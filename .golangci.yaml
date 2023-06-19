@@ -1,0 +1,57 @@
+linters:
+  presets:
+    - bugs
+    - error
+    - format
+    - import
+    - style
+    - test
+  disable:
+    - depguard
+    - dupl
+    - exhaustruct
+    - gochecknoglobals
+    - gochecknoinits
+    - goerr113
+    - gomnd
+    - gosmopolitan
+    - ireturn
+    - lll
+    - nlreturn
+    - varnamelen
+    - wrapcheck
+    - wsl
+
+linters-settings:
+  depguard:
+    rules:
+      main:
+        files:
+          - '$all'
+          - '!$test'
+        deny:
+          github.com/golang/mock/gomock: Don't use gomock package outside tests.
+          github.com/stretchr/testify/assert: Don't use assert package outside tests.
+          github.com/stretchr/testify/require: Don't use require package outside tests.
+          testing: Don't use testing package outside tests.
+
+  exhaustive:
+    ignore-enum-members: '.*Unknown.*'
+  gosec:
+    excludes:
+      - G401
+      - G505
+  revive:
+    rules:
+      - name: receiver-naming
+        severity: error
+        disabled: false
+      - name: var-naming
+        severity: error
+        disabled: false
+
+issues:
+  exclude-rules:
+    - path: (test_\w+|mock)/\w+\.go$
+      linters:
+        - revive
