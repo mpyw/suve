@@ -1,0 +1,44 @@
+{
+  "mcpServers": {
+    "serena": {
+      "command": "uvx",
+      "args": [
+        "--from",
+        "git+https://github.com/oraios/serena",
+        "serena",
+        "start-mcp-server",
+        "--context",
+        "ide-assistant",
+        "--project",
+        ".",
+        "--enable-web-dashboard=false"
+      ],
+      "cwd": "."
+    },
+    "kiri": {
+      "command": "npx",
+      "args": [
+        "kiri-mcp-server@latest",
+        "--repo",
+        "./",
+        "--db",
+        "./.kiri/index.duckdb",
+        "--watch"
+      ],
+      "env": {
+        "KIRI_DAEMON_READY_TIMEOUT": "240"
+      }
+    },
+    "context7": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@upstash/context7-mcp@latest"
+      ]
+    },
+    "gopls": {
+      "command": "gopls",
+      "args": ["mcp"]
+    }
+  }
+}
