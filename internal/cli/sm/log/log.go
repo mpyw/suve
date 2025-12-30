@@ -14,11 +14,12 @@ import (
 	"github.com/urfave/cli/v2"
 
 	internalaws "github.com/mpyw/suve/internal/aws"
+	"github.com/mpyw/suve/internal/sm"
 )
 
 // Client is the interface for the log command.
 type Client interface {
-	ListSecretVersionIds(ctx context.Context, params *secretsmanager.ListSecretVersionIdsInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.ListSecretVersionIdsOutput, error)
+	sm.ListSecretVersionIdsAPI
 }
 
 // Command returns the log command.

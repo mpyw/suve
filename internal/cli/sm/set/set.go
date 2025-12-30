@@ -12,11 +12,12 @@ import (
 	"github.com/urfave/cli/v2"
 
 	internalaws "github.com/mpyw/suve/internal/aws"
+	"github.com/mpyw/suve/internal/sm"
 )
 
 // Client is the interface for the set command.
 type Client interface {
-	PutSecretValue(ctx context.Context, params *secretsmanager.PutSecretValueInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.PutSecretValueOutput, error)
+	sm.PutSecretValueAPI
 }
 
 // Command returns the set command.

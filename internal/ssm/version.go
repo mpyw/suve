@@ -11,16 +11,6 @@ import (
 	"github.com/mpyw/suve/internal/version"
 )
 
-// GetParameterAPI is the interface for getting a single parameter.
-type GetParameterAPI interface {
-	GetParameter(ctx context.Context, params *ssm.GetParameterInput, optFns ...func(*ssm.Options)) (*ssm.GetParameterOutput, error)
-}
-
-// GetParameterHistoryAPI is the interface for getting parameter history.
-type GetParameterHistoryAPI interface {
-	GetParameterHistory(ctx context.Context, params *ssm.GetParameterHistoryInput, optFns ...func(*ssm.Options)) (*ssm.GetParameterHistoryOutput, error)
-}
-
 // versionedClient is the interface for GetParameterWithVersion.
 type versionedClient interface {
 	GetParameterAPI

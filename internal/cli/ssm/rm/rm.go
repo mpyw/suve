@@ -12,11 +12,12 @@ import (
 	"github.com/urfave/cli/v2"
 
 	internalaws "github.com/mpyw/suve/internal/aws"
+	internalssm "github.com/mpyw/suve/internal/ssm"
 )
 
 // Client is the interface for the rm command.
 type Client interface {
-	DeleteParameter(ctx context.Context, params *ssm.DeleteParameterInput, optFns ...func(*ssm.Options)) (*ssm.DeleteParameterOutput, error)
+	internalssm.DeleteParameterAPI
 }
 
 // Command returns the rm command.

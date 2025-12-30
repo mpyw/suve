@@ -12,11 +12,12 @@ import (
 	"github.com/urfave/cli/v2"
 
 	internalaws "github.com/mpyw/suve/internal/aws"
+	"github.com/mpyw/suve/internal/sm"
 )
 
 // Client is the interface for the rm command.
 type Client interface {
-	DeleteSecret(ctx context.Context, params *secretsmanager.DeleteSecretInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.DeleteSecretOutput, error)
+	sm.DeleteSecretAPI
 }
 
 // Command returns the rm command.

@@ -12,11 +12,12 @@ import (
 	"github.com/urfave/cli/v2"
 
 	internalaws "github.com/mpyw/suve/internal/aws"
+	internalssm "github.com/mpyw/suve/internal/ssm"
 )
 
 // Client is the interface for the ls command.
 type Client interface {
-	DescribeParameters(ctx context.Context, params *ssm.DescribeParametersInput, optFns ...func(*ssm.Options)) (*ssm.DescribeParametersOutput, error)
+	internalssm.DescribeParametersAPI
 }
 
 // Command returns the ls command.

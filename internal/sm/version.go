@@ -11,16 +11,6 @@ import (
 	"github.com/mpyw/suve/internal/version"
 )
 
-// GetSecretValueAPI is the interface for getting a secret value.
-type GetSecretValueAPI interface {
-	GetSecretValue(ctx context.Context, params *secretsmanager.GetSecretValueInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.GetSecretValueOutput, error)
-}
-
-// ListSecretVersionIdsAPI is the interface for listing secret versions.
-type ListSecretVersionIdsAPI interface {
-	ListSecretVersionIds(ctx context.Context, params *secretsmanager.ListSecretVersionIdsInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.ListSecretVersionIdsOutput, error)
-}
-
 // versionedClient is the interface for GetSecretWithVersion.
 type versionedClient interface {
 	GetSecretValueAPI

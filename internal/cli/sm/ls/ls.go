@@ -12,11 +12,12 @@ import (
 	"github.com/urfave/cli/v2"
 
 	internalaws "github.com/mpyw/suve/internal/aws"
+	"github.com/mpyw/suve/internal/sm"
 )
 
 // Client is the interface for the ls command.
 type Client interface {
-	ListSecrets(ctx context.Context, params *secretsmanager.ListSecretsInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.ListSecretsOutput, error)
+	sm.ListSecretsAPI
 }
 
 // Command returns the ls command.

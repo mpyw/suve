@@ -12,11 +12,12 @@ import (
 	"github.com/urfave/cli/v2"
 
 	internalaws "github.com/mpyw/suve/internal/aws"
+	"github.com/mpyw/suve/internal/sm"
 )
 
 // Client is the interface for the create command.
 type Client interface {
-	CreateSecret(ctx context.Context, params *secretsmanager.CreateSecretInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.CreateSecretOutput, error)
+	sm.CreateSecretAPI
 }
 
 // Command returns the create command.

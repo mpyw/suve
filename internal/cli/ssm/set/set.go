@@ -13,11 +13,12 @@ import (
 	"github.com/urfave/cli/v2"
 
 	internalaws "github.com/mpyw/suve/internal/aws"
+	internalssm "github.com/mpyw/suve/internal/ssm"
 )
 
 // Client is the interface for the set command.
 type Client interface {
-	PutParameter(ctx context.Context, params *ssm.PutParameterInput, optFns ...func(*ssm.Options)) (*ssm.PutParameterOutput, error)
+	internalssm.PutParameterAPI
 }
 
 // Command returns the set command.
