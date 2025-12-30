@@ -45,13 +45,12 @@ func action(c *cli.Context) error {
 		version1 = ":AWSCURRENT"
 	}
 
-	ctx := context.Background()
-	client, err := internalaws.NewSMClient(ctx)
+	client, err := internalaws.NewSMClient(c.Context)
 	if err != nil {
 		return fmt.Errorf("failed to initialize AWS client: %w", err)
 	}
 
-	return Run(ctx, client, c.App.Writer, name, version1, version2)
+	return Run(c.Context, client, c.App.Writer, name, version1, version2)
 }
 
 // Run executes the diff command.

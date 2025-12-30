@@ -47,13 +47,12 @@ func action(c *cli.Context) error {
 	name := c.Args().First()
 	maxResults := int32(c.Int("number"))
 
-	ctx := context.Background()
-	client, err := internalaws.NewSMClient(ctx)
+	client, err := internalaws.NewSMClient(c.Context)
 	if err != nil {
 		return fmt.Errorf("failed to initialize AWS client: %w", err)
 	}
 
-	return Run(ctx, client, c.App.Writer, name, maxResults)
+	return Run(c.Context, client, c.App.Writer, name, maxResults)
 }
 
 // Run executes the log command.

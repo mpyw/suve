@@ -53,13 +53,12 @@ func action(c *cli.Context) error {
 	paramType := c.String("type")
 	description := c.String("description")
 
-	ctx := context.Background()
-	client, err := internalaws.NewSSMClient(ctx)
+	client, err := internalaws.NewSSMClient(c.Context)
 	if err != nil {
 		return fmt.Errorf("failed to initialize AWS client: %w", err)
 	}
 
-	return Run(ctx, client, c.App.Writer, name, value, paramType, description)
+	return Run(c.Context, client, c.App.Writer, name, value, paramType, description)
 }
 
 // Run executes the set command.

@@ -49,13 +49,12 @@ func action(c *cli.Context) error {
 		return err
 	}
 
-	ctx := context.Background()
-	client, err := internalaws.NewSMClient(ctx)
+	client, err := internalaws.NewSMClient(c.Context)
 	if err != nil {
 		return fmt.Errorf("failed to initialize AWS client: %w", err)
 	}
 
-	return Run(ctx, client, c.App.Writer, spec, c.Bool("json"))
+	return Run(c.Context, client, c.App.Writer, spec, c.Bool("json"))
 }
 
 // Run executes the show command.

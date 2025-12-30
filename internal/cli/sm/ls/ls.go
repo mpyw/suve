@@ -41,13 +41,12 @@ func action(c *cli.Context) error {
 		prefix = c.String("filter")
 	}
 
-	ctx := context.Background()
-	client, err := internalaws.NewSMClient(ctx)
+	client, err := internalaws.NewSMClient(c.Context)
 	if err != nil {
 		return fmt.Errorf("failed to initialize AWS client: %w", err)
 	}
 
-	return Run(ctx, client, c.App.Writer, prefix)
+	return Run(c.Context, client, c.App.Writer, prefix)
 }
 
 // Run executes the ls command.

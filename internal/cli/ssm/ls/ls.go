@@ -40,13 +40,12 @@ func action(c *cli.Context) error {
 	prefix := c.Args().First()
 	recursive := c.Bool("recursive")
 
-	ctx := context.Background()
-	client, err := internalaws.NewSSMClient(ctx)
+	client, err := internalaws.NewSSMClient(c.Context)
 	if err != nil {
 		return fmt.Errorf("failed to initialize AWS client: %w", err)
 	}
 
-	return Run(ctx, client, c.App.Writer, prefix, recursive)
+	return Run(c.Context, client, c.App.Writer, prefix, recursive)
 }
 
 // Run executes the ls command.
