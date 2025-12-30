@@ -40,17 +40,6 @@ func (o *Writer) Value(value string) {
 	}
 }
 
-// ValuePreview prints a truncated preview of a value.
-func (o *Writer) ValuePreview(value string, maxLen int) {
-	if len(value) > maxLen {
-		value = value[:maxLen] + "..."
-	}
-	// Replace newlines with spaces for preview
-	value = strings.ReplaceAll(value, "\n", " ")
-	gray := color.New(color.FgHiBlack).SprintFunc()
-	_, _ = fmt.Fprintf(o.w, "%s\n", gray(value))
-}
-
 // Diff generates a unified diff between two strings.
 func Diff(oldName, newName, oldContent, newContent string) string {
 	edits := myers.ComputeEdits(oldContent, newContent)

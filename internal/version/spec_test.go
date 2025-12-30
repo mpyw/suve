@@ -110,43 +110,6 @@ func TestParse(t *testing.T) {
 	}
 }
 
-func TestSpec_IsLatest(t *testing.T) {
-	tests := []struct {
-		name string
-		spec *Spec
-		want bool
-	}{
-		{
-			name: "no version, shift, or label",
-			spec: &Spec{Name: "/my/param"},
-			want: true,
-		},
-		{
-			name: "with version",
-			spec: &Spec{Name: "/my/param", Version: ptr(int64(3))},
-			want: false,
-		},
-		{
-			name: "with shift",
-			spec: &Spec{Name: "/my/param", Shift: 1},
-			want: false,
-		},
-		{
-			name: "with label",
-			spec: &Spec{Name: "/my/param", Label: strPtr("AWSCURRENT")},
-			want: false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := tt.spec.IsLatest(); got != tt.want {
-				t.Errorf("Spec.IsLatest() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
 func TestSpec_HasShift(t *testing.T) {
 	tests := []struct {
 		name string
@@ -169,48 +132,6 @@ func TestSpec_HasShift(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := tt.spec.HasShift(); got != tt.want {
 				t.Errorf("Spec.HasShift() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestSpec_String(t *testing.T) {
-	tests := []struct {
-		name string
-		spec *Spec
-		want string
-	}{
-		{
-			name: "simple name",
-			spec: &Spec{Name: "/my/param"},
-			want: "/my/param",
-		},
-		{
-			name: "with version",
-			spec: &Spec{Name: "/my/param", Version: ptr(int64(3))},
-			want: "/my/param@3",
-		},
-		{
-			name: "with shift",
-			spec: &Spec{Name: "/my/param", Shift: 1},
-			want: "/my/param~1",
-		},
-		{
-			name: "with label",
-			spec: &Spec{Name: "my-secret", Label: strPtr("AWSCURRENT")},
-			want: "my-secret:AWSCURRENT",
-		},
-		{
-			name: "full spec",
-			spec: &Spec{Name: "/app/secret", Version: ptr(int64(2)), Shift: 1, Label: strPtr("STAGING")},
-			want: "/app/secret@2~1:STAGING",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := tt.spec.String(); got != tt.want {
-				t.Errorf("Spec.String() = %v, want %v", got, tt.want)
 			}
 		})
 	}

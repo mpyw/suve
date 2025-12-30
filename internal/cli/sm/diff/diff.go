@@ -76,9 +76,18 @@ func Run(ctx context.Context, client Client, w io.Writer, name, version1, versio
 		return fmt.Errorf("failed to get version %s: %w", version2, err)
 	}
 
+	v1 := aws.ToString(secret1.VersionId)
+	if len(v1) > 8 {
+		v1 = v1[:8]
+	}
+	v2 := aws.ToString(secret2.VersionId)
+	if len(v2) > 8 {
+		v2 = v2[:8]
+	}
+
 	diff := output.Diff(
-		fmt.Sprintf("%s@%s", name, aws.ToString(secret1.VersionId)[:8]),
-		fmt.Sprintf("%s@%s", name, aws.ToString(secret2.VersionId)[:8]),
+		fmt.Sprintf("%s@%s", name, v1),
+		fmt.Sprintf("%s@%s", name, v2),
 		aws.ToString(secret1.SecretString),
 		aws.ToString(secret2.SecretString),
 	)

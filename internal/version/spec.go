@@ -70,28 +70,7 @@ func Parse(input string) (*Spec, error) {
 	return spec, nil
 }
 
-// IsLatest returns true if no version, shift, or label is specified.
-func (s *Spec) IsLatest() bool {
-	return s.Version == nil && s.Shift == 0 && s.Label == nil
-}
-
 // HasShift returns true if a shift is specified.
 func (s *Spec) HasShift() bool {
 	return s.Shift > 0
-}
-
-// String returns the string representation of the spec.
-func (s *Spec) String() string {
-	var b strings.Builder
-	b.WriteString(s.Name)
-	if s.Version != nil {
-		b.WriteString(fmt.Sprintf("@%d", *s.Version))
-	}
-	if s.Shift > 0 {
-		b.WriteString(fmt.Sprintf("~%d", s.Shift))
-	}
-	if s.Label != nil {
-		b.WriteString(":" + *s.Label)
-	}
-	return b.String()
 }

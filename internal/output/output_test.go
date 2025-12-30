@@ -73,48 +73,6 @@ func TestWriter_Value(t *testing.T) {
 	}
 }
 
-func TestWriter_ValuePreview(t *testing.T) {
-	tests := []struct {
-		name     string
-		value    string
-		maxLen   int
-		contains string
-	}{
-		{
-			name:     "short value",
-			value:    "short",
-			maxLen:   10,
-			contains: "short",
-		},
-		{
-			name:     "truncated value",
-			value:    "this is a very long value",
-			maxLen:   10,
-			contains: "this is a ...",
-		},
-		{
-			name:     "newlines replaced",
-			value:    "line1\nline2",
-			maxLen:   20,
-			contains: "line1 line2",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			var buf bytes.Buffer
-			w := New(&buf)
-
-			w.ValuePreview(tt.value, tt.maxLen)
-
-			output := buf.String()
-			if !strings.Contains(output, tt.contains) {
-				t.Errorf("expected output to contain %q, got %q", tt.contains, output)
-			}
-		})
-	}
-}
-
 func TestDiff(t *testing.T) {
 	tests := []struct {
 		name       string

@@ -18,9 +18,3 @@ func Format(value string) string {
 	}
 	return string(formatted)
 }
-
-// IsValid checks if the given string is valid JSON.
-func IsValid(value string) bool {
-	var data any
-	return json.Unmarshal([]byte(value), &data) == nil
-}
