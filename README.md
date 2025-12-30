@@ -12,7 +12,7 @@ A Git-like CLI for AWS Parameter Store and Secrets Manager.
 ## Features
 
 - Git-like command structure (`show`, `log`, `diff`, `cat`, `ls`, `set`, `rm`)
-- Version specification syntax (`@N`, `~N`, `:LABEL`)
+- Version specification syntax (`#N`, `~N`, `:LABEL`)
 - Colored diff output
 - Supports both SSM Parameter Store and Secrets Manager
 
@@ -55,15 +55,15 @@ suve sm set my-secret "value"       # Update existing secret
 Git-like revision syntax for specifying versions:
 
 ```
-<name>[@<version>][~<shift>][:label]
+<name>[#<version>][~<shift>][:label]
 ```
 
 | Syntax | Description | Service |
 |--------|-------------|---------|
 | `/my/param` | Latest version | SSM |
-| `/my/param@3` | Version 3 | SSM |
+| `/my/param#3` | Version 3 | SSM |
 | `/my/param~1` | 1 version ago from latest | SSM |
-| `/my/param@5~2` | 2 versions before version 5 (= version 3) | SSM |
+| `/my/param#5~2` | 2 versions before version 5 (= version 3) | SSM |
 | `my-secret` | Latest version (AWSCURRENT) | SM |
 | `my-secret:AWSCURRENT` | Current staging label | SM |
 | `my-secret:AWSPREVIOUS` | Previous staging label | SM |
@@ -80,7 +80,7 @@ Service aliases: `ssm`, `ps`, `param`
 Display parameter value with metadata.
 
 ```
-suve ssm show [options] <name[@version][~shift]>
+suve ssm show [options] <name[#version][~shift]>
 ```
 
 **Arguments:**
@@ -113,7 +113,7 @@ Modified: 2024-01-15T10:30:45Z
 suve ssm show /app/config/database-url
 
 # Show specific version
-suve ssm show /app/config/database-url@3
+suve ssm show /app/config/database-url#3
 
 # Show previous version
 suve ssm show /app/config/database-url~1
@@ -129,7 +129,7 @@ suve ssm show --decrypt=false /app/config/database-url
 Output raw parameter value without metadata. Designed for piping and scripting.
 
 ```
-suve ssm cat [options] <name[@version][~shift]>
+suve ssm cat [options] <name[#version][~shift]>
 ```
 
 **Arguments:**
@@ -226,19 +226,19 @@ suve ssm diff <name> <version1> [version2]
 | Argument | Required | Description |
 |----------|----------|-------------|
 | `name` | Yes | Parameter name |
-| `version1` | Yes | First version specifier (e.g., `@1`, `~2`) |
+| `version1` | Yes | First version specifier (e.g., `#1`, `~2`) |
 | `version2` | No | Second version specifier. If omitted, compares `version1` with latest. |
 
 **Behavior:**
 
-- `suve ssm diff /param @1 @2` - Compare version 1 with version 2
-- `suve ssm diff /param @2` - Compare latest with version 2
+- `suve ssm diff /param #1 #2` - Compare version 1 with version 2
+- `suve ssm diff /param #2` - Compare latest with version 2
 
 **Output:**
 
 ```diff
---- /my/param@2
-+++ /my/param@3
+--- /my/param#2
++++ /my/param#3
 @@ -1 +1 @@
 -old-value
 +new-value
@@ -250,10 +250,10 @@ Output is colorized: red for deletions, green for additions.
 
 ```bash
 # Compare two specific versions
-suve ssm diff /app/config/database-url @1 @2
+suve ssm diff /app/config/database-url #1 #2
 
 # Compare latest with version 2
-suve ssm diff /app/config/database-url @2
+suve ssm diff /app/config/database-url #2
 
 # Compare using relative versions
 suve ssm diff /app/config/database-url '~2' '~1'
@@ -411,7 +411,7 @@ Service aliases: `sm`, `secret`
 Display secret value with metadata.
 
 ```
-suve sm show [options] <name[@version][~shift][:label]>
+suve sm show [options] <name[#id | :label][~shift]>
 ```
 
 **Arguments:**
@@ -466,7 +466,7 @@ suve sm show --json my-database-credentials
 suve sm show my-database-credentials:AWSPREVIOUS
 
 # Show specific version by ID
-suve sm show my-database-credentials@abc12345-1234-1234-1234-123456789012
+suve sm show my-database-credentials#abc12345-1234-1234-1234-123456789012
 
 # Show 1 version ago
 suve sm show my-database-credentials~1
@@ -479,7 +479,7 @@ suve sm show my-database-credentials~1
 Output raw secret value without metadata. Designed for piping and scripting.
 
 ```
-suve sm cat <name[@version][~shift][:label]>
+suve sm cat <name[#id | :label][~shift]>
 ```
 
 **Arguments:**
@@ -578,8 +578,8 @@ suve sm diff <name> <version1> [version2]
 **Output:**
 
 ```diff
---- my-secret@abc12345
-+++ my-secret@def67890
+--- my-secret#abc12345
++++ my-secret#def67890
 @@ -1 +1 @@
 -{"password":"old"}
 +{"password":"new"}

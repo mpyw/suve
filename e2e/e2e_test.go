@@ -4,7 +4,6 @@ package e2e
 
 import (
 	"bytes"
-	"context"
 	"fmt"
 	"os"
 	"testing"
@@ -15,7 +14,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 
-	"github.com/mpyw/suve/internal/version"
+	"github.com/mpyw/suve/internal/version/smversion"
+	"github.com/mpyw/suve/internal/version/ssmversion"
 
 	ssmcat "github.com/mpyw/suve/internal/cli/ssm/cat"
 	ssmdiff "github.com/mpyw/suve/internal/cli/ssm/diff"
@@ -107,7 +107,7 @@ func TestSSM_FullWorkflow(t *testing.T) {
 	// 2. Show parameter
 	t.Run("show", func(t *testing.T) {
 		var buf bytes.Buffer
-		spec := &version.Spec{Name: paramName}
+		spec := &ssmversion.Spec{Name: paramName}
 		err := ssmshow.Run(ctx, client, &buf, spec, true)
 		if err != nil {
 			t.Fatalf("ssmshow.Run() error: %v", err)
@@ -122,7 +122,7 @@ func TestSSM_FullWorkflow(t *testing.T) {
 	// 3. Cat parameter (raw output without trailing newline)
 	t.Run("cat", func(t *testing.T) {
 		var buf bytes.Buffer
-		spec := &version.Spec{Name: paramName}
+		spec := &ssmversion.Spec{Name: paramName}
 		err := ssmcat.Run(ctx, client, &buf, spec, true)
 		if err != nil {
 			t.Fatalf("ssmcat.Run() error: %v", err)
@@ -195,7 +195,7 @@ func TestSSM_FullWorkflow(t *testing.T) {
 	// 9. Verify deletion
 	t.Run("verify-deleted", func(t *testing.T) {
 		var buf bytes.Buffer
-		spec := &version.Spec{Name: paramName}
+		spec := &ssmversion.Spec{Name: paramName}
 		err := ssmshow.Run(ctx, client, &buf, spec, true)
 		if err == nil {
 			t.Error("expected error after deletion, got nil")
@@ -233,7 +233,7 @@ func TestSM_FullWorkflow(t *testing.T) {
 	// 2. Show secret
 	t.Run("show", func(t *testing.T) {
 		var buf bytes.Buffer
-		spec := &version.Spec{Name: secretName}
+		spec := &smversion.Spec{Name: secretName}
 		err := smshow.Run(ctx, client, &buf, spec, false)
 		if err != nil {
 			t.Fatalf("smshow.Run() error: %v", err)
@@ -248,7 +248,7 @@ func TestSM_FullWorkflow(t *testing.T) {
 	// 3. Cat secret (raw output without trailing newline)
 	t.Run("cat", func(t *testing.T) {
 		var buf bytes.Buffer
-		spec := &version.Spec{Name: secretName}
+		spec := &smversion.Spec{Name: secretName}
 		err := smcat.Run(ctx, client, &buf, spec)
 		if err != nil {
 			t.Fatalf("smcat.Run() error: %v", err)
@@ -330,7 +330,7 @@ func TestSM_FullWorkflow(t *testing.T) {
 	// 10. Verify restored
 	t.Run("verify-restored", func(t *testing.T) {
 		var buf bytes.Buffer
-		spec := &version.Spec{Name: secretName}
+		spec := &smversion.Spec{Name: secretName}
 		err := smshow.Run(ctx, client, &buf, spec, false)
 		if err != nil {
 			t.Fatalf("smshow.Run() after restore error: %v", err)

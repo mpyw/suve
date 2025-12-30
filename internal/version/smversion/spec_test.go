@@ -265,6 +265,11 @@ func TestParse(t *testing.T) {
 			wantErr: true,
 		},
 		{
+			name:    "both label and ID (reverse order)",
+			input:   "my-secret:AWSCURRENT#abc123",
+			wantErr: true,
+		},
+		{
 			name:    "starts with #",
 			input:   "#abc123",
 			wantErr: true, // empty name
