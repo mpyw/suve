@@ -2,19 +2,18 @@
 package jsonutil
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
 )
 
 // Format formats a JSON string with indentation.
 // If the input is not valid JSON, returns the original string unchanged.
 func Format(value string) string {
-	var data any
-	if err := json.Unmarshal([]byte(value), &data); err != nil {
+	v := jsontext.Value(value)
+	if !v.IsValid() {
 		return value
 	}
-	formatted, err := json.MarshalIndent(data, "", "  ")
-	if err != nil {
+	if err := v.Indent(jsontext.WithIndent("  ")); err != nil {
 		return value
 	}
-	return string(formatted)
+	return string(v)
 }

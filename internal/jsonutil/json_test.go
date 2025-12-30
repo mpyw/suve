@@ -28,7 +28,7 @@ func TestFormat(t *testing.T) {
 		{
 			name:  "complex structure",
 			input: `{"name":"test","values":[1,2,3],"nested":{"key":"value"}}`,
-			want:  "{\n  \"name\": \"test\",\n  \"nested\": {\n    \"key\": \"value\"\n  },\n  \"values\": [\n    1,\n    2,\n    3\n  ]\n}",
+			want:  "{\n  \"name\": \"test\",\n  \"values\": [\n    1,\n    2,\n    3\n  ],\n  \"nested\": {\n    \"key\": \"value\"\n  }\n}",
 		},
 		{
 			name:  "already formatted",

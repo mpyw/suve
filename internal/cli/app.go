@@ -8,11 +8,14 @@ import (
 	"github.com/mpyw/suve/internal/cli/ssm"
 )
 
+// Version is set via ldflags at build time.
+var Version = "dev"
+
 // App is the main CLI application.
 var App = &cli.App{
 	Name:    "suve",
 	Usage:   "Git-like CLI for AWS Parameter Store and Secrets Manager",
-	Version: "0.1.0",
+	Version: Version,
 	Commands: []*cli.Command{
 		ssm.Command(),
 		sm.Command(),

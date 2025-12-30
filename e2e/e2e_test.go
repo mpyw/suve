@@ -37,9 +37,9 @@ import (
 )
 
 func getEndpoint() string {
-	port := os.Getenv("SUVE_AWSMOCK_PORT")
+	port := os.Getenv("SUVE_LOCALSTACK_EXTERNAL_PORT")
 	if port == "" {
-		port = "4599"
+		port = "4566"
 	}
 	return fmt.Sprintf("http://127.0.0.1:%s", port)
 }
@@ -119,7 +119,7 @@ func TestSSM_FullWorkflow(t *testing.T) {
 		t.Logf("show output: %s", output)
 	})
 
-	// 3. Cat parameter
+	// 3. Cat parameter (raw output without trailing newline)
 	t.Run("cat", func(t *testing.T) {
 		var buf bytes.Buffer
 		spec := &version.Spec{Name: paramName}
@@ -128,8 +128,8 @@ func TestSSM_FullWorkflow(t *testing.T) {
 			t.Fatalf("ssmcat.Run() error: %v", err)
 		}
 		output := buf.String()
-		if output != "initial-value\n" {
-			t.Errorf("expected 'initial-value\\n', got: %q", output)
+		if output != "initial-value" {
+			t.Errorf("expected 'initial-value', got: %q", output)
 		}
 	})
 
@@ -245,7 +245,7 @@ func TestSM_FullWorkflow(t *testing.T) {
 		t.Logf("show output: %s", output)
 	})
 
-	// 3. Cat secret
+	// 3. Cat secret (raw output without trailing newline)
 	t.Run("cat", func(t *testing.T) {
 		var buf bytes.Buffer
 		spec := &version.Spec{Name: secretName}
@@ -254,8 +254,8 @@ func TestSM_FullWorkflow(t *testing.T) {
 			t.Fatalf("smcat.Run() error: %v", err)
 		}
 		output := buf.String()
-		if output != "initial-secret\n" {
-			t.Errorf("expected 'initial-secret\\n', got: %q", output)
+		if output != "initial-secret" {
+			t.Errorf("expected 'initial-secret', got: %q", output)
 		}
 	})
 
