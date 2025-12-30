@@ -11,13 +11,13 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager/types"
 	"github.com/urfave/cli/v2"
 
-	internalaws "github.com/mpyw/suve/internal/aws"
-	"github.com/mpyw/suve/internal/sm"
+	"github.com/mpyw/suve/internal/awsutil"
+	"github.com/mpyw/suve/internal/smapi"
 )
 
 // Client is the interface for the ls command.
 type Client interface {
-	sm.ListSecretsAPI
+	smapi.ListSecretsAPI
 }
 
 // Command returns the ls command.
@@ -42,7 +42,7 @@ func action(c *cli.Context) error {
 		prefix = c.String("filter")
 	}
 
-	client, err := internalaws.NewSMClient(c.Context)
+	client, err := awsutil.NewSMClient(c.Context)
 	if err != nil {
 		return fmt.Errorf("failed to initialize AWS client: %w", err)
 	}

@@ -9,16 +9,17 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/urfave/cli/v2"
 
-	internalaws "github.com/mpyw/suve/internal/aws"
+	"github.com/mpyw/suve/internal/awsutil"
 	"github.com/mpyw/suve/internal/output"
-	"github.com/mpyw/suve/internal/ssm"
+	"github.com/mpyw/suve/internal/ssmapi"
+	"github.com/mpyw/suve/internal/ssmutil"
 	"github.com/mpyw/suve/internal/version"
 )
 
 // Client is the interface for the diff command.
 type Client interface {
-	ssm.GetParameterAPI
-	ssm.GetParameterHistoryAPI
+	ssmapi.GetParameterAPI
+	ssmapi.GetParameterHistoryAPI
 }
 
 // Command returns the diff command.
@@ -45,7 +46,7 @@ func action(c *cli.Context) error {
 		version1 = ""
 	}
 
-	client, err := internalaws.NewSSMClient(c.Context)
+	client, err := awsutil.NewSSMClient(c.Context)
 	if err != nil {
 		return fmt.Errorf("failed to initialize AWS client: %w", err)
 	}
@@ -65,12 +66,12 @@ func Run(ctx context.Context, client Client, w io.Writer, name, version1, versio
 		return fmt.Errorf("invalid version2: %w", err)
 	}
 
-	param1, err := ssm.GetParameterWithVersion(ctx, client, spec1, true)
+	param1, err := ssmutil.GetParameterWithVersion(ctx, client, spec1, true)
 	if err != nil {
 		return fmt.Errorf("failed to get version %s: %w", version1, err)
 	}
 
-	param2, err := ssm.GetParameterWithVersion(ctx, client, spec2, true)
+	param2, err := ssmutil.GetParameterWithVersion(ctx, client, spec2, true)
 	if err != nil {
 		return fmt.Errorf("failed to get version %s: %w", version2, err)
 	}

@@ -10,16 +10,17 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/urfave/cli/v2"
 
-	internalaws "github.com/mpyw/suve/internal/aws"
+	"github.com/mpyw/suve/internal/awsutil"
 	"github.com/mpyw/suve/internal/output"
-	"github.com/mpyw/suve/internal/ssm"
+	"github.com/mpyw/suve/internal/ssmapi"
+	"github.com/mpyw/suve/internal/ssmutil"
 	"github.com/mpyw/suve/internal/version"
 )
 
 // Client is the interface for the show command.
 type Client interface {
-	ssm.GetParameterAPI
-	ssm.GetParameterHistoryAPI
+	ssmapi.GetParameterAPI
+	ssmapi.GetParameterHistoryAPI
 }
 
 // Command returns the show command.
@@ -50,7 +51,7 @@ func action(c *cli.Context) error {
 		return err
 	}
 
-	client, err := internalaws.NewSSMClient(c.Context)
+	client, err := awsutil.NewSSMClient(c.Context)
 	if err != nil {
 		return fmt.Errorf("failed to initialize AWS client: %w", err)
 	}
@@ -60,7 +61,7 @@ func action(c *cli.Context) error {
 
 // Run executes the show command.
 func Run(ctx context.Context, client Client, w io.Writer, spec *version.Spec, decrypt bool) error {
-	param, err := ssm.GetParameterWithVersion(ctx, client, spec, decrypt)
+	param, err := ssmutil.GetParameterWithVersion(ctx, client, spec, decrypt)
 	if err != nil {
 		return err
 	}

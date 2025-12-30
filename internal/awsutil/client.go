@@ -1,5 +1,5 @@
-// Package aws provides AWS client initialization.
-package aws
+// Package awsutil provides AWS client initialization.
+package awsutil
 
 import (
 	"context"

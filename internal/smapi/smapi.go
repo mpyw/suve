@@ -1,5 +1,5 @@
-// Package sm provides interfaces and utilities for AWS Secrets Manager.
-package sm
+// Package smapi provides interfaces for AWS Secrets Manager.
+package smapi
 
 import (
 	"context"

@@ -1,5 +1,5 @@
-// Package ssm provides interfaces and utilities for AWS Systems Manager Parameter Store.
-package ssm
+// Package ssmapi provides interfaces for AWS Systems Manager Parameter Store.
+package ssmapi
 
 import (
 	"context"

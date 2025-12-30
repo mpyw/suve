@@ -1,4 +1,5 @@
-package sm
+// Package smutil provides utilities for AWS Secrets Manager.
+package smutil
 
 import (
 	"context"
@@ -8,13 +9,14 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
 
+	"github.com/mpyw/suve/internal/smapi"
 	"github.com/mpyw/suve/internal/version"
 )
 
 // versionedClient is the interface for GetSecretWithVersion.
 type versionedClient interface {
-	GetSecretValueAPI
-	ListSecretVersionIdsAPI
+	smapi.GetSecretValueAPI
+	smapi.ListSecretVersionIdsAPI
 }
 
 // GetSecretWithVersion retrieves a secret with version/shift/label support.

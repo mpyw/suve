@@ -10,16 +10,17 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/urfave/cli/v2"
 
-	internalaws "github.com/mpyw/suve/internal/aws"
+	"github.com/mpyw/suve/internal/awsutil"
 	"github.com/mpyw/suve/internal/output"
-	"github.com/mpyw/suve/internal/sm"
+	"github.com/mpyw/suve/internal/smapi"
+	"github.com/mpyw/suve/internal/smutil"
 	"github.com/mpyw/suve/internal/version"
 )
 
 // Client is the interface for the show command.
 type Client interface {
-	sm.GetSecretValueAPI
-	sm.ListSecretVersionIdsAPI
+	smapi.GetSecretValueAPI
+	smapi.ListSecretVersionIdsAPI
 }
 
 // Command returns the show command.
@@ -49,7 +50,7 @@ func action(c *cli.Context) error {
 		return err
 	}
 
-	client, err := internalaws.NewSMClient(c.Context)
+	client, err := awsutil.NewSMClient(c.Context)
 	if err != nil {
 		return fmt.Errorf("failed to initialize AWS client: %w", err)
 	}
@@ -59,7 +60,7 @@ func action(c *cli.Context) error {
 
 // Run executes the show command.
 func Run(ctx context.Context, client Client, w io.Writer, spec *version.Spec, prettyJSON bool) error {
-	secret, err := sm.GetSecretWithVersion(ctx, client, spec)
+	secret, err := smutil.GetSecretWithVersion(ctx, client, spec)
 	if err != nil {
 		return err
 	}

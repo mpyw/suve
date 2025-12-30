@@ -11,13 +11,13 @@ import (
 	"github.com/fatih/color"
 	"github.com/urfave/cli/v2"
 
-	internalaws "github.com/mpyw/suve/internal/aws"
-	"github.com/mpyw/suve/internal/sm"
+	"github.com/mpyw/suve/internal/awsutil"
+	"github.com/mpyw/suve/internal/smapi"
 )
 
 // Client is the interface for the set command.
 type Client interface {
-	sm.PutSecretValueAPI
+	smapi.PutSecretValueAPI
 }
 
 // Command returns the set command.
@@ -38,7 +38,7 @@ func action(c *cli.Context) error {
 	name := c.Args().Get(0)
 	value := c.Args().Get(1)
 
-	client, err := internalaws.NewSMClient(c.Context)
+	client, err := awsutil.NewSMClient(c.Context)
 	if err != nil {
 		return fmt.Errorf("failed to initialize AWS client: %w", err)
 	}

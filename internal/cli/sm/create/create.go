@@ -11,13 +11,13 @@ import (
 	"github.com/fatih/color"
 	"github.com/urfave/cli/v2"
 
-	internalaws "github.com/mpyw/suve/internal/aws"
-	"github.com/mpyw/suve/internal/sm"
+	"github.com/mpyw/suve/internal/awsutil"
+	"github.com/mpyw/suve/internal/smapi"
 )
 
 // Client is the interface for the create command.
 type Client interface {
-	sm.CreateSecretAPI
+	smapi.CreateSecretAPI
 }
 
 // Command returns the create command.
@@ -46,7 +46,7 @@ func action(c *cli.Context) error {
 	value := c.Args().Get(1)
 	description := c.String("description")
 
-	client, err := internalaws.NewSMClient(c.Context)
+	client, err := awsutil.NewSMClient(c.Context)
 	if err != nil {
 		return fmt.Errorf("failed to initialize AWS client: %w", err)
 	}

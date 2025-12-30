@@ -9,16 +9,17 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/urfave/cli/v2"
 
-	internalaws "github.com/mpyw/suve/internal/aws"
+	"github.com/mpyw/suve/internal/awsutil"
 	"github.com/mpyw/suve/internal/output"
-	"github.com/mpyw/suve/internal/sm"
+	"github.com/mpyw/suve/internal/smapi"
+	"github.com/mpyw/suve/internal/smutil"
 	"github.com/mpyw/suve/internal/version"
 )
 
 // Client is the interface for the diff command.
 type Client interface {
-	sm.GetSecretValueAPI
-	sm.ListSecretVersionIdsAPI
+	smapi.GetSecretValueAPI
+	smapi.ListSecretVersionIdsAPI
 }
 
 // Command returns the diff command.
@@ -45,7 +46,7 @@ func action(c *cli.Context) error {
 		version1 = ":AWSCURRENT"
 	}
 
-	client, err := internalaws.NewSMClient(c.Context)
+	client, err := awsutil.NewSMClient(c.Context)
 	if err != nil {
 		return fmt.Errorf("failed to initialize AWS client: %w", err)
 	}
@@ -65,12 +66,12 @@ func Run(ctx context.Context, client Client, w io.Writer, name, version1, versio
 		return fmt.Errorf("invalid version2: %w", err)
 	}
 
-	secret1, err := sm.GetSecretWithVersion(ctx, client, spec1)
+	secret1, err := smutil.GetSecretWithVersion(ctx, client, spec1)
 	if err != nil {
 		return fmt.Errorf("failed to get version %s: %w", version1, err)
 	}
 
-	secret2, err := sm.GetSecretWithVersion(ctx, client, spec2)
+	secret2, err := smutil.GetSecretWithVersion(ctx, client, spec2)
 	if err != nil {
 		return fmt.Errorf("failed to get version %s: %w", version2, err)
 	}

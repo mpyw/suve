@@ -11,13 +11,13 @@ import (
 	"github.com/fatih/color"
 	"github.com/urfave/cli/v2"
 
-	internalaws "github.com/mpyw/suve/internal/aws"
-	internalssm "github.com/mpyw/suve/internal/ssm"
+	"github.com/mpyw/suve/internal/awsutil"
+	"github.com/mpyw/suve/internal/ssmapi"
 )
 
 // Client is the interface for the rm command.
 type Client interface {
-	internalssm.DeleteParameterAPI
+	ssmapi.DeleteParameterAPI
 }
 
 // Command returns the rm command.
@@ -37,7 +37,7 @@ func action(c *cli.Context) error {
 
 	name := c.Args().First()
 
-	client, err := internalaws.NewSSMClient(c.Context)
+	client, err := awsutil.NewSSMClient(c.Context)
 	if err != nil {
 		return fmt.Errorf("failed to initialize AWS client: %w", err)
 	}
