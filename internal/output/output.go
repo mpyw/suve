@@ -24,19 +24,19 @@ func New(w io.Writer) *Writer {
 // Field prints a labeled field.
 func (o *Writer) Field(label, value string) {
 	cyan := color.New(color.FgCyan).SprintFunc()
-	fmt.Fprintf(o.w, "%s %s\n", cyan(label+":"), value)
+	_, _ = fmt.Fprintf(o.w, "%s %s\n", cyan(label+":"), value)
 }
 
 // Separator prints a separator line.
 func (o *Writer) Separator() {
-	fmt.Fprintln(o.w)
+	_, _ = fmt.Fprintln(o.w)
 }
 
 // Value prints a value with proper indentation.
 func (o *Writer) Value(value string) {
 	lines := strings.Split(value, "\n")
 	for _, line := range lines {
-		fmt.Fprintf(o.w, "  %s\n", line)
+		_, _ = fmt.Fprintf(o.w, "  %s\n", line)
 	}
 }
 
@@ -48,7 +48,7 @@ func (o *Writer) ValuePreview(value string, maxLen int) {
 	// Replace newlines with spaces for preview
 	value = strings.ReplaceAll(value, "\n", " ")
 	gray := color.New(color.FgHiBlack).SprintFunc()
-	fmt.Fprintf(o.w, "%s\n", gray(value))
+	_, _ = fmt.Fprintf(o.w, "%s\n", gray(value))
 }
 
 // Diff generates a unified diff between two strings.
