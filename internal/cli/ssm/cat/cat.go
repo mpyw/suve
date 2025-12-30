@@ -1,4 +1,5 @@
-package ssm
+// Package cat provides the SSM cat command.
+package cat
 
 import (
 	"context"
@@ -8,11 +9,19 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/urfave/cli/v2"
 
-	awsutil "github.com/mpyw/suve/internal/aws"
+	internalaws "github.com/mpyw/suve/internal/aws"
+	"github.com/mpyw/suve/internal/ssm"
 	"github.com/mpyw/suve/internal/version"
 )
 
-func catCommand() *cli.Command {
+// Client is the interface for the cat command.
+type Client interface {
+	ssm.GetParameterAPI
+	ssm.GetParameterHistoryAPI
+}
+
+// Command returns the cat command.
+func Command() *cli.Command {
 	return &cli.Command{
 		Name:      "cat",
 		Usage:     "Output raw parameter value (for piping)",
@@ -25,11 +34,11 @@ func catCommand() *cli.Command {
 				Usage:   "Decrypt SecureString values",
 			},
 		},
-		Action: catAction,
+		Action: action,
 	}
 }
 
-func catAction(c *cli.Context) error {
+func action(c *cli.Context) error {
 	if c.NArg() < 1 {
 		return fmt.Errorf("parameter name required")
 	}
@@ -40,17 +49,17 @@ func catAction(c *cli.Context) error {
 	}
 
 	ctx := context.Background()
-	client, err := awsutil.NewSSMClient(ctx)
+	client, err := internalaws.NewSSMClient(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to initialize AWS client: %w", err)
 	}
 
-	return Cat(ctx, client, c.App.Writer, spec, c.Bool("decrypt"))
+	return Run(ctx, client, c.App.Writer, spec, c.Bool("decrypt"))
 }
 
-// Cat outputs raw parameter value.
-func Cat(ctx context.Context, client CatClient, w io.Writer, spec *version.Spec, decrypt bool) error {
-	param, err := GetParameterWithVersion(ctx, client, spec, decrypt)
+// Run executes the cat command.
+func Run(ctx context.Context, client Client, w io.Writer, spec *version.Spec, decrypt bool) error {
+	param, err := ssm.GetParameterWithVersion(ctx, client, spec, decrypt)
 	if err != nil {
 		return err
 	}

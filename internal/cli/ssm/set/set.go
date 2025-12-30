@@ -1,4 +1,5 @@
-package ssm
+// Package set provides the SSM set command.
+package set
 
 import (
 	"context"
@@ -11,10 +12,16 @@ import (
 	"github.com/fatih/color"
 	"github.com/urfave/cli/v2"
 
-	awsutil "github.com/mpyw/suve/internal/aws"
+	internalaws "github.com/mpyw/suve/internal/aws"
 )
 
-func setCommand() *cli.Command {
+// Client is the interface for the set command.
+type Client interface {
+	PutParameter(ctx context.Context, params *ssm.PutParameterInput, optFns ...func(*ssm.Options)) (*ssm.PutParameterOutput, error)
+}
+
+// Command returns the set command.
+func Command() *cli.Command {
 	return &cli.Command{
 		Name:      "set",
 		Usage:     "Set parameter value",
@@ -23,44 +30,46 @@ func setCommand() *cli.Command {
 			&cli.StringFlag{
 				Name:    "type",
 				Aliases: []string{"t"},
-				Value:   "String",
+				Value:   "SecureString",
 				Usage:   "Parameter type (String, StringList, SecureString)",
 			},
 			&cli.StringFlag{
-				Name:  "description",
-				Usage: "Parameter description",
+				Name:    "description",
+				Aliases: []string{"d"},
+				Usage:   "Parameter description",
 			},
 		},
-		Action: setAction,
+		Action: action,
 	}
 }
 
-func setAction(c *cli.Context) error {
+func action(c *cli.Context) error {
 	if c.NArg() < 2 {
 		return fmt.Errorf("usage: suve ssm set <name> <value>")
 	}
 
 	name := c.Args().Get(0)
 	value := c.Args().Get(1)
+	paramType := c.String("type")
+	description := c.String("description")
 
 	ctx := context.Background()
-	client, err := awsutil.NewSSMClient(ctx)
+	client, err := internalaws.NewSSMClient(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to initialize AWS client: %w", err)
 	}
 
-	return Set(ctx, client, c.App.Writer, name, value, c.String("type"), c.String("description"))
+	return Run(ctx, client, c.App.Writer, name, value, paramType, description)
 }
 
-// Set sets parameter value.
-func Set(ctx context.Context, client SetClient, w io.Writer, name, value, paramType, description string) error {
+// Run executes the set command.
+func Run(ctx context.Context, client Client, w io.Writer, name, value, paramType, description string) error {
 	input := &ssm.PutParameterInput{
 		Name:      aws.String(name),
 		Value:     aws.String(value),
 		Type:      types.ParameterType(paramType),
 		Overwrite: aws.Bool(true),
 	}
-
 	if description != "" {
 		input.Description = aws.String(description)
 	}
@@ -71,7 +80,11 @@ func Set(ctx context.Context, client SetClient, w io.Writer, name, value, paramT
 	}
 
 	green := color.New(color.FgGreen).SprintFunc()
-	_, _ = fmt.Fprintf(w, "%s %s (version %d)\n", green("Set"), name, result.Version)
+	_, _ = fmt.Fprintf(w, "%s Set parameter %s (version: %d)\n",
+		green("✓"),
+		name,
+		result.Version,
+	)
 
 	return nil
 }

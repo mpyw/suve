@@ -1,4 +1,5 @@
-package sm
+// Package cat provides the SM cat command.
+package cat
 
 import (
 	"context"
@@ -8,20 +9,28 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/urfave/cli/v2"
 
-	awsutil "github.com/mpyw/suve/internal/aws"
+	internalaws "github.com/mpyw/suve/internal/aws"
+	"github.com/mpyw/suve/internal/sm"
 	"github.com/mpyw/suve/internal/version"
 )
 
-func catCommand() *cli.Command {
+// Client is the interface for the cat command.
+type Client interface {
+	sm.GetSecretValueAPI
+	sm.ListSecretVersionIdsAPI
+}
+
+// Command returns the cat command.
+func Command() *cli.Command {
 	return &cli.Command{
 		Name:      "cat",
 		Usage:     "Output raw secret value (for piping)",
 		ArgsUsage: "<name[@version][~shift][:label]>",
-		Action:    catAction,
+		Action:    action,
 	}
 }
 
-func catAction(c *cli.Context) error {
+func action(c *cli.Context) error {
 	if c.NArg() < 1 {
 		return fmt.Errorf("secret name required")
 	}
@@ -32,17 +41,17 @@ func catAction(c *cli.Context) error {
 	}
 
 	ctx := context.Background()
-	client, err := awsutil.NewSMClient(ctx)
+	client, err := internalaws.NewSMClient(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to initialize AWS client: %w", err)
 	}
 
-	return Cat(ctx, client, c.App.Writer, spec)
+	return Run(ctx, client, c.App.Writer, spec)
 }
 
-// Cat outputs raw secret value.
-func Cat(ctx context.Context, client CatClient, w io.Writer, spec *version.Spec) error {
-	secret, err := GetSecretWithVersion(ctx, client, spec)
+// Run executes the cat command.
+func Run(ctx context.Context, client Client, w io.Writer, spec *version.Spec) error {
+	secret, err := sm.GetSecretWithVersion(ctx, client, spec)
 	if err != nil {
 		return err
 	}

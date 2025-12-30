@@ -1,4 +1,5 @@
-package sm
+// Package log provides the SM log command.
+package log
 
 import (
 	"context"
@@ -12,10 +13,16 @@ import (
 	"github.com/fatih/color"
 	"github.com/urfave/cli/v2"
 
-	awsutil "github.com/mpyw/suve/internal/aws"
+	internalaws "github.com/mpyw/suve/internal/aws"
 )
 
-func logCommand() *cli.Command {
+// Client is the interface for the log command.
+type Client interface {
+	ListSecretVersionIds(ctx context.Context, params *secretsmanager.ListSecretVersionIdsInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.ListSecretVersionIdsOutput, error)
+}
+
+// Command returns the log command.
+func Command() *cli.Command {
 	return &cli.Command{
 		Name:      "log",
 		Usage:     "Show secret version history",
@@ -28,11 +35,11 @@ func logCommand() *cli.Command {
 				Usage:   "Number of versions to show",
 			},
 		},
-		Action: logAction,
+		Action: action,
 	}
 }
 
-func logAction(c *cli.Context) error {
+func action(c *cli.Context) error {
 	if c.NArg() < 1 {
 		return fmt.Errorf("secret name required")
 	}
@@ -41,16 +48,16 @@ func logAction(c *cli.Context) error {
 	maxResults := int32(c.Int("number"))
 
 	ctx := context.Background()
-	client, err := awsutil.NewSMClient(ctx)
+	client, err := internalaws.NewSMClient(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to initialize AWS client: %w", err)
 	}
 
-	return Log(ctx, client, c.App.Writer, name, maxResults)
+	return Run(ctx, client, c.App.Writer, name, maxResults)
 }
 
-// Log displays secret version history.
-func Log(ctx context.Context, client LogClient, w io.Writer, name string, maxResults int32) error {
+// Run executes the log command.
+func Run(ctx context.Context, client Client, w io.Writer, name string, maxResults int32) error {
 	result, err := client.ListSecretVersionIds(ctx, &secretsmanager.ListSecretVersionIdsInput{
 		SecretId:   aws.String(name),
 		MaxResults: aws.Int32(maxResults),

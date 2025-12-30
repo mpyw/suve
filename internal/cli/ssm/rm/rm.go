@@ -1,4 +1,5 @@
-package ssm
+// Package rm provides the SSM rm command.
+package rm
 
 import (
 	"context"
@@ -10,19 +11,25 @@ import (
 	"github.com/fatih/color"
 	"github.com/urfave/cli/v2"
 
-	awsutil "github.com/mpyw/suve/internal/aws"
+	internalaws "github.com/mpyw/suve/internal/aws"
 )
 
-func rmCommand() *cli.Command {
+// Client is the interface for the rm command.
+type Client interface {
+	DeleteParameter(ctx context.Context, params *ssm.DeleteParameterInput, optFns ...func(*ssm.Options)) (*ssm.DeleteParameterOutput, error)
+}
+
+// Command returns the rm command.
+func Command() *cli.Command {
 	return &cli.Command{
 		Name:      "rm",
 		Usage:     "Delete parameter",
 		ArgsUsage: "<name>",
-		Action:    rmAction,
+		Action:    action,
 	}
 }
 
-func rmAction(c *cli.Context) error {
+func action(c *cli.Context) error {
 	if c.NArg() < 1 {
 		return fmt.Errorf("parameter name required")
 	}
@@ -30,16 +37,16 @@ func rmAction(c *cli.Context) error {
 	name := c.Args().First()
 
 	ctx := context.Background()
-	client, err := awsutil.NewSSMClient(ctx)
+	client, err := internalaws.NewSSMClient(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to initialize AWS client: %w", err)
 	}
 
-	return Rm(ctx, client, c.App.Writer, name)
+	return Run(ctx, client, c.App.Writer, name)
 }
 
-// Rm deletes a parameter.
-func Rm(ctx context.Context, client RmClient, w io.Writer, name string) error {
+// Run executes the rm command.
+func Run(ctx context.Context, client Client, w io.Writer, name string) error {
 	_, err := client.DeleteParameter(ctx, &ssm.DeleteParameterInput{
 		Name: aws.String(name),
 	})

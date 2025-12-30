@@ -1,4 +1,5 @@
-package sm
+// Package ls provides the SM ls command.
+package ls
 
 import (
 	"context"
@@ -13,7 +14,13 @@ import (
 	internalaws "github.com/mpyw/suve/internal/aws"
 )
 
-func lsCommand() *cli.Command {
+// Client is the interface for the ls command.
+type Client interface {
+	ListSecrets(ctx context.Context, params *secretsmanager.ListSecretsInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.ListSecretsOutput, error)
+}
+
+// Command returns the ls command.
+func Command() *cli.Command {
 	return &cli.Command{
 		Name:      "ls",
 		Usage:     "List secrets",
@@ -24,23 +31,27 @@ func lsCommand() *cli.Command {
 				Usage: "Filter secrets by name prefix",
 			},
 		},
-		Action: func(c *cli.Context) error {
-			ctx := c.Context
-			cfg, err := internalaws.LoadConfig(ctx)
-			if err != nil {
-				return err
-			}
-			client := secretsmanager.NewFromConfig(cfg)
-			prefix := c.Args().First()
-			if prefix == "" {
-				prefix = c.String("filter")
-			}
-			return runLs(ctx, c.App.Writer, client, prefix)
-		},
+		Action: action,
 	}
 }
 
-func runLs(ctx context.Context, w io.Writer, client LsClient, prefix string) error {
+func action(c *cli.Context) error {
+	prefix := c.Args().First()
+	if prefix == "" {
+		prefix = c.String("filter")
+	}
+
+	ctx := context.Background()
+	client, err := internalaws.NewSMClient(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to initialize AWS client: %w", err)
+	}
+
+	return Run(ctx, client, c.App.Writer, prefix)
+}
+
+// Run executes the ls command.
+func Run(ctx context.Context, client Client, w io.Writer, prefix string) error {
 	input := &secretsmanager.ListSecretsInput{}
 	if prefix != "" {
 		input.Filters = []types.Filter{

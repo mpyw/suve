@@ -3,83 +3,32 @@ package ssm
 import (
 	"context"
 	"fmt"
-	"io"
-	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/aws/aws-sdk-go-v2/service/ssm/types"
-	"github.com/urfave/cli/v2"
 
-	awsutil "github.com/mpyw/suve/internal/aws"
-	"github.com/mpyw/suve/internal/output"
 	"github.com/mpyw/suve/internal/version"
 )
 
-func showCommand() *cli.Command {
-	return &cli.Command{
-		Name:      "show",
-		Usage:     "Show parameter value with metadata",
-		ArgsUsage: "<name[@version][~shift]>",
-		Flags: []cli.Flag{
-			&cli.BoolFlag{
-				Name:    "decrypt",
-				Aliases: []string{"d"},
-				Value:   true,
-				Usage:   "Decrypt SecureString values",
-			},
-		},
-		Action: showAction,
-	}
+// GetParameterAPI is the interface for getting a single parameter.
+type GetParameterAPI interface {
+	GetParameter(ctx context.Context, params *ssm.GetParameterInput, optFns ...func(*ssm.Options)) (*ssm.GetParameterOutput, error)
 }
 
-func showAction(c *cli.Context) error {
-	if c.NArg() < 1 {
-		return fmt.Errorf("parameter name required")
-	}
-
-	spec, err := version.Parse(c.Args().First())
-	if err != nil {
-		return err
-	}
-
-	ctx := context.Background()
-	client, err := awsutil.NewSSMClient(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to initialize AWS client: %w", err)
-	}
-
-	return Show(ctx, client, c.App.Writer, spec, c.Bool("decrypt"))
+// GetParameterHistoryAPI is the interface for getting parameter history.
+type GetParameterHistoryAPI interface {
+	GetParameterHistory(ctx context.Context, params *ssm.GetParameterHistoryInput, optFns ...func(*ssm.Options)) (*ssm.GetParameterHistoryOutput, error)
 }
 
-// Show displays parameter value with metadata.
-func Show(ctx context.Context, client ShowClient, w io.Writer, spec *version.Spec, decrypt bool) error {
-	param, err := GetParameterWithVersion(ctx, client, spec, decrypt)
-	if err != nil {
-		return err
-	}
-
-	out := output.New(w)
-	out.Field("Name", aws.ToString(param.Name))
-	out.Field("Version", fmt.Sprintf("%d", param.Version))
-	out.Field("Type", string(param.Type))
-	if param.LastModifiedDate != nil {
-		out.Field("Modified", param.LastModifiedDate.Format(time.RFC3339))
-	}
-	out.Separator()
-	out.Value(aws.ToString(param.Value))
-
-	return nil
-}
-
-// VersionedClient is the interface for commands that need version support.
-type VersionedClient interface {
+// versionedClient is the interface for GetParameterWithVersion.
+type versionedClient interface {
 	GetParameterAPI
 	GetParameterHistoryAPI
 }
 
 // GetParameterWithVersion retrieves a parameter with version/shift support.
-func GetParameterWithVersion(ctx context.Context, client VersionedClient, spec *version.Spec, decrypt bool) (*types.ParameterHistory, error) {
+func GetParameterWithVersion(ctx context.Context, client versionedClient, spec *version.Spec, decrypt bool) (*types.ParameterHistory, error) {
 	if spec.HasShift() {
 		return getParameterWithShift(ctx, client, spec, decrypt)
 	}

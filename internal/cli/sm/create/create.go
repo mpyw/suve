@@ -1,4 +1,5 @@
-package sm
+// Package create provides the SM create command.
+package create
 
 import (
 	"context"
@@ -13,7 +14,13 @@ import (
 	internalaws "github.com/mpyw/suve/internal/aws"
 )
 
-func createCommand() *cli.Command {
+// Client is the interface for the create command.
+type Client interface {
+	CreateSecret(ctx context.Context, params *secretsmanager.CreateSecretInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.CreateSecretOutput, error)
+}
+
+// Command returns the create command.
+func Command() *cli.Command {
 	return &cli.Command{
 		Name:      "create",
 		Usage:     "Create a new secret",
@@ -25,25 +32,30 @@ func createCommand() *cli.Command {
 				Usage:   "Description for the secret",
 			},
 		},
-		Action: func(c *cli.Context) error {
-			if c.NArg() < 2 {
-				return fmt.Errorf("usage: suve sm create <name> <value>")
-			}
-			ctx := c.Context
-			cfg, err := internalaws.LoadConfig(ctx)
-			if err != nil {
-				return err
-			}
-			client := secretsmanager.NewFromConfig(cfg)
-			name := c.Args().Get(0)
-			value := c.Args().Get(1)
-			description := c.String("description")
-			return runCreate(ctx, c.App.Writer, client, name, value, description)
-		},
+		Action: action,
 	}
 }
 
-func runCreate(ctx context.Context, w io.Writer, client CreateClient, name, value, description string) error {
+func action(c *cli.Context) error {
+	if c.NArg() < 2 {
+		return fmt.Errorf("usage: suve sm create <name> <value>")
+	}
+
+	name := c.Args().Get(0)
+	value := c.Args().Get(1)
+	description := c.String("description")
+
+	ctx := context.Background()
+	client, err := internalaws.NewSMClient(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to initialize AWS client: %w", err)
+	}
+
+	return Run(ctx, client, c.App.Writer, name, value, description)
+}
+
+// Run executes the create command.
+func Run(ctx context.Context, client Client, w io.Writer, name, value, description string) error {
 	input := &secretsmanager.CreateSecretInput{
 		Name:         aws.String(name),
 		SecretString: aws.String(value),

@@ -1,4 +1,5 @@
-package sm
+// Package rm provides the SM rm command.
+package rm
 
 import (
 	"context"
@@ -13,7 +14,13 @@ import (
 	internalaws "github.com/mpyw/suve/internal/aws"
 )
 
-func rmCommand() *cli.Command {
+// Client is the interface for the rm command.
+type Client interface {
+	DeleteSecret(ctx context.Context, params *secretsmanager.DeleteSecretInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.DeleteSecretOutput, error)
+}
+
+// Command returns the rm command.
+func Command() *cli.Command {
 	return &cli.Command{
 		Name:      "rm",
 		Usage:     "Delete a secret",
@@ -30,25 +37,30 @@ func rmCommand() *cli.Command {
 				Value: 30,
 			},
 		},
-		Action: func(c *cli.Context) error {
-			if c.NArg() < 1 {
-				return fmt.Errorf("usage: suve sm rm <name>")
-			}
-			ctx := c.Context
-			cfg, err := internalaws.LoadConfig(ctx)
-			if err != nil {
-				return err
-			}
-			client := secretsmanager.NewFromConfig(cfg)
-			name := c.Args().First()
-			force := c.Bool("force")
-			recoveryWindow := c.Int("recovery-window")
-			return runRm(ctx, c.App.Writer, client, name, force, recoveryWindow)
-		},
+		Action: action,
 	}
 }
 
-func runRm(ctx context.Context, w io.Writer, client RmClient, name string, force bool, recoveryWindow int) error {
+func action(c *cli.Context) error {
+	if c.NArg() < 1 {
+		return fmt.Errorf("usage: suve sm rm <name>")
+	}
+
+	name := c.Args().First()
+	force := c.Bool("force")
+	recoveryWindow := c.Int("recovery-window")
+
+	ctx := context.Background()
+	client, err := internalaws.NewSMClient(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to initialize AWS client: %w", err)
+	}
+
+	return Run(ctx, client, c.App.Writer, name, force, recoveryWindow)
+}
+
+// Run executes the rm command.
+func Run(ctx context.Context, client Client, w io.Writer, name string, force bool, recoveryWindow int) error {
 	input := &secretsmanager.DeleteSecretInput{
 		SecretId: aws.String(name),
 	}
