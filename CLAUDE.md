@@ -1,238 +1,145 @@
-# CLAUDE.md - suve CLI Redesign Document
+# CLAUDE.md
+
+This file provides guidance to Claude Code when working with code in this repository.
 
 ## Project Overview
 
-Redesigning "suve" - a CLI tool for AWS Parameter Store and Secrets Manager operations.
-Goal: Git-like user experience.
+**suve** is a Git-like CLI for AWS Parameter Store and Secrets Manager. It provides familiar Git-style commands (`show`, `log`, `diff`, `cat`, `ls`, `set`, `rm`) with version specification syntax (`@N`, `~N`, `:LABEL`).
 
-## Design Philosophy
+### Core Concepts
 
-### 1. Git-like Command Structure
+1. **Git-like Commands**: Commands mirror Git behavior for familiarity
+   - `show` - Display value with metadata (like `git show`)
+   - `cat` - Raw value output for piping (like `git cat-file -p`)
+   - `log` - Version history (like `git log`)
+   - `diff` - Compare versions (like `git diff`)
 
-```
-# Basic structure
-suve <service> <command> [options] [arguments]
+2. **Version Specification**: Git-like revision syntax
+   ```
+   <name>[@<version>][~<shift>][:label]
 
-# Services
-- ssm (or ps/param): Parameter Store
-- sm (or secret): Secrets Manager
-```
+   /my/param           # Latest
+   /my/param@3         # Version 3
+   /my/param~1         # 1 version ago (like HEAD~1)
+   my-secret:AWSCURRENT   # Staging label (SM only)
+   ```
 
-### 2. Command Mapping (git -> suve)
-
-| git command | suve equivalent | Description |
-|-------------|-----------------|-------------|
-| git show | suve show | Display value |
-| git log | suve log | Show history |
-| git diff | suve diff | Show diff between versions |
-| git add + commit | suve set | Set value (create/update) |
-| git rm | suve rm | Delete |
-| git ls-files | suve ls | List items |
-| git checkout | suve restore | Restore deleted item |
-| git cat-file | suve cat | Raw output (for piping) |
-
-### 3. Version Specification (Git-like revision syntax)
-
-```bash
-# Latest
-suve ssm show /my/param
-
-# Specific version (Parameter Store uses numbers, Secrets Manager uses UUIDs)
-suve ssm show /my/param@3
-suve sm show my-secret@abc123-...
-
-# N versions ago (like git's HEAD~N)
-suve ssm show /my/param~1    # 1 version ago
-suve ssm show /my/param~2    # 2 versions ago
-
-# Staging labels (Secrets Manager only, like git branches/tags)
-suve sm show my-secret:AWSCURRENT
-suve sm show my-secret:AWSPREVIOUS
-```
-
-## Command Reference
-
-### Parameter Store (ssm)
-
-```bash
-# Show value
-suve ssm show <name[@version][~shift]>
-suve ssm show /my/param
-suve ssm show /my/param@3
-suve ssm show /my/param~1
-
-# Raw value output (for piping/redirection)
-suve ssm cat <name[@version][~shift]>
-
-# Show history
-suve ssm log <name> [-n <count>]
-
-# Show diff
-suve ssm diff <name> <version1> [version2]
-
-# List parameters
-suve ssm ls [path-prefix] [--recursive/-r]
-
-# Set value
-suve ssm set <name> <value> [--type <type>]
-
-# Delete
-suve ssm rm <name>
-```
-
-### Secrets Manager (sm)
-
-```bash
-# Show value
-suve sm show <name[@version][~shift][:label]>
-
-# Raw value output
-suve sm cat <name[@version][~shift][:label]>
-
-# Show history
-suve sm log <name> [-n <count>]
-
-# Show diff
-suve sm diff <name> <version1> [version2]
-
-# List secrets
-suve sm ls [--filter <prefix>]
-
-# Create new secret
-suve sm create <name> <value> [--description <desc>]
-
-# Update secret value
-suve sm set <name> <value>
-
-# Delete
-suve sm rm <name> [--force] [--recovery-window <days>]
-
-# Restore
-suve sm restore <name>
-```
+3. **Two Services**:
+   - `ssm` - AWS Systems Manager Parameter Store
+   - `sm` - AWS Secrets Manager
 
 ## Architecture
 
 ```
-cmd/
-  suve/
-    main.go         # Entry point (go install ready)
-
-internal/
-  cli/
-    app.go          # CLI app definition
-    ssm.go          # Parameter Store commands
-    sm.go           # Secrets Manager commands
-
-  aws/
-    client.go       # AWS client initialization
-
-  version/
-    spec.go         # Version specification parsing (@N, ~N, :LABEL)
-
-  output/
-    output.go       # Output formatting (diff, colors, fields)
-
-bin/                # Build output (gitignored)
+suve/
+├── cmd/suve/main.go           # Entry point
+│
+├── internal/
+│   ├── cli/
+│   │   ├── app.go             # urfave/cli v2 app definition
+│   │   ├── ssm/               # SSM subcommands (cat, diff, log, ls, rm, set, show)
+│   │   └── sm/                # SM subcommands (cat, create, diff, log, ls, restore, rm, set, show)
+│   │
+│   ├── api/
+│   │   ├── ssmapi/            # SSM API interface (for testing)
+│   │   └── smapi/             # SM API interface (for testing)
+│   │
+│   ├── version/
+│   │   ├── spec.go            # Version spec parser (@N, ~N, :LABEL)
+│   │   ├── ssmversion/        # SSM version resolution
+│   │   └── smversion/         # SM version resolution
+│   │
+│   ├── output/                # Output formatting (diff, colors)
+│   ├── jsonutil/              # JSON formatting (uses encoding/json/v2)
+│   ├── awsutil/               # AWS client initialization
+│   └── testutil/              # Test helpers (generic Ptr, PtrEqual)
+│
+├── e2e/                       # E2E tests (requires localstack)
+│
+├── .github/workflows/
+│   ├── test.yml               # CI: test + lint on push/PR
+│   └── release.yml            # CD: build + sign on tag push
+│
+└── Makefile                   # build, test, lint, e2e, up, down
 ```
 
-## Version Specification Grammar
+### Key Design Patterns
 
-```
-<name>[@<version>][~<shift>][:label]
+1. **Subcommand packages**: Each command (cat, show, etc.) is its own package under `internal/cli/{ssm,sm}/`
+2. **Interface-based testing**: API interfaces in `internal/api/` enable mock testing
+3. **Version resolution**: `ssmversion` and `smversion` handle version/shift/label resolution
+4. **Output abstraction**: Commands write to `io.Writer` for testability
 
-Examples:
-/my/param           # Latest
-/my/param@3         # Version 3
-/my/param~1         # 1 version ago
-/my/param@5~2       # 2 versions before version 5 (= version 3)
-my-secret:AWSCURRENT
-my-secret:AWSPREVIOUS
-```
-
-## Output Formats
-
-### show command
-```
-Name: /my/parameter
-Version: 3
-Type: SecureString
-Modified: 2024-01-15T10:30:45Z
-
-  my-secret-value
-```
-
-### log command
-```
-Version 3 (current)
-Date: 2024-01-15T10:30:45Z
-User: arn:aws:iam::...
-my-secret-value...
-
-Version 2
-Date: 2024-01-14T09:20:30Z
-...
-```
-
-### diff command
-```diff
---- /my/param@2
-+++ /my/param@3
-@@ -1 +1 @@
--old-value
-+new-value
-```
-
-## Implementation Status
-
-### Completed
-- [x] Project structure (cmd/, internal/)
-- [x] Version specification parser (@N, ~N, :LABEL)
-- [x] AWS client initialization
-- [x] urfave/cli v2 command definitions
-- [x] SSM commands: show, cat, log, diff, ls, set, rm
-- [x] SM commands: show, cat, log, diff, ls, create, set, rm, restore
-- [x] Colored output with diff highlighting
-
-### Build
+## Development Commands
 
 ```bash
-# Build to bin/
-go build -o bin/suve ./cmd/suve
+# Run tests (requires GOEXPERIMENT=jsonv2)
+make test
 
-# Install globally
-go install ./cmd/suve
+# Run linter
+make lint
+
+# Build CLI
+make build
+
+# E2E tests with localstack
+make up      # Start localstack
+make e2e     # Run SSM E2E tests
+make down    # Stop localstack
+
+# Coverage
+make coverage
 ```
 
-## Files
+## Build Requirements
 
-| File | Purpose |
-|------|---------|
-| cmd/suve/main.go | Entry point |
-| internal/cli/app.go | CLI app definition |
-| internal/cli/ssm.go | Parameter Store commands |
-| internal/cli/sm.go | Secrets Manager commands |
-| internal/version/spec.go | Version spec parser |
-| internal/aws/client.go | AWS SDK client wrapper |
-| internal/output/output.go | Output formatting utilities |
+This project uses Go 1.25's experimental `encoding/json/v2`:
 
----
+```bash
+# The Makefile exports this automatically
+export GOEXPERIMENT=jsonv2
+```
 
-## Work Log
+## Testing Strategy
 
-### Session 1 (2024-12-30)
-- Analyzed existing code structure
-- Created design document
-- Implemented from scratch using urfave/cli v2
-- Created version parser with @N, ~N, :LABEL support
-- Implemented all SSM commands
-- Implemented all SM commands
-- Build successful
+- **Unit tests**: Each command package has `*_test.go` with mock AWS clients
+- **E2E tests**: `e2e/e2e_test.go` runs against localstack (SSM only, SM requires Pro)
+- **Test helpers**: `internal/testutil/` provides generic `Ptr[T]` and `PtrEqual[T]`
 
-### Session 2 (2024-12-30)
-- Restructured for Go distribution (`cmd/suve/main.go`)
-- Extracted CLI logic to `internal/cli/`
-- Removed unused code (`getParametersByPath`)
-- Updated golangci-lint config to v2 format
-- Removed Docker-based golangci-lint wrapper
-- Added `bin/` directory with .gitignore
+### Running E2E Tests
+
+```bash
+# Start localstack (SSM service)
+make up
+
+# Run E2E tests
+make e2e
+
+# Or with custom port
+SUVE_LOCALSTACK_EXTERNAL_PORT=4599 make e2e
+
+# Stop localstack
+make down
+```
+
+## Release Process
+
+Releases are automated via GitHub Actions:
+
+1. Push a tag: `git tag v0.1.0 && git push origin v0.1.0`
+2. Release workflow builds binaries for linux/darwin/windows (amd64/arm64)
+3. Checksums are signed with sigstore/cosign (keyless)
+4. GitHub Release is created with binaries and verification instructions
+
+## Code Style
+
+- Follow standard Go conventions
+- Use `urfave/cli/v2` for CLI structure
+- Commands write to `io.Writer`, not directly to stdout
+- Error messages should be user-friendly
+
+## Refactoring Guidelines
+
+1. **Tests must pass**: Run `make test` after changes
+2. **Lint must pass**: Run `make lint` after changes
+3. **E2E tests**: Run `make e2e` for command behavior changes (optional, requires Docker)
