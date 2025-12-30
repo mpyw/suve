@@ -2,6 +2,8 @@ package version
 
 import (
 	"testing"
+
+	"github.com/mpyw/suve/internal/testutil"
 )
 
 func TestParse(t *testing.T) {
@@ -23,7 +25,7 @@ func TestParse(t *testing.T) {
 			name:        "with version",
 			input:       "/my/param@3",
 			wantName:    "/my/param",
-			wantVersion: ptr(int64(3)),
+			wantVersion: testutil.Ptr(int64(3)),
 		},
 		{
 			name:      "with shift",
@@ -35,28 +37,28 @@ func TestParse(t *testing.T) {
 			name:        "with version and shift",
 			input:       "/my/param@5~2",
 			wantName:    "/my/param",
-			wantVersion: ptr(int64(5)),
+			wantVersion: testutil.Ptr(int64(5)),
 			wantShift:   2,
 		},
 		{
 			name:      "with label",
 			input:     "my-secret:AWSCURRENT",
 			wantName:  "my-secret",
-			wantLabel: strPtr("AWSCURRENT"),
+			wantLabel: testutil.Ptr("AWSCURRENT"),
 		},
 		{
 			name:      "with label AWSPREVIOUS",
 			input:     "my-secret:AWSPREVIOUS",
 			wantName:  "my-secret",
-			wantLabel: strPtr("AWSPREVIOUS"),
+			wantLabel: testutil.Ptr("AWSPREVIOUS"),
 		},
 		{
 			name:        "full spec",
 			input:       "/app/secret@2~1:STAGING",
 			wantName:    "/app/secret",
-			wantVersion: ptr(int64(2)),
+			wantVersion: testutil.Ptr(int64(2)),
 			wantShift:   1,
-			wantLabel:   strPtr("STAGING"),
+			wantLabel:   testutil.Ptr("STAGING"),
 		},
 		{
 			name:     "whitespace trimmed",
@@ -95,16 +97,16 @@ func TestParse(t *testing.T) {
 				t.Errorf("Parse() Name = %v, want %v", spec.Name, tt.wantName)
 			}
 
-			if !int64PtrEqual(spec.Version, tt.wantVersion) {
-				t.Errorf("Parse() Version = %v, want %v", derefInt64(spec.Version), derefInt64(tt.wantVersion))
+			if !testutil.PtrEqual(spec.Version, tt.wantVersion) {
+				t.Errorf("Parse() Version = %v, want %v", spec.Version, tt.wantVersion)
 			}
 
 			if spec.Shift != tt.wantShift {
 				t.Errorf("Parse() Shift = %v, want %v", spec.Shift, tt.wantShift)
 			}
 
-			if !strPtrEqual(spec.Label, tt.wantLabel) {
-				t.Errorf("Parse() Label = %v, want %v", derefStr(spec.Label), derefStr(tt.wantLabel))
+			if !testutil.PtrEqual(spec.Label, tt.wantLabel) {
+				t.Errorf("Parse() Label = %v, want %v", spec.Label, tt.wantLabel)
 			}
 		})
 	}
@@ -135,47 +137,4 @@ func TestSpec_HasShift(t *testing.T) {
 			}
 		})
 	}
-}
-
-// Helper functions
-func ptr(v int64) *int64 {
-	return &v
-}
-
-func strPtr(s string) *string {
-	return &s
-}
-
-func int64PtrEqual(a, b *int64) bool {
-	if a == nil && b == nil {
-		return true
-	}
-	if a == nil || b == nil {
-		return false
-	}
-	return *a == *b
-}
-
-func strPtrEqual(a, b *string) bool {
-	if a == nil && b == nil {
-		return true
-	}
-	if a == nil || b == nil {
-		return false
-	}
-	return *a == *b
-}
-
-func derefInt64(p *int64) string {
-	if p == nil {
-		return "<nil>"
-	}
-	return string(rune(*p))
-}
-
-func derefStr(p *string) string {
-	if p == nil {
-		return "<nil>"
-	}
-	return *p
 }
