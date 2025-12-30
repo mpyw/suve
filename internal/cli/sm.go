@@ -1,4 +1,4 @@
-package main
+package cli
 
 import (
 	"context"
@@ -12,11 +12,11 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager/types"
 	"github.com/fatih/color"
-	"github.com/mpyw/suve/internal/output"
-	"github.com/mpyw/suve/internal/version"
 	"github.com/urfave/cli/v2"
 
 	awsutil "github.com/mpyw/suve/internal/aws"
+	"github.com/mpyw/suve/internal/output"
+	"github.com/mpyw/suve/internal/version"
 )
 
 var smCommand = &cli.Command{
@@ -160,12 +160,11 @@ func smShowAction(c *cli.Context) error {
 		return fmt.Errorf("failed to initialize AWS clients: %w", err)
 	}
 
-	secret, err := getSecretWithVersion(ctx, clients.SecretsManager, spec)
+	secret, err := getSMSecretWithVersion(ctx, clients.SecretsManager, spec)
 	if err != nil {
 		return err
 	}
 
-	// Format output
 	out := output.New(os.Stdout)
 	out.Field("Name", aws.ToString(secret.Name))
 	out.Field("ARN", aws.ToString(secret.ARN))
@@ -205,7 +204,7 @@ func smCatAction(c *cli.Context) error {
 		return fmt.Errorf("failed to initialize AWS clients: %w", err)
 	}
 
-	secret, err := getSecretWithVersion(ctx, clients.SecretsManager, spec)
+	secret, err := getSMSecretWithVersion(ctx, clients.SecretsManager, spec)
 	if err != nil {
 		return err
 	}
@@ -236,7 +235,6 @@ func smLogAction(c *cli.Context) error {
 		return fmt.Errorf("failed to list secret versions: %w", err)
 	}
 
-	// Sort by created date descending
 	versions := result.Versions
 	sort.Slice(versions, func(i, j int) bool {
 		if versions[i].CreatedDate == nil {
@@ -278,7 +276,6 @@ func smDiffAction(c *cli.Context) error {
 	version1 := c.Args().Get(1)
 	version2 := c.Args().Get(2)
 
-	// If only one version specified, compare with current
 	if version2 == "" {
 		version2 = version1
 		version1 = ":AWSCURRENT"
@@ -300,12 +297,12 @@ func smDiffAction(c *cli.Context) error {
 		return fmt.Errorf("failed to initialize AWS clients: %w", err)
 	}
 
-	secret1, err := getSecretWithVersion(ctx, clients.SecretsManager, spec1)
+	secret1, err := getSMSecretWithVersion(ctx, clients.SecretsManager, spec1)
 	if err != nil {
 		return fmt.Errorf("failed to get version %s: %w", version1, err)
 	}
 
-	secret2, err := getSecretWithVersion(ctx, clients.SecretsManager, spec2)
+	secret2, err := getSMSecretWithVersion(ctx, clients.SecretsManager, spec2)
 	if err != nil {
 		return fmt.Errorf("failed to get version %s: %w", version2, err)
 	}
@@ -332,7 +329,6 @@ func smLsAction(c *cli.Context) error {
 		MaxResults: aws.Int32(int32(c.Int("max"))),
 	}
 
-	// Add filters if specified
 	if filters := c.StringSlice("filter"); len(filters) > 0 {
 		for _, f := range filters {
 			input.Filters = append(input.Filters, types.Filter{
@@ -487,18 +483,16 @@ func smRestoreAction(c *cli.Context) error {
 	return nil
 }
 
-// getSecretWithVersion retrieves a secret with version/shift/label support.
-func getSecretWithVersion(ctx context.Context, client *secretsmanager.Client, spec *version.Spec) (*secretsmanager.GetSecretValueOutput, error) {
+// getSMSecretWithVersion retrieves a secret with version/shift/label support.
+func getSMSecretWithVersion(ctx context.Context, client *secretsmanager.Client, spec *version.Spec) (*secretsmanager.GetSecretValueOutput, error) {
 	input := &secretsmanager.GetSecretValueInput{
 		SecretId: aws.String(spec.Name),
 	}
 
-	// Handle label (stage)
 	if spec.Label != nil {
 		input.VersionStage = spec.Label
 	}
 
-	// Handle shift - need to list versions and find the right one
 	if spec.HasShift() {
 		versions, err := client.ListSecretVersionIds(ctx, &secretsmanager.ListSecretVersionIdsInput{
 			SecretId: aws.String(spec.Name),
@@ -507,7 +501,6 @@ func getSecretWithVersion(ctx context.Context, client *secretsmanager.Client, sp
 			return nil, fmt.Errorf("failed to list versions: %w", err)
 		}
 
-		// Sort by created date descending
 		versionList := versions.Versions
 		sort.Slice(versionList, func(i, j int) bool {
 			if versionList[i].CreatedDate == nil {
@@ -532,7 +525,7 @@ func getSecretWithVersion(ctx context.Context, client *secretsmanager.Client, sp
 
 // prettyJSON formats a JSON string with indentation.
 func prettyJSON(s string) string {
-	var data interface{}
+	var data any
 	if err := json.Unmarshal([]byte(s), &data); err != nil {
 		return s
 	}

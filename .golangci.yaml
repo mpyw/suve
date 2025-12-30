@@ -1,57 +1,30 @@
+version: "2"
+
+run:
+  timeout: 5m
+  tests: true
+  modules-download-mode: readonly
+
 linters:
-  presets:
-    - bugs
-    - error
-    - format
-    - import
-    - style
-    - test
-  disable:
-    - depguard
-    - dupl
-    - exhaustruct
-    - gochecknoglobals
-    - gochecknoinits
-    - goerr113
-    - gomnd
-    - gosmopolitan
-    - ireturn
-    - lll
-    - nlreturn
-    - varnamelen
-    - wrapcheck
-    - wsl
+  default: standard
+  settings:
+    cyclop:
+      max-complexity: 30
+    funlen:
+      lines: 200
+      statements: 100
+    gocognit:
+      min-complexity: 60
+    exhaustive:
+      default-signifies-exhaustive: true
 
-linters-settings:
-  depguard:
-    rules:
-      main:
-        files:
-          - '$all'
-          - '!$test'
-        deny:
-          github.com/golang/mock/gomock: Don't use gomock package outside tests.
-          github.com/stretchr/testify/assert: Don't use assert package outside tests.
-          github.com/stretchr/testify/require: Don't use require package outside tests.
-          testing: Don't use testing package outside tests.
-
-  exhaustive:
-    ignore-enum-members: '.*Unknown.*'
-  gosec:
-    excludes:
-      - G401
-      - G505
-  revive:
-    rules:
-      - name: receiver-naming
-        severity: error
-        disabled: false
-      - name: var-naming
-        severity: error
-        disabled: false
-
-issues:
-  exclude-rules:
-    - path: (test_\w+|mock)/\w+\.go$
-      linters:
-        - revive
+formatters:
+  enable:
+    - gci
+  settings:
+    gci:
+      sections:
+        - standard
+        - default
+        - prefix(github.com/mpyw/suve)
+      custom-order: true

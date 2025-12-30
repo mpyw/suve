@@ -115,12 +115,15 @@ suve sm restore <name>
 
 ```
 cmd/
-  main.go           # Entry point
-  root.go           # Root command definition
-  ssm.go            # Parameter Store commands
-  sm.go             # Secrets Manager commands
+  suve/
+    main.go         # Entry point (go install ready)
 
 internal/
+  cli/
+    app.go          # CLI app definition
+    ssm.go          # Parameter Store commands
+    sm.go           # Secrets Manager commands
+
   aws/
     client.go       # AWS client initialization
 
@@ -129,6 +132,8 @@ internal/
 
   output/
     output.go       # Output formatting (diff, colors, fields)
+
+bin/                # Build output (gitignored)
 ```
 
 ## Version Specification Grammar
@@ -192,21 +197,21 @@ Date: 2024-01-14T09:20:30Z
 ### Build
 
 ```bash
-# Build
-go build -o suve ./cmd/...
+# Build to bin/
+go build -o bin/suve ./cmd/suve
 
-# Install
-go install ./cmd/...
+# Install globally
+go install ./cmd/suve
 ```
 
 ## Files
 
 | File | Purpose |
 |------|---------|
-| cmd/main.go | Entry point |
-| cmd/root.go | Root command with subcommands |
-| cmd/ssm.go | Parameter Store commands |
-| cmd/sm.go | Secrets Manager commands |
+| cmd/suve/main.go | Entry point |
+| internal/cli/app.go | CLI app definition |
+| internal/cli/ssm.go | Parameter Store commands |
+| internal/cli/sm.go | Secrets Manager commands |
 | internal/version/spec.go | Version spec parser |
 | internal/aws/client.go | AWS SDK client wrapper |
 | internal/output/output.go | Output formatting utilities |
@@ -223,3 +228,11 @@ go install ./cmd/...
 - Implemented all SSM commands
 - Implemented all SM commands
 - Build successful
+
+### Session 2 (2024-12-30)
+- Restructured for Go distribution (`cmd/suve/main.go`)
+- Extracted CLI logic to `internal/cli/`
+- Removed unused code (`getParametersByPath`)
+- Updated golangci-lint config to v2 format
+- Removed Docker-based golangci-lint wrapper
+- Added `bin/` directory with .gitignore

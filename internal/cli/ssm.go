@@ -1,21 +1,20 @@
-package main
+package cli
 
 import (
 	"context"
 	"fmt"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/aws/aws-sdk-go-v2/service/ssm/types"
 	"github.com/fatih/color"
-	"github.com/mpyw/suve/internal/output"
-	"github.com/mpyw/suve/internal/version"
 	"github.com/urfave/cli/v2"
 
 	awsutil "github.com/mpyw/suve/internal/aws"
+	"github.com/mpyw/suve/internal/output"
+	"github.com/mpyw/suve/internal/version"
 )
 
 var ssmCommand = &cli.Command{
@@ -147,12 +146,11 @@ func ssmShowAction(c *cli.Context) error {
 		return fmt.Errorf("failed to initialize AWS clients: %w", err)
 	}
 
-	param, err := getParameterWithVersion(ctx, clients.SSM, spec, c.Bool("decrypt"))
+	param, err := getSSMParameterWithVersion(ctx, clients.SSM, spec, c.Bool("decrypt"))
 	if err != nil {
 		return err
 	}
 
-	// Format output
 	out := output.New(os.Stdout)
 	out.Field("Name", aws.ToString(param.Name))
 	out.Field("Version", fmt.Sprintf("%d", param.Version))
@@ -182,7 +180,7 @@ func ssmCatAction(c *cli.Context) error {
 		return fmt.Errorf("failed to initialize AWS clients: %w", err)
 	}
 
-	param, err := getParameterWithVersion(ctx, clients.SSM, spec, c.Bool("decrypt"))
+	param, err := getSSMParameterWithVersion(ctx, clients.SSM, spec, c.Bool("decrypt"))
 	if err != nil {
 		return err
 	}
@@ -248,10 +246,9 @@ func ssmDiffAction(c *cli.Context) error {
 	version1 := c.Args().Get(1)
 	version2 := c.Args().Get(2)
 
-	// If only one version specified, compare with current
 	if version2 == "" {
 		version2 = version1
-		version1 = "" // Latest
+		version1 = ""
 	}
 
 	spec1, err := version.Parse(name + version1)
@@ -270,12 +267,12 @@ func ssmDiffAction(c *cli.Context) error {
 		return fmt.Errorf("failed to initialize AWS clients: %w", err)
 	}
 
-	param1, err := getParameterWithVersion(ctx, clients.SSM, spec1, true)
+	param1, err := getSSMParameterWithVersion(ctx, clients.SSM, spec1, true)
 	if err != nil {
 		return fmt.Errorf("failed to get version %s: %w", version1, err)
 	}
 
-	param2, err := getParameterWithVersion(ctx, clients.SSM, spec2, true)
+	param2, err := getSSMParameterWithVersion(ctx, clients.SSM, spec2, true)
 	if err != nil {
 		return fmt.Errorf("failed to get version %s: %w", version2, err)
 	}
@@ -303,35 +300,20 @@ func ssmLsAction(c *cli.Context) error {
 		return fmt.Errorf("failed to initialize AWS clients: %w", err)
 	}
 
-	var filters []types.ParametersFilter
-	if !c.Bool("recursive") {
-		// Non-recursive: only show immediate children
-		filters = append(filters, types.ParametersFilter{
-			Key:    "Path",
-			Values: []string{prefix},
-		})
-	}
-
 	input := &ssm.DescribeParametersInput{
 		MaxResults: aws.Int32(int32(c.Int("max"))),
 	}
 
+	option := "OneLevel"
 	if c.Bool("recursive") {
-		input.ParameterFilters = []types.ParameterStringFilter{
-			{
-				Key:    aws.String("Path"),
-				Option: aws.String("Recursive"),
-				Values: []string{prefix},
-			},
-		}
-	} else {
-		input.ParameterFilters = []types.ParameterStringFilter{
-			{
-				Key:    aws.String("Path"),
-				Option: aws.String("OneLevel"),
-				Values: []string{prefix},
-			},
-		}
+		option = "Recursive"
+	}
+	input.ParameterFilters = []types.ParameterStringFilter{
+		{
+			Key:    aws.String("Path"),
+			Option: aws.String(option),
+			Values: []string{prefix},
+		},
 	}
 
 	result, err := clients.SSM.DescribeParameters(ctx, input)
@@ -416,9 +398,8 @@ func ssmRmAction(c *cli.Context) error {
 	return nil
 }
 
-// getParameterWithVersion retrieves a parameter with version/shift support.
-func getParameterWithVersion(ctx context.Context, client *ssm.Client, spec *version.Spec, decrypt bool) (*types.ParameterHistory, error) {
-	// If shift is specified, we need to get history and find the right version
+// getSSMParameterWithVersion retrieves a parameter with version/shift support.
+func getSSMParameterWithVersion(ctx context.Context, client *ssm.Client, spec *version.Spec, decrypt bool) (*types.ParameterHistory, error) {
 	if spec.HasShift() {
 		history, err := client.GetParameterHistory(ctx, &ssm.GetParameterHistoryInput{
 			Name:           aws.String(spec.Name),
@@ -432,17 +413,13 @@ func getParameterWithVersion(ctx context.Context, client *ssm.Client, spec *vers
 			return nil, fmt.Errorf("parameter not found: %s", spec.Name)
 		}
 
-		// Sort by version descending (newest first)
-		// AWS returns in ascending order, so we need to reverse
 		params := history.Parameters
 		for i, j := 0, len(params)-1; i < j; i, j = i+1, j-1 {
 			params[i], params[j] = params[j], params[i]
 		}
 
-		// Find the base index
 		baseIdx := 0
 		if spec.Version != nil {
-			// Find the specified version
 			found := false
 			for i, p := range params {
 				if p.Version == *spec.Version {
@@ -456,7 +433,6 @@ func getParameterWithVersion(ctx context.Context, client *ssm.Client, spec *vers
 			}
 		}
 
-		// Apply shift
 		targetIdx := baseIdx + spec.Shift
 		if targetIdx >= len(params) {
 			return nil, fmt.Errorf("version shift out of range: ~%d", spec.Shift)
@@ -465,7 +441,6 @@ func getParameterWithVersion(ctx context.Context, client *ssm.Client, spec *vers
 		return &params[targetIdx], nil
 	}
 
-	// No shift - direct version access
 	var nameWithVersion string
 	if spec.Version != nil {
 		nameWithVersion = fmt.Sprintf("%s:%d", spec.Name, *spec.Version)
@@ -489,24 +464,4 @@ func getParameterWithVersion(ctx context.Context, client *ssm.Client, spec *vers
 		Version:          param.Version,
 		LastModifiedDate: param.LastModifiedDate,
 	}, nil
-}
-
-// getParametersByPath gets the immediate children or all descendants of a path
-func getParametersByPath(ctx context.Context, client *ssm.Client, path string, recursive bool, maxResults int32) ([]types.Parameter, error) {
-	// Ensure path ends with /
-	if !strings.HasSuffix(path, "/") {
-		path = path + "/"
-	}
-
-	result, err := client.GetParametersByPath(ctx, &ssm.GetParametersByPathInput{
-		Path:           aws.String(path),
-		Recursive:      aws.Bool(recursive),
-		WithDecryption: aws.Bool(true),
-		MaxResults:     aws.Int32(maxResults),
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	return result.Parameters, nil
 }
