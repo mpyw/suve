@@ -1,0 +1,14 @@
+services:
+  awsmock:
+    image: jensvogt/awsmock:latest
+    platform: linux/amd64
+    ports:
+      - "127.0.0.1:${SUVE_AWSMOCK_EXTERNAL_PORT:-4599}:4566/tcp"
+    environment:
+      - AWSMOCK_MONGODB_ACTIVE=false
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "-o", "/dev/null", "http://localhost:4566/"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
