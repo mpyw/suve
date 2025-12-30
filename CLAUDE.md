@@ -50,15 +50,14 @@ suve/
 │   │   └── smversion/         # SM version resolution
 │   │
 │   ├── output/                # Output formatting (diff, colors)
-│   ├── jsonutil/              # JSON formatting (uses encoding/json/v2)
+│   ├── jsonutil/              # JSON formatting
 │   ├── awsutil/               # AWS client initialization
 │   └── testutil/              # Test helpers (generic Ptr, PtrEqual)
 │
 ├── e2e/                       # E2E tests (requires localstack)
 │
 ├── .github/workflows/
-│   ├── test.yml               # CI: test + lint on push/PR
-│   └── release.yml            # CD: build + sign on tag push
+│   └── test.yml               # CI: test + lint on push/PR
 │
 └── Makefile                   # build, test, lint, e2e, up, down
 ```
@@ -73,7 +72,7 @@ suve/
 ## Development Commands
 
 ```bash
-# Run tests (requires GOEXPERIMENT=jsonv2)
+# Run tests
 make test
 
 # Run linter
@@ -89,15 +88,6 @@ make down    # Stop localstack
 
 # Coverage
 make coverage
-```
-
-## Build Requirements
-
-This project uses Go 1.25's experimental `encoding/json/v2`:
-
-```bash
-# The Makefile exports this automatically
-export GOEXPERIMENT=jsonv2
 ```
 
 ## Testing Strategy
@@ -121,15 +111,6 @@ SUVE_LOCALSTACK_EXTERNAL_PORT=4599 make e2e
 # Stop localstack
 make down
 ```
-
-## Release Process
-
-Releases are automated via GitHub Actions:
-
-1. Push a tag: `git tag v0.1.0 && git push origin v0.1.0`
-2. Release workflow builds binaries for linux/darwin/windows (amd64/arm64)
-3. Checksums are signed with sigstore/cosign (keyless)
-4. GitHub Release is created with binaries and verification instructions
 
 ## Code Style
 

@@ -18,25 +18,21 @@ A Git-like CLI for AWS Parameter Store and Secrets Manager.
 
 ## Installation
 
-### Using [Releases](https://github.com/mpyw/suve/releases) (Recommended)
-
-Download pre-built binaries from the [Releases](https://github.com/mpyw/suve/releases) page. Binaries are signed with [sigstore/cosign](https://docs.sigstore.dev/cosign/overview/).
-
-```bash
-# Example for macOS (Apple Silicon)
-curl -LO https://github.com/mpyw/suve/releases/latest/download/suve-darwin-arm64
-chmod +x suve-darwin-arm64
-mv suve-darwin-arm64 /usr/local/bin/suve
-```
-
 ### Using [`go install`](https://pkg.go.dev/cmd/go#hdr-Compile_and_install_packages_and_dependencies)
 
 ```bash
-GOEXPERIMENT=jsonv2 go install github.com/mpyw/suve/cmd/suve@latest
+go install github.com/mpyw/suve/cmd/suve@latest
 ```
 
-> [!IMPORTANT]
-> This project uses Go 1.25's experimental `encoding/json/v2`. The `GOEXPERIMENT=jsonv2` flag is required.
+### Using [`go tool`](https://pkg.go.dev/cmd/go#hdr-Run_specified_go_tool) (Go 1.24+)
+
+```bash
+# Add to go.mod as a tool dependency
+go get -tool github.com/mpyw/suve/cmd/suve@latest
+
+# Run via go tool
+go tool suve ssm show /my/param
+```
 
 ## Usage
 
@@ -146,28 +142,6 @@ Modified: 2024-01-15T10:30:45Z
 @@ -1 +1 @@
 -old-value
 +new-value
-```
-
-## Verifying Release Signatures
-
-Releases are signed with [sigstore/cosign](https://docs.sigstore.dev/cosign/overview/):
-
-```bash
-# Download checksums and signature
-curl -LO https://github.com/mpyw/suve/releases/latest/download/checksums.txt
-curl -LO https://github.com/mpyw/suve/releases/latest/download/checksums.txt.sig
-curl -LO https://github.com/mpyw/suve/releases/latest/download/checksums.txt.pem
-
-# Verify signature
-cosign verify-blob \
-  --signature checksums.txt.sig \
-  --certificate checksums.txt.pem \
-  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
-  --certificate-identity-regexp '^https://github.com/mpyw/suve/.github/workflows/release.yml@refs/tags/' \
-  checksums.txt
-
-# Verify binary checksum
-sha256sum -c checksums.txt
 ```
 
 ## Documentation

@@ -1,7 +1,6 @@
 .PHONY: build test lint e2e e2e-ssm up down clean coverage
 
 SUVE_LOCALSTACK_EXTERNAL_PORT ?= 4566
-export GOEXPERIMENT := jsonv2
 
 # Build
 build:
