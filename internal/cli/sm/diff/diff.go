@@ -12,7 +12,6 @@ import (
 	"github.com/mpyw/suve/internal/api/smapi"
 	"github.com/mpyw/suve/internal/awsutil"
 	"github.com/mpyw/suve/internal/output"
-	"github.com/mpyw/suve/internal/version"
 	"github.com/mpyw/suve/internal/version/smversion"
 )
 
@@ -28,22 +27,19 @@ func Command() *cli.Command {
 		Name:      "diff",
 		Usage:     "Show diff between two versions",
 		ArgsUsage: "<name> <version1> [version2]",
-		Description: `Compare two versions of a secret and display the differences
-in unified diff format with color highlighting.
+		Description: `Compare two versions of a secret in unified diff format.
+If only one version is specified, compares against AWSCURRENT.
 
-If only one version is specified, it compares that version against
-the current version (AWSCURRENT).
-
-VERSION SPECIFIERS (used as separate arguments after name):
-   @ID     Specific version by VersionId (e.g., @abc12345-...)
-   ~N      Relative version (e.g., ~1 for previous version)
-   :LABEL  Staging label (AWSCURRENT, AWSPREVIOUS)
+VERSION SPECIFIERS (as separate arguments):
+  #ID     Specific version by VersionId
+  :LABEL  Staging label (AWSCURRENT, AWSPREVIOUS)
+  ~N      N versions ago; ~ alone means ~1
 
 EXAMPLES:
-   suve sm diff my-secret :AWSCURRENT :AWSPREVIOUS   Compare current and previous
-   suve sm diff my-secret :AWSPREVIOUS               Compare previous with current
-   suve sm diff my-secret '~1'                       Same as above (compare ~1 with current)
-   suve sm diff my-secret @abc123 @def456            Compare two versions by ID`,
+  suve sm diff my-secret :AWSPREVIOUS :AWSCURRENT  Compare labels
+  suve sm diff my-secret :AWSPREVIOUS              Compare with current
+  suve sm diff my-secret ~                         Compare previous with current
+  suve sm diff my-secret #abc123 #def456           Compare by version ID`,
 		Action: action,
 	}
 }
@@ -72,12 +68,12 @@ func action(c *cli.Context) error {
 
 // Run executes the diff command.
 func Run(ctx context.Context, client Client, w io.Writer, name, version1, version2 string) error {
-	spec1, err := version.Parse(name + version1)
+	spec1, err := smversion.Parse(name + version1)
 	if err != nil {
 		return fmt.Errorf("invalid version1: %w", err)
 	}
 
-	spec2, err := version.Parse(name + version2)
+	spec2, err := smversion.Parse(name + version2)
 	if err != nil {
 		return fmt.Errorf("invalid version2: %w", err)
 	}
@@ -102,8 +98,8 @@ func Run(ctx context.Context, client Client, w io.Writer, name, version1, versio
 	}
 
 	diff := output.Diff(
-		fmt.Sprintf("%s@%s", name, v1),
-		fmt.Sprintf("%s@%s", name, v2),
+		fmt.Sprintf("%s#%s", name, v1),
+		fmt.Sprintf("%s#%s", name, v2),
 		aws.ToString(secret1.SecretString),
 		aws.ToString(secret2.SecretString),
 	)

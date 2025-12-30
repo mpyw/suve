@@ -10,7 +10,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ssm/types"
 
 	"github.com/mpyw/suve/internal/api/ssmapi"
-	"github.com/mpyw/suve/internal/version"
 )
 
 // Client is the interface for GetParameterWithVersion.
@@ -20,14 +19,14 @@ type Client interface {
 }
 
 // GetParameterWithVersion retrieves a parameter with version/shift support.
-func GetParameterWithVersion(ctx context.Context, client Client, spec *version.Spec, decrypt bool) (*types.ParameterHistory, error) {
+func GetParameterWithVersion(ctx context.Context, client Client, spec *Spec, decrypt bool) (*types.ParameterHistory, error) {
 	if spec.HasShift() {
 		return getParameterWithShift(ctx, client, spec, decrypt)
 	}
 	return getParameterDirect(ctx, client, spec, decrypt)
 }
 
-func getParameterWithShift(ctx context.Context, client ssmapi.GetParameterHistoryAPI, spec *version.Spec, decrypt bool) (*types.ParameterHistory, error) {
+func getParameterWithShift(ctx context.Context, client ssmapi.GetParameterHistoryAPI, spec *Spec, decrypt bool) (*types.ParameterHistory, error) {
 	history, err := client.GetParameterHistory(ctx, &ssm.GetParameterHistoryInput{
 		Name:           aws.String(spec.Name),
 		WithDecryption: aws.Bool(decrypt),
@@ -69,7 +68,7 @@ func getParameterWithShift(ctx context.Context, client ssmapi.GetParameterHistor
 	return &params[targetIdx], nil
 }
 
-func getParameterDirect(ctx context.Context, client ssmapi.GetParameterAPI, spec *version.Spec, decrypt bool) (*types.ParameterHistory, error) {
+func getParameterDirect(ctx context.Context, client ssmapi.GetParameterAPI, spec *Spec, decrypt bool) (*types.ParameterHistory, error) {
 	var nameWithVersion string
 	if spec.Version != nil {
 		nameWithVersion = fmt.Sprintf("%s:%d", spec.Name, *spec.Version)

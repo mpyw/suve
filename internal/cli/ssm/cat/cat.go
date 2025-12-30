@@ -11,7 +11,6 @@ import (
 
 	"github.com/mpyw/suve/internal/api/ssmapi"
 	"github.com/mpyw/suve/internal/awsutil"
-	"github.com/mpyw/suve/internal/version"
 	"github.com/mpyw/suve/internal/version/ssmversion"
 )
 
@@ -26,21 +25,19 @@ func Command() *cli.Command {
 	return &cli.Command{
 		Name:      "cat",
 		Usage:     "Output raw parameter value (for piping)",
-		ArgsUsage: "<name[@version][~shift]>",
-		Description: `Output the raw parameter value without any metadata or formatting.
-Designed for use in scripts and piping to other commands.
-Does not append a trailing newline.
+		ArgsUsage: "<name[#version][shifts]>",
+		Description: `Output the raw parameter value without any formatting.
+Does not append a trailing newline. Designed for scripts and piping.
 
 VERSION SPECIFIERS:
-   @N     Specific version number (e.g., @3 for version 3)
-   ~N     Relative version (e.g., ~1 for previous version)
+  #N   Specific version (e.g., #3)
+  ~N   N versions ago (e.g., ~1, ~2); ~ alone means ~1
 
 EXAMPLES:
-   suve ssm cat /app/config/db-url              Output latest value
-   suve ssm cat /app/config/db-url@3            Output version 3
-   suve ssm cat /app/config/db-url~1            Output previous version
-   DB_URL=$(suve ssm cat /app/config/db-url)    Use in shell variable
-   suve ssm cat /app/config/cert > cert.pem     Pipe to file`,
+  suve ssm cat /app/config/db-url            Output latest value
+  suve ssm cat /app/config/db-url#3          Output version 3
+  suve ssm cat /app/config/db-url~           Output previous version
+  DB_URL=$(suve ssm cat /app/config/db-url)  Use in shell variable`,
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
 				Name:    "decrypt",
@@ -58,7 +55,7 @@ func action(c *cli.Context) error {
 		return fmt.Errorf("parameter name required")
 	}
 
-	spec, err := version.Parse(c.Args().First())
+	spec, err := ssmversion.Parse(c.Args().First())
 	if err != nil {
 		return err
 	}
@@ -72,7 +69,7 @@ func action(c *cli.Context) error {
 }
 
 // Run executes the cat command.
-func Run(ctx context.Context, client Client, w io.Writer, spec *version.Spec, decrypt bool) error {
+func Run(ctx context.Context, client Client, w io.Writer, spec *ssmversion.Spec, decrypt bool) error {
 	param, err := ssmversion.GetParameterWithVersion(ctx, client, spec, decrypt)
 	if err != nil {
 		return err

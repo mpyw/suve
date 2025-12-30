@@ -4,7 +4,7 @@ This file provides guidance to Claude Code when working with code in this reposi
 
 ## Project Overview
 
-**suve** is a Git-like CLI for AWS Parameter Store and Secrets Manager. It provides familiar Git-style commands (`show`, `log`, `diff`, `cat`, `ls`, `set`, `rm`) with version specification syntax (`@N`, `~N`, `:LABEL`).
+**suve** is a Git-like CLI for AWS Parameter Store and Secrets Manager. It provides familiar Git-style commands (`show`, `log`, `diff`, `cat`, `ls`, `set`, `rm`) with version specification syntax (`#N`, `~N`, `:LABEL`).
 
 ### Core Concepts
 
@@ -16,12 +16,20 @@ This file provides guidance to Claude Code when working with code in this reposi
 
 2. **Version Specification**: Git-like revision syntax
    ```
-   <name>[@<version>][~<shift>][:label]
+   # SSM Parameter Store
+   <name>[#<version>][~<shift>]
 
    /my/param           # Latest
-   /my/param@3         # Version 3
+   /my/param#3         # Version 3
    /my/param~1         # 1 version ago (like HEAD~1)
-   my-secret:AWSCURRENT   # Staging label (SM only)
+
+   # Secrets Manager
+   <name>[#<id> | :<label>][~<shift>]
+
+   my-secret              # Current version
+   my-secret#abc123       # Specific version ID
+   my-secret:AWSCURRENT   # Staging label
+   user@example.com~1     # @ in name is allowed
    ```
 
 3. **Two Services**:
@@ -45,9 +53,10 @@ suve/
 │   │   └── smapi/             # SM API interface (for testing)
 │   │
 │   ├── version/
-│   │   ├── spec.go            # Version spec parser (@N, ~N, :LABEL)
-│   │   ├── ssmversion/        # SSM version resolution
-│   │   └── smversion/         # SM version resolution
+│   │   ├── internal/          # Shared utilities (char checks)
+│   │   ├── shift/             # Shift parser (~N, ~~, etc.)
+│   │   ├── ssmversion/        # SSM version spec parser (#N, ~N)
+│   │   └── smversion/         # SM version spec parser (#id, :label, ~N)
 │   │
 │   ├── output/                # Output formatting (diff, colors)
 │   ├── jsonutil/              # JSON formatting

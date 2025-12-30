@@ -9,8 +9,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/aws/aws-sdk-go-v2/service/ssm/types"
-
-	"github.com/mpyw/suve/internal/version"
 )
 
 type mockClient struct {
@@ -51,7 +49,7 @@ func TestGetParameterWithVersion_Latest(t *testing.T) {
 		},
 	}
 
-	spec := &version.Spec{Name: "/my/param"}
+	spec := &Spec{Name: "/my/param"}
 	result, err := GetParameterWithVersion(t.Context(), mock, spec, true)
 
 	if err != nil {
@@ -86,7 +84,7 @@ func TestGetParameterWithVersion_SpecificVersion(t *testing.T) {
 	}
 
 	v := int64(2)
-	spec := &version.Spec{Name: "/my/param", Version: &v}
+	spec := &Spec{Name: "/my/param", Version: &v}
 	result, err := GetParameterWithVersion(t.Context(), mock, spec, true)
 
 	if err != nil {
@@ -118,7 +116,7 @@ func TestGetParameterWithVersion_Shift(t *testing.T) {
 		},
 	}
 
-	spec := &version.Spec{Name: "/my/param", Shift: 1}
+	spec := &Spec{Name: "/my/param", Shift: 1}
 	result, err := GetParameterWithVersion(t.Context(), mock, spec, true)
 
 	if err != nil {
@@ -148,7 +146,7 @@ func TestGetParameterWithVersion_ShiftFromSpecificVersion(t *testing.T) {
 	}
 
 	v := int64(3)
-	spec := &version.Spec{Name: "/my/param", Version: &v, Shift: 2}
+	spec := &Spec{Name: "/my/param", Version: &v, Shift: 2}
 	result, err := GetParameterWithVersion(t.Context(), mock, spec, true)
 
 	if err != nil {
@@ -172,7 +170,7 @@ func TestGetParameterWithVersion_ShiftOutOfRange(t *testing.T) {
 		},
 	}
 
-	spec := &version.Spec{Name: "/my/param", Shift: 5}
+	spec := &Spec{Name: "/my/param", Shift: 5}
 	_, err := GetParameterWithVersion(t.Context(), mock, spec, true)
 
 	if err == nil {
@@ -196,7 +194,7 @@ func TestGetParameterWithVersion_VersionNotFound(t *testing.T) {
 	}
 
 	v := int64(99)
-	spec := &version.Spec{Name: "/my/param", Version: &v, Shift: 1}
+	spec := &Spec{Name: "/my/param", Version: &v, Shift: 1}
 	_, err := GetParameterWithVersion(t.Context(), mock, spec, true)
 
 	if err == nil {
@@ -216,7 +214,7 @@ func TestGetParameterWithVersion_EmptyHistory(t *testing.T) {
 		},
 	}
 
-	spec := &version.Spec{Name: "/my/param", Shift: 1}
+	spec := &Spec{Name: "/my/param", Shift: 1}
 	_, err := GetParameterWithVersion(t.Context(), mock, spec, true)
 
 	if err == nil {
@@ -234,7 +232,7 @@ func TestGetParameterWithVersion_GetParameterError(t *testing.T) {
 		},
 	}
 
-	spec := &version.Spec{Name: "/my/param"}
+	spec := &Spec{Name: "/my/param"}
 	_, err := GetParameterWithVersion(t.Context(), mock, spec, true)
 
 	if err == nil {
@@ -252,7 +250,7 @@ func TestGetParameterWithVersion_GetParameterHistoryError(t *testing.T) {
 		},
 	}
 
-	spec := &version.Spec{Name: "/my/param", Shift: 1}
+	spec := &Spec{Name: "/my/param", Shift: 1}
 	_, err := GetParameterWithVersion(t.Context(), mock, spec, true)
 
 	if err == nil {
@@ -280,7 +278,7 @@ func TestGetParameterWithVersion_DecryptFlag(t *testing.T) {
 		},
 	}
 
-	spec := &version.Spec{Name: "/my/param"}
+	spec := &Spec{Name: "/my/param"}
 	result, err := GetParameterWithVersion(t.Context(), mock, spec, true)
 
 	if err != nil {

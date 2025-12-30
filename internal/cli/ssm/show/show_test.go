@@ -10,7 +10,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/aws/aws-sdk-go-v2/service/ssm/types"
 
-	"github.com/mpyw/suve/internal/version"
+	"github.com/mpyw/suve/internal/version/ssmversion"
 )
 
 type mockClient struct {
@@ -31,7 +31,7 @@ func TestRun(t *testing.T) {
 
 	tests := []struct {
 		name    string
-		spec    *version.Spec
+		spec    *ssmversion.Spec
 		mock    *mockClient
 		decrypt bool
 		wantErr bool
@@ -39,7 +39,7 @@ func TestRun(t *testing.T) {
 	}{
 		{
 			name: "show latest version",
-			spec: &version.Spec{Name: "/my/param"},
+			spec: &ssmversion.Spec{Name: "/my/param"},
 			mock: &mockClient{
 				getParameterFunc: func(_ context.Context, _ *ssm.GetParameterInput, _ ...func(*ssm.Options)) (*ssm.GetParameterOutput, error) {
 					return &ssm.GetParameterOutput{
@@ -64,7 +64,7 @@ func TestRun(t *testing.T) {
 		},
 		{
 			name: "show with shift",
-			spec: &version.Spec{Name: "/my/param", Shift: 1},
+			spec: &ssmversion.Spec{Name: "/my/param", Shift: 1},
 			mock: &mockClient{
 				getParameterHistoryFunc: func(_ context.Context, _ *ssm.GetParameterHistoryInput, _ ...func(*ssm.Options)) (*ssm.GetParameterHistoryOutput, error) {
 					return &ssm.GetParameterHistoryOutput{

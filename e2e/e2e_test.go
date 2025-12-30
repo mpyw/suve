@@ -155,7 +155,7 @@ func TestSSM_FullWorkflow(t *testing.T) {
 	// 6. Diff
 	t.Run("diff", func(t *testing.T) {
 		var buf bytes.Buffer
-		err := ssmdiff.Run(ctx, client, &buf, paramName, "@1", "@2")
+		err := ssmdiff.Run(ctx, client, &buf, paramName, "#1", "#2")
 		if err != nil {
 			t.Fatalf("ssmdiff.Run() error: %v", err)
 		}

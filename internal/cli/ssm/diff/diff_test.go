@@ -46,8 +46,8 @@ func TestRun(t *testing.T) {
 		{
 			name:      "diff between two versions",
 			paramName: "/app/param",
-			version1:  "@1",
-			version2:  "@2",
+			version1:  "#1",
+			version2:  "#2",
 			mock: &mockClient{
 				getParameterFunc: func(_ context.Context, params *ssm.GetParameterInput, _ ...func(*ssm.Options)) (*ssm.GetParameterOutput, error) {
 					name := aws.ToString(params.Name)
@@ -85,8 +85,8 @@ func TestRun(t *testing.T) {
 		{
 			name:      "no diff when same content",
 			paramName: "/app/param",
-			version1:  "@1",
-			version2:  "@2",
+			version1:  "#1",
+			version2:  "#2",
 			mock: &mockClient{
 				getParameterFunc: func(_ context.Context, _ *ssm.GetParameterInput, _ ...func(*ssm.Options)) (*ssm.GetParameterOutput, error) {
 					return &ssm.GetParameterOutput{
@@ -109,8 +109,8 @@ func TestRun(t *testing.T) {
 		{
 			name:      "error getting first version",
 			paramName: "/app/param",
-			version1:  "@1",
-			version2:  "@2",
+			version1:  "#1",
+			version2:  "#2",
 			mock: &mockClient{
 				getParameterFunc: func(_ context.Context, params *ssm.GetParameterInput, _ ...func(*ssm.Options)) (*ssm.GetParameterOutput, error) {
 					if aws.ToString(params.Name) == "/app/param:1" {
@@ -130,8 +130,8 @@ func TestRun(t *testing.T) {
 		{
 			name:      "error getting second version",
 			paramName: "/app/param",
-			version1:  "@1",
-			version2:  "@2",
+			version1:  "#1",
+			version2:  "#2",
 			mock: &mockClient{
 				getParameterFunc: func(_ context.Context, params *ssm.GetParameterInput, _ ...func(*ssm.Options)) (*ssm.GetParameterOutput, error) {
 					if aws.ToString(params.Name) == "/app/param:2" {

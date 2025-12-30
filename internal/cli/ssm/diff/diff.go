@@ -12,7 +12,6 @@ import (
 	"github.com/mpyw/suve/internal/api/ssmapi"
 	"github.com/mpyw/suve/internal/awsutil"
 	"github.com/mpyw/suve/internal/output"
-	"github.com/mpyw/suve/internal/version"
 	"github.com/mpyw/suve/internal/version/ssmversion"
 )
 
@@ -28,20 +27,17 @@ func Command() *cli.Command {
 		Name:      "diff",
 		Usage:     "Show diff between two versions",
 		ArgsUsage: "<name> <version1> [version2]",
-		Description: `Compare two versions of a parameter and display the differences
-in unified diff format with color highlighting.
+		Description: `Compare two versions of a parameter in unified diff format.
+If only one version is specified, compares against latest.
 
-If only one version is specified, it compares that version against
-the latest version.
-
-VERSION SPECIFIERS (used as separate arguments after name):
-   @N     Specific version number (e.g., @3 for version 3)
-   ~N     Relative version (e.g., ~1 for previous version)
+VERSION SPECIFIERS (as separate arguments):
+  #N   Specific version (e.g., #3)
+  ~N   N versions ago; ~ alone means ~1
 
 EXAMPLES:
-   suve ssm diff /app/config/db-url @1 @2    Compare v1 and v2
-   suve ssm diff /app/config/db-url @3       Compare v3 with latest
-   suve ssm diff /app/config/db-url '~1'     Compare previous with latest`,
+  suve ssm diff /app/config/db-url #1 #2  Compare v1 and v2
+  suve ssm diff /app/config/db-url #3     Compare v3 with latest
+  suve ssm diff /app/config/db-url ~      Compare previous with latest`,
 		Action: action,
 	}
 }
@@ -70,12 +66,12 @@ func action(c *cli.Context) error {
 
 // Run executes the diff command.
 func Run(ctx context.Context, client Client, w io.Writer, name, version1, version2 string) error {
-	spec1, err := version.Parse(name + version1)
+	spec1, err := ssmversion.Parse(name + version1)
 	if err != nil {
 		return fmt.Errorf("invalid version1: %w", err)
 	}
 
-	spec2, err := version.Parse(name + version2)
+	spec2, err := ssmversion.Parse(name + version2)
 	if err != nil {
 		return fmt.Errorf("invalid version2: %w", err)
 	}
@@ -91,8 +87,8 @@ func Run(ctx context.Context, client Client, w io.Writer, name, version1, versio
 	}
 
 	diff := output.Diff(
-		fmt.Sprintf("%s@%d", name, param1.Version),
-		fmt.Sprintf("%s@%d", name, param2.Version),
+		fmt.Sprintf("%s#%d", name, param1.Version),
+		fmt.Sprintf("%s#%d", name, param2.Version),
 		aws.ToString(param1.Value),
 		aws.ToString(param2.Value),
 	)

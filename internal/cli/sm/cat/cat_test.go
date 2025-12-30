@@ -11,7 +11,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager/types"
 
-	"github.com/mpyw/suve/internal/version"
+	"github.com/mpyw/suve/internal/version/smversion"
 )
 
 type mockClient struct {
@@ -38,14 +38,14 @@ func TestRun(t *testing.T) {
 
 	tests := []struct {
 		name    string
-		spec    *version.Spec
+		spec    *smversion.Spec
 		mock    *mockClient
 		wantErr bool
 		check   func(t *testing.T, output string)
 	}{
 		{
 			name: "output raw value",
-			spec: &version.Spec{Name: "my-secret"},
+			spec: &smversion.Spec{Name: "my-secret"},
 			mock: &mockClient{
 				getSecretValueFunc: func(_ context.Context, _ *secretsmanager.GetSecretValueInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.GetSecretValueOutput, error) {
 					return &secretsmanager.GetSecretValueOutput{
@@ -62,7 +62,7 @@ func TestRun(t *testing.T) {
 		},
 		{
 			name: "output with shift",
-			spec: &version.Spec{Name: "my-secret", Shift: 1},
+			spec: &smversion.Spec{Name: "my-secret", Shift: 1},
 			mock: &mockClient{
 				listSecretVersionIdsFunc: func(_ context.Context, _ *secretsmanager.ListSecretVersionIdsInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.ListSecretVersionIdsOutput, error) {
 					return &secretsmanager.ListSecretVersionIdsOutput{
@@ -87,7 +87,7 @@ func TestRun(t *testing.T) {
 		},
 		{
 			name: "error from AWS",
-			spec: &version.Spec{Name: "my-secret"},
+			spec: &smversion.Spec{Name: "my-secret"},
 			mock: &mockClient{
 				getSecretValueFunc: func(_ context.Context, _ *secretsmanager.GetSecretValueInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.GetSecretValueOutput, error) {
 					return nil, fmt.Errorf("AWS error")

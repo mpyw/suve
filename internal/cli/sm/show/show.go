@@ -14,7 +14,6 @@ import (
 	"github.com/mpyw/suve/internal/awsutil"
 	"github.com/mpyw/suve/internal/jsonutil"
 	"github.com/mpyw/suve/internal/output"
-	"github.com/mpyw/suve/internal/version"
 	"github.com/mpyw/suve/internal/version/smversion"
 )
 
@@ -29,25 +28,20 @@ func Command() *cli.Command {
 	return &cli.Command{
 		Name:      "show",
 		Usage:     "Show secret value with metadata",
-		ArgsUsage: "<name[@version][~shift][:label]>",
-		Description: `Display a secret's value along with its metadata (name, ARN, version ID,
-staging labels, creation date).
+		ArgsUsage: "<name[#id | :label][shifts]>",
+		Description: `Display a secret's value along with its metadata.
 
 VERSION SPECIFIERS:
-   @ID     Specific version by VersionId (e.g., @abc12345-...)
-   ~N      Relative version (e.g., ~1 for previous version)
-   :LABEL  Staging label (AWSCURRENT, AWSPREVIOUS, or custom)
-
-STAGING LABELS:
-   AWSCURRENT   The current active version (default)
-   AWSPREVIOUS  The previous version before the last rotation
+  #ID     Specific version by VersionId
+  :LABEL  Staging label (AWSCURRENT, AWSPREVIOUS, or custom)
+  ~N      N versions ago; ~ alone means ~1
 
 EXAMPLES:
-   suve sm show my-secret                   Show current version
-   suve sm show my-secret:AWSPREVIOUS       Show previous version by label
-   suve sm show my-secret~1                 Show previous version by shift
-   suve sm show my-secret@abc12345          Show specific version by ID
-   suve sm show -j my-secret                Pretty print JSON secret value`,
+  suve sm show my-secret                 Show current version
+  suve sm show my-secret~                Show previous version
+  suve sm show my-secret:AWSPREVIOUS     Show AWSPREVIOUS label
+  suve sm show my-secret:AWSPREVIOUS~1   Show 1 before AWSPREVIOUS
+  suve sm show -j my-secret              Pretty print JSON value`,
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
 				Name:    "json",
@@ -64,7 +58,7 @@ func action(c *cli.Context) error {
 		return fmt.Errorf("secret name required")
 	}
 
-	spec, err := version.Parse(c.Args().First())
+	spec, err := smversion.Parse(c.Args().First())
 	if err != nil {
 		return err
 	}
@@ -78,7 +72,7 @@ func action(c *cli.Context) error {
 }
 
 // Run executes the show command.
-func Run(ctx context.Context, client Client, w io.Writer, spec *version.Spec, prettyJSON bool) error {
+func Run(ctx context.Context, client Client, w io.Writer, spec *smversion.Spec, prettyJSON bool) error {
 	secret, err := smversion.GetSecretWithVersion(ctx, client, spec)
 	if err != nil {
 		return err
