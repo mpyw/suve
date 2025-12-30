@@ -9,11 +9,11 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/urfave/cli/v2"
 
+	"github.com/mpyw/suve/internal/api/ssmapi"
 	"github.com/mpyw/suve/internal/awsutil"
 	"github.com/mpyw/suve/internal/output"
-	"github.com/mpyw/suve/internal/ssmapi"
-	"github.com/mpyw/suve/internal/ssmutil"
 	"github.com/mpyw/suve/internal/version"
+	"github.com/mpyw/suve/internal/version/ssmversion"
 )
 
 // Client is the interface for the diff command.
@@ -66,12 +66,12 @@ func Run(ctx context.Context, client Client, w io.Writer, name, version1, versio
 		return fmt.Errorf("invalid version2: %w", err)
 	}
 
-	param1, err := ssmutil.GetParameterWithVersion(ctx, client, spec1, true)
+	param1, err := ssmversion.GetParameterWithVersion(ctx, client, spec1, true)
 	if err != nil {
 		return fmt.Errorf("failed to get version %s: %w", version1, err)
 	}
 
-	param2, err := ssmutil.GetParameterWithVersion(ctx, client, spec2, true)
+	param2, err := ssmversion.GetParameterWithVersion(ctx, client, spec2, true)
 	if err != nil {
 		return fmt.Errorf("failed to get version %s: %w", version2, err)
 	}

@@ -1,5 +1,5 @@
-// Package ssmutil provides utilities for AWS Systems Manager Parameter Store.
-package ssmutil
+// Package ssmversion provides version resolution for AWS Systems Manager Parameter Store.
+package ssmversion
 
 import (
 	"context"
@@ -9,18 +9,18 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/aws/aws-sdk-go-v2/service/ssm/types"
 
-	"github.com/mpyw/suve/internal/ssmapi"
+	"github.com/mpyw/suve/internal/api/ssmapi"
 	"github.com/mpyw/suve/internal/version"
 )
 
-// versionedClient is the interface for GetParameterWithVersion.
-type versionedClient interface {
+// Client is the interface for GetParameterWithVersion.
+type Client interface {
 	ssmapi.GetParameterAPI
 	ssmapi.GetParameterHistoryAPI
 }
 
 // GetParameterWithVersion retrieves a parameter with version/shift support.
-func GetParameterWithVersion(ctx context.Context, client versionedClient, spec *version.Spec, decrypt bool) (*types.ParameterHistory, error) {
+func GetParameterWithVersion(ctx context.Context, client Client, spec *version.Spec, decrypt bool) (*types.ParameterHistory, error) {
 	if spec.HasShift() {
 		return getParameterWithShift(ctx, client, spec, decrypt)
 	}

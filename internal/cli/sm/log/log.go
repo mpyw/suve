@@ -13,8 +13,8 @@ import (
 	"github.com/fatih/color"
 	"github.com/urfave/cli/v2"
 
+	"github.com/mpyw/suve/internal/api/smapi"
 	"github.com/mpyw/suve/internal/awsutil"
-	"github.com/mpyw/suve/internal/smapi"
 )
 
 // Client is the interface for the log command.
@@ -82,7 +82,11 @@ func Run(ctx context.Context, client Client, w io.Writer, name string, maxResult
 	green := color.New(color.FgGreen).SprintFunc()
 
 	for i, v := range versions {
-		versionLabel := fmt.Sprintf("Version %s", aws.ToString(v.VersionId)[:8])
+		versionID := aws.ToString(v.VersionId)
+		if len(versionID) > 8 {
+			versionID = versionID[:8]
+		}
+		versionLabel := fmt.Sprintf("Version %s", versionID)
 		if len(v.VersionStages) > 0 {
 			versionLabel += " " + green(fmt.Sprintf("%v", v.VersionStages))
 		}

@@ -11,8 +11,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager/types"
 	"github.com/urfave/cli/v2"
 
+	"github.com/mpyw/suve/internal/api/smapi"
 	"github.com/mpyw/suve/internal/awsutil"
-	"github.com/mpyw/suve/internal/smapi"
 )
 
 // Client is the interface for the ls command.

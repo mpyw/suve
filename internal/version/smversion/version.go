@@ -1,5 +1,5 @@
-// Package smutil provides utilities for AWS Secrets Manager.
-package smutil
+// Package smversion provides version resolution for AWS Secrets Manager.
+package smversion
 
 import (
 	"context"
@@ -9,18 +9,18 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
 
-	"github.com/mpyw/suve/internal/smapi"
+	"github.com/mpyw/suve/internal/api/smapi"
 	"github.com/mpyw/suve/internal/version"
 )
 
-// versionedClient is the interface for GetSecretWithVersion.
-type versionedClient interface {
+// Client is the interface for GetSecretWithVersion.
+type Client interface {
 	smapi.GetSecretValueAPI
 	smapi.ListSecretVersionIdsAPI
 }
 
 // GetSecretWithVersion retrieves a secret with version/shift/label support.
-func GetSecretWithVersion(ctx context.Context, client versionedClient, spec *version.Spec) (*secretsmanager.GetSecretValueOutput, error) {
+func GetSecretWithVersion(ctx context.Context, client Client, spec *version.Spec) (*secretsmanager.GetSecretValueOutput, error) {
 	input := &secretsmanager.GetSecretValueInput{
 		SecretId: aws.String(spec.Name),
 	}

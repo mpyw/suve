@@ -10,11 +10,12 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/urfave/cli/v2"
 
+	"github.com/mpyw/suve/internal/api/smapi"
 	"github.com/mpyw/suve/internal/awsutil"
+	"github.com/mpyw/suve/internal/jsonutil"
 	"github.com/mpyw/suve/internal/output"
-	"github.com/mpyw/suve/internal/smapi"
-	"github.com/mpyw/suve/internal/smutil"
 	"github.com/mpyw/suve/internal/version"
+	"github.com/mpyw/suve/internal/version/smversion"
 )
 
 // Client is the interface for the show command.
@@ -60,7 +61,7 @@ func action(c *cli.Context) error {
 
 // Run executes the show command.
 func Run(ctx context.Context, client Client, w io.Writer, spec *version.Spec, prettyJSON bool) error {
-	secret, err := smutil.GetSecretWithVersion(ctx, client, spec)
+	secret, err := smversion.GetSecretWithVersion(ctx, client, spec)
 	if err != nil {
 		return err
 	}
@@ -81,7 +82,7 @@ func Run(ctx context.Context, client Client, w io.Writer, spec *version.Spec, pr
 
 	value := aws.ToString(secret.SecretString)
 	if prettyJSON {
-		value = formatJSON(value)
+		value = jsonutil.Format(value)
 	}
 	out.Value(value)
 

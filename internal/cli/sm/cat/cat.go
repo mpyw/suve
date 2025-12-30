@@ -9,10 +9,10 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/urfave/cli/v2"
 
+	"github.com/mpyw/suve/internal/api/smapi"
 	"github.com/mpyw/suve/internal/awsutil"
-	"github.com/mpyw/suve/internal/smapi"
-	"github.com/mpyw/suve/internal/smutil"
 	"github.com/mpyw/suve/internal/version"
+	"github.com/mpyw/suve/internal/version/smversion"
 )
 
 // Client is the interface for the cat command.
@@ -51,7 +51,7 @@ func action(c *cli.Context) error {
 
 // Run executes the cat command.
 func Run(ctx context.Context, client Client, w io.Writer, spec *version.Spec) error {
-	secret, err := smutil.GetSecretWithVersion(ctx, client, spec)
+	secret, err := smversion.GetSecretWithVersion(ctx, client, spec)
 	if err != nil {
 		return err
 	}
