@@ -26,21 +26,24 @@ func Command() *cli.Command {
 		Name:      "ls",
 		Usage:     "List secrets",
 		ArgsUsage: "[filter-prefix]",
-		Flags: []cli.Flag{
-			&cli.StringFlag{
-				Name:  "filter",
-				Usage: "Filter secrets by name prefix",
-			},
-		},
+		Description: `List secrets in AWS Secrets Manager.
+
+Without a filter prefix, lists all secrets in the account.
+With a filter prefix, lists only secrets whose names contain that prefix.
+
+Note: Unlike SSM parameters, Secrets Manager filters by name substring,
+not by path hierarchy.
+
+EXAMPLES:
+   suve sm ls                  List all secrets
+   suve sm ls prod             List secrets containing "prod"
+   suve sm ls my-app/          List secrets starting with "my-app/"`,
 		Action: action,
 	}
 }
 
 func action(c *cli.Context) error {
 	prefix := c.Args().First()
-	if prefix == "" {
-		prefix = c.String("filter")
-	}
 
 	client, err := awsutil.NewSMClient(c.Context)
 	if err != nil {

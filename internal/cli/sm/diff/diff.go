@@ -27,8 +27,24 @@ func Command() *cli.Command {
 	return &cli.Command{
 		Name:      "diff",
 		Usage:     "Show diff between two versions",
-		ArgsUsage: "<name> <version1> <version2>",
-		Action:    action,
+		ArgsUsage: "<name> <version1> [version2]",
+		Description: `Compare two versions of a secret and display the differences
+in unified diff format with color highlighting.
+
+If only one version is specified, it compares that version against
+the current version (AWSCURRENT).
+
+VERSION SPECIFIERS (used as separate arguments after name):
+   @ID     Specific version by VersionId (e.g., @abc12345-...)
+   ~N      Relative version (e.g., ~1 for previous version)
+   :LABEL  Staging label (AWSCURRENT, AWSPREVIOUS)
+
+EXAMPLES:
+   suve sm diff my-secret :AWSCURRENT :AWSPREVIOUS   Compare current and previous
+   suve sm diff my-secret :AWSPREVIOUS               Compare previous with current
+   suve sm diff my-secret '~1'                       Same as above (compare ~1 with current)
+   suve sm diff my-secret @abc123 @def456            Compare two versions by ID`,
+		Action: action,
 	}
 }
 

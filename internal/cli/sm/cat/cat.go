@@ -27,7 +27,22 @@ func Command() *cli.Command {
 		Name:      "cat",
 		Usage:     "Output raw secret value (for piping)",
 		ArgsUsage: "<name[@version][~shift][:label]>",
-		Action:    action,
+		Description: `Output the raw secret value without any metadata or formatting.
+Designed for use in scripts and piping to other commands.
+Does not append a trailing newline.
+
+VERSION SPECIFIERS:
+   @ID     Specific version by VersionId (e.g., @abc12345-...)
+   ~N      Relative version (e.g., ~1 for previous version)
+   :LABEL  Staging label (AWSCURRENT, AWSPREVIOUS, or custom)
+
+EXAMPLES:
+   suve sm cat my-secret                        Output current value
+   suve sm cat my-secret:AWSPREVIOUS            Output previous version
+   suve sm cat my-secret~1                      Output previous version by shift
+   API_KEY=$(suve sm cat my-api-key)            Use in shell variable
+   suve sm cat my-config | jq '.database'       Pipe JSON to jq`,
+		Action: action,
 	}
 }
 

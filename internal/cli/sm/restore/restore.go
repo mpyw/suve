@@ -26,7 +26,15 @@ func Command() *cli.Command {
 		Name:      "restore",
 		Usage:     "Restore a deleted secret",
 		ArgsUsage: "<name>",
-		Action:    action,
+		Description: `Restore a secret that was scheduled for deletion.
+
+This only works for secrets that were deleted with a recovery window
+and haven't been permanently deleted yet. Secrets deleted with --force
+cannot be restored.
+
+EXAMPLES:
+   suve sm restore my-secret    Restore a deleted secret`,
+		Action: action,
 	}
 }
 

@@ -28,7 +28,21 @@ func Command() *cli.Command {
 		Name:      "diff",
 		Usage:     "Show diff between two versions",
 		ArgsUsage: "<name> <version1> [version2]",
-		Action:    action,
+		Description: `Compare two versions of a parameter and display the differences
+in unified diff format with color highlighting.
+
+If only one version is specified, it compares that version against
+the latest version.
+
+VERSION SPECIFIERS (used as separate arguments after name):
+   @N     Specific version number (e.g., @3 for version 3)
+   ~N     Relative version (e.g., ~1 for previous version)
+
+EXAMPLES:
+   suve ssm diff /app/config/db-url @1 @2    Compare v1 and v2
+   suve ssm diff /app/config/db-url @3       Compare v3 with latest
+   suve ssm diff /app/config/db-url '~1'     Compare previous with latest`,
+		Action: action,
 	}
 }
 

@@ -51,7 +51,7 @@ func TestGetSecretWithVersion_Latest(t *testing.T) {
 	}
 
 	spec := &version.Spec{Name: "my-secret"}
-	result, err := GetSecretWithVersion(context.Background(), mock, spec)
+	result, err := GetSecretWithVersion(t.Context(), mock, spec)
 
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -81,7 +81,7 @@ func TestGetSecretWithVersion_WithLabel(t *testing.T) {
 
 	label := "AWSPREVIOUS"
 	spec := &version.Spec{Name: "my-secret", Label: &label}
-	result, err := GetSecretWithVersion(context.Background(), mock, spec)
+	result, err := GetSecretWithVersion(t.Context(), mock, spec)
 
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -120,7 +120,7 @@ func TestGetSecretWithVersion_Shift(t *testing.T) {
 	}
 
 	spec := &version.Spec{Name: "my-secret", Shift: 1}
-	result, err := GetSecretWithVersion(context.Background(), mock, spec)
+	result, err := GetSecretWithVersion(t.Context(), mock, spec)
 
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -143,7 +143,7 @@ func TestGetSecretWithVersion_ShiftOutOfRange(t *testing.T) {
 	}
 
 	spec := &version.Spec{Name: "my-secret", Shift: 5}
-	_, err := GetSecretWithVersion(context.Background(), mock, spec)
+	_, err := GetSecretWithVersion(t.Context(), mock, spec)
 
 	if err == nil {
 		t.Fatal("expected error for shift out of range")
@@ -161,7 +161,7 @@ func TestGetSecretWithVersion_ListVersionsError(t *testing.T) {
 	}
 
 	spec := &version.Spec{Name: "my-secret", Shift: 1}
-	_, err := GetSecretWithVersion(context.Background(), mock, spec)
+	_, err := GetSecretWithVersion(t.Context(), mock, spec)
 
 	if err == nil {
 		t.Fatal("expected error")
@@ -179,7 +179,7 @@ func TestGetSecretWithVersion_GetSecretError(t *testing.T) {
 	}
 
 	spec := &version.Spec{Name: "my-secret"}
-	_, err := GetSecretWithVersion(context.Background(), mock, spec)
+	_, err := GetSecretWithVersion(t.Context(), mock, spec)
 
 	if err != nil && err.Error() != "AWS error" {
 		t.Errorf("unexpected error message: %v", err)
@@ -213,7 +213,7 @@ func TestGetSecretWithVersion_SortByCreatedDate(t *testing.T) {
 	}
 
 	spec := &version.Spec{Name: "my-secret", Shift: 2}
-	result, err := GetSecretWithVersion(context.Background(), mock, spec)
+	result, err := GetSecretWithVersion(t.Context(), mock, spec)
 
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -249,7 +249,7 @@ func TestGetSecretWithVersion_NilCreatedDate(t *testing.T) {
 	}
 
 	spec := &version.Spec{Name: "my-secret", Shift: 1}
-	result, err := GetSecretWithVersion(context.Background(), mock, spec)
+	result, err := GetSecretWithVersion(t.Context(), mock, spec)
 
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)

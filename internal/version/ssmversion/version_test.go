@@ -52,7 +52,7 @@ func TestGetParameterWithVersion_Latest(t *testing.T) {
 	}
 
 	spec := &version.Spec{Name: "/my/param"}
-	result, err := GetParameterWithVersion(context.Background(), mock, spec, true)
+	result, err := GetParameterWithVersion(t.Context(), mock, spec, true)
 
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -87,7 +87,7 @@ func TestGetParameterWithVersion_SpecificVersion(t *testing.T) {
 
 	v := int64(2)
 	spec := &version.Spec{Name: "/my/param", Version: &v}
-	result, err := GetParameterWithVersion(context.Background(), mock, spec, true)
+	result, err := GetParameterWithVersion(t.Context(), mock, spec, true)
 
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -119,7 +119,7 @@ func TestGetParameterWithVersion_Shift(t *testing.T) {
 	}
 
 	spec := &version.Spec{Name: "/my/param", Shift: 1}
-	result, err := GetParameterWithVersion(context.Background(), mock, spec, true)
+	result, err := GetParameterWithVersion(t.Context(), mock, spec, true)
 
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -149,7 +149,7 @@ func TestGetParameterWithVersion_ShiftFromSpecificVersion(t *testing.T) {
 
 	v := int64(3)
 	spec := &version.Spec{Name: "/my/param", Version: &v, Shift: 2}
-	result, err := GetParameterWithVersion(context.Background(), mock, spec, true)
+	result, err := GetParameterWithVersion(t.Context(), mock, spec, true)
 
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -173,7 +173,7 @@ func TestGetParameterWithVersion_ShiftOutOfRange(t *testing.T) {
 	}
 
 	spec := &version.Spec{Name: "/my/param", Shift: 5}
-	_, err := GetParameterWithVersion(context.Background(), mock, spec, true)
+	_, err := GetParameterWithVersion(t.Context(), mock, spec, true)
 
 	if err == nil {
 		t.Fatal("expected error for shift out of range")
@@ -197,7 +197,7 @@ func TestGetParameterWithVersion_VersionNotFound(t *testing.T) {
 
 	v := int64(99)
 	spec := &version.Spec{Name: "/my/param", Version: &v, Shift: 1}
-	_, err := GetParameterWithVersion(context.Background(), mock, spec, true)
+	_, err := GetParameterWithVersion(t.Context(), mock, spec, true)
 
 	if err == nil {
 		t.Fatal("expected error for version not found")
@@ -217,7 +217,7 @@ func TestGetParameterWithVersion_EmptyHistory(t *testing.T) {
 	}
 
 	spec := &version.Spec{Name: "/my/param", Shift: 1}
-	_, err := GetParameterWithVersion(context.Background(), mock, spec, true)
+	_, err := GetParameterWithVersion(t.Context(), mock, spec, true)
 
 	if err == nil {
 		t.Fatal("expected error for empty history")
@@ -235,7 +235,7 @@ func TestGetParameterWithVersion_GetParameterError(t *testing.T) {
 	}
 
 	spec := &version.Spec{Name: "/my/param"}
-	_, err := GetParameterWithVersion(context.Background(), mock, spec, true)
+	_, err := GetParameterWithVersion(t.Context(), mock, spec, true)
 
 	if err == nil {
 		t.Fatal("expected error")
@@ -253,7 +253,7 @@ func TestGetParameterWithVersion_GetParameterHistoryError(t *testing.T) {
 	}
 
 	spec := &version.Spec{Name: "/my/param", Shift: 1}
-	_, err := GetParameterWithVersion(context.Background(), mock, spec, true)
+	_, err := GetParameterWithVersion(t.Context(), mock, spec, true)
 
 	if err == nil {
 		t.Fatal("expected error")
@@ -281,7 +281,7 @@ func TestGetParameterWithVersion_DecryptFlag(t *testing.T) {
 	}
 
 	spec := &version.Spec{Name: "/my/param"}
-	result, err := GetParameterWithVersion(context.Background(), mock, spec, true)
+	result, err := GetParameterWithVersion(t.Context(), mock, spec, true)
 
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)

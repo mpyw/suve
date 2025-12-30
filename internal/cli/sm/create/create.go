@@ -26,6 +26,18 @@ func Command() *cli.Command {
 		Name:      "create",
 		Usage:     "Create a new secret",
 		ArgsUsage: "<name> <value>",
+		Description: `Create a new secret in AWS Secrets Manager.
+
+Use this command for new secrets only. To update an existing secret,
+use 'suve sm set' instead.
+
+Secret values are automatically encrypted by Secrets Manager using
+the default KMS key or a custom KMS key configured in the account.
+
+EXAMPLES:
+   suve sm create my-api-key "sk-12345"                    Create simple secret
+   suve sm create -d "API Key for service X" my-key "..."  With description
+   suve sm create my-config '{"host":"db.example.com"}'    Create JSON secret`,
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:    "description",

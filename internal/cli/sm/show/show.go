@@ -30,6 +30,24 @@ func Command() *cli.Command {
 		Name:      "show",
 		Usage:     "Show secret value with metadata",
 		ArgsUsage: "<name[@version][~shift][:label]>",
+		Description: `Display a secret's value along with its metadata (name, ARN, version ID,
+staging labels, creation date).
+
+VERSION SPECIFIERS:
+   @ID     Specific version by VersionId (e.g., @abc12345-...)
+   ~N      Relative version (e.g., ~1 for previous version)
+   :LABEL  Staging label (AWSCURRENT, AWSPREVIOUS, or custom)
+
+STAGING LABELS:
+   AWSCURRENT   The current active version (default)
+   AWSPREVIOUS  The previous version before the last rotation
+
+EXAMPLES:
+   suve sm show my-secret                   Show current version
+   suve sm show my-secret:AWSPREVIOUS       Show previous version by label
+   suve sm show my-secret~1                 Show previous version by shift
+   suve sm show my-secret@abc12345          Show specific version by ID
+   suve sm show -j my-secret                Pretty print JSON secret value`,
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
 				Name:    "json",

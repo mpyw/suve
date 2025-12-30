@@ -26,6 +26,23 @@ func Command() *cli.Command {
 		Name:      "rm",
 		Usage:     "Delete a secret",
 		ArgsUsage: "<name>",
+		Description: `Schedule a secret for deletion in AWS Secrets Manager.
+
+By default, secrets are scheduled for deletion after a 30-day recovery
+window. During this period, you can restore the secret using 'suve sm restore'.
+
+Use --force for immediate permanent deletion without a recovery window.
+This action cannot be undone.
+
+RECOVERY WINDOW:
+   Minimum: 7 days
+   Maximum: 30 days
+   Default: 30 days
+
+EXAMPLES:
+   suve sm rm my-secret                      Delete with 30-day recovery
+   suve sm rm --recovery-window 7 my-secret  Delete with 7-day recovery
+   suve sm rm -f my-secret                   Permanently delete immediately`,
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
 				Name:    "force",

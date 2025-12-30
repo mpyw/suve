@@ -29,12 +29,25 @@ func Command() *cli.Command {
 		Name:      "show",
 		Usage:     "Show parameter value with metadata",
 		ArgsUsage: "<name[@version][~shift]>",
+		Description: `Display a parameter's value along with its metadata (name, version, type, modification date).
+
+VERSION SPECIFIERS:
+   @N     Specific version number (e.g., @3 for version 3)
+   ~N     Relative version (e.g., ~1 for previous version)
+   @N~M   Combined: M versions before version N
+
+EXAMPLES:
+   suve ssm show /app/config/db-url            Show latest version
+   suve ssm show /app/config/db-url@3          Show version 3
+   suve ssm show /app/config/db-url~1          Show previous version
+   suve ssm show /app/config/db-url@5~2        Show 2 versions before v5 (=v3)
+   suve ssm show --decrypt=false /app/secret   Show without decryption`,
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
 				Name:    "decrypt",
 				Aliases: []string{"d"},
 				Value:   true,
-				Usage:   "Decrypt SecureString values",
+				Usage:   "Decrypt SecureString values (use --decrypt=false to disable)",
 			},
 		},
 		Action: action,

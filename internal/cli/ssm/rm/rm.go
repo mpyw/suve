@@ -26,7 +26,14 @@ func Command() *cli.Command {
 		Name:      "rm",
 		Usage:     "Delete parameter",
 		ArgsUsage: "<name>",
-		Action:    action,
+		Description: `Permanently delete a parameter from AWS Systems Manager Parameter Store.
+
+WARNING: This action is irreversible. The parameter and all its version
+history will be permanently deleted.
+
+EXAMPLES:
+   suve ssm rm /app/config/old-param    Delete a parameter`,
+		Action: action,
 	}
 }
 

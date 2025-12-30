@@ -27,12 +27,22 @@ func Command() *cli.Command {
 		Name:      "log",
 		Usage:     "Show parameter version history",
 		ArgsUsage: "<name>",
+		Description: `Display the version history of a parameter, showing each version's
+number, modification date, and a preview of the value.
+
+Output is sorted with the most recent version first.
+Value previews are truncated at 50 characters.
+
+EXAMPLES:
+   suve ssm log /app/config/db-url         Show last 10 versions (default)
+   suve ssm log -n 5 /app/config/db-url    Show last 5 versions
+   suve ssm log -n 100 /app/config/db-url  Show last 100 versions`,
 		Flags: []cli.Flag{
 			&cli.IntFlag{
 				Name:    "number",
 				Aliases: []string{"n"},
 				Value:   10,
-				Usage:   "Number of versions to show",
+				Usage:   "Maximum number of versions to show",
 			},
 		},
 		Action: action,

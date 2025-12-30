@@ -26,7 +26,17 @@ func Command() *cli.Command {
 		Name:      "set",
 		Usage:     "Update a secret value",
 		ArgsUsage: "<name> <value>",
-		Action:    action,
+		Description: `Update the value of an existing secret.
+
+This creates a new version of the secret. The previous version will
+have its AWSCURRENT label moved to AWSPREVIOUS.
+
+Use 'suve sm create' to create a new secret.
+
+EXAMPLES:
+   suve sm set my-api-key "new-key-value"            Update with new value
+   suve sm set my-config '{"host":"new-db.com"}'     Update JSON secret`,
+		Action: action,
 	}
 }
 

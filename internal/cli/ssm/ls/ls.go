@@ -26,6 +26,19 @@ func Command() *cli.Command {
 		Name:      "ls",
 		Usage:     "List parameters",
 		ArgsUsage: "[path-prefix]",
+		Description: `List parameters in AWS Systems Manager Parameter Store.
+
+Without a path prefix, lists all parameters in the account.
+With a path prefix, lists only parameters under that path.
+
+By default, lists only immediate children of the path.
+Use --recursive to include all descendant parameters.
+
+EXAMPLES:
+   suve ssm ls                          List all parameters
+   suve ssm ls /app                     List parameters directly under /app
+   suve ssm ls -r /app                  List all parameters under /app recursively
+   suve ssm ls /app/config/             List parameters under /app/config`,
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
 				Name:    "recursive",

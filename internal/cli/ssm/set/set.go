@@ -27,12 +27,32 @@ func Command() *cli.Command {
 		Name:      "set",
 		Usage:     "Set parameter value",
 		ArgsUsage: "<name> <value>",
+		Description: `Create a new parameter or update an existing one.
+
+PARAMETER TYPES:
+   String        Plain text value (default)
+   StringList    Comma-separated list of values
+   SecureString  Encrypted value using AWS KMS
+
+The --secure flag is a shorthand for --type SecureString.
+You cannot use both --secure and --type together.
+
+EXAMPLES:
+   suve ssm set /app/config/db-url "postgres://..."       Create String parameter
+   suve ssm set -s /app/config/api-key "secret123"       Create SecureString
+   suve ssm set -t StringList /app/hosts "a.com,b.com"   Create StringList
+   suve ssm set -d "DB URL" /app/db-url "postgres://..." With description`,
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:    "type",
 				Aliases: []string{"t"},
-				Value:   "SecureString",
+				Value:   "String",
 				Usage:   "Parameter type (String, StringList, SecureString)",
+			},
+			&cli.BoolFlag{
+				Name:    "secure",
+				Aliases: []string{"s"},
+				Usage:   "Shorthand for --type SecureString",
 			},
 			&cli.StringFlag{
 				Name:    "description",
@@ -51,8 +71,17 @@ func action(c *cli.Context) error {
 
 	name := c.Args().Get(0)
 	value := c.Args().Get(1)
+	secure := c.Bool("secure")
 	paramType := c.String("type")
 	description := c.String("description")
+
+	// Check for conflicting flags
+	if secure && c.IsSet("type") {
+		return fmt.Errorf("cannot use --secure with --type; use one or the other")
+	}
+	if secure {
+		paramType = "SecureString"
+	}
 
 	client, err := awsutil.NewSSMClient(c.Context)
 	if err != nil {

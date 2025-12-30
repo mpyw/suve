@@ -28,6 +28,16 @@ func Command() *cli.Command {
 		Name:      "log",
 		Usage:     "Show secret version history",
 		ArgsUsage: "<name>",
+		Description: `Display the version history of a secret, showing each version's
+UUID (truncated), staging labels, and creation date.
+
+Output is sorted with the most recent version first.
+Version UUIDs are truncated to 8 characters for readability.
+
+EXAMPLES:
+   suve sm log my-secret           Show last 10 versions (default)
+   suve sm log -n 5 my-secret      Show last 5 versions
+   suve sm log -n 50 my-secret     Show last 50 versions`,
 		Flags: []cli.Flag{
 			&cli.IntFlag{
 				Name:    "number",

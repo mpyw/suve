@@ -27,12 +27,26 @@ func Command() *cli.Command {
 		Name:      "cat",
 		Usage:     "Output raw parameter value (for piping)",
 		ArgsUsage: "<name[@version][~shift]>",
+		Description: `Output the raw parameter value without any metadata or formatting.
+Designed for use in scripts and piping to other commands.
+Does not append a trailing newline.
+
+VERSION SPECIFIERS:
+   @N     Specific version number (e.g., @3 for version 3)
+   ~N     Relative version (e.g., ~1 for previous version)
+
+EXAMPLES:
+   suve ssm cat /app/config/db-url              Output latest value
+   suve ssm cat /app/config/db-url@3            Output version 3
+   suve ssm cat /app/config/db-url~1            Output previous version
+   DB_URL=$(suve ssm cat /app/config/db-url)    Use in shell variable
+   suve ssm cat /app/config/cert > cert.pem     Pipe to file`,
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
 				Name:    "decrypt",
 				Aliases: []string{"d"},
 				Value:   true,
-				Usage:   "Decrypt SecureString values",
+				Usage:   "Decrypt SecureString values (use --decrypt=false to disable)",
 			},
 		},
 		Action: action,

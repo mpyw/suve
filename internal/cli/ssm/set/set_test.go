@@ -97,7 +97,7 @@ func TestRun(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var buf bytes.Buffer
-			err := Run(context.Background(), tt.mock, &buf, tt.paramName, tt.value, tt.paramType, tt.description)
+			err := Run(t.Context(), tt.mock, &buf, tt.paramName, tt.value, tt.paramType, tt.description)
 
 			if tt.wantErr {
 				if err == nil {

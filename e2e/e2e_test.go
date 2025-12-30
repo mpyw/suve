@@ -48,7 +48,7 @@ func newSSMClient(t *testing.T) *ssm.Client {
 	t.Helper()
 	endpoint := getEndpoint()
 
-	cfg, err := config.LoadDefaultConfig(context.Background(),
+	cfg, err := config.LoadDefaultConfig(t.Context(),
 		config.WithRegion("us-east-1"),
 		config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider("test", "test", "")),
 	)
@@ -65,7 +65,7 @@ func newSMClient(t *testing.T) *secretsmanager.Client {
 	t.Helper()
 	endpoint := getEndpoint()
 
-	cfg, err := config.LoadDefaultConfig(context.Background(),
+	cfg, err := config.LoadDefaultConfig(t.Context(),
 		config.WithRegion("us-east-1"),
 		config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider("test", "test", "")),
 	)
@@ -79,7 +79,7 @@ func newSMClient(t *testing.T) *secretsmanager.Client {
 }
 
 func TestSSM_FullWorkflow(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	client := newSSMClient(t)
 	paramName := "/suve-e2e-test/param"
 
@@ -204,7 +204,7 @@ func TestSSM_FullWorkflow(t *testing.T) {
 }
 
 func TestSM_FullWorkflow(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	client := newSMClient(t)
 	secretName := "suve-e2e-test/secret"
 
