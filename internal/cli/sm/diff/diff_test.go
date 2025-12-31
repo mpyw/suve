@@ -9,7 +9,9 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
 
+	"github.com/mpyw/suve/internal/diff"
 	"github.com/mpyw/suve/internal/testutil"
+	"github.com/mpyw/suve/internal/version/smversion"
 )
 
 func TestParseArgs(t *testing.T) {
@@ -20,7 +22,7 @@ func TestParseArgs(t *testing.T) {
 		wantSpec2  *wantSpec
 		wantErrMsg string
 	}{
-		// === 1 argument: fullspec vs AWSCURRENT ===
+		// === 1 argument: full spec vs AWSCURRENT ===
 		{
 			name: "1 arg: label specified",
 			args: []string{"my-secret:AWSPREVIOUS"},
@@ -88,7 +90,7 @@ func TestParseArgs(t *testing.T) {
 
 		// === 2 arguments: second starts with #/:/ ~ (use name from first) ===
 		{
-			name: "2 args: name + label spec (legacy with omission)",
+			name: "2 args: name + label spec (partial spec)",
 			args: []string{"my-secret", ":AWSPREVIOUS"},
 			wantSpec1: &wantSpec{
 				secretName: "my-secret",
@@ -120,7 +122,7 @@ func TestParseArgs(t *testing.T) {
 			},
 		},
 		{
-			name: "2 args: fullspec + label spec (mixed)",
+			name: "2 args: full spec + label spec (mixed)",
 			args: []string{"my-secret:AWSPREVIOUS", ":AWSCURRENT"},
 			wantSpec1: &wantSpec{
 				secretName: "my-secret",
@@ -136,7 +138,7 @@ func TestParseArgs(t *testing.T) {
 			},
 		},
 		{
-			name: "2 args: fullspec#id + #id spec (mixed)",
+			name: "2 args: full spec#id + #id spec (mixed)",
 			args: []string{"my-secret#abc123", "#def456"},
 			wantSpec1: &wantSpec{
 				secretName: "my-secret",
@@ -170,7 +172,7 @@ func TestParseArgs(t *testing.T) {
 
 		// === 2 arguments: fullpath x2 ===
 		{
-			name: "2 args: fullspec x2 same key with labels",
+			name: "2 args: full spec x2 same key with labels",
 			args: []string{"my-secret:AWSPREVIOUS", "my-secret:AWSCURRENT"},
 			wantSpec1: &wantSpec{
 				secretName: "my-secret",
@@ -186,7 +188,7 @@ func TestParseArgs(t *testing.T) {
 			},
 		},
 		{
-			name: "2 args: fullspec x2 same key with IDs",
+			name: "2 args: full spec x2 same key with IDs",
 			args: []string{"my-secret#abc123", "my-secret#def456"},
 			wantSpec1: &wantSpec{
 				secretName: "my-secret",
@@ -202,7 +204,7 @@ func TestParseArgs(t *testing.T) {
 			},
 		},
 		{
-			name: "2 args: fullspec x2 different keys",
+			name: "2 args: full spec x2 different keys",
 			args: []string{"my-secret#abc123", "other-secret#def456"},
 			wantSpec1: &wantSpec{
 				secretName: "my-secret",
@@ -234,9 +236,9 @@ func TestParseArgs(t *testing.T) {
 			},
 		},
 
-		// === 3 arguments: legacy format ===
+		// === 3 arguments: partial spec format ===
 		{
-			name: "3 args: legacy format with labels",
+			name: "3 args: partial spec format with labels",
 			args: []string{"my-secret", ":AWSPREVIOUS", ":AWSCURRENT"},
 			wantSpec1: &wantSpec{
 				secretName: "my-secret",
@@ -252,7 +254,7 @@ func TestParseArgs(t *testing.T) {
 			},
 		},
 		{
-			name: "3 args: legacy format with IDs",
+			name: "3 args: partial spec format with IDs",
 			args: []string{"my-secret", "#abc123", "#def456"},
 			wantSpec1: &wantSpec{
 				secretName: "my-secret",
@@ -268,7 +270,7 @@ func TestParseArgs(t *testing.T) {
 			},
 		},
 		{
-			name: "3 args: legacy mixed label and shift",
+			name: "3 args: partial spec mixed label and shift",
 			args: []string{"my-secret", ":AWSPREVIOUS", "~"},
 			wantSpec1: &wantSpec{
 				secretName: "my-secret",
@@ -309,7 +311,13 @@ func TestParseArgs(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			spec1, spec2, err := ParseArgs(tt.args)
+			spec1, spec2, err := diff.ParseArgs(
+				tt.args,
+				smversion.Parse,
+				func(abs smversion.AbsoluteSpec) bool { return abs.ID != nil || abs.Label != nil },
+				"#:~",
+				"usage: suve sm diff <spec1> [spec2] | <name> <version1> [version2]",
+			)
 
 			if tt.wantErrMsg != "" {
 				if err == nil {
@@ -338,16 +346,16 @@ type wantSpec struct {
 	shift      int
 }
 
-func assertSpec(t *testing.T, name string, got *ParsedSpec, want *wantSpec) {
+func assertSpec(t *testing.T, name string, got *smversion.Spec, want *wantSpec) {
 	t.Helper()
 	if got.Name != want.secretName {
 		t.Errorf("%s.Name = %q, want %q", name, got.Name, want.secretName)
 	}
-	if !testutil.PtrEqual(got.ID, want.id) {
-		t.Errorf("%s.ID = %v, want %v", name, got.ID, want.id)
+	if !testutil.PtrEqual(got.Absolute.ID, want.id) {
+		t.Errorf("%s.Absolute.ID = %v, want %v", name, got.Absolute.ID, want.id)
 	}
-	if !testutil.PtrEqual(got.Label, want.label) {
-		t.Errorf("%s.Label = %v, want %v", name, got.Label, want.label)
+	if !testutil.PtrEqual(got.Absolute.Label, want.label) {
+		t.Errorf("%s.Absolute.Label = %v, want %v", name, got.Absolute.Label, want.label)
 	}
 	if got.Shift != want.shift {
 		t.Errorf("%s.Shift = %d, want %d", name, got.Shift, want.shift)
@@ -547,8 +555,8 @@ func TestRun_IdenticalWarning(t *testing.T) {
 		Stderr: &stderr,
 	}
 	opts := Options{
-		Spec1:      &ParsedSpec{Name: "my-secret", ID: nil, Label: nil, Shift: 0},
-		Spec2:      &ParsedSpec{Name: "my-secret", ID: nil, Label: nil, Shift: 0},
+		Spec1:      &smversion.Spec{Name: "my-secret", Absolute: smversion.AbsoluteSpec{}},
+		Spec2:      &smversion.Spec{Name: "my-secret", Absolute: smversion.AbsoluteSpec{}},
 		JSONFormat: false,
 	}
 

@@ -169,8 +169,8 @@ func TestSSM_FullWorkflow(t *testing.T) {
 		t.Logf("log output: %s", buf.String())
 	})
 
-	// 6. Diff - Compare version 1 with version 2 using legacy format
-	// This tests the Run() function which uses the legacy 3-argument format.
+	// 6. Diff - Compare version 1 with version 2 using partial spec format
+	// This tests the Run() function which uses the partial spec 3-argument format.
 	// The diff should show "initial-value" as removed (-) and "updated-value" as added (+).
 	t.Run("diff", func(t *testing.T) {
 		var buf bytes.Buffer
@@ -303,8 +303,8 @@ func TestSM_FullWorkflow(t *testing.T) {
 		t.Logf("log output: %s", buf.String())
 	})
 
-	// 6. Diff - Compare AWSPREVIOUS with AWSCURRENT using legacy format
-	// This tests the Run() function which uses the legacy 3-argument format with labels.
+	// 6. Diff - Compare AWSPREVIOUS with AWSCURRENT using partial spec format
+	// This tests the Run() function which uses the partial spec 3-argument format with labels.
 	// After update: AWSPREVIOUS = "initial-secret", AWSCURRENT = "updated-secret"
 	// The diff should show "initial-secret" as removed (-) and "updated-secret" as added (+).
 	t.Run("diff", func(t *testing.T) {

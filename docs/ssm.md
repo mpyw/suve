@@ -218,14 +218,14 @@ The diff command supports multiple argument formats for flexibility:
 
 | Format | Args | Example | Description |
 |--------|------|---------|-------------|
-| fullspec | 2 | `/param#1 /param#2` | Both args include name and version |
-| fullspec | 1 | `/param#3` | Compare specified version with latest |
+| full spec | 2 | `/param#1 /param#2` | Both args include name and version |
+| full spec | 1 | `/param#3` | Compare specified version with latest |
 | mixed | 2 | `/param#1 '#2'` | First with version, second specifier only |
-| legacy | 2 | `/param '#3'` | Name + specifier → compare with latest |
-| legacy | 3 | `/param '#1' '#2'` | Name + two specifiers |
+| partial spec | 2 | `/param '#3'` | Name + specifier → compare with latest |
+| partial spec | 3 | `/param '#1' '#2'` | Name + two specifiers |
 
 > [!TIP]
-> **Use fullspec format** to avoid shell quoting issues. When `#` appears at the start of an argument, shells interpret it as a comment. Fullspec format embeds the specifier within the path, so no quoting is needed.
+> **Use full spec format** to avoid shell quoting issues. When `#` appears at the start of an argument, shells interpret it as a comment. Full spec format embeds the specifier within the path, so no quoting is needed.
 
 > [!NOTE]
 > When only one version is specified, it is compared against the **latest** version.
@@ -267,7 +267,7 @@ Output is colorized when stdout is a TTY:
 
 ### Examples
 
-#### Fullspec Format (Recommended)
+#### Full Spec Format (Recommended)
 
 ```bash
 # Compare version 1 with version 2
@@ -287,10 +287,10 @@ suve ssm diff /app/config/database-url~1
 suve ssm diff /app/config/database-url#1 '#2'
 ```
 
-#### Legacy Format
+#### Partial Spec Format
 
 > [!IMPORTANT]
-> Legacy format requires quoting `#` and `~` specifiers to prevent shell interpretation:
+> Partial spec format requires quoting `#` and `~` specifiers to prevent shell interpretation:
 > - `#` at argument start is treated as a comment in most shells
 > - `~` alone expands to `$HOME` in bash/zsh
 

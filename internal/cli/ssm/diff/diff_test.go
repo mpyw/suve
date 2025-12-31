@@ -11,7 +11,9 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/aws/aws-sdk-go-v2/service/ssm/types"
 
+	"github.com/mpyw/suve/internal/diff"
 	"github.com/mpyw/suve/internal/testutil"
+	"github.com/mpyw/suve/internal/version/ssmversion"
 )
 
 func TestParseArgs(t *testing.T) {
@@ -22,7 +24,7 @@ func TestParseArgs(t *testing.T) {
 		wantSpec2  *wantSpec
 		wantErrMsg string
 	}{
-		// === 1 argument: fullspec vs latest ===
+		// === 1 argument: full spec vs latest ===
 		{
 			name: "1 arg: version specified",
 			args: []string{"/app/config#3"},
@@ -82,7 +84,7 @@ func TestParseArgs(t *testing.T) {
 
 		// === 2 arguments: second starts with # or ~ (use name from first) ===
 		{
-			name: "2 args: name + version spec (legacy with omission)",
+			name: "2 args: name + version spec (partial spec)",
 			args: []string{"/app/config", "#3"},
 			wantSpec1: &wantSpec{
 				name:    "/app/config",
@@ -96,7 +98,7 @@ func TestParseArgs(t *testing.T) {
 			},
 		},
 		{
-			name: "2 args: fullspec + version spec (mixed)",
+			name: "2 args: full spec + version spec (mixed)",
 			args: []string{"/app/config#1", "#2"},
 			wantSpec1: &wantSpec{
 				name:    "/app/config",
@@ -110,7 +112,7 @@ func TestParseArgs(t *testing.T) {
 			},
 		},
 		{
-			name: "2 args: fullspec with shift + version spec",
+			name: "2 args: full spec with shift + version spec",
 			args: []string{"/app/config~1", "#2"},
 			wantSpec1: &wantSpec{
 				name:    "/app/config",
@@ -154,7 +156,7 @@ func TestParseArgs(t *testing.T) {
 
 		// === 2 arguments: fullpath x2 ===
 		{
-			name: "2 args: fullspec x2 same key",
+			name: "2 args: full spec x2 same key",
 			args: []string{"/app/config#1", "/app/config#2"},
 			wantSpec1: &wantSpec{
 				name:    "/app/config",
@@ -168,7 +170,7 @@ func TestParseArgs(t *testing.T) {
 			},
 		},
 		{
-			name: "2 args: fullspec x2 different keys",
+			name: "2 args: full spec x2 different keys",
 			args: []string{"/app/config#1", "/other/key#2"},
 			wantSpec1: &wantSpec{
 				name:    "/app/config",
@@ -210,9 +212,9 @@ func TestParseArgs(t *testing.T) {
 			},
 		},
 
-		// === 3 arguments: legacy format ===
+		// === 3 arguments: partial spec format ===
 		{
-			name: "3 args: legacy format",
+			name: "3 args: partial spec format",
 			args: []string{"/app/config", "#1", "#2"},
 			wantSpec1: &wantSpec{
 				name:    "/app/config",
@@ -226,7 +228,7 @@ func TestParseArgs(t *testing.T) {
 			},
 		},
 		{
-			name: "3 args: legacy with shifts",
+			name: "3 args: partial spec with shifts",
 			args: []string{"/app/config", "~1", "~2"},
 			wantSpec1: &wantSpec{
 				name:    "/app/config",
@@ -240,7 +242,7 @@ func TestParseArgs(t *testing.T) {
 			},
 		},
 		{
-			name: "3 args: legacy mixed version and shift",
+			name: "3 args: partial spec mixed version and shift",
 			args: []string{"/app/config", "#3", "~"},
 			wantSpec1: &wantSpec{
 				name:    "/app/config",
@@ -279,7 +281,13 @@ func TestParseArgs(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			spec1, spec2, err := ParseArgs(tt.args)
+			spec1, spec2, err := diff.ParseArgs(
+				tt.args,
+				ssmversion.Parse,
+				func(abs ssmversion.AbsoluteSpec) bool { return abs.Version != nil },
+				"#~",
+				"usage: suve ssm diff <spec1> [spec2] | <name> <version1> [version2]",
+			)
 
 			if tt.wantErrMsg != "" {
 				if err == nil {
@@ -307,13 +315,13 @@ type wantSpec struct {
 	shift   int
 }
 
-func assertSpec(t *testing.T, label string, got *ParsedSpec, want *wantSpec) {
+func assertSpec(t *testing.T, label string, got *ssmversion.Spec, want *wantSpec) {
 	t.Helper()
 	if got.Name != want.name {
 		t.Errorf("%s.Name = %q, want %q", label, got.Name, want.name)
 	}
-	if !testutil.PtrEqual(got.Version, want.version) {
-		t.Errorf("%s.Version = %v, want %v", label, got.Version, want.version)
+	if !testutil.PtrEqual(got.Absolute.Version, want.version) {
+		t.Errorf("%s.Absolute.Version = %v, want %v", label, got.Absolute.Version, want.version)
 	}
 	if got.Shift != want.shift {
 		t.Errorf("%s.Shift = %d, want %d", label, got.Shift, want.shift)
@@ -352,8 +360,8 @@ func TestRun(t *testing.T) {
 		{
 			name: "diff between two versions",
 			opts: Options{
-				Spec1: &ParsedSpec{Name: "/app/param", Version: testutil.Ptr(int64(1))},
-				Spec2: &ParsedSpec{Name: "/app/param", Version: testutil.Ptr(int64(2))},
+				Spec1: &ssmversion.Spec{Name: "/app/param", Absolute: ssmversion.AbsoluteSpec{Version: testutil.Ptr(int64(1))}},
+				Spec2: &ssmversion.Spec{Name: "/app/param", Absolute: ssmversion.AbsoluteSpec{Version: testutil.Ptr(int64(2))}},
 			},
 			mock: &mockClient{
 				getParameterFunc: func(_ context.Context, params *ssm.GetParameterInput, _ ...func(*ssm.Options)) (*ssm.GetParameterOutput, error) {
@@ -392,8 +400,8 @@ func TestRun(t *testing.T) {
 		{
 			name: "no diff when same content",
 			opts: Options{
-				Spec1: &ParsedSpec{Name: "/app/param", Version: testutil.Ptr(int64(1))},
-				Spec2: &ParsedSpec{Name: "/app/param", Version: testutil.Ptr(int64(2))},
+				Spec1: &ssmversion.Spec{Name: "/app/param", Absolute: ssmversion.AbsoluteSpec{Version: testutil.Ptr(int64(1))}},
+				Spec2: &ssmversion.Spec{Name: "/app/param", Absolute: ssmversion.AbsoluteSpec{Version: testutil.Ptr(int64(2))}},
 			},
 			mock: &mockClient{
 				getParameterFunc: func(_ context.Context, _ *ssm.GetParameterInput, _ ...func(*ssm.Options)) (*ssm.GetParameterOutput, error) {
@@ -417,8 +425,8 @@ func TestRun(t *testing.T) {
 		{
 			name: "error getting first version",
 			opts: Options{
-				Spec1: &ParsedSpec{Name: "/app/param", Version: testutil.Ptr(int64(1))},
-				Spec2: &ParsedSpec{Name: "/app/param", Version: testutil.Ptr(int64(2))},
+				Spec1: &ssmversion.Spec{Name: "/app/param", Absolute: ssmversion.AbsoluteSpec{Version: testutil.Ptr(int64(1))}},
+				Spec2: &ssmversion.Spec{Name: "/app/param", Absolute: ssmversion.AbsoluteSpec{Version: testutil.Ptr(int64(2))}},
 			},
 			mock: &mockClient{
 				getParameterFunc: func(_ context.Context, params *ssm.GetParameterInput, _ ...func(*ssm.Options)) (*ssm.GetParameterOutput, error) {
@@ -439,8 +447,8 @@ func TestRun(t *testing.T) {
 		{
 			name: "error getting second version",
 			opts: Options{
-				Spec1: &ParsedSpec{Name: "/app/param", Version: testutil.Ptr(int64(1))},
-				Spec2: &ParsedSpec{Name: "/app/param", Version: testutil.Ptr(int64(2))},
+				Spec1: &ssmversion.Spec{Name: "/app/param", Absolute: ssmversion.AbsoluteSpec{Version: testutil.Ptr(int64(1))}},
+				Spec2: &ssmversion.Spec{Name: "/app/param", Absolute: ssmversion.AbsoluteSpec{Version: testutil.Ptr(int64(2))}},
 			},
 			mock: &mockClient{
 				getParameterFunc: func(_ context.Context, params *ssm.GetParameterInput, _ ...func(*ssm.Options)) (*ssm.GetParameterOutput, error) {
@@ -509,8 +517,8 @@ func TestRun_IdenticalWarning(t *testing.T) {
 		Stderr: &stderr,
 	}
 	opts := Options{
-		Spec1: &ParsedSpec{Name: "/app/param"},
-		Spec2: &ParsedSpec{Name: "/app/param"},
+		Spec1: &ssmversion.Spec{Name: "/app/param", Absolute: ssmversion.AbsoluteSpec{}},
+		Spec2: &ssmversion.Spec{Name: "/app/param", Absolute: ssmversion.AbsoluteSpec{}},
 	}
 
 	err := r.Run(t.Context(), opts)

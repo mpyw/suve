@@ -218,14 +218,14 @@ The diff command supports multiple argument formats for flexibility:
 
 | Format | Args | Example | Description |
 |--------|------|---------|-------------|
-| fullspec | 2 | `secret:AWSPREVIOUS secret:AWSCURRENT` | Both args include name and version |
-| fullspec | 1 | `secret:AWSPREVIOUS` | Compare specified version with AWSCURRENT |
+| full spec | 2 | `secret:AWSPREVIOUS secret:AWSCURRENT` | Both args include name and version |
+| full spec | 1 | `secret:AWSPREVIOUS` | Compare specified version with AWSCURRENT |
 | mixed | 2 | `secret:AWSPREVIOUS ':AWSCURRENT'` | First with version, second specifier only |
-| legacy | 2 | `secret ':AWSPREVIOUS'` | Name + specifier → compare with AWSCURRENT |
-| legacy | 3 | `secret ':AWSPREVIOUS' ':AWSCURRENT'` | Name + two specifiers |
+| partial spec | 2 | `secret ':AWSPREVIOUS'` | Name + specifier → compare with AWSCURRENT |
+| partial spec | 3 | `secret ':AWSPREVIOUS' ':AWSCURRENT'` | Name + two specifiers |
 
 > [!TIP]
-> **Use fullspec format** to avoid shell quoting issues. When `:` or `~` appear at the start of an argument, special shell handling may occur. Fullspec format embeds the specifier within the name, so no quoting is needed.
+> **Use full spec format** to avoid shell quoting issues. When `:` or `~` appear at the start of an argument, special shell handling may occur. Full spec format embeds the specifier within the name, so no quoting is needed.
 
 > [!NOTE]
 > When only one version is specified, it is compared against **AWSCURRENT** (the current version).
@@ -278,7 +278,7 @@ Output is colorized when stdout is a TTY:
 
 ### Examples
 
-#### Fullspec Format (Recommended)
+#### Full Spec Format (Recommended)
 
 ```bash
 # Compare AWSPREVIOUS with AWSCURRENT
@@ -298,10 +298,10 @@ suve sm diff my-database-credentials~1
 suve sm diff my-database-credentials:AWSPREVIOUS ':AWSCURRENT'
 ```
 
-#### Legacy Format
+#### Partial Spec Format
 
 > [!IMPORTANT]
-> Legacy format requires quoting specifiers to prevent potential shell interpretation:
+> Partial spec format requires quoting specifiers to prevent potential shell interpretation:
 > - `~` alone expands to `$HOME` in bash/zsh
 > - `:` may have special meaning in some contexts
 
