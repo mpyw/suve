@@ -52,6 +52,12 @@ suve sm create my-secret "value"    # Create new secret
 suve sm update my-secret "value"    # Update existing secret
 ```
 
+> [!TIP]
+> **Using with aws-vault**: Wrap commands with `aws-vault exec` to use temporary credentials:
+> ```bash
+> aws-vault exec my-profile -- suve ssm show /my/param
+> ```
+
 ## Version Specification
 
 Git-like revision syntax for specifying versions:

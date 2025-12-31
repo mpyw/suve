@@ -63,10 +63,10 @@ suve/
 │   │   ├── ssmversion/        # SSM version spec parser (#VERSION, ~SHIFT)
 │   │   └── smversion/         # SM version spec parser (#VERSION, :LABEL, ~SHIFT)
 │   │
+│   ├── diff/                  # Diff argument parsing
 │   ├── output/                # Output formatting (diff, colors)
 │   ├── jsonutil/              # JSON formatting
-│   ├── awsutil/               # AWS client initialization
-│   └── testutil/              # Test helpers (generic Ptr, PtrEqual)
+│   └── awsutil/               # AWS client initialization
 │
 ├── e2e/                       # E2E tests (requires localstack)
 │
@@ -108,7 +108,7 @@ make coverage
 
 - **Unit tests**: Each command package has `*_test.go` with mock AWS clients
 - **E2E tests**: `e2e/e2e_test.go` runs against localstack (SSM only, SM requires Pro)
-- **Test helpers**: `internal/testutil/` provides generic `Ptr[T]` and `PtrEqual[T]`
+- **Test dependencies**: Uses `github.com/samber/lo` for pointer helpers and `github.com/stretchr/testify` for assertions
 
 ### Running E2E Tests
 
