@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/urfave/cli/v2"
@@ -21,41 +22,43 @@ type Client interface {
 	smapi.ListSecretVersionIdsAPI
 }
 
+// ParsedSpec represents a parsed version specification for diff.
+type ParsedSpec struct {
+	Name  string
+	ID    *string
+	Label *string
+	Shift int
+}
+
 // Command returns the diff command.
 func Command() *cli.Command {
 	return &cli.Command{
 		Name:      "diff",
 		Usage:     "Show diff between two versions",
-		ArgsUsage: "<name> <version1> [version2]",
+		ArgsUsage: "<spec1> [spec2] | <name> <version1> [version2]",
 		Description: `Compare two versions of a secret in unified diff format.
-If only one version is specified, compares against AWSCURRENT.
+If only one version/spec is specified, compares against AWSCURRENT.
 
-VERSION SPECIFIERS (as separate arguments):
+VERSION SPECIFIERS:
   #VERSION  Specific version by VersionId
   :LABEL    Staging label (AWSCURRENT, AWSPREVIOUS)
   ~SHIFT    N versions ago; ~ alone means ~1
 
 EXAMPLES:
-  suve sm diff my-secret :AWSPREVIOUS :AWSCURRENT  Compare labels
-  suve sm diff my-secret :AWSPREVIOUS              Compare with current
-  suve sm diff my-secret '~'                       Compare previous with current
-  suve sm diff my-secret '#abc123' '#def456'       Compare by version ID`,
+  suve sm diff my-secret:AWSPREVIOUS my-secret:AWSCURRENT  Compare labels (fullspec)
+  suve sm diff my-secret:AWSPREVIOUS                       Compare with current (fullspec)
+  suve sm diff my-secret:AWSPREVIOUS ':AWSCURRENT'         Compare labels (mixed)
+  suve sm diff my-secret ':AWSPREVIOUS' ':AWSCURRENT'      Compare labels (legacy)
+  suve sm diff my-secret '~'                               Compare previous with current`,
 		Action: action,
 	}
 }
 
 func action(c *cli.Context) error {
-	if c.NArg() < 2 {
-		return fmt.Errorf("usage: suve sm diff <name> <version1> [version2]")
-	}
-
-	name := c.Args().Get(0)
-	version1 := c.Args().Get(1)
-	version2 := c.Args().Get(2)
-
-	if version2 == "" {
-		version2 = version1
-		version1 = ":AWSCURRENT"
+	args := c.Args().Slice()
+	spec1, spec2, err := ParseArgs(args)
+	if err != nil {
+		return err
 	}
 
 	client, err := awsutil.NewSMClient(c.Context)
@@ -63,10 +66,155 @@ func action(c *cli.Context) error {
 		return fmt.Errorf("failed to initialize AWS client: %w", err)
 	}
 
-	return Run(c.Context, client, c.App.Writer, name, version1, version2)
+	return RunWithSpecs(c.Context, client, c.App.Writer, spec1, spec2)
 }
 
-// Run executes the diff command.
+// ParseArgs parses diff command arguments into two version specifications.
+//
+// Supports:
+//   - 1 arg:  fullspec           → fullspec vs AWSCURRENT
+//   - 2 args: fullspec fullspec  → fullspec vs fullspec (if 2nd doesn't start with #/:/ ~)
+//   - 2 args: fullspec #version  → fullspec.Name + #version vs fullspec (if 2nd starts with #/:/ ~)
+//   - 3 args: name #v1 #v2       → name#v1 vs name#v2
+func ParseArgs(args []string) (*ParsedSpec, *ParsedSpec, error) {
+	if len(args) == 0 || len(args) > 3 {
+		return nil, nil, fmt.Errorf("usage: suve sm diff <spec1> [spec2] | <name> <version1> [version2]")
+	}
+
+	switch len(args) {
+	case 1:
+		// 1 arg: fullspec vs AWSCURRENT
+		return parseOneArg(args[0])
+	case 2:
+		// 2 args: check if second starts with #, :, or ~
+		return parseTwoArgs(args[0], args[1])
+	case 3:
+		// 3 args: legacy format (name, version1, version2)
+		return parseThreeArgs(args[0], args[1], args[2])
+	}
+
+	return nil, nil, fmt.Errorf("usage: suve sm diff <spec1> [spec2] | <name> <version1> [version2]")
+}
+
+func parseOneArg(arg string) (*ParsedSpec, *ParsedSpec, error) {
+	spec, err := smversion.Parse(arg)
+	if err != nil {
+		return nil, nil, fmt.Errorf("invalid version specification: %w", err)
+	}
+
+	spec1 := &ParsedSpec{
+		Name:  spec.Name,
+		ID:    spec.ID,
+		Label: spec.Label,
+		Shift: spec.Shift,
+	}
+	spec2 := &ParsedSpec{
+		Name:  spec.Name,
+		ID:    nil,
+		Label: nil,
+		Shift: 0,
+	}
+	return spec1, spec2, nil
+}
+
+func parseTwoArgs(arg1, arg2 string) (*ParsedSpec, *ParsedSpec, error) {
+	// Parse first arg
+	spec1Parsed, err := smversion.Parse(arg1)
+	if err != nil {
+		return nil, nil, fmt.Errorf("invalid first argument: %w", err)
+	}
+
+	// Check if second arg starts with #, :, or ~ (version specifier only)
+	if strings.HasPrefix(arg2, "#") || strings.HasPrefix(arg2, ":") || strings.HasPrefix(arg2, "~") {
+		// Use name from first arg
+		spec2Parsed, err := smversion.Parse(spec1Parsed.Name + arg2)
+		if err != nil {
+			return nil, nil, fmt.Errorf("invalid second argument: %w", err)
+		}
+
+		// Check if first arg has version specifier (mixed pattern) or not (omission pattern)
+		firstHasSpec := spec1Parsed.ID != nil || spec1Parsed.Label != nil || spec1Parsed.Shift > 0
+		if firstHasSpec {
+			// Mixed pattern: name:PREV ':CURR' → PREV vs CURR
+			spec1 := &ParsedSpec{
+				Name:  spec1Parsed.Name,
+				ID:    spec1Parsed.ID,
+				Label: spec1Parsed.Label,
+				Shift: spec1Parsed.Shift,
+			}
+			spec2 := &ParsedSpec{
+				Name:  spec1Parsed.Name,
+				ID:    spec2Parsed.ID,
+				Label: spec2Parsed.Label,
+				Shift: spec2Parsed.Shift,
+			}
+			return spec1, spec2, nil
+		}
+
+		// Omission pattern: name ':PREV' → PREV vs AWSCURRENT (swap order)
+		spec1 := &ParsedSpec{
+			Name:  spec1Parsed.Name,
+			ID:    spec2Parsed.ID,
+			Label: spec2Parsed.Label,
+			Shift: spec2Parsed.Shift,
+		}
+		spec2 := &ParsedSpec{
+			Name:  spec1Parsed.Name,
+			ID:    nil,
+			Label: nil,
+			Shift: 0,
+		}
+		return spec1, spec2, nil
+	}
+
+	// Full path x2
+	spec2Parsed, err := smversion.Parse(arg2)
+	if err != nil {
+		return nil, nil, fmt.Errorf("invalid second argument: %w", err)
+	}
+
+	spec1 := &ParsedSpec{
+		Name:  spec1Parsed.Name,
+		ID:    spec1Parsed.ID,
+		Label: spec1Parsed.Label,
+		Shift: spec1Parsed.Shift,
+	}
+	spec2 := &ParsedSpec{
+		Name:  spec2Parsed.Name,
+		ID:    spec2Parsed.ID,
+		Label: spec2Parsed.Label,
+		Shift: spec2Parsed.Shift,
+	}
+	return spec1, spec2, nil
+}
+
+func parseThreeArgs(name, version1, version2 string) (*ParsedSpec, *ParsedSpec, error) {
+	spec1Parsed, err := smversion.Parse(name + version1)
+	if err != nil {
+		return nil, nil, fmt.Errorf("invalid version1: %w", err)
+	}
+
+	spec2Parsed, err := smversion.Parse(name + version2)
+	if err != nil {
+		return nil, nil, fmt.Errorf("invalid version2: %w", err)
+	}
+
+	spec1 := &ParsedSpec{
+		Name:  spec1Parsed.Name,
+		ID:    spec1Parsed.ID,
+		Label: spec1Parsed.Label,
+		Shift: spec1Parsed.Shift,
+	}
+	spec2 := &ParsedSpec{
+		Name:  spec2Parsed.Name,
+		ID:    spec2Parsed.ID,
+		Label: spec2Parsed.Label,
+		Shift: spec2Parsed.Shift,
+	}
+	return spec1, spec2, nil
+}
+
+// Run executes the diff command (legacy interface for backward compatibility).
 func Run(ctx context.Context, client Client, w io.Writer, name, version1, version2 string) error {
 	spec1, err := smversion.Parse(name + version1)
 	if err != nil {
@@ -100,6 +248,51 @@ func Run(ctx context.Context, client Client, w io.Writer, name, version1, versio
 	diff := output.Diff(
 		fmt.Sprintf("%s#%s", name, v1),
 		fmt.Sprintf("%s#%s", name, v2),
+		aws.ToString(secret1.SecretString),
+		aws.ToString(secret2.SecretString),
+	)
+	_, _ = fmt.Fprint(w, diff)
+
+	return nil
+}
+
+// RunWithSpecs executes the diff command with parsed specs.
+func RunWithSpecs(ctx context.Context, client Client, w io.Writer, spec1, spec2 *ParsedSpec) error {
+	smSpec1 := &smversion.Spec{
+		Name:  spec1.Name,
+		ID:    spec1.ID,
+		Label: spec1.Label,
+		Shift: spec1.Shift,
+	}
+	smSpec2 := &smversion.Spec{
+		Name:  spec2.Name,
+		ID:    spec2.ID,
+		Label: spec2.Label,
+		Shift: spec2.Shift,
+	}
+
+	secret1, err := smversion.GetSecretWithVersion(ctx, client, smSpec1)
+	if err != nil {
+		return fmt.Errorf("failed to get first version: %w", err)
+	}
+
+	secret2, err := smversion.GetSecretWithVersion(ctx, client, smSpec2)
+	if err != nil {
+		return fmt.Errorf("failed to get second version: %w", err)
+	}
+
+	v1 := aws.ToString(secret1.VersionId)
+	if len(v1) > 8 {
+		v1 = v1[:8]
+	}
+	v2 := aws.ToString(secret2.VersionId)
+	if len(v2) > 8 {
+		v2 = v2[:8]
+	}
+
+	diff := output.Diff(
+		fmt.Sprintf("%s#%s", spec1.Name, v1),
+		fmt.Sprintf("%s#%s", spec2.Name, v2),
 		aws.ToString(secret1.SecretString),
 		aws.ToString(secret2.SecretString),
 	)
