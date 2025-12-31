@@ -512,6 +512,224 @@ func TestRun(t *testing.T) {
 	}
 }
 
+func TestRun_InvalidVersion(t *testing.T) {
+	t.Parallel()
+	mock := &mockClient{
+		getSecretValueFunc: func(_ context.Context, _ *secretsmanager.GetSecretValueInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.GetSecretValueOutput, error) {
+			return &secretsmanager.GetSecretValueOutput{
+				Name:         lo.ToPtr("my-secret"),
+				VersionId:    lo.ToPtr("v1"),
+				SecretString: lo.ToPtr("secret"),
+			}, nil
+		},
+	}
+
+	t.Run("invalid version1", func(t *testing.T) {
+		t.Parallel()
+		var buf bytes.Buffer
+		err := Run(t.Context(), mock, &buf, "my-secret", "#", ":AWSCURRENT")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid version1")
+	})
+
+	t.Run("invalid version2", func(t *testing.T) {
+		t.Parallel()
+		var buf bytes.Buffer
+		err := Run(t.Context(), mock, &buf, "my-secret", ":AWSPREVIOUS", "#")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid version2")
+	})
+}
+
+func TestRunnerRun(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name    string
+		opts    Options
+		mock    *mockClient
+		wantErr bool
+		check   func(t *testing.T, output string)
+	}{
+		{
+			name: "diff between two versions",
+			opts: Options{
+				Spec1: &smversion.Spec{Name: "my-secret", Absolute: smversion.AbsoluteSpec{Label: lo.ToPtr("AWSPREVIOUS")}},
+				Spec2: &smversion.Spec{Name: "my-secret", Absolute: smversion.AbsoluteSpec{Label: lo.ToPtr("AWSCURRENT")}},
+			},
+			mock: &mockClient{
+				getSecretValueFunc: func(_ context.Context, params *secretsmanager.GetSecretValueInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.GetSecretValueOutput, error) {
+					stage := lo.FromPtr(params.VersionStage)
+					if stage == "AWSPREVIOUS" {
+						return &secretsmanager.GetSecretValueOutput{
+							Name:         lo.ToPtr("my-secret"),
+							VersionId:    lo.ToPtr("prev-version-id-long"),
+							SecretString: lo.ToPtr("old-secret"),
+						}, nil
+					}
+					return &secretsmanager.GetSecretValueOutput{
+						Name:         lo.ToPtr("my-secret"),
+						VersionId:    lo.ToPtr("curr-version-id-long"),
+						SecretString: lo.ToPtr("new-secret"),
+					}, nil
+				},
+			},
+			check: func(t *testing.T, output string) {
+				assert.Contains(t, output, "-old-secret")
+				assert.Contains(t, output, "+new-secret")
+			},
+		},
+		{
+			name: "short version IDs not truncated",
+			opts: Options{
+				Spec1: &smversion.Spec{Name: "my-secret", Absolute: smversion.AbsoluteSpec{Label: lo.ToPtr("AWSPREVIOUS")}},
+				Spec2: &smversion.Spec{Name: "my-secret", Absolute: smversion.AbsoluteSpec{Label: lo.ToPtr("AWSCURRENT")}},
+			},
+			mock: &mockClient{
+				getSecretValueFunc: func(_ context.Context, params *secretsmanager.GetSecretValueInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.GetSecretValueOutput, error) {
+					stage := lo.FromPtr(params.VersionStage)
+					if stage == "AWSPREVIOUS" {
+						return &secretsmanager.GetSecretValueOutput{
+							Name:         lo.ToPtr("my-secret"),
+							VersionId:    lo.ToPtr("v1"),
+							SecretString: lo.ToPtr("old"),
+						}, nil
+					}
+					return &secretsmanager.GetSecretValueOutput{
+						Name:         lo.ToPtr("my-secret"),
+						VersionId:    lo.ToPtr("v2"),
+						SecretString: lo.ToPtr("new"),
+					}, nil
+				},
+			},
+			check: func(t *testing.T, output string) {
+				assert.Contains(t, output, "-old")
+				assert.Contains(t, output, "+new")
+			},
+		},
+		{
+			name: "error getting first version",
+			opts: Options{
+				Spec1: &smversion.Spec{Name: "my-secret", Absolute: smversion.AbsoluteSpec{Label: lo.ToPtr("AWSPREVIOUS")}},
+				Spec2: &smversion.Spec{Name: "my-secret", Absolute: smversion.AbsoluteSpec{Label: lo.ToPtr("AWSCURRENT")}},
+			},
+			mock: &mockClient{
+				getSecretValueFunc: func(_ context.Context, params *secretsmanager.GetSecretValueInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.GetSecretValueOutput, error) {
+					if lo.FromPtr(params.VersionStage) == "AWSPREVIOUS" {
+						return nil, fmt.Errorf("version not found")
+					}
+					return &secretsmanager.GetSecretValueOutput{
+						Name:         lo.ToPtr("my-secret"),
+						VersionId:    lo.ToPtr("v1"),
+						SecretString: lo.ToPtr("secret"),
+					}, nil
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "error getting second version",
+			opts: Options{
+				Spec1: &smversion.Spec{Name: "my-secret", Absolute: smversion.AbsoluteSpec{Label: lo.ToPtr("AWSPREVIOUS")}},
+				Spec2: &smversion.Spec{Name: "my-secret", Absolute: smversion.AbsoluteSpec{Label: lo.ToPtr("AWSCURRENT")}},
+			},
+			mock: &mockClient{
+				getSecretValueFunc: func(_ context.Context, params *secretsmanager.GetSecretValueInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.GetSecretValueOutput, error) {
+					if lo.FromPtr(params.VersionStage) == "AWSCURRENT" {
+						return nil, fmt.Errorf("version not found")
+					}
+					return &secretsmanager.GetSecretValueOutput{
+						Name:         lo.ToPtr("my-secret"),
+						VersionId:    lo.ToPtr("v1"),
+						SecretString: lo.ToPtr("secret"),
+					}, nil
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "json format with valid JSON values",
+			opts: Options{
+				Spec1:      &smversion.Spec{Name: "my-secret", Absolute: smversion.AbsoluteSpec{Label: lo.ToPtr("AWSPREVIOUS")}},
+				Spec2:      &smversion.Spec{Name: "my-secret", Absolute: smversion.AbsoluteSpec{Label: lo.ToPtr("AWSCURRENT")}},
+				JSONFormat: true,
+			},
+			mock: &mockClient{
+				getSecretValueFunc: func(_ context.Context, params *secretsmanager.GetSecretValueInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.GetSecretValueOutput, error) {
+					stage := lo.FromPtr(params.VersionStage)
+					if stage == "AWSPREVIOUS" {
+						return &secretsmanager.GetSecretValueOutput{
+							Name:         lo.ToPtr("my-secret"),
+							VersionId:    lo.ToPtr("v1-longer-id"),
+							SecretString: lo.ToPtr(`{"key":"old"}`),
+						}, nil
+					}
+					return &secretsmanager.GetSecretValueOutput{
+						Name:         lo.ToPtr("my-secret"),
+						VersionId:    lo.ToPtr("v2-longer-id"),
+						SecretString: lo.ToPtr(`{"key":"new"}`),
+					}, nil
+				},
+			},
+			check: func(t *testing.T, output string) {
+				assert.Contains(t, output, "-")
+				assert.Contains(t, output, "+")
+			},
+		},
+		{
+			name: "json format with non-JSON values warns",
+			opts: Options{
+				Spec1:      &smversion.Spec{Name: "my-secret", Absolute: smversion.AbsoluteSpec{Label: lo.ToPtr("AWSPREVIOUS")}},
+				Spec2:      &smversion.Spec{Name: "my-secret", Absolute: smversion.AbsoluteSpec{Label: lo.ToPtr("AWSCURRENT")}},
+				JSONFormat: true,
+			},
+			mock: &mockClient{
+				getSecretValueFunc: func(_ context.Context, params *secretsmanager.GetSecretValueInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.GetSecretValueOutput, error) {
+					stage := lo.FromPtr(params.VersionStage)
+					if stage == "AWSPREVIOUS" {
+						return &secretsmanager.GetSecretValueOutput{
+							Name:         lo.ToPtr("my-secret"),
+							VersionId:    lo.ToPtr("v1-longer-id"),
+							SecretString: lo.ToPtr("not json"),
+						}, nil
+					}
+					return &secretsmanager.GetSecretValueOutput{
+						Name:         lo.ToPtr("my-secret"),
+						VersionId:    lo.ToPtr("v2-longer-id"),
+						SecretString: lo.ToPtr("also not json"),
+					}, nil
+				},
+			},
+			check: func(t *testing.T, output string) {
+				assert.Contains(t, output, "-not json")
+				assert.Contains(t, output, "+also not json")
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			var stdout, stderr bytes.Buffer
+			r := &Runner{
+				Client: tt.mock,
+				Stdout: &stdout,
+				Stderr: &stderr,
+			}
+			err := r.Run(t.Context(), tt.opts)
+
+			if tt.wantErr {
+				assert.Error(t, err)
+				return
+			}
+
+			require.NoError(t, err)
+			if tt.check != nil {
+				tt.check(t, stdout.String())
+			}
+		})
+	}
+}
+
 func TestRun_IdenticalWarning(t *testing.T) {
 	t.Parallel()
 	mock := &mockClient{

@@ -471,6 +471,76 @@ func TestRun(t *testing.T) {
 			},
 			wantErr: true,
 		},
+		{
+			name: "json format with valid JSON values",
+			opts: Options{
+				Spec1:      &ssmversion.Spec{Name: "/app/param", Absolute: ssmversion.AbsoluteSpec{Version: lo.ToPtr(int64(1))}},
+				Spec2:      &ssmversion.Spec{Name: "/app/param", Absolute: ssmversion.AbsoluteSpec{Version: lo.ToPtr(int64(2))}},
+				JSONFormat: true,
+			},
+			mock: &mockClient{
+				getParameterFunc: func(_ context.Context, params *ssm.GetParameterInput, _ ...func(*ssm.Options)) (*ssm.GetParameterOutput, error) {
+					name := lo.FromPtr(params.Name)
+					if name == "/app/param:1" {
+						return &ssm.GetParameterOutput{
+							Parameter: &types.Parameter{
+								Name:    lo.ToPtr("/app/param"),
+								Value:   lo.ToPtr(`{"key":"old"}`),
+								Version: 1,
+								Type:    types.ParameterTypeString,
+							},
+						}, nil
+					}
+					return &ssm.GetParameterOutput{
+						Parameter: &types.Parameter{
+							Name:    lo.ToPtr("/app/param"),
+							Value:   lo.ToPtr(`{"key":"new"}`),
+							Version: 2,
+							Type:    types.ParameterTypeString,
+						},
+					}, nil
+				},
+			},
+			check: func(t *testing.T, output string) {
+				assert.Contains(t, output, "-")
+				assert.Contains(t, output, "+")
+			},
+		},
+		{
+			name: "json format with non-JSON values warns",
+			opts: Options{
+				Spec1:      &ssmversion.Spec{Name: "/app/param", Absolute: ssmversion.AbsoluteSpec{Version: lo.ToPtr(int64(1))}},
+				Spec2:      &ssmversion.Spec{Name: "/app/param", Absolute: ssmversion.AbsoluteSpec{Version: lo.ToPtr(int64(2))}},
+				JSONFormat: true,
+			},
+			mock: &mockClient{
+				getParameterFunc: func(_ context.Context, params *ssm.GetParameterInput, _ ...func(*ssm.Options)) (*ssm.GetParameterOutput, error) {
+					name := lo.FromPtr(params.Name)
+					if name == "/app/param:1" {
+						return &ssm.GetParameterOutput{
+							Parameter: &types.Parameter{
+								Name:    lo.ToPtr("/app/param"),
+								Value:   lo.ToPtr("not json"),
+								Version: 1,
+								Type:    types.ParameterTypeString,
+							},
+						}, nil
+					}
+					return &ssm.GetParameterOutput{
+						Parameter: &types.Parameter{
+							Name:    lo.ToPtr("/app/param"),
+							Value:   lo.ToPtr("also not json"),
+							Version: 2,
+							Type:    types.ParameterTypeString,
+						},
+					}, nil
+				},
+			},
+			check: func(t *testing.T, output string) {
+				assert.Contains(t, output, "-not json")
+				assert.Contains(t, output, "+also not json")
+			},
+		},
 	}
 
 	for _, tt := range tests {

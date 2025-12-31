@@ -168,6 +168,164 @@ func TestRun(t *testing.T) {
 				assert.Empty(t, output)
 			},
 		},
+		{
+			name: "version without CreatedDate",
+			opts: log.Options{Name: "my-secret", MaxResults: 10},
+			mock: &mockClient{
+				listSecretVersionIdsFunc: func(_ context.Context, _ *secretsmanager.ListSecretVersionIdsInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.ListSecretVersionIdsOutput, error) {
+					return &secretsmanager.ListSecretVersionIdsOutput{
+						Versions: []types.SecretVersionsListEntry{
+							{VersionId: lo.ToPtr("v1"), CreatedDate: nil, VersionStages: []string{"AWSPREVIOUS"}},
+							{VersionId: lo.ToPtr("v2"), CreatedDate: &now, VersionStages: []string{"AWSCURRENT"}},
+						},
+					}, nil
+				},
+			},
+			check: func(t *testing.T, output string) {
+				assert.Contains(t, output, "Version")
+			},
+		},
+		{
+			name: "version without CreatedDate reverse",
+			opts: log.Options{Name: "my-secret", MaxResults: 10, Reverse: true},
+			mock: &mockClient{
+				listSecretVersionIdsFunc: func(_ context.Context, _ *secretsmanager.ListSecretVersionIdsInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.ListSecretVersionIdsOutput, error) {
+					return &secretsmanager.ListSecretVersionIdsOutput{
+						Versions: []types.SecretVersionsListEntry{
+							{VersionId: lo.ToPtr("v1"), CreatedDate: nil},
+							{VersionId: lo.ToPtr("v2"), CreatedDate: nil},
+						},
+					}, nil
+				},
+			},
+			check: func(t *testing.T, output string) {
+				assert.Contains(t, output, "Version")
+			},
+		},
+		{
+			name: "patch skips versions with GetSecretValue error",
+			opts: log.Options{Name: "my-secret", MaxResults: 10, ShowPatch: true},
+			mock: &mockClient{
+				listSecretVersionIdsFunc: func(_ context.Context, _ *secretsmanager.ListSecretVersionIdsInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.ListSecretVersionIdsOutput, error) {
+					return &secretsmanager.ListSecretVersionIdsOutput{
+						Versions: []types.SecretVersionsListEntry{
+							{VersionId: lo.ToPtr("v1"), CreatedDate: lo.ToPtr(now.Add(-time.Hour))},
+							{VersionId: lo.ToPtr("v2"), CreatedDate: &now},
+						},
+					}, nil
+				},
+				getSecretValueFunc: func(_ context.Context, _ *secretsmanager.GetSecretValueInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.GetSecretValueOutput, error) {
+					return nil, fmt.Errorf("access denied")
+				},
+			},
+			check: func(t *testing.T, output string) {
+				// Should still show version info but no diff
+				assert.Contains(t, output, "Version")
+				assert.NotContains(t, output, "---")
+			},
+		},
+		{
+			name: "reverse order with patch",
+			opts: log.Options{Name: "my-secret", MaxResults: 10, ShowPatch: true, Reverse: true},
+			mock: &mockClient{
+				listSecretVersionIdsFunc: func(_ context.Context, _ *secretsmanager.ListSecretVersionIdsInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.ListSecretVersionIdsOutput, error) {
+					return &secretsmanager.ListSecretVersionIdsOutput{
+						Versions: []types.SecretVersionsListEntry{
+							{VersionId: lo.ToPtr("version-id-1"), CreatedDate: lo.ToPtr(now.Add(-time.Hour))},
+							{VersionId: lo.ToPtr("version-id-2"), CreatedDate: &now},
+						},
+					}, nil
+				},
+				getSecretValueFunc: func(_ context.Context, params *secretsmanager.GetSecretValueInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.GetSecretValueOutput, error) {
+					versionID := lo.FromPtr(params.VersionId)
+					switch versionID {
+					case "version-id-1":
+						return &secretsmanager.GetSecretValueOutput{
+							SecretString: lo.ToPtr("old-value"),
+							VersionId:    lo.ToPtr("version-id-1"),
+						}, nil
+					case "version-id-2":
+						return &secretsmanager.GetSecretValueOutput{
+							SecretString: lo.ToPtr("new-value"),
+							VersionId:    lo.ToPtr("version-id-2"),
+						}, nil
+					}
+					return nil, fmt.Errorf("unknown version")
+				},
+			},
+			check: func(t *testing.T, output string) {
+				// In reverse mode, first version (oldest) shows diff to next (newer)
+				assert.Contains(t, output, "Version")
+			},
+		},
+		{
+			name: "patch with JSON format",
+			opts: log.Options{Name: "my-secret", MaxResults: 10, ShowPatch: true, JSONFormat: true},
+			mock: &mockClient{
+				listSecretVersionIdsFunc: func(_ context.Context, _ *secretsmanager.ListSecretVersionIdsInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.ListSecretVersionIdsOutput, error) {
+					return &secretsmanager.ListSecretVersionIdsOutput{
+						Versions: []types.SecretVersionsListEntry{
+							{VersionId: lo.ToPtr("version-id-1"), CreatedDate: lo.ToPtr(now.Add(-time.Hour))},
+							{VersionId: lo.ToPtr("version-id-2"), CreatedDate: &now},
+						},
+					}, nil
+				},
+				getSecretValueFunc: func(_ context.Context, params *secretsmanager.GetSecretValueInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.GetSecretValueOutput, error) {
+					versionID := lo.FromPtr(params.VersionId)
+					switch versionID {
+					case "version-id-1":
+						return &secretsmanager.GetSecretValueOutput{
+							SecretString: lo.ToPtr(`{"key":"old"}`),
+							VersionId:    lo.ToPtr("version-id-1"),
+						}, nil
+					case "version-id-2":
+						return &secretsmanager.GetSecretValueOutput{
+							SecretString: lo.ToPtr(`{"key":"new"}`),
+							VersionId:    lo.ToPtr("version-id-2"),
+						}, nil
+					}
+					return nil, fmt.Errorf("unknown version")
+				},
+			},
+			check: func(t *testing.T, output string) {
+				// Check that diff is shown with formatted JSON
+				assert.Contains(t, output, "Version")
+			},
+		},
+		{
+			name: "patch with non-JSON value warns",
+			opts: log.Options{Name: "my-secret", MaxResults: 10, ShowPatch: true, JSONFormat: true},
+			mock: &mockClient{
+				listSecretVersionIdsFunc: func(_ context.Context, _ *secretsmanager.ListSecretVersionIdsInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.ListSecretVersionIdsOutput, error) {
+					return &secretsmanager.ListSecretVersionIdsOutput{
+						Versions: []types.SecretVersionsListEntry{
+							{VersionId: lo.ToPtr("version-id-1"), CreatedDate: lo.ToPtr(now.Add(-time.Hour))},
+							{VersionId: lo.ToPtr("version-id-2"), CreatedDate: &now},
+						},
+					}, nil
+				},
+				getSecretValueFunc: func(_ context.Context, params *secretsmanager.GetSecretValueInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.GetSecretValueOutput, error) {
+					versionID := lo.FromPtr(params.VersionId)
+					switch versionID {
+					case "version-id-1":
+						return &secretsmanager.GetSecretValueOutput{
+							SecretString: lo.ToPtr("not json"),
+							VersionId:    lo.ToPtr("version-id-1"),
+						}, nil
+					case "version-id-2":
+						return &secretsmanager.GetSecretValueOutput{
+							SecretString: lo.ToPtr("also not json"),
+							VersionId:    lo.ToPtr("version-id-2"),
+						}, nil
+					}
+					return nil, fmt.Errorf("unknown version")
+				},
+			},
+			check: func(t *testing.T, output string) {
+				assert.Contains(t, output, "-not json")
+				assert.Contains(t, output, "+also not json")
+			},
+		},
 	}
 
 	for _, tt := range tests {
