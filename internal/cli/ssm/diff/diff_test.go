@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/aws/aws-sdk-go-v2/service/ssm/types"
 	"github.com/samber/lo"
@@ -19,6 +18,7 @@ import (
 )
 
 func TestParseArgs(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name       string
 		args       []string
@@ -283,6 +283,7 @@ func TestParseArgs(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			spec1, spec2, err := diff.ParseArgs(
 				tt.args,
 				ssmversion.Parse,
@@ -337,6 +338,7 @@ func (m *mockClient) GetParameterHistory(ctx context.Context, params *ssm.GetPar
 }
 
 func TestRun(t *testing.T) {
+	t.Parallel()
 	now := time.Now()
 
 	tests := []struct {
@@ -354,22 +356,22 @@ func TestRun(t *testing.T) {
 			},
 			mock: &mockClient{
 				getParameterFunc: func(_ context.Context, params *ssm.GetParameterInput, _ ...func(*ssm.Options)) (*ssm.GetParameterOutput, error) {
-					name := aws.ToString(params.Name)
+					name := lo.FromPtr(params.Name)
 					if name == "/app/param:1" {
 						return &ssm.GetParameterOutput{
 							Parameter: &types.Parameter{
-								Name:             aws.String("/app/param"),
-								Value:            aws.String("old-value"),
+								Name:             lo.ToPtr("/app/param"),
+								Value:            lo.ToPtr("old-value"),
 								Version:          1,
 								Type:             types.ParameterTypeString,
-								LastModifiedDate: aws.Time(now.Add(-time.Hour)),
+								LastModifiedDate: lo.ToPtr(now.Add(-time.Hour)),
 							},
 						}, nil
 					}
 					return &ssm.GetParameterOutput{
 						Parameter: &types.Parameter{
-							Name:             aws.String("/app/param"),
-							Value:            aws.String("new-value"),
+							Name:             lo.ToPtr("/app/param"),
+							Value:            lo.ToPtr("new-value"),
 							Version:          2,
 							Type:             types.ParameterTypeString,
 							LastModifiedDate: &now,
@@ -392,8 +394,8 @@ func TestRun(t *testing.T) {
 				getParameterFunc: func(_ context.Context, _ *ssm.GetParameterInput, _ ...func(*ssm.Options)) (*ssm.GetParameterOutput, error) {
 					return &ssm.GetParameterOutput{
 						Parameter: &types.Parameter{
-							Name:    aws.String("/app/param"),
-							Value:   aws.String("same-value"),
+							Name:    lo.ToPtr("/app/param"),
+							Value:   lo.ToPtr("same-value"),
 							Version: 1,
 							Type:    types.ParameterTypeString,
 						},
@@ -413,13 +415,13 @@ func TestRun(t *testing.T) {
 			},
 			mock: &mockClient{
 				getParameterFunc: func(_ context.Context, params *ssm.GetParameterInput, _ ...func(*ssm.Options)) (*ssm.GetParameterOutput, error) {
-					if aws.ToString(params.Name) == "/app/param:1" {
+					if lo.FromPtr(params.Name) == "/app/param:1" {
 						return nil, fmt.Errorf("version not found")
 					}
 					return &ssm.GetParameterOutput{
 						Parameter: &types.Parameter{
-							Name:    aws.String("/app/param"),
-							Value:   aws.String("value"),
+							Name:    lo.ToPtr("/app/param"),
+							Value:   lo.ToPtr("value"),
 							Version: 2,
 						},
 					}, nil
@@ -435,13 +437,13 @@ func TestRun(t *testing.T) {
 			},
 			mock: &mockClient{
 				getParameterFunc: func(_ context.Context, params *ssm.GetParameterInput, _ ...func(*ssm.Options)) (*ssm.GetParameterOutput, error) {
-					if aws.ToString(params.Name) == "/app/param:2" {
+					if lo.FromPtr(params.Name) == "/app/param:2" {
 						return nil, fmt.Errorf("version not found")
 					}
 					return &ssm.GetParameterOutput{
 						Parameter: &types.Parameter{
-							Name:    aws.String("/app/param"),
-							Value:   aws.String("value"),
+							Name:    lo.ToPtr("/app/param"),
+							Value:   lo.ToPtr("value"),
 							Version: 1,
 						},
 					}, nil
@@ -453,6 +455,7 @@ func TestRun(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			var buf, errBuf bytes.Buffer
 			r := &Runner{
 				Client: tt.mock,
@@ -475,12 +478,13 @@ func TestRun(t *testing.T) {
 }
 
 func TestRun_IdenticalWarning(t *testing.T) {
+	t.Parallel()
 	mock := &mockClient{
 		getParameterFunc: func(_ context.Context, _ *ssm.GetParameterInput, _ ...func(*ssm.Options)) (*ssm.GetParameterOutput, error) {
 			return &ssm.GetParameterOutput{
 				Parameter: &types.Parameter{
-					Name:    aws.String("/app/param"),
-					Value:   aws.String("same-value"),
+					Name:    lo.ToPtr("/app/param"),
+					Value:   lo.ToPtr("same-value"),
 					Version: 1,
 					Type:    types.ParameterTypeString,
 				},

@@ -6,10 +6,10 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/aws/aws-sdk-go-v2/service/ssm/types"
 	"github.com/fatih/color"
+	"github.com/samber/lo"
 	"github.com/urfave/cli/v2"
 
 	"github.com/mpyw/suve/internal/api/ssmapi"
@@ -116,13 +116,13 @@ func action(c *cli.Context) error {
 // Run executes the set command.
 func (r *Runner) Run(ctx context.Context, opts Options) error {
 	input := &ssm.PutParameterInput{
-		Name:      aws.String(opts.Name),
-		Value:     aws.String(opts.Value),
+		Name:      lo.ToPtr(opts.Name),
+		Value:     lo.ToPtr(opts.Value),
 		Type:      types.ParameterType(opts.Type),
-		Overwrite: aws.Bool(true),
+		Overwrite: lo.ToPtr(true),
 	}
 	if opts.Description != "" {
-		input.Description = aws.String(opts.Description)
+		input.Description = lo.ToPtr(opts.Description)
 	}
 
 	result, err := r.Client.PutParameter(ctx, input)

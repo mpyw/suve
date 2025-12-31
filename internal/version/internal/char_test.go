@@ -1,8 +1,13 @@
 package internal
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+)
 
 func TestIsDigit(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		c    byte
 		want bool
@@ -16,13 +21,12 @@ func TestIsDigit(t *testing.T) {
 		{'/', false},
 	}
 	for _, tt := range tests {
-		if got := IsDigit(tt.c); got != tt.want {
-			t.Errorf("IsDigit(%q) = %v, want %v", tt.c, got, tt.want)
-		}
+		assert.Equal(t, tt.want, IsDigit(tt.c), "IsDigit(%q)", tt.c)
 	}
 }
 
 func TestIsLetter(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		c    byte
 		want bool
@@ -39,8 +43,6 @@ func TestIsLetter(t *testing.T) {
 		{'_', false},
 	}
 	for _, tt := range tests {
-		if got := IsLetter(tt.c); got != tt.want {
-			t.Errorf("IsLetter(%q) = %v, want %v", tt.c, got, tt.want)
-		}
+		assert.Equal(t, tt.want, IsLetter(tt.c), "IsLetter(%q)", tt.c)
 	}
 }

@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
 	"github.com/fatih/color"
+	"github.com/samber/lo"
 	"github.com/urfave/cli/v2"
 
 	"github.com/mpyw/suve/internal/api/smapi"
@@ -73,7 +73,7 @@ func action(c *cli.Context) error {
 // Run executes the restore command.
 func (r *Runner) Run(ctx context.Context, opts Options) error {
 	result, err := r.Client.RestoreSecret(ctx, &secretsmanager.RestoreSecretInput{
-		SecretId: aws.String(opts.Name),
+		SecretId: lo.ToPtr(opts.Name),
 	})
 	if err != nil {
 		return fmt.Errorf("failed to restore secret: %w", err)
@@ -82,7 +82,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 	green := color.New(color.FgGreen).SprintFunc()
 	_, _ = fmt.Fprintf(r.Stdout, "%s Restored secret %s\n",
 		green("✓"),
-		aws.ToString(result.Name),
+		lo.FromPtr(result.Name),
 	)
 
 	return nil

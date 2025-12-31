@@ -1,4 +1,4 @@
-package rm
+package rm_test
 
 import (
 	"bytes"
@@ -7,6 +7,10 @@ import (
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/mpyw/suve/internal/cli/ssm/rm"
 )
 
 type mockClient struct {
@@ -21,33 +25,30 @@ func (m *mockClient) DeleteParameter(ctx context.Context, params *ssm.DeletePara
 }
 
 func TestRun(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name    string
-		opts    Options
+		opts    rm.Options
 		mock    *mockClient
 		wantErr bool
 		check   func(t *testing.T, output string)
 	}{
 		{
 			name: "delete parameter",
-			opts: Options{Name: "/app/param"},
+			opts: rm.Options{Name: "/app/param"},
 			mock: &mockClient{
 				deleteParameterFunc: func(_ context.Context, _ *ssm.DeleteParameterInput, _ ...func(*ssm.Options)) (*ssm.DeleteParameterOutput, error) {
 					return &ssm.DeleteParameterOutput{}, nil
 				},
 			},
 			check: func(t *testing.T, output string) {
-				if !bytes.Contains([]byte(output), []byte("Deleted")) {
-					t.Error("expected 'Deleted' in output")
-				}
-				if !bytes.Contains([]byte(output), []byte("/app/param")) {
-					t.Error("expected parameter name in output")
-				}
+				assert.Contains(t, output, "Deleted")
+				assert.Contains(t, output, "/app/param")
 			},
 		},
 		{
 			name: "error from AWS",
-			opts: Options{Name: "/app/param"},
+			opts: rm.Options{Name: "/app/param"},
 			mock: &mockClient{
 				deleteParameterFunc: func(_ context.Context, _ *ssm.DeleteParameterInput, _ ...func(*ssm.Options)) (*ssm.DeleteParameterOutput, error) {
 					return nil, fmt.Errorf("AWS error")
@@ -59,8 +60,9 @@ func TestRun(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			var buf, errBuf bytes.Buffer
-			r := &Runner{
+			r := &rm.Runner{
 				Client: tt.mock,
 				Stdout: &buf,
 				Stderr: &errBuf,
@@ -68,16 +70,11 @@ func TestRun(t *testing.T) {
 			err := r.Run(t.Context(), tt.opts)
 
 			if tt.wantErr {
-				if err == nil {
-					t.Error("expected error, got nil")
-				}
+				assert.Error(t, err)
 				return
 			}
 
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-
+			require.NoError(t, err)
 			if tt.check != nil {
 				tt.check(t, buf.String())
 			}

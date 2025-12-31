@@ -8,11 +8,12 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"slices"
 	"time"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/fatih/color"
+	"github.com/samber/lo"
 	"github.com/urfave/cli/v2"
 
 	"github.com/mpyw/suve/internal/api/ssmapi"
@@ -124,9 +125,9 @@ func action(c *cli.Context) error {
 // Run executes the log command.
 func (r *Runner) Run(ctx context.Context, opts Options) error {
 	result, err := r.Client.GetParameterHistory(ctx, &ssm.GetParameterHistoryInput{
-		Name:           aws.String(opts.Name),
-		MaxResults:     aws.Int32(opts.MaxResults),
-		WithDecryption: aws.Bool(true),
+		Name:           lo.ToPtr(opts.Name),
+		MaxResults:     lo.ToPtr(opts.MaxResults),
+		WithDecryption: lo.ToPtr(true),
 	})
 	if err != nil {
 		return fmt.Errorf("failed to get parameter history: %w", err)
@@ -139,9 +140,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 
 	// AWS returns oldest first; reverse to show newest first (unless --reverse)
 	if !opts.Reverse {
-		for i, j := 0, len(params)-1; i < j; i, j = i+1, j-1 {
-			params[i], params[j] = params[j], params[i]
-		}
+		slices.Reverse(params)
 	}
 
 	yellow := color.New(color.FgYellow).SprintFunc()
@@ -189,8 +188,8 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 			}
 
 			if oldIdx >= 0 {
-				oldValue := aws.ToString(params[oldIdx].Value)
-				newValue := aws.ToString(params[newIdx].Value)
+				oldValue := lo.FromPtr(params[oldIdx].Value)
+				newValue := lo.FromPtr(params[newIdx].Value)
 				oldName := fmt.Sprintf("%s#%d", opts.Name, params[oldIdx].Version)
 				newName := fmt.Sprintf("%s#%d", opts.Name, params[newIdx].Version)
 				diff := output.DiffWithJSON(oldName, newName, oldValue, newValue, opts.JSONFormat, &jsonWarned, r.Stderr)
@@ -201,7 +200,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 			}
 		} else {
 			// Show truncated value preview
-			value := aws.ToString(param.Value)
+			value := lo.FromPtr(param.Value)
 			if len(value) > 50 {
 				value = value[:50] + "..."
 			}

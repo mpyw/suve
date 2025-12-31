@@ -14,7 +14,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/samber/lo"
 	"github.com/urfave/cli/v2"
 
 	"github.com/mpyw/suve/internal/api/smapi"
@@ -128,11 +128,11 @@ func Run(ctx context.Context, client Client, w io.Writer, name, version1, versio
 		return fmt.Errorf("failed to get version %s: %w", version2, err)
 	}
 
-	v1 := aws.ToString(secret1.VersionId)
+	v1 := lo.FromPtr(secret1.VersionId)
 	if len(v1) > 8 {
 		v1 = v1[:8]
 	}
-	v2 := aws.ToString(secret2.VersionId)
+	v2 := lo.FromPtr(secret2.VersionId)
 	if len(v2) > 8 {
 		v2 = v2[:8]
 	}
@@ -140,8 +140,8 @@ func Run(ctx context.Context, client Client, w io.Writer, name, version1, versio
 	diff := output.Diff(
 		fmt.Sprintf("%s#%s", name, v1),
 		fmt.Sprintf("%s#%s", name, v2),
-		aws.ToString(secret1.SecretString),
-		aws.ToString(secret2.SecretString),
+		lo.FromPtr(secret1.SecretString),
+		lo.FromPtr(secret2.SecretString),
 	)
 	_, _ = fmt.Fprint(w, diff)
 
@@ -160,8 +160,8 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 		return fmt.Errorf("failed to get second version: %w", err)
 	}
 
-	value1 := aws.ToString(secret1.SecretString)
-	value2 := aws.ToString(secret2.SecretString)
+	value1 := lo.FromPtr(secret1.SecretString)
+	value2 := lo.FromPtr(secret2.SecretString)
 
 	// Format as JSON if enabled
 	if opts.JSONFormat {
@@ -180,11 +180,11 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 		return nil
 	}
 
-	v1 := aws.ToString(secret1.VersionId)
+	v1 := lo.FromPtr(secret1.VersionId)
 	if len(v1) > 8 {
 		v1 = v1[:8]
 	}
-	v2 := aws.ToString(secret2.VersionId)
+	v2 := lo.FromPtr(secret2.VersionId)
 	if len(v2) > 8 {
 		v2 = v2[:8]
 	}

@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   test:
-    name: Test
+    name: Unit Test
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -32,7 +32,51 @@ jobs:
         with:
           files: ./coverage.txt
           flags: unittests
-          name: codecov-suve
+          name: codecov-suve-unit
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+        continue-on-error: true
+
+  e2e:
+    name: E2E Test
+    runs-on: ubuntu-latest
+    services:
+      localstack:
+        image: localstack/localstack:latest
+        ports:
+          - 4566:4566
+        env:
+          SERVICES: ssm,secretsmanager
+          DEBUG: 0
+        options: >-
+          --health-cmd "curl -f http://localhost:4566/_localstack/health"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Wait for localstack
+        run: |
+          timeout 60 bash -c 'until curl -sf http://localhost:4566/_localstack/health; do sleep 2; done'
+
+      - name: Run e2e tests with coverage
+        run: go test -v -race -tags e2e -coverprofile=coverage-e2e.txt -covermode=atomic -coverpkg=./... ./e2e/...
+        env:
+          SUVE_LOCALSTACK_EXTERNAL_PORT: 4566
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          files: ./coverage-e2e.txt
+          flags: e2e
+          name: codecov-suve-e2e
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
         continue-on-error: true

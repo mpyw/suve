@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/samber/lo"
 	"github.com/urfave/cli/v2"
 
 	"github.com/mpyw/suve/internal/api/smapi"
@@ -99,7 +99,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 		return err
 	}
 
-	value := aws.ToString(secret.SecretString)
+	value := lo.FromPtr(secret.SecretString)
 
 	// Warn if --json is used but value is not valid JSON
 	if opts.JSONFormat {

@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
 	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
@@ -17,6 +16,7 @@ import (
 )
 
 func TestParseArgs(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name       string
 		args       []string
@@ -313,6 +313,7 @@ func TestParseArgs(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			spec1, spec2, err := diff.ParseArgs(
 				tt.args,
 				smversion.Parse,
@@ -369,6 +370,7 @@ func (m *mockClient) ListSecretVersionIds(ctx context.Context, params *secretsma
 }
 
 func TestRun(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name       string
 		secretName string
@@ -385,18 +387,18 @@ func TestRun(t *testing.T) {
 			version2:   ":AWSCURRENT",
 			mock: &mockClient{
 				getSecretValueFunc: func(_ context.Context, params *secretsmanager.GetSecretValueInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.GetSecretValueOutput, error) {
-					stage := aws.ToString(params.VersionStage)
+					stage := lo.FromPtr(params.VersionStage)
 					if stage == "AWSPREVIOUS" {
 						return &secretsmanager.GetSecretValueOutput{
-							Name:         aws.String("my-secret"),
-							VersionId:    aws.String("prev-version-id"),
-							SecretString: aws.String("old-secret"),
+							Name:         lo.ToPtr("my-secret"),
+							VersionId:    lo.ToPtr("prev-version-id"),
+							SecretString: lo.ToPtr("old-secret"),
 						}, nil
 					}
 					return &secretsmanager.GetSecretValueOutput{
-						Name:         aws.String("my-secret"),
-						VersionId:    aws.String("curr-version-id"),
-						SecretString: aws.String("new-secret"),
+						Name:         lo.ToPtr("my-secret"),
+						VersionId:    lo.ToPtr("curr-version-id"),
+						SecretString: lo.ToPtr("new-secret"),
 					}, nil
 				},
 			},
@@ -413,9 +415,9 @@ func TestRun(t *testing.T) {
 			mock: &mockClient{
 				getSecretValueFunc: func(_ context.Context, _ *secretsmanager.GetSecretValueInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.GetSecretValueOutput, error) {
 					return &secretsmanager.GetSecretValueOutput{
-						Name:         aws.String("my-secret"),
-						VersionId:    aws.String("version-id"),
-						SecretString: aws.String("same-content"),
+						Name:         lo.ToPtr("my-secret"),
+						VersionId:    lo.ToPtr("version-id"),
+						SecretString: lo.ToPtr("same-content"),
 					}, nil
 				},
 			},
@@ -430,18 +432,18 @@ func TestRun(t *testing.T) {
 			version2:   ":AWSCURRENT",
 			mock: &mockClient{
 				getSecretValueFunc: func(_ context.Context, params *secretsmanager.GetSecretValueInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.GetSecretValueOutput, error) {
-					stage := aws.ToString(params.VersionStage)
+					stage := lo.FromPtr(params.VersionStage)
 					if stage == "AWSPREVIOUS" {
 						return &secretsmanager.GetSecretValueOutput{
-							Name:         aws.String("my-secret"),
-							VersionId:    aws.String("v1"), // Short version ID
-							SecretString: aws.String("old"),
+							Name:         lo.ToPtr("my-secret"),
+							VersionId:    lo.ToPtr("v1"), // Short version ID
+							SecretString: lo.ToPtr("old"),
 						}, nil
 					}
 					return &secretsmanager.GetSecretValueOutput{
-						Name:         aws.String("my-secret"),
-						VersionId:    aws.String("v2"), // Short version ID
-						SecretString: aws.String("new"),
+						Name:         lo.ToPtr("my-secret"),
+						VersionId:    lo.ToPtr("v2"), // Short version ID
+						SecretString: lo.ToPtr("new"),
 					}, nil
 				},
 			},
@@ -458,13 +460,13 @@ func TestRun(t *testing.T) {
 			version2:   ":AWSCURRENT",
 			mock: &mockClient{
 				getSecretValueFunc: func(_ context.Context, params *secretsmanager.GetSecretValueInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.GetSecretValueOutput, error) {
-					if aws.ToString(params.VersionStage) == "AWSPREVIOUS" {
+					if lo.FromPtr(params.VersionStage) == "AWSPREVIOUS" {
 						return nil, fmt.Errorf("version not found")
 					}
 					return &secretsmanager.GetSecretValueOutput{
-						Name:         aws.String("my-secret"),
-						VersionId:    aws.String("version-id"),
-						SecretString: aws.String("secret"),
+						Name:         lo.ToPtr("my-secret"),
+						VersionId:    lo.ToPtr("version-id"),
+						SecretString: lo.ToPtr("secret"),
 					}, nil
 				},
 			},
@@ -477,13 +479,13 @@ func TestRun(t *testing.T) {
 			version2:   ":AWSCURRENT",
 			mock: &mockClient{
 				getSecretValueFunc: func(_ context.Context, params *secretsmanager.GetSecretValueInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.GetSecretValueOutput, error) {
-					if aws.ToString(params.VersionStage) == "AWSCURRENT" {
+					if lo.FromPtr(params.VersionStage) == "AWSCURRENT" {
 						return nil, fmt.Errorf("version not found")
 					}
 					return &secretsmanager.GetSecretValueOutput{
-						Name:         aws.String("my-secret"),
-						VersionId:    aws.String("version-id"),
-						SecretString: aws.String("secret"),
+						Name:         lo.ToPtr("my-secret"),
+						VersionId:    lo.ToPtr("version-id"),
+						SecretString: lo.ToPtr("secret"),
 					}, nil
 				},
 			},
@@ -493,6 +495,7 @@ func TestRun(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			var buf bytes.Buffer
 			err := Run(t.Context(), tt.mock, &buf, tt.secretName, tt.version1, tt.version2)
 
@@ -510,12 +513,13 @@ func TestRun(t *testing.T) {
 }
 
 func TestRun_IdenticalWarning(t *testing.T) {
+	t.Parallel()
 	mock := &mockClient{
 		getSecretValueFunc: func(_ context.Context, _ *secretsmanager.GetSecretValueInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.GetSecretValueOutput, error) {
 			return &secretsmanager.GetSecretValueOutput{
-				Name:         aws.String("my-secret"),
-				VersionId:    aws.String("version-id"),
-				SecretString: aws.String("same-content"),
+				Name:         lo.ToPtr("my-secret"),
+				VersionId:    lo.ToPtr("version-id"),
+				SecretString: lo.ToPtr("same-content"),
 			}, nil
 		},
 	}

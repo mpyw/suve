@@ -1,4 +1,4 @@
-package ls
+package ls_test
 
 import (
 	"bytes"
@@ -6,9 +6,13 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/aws/aws-sdk-go-v2/service/ssm/types"
+	"github.com/samber/lo"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/mpyw/suve/internal/cli/ssm/ls"
 )
 
 type mockClient struct {
@@ -23,84 +27,70 @@ func (m *mockClient) DescribeParameters(ctx context.Context, params *ssm.Describ
 }
 
 func TestRun(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name    string
-		opts    Options
+		opts    ls.Options
 		mock    *mockClient
 		wantErr bool
 		check   func(t *testing.T, output string)
 	}{
 		{
 			name: "list all parameters",
-			opts: Options{},
+			opts: ls.Options{},
 			mock: &mockClient{
 				describeParametersFunc: func(_ context.Context, _ *ssm.DescribeParametersInput, _ ...func(*ssm.Options)) (*ssm.DescribeParametersOutput, error) {
 					return &ssm.DescribeParametersOutput{
 						Parameters: []types.ParameterMetadata{
-							{Name: aws.String("/app/param1")},
-							{Name: aws.String("/app/param2")},
+							{Name: lo.ToPtr("/app/param1")},
+							{Name: lo.ToPtr("/app/param2")},
 						},
 					}, nil
 				},
 			},
 			check: func(t *testing.T, output string) {
-				if !bytes.Contains([]byte(output), []byte("/app/param1")) {
-					t.Error("expected /app/param1 in output")
-				}
-				if !bytes.Contains([]byte(output), []byte("/app/param2")) {
-					t.Error("expected /app/param2 in output")
-				}
+				assert.Contains(t, output, "/app/param1")
+				assert.Contains(t, output, "/app/param2")
 			},
 		},
 		{
 			name: "list with prefix",
-			opts: Options{Prefix: "/app/"},
+			opts: ls.Options{Prefix: "/app/"},
 			mock: &mockClient{
 				describeParametersFunc: func(_ context.Context, params *ssm.DescribeParametersInput, _ ...func(*ssm.Options)) (*ssm.DescribeParametersOutput, error) {
-					if len(params.ParameterFilters) == 0 {
-						t.Error("expected filter to be set")
-					}
+					require.NotEmpty(t, params.ParameterFilters, "expected filter to be set")
 					return &ssm.DescribeParametersOutput{
 						Parameters: []types.ParameterMetadata{
-							{Name: aws.String("/app/param1")},
+							{Name: lo.ToPtr("/app/param1")},
 						},
 					}, nil
 				},
 			},
 			check: func(t *testing.T, output string) {
-				if !bytes.Contains([]byte(output), []byte("/app/param1")) {
-					t.Error("expected /app/param1 in output")
-				}
+				assert.Contains(t, output, "/app/param1")
 			},
 		},
 		{
 			name: "recursive listing",
-			opts: Options{Prefix: "/app/", Recursive: true},
+			opts: ls.Options{Prefix: "/app/", Recursive: true},
 			mock: &mockClient{
 				describeParametersFunc: func(_ context.Context, params *ssm.DescribeParametersInput, _ ...func(*ssm.Options)) (*ssm.DescribeParametersOutput, error) {
-					if len(params.ParameterFilters) == 0 {
-						t.Error("expected filter to be set")
-						return nil, nil
-					}
-					if aws.ToString(params.ParameterFilters[0].Option) != "Recursive" {
-						t.Errorf("expected Recursive option, got %s", aws.ToString(params.ParameterFilters[0].Option))
-					}
+					require.NotEmpty(t, params.ParameterFilters, "expected filter to be set")
+					assert.Equal(t, "Recursive", lo.FromPtr(params.ParameterFilters[0].Option))
 					return &ssm.DescribeParametersOutput{
 						Parameters: []types.ParameterMetadata{
-							{Name: aws.String("/app/sub/param")},
+							{Name: lo.ToPtr("/app/sub/param")},
 						},
 					}, nil
 				},
 			},
 			check: func(t *testing.T, output string) {
-				if !bytes.Contains([]byte(output), []byte("/app/sub/param")) {
-					t.Error("expected /app/sub/param in output")
-				}
+				assert.Contains(t, output, "/app/sub/param")
 			},
 		},
 		{
 			name: "error from AWS",
-			opts: Options{},
+			opts: ls.Options{},
 			mock: &mockClient{
 				describeParametersFunc: func(_ context.Context, _ *ssm.DescribeParametersInput, _ ...func(*ssm.Options)) (*ssm.DescribeParametersOutput, error) {
 					return nil, fmt.Errorf("AWS error")
@@ -112,8 +102,9 @@ func TestRun(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			var buf, errBuf bytes.Buffer
-			r := &Runner{
+			r := &ls.Runner{
 				Client: tt.mock,
 				Stdout: &buf,
 				Stderr: &errBuf,
@@ -121,16 +112,11 @@ func TestRun(t *testing.T) {
 			err := r.Run(t.Context(), tt.opts)
 
 			if tt.wantErr {
-				if err == nil {
-					t.Error("expected error, got nil")
-				}
+				assert.Error(t, err)
 				return
 			}
 
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-
+			require.NoError(t, err)
 			if tt.check != nil {
 				tt.check(t, buf.String())
 			}

@@ -1,4 +1,4 @@
-package show
+package show_test
 
 import (
 	"bytes"
@@ -6,10 +6,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/aws/aws-sdk-go-v2/service/ssm/types"
+	"github.com/samber/lo"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
+	"github.com/mpyw/suve/internal/cli/ssm/show"
 	"github.com/mpyw/suve/internal/version/ssmversion"
 )
 
@@ -27,26 +30,27 @@ func (m *mockClient) GetParameterHistory(ctx context.Context, params *ssm.GetPar
 }
 
 func TestRun(t *testing.T) {
+	t.Parallel()
 	now := time.Now()
 
 	tests := []struct {
 		name    string
-		opts    Options
+		opts    show.Options
 		mock    *mockClient
 		wantErr bool
 		check   func(t *testing.T, output string)
 	}{
 		{
 			name: "show latest version",
-			opts: Options{
+			opts: show.Options{
 				Spec: &ssmversion.Spec{Name: "/my/param"},
 			},
 			mock: &mockClient{
 				getParameterFunc: func(_ context.Context, _ *ssm.GetParameterInput, _ ...func(*ssm.Options)) (*ssm.GetParameterOutput, error) {
 					return &ssm.GetParameterOutput{
 						Parameter: &types.Parameter{
-							Name:             aws.String("/my/param"),
-							Value:            aws.String("test-value"),
+							Name:             lo.ToPtr("/my/param"),
+							Value:            lo.ToPtr("test-value"),
 							Version:          3,
 							Type:             types.ParameterTypeString,
 							LastModifiedDate: &now,
@@ -55,39 +59,33 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
-				if !bytes.Contains([]byte(output), []byte("/my/param")) {
-					t.Errorf("output should contain parameter name")
-				}
-				if !bytes.Contains([]byte(output), []byte("test-value")) {
-					t.Errorf("output should contain parameter value")
-				}
+				assert.Contains(t, output, "/my/param")
+				assert.Contains(t, output, "test-value")
 			},
 		},
 		{
 			name: "show with shift",
-			opts: Options{
+			opts: show.Options{
 				Spec: &ssmversion.Spec{Name: "/my/param", Shift: 1},
 			},
 			mock: &mockClient{
 				getParameterHistoryFunc: func(_ context.Context, _ *ssm.GetParameterHistoryInput, _ ...func(*ssm.Options)) (*ssm.GetParameterHistoryOutput, error) {
 					return &ssm.GetParameterHistoryOutput{
 						Parameters: []types.ParameterHistory{
-							{Name: aws.String("/my/param"), Value: aws.String("v3"), Version: 3, LastModifiedDate: &now},
-							{Name: aws.String("/my/param"), Value: aws.String("v2"), Version: 2, LastModifiedDate: aws.Time(now.Add(-time.Hour))},
-							{Name: aws.String("/my/param"), Value: aws.String("v1"), Version: 1, LastModifiedDate: aws.Time(now.Add(-2 * time.Hour))},
+							{Name: lo.ToPtr("/my/param"), Value: lo.ToPtr("v3"), Version: 3, LastModifiedDate: &now},
+							{Name: lo.ToPtr("/my/param"), Value: lo.ToPtr("v2"), Version: 2, LastModifiedDate: lo.ToPtr(now.Add(-time.Hour))},
+							{Name: lo.ToPtr("/my/param"), Value: lo.ToPtr("v1"), Version: 1, LastModifiedDate: lo.ToPtr(now.Add(-2 * time.Hour))},
 						},
 					}, nil
 				},
 			},
 			check: func(t *testing.T, output string) {
-				if !bytes.Contains([]byte(output), []byte("v2")) {
-					t.Errorf("output should contain shifted version value")
-				}
+				assert.Contains(t, output, "v2")
 			},
 		},
 		{
 			name: "show JSON formatted",
-			opts: Options{
+			opts: show.Options{
 				Spec:       &ssmversion.Spec{Name: "/my/param"},
 				JSONFormat: true,
 			},
@@ -95,8 +93,8 @@ func TestRun(t *testing.T) {
 				getParameterFunc: func(_ context.Context, _ *ssm.GetParameterInput, _ ...func(*ssm.Options)) (*ssm.GetParameterOutput, error) {
 					return &ssm.GetParameterOutput{
 						Parameter: &types.Parameter{
-							Name:             aws.String("/my/param"),
-							Value:            aws.String(`{"zebra":"last","apple":"first"}`),
+							Name:             lo.ToPtr("/my/param"),
+							Value:            lo.ToPtr(`{"zebra":"last","apple":"first"}`),
 							Version:          1,
 							Type:             types.ParameterTypeString,
 							LastModifiedDate: &now,
@@ -105,24 +103,20 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
-				// Keys should be sorted (apple before zebra)
 				appleIdx := bytes.Index([]byte(output), []byte("apple"))
 				zebraIdx := bytes.Index([]byte(output), []byte("zebra"))
-				if appleIdx == -1 || zebraIdx == -1 {
-					t.Error("expected both keys in output")
-					return
-				}
-				if appleIdx > zebraIdx {
-					t.Error("expected keys to be sorted (apple before zebra)")
-				}
+				require.NotEqual(t, -1, appleIdx, "expected apple in output")
+				require.NotEqual(t, -1, zebraIdx, "expected zebra in output")
+				assert.Less(t, appleIdx, zebraIdx, "expected keys to be sorted (apple before zebra)")
 			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			var buf, errBuf bytes.Buffer
-			r := &Runner{
+			r := &show.Runner{
 				Client: tt.mock,
 				Stdout: &buf,
 				Stderr: &errBuf,
@@ -130,17 +124,11 @@ func TestRun(t *testing.T) {
 			err := r.Run(t.Context(), tt.opts)
 
 			if tt.wantErr {
-				if err == nil {
-					t.Errorf("Run() expected error, got nil")
-				}
+				assert.Error(t, err)
 				return
 			}
 
-			if err != nil {
-				t.Errorf("Run() unexpected error: %v", err)
-				return
-			}
-
+			require.NoError(t, err)
 			if tt.check != nil {
 				tt.check(t, buf.String())
 			}

@@ -1,4 +1,4 @@
-package update
+package update_test
 
 import (
 	"bytes"
@@ -6,8 +6,12 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
+	"github.com/samber/lo"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/mpyw/suve/internal/cli/sm/update"
 )
 
 type mockClient struct {
@@ -22,42 +26,35 @@ func (m *mockClient) PutSecretValue(ctx context.Context, params *secretsmanager.
 }
 
 func TestRun(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name    string
-		opts    Options
+		opts    update.Options
 		mock    *mockClient
 		wantErr bool
 		check   func(t *testing.T, output string)
 	}{
 		{
 			name: "update secret",
-			opts: Options{Name: "my-secret", Value: "new-value"},
+			opts: update.Options{Name: "my-secret", Value: "new-value"},
 			mock: &mockClient{
 				putSecretValueFunc: func(_ context.Context, params *secretsmanager.PutSecretValueInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.PutSecretValueOutput, error) {
-					if aws.ToString(params.SecretId) != "my-secret" {
-						t.Errorf("expected SecretId my-secret, got %s", aws.ToString(params.SecretId))
-					}
-					if aws.ToString(params.SecretString) != "new-value" {
-						t.Errorf("expected value new-value, got %s", aws.ToString(params.SecretString))
-					}
+					assert.Equal(t, "my-secret", lo.FromPtr(params.SecretId))
+					assert.Equal(t, "new-value", lo.FromPtr(params.SecretString))
 					return &secretsmanager.PutSecretValueOutput{
-						Name:      aws.String("my-secret"),
-						VersionId: aws.String("new-version-id"),
+						Name:      lo.ToPtr("my-secret"),
+						VersionId: lo.ToPtr("new-version-id"),
 					}, nil
 				},
 			},
 			check: func(t *testing.T, output string) {
-				if !bytes.Contains([]byte(output), []byte("Updated secret")) {
-					t.Error("expected 'Updated secret' in output")
-				}
-				if !bytes.Contains([]byte(output), []byte("my-secret")) {
-					t.Error("expected secret name in output")
-				}
+				assert.Contains(t, output, "Updated secret")
+				assert.Contains(t, output, "my-secret")
 			},
 		},
 		{
 			name: "error from AWS",
-			opts: Options{Name: "my-secret", Value: "new-value"},
+			opts: update.Options{Name: "my-secret", Value: "new-value"},
 			mock: &mockClient{
 				putSecretValueFunc: func(_ context.Context, _ *secretsmanager.PutSecretValueInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.PutSecretValueOutput, error) {
 					return nil, fmt.Errorf("AWS error")
@@ -69,8 +66,9 @@ func TestRun(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			var buf, errBuf bytes.Buffer
-			r := &Runner{
+			r := &update.Runner{
 				Client: tt.mock,
 				Stdout: &buf,
 				Stderr: &errBuf,
@@ -78,16 +76,11 @@ func TestRun(t *testing.T) {
 			err := r.Run(t.Context(), tt.opts)
 
 			if tt.wantErr {
-				if err == nil {
-					t.Error("expected error, got nil")
-				}
+				assert.Error(t, err)
 				return
 			}
 
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-
+			require.NoError(t, err)
 			if tt.check != nil {
 				tt.check(t, buf.String())
 			}

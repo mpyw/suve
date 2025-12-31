@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/samber/lo"
 	"github.com/urfave/cli/v2"
 
 	"github.com/mpyw/suve/internal/api/ssmapi"
@@ -109,8 +109,8 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 		return fmt.Errorf("failed to get second version: %w", err)
 	}
 
-	value1 := aws.ToString(param1.Value)
-	value2 := aws.ToString(param2.Value)
+	value1 := lo.FromPtr(param1.Value)
+	value2 := lo.FromPtr(param2.Value)
 
 	// Format as JSON if enabled
 	if opts.JSONFormat {

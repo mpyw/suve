@@ -3,6 +3,8 @@ package smversion
 import (
 	"errors"
 
+	"github.com/samber/lo"
+
 	"github.com/mpyw/suve/internal/version"
 	"github.com/mpyw/suve/internal/version/internal"
 )
@@ -43,7 +45,7 @@ var parser = version.AbsoluteParser[AbsoluteSpec]{
 			Error:      ErrInvalidID,
 			Duplicated: hasAbsoluteSpec,
 			Apply: func(value string, abs AbsoluteSpec) (AbsoluteSpec, error) {
-				abs.ID = &value
+				abs.ID = lo.ToPtr(value)
 				return abs, nil
 			},
 		},
@@ -53,7 +55,7 @@ var parser = version.AbsoluteParser[AbsoluteSpec]{
 			Error:      ErrInvalidLabel,
 			Duplicated: hasAbsoluteSpec,
 			Apply: func(value string, abs AbsoluteSpec) (AbsoluteSpec, error) {
-				abs.Label = &value
+				abs.Label = lo.ToPtr(value)
 				return abs, nil
 			},
 		},

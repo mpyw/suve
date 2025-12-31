@@ -1,4 +1,4 @@
-package create
+package create_test
 
 import (
 	"bytes"
@@ -6,8 +6,12 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
+	"github.com/samber/lo"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/mpyw/suve/internal/cli/sm/create"
 )
 
 type mockClient struct {
@@ -22,57 +26,48 @@ func (m *mockClient) CreateSecret(ctx context.Context, params *secretsmanager.Cr
 }
 
 func TestRun(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name    string
-		opts    Options
+		opts    create.Options
 		mock    *mockClient
 		wantErr bool
 		check   func(t *testing.T, output string)
 	}{
 		{
 			name: "create secret",
-			opts: Options{Name: "my-secret", Value: "secret-value"},
+			opts: create.Options{Name: "my-secret", Value: "secret-value"},
 			mock: &mockClient{
 				createSecretFunc: func(_ context.Context, params *secretsmanager.CreateSecretInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.CreateSecretOutput, error) {
-					if aws.ToString(params.Name) != "my-secret" {
-						t.Errorf("expected name my-secret, got %s", aws.ToString(params.Name))
-					}
-					if aws.ToString(params.SecretString) != "secret-value" {
-						t.Errorf("expected value secret-value, got %s", aws.ToString(params.SecretString))
-					}
+					assert.Equal(t, "my-secret", lo.FromPtr(params.Name))
+					assert.Equal(t, "secret-value", lo.FromPtr(params.SecretString))
 					return &secretsmanager.CreateSecretOutput{
-						Name:      aws.String("my-secret"),
-						VersionId: aws.String("abc123"),
+						Name:      lo.ToPtr("my-secret"),
+						VersionId: lo.ToPtr("abc123"),
 					}, nil
 				},
 			},
 			check: func(t *testing.T, output string) {
-				if !bytes.Contains([]byte(output), []byte("Created secret")) {
-					t.Error("expected 'Created secret' in output")
-				}
-				if !bytes.Contains([]byte(output), []byte("my-secret")) {
-					t.Error("expected secret name in output")
-				}
+				assert.Contains(t, output, "Created secret")
+				assert.Contains(t, output, "my-secret")
 			},
 		},
 		{
 			name: "create with description",
-			opts: Options{Name: "my-secret", Value: "secret-value", Description: "Test description"},
+			opts: create.Options{Name: "my-secret", Value: "secret-value", Description: "Test description"},
 			mock: &mockClient{
 				createSecretFunc: func(_ context.Context, params *secretsmanager.CreateSecretInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.CreateSecretOutput, error) {
-					if aws.ToString(params.Description) != "Test description" {
-						t.Errorf("expected description 'Test description', got %s", aws.ToString(params.Description))
-					}
+					assert.Equal(t, "Test description", lo.FromPtr(params.Description))
 					return &secretsmanager.CreateSecretOutput{
-						Name:      aws.String("my-secret"),
-						VersionId: aws.String("abc123"),
+						Name:      lo.ToPtr("my-secret"),
+						VersionId: lo.ToPtr("abc123"),
 					}, nil
 				},
 			},
 		},
 		{
 			name: "error from AWS",
-			opts: Options{Name: "my-secret", Value: "secret-value"},
+			opts: create.Options{Name: "my-secret", Value: "secret-value"},
 			mock: &mockClient{
 				createSecretFunc: func(_ context.Context, _ *secretsmanager.CreateSecretInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.CreateSecretOutput, error) {
 					return nil, fmt.Errorf("AWS error")
@@ -84,8 +79,9 @@ func TestRun(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			var buf, errBuf bytes.Buffer
-			r := &Runner{
+			r := &create.Runner{
 				Client: tt.mock,
 				Stdout: &buf,
 				Stderr: &errBuf,
@@ -93,16 +89,11 @@ func TestRun(t *testing.T) {
 			err := r.Run(t.Context(), tt.opts)
 
 			if tt.wantErr {
-				if err == nil {
-					t.Error("expected error, got nil")
-				}
+				assert.Error(t, err)
 				return
 			}
 
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-
+			require.NoError(t, err)
 			if tt.check != nil {
 				tt.check(t, buf.String())
 			}

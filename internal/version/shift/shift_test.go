@@ -1,8 +1,14 @@
 package shift
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
 
 func TestParse(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name      string
 		input     string
@@ -51,24 +57,20 @@ func TestParse(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			gotShift, err := Parse(tt.input)
 			if tt.wantErr {
-				if err == nil {
-					t.Errorf("Parse(%q) expected error, got nil", tt.input)
-				}
+				assert.Error(t, err)
 				return
 			}
-			if err != nil {
-				t.Fatalf("Parse(%q) unexpected error: %v", tt.input, err)
-			}
-			if gotShift != tt.wantShift {
-				t.Errorf("Parse(%q) shift = %d, want %d", tt.input, gotShift, tt.wantShift)
-			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantShift, gotShift)
 		})
 	}
 }
 
 func TestIsShiftStart(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name string
 		s    string
@@ -114,10 +116,9 @@ func TestIsShiftStart(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			got := IsShiftStart(tt.s, tt.i)
-			if got != tt.want {
-				t.Errorf("IsShiftStart(%q, %d) = %v, want %v", tt.s, tt.i, got, tt.want)
-			}
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }

@@ -4,6 +4,8 @@ import (
 	"errors"
 	"strconv"
 
+	"github.com/samber/lo"
+
 	"github.com/mpyw/suve/internal/version"
 	"github.com/mpyw/suve/internal/version/internal"
 )
@@ -42,7 +44,7 @@ var parser = version.AbsoluteParser[AbsoluteSpec]{
 				if err != nil {
 					return abs, err
 				}
-				abs.Version = &v
+				abs.Version = lo.ToPtr(v)
 				return abs, nil
 			},
 		},

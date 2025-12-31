@@ -4,10 +4,11 @@ package ssmversion
 import (
 	"context"
 	"fmt"
+	"slices"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/aws/aws-sdk-go-v2/service/ssm/types"
+	"github.com/samber/lo"
 
 	"github.com/mpyw/suve/internal/api/ssmapi"
 )
@@ -28,8 +29,8 @@ func GetParameterWithVersion(ctx context.Context, client Client, spec *Spec, dec
 
 func getParameterWithShift(ctx context.Context, client ssmapi.GetParameterHistoryAPI, spec *Spec, decrypt bool) (*types.ParameterHistory, error) {
 	history, err := client.GetParameterHistory(ctx, &ssm.GetParameterHistoryInput{
-		Name:           aws.String(spec.Name),
-		WithDecryption: aws.Bool(decrypt),
+		Name:           lo.ToPtr(spec.Name),
+		WithDecryption: lo.ToPtr(decrypt),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to get parameter history: %w", err)
@@ -41,23 +42,17 @@ func getParameterWithShift(ctx context.Context, client ssmapi.GetParameterHistor
 
 	// Reverse to get newest first
 	params := history.Parameters
-	for i, j := 0, len(params)-1; i < j; i, j = i+1, j-1 {
-		params[i], params[j] = params[j], params[i]
-	}
+	slices.Reverse(params)
 
 	baseIdx := 0
 	if spec.Absolute.Version != nil {
-		found := false
-		for i, p := range params {
-			if p.Version == *spec.Absolute.Version {
-				baseIdx = i
-				found = true
-				break
-			}
-		}
+		_, idx, found := lo.FindIndexOf(params, func(p types.ParameterHistory) bool {
+			return p.Version == *spec.Absolute.Version
+		})
 		if !found {
 			return nil, fmt.Errorf("version %d not found", *spec.Absolute.Version)
 		}
+		baseIdx = idx
 	}
 
 	targetIdx := baseIdx + spec.Shift
@@ -77,8 +72,8 @@ func getParameterDirect(ctx context.Context, client ssmapi.GetParameterAPI, spec
 	}
 
 	result, err := client.GetParameter(ctx, &ssm.GetParameterInput{
-		Name:           aws.String(nameWithVersion),
-		WithDecryption: aws.Bool(decrypt),
+		Name:           lo.ToPtr(nameWithVersion),
+		WithDecryption: lo.ToPtr(decrypt),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to get parameter: %w", err)

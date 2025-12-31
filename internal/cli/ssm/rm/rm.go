@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/fatih/color"
+	"github.com/samber/lo"
 	"github.com/urfave/cli/v2"
 
 	"github.com/mpyw/suve/internal/api/ssmapi"
@@ -72,7 +72,7 @@ func action(c *cli.Context) error {
 // Run executes the rm command.
 func (r *Runner) Run(ctx context.Context, opts Options) error {
 	_, err := r.Client.DeleteParameter(ctx, &ssm.DeleteParameterInput{
-		Name: aws.String(opts.Name),
+		Name: lo.ToPtr(opts.Name),
 	})
 	if err != nil {
 		return fmt.Errorf("failed to delete parameter: %w", err)

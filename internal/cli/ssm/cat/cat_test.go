@@ -1,4 +1,4 @@
-package cat
+package cat_test
 
 import (
 	"bytes"
@@ -7,10 +7,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/aws/aws-sdk-go-v2/service/ssm/types"
+	"github.com/samber/lo"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
+	"github.com/mpyw/suve/internal/cli/ssm/cat"
 	"github.com/mpyw/suve/internal/version/ssmversion"
 )
 
@@ -34,18 +37,19 @@ func (m *mockClient) GetParameterHistory(ctx context.Context, params *ssm.GetPar
 }
 
 func TestRun(t *testing.T) {
+	t.Parallel()
 	now := time.Now()
 
 	tests := []struct {
 		name    string
-		opts    Options
+		opts    cat.Options
 		mock    *mockClient
 		wantErr bool
 		check   func(t *testing.T, output string)
 	}{
 		{
 			name: "output raw value",
-			opts: Options{
+			opts: cat.Options{
 				Spec:    &ssmversion.Spec{Name: "/app/param"},
 				Decrypt: true,
 			},
@@ -53,8 +57,8 @@ func TestRun(t *testing.T) {
 				getParameterFunc: func(_ context.Context, _ *ssm.GetParameterInput, _ ...func(*ssm.Options)) (*ssm.GetParameterOutput, error) {
 					return &ssm.GetParameterOutput{
 						Parameter: &types.Parameter{
-							Name:             aws.String("/app/param"),
-							Value:            aws.String("raw-value"),
+							Name:             lo.ToPtr("/app/param"),
+							Value:            lo.ToPtr("raw-value"),
 							Version:          1,
 							Type:             types.ParameterTypeString,
 							LastModifiedDate: &now,
@@ -63,15 +67,12 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
-				// cat outputs raw value without newline or decoration
-				if output != "raw-value" {
-					t.Errorf("expected 'raw-value', got %q", output)
-				}
+				assert.Equal(t, "raw-value", output)
 			},
 		},
 		{
 			name: "output with shift",
-			opts: Options{
+			opts: cat.Options{
 				Spec:    &ssmversion.Spec{Name: "/app/param", Shift: 1},
 				Decrypt: true,
 			},
@@ -79,21 +80,19 @@ func TestRun(t *testing.T) {
 				getParameterHistoryFunc: func(_ context.Context, _ *ssm.GetParameterHistoryInput, _ ...func(*ssm.Options)) (*ssm.GetParameterHistoryOutput, error) {
 					return &ssm.GetParameterHistoryOutput{
 						Parameters: []types.ParameterHistory{
-							{Name: aws.String("/app/param"), Value: aws.String("v1"), Version: 1, LastModifiedDate: aws.Time(now.Add(-time.Hour))},
-							{Name: aws.String("/app/param"), Value: aws.String("v2"), Version: 2, LastModifiedDate: &now},
+							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr("v1"), Version: 1, LastModifiedDate: lo.ToPtr(now.Add(-time.Hour))},
+							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr("v2"), Version: 2, LastModifiedDate: &now},
 						},
 					}, nil
 				},
 			},
 			check: func(t *testing.T, output string) {
-				if output != "v1" {
-					t.Errorf("expected 'v1', got %q", output)
-				}
+				assert.Equal(t, "v1", output)
 			},
 		},
 		{
 			name: "output JSON formatted with sorted keys",
-			opts: Options{
+			opts: cat.Options{
 				Spec:       &ssmversion.Spec{Name: "/app/param"},
 				Decrypt:    true,
 				JSONFormat: true,
@@ -102,8 +101,8 @@ func TestRun(t *testing.T) {
 				getParameterFunc: func(_ context.Context, _ *ssm.GetParameterInput, _ ...func(*ssm.Options)) (*ssm.GetParameterOutput, error) {
 					return &ssm.GetParameterOutput{
 						Parameter: &types.Parameter{
-							Name:             aws.String("/app/param"),
-							Value:            aws.String(`{"zebra":"last","apple":"first"}`),
+							Name:             lo.ToPtr("/app/param"),
+							Value:            lo.ToPtr(`{"zebra":"last","apple":"first"}`),
 							Version:          1,
 							Type:             types.ParameterTypeString,
 							LastModifiedDate: &now,
@@ -112,21 +111,16 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
-				// Keys should be sorted (apple before zebra)
 				appleIdx := bytes.Index([]byte(output), []byte("apple"))
 				zebraIdx := bytes.Index([]byte(output), []byte("zebra"))
-				if appleIdx == -1 || zebraIdx == -1 {
-					t.Error("expected both keys in output")
-					return
-				}
-				if appleIdx > zebraIdx {
-					t.Error("expected keys to be sorted (apple before zebra)")
-				}
+				require.NotEqual(t, -1, appleIdx, "expected apple in output")
+				require.NotEqual(t, -1, zebraIdx, "expected zebra in output")
+				assert.Less(t, appleIdx, zebraIdx, "expected keys to be sorted (apple before zebra)")
 			},
 		},
 		{
 			name: "error from AWS",
-			opts: Options{
+			opts: cat.Options{
 				Spec:    &ssmversion.Spec{Name: "/app/param"},
 				Decrypt: true,
 			},
@@ -141,8 +135,9 @@ func TestRun(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			var buf, warnBuf bytes.Buffer
-			r := &Runner{
+			r := &cat.Runner{
 				Client: tt.mock,
 				Stdout: &buf,
 				Stderr: &warnBuf,
@@ -150,16 +145,11 @@ func TestRun(t *testing.T) {
 			err := r.Run(t.Context(), tt.opts)
 
 			if tt.wantErr {
-				if err == nil {
-					t.Error("expected error, got nil")
-				}
+				assert.Error(t, err)
 				return
 			}
 
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-
+			require.NoError(t, err)
 			if tt.check != nil {
 				tt.check(t, buf.String())
 			}

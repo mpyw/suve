@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
 	"github.com/fatih/color"
+	"github.com/samber/lo"
 	"github.com/urfave/cli/v2"
 
 	"github.com/mpyw/suve/internal/api/smapi"
@@ -77,8 +77,8 @@ func action(c *cli.Context) error {
 // Run executes the update command.
 func (r *Runner) Run(ctx context.Context, opts Options) error {
 	result, err := r.Client.PutSecretValue(ctx, &secretsmanager.PutSecretValueInput{
-		SecretId:     aws.String(opts.Name),
-		SecretString: aws.String(opts.Value),
+		SecretId:     lo.ToPtr(opts.Name),
+		SecretString: lo.ToPtr(opts.Value),
 	})
 	if err != nil {
 		return fmt.Errorf("failed to update secret: %w", err)
@@ -87,8 +87,8 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 	green := color.New(color.FgGreen).SprintFunc()
 	_, _ = fmt.Fprintf(r.Stdout, "%s Updated secret %s (version: %s)\n",
 		green("✓"),
-		aws.ToString(result.Name),
-		aws.ToString(result.VersionId),
+		lo.FromPtr(result.Name),
+		lo.FromPtr(result.VersionId),
 	)
 
 	return nil

@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
 	"github.com/fatih/color"
+	"github.com/samber/lo"
 	"github.com/urfave/cli/v2"
 
 	"github.com/mpyw/suve/internal/api/smapi"
@@ -98,13 +98,13 @@ func action(c *cli.Context) error {
 // Run executes the rm command.
 func (r *Runner) Run(ctx context.Context, opts Options) error {
 	input := &secretsmanager.DeleteSecretInput{
-		SecretId: aws.String(opts.Name),
+		SecretId: lo.ToPtr(opts.Name),
 	}
 
 	if opts.Force {
-		input.ForceDeleteWithoutRecovery = aws.Bool(true)
+		input.ForceDeleteWithoutRecovery = lo.ToPtr(true)
 	} else {
-		input.RecoveryWindowInDays = aws.Int64(int64(opts.RecoveryWindow))
+		input.RecoveryWindowInDays = lo.ToPtr(int64(opts.RecoveryWindow))
 	}
 
 	result, err := r.Client.DeleteSecret(ctx, input)
@@ -116,12 +116,12 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 	if opts.Force {
 		_, _ = fmt.Fprintf(r.Stdout, "%s Permanently deleted secret %s\n",
 			yellow("!"),
-			aws.ToString(result.Name),
+			lo.FromPtr(result.Name),
 		)
 	} else {
 		_, _ = fmt.Fprintf(r.Stdout, "%s Scheduled deletion of secret %s (deletion date: %s)\n",
 			yellow("!"),
-			aws.ToString(result.Name),
+			lo.FromPtr(result.Name),
 			result.DeletionDate.Format("2006-01-02"),
 		)
 	}

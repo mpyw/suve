@@ -7,8 +7,8 @@ import (
 	"io"
 	"time"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ssm/types"
+	"github.com/samber/lo"
 	"github.com/urfave/cli/v2"
 
 	"github.com/mpyw/suve/internal/api/ssmapi"
@@ -108,7 +108,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 	}
 
 	out := output.New(r.Stdout)
-	out.Field("Name", aws.ToString(param.Name))
+	out.Field("Name", lo.FromPtr(param.Name))
 	out.Field("Version", fmt.Sprintf("%d", param.Version))
 	out.Field("Type", string(param.Type))
 	if param.LastModifiedDate != nil {
@@ -116,7 +116,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 	}
 	out.Separator()
 
-	value := aws.ToString(param.Value)
+	value := lo.FromPtr(param.Value)
 
 	// Warn if --json is used in cases where it's not meaningful
 	if opts.JSONFormat {

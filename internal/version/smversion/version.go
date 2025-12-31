@@ -6,8 +6,9 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
+	"github.com/aws/aws-sdk-go-v2/service/secretsmanager/types"
+	"github.com/samber/lo"
 
 	"github.com/mpyw/suve/internal/api/smapi"
 )
@@ -21,7 +22,7 @@ type Client interface {
 // GetSecretWithVersion retrieves a secret with version/shift/label support.
 func GetSecretWithVersion(ctx context.Context, client Client, spec *Spec) (*secretsmanager.GetSecretValueOutput, error) {
 	input := &secretsmanager.GetSecretValueInput{
-		SecretId: aws.String(spec.Name),
+		SecretId: lo.ToPtr(spec.Name),
 	}
 
 	if spec.HasShift() {
@@ -41,7 +42,7 @@ func GetSecretWithVersion(ctx context.Context, client Client, spec *Spec) (*secr
 
 func getSecretWithShift(ctx context.Context, client Client, spec *Spec) (*secretsmanager.GetSecretValueOutput, error) {
 	versions, err := client.ListSecretVersionIds(ctx, &secretsmanager.ListSecretVersionIdsInput{
-		SecretId: aws.String(spec.Name),
+		SecretId: lo.ToPtr(spec.Name),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to list versions: %w", err)
@@ -65,34 +66,21 @@ func getSecretWithShift(ctx context.Context, client Client, spec *Spec) (*secret
 	// Find base index
 	baseIdx := 0
 	if spec.Absolute.ID != nil {
-		found := false
-		for i, v := range versionList {
-			if aws.ToString(v.VersionId) == *spec.Absolute.ID {
-				baseIdx = i
-				found = true
-				break
-			}
-		}
+		_, idx, found := lo.FindIndexOf(versionList, func(v types.SecretVersionsListEntry) bool {
+			return lo.FromPtr(v.VersionId) == *spec.Absolute.ID
+		})
 		if !found {
 			return nil, fmt.Errorf("version ID not found: %s", *spec.Absolute.ID)
 		}
+		baseIdx = idx
 	} else if spec.Absolute.Label != nil {
-		found := false
-		for i, v := range versionList {
-			for _, stage := range v.VersionStages {
-				if stage == *spec.Absolute.Label {
-					baseIdx = i
-					found = true
-					break
-				}
-			}
-			if found {
-				break
-			}
-		}
+		_, idx, found := lo.FindIndexOf(versionList, func(v types.SecretVersionsListEntry) bool {
+			return lo.Contains(v.VersionStages, *spec.Absolute.Label)
+		})
 		if !found {
 			return nil, fmt.Errorf("version label not found: %s", *spec.Absolute.Label)
 		}
+		baseIdx = idx
 	}
 
 	targetIdx := baseIdx + spec.Shift
@@ -102,7 +90,7 @@ func getSecretWithShift(ctx context.Context, client Client, spec *Spec) (*secret
 
 	targetVersion := versionList[targetIdx]
 	return client.GetSecretValue(ctx, &secretsmanager.GetSecretValueInput{
-		SecretId:  aws.String(spec.Name),
+		SecretId:  lo.ToPtr(spec.Name),
 		VersionId: targetVersion.VersionId,
 	})
 }

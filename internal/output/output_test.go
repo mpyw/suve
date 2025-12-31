@@ -2,38 +2,35 @@ package output
 
 import (
 	"bytes"
-	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestWriter_Field(t *testing.T) {
+	t.Parallel()
 	var buf bytes.Buffer
 	w := New(&buf)
 
 	w.Field("Name", "test-value")
 
 	output := buf.String()
-	if !strings.Contains(output, "Name:") {
-		t.Errorf("expected output to contain 'Name:', got %s", output)
-	}
-	if !strings.Contains(output, "test-value") {
-		t.Errorf("expected output to contain 'test-value', got %s", output)
-	}
+	assert.Contains(t, output, "Name:")
+	assert.Contains(t, output, "test-value")
 }
 
 func TestWriter_Separator(t *testing.T) {
+	t.Parallel()
 	var buf bytes.Buffer
 	w := New(&buf)
 
 	w.Separator()
 
-	output := buf.String()
-	if output != "\n" {
-		t.Errorf("expected newline, got %q", output)
-	}
+	assert.Equal(t, "\n", buf.String())
 }
 
 func TestWriter_Value(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name     string
 		value    string
@@ -58,6 +55,7 @@ func TestWriter_Value(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			var buf bytes.Buffer
 			w := New(&buf)
 
@@ -65,15 +63,14 @@ func TestWriter_Value(t *testing.T) {
 
 			output := buf.String()
 			for _, expected := range tt.contains {
-				if !strings.Contains(output, expected) {
-					t.Errorf("expected output to contain %q, got %q", expected, output)
-				}
+				assert.Contains(t, output, expected)
 			}
 		})
 	}
 }
 
 func TestDiff(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name       string
 		oldName    string
@@ -127,52 +124,39 @@ func TestDiff(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			result := Diff(tt.oldName, tt.newName, tt.oldContent, tt.newContent)
 
 			for _, expected := range tt.contains {
-				if !strings.Contains(result, expected) {
-					t.Errorf("expected diff to contain %q, got:\n%s", expected, result)
-				}
+				assert.Contains(t, result, expected)
 			}
 
 			for _, notExpected := range tt.notContain {
-				if strings.Contains(result, notExpected) {
-					t.Errorf("expected diff NOT to contain %q, got:\n%s", notExpected, result)
-				}
+				assert.NotContains(t, result, notExpected)
 			}
 		})
 	}
 }
 
 func TestDiff_EmptyInputs(t *testing.T) {
+	t.Parallel()
 	result := Diff("old", "new", "", "")
-	if result != "" {
-		t.Errorf("expected empty diff for identical empty strings, got %q", result)
-	}
+	assert.Empty(t, result)
 }
 
 func TestColorDiff(t *testing.T) {
+	t.Parallel()
 	diff := "--- old\n+++ new\n@@ -1 +1 @@\n-removed\n+added\n context"
 
 	result := colorDiff(diff)
 
-	// Just verify it doesn't panic and returns something
-	if result == "" {
-		t.Error("expected non-empty result")
-	}
-
-	// The output should still contain the original content (possibly with ANSI codes)
-	if !strings.Contains(result, "removed") {
-		t.Error("expected result to contain 'removed'")
-	}
-	if !strings.Contains(result, "added") {
-		t.Error("expected result to contain 'added'")
-	}
+	assert.NotEmpty(t, result)
+	assert.Contains(t, result, "removed")
+	assert.Contains(t, result, "added")
 }
 
 func TestColorDiff_EmptyInput(t *testing.T) {
+	t.Parallel()
 	result := colorDiff("")
-	if result != "" {
-		t.Errorf("expected empty result for empty input, got %q", result)
-	}
+	assert.Empty(t, result)
 }

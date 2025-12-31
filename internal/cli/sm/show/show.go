@@ -7,7 +7,7 @@ import (
 	"io"
 	"time"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/samber/lo"
 	"github.com/urfave/cli/v2"
 
 	"github.com/mpyw/suve/internal/api/smapi"
@@ -100,10 +100,10 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 	}
 
 	out := output.New(r.Stdout)
-	out.Field("Name", aws.ToString(secret.Name))
-	out.Field("ARN", aws.ToString(secret.ARN))
+	out.Field("Name", lo.FromPtr(secret.Name))
+	out.Field("ARN", lo.FromPtr(secret.ARN))
 	if secret.VersionId != nil {
-		out.Field("VersionId", aws.ToString(secret.VersionId))
+		out.Field("VersionId", lo.FromPtr(secret.VersionId))
 	}
 	if len(secret.VersionStages) > 0 {
 		out.Field("Stages", fmt.Sprintf("%v", secret.VersionStages))
@@ -113,7 +113,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 	}
 	out.Separator()
 
-	value := aws.ToString(secret.SecretString)
+	value := lo.FromPtr(secret.SecretString)
 
 	// Warn if --json is used but value is not valid JSON
 	if opts.JSONFormat {

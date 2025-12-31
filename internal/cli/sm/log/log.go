@@ -11,9 +11,9 @@ import (
 	"sort"
 	"time"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
 	"github.com/fatih/color"
+	"github.com/samber/lo"
 	"github.com/urfave/cli/v2"
 
 	"github.com/mpyw/suve/internal/api/smapi"
@@ -135,8 +135,8 @@ func truncateID(id string) string {
 // Run executes the log command.
 func (r *Runner) Run(ctx context.Context, opts Options) error {
 	result, err := r.Client.ListSecretVersionIds(ctx, &secretsmanager.ListSecretVersionIdsInput{
-		SecretId:   aws.String(opts.Name),
-		MaxResults: aws.Int32(opts.MaxResults),
+		SecretId:   lo.ToPtr(opts.Name),
+		MaxResults: lo.ToPtr(opts.MaxResults),
 	})
 	if err != nil {
 		return fmt.Errorf("failed to list secret versions: %w", err)
@@ -167,16 +167,16 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 	if opts.ShowPatch {
 		secretValues = make(map[string]string)
 		for _, v := range versions {
-			versionID := aws.ToString(v.VersionId)
+			versionID := lo.FromPtr(v.VersionId)
 			secretResult, err := r.Client.GetSecretValue(ctx, &secretsmanager.GetSecretValueInput{
-				SecretId:  aws.String(opts.Name),
-				VersionId: aws.String(versionID),
+				SecretId:  lo.ToPtr(opts.Name),
+				VersionId: lo.ToPtr(versionID),
 			})
 			if err != nil {
 				// Skip versions that can't be retrieved
 				continue
 			}
-			secretValues[versionID] = aws.ToString(secretResult.SecretString)
+			secretValues[versionID] = lo.FromPtr(secretResult.SecretString)
 		}
 	}
 
@@ -188,7 +188,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 	jsonWarned := false
 
 	for i, v := range versions {
-		versionID := aws.ToString(v.VersionId)
+		versionID := lo.FromPtr(v.VersionId)
 		versionLabel := fmt.Sprintf("Version %s", truncateID(versionID))
 		if len(v.VersionStages) > 0 {
 			versionLabel += " " + green(fmt.Sprintf("%v", v.VersionStages))
@@ -220,8 +220,8 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 			}
 
 			if oldIdx >= 0 {
-				oldVersionID := aws.ToString(versions[oldIdx].VersionId)
-				newVersionID := aws.ToString(versions[newIdx].VersionId)
+				oldVersionID := lo.FromPtr(versions[oldIdx].VersionId)
+				newVersionID := lo.FromPtr(versions[newIdx].VersionId)
 				oldValue, oldOk := secretValues[oldVersionID]
 				newValue, newOk := secretValues[newVersionID]
 				if oldOk && newOk {

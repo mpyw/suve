@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
 	"github.com/fatih/color"
+	"github.com/samber/lo"
 	"github.com/urfave/cli/v2"
 
 	"github.com/mpyw/suve/internal/api/smapi"
@@ -88,11 +88,11 @@ func action(c *cli.Context) error {
 // Run executes the create command.
 func (r *Runner) Run(ctx context.Context, opts Options) error {
 	input := &secretsmanager.CreateSecretInput{
-		Name:         aws.String(opts.Name),
-		SecretString: aws.String(opts.Value),
+		Name:         lo.ToPtr(opts.Name),
+		SecretString: lo.ToPtr(opts.Value),
 	}
 	if opts.Description != "" {
-		input.Description = aws.String(opts.Description)
+		input.Description = lo.ToPtr(opts.Description)
 	}
 
 	result, err := r.Client.CreateSecret(ctx, input)
@@ -103,8 +103,8 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 	green := color.New(color.FgGreen).SprintFunc()
 	_, _ = fmt.Fprintf(r.Stdout, "%s Created secret %s (version: %s)\n",
 		green("✓"),
-		aws.ToString(result.Name),
-		aws.ToString(result.VersionId),
+		lo.FromPtr(result.Name),
+		lo.FromPtr(result.VersionId),
 	)
 
 	return nil

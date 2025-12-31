@@ -1,4 +1,4 @@
-package set
+package set_test
 
 import (
 	"bytes"
@@ -6,9 +6,13 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/aws/aws-sdk-go-v2/service/ssm/types"
+	"github.com/samber/lo"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/mpyw/suve/internal/cli/ssm/set"
 )
 
 type mockClient struct {
@@ -23,48 +27,39 @@ func (m *mockClient) PutParameter(ctx context.Context, params *ssm.PutParameterI
 }
 
 func TestRun(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name    string
-		opts    Options
+		opts    set.Options
 		mock    *mockClient
 		wantErr bool
 		check   func(t *testing.T, output string)
 	}{
 		{
 			name: "set parameter",
-			opts: Options{
+			opts: set.Options{
 				Name:  "/app/param",
 				Value: "test-value",
 				Type:  "SecureString",
 			},
 			mock: &mockClient{
 				putParameterFunc: func(_ context.Context, params *ssm.PutParameterInput, _ ...func(*ssm.Options)) (*ssm.PutParameterOutput, error) {
-					if aws.ToString(params.Name) != "/app/param" {
-						t.Errorf("expected name /app/param, got %s", aws.ToString(params.Name))
-					}
-					if aws.ToString(params.Value) != "test-value" {
-						t.Errorf("expected value test-value, got %s", aws.ToString(params.Value))
-					}
-					if params.Type != types.ParameterTypeSecureString {
-						t.Errorf("expected type SecureString, got %s", params.Type)
-					}
+					assert.Equal(t, "/app/param", lo.FromPtr(params.Name))
+					assert.Equal(t, "test-value", lo.FromPtr(params.Value))
+					assert.Equal(t, types.ParameterTypeSecureString, params.Type)
 					return &ssm.PutParameterOutput{
 						Version: 1,
 					}, nil
 				},
 			},
 			check: func(t *testing.T, output string) {
-				if !bytes.Contains([]byte(output), []byte("/app/param")) {
-					t.Error("expected parameter name in output")
-				}
-				if !bytes.Contains([]byte(output), []byte("version: 1")) {
-					t.Error("expected version in output")
-				}
+				assert.Contains(t, output, "/app/param")
+				assert.Contains(t, output, "version: 1")
 			},
 		},
 		{
 			name: "set with description",
-			opts: Options{
+			opts: set.Options{
 				Name:        "/app/param",
 				Value:       "test-value",
 				Type:        "String",
@@ -72,9 +67,7 @@ func TestRun(t *testing.T) {
 			},
 			mock: &mockClient{
 				putParameterFunc: func(_ context.Context, params *ssm.PutParameterInput, _ ...func(*ssm.Options)) (*ssm.PutParameterOutput, error) {
-					if aws.ToString(params.Description) != "Test description" {
-						t.Errorf("expected description 'Test description', got %s", aws.ToString(params.Description))
-					}
+					assert.Equal(t, "Test description", lo.FromPtr(params.Description))
 					return &ssm.PutParameterOutput{
 						Version: 1,
 					}, nil
@@ -83,7 +76,7 @@ func TestRun(t *testing.T) {
 		},
 		{
 			name: "error from AWS",
-			opts: Options{
+			opts: set.Options{
 				Name:  "/app/param",
 				Value: "test-value",
 				Type:  "String",
@@ -99,8 +92,9 @@ func TestRun(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			var buf, errBuf bytes.Buffer
-			r := &Runner{
+			r := &set.Runner{
 				Client: tt.mock,
 				Stdout: &buf,
 				Stderr: &errBuf,
@@ -108,16 +102,11 @@ func TestRun(t *testing.T) {
 			err := r.Run(t.Context(), tt.opts)
 
 			if tt.wantErr {
-				if err == nil {
-					t.Error("expected error, got nil")
-				}
+				assert.Error(t, err)
 				return
 			}
 
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-
+			require.NoError(t, err)
 			if tt.check != nil {
 				tt.check(t, buf.String())
 			}

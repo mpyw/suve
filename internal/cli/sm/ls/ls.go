@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager/types"
+	"github.com/samber/lo"
 	"github.com/urfave/cli/v2"
 
 	"github.com/mpyw/suve/internal/api/smapi"
@@ -90,7 +90,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 		}
 
 		for _, secret := range page.SecretList {
-			_, _ = fmt.Fprintln(r.Stdout, aws.ToString(secret.Name))
+			_, _ = fmt.Fprintln(r.Stdout, lo.FromPtr(secret.Name))
 		}
 	}
 

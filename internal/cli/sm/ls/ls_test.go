@@ -1,4 +1,4 @@
-package ls
+package ls_test
 
 import (
 	"bytes"
@@ -6,9 +6,13 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager/types"
+	"github.com/samber/lo"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/mpyw/suve/internal/cli/sm/ls"
 )
 
 type mockClient struct {
@@ -23,59 +27,52 @@ func (m *mockClient) ListSecrets(ctx context.Context, params *secretsmanager.Lis
 }
 
 func TestRun(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name    string
-		opts    Options
+		opts    ls.Options
 		mock    *mockClient
 		wantErr bool
 		check   func(t *testing.T, output string)
 	}{
 		{
 			name: "list all secrets",
-			opts: Options{},
+			opts: ls.Options{},
 			mock: &mockClient{
 				listSecretsFunc: func(_ context.Context, _ *secretsmanager.ListSecretsInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.ListSecretsOutput, error) {
 					return &secretsmanager.ListSecretsOutput{
 						SecretList: []types.SecretListEntry{
-							{Name: aws.String("secret1")},
-							{Name: aws.String("secret2")},
+							{Name: lo.ToPtr("secret1")},
+							{Name: lo.ToPtr("secret2")},
 						},
 					}, nil
 				},
 			},
 			check: func(t *testing.T, output string) {
-				if !bytes.Contains([]byte(output), []byte("secret1")) {
-					t.Error("expected secret1 in output")
-				}
-				if !bytes.Contains([]byte(output), []byte("secret2")) {
-					t.Error("expected secret2 in output")
-				}
+				assert.Contains(t, output, "secret1")
+				assert.Contains(t, output, "secret2")
 			},
 		},
 		{
 			name: "list with prefix filter",
-			opts: Options{Prefix: "app/"},
+			opts: ls.Options{Prefix: "app/"},
 			mock: &mockClient{
 				listSecretsFunc: func(_ context.Context, params *secretsmanager.ListSecretsInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.ListSecretsOutput, error) {
-					if len(params.Filters) == 0 {
-						t.Error("expected filter to be set")
-					}
+					require.NotEmpty(t, params.Filters, "expected filter to be set")
 					return &secretsmanager.ListSecretsOutput{
 						SecretList: []types.SecretListEntry{
-							{Name: aws.String("app/secret1")},
+							{Name: lo.ToPtr("app/secret1")},
 						},
 					}, nil
 				},
 			},
 			check: func(t *testing.T, output string) {
-				if !bytes.Contains([]byte(output), []byte("app/secret1")) {
-					t.Error("expected app/secret1 in output")
-				}
+				assert.Contains(t, output, "app/secret1")
 			},
 		},
 		{
 			name: "error from AWS",
-			opts: Options{},
+			opts: ls.Options{},
 			mock: &mockClient{
 				listSecretsFunc: func(_ context.Context, _ *secretsmanager.ListSecretsInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.ListSecretsOutput, error) {
 					return nil, fmt.Errorf("AWS error")
@@ -87,8 +84,9 @@ func TestRun(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			var buf, errBuf bytes.Buffer
-			r := &Runner{
+			r := &ls.Runner{
 				Client: tt.mock,
 				Stdout: &buf,
 				Stderr: &errBuf,
@@ -96,16 +94,11 @@ func TestRun(t *testing.T) {
 			err := r.Run(t.Context(), tt.opts)
 
 			if tt.wantErr {
-				if err == nil {
-					t.Error("expected error, got nil")
-				}
+				assert.Error(t, err)
 				return
 			}
 
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-
+			require.NoError(t, err)
 			if tt.check != nil {
 				tt.check(t, buf.String())
 			}
