@@ -17,22 +17,22 @@ var (
 	ErrEmptyID        = errors.New("empty version ID after #")
 	ErrEmptyLabel     = errors.New("empty label after colon")
 	ErrAmbiguousTilde = errors.New("ambiguous tilde in name")
-	ErrBothIDAndLabel = errors.New("cannot specify both #id and :label")
+	ErrBothIDAndLabel = errors.New("cannot specify both #VERSION and :LABEL")
 )
 
 // Spec represents a parsed SM secret version specification.
 //
 // Grammar: <name>[#<id> | :<label>]<shift>*
-//   - #<id>    optional version ID (0 or 1, mutually exclusive with :label)
-//   - :<label> optional staging label (0 or 1, mutually exclusive with #id)
+//   - #<id>    optional version ID (0 or 1, mutually exclusive with :LABEL)
+//   - :<label> optional staging label (0 or 1, mutually exclusive with #VERSION)
 //   - <shift>  ~ or ~<N>, repeatable (0 or more, cumulative)
 //
 // Examples: my-secret, my-secret#abc123, my-secret:AWSCURRENT, my-secret~1
 type Spec struct {
 	Name  string  // Secret name
-	ID    *string // Version ID (#uuid)
-	Label *string // Staging label (:AWSCURRENT, :AWSPREVIOUS, etc.)
-	Shift int     // Number of versions to go back (~N, ~~, etc.)
+	ID    *string // Version ID (#VERSION)
+	Label *string // Staging label (:LABEL)
+	Shift int     // Number of versions to go back (~SHIFT)
 }
 
 // Parse parses an SM version specification string.

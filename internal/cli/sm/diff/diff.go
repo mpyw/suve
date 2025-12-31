@@ -31,9 +31,9 @@ func Command() *cli.Command {
 If only one version is specified, compares against AWSCURRENT.
 
 VERSION SPECIFIERS (as separate arguments):
-  #ID     Specific version by VersionId
-  :LABEL  Staging label (AWSCURRENT, AWSPREVIOUS)
-  ~N      N versions ago; ~ alone means ~1
+  #VERSION  Specific version by VersionId
+  :LABEL    Staging label (AWSCURRENT, AWSPREVIOUS)
+  ~SHIFT    N versions ago; ~ alone means ~1
 
 EXAMPLES:
   suve sm diff my-secret :AWSPREVIOUS :AWSCURRENT  Compare labels

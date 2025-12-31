@@ -25,14 +25,14 @@ func Command() *cli.Command {
 	return &cli.Command{
 		Name:      "cat",
 		Usage:     "Output raw secret value (for piping)",
-		ArgsUsage: "<name[#id | :label][~...]>",
+		ArgsUsage: "<name[#VERSION | :LABEL][~SHIFT]*>",
 		Description: `Output the raw secret value without any formatting.
 Does not append a trailing newline. Designed for scripts and piping.
 
 VERSION SPECIFIERS:
-  #ID     Specific version by VersionId
-  :LABEL  Staging label (AWSCURRENT, AWSPREVIOUS, or custom)
-  ~N      N versions ago; ~ alone means ~1
+  #VERSION  Specific version by VersionId
+  :LABEL    Staging label (AWSCURRENT, AWSPREVIOUS, or custom)
+  ~SHIFT    N versions ago; ~ alone means ~1
 
 EXAMPLES:
   suve sm cat my-secret              Output current value

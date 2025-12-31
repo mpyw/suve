@@ -27,8 +27,8 @@ var (
 // Examples: /my/param, /my/param#3, /my/param~1, /my/param#5~2, /my/param~~
 type Spec struct {
 	Name    string // Parameter name
-	Version *int64 // Explicit version number (#N)
-	Shift   int    // Number of versions to go back (~N, ~~, etc.)
+	Version *int64 // Explicit version number (#VERSION)
+	Shift   int    // Number of versions to go back (~SHIFT)
 }
 
 // Parse parses an SSM version specification string.
@@ -36,10 +36,10 @@ type Spec struct {
 // Grammar: <name>[#<N>]<shift>*
 //
 // Shift syntax (Git-like, repeatable):
-//   - ~     go back 1 version
-//   - ~N    go back N versions
-//   - ~~    go back 2 versions (same as ~1~1)
-//   - ~1~2  cumulative: go back 3 versions
+//   - ~      go back 1 version
+//   - ~N     go back N versions (e.g., ~2)
+//   - ~~     go back 2 versions (same as ~1~1)
+//   - ~1~2   cumulative: go back 3 versions
 func Parse(input string) (*Spec, error) {
 	input = strings.TrimSpace(input)
 	if input == "" {
@@ -108,7 +108,7 @@ func findSpecifierStart(s string) (int, error) {
 			}
 			// Tilde followed by letter is ambiguous - error
 			if i+1 < len(s) && internal.IsLetter(s[i+1]) {
-				return 0, fmt.Errorf("%w: use ~N for version shift or avoid ~ followed by letters", ErrAmbiguousTilde)
+				return 0, fmt.Errorf("%w: use ~SHIFT (e.g., ~1) for version shift or avoid ~ followed by letters", ErrAmbiguousTilde)
 			}
 		}
 	}

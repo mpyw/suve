@@ -28,13 +28,13 @@ func Command() *cli.Command {
 	return &cli.Command{
 		Name:      "show",
 		Usage:     "Show secret value with metadata",
-		ArgsUsage: "<name[#id | :label][~...]>",
+		ArgsUsage: "<name[#VERSION | :LABEL][~SHIFT]*>",
 		Description: `Display a secret's value along with its metadata.
 
 VERSION SPECIFIERS:
-  #ID     Specific version by VersionId
-  :LABEL  Staging label (AWSCURRENT, AWSPREVIOUS, or custom)
-  ~N      N versions ago; ~ alone means ~1
+  #VERSION  Specific version by VersionId
+  :LABEL    Staging label (AWSCURRENT, AWSPREVIOUS, or custom)
+  ~SHIFT    N versions ago; ~ alone means ~1
 
 EXAMPLES:
   suve sm show my-secret                 Show current version

@@ -25,13 +25,13 @@ func Command() *cli.Command {
 	return &cli.Command{
 		Name:      "cat",
 		Usage:     "Output raw parameter value (for piping)",
-		ArgsUsage: "<name[#N][~...]>",
+		ArgsUsage: "<name[#VERSION][~SHIFT]*>",
 		Description: `Output the raw parameter value without any formatting.
 Does not append a trailing newline. Designed for scripts and piping.
 
 VERSION SPECIFIERS:
-  #N   Specific version (e.g., #3)
-  ~N   N versions ago (e.g., ~1, ~2); ~ alone means ~1
+  #VERSION  Specific version (e.g., #3)
+  ~SHIFT    N versions ago (e.g., ~1, ~2); ~ alone means ~1
 
 EXAMPLES:
   suve ssm cat /app/config/db-url            Output latest value

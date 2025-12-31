@@ -4,7 +4,7 @@ This file provides guidance to Claude Code when working with code in this reposi
 
 ## Project Overview
 
-**suve** is a Git-like CLI for AWS Parameter Store and Secrets Manager. It provides familiar Git-style commands (`show`, `log`, `diff`, `cat`, `ls`, `set`, `rm`) with version specification syntax (`#N`, `~N`, `:LABEL`).
+**suve** is a Git-like CLI for AWS Parameter Store and Secrets Manager. It provides familiar Git-style commands (`show`, `log`, `diff`, `cat`, `ls`, `set`, `rm`) with version specification syntax (`#VERSION`, `~SHIFT`, `:LABEL`).
 
 ### Core Concepts
 
@@ -17,8 +17,8 @@ This file provides guidance to Claude Code when working with code in this reposi
 2. **Version Specification**: Git-like revision syntax
    ```
    # SSM Parameter Store
-   <name>[#<N>]<shift>*
-   where <shift> = ~ | ~<N>  (repeatable, cumulative)
+   <name>[#VERSION][~SHIFT]*
+   where ~SHIFT = ~ | ~N  (repeatable, cumulative)
 
    /my/param           # Latest
    /my/param#3         # Version 3
@@ -27,8 +27,8 @@ This file provides guidance to Claude Code when working with code in this reposi
    /my/param~~         # 2 versions ago (same as ~1~1)
 
    # Secrets Manager
-   <name>[#<id> | :<label>]<shift>*
-   where <shift> = ~ | ~<N>  (repeatable, cumulative)
+   <name>[#VERSION | :LABEL][~SHIFT]*
+   where ~SHIFT = ~ | ~N  (repeatable, cumulative)
 
    my-secret              # Current version
    my-secret#abc123       # Specific version ID
@@ -59,9 +59,9 @@ suve/
 │   │
 │   ├── version/
 │   │   ├── internal/          # Shared utilities (char checks)
-│   │   ├── shift/             # Shift parser (~N, ~~, etc.)
-│   │   ├── ssmversion/        # SSM version spec parser (#N, ~N)
-│   │   └── smversion/         # SM version spec parser (#id, :label, ~N)
+│   │   ├── shift/             # Shift parser (~SHIFT)
+│   │   ├── ssmversion/        # SSM version spec parser (#VERSION, ~SHIFT)
+│   │   └── smversion/         # SM version spec parser (#VERSION, :LABEL, ~SHIFT)
 │   │
 │   ├── output/                # Output formatting (diff, colors)
 │   ├── jsonutil/              # JSON formatting

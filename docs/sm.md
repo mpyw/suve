@@ -9,7 +9,7 @@ Service aliases: `sm`, `secret`
 Display secret value with metadata.
 
 ```
-suve sm show [options] <name[#id | :label][~...]>
+suve sm show [options] <name[#VERSION | :LABEL][~SHIFT]*>
 ```
 
 **Arguments:**
@@ -77,7 +77,7 @@ suve sm show my-database-credentials~1
 Output raw secret value without metadata. Designed for piping and scripting.
 
 ```
-suve sm cat <name[#id | :label][~...]>
+suve sm cat <name[#VERSION | :LABEL][~SHIFT]*>
 ```
 
 **Arguments:**

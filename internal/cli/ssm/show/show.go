@@ -27,12 +27,12 @@ func Command() *cli.Command {
 	return &cli.Command{
 		Name:      "show",
 		Usage:     "Show parameter value with metadata",
-		ArgsUsage: "<name[#N][~...]>",
+		ArgsUsage: "<name[#VERSION][~SHIFT]*>",
 		Description: `Display a parameter's value along with its metadata (name, version, type, modification date).
 
 VERSION SPECIFIERS:
-  #N   Specific version (e.g., #3)
-  ~N   N versions ago (e.g., ~1, ~2); ~ alone means ~1
+  #VERSION  Specific version (e.g., #3)
+  ~SHIFT    N versions ago (e.g., ~1, ~2); ~ alone means ~1
 
 EXAMPLES:
   suve ssm show /app/config/db-url              Show latest version

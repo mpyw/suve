@@ -9,7 +9,7 @@ Service aliases: `ssm`, `ps`, `param`
 Display parameter value with metadata.
 
 ```
-suve ssm show [options] <name[#N][~...]>
+suve ssm show [options] <name[#VERSION][~SHIFT]*>
 ```
 
 **Arguments:**
@@ -58,7 +58,7 @@ suve ssm show --decrypt=false /app/config/database-url
 Output raw parameter value without metadata. Designed for piping and scripting.
 
 ```
-suve ssm cat [options] <name[#N][~...]>
+suve ssm cat [options] <name[#VERSION][~SHIFT]*>
 ```
 
 **Arguments:**

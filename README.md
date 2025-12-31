@@ -14,7 +14,7 @@ A Git-like CLI for AWS Parameter Store and Secrets Manager.
 ## Features
 
 - Git-like command structure (`show`, `log`, `diff`, `cat`, `ls`, `set`, `rm`)
-- Version specification syntax (`#N`, `~N`, `:LABEL`)
+- Version specification syntax (`#VERSION`, `~SHIFT`, `:LABEL`)
 - Colored diff output
 - Supports both SSM Parameter Store and Secrets Manager
 
@@ -58,12 +58,12 @@ Git-like revision syntax for specifying versions:
 
 ```
 # SSM Parameter Store
-<name>[#<N>]<shift>*
+<name>[#VERSION][~SHIFT]*
 
 # Secrets Manager
-<name>[#<id> | :<label>]<shift>*
+<name>[#VERSION | :LABEL][~SHIFT]*
 
-where <shift> = ~ | ~<N>  (repeatable, cumulative)
+where ~SHIFT = ~ | ~N  (repeatable, cumulative)
 ```
 
 | Syntax | Description | Service |
