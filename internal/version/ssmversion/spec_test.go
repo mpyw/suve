@@ -3,7 +3,9 @@ package ssmversion
 import (
 	"testing"
 
-	"github.com/mpyw/suve/internal/testutil"
+	"github.com/samber/lo"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestParse(t *testing.T) {
@@ -32,25 +34,25 @@ func TestParse(t *testing.T) {
 			name:        "with version",
 			input:       "/my/param#3",
 			wantName:    "/my/param",
-			wantVersion: testutil.Ptr(int64(3)),
+			wantVersion: lo.ToPtr(int64(3)),
 		},
 		{
 			name:        "with version 0",
 			input:       "/my/param#0",
 			wantName:    "/my/param",
-			wantVersion: testutil.Ptr(int64(0)),
+			wantVersion: lo.ToPtr(int64(0)),
 		},
 		{
 			name:        "with version 1",
 			input:       "/my/param#1",
 			wantName:    "/my/param",
-			wantVersion: testutil.Ptr(int64(1)),
+			wantVersion: lo.ToPtr(int64(1)),
 		},
 		{
 			name:        "with large version",
 			input:       "/my/param#999999",
 			wantName:    "/my/param",
-			wantVersion: testutil.Ptr(int64(999999)),
+			wantVersion: lo.ToPtr(int64(999999)),
 		},
 
 		// Shift specifier
@@ -102,21 +104,21 @@ func TestParse(t *testing.T) {
 			name:        "version and shift",
 			input:       "/my/param#5~2",
 			wantName:    "/my/param",
-			wantVersion: testutil.Ptr(int64(5)),
+			wantVersion: lo.ToPtr(int64(5)),
 			wantShift:   2,
 		},
 		{
 			name:        "version and bare tilde",
 			input:       "/my/param#3~",
 			wantName:    "/my/param",
-			wantVersion: testutil.Ptr(int64(3)),
+			wantVersion: lo.ToPtr(int64(3)),
 			wantShift:   1,
 		},
 		{
 			name:        "version and double tilde",
 			input:       "/my/param#10~~",
 			wantName:    "/my/param",
-			wantVersion: testutil.Ptr(int64(10)),
+			wantVersion: lo.ToPtr(int64(10)),
 			wantShift:   2,
 		},
 
@@ -130,7 +132,7 @@ func TestParse(t *testing.T) {
 			name:        "whitespace with version",
 			input:       "  /my/param#3  ",
 			wantName:    "/my/param",
-			wantVersion: testutil.Ptr(int64(3)),
+			wantVersion: lo.ToPtr(int64(3)),
 		},
 
 		// Error cases
@@ -211,28 +213,14 @@ func TestParse(t *testing.T) {
 			spec, err := Parse(tt.input)
 
 			if tt.wantErr {
-				if err == nil {
-					t.Errorf("Parse() expected error, got nil")
-				}
+				assert.Error(t, err)
 				return
 			}
 
-			if err != nil {
-				t.Errorf("Parse() unexpected error: %v", err)
-				return
-			}
-
-			if spec.Name != tt.wantName {
-				t.Errorf("Parse() Name = %q, want %q", spec.Name, tt.wantName)
-			}
-
-			if !testutil.PtrEqual(spec.Absolute.Version, tt.wantVersion) {
-				t.Errorf("Parse() Version = %v, want %v", spec.Absolute.Version, tt.wantVersion)
-			}
-
-			if spec.Shift != tt.wantShift {
-				t.Errorf("Parse() Shift = %d, want %d", spec.Shift, tt.wantShift)
-			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantName, spec.Name)
+			assert.Equal(t, tt.wantVersion, spec.Absolute.Version)
+			assert.Equal(t, tt.wantShift, spec.Shift)
 		})
 	}
 }
@@ -262,9 +250,7 @@ func TestSpec_HasShift(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := tt.spec.HasShift(); got != tt.want {
-				t.Errorf("Spec.HasShift() = %v, want %v", got, tt.want)
-			}
+			assert.Equal(t, tt.want, tt.spec.HasShift())
 		})
 	}
 }

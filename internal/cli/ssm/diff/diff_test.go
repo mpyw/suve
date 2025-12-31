@@ -10,9 +10,11 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/aws/aws-sdk-go-v2/service/ssm/types"
+	"github.com/samber/lo"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/mpyw/suve/internal/diff"
-	"github.com/mpyw/suve/internal/testutil"
 	"github.com/mpyw/suve/internal/version/ssmversion"
 )
 
@@ -30,7 +32,7 @@ func TestParseArgs(t *testing.T) {
 			args: []string{"/app/config#3"},
 			wantSpec1: &wantSpec{
 				name:    "/app/config",
-				version: testutil.Ptr(int64(3)),
+				version: lo.ToPtr(int64(3)),
 				shift:   0,
 			},
 			wantSpec2: &wantSpec{
@@ -58,7 +60,7 @@ func TestParseArgs(t *testing.T) {
 			args: []string{"/app/config#5~2"},
 			wantSpec1: &wantSpec{
 				name:    "/app/config",
-				version: testutil.Ptr(int64(5)),
+				version: lo.ToPtr(int64(5)),
 				shift:   2,
 			},
 			wantSpec2: &wantSpec{
@@ -88,7 +90,7 @@ func TestParseArgs(t *testing.T) {
 			args: []string{"/app/config", "#3"},
 			wantSpec1: &wantSpec{
 				name:    "/app/config",
-				version: testutil.Ptr(int64(3)),
+				version: lo.ToPtr(int64(3)),
 				shift:   0,
 			},
 			wantSpec2: &wantSpec{
@@ -102,12 +104,12 @@ func TestParseArgs(t *testing.T) {
 			args: []string{"/app/config#1", "#2"},
 			wantSpec1: &wantSpec{
 				name:    "/app/config",
-				version: testutil.Ptr(int64(1)),
+				version: lo.ToPtr(int64(1)),
 				shift:   0,
 			},
 			wantSpec2: &wantSpec{
 				name:    "/app/config",
-				version: testutil.Ptr(int64(2)),
+				version: lo.ToPtr(int64(2)),
 				shift:   0,
 			},
 		},
@@ -121,7 +123,7 @@ func TestParseArgs(t *testing.T) {
 			},
 			wantSpec2: &wantSpec{
 				name:    "/app/config",
-				version: testutil.Ptr(int64(2)),
+				version: lo.ToPtr(int64(2)),
 				shift:   0,
 			},
 		},
@@ -160,12 +162,12 @@ func TestParseArgs(t *testing.T) {
 			args: []string{"/app/config#1", "/app/config#2"},
 			wantSpec1: &wantSpec{
 				name:    "/app/config",
-				version: testutil.Ptr(int64(1)),
+				version: lo.ToPtr(int64(1)),
 				shift:   0,
 			},
 			wantSpec2: &wantSpec{
 				name:    "/app/config",
-				version: testutil.Ptr(int64(2)),
+				version: lo.ToPtr(int64(2)),
 				shift:   0,
 			},
 		},
@@ -174,12 +176,12 @@ func TestParseArgs(t *testing.T) {
 			args: []string{"/app/config#1", "/other/key#2"},
 			wantSpec1: &wantSpec{
 				name:    "/app/config",
-				version: testutil.Ptr(int64(1)),
+				version: lo.ToPtr(int64(1)),
 				shift:   0,
 			},
 			wantSpec2: &wantSpec{
 				name:    "/other/key",
-				version: testutil.Ptr(int64(2)),
+				version: lo.ToPtr(int64(2)),
 				shift:   0,
 			},
 		},
@@ -193,7 +195,7 @@ func TestParseArgs(t *testing.T) {
 			},
 			wantSpec2: &wantSpec{
 				name:    "/app/config",
-				version: testutil.Ptr(int64(2)),
+				version: lo.ToPtr(int64(2)),
 				shift:   0,
 			},
 		},
@@ -202,7 +204,7 @@ func TestParseArgs(t *testing.T) {
 			args: []string{"/app/config#1", "/app/config"},
 			wantSpec1: &wantSpec{
 				name:    "/app/config",
-				version: testutil.Ptr(int64(1)),
+				version: lo.ToPtr(int64(1)),
 				shift:   0,
 			},
 			wantSpec2: &wantSpec{
@@ -218,12 +220,12 @@ func TestParseArgs(t *testing.T) {
 			args: []string{"/app/config", "#1", "#2"},
 			wantSpec1: &wantSpec{
 				name:    "/app/config",
-				version: testutil.Ptr(int64(1)),
+				version: lo.ToPtr(int64(1)),
 				shift:   0,
 			},
 			wantSpec2: &wantSpec{
 				name:    "/app/config",
-				version: testutil.Ptr(int64(2)),
+				version: lo.ToPtr(int64(2)),
 				shift:   0,
 			},
 		},
@@ -246,7 +248,7 @@ func TestParseArgs(t *testing.T) {
 			args: []string{"/app/config", "#3", "~"},
 			wantSpec1: &wantSpec{
 				name:    "/app/config",
-				version: testutil.Ptr(int64(3)),
+				version: lo.ToPtr(int64(3)),
 				shift:   0,
 			},
 			wantSpec2: &wantSpec{
@@ -290,19 +292,12 @@ func TestParseArgs(t *testing.T) {
 			)
 
 			if tt.wantErrMsg != "" {
-				if err == nil {
-					t.Fatalf("expected error containing %q, got nil", tt.wantErrMsg)
-				}
-				if !bytes.Contains([]byte(err.Error()), []byte(tt.wantErrMsg)) {
-					t.Errorf("expected error containing %q, got %q", tt.wantErrMsg, err.Error())
-				}
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.wantErrMsg)
 				return
 			}
 
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-
+			require.NoError(t, err)
 			assertSpec(t, "spec1", spec1, tt.wantSpec1)
 			assertSpec(t, "spec2", spec2, tt.wantSpec2)
 		})
@@ -317,15 +312,9 @@ type wantSpec struct {
 
 func assertSpec(t *testing.T, label string, got *ssmversion.Spec, want *wantSpec) {
 	t.Helper()
-	if got.Name != want.name {
-		t.Errorf("%s.Name = %q, want %q", label, got.Name, want.name)
-	}
-	if !testutil.PtrEqual(got.Absolute.Version, want.version) {
-		t.Errorf("%s.Absolute.Version = %v, want %v", label, got.Absolute.Version, want.version)
-	}
-	if got.Shift != want.shift {
-		t.Errorf("%s.Shift = %d, want %d", label, got.Shift, want.shift)
-	}
+	assert.Equal(t, want.name, got.Name, "%s.Name", label)
+	assert.Equal(t, want.version, got.Absolute.Version, "%s.Absolute.Version", label)
+	assert.Equal(t, want.shift, got.Shift, "%s.Shift", label)
 }
 
 type mockClient struct {
@@ -360,8 +349,8 @@ func TestRun(t *testing.T) {
 		{
 			name: "diff between two versions",
 			opts: Options{
-				Spec1: &ssmversion.Spec{Name: "/app/param", Absolute: ssmversion.AbsoluteSpec{Version: testutil.Ptr(int64(1))}},
-				Spec2: &ssmversion.Spec{Name: "/app/param", Absolute: ssmversion.AbsoluteSpec{Version: testutil.Ptr(int64(2))}},
+				Spec1: &ssmversion.Spec{Name: "/app/param", Absolute: ssmversion.AbsoluteSpec{Version: lo.ToPtr(int64(1))}},
+				Spec2: &ssmversion.Spec{Name: "/app/param", Absolute: ssmversion.AbsoluteSpec{Version: lo.ToPtr(int64(2))}},
 			},
 			mock: &mockClient{
 				getParameterFunc: func(_ context.Context, params *ssm.GetParameterInput, _ ...func(*ssm.Options)) (*ssm.GetParameterOutput, error) {
@@ -389,19 +378,15 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
-				if !bytes.Contains([]byte(output), []byte("-old-value")) {
-					t.Error("expected '-old-value' in diff output")
-				}
-				if !bytes.Contains([]byte(output), []byte("+new-value")) {
-					t.Error("expected '+new-value' in diff output")
-				}
+				assert.Contains(t, output, "-old-value")
+				assert.Contains(t, output, "+new-value")
 			},
 		},
 		{
 			name: "no diff when same content",
 			opts: Options{
-				Spec1: &ssmversion.Spec{Name: "/app/param", Absolute: ssmversion.AbsoluteSpec{Version: testutil.Ptr(int64(1))}},
-				Spec2: &ssmversion.Spec{Name: "/app/param", Absolute: ssmversion.AbsoluteSpec{Version: testutil.Ptr(int64(2))}},
+				Spec1: &ssmversion.Spec{Name: "/app/param", Absolute: ssmversion.AbsoluteSpec{Version: lo.ToPtr(int64(1))}},
+				Spec2: &ssmversion.Spec{Name: "/app/param", Absolute: ssmversion.AbsoluteSpec{Version: lo.ToPtr(int64(2))}},
 			},
 			mock: &mockClient{
 				getParameterFunc: func(_ context.Context, _ *ssm.GetParameterInput, _ ...func(*ssm.Options)) (*ssm.GetParameterOutput, error) {
@@ -417,16 +402,14 @@ func TestRun(t *testing.T) {
 			},
 			check: func(t *testing.T, output string) {
 				// No diff lines expected for identical content
-				if bytes.Contains([]byte(output), []byte("-same-value")) {
-					t.Error("expected no diff for identical content")
-				}
+				assert.NotContains(t, output, "-same-value")
 			},
 		},
 		{
 			name: "error getting first version",
 			opts: Options{
-				Spec1: &ssmversion.Spec{Name: "/app/param", Absolute: ssmversion.AbsoluteSpec{Version: testutil.Ptr(int64(1))}},
-				Spec2: &ssmversion.Spec{Name: "/app/param", Absolute: ssmversion.AbsoluteSpec{Version: testutil.Ptr(int64(2))}},
+				Spec1: &ssmversion.Spec{Name: "/app/param", Absolute: ssmversion.AbsoluteSpec{Version: lo.ToPtr(int64(1))}},
+				Spec2: &ssmversion.Spec{Name: "/app/param", Absolute: ssmversion.AbsoluteSpec{Version: lo.ToPtr(int64(2))}},
 			},
 			mock: &mockClient{
 				getParameterFunc: func(_ context.Context, params *ssm.GetParameterInput, _ ...func(*ssm.Options)) (*ssm.GetParameterOutput, error) {
@@ -447,8 +430,8 @@ func TestRun(t *testing.T) {
 		{
 			name: "error getting second version",
 			opts: Options{
-				Spec1: &ssmversion.Spec{Name: "/app/param", Absolute: ssmversion.AbsoluteSpec{Version: testutil.Ptr(int64(1))}},
-				Spec2: &ssmversion.Spec{Name: "/app/param", Absolute: ssmversion.AbsoluteSpec{Version: testutil.Ptr(int64(2))}},
+				Spec1: &ssmversion.Spec{Name: "/app/param", Absolute: ssmversion.AbsoluteSpec{Version: lo.ToPtr(int64(1))}},
+				Spec2: &ssmversion.Spec{Name: "/app/param", Absolute: ssmversion.AbsoluteSpec{Version: lo.ToPtr(int64(2))}},
 			},
 			mock: &mockClient{
 				getParameterFunc: func(_ context.Context, params *ssm.GetParameterInput, _ ...func(*ssm.Options)) (*ssm.GetParameterOutput, error) {
@@ -479,16 +462,11 @@ func TestRun(t *testing.T) {
 			err := r.Run(t.Context(), tt.opts)
 
 			if tt.wantErr {
-				if err == nil {
-					t.Error("expected error, got nil")
-				}
+				assert.Error(t, err)
 				return
 			}
 
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-
+			require.NoError(t, err)
 			if tt.check != nil {
 				tt.check(t, buf.String())
 			}
@@ -522,27 +500,15 @@ func TestRun_IdenticalWarning(t *testing.T) {
 	}
 
 	err := r.Run(t.Context(), opts)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 
 	// stdout should be empty (no diff output)
-	if stdout.String() != "" {
-		t.Errorf("expected empty stdout, got %q", stdout.String())
-	}
+	assert.Empty(t, stdout.String())
 
 	// stderr should contain warning and hint
 	stderrStr := stderr.String()
-	if !bytes.Contains([]byte(stderrStr), []byte("Warning:")) {
-		t.Error("expected warning message in stderr")
-	}
-	if !bytes.Contains([]byte(stderrStr), []byte("comparing identical versions")) {
-		t.Error("expected 'comparing identical versions' in stderr")
-	}
-	if !bytes.Contains([]byte(stderrStr), []byte("Hint:")) {
-		t.Error("expected hint message in stderr")
-	}
-	if !bytes.Contains([]byte(stderrStr), []byte("/app/param~1")) {
-		t.Error("expected hint with '~1' in stderr")
-	}
+	assert.Contains(t, stderrStr, "Warning:")
+	assert.Contains(t, stderrStr, "comparing identical versions")
+	assert.Contains(t, stderrStr, "Hint:")
+	assert.Contains(t, stderrStr, "/app/param~1")
 }

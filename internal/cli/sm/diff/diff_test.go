@@ -8,9 +8,11 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
+	"github.com/samber/lo"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/mpyw/suve/internal/diff"
-	"github.com/mpyw/suve/internal/testutil"
 	"github.com/mpyw/suve/internal/version/smversion"
 )
 
@@ -29,7 +31,7 @@ func TestParseArgs(t *testing.T) {
 			wantSpec1: &wantSpec{
 				secretName: "my-secret",
 				id:         nil,
-				label:      testutil.Ptr("AWSPREVIOUS"),
+				label:      lo.ToPtr("AWSPREVIOUS"),
 				shift:      0,
 			},
 			wantSpec2: &wantSpec{
@@ -44,7 +46,7 @@ func TestParseArgs(t *testing.T) {
 			args: []string{"my-secret#abc123"},
 			wantSpec1: &wantSpec{
 				secretName: "my-secret",
-				id:         testutil.Ptr("abc123"),
+				id:         lo.ToPtr("abc123"),
 				label:      nil,
 				shift:      0,
 			},
@@ -95,7 +97,7 @@ func TestParseArgs(t *testing.T) {
 			wantSpec1: &wantSpec{
 				secretName: "my-secret",
 				id:         nil,
-				label:      testutil.Ptr("AWSPREVIOUS"),
+				label:      lo.ToPtr("AWSPREVIOUS"),
 				shift:      0,
 			},
 			wantSpec2: &wantSpec{
@@ -110,7 +112,7 @@ func TestParseArgs(t *testing.T) {
 			args: []string{"my-secret", "#abc123"},
 			wantSpec1: &wantSpec{
 				secretName: "my-secret",
-				id:         testutil.Ptr("abc123"),
+				id:         lo.ToPtr("abc123"),
 				label:      nil,
 				shift:      0,
 			},
@@ -127,13 +129,13 @@ func TestParseArgs(t *testing.T) {
 			wantSpec1: &wantSpec{
 				secretName: "my-secret",
 				id:         nil,
-				label:      testutil.Ptr("AWSPREVIOUS"),
+				label:      lo.ToPtr("AWSPREVIOUS"),
 				shift:      0,
 			},
 			wantSpec2: &wantSpec{
 				secretName: "my-secret",
 				id:         nil,
-				label:      testutil.Ptr("AWSCURRENT"),
+				label:      lo.ToPtr("AWSCURRENT"),
 				shift:      0,
 			},
 		},
@@ -142,13 +144,13 @@ func TestParseArgs(t *testing.T) {
 			args: []string{"my-secret#abc123", "#def456"},
 			wantSpec1: &wantSpec{
 				secretName: "my-secret",
-				id:         testutil.Ptr("abc123"),
+				id:         lo.ToPtr("abc123"),
 				label:      nil,
 				shift:      0,
 			},
 			wantSpec2: &wantSpec{
 				secretName: "my-secret",
-				id:         testutil.Ptr("def456"),
+				id:         lo.ToPtr("def456"),
 				label:      nil,
 				shift:      0,
 			},
@@ -177,13 +179,13 @@ func TestParseArgs(t *testing.T) {
 			wantSpec1: &wantSpec{
 				secretName: "my-secret",
 				id:         nil,
-				label:      testutil.Ptr("AWSPREVIOUS"),
+				label:      lo.ToPtr("AWSPREVIOUS"),
 				shift:      0,
 			},
 			wantSpec2: &wantSpec{
 				secretName: "my-secret",
 				id:         nil,
-				label:      testutil.Ptr("AWSCURRENT"),
+				label:      lo.ToPtr("AWSCURRENT"),
 				shift:      0,
 			},
 		},
@@ -192,13 +194,13 @@ func TestParseArgs(t *testing.T) {
 			args: []string{"my-secret#abc123", "my-secret#def456"},
 			wantSpec1: &wantSpec{
 				secretName: "my-secret",
-				id:         testutil.Ptr("abc123"),
+				id:         lo.ToPtr("abc123"),
 				label:      nil,
 				shift:      0,
 			},
 			wantSpec2: &wantSpec{
 				secretName: "my-secret",
-				id:         testutil.Ptr("def456"),
+				id:         lo.ToPtr("def456"),
 				label:      nil,
 				shift:      0,
 			},
@@ -208,13 +210,13 @@ func TestParseArgs(t *testing.T) {
 			args: []string{"my-secret#abc123", "other-secret#def456"},
 			wantSpec1: &wantSpec{
 				secretName: "my-secret",
-				id:         testutil.Ptr("abc123"),
+				id:         lo.ToPtr("abc123"),
 				label:      nil,
 				shift:      0,
 			},
 			wantSpec2: &wantSpec{
 				secretName: "other-secret",
-				id:         testutil.Ptr("def456"),
+				id:         lo.ToPtr("def456"),
 				label:      nil,
 				shift:      0,
 			},
@@ -230,7 +232,7 @@ func TestParseArgs(t *testing.T) {
 			},
 			wantSpec2: &wantSpec{
 				secretName: "my-secret",
-				id:         testutil.Ptr("abc123"),
+				id:         lo.ToPtr("abc123"),
 				label:      nil,
 				shift:      0,
 			},
@@ -243,13 +245,13 @@ func TestParseArgs(t *testing.T) {
 			wantSpec1: &wantSpec{
 				secretName: "my-secret",
 				id:         nil,
-				label:      testutil.Ptr("AWSPREVIOUS"),
+				label:      lo.ToPtr("AWSPREVIOUS"),
 				shift:      0,
 			},
 			wantSpec2: &wantSpec{
 				secretName: "my-secret",
 				id:         nil,
-				label:      testutil.Ptr("AWSCURRENT"),
+				label:      lo.ToPtr("AWSCURRENT"),
 				shift:      0,
 			},
 		},
@@ -258,13 +260,13 @@ func TestParseArgs(t *testing.T) {
 			args: []string{"my-secret", "#abc123", "#def456"},
 			wantSpec1: &wantSpec{
 				secretName: "my-secret",
-				id:         testutil.Ptr("abc123"),
+				id:         lo.ToPtr("abc123"),
 				label:      nil,
 				shift:      0,
 			},
 			wantSpec2: &wantSpec{
 				secretName: "my-secret",
-				id:         testutil.Ptr("def456"),
+				id:         lo.ToPtr("def456"),
 				label:      nil,
 				shift:      0,
 			},
@@ -275,7 +277,7 @@ func TestParseArgs(t *testing.T) {
 			wantSpec1: &wantSpec{
 				secretName: "my-secret",
 				id:         nil,
-				label:      testutil.Ptr("AWSPREVIOUS"),
+				label:      lo.ToPtr("AWSPREVIOUS"),
 				shift:      0,
 			},
 			wantSpec2: &wantSpec{
@@ -320,19 +322,12 @@ func TestParseArgs(t *testing.T) {
 			)
 
 			if tt.wantErrMsg != "" {
-				if err == nil {
-					t.Fatalf("expected error containing %q, got nil", tt.wantErrMsg)
-				}
-				if !bytes.Contains([]byte(err.Error()), []byte(tt.wantErrMsg)) {
-					t.Errorf("expected error containing %q, got %q", tt.wantErrMsg, err.Error())
-				}
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.wantErrMsg)
 				return
 			}
 
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-
+			require.NoError(t, err)
 			assertSpec(t, "spec1", spec1, tt.wantSpec1)
 			assertSpec(t, "spec2", spec2, tt.wantSpec2)
 		})
@@ -346,20 +341,12 @@ type wantSpec struct {
 	shift      int
 }
 
-func assertSpec(t *testing.T, name string, got *smversion.Spec, want *wantSpec) {
+func assertSpec(t *testing.T, label string, got *smversion.Spec, want *wantSpec) {
 	t.Helper()
-	if got.Name != want.secretName {
-		t.Errorf("%s.Name = %q, want %q", name, got.Name, want.secretName)
-	}
-	if !testutil.PtrEqual(got.Absolute.ID, want.id) {
-		t.Errorf("%s.Absolute.ID = %v, want %v", name, got.Absolute.ID, want.id)
-	}
-	if !testutil.PtrEqual(got.Absolute.Label, want.label) {
-		t.Errorf("%s.Absolute.Label = %v, want %v", name, got.Absolute.Label, want.label)
-	}
-	if got.Shift != want.shift {
-		t.Errorf("%s.Shift = %d, want %d", name, got.Shift, want.shift)
-	}
+	assert.Equal(t, want.secretName, got.Name, "%s.Name", label)
+	assert.Equal(t, want.id, got.Absolute.ID, "%s.Absolute.ID", label)
+	assert.Equal(t, want.label, got.Absolute.Label, "%s.Absolute.Label", label)
+	assert.Equal(t, want.shift, got.Shift, "%s.Shift", label)
 }
 
 type mockClient struct {
@@ -414,12 +401,8 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
-				if !bytes.Contains([]byte(output), []byte("-old-secret")) {
-					t.Error("expected '-old-secret' in diff output")
-				}
-				if !bytes.Contains([]byte(output), []byte("+new-secret")) {
-					t.Error("expected '+new-secret' in diff output")
-				}
+				assert.Contains(t, output, "-old-secret")
+				assert.Contains(t, output, "+new-secret")
 			},
 		},
 		{
@@ -437,9 +420,7 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
-				if bytes.Contains([]byte(output), []byte("-same-content")) {
-					t.Error("expected no diff for identical content")
-				}
+				assert.NotContains(t, output, "-same-content")
 			},
 		},
 		{
@@ -466,12 +447,8 @@ func TestRun(t *testing.T) {
 			},
 			check: func(t *testing.T, output string) {
 				// Should not panic with short version IDs
-				if !bytes.Contains([]byte(output), []byte("-old")) {
-					t.Error("expected '-old' in diff output")
-				}
-				if !bytes.Contains([]byte(output), []byte("+new")) {
-					t.Error("expected '+new' in diff output")
-				}
+				assert.Contains(t, output, "-old")
+				assert.Contains(t, output, "+new")
 			},
 		},
 		{
@@ -520,16 +497,11 @@ func TestRun(t *testing.T) {
 			err := Run(t.Context(), tt.mock, &buf, tt.secretName, tt.version1, tt.version2)
 
 			if tt.wantErr {
-				if err == nil {
-					t.Error("expected error, got nil")
-				}
+				assert.Error(t, err)
 				return
 			}
 
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-
+			require.NoError(t, err)
 			if tt.check != nil {
 				tt.check(t, buf.String())
 			}
@@ -561,30 +533,16 @@ func TestRun_IdenticalWarning(t *testing.T) {
 	}
 
 	err := r.Run(t.Context(), opts)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 
 	// stdout should be empty (no diff output)
-	if stdout.String() != "" {
-		t.Errorf("expected empty stdout, got %q", stdout.String())
-	}
+	assert.Empty(t, stdout.String())
 
 	// stderr should contain warning and hints
 	stderrStr := stderr.String()
-	if !bytes.Contains([]byte(stderrStr), []byte("Warning:")) {
-		t.Error("expected warning message in stderr")
-	}
-	if !bytes.Contains([]byte(stderrStr), []byte("comparing identical versions")) {
-		t.Error("expected 'comparing identical versions' in stderr")
-	}
-	if !bytes.Contains([]byte(stderrStr), []byte("Hint:")) {
-		t.Error("expected hint message in stderr")
-	}
-	if !bytes.Contains([]byte(stderrStr), []byte("my-secret~1")) {
-		t.Error("expected hint with '~1' in stderr")
-	}
-	if !bytes.Contains([]byte(stderrStr), []byte("my-secret:AWSPREVIOUS")) {
-		t.Error("expected hint with ':AWSPREVIOUS' in stderr")
-	}
+	assert.Contains(t, stderrStr, "Warning:")
+	assert.Contains(t, stderrStr, "comparing identical versions")
+	assert.Contains(t, stderrStr, "Hint:")
+	assert.Contains(t, stderrStr, "my-secret~1")
+	assert.Contains(t, stderrStr, "my-secret:AWSPREVIOUS")
 }

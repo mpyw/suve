@@ -3,7 +3,9 @@ package smversion
 import (
 	"testing"
 
-	"github.com/mpyw/suve/internal/testutil"
+	"github.com/samber/lo"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestParse(t *testing.T) {
@@ -38,25 +40,25 @@ func TestParse(t *testing.T) {
 			name:     "with ID",
 			input:    "my-secret#abc123",
 			wantName: "my-secret",
-			wantID:   testutil.Ptr("abc123"),
+			wantID:   lo.ToPtr("abc123"),
 		},
 		{
 			name:     "with UUID-like ID",
 			input:    "my-secret#550e8400-e29b-41d4-a716-446655440000",
 			wantName: "my-secret",
-			wantID:   testutil.Ptr("550e8400-e29b-41d4-a716-446655440000"),
+			wantID:   lo.ToPtr("550e8400-e29b-41d4-a716-446655440000"),
 		},
 		{
 			name:     "with short ID",
 			input:    "my-secret#a",
 			wantName: "my-secret",
-			wantID:   testutil.Ptr("a"),
+			wantID:   lo.ToPtr("a"),
 		},
 		{
 			name:     "with numeric ID",
 			input:    "my-secret#12345",
 			wantName: "my-secret",
-			wantID:   testutil.Ptr("12345"),
+			wantID:   lo.ToPtr("12345"),
 		},
 
 		// Label specifier (:LABEL)
@@ -64,49 +66,49 @@ func TestParse(t *testing.T) {
 			name:      "with AWSCURRENT label",
 			input:     "my-secret:AWSCURRENT",
 			wantName:  "my-secret",
-			wantLabel: testutil.Ptr("AWSCURRENT"),
+			wantLabel: lo.ToPtr("AWSCURRENT"),
 		},
 		{
 			name:      "with AWSPREVIOUS label",
 			input:     "my-secret:AWSPREVIOUS",
 			wantName:  "my-secret",
-			wantLabel: testutil.Ptr("AWSPREVIOUS"),
+			wantLabel: lo.ToPtr("AWSPREVIOUS"),
 		},
 		{
 			name:      "with AWSPENDING label",
 			input:     "my-secret:AWSPENDING",
 			wantName:  "my-secret",
-			wantLabel: testutil.Ptr("AWSPENDING"),
+			wantLabel: lo.ToPtr("AWSPENDING"),
 		},
 		{
 			name:      "with custom label",
 			input:     "my-secret:STAGING",
 			wantName:  "my-secret",
-			wantLabel: testutil.Ptr("STAGING"),
+			wantLabel: lo.ToPtr("STAGING"),
 		},
 		{
 			name:      "with lowercase label",
 			input:     "my-secret:production",
 			wantName:  "my-secret",
-			wantLabel: testutil.Ptr("production"),
+			wantLabel: lo.ToPtr("production"),
 		},
 		{
 			name:      "with label containing dash",
 			input:     "my-secret:my-label",
 			wantName:  "my-secret",
-			wantLabel: testutil.Ptr("my-label"),
+			wantLabel: lo.ToPtr("my-label"),
 		},
 		{
 			name:      "with label containing underscore",
 			input:     "my-secret:my_label",
 			wantName:  "my-secret",
-			wantLabel: testutil.Ptr("my_label"),
+			wantLabel: lo.ToPtr("my_label"),
 		},
 		{
 			name:      "with label containing digits",
 			input:     "my-secret:v2",
 			wantName:  "my-secret",
-			wantLabel: testutil.Ptr("v2"),
+			wantLabel: lo.ToPtr("v2"),
 		},
 
 		// Shift specifier
@@ -146,14 +148,14 @@ func TestParse(t *testing.T) {
 			name:      "ID and shift",
 			input:     "my-secret#abc123~1",
 			wantName:  "my-secret",
-			wantID:    testutil.Ptr("abc123"),
+			wantID:    lo.ToPtr("abc123"),
 			wantShift: 1,
 		},
 		{
 			name:      "ID and bare tilde",
 			input:     "my-secret#abc~",
 			wantName:  "my-secret",
-			wantID:    testutil.Ptr("abc"),
+			wantID:    lo.ToPtr("abc"),
 			wantShift: 1,
 		},
 
@@ -162,21 +164,21 @@ func TestParse(t *testing.T) {
 			name:      "label and shift",
 			input:     "my-secret:AWSPREVIOUS~1",
 			wantName:  "my-secret",
-			wantLabel: testutil.Ptr("AWSPREVIOUS"),
+			wantLabel: lo.ToPtr("AWSPREVIOUS"),
 			wantShift: 1,
 		},
 		{
 			name:      "label and bare tilde",
 			input:     "my-secret:STAGING~",
 			wantName:  "my-secret",
-			wantLabel: testutil.Ptr("STAGING"),
+			wantLabel: lo.ToPtr("STAGING"),
 			wantShift: 1,
 		},
 		{
 			name:      "label and double tilde",
 			input:     "my-secret:AWSCURRENT~~",
 			wantName:  "my-secret",
-			wantLabel: testutil.Ptr("AWSCURRENT"),
+			wantLabel: lo.ToPtr("AWSCURRENT"),
 			wantShift: 2,
 		},
 
@@ -190,7 +192,7 @@ func TestParse(t *testing.T) {
 			name:      "whitespace with label",
 			input:     "  my-secret:AWSCURRENT  ",
 			wantName:  "my-secret",
-			wantLabel: testutil.Ptr("AWSCURRENT"),
+			wantLabel: lo.ToPtr("AWSCURRENT"),
 		},
 
 		// @ in name (allowed in SM secret names)
@@ -213,13 +215,13 @@ func TestParse(t *testing.T) {
 			name:     "email-like name with ID",
 			input:    "user@example.com#abc123",
 			wantName: "user@example.com",
-			wantID:   testutil.Ptr("abc123"),
+			wantID:   lo.ToPtr("abc123"),
 		},
 		{
 			name:      "email-like name with label",
 			input:     "user@example.com:AWSCURRENT",
 			wantName:  "user@example.com",
-			wantLabel: testutil.Ptr("AWSCURRENT"),
+			wantLabel: lo.ToPtr("AWSCURRENT"),
 		},
 
 		// # in name (not an ID specifier - not followed by valid ID char)
@@ -330,7 +332,7 @@ func TestParse(t *testing.T) {
 			name:     "at signs in name with ID",
 			input:    "user@host@domain#abc123",
 			wantName: "user@host@domain",
-			wantID:   testutil.Ptr("abc123"),
+			wantID:   lo.ToPtr("abc123"),
 		},
 	}
 
@@ -339,32 +341,15 @@ func TestParse(t *testing.T) {
 			spec, err := Parse(tt.input)
 
 			if tt.wantErr {
-				if err == nil {
-					t.Errorf("Parse() expected error, got nil")
-				}
+				assert.Error(t, err)
 				return
 			}
 
-			if err != nil {
-				t.Errorf("Parse() unexpected error: %v", err)
-				return
-			}
-
-			if spec.Name != tt.wantName {
-				t.Errorf("Parse() Name = %q, want %q", spec.Name, tt.wantName)
-			}
-
-			if !testutil.PtrEqual(spec.Absolute.ID, tt.wantID) {
-				t.Errorf("Parse() ID = %v, want %v", spec.Absolute.ID, tt.wantID)
-			}
-
-			if !testutil.PtrEqual(spec.Absolute.Label, tt.wantLabel) {
-				t.Errorf("Parse() Label = %v, want %v", spec.Absolute.Label, tt.wantLabel)
-			}
-
-			if spec.Shift != tt.wantShift {
-				t.Errorf("Parse() Shift = %d, want %d", spec.Shift, tt.wantShift)
-			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantName, spec.Name)
+			assert.Equal(t, tt.wantID, spec.Absolute.ID)
+			assert.Equal(t, tt.wantLabel, spec.Absolute.Label)
+			assert.Equal(t, tt.wantShift, spec.Shift)
 		})
 	}
 }
@@ -394,9 +379,7 @@ func TestSpec_HasShift(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := tt.spec.HasShift(); got != tt.want {
-				t.Errorf("Spec.HasShift() = %v, want %v", got, tt.want)
-			}
+			assert.Equal(t, tt.want, tt.spec.HasShift())
 		})
 	}
 }
