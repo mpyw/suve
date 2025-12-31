@@ -136,6 +136,8 @@ suve ssm log [options] <name>
 |--------|-------|---------|-------------|
 | `--number` | `-n` | `10` | Maximum number of versions to show |
 | `--patch` | `-p` | `false` | Show diff between consecutive versions |
+| `--json` | `-j` | `false` | Format JSON values before diffing (use with `-p`) |
+| `--reverse` | `-r` | `false` | Show oldest versions first |
 
 **Output:**
 
@@ -190,8 +192,14 @@ suve ssm log -n 5 /app/config/database-url
 # Show versions with diffs
 suve ssm log -p /app/config/database-url
 
+# Show diffs with JSON formatting
+suve ssm log -p -j /app/config/database-credentials
+
 # Show last 3 versions with diffs
 suve ssm log -n 3 -p /app/config/database-url
+
+# Show oldest versions first
+suve ssm log --reverse /app/config/database-url
 ```
 
 ---

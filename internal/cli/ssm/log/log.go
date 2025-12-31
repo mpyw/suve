@@ -35,7 +35,7 @@ func Command() *cli.Command {
 		Description: `Display the version history of a parameter, showing each version's
 number, modification date, and a preview of the value.
 
-Output is sorted with the most recent version first.
+Output is sorted with the most recent version first (use --reverse to flip).
 Value previews are truncated at 50 characters.
 
 Use -p/--patch to show the diff between consecutive versions (like git log -p).
@@ -45,7 +45,8 @@ EXAMPLES:
    suve ssm log /app/config/db-url           Show last 10 versions (default)
    suve ssm log -n 5 /app/config/db-url      Show last 5 versions
    suve ssm log -p /app/config/db-url        Show versions with diffs
-   suve ssm log -p -j /app/config/db-url     Show diffs with JSON formatting`,
+   suve ssm log -p -j /app/config/db-url     Show diffs with JSON formatting
+   suve ssm log --reverse /app/config/db-url Show oldest first`,
 		Flags: []cli.Flag{
 			&cli.IntFlag{
 				Name:    "number",
@@ -64,6 +65,11 @@ EXAMPLES:
 				Aliases: []string{"j"},
 				Usage:   "Format JSON values before diffing (use with -p; keys are always sorted)",
 			},
+			&cli.BoolFlag{
+				Name:    "reverse",
+				Aliases: []string{"r"},
+				Usage:   "Show oldest versions first",
+			},
 		},
 		Action: action,
 	}
@@ -78,6 +84,7 @@ func action(c *cli.Context) error {
 	maxResults := int32(c.Int("number"))
 	showPatch := c.Bool("patch")
 	jsonFormat := c.Bool("json")
+	reverse := c.Bool("reverse")
 
 	// Warn if --json is used without -p
 	if jsonFormat && !showPatch {
@@ -89,13 +96,13 @@ func action(c *cli.Context) error {
 		return fmt.Errorf("failed to initialize AWS client: %w", err)
 	}
 
-	return Run(c.Context, client, c.App.Writer, c.App.ErrWriter, name, maxResults, showPatch, jsonFormat)
+	return Run(c.Context, client, c.App.Writer, c.App.ErrWriter, name, maxResults, showPatch, jsonFormat, reverse)
 }
 
 // Run executes the log command.
 // If showPatch is true, displays the diff between consecutive versions.
 // If jsonFormat is true, formats JSON values before diffing.
-func Run(ctx context.Context, client Client, w io.Writer, errW io.Writer, name string, maxResults int32, showPatch bool, jsonFormat bool) error {
+func Run(ctx context.Context, client Client, w io.Writer, errW io.Writer, name string, maxResults int32, showPatch bool, jsonFormat bool, reverse bool) error {
 	result, err := client.GetParameterHistory(ctx, &ssm.GetParameterHistoryInput{
 		Name:           aws.String(name),
 		MaxResults:     aws.Int32(maxResults),
@@ -105,10 +112,16 @@ func Run(ctx context.Context, client Client, w io.Writer, errW io.Writer, name s
 		return fmt.Errorf("failed to get parameter history: %w", err)
 	}
 
-	// Reverse to show newest first
 	params := result.Parameters
-	for i, j := 0, len(params)-1; i < j; i, j = i+1, j-1 {
-		params[i], params[j] = params[j], params[i]
+	if len(params) == 0 {
+		return nil
+	}
+
+	// AWS returns oldest first; reverse to show newest first (unless --reverse)
+	if !reverse {
+		for i, j := 0, len(params)-1; i < j; i, j = i+1, j-1 {
+			params[i], params[j] = params[j], params[i]
+		}
 	}
 
 	yellow := color.New(color.FgYellow).SprintFunc()
@@ -118,9 +131,15 @@ func Run(ctx context.Context, client Client, w io.Writer, errW io.Writer, name s
 	// Track if we've warned about invalid JSON (only warn once)
 	jsonWarned := false
 
+	// Find the current (latest) version index
+	currentIdx := 0
+	if reverse {
+		currentIdx = len(params) - 1
+	}
+
 	for i, param := range params {
 		versionLabel := fmt.Sprintf("Version %d", param.Version)
-		if i == 0 {
+		if i == currentIdx {
 			versionLabel += " " + green("(current)")
 		}
 		_, _ = fmt.Fprintln(w, yellow(versionLabel))
@@ -129,10 +148,29 @@ func Run(ctx context.Context, client Client, w io.Writer, errW io.Writer, name s
 		}
 
 		if showPatch {
-			// Show diff with previous version (next in array since we reversed)
-			if i < len(params)-1 {
-				oldValue := aws.ToString(params[i+1].Value)
-				newValue := aws.ToString(param.Value)
+			// Determine old/new indices based on order
+			var oldIdx, newIdx int
+			if reverse {
+				// In reverse mode: comparing with next version (newer)
+				if i < len(params)-1 {
+					oldIdx = i
+					newIdx = i + 1
+				} else {
+					oldIdx = -1 // No diff for the last (current) version
+				}
+			} else {
+				// In normal mode: comparing with previous version (older)
+				if i < len(params)-1 {
+					oldIdx = i + 1
+					newIdx = i
+				} else {
+					oldIdx = -1 // No diff for the oldest version
+				}
+			}
+
+			if oldIdx >= 0 {
+				oldValue := aws.ToString(params[oldIdx].Value)
+				newValue := aws.ToString(params[newIdx].Value)
 
 				// Format as JSON if enabled
 				if jsonFormat {
@@ -147,8 +185,8 @@ func Run(ctx context.Context, client Client, w io.Writer, errW io.Writer, name s
 					}
 				}
 
-				oldName := fmt.Sprintf("%s#%d", name, params[i+1].Version)
-				newName := fmt.Sprintf("%s#%d", name, param.Version)
+				oldName := fmt.Sprintf("%s#%d", name, params[oldIdx].Version)
+				newName := fmt.Sprintf("%s#%d", name, params[newIdx].Version)
 				diff := output.Diff(oldName, newName, oldValue, newValue)
 				if diff != "" {
 					_, _ = fmt.Fprintln(w)

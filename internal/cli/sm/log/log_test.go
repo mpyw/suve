@@ -39,6 +39,7 @@ func TestRun(t *testing.T) {
 		secretName string
 		maxResults int32
 		showPatch  bool
+		reverse    bool
 		mock       *mockClient
 		wantErr    bool
 		check      func(t *testing.T, output string)
@@ -158,12 +159,58 @@ func TestRun(t *testing.T) {
 			},
 			wantErr: true,
 		},
+		{
+			name:       "reverse order shows oldest first",
+			secretName: "my-secret",
+			maxResults: 10,
+			showPatch:  false,
+			reverse:    true,
+			mock: &mockClient{
+				listSecretVersionIdsFunc: func(_ context.Context, _ *secretsmanager.ListSecretVersionIdsInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.ListSecretVersionIdsOutput, error) {
+					return &secretsmanager.ListSecretVersionIdsOutput{
+						Versions: []types.SecretVersionsListEntry{
+							{VersionId: aws.String("version-1"), CreatedDate: aws.Time(now.Add(-time.Hour)), VersionStages: []string{"AWSPREVIOUS"}},
+							{VersionId: aws.String("version-2"), CreatedDate: &now, VersionStages: []string{"AWSCURRENT"}},
+						},
+					}, nil
+				},
+			},
+			check: func(t *testing.T, output string) {
+				// In reverse mode, AWSPREVIOUS should appear before AWSCURRENT
+				prevPos := bytes.Index([]byte(output), []byte("AWSPREVIOUS"))
+				currPos := bytes.Index([]byte(output), []byte("AWSCURRENT"))
+				if prevPos < 0 || currPos < 0 {
+					t.Error("expected both version stages in output")
+				}
+				if prevPos > currPos {
+					t.Error("expected AWSPREVIOUS before AWSCURRENT in reverse mode")
+				}
+			},
+		},
+		{
+			name:       "empty version list",
+			secretName: "my-secret",
+			maxResults: 10,
+			showPatch:  false,
+			mock: &mockClient{
+				listSecretVersionIdsFunc: func(_ context.Context, _ *secretsmanager.ListSecretVersionIdsInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.ListSecretVersionIdsOutput, error) {
+					return &secretsmanager.ListSecretVersionIdsOutput{
+						Versions: []types.SecretVersionsListEntry{},
+					}, nil
+				},
+			},
+			check: func(t *testing.T, output string) {
+				if output != "" {
+					t.Errorf("expected empty output for empty version list, got: %s", output)
+				}
+			},
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var buf, errBuf bytes.Buffer
-			err := Run(t.Context(), tt.mock, &buf, &errBuf, tt.secretName, tt.maxResults, tt.showPatch, false)
+			err := Run(t.Context(), tt.mock, &buf, &errBuf, tt.secretName, tt.maxResults, tt.showPatch, false, tt.reverse)
 
 			if tt.wantErr {
 				if err == nil {

@@ -31,6 +31,7 @@ func TestRun(t *testing.T) {
 		paramName  string
 		maxResults int32
 		showPatch  bool
+		reverse    bool
 		mock       *mockClient
 		wantErr    bool
 		check      func(t *testing.T, output string)
@@ -155,12 +156,96 @@ func TestRun(t *testing.T) {
 			},
 			wantErr: true,
 		},
+		{
+			name:       "reverse order shows oldest first",
+			paramName:  "/app/param",
+			maxResults: 10,
+			showPatch:  false,
+			reverse:    true,
+			mock: &mockClient{
+				getParameterHistoryFunc: func(_ context.Context, _ *ssm.GetParameterHistoryInput, _ ...func(*ssm.Options)) (*ssm.GetParameterHistoryOutput, error) {
+					return &ssm.GetParameterHistoryOutput{
+						Parameters: []types.ParameterHistory{
+							{Name: aws.String("/app/param"), Value: aws.String("v1"), Version: 1, LastModifiedDate: aws.Time(now.Add(-time.Hour))},
+							{Name: aws.String("/app/param"), Value: aws.String("v2"), Version: 2, LastModifiedDate: &now},
+						},
+					}, nil
+				},
+			},
+			check: func(t *testing.T, output string) {
+				// In reverse mode, Version 1 should appear before Version 2
+				v1Pos := bytes.Index([]byte(output), []byte("Version 1"))
+				v2Pos := bytes.Index([]byte(output), []byte("Version 2"))
+				if v1Pos < 0 || v2Pos < 0 {
+					t.Error("expected both versions in output")
+				}
+				if v1Pos > v2Pos {
+					t.Error("expected Version 1 before Version 2 in reverse mode")
+				}
+				// (current) should be on Version 2 (last in list)
+				currentPos := bytes.Index([]byte(output), []byte("(current)"))
+				if currentPos < v2Pos {
+					t.Error("expected (current) label on Version 2 in reverse mode")
+				}
+			},
+		},
+		{
+			name:       "reverse with patch shows diff correctly",
+			paramName:  "/app/param",
+			maxResults: 10,
+			showPatch:  true,
+			reverse:    true,
+			mock: &mockClient{
+				getParameterHistoryFunc: func(_ context.Context, _ *ssm.GetParameterHistoryInput, _ ...func(*ssm.Options)) (*ssm.GetParameterHistoryOutput, error) {
+					return &ssm.GetParameterHistoryOutput{
+						Parameters: []types.ParameterHistory{
+							{Name: aws.String("/app/param"), Value: aws.String("old-value"), Version: 1, LastModifiedDate: aws.Time(now.Add(-time.Hour))},
+							{Name: aws.String("/app/param"), Value: aws.String("new-value"), Version: 2, LastModifiedDate: &now},
+						},
+					}, nil
+				},
+			},
+			check: func(t *testing.T, output string) {
+				// In reverse mode with patch, diff should show old->new transition
+				if !bytes.Contains([]byte(output), []byte("-old-value")) {
+					t.Error("expected -old-value in diff output")
+				}
+				if !bytes.Contains([]byte(output), []byte("+new-value")) {
+					t.Error("expected +new-value in diff output")
+				}
+				// Diff should be under Version 1 (first in reverse mode), comparing #1 -> #2
+				if !bytes.Contains([]byte(output), []byte("--- /app/param#1")) {
+					t.Error("expected diff header '--- /app/param#1'")
+				}
+				if !bytes.Contains([]byte(output), []byte("+++ /app/param#2")) {
+					t.Error("expected diff header '+++ /app/param#2'")
+				}
+			},
+		},
+		{
+			name:       "empty history",
+			paramName:  "/app/param",
+			maxResults: 10,
+			showPatch:  false,
+			mock: &mockClient{
+				getParameterHistoryFunc: func(_ context.Context, _ *ssm.GetParameterHistoryInput, _ ...func(*ssm.Options)) (*ssm.GetParameterHistoryOutput, error) {
+					return &ssm.GetParameterHistoryOutput{
+						Parameters: []types.ParameterHistory{},
+					}, nil
+				},
+			},
+			check: func(t *testing.T, output string) {
+				if output != "" {
+					t.Errorf("expected empty output for empty history, got: %s", output)
+				}
+			},
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var buf, errBuf bytes.Buffer
-			err := Run(t.Context(), tt.mock, &buf, &errBuf, tt.paramName, tt.maxResults, tt.showPatch, false)
+			err := Run(t.Context(), tt.mock, &buf, &errBuf, tt.paramName, tt.maxResults, tt.showPatch, false, tt.reverse)
 
 			if tt.wantErr {
 				if err == nil {

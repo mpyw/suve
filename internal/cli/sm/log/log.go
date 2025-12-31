@@ -37,7 +37,7 @@ func Command() *cli.Command {
 		Description: `Display the version history of a secret, showing each version's
 UUID (truncated), staging labels, and creation date.
 
-Output is sorted with the most recent version first.
+Output is sorted with the most recent version first (use --reverse to flip).
 Version UUIDs are truncated to 8 characters for readability.
 
 Use -p/--patch to show the diff between consecutive versions (like git log -p).
@@ -48,7 +48,8 @@ EXAMPLES:
    suve sm log my-secret           Show last 10 versions (default)
    suve sm log -n 5 my-secret      Show last 5 versions
    suve sm log -p my-secret        Show versions with diffs
-   suve sm log -p -j my-secret     Show diffs with JSON formatting`,
+   suve sm log -p -j my-secret     Show diffs with JSON formatting
+   suve sm log --reverse my-secret Show oldest first`,
 		Flags: []cli.Flag{
 			&cli.IntFlag{
 				Name:    "number",
@@ -67,6 +68,11 @@ EXAMPLES:
 				Aliases: []string{"j"},
 				Usage:   "Format JSON values before diffing (use with -p; keys are always sorted)",
 			},
+			&cli.BoolFlag{
+				Name:    "reverse",
+				Aliases: []string{"r"},
+				Usage:   "Show oldest versions first",
+			},
 		},
 		Action: action,
 	}
@@ -81,6 +87,7 @@ func action(c *cli.Context) error {
 	maxResults := int32(c.Int("number"))
 	showPatch := c.Bool("patch")
 	jsonFormat := c.Bool("json")
+	reverse := c.Bool("reverse")
 
 	// Warn if --json is used without -p
 	if jsonFormat && !showPatch {
@@ -92,13 +99,21 @@ func action(c *cli.Context) error {
 		return fmt.Errorf("failed to initialize AWS client: %w", err)
 	}
 
-	return Run(c.Context, client, c.App.Writer, c.App.ErrWriter, name, maxResults, showPatch, jsonFormat)
+	return Run(c.Context, client, c.App.Writer, c.App.ErrWriter, name, maxResults, showPatch, jsonFormat, reverse)
 }
 
 // Run executes the log command.
 // If showPatch is true, displays the diff between consecutive versions.
 // If jsonFormat is true, formats JSON values before diffing.
-func Run(ctx context.Context, client Client, w io.Writer, errW io.Writer, name string, maxResults int32, showPatch bool, jsonFormat bool) error {
+// truncateID truncates a version ID to 8 characters for display.
+func truncateID(id string) string {
+	if len(id) > 8 {
+		return id[:8]
+	}
+	return id
+}
+
+func Run(ctx context.Context, client Client, w io.Writer, errW io.Writer, name string, maxResults int32, showPatch bool, jsonFormat bool, reverse bool) error {
 	result, err := client.ListSecretVersionIds(ctx, &secretsmanager.ListSecretVersionIdsInput{
 		SecretId:   aws.String(name),
 		MaxResults: aws.Int32(maxResults),
@@ -108,6 +123,10 @@ func Run(ctx context.Context, client Client, w io.Writer, errW io.Writer, name s
 	}
 
 	versions := result.Versions
+	if len(versions) == 0 {
+		return nil
+	}
+
 	sort.Slice(versions, func(i, j int) bool {
 		if versions[i].CreatedDate == nil {
 			return false
@@ -115,6 +134,11 @@ func Run(ctx context.Context, client Client, w io.Writer, errW io.Writer, name s
 		if versions[j].CreatedDate == nil {
 			return true
 		}
+		if reverse {
+			// Oldest first
+			return versions[i].CreatedDate.Before(*versions[j].CreatedDate)
+		}
+		// Newest first (default)
 		return versions[i].CreatedDate.After(*versions[j].CreatedDate)
 	})
 
@@ -145,11 +169,7 @@ func Run(ctx context.Context, client Client, w io.Writer, errW io.Writer, name s
 
 	for i, v := range versions {
 		versionID := aws.ToString(v.VersionId)
-		truncatedID := versionID
-		if len(truncatedID) > 8 {
-			truncatedID = truncatedID[:8]
-		}
-		versionLabel := fmt.Sprintf("Version %s", truncatedID)
+		versionLabel := fmt.Sprintf("Version %s", truncateID(versionID))
 		if len(v.VersionStages) > 0 {
 			versionLabel += " " + green(fmt.Sprintf("%v", v.VersionStages))
 		}
@@ -159,11 +179,31 @@ func Run(ctx context.Context, client Client, w io.Writer, errW io.Writer, name s
 		}
 
 		if showPatch {
-			// Show diff with previous version (next in array since we sorted newest first)
-			if i < len(versions)-1 {
-				nextVersionID := aws.ToString(versions[i+1].VersionId)
-				oldValue, oldOk := secretValues[nextVersionID]
-				newValue, newOk := secretValues[versionID]
+			// Determine old/new indices based on order
+			var oldIdx, newIdx int
+			if reverse {
+				// In reverse mode: comparing with next version (newer)
+				if i < len(versions)-1 {
+					oldIdx = i
+					newIdx = i + 1
+				} else {
+					oldIdx = -1 // No diff for the last (current) version
+				}
+			} else {
+				// In normal mode: comparing with previous version (older)
+				if i < len(versions)-1 {
+					oldIdx = i + 1
+					newIdx = i
+				} else {
+					oldIdx = -1 // No diff for the oldest version
+				}
+			}
+
+			if oldIdx >= 0 {
+				oldVersionID := aws.ToString(versions[oldIdx].VersionId)
+				newVersionID := aws.ToString(versions[newIdx].VersionId)
+				oldValue, oldOk := secretValues[oldVersionID]
+				newValue, newOk := secretValues[newVersionID]
 				if oldOk && newOk {
 					// Format as JSON if enabled
 					if jsonFormat {
@@ -178,12 +218,8 @@ func Run(ctx context.Context, client Client, w io.Writer, errW io.Writer, name s
 						}
 					}
 
-					oldTruncatedID := nextVersionID
-					if len(oldTruncatedID) > 8 {
-						oldTruncatedID = oldTruncatedID[:8]
-					}
-					oldName := fmt.Sprintf("%s#%s", name, oldTruncatedID)
-					newName := fmt.Sprintf("%s#%s", name, truncatedID)
+					oldName := fmt.Sprintf("%s#%s", name, truncateID(oldVersionID))
+					newName := fmt.Sprintf("%s#%s", name, truncateID(newVersionID))
 					diff := output.Diff(oldName, newName, oldValue, newValue)
 					if diff != "" {
 						_, _ = fmt.Fprintln(w)

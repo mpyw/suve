@@ -136,6 +136,8 @@ suve sm log [options] <name>
 |--------|-------|---------|-------------|
 | `--number` | `-n` | `10` | Maximum number of versions to show |
 | `--patch` | `-p` | `false` | Show diff between consecutive versions |
+| `--json` | `-j` | `false` | Format JSON values before diffing (use with `-p`) |
+| `--reverse` | `-r` | `false` | Show oldest versions first |
 
 **Output:**
 
@@ -190,8 +192,14 @@ suve sm log -n 5 my-database-credentials
 # Show versions with diffs
 suve sm log -p my-database-credentials
 
+# Show diffs with JSON formatting
+suve sm log -p -j my-database-credentials
+
 # Show last 3 versions with diffs
 suve sm log -n 3 -p my-database-credentials
+
+# Show oldest versions first
+suve sm log --reverse my-database-credentials
 ```
 
 ---
