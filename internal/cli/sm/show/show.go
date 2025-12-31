@@ -28,7 +28,7 @@ func Command() *cli.Command {
 	return &cli.Command{
 		Name:      "show",
 		Usage:     "Show secret value with metadata",
-		ArgsUsage: "<name[#id | :label][shifts]>",
+		ArgsUsage: "<name[#id | :label][~...]>",
 		Description: `Display a secret's value along with its metadata.
 
 VERSION SPECIFIERS:

@@ -25,7 +25,7 @@ func Command() *cli.Command {
 	return &cli.Command{
 		Name:      "cat",
 		Usage:     "Output raw parameter value (for piping)",
-		ArgsUsage: "<name[#version][shifts]>",
+		ArgsUsage: "<name[#N][~...]>",
 		Description: `Output the raw parameter value without any formatting.
 Does not append a trailing newline. Designed for scripts and piping.
 

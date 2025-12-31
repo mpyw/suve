@@ -17,18 +17,23 @@ This file provides guidance to Claude Code when working with code in this reposi
 2. **Version Specification**: Git-like revision syntax
    ```
    # SSM Parameter Store
-   <name>[#<version>][~<shift>]
+   <name>[#<N>]<shift>*
+   where <shift> = ~ | ~<N>  (repeatable, cumulative)
 
    /my/param           # Latest
    /my/param#3         # Version 3
    /my/param~1         # 1 version ago (like HEAD~1)
+   /my/param#5~2       # Version 5, then 2 back = Version 3
+   /my/param~~         # 2 versions ago (same as ~1~1)
 
    # Secrets Manager
-   <name>[#<id> | :<label>][~<shift>]
+   <name>[#<id> | :<label>]<shift>*
+   where <shift> = ~ | ~<N>  (repeatable, cumulative)
 
    my-secret              # Current version
    my-secret#abc123       # Specific version ID
    my-secret:AWSCURRENT   # Staging label
+   my-secret:AWSCURRENT~1 # 1 version before AWSCURRENT
    user@example.com~1     # @ in name is allowed
    ```
 

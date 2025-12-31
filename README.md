@@ -55,7 +55,13 @@ suve sm set my-secret "value"       # Update existing secret
 Git-like revision syntax for specifying versions:
 
 ```
-<name>[#<version>][~<shift>][:label]
+# SSM Parameter Store
+<name>[#<N>]<shift>*
+
+# Secrets Manager
+<name>[#<id> | :<label>]<shift>*
+
+where <shift> = ~ | ~<N>  (repeatable, cumulative)
 ```
 
 | Syntax | Description | Service |
@@ -64,10 +70,13 @@ Git-like revision syntax for specifying versions:
 | `/my/param#3` | Version 3 | SSM |
 | `/my/param~1` | 1 version ago from latest | SSM |
 | `/my/param#5~2` | 2 versions before version 5 (= version 3) | SSM |
+| `/my/param~~` | 2 versions ago (same as `~1~1`) | SSM |
 | `my-secret` | Latest version (AWSCURRENT) | SM |
+| `my-secret#abc123` | Specific version by ID | SM |
 | `my-secret:AWSCURRENT` | Current staging label | SM |
 | `my-secret:AWSPREVIOUS` | Previous staging label | SM |
 | `my-secret~1` | 1 version ago (by creation date) | SM |
+| `my-secret:AWSCURRENT~1` | 1 before AWSCURRENT | SM |
 
 ---
 
@@ -80,7 +89,7 @@ Service aliases: `ssm`, `ps`, `param`
 Display parameter value with metadata.
 
 ```
-suve ssm show [options] <name[#version][~shift]>
+suve ssm show [options] <name[#N][~...]>
 ```
 
 **Arguments:**
@@ -129,7 +138,7 @@ suve ssm show --decrypt=false /app/config/database-url
 Output raw parameter value without metadata. Designed for piping and scripting.
 
 ```
-suve ssm cat [options] <name[#version][~shift]>
+suve ssm cat [options] <name[#N][~...]>
 ```
 
 **Arguments:**
@@ -411,7 +420,7 @@ Service aliases: `sm`, `secret`
 Display secret value with metadata.
 
 ```
-suve sm show [options] <name[#id | :label][~shift]>
+suve sm show [options] <name[#id | :label][~...]>
 ```
 
 **Arguments:**
@@ -479,7 +488,7 @@ suve sm show my-database-credentials~1
 Output raw secret value without metadata. Designed for piping and scripting.
 
 ```
-suve sm cat <name[#id | :label][~shift]>
+suve sm cat <name[#id | :label][~...]>
 ```
 
 **Arguments:**

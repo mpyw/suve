@@ -27,7 +27,7 @@ func Command() *cli.Command {
 	return &cli.Command{
 		Name:      "show",
 		Usage:     "Show parameter value with metadata",
-		ArgsUsage: "<name[#version][shifts]>",
+		ArgsUsage: "<name[#N][~...]>",
 		Description: `Display a parameter's value along with its metadata (name, version, type, modification date).
 
 VERSION SPECIFIERS:

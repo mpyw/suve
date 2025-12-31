@@ -21,7 +21,13 @@ var (
 )
 
 // Spec represents a parsed SM secret version specification.
-// Grammar: name[#id | :label][shifts]
+//
+// Grammar: <name>[#<id> | :<label>]<shift>*
+//   - #<id>    optional version ID (0 or 1, mutually exclusive with :label)
+//   - :<label> optional staging label (0 or 1, mutually exclusive with #id)
+//   - <shift>  ~ or ~<N>, repeatable (0 or more, cumulative)
+//
+// Examples: my-secret, my-secret#abc123, my-secret:AWSCURRENT, my-secret~1
 type Spec struct {
 	Name  string  // Secret name
 	ID    *string // Version ID (#uuid)
@@ -30,13 +36,14 @@ type Spec struct {
 }
 
 // Parse parses an SM version specification string.
-// Grammar: name[#id | :label][shifts]
 //
-// Supports Git-like syntax for shifts:
-//   - ~          = go back 1 version
-//   - ~N         = go back N versions
-//   - ~~         = go back 2 versions
-//   - ~1~2       = cumulative (e.g., ~1~2 = ~3)
+// Grammar: <name>[#<id> | :<label>]<shift>*
+//
+// Shift syntax (Git-like, repeatable):
+//   - ~     go back 1 version
+//   - ~N    go back N versions
+//   - ~~    go back 2 versions (same as ~1~1)
+//   - ~1~2  cumulative: go back 3 versions
 func Parse(input string) (*Spec, error) {
 	input = strings.TrimSpace(input)
 	if input == "" {

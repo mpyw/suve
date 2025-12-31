@@ -19,7 +19,12 @@ var (
 )
 
 // Spec represents a parsed SSM parameter version specification.
-// Grammar: name[#version][shifts]
+//
+// Grammar: <name>[#<N>]<shift>*
+//   - #<N>     optional version number (0 or 1)
+//   - <shift>  ~ or ~<N>, repeatable (0 or more, cumulative)
+//
+// Examples: /my/param, /my/param#3, /my/param~1, /my/param#5~2, /my/param~~
 type Spec struct {
 	Name    string // Parameter name
 	Version *int64 // Explicit version number (#N)
@@ -27,13 +32,14 @@ type Spec struct {
 }
 
 // Parse parses an SSM version specification string.
-// Grammar: name[#version][shifts]
 //
-// Supports Git-like syntax for shifts:
-//   - ~          = go back 1 version
-//   - ~N         = go back N versions
-//   - ~~         = go back 2 versions
-//   - ~1~2       = cumulative (e.g., ~1~2 = ~3)
+// Grammar: <name>[#<N>]<shift>*
+//
+// Shift syntax (Git-like, repeatable):
+//   - ~     go back 1 version
+//   - ~N    go back N versions
+//   - ~~    go back 2 versions (same as ~1~1)
+//   - ~1~2  cumulative: go back 3 versions
 func Parse(input string) (*Spec, error) {
 	input = strings.TrimSpace(input)
 	if input == "" {
