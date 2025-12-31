@@ -23,6 +23,7 @@ suve sm show [options] <name[#VERSION | :LABEL][~SHIFT]*>
 | Option | Alias | Default | Description |
 |--------|-------|---------|-------------|
 | `--json` | `-j` | `false` | Pretty-print JSON values with indentation |
+| `--json-sort-keys` | - | `true` | Sort JSON object keys alphabetically. Use `--json-sort-keys=false` to preserve original order. |
 
 **Output:**
 
@@ -46,10 +47,13 @@ Stages: [AWSCURRENT]
 Created: 2024-01-15T10:30:45Z
 
   {
-    "username": "admin",
-    "password": "secret123"
+    "password": "secret123",
+    "username": "admin"
   }
 ```
+
+> [!TIP]
+> Key sorting (`--json-sort-keys`) is enabled by default to ensure consistent output for diffing. When JSON objects are sorted, comparing two versions won't show spurious differences due to key order changes.
 
 **Examples:**
 
@@ -59,6 +63,9 @@ suve sm show my-database-credentials
 
 # Show with pretty JSON formatting
 suve sm show --json my-database-credentials
+
+# Show JSON without key sorting (preserve original order)
+suve sm show -j --json-sort-keys=false my-database-credentials
 
 # Show previous version by label
 suve sm show my-database-credentials:AWSPREVIOUS
@@ -77,7 +84,7 @@ suve sm show my-database-credentials~1
 Output raw secret value without metadata. Designed for piping and scripting.
 
 ```
-suve sm cat <name[#VERSION | :LABEL][~SHIFT]*>
+suve sm cat [options] <name[#VERSION | :LABEL][~SHIFT]*>
 ```
 
 **Arguments:**
@@ -85,6 +92,13 @@ suve sm cat <name[#VERSION | :LABEL][~SHIFT]*>
 | Argument | Description |
 |----------|-------------|
 | `name` | Secret name with optional version specifier |
+
+**Options:**
+
+| Option | Alias | Default | Description |
+|--------|-------|---------|-------------|
+| `--json` | `-j` | `false` | Pretty-print JSON values with indentation |
+| `--json-sort-keys` | - | `true` | Sort JSON object keys alphabetically. Use `--json-sort-keys=false` to preserve original order. |
 
 **Output:**
 
@@ -101,6 +115,12 @@ suve sm cat my-database-credentials | jq -r '.password'
 
 # Pipe to file
 suve sm cat my-ssl-certificate > cert.pem
+
+# Pretty print JSON
+suve sm cat -j my-database-credentials
+
+# Pretty print JSON without key sorting
+suve sm cat -j --json-sort-keys=false my-database-credentials
 ```
 
 ---
@@ -124,6 +144,7 @@ suve sm log [options] <name>
 | Option | Alias | Default | Description |
 |--------|-------|---------|-------------|
 | `--number` | `-n` | `10` | Maximum number of versions to show |
+| `--patch` | `-p` | `false` | Show diff between consecutive versions |
 
 **Output:**
 
@@ -140,6 +161,32 @@ Date: 2024-01-13T08:10:00Z
 
 Version IDs are truncated to 8 characters for display.
 
+**With `--patch`:**
+
+```diff
+Version abc12345 [AWSCURRENT]
+Date: 2024-01-15T10:30:45Z
+
+--- my-secret#def67890
++++ my-secret#abc12345
+@@ -1 +1 @@
+-{"password":"old-password"}
++{"password":"new-password"}
+
+Version def67890 [AWSPREVIOUS]
+Date: 2024-01-14T09:20:30Z
+
+--- my-secret#ghi11111
++++ my-secret#def67890
+...
+```
+
+> [!TIP]
+> Use `-p` to review what changed in each secret rotation, similar to `git log -p`.
+
+> [!NOTE]
+> When using `--patch`, the command fetches the actual secret values for each version to compute diffs.
+
 **Examples:**
 
 ```bash
@@ -148,6 +195,12 @@ suve sm log my-database-credentials
 
 # Show last 5 versions
 suve sm log -n 5 my-database-credentials
+
+# Show versions with diffs
+suve sm log -p my-database-credentials
+
+# Show last 3 versions with diffs
+suve sm log -n 3 -p my-database-credentials
 ```
 
 ---

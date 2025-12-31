@@ -125,7 +125,7 @@ func TestSSM_FullWorkflow(t *testing.T) {
 	t.Run("show", func(t *testing.T) {
 		var buf bytes.Buffer
 		spec := &ssmversion.Spec{Name: paramName}
-		err := ssmshow.Run(ctx, client, &buf, spec, true)
+		err := ssmshow.Run(ctx, client, &buf, spec, true, ssmshow.JSONOptions{})
 		if err != nil {
 			t.Fatalf("ssmshow.Run() error: %v", err)
 		}
@@ -138,9 +138,9 @@ func TestSSM_FullWorkflow(t *testing.T) {
 
 	// 3. Cat parameter (raw output without trailing newline)
 	t.Run("cat", func(t *testing.T) {
-		var buf bytes.Buffer
+		var buf, warnBuf bytes.Buffer
 		spec := &ssmversion.Spec{Name: paramName}
-		err := ssmcat.Run(ctx, client, &buf, spec, true)
+		err := ssmcat.Run(ctx, client, &buf, &warnBuf, spec, true, ssmcat.JSONOptions{})
 		if err != nil {
 			t.Fatalf("ssmcat.Run() error: %v", err)
 		}
@@ -159,10 +159,10 @@ func TestSSM_FullWorkflow(t *testing.T) {
 		}
 	})
 
-	// 5. Log
+	// 5. Log (without patch)
 	t.Run("log", func(t *testing.T) {
 		var buf bytes.Buffer
-		err := ssmlog.Run(ctx, client, &buf, paramName, 10)
+		err := ssmlog.Run(ctx, client, &buf, paramName, 10, false)
 		if err != nil {
 			t.Fatalf("ssmlog.Run() error: %v", err)
 		}
@@ -215,7 +215,7 @@ func TestSSM_FullWorkflow(t *testing.T) {
 	t.Run("verify-deleted", func(t *testing.T) {
 		var buf bytes.Buffer
 		spec := &ssmversion.Spec{Name: paramName}
-		err := ssmshow.Run(ctx, client, &buf, spec, true)
+		err := ssmshow.Run(ctx, client, &buf, spec, true, ssmshow.JSONOptions{})
 		if err == nil {
 			t.Error("expected error after deletion, got nil")
 		}
@@ -259,7 +259,7 @@ func TestSM_FullWorkflow(t *testing.T) {
 	t.Run("show", func(t *testing.T) {
 		var buf bytes.Buffer
 		spec := &smversion.Spec{Name: secretName}
-		err := smshow.Run(ctx, client, &buf, spec, false)
+		err := smshow.Run(ctx, client, &buf, spec, smshow.JSONOptions{})
 		if err != nil {
 			t.Fatalf("smshow.Run() error: %v", err)
 		}
@@ -272,9 +272,9 @@ func TestSM_FullWorkflow(t *testing.T) {
 
 	// 3. Cat secret (raw output without trailing newline)
 	t.Run("cat", func(t *testing.T) {
-		var buf bytes.Buffer
+		var buf, warnBuf bytes.Buffer
 		spec := &smversion.Spec{Name: secretName}
-		err := smcat.Run(ctx, client, &buf, spec)
+		err := smcat.Run(ctx, client, &buf, &warnBuf, spec, smcat.JSONOptions{})
 		if err != nil {
 			t.Fatalf("smcat.Run() error: %v", err)
 		}
@@ -293,10 +293,10 @@ func TestSM_FullWorkflow(t *testing.T) {
 		}
 	})
 
-	// 5. Log
+	// 5. Log (without patch)
 	t.Run("log", func(t *testing.T) {
 		var buf bytes.Buffer
-		err := smlog.Run(ctx, client, &buf, secretName, 10)
+		err := smlog.Run(ctx, client, &buf, secretName, 10, false)
 		if err != nil {
 			t.Fatalf("smlog.Run() error: %v", err)
 		}
@@ -359,7 +359,7 @@ func TestSM_FullWorkflow(t *testing.T) {
 	t.Run("verify-restored", func(t *testing.T) {
 		var buf bytes.Buffer
 		spec := &smversion.Spec{Name: secretName}
-		err := smshow.Run(ctx, client, &buf, spec, false)
+		err := smshow.Run(ctx, client, &buf, spec, smshow.JSONOptions{})
 		if err != nil {
 			t.Fatalf("smshow.Run() after restore error: %v", err)
 		}

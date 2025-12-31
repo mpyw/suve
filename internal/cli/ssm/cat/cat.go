@@ -7,10 +7,13 @@ import (
 	"io"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/ssm/types"
 	"github.com/urfave/cli/v2"
 
 	"github.com/mpyw/suve/internal/api/ssmapi"
 	"github.com/mpyw/suve/internal/awsutil"
+	"github.com/mpyw/suve/internal/jsonutil"
+	"github.com/mpyw/suve/internal/output"
 	"github.com/mpyw/suve/internal/version/ssmversion"
 )
 
@@ -37,6 +40,7 @@ EXAMPLES:
   suve ssm cat /app/config/db-url            Output latest value
   suve ssm cat /app/config/db-url#3          Output version 3
   suve ssm cat /app/config/db-url~           Output previous version
+  suve ssm cat -j /app/config/db-url         Pretty print JSON value
   DB_URL=$(suve ssm cat /app/config/db-url)  Use in shell variable`,
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
@@ -44,6 +48,11 @@ EXAMPLES:
 				Aliases: []string{"d"},
 				Value:   true,
 				Usage:   "Decrypt SecureString values (use --decrypt=false to disable)",
+			},
+			&cli.BoolFlag{
+				Name:    "json",
+				Aliases: []string{"j"},
+				Usage:   "Pretty print JSON values (keys are always sorted alphabetically)",
 			},
 		},
 		Action: action,
@@ -65,16 +74,33 @@ func action(c *cli.Context) error {
 		return fmt.Errorf("failed to initialize AWS client: %w", err)
 	}
 
-	return Run(c.Context, client, c.App.Writer, spec, c.Bool("decrypt"))
+	return Run(c.Context, client, c.App.Writer, c.App.ErrWriter, spec, c.Bool("decrypt"), c.Bool("json"))
 }
 
 // Run executes the cat command.
-func Run(ctx context.Context, client Client, w io.Writer, spec *ssmversion.Spec, decrypt bool) error {
+// Output goes to w, warnings go to warnW (typically stderr).
+func Run(ctx context.Context, client Client, w io.Writer, warnW io.Writer, spec *ssmversion.Spec, decrypt bool, jsonFormat bool) error {
 	param, err := ssmversion.GetParameterWithVersion(ctx, client, spec, decrypt)
 	if err != nil {
 		return err
 	}
 
-	_, _ = fmt.Fprint(w, aws.ToString(param.Value))
+	value := aws.ToString(param.Value)
+
+	// Warn if --json is used in cases where it's not meaningful
+	if jsonFormat {
+		switch {
+		case param.Type == types.ParameterTypeStringList:
+			output.Warning(warnW, "--json has no effect on StringList type (comma-separated values)")
+		case param.Type == types.ParameterTypeSecureString && !decrypt:
+			output.Warning(warnW, "--json has no effect on encrypted SecureString (use --decrypt to enable)")
+		case !jsonutil.IsJSON(value):
+			output.Warning(warnW, "--json has no effect: value is not valid JSON")
+		default:
+			value = jsonutil.Format(value)
+		}
+	}
+
+	_, _ = fmt.Fprint(w, value)
 	return nil
 }

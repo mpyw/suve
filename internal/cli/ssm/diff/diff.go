@@ -20,6 +20,7 @@ import (
 
 	"github.com/mpyw/suve/internal/api/ssmapi"
 	"github.com/mpyw/suve/internal/awsutil"
+	"github.com/mpyw/suve/internal/jsonutil"
 	"github.com/mpyw/suve/internal/output"
 	"github.com/mpyw/suve/internal/version/ssmversion"
 )
@@ -55,7 +56,15 @@ EXAMPLES:
   suve ssm diff /app/config#3                 Compare v3 with latest (fullspec)
   suve ssm diff /app/config#1 '#2'            Compare v1 and v2 (mixed)
   suve ssm diff /app/config '#1' '#2'         Compare v1 and v2 (legacy)
-  suve ssm diff /app/config '~'               Compare previous with latest`,
+  suve ssm diff /app/config '~'               Compare previous with latest
+  suve ssm diff -j /app/config#1 /app/config  JSON format before diffing`,
+		Flags: []cli.Flag{
+			&cli.BoolFlag{
+				Name:    "json",
+				Aliases: []string{"j"},
+				Usage:   "Format JSON values before diffing (keys are always sorted)",
+			},
+		},
 		Action: action,
 	}
 }
@@ -72,7 +81,7 @@ func action(c *cli.Context) error {
 		return fmt.Errorf("failed to initialize AWS client: %w", err)
 	}
 
-	return RunWithSpecs(c.Context, client, c.App.Writer, c.App.ErrWriter, spec1, spec2)
+	return RunWithSpecs(c.Context, client, c.App.Writer, c.App.ErrWriter, spec1, spec2, c.Bool("json"))
 }
 
 // ParseArgs parses diff command arguments into two version specifications.
@@ -252,7 +261,7 @@ func Run(ctx context.Context, client Client, w io.Writer, name, version1, versio
 }
 
 // RunWithSpecs executes the diff command with parsed specs.
-func RunWithSpecs(ctx context.Context, client Client, w, errW io.Writer, spec1, spec2 *ParsedSpec) error {
+func RunWithSpecs(ctx context.Context, client Client, w, errW io.Writer, spec1, spec2 *ParsedSpec, jsonFormat bool) error {
 	ssmSpec1 := &ssmversion.Spec{
 		Name:    spec1.Name,
 		Version: spec1.Version,
@@ -276,6 +285,16 @@ func RunWithSpecs(ctx context.Context, client Client, w, errW io.Writer, spec1, 
 
 	value1 := aws.ToString(param1.Value)
 	value2 := aws.ToString(param2.Value)
+
+	// Format as JSON if enabled
+	if jsonFormat {
+		if !jsonutil.IsJSON(value1) || !jsonutil.IsJSON(value2) {
+			output.Warning(errW, "--json has no effect: some values are not valid JSON")
+		} else {
+			value1 = jsonutil.Format(value1)
+			value2 = jsonutil.Format(value2)
+		}
+	}
 
 	if value1 == value2 {
 		output.Warning(errW, "comparing identical versions")

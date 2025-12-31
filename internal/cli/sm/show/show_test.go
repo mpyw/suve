@@ -33,7 +33,7 @@ func TestRun(t *testing.T) {
 		name       string
 		spec       *smversion.Spec
 		mock       *mockClient
-		prettyJSON bool
+		jsonFormat bool
 		wantErr    bool
 		check      func(t *testing.T, output string)
 	}{
@@ -88,13 +88,42 @@ func TestRun(t *testing.T) {
 				}
 			},
 		},
+		{
+			name:       "show JSON formatted with sorted keys",
+			spec:       &smversion.Spec{Name: "my-secret"},
+			jsonFormat: true,
+			mock: &mockClient{
+				getSecretValueFunc: func(_ context.Context, _ *secretsmanager.GetSecretValueInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.GetSecretValueOutput, error) {
+					return &secretsmanager.GetSecretValueOutput{
+						Name:          aws.String("my-secret"),
+						ARN:           aws.String("arn:aws:secretsmanager:us-east-1:123456789012:secret:my-secret-AbCdEf"),
+						VersionId:     aws.String("abc123"),
+						SecretString:  aws.String(`{"zebra":"last","apple":"first"}`),
+						VersionStages: []string{"AWSCURRENT"},
+						CreatedDate:   &now,
+					}, nil
+				},
+			},
+			check: func(t *testing.T, output string) {
+				// Keys should be sorted (apple before zebra)
+				appleIdx := bytes.Index([]byte(output), []byte("apple"))
+				zebraIdx := bytes.Index([]byte(output), []byte("zebra"))
+				if appleIdx == -1 || zebraIdx == -1 {
+					t.Error("expected both keys in output")
+					return
+				}
+				if appleIdx > zebraIdx {
+					t.Error("expected keys to be sorted (apple before zebra)")
+				}
+			},
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var buf bytes.Buffer
 
-			err := Run(t.Context(), tt.mock, &buf, tt.spec, tt.prettyJSON)
+			err := Run(t.Context(), tt.mock, &buf, tt.spec, tt.jsonFormat)
 
 			if tt.wantErr {
 				if err == nil {

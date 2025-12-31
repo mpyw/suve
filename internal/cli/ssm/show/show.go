@@ -8,10 +8,12 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/ssm/types"
 	"github.com/urfave/cli/v2"
 
 	"github.com/mpyw/suve/internal/api/ssmapi"
 	"github.com/mpyw/suve/internal/awsutil"
+	"github.com/mpyw/suve/internal/jsonutil"
 	"github.com/mpyw/suve/internal/output"
 	"github.com/mpyw/suve/internal/version/ssmversion"
 )
@@ -38,7 +40,7 @@ EXAMPLES:
   suve ssm show /app/config/db-url              Show latest version
   suve ssm show /app/config/db-url#3            Show version 3
   suve ssm show /app/config/db-url~             Show previous version
-  suve ssm show /app/config/db-url~~            Show 2 versions ago
+  suve ssm show -j /app/config/db-url           Pretty print JSON value
   suve ssm show --decrypt=false /app/secret     Show without decryption`,
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
@@ -46,6 +48,11 @@ EXAMPLES:
 				Aliases: []string{"d"},
 				Value:   true,
 				Usage:   "Decrypt SecureString values (use --decrypt=false to disable)",
+			},
+			&cli.BoolFlag{
+				Name:    "json",
+				Aliases: []string{"j"},
+				Usage:   "Pretty print JSON values (keys are always sorted alphabetically)",
 			},
 		},
 		Action: action,
@@ -67,11 +74,11 @@ func action(c *cli.Context) error {
 		return fmt.Errorf("failed to initialize AWS client: %w", err)
 	}
 
-	return Run(c.Context, client, c.App.Writer, spec, c.Bool("decrypt"))
+	return Run(c.Context, client, c.App.Writer, spec, c.Bool("decrypt"), c.Bool("json"))
 }
 
 // Run executes the show command.
-func Run(ctx context.Context, client Client, w io.Writer, spec *ssmversion.Spec, decrypt bool) error {
+func Run(ctx context.Context, client Client, w io.Writer, spec *ssmversion.Spec, decrypt bool, jsonFormat bool) error {
 	param, err := ssmversion.GetParameterWithVersion(ctx, client, spec, decrypt)
 	if err != nil {
 		return err
@@ -85,7 +92,23 @@ func Run(ctx context.Context, client Client, w io.Writer, spec *ssmversion.Spec,
 		out.Field("Modified", param.LastModifiedDate.Format(time.RFC3339))
 	}
 	out.Separator()
-	out.Value(aws.ToString(param.Value))
+
+	value := aws.ToString(param.Value)
+
+	// Warn if --json is used in cases where it's not meaningful
+	if jsonFormat {
+		switch {
+		case param.Type == types.ParameterTypeStringList:
+			output.Warning(w, "--json has no effect on StringList type (comma-separated values)")
+		case param.Type == types.ParameterTypeSecureString && !decrypt:
+			output.Warning(w, "--json has no effect on encrypted SecureString (use --decrypt to enable)")
+		case !jsonutil.IsJSON(value):
+			output.Warning(w, "--json has no effect: value is not valid JSON")
+		default:
+			value = jsonutil.Format(value)
+		}
+	}
+	out.Value(value)
 
 	return nil
 }

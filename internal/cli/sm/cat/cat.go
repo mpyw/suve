@@ -11,6 +11,8 @@ import (
 
 	"github.com/mpyw/suve/internal/api/smapi"
 	"github.com/mpyw/suve/internal/awsutil"
+	"github.com/mpyw/suve/internal/jsonutil"
+	"github.com/mpyw/suve/internal/output"
 	"github.com/mpyw/suve/internal/version/smversion"
 )
 
@@ -38,7 +40,15 @@ EXAMPLES:
   suve sm cat my-secret              Output current value
   suve sm cat my-secret~             Output previous version
   suve sm cat my-secret:AWSPREVIOUS  Output AWSPREVIOUS label
+  suve sm cat -j my-secret           Pretty print JSON value
   API_KEY=$(suve sm cat my-api-key)  Use in shell variable`,
+		Flags: []cli.Flag{
+			&cli.BoolFlag{
+				Name:    "json",
+				Aliases: []string{"j"},
+				Usage:   "Pretty print JSON values (keys are always sorted alphabetically)",
+			},
+		},
 		Action: action,
 	}
 }
@@ -58,16 +68,28 @@ func action(c *cli.Context) error {
 		return fmt.Errorf("failed to initialize AWS client: %w", err)
 	}
 
-	return Run(c.Context, client, c.App.Writer, spec)
+	return Run(c.Context, client, c.App.Writer, c.App.ErrWriter, spec, c.Bool("json"))
 }
 
 // Run executes the cat command.
-func Run(ctx context.Context, client Client, w io.Writer, spec *smversion.Spec) error {
+// Output goes to w, warnings go to warnW (typically stderr).
+func Run(ctx context.Context, client Client, w io.Writer, warnW io.Writer, spec *smversion.Spec, jsonFormat bool) error {
 	secret, err := smversion.GetSecretWithVersion(ctx, client, spec)
 	if err != nil {
 		return err
 	}
 
-	_, _ = fmt.Fprint(w, aws.ToString(secret.SecretString))
+	value := aws.ToString(secret.SecretString)
+
+	// Warn if --json is used but value is not valid JSON
+	if jsonFormat {
+		if !jsonutil.IsJSON(value) {
+			output.Warning(warnW, "--json has no effect: value is not valid JSON")
+		} else {
+			value = jsonutil.Format(value)
+		}
+	}
+
+	_, _ = fmt.Fprint(w, value)
 	return nil
 }

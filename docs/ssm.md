@@ -23,6 +23,8 @@ suve ssm show [options] <name[#VERSION][~SHIFT]*>
 | Option | Alias | Default | Description |
 |--------|-------|---------|-------------|
 | `--decrypt` | `-d` | `true` | Decrypt SecureString values. Use `--decrypt=false` to disable. |
+| `--json` | `-j` | `false` | Pretty-print JSON values with indentation |
+| `--json-sort-keys` | - | `true` | Sort JSON object keys alphabetically. Use `--json-sort-keys=false` to preserve original order. |
 
 **Output:**
 
@@ -34,6 +36,23 @@ Modified: 2024-01-15T10:30:45Z
 
   my-secret-value
 ```
+
+With `--json`:
+
+```
+Name: /my/parameter
+Version: 3
+Type: SecureString
+Modified: 2024-01-15T10:30:45Z
+
+  {
+    "password": "secret123",
+    "username": "admin"
+  }
+```
+
+> [!TIP]
+> Key sorting (`--json-sort-keys`) is enabled by default to ensure consistent output for diffing. When JSON objects are sorted, comparing two versions won't show spurious differences due to key order changes.
 
 **Examples:**
 
@@ -49,6 +68,12 @@ suve ssm show /app/config/database-url~1
 
 # Show without decryption (displays encrypted value)
 suve ssm show --decrypt=false /app/config/database-url
+
+# Show with JSON formatting
+suve ssm show -j /app/config/database-credentials
+
+# Show JSON without key sorting (preserve original order)
+suve ssm show -j --json-sort-keys=false /app/config/database-credentials
 ```
 
 ---
@@ -72,6 +97,8 @@ suve ssm cat [options] <name[#VERSION][~SHIFT]*>
 | Option | Alias | Default | Description |
 |--------|-------|---------|-------------|
 | `--decrypt` | `-d` | `true` | Decrypt SecureString values. Use `--decrypt=false` to disable. |
+| `--json` | `-j` | `false` | Pretty-print JSON values with indentation |
+| `--json-sort-keys` | - | `true` | Sort JSON object keys alphabetically. Use `--json-sort-keys=false` to preserve original order. |
 
 **Output:**
 
@@ -88,6 +115,12 @@ suve ssm cat /app/config/ssl-cert > cert.pem
 
 # Pipe to another command
 suve ssm cat /app/config/ssh-key | ssh-add -
+
+# Pretty print JSON
+suve ssm cat -j /app/config/database-credentials
+
+# Pretty print JSON without key sorting
+suve ssm cat -j --json-sort-keys=false /app/config/database-credentials
 ```
 
 ---
@@ -111,6 +144,7 @@ suve ssm log [options] <name>
 | Option | Alias | Default | Description |
 |--------|-------|---------|-------------|
 | `--number` | `-n` | `10` | Maximum number of versions to show |
+| `--patch` | `-p` | `false` | Show diff between consecutive versions |
 
 **Output:**
 
@@ -130,6 +164,29 @@ initial-value...
 
 Values are truncated at 50 characters with `...` suffix.
 
+**With `--patch`:**
+
+```diff
+Version 3 (current)
+Date: 2024-01-15T10:30:45Z
+
+--- /app/config/database-url#2
++++ /app/config/database-url#3
+@@ -1 +1 @@
+-postgres://old-host:5432/db
++postgres://new-host:5432/db
+
+Version 2
+Date: 2024-01-14T09:20:30Z
+
+--- /app/config/database-url#1
++++ /app/config/database-url#2
+...
+```
+
+> [!TIP]
+> Use `-p` to review what changed in each version, similar to `git log -p`.
+
 **Examples:**
 
 ```bash
@@ -138,6 +195,12 @@ suve ssm log /app/config/database-url
 
 # Show last 5 versions
 suve ssm log -n 5 /app/config/database-url
+
+# Show versions with diffs
+suve ssm log -p /app/config/database-url
+
+# Show last 3 versions with diffs
+suve ssm log -n 3 -p /app/config/database-url
 ```
 
 ---

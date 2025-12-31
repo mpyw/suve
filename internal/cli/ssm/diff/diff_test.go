@@ -499,7 +499,7 @@ func TestRunWithSpecs_IdenticalWarning(t *testing.T) {
 	spec1 := &ParsedSpec{Name: "/app/param", Version: nil, Shift: 0}
 	spec2 := &ParsedSpec{Name: "/app/param", Version: nil, Shift: 0}
 
-	err := RunWithSpecs(t.Context(), mock, &stdout, &stderr, spec1, spec2)
+	err := RunWithSpecs(t.Context(), mock, &stdout, &stderr, spec1, spec2, false)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

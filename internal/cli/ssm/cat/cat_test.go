@@ -37,12 +37,13 @@ func TestRun(t *testing.T) {
 	now := time.Now()
 
 	tests := []struct {
-		name    string
-		spec    *ssmversion.Spec
-		mock    *mockClient
-		decrypt bool
-		wantErr bool
-		check   func(t *testing.T, output string)
+		name       string
+		spec       *ssmversion.Spec
+		mock       *mockClient
+		decrypt    bool
+		jsonFormat bool
+		wantErr    bool
+		check      func(t *testing.T, output string)
 	}{
 		{
 			name: "output raw value",
@@ -89,6 +90,37 @@ func TestRun(t *testing.T) {
 			},
 		},
 		{
+			name:       "output JSON formatted with sorted keys",
+			spec:       &ssmversion.Spec{Name: "/app/param"},
+			jsonFormat: true,
+			mock: &mockClient{
+				getParameterFunc: func(_ context.Context, _ *ssm.GetParameterInput, _ ...func(*ssm.Options)) (*ssm.GetParameterOutput, error) {
+					return &ssm.GetParameterOutput{
+						Parameter: &types.Parameter{
+							Name:             aws.String("/app/param"),
+							Value:            aws.String(`{"zebra":"last","apple":"first"}`),
+							Version:          1,
+							Type:             types.ParameterTypeString,
+							LastModifiedDate: &now,
+						},
+					}, nil
+				},
+			},
+			decrypt: true,
+			check: func(t *testing.T, output string) {
+				// Keys should be sorted (apple before zebra)
+				appleIdx := bytes.Index([]byte(output), []byte("apple"))
+				zebraIdx := bytes.Index([]byte(output), []byte("zebra"))
+				if appleIdx == -1 || zebraIdx == -1 {
+					t.Error("expected both keys in output")
+					return
+				}
+				if appleIdx > zebraIdx {
+					t.Error("expected keys to be sorted (apple before zebra)")
+				}
+			},
+		},
+		{
 			name: "error from AWS",
 			spec: &ssmversion.Spec{Name: "/app/param"},
 			mock: &mockClient{
@@ -103,8 +135,8 @@ func TestRun(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var buf bytes.Buffer
-			err := Run(t.Context(), tt.mock, &buf, tt.spec, tt.decrypt)
+			var buf, warnBuf bytes.Buffer
+			err := Run(t.Context(), tt.mock, &buf, &warnBuf, tt.spec, tt.decrypt, tt.jsonFormat)
 
 			if tt.wantErr {
 				if err == nil {

@@ -20,6 +20,7 @@ import (
 
 	"github.com/mpyw/suve/internal/api/smapi"
 	"github.com/mpyw/suve/internal/awsutil"
+	"github.com/mpyw/suve/internal/jsonutil"
 	"github.com/mpyw/suve/internal/output"
 	"github.com/mpyw/suve/internal/version/smversion"
 )
@@ -57,7 +58,15 @@ EXAMPLES:
   suve sm diff my-secret:AWSPREVIOUS                       Compare with current (fullspec)
   suve sm diff my-secret:AWSPREVIOUS ':AWSCURRENT'         Compare labels (mixed)
   suve sm diff my-secret ':AWSPREVIOUS' ':AWSCURRENT'      Compare labels (legacy)
-  suve sm diff my-secret '~'                               Compare previous with current`,
+  suve sm diff my-secret '~'                               Compare previous with current
+  suve sm diff -j my-secret:AWSPREVIOUS                    JSON format before diffing`,
+		Flags: []cli.Flag{
+			&cli.BoolFlag{
+				Name:    "json",
+				Aliases: []string{"j"},
+				Usage:   "Format JSON values before diffing (keys are always sorted)",
+			},
+		},
 		Action: action,
 	}
 }
@@ -74,7 +83,7 @@ func action(c *cli.Context) error {
 		return fmt.Errorf("failed to initialize AWS client: %w", err)
 	}
 
-	return RunWithSpecs(c.Context, client, c.App.Writer, c.App.ErrWriter, spec1, spec2)
+	return RunWithSpecs(c.Context, client, c.App.Writer, c.App.ErrWriter, spec1, spec2, c.Bool("json"))
 }
 
 // ParseArgs parses diff command arguments into two version specifications.
@@ -273,7 +282,7 @@ func Run(ctx context.Context, client Client, w io.Writer, name, version1, versio
 }
 
 // RunWithSpecs executes the diff command with parsed specs.
-func RunWithSpecs(ctx context.Context, client Client, w, errW io.Writer, spec1, spec2 *ParsedSpec) error {
+func RunWithSpecs(ctx context.Context, client Client, w, errW io.Writer, spec1, spec2 *ParsedSpec, jsonFormat bool) error {
 	smSpec1 := &smversion.Spec{
 		Name:  spec1.Name,
 		ID:    spec1.ID,
@@ -299,6 +308,16 @@ func RunWithSpecs(ctx context.Context, client Client, w, errW io.Writer, spec1, 
 
 	value1 := aws.ToString(secret1.SecretString)
 	value2 := aws.ToString(secret2.SecretString)
+
+	// Format as JSON if enabled
+	if jsonFormat {
+		if !jsonutil.IsJSON(value1) || !jsonutil.IsJSON(value2) {
+			output.Warning(errW, "--json has no effect: some values are not valid JSON")
+		} else {
+			value1 = jsonutil.Format(value1)
+			value2 = jsonutil.Format(value2)
+		}
+	}
 
 	if value1 == value2 {
 		output.Warning(errW, "comparing identical versions")

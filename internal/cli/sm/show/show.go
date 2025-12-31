@@ -46,7 +46,7 @@ EXAMPLES:
 			&cli.BoolFlag{
 				Name:    "json",
 				Aliases: []string{"j"},
-				Usage:   "Pretty print JSON values",
+				Usage:   "Pretty print JSON values (keys are always sorted alphabetically)",
 			},
 		},
 		Action: action,
@@ -72,7 +72,7 @@ func action(c *cli.Context) error {
 }
 
 // Run executes the show command.
-func Run(ctx context.Context, client Client, w io.Writer, spec *smversion.Spec, prettyJSON bool) error {
+func Run(ctx context.Context, client Client, w io.Writer, spec *smversion.Spec, jsonFormat bool) error {
 	secret, err := smversion.GetSecretWithVersion(ctx, client, spec)
 	if err != nil {
 		return err
@@ -93,8 +93,14 @@ func Run(ctx context.Context, client Client, w io.Writer, spec *smversion.Spec, 
 	out.Separator()
 
 	value := aws.ToString(secret.SecretString)
-	if prettyJSON {
-		value = jsonutil.Format(value)
+
+	// Warn if --json is used but value is not valid JSON
+	if jsonFormat {
+		if !jsonutil.IsJSON(value) {
+			output.Warning(w, "--json has no effect: value is not valid JSON")
+		} else {
+			value = jsonutil.Format(value)
+		}
 	}
 	out.Value(value)
 

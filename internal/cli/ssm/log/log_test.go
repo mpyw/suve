@@ -30,6 +30,7 @@ func TestRun(t *testing.T) {
 		name       string
 		paramName  string
 		maxResults int32
+		showPatch  bool
 		mock       *mockClient
 		wantErr    bool
 		check      func(t *testing.T, output string)
@@ -38,6 +39,7 @@ func TestRun(t *testing.T) {
 			name:       "show history",
 			paramName:  "/app/param",
 			maxResults: 10,
+			showPatch:  false,
 			mock: &mockClient{
 				getParameterHistoryFunc: func(_ context.Context, params *ssm.GetParameterHistoryInput, _ ...func(*ssm.Options)) (*ssm.GetParameterHistoryOutput, error) {
 					if aws.ToString(params.Name) != "/app/param" {
@@ -67,6 +69,7 @@ func TestRun(t *testing.T) {
 			name:       "truncate long values",
 			paramName:  "/app/param",
 			maxResults: 10,
+			showPatch:  false,
 			mock: &mockClient{
 				getParameterHistoryFunc: func(_ context.Context, _ *ssm.GetParameterHistoryInput, _ ...func(*ssm.Options)) (*ssm.GetParameterHistoryOutput, error) {
 					longValue := "this is a very long value that should be truncated in the preview"
@@ -84,9 +87,67 @@ func TestRun(t *testing.T) {
 			},
 		},
 		{
+			name:       "show patch between versions",
+			paramName:  "/app/param",
+			maxResults: 10,
+			showPatch:  true,
+			mock: &mockClient{
+				getParameterHistoryFunc: func(_ context.Context, _ *ssm.GetParameterHistoryInput, _ ...func(*ssm.Options)) (*ssm.GetParameterHistoryOutput, error) {
+					return &ssm.GetParameterHistoryOutput{
+						Parameters: []types.ParameterHistory{
+							{Name: aws.String("/app/param"), Value: aws.String("old-value"), Version: 1, LastModifiedDate: aws.Time(now.Add(-time.Hour))},
+							{Name: aws.String("/app/param"), Value: aws.String("new-value"), Version: 2, LastModifiedDate: &now},
+						},
+					}, nil
+				},
+			},
+			check: func(t *testing.T, output string) {
+				// Should contain diff markers
+				if !bytes.Contains([]byte(output), []byte("-old-value")) {
+					t.Error("expected -old-value in diff output")
+				}
+				if !bytes.Contains([]byte(output), []byte("+new-value")) {
+					t.Error("expected +new-value in diff output")
+				}
+				// Should contain version headers
+				if !bytes.Contains([]byte(output), []byte("/app/param#1")) {
+					t.Error("expected /app/param#1 in diff output")
+				}
+				if !bytes.Contains([]byte(output), []byte("/app/param#2")) {
+					t.Error("expected /app/param#2 in diff output")
+				}
+			},
+		},
+		{
+			name:       "patch with single version shows no diff",
+			paramName:  "/app/param",
+			maxResults: 10,
+			showPatch:  true,
+			mock: &mockClient{
+				getParameterHistoryFunc: func(_ context.Context, _ *ssm.GetParameterHistoryInput, _ ...func(*ssm.Options)) (*ssm.GetParameterHistoryOutput, error) {
+					return &ssm.GetParameterHistoryOutput{
+						Parameters: []types.ParameterHistory{
+							{Name: aws.String("/app/param"), Value: aws.String("only-value"), Version: 1, LastModifiedDate: &now},
+						},
+					}, nil
+				},
+			},
+			check: func(t *testing.T, output string) {
+				// Should contain version info but no diff markers
+				if !bytes.Contains([]byte(output), []byte("Version 1")) {
+					t.Error("expected Version 1 in output")
+				}
+				// No diff markers for single version
+				if bytes.Contains([]byte(output), []byte("---")) {
+					t.Error("expected no diff markers for single version")
+				}
+			},
+		},
+		{
 			name:       "error from AWS",
 			paramName:  "/app/param",
 			maxResults: 10,
+			showPatch:  false,
 			mock: &mockClient{
 				getParameterHistoryFunc: func(_ context.Context, _ *ssm.GetParameterHistoryInput, _ ...func(*ssm.Options)) (*ssm.GetParameterHistoryOutput, error) {
 					return nil, fmt.Errorf("AWS error")
@@ -98,8 +159,8 @@ func TestRun(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var buf bytes.Buffer
-			err := Run(t.Context(), tt.mock, &buf, tt.paramName, tt.maxResults)
+			var buf, errBuf bytes.Buffer
+			err := Run(t.Context(), tt.mock, &buf, &errBuf, tt.paramName, tt.maxResults, tt.showPatch, false)
 
 			if tt.wantErr {
 				if err == nil {

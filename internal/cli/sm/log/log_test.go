@@ -14,6 +14,7 @@ import (
 
 type mockClient struct {
 	listSecretVersionIdsFunc func(ctx context.Context, params *secretsmanager.ListSecretVersionIdsInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.ListSecretVersionIdsOutput, error)
+	getSecretValueFunc       func(ctx context.Context, params *secretsmanager.GetSecretValueInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.GetSecretValueOutput, error)
 }
 
 func (m *mockClient) ListSecretVersionIds(ctx context.Context, params *secretsmanager.ListSecretVersionIdsInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.ListSecretVersionIdsOutput, error) {
@@ -23,6 +24,13 @@ func (m *mockClient) ListSecretVersionIds(ctx context.Context, params *secretsma
 	return nil, fmt.Errorf("ListSecretVersionIds not mocked")
 }
 
+func (m *mockClient) GetSecretValue(ctx context.Context, params *secretsmanager.GetSecretValueInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.GetSecretValueOutput, error) {
+	if m.getSecretValueFunc != nil {
+		return m.getSecretValueFunc(ctx, params, optFns...)
+	}
+	return nil, fmt.Errorf("GetSecretValue not mocked")
+}
+
 func TestRun(t *testing.T) {
 	now := time.Now()
 
@@ -30,6 +38,7 @@ func TestRun(t *testing.T) {
 		name       string
 		secretName string
 		maxResults int32
+		showPatch  bool
 		mock       *mockClient
 		wantErr    bool
 		check      func(t *testing.T, output string)
@@ -38,6 +47,7 @@ func TestRun(t *testing.T) {
 			name:       "show version history",
 			secretName: "my-secret",
 			maxResults: 10,
+			showPatch:  false,
 			mock: &mockClient{
 				listSecretVersionIdsFunc: func(_ context.Context, params *secretsmanager.ListSecretVersionIdsInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.ListSecretVersionIdsOutput, error) {
 					if aws.ToString(params.SecretId) != "my-secret" {
@@ -61,9 +71,86 @@ func TestRun(t *testing.T) {
 			},
 		},
 		{
+			name:       "show patch between versions",
+			secretName: "my-secret",
+			maxResults: 10,
+			showPatch:  true,
+			mock: &mockClient{
+				listSecretVersionIdsFunc: func(_ context.Context, _ *secretsmanager.ListSecretVersionIdsInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.ListSecretVersionIdsOutput, error) {
+					return &secretsmanager.ListSecretVersionIdsOutput{
+						Versions: []types.SecretVersionsListEntry{
+							{VersionId: aws.String("version-id-1"), CreatedDate: aws.Time(now.Add(-time.Hour)), VersionStages: []string{"AWSPREVIOUS"}},
+							{VersionId: aws.String("version-id-2"), CreatedDate: &now, VersionStages: []string{"AWSCURRENT"}},
+						},
+					}, nil
+				},
+				getSecretValueFunc: func(_ context.Context, params *secretsmanager.GetSecretValueInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.GetSecretValueOutput, error) {
+					versionID := aws.ToString(params.VersionId)
+					switch versionID {
+					case "version-id-1":
+						return &secretsmanager.GetSecretValueOutput{
+							SecretString: aws.String("old-value"),
+							VersionId:    aws.String("version-id-1"),
+						}, nil
+					case "version-id-2":
+						return &secretsmanager.GetSecretValueOutput{
+							SecretString: aws.String("new-value"),
+							VersionId:    aws.String("version-id-2"),
+						}, nil
+					}
+					return nil, fmt.Errorf("unknown version")
+				},
+			},
+			check: func(t *testing.T, output string) {
+				// Should contain diff markers
+				if !bytes.Contains([]byte(output), []byte("-old-value")) {
+					t.Error("expected -old-value in diff output")
+				}
+				if !bytes.Contains([]byte(output), []byte("+new-value")) {
+					t.Error("expected +new-value in diff output")
+				}
+				// Should contain truncated version IDs in headers
+				if !bytes.Contains([]byte(output), []byte("my-secret#version-")) {
+					t.Error("expected version ID in diff output")
+				}
+			},
+		},
+		{
+			name:       "patch with single version shows no diff",
+			secretName: "my-secret",
+			maxResults: 10,
+			showPatch:  true,
+			mock: &mockClient{
+				listSecretVersionIdsFunc: func(_ context.Context, _ *secretsmanager.ListSecretVersionIdsInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.ListSecretVersionIdsOutput, error) {
+					return &secretsmanager.ListSecretVersionIdsOutput{
+						Versions: []types.SecretVersionsListEntry{
+							{VersionId: aws.String("only-version"), CreatedDate: &now, VersionStages: []string{"AWSCURRENT"}},
+						},
+					}, nil
+				},
+				getSecretValueFunc: func(_ context.Context, _ *secretsmanager.GetSecretValueInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.GetSecretValueOutput, error) {
+					return &secretsmanager.GetSecretValueOutput{
+						SecretString: aws.String("only-value"),
+						VersionId:    aws.String("only-version"),
+					}, nil
+				},
+			},
+			check: func(t *testing.T, output string) {
+				// Should contain version info but no diff markers
+				if !bytes.Contains([]byte(output), []byte("Version")) {
+					t.Error("expected Version in output")
+				}
+				// No diff markers for single version
+				if bytes.Contains([]byte(output), []byte("---")) {
+					t.Error("expected no diff markers for single version")
+				}
+			},
+		},
+		{
 			name:       "error from AWS",
 			secretName: "my-secret",
 			maxResults: 10,
+			showPatch:  false,
 			mock: &mockClient{
 				listSecretVersionIdsFunc: func(_ context.Context, _ *secretsmanager.ListSecretVersionIdsInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.ListSecretVersionIdsOutput, error) {
 					return nil, fmt.Errorf("AWS error")
@@ -75,8 +162,8 @@ func TestRun(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var buf bytes.Buffer
-			err := Run(t.Context(), tt.mock, &buf, tt.secretName, tt.maxResults)
+			var buf, errBuf bytes.Buffer
+			err := Run(t.Context(), tt.mock, &buf, &errBuf, tt.secretName, tt.maxResults, tt.showPatch, false)
 
 			if tt.wantErr {
 				if err == nil {
