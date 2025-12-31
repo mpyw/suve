@@ -1,5 +1,5 @@
-// Package set provides the SM set command.
-package set
+// Package update provides the SM update command.
+package update
 
 import (
 	"context"
@@ -15,15 +15,15 @@ import (
 	"github.com/mpyw/suve/internal/awsutil"
 )
 
-// Client is the interface for the set command.
+// Client is the interface for the update command.
 type Client interface {
 	smapi.PutSecretValueAPI
 }
 
-// Command returns the set command.
+// Command returns the update command.
 func Command() *cli.Command {
 	return &cli.Command{
-		Name:      "set",
+		Name:      "update",
 		Usage:     "Update a secret value",
 		ArgsUsage: "<name> <value>",
 		Description: `Update the value of an existing secret.
@@ -34,15 +34,15 @@ have its AWSCURRENT label moved to AWSPREVIOUS.
 Use 'suve sm create' to create a new secret.
 
 EXAMPLES:
-   suve sm set my-api-key "new-key-value"            Update with new value
-   suve sm set my-config '{"host":"new-db.com"}'     Update JSON secret`,
+  suve sm update my-api-key "new-key-value"            Update with new value
+  suve sm update my-config '{"host":"new-db.com"}'     Update JSON secret`,
 		Action: action,
 	}
 }
 
 func action(c *cli.Context) error {
 	if c.NArg() < 2 {
-		return fmt.Errorf("usage: suve sm set <name> <value>")
+		return fmt.Errorf("usage: suve sm update <name> <value>")
 	}
 
 	name := c.Args().Get(0)
@@ -56,7 +56,7 @@ func action(c *cli.Context) error {
 	return Run(c.Context, client, c.App.Writer, name, value)
 }
 
-// Run executes the set command.
+// Run executes the update command.
 func Run(ctx context.Context, client Client, w io.Writer, name, value string) error {
 	result, err := client.PutSecretValue(ctx, &secretsmanager.PutSecretValueInput{
 		SecretId:     aws.String(name),

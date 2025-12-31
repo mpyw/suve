@@ -49,7 +49,7 @@ suve ssm set -s /my/param "secret"  # Create or update (SecureString)
 suve sm show my-secret              # Show secret with metadata
 suve sm cat my-secret               # Output raw value (for piping)
 suve sm create my-secret "value"    # Create new secret
-suve sm set my-secret "value"       # Update existing secret
+suve sm update my-secret "value"    # Update existing secret
 ```
 
 ## Version Specification
@@ -109,7 +109,7 @@ where <shift> = ~ | ~<N>  (repeatable, cumulative)
 | [`suve sm diff`](docs/sm.md#suve-sm-diff) | Show differences between versions |
 | [`suve sm ls`](docs/sm.md#suve-sm-ls) | List secrets |
 | [`suve sm create`](docs/sm.md#suve-sm-create) | Create a new secret |
-| [`suve sm set`](docs/sm.md#suve-sm-set) | Update an existing secret |
+| [`suve sm update`](docs/sm.md#suve-sm-update) | Update an existing secret |
 | [`suve sm rm`](docs/sm.md#suve-sm-rm) | Delete a secret |
 | [`suve sm restore`](docs/sm.md#suve-sm-restore) | Restore a deleted secret |
 

@@ -1,6 +1,8 @@
 package sm
 
 import (
+	"fmt"
+
 	"github.com/urfave/cli/v2"
 
 	"github.com/mpyw/suve/internal/cli/sm/cat"
@@ -10,8 +12,8 @@ import (
 	"github.com/mpyw/suve/internal/cli/sm/ls"
 	"github.com/mpyw/suve/internal/cli/sm/restore"
 	"github.com/mpyw/suve/internal/cli/sm/rm"
-	"github.com/mpyw/suve/internal/cli/sm/set"
 	"github.com/mpyw/suve/internal/cli/sm/show"
+	"github.com/mpyw/suve/internal/cli/sm/update"
 )
 
 // Command returns the sm command with all subcommands.
@@ -27,9 +29,27 @@ func Command() *cli.Command {
 			diff.Command(),
 			ls.Command(),
 			create.Command(),
-			set.Command(),
+			update.Command(),
 			rm.Command(),
 			restore.Command(),
+			setDeprecatedCommand(),
+		},
+	}
+}
+
+// setDeprecatedCommand returns a hidden command that explains why 'set' is not available.
+func setDeprecatedCommand() *cli.Command {
+	return &cli.Command{
+		Name:   "set",
+		Hidden: true,
+		Action: func(c *cli.Context) error {
+			return fmt.Errorf(`'suve sm set' is not available
+
+Secrets Manager distinguishes between creating and updating secrets:
+  suve sm create <name> <value>   Create a new secret
+  suve sm update <name> <value>   Update an existing secret
+
+Unlike SSM Parameter Store, these operations use different AWS APIs`)
 		},
 	}
 }

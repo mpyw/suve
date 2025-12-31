@@ -29,7 +29,7 @@ func Command() *cli.Command {
 		Description: `Create a new secret in AWS Secrets Manager.
 
 Use this command for new secrets only. To update an existing secret,
-use 'suve sm set' instead.
+use 'suve sm update' instead.
 
 Secret values are automatically encrypted by Secrets Manager using
 the default KMS key or a custom KMS key configured in the account.

@@ -264,7 +264,7 @@ suve sm create [options] <name> <value>
 **Notes:**
 
 - Creates a new secret; fails if secret already exists
-- Use `suve sm set` to update an existing secret
+- Use `suve sm update` to update an existing secret
 
 **Examples:**
 
@@ -278,12 +278,12 @@ suve sm create -d "Production database credentials" my-database-credentials '{"u
 
 ---
 
-## suve sm set
+## suve sm update
 
 Update an existing secret's value.
 
 ```
-suve sm set <name> <value>
+suve sm update <name> <value>
 ```
 
 **Arguments:**
@@ -309,7 +309,7 @@ suve sm set <name> <value>
 
 ```bash
 # Update secret value
-suve sm set my-database-credentials '{"username":"admin","password":"newpassword"}'
+suve sm update my-database-credentials '{"username":"admin","password":"newpassword"}'
 ```
 
 ---
