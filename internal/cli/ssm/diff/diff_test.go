@@ -1,4 +1,4 @@
-package diff
+package diff_test
 
 import (
 	"bytes"
@@ -13,9 +13,39 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	appcli "github.com/mpyw/suve/internal/cli"
+	ssmdiff "github.com/mpyw/suve/internal/cli/ssm/diff"
 	"github.com/mpyw/suve/internal/diff"
 	"github.com/mpyw/suve/internal/version/ssmversion"
 )
+
+func TestCommand_Validation(t *testing.T) {
+	t.Parallel()
+
+	t.Run("missing arguments", func(t *testing.T) {
+		t.Parallel()
+		app := appcli.MakeApp()
+		err := app.Run(context.Background(), []string{"suve", "ssm", "diff"})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "usage:")
+	})
+
+	t.Run("invalid version spec", func(t *testing.T) {
+		t.Parallel()
+		app := appcli.MakeApp()
+		err := app.Run(context.Background(), []string{"suve", "ssm", "diff", "/app/param#"})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "must be followed by")
+	})
+
+	t.Run("too many arguments", func(t *testing.T) {
+		t.Parallel()
+		app := appcli.MakeApp()
+		err := app.Run(context.Background(), []string{"suve", "ssm", "diff", "/a", "#1", "#2", "#3"})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "usage:")
+	})
+}
 
 func TestParseArgs(t *testing.T) {
 	t.Parallel()
@@ -363,14 +393,14 @@ func TestRun(t *testing.T) {
 
 	tests := []struct {
 		name    string
-		opts    Options
+		opts    ssmdiff.Options
 		mock    *mockClient
 		wantErr bool
 		check   func(t *testing.T, output string)
 	}{
 		{
 			name: "diff between two versions",
-			opts: Options{
+			opts: ssmdiff.Options{
 				Spec1: &ssmversion.Spec{Name: "/app/param", Absolute: ssmversion.AbsoluteSpec{Version: lo.ToPtr(int64(1))}},
 				Spec2: &ssmversion.Spec{Name: "/app/param", Absolute: ssmversion.AbsoluteSpec{Version: lo.ToPtr(int64(2))}},
 			},
@@ -406,7 +436,7 @@ func TestRun(t *testing.T) {
 		},
 		{
 			name: "no diff when same content",
-			opts: Options{
+			opts: ssmdiff.Options{
 				Spec1: &ssmversion.Spec{Name: "/app/param", Absolute: ssmversion.AbsoluteSpec{Version: lo.ToPtr(int64(1))}},
 				Spec2: &ssmversion.Spec{Name: "/app/param", Absolute: ssmversion.AbsoluteSpec{Version: lo.ToPtr(int64(2))}},
 			},
@@ -429,7 +459,7 @@ func TestRun(t *testing.T) {
 		},
 		{
 			name: "error getting first version",
-			opts: Options{
+			opts: ssmdiff.Options{
 				Spec1: &ssmversion.Spec{Name: "/app/param", Absolute: ssmversion.AbsoluteSpec{Version: lo.ToPtr(int64(1))}},
 				Spec2: &ssmversion.Spec{Name: "/app/param", Absolute: ssmversion.AbsoluteSpec{Version: lo.ToPtr(int64(2))}},
 			},
@@ -451,7 +481,7 @@ func TestRun(t *testing.T) {
 		},
 		{
 			name: "error getting second version",
-			opts: Options{
+			opts: ssmdiff.Options{
 				Spec1: &ssmversion.Spec{Name: "/app/param", Absolute: ssmversion.AbsoluteSpec{Version: lo.ToPtr(int64(1))}},
 				Spec2: &ssmversion.Spec{Name: "/app/param", Absolute: ssmversion.AbsoluteSpec{Version: lo.ToPtr(int64(2))}},
 			},
@@ -473,7 +503,7 @@ func TestRun(t *testing.T) {
 		},
 		{
 			name: "json format with valid JSON values",
-			opts: Options{
+			opts: ssmdiff.Options{
 				Spec1:      &ssmversion.Spec{Name: "/app/param", Absolute: ssmversion.AbsoluteSpec{Version: lo.ToPtr(int64(1))}},
 				Spec2:      &ssmversion.Spec{Name: "/app/param", Absolute: ssmversion.AbsoluteSpec{Version: lo.ToPtr(int64(2))}},
 				JSONFormat: true,
@@ -508,7 +538,7 @@ func TestRun(t *testing.T) {
 		},
 		{
 			name: "json format with non-JSON values warns",
-			opts: Options{
+			opts: ssmdiff.Options{
 				Spec1:      &ssmversion.Spec{Name: "/app/param", Absolute: ssmversion.AbsoluteSpec{Version: lo.ToPtr(int64(1))}},
 				Spec2:      &ssmversion.Spec{Name: "/app/param", Absolute: ssmversion.AbsoluteSpec{Version: lo.ToPtr(int64(2))}},
 				JSONFormat: true,
@@ -547,7 +577,7 @@ func TestRun(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			var buf, errBuf bytes.Buffer
-			r := &Runner{
+			r := &ssmdiff.Runner{
 				Client: tt.mock,
 				Stdout: &buf,
 				Stderr: &errBuf,
@@ -583,12 +613,12 @@ func TestRun_IdenticalWarning(t *testing.T) {
 	}
 
 	var stdout, stderr bytes.Buffer
-	r := &Runner{
+	r := &ssmdiff.Runner{
 		Client: mock,
 		Stdout: &stdout,
 		Stderr: &stderr,
 	}
-	opts := Options{
+	opts := ssmdiff.Options{
 		Spec1: &ssmversion.Spec{Name: "/app/param", Absolute: ssmversion.AbsoluteSpec{}},
 		Spec2: &ssmversion.Spec{Name: "/app/param", Absolute: ssmversion.AbsoluteSpec{}},
 	}

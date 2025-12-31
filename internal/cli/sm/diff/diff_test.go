@@ -1,4 +1,4 @@
-package diff
+package diff_test
 
 import (
 	"bytes"
@@ -11,9 +11,47 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	appcli "github.com/mpyw/suve/internal/cli"
+	smdiff "github.com/mpyw/suve/internal/cli/sm/diff"
 	"github.com/mpyw/suve/internal/diff"
 	"github.com/mpyw/suve/internal/version/smversion"
 )
+
+func TestCommand_Validation(t *testing.T) {
+	t.Parallel()
+
+	t.Run("missing arguments", func(t *testing.T) {
+		t.Parallel()
+		app := appcli.MakeApp()
+		err := app.Run(context.Background(), []string{"suve", "sm", "diff"})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "usage:")
+	})
+
+	t.Run("invalid version spec", func(t *testing.T) {
+		t.Parallel()
+		app := appcli.MakeApp()
+		err := app.Run(context.Background(), []string{"suve", "sm", "diff", "my-secret#"})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "must be followed by")
+	})
+
+	t.Run("invalid label spec", func(t *testing.T) {
+		t.Parallel()
+		app := appcli.MakeApp()
+		err := app.Run(context.Background(), []string{"suve", "sm", "diff", "my-secret:"})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "must be followed by")
+	})
+
+	t.Run("too many arguments", func(t *testing.T) {
+		t.Parallel()
+		app := appcli.MakeApp()
+		err := app.Run(context.Background(), []string{"suve", "sm", "diff", "my-secret", ":AWSPREVIOUS", ":AWSCURRENT", ":extra"})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "usage:")
+	})
+}
 
 func TestParseArgs(t *testing.T) {
 	t.Parallel()
@@ -497,7 +535,7 @@ func TestRun(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			var buf bytes.Buffer
-			err := Run(t.Context(), tt.mock, &buf, tt.secretName, tt.version1, tt.version2)
+			err := smdiff.Run(t.Context(), tt.mock, &buf, tt.secretName, tt.version1, tt.version2)
 
 			if tt.wantErr {
 				assert.Error(t, err)
@@ -527,7 +565,7 @@ func TestRun_InvalidVersion(t *testing.T) {
 	t.Run("invalid version1", func(t *testing.T) {
 		t.Parallel()
 		var buf bytes.Buffer
-		err := Run(t.Context(), mock, &buf, "my-secret", "#", ":AWSCURRENT")
+		err := smdiff.Run(t.Context(), mock, &buf, "my-secret", "#", ":AWSCURRENT")
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid version1")
 	})
@@ -535,7 +573,7 @@ func TestRun_InvalidVersion(t *testing.T) {
 	t.Run("invalid version2", func(t *testing.T) {
 		t.Parallel()
 		var buf bytes.Buffer
-		err := Run(t.Context(), mock, &buf, "my-secret", ":AWSPREVIOUS", "#")
+		err := smdiff.Run(t.Context(), mock, &buf, "my-secret", ":AWSPREVIOUS", "#")
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid version2")
 	})
@@ -545,14 +583,14 @@ func TestRunnerRun(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name    string
-		opts    Options
+		opts    smdiff.Options
 		mock    *mockClient
 		wantErr bool
 		check   func(t *testing.T, output string)
 	}{
 		{
 			name: "diff between two versions",
-			opts: Options{
+			opts: smdiff.Options{
 				Spec1: &smversion.Spec{Name: "my-secret", Absolute: smversion.AbsoluteSpec{Label: lo.ToPtr("AWSPREVIOUS")}},
 				Spec2: &smversion.Spec{Name: "my-secret", Absolute: smversion.AbsoluteSpec{Label: lo.ToPtr("AWSCURRENT")}},
 			},
@@ -580,7 +618,7 @@ func TestRunnerRun(t *testing.T) {
 		},
 		{
 			name: "short version IDs not truncated",
-			opts: Options{
+			opts: smdiff.Options{
 				Spec1: &smversion.Spec{Name: "my-secret", Absolute: smversion.AbsoluteSpec{Label: lo.ToPtr("AWSPREVIOUS")}},
 				Spec2: &smversion.Spec{Name: "my-secret", Absolute: smversion.AbsoluteSpec{Label: lo.ToPtr("AWSCURRENT")}},
 			},
@@ -608,7 +646,7 @@ func TestRunnerRun(t *testing.T) {
 		},
 		{
 			name: "error getting first version",
-			opts: Options{
+			opts: smdiff.Options{
 				Spec1: &smversion.Spec{Name: "my-secret", Absolute: smversion.AbsoluteSpec{Label: lo.ToPtr("AWSPREVIOUS")}},
 				Spec2: &smversion.Spec{Name: "my-secret", Absolute: smversion.AbsoluteSpec{Label: lo.ToPtr("AWSCURRENT")}},
 			},
@@ -628,7 +666,7 @@ func TestRunnerRun(t *testing.T) {
 		},
 		{
 			name: "error getting second version",
-			opts: Options{
+			opts: smdiff.Options{
 				Spec1: &smversion.Spec{Name: "my-secret", Absolute: smversion.AbsoluteSpec{Label: lo.ToPtr("AWSPREVIOUS")}},
 				Spec2: &smversion.Spec{Name: "my-secret", Absolute: smversion.AbsoluteSpec{Label: lo.ToPtr("AWSCURRENT")}},
 			},
@@ -648,7 +686,7 @@ func TestRunnerRun(t *testing.T) {
 		},
 		{
 			name: "json format with valid JSON values",
-			opts: Options{
+			opts: smdiff.Options{
 				Spec1:      &smversion.Spec{Name: "my-secret", Absolute: smversion.AbsoluteSpec{Label: lo.ToPtr("AWSPREVIOUS")}},
 				Spec2:      &smversion.Spec{Name: "my-secret", Absolute: smversion.AbsoluteSpec{Label: lo.ToPtr("AWSCURRENT")}},
 				JSONFormat: true,
@@ -677,7 +715,7 @@ func TestRunnerRun(t *testing.T) {
 		},
 		{
 			name: "json format with non-JSON values warns",
-			opts: Options{
+			opts: smdiff.Options{
 				Spec1:      &smversion.Spec{Name: "my-secret", Absolute: smversion.AbsoluteSpec{Label: lo.ToPtr("AWSPREVIOUS")}},
 				Spec2:      &smversion.Spec{Name: "my-secret", Absolute: smversion.AbsoluteSpec{Label: lo.ToPtr("AWSCURRENT")}},
 				JSONFormat: true,
@@ -710,7 +748,7 @@ func TestRunnerRun(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			var stdout, stderr bytes.Buffer
-			r := &Runner{
+			r := &smdiff.Runner{
 				Client: tt.mock,
 				Stdout: &stdout,
 				Stderr: &stderr,
@@ -743,12 +781,12 @@ func TestRun_IdenticalWarning(t *testing.T) {
 	}
 
 	var stdout, stderr bytes.Buffer
-	r := &Runner{
+	r := &smdiff.Runner{
 		Client: mock,
 		Stdout: &stdout,
 		Stderr: &stderr,
 	}
-	opts := Options{
+	opts := smdiff.Options{
 		Spec1:      &smversion.Spec{Name: "my-secret", Absolute: smversion.AbsoluteSpec{}},
 		Spec2:      &smversion.Spec{Name: "my-secret", Absolute: smversion.AbsoluteSpec{}},
 		JSONFormat: false,
