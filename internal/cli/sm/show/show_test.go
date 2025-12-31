@@ -12,10 +12,33 @@ import (
 	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/urfave/cli/v2"
 
 	"github.com/mpyw/suve/internal/cli/sm/show"
 	"github.com/mpyw/suve/internal/version/smversion"
 )
+
+func TestCommand_Validation(t *testing.T) {
+	t.Parallel()
+	app := &cli.App{
+		Name:     "suve",
+		Commands: []*cli.Command{show.Command()},
+	}
+
+	t.Run("missing secret name", func(t *testing.T) {
+		t.Parallel()
+		err := app.Run([]string{"suve", "show"})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "secret name required")
+	})
+
+	t.Run("invalid version spec", func(t *testing.T) {
+		t.Parallel()
+		err := app.Run([]string{"suve", "show", "my-secret#"})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "must be followed by")
+	})
+}
 
 type mockClient struct {
 	getSecretValueFunc       func(ctx context.Context, params *secretsmanager.GetSecretValueInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.GetSecretValueOutput, error)

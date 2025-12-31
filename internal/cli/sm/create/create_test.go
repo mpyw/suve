@@ -10,9 +10,32 @@ import (
 	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/urfave/cli/v2"
 
 	"github.com/mpyw/suve/internal/cli/sm/create"
 )
+
+func TestCommand_Validation(t *testing.T) {
+	t.Parallel()
+	app := &cli.App{
+		Name:     "suve",
+		Commands: []*cli.Command{create.Command()},
+	}
+
+	t.Run("missing arguments", func(t *testing.T) {
+		t.Parallel()
+		err := app.Run([]string{"suve", "create"})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "usage:")
+	})
+
+	t.Run("missing value argument", func(t *testing.T) {
+		t.Parallel()
+		err := app.Run([]string{"suve", "create", "my-secret"})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "usage:")
+	})
+}
 
 type mockClient struct {
 	createSecretFunc func(ctx context.Context, params *secretsmanager.CreateSecretInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.CreateSecretOutput, error)

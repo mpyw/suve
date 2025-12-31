@@ -11,9 +11,39 @@ import (
 	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/urfave/cli/v2"
 
 	"github.com/mpyw/suve/internal/cli/ssm/set"
 )
+
+func TestCommand_Validation(t *testing.T) {
+	t.Parallel()
+	app := &cli.App{
+		Name:     "suve",
+		Commands: []*cli.Command{set.Command()},
+	}
+
+	t.Run("missing arguments", func(t *testing.T) {
+		t.Parallel()
+		err := app.Run([]string{"suve", "set"})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "usage:")
+	})
+
+	t.Run("missing value argument", func(t *testing.T) {
+		t.Parallel()
+		err := app.Run([]string{"suve", "set", "/app/param"})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "usage:")
+	})
+
+	t.Run("conflicting secure and type flags", func(t *testing.T) {
+		t.Parallel()
+		err := app.Run([]string{"suve", "set", "--secure", "--type", "String", "/app/param", "value"})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "cannot use --secure with --type")
+	})
+}
 
 type mockClient struct {
 	putParameterFunc func(ctx context.Context, params *ssm.PutParameterInput, optFns ...func(*ssm.Options)) (*ssm.PutParameterOutput, error)

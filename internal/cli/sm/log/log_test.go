@@ -12,9 +12,38 @@ import (
 	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/urfave/cli/v2"
 
 	"github.com/mpyw/suve/internal/cli/sm/log"
 )
+
+func TestCommand_Validation(t *testing.T) {
+	t.Parallel()
+	app := &cli.App{
+		Name:     "suve",
+		Commands: []*cli.Command{log.Command()},
+	}
+
+	t.Run("missing secret name", func(t *testing.T) {
+		t.Parallel()
+		err := app.Run([]string{"suve", "log"})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "secret name required")
+	})
+
+	t.Run("json without patch warns", func(t *testing.T) {
+		t.Parallel()
+		// This will fail due to AWS client init, but we test the warning path
+		var errBuf bytes.Buffer
+		app := &cli.App{
+			Name:      "suve",
+			ErrWriter: &errBuf,
+			Commands:  []*cli.Command{log.Command()},
+		}
+		_ = app.Run([]string{"suve", "log", "--json", "my-secret"})
+		assert.Contains(t, errBuf.String(), "--json has no effect")
+	})
+}
 
 type mockClient struct {
 	listSecretVersionIdsFunc func(ctx context.Context, params *secretsmanager.ListSecretVersionIdsInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.ListSecretVersionIdsOutput, error)
