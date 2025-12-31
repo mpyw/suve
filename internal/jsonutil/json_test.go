@@ -83,3 +83,30 @@ func TestFormat(t *testing.T) {
 		})
 	}
 }
+
+func TestIsJSON(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name  string
+		input string
+		want  bool
+	}{
+		{name: "valid object", input: `{"key":"value"}`, want: true},
+		{name: "valid array", input: `[1,2,3]`, want: true},
+		{name: "valid string", input: `"hello"`, want: true},
+		{name: "valid number", input: `123`, want: true},
+		{name: "valid boolean", input: `true`, want: true},
+		{name: "valid null", input: `null`, want: true},
+		{name: "invalid json", input: `not json`, want: false},
+		{name: "empty string", input: ``, want: false},
+		{name: "incomplete object", input: `{"key":`, want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := IsJSON(tt.input)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}

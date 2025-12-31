@@ -16,11 +16,9 @@ func Format(value string) string {
 	if err := json.Unmarshal([]byte(value), &data); err != nil {
 		return value
 	}
-
-	formatted, err := json.MarshalIndent(data, "", "  ")
-	if err != nil {
-		return value
-	}
+	// MarshalIndent cannot fail here: data contains only JSON-safe types
+	// (map, slice, string, number, bool, nil) after successful Unmarshal.
+	formatted, _ := json.MarshalIndent(data, "", "  ")
 	return string(formatted)
 }
 
