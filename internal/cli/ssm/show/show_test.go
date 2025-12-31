@@ -3,6 +3,7 @@ package show_test
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -108,6 +109,103 @@ func TestRun(t *testing.T) {
 				require.NotEqual(t, -1, appleIdx, "expected apple in output")
 				require.NotEqual(t, -1, zebraIdx, "expected zebra in output")
 				assert.Less(t, appleIdx, zebraIdx, "expected keys to be sorted (apple before zebra)")
+			},
+		},
+		{
+			name: "error from AWS",
+			opts: show.Options{Spec: &ssmversion.Spec{Name: "/my/param"}},
+			mock: &mockClient{
+				getParameterFunc: func(_ context.Context, _ *ssm.GetParameterInput, _ ...func(*ssm.Options)) (*ssm.GetParameterOutput, error) {
+					return nil, fmt.Errorf("AWS error")
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "show without LastModifiedDate",
+			opts: show.Options{Spec: &ssmversion.Spec{Name: "/my/param"}},
+			mock: &mockClient{
+				getParameterFunc: func(_ context.Context, _ *ssm.GetParameterInput, _ ...func(*ssm.Options)) (*ssm.GetParameterOutput, error) {
+					return &ssm.GetParameterOutput{
+						Parameter: &types.Parameter{
+							Name:    lo.ToPtr("/my/param"),
+							Value:   lo.ToPtr("test-value"),
+							Version: 1,
+							Type:    types.ParameterTypeString,
+						},
+					}, nil
+				},
+			},
+			check: func(t *testing.T, output string) {
+				assert.Contains(t, output, "/my/param")
+				assert.NotContains(t, output, "Modified")
+			},
+		},
+		{
+			name: "json flag with StringList warns",
+			opts: show.Options{
+				Spec:       &ssmversion.Spec{Name: "/my/param"},
+				JSONFormat: true,
+			},
+			mock: &mockClient{
+				getParameterFunc: func(_ context.Context, _ *ssm.GetParameterInput, _ ...func(*ssm.Options)) (*ssm.GetParameterOutput, error) {
+					return &ssm.GetParameterOutput{
+						Parameter: &types.Parameter{
+							Name:    lo.ToPtr("/my/param"),
+							Value:   lo.ToPtr("a,b,c"),
+							Version: 1,
+							Type:    types.ParameterTypeStringList,
+						},
+					}, nil
+				},
+			},
+			check: func(t *testing.T, output string) {
+				assert.Contains(t, output, "a,b,c")
+			},
+		},
+		{
+			name: "json flag with encrypted SecureString warns",
+			opts: show.Options{
+				Spec:       &ssmversion.Spec{Name: "/my/param"},
+				Decrypt:    false,
+				JSONFormat: true,
+			},
+			mock: &mockClient{
+				getParameterFunc: func(_ context.Context, _ *ssm.GetParameterInput, _ ...func(*ssm.Options)) (*ssm.GetParameterOutput, error) {
+					return &ssm.GetParameterOutput{
+						Parameter: &types.Parameter{
+							Name:    lo.ToPtr("/my/param"),
+							Value:   lo.ToPtr("encrypted-blob"),
+							Version: 1,
+							Type:    types.ParameterTypeSecureString,
+						},
+					}, nil
+				},
+			},
+			check: func(t *testing.T, output string) {
+				assert.Contains(t, output, "encrypted-blob")
+			},
+		},
+		{
+			name: "json flag with non-JSON value warns",
+			opts: show.Options{
+				Spec:       &ssmversion.Spec{Name: "/my/param"},
+				JSONFormat: true,
+			},
+			mock: &mockClient{
+				getParameterFunc: func(_ context.Context, _ *ssm.GetParameterInput, _ ...func(*ssm.Options)) (*ssm.GetParameterOutput, error) {
+					return &ssm.GetParameterOutput{
+						Parameter: &types.Parameter{
+							Name:    lo.ToPtr("/my/param"),
+							Value:   lo.ToPtr("not json"),
+							Version: 1,
+							Type:    types.ParameterTypeString,
+						},
+					}, nil
+				},
+			},
+			check: func(t *testing.T, output string) {
+				assert.Contains(t, output, "not json")
 			},
 		},
 	}

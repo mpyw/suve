@@ -131,6 +131,75 @@ func TestRun(t *testing.T) {
 			},
 			wantErr: true,
 		},
+		{
+			name: "json flag with StringList warns",
+			opts: cat.Options{
+				Spec:       &ssmversion.Spec{Name: "/app/param"},
+				Decrypt:    true,
+				JSONFormat: true,
+			},
+			mock: &mockClient{
+				getParameterFunc: func(_ context.Context, _ *ssm.GetParameterInput, _ ...func(*ssm.Options)) (*ssm.GetParameterOutput, error) {
+					return &ssm.GetParameterOutput{
+						Parameter: &types.Parameter{
+							Name:    lo.ToPtr("/app/param"),
+							Value:   lo.ToPtr("a,b,c"),
+							Version: 1,
+							Type:    types.ParameterTypeStringList,
+						},
+					}, nil
+				},
+			},
+			check: func(t *testing.T, output string) {
+				assert.Equal(t, "a,b,c", output)
+			},
+		},
+		{
+			name: "json flag with encrypted SecureString warns",
+			opts: cat.Options{
+				Spec:       &ssmversion.Spec{Name: "/app/param"},
+				Decrypt:    false,
+				JSONFormat: true,
+			},
+			mock: &mockClient{
+				getParameterFunc: func(_ context.Context, _ *ssm.GetParameterInput, _ ...func(*ssm.Options)) (*ssm.GetParameterOutput, error) {
+					return &ssm.GetParameterOutput{
+						Parameter: &types.Parameter{
+							Name:    lo.ToPtr("/app/param"),
+							Value:   lo.ToPtr("encrypted-blob"),
+							Version: 1,
+							Type:    types.ParameterTypeSecureString,
+						},
+					}, nil
+				},
+			},
+			check: func(t *testing.T, output string) {
+				assert.Equal(t, "encrypted-blob", output)
+			},
+		},
+		{
+			name: "json flag with non-JSON value warns",
+			opts: cat.Options{
+				Spec:       &ssmversion.Spec{Name: "/app/param"},
+				Decrypt:    true,
+				JSONFormat: true,
+			},
+			mock: &mockClient{
+				getParameterFunc: func(_ context.Context, _ *ssm.GetParameterInput, _ ...func(*ssm.Options)) (*ssm.GetParameterOutput, error) {
+					return &ssm.GetParameterOutput{
+						Parameter: &types.Parameter{
+							Name:    lo.ToPtr("/app/param"),
+							Value:   lo.ToPtr("not json"),
+							Version: 1,
+							Type:    types.ParameterTypeString,
+						},
+					}, nil
+				},
+			},
+			check: func(t *testing.T, output string) {
+				assert.Equal(t, "not json", output)
+			},
+		},
 	}
 
 	for _, tt := range tests {

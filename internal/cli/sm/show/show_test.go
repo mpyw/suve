@@ -3,6 +3,7 @@ package show_test
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -106,6 +107,51 @@ func TestRun(t *testing.T) {
 				require.NotEqual(t, -1, appleIdx, "expected apple in output")
 				require.NotEqual(t, -1, zebraIdx, "expected zebra in output")
 				assert.Less(t, appleIdx, zebraIdx, "expected keys to be sorted (apple before zebra)")
+			},
+		},
+		{
+			name: "error from AWS",
+			opts: show.Options{Spec: &smversion.Spec{Name: "my-secret"}},
+			mock: &mockClient{
+				getSecretValueFunc: func(_ context.Context, _ *secretsmanager.GetSecretValueInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.GetSecretValueOutput, error) {
+					return nil, fmt.Errorf("AWS error")
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "show without optional fields",
+			opts: show.Options{Spec: &smversion.Spec{Name: "my-secret"}},
+			mock: &mockClient{
+				getSecretValueFunc: func(_ context.Context, _ *secretsmanager.GetSecretValueInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.GetSecretValueOutput, error) {
+					return &secretsmanager.GetSecretValueOutput{
+						Name:         lo.ToPtr("my-secret"),
+						ARN:          lo.ToPtr("arn:aws:secretsmanager:us-east-1:123456789012:secret:my-secret-AbCdEf"),
+						SecretString: lo.ToPtr("secret-value"),
+					}, nil
+				},
+			},
+			check: func(t *testing.T, output string) {
+				assert.Contains(t, output, "my-secret")
+				assert.NotContains(t, output, "VersionId")
+				assert.NotContains(t, output, "Stages")
+				assert.NotContains(t, output, "Created")
+			},
+		},
+		{
+			name: "json flag with non-JSON value warns",
+			opts: show.Options{Spec: &smversion.Spec{Name: "my-secret"}, JSONFormat: true},
+			mock: &mockClient{
+				getSecretValueFunc: func(_ context.Context, _ *secretsmanager.GetSecretValueInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.GetSecretValueOutput, error) {
+					return &secretsmanager.GetSecretValueOutput{
+						Name:         lo.ToPtr("my-secret"),
+						ARN:          lo.ToPtr("arn:aws:secretsmanager:us-east-1:123456789012:secret:my-secret-AbCdEf"),
+						SecretString: lo.ToPtr("not json"),
+					}, nil
+				},
+			},
+			check: func(t *testing.T, output string) {
+				assert.Contains(t, output, "not json")
 			},
 		},
 	}

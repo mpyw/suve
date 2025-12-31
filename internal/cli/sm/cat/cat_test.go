@@ -114,6 +114,21 @@ func TestRun(t *testing.T) {
 			},
 			wantErr: true,
 		},
+		{
+			name: "json flag with non-JSON value warns",
+			opts: cat.Options{Spec: &smversion.Spec{Name: "my-secret"}, JSONFormat: true},
+			mock: &mockClient{
+				getSecretValueFunc: func(_ context.Context, _ *secretsmanager.GetSecretValueInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.GetSecretValueOutput, error) {
+					return &secretsmanager.GetSecretValueOutput{
+						Name:         lo.ToPtr("my-secret"),
+						SecretString: lo.ToPtr("not json"),
+					}, nil
+				},
+			},
+			check: func(t *testing.T, output string) {
+				assert.Equal(t, "not json", output)
+			},
+		},
 	}
 
 	for _, tt := range tests {
