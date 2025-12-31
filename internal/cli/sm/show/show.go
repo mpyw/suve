@@ -23,6 +23,19 @@ type Client interface {
 	smapi.ListSecretVersionIdsAPI
 }
 
+// Runner executes the show command.
+type Runner struct {
+	Client Client
+	Stdout io.Writer
+	Stderr io.Writer
+}
+
+// Options holds the options for the show command.
+type Options struct {
+	Spec       *smversion.Spec
+	JSONFormat bool
+}
+
 // Command returns the show command.
 func Command() *cli.Command {
 	return &cli.Command{
@@ -68,18 +81,25 @@ func action(c *cli.Context) error {
 		return fmt.Errorf("failed to initialize AWS client: %w", err)
 	}
 
-	return Run(c.Context, client, c.App.Writer, c.App.ErrWriter, spec, c.Bool("json"))
+	r := &Runner{
+		Client: client,
+		Stdout: c.App.Writer,
+		Stderr: c.App.ErrWriter,
+	}
+	return r.Run(c.Context, Options{
+		Spec:       spec,
+		JSONFormat: c.Bool("json"),
+	})
 }
 
 // Run executes the show command.
-// Output goes to w, warnings go to errW (typically stderr).
-func Run(ctx context.Context, client Client, w io.Writer, errW io.Writer, spec *smversion.Spec, jsonFormat bool) error {
-	secret, err := smversion.GetSecretWithVersion(ctx, client, spec)
+func (r *Runner) Run(ctx context.Context, opts Options) error {
+	secret, err := smversion.GetSecretWithVersion(ctx, r.Client, opts.Spec)
 	if err != nil {
 		return err
 	}
 
-	out := output.New(w)
+	out := output.New(r.Stdout)
 	out.Field("Name", aws.ToString(secret.Name))
 	out.Field("ARN", aws.ToString(secret.ARN))
 	if secret.VersionId != nil {
@@ -96,9 +116,9 @@ func Run(ctx context.Context, client Client, w io.Writer, errW io.Writer, spec *
 	value := aws.ToString(secret.SecretString)
 
 	// Warn if --json is used but value is not valid JSON
-	if jsonFormat {
+	if opts.JSONFormat {
 		if !jsonutil.IsJSON(value) {
-			output.Warning(errW, "--json has no effect: value is not valid JSON")
+			output.Warning(r.Stderr, "--json has no effect: value is not valid JSON")
 		} else {
 			value = jsonutil.Format(value)
 		}

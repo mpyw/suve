@@ -24,16 +24,15 @@ func (m *mockClient) DescribeParameters(ctx context.Context, params *ssm.Describ
 
 func TestRun(t *testing.T) {
 	tests := []struct {
-		name      string
-		prefix    string
-		recursive bool
-		mock      *mockClient
-		wantErr   bool
-		check     func(t *testing.T, output string)
+		name    string
+		opts    Options
+		mock    *mockClient
+		wantErr bool
+		check   func(t *testing.T, output string)
 	}{
 		{
-			name:   "list all parameters",
-			prefix: "",
+			name: "list all parameters",
+			opts: Options{},
 			mock: &mockClient{
 				describeParametersFunc: func(_ context.Context, _ *ssm.DescribeParametersInput, _ ...func(*ssm.Options)) (*ssm.DescribeParametersOutput, error) {
 					return &ssm.DescribeParametersOutput{
@@ -54,8 +53,8 @@ func TestRun(t *testing.T) {
 			},
 		},
 		{
-			name:   "list with prefix",
-			prefix: "/app/",
+			name: "list with prefix",
+			opts: Options{Prefix: "/app/"},
 			mock: &mockClient{
 				describeParametersFunc: func(_ context.Context, params *ssm.DescribeParametersInput, _ ...func(*ssm.Options)) (*ssm.DescribeParametersOutput, error) {
 					if len(params.ParameterFilters) == 0 {
@@ -75,9 +74,8 @@ func TestRun(t *testing.T) {
 			},
 		},
 		{
-			name:      "recursive listing",
-			prefix:    "/app/",
-			recursive: true,
+			name: "recursive listing",
+			opts: Options{Prefix: "/app/", Recursive: true},
 			mock: &mockClient{
 				describeParametersFunc: func(_ context.Context, params *ssm.DescribeParametersInput, _ ...func(*ssm.Options)) (*ssm.DescribeParametersOutput, error) {
 					if len(params.ParameterFilters) == 0 {
@@ -102,6 +100,7 @@ func TestRun(t *testing.T) {
 		},
 		{
 			name: "error from AWS",
+			opts: Options{},
 			mock: &mockClient{
 				describeParametersFunc: func(_ context.Context, _ *ssm.DescribeParametersInput, _ ...func(*ssm.Options)) (*ssm.DescribeParametersOutput, error) {
 					return nil, fmt.Errorf("AWS error")
@@ -113,8 +112,13 @@ func TestRun(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var buf bytes.Buffer
-			err := Run(t.Context(), tt.mock, &buf, tt.prefix, tt.recursive)
+			var buf, errBuf bytes.Buffer
+			r := &Runner{
+				Client: tt.mock,
+				Stdout: &buf,
+				Stderr: &errBuf,
+			}
+			err := r.Run(t.Context(), tt.opts)
 
 			if tt.wantErr {
 				if err == nil {

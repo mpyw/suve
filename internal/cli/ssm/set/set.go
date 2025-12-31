@@ -21,6 +21,21 @@ type Client interface {
 	ssmapi.PutParameterAPI
 }
 
+// Runner executes the set command.
+type Runner struct {
+	Client Client
+	Stdout io.Writer
+	Stderr io.Writer
+}
+
+// Options holds the options for the set command.
+type Options struct {
+	Name        string
+	Value       string
+	Type        string
+	Description string
+}
+
 // Command returns the set command.
 func Command() *cli.Command {
 	return &cli.Command{
@@ -69,11 +84,8 @@ func action(c *cli.Context) error {
 		return fmt.Errorf("usage: suve ssm set <name> <value>")
 	}
 
-	name := c.Args().Get(0)
-	value := c.Args().Get(1)
 	secure := c.Bool("secure")
 	paramType := c.String("type")
-	description := c.String("description")
 
 	// Check for conflicting flags
 	if secure && c.IsSet("type") {
@@ -88,30 +100,40 @@ func action(c *cli.Context) error {
 		return fmt.Errorf("failed to initialize AWS client: %w", err)
 	}
 
-	return Run(c.Context, client, c.App.Writer, name, value, paramType, description)
+	r := &Runner{
+		Client: client,
+		Stdout: c.App.Writer,
+		Stderr: c.App.ErrWriter,
+	}
+	return r.Run(c.Context, Options{
+		Name:        c.Args().Get(0),
+		Value:       c.Args().Get(1),
+		Type:        paramType,
+		Description: c.String("description"),
+	})
 }
 
 // Run executes the set command.
-func Run(ctx context.Context, client Client, w io.Writer, name, value, paramType, description string) error {
+func (r *Runner) Run(ctx context.Context, opts Options) error {
 	input := &ssm.PutParameterInput{
-		Name:      aws.String(name),
-		Value:     aws.String(value),
-		Type:      types.ParameterType(paramType),
+		Name:      aws.String(opts.Name),
+		Value:     aws.String(opts.Value),
+		Type:      types.ParameterType(opts.Type),
 		Overwrite: aws.Bool(true),
 	}
-	if description != "" {
-		input.Description = aws.String(description)
+	if opts.Description != "" {
+		input.Description = aws.String(opts.Description)
 	}
 
-	result, err := client.PutParameter(ctx, input)
+	result, err := r.Client.PutParameter(ctx, input)
 	if err != nil {
 		return fmt.Errorf("failed to set parameter: %w", err)
 	}
 
 	green := color.New(color.FgGreen).SprintFunc()
-	_, _ = fmt.Fprintf(w, "%s Set parameter %s (version: %d)\n",
+	_, _ = fmt.Fprintf(r.Stdout, "%s Set parameter %s (version: %d)\n",
 		green("✓"),
-		name,
+		opts.Name,
 		result.Version,
 	)
 

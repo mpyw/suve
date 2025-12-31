@@ -30,17 +30,17 @@ func TestRun(t *testing.T) {
 	now := time.Now()
 
 	tests := []struct {
-		name       string
-		spec       *ssmversion.Spec
-		mock       *mockClient
-		decrypt    bool
-		jsonFormat bool
-		wantErr    bool
-		check      func(t *testing.T, output string)
+		name    string
+		opts    Options
+		mock    *mockClient
+		wantErr bool
+		check   func(t *testing.T, output string)
 	}{
 		{
 			name: "show latest version",
-			spec: &ssmversion.Spec{Name: "/my/param"},
+			opts: Options{
+				Spec: &ssmversion.Spec{Name: "/my/param"},
+			},
 			mock: &mockClient{
 				getParameterFunc: func(_ context.Context, _ *ssm.GetParameterInput, _ ...func(*ssm.Options)) (*ssm.GetParameterOutput, error) {
 					return &ssm.GetParameterOutput{
@@ -65,7 +65,9 @@ func TestRun(t *testing.T) {
 		},
 		{
 			name: "show with shift",
-			spec: &ssmversion.Spec{Name: "/my/param", Shift: 1},
+			opts: Options{
+				Spec: &ssmversion.Spec{Name: "/my/param", Shift: 1},
+			},
 			mock: &mockClient{
 				getParameterHistoryFunc: func(_ context.Context, _ *ssm.GetParameterHistoryInput, _ ...func(*ssm.Options)) (*ssm.GetParameterHistoryOutput, error) {
 					return &ssm.GetParameterHistoryOutput{
@@ -84,9 +86,11 @@ func TestRun(t *testing.T) {
 			},
 		},
 		{
-			name:       "show JSON formatted",
-			spec:       &ssmversion.Spec{Name: "/my/param"},
-			jsonFormat: true,
+			name: "show JSON formatted",
+			opts: Options{
+				Spec:       &ssmversion.Spec{Name: "/my/param"},
+				JSONFormat: true,
+			},
 			mock: &mockClient{
 				getParameterFunc: func(_ context.Context, _ *ssm.GetParameterInput, _ ...func(*ssm.Options)) (*ssm.GetParameterOutput, error) {
 					return &ssm.GetParameterOutput{
@@ -118,8 +122,12 @@ func TestRun(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var buf, errBuf bytes.Buffer
-
-			err := Run(t.Context(), tt.mock, &buf, &errBuf, tt.spec, tt.decrypt, tt.jsonFormat)
+			r := &Runner{
+				Client: tt.mock,
+				Stdout: &buf,
+				Stderr: &errBuf,
+			}
+			err := r.Run(t.Context(), tt.opts)
 
 			if tt.wantErr {
 				if err == nil {

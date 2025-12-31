@@ -23,6 +23,20 @@ type Client interface {
 	ssmapi.GetParameterHistoryAPI
 }
 
+// Runner executes the cat command.
+type Runner struct {
+	Client Client
+	Stdout io.Writer
+	Stderr io.Writer
+}
+
+// Options holds the options for the cat command.
+type Options struct {
+	Spec       *ssmversion.Spec
+	Decrypt    bool
+	JSONFormat bool
+}
+
 // Command returns the cat command.
 func Command() *cli.Command {
 	return &cli.Command{
@@ -74,13 +88,21 @@ func action(c *cli.Context) error {
 		return fmt.Errorf("failed to initialize AWS client: %w", err)
 	}
 
-	return Run(c.Context, client, c.App.Writer, c.App.ErrWriter, spec, c.Bool("decrypt"), c.Bool("json"))
+	r := &Runner{
+		Client: client,
+		Stdout: c.App.Writer,
+		Stderr: c.App.ErrWriter,
+	}
+	return r.Run(c.Context, Options{
+		Spec:       spec,
+		Decrypt:    c.Bool("decrypt"),
+		JSONFormat: c.Bool("json"),
+	})
 }
 
 // Run executes the cat command.
-// Output goes to w, warnings go to warnW (typically stderr).
-func Run(ctx context.Context, client Client, w io.Writer, warnW io.Writer, spec *ssmversion.Spec, decrypt bool, jsonFormat bool) error {
-	param, err := ssmversion.GetParameterWithVersion(ctx, client, spec, decrypt)
+func (r *Runner) Run(ctx context.Context, opts Options) error {
+	param, err := ssmversion.GetParameterWithVersion(ctx, r.Client, opts.Spec, opts.Decrypt)
 	if err != nil {
 		return err
 	}
@@ -88,19 +110,19 @@ func Run(ctx context.Context, client Client, w io.Writer, warnW io.Writer, spec 
 	value := aws.ToString(param.Value)
 
 	// Warn if --json is used in cases where it's not meaningful
-	if jsonFormat {
+	if opts.JSONFormat {
 		switch {
 		case param.Type == types.ParameterTypeStringList:
-			output.Warning(warnW, "--json has no effect on StringList type (comma-separated values)")
-		case param.Type == types.ParameterTypeSecureString && !decrypt:
-			output.Warning(warnW, "--json has no effect on encrypted SecureString (use --decrypt to enable)")
+			output.Warning(r.Stderr, "--json has no effect on StringList type (comma-separated values)")
+		case param.Type == types.ParameterTypeSecureString && !opts.Decrypt:
+			output.Warning(r.Stderr, "--json has no effect on encrypted SecureString (use --decrypt to enable)")
 		case !jsonutil.IsJSON(value):
-			output.Warning(warnW, "--json has no effect: value is not valid JSON")
+			output.Warning(r.Stderr, "--json has no effect: value is not valid JSON")
 		default:
 			value = jsonutil.Format(value)
 		}
 	}
 
-	_, _ = fmt.Fprint(w, value)
+	_, _ = fmt.Fprint(r.Stdout, value)
 	return nil
 }

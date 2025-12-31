@@ -20,6 +20,18 @@ type Client interface {
 	ssmapi.DeleteParameterAPI
 }
 
+// Runner executes the rm command.
+type Runner struct {
+	Client Client
+	Stdout io.Writer
+	Stderr io.Writer
+}
+
+// Options holds the options for the rm command.
+type Options struct {
+	Name string
+}
+
 // Command returns the rm command.
 func Command() *cli.Command {
 	return &cli.Command{
@@ -42,27 +54,32 @@ func action(c *cli.Context) error {
 		return fmt.Errorf("parameter name required")
 	}
 
-	name := c.Args().First()
-
 	client, err := awsutil.NewSSMClient(c.Context)
 	if err != nil {
 		return fmt.Errorf("failed to initialize AWS client: %w", err)
 	}
 
-	return Run(c.Context, client, c.App.Writer, name)
+	r := &Runner{
+		Client: client,
+		Stdout: c.App.Writer,
+		Stderr: c.App.ErrWriter,
+	}
+	return r.Run(c.Context, Options{
+		Name: c.Args().First(),
+	})
 }
 
 // Run executes the rm command.
-func Run(ctx context.Context, client Client, w io.Writer, name string) error {
-	_, err := client.DeleteParameter(ctx, &ssm.DeleteParameterInput{
-		Name: aws.String(name),
+func (r *Runner) Run(ctx context.Context, opts Options) error {
+	_, err := r.Client.DeleteParameter(ctx, &ssm.DeleteParameterInput{
+		Name: aws.String(opts.Name),
 	})
 	if err != nil {
 		return fmt.Errorf("failed to delete parameter: %w", err)
 	}
 
 	red := color.New(color.FgRed).SprintFunc()
-	_, _ = fmt.Fprintf(w, "%s %s\n", red("Deleted"), name)
+	_, _ = fmt.Fprintf(r.Stdout, "%s %s\n", red("Deleted"), opts.Name)
 
 	return nil
 }

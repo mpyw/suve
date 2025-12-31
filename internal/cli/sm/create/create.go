@@ -20,6 +20,20 @@ type Client interface {
 	smapi.CreateSecretAPI
 }
 
+// Runner executes the create command.
+type Runner struct {
+	Client Client
+	Stdout io.Writer
+	Stderr io.Writer
+}
+
+// Options holds the options for the create command.
+type Options struct {
+	Name        string
+	Value       string
+	Description string
+}
+
 // Command returns the create command.
 func Command() *cli.Command {
 	return &cli.Command{
@@ -54,35 +68,40 @@ func action(c *cli.Context) error {
 		return fmt.Errorf("usage: suve sm create <name> <value>")
 	}
 
-	name := c.Args().Get(0)
-	value := c.Args().Get(1)
-	description := c.String("description")
-
 	client, err := awsutil.NewSMClient(c.Context)
 	if err != nil {
 		return fmt.Errorf("failed to initialize AWS client: %w", err)
 	}
 
-	return Run(c.Context, client, c.App.Writer, name, value, description)
+	r := &Runner{
+		Client: client,
+		Stdout: c.App.Writer,
+		Stderr: c.App.ErrWriter,
+	}
+	return r.Run(c.Context, Options{
+		Name:        c.Args().Get(0),
+		Value:       c.Args().Get(1),
+		Description: c.String("description"),
+	})
 }
 
 // Run executes the create command.
-func Run(ctx context.Context, client Client, w io.Writer, name, value, description string) error {
+func (r *Runner) Run(ctx context.Context, opts Options) error {
 	input := &secretsmanager.CreateSecretInput{
-		Name:         aws.String(name),
-		SecretString: aws.String(value),
+		Name:         aws.String(opts.Name),
+		SecretString: aws.String(opts.Value),
 	}
-	if description != "" {
-		input.Description = aws.String(description)
+	if opts.Description != "" {
+		input.Description = aws.String(opts.Description)
 	}
 
-	result, err := client.CreateSecret(ctx, input)
+	result, err := r.Client.CreateSecret(ctx, input)
 	if err != nil {
 		return fmt.Errorf("failed to create secret: %w", err)
 	}
 
 	green := color.New(color.FgGreen).SprintFunc()
-	_, _ = fmt.Fprintf(w, "%s Created secret %s (version: %s)\n",
+	_, _ = fmt.Fprintf(r.Stdout, "%s Created secret %s (version: %s)\n",
 		green("✓"),
 		aws.ToString(result.Name),
 		aws.ToString(result.VersionId),

@@ -20,6 +20,19 @@ type Client interface {
 	ssmapi.DescribeParametersAPI
 }
 
+// Runner executes the ls command.
+type Runner struct {
+	Client Client
+	Stdout io.Writer
+	Stderr io.Writer
+}
+
+// Options holds the options for the ls command.
+type Options struct {
+	Prefix    string
+	Recursive bool
+}
+
 // Command returns the ls command.
 func Command() *cli.Command {
 	return &cli.Command{
@@ -51,36 +64,41 @@ EXAMPLES:
 }
 
 func action(c *cli.Context) error {
-	prefix := c.Args().First()
-	recursive := c.Bool("recursive")
-
 	client, err := awsutil.NewSSMClient(c.Context)
 	if err != nil {
 		return fmt.Errorf("failed to initialize AWS client: %w", err)
 	}
 
-	return Run(c.Context, client, c.App.Writer, prefix, recursive)
+	r := &Runner{
+		Client: client,
+		Stdout: c.App.Writer,
+		Stderr: c.App.ErrWriter,
+	}
+	return r.Run(c.Context, Options{
+		Prefix:    c.Args().First(),
+		Recursive: c.Bool("recursive"),
+	})
 }
 
 // Run executes the ls command.
-func Run(ctx context.Context, client Client, w io.Writer, prefix string, recursive bool) error {
+func (r *Runner) Run(ctx context.Context, opts Options) error {
 	option := "OneLevel"
-	if recursive {
+	if opts.Recursive {
 		option = "Recursive"
 	}
 
 	input := &ssm.DescribeParametersInput{}
-	if prefix != "" {
+	if opts.Prefix != "" {
 		input.ParameterFilters = []types.ParameterStringFilter{
 			{
 				Key:    aws.String("Path"),
 				Option: aws.String(option),
-				Values: []string{prefix},
+				Values: []string{opts.Prefix},
 			},
 		}
 	}
 
-	paginator := ssm.NewDescribeParametersPaginator(client, input)
+	paginator := ssm.NewDescribeParametersPaginator(r.Client, input)
 	for paginator.HasMorePages() {
 		page, err := paginator.NextPage(ctx)
 		if err != nil {
@@ -88,7 +106,7 @@ func Run(ctx context.Context, client Client, w io.Writer, prefix string, recursi
 		}
 
 		for _, param := range page.Parameters {
-			_, _ = fmt.Fprintln(w, aws.ToString(param.Name))
+			_, _ = fmt.Fprintln(r.Stdout, aws.ToString(param.Name))
 		}
 	}
 

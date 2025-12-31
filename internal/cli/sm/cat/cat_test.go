@@ -37,16 +37,15 @@ func TestRun(t *testing.T) {
 	now := time.Now()
 
 	tests := []struct {
-		name       string
-		spec       *smversion.Spec
-		mock       *mockClient
-		jsonFormat bool
-		wantErr    bool
-		check      func(t *testing.T, output string)
+		name    string
+		opts    Options
+		mock    *mockClient
+		wantErr bool
+		check   func(t *testing.T, output string)
 	}{
 		{
 			name: "output raw value",
-			spec: &smversion.Spec{Name: "my-secret"},
+			opts: Options{Spec: &smversion.Spec{Name: "my-secret"}},
 			mock: &mockClient{
 				getSecretValueFunc: func(_ context.Context, _ *secretsmanager.GetSecretValueInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.GetSecretValueOutput, error) {
 					return &secretsmanager.GetSecretValueOutput{
@@ -63,7 +62,7 @@ func TestRun(t *testing.T) {
 		},
 		{
 			name: "output with shift",
-			spec: &smversion.Spec{Name: "my-secret", Shift: 1},
+			opts: Options{Spec: &smversion.Spec{Name: "my-secret", Shift: 1}},
 			mock: &mockClient{
 				listSecretVersionIdsFunc: func(_ context.Context, _ *secretsmanager.ListSecretVersionIdsInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.ListSecretVersionIdsOutput, error) {
 					return &secretsmanager.ListSecretVersionIdsOutput{
@@ -87,9 +86,8 @@ func TestRun(t *testing.T) {
 			},
 		},
 		{
-			name:       "output JSON formatted with sorted keys",
-			spec:       &smversion.Spec{Name: "my-secret"},
-			jsonFormat: true,
+			name: "output JSON formatted with sorted keys",
+			opts: Options{Spec: &smversion.Spec{Name: "my-secret"}, JSONFormat: true},
 			mock: &mockClient{
 				getSecretValueFunc: func(_ context.Context, _ *secretsmanager.GetSecretValueInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.GetSecretValueOutput, error) {
 					return &secretsmanager.GetSecretValueOutput{
@@ -113,7 +111,7 @@ func TestRun(t *testing.T) {
 		},
 		{
 			name: "error from AWS",
-			spec: &smversion.Spec{Name: "my-secret"},
+			opts: Options{Spec: &smversion.Spec{Name: "my-secret"}},
 			mock: &mockClient{
 				getSecretValueFunc: func(_ context.Context, _ *secretsmanager.GetSecretValueInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.GetSecretValueOutput, error) {
 					return nil, fmt.Errorf("AWS error")
@@ -125,8 +123,13 @@ func TestRun(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var buf, warnBuf bytes.Buffer
-			err := Run(t.Context(), tt.mock, &buf, &warnBuf, tt.spec, tt.jsonFormat)
+			var buf, errBuf bytes.Buffer
+			r := &Runner{
+				Client: tt.mock,
+				Stdout: &buf,
+				Stderr: &errBuf,
+			}
+			err := r.Run(t.Context(), tt.opts)
 
 			if tt.wantErr {
 				if err == nil {

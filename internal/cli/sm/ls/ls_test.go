@@ -25,14 +25,14 @@ func (m *mockClient) ListSecrets(ctx context.Context, params *secretsmanager.Lis
 func TestRun(t *testing.T) {
 	tests := []struct {
 		name    string
-		prefix  string
+		opts    Options
 		mock    *mockClient
 		wantErr bool
 		check   func(t *testing.T, output string)
 	}{
 		{
-			name:   "list all secrets",
-			prefix: "",
+			name: "list all secrets",
+			opts: Options{},
 			mock: &mockClient{
 				listSecretsFunc: func(_ context.Context, _ *secretsmanager.ListSecretsInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.ListSecretsOutput, error) {
 					return &secretsmanager.ListSecretsOutput{
@@ -53,8 +53,8 @@ func TestRun(t *testing.T) {
 			},
 		},
 		{
-			name:   "list with prefix filter",
-			prefix: "app/",
+			name: "list with prefix filter",
+			opts: Options{Prefix: "app/"},
 			mock: &mockClient{
 				listSecretsFunc: func(_ context.Context, params *secretsmanager.ListSecretsInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.ListSecretsOutput, error) {
 					if len(params.Filters) == 0 {
@@ -75,6 +75,7 @@ func TestRun(t *testing.T) {
 		},
 		{
 			name: "error from AWS",
+			opts: Options{},
 			mock: &mockClient{
 				listSecretsFunc: func(_ context.Context, _ *secretsmanager.ListSecretsInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.ListSecretsOutput, error) {
 					return nil, fmt.Errorf("AWS error")
@@ -86,8 +87,13 @@ func TestRun(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var buf bytes.Buffer
-			err := Run(t.Context(), tt.mock, &buf, tt.prefix)
+			var buf, errBuf bytes.Buffer
+			r := &Runner{
+				Client: tt.mock,
+				Stdout: &buf,
+				Stderr: &errBuf,
+			}
+			err := r.Run(t.Context(), tt.opts)
 
 			if tt.wantErr {
 				if err == nil {

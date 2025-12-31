@@ -31,6 +31,20 @@ type Client interface {
 	ssmapi.GetParameterHistoryAPI
 }
 
+// Runner executes the diff command.
+type Runner struct {
+	Client Client
+	Stdout io.Writer
+	Stderr io.Writer
+}
+
+// Options holds the options for the diff command.
+type Options struct {
+	Spec1      *ParsedSpec
+	Spec2      *ParsedSpec
+	JSONFormat bool
+}
+
 // ParsedSpec represents a parsed version specification for diff.
 type ParsedSpec struct {
 	Name    string
@@ -81,7 +95,16 @@ func action(c *cli.Context) error {
 		return fmt.Errorf("failed to initialize AWS client: %w", err)
 	}
 
-	return RunWithSpecs(c.Context, client, c.App.Writer, c.App.ErrWriter, spec1, spec2, c.Bool("json"))
+	r := &Runner{
+		Client: client,
+		Stdout: c.App.Writer,
+		Stderr: c.App.ErrWriter,
+	}
+	return r.Run(c.Context, Options{
+		Spec1:      spec1,
+		Spec2:      spec2,
+		JSONFormat: c.Bool("json"),
+	})
 }
 
 // ParseArgs parses diff command arguments into two version specifications.
@@ -227,58 +250,25 @@ func parseThreeArgs(name, version1, version2 string) (*ParsedSpec, *ParsedSpec, 
 	return spec1, spec2, nil
 }
 
-// Run executes the diff command (legacy interface for backward compatibility).
-func Run(ctx context.Context, client Client, w io.Writer, name, version1, version2 string) error {
-	spec1, err := ssmversion.Parse(name + version1)
-	if err != nil {
-		return fmt.Errorf("invalid version1: %w", err)
-	}
-
-	spec2, err := ssmversion.Parse(name + version2)
-	if err != nil {
-		return fmt.Errorf("invalid version2: %w", err)
-	}
-
-	param1, err := ssmversion.GetParameterWithVersion(ctx, client, spec1, true)
-	if err != nil {
-		return fmt.Errorf("failed to get version %s: %w", version1, err)
-	}
-
-	param2, err := ssmversion.GetParameterWithVersion(ctx, client, spec2, true)
-	if err != nil {
-		return fmt.Errorf("failed to get version %s: %w", version2, err)
-	}
-
-	diff := output.Diff(
-		fmt.Sprintf("%s#%d", name, param1.Version),
-		fmt.Sprintf("%s#%d", name, param2.Version),
-		aws.ToString(param1.Value),
-		aws.ToString(param2.Value),
-	)
-	_, _ = fmt.Fprint(w, diff)
-
-	return nil
-}
-
-// RunWithSpecs executes the diff command with parsed specs.
-func RunWithSpecs(ctx context.Context, client Client, w, errW io.Writer, spec1, spec2 *ParsedSpec, jsonFormat bool) error {
+// Run executes the diff command.
+func (r *Runner) Run(ctx context.Context, opts Options) error {
 	ssmSpec1 := &ssmversion.Spec{
-		Name:    spec1.Name,
-		Version: spec1.Version,
-		Shift:   spec1.Shift,
+		Name:    opts.Spec1.Name,
+		Version: opts.Spec1.Version,
+		Shift:   opts.Spec1.Shift,
 	}
 	ssmSpec2 := &ssmversion.Spec{
-		Name:    spec2.Name,
-		Version: spec2.Version,
-		Shift:   spec2.Shift,
+		Name:    opts.Spec2.Name,
+		Version: opts.Spec2.Version,
+		Shift:   opts.Spec2.Shift,
 	}
 
-	param1, err := ssmversion.GetParameterWithVersion(ctx, client, ssmSpec1, true)
+	param1, err := ssmversion.GetParameterWithVersion(ctx, r.Client, ssmSpec1, true)
 	if err != nil {
 		return fmt.Errorf("failed to get first version: %w", err)
 	}
 
-	param2, err := ssmversion.GetParameterWithVersion(ctx, client, ssmSpec2, true)
+	param2, err := ssmversion.GetParameterWithVersion(ctx, r.Client, ssmSpec2, true)
 	if err != nil {
 		return fmt.Errorf("failed to get second version: %w", err)
 	}
@@ -287,9 +277,9 @@ func RunWithSpecs(ctx context.Context, client Client, w, errW io.Writer, spec1, 
 	value2 := aws.ToString(param2.Value)
 
 	// Format as JSON if enabled
-	if jsonFormat {
+	if opts.JSONFormat {
 		if !jsonutil.IsJSON(value1) || !jsonutil.IsJSON(value2) {
-			output.Warning(errW, "--json has no effect: some values are not valid JSON")
+			output.Warning(r.Stderr, "--json has no effect: some values are not valid JSON")
 		} else {
 			value1 = jsonutil.Format(value1)
 			value2 = jsonutil.Format(value2)
@@ -297,18 +287,18 @@ func RunWithSpecs(ctx context.Context, client Client, w, errW io.Writer, spec1, 
 	}
 
 	if value1 == value2 {
-		output.Warning(errW, "comparing identical versions")
-		output.Hint(errW, "To compare with previous version, use: suve ssm diff %s~1", spec1.Name)
+		output.Warning(r.Stderr, "comparing identical versions")
+		output.Hint(r.Stderr, "To compare with previous version, use: suve ssm diff %s~1", opts.Spec1.Name)
 		return nil
 	}
 
 	diff := output.Diff(
-		fmt.Sprintf("%s#%d", spec1.Name, param1.Version),
-		fmt.Sprintf("%s#%d", spec2.Name, param2.Version),
+		fmt.Sprintf("%s#%d", opts.Spec1.Name, param1.Version),
+		fmt.Sprintf("%s#%d", opts.Spec2.Name, param2.Version),
 		value1,
 		value2,
 	)
-	_, _ = fmt.Fprint(w, diff)
+	_, _ = fmt.Fprint(r.Stdout, diff)
 
 	return nil
 }

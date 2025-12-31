@@ -27,19 +27,15 @@ func TestRun(t *testing.T) {
 	deletionDate := now.Add(30 * 24 * time.Hour)
 
 	tests := []struct {
-		name           string
-		secretName     string
-		force          bool
-		recoveryWindow int
-		mock           *mockClient
-		wantErr        bool
-		check          func(t *testing.T, output string)
+		name    string
+		opts    Options
+		mock    *mockClient
+		wantErr bool
+		check   func(t *testing.T, output string)
 	}{
 		{
-			name:           "delete with recovery window",
-			secretName:     "my-secret",
-			force:          false,
-			recoveryWindow: 30,
+			name: "delete with recovery window",
+			opts: Options{Name: "my-secret", Force: false, RecoveryWindow: 30},
 			mock: &mockClient{
 				deleteSecretFunc: func(_ context.Context, params *secretsmanager.DeleteSecretInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.DeleteSecretOutput, error) {
 					if aws.ToBool(params.ForceDeleteWithoutRecovery) {
@@ -64,9 +60,8 @@ func TestRun(t *testing.T) {
 			},
 		},
 		{
-			name:       "force delete",
-			secretName: "my-secret",
-			force:      true,
+			name: "force delete",
+			opts: Options{Name: "my-secret", Force: true},
 			mock: &mockClient{
 				deleteSecretFunc: func(_ context.Context, params *secretsmanager.DeleteSecretInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.DeleteSecretOutput, error) {
 					if !aws.ToBool(params.ForceDeleteWithoutRecovery) {
@@ -84,8 +79,8 @@ func TestRun(t *testing.T) {
 			},
 		},
 		{
-			name:       "error from AWS",
-			secretName: "my-secret",
+			name: "error from AWS",
+			opts: Options{Name: "my-secret"},
 			mock: &mockClient{
 				deleteSecretFunc: func(_ context.Context, _ *secretsmanager.DeleteSecretInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.DeleteSecretOutput, error) {
 					return nil, fmt.Errorf("AWS error")
@@ -97,8 +92,13 @@ func TestRun(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var buf bytes.Buffer
-			err := Run(t.Context(), tt.mock, &buf, tt.secretName, tt.force, tt.recoveryWindow)
+			var buf, errBuf bytes.Buffer
+			r := &Runner{
+				Client: tt.mock,
+				Stdout: &buf,
+				Stderr: &errBuf,
+			}
+			err := r.Run(t.Context(), tt.opts)
 
 			if tt.wantErr {
 				if err == nil {

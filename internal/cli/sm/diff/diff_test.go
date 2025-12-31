@@ -529,7 +529,7 @@ func TestRun(t *testing.T) {
 	}
 }
 
-func TestRunWithSpecs_IdenticalWarning(t *testing.T) {
+func TestRun_IdenticalWarning(t *testing.T) {
 	mock := &mockClient{
 		getSecretValueFunc: func(_ context.Context, _ *secretsmanager.GetSecretValueInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.GetSecretValueOutput, error) {
 			return &secretsmanager.GetSecretValueOutput{
@@ -541,10 +541,18 @@ func TestRunWithSpecs_IdenticalWarning(t *testing.T) {
 	}
 
 	var stdout, stderr bytes.Buffer
-	spec1 := &ParsedSpec{Name: "my-secret", ID: nil, Label: nil, Shift: 0}
-	spec2 := &ParsedSpec{Name: "my-secret", ID: nil, Label: nil, Shift: 0}
+	r := &Runner{
+		Client: mock,
+		Stdout: &stdout,
+		Stderr: &stderr,
+	}
+	opts := Options{
+		Spec1:      &ParsedSpec{Name: "my-secret", ID: nil, Label: nil, Shift: 0},
+		Spec2:      &ParsedSpec{Name: "my-secret", ID: nil, Label: nil, Shift: 0},
+		JSONFormat: false,
+	}
 
-	err := RunWithSpecs(t.Context(), mock, &stdout, &stderr, spec1, spec2, false)
+	err := r.Run(t.Context(), opts)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

@@ -24,20 +24,19 @@ func (m *mockClient) PutParameter(ctx context.Context, params *ssm.PutParameterI
 
 func TestRun(t *testing.T) {
 	tests := []struct {
-		name        string
-		paramName   string
-		value       string
-		paramType   string
-		description string
-		mock        *mockClient
-		wantErr     bool
-		check       func(t *testing.T, output string)
+		name    string
+		opts    Options
+		mock    *mockClient
+		wantErr bool
+		check   func(t *testing.T, output string)
 	}{
 		{
-			name:      "set parameter",
-			paramName: "/app/param",
-			value:     "test-value",
-			paramType: "SecureString",
+			name: "set parameter",
+			opts: Options{
+				Name:  "/app/param",
+				Value: "test-value",
+				Type:  "SecureString",
+			},
 			mock: &mockClient{
 				putParameterFunc: func(_ context.Context, params *ssm.PutParameterInput, _ ...func(*ssm.Options)) (*ssm.PutParameterOutput, error) {
 					if aws.ToString(params.Name) != "/app/param" {
@@ -64,11 +63,13 @@ func TestRun(t *testing.T) {
 			},
 		},
 		{
-			name:        "set with description",
-			paramName:   "/app/param",
-			value:       "test-value",
-			paramType:   "String",
-			description: "Test description",
+			name: "set with description",
+			opts: Options{
+				Name:        "/app/param",
+				Value:       "test-value",
+				Type:        "String",
+				Description: "Test description",
+			},
 			mock: &mockClient{
 				putParameterFunc: func(_ context.Context, params *ssm.PutParameterInput, _ ...func(*ssm.Options)) (*ssm.PutParameterOutput, error) {
 					if aws.ToString(params.Description) != "Test description" {
@@ -81,10 +82,12 @@ func TestRun(t *testing.T) {
 			},
 		},
 		{
-			name:      "error from AWS",
-			paramName: "/app/param",
-			value:     "test-value",
-			paramType: "String",
+			name: "error from AWS",
+			opts: Options{
+				Name:  "/app/param",
+				Value: "test-value",
+				Type:  "String",
+			},
 			mock: &mockClient{
 				putParameterFunc: func(_ context.Context, _ *ssm.PutParameterInput, _ ...func(*ssm.Options)) (*ssm.PutParameterOutput, error) {
 					return nil, fmt.Errorf("AWS error")
@@ -96,8 +99,13 @@ func TestRun(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var buf bytes.Buffer
-			err := Run(t.Context(), tt.mock, &buf, tt.paramName, tt.value, tt.paramType, tt.description)
+			var buf, errBuf bytes.Buffer
+			r := &Runner{
+				Client: tt.mock,
+				Stdout: &buf,
+				Stderr: &errBuf,
+			}
+			err := r.Run(t.Context(), tt.opts)
 
 			if tt.wantErr {
 				if err == nil {

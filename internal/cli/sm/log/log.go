@@ -27,8 +27,16 @@ type Client interface {
 	smapi.GetSecretValueAPI
 }
 
+// Runner executes the log command.
+type Runner struct {
+	Client Client
+	Stdout io.Writer
+	Stderr io.Writer
+}
+
 // Options holds the options for the log command.
 type Options struct {
+	Name       string
 	MaxResults int32
 	ShowPatch  bool
 	JSONFormat bool
@@ -90,8 +98,8 @@ func action(c *cli.Context) error {
 		return fmt.Errorf("secret name required")
 	}
 
-	name := c.Args().First()
 	opts := Options{
+		Name:       c.Args().First(),
 		MaxResults: int32(c.Int("number")),
 		ShowPatch:  c.Bool("patch"),
 		JSONFormat: c.Bool("json"),
@@ -108,7 +116,12 @@ func action(c *cli.Context) error {
 		return fmt.Errorf("failed to initialize AWS client: %w", err)
 	}
 
-	return Run(c.Context, client, c.App.Writer, c.App.ErrWriter, name, opts)
+	r := &Runner{
+		Client: client,
+		Stdout: c.App.Writer,
+		Stderr: c.App.ErrWriter,
+	}
+	return r.Run(c.Context, opts)
 }
 
 // truncateID truncates a version ID to 8 characters for display.
@@ -120,9 +133,9 @@ func truncateID(id string) string {
 }
 
 // Run executes the log command.
-func Run(ctx context.Context, client Client, w io.Writer, errW io.Writer, name string, opts Options) error {
-	result, err := client.ListSecretVersionIds(ctx, &secretsmanager.ListSecretVersionIdsInput{
-		SecretId:   aws.String(name),
+func (r *Runner) Run(ctx context.Context, opts Options) error {
+	result, err := r.Client.ListSecretVersionIds(ctx, &secretsmanager.ListSecretVersionIdsInput{
+		SecretId:   aws.String(opts.Name),
 		MaxResults: aws.Int32(opts.MaxResults),
 	})
 	if err != nil {
@@ -155,8 +168,8 @@ func Run(ctx context.Context, client Client, w io.Writer, errW io.Writer, name s
 		secretValues = make(map[string]string)
 		for _, v := range versions {
 			versionID := aws.ToString(v.VersionId)
-			secretResult, err := client.GetSecretValue(ctx, &secretsmanager.GetSecretValueInput{
-				SecretId:  aws.String(name),
+			secretResult, err := r.Client.GetSecretValue(ctx, &secretsmanager.GetSecretValueInput{
+				SecretId:  aws.String(opts.Name),
 				VersionId: aws.String(versionID),
 			})
 			if err != nil {
@@ -180,9 +193,9 @@ func Run(ctx context.Context, client Client, w io.Writer, errW io.Writer, name s
 		if len(v.VersionStages) > 0 {
 			versionLabel += " " + green(fmt.Sprintf("%v", v.VersionStages))
 		}
-		_, _ = fmt.Fprintln(w, yellow(versionLabel))
+		_, _ = fmt.Fprintln(r.Stdout, yellow(versionLabel))
 		if v.CreatedDate != nil {
-			_, _ = fmt.Fprintf(w, "%s %s\n", cyan("Date:"), v.CreatedDate.Format(time.RFC3339))
+			_, _ = fmt.Fprintf(r.Stdout, "%s %s\n", cyan("Date:"), v.CreatedDate.Format(time.RFC3339))
 		}
 
 		if opts.ShowPatch {
@@ -212,19 +225,19 @@ func Run(ctx context.Context, client Client, w io.Writer, errW io.Writer, name s
 				oldValue, oldOk := secretValues[oldVersionID]
 				newValue, newOk := secretValues[newVersionID]
 				if oldOk && newOk {
-					oldName := fmt.Sprintf("%s#%s", name, truncateID(oldVersionID))
-					newName := fmt.Sprintf("%s#%s", name, truncateID(newVersionID))
-					diff := output.DiffWithJSON(oldName, newName, oldValue, newValue, opts.JSONFormat, &jsonWarned, errW)
+					oldName := fmt.Sprintf("%s#%s", opts.Name, truncateID(oldVersionID))
+					newName := fmt.Sprintf("%s#%s", opts.Name, truncateID(newVersionID))
+					diff := output.DiffWithJSON(oldName, newName, oldValue, newValue, opts.JSONFormat, &jsonWarned, r.Stderr)
 					if diff != "" {
-						_, _ = fmt.Fprintln(w)
-						_, _ = fmt.Fprint(w, diff)
+						_, _ = fmt.Fprintln(r.Stdout)
+						_, _ = fmt.Fprint(r.Stdout, diff)
 					}
 				}
 			}
 		}
 
 		if i < len(versions)-1 {
-			_, _ = fmt.Fprintln(w)
+			_, _ = fmt.Fprintln(r.Stdout)
 		}
 	}
 

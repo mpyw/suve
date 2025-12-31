@@ -30,16 +30,15 @@ func TestRun(t *testing.T) {
 	now := time.Now()
 
 	tests := []struct {
-		name       string
-		spec       *smversion.Spec
-		mock       *mockClient
-		jsonFormat bool
-		wantErr    bool
-		check      func(t *testing.T, output string)
+		name    string
+		opts    Options
+		mock    *mockClient
+		wantErr bool
+		check   func(t *testing.T, output string)
 	}{
 		{
 			name: "show latest version",
-			spec: &smversion.Spec{Name: "my-secret"},
+			opts: Options{Spec: &smversion.Spec{Name: "my-secret"}},
 			mock: &mockClient{
 				getSecretValueFunc: func(_ context.Context, _ *secretsmanager.GetSecretValueInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.GetSecretValueOutput, error) {
 					return &secretsmanager.GetSecretValueOutput{
@@ -63,7 +62,7 @@ func TestRun(t *testing.T) {
 		},
 		{
 			name: "show with shift",
-			spec: &smversion.Spec{Name: "my-secret", Shift: 1},
+			opts: Options{Spec: &smversion.Spec{Name: "my-secret", Shift: 1}},
 			mock: &mockClient{
 				listSecretVersionIdsFunc: func(_ context.Context, _ *secretsmanager.ListSecretVersionIdsInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.ListSecretVersionIdsOutput, error) {
 					return &secretsmanager.ListSecretVersionIdsOutput{
@@ -89,9 +88,8 @@ func TestRun(t *testing.T) {
 			},
 		},
 		{
-			name:       "show JSON formatted with sorted keys",
-			spec:       &smversion.Spec{Name: "my-secret"},
-			jsonFormat: true,
+			name: "show JSON formatted with sorted keys",
+			opts: Options{Spec: &smversion.Spec{Name: "my-secret"}, JSONFormat: true},
 			mock: &mockClient{
 				getSecretValueFunc: func(_ context.Context, _ *secretsmanager.GetSecretValueInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.GetSecretValueOutput, error) {
 					return &secretsmanager.GetSecretValueOutput{
@@ -122,8 +120,12 @@ func TestRun(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var buf, errBuf bytes.Buffer
-
-			err := Run(t.Context(), tt.mock, &buf, &errBuf, tt.spec, tt.jsonFormat)
+			r := &Runner{
+				Client: tt.mock,
+				Stdout: &buf,
+				Stderr: &errBuf,
+			}
+			err := r.Run(t.Context(), tt.opts)
 
 			if tt.wantErr {
 				if err == nil {

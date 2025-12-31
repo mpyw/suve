@@ -23,18 +23,15 @@ func (m *mockClient) CreateSecret(ctx context.Context, params *secretsmanager.Cr
 
 func TestRun(t *testing.T) {
 	tests := []struct {
-		name        string
-		secretName  string
-		value       string
-		description string
-		mock        *mockClient
-		wantErr     bool
-		check       func(t *testing.T, output string)
+		name    string
+		opts    Options
+		mock    *mockClient
+		wantErr bool
+		check   func(t *testing.T, output string)
 	}{
 		{
-			name:       "create secret",
-			secretName: "my-secret",
-			value:      "secret-value",
+			name: "create secret",
+			opts: Options{Name: "my-secret", Value: "secret-value"},
 			mock: &mockClient{
 				createSecretFunc: func(_ context.Context, params *secretsmanager.CreateSecretInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.CreateSecretOutput, error) {
 					if aws.ToString(params.Name) != "my-secret" {
@@ -59,10 +56,8 @@ func TestRun(t *testing.T) {
 			},
 		},
 		{
-			name:        "create with description",
-			secretName:  "my-secret",
-			value:       "secret-value",
-			description: "Test description",
+			name: "create with description",
+			opts: Options{Name: "my-secret", Value: "secret-value", Description: "Test description"},
 			mock: &mockClient{
 				createSecretFunc: func(_ context.Context, params *secretsmanager.CreateSecretInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.CreateSecretOutput, error) {
 					if aws.ToString(params.Description) != "Test description" {
@@ -76,9 +71,8 @@ func TestRun(t *testing.T) {
 			},
 		},
 		{
-			name:       "error from AWS",
-			secretName: "my-secret",
-			value:      "secret-value",
+			name: "error from AWS",
+			opts: Options{Name: "my-secret", Value: "secret-value"},
 			mock: &mockClient{
 				createSecretFunc: func(_ context.Context, _ *secretsmanager.CreateSecretInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.CreateSecretOutput, error) {
 					return nil, fmt.Errorf("AWS error")
@@ -90,8 +84,13 @@ func TestRun(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var buf bytes.Buffer
-			err := Run(t.Context(), tt.mock, &buf, tt.secretName, tt.value, tt.description)
+			var buf, errBuf bytes.Buffer
+			r := &Runner{
+				Client: tt.mock,
+				Stdout: &buf,
+				Stderr: &errBuf,
+			}
+			err := r.Run(t.Context(), tt.opts)
 
 			if tt.wantErr {
 				if err == nil {

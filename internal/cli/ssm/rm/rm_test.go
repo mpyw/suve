@@ -22,15 +22,15 @@ func (m *mockClient) DeleteParameter(ctx context.Context, params *ssm.DeletePara
 
 func TestRun(t *testing.T) {
 	tests := []struct {
-		name      string
-		paramName string
-		mock      *mockClient
-		wantErr   bool
-		check     func(t *testing.T, output string)
+		name    string
+		opts    Options
+		mock    *mockClient
+		wantErr bool
+		check   func(t *testing.T, output string)
 	}{
 		{
-			name:      "delete parameter",
-			paramName: "/app/param",
+			name: "delete parameter",
+			opts: Options{Name: "/app/param"},
 			mock: &mockClient{
 				deleteParameterFunc: func(_ context.Context, _ *ssm.DeleteParameterInput, _ ...func(*ssm.Options)) (*ssm.DeleteParameterOutput, error) {
 					return &ssm.DeleteParameterOutput{}, nil
@@ -46,8 +46,8 @@ func TestRun(t *testing.T) {
 			},
 		},
 		{
-			name:      "error from AWS",
-			paramName: "/app/param",
+			name: "error from AWS",
+			opts: Options{Name: "/app/param"},
 			mock: &mockClient{
 				deleteParameterFunc: func(_ context.Context, _ *ssm.DeleteParameterInput, _ ...func(*ssm.Options)) (*ssm.DeleteParameterOutput, error) {
 					return nil, fmt.Errorf("AWS error")
@@ -59,8 +59,13 @@ func TestRun(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var buf bytes.Buffer
-			err := Run(t.Context(), tt.mock, &buf, tt.paramName)
+			var buf, errBuf bytes.Buffer
+			r := &Runner{
+				Client: tt.mock,
+				Stdout: &buf,
+				Stderr: &errBuf,
+			}
+			err := r.Run(t.Context(), tt.opts)
 
 			if tt.wantErr {
 				if err == nil {

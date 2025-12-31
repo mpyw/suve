@@ -37,17 +37,18 @@ func TestRun(t *testing.T) {
 	now := time.Now()
 
 	tests := []struct {
-		name       string
-		spec       *ssmversion.Spec
-		mock       *mockClient
-		decrypt    bool
-		jsonFormat bool
-		wantErr    bool
-		check      func(t *testing.T, output string)
+		name    string
+		opts    Options
+		mock    *mockClient
+		wantErr bool
+		check   func(t *testing.T, output string)
 	}{
 		{
 			name: "output raw value",
-			spec: &ssmversion.Spec{Name: "/app/param"},
+			opts: Options{
+				Spec:    &ssmversion.Spec{Name: "/app/param"},
+				Decrypt: true,
+			},
 			mock: &mockClient{
 				getParameterFunc: func(_ context.Context, _ *ssm.GetParameterInput, _ ...func(*ssm.Options)) (*ssm.GetParameterOutput, error) {
 					return &ssm.GetParameterOutput{
@@ -61,7 +62,6 @@ func TestRun(t *testing.T) {
 					}, nil
 				},
 			},
-			decrypt: true,
 			check: func(t *testing.T, output string) {
 				// cat outputs raw value without newline or decoration
 				if output != "raw-value" {
@@ -71,7 +71,10 @@ func TestRun(t *testing.T) {
 		},
 		{
 			name: "output with shift",
-			spec: &ssmversion.Spec{Name: "/app/param", Shift: 1},
+			opts: Options{
+				Spec:    &ssmversion.Spec{Name: "/app/param", Shift: 1},
+				Decrypt: true,
+			},
 			mock: &mockClient{
 				getParameterHistoryFunc: func(_ context.Context, _ *ssm.GetParameterHistoryInput, _ ...func(*ssm.Options)) (*ssm.GetParameterHistoryOutput, error) {
 					return &ssm.GetParameterHistoryOutput{
@@ -82,7 +85,6 @@ func TestRun(t *testing.T) {
 					}, nil
 				},
 			},
-			decrypt: true,
 			check: func(t *testing.T, output string) {
 				if output != "v1" {
 					t.Errorf("expected 'v1', got %q", output)
@@ -90,9 +92,12 @@ func TestRun(t *testing.T) {
 			},
 		},
 		{
-			name:       "output JSON formatted with sorted keys",
-			spec:       &ssmversion.Spec{Name: "/app/param"},
-			jsonFormat: true,
+			name: "output JSON formatted with sorted keys",
+			opts: Options{
+				Spec:       &ssmversion.Spec{Name: "/app/param"},
+				Decrypt:    true,
+				JSONFormat: true,
+			},
 			mock: &mockClient{
 				getParameterFunc: func(_ context.Context, _ *ssm.GetParameterInput, _ ...func(*ssm.Options)) (*ssm.GetParameterOutput, error) {
 					return &ssm.GetParameterOutput{
@@ -106,7 +111,6 @@ func TestRun(t *testing.T) {
 					}, nil
 				},
 			},
-			decrypt: true,
 			check: func(t *testing.T, output string) {
 				// Keys should be sorted (apple before zebra)
 				appleIdx := bytes.Index([]byte(output), []byte("apple"))
@@ -122,13 +126,15 @@ func TestRun(t *testing.T) {
 		},
 		{
 			name: "error from AWS",
-			spec: &ssmversion.Spec{Name: "/app/param"},
+			opts: Options{
+				Spec:    &ssmversion.Spec{Name: "/app/param"},
+				Decrypt: true,
+			},
 			mock: &mockClient{
 				getParameterFunc: func(_ context.Context, _ *ssm.GetParameterInput, _ ...func(*ssm.Options)) (*ssm.GetParameterOutput, error) {
 					return nil, fmt.Errorf("AWS error")
 				},
 			},
-			decrypt: true,
 			wantErr: true,
 		},
 	}
@@ -136,7 +142,12 @@ func TestRun(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var buf, warnBuf bytes.Buffer
-			err := Run(t.Context(), tt.mock, &buf, &warnBuf, tt.spec, tt.decrypt, tt.jsonFormat)
+			r := &Runner{
+				Client: tt.mock,
+				Stdout: &buf,
+				Stderr: &warnBuf,
+			}
+			err := r.Run(t.Context(), tt.opts)
 
 			if tt.wantErr {
 				if err == nil {

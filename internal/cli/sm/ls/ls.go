@@ -20,6 +20,18 @@ type Client interface {
 	smapi.ListSecretsAPI
 }
 
+// Runner executes the ls command.
+type Runner struct {
+	Client Client
+	Stdout io.Writer
+	Stderr io.Writer
+}
+
+// Options holds the options for the ls command.
+type Options struct {
+	Prefix string
+}
+
 // Command returns the ls command.
 func Command() *cli.Command {
 	return &cli.Command{
@@ -43,29 +55,34 @@ EXAMPLES:
 }
 
 func action(c *cli.Context) error {
-	prefix := c.Args().First()
-
 	client, err := awsutil.NewSMClient(c.Context)
 	if err != nil {
 		return fmt.Errorf("failed to initialize AWS client: %w", err)
 	}
 
-	return Run(c.Context, client, c.App.Writer, prefix)
+	r := &Runner{
+		Client: client,
+		Stdout: c.App.Writer,
+		Stderr: c.App.ErrWriter,
+	}
+	return r.Run(c.Context, Options{
+		Prefix: c.Args().First(),
+	})
 }
 
 // Run executes the ls command.
-func Run(ctx context.Context, client Client, w io.Writer, prefix string) error {
+func (r *Runner) Run(ctx context.Context, opts Options) error {
 	input := &secretsmanager.ListSecretsInput{}
-	if prefix != "" {
+	if opts.Prefix != "" {
 		input.Filters = []types.Filter{
 			{
 				Key:    types.FilterNameStringTypeName,
-				Values: []string{prefix},
+				Values: []string{opts.Prefix},
 			},
 		}
 	}
 
-	paginator := secretsmanager.NewListSecretsPaginator(client, input)
+	paginator := secretsmanager.NewListSecretsPaginator(r.Client, input)
 	for paginator.HasMorePages() {
 		page, err := paginator.NextPage(ctx)
 		if err != nil {
@@ -73,7 +90,7 @@ func Run(ctx context.Context, client Client, w io.Writer, prefix string) error {
 		}
 
 		for _, secret := range page.SecretList {
-			_, _ = fmt.Fprintln(w, aws.ToString(secret.Name))
+			_, _ = fmt.Fprintln(r.Stdout, aws.ToString(secret.Name))
 		}
 	}
 

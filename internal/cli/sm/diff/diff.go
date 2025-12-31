@@ -31,6 +31,20 @@ type Client interface {
 	smapi.ListSecretVersionIdsAPI
 }
 
+// Runner executes the diff command.
+type Runner struct {
+	Client Client
+	Stdout io.Writer
+	Stderr io.Writer
+}
+
+// Options holds the options for the diff command.
+type Options struct {
+	Spec1      *ParsedSpec
+	Spec2      *ParsedSpec
+	JSONFormat bool
+}
+
 // ParsedSpec represents a parsed version specification for diff.
 type ParsedSpec struct {
 	Name  string
@@ -83,7 +97,16 @@ func action(c *cli.Context) error {
 		return fmt.Errorf("failed to initialize AWS client: %w", err)
 	}
 
-	return RunWithSpecs(c.Context, client, c.App.Writer, c.App.ErrWriter, spec1, spec2, c.Bool("json"))
+	r := &Runner{
+		Client: client,
+		Stdout: c.App.Writer,
+		Stderr: c.App.ErrWriter,
+	}
+	return r.Run(c.Context, Options{
+		Spec1:      spec1,
+		Spec2:      spec2,
+		JSONFormat: c.Bool("json"),
+	})
 }
 
 // ParseArgs parses diff command arguments into two version specifications.
@@ -281,27 +304,27 @@ func Run(ctx context.Context, client Client, w io.Writer, name, version1, versio
 	return nil
 }
 
-// RunWithSpecs executes the diff command with parsed specs.
-func RunWithSpecs(ctx context.Context, client Client, w, errW io.Writer, spec1, spec2 *ParsedSpec, jsonFormat bool) error {
+// Run executes the diff command.
+func (r *Runner) Run(ctx context.Context, opts Options) error {
 	smSpec1 := &smversion.Spec{
-		Name:  spec1.Name,
-		ID:    spec1.ID,
-		Label: spec1.Label,
-		Shift: spec1.Shift,
+		Name:  opts.Spec1.Name,
+		ID:    opts.Spec1.ID,
+		Label: opts.Spec1.Label,
+		Shift: opts.Spec1.Shift,
 	}
 	smSpec2 := &smversion.Spec{
-		Name:  spec2.Name,
-		ID:    spec2.ID,
-		Label: spec2.Label,
-		Shift: spec2.Shift,
+		Name:  opts.Spec2.Name,
+		ID:    opts.Spec2.ID,
+		Label: opts.Spec2.Label,
+		Shift: opts.Spec2.Shift,
 	}
 
-	secret1, err := smversion.GetSecretWithVersion(ctx, client, smSpec1)
+	secret1, err := smversion.GetSecretWithVersion(ctx, r.Client, smSpec1)
 	if err != nil {
 		return fmt.Errorf("failed to get first version: %w", err)
 	}
 
-	secret2, err := smversion.GetSecretWithVersion(ctx, client, smSpec2)
+	secret2, err := smversion.GetSecretWithVersion(ctx, r.Client, smSpec2)
 	if err != nil {
 		return fmt.Errorf("failed to get second version: %w", err)
 	}
@@ -310,9 +333,9 @@ func RunWithSpecs(ctx context.Context, client Client, w, errW io.Writer, spec1, 
 	value2 := aws.ToString(secret2.SecretString)
 
 	// Format as JSON if enabled
-	if jsonFormat {
+	if opts.JSONFormat {
 		if !jsonutil.IsJSON(value1) || !jsonutil.IsJSON(value2) {
-			output.Warning(errW, "--json has no effect: some values are not valid JSON")
+			output.Warning(r.Stderr, "--json has no effect: some values are not valid JSON")
 		} else {
 			value1 = jsonutil.Format(value1)
 			value2 = jsonutil.Format(value2)
@@ -320,9 +343,9 @@ func RunWithSpecs(ctx context.Context, client Client, w, errW io.Writer, spec1, 
 	}
 
 	if value1 == value2 {
-		output.Warning(errW, "comparing identical versions")
-		output.Hint(errW, "To compare with previous version, use: suve sm diff %s~1", spec1.Name)
-		output.Hint(errW, "or: suve sm diff %s:AWSPREVIOUS", spec1.Name)
+		output.Warning(r.Stderr, "comparing identical versions")
+		output.Hint(r.Stderr, "To compare with previous version, use: suve sm diff %s~1", opts.Spec1.Name)
+		output.Hint(r.Stderr, "or: suve sm diff %s:AWSPREVIOUS", opts.Spec1.Name)
 		return nil
 	}
 
@@ -336,12 +359,12 @@ func RunWithSpecs(ctx context.Context, client Client, w, errW io.Writer, spec1, 
 	}
 
 	diff := output.Diff(
-		fmt.Sprintf("%s#%s", spec1.Name, v1),
-		fmt.Sprintf("%s#%s", spec2.Name, v2),
+		fmt.Sprintf("%s#%s", opts.Spec1.Name, v1),
+		fmt.Sprintf("%s#%s", opts.Spec2.Name, v2),
 		value1,
 		value2,
 	)
-	_, _ = fmt.Fprint(w, diff)
+	_, _ = fmt.Fprint(r.Stdout, diff)
 
 	return nil
 }

@@ -23,15 +23,15 @@ func (m *mockClient) RestoreSecret(ctx context.Context, params *secretsmanager.R
 
 func TestRun(t *testing.T) {
 	tests := []struct {
-		name       string
-		secretName string
-		mock       *mockClient
-		wantErr    bool
-		check      func(t *testing.T, output string)
+		name    string
+		opts    Options
+		mock    *mockClient
+		wantErr bool
+		check   func(t *testing.T, output string)
 	}{
 		{
-			name:       "restore secret",
-			secretName: "my-secret",
+			name: "restore secret",
+			opts: Options{Name: "my-secret"},
 			mock: &mockClient{
 				restoreSecretFunc: func(_ context.Context, params *secretsmanager.RestoreSecretInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.RestoreSecretOutput, error) {
 					if aws.ToString(params.SecretId) != "my-secret" {
@@ -52,8 +52,8 @@ func TestRun(t *testing.T) {
 			},
 		},
 		{
-			name:       "error from AWS",
-			secretName: "my-secret",
+			name: "error from AWS",
+			opts: Options{Name: "my-secret"},
 			mock: &mockClient{
 				restoreSecretFunc: func(_ context.Context, _ *secretsmanager.RestoreSecretInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.RestoreSecretOutput, error) {
 					return nil, fmt.Errorf("AWS error")
@@ -65,8 +65,13 @@ func TestRun(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var buf bytes.Buffer
-			err := Run(t.Context(), tt.mock, &buf, tt.secretName)
+			var buf, errBuf bytes.Buffer
+			r := &Runner{
+				Client: tt.mock,
+				Stdout: &buf,
+				Stderr: &errBuf,
+			}
+			err := r.Run(t.Context(), tt.opts)
 
 			if tt.wantErr {
 				if err == nil {

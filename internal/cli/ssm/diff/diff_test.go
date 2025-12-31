@@ -343,19 +343,18 @@ func TestRun(t *testing.T) {
 	now := time.Now()
 
 	tests := []struct {
-		name      string
-		paramName string
-		version1  string
-		version2  string
-		mock      *mockClient
-		wantErr   bool
-		check     func(t *testing.T, output string)
+		name    string
+		opts    Options
+		mock    *mockClient
+		wantErr bool
+		check   func(t *testing.T, output string)
 	}{
 		{
-			name:      "diff between two versions",
-			paramName: "/app/param",
-			version1:  "#1",
-			version2:  "#2",
+			name: "diff between two versions",
+			opts: Options{
+				Spec1: &ParsedSpec{Name: "/app/param", Version: testutil.Ptr(int64(1))},
+				Spec2: &ParsedSpec{Name: "/app/param", Version: testutil.Ptr(int64(2))},
+			},
 			mock: &mockClient{
 				getParameterFunc: func(_ context.Context, params *ssm.GetParameterInput, _ ...func(*ssm.Options)) (*ssm.GetParameterOutput, error) {
 					name := aws.ToString(params.Name)
@@ -391,10 +390,11 @@ func TestRun(t *testing.T) {
 			},
 		},
 		{
-			name:      "no diff when same content",
-			paramName: "/app/param",
-			version1:  "#1",
-			version2:  "#2",
+			name: "no diff when same content",
+			opts: Options{
+				Spec1: &ParsedSpec{Name: "/app/param", Version: testutil.Ptr(int64(1))},
+				Spec2: &ParsedSpec{Name: "/app/param", Version: testutil.Ptr(int64(2))},
+			},
 			mock: &mockClient{
 				getParameterFunc: func(_ context.Context, _ *ssm.GetParameterInput, _ ...func(*ssm.Options)) (*ssm.GetParameterOutput, error) {
 					return &ssm.GetParameterOutput{
@@ -415,10 +415,11 @@ func TestRun(t *testing.T) {
 			},
 		},
 		{
-			name:      "error getting first version",
-			paramName: "/app/param",
-			version1:  "#1",
-			version2:  "#2",
+			name: "error getting first version",
+			opts: Options{
+				Spec1: &ParsedSpec{Name: "/app/param", Version: testutil.Ptr(int64(1))},
+				Spec2: &ParsedSpec{Name: "/app/param", Version: testutil.Ptr(int64(2))},
+			},
 			mock: &mockClient{
 				getParameterFunc: func(_ context.Context, params *ssm.GetParameterInput, _ ...func(*ssm.Options)) (*ssm.GetParameterOutput, error) {
 					if aws.ToString(params.Name) == "/app/param:1" {
@@ -436,10 +437,11 @@ func TestRun(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name:      "error getting second version",
-			paramName: "/app/param",
-			version1:  "#1",
-			version2:  "#2",
+			name: "error getting second version",
+			opts: Options{
+				Spec1: &ParsedSpec{Name: "/app/param", Version: testutil.Ptr(int64(1))},
+				Spec2: &ParsedSpec{Name: "/app/param", Version: testutil.Ptr(int64(2))},
+			},
 			mock: &mockClient{
 				getParameterFunc: func(_ context.Context, params *ssm.GetParameterInput, _ ...func(*ssm.Options)) (*ssm.GetParameterOutput, error) {
 					if aws.ToString(params.Name) == "/app/param:2" {
@@ -460,8 +462,13 @@ func TestRun(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var buf bytes.Buffer
-			err := Run(t.Context(), tt.mock, &buf, tt.paramName, tt.version1, tt.version2)
+			var buf, errBuf bytes.Buffer
+			r := &Runner{
+				Client: tt.mock,
+				Stdout: &buf,
+				Stderr: &errBuf,
+			}
+			err := r.Run(t.Context(), tt.opts)
 
 			if tt.wantErr {
 				if err == nil {
@@ -481,7 +488,7 @@ func TestRun(t *testing.T) {
 	}
 }
 
-func TestRunWithSpecs_IdenticalWarning(t *testing.T) {
+func TestRun_IdenticalWarning(t *testing.T) {
 	mock := &mockClient{
 		getParameterFunc: func(_ context.Context, _ *ssm.GetParameterInput, _ ...func(*ssm.Options)) (*ssm.GetParameterOutput, error) {
 			return &ssm.GetParameterOutput{
@@ -496,10 +503,17 @@ func TestRunWithSpecs_IdenticalWarning(t *testing.T) {
 	}
 
 	var stdout, stderr bytes.Buffer
-	spec1 := &ParsedSpec{Name: "/app/param", Version: nil, Shift: 0}
-	spec2 := &ParsedSpec{Name: "/app/param", Version: nil, Shift: 0}
+	r := &Runner{
+		Client: mock,
+		Stdout: &stdout,
+		Stderr: &stderr,
+	}
+	opts := Options{
+		Spec1: &ParsedSpec{Name: "/app/param"},
+		Spec2: &ParsedSpec{Name: "/app/param"},
+	}
 
-	err := RunWithSpecs(t.Context(), mock, &stdout, &stderr, spec1, spec2, false)
+	err := r.Run(t.Context(), opts)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

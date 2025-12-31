@@ -37,7 +37,7 @@ clean:
 	rm -rf bin/
 	docker compose down -v 2>/dev/null || true
 
-# Coverage
+# Coverage (exclude testutil from coverage calculation)
 coverage:
-	go test -coverprofile=coverage.out ./...
+	go test -coverprofile=coverage.out -coverpkg=$$(go list ./... | grep -v testutil | tr '\n' ',') ./...
 	go tool cover -func=coverage.out | grep total

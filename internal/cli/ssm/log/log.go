@@ -25,8 +25,16 @@ type Client interface {
 	ssmapi.GetParameterHistoryAPI
 }
 
+// Runner executes the log command.
+type Runner struct {
+	Client Client
+	Stdout io.Writer
+	Stderr io.Writer
+}
+
 // Options holds the options for the log command.
 type Options struct {
+	Name       string
 	MaxResults int32
 	ShowPatch  bool
 	JSONFormat bool
@@ -87,8 +95,8 @@ func action(c *cli.Context) error {
 		return fmt.Errorf("parameter name required")
 	}
 
-	name := c.Args().First()
 	opts := Options{
+		Name:       c.Args().First(),
 		MaxResults: int32(c.Int("number")),
 		ShowPatch:  c.Bool("patch"),
 		JSONFormat: c.Bool("json"),
@@ -105,13 +113,18 @@ func action(c *cli.Context) error {
 		return fmt.Errorf("failed to initialize AWS client: %w", err)
 	}
 
-	return Run(c.Context, client, c.App.Writer, c.App.ErrWriter, name, opts)
+	r := &Runner{
+		Client: client,
+		Stdout: c.App.Writer,
+		Stderr: c.App.ErrWriter,
+	}
+	return r.Run(c.Context, opts)
 }
 
 // Run executes the log command.
-func Run(ctx context.Context, client Client, w io.Writer, errW io.Writer, name string, opts Options) error {
-	result, err := client.GetParameterHistory(ctx, &ssm.GetParameterHistoryInput{
-		Name:           aws.String(name),
+func (r *Runner) Run(ctx context.Context, opts Options) error {
+	result, err := r.Client.GetParameterHistory(ctx, &ssm.GetParameterHistoryInput{
+		Name:           aws.String(opts.Name),
 		MaxResults:     aws.Int32(opts.MaxResults),
 		WithDecryption: aws.Bool(true),
 	})
@@ -149,9 +162,9 @@ func Run(ctx context.Context, client Client, w io.Writer, errW io.Writer, name s
 		if i == currentIdx {
 			versionLabel += " " + green("(current)")
 		}
-		_, _ = fmt.Fprintln(w, yellow(versionLabel))
+		_, _ = fmt.Fprintln(r.Stdout, yellow(versionLabel))
 		if param.LastModifiedDate != nil {
-			_, _ = fmt.Fprintf(w, "%s %s\n", cyan("Date:"), param.LastModifiedDate.Format(time.RFC3339))
+			_, _ = fmt.Fprintf(r.Stdout, "%s %s\n", cyan("Date:"), param.LastModifiedDate.Format(time.RFC3339))
 		}
 
 		if opts.ShowPatch {
@@ -178,12 +191,12 @@ func Run(ctx context.Context, client Client, w io.Writer, errW io.Writer, name s
 			if oldIdx >= 0 {
 				oldValue := aws.ToString(params[oldIdx].Value)
 				newValue := aws.ToString(params[newIdx].Value)
-				oldName := fmt.Sprintf("%s#%d", name, params[oldIdx].Version)
-				newName := fmt.Sprintf("%s#%d", name, params[newIdx].Version)
-				diff := output.DiffWithJSON(oldName, newName, oldValue, newValue, opts.JSONFormat, &jsonWarned, errW)
+				oldName := fmt.Sprintf("%s#%d", opts.Name, params[oldIdx].Version)
+				newName := fmt.Sprintf("%s#%d", opts.Name, params[newIdx].Version)
+				diff := output.DiffWithJSON(oldName, newName, oldValue, newValue, opts.JSONFormat, &jsonWarned, r.Stderr)
 				if diff != "" {
-					_, _ = fmt.Fprintln(w)
-					_, _ = fmt.Fprint(w, diff)
+					_, _ = fmt.Fprintln(r.Stdout)
+					_, _ = fmt.Fprint(r.Stdout, diff)
 				}
 			}
 		} else {
@@ -192,11 +205,11 @@ func Run(ctx context.Context, client Client, w io.Writer, errW io.Writer, name s
 			if len(value) > 50 {
 				value = value[:50] + "..."
 			}
-			_, _ = fmt.Fprintf(w, "%s\n", value)
+			_, _ = fmt.Fprintf(r.Stdout, "%s\n", value)
 		}
 
 		if i < len(params)-1 {
-			_, _ = fmt.Fprintln(w)
+			_, _ = fmt.Fprintln(r.Stdout)
 		}
 	}
 

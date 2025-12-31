@@ -20,6 +20,19 @@ type Client interface {
 	smapi.PutSecretValueAPI
 }
 
+// Runner executes the update command.
+type Runner struct {
+	Client Client
+	Stdout io.Writer
+	Stderr io.Writer
+}
+
+// Options holds the options for the update command.
+type Options struct {
+	Name  string
+	Value string
+}
+
 // Command returns the update command.
 func Command() *cli.Command {
 	return &cli.Command{
@@ -45,29 +58,34 @@ func action(c *cli.Context) error {
 		return fmt.Errorf("usage: suve sm update <name> <value>")
 	}
 
-	name := c.Args().Get(0)
-	value := c.Args().Get(1)
-
 	client, err := awsutil.NewSMClient(c.Context)
 	if err != nil {
 		return fmt.Errorf("failed to initialize AWS client: %w", err)
 	}
 
-	return Run(c.Context, client, c.App.Writer, name, value)
+	r := &Runner{
+		Client: client,
+		Stdout: c.App.Writer,
+		Stderr: c.App.ErrWriter,
+	}
+	return r.Run(c.Context, Options{
+		Name:  c.Args().Get(0),
+		Value: c.Args().Get(1),
+	})
 }
 
 // Run executes the update command.
-func Run(ctx context.Context, client Client, w io.Writer, name, value string) error {
-	result, err := client.PutSecretValue(ctx, &secretsmanager.PutSecretValueInput{
-		SecretId:     aws.String(name),
-		SecretString: aws.String(value),
+func (r *Runner) Run(ctx context.Context, opts Options) error {
+	result, err := r.Client.PutSecretValue(ctx, &secretsmanager.PutSecretValueInput{
+		SecretId:     aws.String(opts.Name),
+		SecretString: aws.String(opts.Value),
 	})
 	if err != nil {
 		return fmt.Errorf("failed to update secret: %w", err)
 	}
 
 	green := color.New(color.FgGreen).SprintFunc()
-	_, _ = fmt.Fprintf(w, "%s Updated secret %s (version: %s)\n",
+	_, _ = fmt.Fprintf(r.Stdout, "%s Updated secret %s (version: %s)\n",
 		green("✓"),
 		aws.ToString(result.Name),
 		aws.ToString(result.VersionId),
