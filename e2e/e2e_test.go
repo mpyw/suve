@@ -86,7 +86,6 @@ func runCommand(t *testing.T, cmd *cli.Command, args ...string) (stdout, stderr 
 // This test creates a parameter, updates it, verifies version history,
 // compares versions using diff, and cleans up by deleting.
 func TestSSM_FullWorkflow(t *testing.T) {
-	t.Parallel()
 	setupEnv(t)
 	paramName := "/suve-e2e-test/param"
 
@@ -168,7 +167,6 @@ func TestSSM_FullWorkflow(t *testing.T) {
 // compares versions using diff, tests soft delete with recovery, and cleans up
 // with force delete.
 func TestSM_FullWorkflow(t *testing.T) {
-	t.Parallel()
 	setupEnv(t)
 	secretName := "suve-e2e-test/secret"
 
