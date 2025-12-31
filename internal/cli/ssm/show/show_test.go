@@ -117,9 +117,9 @@ func TestRun(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var buf bytes.Buffer
+			var buf, errBuf bytes.Buffer
 
-			err := Run(t.Context(), tt.mock, &buf, tt.spec, tt.decrypt, tt.jsonFormat)
+			err := Run(t.Context(), tt.mock, &buf, &errBuf, tt.spec, tt.decrypt, tt.jsonFormat)
 
 			if tt.wantErr {
 				if err == nil {

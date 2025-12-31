@@ -68,11 +68,12 @@ func action(c *cli.Context) error {
 		return fmt.Errorf("failed to initialize AWS client: %w", err)
 	}
 
-	return Run(c.Context, client, c.App.Writer, spec, c.Bool("json"))
+	return Run(c.Context, client, c.App.Writer, c.App.ErrWriter, spec, c.Bool("json"))
 }
 
 // Run executes the show command.
-func Run(ctx context.Context, client Client, w io.Writer, spec *smversion.Spec, jsonFormat bool) error {
+// Output goes to w, warnings go to errW (typically stderr).
+func Run(ctx context.Context, client Client, w io.Writer, errW io.Writer, spec *smversion.Spec, jsonFormat bool) error {
 	secret, err := smversion.GetSecretWithVersion(ctx, client, spec)
 	if err != nil {
 		return err
@@ -97,7 +98,7 @@ func Run(ctx context.Context, client Client, w io.Writer, spec *smversion.Spec, 
 	// Warn if --json is used but value is not valid JSON
 	if jsonFormat {
 		if !jsonutil.IsJSON(value) {
-			output.Warning(w, "--json has no effect: value is not valid JSON")
+			output.Warning(errW, "--json has no effect: value is not valid JSON")
 		} else {
 			value = jsonutil.Format(value)
 		}

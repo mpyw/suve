@@ -74,11 +74,12 @@ func action(c *cli.Context) error {
 		return fmt.Errorf("failed to initialize AWS client: %w", err)
 	}
 
-	return Run(c.Context, client, c.App.Writer, spec, c.Bool("decrypt"), c.Bool("json"))
+	return Run(c.Context, client, c.App.Writer, c.App.ErrWriter, spec, c.Bool("decrypt"), c.Bool("json"))
 }
 
 // Run executes the show command.
-func Run(ctx context.Context, client Client, w io.Writer, spec *ssmversion.Spec, decrypt bool, jsonFormat bool) error {
+// Output goes to w, warnings go to errW (typically stderr).
+func Run(ctx context.Context, client Client, w io.Writer, errW io.Writer, spec *ssmversion.Spec, decrypt bool, jsonFormat bool) error {
 	param, err := ssmversion.GetParameterWithVersion(ctx, client, spec, decrypt)
 	if err != nil {
 		return err
@@ -99,11 +100,11 @@ func Run(ctx context.Context, client Client, w io.Writer, spec *ssmversion.Spec,
 	if jsonFormat {
 		switch {
 		case param.Type == types.ParameterTypeStringList:
-			output.Warning(w, "--json has no effect on StringList type (comma-separated values)")
+			output.Warning(errW, "--json has no effect on StringList type (comma-separated values)")
 		case param.Type == types.ParameterTypeSecureString && !decrypt:
-			output.Warning(w, "--json has no effect on encrypted SecureString (use --decrypt to enable)")
+			output.Warning(errW, "--json has no effect on encrypted SecureString (use --decrypt to enable)")
 		case !jsonutil.IsJSON(value):
-			output.Warning(w, "--json has no effect: value is not valid JSON")
+			output.Warning(errW, "--json has no effect: value is not valid JSON")
 		default:
 			value = jsonutil.Format(value)
 		}

@@ -123,9 +123,9 @@ func TestSSM_FullWorkflow(t *testing.T) {
 
 	// 2. Show parameter
 	t.Run("show", func(t *testing.T) {
-		var buf bytes.Buffer
+		var buf, errBuf bytes.Buffer
 		spec := &ssmversion.Spec{Name: paramName}
-		err := ssmshow.Run(ctx, client, &buf, spec, true, ssmshow.JSONOptions{})
+		err := ssmshow.Run(ctx, client, &buf, &errBuf, spec, true, false)
 		if err != nil {
 			t.Fatalf("ssmshow.Run() error: %v", err)
 		}
@@ -140,7 +140,7 @@ func TestSSM_FullWorkflow(t *testing.T) {
 	t.Run("cat", func(t *testing.T) {
 		var buf, warnBuf bytes.Buffer
 		spec := &ssmversion.Spec{Name: paramName}
-		err := ssmcat.Run(ctx, client, &buf, &warnBuf, spec, true, ssmcat.JSONOptions{})
+		err := ssmcat.Run(ctx, client, &buf, &warnBuf, spec, true, false)
 		if err != nil {
 			t.Fatalf("ssmcat.Run() error: %v", err)
 		}
@@ -213,9 +213,9 @@ func TestSSM_FullWorkflow(t *testing.T) {
 
 	// 9. Verify deletion
 	t.Run("verify-deleted", func(t *testing.T) {
-		var buf bytes.Buffer
+		var buf, errBuf bytes.Buffer
 		spec := &ssmversion.Spec{Name: paramName}
-		err := ssmshow.Run(ctx, client, &buf, spec, true, ssmshow.JSONOptions{})
+		err := ssmshow.Run(ctx, client, &buf, &errBuf, spec, true, false)
 		if err == nil {
 			t.Error("expected error after deletion, got nil")
 		}
@@ -257,9 +257,9 @@ func TestSM_FullWorkflow(t *testing.T) {
 
 	// 2. Show secret
 	t.Run("show", func(t *testing.T) {
-		var buf bytes.Buffer
+		var buf, errBuf bytes.Buffer
 		spec := &smversion.Spec{Name: secretName}
-		err := smshow.Run(ctx, client, &buf, spec, smshow.JSONOptions{})
+		err := smshow.Run(ctx, client, &buf, &errBuf, spec, false)
 		if err != nil {
 			t.Fatalf("smshow.Run() error: %v", err)
 		}
@@ -274,7 +274,7 @@ func TestSM_FullWorkflow(t *testing.T) {
 	t.Run("cat", func(t *testing.T) {
 		var buf, warnBuf bytes.Buffer
 		spec := &smversion.Spec{Name: secretName}
-		err := smcat.Run(ctx, client, &buf, &warnBuf, spec, smcat.JSONOptions{})
+		err := smcat.Run(ctx, client, &buf, &warnBuf, spec, false)
 		if err != nil {
 			t.Fatalf("smcat.Run() error: %v", err)
 		}
@@ -357,9 +357,9 @@ func TestSM_FullWorkflow(t *testing.T) {
 
 	// 10. Verify restored
 	t.Run("verify-restored", func(t *testing.T) {
-		var buf bytes.Buffer
+		var buf, errBuf bytes.Buffer
 		spec := &smversion.Spec{Name: secretName}
-		err := smshow.Run(ctx, client, &buf, spec, smshow.JSONOptions{})
+		err := smshow.Run(ctx, client, &buf, &errBuf, spec, false)
 		if err != nil {
 			t.Fatalf("smshow.Run() after restore error: %v", err)
 		}

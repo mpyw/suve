@@ -23,7 +23,6 @@ suve sm show [options] <name[#VERSION | :LABEL][~SHIFT]*>
 | Option | Alias | Default | Description |
 |--------|-------|---------|-------------|
 | `--json` | `-j` | `false` | Pretty-print JSON values with indentation |
-| `--json-sort-keys` | - | `true` | Sort JSON object keys alphabetically. Use `--json-sort-keys=false` to preserve original order. |
 
 **Output:**
 
@@ -52,9 +51,6 @@ Created: 2024-01-15T10:30:45Z
   }
 ```
 
-> [!TIP]
-> Key sorting (`--json-sort-keys`) is enabled by default to ensure consistent output for diffing. When JSON objects are sorted, comparing two versions won't show spurious differences due to key order changes.
-
 **Examples:**
 
 ```bash
@@ -64,8 +60,6 @@ suve sm show my-database-credentials
 # Show with pretty JSON formatting
 suve sm show --json my-database-credentials
 
-# Show JSON without key sorting (preserve original order)
-suve sm show -j --json-sort-keys=false my-database-credentials
 
 # Show previous version by label
 suve sm show my-database-credentials:AWSPREVIOUS
@@ -98,7 +92,6 @@ suve sm cat [options] <name[#VERSION | :LABEL][~SHIFT]*>
 | Option | Alias | Default | Description |
 |--------|-------|---------|-------------|
 | `--json` | `-j` | `false` | Pretty-print JSON values with indentation |
-| `--json-sort-keys` | - | `true` | Sort JSON object keys alphabetically. Use `--json-sort-keys=false` to preserve original order. |
 
 **Output:**
 
@@ -119,8 +112,6 @@ suve sm cat my-ssl-certificate > cert.pem
 # Pretty print JSON
 suve sm cat -j my-database-credentials
 
-# Pretty print JSON without key sorting
-suve sm cat -j --json-sort-keys=false my-database-credentials
 ```
 
 ---
