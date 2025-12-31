@@ -29,11 +29,11 @@ func GetSecretWithVersion(ctx context.Context, client Client, spec *Spec) (*secr
 	}
 
 	// No shift: use ID or Label directly
-	if spec.ID != nil {
-		input.VersionId = spec.ID
+	if spec.Absolute.ID != nil {
+		input.VersionId = spec.Absolute.ID
 	}
-	if spec.Label != nil {
-		input.VersionStage = spec.Label
+	if spec.Absolute.Label != nil {
+		input.VersionStage = spec.Absolute.Label
 	}
 
 	return client.GetSecretValue(ctx, input)
@@ -64,23 +64,23 @@ func getSecretWithShift(ctx context.Context, client Client, spec *Spec) (*secret
 
 	// Find base index
 	baseIdx := 0
-	if spec.ID != nil {
+	if spec.Absolute.ID != nil {
 		found := false
 		for i, v := range versionList {
-			if aws.ToString(v.VersionId) == *spec.ID {
+			if aws.ToString(v.VersionId) == *spec.Absolute.ID {
 				baseIdx = i
 				found = true
 				break
 			}
 		}
 		if !found {
-			return nil, fmt.Errorf("version ID not found: %s", *spec.ID)
+			return nil, fmt.Errorf("version ID not found: %s", *spec.Absolute.ID)
 		}
-	} else if spec.Label != nil {
+	} else if spec.Absolute.Label != nil {
 		found := false
 		for i, v := range versionList {
 			for _, stage := range v.VersionStages {
-				if stage == *spec.Label {
+				if stage == *spec.Absolute.Label {
 					baseIdx = i
 					found = true
 					break
@@ -91,7 +91,7 @@ func getSecretWithShift(ctx context.Context, client Client, spec *Spec) (*secret
 			}
 		}
 		if !found {
-			return nil, fmt.Errorf("version label not found: %s", *spec.Label)
+			return nil, fmt.Errorf("version label not found: %s", *spec.Absolute.Label)
 		}
 	}
 

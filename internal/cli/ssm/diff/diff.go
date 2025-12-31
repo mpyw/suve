@@ -150,7 +150,7 @@ func parseOneArg(arg string) (*ParsedSpec, *ParsedSpec, error) {
 
 	spec1 := &ParsedSpec{
 		Name:    spec.Name,
-		Version: spec.Version,
+		Version: spec.Absolute.Version,
 		Shift:   spec.Shift,
 	}
 	spec2 := &ParsedSpec{
@@ -177,17 +177,17 @@ func parseTwoArgs(arg1, arg2 string) (*ParsedSpec, *ParsedSpec, error) {
 		}
 
 		// Check if first arg has version specifier (mixed pattern) or not (omission pattern)
-		firstHasSpec := spec1Parsed.Version != nil || spec1Parsed.Shift > 0
+		firstHasSpec := spec1Parsed.Absolute.Version != nil || spec1Parsed.Shift > 0
 		if firstHasSpec {
 			// Mixed pattern: name#1 '#2' → v1 vs v2
 			spec1 := &ParsedSpec{
 				Name:    spec1Parsed.Name,
-				Version: spec1Parsed.Version,
+				Version: spec1Parsed.Absolute.Version,
 				Shift:   spec1Parsed.Shift,
 			}
 			spec2 := &ParsedSpec{
 				Name:    spec1Parsed.Name,
-				Version: spec2Parsed.Version,
+				Version: spec2Parsed.Absolute.Version,
 				Shift:   spec2Parsed.Shift,
 			}
 			return spec1, spec2, nil
@@ -196,7 +196,7 @@ func parseTwoArgs(arg1, arg2 string) (*ParsedSpec, *ParsedSpec, error) {
 		// Omission pattern: name '#3' → v3 vs latest (swap order)
 		spec1 := &ParsedSpec{
 			Name:    spec1Parsed.Name,
-			Version: spec2Parsed.Version,
+			Version: spec2Parsed.Absolute.Version,
 			Shift:   spec2Parsed.Shift,
 		}
 		spec2 := &ParsedSpec{
@@ -215,12 +215,12 @@ func parseTwoArgs(arg1, arg2 string) (*ParsedSpec, *ParsedSpec, error) {
 
 	spec1 := &ParsedSpec{
 		Name:    spec1Parsed.Name,
-		Version: spec1Parsed.Version,
+		Version: spec1Parsed.Absolute.Version,
 		Shift:   spec1Parsed.Shift,
 	}
 	spec2 := &ParsedSpec{
 		Name:    spec2Parsed.Name,
-		Version: spec2Parsed.Version,
+		Version: spec2Parsed.Absolute.Version,
 		Shift:   spec2Parsed.Shift,
 	}
 	return spec1, spec2, nil
@@ -239,12 +239,12 @@ func parseThreeArgs(name, version1, version2 string) (*ParsedSpec, *ParsedSpec, 
 
 	spec1 := &ParsedSpec{
 		Name:    spec1Parsed.Name,
-		Version: spec1Parsed.Version,
+		Version: spec1Parsed.Absolute.Version,
 		Shift:   spec1Parsed.Shift,
 	}
 	spec2 := &ParsedSpec{
 		Name:    spec2Parsed.Name,
-		Version: spec2Parsed.Version,
+		Version: spec2Parsed.Absolute.Version,
 		Shift:   spec2Parsed.Shift,
 	}
 	return spec1, spec2, nil
@@ -253,14 +253,14 @@ func parseThreeArgs(name, version1, version2 string) (*ParsedSpec, *ParsedSpec, 
 // Run executes the diff command.
 func (r *Runner) Run(ctx context.Context, opts Options) error {
 	ssmSpec1 := &ssmversion.Spec{
-		Name:    opts.Spec1.Name,
-		Version: opts.Spec1.Version,
-		Shift:   opts.Spec1.Shift,
+		Name:     opts.Spec1.Name,
+		Absolute: ssmversion.AbsoluteSpec{Version: opts.Spec1.Version},
+		Shift:    opts.Spec1.Shift,
 	}
 	ssmSpec2 := &ssmversion.Spec{
-		Name:    opts.Spec2.Name,
-		Version: opts.Spec2.Version,
-		Shift:   opts.Spec2.Shift,
+		Name:     opts.Spec2.Name,
+		Absolute: ssmversion.AbsoluteSpec{Version: opts.Spec2.Version},
+		Shift:    opts.Spec2.Shift,
 	}
 
 	param1, err := ssmversion.GetParameterWithVersion(ctx, r.Client, ssmSpec1, true)

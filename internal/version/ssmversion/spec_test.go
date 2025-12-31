@@ -140,11 +140,6 @@ func TestParse(t *testing.T) {
 			wantName: "/my/param#abc",
 		},
 		{
-			name:     "hash at end",
-			input:    "/my/param#",
-			wantName: "/my/param#",
-		},
-		{
 			name:     "negative version syntax (not valid)",
 			input:    "/my/param#-1",
 			wantName: "/my/param#-1",
@@ -160,6 +155,11 @@ func TestParse(t *testing.T) {
 			name:    "whitespace only",
 			input:   "   ",
 			wantErr: true,
+		},
+		{
+			name:    "hash at end",
+			input:   "/my/param#",
+			wantErr: true, // empty version number
 		},
 		{
 			name:    "starts with #",
@@ -228,8 +228,8 @@ func TestParse(t *testing.T) {
 				t.Errorf("Parse() Name = %q, want %q", spec.Name, tt.wantName)
 			}
 
-			if !testutil.PtrEqual(spec.Version, tt.wantVersion) {
-				t.Errorf("Parse() Version = %v, want %v", spec.Version, tt.wantVersion)
+			if !testutil.PtrEqual(spec.Absolute.Version, tt.wantVersion) {
+				t.Errorf("Parse() Version = %v, want %v", spec.Absolute.Version, tt.wantVersion)
 			}
 
 			if spec.Shift != tt.wantShift {

@@ -78,7 +78,7 @@ func TestGetSecretWithVersion_WithLabel(t *testing.T) {
 	}
 
 	label := "AWSPREVIOUS"
-	spec := &Spec{Name: "my-secret", Label: &label}
+	spec := &Spec{Name: "my-secret", Absolute: AbsoluteSpec{Label: &label}}
 	result, err := GetSecretWithVersion(t.Context(), mock, spec)
 
 	if err != nil {
@@ -294,7 +294,7 @@ func TestGetSecretWithVersion_WithID(t *testing.T) {
 	}
 
 	id := "abc123"
-	spec := &Spec{Name: "my-secret", ID: &id}
+	spec := &Spec{Name: "my-secret", Absolute: AbsoluteSpec{ID: &id}}
 	result, err := GetSecretWithVersion(t.Context(), mock, spec)
 
 	if err != nil {
@@ -332,7 +332,7 @@ func TestGetSecretWithVersion_IDWithShift(t *testing.T) {
 	}
 
 	id := "v2"
-	spec := &Spec{Name: "my-secret", ID: &id, Shift: 1}
+	spec := &Spec{Name: "my-secret", Absolute: AbsoluteSpec{ID: &id}, Shift: 1}
 	result, err := GetSecretWithVersion(t.Context(), mock, spec)
 
 	if err != nil {
@@ -370,7 +370,7 @@ func TestGetSecretWithVersion_LabelWithShift(t *testing.T) {
 	}
 
 	label := "AWSCURRENT"
-	spec := &Spec{Name: "my-secret", Label: &label, Shift: 1}
+	spec := &Spec{Name: "my-secret", Absolute: AbsoluteSpec{Label: &label}, Shift: 1}
 	result, err := GetSecretWithVersion(t.Context(), mock, spec)
 
 	if err != nil {
@@ -394,7 +394,7 @@ func TestGetSecretWithVersion_IDNotFound(t *testing.T) {
 	}
 
 	id := "nonexistent"
-	spec := &Spec{Name: "my-secret", ID: &id, Shift: 1}
+	spec := &Spec{Name: "my-secret", Absolute: AbsoluteSpec{ID: &id}, Shift: 1}
 	_, err := GetSecretWithVersion(t.Context(), mock, spec)
 
 	if err == nil {
@@ -418,7 +418,7 @@ func TestGetSecretWithVersion_LabelNotFound(t *testing.T) {
 	}
 
 	label := "NONEXISTENT"
-	spec := &Spec{Name: "my-secret", Label: &label, Shift: 1}
+	spec := &Spec{Name: "my-secret", Absolute: AbsoluteSpec{Label: &label}, Shift: 1}
 	_, err := GetSecretWithVersion(t.Context(), mock, spec)
 
 	if err == nil {

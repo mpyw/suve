@@ -4,19 +4,29 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
-	"strings"
 
+	"github.com/mpyw/suve/internal/version"
 	"github.com/mpyw/suve/internal/version/internal"
 	"github.com/mpyw/suve/internal/version/shift"
 )
 
-// Sentinel errors for version specification parsing.
+// Re-export common errors for backward compatibility.
 var (
-	ErrNoSpecifier    = errors.New("no specifier found")
-	ErrEmptySpec      = errors.New("empty version specification")
-	ErrEmptyName      = errors.New("empty name in version specification")
-	ErrAmbiguousTilde = errors.New("ambiguous tilde in name")
+	ErrNoSpecifier    = version.ErrNoSpecifier
+	ErrEmptySpec      = version.ErrEmptySpec
+	ErrEmptyName      = version.ErrEmptyName
+	ErrAmbiguousTilde = version.ErrAmbiguousTilde
 )
+
+// SSM-specific errors.
+var (
+	ErrEmptyVersion = errors.New("empty version number after #")
+)
+
+// AbsoluteSpec represents the absolute version specifier for SSM.
+type AbsoluteSpec struct {
+	Version *int64 // Explicit version number (#VERSION)
+}
 
 // Spec represents a parsed SSM parameter version specification.
 //
@@ -25,10 +35,44 @@ var (
 //   - <shift>  ~ or ~<N>, repeatable (0 or more, cumulative)
 //
 // Examples: /my/param, /my/param#3, /my/param~1, /my/param#5~2, /my/param~~
-type Spec struct {
-	Name    string // Parameter name
-	Version *int64 // Explicit version number (#VERSION)
-	Shift   int    // Number of versions to go back (~SHIFT)
+type Spec = version.Spec[AbsoluteSpec]
+
+// parser defines the SSM-specific parsing logic.
+var parser = version.AbsoluteParser[AbsoluteSpec]{
+	IsSpecifierStart: func(s string, i int) (bool, error) {
+		switch s[i] {
+		case '#':
+			// # followed by digit = version specifier
+			if i+1 < len(s) && internal.IsDigit(s[i+1]) {
+				return true, nil
+			}
+			// # at end of string is an error
+			if i+1 >= len(s) {
+				return false, ErrEmptyVersion
+			}
+		}
+		return false, nil
+	},
+	ParseAbsolute: func(remaining string) (AbsoluteSpec, string, error) {
+		var abs AbsoluteSpec
+
+		// Parse #version if present
+		if len(remaining) > 0 && remaining[0] == '#' {
+			end := findNextSpecifier(remaining, 1)
+			versionStr := remaining[1:end]
+			v, err := strconv.ParseInt(versionStr, 10, 64)
+			if err != nil {
+				return AbsoluteSpec{}, "", fmt.Errorf("invalid version number: %s", versionStr)
+			}
+			abs.Version = &v
+			remaining = remaining[end:]
+		}
+
+		return abs, remaining, nil
+	},
+	Zero: func() AbsoluteSpec {
+		return AbsoluteSpec{}
+	},
 }
 
 // Parse parses an SSM version specification string.
@@ -41,91 +85,22 @@ type Spec struct {
 //   - ~~     go back 2 versions (same as ~1~1)
 //   - ~1~2   cumulative: go back 3 versions
 func Parse(input string) (*Spec, error) {
-	input = strings.TrimSpace(input)
-	if input == "" {
-		return nil, ErrEmptySpec
-	}
-
-	spec := &Spec{}
-
-	// Find where specifiers start
-	specStart, err := findSpecifierStart(input)
-	if err != nil {
-		if errors.Is(err, ErrNoSpecifier) {
-			spec.Name = input
-			return spec, nil
-		}
-		return nil, err
-	}
-
-	spec.Name = input[:specStart]
-	if spec.Name == "" {
-		return nil, ErrEmptyName
-	}
-
-	remaining := input[specStart:]
-
-	// Parse #version if present
-	if strings.HasPrefix(remaining, "#") {
-		end := findShiftStart(remaining, 1)
-		versionStr := remaining[1:end]
-		// versionStr is guaranteed non-empty because findSpecifierStart only
-		// returns a position for # when followed by a digit
-		v, err := strconv.ParseInt(versionStr, 10, 64)
-		if err != nil {
-			return nil, fmt.Errorf("invalid version number: %s", versionStr)
-		}
-		spec.Version = &v
-		remaining = remaining[end:]
-	}
-
-	// Parse shifts
-	if remaining != "" {
-		s, err := shift.Parse(remaining)
-		if err != nil {
-			return nil, err
-		}
-		spec.Shift = s
-	}
-
-	return spec, nil
+	return version.Parse(input, parser)
 }
 
-// findSpecifierStart finds the index where specifiers begin.
-// Returns the position of the first specifier.
-// Returns ErrNoSpecifier if no specifier found.
-// Returns other errors for invalid patterns.
-func findSpecifierStart(s string) (int, error) {
-	for i := 0; i < len(s); i++ {
+// findNextSpecifier finds the next specifier start after position start.
+func findNextSpecifier(s string, start int) int {
+	for i := start; i < len(s); i++ {
 		switch s[i] {
 		case '#':
 			if i+1 < len(s) && internal.IsDigit(s[i+1]) {
-				return i, nil
+				return i
 			}
 		case '~':
 			if shift.IsShiftStart(s, i) {
-				return i, nil
+				return i
 			}
-			// Tilde followed by letter is ambiguous - error
-			if i+1 < len(s) && internal.IsLetter(s[i+1]) {
-				return 0, fmt.Errorf("%w: use ~SHIFT (e.g., ~1) for version shift or avoid ~ followed by letters", ErrAmbiguousTilde)
-			}
-		}
-	}
-	return 0, ErrNoSpecifier
-}
-
-// findShiftStart finds the next shift start after position start.
-func findShiftStart(s string, start int) int {
-	for i := start; i < len(s); i++ {
-		if shift.IsShiftStart(s, i) {
-			return i
 		}
 	}
 	return len(s)
-}
-
-// HasShift returns true if a shift is specified.
-func (s *Spec) HasShift() bool {
-	return s.Shift > 0
 }

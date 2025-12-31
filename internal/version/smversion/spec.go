@@ -3,22 +3,32 @@ package smversion
 import (
 	"errors"
 	"fmt"
-	"strings"
 
+	"github.com/mpyw/suve/internal/version"
 	"github.com/mpyw/suve/internal/version/internal"
 	"github.com/mpyw/suve/internal/version/shift"
 )
 
-// Sentinel errors for version specification parsing.
+// Re-export common errors for backward compatibility.
 var (
-	ErrNoSpecifier    = errors.New("no specifier found")
-	ErrEmptySpec      = errors.New("empty version specification")
-	ErrEmptyName      = errors.New("empty name in version specification")
+	ErrNoSpecifier    = version.ErrNoSpecifier
+	ErrEmptySpec      = version.ErrEmptySpec
+	ErrEmptyName      = version.ErrEmptyName
+	ErrAmbiguousTilde = version.ErrAmbiguousTilde
+)
+
+// SM-specific errors.
+var (
 	ErrEmptyID        = errors.New("empty version ID after #")
 	ErrEmptyLabel     = errors.New("empty label after colon")
-	ErrAmbiguousTilde = errors.New("ambiguous tilde in name")
 	ErrBothIDAndLabel = errors.New("cannot specify both #VERSION and :LABEL")
 )
+
+// AbsoluteSpec represents the absolute version specifier for SM.
+type AbsoluteSpec struct {
+	ID    *string // Version ID (#VERSION)
+	Label *string // Staging label (:LABEL)
+}
 
 // Spec represents a parsed SM secret version specification.
 //
@@ -28,11 +38,65 @@ var (
 //   - <shift>  ~ or ~<N>, repeatable (0 or more, cumulative)
 //
 // Examples: my-secret, my-secret#abc123, my-secret:AWSCURRENT, my-secret~1
-type Spec struct {
-	Name  string  // Secret name
-	ID    *string // Version ID (#VERSION)
-	Label *string // Staging label (:LABEL)
-	Shift int     // Number of versions to go back (~SHIFT)
+type Spec = version.Spec[AbsoluteSpec]
+
+// parser defines the SM-specific parsing logic.
+var parser = version.AbsoluteParser[AbsoluteSpec]{
+	IsSpecifierStart: func(s string, i int) (bool, error) {
+		switch s[i] {
+		case '#':
+			// # followed by valid ID char = version ID specifier
+			if i+1 < len(s) && isIDChar(s[i+1]) {
+				return true, nil
+			}
+			// # at end of string is an error
+			if i+1 >= len(s) {
+				return false, ErrEmptyID
+			}
+		case ':':
+			// : followed by valid label start = label specifier
+			if i+1 < len(s) && isLabelChar(s[i+1]) {
+				return true, nil
+			}
+			// : at end of string is an error
+			if i+1 >= len(s) {
+				return false, ErrEmptyLabel
+			}
+		}
+		return false, nil
+	},
+	ParseAbsolute: func(remaining string) (AbsoluteSpec, string, error) {
+		var abs AbsoluteSpec
+
+		// Parse #id if present
+		if len(remaining) > 0 && remaining[0] == '#' {
+			end := findNextSpecifier(remaining, 1)
+			id := remaining[1:end]
+			abs.ID = &id
+			remaining = remaining[end:]
+		}
+
+		// Parse :label if present
+		if len(remaining) > 0 && remaining[0] == ':' {
+			end := findNextSpecifier(remaining, 1)
+			label := remaining[1:end]
+			if !isValidLabel(label) {
+				return AbsoluteSpec{}, "", fmt.Errorf("invalid label: %s", label)
+			}
+			abs.Label = &label
+			remaining = remaining[end:]
+		}
+
+		// Validate: #id and :label are mutually exclusive
+		if abs.ID != nil && abs.Label != nil {
+			return AbsoluteSpec{}, "", ErrBothIDAndLabel
+		}
+
+		return abs, remaining, nil
+	},
+	Zero: func() AbsoluteSpec {
+		return AbsoluteSpec{}
+	},
 }
 
 // Parse parses an SM version specification string.
@@ -45,106 +109,7 @@ type Spec struct {
 //   - ~~    go back 2 versions (same as ~1~1)
 //   - ~1~2  cumulative: go back 3 versions
 func Parse(input string) (*Spec, error) {
-	input = strings.TrimSpace(input)
-	if input == "" {
-		return nil, ErrEmptySpec
-	}
-
-	spec := &Spec{}
-
-	// Find where specifiers start
-	specStart, err := findSpecifierStart(input)
-	if err != nil {
-		if errors.Is(err, ErrNoSpecifier) {
-			spec.Name = input
-			return spec, nil
-		}
-		return nil, err
-	}
-
-	spec.Name = input[:specStart]
-	if spec.Name == "" {
-		return nil, ErrEmptyName
-	}
-
-	remaining := input[specStart:]
-
-	// Parse #id if present
-	if strings.HasPrefix(remaining, "#") {
-		end := findNextSpecifier(remaining, 1)
-		id := remaining[1:end]
-		// id is guaranteed non-empty because findSpecifierStart only
-		// returns a position for # when followed by isIDChar
-		spec.ID = &id
-		remaining = remaining[end:]
-	}
-
-	// Parse :label if present
-	if strings.HasPrefix(remaining, ":") {
-		end := findNextSpecifier(remaining, 1)
-		label := remaining[1:end]
-		// label is guaranteed non-empty because findSpecifierStart only
-		// returns a position for : when followed by isLabelChar
-		if !isValidLabel(label) {
-			return nil, fmt.Errorf("invalid label: %s", label)
-		}
-		spec.Label = &label
-		remaining = remaining[end:]
-	}
-
-	// Parse shifts
-	if remaining != "" {
-		s, err := shift.Parse(remaining)
-		if err != nil {
-			return nil, err
-		}
-		spec.Shift = s
-	}
-
-	// Validate: #id and :label are mutually exclusive
-	if spec.ID != nil && spec.Label != nil {
-		return nil, ErrBothIDAndLabel
-	}
-
-	return spec, nil
-}
-
-// findSpecifierStart finds the index where specifiers begin.
-// Returns the position of the first specifier.
-// Returns ErrNoSpecifier if no specifier found.
-// Returns other errors for invalid patterns.
-func findSpecifierStart(s string) (int, error) {
-	for i := 0; i < len(s); i++ {
-		switch s[i] {
-		case '#':
-			// # followed by valid ID char = version ID specifier
-			if i+1 < len(s) && isIDChar(s[i+1]) {
-				return i, nil
-			}
-			// # at end of string is an error
-			if i+1 >= len(s) {
-				return 0, ErrEmptyID
-			}
-		case ':':
-			// : followed by valid label start = label specifier
-			if i+1 < len(s) && isLabelChar(s[i+1]) {
-				return i, nil
-			}
-			// : at end of string is an error
-			if i+1 >= len(s) {
-				return 0, ErrEmptyLabel
-			}
-		case '~':
-			if shift.IsShiftStart(s, i) {
-				return i, nil
-			}
-			// Tilde followed by letter is ambiguous - error
-			if i+1 < len(s) && internal.IsLetter(s[i+1]) {
-				return 0, fmt.Errorf("%w: use ~N for version shift or avoid ~ followed by letters", ErrAmbiguousTilde)
-			}
-		}
-	}
-	return 0, ErrNoSpecifier
+	return version.Parse(input, parser)
 }
 
 // findNextSpecifier finds the next specifier start after position start.
@@ -177,17 +142,10 @@ func isLabelChar(c byte) bool {
 }
 
 func isValidLabel(s string) bool {
-	// Empty check is not needed here because Parse guarantees
-	// labels are non-empty before calling isValidLabel
 	for i := 0; i < len(s); i++ {
 		if !isLabelChar(s[i]) {
 			return false
 		}
 	}
 	return true
-}
-
-// HasShift returns true if a shift is specified.
-func (s *Spec) HasShift() bool {
-	return s.Shift > 0
 }

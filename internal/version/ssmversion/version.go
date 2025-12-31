@@ -46,17 +46,17 @@ func getParameterWithShift(ctx context.Context, client ssmapi.GetParameterHistor
 	}
 
 	baseIdx := 0
-	if spec.Version != nil {
+	if spec.Absolute.Version != nil {
 		found := false
 		for i, p := range params {
-			if p.Version == *spec.Version {
+			if p.Version == *spec.Absolute.Version {
 				baseIdx = i
 				found = true
 				break
 			}
 		}
 		if !found {
-			return nil, fmt.Errorf("version %d not found", *spec.Version)
+			return nil, fmt.Errorf("version %d not found", *spec.Absolute.Version)
 		}
 	}
 
@@ -70,8 +70,8 @@ func getParameterWithShift(ctx context.Context, client ssmapi.GetParameterHistor
 
 func getParameterDirect(ctx context.Context, client ssmapi.GetParameterAPI, spec *Spec, decrypt bool) (*types.ParameterHistory, error) {
 	var nameWithVersion string
-	if spec.Version != nil {
-		nameWithVersion = fmt.Sprintf("%s:%d", spec.Name, *spec.Version)
+	if spec.Absolute.Version != nil {
+		nameWithVersion = fmt.Sprintf("%s:%d", spec.Name, *spec.Absolute.Version)
 	} else {
 		nameWithVersion = spec.Name
 	}

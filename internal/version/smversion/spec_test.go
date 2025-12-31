@@ -354,12 +354,12 @@ func TestParse(t *testing.T) {
 				t.Errorf("Parse() Name = %q, want %q", spec.Name, tt.wantName)
 			}
 
-			if !testutil.PtrEqual(spec.ID, tt.wantID) {
-				t.Errorf("Parse() ID = %v, want %v", spec.ID, tt.wantID)
+			if !testutil.PtrEqual(spec.Absolute.ID, tt.wantID) {
+				t.Errorf("Parse() ID = %v, want %v", spec.Absolute.ID, tt.wantID)
 			}
 
-			if !testutil.PtrEqual(spec.Label, tt.wantLabel) {
-				t.Errorf("Parse() Label = %v, want %v", spec.Label, tt.wantLabel)
+			if !testutil.PtrEqual(spec.Absolute.Label, tt.wantLabel) {
+				t.Errorf("Parse() Label = %v, want %v", spec.Absolute.Label, tt.wantLabel)
 			}
 
 			if spec.Shift != tt.wantShift {

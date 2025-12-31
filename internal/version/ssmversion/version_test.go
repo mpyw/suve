@@ -84,7 +84,7 @@ func TestGetParameterWithVersion_SpecificVersion(t *testing.T) {
 	}
 
 	v := int64(2)
-	spec := &Spec{Name: "/my/param", Version: &v}
+	spec := &Spec{Name: "/my/param", Absolute: AbsoluteSpec{Version: &v}}
 	result, err := GetParameterWithVersion(t.Context(), mock, spec, true)
 
 	if err != nil {
@@ -146,7 +146,7 @@ func TestGetParameterWithVersion_ShiftFromSpecificVersion(t *testing.T) {
 	}
 
 	v := int64(3)
-	spec := &Spec{Name: "/my/param", Version: &v, Shift: 2}
+	spec := &Spec{Name: "/my/param", Absolute: AbsoluteSpec{Version: &v}, Shift: 2}
 	result, err := GetParameterWithVersion(t.Context(), mock, spec, true)
 
 	if err != nil {
@@ -194,7 +194,7 @@ func TestGetParameterWithVersion_VersionNotFound(t *testing.T) {
 	}
 
 	v := int64(99)
-	spec := &Spec{Name: "/my/param", Version: &v, Shift: 1}
+	spec := &Spec{Name: "/my/param", Absolute: AbsoluteSpec{Version: &v}, Shift: 1}
 	_, err := GetParameterWithVersion(t.Context(), mock, spec, true)
 
 	if err == nil {
