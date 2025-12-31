@@ -32,7 +32,7 @@ import (
 	smls "github.com/mpyw/suve/internal/cli/sm/ls"
 	smrestore "github.com/mpyw/suve/internal/cli/sm/restore"
 	smrm "github.com/mpyw/suve/internal/cli/sm/rm"
-	smset "github.com/mpyw/suve/internal/cli/sm/set"
+	smupdate "github.com/mpyw/suve/internal/cli/sm/update"
 	smshow "github.com/mpyw/suve/internal/cli/sm/show"
 )
 
@@ -260,11 +260,11 @@ func TestSM_FullWorkflow(t *testing.T) {
 	})
 
 	// 4. Update secret
-	t.Run("set", func(t *testing.T) {
+	t.Run("update", func(t *testing.T) {
 		var buf bytes.Buffer
-		err := smset.Run(ctx, client, &buf, secretName, "updated-secret")
+		err := smupdate.Run(ctx, client, &buf, secretName, "updated-secret")
 		if err != nil {
-			t.Fatalf("smset.Run() error: %v", err)
+			t.Fatalf("smupdate.Run() error: %v", err)
 		}
 	})
 
