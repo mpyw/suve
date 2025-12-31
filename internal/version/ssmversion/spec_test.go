@@ -133,18 +133,6 @@ func TestParse(t *testing.T) {
 			wantVersion: testutil.Ptr(int64(3)),
 		},
 
-		// # in name (not a version specifier - not followed by digit)
-		{
-			name:     "hash followed by non-digit",
-			input:    "/my/param#abc",
-			wantName: "/my/param#abc",
-		},
-		{
-			name:     "negative version syntax (not valid)",
-			input:    "/my/param#-1",
-			wantName: "/my/param#-1",
-		},
-
 		// Error cases
 		{
 			name:    "empty input",
@@ -159,7 +147,17 @@ func TestParse(t *testing.T) {
 		{
 			name:    "hash at end",
 			input:   "/my/param#",
-			wantErr: true, // empty version number
+			wantErr: true,
+		},
+		{
+			name:    "hash followed by non-digit",
+			input:   "/my/param#abc",
+			wantErr: true,
+		},
+		{
+			name:    "negative version syntax",
+			input:   "/my/param#-1",
+			wantErr: true,
 		},
 		{
 			name:    "starts with #",
