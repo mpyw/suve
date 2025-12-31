@@ -1,4 +1,4 @@
-package smversion
+package smversion_test
 
 import (
 	"context"
@@ -11,6 +11,8 @@ import (
 	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/mpyw/suve/internal/version/smversion"
 )
 
 type mockClient struct {
@@ -49,8 +51,8 @@ func TestGetSecretWithVersion_Latest(t *testing.T) {
 		},
 	}
 
-	spec := &Spec{Name: "my-secret"}
-	result, err := GetSecretWithVersion(t.Context(), mock, spec)
+	spec := &smversion.Spec{Name: "my-secret"}
+	result, err := smversion.GetSecretWithVersion(t.Context(), mock, spec)
 
 	require.NoError(t, err)
 	assert.Equal(t, "my-secret", lo.FromPtr(result.Name))
@@ -72,8 +74,8 @@ func TestGetSecretWithVersion_WithLabel(t *testing.T) {
 	}
 
 	label := "AWSPREVIOUS"
-	spec := &Spec{Name: "my-secret", Absolute: AbsoluteSpec{Label: &label}}
-	result, err := GetSecretWithVersion(t.Context(), mock, spec)
+	spec := &smversion.Spec{Name: "my-secret", Absolute: smversion.AbsoluteSpec{Label: &label}}
+	result, err := smversion.GetSecretWithVersion(t.Context(), mock, spec)
 
 	require.NoError(t, err)
 	assert.Equal(t, "previous-value", lo.FromPtr(result.SecretString))
@@ -104,8 +106,8 @@ func TestGetSecretWithVersion_Shift(t *testing.T) {
 		},
 	}
 
-	spec := &Spec{Name: "my-secret", Shift: 1}
-	result, err := GetSecretWithVersion(t.Context(), mock, spec)
+	spec := &smversion.Spec{Name: "my-secret", Shift: 1}
+	result, err := smversion.GetSecretWithVersion(t.Context(), mock, spec)
 
 	require.NoError(t, err)
 	assert.Equal(t, "v2-value", lo.FromPtr(result.SecretString))
@@ -124,8 +126,8 @@ func TestGetSecretWithVersion_ShiftOutOfRange(t *testing.T) {
 		},
 	}
 
-	spec := &Spec{Name: "my-secret", Shift: 5}
-	_, err := GetSecretWithVersion(t.Context(), mock, spec)
+	spec := &smversion.Spec{Name: "my-secret", Shift: 5}
+	_, err := smversion.GetSecretWithVersion(t.Context(), mock, spec)
 
 	require.Error(t, err)
 	assert.Equal(t, "version shift out of range: ~5", err.Error())
@@ -139,8 +141,8 @@ func TestGetSecretWithVersion_ListVersionsError(t *testing.T) {
 		},
 	}
 
-	spec := &Spec{Name: "my-secret", Shift: 1}
-	_, err := GetSecretWithVersion(t.Context(), mock, spec)
+	spec := &smversion.Spec{Name: "my-secret", Shift: 1}
+	_, err := smversion.GetSecretWithVersion(t.Context(), mock, spec)
 
 	require.Error(t, err)
 	assert.Equal(t, "failed to list versions: AWS error", err.Error())
@@ -154,8 +156,8 @@ func TestGetSecretWithVersion_GetSecretError(t *testing.T) {
 		},
 	}
 
-	spec := &Spec{Name: "my-secret"}
-	_, err := GetSecretWithVersion(t.Context(), mock, spec)
+	spec := &smversion.Spec{Name: "my-secret"}
+	_, err := smversion.GetSecretWithVersion(t.Context(), mock, spec)
 
 	require.Error(t, err)
 	assert.Equal(t, "AWS error", err.Error())
@@ -171,8 +173,8 @@ func TestGetSecretWithVersion_EmptyVersionList(t *testing.T) {
 		},
 	}
 
-	spec := &Spec{Name: "my-secret", Shift: 1}
-	_, err := GetSecretWithVersion(t.Context(), mock, spec)
+	spec := &smversion.Spec{Name: "my-secret", Shift: 1}
+	_, err := smversion.GetSecretWithVersion(t.Context(), mock, spec)
 
 	require.Error(t, err)
 	assert.Equal(t, "secret not found or has no versions: my-secret", err.Error())
@@ -203,8 +205,8 @@ func TestGetSecretWithVersion_SortByCreatedDate(t *testing.T) {
 		},
 	}
 
-	spec := &Spec{Name: "my-secret", Shift: 2}
-	result, err := GetSecretWithVersion(t.Context(), mock, spec)
+	spec := &smversion.Spec{Name: "my-secret", Shift: 2}
+	result, err := smversion.GetSecretWithVersion(t.Context(), mock, spec)
 
 	require.NoError(t, err)
 	assert.Equal(t, "oldest", lo.FromPtr(result.SecretString))
@@ -235,8 +237,8 @@ func TestGetSecretWithVersion_NilCreatedDate(t *testing.T) {
 		},
 	}
 
-	spec := &Spec{Name: "my-secret", Shift: 1}
-	result, err := GetSecretWithVersion(t.Context(), mock, spec)
+	spec := &smversion.Spec{Name: "my-secret", Shift: 1}
+	result, err := smversion.GetSecretWithVersion(t.Context(), mock, spec)
 
 	require.NoError(t, err)
 	assert.Equal(t, "value", lo.FromPtr(result.SecretString))
@@ -256,8 +258,8 @@ func TestGetSecretWithVersion_WithID(t *testing.T) {
 	}
 
 	id := "abc123"
-	spec := &Spec{Name: "my-secret", Absolute: AbsoluteSpec{ID: &id}}
-	result, err := GetSecretWithVersion(t.Context(), mock, spec)
+	spec := &smversion.Spec{Name: "my-secret", Absolute: smversion.AbsoluteSpec{ID: &id}}
+	result, err := smversion.GetSecretWithVersion(t.Context(), mock, spec)
 
 	require.NoError(t, err)
 	assert.Equal(t, "versioned-value", lo.FromPtr(result.SecretString))
@@ -289,8 +291,8 @@ func TestGetSecretWithVersion_IDWithShift(t *testing.T) {
 	}
 
 	id := "v2"
-	spec := &Spec{Name: "my-secret", Absolute: AbsoluteSpec{ID: &id}, Shift: 1}
-	result, err := GetSecretWithVersion(t.Context(), mock, spec)
+	spec := &smversion.Spec{Name: "my-secret", Absolute: smversion.AbsoluteSpec{ID: &id}, Shift: 1}
+	result, err := smversion.GetSecretWithVersion(t.Context(), mock, spec)
 
 	require.NoError(t, err)
 	assert.Equal(t, "v1-value", lo.FromPtr(result.SecretString))
@@ -322,8 +324,8 @@ func TestGetSecretWithVersion_LabelWithShift(t *testing.T) {
 	}
 
 	label := "AWSCURRENT"
-	spec := &Spec{Name: "my-secret", Absolute: AbsoluteSpec{Label: &label}, Shift: 1}
-	result, err := GetSecretWithVersion(t.Context(), mock, spec)
+	spec := &smversion.Spec{Name: "my-secret", Absolute: smversion.AbsoluteSpec{Label: &label}, Shift: 1}
+	result, err := smversion.GetSecretWithVersion(t.Context(), mock, spec)
 
 	require.NoError(t, err)
 	assert.Equal(t, "v2-value", lo.FromPtr(result.SecretString))
@@ -343,8 +345,8 @@ func TestGetSecretWithVersion_IDNotFound(t *testing.T) {
 	}
 
 	id := "nonexistent"
-	spec := &Spec{Name: "my-secret", Absolute: AbsoluteSpec{ID: &id}, Shift: 1}
-	_, err := GetSecretWithVersion(t.Context(), mock, spec)
+	spec := &smversion.Spec{Name: "my-secret", Absolute: smversion.AbsoluteSpec{ID: &id}, Shift: 1}
+	_, err := smversion.GetSecretWithVersion(t.Context(), mock, spec)
 
 	require.Error(t, err)
 	assert.Equal(t, "version ID not found: nonexistent", err.Error())
@@ -364,8 +366,8 @@ func TestGetSecretWithVersion_LabelNotFound(t *testing.T) {
 	}
 
 	label := "NONEXISTENT"
-	spec := &Spec{Name: "my-secret", Absolute: AbsoluteSpec{Label: &label}, Shift: 1}
-	_, err := GetSecretWithVersion(t.Context(), mock, spec)
+	spec := &smversion.Spec{Name: "my-secret", Absolute: smversion.AbsoluteSpec{Label: &label}, Shift: 1}
+	_, err := smversion.GetSecretWithVersion(t.Context(), mock, spec)
 
 	require.Error(t, err)
 	assert.Equal(t, "version label not found: NONEXISTENT", err.Error())

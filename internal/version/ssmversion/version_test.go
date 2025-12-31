@@ -1,4 +1,4 @@
-package ssmversion
+package ssmversion_test
 
 import (
 	"context"
@@ -11,6 +11,8 @@ import (
 	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/mpyw/suve/internal/version/ssmversion"
 )
 
 type mockClient struct {
@@ -50,8 +52,8 @@ func TestGetParameterWithVersion_Latest(t *testing.T) {
 		},
 	}
 
-	spec := &Spec{Name: "/my/param"}
-	result, err := GetParameterWithVersion(t.Context(), mock, spec, true)
+	spec := &ssmversion.Spec{Name: "/my/param"}
+	result, err := ssmversion.GetParameterWithVersion(t.Context(), mock, spec, true)
 
 	require.NoError(t, err)
 	assert.Equal(t, "/my/param", lo.FromPtr(result.Name))
@@ -76,8 +78,8 @@ func TestGetParameterWithVersion_SpecificVersion(t *testing.T) {
 	}
 
 	v := int64(2)
-	spec := &Spec{Name: "/my/param", Absolute: AbsoluteSpec{Version: &v}}
-	result, err := GetParameterWithVersion(t.Context(), mock, spec, true)
+	spec := &ssmversion.Spec{Name: "/my/param", Absolute: ssmversion.AbsoluteSpec{Version: &v}}
+	result, err := ssmversion.GetParameterWithVersion(t.Context(), mock, spec, true)
 
 	require.NoError(t, err)
 	assert.Equal(t, "old-value", lo.FromPtr(result.Value))
@@ -101,8 +103,8 @@ func TestGetParameterWithVersion_Shift(t *testing.T) {
 		},
 	}
 
-	spec := &Spec{Name: "/my/param", Shift: 1}
-	result, err := GetParameterWithVersion(t.Context(), mock, spec, true)
+	spec := &ssmversion.Spec{Name: "/my/param", Shift: 1}
+	result, err := ssmversion.GetParameterWithVersion(t.Context(), mock, spec, true)
 
 	require.NoError(t, err)
 	// Shift 1 means one version back from latest (v3), so v2
@@ -126,8 +128,8 @@ func TestGetParameterWithVersion_ShiftFromSpecificVersion(t *testing.T) {
 	}
 
 	v := int64(3)
-	spec := &Spec{Name: "/my/param", Absolute: AbsoluteSpec{Version: &v}, Shift: 2}
-	result, err := GetParameterWithVersion(t.Context(), mock, spec, true)
+	spec := &ssmversion.Spec{Name: "/my/param", Absolute: ssmversion.AbsoluteSpec{Version: &v}, Shift: 2}
+	result, err := ssmversion.GetParameterWithVersion(t.Context(), mock, spec, true)
 
 	require.NoError(t, err)
 	// Version 3, shift 2 means v3 -> v2 -> v1
@@ -147,8 +149,8 @@ func TestGetParameterWithVersion_ShiftOutOfRange(t *testing.T) {
 		},
 	}
 
-	spec := &Spec{Name: "/my/param", Shift: 5}
-	_, err := GetParameterWithVersion(t.Context(), mock, spec, true)
+	spec := &ssmversion.Spec{Name: "/my/param", Shift: 5}
+	_, err := ssmversion.GetParameterWithVersion(t.Context(), mock, spec, true)
 
 	require.Error(t, err)
 	assert.Equal(t, "version shift out of range: ~5", err.Error())
@@ -168,8 +170,8 @@ func TestGetParameterWithVersion_VersionNotFound(t *testing.T) {
 	}
 
 	v := int64(99)
-	spec := &Spec{Name: "/my/param", Absolute: AbsoluteSpec{Version: &v}, Shift: 1}
-	_, err := GetParameterWithVersion(t.Context(), mock, spec, true)
+	spec := &ssmversion.Spec{Name: "/my/param", Absolute: ssmversion.AbsoluteSpec{Version: &v}, Shift: 1}
+	_, err := ssmversion.GetParameterWithVersion(t.Context(), mock, spec, true)
 
 	require.Error(t, err)
 	assert.Equal(t, "version 99 not found", err.Error())
@@ -185,8 +187,8 @@ func TestGetParameterWithVersion_EmptyHistory(t *testing.T) {
 		},
 	}
 
-	spec := &Spec{Name: "/my/param", Shift: 1}
-	_, err := GetParameterWithVersion(t.Context(), mock, spec, true)
+	spec := &ssmversion.Spec{Name: "/my/param", Shift: 1}
+	_, err := ssmversion.GetParameterWithVersion(t.Context(), mock, spec, true)
 
 	require.Error(t, err)
 	assert.Equal(t, "parameter not found: /my/param", err.Error())
@@ -200,8 +202,8 @@ func TestGetParameterWithVersion_GetParameterError(t *testing.T) {
 		},
 	}
 
-	spec := &Spec{Name: "/my/param"}
-	_, err := GetParameterWithVersion(t.Context(), mock, spec, true)
+	spec := &ssmversion.Spec{Name: "/my/param"}
+	_, err := ssmversion.GetParameterWithVersion(t.Context(), mock, spec, true)
 
 	require.Error(t, err)
 	assert.Equal(t, "failed to get parameter: AWS error", err.Error())
@@ -215,8 +217,8 @@ func TestGetParameterWithVersion_GetParameterHistoryError(t *testing.T) {
 		},
 	}
 
-	spec := &Spec{Name: "/my/param", Shift: 1}
-	_, err := GetParameterWithVersion(t.Context(), mock, spec, true)
+	spec := &ssmversion.Spec{Name: "/my/param", Shift: 1}
+	_, err := ssmversion.GetParameterWithVersion(t.Context(), mock, spec, true)
 
 	require.Error(t, err)
 	assert.Equal(t, "failed to get parameter history: AWS error", err.Error())
@@ -238,8 +240,8 @@ func TestGetParameterWithVersion_DecryptFlag(t *testing.T) {
 		},
 	}
 
-	spec := &Spec{Name: "/my/param"}
-	result, err := GetParameterWithVersion(t.Context(), mock, spec, true)
+	spec := &ssmversion.Spec{Name: "/my/param"}
+	result, err := ssmversion.GetParameterWithVersion(t.Context(), mock, spec, true)
 
 	require.NoError(t, err)
 	assert.Equal(t, "decrypted-value", lo.FromPtr(result.Value))

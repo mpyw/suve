@@ -1,9 +1,11 @@
-package internal
+package internal_test
 
 import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
+	"github.com/mpyw/suve/internal/version/internal"
 )
 
 func TestIsDigit(t *testing.T) {
@@ -21,7 +23,7 @@ func TestIsDigit(t *testing.T) {
 		{'/', false},
 	}
 	for _, tt := range tests {
-		assert.Equal(t, tt.want, IsDigit(tt.c), "IsDigit(%q)", tt.c)
+		assert.Equal(t, tt.want, internal.IsDigit(tt.c), "IsDigit(%q)", tt.c)
 	}
 }
 
@@ -43,6 +45,6 @@ func TestIsLetter(t *testing.T) {
 		{'_', false},
 	}
 	for _, tt := range tests {
-		assert.Equal(t, tt.want, IsLetter(tt.c), "IsLetter(%q)", tt.c)
+		assert.Equal(t, tt.want, internal.IsLetter(tt.c), "IsLetter(%q)", tt.c)
 	}
 }

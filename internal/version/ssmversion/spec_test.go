@@ -1,4 +1,4 @@
-package ssmversion
+package ssmversion_test
 
 import (
 	"testing"
@@ -6,6 +6,8 @@ import (
 	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/mpyw/suve/internal/version/ssmversion"
 )
 
 func TestParse(t *testing.T) {
@@ -220,7 +222,7 @@ func TestParse(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			spec, err := Parse(tt.input)
+			spec, err := ssmversion.Parse(tt.input)
 
 			if tt.wantErr {
 				assert.Error(t, err)
@@ -239,22 +241,22 @@ func TestSpec_HasShift(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name string
-		spec *Spec
+		spec *ssmversion.Spec
 		want bool
 	}{
 		{
 			name: "no shift",
-			spec: &Spec{Name: "/my/param", Shift: 0},
+			spec: &ssmversion.Spec{Name: "/my/param", Shift: 0},
 			want: false,
 		},
 		{
 			name: "with shift 1",
-			spec: &Spec{Name: "/my/param", Shift: 1},
+			spec: &ssmversion.Spec{Name: "/my/param", Shift: 1},
 			want: true,
 		},
 		{
 			name: "with shift 5",
-			spec: &Spec{Name: "/my/param", Shift: 5},
+			spec: &ssmversion.Spec{Name: "/my/param", Shift: 5},
 			want: true,
 		},
 	}

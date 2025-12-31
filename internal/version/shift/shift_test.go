@@ -1,10 +1,12 @@
-package shift
+package shift_test
 
 import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/mpyw/suve/internal/version/shift"
 )
 
 func TestParse(t *testing.T) {
@@ -58,7 +60,7 @@ func TestParse(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			gotShift, err := Parse(tt.input)
+			gotShift, err := shift.Parse(tt.input)
 			if tt.wantErr {
 				assert.Error(t, err)
 				return
@@ -117,7 +119,7 @@ func TestIsShiftStart(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got := IsShiftStart(tt.s, tt.i)
+			got := shift.IsShiftStart(tt.s, tt.i)
 			assert.Equal(t, tt.want, got)
 		})
 	}

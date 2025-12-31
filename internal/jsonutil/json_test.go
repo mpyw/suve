@@ -1,9 +1,11 @@
-package jsonutil
+package jsonutil_test
 
 import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
+	"github.com/mpyw/suve/internal/jsonutil"
 )
 
 func TestFormat(t *testing.T) {
@@ -78,7 +80,7 @@ func TestFormat(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got := Format(tt.input)
+			got := jsonutil.Format(tt.input)
 			assert.Equal(t, tt.want, got)
 		})
 	}
@@ -105,7 +107,7 @@ func TestIsJSON(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got := IsJSON(tt.input)
+			got := jsonutil.IsJSON(tt.input)
 			assert.Equal(t, tt.want, got)
 		})
 	}
