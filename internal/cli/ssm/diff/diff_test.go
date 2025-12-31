@@ -279,6 +279,26 @@ func TestParseArgs(t *testing.T) {
 			args:       []string{"/app/config", "#3~abc"},
 			wantErrMsg: "invalid",
 		},
+		{
+			name:       "2 args: invalid first arg",
+			args:       []string{"#", "/app/config#2"},
+			wantErrMsg: "invalid first argument",
+		},
+		{
+			name:       "2 args: invalid second arg (full spec x2)",
+			args:       []string{"/app/config#1", "/app/config#"},
+			wantErrMsg: "invalid second argument",
+		},
+		{
+			name:       "3 args: invalid version1",
+			args:       []string{"/app/config", "#", "#2"},
+			wantErrMsg: "invalid version1",
+		},
+		{
+			name:       "3 args: invalid version2",
+			args:       []string{"/app/config", "#1", "#"},
+			wantErrMsg: "invalid version2",
+		},
 	}
 
 	for _, tt := range tests {

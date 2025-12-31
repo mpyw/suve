@@ -160,3 +160,101 @@ func TestColorDiff_EmptyInput(t *testing.T) {
 	result := colorDiff("")
 	assert.Empty(t, result)
 }
+
+func TestWarning(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
+	Warning(&buf, "test %s", "message")
+	assert.Contains(t, buf.String(), "Warning:")
+	assert.Contains(t, buf.String(), "test message")
+}
+
+func TestHint(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
+	Hint(&buf, "try %s", "this")
+	assert.Contains(t, buf.String(), "Hint:")
+	assert.Contains(t, buf.String(), "try this")
+}
+
+func TestError(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
+	Error(&buf, "error %d", 42)
+	assert.Contains(t, buf.String(), "Error:")
+	assert.Contains(t, buf.String(), "error 42")
+}
+
+func TestDiffWithJSON(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name          string
+		oldValue      string
+		newValue      string
+		jsonFormat    bool
+		jsonWarned    bool
+		wantWarning   bool
+		wantFormatted bool
+	}{
+		{
+			name:          "no json format",
+			oldValue:      "old",
+			newValue:      "new",
+			jsonFormat:    false,
+			wantWarning:   false,
+			wantFormatted: false,
+		},
+		{
+			name:          "json format with valid json",
+			oldValue:      `{"a":1}`,
+			newValue:      `{"b":2}`,
+			jsonFormat:    true,
+			wantWarning:   false,
+			wantFormatted: true,
+		},
+		{
+			name:          "json format with invalid json",
+			oldValue:      "not json",
+			newValue:      `{"b":2}`,
+			jsonFormat:    true,
+			wantWarning:   true,
+			wantFormatted: false,
+		},
+		{
+			name:          "json format already warned",
+			oldValue:      "not json",
+			newValue:      "also not json",
+			jsonFormat:    true,
+			jsonWarned:    true,
+			wantWarning:   false, // already warned
+			wantFormatted: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			var errBuf bytes.Buffer
+			jsonWarned := tt.jsonWarned
+
+			result := DiffWithJSON("old", "new", tt.oldValue, tt.newValue, tt.jsonFormat, &jsonWarned, &errBuf)
+
+			if tt.wantWarning {
+				assert.Contains(t, errBuf.String(), "Warning:")
+				assert.True(t, jsonWarned)
+			} else {
+				if !tt.jsonWarned {
+					assert.Empty(t, errBuf.String())
+				}
+			}
+
+			if tt.wantFormatted && tt.oldValue != tt.newValue {
+				// Formatted JSON should have newlines/indentation
+				assert.Contains(t, result, "\n")
+			}
+
+			// Result should always be a diff (or empty if identical)
+			_ = result
+		})
+	}
+}

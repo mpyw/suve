@@ -123,12 +123,9 @@ func ParseArgs[A any](
 		return parseOneArg(args[0], parse)
 	case 2:
 		return parseTwoArgs(args[0], args[1], parse, hasAbsolute, prefixes)
-	case 3:
+	default: // case 3
 		return parseThreeArgs(args[0], args[1], args[2], parse)
 	}
-
-	// Unreachable due to the check above, but required for compilation
-	return nil, nil, errors.New(usage)
 }
 
 // parseOneArg handles full spec format with single argument.

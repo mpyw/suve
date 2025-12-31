@@ -123,6 +123,14 @@ func TestParse(t *testing.T) {
 			wantShift:   2,
 		},
 
+		// Tilde in name (not a shift specifier)
+		{
+			name:        "tilde followed by special char then version",
+			input:       "/my/param~@test#3",
+			wantName:    "/my/param~@test",
+			wantVersion: lo.ToPtr(int64(3)),
+		},
+
 		// Whitespace handling
 		{
 			name:     "whitespace trimmed",

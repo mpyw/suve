@@ -1,15 +1,15 @@
 package main
 
 import (
-	"fmt"
 	"os"
 
 	"github.com/mpyw/suve/internal/cli"
+	"github.com/mpyw/suve/internal/output"
 )
 
 func main() {
 	if err := cli.App.Run(os.Args); err != nil {
-		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		output.Error(os.Stderr, "%v", err)
 		os.Exit(1)
 	}
 }
