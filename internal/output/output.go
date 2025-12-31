@@ -40,6 +40,27 @@ func (o *Writer) Value(value string) {
 	}
 }
 
+// Warning prints a warning message in yellow.
+func Warning(w io.Writer, format string, args ...any) {
+	yellow := color.New(color.FgYellow).SprintFunc()
+	msg := fmt.Sprintf(format, args...)
+	_, _ = fmt.Fprintln(w, yellow("Warning: "+msg))
+}
+
+// Hint prints a hint message in cyan.
+func Hint(w io.Writer, format string, args ...any) {
+	cyan := color.New(color.FgCyan).SprintFunc()
+	msg := fmt.Sprintf(format, args...)
+	_, _ = fmt.Fprintln(w, cyan("Hint: "+msg))
+}
+
+// Error prints an error message in red.
+func Error(w io.Writer, format string, args ...any) {
+	red := color.New(color.FgRed).SprintFunc()
+	msg := fmt.Sprintf(format, args...)
+	_, _ = fmt.Fprintln(w, red("Error: "+msg))
+}
+
 // Diff generates a unified diff between two strings.
 func Diff(oldName, newName, oldContent, newContent string) string {
 	edits := myers.ComputeEdits(oldContent, newContent)

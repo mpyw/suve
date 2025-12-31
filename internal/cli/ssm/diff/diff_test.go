@@ -480,3 +480,47 @@ func TestRun(t *testing.T) {
 		})
 	}
 }
+
+func TestRunWithSpecs_IdenticalWarning(t *testing.T) {
+	mock := &mockClient{
+		getParameterFunc: func(_ context.Context, _ *ssm.GetParameterInput, _ ...func(*ssm.Options)) (*ssm.GetParameterOutput, error) {
+			return &ssm.GetParameterOutput{
+				Parameter: &types.Parameter{
+					Name:    aws.String("/app/param"),
+					Value:   aws.String("same-value"),
+					Version: 1,
+					Type:    types.ParameterTypeString,
+				},
+			}, nil
+		},
+	}
+
+	var stdout, stderr bytes.Buffer
+	spec1 := &ParsedSpec{Name: "/app/param", Version: nil, Shift: 0}
+	spec2 := &ParsedSpec{Name: "/app/param", Version: nil, Shift: 0}
+
+	err := RunWithSpecs(t.Context(), mock, &stdout, &stderr, spec1, spec2)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// stdout should be empty (no diff output)
+	if stdout.String() != "" {
+		t.Errorf("expected empty stdout, got %q", stdout.String())
+	}
+
+	// stderr should contain warning and hint
+	stderrStr := stderr.String()
+	if !bytes.Contains([]byte(stderrStr), []byte("Warning:")) {
+		t.Error("expected warning message in stderr")
+	}
+	if !bytes.Contains([]byte(stderrStr), []byte("comparing identical versions")) {
+		t.Error("expected 'comparing identical versions' in stderr")
+	}
+	if !bytes.Contains([]byte(stderrStr), []byte("Hint:")) {
+		t.Error("expected hint message in stderr")
+	}
+	if !bytes.Contains([]byte(stderrStr), []byte("/app/param~1")) {
+		t.Error("expected hint with '~1' in stderr")
+	}
+}

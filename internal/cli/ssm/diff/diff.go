@@ -64,7 +64,7 @@ func action(c *cli.Context) error {
 		return fmt.Errorf("failed to initialize AWS client: %w", err)
 	}
 
-	return RunWithSpecs(c.Context, client, c.App.Writer, spec1, spec2)
+	return RunWithSpecs(c.Context, client, c.App.Writer, c.App.ErrWriter, spec1, spec2)
 }
 
 // ParseArgs parses diff command arguments into two version specifications.
@@ -236,7 +236,7 @@ func Run(ctx context.Context, client Client, w io.Writer, name, version1, versio
 }
 
 // RunWithSpecs executes the diff command with parsed specs.
-func RunWithSpecs(ctx context.Context, client Client, w io.Writer, spec1, spec2 *ParsedSpec) error {
+func RunWithSpecs(ctx context.Context, client Client, w, errW io.Writer, spec1, spec2 *ParsedSpec) error {
 	ssmSpec1 := &ssmversion.Spec{
 		Name:    spec1.Name,
 		Version: spec1.Version,
@@ -258,11 +258,20 @@ func RunWithSpecs(ctx context.Context, client Client, w io.Writer, spec1, spec2 
 		return fmt.Errorf("failed to get second version: %w", err)
 	}
 
+	value1 := aws.ToString(param1.Value)
+	value2 := aws.ToString(param2.Value)
+
+	if value1 == value2 {
+		output.Warning(errW, "comparing identical versions")
+		output.Hint(errW, "To compare with previous version, use: suve ssm diff %s~1", spec1.Name)
+		return nil
+	}
+
 	diff := output.Diff(
 		fmt.Sprintf("%s#%d", spec1.Name, param1.Version),
 		fmt.Sprintf("%s#%d", spec2.Name, param2.Version),
-		aws.ToString(param1.Value),
-		aws.ToString(param2.Value),
+		value1,
+		value2,
 	)
 	_, _ = fmt.Fprint(w, diff)
 

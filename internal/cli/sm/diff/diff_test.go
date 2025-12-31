@@ -528,3 +528,47 @@ func TestRun(t *testing.T) {
 		})
 	}
 }
+
+func TestRunWithSpecs_IdenticalWarning(t *testing.T) {
+	mock := &mockClient{
+		getSecretValueFunc: func(_ context.Context, _ *secretsmanager.GetSecretValueInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.GetSecretValueOutput, error) {
+			return &secretsmanager.GetSecretValueOutput{
+				Name:         aws.String("my-secret"),
+				VersionId:    aws.String("version-id"),
+				SecretString: aws.String("same-content"),
+			}, nil
+		},
+	}
+
+	var stdout, stderr bytes.Buffer
+	spec1 := &ParsedSpec{Name: "my-secret", ID: nil, Label: nil, Shift: 0}
+	spec2 := &ParsedSpec{Name: "my-secret", ID: nil, Label: nil, Shift: 0}
+
+	err := RunWithSpecs(t.Context(), mock, &stdout, &stderr, spec1, spec2)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// stdout should be empty (no diff output)
+	if stdout.String() != "" {
+		t.Errorf("expected empty stdout, got %q", stdout.String())
+	}
+
+	// stderr should contain warning and hints
+	stderrStr := stderr.String()
+	if !bytes.Contains([]byte(stderrStr), []byte("Warning:")) {
+		t.Error("expected warning message in stderr")
+	}
+	if !bytes.Contains([]byte(stderrStr), []byte("comparing identical versions")) {
+		t.Error("expected 'comparing identical versions' in stderr")
+	}
+	if !bytes.Contains([]byte(stderrStr), []byte("Hint:")) {
+		t.Error("expected hint message in stderr")
+	}
+	if !bytes.Contains([]byte(stderrStr), []byte("my-secret~1")) {
+		t.Error("expected hint with '~1' in stderr")
+	}
+	if !bytes.Contains([]byte(stderrStr), []byte("my-secret:AWSPREVIOUS")) {
+		t.Error("expected hint with ':AWSPREVIOUS' in stderr")
+	}
+}
