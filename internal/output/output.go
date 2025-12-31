@@ -17,6 +17,8 @@ import (
 	"github.com/aymanbagabas/go-udiff"
 	"github.com/aymanbagabas/go-udiff/myers"
 	"github.com/fatih/color"
+
+	"github.com/mpyw/suve/internal/jsonutil"
 )
 
 // Writer provides formatted output methods.
@@ -80,6 +82,24 @@ func Diff(oldName, newName, oldContent, newContent string) string {
 	edits := myers.ComputeEdits(oldContent, newContent)
 	unified, _ := udiff.ToUnifiedDiff(oldName, newName, oldContent, edits)
 	return colorDiff(unified.String())
+}
+
+// DiffWithJSON generates a diff between two values, optionally formatting as JSON.
+// If jsonFormat is true, values are formatted as JSON with sorted keys.
+// The jsonWarned flag tracks whether an invalid JSON warning has been shown.
+func DiffWithJSON(oldName, newName, oldValue, newValue string, jsonFormat bool, jsonWarned *bool, errW io.Writer) string {
+	if jsonFormat {
+		if !jsonutil.IsJSON(oldValue) || !jsonutil.IsJSON(newValue) {
+			if !*jsonWarned {
+				Warning(errW, "--json has no effect: some values are not valid JSON")
+				*jsonWarned = true
+			}
+		} else {
+			oldValue = jsonutil.Format(oldValue)
+			newValue = jsonutil.Format(newValue)
+		}
+	}
+	return Diff(oldName, newName, oldValue, newValue)
 }
 
 // colorDiff adds ANSI colors to diff output.

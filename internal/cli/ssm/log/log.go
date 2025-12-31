@@ -17,13 +17,20 @@ import (
 
 	"github.com/mpyw/suve/internal/api/ssmapi"
 	"github.com/mpyw/suve/internal/awsutil"
-	"github.com/mpyw/suve/internal/jsonutil"
 	"github.com/mpyw/suve/internal/output"
 )
 
 // Client is the interface for the log command.
 type Client interface {
 	ssmapi.GetParameterHistoryAPI
+}
+
+// Options holds the options for the log command.
+type Options struct {
+	MaxResults int32
+	ShowPatch  bool
+	JSONFormat bool
+	Reverse    bool
 }
 
 // Command returns the log command.
@@ -81,13 +88,15 @@ func action(c *cli.Context) error {
 	}
 
 	name := c.Args().First()
-	maxResults := int32(c.Int("number"))
-	showPatch := c.Bool("patch")
-	jsonFormat := c.Bool("json")
-	reverse := c.Bool("reverse")
+	opts := Options{
+		MaxResults: int32(c.Int("number")),
+		ShowPatch:  c.Bool("patch"),
+		JSONFormat: c.Bool("json"),
+		Reverse:    c.Bool("reverse"),
+	}
 
 	// Warn if --json is used without -p
-	if jsonFormat && !showPatch {
+	if opts.JSONFormat && !opts.ShowPatch {
 		output.Warning(c.App.ErrWriter, "--json has no effect without -p/--patch")
 	}
 
@@ -96,16 +105,14 @@ func action(c *cli.Context) error {
 		return fmt.Errorf("failed to initialize AWS client: %w", err)
 	}
 
-	return Run(c.Context, client, c.App.Writer, c.App.ErrWriter, name, maxResults, showPatch, jsonFormat, reverse)
+	return Run(c.Context, client, c.App.Writer, c.App.ErrWriter, name, opts)
 }
 
 // Run executes the log command.
-// If showPatch is true, displays the diff between consecutive versions.
-// If jsonFormat is true, formats JSON values before diffing.
-func Run(ctx context.Context, client Client, w io.Writer, errW io.Writer, name string, maxResults int32, showPatch bool, jsonFormat bool, reverse bool) error {
+func Run(ctx context.Context, client Client, w io.Writer, errW io.Writer, name string, opts Options) error {
 	result, err := client.GetParameterHistory(ctx, &ssm.GetParameterHistoryInput{
 		Name:           aws.String(name),
-		MaxResults:     aws.Int32(maxResults),
+		MaxResults:     aws.Int32(opts.MaxResults),
 		WithDecryption: aws.Bool(true),
 	})
 	if err != nil {
@@ -118,7 +125,7 @@ func Run(ctx context.Context, client Client, w io.Writer, errW io.Writer, name s
 	}
 
 	// AWS returns oldest first; reverse to show newest first (unless --reverse)
-	if !reverse {
+	if !opts.Reverse {
 		for i, j := 0, len(params)-1; i < j; i, j = i+1, j-1 {
 			params[i], params[j] = params[j], params[i]
 		}
@@ -133,7 +140,7 @@ func Run(ctx context.Context, client Client, w io.Writer, errW io.Writer, name s
 
 	// Find the current (latest) version index
 	currentIdx := 0
-	if reverse {
+	if opts.Reverse {
 		currentIdx = len(params) - 1
 	}
 
@@ -147,10 +154,10 @@ func Run(ctx context.Context, client Client, w io.Writer, errW io.Writer, name s
 			_, _ = fmt.Fprintf(w, "%s %s\n", cyan("Date:"), param.LastModifiedDate.Format(time.RFC3339))
 		}
 
-		if showPatch {
+		if opts.ShowPatch {
 			// Determine old/new indices based on order
 			var oldIdx, newIdx int
-			if reverse {
+			if opts.Reverse {
 				// In reverse mode: comparing with next version (newer)
 				if i < len(params)-1 {
 					oldIdx = i
@@ -171,23 +178,9 @@ func Run(ctx context.Context, client Client, w io.Writer, errW io.Writer, name s
 			if oldIdx >= 0 {
 				oldValue := aws.ToString(params[oldIdx].Value)
 				newValue := aws.ToString(params[newIdx].Value)
-
-				// Format as JSON if enabled
-				if jsonFormat {
-					if !jsonutil.IsJSON(oldValue) || !jsonutil.IsJSON(newValue) {
-						if !jsonWarned {
-							output.Warning(errW, "--json has no effect: some values are not valid JSON")
-							jsonWarned = true
-						}
-					} else {
-						oldValue = jsonutil.Format(oldValue)
-						newValue = jsonutil.Format(newValue)
-					}
-				}
-
 				oldName := fmt.Sprintf("%s#%d", name, params[oldIdx].Version)
 				newName := fmt.Sprintf("%s#%d", name, params[newIdx].Version)
-				diff := output.Diff(oldName, newName, oldValue, newValue)
+				diff := output.DiffWithJSON(oldName, newName, oldValue, newValue, opts.JSONFormat, &jsonWarned, errW)
 				if diff != "" {
 					_, _ = fmt.Fprintln(w)
 					_, _ = fmt.Fprint(w, diff)

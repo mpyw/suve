@@ -37,9 +37,7 @@ func TestRun(t *testing.T) {
 	tests := []struct {
 		name       string
 		secretName string
-		maxResults int32
-		showPatch  bool
-		reverse    bool
+		opts       Options
 		mock       *mockClient
 		wantErr    bool
 		check      func(t *testing.T, output string)
@@ -47,8 +45,7 @@ func TestRun(t *testing.T) {
 		{
 			name:       "show version history",
 			secretName: "my-secret",
-			maxResults: 10,
-			showPatch:  false,
+			opts:       Options{MaxResults: 10},
 			mock: &mockClient{
 				listSecretVersionIdsFunc: func(_ context.Context, params *secretsmanager.ListSecretVersionIdsInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.ListSecretVersionIdsOutput, error) {
 					if aws.ToString(params.SecretId) != "my-secret" {
@@ -74,8 +71,7 @@ func TestRun(t *testing.T) {
 		{
 			name:       "show patch between versions",
 			secretName: "my-secret",
-			maxResults: 10,
-			showPatch:  true,
+			opts:       Options{MaxResults: 10, ShowPatch: true},
 			mock: &mockClient{
 				listSecretVersionIdsFunc: func(_ context.Context, _ *secretsmanager.ListSecretVersionIdsInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.ListSecretVersionIdsOutput, error) {
 					return &secretsmanager.ListSecretVersionIdsOutput{
@@ -119,8 +115,7 @@ func TestRun(t *testing.T) {
 		{
 			name:       "patch with single version shows no diff",
 			secretName: "my-secret",
-			maxResults: 10,
-			showPatch:  true,
+			opts:       Options{MaxResults: 10, ShowPatch: true},
 			mock: &mockClient{
 				listSecretVersionIdsFunc: func(_ context.Context, _ *secretsmanager.ListSecretVersionIdsInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.ListSecretVersionIdsOutput, error) {
 					return &secretsmanager.ListSecretVersionIdsOutput{
@@ -150,8 +145,7 @@ func TestRun(t *testing.T) {
 		{
 			name:       "error from AWS",
 			secretName: "my-secret",
-			maxResults: 10,
-			showPatch:  false,
+			opts:       Options{MaxResults: 10},
 			mock: &mockClient{
 				listSecretVersionIdsFunc: func(_ context.Context, _ *secretsmanager.ListSecretVersionIdsInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.ListSecretVersionIdsOutput, error) {
 					return nil, fmt.Errorf("AWS error")
@@ -162,9 +156,7 @@ func TestRun(t *testing.T) {
 		{
 			name:       "reverse order shows oldest first",
 			secretName: "my-secret",
-			maxResults: 10,
-			showPatch:  false,
-			reverse:    true,
+			opts:       Options{MaxResults: 10, Reverse: true},
 			mock: &mockClient{
 				listSecretVersionIdsFunc: func(_ context.Context, _ *secretsmanager.ListSecretVersionIdsInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.ListSecretVersionIdsOutput, error) {
 					return &secretsmanager.ListSecretVersionIdsOutput{
@@ -190,8 +182,7 @@ func TestRun(t *testing.T) {
 		{
 			name:       "empty version list",
 			secretName: "my-secret",
-			maxResults: 10,
-			showPatch:  false,
+			opts:       Options{MaxResults: 10},
 			mock: &mockClient{
 				listSecretVersionIdsFunc: func(_ context.Context, _ *secretsmanager.ListSecretVersionIdsInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.ListSecretVersionIdsOutput, error) {
 					return &secretsmanager.ListSecretVersionIdsOutput{
@@ -210,7 +201,7 @@ func TestRun(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var buf, errBuf bytes.Buffer
-			err := Run(t.Context(), tt.mock, &buf, &errBuf, tt.secretName, tt.maxResults, tt.showPatch, false, tt.reverse)
+			err := Run(t.Context(), tt.mock, &buf, &errBuf, tt.secretName, tt.opts)
 
 			if tt.wantErr {
 				if err == nil {

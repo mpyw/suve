@@ -27,20 +27,17 @@ func TestRun(t *testing.T) {
 	now := time.Now()
 
 	tests := []struct {
-		name       string
-		paramName  string
-		maxResults int32
-		showPatch  bool
-		reverse    bool
-		mock       *mockClient
-		wantErr    bool
-		check      func(t *testing.T, output string)
+		name      string
+		paramName string
+		opts      Options
+		mock      *mockClient
+		wantErr   bool
+		check     func(t *testing.T, output string)
 	}{
 		{
-			name:       "show history",
-			paramName:  "/app/param",
-			maxResults: 10,
-			showPatch:  false,
+			name:      "show history",
+			paramName: "/app/param",
+			opts:      Options{MaxResults: 10},
 			mock: &mockClient{
 				getParameterHistoryFunc: func(_ context.Context, params *ssm.GetParameterHistoryInput, _ ...func(*ssm.Options)) (*ssm.GetParameterHistoryOutput, error) {
 					if aws.ToString(params.Name) != "/app/param" {
@@ -67,10 +64,9 @@ func TestRun(t *testing.T) {
 			},
 		},
 		{
-			name:       "truncate long values",
-			paramName:  "/app/param",
-			maxResults: 10,
-			showPatch:  false,
+			name:      "truncate long values",
+			paramName: "/app/param",
+			opts:      Options{MaxResults: 10},
 			mock: &mockClient{
 				getParameterHistoryFunc: func(_ context.Context, _ *ssm.GetParameterHistoryInput, _ ...func(*ssm.Options)) (*ssm.GetParameterHistoryOutput, error) {
 					longValue := "this is a very long value that should be truncated in the preview"
@@ -88,10 +84,9 @@ func TestRun(t *testing.T) {
 			},
 		},
 		{
-			name:       "show patch between versions",
-			paramName:  "/app/param",
-			maxResults: 10,
-			showPatch:  true,
+			name:      "show patch between versions",
+			paramName: "/app/param",
+			opts:      Options{MaxResults: 10, ShowPatch: true},
 			mock: &mockClient{
 				getParameterHistoryFunc: func(_ context.Context, _ *ssm.GetParameterHistoryInput, _ ...func(*ssm.Options)) (*ssm.GetParameterHistoryOutput, error) {
 					return &ssm.GetParameterHistoryOutput{
@@ -120,10 +115,9 @@ func TestRun(t *testing.T) {
 			},
 		},
 		{
-			name:       "patch with single version shows no diff",
-			paramName:  "/app/param",
-			maxResults: 10,
-			showPatch:  true,
+			name:      "patch with single version shows no diff",
+			paramName: "/app/param",
+			opts:      Options{MaxResults: 10, ShowPatch: true},
 			mock: &mockClient{
 				getParameterHistoryFunc: func(_ context.Context, _ *ssm.GetParameterHistoryInput, _ ...func(*ssm.Options)) (*ssm.GetParameterHistoryOutput, error) {
 					return &ssm.GetParameterHistoryOutput{
@@ -145,10 +139,9 @@ func TestRun(t *testing.T) {
 			},
 		},
 		{
-			name:       "error from AWS",
-			paramName:  "/app/param",
-			maxResults: 10,
-			showPatch:  false,
+			name:      "error from AWS",
+			paramName: "/app/param",
+			opts:      Options{MaxResults: 10},
 			mock: &mockClient{
 				getParameterHistoryFunc: func(_ context.Context, _ *ssm.GetParameterHistoryInput, _ ...func(*ssm.Options)) (*ssm.GetParameterHistoryOutput, error) {
 					return nil, fmt.Errorf("AWS error")
@@ -157,11 +150,9 @@ func TestRun(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name:       "reverse order shows oldest first",
-			paramName:  "/app/param",
-			maxResults: 10,
-			showPatch:  false,
-			reverse:    true,
+			name:      "reverse order shows oldest first",
+			paramName: "/app/param",
+			opts:      Options{MaxResults: 10, Reverse: true},
 			mock: &mockClient{
 				getParameterHistoryFunc: func(_ context.Context, _ *ssm.GetParameterHistoryInput, _ ...func(*ssm.Options)) (*ssm.GetParameterHistoryOutput, error) {
 					return &ssm.GetParameterHistoryOutput{
@@ -190,11 +181,9 @@ func TestRun(t *testing.T) {
 			},
 		},
 		{
-			name:       "reverse with patch shows diff correctly",
-			paramName:  "/app/param",
-			maxResults: 10,
-			showPatch:  true,
-			reverse:    true,
+			name:      "reverse with patch shows diff correctly",
+			paramName: "/app/param",
+			opts:      Options{MaxResults: 10, ShowPatch: true, Reverse: true},
 			mock: &mockClient{
 				getParameterHistoryFunc: func(_ context.Context, _ *ssm.GetParameterHistoryInput, _ ...func(*ssm.Options)) (*ssm.GetParameterHistoryOutput, error) {
 					return &ssm.GetParameterHistoryOutput{
@@ -223,10 +212,9 @@ func TestRun(t *testing.T) {
 			},
 		},
 		{
-			name:       "empty history",
-			paramName:  "/app/param",
-			maxResults: 10,
-			showPatch:  false,
+			name:      "empty history",
+			paramName: "/app/param",
+			opts:      Options{MaxResults: 10},
 			mock: &mockClient{
 				getParameterHistoryFunc: func(_ context.Context, _ *ssm.GetParameterHistoryInput, _ ...func(*ssm.Options)) (*ssm.GetParameterHistoryOutput, error) {
 					return &ssm.GetParameterHistoryOutput{
@@ -245,7 +233,7 @@ func TestRun(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var buf, errBuf bytes.Buffer
-			err := Run(t.Context(), tt.mock, &buf, &errBuf, tt.paramName, tt.maxResults, tt.showPatch, false, tt.reverse)
+			err := Run(t.Context(), tt.mock, &buf, &errBuf, tt.paramName, tt.opts)
 
 			if tt.wantErr {
 				if err == nil {

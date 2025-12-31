@@ -18,7 +18,6 @@ import (
 
 	"github.com/mpyw/suve/internal/api/smapi"
 	"github.com/mpyw/suve/internal/awsutil"
-	"github.com/mpyw/suve/internal/jsonutil"
 	"github.com/mpyw/suve/internal/output"
 )
 
@@ -26,6 +25,14 @@ import (
 type Client interface {
 	smapi.ListSecretVersionIdsAPI
 	smapi.GetSecretValueAPI
+}
+
+// Options holds the options for the log command.
+type Options struct {
+	MaxResults int32
+	ShowPatch  bool
+	JSONFormat bool
+	Reverse    bool
 }
 
 // Command returns the log command.
@@ -84,13 +91,15 @@ func action(c *cli.Context) error {
 	}
 
 	name := c.Args().First()
-	maxResults := int32(c.Int("number"))
-	showPatch := c.Bool("patch")
-	jsonFormat := c.Bool("json")
-	reverse := c.Bool("reverse")
+	opts := Options{
+		MaxResults: int32(c.Int("number")),
+		ShowPatch:  c.Bool("patch"),
+		JSONFormat: c.Bool("json"),
+		Reverse:    c.Bool("reverse"),
+	}
 
 	// Warn if --json is used without -p
-	if jsonFormat && !showPatch {
+	if opts.JSONFormat && !opts.ShowPatch {
 		output.Warning(c.App.ErrWriter, "--json has no effect without -p/--patch")
 	}
 
@@ -99,12 +108,9 @@ func action(c *cli.Context) error {
 		return fmt.Errorf("failed to initialize AWS client: %w", err)
 	}
 
-	return Run(c.Context, client, c.App.Writer, c.App.ErrWriter, name, maxResults, showPatch, jsonFormat, reverse)
+	return Run(c.Context, client, c.App.Writer, c.App.ErrWriter, name, opts)
 }
 
-// Run executes the log command.
-// If showPatch is true, displays the diff between consecutive versions.
-// If jsonFormat is true, formats JSON values before diffing.
 // truncateID truncates a version ID to 8 characters for display.
 func truncateID(id string) string {
 	if len(id) > 8 {
@@ -113,10 +119,11 @@ func truncateID(id string) string {
 	return id
 }
 
-func Run(ctx context.Context, client Client, w io.Writer, errW io.Writer, name string, maxResults int32, showPatch bool, jsonFormat bool, reverse bool) error {
+// Run executes the log command.
+func Run(ctx context.Context, client Client, w io.Writer, errW io.Writer, name string, opts Options) error {
 	result, err := client.ListSecretVersionIds(ctx, &secretsmanager.ListSecretVersionIdsInput{
 		SecretId:   aws.String(name),
-		MaxResults: aws.Int32(maxResults),
+		MaxResults: aws.Int32(opts.MaxResults),
 	})
 	if err != nil {
 		return fmt.Errorf("failed to list secret versions: %w", err)
@@ -134,7 +141,7 @@ func Run(ctx context.Context, client Client, w io.Writer, errW io.Writer, name s
 		if versions[j].CreatedDate == nil {
 			return true
 		}
-		if reverse {
+		if opts.Reverse {
 			// Oldest first
 			return versions[i].CreatedDate.Before(*versions[j].CreatedDate)
 		}
@@ -144,7 +151,7 @@ func Run(ctx context.Context, client Client, w io.Writer, errW io.Writer, name s
 
 	// If showing patches, fetch all secret values upfront
 	var secretValues map[string]string
-	if showPatch {
+	if opts.ShowPatch {
 		secretValues = make(map[string]string)
 		for _, v := range versions {
 			versionID := aws.ToString(v.VersionId)
@@ -178,10 +185,10 @@ func Run(ctx context.Context, client Client, w io.Writer, errW io.Writer, name s
 			_, _ = fmt.Fprintf(w, "%s %s\n", cyan("Date:"), v.CreatedDate.Format(time.RFC3339))
 		}
 
-		if showPatch {
+		if opts.ShowPatch {
 			// Determine old/new indices based on order
 			var oldIdx, newIdx int
-			if reverse {
+			if opts.Reverse {
 				// In reverse mode: comparing with next version (newer)
 				if i < len(versions)-1 {
 					oldIdx = i
@@ -205,22 +212,9 @@ func Run(ctx context.Context, client Client, w io.Writer, errW io.Writer, name s
 				oldValue, oldOk := secretValues[oldVersionID]
 				newValue, newOk := secretValues[newVersionID]
 				if oldOk && newOk {
-					// Format as JSON if enabled
-					if jsonFormat {
-						if !jsonutil.IsJSON(oldValue) || !jsonutil.IsJSON(newValue) {
-							if !jsonWarned {
-								output.Warning(errW, "--json has no effect: some values are not valid JSON")
-								jsonWarned = true
-							}
-						} else {
-							oldValue = jsonutil.Format(oldValue)
-							newValue = jsonutil.Format(newValue)
-						}
-					}
-
 					oldName := fmt.Sprintf("%s#%s", name, truncateID(oldVersionID))
 					newName := fmt.Sprintf("%s#%s", name, truncateID(newVersionID))
-					diff := output.Diff(oldName, newName, oldValue, newValue)
+					diff := output.DiffWithJSON(oldName, newName, oldValue, newValue, opts.JSONFormat, &jsonWarned, errW)
 					if diff != "" {
 						_, _ = fmt.Fprintln(w)
 						_, _ = fmt.Fprint(w, diff)

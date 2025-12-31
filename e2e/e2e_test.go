@@ -162,7 +162,7 @@ func TestSSM_FullWorkflow(t *testing.T) {
 	// 5. Log (without patch)
 	t.Run("log", func(t *testing.T) {
 		var buf, errBuf bytes.Buffer
-		err := ssmlog.Run(ctx, client, &buf, &errBuf, paramName, 10, false, false, false)
+		err := ssmlog.Run(ctx, client, &buf, &errBuf, paramName, ssmlog.Options{MaxResults: 10})
 		if err != nil {
 			t.Fatalf("ssmlog.Run() error: %v", err)
 		}
@@ -296,7 +296,7 @@ func TestSM_FullWorkflow(t *testing.T) {
 	// 5. Log (without patch)
 	t.Run("log", func(t *testing.T) {
 		var buf, errBuf bytes.Buffer
-		err := smlog.Run(ctx, client, &buf, &errBuf, secretName, 10, false, false, false)
+		err := smlog.Run(ctx, client, &buf, &errBuf, secretName, smlog.Options{MaxResults: 10})
 		if err != nil {
 			t.Fatalf("smlog.Run() error: %v", err)
 		}
