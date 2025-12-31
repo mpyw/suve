@@ -15,7 +15,7 @@ import (
 	"io"
 
 	"github.com/samber/lo"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 
 	"github.com/mpyw/suve/internal/api/smapi"
 	"github.com/mpyw/suve/internal/awsutil"
@@ -77,9 +77,9 @@ EXAMPLES:
 	}
 }
 
-func action(c *cli.Context) error {
+func action(ctx context.Context, cmd *cli.Command) error {
 	spec1, spec2, err := diff.ParseArgs(
-		c.Args().Slice(),
+		cmd.Args().Slice(),
 		smversion.Parse,
 		func(abs smversion.AbsoluteSpec) bool { return abs.ID != nil || abs.Label != nil },
 		"#:~",
@@ -89,20 +89,20 @@ func action(c *cli.Context) error {
 		return err
 	}
 
-	client, err := awsutil.NewSMClient(c.Context)
+	client, err := awsutil.NewSMClient(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to initialize AWS client: %w", err)
 	}
 
 	r := &Runner{
 		Client: client,
-		Stdout: c.App.Writer,
-		Stderr: c.App.ErrWriter,
+		Stdout: cmd.Root().Writer,
+		Stderr: cmd.Root().ErrWriter,
 	}
-	return r.Run(c.Context, Options{
+	return r.Run(ctx, Options{
 		Spec1:      spec1,
 		Spec2:      spec2,
-		JSONFormat: c.Bool("json"),
+		JSONFormat: cmd.Bool("json"),
 	})
 }
 

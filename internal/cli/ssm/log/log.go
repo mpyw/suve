@@ -14,7 +14,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/fatih/color"
 	"github.com/samber/lo"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 
 	"github.com/mpyw/suve/internal/api/ssmapi"
 	"github.com/mpyw/suve/internal/awsutil"
@@ -91,35 +91,35 @@ EXAMPLES:
 	}
 }
 
-func action(c *cli.Context) error {
-	if c.NArg() < 1 {
+func action(ctx context.Context, cmd *cli.Command) error {
+	if cmd.Args().Len() < 1 {
 		return fmt.Errorf("parameter name required")
 	}
 
 	opts := Options{
-		Name:       c.Args().First(),
-		MaxResults: int32(c.Int("number")),
-		ShowPatch:  c.Bool("patch"),
-		JSONFormat: c.Bool("json"),
-		Reverse:    c.Bool("reverse"),
+		Name:       cmd.Args().First(),
+		MaxResults: int32(cmd.Int("number")),
+		ShowPatch:  cmd.Bool("patch"),
+		JSONFormat: cmd.Bool("json"),
+		Reverse:    cmd.Bool("reverse"),
 	}
 
 	// Warn if --json is used without -p
 	if opts.JSONFormat && !opts.ShowPatch {
-		output.Warning(c.App.ErrWriter, "--json has no effect without -p/--patch")
+		output.Warning(cmd.Root().ErrWriter, "--json has no effect without -p/--patch")
 	}
 
-	client, err := awsutil.NewSSMClient(c.Context)
+	client, err := awsutil.NewSSMClient(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to initialize AWS client: %w", err)
 	}
 
 	r := &Runner{
 		Client: client,
-		Stdout: c.App.Writer,
-		Stderr: c.App.ErrWriter,
+		Stdout: cmd.Root().Writer,
+		Stderr: cmd.Root().ErrWriter,
 	}
-	return r.Run(c.Context, opts)
+	return r.Run(ctx, opts)
 }
 
 // Run executes the log command.

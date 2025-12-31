@@ -10,7 +10,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ssm/types"
 	"github.com/fatih/color"
 	"github.com/samber/lo"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 
 	"github.com/mpyw/suve/internal/api/ssmapi"
 	"github.com/mpyw/suve/internal/awsutil"
@@ -79,37 +79,37 @@ EXAMPLES:
 	}
 }
 
-func action(c *cli.Context) error {
-	if c.NArg() < 2 {
+func action(ctx context.Context, cmd *cli.Command) error {
+	if cmd.Args().Len() < 2 {
 		return fmt.Errorf("usage: suve ssm set <name> <value>")
 	}
 
-	secure := c.Bool("secure")
-	paramType := c.String("type")
+	secure := cmd.Bool("secure")
+	paramType := cmd.String("type")
 
 	// Check for conflicting flags
-	if secure && c.IsSet("type") {
+	if secure && cmd.IsSet("type") {
 		return fmt.Errorf("cannot use --secure with --type; use one or the other")
 	}
 	if secure {
 		paramType = "SecureString"
 	}
 
-	client, err := awsutil.NewSSMClient(c.Context)
+	client, err := awsutil.NewSSMClient(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to initialize AWS client: %w", err)
 	}
 
 	r := &Runner{
 		Client: client,
-		Stdout: c.App.Writer,
-		Stderr: c.App.ErrWriter,
+		Stdout: cmd.Root().Writer,
+		Stderr: cmd.Root().ErrWriter,
 	}
-	return r.Run(c.Context, Options{
-		Name:        c.Args().Get(0),
-		Value:       c.Args().Get(1),
+	return r.Run(ctx, Options{
+		Name:        cmd.Args().Get(0),
+		Value:       cmd.Args().Get(1),
 		Type:        paramType,
-		Description: c.String("description"),
+		Description: cmd.String("description"),
 	})
 }
 

@@ -2,19 +2,37 @@
 package cli
 
 import (
-	"github.com/urfave/cli/v2"
+	"context"
+	"fmt"
+
+	"github.com/urfave/cli/v3"
 
 	"github.com/mpyw/suve/internal/cli/sm"
 	"github.com/mpyw/suve/internal/cli/ssm"
 )
 
-// App is the main CLI application.
-var App = &cli.App{
-	Name:    "suve",
-	Usage:   "Git-like CLI for AWS Parameter Store and Secrets Manager",
-	Version: "0.1.0",
-	Commands: []*cli.Command{
-		ssm.Command(),
-		sm.Command(),
-	},
+// MakeApp creates a new CLI application instance.
+func MakeApp() *cli.Command {
+	return &cli.Command{
+		Name:    "suve",
+		Usage:   "Git-like CLI for AWS Parameter Store and Secrets Manager",
+		Version: "0.1.0",
+		Commands: []*cli.Command{
+			ssm.Command(),
+			sm.Command(),
+		},
+		CommandNotFound: commandNotFound,
+	}
 }
+
+func commandNotFound(_ context.Context, cmd *cli.Command, command string) {
+	_ = cli.ShowAppHelp(cmd)
+	w := cmd.Root().ErrWriter
+	if w == nil {
+		w = cmd.Root().Writer
+	}
+	_, _ = fmt.Fprintf(w, "\nCommand not found: %s\n", command)
+}
+
+// App is the main CLI application.
+var App = MakeApp()

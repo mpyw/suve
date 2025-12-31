@@ -9,7 +9,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager/types"
 	"github.com/samber/lo"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 
 	"github.com/mpyw/suve/internal/api/smapi"
 	"github.com/mpyw/suve/internal/awsutil"
@@ -54,19 +54,19 @@ EXAMPLES:
 	}
 }
 
-func action(c *cli.Context) error {
-	client, err := awsutil.NewSMClient(c.Context)
+func action(ctx context.Context, cmd *cli.Command) error {
+	client, err := awsutil.NewSMClient(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to initialize AWS client: %w", err)
 	}
 
 	r := &Runner{
 		Client: client,
-		Stdout: c.App.Writer,
-		Stderr: c.App.ErrWriter,
+		Stdout: cmd.Root().Writer,
+		Stderr: cmd.Root().ErrWriter,
 	}
-	return r.Run(c.Context, Options{
-		Prefix: c.Args().First(),
+	return r.Run(ctx, Options{
+		Prefix: cmd.Args().First(),
 	})
 }
 

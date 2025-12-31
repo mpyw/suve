@@ -1,7 +1,7 @@
 package ssm
 
 import (
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 
 	"github.com/mpyw/suve/internal/cli/ssm/cat"
 	"github.com/mpyw/suve/internal/cli/ssm/diff"
@@ -18,7 +18,7 @@ func Command() *cli.Command {
 		Name:    "ssm",
 		Aliases: []string{"ps", "param"},
 		Usage:   "Interact with AWS Systems Manager Parameter Store",
-		Subcommands: []*cli.Command{
+		Commands: []*cli.Command{
 			show.Command(),
 			cat.Command(),
 			log.Command(),

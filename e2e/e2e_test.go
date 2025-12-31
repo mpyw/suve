@@ -21,7 +21,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 
 	smcat "github.com/mpyw/suve/internal/cli/sm/cat"
 	smcreate "github.com/mpyw/suve/internal/cli/sm/create"
@@ -66,7 +66,7 @@ func runCommand(t *testing.T, cmd *cli.Command, args ...string) (stdout, stderr 
 	t.Helper()
 
 	var outBuf, errBuf bytes.Buffer
-	app := &cli.App{
+	app := &cli.Command{
 		Name:      "suve",
 		Writer:    &outBuf,
 		ErrWriter: &errBuf,
@@ -75,7 +75,7 @@ func runCommand(t *testing.T, cmd *cli.Command, args ...string) (stdout, stderr 
 
 	// Build full args: ["suve", "command-name", ...args]
 	fullArgs := append([]string{"suve", cmd.Name}, args...)
-	err = app.RunContext(t.Context(), fullArgs)
+	err = app.Run(t.Context(), fullArgs)
 
 	return outBuf.String(), errBuf.String(), err
 }

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"os"
 
 	"github.com/mpyw/suve/internal/cli"
@@ -8,7 +9,7 @@ import (
 )
 
 func main() {
-	if err := cli.App.Run(os.Args); err != nil {
+	if err := cli.App.Run(context.Background(), os.Args); err != nil {
 		output.Error(os.Stderr, "%v", err)
 		os.Exit(1)
 	}

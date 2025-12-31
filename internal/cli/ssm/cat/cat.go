@@ -8,7 +8,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/service/ssm/types"
 	"github.com/samber/lo"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 
 	"github.com/mpyw/suve/internal/api/ssmapi"
 	"github.com/mpyw/suve/internal/awsutil"
@@ -73,30 +73,30 @@ EXAMPLES:
 	}
 }
 
-func action(c *cli.Context) error {
-	if c.NArg() < 1 {
+func action(ctx context.Context, cmd *cli.Command) error {
+	if cmd.Args().Len() < 1 {
 		return fmt.Errorf("parameter name required")
 	}
 
-	spec, err := ssmversion.Parse(c.Args().First())
+	spec, err := ssmversion.Parse(cmd.Args().First())
 	if err != nil {
 		return err
 	}
 
-	client, err := awsutil.NewSSMClient(c.Context)
+	client, err := awsutil.NewSSMClient(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to initialize AWS client: %w", err)
 	}
 
 	r := &Runner{
 		Client: client,
-		Stdout: c.App.Writer,
-		Stderr: c.App.ErrWriter,
+		Stdout: cmd.Root().Writer,
+		Stderr: cmd.Root().ErrWriter,
 	}
-	return r.Run(c.Context, Options{
+	return r.Run(ctx, Options{
 		Spec:       spec,
-		Decrypt:    c.Bool("decrypt"),
-		JSONFormat: c.Bool("json"),
+		Decrypt:    cmd.Bool("decrypt"),
+		JSONFormat: cmd.Bool("json"),
 	})
 }
 

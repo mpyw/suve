@@ -10,28 +10,26 @@ import (
 	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/urfave/cli/v2"
 
+	appcli "github.com/mpyw/suve/internal/cli"
 	"github.com/mpyw/suve/internal/cli/sm/update"
 )
 
 func TestCommand_Validation(t *testing.T) {
 	t.Parallel()
-	app := &cli.App{
-		Name:     "suve",
-		Commands: []*cli.Command{update.Command()},
-	}
 
 	t.Run("missing arguments", func(t *testing.T) {
 		t.Parallel()
-		err := app.Run([]string{"suve", "update"})
+		app := appcli.MakeApp()
+		err := app.Run(context.Background(), []string{"suve", "sm", "update"})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "usage:")
 	})
 
 	t.Run("missing value argument", func(t *testing.T) {
 		t.Parallel()
-		err := app.Run([]string{"suve", "update", "my-secret"})
+		app := appcli.MakeApp()
+		err := app.Run(context.Background(), []string{"suve", "sm", "update", "my-secret"})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "usage:")
 	})

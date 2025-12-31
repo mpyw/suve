@@ -9,7 +9,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
 	"github.com/fatih/color"
 	"github.com/samber/lo"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 
 	"github.com/mpyw/suve/internal/api/smapi"
 	"github.com/mpyw/suve/internal/awsutil"
@@ -53,24 +53,24 @@ EXAMPLES:
 	}
 }
 
-func action(c *cli.Context) error {
-	if c.NArg() < 2 {
+func action(ctx context.Context, cmd *cli.Command) error {
+	if cmd.Args().Len() < 2 {
 		return fmt.Errorf("usage: suve sm update <name> <value>")
 	}
 
-	client, err := awsutil.NewSMClient(c.Context)
+	client, err := awsutil.NewSMClient(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to initialize AWS client: %w", err)
 	}
 
 	r := &Runner{
 		Client: client,
-		Stdout: c.App.Writer,
-		Stderr: c.App.ErrWriter,
+		Stdout: cmd.Root().Writer,
+		Stderr: cmd.Root().ErrWriter,
 	}
-	return r.Run(c.Context, Options{
-		Name:  c.Args().Get(0),
-		Value: c.Args().Get(1),
+	return r.Run(ctx, Options{
+		Name:  cmd.Args().Get(0),
+		Value: cmd.Args().Get(1),
 	})
 }
 

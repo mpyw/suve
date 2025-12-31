@@ -12,29 +12,27 @@ import (
 	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/urfave/cli/v2"
 
+	appcli "github.com/mpyw/suve/internal/cli"
 	"github.com/mpyw/suve/internal/cli/ssm/cat"
 	"github.com/mpyw/suve/internal/version/ssmversion"
 )
 
 func TestCommand_Validation(t *testing.T) {
 	t.Parallel()
-	app := &cli.App{
-		Name:     "suve",
-		Commands: []*cli.Command{cat.Command()},
-	}
 
 	t.Run("missing parameter name", func(t *testing.T) {
 		t.Parallel()
-		err := app.Run([]string{"suve", "cat"})
+		app := appcli.MakeApp()
+		err := app.Run(context.Background(), []string{"suve", "ssm", "cat"})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "parameter name required")
 	})
 
 	t.Run("invalid version spec", func(t *testing.T) {
 		t.Parallel()
-		err := app.Run([]string{"suve", "cat", "/app/param#"})
+		app := appcli.MakeApp()
+		err := app.Run(context.Background(), []string{"suve", "ssm", "cat", "/app/param#"})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "must be followed by")
 	})

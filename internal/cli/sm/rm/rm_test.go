@@ -11,21 +11,18 @@ import (
 	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/urfave/cli/v2"
 
+	appcli "github.com/mpyw/suve/internal/cli"
 	"github.com/mpyw/suve/internal/cli/sm/rm"
 )
 
 func TestCommand_Validation(t *testing.T) {
 	t.Parallel()
-	app := &cli.App{
-		Name:     "suve",
-		Commands: []*cli.Command{rm.Command()},
-	}
 
 	t.Run("missing secret name", func(t *testing.T) {
 		t.Parallel()
-		err := app.Run([]string{"suve", "rm"})
+		app := appcli.MakeApp()
+		err := app.Run(context.Background(), []string{"suve", "sm", "rm"})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "usage:")
 	})

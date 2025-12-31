@@ -1,9 +1,10 @@
 package sm
 
 import (
+	"context"
 	"fmt"
 
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 
 	"github.com/mpyw/suve/internal/cli/sm/cat"
 	"github.com/mpyw/suve/internal/cli/sm/create"
@@ -22,7 +23,7 @@ func Command() *cli.Command {
 		Name:    "sm",
 		Aliases: []string{"secret"},
 		Usage:   "Interact with AWS Secrets Manager",
-		Subcommands: []*cli.Command{
+		Commands: []*cli.Command{
 			show.Command(),
 			cat.Command(),
 			log.Command(),
@@ -42,7 +43,7 @@ func setDeprecatedCommand() *cli.Command {
 	return &cli.Command{
 		Name:   "set",
 		Hidden: true,
-		Action: func(c *cli.Context) error {
+		Action: func(_ context.Context, _ *cli.Command) error {
 			return fmt.Errorf(`'suve sm set' is not available
 
 Secrets Manager distinguishes between creating and updating secrets:
