@@ -1,4 +1,12 @@
 // Package output handles formatted output for the CLI.
+//
+// This package provides utilities for:
+//   - Structured field output (label: value format)
+//   - Unified diff generation with color highlighting
+//   - User feedback messages (Warning, Hint, Error) with TTY-aware coloring
+//
+// Colors are automatically disabled when output is not a TTY, ensuring
+// clean output when piped or redirected.
 package output
 
 import (
@@ -41,6 +49,8 @@ func (o *Writer) Value(value string) {
 }
 
 // Warning prints a warning message in yellow.
+// Used to alert users about non-critical issues that don't prevent command execution.
+// Example: "Warning: comparing identical versions"
 func Warning(w io.Writer, format string, args ...any) {
 	yellow := color.New(color.FgYellow).SprintFunc()
 	msg := fmt.Sprintf(format, args...)
@@ -48,6 +58,8 @@ func Warning(w io.Writer, format string, args ...any) {
 }
 
 // Hint prints a hint message in cyan.
+// Used to provide helpful suggestions to the user, typically following a warning.
+// Example: "Hint: To compare with previous version, use: suve ssm diff /param~1"
 func Hint(w io.Writer, format string, args ...any) {
 	cyan := color.New(color.FgCyan).SprintFunc()
 	msg := fmt.Sprintf(format, args...)
@@ -55,6 +67,8 @@ func Hint(w io.Writer, format string, args ...any) {
 }
 
 // Error prints an error message in red.
+// Used for user-facing error messages that are not Go errors.
+// For Go errors, use the standard error return pattern instead.
 func Error(w io.Writer, format string, args ...any) {
 	red := color.New(color.FgRed).SprintFunc()
 	msg := fmt.Sprintf(format, args...)

@@ -1,5 +1,17 @@
 //go:build e2e
 
+// Package e2e contains end-to-end tests for the suve CLI.
+//
+// These tests run against a real AWS-compatible service (localstack) and verify
+// the complete workflow of each command. They require Docker to be running and
+// localstack to be started via `make up`.
+//
+// Run with: make e2e
+//
+// Environment variables:
+//   - SUVE_LOCALSTACK_EXTERNAL_PORT: Custom localstack port (default: 4566)
+//
+// Note: Secrets Manager tests require localstack Pro for full functionality.
 package e2e
 
 import (
@@ -78,6 +90,11 @@ func newSMClient(t *testing.T) *secretsmanager.Client {
 	})
 }
 
+// TestSSM_FullWorkflow tests the complete SSM Parameter Store workflow:
+// set → show → cat → update → log → diff → ls → rm → verify deletion
+//
+// This test creates a parameter, updates it, verifies version history,
+// compares versions using diff, and cleans up by deleting.
 func TestSSM_FullWorkflow(t *testing.T) {
 	ctx := t.Context()
 	client := newSSMClient(t)
@@ -152,7 +169,9 @@ func TestSSM_FullWorkflow(t *testing.T) {
 		t.Logf("log output: %s", buf.String())
 	})
 
-	// 6. Diff
+	// 6. Diff - Compare version 1 with version 2 using legacy format
+	// This tests the Run() function which uses the legacy 3-argument format.
+	// The diff should show "initial-value" as removed (-) and "updated-value" as added (+).
 	t.Run("diff", func(t *testing.T) {
 		var buf bytes.Buffer
 		err := ssmdiff.Run(ctx, client, &buf, paramName, "#1", "#2")
@@ -203,6 +222,12 @@ func TestSSM_FullWorkflow(t *testing.T) {
 	})
 }
 
+// TestSM_FullWorkflow tests the complete Secrets Manager workflow:
+// create → show → cat → update → log → diff → ls → rm → restore → verify → force-rm
+//
+// This test creates a secret, updates it, verifies version history using labels,
+// compares versions using diff, tests soft delete with recovery, and cleans up
+// with force delete.
 func TestSM_FullWorkflow(t *testing.T) {
 	ctx := t.Context()
 	client := newSMClient(t)
@@ -278,7 +303,10 @@ func TestSM_FullWorkflow(t *testing.T) {
 		t.Logf("log output: %s", buf.String())
 	})
 
-	// 6. Diff
+	// 6. Diff - Compare AWSPREVIOUS with AWSCURRENT using legacy format
+	// This tests the Run() function which uses the legacy 3-argument format with labels.
+	// After update: AWSPREVIOUS = "initial-secret", AWSCURRENT = "updated-secret"
+	// The diff should show "initial-secret" as removed (-) and "updated-secret" as added (+).
 	t.Run("diff", func(t *testing.T) {
 		var buf bytes.Buffer
 		err := smdiff.Run(ctx, client, &buf, secretName, ":AWSPREVIOUS", ":AWSCURRENT")

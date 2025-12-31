@@ -144,26 +144,41 @@ suve ssm log -n 5 /app/config/database-url
 
 ## suve ssm diff
 
-Show differences between two parameter versions.
+Show differences between two parameter versions in unified diff format.
 
 ```
-suve ssm diff <name> <version1> [version2]
+suve ssm diff <spec1> [spec2] | <name> <version1> [version2]
 ```
 
-**Arguments:**
+### Argument Formats
 
-| Argument | Required | Description |
-|----------|----------|-------------|
-| `name` | Yes | Parameter name |
-| `version1` | Yes | First version specifier (e.g., `#1`, `~2`) |
-| `version2` | No | Second version specifier. If omitted, compares `version1` with latest. |
+The diff command supports multiple argument formats for flexibility:
 
-**Behavior:**
+| Format | Args | Example | Description |
+|--------|------|---------|-------------|
+| fullspec | 2 | `/param#1 /param#2` | Both args include name and version |
+| fullspec | 1 | `/param#3` | Compare specified version with latest |
+| mixed | 2 | `/param#1 '#2'` | First with version, second specifier only |
+| legacy | 2 | `/param '#3'` | Name + specifier → compare with latest |
+| legacy | 3 | `/param '#1' '#2'` | Name + two specifiers |
 
-- `suve ssm diff /param '#1' '#2'` - Compare version 1 with version 2
-- `suve ssm diff /param '#2'` - Compare latest with version 2
+> [!TIP]
+> **Use fullspec format** to avoid shell quoting issues. When `#` appears at the start of an argument, shells interpret it as a comment. Fullspec format embeds the specifier within the path, so no quoting is needed.
 
-**Output:**
+> [!NOTE]
+> When only one version is specified, it is compared against the **latest** version.
+
+### Version Specifiers
+
+| Specifier | Description | Example |
+|-----------|-------------|---------|
+| `#VERSION` | Specific version number | `#3` = version 3 |
+| `~` | One version ago | `~` = latest - 1 |
+| `~N` | N versions ago | `~2` = latest - 2 |
+
+Specifiers can be combined: `/param#5~2` means "version 5, then 2 back" = version 3.
+
+### Output
 
 ```diff
 --- /my/param#2
@@ -173,19 +188,75 @@ suve ssm diff <name> <version1> [version2]
 +new-value
 ```
 
-Output is colorized: red for deletions, green for additions.
+Output is colorized when stdout is a TTY:
+- **Red**: Deleted lines (`-`)
+- **Green**: Added lines (`+`)
+- **Cyan**: Headers (`---`, `+++`, `@@`)
 
-**Examples:**
+### Identical Version Warning
+
+> [!WARNING]
+> When comparing versions with **identical content**, no diff is produced. Instead, a warning and hint are displayed:
+> ```
+> Warning: comparing identical versions
+> Hint: To compare with previous version, use: suve ssm diff /param~1
+> ```
+> This typically happens when you compare the latest version with itself (e.g., `/param` vs `/param`).
+
+### Examples
+
+#### Fullspec Format (Recommended)
 
 ```bash
-# Compare two specific versions
+# Compare version 1 with version 2
+suve ssm diff /app/config/database-url#1 /app/config/database-url#2
+
+# Compare version 3 with latest
+suve ssm diff /app/config/database-url#3
+
+# Compare previous with latest
+suve ssm diff /app/config/database-url~1
+```
+
+#### Mixed Format
+
+```bash
+# Compare version 1 with version 2 (name from first arg)
+suve ssm diff /app/config/database-url#1 '#2'
+```
+
+#### Legacy Format
+
+> [!IMPORTANT]
+> Legacy format requires quoting `#` and `~` specifiers to prevent shell interpretation:
+> - `#` at argument start is treated as a comment in most shells
+> - `~` alone expands to `$HOME` in bash/zsh
+
+```bash
+# Compare version 1 with version 2
 suve ssm diff /app/config/database-url '#1' '#2'
 
-# Compare latest with version 2
+# Compare version 2 with latest
 suve ssm diff /app/config/database-url '#2'
 
 # Compare using relative versions
 suve ssm diff /app/config/database-url '~2' '~1'
+
+# Compare previous with latest
+suve ssm diff /app/config/database-url '~'
+```
+
+#### Practical Use Cases
+
+```bash
+# Review what changed in the last update
+suve ssm diff /app/config/database-url~1
+
+# Compare any two versions
+suve ssm diff /app/config/database-url#1 /app/config/database-url#5
+
+# Pipe to a file for review
+suve ssm diff /app/config/database-url~1 > changes.diff
 ```
 
 ---

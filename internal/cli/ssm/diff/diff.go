@@ -1,4 +1,12 @@
-// Package diff provides the SSM diff command.
+// Package diff provides the SSM diff command for comparing parameter versions.
+//
+// The diff command supports multiple argument formats:
+//   - Fullspec: Both arguments include name and version (e.g., /param#1 /param#2)
+//   - Fullspec single: One fullspec compared against latest (e.g., /param#3)
+//   - Mixed: First arg with version, second is specifier only (e.g., /param#1 '#2')
+//   - Legacy: Name followed by specifiers (e.g., /param '#1' '#2')
+//
+// When comparing identical versions, a warning and hint are displayed instead of empty diff.
 package diff
 
 import (
@@ -69,11 +77,19 @@ func action(c *cli.Context) error {
 
 // ParseArgs parses diff command arguments into two version specifications.
 //
-// Supports:
-//   - 1 arg:  fullspec           → fullspec vs latest
-//   - 2 args: fullspec fullspec  → fullspec vs fullspec (if 2nd doesn't start with #/~)
-//   - 2 args: fullspec #version  → fullspec.Name + #version vs fullspec (if 2nd starts with #/~)
-//   - 3 args: name #v1 #v2       → name#v1 vs name#v2
+// Argument patterns supported:
+//
+//   - 1 arg (fullspec): "/param#3" → compare version 3 with latest
+//   - 2 args (fullspec x2): "/param#1 /param#2" → compare v1 with v2
+//   - 2 args (mixed): "/param#1 '#2'" → first with version, second specifier only
+//   - 2 args (legacy omission): "/param '#3'" → compare v3 with latest
+//   - 3 args (legacy): "/param '#1' '#2'" → compare v1 with v2
+//
+// The function detects the pattern by checking if the second argument starts with
+// '#' or '~' (specifier-only format) or contains a full path (fullspec format).
+//
+// Returns two ParsedSpec pointers representing the versions to compare, or an error
+// if the arguments cannot be parsed.
 func ParseArgs(args []string) (*ParsedSpec, *ParsedSpec, error) {
 	if len(args) == 0 || len(args) > 3 {
 		return nil, nil, fmt.Errorf("usage: suve ssm diff <spec1> [spec2] | <name> <version1> [version2]")

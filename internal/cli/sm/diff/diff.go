@@ -1,4 +1,12 @@
-// Package diff provides the SM diff command.
+// Package diff provides the SM diff command for comparing secret versions.
+//
+// The diff command supports multiple argument formats:
+//   - Fullspec: Both arguments include name and version (e.g., secret:AWSPREVIOUS secret:AWSCURRENT)
+//   - Fullspec single: One fullspec compared against AWSCURRENT (e.g., secret:AWSPREVIOUS)
+//   - Mixed: First arg with version, second is specifier only (e.g., secret:AWSPREVIOUS ':AWSCURRENT')
+//   - Legacy: Name followed by specifiers (e.g., secret ':AWSPREVIOUS' ':AWSCURRENT')
+//
+// When comparing identical versions, a warning and hints are displayed instead of empty diff.
 package diff
 
 import (
@@ -71,11 +79,19 @@ func action(c *cli.Context) error {
 
 // ParseArgs parses diff command arguments into two version specifications.
 //
-// Supports:
-//   - 1 arg:  fullspec           → fullspec vs AWSCURRENT
-//   - 2 args: fullspec fullspec  → fullspec vs fullspec (if 2nd doesn't start with #/:/ ~)
-//   - 2 args: fullspec #version  → fullspec.Name + #version vs fullspec (if 2nd starts with #/:/ ~)
-//   - 3 args: name #v1 #v2       → name#v1 vs name#v2
+// Argument patterns supported:
+//
+//   - 1 arg (fullspec): "secret:AWSPREVIOUS" → compare AWSPREVIOUS with AWSCURRENT
+//   - 2 args (fullspec x2): "secret:AWSPREVIOUS secret:AWSCURRENT" → compare two versions
+//   - 2 args (mixed): "secret:AWSPREVIOUS ':AWSCURRENT'" → first with version, second specifier only
+//   - 2 args (legacy omission): "secret ':AWSPREVIOUS'" → compare AWSPREVIOUS with AWSCURRENT
+//   - 3 args (legacy): "secret ':AWSPREVIOUS' ':AWSCURRENT'" → compare two versions
+//
+// The function detects the pattern by checking if the second argument starts with
+// '#', ':', or '~' (specifier-only format) or contains a full name (fullspec format).
+//
+// Returns two ParsedSpec pointers representing the versions to compare, or an error
+// if the arguments cannot be parsed.
 func ParseArgs(args []string) (*ParsedSpec, *ParsedSpec, error) {
 	if len(args) == 0 || len(args) > 3 {
 		return nil, nil, fmt.Errorf("usage: suve sm diff <spec1> [spec2] | <name> <version1> [version2]")

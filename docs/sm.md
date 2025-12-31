@@ -154,26 +154,48 @@ suve sm log -n 5 my-database-credentials
 
 ## suve sm diff
 
-Show differences between two secret versions.
+Show differences between two secret versions in unified diff format.
 
 ```
-suve sm diff <name> <version1> [version2]
+suve sm diff <spec1> [spec2] | <name> <version1> [version2]
 ```
 
-**Arguments:**
+### Argument Formats
 
-| Argument | Required | Description |
-|----------|----------|-------------|
-| `name` | Yes | Secret name |
-| `version1` | Yes | First version specifier (e.g., `:AWSPREVIOUS`, `~1`) |
-| `version2` | No | Second version specifier. If omitted, compares AWSCURRENT with `version1`. |
+The diff command supports multiple argument formats for flexibility:
 
-**Behavior:**
+| Format | Args | Example | Description |
+|--------|------|---------|-------------|
+| fullspec | 2 | `secret:AWSPREVIOUS secret:AWSCURRENT` | Both args include name and version |
+| fullspec | 1 | `secret:AWSPREVIOUS` | Compare specified version with AWSCURRENT |
+| mixed | 2 | `secret:AWSPREVIOUS ':AWSCURRENT'` | First with version, second specifier only |
+| legacy | 2 | `secret ':AWSPREVIOUS'` | Name + specifier → compare with AWSCURRENT |
+| legacy | 3 | `secret ':AWSPREVIOUS' ':AWSCURRENT'` | Name + two specifiers |
 
-- `suve sm diff secret :AWSPREVIOUS :AWSCURRENT` - Compare previous with current
-- `suve sm diff secret :AWSPREVIOUS` - Compare AWSCURRENT with AWSPREVIOUS
+> [!TIP]
+> **Use fullspec format** to avoid shell quoting issues. When `:` or `~` appear at the start of an argument, special shell handling may occur. Fullspec format embeds the specifier within the name, so no quoting is needed.
 
-**Output:**
+> [!NOTE]
+> When only one version is specified, it is compared against **AWSCURRENT** (the current version).
+
+### Version Specifiers
+
+| Specifier | Description | Example |
+|-----------|-------------|---------|
+| `#VERSION` | Specific version by VersionId | `#abc12345-...` |
+| `:LABEL` | Staging label | `:AWSCURRENT`, `:AWSPREVIOUS` |
+| `~` | One version ago | `~` = current - 1 |
+| `~N` | N versions ago | `~2` = current - 2 |
+
+Specifiers can be combined: `secret:AWSCURRENT~1` means "1 version before AWSCURRENT".
+
+> [!NOTE]
+> **Labels vs Shift**: Labels (`:AWSCURRENT`, `:AWSPREVIOUS`) point to specific tagged versions. Shift (`~N`) navigates by creation date order. After a secret update:
+> - `:AWSCURRENT` = new value
+> - `:AWSPREVIOUS` = old value
+> - `~1` = 1 version ago (same as `:AWSPREVIOUS` after a single update)
+
+### Output
 
 ```diff
 --- my-secret#abc12345
@@ -183,17 +205,87 @@ suve sm diff <name> <version1> [version2]
 +{"password":"new"}
 ```
 
-**Examples:**
+Output is colorized when stdout is a TTY:
+- **Red**: Deleted lines (`-`)
+- **Green**: Added lines (`+`)
+- **Cyan**: Headers (`---`, `+++`, `@@`)
+
+> [!NOTE]
+> Version IDs in the diff header are truncated to 8 characters for readability.
+
+### Identical Version Warning
+
+> [!WARNING]
+> When comparing versions with **identical content**, no diff is produced. Instead, warnings and hints are displayed:
+> ```
+> Warning: comparing identical versions
+> Hint: To compare with previous version, use: suve sm diff my-secret~1
+> Hint: or: suve sm diff my-secret:AWSPREVIOUS
+> ```
+> This typically happens when you compare AWSCURRENT with itself (e.g., `my-secret` vs `my-secret`).
+
+### Examples
+
+#### Fullspec Format (Recommended)
 
 ```bash
-# Compare previous with current
-suve sm diff my-database-credentials :AWSPREVIOUS :AWSCURRENT
+# Compare AWSPREVIOUS with AWSCURRENT
+suve sm diff my-database-credentials:AWSPREVIOUS my-database-credentials:AWSCURRENT
 
-# Compare current with previous (shorthand)
-suve sm diff my-database-credentials :AWSPREVIOUS
+# Compare AWSPREVIOUS with AWSCURRENT (single arg)
+suve sm diff my-database-credentials:AWSPREVIOUS
+
+# Compare previous with current using shift
+suve sm diff my-database-credentials~1
+```
+
+#### Mixed Format
+
+```bash
+# Compare AWSPREVIOUS with AWSCURRENT (name from first arg)
+suve sm diff my-database-credentials:AWSPREVIOUS ':AWSCURRENT'
+```
+
+#### Legacy Format
+
+> [!IMPORTANT]
+> Legacy format requires quoting specifiers to prevent potential shell interpretation:
+> - `~` alone expands to `$HOME` in bash/zsh
+> - `:` may have special meaning in some contexts
+
+```bash
+# Compare AWSPREVIOUS with AWSCURRENT
+suve sm diff my-database-credentials ':AWSPREVIOUS' ':AWSCURRENT'
+
+# Compare AWSPREVIOUS with AWSCURRENT (shorthand)
+suve sm diff my-database-credentials ':AWSPREVIOUS'
 
 # Compare using relative versions
 suve sm diff my-database-credentials '~2' '~1'
+
+# Compare previous with current
+suve sm diff my-database-credentials '~'
+```
+
+#### Practical Use Cases
+
+```bash
+# Review what changed in the last secret rotation
+suve sm diff my-database-credentials:AWSPREVIOUS
+
+# Compare current with 2 versions ago
+suve sm diff my-database-credentials~2 my-database-credentials:AWSCURRENT
+
+# Compare specific version IDs
+suve sm diff my-database-credentials#abc12345 my-database-credentials#def67890
+
+# Pipe to a file for review
+suve sm diff my-database-credentials:AWSPREVIOUS > changes.diff
+
+# Use with jq for JSON secrets (compare formatted)
+suve sm cat my-database-credentials:AWSPREVIOUS | jq . > old.json
+suve sm cat my-database-credentials:AWSCURRENT | jq . > new.json
+diff old.json new.json
 ```
 
 ---
