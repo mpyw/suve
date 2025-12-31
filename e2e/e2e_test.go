@@ -3,8 +3,7 @@
 // Package e2e contains end-to-end tests for the suve CLI.
 //
 // These tests run against a real AWS-compatible service (localstack) and verify
-// the complete workflow of each command. They require Docker to be running and
-// localstack to be started via `make up`.
+// the complete workflow of each command using the actual CLI commands.
 //
 // Run with: make e2e
 //
@@ -20,13 +19,9 @@ import (
 	"os"
 	"testing"
 
-	"github.com/aws/aws-sdk-go-v2/config"
-	"github.com/aws/aws-sdk-go-v2/credentials"
-	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
-	"github.com/aws/aws-sdk-go-v2/service/ssm"
-	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/urfave/cli/v2"
 
 	smcat "github.com/mpyw/suve/internal/cli/sm/cat"
 	smcreate "github.com/mpyw/suve/internal/cli/sm/create"
@@ -44,8 +39,6 @@ import (
 	ssmrm "github.com/mpyw/suve/internal/cli/ssm/rm"
 	ssmset "github.com/mpyw/suve/internal/cli/ssm/set"
 	ssmshow "github.com/mpyw/suve/internal/cli/ssm/show"
-	"github.com/mpyw/suve/internal/version/smversion"
-	"github.com/mpyw/suve/internal/version/ssmversion"
 )
 
 func getEndpoint() string {
@@ -56,34 +49,35 @@ func getEndpoint() string {
 	return fmt.Sprintf("http://127.0.0.1:%s", port)
 }
 
-func newSSMClient(t *testing.T) *ssm.Client {
+// setupEnv sets up environment variables for localstack and returns a cleanup function.
+func setupEnv(t *testing.T) {
 	t.Helper()
 	endpoint := getEndpoint()
 
-	cfg, err := config.LoadDefaultConfig(t.Context(),
-		config.WithRegion("us-east-1"),
-		config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider("test", "test", "")),
-	)
-	require.NoError(t, err, "failed to load AWS config")
-
-	return ssm.NewFromConfig(cfg, func(o *ssm.Options) {
-		o.BaseEndpoint = lo.ToPtr(endpoint)
-	})
+	// Set AWS environment variables for localstack
+	t.Setenv("AWS_ENDPOINT_URL", endpoint)
+	t.Setenv("AWS_ACCESS_KEY_ID", "test")
+	t.Setenv("AWS_SECRET_ACCESS_KEY", "test")
+	t.Setenv("AWS_DEFAULT_REGION", "us-east-1")
 }
 
-func newSMClient(t *testing.T) *secretsmanager.Client {
+// runCommand executes a CLI command and returns stdout, stderr, and error.
+func runCommand(t *testing.T, cmd *cli.Command, args ...string) (stdout, stderr string, err error) {
 	t.Helper()
-	endpoint := getEndpoint()
 
-	cfg, err := config.LoadDefaultConfig(t.Context(),
-		config.WithRegion("us-east-1"),
-		config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider("test", "test", "")),
-	)
-	require.NoError(t, err, "failed to load AWS config")
+	var outBuf, errBuf bytes.Buffer
+	app := &cli.App{
+		Name:      "suve",
+		Writer:    &outBuf,
+		ErrWriter: &errBuf,
+		Commands:  []*cli.Command{cmd},
+	}
 
-	return secretsmanager.NewFromConfig(cfg, func(o *secretsmanager.Options) {
-		o.BaseEndpoint = lo.ToPtr(endpoint)
-	})
+	// Build full args: ["suve", "command-name", ...args]
+	fullArgs := append([]string{"suve", cmd.Name}, args...)
+	err = app.RunContext(t.Context(), fullArgs)
+
+	return outBuf.String(), errBuf.String(), err
 }
 
 // TestSSM_FullWorkflow tests the complete SSM Parameter Store workflow:
@@ -93,99 +87,76 @@ func newSMClient(t *testing.T) *secretsmanager.Client {
 // compares versions using diff, and cleans up by deleting.
 func TestSSM_FullWorkflow(t *testing.T) {
 	t.Parallel()
-	ctx := t.Context()
-	client := newSSMClient(t)
+	setupEnv(t)
 	paramName := "/suve-e2e-test/param"
 
-	// Cleanup function
-	cleanup := func() {
-		_, _ = client.DeleteParameter(ctx, &ssm.DeleteParameterInput{
-			Name: lo.ToPtr(paramName),
-		})
-	}
-
-	// Clean up before and after test
-	cleanup()
-	t.Cleanup(cleanup)
+	// Cleanup: delete parameter if it exists (ignore errors)
+	_, _, _ = runCommand(t, ssmrm.Command(), paramName)
+	t.Cleanup(func() {
+		_, _, _ = runCommand(t, ssmrm.Command(), paramName)
+	})
 
 	// 1. Set parameter
 	t.Run("set", func(t *testing.T) {
-		var buf bytes.Buffer
-		err := ssmset.Run(ctx, client, &buf, paramName, "initial-value", "String", "")
+		stdout, _, err := runCommand(t, ssmset.Command(), paramName, "initial-value")
 		require.NoError(t, err)
-		t.Logf("set output: %s", buf.String())
+		t.Logf("set output: %s", stdout)
 	})
 
 	// 2. Show parameter
 	t.Run("show", func(t *testing.T) {
-		var buf, errBuf bytes.Buffer
-		spec := &ssmversion.Spec{Name: paramName}
-		err := ssmshow.Run(ctx, client, &buf, &errBuf, spec, true, false)
+		stdout, _, err := runCommand(t, ssmshow.Command(), paramName)
 		require.NoError(t, err)
-		output := buf.String()
-		assert.Contains(t, output, "initial-value")
-		t.Logf("show output: %s", output)
+		assert.Contains(t, stdout, "initial-value")
+		t.Logf("show output: %s", stdout)
 	})
 
 	// 3. Cat parameter (raw output without trailing newline)
 	t.Run("cat", func(t *testing.T) {
-		var buf, warnBuf bytes.Buffer
-		spec := &ssmversion.Spec{Name: paramName}
-		err := ssmcat.Run(ctx, client, &buf, &warnBuf, spec, true, false)
+		stdout, _, err := runCommand(t, ssmcat.Command(), paramName)
 		require.NoError(t, err)
-		assert.Equal(t, "initial-value", buf.String())
+		assert.Equal(t, "initial-value", stdout)
 	})
 
 	// 4. Update parameter
 	t.Run("update", func(t *testing.T) {
-		var buf bytes.Buffer
-		err := ssmset.Run(ctx, client, &buf, paramName, "updated-value", "String", "")
+		_, _, err := runCommand(t, ssmset.Command(), paramName, "updated-value")
 		require.NoError(t, err)
 	})
 
 	// 5. Log (without patch)
 	t.Run("log", func(t *testing.T) {
-		var buf, errBuf bytes.Buffer
-		err := ssmlog.Run(ctx, client, &buf, &errBuf, paramName, ssmlog.Options{MaxResults: 10})
+		stdout, _, err := runCommand(t, ssmlog.Command(), paramName)
 		require.NoError(t, err)
-		t.Logf("log output: %s", buf.String())
+		t.Logf("log output: %s", stdout)
 	})
 
-	// 6. Diff - Compare version 1 with version 2 using partial spec format
-	// This tests the Run() function which uses the partial spec 3-argument format.
-	// The diff should show "initial-value" as removed (-) and "updated-value" as added (+).
+	// 6. Diff - Compare version 1 with version 2
 	t.Run("diff", func(t *testing.T) {
-		var buf bytes.Buffer
-		err := ssmdiff.Run(ctx, client, &buf, paramName, "#1", "#2")
+		stdout, _, err := runCommand(t, ssmdiff.Command(), paramName+"#1", paramName+"#2")
 		require.NoError(t, err)
-		output := buf.String()
-		t.Logf("diff output: %s", output)
-		assert.Contains(t, output, "-initial-value")
-		assert.Contains(t, output, "+updated-value")
+		t.Logf("diff output: %s", stdout)
+		assert.Contains(t, stdout, "-initial-value")
+		assert.Contains(t, stdout, "+updated-value")
 	})
 
 	// 7. List
 	t.Run("ls", func(t *testing.T) {
-		var buf bytes.Buffer
-		err := ssmls.Run(ctx, client, &buf, "/suve-e2e-test/", false)
+		stdout, _, err := runCommand(t, ssmls.Command(), "/suve-e2e-test/")
 		require.NoError(t, err)
-		output := buf.String()
-		assert.Contains(t, output, paramName)
-		t.Logf("ls output: %s", output)
+		assert.Contains(t, stdout, paramName)
+		t.Logf("ls output: %s", stdout)
 	})
 
 	// 8. Delete
 	t.Run("rm", func(t *testing.T) {
-		var buf bytes.Buffer
-		err := ssmrm.Run(ctx, client, &buf, paramName)
+		_, _, err := runCommand(t, ssmrm.Command(), paramName)
 		require.NoError(t, err)
 	})
 
 	// 9. Verify deletion
 	t.Run("verify-deleted", func(t *testing.T) {
-		var buf, errBuf bytes.Buffer
-		spec := &ssmversion.Spec{Name: paramName}
-		err := ssmshow.Run(ctx, client, &buf, &errBuf, spec, true, false)
+		_, _, err := runCommand(t, ssmshow.Command(), paramName)
 		assert.Error(t, err, "expected error after deletion")
 	})
 }
@@ -198,115 +169,88 @@ func TestSSM_FullWorkflow(t *testing.T) {
 // with force delete.
 func TestSM_FullWorkflow(t *testing.T) {
 	t.Parallel()
-	ctx := t.Context()
-	client := newSMClient(t)
+	setupEnv(t)
 	secretName := "suve-e2e-test/secret"
 
-	// Cleanup function
-	cleanup := func() {
-		_, _ = client.DeleteSecret(ctx, &secretsmanager.DeleteSecretInput{
-			SecretId:                   lo.ToPtr(secretName),
-			ForceDeleteWithoutRecovery: lo.ToPtr(true),
-		})
-	}
-
-	// Clean up before and after test
-	cleanup()
-	t.Cleanup(cleanup)
+	// Cleanup: force delete secret if it exists (ignore errors)
+	_, _, _ = runCommand(t, smrm.Command(), "-f", secretName)
+	t.Cleanup(func() {
+		_, _, _ = runCommand(t, smrm.Command(), "-f", secretName)
+	})
 
 	// 1. Create secret
 	t.Run("create", func(t *testing.T) {
-		var buf bytes.Buffer
-		err := smcreate.Run(ctx, client, &buf, secretName, "initial-secret", "E2E test secret")
+		stdout, _, err := runCommand(t, smcreate.Command(), secretName, "initial-secret")
 		require.NoError(t, err)
-		t.Logf("create output: %s", buf.String())
+		t.Logf("create output: %s", stdout)
 	})
 
 	// 2. Show secret
 	t.Run("show", func(t *testing.T) {
-		var buf, errBuf bytes.Buffer
-		spec := &smversion.Spec{Name: secretName}
-		err := smshow.Run(ctx, client, &buf, &errBuf, spec, false)
+		stdout, _, err := runCommand(t, smshow.Command(), secretName)
 		require.NoError(t, err)
-		output := buf.String()
-		assert.Contains(t, output, "initial-secret")
-		t.Logf("show output: %s", output)
+		assert.Contains(t, stdout, "initial-secret")
+		t.Logf("show output: %s", stdout)
 	})
 
 	// 3. Cat secret (raw output without trailing newline)
 	t.Run("cat", func(t *testing.T) {
-		var buf, warnBuf bytes.Buffer
-		spec := &smversion.Spec{Name: secretName}
-		err := smcat.Run(ctx, client, &buf, &warnBuf, spec, false)
+		stdout, _, err := runCommand(t, smcat.Command(), secretName)
 		require.NoError(t, err)
-		assert.Equal(t, "initial-secret", buf.String())
+		assert.Equal(t, "initial-secret", stdout)
 	})
 
 	// 4. Update secret
 	t.Run("update", func(t *testing.T) {
-		var buf bytes.Buffer
-		err := smupdate.Run(ctx, client, &buf, secretName, "updated-secret")
+		_, _, err := runCommand(t, smupdate.Command(), secretName, "updated-secret")
 		require.NoError(t, err)
 	})
 
 	// 5. Log (without patch)
 	t.Run("log", func(t *testing.T) {
-		var buf, errBuf bytes.Buffer
-		err := smlog.Run(ctx, client, &buf, &errBuf, secretName, smlog.Options{MaxResults: 10})
+		stdout, _, err := runCommand(t, smlog.Command(), secretName)
 		require.NoError(t, err)
-		t.Logf("log output: %s", buf.String())
+		t.Logf("log output: %s", stdout)
 	})
 
-	// 6. Diff - Compare AWSPREVIOUS with AWSCURRENT using partial spec format
-	// This tests the Run() function which uses the partial spec 3-argument format with labels.
-	// After update: AWSPREVIOUS = "initial-secret", AWSCURRENT = "updated-secret"
-	// The diff should show "initial-secret" as removed (-) and "updated-secret" as added (+).
+	// 6. Diff - Compare AWSPREVIOUS with AWSCURRENT
 	t.Run("diff", func(t *testing.T) {
-		var buf bytes.Buffer
-		err := smdiff.Run(ctx, client, &buf, secretName, ":AWSPREVIOUS", ":AWSCURRENT")
+		stdout, _, err := runCommand(t, smdiff.Command(), secretName+":AWSPREVIOUS", secretName+":AWSCURRENT")
 		require.NoError(t, err)
-		output := buf.String()
-		t.Logf("diff output: %s", output)
-		assert.Contains(t, output, "-initial-secret")
-		assert.Contains(t, output, "+updated-secret")
+		t.Logf("diff output: %s", stdout)
+		assert.Contains(t, stdout, "-initial-secret")
+		assert.Contains(t, stdout, "+updated-secret")
 	})
 
 	// 7. List
 	t.Run("ls", func(t *testing.T) {
-		var buf bytes.Buffer
-		err := smls.Run(ctx, client, &buf, "")
+		stdout, _, err := runCommand(t, smls.Command())
 		require.NoError(t, err)
-		output := buf.String()
-		assert.Contains(t, output, secretName)
-		t.Logf("ls output: %s", output)
+		assert.Contains(t, stdout, secretName)
+		t.Logf("ls output: %s", stdout)
 	})
 
 	// 8. Delete (with recovery window)
 	t.Run("rm", func(t *testing.T) {
-		var buf bytes.Buffer
-		err := smrm.Run(ctx, client, &buf, secretName, false, 7)
+		_, _, err := runCommand(t, smrm.Command(), "--recovery-window", "7", secretName)
 		require.NoError(t, err)
 	})
 
 	// 9. Restore
 	t.Run("restore", func(t *testing.T) {
-		var buf bytes.Buffer
-		err := smrestore.Run(ctx, client, &buf, secretName)
+		_, _, err := runCommand(t, smrestore.Command(), secretName)
 		require.NoError(t, err)
 	})
 
 	// 10. Verify restored
 	t.Run("verify-restored", func(t *testing.T) {
-		var buf, errBuf bytes.Buffer
-		spec := &smversion.Spec{Name: secretName}
-		err := smshow.Run(ctx, client, &buf, &errBuf, spec, false)
+		_, _, err := runCommand(t, smshow.Command(), secretName)
 		require.NoError(t, err)
 	})
 
 	// 11. Final cleanup (force delete)
 	t.Run("force-rm", func(t *testing.T) {
-		var buf bytes.Buffer
-		err := smrm.Run(ctx, client, &buf, secretName, true, 0)
+		_, _, err := runCommand(t, smrm.Command(), "-f", secretName)
 		require.NoError(t, err)
 	})
 }
