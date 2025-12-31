@@ -160,8 +160,8 @@ suve ssm diff <name> <version1> [version2]
 
 **Behavior:**
 
-- `suve ssm diff /param #1 #2` - Compare version 1 with version 2
-- `suve ssm diff /param #2` - Compare latest with version 2
+- `suve ssm diff /param '#1' '#2'` - Compare version 1 with version 2
+- `suve ssm diff /param '#2'` - Compare latest with version 2
 
 **Output:**
 
@@ -179,10 +179,10 @@ Output is colorized: red for deletions, green for additions.
 
 ```bash
 # Compare two specific versions
-suve ssm diff /app/config/database-url #1 #2
+suve ssm diff /app/config/database-url '#1' '#2'
 
 # Compare latest with version 2
-suve ssm diff /app/config/database-url #2
+suve ssm diff /app/config/database-url '#2'
 
 # Compare using relative versions
 suve ssm diff /app/config/database-url '~2' '~1'
