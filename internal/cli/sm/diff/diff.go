@@ -38,8 +38,8 @@ VERSION SPECIFIERS (as separate arguments):
 EXAMPLES:
   suve sm diff my-secret :AWSPREVIOUS :AWSCURRENT  Compare labels
   suve sm diff my-secret :AWSPREVIOUS              Compare with current
-  suve sm diff my-secret ~                         Compare previous with current
-  suve sm diff my-secret #abc123 #def456           Compare by version ID`,
+  suve sm diff my-secret '~'                       Compare previous with current
+  suve sm diff my-secret '#abc123' '#def456'       Compare by version ID`,
 		Action: action,
 	}
 }

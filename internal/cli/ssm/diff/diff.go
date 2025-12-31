@@ -35,9 +35,9 @@ VERSION SPECIFIERS (as separate arguments):
   ~SHIFT    N versions ago; ~ alone means ~1
 
 EXAMPLES:
-  suve ssm diff /app/config/db-url #1 #2  Compare v1 and v2
-  suve ssm diff /app/config/db-url #3     Compare v3 with latest
-  suve ssm diff /app/config/db-url ~      Compare previous with latest`,
+  suve ssm diff /app/config/db-url '#1' '#2'  Compare v1 and v2
+  suve ssm diff /app/config/db-url '#3'       Compare v3 with latest
+  suve ssm diff /app/config/db-url '~'        Compare previous with latest`,
 		Action: action,
 	}
 }
