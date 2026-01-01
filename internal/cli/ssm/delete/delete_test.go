@@ -1,4 +1,4 @@
-package rm_test
+package delete_test
 
 import (
 	"bytes"
@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	appcli "github.com/mpyw/suve/internal/cli"
-	"github.com/mpyw/suve/internal/cli/ssm/rm"
+	"github.com/mpyw/suve/internal/cli/ssm/delete"
 )
 
 func TestCommand_Validation(t *testing.T) {
@@ -20,9 +20,9 @@ func TestCommand_Validation(t *testing.T) {
 	t.Run("missing parameter name", func(t *testing.T) {
 		t.Parallel()
 		app := appcli.MakeApp()
-		err := app.Run(context.Background(), []string{"suve", "ssm", "rm"})
+		err := app.Run(context.Background(), []string{"suve", "ssm", "delete"})
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "usage: suve ssm rm")
+		assert.Contains(t, err.Error(), "usage: suve ssm delete")
 	})
 }
 
@@ -41,14 +41,14 @@ func TestRun(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name    string
-		opts    rm.Options
+		opts    delete.Options
 		mock    *mockClient
 		wantErr bool
 		check   func(t *testing.T, output string)
 	}{
 		{
 			name: "delete parameter",
-			opts: rm.Options{Name: "/app/param"},
+			opts: delete.Options{Name: "/app/param"},
 			mock: &mockClient{
 				deleteParameterFunc: func(_ context.Context, _ *ssm.DeleteParameterInput, _ ...func(*ssm.Options)) (*ssm.DeleteParameterOutput, error) {
 					return &ssm.DeleteParameterOutput{}, nil
@@ -61,7 +61,7 @@ func TestRun(t *testing.T) {
 		},
 		{
 			name: "error from AWS",
-			opts: rm.Options{Name: "/app/param"},
+			opts: delete.Options{Name: "/app/param"},
 			mock: &mockClient{
 				deleteParameterFunc: func(_ context.Context, _ *ssm.DeleteParameterInput, _ ...func(*ssm.Options)) (*ssm.DeleteParameterOutput, error) {
 					return nil, fmt.Errorf("AWS error")
@@ -75,7 +75,7 @@ func TestRun(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			var buf, errBuf bytes.Buffer
-			r := &rm.Runner{
+			r := &delete.Runner{
 				Client: tt.mock,
 				Stdout: &buf,
 				Stderr: &errBuf,

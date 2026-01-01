@@ -16,7 +16,7 @@ import (
 
 	appcli "github.com/mpyw/suve/internal/cli"
 	ssmdiff "github.com/mpyw/suve/internal/cli/ssm/diff"
-	"github.com/mpyw/suve/internal/diff"
+	"github.com/mpyw/suve/internal/diffutil"
 	"github.com/mpyw/suve/internal/stage"
 	"github.com/mpyw/suve/internal/version/ssmversion"
 )
@@ -336,7 +336,7 @@ func TestParseArgs(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			spec1, spec2, err := diff.ParseArgs(
+			spec1, spec2, err := diffutil.ParseArgs(
 				tt.args,
 				ssmversion.Parse,
 				func(abs ssmversion.AbsoluteSpec) bool { return abs.Version != nil },
@@ -642,12 +642,14 @@ func TestRun_IdenticalWarning(t *testing.T) {
 func TestCommand_StagedValidation(t *testing.T) {
 	t.Parallel()
 
-	t.Run("staged without args", func(t *testing.T) {
+	t.Run("staged without args shows nothing staged", func(t *testing.T) {
 		t.Parallel()
 		app := appcli.MakeApp()
+		var stderr bytes.Buffer
+		app.ErrWriter = &stderr
 		err := app.Run(context.Background(), []string{"suve", "ssm", "diff", "--staged"})
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "usage: suve ssm diff --staged <name>")
+		require.NoError(t, err)
+		assert.Contains(t, stderr.String(), "nothing staged")
 	})
 
 	t.Run("staged with version specifier", func(t *testing.T) {
@@ -671,7 +673,7 @@ func TestCommand_StagedValidation(t *testing.T) {
 		app := appcli.MakeApp()
 		err := app.Run(context.Background(), []string{"suve", "ssm", "diff", "--staged", "/app/config", "/other/config"})
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "usage: suve ssm diff --staged <name>")
+		assert.Contains(t, err.Error(), "usage: suve ssm diff --staged [name]")
 	})
 }
 

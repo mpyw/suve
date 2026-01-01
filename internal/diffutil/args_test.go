@@ -1,4 +1,4 @@
-package diff_test
+package diffutil_test
 
 import (
 	"testing"
@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/mpyw/suve/internal/diff"
+	"github.com/mpyw/suve/internal/diffutil"
 	"github.com/mpyw/suve/internal/version/smversion"
 	"github.com/mpyw/suve/internal/version/ssmversion"
 )
@@ -199,7 +199,7 @@ func TestParseArgs_SSM(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			spec1, spec2, err := diff.ParseArgs(tt.args, parse, hasAbsolute, prefixes, usage)
+			spec1, spec2, err := diffutil.ParseArgs(tt.args, parse, hasAbsolute, prefixes, usage)
 
 			if tt.wantErrMsg != "" {
 				require.Error(t, err)
@@ -288,7 +288,7 @@ func TestParseArgs_SM(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			spec1, spec2, err := diff.ParseArgs(tt.args, parse, hasAbsolute, prefixes, usage)
+			spec1, spec2, err := diffutil.ParseArgs(tt.args, parse, hasAbsolute, prefixes, usage)
 
 			if tt.wantErrMsg != "" {
 				require.Error(t, err)

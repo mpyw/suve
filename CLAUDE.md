@@ -4,7 +4,7 @@ This file provides guidance to Claude Code when working with code in this reposi
 
 ## Project Overview
 
-**suve** is a Git-like CLI for AWS Parameter Store and Secrets Manager. It provides familiar Git-style commands (`show`, `log`, `diff`, `cat`, `ls`, `set`, `rm`) with version specification syntax (`#VERSION`, `~SHIFT`, `:LABEL`).
+**suve** is a Git-like CLI for AWS Parameter Store and Secrets Manager. It provides familiar Git-style commands (`show`, `log`, `diff`, `cat`, `ls`, `set`, `delete`) with version specification syntax (`#VERSION`, `~SHIFT`, `:LABEL`).
 
 ### Core Concepts
 
@@ -50,8 +50,8 @@ suve/
 ├── internal/
 │   ├── cli/
 │   │   ├── app.go             # urfave/cli v2 app definition
-│   │   ├── ssm/               # SSM subcommands (cat, diff, log, ls, rm, set, show)
-│   │   └── sm/                # SM subcommands (cat, create, diff, log, ls, restore, rm, set, show)
+│   │   ├── ssm/               # SSM subcommands (cat, delete, diff, log, ls, set, show)
+│   │   └── sm/                # SM subcommands (cat, create, delete, diff, log, ls, restore, set, show)
 │   │
 │   ├── api/
 │   │   ├── ssmapi/            # SSM API interface (for testing)

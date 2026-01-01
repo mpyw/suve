@@ -31,7 +31,7 @@ import (
 	smlog "github.com/mpyw/suve/internal/cli/sm/log"
 	smls "github.com/mpyw/suve/internal/cli/sm/ls"
 	smrestore "github.com/mpyw/suve/internal/cli/sm/restore"
-	smrm "github.com/mpyw/suve/internal/cli/sm/rm"
+	smdelete "github.com/mpyw/suve/internal/cli/sm/delete"
 	smshow "github.com/mpyw/suve/internal/cli/sm/show"
 	smupdate "github.com/mpyw/suve/internal/cli/sm/update"
 	ssmcat "github.com/mpyw/suve/internal/cli/ssm/cat"
@@ -40,7 +40,7 @@ import (
 	ssmls "github.com/mpyw/suve/internal/cli/ssm/ls"
 	ssmpush "github.com/mpyw/suve/internal/cli/ssm/push"
 	ssmreset "github.com/mpyw/suve/internal/cli/ssm/reset"
-	ssmrm "github.com/mpyw/suve/internal/cli/ssm/rm"
+	ssmdelete "github.com/mpyw/suve/internal/cli/ssm/delete"
 	ssmset "github.com/mpyw/suve/internal/cli/ssm/set"
 	ssmshow "github.com/mpyw/suve/internal/cli/ssm/show"
 	ssmstatus "github.com/mpyw/suve/internal/cli/ssm/status"
@@ -87,7 +87,7 @@ func runCommand(t *testing.T, cmd *cli.Command, args ...string) (stdout, stderr 
 }
 
 // TestSSM_FullWorkflow tests the complete SSM Parameter Store workflow:
-// set → show → cat → update → log → diff → ls → rm → verify deletion
+// set → show → cat → update → log → diff → ls → delete → verify deletion
 //
 // This test creates a parameter, updates it, verifies version history,
 // compares versions using diff, and cleans up by deleting.
@@ -96,9 +96,9 @@ func TestSSM_FullWorkflow(t *testing.T) {
 	paramName := "/suve-e2e-test/param"
 
 	// Cleanup: delete parameter if it exists (ignore errors)
-	_, _, _ = runCommand(t, ssmrm.Command(), paramName)
+	_, _, _ = runCommand(t, ssmdelete.Command(), paramName)
 	t.Cleanup(func() {
-		_, _, _ = runCommand(t, ssmrm.Command(), paramName)
+		_, _, _ = runCommand(t, ssmdelete.Command(), paramName)
 	})
 
 	// 1. Set parameter
@@ -154,8 +154,8 @@ func TestSSM_FullWorkflow(t *testing.T) {
 	})
 
 	// 8. Delete
-	t.Run("rm", func(t *testing.T) {
-		_, _, err := runCommand(t, ssmrm.Command(), paramName)
+	t.Run("delete", func(t *testing.T) {
+		_, _, err := runCommand(t, ssmdelete.Command(), paramName)
 		require.NoError(t, err)
 	})
 
@@ -167,7 +167,7 @@ func TestSSM_FullWorkflow(t *testing.T) {
 }
 
 // TestSM_FullWorkflow tests the complete Secrets Manager workflow:
-// create → show → cat → update → log → diff → ls → rm → restore → verify → force-rm
+// create → show → cat → update → log → diff → ls → delete → restore → verify → force-delete
 //
 // This test creates a secret, updates it, verifies version history using labels,
 // compares versions using diff, tests soft delete with recovery, and cleans up
@@ -177,9 +177,9 @@ func TestSM_FullWorkflow(t *testing.T) {
 	secretName := "suve-e2e-test/secret"
 
 	// Cleanup: force delete secret if it exists (ignore errors)
-	_, _, _ = runCommand(t, smrm.Command(), "-f", secretName)
+	_, _, _ = runCommand(t, smdelete.Command(), "-f", secretName)
 	t.Cleanup(func() {
-		_, _, _ = runCommand(t, smrm.Command(), "-f", secretName)
+		_, _, _ = runCommand(t, smdelete.Command(), "-f", secretName)
 	})
 
 	// 1. Create secret
@@ -235,8 +235,8 @@ func TestSM_FullWorkflow(t *testing.T) {
 	})
 
 	// 8. Delete (with recovery window)
-	t.Run("rm", func(t *testing.T) {
-		_, _, err := runCommand(t, smrm.Command(), "--recovery-window", "7", secretName)
+	t.Run("delete", func(t *testing.T) {
+		_, _, err := runCommand(t, smdelete.Command(), "--recovery-window", "7", secretName)
 		require.NoError(t, err)
 	})
 
@@ -253,8 +253,8 @@ func TestSM_FullWorkflow(t *testing.T) {
 	})
 
 	// 11. Final cleanup (force delete)
-	t.Run("force-rm", func(t *testing.T) {
-		_, _, err := runCommand(t, smrm.Command(), "-f", secretName)
+	t.Run("force-delete", func(t *testing.T) {
+		_, _, err := runCommand(t, smdelete.Command(), "-f", secretName)
 		require.NoError(t, err)
 	})
 }
@@ -274,9 +274,9 @@ func TestSSM_StagingWorkflow(t *testing.T) {
 	paramName := "/suve-e2e-staging/param"
 
 	// Cleanup: delete parameter if it exists (ignore errors)
-	_, _, _ = runCommand(t, ssmrm.Command(), paramName)
+	_, _, _ = runCommand(t, ssmdelete.Command(), paramName)
 	t.Cleanup(func() {
-		_, _, _ = runCommand(t, ssmrm.Command(), paramName)
+		_, _, _ = runCommand(t, ssmdelete.Command(), paramName)
 	})
 
 	// 1. Create initial parameter

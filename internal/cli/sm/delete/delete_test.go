@@ -1,4 +1,4 @@
-package rm_test
+package delete_test
 
 import (
 	"bytes"
@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	appcli "github.com/mpyw/suve/internal/cli"
-	"github.com/mpyw/suve/internal/cli/sm/rm"
+	"github.com/mpyw/suve/internal/cli/sm/delete"
 )
 
 func TestCommand_Validation(t *testing.T) {
@@ -22,7 +22,7 @@ func TestCommand_Validation(t *testing.T) {
 	t.Run("missing secret name", func(t *testing.T) {
 		t.Parallel()
 		app := appcli.MakeApp()
-		err := app.Run(context.Background(), []string{"suve", "sm", "rm"})
+		err := app.Run(context.Background(), []string{"suve", "sm", "delete"})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "usage:")
 	})
@@ -46,14 +46,14 @@ func TestRun(t *testing.T) {
 
 	tests := []struct {
 		name    string
-		opts    rm.Options
+		opts    delete.Options
 		mock    *mockClient
 		wantErr bool
 		check   func(t *testing.T, output string)
 	}{
 		{
 			name: "delete with recovery window",
-			opts: rm.Options{Name: "my-secret", Force: false, RecoveryWindow: 30},
+			opts: delete.Options{Name: "my-secret", Force: false, RecoveryWindow: 30},
 			mock: &mockClient{
 				deleteSecretFunc: func(_ context.Context, params *secretsmanager.DeleteSecretInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.DeleteSecretOutput, error) {
 					assert.False(t, lo.FromPtr(params.ForceDeleteWithoutRecovery), "expected ForceDeleteWithoutRecovery to be false")
@@ -71,7 +71,7 @@ func TestRun(t *testing.T) {
 		},
 		{
 			name: "force delete",
-			opts: rm.Options{Name: "my-secret", Force: true},
+			opts: delete.Options{Name: "my-secret", Force: true},
 			mock: &mockClient{
 				deleteSecretFunc: func(_ context.Context, params *secretsmanager.DeleteSecretInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.DeleteSecretOutput, error) {
 					assert.True(t, lo.FromPtr(params.ForceDeleteWithoutRecovery), "expected ForceDeleteWithoutRecovery to be true")
@@ -86,7 +86,7 @@ func TestRun(t *testing.T) {
 		},
 		{
 			name: "error from AWS",
-			opts: rm.Options{Name: "my-secret"},
+			opts: delete.Options{Name: "my-secret"},
 			mock: &mockClient{
 				deleteSecretFunc: func(_ context.Context, _ *secretsmanager.DeleteSecretInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.DeleteSecretOutput, error) {
 					return nil, fmt.Errorf("AWS error")
@@ -100,7 +100,7 @@ func TestRun(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			var buf, errBuf bytes.Buffer
-			r := &rm.Runner{
+			r := &delete.Runner{
 				Client: tt.mock,
 				Stdout: &buf,
 				Stderr: &errBuf,

@@ -1,5 +1,5 @@
-// Package rm provides the SM rm command.
-package rm
+// Package delete provides the SM delete command.
+package delete
 
 import (
 	"context"
@@ -15,30 +15,29 @@ import (
 	"github.com/mpyw/suve/internal/awsutil"
 )
 
-// Client is the interface for the rm command.
+// Client is the interface for the delete command.
 type Client interface {
 	smapi.DeleteSecretAPI
 }
 
-// Runner executes the rm command.
+// Runner executes the delete command.
 type Runner struct {
 	Client Client
 	Stdout io.Writer
 	Stderr io.Writer
 }
 
-// Options holds the options for the rm command.
+// Options holds the options for the delete command.
 type Options struct {
 	Name           string
 	Force          bool
 	RecoveryWindow int
 }
 
-// Command returns the rm command.
+// Command returns the delete command.
 func Command() *cli.Command {
 	return &cli.Command{
-		Name:      "rm",
-		Aliases:   []string{"delete"},
+		Name:      "delete",
 		Usage:     "Delete a secret",
 		ArgsUsage: "<name>",
 		Description: `Schedule a secret for deletion in AWS Secrets Manager.
@@ -55,9 +54,9 @@ RECOVERY WINDOW:
    Default: 30 days
 
 EXAMPLES:
-   suve sm rm my-secret                      Delete with 30-day recovery
-   suve sm rm --recovery-window 7 my-secret  Delete with 7-day recovery
-   suve sm rm --force my-secret              Permanently delete immediately`,
+   suve sm delete my-secret                      Delete with 30-day recovery
+   suve sm delete --recovery-window 7 my-secret  Delete with 7-day recovery
+   suve sm delete --force my-secret              Permanently delete immediately`,
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
 				Name:  "force",
@@ -75,7 +74,7 @@ EXAMPLES:
 
 func action(ctx context.Context, cmd *cli.Command) error {
 	if cmd.Args().Len() < 1 {
-		return fmt.Errorf("usage: suve sm rm <name>")
+		return fmt.Errorf("usage: suve sm delete <name>")
 	}
 
 	client, err := awsutil.NewSMClient(ctx)
@@ -95,7 +94,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	})
 }
 
-// Run executes the rm command.
+// Run executes the delete command.
 func (r *Runner) Run(ctx context.Context, opts Options) error {
 	input := &secretsmanager.DeleteSecretInput{
 		SecretId: lo.ToPtr(opts.Name),

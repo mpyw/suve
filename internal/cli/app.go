@@ -7,6 +7,7 @@ import (
 
 	"github.com/urfave/cli/v3"
 
+	"github.com/mpyw/suve/internal/cli/diff"
 	"github.com/mpyw/suve/internal/cli/push"
 	"github.com/mpyw/suve/internal/cli/reset"
 	"github.com/mpyw/suve/internal/cli/sm"
@@ -24,6 +25,7 @@ func MakeApp() *cli.Command {
 			ssm.Command(),
 			sm.Command(),
 			status.Command(),
+			diff.Command(),
 			push.Command(),
 			reset.Command(),
 		},

@@ -1,5 +1,5 @@
-// Package rm provides the SSM rm command.
-package rm
+// Package delete provides the SSM delete command.
+package delete
 
 import (
 	"context"
@@ -15,28 +15,27 @@ import (
 	"github.com/mpyw/suve/internal/awsutil"
 )
 
-// Client is the interface for the rm command.
+// Client is the interface for the delete command.
 type Client interface {
 	ssmapi.DeleteParameterAPI
 }
 
-// Runner executes the rm command.
+// Runner executes the delete command.
 type Runner struct {
 	Client Client
 	Stdout io.Writer
 	Stderr io.Writer
 }
 
-// Options holds the options for the rm command.
+// Options holds the options for the delete command.
 type Options struct {
 	Name string
 }
 
-// Command returns the rm command.
+// Command returns the delete command.
 func Command() *cli.Command {
 	return &cli.Command{
-		Name:      "rm",
-		Aliases:   []string{"delete"},
+		Name:      "delete",
 		Usage:     "Delete parameter",
 		ArgsUsage: "<name>",
 		Description: `Permanently delete a parameter from AWS Systems Manager Parameter Store.
@@ -45,14 +44,14 @@ WARNING: This action is irreversible. The parameter and all its version
 history will be permanently deleted.
 
 EXAMPLES:
-   suve ssm rm /app/config/old-param    Delete a parameter`,
+   suve ssm delete /app/config/old-param    Delete a parameter`,
 		Action: action,
 	}
 }
 
 func action(ctx context.Context, cmd *cli.Command) error {
 	if cmd.Args().Len() < 1 {
-		return fmt.Errorf("usage: suve ssm rm <name>")
+		return fmt.Errorf("usage: suve ssm delete <name>")
 	}
 
 	client, err := awsutil.NewSSMClient(ctx)
@@ -70,7 +69,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	})
 }
 
-// Run executes the rm command.
+// Run executes the delete command.
 func (r *Runner) Run(ctx context.Context, opts Options) error {
 	_, err := r.Client.DeleteParameter(ctx, &ssm.DeleteParameterInput{
 		Name: lo.ToPtr(opts.Name),

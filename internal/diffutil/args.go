@@ -1,4 +1,4 @@
-// Package diff provides shared diff command argument parsing logic for SSM and SM.
+// Package diffutil provides shared diff command argument parsing logic for SSM and SM.
 //
 // The diff command compares two versions of a parameter (SSM) or secret (SM).
 // This package provides a generic ParseArgs function that handles the various
@@ -50,7 +50,7 @@
 // The diff output will show:
 //   - Lines removed from spec1 as "-" (red)
 //   - Lines added in spec2 as "+" (green)
-package diff
+package diffutil
 
 import (
 	"errors"

@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"runtime"
 	"strings"
 	"time"
 
@@ -186,12 +187,16 @@ func (r *Runner) RunDelete(_ context.Context, opts Options) error {
 }
 
 func openEditor(content string) (string, error) {
-	editor := os.Getenv("EDITOR")
+	editor := os.Getenv("VISUAL")
 	if editor == "" {
-		editor = os.Getenv("VISUAL")
+		editor = os.Getenv("EDITOR")
 	}
 	if editor == "" {
-		editor = "vi"
+		if runtime.GOOS == "windows" {
+			editor = "notepad"
+		} else {
+			editor = "vi"
+		}
 	}
 
 	tmpFile, err := os.CreateTemp("", "suve-edit-*.txt")

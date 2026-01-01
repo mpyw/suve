@@ -13,7 +13,7 @@ A Git-like CLI for AWS Parameter Store and Secrets Manager.
 
 ## Features
 
-- Git-like command structure (`show`, `log`, `diff`, `cat`, `ls`, `set`, `rm`)
+- Git-like command structure (`show`, `log`, `diff`, `cat`, `ls`, `set`, `delete`)
 - **Staging workflow** (`edit`, `status`, `push`, `reset`) - stage changes locally before applying to AWS
 - Version specification syntax (`#VERSION`, `~SHIFT`, `:LABEL`)
 - Colored diff output
@@ -104,7 +104,7 @@ where ~SHIFT = ~ | ~N  (repeatable, cumulative)
 | [`suve ssm diff`](docs/ssm.md#suve-ssm-diff) | Show differences between versions |
 | [`suve ssm ls`](docs/ssm.md#suve-ssm-ls) | List parameters |
 | [`suve ssm set`](docs/ssm.md#suve-ssm-set) | Create or update a parameter |
-| [`suve ssm rm`](docs/ssm.md#suve-ssm-rm) | Delete a parameter |
+| [`suve ssm delete`](docs/ssm.md#suve-ssm-delete) | Delete a parameter |
 | [`suve ssm edit`](docs/ssm.md#suve-ssm-edit) | Edit parameter value in editor and stage |
 | [`suve ssm status`](docs/ssm.md#suve-ssm-status) | Show staged changes |
 | [`suve ssm push`](docs/ssm.md#suve-ssm-push) | Apply staged changes to AWS |
@@ -121,7 +121,7 @@ where ~SHIFT = ~ | ~N  (repeatable, cumulative)
 | [`suve sm ls`](docs/sm.md#suve-sm-ls) | List secrets |
 | [`suve sm create`](docs/sm.md#suve-sm-create) | Create a new secret |
 | [`suve sm update`](docs/sm.md#suve-sm-update) | Update an existing secret |
-| [`suve sm rm`](docs/sm.md#suve-sm-rm) | Delete a secret |
+| [`suve sm delete`](docs/sm.md#suve-sm-delete) | Delete a secret |
 | [`suve sm restore`](docs/sm.md#suve-sm-restore) | Restore a deleted secret |
 | [`suve sm edit`](docs/sm.md#suve-sm-edit) | Edit secret value in editor and stage |
 | [`suve sm status`](docs/sm.md#suve-sm-status) | Show staged changes |

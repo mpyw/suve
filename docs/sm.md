@@ -458,12 +458,12 @@ suve sm update my-database-credentials '{"username":"admin","password":"newpassw
 
 ---
 
-## suve sm rm
+## suve sm delete
 
 Delete a secret.
 
 ```
-suve sm rm [options] <name>
+suve sm delete [options] <name>
 ```
 
 **Arguments:**
@@ -500,13 +500,13 @@ With `--force`:
 
 ```bash
 # Delete with 30-day recovery window (default)
-suve sm rm my-old-secret
+suve sm delete my-old-secret
 
 # Delete with 7-day recovery window
-suve sm rm --recovery-window 7 my-old-secret
+suve sm delete --recovery-window 7 my-old-secret
 
 # Delete immediately (no recovery possible)
-suve sm rm --force my-old-secret
+suve sm delete --force my-old-secret
 ```
 
 ---

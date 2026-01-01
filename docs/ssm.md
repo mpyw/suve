@@ -430,12 +430,12 @@ suve ssm set --type StringList /app/config/allowed-hosts "host1,host2,host3"
 
 ---
 
-## suve ssm rm
+## suve ssm delete
 
 Delete a parameter.
 
 ```
-suve ssm rm <name>
+suve ssm delete <name>
 ```
 
 **Arguments:**
@@ -459,7 +459,7 @@ Deleted /app/config/database-url
 **Examples:**
 
 ```bash
-suve ssm rm /app/config/old-param
+suve ssm delete /app/config/old-param
 ```
 
 ---
