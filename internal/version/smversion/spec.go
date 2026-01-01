@@ -5,6 +5,7 @@ import (
 
 	"github.com/samber/lo"
 
+	"github.com/mpyw/suve/internal/diff"
 	"github.com/mpyw/suve/internal/version"
 	"github.com/mpyw/suve/internal/version/internal"
 )
@@ -76,6 +77,18 @@ var parser = version.AbsoluteParser[AbsoluteSpec]{
 //   - ~1~2  cumulative: go back 3 versions
 func Parse(input string) (*Spec, error) {
 	return version.Parse(input, parser)
+}
+
+// ParseDiffArgs parses diff command arguments for Secrets Manager.
+// This is a convenience wrapper around diff.ParseArgs with SM-specific settings.
+func ParseDiffArgs(args []string) (*Spec, *Spec, error) {
+	return diff.ParseArgs(
+		args,
+		Parse,
+		hasAbsoluteSpec,
+		"#:~",
+		"usage: suve sm diff <spec1> [spec2] | <name> <version1> [version2]",
+	)
 }
 
 func isIDChar(c byte) bool {

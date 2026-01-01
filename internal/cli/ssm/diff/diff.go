@@ -11,7 +11,6 @@ import (
 
 	"github.com/mpyw/suve/internal/api/ssmapi"
 	"github.com/mpyw/suve/internal/awsutil"
-	"github.com/mpyw/suve/internal/diff"
 	"github.com/mpyw/suve/internal/jsonutil"
 	"github.com/mpyw/suve/internal/output"
 	"github.com/mpyw/suve/internal/version/ssmversion"
@@ -69,13 +68,7 @@ EXAMPLES:
 }
 
 func action(ctx context.Context, cmd *cli.Command) error {
-	spec1, spec2, err := diff.ParseArgs(
-		cmd.Args().Slice(),
-		ssmversion.Parse,
-		func(abs ssmversion.AbsoluteSpec) bool { return abs.Version != nil },
-		"#~",
-		"usage: suve ssm diff <spec1> [spec2] | <name> <version1> [version2]",
-	)
+	spec1, spec2, err := ssmversion.ParseDiffArgs(cmd.Args().Slice())
 	if err != nil {
 		return err
 	}
