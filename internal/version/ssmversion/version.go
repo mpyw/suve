@@ -46,13 +46,13 @@ func getParameterWithShift(ctx context.Context, client ssmapi.GetParameterHistor
 
 	baseIdx := 0
 	if spec.Absolute.Version != nil {
-		_, idx, found := lo.FindIndexOf(params, func(p types.ParameterHistory) bool {
+		var found bool
+		_, baseIdx, found = lo.FindIndexOf(params, func(p types.ParameterHistory) bool {
 			return p.Version == *spec.Absolute.Version
 		})
 		if !found {
 			return nil, fmt.Errorf("version %d not found", *spec.Absolute.Version)
 		}
-		baseIdx = idx
 	}
 
 	targetIdx := baseIdx + spec.Shift

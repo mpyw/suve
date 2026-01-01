@@ -3,7 +3,9 @@ package smversion
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"slices"
 	"sort"
 
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
@@ -75,23 +77,28 @@ func getSecretWithShift(ctx context.Context, client Client, spec *Spec) (*secret
 
 	// Find base index
 	baseIdx := 0
+	var (
+		predicate func(types.SecretVersionsListEntry) bool
+		errMsg    string
+		found     bool
+	)
 	switch {
 	case spec.Absolute.ID != nil:
-		_, idx, found := lo.FindIndexOf(versionList, func(v types.SecretVersionsListEntry) bool {
+		predicate = func(v types.SecretVersionsListEntry) bool {
 			return lo.FromPtr(v.VersionId) == *spec.Absolute.ID
-		})
-		if !found {
-			return nil, fmt.Errorf("version ID not found: %s", *spec.Absolute.ID)
 		}
-		baseIdx = idx
+		errMsg = fmt.Sprintf("version ID not found: %s", *spec.Absolute.ID)
 	case spec.Absolute.Label != nil:
-		_, idx, found := lo.FindIndexOf(versionList, func(v types.SecretVersionsListEntry) bool {
-			return lo.Contains(v.VersionStages, *spec.Absolute.Label)
-		})
-		if !found {
-			return nil, fmt.Errorf("version label not found: %s", *spec.Absolute.Label)
+		predicate = func(v types.SecretVersionsListEntry) bool {
+			return slices.Contains(v.VersionStages, *spec.Absolute.Label)
 		}
-		baseIdx = idx
+		errMsg = fmt.Sprintf("version label not found: %s", *spec.Absolute.Label)
+	}
+	if predicate != nil {
+		_, baseIdx, found = lo.FindIndexOf(versionList, predicate)
+		if !found {
+			return nil, errors.New(errMsg)
+		}
 	}
 
 	targetIdx := baseIdx + spec.Shift
