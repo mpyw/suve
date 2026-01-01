@@ -6,6 +6,7 @@ import (
 
 	"github.com/urfave/cli/v3"
 
+	cliinternal "github.com/mpyw/suve/internal/cli/internal"
 	"github.com/mpyw/suve/internal/cli/sm/cat"
 	"github.com/mpyw/suve/internal/cli/sm/create"
 	smdelete "github.com/mpyw/suve/internal/cli/sm/delete"
@@ -35,6 +36,7 @@ func Command() *cli.Command {
 			restore.Command(),
 			setDeprecatedCommand(),
 		},
+		CommandNotFound: cliinternal.CommandNotFound,
 	}
 }
 

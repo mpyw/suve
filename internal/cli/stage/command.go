@@ -4,6 +4,7 @@ package stage
 import (
 	"github.com/urfave/cli/v3"
 
+	cliinternal "github.com/mpyw/suve/internal/cli/internal"
 	"github.com/mpyw/suve/internal/cli/stage/diff"
 	"github.com/mpyw/suve/internal/cli/stage/push"
 	"github.com/mpyw/suve/internal/cli/stage/reset"
@@ -41,5 +42,6 @@ EXAMPLES:
 			push.Command(),
 			reset.Command(),
 		},
+		CommandNotFound: cliinternal.CommandNotFound,
 	}
 }

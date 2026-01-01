@@ -3,6 +3,7 @@ package ssm
 import (
 	"github.com/urfave/cli/v3"
 
+	cliinternal "github.com/mpyw/suve/internal/cli/internal"
 	"github.com/mpyw/suve/internal/cli/ssm/cat"
 	ssmdelete "github.com/mpyw/suve/internal/cli/ssm/delete"
 	"github.com/mpyw/suve/internal/cli/ssm/diff"
@@ -27,5 +28,6 @@ func Command() *cli.Command {
 			set.Command(),
 			ssmdelete.Command(),
 		},
+		CommandNotFound: cliinternal.CommandNotFound,
 	}
 }

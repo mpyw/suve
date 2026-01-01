@@ -4,6 +4,7 @@ package sm
 import (
 	"github.com/urfave/cli/v3"
 
+	cliinternal "github.com/mpyw/suve/internal/cli/internal"
 	"github.com/mpyw/suve/internal/staging"
 	"github.com/mpyw/suve/internal/staging/runner"
 )
@@ -39,5 +40,6 @@ Use 'suve stage sm reset' to unstage or restore from a version.`,
 			runner.NewPushCommand(config),
 			runner.NewResetCommand(config),
 		},
+		CommandNotFound: cliinternal.CommandNotFound,
 	}
 }
