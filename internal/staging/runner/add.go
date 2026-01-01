@@ -1,4 +1,4 @@
-// Package stagerunner provides shared utilities for stage commands.
+// Package runner provides shared runners and command builders for stage commands.
 package runner
 
 import (
@@ -61,7 +61,7 @@ func (r *AddRunner) Run(_ context.Context, opts AddOptions) error {
 		return fmt.Errorf("failed to edit: %w", err)
 	}
 
-	// Check if value is empty (cancelled)
+	// Check if value is empty (canceled)
 	if newValue == "" {
 		yellow := color.New(color.FgYellow).SprintFunc()
 		_, _ = fmt.Fprintln(r.Stdout, yellow("Empty value, not staged."))

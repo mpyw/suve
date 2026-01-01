@@ -1,4 +1,4 @@
-// Package strategy provides SSM-specific stage command strategy implementations.
+// Package ssm provides SSM-specific stage command strategy implementations.
 package ssm
 
 import (

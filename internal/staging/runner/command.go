@@ -1,4 +1,4 @@
-// Package stagerunner provides shared runners and command builders for stage commands.
+// Package runner provides shared runners and command builders for stage commands.
 package runner
 
 import (

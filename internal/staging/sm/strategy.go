@@ -1,4 +1,4 @@
-// Package strategy provides SM-specific stage command strategy implementations.
+// Package sm provides SM-specific stage command strategy implementations.
 package sm
 
 import (

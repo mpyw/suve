@@ -1,4 +1,4 @@
-// Package stage provides staging functionality for AWS parameter and secret changes.
+// Package staging provides staging functionality for AWS parameter and secret changes.
 package staging
 
 import (

@@ -11,10 +11,8 @@ import (
 	"github.com/mpyw/suve/internal/version/internal"
 )
 
-// SSM-specific errors.
-var (
-	ErrInvalidVersion = errors.New("# must be followed by a version number")
-)
+// ErrInvalidVersion is returned when # is not followed by a version number.
+var ErrInvalidVersion = errors.New("# must be followed by a version number")
 
 // AbsoluteSpec represents the absolute version specifier for SSM.
 type AbsoluteSpec struct {

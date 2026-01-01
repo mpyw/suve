@@ -150,7 +150,7 @@ func Parse[A any](input string, parser AbsoluteParser[A]) (*Spec[A], error) {
 //   - PrefixChar followed by a valid char for that specifier (absolute specifier)
 //
 // Returns error for:
-//   - '~' followed by a letter (ambiguous: could be name or shift typo)
+//   - '~' followed by a letter (ambiguous: could be part of the name or a shift typo)
 //   - PrefixChar at end or followed by invalid char, when Error is set
 func findNameEnd[A any](input string, parsers []SpecifierParser[A]) (int, error) {
 	for i := 0; i < len(input); i++ {

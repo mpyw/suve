@@ -1,4 +1,4 @@
-// Package stageutil provides shared utilities for stage commands.
+// Package runner provides shared runners and command builders for stage commands.
 package runner
 
 import (
