@@ -1,4 +1,4 @@
-package stage
+package staging
 
 import (
 	"fmt"
@@ -22,7 +22,9 @@ func (p *EntryPrinter) PrintEntry(name string, entry Entry, verbose, showDeleteO
 
 	var opColor string
 	switch entry.Operation {
-	case OperationSet:
+	case OperationCreate:
+		opColor = green("A")
+	case OperationUpdate:
 		opColor = green("M")
 	case OperationDelete:
 		opColor = red("D")
@@ -31,7 +33,7 @@ func (p *EntryPrinter) PrintEntry(name string, entry Entry, verbose, showDeleteO
 	if verbose {
 		_, _ = fmt.Fprintf(p.Writer, "\n%s %s\n", opColor, name)
 		_, _ = fmt.Fprintf(p.Writer, "  %s %s\n", cyan("Staged:"), entry.StagedAt.Format("2006-01-02 15:04:05"))
-		if entry.Operation == OperationSet {
+		if entry.Operation == OperationCreate || entry.Operation == OperationUpdate {
 			value := entry.Value
 			if len(value) > 100 {
 				value = value[:100] + "..."

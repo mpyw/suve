@@ -1,8 +1,9 @@
 // Package stageutil provides shared utilities for stage commands.
-package stagerunner
+package runner
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"time"
@@ -10,13 +11,13 @@ import (
 	"github.com/fatih/color"
 
 	"github.com/mpyw/suve/internal/editor"
-	"github.com/mpyw/suve/internal/stage"
+	"github.com/mpyw/suve/internal/staging"
 )
 
 // EditRunner executes edit operations using a strategy.
 type EditRunner struct {
-	Strategy   stage.EditStrategy
-	Store      *stage.Store
+	Strategy   staging.EditStrategy
+	Store      *staging.Store
 	Stdout     io.Writer
 	Stderr     io.Writer
 	OpenEditor editor.OpenFunc // Optional: defaults to editor.Open if nil
@@ -33,12 +34,12 @@ func (r *EditRunner) Run(ctx context.Context, opts EditOptions) error {
 
 	// Check if already staged
 	stagedEntry, err := r.Store.Get(service, opts.Name)
-	if err != nil && err != stage.ErrNotStaged {
+	if err != nil && !errors.Is(err, staging.ErrNotStaged) {
 		return err
 	}
 
 	var currentValue string
-	if stagedEntry != nil && stagedEntry.Operation == stage.OperationSet {
+	if stagedEntry != nil && (stagedEntry.Operation == staging.OperationCreate || stagedEntry.Operation == staging.OperationUpdate) {
 		// Use staged value
 		currentValue = stagedEntry.Value
 	} else {
@@ -67,8 +68,8 @@ func (r *EditRunner) Run(ctx context.Context, opts EditOptions) error {
 	}
 
 	// Stage the change
-	if err := r.Store.Stage(service, opts.Name, stage.Entry{
-		Operation: stage.OperationSet,
+	if err := r.Store.Stage(service, opts.Name, staging.Entry{
+		Operation: staging.OperationUpdate,
 		Value:     newValue,
 		StagedAt:  time.Now(),
 	}); err != nil {

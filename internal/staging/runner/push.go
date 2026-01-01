@@ -1,5 +1,5 @@
 // Package stageutil provides shared utilities for stage commands.
-package stagerunner
+package runner
 
 import (
 	"context"
@@ -9,13 +9,13 @@ import (
 	"github.com/mpyw/suve/internal/maputil"
 	"github.com/mpyw/suve/internal/output"
 	"github.com/mpyw/suve/internal/parallel"
-	"github.com/mpyw/suve/internal/stage"
+	"github.com/mpyw/suve/internal/staging"
 )
 
 // PushRunner executes push operations using a strategy.
 type PushRunner struct {
-	Strategy stage.PushStrategy
-	Store    *stage.Store
+	Strategy staging.PushStrategy
+	Store    *staging.Store
 	Stdout   io.Writer
 	Stderr   io.Writer
 }
@@ -47,20 +47,12 @@ func (r *PushRunner) Run(ctx context.Context, opts PushOptions) error {
 		if !exists {
 			return fmt.Errorf("%s %s is not staged", itemName, opts.Name)
 		}
-		entries = map[string]stage.Entry{opts.Name: entry}
+		entries = map[string]staging.Entry{opts.Name: entry}
 	}
 
 	// Execute push operations in parallel
-	results := parallel.ExecuteMap(ctx, entries, func(ctx context.Context, name string, entry stage.Entry) (stage.Operation, error) {
-		var err error
-		switch entry.Operation {
-		case stage.OperationSet:
-			err = r.Strategy.PushSet(ctx, name, entry.Value)
-		case stage.OperationDelete:
-			err = r.Strategy.PushDelete(ctx, name, entry)
-		default:
-			err = fmt.Errorf("unknown operation: %s", entry.Operation)
-		}
+	results := parallel.ExecuteMap(ctx, entries, func(ctx context.Context, name string, entry staging.Entry) (staging.Operation, error) {
+		err := r.Strategy.Push(ctx, name, entry)
 		return entry.Operation, err
 	})
 
@@ -72,9 +64,12 @@ func (r *PushRunner) Run(ctx context.Context, opts PushOptions) error {
 			output.Failed(r.Stderr, name, result.Err)
 			failed++
 		} else {
-			if result.Value == stage.OperationSet {
-				output.Success(r.Stdout, "Set %s", name)
-			} else {
+			switch result.Value {
+			case staging.OperationCreate:
+				output.Success(r.Stdout, "Created %s", name)
+			case staging.OperationUpdate:
+				output.Success(r.Stdout, "Updated %s", name)
+			case staging.OperationDelete:
 				output.Success(r.Stdout, "Deleted %s", name)
 			}
 			if err := r.Store.Unstage(service, name); err != nil {

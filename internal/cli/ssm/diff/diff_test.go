@@ -15,7 +15,7 @@ import (
 
 	appcli "github.com/mpyw/suve/internal/cli"
 	ssmdiff "github.com/mpyw/suve/internal/cli/ssm/diff"
-	"github.com/mpyw/suve/internal/diffutil"
+	"github.com/mpyw/suve/internal/diffargs"
 	"github.com/mpyw/suve/internal/version/ssmversion"
 )
 
@@ -334,7 +334,7 @@ func TestParseArgs(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			spec1, spec2, err := diffutil.ParseArgs(
+			spec1, spec2, err := diffargs.ParseArgs(
 				tt.args,
 				ssmversion.Parse,
 				func(abs ssmversion.AbsoluteSpec) bool { return abs.Version != nil },

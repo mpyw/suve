@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
 
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/fatih/color"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/mpyw/suve/internal/api/ssmapi"
 	"github.com/mpyw/suve/internal/awsutil"
+	"github.com/mpyw/suve/internal/confirm"
 )
 
 // Client is the interface for the delete command.
@@ -44,7 +46,15 @@ WARNING: This action is irreversible. The parameter and all its version
 history will be permanently deleted.
 
 EXAMPLES:
-   suve ssm delete /app/config/old-param    Delete a parameter`,
+   suve ssm delete /app/config/old-param         Delete a parameter (with confirmation)
+   suve ssm delete -y /app/config/old-param      Delete without confirmation`,
+		Flags: []cli.Flag{
+			&cli.BoolFlag{
+				Name:    "yes",
+				Aliases: []string{"y"},
+				Usage:   "Skip confirmation prompt",
+			},
+		},
 		Action: action,
 	}
 }
@@ -52,6 +62,23 @@ EXAMPLES:
 func action(ctx context.Context, cmd *cli.Command) error {
 	if cmd.Args().Len() < 1 {
 		return fmt.Errorf("usage: suve ssm delete <name>")
+	}
+
+	name := cmd.Args().First()
+	skipConfirm := cmd.Bool("yes")
+
+	// Confirm deletion
+	prompter := &confirm.Prompter{
+		Stdin:  os.Stdin,
+		Stdout: cmd.Root().Writer,
+		Stderr: cmd.Root().ErrWriter,
+	}
+	confirmed, err := prompter.ConfirmDelete(name, skipConfirm)
+	if err != nil {
+		return err
+	}
+	if !confirmed {
+		return nil
 	}
 
 	client, err := awsutil.NewSSMClient(ctx)
@@ -65,7 +92,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		Stderr: cmd.Root().ErrWriter,
 	}
 	return r.Run(ctx, Options{
-		Name: cmd.Args().First(),
+		Name: name,
 	})
 }
 

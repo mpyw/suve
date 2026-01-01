@@ -17,7 +17,7 @@ import (
 
 	appcli "github.com/mpyw/suve/internal/cli"
 	stagediff "github.com/mpyw/suve/internal/cli/stage/diff"
-	"github.com/mpyw/suve/internal/stage"
+	"github.com/mpyw/suve/internal/staging"
 )
 
 type mockSSMClient struct {
@@ -84,7 +84,7 @@ func TestRun_NothingStaged(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	store := stage.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 	var stdout, stderr bytes.Buffer
 	r := &stagediff.Runner{
@@ -104,10 +104,10 @@ func TestRun_SSMOnly(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	store := stage.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
-	err := store.Stage(stage.ServiceSSM, "/app/config", stage.Entry{
-		Operation: stage.OperationSet,
+	err := store.Stage(staging.ServiceSSM, "/app/config", staging.Entry{
+		Operation: staging.OperationUpdate,
 		Value:     "new-value",
 		StagedAt:  time.Now(),
 	})
@@ -147,10 +147,10 @@ func TestRun_SMOnly(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	store := stage.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
-	err := store.Stage(stage.ServiceSM, "my-secret", stage.Entry{
-		Operation: stage.OperationSet,
+	err := store.Stage(staging.ServiceSM, "my-secret", staging.Entry{
+		Operation: staging.OperationUpdate,
 		Value:     "new-secret",
 		StagedAt:  time.Now(),
 	})
@@ -186,17 +186,17 @@ func TestRun_BothServices(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	store := stage.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
-	err := store.Stage(stage.ServiceSSM, "/app/config", stage.Entry{
-		Operation: stage.OperationSet,
+	err := store.Stage(staging.ServiceSSM, "/app/config", staging.Entry{
+		Operation: staging.OperationUpdate,
 		Value:     "ssm-new",
 		StagedAt:  time.Now(),
 	})
 	require.NoError(t, err)
 
-	err = store.Stage(stage.ServiceSM, "my-secret", stage.Entry{
-		Operation: stage.OperationSet,
+	err = store.Stage(staging.ServiceSM, "my-secret", staging.Entry{
+		Operation: staging.OperationUpdate,
 		Value:     "sm-new",
 		StagedAt:  time.Now(),
 	})
@@ -249,16 +249,16 @@ func TestRun_DeleteOperations(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	store := stage.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
-	err := store.Stage(stage.ServiceSSM, "/app/config", stage.Entry{
-		Operation: stage.OperationDelete,
+	err := store.Stage(staging.ServiceSSM, "/app/config", staging.Entry{
+		Operation: staging.OperationDelete,
 		StagedAt:  time.Now(),
 	})
 	require.NoError(t, err)
 
-	err = store.Stage(stage.ServiceSM, "my-secret", stage.Entry{
-		Operation: stage.OperationDelete,
+	err = store.Stage(staging.ServiceSM, "my-secret", staging.Entry{
+		Operation: staging.OperationDelete,
 		StagedAt:  time.Now(),
 	})
 	require.NoError(t, err)
@@ -307,10 +307,10 @@ func TestRun_IdenticalValues(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	store := stage.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
-	err := store.Stage(stage.ServiceSSM, "/app/config", stage.Entry{
-		Operation: stage.OperationSet,
+	err := store.Stage(staging.ServiceSSM, "/app/config", staging.Entry{
+		Operation: staging.OperationUpdate,
 		Value:     "same-value",
 		StagedAt:  time.Now(),
 	})
@@ -343,18 +343,18 @@ func TestRun_IdenticalValues(t *testing.T) {
 	assert.Contains(t, stderr.String(), "unstaged /app/config: identical to AWS current")
 
 	// Verify actually unstaged
-	_, err = store.Get(stage.ServiceSSM, "/app/config")
-	assert.Equal(t, stage.ErrNotStaged, err)
+	_, err = store.Get(staging.ServiceSSM, "/app/config")
+	assert.Equal(t, staging.ErrNotStaged, err)
 }
 
 func TestRun_JSONFormat(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	store := stage.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
-	err := store.Stage(stage.ServiceSSM, "/app/config", stage.Entry{
-		Operation: stage.OperationSet,
+	err := store.Stage(staging.ServiceSSM, "/app/config", staging.Entry{
+		Operation: staging.OperationUpdate,
 		Value:     `{"key":"new"}`,
 		StagedAt:  time.Now(),
 	})
@@ -392,10 +392,10 @@ func TestRun_AWSError(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	store := stage.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
-	err := store.Stage(stage.ServiceSSM, "/app/config", stage.Entry{
-		Operation: stage.OperationSet,
+	err := store.Stage(staging.ServiceSSM, "/app/config", staging.Entry{
+		Operation: staging.OperationUpdate,
 		Value:     "new-value",
 		StagedAt:  time.Now(),
 	})
@@ -424,10 +424,10 @@ func TestRun_SMAWSError(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	store := stage.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
-	err := store.Stage(stage.ServiceSM, "my-secret", stage.Entry{
-		Operation: stage.OperationSet,
+	err := store.Stage(staging.ServiceSM, "my-secret", staging.Entry{
+		Operation: staging.OperationUpdate,
 		Value:     "new-value",
 		StagedAt:  time.Now(),
 	})
@@ -456,10 +456,10 @@ func TestRun_SMIdenticalValues(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	store := stage.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
-	err := store.Stage(stage.ServiceSM, "my-secret", stage.Entry{
-		Operation: stage.OperationSet,
+	err := store.Stage(staging.ServiceSM, "my-secret", staging.Entry{
+		Operation: staging.OperationUpdate,
 		Value:     "same-value",
 		StagedAt:  time.Now(),
 	})
@@ -490,18 +490,18 @@ func TestRun_SMIdenticalValues(t *testing.T) {
 	assert.Contains(t, stderr.String(), "unstaged my-secret: identical to AWS current")
 
 	// Verify actually unstaged
-	_, err = store.Get(stage.ServiceSM, "my-secret")
-	assert.Equal(t, stage.ErrNotStaged, err)
+	_, err = store.Get(staging.ServiceSM, "my-secret")
+	assert.Equal(t, staging.ErrNotStaged, err)
 }
 
 func TestRun_SMJSONFormat(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	store := stage.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
-	err := store.Stage(stage.ServiceSM, "my-secret", stage.Entry{
-		Operation: stage.OperationSet,
+	err := store.Stage(staging.ServiceSM, "my-secret", staging.Entry{
+		Operation: staging.OperationUpdate,
 		Value:     `{"key":"new"}`,
 		StagedAt:  time.Now(),
 	})
@@ -537,10 +537,10 @@ func TestRun_SMJSONFormatMixed(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	store := stage.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
-	err := store.Stage(stage.ServiceSM, "my-secret", stage.Entry{
-		Operation: stage.OperationSet,
+	err := store.Stage(staging.ServiceSM, "my-secret", staging.Entry{
+		Operation: staging.OperationUpdate,
 		Value:     "not-json",
 		StagedAt:  time.Now(),
 	})

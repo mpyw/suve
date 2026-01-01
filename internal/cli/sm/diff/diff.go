@@ -22,7 +22,7 @@ import (
 	"github.com/mpyw/suve/internal/jsonutil"
 	"github.com/mpyw/suve/internal/output"
 	"github.com/mpyw/suve/internal/pager"
-	"github.com/mpyw/suve/internal/smutil"
+	// smutil removed
 	"github.com/mpyw/suve/internal/version/smversion"
 )
 
@@ -147,8 +147,8 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 		return nil
 	}
 
-	v1 := smutil.TruncateVersionID(lo.FromPtr(secret1.VersionId))
-	v2 := smutil.TruncateVersionID(lo.FromPtr(secret2.VersionId))
+	v1 := smversion.TruncateVersionID(lo.FromPtr(secret1.VersionId))
+	v2 := smversion.TruncateVersionID(lo.FromPtr(secret2.VersionId))
 
 	diff := output.Diff(
 		fmt.Sprintf("%s#%s", opts.Spec1.Name, v1),

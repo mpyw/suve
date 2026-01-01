@@ -1,4 +1,4 @@
-package stage_test
+package staging_test
 
 import (
 	"bytes"
@@ -8,7 +8,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/mpyw/suve/internal/stage"
+	"github.com/mpyw/suve/internal/staging"
 )
 
 func TestEntryPrinter_PrintEntry(t *testing.T) {
@@ -19,7 +19,7 @@ func TestEntryPrinter_PrintEntry(t *testing.T) {
 	tests := []struct {
 		name              string
 		entryName         string
-		entry             stage.Entry
+		entry             staging.Entry
 		verbose           bool
 		showDeleteOptions bool
 		wantContains      []string
@@ -28,8 +28,8 @@ func TestEntryPrinter_PrintEntry(t *testing.T) {
 		{
 			name:      "set operation non-verbose",
 			entryName: "/app/config",
-			entry: stage.Entry{
-				Operation: stage.OperationSet,
+			entry: staging.Entry{
+				Operation: staging.OperationUpdate,
 				Value:     "test-value",
 				StagedAt:  fixedTime,
 			},
@@ -39,8 +39,8 @@ func TestEntryPrinter_PrintEntry(t *testing.T) {
 		{
 			name:      "delete operation non-verbose",
 			entryName: "/app/secret",
-			entry: stage.Entry{
-				Operation: stage.OperationDelete,
+			entry: staging.Entry{
+				Operation: staging.OperationDelete,
 				StagedAt:  fixedTime,
 			},
 			verbose:      false,
@@ -49,8 +49,8 @@ func TestEntryPrinter_PrintEntry(t *testing.T) {
 		{
 			name:      "set operation verbose",
 			entryName: "/app/config",
-			entry: stage.Entry{
-				Operation: stage.OperationSet,
+			entry: staging.Entry{
+				Operation: staging.OperationUpdate,
 				Value:     "test-value",
 				StagedAt:  fixedTime,
 			},
@@ -60,8 +60,8 @@ func TestEntryPrinter_PrintEntry(t *testing.T) {
 		{
 			name:      "set operation verbose with long value",
 			entryName: "/app/config",
-			entry: stage.Entry{
-				Operation: stage.OperationSet,
+			entry: staging.Entry{
+				Operation: staging.OperationUpdate,
 				Value:     strings.Repeat("x", 150),
 				StagedAt:  fixedTime,
 			},
@@ -71,8 +71,8 @@ func TestEntryPrinter_PrintEntry(t *testing.T) {
 		{
 			name:      "delete operation verbose without options",
 			entryName: "/app/secret",
-			entry: stage.Entry{
-				Operation: stage.OperationDelete,
+			entry: staging.Entry{
+				Operation: staging.OperationDelete,
 				StagedAt:  fixedTime,
 			},
 			verbose:           true,
@@ -83,10 +83,10 @@ func TestEntryPrinter_PrintEntry(t *testing.T) {
 		{
 			name:      "delete operation verbose with force option",
 			entryName: "/app/secret",
-			entry: stage.Entry{
-				Operation:     stage.OperationDelete,
+			entry: staging.Entry{
+				Operation:     staging.OperationDelete,
 				StagedAt:      fixedTime,
-				DeleteOptions: &stage.DeleteOptions{Force: true},
+				DeleteOptions: &staging.DeleteOptions{Force: true},
 			},
 			verbose:           true,
 			showDeleteOptions: true,
@@ -95,10 +95,10 @@ func TestEntryPrinter_PrintEntry(t *testing.T) {
 		{
 			name:      "delete operation verbose with recovery window",
 			entryName: "/app/secret",
-			entry: stage.Entry{
-				Operation:     stage.OperationDelete,
+			entry: staging.Entry{
+				Operation:     staging.OperationDelete,
 				StagedAt:      fixedTime,
-				DeleteOptions: &stage.DeleteOptions{RecoveryWindow: 7},
+				DeleteOptions: &staging.DeleteOptions{RecoveryWindow: 7},
 			},
 			verbose:           true,
 			showDeleteOptions: true,
@@ -107,10 +107,10 @@ func TestEntryPrinter_PrintEntry(t *testing.T) {
 		{
 			name:      "delete operation verbose with showDeleteOptions false",
 			entryName: "/app/secret",
-			entry: stage.Entry{
-				Operation:     stage.OperationDelete,
+			entry: staging.Entry{
+				Operation:     staging.OperationDelete,
 				StagedAt:      fixedTime,
-				DeleteOptions: &stage.DeleteOptions{Force: true},
+				DeleteOptions: &staging.DeleteOptions{Force: true},
 			},
 			verbose:           true,
 			showDeleteOptions: false,
@@ -123,7 +123,7 @@ func TestEntryPrinter_PrintEntry(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			var buf bytes.Buffer
-			printer := &stage.EntryPrinter{Writer: &buf}
+			printer := &staging.EntryPrinter{Writer: &buf}
 
 			printer.PrintEntry(tt.entryName, tt.entry, tt.verbose, tt.showDeleteOptions)
 

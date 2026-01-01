@@ -1,8 +1,9 @@
 // Package stageutil provides shared utilities for stage commands.
-package stagerunner
+package runner
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 
@@ -10,13 +11,13 @@ import (
 	"github.com/mpyw/suve/internal/maputil"
 	"github.com/mpyw/suve/internal/output"
 	"github.com/mpyw/suve/internal/parallel"
-	"github.com/mpyw/suve/internal/stage"
+	"github.com/mpyw/suve/internal/staging"
 )
 
 // DiffRunner executes diff operations using a strategy.
 type DiffRunner struct {
-	Strategy stage.DiffStrategy
-	Store    *stage.Store
+	Strategy staging.DiffStrategy
+	Store    *staging.Store
 	Stdout   io.Writer
 	Stderr   io.Writer
 }
@@ -43,14 +44,14 @@ func (r *DiffRunner) Run(ctx context.Context, opts DiffOptions) error {
 	// Filter by name if specified
 	if opts.Name != "" {
 		entry, err := r.Store.Get(service, opts.Name)
-		if err == stage.ErrNotStaged {
+		if errors.Is(err, staging.ErrNotStaged) {
 			output.Warning(r.Stderr, "%s is not staged", opts.Name)
 			return nil
 		}
 		if err != nil {
 			return err
 		}
-		entries = map[string]stage.Entry{opts.Name: *entry}
+		entries = map[string]staging.Entry{opts.Name: *entry}
 	}
 
 	if len(entries) == 0 {
@@ -59,7 +60,7 @@ func (r *DiffRunner) Run(ctx context.Context, opts DiffOptions) error {
 	}
 
 	// Fetch all values in parallel
-	results := parallel.ExecuteMap(ctx, entries, func(ctx context.Context, name string, _ stage.Entry) (*stage.FetchResult, error) {
+	results := parallel.ExecuteMap(ctx, entries, func(ctx context.Context, name string, _ staging.Entry) (*staging.FetchResult, error) {
 		return r.Strategy.FetchCurrent(ctx, name)
 	})
 
@@ -86,13 +87,13 @@ func (r *DiffRunner) Run(ctx context.Context, opts DiffOptions) error {
 	return nil
 }
 
-func (r *DiffRunner) outputDiff(opts DiffOptions, name string, entry stage.Entry, fetchResult *stage.FetchResult) error {
+func (r *DiffRunner) outputDiff(opts DiffOptions, name string, entry staging.Entry, fetchResult *staging.FetchResult) error {
 	service := r.Strategy.Service()
 	awsValue := fetchResult.Value
 	stagedValue := entry.Value
 
 	// For delete operation, staged value is empty
-	if entry.Operation == stage.OperationDelete {
+	if entry.Operation == staging.OperationDelete {
 		stagedValue = ""
 	}
 
@@ -117,9 +118,9 @@ func (r *DiffRunner) outputDiff(opts DiffOptions, name string, entry stage.Entry
 		return nil
 	}
 
-	label1 := fmt.Sprintf("%s%s (AWS)", name, fetchResult.VersionLabel)
+	label1 := fmt.Sprintf("%s%s (AWS)", name, fetchResult.Identifier)
 	label2 := fmt.Sprintf("%s (staged)", name)
-	if entry.Operation == stage.OperationDelete {
+	if entry.Operation == staging.OperationDelete {
 		label2 = fmt.Sprintf("%s (staged for deletion)", name)
 	}
 

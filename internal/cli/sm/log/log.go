@@ -20,7 +20,7 @@ import (
 	"github.com/mpyw/suve/internal/awsutil"
 	"github.com/mpyw/suve/internal/output"
 	"github.com/mpyw/suve/internal/pager"
-	"github.com/mpyw/suve/internal/smutil"
+	"github.com/mpyw/suve/internal/version/smversion"
 )
 
 // Client is the interface for the log command.
@@ -214,7 +214,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 				labelsStr = green(fmt.Sprintf(" %v", v.VersionStages))
 			}
 			_, _ = fmt.Fprintf(r.Stdout, "%s%s  %s%s\n",
-				yellow(smutil.TruncateVersionID(versionID)),
+				yellow(smversion.TruncateVersionID(versionID)),
 				labelsStr,
 				cyan(dateStr),
 				"",
@@ -222,7 +222,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 			continue
 		}
 
-		versionLabel := fmt.Sprintf("Version %s", smutil.TruncateVersionID(versionID))
+		versionLabel := fmt.Sprintf("Version %s", smversion.TruncateVersionID(versionID))
 		if len(v.VersionStages) > 0 {
 			versionLabel += " " + green(fmt.Sprintf("%v", v.VersionStages))
 		}
@@ -258,8 +258,8 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 				oldValue, oldOk := secretValues[oldVersionID]
 				newValue, newOk := secretValues[newVersionID]
 				if oldOk && newOk {
-					oldName := fmt.Sprintf("%s#%s", opts.Name, smutil.TruncateVersionID(oldVersionID))
-					newName := fmt.Sprintf("%s#%s", opts.Name, smutil.TruncateVersionID(newVersionID))
+					oldName := fmt.Sprintf("%s#%s", opts.Name, smversion.TruncateVersionID(oldVersionID))
+					newName := fmt.Sprintf("%s#%s", opts.Name, smversion.TruncateVersionID(newVersionID))
 					diff := output.DiffWithJSON(oldName, newName, oldValue, newValue, opts.JSONFormat, &jsonWarned, r.Stderr)
 					if diff != "" {
 						_, _ = fmt.Fprintln(r.Stdout)

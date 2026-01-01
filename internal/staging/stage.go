@@ -1,5 +1,5 @@
 // Package stage provides staging functionality for AWS parameter and secret changes.
-package stage
+package staging
 
 import (
 	"encoding/json"
@@ -9,14 +9,18 @@ import (
 	"path/filepath"
 	"sync"
 	"time"
+
+	"github.com/gofrs/flock"
 )
 
 // Operation represents the type of staged change.
 type Operation string
 
 const (
-	// OperationSet represents a set/update operation.
-	OperationSet Operation = "set"
+	// OperationCreate represents a create operation (new item).
+	OperationCreate Operation = "create"
+	// OperationUpdate represents an update operation (existing item).
+	OperationUpdate Operation = "update"
 	// OperationDelete represents a delete operation.
 	OperationDelete Operation = "delete"
 )
@@ -68,12 +72,13 @@ var (
 	ErrNotStaged = errors.New("not staged")
 )
 
-// fileMu protects concurrent access to the state file.
+// fileMu protects concurrent access to the state file within a process.
 var fileMu sync.Mutex
 
 // Store manages the staging state.
 type Store struct {
 	stateFilePath string
+	lockFilePath  string
 }
 
 // NewStore creates a new Store with the default state file path.
@@ -82,15 +87,46 @@ func NewStore() (*Store, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to get home directory: %w", err)
 	}
+	stateDir := filepath.Join(homeDir, stateDirName)
 	return &Store{
-		stateFilePath: filepath.Join(homeDir, stateDirName, stateFileName),
+		stateFilePath: filepath.Join(stateDir, stateFileName),
+		lockFilePath:  filepath.Join(stateDir, stateFileName+".lock"),
 	}, nil
 }
 
 // NewStoreWithPath creates a new Store with a custom state file path.
 // This is primarily for testing.
 func NewStoreWithPath(path string) *Store {
-	return &Store{stateFilePath: path}
+	return &Store{
+		stateFilePath: path,
+		lockFilePath:  path + ".lock",
+	}
+}
+
+// acquireFileLock acquires an exclusive file lock for cross-process synchronization.
+// Returns the flock that must be unlocked to release the lock.
+func (s *Store) acquireFileLock() (*flock.Flock, error) {
+	// Ensure directory exists
+	dir := filepath.Dir(s.lockFilePath)
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return nil, fmt.Errorf("failed to create lock directory: %w", err)
+	}
+
+	fileLock := flock.New(s.lockFilePath)
+
+	// Acquire exclusive lock (blocks until lock is available)
+	if err := fileLock.Lock(); err != nil {
+		return nil, fmt.Errorf("failed to acquire file lock: %w", err)
+	}
+
+	return fileLock, nil
+}
+
+// releaseFileLock releases the file lock.
+func (s *Store) releaseFileLock(fileLock *flock.Flock) {
+	if fileLock != nil {
+		_ = fileLock.Unlock()
+	}
 }
 
 // Load loads the current staging state from disk.
@@ -168,6 +204,13 @@ func (s *Store) saveLocked(state *State) error {
 
 // Stage adds or updates a staged change.
 func (s *Store) Stage(service Service, name string, entry Entry) error {
+	// Acquire cross-process file lock
+	lockFile, err := s.acquireFileLock()
+	if err != nil {
+		return err
+	}
+	defer s.releaseFileLock(lockFile)
+
 	fileMu.Lock()
 	defer fileMu.Unlock()
 
@@ -190,6 +233,13 @@ func (s *Store) Stage(service Service, name string, entry Entry) error {
 
 // Unstage removes a staged change.
 func (s *Store) Unstage(service Service, name string) error {
+	// Acquire cross-process file lock
+	lockFile, err := s.acquireFileLock()
+	if err != nil {
+		return err
+	}
+	defer s.releaseFileLock(lockFile)
+
 	fileMu.Lock()
 	defer fileMu.Unlock()
 
@@ -219,6 +269,13 @@ func (s *Store) Unstage(service Service, name string) error {
 // UnstageAll removes all staged changes for a service.
 // If service is empty, removes all staged changes.
 func (s *Store) UnstageAll(service Service) error {
+	// Acquire cross-process file lock
+	lockFile, err := s.acquireFileLock()
+	if err != nil {
+		return err
+	}
+	defer s.releaseFileLock(lockFile)
+
 	fileMu.Lock()
 	defer fileMu.Unlock()
 

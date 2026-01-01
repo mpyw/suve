@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
 
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
 	"github.com/fatih/color"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/mpyw/suve/internal/api/smapi"
 	"github.com/mpyw/suve/internal/awsutil"
+	"github.com/mpyw/suve/internal/confirm"
 )
 
 // Client is the interface for the delete command.
@@ -54,9 +56,10 @@ RECOVERY WINDOW:
    Default: 30 days
 
 EXAMPLES:
-   suve sm delete my-secret                      Delete with 30-day recovery
+   suve sm delete my-secret                      Delete with 30-day recovery (with confirmation)
    suve sm delete --recovery-window 7 my-secret  Delete with 7-day recovery
-   suve sm delete --force my-secret              Permanently delete immediately`,
+   suve sm delete --force my-secret              Permanently delete immediately
+   suve sm delete -y my-secret                   Delete without confirmation`,
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
 				Name:    "force",
@@ -68,6 +71,11 @@ EXAMPLES:
 				Usage: "Number of days before permanent deletion (7-30)",
 				Value: 30,
 			},
+			&cli.BoolFlag{
+				Name:    "yes",
+				Aliases: []string{"y"},
+				Usage:   "Skip confirmation prompt",
+			},
 		},
 		Action: action,
 	}
@@ -76,6 +84,23 @@ EXAMPLES:
 func action(ctx context.Context, cmd *cli.Command) error {
 	if cmd.Args().Len() < 1 {
 		return fmt.Errorf("usage: suve sm delete <name>")
+	}
+
+	name := cmd.Args().First()
+	skipConfirm := cmd.Bool("yes")
+
+	// Confirm deletion
+	prompter := &confirm.Prompter{
+		Stdin:  os.Stdin,
+		Stdout: cmd.Root().Writer,
+		Stderr: cmd.Root().ErrWriter,
+	}
+	confirmed, err := prompter.ConfirmDelete(name, skipConfirm)
+	if err != nil {
+		return err
+	}
+	if !confirmed {
+		return nil
 	}
 
 	client, err := awsutil.NewSMClient(ctx)
@@ -89,7 +114,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		Stderr: cmd.Root().ErrWriter,
 	}
 	return r.Run(ctx, Options{
-		Name:           cmd.Args().First(),
+		Name:           name,
 		Force:          cmd.Bool("force"),
 		RecoveryWindow: int(cmd.Int("recovery-window")),
 	})

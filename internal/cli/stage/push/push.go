@@ -8,19 +8,19 @@ import (
 
 	"github.com/urfave/cli/v3"
 
-	smstrategy "github.com/mpyw/suve/internal/cli/sm/strategy"
-	ssmstrategy "github.com/mpyw/suve/internal/cli/ssm/strategy"
 	"github.com/mpyw/suve/internal/maputil"
 	"github.com/mpyw/suve/internal/output"
 	"github.com/mpyw/suve/internal/parallel"
-	"github.com/mpyw/suve/internal/stage"
+	"github.com/mpyw/suve/internal/staging"
+	smstrategy "github.com/mpyw/suve/internal/staging/sm"
+	ssmstrategy "github.com/mpyw/suve/internal/staging/ssm"
 )
 
 // Runner executes the push command.
 type Runner struct {
-	SSMStrategy stage.PushStrategy
-	SMStrategy  stage.PushStrategy
-	Store       *stage.Store
+	SSMStrategy staging.PushStrategy
+	SMStrategy  staging.PushStrategy
+	Store       *staging.Store
 	Stdout      io.Writer
 	Stderr      io.Writer
 }
@@ -44,23 +44,23 @@ EXAMPLES:
 }
 
 func action(ctx context.Context, cmd *cli.Command) error {
-	store, err := stage.NewStore()
+	store, err := staging.NewStore()
 	if err != nil {
 		return fmt.Errorf("failed to initialize stage store: %w", err)
 	}
 
 	// Check if there are any staged changes
-	ssmStaged, err := store.List(stage.ServiceSSM)
+	ssmStaged, err := store.List(staging.ServiceSSM)
 	if err != nil {
 		return err
 	}
-	smStaged, err := store.List(stage.ServiceSM)
+	smStaged, err := store.List(staging.ServiceSM)
 	if err != nil {
 		return err
 	}
 
-	hasSSM := len(ssmStaged[stage.ServiceSSM]) > 0
-	hasSM := len(smStaged[stage.ServiceSM]) > 0
+	hasSSM := len(ssmStaged[staging.ServiceSSM]) > 0
+	hasSM := len(smStaged[staging.ServiceSM]) > 0
 
 	if !hasSSM && !hasSM {
 		output.Info(cmd.Root().Writer, "No changes staged.")
@@ -101,8 +101,8 @@ func (r *Runner) Run(ctx context.Context) error {
 		return err
 	}
 
-	ssmStaged := allStaged[stage.ServiceSSM]
-	smStaged := allStaged[stage.ServiceSM]
+	ssmStaged := allStaged[staging.ServiceSSM]
+	smStaged := allStaged[staging.ServiceSM]
 
 	var totalSucceeded, totalFailed int
 
@@ -130,20 +130,12 @@ func (r *Runner) Run(ctx context.Context) error {
 	return nil
 }
 
-func (r *Runner) pushService(ctx context.Context, strat stage.PushStrategy, staged map[string]stage.Entry) (succeeded, failed int) {
+func (r *Runner) pushService(ctx context.Context, strat staging.PushStrategy, staged map[string]staging.Entry) (succeeded, failed int) {
 	service := strat.Service()
 	serviceName := strat.ServiceName()
 
-	results := parallel.ExecuteMap(ctx, staged, func(ctx context.Context, name string, entry stage.Entry) (stage.Operation, error) {
-		var err error
-		switch entry.Operation {
-		case stage.OperationSet:
-			err = strat.PushSet(ctx, name, entry.Value)
-		case stage.OperationDelete:
-			err = strat.PushDelete(ctx, name, entry)
-		default:
-			err = fmt.Errorf("unknown operation: %s", entry.Operation)
-		}
+	results := parallel.ExecuteMap(ctx, staged, func(ctx context.Context, name string, entry staging.Entry) (staging.Operation, error) {
+		err := strat.Push(ctx, name, entry)
 		return entry.Operation, err
 	})
 
@@ -153,9 +145,12 @@ func (r *Runner) pushService(ctx context.Context, strat stage.PushStrategy, stag
 			output.Failed(r.Stderr, serviceName+": "+name, result.Err)
 			failed++
 		} else {
-			if result.Value == stage.OperationSet {
-				output.Success(r.Stdout, "%s: Set %s", serviceName, name)
-			} else {
+			switch result.Value {
+			case staging.OperationCreate:
+				output.Success(r.Stdout, "%s: Created %s", serviceName, name)
+			case staging.OperationUpdate:
+				output.Success(r.Stdout, "%s: Updated %s", serviceName, name)
+			case staging.OperationDelete:
 				output.Success(r.Stdout, "%s: Deleted %s", serviceName, name)
 			}
 			if err := r.Store.Unstage(service, name); err != nil {

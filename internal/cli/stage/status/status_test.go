@@ -13,14 +13,14 @@ import (
 
 	appcli "github.com/mpyw/suve/internal/cli"
 	"github.com/mpyw/suve/internal/cli/stage/status"
-	"github.com/mpyw/suve/internal/stage"
+	"github.com/mpyw/suve/internal/staging"
 )
 
 func TestCommand_NoStagedChanges(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	store := stage.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 	var buf bytes.Buffer
 	r := &status.Runner{
@@ -38,11 +38,11 @@ func TestCommand_ShowSSMChangesOnly(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	store := stage.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 	now := time.Now()
-	_ = store.Stage(stage.ServiceSSM, "/app/config", stage.Entry{
-		Operation: stage.OperationSet,
+	_ = store.Stage(staging.ServiceSSM, "/app/config", staging.Entry{
+		Operation: staging.OperationUpdate,
 		Value:     "value1",
 		StagedAt:  now,
 	})
@@ -67,11 +67,11 @@ func TestCommand_ShowSMChangesOnly(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	store := stage.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 	now := time.Now()
-	_ = store.Stage(stage.ServiceSM, "my-secret", stage.Entry{
-		Operation: stage.OperationSet,
+	_ = store.Stage(staging.ServiceSM, "my-secret", staging.Entry{
+		Operation: staging.OperationUpdate,
 		Value:     "secret-value",
 		StagedAt:  now,
 	})
@@ -96,16 +96,16 @@ func TestCommand_ShowBothSSMAndSMChanges(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	store := stage.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 	now := time.Now()
-	_ = store.Stage(stage.ServiceSSM, "/app/config", stage.Entry{
-		Operation: stage.OperationSet,
+	_ = store.Stage(staging.ServiceSSM, "/app/config", staging.Entry{
+		Operation: staging.OperationUpdate,
 		Value:     "param-value",
 		StagedAt:  now,
 	})
-	_ = store.Stage(stage.ServiceSM, "my-secret", stage.Entry{
-		Operation: stage.OperationDelete,
+	_ = store.Stage(staging.ServiceSM, "my-secret", staging.Entry{
+		Operation: staging.OperationDelete,
 		StagedAt:  now,
 	})
 
@@ -132,16 +132,16 @@ func TestCommand_VerboseOutput(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	store := stage.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 	now := time.Now()
-	_ = store.Stage(stage.ServiceSSM, "/app/config", stage.Entry{
-		Operation: stage.OperationSet,
+	_ = store.Stage(staging.ServiceSSM, "/app/config", staging.Entry{
+		Operation: staging.OperationUpdate,
 		Value:     "test-value",
 		StagedAt:  now,
 	})
-	_ = store.Stage(stage.ServiceSM, "my-secret", stage.Entry{
-		Operation: stage.OperationSet,
+	_ = store.Stage(staging.ServiceSM, "my-secret", staging.Entry{
+		Operation: staging.OperationUpdate,
 		Value:     "secret-value",
 		StagedAt:  now,
 	})
@@ -167,11 +167,11 @@ func TestCommand_VerboseWithDelete(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	store := stage.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 	now := time.Now()
-	_ = store.Stage(stage.ServiceSSM, "/app/config", stage.Entry{
-		Operation: stage.OperationDelete,
+	_ = store.Stage(staging.ServiceSSM, "/app/config", staging.Entry{
+		Operation: staging.OperationDelete,
 		StagedAt:  now,
 	})
 
@@ -195,12 +195,12 @@ func TestCommand_VerboseTruncatesLongValue(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	store := stage.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 	now := time.Now()
 	longValue := "this is a very long value that exceeds one hundred characters and should be truncated in verbose mode output display"
-	_ = store.Stage(stage.ServiceSSM, "/app/config", stage.Entry{
-		Operation: stage.OperationSet,
+	_ = store.Stage(staging.ServiceSSM, "/app/config", staging.Entry{
+		Operation: staging.OperationUpdate,
 		Value:     longValue,
 		StagedAt:  now,
 	})
@@ -243,7 +243,7 @@ func TestCommand_StoreError(t *testing.T) {
 	err := os.WriteFile(path, []byte("invalid json"), 0o600)
 	require.NoError(t, err)
 
-	store := stage.NewStoreWithPath(path)
+	store := staging.NewStoreWithPath(path)
 
 	var buf bytes.Buffer
 	r := &status.Runner{

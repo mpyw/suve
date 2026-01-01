@@ -1,5 +1,5 @@
 // Package stagerunner provides shared runners and command builders for stage commands.
-package stagerunner
+package runner
 
 import (
 	"context"
@@ -11,7 +11,7 @@ import (
 	"github.com/urfave/cli/v3"
 
 	"github.com/mpyw/suve/internal/pager"
-	"github.com/mpyw/suve/internal/stage"
+	"github.com/mpyw/suve/internal/staging"
 )
 
 // CommandConfig holds service-specific configuration for building stage commands.
@@ -23,10 +23,10 @@ type CommandConfig struct {
 	ItemName string
 
 	// Factory creates a FullStrategy with an initialized AWS client.
-	Factory stage.StrategyFactory
+	Factory staging.StrategyFactory
 
-	// FactoryWithoutClient creates a Strategy without AWS client (for status).
-	FactoryWithoutClient func() stage.FullStrategy
+	// ParserFactory creates a Parser without AWS client (for status, parsing).
+	ParserFactory staging.ParserFactory
 }
 
 // NewStatusCommand creates a status command with the given config.
@@ -58,13 +58,13 @@ EXAMPLES:
 			},
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
-			store, err := stage.NewStore()
+			store, err := staging.NewStore()
 			if err != nil {
 				return fmt.Errorf("failed to initialize stage store: %w", err)
 			}
 
 			r := &StatusRunner{
-				Strategy: cfg.FactoryWithoutClient(),
+				Strategy: cfg.ParserFactory(),
 				Store:    store,
 				Stdout:   cmd.Root().Writer,
 				Stderr:   cmd.Root().ErrWriter,
@@ -118,7 +118,7 @@ EXAMPLES:
 				return fmt.Errorf("usage: suve %s stage diff [name]", cfg.ServiceName)
 			}
 			if cmd.Args().Len() == 1 {
-				strat := cfg.FactoryWithoutClient()
+				strat := cfg.ParserFactory()
 				parsedName, err := strat.ParseName(cmd.Args().First())
 				if err != nil {
 					return err
@@ -126,7 +126,7 @@ EXAMPLES:
 				name = parsedName
 			}
 
-			store, err := stage.NewStore()
+			store, err := staging.NewStore()
 			if err != nil {
 				return fmt.Errorf("failed to initialize stage store: %w", err)
 			}
@@ -151,6 +151,53 @@ EXAMPLES:
 				}
 				return r.Run(ctx, opts)
 			})
+		},
+	}
+}
+
+// NewAddCommand creates an add command with the given config.
+func NewAddCommand(cfg CommandConfig) *cli.Command {
+	return &cli.Command{
+		Name:      "add",
+		Usage:     fmt.Sprintf("Create new %s and stage it", cfg.ItemName),
+		ArgsUsage: "<name>",
+		Description: fmt.Sprintf(`Open an editor to create a new %s value, then stage the change.
+
+If the %s is already staged for creation, edits the staged value.
+The new %s will be created in AWS when you run 'suve %s stage push'.
+
+Use 'suve %s stage edit' to modify an existing %s.
+Use 'suve %s stage status' to view staged changes.
+
+EXAMPLES:
+   suve %s stage add <name>  Create and stage new %s`,
+			cfg.ItemName,
+			cfg.ItemName,
+			cfg.ItemName, cfg.ServiceName,
+			cfg.ServiceName, cfg.ItemName,
+			cfg.ServiceName,
+			cfg.ServiceName, cfg.ItemName),
+		Action: func(ctx context.Context, cmd *cli.Command) error {
+			if cmd.Args().Len() < 1 {
+				return fmt.Errorf("usage: suve %s stage add <name>", cfg.ServiceName)
+			}
+
+			name := cmd.Args().First()
+
+			store, err := staging.NewStore()
+			if err != nil {
+				return fmt.Errorf("failed to initialize stage store: %w", err)
+			}
+
+			strat := cfg.ParserFactory()
+
+			r := &AddRunner{
+				Strategy: strat,
+				Store:    store,
+				Stdout:   cmd.Root().Writer,
+				Stderr:   cmd.Root().ErrWriter,
+			}
+			return r.Run(ctx, AddOptions{Name: name})
 		},
 	}
 }
@@ -186,7 +233,7 @@ EXAMPLES:
 
 			name := cmd.Args().First()
 
-			store, err := stage.NewStore()
+			store, err := staging.NewStore()
 			if err != nil {
 				return fmt.Errorf("failed to initialize stage store: %w", err)
 			}
@@ -232,7 +279,7 @@ EXAMPLES:
 			cfg.ServiceName, cfg.ServiceName,
 			cfg.ServiceName, cfg.ItemName),
 		Action: func(ctx context.Context, cmd *cli.Command) error {
-			store, err := stage.NewStore()
+			store, err := staging.NewStore()
 			if err != nil {
 				return fmt.Errorf("failed to initialize stage store: %w", err)
 			}
@@ -303,7 +350,7 @@ EXAMPLES:
 				return fmt.Errorf("usage: suve %s stage reset <spec> or suve %s stage reset --all", cfg.ServiceName, cfg.ServiceName)
 			}
 
-			store, err := stage.NewStore()
+			store, err := staging.NewStore()
 			if err != nil {
 				return fmt.Errorf("failed to initialize stage store: %w", err)
 			}
@@ -315,32 +362,30 @@ EXAMPLES:
 				opts.Spec = cmd.Args().First()
 			}
 
-			// Check if version spec is provided (need AWS client)
-			needsAWS := false
-			if !resetAll && opts.Spec != "" {
-				strat := cfg.FactoryWithoutClient()
-				_, hasVersion, err := strat.ParseSpec(opts.Spec)
-				if err != nil {
-					return err
-				}
-				needsAWS = hasVersion
-			}
+			parser := cfg.ParserFactory()
 
-			var strat stage.FullStrategy
-			if needsAWS {
-				strat, err = cfg.Factory(ctx)
+			// Check if version spec is provided (need AWS client for FetchVersion)
+			var fetcher VersionFetcher
+			if !resetAll && opts.Spec != "" {
+				_, hasVersion, err := parser.ParseSpec(opts.Spec)
 				if err != nil {
 					return err
 				}
-			} else {
-				strat = cfg.FactoryWithoutClient()
+				if hasVersion {
+					strat, err := cfg.Factory(ctx)
+					if err != nil {
+						return err
+					}
+					fetcher = strat
+				}
 			}
 
 			r := &ResetRunner{
-				Strategy: strat,
-				Store:    store,
-				Stdout:   cmd.Root().Writer,
-				Stderr:   cmd.Root().ErrWriter,
+				Parser:  parser,
+				Fetcher: fetcher,
+				Store:   store,
+				Stdout:  cmd.Root().Writer,
+				Stderr:  cmd.Root().ErrWriter,
 			}
 
 			return r.Run(ctx, opts)
@@ -350,7 +395,7 @@ EXAMPLES:
 
 // NewDeleteCommand creates a delete command with the given config.
 func NewDeleteCommand(cfg CommandConfig) *cli.Command {
-	strat := cfg.FactoryWithoutClient()
+	strat := cfg.ParserFactory()
 	hasDeleteOptions := strat.HasDeleteOptions()
 
 	flags := []cli.Flag{}
@@ -425,16 +470,16 @@ EXAMPLES:
 				return fmt.Errorf("usage: suve %s stage delete <name>", cfg.ServiceName)
 			}
 
-			store, err := stage.NewStore()
+			store, err := staging.NewStore()
 			if err != nil {
 				return fmt.Errorf("failed to initialize stage store: %w", err)
 			}
 
 			name := cmd.Args().First()
-			service := cfg.FactoryWithoutClient().Service()
+			service := cfg.ParserFactory().Service()
 
-			entry := stage.Entry{
-				Operation: stage.OperationDelete,
+			entry := staging.Entry{
+				Operation: staging.OperationDelete,
 				StagedAt:  time.Now(),
 			}
 
@@ -447,7 +492,7 @@ EXAMPLES:
 					return fmt.Errorf("recovery window must be between 7 and 30 days")
 				}
 
-				entry.DeleteOptions = &stage.DeleteOptions{
+				entry.DeleteOptions = &staging.DeleteOptions{
 					Force:          force,
 					RecoveryWindow: recoveryWindow,
 				}

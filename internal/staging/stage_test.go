@@ -1,4 +1,4 @@
-package stage_test
+package staging_test
 
 import (
 	"os"
@@ -9,13 +9,13 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/mpyw/suve/internal/stage"
+	"github.com/mpyw/suve/internal/staging"
 )
 
 func TestNewStore(t *testing.T) {
 	t.Parallel()
 
-	store, err := stage.NewStore()
+	store, err := staging.NewStore()
 	require.NoError(t, err)
 	assert.NotNil(t, store)
 }
@@ -24,7 +24,7 @@ func TestStore_LoadEmpty(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	store := stage.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "staging.json"))
 
 	state, err := store.Load()
 	require.NoError(t, err)
@@ -37,21 +37,21 @@ func TestStore_StageAndLoad(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	store := stage.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "staging.json"))
 
 	now := time.Now().Truncate(time.Second)
 
 	// Stage SSM entry
-	err := store.Stage(stage.ServiceSSM, "/app/config", stage.Entry{
-		Operation: stage.OperationSet,
+	err := store.Stage(staging.ServiceSSM, "/app/config", staging.Entry{
+		Operation: staging.OperationUpdate,
 		Value:     "test-value",
 		StagedAt:  now,
 	})
 	require.NoError(t, err)
 
 	// Stage SM entry
-	err = store.Stage(stage.ServiceSM, "my-secret", stage.Entry{
-		Operation: stage.OperationDelete,
+	err = store.Stage(staging.ServiceSM, "my-secret", staging.Entry{
+		Operation: staging.OperationDelete,
 		StagedAt:  now,
 	})
 	require.NoError(t, err)
@@ -61,39 +61,39 @@ func TestStore_StageAndLoad(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Len(t, state.SSM, 1)
-	assert.Equal(t, stage.OperationSet, state.SSM["/app/config"].Operation)
+	assert.Equal(t, staging.OperationUpdate, state.SSM["/app/config"].Operation)
 	assert.Equal(t, "test-value", state.SSM["/app/config"].Value)
 
 	assert.Len(t, state.SM, 1)
-	assert.Equal(t, stage.OperationDelete, state.SM["my-secret"].Operation)
+	assert.Equal(t, staging.OperationDelete, state.SM["my-secret"].Operation)
 }
 
 func TestStore_StageOverwrite(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	store := stage.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "staging.json"))
 
 	now := time.Now()
 
 	// Stage initial
-	err := store.Stage(stage.ServiceSSM, "/app/config", stage.Entry{
-		Operation: stage.OperationSet,
+	err := store.Stage(staging.ServiceSSM, "/app/config", staging.Entry{
+		Operation: staging.OperationUpdate,
 		Value:     "initial",
 		StagedAt:  now,
 	})
 	require.NoError(t, err)
 
 	// Stage overwrite
-	err = store.Stage(stage.ServiceSSM, "/app/config", stage.Entry{
-		Operation: stage.OperationSet,
+	err = store.Stage(staging.ServiceSSM, "/app/config", staging.Entry{
+		Operation: staging.OperationUpdate,
 		Value:     "updated",
 		StagedAt:  now,
 	})
 	require.NoError(t, err)
 
 	// Verify overwritten
-	entry, err := store.Get(stage.ServiceSSM, "/app/config")
+	entry, err := store.Get(staging.ServiceSSM, "/app/config")
 	require.NoError(t, err)
 	assert.Equal(t, "updated", entry.Value)
 }
@@ -102,38 +102,38 @@ func TestStore_Unstage(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	store := stage.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "staging.json"))
 
 	now := time.Now()
 
 	// Stage
-	err := store.Stage(stage.ServiceSSM, "/app/config", stage.Entry{
-		Operation: stage.OperationSet,
+	err := store.Stage(staging.ServiceSSM, "/app/config", staging.Entry{
+		Operation: staging.OperationUpdate,
 		Value:     "test",
 		StagedAt:  now,
 	})
 	require.NoError(t, err)
 
 	// Unstage
-	err = store.Unstage(stage.ServiceSSM, "/app/config")
+	err = store.Unstage(staging.ServiceSSM, "/app/config")
 	require.NoError(t, err)
 
 	// Verify removed
-	_, err = store.Get(stage.ServiceSSM, "/app/config")
-	assert.ErrorIs(t, err, stage.ErrNotStaged)
+	_, err = store.Get(staging.ServiceSSM, "/app/config")
+	assert.ErrorIs(t, err, staging.ErrNotStaged)
 }
 
 func TestStore_UnstageNotStaged(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	store := stage.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "staging.json"))
 
-	err := store.Unstage(stage.ServiceSSM, "/not/staged")
-	assert.ErrorIs(t, err, stage.ErrNotStaged)
+	err := store.Unstage(staging.ServiceSSM, "/not/staged")
+	assert.ErrorIs(t, err, staging.ErrNotStaged)
 
-	err = store.Unstage(stage.ServiceSM, "not-staged")
-	assert.ErrorIs(t, err, stage.ErrNotStaged)
+	err = store.Unstage(staging.ServiceSM, "not-staged")
+	assert.ErrorIs(t, err, staging.ErrNotStaged)
 }
 
 func TestStore_UnstageAll(t *testing.T) {
@@ -143,17 +143,17 @@ func TestStore_UnstageAll(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
-		store := stage.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "staging.json"))
 
 		now := time.Now()
 
 		// Stage multiple
-		_ = store.Stage(stage.ServiceSSM, "/app/config1", stage.Entry{Operation: stage.OperationSet, Value: "v1", StagedAt: now})
-		_ = store.Stage(stage.ServiceSSM, "/app/config2", stage.Entry{Operation: stage.OperationSet, Value: "v2", StagedAt: now})
-		_ = store.Stage(stage.ServiceSM, "secret1", stage.Entry{Operation: stage.OperationSet, Value: "s1", StagedAt: now})
+		_ = store.Stage(staging.ServiceSSM, "/app/config1", staging.Entry{Operation: staging.OperationUpdate, Value: "v1", StagedAt: now})
+		_ = store.Stage(staging.ServiceSSM, "/app/config2", staging.Entry{Operation: staging.OperationUpdate, Value: "v2", StagedAt: now})
+		_ = store.Stage(staging.ServiceSM, "secret1", staging.Entry{Operation: staging.OperationUpdate, Value: "s1", StagedAt: now})
 
 		// Unstage all SSM
-		err := store.UnstageAll(stage.ServiceSSM)
+		err := store.UnstageAll(staging.ServiceSSM)
 		require.NoError(t, err)
 
 		// Verify SSM cleared, SM intact
@@ -167,15 +167,15 @@ func TestStore_UnstageAll(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
-		store := stage.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "staging.json"))
 
 		now := time.Now()
 
-		_ = store.Stage(stage.ServiceSSM, "/app/config", stage.Entry{Operation: stage.OperationSet, Value: "v", StagedAt: now})
-		_ = store.Stage(stage.ServiceSM, "secret1", stage.Entry{Operation: stage.OperationSet, Value: "s1", StagedAt: now})
-		_ = store.Stage(stage.ServiceSM, "secret2", stage.Entry{Operation: stage.OperationSet, Value: "s2", StagedAt: now})
+		_ = store.Stage(staging.ServiceSSM, "/app/config", staging.Entry{Operation: staging.OperationUpdate, Value: "v", StagedAt: now})
+		_ = store.Stage(staging.ServiceSM, "secret1", staging.Entry{Operation: staging.OperationUpdate, Value: "s1", StagedAt: now})
+		_ = store.Stage(staging.ServiceSM, "secret2", staging.Entry{Operation: staging.OperationUpdate, Value: "s2", StagedAt: now})
 
-		err := store.UnstageAll(stage.ServiceSM)
+		err := store.UnstageAll(staging.ServiceSM)
 		require.NoError(t, err)
 
 		state, err := store.Load()
@@ -188,12 +188,12 @@ func TestStore_UnstageAll(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
-		store := stage.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "staging.json"))
 
 		now := time.Now()
 
-		_ = store.Stage(stage.ServiceSSM, "/app/config", stage.Entry{Operation: stage.OperationSet, Value: "v", StagedAt: now})
-		_ = store.Stage(stage.ServiceSM, "secret", stage.Entry{Operation: stage.OperationSet, Value: "s", StagedAt: now})
+		_ = store.Stage(staging.ServiceSSM, "/app/config", staging.Entry{Operation: staging.OperationUpdate, Value: "v", StagedAt: now})
+		_ = store.Stage(staging.ServiceSM, "secret", staging.Entry{Operation: staging.OperationUpdate, Value: "s", StagedAt: now})
 
 		err := store.UnstageAll("")
 		require.NoError(t, err)
@@ -209,33 +209,33 @@ func TestStore_Get(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	store := stage.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "staging.json"))
 
 	now := time.Now()
 
-	_ = store.Stage(stage.ServiceSSM, "/app/config", stage.Entry{
-		Operation: stage.OperationSet,
+	_ = store.Stage(staging.ServiceSSM, "/app/config", staging.Entry{
+		Operation: staging.OperationUpdate,
 		Value:     "test-value",
 		StagedAt:  now,
 	})
 
 	t.Run("get existing", func(t *testing.T) {
 		t.Parallel()
-		entry, err := store.Get(stage.ServiceSSM, "/app/config")
+		entry, err := store.Get(staging.ServiceSSM, "/app/config")
 		require.NoError(t, err)
 		assert.Equal(t, "test-value", entry.Value)
 	})
 
 	t.Run("get not staged", func(t *testing.T) {
 		t.Parallel()
-		_, err := store.Get(stage.ServiceSSM, "/not/staged")
-		assert.ErrorIs(t, err, stage.ErrNotStaged)
+		_, err := store.Get(staging.ServiceSSM, "/not/staged")
+		assert.ErrorIs(t, err, staging.ErrNotStaged)
 	})
 
 	t.Run("get wrong service", func(t *testing.T) {
 		t.Parallel()
-		_, err := store.Get(stage.ServiceSM, "/app/config")
-		assert.ErrorIs(t, err, stage.ErrNotStaged)
+		_, err := store.Get(staging.ServiceSM, "/app/config")
+		assert.ErrorIs(t, err, staging.ErrNotStaged)
 	})
 }
 
@@ -243,28 +243,28 @@ func TestStore_List(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	store := stage.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "staging.json"))
 
 	now := time.Now()
 
-	_ = store.Stage(stage.ServiceSSM, "/app/config1", stage.Entry{Operation: stage.OperationSet, Value: "v1", StagedAt: now})
-	_ = store.Stage(stage.ServiceSSM, "/app/config2", stage.Entry{Operation: stage.OperationDelete, StagedAt: now})
-	_ = store.Stage(stage.ServiceSM, "secret1", stage.Entry{Operation: stage.OperationSet, Value: "s1", StagedAt: now})
+	_ = store.Stage(staging.ServiceSSM, "/app/config1", staging.Entry{Operation: staging.OperationUpdate, Value: "v1", StagedAt: now})
+	_ = store.Stage(staging.ServiceSSM, "/app/config2", staging.Entry{Operation: staging.OperationDelete, StagedAt: now})
+	_ = store.Stage(staging.ServiceSM, "secret1", staging.Entry{Operation: staging.OperationUpdate, Value: "s1", StagedAt: now})
 
 	t.Run("list SSM only", func(t *testing.T) {
 		t.Parallel()
-		result, err := store.List(stage.ServiceSSM)
+		result, err := store.List(staging.ServiceSSM)
 		require.NoError(t, err)
 		assert.Len(t, result, 1)
-		assert.Len(t, result[stage.ServiceSSM], 2)
+		assert.Len(t, result[staging.ServiceSSM], 2)
 	})
 
 	t.Run("list SM only", func(t *testing.T) {
 		t.Parallel()
-		result, err := store.List(stage.ServiceSM)
+		result, err := store.List(staging.ServiceSM)
 		require.NoError(t, err)
 		assert.Len(t, result, 1)
-		assert.Len(t, result[stage.ServiceSM], 1)
+		assert.Len(t, result[staging.ServiceSM], 1)
 	})
 
 	t.Run("list all", func(t *testing.T) {
@@ -272,8 +272,8 @@ func TestStore_List(t *testing.T) {
 		result, err := store.List("")
 		require.NoError(t, err)
 		assert.Len(t, result, 2)
-		assert.Len(t, result[stage.ServiceSSM], 2)
-		assert.Len(t, result[stage.ServiceSM], 1)
+		assert.Len(t, result[staging.ServiceSSM], 2)
+		assert.Len(t, result[staging.ServiceSM], 1)
 	})
 }
 
@@ -281,7 +281,7 @@ func TestStore_ListEmpty(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	store := stage.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "staging.json"))
 
 	result, err := store.List("")
 	require.NoError(t, err)
@@ -292,30 +292,30 @@ func TestStore_HasChanges(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	store := stage.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "staging.json"))
 
 	// Initially no changes
 	has, err := store.HasChanges("")
 	require.NoError(t, err)
 	assert.False(t, has)
 
-	has, err = store.HasChanges(stage.ServiceSSM)
+	has, err = store.HasChanges(staging.ServiceSSM)
 	require.NoError(t, err)
 	assert.False(t, has)
 
 	// Add SSM change
 	now := time.Now()
-	_ = store.Stage(stage.ServiceSSM, "/app/config", stage.Entry{Operation: stage.OperationSet, Value: "v", StagedAt: now})
+	_ = store.Stage(staging.ServiceSSM, "/app/config", staging.Entry{Operation: staging.OperationUpdate, Value: "v", StagedAt: now})
 
 	has, err = store.HasChanges("")
 	require.NoError(t, err)
 	assert.True(t, has)
 
-	has, err = store.HasChanges(stage.ServiceSSM)
+	has, err = store.HasChanges(staging.ServiceSSM)
 	require.NoError(t, err)
 	assert.True(t, has)
 
-	has, err = store.HasChanges(stage.ServiceSM)
+	has, err = store.HasChanges(staging.ServiceSM)
 	require.NoError(t, err)
 	assert.False(t, has)
 }
@@ -324,23 +324,23 @@ func TestStore_Count(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	store := stage.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "staging.json"))
 
 	now := time.Now()
 
-	_ = store.Stage(stage.ServiceSSM, "/app/config1", stage.Entry{Operation: stage.OperationSet, Value: "v1", StagedAt: now})
-	_ = store.Stage(stage.ServiceSSM, "/app/config2", stage.Entry{Operation: stage.OperationSet, Value: "v2", StagedAt: now})
-	_ = store.Stage(stage.ServiceSM, "secret1", stage.Entry{Operation: stage.OperationSet, Value: "s1", StagedAt: now})
+	_ = store.Stage(staging.ServiceSSM, "/app/config1", staging.Entry{Operation: staging.OperationUpdate, Value: "v1", StagedAt: now})
+	_ = store.Stage(staging.ServiceSSM, "/app/config2", staging.Entry{Operation: staging.OperationUpdate, Value: "v2", StagedAt: now})
+	_ = store.Stage(staging.ServiceSM, "secret1", staging.Entry{Operation: staging.OperationUpdate, Value: "s1", StagedAt: now})
 
 	count, err := store.Count("")
 	require.NoError(t, err)
 	assert.Equal(t, 3, count)
 
-	count, err = store.Count(stage.ServiceSSM)
+	count, err = store.Count(staging.ServiceSSM)
 	require.NoError(t, err)
 	assert.Equal(t, 2, count)
 
-	count, err = store.Count(stage.ServiceSM)
+	count, err = store.Count(staging.ServiceSM)
 	require.NoError(t, err)
 	assert.Equal(t, 1, count)
 }
@@ -349,11 +349,11 @@ func TestStore_UnknownService(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	store := stage.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "staging.json"))
 
-	unknownService := stage.Service("unknown")
+	unknownService := staging.Service("unknown")
 
-	err := store.Stage(unknownService, "test", stage.Entry{Operation: stage.OperationSet})
+	err := store.Stage(unknownService, "test", staging.Entry{Operation: staging.OperationUpdate})
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "unknown service")
 
@@ -386,12 +386,12 @@ func TestStore_CorruptedFile(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	path := filepath.Join(tmpDir, "stage.json")
+	path := filepath.Join(tmpDir, "staging.json")
 
 	err := os.WriteFile(path, []byte("not valid json"), 0o600)
 	require.NoError(t, err)
 
-	store := stage.NewStoreWithPath(path)
+	store := staging.NewStoreWithPath(path)
 	_, err = store.Load()
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to parse state file")
@@ -401,13 +401,13 @@ func TestStore_SaveRemovesEmptyFile(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	path := filepath.Join(tmpDir, "stage.json")
-	store := stage.NewStoreWithPath(path)
+	path := filepath.Join(tmpDir, "staging.json")
+	store := staging.NewStoreWithPath(path)
 
 	now := time.Now()
 
 	// Stage and then unstage
-	err := store.Stage(stage.ServiceSSM, "/app/config", stage.Entry{Operation: stage.OperationSet, Value: "v", StagedAt: now})
+	err := store.Stage(staging.ServiceSSM, "/app/config", staging.Entry{Operation: staging.OperationUpdate, Value: "v", StagedAt: now})
 	require.NoError(t, err)
 
 	// File should exist
@@ -415,7 +415,7 @@ func TestStore_SaveRemovesEmptyFile(t *testing.T) {
 	require.NoError(t, err)
 
 	// Unstage
-	err = store.Unstage(stage.ServiceSSM, "/app/config")
+	err = store.Unstage(staging.ServiceSSM, "/app/config")
 	require.NoError(t, err)
 
 	// File should be removed
@@ -427,13 +427,13 @@ func TestStore_NilMapsInLoadedState(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	path := filepath.Join(tmpDir, "stage.json")
+	path := filepath.Join(tmpDir, "staging.json")
 
 	// Write a state with null maps
 	err := os.WriteFile(path, []byte(`{"version":1,"ssm":null,"sm":null}`), 0o600)
 	require.NoError(t, err)
 
-	store := stage.NewStoreWithPath(path)
+	store := staging.NewStoreWithPath(path)
 	state, err := store.Load()
 	require.NoError(t, err)
 
@@ -446,19 +446,19 @@ func TestStore_Save(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	path := filepath.Join(tmpDir, "stage.json")
-	store := stage.NewStoreWithPath(path)
+	path := filepath.Join(tmpDir, "staging.json")
+	store := staging.NewStoreWithPath(path)
 
-	state := &stage.State{
+	state := &staging.State{
 		Version: 1,
-		SSM: map[string]stage.Entry{
+		SSM: map[string]staging.Entry{
 			"/app/config": {
-				Operation: stage.OperationSet,
+				Operation: staging.OperationUpdate,
 				Value:     "test",
 				StagedAt:  time.Now(),
 			},
 		},
-		SM: make(map[string]stage.Entry),
+		SM: make(map[string]staging.Entry),
 	}
 
 	err := store.Save(state)
@@ -479,12 +479,12 @@ func TestStore_DirectoryCreation(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	path := filepath.Join(tmpDir, "subdir", "nested", "stage.json")
-	store := stage.NewStoreWithPath(path)
+	path := filepath.Join(tmpDir, "subdir", "nested", "staging.json")
+	store := staging.NewStoreWithPath(path)
 
 	now := time.Now()
-	err := store.Stage(stage.ServiceSSM, "/app/config", stage.Entry{
-		Operation: stage.OperationSet,
+	err := store.Stage(staging.ServiceSSM, "/app/config", staging.Entry{
+		Operation: staging.OperationUpdate,
 		Value:     "test",
 		StagedAt:  now,
 	})
@@ -499,38 +499,38 @@ func TestStore_UnstageFromSM(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	store := stage.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "staging.json"))
 
 	now := time.Now()
 
 	// Stage SM entry
-	err := store.Stage(stage.ServiceSM, "my-secret", stage.Entry{
-		Operation: stage.OperationSet,
+	err := store.Stage(staging.ServiceSM, "my-secret", staging.Entry{
+		Operation: staging.OperationUpdate,
 		Value:     "secret-value",
 		StagedAt:  now,
 	})
 	require.NoError(t, err)
 
 	// Unstage
-	err = store.Unstage(stage.ServiceSM, "my-secret")
+	err = store.Unstage(staging.ServiceSM, "my-secret")
 	require.NoError(t, err)
 
 	// Verify removed
-	_, err = store.Get(stage.ServiceSM, "my-secret")
-	assert.ErrorIs(t, err, stage.ErrNotStaged)
+	_, err = store.Get(staging.ServiceSM, "my-secret")
+	assert.ErrorIs(t, err, staging.ErrNotStaged)
 }
 
 func TestStore_LoadReadError(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	path := filepath.Join(tmpDir, "stage.json")
+	path := filepath.Join(tmpDir, "staging.json")
 
 	// Create a directory with the same name as the file
 	err := os.Mkdir(path, 0o755)
 	require.NoError(t, err)
 
-	store := stage.NewStoreWithPath(path)
+	store := staging.NewStoreWithPath(path)
 	_, err = store.Load()
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to read state file")
@@ -540,15 +540,15 @@ func TestStore_StageLoadError(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	path := filepath.Join(tmpDir, "stage.json")
+	path := filepath.Join(tmpDir, "staging.json")
 
 	// Create invalid JSON
 	err := os.WriteFile(path, []byte("invalid json"), 0o600)
 	require.NoError(t, err)
 
-	store := stage.NewStoreWithPath(path)
-	err = store.Stage(stage.ServiceSSM, "/app/config", stage.Entry{
-		Operation: stage.OperationSet,
+	store := staging.NewStoreWithPath(path)
+	err = store.Stage(staging.ServiceSSM, "/app/config", staging.Entry{
+		Operation: staging.OperationUpdate,
 		Value:     "test",
 		StagedAt:  time.Now(),
 	})
@@ -560,14 +560,14 @@ func TestStore_UnstageLoadError(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	path := filepath.Join(tmpDir, "stage.json")
+	path := filepath.Join(tmpDir, "staging.json")
 
 	// Create invalid JSON
 	err := os.WriteFile(path, []byte("invalid json"), 0o600)
 	require.NoError(t, err)
 
-	store := stage.NewStoreWithPath(path)
-	err = store.Unstage(stage.ServiceSSM, "/app/config")
+	store := staging.NewStoreWithPath(path)
+	err = store.Unstage(staging.ServiceSSM, "/app/config")
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to parse state file")
 }
@@ -576,14 +576,14 @@ func TestStore_UnstageAllLoadError(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	path := filepath.Join(tmpDir, "stage.json")
+	path := filepath.Join(tmpDir, "staging.json")
 
 	// Create invalid JSON
 	err := os.WriteFile(path, []byte("invalid json"), 0o600)
 	require.NoError(t, err)
 
-	store := stage.NewStoreWithPath(path)
-	err = store.UnstageAll(stage.ServiceSSM)
+	store := staging.NewStoreWithPath(path)
+	err = store.UnstageAll(staging.ServiceSSM)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to parse state file")
 }
@@ -592,14 +592,14 @@ func TestStore_GetLoadError(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	path := filepath.Join(tmpDir, "stage.json")
+	path := filepath.Join(tmpDir, "staging.json")
 
 	// Create invalid JSON
 	err := os.WriteFile(path, []byte("invalid json"), 0o600)
 	require.NoError(t, err)
 
-	store := stage.NewStoreWithPath(path)
-	_, err = store.Get(stage.ServiceSSM, "/app/config")
+	store := staging.NewStoreWithPath(path)
+	_, err = store.Get(staging.ServiceSSM, "/app/config")
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to parse state file")
 }
@@ -608,14 +608,14 @@ func TestStore_ListLoadError(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	path := filepath.Join(tmpDir, "stage.json")
+	path := filepath.Join(tmpDir, "staging.json")
 
 	// Create invalid JSON
 	err := os.WriteFile(path, []byte("invalid json"), 0o600)
 	require.NoError(t, err)
 
-	store := stage.NewStoreWithPath(path)
-	_, err = store.List(stage.ServiceSSM)
+	store := staging.NewStoreWithPath(path)
+	_, err = store.List(staging.ServiceSSM)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to parse state file")
 }
@@ -624,14 +624,14 @@ func TestStore_HasChangesLoadError(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	path := filepath.Join(tmpDir, "stage.json")
+	path := filepath.Join(tmpDir, "staging.json")
 
 	// Create invalid JSON
 	err := os.WriteFile(path, []byte("invalid json"), 0o600)
 	require.NoError(t, err)
 
-	store := stage.NewStoreWithPath(path)
-	_, err = store.HasChanges(stage.ServiceSSM)
+	store := staging.NewStoreWithPath(path)
+	_, err = store.HasChanges(staging.ServiceSSM)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to parse state file")
 }
@@ -640,14 +640,14 @@ func TestStore_CountLoadError(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	path := filepath.Join(tmpDir, "stage.json")
+	path := filepath.Join(tmpDir, "staging.json")
 
 	// Create invalid JSON
 	err := os.WriteFile(path, []byte("invalid json"), 0o600)
 	require.NoError(t, err)
 
-	store := stage.NewStoreWithPath(path)
-	_, err = store.Count(stage.ServiceSSM)
+	store := staging.NewStoreWithPath(path)
+	_, err = store.Count(staging.ServiceSSM)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to parse state file")
 }
@@ -656,17 +656,17 @@ func TestStore_GetSM(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	store := stage.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "staging.json"))
 
 	now := time.Now()
 
-	_ = store.Stage(stage.ServiceSM, "my-secret", stage.Entry{
-		Operation: stage.OperationSet,
+	_ = store.Stage(staging.ServiceSM, "my-secret", staging.Entry{
+		Operation: staging.OperationUpdate,
 		Value:     "secret-value",
 		StagedAt:  now,
 	})
 
-	entry, err := store.Get(stage.ServiceSM, "my-secret")
+	entry, err := store.Get(staging.ServiceSM, "my-secret")
 	require.NoError(t, err)
 	assert.Equal(t, "secret-value", entry.Value)
 }
@@ -680,19 +680,19 @@ func TestStore_SaveWriteError(t *testing.T) {
 	err := os.Mkdir(readOnlyDir, 0o500)
 	require.NoError(t, err)
 
-	path := filepath.Join(readOnlyDir, "subdir", "stage.json")
-	store := stage.NewStoreWithPath(path)
+	path := filepath.Join(readOnlyDir, "subdir", "staging.json")
+	store := staging.NewStoreWithPath(path)
 
-	state := &stage.State{
+	state := &staging.State{
 		Version: 1,
-		SSM: map[string]stage.Entry{
+		SSM: map[string]staging.Entry{
 			"/app/config": {
-				Operation: stage.OperationSet,
+				Operation: staging.OperationUpdate,
 				Value:     "test",
 				StagedAt:  time.Now(),
 			},
 		},
-		SM: make(map[string]stage.Entry),
+		SM: make(map[string]staging.Entry),
 	}
 
 	err = store.Save(state)

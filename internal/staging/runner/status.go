@@ -1,21 +1,22 @@
 // Package stageutil provides shared utilities for stage commands.
-package stagerunner
+package runner
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"sort"
 
 	"github.com/fatih/color"
 
-	"github.com/mpyw/suve/internal/stage"
+	"github.com/mpyw/suve/internal/staging"
 )
 
 // StatusRunner executes status operations using a strategy.
 type StatusRunner struct {
-	Strategy stage.ServiceStrategy
-	Store    *stage.Store
+	Strategy staging.ServiceStrategy
+	Store    *staging.Store
 	Stdout   io.Writer
 	Stderr   io.Writer
 }
@@ -41,13 +42,13 @@ func (r *StatusRunner) showSingle(name string, verbose bool) error {
 
 	entry, err := r.Store.Get(service, name)
 	if err != nil {
-		if err == stage.ErrNotStaged {
+		if errors.Is(err, staging.ErrNotStaged) {
 			return fmt.Errorf("%s %s is not staged", itemName, name)
 		}
 		return err
 	}
 
-	printer := &stage.EntryPrinter{Writer: r.Stdout}
+	printer := &staging.EntryPrinter{Writer: r.Stdout}
 	printer.PrintEntry(name, *entry, verbose, showDeleteOptions)
 	return nil
 }
@@ -78,7 +79,7 @@ func (r *StatusRunner) showAll(verbose bool) error {
 	yellow := color.New(color.FgYellow).SprintFunc()
 	_, _ = fmt.Fprintf(r.Stdout, "%s (%d):\n", yellow(fmt.Sprintf("Staged %s changes", serviceName)), len(serviceEntries))
 
-	printer := &stage.EntryPrinter{Writer: r.Stdout}
+	printer := &staging.EntryPrinter{Writer: r.Stdout}
 	for _, name := range names {
 		entry := serviceEntries[name]
 		printer.PrintEntry(name, entry, verbose, showDeleteOptions)

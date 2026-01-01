@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
 
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/aws/aws-sdk-go-v2/service/ssm/types"
@@ -14,6 +15,7 @@ import (
 
 	"github.com/mpyw/suve/internal/api/ssmapi"
 	"github.com/mpyw/suve/internal/awsutil"
+	"github.com/mpyw/suve/internal/confirm"
 )
 
 // Client is the interface for the set command.
@@ -53,10 +55,10 @@ The --secure flag is a shorthand for --type SecureString.
 You cannot use both --secure and --type together.
 
 EXAMPLES:
-   suve ssm set /app/config/db-url "postgres://..."       Create String parameter
-   suve ssm set --secure /app/config/api-key "secret123"        Create SecureString
-   suve ssm set --type StringList /app/hosts "a.com,b.com"      Create StringList
-   suve ssm set --description "DB URL" /app/db-url "postgres://..." With description`,
+   suve ssm set /app/config/db-url "postgres://..."              Create String parameter
+   suve ssm set --secure /app/config/api-key "secret123"         Create SecureString
+   suve ssm set --type StringList /app/hosts "a.com,b.com"       Create StringList
+   suve ssm set -y /app/config/db-url "postgres://..."           Set without confirmation`,
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:  "type",
@@ -70,6 +72,11 @@ EXAMPLES:
 			&cli.StringFlag{
 				Name:  "description",
 				Usage: "Parameter description",
+			},
+			&cli.BoolFlag{
+				Name:    "yes",
+				Aliases: []string{"y"},
+				Usage:   "Skip confirmation prompt",
 			},
 		},
 		Action: action,
@@ -92,6 +99,23 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		paramType = "SecureString"
 	}
 
+	name := cmd.Args().Get(0)
+	skipConfirm := cmd.Bool("yes")
+
+	// Confirm operation
+	prompter := &confirm.Prompter{
+		Stdin:  os.Stdin,
+		Stdout: cmd.Root().Writer,
+		Stderr: cmd.Root().ErrWriter,
+	}
+	confirmed, err := prompter.ConfirmAction("Set parameter", name, skipConfirm)
+	if err != nil {
+		return err
+	}
+	if !confirmed {
+		return nil
+	}
+
 	client, err := awsutil.NewSSMClient(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to initialize AWS client: %w", err)
@@ -103,7 +127,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		Stderr: cmd.Root().ErrWriter,
 	}
 	return r.Run(ctx, Options{
-		Name:        cmd.Args().Get(0),
+		Name:        name,
 		Value:       cmd.Args().Get(1),
 		Type:        paramType,
 		Description: cmd.String("description"),

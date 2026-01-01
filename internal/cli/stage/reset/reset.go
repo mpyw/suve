@@ -9,12 +9,12 @@ import (
 	"github.com/fatih/color"
 	"github.com/urfave/cli/v3"
 
-	"github.com/mpyw/suve/internal/stage"
+	"github.com/mpyw/suve/internal/staging"
 )
 
 // Runner executes the reset command.
 type Runner struct {
-	Store  *stage.Store
+	Store  *staging.Store
 	Stdout io.Writer
 	Stderr io.Writer
 }
@@ -37,7 +37,7 @@ EXAMPLES:
 }
 
 func action(ctx context.Context, cmd *cli.Command) error {
-	store, err := stage.NewStore()
+	store, err := staging.NewStore()
 	if err != nil {
 		return fmt.Errorf("failed to initialize stage store: %w", err)
 	}
@@ -59,8 +59,8 @@ func (r *Runner) Run(_ context.Context) error {
 		return err
 	}
 
-	ssmCount := len(staged[stage.ServiceSSM])
-	smCount := len(staged[stage.ServiceSM])
+	ssmCount := len(staged[staging.ServiceSSM])
+	smCount := len(staged[staging.ServiceSM])
 	totalCount := ssmCount + smCount
 
 	if totalCount == 0 {
@@ -71,14 +71,14 @@ func (r *Runner) Run(_ context.Context) error {
 
 	// Unstage all SSM
 	if ssmCount > 0 {
-		if err := r.Store.UnstageAll(stage.ServiceSSM); err != nil {
+		if err := r.Store.UnstageAll(staging.ServiceSSM); err != nil {
 			return err
 		}
 	}
 
 	// Unstage all SM
 	if smCount > 0 {
-		if err := r.Store.UnstageAll(stage.ServiceSM); err != nil {
+		if err := r.Store.UnstageAll(staging.ServiceSM); err != nil {
 			return err
 		}
 	}

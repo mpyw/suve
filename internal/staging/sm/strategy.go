@@ -1,5 +1,5 @@
 // Package strategy provides SM-specific stage command strategy implementations.
-package strategy
+package sm
 
 import (
 	"context"
@@ -10,8 +10,7 @@ import (
 
 	"github.com/mpyw/suve/internal/api/smapi"
 	"github.com/mpyw/suve/internal/awsutil"
-	"github.com/mpyw/suve/internal/smutil"
-	"github.com/mpyw/suve/internal/stage"
+	"github.com/mpyw/suve/internal/staging"
 	"github.com/mpyw/suve/internal/version/smversion"
 )
 
@@ -19,11 +18,12 @@ import (
 type Client interface {
 	smapi.GetSecretValueAPI
 	smapi.ListSecretVersionIdsAPI
+	smapi.CreateSecretAPI
 	smapi.PutSecretValueAPI
 	smapi.DeleteSecretAPI
 }
 
-// Strategy implements stage.ServiceStrategy for SM.
+// Strategy implements staging.ServiceStrategy for SM.
 type Strategy struct {
 	Client Client
 }
@@ -34,8 +34,8 @@ func NewStrategy(client Client) *Strategy {
 }
 
 // Service returns the service type.
-func (s *Strategy) Service() stage.Service {
-	return stage.ServiceSM
+func (s *Strategy) Service() staging.Service {
+	return staging.ServiceSM
 }
 
 // ServiceName returns the user-friendly service name.
@@ -53,8 +53,32 @@ func (s *Strategy) HasDeleteOptions() bool {
 	return true
 }
 
-// PushSet applies a set operation to AWS Secrets Manager.
-func (s *Strategy) PushSet(ctx context.Context, name, value string) error {
+// Push applies a staged operation to AWS Secrets Manager.
+func (s *Strategy) Push(ctx context.Context, name string, entry staging.Entry) error {
+	switch entry.Operation {
+	case staging.OperationCreate:
+		return s.pushCreate(ctx, name, entry.Value)
+	case staging.OperationUpdate:
+		return s.pushUpdate(ctx, name, entry.Value)
+	case staging.OperationDelete:
+		return s.pushDelete(ctx, name, entry)
+	default:
+		return fmt.Errorf("unknown operation: %s", entry.Operation)
+	}
+}
+
+func (s *Strategy) pushCreate(ctx context.Context, name, value string) error {
+	_, err := s.Client.CreateSecret(ctx, &secretsmanager.CreateSecretInput{
+		Name:         lo.ToPtr(name),
+		SecretString: lo.ToPtr(value),
+	})
+	if err != nil {
+		return fmt.Errorf("failed to create secret: %w", err)
+	}
+	return nil
+}
+
+func (s *Strategy) pushUpdate(ctx context.Context, name, value string) error {
 	_, err := s.Client.PutSecretValue(ctx, &secretsmanager.PutSecretValueInput{
 		SecretId:     lo.ToPtr(name),
 		SecretString: lo.ToPtr(value),
@@ -65,8 +89,7 @@ func (s *Strategy) PushSet(ctx context.Context, name, value string) error {
 	return nil
 }
 
-// PushDelete applies a delete operation to AWS Secrets Manager.
-func (s *Strategy) PushDelete(ctx context.Context, name string, entry stage.Entry) error {
+func (s *Strategy) pushDelete(ctx context.Context, name string, entry staging.Entry) error {
 	input := &secretsmanager.DeleteSecretInput{
 		SecretId: lo.ToPtr(name),
 	}
@@ -87,16 +110,16 @@ func (s *Strategy) PushDelete(ctx context.Context, name string, entry stage.Entr
 }
 
 // FetchCurrent fetches the current value from AWS Secrets Manager for diffing.
-func (s *Strategy) FetchCurrent(ctx context.Context, name string) (*stage.FetchResult, error) {
+func (s *Strategy) FetchCurrent(ctx context.Context, name string) (*staging.FetchResult, error) {
 	spec := &smversion.Spec{Name: name}
 	secret, err := smversion.GetSecretWithVersion(ctx, s.Client, spec)
 	if err != nil {
 		return nil, err
 	}
-	versionID := smutil.TruncateVersionID(lo.FromPtr(secret.VersionId))
-	return &stage.FetchResult{
-		Value:        lo.FromPtr(secret.SecretString),
-		VersionLabel: "#" + versionID,
+	versionID := smversion.TruncateVersionID(lo.FromPtr(secret.VersionId))
+	return &staging.FetchResult{
+		Value:      lo.FromPtr(secret.SecretString),
+		Identifier: "#" + versionID,
 	}, nil
 }
 
@@ -142,12 +165,12 @@ func (s *Strategy) FetchVersion(ctx context.Context, input string) (value string
 	if err != nil {
 		return "", "", err
 	}
-	versionID := smutil.TruncateVersionID(lo.FromPtr(secret.VersionId))
+	versionID := smversion.TruncateVersionID(lo.FromPtr(secret.VersionId))
 	return lo.FromPtr(secret.SecretString), "#" + versionID, nil
 }
 
 // Factory creates a FullStrategy with an initialized AWS client.
-func Factory(ctx context.Context) (stage.FullStrategy, error) {
+func Factory(ctx context.Context) (staging.FullStrategy, error) {
 	client, err := awsutil.NewSMClient(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize AWS client: %w", err)
@@ -155,8 +178,8 @@ func Factory(ctx context.Context) (stage.FullStrategy, error) {
 	return NewStrategy(client), nil
 }
 
-// FactoryWithoutClient creates a Strategy without an AWS client.
+// ParserFactory creates a Parser without an AWS client.
 // Use this for operations that don't need AWS access (e.g., status, parsing).
-func FactoryWithoutClient() stage.FullStrategy {
+func ParserFactory() staging.Parser {
 	return NewStrategy(nil)
 }

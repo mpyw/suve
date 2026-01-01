@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
 
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
 	"github.com/fatih/color"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/mpyw/suve/internal/api/smapi"
 	"github.com/mpyw/suve/internal/awsutil"
+	"github.com/mpyw/suve/internal/confirm"
 )
 
 // Client is the interface for the update command.
@@ -48,7 +50,15 @@ Use 'suve sm create' to create a new secret.
 
 EXAMPLES:
   suve sm update my-api-key "new-key-value"            Update with new value
-  suve sm update my-config '{"host":"new-db.com"}'     Update JSON secret`,
+  suve sm update my-config '{"host":"new-db.com"}'     Update JSON secret
+  suve sm update -y my-api-key "new-key-value"         Update without confirmation`,
+		Flags: []cli.Flag{
+			&cli.BoolFlag{
+				Name:    "yes",
+				Aliases: []string{"y"},
+				Usage:   "Skip confirmation prompt",
+			},
+		},
 		Action: action,
 	}
 }
@@ -56,6 +66,23 @@ EXAMPLES:
 func action(ctx context.Context, cmd *cli.Command) error {
 	if cmd.Args().Len() < 2 {
 		return fmt.Errorf("usage: suve sm update <name> <value>")
+	}
+
+	name := cmd.Args().Get(0)
+	skipConfirm := cmd.Bool("yes")
+
+	// Confirm operation
+	prompter := &confirm.Prompter{
+		Stdin:  os.Stdin,
+		Stdout: cmd.Root().Writer,
+		Stderr: cmd.Root().ErrWriter,
+	}
+	confirmed, err := prompter.ConfirmAction("Update secret", name, skipConfirm)
+	if err != nil {
+		return err
+	}
+	if !confirmed {
+		return nil
 	}
 
 	client, err := awsutil.NewSMClient(ctx)
@@ -69,7 +96,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		Stderr: cmd.Root().ErrWriter,
 	}
 	return r.Run(ctx, Options{
-		Name:  cmd.Args().Get(0),
+		Name:  name,
 		Value: cmd.Args().Get(1),
 	})
 }

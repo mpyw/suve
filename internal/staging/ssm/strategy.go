@@ -1,5 +1,5 @@
 // Package strategy provides SSM-specific stage command strategy implementations.
-package strategy
+package ssm
 
 import (
 	"context"
@@ -12,7 +12,7 @@ import (
 
 	"github.com/mpyw/suve/internal/api/ssmapi"
 	"github.com/mpyw/suve/internal/awsutil"
-	"github.com/mpyw/suve/internal/stage"
+	"github.com/mpyw/suve/internal/staging"
 	"github.com/mpyw/suve/internal/version/ssmversion"
 )
 
@@ -24,7 +24,7 @@ type Client interface {
 	ssmapi.DeleteParameterAPI
 }
 
-// Strategy implements stage.ServiceStrategy for SSM.
+// Strategy implements staging.ServiceStrategy for SSM.
 type Strategy struct {
 	Client Client
 }
@@ -35,8 +35,8 @@ func NewStrategy(client Client) *Strategy {
 }
 
 // Service returns the service type.
-func (s *Strategy) Service() stage.Service {
-	return stage.ServiceSSM
+func (s *Strategy) Service() staging.Service {
+	return staging.ServiceSSM
 }
 
 // ServiceName returns the user-friendly service name.
@@ -54,8 +54,19 @@ func (s *Strategy) HasDeleteOptions() bool {
 	return false
 }
 
-// PushSet applies a set operation to AWS SSM.
-func (s *Strategy) PushSet(ctx context.Context, name, value string) error {
+// Push applies a staged operation to AWS SSM.
+func (s *Strategy) Push(ctx context.Context, name string, entry staging.Entry) error {
+	switch entry.Operation {
+	case staging.OperationCreate, staging.OperationUpdate:
+		return s.pushSet(ctx, name, entry.Value)
+	case staging.OperationDelete:
+		return s.pushDelete(ctx, name)
+	default:
+		return fmt.Errorf("unknown operation: %s", entry.Operation)
+	}
+}
+
+func (s *Strategy) pushSet(ctx context.Context, name, value string) error {
 	// Try to get existing parameter to preserve type
 	paramType := types.ParameterTypeString
 	existing, err := s.Client.GetParameter(ctx, &ssm.GetParameterInput{
@@ -82,8 +93,7 @@ func (s *Strategy) PushSet(ctx context.Context, name, value string) error {
 	return nil
 }
 
-// PushDelete applies a delete operation to AWS SSM.
-func (s *Strategy) PushDelete(ctx context.Context, name string, _ stage.Entry) error {
+func (s *Strategy) pushDelete(ctx context.Context, name string) error {
 	_, err := s.Client.DeleteParameter(ctx, &ssm.DeleteParameterInput{
 		Name: lo.ToPtr(name),
 	})
@@ -94,15 +104,15 @@ func (s *Strategy) PushDelete(ctx context.Context, name string, _ stage.Entry) e
 }
 
 // FetchCurrent fetches the current value from AWS SSM for diffing.
-func (s *Strategy) FetchCurrent(ctx context.Context, name string) (*stage.FetchResult, error) {
+func (s *Strategy) FetchCurrent(ctx context.Context, name string) (*staging.FetchResult, error) {
 	spec := &ssmversion.Spec{Name: name}
 	param, err := ssmversion.GetParameterWithVersion(ctx, s.Client, spec, true)
 	if err != nil {
 		return nil, err
 	}
-	return &stage.FetchResult{
-		Value:        lo.FromPtr(param.Value),
-		VersionLabel: fmt.Sprintf("#%d", param.Version),
+	return &staging.FetchResult{
+		Value:      lo.FromPtr(param.Value),
+		Identifier: fmt.Sprintf("#%d", param.Version),
 	}, nil
 }
 
@@ -152,7 +162,7 @@ func (s *Strategy) FetchVersion(ctx context.Context, input string) (value string
 }
 
 // Factory creates a FullStrategy with an initialized AWS client.
-func Factory(ctx context.Context) (stage.FullStrategy, error) {
+func Factory(ctx context.Context) (staging.FullStrategy, error) {
 	client, err := awsutil.NewSSMClient(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize AWS client: %w", err)
@@ -160,8 +170,8 @@ func Factory(ctx context.Context) (stage.FullStrategy, error) {
 	return NewStrategy(client), nil
 }
 
-// FactoryWithoutClient creates a Strategy without an AWS client.
+// ParserFactory creates a Parser without an AWS client.
 // Use this for operations that don't need AWS access (e.g., status, parsing).
-func FactoryWithoutClient() stage.FullStrategy {
+func ParserFactory() staging.Parser {
 	return NewStrategy(nil)
 }

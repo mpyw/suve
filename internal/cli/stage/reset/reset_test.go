@@ -13,7 +13,7 @@ import (
 
 	appcli "github.com/mpyw/suve/internal/cli"
 	"github.com/mpyw/suve/internal/cli/stage/reset"
-	"github.com/mpyw/suve/internal/stage"
+	"github.com/mpyw/suve/internal/staging"
 )
 
 func TestCommand_Validation(t *testing.T) {
@@ -34,7 +34,7 @@ func TestRun_NoChanges(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	store := stage.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 	var buf bytes.Buffer
 	r := &reset.Runner{
@@ -52,23 +52,23 @@ func TestRun_UnstageAll(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	store := stage.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 	// Stage SSM parameters
-	_ = store.Stage(stage.ServiceSSM, "/app/config1", stage.Entry{
-		Operation: stage.OperationSet,
+	_ = store.Stage(staging.ServiceSSM, "/app/config1", staging.Entry{
+		Operation: staging.OperationUpdate,
 		Value:     "ssm-value1",
 		StagedAt:  time.Now(),
 	})
-	_ = store.Stage(stage.ServiceSSM, "/app/config2", stage.Entry{
-		Operation: stage.OperationSet,
+	_ = store.Stage(staging.ServiceSSM, "/app/config2", staging.Entry{
+		Operation: staging.OperationUpdate,
 		Value:     "ssm-value2",
 		StagedAt:  time.Now(),
 	})
 
 	// Stage SM secrets
-	_ = store.Stage(stage.ServiceSM, "secret1", stage.Entry{
-		Operation: stage.OperationSet,
+	_ = store.Stage(staging.ServiceSM, "secret1", staging.Entry{
+		Operation: staging.OperationUpdate,
 		Value:     "sm-value1",
 		StagedAt:  time.Now(),
 	})
@@ -85,23 +85,23 @@ func TestRun_UnstageAll(t *testing.T) {
 	assert.Contains(t, buf.String(), "Unstaged all changes (2 SSM, 1 SM)")
 
 	// Verify all unstaged
-	_, err = store.Get(stage.ServiceSSM, "/app/config1")
-	assert.Equal(t, stage.ErrNotStaged, err)
-	_, err = store.Get(stage.ServiceSSM, "/app/config2")
-	assert.Equal(t, stage.ErrNotStaged, err)
-	_, err = store.Get(stage.ServiceSM, "secret1")
-	assert.Equal(t, stage.ErrNotStaged, err)
+	_, err = store.Get(staging.ServiceSSM, "/app/config1")
+	assert.Equal(t, staging.ErrNotStaged, err)
+	_, err = store.Get(staging.ServiceSSM, "/app/config2")
+	assert.Equal(t, staging.ErrNotStaged, err)
+	_, err = store.Get(staging.ServiceSM, "secret1")
+	assert.Equal(t, staging.ErrNotStaged, err)
 }
 
 func TestRun_UnstageSSMOnly(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	store := stage.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 	// Stage only SSM parameters
-	_ = store.Stage(stage.ServiceSSM, "/app/config", stage.Entry{
-		Operation: stage.OperationSet,
+	_ = store.Stage(staging.ServiceSSM, "/app/config", staging.Entry{
+		Operation: staging.OperationUpdate,
 		Value:     "ssm-value",
 		StagedAt:  time.Now(),
 	})
@@ -122,11 +122,11 @@ func TestRun_UnstageSMOnly(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	store := stage.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 	// Stage only SM secrets
-	_ = store.Stage(stage.ServiceSM, "my-secret", stage.Entry{
-		Operation: stage.OperationSet,
+	_ = store.Stage(staging.ServiceSM, "my-secret", staging.Entry{
+		Operation: staging.OperationUpdate,
 		Value:     "sm-value",
 		StagedAt:  time.Now(),
 	})
@@ -152,7 +152,7 @@ func TestRun_StoreError(t *testing.T) {
 	// Create invalid JSON
 	require.NoError(t, os.WriteFile(path, []byte("invalid json"), 0o644))
 
-	store := stage.NewStoreWithPath(path)
+	store := staging.NewStoreWithPath(path)
 
 	var buf bytes.Buffer
 	r := &reset.Runner{

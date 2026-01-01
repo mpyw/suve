@@ -1,5 +1,5 @@
 // Package stage provides staging functionality for AWS parameter and secret changes.
-package stage
+package staging
 
 import (
 	"context"
@@ -21,23 +21,38 @@ type ServiceStrategy interface {
 	HasDeleteOptions() bool
 }
 
+// Parser provides name/spec parsing without AWS access.
+// Use this interface when only parsing is needed (e.g., status, add commands).
+type Parser interface {
+	ServiceStrategy
+
+	// ParseName parses and validates a name, returning only the base name without version specifiers.
+	// Returns an error if version specifiers are present.
+	ParseName(input string) (string, error)
+
+	// ParseSpec parses a version spec string.
+	// Returns the base name and whether a version/shift was specified.
+	ParseSpec(input string) (name string, hasVersion bool, err error)
+}
+
+// ParserFactory creates a Parser without AWS client.
+type ParserFactory func() Parser
+
 // PushStrategy defines service-specific push operations.
 type PushStrategy interface {
 	ServiceStrategy
 
-	// PushSet applies a set operation to AWS.
-	PushSet(ctx context.Context, name, value string) error
-
-	// PushDelete applies a delete operation to AWS.
-	PushDelete(ctx context.Context, name string, entry Entry) error
+	// Push applies a staged operation to AWS.
+	// Handles OperationCreate, OperationUpdate, and OperationDelete based on entry.Operation.
+	Push(ctx context.Context, name string, entry Entry) error
 }
 
 // FetchResult holds the result of fetching a value from AWS.
 type FetchResult struct {
 	// Value is the current value in AWS.
 	Value string
-	// VersionLabel is a display string for the version (e.g., "#3" for SSM, "#abc123" for SM).
-	VersionLabel string
+	// Identifier is a display string for the version (e.g., "#3" for SSM, "#abc123" for SM).
+	Identifier string
 }
 
 // DiffStrategy defines service-specific diff/fetch operations.
@@ -50,11 +65,7 @@ type DiffStrategy interface {
 
 // EditStrategy defines service-specific edit operations.
 type EditStrategy interface {
-	ServiceStrategy
-
-	// ParseName parses and validates a name, returning only the base name without version specifiers.
-	// Returns an error if version specifiers are present.
-	ParseName(input string) (string, error)
+	Parser
 
 	// FetchCurrentValue fetches the current value from AWS for editing.
 	FetchCurrentValue(ctx context.Context, name string) (string, error)
@@ -62,11 +73,7 @@ type EditStrategy interface {
 
 // ResetStrategy defines service-specific reset operations.
 type ResetStrategy interface {
-	ServiceStrategy
-
-	// ParseSpec parses a version spec string.
-	// Returns the base name and whether a version/shift was specified.
-	ParseSpec(input string) (name string, hasVersion bool, err error)
+	Parser
 
 	// FetchVersion fetches the value for a specific version.
 	// Returns the value and a version label for display.

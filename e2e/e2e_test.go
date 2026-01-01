@@ -21,10 +21,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-	"github.com/urfave/cli/v3"
-
 	smcat "github.com/mpyw/suve/internal/cli/sm/cat"
 	smcreate "github.com/mpyw/suve/internal/cli/sm/create"
 	smdelete "github.com/mpyw/suve/internal/cli/sm/delete"
@@ -45,7 +41,10 @@ import (
 	ssmpush "github.com/mpyw/suve/internal/cli/ssm/stage/push"
 	ssmreset "github.com/mpyw/suve/internal/cli/ssm/stage/reset"
 	ssmstatus "github.com/mpyw/suve/internal/cli/ssm/stage/status"
-	"github.com/mpyw/suve/internal/stage"
+	"github.com/mpyw/suve/internal/staging"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"github.com/urfave/cli/v3"
 )
 
 func getEndpoint() string {

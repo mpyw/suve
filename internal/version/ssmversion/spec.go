@@ -6,7 +6,7 @@ import (
 
 	"github.com/samber/lo"
 
-	"github.com/mpyw/suve/internal/diffutil"
+	"github.com/mpyw/suve/internal/diffargs"
 	"github.com/mpyw/suve/internal/version"
 	"github.com/mpyw/suve/internal/version/internal"
 )
@@ -71,7 +71,7 @@ func Parse(input string) (*Spec, error) {
 // ParseDiffArgs parses diff command arguments for SSM parameters.
 // This is a convenience wrapper around diff.ParseArgs with SSM-specific settings.
 func ParseDiffArgs(args []string) (*Spec, *Spec, error) {
-	return diffutil.ParseArgs(
+	return diffargs.ParseArgs(
 		args,
 		Parse,
 		func(abs AbsoluteSpec) bool { return abs.Version != nil },

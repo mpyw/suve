@@ -14,41 +14,33 @@ import (
 
 	appcli "github.com/mpyw/suve/internal/cli"
 	"github.com/mpyw/suve/internal/cli/stage/push"
-	"github.com/mpyw/suve/internal/stage"
+	"github.com/mpyw/suve/internal/staging"
 )
 
-// mockStrategy implements stage.PushStrategy for testing.
+// mockStrategy implements staging.PushStrategy for testing.
 type mockStrategy struct {
-	service          stage.Service
+	service          staging.Service
 	serviceName      string
 	itemName         string
 	hasDeleteOptions bool
-	pushSetFunc      func(ctx context.Context, name, value string) error
-	pushDeleteFunc   func(ctx context.Context, name string, entry stage.Entry) error
+	pushFunc         func(ctx context.Context, name string, entry staging.Entry) error
 }
 
-func (m *mockStrategy) Service() stage.Service { return m.service }
-func (m *mockStrategy) ServiceName() string    { return m.serviceName }
-func (m *mockStrategy) ItemName() string       { return m.itemName }
-func (m *mockStrategy) HasDeleteOptions() bool { return m.hasDeleteOptions }
+func (m *mockStrategy) Service() staging.Service { return m.service }
+func (m *mockStrategy) ServiceName() string      { return m.serviceName }
+func (m *mockStrategy) ItemName() string         { return m.itemName }
+func (m *mockStrategy) HasDeleteOptions() bool   { return m.hasDeleteOptions }
 
-func (m *mockStrategy) PushSet(ctx context.Context, name, value string) error {
-	if m.pushSetFunc != nil {
-		return m.pushSetFunc(ctx, name, value)
-	}
-	return nil
-}
-
-func (m *mockStrategy) PushDelete(ctx context.Context, name string, entry stage.Entry) error {
-	if m.pushDeleteFunc != nil {
-		return m.pushDeleteFunc(ctx, name, entry)
+func (m *mockStrategy) Push(ctx context.Context, name string, entry staging.Entry) error {
+	if m.pushFunc != nil {
+		return m.pushFunc(ctx, name, entry)
 	}
 	return nil
 }
 
 func newSSMStrategy() *mockStrategy {
 	return &mockStrategy{
-		service:          stage.ServiceSSM,
+		service:          staging.ServiceSSM,
 		serviceName:      "SSM",
 		itemName:         "parameter",
 		hasDeleteOptions: false,
@@ -57,7 +49,7 @@ func newSSMStrategy() *mockStrategy {
 
 func newSMStrategy() *mockStrategy {
 	return &mockStrategy{
-		service:          stage.ServiceSM,
+		service:          staging.ServiceSM,
 		serviceName:      "SM",
 		itemName:         "secret",
 		hasDeleteOptions: true,
@@ -82,7 +74,7 @@ func TestRun_NoChanges(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	store := stage.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 	var buf bytes.Buffer
 	r := &push.Runner{
@@ -104,18 +96,18 @@ func TestRun_PushBothServices(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	store := stage.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 	// Stage SSM parameter
-	_ = store.Stage(stage.ServiceSSM, "/app/config", stage.Entry{
-		Operation: stage.OperationSet,
+	_ = store.Stage(staging.ServiceSSM, "/app/config", staging.Entry{
+		Operation: staging.OperationUpdate,
 		Value:     "ssm-value",
 		StagedAt:  time.Now(),
 	})
 
 	// Stage SM secret
-	_ = store.Stage(stage.ServiceSM, "my-secret", stage.Entry{
-		Operation: stage.OperationSet,
+	_ = store.Stage(staging.ServiceSM, "my-secret", staging.Entry{
+		Operation: staging.OperationUpdate,
 		Value:     "sm-value",
 		StagedAt:  time.Now(),
 	})
@@ -124,14 +116,14 @@ func TestRun_PushBothServices(t *testing.T) {
 	smPutCalled := false
 
 	ssmMock := newSSMStrategy()
-	ssmMock.pushSetFunc = func(_ context.Context, name, _ string) error {
+	ssmMock.pushFunc = func(_ context.Context, name string, _ staging.Entry) error {
 		ssmPutCalled = true
 		assert.Equal(t, "/app/config", name)
 		return nil
 	}
 
 	smMock := newSMStrategy()
-	smMock.pushSetFunc = func(_ context.Context, name, _ string) error {
+	smMock.pushFunc = func(_ context.Context, name string, _ staging.Entry) error {
 		smPutCalled = true
 		assert.Equal(t, "my-secret", name)
 		return nil
@@ -152,32 +144,32 @@ func TestRun_PushBothServices(t *testing.T) {
 	assert.True(t, smPutCalled)
 	assert.Contains(t, buf.String(), "Pushing SSM parameters")
 	assert.Contains(t, buf.String(), "Pushing SM secrets")
-	assert.Contains(t, buf.String(), "SSM: Set /app/config")
-	assert.Contains(t, buf.String(), "SM: Set my-secret")
+	assert.Contains(t, buf.String(), "SSM: Updated /app/config")
+	assert.Contains(t, buf.String(), "SM: Updated my-secret")
 
 	// Verify both unstaged
-	_, err = store.Get(stage.ServiceSSM, "/app/config")
-	assert.Equal(t, stage.ErrNotStaged, err)
-	_, err = store.Get(stage.ServiceSM, "my-secret")
-	assert.Equal(t, stage.ErrNotStaged, err)
+	_, err = store.Get(staging.ServiceSSM, "/app/config")
+	assert.Equal(t, staging.ErrNotStaged, err)
+	_, err = store.Get(staging.ServiceSM, "my-secret")
+	assert.Equal(t, staging.ErrNotStaged, err)
 }
 
 func TestRun_PushSSMOnly(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	store := stage.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 	// Stage only SSM parameter
-	_ = store.Stage(stage.ServiceSSM, "/app/config", stage.Entry{
-		Operation: stage.OperationSet,
+	_ = store.Stage(staging.ServiceSSM, "/app/config", staging.Entry{
+		Operation: staging.OperationUpdate,
 		Value:     "ssm-value",
 		StagedAt:  time.Now(),
 	})
 
 	ssmPutCalled := false
 	ssmMock := newSSMStrategy()
-	ssmMock.pushSetFunc = func(_ context.Context, _, _ string) error {
+	ssmMock.pushFunc = func(_ context.Context, _ string, _ staging.Entry) error {
 		ssmPutCalled = true
 		return nil
 	}
@@ -202,18 +194,18 @@ func TestRun_PushSMOnly(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	store := stage.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 	// Stage only SM secret
-	_ = store.Stage(stage.ServiceSM, "my-secret", stage.Entry{
-		Operation: stage.OperationSet,
+	_ = store.Stage(staging.ServiceSM, "my-secret", staging.Entry{
+		Operation: staging.OperationUpdate,
 		Value:     "sm-value",
 		StagedAt:  time.Now(),
 	})
 
 	smPutCalled := false
 	smMock := newSMStrategy()
-	smMock.pushSetFunc = func(_ context.Context, _, _ string) error {
+	smMock.pushFunc = func(_ context.Context, _ string, _ staging.Entry) error {
 		smPutCalled = true
 		return nil
 	}
@@ -238,15 +230,15 @@ func TestRun_PushDelete(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	store := stage.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 	// Stage deletes
-	_ = store.Stage(stage.ServiceSSM, "/app/old", stage.Entry{
-		Operation: stage.OperationDelete,
+	_ = store.Stage(staging.ServiceSSM, "/app/old", staging.Entry{
+		Operation: staging.OperationDelete,
 		StagedAt:  time.Now(),
 	})
-	_ = store.Stage(stage.ServiceSM, "old-secret", stage.Entry{
-		Operation: stage.OperationDelete,
+	_ = store.Stage(staging.ServiceSM, "old-secret", staging.Entry{
+		Operation: staging.OperationDelete,
 		StagedAt:  time.Now(),
 	})
 
@@ -254,13 +246,13 @@ func TestRun_PushDelete(t *testing.T) {
 	smDeleteCalled := false
 
 	ssmMock := newSSMStrategy()
-	ssmMock.pushDeleteFunc = func(_ context.Context, _ string, _ stage.Entry) error {
+	ssmMock.pushFunc = func(_ context.Context, _ string, _ staging.Entry) error {
 		ssmDeleteCalled = true
 		return nil
 	}
 
 	smMock := newSMStrategy()
-	smMock.pushDeleteFunc = func(_ context.Context, _ string, _ stage.Entry) error {
+	smMock.pushFunc = func(_ context.Context, _ string, _ staging.Entry) error {
 		smDeleteCalled = true
 		return nil
 	}
@@ -286,27 +278,27 @@ func TestRun_PartialFailure(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	store := stage.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 	// Stage both
-	_ = store.Stage(stage.ServiceSSM, "/app/config", stage.Entry{
-		Operation: stage.OperationSet,
+	_ = store.Stage(staging.ServiceSSM, "/app/config", staging.Entry{
+		Operation: staging.OperationUpdate,
 		Value:     "ssm-value",
 		StagedAt:  time.Now(),
 	})
-	_ = store.Stage(stage.ServiceSM, "my-secret", stage.Entry{
-		Operation: stage.OperationSet,
+	_ = store.Stage(staging.ServiceSM, "my-secret", staging.Entry{
+		Operation: staging.OperationUpdate,
 		Value:     "sm-value",
 		StagedAt:  time.Now(),
 	})
 
 	ssmMock := newSSMStrategy()
-	ssmMock.pushSetFunc = func(_ context.Context, _, _ string) error {
+	ssmMock.pushFunc = func(_ context.Context, _ string, _ staging.Entry) error {
 		return fmt.Errorf("SSM error")
 	}
 
 	smMock := newSMStrategy()
-	smMock.pushSetFunc = func(_ context.Context, _, _ string) error {
+	smMock.pushFunc = func(_ context.Context, _ string, _ staging.Entry) error {
 		return nil
 	}
 
@@ -324,13 +316,13 @@ func TestRun_PartialFailure(t *testing.T) {
 	assert.Contains(t, err.Error(), "pushed 1, failed 1")
 
 	// SSM should still be staged (failed)
-	entry, err := store.Get(stage.ServiceSSM, "/app/config")
+	entry, err := store.Get(staging.ServiceSSM, "/app/config")
 	require.NoError(t, err)
 	assert.Equal(t, "ssm-value", entry.Value)
 
 	// SM should be unstaged (succeeded)
-	_, err = store.Get(stage.ServiceSM, "my-secret")
-	assert.Equal(t, stage.ErrNotStaged, err)
+	_, err = store.Get(staging.ServiceSM, "my-secret")
+	assert.Equal(t, staging.ErrNotStaged, err)
 }
 
 func TestRun_StoreError(t *testing.T) {
@@ -342,7 +334,7 @@ func TestRun_StoreError(t *testing.T) {
 	// Create invalid JSON
 	require.NoError(t, os.WriteFile(path, []byte("invalid json"), 0o644))
 
-	store := stage.NewStoreWithPath(path)
+	store := staging.NewStoreWithPath(path)
 
 	var buf bytes.Buffer
 	r := &push.Runner{
@@ -362,20 +354,20 @@ func TestRun_SMDeleteWithForce(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	store := stage.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 	// Stage SM delete with force option
-	_ = store.Stage(stage.ServiceSM, "my-secret", stage.Entry{
-		Operation: stage.OperationDelete,
+	_ = store.Stage(staging.ServiceSM, "my-secret", staging.Entry{
+		Operation: staging.OperationDelete,
 		StagedAt:  time.Now(),
-		DeleteOptions: &stage.DeleteOptions{
+		DeleteOptions: &staging.DeleteOptions{
 			Force: true,
 		},
 	})
 
-	var capturedEntry stage.Entry
+	var capturedEntry staging.Entry
 	smMock := newSMStrategy()
-	smMock.pushDeleteFunc = func(_ context.Context, _ string, entry stage.Entry) error {
+	smMock.pushFunc = func(_ context.Context, _ string, entry staging.Entry) error {
 		capturedEntry = entry
 		return nil
 	}
@@ -398,20 +390,20 @@ func TestRun_SMDeleteWithRecoveryWindow(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	store := stage.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 	// Stage SM delete with custom recovery window
-	_ = store.Stage(stage.ServiceSM, "my-secret", stage.Entry{
-		Operation: stage.OperationDelete,
+	_ = store.Stage(staging.ServiceSM, "my-secret", staging.Entry{
+		Operation: staging.OperationDelete,
 		StagedAt:  time.Now(),
-		DeleteOptions: &stage.DeleteOptions{
+		DeleteOptions: &staging.DeleteOptions{
 			RecoveryWindow: 7,
 		},
 	})
 
-	var capturedEntry stage.Entry
+	var capturedEntry staging.Entry
 	smMock := newSMStrategy()
-	smMock.pushDeleteFunc = func(_ context.Context, _ string, entry stage.Entry) error {
+	smMock.pushFunc = func(_ context.Context, _ string, entry staging.Entry) error {
 		capturedEntry = entry
 		return nil
 	}
@@ -434,15 +426,15 @@ func TestRun_SSMDeleteError(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	store := stage.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
-	_ = store.Stage(stage.ServiceSSM, "/app/config", stage.Entry{
-		Operation: stage.OperationDelete,
+	_ = store.Stage(staging.ServiceSSM, "/app/config", staging.Entry{
+		Operation: staging.OperationDelete,
 		StagedAt:  time.Now(),
 	})
 
 	ssmMock := newSSMStrategy()
-	ssmMock.pushDeleteFunc = func(_ context.Context, _ string, _ stage.Entry) error {
+	ssmMock.pushFunc = func(_ context.Context, _ string, _ staging.Entry) error {
 		return fmt.Errorf("delete failed")
 	}
 
@@ -463,16 +455,16 @@ func TestRun_SMSetError(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	store := stage.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
-	_ = store.Stage(stage.ServiceSM, "my-secret", stage.Entry{
-		Operation: stage.OperationSet,
+	_ = store.Stage(staging.ServiceSM, "my-secret", staging.Entry{
+		Operation: staging.OperationUpdate,
 		Value:     "value",
 		StagedAt:  time.Now(),
 	})
 
 	smMock := newSMStrategy()
-	smMock.pushSetFunc = func(_ context.Context, _, _ string) error {
+	smMock.pushFunc = func(_ context.Context, _ string, _ staging.Entry) error {
 		return fmt.Errorf("put secret failed")
 	}
 
@@ -493,15 +485,15 @@ func TestRun_SMDeleteError(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	store := stage.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
-	_ = store.Stage(stage.ServiceSM, "my-secret", stage.Entry{
-		Operation: stage.OperationDelete,
+	_ = store.Stage(staging.ServiceSM, "my-secret", staging.Entry{
+		Operation: staging.OperationDelete,
 		StagedAt:  time.Now(),
 	})
 
 	smMock := newSMStrategy()
-	smMock.pushDeleteFunc = func(_ context.Context, _ string, _ stage.Entry) error {
+	smMock.pushFunc = func(_ context.Context, _ string, _ staging.Entry) error {
 		return fmt.Errorf("delete secret failed")
 	}
 
@@ -522,16 +514,16 @@ func TestRun_SSMSetError(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	store := stage.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
-	_ = store.Stage(stage.ServiceSSM, "/app/config", stage.Entry{
-		Operation: stage.OperationSet,
+	_ = store.Stage(staging.ServiceSSM, "/app/config", staging.Entry{
+		Operation: staging.OperationUpdate,
 		Value:     "value",
 		StagedAt:  time.Now(),
 	})
 
 	ssmMock := newSSMStrategy()
-	ssmMock.pushSetFunc = func(_ context.Context, _, _ string) error {
+	ssmMock.pushFunc = func(_ context.Context, _ string, _ staging.Entry) error {
 		return fmt.Errorf("put parameter failed")
 	}
 
