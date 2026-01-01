@@ -75,7 +75,8 @@ func getSecretWithShift(ctx context.Context, client Client, spec *Spec) (*secret
 
 	// Find base index
 	baseIdx := 0
-	if spec.Absolute.ID != nil {
+	switch {
+	case spec.Absolute.ID != nil:
 		_, idx, found := lo.FindIndexOf(versionList, func(v types.SecretVersionsListEntry) bool {
 			return lo.FromPtr(v.VersionId) == *spec.Absolute.ID
 		})
@@ -83,7 +84,7 @@ func getSecretWithShift(ctx context.Context, client Client, spec *Spec) (*secret
 			return nil, fmt.Errorf("version ID not found: %s", *spec.Absolute.ID)
 		}
 		baseIdx = idx
-	} else if spec.Absolute.Label != nil {
+	case spec.Absolute.Label != nil:
 		_, idx, found := lo.FindIndexOf(versionList, func(v types.SecretVersionsListEntry) bool {
 			return lo.Contains(v.VersionStages, *spec.Absolute.Label)
 		})

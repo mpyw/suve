@@ -30,23 +30,30 @@ func (p *EntryPrinter) PrintEntry(name string, entry Entry, verbose, showDeleteO
 		opColor = red("D")
 	}
 
-	if verbose {
-		_, _ = fmt.Fprintf(p.Writer, "\n%s %s\n", opColor, name)
-		_, _ = fmt.Fprintf(p.Writer, "  %s %s\n", cyan("Staged:"), entry.StagedAt.Format("2006-01-02 15:04:05"))
-		if entry.Operation == OperationCreate || entry.Operation == OperationUpdate {
-			value := entry.Value
-			if len(value) > 100 {
-				value = value[:100] + "..."
-			}
-			_, _ = fmt.Fprintf(p.Writer, "  %s %s\n", cyan("Value:"), value)
-		} else if entry.Operation == OperationDelete && showDeleteOptions && entry.DeleteOptions != nil {
-			if entry.DeleteOptions.Force {
-				_, _ = fmt.Fprintf(p.Writer, "  %s force (immediate, no recovery)\n", cyan("Delete:"))
-			} else if entry.DeleteOptions.RecoveryWindow > 0 {
-				_, _ = fmt.Fprintf(p.Writer, "  %s %d days recovery window\n", cyan("Delete:"), entry.DeleteOptions.RecoveryWindow)
-			}
-		}
-	} else {
+	if !verbose {
 		_, _ = fmt.Fprintf(p.Writer, "  %s %s\n", opColor, name)
+		return
+	}
+
+	_, _ = fmt.Fprintf(p.Writer, "\n%s %s\n", opColor, name)
+	_, _ = fmt.Fprintf(p.Writer, "  %s %s\n", cyan("Staged:"), entry.StagedAt.Format("2006-01-02 15:04:05"))
+
+	switch entry.Operation {
+	case OperationCreate, OperationUpdate:
+		value := entry.Value
+		if len(value) > 100 {
+			value = value[:100] + "..."
+		}
+		_, _ = fmt.Fprintf(p.Writer, "  %s %s\n", cyan("Value:"), value)
+	case OperationDelete:
+		if !showDeleteOptions || entry.DeleteOptions == nil {
+			return
+		}
+		switch {
+		case entry.DeleteOptions.Force:
+			_, _ = fmt.Fprintf(p.Writer, "  %s force (immediate, no recovery)\n", cyan("Delete:"))
+		case entry.DeleteOptions.RecoveryWindow > 0:
+			_, _ = fmt.Fprintf(p.Writer, "  %s %d days recovery window\n", cyan("Delete:"), entry.DeleteOptions.RecoveryWindow)
+		}
 	}
 }

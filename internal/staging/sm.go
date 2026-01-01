@@ -140,9 +140,10 @@ func (s *SMStrategy) pushDelete(ctx context.Context, name string, entry Entry) e
 	}
 
 	if entry.DeleteOptions != nil {
-		if entry.DeleteOptions.Force {
+		switch {
+		case entry.DeleteOptions.Force:
 			input.ForceDeleteWithoutRecovery = lo.ToPtr(true)
-		} else if entry.DeleteOptions.RecoveryWindow > 0 {
+		case entry.DeleteOptions.RecoveryWindow > 0:
 			input.RecoveryWindowInDays = lo.ToPtr(int64(entry.DeleteOptions.RecoveryWindow))
 		}
 	}
