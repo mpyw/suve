@@ -4,6 +4,8 @@ package tagging
 import (
 	"fmt"
 	"strings"
+
+	"github.com/samber/lo"
 )
 
 // Change represents tag modifications to apply.
@@ -75,17 +77,14 @@ func ParseFlags(tags []string, untags []string) (*ParseResult, error) {
 	for _, op := range ops {
 		if prev, exists := seen[op.key]; exists {
 			// Conflict detected
-			var prevAction, newAction string
-			if prev.isAdd {
-				prevAction = fmt.Sprintf("--tag %s=%s", prev.key, prev.value)
-			} else {
-				prevAction = fmt.Sprintf("--untag %s", prev.key)
-			}
-			if op.isAdd {
-				newAction = fmt.Sprintf("--tag %s=%s", op.key, op.value)
-			} else {
-				newAction = fmt.Sprintf("--untag %s", op.key)
-			}
+			prevAction := lo.Ternary(prev.isAdd,
+				fmt.Sprintf("--tag %s=%s", prev.key, prev.value),
+				fmt.Sprintf("--untag %s", prev.key),
+			)
+			newAction := lo.Ternary(op.isAdd,
+				fmt.Sprintf("--tag %s=%s", op.key, op.value),
+				fmt.Sprintf("--untag %s", op.key),
+			)
 			result.Warnings = append(result.Warnings,
 				fmt.Sprintf("tag %q: %s overrides %s", op.key, newAction, prevAction))
 		}

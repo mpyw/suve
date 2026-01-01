@@ -21,7 +21,7 @@ func Open(content string) (string, error) {
 	editor := lo.CoalesceOrEmpty(
 		os.Getenv("VISUAL"),
 		os.Getenv("EDITOR"),
-		lo.If(runtime.GOOS == "windows", "notepad").Else("vi"),
+		lo.Ternary(runtime.GOOS == "windows", "notepad", "vi"),
 	)
 
 	tmpFile, err := os.CreateTemp("", "suve-edit-*.txt")

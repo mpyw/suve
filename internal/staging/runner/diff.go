@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"sort"
 	"strings"
 
 	"github.com/fatih/color"
@@ -153,10 +152,11 @@ func (r *DiffRunner) outputDiff(opts DiffOptions, name string, entry staging.Ent
 	}
 
 	label1 := fmt.Sprintf("%s%s (AWS)", name, fetchResult.Identifier)
-	label2 := fmt.Sprintf("%s (staged)", name)
-	if entry.Operation == staging.OperationDelete {
-		label2 = fmt.Sprintf("%s (staged for deletion)", name)
-	}
+	label2 := fmt.Sprintf(lo.Ternary(
+		entry.Operation == staging.OperationDelete,
+		"%s (staged for deletion)",
+		"%s (staged)",
+	), name)
 
 	diff := output.Diff(label1, label2, awsValue, stagedValue)
 	_, _ = fmt.Fprint(r.Stdout, diff)
@@ -197,12 +197,7 @@ func (r *DiffRunner) outputMetadata(entry staging.Entry) {
 	}
 	if len(entry.Tags) > 0 {
 		var tagPairs []string
-		keys := make([]string, 0, len(entry.Tags))
-		for k := range entry.Tags {
-			keys = append(keys, k)
-		}
-		sort.Strings(keys)
-		for _, k := range keys {
+		for _, k := range maputil.SortedKeys(entry.Tags) {
 			tagPairs = append(tagPairs, fmt.Sprintf("%s=%s", k, entry.Tags[k]))
 		}
 		_, _ = fmt.Fprintf(r.Stdout, "%s %s\n", cyan("Tags:"), strings.Join(tagPairs, ", "))

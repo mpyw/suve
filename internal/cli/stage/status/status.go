@@ -5,11 +5,11 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"sort"
 
 	"github.com/fatih/color"
 	"github.com/urfave/cli/v3"
 
+	"github.com/mpyw/suve/internal/maputil"
 	"github.com/mpyw/suve/internal/staging"
 )
 
@@ -103,14 +103,7 @@ func (r *Runner) Run(_ context.Context, opts Options) error {
 
 func printEntries(printer *staging.EntryPrinter, entries map[string]staging.Entry, verbose, showDeleteOptions bool) {
 	// Sort names for consistent output
-	names := make([]string, 0, len(entries))
-	for name := range entries {
-		names = append(names, name)
-	}
-	sort.Strings(names)
-
-	for _, name := range names {
-		entry := entries[name]
-		printer.PrintEntry(name, entry, verbose, showDeleteOptions)
+	for _, name := range maputil.SortedKeys(entries) {
+		printer.PrintEntry(name, entries[name], verbose, showDeleteOptions)
 	}
 }

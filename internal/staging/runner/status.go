@@ -6,10 +6,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"sort"
 
 	"github.com/fatih/color"
 
+	"github.com/mpyw/suve/internal/maputil"
 	"github.com/mpyw/suve/internal/staging"
 )
 
@@ -69,18 +69,11 @@ func (r *StatusRunner) showAll(verbose bool) error {
 		return nil
 	}
 
-	// Sort names for consistent output
-	names := make([]string, 0, len(serviceEntries))
-	for name := range serviceEntries {
-		names = append(names, name)
-	}
-	sort.Strings(names)
-
 	yellow := color.New(color.FgYellow).SprintFunc()
 	_, _ = fmt.Fprintf(r.Stdout, "%s (%d):\n", yellow(fmt.Sprintf("Staged %s changes", serviceName)), len(serviceEntries))
 
 	printer := &staging.EntryPrinter{Writer: r.Stdout}
-	for _, name := range names {
+	for _, name := range maputil.SortedKeys(serviceEntries) {
 		entry := serviceEntries[name]
 		printer.PrintEntry(name, entry, verbose, showDeleteOptions)
 	}
