@@ -302,7 +302,7 @@ func TestSSM_StagingWorkflow(t *testing.T) {
 		stdout, _, err := runCommand(t, ssmstatus.Command())
 		require.NoError(t, err)
 		assert.Contains(t, stdout, paramName)
-		assert.Contains(t, stdout, "set")
+		assert.Contains(t, stdout, "M") // M = Modified (set operation)
 		t.Logf("status output: %s", stdout)
 	})
 

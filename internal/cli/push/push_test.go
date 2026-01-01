@@ -163,8 +163,8 @@ func TestRun_PushBothServices(t *testing.T) {
 	assert.True(t, smPutCalled)
 	assert.Contains(t, buf.String(), "Pushing SSM parameters")
 	assert.Contains(t, buf.String(), "Pushing SM secrets")
-	assert.Contains(t, buf.String(), "ssm set /app/config")
-	assert.Contains(t, buf.String(), "sm set my-secret")
+	assert.Contains(t, buf.String(), "SSM: Set /app/config")
+	assert.Contains(t, buf.String(), "SM: Set my-secret")
 
 	// Verify both unstaged
 	_, err = store.Get(stage.ServiceSSM, "/app/config")
@@ -295,8 +295,8 @@ func TestRun_PushDelete(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, ssmDeleteCalled)
 	assert.True(t, smDeleteCalled)
-	assert.Contains(t, buf.String(), "ssm delete /app/old")
-	assert.Contains(t, buf.String(), "sm delete old-secret")
+	assert.Contains(t, buf.String(), "SSM: Deleted /app/old")
+	assert.Contains(t, buf.String(), "SM: Deleted old-secret")
 }
 
 func TestRun_PartialFailure(t *testing.T) {

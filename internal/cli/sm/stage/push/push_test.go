@@ -120,7 +120,7 @@ func TestRun_PushSet(t *testing.T) {
 	assert.Equal(t, stage.ErrNotStaged, err)
 }
 
-func TestRun_PushDelete(t *testing.T) {
+func TestRun_PushDeleteForce(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
@@ -163,6 +163,91 @@ func TestRun_PushDelete(t *testing.T) {
 	// Verify unstaged
 	_, err = store.Get(stage.ServiceSM, "old-secret")
 	assert.Equal(t, stage.ErrNotStaged, err)
+}
+
+func TestRun_PushDeleteRecoveryWindow(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	store := stage.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+
+	// Stage a delete with recovery window
+	_ = store.Stage(stage.ServiceSM, "old-secret", stage.Entry{
+		Operation: stage.OperationDelete,
+		StagedAt:  time.Now(),
+		DeleteOptions: &stage.DeleteOptions{
+			RecoveryWindow: 14,
+		},
+	})
+
+	deleteCalled := false
+	mock := &mockClient{
+		deleteSecretFunc: func(_ context.Context, params *secretsmanager.DeleteSecretInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.DeleteSecretOutput, error) {
+			deleteCalled = true
+			assert.Equal(t, "old-secret", lo.FromPtr(params.SecretId))
+			assert.Nil(t, params.ForceDeleteWithoutRecovery)
+			assert.Equal(t, int64(14), lo.FromPtr(params.RecoveryWindowInDays))
+			return &secretsmanager.DeleteSecretOutput{
+				Name: params.SecretId,
+			}, nil
+		},
+	}
+
+	var buf bytes.Buffer
+	r := &push.Runner{
+		Client: mock,
+		Store:  store,
+		Stdout: &buf,
+		Stderr: &bytes.Buffer{},
+	}
+
+	err := r.Run(context.Background(), push.Options{})
+	require.NoError(t, err)
+	assert.True(t, deleteCalled)
+	assert.Contains(t, buf.String(), "Deleted old-secret")
+
+	// Verify unstaged
+	_, err = store.Get(stage.ServiceSM, "old-secret")
+	assert.Equal(t, stage.ErrNotStaged, err)
+}
+
+func TestRun_PushDeleteNoOptions(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	store := stage.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+
+	// Stage a delete without options (default AWS behavior)
+	_ = store.Stage(stage.ServiceSM, "old-secret", stage.Entry{
+		Operation: stage.OperationDelete,
+		StagedAt:  time.Now(),
+	})
+
+	deleteCalled := false
+	mock := &mockClient{
+		deleteSecretFunc: func(_ context.Context, params *secretsmanager.DeleteSecretInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.DeleteSecretOutput, error) {
+			deleteCalled = true
+			assert.Equal(t, "old-secret", lo.FromPtr(params.SecretId))
+			assert.Nil(t, params.ForceDeleteWithoutRecovery)
+			assert.Nil(t, params.RecoveryWindowInDays)
+			return &secretsmanager.DeleteSecretOutput{
+				Name: params.SecretId,
+			}, nil
+		},
+	}
+
+	var buf bytes.Buffer
+	r := &push.Runner{
+		Client: mock,
+		Store:  store,
+		Stdout: &buf,
+		Stderr: &bytes.Buffer{},
+	}
+
+	err := r.Run(context.Background(), push.Options{})
+	require.NoError(t, err)
+	assert.True(t, deleteCalled)
+	assert.Contains(t, buf.String(), "Deleted old-secret")
 }
 
 func TestRun_PushSpecificSecret(t *testing.T) {

@@ -1,0 +1,415 @@
+package diff_test
+
+import (
+	"bytes"
+	"context"
+	"fmt"
+	"path/filepath"
+	"testing"
+	"time"
+
+	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
+	"github.com/aws/aws-sdk-go-v2/service/ssm"
+	"github.com/aws/aws-sdk-go-v2/service/ssm/types"
+	"github.com/samber/lo"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	appcli "github.com/mpyw/suve/internal/cli"
+	stagediff "github.com/mpyw/suve/internal/cli/diff"
+	"github.com/mpyw/suve/internal/stage"
+)
+
+type mockSSMClient struct {
+	getParameterFunc        func(ctx context.Context, params *ssm.GetParameterInput, optFns ...func(*ssm.Options)) (*ssm.GetParameterOutput, error)
+	getParameterHistoryFunc func(ctx context.Context, params *ssm.GetParameterHistoryInput, optFns ...func(*ssm.Options)) (*ssm.GetParameterHistoryOutput, error)
+}
+
+func (m *mockSSMClient) GetParameter(ctx context.Context, params *ssm.GetParameterInput, optFns ...func(*ssm.Options)) (*ssm.GetParameterOutput, error) {
+	if m.getParameterFunc != nil {
+		return m.getParameterFunc(ctx, params, optFns...)
+	}
+	return nil, fmt.Errorf("GetParameter not mocked")
+}
+
+func (m *mockSSMClient) GetParameterHistory(ctx context.Context, params *ssm.GetParameterHistoryInput, optFns ...func(*ssm.Options)) (*ssm.GetParameterHistoryOutput, error) {
+	if m.getParameterHistoryFunc != nil {
+		return m.getParameterHistoryFunc(ctx, params, optFns...)
+	}
+	return nil, fmt.Errorf("GetParameterHistory not mocked")
+}
+
+type mockSMClient struct {
+	getSecretValueFunc       func(ctx context.Context, params *secretsmanager.GetSecretValueInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.GetSecretValueOutput, error)
+	listSecretVersionIdsFunc func(ctx context.Context, params *secretsmanager.ListSecretVersionIdsInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.ListSecretVersionIdsOutput, error)
+}
+
+func (m *mockSMClient) GetSecretValue(ctx context.Context, params *secretsmanager.GetSecretValueInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.GetSecretValueOutput, error) {
+	if m.getSecretValueFunc != nil {
+		return m.getSecretValueFunc(ctx, params, optFns...)
+	}
+	return nil, fmt.Errorf("GetSecretValue not mocked")
+}
+
+func (m *mockSMClient) ListSecretVersionIds(ctx context.Context, params *secretsmanager.ListSecretVersionIdsInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.ListSecretVersionIdsOutput, error) {
+	if m.listSecretVersionIdsFunc != nil {
+		return m.listSecretVersionIdsFunc(ctx, params, optFns...)
+	}
+	return nil, fmt.Errorf("ListSecretVersionIds not mocked")
+}
+
+func TestCommand_Validation(t *testing.T) {
+	t.Parallel()
+
+	t.Run("help", func(t *testing.T) {
+		t.Parallel()
+		app := appcli.MakeApp()
+		var buf bytes.Buffer
+		app.Writer = &buf
+		err := app.Run(context.Background(), []string{"suve", "stage", "diff", "--help"})
+		require.NoError(t, err)
+		assert.Contains(t, buf.String(), "Show diff of all staged changes")
+	})
+
+	t.Run("no arguments allowed", func(t *testing.T) {
+		t.Parallel()
+		app := appcli.MakeApp()
+		err := app.Run(context.Background(), []string{"suve", "stage", "diff", "extra-arg"})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "usage:")
+	})
+}
+
+func TestRun_NothingStaged(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	store := stage.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+
+	var stdout, stderr bytes.Buffer
+	r := &stagediff.Runner{
+		Store:  store,
+		Stdout: &stdout,
+		Stderr: &stderr,
+	}
+
+	err := r.Run(context.Background(), stagediff.Options{})
+	require.NoError(t, err)
+	assert.Contains(t, stderr.String(), "nothing staged")
+}
+
+func TestRun_SSMOnly(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	store := stage.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+
+	err := store.Stage(stage.ServiceSSM, "/app/config", stage.Entry{
+		Operation: stage.OperationSet,
+		Value:     "new-value",
+		StagedAt:  time.Now(),
+	})
+	require.NoError(t, err)
+
+	ssmMock := &mockSSMClient{
+		getParameterFunc: func(_ context.Context, _ *ssm.GetParameterInput, _ ...func(*ssm.Options)) (*ssm.GetParameterOutput, error) {
+			return &ssm.GetParameterOutput{
+				Parameter: &types.Parameter{
+					Name:    lo.ToPtr("/app/config"),
+					Value:   lo.ToPtr("old-value"),
+					Version: 1,
+				},
+			}, nil
+		},
+	}
+
+	var stdout, stderr bytes.Buffer
+	r := &stagediff.Runner{
+		SSMClient: ssmMock,
+		Store:     store,
+		Stdout:    &stdout,
+		Stderr:    &stderr,
+	}
+
+	err = r.Run(context.Background(), stagediff.Options{})
+	require.NoError(t, err)
+
+	output := stdout.String()
+	assert.Contains(t, output, "-old-value")
+	assert.Contains(t, output, "+new-value")
+	assert.Contains(t, output, "(AWS)")
+	assert.Contains(t, output, "(staged)")
+}
+
+func TestRun_SMOnly(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	store := stage.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+
+	err := store.Stage(stage.ServiceSM, "my-secret", stage.Entry{
+		Operation: stage.OperationSet,
+		Value:     "new-secret",
+		StagedAt:  time.Now(),
+	})
+	require.NoError(t, err)
+
+	smMock := &mockSMClient{
+		getSecretValueFunc: func(_ context.Context, _ *secretsmanager.GetSecretValueInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.GetSecretValueOutput, error) {
+			return &secretsmanager.GetSecretValueOutput{
+				Name:         lo.ToPtr("my-secret"),
+				SecretString: lo.ToPtr("old-secret"),
+				VersionId:    lo.ToPtr("abc123def456"),
+			}, nil
+		},
+	}
+
+	var stdout, stderr bytes.Buffer
+	r := &stagediff.Runner{
+		SMClient: smMock,
+		Store:    store,
+		Stdout:   &stdout,
+		Stderr:   &stderr,
+	}
+
+	err = r.Run(context.Background(), stagediff.Options{})
+	require.NoError(t, err)
+
+	output := stdout.String()
+	assert.Contains(t, output, "-old-secret")
+	assert.Contains(t, output, "+new-secret")
+}
+
+func TestRun_BothServices(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	store := stage.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+
+	err := store.Stage(stage.ServiceSSM, "/app/config", stage.Entry{
+		Operation: stage.OperationSet,
+		Value:     "ssm-new",
+		StagedAt:  time.Now(),
+	})
+	require.NoError(t, err)
+
+	err = store.Stage(stage.ServiceSM, "my-secret", stage.Entry{
+		Operation: stage.OperationSet,
+		Value:     "sm-new",
+		StagedAt:  time.Now(),
+	})
+	require.NoError(t, err)
+
+	ssmMock := &mockSSMClient{
+		getParameterFunc: func(_ context.Context, _ *ssm.GetParameterInput, _ ...func(*ssm.Options)) (*ssm.GetParameterOutput, error) {
+			return &ssm.GetParameterOutput{
+				Parameter: &types.Parameter{
+					Name:    lo.ToPtr("/app/config"),
+					Value:   lo.ToPtr("ssm-old"),
+					Version: 1,
+				},
+			}, nil
+		},
+	}
+
+	smMock := &mockSMClient{
+		getSecretValueFunc: func(_ context.Context, _ *secretsmanager.GetSecretValueInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.GetSecretValueOutput, error) {
+			return &secretsmanager.GetSecretValueOutput{
+				Name:         lo.ToPtr("my-secret"),
+				SecretString: lo.ToPtr("sm-old"),
+				VersionId:    lo.ToPtr("abc123def456"),
+			}, nil
+		},
+	}
+
+	var stdout, stderr bytes.Buffer
+	r := &stagediff.Runner{
+		SSMClient: ssmMock,
+		SMClient:  smMock,
+		Store:     store,
+		Stdout:    &stdout,
+		Stderr:    &stderr,
+	}
+
+	err = r.Run(context.Background(), stagediff.Options{})
+	require.NoError(t, err)
+
+	output := stdout.String()
+	assert.Contains(t, output, "/app/config")
+	assert.Contains(t, output, "my-secret")
+	assert.Contains(t, output, "-ssm-old")
+	assert.Contains(t, output, "+ssm-new")
+	assert.Contains(t, output, "-sm-old")
+	assert.Contains(t, output, "+sm-new")
+}
+
+func TestRun_DeleteOperations(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	store := stage.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+
+	err := store.Stage(stage.ServiceSSM, "/app/config", stage.Entry{
+		Operation: stage.OperationDelete,
+		StagedAt:  time.Now(),
+	})
+	require.NoError(t, err)
+
+	err = store.Stage(stage.ServiceSM, "my-secret", stage.Entry{
+		Operation: stage.OperationDelete,
+		StagedAt:  time.Now(),
+	})
+	require.NoError(t, err)
+
+	ssmMock := &mockSSMClient{
+		getParameterFunc: func(_ context.Context, _ *ssm.GetParameterInput, _ ...func(*ssm.Options)) (*ssm.GetParameterOutput, error) {
+			return &ssm.GetParameterOutput{
+				Parameter: &types.Parameter{
+					Name:    lo.ToPtr("/app/config"),
+					Value:   lo.ToPtr("existing-value"),
+					Version: 1,
+				},
+			}, nil
+		},
+	}
+
+	smMock := &mockSMClient{
+		getSecretValueFunc: func(_ context.Context, _ *secretsmanager.GetSecretValueInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.GetSecretValueOutput, error) {
+			return &secretsmanager.GetSecretValueOutput{
+				Name:         lo.ToPtr("my-secret"),
+				SecretString: lo.ToPtr("existing-secret"),
+				VersionId:    lo.ToPtr("abc123def456"),
+			}, nil
+		},
+	}
+
+	var stdout, stderr bytes.Buffer
+	r := &stagediff.Runner{
+		SSMClient: ssmMock,
+		SMClient:  smMock,
+		Store:     store,
+		Stdout:    &stdout,
+		Stderr:    &stderr,
+	}
+
+	err = r.Run(context.Background(), stagediff.Options{})
+	require.NoError(t, err)
+
+	output := stdout.String()
+	assert.Contains(t, output, "(staged for deletion)")
+	assert.Contains(t, output, "-existing-value")
+	assert.Contains(t, output, "-existing-secret")
+}
+
+func TestRun_IdenticalValues(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	store := stage.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+
+	err := store.Stage(stage.ServiceSSM, "/app/config", stage.Entry{
+		Operation: stage.OperationSet,
+		Value:     "same-value",
+		StagedAt:  time.Now(),
+	})
+	require.NoError(t, err)
+
+	ssmMock := &mockSSMClient{
+		getParameterFunc: func(_ context.Context, _ *ssm.GetParameterInput, _ ...func(*ssm.Options)) (*ssm.GetParameterOutput, error) {
+			return &ssm.GetParameterOutput{
+				Parameter: &types.Parameter{
+					Name:    lo.ToPtr("/app/config"),
+					Value:   lo.ToPtr("same-value"),
+					Version: 1,
+				},
+			}, nil
+		},
+	}
+
+	var stdout, stderr bytes.Buffer
+	r := &stagediff.Runner{
+		SSMClient: ssmMock,
+		Store:     store,
+		Stdout:    &stdout,
+		Stderr:    &stderr,
+	}
+
+	err = r.Run(context.Background(), stagediff.Options{})
+	require.NoError(t, err)
+
+	assert.Empty(t, stdout.String())
+	assert.Contains(t, stderr.String(), "staged value is identical to AWS current")
+}
+
+func TestRun_JSONFormat(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	store := stage.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+
+	err := store.Stage(stage.ServiceSSM, "/app/config", stage.Entry{
+		Operation: stage.OperationSet,
+		Value:     `{"key":"new"}`,
+		StagedAt:  time.Now(),
+	})
+	require.NoError(t, err)
+
+	ssmMock := &mockSSMClient{
+		getParameterFunc: func(_ context.Context, _ *ssm.GetParameterInput, _ ...func(*ssm.Options)) (*ssm.GetParameterOutput, error) {
+			return &ssm.GetParameterOutput{
+				Parameter: &types.Parameter{
+					Name:    lo.ToPtr("/app/config"),
+					Value:   lo.ToPtr(`{"key":"old"}`),
+					Version: 1,
+				},
+			}, nil
+		},
+	}
+
+	var stdout, stderr bytes.Buffer
+	r := &stagediff.Runner{
+		SSMClient: ssmMock,
+		Store:     store,
+		Stdout:    &stdout,
+		Stderr:    &stderr,
+	}
+
+	err = r.Run(context.Background(), stagediff.Options{JSONFormat: true})
+	require.NoError(t, err)
+
+	output := stdout.String()
+	assert.Contains(t, output, "-")
+	assert.Contains(t, output, "+")
+}
+
+func TestRun_AWSError(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	store := stage.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+
+	err := store.Stage(stage.ServiceSSM, "/app/config", stage.Entry{
+		Operation: stage.OperationSet,
+		Value:     "new-value",
+		StagedAt:  time.Now(),
+	})
+	require.NoError(t, err)
+
+	ssmMock := &mockSSMClient{
+		getParameterFunc: func(_ context.Context, _ *ssm.GetParameterInput, _ ...func(*ssm.Options)) (*ssm.GetParameterOutput, error) {
+			return nil, fmt.Errorf("AWS error: parameter not found")
+		},
+	}
+
+	var stdout, stderr bytes.Buffer
+	r := &stagediff.Runner{
+		SSMClient: ssmMock,
+		Store:     store,
+		Stdout:    &stdout,
+		Stderr:    &stderr,
+	}
+
+	err = r.Run(context.Background(), stagediff.Options{})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "AWS error")
+}

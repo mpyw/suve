@@ -136,6 +136,12 @@ func (r *Runner) printEntry(name string, entry stage.Entry, verbose bool) {
 				value = value[:100] + "..."
 			}
 			_, _ = fmt.Fprintf(r.Stdout, "  %s %s\n", cyan("Value:"), value)
+		} else if entry.Operation == stage.OperationDelete && entry.DeleteOptions != nil {
+			if entry.DeleteOptions.Force {
+				_, _ = fmt.Fprintf(r.Stdout, "  %s force (immediate, no recovery)\n", cyan("Delete:"))
+			} else if entry.DeleteOptions.RecoveryWindow > 0 {
+				_, _ = fmt.Fprintf(r.Stdout, "  %s %d days recovery window\n", cyan("Delete:"), entry.DeleteOptions.RecoveryWindow)
+			}
 		}
 	} else {
 		_, _ = fmt.Fprintf(r.Stdout, "  %s %s\n", opColor, name)

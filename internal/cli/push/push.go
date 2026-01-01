@@ -179,13 +179,13 @@ func (r *Runner) pushSSM(ctx context.Context, staged map[string]stage.Entry) (su
 		}
 
 		if pushErr != nil {
-			_, _ = fmt.Fprintf(r.Stderr, "%s ssm %s: %v\n", red("Failed"), name, pushErr)
+			_, _ = fmt.Fprintf(r.Stderr, "%s SSM: %s: %v\n", red("Failed"), name, pushErr)
 			failed++
 		} else {
 			if entry.Operation == stage.OperationSet {
-				_, _ = fmt.Fprintf(r.Stdout, "%s ssm set %s\n", green("✓"), name)
+				_, _ = fmt.Fprintf(r.Stdout, "%s SSM: Set %s\n", green("✓"), name)
 			} else {
-				_, _ = fmt.Fprintf(r.Stdout, "%s ssm delete %s\n", green("✓"), name)
+				_, _ = fmt.Fprintf(r.Stdout, "%s SSM: Deleted %s\n", green("✓"), name)
 			}
 			// Clear staging for this item
 			if err := r.Store.Unstage(stage.ServiceSSM, name); err != nil {
@@ -255,13 +255,13 @@ func (r *Runner) pushSM(ctx context.Context, staged map[string]stage.Entry) (suc
 		}
 
 		if pushErr != nil {
-			_, _ = fmt.Fprintf(r.Stderr, "%s sm %s: %v\n", red("Failed"), name, pushErr)
+			_, _ = fmt.Fprintf(r.Stderr, "%s SM: %s: %v\n", red("Failed"), name, pushErr)
 			failed++
 		} else {
 			if entry.Operation == stage.OperationSet {
-				_, _ = fmt.Fprintf(r.Stdout, "%s sm set %s\n", green("✓"), name)
+				_, _ = fmt.Fprintf(r.Stdout, "%s SM: Set %s\n", green("✓"), name)
 			} else {
-				_, _ = fmt.Fprintf(r.Stdout, "%s sm delete %s\n", green("✓"), name)
+				_, _ = fmt.Fprintf(r.Stdout, "%s SM: Deleted %s\n", green("✓"), name)
 			}
 			// Clear staging for this item
 			if err := r.Store.Unstage(stage.ServiceSM, name); err != nil {

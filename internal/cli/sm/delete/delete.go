@@ -59,8 +59,9 @@ EXAMPLES:
    suve sm delete --force my-secret              Permanently delete immediately`,
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
-				Name:  "force",
-				Usage: "Force deletion without recovery window",
+				Name:    "force",
+				Aliases: []string{"f"},
+				Usage:   "Force deletion without recovery window",
 			},
 			&cli.IntFlag{
 				Name:  "recovery-window",

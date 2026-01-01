@@ -86,14 +86,44 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		return fmt.Errorf("failed to initialize stage store: %w", err)
 	}
 
-	ssmClient, err := awsutil.NewSSMClient(ctx)
+	// Check if there are any staged changes before creating clients
+	ssmStaged, err := store.List(stage.ServiceSSM)
 	if err != nil {
-		return fmt.Errorf("failed to initialize SSM client: %w", err)
+		return err
+	}
+	smStaged, err := store.List(stage.ServiceSM)
+	if err != nil {
+		return err
 	}
 
-	smClient, err := awsutil.NewSMClient(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to initialize SM client: %w", err)
+	hasSSM := len(ssmStaged[stage.ServiceSSM]) > 0
+	hasSM := len(smStaged[stage.ServiceSM]) > 0
+
+	if !hasSSM && !hasSM {
+		output.Warning(cmd.Root().ErrWriter, "nothing staged")
+		return nil
+	}
+
+	r := &Runner{
+		Store:  store,
+		Stderr: cmd.Root().ErrWriter,
+	}
+
+	// Initialize clients only if needed
+	if hasSSM {
+		ssmClient, err := awsutil.NewSSMClient(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to initialize SSM client: %w", err)
+		}
+		r.SSMClient = ssmClient
+	}
+
+	if hasSM {
+		smClient, err := awsutil.NewSMClient(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to initialize SM client: %w", err)
+		}
+		r.SMClient = smClient
 	}
 
 	opts := Options{
@@ -102,13 +132,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	}
 
 	return pager.WithPagerWriter(cmd.Root().Writer, opts.NoPager, func(w io.Writer) error {
-		r := &Runner{
-			SSMClient: ssmClient,
-			SMClient:  smClient,
-			Store:     store,
-			Stdout:    w,
-			Stderr:    cmd.Root().ErrWriter,
-		}
+		r.Stdout = w
 		return r.Run(ctx, opts)
 	})
 }
