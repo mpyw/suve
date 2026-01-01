@@ -6,20 +6,19 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"sort"
-	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/aws/aws-sdk-go-v2/service/ssm/types"
-	"github.com/fatih/color"
 	"github.com/samber/lo"
 	"github.com/urfave/cli/v3"
-	"golang.org/x/sync/errgroup"
 
 	"github.com/mpyw/suve/internal/api/smapi"
 	"github.com/mpyw/suve/internal/api/ssmapi"
 	"github.com/mpyw/suve/internal/awsutil"
+	"github.com/mpyw/suve/internal/maputil"
+	"github.com/mpyw/suve/internal/output"
+	"github.com/mpyw/suve/internal/parallel"
 	"github.com/mpyw/suve/internal/stage"
 )
 
@@ -83,8 +82,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	hasSM := len(smStaged[stage.ServiceSM]) > 0
 
 	if !hasSSM && !hasSM {
-		yellow := color.New(color.FgYellow).SprintFunc()
-		_, _ = fmt.Fprintln(cmd.Root().Writer, yellow("No changes staged."))
+		output.Info(cmd.Root().Writer, "No changes staged.")
 		return nil
 	}
 
@@ -151,67 +149,33 @@ func (r *Runner) Run(ctx context.Context) error {
 	return nil
 }
 
-// pushResult holds the result of a push operation.
-type pushResult struct {
-	name      string
-	operation stage.Operation
-	err       error
-}
-
 func (r *Runner) pushSSM(ctx context.Context, staged map[string]stage.Entry) (succeeded, failed int) {
-	// Sort names for consistent output
-	var names []string
-	for name := range staged {
-		names = append(names, name)
-	}
-	sort.Strings(names)
+	results := parallel.ExecuteMap(ctx, staged, func(ctx context.Context, name string, entry stage.Entry) (stage.Operation, error) {
+		var err error
+		switch entry.Operation {
+		case stage.OperationSet:
+			err = r.pushSSMSet(ctx, name, entry.Value)
+		case stage.OperationDelete:
+			err = r.pushSSMDelete(ctx, name)
+		default:
+			err = fmt.Errorf("unknown operation: %s", entry.Operation)
+		}
+		return entry.Operation, err
+	})
 
-	// Run push operations in parallel
-	results := make(map[string]*pushResult)
-	var mu sync.Mutex
-	g, gctx := errgroup.WithContext(ctx)
-	g.SetLimit(10) // Limit concurrent AWS API calls
-
-	for _, name := range names {
-		entry := staged[name]
-		g.Go(func() error {
-			var pushErr error
-			switch entry.Operation {
-			case stage.OperationSet:
-				pushErr = r.pushSSMSet(gctx, name, entry.Value)
-			case stage.OperationDelete:
-				pushErr = r.pushSSMDelete(gctx, name)
-			default:
-				pushErr = fmt.Errorf("unknown operation: %s", entry.Operation)
-			}
-
-			mu.Lock()
-			results[name] = &pushResult{name: name, operation: entry.Operation, err: pushErr}
-			mu.Unlock()
-			return nil // Don't fail the group on individual errors
-		})
-	}
-
-	_ = g.Wait() // Errors are tracked per-item
-
-	// Output results in sorted order
-	green := color.New(color.FgGreen).SprintFunc()
-	red := color.New(color.FgRed).SprintFunc()
-
-	for _, name := range names {
+	for _, name := range maputil.SortedKeys(staged) {
 		result := results[name]
-		if result.err != nil {
-			_, _ = fmt.Fprintf(r.Stderr, "%s SSM: %s: %v\n", red("Failed"), name, result.err)
+		if result.Err != nil {
+			output.Failed(r.Stderr, "SSM: "+name, result.Err)
 			failed++
 		} else {
-			if result.operation == stage.OperationSet {
-				_, _ = fmt.Fprintf(r.Stdout, "%s SSM: Set %s\n", green("✓"), name)
+			if result.Value == stage.OperationSet {
+				output.Success(r.Stdout, "SSM: Set %s", name)
 			} else {
-				_, _ = fmt.Fprintf(r.Stdout, "%s SSM: Deleted %s\n", green("✓"), name)
+				output.Success(r.Stdout, "SSM: Deleted %s", name)
 			}
-			// Clear staging for this item
 			if err := r.Store.Unstage(stage.ServiceSSM, name); err != nil {
-				_, _ = fmt.Fprintf(r.Stderr, "Warning: failed to clear staging for %s: %v\n", name, err)
+				output.Warning(r.Stderr, "failed to clear staging for %s: %v", name, err)
 			}
 			succeeded++
 		}
@@ -259,59 +223,32 @@ func (r *Runner) pushSSMDelete(ctx context.Context, name string) error {
 }
 
 func (r *Runner) pushSM(ctx context.Context, staged map[string]stage.Entry) (succeeded, failed int) {
-	// Sort names for consistent output
-	var names []string
-	for name := range staged {
-		names = append(names, name)
-	}
-	sort.Strings(names)
+	results := parallel.ExecuteMap(ctx, staged, func(ctx context.Context, name string, entry stage.Entry) (stage.Operation, error) {
+		var err error
+		switch entry.Operation {
+		case stage.OperationSet:
+			err = r.pushSMSet(ctx, name, entry.Value)
+		case stage.OperationDelete:
+			err = r.pushSMDelete(ctx, name, entry)
+		default:
+			err = fmt.Errorf("unknown operation: %s", entry.Operation)
+		}
+		return entry.Operation, err
+	})
 
-	// Run push operations in parallel
-	results := make(map[string]*pushResult)
-	var mu sync.Mutex
-	g, gctx := errgroup.WithContext(ctx)
-	g.SetLimit(10) // Limit concurrent AWS API calls
-
-	for _, name := range names {
-		entry := staged[name]
-		g.Go(func() error {
-			var pushErr error
-			switch entry.Operation {
-			case stage.OperationSet:
-				pushErr = r.pushSMSet(gctx, name, entry.Value)
-			case stage.OperationDelete:
-				pushErr = r.pushSMDelete(gctx, name, entry)
-			default:
-				pushErr = fmt.Errorf("unknown operation: %s", entry.Operation)
-			}
-
-			mu.Lock()
-			results[name] = &pushResult{name: name, operation: entry.Operation, err: pushErr}
-			mu.Unlock()
-			return nil // Don't fail the group on individual errors
-		})
-	}
-
-	_ = g.Wait() // Errors are tracked per-item
-
-	// Output results in sorted order
-	green := color.New(color.FgGreen).SprintFunc()
-	red := color.New(color.FgRed).SprintFunc()
-
-	for _, name := range names {
+	for _, name := range maputil.SortedKeys(staged) {
 		result := results[name]
-		if result.err != nil {
-			_, _ = fmt.Fprintf(r.Stderr, "%s SM: %s: %v\n", red("Failed"), name, result.err)
+		if result.Err != nil {
+			output.Failed(r.Stderr, "SM: "+name, result.Err)
 			failed++
 		} else {
-			if result.operation == stage.OperationSet {
-				_, _ = fmt.Fprintf(r.Stdout, "%s SM: Set %s\n", green("✓"), name)
+			if result.Value == stage.OperationSet {
+				output.Success(r.Stdout, "SM: Set %s", name)
 			} else {
-				_, _ = fmt.Fprintf(r.Stdout, "%s SM: Deleted %s\n", green("✓"), name)
+				output.Success(r.Stdout, "SM: Deleted %s", name)
 			}
-			// Clear staging for this item
 			if err := r.Store.Unstage(stage.ServiceSM, name); err != nil {
-				_, _ = fmt.Fprintf(r.Stderr, "Warning: failed to clear staging for %s: %v\n", name, err)
+				output.Warning(r.Stderr, "failed to clear staging for %s: %v", name, err)
 			}
 			succeeded++
 		}

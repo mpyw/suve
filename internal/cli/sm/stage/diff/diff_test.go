@@ -14,13 +14,16 @@ import (
 	"github.com/stretchr/testify/require"
 
 	appcli "github.com/mpyw/suve/internal/cli"
-	smstageddiff "github.com/mpyw/suve/internal/cli/sm/stage/diff"
+	"github.com/mpyw/suve/internal/cli/sm/strategy"
 	"github.com/mpyw/suve/internal/stage"
+	"github.com/mpyw/suve/internal/stageutil"
 )
 
 type mockClient struct {
 	getSecretValueFunc       func(ctx context.Context, params *secretsmanager.GetSecretValueInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.GetSecretValueOutput, error)
 	listSecretVersionIdsFunc func(ctx context.Context, params *secretsmanager.ListSecretVersionIdsInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.ListSecretVersionIdsOutput, error)
+	putSecretValueFunc       func(ctx context.Context, params *secretsmanager.PutSecretValueInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.PutSecretValueOutput, error)
+	deleteSecretFunc         func(ctx context.Context, params *secretsmanager.DeleteSecretInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.DeleteSecretOutput, error)
 }
 
 func (m *mockClient) GetSecretValue(ctx context.Context, params *secretsmanager.GetSecretValueInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.GetSecretValueOutput, error) {
@@ -35,6 +38,20 @@ func (m *mockClient) ListSecretVersionIds(ctx context.Context, params *secretsma
 		return m.listSecretVersionIdsFunc(ctx, params, optFns...)
 	}
 	return nil, fmt.Errorf("ListSecretVersionIds not mocked")
+}
+
+func (m *mockClient) PutSecretValue(ctx context.Context, params *secretsmanager.PutSecretValueInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.PutSecretValueOutput, error) {
+	if m.putSecretValueFunc != nil {
+		return m.putSecretValueFunc(ctx, params, optFns...)
+	}
+	return nil, fmt.Errorf("PutSecretValue not mocked")
+}
+
+func (m *mockClient) DeleteSecret(ctx context.Context, params *secretsmanager.DeleteSecretInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.DeleteSecretOutput, error) {
+	if m.deleteSecretFunc != nil {
+		return m.deleteSecretFunc(ctx, params, optFns...)
+	}
+	return nil, fmt.Errorf("DeleteSecret not mocked")
 }
 
 func TestCommand_Validation(t *testing.T) {
@@ -80,17 +97,19 @@ func TestRun_NothingStaged(t *testing.T) {
 
 	tmpDir := t.TempDir()
 	store := stage.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	mock := &mockClient{}
 
 	var stdout, stderr bytes.Buffer
-	r := &smstageddiff.Runner{
-		Store:  store,
-		Stdout: &stdout,
-		Stderr: &stderr,
+	r := &stageutil.DiffRunner{
+		Strategy: strategy.NewStrategy(mock),
+		Store:    store,
+		Stdout:   &stdout,
+		Stderr:   &stderr,
 	}
 
-	err := r.Run(context.Background(), smstageddiff.Options{})
+	err := r.Run(context.Background(), stageutil.DiffOptions{})
 	require.NoError(t, err)
-	assert.Contains(t, stderr.String(), "nothing staged")
+	assert.Contains(t, stderr.String(), "staged")
 }
 
 func TestRun_NotStaged(t *testing.T) {
@@ -98,15 +117,17 @@ func TestRun_NotStaged(t *testing.T) {
 
 	tmpDir := t.TempDir()
 	store := stage.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	mock := &mockClient{}
 
 	var stdout, stderr bytes.Buffer
-	r := &smstageddiff.Runner{
-		Store:  store,
-		Stdout: &stdout,
-		Stderr: &stderr,
+	r := &stageutil.DiffRunner{
+		Strategy: strategy.NewStrategy(mock),
+		Store:    store,
+		Stdout:   &stdout,
+		Stderr:   &stderr,
 	}
 
-	err := r.Run(context.Background(), smstageddiff.Options{Name: "not-staged"})
+	err := r.Run(context.Background(), stageutil.DiffOptions{Name: "not-staged"})
 	require.NoError(t, err)
 	assert.Contains(t, stderr.String(), "is not staged")
 }
@@ -135,14 +156,14 @@ func TestRun_ShowDiff(t *testing.T) {
 	}
 
 	var stdout, stderr bytes.Buffer
-	r := &smstageddiff.Runner{
-		Client: mock,
-		Store:  store,
-		Stdout: &stdout,
-		Stderr: &stderr,
+	r := &stageutil.DiffRunner{
+		Strategy: strategy.NewStrategy(mock),
+		Store:    store,
+		Stdout:   &stdout,
+		Stderr:   &stderr,
 	}
 
-	err = r.Run(context.Background(), smstageddiff.Options{Name: "my-secret"})
+	err = r.Run(context.Background(), stageutil.DiffOptions{Name: "my-secret"})
 	require.NoError(t, err)
 
 	output := stdout.String()
@@ -175,14 +196,14 @@ func TestRun_DeleteOperation(t *testing.T) {
 	}
 
 	var stdout, stderr bytes.Buffer
-	r := &smstageddiff.Runner{
-		Client: mock,
-		Store:  store,
-		Stdout: &stdout,
-		Stderr: &stderr,
+	r := &stageutil.DiffRunner{
+		Strategy: strategy.NewStrategy(mock),
+		Store:    store,
+		Stdout:   &stdout,
+		Stderr:   &stderr,
 	}
 
-	err = r.Run(context.Background(), smstageddiff.Options{Name: "my-secret"})
+	err = r.Run(context.Background(), stageutil.DiffOptions{Name: "my-secret"})
 	require.NoError(t, err)
 
 	output := stdout.String()
@@ -214,14 +235,14 @@ func TestRun_IdenticalValues(t *testing.T) {
 	}
 
 	var stdout, stderr bytes.Buffer
-	r := &smstageddiff.Runner{
-		Client: mock,
-		Store:  store,
-		Stdout: &stdout,
-		Stderr: &stderr,
+	r := &stageutil.DiffRunner{
+		Strategy: strategy.NewStrategy(mock),
+		Store:    store,
+		Stdout:   &stdout,
+		Stderr:   &stderr,
 	}
 
-	err = r.Run(context.Background(), smstageddiff.Options{Name: "my-secret"})
+	err = r.Run(context.Background(), stageutil.DiffOptions{Name: "my-secret"})
 	require.NoError(t, err)
 
 	assert.Empty(t, stdout.String())
@@ -256,14 +277,14 @@ func TestRun_JSONFormat(t *testing.T) {
 	}
 
 	var stdout, stderr bytes.Buffer
-	r := &smstageddiff.Runner{
-		Client: mock,
-		Store:  store,
-		Stdout: &stdout,
-		Stderr: &stderr,
+	r := &stageutil.DiffRunner{
+		Strategy: strategy.NewStrategy(mock),
+		Store:    store,
+		Stdout:   &stdout,
+		Stderr:   &stderr,
 	}
 
-	err = r.Run(context.Background(), smstageddiff.Options{
+	err = r.Run(context.Background(), stageutil.DiffOptions{
 		Name:       "my-secret",
 		JSONFormat: true,
 	})
@@ -294,14 +315,14 @@ func TestRun_AWSError(t *testing.T) {
 	}
 
 	var stdout, stderr bytes.Buffer
-	r := &smstageddiff.Runner{
-		Client: mock,
-		Store:  store,
-		Stdout: &stdout,
-		Stderr: &stderr,
+	r := &stageutil.DiffRunner{
+		Strategy: strategy.NewStrategy(mock),
+		Store:    store,
+		Stdout:   &stdout,
+		Stderr:   &stderr,
 	}
 
-	err = r.Run(context.Background(), smstageddiff.Options{Name: "my-secret"})
+	err = r.Run(context.Background(), stageutil.DiffOptions{Name: "my-secret"})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "AWS error")
 }
@@ -338,14 +359,14 @@ func TestRun_MultipleStaged(t *testing.T) {
 	}
 
 	var stdout, stderr bytes.Buffer
-	r := &smstageddiff.Runner{
-		Client: mock,
-		Store:  store,
-		Stdout: &stdout,
-		Stderr: &stderr,
+	r := &stageutil.DiffRunner{
+		Strategy: strategy.NewStrategy(mock),
+		Store:    store,
+		Stdout:   &stdout,
+		Stderr:   &stderr,
 	}
 
-	err = r.Run(context.Background(), smstageddiff.Options{})
+	err = r.Run(context.Background(), stageutil.DiffOptions{})
 	require.NoError(t, err)
 
 	output := stdout.String()

@@ -16,14 +16,16 @@ import (
 	"github.com/stretchr/testify/require"
 
 	appcli "github.com/mpyw/suve/internal/cli"
-	"github.com/mpyw/suve/internal/cli/ssm/stage/push"
+	"github.com/mpyw/suve/internal/cli/ssm/strategy"
 	"github.com/mpyw/suve/internal/stage"
+	"github.com/mpyw/suve/internal/stageutil"
 )
 
 type mockClient struct {
-	putParameterFunc    func(ctx context.Context, params *ssm.PutParameterInput, optFns ...func(*ssm.Options)) (*ssm.PutParameterOutput, error)
-	deleteParameterFunc func(ctx context.Context, params *ssm.DeleteParameterInput, optFns ...func(*ssm.Options)) (*ssm.DeleteParameterOutput, error)
-	getParameterFunc    func(ctx context.Context, params *ssm.GetParameterInput, optFns ...func(*ssm.Options)) (*ssm.GetParameterOutput, error)
+	putParameterFunc        func(ctx context.Context, params *ssm.PutParameterInput, optFns ...func(*ssm.Options)) (*ssm.PutParameterOutput, error)
+	deleteParameterFunc     func(ctx context.Context, params *ssm.DeleteParameterInput, optFns ...func(*ssm.Options)) (*ssm.DeleteParameterOutput, error)
+	getParameterFunc        func(ctx context.Context, params *ssm.GetParameterInput, optFns ...func(*ssm.Options)) (*ssm.GetParameterOutput, error)
+	getParameterHistoryFunc func(ctx context.Context, params *ssm.GetParameterHistoryInput, optFns ...func(*ssm.Options)) (*ssm.GetParameterHistoryOutput, error)
 }
 
 func (m *mockClient) PutParameter(ctx context.Context, params *ssm.PutParameterInput, optFns ...func(*ssm.Options)) (*ssm.PutParameterOutput, error) {
@@ -48,6 +50,13 @@ func (m *mockClient) GetParameter(ctx context.Context, params *ssm.GetParameterI
 	return nil, &types.ParameterNotFound{Message: lo.ToPtr("parameter not found")}
 }
 
+func (m *mockClient) GetParameterHistory(ctx context.Context, params *ssm.GetParameterHistoryInput, optFns ...func(*ssm.Options)) (*ssm.GetParameterHistoryOutput, error) {
+	if m.getParameterHistoryFunc != nil {
+		return m.getParameterHistoryFunc(ctx, params, optFns...)
+	}
+	return &ssm.GetParameterHistoryOutput{}, nil
+}
+
 func TestCommand_Validation(t *testing.T) {
 	t.Parallel()
 
@@ -69,14 +78,14 @@ func TestRun_NoChanges(t *testing.T) {
 	store := stage.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 	var buf bytes.Buffer
-	r := &push.Runner{
-		Client: &mockClient{},
-		Store:  store,
-		Stdout: &buf,
-		Stderr: &bytes.Buffer{},
+	r := &stageutil.PushRunner{
+		Strategy: strategy.NewStrategy(&mockClient{}),
+		Store:    store,
+		Stdout:   &buf,
+		Stderr:   &bytes.Buffer{},
 	}
 
-	err := r.Run(context.Background(), push.Options{})
+	err := r.Run(context.Background(), stageutil.PushOptions{})
 	require.NoError(t, err)
 	assert.Contains(t, buf.String(), "No SSM changes staged")
 }
@@ -105,14 +114,14 @@ func TestRun_PushSet(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	r := &push.Runner{
-		Client: mock,
-		Store:  store,
-		Stdout: &buf,
-		Stderr: &bytes.Buffer{},
+	r := &stageutil.PushRunner{
+		Strategy: strategy.NewStrategy(mock),
+		Store:    store,
+		Stdout:   &buf,
+		Stderr:   &bytes.Buffer{},
 	}
 
-	err := r.Run(context.Background(), push.Options{})
+	err := r.Run(context.Background(), stageutil.PushOptions{})
 	require.NoError(t, err)
 	assert.True(t, putCalled)
 	assert.Contains(t, buf.String(), "Set /app/config")
@@ -144,14 +153,14 @@ func TestRun_PushDelete(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	r := &push.Runner{
-		Client: mock,
-		Store:  store,
-		Stdout: &buf,
-		Stderr: &bytes.Buffer{},
+	r := &stageutil.PushRunner{
+		Strategy: strategy.NewStrategy(mock),
+		Store:    store,
+		Stdout:   &buf,
+		Stderr:   &bytes.Buffer{},
 	}
 
-	err := r.Run(context.Background(), push.Options{})
+	err := r.Run(context.Background(), stageutil.PushOptions{})
 	require.NoError(t, err)
 	assert.True(t, deleteCalled)
 	assert.Contains(t, buf.String(), "Deleted /app/old-config")
@@ -188,15 +197,15 @@ func TestRun_PushSpecificParameter(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	r := &push.Runner{
-		Client: mock,
-		Store:  store,
-		Stdout: &buf,
-		Stderr: &bytes.Buffer{},
+	r := &stageutil.PushRunner{
+		Strategy: strategy.NewStrategy(mock),
+		Store:    store,
+		Stdout:   &buf,
+		Stderr:   &bytes.Buffer{},
 	}
 
 	// Push only config1
-	err := r.Run(context.Background(), push.Options{Name: "/app/config1"})
+	err := r.Run(context.Background(), stageutil.PushOptions{Name: "/app/config1"})
 	require.NoError(t, err)
 	assert.Equal(t, []string{"/app/config1"}, pushedParams)
 
@@ -220,15 +229,15 @@ func TestRun_NotStaged(t *testing.T) {
 	})
 
 	var buf bytes.Buffer
-	r := &push.Runner{
-		Client: &mockClient{},
-		Store:  store,
-		Stdout: &buf,
-		Stderr: &bytes.Buffer{},
+	r := &stageutil.PushRunner{
+		Strategy: strategy.NewStrategy(&mockClient{}),
+		Store:    store,
+		Stdout:   &buf,
+		Stderr:   &bytes.Buffer{},
 	}
 
 	// Try to push non-existent parameter
-	err := r.Run(context.Background(), push.Options{Name: "/app/nonexistent"})
+	err := r.Run(context.Background(), stageutil.PushOptions{Name: "/app/nonexistent"})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "is not staged")
 }
@@ -253,14 +262,14 @@ func TestRun_PushError(t *testing.T) {
 	}
 
 	var buf, errBuf bytes.Buffer
-	r := &push.Runner{
-		Client: mock,
-		Store:  store,
-		Stdout: &buf,
-		Stderr: &errBuf,
+	r := &stageutil.PushRunner{
+		Strategy: strategy.NewStrategy(mock),
+		Store:    store,
+		Stdout:   &buf,
+		Stderr:   &errBuf,
 	}
 
-	err := r.Run(context.Background(), push.Options{})
+	err := r.Run(context.Background(), stageutil.PushOptions{})
 	require.Error(t, err)
 	assert.Contains(t, errBuf.String(), "Failed")
 	assert.Contains(t, errBuf.String(), "AWS error")
@@ -300,14 +309,14 @@ func TestRun_PreserveExistingType(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	r := &push.Runner{
-		Client: mock,
-		Store:  store,
-		Stdout: &buf,
-		Stderr: &bytes.Buffer{},
+	r := &stageutil.PushRunner{
+		Strategy: strategy.NewStrategy(mock),
+		Store:    store,
+		Stdout:   &buf,
+		Stderr:   &bytes.Buffer{},
 	}
 
-	err := r.Run(context.Background(), push.Options{})
+	err := r.Run(context.Background(), stageutil.PushOptions{})
 	require.NoError(t, err)
 	assert.Equal(t, types.ParameterTypeSecureString, capturedType)
 }
@@ -324,14 +333,14 @@ func TestRun_StoreError(t *testing.T) {
 	store := stage.NewStoreWithPath(path)
 
 	var buf bytes.Buffer
-	r := &push.Runner{
-		Client: &mockClient{},
-		Store:  store,
-		Stdout: &buf,
-		Stderr: &bytes.Buffer{},
+	r := &stageutil.PushRunner{
+		Strategy: strategy.NewStrategy(&mockClient{}),
+		Store:    store,
+		Stdout:   &buf,
+		Stderr:   &bytes.Buffer{},
 	}
 
-	err := r.Run(context.Background(), push.Options{})
+	err := r.Run(context.Background(), stageutil.PushOptions{})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to parse")
 }
@@ -355,14 +364,14 @@ func TestRun_PushDeleteError(t *testing.T) {
 	}
 
 	var buf, errBuf bytes.Buffer
-	r := &push.Runner{
-		Client: mock,
-		Store:  store,
-		Stdout: &buf,
-		Stderr: &errBuf,
+	r := &stageutil.PushRunner{
+		Strategy: strategy.NewStrategy(mock),
+		Store:    store,
+		Stdout:   &buf,
+		Stderr:   &errBuf,
 	}
 
-	err := r.Run(context.Background(), push.Options{})
+	err := r.Run(context.Background(), stageutil.PushOptions{})
 	require.Error(t, err)
 	assert.Contains(t, errBuf.String(), "Failed")
 	assert.Contains(t, errBuf.String(), "delete error")

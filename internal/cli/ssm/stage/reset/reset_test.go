@@ -16,13 +16,16 @@ import (
 	"github.com/stretchr/testify/require"
 
 	appcli "github.com/mpyw/suve/internal/cli"
-	"github.com/mpyw/suve/internal/cli/ssm/stage/reset"
+	"github.com/mpyw/suve/internal/cli/ssm/strategy"
 	"github.com/mpyw/suve/internal/stage"
+	"github.com/mpyw/suve/internal/stageutil"
 )
 
 type mockClient struct {
 	getParameterFunc        func(ctx context.Context, params *ssm.GetParameterInput, optFns ...func(*ssm.Options)) (*ssm.GetParameterOutput, error)
 	getParameterHistoryFunc func(ctx context.Context, params *ssm.GetParameterHistoryInput, optFns ...func(*ssm.Options)) (*ssm.GetParameterHistoryOutput, error)
+	putParameterFunc        func(ctx context.Context, params *ssm.PutParameterInput, optFns ...func(*ssm.Options)) (*ssm.PutParameterOutput, error)
+	deleteParameterFunc     func(ctx context.Context, params *ssm.DeleteParameterInput, optFns ...func(*ssm.Options)) (*ssm.DeleteParameterOutput, error)
 }
 
 func (m *mockClient) GetParameter(ctx context.Context, params *ssm.GetParameterInput, optFns ...func(*ssm.Options)) (*ssm.GetParameterOutput, error) {
@@ -37,6 +40,20 @@ func (m *mockClient) GetParameterHistory(ctx context.Context, params *ssm.GetPar
 		return m.getParameterHistoryFunc(ctx, params, optFns...)
 	}
 	return nil, fmt.Errorf("GetParameterHistory not mocked")
+}
+
+func (m *mockClient) PutParameter(ctx context.Context, params *ssm.PutParameterInput, optFns ...func(*ssm.Options)) (*ssm.PutParameterOutput, error) {
+	if m.putParameterFunc != nil {
+		return m.putParameterFunc(ctx, params, optFns...)
+	}
+	return nil, fmt.Errorf("PutParameter not mocked")
+}
+
+func (m *mockClient) DeleteParameter(ctx context.Context, params *ssm.DeleteParameterInput, optFns ...func(*ssm.Options)) (*ssm.DeleteParameterOutput, error) {
+	if m.deleteParameterFunc != nil {
+		return m.deleteParameterFunc(ctx, params, optFns...)
+	}
+	return nil, fmt.Errorf("DeleteParameter not mocked")
 }
 
 func TestCommand_Validation(t *testing.T) {
@@ -68,13 +85,14 @@ func TestRun_UnstageAll_Empty(t *testing.T) {
 	store := stage.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 	var buf bytes.Buffer
-	r := &reset.Runner{
-		Store:  store,
-		Stdout: &buf,
-		Stderr: &bytes.Buffer{},
+	r := &stageutil.ResetRunner{
+		Strategy: strategy.NewStrategy(nil),
+		Store:    store,
+		Stdout:   &buf,
+		Stderr:   &bytes.Buffer{},
 	}
 
-	err := r.Run(context.Background(), reset.Options{All: true})
+	err := r.Run(context.Background(), stageutil.ResetOptions{All: true})
 	require.NoError(t, err)
 	assert.Contains(t, buf.String(), "No SSM changes staged")
 }
@@ -98,13 +116,14 @@ func TestRun_UnstageAll(t *testing.T) {
 	})
 
 	var buf bytes.Buffer
-	r := &reset.Runner{
-		Store:  store,
-		Stdout: &buf,
-		Stderr: &bytes.Buffer{},
+	r := &stageutil.ResetRunner{
+		Strategy: strategy.NewStrategy(nil),
+		Store:    store,
+		Stdout:   &buf,
+		Stderr:   &bytes.Buffer{},
 	}
 
-	err := r.Run(context.Background(), reset.Options{All: true})
+	err := r.Run(context.Background(), stageutil.ResetOptions{All: true})
 	require.NoError(t, err)
 	assert.Contains(t, buf.String(), "Unstaged all SSM parameters (2)")
 
@@ -129,13 +148,14 @@ func TestRun_Unstage(t *testing.T) {
 	})
 
 	var buf bytes.Buffer
-	r := &reset.Runner{
-		Store:  store,
-		Stdout: &buf,
-		Stderr: &bytes.Buffer{},
+	r := &stageutil.ResetRunner{
+		Strategy: strategy.NewStrategy(nil),
+		Store:    store,
+		Stdout:   &buf,
+		Stderr:   &bytes.Buffer{},
 	}
 
-	err := r.Run(context.Background(), reset.Options{Spec: "/app/config"})
+	err := r.Run(context.Background(), stageutil.ResetOptions{Spec: "/app/config"})
 	require.NoError(t, err)
 	assert.Contains(t, buf.String(), "Unstaged /app/config")
 
@@ -151,13 +171,14 @@ func TestRun_UnstageNotStaged(t *testing.T) {
 	store := stage.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 	var buf bytes.Buffer
-	r := &reset.Runner{
-		Store:  store,
-		Stdout: &buf,
-		Stderr: &bytes.Buffer{},
+	r := &stageutil.ResetRunner{
+		Strategy: strategy.NewStrategy(nil),
+		Store:    store,
+		Stdout:   &buf,
+		Stderr:   &bytes.Buffer{},
 	}
 
-	err := r.Run(context.Background(), reset.Options{Spec: "/app/config"})
+	err := r.Run(context.Background(), stageutil.ResetOptions{Spec: "/app/config"})
 	require.NoError(t, err)
 	assert.Contains(t, buf.String(), "is not staged")
 }
@@ -183,17 +204,17 @@ func TestRun_RestoreVersion(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	r := &reset.Runner{
-		Client: mock,
-		Store:  store,
-		Stdout: &buf,
-		Stderr: &bytes.Buffer{},
+	r := &stageutil.ResetRunner{
+		Strategy: strategy.NewStrategy(mock),
+		Store:    store,
+		Stdout:   &buf,
+		Stderr:   &bytes.Buffer{},
 	}
 
-	err := r.Run(context.Background(), reset.Options{Spec: "/app/config#2"})
+	err := r.Run(context.Background(), stageutil.ResetOptions{Spec: "/app/config#2"})
 	require.NoError(t, err)
 	assert.Contains(t, buf.String(), "Restored /app/config")
-	assert.Contains(t, buf.String(), "version 2")
+	assert.Contains(t, buf.String(), "#2")
 
 	// Verify staged
 	entry, err := store.Get(stage.ServiceSSM, "/app/config")
@@ -221,15 +242,15 @@ func TestRun_RestoreShift(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	r := &reset.Runner{
-		Client: mock,
-		Store:  store,
-		Stdout: &buf,
-		Stderr: &bytes.Buffer{},
+	r := &stageutil.ResetRunner{
+		Strategy: strategy.NewStrategy(mock),
+		Store:    store,
+		Stdout:   &buf,
+		Stderr:   &bytes.Buffer{},
 	}
 
 	// ~1 means one version back from latest
-	err := r.Run(context.Background(), reset.Options{Spec: "/app/config~1"})
+	err := r.Run(context.Background(), stageutil.ResetOptions{Spec: "/app/config~1"})
 	require.NoError(t, err)
 	assert.Contains(t, buf.String(), "Restored /app/config")
 
@@ -252,14 +273,14 @@ func TestRun_RestoreAWSError(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	r := &reset.Runner{
-		Client: mock,
-		Store:  store,
-		Stdout: &buf,
-		Stderr: &bytes.Buffer{},
+	r := &stageutil.ResetRunner{
+		Strategy: strategy.NewStrategy(mock),
+		Store:    store,
+		Stdout:   &buf,
+		Stderr:   &bytes.Buffer{},
 	}
 
-	err := r.Run(context.Background(), reset.Options{Spec: "/app/config#2"})
+	err := r.Run(context.Background(), stageutil.ResetOptions{Spec: "/app/config#2"})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "AWS error")
 }
@@ -276,13 +297,14 @@ func TestRun_StoreError(t *testing.T) {
 	store := stage.NewStoreWithPath(path)
 
 	var buf bytes.Buffer
-	r := &reset.Runner{
-		Store:  store,
-		Stdout: &buf,
-		Stderr: &bytes.Buffer{},
+	r := &stageutil.ResetRunner{
+		Strategy: strategy.NewStrategy(nil),
+		Store:    store,
+		Stdout:   &buf,
+		Stderr:   &bytes.Buffer{},
 	}
 
-	err := r.Run(context.Background(), reset.Options{All: true})
+	err := r.Run(context.Background(), stageutil.ResetOptions{All: true})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to parse")
 }
@@ -294,12 +316,13 @@ func TestRun_ParseError(t *testing.T) {
 	store := stage.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 	var buf bytes.Buffer
-	r := &reset.Runner{
-		Store:  store,
-		Stdout: &buf,
-		Stderr: &bytes.Buffer{},
+	r := &stageutil.ResetRunner{
+		Strategy: strategy.NewStrategy(nil),
+		Store:    store,
+		Stdout:   &buf,
+		Stderr:   &bytes.Buffer{},
 	}
 
-	err := r.Run(context.Background(), reset.Options{Spec: ""})
+	err := r.Run(context.Background(), stageutil.ResetOptions{Spec: ""})
 	require.Error(t, err)
 }

@@ -16,13 +16,16 @@ import (
 	"github.com/stretchr/testify/require"
 
 	appcli "github.com/mpyw/suve/internal/cli"
-	"github.com/mpyw/suve/internal/cli/sm/stage/reset"
+	"github.com/mpyw/suve/internal/cli/sm/strategy"
 	"github.com/mpyw/suve/internal/stage"
+	"github.com/mpyw/suve/internal/stageutil"
 )
 
 type mockClient struct {
 	getSecretValueFunc       func(ctx context.Context, params *secretsmanager.GetSecretValueInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.GetSecretValueOutput, error)
 	listSecretVersionIdsFunc func(ctx context.Context, params *secretsmanager.ListSecretVersionIdsInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.ListSecretVersionIdsOutput, error)
+	putSecretValueFunc       func(ctx context.Context, params *secretsmanager.PutSecretValueInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.PutSecretValueOutput, error)
+	deleteSecretFunc         func(ctx context.Context, params *secretsmanager.DeleteSecretInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.DeleteSecretOutput, error)
 }
 
 func (m *mockClient) GetSecretValue(ctx context.Context, params *secretsmanager.GetSecretValueInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.GetSecretValueOutput, error) {
@@ -37,6 +40,20 @@ func (m *mockClient) ListSecretVersionIds(ctx context.Context, params *secretsma
 		return m.listSecretVersionIdsFunc(ctx, params, optFns...)
 	}
 	return nil, fmt.Errorf("ListSecretVersionIds not mocked")
+}
+
+func (m *mockClient) PutSecretValue(ctx context.Context, params *secretsmanager.PutSecretValueInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.PutSecretValueOutput, error) {
+	if m.putSecretValueFunc != nil {
+		return m.putSecretValueFunc(ctx, params, optFns...)
+	}
+	return nil, fmt.Errorf("PutSecretValue not mocked")
+}
+
+func (m *mockClient) DeleteSecret(ctx context.Context, params *secretsmanager.DeleteSecretInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.DeleteSecretOutput, error) {
+	if m.deleteSecretFunc != nil {
+		return m.deleteSecretFunc(ctx, params, optFns...)
+	}
+	return nil, fmt.Errorf("DeleteSecret not mocked")
 }
 
 func TestCommand_Validation(t *testing.T) {
@@ -68,13 +85,14 @@ func TestRun_UnstageAll_Empty(t *testing.T) {
 	store := stage.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 	var buf bytes.Buffer
-	r := &reset.Runner{
-		Store:  store,
-		Stdout: &buf,
-		Stderr: &bytes.Buffer{},
+	r := &stageutil.ResetRunner{
+		Strategy: strategy.NewStrategy(nil),
+		Store:    store,
+		Stdout:   &buf,
+		Stderr:   &bytes.Buffer{},
 	}
 
-	err := r.Run(context.Background(), reset.Options{All: true})
+	err := r.Run(context.Background(), stageutil.ResetOptions{All: true})
 	require.NoError(t, err)
 	assert.Contains(t, buf.String(), "No SM changes staged")
 }
@@ -98,13 +116,14 @@ func TestRun_UnstageAll(t *testing.T) {
 	})
 
 	var buf bytes.Buffer
-	r := &reset.Runner{
-		Store:  store,
-		Stdout: &buf,
-		Stderr: &bytes.Buffer{},
+	r := &stageutil.ResetRunner{
+		Strategy: strategy.NewStrategy(nil),
+		Store:    store,
+		Stdout:   &buf,
+		Stderr:   &bytes.Buffer{},
 	}
 
-	err := r.Run(context.Background(), reset.Options{All: true})
+	err := r.Run(context.Background(), stageutil.ResetOptions{All: true})
 	require.NoError(t, err)
 	assert.Contains(t, buf.String(), "Unstaged all SM secrets (2)")
 
@@ -129,13 +148,14 @@ func TestRun_Unstage(t *testing.T) {
 	})
 
 	var buf bytes.Buffer
-	r := &reset.Runner{
-		Store:  store,
-		Stdout: &buf,
-		Stderr: &bytes.Buffer{},
+	r := &stageutil.ResetRunner{
+		Strategy: strategy.NewStrategy(nil),
+		Store:    store,
+		Stdout:   &buf,
+		Stderr:   &bytes.Buffer{},
 	}
 
-	err := r.Run(context.Background(), reset.Options{Spec: "my-secret"})
+	err := r.Run(context.Background(), stageutil.ResetOptions{Spec: "my-secret"})
 	require.NoError(t, err)
 	assert.Contains(t, buf.String(), "Unstaged my-secret")
 
@@ -151,13 +171,14 @@ func TestRun_UnstageNotStaged(t *testing.T) {
 	store := stage.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 	var buf bytes.Buffer
-	r := &reset.Runner{
-		Store:  store,
-		Stdout: &buf,
-		Stderr: &bytes.Buffer{},
+	r := &stageutil.ResetRunner{
+		Strategy: strategy.NewStrategy(nil),
+		Store:    store,
+		Stdout:   &buf,
+		Stderr:   &bytes.Buffer{},
 	}
 
-	err := r.Run(context.Background(), reset.Options{Spec: "my-secret"})
+	err := r.Run(context.Background(), stageutil.ResetOptions{Spec: "my-secret"})
 	require.NoError(t, err)
 	assert.Contains(t, buf.String(), "is not staged")
 }
@@ -191,14 +212,14 @@ func TestRun_RestoreVersion(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	r := &reset.Runner{
-		Client: mock,
-		Store:  store,
-		Stdout: &buf,
-		Stderr: &bytes.Buffer{},
+	r := &stageutil.ResetRunner{
+		Strategy: strategy.NewStrategy(mock),
+		Store:    store,
+		Stdout:   &buf,
+		Stderr:   &bytes.Buffer{},
 	}
 
-	err := r.Run(context.Background(), reset.Options{Spec: "my-secret#abc123"})
+	err := r.Run(context.Background(), stageutil.ResetOptions{Spec: "my-secret#abc123"})
 	require.NoError(t, err)
 	assert.Contains(t, buf.String(), "Restored my-secret")
 
@@ -238,14 +259,14 @@ func TestRun_RestoreLabel(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	r := &reset.Runner{
-		Client: mock,
-		Store:  store,
-		Stdout: &buf,
-		Stderr: &bytes.Buffer{},
+	r := &stageutil.ResetRunner{
+		Strategy: strategy.NewStrategy(mock),
+		Store:    store,
+		Stdout:   &buf,
+		Stderr:   &bytes.Buffer{},
 	}
 
-	err := r.Run(context.Background(), reset.Options{Spec: "my-secret:AWSPREVIOUS"})
+	err := r.Run(context.Background(), stageutil.ResetOptions{Spec: "my-secret:AWSPREVIOUS"})
 	require.NoError(t, err)
 	assert.Contains(t, buf.String(), "Restored my-secret")
 
@@ -284,15 +305,15 @@ func TestRun_RestoreShift(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	r := &reset.Runner{
-		Client: mock,
-		Store:  store,
-		Stdout: &buf,
-		Stderr: &bytes.Buffer{},
+	r := &stageutil.ResetRunner{
+		Strategy: strategy.NewStrategy(mock),
+		Store:    store,
+		Stdout:   &buf,
+		Stderr:   &bytes.Buffer{},
 	}
 
 	// ~1 means one version back from latest
-	err := r.Run(context.Background(), reset.Options{Spec: "my-secret~1"})
+	err := r.Run(context.Background(), stageutil.ResetOptions{Spec: "my-secret~1"})
 	require.NoError(t, err)
 	assert.Contains(t, buf.String(), "Restored my-secret")
 
@@ -323,14 +344,14 @@ func TestRun_RestoreAWSError(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	r := &reset.Runner{
-		Client: mock,
-		Store:  store,
-		Stdout: &buf,
-		Stderr: &bytes.Buffer{},
+	r := &stageutil.ResetRunner{
+		Strategy: strategy.NewStrategy(mock),
+		Store:    store,
+		Stdout:   &buf,
+		Stderr:   &bytes.Buffer{},
 	}
 
-	err := r.Run(context.Background(), reset.Options{Spec: "my-secret#abc123"})
+	err := r.Run(context.Background(), stageutil.ResetOptions{Spec: "my-secret#abc123"})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "AWS error")
 }
@@ -347,13 +368,14 @@ func TestRun_StoreError(t *testing.T) {
 	store := stage.NewStoreWithPath(path)
 
 	var buf bytes.Buffer
-	r := &reset.Runner{
-		Store:  store,
-		Stdout: &buf,
-		Stderr: &bytes.Buffer{},
+	r := &stageutil.ResetRunner{
+		Strategy: strategy.NewStrategy(nil),
+		Store:    store,
+		Stdout:   &buf,
+		Stderr:   &bytes.Buffer{},
 	}
 
-	err := r.Run(context.Background(), reset.Options{All: true})
+	err := r.Run(context.Background(), stageutil.ResetOptions{All: true})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to parse")
 }
@@ -365,12 +387,13 @@ func TestRun_ParseError(t *testing.T) {
 	store := stage.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 	var buf bytes.Buffer
-	r := &reset.Runner{
-		Store:  store,
-		Stdout: &buf,
-		Stderr: &bytes.Buffer{},
+	r := &stageutil.ResetRunner{
+		Strategy: strategy.NewStrategy(nil),
+		Store:    store,
+		Stdout:   &buf,
+		Stderr:   &bytes.Buffer{},
 	}
 
-	err := r.Run(context.Background(), reset.Options{Spec: ""})
+	err := r.Run(context.Background(), stageutil.ResetOptions{Spec: ""})
 	require.Error(t, err)
 }

@@ -4,39 +4,14 @@ package push
 import (
 	"context"
 	"fmt"
-	"io"
-	"sort"
-	"sync"
 
-	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
-	"github.com/fatih/color"
-	"github.com/samber/lo"
 	"github.com/urfave/cli/v3"
-	"golang.org/x/sync/errgroup"
 
-	"github.com/mpyw/suve/internal/api/smapi"
 	"github.com/mpyw/suve/internal/awsutil"
+	"github.com/mpyw/suve/internal/cli/sm/strategy"
 	"github.com/mpyw/suve/internal/stage"
+	"github.com/mpyw/suve/internal/stageutil"
 )
-
-// Client is the interface for the push command.
-type Client interface {
-	smapi.PutSecretValueAPI
-	smapi.DeleteSecretAPI
-}
-
-// Runner executes the push command.
-type Runner struct {
-	Client Client
-	Store  *stage.Store
-	Stdout io.Writer
-	Stderr io.Writer
-}
-
-// Options holds the options for the push command.
-type Options struct {
-	Name string // Optional: push only this secret, otherwise push all
-}
 
 // Command returns the push command.
 func Command() *cli.Command {
@@ -71,145 +46,17 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		return fmt.Errorf("failed to initialize AWS client: %w", err)
 	}
 
-	r := &Runner{
-		Client: client,
-		Store:  store,
-		Stdout: cmd.Root().Writer,
-		Stderr: cmd.Root().ErrWriter,
+	r := &stageutil.PushRunner{
+		Strategy: strategy.NewStrategy(client),
+		Store:    store,
+		Stdout:   cmd.Root().Writer,
+		Stderr:   cmd.Root().ErrWriter,
 	}
 
-	opts := Options{}
+	opts := stageutil.PushOptions{}
 	if cmd.Args().Len() > 0 {
 		opts.Name = cmd.Args().First()
 	}
 
 	return r.Run(ctx, opts)
-}
-
-// Run executes the push command.
-func (r *Runner) Run(ctx context.Context, opts Options) error {
-	// Get staged changes
-	stagedMap, err := r.Store.List(stage.ServiceSM)
-	if err != nil {
-		return err
-	}
-
-	staged := stagedMap[stage.ServiceSM]
-	if len(staged) == 0 {
-		yellow := color.New(color.FgYellow).SprintFunc()
-		_, _ = fmt.Fprintln(r.Stdout, yellow("No SM changes staged."))
-		return nil
-	}
-
-	// If specific name requested, filter to just that
-	if opts.Name != "" {
-		entry, exists := staged[opts.Name]
-		if !exists {
-			return fmt.Errorf("secret %s is not staged", opts.Name)
-		}
-		staged = map[string]stage.Entry{opts.Name: entry}
-	}
-
-	// Sort names for consistent output
-	var names []string
-	for name := range staged {
-		names = append(names, name)
-	}
-	sort.Strings(names)
-
-	// Run push operations in parallel
-	type pushResult struct {
-		name      string
-		operation stage.Operation
-		err       error
-	}
-	results := make(map[string]*pushResult)
-	var mu sync.Mutex
-	g, gctx := errgroup.WithContext(ctx)
-	g.SetLimit(10) // Limit concurrent AWS API calls
-
-	for _, name := range names {
-		entry := staged[name]
-		g.Go(func() error {
-			var pushErr error
-			switch entry.Operation {
-			case stage.OperationSet:
-				pushErr = r.pushSet(gctx, name, entry.Value)
-			case stage.OperationDelete:
-				pushErr = r.pushDelete(gctx, name, entry)
-			default:
-				pushErr = fmt.Errorf("unknown operation: %s", entry.Operation)
-			}
-
-			mu.Lock()
-			results[name] = &pushResult{name: name, operation: entry.Operation, err: pushErr}
-			mu.Unlock()
-			return nil // Don't fail the group on individual errors
-		})
-	}
-
-	_ = g.Wait() // Errors are tracked per-item
-
-	// Output results in sorted order
-	var succeeded, failed int
-	green := color.New(color.FgGreen).SprintFunc()
-	red := color.New(color.FgRed).SprintFunc()
-
-	for _, name := range names {
-		result := results[name]
-		if result.err != nil {
-			_, _ = fmt.Fprintf(r.Stderr, "%s %s: %v\n", red("Failed"), name, result.err)
-			failed++
-		} else {
-			if result.operation == stage.OperationSet {
-				_, _ = fmt.Fprintf(r.Stdout, "%s Set %s\n", green("✓"), name)
-			} else {
-				_, _ = fmt.Fprintf(r.Stdout, "%s Deleted %s\n", green("✓"), name)
-			}
-			// Clear staging for this item
-			if err := r.Store.Unstage(stage.ServiceSM, name); err != nil {
-				_, _ = fmt.Fprintf(r.Stderr, "Warning: failed to clear staging for %s: %v\n", name, err)
-			}
-			succeeded++
-		}
-	}
-
-	// Summary
-	if failed > 0 {
-		return fmt.Errorf("pushed %d, failed %d", succeeded, failed)
-	}
-
-	return nil
-}
-
-func (r *Runner) pushSet(ctx context.Context, name, value string) error {
-	_, err := r.Client.PutSecretValue(ctx, &secretsmanager.PutSecretValueInput{
-		SecretId:     lo.ToPtr(name),
-		SecretString: lo.ToPtr(value),
-	})
-	if err != nil {
-		return fmt.Errorf("failed to update secret: %w", err)
-	}
-	return nil
-}
-
-func (r *Runner) pushDelete(ctx context.Context, name string, entry stage.Entry) error {
-	input := &secretsmanager.DeleteSecretInput{
-		SecretId: lo.ToPtr(name),
-	}
-
-	// Apply delete options if present
-	if entry.DeleteOptions != nil {
-		if entry.DeleteOptions.Force {
-			input.ForceDeleteWithoutRecovery = lo.ToPtr(true)
-		} else if entry.DeleteOptions.RecoveryWindow > 0 {
-			input.RecoveryWindowInDays = lo.ToPtr(int64(entry.DeleteOptions.RecoveryWindow))
-		}
-	}
-
-	_, err := r.Client.DeleteSecret(ctx, input)
-	if err != nil {
-		return fmt.Errorf("failed to delete secret: %w", err)
-	}
-	return nil
 }

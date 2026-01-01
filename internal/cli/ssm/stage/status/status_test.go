@@ -12,8 +12,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	appcli "github.com/mpyw/suve/internal/cli"
-	"github.com/mpyw/suve/internal/cli/ssm/stage/status"
+	"github.com/mpyw/suve/internal/cli/ssm/strategy"
 	"github.com/mpyw/suve/internal/stage"
+	"github.com/mpyw/suve/internal/stageutil"
 )
 
 func TestCommand_NoStagedChanges(t *testing.T) {
@@ -23,13 +24,14 @@ func TestCommand_NoStagedChanges(t *testing.T) {
 	store := stage.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 	var buf bytes.Buffer
-	r := &status.Runner{
-		Store:  store,
-		Stdout: &buf,
-		Stderr: &bytes.Buffer{},
+	r := &stageutil.StatusRunner{
+		Strategy: strategy.NewStrategy(nil),
+		Store:    store,
+		Stdout:   &buf,
+		Stderr:   &bytes.Buffer{},
 	}
 
-	err := r.Run(context.Background(), status.Options{})
+	err := r.Run(context.Background(), stageutil.StatusOptions{})
 	require.NoError(t, err)
 	assert.Contains(t, buf.String(), "No SSM changes staged")
 }
@@ -52,13 +54,14 @@ func TestCommand_ShowAllStagedChanges(t *testing.T) {
 	})
 
 	var buf bytes.Buffer
-	r := &status.Runner{
-		Store:  store,
-		Stdout: &buf,
-		Stderr: &bytes.Buffer{},
+	r := &stageutil.StatusRunner{
+		Strategy: strategy.NewStrategy(nil),
+		Store:    store,
+		Stdout:   &buf,
+		Stderr:   &bytes.Buffer{},
 	}
 
-	err := r.Run(context.Background(), status.Options{})
+	err := r.Run(context.Background(), stageutil.StatusOptions{})
 	require.NoError(t, err)
 
 	output := buf.String()
@@ -84,13 +87,14 @@ func TestCommand_ShowSingleStagedChange(t *testing.T) {
 	})
 
 	var buf bytes.Buffer
-	r := &status.Runner{
-		Store:  store,
-		Stdout: &buf,
-		Stderr: &bytes.Buffer{},
+	r := &stageutil.StatusRunner{
+		Strategy: strategy.NewStrategy(nil),
+		Store:    store,
+		Stdout:   &buf,
+		Stderr:   &bytes.Buffer{},
 	}
 
-	err := r.Run(context.Background(), status.Options{Name: "/app/config"})
+	err := r.Run(context.Background(), stageutil.StatusOptions{Name: "/app/config"})
 	require.NoError(t, err)
 
 	output := buf.String()
@@ -105,13 +109,14 @@ func TestCommand_ShowSingleNotStaged(t *testing.T) {
 	store := stage.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 	var buf bytes.Buffer
-	r := &status.Runner{
-		Store:  store,
-		Stdout: &buf,
-		Stderr: &bytes.Buffer{},
+	r := &stageutil.StatusRunner{
+		Strategy: strategy.NewStrategy(nil),
+		Store:    store,
+		Stdout:   &buf,
+		Stderr:   &bytes.Buffer{},
 	}
 
-	err := r.Run(context.Background(), status.Options{Name: "/not/staged"})
+	err := r.Run(context.Background(), stageutil.StatusOptions{Name: "/not/staged"})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "not staged")
 }
@@ -130,13 +135,14 @@ func TestCommand_VerboseOutput(t *testing.T) {
 	})
 
 	var buf bytes.Buffer
-	r := &status.Runner{
-		Store:  store,
-		Stdout: &buf,
-		Stderr: &bytes.Buffer{},
+	r := &stageutil.StatusRunner{
+		Strategy: strategy.NewStrategy(nil),
+		Store:    store,
+		Stdout:   &buf,
+		Stderr:   &bytes.Buffer{},
 	}
 
-	err := r.Run(context.Background(), status.Options{Verbose: true})
+	err := r.Run(context.Background(), stageutil.StatusOptions{Verbose: true})
 	require.NoError(t, err)
 
 	output := buf.String()
@@ -159,13 +165,14 @@ func TestCommand_VerboseWithDelete(t *testing.T) {
 	})
 
 	var buf bytes.Buffer
-	r := &status.Runner{
-		Store:  store,
-		Stdout: &buf,
-		Stderr: &bytes.Buffer{},
+	r := &stageutil.StatusRunner{
+		Strategy: strategy.NewStrategy(nil),
+		Store:    store,
+		Stdout:   &buf,
+		Stderr:   &bytes.Buffer{},
 	}
 
-	err := r.Run(context.Background(), status.Options{Verbose: true})
+	err := r.Run(context.Background(), stageutil.StatusOptions{Verbose: true})
 	require.NoError(t, err)
 
 	output := buf.String()
@@ -189,13 +196,14 @@ func TestCommand_VerboseTruncatesLongValue(t *testing.T) {
 	})
 
 	var buf bytes.Buffer
-	r := &status.Runner{
-		Store:  store,
-		Stdout: &buf,
-		Stderr: &bytes.Buffer{},
+	r := &stageutil.StatusRunner{
+		Strategy: strategy.NewStrategy(nil),
+		Store:    store,
+		Stdout:   &buf,
+		Stderr:   &bytes.Buffer{},
 	}
 
-	err := r.Run(context.Background(), status.Options{Verbose: true})
+	err := r.Run(context.Background(), stageutil.StatusOptions{Verbose: true})
 	require.NoError(t, err)
 
 	output := buf.String()
@@ -229,13 +237,14 @@ func TestCommand_ShowSingleStoreError(t *testing.T) {
 	store := stage.NewStoreWithPath(path)
 
 	var buf bytes.Buffer
-	r := &status.Runner{
-		Store:  store,
-		Stdout: &buf,
-		Stderr: &bytes.Buffer{},
+	r := &stageutil.StatusRunner{
+		Strategy: strategy.NewStrategy(nil),
+		Store:    store,
+		Stdout:   &buf,
+		Stderr:   &bytes.Buffer{},
 	}
 
-	err = r.Run(context.Background(), status.Options{Name: "/app/config"})
+	err = r.Run(context.Background(), stageutil.StatusOptions{Name: "/app/config"})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to parse")
 }
@@ -253,13 +262,14 @@ func TestCommand_ShowAllStoreError(t *testing.T) {
 	store := stage.NewStoreWithPath(path)
 
 	var buf bytes.Buffer
-	r := &status.Runner{
-		Store:  store,
-		Stdout: &buf,
-		Stderr: &bytes.Buffer{},
+	r := &stageutil.StatusRunner{
+		Strategy: strategy.NewStrategy(nil),
+		Store:    store,
+		Stdout:   &buf,
+		Stderr:   &bytes.Buffer{},
 	}
 
-	err = r.Run(context.Background(), status.Options{})
+	err = r.Run(context.Background(), stageutil.StatusOptions{})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to parse")
 }

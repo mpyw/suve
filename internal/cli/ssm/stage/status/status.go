@@ -4,27 +4,13 @@ package status
 import (
 	"context"
 	"fmt"
-	"io"
-	"sort"
 
-	"github.com/fatih/color"
 	"github.com/urfave/cli/v3"
 
+	"github.com/mpyw/suve/internal/cli/ssm/strategy"
 	"github.com/mpyw/suve/internal/stage"
+	"github.com/mpyw/suve/internal/stageutil"
 )
-
-// Runner executes the status command.
-type Runner struct {
-	Store  *stage.Store
-	Stdout io.Writer
-	Stderr io.Writer
-}
-
-// Options holds the options for the status command.
-type Options struct {
-	Name    string
-	Verbose bool
-}
 
 // Command returns the status command.
 func Command() *cli.Command {
@@ -60,13 +46,14 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		return fmt.Errorf("failed to initialize stage store: %w", err)
 	}
 
-	r := &Runner{
-		Store:  store,
-		Stdout: cmd.Root().Writer,
-		Stderr: cmd.Root().ErrWriter,
+	r := &stageutil.StatusRunner{
+		Strategy: strategy.NewStrategy(nil),
+		Store:    store,
+		Stdout:   cmd.Root().Writer,
+		Stderr:   cmd.Root().ErrWriter,
 	}
 
-	opts := Options{
+	opts := stageutil.StatusOptions{
 		Verbose: cmd.Bool("verbose"),
 	}
 	if cmd.Args().Len() > 0 {
@@ -74,57 +61,4 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	}
 
 	return r.Run(ctx, opts)
-}
-
-// Run executes the status command.
-func (r *Runner) Run(_ context.Context, opts Options) error {
-	if opts.Name != "" {
-		return r.showSingle(opts.Name, opts.Verbose)
-	}
-	return r.showAll(opts.Verbose)
-}
-
-func (r *Runner) showSingle(name string, verbose bool) error {
-	entry, err := r.Store.Get(stage.ServiceSSM, name)
-	if err != nil {
-		if err == stage.ErrNotStaged {
-			return fmt.Errorf("parameter %s is not staged", name)
-		}
-		return err
-	}
-
-	printer := &stage.EntryPrinter{Writer: r.Stdout}
-	printer.PrintEntry(name, *entry, verbose, false) // SSM has no DeleteOptions
-	return nil
-}
-
-func (r *Runner) showAll(verbose bool) error {
-	entries, err := r.Store.List(stage.ServiceSSM)
-	if err != nil {
-		return err
-	}
-
-	ssmEntries := entries[stage.ServiceSSM]
-	if len(ssmEntries) == 0 {
-		_, _ = fmt.Fprintln(r.Stdout, "No SSM changes staged.")
-		return nil
-	}
-
-	// Sort names for consistent output
-	names := make([]string, 0, len(ssmEntries))
-	for name := range ssmEntries {
-		names = append(names, name)
-	}
-	sort.Strings(names)
-
-	yellow := color.New(color.FgYellow).SprintFunc()
-	_, _ = fmt.Fprintf(r.Stdout, "%s (%d):\n", yellow("Staged SSM changes"), len(ssmEntries))
-
-	printer := &stage.EntryPrinter{Writer: r.Stdout}
-	for _, name := range names {
-		entry := ssmEntries[name]
-		printer.PrintEntry(name, entry, verbose, false) // SSM has no DeleteOptions
-	}
-
-	return nil
 }

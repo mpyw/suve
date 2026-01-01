@@ -4,39 +4,15 @@ package reset
 import (
 	"context"
 	"fmt"
-	"io"
-	"time"
 
-	"github.com/fatih/color"
-	"github.com/samber/lo"
 	"github.com/urfave/cli/v3"
 
-	"github.com/mpyw/suve/internal/api/smapi"
 	"github.com/mpyw/suve/internal/awsutil"
-	"github.com/mpyw/suve/internal/smutil"
+	"github.com/mpyw/suve/internal/cli/sm/strategy"
 	"github.com/mpyw/suve/internal/stage"
+	"github.com/mpyw/suve/internal/stageutil"
 	"github.com/mpyw/suve/internal/version/smversion"
 )
-
-// Client is the interface for the reset command.
-type Client interface {
-	smapi.GetSecretValueAPI
-	smapi.ListSecretVersionIdsAPI
-}
-
-// Runner executes the reset command.
-type Runner struct {
-	Client Client
-	Store  *stage.Store
-	Stdout io.Writer
-	Stderr io.Writer
-}
-
-// Options holds the options for the reset command.
-type Options struct {
-	Spec string // Secret name with optional version spec
-	All  bool   // Reset all staged SM secrets
-}
 
 // Command returns the reset command.
 func Command() *cli.Command {
@@ -85,7 +61,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		return fmt.Errorf("failed to initialize stage store: %w", err)
 	}
 
-	opts := Options{
+	opts := stageutil.ResetOptions{
 		All: resetAll,
 	}
 	if !resetAll {
@@ -102,108 +78,23 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		needsAWS = spec.Absolute.ID != nil || spec.Absolute.Label != nil || spec.Shift > 0
 	}
 
-	r := &Runner{
-		Store:  store,
-		Stdout: cmd.Root().Writer,
-		Stderr: cmd.Root().ErrWriter,
-	}
-
+	var strat *strategy.Strategy
 	if needsAWS {
 		client, err := awsutil.NewSMClient(ctx)
 		if err != nil {
 			return fmt.Errorf("failed to initialize AWS client: %w", err)
 		}
-		r.Client = client
+		strat = strategy.NewStrategy(client)
+	} else {
+		strat = strategy.NewStrategy(nil)
+	}
+
+	r := &stageutil.ResetRunner{
+		Strategy: strat,
+		Store:    store,
+		Stdout:   cmd.Root().Writer,
+		Stderr:   cmd.Root().ErrWriter,
 	}
 
 	return r.Run(ctx, opts)
-}
-
-// Run executes the reset command.
-func (r *Runner) Run(ctx context.Context, opts Options) error {
-	if opts.All {
-		return r.runUnstageAll()
-	}
-
-	spec, err := smversion.Parse(opts.Spec)
-	if err != nil {
-		return err
-	}
-
-	// If version, label, or shift specified, restore to that version
-	if spec.Absolute.ID != nil || spec.Absolute.Label != nil || spec.Shift > 0 {
-		return r.runRestore(ctx, spec)
-	}
-
-	// Otherwise, just unstage
-	return r.runUnstage(spec.Name)
-}
-
-func (r *Runner) runUnstageAll() error {
-	// Check if there are any staged changes
-	staged, err := r.Store.List(stage.ServiceSM)
-	if err != nil {
-		return err
-	}
-
-	smStaged := staged[stage.ServiceSM]
-	if len(smStaged) == 0 {
-		yellow := color.New(color.FgYellow).SprintFunc()
-		_, _ = fmt.Fprintln(r.Stdout, yellow("No SM changes staged."))
-		return nil
-	}
-
-	if err := r.Store.UnstageAll(stage.ServiceSM); err != nil {
-		return err
-	}
-
-	green := color.New(color.FgGreen).SprintFunc()
-	_, _ = fmt.Fprintf(r.Stdout, "%s Unstaged all SM secrets (%d)\n", green("✓"), len(smStaged))
-	return nil
-}
-
-func (r *Runner) runUnstage(name string) error {
-	// Check if actually staged
-	_, err := r.Store.Get(stage.ServiceSM, name)
-	if err == stage.ErrNotStaged {
-		yellow := color.New(color.FgYellow).SprintFunc()
-		_, _ = fmt.Fprintf(r.Stdout, "%s %s is not staged\n", yellow("!"), name)
-		return nil
-	}
-	if err != nil {
-		return err
-	}
-
-	if err := r.Store.Unstage(stage.ServiceSM, name); err != nil {
-		return err
-	}
-
-	green := color.New(color.FgGreen).SprintFunc()
-	_, _ = fmt.Fprintf(r.Stdout, "%s Unstaged %s\n", green("✓"), name)
-	return nil
-}
-
-func (r *Runner) runRestore(ctx context.Context, spec *smversion.Spec) error {
-	// Fetch the specific version
-	secret, err := smversion.GetSecretWithVersion(ctx, r.Client, spec)
-	if err != nil {
-		return err
-	}
-
-	value := lo.FromPtr(secret.SecretString)
-
-	// Stage this value
-	if err := r.Store.Stage(stage.ServiceSM, spec.Name, stage.Entry{
-		Operation: stage.OperationSet,
-		Value:     value,
-		StagedAt:  time.Now(),
-	}); err != nil {
-		return err
-	}
-
-	green := color.New(color.FgGreen).SprintFunc()
-	versionID := smutil.TruncateVersionID(lo.FromPtr(secret.VersionId))
-	_, _ = fmt.Fprintf(r.Stdout, "%s Restored %s (staged from version %s)\n",
-		green("✓"), spec.Name, versionID)
-	return nil
 }

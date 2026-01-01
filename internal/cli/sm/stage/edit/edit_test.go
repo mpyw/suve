@@ -16,13 +16,16 @@ import (
 	"github.com/stretchr/testify/require"
 
 	appcli "github.com/mpyw/suve/internal/cli"
-	"github.com/mpyw/suve/internal/cli/sm/stage/edit"
+	"github.com/mpyw/suve/internal/cli/sm/strategy"
 	"github.com/mpyw/suve/internal/stage"
+	"github.com/mpyw/suve/internal/stageutil"
 )
 
 type mockClient struct {
 	getSecretValueFunc       func(ctx context.Context, params *secretsmanager.GetSecretValueInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.GetSecretValueOutput, error)
 	listSecretVersionIdsFunc func(ctx context.Context, params *secretsmanager.ListSecretVersionIdsInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.ListSecretVersionIdsOutput, error)
+	putSecretValueFunc       func(ctx context.Context, params *secretsmanager.PutSecretValueInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.PutSecretValueOutput, error)
+	deleteSecretFunc         func(ctx context.Context, params *secretsmanager.DeleteSecretInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.DeleteSecretOutput, error)
 }
 
 func (m *mockClient) GetSecretValue(ctx context.Context, params *secretsmanager.GetSecretValueInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.GetSecretValueOutput, error) {
@@ -37,6 +40,20 @@ func (m *mockClient) ListSecretVersionIds(ctx context.Context, params *secretsma
 		return m.listSecretVersionIdsFunc(ctx, params, optFns...)
 	}
 	return nil, fmt.Errorf("ListSecretVersionIds not mocked")
+}
+
+func (m *mockClient) PutSecretValue(ctx context.Context, params *secretsmanager.PutSecretValueInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.PutSecretValueOutput, error) {
+	if m.putSecretValueFunc != nil {
+		return m.putSecretValueFunc(ctx, params, optFns...)
+	}
+	return nil, fmt.Errorf("PutSecretValue not mocked")
+}
+
+func (m *mockClient) DeleteSecret(ctx context.Context, params *secretsmanager.DeleteSecretInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.DeleteSecretOutput, error) {
+	if m.deleteSecretFunc != nil {
+		return m.deleteSecretFunc(ctx, params, optFns...)
+	}
+	return nil, fmt.Errorf("DeleteSecret not mocked")
 }
 
 func TestCommand_Validation(t *testing.T) {
@@ -82,11 +99,11 @@ func TestRun_UseStagedValue(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	r := &edit.Runner{
-		Client: mock,
-		Store:  store,
-		Stdout: &buf,
-		Stderr: &bytes.Buffer{},
+	r := &stageutil.EditRunner{
+		Strategy: strategy.NewStrategy(mock),
+		Store:    store,
+		Stdout:   &buf,
+		Stderr:   &bytes.Buffer{},
 		OpenEditor: func(content string) (string, error) {
 			// Verify staged value is passed to editor
 			assert.Equal(t, "staged-value", content)
@@ -96,7 +113,7 @@ func TestRun_UseStagedValue(t *testing.T) {
 
 	// Test that it uses staged value (will hit the "no changes" path)
 	// This validates that GetSecretValue is not called
-	err := r.Run(context.Background(), edit.Options{Name: "my-secret"})
+	err := r.Run(context.Background(), stageutil.EditOptions{Name: "my-secret"})
 	require.NoError(t, err)
 	assert.Contains(t, buf.String(), "No changes made")
 }
@@ -133,11 +150,11 @@ func TestRun_FetchFromAWS(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	r := &edit.Runner{
-		Client: mock,
-		Store:  store,
-		Stdout: &buf,
-		Stderr: &bytes.Buffer{},
+	r := &stageutil.EditRunner{
+		Strategy: strategy.NewStrategy(mock),
+		Store:    store,
+		Stdout:   &buf,
+		Stderr:   &bytes.Buffer{},
 		OpenEditor: func(content string) (string, error) {
 			// Verify AWS value is passed to editor
 			assert.Equal(t, "aws-value", content)
@@ -146,7 +163,7 @@ func TestRun_FetchFromAWS(t *testing.T) {
 	}
 
 	// Test that it fetches from AWS when not staged
-	err := r.Run(context.Background(), edit.Options{Name: "my-secret"})
+	err := r.Run(context.Background(), stageutil.EditOptions{Name: "my-secret"})
 	require.NoError(t, err)
 	assert.True(t, fetchCalled, "GetSecretValue should be called when value is not staged")
 	assert.Contains(t, buf.String(), "No changes made")
@@ -162,15 +179,17 @@ func TestRun_StoreError(t *testing.T) {
 	require.NoError(t, os.WriteFile(path, []byte("invalid json"), 0o644))
 
 	store := stage.NewStoreWithPath(path)
+	mock := &mockClient{}
 
 	var buf bytes.Buffer
-	r := &edit.Runner{
-		Store:  store,
-		Stdout: &buf,
-		Stderr: &bytes.Buffer{},
+	r := &stageutil.EditRunner{
+		Strategy: strategy.NewStrategy(mock),
+		Store:    store,
+		Stdout:   &buf,
+		Stderr:   &bytes.Buffer{},
 	}
 
-	err := r.Run(context.Background(), edit.Options{Name: "my-secret"})
+	err := r.Run(context.Background(), stageutil.EditOptions{Name: "my-secret"})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to parse")
 }
@@ -199,14 +218,14 @@ func TestRun_AWSError(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	r := &edit.Runner{
-		Client: mock,
-		Store:  store,
-		Stdout: &buf,
-		Stderr: &bytes.Buffer{},
+	r := &stageutil.EditRunner{
+		Strategy: strategy.NewStrategy(mock),
+		Store:    store,
+		Stdout:   &buf,
+		Stderr:   &bytes.Buffer{},
 	}
 
-	err := r.Run(context.Background(), edit.Options{Name: "my-secret"})
+	err := r.Run(context.Background(), stageutil.EditOptions{Name: "my-secret"})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "AWS error")
 }
@@ -216,16 +235,18 @@ func TestRun_ParseError(t *testing.T) {
 
 	tmpDir := t.TempDir()
 	store := stage.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	mock := &mockClient{}
 
 	var buf bytes.Buffer
-	r := &edit.Runner{
-		Store:  store,
-		Stdout: &buf,
-		Stderr: &bytes.Buffer{},
+	r := &stageutil.EditRunner{
+		Strategy: strategy.NewStrategy(mock),
+		Store:    store,
+		Stdout:   &buf,
+		Stderr:   &bytes.Buffer{},
 	}
 
 	// Invalid secret name (empty)
-	err := r.Run(context.Background(), edit.Options{Name: ""})
+	err := r.Run(context.Background(), stageutil.EditOptions{Name: ""})
 	require.Error(t, err)
 }
 
@@ -258,18 +279,18 @@ func TestRun_NoChanges(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	r := &edit.Runner{
-		Client: mock,
-		Store:  store,
-		Stdout: &buf,
-		Stderr: &bytes.Buffer{},
+	r := &stageutil.EditRunner{
+		Strategy: strategy.NewStrategy(mock),
+		Store:    store,
+		Stdout:   &buf,
+		Stderr:   &bytes.Buffer{},
 		OpenEditor: func(content string) (string, error) {
 			// Return the same value (no changes)
 			return content, nil
 		},
 	}
 
-	err := r.Run(context.Background(), edit.Options{Name: "my-secret"})
+	err := r.Run(context.Background(), stageutil.EditOptions{Name: "my-secret"})
 	require.NoError(t, err)
 	assert.Contains(t, buf.String(), "No changes made")
 }
@@ -303,17 +324,17 @@ func TestRun_SuccessfulStaging(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	r := &edit.Runner{
-		Client: mock,
-		Store:  store,
-		Stdout: &buf,
-		Stderr: &bytes.Buffer{},
+	r := &stageutil.EditRunner{
+		Strategy: strategy.NewStrategy(mock),
+		Store:    store,
+		Stdout:   &buf,
+		Stderr:   &bytes.Buffer{},
 		OpenEditor: func(_ string) (string, error) {
 			return "new-value", nil
 		},
 	}
 
-	err := r.Run(context.Background(), edit.Options{Name: "my-secret"})
+	err := r.Run(context.Background(), stageutil.EditOptions{Name: "my-secret"})
 	require.NoError(t, err)
 	assert.Contains(t, buf.String(), "Staged")
 	assert.Contains(t, buf.String(), "my-secret")
@@ -354,17 +375,17 @@ func TestRun_EditorError(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	r := &edit.Runner{
-		Client: mock,
-		Store:  store,
-		Stdout: &buf,
-		Stderr: &bytes.Buffer{},
+	r := &stageutil.EditRunner{
+		Strategy: strategy.NewStrategy(mock),
+		Store:    store,
+		Stdout:   &buf,
+		Stderr:   &bytes.Buffer{},
 		OpenEditor: func(_ string) (string, error) {
 			return "", fmt.Errorf("editor failed")
 		},
 	}
 
-	err := r.Run(context.Background(), edit.Options{Name: "my-secret"})
+	err := r.Run(context.Background(), stageutil.EditOptions{Name: "my-secret"})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to edit")
 }
@@ -401,11 +422,11 @@ func TestRun_StagingStoreError(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	r := &edit.Runner{
-		Client: mock,
-		Store:  store,
-		Stdout: &buf,
-		Stderr: &bytes.Buffer{},
+	r := &stageutil.EditRunner{
+		Strategy: strategy.NewStrategy(mock),
+		Store:    store,
+		Stdout:   &buf,
+		Stderr:   &bytes.Buffer{},
 		OpenEditor: func(_ string) (string, error) {
 			// Make the store file invalid before returning
 			_ = os.WriteFile(path, []byte("invalid json"), 0o644)
@@ -413,7 +434,7 @@ func TestRun_StagingStoreError(t *testing.T) {
 		},
 	}
 
-	err := r.Run(context.Background(), edit.Options{Name: "my-secret"})
+	err := r.Run(context.Background(), stageutil.EditOptions{Name: "my-secret"})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to parse")
 }

@@ -77,6 +77,29 @@ func Error(w io.Writer, format string, args ...any) {
 	_, _ = fmt.Fprintln(w, red("Error: "+msg))
 }
 
+// Success prints a success message with green checkmark.
+// Example: "✓ Set /app/config"
+func Success(w io.Writer, format string, args ...any) {
+	green := color.New(color.FgGreen).SprintFunc()
+	msg := fmt.Sprintf(format, args...)
+	_, _ = fmt.Fprintf(w, "%s %s\n", green("✓"), msg)
+}
+
+// Failed prints a failure message in red.
+// Example: "Failed /app/config: error message"
+func Failed(w io.Writer, name string, err error) {
+	red := color.New(color.FgRed).SprintFunc()
+	_, _ = fmt.Fprintf(w, "%s %s: %v\n", red("Failed"), name, err)
+}
+
+// Info prints an informational message in yellow (without "Warning:" prefix).
+// Example: "No changes staged."
+func Info(w io.Writer, format string, args ...any) {
+	yellow := color.New(color.FgYellow).SprintFunc()
+	msg := fmt.Sprintf(format, args...)
+	_, _ = fmt.Fprintln(w, yellow(msg))
+}
+
 // Diff generates a unified diff between two strings.
 func Diff(oldName, newName, oldContent, newContent string) string {
 	edits := myers.ComputeEdits(oldContent, newContent)

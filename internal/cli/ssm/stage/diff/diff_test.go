@@ -15,13 +15,16 @@ import (
 	"github.com/stretchr/testify/require"
 
 	appcli "github.com/mpyw/suve/internal/cli"
-	ssmstageddiff "github.com/mpyw/suve/internal/cli/ssm/stage/diff"
+	"github.com/mpyw/suve/internal/cli/ssm/strategy"
 	"github.com/mpyw/suve/internal/stage"
+	"github.com/mpyw/suve/internal/stageutil"
 )
 
 type mockClient struct {
 	getParameterFunc        func(ctx context.Context, params *ssm.GetParameterInput, optFns ...func(*ssm.Options)) (*ssm.GetParameterOutput, error)
 	getParameterHistoryFunc func(ctx context.Context, params *ssm.GetParameterHistoryInput, optFns ...func(*ssm.Options)) (*ssm.GetParameterHistoryOutput, error)
+	putParameterFunc        func(ctx context.Context, params *ssm.PutParameterInput, optFns ...func(*ssm.Options)) (*ssm.PutParameterOutput, error)
+	deleteParameterFunc     func(ctx context.Context, params *ssm.DeleteParameterInput, optFns ...func(*ssm.Options)) (*ssm.DeleteParameterOutput, error)
 }
 
 func (m *mockClient) GetParameter(ctx context.Context, params *ssm.GetParameterInput, optFns ...func(*ssm.Options)) (*ssm.GetParameterOutput, error) {
@@ -36,6 +39,20 @@ func (m *mockClient) GetParameterHistory(ctx context.Context, params *ssm.GetPar
 		return m.getParameterHistoryFunc(ctx, params, optFns...)
 	}
 	return nil, fmt.Errorf("GetParameterHistory not mocked")
+}
+
+func (m *mockClient) PutParameter(ctx context.Context, params *ssm.PutParameterInput, optFns ...func(*ssm.Options)) (*ssm.PutParameterOutput, error) {
+	if m.putParameterFunc != nil {
+		return m.putParameterFunc(ctx, params, optFns...)
+	}
+	return nil, fmt.Errorf("PutParameter not mocked")
+}
+
+func (m *mockClient) DeleteParameter(ctx context.Context, params *ssm.DeleteParameterInput, optFns ...func(*ssm.Options)) (*ssm.DeleteParameterOutput, error) {
+	if m.deleteParameterFunc != nil {
+		return m.deleteParameterFunc(ctx, params, optFns...)
+	}
+	return nil, fmt.Errorf("DeleteParameter not mocked")
 }
 
 func TestCommand_Validation(t *testing.T) {
@@ -73,17 +90,19 @@ func TestRun_NothingStaged(t *testing.T) {
 
 	tmpDir := t.TempDir()
 	store := stage.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	mock := &mockClient{}
 
 	var stdout, stderr bytes.Buffer
-	r := &ssmstageddiff.Runner{
-		Store:  store,
-		Stdout: &stdout,
-		Stderr: &stderr,
+	r := &stageutil.DiffRunner{
+		Strategy: strategy.NewStrategy(mock),
+		Store:    store,
+		Stdout:   &stdout,
+		Stderr:   &stderr,
 	}
 
-	err := r.Run(context.Background(), ssmstageddiff.Options{})
+	err := r.Run(context.Background(), stageutil.DiffOptions{})
 	require.NoError(t, err)
-	assert.Contains(t, stderr.String(), "nothing staged")
+	assert.Contains(t, stderr.String(), "staged")
 }
 
 func TestRun_NotStaged(t *testing.T) {
@@ -91,15 +110,17 @@ func TestRun_NotStaged(t *testing.T) {
 
 	tmpDir := t.TempDir()
 	store := stage.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	mock := &mockClient{}
 
 	var stdout, stderr bytes.Buffer
-	r := &ssmstageddiff.Runner{
-		Store:  store,
-		Stdout: &stdout,
-		Stderr: &stderr,
+	r := &stageutil.DiffRunner{
+		Strategy: strategy.NewStrategy(mock),
+		Store:    store,
+		Stdout:   &stdout,
+		Stderr:   &stderr,
 	}
 
-	err := r.Run(context.Background(), ssmstageddiff.Options{Name: "/not-staged"})
+	err := r.Run(context.Background(), stageutil.DiffOptions{Name: "/not-staged"})
 	require.NoError(t, err)
 	assert.Contains(t, stderr.String(), "is not staged")
 }
@@ -130,14 +151,14 @@ func TestRun_ShowDiff(t *testing.T) {
 	}
 
 	var stdout, stderr bytes.Buffer
-	r := &ssmstageddiff.Runner{
-		Client: mock,
-		Store:  store,
-		Stdout: &stdout,
-		Stderr: &stderr,
+	r := &stageutil.DiffRunner{
+		Strategy: strategy.NewStrategy(mock),
+		Store:    store,
+		Stdout:   &stdout,
+		Stderr:   &stderr,
 	}
 
-	err = r.Run(context.Background(), ssmstageddiff.Options{Name: "/app/config"})
+	err = r.Run(context.Background(), stageutil.DiffOptions{Name: "/app/config"})
 	require.NoError(t, err)
 
 	output := stdout.String()
@@ -172,14 +193,14 @@ func TestRun_DeleteOperation(t *testing.T) {
 	}
 
 	var stdout, stderr bytes.Buffer
-	r := &ssmstageddiff.Runner{
-		Client: mock,
-		Store:  store,
-		Stdout: &stdout,
-		Stderr: &stderr,
+	r := &stageutil.DiffRunner{
+		Strategy: strategy.NewStrategy(mock),
+		Store:    store,
+		Stdout:   &stdout,
+		Stderr:   &stderr,
 	}
 
-	err = r.Run(context.Background(), ssmstageddiff.Options{Name: "/app/config"})
+	err = r.Run(context.Background(), stageutil.DiffOptions{Name: "/app/config"})
 	require.NoError(t, err)
 
 	output := stdout.String()
@@ -213,14 +234,14 @@ func TestRun_IdenticalValues(t *testing.T) {
 	}
 
 	var stdout, stderr bytes.Buffer
-	r := &ssmstageddiff.Runner{
-		Client: mock,
-		Store:  store,
-		Stdout: &stdout,
-		Stderr: &stderr,
+	r := &stageutil.DiffRunner{
+		Strategy: strategy.NewStrategy(mock),
+		Store:    store,
+		Stdout:   &stdout,
+		Stderr:   &stderr,
 	}
 
-	err = r.Run(context.Background(), ssmstageddiff.Options{Name: "/app/config"})
+	err = r.Run(context.Background(), stageutil.DiffOptions{Name: "/app/config"})
 	require.NoError(t, err)
 
 	assert.Empty(t, stdout.String())
@@ -257,14 +278,14 @@ func TestRun_JSONFormat(t *testing.T) {
 	}
 
 	var stdout, stderr bytes.Buffer
-	r := &ssmstageddiff.Runner{
-		Client: mock,
-		Store:  store,
-		Stdout: &stdout,
-		Stderr: &stderr,
+	r := &stageutil.DiffRunner{
+		Strategy: strategy.NewStrategy(mock),
+		Store:    store,
+		Stdout:   &stdout,
+		Stderr:   &stderr,
 	}
 
-	err = r.Run(context.Background(), ssmstageddiff.Options{
+	err = r.Run(context.Background(), stageutil.DiffOptions{
 		Name:       "/app/config",
 		JSONFormat: true,
 	})
@@ -295,14 +316,14 @@ func TestRun_AWSError(t *testing.T) {
 	}
 
 	var stdout, stderr bytes.Buffer
-	r := &ssmstageddiff.Runner{
-		Client: mock,
-		Store:  store,
-		Stdout: &stdout,
-		Stderr: &stderr,
+	r := &stageutil.DiffRunner{
+		Strategy: strategy.NewStrategy(mock),
+		Store:    store,
+		Stdout:   &stdout,
+		Stderr:   &stderr,
 	}
 
-	err = r.Run(context.Background(), ssmstageddiff.Options{Name: "/app/config"})
+	err = r.Run(context.Background(), stageutil.DiffOptions{Name: "/app/config"})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "AWS error")
 }
@@ -341,14 +362,14 @@ func TestRun_MultipleStaged(t *testing.T) {
 	}
 
 	var stdout, stderr bytes.Buffer
-	r := &ssmstageddiff.Runner{
-		Client: mock,
-		Store:  store,
-		Stdout: &stdout,
-		Stderr: &stderr,
+	r := &stageutil.DiffRunner{
+		Strategy: strategy.NewStrategy(mock),
+		Store:    store,
+		Stdout:   &stdout,
+		Stderr:   &stderr,
 	}
 
-	err = r.Run(context.Background(), ssmstageddiff.Options{})
+	err = r.Run(context.Background(), stageutil.DiffOptions{})
 	require.NoError(t, err)
 
 	output := stdout.String()

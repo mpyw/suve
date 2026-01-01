@@ -5,21 +5,20 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"sort"
-	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
 	"github.com/aws/aws-sdk-go-v2/service/ssm/types"
 	"github.com/samber/lo"
 	"github.com/urfave/cli/v3"
-	"golang.org/x/sync/errgroup"
 
 	"github.com/mpyw/suve/internal/api/smapi"
 	"github.com/mpyw/suve/internal/api/ssmapi"
 	"github.com/mpyw/suve/internal/awsutil"
 	"github.com/mpyw/suve/internal/jsonutil"
+	"github.com/mpyw/suve/internal/maputil"
 	"github.com/mpyw/suve/internal/output"
 	"github.com/mpyw/suve/internal/pager"
+	"github.com/mpyw/suve/internal/parallel"
 	"github.com/mpyw/suve/internal/smutil"
 	"github.com/mpyw/suve/internal/stage"
 	"github.com/mpyw/suve/internal/version/smversion"
@@ -141,18 +140,6 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	})
 }
 
-// ssmFetchResult holds the result of fetching an SSM parameter.
-type ssmFetchResult struct {
-	param *types.ParameterHistory
-	err   error
-}
-
-// smFetchResult holds the result of fetching a SM secret.
-type smFetchResult struct {
-	secret *secretsmanager.GetSecretValueOutput
-	err    error
-}
-
 // Run executes the diff command.
 func (r *Runner) Run(ctx context.Context, opts Options) error {
 	allEntries, err := r.Store.List("")
@@ -164,92 +151,53 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 	smEntries := allEntries[stage.ServiceSM]
 
 	// Fetch all values in parallel
-	ssmResults := make(map[string]*ssmFetchResult)
-	smResults := make(map[string]*smFetchResult)
+	ssmResults := parallel.ExecuteMap(ctx, ssmEntries, func(ctx context.Context, name string, _ stage.Entry) (*types.ParameterHistory, error) {
+		spec := &ssmversion.Spec{Name: name}
+		return ssmversion.GetParameterWithVersion(ctx, r.SSMClient, spec, true)
+	})
 
-	var mu sync.Mutex
-	g, gctx := errgroup.WithContext(ctx)
-	g.SetLimit(10) // Limit concurrent AWS API calls
-
-	// Fetch SSM parameters
-	for name := range ssmEntries {
-		g.Go(func() error {
-			spec := &ssmversion.Spec{Name: name}
-			param, err := ssmversion.GetParameterWithVersion(gctx, r.SSMClient, spec, true)
-			mu.Lock()
-			ssmResults[name] = &ssmFetchResult{param: param, err: err}
-			mu.Unlock()
-			return nil // Don't fail the group on individual errors
-		})
-	}
-
-	// Fetch SM secrets
-	for name := range smEntries {
-		g.Go(func() error {
-			spec := &smversion.Spec{Name: name}
-			secret, err := smversion.GetSecretWithVersion(gctx, r.SMClient, spec)
-			mu.Lock()
-			smResults[name] = &smFetchResult{secret: secret, err: err}
-			mu.Unlock()
-			return nil // Don't fail the group on individual errors
-		})
-	}
-
-	_ = g.Wait() // Errors are tracked per-item
+	smResults := parallel.ExecuteMap(ctx, smEntries, func(ctx context.Context, name string, _ stage.Entry) (*secretsmanager.GetSecretValueOutput, error) {
+		spec := &smversion.Spec{Name: name}
+		return smversion.GetSecretWithVersion(ctx, r.SMClient, spec)
+	})
 
 	first := true
 
 	// Process SSM entries in sorted order
-	if len(ssmEntries) > 0 {
-		names := make([]string, 0, len(ssmEntries))
-		for name := range ssmEntries {
-			names = append(names, name)
+	for _, name := range maputil.SortedKeys(ssmEntries) {
+		entry := ssmEntries[name]
+		result := ssmResults[name]
+
+		if result.Err != nil {
+			return fmt.Errorf("failed to get current version for %s: %w", name, result.Err)
 		}
-		sort.Strings(names)
 
-		for _, name := range names {
-			entry := ssmEntries[name]
-			result := ssmResults[name]
+		if !first {
+			_, _ = fmt.Fprintln(r.Stdout)
+		}
+		first = false
 
-			if result.err != nil {
-				return fmt.Errorf("failed to get current version for %s: %w", name, result.err)
-			}
-
-			if !first {
-				_, _ = fmt.Fprintln(r.Stdout)
-			}
-			first = false
-
-			if err := r.outputSSMDiff(opts, name, entry, result.param); err != nil {
-				return err
-			}
+		if err := r.outputSSMDiff(opts, name, entry, result.Value); err != nil {
+			return err
 		}
 	}
 
 	// Process SM entries in sorted order
-	if len(smEntries) > 0 {
-		names := make([]string, 0, len(smEntries))
-		for name := range smEntries {
-			names = append(names, name)
+	for _, name := range maputil.SortedKeys(smEntries) {
+		entry := smEntries[name]
+		result := smResults[name]
+
+		if result.Err != nil {
+			return fmt.Errorf("failed to get current version for %s: %w", name, result.Err)
 		}
-		sort.Strings(names)
 
-		for _, name := range names {
-			entry := smEntries[name]
-			result := smResults[name]
+		if !first {
+			_, _ = fmt.Fprintln(r.Stdout)
+		}
+		first = false
 
-			if result.err != nil {
-				return fmt.Errorf("failed to get current version for %s: %w", name, result.err)
-			}
-
-			if !first {
-				_, _ = fmt.Fprintln(r.Stdout)
-			}
-			first = false
-
-			if err := r.outputSMDiff(opts, name, entry, result.secret); err != nil {
-				return err
-			}
+		if err := r.outputSMDiff(opts, name, entry, result.Value); err != nil {
+			return err
 		}
 	}
 
