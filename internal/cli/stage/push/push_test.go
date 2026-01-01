@@ -9,10 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
-	"github.com/aws/aws-sdk-go-v2/service/ssm"
-	"github.com/aws/aws-sdk-go-v2/service/ssm/types"
-	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -21,56 +17,51 @@ import (
 	"github.com/mpyw/suve/internal/stage"
 )
 
-type mockSSMClient struct {
-	putParameterFunc    func(ctx context.Context, params *ssm.PutParameterInput, optFns ...func(*ssm.Options)) (*ssm.PutParameterOutput, error)
-	deleteParameterFunc func(ctx context.Context, params *ssm.DeleteParameterInput, optFns ...func(*ssm.Options)) (*ssm.DeleteParameterOutput, error)
-	getParameterFunc    func(ctx context.Context, params *ssm.GetParameterInput, optFns ...func(*ssm.Options)) (*ssm.GetParameterOutput, error)
+// mockStrategy implements stage.PushStrategy for testing.
+type mockStrategy struct {
+	service          stage.Service
+	serviceName      string
+	itemName         string
+	hasDeleteOptions bool
+	pushSetFunc      func(ctx context.Context, name, value string) error
+	pushDeleteFunc   func(ctx context.Context, name string, entry stage.Entry) error
 }
 
-func (m *mockSSMClient) PutParameter(ctx context.Context, params *ssm.PutParameterInput, optFns ...func(*ssm.Options)) (*ssm.PutParameterOutput, error) {
-	if m.putParameterFunc != nil {
-		return m.putParameterFunc(ctx, params, optFns...)
+func (m *mockStrategy) Service() stage.Service { return m.service }
+func (m *mockStrategy) ServiceName() string    { return m.serviceName }
+func (m *mockStrategy) ItemName() string       { return m.itemName }
+func (m *mockStrategy) HasDeleteOptions() bool { return m.hasDeleteOptions }
+
+func (m *mockStrategy) PushSet(ctx context.Context, name, value string) error {
+	if m.pushSetFunc != nil {
+		return m.pushSetFunc(ctx, name, value)
 	}
-	return &ssm.PutParameterOutput{Version: 1}, nil
+	return nil
 }
 
-func (m *mockSSMClient) DeleteParameter(ctx context.Context, params *ssm.DeleteParameterInput, optFns ...func(*ssm.Options)) (*ssm.DeleteParameterOutput, error) {
-	if m.deleteParameterFunc != nil {
-		return m.deleteParameterFunc(ctx, params, optFns...)
+func (m *mockStrategy) PushDelete(ctx context.Context, name string, entry stage.Entry) error {
+	if m.pushDeleteFunc != nil {
+		return m.pushDeleteFunc(ctx, name, entry)
 	}
-	return &ssm.DeleteParameterOutput{}, nil
+	return nil
 }
 
-func (m *mockSSMClient) GetParameter(ctx context.Context, params *ssm.GetParameterInput, optFns ...func(*ssm.Options)) (*ssm.GetParameterOutput, error) {
-	if m.getParameterFunc != nil {
-		return m.getParameterFunc(ctx, params, optFns...)
+func newSSMStrategy() *mockStrategy {
+	return &mockStrategy{
+		service:          stage.ServiceSSM,
+		serviceName:      "SSM",
+		itemName:         "parameter",
+		hasDeleteOptions: false,
 	}
-	// Return ParameterNotFound error to indicate a new parameter
-	return nil, &types.ParameterNotFound{Message: lo.ToPtr("parameter not found")}
 }
 
-type mockSMClient struct {
-	putSecretValueFunc func(ctx context.Context, params *secretsmanager.PutSecretValueInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.PutSecretValueOutput, error)
-	deleteSecretFunc   func(ctx context.Context, params *secretsmanager.DeleteSecretInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.DeleteSecretOutput, error)
-}
-
-func (m *mockSMClient) PutSecretValue(ctx context.Context, params *secretsmanager.PutSecretValueInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.PutSecretValueOutput, error) {
-	if m.putSecretValueFunc != nil {
-		return m.putSecretValueFunc(ctx, params, optFns...)
+func newSMStrategy() *mockStrategy {
+	return &mockStrategy{
+		service:          stage.ServiceSM,
+		serviceName:      "SM",
+		itemName:         "secret",
+		hasDeleteOptions: true,
 	}
-	return &secretsmanager.PutSecretValueOutput{
-		Name:      params.SecretId,
-		VersionId: lo.ToPtr("v1"),
-	}, nil
-}
-
-func (m *mockSMClient) DeleteSecret(ctx context.Context, params *secretsmanager.DeleteSecretInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.DeleteSecretOutput, error) {
-	if m.deleteSecretFunc != nil {
-		return m.deleteSecretFunc(ctx, params, optFns...)
-	}
-	return &secretsmanager.DeleteSecretOutput{
-		Name: params.SecretId,
-	}, nil
 }
 
 func TestCommand_Validation(t *testing.T) {
@@ -95,11 +86,11 @@ func TestRun_NoChanges(t *testing.T) {
 
 	var buf bytes.Buffer
 	r := &push.Runner{
-		SSMClient: &mockSSMClient{},
-		SMClient:  &mockSMClient{},
-		Store:     store,
-		Stdout:    &buf,
-		Stderr:    &bytes.Buffer{},
+		SSMStrategy: newSSMStrategy(),
+		SMStrategy:  newSMStrategy(),
+		Store:       store,
+		Stdout:      &buf,
+		Stderr:      &bytes.Buffer{},
 	}
 
 	// When called with empty store, Run should return without error
@@ -132,32 +123,27 @@ func TestRun_PushBothServices(t *testing.T) {
 	ssmPutCalled := false
 	smPutCalled := false
 
-	ssmMock := &mockSSMClient{
-		putParameterFunc: func(_ context.Context, params *ssm.PutParameterInput, _ ...func(*ssm.Options)) (*ssm.PutParameterOutput, error) {
-			ssmPutCalled = true
-			assert.Equal(t, "/app/config", lo.FromPtr(params.Name))
-			return &ssm.PutParameterOutput{Version: 2}, nil
-		},
+	ssmMock := newSSMStrategy()
+	ssmMock.pushSetFunc = func(_ context.Context, name, _ string) error {
+		ssmPutCalled = true
+		assert.Equal(t, "/app/config", name)
+		return nil
 	}
 
-	smMock := &mockSMClient{
-		putSecretValueFunc: func(_ context.Context, params *secretsmanager.PutSecretValueInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.PutSecretValueOutput, error) {
-			smPutCalled = true
-			assert.Equal(t, "my-secret", lo.FromPtr(params.SecretId))
-			return &secretsmanager.PutSecretValueOutput{
-				Name:      params.SecretId,
-				VersionId: lo.ToPtr("v2"),
-			}, nil
-		},
+	smMock := newSMStrategy()
+	smMock.pushSetFunc = func(_ context.Context, name, _ string) error {
+		smPutCalled = true
+		assert.Equal(t, "my-secret", name)
+		return nil
 	}
 
 	var buf bytes.Buffer
 	r := &push.Runner{
-		SSMClient: ssmMock,
-		SMClient:  smMock,
-		Store:     store,
-		Stdout:    &buf,
-		Stderr:    &bytes.Buffer{},
+		SSMStrategy: ssmMock,
+		SMStrategy:  smMock,
+		Store:       store,
+		Stdout:      &buf,
+		Stderr:      &bytes.Buffer{},
 	}
 
 	err := r.Run(context.Background())
@@ -190,20 +176,19 @@ func TestRun_PushSSMOnly(t *testing.T) {
 	})
 
 	ssmPutCalled := false
-	ssmMock := &mockSSMClient{
-		putParameterFunc: func(_ context.Context, _ *ssm.PutParameterInput, _ ...func(*ssm.Options)) (*ssm.PutParameterOutput, error) {
-			ssmPutCalled = true
-			return &ssm.PutParameterOutput{Version: 2}, nil
-		},
+	ssmMock := newSSMStrategy()
+	ssmMock.pushSetFunc = func(_ context.Context, _, _ string) error {
+		ssmPutCalled = true
+		return nil
 	}
 
 	var buf bytes.Buffer
 	r := &push.Runner{
-		SSMClient: ssmMock,
-		SMClient:  nil, // Should not be needed
-		Store:     store,
-		Stdout:    &buf,
-		Stderr:    &bytes.Buffer{},
+		SSMStrategy: ssmMock,
+		SMStrategy:  nil, // Should not be needed
+		Store:       store,
+		Stdout:      &buf,
+		Stderr:      &bytes.Buffer{},
 	}
 
 	err := r.Run(context.Background())
@@ -227,22 +212,19 @@ func TestRun_PushSMOnly(t *testing.T) {
 	})
 
 	smPutCalled := false
-	smMock := &mockSMClient{
-		putSecretValueFunc: func(_ context.Context, _ *secretsmanager.PutSecretValueInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.PutSecretValueOutput, error) {
-			smPutCalled = true
-			return &secretsmanager.PutSecretValueOutput{
-				VersionId: lo.ToPtr("v2"),
-			}, nil
-		},
+	smMock := newSMStrategy()
+	smMock.pushSetFunc = func(_ context.Context, _, _ string) error {
+		smPutCalled = true
+		return nil
 	}
 
 	var buf bytes.Buffer
 	r := &push.Runner{
-		SSMClient: nil, // Should not be needed
-		SMClient:  smMock,
-		Store:     store,
-		Stdout:    &buf,
-		Stderr:    &bytes.Buffer{},
+		SSMStrategy: nil, // Should not be needed
+		SMStrategy:  smMock,
+		Store:       store,
+		Stdout:      &buf,
+		Stderr:      &bytes.Buffer{},
 	}
 
 	err := r.Run(context.Background())
@@ -271,27 +253,25 @@ func TestRun_PushDelete(t *testing.T) {
 	ssmDeleteCalled := false
 	smDeleteCalled := false
 
-	ssmMock := &mockSSMClient{
-		deleteParameterFunc: func(_ context.Context, _ *ssm.DeleteParameterInput, _ ...func(*ssm.Options)) (*ssm.DeleteParameterOutput, error) {
-			ssmDeleteCalled = true
-			return &ssm.DeleteParameterOutput{}, nil
-		},
+	ssmMock := newSSMStrategy()
+	ssmMock.pushDeleteFunc = func(_ context.Context, _ string, _ stage.Entry) error {
+		ssmDeleteCalled = true
+		return nil
 	}
 
-	smMock := &mockSMClient{
-		deleteSecretFunc: func(_ context.Context, _ *secretsmanager.DeleteSecretInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.DeleteSecretOutput, error) {
-			smDeleteCalled = true
-			return &secretsmanager.DeleteSecretOutput{}, nil
-		},
+	smMock := newSMStrategy()
+	smMock.pushDeleteFunc = func(_ context.Context, _ string, _ stage.Entry) error {
+		smDeleteCalled = true
+		return nil
 	}
 
 	var buf bytes.Buffer
 	r := &push.Runner{
-		SSMClient: ssmMock,
-		SMClient:  smMock,
-		Store:     store,
-		Stdout:    &buf,
-		Stderr:    &bytes.Buffer{},
+		SSMStrategy: ssmMock,
+		SMStrategy:  smMock,
+		Store:       store,
+		Stdout:      &buf,
+		Stderr:      &bytes.Buffer{},
 	}
 
 	err := r.Run(context.Background())
@@ -320,27 +300,23 @@ func TestRun_PartialFailure(t *testing.T) {
 		StagedAt:  time.Now(),
 	})
 
-	ssmMock := &mockSSMClient{
-		putParameterFunc: func(_ context.Context, _ *ssm.PutParameterInput, _ ...func(*ssm.Options)) (*ssm.PutParameterOutput, error) {
-			return nil, fmt.Errorf("SSM error")
-		},
+	ssmMock := newSSMStrategy()
+	ssmMock.pushSetFunc = func(_ context.Context, _, _ string) error {
+		return fmt.Errorf("SSM error")
 	}
 
-	smMock := &mockSMClient{
-		putSecretValueFunc: func(_ context.Context, _ *secretsmanager.PutSecretValueInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.PutSecretValueOutput, error) {
-			return &secretsmanager.PutSecretValueOutput{
-				VersionId: lo.ToPtr("v2"),
-			}, nil
-		},
+	smMock := newSMStrategy()
+	smMock.pushSetFunc = func(_ context.Context, _, _ string) error {
+		return nil
 	}
 
 	var buf, errBuf bytes.Buffer
 	r := &push.Runner{
-		SSMClient: ssmMock,
-		SMClient:  smMock,
-		Store:     store,
-		Stdout:    &buf,
-		Stderr:    &errBuf,
+		SSMStrategy: ssmMock,
+		SMStrategy:  smMock,
+		Store:       store,
+		Stdout:      &buf,
+		Stderr:      &errBuf,
 	}
 
 	err := r.Run(context.Background())
@@ -357,48 +333,6 @@ func TestRun_PartialFailure(t *testing.T) {
 	assert.Equal(t, stage.ErrNotStaged, err)
 }
 
-func TestRun_PreserveExistingType(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
-	store := stage.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
-
-	// Stage a parameter
-	_ = store.Stage(stage.ServiceSSM, "/app/secure", stage.Entry{
-		Operation: stage.OperationSet,
-		Value:     "new-value",
-		StagedAt:  time.Now(),
-	})
-
-	var capturedType types.ParameterType
-	ssmMock := &mockSSMClient{
-		getParameterFunc: func(_ context.Context, _ *ssm.GetParameterInput, _ ...func(*ssm.Options)) (*ssm.GetParameterOutput, error) {
-			return &ssm.GetParameterOutput{
-				Parameter: &types.Parameter{
-					Type: types.ParameterTypeSecureString,
-				},
-			}, nil
-		},
-		putParameterFunc: func(_ context.Context, params *ssm.PutParameterInput, _ ...func(*ssm.Options)) (*ssm.PutParameterOutput, error) {
-			capturedType = params.Type
-			return &ssm.PutParameterOutput{Version: 2}, nil
-		},
-	}
-
-	var buf bytes.Buffer
-	r := &push.Runner{
-		SSMClient: ssmMock,
-		SMClient:  nil,
-		Store:     store,
-		Stdout:    &buf,
-		Stderr:    &bytes.Buffer{},
-	}
-
-	err := r.Run(context.Background())
-	require.NoError(t, err)
-	assert.Equal(t, types.ParameterTypeSecureString, capturedType)
-}
-
 func TestRun_StoreError(t *testing.T) {
 	t.Parallel()
 
@@ -412,11 +346,11 @@ func TestRun_StoreError(t *testing.T) {
 
 	var buf bytes.Buffer
 	r := &push.Runner{
-		SSMClient: &mockSSMClient{},
-		SMClient:  &mockSMClient{},
-		Store:     store,
-		Stdout:    &buf,
-		Stderr:    &bytes.Buffer{},
+		SSMStrategy: newSSMStrategy(),
+		SMStrategy:  newSMStrategy(),
+		Store:       store,
+		Stdout:      &buf,
+		Stderr:      &bytes.Buffer{},
 	}
 
 	err := r.Run(context.Background())
@@ -439,26 +373,25 @@ func TestRun_SMDeleteWithForce(t *testing.T) {
 		},
 	})
 
-	var capturedForce *bool
-	smMock := &mockSMClient{
-		deleteSecretFunc: func(_ context.Context, params *secretsmanager.DeleteSecretInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.DeleteSecretOutput, error) {
-			capturedForce = params.ForceDeleteWithoutRecovery
-			return &secretsmanager.DeleteSecretOutput{}, nil
-		},
+	var capturedEntry stage.Entry
+	smMock := newSMStrategy()
+	smMock.pushDeleteFunc = func(_ context.Context, _ string, entry stage.Entry) error {
+		capturedEntry = entry
+		return nil
 	}
 
 	var buf bytes.Buffer
 	r := &push.Runner{
-		SMClient: smMock,
-		Store:    store,
-		Stdout:   &buf,
-		Stderr:   &bytes.Buffer{},
+		SMStrategy: smMock,
+		Store:      store,
+		Stdout:     &buf,
+		Stderr:     &bytes.Buffer{},
 	}
 
 	err := r.Run(context.Background())
 	require.NoError(t, err)
-	require.NotNil(t, capturedForce)
-	assert.True(t, *capturedForce)
+	require.NotNil(t, capturedEntry.DeleteOptions)
+	assert.True(t, capturedEntry.DeleteOptions.Force)
 }
 
 func TestRun_SMDeleteWithRecoveryWindow(t *testing.T) {
@@ -476,26 +409,25 @@ func TestRun_SMDeleteWithRecoveryWindow(t *testing.T) {
 		},
 	})
 
-	var capturedRecoveryWindow *int64
-	smMock := &mockSMClient{
-		deleteSecretFunc: func(_ context.Context, params *secretsmanager.DeleteSecretInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.DeleteSecretOutput, error) {
-			capturedRecoveryWindow = params.RecoveryWindowInDays
-			return &secretsmanager.DeleteSecretOutput{}, nil
-		},
+	var capturedEntry stage.Entry
+	smMock := newSMStrategy()
+	smMock.pushDeleteFunc = func(_ context.Context, _ string, entry stage.Entry) error {
+		capturedEntry = entry
+		return nil
 	}
 
 	var buf bytes.Buffer
 	r := &push.Runner{
-		SMClient: smMock,
-		Store:    store,
-		Stdout:   &buf,
-		Stderr:   &bytes.Buffer{},
+		SMStrategy: smMock,
+		Store:      store,
+		Stdout:     &buf,
+		Stderr:     &bytes.Buffer{},
 	}
 
 	err := r.Run(context.Background())
 	require.NoError(t, err)
-	require.NotNil(t, capturedRecoveryWindow)
-	assert.Equal(t, int64(7), *capturedRecoveryWindow)
+	require.NotNil(t, capturedEntry.DeleteOptions)
+	assert.Equal(t, 7, capturedEntry.DeleteOptions.RecoveryWindow)
 }
 
 func TestRun_SSMDeleteError(t *testing.T) {
@@ -509,18 +441,17 @@ func TestRun_SSMDeleteError(t *testing.T) {
 		StagedAt:  time.Now(),
 	})
 
-	ssmMock := &mockSSMClient{
-		deleteParameterFunc: func(_ context.Context, _ *ssm.DeleteParameterInput, _ ...func(*ssm.Options)) (*ssm.DeleteParameterOutput, error) {
-			return nil, fmt.Errorf("delete failed")
-		},
+	ssmMock := newSSMStrategy()
+	ssmMock.pushDeleteFunc = func(_ context.Context, _ string, _ stage.Entry) error {
+		return fmt.Errorf("delete failed")
 	}
 
 	var buf, errBuf bytes.Buffer
 	r := &push.Runner{
-		SSMClient: ssmMock,
-		Store:     store,
-		Stdout:    &buf,
-		Stderr:    &errBuf,
+		SSMStrategy: ssmMock,
+		Store:       store,
+		Stdout:      &buf,
+		Stderr:      &errBuf,
 	}
 
 	err := r.Run(context.Background())
@@ -540,18 +471,17 @@ func TestRun_SMSetError(t *testing.T) {
 		StagedAt:  time.Now(),
 	})
 
-	smMock := &mockSMClient{
-		putSecretValueFunc: func(_ context.Context, _ *secretsmanager.PutSecretValueInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.PutSecretValueOutput, error) {
-			return nil, fmt.Errorf("put secret failed")
-		},
+	smMock := newSMStrategy()
+	smMock.pushSetFunc = func(_ context.Context, _, _ string) error {
+		return fmt.Errorf("put secret failed")
 	}
 
 	var buf, errBuf bytes.Buffer
 	r := &push.Runner{
-		SMClient: smMock,
-		Store:    store,
-		Stdout:   &buf,
-		Stderr:   &errBuf,
+		SMStrategy: smMock,
+		Store:      store,
+		Stdout:     &buf,
+		Stderr:     &errBuf,
 	}
 
 	err := r.Run(context.Background())
@@ -570,18 +500,17 @@ func TestRun_SMDeleteError(t *testing.T) {
 		StagedAt:  time.Now(),
 	})
 
-	smMock := &mockSMClient{
-		deleteSecretFunc: func(_ context.Context, _ *secretsmanager.DeleteSecretInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.DeleteSecretOutput, error) {
-			return nil, fmt.Errorf("delete secret failed")
-		},
+	smMock := newSMStrategy()
+	smMock.pushDeleteFunc = func(_ context.Context, _ string, _ stage.Entry) error {
+		return fmt.Errorf("delete secret failed")
 	}
 
 	var buf, errBuf bytes.Buffer
 	r := &push.Runner{
-		SMClient: smMock,
-		Store:    store,
-		Stdout:   &buf,
-		Stderr:   &errBuf,
+		SMStrategy: smMock,
+		Store:      store,
+		Stdout:     &buf,
+		Stderr:     &errBuf,
 	}
 
 	err := r.Run(context.Background())
@@ -601,18 +530,17 @@ func TestRun_SSMSetError(t *testing.T) {
 		StagedAt:  time.Now(),
 	})
 
-	ssmMock := &mockSSMClient{
-		putParameterFunc: func(_ context.Context, _ *ssm.PutParameterInput, _ ...func(*ssm.Options)) (*ssm.PutParameterOutput, error) {
-			return nil, fmt.Errorf("put parameter failed")
-		},
+	ssmMock := newSSMStrategy()
+	ssmMock.pushSetFunc = func(_ context.Context, _, _ string) error {
+		return fmt.Errorf("put parameter failed")
 	}
 
 	var buf, errBuf bytes.Buffer
 	r := &push.Runner{
-		SSMClient: ssmMock,
-		Store:     store,
-		Stdout:    &buf,
-		Stderr:    &errBuf,
+		SSMStrategy: ssmMock,
+		Store:       store,
+		Stdout:      &buf,
+		Stderr:      &errBuf,
 	}
 
 	err := r.Run(context.Background())
