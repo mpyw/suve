@@ -14,6 +14,7 @@ import (
 	"github.com/mpyw/suve/internal/cli/sm/restore"
 	"github.com/mpyw/suve/internal/cli/sm/rm"
 	"github.com/mpyw/suve/internal/cli/sm/show"
+	"github.com/mpyw/suve/internal/cli/sm/status"
 	"github.com/mpyw/suve/internal/cli/sm/update"
 )
 
@@ -33,6 +34,7 @@ func Command() *cli.Command {
 			update.Command(),
 			rm.Command(),
 			restore.Command(),
+			status.Command(),
 			setDeprecatedCommand(),
 		},
 	}

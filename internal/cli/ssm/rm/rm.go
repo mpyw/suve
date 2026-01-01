@@ -36,6 +36,7 @@ type Options struct {
 func Command() *cli.Command {
 	return &cli.Command{
 		Name:      "rm",
+		Aliases:   []string{"delete"},
 		Usage:     "Delete parameter",
 		ArgsUsage: "<name>",
 		Description: `Permanently delete a parameter from AWS Systems Manager Parameter Store.

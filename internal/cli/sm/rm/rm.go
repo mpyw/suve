@@ -38,6 +38,7 @@ type Options struct {
 func Command() *cli.Command {
 	return &cli.Command{
 		Name:      "rm",
+		Aliases:   []string{"delete"},
 		Usage:     "Delete a secret",
 		ArgsUsage: "<name>",
 		Description: `Schedule a secret for deletion in AWS Secrets Manager.

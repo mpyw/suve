@@ -9,6 +9,7 @@ import (
 
 	"github.com/mpyw/suve/internal/cli/sm"
 	"github.com/mpyw/suve/internal/cli/ssm"
+	"github.com/mpyw/suve/internal/cli/status"
 )
 
 // MakeApp creates a new CLI application instance.
@@ -20,6 +21,7 @@ func MakeApp() *cli.Command {
 		Commands: []*cli.Command{
 			ssm.Command(),
 			sm.Command(),
+			status.Command(),
 		},
 		CommandNotFound: commandNotFound,
 	}

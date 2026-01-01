@@ -10,6 +10,7 @@ import (
 	"github.com/mpyw/suve/internal/cli/ssm/rm"
 	"github.com/mpyw/suve/internal/cli/ssm/set"
 	"github.com/mpyw/suve/internal/cli/ssm/show"
+	"github.com/mpyw/suve/internal/cli/ssm/status"
 )
 
 // Command returns the ssm command with all subcommands.
@@ -26,6 +27,7 @@ func Command() *cli.Command {
 			ls.Command(),
 			set.Command(),
 			rm.Command(),
+			status.Command(),
 		},
 	}
 }
