@@ -45,7 +45,9 @@ func TestCommand_Validation(t *testing.T) {
 }
 
 type mockClient struct {
-	putParameterFunc func(ctx context.Context, params *ssm.PutParameterInput, optFns ...func(*ssm.Options)) (*ssm.PutParameterOutput, error)
+	putParameterFunc           func(ctx context.Context, params *ssm.PutParameterInput, optFns ...func(*ssm.Options)) (*ssm.PutParameterOutput, error)
+	addTagsToResourceFunc      func(ctx context.Context, params *ssm.AddTagsToResourceInput, optFns ...func(*ssm.Options)) (*ssm.AddTagsToResourceOutput, error)
+	removeTagsFromResourceFunc func(ctx context.Context, params *ssm.RemoveTagsFromResourceInput, optFns ...func(*ssm.Options)) (*ssm.RemoveTagsFromResourceOutput, error)
 }
 
 func (m *mockClient) PutParameter(ctx context.Context, params *ssm.PutParameterInput, optFns ...func(*ssm.Options)) (*ssm.PutParameterOutput, error) {
@@ -53,6 +55,20 @@ func (m *mockClient) PutParameter(ctx context.Context, params *ssm.PutParameterI
 		return m.putParameterFunc(ctx, params, optFns...)
 	}
 	return nil, fmt.Errorf("PutParameter not mocked")
+}
+
+func (m *mockClient) AddTagsToResource(ctx context.Context, params *ssm.AddTagsToResourceInput, optFns ...func(*ssm.Options)) (*ssm.AddTagsToResourceOutput, error) {
+	if m.addTagsToResourceFunc != nil {
+		return m.addTagsToResourceFunc(ctx, params, optFns...)
+	}
+	return &ssm.AddTagsToResourceOutput{}, nil
+}
+
+func (m *mockClient) RemoveTagsFromResource(ctx context.Context, params *ssm.RemoveTagsFromResourceInput, optFns ...func(*ssm.Options)) (*ssm.RemoveTagsFromResourceOutput, error) {
+	if m.removeTagsFromResourceFunc != nil {
+		return m.removeTagsFromResourceFunc(ctx, params, optFns...)
+	}
+	return &ssm.RemoveTagsFromResourceOutput{}, nil
 }
 
 func TestRun(t *testing.T) {

@@ -1,5 +1,4 @@
-// Package ssm provides SSM-specific stage command strategy implementations.
-package ssm
+package staging
 
 import (
 	"context"
@@ -13,61 +12,63 @@ import (
 
 	"github.com/mpyw/suve/internal/api/ssmapi"
 	"github.com/mpyw/suve/internal/awsutil"
-	"github.com/mpyw/suve/internal/staging"
+	"github.com/mpyw/suve/internal/tagging"
 	"github.com/mpyw/suve/internal/version/ssmversion"
 )
 
-// Client is the combined interface for SSM stage operations.
-type Client interface {
+// SSMClient is the combined interface for SSM stage operations.
+type SSMClient interface {
 	ssmapi.GetParameterAPI
 	ssmapi.GetParameterHistoryAPI
 	ssmapi.PutParameterAPI
 	ssmapi.DeleteParameterAPI
+	ssmapi.AddTagsToResourceAPI
+	ssmapi.RemoveTagsFromResourceAPI
 }
 
-// Strategy implements staging.ServiceStrategy for SSM.
-type Strategy struct {
-	Client Client
+// SSMStrategy implements ServiceStrategy for SSM Parameter Store.
+type SSMStrategy struct {
+	Client SSMClient
 }
 
-// NewStrategy creates a new SSM strategy.
-func NewStrategy(client Client) *Strategy {
-	return &Strategy{Client: client}
+// NewSSMStrategy creates a new SSM strategy.
+func NewSSMStrategy(client SSMClient) *SSMStrategy {
+	return &SSMStrategy{Client: client}
 }
 
 // Service returns the service type.
-func (s *Strategy) Service() staging.Service {
-	return staging.ServiceSSM
+func (s *SSMStrategy) Service() Service {
+	return ServiceSSM
 }
 
 // ServiceName returns the user-friendly service name.
-func (s *Strategy) ServiceName() string {
+func (s *SSMStrategy) ServiceName() string {
 	return "SSM"
 }
 
 // ItemName returns the item name for messages.
-func (s *Strategy) ItemName() string {
+func (s *SSMStrategy) ItemName() string {
 	return "parameter"
 }
 
 // HasDeleteOptions returns false as SSM doesn't have delete options.
-func (s *Strategy) HasDeleteOptions() bool {
+func (s *SSMStrategy) HasDeleteOptions() bool {
 	return false
 }
 
 // Push applies a staged operation to AWS SSM.
-func (s *Strategy) Push(ctx context.Context, name string, entry staging.Entry) error {
+func (s *SSMStrategy) Push(ctx context.Context, name string, entry Entry) error {
 	switch entry.Operation {
-	case staging.OperationCreate, staging.OperationUpdate:
+	case OperationCreate, OperationUpdate:
 		return s.pushSet(ctx, name, entry)
-	case staging.OperationDelete:
+	case OperationDelete:
 		return s.pushDelete(ctx, name)
 	default:
 		return fmt.Errorf("unknown operation: %s", entry.Operation)
 	}
 }
 
-func (s *Strategy) pushSet(ctx context.Context, name string, entry staging.Entry) error {
+func (s *SSMStrategy) pushSet(ctx context.Context, name string, entry Entry) error {
 	// Try to get existing parameter to preserve type
 	paramType := types.ParameterTypeString
 	existing, err := s.Client.GetParameter(ctx, &ssm.GetParameterInput{
@@ -91,24 +92,29 @@ func (s *Strategy) pushSet(ctx context.Context, name string, entry staging.Entry
 	if entry.Description != nil {
 		input.Description = entry.Description
 	}
-	if len(entry.Tags) > 0 {
-		input.Tags = make([]types.Tag, 0, len(entry.Tags))
-		for k, v := range entry.Tags {
-			input.Tags = append(input.Tags, types.Tag{
-				Key:   lo.ToPtr(k),
-				Value: lo.ToPtr(v),
-			})
-		}
-	}
 
 	_, err = s.Client.PutParameter(ctx, input)
 	if err != nil {
 		return fmt.Errorf("failed to set parameter: %w", err)
 	}
+
+	// Apply tag changes (additive)
+	if len(entry.Tags) > 0 || len(entry.UntagKeys) > 0 {
+		change := &tagging.Change{
+			Add:    entry.Tags,
+			Remove: entry.UntagKeys,
+		}
+		if !change.IsEmpty() {
+			if err := tagging.ApplySSM(ctx, s.Client, name, change); err != nil {
+				return err
+			}
+		}
+	}
+
 	return nil
 }
 
-func (s *Strategy) pushDelete(ctx context.Context, name string) error {
+func (s *SSMStrategy) pushDelete(ctx context.Context, name string) error {
 	_, err := s.Client.DeleteParameter(ctx, &ssm.DeleteParameterInput{
 		Name: lo.ToPtr(name),
 	})
@@ -125,7 +131,7 @@ func (s *Strategy) pushDelete(ctx context.Context, name string) error {
 
 // FetchLastModified returns the last modified time of the parameter in AWS.
 // Returns zero time if the parameter doesn't exist.
-func (s *Strategy) FetchLastModified(ctx context.Context, name string) (time.Time, error) {
+func (s *SSMStrategy) FetchLastModified(ctx context.Context, name string) (time.Time, error) {
 	result, err := s.Client.GetParameter(ctx, &ssm.GetParameterInput{
 		Name: lo.ToPtr(name),
 	})
@@ -143,20 +149,20 @@ func (s *Strategy) FetchLastModified(ctx context.Context, name string) (time.Tim
 }
 
 // FetchCurrent fetches the current value from AWS SSM for diffing.
-func (s *Strategy) FetchCurrent(ctx context.Context, name string) (*staging.FetchResult, error) {
+func (s *SSMStrategy) FetchCurrent(ctx context.Context, name string) (*FetchResult, error) {
 	spec := &ssmversion.Spec{Name: name}
 	param, err := ssmversion.GetParameterWithVersion(ctx, s.Client, spec, true)
 	if err != nil {
 		return nil, err
 	}
-	return &staging.FetchResult{
+	return &FetchResult{
 		Value:      lo.FromPtr(param.Value),
 		Identifier: fmt.Sprintf("#%d", param.Version),
 	}, nil
 }
 
 // ParseName parses and validates a name for editing.
-func (s *Strategy) ParseName(input string) (string, error) {
+func (s *SSMStrategy) ParseName(input string) (string, error) {
 	spec, err := ssmversion.Parse(input)
 	if err != nil {
 		return "", err
@@ -168,7 +174,7 @@ func (s *Strategy) ParseName(input string) (string, error) {
 }
 
 // FetchCurrentValue fetches the current value from AWS SSM for editing.
-func (s *Strategy) FetchCurrentValue(ctx context.Context, name string) (string, error) {
+func (s *SSMStrategy) FetchCurrentValue(ctx context.Context, name string) (string, error) {
 	spec := &ssmversion.Spec{Name: name}
 	param, err := ssmversion.GetParameterWithVersion(ctx, s.Client, spec, true)
 	if err != nil {
@@ -178,7 +184,7 @@ func (s *Strategy) FetchCurrentValue(ctx context.Context, name string) (string, 
 }
 
 // ParseSpec parses a version spec string for reset.
-func (s *Strategy) ParseSpec(input string) (name string, hasVersion bool, err error) {
+func (s *SSMStrategy) ParseSpec(input string) (name string, hasVersion bool, err error) {
 	spec, err := ssmversion.Parse(input)
 	if err != nil {
 		return "", false, err
@@ -188,7 +194,7 @@ func (s *Strategy) ParseSpec(input string) (name string, hasVersion bool, err er
 }
 
 // FetchVersion fetches the value for a specific version.
-func (s *Strategy) FetchVersion(ctx context.Context, input string) (value string, versionLabel string, err error) {
+func (s *SSMStrategy) FetchVersion(ctx context.Context, input string) (value string, versionLabel string, err error) {
 	spec, err := ssmversion.Parse(input)
 	if err != nil {
 		return "", "", err
@@ -200,17 +206,17 @@ func (s *Strategy) FetchVersion(ctx context.Context, input string) (value string
 	return lo.FromPtr(param.Value), fmt.Sprintf("#%d", param.Version), nil
 }
 
-// Factory creates a FullStrategy with an initialized AWS client.
-func Factory(ctx context.Context) (staging.FullStrategy, error) {
+// SSMFactory creates a FullStrategy with an initialized AWS client.
+func SSMFactory(ctx context.Context) (FullStrategy, error) {
 	client, err := awsutil.NewSSMClient(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize AWS client: %w", err)
 	}
-	return NewStrategy(client), nil
+	return NewSSMStrategy(client), nil
 }
 
-// ParserFactory creates a Parser without an AWS client.
+// SSMParserFactory creates a Parser without an AWS client.
 // Use this for operations that don't need AWS access (e.g., status, parsing).
-func ParserFactory() staging.Parser {
-	return NewStrategy(nil)
+func SSMParserFactory() Parser {
+	return NewSSMStrategy(nil)
 }

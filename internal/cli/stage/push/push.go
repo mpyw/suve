@@ -12,8 +12,6 @@ import (
 	"github.com/mpyw/suve/internal/output"
 	"github.com/mpyw/suve/internal/parallel"
 	"github.com/mpyw/suve/internal/staging"
-	smstrategy "github.com/mpyw/suve/internal/staging/sm"
-	ssmstrategy "github.com/mpyw/suve/internal/staging/ssm"
 )
 
 // Runner executes the push command.
@@ -75,7 +73,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 
 	// Initialize strategies only if needed
 	if hasSSM {
-		strat, err := ssmstrategy.Factory(ctx)
+		strat, err := staging.SSMFactory(ctx)
 		if err != nil {
 			return err
 		}
@@ -83,7 +81,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	}
 
 	if hasSM {
-		strat, err := smstrategy.Factory(ctx)
+		strat, err := staging.SMFactory(ctx)
 		if err != nil {
 			return err
 		}

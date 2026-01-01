@@ -39,6 +39,7 @@ type mockClient struct {
 	putSecretValueFunc func(ctx context.Context, params *secretsmanager.PutSecretValueInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.PutSecretValueOutput, error)
 	updateSecretFunc   func(ctx context.Context, params *secretsmanager.UpdateSecretInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.UpdateSecretOutput, error)
 	tagResourceFunc    func(ctx context.Context, params *secretsmanager.TagResourceInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.TagResourceOutput, error)
+	untagResourceFunc  func(ctx context.Context, params *secretsmanager.UntagResourceInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.UntagResourceOutput, error)
 }
 
 func (m *mockClient) PutSecretValue(ctx context.Context, params *secretsmanager.PutSecretValueInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.PutSecretValueOutput, error) {
@@ -60,6 +61,13 @@ func (m *mockClient) TagResource(ctx context.Context, params *secretsmanager.Tag
 		return m.tagResourceFunc(ctx, params, optFns...)
 	}
 	return &secretsmanager.TagResourceOutput{}, nil
+}
+
+func (m *mockClient) UntagResource(ctx context.Context, params *secretsmanager.UntagResourceInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.UntagResourceOutput, error) {
+	if m.untagResourceFunc != nil {
+		return m.untagResourceFunc(ctx, params, optFns...)
+	}
+	return &secretsmanager.UntagResourceOutput{}, nil
 }
 
 func TestRun(t *testing.T) {

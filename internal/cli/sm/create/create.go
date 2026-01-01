@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager/types"
@@ -15,6 +14,7 @@ import (
 
 	"github.com/mpyw/suve/internal/api/smapi"
 	"github.com/mpyw/suve/internal/awsutil"
+	"github.com/mpyw/suve/internal/tagging"
 )
 
 // Client is the interface for the create command.
@@ -74,14 +74,15 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		return fmt.Errorf("usage: suve sm create <name> <value>")
 	}
 
+	// Parse tags (untag doesn't make sense for create)
+	tagResult, err := tagging.ParseFlags(cmd.StringSlice("tag"), nil)
+	if err != nil {
+		return err
+	}
+
 	client, err := awsutil.NewSMClient(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to initialize AWS client: %w", err)
-	}
-
-	tags, err := parseTags(cmd.StringSlice("tag"))
-	if err != nil {
-		return err
 	}
 
 	r := &Runner{
@@ -93,23 +94,8 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		Name:        cmd.Args().Get(0),
 		Value:       cmd.Args().Get(1),
 		Description: cmd.String("description"),
-		Tags:        tags,
+		Tags:        tagResult.Change.Add,
 	})
-}
-
-func parseTags(tagSlice []string) (map[string]string, error) {
-	if len(tagSlice) == 0 {
-		return nil, nil
-	}
-	tags := make(map[string]string)
-	for _, t := range tagSlice {
-		parts := strings.SplitN(t, "=", 2)
-		if len(parts) != 2 {
-			return nil, fmt.Errorf("invalid tag format %q: expected key=value", t)
-		}
-		tags[parts[0]] = parts[1]
-	}
-	return tags, nil
 }
 
 // Run executes the create command.

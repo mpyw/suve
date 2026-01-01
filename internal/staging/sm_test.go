@@ -1,4 +1,4 @@
-package sm_test
+package staging_test
 
 import (
 	"context"
@@ -12,10 +12,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/mpyw/suve/internal/staging"
-	stgsm "github.com/mpyw/suve/internal/staging/sm"
 )
 
-type mockClient struct {
+type smMockClient struct {
 	getSecretValueFunc       func(ctx context.Context, params *secretsmanager.GetSecretValueInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.GetSecretValueOutput, error)
 	listSecretVersionIdsFunc func(ctx context.Context, params *secretsmanager.ListSecretVersionIdsInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.ListSecretVersionIdsOutput, error)
 	createSecretFunc         func(ctx context.Context, params *secretsmanager.CreateSecretInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.CreateSecretOutput, error)
@@ -23,61 +22,69 @@ type mockClient struct {
 	deleteSecretFunc         func(ctx context.Context, params *secretsmanager.DeleteSecretInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.DeleteSecretOutput, error)
 	updateSecretFunc         func(ctx context.Context, params *secretsmanager.UpdateSecretInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.UpdateSecretOutput, error)
 	tagResourceFunc          func(ctx context.Context, params *secretsmanager.TagResourceInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.TagResourceOutput, error)
+	untagResourceFunc        func(ctx context.Context, params *secretsmanager.UntagResourceInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.UntagResourceOutput, error)
 }
 
-func (m *mockClient) GetSecretValue(ctx context.Context, params *secretsmanager.GetSecretValueInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.GetSecretValueOutput, error) {
+func (m *smMockClient) GetSecretValue(ctx context.Context, params *secretsmanager.GetSecretValueInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.GetSecretValueOutput, error) {
 	if m.getSecretValueFunc != nil {
 		return m.getSecretValueFunc(ctx, params, optFns...)
 	}
 	return nil, errors.New("GetSecretValue not mocked")
 }
 
-func (m *mockClient) ListSecretVersionIds(ctx context.Context, params *secretsmanager.ListSecretVersionIdsInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.ListSecretVersionIdsOutput, error) {
+func (m *smMockClient) ListSecretVersionIds(ctx context.Context, params *secretsmanager.ListSecretVersionIdsInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.ListSecretVersionIdsOutput, error) {
 	if m.listSecretVersionIdsFunc != nil {
 		return m.listSecretVersionIdsFunc(ctx, params, optFns...)
 	}
 	return nil, errors.New("ListSecretVersionIds not mocked")
 }
 
-func (m *mockClient) CreateSecret(ctx context.Context, params *secretsmanager.CreateSecretInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.CreateSecretOutput, error) {
+func (m *smMockClient) CreateSecret(ctx context.Context, params *secretsmanager.CreateSecretInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.CreateSecretOutput, error) {
 	if m.createSecretFunc != nil {
 		return m.createSecretFunc(ctx, params, optFns...)
 	}
 	return nil, errors.New("CreateSecret not mocked")
 }
 
-func (m *mockClient) PutSecretValue(ctx context.Context, params *secretsmanager.PutSecretValueInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.PutSecretValueOutput, error) {
+func (m *smMockClient) PutSecretValue(ctx context.Context, params *secretsmanager.PutSecretValueInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.PutSecretValueOutput, error) {
 	if m.putSecretValueFunc != nil {
 		return m.putSecretValueFunc(ctx, params, optFns...)
 	}
 	return nil, errors.New("PutSecretValue not mocked")
 }
 
-func (m *mockClient) DeleteSecret(ctx context.Context, params *secretsmanager.DeleteSecretInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.DeleteSecretOutput, error) {
+func (m *smMockClient) DeleteSecret(ctx context.Context, params *secretsmanager.DeleteSecretInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.DeleteSecretOutput, error) {
 	if m.deleteSecretFunc != nil {
 		return m.deleteSecretFunc(ctx, params, optFns...)
 	}
 	return nil, errors.New("DeleteSecret not mocked")
 }
 
-func (m *mockClient) UpdateSecret(ctx context.Context, params *secretsmanager.UpdateSecretInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.UpdateSecretOutput, error) {
+func (m *smMockClient) UpdateSecret(ctx context.Context, params *secretsmanager.UpdateSecretInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.UpdateSecretOutput, error) {
 	if m.updateSecretFunc != nil {
 		return m.updateSecretFunc(ctx, params, optFns...)
 	}
 	return &secretsmanager.UpdateSecretOutput{}, nil
 }
 
-func (m *mockClient) TagResource(ctx context.Context, params *secretsmanager.TagResourceInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.TagResourceOutput, error) {
+func (m *smMockClient) TagResource(ctx context.Context, params *secretsmanager.TagResourceInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.TagResourceOutput, error) {
 	if m.tagResourceFunc != nil {
 		return m.tagResourceFunc(ctx, params, optFns...)
 	}
 	return &secretsmanager.TagResourceOutput{}, nil
 }
 
-func TestStrategy_BasicMethods(t *testing.T) {
+func (m *smMockClient) UntagResource(ctx context.Context, params *secretsmanager.UntagResourceInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.UntagResourceOutput, error) {
+	if m.untagResourceFunc != nil {
+		return m.untagResourceFunc(ctx, params, optFns...)
+	}
+	return &secretsmanager.UntagResourceOutput{}, nil
+}
+
+func TestSMStrategy_BasicMethods(t *testing.T) {
 	t.Parallel()
 
-	s := stgsm.NewStrategy(nil)
+	s := staging.NewSMStrategy(nil)
 
 	t.Run("Service", func(t *testing.T) {
 		t.Parallel()
@@ -100,12 +107,12 @@ func TestStrategy_BasicMethods(t *testing.T) {
 	})
 }
 
-func TestStrategy_Push(t *testing.T) {
+func TestSMStrategy_Push(t *testing.T) {
 	t.Parallel()
 
 	t.Run("create operation", func(t *testing.T) {
 		t.Parallel()
-		mock := &mockClient{
+		mock := &smMockClient{
 			createSecretFunc: func(_ context.Context, params *secretsmanager.CreateSecretInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.CreateSecretOutput, error) {
 				assert.Equal(t, "my-secret", lo.FromPtr(params.Name))
 				assert.Equal(t, "secret-value", lo.FromPtr(params.SecretString))
@@ -113,7 +120,7 @@ func TestStrategy_Push(t *testing.T) {
 			},
 		}
 
-		s := stgsm.NewStrategy(mock)
+		s := staging.NewSMStrategy(mock)
 		err := s.Push(context.Background(), "my-secret", staging.Entry{
 			Operation: staging.OperationCreate,
 			Value:     "secret-value",
@@ -123,13 +130,13 @@ func TestStrategy_Push(t *testing.T) {
 
 	t.Run("create operation error", func(t *testing.T) {
 		t.Parallel()
-		mock := &mockClient{
+		mock := &smMockClient{
 			createSecretFunc: func(_ context.Context, _ *secretsmanager.CreateSecretInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.CreateSecretOutput, error) {
 				return nil, errors.New("create failed")
 			},
 		}
 
-		s := stgsm.NewStrategy(mock)
+		s := staging.NewSMStrategy(mock)
 		err := s.Push(context.Background(), "my-secret", staging.Entry{
 			Operation: staging.OperationCreate,
 			Value:     "secret-value",
@@ -140,7 +147,7 @@ func TestStrategy_Push(t *testing.T) {
 
 	t.Run("update operation", func(t *testing.T) {
 		t.Parallel()
-		mock := &mockClient{
+		mock := &smMockClient{
 			putSecretValueFunc: func(_ context.Context, params *secretsmanager.PutSecretValueInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.PutSecretValueOutput, error) {
 				assert.Equal(t, "my-secret", lo.FromPtr(params.SecretId))
 				assert.Equal(t, "updated-value", lo.FromPtr(params.SecretString))
@@ -148,7 +155,7 @@ func TestStrategy_Push(t *testing.T) {
 			},
 		}
 
-		s := stgsm.NewStrategy(mock)
+		s := staging.NewSMStrategy(mock)
 		err := s.Push(context.Background(), "my-secret", staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     "updated-value",
@@ -158,13 +165,13 @@ func TestStrategy_Push(t *testing.T) {
 
 	t.Run("update operation error", func(t *testing.T) {
 		t.Parallel()
-		mock := &mockClient{
+		mock := &smMockClient{
 			putSecretValueFunc: func(_ context.Context, _ *secretsmanager.PutSecretValueInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.PutSecretValueOutput, error) {
 				return nil, errors.New("update failed")
 			},
 		}
 
-		s := stgsm.NewStrategy(mock)
+		s := staging.NewSMStrategy(mock)
 		err := s.Push(context.Background(), "my-secret", staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     "updated-value",
@@ -175,7 +182,7 @@ func TestStrategy_Push(t *testing.T) {
 
 	t.Run("delete operation - basic", func(t *testing.T) {
 		t.Parallel()
-		mock := &mockClient{
+		mock := &smMockClient{
 			deleteSecretFunc: func(_ context.Context, params *secretsmanager.DeleteSecretInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.DeleteSecretOutput, error) {
 				assert.Equal(t, "my-secret", lo.FromPtr(params.SecretId))
 				assert.Nil(t, params.ForceDeleteWithoutRecovery)
@@ -184,7 +191,7 @@ func TestStrategy_Push(t *testing.T) {
 			},
 		}
 
-		s := stgsm.NewStrategy(mock)
+		s := staging.NewSMStrategy(mock)
 		err := s.Push(context.Background(), "my-secret", staging.Entry{
 			Operation: staging.OperationDelete,
 		})
@@ -193,14 +200,14 @@ func TestStrategy_Push(t *testing.T) {
 
 	t.Run("delete operation - with force", func(t *testing.T) {
 		t.Parallel()
-		mock := &mockClient{
+		mock := &smMockClient{
 			deleteSecretFunc: func(_ context.Context, params *secretsmanager.DeleteSecretInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.DeleteSecretOutput, error) {
 				assert.True(t, lo.FromPtr(params.ForceDeleteWithoutRecovery))
 				return &secretsmanager.DeleteSecretOutput{}, nil
 			},
 		}
 
-		s := stgsm.NewStrategy(mock)
+		s := staging.NewSMStrategy(mock)
 		err := s.Push(context.Background(), "my-secret", staging.Entry{
 			Operation: staging.OperationDelete,
 			DeleteOptions: &staging.DeleteOptions{
@@ -212,7 +219,7 @@ func TestStrategy_Push(t *testing.T) {
 
 	t.Run("delete operation - with recovery window", func(t *testing.T) {
 		t.Parallel()
-		mock := &mockClient{
+		mock := &smMockClient{
 			deleteSecretFunc: func(_ context.Context, params *secretsmanager.DeleteSecretInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.DeleteSecretOutput, error) {
 				assert.Nil(t, params.ForceDeleteWithoutRecovery)
 				assert.Equal(t, int64(14), lo.FromPtr(params.RecoveryWindowInDays))
@@ -220,7 +227,7 @@ func TestStrategy_Push(t *testing.T) {
 			},
 		}
 
-		s := stgsm.NewStrategy(mock)
+		s := staging.NewSMStrategy(mock)
 		err := s.Push(context.Background(), "my-secret", staging.Entry{
 			Operation: staging.OperationDelete,
 			DeleteOptions: &staging.DeleteOptions{
@@ -232,13 +239,13 @@ func TestStrategy_Push(t *testing.T) {
 
 	t.Run("delete operation error", func(t *testing.T) {
 		t.Parallel()
-		mock := &mockClient{
+		mock := &smMockClient{
 			deleteSecretFunc: func(_ context.Context, _ *secretsmanager.DeleteSecretInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.DeleteSecretOutput, error) {
 				return nil, errors.New("delete failed")
 			},
 		}
 
-		s := stgsm.NewStrategy(mock)
+		s := staging.NewSMStrategy(mock)
 		err := s.Push(context.Background(), "my-secret", staging.Entry{
 			Operation: staging.OperationDelete,
 		})
@@ -248,7 +255,7 @@ func TestStrategy_Push(t *testing.T) {
 
 	t.Run("unknown operation", func(t *testing.T) {
 		t.Parallel()
-		s := stgsm.NewStrategy(&mockClient{})
+		s := staging.NewSMStrategy(&smMockClient{})
 		err := s.Push(context.Background(), "my-secret", staging.Entry{
 			Operation: staging.Operation("unknown"),
 		})
@@ -257,12 +264,12 @@ func TestStrategy_Push(t *testing.T) {
 	})
 }
 
-func TestStrategy_FetchCurrent(t *testing.T) {
+func TestSMStrategy_FetchCurrent(t *testing.T) {
 	t.Parallel()
 
 	t.Run("success", func(t *testing.T) {
 		t.Parallel()
-		mock := &mockClient{
+		mock := &smMockClient{
 			getSecretValueFunc: func(_ context.Context, _ *secretsmanager.GetSecretValueInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.GetSecretValueOutput, error) {
 				return &secretsmanager.GetSecretValueOutput{
 					SecretString: lo.ToPtr("secret-value"),
@@ -271,7 +278,7 @@ func TestStrategy_FetchCurrent(t *testing.T) {
 			},
 		}
 
-		s := stgsm.NewStrategy(mock)
+		s := staging.NewSMStrategy(mock)
 		result, err := s.FetchCurrent(context.Background(), "my-secret")
 		require.NoError(t, err)
 		assert.Equal(t, "secret-value", result.Value)
@@ -280,22 +287,22 @@ func TestStrategy_FetchCurrent(t *testing.T) {
 
 	t.Run("error", func(t *testing.T) {
 		t.Parallel()
-		mock := &mockClient{
+		mock := &smMockClient{
 			getSecretValueFunc: func(_ context.Context, _ *secretsmanager.GetSecretValueInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.GetSecretValueOutput, error) {
 				return nil, errors.New("not found")
 			},
 		}
 
-		s := stgsm.NewStrategy(mock)
+		s := staging.NewSMStrategy(mock)
 		_, err := s.FetchCurrent(context.Background(), "my-secret")
 		require.Error(t, err)
 	})
 }
 
-func TestStrategy_ParseName(t *testing.T) {
+func TestSMStrategy_ParseName(t *testing.T) {
 	t.Parallel()
 
-	s := stgsm.NewStrategy(nil)
+	s := staging.NewSMStrategy(nil)
 
 	t.Run("valid name", func(t *testing.T) {
 		t.Parallel()
@@ -326,12 +333,12 @@ func TestStrategy_ParseName(t *testing.T) {
 	})
 }
 
-func TestStrategy_FetchCurrentValue(t *testing.T) {
+func TestSMStrategy_FetchCurrentValue(t *testing.T) {
 	t.Parallel()
 
 	t.Run("success", func(t *testing.T) {
 		t.Parallel()
-		mock := &mockClient{
+		mock := &smMockClient{
 			getSecretValueFunc: func(_ context.Context, _ *secretsmanager.GetSecretValueInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.GetSecretValueOutput, error) {
 				return &secretsmanager.GetSecretValueOutput{
 					SecretString: lo.ToPtr("fetched-secret"),
@@ -339,7 +346,7 @@ func TestStrategy_FetchCurrentValue(t *testing.T) {
 			},
 		}
 
-		s := stgsm.NewStrategy(mock)
+		s := staging.NewSMStrategy(mock)
 		value, err := s.FetchCurrentValue(context.Background(), "my-secret")
 		require.NoError(t, err)
 		assert.Equal(t, "fetched-secret", value)
@@ -347,22 +354,22 @@ func TestStrategy_FetchCurrentValue(t *testing.T) {
 
 	t.Run("error", func(t *testing.T) {
 		t.Parallel()
-		mock := &mockClient{
+		mock := &smMockClient{
 			getSecretValueFunc: func(_ context.Context, _ *secretsmanager.GetSecretValueInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.GetSecretValueOutput, error) {
 				return nil, errors.New("fetch error")
 			},
 		}
 
-		s := stgsm.NewStrategy(mock)
+		s := staging.NewSMStrategy(mock)
 		_, err := s.FetchCurrentValue(context.Background(), "my-secret")
 		require.Error(t, err)
 	})
 }
 
-func TestStrategy_ParseSpec(t *testing.T) {
+func TestSMStrategy_ParseSpec(t *testing.T) {
 	t.Parallel()
 
-	s := stgsm.NewStrategy(nil)
+	s := staging.NewSMStrategy(nil)
 
 	t.Run("name only", func(t *testing.T) {
 		t.Parallel()
@@ -397,12 +404,12 @@ func TestStrategy_ParseSpec(t *testing.T) {
 	})
 }
 
-func TestStrategy_FetchVersion(t *testing.T) {
+func TestSMStrategy_FetchVersion(t *testing.T) {
 	t.Parallel()
 
 	t.Run("success with label", func(t *testing.T) {
 		t.Parallel()
-		mock := &mockClient{
+		mock := &smMockClient{
 			getSecretValueFunc: func(_ context.Context, params *secretsmanager.GetSecretValueInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.GetSecretValueOutput, error) {
 				assert.Equal(t, "AWSPREVIOUS", lo.FromPtr(params.VersionStage))
 				return &secretsmanager.GetSecretValueOutput{
@@ -412,7 +419,7 @@ func TestStrategy_FetchVersion(t *testing.T) {
 			},
 		}
 
-		s := stgsm.NewStrategy(mock)
+		s := staging.NewSMStrategy(mock)
 		value, label, err := s.FetchVersion(context.Background(), "my-secret:AWSPREVIOUS")
 		require.NoError(t, err)
 		assert.Equal(t, "previous-value", value)
@@ -421,10 +428,8 @@ func TestStrategy_FetchVersion(t *testing.T) {
 
 	t.Run("success with shift", func(t *testing.T) {
 		t.Parallel()
-		getSecretValueCalls := 0
-		mock := &mockClient{
+		mock := &smMockClient{
 			getSecretValueFunc: func(_ context.Context, params *secretsmanager.GetSecretValueInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.GetSecretValueOutput, error) {
-				getSecretValueCalls++
 				if params.VersionStage != nil && lo.FromPtr(params.VersionStage) == "AWSCURRENT" {
 					return &secretsmanager.GetSecretValueOutput{
 						SecretString: lo.ToPtr("current-value"),
@@ -446,7 +451,7 @@ func TestStrategy_FetchVersion(t *testing.T) {
 			},
 		}
 
-		s := stgsm.NewStrategy(mock)
+		s := staging.NewSMStrategy(mock)
 		value, label, err := s.FetchVersion(context.Background(), "my-secret~1")
 		require.NoError(t, err)
 		assert.Equal(t, "shifted-value", value)
@@ -455,29 +460,29 @@ func TestStrategy_FetchVersion(t *testing.T) {
 
 	t.Run("parse error", func(t *testing.T) {
 		t.Parallel()
-		s := stgsm.NewStrategy(&mockClient{})
+		s := staging.NewSMStrategy(&smMockClient{})
 		_, _, err := s.FetchVersion(context.Background(), "")
 		require.Error(t, err)
 	})
 
 	t.Run("fetch error", func(t *testing.T) {
 		t.Parallel()
-		mock := &mockClient{
+		mock := &smMockClient{
 			getSecretValueFunc: func(_ context.Context, _ *secretsmanager.GetSecretValueInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.GetSecretValueOutput, error) {
 				return nil, errors.New("fetch error")
 			},
 		}
 
-		s := stgsm.NewStrategy(mock)
+		s := staging.NewSMStrategy(mock)
 		_, _, err := s.FetchVersion(context.Background(), "my-secret:AWSCURRENT")
 		require.Error(t, err)
 	})
 }
 
-func TestParserFactory(t *testing.T) {
+func TestSMParserFactory(t *testing.T) {
 	t.Parallel()
 
-	parser := stgsm.ParserFactory()
+	parser := staging.SMParserFactory()
 	require.NotNil(t, parser)
 	assert.Equal(t, staging.ServiceSM, parser.Service())
 }

@@ -31,3 +31,13 @@ type DeleteParameterAPI interface {
 type DescribeParametersAPI interface {
 	DescribeParameters(ctx context.Context, params *ssm.DescribeParametersInput, optFns ...func(*ssm.Options)) (*ssm.DescribeParametersOutput, error)
 }
+
+// AddTagsToResourceAPI is the interface for adding tags to a resource.
+type AddTagsToResourceAPI interface {
+	AddTagsToResource(ctx context.Context, params *ssm.AddTagsToResourceInput, optFns ...func(*ssm.Options)) (*ssm.AddTagsToResourceOutput, error)
+}
+
+// RemoveTagsFromResourceAPI is the interface for removing tags from a resource.
+type RemoveTagsFromResourceAPI interface {
+	RemoveTagsFromResource(ctx context.Context, params *ssm.RemoveTagsFromResourceInput, optFns ...func(*ssm.Options)) (*ssm.RemoveTagsFromResourceOutput, error)
+}

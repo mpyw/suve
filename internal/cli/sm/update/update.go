@@ -6,10 +6,8 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
-	"github.com/aws/aws-sdk-go-v2/service/secretsmanager/types"
 	"github.com/fatih/color"
 	"github.com/samber/lo"
 	"github.com/urfave/cli/v3"
@@ -17,6 +15,8 @@ import (
 	"github.com/mpyw/suve/internal/api/smapi"
 	"github.com/mpyw/suve/internal/awsutil"
 	"github.com/mpyw/suve/internal/confirm"
+	"github.com/mpyw/suve/internal/output"
+	"github.com/mpyw/suve/internal/tagging"
 )
 
 // Client is the interface for the update command.
@@ -24,6 +24,7 @@ type Client interface {
 	smapi.PutSecretValueAPI
 	smapi.UpdateSecretAPI
 	smapi.TagResourceAPI
+	smapi.UntagResourceAPI
 }
 
 // Runner executes the update command.
@@ -38,7 +39,7 @@ type Options struct {
 	Name        string
 	Value       string
 	Description string
-	Tags        map[string]string
+	TagChange   *tagging.Change
 }
 
 // Command returns the update command.
@@ -54,10 +55,17 @@ have its AWSCURRENT label moved to AWSPREVIOUS.
 
 Use 'suve sm create' to create a new secret.
 
+TAGGING:
+   --tag adds or updates tags (additive, does not remove existing tags)
+   --untag removes specific tags by key
+   If the same key appears in both, the later flag wins with a warning.
+
 EXAMPLES:
-  suve sm update my-api-key "new-key-value"            Update with new value
-  suve sm update my-config '{"host":"new-db.com"}'     Update JSON secret
-  suve sm update -y my-api-key "new-key-value"         Update without confirmation`,
+  suve sm update my-api-key "new-key-value"             Update with new value
+  suve sm update my-config '{"host":"new-db.com"}'      Update JSON secret
+  suve sm update -y my-api-key "new-key-value"          Update without confirmation
+  suve sm update --tag env=prod my-api-key "value"      Update with tags
+  suve sm update --untag deprecated my-api-key "value"  Remove a tag`,
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:  "description",
@@ -65,7 +73,11 @@ EXAMPLES:
 			},
 			&cli.StringSliceFlag{
 				Name:  "tag",
-				Usage: "Tag in key=value format (can be specified multiple times)",
+				Usage: "Tag in key=value format (can be specified multiple times, additive)",
+			},
+			&cli.StringSliceFlag{
+				Name:  "untag",
+				Usage: "Tag key to remove (can be specified multiple times)",
 			},
 			&cli.BoolFlag{
 				Name:    "yes",
@@ -84,6 +96,17 @@ func action(ctx context.Context, cmd *cli.Command) error {
 
 	name := cmd.Args().Get(0)
 	skipConfirm := cmd.Bool("yes")
+
+	// Parse tags
+	tagResult, err := tagging.ParseFlags(cmd.StringSlice("tag"), cmd.StringSlice("untag"))
+	if err != nil {
+		return err
+	}
+
+	// Output warnings
+	for _, w := range tagResult.Warnings {
+		output.Warning(cmd.Root().ErrWriter, "%s", w)
+	}
 
 	// Confirm operation
 	prompter := &confirm.Prompter{
@@ -104,11 +127,6 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		return fmt.Errorf("failed to initialize AWS client: %w", err)
 	}
 
-	tags, err := parseTags(cmd.StringSlice("tag"))
-	if err != nil {
-		return err
-	}
-
 	r := &Runner{
 		Client: client,
 		Stdout: cmd.Root().Writer,
@@ -118,23 +136,8 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		Name:        name,
 		Value:       cmd.Args().Get(1),
 		Description: cmd.String("description"),
-		Tags:        tags,
+		TagChange:   tagResult.Change,
 	})
-}
-
-func parseTags(tagSlice []string) (map[string]string, error) {
-	if len(tagSlice) == 0 {
-		return nil, nil
-	}
-	tags := make(map[string]string)
-	for _, t := range tagSlice {
-		parts := strings.SplitN(t, "=", 2)
-		if len(parts) != 2 {
-			return nil, fmt.Errorf("invalid tag format %q: expected key=value", t)
-		}
-		tags[parts[0]] = parts[1]
-	}
-	return tags, nil
 }
 
 // Run executes the update command.
@@ -159,21 +162,10 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 		}
 	}
 
-	// Update tags if provided
-	if len(opts.Tags) > 0 {
-		smTags := make([]types.Tag, 0, len(opts.Tags))
-		for k, v := range opts.Tags {
-			smTags = append(smTags, types.Tag{
-				Key:   lo.ToPtr(k),
-				Value: lo.ToPtr(v),
-			})
-		}
-		_, err := r.Client.TagResource(ctx, &secretsmanager.TagResourceInput{
-			SecretId: lo.ToPtr(opts.Name),
-			Tags:     smTags,
-		})
-		if err != nil {
-			return fmt.Errorf("failed to update tags: %w", err)
+	// Apply tag changes (additive)
+	if opts.TagChange != nil && !opts.TagChange.IsEmpty() {
+		if err := tagging.ApplySM(ctx, r.Client, opts.Name, opts.TagChange); err != nil {
+			return err
 		}
 	}
 

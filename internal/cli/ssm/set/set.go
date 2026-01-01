@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/aws/aws-sdk-go-v2/service/ssm/types"
@@ -17,11 +16,15 @@ import (
 	"github.com/mpyw/suve/internal/api/ssmapi"
 	"github.com/mpyw/suve/internal/awsutil"
 	"github.com/mpyw/suve/internal/confirm"
+	"github.com/mpyw/suve/internal/output"
+	"github.com/mpyw/suve/internal/tagging"
 )
 
 // Client is the interface for the set command.
 type Client interface {
 	ssmapi.PutParameterAPI
+	ssmapi.AddTagsToResourceAPI
+	ssmapi.RemoveTagsFromResourceAPI
 }
 
 // Runner executes the set command.
@@ -37,7 +40,7 @@ type Options struct {
 	Value       string
 	Type        string
 	Description string
-	Tags        map[string]string
+	TagChange   *tagging.Change
 }
 
 // Command returns the set command.
@@ -56,10 +59,17 @@ PARAMETER TYPES:
 The --secure flag is a shorthand for --type SecureString.
 You cannot use both --secure and --type together.
 
+TAGGING:
+   --tag adds or updates tags (additive, does not remove existing tags)
+   --untag removes specific tags by key
+   If the same key appears in both, the later flag wins with a warning.
+
 EXAMPLES:
    suve ssm set /app/config/db-url "postgres://..."              Create String parameter
    suve ssm set --secure /app/config/api-key "secret123"         Create SecureString
    suve ssm set --type StringList /app/hosts "a.com,b.com"       Create StringList
+   suve ssm set --tag env=prod --tag team=platform /app/key val  Set with tags
+   suve ssm set --untag deprecated /app/key val                  Remove a tag
    suve ssm set -y /app/config/db-url "postgres://..."           Set without confirmation`,
 		Flags: []cli.Flag{
 			&cli.StringFlag{
@@ -77,7 +87,11 @@ EXAMPLES:
 			},
 			&cli.StringSliceFlag{
 				Name:  "tag",
-				Usage: "Tag in key=value format (can be specified multiple times)",
+				Usage: "Tag in key=value format (can be specified multiple times, additive)",
+			},
+			&cli.StringSliceFlag{
+				Name:  "untag",
+				Usage: "Tag key to remove (can be specified multiple times)",
 			},
 			&cli.BoolFlag{
 				Name:    "yes",
@@ -108,6 +122,17 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	name := cmd.Args().Get(0)
 	skipConfirm := cmd.Bool("yes")
 
+	// Parse tags
+	tagResult, err := tagging.ParseFlags(cmd.StringSlice("tag"), cmd.StringSlice("untag"))
+	if err != nil {
+		return err
+	}
+
+	// Output warnings
+	for _, w := range tagResult.Warnings {
+		output.Warning(cmd.Root().ErrWriter, "%s", w)
+	}
+
 	// Confirm operation
 	prompter := &confirm.Prompter{
 		Stdin:  os.Stdin,
@@ -127,11 +152,6 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		return fmt.Errorf("failed to initialize AWS client: %w", err)
 	}
 
-	tags, err := parseTags(cmd.StringSlice("tag"))
-	if err != nil {
-		return err
-	}
-
 	r := &Runner{
 		Client: client,
 		Stdout: cmd.Root().Writer,
@@ -142,23 +162,8 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		Value:       cmd.Args().Get(1),
 		Type:        paramType,
 		Description: cmd.String("description"),
-		Tags:        tags,
+		TagChange:   tagResult.Change,
 	})
-}
-
-func parseTags(tagSlice []string) (map[string]string, error) {
-	if len(tagSlice) == 0 {
-		return nil, nil
-	}
-	tags := make(map[string]string)
-	for _, t := range tagSlice {
-		parts := strings.SplitN(t, "=", 2)
-		if len(parts) != 2 {
-			return nil, fmt.Errorf("invalid tag format %q: expected key=value", t)
-		}
-		tags[parts[0]] = parts[1]
-	}
-	return tags, nil
 }
 
 // Run executes the set command.
@@ -172,19 +177,17 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 	if opts.Description != "" {
 		input.Description = lo.ToPtr(opts.Description)
 	}
-	if len(opts.Tags) > 0 {
-		input.Tags = make([]types.Tag, 0, len(opts.Tags))
-		for k, v := range opts.Tags {
-			input.Tags = append(input.Tags, types.Tag{
-				Key:   lo.ToPtr(k),
-				Value: lo.ToPtr(v),
-			})
-		}
-	}
 
 	result, err := r.Client.PutParameter(ctx, input)
 	if err != nil {
 		return fmt.Errorf("failed to set parameter: %w", err)
+	}
+
+	// Apply tag changes (additive)
+	if opts.TagChange != nil && !opts.TagChange.IsEmpty() {
+		if err := tagging.ApplySSM(ctx, r.Client, opts.Name, opts.TagChange); err != nil {
+			return err
+		}
 	}
 
 	green := color.New(color.FgGreen).SprintFunc()

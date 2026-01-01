@@ -1,5 +1,4 @@
-// Package sm provides SM-specific stage command strategy implementations.
-package sm
+package staging
 
 import (
 	"context"
@@ -13,12 +12,12 @@ import (
 
 	"github.com/mpyw/suve/internal/api/smapi"
 	"github.com/mpyw/suve/internal/awsutil"
-	"github.com/mpyw/suve/internal/staging"
+	"github.com/mpyw/suve/internal/tagging"
 	"github.com/mpyw/suve/internal/version/smversion"
 )
 
-// Client is the combined interface for SM stage operations.
-type Client interface {
+// SMClient is the combined interface for SM stage operations.
+type SMClient interface {
 	smapi.GetSecretValueAPI
 	smapi.ListSecretVersionIdsAPI
 	smapi.CreateSecretAPI
@@ -26,53 +25,54 @@ type Client interface {
 	smapi.DeleteSecretAPI
 	smapi.UpdateSecretAPI
 	smapi.TagResourceAPI
+	smapi.UntagResourceAPI
 }
 
-// Strategy implements staging.ServiceStrategy for SM.
-type Strategy struct {
-	Client Client
+// SMStrategy implements ServiceStrategy for Secrets Manager.
+type SMStrategy struct {
+	Client SMClient
 }
 
-// NewStrategy creates a new SM strategy.
-func NewStrategy(client Client) *Strategy {
-	return &Strategy{Client: client}
+// NewSMStrategy creates a new SM strategy.
+func NewSMStrategy(client SMClient) *SMStrategy {
+	return &SMStrategy{Client: client}
 }
 
 // Service returns the service type.
-func (s *Strategy) Service() staging.Service {
-	return staging.ServiceSM
+func (s *SMStrategy) Service() Service {
+	return ServiceSM
 }
 
 // ServiceName returns the user-friendly service name.
-func (s *Strategy) ServiceName() string {
+func (s *SMStrategy) ServiceName() string {
 	return "SM"
 }
 
 // ItemName returns the item name for messages.
-func (s *Strategy) ItemName() string {
+func (s *SMStrategy) ItemName() string {
 	return "secret"
 }
 
 // HasDeleteOptions returns true as SM has delete options.
-func (s *Strategy) HasDeleteOptions() bool {
+func (s *SMStrategy) HasDeleteOptions() bool {
 	return true
 }
 
 // Push applies a staged operation to AWS Secrets Manager.
-func (s *Strategy) Push(ctx context.Context, name string, entry staging.Entry) error {
+func (s *SMStrategy) Push(ctx context.Context, name string, entry Entry) error {
 	switch entry.Operation {
-	case staging.OperationCreate:
+	case OperationCreate:
 		return s.pushCreate(ctx, name, entry)
-	case staging.OperationUpdate:
+	case OperationUpdate:
 		return s.pushUpdate(ctx, name, entry)
-	case staging.OperationDelete:
+	case OperationDelete:
 		return s.pushDelete(ctx, name, entry)
 	default:
 		return fmt.Errorf("unknown operation: %s", entry.Operation)
 	}
 }
 
-func (s *Strategy) pushCreate(ctx context.Context, name string, entry staging.Entry) error {
+func (s *SMStrategy) pushCreate(ctx context.Context, name string, entry Entry) error {
 	input := &secretsmanager.CreateSecretInput{
 		Name:         lo.ToPtr(name),
 		SecretString: lo.ToPtr(entry.Value),
@@ -97,7 +97,7 @@ func (s *Strategy) pushCreate(ctx context.Context, name string, entry staging.En
 	return nil
 }
 
-func (s *Strategy) pushUpdate(ctx context.Context, name string, entry staging.Entry) error {
+func (s *SMStrategy) pushUpdate(ctx context.Context, name string, entry Entry) error {
 	// Update secret value
 	_, err := s.Client.PutSecretValue(ctx, &secretsmanager.PutSecretValueInput{
 		SecretId:     lo.ToPtr(name),
@@ -118,28 +118,23 @@ func (s *Strategy) pushUpdate(ctx context.Context, name string, entry staging.En
 		}
 	}
 
-	// Update tags if provided
-	if len(entry.Tags) > 0 {
-		smTags := make([]types.Tag, 0, len(entry.Tags))
-		for k, v := range entry.Tags {
-			smTags = append(smTags, types.Tag{
-				Key:   lo.ToPtr(k),
-				Value: lo.ToPtr(v),
-			})
+	// Apply tag changes (additive)
+	if len(entry.Tags) > 0 || len(entry.UntagKeys) > 0 {
+		change := &tagging.Change{
+			Add:    entry.Tags,
+			Remove: entry.UntagKeys,
 		}
-		_, err := s.Client.TagResource(ctx, &secretsmanager.TagResourceInput{
-			SecretId: lo.ToPtr(name),
-			Tags:     smTags,
-		})
-		if err != nil {
-			return fmt.Errorf("failed to update tags: %w", err)
+		if !change.IsEmpty() {
+			if err := tagging.ApplySM(ctx, s.Client, name, change); err != nil {
+				return err
+			}
 		}
 	}
 
 	return nil
 }
 
-func (s *Strategy) pushDelete(ctx context.Context, name string, entry staging.Entry) error {
+func (s *SMStrategy) pushDelete(ctx context.Context, name string, entry Entry) error {
 	input := &secretsmanager.DeleteSecretInput{
 		SecretId: lo.ToPtr(name),
 	}
@@ -166,7 +161,7 @@ func (s *Strategy) pushDelete(ctx context.Context, name string, entry staging.En
 
 // FetchLastModified returns the last modified time of the secret in AWS.
 // Returns zero time if the secret doesn't exist.
-func (s *Strategy) FetchLastModified(ctx context.Context, name string) (time.Time, error) {
+func (s *SMStrategy) FetchLastModified(ctx context.Context, name string) (time.Time, error) {
 	result, err := s.Client.GetSecretValue(ctx, &secretsmanager.GetSecretValueInput{
 		SecretId: lo.ToPtr(name),
 	})
@@ -184,21 +179,21 @@ func (s *Strategy) FetchLastModified(ctx context.Context, name string) (time.Tim
 }
 
 // FetchCurrent fetches the current value from AWS Secrets Manager for diffing.
-func (s *Strategy) FetchCurrent(ctx context.Context, name string) (*staging.FetchResult, error) {
+func (s *SMStrategy) FetchCurrent(ctx context.Context, name string) (*FetchResult, error) {
 	spec := &smversion.Spec{Name: name}
 	secret, err := smversion.GetSecretWithVersion(ctx, s.Client, spec)
 	if err != nil {
 		return nil, err
 	}
 	versionID := smversion.TruncateVersionID(lo.FromPtr(secret.VersionId))
-	return &staging.FetchResult{
+	return &FetchResult{
 		Value:      lo.FromPtr(secret.SecretString),
 		Identifier: "#" + versionID,
 	}, nil
 }
 
 // ParseName parses and validates a name for editing.
-func (s *Strategy) ParseName(input string) (string, error) {
+func (s *SMStrategy) ParseName(input string) (string, error) {
 	spec, err := smversion.Parse(input)
 	if err != nil {
 		return "", err
@@ -210,7 +205,7 @@ func (s *Strategy) ParseName(input string) (string, error) {
 }
 
 // FetchCurrentValue fetches the current value from AWS Secrets Manager for editing.
-func (s *Strategy) FetchCurrentValue(ctx context.Context, name string) (string, error) {
+func (s *SMStrategy) FetchCurrentValue(ctx context.Context, name string) (string, error) {
 	spec := &smversion.Spec{Name: name}
 	secret, err := smversion.GetSecretWithVersion(ctx, s.Client, spec)
 	if err != nil {
@@ -220,7 +215,7 @@ func (s *Strategy) FetchCurrentValue(ctx context.Context, name string) (string, 
 }
 
 // ParseSpec parses a version spec string for reset.
-func (s *Strategy) ParseSpec(input string) (name string, hasVersion bool, err error) {
+func (s *SMStrategy) ParseSpec(input string) (name string, hasVersion bool, err error) {
 	spec, err := smversion.Parse(input)
 	if err != nil {
 		return "", false, err
@@ -230,7 +225,7 @@ func (s *Strategy) ParseSpec(input string) (name string, hasVersion bool, err er
 }
 
 // FetchVersion fetches the value for a specific version.
-func (s *Strategy) FetchVersion(ctx context.Context, input string) (value string, versionLabel string, err error) {
+func (s *SMStrategy) FetchVersion(ctx context.Context, input string) (value string, versionLabel string, err error) {
 	spec, err := smversion.Parse(input)
 	if err != nil {
 		return "", "", err
@@ -243,17 +238,17 @@ func (s *Strategy) FetchVersion(ctx context.Context, input string) (value string
 	return lo.FromPtr(secret.SecretString), "#" + versionID, nil
 }
 
-// Factory creates a FullStrategy with an initialized AWS client.
-func Factory(ctx context.Context) (staging.FullStrategy, error) {
+// SMFactory creates a FullStrategy with an initialized AWS client.
+func SMFactory(ctx context.Context) (FullStrategy, error) {
 	client, err := awsutil.NewSMClient(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize AWS client: %w", err)
 	}
-	return NewStrategy(client), nil
+	return NewSMStrategy(client), nil
 }
 
-// ParserFactory creates a Parser without an AWS client.
+// SMParserFactory creates a Parser without an AWS client.
 // Use this for operations that don't need AWS access (e.g., status, parsing).
-func ParserFactory() staging.Parser {
-	return NewStrategy(nil)
+func SMParserFactory() Parser {
+	return NewSMStrategy(nil)
 }

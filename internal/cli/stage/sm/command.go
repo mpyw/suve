@@ -4,15 +4,15 @@ package sm
 import (
 	"github.com/urfave/cli/v3"
 
+	"github.com/mpyw/suve/internal/staging"
 	"github.com/mpyw/suve/internal/staging/runner"
-	"github.com/mpyw/suve/internal/staging/sm"
 )
 
 var config = runner.CommandConfig{
 	ServiceName:   "sm",
 	ItemName:      "secret",
-	Factory:       sm.Factory,
-	ParserFactory: sm.ParserFactory,
+	Factory:       staging.SMFactory,
+	ParserFactory: staging.SMParserFactory,
 }
 
 // Command returns the SM stage command with all staging subcommands.

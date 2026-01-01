@@ -4,15 +4,15 @@ package ssm
 import (
 	"github.com/urfave/cli/v3"
 
+	"github.com/mpyw/suve/internal/staging"
 	"github.com/mpyw/suve/internal/staging/runner"
-	"github.com/mpyw/suve/internal/staging/ssm"
 )
 
 var config = runner.CommandConfig{
 	ServiceName:   "ssm",
 	ItemName:      "parameter",
-	Factory:       ssm.Factory,
-	ParserFactory: ssm.ParserFactory,
+	Factory:       staging.SSMFactory,
+	ParserFactory: staging.SSMParserFactory,
 }
 
 // Command returns the SSM stage command with all staging subcommands.

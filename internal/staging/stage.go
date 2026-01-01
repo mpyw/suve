@@ -31,6 +31,7 @@ type Entry struct {
 	Value       string            `json:"value,omitempty"`
 	Description *string           `json:"description,omitempty"`
 	Tags        map[string]string `json:"tags,omitempty"`
+	UntagKeys   []string          `json:"untag_keys,omitempty"`
 	StagedAt    time.Time         `json:"staged_at"`
 	// DeleteOptions holds SM-specific delete options.
 	// Only used when Operation is OperationDelete and service is SM.

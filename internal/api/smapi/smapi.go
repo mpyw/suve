@@ -51,3 +51,8 @@ type UpdateSecretAPI interface {
 type TagResourceAPI interface {
 	TagResource(ctx context.Context, params *secretsmanager.TagResourceInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.TagResourceOutput, error)
 }
+
+// UntagResourceAPI is the interface for removing tags from a secret.
+type UntagResourceAPI interface {
+	UntagResource(ctx context.Context, params *secretsmanager.UntagResourceInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.UntagResourceOutput, error)
+}
