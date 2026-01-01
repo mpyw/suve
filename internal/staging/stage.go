@@ -116,6 +116,7 @@ func (s *Store) acquireFileLock() (*flock.Flock, error) {
 
 	// Acquire exclusive lock (blocks until lock is available)
 	if err := fileLock.Lock(); err != nil {
+		_ = fileLock.Close()
 		return nil, fmt.Errorf("failed to acquire file lock: %w", err)
 	}
 

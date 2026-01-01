@@ -451,7 +451,7 @@ func NewDeleteCommand(cfg CommandConfig) *cli.Command {
 	strat := cfg.ParserFactory()
 	hasDeleteOptions := strat.HasDeleteOptions()
 
-	flags := []cli.Flag{}
+	var flags []cli.Flag
 	var description string
 
 	if hasDeleteOptions {
@@ -538,7 +538,7 @@ EXAMPLES:
 
 			if hasDeleteOptions {
 				force := cmd.Bool("force")
-				recoveryWindow := int(cmd.Int("recovery-window"))
+				recoveryWindow := cmd.Int("recovery-window")
 
 				// Validate recovery window
 				if !force && (recoveryWindow < 7 || recoveryWindow > 30) {

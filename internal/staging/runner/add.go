@@ -29,7 +29,7 @@ type AddOptions struct {
 }
 
 // Run executes the add command.
-func (r *AddRunner) Run(ctx context.Context, opts AddOptions) error {
+func (r *AddRunner) Run(_ context.Context, opts AddOptions) error {
 	service := r.Strategy.Service()
 
 	// Parse and validate name

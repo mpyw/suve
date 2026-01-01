@@ -116,7 +116,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	return r.Run(ctx, Options{
 		Name:           name,
 		Force:          cmd.Bool("force"),
-		RecoveryWindow: int(cmd.Int("recovery-window")),
+		RecoveryWindow: cmd.Int("recovery-window"),
 	})
 }
 
