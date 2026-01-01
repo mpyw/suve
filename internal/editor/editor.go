@@ -41,7 +41,10 @@ func Open(content string) (string, error) {
 		return "", err
 	}
 
-	cmd := exec.Command(editor, tmpFile.Name())
+	// Split editor command to support multi-argument editors like "code --wait"
+	args := strings.Fields(editor)
+	args = append(args, tmpFile.Name())
+	cmd := exec.Command(args[0], args[1:]...) //nolint:gosec // Editor command from user environment
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr

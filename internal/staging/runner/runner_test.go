@@ -34,10 +34,10 @@ type fullMockStrategy struct {
 	pushErr          error
 }
 
-func (m *fullMockStrategy) Service() staging.Service     { return m.service }
-func (m *fullMockStrategy) ServiceName() string          { return string(m.service) }
-func (m *fullMockStrategy) ItemName() string             { return "item" }
-func (m *fullMockStrategy) HasDeleteOptions() bool       { return m.hasDeleteOptions }
+func (m *fullMockStrategy) Service() staging.Service { return m.service }
+func (m *fullMockStrategy) ServiceName() string      { return string(m.service) }
+func (m *fullMockStrategy) ItemName() string         { return "item" }
+func (m *fullMockStrategy) HasDeleteOptions() bool   { return m.hasDeleteOptions }
 func (m *fullMockStrategy) ParseName(input string) (string, error) {
 	if m.parseNameErr != nil {
 		return "", m.parseNameErr
@@ -921,10 +921,10 @@ func TestResetRunner_Run(t *testing.T) {
 
 		var stdout, stderr bytes.Buffer
 		fetcher := &fullMockStrategy{
-			service:         staging.ServiceSSM,
+			service:          staging.ServiceSSM,
 			parseSpecVersion: true,
-			fetchVersionVal: "old-value",
-			fetchVersionLbl: "#1",
+			fetchVersionVal:  "old-value",
+			fetchVersionLbl:  "#1",
 		}
 		r := &runner.ResetRunner{
 			Parser:  fetcher,

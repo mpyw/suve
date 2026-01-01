@@ -9,6 +9,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/ssm v1.67.7
 	github.com/aymanbagabas/go-udiff v0.1.2
 	github.com/fatih/color v1.15.0
+	github.com/gofrs/flock v0.13.0
 	github.com/mattn/go-isatty v0.0.20
 	github.com/samber/lo v1.52.0
 	github.com/stretchr/testify v1.11.1
@@ -36,11 +37,12 @@ require (
 	github.com/charlievieth/strcase v0.0.5 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dlclark/regexp2 v1.11.5 // indirect
-	github.com/gofrs/flock v0.13.0 // indirect
 	github.com/klauspost/compress v1.17.4 // indirect
+	github.com/kr/text v0.2.0 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
+	github.com/rogpeppe/go-internal v1.14.1 // indirect
 	github.com/sirupsen/logrus v1.8.3 // indirect
 	github.com/ulikunitz/xz v0.5.15 // indirect
 	golang.org/x/exp v0.0.0-20240103183307-be819d1f06fc // indirect
