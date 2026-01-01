@@ -93,7 +93,8 @@ func (r *Runner) showSingle(name string, verbose bool) error {
 		return err
 	}
 
-	r.printEntry(name, *entry, verbose)
+	printer := &stage.EntryPrinter{Writer: r.Stdout}
+	printer.PrintEntry(name, *entry, verbose, true) // SM has DeleteOptions
 	return nil
 }
 
@@ -119,46 +120,11 @@ func (r *Runner) showAll(verbose bool) error {
 	yellow := color.New(color.FgYellow).SprintFunc()
 	_, _ = fmt.Fprintf(r.Stdout, "%s (%d):\n", yellow("Staged SM changes"), len(smEntries))
 
+	printer := &stage.EntryPrinter{Writer: r.Stdout}
 	for _, name := range names {
 		entry := smEntries[name]
-		r.printEntry(name, entry, verbose)
+		printer.PrintEntry(name, entry, verbose, true) // SM has DeleteOptions
 	}
 
 	return nil
-}
-
-func (r *Runner) printEntry(name string, entry stage.Entry, verbose bool) {
-	green := color.New(color.FgGreen).SprintFunc()
-	red := color.New(color.FgRed).SprintFunc()
-	cyan := color.New(color.FgCyan).SprintFunc()
-
-	var opSymbol, opColor string
-	switch entry.Operation {
-	case stage.OperationSet:
-		opSymbol = "M"
-		opColor = green(opSymbol)
-	case stage.OperationDelete:
-		opSymbol = "D"
-		opColor = red(opSymbol)
-	}
-
-	if verbose {
-		_, _ = fmt.Fprintf(r.Stdout, "\n%s %s\n", opColor, name)
-		_, _ = fmt.Fprintf(r.Stdout, "  %s %s\n", cyan("Staged:"), entry.StagedAt.Format("2006-01-02 15:04:05"))
-		if entry.Operation == stage.OperationSet {
-			value := entry.Value
-			if len(value) > 100 {
-				value = value[:100] + "..."
-			}
-			_, _ = fmt.Fprintf(r.Stdout, "  %s %s\n", cyan("Value:"), value)
-		} else if entry.Operation == stage.OperationDelete && entry.DeleteOptions != nil {
-			if entry.DeleteOptions.Force {
-				_, _ = fmt.Fprintf(r.Stdout, "  %s force (immediate, no recovery)\n", cyan("Delete:"))
-			} else if entry.DeleteOptions.RecoveryWindow > 0 {
-				_, _ = fmt.Fprintf(r.Stdout, "  %s %d days recovery window\n", cyan("Delete:"), entry.DeleteOptions.RecoveryWindow)
-			}
-		}
-	} else {
-		_, _ = fmt.Fprintf(r.Stdout, "  %s %s\n", opColor, name)
-	}
 }

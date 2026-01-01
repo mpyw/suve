@@ -5,10 +5,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"os"
-	"os/exec"
-	"runtime"
-	"strings"
 	"time"
 
 	"github.com/fatih/color"
@@ -17,6 +13,7 @@ import (
 
 	"github.com/mpyw/suve/internal/api/smapi"
 	"github.com/mpyw/suve/internal/awsutil"
+	"github.com/mpyw/suve/internal/editor"
 	"github.com/mpyw/suve/internal/stage"
 	"github.com/mpyw/suve/internal/version/smversion"
 )
@@ -27,16 +24,13 @@ type Client interface {
 	smapi.ListSecretVersionIdsAPI
 }
 
-// EditorFunc is a function that opens an editor with content and returns the edited result.
-type EditorFunc func(content string) (string, error)
-
 // Runner executes the edit command.
 type Runner struct {
 	Client     Client
 	Store      *stage.Store
 	Stdout     io.Writer
 	Stderr     io.Writer
-	OpenEditor EditorFunc // Optional: defaults to openEditor if nil
+	OpenEditor editor.OpenFunc // Optional: defaults to editor.Open if nil
 }
 
 // Options holds the options for the edit command.
@@ -121,7 +115,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 	// Open editor
 	editorFn := r.OpenEditor
 	if editorFn == nil {
-		editorFn = openEditor
+		editorFn = editor.Open
 	}
 	newValue, err := editorFn(currentValue)
 	if err != nil {
@@ -147,52 +141,4 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 	green := color.New(color.FgGreen).SprintFunc()
 	_, _ = fmt.Fprintf(r.Stdout, "%s Staged: %s\n", green("✓"), opts.Name)
 	return nil
-}
-
-func openEditor(content string) (string, error) {
-	editor := os.Getenv("VISUAL")
-	if editor == "" {
-		editor = os.Getenv("EDITOR")
-	}
-	if editor == "" {
-		if runtime.GOOS == "windows" {
-			editor = "notepad"
-		} else {
-			editor = "vi"
-		}
-	}
-
-	tmpFile, err := os.CreateTemp("", "suve-edit-*.txt")
-	if err != nil {
-		return "", err
-	}
-	defer func() { _ = os.Remove(tmpFile.Name()) }()
-
-	if _, err := tmpFile.WriteString(content); err != nil {
-		_ = tmpFile.Close()
-		return "", err
-	}
-	if err := tmpFile.Close(); err != nil {
-		return "", err
-	}
-
-	cmd := exec.Command(editor, tmpFile.Name())
-	cmd.Stdin = os.Stdin
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
-	if err := cmd.Run(); err != nil {
-		return "", err
-	}
-
-	data, err := os.ReadFile(tmpFile.Name())
-	if err != nil {
-		return "", err
-	}
-
-	// Trim trailing newline that editors often add
-	result := string(data)
-	result = strings.TrimSuffix(result, "\n")
-
-	return result, nil
 }
