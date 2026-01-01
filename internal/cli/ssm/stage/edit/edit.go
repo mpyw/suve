@@ -10,7 +10,7 @@ import (
 	"github.com/mpyw/suve/internal/awsutil"
 	"github.com/mpyw/suve/internal/cli/ssm/strategy"
 	"github.com/mpyw/suve/internal/stage"
-	"github.com/mpyw/suve/internal/stageutil"
+	"github.com/mpyw/suve/internal/stage/stagerunner"
 )
 
 // Command returns the edit command.
@@ -52,11 +52,11 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		return fmt.Errorf("failed to initialize AWS client: %w", err)
 	}
 
-	r := &stageutil.EditRunner{
+	r := &stagerunner.EditRunner{
 		Strategy: strategy.NewStrategy(client),
 		Store:    store,
 		Stdout:   cmd.Root().Writer,
 		Stderr:   cmd.Root().ErrWriter,
 	}
-	return r.Run(ctx, stageutil.EditOptions{Name: name})
+	return r.Run(ctx, stagerunner.EditOptions{Name: name})
 }

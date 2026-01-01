@@ -1,5 +1,5 @@
 // Package stageutil provides shared utilities for stage commands.
-package stageutil
+package stagerunner
 
 import (
 	"context"

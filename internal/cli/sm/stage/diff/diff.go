@@ -12,7 +12,7 @@ import (
 	"github.com/mpyw/suve/internal/cli/sm/strategy"
 	"github.com/mpyw/suve/internal/pager"
 	"github.com/mpyw/suve/internal/stage"
-	"github.com/mpyw/suve/internal/stageutil"
+	"github.com/mpyw/suve/internal/stage/stagerunner"
 	"github.com/mpyw/suve/internal/version/smversion"
 )
 
@@ -73,14 +73,14 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		return fmt.Errorf("failed to initialize AWS client: %w", err)
 	}
 
-	opts := stageutil.DiffOptions{
+	opts := stagerunner.DiffOptions{
 		Name:       name,
 		JSONFormat: cmd.Bool("json"),
 		NoPager:    cmd.Bool("no-pager"),
 	}
 
 	return pager.WithPagerWriter(cmd.Root().Writer, opts.NoPager, func(w io.Writer) error {
-		r := &stageutil.DiffRunner{
+		r := &stagerunner.DiffRunner{
 			Strategy: strategy.NewStrategy(client),
 			Store:    store,
 			Stdout:   w,

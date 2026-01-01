@@ -10,7 +10,7 @@ import (
 	"github.com/mpyw/suve/internal/awsutil"
 	"github.com/mpyw/suve/internal/cli/sm/strategy"
 	"github.com/mpyw/suve/internal/stage"
-	"github.com/mpyw/suve/internal/stageutil"
+	"github.com/mpyw/suve/internal/stage/stagerunner"
 	"github.com/mpyw/suve/internal/version/smversion"
 )
 
@@ -61,7 +61,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		return fmt.Errorf("failed to initialize stage store: %w", err)
 	}
 
-	opts := stageutil.ResetOptions{
+	opts := stagerunner.ResetOptions{
 		All: resetAll,
 	}
 	if !resetAll {
@@ -89,7 +89,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		strat = strategy.NewStrategy(nil)
 	}
 
-	r := &stageutil.ResetRunner{
+	r := &stagerunner.ResetRunner{
 		Strategy: strat,
 		Store:    store,
 		Stdout:   cmd.Root().Writer,

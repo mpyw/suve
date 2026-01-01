@@ -10,7 +10,7 @@ import (
 	"github.com/mpyw/suve/internal/awsutil"
 	"github.com/mpyw/suve/internal/cli/sm/strategy"
 	"github.com/mpyw/suve/internal/stage"
-	"github.com/mpyw/suve/internal/stageutil"
+	"github.com/mpyw/suve/internal/stage/stagerunner"
 )
 
 // Command returns the push command.
@@ -46,14 +46,14 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		return fmt.Errorf("failed to initialize AWS client: %w", err)
 	}
 
-	r := &stageutil.PushRunner{
+	r := &stagerunner.PushRunner{
 		Strategy: strategy.NewStrategy(client),
 		Store:    store,
 		Stdout:   cmd.Root().Writer,
 		Stderr:   cmd.Root().ErrWriter,
 	}
 
-	opts := stageutil.PushOptions{}
+	opts := stagerunner.PushOptions{}
 	if cmd.Args().Len() > 0 {
 		opts.Name = cmd.Args().First()
 	}

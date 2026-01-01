@@ -9,7 +9,7 @@ import (
 
 	"github.com/mpyw/suve/internal/cli/ssm/strategy"
 	"github.com/mpyw/suve/internal/stage"
-	"github.com/mpyw/suve/internal/stageutil"
+	"github.com/mpyw/suve/internal/stage/stagerunner"
 )
 
 // Command returns the status command.
@@ -46,14 +46,14 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		return fmt.Errorf("failed to initialize stage store: %w", err)
 	}
 
-	r := &stageutil.StatusRunner{
+	r := &stagerunner.StatusRunner{
 		Strategy: strategy.NewStrategy(nil),
 		Store:    store,
 		Stdout:   cmd.Root().Writer,
 		Stderr:   cmd.Root().ErrWriter,
 	}
 
-	opts := stageutil.StatusOptions{
+	opts := stagerunner.StatusOptions{
 		Verbose: cmd.Bool("verbose"),
 	}
 	if cmd.Args().Len() > 0 {

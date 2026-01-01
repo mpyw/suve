@@ -18,7 +18,7 @@ import (
 	appcli "github.com/mpyw/suve/internal/cli"
 	"github.com/mpyw/suve/internal/cli/sm/strategy"
 	"github.com/mpyw/suve/internal/stage"
-	"github.com/mpyw/suve/internal/stageutil"
+	"github.com/mpyw/suve/internal/stage/stagerunner"
 )
 
 type mockClient struct {
@@ -85,14 +85,14 @@ func TestRun_UnstageAll_Empty(t *testing.T) {
 	store := stage.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 	var buf bytes.Buffer
-	r := &stageutil.ResetRunner{
+	r := &stagerunner.ResetRunner{
 		Strategy: strategy.NewStrategy(nil),
 		Store:    store,
 		Stdout:   &buf,
 		Stderr:   &bytes.Buffer{},
 	}
 
-	err := r.Run(context.Background(), stageutil.ResetOptions{All: true})
+	err := r.Run(context.Background(), stagerunner.ResetOptions{All: true})
 	require.NoError(t, err)
 	assert.Contains(t, buf.String(), "No SM changes staged")
 }
@@ -116,14 +116,14 @@ func TestRun_UnstageAll(t *testing.T) {
 	})
 
 	var buf bytes.Buffer
-	r := &stageutil.ResetRunner{
+	r := &stagerunner.ResetRunner{
 		Strategy: strategy.NewStrategy(nil),
 		Store:    store,
 		Stdout:   &buf,
 		Stderr:   &bytes.Buffer{},
 	}
 
-	err := r.Run(context.Background(), stageutil.ResetOptions{All: true})
+	err := r.Run(context.Background(), stagerunner.ResetOptions{All: true})
 	require.NoError(t, err)
 	assert.Contains(t, buf.String(), "Unstaged all SM secrets (2)")
 
@@ -148,14 +148,14 @@ func TestRun_Unstage(t *testing.T) {
 	})
 
 	var buf bytes.Buffer
-	r := &stageutil.ResetRunner{
+	r := &stagerunner.ResetRunner{
 		Strategy: strategy.NewStrategy(nil),
 		Store:    store,
 		Stdout:   &buf,
 		Stderr:   &bytes.Buffer{},
 	}
 
-	err := r.Run(context.Background(), stageutil.ResetOptions{Spec: "my-secret"})
+	err := r.Run(context.Background(), stagerunner.ResetOptions{Spec: "my-secret"})
 	require.NoError(t, err)
 	assert.Contains(t, buf.String(), "Unstaged my-secret")
 
@@ -171,14 +171,14 @@ func TestRun_UnstageNotStaged(t *testing.T) {
 	store := stage.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 	var buf bytes.Buffer
-	r := &stageutil.ResetRunner{
+	r := &stagerunner.ResetRunner{
 		Strategy: strategy.NewStrategy(nil),
 		Store:    store,
 		Stdout:   &buf,
 		Stderr:   &bytes.Buffer{},
 	}
 
-	err := r.Run(context.Background(), stageutil.ResetOptions{Spec: "my-secret"})
+	err := r.Run(context.Background(), stagerunner.ResetOptions{Spec: "my-secret"})
 	require.NoError(t, err)
 	assert.Contains(t, buf.String(), "is not staged")
 }
@@ -212,14 +212,14 @@ func TestRun_RestoreVersion(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	r := &stageutil.ResetRunner{
+	r := &stagerunner.ResetRunner{
 		Strategy: strategy.NewStrategy(mock),
 		Store:    store,
 		Stdout:   &buf,
 		Stderr:   &bytes.Buffer{},
 	}
 
-	err := r.Run(context.Background(), stageutil.ResetOptions{Spec: "my-secret#abc123"})
+	err := r.Run(context.Background(), stagerunner.ResetOptions{Spec: "my-secret#abc123"})
 	require.NoError(t, err)
 	assert.Contains(t, buf.String(), "Restored my-secret")
 
@@ -259,14 +259,14 @@ func TestRun_RestoreLabel(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	r := &stageutil.ResetRunner{
+	r := &stagerunner.ResetRunner{
 		Strategy: strategy.NewStrategy(mock),
 		Store:    store,
 		Stdout:   &buf,
 		Stderr:   &bytes.Buffer{},
 	}
 
-	err := r.Run(context.Background(), stageutil.ResetOptions{Spec: "my-secret:AWSPREVIOUS"})
+	err := r.Run(context.Background(), stagerunner.ResetOptions{Spec: "my-secret:AWSPREVIOUS"})
 	require.NoError(t, err)
 	assert.Contains(t, buf.String(), "Restored my-secret")
 
@@ -305,7 +305,7 @@ func TestRun_RestoreShift(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	r := &stageutil.ResetRunner{
+	r := &stagerunner.ResetRunner{
 		Strategy: strategy.NewStrategy(mock),
 		Store:    store,
 		Stdout:   &buf,
@@ -313,7 +313,7 @@ func TestRun_RestoreShift(t *testing.T) {
 	}
 
 	// ~1 means one version back from latest
-	err := r.Run(context.Background(), stageutil.ResetOptions{Spec: "my-secret~1"})
+	err := r.Run(context.Background(), stagerunner.ResetOptions{Spec: "my-secret~1"})
 	require.NoError(t, err)
 	assert.Contains(t, buf.String(), "Restored my-secret")
 
@@ -344,14 +344,14 @@ func TestRun_RestoreAWSError(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	r := &stageutil.ResetRunner{
+	r := &stagerunner.ResetRunner{
 		Strategy: strategy.NewStrategy(mock),
 		Store:    store,
 		Stdout:   &buf,
 		Stderr:   &bytes.Buffer{},
 	}
 
-	err := r.Run(context.Background(), stageutil.ResetOptions{Spec: "my-secret#abc123"})
+	err := r.Run(context.Background(), stagerunner.ResetOptions{Spec: "my-secret#abc123"})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "AWS error")
 }
@@ -368,14 +368,14 @@ func TestRun_StoreError(t *testing.T) {
 	store := stage.NewStoreWithPath(path)
 
 	var buf bytes.Buffer
-	r := &stageutil.ResetRunner{
+	r := &stagerunner.ResetRunner{
 		Strategy: strategy.NewStrategy(nil),
 		Store:    store,
 		Stdout:   &buf,
 		Stderr:   &bytes.Buffer{},
 	}
 
-	err := r.Run(context.Background(), stageutil.ResetOptions{All: true})
+	err := r.Run(context.Background(), stagerunner.ResetOptions{All: true})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to parse")
 }
@@ -387,13 +387,13 @@ func TestRun_ParseError(t *testing.T) {
 	store := stage.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 	var buf bytes.Buffer
-	r := &stageutil.ResetRunner{
+	r := &stagerunner.ResetRunner{
 		Strategy: strategy.NewStrategy(nil),
 		Store:    store,
 		Stdout:   &buf,
 		Stderr:   &bytes.Buffer{},
 	}
 
-	err := r.Run(context.Background(), stageutil.ResetOptions{Spec: ""})
+	err := r.Run(context.Background(), stagerunner.ResetOptions{Spec: ""})
 	require.Error(t, err)
 }

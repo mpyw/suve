@@ -17,7 +17,7 @@ import (
 	appcli "github.com/mpyw/suve/internal/cli"
 	"github.com/mpyw/suve/internal/cli/ssm/strategy"
 	"github.com/mpyw/suve/internal/stage"
-	"github.com/mpyw/suve/internal/stageutil"
+	"github.com/mpyw/suve/internal/stage/stagerunner"
 )
 
 type mockClient struct {
@@ -93,14 +93,14 @@ func TestRun_NothingStaged(t *testing.T) {
 	mock := &mockClient{}
 
 	var stdout, stderr bytes.Buffer
-	r := &stageutil.DiffRunner{
+	r := &stagerunner.DiffRunner{
 		Strategy: strategy.NewStrategy(mock),
 		Store:    store,
 		Stdout:   &stdout,
 		Stderr:   &stderr,
 	}
 
-	err := r.Run(context.Background(), stageutil.DiffOptions{})
+	err := r.Run(context.Background(), stagerunner.DiffOptions{})
 	require.NoError(t, err)
 	assert.Contains(t, stderr.String(), "staged")
 }
@@ -113,14 +113,14 @@ func TestRun_NotStaged(t *testing.T) {
 	mock := &mockClient{}
 
 	var stdout, stderr bytes.Buffer
-	r := &stageutil.DiffRunner{
+	r := &stagerunner.DiffRunner{
 		Strategy: strategy.NewStrategy(mock),
 		Store:    store,
 		Stdout:   &stdout,
 		Stderr:   &stderr,
 	}
 
-	err := r.Run(context.Background(), stageutil.DiffOptions{Name: "/not-staged"})
+	err := r.Run(context.Background(), stagerunner.DiffOptions{Name: "/not-staged"})
 	require.NoError(t, err)
 	assert.Contains(t, stderr.String(), "is not staged")
 }
@@ -151,14 +151,14 @@ func TestRun_ShowDiff(t *testing.T) {
 	}
 
 	var stdout, stderr bytes.Buffer
-	r := &stageutil.DiffRunner{
+	r := &stagerunner.DiffRunner{
 		Strategy: strategy.NewStrategy(mock),
 		Store:    store,
 		Stdout:   &stdout,
 		Stderr:   &stderr,
 	}
 
-	err = r.Run(context.Background(), stageutil.DiffOptions{Name: "/app/config"})
+	err = r.Run(context.Background(), stagerunner.DiffOptions{Name: "/app/config"})
 	require.NoError(t, err)
 
 	output := stdout.String()
@@ -193,14 +193,14 @@ func TestRun_DeleteOperation(t *testing.T) {
 	}
 
 	var stdout, stderr bytes.Buffer
-	r := &stageutil.DiffRunner{
+	r := &stagerunner.DiffRunner{
 		Strategy: strategy.NewStrategy(mock),
 		Store:    store,
 		Stdout:   &stdout,
 		Stderr:   &stderr,
 	}
 
-	err = r.Run(context.Background(), stageutil.DiffOptions{Name: "/app/config"})
+	err = r.Run(context.Background(), stagerunner.DiffOptions{Name: "/app/config"})
 	require.NoError(t, err)
 
 	output := stdout.String()
@@ -234,14 +234,14 @@ func TestRun_IdenticalValues(t *testing.T) {
 	}
 
 	var stdout, stderr bytes.Buffer
-	r := &stageutil.DiffRunner{
+	r := &stagerunner.DiffRunner{
 		Strategy: strategy.NewStrategy(mock),
 		Store:    store,
 		Stdout:   &stdout,
 		Stderr:   &stderr,
 	}
 
-	err = r.Run(context.Background(), stageutil.DiffOptions{Name: "/app/config"})
+	err = r.Run(context.Background(), stagerunner.DiffOptions{Name: "/app/config"})
 	require.NoError(t, err)
 
 	assert.Empty(t, stdout.String())
@@ -278,14 +278,14 @@ func TestRun_JSONFormat(t *testing.T) {
 	}
 
 	var stdout, stderr bytes.Buffer
-	r := &stageutil.DiffRunner{
+	r := &stagerunner.DiffRunner{
 		Strategy: strategy.NewStrategy(mock),
 		Store:    store,
 		Stdout:   &stdout,
 		Stderr:   &stderr,
 	}
 
-	err = r.Run(context.Background(), stageutil.DiffOptions{
+	err = r.Run(context.Background(), stagerunner.DiffOptions{
 		Name:       "/app/config",
 		JSONFormat: true,
 	})
@@ -316,14 +316,14 @@ func TestRun_AWSError(t *testing.T) {
 	}
 
 	var stdout, stderr bytes.Buffer
-	r := &stageutil.DiffRunner{
+	r := &stagerunner.DiffRunner{
 		Strategy: strategy.NewStrategy(mock),
 		Store:    store,
 		Stdout:   &stdout,
 		Stderr:   &stderr,
 	}
 
-	err = r.Run(context.Background(), stageutil.DiffOptions{Name: "/app/config"})
+	err = r.Run(context.Background(), stagerunner.DiffOptions{Name: "/app/config"})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "AWS error")
 }
@@ -362,14 +362,14 @@ func TestRun_MultipleStaged(t *testing.T) {
 	}
 
 	var stdout, stderr bytes.Buffer
-	r := &stageutil.DiffRunner{
+	r := &stagerunner.DiffRunner{
 		Strategy: strategy.NewStrategy(mock),
 		Store:    store,
 		Stdout:   &stdout,
 		Stderr:   &stderr,
 	}
 
-	err = r.Run(context.Background(), stageutil.DiffOptions{})
+	err = r.Run(context.Background(), stagerunner.DiffOptions{})
 	require.NoError(t, err)
 
 	output := stdout.String()

@@ -18,7 +18,7 @@ import (
 	appcli "github.com/mpyw/suve/internal/cli"
 	"github.com/mpyw/suve/internal/cli/ssm/strategy"
 	"github.com/mpyw/suve/internal/stage"
-	"github.com/mpyw/suve/internal/stageutil"
+	"github.com/mpyw/suve/internal/stage/stagerunner"
 )
 
 type mockClient struct {
@@ -99,7 +99,7 @@ func TestRun_UseStagedValue(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	r := &stageutil.EditRunner{
+	r := &stagerunner.EditRunner{
 		Strategy: strategy.NewStrategy(mock),
 		Store:    store,
 		Stdout:   &buf,
@@ -113,7 +113,7 @@ func TestRun_UseStagedValue(t *testing.T) {
 
 	// Test that it uses staged value (will hit the "no changes" path)
 	// This validates that GetParameter is not called
-	err := r.Run(context.Background(), stageutil.EditOptions{Name: "/app/config"})
+	err := r.Run(context.Background(), stagerunner.EditOptions{Name: "/app/config"})
 	require.NoError(t, err)
 	assert.Contains(t, buf.String(), "No changes made")
 }
@@ -140,7 +140,7 @@ func TestRun_FetchFromAWS(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	r := &stageutil.EditRunner{
+	r := &stagerunner.EditRunner{
 		Strategy: strategy.NewStrategy(mock),
 		Store:    store,
 		Stdout:   &buf,
@@ -153,7 +153,7 @@ func TestRun_FetchFromAWS(t *testing.T) {
 	}
 
 	// Test that it fetches from AWS when not staged
-	err := r.Run(context.Background(), stageutil.EditOptions{Name: "/app/config"})
+	err := r.Run(context.Background(), stagerunner.EditOptions{Name: "/app/config"})
 	require.NoError(t, err)
 	assert.True(t, fetchCalled, "GetParameter should be called when value is not staged")
 	assert.Contains(t, buf.String(), "No changes made")
@@ -172,14 +172,14 @@ func TestRun_StoreError(t *testing.T) {
 	mock := &mockClient{}
 
 	var buf bytes.Buffer
-	r := &stageutil.EditRunner{
+	r := &stagerunner.EditRunner{
 		Strategy: strategy.NewStrategy(mock),
 		Store:    store,
 		Stdout:   &buf,
 		Stderr:   &bytes.Buffer{},
 	}
 
-	err := r.Run(context.Background(), stageutil.EditOptions{Name: "/app/config"})
+	err := r.Run(context.Background(), stagerunner.EditOptions{Name: "/app/config"})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to parse")
 }
@@ -197,14 +197,14 @@ func TestRun_AWSError(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	r := &stageutil.EditRunner{
+	r := &stagerunner.EditRunner{
 		Strategy: strategy.NewStrategy(mock),
 		Store:    store,
 		Stdout:   &buf,
 		Stderr:   &bytes.Buffer{},
 	}
 
-	err := r.Run(context.Background(), stageutil.EditOptions{Name: "/app/config"})
+	err := r.Run(context.Background(), stagerunner.EditOptions{Name: "/app/config"})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "AWS error")
 }
@@ -217,7 +217,7 @@ func TestRun_ParseError(t *testing.T) {
 	mock := &mockClient{}
 
 	var buf bytes.Buffer
-	r := &stageutil.EditRunner{
+	r := &stagerunner.EditRunner{
 		Strategy: strategy.NewStrategy(mock),
 		Store:    store,
 		Stdout:   &buf,
@@ -225,7 +225,7 @@ func TestRun_ParseError(t *testing.T) {
 	}
 
 	// Invalid parameter name
-	err := r.Run(context.Background(), stageutil.EditOptions{Name: ""})
+	err := r.Run(context.Background(), stagerunner.EditOptions{Name: ""})
 	require.Error(t, err)
 }
 
@@ -248,7 +248,7 @@ func TestRun_NoChanges(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	r := &stageutil.EditRunner{
+	r := &stagerunner.EditRunner{
 		Strategy: strategy.NewStrategy(mock),
 		Store:    store,
 		Stdout:   &buf,
@@ -259,7 +259,7 @@ func TestRun_NoChanges(t *testing.T) {
 		},
 	}
 
-	err := r.Run(context.Background(), stageutil.EditOptions{Name: "/app/config"})
+	err := r.Run(context.Background(), stagerunner.EditOptions{Name: "/app/config"})
 	require.NoError(t, err)
 	assert.Contains(t, buf.String(), "No changes made")
 }
@@ -283,7 +283,7 @@ func TestRun_SuccessfulStaging(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	r := &stageutil.EditRunner{
+	r := &stagerunner.EditRunner{
 		Strategy: strategy.NewStrategy(mock),
 		Store:    store,
 		Stdout:   &buf,
@@ -293,7 +293,7 @@ func TestRun_SuccessfulStaging(t *testing.T) {
 		},
 	}
 
-	err := r.Run(context.Background(), stageutil.EditOptions{Name: "/app/config"})
+	err := r.Run(context.Background(), stagerunner.EditOptions{Name: "/app/config"})
 	require.NoError(t, err)
 	assert.Contains(t, buf.String(), "Staged")
 	assert.Contains(t, buf.String(), "/app/config")
@@ -324,7 +324,7 @@ func TestRun_EditorError(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	r := &stageutil.EditRunner{
+	r := &stagerunner.EditRunner{
 		Strategy: strategy.NewStrategy(mock),
 		Store:    store,
 		Stdout:   &buf,
@@ -334,7 +334,7 @@ func TestRun_EditorError(t *testing.T) {
 		},
 	}
 
-	err := r.Run(context.Background(), stageutil.EditOptions{Name: "/app/config"})
+	err := r.Run(context.Background(), stagerunner.EditOptions{Name: "/app/config"})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to edit")
 }
@@ -361,7 +361,7 @@ func TestRun_StagingStoreError(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	r := &stageutil.EditRunner{
+	r := &stagerunner.EditRunner{
 		Strategy: strategy.NewStrategy(mock),
 		Store:    store,
 		Stdout:   &buf,
@@ -373,7 +373,7 @@ func TestRun_StagingStoreError(t *testing.T) {
 		},
 	}
 
-	err := r.Run(context.Background(), stageutil.EditOptions{Name: "/app/config"})
+	err := r.Run(context.Background(), stagerunner.EditOptions{Name: "/app/config"})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to parse")
 }
