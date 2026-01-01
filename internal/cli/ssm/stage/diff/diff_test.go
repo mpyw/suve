@@ -224,7 +224,11 @@ func TestRun_IdenticalValues(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Empty(t, stdout.String())
-	assert.Contains(t, stderr.String(), "staged value is identical to AWS current")
+	assert.Contains(t, stderr.String(), "unstaged /app/config: identical to AWS current")
+
+	// Verify actually unstaged
+	_, err = store.Get(stage.ServiceSSM, "/app/config")
+	assert.Equal(t, stage.ErrNotStaged, err)
 }
 
 func TestRun_JSONFormat(t *testing.T) {

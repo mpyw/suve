@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"sort"
+	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
@@ -14,6 +15,7 @@ import (
 	"github.com/fatih/color"
 	"github.com/samber/lo"
 	"github.com/urfave/cli/v3"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/mpyw/suve/internal/api/smapi"
 	"github.com/mpyw/suve/internal/api/ssmapi"
@@ -149,6 +151,13 @@ func (r *Runner) Run(ctx context.Context) error {
 	return nil
 }
 
+// pushResult holds the result of a push operation.
+type pushResult struct {
+	name      string
+	operation stage.Operation
+	err       error
+}
+
 func (r *Runner) pushSSM(ctx context.Context, staged map[string]stage.Entry) (succeeded, failed int) {
 	// Sort names for consistent output
 	var names []string
@@ -157,27 +166,45 @@ func (r *Runner) pushSSM(ctx context.Context, staged map[string]stage.Entry) (su
 	}
 	sort.Strings(names)
 
+	// Run push operations in parallel
+	results := make(map[string]*pushResult)
+	var mu sync.Mutex
+	g, gctx := errgroup.WithContext(ctx)
+	g.SetLimit(10) // Limit concurrent AWS API calls
+
+	for _, name := range names {
+		entry := staged[name]
+		g.Go(func() error {
+			var pushErr error
+			switch entry.Operation {
+			case stage.OperationSet:
+				pushErr = r.pushSSMSet(gctx, name, entry.Value)
+			case stage.OperationDelete:
+				pushErr = r.pushSSMDelete(gctx, name)
+			default:
+				pushErr = fmt.Errorf("unknown operation: %s", entry.Operation)
+			}
+
+			mu.Lock()
+			results[name] = &pushResult{name: name, operation: entry.Operation, err: pushErr}
+			mu.Unlock()
+			return nil // Don't fail the group on individual errors
+		})
+	}
+
+	_ = g.Wait() // Errors are tracked per-item
+
+	// Output results in sorted order
 	green := color.New(color.FgGreen).SprintFunc()
 	red := color.New(color.FgRed).SprintFunc()
 
 	for _, name := range names {
-		entry := staged[name]
-
-		var pushErr error
-		switch entry.Operation {
-		case stage.OperationSet:
-			pushErr = r.pushSSMSet(ctx, name, entry.Value)
-		case stage.OperationDelete:
-			pushErr = r.pushSSMDelete(ctx, name)
-		default:
-			pushErr = fmt.Errorf("unknown operation: %s", entry.Operation)
-		}
-
-		if pushErr != nil {
-			_, _ = fmt.Fprintf(r.Stderr, "%s SSM: %s: %v\n", red("Failed"), name, pushErr)
+		result := results[name]
+		if result.err != nil {
+			_, _ = fmt.Fprintf(r.Stderr, "%s SSM: %s: %v\n", red("Failed"), name, result.err)
 			failed++
 		} else {
-			if entry.Operation == stage.OperationSet {
+			if result.operation == stage.OperationSet {
 				_, _ = fmt.Fprintf(r.Stdout, "%s SSM: Set %s\n", green("✓"), name)
 			} else {
 				_, _ = fmt.Fprintf(r.Stdout, "%s SSM: Deleted %s\n", green("✓"), name)
@@ -239,27 +266,45 @@ func (r *Runner) pushSM(ctx context.Context, staged map[string]stage.Entry) (suc
 	}
 	sort.Strings(names)
 
+	// Run push operations in parallel
+	results := make(map[string]*pushResult)
+	var mu sync.Mutex
+	g, gctx := errgroup.WithContext(ctx)
+	g.SetLimit(10) // Limit concurrent AWS API calls
+
+	for _, name := range names {
+		entry := staged[name]
+		g.Go(func() error {
+			var pushErr error
+			switch entry.Operation {
+			case stage.OperationSet:
+				pushErr = r.pushSMSet(gctx, name, entry.Value)
+			case stage.OperationDelete:
+				pushErr = r.pushSMDelete(gctx, name, entry)
+			default:
+				pushErr = fmt.Errorf("unknown operation: %s", entry.Operation)
+			}
+
+			mu.Lock()
+			results[name] = &pushResult{name: name, operation: entry.Operation, err: pushErr}
+			mu.Unlock()
+			return nil // Don't fail the group on individual errors
+		})
+	}
+
+	_ = g.Wait() // Errors are tracked per-item
+
+	// Output results in sorted order
 	green := color.New(color.FgGreen).SprintFunc()
 	red := color.New(color.FgRed).SprintFunc()
 
 	for _, name := range names {
-		entry := staged[name]
-
-		var pushErr error
-		switch entry.Operation {
-		case stage.OperationSet:
-			pushErr = r.pushSMSet(ctx, name, entry.Value)
-		case stage.OperationDelete:
-			pushErr = r.pushSMDelete(ctx, name, entry)
-		default:
-			pushErr = fmt.Errorf("unknown operation: %s", entry.Operation)
-		}
-
-		if pushErr != nil {
-			_, _ = fmt.Fprintf(r.Stderr, "%s SM: %s: %v\n", red("Failed"), name, pushErr)
+		result := results[name]
+		if result.err != nil {
+			_, _ = fmt.Fprintf(r.Stderr, "%s SM: %s: %v\n", red("Failed"), name, result.err)
 			failed++
 		} else {
-			if entry.Operation == stage.OperationSet {
+			if result.operation == stage.OperationSet {
 				_, _ = fmt.Fprintf(r.Stdout, "%s SM: Set %s\n", green("✓"), name)
 			} else {
 				_, _ = fmt.Fprintf(r.Stdout, "%s SM: Deleted %s\n", green("✓"), name)

@@ -12,8 +12,19 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	appcli "github.com/mpyw/suve/internal/cli"
 	"github.com/mpyw/suve/internal/cli/sm/ls"
 )
+
+func TestCommand_Help(t *testing.T) {
+	t.Parallel()
+	app := appcli.MakeApp()
+	var buf bytes.Buffer
+	app.Writer = &buf
+	err := app.Run(context.Background(), []string{"suve", "sm", "ls", "--help"})
+	require.NoError(t, err)
+	assert.Contains(t, buf.String(), "List secrets")
+}
 
 type mockClient struct {
 	listSecretsFunc func(ctx context.Context, params *secretsmanager.ListSecretsInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.ListSecretsOutput, error)

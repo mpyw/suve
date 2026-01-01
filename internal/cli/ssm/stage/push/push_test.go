@@ -335,3 +335,35 @@ func TestRun_StoreError(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to parse")
 }
+
+func TestRun_PushDeleteError(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	store := stage.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+
+	// Stage a delete
+	_ = store.Stage(stage.ServiceSSM, "/app/config", stage.Entry{
+		Operation: stage.OperationDelete,
+		StagedAt:  time.Now(),
+	})
+
+	mock := &mockClient{
+		deleteParameterFunc: func(_ context.Context, _ *ssm.DeleteParameterInput, _ ...func(*ssm.Options)) (*ssm.DeleteParameterOutput, error) {
+			return nil, fmt.Errorf("delete error")
+		},
+	}
+
+	var buf, errBuf bytes.Buffer
+	r := &push.Runner{
+		Client: mock,
+		Store:  store,
+		Stdout: &buf,
+		Stderr: &errBuf,
+	}
+
+	err := r.Run(context.Background(), push.Options{})
+	require.Error(t, err)
+	assert.Contains(t, errBuf.String(), "Failed")
+	assert.Contains(t, errBuf.String(), "delete error")
+}

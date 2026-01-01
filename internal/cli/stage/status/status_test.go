@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	appcli "github.com/mpyw/suve/internal/cli"
-	"github.com/mpyw/suve/internal/cli/status"
+	"github.com/mpyw/suve/internal/cli/stage/status"
 	"github.com/mpyw/suve/internal/stage"
 )
 

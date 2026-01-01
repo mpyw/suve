@@ -6,9 +6,12 @@ import (
 	"fmt"
 	"io"
 	"sort"
+	"sync"
 
+	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
 	"github.com/samber/lo"
 	"github.com/urfave/cli/v3"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/mpyw/suve/internal/api/smapi"
 	"github.com/mpyw/suve/internal/awsutil"
@@ -115,6 +118,12 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	})
 }
 
+// fetchResult holds the result of fetching a SM secret.
+type fetchResult struct {
+	secret *secretsmanager.GetSecretValueOutput
+	err    error
+}
+
 // Run executes the diff command.
 func (r *Runner) Run(ctx context.Context, opts Options) error {
 	// Get all staged entries for SM
@@ -149,16 +158,41 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 	}
 	sort.Strings(names)
 
+	// Fetch all values in parallel
+	results := make(map[string]*fetchResult)
+	var mu sync.Mutex
+	g, gctx := errgroup.WithContext(ctx)
+	g.SetLimit(10) // Limit concurrent AWS API calls
+
+	for name := range entries {
+		g.Go(func() error {
+			spec := &smversion.Spec{Name: name}
+			secret, err := smversion.GetSecretWithVersion(gctx, r.Client, spec)
+			mu.Lock()
+			results[name] = &fetchResult{secret: secret, err: err}
+			mu.Unlock()
+			return nil // Don't fail the group on individual errors
+		})
+	}
+
+	_ = g.Wait() // Errors are tracked per-item
+
+	// Output results in sorted order
 	first := true
 	for _, name := range names {
 		entry := entries[name]
+		result := results[name]
+
+		if result.err != nil {
+			return fmt.Errorf("failed to get current version for %s: %w", name, result.err)
+		}
 
 		if !first {
 			_, _ = fmt.Fprintln(r.Stdout)
 		}
 		first = false
 
-		if err := r.diffSingle(ctx, opts, name, entry); err != nil {
+		if err := r.outputDiff(opts, name, entry, result.secret); err != nil {
 			return err
 		}
 	}
@@ -166,14 +200,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 	return nil
 }
 
-func (r *Runner) diffSingle(ctx context.Context, opts Options, name string, entry stage.Entry) error {
-	// Get current AWS value
-	spec := &smversion.Spec{Name: name}
-	secret, err := smversion.GetSecretWithVersion(ctx, r.Client, spec)
-	if err != nil {
-		return fmt.Errorf("failed to get current version for %s: %w", name, err)
-	}
-
+func (r *Runner) outputDiff(opts Options, name string, entry stage.Entry, secret *secretsmanager.GetSecretValueOutput) error {
 	awsValue := lo.FromPtr(secret.SecretString)
 	stagedValue := entry.Value
 
@@ -195,7 +222,11 @@ func (r *Runner) diffSingle(ctx context.Context, opts Options, name string, entr
 	}
 
 	if awsValue == stagedValue {
-		output.Warning(r.Stderr, "staged value is identical to AWS current for %s", name)
+		// Auto-unstage since there's no difference
+		if err := r.Store.Unstage(stage.ServiceSM, name); err != nil {
+			return fmt.Errorf("failed to unstage %s: %w", name, err)
+		}
+		output.Warning(r.Stderr, "unstaged %s: identical to AWS current", name)
 		return nil
 	}
 

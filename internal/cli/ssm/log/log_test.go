@@ -27,6 +27,64 @@ func TestCommand_Validation(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "usage: suve ssm log")
 	})
+
+	t.Run("invalid from version", func(t *testing.T) {
+		t.Parallel()
+		app := appcli.MakeApp()
+		err := app.Run(context.Background(), []string{"suve", "ssm", "log", "--from", "invalid", "/app/param"})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid --from value")
+	})
+
+	t.Run("invalid to version", func(t *testing.T) {
+		t.Parallel()
+		app := appcli.MakeApp()
+		err := app.Run(context.Background(), []string{"suve", "ssm", "log", "--to", "invalid", "/app/param"})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid --to value")
+	})
+
+	t.Run("from with shift syntax not allowed", func(t *testing.T) {
+		t.Parallel()
+		app := appcli.MakeApp()
+		err := app.Run(context.Background(), []string{"suve", "ssm", "log", "--from", "~1", "/app/param"})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "shift syntax (~) not supported")
+	})
+
+	t.Run("to with shift syntax not allowed", func(t *testing.T) {
+		t.Parallel()
+		app := appcli.MakeApp()
+		err := app.Run(context.Background(), []string{"suve", "ssm", "log", "--to", "~1", "/app/param"})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "shift syntax (~) not supported")
+	})
+
+	t.Run("from without version specifier", func(t *testing.T) {
+		t.Parallel()
+		app := appcli.MakeApp()
+		err := app.Run(context.Background(), []string{"suve", "ssm", "log", "--from", "/app/param", "/app/param"})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "version specifier required")
+	})
+
+	t.Run("to without version specifier", func(t *testing.T) {
+		t.Parallel()
+		app := appcli.MakeApp()
+		err := app.Run(context.Background(), []string{"suve", "ssm", "log", "--to", "/app/param", "/app/param"})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "version specifier required")
+	})
+
+	t.Run("help", func(t *testing.T) {
+		t.Parallel()
+		app := appcli.MakeApp()
+		var buf bytes.Buffer
+		app.Writer = &buf
+		err := app.Run(context.Background(), []string{"suve", "ssm", "log", "--help"})
+		require.NoError(t, err)
+		assert.Contains(t, buf.String(), "Show parameter version history")
+	})
 }
 
 type mockClient struct {

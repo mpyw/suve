@@ -670,3 +670,32 @@ func TestStore_GetSM(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "secret-value", entry.Value)
 }
+
+func TestStore_SaveWriteError(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	// Create a read-only directory to trigger write error
+	readOnlyDir := filepath.Join(tmpDir, "readonly")
+	err := os.Mkdir(readOnlyDir, 0o500)
+	require.NoError(t, err)
+
+	path := filepath.Join(readOnlyDir, "subdir", "stage.json")
+	store := stage.NewStoreWithPath(path)
+
+	state := &stage.State{
+		Version: 1,
+		SSM: map[string]stage.Entry{
+			"/app/config": {
+				Operation: stage.OperationSet,
+				Value:     "test",
+				StagedAt:  time.Now(),
+			},
+		},
+		SM: make(map[string]stage.Entry),
+	}
+
+	err = store.Save(state)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to create state directory")
+}

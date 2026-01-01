@@ -17,7 +17,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	appcli "github.com/mpyw/suve/internal/cli"
-	"github.com/mpyw/suve/internal/cli/push"
+	"github.com/mpyw/suve/internal/cli/stage/push"
 	"github.com/mpyw/suve/internal/stage"
 )
 
@@ -422,4 +422,200 @@ func TestRun_StoreError(t *testing.T) {
 	err := r.Run(context.Background())
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to parse")
+}
+
+func TestRun_SMDeleteWithForce(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	store := stage.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+
+	// Stage SM delete with force option
+	_ = store.Stage(stage.ServiceSM, "my-secret", stage.Entry{
+		Operation: stage.OperationDelete,
+		StagedAt:  time.Now(),
+		DeleteOptions: &stage.DeleteOptions{
+			Force: true,
+		},
+	})
+
+	var capturedForce *bool
+	smMock := &mockSMClient{
+		deleteSecretFunc: func(_ context.Context, params *secretsmanager.DeleteSecretInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.DeleteSecretOutput, error) {
+			capturedForce = params.ForceDeleteWithoutRecovery
+			return &secretsmanager.DeleteSecretOutput{}, nil
+		},
+	}
+
+	var buf bytes.Buffer
+	r := &push.Runner{
+		SMClient: smMock,
+		Store:    store,
+		Stdout:   &buf,
+		Stderr:   &bytes.Buffer{},
+	}
+
+	err := r.Run(context.Background())
+	require.NoError(t, err)
+	require.NotNil(t, capturedForce)
+	assert.True(t, *capturedForce)
+}
+
+func TestRun_SMDeleteWithRecoveryWindow(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	store := stage.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+
+	// Stage SM delete with custom recovery window
+	_ = store.Stage(stage.ServiceSM, "my-secret", stage.Entry{
+		Operation: stage.OperationDelete,
+		StagedAt:  time.Now(),
+		DeleteOptions: &stage.DeleteOptions{
+			RecoveryWindow: 7,
+		},
+	})
+
+	var capturedRecoveryWindow *int64
+	smMock := &mockSMClient{
+		deleteSecretFunc: func(_ context.Context, params *secretsmanager.DeleteSecretInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.DeleteSecretOutput, error) {
+			capturedRecoveryWindow = params.RecoveryWindowInDays
+			return &secretsmanager.DeleteSecretOutput{}, nil
+		},
+	}
+
+	var buf bytes.Buffer
+	r := &push.Runner{
+		SMClient: smMock,
+		Store:    store,
+		Stdout:   &buf,
+		Stderr:   &bytes.Buffer{},
+	}
+
+	err := r.Run(context.Background())
+	require.NoError(t, err)
+	require.NotNil(t, capturedRecoveryWindow)
+	assert.Equal(t, int64(7), *capturedRecoveryWindow)
+}
+
+func TestRun_SSMDeleteError(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	store := stage.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+
+	_ = store.Stage(stage.ServiceSSM, "/app/config", stage.Entry{
+		Operation: stage.OperationDelete,
+		StagedAt:  time.Now(),
+	})
+
+	ssmMock := &mockSSMClient{
+		deleteParameterFunc: func(_ context.Context, _ *ssm.DeleteParameterInput, _ ...func(*ssm.Options)) (*ssm.DeleteParameterOutput, error) {
+			return nil, fmt.Errorf("delete failed")
+		},
+	}
+
+	var buf, errBuf bytes.Buffer
+	r := &push.Runner{
+		SSMClient: ssmMock,
+		Store:     store,
+		Stdout:    &buf,
+		Stderr:    &errBuf,
+	}
+
+	err := r.Run(context.Background())
+	require.Error(t, err)
+	assert.Contains(t, errBuf.String(), "Failed")
+}
+
+func TestRun_SMSetError(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	store := stage.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+
+	_ = store.Stage(stage.ServiceSM, "my-secret", stage.Entry{
+		Operation: stage.OperationSet,
+		Value:     "value",
+		StagedAt:  time.Now(),
+	})
+
+	smMock := &mockSMClient{
+		putSecretValueFunc: func(_ context.Context, _ *secretsmanager.PutSecretValueInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.PutSecretValueOutput, error) {
+			return nil, fmt.Errorf("put secret failed")
+		},
+	}
+
+	var buf, errBuf bytes.Buffer
+	r := &push.Runner{
+		SMClient: smMock,
+		Store:    store,
+		Stdout:   &buf,
+		Stderr:   &errBuf,
+	}
+
+	err := r.Run(context.Background())
+	require.Error(t, err)
+	assert.Contains(t, errBuf.String(), "Failed")
+}
+
+func TestRun_SMDeleteError(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	store := stage.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+
+	_ = store.Stage(stage.ServiceSM, "my-secret", stage.Entry{
+		Operation: stage.OperationDelete,
+		StagedAt:  time.Now(),
+	})
+
+	smMock := &mockSMClient{
+		deleteSecretFunc: func(_ context.Context, _ *secretsmanager.DeleteSecretInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.DeleteSecretOutput, error) {
+			return nil, fmt.Errorf("delete secret failed")
+		},
+	}
+
+	var buf, errBuf bytes.Buffer
+	r := &push.Runner{
+		SMClient: smMock,
+		Store:    store,
+		Stdout:   &buf,
+		Stderr:   &errBuf,
+	}
+
+	err := r.Run(context.Background())
+	require.Error(t, err)
+	assert.Contains(t, errBuf.String(), "Failed")
+}
+
+func TestRun_SSMSetError(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	store := stage.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+
+	_ = store.Stage(stage.ServiceSSM, "/app/config", stage.Entry{
+		Operation: stage.OperationSet,
+		Value:     "value",
+		StagedAt:  time.Now(),
+	})
+
+	ssmMock := &mockSSMClient{
+		putParameterFunc: func(_ context.Context, _ *ssm.PutParameterInput, _ ...func(*ssm.Options)) (*ssm.PutParameterOutput, error) {
+			return nil, fmt.Errorf("put parameter failed")
+		},
+	}
+
+	var buf, errBuf bytes.Buffer
+	r := &push.Runner{
+		SSMClient: ssmMock,
+		Store:     store,
+		Stdout:    &buf,
+		Stderr:    &errBuf,
+	}
+
+	err := r.Run(context.Background())
+	require.Error(t, err)
+	assert.Contains(t, errBuf.String(), "Failed")
 }

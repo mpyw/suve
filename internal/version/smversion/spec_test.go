@@ -436,3 +436,78 @@ func TestSpec_HasShift(t *testing.T) {
 		})
 	}
 }
+
+func TestParseDiffArgs(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		args       []string
+		wantSpec1  *smversion.Spec
+		wantSpec2  *smversion.Spec
+		wantErrMsg string
+	}{
+		{
+			name: "one arg with label",
+			args: []string{"my-secret:AWSPREVIOUS"},
+			wantSpec1: &smversion.Spec{
+				Name:     "my-secret",
+				Absolute: smversion.AbsoluteSpec{Label: lo.ToPtr("AWSPREVIOUS")},
+			},
+			wantSpec2: &smversion.Spec{
+				Name: "my-secret",
+			},
+		},
+		{
+			name: "two args with version ID",
+			args: []string{"my-secret#abc123", "#def456"},
+			wantSpec1: &smversion.Spec{
+				Name:     "my-secret",
+				Absolute: smversion.AbsoluteSpec{ID: lo.ToPtr("abc123")},
+			},
+			wantSpec2: &smversion.Spec{
+				Name:     "my-secret",
+				Absolute: smversion.AbsoluteSpec{ID: lo.ToPtr("def456")},
+			},
+		},
+		{
+			name: "three args with labels",
+			args: []string{"my-secret", ":AWSPREVIOUS", ":AWSCURRENT"},
+			wantSpec1: &smversion.Spec{
+				Name:     "my-secret",
+				Absolute: smversion.AbsoluteSpec{Label: lo.ToPtr("AWSPREVIOUS")},
+			},
+			wantSpec2: &smversion.Spec{
+				Name:     "my-secret",
+				Absolute: smversion.AbsoluteSpec{Label: lo.ToPtr("AWSCURRENT")},
+			},
+		},
+		{
+			name:       "no arguments",
+			args:       []string{},
+			wantErrMsg: "usage:",
+		},
+		{
+			name:       "invalid spec",
+			args:       []string{"my-secret#"},
+			wantErrMsg: "invalid",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			spec1, spec2, err := smversion.ParseDiffArgs(tt.args)
+
+			if tt.wantErrMsg != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.wantErrMsg)
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantSpec1, spec1)
+			assert.Equal(t, tt.wantSpec2, spec2)
+		})
+	}
+}

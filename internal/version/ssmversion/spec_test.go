@@ -315,3 +315,78 @@ func TestSpec_HasShift(t *testing.T) {
 		})
 	}
 }
+
+func TestParseDiffArgs(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		args       []string
+		wantSpec1  *ssmversion.Spec
+		wantSpec2  *ssmversion.Spec
+		wantErrMsg string
+	}{
+		{
+			name: "one arg with version",
+			args: []string{"/app/param#3"},
+			wantSpec1: &ssmversion.Spec{
+				Name:     "/app/param",
+				Absolute: ssmversion.AbsoluteSpec{Version: lo.ToPtr(int64(3))},
+			},
+			wantSpec2: &ssmversion.Spec{
+				Name: "/app/param",
+			},
+		},
+		{
+			name: "two args",
+			args: []string{"/app/param#1", "#2"},
+			wantSpec1: &ssmversion.Spec{
+				Name:     "/app/param",
+				Absolute: ssmversion.AbsoluteSpec{Version: lo.ToPtr(int64(1))},
+			},
+			wantSpec2: &ssmversion.Spec{
+				Name:     "/app/param",
+				Absolute: ssmversion.AbsoluteSpec{Version: lo.ToPtr(int64(2))},
+			},
+		},
+		{
+			name: "three args",
+			args: []string{"/app/param", "#1", "#2"},
+			wantSpec1: &ssmversion.Spec{
+				Name:     "/app/param",
+				Absolute: ssmversion.AbsoluteSpec{Version: lo.ToPtr(int64(1))},
+			},
+			wantSpec2: &ssmversion.Spec{
+				Name:     "/app/param",
+				Absolute: ssmversion.AbsoluteSpec{Version: lo.ToPtr(int64(2))},
+			},
+		},
+		{
+			name:       "no arguments",
+			args:       []string{},
+			wantErrMsg: "usage:",
+		},
+		{
+			name:       "invalid spec",
+			args:       []string{"/app/param#"},
+			wantErrMsg: "invalid",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			spec1, spec2, err := ssmversion.ParseDiffArgs(tt.args)
+
+			if tt.wantErrMsg != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.wantErrMsg)
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantSpec1, spec1)
+			assert.Equal(t, tt.wantSpec2, spec2)
+		})
+	}
+}

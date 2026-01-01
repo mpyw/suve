@@ -12,8 +12,20 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	appcli "github.com/mpyw/suve/internal/cli"
 	"github.com/mpyw/suve/internal/cli/ssm/ls"
 )
+
+func TestCommand_Help(t *testing.T) {
+	t.Parallel()
+	app := appcli.MakeApp()
+	var buf bytes.Buffer
+	app.Writer = &buf
+	err := app.Run(context.Background(), []string{"suve", "ssm", "ls", "--help"})
+	require.NoError(t, err)
+	assert.Contains(t, buf.String(), "List parameters")
+	assert.Contains(t, buf.String(), "--recursive")
+}
 
 type mockClient struct {
 	describeParametersFunc func(ctx context.Context, params *ssm.DescribeParametersInput, optFns ...func(*ssm.Options)) (*ssm.DescribeParametersOutput, error)

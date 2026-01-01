@@ -6,9 +6,13 @@ import (
 	"fmt"
 	"io"
 	"sort"
+	"sync"
 
+	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
+	"github.com/aws/aws-sdk-go-v2/service/ssm/types"
 	"github.com/samber/lo"
 	"github.com/urfave/cli/v3"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/mpyw/suve/internal/api/smapi"
 	"github.com/mpyw/suve/internal/api/ssmapi"
@@ -137,6 +141,18 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	})
 }
 
+// ssmFetchResult holds the result of fetching an SSM parameter.
+type ssmFetchResult struct {
+	param *types.ParameterHistory
+	err   error
+}
+
+// smFetchResult holds the result of fetching a SM secret.
+type smFetchResult struct {
+	secret *secretsmanager.GetSecretValueOutput
+	err    error
+}
+
 // Run executes the diff command.
 func (r *Runner) Run(ctx context.Context, opts Options) error {
 	allEntries, err := r.Store.List("")
@@ -144,10 +160,47 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 		return err
 	}
 
+	ssmEntries := allEntries[stage.ServiceSSM]
+	smEntries := allEntries[stage.ServiceSM]
+
+	// Fetch all values in parallel
+	ssmResults := make(map[string]*ssmFetchResult)
+	smResults := make(map[string]*smFetchResult)
+
+	var mu sync.Mutex
+	g, gctx := errgroup.WithContext(ctx)
+	g.SetLimit(10) // Limit concurrent AWS API calls
+
+	// Fetch SSM parameters
+	for name := range ssmEntries {
+		g.Go(func() error {
+			spec := &ssmversion.Spec{Name: name}
+			param, err := ssmversion.GetParameterWithVersion(gctx, r.SSMClient, spec, true)
+			mu.Lock()
+			ssmResults[name] = &ssmFetchResult{param: param, err: err}
+			mu.Unlock()
+			return nil // Don't fail the group on individual errors
+		})
+	}
+
+	// Fetch SM secrets
+	for name := range smEntries {
+		g.Go(func() error {
+			spec := &smversion.Spec{Name: name}
+			secret, err := smversion.GetSecretWithVersion(gctx, r.SMClient, spec)
+			mu.Lock()
+			smResults[name] = &smFetchResult{secret: secret, err: err}
+			mu.Unlock()
+			return nil // Don't fail the group on individual errors
+		})
+	}
+
+	_ = g.Wait() // Errors are tracked per-item
+
 	first := true
 
-	// Process SSM entries
-	if ssmEntries, ok := allEntries[stage.ServiceSSM]; ok && len(ssmEntries) > 0 {
+	// Process SSM entries in sorted order
+	if len(ssmEntries) > 0 {
 		names := make([]string, 0, len(ssmEntries))
 		for name := range ssmEntries {
 			names = append(names, name)
@@ -156,20 +209,25 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 
 		for _, name := range names {
 			entry := ssmEntries[name]
+			result := ssmResults[name]
+
+			if result.err != nil {
+				return fmt.Errorf("failed to get current version for %s: %w", name, result.err)
+			}
 
 			if !first {
 				_, _ = fmt.Fprintln(r.Stdout)
 			}
 			first = false
 
-			if err := r.diffSSMStaged(ctx, opts, name, entry); err != nil {
+			if err := r.outputSSMDiff(opts, name, entry, result.param); err != nil {
 				return err
 			}
 		}
 	}
 
-	// Process SM entries
-	if smEntries, ok := allEntries[stage.ServiceSM]; ok && len(smEntries) > 0 {
+	// Process SM entries in sorted order
+	if len(smEntries) > 0 {
 		names := make([]string, 0, len(smEntries))
 		for name := range smEntries {
 			names = append(names, name)
@@ -178,13 +236,18 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 
 		for _, name := range names {
 			entry := smEntries[name]
+			result := smResults[name]
+
+			if result.err != nil {
+				return fmt.Errorf("failed to get current version for %s: %w", name, result.err)
+			}
 
 			if !first {
 				_, _ = fmt.Fprintln(r.Stdout)
 			}
 			first = false
 
-			if err := r.diffSMStaged(ctx, opts, name, entry); err != nil {
+			if err := r.outputSMDiff(opts, name, entry, result.secret); err != nil {
 				return err
 			}
 		}
@@ -193,14 +256,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 	return nil
 }
 
-func (r *Runner) diffSSMStaged(ctx context.Context, opts Options, name string, entry stage.Entry) error {
-	// Get current AWS value
-	spec := &ssmversion.Spec{Name: name}
-	param, err := ssmversion.GetParameterWithVersion(ctx, r.SSMClient, spec, true)
-	if err != nil {
-		return fmt.Errorf("failed to get current version for %s: %w", name, err)
-	}
-
+func (r *Runner) outputSSMDiff(opts Options, name string, entry stage.Entry, param *types.ParameterHistory) error {
 	awsValue := lo.FromPtr(param.Value)
 	stagedValue := entry.Value
 
@@ -222,7 +278,11 @@ func (r *Runner) diffSSMStaged(ctx context.Context, opts Options, name string, e
 	}
 
 	if awsValue == stagedValue {
-		output.Warning(r.Stderr, "staged value is identical to AWS current for %s", name)
+		// Auto-unstage since there's no difference
+		if err := r.Store.Unstage(stage.ServiceSSM, name); err != nil {
+			return fmt.Errorf("failed to unstage %s: %w", name, err)
+		}
+		output.Warning(r.Stderr, "unstaged %s: identical to AWS current", name)
 		return nil
 	}
 
@@ -238,14 +298,7 @@ func (r *Runner) diffSSMStaged(ctx context.Context, opts Options, name string, e
 	return nil
 }
 
-func (r *Runner) diffSMStaged(ctx context.Context, opts Options, name string, entry stage.Entry) error {
-	// Get current AWS value
-	spec := &smversion.Spec{Name: name}
-	secret, err := smversion.GetSecretWithVersion(ctx, r.SMClient, spec)
-	if err != nil {
-		return fmt.Errorf("failed to get current version for %s: %w", name, err)
-	}
-
+func (r *Runner) outputSMDiff(opts Options, name string, entry stage.Entry, secret *secretsmanager.GetSecretValueOutput) error {
 	awsValue := lo.FromPtr(secret.SecretString)
 	stagedValue := entry.Value
 
@@ -267,7 +320,11 @@ func (r *Runner) diffSMStaged(ctx context.Context, opts Options, name string, en
 	}
 
 	if awsValue == stagedValue {
-		output.Warning(r.Stderr, "staged value is identical to AWS current for %s", name)
+		// Auto-unstage since there's no difference
+		if err := r.Store.Unstage(stage.ServiceSM, name); err != nil {
+			return fmt.Errorf("failed to unstage %s: %w", name, err)
+		}
+		output.Warning(r.Stderr, "unstaged %s: identical to AWS current", name)
 		return nil
 	}
 

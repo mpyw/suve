@@ -7,12 +7,14 @@ import (
 	"fmt"
 	"io"
 	"sort"
+	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/aws/aws-sdk-go-v2/service/ssm/types"
 	"github.com/fatih/color"
 	"github.com/samber/lo"
 	"github.com/urfave/cli/v3"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/mpyw/suve/internal/api/ssmapi"
 	"github.com/mpyw/suve/internal/awsutil"
@@ -118,29 +120,51 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 	}
 	sort.Strings(names)
 
-	// Apply each change
+	// Run push operations in parallel
+	type pushResult struct {
+		name      string
+		operation stage.Operation
+		err       error
+	}
+	results := make(map[string]*pushResult)
+	var mu sync.Mutex
+	g, gctx := errgroup.WithContext(ctx)
+	g.SetLimit(10) // Limit concurrent AWS API calls
+
+	for _, name := range names {
+		entry := staged[name]
+		g.Go(func() error {
+			var pushErr error
+			switch entry.Operation {
+			case stage.OperationSet:
+				pushErr = r.pushSet(gctx, name, entry.Value)
+			case stage.OperationDelete:
+				pushErr = r.pushDelete(gctx, name)
+			default:
+				pushErr = fmt.Errorf("unknown operation: %s", entry.Operation)
+			}
+
+			mu.Lock()
+			results[name] = &pushResult{name: name, operation: entry.Operation, err: pushErr}
+			mu.Unlock()
+			return nil // Don't fail the group on individual errors
+		})
+	}
+
+	_ = g.Wait() // Errors are tracked per-item
+
+	// Output results in sorted order
 	var succeeded, failed int
 	green := color.New(color.FgGreen).SprintFunc()
 	red := color.New(color.FgRed).SprintFunc()
 
 	for _, name := range names {
-		entry := staged[name]
-
-		var pushErr error
-		switch entry.Operation {
-		case stage.OperationSet:
-			pushErr = r.pushSet(ctx, name, entry.Value)
-		case stage.OperationDelete:
-			pushErr = r.pushDelete(ctx, name)
-		default:
-			pushErr = fmt.Errorf("unknown operation: %s", entry.Operation)
-		}
-
-		if pushErr != nil {
-			_, _ = fmt.Fprintf(r.Stderr, "%s %s: %v\n", red("Failed"), name, pushErr)
+		result := results[name]
+		if result.err != nil {
+			_, _ = fmt.Fprintf(r.Stderr, "%s %s: %v\n", red("Failed"), name, result.err)
 			failed++
 		} else {
-			if entry.Operation == stage.OperationSet {
+			if result.operation == stage.OperationSet {
 				_, _ = fmt.Fprintf(r.Stdout, "%s Set %s\n", green("✓"), name)
 			} else {
 				_, _ = fmt.Fprintf(r.Stdout, "%s Deleted %s\n", green("✓"), name)

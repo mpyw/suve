@@ -16,7 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	appcli "github.com/mpyw/suve/internal/cli"
-	stagediff "github.com/mpyw/suve/internal/cli/diff"
+	stagediff "github.com/mpyw/suve/internal/cli/stage/diff"
 	"github.com/mpyw/suve/internal/stage"
 )
 
@@ -340,7 +340,11 @@ func TestRun_IdenticalValues(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Empty(t, stdout.String())
-	assert.Contains(t, stderr.String(), "staged value is identical to AWS current")
+	assert.Contains(t, stderr.String(), "unstaged /app/config: identical to AWS current")
+
+	// Verify actually unstaged
+	_, err = store.Get(stage.ServiceSSM, "/app/config")
+	assert.Equal(t, stage.ErrNotStaged, err)
 }
 
 func TestRun_JSONFormat(t *testing.T) {
@@ -414,4 +418,154 @@ func TestRun_AWSError(t *testing.T) {
 	err = r.Run(context.Background(), stagediff.Options{})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "AWS error")
+}
+
+func TestRun_SMAWSError(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	store := stage.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+
+	err := store.Stage(stage.ServiceSM, "my-secret", stage.Entry{
+		Operation: stage.OperationSet,
+		Value:     "new-value",
+		StagedAt:  time.Now(),
+	})
+	require.NoError(t, err)
+
+	smMock := &mockSMClient{
+		getSecretValueFunc: func(_ context.Context, _ *secretsmanager.GetSecretValueInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.GetSecretValueOutput, error) {
+			return nil, fmt.Errorf("AWS error: secret not found")
+		},
+	}
+
+	var stdout, stderr bytes.Buffer
+	r := &stagediff.Runner{
+		SMClient: smMock,
+		Store:    store,
+		Stdout:   &stdout,
+		Stderr:   &stderr,
+	}
+
+	err = r.Run(context.Background(), stagediff.Options{})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "AWS error")
+}
+
+func TestRun_SMIdenticalValues(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	store := stage.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+
+	err := store.Stage(stage.ServiceSM, "my-secret", stage.Entry{
+		Operation: stage.OperationSet,
+		Value:     "same-value",
+		StagedAt:  time.Now(),
+	})
+	require.NoError(t, err)
+
+	smMock := &mockSMClient{
+		getSecretValueFunc: func(_ context.Context, _ *secretsmanager.GetSecretValueInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.GetSecretValueOutput, error) {
+			return &secretsmanager.GetSecretValueOutput{
+				Name:         lo.ToPtr("my-secret"),
+				SecretString: lo.ToPtr("same-value"),
+				VersionId:    lo.ToPtr("abc123def456"),
+			}, nil
+		},
+	}
+
+	var stdout, stderr bytes.Buffer
+	r := &stagediff.Runner{
+		SMClient: smMock,
+		Store:    store,
+		Stdout:   &stdout,
+		Stderr:   &stderr,
+	}
+
+	err = r.Run(context.Background(), stagediff.Options{})
+	require.NoError(t, err)
+
+	assert.Empty(t, stdout.String())
+	assert.Contains(t, stderr.String(), "unstaged my-secret: identical to AWS current")
+
+	// Verify actually unstaged
+	_, err = store.Get(stage.ServiceSM, "my-secret")
+	assert.Equal(t, stage.ErrNotStaged, err)
+}
+
+func TestRun_SMJSONFormat(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	store := stage.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+
+	err := store.Stage(stage.ServiceSM, "my-secret", stage.Entry{
+		Operation: stage.OperationSet,
+		Value:     `{"key":"new"}`,
+		StagedAt:  time.Now(),
+	})
+	require.NoError(t, err)
+
+	smMock := &mockSMClient{
+		getSecretValueFunc: func(_ context.Context, _ *secretsmanager.GetSecretValueInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.GetSecretValueOutput, error) {
+			return &secretsmanager.GetSecretValueOutput{
+				Name:         lo.ToPtr("my-secret"),
+				SecretString: lo.ToPtr(`{"key":"old"}`),
+				VersionId:    lo.ToPtr("abc123def456"),
+			}, nil
+		},
+	}
+
+	var stdout, stderr bytes.Buffer
+	r := &stagediff.Runner{
+		SMClient: smMock,
+		Store:    store,
+		Stdout:   &stdout,
+		Stderr:   &stderr,
+	}
+
+	err = r.Run(context.Background(), stagediff.Options{JSONFormat: true})
+	require.NoError(t, err)
+
+	output := stdout.String()
+	assert.Contains(t, output, "-")
+	assert.Contains(t, output, "+")
+}
+
+func TestRun_SMJSONFormatMixed(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	store := stage.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+
+	err := store.Stage(stage.ServiceSM, "my-secret", stage.Entry{
+		Operation: stage.OperationSet,
+		Value:     "not-json",
+		StagedAt:  time.Now(),
+	})
+	require.NoError(t, err)
+
+	smMock := &mockSMClient{
+		getSecretValueFunc: func(_ context.Context, _ *secretsmanager.GetSecretValueInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.GetSecretValueOutput, error) {
+			return &secretsmanager.GetSecretValueOutput{
+				Name:         lo.ToPtr("my-secret"),
+				SecretString: lo.ToPtr(`{"key":"old"}`),
+				VersionId:    lo.ToPtr("abc123def456"),
+			}, nil
+		},
+	}
+
+	var stdout, stderr bytes.Buffer
+	r := &stagediff.Runner{
+		SMClient: smMock,
+		Store:    store,
+		Stdout:   &stdout,
+		Stderr:   &stderr,
+	}
+
+	err = r.Run(context.Background(), stagediff.Options{JSONFormat: true})
+	require.NoError(t, err)
+
+	assert.Contains(t, stderr.String(), "--json has no effect")
 }
