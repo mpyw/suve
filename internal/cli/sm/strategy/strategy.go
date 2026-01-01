@@ -9,6 +9,7 @@ import (
 	"github.com/samber/lo"
 
 	"github.com/mpyw/suve/internal/api/smapi"
+	"github.com/mpyw/suve/internal/awsutil"
 	"github.com/mpyw/suve/internal/smutil"
 	"github.com/mpyw/suve/internal/stage"
 	"github.com/mpyw/suve/internal/version/smversion"
@@ -143,4 +144,19 @@ func (s *Strategy) FetchVersion(ctx context.Context, input string) (value string
 	}
 	versionID := smutil.TruncateVersionID(lo.FromPtr(secret.VersionId))
 	return lo.FromPtr(secret.SecretString), "#" + versionID, nil
+}
+
+// Factory creates a FullStrategy with an initialized AWS client.
+func Factory(ctx context.Context) (stage.FullStrategy, error) {
+	client, err := awsutil.NewSMClient(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize AWS client: %w", err)
+	}
+	return NewStrategy(client), nil
+}
+
+// FactoryWithoutClient creates a Strategy without an AWS client.
+// Use this for operations that don't need AWS access (e.g., status, parsing).
+func FactoryWithoutClient() stage.FullStrategy {
+	return NewStrategy(nil)
 }

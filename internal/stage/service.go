@@ -72,3 +72,16 @@ type ResetStrategy interface {
 	// Returns the value and a version label for display.
 	FetchVersion(ctx context.Context, input string) (value string, versionLabel string, err error)
 }
+
+// FullStrategy combines all service-specific strategy interfaces.
+// This enables unified stage commands that work with either SSM or SM.
+type FullStrategy interface {
+	PushStrategy
+	DiffStrategy
+	EditStrategy
+	ResetStrategy
+}
+
+// StrategyFactory creates a FullStrategy for a given context.
+// Used to defer AWS client initialization until command execution.
+type StrategyFactory func(ctx context.Context) (FullStrategy, error)

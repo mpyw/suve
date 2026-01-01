@@ -11,6 +11,7 @@ import (
 	"github.com/samber/lo"
 
 	"github.com/mpyw/suve/internal/api/ssmapi"
+	"github.com/mpyw/suve/internal/awsutil"
 	"github.com/mpyw/suve/internal/stage"
 	"github.com/mpyw/suve/internal/version/ssmversion"
 )
@@ -148,4 +149,19 @@ func (s *Strategy) FetchVersion(ctx context.Context, input string) (value string
 		return "", "", err
 	}
 	return lo.FromPtr(param.Value), fmt.Sprintf("#%d", param.Version), nil
+}
+
+// Factory creates a FullStrategy with an initialized AWS client.
+func Factory(ctx context.Context) (stage.FullStrategy, error) {
+	client, err := awsutil.NewSSMClient(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize AWS client: %w", err)
+	}
+	return NewStrategy(client), nil
+}
+
+// FactoryWithoutClient creates a Strategy without an AWS client.
+// Use this for operations that don't need AWS access (e.g., status, parsing).
+func FactoryWithoutClient() stage.FullStrategy {
+	return NewStrategy(nil)
 }

@@ -4,13 +4,16 @@ package stage
 import (
 	"github.com/urfave/cli/v3"
 
-	"github.com/mpyw/suve/internal/cli/sm/stage/delete"
-	"github.com/mpyw/suve/internal/cli/sm/stage/diff"
-	"github.com/mpyw/suve/internal/cli/sm/stage/edit"
-	"github.com/mpyw/suve/internal/cli/sm/stage/push"
-	"github.com/mpyw/suve/internal/cli/sm/stage/reset"
-	"github.com/mpyw/suve/internal/cli/sm/stage/status"
+	"github.com/mpyw/suve/internal/cli/sm/strategy"
+	"github.com/mpyw/suve/internal/stage/stagerunner"
 )
+
+var config = stagerunner.CommandConfig{
+	ServiceName:          "sm",
+	ItemName:             "secret",
+	Factory:              strategy.Factory,
+	FactoryWithoutClient: strategy.FactoryWithoutClient,
+}
 
 // Command returns the stage command with all staging subcommands.
 func Command() *cli.Command {
@@ -26,12 +29,12 @@ Use 'suve sm stage diff' to see differences between staged and AWS values.
 Use 'suve sm stage push' to apply staged changes to AWS.
 Use 'suve sm stage reset' to unstage or restore from a version.`,
 		Commands: []*cli.Command{
-			edit.Command(),
-			delete.Command(),
-			status.Command(),
-			diff.Command(),
-			push.Command(),
-			reset.Command(),
+			stagerunner.NewEditCommand(config),
+			stagerunner.NewDeleteCommand(config),
+			stagerunner.NewStatusCommand(config),
+			stagerunner.NewDiffCommand(config),
+			stagerunner.NewPushCommand(config),
+			stagerunner.NewResetCommand(config),
 		},
 	}
 }
