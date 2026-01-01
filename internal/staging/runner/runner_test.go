@@ -438,7 +438,7 @@ func TestDiffRunner_Run(t *testing.T) {
 		assert.Contains(t, output, "staged for deletion")
 	})
 
-	t.Run("diff fetch error", func(t *testing.T) {
+	t.Run("diff update - auto unstage when item deleted from AWS", func(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
@@ -451,15 +451,139 @@ func TestDiffRunner_Run(t *testing.T) {
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.DiffRunner{
-			Strategy: &fullMockStrategy{service: staging.ServiceSSM, fetchCurrentErr: errors.New("fetch failed")},
+			// FetchCurrent returns error because item was deleted from AWS
+			Strategy: &fullMockStrategy{service: staging.ServiceSSM, fetchCurrentErr: errors.New("parameter not found")},
 			Store:    store,
 			Stdout:   &stdout,
 			Stderr:   &stderr,
 		}
 
 		err := r.Run(context.Background(), runner.DiffOptions{Name: "/app/config"})
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "fetch failed")
+		require.NoError(t, err)
+		assert.Contains(t, stderr.String(), "unstaged")
+		assert.Contains(t, stderr.String(), "no longer exists")
+
+		// Verify unstaged
+		_, err = store.Get(staging.ServiceSSM, "/app/config")
+		assert.ErrorIs(t, err, staging.ErrNotStaged)
+	})
+
+	t.Run("diff create - show diff from empty when item not in AWS", func(t *testing.T) {
+		t.Parallel()
+
+		tmpDir := t.TempDir()
+		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		_ = store.Stage(staging.ServiceSSM, "/app/new-param", staging.Entry{
+			Operation: staging.OperationCreate,
+			Value:     "brand-new-value",
+			StagedAt:  time.Now(),
+		})
+
+		var stdout, stderr bytes.Buffer
+		r := &runner.DiffRunner{
+			// FetchCurrent returns error because item doesn't exist yet
+			Strategy: &fullMockStrategy{service: staging.ServiceSSM, fetchCurrentErr: errors.New("parameter not found")},
+			Store:    store,
+			Stdout:   &stdout,
+			Stderr:   &stderr,
+		}
+
+		err := r.Run(context.Background(), runner.DiffOptions{Name: "/app/new-param"})
+		require.NoError(t, err)
+
+		output := stdout.String()
+		assert.Contains(t, output, "+brand-new-value")
+		assert.Contains(t, output, "not in AWS")
+		assert.Contains(t, output, "staged for creation")
+
+		// Verify still staged (not auto-unstaged)
+		entry, err := store.Get(staging.ServiceSSM, "/app/new-param")
+		require.NoError(t, err)
+		assert.Equal(t, staging.OperationCreate, entry.Operation)
+	})
+
+	t.Run("diff create with JSON format - item not in AWS", func(t *testing.T) {
+		t.Parallel()
+
+		tmpDir := t.TempDir()
+		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		_ = store.Stage(staging.ServiceSSM, "/app/new-json", staging.Entry{
+			Operation: staging.OperationCreate,
+			Value:     `{"b":2,"a":1}`,
+			StagedAt:  time.Now(),
+		})
+
+		var stdout, stderr bytes.Buffer
+		r := &runner.DiffRunner{
+			Strategy: &fullMockStrategy{service: staging.ServiceSSM, fetchCurrentErr: errors.New("parameter not found")},
+			Store:    store,
+			Stdout:   &stdout,
+			Stderr:   &stderr,
+		}
+
+		err := r.Run(context.Background(), runner.DiffOptions{Name: "/app/new-json", JSONFormat: true})
+		require.NoError(t, err)
+		output := stdout.String()
+		// JSON should be formatted
+		assert.Contains(t, output, `"a"`)
+		assert.Contains(t, output, `"b"`)
+	})
+
+	t.Run("diff create - auto unstage when item exists in AWS with same value", func(t *testing.T) {
+		t.Parallel()
+
+		tmpDir := t.TempDir()
+		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		_ = store.Stage(staging.ServiceSSM, "/app/param", staging.Entry{
+			Operation: staging.OperationCreate,
+			Value:     "same-value",
+			StagedAt:  time.Now(),
+		})
+
+		var stdout, stderr bytes.Buffer
+		r := &runner.DiffRunner{
+			// Item already exists in AWS with same value
+			Strategy: &fullMockStrategy{service: staging.ServiceSSM, fetchCurrentVal: "same-value"},
+			Store:    store,
+			Stdout:   &stdout,
+			Stderr:   &stderr,
+		}
+
+		err := r.Run(context.Background(), runner.DiffOptions{Name: "/app/param"})
+		require.NoError(t, err)
+		assert.Contains(t, stderr.String(), "unstaged")
+		assert.Contains(t, stderr.String(), "identical")
+
+		// Verify unstaged
+		_, err = store.Get(staging.ServiceSSM, "/app/param")
+		assert.ErrorIs(t, err, staging.ErrNotStaged)
+	})
+
+	t.Run("diff create - show diff when item exists in AWS with different value", func(t *testing.T) {
+		t.Parallel()
+
+		tmpDir := t.TempDir()
+		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		_ = store.Stage(staging.ServiceSSM, "/app/param", staging.Entry{
+			Operation: staging.OperationCreate,
+			Value:     "new-value",
+			StagedAt:  time.Now(),
+		})
+
+		var stdout, stderr bytes.Buffer
+		r := &runner.DiffRunner{
+			// Item already exists in AWS with different value
+			Strategy: &fullMockStrategy{service: staging.ServiceSSM, fetchCurrentVal: "old-value"},
+			Store:    store,
+			Stdout:   &stdout,
+			Stderr:   &stderr,
+		}
+
+		err := r.Run(context.Background(), runner.DiffOptions{Name: "/app/param"})
+		require.NoError(t, err)
+		output := stdout.String()
+		assert.Contains(t, output, "-old-value")
+		assert.Contains(t, output, "+new-value")
 	})
 
 	t.Run("diff delete - auto unstage when already deleted in AWS", func(t *testing.T) {

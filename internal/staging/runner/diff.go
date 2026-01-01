@@ -71,16 +71,36 @@ func (r *DiffRunner) Run(ctx context.Context, opts DiffOptions) error {
 		result := results[name]
 
 		if result.Err != nil {
-			// For delete operations, if the item doesn't exist in AWS anymore,
-			// it means the deletion has already been applied, so auto-unstage
-			if entry.Operation == staging.OperationDelete {
+			// Handle fetch error based on operation type
+			switch entry.Operation {
+			case staging.OperationDelete:
+				// Item doesn't exist in AWS anymore - deletion already applied
 				if err := r.Store.Unstage(service, name); err != nil {
 					return fmt.Errorf("failed to unstage %s: %w", name, err)
 				}
 				output.Warning(r.Stderr, "unstaged %s: already deleted in AWS", name)
 				continue
+
+			case staging.OperationCreate:
+				// Item doesn't exist in AWS - this is expected for create operations
+				// Show diff from empty to staged value
+				if !first {
+					_, _ = fmt.Fprintln(r.Stdout)
+				}
+				first = false
+				if err := r.outputDiffCreate(opts, name, entry); err != nil {
+					return err
+				}
+				continue
+
+			case staging.OperationUpdate:
+				// Item doesn't exist in AWS anymore - staged update is invalid
+				if err := r.Store.Unstage(service, name); err != nil {
+					return fmt.Errorf("failed to unstage %s: %w", name, err)
+				}
+				output.Warning(r.Stderr, "unstaged %s: item no longer exists in AWS", name)
+				continue
 			}
-			return fmt.Errorf("failed to get current version for %s: %w", name, result.Err)
 		}
 
 		if !first {
@@ -134,6 +154,25 @@ func (r *DiffRunner) outputDiff(opts DiffOptions, name string, entry staging.Ent
 	}
 
 	diff := output.Diff(label1, label2, awsValue, stagedValue)
+	_, _ = fmt.Fprint(r.Stdout, diff)
+
+	return nil
+}
+
+func (r *DiffRunner) outputDiffCreate(opts DiffOptions, name string, entry staging.Entry) error {
+	stagedValue := entry.Value
+
+	// Format as JSON if enabled
+	if opts.JSONFormat {
+		if formatted, ok := jsonutil.TryFormat(stagedValue); ok {
+			stagedValue = formatted
+		}
+	}
+
+	label1 := fmt.Sprintf("%s (not in AWS)", name)
+	label2 := fmt.Sprintf("%s (staged for creation)", name)
+
+	diff := output.Diff(label1, label2, "", stagedValue)
 	_, _ = fmt.Fprint(r.Stdout, diff)
 
 	return nil
