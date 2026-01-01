@@ -1,15 +1,13 @@
-package shift_test
+package version
 
 import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/mpyw/suve/internal/version/shift"
 )
 
-func TestParse(t *testing.T) {
+func TestParseShift(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name      string
@@ -60,7 +58,7 @@ func TestParse(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			gotShift, err := shift.Parse(tt.input)
+			gotShift, err := parseShift(tt.input)
 			if tt.wantErr {
 				assert.Error(t, err)
 				return
@@ -119,7 +117,7 @@ func TestIsShiftStart(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got := shift.IsShiftStart(tt.s, tt.i)
+			got := isShiftStart(tt.s, tt.i)
 			assert.Equal(t, tt.want, got)
 		})
 	}

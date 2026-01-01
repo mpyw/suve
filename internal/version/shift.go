@@ -1,5 +1,4 @@
-// Package shift provides Git-like shift parsing utilities.
-package shift
+package version
 
 import (
 	"fmt"
@@ -8,11 +7,11 @@ import (
 	"github.com/mpyw/suve/internal/version/internal"
 )
 
-// Parse parses shift specifiers from the beginning of a string.
+// parseShift parses shift specifiers from the beginning of a string.
 // Supports Git-like syntax: ~, ~N, ~~, ~1~2, etc.
 // Returns total shift amount and error.
 // Returns error if ~ is not followed by digit, ~, or end of string.
-func Parse(s string) (int, error) {
+func parseShift(s string) (int, error) {
 	total := 0
 	i := 0
 
@@ -46,8 +45,8 @@ func Parse(s string) (int, error) {
 	return total, nil
 }
 
-// IsShiftStart returns true if position i in string s looks like the start of a shift.
-func IsShiftStart(s string, i int) bool {
+// isShiftStart returns true if position i in string s looks like the start of a shift.
+func isShiftStart(s string, i int) bool {
 	if i >= len(s) || s[i] != '~' {
 		return false
 	}

@@ -21,7 +21,6 @@ import (
 	"strings"
 
 	"github.com/mpyw/suve/internal/version/internal"
-	"github.com/mpyw/suve/internal/version/shift"
 )
 
 // Common errors for version parsing.
@@ -135,7 +134,7 @@ func Parse[A any](input string, parser AbsoluteParser[A]) (*Spec[A], error) {
 	// Example: "~1" -> s=1
 	var s int
 	if rest != "" {
-		if s, err = shift.Parse(rest); err != nil {
+		if s, err = parseShift(rest); err != nil {
 			return nil, err
 		}
 	}
@@ -157,7 +156,7 @@ func findNameEnd[A any](input string, parsers []SpecifierParser[A]) (int, error)
 	for i := 0; i < len(input); i++ {
 		// Check for shift specifier (~)
 		if input[i] == '~' {
-			if shift.IsShiftStart(input, i) {
+			if isShiftStart(input, i) {
 				return i, nil // Found shift start
 			}
 			// "~" followed by letter is ambiguous (e.g., "param~backup")
