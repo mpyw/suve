@@ -5,8 +5,11 @@ import (
 
 	"github.com/mpyw/suve/internal/cli/ssm/cat"
 	"github.com/mpyw/suve/internal/cli/ssm/diff"
+	"github.com/mpyw/suve/internal/cli/ssm/edit"
 	"github.com/mpyw/suve/internal/cli/ssm/log"
 	"github.com/mpyw/suve/internal/cli/ssm/ls"
+	"github.com/mpyw/suve/internal/cli/ssm/push"
+	"github.com/mpyw/suve/internal/cli/ssm/reset"
 	"github.com/mpyw/suve/internal/cli/ssm/rm"
 	"github.com/mpyw/suve/internal/cli/ssm/set"
 	"github.com/mpyw/suve/internal/cli/ssm/show"
@@ -27,7 +30,10 @@ func Command() *cli.Command {
 			ls.Command(),
 			set.Command(),
 			rm.Command(),
+			edit.Command(),
 			status.Command(),
+			push.Command(),
+			reset.Command(),
 		},
 	}
 }

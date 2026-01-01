@@ -9,8 +9,11 @@ import (
 	"github.com/mpyw/suve/internal/cli/sm/cat"
 	"github.com/mpyw/suve/internal/cli/sm/create"
 	"github.com/mpyw/suve/internal/cli/sm/diff"
+	"github.com/mpyw/suve/internal/cli/sm/edit"
 	"github.com/mpyw/suve/internal/cli/sm/log"
 	"github.com/mpyw/suve/internal/cli/sm/ls"
+	"github.com/mpyw/suve/internal/cli/sm/push"
+	"github.com/mpyw/suve/internal/cli/sm/reset"
 	"github.com/mpyw/suve/internal/cli/sm/restore"
 	"github.com/mpyw/suve/internal/cli/sm/rm"
 	"github.com/mpyw/suve/internal/cli/sm/show"
@@ -34,7 +37,10 @@ func Command() *cli.Command {
 			update.Command(),
 			rm.Command(),
 			restore.Command(),
+			edit.Command(),
 			status.Command(),
+			push.Command(),
+			reset.Command(),
 			setDeprecatedCommand(),
 		},
 	}
