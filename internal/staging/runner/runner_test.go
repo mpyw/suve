@@ -21,17 +21,18 @@ import (
 
 // fullMockStrategy implements all staging interfaces for testing.
 type fullMockStrategy struct {
-	service          staging.Service
-	hasDeleteOptions bool
-	parseNameErr     error
-	parseSpecVersion bool
-	parseSpecErr     error
-	fetchCurrentErr  error
-	fetchCurrentVal  string
-	fetchVersionErr  error
-	fetchVersionVal  string
-	fetchVersionLbl  string
-	pushErr          error
+	service              staging.Service
+	hasDeleteOptions     bool
+	parseNameErr         error
+	parseSpecVersion     bool
+	parseSpecErr         error
+	fetchCurrentErr      error
+	fetchCurrentVal      string
+	fetchVersionErr      error
+	fetchVersionVal      string
+	fetchVersionLbl      string
+	pushErr              error
+	fetchLastModifiedVal time.Time
 }
 
 func (m *fullMockStrategy) Service() staging.Service { return m.service }
@@ -73,6 +74,9 @@ func (m *fullMockStrategy) FetchVersion(_ context.Context, _ string) (string, st
 }
 func (m *fullMockStrategy) Push(_ context.Context, _ string, _ staging.Entry) error {
 	return m.pushErr
+}
+func (m *fullMockStrategy) FetchLastModified(_ context.Context, _ string) (time.Time, error) {
+	return m.fetchLastModifiedVal, nil
 }
 
 // =============================================================================

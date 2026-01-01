@@ -37,6 +37,8 @@ func TestCommand_Validation(t *testing.T) {
 
 type mockClient struct {
 	putSecretValueFunc func(ctx context.Context, params *secretsmanager.PutSecretValueInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.PutSecretValueOutput, error)
+	updateSecretFunc   func(ctx context.Context, params *secretsmanager.UpdateSecretInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.UpdateSecretOutput, error)
+	tagResourceFunc    func(ctx context.Context, params *secretsmanager.TagResourceInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.TagResourceOutput, error)
 }
 
 func (m *mockClient) PutSecretValue(ctx context.Context, params *secretsmanager.PutSecretValueInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.PutSecretValueOutput, error) {
@@ -44,6 +46,20 @@ func (m *mockClient) PutSecretValue(ctx context.Context, params *secretsmanager.
 		return m.putSecretValueFunc(ctx, params, optFns...)
 	}
 	return nil, fmt.Errorf("PutSecretValue not mocked")
+}
+
+func (m *mockClient) UpdateSecret(ctx context.Context, params *secretsmanager.UpdateSecretInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.UpdateSecretOutput, error) {
+	if m.updateSecretFunc != nil {
+		return m.updateSecretFunc(ctx, params, optFns...)
+	}
+	return &secretsmanager.UpdateSecretOutput{}, nil
+}
+
+func (m *mockClient) TagResource(ctx context.Context, params *secretsmanager.TagResourceInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.TagResourceOutput, error) {
+	if m.tagResourceFunc != nil {
+		return m.tagResourceFunc(ctx, params, optFns...)
+	}
+	return &secretsmanager.TagResourceOutput{}, nil
 }
 
 func TestRun(t *testing.T) {

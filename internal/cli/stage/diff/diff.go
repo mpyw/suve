@@ -5,9 +5,12 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"sort"
+	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
 	"github.com/aws/aws-sdk-go-v2/service/ssm/types"
+	"github.com/fatih/color"
 	"github.com/samber/lo"
 	"github.com/urfave/cli/v3"
 
@@ -299,6 +302,9 @@ func (r *Runner) outputSSMDiff(opts Options, name string, entry staging.Entry, p
 	diff := output.Diff(label1, label2, awsValue, stagedValue)
 	_, _ = fmt.Fprint(r.Stdout, diff)
 
+	// Show staged metadata
+	r.outputMetadata(entry)
+
 	return nil
 }
 
@@ -342,6 +348,9 @@ func (r *Runner) outputSMDiff(opts Options, name string, entry staging.Entry, se
 	diff := output.Diff(label1, label2, awsValue, stagedValue)
 	_, _ = fmt.Fprint(r.Stdout, diff)
 
+	// Show staged metadata
+	r.outputMetadata(entry)
+
 	return nil
 }
 
@@ -360,6 +369,9 @@ func (r *Runner) outputSSMDiffCreate(opts Options, name string, entry staging.En
 
 	diff := output.Diff(label1, label2, "", stagedValue)
 	_, _ = fmt.Fprint(r.Stdout, diff)
+
+	// Show staged metadata
+	r.outputMetadata(entry)
 
 	return nil
 }
@@ -380,5 +392,28 @@ func (r *Runner) outputSMDiffCreate(opts Options, name string, entry staging.Ent
 	diff := output.Diff(label1, label2, "", stagedValue)
 	_, _ = fmt.Fprint(r.Stdout, diff)
 
+	// Show staged metadata
+	r.outputMetadata(entry)
+
 	return nil
+}
+
+func (r *Runner) outputMetadata(entry staging.Entry) {
+	cyan := color.New(color.FgCyan).SprintFunc()
+
+	if entry.Description != nil && *entry.Description != "" {
+		_, _ = fmt.Fprintf(r.Stdout, "%s %s\n", cyan("Description:"), *entry.Description)
+	}
+	if len(entry.Tags) > 0 {
+		var tagPairs []string
+		keys := make([]string, 0, len(entry.Tags))
+		for k := range entry.Tags {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		for _, k := range keys {
+			tagPairs = append(tagPairs, fmt.Sprintf("%s=%s", k, entry.Tags[k]))
+		}
+		_, _ = fmt.Fprintf(r.Stdout, "%s %s\n", cyan("Tags:"), strings.Join(tagPairs, ", "))
+	}
 }

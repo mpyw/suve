@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/aws/aws-sdk-go-v2/service/ssm/types"
@@ -36,6 +37,7 @@ type Options struct {
 	Value       string
 	Type        string
 	Description string
+	Tags        map[string]string
 }
 
 // Command returns the set command.
@@ -72,6 +74,10 @@ EXAMPLES:
 			&cli.StringFlag{
 				Name:  "description",
 				Usage: "Parameter description",
+			},
+			&cli.StringSliceFlag{
+				Name:  "tag",
+				Usage: "Tag in key=value format (can be specified multiple times)",
 			},
 			&cli.BoolFlag{
 				Name:    "yes",
@@ -121,6 +127,11 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		return fmt.Errorf("failed to initialize AWS client: %w", err)
 	}
 
+	tags, err := parseTags(cmd.StringSlice("tag"))
+	if err != nil {
+		return err
+	}
+
 	r := &Runner{
 		Client: client,
 		Stdout: cmd.Root().Writer,
@@ -131,7 +142,23 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		Value:       cmd.Args().Get(1),
 		Type:        paramType,
 		Description: cmd.String("description"),
+		Tags:        tags,
 	})
+}
+
+func parseTags(tagSlice []string) (map[string]string, error) {
+	if len(tagSlice) == 0 {
+		return nil, nil
+	}
+	tags := make(map[string]string)
+	for _, t := range tagSlice {
+		parts := strings.SplitN(t, "=", 2)
+		if len(parts) != 2 {
+			return nil, fmt.Errorf("invalid tag format %q: expected key=value", t)
+		}
+		tags[parts[0]] = parts[1]
+	}
+	return tags, nil
 }
 
 // Run executes the set command.
@@ -144,6 +171,15 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 	}
 	if opts.Description != "" {
 		input.Description = lo.ToPtr(opts.Description)
+	}
+	if len(opts.Tags) > 0 {
+		input.Tags = make([]types.Tag, 0, len(opts.Tags))
+		for k, v := range opts.Tags {
+			input.Tags = append(input.Tags, types.Tag{
+				Key:   lo.ToPtr(k),
+				Value: lo.ToPtr(v),
+			})
+		}
 	}
 
 	result, err := r.Client.PutParameter(ctx, input)

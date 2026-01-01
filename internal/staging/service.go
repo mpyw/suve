@@ -3,6 +3,7 @@ package staging
 
 import (
 	"context"
+	"time"
 )
 
 // ServiceStrategy defines the common interface for service-specific operations.
@@ -45,6 +46,10 @@ type PushStrategy interface {
 	// Push applies a staged operation to AWS.
 	// Handles OperationCreate, OperationUpdate, and OperationDelete based on entry.Operation.
 	Push(ctx context.Context, name string, entry Entry) error
+
+	// FetchLastModified returns the last modified time of the resource in AWS.
+	// Returns zero time if the resource doesn't exist (for create operations).
+	FetchLastModified(ctx context.Context, name string) (time.Time, error)
 }
 
 // FetchResult holds the result of fetching a value from AWS.

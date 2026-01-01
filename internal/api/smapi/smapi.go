@@ -41,3 +41,13 @@ type DeleteSecretAPI interface {
 type RestoreSecretAPI interface {
 	RestoreSecret(ctx context.Context, params *secretsmanager.RestoreSecretInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.RestoreSecretOutput, error)
 }
+
+// UpdateSecretAPI is the interface for updating secret metadata (description).
+type UpdateSecretAPI interface {
+	UpdateSecret(ctx context.Context, params *secretsmanager.UpdateSecretInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.UpdateSecretOutput, error)
+}
+
+// TagResourceAPI is the interface for tagging a secret.
+type TagResourceAPI interface {
+	TagResource(ctx context.Context, params *secretsmanager.TagResourceInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.TagResourceOutput, error)
+}

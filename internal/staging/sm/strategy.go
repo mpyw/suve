@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager/types"
@@ -23,6 +24,8 @@ type Client interface {
 	smapi.CreateSecretAPI
 	smapi.PutSecretValueAPI
 	smapi.DeleteSecretAPI
+	smapi.UpdateSecretAPI
+	smapi.TagResourceAPI
 }
 
 // Strategy implements staging.ServiceStrategy for SM.
@@ -59,9 +62,9 @@ func (s *Strategy) HasDeleteOptions() bool {
 func (s *Strategy) Push(ctx context.Context, name string, entry staging.Entry) error {
 	switch entry.Operation {
 	case staging.OperationCreate:
-		return s.pushCreate(ctx, name, entry.Value)
+		return s.pushCreate(ctx, name, entry)
 	case staging.OperationUpdate:
-		return s.pushUpdate(ctx, name, entry.Value)
+		return s.pushUpdate(ctx, name, entry)
 	case staging.OperationDelete:
 		return s.pushDelete(ctx, name, entry)
 	default:
@@ -69,25 +72,70 @@ func (s *Strategy) Push(ctx context.Context, name string, entry staging.Entry) e
 	}
 }
 
-func (s *Strategy) pushCreate(ctx context.Context, name, value string) error {
-	_, err := s.Client.CreateSecret(ctx, &secretsmanager.CreateSecretInput{
+func (s *Strategy) pushCreate(ctx context.Context, name string, entry staging.Entry) error {
+	input := &secretsmanager.CreateSecretInput{
 		Name:         lo.ToPtr(name),
-		SecretString: lo.ToPtr(value),
-	})
+		SecretString: lo.ToPtr(entry.Value),
+	}
+	if entry.Description != nil {
+		input.Description = entry.Description
+	}
+	if len(entry.Tags) > 0 {
+		input.Tags = make([]types.Tag, 0, len(entry.Tags))
+		for k, v := range entry.Tags {
+			input.Tags = append(input.Tags, types.Tag{
+				Key:   lo.ToPtr(k),
+				Value: lo.ToPtr(v),
+			})
+		}
+	}
+
+	_, err := s.Client.CreateSecret(ctx, input)
 	if err != nil {
 		return fmt.Errorf("failed to create secret: %w", err)
 	}
 	return nil
 }
 
-func (s *Strategy) pushUpdate(ctx context.Context, name, value string) error {
+func (s *Strategy) pushUpdate(ctx context.Context, name string, entry staging.Entry) error {
+	// Update secret value
 	_, err := s.Client.PutSecretValue(ctx, &secretsmanager.PutSecretValueInput{
 		SecretId:     lo.ToPtr(name),
-		SecretString: lo.ToPtr(value),
+		SecretString: lo.ToPtr(entry.Value),
 	})
 	if err != nil {
 		return fmt.Errorf("failed to update secret: %w", err)
 	}
+
+	// Update description if provided
+	if entry.Description != nil {
+		_, err := s.Client.UpdateSecret(ctx, &secretsmanager.UpdateSecretInput{
+			SecretId:    lo.ToPtr(name),
+			Description: entry.Description,
+		})
+		if err != nil {
+			return fmt.Errorf("failed to update description: %w", err)
+		}
+	}
+
+	// Update tags if provided
+	if len(entry.Tags) > 0 {
+		smTags := make([]types.Tag, 0, len(entry.Tags))
+		for k, v := range entry.Tags {
+			smTags = append(smTags, types.Tag{
+				Key:   lo.ToPtr(k),
+				Value: lo.ToPtr(v),
+			})
+		}
+		_, err := s.Client.TagResource(ctx, &secretsmanager.TagResourceInput{
+			SecretId: lo.ToPtr(name),
+			Tags:     smTags,
+		})
+		if err != nil {
+			return fmt.Errorf("failed to update tags: %w", err)
+		}
+	}
+
 	return nil
 }
 
@@ -114,6 +162,25 @@ func (s *Strategy) pushDelete(ctx context.Context, name string, entry staging.En
 		return fmt.Errorf("failed to delete secret: %w", err)
 	}
 	return nil
+}
+
+// FetchLastModified returns the last modified time of the secret in AWS.
+// Returns zero time if the secret doesn't exist.
+func (s *Strategy) FetchLastModified(ctx context.Context, name string) (time.Time, error) {
+	result, err := s.Client.GetSecretValue(ctx, &secretsmanager.GetSecretValueInput{
+		SecretId: lo.ToPtr(name),
+	})
+	if err != nil {
+		var rnf *types.ResourceNotFoundException
+		if errors.As(err, &rnf) {
+			return time.Time{}, nil
+		}
+		return time.Time{}, fmt.Errorf("failed to get secret: %w", err)
+	}
+	if result.CreatedDate != nil {
+		return *result.CreatedDate, nil
+	}
+	return time.Time{}, nil
 }
 
 // FetchCurrent fetches the current value from AWS Secrets Manager for diffing.

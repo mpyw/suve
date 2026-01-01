@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/fatih/color"
@@ -162,8 +163,11 @@ func NewAddCommand(cfg CommandConfig) *cli.Command {
 	return &cli.Command{
 		Name:      "add",
 		Usage:     fmt.Sprintf("Create new %s and stage it", cfg.ItemName),
-		ArgsUsage: "<name>",
-		Description: fmt.Sprintf(`Open an editor to create a new %s value, then stage the change.
+		ArgsUsage: "<name> [value]",
+		Description: fmt.Sprintf(`Create a new %s value and stage the change.
+
+If value is provided as an argument, uses that value directly.
+Otherwise, opens an editor to create the value.
 
 If the %s is already staged for creation, edits the staged value.
 The new %s will be created in AWS when you run 'suve %s stage push'.
@@ -172,23 +176,44 @@ Use 'suve %s stage edit' to modify an existing %s.
 Use 'suve %s stage status' to view staged changes.
 
 EXAMPLES:
-   suve %s stage add <name>  Create and stage new %s`,
+   suve %s stage add <name>              Open editor to create new %s
+   suve %s stage add <name> <value>      Create new %s with given value`,
 			cfg.ItemName,
 			cfg.ItemName,
 			cfg.ItemName, cfg.ServiceName,
 			cfg.ServiceName, cfg.ItemName,
 			cfg.ServiceName,
+			cfg.ServiceName, cfg.ItemName,
 			cfg.ServiceName, cfg.ItemName),
+		Flags: []cli.Flag{
+			&cli.StringFlag{
+				Name:  "description",
+				Usage: fmt.Sprintf("Description for the %s", cfg.ItemName),
+			},
+			&cli.StringSliceFlag{
+				Name:  "tag",
+				Usage: "Tag in key=value format (can be specified multiple times)",
+			},
+		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			if cmd.Args().Len() < 1 {
-				return fmt.Errorf("usage: suve %s stage add <name>", cfg.ServiceName)
+				return fmt.Errorf("usage: suve %s stage add <name> [value]", cfg.ServiceName)
 			}
 
 			name := cmd.Args().First()
+			var value string
+			if cmd.Args().Len() >= 2 {
+				value = cmd.Args().Get(1)
+			}
 
 			store, err := staging.NewStore()
 			if err != nil {
 				return fmt.Errorf("failed to initialize stage store: %w", err)
+			}
+
+			tags, err := parseTags(cmd.StringSlice("tag"))
+			if err != nil {
+				return err
 			}
 
 			strat := cfg.ParserFactory()
@@ -199,7 +224,12 @@ EXAMPLES:
 				Stdout:   cmd.Root().Writer,
 				Stderr:   cmd.Root().ErrWriter,
 			}
-			return r.Run(ctx, AddOptions{Name: name})
+			return r.Run(ctx, AddOptions{
+				Name:        name,
+				Value:       value,
+				Description: cmd.String("description"),
+				Tags:        tags,
+			})
 		},
 	}
 }
@@ -209,8 +239,11 @@ func NewEditCommand(cfg CommandConfig) *cli.Command {
 	return &cli.Command{
 		Name:      "edit",
 		Usage:     fmt.Sprintf("Edit %s value and stage changes", cfg.ItemName),
-		ArgsUsage: "<name>",
-		Description: fmt.Sprintf(`Open an editor to modify a %s value, then stage the change.
+		ArgsUsage: "<name> [value]",
+		Description: fmt.Sprintf(`Modify a %s value and stage the change.
+
+If value is provided as an argument, uses that value directly.
+Otherwise, opens an editor to modify the value.
 
 If the %s is already staged, edits the staged value.
 Otherwise, fetches the current value from AWS and opens it for editing.
@@ -221,23 +254,44 @@ Use 'suve %s stage push' to apply staged changes to AWS.
 Use 'suve %s stage status' to view staged changes.
 
 EXAMPLES:
-   suve %s stage edit <name>  Edit and stage %s`,
+   suve %s stage edit <name>              Open editor to modify %s
+   suve %s stage edit <name> <value>      Set %s to given value`,
 			cfg.ItemName,
 			cfg.ItemName,
 			cfg.ServiceName, cfg.ItemName,
 			cfg.ServiceName,
 			cfg.ServiceName,
+			cfg.ServiceName, cfg.ItemName,
 			cfg.ServiceName, cfg.ItemName),
+		Flags: []cli.Flag{
+			&cli.StringFlag{
+				Name:  "description",
+				Usage: fmt.Sprintf("Description for the %s", cfg.ItemName),
+			},
+			&cli.StringSliceFlag{
+				Name:  "tag",
+				Usage: "Tag in key=value format (can be specified multiple times)",
+			},
+		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			if cmd.Args().Len() < 1 {
-				return fmt.Errorf("usage: suve %s stage edit <name>", cfg.ServiceName)
+				return fmt.Errorf("usage: suve %s stage edit <name> [value]", cfg.ServiceName)
 			}
 
 			name := cmd.Args().First()
+			var value string
+			if cmd.Args().Len() >= 2 {
+				value = cmd.Args().Get(1)
+			}
 
 			store, err := staging.NewStore()
 			if err != nil {
 				return fmt.Errorf("failed to initialize stage store: %w", err)
+			}
+
+			tags, err := parseTags(cmd.StringSlice("tag"))
+			if err != nil {
+				return err
 			}
 
 			strat, err := cfg.Factory(ctx)
@@ -251,7 +305,12 @@ EXAMPLES:
 				Stdout:   cmd.Root().Writer,
 				Stderr:   cmd.Root().ErrWriter,
 			}
-			return r.Run(ctx, EditOptions{Name: name})
+			return r.Run(ctx, EditOptions{
+				Name:        name,
+				Value:       value,
+				Description: cmd.String("description"),
+				Tags:        tags,
+			})
 		},
 	}
 }
@@ -271,22 +330,33 @@ After successful push, the staged changes are cleared.
 
 Use 'suve %s stage status' to view staged changes before pushing.
 
+CONFLICT DETECTION:
+   Before pushing, suve checks if the AWS resource was modified after staging.
+   If a conflict is detected, the push is rejected to prevent lost updates.
+   Use --ignore-conflicts to force push despite conflicts.
+
 EXAMPLES:
-   suve %s stage push           Push all staged %s changes (with confirmation)
-   suve %s stage push <name>    Push only the specified %s
-   suve %s stage push -y        Push without confirmation`,
+   suve %s stage push                      Push all staged %s changes (with confirmation)
+   suve %s stage push <name>               Push only the specified %s
+   suve %s stage push -y                   Push without confirmation
+   suve %s stage push --ignore-conflicts   Push even if AWS was modified after staging`,
 			cfg.ServiceName, cfg.ItemName,
 			cfg.ItemName, cfg.ItemName,
 			cfg.ServiceName, cfg.ItemName,
 			cfg.ServiceName,
 			cfg.ServiceName, cfg.ServiceName,
 			cfg.ServiceName, cfg.ItemName,
+			cfg.ServiceName,
 			cfg.ServiceName),
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
 				Name:    "yes",
 				Aliases: []string{"y"},
 				Usage:   "Skip confirmation prompt",
+			},
+			&cli.BoolFlag{
+				Name:  "ignore-conflicts",
+				Usage: "Push even if AWS was modified after staging",
 			},
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
@@ -311,7 +381,9 @@ EXAMPLES:
 			}
 
 			// Filter by name if specified
-			opts := PushOptions{}
+			opts := PushOptions{
+				IgnoreConflicts: cmd.Bool("ignore-conflicts"),
+			}
 			if cmd.Args().Len() > 0 {
 				opts.Name = cmd.Args().First()
 				if _, ok := serviceEntries[opts.Name]; !ok {
@@ -444,6 +516,21 @@ EXAMPLES:
 			return r.Run(ctx, opts)
 		},
 	}
+}
+
+func parseTags(tagSlice []string) (map[string]string, error) {
+	if len(tagSlice) == 0 {
+		return nil, nil
+	}
+	tags := make(map[string]string)
+	for _, t := range tagSlice {
+		parts := strings.SplitN(t, "=", 2)
+		if len(parts) != 2 {
+			return nil, fmt.Errorf("invalid tag format %q: expected key=value", t)
+		}
+		tags[parts[0]] = parts[1]
+	}
+	return tags, nil
 }
 
 // NewDeleteCommand creates a delete command with the given config.

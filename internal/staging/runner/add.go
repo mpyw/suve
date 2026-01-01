@@ -25,7 +25,10 @@ type AddRunner struct {
 
 // AddOptions holds options for the add command.
 type AddOptions struct {
-	Name string
+	Name        string
+	Value       string // Optional: if set, skip editor and use this value
+	Description string
+	Tags        map[string]string
 }
 
 // Run executes the add command.
@@ -51,36 +54,49 @@ func (r *AddRunner) Run(_ context.Context, opts AddOptions) error {
 	}
 	// For new items, currentValue stays empty
 
-	// Open editor
-	editorFn := r.OpenEditor
-	if editorFn == nil {
-		editorFn = editor.Open
-	}
-	newValue, err := editorFn(currentValue)
-	if err != nil {
-		return fmt.Errorf("failed to edit: %w", err)
-	}
+	var newValue string
+	if opts.Value != "" {
+		// Use provided value, skip editor
+		newValue = opts.Value
+	} else {
+		// Open editor
+		editorFn := r.OpenEditor
+		if editorFn == nil {
+			editorFn = editor.Open
+		}
+		newValue, err = editorFn(currentValue)
+		if err != nil {
+			return fmt.Errorf("failed to edit: %w", err)
+		}
 
-	// Check if value is empty (canceled)
-	if newValue == "" {
-		yellow := color.New(color.FgYellow).SprintFunc()
-		_, _ = fmt.Fprintln(r.Stdout, yellow("Empty value, not staged."))
-		return nil
-	}
+		// Check if value is empty (canceled)
+		if newValue == "" {
+			yellow := color.New(color.FgYellow).SprintFunc()
+			_, _ = fmt.Fprintln(r.Stdout, yellow("Empty value, not staged."))
+			return nil
+		}
 
-	// Check if unchanged from staged value
-	if stagedEntry != nil && newValue == currentValue {
-		yellow := color.New(color.FgYellow).SprintFunc()
-		_, _ = fmt.Fprintln(r.Stdout, yellow("No changes made."))
-		return nil
+		// Check if unchanged from staged value
+		if stagedEntry != nil && newValue == currentValue {
+			yellow := color.New(color.FgYellow).SprintFunc()
+			_, _ = fmt.Fprintln(r.Stdout, yellow("No changes made."))
+			return nil
+		}
 	}
 
 	// Stage the change with OperationCreate
-	if err := r.Store.Stage(service, name, staging.Entry{
+	entry := staging.Entry{
 		Operation: staging.OperationCreate,
 		Value:     newValue,
 		StagedAt:  time.Now(),
-	}); err != nil {
+	}
+	if opts.Description != "" {
+		entry.Description = &opts.Description
+	}
+	if len(opts.Tags) > 0 {
+		entry.Tags = opts.Tags
+	}
+	if err := r.Store.Stage(service, name, entry); err != nil {
 		return err
 	}
 

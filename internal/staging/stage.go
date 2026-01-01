@@ -27,9 +27,11 @@ const (
 
 // Entry represents a single staged change.
 type Entry struct {
-	Operation Operation `json:"operation"`
-	Value     string    `json:"value,omitempty"`
-	StagedAt  time.Time `json:"staged_at"`
+	Operation   Operation         `json:"operation"`
+	Value       string            `json:"value,omitempty"`
+	Description *string           `json:"description,omitempty"`
+	Tags        map[string]string `json:"tags,omitempty"`
+	StagedAt    time.Time         `json:"staged_at"`
 	// DeleteOptions holds SM-specific delete options.
 	// Only used when Operation is OperationDelete and service is SM.
 	DeleteOptions *DeleteOptions `json:"delete_options,omitempty"`

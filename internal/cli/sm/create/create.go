@@ -5,8 +5,10 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
+	"github.com/aws/aws-sdk-go-v2/service/secretsmanager/types"
 	"github.com/fatih/color"
 	"github.com/samber/lo"
 	"github.com/urfave/cli/v3"
@@ -32,6 +34,7 @@ type Options struct {
 	Name        string
 	Value       string
 	Description string
+	Tags        map[string]string
 }
 
 // Command returns the create command.
@@ -57,6 +60,10 @@ EXAMPLES:
 				Name:  "description",
 				Usage: "Description for the secret",
 			},
+			&cli.StringSliceFlag{
+				Name:  "tag",
+				Usage: "Tag in key=value format (can be specified multiple times)",
+			},
 		},
 		Action: action,
 	}
@@ -72,6 +79,11 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		return fmt.Errorf("failed to initialize AWS client: %w", err)
 	}
 
+	tags, err := parseTags(cmd.StringSlice("tag"))
+	if err != nil {
+		return err
+	}
+
 	r := &Runner{
 		Client: client,
 		Stdout: cmd.Root().Writer,
@@ -81,7 +93,23 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		Name:        cmd.Args().Get(0),
 		Value:       cmd.Args().Get(1),
 		Description: cmd.String("description"),
+		Tags:        tags,
 	})
+}
+
+func parseTags(tagSlice []string) (map[string]string, error) {
+	if len(tagSlice) == 0 {
+		return nil, nil
+	}
+	tags := make(map[string]string)
+	for _, t := range tagSlice {
+		parts := strings.SplitN(t, "=", 2)
+		if len(parts) != 2 {
+			return nil, fmt.Errorf("invalid tag format %q: expected key=value", t)
+		}
+		tags[parts[0]] = parts[1]
+	}
+	return tags, nil
 }
 
 // Run executes the create command.
@@ -92,6 +120,15 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 	}
 	if opts.Description != "" {
 		input.Description = lo.ToPtr(opts.Description)
+	}
+	if len(opts.Tags) > 0 {
+		input.Tags = make([]types.Tag, 0, len(opts.Tags))
+		for k, v := range opts.Tags {
+			input.Tags = append(input.Tags, types.Tag{
+				Key:   lo.ToPtr(k),
+				Value: lo.ToPtr(v),
+			})
+		}
 	}
 
 	result, err := r.Client.CreateSecret(ctx, input)

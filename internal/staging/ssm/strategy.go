@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/aws/aws-sdk-go-v2/service/ssm/types"
@@ -58,7 +59,7 @@ func (s *Strategy) HasDeleteOptions() bool {
 func (s *Strategy) Push(ctx context.Context, name string, entry staging.Entry) error {
 	switch entry.Operation {
 	case staging.OperationCreate, staging.OperationUpdate:
-		return s.pushSet(ctx, name, entry.Value)
+		return s.pushSet(ctx, name, entry)
 	case staging.OperationDelete:
 		return s.pushDelete(ctx, name)
 	default:
@@ -66,7 +67,7 @@ func (s *Strategy) Push(ctx context.Context, name string, entry staging.Entry) e
 	}
 }
 
-func (s *Strategy) pushSet(ctx context.Context, name, value string) error {
+func (s *Strategy) pushSet(ctx context.Context, name string, entry staging.Entry) error {
 	// Try to get existing parameter to preserve type
 	paramType := types.ParameterTypeString
 	existing, err := s.Client.GetParameter(ctx, &ssm.GetParameterInput{
@@ -81,12 +82,26 @@ func (s *Strategy) pushSet(ctx context.Context, name, value string) error {
 		paramType = existing.Parameter.Type
 	}
 
-	_, err = s.Client.PutParameter(ctx, &ssm.PutParameterInput{
+	input := &ssm.PutParameterInput{
 		Name:      lo.ToPtr(name),
-		Value:     lo.ToPtr(value),
+		Value:     lo.ToPtr(entry.Value),
 		Type:      paramType,
 		Overwrite: lo.ToPtr(true),
-	})
+	}
+	if entry.Description != nil {
+		input.Description = entry.Description
+	}
+	if len(entry.Tags) > 0 {
+		input.Tags = make([]types.Tag, 0, len(entry.Tags))
+		for k, v := range entry.Tags {
+			input.Tags = append(input.Tags, types.Tag{
+				Key:   lo.ToPtr(k),
+				Value: lo.ToPtr(v),
+			})
+		}
+	}
+
+	_, err = s.Client.PutParameter(ctx, input)
 	if err != nil {
 		return fmt.Errorf("failed to set parameter: %w", err)
 	}
@@ -106,6 +121,25 @@ func (s *Strategy) pushDelete(ctx context.Context, name string) error {
 		return fmt.Errorf("failed to delete parameter: %w", err)
 	}
 	return nil
+}
+
+// FetchLastModified returns the last modified time of the parameter in AWS.
+// Returns zero time if the parameter doesn't exist.
+func (s *Strategy) FetchLastModified(ctx context.Context, name string) (time.Time, error) {
+	result, err := s.Client.GetParameter(ctx, &ssm.GetParameterInput{
+		Name: lo.ToPtr(name),
+	})
+	if err != nil {
+		var pnf *types.ParameterNotFound
+		if errors.As(err, &pnf) {
+			return time.Time{}, nil
+		}
+		return time.Time{}, fmt.Errorf("failed to get parameter: %w", err)
+	}
+	if result.Parameter != nil && result.Parameter.LastModifiedDate != nil {
+		return *result.Parameter.LastModifiedDate, nil
+	}
+	return time.Time{}, nil
 }
 
 // FetchCurrent fetches the current value from AWS SSM for diffing.

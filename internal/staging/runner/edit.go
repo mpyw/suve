@@ -25,7 +25,10 @@ type EditRunner struct {
 
 // EditOptions holds options for the edit command.
 type EditOptions struct {
-	Name string
+	Name        string
+	Value       string // Optional: if set, skip editor and use this value
+	Description string
+	Tags        map[string]string
 }
 
 // Run executes the edit command.
@@ -50,29 +53,42 @@ func (r *EditRunner) Run(ctx context.Context, opts EditOptions) error {
 		}
 	}
 
-	// Open editor
-	editorFn := r.OpenEditor
-	if editorFn == nil {
-		editorFn = editor.Open
-	}
-	newValue, err := editorFn(currentValue)
-	if err != nil {
-		return fmt.Errorf("failed to edit: %w", err)
-	}
+	var newValue string
+	if opts.Value != "" {
+		// Use provided value, skip editor
+		newValue = opts.Value
+	} else {
+		// Open editor
+		editorFn := r.OpenEditor
+		if editorFn == nil {
+			editorFn = editor.Open
+		}
+		newValue, err = editorFn(currentValue)
+		if err != nil {
+			return fmt.Errorf("failed to edit: %w", err)
+		}
 
-	// Check if changed
-	if newValue == currentValue {
-		yellow := color.New(color.FgYellow).SprintFunc()
-		_, _ = fmt.Fprintln(r.Stdout, yellow("No changes made."))
-		return nil
+		// Check if changed
+		if newValue == currentValue {
+			yellow := color.New(color.FgYellow).SprintFunc()
+			_, _ = fmt.Fprintln(r.Stdout, yellow("No changes made."))
+			return nil
+		}
 	}
 
 	// Stage the change
-	if err := r.Store.Stage(service, opts.Name, staging.Entry{
+	entry := staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     newValue,
 		StagedAt:  time.Now(),
-	}); err != nil {
+	}
+	if opts.Description != "" {
+		entry.Description = &opts.Description
+	}
+	if len(opts.Tags) > 0 {
+		entry.Tags = opts.Tags
+	}
+	if err := r.Store.Stage(service, opts.Name, entry); err != nil {
 		return err
 	}
 

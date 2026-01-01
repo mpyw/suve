@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"time"
 
 	"github.com/mpyw/suve/internal/maputil"
 	"github.com/mpyw/suve/internal/output"
@@ -22,7 +23,8 @@ type PushRunner struct {
 
 // PushOptions holds options for the push command.
 type PushOptions struct {
-	Name string // Optional: push only this item, otherwise push all
+	Name            string // Optional: push only this item, otherwise push all
+	IgnoreConflicts bool   // Skip conflict detection and force push
 }
 
 // Run executes the push command.
@@ -48,6 +50,17 @@ func (r *PushRunner) Run(ctx context.Context, opts PushOptions) error {
 			return fmt.Errorf("%s %s is not staged", itemName, opts.Name)
 		}
 		entries = map[string]staging.Entry{opts.Name: entry}
+	}
+
+	// Check for conflicts unless --ignore-conflicts is specified
+	if !opts.IgnoreConflicts {
+		conflicts := r.checkConflicts(ctx, entries)
+		if len(conflicts) > 0 {
+			for _, name := range maputil.SortedKeys(conflicts) {
+				output.Warning(r.Stderr, "conflict detected for %s: AWS was modified after staging", name)
+			}
+			return fmt.Errorf("push rejected: %d conflict(s) detected (use --ignore-conflicts to force)", len(conflicts))
+		}
 	}
 
 	// Execute push operations in parallel
@@ -84,4 +97,50 @@ func (r *PushRunner) Run(ctx context.Context, opts PushOptions) error {
 	}
 
 	return nil
+}
+
+// checkConflicts checks if AWS resources were modified after staging.
+// Returns a map of names that have conflicts.
+func (r *PushRunner) checkConflicts(ctx context.Context, entries map[string]staging.Entry) map[string]struct{} {
+	conflicts := make(map[string]struct{})
+
+	// Only check Update and Delete operations (Create has nothing to conflict with)
+	toCheck := make(map[string]staging.Entry)
+	for name, entry := range entries {
+		if entry.Operation == staging.OperationUpdate || entry.Operation == staging.OperationDelete {
+			toCheck[name] = entry
+		}
+	}
+
+	if len(toCheck) == 0 {
+		return conflicts
+	}
+
+	// Fetch last modified times in parallel
+	results := parallel.ExecuteMap(ctx, toCheck, func(ctx context.Context, name string, _ staging.Entry) (time.Time, error) {
+		return r.Strategy.FetchLastModified(ctx, name)
+	})
+
+	// Check for conflicts
+	for name, result := range results {
+		if result.Err != nil {
+			// If we can't fetch, assume no conflict (will fail on push anyway)
+			continue
+		}
+
+		entry := toCheck[name]
+		awsModified := result.Value
+
+		// Zero time means resource doesn't exist - no conflict for delete (already gone)
+		if awsModified.IsZero() {
+			continue
+		}
+
+		// If AWS was modified after staging, it's a conflict
+		if awsModified.After(entry.StagedAt) {
+			conflicts[name] = struct{}{}
+		}
+	}
+
+	return conflicts
 }

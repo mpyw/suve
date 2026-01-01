@@ -19,11 +19,12 @@ import (
 
 // mockStrategy implements staging.PushStrategy for testing.
 type mockStrategy struct {
-	service          staging.Service
-	serviceName      string
-	itemName         string
-	hasDeleteOptions bool
-	pushFunc         func(ctx context.Context, name string, entry staging.Entry) error
+	service              staging.Service
+	serviceName          string
+	itemName             string
+	hasDeleteOptions     bool
+	pushFunc             func(ctx context.Context, name string, entry staging.Entry) error
+	fetchLastModifiedVal time.Time
 }
 
 func (m *mockStrategy) Service() staging.Service { return m.service }
@@ -36,6 +37,10 @@ func (m *mockStrategy) Push(ctx context.Context, name string, entry staging.Entr
 		return m.pushFunc(ctx, name, entry)
 	}
 	return nil
+}
+
+func (m *mockStrategy) FetchLastModified(_ context.Context, _ string) (time.Time, error) {
+	return m.fetchLastModifiedVal, nil
 }
 
 func newSSMStrategy() *mockStrategy {

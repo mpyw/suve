@@ -21,6 +21,8 @@ type mockClient struct {
 	createSecretFunc         func(ctx context.Context, params *secretsmanager.CreateSecretInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.CreateSecretOutput, error)
 	putSecretValueFunc       func(ctx context.Context, params *secretsmanager.PutSecretValueInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.PutSecretValueOutput, error)
 	deleteSecretFunc         func(ctx context.Context, params *secretsmanager.DeleteSecretInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.DeleteSecretOutput, error)
+	updateSecretFunc         func(ctx context.Context, params *secretsmanager.UpdateSecretInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.UpdateSecretOutput, error)
+	tagResourceFunc          func(ctx context.Context, params *secretsmanager.TagResourceInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.TagResourceOutput, error)
 }
 
 func (m *mockClient) GetSecretValue(ctx context.Context, params *secretsmanager.GetSecretValueInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.GetSecretValueOutput, error) {
@@ -56,6 +58,20 @@ func (m *mockClient) DeleteSecret(ctx context.Context, params *secretsmanager.De
 		return m.deleteSecretFunc(ctx, params, optFns...)
 	}
 	return nil, errors.New("DeleteSecret not mocked")
+}
+
+func (m *mockClient) UpdateSecret(ctx context.Context, params *secretsmanager.UpdateSecretInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.UpdateSecretOutput, error) {
+	if m.updateSecretFunc != nil {
+		return m.updateSecretFunc(ctx, params, optFns...)
+	}
+	return &secretsmanager.UpdateSecretOutput{}, nil
+}
+
+func (m *mockClient) TagResource(ctx context.Context, params *secretsmanager.TagResourceInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.TagResourceOutput, error) {
+	if m.tagResourceFunc != nil {
+		return m.tagResourceFunc(ctx, params, optFns...)
+	}
+	return &secretsmanager.TagResourceOutput{}, nil
 }
 
 func TestStrategy_BasicMethods(t *testing.T) {
