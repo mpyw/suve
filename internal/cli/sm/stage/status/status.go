@@ -40,9 +40,9 @@ With a secret name, shows the staged change for that specific secret.
 Use -v/--verbose to show detailed information including the staged value.
 
 EXAMPLES:
-   suve sm status             Show all staged SM changes
-   suve sm status my-secret   Show staged change for specific secret
-   suve sm status -v          Show detailed information`,
+   suve sm stage status             Show all staged SM changes
+   suve sm stage status my-secret   Show staged change for specific secret
+   suve sm stage status -v          Show detailed information`,
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
 				Name:    "verbose",
@@ -106,7 +106,7 @@ func (r *Runner) showAll(verbose bool) error {
 
 	smEntries := entries[stage.ServiceSM]
 	if len(smEntries) == 0 {
-		_, _ = fmt.Fprintln(r.Stdout, "No staged SM changes.")
+		_, _ = fmt.Fprintln(r.Stdout, "No SM changes staged.")
 		return nil
 	}
 

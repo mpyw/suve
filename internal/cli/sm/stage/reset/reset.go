@@ -13,6 +13,7 @@ import (
 
 	"github.com/mpyw/suve/internal/api/smapi"
 	"github.com/mpyw/suve/internal/awsutil"
+	"github.com/mpyw/suve/internal/smutil"
 	"github.com/mpyw/suve/internal/stage"
 	"github.com/mpyw/suve/internal/version/smversion"
 )
@@ -48,7 +49,7 @@ func Command() *cli.Command {
 Without a version specifier, the secret is simply removed from staging.
 With a version specifier, the value at that version is fetched and staged.
 
-Use 'suve sm reset --all' to unstage all SM secrets at once.
+Use 'suve sm stage reset --all' to unstage all SM secrets at once.
 
 VERSION SPECIFIERS:
    my-secret            Unstage secret (remove from staging)
@@ -57,11 +58,11 @@ VERSION SPECIFIERS:
    my-secret~1          Restore to 1 version ago
 
 EXAMPLES:
-   suve sm reset my-secret              Unstage (remove from staging)
-   suve sm reset my-secret#abc123       Stage value from specific version
-   suve sm reset my-secret:AWSPREVIOUS  Stage value from AWSPREVIOUS
-   suve sm reset my-secret~1            Stage value from previous version
-   suve sm reset --all                  Unstage all SM secrets`,
+   suve sm stage reset my-secret              Unstage (remove from staging)
+   suve sm stage reset my-secret#abc123       Stage value from specific version
+   suve sm stage reset my-secret:AWSPREVIOUS  Stage value from AWSPREVIOUS
+   suve sm stage reset my-secret~1            Stage value from previous version
+   suve sm stage reset --all                  Unstage all SM secrets`,
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
 				Name:  "all",
@@ -201,7 +202,8 @@ func (r *Runner) runRestore(ctx context.Context, spec *smversion.Spec) error {
 	}
 
 	green := color.New(color.FgGreen).SprintFunc()
+	versionID := smutil.TruncateVersionID(lo.FromPtr(secret.VersionId))
 	_, _ = fmt.Fprintf(r.Stdout, "%s Restored %s (staged from version %s)\n",
-		green("✓"), spec.Name, lo.FromPtr(secret.VersionId))
+		green("✓"), spec.Name, versionID)
 	return nil
 }

@@ -31,7 +31,7 @@ func TestCommand_NoStagedChanges(t *testing.T) {
 
 	err := r.Run(context.Background(), status.Options{})
 	require.NoError(t, err)
-	assert.Contains(t, buf.String(), "No staged changes")
+	assert.Contains(t, buf.String(), "No changes staged")
 }
 
 func TestCommand_ShowSSMChangesOnly(t *testing.T) {

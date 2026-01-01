@@ -71,7 +71,7 @@ func (r *Runner) Run(_ context.Context, opts Options) error {
 		return err
 	}
 
-	red := color.New(color.FgRed).SprintFunc()
-	_, _ = fmt.Fprintf(r.Stdout, "%s Staged for deletion: %s\n", red("✗"), opts.Name)
+	green := color.New(color.FgGreen).SprintFunc()
+	_, _ = fmt.Fprintf(r.Stdout, "%s Staged for deletion: %s\n", green("✓"), opts.Name)
 	return nil
 }

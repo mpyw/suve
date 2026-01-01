@@ -93,9 +93,11 @@ func TestRun_NothingStaged(t *testing.T) {
 		Stderr: &stderr,
 	}
 
+	// When called with empty store, Run should return without error
+	// and produce no output (action handles the warning)
 	err := r.Run(context.Background(), stagediff.Options{})
 	require.NoError(t, err)
-	assert.Contains(t, stderr.String(), "nothing staged")
+	assert.Empty(t, stdout.String())
 }
 
 func TestRun_SSMOnly(t *testing.T) {

@@ -45,7 +45,8 @@ func (m *mockSSMClient) GetParameter(ctx context.Context, params *ssm.GetParamet
 	if m.getParameterFunc != nil {
 		return m.getParameterFunc(ctx, params, optFns...)
 	}
-	return nil, fmt.Errorf("parameter not found")
+	// Return ParameterNotFound error to indicate a new parameter
+	return nil, &types.ParameterNotFound{Message: lo.ToPtr("parameter not found")}
 }
 
 type mockSMClient struct {
@@ -101,9 +102,11 @@ func TestRun_NoChanges(t *testing.T) {
 		Stderr:    &bytes.Buffer{},
 	}
 
+	// When called with empty store, Run should return without error
+	// and produce no output (action handles the warning)
 	err := r.Run(context.Background())
 	require.NoError(t, err)
-	assert.Contains(t, buf.String(), "No changes staged")
+	assert.Empty(t, buf.String())
 }
 
 func TestRun_PushBothServices(t *testing.T) {

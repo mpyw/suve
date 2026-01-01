@@ -49,11 +49,11 @@ Otherwise, all staged SM secret changes are applied.
 
 After successful push, the staged changes are cleared.
 
-Use 'suve sm status' to view staged changes before pushing.
+Use 'suve sm stage status' to view staged changes before pushing.
 
 EXAMPLES:
-   suve sm push              Push all staged SM changes
-   suve sm push my-secret    Push only the specified secret`,
+   suve sm stage push              Push all staged SM changes
+   suve sm stage push my-secret    Push only the specified secret`,
 		Action: action,
 	}
 }

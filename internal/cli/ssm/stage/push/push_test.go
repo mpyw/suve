@@ -44,7 +44,8 @@ func (m *mockClient) GetParameter(ctx context.Context, params *ssm.GetParameterI
 	if m.getParameterFunc != nil {
 		return m.getParameterFunc(ctx, params, optFns...)
 	}
-	return nil, fmt.Errorf("parameter not found")
+	// Return ParameterNotFound error to indicate a new parameter
+	return nil, &types.ParameterNotFound{Message: lo.ToPtr("parameter not found")}
 }
 
 func TestCommand_Validation(t *testing.T) {

@@ -112,11 +112,11 @@ func (r *Runner) Run(_ context.Context, opts Options) error {
 		return err
 	}
 
-	red := color.New(color.FgRed).SprintFunc()
+	green := color.New(color.FgGreen).SprintFunc()
 	if opts.Force {
-		_, _ = fmt.Fprintf(r.Stdout, "%s Staged for immediate deletion: %s\n", red("✗"), opts.Name)
+		_, _ = fmt.Fprintf(r.Stdout, "%s Staged for immediate deletion: %s\n", green("✓"), opts.Name)
 	} else {
-		_, _ = fmt.Fprintf(r.Stdout, "%s Staged for deletion (%d-day recovery): %s\n", red("✗"), opts.RecoveryWindow, opts.Name)
+		_, _ = fmt.Fprintf(r.Stdout, "%s Staged for deletion (%d-day recovery): %s\n", green("✓"), opts.RecoveryWindow, opts.Name)
 	}
 	return nil
 }

@@ -56,7 +56,9 @@ func Open(content string) (string, error) {
 	}
 
 	// Trim trailing newline that editors often add
+	// Handle both Unix (\n) and Windows (\r\n) line endings
 	result := string(data)
+	result = strings.TrimSuffix(result, "\r\n")
 	result = strings.TrimSuffix(result, "\n")
 
 	return result, nil

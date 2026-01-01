@@ -75,7 +75,7 @@ func (r *Runner) Run(_ context.Context, opts Options) error {
 	}
 
 	if len(entries) == 0 {
-		_, _ = fmt.Fprintln(r.Stdout, "No staged changes.")
+		_, _ = fmt.Fprintln(r.Stdout, "No changes staged.")
 		return nil
 	}
 

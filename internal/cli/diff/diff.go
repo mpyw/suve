@@ -144,11 +144,6 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 		return err
 	}
 
-	if len(allEntries) == 0 {
-		output.Warning(r.Stderr, "nothing staged")
-		return nil
-	}
-
 	first := true
 
 	// Process SSM entries

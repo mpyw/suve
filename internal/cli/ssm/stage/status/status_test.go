@@ -31,7 +31,7 @@ func TestCommand_NoStagedChanges(t *testing.T) {
 
 	err := r.Run(context.Background(), status.Options{})
 	require.NoError(t, err)
-	assert.Contains(t, buf.String(), "No staged SSM changes")
+	assert.Contains(t, buf.String(), "No SSM changes staged")
 }
 
 func TestCommand_ShowAllStagedChanges(t *testing.T) {

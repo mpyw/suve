@@ -40,9 +40,9 @@ With a parameter name, shows the staged change for that specific parameter.
 Use -v/--verbose to show detailed information including the staged value.
 
 EXAMPLES:
-   suve ssm status              Show all staged SSM changes
-   suve ssm status /app/config  Show staged change for specific parameter
-   suve ssm status -v           Show detailed information`,
+   suve ssm stage status              Show all staged SSM changes
+   suve ssm stage status /app/config  Show staged change for specific parameter
+   suve ssm stage status -v           Show detailed information`,
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
 				Name:    "verbose",
@@ -106,7 +106,7 @@ func (r *Runner) showAll(verbose bool) error {
 
 	ssmEntries := entries[stage.ServiceSSM]
 	if len(ssmEntries) == 0 {
-		_, _ = fmt.Fprintln(r.Stdout, "No staged SSM changes.")
+		_, _ = fmt.Fprintln(r.Stdout, "No SSM changes staged.")
 		return nil
 	}
 

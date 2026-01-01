@@ -48,7 +48,7 @@ func Command() *cli.Command {
 Without a version specifier, the parameter is simply removed from staging.
 With a version specifier, the value at that version is fetched and staged.
 
-Use 'suve ssm reset --all' to unstage all SSM parameters at once.
+Use 'suve ssm stage reset --all' to unstage all SSM parameters at once.
 
 VERSION SPECIFIERS:
    /app/config          Unstage parameter (remove from staging)
@@ -56,10 +56,10 @@ VERSION SPECIFIERS:
    /app/config~1        Restore to 1 version ago
 
 EXAMPLES:
-   suve ssm reset /app/config              Unstage (remove from staging)
-   suve ssm reset /app/config#3            Stage value from version 3
-   suve ssm reset /app/config~1            Stage value from previous version
-   suve ssm reset --all                    Unstage all SSM parameters`,
+   suve ssm stage reset /app/config              Unstage (remove from staging)
+   suve ssm stage reset /app/config#3            Stage value from version 3
+   suve ssm stage reset /app/config~1            Stage value from previous version
+   suve ssm stage reset --all                    Unstage all SSM parameters`,
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
 				Name:  "all",

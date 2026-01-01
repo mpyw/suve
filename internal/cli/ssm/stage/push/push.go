@@ -3,6 +3,7 @@ package push
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"sort"
@@ -51,11 +52,11 @@ Otherwise, all staged SSM parameter changes are applied.
 
 After successful push, the staged changes are cleared.
 
-Use 'suve ssm status' to view staged changes before pushing.
+Use 'suve ssm stage status' to view staged changes before pushing.
 
 EXAMPLES:
-   suve ssm push                    Push all staged SSM changes
-   suve ssm push /app/config/db     Push only the specified parameter`,
+   suve ssm stage push                    Push all staged SSM changes
+   suve ssm stage push /app/config/db     Push only the specified parameter`,
 		Action: action,
 	}
 }
@@ -166,7 +167,13 @@ func (r *Runner) pushSet(ctx context.Context, name, value string) error {
 	existing, err := r.Client.GetParameter(ctx, &ssm.GetParameterInput{
 		Name: lo.ToPtr(name),
 	})
-	if err == nil && existing.Parameter != nil {
+	if err != nil {
+		// Only proceed with String type if parameter doesn't exist
+		var pnf *types.ParameterNotFound
+		if !errors.As(err, &pnf) {
+			return fmt.Errorf("failed to get existing parameter: %w", err)
+		}
+	} else if existing.Parameter != nil {
 		paramType = existing.Parameter.Type
 	}
 
