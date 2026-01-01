@@ -19,6 +19,7 @@ import (
 	"github.com/mpyw/suve/internal/api/smapi"
 	"github.com/mpyw/suve/internal/awsutil"
 	"github.com/mpyw/suve/internal/output"
+	"github.com/mpyw/suve/internal/smutil"
 )
 
 // Client is the interface for the log command.
@@ -95,7 +96,7 @@ EXAMPLES:
 
 func action(ctx context.Context, cmd *cli.Command) error {
 	if cmd.Args().Len() < 1 {
-		return fmt.Errorf("secret name required")
+		return fmt.Errorf("usage: suve sm log <name>")
 	}
 
 	opts := Options{
@@ -122,14 +123,6 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		Stderr: cmd.Root().ErrWriter,
 	}
 	return r.Run(ctx, opts)
-}
-
-// truncateID truncates a version ID to 8 characters for display.
-func truncateID(id string) string {
-	if len(id) > 8 {
-		return id[:8]
-	}
-	return id
 }
 
 // Run executes the log command.
@@ -189,7 +182,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 
 	for i, v := range versions {
 		versionID := lo.FromPtr(v.VersionId)
-		versionLabel := fmt.Sprintf("Version %s", truncateID(versionID))
+		versionLabel := fmt.Sprintf("Version %s", smutil.TruncateVersionID(versionID))
 		if len(v.VersionStages) > 0 {
 			versionLabel += " " + green(fmt.Sprintf("%v", v.VersionStages))
 		}
@@ -225,8 +218,8 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 				oldValue, oldOk := secretValues[oldVersionID]
 				newValue, newOk := secretValues[newVersionID]
 				if oldOk && newOk {
-					oldName := fmt.Sprintf("%s#%s", opts.Name, truncateID(oldVersionID))
-					newName := fmt.Sprintf("%s#%s", opts.Name, truncateID(newVersionID))
+					oldName := fmt.Sprintf("%s#%s", opts.Name, smutil.TruncateVersionID(oldVersionID))
+					newName := fmt.Sprintf("%s#%s", opts.Name, smutil.TruncateVersionID(newVersionID))
 					diff := output.DiffWithJSON(oldName, newName, oldValue, newValue, opts.JSONFormat, &jsonWarned, r.Stderr)
 					if diff != "" {
 						_, _ = fmt.Fprintln(r.Stdout)

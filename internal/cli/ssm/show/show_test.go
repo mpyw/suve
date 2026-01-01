@@ -26,7 +26,7 @@ func TestCommand_Validation(t *testing.T) {
 		app := appcli.MakeApp()
 		err := app.Run(context.Background(), []string{"suve", "ssm", "show"})
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "parameter name required")
+		assert.Contains(t, err.Error(), "usage: suve ssm show")
 	})
 
 	t.Run("invalid version spec", func(t *testing.T) {

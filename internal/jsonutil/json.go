@@ -27,3 +27,15 @@ func IsJSON(value string) bool {
 	var data any
 	return json.Unmarshal([]byte(value), &data) == nil
 }
+
+// TryFormat attempts to format a JSON string with indentation.
+// Returns the formatted string and true if successful, or the original string and false if not valid JSON.
+// This is useful for commands that need to know whether formatting was applied.
+func TryFormat(value string) (string, bool) {
+	var data any
+	if err := json.Unmarshal([]byte(value), &data); err != nil {
+		return value, false
+	}
+	formatted, _ := json.MarshalIndent(data, "", "  ")
+	return string(formatted), true
+}

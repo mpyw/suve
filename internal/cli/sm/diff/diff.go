@@ -22,6 +22,7 @@ import (
 	"github.com/mpyw/suve/internal/diff"
 	"github.com/mpyw/suve/internal/jsonutil"
 	"github.com/mpyw/suve/internal/output"
+	"github.com/mpyw/suve/internal/smutil"
 	"github.com/mpyw/suve/internal/version/smversion"
 )
 
@@ -106,48 +107,6 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	})
 }
 
-// Run executes the diff command using partial spec format (name + two specifiers).
-func Run(ctx context.Context, client Client, w io.Writer, name, version1, version2 string) error {
-	spec1, err := smversion.Parse(name + version1)
-	if err != nil {
-		return fmt.Errorf("invalid version1: %w", err)
-	}
-
-	spec2, err := smversion.Parse(name + version2)
-	if err != nil {
-		return fmt.Errorf("invalid version2: %w", err)
-	}
-
-	secret1, err := smversion.GetSecretWithVersion(ctx, client, spec1)
-	if err != nil {
-		return fmt.Errorf("failed to get version %s: %w", version1, err)
-	}
-
-	secret2, err := smversion.GetSecretWithVersion(ctx, client, spec2)
-	if err != nil {
-		return fmt.Errorf("failed to get version %s: %w", version2, err)
-	}
-
-	v1 := lo.FromPtr(secret1.VersionId)
-	if len(v1) > 8 {
-		v1 = v1[:8]
-	}
-	v2 := lo.FromPtr(secret2.VersionId)
-	if len(v2) > 8 {
-		v2 = v2[:8]
-	}
-
-	diff := output.Diff(
-		fmt.Sprintf("%s#%s", name, v1),
-		fmt.Sprintf("%s#%s", name, v2),
-		lo.FromPtr(secret1.SecretString),
-		lo.FromPtr(secret2.SecretString),
-	)
-	_, _ = fmt.Fprint(w, diff)
-
-	return nil
-}
-
 // Run executes the diff command.
 func (r *Runner) Run(ctx context.Context, opts Options) error {
 	secret1, err := smversion.GetSecretWithVersion(ctx, r.Client, opts.Spec1)
@@ -165,11 +124,13 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 
 	// Format as JSON if enabled
 	if opts.JSONFormat {
-		if !jsonutil.IsJSON(value1) || !jsonutil.IsJSON(value2) {
-			output.Warning(r.Stderr, "--json has no effect: some values are not valid JSON")
+		formatted1, ok1 := jsonutil.TryFormat(value1)
+		formatted2, ok2 := jsonutil.TryFormat(value2)
+		if ok1 && ok2 {
+			value1 = formatted1
+			value2 = formatted2
 		} else {
-			value1 = jsonutil.Format(value1)
-			value2 = jsonutil.Format(value2)
+			output.Warning(r.Stderr, "--json has no effect: some values are not valid JSON")
 		}
 	}
 
@@ -180,14 +141,8 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 		return nil
 	}
 
-	v1 := lo.FromPtr(secret1.VersionId)
-	if len(v1) > 8 {
-		v1 = v1[:8]
-	}
-	v2 := lo.FromPtr(secret2.VersionId)
-	if len(v2) > 8 {
-		v2 = v2[:8]
-	}
+	v1 := smutil.TruncateVersionID(lo.FromPtr(secret1.VersionId))
+	v2 := smutil.TruncateVersionID(lo.FromPtr(secret2.VersionId))
 
 	diff := output.Diff(
 		fmt.Sprintf("%s#%s", opts.Spec1.Name, v1),

@@ -93,7 +93,7 @@ EXAMPLES:
 
 func action(ctx context.Context, cmd *cli.Command) error {
 	if cmd.Args().Len() < 1 {
-		return fmt.Errorf("parameter name required")
+		return fmt.Errorf("usage: suve ssm log <name>")
 	}
 
 	opts := Options{

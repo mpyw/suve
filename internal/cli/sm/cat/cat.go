@@ -68,7 +68,7 @@ EXAMPLES:
 
 func action(ctx context.Context, cmd *cli.Command) error {
 	if cmd.Args().Len() < 1 {
-		return fmt.Errorf("secret name required")
+		return fmt.Errorf("usage: suve sm cat <name>")
 	}
 
 	spec, err := smversion.Parse(cmd.Args().First())
@@ -101,12 +101,12 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 
 	value := lo.FromPtr(secret.SecretString)
 
-	// Warn if --json is used but value is not valid JSON
+	// Format as JSON if enabled
 	if opts.JSONFormat {
-		if !jsonutil.IsJSON(value) {
-			output.Warning(r.Stderr, "--json has no effect: value is not valid JSON")
+		if formatted, ok := jsonutil.TryFormat(value); ok {
+			value = formatted
 		} else {
-			value = jsonutil.Format(value)
+			output.Warning(r.Stderr, "--json has no effect: value is not valid JSON")
 		}
 	}
 
