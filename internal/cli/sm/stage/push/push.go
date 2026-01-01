@@ -128,7 +128,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 		case stage.OperationSet:
 			pushErr = r.pushSet(ctx, name, entry.Value)
 		case stage.OperationDelete:
-			pushErr = r.pushDelete(ctx, name)
+			pushErr = r.pushDelete(ctx, name, entry)
 		default:
 			pushErr = fmt.Errorf("unknown operation: %s", entry.Operation)
 		}
@@ -169,11 +169,21 @@ func (r *Runner) pushSet(ctx context.Context, name, value string) error {
 	return nil
 }
 
-func (r *Runner) pushDelete(ctx context.Context, name string) error {
-	_, err := r.Client.DeleteSecret(ctx, &secretsmanager.DeleteSecretInput{
-		SecretId:                   lo.ToPtr(name),
-		ForceDeleteWithoutRecovery: lo.ToPtr(true),
-	})
+func (r *Runner) pushDelete(ctx context.Context, name string, entry stage.Entry) error {
+	input := &secretsmanager.DeleteSecretInput{
+		SecretId: lo.ToPtr(name),
+	}
+
+	// Apply delete options if present
+	if entry.DeleteOptions != nil {
+		if entry.DeleteOptions.Force {
+			input.ForceDeleteWithoutRecovery = lo.ToPtr(true)
+		} else if entry.DeleteOptions.RecoveryWindow > 0 {
+			input.RecoveryWindowInDays = lo.ToPtr(int64(entry.DeleteOptions.RecoveryWindow))
+		}
+	}
+
+	_, err := r.Client.DeleteSecret(ctx, input)
 	if err != nil {
 		return fmt.Errorf("failed to delete secret: %w", err)
 	}

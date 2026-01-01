@@ -76,7 +76,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	resetAll := cmd.Bool("all")
 
 	if !resetAll && cmd.Args().Len() < 1 {
-		return fmt.Errorf("usage: suve sm reset <spec> or suve sm reset --all")
+		return fmt.Errorf("usage: suve sm stage reset <spec> or suve sm stage reset --all")
 	}
 
 	store, err := stage.NewStore()

@@ -10,14 +10,11 @@ import (
 	"github.com/mpyw/suve/internal/cli/sm/create"
 	smdelete "github.com/mpyw/suve/internal/cli/sm/delete"
 	"github.com/mpyw/suve/internal/cli/sm/diff"
-	"github.com/mpyw/suve/internal/cli/sm/edit"
 	"github.com/mpyw/suve/internal/cli/sm/log"
 	"github.com/mpyw/suve/internal/cli/sm/ls"
-	"github.com/mpyw/suve/internal/cli/sm/push"
-	"github.com/mpyw/suve/internal/cli/sm/reset"
 	"github.com/mpyw/suve/internal/cli/sm/restore"
 	"github.com/mpyw/suve/internal/cli/sm/show"
-	"github.com/mpyw/suve/internal/cli/sm/status"
+	"github.com/mpyw/suve/internal/cli/sm/stage"
 	"github.com/mpyw/suve/internal/cli/sm/update"
 )
 
@@ -37,10 +34,7 @@ func Command() *cli.Command {
 			update.Command(),
 			smdelete.Command(),
 			restore.Command(),
-			edit.Command(),
-			status.Command(),
-			push.Command(),
-			reset.Command(),
+			stage.Command(),
 			setDeprecatedCommand(),
 		},
 	}

@@ -41,8 +41,7 @@ type Runner struct {
 
 // Options holds the options for the edit command.
 type Options struct {
-	Name   string
-	Delete bool
+	Name string
 }
 
 // Command returns the edit command.
@@ -57,27 +56,19 @@ If the secret is already staged, edits the staged value.
 Otherwise, fetches the current value from AWS and opens it for editing.
 Saves the edited value to the staging area (does not immediately push to AWS).
 
-Use --delete to stage the secret for deletion instead of editing.
-
-Use 'suve sm push' to apply staged changes to AWS.
-Use 'suve sm status' to view staged changes.
+Use 'suve sm stage delete' to stage a secret for deletion.
+Use 'suve sm stage push' to apply staged changes to AWS.
+Use 'suve sm stage status' to view staged changes.
 
 EXAMPLES:
-   suve sm edit my-secret           Edit and stage secret
-   suve sm edit --delete old-secret Stage secret for deletion`,
-		Flags: []cli.Flag{
-			&cli.BoolFlag{
-				Name:  "delete",
-				Usage: "Stage secret for deletion",
-			},
-		},
+   suve sm stage edit my-secret  Edit and stage secret`,
 		Action: action,
 	}
 }
 
 func action(ctx context.Context, cmd *cli.Command) error {
 	if cmd.Args().Len() < 1 {
-		return fmt.Errorf("usage: suve sm edit <name>")
+		return fmt.Errorf("usage: suve sm stage edit <name>")
 	}
 
 	name := cmd.Args().First()
@@ -85,20 +76,6 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	store, err := stage.NewStore()
 	if err != nil {
 		return fmt.Errorf("failed to initialize stage store: %w", err)
-	}
-
-	opts := Options{
-		Name:   name,
-		Delete: cmd.Bool("delete"),
-	}
-
-	if opts.Delete {
-		r := &Runner{
-			Store:  store,
-			Stdout: cmd.Root().Writer,
-			Stderr: cmd.Root().ErrWriter,
-		}
-		return r.RunDelete(ctx, opts)
 	}
 
 	client, err := awsutil.NewSMClient(ctx)
@@ -112,7 +89,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		Stdout: cmd.Root().Writer,
 		Stderr: cmd.Root().ErrWriter,
 	}
-	return r.Run(ctx, opts)
+	return r.Run(ctx, Options{Name: name})
 }
 
 // Run executes the edit command.
@@ -169,20 +146,6 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 
 	green := color.New(color.FgGreen).SprintFunc()
 	_, _ = fmt.Fprintf(r.Stdout, "%s Staged: %s\n", green("✓"), opts.Name)
-	return nil
-}
-
-// RunDelete stages a secret for deletion.
-func (r *Runner) RunDelete(_ context.Context, opts Options) error {
-	if err := r.Store.Stage(stage.ServiceSM, opts.Name, stage.Entry{
-		Operation: stage.OperationDelete,
-		StagedAt:  time.Now(),
-	}); err != nil {
-		return err
-	}
-
-	red := color.New(color.FgRed).SprintFunc()
-	_, _ = fmt.Fprintf(r.Stdout, "%s Staged for deletion: %s\n", red("✗"), opts.Name)
 	return nil
 }
 

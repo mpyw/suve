@@ -16,7 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	appcli "github.com/mpyw/suve/internal/cli"
-	"github.com/mpyw/suve/internal/cli/sm/edit"
+	"github.com/mpyw/suve/internal/cli/sm/stage/edit"
 	"github.com/mpyw/suve/internal/stage"
 )
 
@@ -45,9 +45,9 @@ func TestCommand_Validation(t *testing.T) {
 	t.Run("missing secret name", func(t *testing.T) {
 		t.Parallel()
 		app := appcli.MakeApp()
-		err := app.Run(context.Background(), []string{"suve", "sm", "edit"})
+		err := app.Run(context.Background(), []string{"suve", "sm", "stage", "edit"})
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "usage: suve sm edit")
+		assert.Contains(t, err.Error(), "usage: suve sm stage edit")
 	})
 
 	t.Run("help", func(t *testing.T) {
@@ -55,38 +55,10 @@ func TestCommand_Validation(t *testing.T) {
 		app := appcli.MakeApp()
 		var buf bytes.Buffer
 		app.Writer = &buf
-		err := app.Run(context.Background(), []string{"suve", "sm", "edit", "--help"})
+		err := app.Run(context.Background(), []string{"suve", "sm", "stage", "edit", "--help"})
 		require.NoError(t, err)
 		assert.Contains(t, buf.String(), "Edit secret value")
 	})
-}
-
-func TestRunDelete(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
-	store := stage.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
-
-	var buf bytes.Buffer
-	r := &edit.Runner{
-		Store:  store,
-		Stdout: &buf,
-		Stderr: &bytes.Buffer{},
-	}
-
-	err := r.RunDelete(context.Background(), edit.Options{
-		Name:   "my-secret",
-		Delete: true,
-	})
-	require.NoError(t, err)
-
-	assert.Contains(t, buf.String(), "Staged for deletion")
-	assert.Contains(t, buf.String(), "my-secret")
-
-	// Verify staged
-	entry, err := store.Get(stage.ServiceSM, "my-secret")
-	require.NoError(t, err)
-	assert.Equal(t, stage.OperationDelete, entry.Operation)
 }
 
 func TestRun_UseStagedValue(t *testing.T) {
@@ -395,31 +367,6 @@ func TestRun_EditorError(t *testing.T) {
 	err := r.Run(context.Background(), edit.Options{Name: "my-secret"})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to edit")
-}
-
-func TestRunDelete_StoreError(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
-	path := filepath.Join(tmpDir, "stage.json")
-
-	// Create invalid JSON to cause store error
-	require.NoError(t, os.WriteFile(path, []byte("invalid json"), 0o644))
-
-	store := stage.NewStoreWithPath(path)
-
-	var buf bytes.Buffer
-	r := &edit.Runner{
-		Store:  store,
-		Stdout: &buf,
-		Stderr: &bytes.Buffer{},
-	}
-
-	err := r.RunDelete(context.Background(), edit.Options{
-		Name:   "my-secret",
-		Delete: true,
-	})
-	require.Error(t, err)
 }
 
 func TestRun_StagingStoreError(t *testing.T) {

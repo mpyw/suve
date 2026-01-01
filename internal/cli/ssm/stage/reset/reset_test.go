@@ -16,7 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	appcli "github.com/mpyw/suve/internal/cli"
-	"github.com/mpyw/suve/internal/cli/ssm/reset"
+	"github.com/mpyw/suve/internal/cli/ssm/stage/reset"
 	"github.com/mpyw/suve/internal/stage"
 )
 
@@ -45,9 +45,9 @@ func TestCommand_Validation(t *testing.T) {
 	t.Run("missing spec without --all", func(t *testing.T) {
 		t.Parallel()
 		app := appcli.MakeApp()
-		err := app.Run(context.Background(), []string{"suve", "ssm", "reset"})
+		err := app.Run(context.Background(), []string{"suve", "ssm", "stage", "reset"})
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "usage: suve ssm reset")
+		assert.Contains(t, err.Error(), "usage: suve ssm stage reset")
 	})
 
 	t.Run("help", func(t *testing.T) {
@@ -55,7 +55,7 @@ func TestCommand_Validation(t *testing.T) {
 		app := appcli.MakeApp()
 		var buf bytes.Buffer
 		app.Writer = &buf
-		err := app.Run(context.Background(), []string{"suve", "ssm", "reset", "--help"})
+		err := app.Run(context.Background(), []string{"suve", "ssm", "stage", "reset", "--help"})
 		require.NoError(t, err)
 		assert.Contains(t, buf.String(), "Unstage parameter or restore")
 	})

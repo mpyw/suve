@@ -26,6 +26,18 @@ type Entry struct {
 	Operation Operation `json:"operation"`
 	Value     string    `json:"value,omitempty"`
 	StagedAt  time.Time `json:"staged_at"`
+	// DeleteOptions holds SM-specific delete options.
+	// Only used when Operation is OperationDelete and service is SM.
+	DeleteOptions *DeleteOptions `json:"delete_options,omitempty"`
+}
+
+// DeleteOptions holds options for SM delete operations.
+type DeleteOptions struct {
+	// Force enables immediate permanent deletion without recovery window.
+	Force bool `json:"force,omitempty"`
+	// RecoveryWindow is the number of days before permanent deletion (7-30).
+	// Only used when Force is false. 0 means default (30 days).
+	RecoveryWindow int `json:"recovery_window,omitempty"`
 }
 
 // State represents the entire staging state.

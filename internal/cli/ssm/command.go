@@ -6,14 +6,11 @@ import (
 	"github.com/mpyw/suve/internal/cli/ssm/cat"
 	ssmdelete "github.com/mpyw/suve/internal/cli/ssm/delete"
 	"github.com/mpyw/suve/internal/cli/ssm/diff"
-	"github.com/mpyw/suve/internal/cli/ssm/edit"
 	"github.com/mpyw/suve/internal/cli/ssm/log"
 	"github.com/mpyw/suve/internal/cli/ssm/ls"
-	"github.com/mpyw/suve/internal/cli/ssm/push"
-	"github.com/mpyw/suve/internal/cli/ssm/reset"
 	"github.com/mpyw/suve/internal/cli/ssm/set"
 	"github.com/mpyw/suve/internal/cli/ssm/show"
-	"github.com/mpyw/suve/internal/cli/ssm/status"
+	"github.com/mpyw/suve/internal/cli/ssm/stage"
 )
 
 // Command returns the ssm command with all subcommands.
@@ -30,10 +27,7 @@ func Command() *cli.Command {
 			ls.Command(),
 			set.Command(),
 			ssmdelete.Command(),
-			edit.Command(),
-			status.Command(),
-			push.Command(),
-			reset.Command(),
+			stage.Command(),
 		},
 	}
 }

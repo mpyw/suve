@@ -16,7 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	appcli "github.com/mpyw/suve/internal/cli"
-	"github.com/mpyw/suve/internal/cli/ssm/push"
+	"github.com/mpyw/suve/internal/cli/ssm/stage/push"
 	"github.com/mpyw/suve/internal/stage"
 )
 
@@ -55,7 +55,7 @@ func TestCommand_Validation(t *testing.T) {
 		app := appcli.MakeApp()
 		var buf bytes.Buffer
 		app.Writer = &buf
-		err := app.Run(context.Background(), []string{"suve", "ssm", "push", "--help"})
+		err := app.Run(context.Background(), []string{"suve", "ssm", "stage", "push", "--help"})
 		require.NoError(t, err)
 		assert.Contains(t, buf.String(), "Apply staged parameter changes")
 	})

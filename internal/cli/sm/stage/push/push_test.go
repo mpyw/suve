@@ -15,7 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	appcli "github.com/mpyw/suve/internal/cli"
-	"github.com/mpyw/suve/internal/cli/sm/push"
+	"github.com/mpyw/suve/internal/cli/sm/stage/push"
 	"github.com/mpyw/suve/internal/stage"
 )
 
@@ -51,7 +51,7 @@ func TestCommand_Validation(t *testing.T) {
 		app := appcli.MakeApp()
 		var buf bytes.Buffer
 		app.Writer = &buf
-		err := app.Run(context.Background(), []string{"suve", "sm", "push", "--help"})
+		err := app.Run(context.Background(), []string{"suve", "sm", "stage", "push", "--help"})
 		require.NoError(t, err)
 		assert.Contains(t, buf.String(), "Apply staged secret changes")
 	})
@@ -126,10 +126,13 @@ func TestRun_PushDelete(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := stage.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
-	// Stage a delete
+	// Stage a delete with force option
 	_ = store.Stage(stage.ServiceSM, "old-secret", stage.Entry{
 		Operation: stage.OperationDelete,
 		StagedAt:  time.Now(),
+		DeleteOptions: &stage.DeleteOptions{
+			Force: true,
+		},
 	})
 
 	deleteCalled := false
