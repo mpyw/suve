@@ -19,6 +19,7 @@ import (
 	"github.com/mpyw/suve/internal/api/smapi"
 	"github.com/mpyw/suve/internal/awsutil"
 	"github.com/mpyw/suve/internal/output"
+	"github.com/mpyw/suve/internal/pager"
 	"github.com/mpyw/suve/internal/smutil"
 )
 
@@ -42,6 +43,8 @@ type Options struct {
 	ShowPatch  bool
 	JSONFormat bool
 	Reverse    bool
+	NoPager    bool
+	Oneline    bool
 }
 
 // Command returns the log command.
@@ -57,14 +60,15 @@ Output is sorted with the most recent version first (use --reverse to flip).
 Version UUIDs are truncated to 8 characters for readability.
 
 Use -p/--patch to show the diff between consecutive versions (like git log -p).
-
 Use -j/--json with -p to format JSON values before diffing (keys are always sorted).
+Use --oneline for a compact one-line-per-version format.
 
 EXAMPLES:
    suve sm log my-secret           Show last 10 versions (default)
    suve sm log -n 5 my-secret      Show last 5 versions
    suve sm log -p my-secret        Show versions with diffs
    suve sm log -p -j my-secret     Show diffs with JSON formatting
+   suve sm log --oneline my-secret Compact one-line format
    suve sm log --reverse my-secret Show oldest first`,
 		Flags: []cli.Flag{
 			&cli.IntFlag{
@@ -85,8 +89,16 @@ EXAMPLES:
 				Usage:   "Format JSON values before diffing (use with -p; keys are always sorted)",
 			},
 			&cli.BoolFlag{
+				Name:  "oneline",
+				Usage: "Compact one-line-per-version format",
+			},
+			&cli.BoolFlag{
 				Name:  "reverse",
 				Usage: "Show oldest versions first",
+			},
+			&cli.BoolFlag{
+				Name:  "no-pager",
+				Usage: "Disable pager output",
 			},
 		},
 		Action: action,
@@ -104,6 +116,8 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		ShowPatch:  cmd.Bool("patch"),
 		JSONFormat: cmd.Bool("json"),
 		Reverse:    cmd.Bool("reverse"),
+		NoPager:    cmd.Bool("no-pager"),
+		Oneline:    cmd.Bool("oneline"),
 	}
 
 	// Warn if --json is used without -p
@@ -111,17 +125,24 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		output.Warning(cmd.Root().ErrWriter, "--json has no effect without -p/--patch")
 	}
 
+	// Warn if --oneline is used with -p
+	if opts.Oneline && opts.ShowPatch {
+		output.Warning(cmd.Root().ErrWriter, "--oneline has no effect with -p/--patch")
+	}
+
 	client, err := awsutil.NewSMClient(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to initialize AWS client: %w", err)
 	}
 
-	r := &Runner{
-		Client: client,
-		Stdout: cmd.Root().Writer,
-		Stderr: cmd.Root().ErrWriter,
-	}
-	return r.Run(ctx, opts)
+	return pager.WithPagerWriter(cmd.Root().Writer, opts.NoPager, func(w io.Writer) error {
+		r := &Runner{
+			Client: client,
+			Stdout: w,
+			Stderr: cmd.Root().ErrWriter,
+		}
+		return r.Run(ctx, opts)
+	})
 }
 
 // Run executes the log command.
@@ -181,6 +202,26 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 
 	for i, v := range versions {
 		versionID := lo.FromPtr(v.VersionId)
+
+		if opts.Oneline && !opts.ShowPatch {
+			// Compact one-line format: VERSION_ID  DATE  [LABELS]
+			dateStr := ""
+			if v.CreatedDate != nil {
+				dateStr = v.CreatedDate.Format("2006-01-02")
+			}
+			labelsStr := ""
+			if len(v.VersionStages) > 0 {
+				labelsStr = green(fmt.Sprintf(" %v", v.VersionStages))
+			}
+			_, _ = fmt.Fprintf(r.Stdout, "%s%s  %s%s\n",
+				yellow(smutil.TruncateVersionID(versionID)),
+				labelsStr,
+				cyan(dateStr),
+				"",
+			)
+			continue
+		}
+
 		versionLabel := fmt.Sprintf("Version %s", smutil.TruncateVersionID(versionID))
 		if len(v.VersionStages) > 0 {
 			versionLabel += " " + green(fmt.Sprintf("%v", v.VersionStages))

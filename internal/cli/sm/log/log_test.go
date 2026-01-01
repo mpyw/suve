@@ -349,6 +349,27 @@ func TestRun(t *testing.T) {
 				assert.Contains(t, output, "+also not json")
 			},
 		},
+		{
+			name: "oneline format",
+			opts: log.Options{Name: "my-secret", MaxResults: 10, Oneline: true},
+			mock: &mockClient{
+				listSecretVersionIdsFunc: func(_ context.Context, _ *secretsmanager.ListSecretVersionIdsInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.ListSecretVersionIdsOutput, error) {
+					return &secretsmanager.ListSecretVersionIdsOutput{
+						Versions: []types.SecretVersionsListEntry{
+							{VersionId: lo.ToPtr("version-id-1"), CreatedDate: lo.ToPtr(now.Add(-time.Hour)), VersionStages: []string{"AWSPREVIOUS"}},
+							{VersionId: lo.ToPtr("version-id-2"), CreatedDate: &now, VersionStages: []string{"AWSCURRENT"}},
+						},
+					}, nil
+				},
+			},
+			check: func(t *testing.T, output string) {
+				// Oneline format should be compact
+				assert.Contains(t, output, "version-")
+				assert.Contains(t, output, "AWSCURRENT")
+				// Should not have "Version" prefix like normal format
+				assert.NotContains(t, output, "Version ")
+			},
+		},
 	}
 
 	for _, tt := range tests {

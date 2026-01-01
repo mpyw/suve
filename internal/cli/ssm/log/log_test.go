@@ -192,6 +192,125 @@ func TestRun(t *testing.T) {
 				assert.Empty(t, output)
 			},
 		},
+		{
+			name: "oneline format",
+			opts: log.Options{Name: "/app/param", MaxResults: 10, Oneline: true},
+			mock: &mockClient{
+				getParameterHistoryFunc: func(_ context.Context, _ *ssm.GetParameterHistoryInput, _ ...func(*ssm.Options)) (*ssm.GetParameterHistoryOutput, error) {
+					return &ssm.GetParameterHistoryOutput{
+						Parameters: []types.ParameterHistory{
+							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr("v1"), Version: 1, LastModifiedDate: lo.ToPtr(now.Add(-time.Hour))},
+							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr("v2"), Version: 2, LastModifiedDate: &now},
+						},
+					}, nil
+				},
+			},
+			check: func(t *testing.T, output string) {
+				// Oneline format should be compact
+				assert.Contains(t, output, "2")
+				assert.Contains(t, output, "(current)")
+				assert.Contains(t, output, "v2")
+				// Should not have "Version" prefix like normal format
+				assert.NotContains(t, output, "Version 2")
+			},
+		},
+		{
+			name: "oneline truncates long values",
+			opts: log.Options{Name: "/app/param", MaxResults: 10, Oneline: true},
+			mock: &mockClient{
+				getParameterHistoryFunc: func(_ context.Context, _ *ssm.GetParameterHistoryInput, _ ...func(*ssm.Options)) (*ssm.GetParameterHistoryOutput, error) {
+					longValue := "this is a very long value that exceeds forty characters"
+					return &ssm.GetParameterHistoryOutput{
+						Parameters: []types.ParameterHistory{
+							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr(longValue), Version: 1, LastModifiedDate: &now},
+						},
+					}, nil
+				},
+			},
+			check: func(t *testing.T, output string) {
+				assert.Contains(t, output, "...")
+				// Full value should not appear
+				assert.NotContains(t, output, "exceeds forty characters")
+			},
+		},
+		{
+			name: "filter by from version",
+			opts: log.Options{Name: "/app/param", MaxResults: 10, FromVersion: lo.ToPtr(int64(2))},
+			mock: &mockClient{
+				getParameterHistoryFunc: func(_ context.Context, _ *ssm.GetParameterHistoryInput, _ ...func(*ssm.Options)) (*ssm.GetParameterHistoryOutput, error) {
+					return &ssm.GetParameterHistoryOutput{
+						Parameters: []types.ParameterHistory{
+							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr("v1"), Version: 1, LastModifiedDate: lo.ToPtr(now.Add(-2 * time.Hour))},
+							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr("v2"), Version: 2, LastModifiedDate: lo.ToPtr(now.Add(-time.Hour))},
+							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr("v3"), Version: 3, LastModifiedDate: &now},
+						},
+					}, nil
+				},
+			},
+			check: func(t *testing.T, output string) {
+				assert.Contains(t, output, "Version 2")
+				assert.Contains(t, output, "Version 3")
+				assert.NotContains(t, output, "Version 1")
+			},
+		},
+		{
+			name: "filter by to version",
+			opts: log.Options{Name: "/app/param", MaxResults: 10, ToVersion: lo.ToPtr(int64(2))},
+			mock: &mockClient{
+				getParameterHistoryFunc: func(_ context.Context, _ *ssm.GetParameterHistoryInput, _ ...func(*ssm.Options)) (*ssm.GetParameterHistoryOutput, error) {
+					return &ssm.GetParameterHistoryOutput{
+						Parameters: []types.ParameterHistory{
+							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr("v1"), Version: 1, LastModifiedDate: lo.ToPtr(now.Add(-2 * time.Hour))},
+							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr("v2"), Version: 2, LastModifiedDate: lo.ToPtr(now.Add(-time.Hour))},
+							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr("v3"), Version: 3, LastModifiedDate: &now},
+						},
+					}, nil
+				},
+			},
+			check: func(t *testing.T, output string) {
+				assert.Contains(t, output, "Version 1")
+				assert.Contains(t, output, "Version 2")
+				assert.NotContains(t, output, "Version 3")
+			},
+		},
+		{
+			name: "filter by from and to version range",
+			opts: log.Options{Name: "/app/param", MaxResults: 10, FromVersion: lo.ToPtr(int64(2)), ToVersion: lo.ToPtr(int64(4))},
+			mock: &mockClient{
+				getParameterHistoryFunc: func(_ context.Context, _ *ssm.GetParameterHistoryInput, _ ...func(*ssm.Options)) (*ssm.GetParameterHistoryOutput, error) {
+					return &ssm.GetParameterHistoryOutput{
+						Parameters: []types.ParameterHistory{
+							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr("v1"), Version: 1, LastModifiedDate: lo.ToPtr(now.Add(-3 * time.Hour))},
+							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr("v2"), Version: 2, LastModifiedDate: lo.ToPtr(now.Add(-2 * time.Hour))},
+							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr("v3"), Version: 3, LastModifiedDate: lo.ToPtr(now.Add(-time.Hour))},
+							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr("v4"), Version: 4, LastModifiedDate: &now},
+						},
+					}, nil
+				},
+			},
+			check: func(t *testing.T, output string) {
+				assert.NotContains(t, output, "Version 1")
+				assert.Contains(t, output, "Version 2")
+				assert.Contains(t, output, "Version 3")
+				assert.Contains(t, output, "Version 4")
+			},
+		},
+		{
+			name: "filter with no matching versions returns empty",
+			opts: log.Options{Name: "/app/param", MaxResults: 10, FromVersion: lo.ToPtr(int64(10)), ToVersion: lo.ToPtr(int64(20))},
+			mock: &mockClient{
+				getParameterHistoryFunc: func(_ context.Context, _ *ssm.GetParameterHistoryInput, _ ...func(*ssm.Options)) (*ssm.GetParameterHistoryOutput, error) {
+					return &ssm.GetParameterHistoryOutput{
+						Parameters: []types.ParameterHistory{
+							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr("v1"), Version: 1, LastModifiedDate: &now},
+						},
+					}, nil
+				},
+			},
+			check: func(t *testing.T, output string) {
+				assert.Empty(t, output)
+			},
+		},
 	}
 
 	for _, tt := range tests {

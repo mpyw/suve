@@ -133,6 +133,53 @@ func TestParse(t *testing.T) {
 			wantVersion: lo.ToPtr(int64(3)),
 		},
 
+		// Dots in names
+		{
+			name:     "name with dots",
+			input:    "/app.config/db.url",
+			wantName: "/app.config/db.url",
+		},
+		{
+			name:        "name with dots and version",
+			input:       "/app.config/db.url#3",
+			wantName:    "/app.config/db.url",
+			wantVersion: lo.ToPtr(int64(3)),
+		},
+		{
+			name:      "name with dots and shift",
+			input:     "/app.config/db.url~1",
+			wantName:  "/app.config/db.url",
+			wantShift: 1,
+		},
+		{
+			name:     "name ending with dot",
+			input:    "/config/v1.0.",
+			wantName: "/config/v1.0.",
+		},
+		{
+			name:     "multiple consecutive dots",
+			input:    "/app../config",
+			wantName: "/app../config",
+		},
+
+		// Underscores and dashes
+		{
+			name:     "name with underscores",
+			input:    "/app_config/db_url",
+			wantName: "/app_config/db_url",
+		},
+		{
+			name:        "name with dashes and version",
+			input:       "/app-config/db-url#5",
+			wantName:    "/app-config/db-url",
+			wantVersion: lo.ToPtr(int64(5)),
+		},
+		{
+			name:     "mixed special chars in name",
+			input:    "/app.config-v1_2/db.url",
+			wantName: "/app.config-v1_2/db.url",
+		},
+
 		// Whitespace handling
 		{
 			name:     "whitespace trimmed",

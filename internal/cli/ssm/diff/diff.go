@@ -13,6 +13,7 @@ import (
 	"github.com/mpyw/suve/internal/awsutil"
 	"github.com/mpyw/suve/internal/jsonutil"
 	"github.com/mpyw/suve/internal/output"
+	"github.com/mpyw/suve/internal/pager"
 	"github.com/mpyw/suve/internal/version/ssmversion"
 )
 
@@ -34,6 +35,7 @@ type Options struct {
 	Spec1      *ssmversion.Spec
 	Spec2      *ssmversion.Spec
 	JSONFormat bool
+	NoPager    bool
 }
 
 // Command returns the diff command.
@@ -62,6 +64,10 @@ EXAMPLES:
 				Aliases: []string{"j"},
 				Usage:   "Format JSON values before diffing (keys are always sorted)",
 			},
+			&cli.BoolFlag{
+				Name:  "no-pager",
+				Usage: "Disable pager output",
+			},
 		},
 		Action: action,
 	}
@@ -78,15 +84,20 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		return fmt.Errorf("failed to initialize AWS client: %w", err)
 	}
 
-	r := &Runner{
-		Client: client,
-		Stdout: cmd.Root().Writer,
-		Stderr: cmd.Root().ErrWriter,
-	}
-	return r.Run(ctx, Options{
+	opts := Options{
 		Spec1:      spec1,
 		Spec2:      spec2,
 		JSONFormat: cmd.Bool("json"),
+		NoPager:    cmd.Bool("no-pager"),
+	}
+
+	return pager.WithPagerWriter(cmd.Root().Writer, opts.NoPager, func(w io.Writer) error {
+		r := &Runner{
+			Client: client,
+			Stdout: w,
+			Stderr: cmd.Root().ErrWriter,
+		}
+		return r.Run(ctx, opts)
 	})
 }
 

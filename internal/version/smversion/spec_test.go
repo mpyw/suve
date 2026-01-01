@@ -185,6 +185,53 @@ func TestParse(t *testing.T) {
 			wantShift: 2,
 		},
 
+		// Dots in names
+		{
+			name:     "name with dots",
+			input:    "app.config.db",
+			wantName: "app.config.db",
+		},
+		{
+			name:     "name with dots and ID",
+			input:    "app.config.db#abc123",
+			wantName: "app.config.db",
+			wantID:   lo.ToPtr("abc123"),
+		},
+		{
+			name:      "name with dots and label",
+			input:     "app.config.db:AWSCURRENT",
+			wantName:  "app.config.db",
+			wantLabel: lo.ToPtr("AWSCURRENT"),
+		},
+		{
+			name:      "name with dots and shift",
+			input:     "app.config.db~1",
+			wantName:  "app.config.db",
+			wantShift: 1,
+		},
+		{
+			name:     "name ending with dot",
+			input:    "config.v1.0.",
+			wantName: "config.v1.0.",
+		},
+		{
+			name:     "multiple consecutive dots",
+			input:    "app..config",
+			wantName: "app..config",
+		},
+
+		// Underscores mixed
+		{
+			name:     "name with underscores",
+			input:    "app_config_db",
+			wantName: "app_config_db",
+		},
+		{
+			name:     "mixed special chars in name",
+			input:    "app.config-v1_2",
+			wantName: "app.config-v1_2",
+		},
+
 		// Whitespace handling
 		{
 			name:     "whitespace trimmed",
