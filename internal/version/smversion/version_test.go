@@ -372,3 +372,31 @@ func TestGetSecretWithVersion_LabelNotFound(t *testing.T) {
 	require.Error(t, err)
 	assert.Equal(t, "version label not found: NONEXISTENT", err.Error())
 }
+
+func TestTruncateVersionID(t *testing.T) {
+	t.Parallel()
+
+	t.Run("long ID - truncate to 8", func(t *testing.T) {
+		t.Parallel()
+		result := smversion.TruncateVersionID("abcdefgh-1234-5678-9abc-def012345678")
+		assert.Equal(t, "abcdefgh", result)
+	})
+
+	t.Run("exactly 8 chars", func(t *testing.T) {
+		t.Parallel()
+		result := smversion.TruncateVersionID("12345678")
+		assert.Equal(t, "12345678", result)
+	})
+
+	t.Run("short ID - no truncation", func(t *testing.T) {
+		t.Parallel()
+		result := smversion.TruncateVersionID("abc")
+		assert.Equal(t, "abc", result)
+	})
+
+	t.Run("empty string", func(t *testing.T) {
+		t.Parallel()
+		result := smversion.TruncateVersionID("")
+		assert.Equal(t, "", result)
+	})
+}

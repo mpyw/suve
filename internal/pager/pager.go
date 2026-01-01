@@ -20,6 +20,10 @@ type fder interface {
 // It can be overridden in tests.
 var getTermSize = term.GetSize
 
+// isTTY checks if the file descriptor is a TTY.
+// It can be overridden in tests.
+var isTTY = isatty.IsTerminal
+
 // WithPagerWriter executes fn with pager support.
 // If noPager is true or stdout is not a TTY, output goes directly to the provided writer.
 // If the output fits within the terminal height, it's written directly without paging.
@@ -31,7 +35,7 @@ func WithPagerWriter(stdout io.Writer, noPager bool, fn func(w io.Writer) error)
 
 	// Check if stdout supports Fd() for TTY detection
 	f, ok := stdout.(fder)
-	if !ok || !isatty.IsTerminal(f.Fd()) {
+	if !ok || !isTTY(f.Fd()) {
 		// Not a TTY or doesn't support Fd() - write directly
 		return fn(stdout)
 	}

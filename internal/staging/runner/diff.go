@@ -71,6 +71,15 @@ func (r *DiffRunner) Run(ctx context.Context, opts DiffOptions) error {
 		result := results[name]
 
 		if result.Err != nil {
+			// For delete operations, if the item doesn't exist in AWS anymore,
+			// it means the deletion has already been applied, so auto-unstage
+			if entry.Operation == staging.OperationDelete {
+				if err := r.Store.Unstage(service, name); err != nil {
+					return fmt.Errorf("failed to unstage %s: %w", name, err)
+				}
+				output.Warning(r.Stderr, "unstaged %s: already deleted in AWS", name)
+				continue
+			}
 			return fmt.Errorf("failed to get current version for %s: %w", name, result.Err)
 		}
 

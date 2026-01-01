@@ -1,10 +1,31 @@
 package pager
 
 import (
+	"bytes"
+	"errors"
+	"io"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
+
+// mockFdWriter is a writer that implements fder interface for testing TTY code path.
+type mockFdWriter struct {
+	buf bytes.Buffer
+	fd  uintptr
+}
+
+func (m *mockFdWriter) Write(p []byte) (n int, err error) {
+	return m.buf.Write(p)
+}
+
+func (m *mockFdWriter) Fd() uintptr {
+	return m.fd
+}
+
+func (m *mockFdWriter) String() string {
+	return m.buf.String()
+}
 
 func TestFitsInTerminal_InvalidFd(t *testing.T) {
 	t.Parallel()
@@ -102,4 +123,68 @@ func TestFitsInTerminal_EmptyContent(t *testing.T) {
 	// Empty content should fit
 	result := fitsInTerminal(0, "")
 	assert.True(t, result)
+}
+
+func TestWithPagerWriter_TTY_EmptyOutput(t *testing.T) {
+	// Not parallel because we override globals
+	origIsTTY := isTTY
+	origGetTermSize := getTermSize
+	defer func() {
+		isTTY = origIsTTY
+		getTermSize = origGetTermSize
+	}()
+
+	isTTY = func(fd uintptr) bool { return true }
+	getTermSize = func(fd int) (width, height int, err error) {
+		return 80, 10, nil
+	}
+
+	w := &mockFdWriter{fd: 1}
+	err := WithPagerWriter(w, false, func(w io.Writer) error {
+		// Write nothing
+		return nil
+	})
+
+	assert.NoError(t, err)
+	assert.Empty(t, w.String())
+}
+
+func TestWithPagerWriter_TTY_FitsInTerminal(t *testing.T) {
+	// Not parallel because we override globals
+	origIsTTY := isTTY
+	origGetTermSize := getTermSize
+	defer func() {
+		isTTY = origIsTTY
+		getTermSize = origGetTermSize
+	}()
+
+	isTTY = func(fd uintptr) bool { return true }
+	getTermSize = func(fd int) (width, height int, err error) {
+		return 80, 10, nil
+	}
+
+	w := &mockFdWriter{fd: 1}
+	err := WithPagerWriter(w, false, func(w io.Writer) error {
+		_, err := w.Write([]byte("line1\nline2\nline3\n"))
+		return err
+	})
+
+	assert.NoError(t, err)
+	assert.Equal(t, "line1\nline2\nline3\n", w.String())
+}
+
+func TestWithPagerWriter_TTY_ErrorFromFn(t *testing.T) {
+	// Not parallel because we override globals
+	origIsTTY := isTTY
+	defer func() { isTTY = origIsTTY }()
+
+	isTTY = func(fd uintptr) bool { return true }
+
+	w := &mockFdWriter{fd: 1}
+	expectedErr := errors.New("test error")
+	err := WithPagerWriter(w, false, func(w io.Writer) error {
+		return expectedErr
+	})
+
+	assert.ErrorIs(t, err, expectedErr)
 }
