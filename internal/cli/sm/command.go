@@ -34,25 +34,20 @@ func Command() *cli.Command {
 			update.Command(),
 			smdelete.Command(),
 			restore.Command(),
-			setDeprecatedCommand(),
-		},
-		CommandNotFound: cliinternal.CommandNotFound,
-	}
-}
-
-// setDeprecatedCommand returns a hidden command that explains why 'set' is not available.
-func setDeprecatedCommand() *cli.Command {
-	return &cli.Command{
-		Name:   "set",
-		Hidden: true,
-		Action: func(_ context.Context, _ *cli.Command) error {
-			return fmt.Errorf(`'suve sm set' is not available
+			{
+				Name:   "set",
+				Hidden: true,
+				Action: func(_ context.Context, _ *cli.Command) error {
+					return fmt.Errorf(`'suve sm set' is not available
 
 Secrets Manager distinguishes between creating and updating secrets:
   suve sm create <name> <value>   Create a new secret
   suve sm update <name> <value>   Update an existing secret
 
 Unlike SSM Parameter Store, these operations use different AWS APIs`)
+				},
+			},
 		},
+		CommandNotFound: cliinternal.CommandNotFound,
 	}
 }

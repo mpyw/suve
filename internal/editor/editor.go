@@ -2,10 +2,13 @@
 package editor
 
 import (
+	"errors"
 	"os"
 	"os/exec"
 	"runtime"
 	"strings"
+
+	"github.com/samber/lo"
 )
 
 // OpenFunc is the type for editor functions.
@@ -15,17 +18,11 @@ type OpenFunc func(content string) (string, error)
 // It uses the VISUAL or EDITOR environment variable to determine the editor.
 // Falls back to notepad on Windows or vi on other platforms.
 func Open(content string) (string, error) {
-	editor := os.Getenv("VISUAL")
-	if editor == "" {
-		editor = os.Getenv("EDITOR")
-	}
-	if editor == "" {
-		if runtime.GOOS == "windows" {
-			editor = "notepad"
-		} else {
-			editor = "vi"
-		}
-	}
+	editor := lo.CoalesceOrEmpty(
+		os.Getenv("VISUAL"),
+		os.Getenv("EDITOR"),
+		lo.If(runtime.GOOS == "windows", "notepad").Else("vi"),
+	)
 
 	tmpFile, err := os.CreateTemp("", "suve-edit-*.txt")
 	if err != nil {
@@ -34,8 +31,7 @@ func Open(content string) (string, error) {
 	defer func() { _ = os.Remove(tmpFile.Name()) }()
 
 	if _, err := tmpFile.WriteString(content); err != nil {
-		_ = tmpFile.Close()
-		return "", err
+		return "", errors.Join(err, tmpFile.Close())
 	}
 	if err := tmpFile.Close(); err != nil {
 		return "", err

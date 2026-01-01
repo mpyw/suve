@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/samber/lo"
 	"github.com/urfave/cli/v3"
 
 	"github.com/mpyw/suve/internal/cli/sm"
@@ -23,17 +24,12 @@ func MakeApp() *cli.Command {
 			sm.Command(),
 			stage.Command(),
 		},
-		CommandNotFound: commandNotFound,
+		CommandNotFound: func(_ context.Context, cmd *cli.Command, command string) {
+			_ = cli.ShowAppHelp(cmd)
+			w := lo.CoalesceOrEmpty(cmd.Root().ErrWriter, cmd.Root().Writer)
+			_, _ = fmt.Fprintf(w, "\nCommand not found: %s\n", command)
+		},
 	}
-}
-
-func commandNotFound(_ context.Context, cmd *cli.Command, command string) {
-	_ = cli.ShowAppHelp(cmd)
-	w := cmd.Root().ErrWriter
-	if w == nil {
-		w = cmd.Root().Writer
-	}
-	_, _ = fmt.Fprintf(w, "\nCommand not found: %s\n", command)
 }
 
 // App is the main CLI application.

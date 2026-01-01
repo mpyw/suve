@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/fatih/color"
+	"github.com/samber/lo"
 
 	"github.com/mpyw/suve/internal/jsonutil"
 	"github.com/mpyw/suve/internal/maputil"
@@ -191,8 +192,8 @@ func (r *DiffRunner) outputDiffCreate(opts DiffOptions, name string, entry stagi
 func (r *DiffRunner) outputMetadata(entry staging.Entry) {
 	cyan := color.New(color.FgCyan).SprintFunc()
 
-	if entry.Description != nil && *entry.Description != "" {
-		_, _ = fmt.Fprintf(r.Stdout, "%s %s\n", cyan("Description:"), *entry.Description)
+	if desc := lo.FromPtr(entry.Description); desc != "" {
+		_, _ = fmt.Fprintf(r.Stdout, "%s %s\n", cyan("Description:"), desc)
 	}
 	if len(entry.Tags) > 0 {
 		var tagPairs []string

@@ -401,8 +401,8 @@ func (r *Runner) outputSMDiffCreate(opts Options, name string, entry staging.Ent
 func (r *Runner) outputMetadata(entry staging.Entry) {
 	cyan := color.New(color.FgCyan).SprintFunc()
 
-	if entry.Description != nil && *entry.Description != "" {
-		_, _ = fmt.Fprintf(r.Stdout, "%s %s\n", cyan("Description:"), *entry.Description)
+	if desc := lo.FromPtr(entry.Description); desc != "" {
+		_, _ = fmt.Fprintf(r.Stdout, "%s %s\n", cyan("Description:"), desc)
 	}
 	if len(entry.Tags) > 0 {
 		var tagPairs []string

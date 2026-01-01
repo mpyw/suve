@@ -16,11 +16,14 @@ package e2e
 import (
 	"bytes"
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"github.com/urfave/cli/v3"
 
 	smcat "github.com/mpyw/suve/internal/cli/sm/cat"
 	smcreate "github.com/mpyw/suve/internal/cli/sm/create"
@@ -30,13 +33,7 @@ import (
 	smls "github.com/mpyw/suve/internal/cli/sm/ls"
 	smrestore "github.com/mpyw/suve/internal/cli/sm/restore"
 	smshow "github.com/mpyw/suve/internal/cli/sm/show"
-	smstage "github.com/mpyw/suve/internal/cli/stage/sm"
 	smupdate "github.com/mpyw/suve/internal/cli/sm/update"
-	globalstage "github.com/mpyw/suve/internal/cli/stage"
-	globaldiff "github.com/mpyw/suve/internal/cli/stage/diff"
-	globalpush "github.com/mpyw/suve/internal/cli/stage/push"
-	globalreset "github.com/mpyw/suve/internal/cli/stage/reset"
-	globalstatus "github.com/mpyw/suve/internal/cli/stage/status"
 	ssmcat "github.com/mpyw/suve/internal/cli/ssm/cat"
 	ssmdelete "github.com/mpyw/suve/internal/cli/ssm/delete"
 	ssmdiff "github.com/mpyw/suve/internal/cli/ssm/diff"
@@ -44,19 +41,21 @@ import (
 	ssmls "github.com/mpyw/suve/internal/cli/ssm/ls"
 	ssmset "github.com/mpyw/suve/internal/cli/ssm/set"
 	ssmshow "github.com/mpyw/suve/internal/cli/ssm/show"
+	globalstage "github.com/mpyw/suve/internal/cli/stage"
+	globaldiff "github.com/mpyw/suve/internal/cli/stage/diff"
+	globalpush "github.com/mpyw/suve/internal/cli/stage/push"
+	globalreset "github.com/mpyw/suve/internal/cli/stage/reset"
+	smstage "github.com/mpyw/suve/internal/cli/stage/sm"
 	ssmstage "github.com/mpyw/suve/internal/cli/stage/ssm"
+	globalstatus "github.com/mpyw/suve/internal/cli/stage/status"
 	"github.com/mpyw/suve/internal/staging"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-	"github.com/urfave/cli/v3"
 )
 
 func getEndpoint() string {
-	port := os.Getenv("SUVE_LOCALSTACK_EXTERNAL_PORT")
-	if port == "" {
-		port = "4566"
-	}
-	return fmt.Sprintf("http://127.0.0.1:%s", port)
+	return fmt.Sprintf(
+		"http://127.0.0.1:%s",
+		lo.CoalesceOrEmpty(os.Getenv("SUVE_LOCALSTACK_EXTERNAL_PORT"), "4566"),
+	)
 }
 
 // setupEnv sets up environment variables for localstack and returns a cleanup function.
