@@ -46,11 +46,11 @@ With a %s name, shows the staged change for that specific %s.
 Use -v/--verbose to show detailed information including the staged value.
 
 EXAMPLES:
-   suve %s stage status              Show all staged %s changes
-   suve %s stage status <name>       Show staged change for specific %s
-   suve %s stage status -v           Show detailed information`,
+   suve stage %s status              Show all staged %s changes
+   suve stage %s status <name>       Show staged change for specific %s
+   suve stage %s status -v           Show detailed information`,
 			cfg.ServiceName, cfg.ItemName, cfg.ItemName, cfg.ItemName,
-			cfg.ServiceName, cfg.ServiceName,
+			cfg.ServiceName, cfg.ItemName,
 			cfg.ServiceName, cfg.ItemName,
 			cfg.ServiceName),
 		Flags: []cli.Flag{
@@ -94,14 +94,14 @@ func NewDiffCommand(cfg CommandConfig) *cli.Command {
 		Description: fmt.Sprintf(`Compare staged values against AWS current values.
 
 If a %s name is specified, shows diff for that %s only.
-Otherwise, shows diff for all staged %s %ss.
+Otherwise, shows diff for all staged %ss.
 
 EXAMPLES:
-   suve %s stage diff              Show diff for all staged %s %ss
-   suve %s stage diff <name>       Show diff for specific %s
-   suve %s stage diff -j           Show diff with JSON formatting`,
-			cfg.ItemName, cfg.ItemName, cfg.ServiceName, cfg.ItemName,
-			cfg.ServiceName, cfg.ServiceName, cfg.ItemName,
+   suve stage %s diff              Show diff for all staged %ss
+   suve stage %s diff <name>       Show diff for specific %s
+   suve stage %s diff -j           Show diff with JSON formatting`,
+			cfg.ItemName, cfg.ItemName, cfg.ItemName,
+			cfg.ServiceName, cfg.ItemName,
 			cfg.ServiceName, cfg.ItemName,
 			cfg.ServiceName),
 		Flags: []cli.Flag{
@@ -118,7 +118,7 @@ EXAMPLES:
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			var name string
 			if cmd.Args().Len() > 1 {
-				return fmt.Errorf("usage: suve %s stage diff [name]", cfg.ServiceName)
+				return fmt.Errorf("usage: suve stage %s diff [name]", cfg.ServiceName)
 			}
 			if cmd.Args().Len() == 1 {
 				strat := cfg.ParserFactory()
@@ -170,14 +170,14 @@ If value is provided as an argument, uses that value directly.
 Otherwise, opens an editor to create the value.
 
 If the %s is already staged for creation, edits the staged value.
-The new %s will be created in AWS when you run 'suve %s stage push'.
+The new %s will be created in AWS when you run 'suve stage %s push'.
 
-Use 'suve %s stage edit' to modify an existing %s.
-Use 'suve %s stage status' to view staged changes.
+Use 'suve stage %s edit' to modify an existing %s.
+Use 'suve stage %s status' to view staged changes.
 
 EXAMPLES:
-   suve %s stage add <name>              Open editor to create new %s
-   suve %s stage add <name> <value>      Create new %s with given value`,
+   suve stage %s add <name>              Open editor to create new %s
+   suve stage %s add <name> <value>      Create new %s with given value`,
 			cfg.ItemName,
 			cfg.ItemName,
 			cfg.ItemName, cfg.ServiceName,
@@ -197,7 +197,7 @@ EXAMPLES:
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			if cmd.Args().Len() < 1 {
-				return fmt.Errorf("usage: suve %s stage add <name> [value]", cfg.ServiceName)
+				return fmt.Errorf("usage: suve stage %s add <name> [value]", cfg.ServiceName)
 			}
 
 			name := cmd.Args().First()
@@ -249,13 +249,13 @@ If the %s is already staged, edits the staged value.
 Otherwise, fetches the current value from AWS and opens it for editing.
 Saves the edited value to the staging area (does not immediately push to AWS).
 
-Use 'suve %s stage delete' to stage a %s for deletion.
-Use 'suve %s stage push' to apply staged changes to AWS.
-Use 'suve %s stage status' to view staged changes.
+Use 'suve stage %s delete' to stage a %s for deletion.
+Use 'suve stage %s push' to apply staged changes to AWS.
+Use 'suve stage %s status' to view staged changes.
 
 EXAMPLES:
-   suve %s stage edit <name>              Open editor to modify %s
-   suve %s stage edit <name> <value>      Set %s to given value`,
+   suve stage %s edit <name>              Open editor to modify %s
+   suve stage %s edit <name> <value>      Set %s to given value`,
 			cfg.ItemName,
 			cfg.ItemName,
 			cfg.ServiceName, cfg.ItemName,
@@ -275,7 +275,7 @@ EXAMPLES:
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			if cmd.Args().Len() < 1 {
-				return fmt.Errorf("usage: suve %s stage edit <name> [value]", cfg.ServiceName)
+				return fmt.Errorf("usage: suve stage %s edit <name> [value]", cfg.ServiceName)
 			}
 
 			name := cmd.Args().First()
@@ -328,7 +328,7 @@ Otherwise, all staged %s %s changes are applied.
 
 After successful push, the staged changes are cleared.
 
-Use 'suve %s stage status' to view staged changes before pushing.
+Use 'suve stage %s status' to view staged changes before pushing.
 
 CONFLICT DETECTION:
    Before pushing, suve checks if the AWS resource was modified after staging.
@@ -336,10 +336,10 @@ CONFLICT DETECTION:
    Use --ignore-conflicts to force push despite conflicts.
 
 EXAMPLES:
-   suve %s stage push                      Push all staged %s changes (with confirmation)
-   suve %s stage push <name>               Push only the specified %s
-   suve %s stage push -y                   Push without confirmation
-   suve %s stage push --ignore-conflicts   Push even if AWS was modified after staging`,
+   suve stage %s push                      Push all staged %s changes (with confirmation)
+   suve stage %s push <name>               Push only the specified %s
+   suve stage %s push -y                   Push without confirmation
+   suve stage %s push --ignore-conflicts   Push even if AWS was modified after staging`,
 			cfg.ServiceName, cfg.ItemName,
 			cfg.ItemName, cfg.ItemName,
 			cfg.ServiceName, cfg.ItemName,
@@ -442,7 +442,7 @@ func NewResetCommand(cfg CommandConfig) *cli.Command {
 Without a version specifier, the %s is simply removed from staging.
 With a version specifier, the value at that version is fetched and staged.
 
-Use 'suve %s stage reset --all' to unstage all %s %ss at once.
+Use 'suve stage %s reset --all' to unstage all %s %ss at once.
 
 VERSION SPECIFIERS:
    <name>          Unstage %s (remove from staging)
@@ -450,10 +450,10 @@ VERSION SPECIFIERS:
    <name>~1        Restore to 1 version ago
 
 EXAMPLES:
-   suve %s stage reset <name>              Unstage (remove from staging)
-   suve %s stage reset <name>#<ver>        Stage value from specific version
-   suve %s stage reset <name>~1            Stage value from previous version
-   suve %s stage reset --all               Unstage all %s %ss`,
+   suve stage %s reset <name>              Unstage (remove from staging)
+   suve stage %s reset <name>#<ver>        Stage value from specific version
+   suve stage %s reset <name>~1            Stage value from previous version
+   suve stage %s reset --all               Unstage all %s %ss`,
 			cfg.ItemName,
 			cfg.ItemName,
 			cfg.ServiceName, cfg.ServiceName, cfg.ItemName,
@@ -472,7 +472,7 @@ EXAMPLES:
 			resetAll := cmd.Bool("all")
 
 			if !resetAll && cmd.Args().Len() < 1 {
-				return fmt.Errorf("usage: suve %s stage reset <spec> or suve %s stage reset --all", cfg.ServiceName, cfg.ServiceName)
+				return fmt.Errorf("usage: suve stage %s reset <spec> or suve stage %s reset --all", cfg.ServiceName, cfg.ServiceName)
 			}
 
 			store, err := staging.NewStore()
@@ -556,9 +556,9 @@ func NewDeleteCommand(cfg CommandConfig) *cli.Command {
 		}
 		description = fmt.Sprintf(`Stage a %s for deletion.
 
-The %s will be deleted from AWS when you run 'suve %s stage push'.
-Use 'suve %s stage status' to view staged changes.
-Use 'suve %s stage reset <name>' to unstage.
+The %s will be deleted from AWS when you run 'suve stage %s push'.
+Use 'suve stage %s status' to view staged changes.
+Use 'suve stage %s reset <name>' to unstage.
 
 RECOVERY WINDOW:
    By default, %ss are scheduled for deletion after a 30-day recovery window.
@@ -570,9 +570,9 @@ RECOVERY WINDOW:
    Default: 30 days
 
 EXAMPLES:
-   suve %s stage delete <name>                      Stage with 30-day recovery
-   suve %s stage delete --recovery-window 7 <name>  Stage with 7-day recovery
-   suve %s stage delete --force <name>              Stage for immediate deletion`,
+   suve stage %s delete <name>                      Stage with 30-day recovery
+   suve stage %s delete --recovery-window 7 <name>  Stage with 7-day recovery
+   suve stage %s delete --force <name>              Stage for immediate deletion`,
 			cfg.ItemName,
 			cfg.ItemName, cfg.ServiceName,
 			cfg.ServiceName,
@@ -586,12 +586,12 @@ EXAMPLES:
 		// SSM doesn't have delete options
 		description = fmt.Sprintf(`Stage a %s for deletion.
 
-The %s will be deleted from AWS when you run 'suve %s stage push'.
-Use 'suve %s stage status' to view staged changes.
-Use 'suve %s stage reset <name>' to unstage.
+The %s will be deleted from AWS when you run 'suve stage %s push'.
+Use 'suve stage %s status' to view staged changes.
+Use 'suve stage %s reset <name>' to unstage.
 
 EXAMPLES:
-   suve %s stage delete <name>  Stage %s for deletion`,
+   suve stage %s delete <name>  Stage %s for deletion`,
 			cfg.ItemName,
 			cfg.ItemName, cfg.ServiceName,
 			cfg.ServiceName,
@@ -607,7 +607,7 @@ EXAMPLES:
 		Flags:       flags,
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			if cmd.Args().Len() < 1 {
-				return fmt.Errorf("usage: suve %s stage delete <name>", cfg.ServiceName)
+				return fmt.Errorf("usage: suve stage %s delete <name>", cfg.ServiceName)
 			}
 
 			store, err := staging.NewStore()

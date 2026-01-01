@@ -10,7 +10,6 @@ import (
 	"github.com/mpyw/suve/internal/cli/ssm/ls"
 	"github.com/mpyw/suve/internal/cli/ssm/set"
 	"github.com/mpyw/suve/internal/cli/ssm/show"
-	"github.com/mpyw/suve/internal/cli/ssm/stage"
 )
 
 // Command returns the ssm command with all subcommands.
@@ -27,7 +26,6 @@ func Command() *cli.Command {
 			ls.Command(),
 			set.Command(),
 			ssmdelete.Command(),
-			stage.Command(),
 		},
 	}
 }

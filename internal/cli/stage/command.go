@@ -7,6 +7,8 @@ import (
 	"github.com/mpyw/suve/internal/cli/stage/diff"
 	"github.com/mpyw/suve/internal/cli/stage/push"
 	"github.com/mpyw/suve/internal/cli/stage/reset"
+	"github.com/mpyw/suve/internal/cli/stage/sm"
+	"github.com/mpyw/suve/internal/cli/stage/ssm"
 	"github.com/mpyw/suve/internal/cli/stage/status"
 )
 
@@ -14,25 +16,26 @@ import (
 func Command() *cli.Command {
 	return &cli.Command{
 		Name:  "stage",
-		Usage: "Manage staged changes (SSM and SM)",
-		Description: `Manage staged changes for both SSM Parameter Store and Secrets Manager.
+		Usage: "Manage staged changes for AWS Parameter Store and Secrets Manager",
+		Description: `Stage changes locally before pushing to AWS.
 
-Staging allows you to prepare changes locally before pushing to AWS.
-Use service-specific stage commands (suve ssm stage, suve sm stage)
-for staging individual parameters or secrets.
+Use 'suve stage ssm' for SSM Parameter Store operations.
+Use 'suve stage sm' for Secrets Manager operations.
 
-SUBCOMMANDS:
-   status    Show all staged changes
-   diff      Show diff of staged changes vs AWS
+Global commands operate on all staged changes:
+   status    Show all staged changes (SSM and SM)
+   diff      Show diff of all staged changes vs AWS
    push      Apply all staged changes to AWS
    reset     Unstage all changes
 
 EXAMPLES:
-   suve stage status    View all staged changes
-   suve stage diff      Compare staged values with AWS
-   suve stage push      Apply all staged changes
-   suve stage reset     Clear all staged changes`,
+   suve stage ssm add /my/param         Stage a new SSM parameter
+   suve stage sm edit my-secret         Edit and stage a secret
+   suve stage status                    View all staged changes
+   suve stage push                      Apply all staged changes`,
 		Commands: []*cli.Command{
+			ssm.Command(),
+			sm.Command(),
 			status.Command(),
 			diff.Command(),
 			push.Command(),
