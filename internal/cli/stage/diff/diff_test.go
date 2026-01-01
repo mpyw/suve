@@ -388,7 +388,7 @@ func TestRun_JSONFormat(t *testing.T) {
 	assert.Contains(t, output, "+")
 }
 
-func TestRun_AWSError(t *testing.T) {
+func TestRun_SSMUpdateAutoUnstageWhenDeleted(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
@@ -403,7 +403,7 @@ func TestRun_AWSError(t *testing.T) {
 
 	ssmMock := &mockSSMClient{
 		getParameterFunc: func(_ context.Context, _ *ssm.GetParameterInput, _ ...func(*ssm.Options)) (*ssm.GetParameterOutput, error) {
-			return nil, fmt.Errorf("AWS error: parameter not found")
+			return nil, fmt.Errorf("parameter not found")
 		},
 	}
 
@@ -416,11 +416,16 @@ func TestRun_AWSError(t *testing.T) {
 	}
 
 	err = r.Run(context.Background(), stagediff.Options{})
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "AWS error")
+	require.NoError(t, err)
+	assert.Contains(t, stderr.String(), "unstaged")
+	assert.Contains(t, stderr.String(), "no longer exists")
+
+	// Verify unstaged
+	_, err = store.Get(staging.ServiceSSM, "/app/config")
+	assert.ErrorIs(t, err, staging.ErrNotStaged)
 }
 
-func TestRun_SMAWSError(t *testing.T) {
+func TestRun_SMUpdateAutoUnstageWhenDeleted(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
@@ -435,7 +440,7 @@ func TestRun_SMAWSError(t *testing.T) {
 
 	smMock := &mockSMClient{
 		getSecretValueFunc: func(_ context.Context, _ *secretsmanager.GetSecretValueInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.GetSecretValueOutput, error) {
-			return nil, fmt.Errorf("AWS error: secret not found")
+			return nil, fmt.Errorf("secret not found")
 		},
 	}
 
@@ -448,8 +453,13 @@ func TestRun_SMAWSError(t *testing.T) {
 	}
 
 	err = r.Run(context.Background(), stagediff.Options{})
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "AWS error")
+	require.NoError(t, err)
+	assert.Contains(t, stderr.String(), "unstaged")
+	assert.Contains(t, stderr.String(), "no longer exists")
+
+	// Verify unstaged
+	_, err = store.Get(staging.ServiceSM, "my-secret")
+	assert.ErrorIs(t, err, staging.ErrNotStaged)
 }
 
 func TestRun_SMIdenticalValues(t *testing.T) {

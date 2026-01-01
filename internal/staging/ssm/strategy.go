@@ -98,6 +98,11 @@ func (s *Strategy) pushDelete(ctx context.Context, name string) error {
 		Name: lo.ToPtr(name),
 	})
 	if err != nil {
+		// Already deleted is considered success
+		var pnf *types.ParameterNotFound
+		if errors.As(err, &pnf) {
+			return nil
+		}
 		return fmt.Errorf("failed to delete parameter: %w", err)
 	}
 	return nil

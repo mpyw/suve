@@ -3,9 +3,11 @@ package sm
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
+	"github.com/aws/aws-sdk-go-v2/service/secretsmanager/types"
 	"github.com/samber/lo"
 
 	"github.com/mpyw/suve/internal/api/smapi"
@@ -104,6 +106,11 @@ func (s *Strategy) pushDelete(ctx context.Context, name string, entry staging.En
 
 	_, err := s.Client.DeleteSecret(ctx, input)
 	if err != nil {
+		// Already deleted is considered success
+		var rnf *types.ResourceNotFoundException
+		if errors.As(err, &rnf) {
+			return nil
+		}
 		return fmt.Errorf("failed to delete secret: %w", err)
 	}
 	return nil

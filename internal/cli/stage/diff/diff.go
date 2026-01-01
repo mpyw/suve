@@ -169,7 +169,35 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 		result := ssmResults[name]
 
 		if result.Err != nil {
-			return fmt.Errorf("failed to get current version for %s: %w", name, result.Err)
+			// Handle fetch error based on operation type
+			switch entry.Operation {
+			case staging.OperationDelete:
+				// Item doesn't exist in AWS anymore - deletion already applied
+				if err := r.Store.Unstage(staging.ServiceSSM, name); err != nil {
+					return fmt.Errorf("failed to unstage %s: %w", name, err)
+				}
+				output.Warning(r.Stderr, "unstaged %s: already deleted in AWS", name)
+				continue
+
+			case staging.OperationCreate:
+				// Item doesn't exist in AWS - this is expected for create operations
+				if !first {
+					_, _ = fmt.Fprintln(r.Stdout)
+				}
+				first = false
+				if err := r.outputSSMDiffCreate(opts, name, entry); err != nil {
+					return err
+				}
+				continue
+
+			case staging.OperationUpdate:
+				// Item doesn't exist in AWS anymore - staged update is invalid
+				if err := r.Store.Unstage(staging.ServiceSSM, name); err != nil {
+					return fmt.Errorf("failed to unstage %s: %w", name, err)
+				}
+				output.Warning(r.Stderr, "unstaged %s: item no longer exists in AWS", name)
+				continue
+			}
 		}
 
 		if !first {
@@ -188,7 +216,35 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 		result := smResults[name]
 
 		if result.Err != nil {
-			return fmt.Errorf("failed to get current version for %s: %w", name, result.Err)
+			// Handle fetch error based on operation type
+			switch entry.Operation {
+			case staging.OperationDelete:
+				// Item doesn't exist in AWS anymore - deletion already applied
+				if err := r.Store.Unstage(staging.ServiceSM, name); err != nil {
+					return fmt.Errorf("failed to unstage %s: %w", name, err)
+				}
+				output.Warning(r.Stderr, "unstaged %s: already deleted in AWS", name)
+				continue
+
+			case staging.OperationCreate:
+				// Item doesn't exist in AWS - this is expected for create operations
+				if !first {
+					_, _ = fmt.Fprintln(r.Stdout)
+				}
+				first = false
+				if err := r.outputSMDiffCreate(opts, name, entry); err != nil {
+					return err
+				}
+				continue
+
+			case staging.OperationUpdate:
+				// Item doesn't exist in AWS anymore - staged update is invalid
+				if err := r.Store.Unstage(staging.ServiceSM, name); err != nil {
+					return fmt.Errorf("failed to unstage %s: %w", name, err)
+				}
+				output.Warning(r.Stderr, "unstaged %s: item no longer exists in AWS", name)
+				continue
+			}
 		}
 
 		if !first {
@@ -284,6 +340,44 @@ func (r *Runner) outputSMDiff(opts Options, name string, entry staging.Entry, se
 	}
 
 	diff := output.Diff(label1, label2, awsValue, stagedValue)
+	_, _ = fmt.Fprint(r.Stdout, diff)
+
+	return nil
+}
+
+func (r *Runner) outputSSMDiffCreate(opts Options, name string, entry staging.Entry) error {
+	stagedValue := entry.Value
+
+	// Format as JSON if enabled
+	if opts.JSONFormat {
+		if formatted, ok := jsonutil.TryFormat(stagedValue); ok {
+			stagedValue = formatted
+		}
+	}
+
+	label1 := fmt.Sprintf("%s (not in AWS)", name)
+	label2 := fmt.Sprintf("%s (staged for creation)", name)
+
+	diff := output.Diff(label1, label2, "", stagedValue)
+	_, _ = fmt.Fprint(r.Stdout, diff)
+
+	return nil
+}
+
+func (r *Runner) outputSMDiffCreate(opts Options, name string, entry staging.Entry) error {
+	stagedValue := entry.Value
+
+	// Format as JSON if enabled
+	if opts.JSONFormat {
+		if formatted, ok := jsonutil.TryFormat(stagedValue); ok {
+			stagedValue = formatted
+		}
+	}
+
+	label1 := fmt.Sprintf("%s (not in AWS)", name)
+	label2 := fmt.Sprintf("%s (staged for creation)", name)
+
+	diff := output.Diff(label1, label2, "", stagedValue)
 	_, _ = fmt.Fprint(r.Stdout, diff)
 
 	return nil
