@@ -58,10 +58,9 @@ EXAMPLES:
   DB_URL=$(suve ssm cat /app/config/db-url)  Use in shell variable`,
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
-				Name:    "decrypt",
-				Aliases: []string{"d"},
-				Value:   true,
-				Usage:   "Decrypt SecureString values (use --decrypt=false to disable)",
+				Name:  "decrypt",
+				Value: true,
+				Usage: "Decrypt SecureString values (use --decrypt=false to disable)",
 			},
 			&cli.BoolFlag{
 				Name:    "json",

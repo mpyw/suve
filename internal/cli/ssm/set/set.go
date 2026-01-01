@@ -54,25 +54,22 @@ You cannot use both --secure and --type together.
 
 EXAMPLES:
    suve ssm set /app/config/db-url "postgres://..."       Create String parameter
-   suve ssm set -s /app/config/api-key "secret123"       Create SecureString
-   suve ssm set -t StringList /app/hosts "a.com,b.com"   Create StringList
-   suve ssm set -d "DB URL" /app/db-url "postgres://..." With description`,
+   suve ssm set --secure /app/config/api-key "secret123"        Create SecureString
+   suve ssm set --type StringList /app/hosts "a.com,b.com"      Create StringList
+   suve ssm set --description "DB URL" /app/db-url "postgres://..." With description`,
 		Flags: []cli.Flag{
 			&cli.StringFlag{
-				Name:    "type",
-				Aliases: []string{"t"},
-				Value:   "String",
-				Usage:   "Parameter type (String, StringList, SecureString)",
+				Name:  "type",
+				Value: "String",
+				Usage: "Parameter type (String, StringList, SecureString)",
 			},
 			&cli.BoolFlag{
-				Name:    "secure",
-				Aliases: []string{"s"},
-				Usage:   "Shorthand for --type SecureString",
+				Name:  "secure",
+				Usage: "Shorthand for --type SecureString",
 			},
 			&cli.StringFlag{
-				Name:    "description",
-				Aliases: []string{"d"},
-				Usage:   "Parameter description",
+				Name:  "description",
+				Usage: "Parameter description",
 			},
 		},
 		Action: action,

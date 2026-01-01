@@ -58,10 +58,9 @@ EXAMPLES:
   suve ssm show --decrypt=false /app/secret     Show without decryption`,
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
-				Name:    "decrypt",
-				Aliases: []string{"d"},
-				Value:   true,
-				Usage:   "Decrypt SecureString values (use --decrypt=false to disable)",
+				Name:  "decrypt",
+				Value: true,
+				Usage: "Decrypt SecureString values (use --decrypt=false to disable)",
 			},
 			&cli.BoolFlag{
 				Name:    "json",

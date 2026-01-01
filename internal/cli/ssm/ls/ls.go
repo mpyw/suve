@@ -50,13 +50,12 @@ Use --recursive to include all descendant parameters.
 EXAMPLES:
    suve ssm ls                          List all parameters
    suve ssm ls /app                     List parameters directly under /app
-   suve ssm ls -r /app                  List all parameters under /app recursively
+   suve ssm ls --recursive /app         List all parameters under /app recursively
    suve ssm ls /app/config/             List parameters under /app/config`,
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
-				Name:    "recursive",
-				Aliases: []string{"r"},
-				Usage:   "List recursively",
+				Name:  "recursive",
+				Usage: "List recursively",
 			},
 		},
 		Action: action,

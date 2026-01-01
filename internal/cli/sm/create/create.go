@@ -50,13 +50,12 @@ the default KMS key or a custom KMS key configured in the account.
 
 EXAMPLES:
    suve sm create my-api-key "sk-12345"                    Create simple secret
-   suve sm create -d "API Key for service X" my-key "..."  With description
+   suve sm create --description "API Key for service X" my-key "..."  With description
    suve sm create my-config '{"host":"db.example.com"}'    Create JSON secret`,
 		Flags: []cli.Flag{
 			&cli.StringFlag{
-				Name:    "description",
-				Aliases: []string{"d"},
-				Usage:   "Description for the secret",
+				Name:  "description",
+				Usage: "Description for the secret",
 			},
 		},
 		Action: action,

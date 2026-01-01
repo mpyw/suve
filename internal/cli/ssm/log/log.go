@@ -82,9 +82,8 @@ EXAMPLES:
 				Usage:   "Format JSON values before diffing (use with -p; keys are always sorted)",
 			},
 			&cli.BoolFlag{
-				Name:    "reverse",
-				Aliases: []string{"r"},
-				Usage:   "Show oldest versions first",
+				Name:  "reverse",
+				Usage: "Show oldest versions first",
 			},
 		},
 		Action: action,

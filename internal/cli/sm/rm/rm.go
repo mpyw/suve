@@ -56,12 +56,11 @@ RECOVERY WINDOW:
 EXAMPLES:
    suve sm rm my-secret                      Delete with 30-day recovery
    suve sm rm --recovery-window 7 my-secret  Delete with 7-day recovery
-   suve sm rm -f my-secret                   Permanently delete immediately`,
+   suve sm rm --force my-secret              Permanently delete immediately`,
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
-				Name:    "force",
-				Aliases: []string{"f"},
-				Usage:   "Force deletion without recovery window",
+				Name:  "force",
+				Usage: "Force deletion without recovery window",
 			},
 			&cli.IntFlag{
 				Name:  "recovery-window",
