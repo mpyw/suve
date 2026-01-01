@@ -461,3 +461,252 @@ Deleted /app/config/database-url
 ```bash
 suve ssm rm /app/config/old-param
 ```
+
+---
+
+## Staging Workflow
+
+The staging workflow allows you to prepare changes locally before applying them to AWS. This is useful for:
+- Reviewing changes before they go live
+- Batch applying multiple changes together
+- Avoiding accidental modifications
+
+The stage file is stored at `~/.suve/stage.json`.
+
+### Workflow Overview
+
+```
+┌─────────┐    ┌─────────┐    ┌─────────┐
+│  edit   │───>│  stage  │───>│  push   │
+└─────────┘    └─────────┘    └─────────┘
+     │              │              │
+     │              │              v
+     │              │         Applied to AWS
+     │              │
+     │              v
+     │         status (view)
+     │         diff --staged (compare)
+     │         reset (unstage)
+     │              │
+     │              v
+     │         Discarded
+     └──────────────┘
+```
+
+---
+
+## suve ssm edit
+
+Edit a parameter value in your editor and stage the changes.
+
+```
+suve ssm edit [options] <name>
+```
+
+**Arguments:**
+
+| Argument | Description |
+|----------|-------------|
+| `name` | Parameter name |
+
+**Options:**
+
+| Option | Alias | Default | Description |
+|--------|-------|---------|-------------|
+| `--delete` | `-d` | `false` | Stage parameter for deletion |
+
+**Behavior:**
+
+1. If the parameter is already staged, uses the staged value
+2. Otherwise, fetches the current value from AWS
+3. Opens your editor (`$EDITOR`, defaults to `vim`)
+4. If the value changed, stages the new value
+
+**Output:**
+
+```
+Staged /app/config/database-url
+```
+
+If no changes were made:
+```
+No changes made
+```
+
+**Examples:**
+
+```bash
+# Edit a parameter
+suve ssm edit /app/config/database-url
+
+# Stage a parameter for deletion
+suve ssm edit --delete /app/config/old-param
+```
+
+---
+
+## suve ssm status
+
+Show staged changes for SSM parameters.
+
+```
+suve ssm status
+```
+
+**Output:**
+
+```
+SSM Parameter Store:
+  set    /app/config/database-url
+  delete /app/config/old-param
+```
+
+If no changes are staged:
+```
+SSM Parameter Store:
+  (no staged changes)
+```
+
+**Examples:**
+
+```bash
+# Show SSM staged changes
+suve ssm status
+
+# Show all staged changes (SSM + SM)
+suve status
+```
+
+---
+
+## suve ssm push
+
+Apply staged SSM parameter changes to AWS.
+
+```
+suve ssm push
+```
+
+**Behavior:**
+
+1. Reads all staged SSM changes
+2. For each `set` operation: calls PutParameter
+3. For each `delete` operation: calls DeleteParameter
+4. Removes successfully applied changes from stage
+5. Keeps failed changes in stage for retry
+
+**Output:**
+
+```
+Pushing SSM parameters...
+✓ /app/config/database-url
+✓ /app/config/old-param (deleted)
+```
+
+If nothing is staged:
+```
+SSM: nothing to push
+```
+
+**Examples:**
+
+```bash
+# Push SSM changes only
+suve ssm push
+
+# Push all changes (SSM + SM)
+suve push
+```
+
+---
+
+## suve ssm reset
+
+Unstage SSM parameter changes.
+
+```
+suve ssm reset [name]
+```
+
+**Arguments:**
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `name` | No | Specific parameter to unstage (if omitted, unstages all) |
+
+**Output:**
+
+Specific parameter:
+```
+Unstaged /app/config/database-url
+```
+
+All parameters:
+```
+Unstaged all SSM changes
+```
+
+**Examples:**
+
+```bash
+# Unstage a specific parameter
+suve ssm reset /app/config/database-url
+
+# Unstage all SSM parameters
+suve ssm reset
+
+# Unstage everything (SSM + SM)
+suve reset
+```
+
+---
+
+## suve ssm diff --staged
+
+Compare staged value with current AWS value.
+
+```
+suve ssm diff --staged <name>
+```
+
+**Arguments:**
+
+| Argument | Description |
+|----------|-------------|
+| `name` | Parameter name (without version specifier) |
+
+**Options:**
+
+| Option | Alias | Default | Description |
+|--------|-------|---------|-------------|
+| `--staged` | - | `false` | Compare staged value with AWS current |
+| `--json` | `-j` | `false` | Format JSON values before diffing |
+| `--no-pager` | - | `false` | Disable pager |
+
+**Output:**
+
+```diff
+--- /app/config/database-url (AWS)
++++ /app/config/database-url (staged)
+@@ -1 +1 @@
+-postgres://old-host:5432/db
++postgres://new-host:5432/db
+```
+
+If parameter is staged for deletion:
+```diff
+--- /app/config/old-param (AWS)
++++ /app/config/old-param (staged for deletion)
+@@ -1 +0,0 @@
+-old-value
+```
+
+**Examples:**
+
+```bash
+# Compare staged vs AWS
+suve ssm diff --staged /app/config/database-url
+
+# Compare with JSON formatting
+suve ssm diff --staged --json /app/config/database-credentials
+```

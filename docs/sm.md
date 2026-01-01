@@ -542,3 +542,252 @@ suve sm restore <name>
 ```bash
 suve sm restore my-accidentally-deleted-secret
 ```
+
+---
+
+## Staging Workflow
+
+The staging workflow allows you to prepare changes locally before applying them to AWS. This is useful for:
+- Reviewing changes before they go live
+- Batch applying multiple changes together
+- Avoiding accidental modifications
+
+The stage file is stored at `~/.suve/stage.json`.
+
+### Workflow Overview
+
+```
+┌─────────┐    ┌─────────┐    ┌─────────┐
+│  edit   │───>│  stage  │───>│  push   │
+└─────────┘    └─────────┘    └─────────┘
+     │              │              │
+     │              │              v
+     │              │         Applied to AWS
+     │              │
+     │              v
+     │         status (view)
+     │         diff --staged (compare)
+     │         reset (unstage)
+     │              │
+     │              v
+     │         Discarded
+     └──────────────┘
+```
+
+---
+
+## suve sm edit
+
+Edit a secret value in your editor and stage the changes.
+
+```
+suve sm edit [options] <name>
+```
+
+**Arguments:**
+
+| Argument | Description |
+|----------|-------------|
+| `name` | Secret name |
+
+**Options:**
+
+| Option | Alias | Default | Description |
+|--------|-------|---------|-------------|
+| `--delete` | `-d` | `false` | Stage secret for deletion |
+
+**Behavior:**
+
+1. If the secret is already staged, uses the staged value
+2. Otherwise, fetches the current value from AWS
+3. Opens your editor (`$EDITOR`, defaults to `vim`)
+4. If the value changed, stages the new value
+
+**Output:**
+
+```
+Staged my-database-credentials
+```
+
+If no changes were made:
+```
+No changes made
+```
+
+**Examples:**
+
+```bash
+# Edit a secret
+suve sm edit my-database-credentials
+
+# Stage a secret for deletion
+suve sm edit --delete my-old-secret
+```
+
+---
+
+## suve sm status
+
+Show staged changes for Secrets Manager secrets.
+
+```
+suve sm status
+```
+
+**Output:**
+
+```
+Secrets Manager:
+  set    my-database-credentials
+  delete my-old-secret
+```
+
+If no changes are staged:
+```
+Secrets Manager:
+  (no staged changes)
+```
+
+**Examples:**
+
+```bash
+# Show SM staged changes
+suve sm status
+
+# Show all staged changes (SSM + SM)
+suve status
+```
+
+---
+
+## suve sm push
+
+Apply staged Secrets Manager changes to AWS.
+
+```
+suve sm push
+```
+
+**Behavior:**
+
+1. Reads all staged SM changes
+2. For each `set` operation: calls UpdateSecret (or CreateSecret if new)
+3. For each `delete` operation: calls DeleteSecret with force
+4. Removes successfully applied changes from stage
+5. Keeps failed changes in stage for retry
+
+**Output:**
+
+```
+Pushing Secrets Manager secrets...
+✓ my-database-credentials
+✓ my-old-secret (deleted)
+```
+
+If nothing is staged:
+```
+SM: nothing to push
+```
+
+**Examples:**
+
+```bash
+# Push SM changes only
+suve sm push
+
+# Push all changes (SSM + SM)
+suve push
+```
+
+---
+
+## suve sm reset
+
+Unstage Secrets Manager changes.
+
+```
+suve sm reset [name]
+```
+
+**Arguments:**
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `name` | No | Specific secret to unstage (if omitted, unstages all) |
+
+**Output:**
+
+Specific secret:
+```
+Unstaged my-database-credentials
+```
+
+All secrets:
+```
+Unstaged all SM changes
+```
+
+**Examples:**
+
+```bash
+# Unstage a specific secret
+suve sm reset my-database-credentials
+
+# Unstage all SM secrets
+suve sm reset
+
+# Unstage everything (SSM + SM)
+suve reset
+```
+
+---
+
+## suve sm diff --staged
+
+Compare staged value with current AWS value.
+
+```
+suve sm diff --staged <name>
+```
+
+**Arguments:**
+
+| Argument | Description |
+|----------|-------------|
+| `name` | Secret name (without version specifier) |
+
+**Options:**
+
+| Option | Alias | Default | Description |
+|--------|-------|---------|-------------|
+| `--staged` | - | `false` | Compare staged value with AWS current |
+| `--json` | `-j` | `false` | Format JSON values before diffing |
+| `--no-pager` | - | `false` | Disable pager |
+
+**Output:**
+
+```diff
+--- my-database-credentials (AWS)
++++ my-database-credentials (staged)
+@@ -1 +1 @@
+-{"password":"old"}
++{"password":"new"}
+```
+
+If secret is staged for deletion:
+```diff
+--- my-old-secret (AWS)
++++ my-old-secret (staged for deletion)
+@@ -1 +0,0 @@
+-{"password":"deleted"}
+```
+
+**Examples:**
+
+```bash
+# Compare staged vs AWS
+suve sm diff --staged my-database-credentials
+
+# Compare with JSON formatting
+suve sm diff --staged --json my-database-credentials
+```
