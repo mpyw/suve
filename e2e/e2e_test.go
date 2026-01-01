@@ -17,7 +17,9 @@ import (
 	"bytes"
 	"fmt"
 	"os"
+	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -36,9 +38,13 @@ import (
 	ssmdiff "github.com/mpyw/suve/internal/cli/ssm/diff"
 	ssmlog "github.com/mpyw/suve/internal/cli/ssm/log"
 	ssmls "github.com/mpyw/suve/internal/cli/ssm/ls"
+	ssmpush "github.com/mpyw/suve/internal/cli/ssm/push"
+	ssmreset "github.com/mpyw/suve/internal/cli/ssm/reset"
 	ssmrm "github.com/mpyw/suve/internal/cli/ssm/rm"
 	ssmset "github.com/mpyw/suve/internal/cli/ssm/set"
 	ssmshow "github.com/mpyw/suve/internal/cli/ssm/show"
+	ssmstatus "github.com/mpyw/suve/internal/cli/ssm/status"
+	"github.com/mpyw/suve/internal/stage"
 )
 
 func getEndpoint() string {
@@ -250,5 +256,116 @@ func TestSM_FullWorkflow(t *testing.T) {
 	t.Run("force-rm", func(t *testing.T) {
 		_, _, err := runCommand(t, smrm.Command(), "-f", secretName)
 		require.NoError(t, err)
+	})
+}
+
+// TestSSM_StagingWorkflow tests the staging workflow:
+// stage → status → diff --staged → push → verify → reset
+//
+// This test stages a parameter value, verifies status, compares staged vs current,
+// pushes the staged value to AWS, and tests the reset command.
+func TestSSM_StagingWorkflow(t *testing.T) {
+	setupEnv(t)
+
+	// Use a temp directory for HOME to isolate the stage file
+	tmpHome := t.TempDir()
+	t.Setenv("HOME", tmpHome)
+
+	paramName := "/suve-e2e-staging/param"
+
+	// Cleanup: delete parameter if it exists (ignore errors)
+	_, _, _ = runCommand(t, ssmrm.Command(), paramName)
+	t.Cleanup(func() {
+		_, _, _ = runCommand(t, ssmrm.Command(), paramName)
+	})
+
+	// 1. Create initial parameter
+	t.Run("setup", func(t *testing.T) {
+		_, _, err := runCommand(t, ssmset.Command(), paramName, "original-value")
+		require.NoError(t, err)
+	})
+
+	// 2. Stage a new value (using store directly since edit requires interactive editor)
+	t.Run("stage", func(t *testing.T) {
+		store := stage.NewStoreWithPath(filepath.Join(tmpHome, ".suve", "stage.json"))
+		err := store.Stage(stage.ServiceSSM, paramName, stage.Entry{
+			Operation: stage.OperationSet,
+			Value:     "staged-value",
+			StagedAt:  time.Now(),
+		})
+		require.NoError(t, err)
+	})
+
+	// 3. Status - verify staged parameter is listed
+	t.Run("status", func(t *testing.T) {
+		stdout, _, err := runCommand(t, ssmstatus.Command())
+		require.NoError(t, err)
+		assert.Contains(t, stdout, paramName)
+		assert.Contains(t, stdout, "set")
+		t.Logf("status output: %s", stdout)
+	})
+
+	// 4. Diff --staged - compare staged vs current
+	t.Run("diff-staged", func(t *testing.T) {
+		stdout, _, err := runCommand(t, ssmdiff.Command(), "--staged", paramName)
+		require.NoError(t, err)
+		assert.Contains(t, stdout, "-original-value")
+		assert.Contains(t, stdout, "+staged-value")
+		t.Logf("diff --staged output: %s", stdout)
+	})
+
+	// 5. Push - apply staged changes
+	t.Run("push", func(t *testing.T) {
+		stdout, _, err := runCommand(t, ssmpush.Command())
+		require.NoError(t, err)
+		assert.Contains(t, stdout, paramName)
+		t.Logf("push output: %s", stdout)
+	})
+
+	// 6. Verify - check the value was applied
+	t.Run("verify", func(t *testing.T) {
+		stdout, _, err := runCommand(t, ssmcat.Command(), paramName)
+		require.NoError(t, err)
+		assert.Equal(t, "staged-value", stdout)
+	})
+
+	// 7. Status after push - should be empty
+	t.Run("status-after-push", func(t *testing.T) {
+		stdout, _, err := runCommand(t, ssmstatus.Command())
+		require.NoError(t, err)
+		assert.NotContains(t, stdout, paramName)
+	})
+
+	// 8. Stage another value for reset test
+	t.Run("stage-for-reset", func(t *testing.T) {
+		store := stage.NewStoreWithPath(filepath.Join(tmpHome, ".suve", "stage.json"))
+		err := store.Stage(stage.ServiceSSM, paramName, stage.Entry{
+			Operation: stage.OperationSet,
+			Value:     "will-be-reset",
+			StagedAt:  time.Now(),
+		})
+		require.NoError(t, err)
+	})
+
+	// 9. Reset - unstage the changes
+	t.Run("reset", func(t *testing.T) {
+		stdout, _, err := runCommand(t, ssmreset.Command(), paramName)
+		require.NoError(t, err)
+		assert.Contains(t, stdout, "Unstaged")
+		t.Logf("reset output: %s", stdout)
+	})
+
+	// 10. Status after reset - should be empty
+	t.Run("status-after-reset", func(t *testing.T) {
+		stdout, _, err := runCommand(t, ssmstatus.Command())
+		require.NoError(t, err)
+		assert.NotContains(t, stdout, paramName)
+	})
+
+	// 11. Verify original value unchanged after reset
+	t.Run("verify-unchanged", func(t *testing.T) {
+		stdout, _, err := runCommand(t, ssmcat.Command(), paramName)
+		require.NoError(t, err)
+		assert.Equal(t, "staged-value", stdout) // Still the pushed value, not "will-be-reset"
 	})
 }
