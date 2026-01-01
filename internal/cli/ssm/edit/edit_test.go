@@ -115,13 +115,18 @@ func TestRun_UseStagedValue(t *testing.T) {
 		Store:  store,
 		Stdout: &buf,
 		Stderr: &bytes.Buffer{},
+		OpenEditor: func(content string) (string, error) {
+			// Verify staged value is passed to editor
+			assert.Equal(t, "staged-value", content)
+			return content, nil // No changes
+		},
 	}
 
-	// Test that it uses staged value (will hit the "no changes" path since editor not invoked)
+	// Test that it uses staged value (will hit the "no changes" path)
 	// This validates that GetParameter is not called
 	err := r.Run(context.Background(), edit.Options{Name: "/app/config"})
-	// Will error because openEditor will fail in test environment, but we validated GetParameter wasn't called
-	require.Error(t, err)
+	require.NoError(t, err)
+	assert.Contains(t, buf.String(), "No changes made")
 }
 
 func TestRun_FetchFromAWS(t *testing.T) {
@@ -151,13 +156,18 @@ func TestRun_FetchFromAWS(t *testing.T) {
 		Store:  store,
 		Stdout: &buf,
 		Stderr: &bytes.Buffer{},
+		OpenEditor: func(content string) (string, error) {
+			// Verify AWS value is passed to editor
+			assert.Equal(t, "aws-value", content)
+			return content, nil // No changes
+		},
 	}
 
 	// Test that it fetches from AWS when not staged
 	err := r.Run(context.Background(), edit.Options{Name: "/app/config"})
-	// Will error because openEditor will fail in test environment
-	require.Error(t, err)
+	require.NoError(t, err)
 	assert.True(t, fetchCalled, "GetParameter should be called when value is not staged")
+	assert.Contains(t, buf.String(), "No changes made")
 }
 
 func TestRun_StoreError(t *testing.T) {

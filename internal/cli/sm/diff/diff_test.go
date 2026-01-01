@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
 	"github.com/samber/lo"
@@ -14,6 +16,7 @@ import (
 	appcli "github.com/mpyw/suve/internal/cli"
 	smdiff "github.com/mpyw/suve/internal/cli/sm/diff"
 	"github.com/mpyw/suve/internal/diff"
+	"github.com/mpyw/suve/internal/stage"
 	"github.com/mpyw/suve/internal/version/smversion"
 )
 
@@ -633,4 +636,278 @@ func TestRun_IdenticalWarning(t *testing.T) {
 	assert.Contains(t, stderrStr, "Hint:")
 	assert.Contains(t, stderrStr, "my-secret~1")
 	assert.Contains(t, stderrStr, "my-secret:AWSPREVIOUS")
+}
+
+func TestCommand_StagedValidation(t *testing.T) {
+	t.Parallel()
+
+	t.Run("staged without args", func(t *testing.T) {
+		t.Parallel()
+		app := appcli.MakeApp()
+		err := app.Run(context.Background(), []string{"suve", "sm", "diff", "--staged"})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "usage: suve sm diff --staged <name>")
+	})
+
+	t.Run("staged with version ID", func(t *testing.T) {
+		t.Parallel()
+		app := appcli.MakeApp()
+		err := app.Run(context.Background(), []string{"suve", "sm", "diff", "--staged", "my-secret#abc123"})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "--staged requires a secret name without version specifier")
+	})
+
+	t.Run("staged with label", func(t *testing.T) {
+		t.Parallel()
+		app := appcli.MakeApp()
+		err := app.Run(context.Background(), []string{"suve", "sm", "diff", "--staged", "my-secret:AWSCURRENT"})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "--staged requires a secret name without version specifier")
+	})
+
+	t.Run("staged with shift specifier", func(t *testing.T) {
+		t.Parallel()
+		app := appcli.MakeApp()
+		err := app.Run(context.Background(), []string{"suve", "sm", "diff", "--staged", "my-secret~1"})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "--staged requires a secret name without version specifier")
+	})
+
+	t.Run("staged with too many args", func(t *testing.T) {
+		t.Parallel()
+		app := appcli.MakeApp()
+		err := app.Run(context.Background(), []string{"suve", "sm", "diff", "--staged", "my-secret", "other-secret"})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "usage: suve sm diff --staged <name>")
+	})
+}
+
+func TestRunStaged_NotStaged(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	store := stage.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+
+	var stdout, stderr bytes.Buffer
+	r := &smdiff.Runner{
+		Store:  store,
+		Stdout: &stdout,
+		Stderr: &stderr,
+	}
+
+	err := r.Run(t.Context(), smdiff.Options{
+		Staged:     true,
+		StagedName: "my-secret",
+	})
+	require.NoError(t, err)
+	assert.Contains(t, stderr.String(), "my-secret is not staged")
+}
+
+func TestRunStaged_ShowDiff(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	store := stage.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+
+	// Stage a value
+	err := store.Stage(stage.ServiceSM, "my-secret", stage.Entry{
+		Operation: stage.OperationSet,
+		Value:     "new-secret-value",
+		StagedAt:  time.Now(),
+	})
+	require.NoError(t, err)
+
+	mock := &mockClient{
+		getSecretValueFunc: func(_ context.Context, _ *secretsmanager.GetSecretValueInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.GetSecretValueOutput, error) {
+			return &secretsmanager.GetSecretValueOutput{
+				Name:         lo.ToPtr("my-secret"),
+				VersionId:    lo.ToPtr("abc123-long-version-id"),
+				SecretString: lo.ToPtr("old-secret-value"),
+			}, nil
+		},
+	}
+
+	var stdout, stderr bytes.Buffer
+	r := &smdiff.Runner{
+		Client: mock,
+		Store:  store,
+		Stdout: &stdout,
+		Stderr: &stderr,
+	}
+
+	err = r.Run(t.Context(), smdiff.Options{
+		Staged:     true,
+		StagedName: "my-secret",
+	})
+	require.NoError(t, err)
+
+	output := stdout.String()
+	assert.Contains(t, output, "-old-secret-value")
+	assert.Contains(t, output, "+new-secret-value")
+	assert.Contains(t, output, "(AWS)")
+	assert.Contains(t, output, "(staged)")
+}
+
+func TestRunStaged_DeleteOperation(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	store := stage.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+
+	// Stage for deletion
+	err := store.Stage(stage.ServiceSM, "my-secret", stage.Entry{
+		Operation: stage.OperationDelete,
+		StagedAt:  time.Now(),
+	})
+	require.NoError(t, err)
+
+	mock := &mockClient{
+		getSecretValueFunc: func(_ context.Context, _ *secretsmanager.GetSecretValueInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.GetSecretValueOutput, error) {
+			return &secretsmanager.GetSecretValueOutput{
+				Name:         lo.ToPtr("my-secret"),
+				VersionId:    lo.ToPtr("abc123"),
+				SecretString: lo.ToPtr("existing-value"),
+			}, nil
+		},
+	}
+
+	var stdout, stderr bytes.Buffer
+	r := &smdiff.Runner{
+		Client: mock,
+		Store:  store,
+		Stdout: &stdout,
+		Stderr: &stderr,
+	}
+
+	err = r.Run(t.Context(), smdiff.Options{
+		Staged:     true,
+		StagedName: "my-secret",
+	})
+	require.NoError(t, err)
+
+	output := stdout.String()
+	assert.Contains(t, output, "-existing-value")
+	assert.Contains(t, output, "(staged for deletion)")
+}
+
+func TestRunStaged_IdenticalValues(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	store := stage.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+
+	// Stage the same value as AWS
+	err := store.Stage(stage.ServiceSM, "my-secret", stage.Entry{
+		Operation: stage.OperationSet,
+		Value:     "same-value",
+		StagedAt:  time.Now(),
+	})
+	require.NoError(t, err)
+
+	mock := &mockClient{
+		getSecretValueFunc: func(_ context.Context, _ *secretsmanager.GetSecretValueInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.GetSecretValueOutput, error) {
+			return &secretsmanager.GetSecretValueOutput{
+				Name:         lo.ToPtr("my-secret"),
+				VersionId:    lo.ToPtr("abc123"),
+				SecretString: lo.ToPtr("same-value"),
+			}, nil
+		},
+	}
+
+	var stdout, stderr bytes.Buffer
+	r := &smdiff.Runner{
+		Client: mock,
+		Store:  store,
+		Stdout: &stdout,
+		Stderr: &stderr,
+	}
+
+	err = r.Run(t.Context(), smdiff.Options{
+		Staged:     true,
+		StagedName: "my-secret",
+	})
+	require.NoError(t, err)
+
+	assert.Empty(t, stdout.String())
+	assert.Contains(t, stderr.String(), "staged value is identical to AWS current")
+}
+
+func TestRunStaged_JSONFormat(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	store := stage.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+
+	// Stage JSON value
+	err := store.Stage(stage.ServiceSM, "my-secret", stage.Entry{
+		Operation: stage.OperationSet,
+		Value:     `{"key":"new"}`,
+		StagedAt:  time.Now(),
+	})
+	require.NoError(t, err)
+
+	mock := &mockClient{
+		getSecretValueFunc: func(_ context.Context, _ *secretsmanager.GetSecretValueInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.GetSecretValueOutput, error) {
+			return &secretsmanager.GetSecretValueOutput{
+				Name:         lo.ToPtr("my-secret"),
+				VersionId:    lo.ToPtr("abc123"),
+				SecretString: lo.ToPtr(`{"key":"old"}`),
+			}, nil
+		},
+	}
+
+	var stdout, stderr bytes.Buffer
+	r := &smdiff.Runner{
+		Client: mock,
+		Store:  store,
+		Stdout: &stdout,
+		Stderr: &stderr,
+	}
+
+	err = r.Run(t.Context(), smdiff.Options{
+		Staged:     true,
+		StagedName: "my-secret",
+		JSONFormat: true,
+	})
+	require.NoError(t, err)
+
+	output := stdout.String()
+	assert.Contains(t, output, "-")
+	assert.Contains(t, output, "+")
+}
+
+func TestRunStaged_AWSError(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	store := stage.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+
+	// Stage a value
+	err := store.Stage(stage.ServiceSM, "my-secret", stage.Entry{
+		Operation: stage.OperationSet,
+		Value:     "new-value",
+		StagedAt:  time.Now(),
+	})
+	require.NoError(t, err)
+
+	mock := &mockClient{
+		getSecretValueFunc: func(_ context.Context, _ *secretsmanager.GetSecretValueInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.GetSecretValueOutput, error) {
+			return nil, fmt.Errorf("AWS error: secret not found")
+		},
+	}
+
+	var stdout, stderr bytes.Buffer
+	r := &smdiff.Runner{
+		Client: mock,
+		Store:  store,
+		Stdout: &stdout,
+		Stderr: &stderr,
+	}
+
+	err = r.Run(t.Context(), smdiff.Options{
+		Staged:     true,
+		StagedName: "my-secret",
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "AWS error")
 }

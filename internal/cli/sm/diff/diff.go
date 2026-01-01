@@ -23,6 +23,7 @@ import (
 	"github.com/mpyw/suve/internal/output"
 	"github.com/mpyw/suve/internal/pager"
 	"github.com/mpyw/suve/internal/smutil"
+	"github.com/mpyw/suve/internal/stage"
 	"github.com/mpyw/suve/internal/version/smversion"
 )
 
@@ -35,6 +36,7 @@ type Client interface {
 // Runner executes the diff command.
 type Runner struct {
 	Client Client
+	Store  *stage.Store
 	Stdout io.Writer
 	Stderr io.Writer
 }
@@ -45,6 +47,8 @@ type Options struct {
 	Spec2      *smversion.Spec
 	JSONFormat bool
 	NoPager    bool
+	Staged     bool   // Compare staged value vs AWS current
+	StagedName string // Secret name for staged diff
 }
 
 // Command returns the diff command.
@@ -67,7 +71,8 @@ EXAMPLES:
   suve sm diff my-secret:AWSPREVIOUS ':AWSCURRENT'         Compare labels (mixed)
   suve sm diff my-secret ':AWSPREVIOUS' ':AWSCURRENT'      Compare labels (partial spec)
   suve sm diff my-secret '~'                               Compare previous with current
-  suve sm diff -j my-secret:AWSPREVIOUS                    JSON format before diffing`,
+  suve sm diff -j my-secret:AWSPREVIOUS                    JSON format before diffing
+  suve sm diff --staged my-secret                          Compare staged vs AWS current`,
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
 				Name:    "json",
@@ -78,12 +83,62 @@ EXAMPLES:
 				Name:  "no-pager",
 				Usage: "Disable pager output",
 			},
+			&cli.BoolFlag{
+				Name:  "staged",
+				Usage: "Compare staged value vs AWS current value",
+			},
 		},
 		Action: action,
 	}
 }
 
 func action(ctx context.Context, cmd *cli.Command) error {
+	staged := cmd.Bool("staged")
+
+	// Handle --staged mode
+	if staged {
+		if cmd.Args().Len() != 1 {
+			return fmt.Errorf("usage: suve sm diff --staged <name>")
+		}
+
+		// Parse and validate the name (no version specifier allowed)
+		spec, err := smversion.Parse(cmd.Args().First())
+		if err != nil {
+			return err
+		}
+		if spec.Absolute.ID != nil || spec.Absolute.Label != nil || spec.Shift > 0 {
+			return fmt.Errorf("--staged requires a secret name without version specifier")
+		}
+
+		store, err := stage.NewStore()
+		if err != nil {
+			return fmt.Errorf("failed to initialize stage store: %w", err)
+		}
+
+		client, err := awsutil.NewSMClient(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to initialize AWS client: %w", err)
+		}
+
+		opts := Options{
+			JSONFormat: cmd.Bool("json"),
+			NoPager:    cmd.Bool("no-pager"),
+			Staged:     true,
+			StagedName: spec.Name,
+		}
+
+		return pager.WithPagerWriter(cmd.Root().Writer, opts.NoPager, func(w io.Writer) error {
+			r := &Runner{
+				Client: client,
+				Store:  store,
+				Stdout: w,
+				Stderr: cmd.Root().ErrWriter,
+			}
+			return r.Run(ctx, opts)
+		})
+	}
+
+	// Normal diff mode
 	spec1, spec2, err := smversion.ParseDiffArgs(cmd.Args().Slice())
 	if err != nil {
 		return err
@@ -113,6 +168,69 @@ func action(ctx context.Context, cmd *cli.Command) error {
 
 // Run executes the diff command.
 func (r *Runner) Run(ctx context.Context, opts Options) error {
+	if opts.Staged {
+		return r.runStaged(ctx, opts)
+	}
+	return r.runNormal(ctx, opts)
+}
+
+func (r *Runner) runStaged(ctx context.Context, opts Options) error {
+	// Get staged value
+	entry, err := r.Store.Get(stage.ServiceSM, opts.StagedName)
+	if err == stage.ErrNotStaged {
+		output.Warning(r.Stderr, "%s is not staged", opts.StagedName)
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+
+	// Get current AWS value
+	spec := &smversion.Spec{Name: opts.StagedName}
+	secret, err := smversion.GetSecretWithVersion(ctx, r.Client, spec)
+	if err != nil {
+		return fmt.Errorf("failed to get current version: %w", err)
+	}
+
+	awsValue := lo.FromPtr(secret.SecretString)
+	stagedValue := entry.Value
+
+	// For delete operation, staged value is empty
+	if entry.Operation == stage.OperationDelete {
+		stagedValue = ""
+	}
+
+	// Format as JSON if enabled
+	if opts.JSONFormat {
+		formatted1, ok1 := jsonutil.TryFormat(awsValue)
+		formatted2, ok2 := jsonutil.TryFormat(stagedValue)
+		if ok1 && ok2 {
+			awsValue = formatted1
+			stagedValue = formatted2
+		} else if ok1 || ok2 {
+			output.Warning(r.Stderr, "--json has no effect: some values are not valid JSON")
+		}
+	}
+
+	if awsValue == stagedValue {
+		output.Warning(r.Stderr, "staged value is identical to AWS current")
+		return nil
+	}
+
+	versionID := smutil.TruncateVersionID(lo.FromPtr(secret.VersionId))
+	label1 := fmt.Sprintf("%s#%s (AWS)", opts.StagedName, versionID)
+	label2 := fmt.Sprintf("%s (staged)", opts.StagedName)
+	if entry.Operation == stage.OperationDelete {
+		label2 = fmt.Sprintf("%s (staged for deletion)", opts.StagedName)
+	}
+
+	diff := output.Diff(label1, label2, awsValue, stagedValue)
+	_, _ = fmt.Fprint(r.Stdout, diff)
+
+	return nil
+}
+
+func (r *Runner) runNormal(ctx context.Context, opts Options) error {
 	secret1, err := smversion.GetSecretWithVersion(ctx, r.Client, opts.Spec1)
 	if err != nil {
 		return fmt.Errorf("failed to get first version: %w", err)
