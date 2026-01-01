@@ -35,8 +35,8 @@ func Command() *cli.Command {
 Use -v/--verbose to show detailed information including the staged values.
 
 EXAMPLES:
-   suve status     Show all staged changes
-   suve status -v  Show detailed information`,
+   suve stage status     Show all staged changes
+   suve stage status -v  Show detailed information`,
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
 				Name:    "verbose",

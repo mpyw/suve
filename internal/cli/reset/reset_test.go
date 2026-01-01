@@ -24,7 +24,7 @@ func TestCommand_Validation(t *testing.T) {
 		app := appcli.MakeApp()
 		var buf bytes.Buffer
 		app.Writer = &buf
-		err := app.Run(context.Background(), []string{"suve", "reset", "--help"})
+		err := app.Run(context.Background(), []string{"suve", "stage", "reset", "--help"})
 		require.NoError(t, err)
 		assert.Contains(t, buf.String(), "Unstage all changes")
 	})

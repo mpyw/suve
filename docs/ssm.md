@@ -485,7 +485,7 @@ The stage file is stored at `~/.suve/stage.json`.
      │              │
      │              v
      │         status (view)
-     │         diff --staged (compare)
+     │         diff (compare)
      │         reset (unstage)
      │              │
      │              v
@@ -661,25 +661,24 @@ suve reset
 
 ---
 
-## suve ssm diff --staged
+## suve ssm stage diff
 
 Compare staged value with current AWS value.
 
 ```
-suve ssm diff --staged <name>
+suve ssm stage diff [name]
 ```
 
 **Arguments:**
 
 | Argument | Description |
 |----------|-------------|
-| `name` | Parameter name (without version specifier) |
+| `name` | Parameter name (optional, shows all if not specified) |
 
 **Options:**
 
 | Option | Alias | Default | Description |
 |--------|-------|---------|-------------|
-| `--staged` | - | `false` | Compare staged value with AWS current |
 | `--json` | `-j` | `false` | Format JSON values before diffing |
 | `--no-pager` | - | `false` | Disable pager |
 
@@ -704,9 +703,12 @@ If parameter is staged for deletion:
 **Examples:**
 
 ```bash
-# Compare staged vs AWS
-suve ssm diff --staged /app/config/database-url
+# Compare all staged vs AWS
+suve ssm stage diff
+
+# Compare specific staged vs AWS
+suve ssm stage diff /app/config/database-url
 
 # Compare with JSON formatting
-suve ssm diff --staged --json /app/config/database-credentials
+suve ssm stage diff --json /app/config/database-credentials
 ```

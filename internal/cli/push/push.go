@@ -51,11 +51,11 @@ func Command() *cli.Command {
 
 After successful push, the staged changes are cleared.
 
-Use 'suve status' to view all staged changes before pushing.
-Use 'suve ssm push' or 'suve sm push' to push service-specific changes.
+Use 'suve stage status' to view all staged changes before pushing.
+Use 'suve ssm stage push' or 'suve sm stage push' to push service-specific changes.
 
 EXAMPLES:
-   suve push    Push all staged changes (SSM and SM)`,
+   suve stage push    Push all staged changes (SSM and SM)`,
 		Action: action,
 	}
 }
@@ -249,7 +249,7 @@ func (r *Runner) pushSM(ctx context.Context, staged map[string]stage.Entry) (suc
 		case stage.OperationSet:
 			pushErr = r.pushSMSet(ctx, name, entry.Value)
 		case stage.OperationDelete:
-			pushErr = r.pushSMDelete(ctx, name)
+			pushErr = r.pushSMDelete(ctx, name, entry)
 		default:
 			pushErr = fmt.Errorf("unknown operation: %s", entry.Operation)
 		}
@@ -285,11 +285,21 @@ func (r *Runner) pushSMSet(ctx context.Context, name, value string) error {
 	return nil
 }
 
-func (r *Runner) pushSMDelete(ctx context.Context, name string) error {
-	_, err := r.SMClient.DeleteSecret(ctx, &secretsmanager.DeleteSecretInput{
-		SecretId:                   lo.ToPtr(name),
-		ForceDeleteWithoutRecovery: lo.ToPtr(true),
-	})
+func (r *Runner) pushSMDelete(ctx context.Context, name string, entry stage.Entry) error {
+	input := &secretsmanager.DeleteSecretInput{
+		SecretId: lo.ToPtr(name),
+	}
+
+	// Apply delete options if present
+	if entry.DeleteOptions != nil {
+		if entry.DeleteOptions.Force {
+			input.ForceDeleteWithoutRecovery = lo.ToPtr(true)
+		} else if entry.DeleteOptions.RecoveryWindow > 0 {
+			input.RecoveryWindowInDays = lo.ToPtr(int64(entry.DeleteOptions.RecoveryWindow))
+		}
+	}
+
+	_, err := r.SMClient.DeleteSecret(ctx, input)
 	if err != nil {
 		return fmt.Errorf("failed to delete secret: %w", err)
 	}

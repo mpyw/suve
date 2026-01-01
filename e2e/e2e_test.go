@@ -27,23 +27,24 @@ import (
 
 	smcat "github.com/mpyw/suve/internal/cli/sm/cat"
 	smcreate "github.com/mpyw/suve/internal/cli/sm/create"
+	smdelete "github.com/mpyw/suve/internal/cli/sm/delete"
 	smdiff "github.com/mpyw/suve/internal/cli/sm/diff"
 	smlog "github.com/mpyw/suve/internal/cli/sm/log"
 	smls "github.com/mpyw/suve/internal/cli/sm/ls"
 	smrestore "github.com/mpyw/suve/internal/cli/sm/restore"
-	smdelete "github.com/mpyw/suve/internal/cli/sm/delete"
 	smshow "github.com/mpyw/suve/internal/cli/sm/show"
 	smupdate "github.com/mpyw/suve/internal/cli/sm/update"
 	ssmcat "github.com/mpyw/suve/internal/cli/ssm/cat"
+	ssmdelete "github.com/mpyw/suve/internal/cli/ssm/delete"
 	ssmdiff "github.com/mpyw/suve/internal/cli/ssm/diff"
 	ssmlog "github.com/mpyw/suve/internal/cli/ssm/log"
 	ssmls "github.com/mpyw/suve/internal/cli/ssm/ls"
-	ssmpush "github.com/mpyw/suve/internal/cli/ssm/push"
-	ssmreset "github.com/mpyw/suve/internal/cli/ssm/reset"
-	ssmdelete "github.com/mpyw/suve/internal/cli/ssm/delete"
 	ssmset "github.com/mpyw/suve/internal/cli/ssm/set"
 	ssmshow "github.com/mpyw/suve/internal/cli/ssm/show"
-	ssmstatus "github.com/mpyw/suve/internal/cli/ssm/status"
+	ssmstageddiff "github.com/mpyw/suve/internal/cli/ssm/stage/diff"
+	ssmpush "github.com/mpyw/suve/internal/cli/ssm/stage/push"
+	ssmreset "github.com/mpyw/suve/internal/cli/ssm/stage/reset"
+	ssmstatus "github.com/mpyw/suve/internal/cli/ssm/stage/status"
 	"github.com/mpyw/suve/internal/stage"
 )
 
@@ -260,7 +261,7 @@ func TestSM_FullWorkflow(t *testing.T) {
 }
 
 // TestSSM_StagingWorkflow tests the staging workflow:
-// stage → status → diff --staged → push → verify → reset
+// stage → status → diff → push → verify → reset
 //
 // This test stages a parameter value, verifies status, compares staged vs current,
 // pushes the staged value to AWS, and tests the reset command.
@@ -305,13 +306,13 @@ func TestSSM_StagingWorkflow(t *testing.T) {
 		t.Logf("status output: %s", stdout)
 	})
 
-	// 4. Diff --staged - compare staged vs current
-	t.Run("diff-staged", func(t *testing.T) {
-		stdout, _, err := runCommand(t, ssmdiff.Command(), "--staged", paramName)
+	// 4. Stage diff - compare staged vs current
+	t.Run("stage-diff", func(t *testing.T) {
+		stdout, _, err := runCommand(t, ssmstageddiff.Command(), paramName)
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "-original-value")
 		assert.Contains(t, stdout, "+staged-value")
-		t.Logf("diff --staged output: %s", stdout)
+		t.Logf("stage diff output: %s", stdout)
 	})
 
 	// 5. Push - apply staged changes

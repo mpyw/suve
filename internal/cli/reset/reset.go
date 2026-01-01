@@ -28,10 +28,10 @@ func Command() *cli.Command {
 
 This does not affect AWS - it only clears the local staging area.
 
-Use 'suve ssm reset' or 'suve sm reset' for service-specific operations.
+Use 'suve ssm stage reset' or 'suve sm stage reset' for service-specific operations.
 
 EXAMPLES:
-   suve reset    Unstage all changes (SSM and SM)`,
+   suve stage reset    Unstage all changes (SSM and SM)`,
 		Action: action,
 	}
 }

@@ -7,12 +7,9 @@ import (
 
 	"github.com/urfave/cli/v3"
 
-	"github.com/mpyw/suve/internal/cli/diff"
-	"github.com/mpyw/suve/internal/cli/push"
-	"github.com/mpyw/suve/internal/cli/reset"
 	"github.com/mpyw/suve/internal/cli/sm"
 	"github.com/mpyw/suve/internal/cli/ssm"
-	"github.com/mpyw/suve/internal/cli/status"
+	"github.com/mpyw/suve/internal/cli/stage"
 )
 
 // MakeApp creates a new CLI application instance.
@@ -24,10 +21,7 @@ func MakeApp() *cli.Command {
 		Commands: []*cli.Command{
 			ssm.Command(),
 			sm.Command(),
-			status.Command(),
-			diff.Command(),
-			push.Command(),
-			reset.Command(),
+			stage.Command(),
 		},
 		CommandNotFound: commandNotFound,
 	}

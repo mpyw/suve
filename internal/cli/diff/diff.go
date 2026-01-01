@@ -56,12 +56,11 @@ func Command() *cli.Command {
 		Usage: "Show diff of all staged changes (SSM and SM)",
 		Description: `Compare all staged changes against AWS current values.
 
-This command requires --staged flag. For comparing specific versions,
-use 'suve ssm diff' or 'suve sm diff'.
+For comparing specific versions, use 'suve ssm diff' or 'suve sm diff'.
 
 EXAMPLES:
-   suve diff --staged     Show diff of all staged changes
-   suve diff --staged -j  Show diff with JSON formatting`,
+   suve stage diff     Show diff of all staged changes
+   suve stage diff -j  Show diff with JSON formatting`,
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
 				Name:    "json",
@@ -72,31 +71,14 @@ EXAMPLES:
 				Name:  "no-pager",
 				Usage: "Disable pager output",
 			},
-			&cli.BoolFlag{
-				Name:  "staged",
-				Usage: "Compare staged values vs AWS current values (required)",
-			},
 		},
 		Action: action,
 	}
 }
 
 func action(ctx context.Context, cmd *cli.Command) error {
-	staged := cmd.Bool("staged")
-
-	if !staged {
-		return fmt.Errorf(`'suve diff' requires --staged flag
-
-For comparing specific versions, use:
-  suve ssm diff <spec1> [spec2]  Compare SSM parameter versions
-  suve sm diff <spec1> [spec2]   Compare Secrets Manager versions
-
-For staged changes:
-  suve diff --staged             Show diff of all staged changes`)
-	}
-
 	if cmd.Args().Len() > 0 {
-		return fmt.Errorf("usage: suve diff --staged (no arguments)")
+		return fmt.Errorf("usage: suve stage diff (no arguments)")
 	}
 
 	store, err := stage.NewStore()
