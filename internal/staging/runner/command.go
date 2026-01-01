@@ -5,11 +5,13 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
 	"time"
 
 	"github.com/fatih/color"
 	"github.com/urfave/cli/v3"
 
+	"github.com/mpyw/suve/internal/confirm"
 	"github.com/mpyw/suve/internal/pager"
 	"github.com/mpyw/suve/internal/staging"
 )
@@ -270,18 +272,74 @@ After successful push, the staged changes are cleared.
 Use 'suve %s stage status' to view staged changes before pushing.
 
 EXAMPLES:
-   suve %s stage push           Push all staged %s changes
-   suve %s stage push <name>    Push only the specified %s`,
+   suve %s stage push           Push all staged %s changes (with confirmation)
+   suve %s stage push <name>    Push only the specified %s
+   suve %s stage push -y        Push without confirmation`,
 			cfg.ServiceName, cfg.ItemName,
 			cfg.ItemName, cfg.ItemName,
 			cfg.ServiceName, cfg.ItemName,
 			cfg.ServiceName,
 			cfg.ServiceName, cfg.ServiceName,
-			cfg.ServiceName, cfg.ItemName),
+			cfg.ServiceName, cfg.ItemName,
+			cfg.ServiceName),
+		Flags: []cli.Flag{
+			&cli.BoolFlag{
+				Name:    "yes",
+				Aliases: []string{"y"},
+				Usage:   "Skip confirmation prompt",
+			},
+		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			store, err := staging.NewStore()
 			if err != nil {
 				return fmt.Errorf("failed to initialize stage store: %w", err)
+			}
+
+			// Get entries to show what will be pushed
+			parser := cfg.ParserFactory()
+			service := parser.Service()
+			entries, err := store.List(service)
+			if err != nil {
+				return err
+			}
+
+			serviceEntries := entries[service]
+			if len(serviceEntries) == 0 {
+				yellow := color.New(color.FgYellow).SprintFunc()
+				_, _ = fmt.Fprintf(cmd.Root().Writer, "%s No %s changes staged.\n", yellow("!"), parser.ServiceName())
+				return nil
+			}
+
+			// Filter by name if specified
+			opts := PushOptions{}
+			if cmd.Args().Len() > 0 {
+				opts.Name = cmd.Args().First()
+				if _, ok := serviceEntries[opts.Name]; !ok {
+					return fmt.Errorf("%s is not staged", opts.Name)
+				}
+			}
+
+			// Confirm push
+			skipConfirm := cmd.Bool("yes")
+			prompter := &confirm.Prompter{
+				Stdin:  os.Stdin,
+				Stdout: cmd.Root().Writer,
+				Stderr: cmd.Root().ErrWriter,
+			}
+
+			var message string
+			if opts.Name != "" {
+				message = fmt.Sprintf("Push staged changes for %s to AWS?", opts.Name)
+			} else {
+				message = fmt.Sprintf("Push %d staged %s change(s) to AWS?", len(serviceEntries), parser.ServiceName())
+			}
+
+			confirmed, err := prompter.Confirm(message, skipConfirm)
+			if err != nil {
+				return err
+			}
+			if !confirmed {
+				return nil
 			}
 
 			strat, err := cfg.Factory(ctx)
@@ -294,11 +352,6 @@ EXAMPLES:
 				Store:    store,
 				Stdout:   cmd.Root().Writer,
 				Stderr:   cmd.Root().ErrWriter,
-			}
-
-			opts := PushOptions{}
-			if cmd.Args().Len() > 0 {
-				opts.Name = cmd.Args().First()
 			}
 
 			return r.Run(ctx, opts)
