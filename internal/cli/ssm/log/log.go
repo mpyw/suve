@@ -20,6 +20,7 @@ import (
 
 	"github.com/mpyw/suve/internal/api/ssmapi"
 	"github.com/mpyw/suve/internal/awsutil"
+	"github.com/mpyw/suve/internal/jsonutil"
 	"github.com/mpyw/suve/internal/output"
 	"github.com/mpyw/suve/internal/pager"
 	"github.com/mpyw/suve/internal/version/ssmversion"
@@ -211,9 +212,6 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 	cyan := color.New(color.FgCyan).SprintFunc()
 	green := color.New(color.FgGreen).SprintFunc()
 
-	// Track if we've warned about invalid JSON (only warn once)
-	jsonWarned := false
-
 	// Find the current (latest) version index
 	currentIdx := 0
 	if opts.Reverse {
@@ -278,9 +276,12 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 			if oldIdx >= 0 {
 				oldValue := lo.FromPtr(params[oldIdx].Value)
 				newValue := lo.FromPtr(params[newIdx].Value)
+				if opts.JSONFormat {
+					oldValue, newValue = jsonutil.TryFormatOrWarn2(oldValue, newValue, r.Stderr, "")
+				}
 				oldName := fmt.Sprintf("%s#%d", opts.Name, params[oldIdx].Version)
 				newName := fmt.Sprintf("%s#%d", opts.Name, params[newIdx].Version)
-				diff := output.DiffWithJSON(oldName, newName, oldValue, newValue, opts.JSONFormat, &jsonWarned, r.Stderr)
+				diff := output.Diff(oldName, newName, oldValue, newValue)
 				if diff != "" {
 					_, _ = fmt.Fprintln(r.Stdout)
 					_, _ = fmt.Fprint(r.Stdout, diff)

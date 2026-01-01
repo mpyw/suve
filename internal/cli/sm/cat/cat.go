@@ -12,7 +12,6 @@ import (
 	"github.com/mpyw/suve/internal/api/smapi"
 	"github.com/mpyw/suve/internal/awsutil"
 	"github.com/mpyw/suve/internal/jsonutil"
-	"github.com/mpyw/suve/internal/output"
 	"github.com/mpyw/suve/internal/version/smversion"
 )
 
@@ -103,11 +102,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 
 	// Format as JSON if enabled
 	if opts.JSONFormat {
-		if formatted, ok := jsonutil.TryFormat(value); ok {
-			value = formatted
-		} else {
-			output.Warning(r.Stderr, "--json has no effect: value is not valid JSON")
-		}
+		value = jsonutil.TryFormatOrWarn(value, r.Stderr, "")
 	}
 
 	_, _ = fmt.Fprint(r.Stdout, value)

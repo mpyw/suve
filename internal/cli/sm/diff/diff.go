@@ -130,14 +130,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 
 	// Format as JSON if enabled
 	if opts.JSONFormat {
-		formatted1, ok1 := jsonutil.TryFormat(value1)
-		formatted2, ok2 := jsonutil.TryFormat(value2)
-		if ok1 && ok2 {
-			value1 = formatted1
-			value2 = formatted2
-		} else {
-			output.Warning(r.Stderr, "--json has no effect: some values are not valid JSON")
-		}
+		value1, value2 = jsonutil.TryFormatOrWarn2(value1, value2, r.Stderr, "")
 	}
 
 	if value1 == value2 {

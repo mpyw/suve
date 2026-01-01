@@ -6,27 +6,11 @@ package jsonutil
 
 import (
 	"encoding/json"
+	"fmt"
+	"io"
+
+	"github.com/mpyw/suve/internal/colors"
 )
-
-// Format formats a JSON string with indentation.
-// Keys are automatically sorted alphabetically by Go's json.Marshal.
-// If the input is not valid JSON, returns the original string unchanged.
-func Format(value string) string {
-	var data any
-	if err := json.Unmarshal([]byte(value), &data); err != nil {
-		return value
-	}
-	// MarshalIndent cannot fail here: data contains only JSON-safe types
-	// (map, slice, string, number, bool, nil) after successful Unmarshal.
-	formatted, _ := json.MarshalIndent(data, "", "  ")
-	return string(formatted)
-}
-
-// IsJSON checks if a string is valid JSON.
-func IsJSON(value string) bool {
-	var data any
-	return json.Unmarshal([]byte(value), &data) == nil
-}
 
 // TryFormat attempts to format a JSON string with indentation.
 // Returns the formatted string and true if successful, or the original string and false if not valid JSON.
@@ -38,4 +22,35 @@ func TryFormat(value string) (string, bool) {
 	}
 	formatted, _ := json.MarshalIndent(data, "", "  ")
 	return string(formatted), true
+}
+
+// TryFormatOrWarn formats JSON or warns and returns original.
+// If name is non-empty, includes it in the warning message.
+func TryFormatOrWarn(value string, errW io.Writer, name string) string {
+	if formatted, ok := TryFormat(value); ok {
+		return formatted
+	}
+	warn(errW, name, "value is not valid JSON")
+	return value
+}
+
+// TryFormatOrWarn2 formats both JSONs or warns and returns originals.
+// If name is non-empty, includes it in the warning message.
+func TryFormatOrWarn2(v1, v2 string, errW io.Writer, name string) (string, string) {
+	f1, ok1 := TryFormat(v1)
+	f2, ok2 := TryFormat(v2)
+	if ok1 && ok2 {
+		return f1, f2
+	}
+	warn(errW, name, "some values are not valid JSON")
+	return v1, v2
+}
+
+func warn(w io.Writer, name, reason string) {
+	msg := "--json has no effect"
+	if name != "" {
+		msg += " for " + name
+	}
+	msg += ": " + reason
+	_, _ = fmt.Fprintln(w, colors.Warning("Warning: "+msg))
 }

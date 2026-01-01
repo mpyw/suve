@@ -132,14 +132,7 @@ func (r *DiffRunner) outputDiff(opts DiffOptions, name string, entry staging.Ent
 
 	// Format as JSON if enabled
 	if opts.JSONFormat {
-		formatted1, ok1 := jsonutil.TryFormat(awsValue)
-		formatted2, ok2 := jsonutil.TryFormat(stagedValue)
-		if ok1 && ok2 {
-			awsValue = formatted1
-			stagedValue = formatted2
-		} else if ok1 || ok2 {
-			output.Warning(r.Stderr, "--json has no effect for %s: some values are not valid JSON", name)
-		}
+		awsValue, stagedValue = jsonutil.TryFormatOrWarn2(awsValue, stagedValue, r.Stderr, name)
 	}
 
 	if awsValue == stagedValue {

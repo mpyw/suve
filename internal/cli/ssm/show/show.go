@@ -135,10 +135,8 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 			output.Warning(r.Stderr, "--json has no effect on StringList type (comma-separated values)")
 		case param.Type == types.ParameterTypeSecureString && !opts.Decrypt:
 			output.Warning(r.Stderr, "--json has no effect on encrypted SecureString (use --decrypt to enable)")
-		case !jsonutil.IsJSON(value):
-			output.Warning(r.Stderr, "--json has no effect: value is not valid JSON")
 		default:
-			value = jsonutil.Format(value)
+			value = jsonutil.TryFormatOrWarn(value, r.Stderr, "")
 		}
 	}
 	out.Value(value)
