@@ -22,8 +22,9 @@ suve ssm show [options] <name[#VERSION][~SHIFT]*>
 
 | Option | Alias | Default | Description |
 |--------|-------|---------|-------------|
-| `--decrypt` | `-d` | `true` | Decrypt SecureString values. Use `--decrypt=false` to disable. |
+| `--decrypt` | - | `true` | Decrypt SecureString values. Use `--decrypt=false` to disable. |
 | `--json` | `-j` | `false` | Pretty-print JSON values with indentation |
+| `--no-pager` | - | `false` | Disable pager output |
 
 **Examples:**
 
@@ -83,7 +84,7 @@ suve ssm cat [options] <name[#VERSION][~SHIFT]*>
 
 | Option | Alias | Default | Description |
 |--------|-------|---------|-------------|
-| `--decrypt` | `-d` | `true` | Decrypt SecureString values. Use `--decrypt=false` to disable. |
+| `--decrypt` | - | `true` | Decrypt SecureString values. Use `--decrypt=false` to disable. |
 | `--json` | `-j` | `false` | Pretty-print JSON values with indentation |
 
 **Examples:**
@@ -133,7 +134,11 @@ suve ssm log [options] <name>
 | `--number` | `-n` | `10` | Maximum number of versions to show |
 | `--patch` | `-p` | `false` | Show diff between consecutive versions |
 | `--json` | `-j` | `false` | Format JSON values before diffing (use with `-p`) |
-| `--reverse` | `-r` | `false` | Show oldest versions first |
+| `--oneline` | - | `false` | Compact one-line-per-version format |
+| `--reverse` | - | `false` | Show oldest versions first |
+| `--no-pager` | - | `false` | Disable pager output |
+| `--from` | - | - | Start version (e.g., `#3`, `~2`) |
+| `--to` | - | - | End version (e.g., `#5`, `~0`) |
 
 **Examples:**
 
@@ -232,6 +237,13 @@ The diff command supports multiple argument formats for flexibility:
 
 Specifiers can be combined: `/param#5~2` means "version 5, then 2 back" = version 3.
 
+**Options:**
+
+| Option | Alias | Default | Description |
+|--------|-------|---------|-------------|
+| `--json` | `-j` | `false` | Format JSON values before diffing |
+| `--no-pager` | - | `false` | Disable pager output |
+
 ### Examples
 
 Compare two versions:
@@ -309,7 +321,7 @@ suve ssm ls [options] [path-prefix]
 
 | Option | Alias | Default | Description |
 |--------|-------|---------|-------------|
-| `--recursive` | `-r` | `false` | List parameters recursively under the path |
+| `--recursive` | - | `false` | List parameters recursively under the path |
 
 **Examples:**
 
@@ -365,9 +377,12 @@ suve ssm set [options] <name> <value>
 
 | Option | Alias | Default | Description |
 |--------|-------|---------|-------------|
-| `--type` | `-t` | `String` | Parameter type: `String`, `StringList`, or `SecureString` |
-| `--secure` | `-s` | `false` | Shorthand for `--type SecureString` |
-| `--description` | `-d` | - | Parameter description |
+| `--type` | - | `String` | Parameter type: `String`, `StringList`, or `SecureString` |
+| `--secure` | - | `false` | Shorthand for `--type SecureString` |
+| `--description` | - | - | Parameter description |
+| `--tag` | - | - | Tag in key=value format (can be specified multiple times, additive) |
+| `--untag` | - | - | Tag key to remove (can be specified multiple times) |
+| `--yes` | `-y` | `false` | Skip confirmation prompt |
 
 > [!NOTE]
 > `--secure` and `--type` cannot be used together.
@@ -376,6 +391,7 @@ suve ssm set [options] <name> <value>
 
 ```ShellSession
 user@host:~$ suve ssm set --secure /app/config/database-url "postgres://db.example.com:5432/myapp"
+? Set parameter /app/config/database-url? [y/N] y
 ✓ Set parameter /app/config/database-url (version: 1)
 ```
 
@@ -383,14 +399,20 @@ user@host:~$ suve ssm set --secure /app/config/database-url "postgres://db.examp
 # Create/update as String (default)
 suve ssm set /app/config/log-level "debug"
 
-# Create as SecureString (shorthand)
-suve ssm set -s /app/config/api-key "sk-1234567890"
+# Create as SecureString
+suve ssm set --secure /app/config/api-key "sk-1234567890"
 
 # Create with description
-suve ssm set -d "Database connection string" -s /app/config/database-url "postgres://..."
+suve ssm set --description "Database connection string" --secure /app/config/database-url "postgres://..."
 
 # StringList (comma-separated values)
 suve ssm set --type StringList /app/config/allowed-hosts "host1,host2,host3"
+
+# Set with tags
+suve ssm set --tag env=prod --tag team=platform /app/config/key "value"
+
+# Skip confirmation
+suve ssm set -y /app/config/log-level "debug"
 ```
 
 > [!IMPORTANT]
@@ -403,7 +425,7 @@ suve ssm set --type StringList /app/config/allowed-hosts "host1,host2,host3"
 Delete a parameter.
 
 ```
-suve ssm delete <name>
+suve ssm delete [options] <name>
 ```
 
 **Arguments:**
@@ -412,15 +434,27 @@ suve ssm delete <name>
 |----------|-------------|
 | `name` | Parameter name to delete |
 
+**Options:**
+
+| Option | Alias | Default | Description |
+|--------|-------|---------|-------------|
+| `--yes` | `-y` | `false` | Skip confirmation prompt |
+
 **Examples:**
 
 ```ShellSession
 user@host:~$ suve ssm delete /app/config/old-param
+? Delete parameter /app/config/old-param? [y/N] y
 Deleted /app/config/old-param
 ```
 
+```bash
+# Delete without confirmation
+suve ssm delete -y /app/config/old-param
+```
+
 > [!CAUTION]
-> Deletion is immediate and permanent. There is no confirmation prompt or recovery option.
+> Deletion is immediate and permanent. There is no recovery option.
 
 ---
 
@@ -457,7 +491,7 @@ The stage file is stored at `~/.suve/stage.json`.
 
 ## suve stage ssm add
 
-Stage a new parameter or modification.
+Stage a new parameter for creation.
 
 ```
 suve stage ssm add [options] <name> [value]
@@ -474,9 +508,8 @@ suve stage ssm add [options] <name> [value]
 
 | Option | Alias | Default | Description |
 |--------|-------|---------|-------------|
-| `--type` | `-t` | `String` | Parameter type: `String`, `StringList`, or `SecureString` |
-| `--secure` | `-s` | `false` | Shorthand for `--type SecureString` |
-| `--description` | `-d` | - | Parameter description |
+| `--description` | - | - | Parameter description |
+| `--tag` | - | - | Tag in key=value format (can be specified multiple times) |
 
 **Examples:**
 
@@ -492,8 +525,8 @@ suve stage ssm add /app/config/new-param "my-value"
 # Stage via editor
 suve stage ssm add /app/config/new-param
 
-# Stage as SecureString
-suve stage ssm add -s /app/config/api-key "sk-1234567890"
+# Stage with description and tags
+suve stage ssm add --description "API key" --tag env=prod /app/config/api-key "sk-1234567890"
 ```
 
 ---
@@ -517,7 +550,8 @@ suve stage ssm edit [options] <name> [value]
 
 | Option | Alias | Default | Description |
 |--------|-------|---------|-------------|
-| `--delete` | `-d` | `false` | Stage parameter for deletion |
+| `--description` | - | - | Parameter description |
+| `--tag` | - | - | Tag in key=value format (can be specified multiple times) |
 
 **Behavior:**
 
@@ -540,8 +574,8 @@ suve stage ssm edit /app/config/database-url
 # Edit with inline value
 suve stage ssm edit /app/config/database-url "new-value"
 
-# Stage for deletion
-suve stage ssm edit --delete /app/config/old-param
+# Edit with tags
+suve stage ssm edit --tag env=prod /app/config/database-url "new-value"
 ```
 
 ---
@@ -568,8 +602,20 @@ user@host:~$ suve stage ssm delete /app/config/old-param
 Show staged changes for SSM parameters.
 
 ```
-suve stage ssm status
+suve stage ssm status [options] [name]
 ```
+
+**Arguments:**
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `name` | No | Specific parameter name to show |
+
+**Options:**
+
+| Option | Alias | Default | Description |
+|--------|-------|---------|-------------|
+| `--verbose` | `-v` | `false` | Show detailed information including values |
 
 **Examples:**
 
@@ -655,6 +701,10 @@ suve stage ssm push [options] [name]
 | Option | Alias | Default | Description |
 |--------|-------|---------|-------------|
 | `--yes` | `-y` | `false` | Skip confirmation prompt |
+| `--ignore-conflicts` | - | `false` | Push even if AWS was modified after staging |
+
+> [!NOTE]
+> Before pushing, suve checks if the AWS resource was modified after staging. If a conflict is detected, the push is rejected to prevent lost updates. Use `--ignore-conflicts` to force push despite conflicts.
 
 **Examples:**
 
@@ -673,17 +723,31 @@ Pushing SSM parameters...
 
 ## suve stage ssm reset
 
-Unstage SSM parameter changes.
+Unstage SSM parameter changes or restore to a specific version.
 
 ```
-suve stage ssm reset [name]
+suve stage ssm reset [options] [spec]
 ```
 
 **Arguments:**
 
 | Argument | Required | Description |
 |----------|----------|-------------|
-| `name` | No | Specific parameter to unstage (if omitted, unstages all) |
+| `spec` | No | Parameter name with optional version specifier |
+
+**Options:**
+
+| Option | Alias | Default | Description |
+|--------|-------|---------|-------------|
+| `--all` | - | `false` | Unstage all SSM parameters |
+
+**Version Specifiers:**
+
+| Specifier | Description |
+|-----------|-------------|
+| `<name>` | Unstage parameter (remove from staging) |
+| `<name>#<ver>` | Restore to specific version |
+| `<name>~1` | Restore to 1 version ago |
 
 **Examples:**
 
@@ -691,8 +755,22 @@ suve stage ssm reset [name]
 user@host:~$ suve stage ssm reset /app/config/database-url
 Unstaged /app/config/database-url
 
-user@host:~$ suve stage ssm reset
+user@host:~$ suve stage ssm reset --all
 Unstaged all SSM changes
+```
+
+```bash
+# Unstage specific parameter
+suve stage ssm reset /app/config/database-url
+
+# Restore to specific version and stage
+suve stage ssm reset /app/config/database-url#3
+
+# Restore to previous version and stage
+suve stage ssm reset /app/config/database-url~1
+
+# Unstage all SSM parameters
+suve stage ssm reset --all
 ```
 
 > [!TIP]

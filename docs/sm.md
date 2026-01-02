@@ -23,6 +23,7 @@ suve sm show [options] <name[#VERSION | :LABEL][~SHIFT]*>
 | Option | Alias | Default | Description |
 |--------|-------|---------|-------------|
 | `--json` | `-j` | `false` | Pretty-print JSON values with indentation |
+| `--no-pager` | - | `false` | Disable pager output |
 
 **Examples:**
 
@@ -137,7 +138,9 @@ suve sm log [options] <name>
 | `--number` | `-n` | `10` | Maximum number of versions to show |
 | `--patch` | `-p` | `false` | Show diff between consecutive versions |
 | `--json` | `-j` | `false` | Format JSON values before diffing (use with `-p`) |
-| `--reverse` | `-r` | `false` | Show oldest versions first |
+| `--oneline` | - | `false` | Compact one-line-per-version format |
+| `--reverse` | - | `false` | Show oldest versions first |
+| `--no-pager` | - | `false` | Disable pager output |
 
 **Examples:**
 
@@ -242,6 +245,13 @@ Specifiers can be combined: `secret:AWSCURRENT~1` means "1 version before AWSCUR
 > - `:AWSCURRENT` = new value
 > - `:AWSPREVIOUS` = old value
 > - `~1` = 1 version ago (same as `:AWSPREVIOUS` after a single update)
+
+**Options:**
+
+| Option | Alias | Default | Description |
+|--------|-------|---------|-------------|
+| `--json` | `-j` | `false` | Format JSON values before diffing |
+| `--no-pager` | - | `false` | Disable pager output |
 
 ### Examples
 
@@ -370,7 +380,8 @@ suve sm create [options] <name> <value>
 
 | Option | Alias | Default | Description |
 |--------|-------|---------|-------------|
-| `--description` | `-d` | - | Description for the secret |
+| `--description` | - | - | Description for the secret |
+| `--tag` | - | - | Tag in key=value format (can be specified multiple times) |
 
 **Examples:**
 
@@ -396,7 +407,7 @@ user@host:~$ suve sm create -d "Production database credentials" my-database-cre
 Update an existing secret's value.
 
 ```
-suve sm update <name> <value>
+suve sm update [options] <name> <value>
 ```
 
 **Arguments:**
@@ -406,11 +417,29 @@ suve sm update <name> <value>
 | `name` | Secret name |
 | `value` | New secret value |
 
+**Options:**
+
+| Option | Alias | Default | Description |
+|--------|-------|---------|-------------|
+| `--description` | - | - | Update secret description |
+| `--tag` | - | - | Tag in key=value format (can be specified multiple times, additive) |
+| `--untag` | - | - | Tag key to remove (can be specified multiple times) |
+| `--yes` | `-y` | `false` | Skip confirmation prompt |
+
 **Examples:**
 
 ```ShellSession
 user@host:~$ suve sm update my-database-credentials '{"username":"admin","password":"newpassword"}'
+? Update secret my-database-credentials? [y/N] y
 ✓ Updated secret my-database-credentials (version: ghi11111-1234-1234-1234-123456789012)
+```
+
+```bash
+# Update with tags
+suve sm update --tag env=prod my-api-key "new-key-value"
+
+# Update without confirmation
+suve sm update -y my-api-key "new-key-value"
 ```
 
 > [!NOTE]
@@ -439,6 +468,7 @@ suve sm delete [options] <name>
 |--------|-------|---------|-------------|
 | `--force` | `-f` | `false` | Delete immediately without recovery window |
 | `--recovery-window` | - | `30` | Days before permanent deletion (7-30). Ignored if `--force` is set. |
+| `--yes` | `-y` | `false` | Skip confirmation prompt |
 
 **Examples:**
 
@@ -446,6 +476,7 @@ With recovery window (default):
 
 ```ShellSession
 user@host:~$ suve sm delete my-old-secret
+? Delete secret my-old-secret? [y/N] y
 ! Scheduled deletion of secret my-old-secret (deletion date: 2024-02-14)
 ```
 
@@ -536,7 +567,7 @@ The stage file is stored at `~/.suve/stage.json`.
 
 ## suve stage sm add
 
-Stage a new secret or modification.
+Stage a new secret for creation.
 
 ```
 suve stage sm add [options] <name> [value]
@@ -553,7 +584,8 @@ suve stage sm add [options] <name> [value]
 
 | Option | Alias | Default | Description |
 |--------|-------|---------|-------------|
-| `--description` | `-d` | - | Secret description |
+| `--description` | - | - | Secret description |
+| `--tag` | - | - | Tag in key=value format (can be specified multiple times) |
 
 **Examples:**
 
@@ -569,8 +601,8 @@ suve stage sm add my-new-secret '{"key":"value"}'
 # Stage via editor
 suve stage sm add my-new-secret
 
-# Stage with description
-suve stage sm add -d "API key for production" my-api-key "sk-1234567890"
+# Stage with description and tags
+suve stage sm add --description "API key for production" --tag env=prod my-api-key "sk-1234567890"
 ```
 
 ---
@@ -594,7 +626,8 @@ suve stage sm edit [options] <name> [value]
 
 | Option | Alias | Default | Description |
 |--------|-------|---------|-------------|
-| `--delete` | `-d` | `false` | Stage secret for deletion |
+| `--description` | - | - | Secret description |
+| `--tag` | - | - | Tag in key=value format (can be specified multiple times) |
 
 **Behavior:**
 
@@ -617,8 +650,8 @@ suve stage sm edit my-database-credentials
 # Edit with inline value
 suve stage sm edit my-database-credentials '{"username":"admin","password":"newpassword"}'
 
-# Stage for deletion
-suve stage sm edit --delete my-old-secret
+# Edit with tags
+suve stage sm edit --tag env=prod my-database-credentials '{"password":"new"}'
 ```
 
 ---
@@ -628,14 +661,38 @@ suve stage sm edit --delete my-old-secret
 Stage a secret for deletion.
 
 ```
-suve stage sm delete <name>
+suve stage sm delete [options] <name>
 ```
+
+**Arguments:**
+
+| Argument | Description |
+|----------|-------------|
+| `name` | Secret name to stage for deletion |
+
+**Options:**
+
+| Option | Alias | Default | Description |
+|--------|-------|---------|-------------|
+| `--force` | - | `false` | Force immediate deletion without recovery window |
+| `--recovery-window` | - | `30` | Days before permanent deletion (7-30) |
 
 **Examples:**
 
 ```ShellSession
 user@host:~$ suve stage sm delete my-old-secret
 ✓ Staged for deletion: my-old-secret
+```
+
+```bash
+# Stage for deletion with default 30-day recovery
+suve stage sm delete my-old-secret
+
+# Stage for deletion with 7-day recovery
+suve stage sm delete --recovery-window 7 my-old-secret
+
+# Stage for immediate deletion
+suve stage sm delete --force my-old-secret
 ```
 
 ---
@@ -645,8 +702,20 @@ user@host:~$ suve stage sm delete my-old-secret
 Show staged changes for Secrets Manager secrets.
 
 ```
-suve stage sm status
+suve stage sm status [options] [name]
 ```
+
+**Arguments:**
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `name` | No | Specific secret name to show |
+
+**Options:**
+
+| Option | Alias | Default | Description |
+|--------|-------|---------|-------------|
+| `--verbose` | `-v` | `false` | Show detailed information including values |
 
 **Examples:**
 
@@ -742,12 +811,16 @@ suve stage sm push [options] [name]
 | Option | Alias | Default | Description |
 |--------|-------|---------|-------------|
 | `--yes` | `-y` | `false` | Skip confirmation prompt |
+| `--ignore-conflicts` | - | `false` | Push even if AWS was modified after staging |
+
+> [!NOTE]
+> Before pushing, suve checks if the AWS resource was modified after staging. If a conflict is detected, the push is rejected to prevent lost updates. Use `--ignore-conflicts` to force push despite conflicts.
 
 **Behavior:**
 
 1. Reads all staged SM changes
 2. For each `set` operation: calls UpdateSecret (or CreateSecret if new)
-3. For each `delete` operation: calls DeleteSecret with force
+3. For each `delete` operation: calls DeleteSecret
 4. Removes successfully applied changes from stage
 5. Keeps failed changes in stage for retry
 
@@ -768,17 +841,31 @@ Pushing Secrets Manager secrets...
 
 ## suve stage sm reset
 
-Unstage Secrets Manager changes.
+Unstage Secrets Manager changes or restore to a specific version.
 
 ```
-suve stage sm reset [name]
+suve stage sm reset [options] [spec]
 ```
 
 **Arguments:**
 
 | Argument | Required | Description |
 |----------|----------|-------------|
-| `name` | No | Specific secret to unstage (if omitted, unstages all) |
+| `spec` | No | Secret name with optional version specifier |
+
+**Options:**
+
+| Option | Alias | Default | Description |
+|--------|-------|---------|-------------|
+| `--all` | - | `false` | Unstage all SM secrets |
+
+**Version Specifiers:**
+
+| Specifier | Description |
+|-----------|-------------|
+| `<name>` | Unstage secret (remove from staging) |
+| `<name>#<ver>` | Restore to specific version |
+| `<name>~1` | Restore to 1 version ago |
 
 **Examples:**
 
@@ -786,8 +873,22 @@ suve stage sm reset [name]
 user@host:~$ suve stage sm reset my-database-credentials
 Unstaged my-database-credentials
 
-user@host:~$ suve stage sm reset
+user@host:~$ suve stage sm reset --all
 Unstaged all SM changes
+```
+
+```bash
+# Unstage specific secret
+suve stage sm reset my-database-credentials
+
+# Restore to specific version and stage
+suve stage sm reset my-database-credentials#abc12345
+
+# Restore to previous version and stage
+suve stage sm reset my-database-credentials~1
+
+# Unstage all SM secrets
+suve stage sm reset --all
 ```
 
 > [!TIP]

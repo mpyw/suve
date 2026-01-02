@@ -51,7 +51,7 @@ suve/
 │   ├── cli/
 │   │   ├── app.go             # urfave/cli v2 app definition
 │   │   ├── ssm/               # SSM subcommands (cat, delete, diff, log, ls, set, show)
-│   │   └── sm/                # SM subcommands (cat, create, delete, diff, log, ls, restore, set, show)
+│   │   └── sm/                # SM subcommands (cat, create, delete, diff, log, ls, restore, show, update)
 │   │
 │   ├── api/
 │   │   ├── ssmapi/            # SSM API interface (for testing)
