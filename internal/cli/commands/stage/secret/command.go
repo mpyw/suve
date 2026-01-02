@@ -22,7 +22,7 @@ func Command() *cli.Command {
 		Name:    "secret",
 		Aliases: []string{"sm"},
 		Usage:   "Staging operations for Secrets Manager",
-		Description: `Stage changes locally before pushing to AWS.
+		Description: `Stage changes locally before applying to AWS.
 
 Use 'suve stage secret add' to create and stage a new secret.
 Use 'suve stage secret edit' to edit and stage an existing secret.
@@ -37,7 +37,7 @@ Use 'suve stage secret reset' to unstage or restore from a version.`,
 			runner.NewDeleteCommand(config),
 			runner.NewStatusCommand(config),
 			runner.NewDiffCommand(config),
-			runner.NewPushCommand(config),
+			runner.NewApplyCommand(config),
 			runner.NewResetCommand(config),
 		},
 		CommandNotFound: cliinternal.CommandNotFound,

@@ -56,21 +56,21 @@ func (s *SecretStrategy) HasDeleteOptions() bool {
 	return true
 }
 
-// Push applies a staged operation to AWS Secrets Manager.
-func (s *SecretStrategy) Push(ctx context.Context, name string, entry Entry) error {
+// Apply applies a staged operation to AWS Secrets Manager.
+func (s *SecretStrategy) Apply(ctx context.Context, name string, entry Entry) error {
 	switch entry.Operation {
 	case OperationCreate:
-		return s.pushCreate(ctx, name, entry)
+		return s.applyCreate(ctx, name, entry)
 	case OperationUpdate:
-		return s.pushUpdate(ctx, name, entry)
+		return s.applyUpdate(ctx, name, entry)
 	case OperationDelete:
-		return s.pushDelete(ctx, name, entry)
+		return s.applyDelete(ctx, name, entry)
 	default:
 		return fmt.Errorf("unknown operation: %s", entry.Operation)
 	}
 }
 
-func (s *SecretStrategy) pushCreate(ctx context.Context, name string, entry Entry) error {
+func (s *SecretStrategy) applyCreate(ctx context.Context, name string, entry Entry) error {
 	input := &secretapi.CreateSecretInput{
 		Name:         lo.ToPtr(name),
 		SecretString: lo.ToPtr(entry.Value),
@@ -95,7 +95,7 @@ func (s *SecretStrategy) pushCreate(ctx context.Context, name string, entry Entr
 	return nil
 }
 
-func (s *SecretStrategy) pushUpdate(ctx context.Context, name string, entry Entry) error {
+func (s *SecretStrategy) applyUpdate(ctx context.Context, name string, entry Entry) error {
 	// Update secret value
 	_, err := s.Client.PutSecretValue(ctx, &secretapi.PutSecretValueInput{
 		SecretId:     lo.ToPtr(name),
@@ -132,7 +132,7 @@ func (s *SecretStrategy) pushUpdate(ctx context.Context, name string, entry Entr
 	return nil
 }
 
-func (s *SecretStrategy) pushDelete(ctx context.Context, name string, entry Entry) error {
+func (s *SecretStrategy) applyDelete(ctx context.Context, name string, entry Entry) error {
 	input := &secretapi.DeleteSecretInput{
 		SecretId: lo.ToPtr(name),
 	}

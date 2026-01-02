@@ -22,7 +22,7 @@ func Command() *cli.Command {
 		Name:    "param",
 		Aliases: []string{"ssm", "ps"},
 		Usage:   "Staging operations for SSM Parameter Store parameters",
-		Description: `Stage changes locally before pushing to AWS.
+		Description: `Stage changes locally before applying to AWS.
 
 Use 'suve stage param add' to create and stage a new parameter.
 Use 'suve stage param edit' to edit and stage an existing parameter.
@@ -37,7 +37,7 @@ Use 'suve stage param reset' to unstage or restore from a version.`,
 			runner.NewDeleteCommand(config),
 			runner.NewStatusCommand(config),
 			runner.NewDiffCommand(config),
-			runner.NewPushCommand(config),
+			runner.NewApplyCommand(config),
 			runner.NewResetCommand(config),
 		},
 		CommandNotFound: cliinternal.CommandNotFound,

@@ -5,9 +5,9 @@ import (
 	"github.com/urfave/cli/v3"
 
 	cliinternal "github.com/mpyw/suve/internal/cli/commands/internal"
+	"github.com/mpyw/suve/internal/cli/commands/stage/apply"
 	"github.com/mpyw/suve/internal/cli/commands/stage/diff"
 	"github.com/mpyw/suve/internal/cli/commands/stage/param"
-	"github.com/mpyw/suve/internal/cli/commands/stage/push"
 	"github.com/mpyw/suve/internal/cli/commands/stage/reset"
 	"github.com/mpyw/suve/internal/cli/commands/stage/secret"
 	"github.com/mpyw/suve/internal/cli/commands/stage/status"
@@ -18,7 +18,7 @@ func Command() *cli.Command {
 	return &cli.Command{
 		Name:  "stage",
 		Usage: "Manage staged changes for AWS Parameter Store and Secrets Manager",
-		Description: `Stage changes locally before pushing to AWS.
+		Description: `Stage changes locally before applying to AWS.
 
 Use 'suve stage param' for SSM Parameter Store operations.
 Use 'suve stage secret' for Secrets Manager operations.
@@ -39,7 +39,7 @@ EXAMPLES:
 			secret.Command(),
 			status.Command(),
 			diff.Command(),
-			push.Command(),
+			apply.Command(),
 			reset.Command(),
 		},
 		CommandNotFound: cliinternal.CommandNotFound,

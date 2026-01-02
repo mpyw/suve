@@ -1,5 +1,5 @@
-// Package push provides the global push command for applying all staged changes.
-package push
+// Package apply provides the global apply command for applying all staged changes.
+package apply
 
 import (
 	"context"
@@ -14,10 +14,10 @@ import (
 	"github.com/mpyw/suve/internal/staging"
 )
 
-// Runner executes the push command.
+// Runner executes the apply command.
 type Runner struct {
-	ParamStrategy  staging.PushStrategy
-	SecretStrategy staging.PushStrategy
+	ParamStrategy  staging.ApplyStrategy
+	SecretStrategy staging.ApplyStrategy
 	Store          *staging.Store
 	Stdout         io.Writer
 	Stderr         io.Writer
@@ -92,7 +92,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	return r.Run(ctx)
 }
 
-// Run executes the push command.
+// Run executes the apply command.
 func (r *Runner) Run(ctx context.Context) error {
 	// Get all staged changes (empty string means all services)
 	allStaged, err := r.Store.List("")
@@ -105,36 +105,36 @@ func (r *Runner) Run(ctx context.Context) error {
 
 	var totalSucceeded, totalFailed int
 
-	// Push SSM Parameter Store changes
+	// Apply SSM Parameter Store changes
 	if len(paramStaged) > 0 {
-		_, _ = fmt.Fprintln(r.Stdout, "Pushing SSM Parameter Store parameters...")
-		succeeded, failed := r.pushService(ctx, r.ParamStrategy, paramStaged)
+		_, _ = fmt.Fprintln(r.Stdout, "Applying SSM Parameter Store parameters...")
+		succeeded, failed := r.applyService(ctx, r.ParamStrategy, paramStaged)
 		totalSucceeded += succeeded
 		totalFailed += failed
 	}
 
-	// Push Secrets Manager changes
+	// Apply Secrets Manager changes
 	if len(secretStaged) > 0 {
-		_, _ = fmt.Fprintln(r.Stdout, "Pushing Secrets Manager secrets...")
-		succeeded, failed := r.pushService(ctx, r.SecretStrategy, secretStaged)
+		_, _ = fmt.Fprintln(r.Stdout, "Applying Secrets Manager secrets...")
+		succeeded, failed := r.applyService(ctx, r.SecretStrategy, secretStaged)
 		totalSucceeded += succeeded
 		totalFailed += failed
 	}
 
 	// Summary
 	if totalFailed > 0 {
-		return fmt.Errorf("pushed %d, failed %d", totalSucceeded, totalFailed)
+		return fmt.Errorf("applied %d, failed %d", totalSucceeded, totalFailed)
 	}
 
 	return nil
 }
 
-func (r *Runner) pushService(ctx context.Context, strat staging.PushStrategy, staged map[string]staging.Entry) (succeeded, failed int) {
+func (r *Runner) applyService(ctx context.Context, strat staging.ApplyStrategy, staged map[string]staging.Entry) (succeeded, failed int) {
 	service := strat.Service()
 	serviceName := strat.ServiceName()
 
 	results := parallel.ExecuteMap(ctx, staged, func(ctx context.Context, name string, entry staging.Entry) (staging.Operation, error) {
-		err := strat.Push(ctx, name, entry)
+		err := strat.Apply(ctx, name, entry)
 		return entry.Operation, err
 	})
 

@@ -315,8 +315,8 @@ EXAMPLES:
 	}
 }
 
-// NewPushCommand creates an apply command with the given config.
-func NewPushCommand(cfg CommandConfig) *cli.Command {
+// NewApplyCommand creates an apply command with the given config.
+func NewApplyCommand(cfg CommandConfig) *cli.Command {
 	return &cli.Command{
 		Name:      "apply",
 		Aliases:   []string{"push"},
@@ -365,7 +365,7 @@ EXAMPLES:
 				return fmt.Errorf("failed to initialize stage store: %w", err)
 			}
 
-			// Get entries to show what will be pushed
+			// Get entries to show what will be applied
 			parser := cfg.ParserFactory()
 			service := parser.Service()
 			entries, err := store.List(service)
@@ -380,7 +380,7 @@ EXAMPLES:
 			}
 
 			// Filter by name if specified
-			opts := PushOptions{
+			opts := ApplyOptions{
 				IgnoreConflicts: cmd.Bool("ignore-conflicts"),
 			}
 			if cmd.Args().Len() > 0 {
@@ -390,7 +390,7 @@ EXAMPLES:
 				}
 			}
 
-			// Confirm push
+			// Confirm apply
 			skipConfirm := cmd.Bool("yes")
 			prompter := &confirm.Prompter{
 				Stdin:  os.Stdin,
@@ -418,7 +418,7 @@ EXAMPLES:
 				return err
 			}
 
-			r := &PushRunner{
+			r := &ApplyRunner{
 				Strategy: strat,
 				Store:    store,
 				Stdout:   cmd.Root().Writer,

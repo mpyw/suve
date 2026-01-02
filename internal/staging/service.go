@@ -39,13 +39,13 @@ type Parser interface {
 // ParserFactory creates a Parser without AWS client.
 type ParserFactory func() Parser
 
-// PushStrategy defines service-specific push operations.
-type PushStrategy interface {
+// ApplyStrategy defines service-specific apply operations.
+type ApplyStrategy interface {
 	ServiceStrategy
 
-	// Push applies a staged operation to AWS.
+	// Apply applies a staged operation to AWS.
 	// Handles OperationCreate, OperationUpdate, and OperationDelete based on entry.Operation.
-	Push(ctx context.Context, name string, entry Entry) error
+	Apply(ctx context.Context, name string, entry Entry) error
 
 	// FetchLastModified returns the last modified time of the resource in AWS.
 	// Returns zero time if the resource doesn't exist (for create operations).
@@ -88,7 +88,7 @@ type ResetStrategy interface {
 // FullStrategy combines all service-specific strategy interfaces.
 // This enables unified stage commands that work with either SSM Parameter Store or Secrets Manager.
 type FullStrategy interface {
-	PushStrategy
+	ApplyStrategy
 	DiffStrategy
 	EditStrategy
 	ResetStrategy

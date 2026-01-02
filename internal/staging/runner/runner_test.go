@@ -31,7 +31,7 @@ type fullMockStrategy struct {
 	fetchVersionErr      error
 	fetchVersionVal      string
 	fetchVersionLbl      string
-	pushErr              error
+	applyErr             error
 	fetchLastModifiedVal time.Time
 }
 
@@ -72,8 +72,8 @@ func (m *fullMockStrategy) FetchVersion(_ context.Context, _ string) (string, st
 	}
 	return m.fetchVersionVal, m.fetchVersionLbl, nil
 }
-func (m *fullMockStrategy) Push(_ context.Context, _ string, _ staging.Entry) error {
-	return m.pushErr
+func (m *fullMockStrategy) Apply(_ context.Context, _ string, _ staging.Entry) error {
+	return m.applyErr
 }
 func (m *fullMockStrategy) FetchLastModified(_ context.Context, _ string) (time.Time, error) {
 	return m.fetchLastModifiedVal, nil
@@ -784,10 +784,10 @@ func TestEditRunner_Run(t *testing.T) {
 // PushRunner Tests
 // =============================================================================
 
-func TestPushRunner_Run(t *testing.T) {
+func TestApplyRunner_Run(t *testing.T) {
 	t.Parallel()
 
-	t.Run("push all - success", func(t *testing.T) {
+	t.Run("apply all - success", func(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
@@ -808,14 +808,14 @@ func TestPushRunner_Run(t *testing.T) {
 		})
 
 		var stdout, stderr bytes.Buffer
-		r := &runner.PushRunner{
+		r := &runner.ApplyRunner{
 			Strategy: &fullMockStrategy{service: staging.ServiceParam},
 			Store:    store,
 			Stdout:   &stdout,
 			Stderr:   &stderr,
 		}
 
-		err := r.Run(context.Background(), runner.PushOptions{})
+		err := r.Run(context.Background(), runner.ApplyOptions{})
 		require.NoError(t, err)
 		output := stdout.String()
 		assert.Contains(t, output, "Created")
@@ -831,7 +831,7 @@ func TestPushRunner_Run(t *testing.T) {
 		assert.ErrorIs(t, err, staging.ErrNotStaged)
 	})
 
-	t.Run("push single - success", func(t *testing.T) {
+	t.Run("apply single - success", func(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
@@ -848,14 +848,14 @@ func TestPushRunner_Run(t *testing.T) {
 		})
 
 		var stdout, stderr bytes.Buffer
-		r := &runner.PushRunner{
+		r := &runner.ApplyRunner{
 			Strategy: &fullMockStrategy{service: staging.ServiceParam},
 			Store:    store,
 			Stdout:   &stdout,
 			Stderr:   &stderr,
 		}
 
-		err := r.Run(context.Background(), runner.PushOptions{Name: "/app/config1"})
+		err := r.Run(context.Background(), runner.ApplyOptions{Name: "/app/config1"})
 		require.NoError(t, err)
 
 		// Only config1 should be unstaged
@@ -865,7 +865,7 @@ func TestPushRunner_Run(t *testing.T) {
 		assert.NoError(t, err) // Still staged
 	})
 
-	t.Run("push single - not staged", func(t *testing.T) {
+	t.Run("apply single - not staged", func(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
@@ -878,38 +878,38 @@ func TestPushRunner_Run(t *testing.T) {
 		})
 
 		var stdout, stderr bytes.Buffer
-		r := &runner.PushRunner{
+		r := &runner.ApplyRunner{
 			Strategy: &fullMockStrategy{service: staging.ServiceParam},
 			Store:    store,
 			Stdout:   &stdout,
 			Stderr:   &stderr,
 		}
 
-		err := r.Run(context.Background(), runner.PushOptions{Name: "/app/config"})
+		err := r.Run(context.Background(), runner.ApplyOptions{Name: "/app/config"})
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "not staged")
 	})
 
-	t.Run("push - nothing staged", func(t *testing.T) {
+	t.Run("apply - nothing staged", func(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
 		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 		var stdout, stderr bytes.Buffer
-		r := &runner.PushRunner{
+		r := &runner.ApplyRunner{
 			Strategy: &fullMockStrategy{service: staging.ServiceParam},
 			Store:    store,
 			Stdout:   &stdout,
 			Stderr:   &stderr,
 		}
 
-		err := r.Run(context.Background(), runner.PushOptions{})
+		err := r.Run(context.Background(), runner.ApplyOptions{})
 		require.NoError(t, err)
 		assert.Contains(t, stdout.String(), "No")
 	})
 
-	t.Run("push - with failures", func(t *testing.T) {
+	t.Run("apply - with failures", func(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
@@ -921,17 +921,17 @@ func TestPushRunner_Run(t *testing.T) {
 		})
 
 		var stdout, stderr bytes.Buffer
-		r := &runner.PushRunner{
-			Strategy: &fullMockStrategy{service: staging.ServiceParam, pushErr: errors.New("push failed")},
+		r := &runner.ApplyRunner{
+			Strategy: &fullMockStrategy{service: staging.ServiceParam, applyErr: errors.New("apply failed")},
 			Store:    store,
 			Stdout:   &stdout,
 			Stderr:   &stderr,
 		}
 
-		err := r.Run(context.Background(), runner.PushOptions{})
+		err := r.Run(context.Background(), runner.ApplyOptions{})
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "failed 1")
-		assert.Contains(t, stderr.String(), "push failed")
+		assert.Contains(t, stderr.String(), "apply failed")
 	})
 }
 
@@ -1171,7 +1171,7 @@ func TestRunners_SecretService(t *testing.T) {
 		assert.Contains(t, stdout.String(), "my-secret")
 	})
 
-	t.Run("push runner with Secrets Manager", func(t *testing.T) {
+	t.Run("apply runner with Secrets Manager", func(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
@@ -1183,14 +1183,14 @@ func TestRunners_SecretService(t *testing.T) {
 		})
 
 		var stdout, stderr bytes.Buffer
-		r := &runner.PushRunner{
+		r := &runner.ApplyRunner{
 			Strategy: &fullMockStrategy{service: staging.ServiceSecret},
 			Store:    store,
 			Stdout:   &stdout,
 			Stderr:   &stderr,
 		}
 
-		err := r.Run(context.Background(), runner.PushOptions{})
+		err := r.Run(context.Background(), runner.ApplyOptions{})
 		require.NoError(t, err)
 		assert.Contains(t, stdout.String(), "Updated")
 	})

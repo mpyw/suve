@@ -106,7 +106,7 @@ func TestSecretStrategy_BasicMethods(t *testing.T) {
 	})
 }
 
-func TestSecretStrategy_Push(t *testing.T) {
+func TestSecretStrategy_Apply(t *testing.T) {
 	t.Parallel()
 
 	t.Run("create operation", func(t *testing.T) {
@@ -120,7 +120,7 @@ func TestSecretStrategy_Push(t *testing.T) {
 		}
 
 		s := staging.NewSecretStrategy(mock)
-		err := s.Push(context.Background(), "my-secret", staging.Entry{
+		err := s.Apply(context.Background(), "my-secret", staging.Entry{
 			Operation: staging.OperationCreate,
 			Value:     "secret-value",
 		})
@@ -136,7 +136,7 @@ func TestSecretStrategy_Push(t *testing.T) {
 		}
 
 		s := staging.NewSecretStrategy(mock)
-		err := s.Push(context.Background(), "my-secret", staging.Entry{
+		err := s.Apply(context.Background(), "my-secret", staging.Entry{
 			Operation: staging.OperationCreate,
 			Value:     "secret-value",
 		})
@@ -155,7 +155,7 @@ func TestSecretStrategy_Push(t *testing.T) {
 		}
 
 		s := staging.NewSecretStrategy(mock)
-		err := s.Push(context.Background(), "my-secret", staging.Entry{
+		err := s.Apply(context.Background(), "my-secret", staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     "updated-value",
 		})
@@ -171,7 +171,7 @@ func TestSecretStrategy_Push(t *testing.T) {
 		}
 
 		s := staging.NewSecretStrategy(mock)
-		err := s.Push(context.Background(), "my-secret", staging.Entry{
+		err := s.Apply(context.Background(), "my-secret", staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     "updated-value",
 		})
@@ -191,7 +191,7 @@ func TestSecretStrategy_Push(t *testing.T) {
 		}
 
 		s := staging.NewSecretStrategy(mock)
-		err := s.Push(context.Background(), "my-secret", staging.Entry{
+		err := s.Apply(context.Background(), "my-secret", staging.Entry{
 			Operation: staging.OperationDelete,
 		})
 		require.NoError(t, err)
@@ -207,7 +207,7 @@ func TestSecretStrategy_Push(t *testing.T) {
 		}
 
 		s := staging.NewSecretStrategy(mock)
-		err := s.Push(context.Background(), "my-secret", staging.Entry{
+		err := s.Apply(context.Background(), "my-secret", staging.Entry{
 			Operation: staging.OperationDelete,
 			DeleteOptions: &staging.DeleteOptions{
 				Force: true,
@@ -227,7 +227,7 @@ func TestSecretStrategy_Push(t *testing.T) {
 		}
 
 		s := staging.NewSecretStrategy(mock)
-		err := s.Push(context.Background(), "my-secret", staging.Entry{
+		err := s.Apply(context.Background(), "my-secret", staging.Entry{
 			Operation: staging.OperationDelete,
 			DeleteOptions: &staging.DeleteOptions{
 				RecoveryWindow: 14,
@@ -245,7 +245,7 @@ func TestSecretStrategy_Push(t *testing.T) {
 		}
 
 		s := staging.NewSecretStrategy(mock)
-		err := s.Push(context.Background(), "my-secret", staging.Entry{
+		err := s.Apply(context.Background(), "my-secret", staging.Entry{
 			Operation: staging.OperationDelete,
 		})
 		require.Error(t, err)
@@ -255,7 +255,7 @@ func TestSecretStrategy_Push(t *testing.T) {
 	t.Run("unknown operation", func(t *testing.T) {
 		t.Parallel()
 		s := staging.NewSecretStrategy(&secretMockClient{})
-		err := s.Push(context.Background(), "my-secret", staging.Entry{
+		err := s.Apply(context.Background(), "my-secret", staging.Entry{
 			Operation: staging.Operation("unknown"),
 		})
 		require.Error(t, err)

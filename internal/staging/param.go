@@ -54,19 +54,19 @@ func (s *ParamStrategy) HasDeleteOptions() bool {
 	return false
 }
 
-// Push applies a staged operation to AWS SSM Parameter Store.
-func (s *ParamStrategy) Push(ctx context.Context, name string, entry Entry) error {
+// Apply applies a staged operation to AWS SSM Parameter Store.
+func (s *ParamStrategy) Apply(ctx context.Context, name string, entry Entry) error {
 	switch entry.Operation {
 	case OperationCreate, OperationUpdate:
-		return s.pushSet(ctx, name, entry)
+		return s.applySet(ctx, name, entry)
 	case OperationDelete:
-		return s.pushDelete(ctx, name)
+		return s.applyDelete(ctx, name)
 	default:
 		return fmt.Errorf("unknown operation: %s", entry.Operation)
 	}
 }
 
-func (s *ParamStrategy) pushSet(ctx context.Context, name string, entry Entry) error {
+func (s *ParamStrategy) applySet(ctx context.Context, name string, entry Entry) error {
 	// Try to get existing parameter to preserve type
 	paramType := paramapi.ParameterTypeString
 	existing, err := s.Client.GetParameter(ctx, &paramapi.GetParameterInput{
@@ -112,7 +112,7 @@ func (s *ParamStrategy) pushSet(ctx context.Context, name string, entry Entry) e
 	return nil
 }
 
-func (s *ParamStrategy) pushDelete(ctx context.Context, name string) error {
+func (s *ParamStrategy) applyDelete(ctx context.Context, name string) error {
 	_, err := s.Client.DeleteParameter(ctx, &paramapi.DeleteParameterInput{
 		Name: lo.ToPtr(name),
 	})

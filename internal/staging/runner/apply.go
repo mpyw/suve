@@ -13,22 +13,22 @@ import (
 	"github.com/mpyw/suve/internal/staging"
 )
 
-// PushRunner executes push operations using a strategy.
-type PushRunner struct {
-	Strategy staging.PushStrategy
+// ApplyRunner executes apply operations using a strategy.
+type ApplyRunner struct {
+	Strategy staging.ApplyStrategy
 	Store    *staging.Store
 	Stdout   io.Writer
 	Stderr   io.Writer
 }
 
-// PushOptions holds options for the push command.
-type PushOptions struct {
-	Name            string // Optional: push only this item, otherwise push all
-	IgnoreConflicts bool   // Skip conflict detection and force push
+// ApplyOptions holds options for the apply command.
+type ApplyOptions struct {
+	Name            string // Optional: apply only this item, otherwise apply all
+	IgnoreConflicts bool   // Skip conflict detection and force apply
 }
 
-// Run executes the push command.
-func (r *PushRunner) Run(ctx context.Context, opts PushOptions) error {
+// Run executes the apply command.
+func (r *ApplyRunner) Run(ctx context.Context, opts ApplyOptions) error {
 	service := r.Strategy.Service()
 	itemName := r.Strategy.ItemName()
 
@@ -59,13 +59,13 @@ func (r *PushRunner) Run(ctx context.Context, opts PushOptions) error {
 			for _, name := range maputil.SortedKeys(conflicts) {
 				output.Warning(r.Stderr, "conflict detected for %s: AWS was modified after staging", name)
 			}
-			return fmt.Errorf("push rejected: %d conflict(s) detected (use --ignore-conflicts to force)", len(conflicts))
+			return fmt.Errorf("apply rejected: %d conflict(s) detected (use --ignore-conflicts to force)", len(conflicts))
 		}
 	}
 
-	// Execute push operations in parallel
+	// Execute apply operations in parallel
 	results := parallel.ExecuteMap(ctx, entries, func(ctx context.Context, name string, entry staging.Entry) (staging.Operation, error) {
-		err := r.Strategy.Push(ctx, name, entry)
+		err := r.Strategy.Apply(ctx, name, entry)
 		return entry.Operation, err
 	})
 
@@ -93,7 +93,7 @@ func (r *PushRunner) Run(ctx context.Context, opts PushOptions) error {
 	}
 
 	if failed > 0 {
-		return fmt.Errorf("pushed %d, failed %d", succeeded, failed)
+		return fmt.Errorf("applied %d, failed %d", succeeded, failed)
 	}
 
 	return nil
@@ -101,7 +101,7 @@ func (r *PushRunner) Run(ctx context.Context, opts PushOptions) error {
 
 // checkConflicts checks if AWS resources were modified after staging.
 // Returns a map of names that have conflicts.
-func (r *PushRunner) checkConflicts(ctx context.Context, entries map[string]staging.Entry) map[string]struct{} {
+func (r *ApplyRunner) checkConflicts(ctx context.Context, entries map[string]staging.Entry) map[string]struct{} {
 	conflicts := make(map[string]struct{})
 
 	// Only check Update and Delete operations (Create has nothing to conflict with)
@@ -124,7 +124,7 @@ func (r *PushRunner) checkConflicts(ctx context.Context, entries map[string]stag
 	// Check for conflicts
 	for name, result := range results {
 		if result.Err != nil {
-			// If we can't fetch, assume no conflict (will fail on push anyway)
+			// If we can't fetch, assume no conflict (will fail on apply anyway)
 			continue
 		}
 

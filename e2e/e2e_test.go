@@ -43,7 +43,7 @@ import (
 	paramshow "github.com/mpyw/suve/internal/cli/commands/param/show"
 	globalstage "github.com/mpyw/suve/internal/cli/commands/stage"
 	globaldiff "github.com/mpyw/suve/internal/cli/commands/stage/diff"
-	globalpush "github.com/mpyw/suve/internal/cli/commands/stage/push"
+	globalapply "github.com/mpyw/suve/internal/cli/commands/stage/apply"
 	globalreset "github.com/mpyw/suve/internal/cli/commands/stage/reset"
 	secretstage "github.com/mpyw/suve/internal/cli/commands/stage/secret"
 	paramstage "github.com/mpyw/suve/internal/cli/commands/stage/param"
@@ -402,11 +402,11 @@ func TestParam_StagingWorkflow(t *testing.T) {
 	})
 
 	// 5. Push - apply staged changes (with -y to skip confirmation, --ignore-conflicts since we staged directly)
-	t.Run("push", func(t *testing.T) {
+	t.Run("apply", func(t *testing.T) {
 		stdout, _, err := runSubCommand(t, paramstage.Command(), "apply", "--yes", "--ignore-conflicts")
 		require.NoError(t, err)
 		assert.Contains(t, stdout, paramName)
-		t.Logf("push output: %s", stdout)
+		t.Logf("apply output: %s", stdout)
 	})
 
 	// 6. Verify - check the value was applied
@@ -416,8 +416,8 @@ func TestParam_StagingWorkflow(t *testing.T) {
 		assert.Equal(t, "staged-value", stdout)
 	})
 
-	// 7. Status after push - should be empty
-	t.Run("status-after-push", func(t *testing.T) {
+	// 7. Status after apply - should be empty
+	t.Run("status-after-apply", func(t *testing.T) {
 		stdout, _, err := runSubCommand(t, paramstage.Command(), "status")
 		require.NoError(t, err)
 		assert.NotContains(t, stdout, paramName)
@@ -493,7 +493,7 @@ func TestParam_StagingAdd(t *testing.T) {
 	})
 
 	// 3. Push to create
-	t.Run("push", func(t *testing.T) {
+	t.Run("apply", func(t *testing.T) {
 		_, _, err := runSubCommand(t, paramstage.Command(), "apply", "--yes")
 		require.NoError(t, err)
 	})
@@ -551,7 +551,7 @@ func TestParam_StagingResetWithVersion(t *testing.T) {
 	})
 
 	// 4. Push to apply (use --ignore-conflicts for robustness in test environment)
-	t.Run("push", func(t *testing.T) {
+	t.Run("apply", func(t *testing.T) {
 		_, _, err := runSubCommand(t, paramstage.Command(), "apply", "--yes", "--ignore-conflicts")
 		require.NoError(t, err)
 	})
@@ -622,13 +622,13 @@ func TestParam_StagingResetAll(t *testing.T) {
 	})
 }
 
-// TestParam_StagingPushSingle tests pushing a single parameter.
-func TestParam_StagingPushSingle(t *testing.T) {
+// TestParam_StagingApplySingle tests applying a single parameter.
+func TestParam_StagingApplySingle(t *testing.T) {
 	setupEnv(t)
 	tmpHome := setupTempHome(t)
 
-	param1 := "/suve-e2e-staging/push-single/param1"
-	param2 := "/suve-e2e-staging/push-single/param2"
+	param1 := "/suve-e2e-staging/apply-single/param1"
+	param2 := "/suve-e2e-staging/apply-single/param2"
 
 	// Cleanup
 	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", param1)
@@ -656,7 +656,7 @@ func TestParam_StagingPushSingle(t *testing.T) {
 	})
 
 	// Push only param1 (use --ignore-conflicts since we staged without original version)
-	t.Run("push-single", func(t *testing.T) {
+	t.Run("apply-single", func(t *testing.T) {
 		_, _, err := runSubCommand(t, paramstage.Command(), "apply", "--yes", "--ignore-conflicts", param1)
 		require.NoError(t, err)
 	})
@@ -669,12 +669,12 @@ func TestParam_StagingPushSingle(t *testing.T) {
 
 		stdout, _, err = runCommand(t, paramshow.Command(), "--raw", param2)
 		require.NoError(t, err)
-		assert.Equal(t, "original2", stdout) // Not pushed yet
+		assert.Equal(t, "original2", stdout) // Not applied yet
 
 		// param2 should still be staged
 		stdout, _, err = runSubCommand(t, paramstage.Command(), "status")
 		require.NoError(t, err)
-		assert.NotContains(t, stdout, param1) // Already pushed
+		assert.NotContains(t, stdout, param1) // Already applied
 		assert.Contains(t, stdout, param2)    // Still staged
 	})
 }
@@ -925,7 +925,7 @@ func TestSecret_StagingWorkflow(t *testing.T) {
 	})
 
 	// 5. Push
-	t.Run("push", func(t *testing.T) {
+	t.Run("apply", func(t *testing.T) {
 		_, _, err := runSubCommand(t, secretstage.Command(), "apply", "--yes")
 		require.NoError(t, err)
 	})
@@ -952,7 +952,7 @@ func TestSecret_StagingWorkflow(t *testing.T) {
 	})
 
 	// 9. Push delete
-	t.Run("push-delete", func(t *testing.T) {
+	t.Run("apply-delete", func(t *testing.T) {
 		_, _, err := runSubCommand(t, secretstage.Command(), "apply", "--yes")
 		require.NoError(t, err)
 	})
@@ -1054,13 +1054,13 @@ func TestGlobal_StageWorkflow(t *testing.T) {
 		t.Logf("global diff output: %s", stdout)
 	})
 
-	// 3. Global push applies both (no -y needed, it doesn't have confirmation)
-	t.Run("global-push", func(t *testing.T) {
-		stdout, _, err := runCommand(t, globalpush.Command())
+	// 3. Global apply applies both (no -y needed, it doesn't have confirmation)
+	t.Run("global-apply", func(t *testing.T) {
+		stdout, _, err := runCommand(t, globalapply.Command())
 		require.NoError(t, err)
 		assert.Contains(t, stdout, paramName)
 		assert.Contains(t, stdout, secretName)
-		t.Logf("global push output: %s", stdout)
+		t.Logf("global apply output: %s", stdout)
 	})
 
 	// 4. Verify both updated
@@ -1229,20 +1229,20 @@ func TestStaging_ErrorCases(t *testing.T) {
 	_ = setupTempHome(t)
 
 	// Push when nothing staged - warning goes to stdout
-	t.Run("push-nothing-staged", func(t *testing.T) {
+	t.Run("apply-nothing-staged", func(t *testing.T) {
 		stdout, _, err := runSubCommand(t, paramstage.Command(), "apply", "--yes")
 		require.NoError(t, err)
 		// Message might say "No SSM Parameter Store changes staged" or similar
 		assert.Contains(t, stdout, "No")
-		t.Logf("push nothing staged output: %s", stdout)
+		t.Logf("apply nothing staged output: %s", stdout)
 	})
 
 	// Push non-existent staged item - the command checks if it's staged first
-	t.Run("push-nonexistent", func(t *testing.T) {
+	t.Run("apply-nonexistent", func(t *testing.T) {
 		_, _, err := runSubCommand(t, paramstage.Command(), "apply", "--yes", "/nonexistent/param")
 		// Should error with "not staged" message
 		if err == nil {
-			t.Log("Note: push with non-staged param didn't error (may be expected behavior)")
+			t.Log("Note: apply with non-staged param didn't error (may be expected behavior)")
 		}
 	})
 
@@ -1391,7 +1391,7 @@ func TestParam_StagingAddViaCLI(t *testing.T) {
 	})
 
 	// 3. Push to create
-	t.Run("push", func(t *testing.T) {
+	t.Run("apply", func(t *testing.T) {
 		_, _, err := runSubCommand(t, paramstage.Command(), "apply", "--yes")
 		require.NoError(t, err)
 	})
@@ -1443,7 +1443,7 @@ func TestParam_StagingAddWithOptions(t *testing.T) {
 	})
 
 	// Push and verify
-	t.Run("push-and-verify", func(t *testing.T) {
+	t.Run("apply-and-verify", func(t *testing.T) {
 		_, _, err := runSubCommand(t, paramstage.Command(), "apply", "--yes")
 		require.NoError(t, err)
 
@@ -1483,7 +1483,7 @@ func TestSecret_StagingAddViaCLI(t *testing.T) {
 	})
 
 	// 3. Push to create
-	t.Run("push", func(t *testing.T) {
+	t.Run("apply", func(t *testing.T) {
 		_, _, err := runSubCommand(t, secretstage.Command(), "apply", "--yes")
 		require.NoError(t, err)
 	})
@@ -1524,7 +1524,7 @@ func TestParam_StagingEditViaCLI(t *testing.T) {
 	})
 
 	// 3. Push and verify
-	t.Run("push-and-verify", func(t *testing.T) {
+	t.Run("apply-and-verify", func(t *testing.T) {
 		_, _, err := runSubCommand(t, paramstage.Command(), "apply", "--yes")
 		require.NoError(t, err)
 
@@ -1559,7 +1559,7 @@ func TestParam_StagingDiffViaCLI(t *testing.T) {
 	})
 
 	// 2. Push and setup for update
-	t.Run("push-and-setup", func(t *testing.T) {
+	t.Run("apply-and-setup", func(t *testing.T) {
 		_, _, err := runSubCommand(t, paramstage.Command(), "apply", "--yes")
 		require.NoError(t, err)
 	})

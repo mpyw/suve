@@ -90,7 +90,7 @@ func TestParamStrategy_BasicMethods(t *testing.T) {
 	})
 }
 
-func TestParamStrategy_Push(t *testing.T) {
+func TestParamStrategy_Apply(t *testing.T) {
 	t.Parallel()
 
 	t.Run("create operation - new parameter", func(t *testing.T) {
@@ -108,7 +108,7 @@ func TestParamStrategy_Push(t *testing.T) {
 		}
 
 		s := staging.NewParamStrategy(mock)
-		err := s.Push(context.Background(), "/app/param", staging.Entry{
+		err := s.Apply(context.Background(), "/app/param", staging.Entry{
 			Operation: staging.OperationCreate,
 			Value:     "new-value",
 		})
@@ -134,7 +134,7 @@ func TestParamStrategy_Push(t *testing.T) {
 		}
 
 		s := staging.NewParamStrategy(mock)
-		err := s.Push(context.Background(), "/app/param", staging.Entry{
+		err := s.Apply(context.Background(), "/app/param", staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     "updated-value",
 		})
@@ -151,7 +151,7 @@ func TestParamStrategy_Push(t *testing.T) {
 		}
 
 		s := staging.NewParamStrategy(mock)
-		err := s.Push(context.Background(), "/app/param", staging.Entry{
+		err := s.Apply(context.Background(), "/app/param", staging.Entry{
 			Operation: staging.OperationDelete,
 		})
 		require.NoError(t, err)
@@ -160,7 +160,7 @@ func TestParamStrategy_Push(t *testing.T) {
 	t.Run("unknown operation", func(t *testing.T) {
 		t.Parallel()
 		s := staging.NewParamStrategy(&paramMockClient{})
-		err := s.Push(context.Background(), "/app/param", staging.Entry{
+		err := s.Apply(context.Background(), "/app/param", staging.Entry{
 			Operation: staging.Operation("unknown"),
 		})
 		require.Error(t, err)
@@ -176,7 +176,7 @@ func TestParamStrategy_Push(t *testing.T) {
 		}
 
 		s := staging.NewParamStrategy(mock)
-		err := s.Push(context.Background(), "/app/param", staging.Entry{
+		err := s.Apply(context.Background(), "/app/param", staging.Entry{
 			Operation: staging.OperationCreate,
 			Value:     "value",
 		})
@@ -196,7 +196,7 @@ func TestParamStrategy_Push(t *testing.T) {
 		}
 
 		s := staging.NewParamStrategy(mock)
-		err := s.Push(context.Background(), "/app/param", staging.Entry{
+		err := s.Apply(context.Background(), "/app/param", staging.Entry{
 			Operation: staging.OperationCreate,
 			Value:     "value",
 		})
@@ -213,7 +213,7 @@ func TestParamStrategy_Push(t *testing.T) {
 		}
 
 		s := staging.NewParamStrategy(mock)
-		err := s.Push(context.Background(), "/app/param", staging.Entry{
+		err := s.Apply(context.Background(), "/app/param", staging.Entry{
 			Operation: staging.OperationDelete,
 		})
 		require.Error(t, err)

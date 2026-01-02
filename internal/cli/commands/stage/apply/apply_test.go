@@ -1,4 +1,4 @@
-package push_test
+package apply_test
 
 import (
 	"bytes"
@@ -13,17 +13,17 @@ import (
 	"github.com/stretchr/testify/require"
 
 	appcli "github.com/mpyw/suve/internal/cli/commands"
-	"github.com/mpyw/suve/internal/cli/commands/stage/push"
+	"github.com/mpyw/suve/internal/cli/commands/stage/apply"
 	"github.com/mpyw/suve/internal/staging"
 )
 
-// mockStrategy implements staging.PushStrategy for testing.
+// mockStrategy implements staging.ApplyStrategy for testing.
 type mockStrategy struct {
 	service              staging.Service
 	serviceName          string
 	itemName             string
 	hasDeleteOptions     bool
-	pushFunc             func(ctx context.Context, name string, entry staging.Entry) error
+	applyFunc            func(ctx context.Context, name string, entry staging.Entry) error
 	fetchLastModifiedVal time.Time
 }
 
@@ -32,9 +32,9 @@ func (m *mockStrategy) ServiceName() string      { return m.serviceName }
 func (m *mockStrategy) ItemName() string         { return m.itemName }
 func (m *mockStrategy) HasDeleteOptions() bool   { return m.hasDeleteOptions }
 
-func (m *mockStrategy) Push(ctx context.Context, name string, entry staging.Entry) error {
-	if m.pushFunc != nil {
-		return m.pushFunc(ctx, name, entry)
+func (m *mockStrategy) Apply(ctx context.Context, name string, entry staging.Entry) error {
+	if m.applyFunc != nil {
+		return m.applyFunc(ctx, name, entry)
 	}
 	return nil
 }
@@ -82,7 +82,7 @@ func TestRun_NoChanges(t *testing.T) {
 	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 	var buf bytes.Buffer
-	r := &push.Runner{
+	r := &apply.Runner{
 		ParamStrategy:  newParamStrategy(),
 		SecretStrategy: newSecretStrategy(),
 		Store:          store,
@@ -97,7 +97,7 @@ func TestRun_NoChanges(t *testing.T) {
 	assert.Empty(t, buf.String())
 }
 
-func TestRun_PushBothServices(t *testing.T) {
+func TestRun_ApplyBothServices(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
@@ -121,21 +121,21 @@ func TestRun_PushBothServices(t *testing.T) {
 	secretPutCalled := false
 
 	paramMock := newParamStrategy()
-	paramMock.pushFunc = func(_ context.Context, name string, _ staging.Entry) error {
+	paramMock.applyFunc = func(_ context.Context, name string, _ staging.Entry) error {
 		paramPutCalled = true
 		assert.Equal(t, "/app/config", name)
 		return nil
 	}
 
 	secretMock := newSecretStrategy()
-	secretMock.pushFunc = func(_ context.Context, name string, _ staging.Entry) error {
+	secretMock.applyFunc = func(_ context.Context, name string, _ staging.Entry) error {
 		secretPutCalled = true
 		assert.Equal(t, "my-secret", name)
 		return nil
 	}
 
 	var buf bytes.Buffer
-	r := &push.Runner{
+	r := &apply.Runner{
 		ParamStrategy:  paramMock,
 		SecretStrategy: secretMock,
 		Store:          store,
@@ -147,8 +147,8 @@ func TestRun_PushBothServices(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, paramPutCalled)
 	assert.True(t, secretPutCalled)
-	assert.Contains(t, buf.String(), "Pushing SSM Parameter Store parameters")
-	assert.Contains(t, buf.String(), "Pushing Secrets Manager secrets")
+	assert.Contains(t, buf.String(), "Applying SSM Parameter Store parameters")
+	assert.Contains(t, buf.String(), "Applying Secrets Manager secrets")
 	assert.Contains(t, buf.String(), "SSM Parameter Store: Updated /app/config")
 	assert.Contains(t, buf.String(), "Secrets Manager: Updated my-secret")
 
@@ -159,7 +159,7 @@ func TestRun_PushBothServices(t *testing.T) {
 	assert.Equal(t, staging.ErrNotStaged, err)
 }
 
-func TestRun_PushParamOnly(t *testing.T) {
+func TestRun_ApplyParamOnly(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
@@ -174,13 +174,13 @@ func TestRun_PushParamOnly(t *testing.T) {
 
 	paramPutCalled := false
 	paramMock := newParamStrategy()
-	paramMock.pushFunc = func(_ context.Context, _ string, _ staging.Entry) error {
+	paramMock.applyFunc = func(_ context.Context, _ string, _ staging.Entry) error {
 		paramPutCalled = true
 		return nil
 	}
 
 	var buf bytes.Buffer
-	r := &push.Runner{
+	r := &apply.Runner{
 		ParamStrategy:  paramMock,
 		SecretStrategy: nil, // Should not be needed
 		Store:          store,
@@ -191,11 +191,11 @@ func TestRun_PushParamOnly(t *testing.T) {
 	err := r.Run(context.Background())
 	require.NoError(t, err)
 	assert.True(t, paramPutCalled)
-	assert.Contains(t, buf.String(), "Pushing SSM Parameter Store parameters")
-	assert.NotContains(t, buf.String(), "Pushing Secrets Manager secrets")
+	assert.Contains(t, buf.String(), "Applying SSM Parameter Store parameters")
+	assert.NotContains(t, buf.String(), "Applying Secrets Manager secrets")
 }
 
-func TestRun_PushSecretOnly(t *testing.T) {
+func TestRun_ApplySecretOnly(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
@@ -210,13 +210,13 @@ func TestRun_PushSecretOnly(t *testing.T) {
 
 	secretPutCalled := false
 	secretMock := newSecretStrategy()
-	secretMock.pushFunc = func(_ context.Context, _ string, _ staging.Entry) error {
+	secretMock.applyFunc = func(_ context.Context, _ string, _ staging.Entry) error {
 		secretPutCalled = true
 		return nil
 	}
 
 	var buf bytes.Buffer
-	r := &push.Runner{
+	r := &apply.Runner{
 		ParamStrategy:  nil, // Should not be needed
 		SecretStrategy: secretMock,
 		Store:          store,
@@ -227,11 +227,11 @@ func TestRun_PushSecretOnly(t *testing.T) {
 	err := r.Run(context.Background())
 	require.NoError(t, err)
 	assert.True(t, secretPutCalled)
-	assert.NotContains(t, buf.String(), "Pushing SSM Parameter Store parameters")
-	assert.Contains(t, buf.String(), "Pushing Secrets Manager secrets")
+	assert.NotContains(t, buf.String(), "Applying SSM Parameter Store parameters")
+	assert.Contains(t, buf.String(), "Applying Secrets Manager secrets")
 }
 
-func TestRun_PushDelete(t *testing.T) {
+func TestRun_ApplyDelete(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
@@ -251,19 +251,19 @@ func TestRun_PushDelete(t *testing.T) {
 	secretDeleteCalled := false
 
 	paramMock := newParamStrategy()
-	paramMock.pushFunc = func(_ context.Context, _ string, _ staging.Entry) error {
+	paramMock.applyFunc = func(_ context.Context, _ string, _ staging.Entry) error {
 		paramDeleteCalled = true
 		return nil
 	}
 
 	secretMock := newSecretStrategy()
-	secretMock.pushFunc = func(_ context.Context, _ string, _ staging.Entry) error {
+	secretMock.applyFunc = func(_ context.Context, _ string, _ staging.Entry) error {
 		secretDeleteCalled = true
 		return nil
 	}
 
 	var buf bytes.Buffer
-	r := &push.Runner{
+	r := &apply.Runner{
 		ParamStrategy:  paramMock,
 		SecretStrategy: secretMock,
 		Store:          store,
@@ -298,17 +298,17 @@ func TestRun_PartialFailure(t *testing.T) {
 	})
 
 	paramMock := newParamStrategy()
-	paramMock.pushFunc = func(_ context.Context, _ string, _ staging.Entry) error {
+	paramMock.applyFunc = func(_ context.Context, _ string, _ staging.Entry) error {
 		return fmt.Errorf("SSM Parameter Store error")
 	}
 
 	secretMock := newSecretStrategy()
-	secretMock.pushFunc = func(_ context.Context, _ string, _ staging.Entry) error {
+	secretMock.applyFunc = func(_ context.Context, _ string, _ staging.Entry) error {
 		return nil
 	}
 
 	var buf, errBuf bytes.Buffer
-	r := &push.Runner{
+	r := &apply.Runner{
 		ParamStrategy:  paramMock,
 		SecretStrategy: secretMock,
 		Store:          store,
@@ -318,7 +318,7 @@ func TestRun_PartialFailure(t *testing.T) {
 
 	err := r.Run(context.Background())
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "pushed 1, failed 1")
+	assert.Contains(t, err.Error(), "applied 1, failed 1")
 
 	// SSM Parameter Store should still be staged (failed)
 	entry, err := store.Get(staging.ServiceParam, "/app/config")
@@ -342,7 +342,7 @@ func TestRun_StoreError(t *testing.T) {
 	store := staging.NewStoreWithPath(path)
 
 	var buf bytes.Buffer
-	r := &push.Runner{
+	r := &apply.Runner{
 		ParamStrategy:  newParamStrategy(),
 		SecretStrategy: newSecretStrategy(),
 		Store:          store,
@@ -372,13 +372,13 @@ func TestRun_SecretDeleteWithForce(t *testing.T) {
 
 	var capturedEntry staging.Entry
 	secretMock := newSecretStrategy()
-	secretMock.pushFunc = func(_ context.Context, _ string, entry staging.Entry) error {
+	secretMock.applyFunc = func(_ context.Context, _ string, entry staging.Entry) error {
 		capturedEntry = entry
 		return nil
 	}
 
 	var buf bytes.Buffer
-	r := &push.Runner{
+	r := &apply.Runner{
 		SecretStrategy: secretMock,
 		Store:          store,
 		Stdout:         &buf,
@@ -408,13 +408,13 @@ func TestRun_SecretDeleteWithRecoveryWindow(t *testing.T) {
 
 	var capturedEntry staging.Entry
 	secretMock := newSecretStrategy()
-	secretMock.pushFunc = func(_ context.Context, _ string, entry staging.Entry) error {
+	secretMock.applyFunc = func(_ context.Context, _ string, entry staging.Entry) error {
 		capturedEntry = entry
 		return nil
 	}
 
 	var buf bytes.Buffer
-	r := &push.Runner{
+	r := &apply.Runner{
 		SecretStrategy: secretMock,
 		Store:          store,
 		Stdout:         &buf,
@@ -439,12 +439,12 @@ func TestRun_ParamDeleteError(t *testing.T) {
 	})
 
 	paramMock := newParamStrategy()
-	paramMock.pushFunc = func(_ context.Context, _ string, _ staging.Entry) error {
+	paramMock.applyFunc = func(_ context.Context, _ string, _ staging.Entry) error {
 		return fmt.Errorf("delete failed")
 	}
 
 	var buf, errBuf bytes.Buffer
-	r := &push.Runner{
+	r := &apply.Runner{
 		ParamStrategy: paramMock,
 		Store:         store,
 		Stdout:        &buf,
@@ -469,12 +469,12 @@ func TestRun_SecretSetError(t *testing.T) {
 	})
 
 	secretMock := newSecretStrategy()
-	secretMock.pushFunc = func(_ context.Context, _ string, _ staging.Entry) error {
+	secretMock.applyFunc = func(_ context.Context, _ string, _ staging.Entry) error {
 		return fmt.Errorf("put secret failed")
 	}
 
 	var buf, errBuf bytes.Buffer
-	r := &push.Runner{
+	r := &apply.Runner{
 		SecretStrategy: secretMock,
 		Store:          store,
 		Stdout:         &buf,
@@ -498,12 +498,12 @@ func TestRun_SecretDeleteError(t *testing.T) {
 	})
 
 	secretMock := newSecretStrategy()
-	secretMock.pushFunc = func(_ context.Context, _ string, _ staging.Entry) error {
+	secretMock.applyFunc = func(_ context.Context, _ string, _ staging.Entry) error {
 		return fmt.Errorf("delete secret failed")
 	}
 
 	var buf, errBuf bytes.Buffer
-	r := &push.Runner{
+	r := &apply.Runner{
 		SecretStrategy: secretMock,
 		Store:          store,
 		Stdout:         &buf,
@@ -528,12 +528,12 @@ func TestRun_ParamSetError(t *testing.T) {
 	})
 
 	paramMock := newParamStrategy()
-	paramMock.pushFunc = func(_ context.Context, _ string, _ staging.Entry) error {
+	paramMock.applyFunc = func(_ context.Context, _ string, _ staging.Entry) error {
 		return fmt.Errorf("put parameter failed")
 	}
 
 	var buf, errBuf bytes.Buffer
-	r := &push.Runner{
+	r := &apply.Runner{
 		ParamStrategy: paramMock,
 		Store:         store,
 		Stdout:        &buf,
