@@ -160,7 +160,7 @@ Output will look like:
 
 ### Staging Workflow
 
-> [!IMPORTANT]
+> [!NOTE]
 > The staging workflow lets you prepare changes locally, review them, and apply when ready—just like `git add` → `git diff --staged` → `git commit`.
 
 > [!CAUTION]
