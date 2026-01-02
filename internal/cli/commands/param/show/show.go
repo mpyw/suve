@@ -201,6 +201,10 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 	out.Field("Name", lo.FromPtr(param.Name))
 	out.Field("Version", fmt.Sprintf("%d", param.Version))
 	out.Field("Type", string(param.Type))
+	// Show decrypted status only for SecureString
+	if param.Type == paramapi.ParameterTypeSecureString {
+		out.Field("Decrypted", fmt.Sprintf("%t", opts.Decrypt))
+	}
 	if param.LastModifiedDate != nil {
 		out.Field("Modified", param.LastModifiedDate.Format(time.RFC3339))
 	}

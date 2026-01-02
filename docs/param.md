@@ -36,6 +36,7 @@ user@host:~$ suve param show /app/config/database-url
 Name: /app/config/database-url
 Version: 3
 Type: SecureString
+Decrypted: true
 Modified: 2024-01-15T10:30:45Z
 
   postgres://db.example.com:5432/myapp
@@ -48,6 +49,7 @@ user@host:~$ suve param show --parse-json /app/config/credentials
 Name: /app/config/credentials
 Version: 2
 Type: SecureString
+Decrypted: true
 Modified: 2024-01-15T10:30:45Z
 
   {
