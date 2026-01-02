@@ -104,31 +104,61 @@ func (r *ApplyRunner) Run(ctx context.Context, opts ApplyOptions) error {
 func (r *ApplyRunner) checkConflicts(ctx context.Context, entries map[string]staging.Entry) map[string]struct{} {
 	conflicts := make(map[string]struct{})
 
-	// Only check Update and Delete operations (Create has nothing to conflict with)
-	toCheck := make(map[string]staging.Entry)
+	// Separate entries by check type:
+	// - Create: check if resource now exists (someone else created it)
+	// - Update/Delete with BaseModifiedAt: check if modified after base
+	toCheckCreate := make(map[string]staging.Entry)
+	toCheckModified := make(map[string]staging.Entry)
+
 	for name, entry := range entries {
-		if entry.Operation == staging.OperationUpdate || entry.Operation == staging.OperationDelete {
-			toCheck[name] = entry
+		switch {
+		case entry.Operation == staging.OperationCreate:
+			toCheckCreate[name] = entry
+		case (entry.Operation == staging.OperationUpdate || entry.Operation == staging.OperationDelete) && entry.BaseModifiedAt != nil:
+			toCheckModified[name] = entry
 		}
 	}
 
-	if len(toCheck) == 0 {
+	if len(toCheckCreate) == 0 && len(toCheckModified) == 0 {
 		return conflicts
 	}
 
+	// Combine all entries for parallel fetch
+	allToCheck := make(map[string]staging.Entry)
+	for name, entry := range toCheckCreate {
+		allToCheck[name] = entry
+	}
+	for name, entry := range toCheckModified {
+		allToCheck[name] = entry
+	}
+
 	// Fetch last modified times in parallel
-	results := parallel.ExecuteMap(ctx, toCheck, func(ctx context.Context, name string, _ staging.Entry) (time.Time, error) {
+	results := parallel.ExecuteMap(ctx, allToCheck, func(ctx context.Context, name string, _ staging.Entry) (time.Time, error) {
 		return r.Strategy.FetchLastModified(ctx, name)
 	})
 
-	// Check for conflicts
-	for name, result := range results {
+	// Check for conflicts - Create operations
+	for name := range toCheckCreate {
+		result := results[name]
 		if result.Err != nil {
 			// If we can't fetch, assume no conflict (will fail on apply anyway)
 			continue
 		}
 
-		entry := toCheck[name]
+		// For Create: if resource now exists (non-zero time), someone else created it
+		if !result.Value.IsZero() {
+			conflicts[name] = struct{}{}
+		}
+	}
+
+	// Check for conflicts - Update/Delete operations
+	for name, entry := range toCheckModified {
+		result := results[name]
+		if result.Err != nil {
+			// If we can't fetch, assume no conflict (will fail on apply anyway)
+			continue
+		}
+
 		awsModified := result.Value
 
 		// Zero time means resource doesn't exist - no conflict for delete (already gone)
@@ -136,8 +166,8 @@ func (r *ApplyRunner) checkConflicts(ctx context.Context, entries map[string]sta
 			continue
 		}
 
-		// If AWS was modified after staging, it's a conflict
-		if awsModified.After(entry.StagedAt) {
+		// If AWS was modified after the base value was fetched, it's a conflict
+		if awsModified.After(*entry.BaseModifiedAt) {
 			conflicts[name] = struct{}{}
 		}
 	}

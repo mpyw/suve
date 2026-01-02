@@ -23,10 +23,13 @@ func TestCommand_Help(t *testing.T) {
 	err := app.Run(context.Background(), []string{"suve", "secret", "list", "--help"})
 	require.NoError(t, err)
 	assert.Contains(t, buf.String(), "List secrets")
+	assert.Contains(t, buf.String(), "--filter")
+	assert.Contains(t, buf.String(), "--show")
 }
 
 type mockClient struct {
-	listSecretsFunc func(ctx context.Context, params *secretapi.ListSecretsInput, optFns ...func(*secretapi.Options)) (*secretapi.ListSecretsOutput, error)
+	listSecretsFunc    func(ctx context.Context, params *secretapi.ListSecretsInput, optFns ...func(*secretapi.Options)) (*secretapi.ListSecretsOutput, error)
+	getSecretValueFunc func(ctx context.Context, params *secretapi.GetSecretValueInput, optFns ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error)
 }
 
 func (m *mockClient) ListSecrets(ctx context.Context, params *secretapi.ListSecretsInput, optFns ...func(*secretapi.Options)) (*secretapi.ListSecretsOutput, error) {
@@ -34,6 +37,13 @@ func (m *mockClient) ListSecrets(ctx context.Context, params *secretapi.ListSecr
 		return m.listSecretsFunc(ctx, params, optFns...)
 	}
 	return nil, fmt.Errorf("ListSecrets not mocked")
+}
+
+func (m *mockClient) GetSecretValue(ctx context.Context, params *secretapi.GetSecretValueInput, optFns ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) {
+	if m.getSecretValueFunc != nil {
+		return m.getSecretValueFunc(ctx, params, optFns...)
+	}
+	return nil, fmt.Errorf("GetSecretValue not mocked")
 }
 
 func TestRun(t *testing.T) {
@@ -89,6 +99,65 @@ func TestRun(t *testing.T) {
 				},
 			},
 			wantErr: true,
+		},
+		{
+			name: "filter by regex",
+			opts: list.Options{Filter: "prod"},
+			mock: &mockClient{
+				listSecretsFunc: func(_ context.Context, _ *secretapi.ListSecretsInput, _ ...func(*secretapi.Options)) (*secretapi.ListSecretsOutput, error) {
+					return &secretapi.ListSecretsOutput{
+						SecretList: []secretapi.SecretListEntry{
+							{Name: lo.ToPtr("app/prod/secret1")},
+							{Name: lo.ToPtr("app/dev/secret2")},
+							{Name: lo.ToPtr("app/prod/secret3")},
+						},
+					}, nil
+				},
+			},
+			check: func(t *testing.T, output string) {
+				assert.Contains(t, output, "app/prod/secret1")
+				assert.NotContains(t, output, "app/dev/secret2")
+				assert.Contains(t, output, "app/prod/secret3")
+			},
+		},
+		{
+			name: "invalid regex filter",
+			opts: list.Options{Filter: "[invalid"},
+			mock: &mockClient{
+				listSecretsFunc: func(_ context.Context, _ *secretapi.ListSecretsInput, _ ...func(*secretapi.Options)) (*secretapi.ListSecretsOutput, error) {
+					return &secretapi.ListSecretsOutput{}, nil
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "show secret values",
+			opts: list.Options{Show: true},
+			mock: &mockClient{
+				listSecretsFunc: func(_ context.Context, _ *secretapi.ListSecretsInput, _ ...func(*secretapi.Options)) (*secretapi.ListSecretsOutput, error) {
+					return &secretapi.ListSecretsOutput{
+						SecretList: []secretapi.SecretListEntry{
+							{Name: lo.ToPtr("secret1")},
+							{Name: lo.ToPtr("secret2")},
+						},
+					}, nil
+				},
+				getSecretValueFunc: func(_ context.Context, params *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) {
+					name := lo.FromPtr(params.SecretId)
+					values := map[string]string{
+						"secret1": "value1",
+						"secret2": "value2",
+					}
+					return &secretapi.GetSecretValueOutput{
+						Name:         params.SecretId,
+						SecretString: lo.ToPtr(values[name]),
+					}, nil
+				},
+			},
+			check: func(t *testing.T, output string) {
+				assert.Contains(t, output, "secret1\tvalue1")
+				assert.Contains(t, output, "secret2\tvalue2")
+			},
 		},
 	}
 

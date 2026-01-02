@@ -60,6 +60,15 @@ type FetchResult struct {
 	Identifier string
 }
 
+// EditFetchResult holds the result of fetching a value for editing.
+type EditFetchResult struct {
+	// Value is the current value in AWS.
+	Value string
+	// LastModified is the last modification time of the resource.
+	// Used for conflict detection when applying staged changes.
+	LastModified time.Time
+}
+
 // DiffStrategy defines service-specific diff/fetch operations.
 type DiffStrategy interface {
 	ServiceStrategy
@@ -73,7 +82,8 @@ type EditStrategy interface {
 	Parser
 
 	// FetchCurrentValue fetches the current value from AWS for editing.
-	FetchCurrentValue(ctx context.Context, name string) (string, error)
+	// Returns the value and last modified time for conflict detection.
+	FetchCurrentValue(ctx context.Context, name string) (*EditFetchResult, error)
 }
 
 // ResetStrategy defines service-specific reset operations.

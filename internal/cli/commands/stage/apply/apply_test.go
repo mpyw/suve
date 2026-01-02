@@ -544,3 +544,221 @@ func TestRun_ParamSetError(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, errBuf.String(), "Failed")
 }
+
+func TestRun_ConflictDetection_CreateConflict(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+
+	// Stage a create operation
+	_ = store.Stage(staging.ServiceParam, "/app/new-param", staging.Entry{
+		Operation: staging.OperationCreate,
+		Value:     "new-value",
+		StagedAt:  time.Now(),
+	})
+
+	paramMock := newParamStrategy()
+	// Resource now exists (someone else created it)
+	paramMock.fetchLastModifiedVal = time.Now()
+
+	var buf, errBuf bytes.Buffer
+	r := &apply.Runner{
+		ParamStrategy:   paramMock,
+		Store:           store,
+		Stdout:          &buf,
+		Stderr:          &errBuf,
+		IgnoreConflicts: false,
+	}
+
+	err := r.Run(context.Background())
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "conflict(s) detected")
+	assert.Contains(t, errBuf.String(), "conflict detected for /app/new-param")
+}
+
+func TestRun_ConflictDetection_UpdateConflict(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+
+	baseTime := time.Now().Add(-1 * time.Hour)
+	_ = store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
+		Operation:      staging.OperationUpdate,
+		Value:          "updated-value",
+		StagedAt:       time.Now(),
+		BaseModifiedAt: &baseTime,
+	})
+
+	paramMock := newParamStrategy()
+	// AWS was modified after BaseModifiedAt
+	paramMock.fetchLastModifiedVal = time.Now()
+
+	var buf, errBuf bytes.Buffer
+	r := &apply.Runner{
+		ParamStrategy:   paramMock,
+		Store:           store,
+		Stdout:          &buf,
+		Stderr:          &errBuf,
+		IgnoreConflicts: false,
+	}
+
+	err := r.Run(context.Background())
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "conflict(s) detected")
+	assert.Contains(t, errBuf.String(), "conflict detected for /app/config")
+}
+
+func TestRun_ConflictDetection_DeleteConflict(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+
+	baseTime := time.Now().Add(-1 * time.Hour)
+	_ = store.Stage(staging.ServiceSecret, "my-secret", staging.Entry{
+		Operation:      staging.OperationDelete,
+		StagedAt:       time.Now(),
+		BaseModifiedAt: &baseTime,
+	})
+
+	secretMock := newSecretStrategy()
+	// AWS was modified after BaseModifiedAt
+	secretMock.fetchLastModifiedVal = time.Now()
+
+	var buf, errBuf bytes.Buffer
+	r := &apply.Runner{
+		SecretStrategy:  secretMock,
+		Store:           store,
+		Stdout:          &buf,
+		Stderr:          &errBuf,
+		IgnoreConflicts: false,
+	}
+
+	err := r.Run(context.Background())
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "conflict(s) detected")
+	assert.Contains(t, errBuf.String(), "conflict detected for my-secret")
+}
+
+func TestRun_ConflictDetection_IgnoreConflicts(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+
+	baseTime := time.Now().Add(-1 * time.Hour)
+	_ = store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
+		Operation:      staging.OperationUpdate,
+		Value:          "updated-value",
+		StagedAt:       time.Now(),
+		BaseModifiedAt: &baseTime,
+	})
+
+	applyCalled := false
+	paramMock := newParamStrategy()
+	// AWS was modified after BaseModifiedAt (conflict)
+	paramMock.fetchLastModifiedVal = time.Now()
+	paramMock.applyFunc = func(_ context.Context, _ string, _ staging.Entry) error {
+		applyCalled = true
+		return nil
+	}
+
+	var buf, errBuf bytes.Buffer
+	r := &apply.Runner{
+		ParamStrategy:   paramMock,
+		Store:           store,
+		Stdout:          &buf,
+		Stderr:          &errBuf,
+		IgnoreConflicts: true, // Should bypass conflict check
+	}
+
+	err := r.Run(context.Background())
+	require.NoError(t, err)
+	assert.True(t, applyCalled, "Apply should be called when IgnoreConflicts is true")
+}
+
+func TestRun_ConflictDetection_NoConflict(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+
+	baseTime := time.Now()
+	_ = store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
+		Operation:      staging.OperationUpdate,
+		Value:          "updated-value",
+		StagedAt:       time.Now(),
+		BaseModifiedAt: &baseTime,
+	})
+
+	applyCalled := false
+	paramMock := newParamStrategy()
+	// AWS was modified BEFORE BaseModifiedAt (no conflict)
+	paramMock.fetchLastModifiedVal = baseTime.Add(-1 * time.Hour)
+	paramMock.applyFunc = func(_ context.Context, _ string, _ staging.Entry) error {
+		applyCalled = true
+		return nil
+	}
+
+	var buf bytes.Buffer
+	r := &apply.Runner{
+		ParamStrategy:   paramMock,
+		Store:           store,
+		Stdout:          &buf,
+		Stderr:          &bytes.Buffer{},
+		IgnoreConflicts: false,
+	}
+
+	err := r.Run(context.Background())
+	require.NoError(t, err)
+	assert.True(t, applyCalled, "Apply should be called when there's no conflict")
+}
+
+func TestRun_ConflictDetection_BothServices(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+
+	baseTime := time.Now().Add(-1 * time.Hour)
+
+	// Stage param with conflict
+	_ = store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
+		Operation:      staging.OperationUpdate,
+		Value:          "param-value",
+		StagedAt:       time.Now(),
+		BaseModifiedAt: &baseTime,
+	})
+
+	// Stage secret with conflict
+	_ = store.Stage(staging.ServiceSecret, "my-secret", staging.Entry{
+		Operation:      staging.OperationUpdate,
+		Value:          "secret-value",
+		StagedAt:       time.Now(),
+		BaseModifiedAt: &baseTime,
+	})
+
+	paramMock := newParamStrategy()
+	paramMock.fetchLastModifiedVal = time.Now() // conflict
+
+	secretMock := newSecretStrategy()
+	secretMock.fetchLastModifiedVal = time.Now() // conflict
+
+	var buf, errBuf bytes.Buffer
+	r := &apply.Runner{
+		ParamStrategy:   paramMock,
+		SecretStrategy:  secretMock,
+		Store:           store,
+		Stdout:          &buf,
+		Stderr:          &errBuf,
+		IgnoreConflicts: false,
+	}
+
+	err := r.Run(context.Background())
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "2 conflict(s) detected")
+	assert.Contains(t, errBuf.String(), "conflict detected for /app/config")
+	assert.Contains(t, errBuf.String(), "conflict detected for my-secret")
+}

@@ -60,11 +60,14 @@ func (m *fullMockStrategy) FetchCurrent(_ context.Context, name string) (*stagin
 		Identifier: "#1",
 	}, nil
 }
-func (m *fullMockStrategy) FetchCurrentValue(_ context.Context, _ string) (string, error) {
+func (m *fullMockStrategy) FetchCurrentValue(_ context.Context, _ string) (*staging.EditFetchResult, error) {
 	if m.fetchCurrentErr != nil {
-		return "", m.fetchCurrentErr
+		return nil, m.fetchCurrentErr
 	}
-	return m.fetchCurrentVal, nil
+	return &staging.EditFetchResult{
+		Value:        m.fetchCurrentVal,
+		LastModified: m.fetchLastModifiedVal,
+	}, nil
 }
 func (m *fullMockStrategy) FetchVersion(_ context.Context, _ string) (string, string, error) {
 	if m.fetchVersionErr != nil {
@@ -932,6 +935,165 @@ func TestApplyRunner_Run(t *testing.T) {
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "failed 1")
 		assert.Contains(t, stderr.String(), "apply failed")
+	})
+
+	t.Run("conflict - create operation (resource already exists)", func(t *testing.T) {
+		t.Parallel()
+
+		tmpDir := t.TempDir()
+		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		_ = store.Stage(staging.ServiceParam, "/app/new-config", staging.Entry{
+			Operation: staging.OperationCreate,
+			Value:     "new-value",
+			StagedAt:  time.Now(),
+			// No BaseModifiedAt for Create (didn't exist at staging time)
+		})
+
+		var stdout, stderr bytes.Buffer
+		r := &runner.ApplyRunner{
+			// FetchLastModified returns non-zero time = resource exists now
+			Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchLastModifiedVal: time.Now()},
+			Store:    store,
+			Stdout:   &stdout,
+			Stderr:   &stderr,
+		}
+
+		err := r.Run(context.Background(), runner.ApplyOptions{})
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "conflict")
+		assert.Contains(t, stderr.String(), "conflict detected")
+	})
+
+	t.Run("conflict - update operation (resource modified after staging)", func(t *testing.T) {
+		t.Parallel()
+
+		tmpDir := t.TempDir()
+		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		baseTime := time.Now().Add(-time.Hour)
+		_ = store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
+			Operation:      staging.OperationUpdate,
+			Value:          "updated-value",
+			StagedAt:       time.Now(),
+			BaseModifiedAt: &baseTime, // AWS was at this time when we fetched
+		})
+
+		var stdout, stderr bytes.Buffer
+		r := &runner.ApplyRunner{
+			// FetchLastModified returns time AFTER BaseModifiedAt = conflict
+			Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchLastModifiedVal: time.Now()},
+			Store:    store,
+			Stdout:   &stdout,
+			Stderr:   &stderr,
+		}
+
+		err := r.Run(context.Background(), runner.ApplyOptions{})
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "conflict")
+		assert.Contains(t, stderr.String(), "conflict detected")
+	})
+
+	t.Run("conflict - delete operation (resource modified after staging)", func(t *testing.T) {
+		t.Parallel()
+
+		tmpDir := t.TempDir()
+		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		baseTime := time.Now().Add(-time.Hour)
+		_ = store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
+			Operation:      staging.OperationDelete,
+			StagedAt:       time.Now(),
+			BaseModifiedAt: &baseTime,
+		})
+
+		var stdout, stderr bytes.Buffer
+		r := &runner.ApplyRunner{
+			Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchLastModifiedVal: time.Now()},
+			Store:    store,
+			Stdout:   &stdout,
+			Stderr:   &stderr,
+		}
+
+		err := r.Run(context.Background(), runner.ApplyOptions{})
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "conflict")
+	})
+
+	t.Run("no conflict - update with same time", func(t *testing.T) {
+		t.Parallel()
+
+		tmpDir := t.TempDir()
+		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		baseTime := time.Now()
+		_ = store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
+			Operation:      staging.OperationUpdate,
+			Value:          "updated-value",
+			StagedAt:       time.Now(),
+			BaseModifiedAt: &baseTime,
+		})
+
+		var stdout, stderr bytes.Buffer
+		r := &runner.ApplyRunner{
+			// FetchLastModified returns same time as BaseModifiedAt = no conflict
+			Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchLastModifiedVal: baseTime},
+			Store:    store,
+			Stdout:   &stdout,
+			Stderr:   &stderr,
+		}
+
+		err := r.Run(context.Background(), runner.ApplyOptions{})
+		require.NoError(t, err)
+		assert.Contains(t, stdout.String(), "Updated")
+	})
+
+	t.Run("conflict ignored with --ignore-conflicts", func(t *testing.T) {
+		t.Parallel()
+
+		tmpDir := t.TempDir()
+		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		baseTime := time.Now().Add(-time.Hour)
+		_ = store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
+			Operation:      staging.OperationUpdate,
+			Value:          "updated-value",
+			StagedAt:       time.Now(),
+			BaseModifiedAt: &baseTime,
+		})
+
+		var stdout, stderr bytes.Buffer
+		r := &runner.ApplyRunner{
+			Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchLastModifiedVal: time.Now()},
+			Store:    store,
+			Stdout:   &stdout,
+			Stderr:   &stderr,
+		}
+
+		// With IgnoreConflicts, apply should proceed despite conflict
+		err := r.Run(context.Background(), runner.ApplyOptions{IgnoreConflicts: true})
+		require.NoError(t, err)
+		assert.Contains(t, stdout.String(), "Updated")
+	})
+
+	t.Run("no conflict - create when resource doesn't exist", func(t *testing.T) {
+		t.Parallel()
+
+		tmpDir := t.TempDir()
+		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		_ = store.Stage(staging.ServiceParam, "/app/new-config", staging.Entry{
+			Operation: staging.OperationCreate,
+			Value:     "new-value",
+			StagedAt:  time.Now(),
+		})
+
+		var stdout, stderr bytes.Buffer
+		r := &runner.ApplyRunner{
+			// FetchLastModified returns zero time = resource doesn't exist = no conflict
+			Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchLastModifiedVal: time.Time{}},
+			Store:    store,
+			Stdout:   &stdout,
+			Stderr:   &stderr,
+		}
+
+		err := r.Run(context.Background(), runner.ApplyOptions{})
+		require.NoError(t, err)
+		assert.Contains(t, stdout.String(), "Created")
 	})
 }
 

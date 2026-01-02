@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
@@ -296,22 +297,26 @@ func TestParamStrategy_ParseName(t *testing.T) {
 func TestParamStrategy_FetchCurrentValue(t *testing.T) {
 	t.Parallel()
 
+	now := time.Now()
+
 	t.Run("success", func(t *testing.T) {
 		t.Parallel()
 		mock := &paramMockClient{
 			getParameterFunc: func(_ context.Context, _ *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
 				return &paramapi.GetParameterOutput{
 					Parameter: &paramapi.Parameter{
-						Value: lo.ToPtr("fetched-value"),
+						Value:            lo.ToPtr("fetched-value"),
+						LastModifiedDate: &now,
 					},
 				}, nil
 			},
 		}
 
 		s := staging.NewParamStrategy(mock)
-		value, err := s.FetchCurrentValue(context.Background(), "/app/param")
+		result, err := s.FetchCurrentValue(context.Background(), "/app/param")
 		require.NoError(t, err)
-		assert.Equal(t, "fetched-value", value)
+		assert.Equal(t, "fetched-value", result.Value)
+		assert.Equal(t, now, result.LastModified)
 	})
 
 	t.Run("error", func(t *testing.T) {

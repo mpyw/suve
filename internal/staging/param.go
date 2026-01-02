@@ -172,13 +172,19 @@ func (s *ParamStrategy) ParseName(input string) (string, error) {
 }
 
 // FetchCurrentValue fetches the current value from AWS SSM Parameter Store for editing.
-func (s *ParamStrategy) FetchCurrentValue(ctx context.Context, name string) (string, error) {
+func (s *ParamStrategy) FetchCurrentValue(ctx context.Context, name string) (*EditFetchResult, error) {
 	spec := &paramversion.Spec{Name: name}
 	param, err := paramversion.GetParameterWithVersion(ctx, s.Client, spec, true)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	return lo.FromPtr(param.Value), nil
+	result := &EditFetchResult{
+		Value: lo.FromPtr(param.Value),
+	}
+	if param.LastModifiedDate != nil {
+		result.LastModified = *param.LastModifiedDate
+	}
+	return result, nil
 }
 
 // ParseSpec parses a version spec string for reset.

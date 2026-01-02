@@ -332,8 +332,9 @@ After successful apply, the staged changes are cleared.
 Use 'suve stage %s status' to view staged changes before applying.
 
 CONFLICT DETECTION:
-   Before applying, suve checks if the AWS resource was modified after staging.
-   If a conflict is detected, the apply is rejected to prevent lost updates.
+   Before applying, suve checks for conflicts to prevent lost updates:
+   - For new resources: checks if someone else created it after staging
+   - For existing resources: checks if it was modified after staging
    Use --ignore-conflicts to force apply despite conflicts.
 
 EXAMPLES:
@@ -615,11 +616,26 @@ EXAMPLES:
 			}
 
 			name := cmd.Args().First()
-			service := cfg.ParserFactory().Service()
+
+			// Initialize strategy to fetch LastModified for conflict detection
+			strategy, err := cfg.Factory(ctx)
+			if err != nil {
+				return err
+			}
+			service := strategy.Service()
+
+			// Fetch LastModified for conflict detection
+			lastModified, err := strategy.FetchLastModified(ctx, name)
+			if err != nil {
+				return fmt.Errorf("failed to fetch %s: %w", cfg.ItemName, err)
+			}
 
 			entry := staging.Entry{
 				Operation: staging.OperationDelete,
 				StagedAt:  time.Now(),
+			}
+			if !lastModified.IsZero() {
+				entry.BaseModifiedAt = &lastModified
 			}
 
 			if hasDeleteOptions {

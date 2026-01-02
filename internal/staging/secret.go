@@ -204,13 +204,19 @@ func (s *SecretStrategy) ParseName(input string) (string, error) {
 }
 
 // FetchCurrentValue fetches the current value from AWS Secrets Manager for editing.
-func (s *SecretStrategy) FetchCurrentValue(ctx context.Context, name string) (string, error) {
+func (s *SecretStrategy) FetchCurrentValue(ctx context.Context, name string) (*EditFetchResult, error) {
 	spec := &secretversion.Spec{Name: name}
 	secret, err := secretversion.GetSecretWithVersion(ctx, s.Client, spec)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	return lo.FromPtr(secret.SecretString), nil
+	result := &EditFetchResult{
+		Value: lo.FromPtr(secret.SecretString),
+	}
+	if secret.CreatedDate != nil {
+		result.LastModified = *secret.CreatedDate
+	}
+	return result, nil
 }
 
 // ParseSpec parses a version spec string for reset.

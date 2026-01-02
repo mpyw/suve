@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
@@ -335,20 +336,24 @@ func TestSecretStrategy_ParseName(t *testing.T) {
 func TestSecretStrategy_FetchCurrentValue(t *testing.T) {
 	t.Parallel()
 
+	now := time.Now()
+
 	t.Run("success", func(t *testing.T) {
 		t.Parallel()
 		mock := &secretMockClient{
 			getSecretValueFunc: func(_ context.Context, _ *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) {
 				return &secretapi.GetSecretValueOutput{
 					SecretString: lo.ToPtr("fetched-secret"),
+					CreatedDate:  &now,
 				}, nil
 			},
 		}
 
 		s := staging.NewSecretStrategy(mock)
-		value, err := s.FetchCurrentValue(context.Background(), "my-secret")
+		result, err := s.FetchCurrentValue(context.Background(), "my-secret")
 		require.NoError(t, err)
-		assert.Equal(t, "fetched-secret", value)
+		assert.Equal(t, "fetched-secret", result.Value)
+		assert.Equal(t, now, result.LastModified)
 	})
 
 	t.Run("error", func(t *testing.T) {

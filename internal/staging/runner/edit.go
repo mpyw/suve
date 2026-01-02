@@ -41,14 +41,20 @@ func (r *EditRunner) Run(ctx context.Context, opts EditOptions) error {
 	}
 
 	var currentValue string
+	var baseModifiedAt *time.Time
 	if stagedEntry != nil && (stagedEntry.Operation == staging.OperationCreate || stagedEntry.Operation == staging.OperationUpdate) {
-		// Use staged value
+		// Use staged value (preserve existing BaseModifiedAt)
 		currentValue = stagedEntry.Value
+		baseModifiedAt = stagedEntry.BaseModifiedAt
 	} else {
 		// Fetch from AWS
-		currentValue, err = r.Strategy.FetchCurrentValue(ctx, opts.Name)
+		result, err := r.Strategy.FetchCurrentValue(ctx, opts.Name)
 		if err != nil {
 			return err
+		}
+		currentValue = result.Value
+		if !result.LastModified.IsZero() {
+			baseModifiedAt = &result.LastModified
 		}
 	}
 
@@ -76,9 +82,10 @@ func (r *EditRunner) Run(ctx context.Context, opts EditOptions) error {
 
 	// Stage the change
 	entry := staging.Entry{
-		Operation: staging.OperationUpdate,
-		Value:     newValue,
-		StagedAt:  time.Now(),
+		Operation:      staging.OperationUpdate,
+		Value:          newValue,
+		StagedAt:       time.Now(),
+		BaseModifiedAt: baseModifiedAt,
 	}
 	if opts.Description != "" {
 		entry.Description = &opts.Description

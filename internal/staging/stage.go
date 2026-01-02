@@ -33,6 +33,10 @@ type Entry struct {
 	Tags        map[string]string `json:"tags,omitempty"`
 	UntagKeys   []string          `json:"untag_keys,omitempty"`
 	StagedAt    time.Time         `json:"staged_at"`
+	// BaseModifiedAt records the AWS LastModified time when the value was fetched.
+	// Used for conflict detection: if AWS was modified after this time, it's a conflict.
+	// Only set for update/delete operations (nil for create since there's no base).
+	BaseModifiedAt *time.Time `json:"base_modified_at,omitempty"`
 	// DeleteOptions holds Secrets Manager-specific delete options.
 	// Only used when Operation is OperationDelete and service is Secrets Manager.
 	DeleteOptions *DeleteOptions `json:"delete_options,omitempty"`

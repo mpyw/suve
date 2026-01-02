@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"time"
 
 	"github.com/urfave/cli/v3"
 
@@ -16,13 +17,20 @@ import (
 	"github.com/mpyw/suve/internal/staging"
 )
 
+// serviceConflictCheck holds entries and strategy for a single service's conflict checking.
+type serviceConflictCheck struct {
+	entries  map[string]staging.Entry
+	strategy staging.ApplyStrategy
+}
+
 // Runner executes the apply command.
 type Runner struct {
-	ParamStrategy  staging.ApplyStrategy
-	SecretStrategy staging.ApplyStrategy
-	Store          *staging.Store
-	Stdout         io.Writer
-	Stderr         io.Writer
+	ParamStrategy   staging.ApplyStrategy
+	SecretStrategy  staging.ApplyStrategy
+	Store           *staging.Store
+	Stdout          io.Writer
+	Stderr          io.Writer
+	IgnoreConflicts bool
 }
 
 // Command returns the global apply command.
@@ -38,13 +46,24 @@ After successful apply, the staged changes are cleared.
 Use 'suve stage status' to view all staged changes before applying.
 Use 'suve stage param apply' or 'suve stage secret apply' for service-specific changes.
 
+CONFLICT DETECTION:
+   Before applying, suve checks for conflicts to prevent lost updates:
+   - For new resources: checks if someone else created it after staging
+   - For existing resources: checks if it was modified after staging
+   Use --ignore-conflicts to force apply despite conflicts.
+
 EXAMPLES:
-   suve stage apply        Apply all staged changes (with confirmation)
-   suve stage apply --yes  Apply without confirmation`,
+   suve stage apply                      Apply all staged changes (with confirmation)
+   suve stage apply --yes                Apply without confirmation
+   suve stage apply --ignore-conflicts   Apply even if conflicts detected`,
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
 				Name:  "yes",
 				Usage: "Skip confirmation prompt",
+			},
+			&cli.BoolFlag{
+				Name:  "ignore-conflicts",
+				Usage: "Apply even if AWS was modified after staging",
 			},
 		},
 		Action: action,
@@ -96,9 +115,10 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	}
 
 	r := &Runner{
-		Store:  store,
-		Stdout: cmd.Root().Writer,
-		Stderr: cmd.Root().ErrWriter,
+		Store:           store,
+		Stdout:          cmd.Root().Writer,
+		Stderr:          cmd.Root().ErrWriter,
+		IgnoreConflicts: cmd.Bool("ignore-conflicts"),
 	}
 
 	// Initialize strategies only if needed
@@ -131,6 +151,31 @@ func (r *Runner) Run(ctx context.Context) error {
 
 	paramStaged := allStaged[staging.ServiceParam]
 	secretStaged := allStaged[staging.ServiceSecret]
+
+	// Check for conflicts unless --ignore-conflicts is specified
+	if !r.IgnoreConflicts {
+		var checks []serviceConflictCheck
+		if len(paramStaged) > 0 && r.ParamStrategy != nil {
+			checks = append(checks, serviceConflictCheck{
+				entries:  paramStaged,
+				strategy: r.ParamStrategy,
+			})
+		}
+		if len(secretStaged) > 0 && r.SecretStrategy != nil {
+			checks = append(checks, serviceConflictCheck{
+				entries:  secretStaged,
+				strategy: r.SecretStrategy,
+			})
+		}
+
+		allConflicts := r.checkAllConflicts(ctx, checks)
+		if len(allConflicts) > 0 {
+			for _, name := range maputil.SortedKeys(allConflicts) {
+				output.Warning(r.Stderr, "conflict detected for %s: AWS was modified after staging", name)
+			}
+			return fmt.Errorf("apply rejected: %d conflict(s) detected (use --ignore-conflicts to force)", len(allConflicts))
+		}
+	}
 
 	var totalSucceeded, totalFailed int
 
@@ -189,4 +234,94 @@ func (r *Runner) applyService(ctx context.Context, strat staging.ApplyStrategy, 
 	}
 
 	return succeeded, failed
+}
+
+// checkAllConflicts checks all services for conflicts and returns a combined map of conflicting names.
+func (r *Runner) checkAllConflicts(ctx context.Context, checks []serviceConflictCheck) map[string]struct{} {
+	allConflicts := make(map[string]struct{})
+
+	for _, check := range checks {
+		conflicts := r.checkConflicts(ctx, check.strategy, check.entries)
+		for name := range conflicts {
+			allConflicts[name] = struct{}{}
+		}
+	}
+
+	return allConflicts
+}
+
+// checkConflicts checks if AWS resources were modified after staging.
+// Returns a map of names that have conflicts.
+func (r *Runner) checkConflicts(ctx context.Context, strat staging.ApplyStrategy, entries map[string]staging.Entry) map[string]struct{} {
+	conflicts := make(map[string]struct{})
+
+	// Separate entries by check type:
+	// - Create: check if resource now exists (someone else created it)
+	// - Update/Delete with BaseModifiedAt: check if modified after base
+	toCheckCreate := make(map[string]staging.Entry)
+	toCheckModified := make(map[string]staging.Entry)
+
+	for name, entry := range entries {
+		switch {
+		case entry.Operation == staging.OperationCreate:
+			toCheckCreate[name] = entry
+		case (entry.Operation == staging.OperationUpdate || entry.Operation == staging.OperationDelete) && entry.BaseModifiedAt != nil:
+			toCheckModified[name] = entry
+		}
+	}
+
+	if len(toCheckCreate) == 0 && len(toCheckModified) == 0 {
+		return conflicts
+	}
+
+	// Combine all entries for parallel fetch
+	allToCheck := make(map[string]staging.Entry)
+	for name, entry := range toCheckCreate {
+		allToCheck[name] = entry
+	}
+	for name, entry := range toCheckModified {
+		allToCheck[name] = entry
+	}
+
+	// Fetch last modified times in parallel
+	results := parallel.ExecuteMap(ctx, allToCheck, func(ctx context.Context, name string, _ staging.Entry) (time.Time, error) {
+		return strat.FetchLastModified(ctx, name)
+	})
+
+	// Check for conflicts - Create operations
+	for name := range toCheckCreate {
+		result := results[name]
+		if result.Err != nil {
+			// If we can't fetch, assume no conflict (will fail on apply anyway)
+			continue
+		}
+
+		// For Create: if resource now exists (non-zero time), someone else created it
+		if !result.Value.IsZero() {
+			conflicts[name] = struct{}{}
+		}
+	}
+
+	// Check for conflicts - Update/Delete operations
+	for name, entry := range toCheckModified {
+		result := results[name]
+		if result.Err != nil {
+			// If we can't fetch, assume no conflict (will fail on apply anyway)
+			continue
+		}
+
+		awsModified := result.Value
+
+		// Zero time means resource doesn't exist - no conflict for delete (already gone)
+		if awsModified.IsZero() {
+			continue
+		}
+
+		// If AWS was modified after the base value was fetched, it's a conflict
+		if awsModified.After(*entry.BaseModifiedAt) {
+			conflicts[name] = struct{}{}
+		}
+	}
+
+	return conflicts
 }
