@@ -14,6 +14,7 @@ import (
 	"github.com/mpyw/suve/internal/api/paramapi"
 	appcli "github.com/mpyw/suve/internal/cli/commands"
 	"github.com/mpyw/suve/internal/cli/commands/param/log"
+	"github.com/mpyw/suve/internal/output"
 )
 
 func TestCommand_Validation(t *testing.T) {
@@ -27,52 +28,20 @@ func TestCommand_Validation(t *testing.T) {
 		assert.Contains(t, err.Error(), "usage: suve param log")
 	})
 
-	t.Run("invalid from version", func(t *testing.T) {
+	t.Run("invalid since timestamp", func(t *testing.T) {
 		t.Parallel()
 		app := appcli.MakeApp()
-		err := app.Run(context.Background(), []string{"suve", "param", "log", "--from", "invalid", "/app/param"})
+		err := app.Run(context.Background(), []string{"suve", "param", "log", "--since", "invalid", "/app/param"})
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "invalid --from value")
+		assert.Contains(t, err.Error(), "invalid --since value")
 	})
 
-	t.Run("invalid to version", func(t *testing.T) {
+	t.Run("invalid until timestamp", func(t *testing.T) {
 		t.Parallel()
 		app := appcli.MakeApp()
-		err := app.Run(context.Background(), []string{"suve", "param", "log", "--to", "invalid", "/app/param"})
+		err := app.Run(context.Background(), []string{"suve", "param", "log", "--until", "invalid", "/app/param"})
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "invalid --to value")
-	})
-
-	t.Run("from with shift syntax not allowed", func(t *testing.T) {
-		t.Parallel()
-		app := appcli.MakeApp()
-		err := app.Run(context.Background(), []string{"suve", "param", "log", "--from", "~1", "/app/param"})
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "shift syntax (~) not supported")
-	})
-
-	t.Run("to with shift syntax not allowed", func(t *testing.T) {
-		t.Parallel()
-		app := appcli.MakeApp()
-		err := app.Run(context.Background(), []string{"suve", "param", "log", "--to", "~1", "/app/param"})
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "shift syntax (~) not supported")
-	})
-
-	t.Run("from without version specifier", func(t *testing.T) {
-		t.Parallel()
-		app := appcli.MakeApp()
-		err := app.Run(context.Background(), []string{"suve", "param", "log", "--from", "/app/param", "/app/param"})
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "version specifier required")
-	})
-
-	t.Run("to without version specifier", func(t *testing.T) {
-		t.Parallel()
-		app := appcli.MakeApp()
-		err := app.Run(context.Background(), []string{"suve", "param", "log", "--to", "/app/param", "/app/param"})
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "version specifier required")
+		assert.Contains(t, err.Error(), "invalid --until value")
 	})
 
 	t.Run("help", func(t *testing.T) {
@@ -83,6 +52,42 @@ func TestCommand_Validation(t *testing.T) {
 		err := app.Run(context.Background(), []string{"suve", "param", "log", "--help"})
 		require.NoError(t, err)
 		assert.Contains(t, buf.String(), "Show parameter version history")
+	})
+
+	t.Run("json without patch warns", func(t *testing.T) {
+		t.Parallel()
+		var errBuf bytes.Buffer
+		app := appcli.MakeApp()
+		app.ErrWriter = &errBuf
+		_ = app.Run(context.Background(), []string{"suve", "param", "log", "--parse-json", "/app/param"})
+		assert.Contains(t, errBuf.String(), "--parse-json has no effect")
+	})
+
+	t.Run("oneline with patch warns", func(t *testing.T) {
+		t.Parallel()
+		var errBuf bytes.Buffer
+		app := appcli.MakeApp()
+		app.ErrWriter = &errBuf
+		_ = app.Run(context.Background(), []string{"suve", "param", "log", "--oneline", "--patch", "/app/param"})
+		assert.Contains(t, errBuf.String(), "--oneline has no effect")
+	})
+
+	t.Run("output json with patch warns", func(t *testing.T) {
+		t.Parallel()
+		var errBuf bytes.Buffer
+		app := appcli.MakeApp()
+		app.ErrWriter = &errBuf
+		_ = app.Run(context.Background(), []string{"suve", "param", "log", "--output=json", "--patch", "/app/param"})
+		assert.Contains(t, errBuf.String(), "-p/--patch has no effect")
+	})
+
+	t.Run("output json with oneline warns", func(t *testing.T) {
+		t.Parallel()
+		var errBuf bytes.Buffer
+		app := appcli.MakeApp()
+		app.ErrWriter = &errBuf
+		_ = app.Run(context.Background(), []string{"suve", "param", "log", "--output=json", "--oneline", "/app/param"})
+		assert.Contains(t, errBuf.String(), "--oneline has no effect")
 	})
 }
 
@@ -291,8 +296,8 @@ func TestRun(t *testing.T) {
 			},
 		},
 		{
-			name: "filter by from version",
-			opts: log.Options{Name: "/app/param", MaxResults: 10, FromVersion: lo.ToPtr(int64(2))},
+			name: "filter by since date",
+			opts: log.Options{Name: "/app/param", MaxResults: 10, Since: lo.ToPtr(now.Add(-90 * time.Minute))},
 			mock: &mockClient{
 				getParameterHistoryFunc: func(_ context.Context, _ *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
 					return &paramapi.GetParameterHistoryOutput{
@@ -311,8 +316,8 @@ func TestRun(t *testing.T) {
 			},
 		},
 		{
-			name: "filter by to version",
-			opts: log.Options{Name: "/app/param", MaxResults: 10, ToVersion: lo.ToPtr(int64(2))},
+			name: "filter by until date",
+			opts: log.Options{Name: "/app/param", MaxResults: 10, Until: lo.ToPtr(now.Add(-30 * time.Minute))},
 			mock: &mockClient{
 				getParameterHistoryFunc: func(_ context.Context, _ *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
 					return &paramapi.GetParameterHistoryOutput{
@@ -331,8 +336,8 @@ func TestRun(t *testing.T) {
 			},
 		},
 		{
-			name: "filter by from and to version range",
-			opts: log.Options{Name: "/app/param", MaxResults: 10, FromVersion: lo.ToPtr(int64(2)), ToVersion: lo.ToPtr(int64(4))},
+			name: "filter by since and until date range",
+			opts: log.Options{Name: "/app/param", MaxResults: 10, Since: lo.ToPtr(now.Add(-150 * time.Minute)), Until: lo.ToPtr(now.Add(-30 * time.Minute))},
 			mock: &mockClient{
 				getParameterHistoryFunc: func(_ context.Context, _ *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
 					return &paramapi.GetParameterHistoryOutput{
@@ -349,12 +354,12 @@ func TestRun(t *testing.T) {
 				assert.NotContains(t, output, "Version 1")
 				assert.Contains(t, output, "Version 2")
 				assert.Contains(t, output, "Version 3")
-				assert.Contains(t, output, "Version 4")
+				assert.NotContains(t, output, "Version 4")
 			},
 		},
 		{
-			name: "filter with no matching versions returns empty",
-			opts: log.Options{Name: "/app/param", MaxResults: 10, FromVersion: lo.ToPtr(int64(10)), ToVersion: lo.ToPtr(int64(20))},
+			name: "filter with no matching dates returns empty",
+			opts: log.Options{Name: "/app/param", MaxResults: 10, Since: lo.ToPtr(now.Add(time.Hour)), Until: lo.ToPtr(now.Add(2 * time.Hour))},
 			mock: &mockClient{
 				getParameterHistoryFunc: func(_ context.Context, _ *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
 					return &paramapi.GetParameterHistoryOutput{
@@ -366,6 +371,132 @@ func TestRun(t *testing.T) {
 			},
 			check: func(t *testing.T, output string) {
 				assert.Empty(t, output)
+			},
+		},
+		{
+			name: "filter skips versions without LastModifiedDate",
+			opts: log.Options{Name: "/app/param", MaxResults: 10, Since: lo.ToPtr(now.Add(-30 * time.Minute))},
+			mock: &mockClient{
+				getParameterHistoryFunc: func(_ context.Context, _ *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
+					return &paramapi.GetParameterHistoryOutput{
+						Parameters: []paramapi.ParameterHistory{
+							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr("v1"), Version: 1, LastModifiedDate: nil},
+							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr("v2"), Version: 2, LastModifiedDate: &now},
+						},
+					}, nil
+				},
+			},
+			check: func(t *testing.T, output string) {
+				assert.Contains(t, output, "Version 2")
+				assert.NotContains(t, output, "Version 1")
+			},
+		},
+		{
+			name: "JSON output format",
+			opts: log.Options{Name: "/app/param", MaxResults: 10, Output: output.FormatJSON},
+			mock: &mockClient{
+				getParameterHistoryFunc: func(_ context.Context, _ *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
+					return &paramapi.GetParameterHistoryOutput{
+						Parameters: []paramapi.ParameterHistory{
+							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr("value1"), Version: 1, Type: paramapi.ParameterTypeString, LastModifiedDate: lo.ToPtr(now.Add(-time.Hour))},
+							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr("value2"), Version: 2, Type: paramapi.ParameterTypeSecureString, LastModifiedDate: &now},
+						},
+					}, nil
+				},
+			},
+			check: func(t *testing.T, output string) {
+				assert.Contains(t, output, `"version"`)
+				assert.Contains(t, output, `"value"`)
+				assert.Contains(t, output, `"type"`)
+				assert.Contains(t, output, `"SecureString"`)
+				assert.Contains(t, output, `"decrypted"`)
+			},
+		},
+		{
+			name: "JSON output without LastModifiedDate",
+			opts: log.Options{Name: "/app/param", MaxResults: 10, Output: output.FormatJSON},
+			mock: &mockClient{
+				getParameterHistoryFunc: func(_ context.Context, _ *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
+					return &paramapi.GetParameterHistoryOutput{
+						Parameters: []paramapi.ParameterHistory{
+							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr("value1"), Version: 1, Type: paramapi.ParameterTypeString, LastModifiedDate: nil},
+						},
+					}, nil
+				},
+			},
+			check: func(t *testing.T, output string) {
+				assert.Contains(t, output, `"version"`)
+				assert.NotContains(t, output, `"modified"`)
+			},
+		},
+		{
+			name: "patch with JSON format",
+			opts: log.Options{Name: "/app/param", MaxResults: 10, ShowPatch: true, ParseJSON: true},
+			mock: &mockClient{
+				getParameterHistoryFunc: func(_ context.Context, _ *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
+					return &paramapi.GetParameterHistoryOutput{
+						Parameters: []paramapi.ParameterHistory{
+							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr(`{"key":"old"}`), Version: 1, LastModifiedDate: lo.ToPtr(now.Add(-time.Hour))},
+							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr(`{"key":"new"}`), Version: 2, LastModifiedDate: &now},
+						},
+					}, nil
+				},
+			},
+			check: func(t *testing.T, output string) {
+				assert.Contains(t, output, "Version")
+			},
+		},
+		{
+			name: "version without LastModifiedDate shows correctly",
+			opts: log.Options{Name: "/app/param", MaxResults: 10},
+			mock: &mockClient{
+				getParameterHistoryFunc: func(_ context.Context, _ *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
+					return &paramapi.GetParameterHistoryOutput{
+						Parameters: []paramapi.ParameterHistory{
+							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr("v1"), Version: 1, LastModifiedDate: nil},
+						},
+					}, nil
+				},
+			},
+			check: func(t *testing.T, output string) {
+				assert.Contains(t, output, "Version 1")
+				assert.NotContains(t, output, "Date:")
+			},
+		},
+		{
+			name: "oneline without LastModifiedDate",
+			opts: log.Options{Name: "/app/param", MaxResults: 10, Oneline: true},
+			mock: &mockClient{
+				getParameterHistoryFunc: func(_ context.Context, _ *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
+					return &paramapi.GetParameterHistoryOutput{
+						Parameters: []paramapi.ParameterHistory{
+							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr("v1"), Version: 1, LastModifiedDate: nil},
+						},
+					}, nil
+				},
+			},
+			check: func(t *testing.T, output string) {
+				assert.Contains(t, output, "1")
+			},
+		},
+		{
+			name: "patch with identical values shows no diff",
+			opts: log.Options{Name: "/app/param", MaxResults: 10, ShowPatch: true},
+			mock: &mockClient{
+				getParameterHistoryFunc: func(_ context.Context, _ *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
+					return &paramapi.GetParameterHistoryOutput{
+						Parameters: []paramapi.ParameterHistory{
+							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr("same-value"), Version: 1, LastModifiedDate: lo.ToPtr(now.Add(-time.Hour))},
+							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr("same-value"), Version: 2, LastModifiedDate: &now},
+						},
+					}, nil
+				},
+			},
+			check: func(t *testing.T, output string) {
+				assert.Contains(t, output, "Version")
+				// No diff should be shown since values are identical
+				assert.NotContains(t, output, "-same-value")
+				assert.NotContains(t, output, "+same-value")
 			},
 		},
 	}

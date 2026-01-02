@@ -1107,20 +1107,37 @@ func TestGlobal_StageResetAll(t *testing.T) {
 	store := staging.NewStoreWithPath(filepath.Join(tmpHome, ".suve", "stage.json"))
 	_ = store.Stage(staging.ServiceParam, paramName, staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value: lo.ToPtr("staged"),
+		Value:     lo.ToPtr("staged"),
 		StagedAt:  time.Now(),
 	})
 	_ = store.Stage(staging.ServiceSecret, secretName, staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value: lo.ToPtr("staged"),
+		Value:     lo.ToPtr("staged"),
 		StagedAt:  time.Now(),
 	})
 
-	// Global reset (automatically resets all, no --all flag needed)
-	t.Run("reset-all", func(t *testing.T) {
-		stdout, _, err := runCommand(t, globalreset.Command())
+	// Global reset requires --all flag
+	t.Run("reset-without-all-warns", func(t *testing.T) {
+		stdout, stderr, err := runCommand(t, globalreset.Command())
 		require.NoError(t, err)
-		t.Logf("global reset output: %s", stdout)
+		// Without --all, should show warning
+		assert.Contains(t, stderr, "no effect")
+		t.Logf("global reset without --all output: %s, stderr: %s", stdout, stderr)
+	})
+
+	// Verify still staged (not reset without --all)
+	t.Run("verify-still-staged", func(t *testing.T) {
+		stdout, _, err := runCommand(t, globalstatus.Command())
+		require.NoError(t, err)
+		assert.Contains(t, stdout, paramName)
+		assert.Contains(t, stdout, secretName)
+	})
+
+	// Global reset with --all
+	t.Run("reset-with-all", func(t *testing.T) {
+		stdout, _, err := runCommand(t, globalreset.Command(), "--all")
+		require.NoError(t, err)
+		t.Logf("global reset --all output: %s", stdout)
 	})
 
 	// Verify empty

@@ -220,7 +220,7 @@ Applying SSM Parameter Store parameters...
 suve stage param reset /app/config/database-url
 
 # Unstage all
-suve stage reset
+suve stage reset --all
 ```
 
 > [!TIP]
@@ -286,7 +286,7 @@ where ~SHIFT = ~ | ~N  (repeatable, cumulative)
 | Command | Options | Description |
 |---------|---------|-------------|
 | [`suve param show`](docs/param.md#show) | `--raw`<br>`--decrypt`<br>`--parse-json` (`-j`)<br>`--no-pager`<br>`--output=<FORMAT>` | Display parameter with metadata |
-| [`suve param log`](docs/param.md#log) | `--number=<N>` (`-n`)<br>`--patch` (`-p`)<br>`--parse-json` (`-j`)<br>`--oneline`<br>`--reverse`<br>`--from=<SPEC>`<br>`--to=<SPEC>`<br>`--no-pager`<br>`--output=<FORMAT>` | Show version history |
+| [`suve param log`](docs/param.md#log) | `--number=<N>` (`-n`)<br>`--patch` (`-p`)<br>`--parse-json` (`-j`)<br>`--oneline`<br>`--reverse`<br>`--since=<DATE>`<br>`--until=<DATE>`<br>`--no-pager`<br>`--output=<FORMAT>` | Show version history |
 | [`suve param diff`](docs/param.md#diff) | `--parse-json` (`-j`)<br>`--no-pager`<br>`--output=<FORMAT>` | Compare versions |
 | [`suve param list`](docs/param.md#list) | `--recursive` (`-R`)<br>`--filter=<REGEX>`<br>`--show`<br>`--output=<FORMAT>` | List parameters |
 | [`suve param set`](docs/param.md#set) | `--type=<TYPE>`<br>`--secure`<br>`--description=<TEXT>`<br>`--tag=<KEY>=<VALUE> --tag=...`<br>`--untag=<KEY> --untag=...`<br>`--yes` | Create or update parameter |
@@ -309,7 +309,7 @@ where ~SHIFT = ~ | ~N  (repeatable, cumulative)
 | Command | Options | Description |
 |---------|---------|-------------|
 | [`suve secret show`](docs/secret.md#show) | `--raw`<br>`--parse-json` (`-j`)<br>`--no-pager`<br>`--output=<FORMAT>` | Display secret with metadata |
-| [`suve secret log`](docs/secret.md#log) | `--number=<N>` (`-n`)<br>`--patch` (`-p`)<br>`--parse-json` (`-j`)<br>`--oneline`<br>`--reverse`<br>`--no-pager`<br>`--output=<FORMAT>` | Show version history |
+| [`suve secret log`](docs/secret.md#log) | `--number=<N>` (`-n`)<br>`--patch` (`-p`)<br>`--parse-json` (`-j`)<br>`--oneline`<br>`--reverse`<br>`--since=<DATE>`<br>`--until=<DATE>`<br>`--no-pager`<br>`--output=<FORMAT>` | Show version history |
 | [`suve secret diff`](docs/secret.md#diff) | `--parse-json` (`-j`)<br>`--no-pager`<br>`--output=<FORMAT>` | Compare versions |
 | [`suve secret list`](docs/secret.md#list) | `--filter=<REGEX>`<br>`--show`<br>`--output=<FORMAT>` | List secrets |
 | [`suve secret create`](docs/secret.md#create) | `--description=<TEXT>`<br>`--tag=<KEY>=<VALUE> --tag=...` | Create new secret |
@@ -336,7 +336,7 @@ where ~SHIFT = ~ | ~N  (repeatable, cumulative)
 | `suve stage status` | `--verbose` (`-v`) | Show all staged changes |
 | `suve stage diff` | `--parse-json` (`-j`)<br>`--no-pager` | Compare all staged vs AWS |
 | `suve stage apply` | `--yes`<br>`--ignore-conflicts` | Apply all staged changes |
-| `suve stage reset` | | Unstage all changes |
+| `suve stage reset` | `--all` | Unstage all changes |
 
 ## Environment Variables
 

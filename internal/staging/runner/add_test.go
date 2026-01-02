@@ -3,6 +3,7 @@ package runner_test
 import (
 	"bytes"
 	"context"
+	"errors"
 	"path/filepath"
 	"testing"
 
@@ -159,7 +160,8 @@ func TestAddRunner_Run(t *testing.T) {
 
 // mockStrategy implements staging.Parser for testing.
 type mockStrategy struct {
-	service staging.Service
+	service      staging.Service
+	parseNameErr error
 }
 
 func (m *mockStrategy) Service() staging.Service { return m.service }
@@ -167,8 +169,116 @@ func (m *mockStrategy) ServiceName() string      { return string(m.service) }
 func (m *mockStrategy) ItemName() string         { return "item" }
 func (m *mockStrategy) HasDeleteOptions() bool   { return false }
 func (m *mockStrategy) ParseName(input string) (string, error) {
+	if m.parseNameErr != nil {
+		return "", m.parseNameErr
+	}
 	return input, nil
 }
 func (m *mockStrategy) ParseSpec(input string) (string, bool, error) {
 	return input, false, nil
+}
+
+func TestAddRunner_ErrorCases(t *testing.T) {
+	t.Parallel()
+
+	t.Run("parse name error", func(t *testing.T) {
+		t.Parallel()
+
+		tmpDir := t.TempDir()
+		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+
+		var stdout, stderr bytes.Buffer
+		r := &runner.AddRunner{
+			Strategy: &mockStrategy{service: staging.ServiceParam, parseNameErr: errors.New("invalid name")},
+			Store:    store,
+			Stdout:   &stdout,
+			Stderr:   &stderr,
+		}
+
+		err := r.Run(context.Background(), runner.AddOptions{Name: "invalid"})
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid name")
+	})
+
+	t.Run("editor error", func(t *testing.T) {
+		t.Parallel()
+
+		tmpDir := t.TempDir()
+		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+
+		var stdout, stderr bytes.Buffer
+		r := &runner.AddRunner{
+			Strategy: &mockStrategy{service: staging.ServiceParam},
+			Store:    store,
+			Stdout:   &stdout,
+			Stderr:   &stderr,
+			OpenEditor: func(_ string) (string, error) {
+				return "", errors.New("editor crashed")
+			},
+		}
+
+		err := r.Run(context.Background(), runner.AddOptions{Name: "/app/config"})
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to edit")
+	})
+}
+
+func TestAddRunner_WithOptions(t *testing.T) {
+	t.Parallel()
+
+	t.Run("with provided value (skip editor)", func(t *testing.T) {
+		t.Parallel()
+
+		tmpDir := t.TempDir()
+		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+
+		var stdout, stderr bytes.Buffer
+		r := &runner.AddRunner{
+			Strategy: &mockStrategy{service: staging.ServiceParam},
+			Store:    store,
+			Stdout:   &stdout,
+			Stderr:   &stderr,
+			// No OpenEditor set - with Value provided, editor should not be called
+		}
+
+		err := r.Run(context.Background(), runner.AddOptions{
+			Name:  "/app/new-config",
+			Value: "direct-value",
+		})
+		require.NoError(t, err)
+		assert.Contains(t, stdout.String(), "Staged for creation")
+
+		entry, err := store.Get(staging.ServiceParam, "/app/new-config")
+		require.NoError(t, err)
+		assert.Equal(t, staging.OperationCreate, entry.Operation)
+		assert.Equal(t, "direct-value", lo.FromPtr(entry.Value))
+	})
+
+	t.Run("with description and tags", func(t *testing.T) {
+		t.Parallel()
+
+		tmpDir := t.TempDir()
+		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+
+		var stdout, stderr bytes.Buffer
+		r := &runner.AddRunner{
+			Strategy: &mockStrategy{service: staging.ServiceParam},
+			Store:    store,
+			Stdout:   &stdout,
+			Stderr:   &stderr,
+		}
+
+		err := r.Run(context.Background(), runner.AddOptions{
+			Name:        "/app/new-config",
+			Value:       "test-value",
+			Description: "Test description",
+			Tags:        map[string]string{"env": "prod"},
+		})
+		require.NoError(t, err)
+
+		entry, err := store.Get(staging.ServiceParam, "/app/new-config")
+		require.NoError(t, err)
+		assert.Equal(t, "Test description", lo.FromPtr(entry.Description))
+		assert.Equal(t, map[string]string{"env": "prod"}, entry.Tags)
+	})
 }

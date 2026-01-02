@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"sort"
+	"time"
 
 	"github.com/samber/lo"
 	"github.com/urfave/cli/v3"
@@ -46,6 +47,8 @@ type Options struct {
 	Reverse    bool
 	NoPager    bool
 	Oneline    bool
+	Since      *time.Time
+	Until      *time.Time
 	Output     output.Format
 }
 
@@ -74,6 +77,7 @@ Version UUIDs are truncated to 8 characters for readability.
 Use --patch to show the diff between consecutive versions (like git log -p).
 Use --parse-json with --patch to format JSON values before diffing (keys are always sorted).
 Use --oneline for a compact one-line-per-version format.
+Use --since/--until to filter by creation date (RFC3339 format).
 
 OUTPUT FORMAT:
    Use --output=json for structured JSON output.
@@ -84,6 +88,7 @@ EXAMPLES:
    suve secret log --patch --parse-json my-secret        Show diffs with JSON formatting
    suve secret log --oneline my-secret                   Compact one-line format
    suve secret log --number 5 my-secret                  Show last 5 versions
+   suve secret log --since 2024-01-01T00:00:00Z my-secret  Show versions since date
    suve secret log --output=json my-secret               Output as JSON`,
 		Flags: []cli.Flag{
 			&cli.IntFlag{
@@ -116,6 +121,14 @@ EXAMPLES:
 				Usage: "Disable pager output",
 			},
 			&cli.StringFlag{
+				Name:  "since",
+				Usage: "Show versions created after this date (RFC3339 format, e.g., '2024-01-01T00:00:00Z')",
+			},
+			&cli.StringFlag{
+				Name:  "until",
+				Usage: "Show versions created before this date (RFC3339 format, e.g., '2024-12-31T23:59:59Z')",
+			},
+			&cli.StringFlag{
 				Name:  "output",
 				Usage: "Output format: text (default) or json",
 			},
@@ -138,6 +151,24 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		NoPager:    cmd.Bool("no-pager"),
 		Oneline:    cmd.Bool("oneline"),
 		Output:     output.ParseFormat(cmd.String("output")),
+	}
+
+	// Parse --since timestamp
+	if sinceArg := cmd.String("since"); sinceArg != "" {
+		since, err := time.Parse(time.RFC3339, sinceArg)
+		if err != nil {
+			return fmt.Errorf("invalid --since value: must be RFC3339 format (e.g., '2024-01-01T00:00:00Z')")
+		}
+		opts.Since = &since
+	}
+
+	// Parse --until timestamp
+	if untilArg := cmd.String("until"); untilArg != "" {
+		until, err := time.Parse(time.RFC3339, untilArg)
+		if err != nil {
+			return fmt.Errorf("invalid --until value: must be RFC3339 format (e.g., '2024-12-31T23:59:59Z')")
+		}
+		opts.Until = &until
 	}
 
 	// Warn if --parse-json is used without -p
@@ -191,6 +222,14 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 	versions := result.Versions
 	if len(versions) == 0 {
 		return nil
+	}
+
+	// Filter by date range if specified (before sorting for efficiency)
+	if opts.Since != nil || opts.Until != nil {
+		versions = filterDateRange(versions, opts.Since, opts.Until)
+		if len(versions) == 0 {
+			return nil
+		}
 	}
 
 	sort.Slice(versions, func(i, j int) bool {
@@ -334,4 +373,22 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 	}
 
 	return nil
+}
+
+// filterDateRange filters secret versions to only include those within the specified date range.
+func filterDateRange(versions []secretapi.SecretVersionsListEntry, since, until *time.Time) []secretapi.SecretVersionsListEntry {
+	var filtered []secretapi.SecretVersionsListEntry
+	for _, v := range versions {
+		if v.CreatedDate == nil {
+			continue
+		}
+		if since != nil && v.CreatedDate.Before(*since) {
+			continue
+		}
+		if until != nil && v.CreatedDate.After(*until) {
+			continue
+		}
+		filtered = append(filtered, v)
+	}
+	return filtered
 }

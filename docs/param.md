@@ -143,9 +143,9 @@ suve param log [options] <name>
 | `--parse-json` | `-j` | `false` | Format JSON values before diffing (use with `--patch`) |
 | `--oneline` | - | `false` | Compact one-line-per-version format |
 | `--reverse` | - | `false` | Show oldest versions first |
+| `--since` | - | - | Show versions modified after this date (RFC3339 format) |
+| `--until` | - | - | Show versions modified before this date (RFC3339 format) |
 | `--no-pager` | - | `false` | Disable pager output |
-| `--from` | - | - | Start version (e.g., `#3`, `~2`) |
-| `--to` | - | - | End version (e.g., `#5`, `~0`) |
 | `--output` | - | `text` | Output format: `text` (default) or `json` |
 
 **Examples:**

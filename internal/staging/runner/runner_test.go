@@ -1481,3 +1481,103 @@ func TestDiffRunner_OutputMetadata(t *testing.T) {
 		assert.Contains(t, output, "env=staging")
 	})
 }
+
+// =============================================================================
+// EditRunner Additional Tests
+// =============================================================================
+
+func TestEditRunner_WithMetadata(t *testing.T) {
+	t.Parallel()
+
+	t.Run("edit with description and tags", func(t *testing.T) {
+		t.Parallel()
+
+		tmpDir := t.TempDir()
+		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+
+		var stdout, stderr bytes.Buffer
+		r := &runner.EditRunner{
+			Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentVal: "current"},
+			Store:    store,
+			Stdout:   &stdout,
+			Stderr:   &stderr,
+		}
+
+		err := r.Run(context.Background(), runner.EditOptions{
+			Name:        "/app/config",
+			Value:       "new-value",
+			Description: "Updated description",
+			Tags:        map[string]string{"env": "staging"},
+		})
+		require.NoError(t, err)
+
+		entry, err := store.Get(staging.ServiceParam, "/app/config")
+		require.NoError(t, err)
+		assert.Equal(t, "Updated description", lo.FromPtr(entry.Description))
+		assert.Equal(t, map[string]string{"env": "staging"}, entry.Tags)
+	})
+
+	t.Run("edit preserves BaseModifiedAt from AWS", func(t *testing.T) {
+		t.Parallel()
+
+		tmpDir := t.TempDir()
+		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		awsTime := time.Now().Add(-time.Hour).Truncate(time.Second)
+
+		var stdout, stderr bytes.Buffer
+		r := &runner.EditRunner{
+			Strategy: &fullMockStrategy{
+				service:              staging.ServiceParam,
+				fetchCurrentVal:      "current",
+				fetchLastModifiedVal: awsTime,
+			},
+			Store:  store,
+			Stdout: &stdout,
+			Stderr: &stderr,
+		}
+
+		err := r.Run(context.Background(), runner.EditOptions{
+			Name:  "/app/config",
+			Value: "new-value",
+		})
+		require.NoError(t, err)
+
+		entry, err := store.Get(staging.ServiceParam, "/app/config")
+		require.NoError(t, err)
+		require.NotNil(t, entry.BaseModifiedAt)
+		assert.WithinDuration(t, awsTime, *entry.BaseModifiedAt, time.Second)
+	})
+
+	t.Run("edit staged delete operation fetches from AWS", func(t *testing.T) {
+		t.Parallel()
+
+		tmpDir := t.TempDir()
+		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		// Stage a delete operation
+		_ = store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
+			Operation: staging.OperationDelete,
+			StagedAt:  time.Now(),
+		})
+
+		var stdout, stderr bytes.Buffer
+		r := &runner.EditRunner{
+			Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentVal: "aws-value"},
+			Store:    store,
+			Stdout:   &stdout,
+			Stderr:   &stderr,
+			OpenEditor: func(current string) (string, error) {
+				// Should fetch from AWS, not use empty staged value
+				assert.Equal(t, "aws-value", current)
+				return "edited-value", nil
+			},
+		}
+
+		err := r.Run(context.Background(), runner.EditOptions{Name: "/app/config"})
+		require.NoError(t, err)
+
+		entry, err := store.Get(staging.ServiceParam, "/app/config")
+		require.NoError(t, err)
+		assert.Equal(t, staging.OperationUpdate, entry.Operation)
+		assert.Equal(t, "edited-value", lo.FromPtr(entry.Value))
+	})
+}

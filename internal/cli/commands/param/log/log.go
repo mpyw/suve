@@ -10,7 +10,7 @@ import (
 	"fmt"
 	"io"
 	"slices"
-	"strings"
+	"time"
 
 	"github.com/samber/lo"
 	"github.com/urfave/cli/v3"
@@ -22,7 +22,6 @@ import (
 	"github.com/mpyw/suve/internal/jsonutil"
 	"github.com/mpyw/suve/internal/output"
 	"github.com/mpyw/suve/internal/timeutil"
-	"github.com/mpyw/suve/internal/version/paramversion"
 )
 
 // Client is the interface for the log command.
@@ -39,16 +38,16 @@ type Runner struct {
 
 // Options holds the options for the log command.
 type Options struct {
-	Name        string
-	MaxResults  int32
-	ShowPatch   bool
-	ParseJSON   bool
-	Reverse     bool
-	NoPager     bool
-	Oneline     bool
-	FromVersion *int64
-	ToVersion   *int64
-	Output      output.Format
+	Name       string
+	MaxResults int32
+	ShowPatch  bool
+	ParseJSON  bool
+	Reverse    bool
+	NoPager    bool
+	Oneline    bool
+	Since      *time.Time
+	Until      *time.Time
+	Output     output.Format
 }
 
 // JSONOutputItem represents a single version entry in JSON output.
@@ -76,7 +75,7 @@ Value previews are truncated at 50 characters.
 Use --patch to show the diff between consecutive versions (like git log -p).
 Use --parse-json with --patch to format JSON values before diffing (keys are always sorted).
 Use --oneline for a compact one-line-per-version format.
-Use --from/--to to filter by version range (accepts version specs like '#3', '~1').
+Use --since/--until to filter by modification date (RFC3339 format).
 
 OUTPUT FORMAT:
    Use --output=json for structured JSON output.
@@ -87,7 +86,7 @@ EXAMPLES:
    suve param log --patch --parse-json /app/config        Show diffs with JSON formatting
    suve param log --oneline /app/config                   Compact one-line format
    suve param log --number 5 /app/config                  Show last 5 versions
-   suve param log --from '#3' --to '#5' /app/config       Show versions 3 to 5
+   suve param log --since 2024-01-01T00:00:00Z /app/config  Show versions since date
    suve param log --output=json /app/config               Output as JSON`,
 		Flags: []cli.Flag{
 			&cli.IntFlag{
@@ -120,12 +119,12 @@ EXAMPLES:
 				Usage: "Disable pager output",
 			},
 			&cli.StringFlag{
-				Name:  "from",
-				Usage: "Start version (e.g., '#3', '~2')",
+				Name:  "since",
+				Usage: "Show versions modified after this date (RFC3339 format, e.g., '2024-01-01T00:00:00Z')",
 			},
 			&cli.StringFlag{
-				Name:  "to",
-				Usage: "End version (e.g., '#5', '~0')",
+				Name:  "until",
+				Usage: "Show versions modified before this date (RFC3339 format, e.g., '2024-12-31T23:59:59Z')",
 			},
 			&cli.StringFlag{
 				Name:  "output",
@@ -154,22 +153,22 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		Output:     output.ParseFormat(cmd.String("output")),
 	}
 
-	// Parse --from version spec
-	if fromArg := cmd.String("from"); fromArg != "" {
-		fromVersion, err := parseVersionSpec(name, fromArg)
+	// Parse --since timestamp
+	if sinceArg := cmd.String("since"); sinceArg != "" {
+		since, err := time.Parse(time.RFC3339, sinceArg)
 		if err != nil {
-			return fmt.Errorf("invalid --from value: %w", err)
+			return fmt.Errorf("invalid --since value: must be RFC3339 format (e.g., '2024-01-01T00:00:00Z')")
 		}
-		opts.FromVersion = fromVersion
+		opts.Since = &since
 	}
 
-	// Parse --to version spec
-	if toArg := cmd.String("to"); toArg != "" {
-		toVersion, err := parseVersionSpec(name, toArg)
+	// Parse --until timestamp
+	if untilArg := cmd.String("until"); untilArg != "" {
+		until, err := time.Parse(time.RFC3339, untilArg)
 		if err != nil {
-			return fmt.Errorf("invalid --to value: %w", err)
+			return fmt.Errorf("invalid --until value: must be RFC3339 format (e.g., '2024-12-31T23:59:59Z')")
 		}
-		opts.ToVersion = toVersion
+		opts.Until = &until
 	}
 
 	// Warn if --parse-json is used without -p
@@ -226,9 +225,9 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 		return nil
 	}
 
-	// Filter by version range if specified
-	if opts.FromVersion != nil || opts.ToVersion != nil {
-		params = filterVersionRange(params, opts.FromVersion, opts.ToVersion)
+	// Filter by date range if specified
+	if opts.Since != nil || opts.Until != nil {
+		params = filterDateRange(params, opts.Since, opts.Until)
 		if len(params) == 0 {
 			return nil
 		}
@@ -353,42 +352,18 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 	return nil
 }
 
-// parseVersionSpec parses a version specifier like "#3" or "~1" and returns the resolved version.
-// If the spec doesn't start with a specifier character, it's treated as a full spec.
-func parseVersionSpec(name, spec string) (*int64, error) {
-	// If spec starts with #, ~, prepend the name
-	spec = strings.TrimSpace(spec)
-	if strings.HasPrefix(spec, "#") || strings.HasPrefix(spec, "~") {
-		spec = name + spec
-	}
-
-	parsed, err := paramversion.Parse(spec)
-	if err != nil {
-		return nil, err
-	}
-
-	// For now, we only support absolute version or shift from latest
-	// If there's a shift, we can't resolve it here (need history data)
-	if parsed.HasShift() {
-		return nil, fmt.Errorf("shift syntax (~) not supported in --from/--to; use absolute version (#N)")
-	}
-
-	if parsed.Absolute.Version == nil {
-		return nil, fmt.Errorf("version specifier required (e.g., '#3')")
-	}
-
-	return parsed.Absolute.Version, nil
-}
-
-// filterVersionRange filters parameters to only include versions in the specified range.
+// filterDateRange filters parameters to only include versions within the specified date range.
 // Parameters are expected in oldest-first order (as returned by AWS).
-func filterVersionRange(params []paramapi.ParameterHistory, from, to *int64) []paramapi.ParameterHistory {
+func filterDateRange(params []paramapi.ParameterHistory, since, until *time.Time) []paramapi.ParameterHistory {
 	var filtered []paramapi.ParameterHistory
 	for _, p := range params {
-		if from != nil && p.Version < *from {
+		if p.LastModifiedDate == nil {
 			continue
 		}
-		if to != nil && p.Version > *to {
+		if since != nil && p.LastModifiedDate.Before(*since) {
+			continue
+		}
+		if until != nil && p.LastModifiedDate.After(*until) {
 			continue
 		}
 		filtered = append(filtered, p)

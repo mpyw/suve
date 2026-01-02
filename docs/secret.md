@@ -142,6 +142,8 @@ suve secret log [options] <name>
 | `--parse-json` | `-j` | `false` | Format JSON values before diffing (use with `--patch`) |
 | `--oneline` | - | `false` | Compact one-line-per-version format |
 | `--reverse` | - | `false` | Show oldest versions first |
+| `--since` | - | - | Show versions created after this date (RFC3339 format) |
+| `--until` | - | - | Show versions created before this date (RFC3339 format) |
 | `--no-pager` | - | `false` | Disable pager output |
 | `--output` | - | `text` | Output format: `text` (default) or `json` |
 

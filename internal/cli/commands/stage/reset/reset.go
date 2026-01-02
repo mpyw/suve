@@ -31,12 +31,25 @@ This does not affect AWS - it only clears the local staging area.
 Use 'suve stage param reset' or 'suve stage secret reset' for service-specific operations.
 
 EXAMPLES:
-   suve stage reset    Unstage all changes (SSM Parameter Store and Secrets Manager)`,
+   suve stage reset --all    Unstage all changes (SSM Parameter Store and Secrets Manager)`,
+		Flags: []cli.Flag{
+			&cli.BoolFlag{
+				Name:  "all",
+				Usage: "Unstage all changes (required)",
+			},
+		},
 		Action: action,
 	}
 }
 
 func action(ctx context.Context, cmd *cli.Command) error {
+	// Require --all flag for safety
+	if !cmd.Bool("all") {
+		_, _ = fmt.Fprintln(cmd.Root().ErrWriter, colors.Warning("Warning: no effect without --all flag"))
+		_, _ = fmt.Fprintln(cmd.Root().ErrWriter, "Hint: Use 'suve stage reset --all' to unstage all changes")
+		return nil
+	}
+
 	store, err := staging.NewStore()
 	if err != nil {
 		return fmt.Errorf("failed to initialize stage store: %w", err)
