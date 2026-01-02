@@ -1054,9 +1054,9 @@ func TestGlobal_StageWorkflow(t *testing.T) {
 		t.Logf("global diff output: %s", stdout)
 	})
 
-	// 3. Global apply applies both (no -y needed, it doesn't have confirmation)
+	// 3. Global apply applies both
 	t.Run("global-apply", func(t *testing.T) {
-		stdout, _, err := runCommand(t, globalapply.Command())
+		stdout, _, err := runCommand(t, globalapply.Command(), "--yes")
 		require.NoError(t, err)
 		assert.Contains(t, stdout, paramName)
 		assert.Contains(t, stdout, secretName)

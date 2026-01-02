@@ -322,10 +322,10 @@ func NewApplyCommand(cfg CommandConfig) *cli.Command {
 		Aliases:   []string{"push"},
 		Usage:     fmt.Sprintf("Apply staged %s changes to AWS", cfg.ItemName),
 		ArgsUsage: "[name]",
-		Description: fmt.Sprintf(`Apply all staged %s %s changes to AWS.
+		Description: fmt.Sprintf(`Apply all staged %s changes to AWS.
 
 If a %s name is specified, only that %s's staged changes are applied.
-Otherwise, all staged %s %s changes are applied.
+Otherwise, all staged %s changes are applied.
 
 After successful apply, the staged changes are cleared.
 
@@ -341,11 +341,11 @@ EXAMPLES:
    suve stage %s apply <name>               Apply only the specified %s
    suve stage %s apply --yes                Apply without confirmation
    suve stage %s apply --ignore-conflicts   Apply even if AWS was modified after staging`,
-			cfg.ServiceName, cfg.ItemName,
+			cfg.ItemName,
 			cfg.ItemName, cfg.ItemName,
-			cfg.ServiceName, cfg.ItemName,
+			cfg.ItemName,
 			cfg.ServiceName,
-			cfg.ServiceName, cfg.ServiceName,
+			cfg.ServiceName, cfg.ItemName,
 			cfg.ServiceName, cfg.ItemName,
 			cfg.ServiceName,
 			cfg.ServiceName),
@@ -441,7 +441,7 @@ func NewResetCommand(cfg CommandConfig) *cli.Command {
 Without a version specifier, the %s is simply removed from staging.
 With a version specifier, the value at that version is fetched and staged.
 
-Use 'suve stage %s reset --all' to unstage all %s %ss at once.
+Use 'suve stage %s reset --all' to unstage all %ss at once.
 
 VERSION SPECIFIERS:
    <name>          Unstage %s (remove from staging)
@@ -452,19 +452,19 @@ EXAMPLES:
    suve stage %s reset <name>              Unstage (remove from staging)
    suve stage %s reset <name>#<ver>        Stage value from specific version
    suve stage %s reset <name>~1            Stage value from previous version
-   suve stage %s reset --all               Unstage all %s %ss`,
+   suve stage %s reset --all               Unstage all %ss`,
 			cfg.ItemName,
 			cfg.ItemName,
-			cfg.ServiceName, cfg.ServiceName, cfg.ItemName,
+			cfg.ServiceName, cfg.ItemName,
 			cfg.ItemName,
 			cfg.ServiceName,
 			cfg.ServiceName,
 			cfg.ServiceName,
-			cfg.ServiceName, cfg.ServiceName, cfg.ItemName),
+			cfg.ServiceName, cfg.ItemName),
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
 				Name:  "all",
-				Usage: fmt.Sprintf("Unstage all %s %ss", cfg.ServiceName, cfg.ItemName),
+				Usage: fmt.Sprintf("Unstage all %ss", cfg.ItemName),
 			},
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {

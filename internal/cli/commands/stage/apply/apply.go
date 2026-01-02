@@ -5,9 +5,11 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
 
 	"github.com/urfave/cli/v3"
 
+	"github.com/mpyw/suve/internal/cli/confirm"
 	"github.com/mpyw/suve/internal/maputil"
 	"github.com/mpyw/suve/internal/output"
 	"github.com/mpyw/suve/internal/parallel"
@@ -37,7 +39,14 @@ Use 'suve stage status' to view all staged changes before applying.
 Use 'suve stage param apply' or 'suve stage secret apply' for service-specific changes.
 
 EXAMPLES:
-   suve stage apply    Apply all staged changes (SSM Parameter Store and Secrets Manager)`,
+   suve stage apply        Apply all staged changes (with confirmation)
+   suve stage apply --yes  Apply without confirmation`,
+		Flags: []cli.Flag{
+			&cli.BoolFlag{
+				Name:  "yes",
+				Usage: "Skip confirmation prompt",
+			},
+		},
 		Action: action,
 	}
 }
@@ -63,6 +72,26 @@ func action(ctx context.Context, cmd *cli.Command) error {
 
 	if !hasParam && !hasSecret {
 		output.Info(cmd.Root().Writer, "No changes staged.")
+		return nil
+	}
+
+	// Count total staged changes
+	totalStaged := len(paramStaged[staging.ServiceParam]) + len(secretStaged[staging.ServiceSecret])
+
+	// Confirm apply
+	skipConfirm := cmd.Bool("yes")
+	prompter := &confirm.Prompter{
+		Stdin:  os.Stdin,
+		Stdout: cmd.Root().Writer,
+		Stderr: cmd.Root().ErrWriter,
+	}
+
+	message := fmt.Sprintf("Apply %d staged change(s) to AWS?", totalStaged)
+	confirmed, err := prompter.Confirm(message, skipConfirm)
+	if err != nil {
+		return err
+	}
+	if !confirmed {
 		return nil
 	}
 
