@@ -9,7 +9,7 @@ import (
 // ServiceStrategy defines the common interface for service-specific operations.
 // This enables Strategy Pattern to consolidate duplicate code across SSM and SM commands.
 type ServiceStrategy interface {
-	// Service returns the service type (ServiceSSM or ServiceSM).
+	// Service returns the service type (ServiceParam or ServiceSecret).
 	Service() Service
 
 	// ServiceName returns the user-friendly service name (e.g., "SSM", "SM").

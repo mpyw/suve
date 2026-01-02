@@ -27,28 +27,26 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/urfave/cli/v3"
 
-	smcat "github.com/mpyw/suve/internal/cli/commands/sm/cat"
-	smcreate "github.com/mpyw/suve/internal/cli/commands/sm/create"
-	smdelete "github.com/mpyw/suve/internal/cli/commands/sm/delete"
-	smdiff "github.com/mpyw/suve/internal/cli/commands/sm/diff"
-	smlog "github.com/mpyw/suve/internal/cli/commands/sm/log"
-	smls "github.com/mpyw/suve/internal/cli/commands/sm/ls"
-	smrestore "github.com/mpyw/suve/internal/cli/commands/sm/restore"
-	smshow "github.com/mpyw/suve/internal/cli/commands/sm/show"
-	smupdate "github.com/mpyw/suve/internal/cli/commands/sm/update"
-	ssmcat "github.com/mpyw/suve/internal/cli/commands/ssm/cat"
-	ssmdelete "github.com/mpyw/suve/internal/cli/commands/ssm/delete"
-	ssmdiff "github.com/mpyw/suve/internal/cli/commands/ssm/diff"
-	ssmlog "github.com/mpyw/suve/internal/cli/commands/ssm/log"
-	ssmls "github.com/mpyw/suve/internal/cli/commands/ssm/ls"
-	ssmset "github.com/mpyw/suve/internal/cli/commands/ssm/set"
-	ssmshow "github.com/mpyw/suve/internal/cli/commands/ssm/show"
+	secretcreate "github.com/mpyw/suve/internal/cli/commands/secret/create"
+	secretdelete "github.com/mpyw/suve/internal/cli/commands/secret/delete"
+	secretdiff "github.com/mpyw/suve/internal/cli/commands/secret/diff"
+	secretlog "github.com/mpyw/suve/internal/cli/commands/secret/log"
+	secretls "github.com/mpyw/suve/internal/cli/commands/secret/ls"
+	secretrestore "github.com/mpyw/suve/internal/cli/commands/secret/restore"
+	secretshow "github.com/mpyw/suve/internal/cli/commands/secret/show"
+	secretupdate "github.com/mpyw/suve/internal/cli/commands/secret/update"
+	paramdelete "github.com/mpyw/suve/internal/cli/commands/param/delete"
+	paramdiff "github.com/mpyw/suve/internal/cli/commands/param/diff"
+	paramlog "github.com/mpyw/suve/internal/cli/commands/param/log"
+	paramls "github.com/mpyw/suve/internal/cli/commands/param/ls"
+	paramset "github.com/mpyw/suve/internal/cli/commands/param/set"
+	paramshow "github.com/mpyw/suve/internal/cli/commands/param/show"
 	globalstage "github.com/mpyw/suve/internal/cli/commands/stage"
 	globaldiff "github.com/mpyw/suve/internal/cli/commands/stage/diff"
 	globalpush "github.com/mpyw/suve/internal/cli/commands/stage/push"
 	globalreset "github.com/mpyw/suve/internal/cli/commands/stage/reset"
-	smstage "github.com/mpyw/suve/internal/cli/commands/stage/sm"
-	ssmstage "github.com/mpyw/suve/internal/cli/commands/stage/ssm"
+	secretstage "github.com/mpyw/suve/internal/cli/commands/stage/secret"
+	paramstage "github.com/mpyw/suve/internal/cli/commands/stage/param"
 	globalstatus "github.com/mpyw/suve/internal/cli/commands/stage/status"
 	"github.com/mpyw/suve/internal/staging"
 )
@@ -99,7 +97,7 @@ func runCommand(t *testing.T, cmd *cli.Command, args ...string) (stdout, stderr 
 	return outBuf.String(), errBuf.String(), err
 }
 
-// runSubCommand executes a subcommand (e.g., "ssm stage status") and returns stdout, stderr, and error.
+// runSubCommand executes a subcommand (e.g., "param stage status") and returns stdout, stderr, and error.
 func runSubCommand(t *testing.T, parentCmd *cli.Command, subCmdName string, args ...string) (stdout, stderr string, err error) {
 	t.Helper()
 
@@ -123,49 +121,49 @@ func runSubCommand(t *testing.T, parentCmd *cli.Command, subCmdName string, args
 // =============================================================================
 
 // TestSSM_FullWorkflow tests the complete SSM Parameter Store workflow:
-// set → show → cat → update → log → diff → ls → delete → verify deletion
+// set → show → show --raw → update → log → diff → ls → delete → verify deletion
 func TestSSM_FullWorkflow(t *testing.T) {
 	setupEnv(t)
 	paramName := "/suve-e2e-test/basic/param"
 
 	// Cleanup: delete parameter if it exists (ignore errors)
-	_, _, _ = runCommand(t, ssmdelete.Command(), "-y", paramName)
+	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
 	t.Cleanup(func() {
-		_, _, _ = runCommand(t, ssmdelete.Command(), "-y", paramName)
+		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
 	})
 
 	// 1. Set parameter (with -y to skip confirmation)
 	t.Run("set", func(t *testing.T) {
-		stdout, _, err := runCommand(t, ssmset.Command(), "-y", paramName, "initial-value")
+		stdout, _, err := runCommand(t, paramset.Command(), "--yes", paramName, "initial-value")
 		require.NoError(t, err)
 		t.Logf("set output: %s", stdout)
 	})
 
 	// 2. Show parameter
 	t.Run("show", func(t *testing.T) {
-		stdout, _, err := runCommand(t, ssmshow.Command(), paramName)
+		stdout, _, err := runCommand(t, paramshow.Command(), paramName)
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "initial-value")
 		assert.Contains(t, stdout, paramName)
 		t.Logf("show output: %s", stdout)
 	})
 
-	// 3. Cat parameter (raw output without trailing newline)
-	t.Run("cat", func(t *testing.T) {
-		stdout, _, err := runCommand(t, ssmcat.Command(), paramName)
+	// 3. Show --raw (raw output without trailing newline)
+	t.Run("show-raw", func(t *testing.T) {
+		stdout, _, err := runCommand(t, paramshow.Command(), "--raw", paramName)
 		require.NoError(t, err)
 		assert.Equal(t, "initial-value", stdout)
 	})
 
 	// 4. Update parameter
 	t.Run("update", func(t *testing.T) {
-		_, _, err := runCommand(t, ssmset.Command(), "-y", paramName, "updated-value")
+		_, _, err := runCommand(t, paramset.Command(), "--yes", paramName, "updated-value")
 		require.NoError(t, err)
 	})
 
 	// 5. Log (basic)
 	t.Run("log", func(t *testing.T) {
-		stdout, _, err := runCommand(t, ssmlog.Command(), paramName)
+		stdout, _, err := runCommand(t, paramlog.Command(), paramName)
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "Version 1")
 		assert.Contains(t, stdout, "Version 2")
@@ -175,20 +173,20 @@ func TestSSM_FullWorkflow(t *testing.T) {
 	// 6. Log with options
 	t.Run("log-with-options", func(t *testing.T) {
 		// --oneline format: "VERSION  DATE  VALUE"
-		stdout, _, err := runCommand(t, ssmlog.Command(), "--oneline", paramName)
+		stdout, _, err := runCommand(t, paramlog.Command(), "--oneline", paramName)
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "1")
 		assert.Contains(t, stdout, "2")
 		t.Logf("log --oneline output: %s", stdout)
 
 		// -n 1 (limit) - shows only most recent
-		stdout, _, err = runCommand(t, ssmlog.Command(), "-n", "1", paramName)
+		stdout, _, err = runCommand(t, paramlog.Command(), "-n", "1", paramName)
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "current") // Most recent has "(current)"
 		t.Logf("log -n 1 output: %s", stdout)
 
 		// --reverse - oldest first
-		stdout, _, err = runCommand(t, ssmlog.Command(), "--reverse", paramName)
+		stdout, _, err = runCommand(t, paramlog.Command(), "--reverse", paramName)
 		require.NoError(t, err)
 		// First entry should be Version 1 when reversed
 		lines := strings.Split(strings.TrimSpace(stdout), "\n")
@@ -196,7 +194,7 @@ func TestSSM_FullWorkflow(t *testing.T) {
 		t.Logf("log --reverse output: %s", stdout)
 
 		// -p (patch)
-		stdout, _, err = runCommand(t, ssmlog.Command(), "-p", paramName)
+		stdout, _, err = runCommand(t, paramlog.Command(), "-p", paramName)
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "-initial-value")
 		assert.Contains(t, stdout, "+updated-value")
@@ -205,7 +203,7 @@ func TestSSM_FullWorkflow(t *testing.T) {
 
 	// 7. Diff - Compare version 1 with version 2
 	t.Run("diff", func(t *testing.T) {
-		stdout, _, err := runCommand(t, ssmdiff.Command(), paramName+"#1", paramName+"#2")
+		stdout, _, err := runCommand(t, paramdiff.Command(), paramName+"#1", paramName+"#2")
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "-initial-value")
 		assert.Contains(t, stdout, "+updated-value")
@@ -214,7 +212,7 @@ func TestSSM_FullWorkflow(t *testing.T) {
 
 	// 8. Diff with single arg (compare with current)
 	t.Run("diff-single-arg", func(t *testing.T) {
-		stdout, _, err := runCommand(t, ssmdiff.Command(), paramName+"#1")
+		stdout, _, err := runCommand(t, paramdiff.Command(), paramName+"#1")
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "-initial-value")
 		assert.Contains(t, stdout, "+updated-value")
@@ -222,7 +220,7 @@ func TestSSM_FullWorkflow(t *testing.T) {
 
 	// 9. Diff with ~SHIFT
 	t.Run("diff-shift", func(t *testing.T) {
-		stdout, _, err := runCommand(t, ssmdiff.Command(), paramName+"~1")
+		stdout, _, err := runCommand(t, paramdiff.Command(), paramName+"~1")
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "-initial-value")
 		assert.Contains(t, stdout, "+updated-value")
@@ -230,7 +228,7 @@ func TestSSM_FullWorkflow(t *testing.T) {
 
 	// 10. List (note: localstack may not support path filtering perfectly)
 	t.Run("ls", func(t *testing.T) {
-		stdout, _, err := runCommand(t, ssmls.Command(), "/suve-e2e-test/basic/")
+		stdout, _, err := runCommand(t, paramls.Command(), "/suve-e2e-test/basic/")
 		require.NoError(t, err)
 		// Localstack might return empty for path-filtered ls, skip assertion if empty
 		if stdout != "" {
@@ -241,13 +239,13 @@ func TestSSM_FullWorkflow(t *testing.T) {
 
 	// 11. Delete (with -y to skip confirmation)
 	t.Run("delete", func(t *testing.T) {
-		_, _, err := runCommand(t, ssmdelete.Command(), "-y", paramName)
+		_, _, err := runCommand(t, paramdelete.Command(), "--yes", paramName)
 		require.NoError(t, err)
 	})
 
 	// 12. Verify deletion
 	t.Run("verify-deleted", func(t *testing.T) {
-		_, _, err := runCommand(t, ssmshow.Command(), paramName)
+		_, _, err := runCommand(t, paramshow.Command(), paramName)
 		assert.Error(t, err, "expected error after deletion")
 	})
 }
@@ -258,26 +256,26 @@ func TestSSM_VersionSpecifiers(t *testing.T) {
 	paramName := "/suve-e2e-test/version/param"
 
 	// Cleanup
-	_, _, _ = runCommand(t, ssmdelete.Command(), "-y", paramName)
+	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
 	t.Cleanup(func() {
-		_, _, _ = runCommand(t, ssmdelete.Command(), "-y", paramName)
+		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
 	})
 
 	// Create 3 versions
-	_, _, err := runCommand(t, ssmset.Command(), "-y", paramName, "v1")
+	_, _, err := runCommand(t, paramset.Command(), "--yes", paramName, "v1")
 	require.NoError(t, err)
-	_, _, err = runCommand(t, ssmset.Command(), "-y", paramName, "v2")
+	_, _, err = runCommand(t, paramset.Command(), "--yes", paramName, "v2")
 	require.NoError(t, err)
-	_, _, err = runCommand(t, ssmset.Command(), "-y", paramName, "v3")
+	_, _, err = runCommand(t, paramset.Command(), "--yes", paramName, "v3")
 	require.NoError(t, err)
 
 	// Test #VERSION
 	t.Run("version-number", func(t *testing.T) {
-		stdout, _, err := runCommand(t, ssmcat.Command(), paramName+"#1")
+		stdout, _, err := runCommand(t, paramshow.Command(), "--raw", paramName+"#1")
 		require.NoError(t, err)
 		assert.Equal(t, "v1", stdout)
 
-		stdout, _, err = runCommand(t, ssmcat.Command(), paramName+"#2")
+		stdout, _, err = runCommand(t, paramshow.Command(), "--raw", paramName+"#2")
 		require.NoError(t, err)
 		assert.Equal(t, "v2", stdout)
 	})
@@ -285,22 +283,22 @@ func TestSSM_VersionSpecifiers(t *testing.T) {
 	// Test ~SHIFT
 	t.Run("shift", func(t *testing.T) {
 		// ~1 = 1 version ago
-		stdout, _, err := runCommand(t, ssmcat.Command(), paramName+"~1")
+		stdout, _, err := runCommand(t, paramshow.Command(), "--raw", paramName+"~1")
 		require.NoError(t, err)
 		assert.Equal(t, "v2", stdout)
 
 		// ~2 = 2 versions ago
-		stdout, _, err = runCommand(t, ssmcat.Command(), paramName+"~2")
+		stdout, _, err = runCommand(t, paramshow.Command(), "--raw", paramName+"~2")
 		require.NoError(t, err)
 		assert.Equal(t, "v1", stdout)
 
 		// ~ alone = ~1
-		stdout, _, err = runCommand(t, ssmcat.Command(), paramName+"~")
+		stdout, _, err = runCommand(t, paramshow.Command(), "--raw", paramName+"~")
 		require.NoError(t, err)
 		assert.Equal(t, "v2", stdout)
 
 		// ~~ = ~1~1 = ~2
-		stdout, _, err = runCommand(t, ssmcat.Command(), paramName+"~~")
+		stdout, _, err = runCommand(t, paramshow.Command(), "--raw", paramName+"~~")
 		require.NoError(t, err)
 		assert.Equal(t, "v1", stdout)
 	})
@@ -308,7 +306,7 @@ func TestSSM_VersionSpecifiers(t *testing.T) {
 	// Test #VERSION~SHIFT combination
 	t.Run("version-and-shift", func(t *testing.T) {
 		// #3~1 = version 3, then 1 back = version 2
-		stdout, _, err := runCommand(t, ssmcat.Command(), paramName+"#3~1")
+		stdout, _, err := runCommand(t, paramshow.Command(), "--raw", paramName+"#3~1")
 		require.NoError(t, err)
 		assert.Equal(t, "v2", stdout)
 	})
@@ -320,20 +318,20 @@ func TestSSM_JSONFlag(t *testing.T) {
 	paramName := "/suve-e2e-test/json/param"
 
 	// Cleanup
-	_, _, _ = runCommand(t, ssmdelete.Command(), "-y", paramName)
+	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
 	t.Cleanup(func() {
-		_, _, _ = runCommand(t, ssmdelete.Command(), "-y", paramName)
+		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
 	})
 
 	// Create with JSON value
-	_, _, err := runCommand(t, ssmset.Command(), "-y", paramName, `{"b":2,"a":1}`)
+	_, _, err := runCommand(t, paramset.Command(), "--yes", paramName, `{"b":2,"a":1}`)
 	require.NoError(t, err)
-	_, _, err = runCommand(t, ssmset.Command(), "-y", paramName, `{"c":3,"b":2,"a":1}`)
+	_, _, err = runCommand(t, paramset.Command(), "--yes", paramName, `{"c":3,"b":2,"a":1}`)
 	require.NoError(t, err)
 
 	// Test diff with --json flag (should format and sort keys)
 	t.Run("diff-json", func(t *testing.T) {
-		stdout, _, err := runCommand(t, ssmdiff.Command(), "-j", paramName+"#1", paramName+"#2")
+		stdout, _, err := runCommand(t, paramdiff.Command(), "-j", paramName+"#1", paramName+"#2")
 		require.NoError(t, err)
 		// Keys should be sorted alphabetically in the formatted output
 		assert.Contains(t, stdout, `"a"`)
@@ -344,7 +342,7 @@ func TestSSM_JSONFlag(t *testing.T) {
 
 	// Test log with -p -j flags
 	t.Run("log-patch-json", func(t *testing.T) {
-		stdout, _, err := runCommand(t, ssmlog.Command(), "-p", "-j", paramName)
+		stdout, _, err := runCommand(t, paramlog.Command(), "-p", "-j", paramName)
 		require.NoError(t, err)
 		assert.Contains(t, stdout, `"a"`)
 		t.Logf("log -p -j output: %s", stdout)
@@ -363,14 +361,14 @@ func TestSSM_StagingWorkflow(t *testing.T) {
 	paramName := "/suve-e2e-staging/workflow/param"
 
 	// Cleanup: delete parameter if it exists
-	_, _, _ = runCommand(t, ssmdelete.Command(), "-y", paramName)
+	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
 	t.Cleanup(func() {
-		_, _, _ = runCommand(t, ssmdelete.Command(), "-y", paramName)
+		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
 	})
 
 	// 1. Create initial parameter
 	t.Run("setup", func(t *testing.T) {
-		_, _, err := runCommand(t, ssmset.Command(), "-y", paramName, "original-value")
+		_, _, err := runCommand(t, paramset.Command(), "--yes", paramName, "original-value")
 		require.NoError(t, err)
 	})
 
@@ -387,7 +385,7 @@ func TestSSM_StagingWorkflow(t *testing.T) {
 
 	// 3. Status - verify staged parameter is listed
 	t.Run("status", func(t *testing.T) {
-		stdout, _, err := runSubCommand(t, ssmstage.Command(), "status")
+		stdout, _, err := runSubCommand(t, paramstage.Command(), "status")
 		require.NoError(t, err)
 		assert.Contains(t, stdout, paramName)
 		assert.Contains(t, stdout, "M") // M = Modified (update operation)
@@ -396,7 +394,7 @@ func TestSSM_StagingWorkflow(t *testing.T) {
 
 	// 4. Stage diff - compare staged vs current
 	t.Run("stage-diff", func(t *testing.T) {
-		stdout, _, err := runSubCommand(t, ssmstage.Command(), "diff", paramName)
+		stdout, _, err := runSubCommand(t, paramstage.Command(), "diff", paramName)
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "-original-value")
 		assert.Contains(t, stdout, "+staged-value")
@@ -405,7 +403,7 @@ func TestSSM_StagingWorkflow(t *testing.T) {
 
 	// 5. Push - apply staged changes (with -y to skip confirmation, --ignore-conflicts since we staged directly)
 	t.Run("push", func(t *testing.T) {
-		stdout, _, err := runSubCommand(t, ssmstage.Command(), "push", "-y", "--ignore-conflicts")
+		stdout, _, err := runSubCommand(t, paramstage.Command(), "apply", "--yes", "--ignore-conflicts")
 		require.NoError(t, err)
 		assert.Contains(t, stdout, paramName)
 		t.Logf("push output: %s", stdout)
@@ -413,27 +411,27 @@ func TestSSM_StagingWorkflow(t *testing.T) {
 
 	// 6. Verify - check the value was applied
 	t.Run("verify", func(t *testing.T) {
-		stdout, _, err := runCommand(t, ssmcat.Command(), paramName)
+		stdout, _, err := runCommand(t, paramshow.Command(), "--raw", paramName)
 		require.NoError(t, err)
 		assert.Equal(t, "staged-value", stdout)
 	})
 
 	// 7. Status after push - should be empty
 	t.Run("status-after-push", func(t *testing.T) {
-		stdout, _, err := runSubCommand(t, ssmstage.Command(), "status")
+		stdout, _, err := runSubCommand(t, paramstage.Command(), "status")
 		require.NoError(t, err)
 		assert.NotContains(t, stdout, paramName)
 	})
 
 	// 8. Stage for delete
 	t.Run("stage-delete", func(t *testing.T) {
-		_, _, err := runSubCommand(t, ssmstage.Command(), "delete", paramName)
+		_, _, err := runSubCommand(t, paramstage.Command(), "delete", paramName)
 		require.NoError(t, err)
 	})
 
 	// 9. Status shows delete operation
 	t.Run("status-delete", func(t *testing.T) {
-		stdout, _, err := runSubCommand(t, ssmstage.Command(), "status")
+		stdout, _, err := runSubCommand(t, paramstage.Command(), "status")
 		require.NoError(t, err)
 		assert.Contains(t, stdout, paramName)
 		assert.Contains(t, stdout, "D") // D = Delete
@@ -441,7 +439,7 @@ func TestSSM_StagingWorkflow(t *testing.T) {
 
 	// 10. Reset - unstage the delete
 	t.Run("reset", func(t *testing.T) {
-		stdout, _, err := runSubCommand(t, ssmstage.Command(), "reset", paramName)
+		stdout, _, err := runSubCommand(t, paramstage.Command(), "reset", paramName)
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "Unstaged")
 		t.Logf("reset output: %s", stdout)
@@ -449,14 +447,14 @@ func TestSSM_StagingWorkflow(t *testing.T) {
 
 	// 11. Status after reset - should be empty
 	t.Run("status-after-reset", func(t *testing.T) {
-		stdout, _, err := runSubCommand(t, ssmstage.Command(), "status")
+		stdout, _, err := runSubCommand(t, paramstage.Command(), "status")
 		require.NoError(t, err)
 		assert.NotContains(t, stdout, paramName)
 	})
 
 	// 12. Verify parameter still exists after reset
 	t.Run("verify-not-deleted", func(t *testing.T) {
-		stdout, _, err := runCommand(t, ssmcat.Command(), paramName)
+		stdout, _, err := runCommand(t, paramshow.Command(), "--raw", paramName)
 		require.NoError(t, err)
 		assert.Equal(t, "staged-value", stdout)
 	})
@@ -470,9 +468,9 @@ func TestSSM_StagingAdd(t *testing.T) {
 	paramName := "/suve-e2e-staging/add/newparam"
 
 	// Cleanup
-	_, _, _ = runCommand(t, ssmdelete.Command(), "-y", paramName)
+	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
 	t.Cleanup(func() {
-		_, _, _ = runCommand(t, ssmdelete.Command(), "-y", paramName)
+		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
 	})
 
 	// 1. Stage add (using store directly since add requires interactive editor)
@@ -488,7 +486,7 @@ func TestSSM_StagingAdd(t *testing.T) {
 
 	// 2. Status shows add operation
 	t.Run("status", func(t *testing.T) {
-		stdout, _, err := runSubCommand(t, ssmstage.Command(), "status")
+		stdout, _, err := runSubCommand(t, paramstage.Command(), "status")
 		require.NoError(t, err)
 		assert.Contains(t, stdout, paramName)
 		assert.Contains(t, stdout, "A") // A = Add
@@ -496,13 +494,13 @@ func TestSSM_StagingAdd(t *testing.T) {
 
 	// 3. Push to create
 	t.Run("push", func(t *testing.T) {
-		_, _, err := runSubCommand(t, ssmstage.Command(), "push", "-y")
+		_, _, err := runSubCommand(t, paramstage.Command(), "apply", "--yes")
 		require.NoError(t, err)
 	})
 
 	// 4. Verify created
 	t.Run("verify", func(t *testing.T) {
-		stdout, _, err := runCommand(t, ssmcat.Command(), paramName)
+		stdout, _, err := runCommand(t, paramshow.Command(), "--raw", paramName)
 		require.NoError(t, err)
 		assert.Equal(t, "new-param-value", stdout)
 	})
@@ -516,22 +514,22 @@ func TestSSM_StagingResetWithVersion(t *testing.T) {
 	paramName := "/suve-e2e-staging/reset-version/param"
 
 	// Cleanup
-	_, _, _ = runCommand(t, ssmdelete.Command(), "-y", paramName)
+	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
 	t.Cleanup(func() {
-		_, _, _ = runCommand(t, ssmdelete.Command(), "-y", paramName)
+		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
 	})
 
 	// Create parameter with multiple versions
-	_, _, err := runCommand(t, ssmset.Command(), "-y", paramName, "v1")
+	_, _, err := runCommand(t, paramset.Command(), "--yes", paramName, "v1")
 	require.NoError(t, err)
-	_, _, err = runCommand(t, ssmset.Command(), "-y", paramName, "v2")
+	_, _, err = runCommand(t, paramset.Command(), "--yes", paramName, "v2")
 	require.NoError(t, err)
-	_, _, err = runCommand(t, ssmset.Command(), "-y", paramName, "v3")
+	_, _, err = runCommand(t, paramset.Command(), "--yes", paramName, "v3")
 	require.NoError(t, err)
 
 	// 1. Reset with version spec (restore old version to staging)
 	t.Run("reset-with-version", func(t *testing.T) {
-		stdout, _, err := runSubCommand(t, ssmstage.Command(), "reset", paramName+"#1")
+		stdout, _, err := runSubCommand(t, paramstage.Command(), "reset", paramName+"#1")
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "Restored")
 		t.Logf("reset with version output: %s", stdout)
@@ -539,7 +537,7 @@ func TestSSM_StagingResetWithVersion(t *testing.T) {
 
 	// 2. Status shows staged value
 	t.Run("status", func(t *testing.T) {
-		stdout, _, err := runSubCommand(t, ssmstage.Command(), "status")
+		stdout, _, err := runSubCommand(t, paramstage.Command(), "status")
 		require.NoError(t, err)
 		assert.Contains(t, stdout, paramName)
 	})
@@ -554,13 +552,13 @@ func TestSSM_StagingResetWithVersion(t *testing.T) {
 
 	// 4. Push to apply (use --ignore-conflicts for robustness in test environment)
 	t.Run("push", func(t *testing.T) {
-		_, _, err := runSubCommand(t, ssmstage.Command(), "push", "-y", "--ignore-conflicts")
+		_, _, err := runSubCommand(t, paramstage.Command(), "apply", "--yes", "--ignore-conflicts")
 		require.NoError(t, err)
 	})
 
 	// 5. Verify reverted
 	t.Run("verify-reverted", func(t *testing.T) {
-		stdout, _, err := runCommand(t, ssmcat.Command(), paramName)
+		stdout, _, err := runCommand(t, paramshow.Command(), "--raw", paramName)
 		require.NoError(t, err)
 		assert.Equal(t, "v1", stdout)
 	})
@@ -575,16 +573,16 @@ func TestSSM_StagingResetAll(t *testing.T) {
 	param2 := "/suve-e2e-staging/reset-all/param2"
 
 	// Cleanup
-	_, _, _ = runCommand(t, ssmdelete.Command(), "-y", param1)
-	_, _, _ = runCommand(t, ssmdelete.Command(), "-y", param2)
+	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", param1)
+	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", param2)
 	t.Cleanup(func() {
-		_, _, _ = runCommand(t, ssmdelete.Command(), "-y", param1)
-		_, _, _ = runCommand(t, ssmdelete.Command(), "-y", param2)
+		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", param1)
+		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", param2)
 	})
 
 	// Create parameters
-	_, _, _ = runCommand(t, ssmset.Command(), "-y", param1, "value1")
-	_, _, _ = runCommand(t, ssmset.Command(), "-y", param2, "value2")
+	_, _, _ = runCommand(t, paramset.Command(), "--yes", param1, "value1")
+	_, _, _ = runCommand(t, paramset.Command(), "--yes", param2, "value2")
 
 	// Stage both
 	store := staging.NewStoreWithPath(filepath.Join(tmpHome, ".suve", "stage.json"))
@@ -601,7 +599,7 @@ func TestSSM_StagingResetAll(t *testing.T) {
 
 	// Verify both staged
 	t.Run("verify-staged", func(t *testing.T) {
-		stdout, _, err := runSubCommand(t, ssmstage.Command(), "status")
+		stdout, _, err := runSubCommand(t, paramstage.Command(), "status")
 		require.NoError(t, err)
 		assert.Contains(t, stdout, param1)
 		assert.Contains(t, stdout, param2)
@@ -609,7 +607,7 @@ func TestSSM_StagingResetAll(t *testing.T) {
 
 	// Reset all
 	t.Run("reset-all", func(t *testing.T) {
-		stdout, _, err := runSubCommand(t, ssmstage.Command(), "reset", "--all")
+		stdout, _, err := runSubCommand(t, paramstage.Command(), "reset", "--all")
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "Unstaged")
 		t.Logf("reset --all output: %s", stdout)
@@ -617,7 +615,7 @@ func TestSSM_StagingResetAll(t *testing.T) {
 
 	// Verify empty
 	t.Run("verify-empty", func(t *testing.T) {
-		stdout, _, err := runSubCommand(t, ssmstage.Command(), "status")
+		stdout, _, err := runSubCommand(t, paramstage.Command(), "status")
 		require.NoError(t, err)
 		assert.NotContains(t, stdout, param1)
 		assert.NotContains(t, stdout, param2)
@@ -633,16 +631,16 @@ func TestSSM_StagingPushSingle(t *testing.T) {
 	param2 := "/suve-e2e-staging/push-single/param2"
 
 	// Cleanup
-	_, _, _ = runCommand(t, ssmdelete.Command(), "-y", param1)
-	_, _, _ = runCommand(t, ssmdelete.Command(), "-y", param2)
+	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", param1)
+	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", param2)
 	t.Cleanup(func() {
-		_, _, _ = runCommand(t, ssmdelete.Command(), "-y", param1)
-		_, _, _ = runCommand(t, ssmdelete.Command(), "-y", param2)
+		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", param1)
+		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", param2)
 	})
 
 	// Create parameters
-	_, _, _ = runCommand(t, ssmset.Command(), "-y", param1, "original1")
-	_, _, _ = runCommand(t, ssmset.Command(), "-y", param2, "original2")
+	_, _, _ = runCommand(t, paramset.Command(), "--yes", param1, "original1")
+	_, _, _ = runCommand(t, paramset.Command(), "--yes", param2, "original2")
 
 	// Stage both
 	store := staging.NewStoreWithPath(filepath.Join(tmpHome, ".suve", "stage.json"))
@@ -659,22 +657,22 @@ func TestSSM_StagingPushSingle(t *testing.T) {
 
 	// Push only param1 (use --ignore-conflicts since we staged without original version)
 	t.Run("push-single", func(t *testing.T) {
-		_, _, err := runSubCommand(t, ssmstage.Command(), "push", "-y", "--ignore-conflicts", param1)
+		_, _, err := runSubCommand(t, paramstage.Command(), "apply", "--yes", "--ignore-conflicts", param1)
 		require.NoError(t, err)
 	})
 
 	// Verify param1 updated, param2 still staged
 	t.Run("verify", func(t *testing.T) {
-		stdout, _, err := runCommand(t, ssmcat.Command(), param1)
+		stdout, _, err := runCommand(t, paramshow.Command(), "--raw", param1)
 		require.NoError(t, err)
 		assert.Equal(t, "staged1", stdout)
 
-		stdout, _, err = runCommand(t, ssmcat.Command(), param2)
+		stdout, _, err = runCommand(t, paramshow.Command(), "--raw", param2)
 		require.NoError(t, err)
 		assert.Equal(t, "original2", stdout) // Not pushed yet
 
 		// param2 should still be staged
-		stdout, _, err = runSubCommand(t, ssmstage.Command(), "status")
+		stdout, _, err = runSubCommand(t, paramstage.Command(), "status")
 		require.NoError(t, err)
 		assert.NotContains(t, stdout, param1) // Already pushed
 		assert.Contains(t, stdout, param2)    // Still staged
@@ -691,21 +689,21 @@ func TestSM_FullWorkflow(t *testing.T) {
 	secretName := "suve-e2e-test/basic/secret"
 
 	// Cleanup: force delete secret if it exists
-	_, _, _ = runCommand(t, smdelete.Command(), "-y", "-f", secretName)
+	_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
 	t.Cleanup(func() {
-		_, _, _ = runCommand(t, smdelete.Command(), "-y", "-f", secretName)
+		_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
 	})
 
 	// 1. Create secret
 	t.Run("create", func(t *testing.T) {
-		stdout, _, err := runCommand(t, smcreate.Command(), secretName, "initial-secret")
+		stdout, _, err := runCommand(t, secretcreate.Command(), secretName, "initial-secret")
 		require.NoError(t, err)
 		t.Logf("create output: %s", stdout)
 	})
 
 	// 2. Show secret
 	t.Run("show", func(t *testing.T) {
-		stdout, _, err := runCommand(t, smshow.Command(), secretName)
+		stdout, _, err := runCommand(t, secretshow.Command(), secretName)
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "initial-secret")
 		t.Logf("show output: %s", stdout)
@@ -713,20 +711,20 @@ func TestSM_FullWorkflow(t *testing.T) {
 
 	// 3. Cat secret
 	t.Run("cat", func(t *testing.T) {
-		stdout, _, err := runCommand(t, smcat.Command(), secretName)
+		stdout, _, err := runCommand(t, secretshow.Command(), "--raw", secretName)
 		require.NoError(t, err)
 		assert.Equal(t, "initial-secret", stdout)
 	})
 
 	// 4. Update secret (with -y to skip confirmation)
 	t.Run("update", func(t *testing.T) {
-		_, _, err := runCommand(t, smupdate.Command(), "-y", secretName, "updated-secret")
+		_, _, err := runCommand(t, secretupdate.Command(), "--yes", secretName, "updated-secret")
 		require.NoError(t, err)
 	})
 
 	// 5. Log
 	t.Run("log", func(t *testing.T) {
-		stdout, _, err := runCommand(t, smlog.Command(), secretName)
+		stdout, _, err := runCommand(t, secretlog.Command(), secretName)
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "Version")
 		t.Logf("log output: %s", stdout)
@@ -735,12 +733,12 @@ func TestSM_FullWorkflow(t *testing.T) {
 	// 6. Log with options
 	t.Run("log-with-options", func(t *testing.T) {
 		// --oneline
-		stdout, _, err := runCommand(t, smlog.Command(), "--oneline", secretName)
+		stdout, _, err := runCommand(t, secretlog.Command(), "--oneline", secretName)
 		require.NoError(t, err)
 		t.Logf("log --oneline output: %s", stdout)
 
 		// -p (patch) - log shows from newest to oldest, so diff is current→previous
-		stdout, _, err = runCommand(t, smlog.Command(), "-p", secretName)
+		stdout, _, err = runCommand(t, secretlog.Command(), "-p", secretName)
 		require.NoError(t, err)
 		// Check that diff contains both values (order depends on log direction)
 		assert.Contains(t, stdout, "initial-secret")
@@ -750,7 +748,7 @@ func TestSM_FullWorkflow(t *testing.T) {
 
 	// 7. Diff - Compare AWSPREVIOUS with AWSCURRENT
 	t.Run("diff", func(t *testing.T) {
-		stdout, _, err := runCommand(t, smdiff.Command(), secretName+":AWSPREVIOUS", secretName+":AWSCURRENT")
+		stdout, _, err := runCommand(t, secretdiff.Command(), secretName+":AWSPREVIOUS", secretName+":AWSCURRENT")
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "-initial-secret")
 		assert.Contains(t, stdout, "+updated-secret")
@@ -759,7 +757,7 @@ func TestSM_FullWorkflow(t *testing.T) {
 
 	// 8. Diff with single arg
 	t.Run("diff-single-arg", func(t *testing.T) {
-		stdout, _, err := runCommand(t, smdiff.Command(), secretName+":AWSPREVIOUS")
+		stdout, _, err := runCommand(t, secretdiff.Command(), secretName+":AWSPREVIOUS")
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "-initial-secret")
 		assert.Contains(t, stdout, "+updated-secret")
@@ -768,7 +766,7 @@ func TestSM_FullWorkflow(t *testing.T) {
 	// 9. Diff with ~SHIFT
 	// Note: SM shift (~) may not work correctly in localstack due to version history limitations
 	t.Run("diff-shift", func(t *testing.T) {
-		stdout, stderr, err := runCommand(t, smdiff.Command(), secretName+"~1")
+		stdout, stderr, err := runCommand(t, secretdiff.Command(), secretName+"~1")
 		t.Logf("diff-shift stdout: %s", stdout)
 		t.Logf("diff-shift stderr: %s", stderr)
 		// Skip strict assertion - localstack may not support shift properly
@@ -780,7 +778,7 @@ func TestSM_FullWorkflow(t *testing.T) {
 
 	// 10. List
 	t.Run("ls", func(t *testing.T) {
-		stdout, _, err := runCommand(t, smls.Command())
+		stdout, _, err := runCommand(t, secretls.Command())
 		require.NoError(t, err)
 		assert.Contains(t, stdout, secretName)
 		t.Logf("ls output: %s", stdout)
@@ -788,31 +786,31 @@ func TestSM_FullWorkflow(t *testing.T) {
 
 	// 11. Delete with recovery window
 	t.Run("delete-with-recovery", func(t *testing.T) {
-		_, _, err := runCommand(t, smdelete.Command(), "-y", "--recovery-window", "7", secretName)
+		_, _, err := runCommand(t, secretdelete.Command(), "--yes", "--recovery-window", "7", secretName)
 		require.NoError(t, err)
 	})
 
 	// 12. Restore
 	t.Run("restore", func(t *testing.T) {
-		_, _, err := runCommand(t, smrestore.Command(), secretName)
+		_, _, err := runCommand(t, secretrestore.Command(), secretName)
 		require.NoError(t, err)
 	})
 
 	// 13. Verify restored
 	t.Run("verify-restored", func(t *testing.T) {
-		_, _, err := runCommand(t, smshow.Command(), secretName)
+		_, _, err := runCommand(t, secretshow.Command(), secretName)
 		require.NoError(t, err)
 	})
 
 	// 14. Force delete
 	t.Run("force-delete", func(t *testing.T) {
-		_, _, err := runCommand(t, smdelete.Command(), "-y", "-f", secretName)
+		_, _, err := runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
 		require.NoError(t, err)
 	})
 
 	// 15. Verify deleted
 	t.Run("verify-deleted", func(t *testing.T) {
-		_, _, err := runCommand(t, smshow.Command(), secretName)
+		_, _, err := runCommand(t, secretshow.Command(), secretName)
 		assert.Error(t, err, "expected error after deletion")
 	})
 }
@@ -823,26 +821,26 @@ func TestSM_VersionSpecifiers(t *testing.T) {
 	secretName := "suve-e2e-test/version/secret"
 
 	// Cleanup
-	_, _, _ = runCommand(t, smdelete.Command(), "-y", "-f", secretName)
+	_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
 	t.Cleanup(func() {
-		_, _, _ = runCommand(t, smdelete.Command(), "-y", "-f", secretName)
+		_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
 	})
 
 	// Create with multiple versions
-	_, _, err := runCommand(t, smcreate.Command(), secretName, "v1")
+	_, _, err := runCommand(t, secretcreate.Command(), secretName, "v1")
 	require.NoError(t, err)
-	_, _, err = runCommand(t, smupdate.Command(), "-y", secretName, "v2")
+	_, _, err = runCommand(t, secretupdate.Command(), "--yes", secretName, "v2")
 	require.NoError(t, err)
-	_, _, err = runCommand(t, smupdate.Command(), "-y", secretName, "v3")
+	_, _, err = runCommand(t, secretupdate.Command(), "--yes", secretName, "v3")
 	require.NoError(t, err)
 
 	// Test :LABEL
 	t.Run("label", func(t *testing.T) {
-		stdout, _, err := runCommand(t, smcat.Command(), secretName+":AWSCURRENT")
+		stdout, _, err := runCommand(t, secretshow.Command(), "--raw", secretName+":AWSCURRENT")
 		require.NoError(t, err)
 		assert.Equal(t, "v3", stdout)
 
-		stdout, _, err = runCommand(t, smcat.Command(), secretName+":AWSPREVIOUS")
+		stdout, _, err = runCommand(t, secretshow.Command(), "--raw", secretName+":AWSPREVIOUS")
 		require.NoError(t, err)
 		assert.Equal(t, "v2", stdout)
 	})
@@ -851,7 +849,7 @@ func TestSM_VersionSpecifiers(t *testing.T) {
 	// Note: SM shift (~) may not work correctly in localstack due to version history limitations
 	t.Run("shift", func(t *testing.T) {
 		// ~1 = 1 version ago
-		stdout, _, err := runCommand(t, smcat.Command(), secretName+"~1")
+		stdout, _, err := runCommand(t, secretshow.Command(), "--raw", secretName+"~1")
 		// Localstack may not support shift properly, skip strict assertion
 		t.Logf("shift ~1 stdout: %s, err: %v", stdout, err)
 		if err == nil {
@@ -865,7 +863,7 @@ func TestSM_VersionSpecifiers(t *testing.T) {
 	// Note: May not work in localstack due to version history limitations
 	t.Run("label-and-shift", func(t *testing.T) {
 		// :AWSCURRENT~1 = 1 version before current
-		stdout, _, err := runCommand(t, smcat.Command(), secretName+":AWSCURRENT~1")
+		stdout, _, err := runCommand(t, secretshow.Command(), "--raw", secretName+":AWSCURRENT~1")
 		t.Logf("label-and-shift stdout: %s, err: %v", stdout, err)
 		// Skip strict assertion - localstack may error with "version shift out of range"
 		if err == nil {
@@ -887,14 +885,14 @@ func TestSM_StagingWorkflow(t *testing.T) {
 	secretName := "suve-e2e-staging/workflow/secret"
 
 	// Cleanup
-	_, _, _ = runCommand(t, smdelete.Command(), "-y", "-f", secretName)
+	_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
 	t.Cleanup(func() {
-		_, _, _ = runCommand(t, smdelete.Command(), "-y", "-f", secretName)
+		_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
 	})
 
 	// 1. Create initial secret
 	t.Run("setup", func(t *testing.T) {
-		_, _, err := runCommand(t, smcreate.Command(), secretName, "original-secret")
+		_, _, err := runCommand(t, secretcreate.Command(), secretName, "original-secret")
 		require.NoError(t, err)
 	})
 
@@ -911,7 +909,7 @@ func TestSM_StagingWorkflow(t *testing.T) {
 
 	// 3. Status
 	t.Run("status", func(t *testing.T) {
-		stdout, _, err := runSubCommand(t, smstage.Command(), "status")
+		stdout, _, err := runSubCommand(t, secretstage.Command(), "status")
 		require.NoError(t, err)
 		assert.Contains(t, stdout, secretName)
 		assert.Contains(t, stdout, "M")
@@ -920,7 +918,7 @@ func TestSM_StagingWorkflow(t *testing.T) {
 
 	// 4. Diff
 	t.Run("diff", func(t *testing.T) {
-		stdout, _, err := runSubCommand(t, smstage.Command(), "diff", secretName)
+		stdout, _, err := runSubCommand(t, secretstage.Command(), "diff", secretName)
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "-original-secret")
 		assert.Contains(t, stdout, "+staged-secret")
@@ -928,26 +926,26 @@ func TestSM_StagingWorkflow(t *testing.T) {
 
 	// 5. Push
 	t.Run("push", func(t *testing.T) {
-		_, _, err := runSubCommand(t, smstage.Command(), "push", "-y")
+		_, _, err := runSubCommand(t, secretstage.Command(), "apply", "--yes")
 		require.NoError(t, err)
 	})
 
 	// 6. Verify
 	t.Run("verify", func(t *testing.T) {
-		stdout, _, err := runCommand(t, smcat.Command(), secretName)
+		stdout, _, err := runCommand(t, secretshow.Command(), "--raw", secretName)
 		require.NoError(t, err)
 		assert.Equal(t, "staged-secret", stdout)
 	})
 
 	// 7. Stage delete with options
 	t.Run("stage-delete-with-force", func(t *testing.T) {
-		_, _, err := runSubCommand(t, smstage.Command(), "delete", "--force", secretName)
+		_, _, err := runSubCommand(t, secretstage.Command(), "delete", "--force", secretName)
 		require.NoError(t, err)
 	})
 
 	// 8. Status shows delete
 	t.Run("status-delete", func(t *testing.T) {
-		stdout, _, err := runSubCommand(t, smstage.Command(), "status")
+		stdout, _, err := runSubCommand(t, secretstage.Command(), "status")
 		require.NoError(t, err)
 		assert.Contains(t, stdout, secretName)
 		assert.Contains(t, stdout, "D")
@@ -955,13 +953,13 @@ func TestSM_StagingWorkflow(t *testing.T) {
 
 	// 9. Push delete
 	t.Run("push-delete", func(t *testing.T) {
-		_, _, err := runSubCommand(t, smstage.Command(), "push", "-y")
+		_, _, err := runSubCommand(t, secretstage.Command(), "apply", "--yes")
 		require.NoError(t, err)
 	})
 
 	// 10. Verify deleted
 	t.Run("verify-deleted", func(t *testing.T) {
-		_, _, err := runCommand(t, smshow.Command(), secretName)
+		_, _, err := runCommand(t, secretshow.Command(), secretName)
 		assert.Error(t, err)
 	})
 }
@@ -974,17 +972,17 @@ func TestSM_StagingDeleteOptions(t *testing.T) {
 	secretName := "suve-e2e-staging/delete-opts/secret"
 
 	// Cleanup
-	_, _, _ = runCommand(t, smdelete.Command(), "-y", "-f", secretName)
+	_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
 	t.Cleanup(func() {
-		_, _, _ = runCommand(t, smdelete.Command(), "-y", "-f", secretName)
+		_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
 	})
 
 	// Create secret
-	_, _, _ = runCommand(t, smcreate.Command(), secretName, "test-value")
+	_, _, _ = runCommand(t, secretcreate.Command(), secretName, "test-value")
 
 	// Test delete with recovery window
 	t.Run("delete-with-recovery-window", func(t *testing.T) {
-		_, _, err := runSubCommand(t, smstage.Command(), "delete", "--recovery-window", "14", secretName)
+		_, _, err := runSubCommand(t, secretstage.Command(), "delete", "--recovery-window", "14", secretName)
 		require.NoError(t, err)
 
 		// Verify options are stored
@@ -1010,16 +1008,16 @@ func TestGlobal_StageWorkflow(t *testing.T) {
 	secretName := "suve-e2e-global/secret"
 
 	// Cleanup
-	_, _, _ = runCommand(t, ssmdelete.Command(), "-y", paramName)
-	_, _, _ = runCommand(t, smdelete.Command(), "-y", "-f", secretName)
+	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
 	t.Cleanup(func() {
-		_, _, _ = runCommand(t, ssmdelete.Command(), "-y", paramName)
-		_, _, _ = runCommand(t, smdelete.Command(), "-y", "-f", secretName)
+		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+		_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
 	})
 
 	// Create resources
-	_, _, _ = runCommand(t, ssmset.Command(), "-y", paramName, "original-param")
-	_, _, _ = runCommand(t, smcreate.Command(), secretName, "original-secret")
+	_, _, _ = runCommand(t, paramset.Command(), "--yes", paramName, "original-param")
+	_, _, _ = runCommand(t, secretcreate.Command(), secretName, "original-secret")
 
 	// Stage both
 	store := staging.NewStoreWithPath(filepath.Join(tmpHome, ".suve", "stage.json"))
@@ -1067,11 +1065,11 @@ func TestGlobal_StageWorkflow(t *testing.T) {
 
 	// 4. Verify both updated
 	t.Run("verify", func(t *testing.T) {
-		stdout, _, err := runCommand(t, ssmcat.Command(), paramName)
+		stdout, _, err := runCommand(t, paramshow.Command(), "--raw", paramName)
 		require.NoError(t, err)
 		assert.Equal(t, "staged-param", stdout)
 
-		stdout, _, err = runCommand(t, smcat.Command(), secretName)
+		stdout, _, err = runCommand(t, secretshow.Command(), "--raw", secretName)
 		require.NoError(t, err)
 		assert.Equal(t, "staged-secret", stdout)
 	})
@@ -1094,16 +1092,16 @@ func TestGlobal_StageResetAll(t *testing.T) {
 	secretName := "suve-e2e-global-reset/secret"
 
 	// Cleanup
-	_, _, _ = runCommand(t, ssmdelete.Command(), "-y", paramName)
-	_, _, _ = runCommand(t, smdelete.Command(), "-y", "-f", secretName)
+	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
 	t.Cleanup(func() {
-		_, _, _ = runCommand(t, ssmdelete.Command(), "-y", paramName)
-		_, _, _ = runCommand(t, smdelete.Command(), "-y", "-f", secretName)
+		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+		_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
 	})
 
 	// Create and stage
-	_, _, _ = runCommand(t, ssmset.Command(), "-y", paramName, "original")
-	_, _, _ = runCommand(t, smcreate.Command(), secretName, "original")
+	_, _, _ = runCommand(t, paramset.Command(), "--yes", paramName, "original")
+	_, _, _ = runCommand(t, secretcreate.Command(), secretName, "original")
 
 	store := staging.NewStoreWithPath(filepath.Join(tmpHome, ".suve", "stage.json"))
 	_ = store.Stage(staging.ServiceSSM, paramName, staging.Entry{
@@ -1150,7 +1148,7 @@ func TestGlobal_StageCommand(t *testing.T) {
 
 		assert.Contains(t, subCmdNames, "status")
 		assert.Contains(t, subCmdNames, "diff")
-		assert.Contains(t, subCmdNames, "push")
+		assert.Contains(t, subCmdNames, "apply")
 		assert.Contains(t, subCmdNames, "reset")
 	})
 }
@@ -1165,36 +1163,36 @@ func TestSSM_ErrorCases(t *testing.T) {
 
 	// Show non-existent parameter
 	t.Run("show-nonexistent", func(t *testing.T) {
-		_, _, err := runCommand(t, ssmshow.Command(), "/nonexistent/param/12345")
+		_, _, err := runCommand(t, paramshow.Command(), "/nonexistent/param/12345")
 		assert.Error(t, err)
 	})
 
 	// Cat non-existent parameter
 	t.Run("cat-nonexistent", func(t *testing.T) {
-		_, _, err := runCommand(t, ssmcat.Command(), "/nonexistent/param/12345")
+		_, _, err := runCommand(t, paramshow.Command(), "--raw", "/nonexistent/param/12345")
 		assert.Error(t, err)
 	})
 
 	// Delete non-existent parameter
 	t.Run("delete-nonexistent", func(t *testing.T) {
-		_, _, err := runCommand(t, ssmdelete.Command(), "-y", "/nonexistent/param/12345")
+		_, _, err := runCommand(t, paramdelete.Command(), "--yes", "/nonexistent/param/12345")
 		assert.Error(t, err)
 	})
 
 	// Invalid version specifier
 	t.Run("invalid-version", func(t *testing.T) {
-		_, _, err := runCommand(t, ssmcat.Command(), "/param#abc")
+		_, _, err := runCommand(t, paramshow.Command(), "--raw", "/param#abc")
 		assert.Error(t, err)
 	})
 
 	// Missing required args
 	t.Run("missing-args-set", func(t *testing.T) {
-		_, _, err := runCommand(t, ssmset.Command())
+		_, _, err := runCommand(t, paramset.Command())
 		assert.Error(t, err)
 	})
 
 	t.Run("missing-args-show", func(t *testing.T) {
-		_, _, err := runCommand(t, ssmshow.Command())
+		_, _, err := runCommand(t, paramshow.Command())
 		assert.Error(t, err)
 	})
 }
@@ -1205,7 +1203,7 @@ func TestSM_ErrorCases(t *testing.T) {
 
 	// Show non-existent secret
 	t.Run("show-nonexistent", func(t *testing.T) {
-		_, _, err := runCommand(t, smshow.Command(), "nonexistent-secret-12345")
+		_, _, err := runCommand(t, secretshow.Command(), "nonexistent-secret-12345")
 		assert.Error(t, err)
 	})
 
@@ -1220,7 +1218,7 @@ func TestSM_ErrorCases(t *testing.T) {
 
 	// Invalid recovery window
 	t.Run("invalid-recovery-window", func(t *testing.T) {
-		_, _, err := runCommand(t, smdelete.Command(), "-y", "--recovery-window", "5", "some-secret")
+		_, _, err := runCommand(t, secretdelete.Command(), "--yes", "--recovery-window", "5", "some-secret")
 		assert.Error(t, err) // Must be 7-30
 	})
 }
@@ -1232,7 +1230,7 @@ func TestStaging_ErrorCases(t *testing.T) {
 
 	// Push when nothing staged - warning goes to stdout
 	t.Run("push-nothing-staged", func(t *testing.T) {
-		stdout, _, err := runSubCommand(t, ssmstage.Command(), "push", "-y")
+		stdout, _, err := runSubCommand(t, paramstage.Command(), "apply", "--yes")
 		require.NoError(t, err)
 		// Message might say "No SSM changes staged" or similar
 		assert.Contains(t, stdout, "No")
@@ -1241,7 +1239,7 @@ func TestStaging_ErrorCases(t *testing.T) {
 
 	// Push non-existent staged item - the command checks if it's staged first
 	t.Run("push-nonexistent", func(t *testing.T) {
-		_, _, err := runSubCommand(t, ssmstage.Command(), "push", "-y", "/nonexistent/param")
+		_, _, err := runSubCommand(t, paramstage.Command(), "apply", "--yes", "/nonexistent/param")
 		// Should error with "not staged" message
 		if err == nil {
 			t.Log("Note: push with non-staged param didn't error (may be expected behavior)")
@@ -1250,7 +1248,7 @@ func TestStaging_ErrorCases(t *testing.T) {
 
 	// Reset when nothing staged - message goes to stdout
 	t.Run("reset-all-nothing-staged", func(t *testing.T) {
-		stdout, _, err := runSubCommand(t, ssmstage.Command(), "reset", "--all")
+		stdout, _, err := runSubCommand(t, paramstage.Command(), "reset", "--all")
 		require.NoError(t, err)
 		// Message might say "No SSM parameters staged" or similar
 		assert.Contains(t, stdout, "No")
@@ -1259,7 +1257,7 @@ func TestStaging_ErrorCases(t *testing.T) {
 
 	// Diff with non-staged parameter
 	t.Run("diff-not-staged", func(t *testing.T) {
-		_, _, err := runSubCommand(t, ssmstage.Command(), "diff", "/nonexistent/param")
+		_, _, err := runSubCommand(t, paramstage.Command(), "diff", "/nonexistent/param")
 		// Should error with "not staged" message
 		if err == nil {
 			t.Log("Note: diff with non-staged param didn't error (may be expected behavior)")
@@ -1277,9 +1275,9 @@ func TestSSM_SpecialCharactersInValue(t *testing.T) {
 	paramName := "/suve-e2e-test/special/param"
 
 	// Cleanup
-	_, _, _ = runCommand(t, ssmdelete.Command(), "-y", paramName)
+	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
 	t.Cleanup(func() {
-		_, _, _ = runCommand(t, ssmdelete.Command(), "-y", paramName)
+		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
 	})
 
 	testCases := []struct {
@@ -1296,10 +1294,10 @@ func TestSSM_SpecialCharactersInValue(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			_, _, err := runCommand(t, ssmset.Command(), "-y", paramName, tc.value)
+			_, _, err := runCommand(t, paramset.Command(), "--yes", paramName, tc.value)
 			require.NoError(t, err)
 
-			stdout, _, err := runCommand(t, ssmcat.Command(), paramName)
+			stdout, _, err := runCommand(t, paramshow.Command(), "--raw", paramName)
 			require.NoError(t, err)
 			assert.Equal(t, tc.value, stdout)
 		})
@@ -1322,15 +1320,15 @@ func TestSM_SpecialCharactersInName(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			// Cleanup
-			_, _, _ = runCommand(t, smdelete.Command(), "-y", "-f", tc.secretName)
+			_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", tc.secretName)
 			t.Cleanup(func() {
-				_, _, _ = runCommand(t, smdelete.Command(), "-y", "-f", tc.secretName)
+				_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", tc.secretName)
 			})
 
-			_, _, err := runCommand(t, smcreate.Command(), tc.secretName, "test-value")
+			_, _, err := runCommand(t, secretcreate.Command(), tc.secretName, "test-value")
 			require.NoError(t, err)
 
-			stdout, _, err := runCommand(t, smcat.Command(), tc.secretName)
+			stdout, _, err := runCommand(t, secretshow.Command(), "--raw", tc.secretName)
 			require.NoError(t, err)
 			assert.Equal(t, "test-value", stdout)
 		})
@@ -1343,18 +1341,18 @@ func TestSSM_LongValue(t *testing.T) {
 	paramName := "/suve-e2e-test/long/param"
 
 	// Cleanup
-	_, _, _ = runCommand(t, ssmdelete.Command(), "-y", paramName)
+	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
 	t.Cleanup(func() {
-		_, _, _ = runCommand(t, ssmdelete.Command(), "-y", paramName)
+		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
 	})
 
 	// Create a long value (SSM limit is 4KB for standard, 8KB for advanced)
 	longValue := strings.Repeat("a", 4000)
 
-	_, _, err := runCommand(t, ssmset.Command(), "-y", paramName, longValue)
+	_, _, err := runCommand(t, paramset.Command(), "--yes", paramName, longValue)
 	require.NoError(t, err)
 
-	stdout, _, err := runCommand(t, ssmcat.Command(), paramName)
+	stdout, _, err := runCommand(t, paramshow.Command(), "--raw", paramName)
 	require.NoError(t, err)
 	assert.Equal(t, longValue, stdout)
 }
@@ -1371,14 +1369,14 @@ func TestSSM_StagingAddViaCLI(t *testing.T) {
 	paramName := "/suve-e2e-staging/add-cli/param"
 
 	// Cleanup
-	_, _, _ = runCommand(t, ssmdelete.Command(), "-y", paramName)
+	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
 	t.Cleanup(func() {
-		_, _, _ = runCommand(t, ssmdelete.Command(), "-y", paramName)
+		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
 	})
 
 	// 1. Stage add via CLI (with value argument - no editor needed)
 	t.Run("add-via-cli", func(t *testing.T) {
-		stdout, _, err := runSubCommand(t, ssmstage.Command(), "add", paramName, "cli-staged-value")
+		stdout, _, err := runSubCommand(t, paramstage.Command(), "add", paramName, "cli-staged-value")
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "Staged")
 		t.Logf("stage add output: %s", stdout)
@@ -1386,7 +1384,7 @@ func TestSSM_StagingAddViaCLI(t *testing.T) {
 
 	// 2. Verify status shows add operation
 	t.Run("status", func(t *testing.T) {
-		stdout, _, err := runSubCommand(t, ssmstage.Command(), "status")
+		stdout, _, err := runSubCommand(t, paramstage.Command(), "status")
 		require.NoError(t, err)
 		assert.Contains(t, stdout, paramName)
 		assert.Contains(t, stdout, "A") // A = Add
@@ -1394,13 +1392,13 @@ func TestSSM_StagingAddViaCLI(t *testing.T) {
 
 	// 3. Push to create
 	t.Run("push", func(t *testing.T) {
-		_, _, err := runSubCommand(t, ssmstage.Command(), "push", "-y")
+		_, _, err := runSubCommand(t, paramstage.Command(), "apply", "--yes")
 		require.NoError(t, err)
 	})
 
 	// 4. Verify created
 	t.Run("verify", func(t *testing.T) {
-		stdout, _, err := runCommand(t, ssmcat.Command(), paramName)
+		stdout, _, err := runCommand(t, paramshow.Command(), "--raw", paramName)
 		require.NoError(t, err)
 		assert.Equal(t, "cli-staged-value", stdout)
 	})
@@ -1414,14 +1412,14 @@ func TestSSM_StagingAddWithOptions(t *testing.T) {
 	paramName := "/suve-e2e-staging/add-options/param"
 
 	// Cleanup
-	_, _, _ = runCommand(t, ssmdelete.Command(), "-y", paramName)
+	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
 	t.Cleanup(func() {
-		_, _, _ = runCommand(t, ssmdelete.Command(), "-y", paramName)
+		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
 	})
 
 	// Stage add with description and tags
 	t.Run("add-with-options", func(t *testing.T) {
-		stdout, _, err := runSubCommand(t, ssmstage.Command(), "add",
+		stdout, _, err := runSubCommand(t, paramstage.Command(), "add",
 			"--description", "Test description",
 			"--tag", "env=test",
 			"--tag", "owner=e2e",
@@ -1446,10 +1444,10 @@ func TestSSM_StagingAddWithOptions(t *testing.T) {
 
 	// Push and verify
 	t.Run("push-and-verify", func(t *testing.T) {
-		_, _, err := runSubCommand(t, ssmstage.Command(), "push", "-y")
+		_, _, err := runSubCommand(t, paramstage.Command(), "apply", "--yes")
 		require.NoError(t, err)
 
-		stdout, _, err := runCommand(t, ssmcat.Command(), paramName)
+		stdout, _, err := runCommand(t, paramshow.Command(), "--raw", paramName)
 		require.NoError(t, err)
 		assert.Equal(t, "value-with-options", stdout)
 	})
@@ -1463,14 +1461,14 @@ func TestSM_StagingAddViaCLI(t *testing.T) {
 	secretName := "suve-e2e-staging/add-cli/secret"
 
 	// Cleanup
-	_, _, _ = runCommand(t, smdelete.Command(), "-y", "-f", secretName)
+	_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
 	t.Cleanup(func() {
-		_, _, _ = runCommand(t, smdelete.Command(), "-y", "-f", secretName)
+		_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
 	})
 
 	// 1. Stage add via CLI
 	t.Run("add-via-cli", func(t *testing.T) {
-		stdout, _, err := runSubCommand(t, smstage.Command(), "add", secretName, "cli-staged-secret")
+		stdout, _, err := runSubCommand(t, secretstage.Command(), "add", secretName, "cli-staged-secret")
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "Staged")
 		t.Logf("stage add output: %s", stdout)
@@ -1478,7 +1476,7 @@ func TestSM_StagingAddViaCLI(t *testing.T) {
 
 	// 2. Verify status
 	t.Run("status", func(t *testing.T) {
-		stdout, _, err := runSubCommand(t, smstage.Command(), "status")
+		stdout, _, err := runSubCommand(t, secretstage.Command(), "status")
 		require.NoError(t, err)
 		assert.Contains(t, stdout, secretName)
 		assert.Contains(t, stdout, "A")
@@ -1486,13 +1484,13 @@ func TestSM_StagingAddViaCLI(t *testing.T) {
 
 	// 3. Push to create
 	t.Run("push", func(t *testing.T) {
-		_, _, err := runSubCommand(t, smstage.Command(), "push", "-y")
+		_, _, err := runSubCommand(t, secretstage.Command(), "apply", "--yes")
 		require.NoError(t, err)
 	})
 
 	// 4. Verify created
 	t.Run("verify", func(t *testing.T) {
-		stdout, _, err := runCommand(t, smcat.Command(), secretName)
+		stdout, _, err := runCommand(t, secretshow.Command(), "--raw", secretName)
 		require.NoError(t, err)
 		assert.Equal(t, "cli-staged-secret", stdout)
 	})
@@ -1506,20 +1504,20 @@ func TestSSM_StagingEditViaCLI(t *testing.T) {
 	paramName := "/suve-e2e-staging/edit-cli/param"
 
 	// Cleanup
-	_, _, _ = runCommand(t, ssmdelete.Command(), "-y", paramName)
+	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
 	t.Cleanup(func() {
-		_, _, _ = runCommand(t, ssmdelete.Command(), "-y", paramName)
+		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
 	})
 
 	// 1. Stage add first
 	t.Run("stage-add", func(t *testing.T) {
-		_, _, err := runSubCommand(t, ssmstage.Command(), "add", paramName, "initial-value")
+		_, _, err := runSubCommand(t, paramstage.Command(), "add", paramName, "initial-value")
 		require.NoError(t, err)
 	})
 
 	// 2. Re-add (edit) the staged value
 	t.Run("re-add-edit", func(t *testing.T) {
-		stdout, _, err := runSubCommand(t, ssmstage.Command(), "add", paramName, "edited-value")
+		stdout, _, err := runSubCommand(t, paramstage.Command(), "add", paramName, "edited-value")
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "Staged")
 		t.Logf("re-add output: %s", stdout)
@@ -1527,10 +1525,10 @@ func TestSSM_StagingEditViaCLI(t *testing.T) {
 
 	// 3. Push and verify
 	t.Run("push-and-verify", func(t *testing.T) {
-		_, _, err := runSubCommand(t, ssmstage.Command(), "push", "-y")
+		_, _, err := runSubCommand(t, paramstage.Command(), "apply", "--yes")
 		require.NoError(t, err)
 
-		stdout, _, err := runCommand(t, ssmcat.Command(), paramName)
+		stdout, _, err := runCommand(t, paramshow.Command(), "--raw", paramName)
 		require.NoError(t, err)
 		assert.Equal(t, "edited-value", stdout)
 	})
@@ -1544,17 +1542,17 @@ func TestSSM_StagingDiffViaCLI(t *testing.T) {
 	paramName := "/suve-e2e-staging/diff-cli/param"
 
 	// Cleanup
-	_, _, _ = runCommand(t, ssmdelete.Command(), "-y", paramName)
+	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
 	t.Cleanup(func() {
-		_, _, _ = runCommand(t, ssmdelete.Command(), "-y", paramName)
+		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
 	})
 
 	// 1. Stage add and check diff
 	t.Run("diff-for-create", func(t *testing.T) {
-		_, _, err := runSubCommand(t, ssmstage.Command(), "add", paramName, "new-value")
+		_, _, err := runSubCommand(t, paramstage.Command(), "add", paramName, "new-value")
 		require.NoError(t, err)
 
-		stdout, _, err := runSubCommand(t, ssmstage.Command(), "diff", paramName)
+		stdout, _, err := runSubCommand(t, paramstage.Command(), "diff", paramName)
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "+new-value")
 		t.Logf("diff output for create: %s", stdout)
@@ -1562,16 +1560,16 @@ func TestSSM_StagingDiffViaCLI(t *testing.T) {
 
 	// 2. Push and setup for update
 	t.Run("push-and-setup", func(t *testing.T) {
-		_, _, err := runSubCommand(t, ssmstage.Command(), "push", "-y")
+		_, _, err := runSubCommand(t, paramstage.Command(), "apply", "--yes")
 		require.NoError(t, err)
 	})
 
 	// 3. Stage delete and check diff
 	t.Run("diff-for-delete", func(t *testing.T) {
-		_, _, err := runSubCommand(t, ssmstage.Command(), "delete", paramName)
+		_, _, err := runSubCommand(t, paramstage.Command(), "delete", paramName)
 		require.NoError(t, err)
 
-		stdout, _, err := runSubCommand(t, ssmstage.Command(), "diff", paramName)
+		stdout, _, err := runSubCommand(t, paramstage.Command(), "diff", paramName)
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "-new-value")
 		t.Logf("diff output for delete: %s", stdout)
@@ -1586,13 +1584,13 @@ func TestSSM_GlobalDiffWithJSON(t *testing.T) {
 	paramName := "/suve-e2e-global/json-diff/param"
 
 	// Cleanup
-	_, _, _ = runCommand(t, ssmdelete.Command(), "-y", paramName)
+	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
 	t.Cleanup(func() {
-		_, _, _ = runCommand(t, ssmdelete.Command(), "-y", paramName)
+		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
 	})
 
 	// Create param with JSON value
-	_, _, err := runCommand(t, ssmset.Command(), "-y", paramName, `{"a":1}`)
+	_, _, err := runCommand(t, paramset.Command(), "--yes", paramName, `{"a":1}`)
 	require.NoError(t, err)
 
 	// Stage update with different JSON

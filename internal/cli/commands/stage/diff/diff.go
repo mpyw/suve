@@ -12,8 +12,8 @@ import (
 	"github.com/samber/lo"
 	"github.com/urfave/cli/v3"
 
-	"github.com/mpyw/suve/internal/api/smapi"
-	"github.com/mpyw/suve/internal/api/ssmapi"
+	"github.com/mpyw/suve/internal/api/paramapi"
+	"github.com/mpyw/suve/internal/api/secretapi"
 	"github.com/mpyw/suve/internal/cli/colors"
 	"github.com/mpyw/suve/internal/cli/pager"
 	"github.com/mpyw/suve/internal/infra"
@@ -21,22 +21,21 @@ import (
 	"github.com/mpyw/suve/internal/maputil"
 	"github.com/mpyw/suve/internal/output"
 	"github.com/mpyw/suve/internal/parallel"
-	// smutil removed
 	"github.com/mpyw/suve/internal/staging"
-	"github.com/mpyw/suve/internal/version/smversion"
-	"github.com/mpyw/suve/internal/version/ssmversion"
+	"github.com/mpyw/suve/internal/version/paramversion"
+	"github.com/mpyw/suve/internal/version/secretversion"
 )
 
 // SSMClient is the interface for SSM operations.
 type SSMClient interface {
-	ssmapi.GetParameterAPI
-	ssmapi.GetParameterHistoryAPI
+	paramapi.GetParameterAPI
+	paramapi.GetParameterHistoryAPI
 }
 
 // SMClient is the interface for SM operations.
 type SMClient interface {
-	smapi.GetSecretValueAPI
-	smapi.ListSecretVersionIdsAPI
+	secretapi.GetSecretValueAPI
+	secretapi.ListSecretVersionIdsAPI
 }
 
 // Runner executes the diff command.
@@ -61,7 +60,7 @@ func Command() *cli.Command {
 		Usage: "Show diff of all staged changes (SSM and SM)",
 		Description: `Compare all staged changes against AWS current values.
 
-For comparing specific versions, use 'suve ssm diff' or 'suve sm diff'.
+For comparing specific versions, use 'suve param diff' or 'suve secret diff'.
 
 EXAMPLES:
    suve stage diff     Show diff of all staged changes
@@ -92,17 +91,17 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	}
 
 	// Check if there are any staged changes before creating clients
-	ssmStaged, err := store.List(staging.ServiceSSM)
+	ssmStaged, err := store.List(staging.ServiceParam)
 	if err != nil {
 		return err
 	}
-	smStaged, err := store.List(staging.ServiceSM)
+	smStaged, err := store.List(staging.ServiceSecret)
 	if err != nil {
 		return err
 	}
 
-	hasSSM := len(ssmStaged[staging.ServiceSSM]) > 0
-	hasSM := len(smStaged[staging.ServiceSM]) > 0
+	hasSSM := len(ssmStaged[staging.ServiceParam]) > 0
+	hasSM := len(smStaged[staging.ServiceSecret]) > 0
 
 	if !hasSSM && !hasSM {
 		output.Warning(cmd.Root().ErrWriter, "nothing staged")
@@ -116,7 +115,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 
 	// Initialize clients only if needed
 	if hasSSM {
-		ssmClient, err := infra.NewSSMClient(ctx)
+		ssmClient, err := infra.NewParamClient(ctx)
 		if err != nil {
 			return fmt.Errorf("failed to initialize SSM client: %w", err)
 		}
@@ -124,7 +123,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	}
 
 	if hasSM {
-		smClient, err := infra.NewSMClient(ctx)
+		smClient, err := infra.NewSecretClient(ctx)
 		if err != nil {
 			return fmt.Errorf("failed to initialize SM client: %w", err)
 		}
@@ -149,18 +148,18 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 		return err
 	}
 
-	ssmEntries := allEntries[staging.ServiceSSM]
-	smEntries := allEntries[staging.ServiceSM]
+	ssmEntries := allEntries[staging.ServiceParam]
+	smEntries := allEntries[staging.ServiceSecret]
 
 	// Fetch all values in parallel
 	ssmResults := parallel.ExecuteMap(ctx, ssmEntries, func(ctx context.Context, name string, _ staging.Entry) (*types.ParameterHistory, error) {
-		spec := &ssmversion.Spec{Name: name}
-		return ssmversion.GetParameterWithVersion(ctx, r.SSMClient, spec, true)
+		spec := &paramversion.Spec{Name: name}
+		return paramversion.GetParameterWithVersion(ctx, r.SSMClient, spec, true)
 	})
 
 	smResults := parallel.ExecuteMap(ctx, smEntries, func(ctx context.Context, name string, _ staging.Entry) (*secretsmanager.GetSecretValueOutput, error) {
-		spec := &smversion.Spec{Name: name}
-		return smversion.GetSecretWithVersion(ctx, r.SMClient, spec)
+		spec := &secretversion.Spec{Name: name}
+		return secretversion.GetSecretWithVersion(ctx, r.SMClient, spec)
 	})
 
 	first := true
@@ -175,7 +174,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 			switch entry.Operation {
 			case staging.OperationDelete:
 				// Item doesn't exist in AWS anymore - deletion already applied
-				if err := r.Store.Unstage(staging.ServiceSSM, name); err != nil {
+				if err := r.Store.Unstage(staging.ServiceParam, name); err != nil {
 					return fmt.Errorf("failed to unstage %s: %w", name, err)
 				}
 				output.Warning(r.Stderr, "unstaged %s: already deleted in AWS", name)
@@ -194,7 +193,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 
 			case staging.OperationUpdate:
 				// Item doesn't exist in AWS anymore - staged update is invalid
-				if err := r.Store.Unstage(staging.ServiceSSM, name); err != nil {
+				if err := r.Store.Unstage(staging.ServiceParam, name); err != nil {
 					return fmt.Errorf("failed to unstage %s: %w", name, err)
 				}
 				output.Warning(r.Stderr, "unstaged %s: item no longer exists in AWS", name)
@@ -222,7 +221,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 			switch entry.Operation {
 			case staging.OperationDelete:
 				// Item doesn't exist in AWS anymore - deletion already applied
-				if err := r.Store.Unstage(staging.ServiceSM, name); err != nil {
+				if err := r.Store.Unstage(staging.ServiceSecret, name); err != nil {
 					return fmt.Errorf("failed to unstage %s: %w", name, err)
 				}
 				output.Warning(r.Stderr, "unstaged %s: already deleted in AWS", name)
@@ -241,7 +240,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 
 			case staging.OperationUpdate:
 				// Item doesn't exist in AWS anymore - staged update is invalid
-				if err := r.Store.Unstage(staging.ServiceSM, name); err != nil {
+				if err := r.Store.Unstage(staging.ServiceSecret, name); err != nil {
 					return fmt.Errorf("failed to unstage %s: %w", name, err)
 				}
 				output.Warning(r.Stderr, "unstaged %s: item no longer exists in AWS", name)
@@ -278,7 +277,7 @@ func (r *Runner) outputSSMDiff(opts Options, name string, entry staging.Entry, p
 
 	if awsValue == stagedValue {
 		// Auto-unstage since there's no difference
-		if err := r.Store.Unstage(staging.ServiceSSM, name); err != nil {
+		if err := r.Store.Unstage(staging.ServiceParam, name); err != nil {
 			return fmt.Errorf("failed to unstage %s: %w", name, err)
 		}
 		output.Warning(r.Stderr, "unstaged %s: identical to AWS current", name)
@@ -317,14 +316,14 @@ func (r *Runner) outputSMDiff(opts Options, name string, entry staging.Entry, se
 
 	if awsValue == stagedValue {
 		// Auto-unstage since there's no difference
-		if err := r.Store.Unstage(staging.ServiceSM, name); err != nil {
+		if err := r.Store.Unstage(staging.ServiceSecret, name); err != nil {
 			return fmt.Errorf("failed to unstage %s: %w", name, err)
 		}
 		output.Warning(r.Stderr, "unstaged %s: identical to AWS current", name)
 		return nil
 	}
 
-	versionID := smversion.TruncateVersionID(lo.FromPtr(secret.VersionId))
+	versionID := secretversion.TruncateVersionID(lo.FromPtr(secret.VersionId))
 	label1 := fmt.Sprintf("%s#%s (AWS)", name, versionID)
 	label2 := fmt.Sprintf(lo.Ternary(
 		entry.Operation == staging.OperationDelete,

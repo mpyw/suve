@@ -1,15 +1,16 @@
 # Secrets Manager Commands
 
-[← Back to README](../README.md) | [← SSM Parameter Store Commands](ssm.md)
+[<- Back to README](../README.md) | [<- SSM Parameter Store Commands](ssm.md)
 
-Service aliases: `sm`, `secret`
+Primary command: `secret`
+Aliases: `sm`
 
-## suve sm show
+## suve secret show
 
 Display secret value with metadata.
 
 ```
-suve sm show [options] <name[#VERSION | :LABEL][~SHIFT]*>
+suve secret show [options] <name[#VERSION | :LABEL][~SHIFT]*>
 ```
 
 **Arguments:**
@@ -24,14 +25,15 @@ suve sm show [options] <name[#VERSION | :LABEL][~SHIFT]*>
 |--------|-------|---------|-------------|
 | `--json` | `-j` | `false` | Pretty-print JSON values with indentation |
 | `--no-pager` | - | `false` | Disable pager output |
+| `--raw` | - | `false` | Output raw value only without metadata (for piping) |
 
 **Examples:**
 
 ```ShellSession
-user@host:~$ suve sm show my-database-credentials
+user@host:~$ suve secret show my-database-credentials
 Name: my-database-credentials
 ARN: arn:aws:secretsmanager:us-east-1:123456789012:secret:my-database-credentials-AbCdEf
-VersionId: abc12345-1234-1234-1234-123456789012
+ VersionId: abc12345-1234-1234-1234-123456789012
 Stages: [AWSCURRENT]
 Created: 2024-01-15T10:30:45Z
 
@@ -41,10 +43,10 @@ Created: 2024-01-15T10:30:45Z
 With `--json` for JSON values:
 
 ```ShellSession
-user@host:~$ suve sm show -j my-database-credentials
+user@host:~$ suve secret show -j my-database-credentials
 Name: my-database-credentials
 ARN: arn:aws:secretsmanager:us-east-1:123456789012:secret:my-database-credentials-AbCdEf
-VersionId: abc12345-1234-1234-1234-123456789012
+ VersionId: abc12345-1234-1234-1234-123456789012
 Stages: [AWSCURRENT]
 Created: 2024-01-15T10:30:45Z
 
@@ -54,75 +56,53 @@ Created: 2024-01-15T10:30:45Z
   }
 ```
 
-```bash
-# Show previous version by label
-suve sm show my-database-credentials:AWSPREVIOUS
-
-# Show specific version by ID
-suve sm show my-database-credentials#abc12345-1234-1234-1234-123456789012
-
-# Show 1 version ago
-suve sm show my-database-credentials~1
-```
-
----
-
-## suve sm cat
-
-Output raw secret value without metadata. Designed for piping and scripting.
-
-```
-suve sm cat [options] <name[#VERSION | :LABEL][~SHIFT]*>
-```
-
-**Arguments:**
-
-| Argument | Description |
-|----------|-------------|
-| `name` | Secret name with optional version specifier |
-
-**Options:**
-
-| Option | Alias | Default | Description |
-|--------|-------|---------|-------------|
-| `--json` | `-j` | `false` | Pretty-print JSON values with indentation |
-
-**Examples:**
+With `--raw` for scripting (outputs value only, no trailing newline):
 
 ```ShellSession
-user@host:~$ suve sm cat my-database-credentials
+user@host:~$ suve secret show --raw my-database-credentials
 {"username":"admin","password":"secret123"}
 ```
 
 > [!TIP]
-> Use `cat` for scripting and piping. The output has no trailing newline.
+> Use `--raw` for scripting and piping. The output has no trailing newline.
 
 Extract JSON fields with `jq`:
 
 ```ShellSession
-user@host:~$ suve sm cat my-database-credentials | jq -r '.password'
+user@host:~$ suve secret show --raw my-database-credentials | jq -r '.password'
 secret123
 ```
 
 ```bash
+# Show previous version by label
+suve secret show my-database-credentials:AWSPREVIOUS
+
+# Show specific version by ID
+suve secret show my-database-credentials#abc12345-1234-1234-1234-123456789012
+
+# Show 1 version ago
+suve secret show my-database-credentials~1
+
 # Use in scripts
-CREDS=$(suve sm cat my-database-credentials)
+CREDS=$(suve secret show --raw my-database-credentials)
 
 # Pipe to file
-suve sm cat my-ssl-certificate > cert.pem
+suve secret show --raw my-ssl-certificate > cert.pem
 
-# Pretty print JSON
-suve sm cat -j my-database-credentials
+# Pretty print JSON with raw output
+suve secret show --raw -j my-database-credentials
 ```
 
 ---
 
-## suve sm log
+## suve secret log
 
 Show secret version history, similar to `git log`.
 
+Command aliases: `history`
+
 ```
-suve sm log [options] <name>
+suve secret log [options] <name>
 ```
 
 **Arguments:**
@@ -147,7 +127,7 @@ suve sm log [options] <name>
 Basic version history:
 
 ```ShellSession
-user@host:~$ suve sm log my-database-credentials
+user@host:~$ suve secret log my-database-credentials
 Version abc12345 [AWSCURRENT]
 Date: 2024-01-15T10:30:45Z
 
@@ -164,7 +144,7 @@ Date: 2024-01-13T08:10:00Z
 With `--patch` to see what changed:
 
 ```ShellSession
-user@host:~$ suve sm log -p my-database-credentials
+user@host:~$ suve secret log -p my-database-credentials
 Version abc12345 [AWSCURRENT]
 Date: 2024-01-15T10:30:45Z
 
@@ -192,23 +172,23 @@ Date: 2024-01-14T09:20:30Z
 
 ```bash
 # Show last 5 versions
-suve sm log -n 5 my-database-credentials
+suve secret log -n 5 my-database-credentials
 
 # Show diffs with JSON formatting
-suve sm log -p -j my-database-credentials
+suve secret log -p -j my-database-credentials
 
 # Show oldest versions first
-suve sm log --reverse my-database-credentials
+suve secret log --reverse my-database-credentials
 ```
 
 ---
 
-## suve sm diff
+## suve secret diff
 
 Show differences between two secret versions in unified diff format.
 
 ```
-suve sm diff <spec1> [spec2] | <name> <version1> [version2]
+suve secret diff <spec1> [spec2] | <name> <version1> [version2]
 ```
 
 ### Argument Formats
@@ -220,7 +200,7 @@ The diff command supports multiple argument formats for flexibility:
 | full spec | 2 | `secret:AWSPREVIOUS secret:AWSCURRENT` | Both args include name and version |
 | full spec | 1 | `secret:AWSPREVIOUS` | Compare specified version with AWSCURRENT |
 | mixed | 2 | `secret:AWSPREVIOUS ':AWSCURRENT'` | First with version, second specifier only |
-| partial spec | 2 | `secret ':AWSPREVIOUS'` | Name + specifier → compare with AWSCURRENT |
+| partial spec | 2 | `secret ':AWSPREVIOUS'` | Name + specifier -> compare with AWSCURRENT |
 | partial spec | 3 | `secret ':AWSPREVIOUS' ':AWSCURRENT'` | Name + two specifiers |
 
 > [!TIP]
@@ -258,7 +238,7 @@ Specifiers can be combined: `secret:AWSCURRENT~1` means "1 version before AWSCUR
 Compare AWSPREVIOUS with AWSCURRENT:
 
 ```ShellSession
-user@host:~$ suve sm diff my-database-credentials:AWSPREVIOUS
+user@host:~$ suve secret diff my-database-credentials:AWSPREVIOUS
 --- my-database-credentials#def67890
 +++ my-database-credentials#abc12345
 @@ -1 +1 @@
@@ -269,7 +249,7 @@ user@host:~$ suve sm diff my-database-credentials:AWSPREVIOUS
 Compare using shift syntax:
 
 ```ShellSession
-user@host:~$ suve sm diff my-database-credentials~1
+user@host:~$ suve secret diff my-database-credentials~1
 --- my-database-credentials#def67890
 +++ my-database-credentials#abc12345
 @@ -1 +1 @@
@@ -291,8 +271,8 @@ user@host:~$ suve sm diff my-database-credentials~1
 > When comparing versions with **identical content**, no diff is produced:
 > ```
 > Warning: comparing identical versions
-> Hint: To compare with previous version, use: suve sm diff my-secret~1
-> Hint: or: suve sm diff my-secret:AWSPREVIOUS
+> Hint: To compare with previous version, use: suve secret diff my-secret~1
+> Hint: or: suve secret diff my-secret:AWSPREVIOUS
 > ```
 
 ### Partial Spec Format
@@ -304,26 +284,28 @@ user@host:~$ suve sm diff my-database-credentials~1
 
 ```bash
 # Compare AWSPREVIOUS with AWSCURRENT
-suve sm diff my-database-credentials ':AWSPREVIOUS' ':AWSCURRENT'
+suve secret diff my-database-credentials ':AWSPREVIOUS' ':AWSCURRENT'
 
 # Compare previous with current
-suve sm diff my-database-credentials '~'
+suve secret diff my-database-credentials '~'
 
 # Compare specific version IDs
-suve sm diff my-database-credentials#abc12345 my-database-credentials#def67890
+suve secret diff my-database-credentials#abc12345 my-database-credentials#def67890
 
 # Pipe to a file for review
-suve sm diff my-database-credentials:AWSPREVIOUS > changes.diff
+suve secret diff my-database-credentials:AWSPREVIOUS > changes.diff
 ```
 
 ---
 
-## suve sm ls
+## suve secret list
 
 List secrets.
 
+Command aliases: `ls`
+
 ```
-suve sm ls [filter-prefix]
+suve secret list [filter-prefix]
 ```
 
 **Arguments:**
@@ -335,7 +317,7 @@ suve sm ls [filter-prefix]
 **Examples:**
 
 ```ShellSession
-user@host:~$ suve sm ls
+user@host:~$ suve secret list
 my-database-credentials
 my-api-key
 production/database-credentials
@@ -345,7 +327,7 @@ staging/database-credentials
 With prefix filter:
 
 ```ShellSession
-user@host:~$ suve sm ls production/
+user@host:~$ suve secret list production/
 production/database-credentials
 production/api-key
 production/ssl-cert
@@ -353,20 +335,20 @@ production/ssl-cert
 
 ```bash
 # List all secrets
-suve sm ls
+suve secret list
 
 # List secrets with prefix
-suve sm ls production/
+suve secret list production/
 ```
 
 ---
 
-## suve sm create
+## suve secret create
 
 Create a new secret.
 
 ```
-suve sm create [options] <name> <value>
+suve secret create [options] <name> <value>
 ```
 
 **Arguments:**
@@ -386,28 +368,28 @@ suve sm create [options] <name> <value>
 **Examples:**
 
 ```ShellSession
-user@host:~$ suve sm create my-api-key "sk-1234567890"
-✓ Created secret my-api-key (version: abc12345-1234-1234-1234-123456789012)
+user@host:~$ suve secret create my-api-key "sk-1234567890"
+Created secret my-api-key (version: abc12345-1234-1234-1234-123456789012)
 ```
 
 With JSON value and description:
 
 ```ShellSession
-user@host:~$ suve sm create -d "Production database credentials" my-database-credentials '{"username":"admin","password":"secret"}'
-✓ Created secret my-database-credentials (version: def67890-1234-1234-1234-123456789012)
+user@host:~$ suve secret create -d "Production database credentials" my-database-credentials '{"username":"admin","password":"secret"}'
+Created secret my-database-credentials (version: def67890-1234-1234-1234-123456789012)
 ```
 
 > [!NOTE]
-> `create` fails if the secret already exists. Use `suve sm update` to update an existing secret.
+> `create` fails if the secret already exists. Use `suve secret update` to update an existing secret.
 
 ---
 
-## suve sm update
+## suve secret update
 
 Update an existing secret's value.
 
 ```
-suve sm update [options] <name> <value>
+suve secret update [options] <name> <value>
 ```
 
 **Arguments:**
@@ -424,36 +406,38 @@ suve sm update [options] <name> <value>
 | `--description` | - | - | Update secret description |
 | `--tag` | - | - | Tag in key=value format (can be specified multiple times, additive) |
 | `--untag` | - | - | Tag key to remove (can be specified multiple times) |
-| `--yes` | `-y` | `false` | Skip confirmation prompt |
+| `--yes` | - | `false` | Skip confirmation prompt |
 
 **Examples:**
 
 ```ShellSession
-user@host:~$ suve sm update my-database-credentials '{"username":"admin","password":"newpassword"}'
+user@host:~$ suve secret update my-database-credentials '{"username":"admin","password":"newpassword"}'
 ? Update secret my-database-credentials? [y/N] y
-✓ Updated secret my-database-credentials (version: ghi11111-1234-1234-1234-123456789012)
+Updated secret my-database-credentials (version: ghi11111-1234-1234-1234-123456789012)
 ```
 
 ```bash
 # Update with tags
-suve sm update --tag env=prod my-api-key "new-key-value"
+suve secret update --tag env=prod my-api-key "new-key-value"
 
 # Update without confirmation
-suve sm update -y my-api-key "new-key-value"
+suve secret update --yes my-api-key "new-key-value"
 ```
 
 > [!NOTE]
-> - `update` fails if the secret doesn't exist. Use `suve sm create` to create a new secret.
+> - `update` fails if the secret doesn't exist. Use `suve secret create` to create a new secret.
 > - The previous version automatically becomes AWSPREVIOUS.
 
 ---
 
-## suve sm delete
+## suve secret delete
 
 Delete a secret.
 
+Command aliases: `rm`
+
 ```
-suve sm delete [options] <name>
+suve secret delete [options] <name>
 ```
 
 **Arguments:**
@@ -466,16 +450,16 @@ suve sm delete [options] <name>
 
 | Option | Alias | Default | Description |
 |--------|-------|---------|-------------|
-| `--force` | `-f` | `false` | Delete immediately without recovery window |
+| `--force` | - | `false` | Delete immediately without recovery window |
 | `--recovery-window` | - | `30` | Days before permanent deletion (7-30). Ignored if `--force` is set. |
-| `--yes` | `-y` | `false` | Skip confirmation prompt |
+| `--yes` | - | `false` | Skip confirmation prompt |
 
 **Examples:**
 
 With recovery window (default):
 
 ```ShellSession
-user@host:~$ suve sm delete my-old-secret
+user@host:~$ suve secret delete my-old-secret
 ? Delete secret my-old-secret? [y/N] y
 ! Scheduled deletion of secret my-old-secret (deletion date: 2024-02-14)
 ```
@@ -483,35 +467,35 @@ user@host:~$ suve sm delete my-old-secret
 Immediate deletion:
 
 ```ShellSession
-user@host:~$ suve sm delete --force my-old-secret
+user@host:~$ suve secret delete --force my-old-secret
 ! Permanently deleted secret my-old-secret
 ```
 
 > [!WARNING]
-> Without `--force`, the secret can be restored using `suve sm restore` until the deletion date.
+> Without `--force`, the secret can be restored using `suve secret restore` until the deletion date.
 
 > [!CAUTION]
 > With `--force`, deletion is **immediate and irreversible**. The secret cannot be recovered.
 
 ```bash
 # Delete with 30-day recovery window (default)
-suve sm delete my-old-secret
+suve secret delete my-old-secret
 
 # Delete with 7-day recovery window
-suve sm delete --recovery-window 7 my-old-secret
+suve secret delete --recovery-window 7 my-old-secret
 
 # Delete immediately (no recovery possible)
-suve sm delete --force my-old-secret
+suve secret delete --force my-old-secret
 ```
 
 ---
 
-## suve sm restore
+## suve secret restore
 
 Restore a deleted secret that is pending deletion.
 
 ```
-suve sm restore <name>
+suve secret restore <name>
 ```
 
 **Arguments:**
@@ -523,8 +507,8 @@ suve sm restore <name>
 **Examples:**
 
 ```ShellSession
-user@host:~$ suve sm restore my-accidentally-deleted-secret
-✓ Restored secret my-accidentally-deleted-secret
+user@host:~$ suve secret restore my-accidentally-deleted-secret
+Restored secret my-accidentally-deleted-secret
 ```
 
 > [!NOTE]
@@ -539,38 +523,38 @@ user@host:~$ suve sm restore my-accidentally-deleted-secret
 The staging workflow allows you to prepare changes locally before applying them to AWS.
 
 > [!IMPORTANT]
-> The staging workflow lets you prepare changes locally, review them, and apply when ready—just like `git add` → `git diff --staged` → `git commit`.
+> The staging workflow lets you prepare changes locally, review them, and apply when ready--just like `git add` -> `git diff --staged` -> `git commit`.
 
 The stage file is stored at `~/.suve/stage.json`.
 
 ### Workflow Overview
 
 ```
-┌─────────┐    ┌─────────┐    ┌─────────┐
-│  edit   │───>│  stage  │───>│  push   │
-└─────────┘    └─────────┘    └─────────┘
-     │              │              │
-     │              │              v
-     │              │         Applied to AWS
-     │              │
-     │              v
-     │         status (view)
-     │         diff (compare)
-     │         reset (unstage)
-     │              │
-     │              v
-     │         Discarded
-     └──────────────┘
++---------+    +---------+    +---------+
+|  edit   |--->|  stage  |--->|  apply  |
++---------+    +---------+    +---------+
+     |              |              |
+     |              |              v
+     |              |         Applied to AWS
+     |              |
+     |              v
+     |         status (view)
+     |         diff (compare)
+     |         reset (unstage)
+     |              |
+     |              v
+     |         Discarded
+     +-------------+
 ```
 
 ---
 
-## suve stage sm add
+## suve stage secret add
 
 Stage a new secret for creation.
 
 ```
-suve stage sm add [options] <name> [value]
+suve stage secret add [options] <name> [value]
 ```
 
 **Arguments:**
@@ -590,29 +574,29 @@ suve stage sm add [options] <name> [value]
 **Examples:**
 
 ```ShellSession
-user@host:~$ suve stage sm add my-new-secret '{"key":"value"}'
-✓ Staged for creation: my-new-secret
+user@host:~$ suve stage secret add my-new-secret '{"key":"value"}'
+Staged for creation: my-new-secret
 ```
 
 ```bash
 # Stage with inline value
-suve stage sm add my-new-secret '{"key":"value"}'
+suve stage secret add my-new-secret '{"key":"value"}'
 
 # Stage via editor
-suve stage sm add my-new-secret
+suve stage secret add my-new-secret
 
 # Stage with description and tags
-suve stage sm add --description "API key for production" --tag env=prod my-api-key "sk-1234567890"
+suve stage secret add --description "API key for production" --tag env=prod my-api-key "sk-1234567890"
 ```
 
 ---
 
-## suve stage sm edit
+## suve stage secret edit
 
 Edit an existing secret and stage the changes.
 
 ```
-suve stage sm edit [options] <name> [value]
+suve stage secret edit [options] <name> [value]
 ```
 
 **Arguments:**
@@ -639,29 +623,29 @@ suve stage sm edit [options] <name> [value]
 **Examples:**
 
 ```ShellSession
-user@host:~$ suve stage sm edit my-database-credentials
-✓ Staged: my-database-credentials
+user@host:~$ suve stage secret edit my-database-credentials
+Staged: my-database-credentials
 ```
 
 ```bash
 # Edit via editor
-suve stage sm edit my-database-credentials
+suve stage secret edit my-database-credentials
 
 # Edit with inline value
-suve stage sm edit my-database-credentials '{"username":"admin","password":"newpassword"}'
+suve stage secret edit my-database-credentials '{"username":"admin","password":"newpassword"}'
 
 # Edit with tags
-suve stage sm edit --tag env=prod my-database-credentials '{"password":"new"}'
+suve stage secret edit --tag env=prod my-database-credentials '{"password":"new"}'
 ```
 
 ---
 
-## suve stage sm delete
+## suve stage secret delete
 
 Stage a secret for deletion.
 
 ```
-suve stage sm delete [options] <name>
+suve stage secret delete [options] <name>
 ```
 
 **Arguments:**
@@ -680,29 +664,29 @@ suve stage sm delete [options] <name>
 **Examples:**
 
 ```ShellSession
-user@host:~$ suve stage sm delete my-old-secret
-✓ Staged for deletion: my-old-secret
+user@host:~$ suve stage secret delete my-old-secret
+Staged for deletion: my-old-secret
 ```
 
 ```bash
 # Stage for deletion with default 30-day recovery
-suve stage sm delete my-old-secret
+suve stage secret delete my-old-secret
 
 # Stage for deletion with 7-day recovery
-suve stage sm delete --recovery-window 7 my-old-secret
+suve stage secret delete --recovery-window 7 my-old-secret
 
 # Stage for immediate deletion
-suve stage sm delete --force my-old-secret
+suve stage secret delete --force my-old-secret
 ```
 
 ---
 
-## suve stage sm status
+## suve stage secret status
 
 Show staged changes for Secrets Manager secrets.
 
 ```
-suve stage sm status [options] [name]
+suve stage secret status [options] [name]
 ```
 
 **Arguments:**
@@ -720,7 +704,7 @@ suve stage sm status [options] [name]
 **Examples:**
 
 ```ShellSession
-user@host:~$ suve stage sm status
+user@host:~$ suve stage secret status
 Staged SM changes (3):
   A my-new-secret
   M my-database-credentials
@@ -730,7 +714,7 @@ Staged SM changes (3):
 If no changes are staged:
 
 ```ShellSession
-user@host:~$ suve stage sm status
+user@host:~$ suve stage secret status
 Secrets Manager:
   (no staged changes)
 ```
@@ -740,12 +724,12 @@ Secrets Manager:
 
 ---
 
-## suve stage sm diff
+## suve stage secret diff
 
 Compare staged values with current AWS values.
 
 ```
-suve stage sm diff [options] [name]
+suve stage secret diff [options] [name]
 ```
 
 **Arguments:**
@@ -764,7 +748,7 @@ suve stage sm diff [options] [name]
 **Examples:**
 
 ```ShellSession
-user@host:~$ suve stage sm diff
+user@host:~$ suve stage secret diff
 --- my-database-credentials (AWS)
 +++ my-database-credentials (staged)
 @@ -1 +1 @@
@@ -780,7 +764,7 @@ user@host:~$ suve stage sm diff
 For secrets staged for deletion:
 
 ```ShellSession
-user@host:~$ suve stage sm diff my-old-secret
+user@host:~$ suve stage secret diff my-old-secret
 --- my-old-secret (AWS)
 +++ my-old-secret (staged for deletion)
 @@ -1 +0,0 @@
@@ -788,33 +772,35 @@ user@host:~$ suve stage sm diff my-old-secret
 ```
 
 > [!CAUTION]
-> Always review the diff before pushing to ensure you're applying the intended changes.
+> Always review the diff before applying to ensure you're applying the intended changes.
 
 ---
 
-## suve stage sm push
+## suve stage secret apply
 
 Apply staged Secrets Manager changes to AWS.
 
+Command aliases: `push`
+
 ```
-suve stage sm push [options] [name]
+suve stage secret apply [options] [name]
 ```
 
 **Arguments:**
 
 | Argument | Description |
 |----------|-------------|
-| `name` | Secret name (optional, pushes all if not specified) |
+| `name` | Secret name (optional, applies all if not specified) |
 
 **Options:**
 
 | Option | Alias | Default | Description |
 |--------|-------|---------|-------------|
-| `--yes` | `-y` | `false` | Skip confirmation prompt |
-| `--ignore-conflicts` | - | `false` | Push even if AWS was modified after staging |
+| `--yes` | - | `false` | Skip confirmation prompt |
+| `--ignore-conflicts` | - | `false` | Apply even if AWS was modified after staging |
 
 > [!NOTE]
-> Before pushing, suve checks if the AWS resource was modified after staging. If a conflict is detected, the push is rejected to prevent lost updates. Use `--ignore-conflicts` to force push despite conflicts.
+> Before applying, suve checks if the AWS resource was modified after staging. If a conflict is detected, the apply is rejected to prevent lost updates. Use `--ignore-conflicts` to force apply despite conflicts.
 
 **Behavior:**
 
@@ -827,24 +813,24 @@ suve stage sm push [options] [name]
 **Examples:**
 
 ```ShellSession
-user@host:~$ suve stage sm push
-Pushing Secrets Manager secrets...
-✓ Created my-new-secret (version: abc12345)
-✓ Updated my-database-credentials (version: def67890)
-✓ Deleted my-old-secret
+user@host:~$ suve stage secret apply
+Applying Secrets Manager secrets...
+Created my-new-secret (version: abc12345)
+Updated my-database-credentials (version: def67890)
+Deleted my-old-secret
 ```
 
 > [!CAUTION]
-> `suve stage sm push` applies changes to AWS immediately. Always review with `suve stage sm diff` first!
+> `suve stage secret apply` applies changes to AWS immediately. Always review with `suve stage secret diff` first!
 
 ---
 
-## suve stage sm reset
+## suve stage secret reset
 
 Unstage Secrets Manager changes or restore to a specific version.
 
 ```
-suve stage sm reset [options] [spec]
+suve stage secret reset [options] [spec]
 ```
 
 **Arguments:**
@@ -870,25 +856,25 @@ suve stage sm reset [options] [spec]
 **Examples:**
 
 ```ShellSession
-user@host:~$ suve stage sm reset my-database-credentials
+user@host:~$ suve stage secret reset my-database-credentials
 Unstaged my-database-credentials
 
-user@host:~$ suve stage sm reset --all
+user@host:~$ suve stage secret reset --all
 Unstaged all SM changes
 ```
 
 ```bash
 # Unstage specific secret
-suve stage sm reset my-database-credentials
+suve stage secret reset my-database-credentials
 
 # Restore to specific version and stage
-suve stage sm reset my-database-credentials#abc12345
+suve stage secret reset my-database-credentials#abc12345
 
 # Restore to previous version and stage
-suve stage sm reset my-database-credentials~1
+suve stage secret reset my-database-credentials~1
 
 # Unstage all SM secrets
-suve stage sm reset --all
+suve stage secret reset --all
 ```
 
 > [!TIP]

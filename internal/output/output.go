@@ -58,7 +58,7 @@ func Warning(w io.Writer, format string, args ...any) {
 
 // Hint prints a hint message in cyan.
 // Used to provide helpful suggestions to the user, typically following a warning.
-// Example: "Hint: To compare with previous version, use: suve ssm diff /param~1"
+// Example: "Hint: To compare with previous version, use: suve param diff /param~1"
 func Hint(w io.Writer, format string, args ...any) {
 	msg := fmt.Sprintf(format, args...)
 	_, _ = fmt.Fprintln(w, colors.Info("Hint: "+msg))

@@ -91,7 +91,7 @@ func TestStatusRunner_Run(t *testing.T) {
 
 		tmpDir := t.TempDir()
 		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
-		_ = store.Stage(staging.ServiceSSM, "/app/config", staging.Entry{
+		_ = store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     "staged-value",
 			StagedAt:  time.Now(),
@@ -99,7 +99,7 @@ func TestStatusRunner_Run(t *testing.T) {
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.StatusRunner{
-			Strategy: &fullMockStrategy{service: staging.ServiceSSM},
+			Strategy: &fullMockStrategy{service: staging.ServiceParam},
 			Store:    store,
 			Stdout:   &stdout,
 			Stderr:   &stderr,
@@ -119,7 +119,7 @@ func TestStatusRunner_Run(t *testing.T) {
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.StatusRunner{
-			Strategy: &fullMockStrategy{service: staging.ServiceSSM},
+			Strategy: &fullMockStrategy{service: staging.ServiceParam},
 			Store:    store,
 			Stdout:   &stdout,
 			Stderr:   &stderr,
@@ -135,7 +135,7 @@ func TestStatusRunner_Run(t *testing.T) {
 
 		tmpDir := t.TempDir()
 		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
-		_ = store.Stage(staging.ServiceSSM, "/app/config", staging.Entry{
+		_ = store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     "staged-value",
 			StagedAt:  time.Now(),
@@ -143,7 +143,7 @@ func TestStatusRunner_Run(t *testing.T) {
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.StatusRunner{
-			Strategy: &fullMockStrategy{service: staging.ServiceSSM},
+			Strategy: &fullMockStrategy{service: staging.ServiceParam},
 			Store:    store,
 			Stdout:   &stdout,
 			Stderr:   &stderr,
@@ -162,7 +162,7 @@ func TestStatusRunner_Run(t *testing.T) {
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.StatusRunner{
-			Strategy: &fullMockStrategy{service: staging.ServiceSSM},
+			Strategy: &fullMockStrategy{service: staging.ServiceParam},
 			Store:    store,
 			Stdout:   &stdout,
 			Stderr:   &stderr,
@@ -178,24 +178,24 @@ func TestStatusRunner_Run(t *testing.T) {
 
 		tmpDir := t.TempDir()
 		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
-		_ = store.Stage(staging.ServiceSSM, "/app/config1", staging.Entry{
+		_ = store.Stage(staging.ServiceParam, "/app/config1", staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     "value1",
 			StagedAt:  time.Now(),
 		})
-		_ = store.Stage(staging.ServiceSSM, "/app/config2", staging.Entry{
+		_ = store.Stage(staging.ServiceParam, "/app/config2", staging.Entry{
 			Operation: staging.OperationCreate,
 			Value:     "value2",
 			StagedAt:  time.Now(),
 		})
-		_ = store.Stage(staging.ServiceSSM, "/app/config3", staging.Entry{
+		_ = store.Stage(staging.ServiceParam, "/app/config3", staging.Entry{
 			Operation: staging.OperationDelete,
 			StagedAt:  time.Now(),
 		})
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.StatusRunner{
-			Strategy: &fullMockStrategy{service: staging.ServiceSSM},
+			Strategy: &fullMockStrategy{service: staging.ServiceParam},
 			Store:    store,
 			Stdout:   &stdout,
 			Stderr:   &stderr,
@@ -216,7 +216,7 @@ func TestStatusRunner_Run(t *testing.T) {
 
 		tmpDir := t.TempDir()
 		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
-		_ = store.Stage(staging.ServiceSM, "my-secret", staging.Entry{
+		_ = store.Stage(staging.ServiceSecret, "my-secret", staging.Entry{
 			Operation:     staging.OperationDelete,
 			StagedAt:      time.Now(),
 			DeleteOptions: &staging.DeleteOptions{Force: true},
@@ -224,7 +224,7 @@ func TestStatusRunner_Run(t *testing.T) {
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.StatusRunner{
-			Strategy: &fullMockStrategy{service: staging.ServiceSM, hasDeleteOptions: true},
+			Strategy: &fullMockStrategy{service: staging.ServiceSecret, hasDeleteOptions: true},
 			Store:    store,
 			Stdout:   &stdout,
 			Stderr:   &stderr,
@@ -248,7 +248,7 @@ func TestDiffRunner_Run(t *testing.T) {
 
 		tmpDir := t.TempDir()
 		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
-		_ = store.Stage(staging.ServiceSSM, "/app/config", staging.Entry{
+		_ = store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     "new-value",
 			StagedAt:  time.Now(),
@@ -256,7 +256,7 @@ func TestDiffRunner_Run(t *testing.T) {
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.DiffRunner{
-			Strategy: &fullMockStrategy{service: staging.ServiceSSM, fetchCurrentVal: "old-value"},
+			Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentVal: "old-value"},
 			Store:    store,
 			Stdout:   &stdout,
 			Stderr:   &stderr,
@@ -274,12 +274,12 @@ func TestDiffRunner_Run(t *testing.T) {
 
 		tmpDir := t.TempDir()
 		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
-		_ = store.Stage(staging.ServiceSSM, "/app/config1", staging.Entry{
+		_ = store.Stage(staging.ServiceParam, "/app/config1", staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     "new1",
 			StagedAt:  time.Now(),
 		})
-		_ = store.Stage(staging.ServiceSSM, "/app/config2", staging.Entry{
+		_ = store.Stage(staging.ServiceParam, "/app/config2", staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     "new2",
 			StagedAt:  time.Now(),
@@ -287,7 +287,7 @@ func TestDiffRunner_Run(t *testing.T) {
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.DiffRunner{
-			Strategy: &fullMockStrategy{service: staging.ServiceSSM, fetchCurrentVal: "old"},
+			Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentVal: "old"},
 			Store:    store,
 			Stdout:   &stdout,
 			Stderr:   &stderr,
@@ -308,7 +308,7 @@ func TestDiffRunner_Run(t *testing.T) {
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.DiffRunner{
-			Strategy: &fullMockStrategy{service: staging.ServiceSSM},
+			Strategy: &fullMockStrategy{service: staging.ServiceParam},
 			Store:    store,
 			Stdout:   &stdout,
 			Stderr:   &stderr,
@@ -327,7 +327,7 @@ func TestDiffRunner_Run(t *testing.T) {
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.DiffRunner{
-			Strategy: &fullMockStrategy{service: staging.ServiceSSM},
+			Strategy: &fullMockStrategy{service: staging.ServiceParam},
 			Store:    store,
 			Stdout:   &stdout,
 			Stderr:   &stderr,
@@ -343,7 +343,7 @@ func TestDiffRunner_Run(t *testing.T) {
 
 		tmpDir := t.TempDir()
 		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
-		_ = store.Stage(staging.ServiceSSM, "/app/config", staging.Entry{
+		_ = store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     `{"b":2,"a":1}`,
 			StagedAt:  time.Now(),
@@ -351,7 +351,7 @@ func TestDiffRunner_Run(t *testing.T) {
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.DiffRunner{
-			Strategy: &fullMockStrategy{service: staging.ServiceSSM, fetchCurrentVal: `{"a":1}`},
+			Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentVal: `{"a":1}`},
 			Store:    store,
 			Stdout:   &stdout,
 			Stderr:   &stderr,
@@ -369,7 +369,7 @@ func TestDiffRunner_Run(t *testing.T) {
 
 		tmpDir := t.TempDir()
 		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
-		_ = store.Stage(staging.ServiceSSM, "/app/config", staging.Entry{
+		_ = store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     "not-json",
 			StagedAt:  time.Now(),
@@ -377,7 +377,7 @@ func TestDiffRunner_Run(t *testing.T) {
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.DiffRunner{
-			Strategy: &fullMockStrategy{service: staging.ServiceSSM, fetchCurrentVal: `{"valid": "json"}`},
+			Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentVal: `{"valid": "json"}`},
 			Store:    store,
 			Stdout:   &stdout,
 			Stderr:   &stderr,
@@ -393,7 +393,7 @@ func TestDiffRunner_Run(t *testing.T) {
 
 		tmpDir := t.TempDir()
 		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
-		_ = store.Stage(staging.ServiceSSM, "/app/config", staging.Entry{
+		_ = store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     "same-value",
 			StagedAt:  time.Now(),
@@ -401,7 +401,7 @@ func TestDiffRunner_Run(t *testing.T) {
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.DiffRunner{
-			Strategy: &fullMockStrategy{service: staging.ServiceSSM, fetchCurrentVal: "same-value"},
+			Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentVal: "same-value"},
 			Store:    store,
 			Stdout:   &stdout,
 			Stderr:   &stderr,
@@ -413,7 +413,7 @@ func TestDiffRunner_Run(t *testing.T) {
 		assert.Contains(t, stderr.String(), "identical")
 
 		// Verify unstaged
-		_, err = store.Get(staging.ServiceSSM, "/app/config")
+		_, err = store.Get(staging.ServiceParam, "/app/config")
 		assert.ErrorIs(t, err, staging.ErrNotStaged)
 	})
 
@@ -422,14 +422,14 @@ func TestDiffRunner_Run(t *testing.T) {
 
 		tmpDir := t.TempDir()
 		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
-		_ = store.Stage(staging.ServiceSSM, "/app/config", staging.Entry{
+		_ = store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
 			Operation: staging.OperationDelete,
 			StagedAt:  time.Now(),
 		})
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.DiffRunner{
-			Strategy: &fullMockStrategy{service: staging.ServiceSSM, fetchCurrentVal: "current-value"},
+			Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentVal: "current-value"},
 			Store:    store,
 			Stdout:   &stdout,
 			Stderr:   &stderr,
@@ -447,7 +447,7 @@ func TestDiffRunner_Run(t *testing.T) {
 
 		tmpDir := t.TempDir()
 		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
-		_ = store.Stage(staging.ServiceSSM, "/app/config", staging.Entry{
+		_ = store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     "new-value",
 			StagedAt:  time.Now(),
@@ -456,7 +456,7 @@ func TestDiffRunner_Run(t *testing.T) {
 		var stdout, stderr bytes.Buffer
 		r := &runner.DiffRunner{
 			// FetchCurrent returns error because item was deleted from AWS
-			Strategy: &fullMockStrategy{service: staging.ServiceSSM, fetchCurrentErr: errors.New("parameter not found")},
+			Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentErr: errors.New("parameter not found")},
 			Store:    store,
 			Stdout:   &stdout,
 			Stderr:   &stderr,
@@ -468,7 +468,7 @@ func TestDiffRunner_Run(t *testing.T) {
 		assert.Contains(t, stderr.String(), "no longer exists")
 
 		// Verify unstaged
-		_, err = store.Get(staging.ServiceSSM, "/app/config")
+		_, err = store.Get(staging.ServiceParam, "/app/config")
 		assert.ErrorIs(t, err, staging.ErrNotStaged)
 	})
 
@@ -477,7 +477,7 @@ func TestDiffRunner_Run(t *testing.T) {
 
 		tmpDir := t.TempDir()
 		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
-		_ = store.Stage(staging.ServiceSSM, "/app/new-param", staging.Entry{
+		_ = store.Stage(staging.ServiceParam, "/app/new-param", staging.Entry{
 			Operation: staging.OperationCreate,
 			Value:     "brand-new-value",
 			StagedAt:  time.Now(),
@@ -486,7 +486,7 @@ func TestDiffRunner_Run(t *testing.T) {
 		var stdout, stderr bytes.Buffer
 		r := &runner.DiffRunner{
 			// FetchCurrent returns error because item doesn't exist yet
-			Strategy: &fullMockStrategy{service: staging.ServiceSSM, fetchCurrentErr: errors.New("parameter not found")},
+			Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentErr: errors.New("parameter not found")},
 			Store:    store,
 			Stdout:   &stdout,
 			Stderr:   &stderr,
@@ -501,7 +501,7 @@ func TestDiffRunner_Run(t *testing.T) {
 		assert.Contains(t, output, "staged for creation")
 
 		// Verify still staged (not auto-unstaged)
-		entry, err := store.Get(staging.ServiceSSM, "/app/new-param")
+		entry, err := store.Get(staging.ServiceParam, "/app/new-param")
 		require.NoError(t, err)
 		assert.Equal(t, staging.OperationCreate, entry.Operation)
 	})
@@ -511,7 +511,7 @@ func TestDiffRunner_Run(t *testing.T) {
 
 		tmpDir := t.TempDir()
 		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
-		_ = store.Stage(staging.ServiceSSM, "/app/new-json", staging.Entry{
+		_ = store.Stage(staging.ServiceParam, "/app/new-json", staging.Entry{
 			Operation: staging.OperationCreate,
 			Value:     `{"b":2,"a":1}`,
 			StagedAt:  time.Now(),
@@ -519,7 +519,7 @@ func TestDiffRunner_Run(t *testing.T) {
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.DiffRunner{
-			Strategy: &fullMockStrategy{service: staging.ServiceSSM, fetchCurrentErr: errors.New("parameter not found")},
+			Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentErr: errors.New("parameter not found")},
 			Store:    store,
 			Stdout:   &stdout,
 			Stderr:   &stderr,
@@ -538,7 +538,7 @@ func TestDiffRunner_Run(t *testing.T) {
 
 		tmpDir := t.TempDir()
 		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
-		_ = store.Stage(staging.ServiceSSM, "/app/param", staging.Entry{
+		_ = store.Stage(staging.ServiceParam, "/app/param", staging.Entry{
 			Operation: staging.OperationCreate,
 			Value:     "same-value",
 			StagedAt:  time.Now(),
@@ -547,7 +547,7 @@ func TestDiffRunner_Run(t *testing.T) {
 		var stdout, stderr bytes.Buffer
 		r := &runner.DiffRunner{
 			// Item already exists in AWS with same value
-			Strategy: &fullMockStrategy{service: staging.ServiceSSM, fetchCurrentVal: "same-value"},
+			Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentVal: "same-value"},
 			Store:    store,
 			Stdout:   &stdout,
 			Stderr:   &stderr,
@@ -559,7 +559,7 @@ func TestDiffRunner_Run(t *testing.T) {
 		assert.Contains(t, stderr.String(), "identical")
 
 		// Verify unstaged
-		_, err = store.Get(staging.ServiceSSM, "/app/param")
+		_, err = store.Get(staging.ServiceParam, "/app/param")
 		assert.ErrorIs(t, err, staging.ErrNotStaged)
 	})
 
@@ -568,7 +568,7 @@ func TestDiffRunner_Run(t *testing.T) {
 
 		tmpDir := t.TempDir()
 		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
-		_ = store.Stage(staging.ServiceSSM, "/app/param", staging.Entry{
+		_ = store.Stage(staging.ServiceParam, "/app/param", staging.Entry{
 			Operation: staging.OperationCreate,
 			Value:     "new-value",
 			StagedAt:  time.Now(),
@@ -577,7 +577,7 @@ func TestDiffRunner_Run(t *testing.T) {
 		var stdout, stderr bytes.Buffer
 		r := &runner.DiffRunner{
 			// Item already exists in AWS with different value
-			Strategy: &fullMockStrategy{service: staging.ServiceSSM, fetchCurrentVal: "old-value"},
+			Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentVal: "old-value"},
 			Store:    store,
 			Stdout:   &stdout,
 			Stderr:   &stderr,
@@ -595,7 +595,7 @@ func TestDiffRunner_Run(t *testing.T) {
 
 		tmpDir := t.TempDir()
 		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
-		_ = store.Stage(staging.ServiceSSM, "/app/config", staging.Entry{
+		_ = store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
 			Operation: staging.OperationDelete,
 			StagedAt:  time.Now(),
 		})
@@ -603,7 +603,7 @@ func TestDiffRunner_Run(t *testing.T) {
 		var stdout, stderr bytes.Buffer
 		r := &runner.DiffRunner{
 			// FetchCurrent returns error because item doesn't exist in AWS anymore
-			Strategy: &fullMockStrategy{service: staging.ServiceSSM, fetchCurrentErr: errors.New("parameter not found")},
+			Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentErr: errors.New("parameter not found")},
 			Store:    store,
 			Stdout:   &stdout,
 			Stderr:   &stderr,
@@ -615,7 +615,7 @@ func TestDiffRunner_Run(t *testing.T) {
 		assert.Contains(t, stderr.String(), "already deleted")
 
 		// Verify unstaged
-		_, err = store.Get(staging.ServiceSSM, "/app/config")
+		_, err = store.Get(staging.ServiceParam, "/app/config")
 		assert.ErrorIs(t, err, staging.ErrNotStaged)
 	})
 }
@@ -635,7 +635,7 @@ func TestEditRunner_Run(t *testing.T) {
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.EditRunner{
-			Strategy: &fullMockStrategy{service: staging.ServiceSSM, fetchCurrentVal: "aws-value"},
+			Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentVal: "aws-value"},
 			Store:    store,
 			Stdout:   &stdout,
 			Stderr:   &stderr,
@@ -649,7 +649,7 @@ func TestEditRunner_Run(t *testing.T) {
 		require.NoError(t, err)
 		assert.Contains(t, stdout.String(), "Staged")
 
-		entry, err := store.Get(staging.ServiceSSM, "/app/config")
+		entry, err := store.Get(staging.ServiceParam, "/app/config")
 		require.NoError(t, err)
 		assert.Equal(t, staging.OperationUpdate, entry.Operation)
 		assert.Equal(t, "edited-value", entry.Value)
@@ -660,7 +660,7 @@ func TestEditRunner_Run(t *testing.T) {
 
 		tmpDir := t.TempDir()
 		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
-		_ = store.Stage(staging.ServiceSSM, "/app/config", staging.Entry{
+		_ = store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     "staged-value",
 			StagedAt:  time.Now(),
@@ -668,7 +668,7 @@ func TestEditRunner_Run(t *testing.T) {
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.EditRunner{
-			Strategy: &fullMockStrategy{service: staging.ServiceSSM, fetchCurrentVal: "aws-value"},
+			Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentVal: "aws-value"},
 			Store:    store,
 			Stdout:   &stdout,
 			Stderr:   &stderr,
@@ -681,7 +681,7 @@ func TestEditRunner_Run(t *testing.T) {
 		err := r.Run(context.Background(), runner.EditOptions{Name: "/app/config"})
 		require.NoError(t, err)
 
-		entry, err := store.Get(staging.ServiceSSM, "/app/config")
+		entry, err := store.Get(staging.ServiceParam, "/app/config")
 		require.NoError(t, err)
 		assert.Equal(t, "new-value", entry.Value)
 	})
@@ -691,7 +691,7 @@ func TestEditRunner_Run(t *testing.T) {
 
 		tmpDir := t.TempDir()
 		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
-		_ = store.Stage(staging.ServiceSSM, "/app/config", staging.Entry{
+		_ = store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
 			Operation: staging.OperationCreate,
 			Value:     "create-value",
 			StagedAt:  time.Now(),
@@ -699,7 +699,7 @@ func TestEditRunner_Run(t *testing.T) {
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.EditRunner{
-			Strategy: &fullMockStrategy{service: staging.ServiceSSM},
+			Strategy: &fullMockStrategy{service: staging.ServiceParam},
 			Store:    store,
 			Stdout:   &stdout,
 			Stderr:   &stderr,
@@ -721,7 +721,7 @@ func TestEditRunner_Run(t *testing.T) {
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.EditRunner{
-			Strategy: &fullMockStrategy{service: staging.ServiceSSM, fetchCurrentVal: "same-value"},
+			Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentVal: "same-value"},
 			Store:    store,
 			Stdout:   &stdout,
 			Stderr:   &stderr,
@@ -743,7 +743,7 @@ func TestEditRunner_Run(t *testing.T) {
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.EditRunner{
-			Strategy: &fullMockStrategy{service: staging.ServiceSSM, fetchCurrentVal: "value"},
+			Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentVal: "value"},
 			Store:    store,
 			Stdout:   &stdout,
 			Stderr:   &stderr,
@@ -765,7 +765,7 @@ func TestEditRunner_Run(t *testing.T) {
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.EditRunner{
-			Strategy: &fullMockStrategy{service: staging.ServiceSSM, fetchCurrentErr: errors.New("not found")},
+			Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentErr: errors.New("not found")},
 			Store:    store,
 			Stdout:   &stdout,
 			Stderr:   &stderr,
@@ -792,24 +792,24 @@ func TestPushRunner_Run(t *testing.T) {
 
 		tmpDir := t.TempDir()
 		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
-		_ = store.Stage(staging.ServiceSSM, "/app/config1", staging.Entry{
+		_ = store.Stage(staging.ServiceParam, "/app/config1", staging.Entry{
 			Operation: staging.OperationCreate,
 			Value:     "value1",
 			StagedAt:  time.Now(),
 		})
-		_ = store.Stage(staging.ServiceSSM, "/app/config2", staging.Entry{
+		_ = store.Stage(staging.ServiceParam, "/app/config2", staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     "value2",
 			StagedAt:  time.Now(),
 		})
-		_ = store.Stage(staging.ServiceSSM, "/app/config3", staging.Entry{
+		_ = store.Stage(staging.ServiceParam, "/app/config3", staging.Entry{
 			Operation: staging.OperationDelete,
 			StagedAt:  time.Now(),
 		})
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.PushRunner{
-			Strategy: &fullMockStrategy{service: staging.ServiceSSM},
+			Strategy: &fullMockStrategy{service: staging.ServiceParam},
 			Store:    store,
 			Stdout:   &stdout,
 			Stderr:   &stderr,
@@ -823,11 +823,11 @@ func TestPushRunner_Run(t *testing.T) {
 		assert.Contains(t, output, "Deleted")
 
 		// Verify all unstaged
-		_, err = store.Get(staging.ServiceSSM, "/app/config1")
+		_, err = store.Get(staging.ServiceParam, "/app/config1")
 		assert.ErrorIs(t, err, staging.ErrNotStaged)
-		_, err = store.Get(staging.ServiceSSM, "/app/config2")
+		_, err = store.Get(staging.ServiceParam, "/app/config2")
 		assert.ErrorIs(t, err, staging.ErrNotStaged)
-		_, err = store.Get(staging.ServiceSSM, "/app/config3")
+		_, err = store.Get(staging.ServiceParam, "/app/config3")
 		assert.ErrorIs(t, err, staging.ErrNotStaged)
 	})
 
@@ -836,12 +836,12 @@ func TestPushRunner_Run(t *testing.T) {
 
 		tmpDir := t.TempDir()
 		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
-		_ = store.Stage(staging.ServiceSSM, "/app/config1", staging.Entry{
+		_ = store.Stage(staging.ServiceParam, "/app/config1", staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     "value1",
 			StagedAt:  time.Now(),
 		})
-		_ = store.Stage(staging.ServiceSSM, "/app/config2", staging.Entry{
+		_ = store.Stage(staging.ServiceParam, "/app/config2", staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     "value2",
 			StagedAt:  time.Now(),
@@ -849,7 +849,7 @@ func TestPushRunner_Run(t *testing.T) {
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.PushRunner{
-			Strategy: &fullMockStrategy{service: staging.ServiceSSM},
+			Strategy: &fullMockStrategy{service: staging.ServiceParam},
 			Store:    store,
 			Stdout:   &stdout,
 			Stderr:   &stderr,
@@ -859,9 +859,9 @@ func TestPushRunner_Run(t *testing.T) {
 		require.NoError(t, err)
 
 		// Only config1 should be unstaged
-		_, err = store.Get(staging.ServiceSSM, "/app/config1")
+		_, err = store.Get(staging.ServiceParam, "/app/config1")
 		assert.ErrorIs(t, err, staging.ErrNotStaged)
-		_, err = store.Get(staging.ServiceSSM, "/app/config2")
+		_, err = store.Get(staging.ServiceParam, "/app/config2")
 		assert.NoError(t, err) // Still staged
 	})
 
@@ -871,7 +871,7 @@ func TestPushRunner_Run(t *testing.T) {
 		tmpDir := t.TempDir()
 		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 		// Stage a different item so we can test "specific item not staged"
-		_ = store.Stage(staging.ServiceSSM, "/app/other", staging.Entry{
+		_ = store.Stage(staging.ServiceParam, "/app/other", staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     "value",
 			StagedAt:  time.Now(),
@@ -879,7 +879,7 @@ func TestPushRunner_Run(t *testing.T) {
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.PushRunner{
-			Strategy: &fullMockStrategy{service: staging.ServiceSSM},
+			Strategy: &fullMockStrategy{service: staging.ServiceParam},
 			Store:    store,
 			Stdout:   &stdout,
 			Stderr:   &stderr,
@@ -898,7 +898,7 @@ func TestPushRunner_Run(t *testing.T) {
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.PushRunner{
-			Strategy: &fullMockStrategy{service: staging.ServiceSSM},
+			Strategy: &fullMockStrategy{service: staging.ServiceParam},
 			Store:    store,
 			Stdout:   &stdout,
 			Stderr:   &stderr,
@@ -914,7 +914,7 @@ func TestPushRunner_Run(t *testing.T) {
 
 		tmpDir := t.TempDir()
 		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
-		_ = store.Stage(staging.ServiceSSM, "/app/config", staging.Entry{
+		_ = store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     "value",
 			StagedAt:  time.Now(),
@@ -922,7 +922,7 @@ func TestPushRunner_Run(t *testing.T) {
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.PushRunner{
-			Strategy: &fullMockStrategy{service: staging.ServiceSSM, pushErr: errors.New("push failed")},
+			Strategy: &fullMockStrategy{service: staging.ServiceParam, pushErr: errors.New("push failed")},
 			Store:    store,
 			Stdout:   &stdout,
 			Stderr:   &stderr,
@@ -947,12 +947,12 @@ func TestResetRunner_Run(t *testing.T) {
 
 		tmpDir := t.TempDir()
 		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
-		_ = store.Stage(staging.ServiceSSM, "/app/config1", staging.Entry{
+		_ = store.Stage(staging.ServiceParam, "/app/config1", staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     "value1",
 			StagedAt:  time.Now(),
 		})
-		_ = store.Stage(staging.ServiceSSM, "/app/config2", staging.Entry{
+		_ = store.Stage(staging.ServiceParam, "/app/config2", staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     "value2",
 			StagedAt:  time.Now(),
@@ -960,7 +960,7 @@ func TestResetRunner_Run(t *testing.T) {
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.ResetRunner{
-			Parser: &fullMockStrategy{service: staging.ServiceSSM},
+			Parser: &fullMockStrategy{service: staging.ServiceParam},
 			Store:  store,
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -972,7 +972,7 @@ func TestResetRunner_Run(t *testing.T) {
 		assert.Contains(t, stdout.String(), "(2)")
 
 		// Verify all unstaged
-		_, err = store.Get(staging.ServiceSSM, "/app/config1")
+		_, err = store.Get(staging.ServiceParam, "/app/config1")
 		assert.ErrorIs(t, err, staging.ErrNotStaged)
 	})
 
@@ -984,7 +984,7 @@ func TestResetRunner_Run(t *testing.T) {
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.ResetRunner{
-			Parser: &fullMockStrategy{service: staging.ServiceSSM},
+			Parser: &fullMockStrategy{service: staging.ServiceParam},
 			Store:  store,
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -1000,7 +1000,7 @@ func TestResetRunner_Run(t *testing.T) {
 
 		tmpDir := t.TempDir()
 		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
-		_ = store.Stage(staging.ServiceSSM, "/app/config", staging.Entry{
+		_ = store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     "value",
 			StagedAt:  time.Now(),
@@ -1008,7 +1008,7 @@ func TestResetRunner_Run(t *testing.T) {
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.ResetRunner{
-			Parser: &fullMockStrategy{service: staging.ServiceSSM},
+			Parser: &fullMockStrategy{service: staging.ServiceParam},
 			Store:  store,
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -1018,7 +1018,7 @@ func TestResetRunner_Run(t *testing.T) {
 		require.NoError(t, err)
 		assert.Contains(t, stdout.String(), "Unstaged")
 
-		_, err = store.Get(staging.ServiceSSM, "/app/config")
+		_, err = store.Get(staging.ServiceParam, "/app/config")
 		assert.ErrorIs(t, err, staging.ErrNotStaged)
 	})
 
@@ -1030,7 +1030,7 @@ func TestResetRunner_Run(t *testing.T) {
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.ResetRunner{
-			Parser: &fullMockStrategy{service: staging.ServiceSSM},
+			Parser: &fullMockStrategy{service: staging.ServiceParam},
 			Store:  store,
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -1049,7 +1049,7 @@ func TestResetRunner_Run(t *testing.T) {
 
 		var stdout, stderr bytes.Buffer
 		fetcher := &fullMockStrategy{
-			service:          staging.ServiceSSM,
+			service:          staging.ServiceParam,
 			parseSpecVersion: true,
 			fetchVersionVal:  "old-value",
 			fetchVersionLbl:  "#1",
@@ -1067,7 +1067,7 @@ func TestResetRunner_Run(t *testing.T) {
 		assert.Contains(t, stdout.String(), "Restored")
 		assert.Contains(t, stdout.String(), "#1")
 
-		entry, err := store.Get(staging.ServiceSSM, "/app/config#1")
+		entry, err := store.Get(staging.ServiceParam, "/app/config#1")
 		require.NoError(t, err)
 		assert.Equal(t, "old-value", entry.Value)
 	})
@@ -1080,7 +1080,7 @@ func TestResetRunner_Run(t *testing.T) {
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.ResetRunner{
-			Parser:  &fullMockStrategy{service: staging.ServiceSSM, parseSpecVersion: true},
+			Parser:  &fullMockStrategy{service: staging.ServiceParam, parseSpecVersion: true},
 			Fetcher: nil, // No fetcher
 			Store:   store,
 			Stdout:  &stdout,
@@ -1100,7 +1100,7 @@ func TestResetRunner_Run(t *testing.T) {
 
 		var stdout, stderr bytes.Buffer
 		fetcher := &fullMockStrategy{
-			service:          staging.ServiceSSM,
+			service:          staging.ServiceParam,
 			parseSpecVersion: true,
 			fetchVersionErr:  errors.New("version not found"),
 		}
@@ -1126,7 +1126,7 @@ func TestResetRunner_Run(t *testing.T) {
 		var stdout, stderr bytes.Buffer
 		r := &runner.ResetRunner{
 			Parser: &fullMockStrategy{
-				service:      staging.ServiceSSM,
+				service:      staging.ServiceParam,
 				parseSpecErr: errors.New("invalid spec"),
 			},
 			Store:  store,
@@ -1152,7 +1152,7 @@ func TestRunners_SMService(t *testing.T) {
 
 		tmpDir := t.TempDir()
 		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
-		_ = store.Stage(staging.ServiceSM, "my-secret", staging.Entry{
+		_ = store.Stage(staging.ServiceSecret, "my-secret", staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     "secret-value",
 			StagedAt:  time.Now(),
@@ -1160,7 +1160,7 @@ func TestRunners_SMService(t *testing.T) {
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.StatusRunner{
-			Strategy: &fullMockStrategy{service: staging.ServiceSM},
+			Strategy: &fullMockStrategy{service: staging.ServiceSecret},
 			Store:    store,
 			Stdout:   &stdout,
 			Stderr:   &stderr,
@@ -1176,7 +1176,7 @@ func TestRunners_SMService(t *testing.T) {
 
 		tmpDir := t.TempDir()
 		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
-		_ = store.Stage(staging.ServiceSM, "my-secret", staging.Entry{
+		_ = store.Stage(staging.ServiceSecret, "my-secret", staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     "secret-value",
 			StagedAt:  time.Now(),
@@ -1184,7 +1184,7 @@ func TestRunners_SMService(t *testing.T) {
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.PushRunner{
-			Strategy: &fullMockStrategy{service: staging.ServiceSM},
+			Strategy: &fullMockStrategy{service: staging.ServiceSecret},
 			Store:    store,
 			Stdout:   &stdout,
 			Stderr:   &stderr,
@@ -1204,7 +1204,7 @@ func TestRunners_DeleteOptions(t *testing.T) {
 
 		tmpDir := t.TempDir()
 		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
-		_ = store.Stage(staging.ServiceSM, "my-secret", staging.Entry{
+		_ = store.Stage(staging.ServiceSecret, "my-secret", staging.Entry{
 			Operation:     staging.OperationDelete,
 			StagedAt:      time.Now(),
 			DeleteOptions: &staging.DeleteOptions{RecoveryWindow: 14},
@@ -1212,7 +1212,7 @@ func TestRunners_DeleteOptions(t *testing.T) {
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.StatusRunner{
-			Strategy: &fullMockStrategy{service: staging.ServiceSM, hasDeleteOptions: true},
+			Strategy: &fullMockStrategy{service: staging.ServiceSecret, hasDeleteOptions: true},
 			Store:    store,
 			Stdout:   &stdout,
 			Stderr:   &stderr,
@@ -1235,7 +1235,7 @@ func TestDiffRunner_OutputMetadata(t *testing.T) {
 		tmpDir := t.TempDir()
 		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 		desc := "Updated config description"
-		_ = store.Stage(staging.ServiceSSM, "/app/config", staging.Entry{
+		_ = store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
 			Operation:   staging.OperationUpdate,
 			Value:       "new-value",
 			Description: &desc,
@@ -1244,7 +1244,7 @@ func TestDiffRunner_OutputMetadata(t *testing.T) {
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.DiffRunner{
-			Strategy: &fullMockStrategy{service: staging.ServiceSSM, fetchCurrentVal: "old-value"},
+			Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentVal: "old-value"},
 			Store:    store,
 			Stdout:   &stdout,
 			Stderr:   &stderr,
@@ -1262,7 +1262,7 @@ func TestDiffRunner_OutputMetadata(t *testing.T) {
 
 		tmpDir := t.TempDir()
 		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
-		_ = store.Stage(staging.ServiceSSM, "/app/config", staging.Entry{
+		_ = store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     "new-value",
 			Tags:      map[string]string{"env": "prod", "team": "platform"},
@@ -1271,7 +1271,7 @@ func TestDiffRunner_OutputMetadata(t *testing.T) {
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.DiffRunner{
-			Strategy: &fullMockStrategy{service: staging.ServiceSSM, fetchCurrentVal: "old-value"},
+			Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentVal: "old-value"},
 			Store:    store,
 			Stdout:   &stdout,
 			Stderr:   &stderr,
@@ -1291,7 +1291,7 @@ func TestDiffRunner_OutputMetadata(t *testing.T) {
 		tmpDir := t.TempDir()
 		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 		desc := "New parameter"
-		_ = store.Stage(staging.ServiceSSM, "/app/new-param", staging.Entry{
+		_ = store.Stage(staging.ServiceParam, "/app/new-param", staging.Entry{
 			Operation:   staging.OperationCreate,
 			Value:       "brand-new",
 			Description: &desc,
@@ -1301,7 +1301,7 @@ func TestDiffRunner_OutputMetadata(t *testing.T) {
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.DiffRunner{
-			Strategy: &fullMockStrategy{service: staging.ServiceSSM, fetchCurrentErr: errors.New("not found")},
+			Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentErr: errors.New("not found")},
 			Store:    store,
 			Stdout:   &stdout,
 			Stderr:   &stderr,

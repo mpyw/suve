@@ -29,8 +29,8 @@ func TestStore_LoadEmpty(t *testing.T) {
 	state, err := store.Load()
 	require.NoError(t, err)
 	assert.Equal(t, 1, state.Version)
-	assert.Empty(t, state.SSM)
-	assert.Empty(t, state.SM)
+	assert.Empty(t, state.Param)
+	assert.Empty(t, state.Secret)
 }
 
 func TestStore_StageAndLoad(t *testing.T) {
@@ -42,7 +42,7 @@ func TestStore_StageAndLoad(t *testing.T) {
 	now := time.Now().Truncate(time.Second)
 
 	// Stage SSM entry
-	err := store.Stage(staging.ServiceSSM, "/app/config", staging.Entry{
+	err := store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     "test-value",
 		StagedAt:  now,
@@ -50,7 +50,7 @@ func TestStore_StageAndLoad(t *testing.T) {
 	require.NoError(t, err)
 
 	// Stage SM entry
-	err = store.Stage(staging.ServiceSM, "my-secret", staging.Entry{
+	err = store.Stage(staging.ServiceSecret, "my-secret", staging.Entry{
 		Operation: staging.OperationDelete,
 		StagedAt:  now,
 	})
@@ -60,12 +60,12 @@ func TestStore_StageAndLoad(t *testing.T) {
 	state, err := store.Load()
 	require.NoError(t, err)
 
-	assert.Len(t, state.SSM, 1)
-	assert.Equal(t, staging.OperationUpdate, state.SSM["/app/config"].Operation)
-	assert.Equal(t, "test-value", state.SSM["/app/config"].Value)
+	assert.Len(t, state.Param, 1)
+	assert.Equal(t, staging.OperationUpdate, state.Param["/app/config"].Operation)
+	assert.Equal(t, "test-value", state.Param["/app/config"].Value)
 
-	assert.Len(t, state.SM, 1)
-	assert.Equal(t, staging.OperationDelete, state.SM["my-secret"].Operation)
+	assert.Len(t, state.Secret, 1)
+	assert.Equal(t, staging.OperationDelete, state.Secret["my-secret"].Operation)
 }
 
 func TestStore_StageOverwrite(t *testing.T) {
@@ -77,7 +77,7 @@ func TestStore_StageOverwrite(t *testing.T) {
 	now := time.Now()
 
 	// Stage initial
-	err := store.Stage(staging.ServiceSSM, "/app/config", staging.Entry{
+	err := store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     "initial",
 		StagedAt:  now,
@@ -85,7 +85,7 @@ func TestStore_StageOverwrite(t *testing.T) {
 	require.NoError(t, err)
 
 	// Stage overwrite
-	err = store.Stage(staging.ServiceSSM, "/app/config", staging.Entry{
+	err = store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     "updated",
 		StagedAt:  now,
@@ -93,7 +93,7 @@ func TestStore_StageOverwrite(t *testing.T) {
 	require.NoError(t, err)
 
 	// Verify overwritten
-	entry, err := store.Get(staging.ServiceSSM, "/app/config")
+	entry, err := store.Get(staging.ServiceParam, "/app/config")
 	require.NoError(t, err)
 	assert.Equal(t, "updated", entry.Value)
 }
@@ -107,7 +107,7 @@ func TestStore_Unstage(t *testing.T) {
 	now := time.Now()
 
 	// Stage
-	err := store.Stage(staging.ServiceSSM, "/app/config", staging.Entry{
+	err := store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     "test",
 		StagedAt:  now,
@@ -115,11 +115,11 @@ func TestStore_Unstage(t *testing.T) {
 	require.NoError(t, err)
 
 	// Unstage
-	err = store.Unstage(staging.ServiceSSM, "/app/config")
+	err = store.Unstage(staging.ServiceParam, "/app/config")
 	require.NoError(t, err)
 
 	// Verify removed
-	_, err = store.Get(staging.ServiceSSM, "/app/config")
+	_, err = store.Get(staging.ServiceParam, "/app/config")
 	assert.ErrorIs(t, err, staging.ErrNotStaged)
 }
 
@@ -129,10 +129,10 @@ func TestStore_UnstageNotStaged(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "staging.json"))
 
-	err := store.Unstage(staging.ServiceSSM, "/not/staged")
+	err := store.Unstage(staging.ServiceParam, "/not/staged")
 	assert.ErrorIs(t, err, staging.ErrNotStaged)
 
-	err = store.Unstage(staging.ServiceSM, "not-staged")
+	err = store.Unstage(staging.ServiceSecret, "not-staged")
 	assert.ErrorIs(t, err, staging.ErrNotStaged)
 }
 
@@ -148,19 +148,19 @@ func TestStore_UnstageAll(t *testing.T) {
 		now := time.Now()
 
 		// Stage multiple
-		_ = store.Stage(staging.ServiceSSM, "/app/config1", staging.Entry{Operation: staging.OperationUpdate, Value: "v1", StagedAt: now})
-		_ = store.Stage(staging.ServiceSSM, "/app/config2", staging.Entry{Operation: staging.OperationUpdate, Value: "v2", StagedAt: now})
-		_ = store.Stage(staging.ServiceSM, "secret1", staging.Entry{Operation: staging.OperationUpdate, Value: "s1", StagedAt: now})
+		_ = store.Stage(staging.ServiceParam, "/app/config1", staging.Entry{Operation: staging.OperationUpdate, Value: "v1", StagedAt: now})
+		_ = store.Stage(staging.ServiceParam, "/app/config2", staging.Entry{Operation: staging.OperationUpdate, Value: "v2", StagedAt: now})
+		_ = store.Stage(staging.ServiceSecret, "secret1", staging.Entry{Operation: staging.OperationUpdate, Value: "s1", StagedAt: now})
 
 		// Unstage all SSM
-		err := store.UnstageAll(staging.ServiceSSM)
+		err := store.UnstageAll(staging.ServiceParam)
 		require.NoError(t, err)
 
 		// Verify SSM cleared, SM intact
 		state, err := store.Load()
 		require.NoError(t, err)
-		assert.Empty(t, state.SSM)
-		assert.Len(t, state.SM, 1)
+		assert.Empty(t, state.Param)
+		assert.Len(t, state.Secret, 1)
 	})
 
 	t.Run("unstage all SM", func(t *testing.T) {
@@ -171,17 +171,17 @@ func TestStore_UnstageAll(t *testing.T) {
 
 		now := time.Now()
 
-		_ = store.Stage(staging.ServiceSSM, "/app/config", staging.Entry{Operation: staging.OperationUpdate, Value: "v", StagedAt: now})
-		_ = store.Stage(staging.ServiceSM, "secret1", staging.Entry{Operation: staging.OperationUpdate, Value: "s1", StagedAt: now})
-		_ = store.Stage(staging.ServiceSM, "secret2", staging.Entry{Operation: staging.OperationUpdate, Value: "s2", StagedAt: now})
+		_ = store.Stage(staging.ServiceParam, "/app/config", staging.Entry{Operation: staging.OperationUpdate, Value: "v", StagedAt: now})
+		_ = store.Stage(staging.ServiceSecret, "secret1", staging.Entry{Operation: staging.OperationUpdate, Value: "s1", StagedAt: now})
+		_ = store.Stage(staging.ServiceSecret, "secret2", staging.Entry{Operation: staging.OperationUpdate, Value: "s2", StagedAt: now})
 
-		err := store.UnstageAll(staging.ServiceSM)
+		err := store.UnstageAll(staging.ServiceSecret)
 		require.NoError(t, err)
 
 		state, err := store.Load()
 		require.NoError(t, err)
-		assert.Len(t, state.SSM, 1)
-		assert.Empty(t, state.SM)
+		assert.Len(t, state.Param, 1)
+		assert.Empty(t, state.Secret)
 	})
 
 	t.Run("unstage everything", func(t *testing.T) {
@@ -192,16 +192,16 @@ func TestStore_UnstageAll(t *testing.T) {
 
 		now := time.Now()
 
-		_ = store.Stage(staging.ServiceSSM, "/app/config", staging.Entry{Operation: staging.OperationUpdate, Value: "v", StagedAt: now})
-		_ = store.Stage(staging.ServiceSM, "secret", staging.Entry{Operation: staging.OperationUpdate, Value: "s", StagedAt: now})
+		_ = store.Stage(staging.ServiceParam, "/app/config", staging.Entry{Operation: staging.OperationUpdate, Value: "v", StagedAt: now})
+		_ = store.Stage(staging.ServiceSecret, "secret", staging.Entry{Operation: staging.OperationUpdate, Value: "s", StagedAt: now})
 
 		err := store.UnstageAll("")
 		require.NoError(t, err)
 
 		state, err := store.Load()
 		require.NoError(t, err)
-		assert.Empty(t, state.SSM)
-		assert.Empty(t, state.SM)
+		assert.Empty(t, state.Param)
+		assert.Empty(t, state.Secret)
 	})
 }
 
@@ -213,7 +213,7 @@ func TestStore_Get(t *testing.T) {
 
 	now := time.Now()
 
-	_ = store.Stage(staging.ServiceSSM, "/app/config", staging.Entry{
+	_ = store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     "test-value",
 		StagedAt:  now,
@@ -221,20 +221,20 @@ func TestStore_Get(t *testing.T) {
 
 	t.Run("get existing", func(t *testing.T) {
 		t.Parallel()
-		entry, err := store.Get(staging.ServiceSSM, "/app/config")
+		entry, err := store.Get(staging.ServiceParam, "/app/config")
 		require.NoError(t, err)
 		assert.Equal(t, "test-value", entry.Value)
 	})
 
 	t.Run("get not staged", func(t *testing.T) {
 		t.Parallel()
-		_, err := store.Get(staging.ServiceSSM, "/not/staged")
+		_, err := store.Get(staging.ServiceParam, "/not/staged")
 		assert.ErrorIs(t, err, staging.ErrNotStaged)
 	})
 
 	t.Run("get wrong service", func(t *testing.T) {
 		t.Parallel()
-		_, err := store.Get(staging.ServiceSM, "/app/config")
+		_, err := store.Get(staging.ServiceSecret, "/app/config")
 		assert.ErrorIs(t, err, staging.ErrNotStaged)
 	})
 }
@@ -247,24 +247,24 @@ func TestStore_List(t *testing.T) {
 
 	now := time.Now()
 
-	_ = store.Stage(staging.ServiceSSM, "/app/config1", staging.Entry{Operation: staging.OperationUpdate, Value: "v1", StagedAt: now})
-	_ = store.Stage(staging.ServiceSSM, "/app/config2", staging.Entry{Operation: staging.OperationDelete, StagedAt: now})
-	_ = store.Stage(staging.ServiceSM, "secret1", staging.Entry{Operation: staging.OperationUpdate, Value: "s1", StagedAt: now})
+	_ = store.Stage(staging.ServiceParam, "/app/config1", staging.Entry{Operation: staging.OperationUpdate, Value: "v1", StagedAt: now})
+	_ = store.Stage(staging.ServiceParam, "/app/config2", staging.Entry{Operation: staging.OperationDelete, StagedAt: now})
+	_ = store.Stage(staging.ServiceSecret, "secret1", staging.Entry{Operation: staging.OperationUpdate, Value: "s1", StagedAt: now})
 
 	t.Run("list SSM only", func(t *testing.T) {
 		t.Parallel()
-		result, err := store.List(staging.ServiceSSM)
+		result, err := store.List(staging.ServiceParam)
 		require.NoError(t, err)
 		assert.Len(t, result, 1)
-		assert.Len(t, result[staging.ServiceSSM], 2)
+		assert.Len(t, result[staging.ServiceParam], 2)
 	})
 
 	t.Run("list SM only", func(t *testing.T) {
 		t.Parallel()
-		result, err := store.List(staging.ServiceSM)
+		result, err := store.List(staging.ServiceSecret)
 		require.NoError(t, err)
 		assert.Len(t, result, 1)
-		assert.Len(t, result[staging.ServiceSM], 1)
+		assert.Len(t, result[staging.ServiceSecret], 1)
 	})
 
 	t.Run("list all", func(t *testing.T) {
@@ -272,8 +272,8 @@ func TestStore_List(t *testing.T) {
 		result, err := store.List("")
 		require.NoError(t, err)
 		assert.Len(t, result, 2)
-		assert.Len(t, result[staging.ServiceSSM], 2)
-		assert.Len(t, result[staging.ServiceSM], 1)
+		assert.Len(t, result[staging.ServiceParam], 2)
+		assert.Len(t, result[staging.ServiceSecret], 1)
 	})
 }
 
@@ -299,23 +299,23 @@ func TestStore_HasChanges(t *testing.T) {
 	require.NoError(t, err)
 	assert.False(t, has)
 
-	has, err = store.HasChanges(staging.ServiceSSM)
+	has, err = store.HasChanges(staging.ServiceParam)
 	require.NoError(t, err)
 	assert.False(t, has)
 
 	// Add SSM change
 	now := time.Now()
-	_ = store.Stage(staging.ServiceSSM, "/app/config", staging.Entry{Operation: staging.OperationUpdate, Value: "v", StagedAt: now})
+	_ = store.Stage(staging.ServiceParam, "/app/config", staging.Entry{Operation: staging.OperationUpdate, Value: "v", StagedAt: now})
 
 	has, err = store.HasChanges("")
 	require.NoError(t, err)
 	assert.True(t, has)
 
-	has, err = store.HasChanges(staging.ServiceSSM)
+	has, err = store.HasChanges(staging.ServiceParam)
 	require.NoError(t, err)
 	assert.True(t, has)
 
-	has, err = store.HasChanges(staging.ServiceSM)
+	has, err = store.HasChanges(staging.ServiceSecret)
 	require.NoError(t, err)
 	assert.False(t, has)
 }
@@ -328,19 +328,19 @@ func TestStore_Count(t *testing.T) {
 
 	now := time.Now()
 
-	_ = store.Stage(staging.ServiceSSM, "/app/config1", staging.Entry{Operation: staging.OperationUpdate, Value: "v1", StagedAt: now})
-	_ = store.Stage(staging.ServiceSSM, "/app/config2", staging.Entry{Operation: staging.OperationUpdate, Value: "v2", StagedAt: now})
-	_ = store.Stage(staging.ServiceSM, "secret1", staging.Entry{Operation: staging.OperationUpdate, Value: "s1", StagedAt: now})
+	_ = store.Stage(staging.ServiceParam, "/app/config1", staging.Entry{Operation: staging.OperationUpdate, Value: "v1", StagedAt: now})
+	_ = store.Stage(staging.ServiceParam, "/app/config2", staging.Entry{Operation: staging.OperationUpdate, Value: "v2", StagedAt: now})
+	_ = store.Stage(staging.ServiceSecret, "secret1", staging.Entry{Operation: staging.OperationUpdate, Value: "s1", StagedAt: now})
 
 	count, err := store.Count("")
 	require.NoError(t, err)
 	assert.Equal(t, 3, count)
 
-	count, err = store.Count(staging.ServiceSSM)
+	count, err = store.Count(staging.ServiceParam)
 	require.NoError(t, err)
 	assert.Equal(t, 2, count)
 
-	count, err = store.Count(staging.ServiceSM)
+	count, err = store.Count(staging.ServiceSecret)
 	require.NoError(t, err)
 	assert.Equal(t, 1, count)
 }
@@ -407,7 +407,7 @@ func TestStore_SaveRemovesEmptyFile(t *testing.T) {
 	now := time.Now()
 
 	// Stage and then unstage
-	err := store.Stage(staging.ServiceSSM, "/app/config", staging.Entry{Operation: staging.OperationUpdate, Value: "v", StagedAt: now})
+	err := store.Stage(staging.ServiceParam, "/app/config", staging.Entry{Operation: staging.OperationUpdate, Value: "v", StagedAt: now})
 	require.NoError(t, err)
 
 	// File should exist
@@ -415,7 +415,7 @@ func TestStore_SaveRemovesEmptyFile(t *testing.T) {
 	require.NoError(t, err)
 
 	// Unstage
-	err = store.Unstage(staging.ServiceSSM, "/app/config")
+	err = store.Unstage(staging.ServiceParam, "/app/config")
 	require.NoError(t, err)
 
 	// File should be removed
@@ -430,7 +430,7 @@ func TestStore_NilMapsInLoadedState(t *testing.T) {
 	path := filepath.Join(tmpDir, "staging.json")
 
 	// Write a state with null maps
-	err := os.WriteFile(path, []byte(`{"version":1,"ssm":null,"sm":null}`), 0o600)
+	err := os.WriteFile(path, []byte(`{"version":1,"param":null,"secret":null}`), 0o600)
 	require.NoError(t, err)
 
 	store := staging.NewStoreWithPath(path)
@@ -438,8 +438,8 @@ func TestStore_NilMapsInLoadedState(t *testing.T) {
 	require.NoError(t, err)
 
 	// Maps should be initialized
-	assert.NotNil(t, state.SSM)
-	assert.NotNil(t, state.SM)
+	assert.NotNil(t, state.Param)
+	assert.NotNil(t, state.Secret)
 }
 
 func TestStore_Save(t *testing.T) {
@@ -451,14 +451,14 @@ func TestStore_Save(t *testing.T) {
 
 	state := &staging.State{
 		Version: 1,
-		SSM: map[string]staging.Entry{
+		Param: map[string]staging.Entry{
 			"/app/config": {
 				Operation: staging.OperationUpdate,
 				Value:     "test",
 				StagedAt:  time.Now(),
 			},
 		},
-		SM: make(map[string]staging.Entry),
+		Secret: make(map[string]staging.Entry),
 	}
 
 	err := store.Save(state)
@@ -472,7 +472,7 @@ func TestStore_Save(t *testing.T) {
 	loaded, err := store.Load()
 	require.NoError(t, err)
 	assert.Equal(t, state.Version, loaded.Version)
-	assert.Equal(t, state.SSM["/app/config"].Value, loaded.SSM["/app/config"].Value)
+	assert.Equal(t, state.Param["/app/config"].Value, loaded.Param["/app/config"].Value)
 }
 
 func TestStore_DirectoryCreation(t *testing.T) {
@@ -483,7 +483,7 @@ func TestStore_DirectoryCreation(t *testing.T) {
 	store := staging.NewStoreWithPath(path)
 
 	now := time.Now()
-	err := store.Stage(staging.ServiceSSM, "/app/config", staging.Entry{
+	err := store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     "test",
 		StagedAt:  now,
@@ -504,7 +504,7 @@ func TestStore_UnstageFromSM(t *testing.T) {
 	now := time.Now()
 
 	// Stage SM entry
-	err := store.Stage(staging.ServiceSM, "my-secret", staging.Entry{
+	err := store.Stage(staging.ServiceSecret, "my-secret", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     "secret-value",
 		StagedAt:  now,
@@ -512,11 +512,11 @@ func TestStore_UnstageFromSM(t *testing.T) {
 	require.NoError(t, err)
 
 	// Unstage
-	err = store.Unstage(staging.ServiceSM, "my-secret")
+	err = store.Unstage(staging.ServiceSecret, "my-secret")
 	require.NoError(t, err)
 
 	// Verify removed
-	_, err = store.Get(staging.ServiceSM, "my-secret")
+	_, err = store.Get(staging.ServiceSecret, "my-secret")
 	assert.ErrorIs(t, err, staging.ErrNotStaged)
 }
 
@@ -547,7 +547,7 @@ func TestStore_StageLoadError(t *testing.T) {
 	require.NoError(t, err)
 
 	store := staging.NewStoreWithPath(path)
-	err = store.Stage(staging.ServiceSSM, "/app/config", staging.Entry{
+	err = store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     "test",
 		StagedAt:  time.Now(),
@@ -567,7 +567,7 @@ func TestStore_UnstageLoadError(t *testing.T) {
 	require.NoError(t, err)
 
 	store := staging.NewStoreWithPath(path)
-	err = store.Unstage(staging.ServiceSSM, "/app/config")
+	err = store.Unstage(staging.ServiceParam, "/app/config")
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to parse state file")
 }
@@ -583,7 +583,7 @@ func TestStore_UnstageAllLoadError(t *testing.T) {
 	require.NoError(t, err)
 
 	store := staging.NewStoreWithPath(path)
-	err = store.UnstageAll(staging.ServiceSSM)
+	err = store.UnstageAll(staging.ServiceParam)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to parse state file")
 }
@@ -599,7 +599,7 @@ func TestStore_GetLoadError(t *testing.T) {
 	require.NoError(t, err)
 
 	store := staging.NewStoreWithPath(path)
-	_, err = store.Get(staging.ServiceSSM, "/app/config")
+	_, err = store.Get(staging.ServiceParam, "/app/config")
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to parse state file")
 }
@@ -615,7 +615,7 @@ func TestStore_ListLoadError(t *testing.T) {
 	require.NoError(t, err)
 
 	store := staging.NewStoreWithPath(path)
-	_, err = store.List(staging.ServiceSSM)
+	_, err = store.List(staging.ServiceParam)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to parse state file")
 }
@@ -631,7 +631,7 @@ func TestStore_HasChangesLoadError(t *testing.T) {
 	require.NoError(t, err)
 
 	store := staging.NewStoreWithPath(path)
-	_, err = store.HasChanges(staging.ServiceSSM)
+	_, err = store.HasChanges(staging.ServiceParam)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to parse state file")
 }
@@ -647,7 +647,7 @@ func TestStore_CountLoadError(t *testing.T) {
 	require.NoError(t, err)
 
 	store := staging.NewStoreWithPath(path)
-	_, err = store.Count(staging.ServiceSSM)
+	_, err = store.Count(staging.ServiceParam)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to parse state file")
 }
@@ -660,13 +660,13 @@ func TestStore_GetSM(t *testing.T) {
 
 	now := time.Now()
 
-	_ = store.Stage(staging.ServiceSM, "my-secret", staging.Entry{
+	_ = store.Stage(staging.ServiceSecret, "my-secret", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     "secret-value",
 		StagedAt:  now,
 	})
 
-	entry, err := store.Get(staging.ServiceSM, "my-secret")
+	entry, err := store.Get(staging.ServiceSecret, "my-secret")
 	require.NoError(t, err)
 	assert.Equal(t, "secret-value", entry.Value)
 }
@@ -685,14 +685,14 @@ func TestStore_SaveWriteError(t *testing.T) {
 
 	state := &staging.State{
 		Version: 1,
-		SSM: map[string]staging.Entry{
+		Param: map[string]staging.Entry{
 			"/app/config": {
 				Operation: staging.OperationUpdate,
 				Value:     "test",
 				StagedAt:  time.Now(),
 			},
 		},
-		SM: make(map[string]staging.Entry),
+		Secret: make(map[string]staging.Entry),
 	}
 
 	err = store.Save(state)

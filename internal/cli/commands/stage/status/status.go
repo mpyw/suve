@@ -82,15 +82,15 @@ func (r *Runner) Run(_ context.Context, opts Options) error {
 	printer := &staging.EntryPrinter{Writer: r.Stdout}
 
 	// Show SSM changes (no DeleteOptions for SSM)
-	if ssmEntries, ok := entries[staging.ServiceSSM]; ok && len(ssmEntries) > 0 {
+	if ssmEntries, ok := entries[staging.ServiceParam]; ok && len(ssmEntries) > 0 {
 		_, _ = fmt.Fprintf(r.Stdout, "%s (%d):\n", colors.Warning("Staged SSM changes"), len(ssmEntries))
 		printEntries(printer, ssmEntries, opts.Verbose, false)
 	}
 
 	// Show SM changes (with DeleteOptions)
-	if smEntries, ok := entries[staging.ServiceSM]; ok && len(smEntries) > 0 {
+	if smEntries, ok := entries[staging.ServiceSecret]; ok && len(smEntries) > 0 {
 		// Add spacing if we printed SSM entries
-		if _, ok := entries[staging.ServiceSSM]; ok && len(entries[staging.ServiceSSM]) > 0 {
+		if _, ok := entries[staging.ServiceParam]; ok && len(entries[staging.ServiceParam]) > 0 {
 			_, _ = fmt.Fprintln(r.Stdout)
 		}
 		_, _ = fmt.Fprintf(r.Stdout, "%s (%d):\n", colors.Warning("Staged SM changes"), len(smEntries))

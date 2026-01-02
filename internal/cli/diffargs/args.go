@@ -13,32 +13,32 @@
 // Each argument is a complete specification including name and version.
 //
 //   - 1 arg: Compare specified version against default (latest/AWSCURRENT)
-//     suve ssm diff /app/config#3
-//     suve sm diff my-secret:AWSPREVIOUS
+//     suve param diff /app/config#3
+//     suve secret diff my-secret:AWSPREVIOUS
 //
 //   - 2 args: Compare two fully-specified versions
-//     suve ssm diff /app/config#1 /app/config#2
-//     suve sm diff my-secret:AWSPREVIOUS my-secret:AWSCURRENT
+//     suve param diff /app/config#1 /app/config#2
+//     suve secret diff my-secret:AWSPREVIOUS my-secret:AWSCURRENT
 //
 // ## Partial Spec Format
 //
 // Name is specified separately from version specifiers.
 //
 //   - 2 args: Name + specifier → compare with default
-//     suve ssm diff /app/config '#3'
-//     suve sm diff my-secret ':AWSPREVIOUS'
+//     suve param diff /app/config '#3'
+//     suve secret diff my-secret ':AWSPREVIOUS'
 //
 //   - 3 args: Name + two specifiers
-//     suve ssm diff /app/config '#1' '#2'
-//     suve sm diff my-secret ':AWSPREVIOUS' ':AWSCURRENT'
+//     suve param diff /app/config '#1' '#2'
+//     suve secret diff my-secret ':AWSPREVIOUS' ':AWSCURRENT'
 //
 // ## Mixed Format
 //
 // First argument is full spec, second is specifier-only (inherits name from first).
 //
 //   - 2 args: Full spec + specifier
-//     suve ssm diff /app/config#1 '#2'
-//     suve sm diff my-secret:AWSPREVIOUS ':AWSCURRENT'
+//     suve param diff /app/config#1 '#2'
+//     suve secret diff my-secret:AWSPREVIOUS ':AWSCURRENT'
 //
 // # Return Value Semantics
 //
@@ -69,7 +69,7 @@ import (
 // # Parameters
 //
 //   - args: Command line arguments (1-3 arguments supported)
-//   - parse: Service-specific parser function (e.g., ssmversion.Parse, smversion.Parse)
+//   - parse: Service-specific parser function (e.g., paramversion.Parse, secretversion.Parse)
 //   - hasAbsolute: Returns true if the absolute specifier is set (non-zero).
 //     Used to distinguish "mixed" pattern from "partial spec" pattern in 2-arg case.
 //     For SSM: func(abs) bool { return abs.Version != nil }
@@ -92,20 +92,20 @@ import (
 //
 //	spec1, spec2, err := ParseArgs(
 //	    args,
-//	    ssmversion.Parse,
-//	    func(abs ssmversion.AbsoluteSpec) bool { return abs.Version != nil },
+//	    paramversion.Parse,
+//	    func(abs paramversion.AbsoluteSpec) bool { return abs.Version != nil },
 //	    "#~",
-//	    "usage: suve ssm diff <spec1> [spec2] | <name> <version1> [version2]",
+//	    "usage: suve param diff <spec1> [spec2] | <name> <version1> [version2]",
 //	)
 //
 // SM usage:
 //
 //	spec1, spec2, err := ParseArgs(
 //	    args,
-//	    smversion.Parse,
-//	    func(abs smversion.AbsoluteSpec) bool { return abs.ID != nil || abs.Label != nil },
+//	    secretversion.Parse,
+//	    func(abs secretversion.AbsoluteSpec) bool { return abs.ID != nil || abs.Label != nil },
 //	    "#:~",
-//	    "usage: suve sm diff <spec1> [spec2] | <name> <version1> [version2]",
+//	    "usage: suve secret diff <spec1> [spec2] | <name> <version1> [version2]",
 //	)
 func ParseArgs[A any](
 	args []string,

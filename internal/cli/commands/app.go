@@ -8,8 +8,8 @@ import (
 	"github.com/samber/lo"
 	"github.com/urfave/cli/v3"
 
-	"github.com/mpyw/suve/internal/cli/commands/sm"
-	"github.com/mpyw/suve/internal/cli/commands/ssm"
+	"github.com/mpyw/suve/internal/cli/commands/param"
+	"github.com/mpyw/suve/internal/cli/commands/secret"
 	"github.com/mpyw/suve/internal/cli/commands/stage"
 )
 
@@ -20,8 +20,8 @@ func MakeApp() *cli.Command {
 		Usage:   "Git-like CLI for AWS Parameter Store and Secrets Manager",
 		Version: "0.1.0",
 		Commands: []*cli.Command{
-			ssm.Command(),
-			sm.Command(),
+			param.Command(),
+			secret.Command(),
 			stage.Command(),
 		},
 		CommandNotFound: func(_ context.Context, cmd *cli.Command, command string) {

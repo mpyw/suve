@@ -8,23 +8,23 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/mpyw/suve/internal/cli/diffargs"
-	"github.com/mpyw/suve/internal/version/smversion"
-	"github.com/mpyw/suve/internal/version/ssmversion"
+	"github.com/mpyw/suve/internal/version/paramversion"
+	"github.com/mpyw/suve/internal/version/secretversion"
 )
 
 func TestParseArgs_SSM(t *testing.T) {
 	t.Parallel()
 
-	parse := ssmversion.Parse
-	hasAbsolute := func(abs ssmversion.AbsoluteSpec) bool { return abs.Version != nil }
+	parse := paramversion.Parse
+	hasAbsolute := func(abs paramversion.AbsoluteSpec) bool { return abs.Version != nil }
 	prefixes := "#~"
-	usage := "usage: suve ssm diff"
+	usage := "usage: suve param diff"
 
 	tests := []struct {
 		name       string
 		args       []string
-		wantSpec1  *ssmversion.Spec
-		wantSpec2  *ssmversion.Spec
+		wantSpec1  *paramversion.Spec
+		wantSpec2  *paramversion.Spec
 		wantErrMsg string
 	}{
 		// Error cases
@@ -43,22 +43,22 @@ func TestParseArgs_SSM(t *testing.T) {
 		{
 			name: "one arg with version",
 			args: []string{"/app/param#3"},
-			wantSpec1: &ssmversion.Spec{
+			wantSpec1: &paramversion.Spec{
 				Name:     "/app/param",
-				Absolute: ssmversion.AbsoluteSpec{Version: lo.ToPtr(int64(3))},
+				Absolute: paramversion.AbsoluteSpec{Version: lo.ToPtr(int64(3))},
 			},
-			wantSpec2: &ssmversion.Spec{
+			wantSpec2: &paramversion.Spec{
 				Name: "/app/param",
 			},
 		},
 		{
 			name: "one arg with shift",
 			args: []string{"/app/param~1"},
-			wantSpec1: &ssmversion.Spec{
+			wantSpec1: &paramversion.Spec{
 				Name:  "/app/param",
 				Shift: 1,
 			},
-			wantSpec2: &ssmversion.Spec{
+			wantSpec2: &paramversion.Spec{
 				Name: "/app/param",
 			},
 		},
@@ -72,25 +72,25 @@ func TestParseArgs_SSM(t *testing.T) {
 		{
 			name: "two args both full spec",
 			args: []string{"/app/param#1", "/app/param#2"},
-			wantSpec1: &ssmversion.Spec{
+			wantSpec1: &paramversion.Spec{
 				Name:     "/app/param",
-				Absolute: ssmversion.AbsoluteSpec{Version: lo.ToPtr(int64(1))},
+				Absolute: paramversion.AbsoluteSpec{Version: lo.ToPtr(int64(1))},
 			},
-			wantSpec2: &ssmversion.Spec{
+			wantSpec2: &paramversion.Spec{
 				Name:     "/app/param",
-				Absolute: ssmversion.AbsoluteSpec{Version: lo.ToPtr(int64(2))},
+				Absolute: paramversion.AbsoluteSpec{Version: lo.ToPtr(int64(2))},
 			},
 		},
 		{
 			name: "two args different names",
 			args: []string{"/app/config#1", "/app/secrets#2"},
-			wantSpec1: &ssmversion.Spec{
+			wantSpec1: &paramversion.Spec{
 				Name:     "/app/config",
-				Absolute: ssmversion.AbsoluteSpec{Version: lo.ToPtr(int64(1))},
+				Absolute: paramversion.AbsoluteSpec{Version: lo.ToPtr(int64(1))},
 			},
-			wantSpec2: &ssmversion.Spec{
+			wantSpec2: &paramversion.Spec{
 				Name:     "/app/secrets",
-				Absolute: ssmversion.AbsoluteSpec{Version: lo.ToPtr(int64(2))},
+				Absolute: paramversion.AbsoluteSpec{Version: lo.ToPtr(int64(2))},
 			},
 		},
 
@@ -98,23 +98,23 @@ func TestParseArgs_SSM(t *testing.T) {
 		{
 			name: "two args mixed format",
 			args: []string{"/app/param#1", "#2"},
-			wantSpec1: &ssmversion.Spec{
+			wantSpec1: &paramversion.Spec{
 				Name:     "/app/param",
-				Absolute: ssmversion.AbsoluteSpec{Version: lo.ToPtr(int64(1))},
+				Absolute: paramversion.AbsoluteSpec{Version: lo.ToPtr(int64(1))},
 			},
-			wantSpec2: &ssmversion.Spec{
+			wantSpec2: &paramversion.Spec{
 				Name:     "/app/param",
-				Absolute: ssmversion.AbsoluteSpec{Version: lo.ToPtr(int64(2))},
+				Absolute: paramversion.AbsoluteSpec{Version: lo.ToPtr(int64(2))},
 			},
 		},
 		{
 			name: "two args mixed format with shift",
 			args: []string{"/app/param~1", "~2"},
-			wantSpec1: &ssmversion.Spec{
+			wantSpec1: &paramversion.Spec{
 				Name:  "/app/param",
 				Shift: 1,
 			},
-			wantSpec2: &ssmversion.Spec{
+			wantSpec2: &paramversion.Spec{
 				Name:  "/app/param",
 				Shift: 2,
 			},
@@ -124,22 +124,22 @@ func TestParseArgs_SSM(t *testing.T) {
 		{
 			name: "two args partial spec format",
 			args: []string{"/app/param", "#3"},
-			wantSpec1: &ssmversion.Spec{
+			wantSpec1: &paramversion.Spec{
 				Name:     "/app/param",
-				Absolute: ssmversion.AbsoluteSpec{Version: lo.ToPtr(int64(3))},
+				Absolute: paramversion.AbsoluteSpec{Version: lo.ToPtr(int64(3))},
 			},
-			wantSpec2: &ssmversion.Spec{
+			wantSpec2: &paramversion.Spec{
 				Name: "/app/param",
 			},
 		},
 		{
 			name: "two args partial spec with shift",
 			args: []string{"/app/param", "~2"},
-			wantSpec1: &ssmversion.Spec{
+			wantSpec1: &paramversion.Spec{
 				Name:  "/app/param",
 				Shift: 2,
 			},
-			wantSpec2: &ssmversion.Spec{
+			wantSpec2: &paramversion.Spec{
 				Name: "/app/param",
 			},
 		},
@@ -163,23 +163,23 @@ func TestParseArgs_SSM(t *testing.T) {
 		{
 			name: "three args",
 			args: []string{"/app/param", "#1", "#2"},
-			wantSpec1: &ssmversion.Spec{
+			wantSpec1: &paramversion.Spec{
 				Name:     "/app/param",
-				Absolute: ssmversion.AbsoluteSpec{Version: lo.ToPtr(int64(1))},
+				Absolute: paramversion.AbsoluteSpec{Version: lo.ToPtr(int64(1))},
 			},
-			wantSpec2: &ssmversion.Spec{
+			wantSpec2: &paramversion.Spec{
 				Name:     "/app/param",
-				Absolute: ssmversion.AbsoluteSpec{Version: lo.ToPtr(int64(2))},
+				Absolute: paramversion.AbsoluteSpec{Version: lo.ToPtr(int64(2))},
 			},
 		},
 		{
 			name: "three args with shifts",
 			args: []string{"/app/param", "~2", "~1"},
-			wantSpec1: &ssmversion.Spec{
+			wantSpec1: &paramversion.Spec{
 				Name:  "/app/param",
 				Shift: 2,
 			},
-			wantSpec2: &ssmversion.Spec{
+			wantSpec2: &paramversion.Spec{
 				Name:  "/app/param",
 				Shift: 1,
 			},
@@ -217,27 +217,27 @@ func TestParseArgs_SSM(t *testing.T) {
 func TestParseArgs_SM(t *testing.T) {
 	t.Parallel()
 
-	parse := smversion.Parse
-	hasAbsolute := func(abs smversion.AbsoluteSpec) bool { return abs.ID != nil || abs.Label != nil }
+	parse := secretversion.Parse
+	hasAbsolute := func(abs secretversion.AbsoluteSpec) bool { return abs.ID != nil || abs.Label != nil }
 	prefixes := "#:~"
-	usage := "usage: suve sm diff"
+	usage := "usage: suve secret diff"
 
 	tests := []struct {
 		name       string
 		args       []string
-		wantSpec1  *smversion.Spec
-		wantSpec2  *smversion.Spec
+		wantSpec1  *secretversion.Spec
+		wantSpec2  *secretversion.Spec
 		wantErrMsg string
 	}{
 		// 1 arg with label
 		{
 			name: "one arg with label",
 			args: []string{"my-secret:AWSPREVIOUS"},
-			wantSpec1: &smversion.Spec{
+			wantSpec1: &secretversion.Spec{
 				Name:     "my-secret",
-				Absolute: smversion.AbsoluteSpec{Label: lo.ToPtr("AWSPREVIOUS")},
+				Absolute: secretversion.AbsoluteSpec{Label: lo.ToPtr("AWSPREVIOUS")},
 			},
-			wantSpec2: &smversion.Spec{
+			wantSpec2: &secretversion.Spec{
 				Name: "my-secret",
 			},
 		},
@@ -246,13 +246,13 @@ func TestParseArgs_SM(t *testing.T) {
 		{
 			name: "two args mixed with labels",
 			args: []string{"my-secret:AWSPREVIOUS", ":AWSCURRENT"},
-			wantSpec1: &smversion.Spec{
+			wantSpec1: &secretversion.Spec{
 				Name:     "my-secret",
-				Absolute: smversion.AbsoluteSpec{Label: lo.ToPtr("AWSPREVIOUS")},
+				Absolute: secretversion.AbsoluteSpec{Label: lo.ToPtr("AWSPREVIOUS")},
 			},
-			wantSpec2: &smversion.Spec{
+			wantSpec2: &secretversion.Spec{
 				Name:     "my-secret",
-				Absolute: smversion.AbsoluteSpec{Label: lo.ToPtr("AWSCURRENT")},
+				Absolute: secretversion.AbsoluteSpec{Label: lo.ToPtr("AWSCURRENT")},
 			},
 		},
 
@@ -260,13 +260,13 @@ func TestParseArgs_SM(t *testing.T) {
 		{
 			name: "two args with version ID",
 			args: []string{"my-secret#abc123", "#def456"},
-			wantSpec1: &smversion.Spec{
+			wantSpec1: &secretversion.Spec{
 				Name:     "my-secret",
-				Absolute: smversion.AbsoluteSpec{ID: lo.ToPtr("abc123")},
+				Absolute: secretversion.AbsoluteSpec{ID: lo.ToPtr("abc123")},
 			},
-			wantSpec2: &smversion.Spec{
+			wantSpec2: &secretversion.Spec{
 				Name:     "my-secret",
-				Absolute: smversion.AbsoluteSpec{ID: lo.ToPtr("def456")},
+				Absolute: secretversion.AbsoluteSpec{ID: lo.ToPtr("def456")},
 			},
 		},
 
@@ -274,13 +274,13 @@ func TestParseArgs_SM(t *testing.T) {
 		{
 			name: "three args with labels",
 			args: []string{"my-secret", ":AWSPREVIOUS", ":AWSCURRENT"},
-			wantSpec1: &smversion.Spec{
+			wantSpec1: &secretversion.Spec{
 				Name:     "my-secret",
-				Absolute: smversion.AbsoluteSpec{Label: lo.ToPtr("AWSPREVIOUS")},
+				Absolute: secretversion.AbsoluteSpec{Label: lo.ToPtr("AWSPREVIOUS")},
 			},
-			wantSpec2: &smversion.Spec{
+			wantSpec2: &secretversion.Spec{
 				Name:     "my-secret",
-				Absolute: smversion.AbsoluteSpec{Label: lo.ToPtr("AWSCURRENT")},
+				Absolute: secretversion.AbsoluteSpec{Label: lo.ToPtr("AWSCURRENT")},
 			},
 		},
 	}

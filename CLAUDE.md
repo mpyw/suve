@@ -4,15 +4,15 @@ This file provides guidance to Claude Code when working with code in this reposi
 
 ## Project Overview
 
-**suve** is a Git-like CLI for AWS Parameter Store and Secrets Manager. It provides familiar Git-style commands (`show`, `log`, `diff`, `cat`, `ls`, `set`, `delete`) with version specification syntax (`#VERSION`, `~SHIFT`, `:LABEL`).
+**suve** is a Git-like CLI for AWS Parameter Store and Secrets Manager. It provides familiar Git-style commands (`show`, `log`, `diff`, `list`, `set`, `delete`) with version specification syntax (`#VERSION`, `~SHIFT`, `:LABEL`).
 
 ### Core Concepts
 
 1. **Git-like Commands**: Commands mirror Git behavior for familiarity
-   - `show` - Display value with metadata (like `git show`)
-   - `cat` - Raw value output for piping (like `git cat-file -p`)
+   - `show` - Display value with metadata (like `git show`); use `--raw` for piping
    - `log` - Version history (like `git log`)
    - `diff` - Compare versions (like `git diff`)
+   - `list` - List parameters/secrets (aliased as `ls`)
 
 2. **Version Specification**: Git-like revision syntax
    ```
@@ -38,8 +38,8 @@ This file provides guidance to Claude Code when working with code in this reposi
    ```
 
 3. **Two Services**:
-   - `ssm` - AWS Systems Manager Parameter Store
-   - `sm` - AWS Secrets Manager
+   - `param` (aliases: `ssm`, `ps`) - AWS Systems Manager Parameter Store
+   - `secret` (aliases: `sm`) - AWS Secrets Manager
 
 ## Architecture
 
@@ -49,24 +49,26 @@ suve/
 │
 ├── internal/
 │   ├── cli/
-│   │   ├── app.go             # urfave/cli v2 app definition
-│   │   ├── ssm/               # SSM subcommands (cat, delete, diff, log, ls, set, show)
-│   │   └── sm/                # SM subcommands (cat, create, delete, diff, log, ls, restore, show, update)
+│   │   ├── commands/
+│   │   │   ├── app.go         # urfave/cli v3 app definition
+│   │   │   ├── param/         # param subcommands (delete, diff, log, ls, set, show)
+│   │   │   ├── secret/        # secret subcommands (create, delete, diff, log, ls, restore, show, update)
+│   │   │   └── stage/         # staging subcommands
+│   │   └── ...
 │   │
 │   ├── api/
-│   │   ├── ssmapi/            # SSM API interface (for testing)
-│   │   └── smapi/             # SM API interface (for testing)
+│   │   ├── paramapi/          # SSM API interface (for testing)
+│   │   └── secretapi/         # SM API interface (for testing)
 │   │
 │   ├── version/
 │   │   ├── internal/          # Shared utilities (char checks)
-│   │   ├── shift/             # Shift parser (~SHIFT)
-│   │   ├── ssmversion/        # SSM version spec parser (#VERSION, ~SHIFT)
-│   │   └── smversion/         # SM version spec parser (#VERSION, :LABEL, ~SHIFT)
+│   │   ├── paramversion/      # SSM version spec parser (#VERSION, ~SHIFT)
+│   │   └── secretversion/     # SM version spec parser (#VERSION, :LABEL, ~SHIFT)
 │   │
-│   ├── diff/                  # Diff argument parsing
+│   ├── staging/               # Staging functionality
 │   ├── output/                # Output formatting (diff, colors)
 │   ├── jsonutil/              # JSON formatting
-│   └── awsutil/               # AWS client initialization
+│   └── infra/                 # AWS client initialization
 │
 ├── e2e/                       # E2E tests (requires localstack)
 │
@@ -78,9 +80,9 @@ suve/
 
 ### Key Design Patterns
 
-1. **Subcommand packages**: Each command (cat, show, etc.) is its own package under `internal/cli/{ssm,sm}/`
+1. **Subcommand packages**: Each command (show, etc.) is its own package under `internal/cli/commands/{param,secret}/`
 2. **Interface-based testing**: API interfaces in `internal/api/` enable mock testing
-3. **Version resolution**: `ssmversion` and `smversion` handle version/shift/label resolution
+3. **Version resolution**: `paramversion` and `secretversion` handle version/shift/label resolution
 4. **Output abstraction**: Commands write to `io.Writer` for testability
 
 ## Development Commands
@@ -97,7 +99,7 @@ make build
 
 # E2E tests with localstack
 make up      # Start localstack
-make e2e     # Run SSM E2E tests
+make e2e     # Run E2E tests
 make down    # Stop localstack
 
 # Coverage
@@ -129,7 +131,7 @@ make down
 ## Code Style
 
 - Follow standard Go conventions
-- Use `urfave/cli/v2` for CLI structure
+- Use `urfave/cli/v3` for CLI structure
 - Commands write to `io.Writer`, not directly to stdout
 - Error messages should be user-friendly
 

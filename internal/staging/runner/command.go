@@ -170,7 +170,7 @@ If value is provided as an argument, uses that value directly.
 Otherwise, opens an editor to create the value.
 
 If the %s is already staged for creation, edits the staged value.
-The new %s will be created in AWS when you run 'suve stage %s push'.
+The new %s will be created in AWS when you run 'suve stage %s apply'.
 
 Use 'suve stage %s edit' to modify an existing %s.
 Use 'suve stage %s status' to view staged changes.
@@ -247,10 +247,10 @@ Otherwise, opens an editor to modify the value.
 
 If the %s is already staged, edits the staged value.
 Otherwise, fetches the current value from AWS and opens it for editing.
-Saves the edited value to the staging area (does not immediately push to AWS).
+Saves the edited value to the staging area (does not immediately apply to AWS).
 
 Use 'suve stage %s delete' to stage a %s for deletion.
-Use 'suve stage %s push' to apply staged changes to AWS.
+Use 'suve stage %s apply' to apply staged changes to AWS.
 Use 'suve stage %s status' to view staged changes.
 
 EXAMPLES:
@@ -315,10 +315,11 @@ EXAMPLES:
 	}
 }
 
-// NewPushCommand creates a push command with the given config.
+// NewPushCommand creates an apply command with the given config.
 func NewPushCommand(cfg CommandConfig) *cli.Command {
 	return &cli.Command{
-		Name:      "push",
+		Name:      "apply",
+		Aliases:   []string{"push"},
 		Usage:     fmt.Sprintf("Apply staged %s changes to AWS", cfg.ItemName),
 		ArgsUsage: "[name]",
 		Description: fmt.Sprintf(`Apply all staged %s %s changes to AWS.
@@ -326,20 +327,20 @@ func NewPushCommand(cfg CommandConfig) *cli.Command {
 If a %s name is specified, only that %s's staged changes are applied.
 Otherwise, all staged %s %s changes are applied.
 
-After successful push, the staged changes are cleared.
+After successful apply, the staged changes are cleared.
 
-Use 'suve stage %s status' to view staged changes before pushing.
+Use 'suve stage %s status' to view staged changes before applying.
 
 CONFLICT DETECTION:
-   Before pushing, suve checks if the AWS resource was modified after staging.
-   If a conflict is detected, the push is rejected to prevent lost updates.
-   Use --ignore-conflicts to force push despite conflicts.
+   Before applying, suve checks if the AWS resource was modified after staging.
+   If a conflict is detected, the apply is rejected to prevent lost updates.
+   Use --ignore-conflicts to force apply despite conflicts.
 
 EXAMPLES:
-   suve stage %s push                      Push all staged %s changes (with confirmation)
-   suve stage %s push <name>               Push only the specified %s
-   suve stage %s push -y                   Push without confirmation
-   suve stage %s push --ignore-conflicts   Push even if AWS was modified after staging`,
+   suve stage %s apply                      Apply all staged %s changes (with confirmation)
+   suve stage %s apply <name>               Apply only the specified %s
+   suve stage %s apply --yes                Apply without confirmation
+   suve stage %s apply --ignore-conflicts   Apply even if AWS was modified after staging`,
 			cfg.ServiceName, cfg.ItemName,
 			cfg.ItemName, cfg.ItemName,
 			cfg.ServiceName, cfg.ItemName,
@@ -350,13 +351,12 @@ EXAMPLES:
 			cfg.ServiceName),
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
-				Name:    "yes",
-				Aliases: []string{"y"},
-				Usage:   "Skip confirmation prompt",
+				Name:  "yes",
+				Usage: "Skip confirmation prompt",
 			},
 			&cli.BoolFlag{
 				Name:  "ignore-conflicts",
-				Usage: "Push even if AWS was modified after staging",
+				Usage: "Apply even if AWS was modified after staging",
 			},
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
@@ -400,9 +400,9 @@ EXAMPLES:
 
 			var message string
 			if opts.Name != "" {
-				message = fmt.Sprintf("Push staged changes for %s to AWS?", opts.Name)
+				message = fmt.Sprintf("Apply staged changes for %s to AWS?", opts.Name)
 			} else {
-				message = fmt.Sprintf("Push %d staged %s change(s) to AWS?", len(serviceEntries), parser.ServiceName())
+				message = fmt.Sprintf("Apply %d staged %s change(s) to AWS?", len(serviceEntries), parser.ServiceName())
 			}
 
 			confirmed, err := prompter.Confirm(message, skipConfirm)
@@ -555,7 +555,7 @@ func NewDeleteCommand(cfg CommandConfig) *cli.Command {
 		}
 		description = fmt.Sprintf(`Stage a %s for deletion.
 
-The %s will be deleted from AWS when you run 'suve stage %s push'.
+The %s will be deleted from AWS when you run 'suve stage %s apply'.
 Use 'suve stage %s status' to view staged changes.
 Use 'suve stage %s reset <name>' to unstage.
 
@@ -585,7 +585,7 @@ EXAMPLES:
 		// SSM doesn't have delete options
 		description = fmt.Sprintf(`Stage a %s for deletion.
 
-The %s will be deleted from AWS when you run 'suve stage %s push'.
+The %s will be deleted from AWS when you run 'suve stage %s apply'.
 Use 'suve stage %s status' to view staged changes.
 Use 'suve stage %s reset <name>' to unstage.
 

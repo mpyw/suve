@@ -55,19 +55,19 @@ func TestRun_UnstageAll(t *testing.T) {
 	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 	// Stage SSM parameters
-	_ = store.Stage(staging.ServiceSSM, "/app/config1", staging.Entry{
+	_ = store.Stage(staging.ServiceParam, "/app/config1", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     "ssm-value1",
 		StagedAt:  time.Now(),
 	})
-	_ = store.Stage(staging.ServiceSSM, "/app/config2", staging.Entry{
+	_ = store.Stage(staging.ServiceParam, "/app/config2", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     "ssm-value2",
 		StagedAt:  time.Now(),
 	})
 
 	// Stage SM secrets
-	_ = store.Stage(staging.ServiceSM, "secret1", staging.Entry{
+	_ = store.Stage(staging.ServiceSecret, "secret1", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     "sm-value1",
 		StagedAt:  time.Now(),
@@ -85,11 +85,11 @@ func TestRun_UnstageAll(t *testing.T) {
 	assert.Contains(t, buf.String(), "Unstaged all changes (2 SSM, 1 SM)")
 
 	// Verify all unstaged
-	_, err = store.Get(staging.ServiceSSM, "/app/config1")
+	_, err = store.Get(staging.ServiceParam, "/app/config1")
 	assert.Equal(t, staging.ErrNotStaged, err)
-	_, err = store.Get(staging.ServiceSSM, "/app/config2")
+	_, err = store.Get(staging.ServiceParam, "/app/config2")
 	assert.Equal(t, staging.ErrNotStaged, err)
-	_, err = store.Get(staging.ServiceSM, "secret1")
+	_, err = store.Get(staging.ServiceSecret, "secret1")
 	assert.Equal(t, staging.ErrNotStaged, err)
 }
 
@@ -100,7 +100,7 @@ func TestRun_UnstageSSMOnly(t *testing.T) {
 	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 	// Stage only SSM parameters
-	_ = store.Stage(staging.ServiceSSM, "/app/config", staging.Entry{
+	_ = store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     "ssm-value",
 		StagedAt:  time.Now(),
@@ -125,7 +125,7 @@ func TestRun_UnstageSMOnly(t *testing.T) {
 	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 	// Stage only SM secrets
-	_ = store.Stage(staging.ServiceSM, "my-secret", staging.Entry{
+	_ = store.Stage(staging.ServiceSecret, "my-secret", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     "sm-value",
 		StagedAt:  time.Now(),

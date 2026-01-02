@@ -106,7 +106,7 @@ func TestRun_SSMOnly(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
-	err := store.Stage(staging.ServiceSSM, "/app/config", staging.Entry{
+	err := store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     "new-value",
 		StagedAt:  time.Now(),
@@ -149,7 +149,7 @@ func TestRun_SMOnly(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
-	err := store.Stage(staging.ServiceSM, "my-secret", staging.Entry{
+	err := store.Stage(staging.ServiceSecret, "my-secret", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     "new-secret",
 		StagedAt:  time.Now(),
@@ -188,14 +188,14 @@ func TestRun_BothServices(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
-	err := store.Stage(staging.ServiceSSM, "/app/config", staging.Entry{
+	err := store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     "ssm-new",
 		StagedAt:  time.Now(),
 	})
 	require.NoError(t, err)
 
-	err = store.Stage(staging.ServiceSM, "my-secret", staging.Entry{
+	err = store.Stage(staging.ServiceSecret, "my-secret", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     "sm-new",
 		StagedAt:  time.Now(),
@@ -251,13 +251,13 @@ func TestRun_DeleteOperations(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
-	err := store.Stage(staging.ServiceSSM, "/app/config", staging.Entry{
+	err := store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
 		Operation: staging.OperationDelete,
 		StagedAt:  time.Now(),
 	})
 	require.NoError(t, err)
 
-	err = store.Stage(staging.ServiceSM, "my-secret", staging.Entry{
+	err = store.Stage(staging.ServiceSecret, "my-secret", staging.Entry{
 		Operation: staging.OperationDelete,
 		StagedAt:  time.Now(),
 	})
@@ -309,7 +309,7 @@ func TestRun_IdenticalValues(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
-	err := store.Stage(staging.ServiceSSM, "/app/config", staging.Entry{
+	err := store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     "same-value",
 		StagedAt:  time.Now(),
@@ -343,7 +343,7 @@ func TestRun_IdenticalValues(t *testing.T) {
 	assert.Contains(t, stderr.String(), "unstaged /app/config: identical to AWS current")
 
 	// Verify actually unstaged
-	_, err = store.Get(staging.ServiceSSM, "/app/config")
+	_, err = store.Get(staging.ServiceParam, "/app/config")
 	assert.Equal(t, staging.ErrNotStaged, err)
 }
 
@@ -353,7 +353,7 @@ func TestRun_JSONFormat(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
-	err := store.Stage(staging.ServiceSSM, "/app/config", staging.Entry{
+	err := store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     `{"key":"new"}`,
 		StagedAt:  time.Now(),
@@ -394,7 +394,7 @@ func TestRun_SSMUpdateAutoUnstageWhenDeleted(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
-	err := store.Stage(staging.ServiceSSM, "/app/config", staging.Entry{
+	err := store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     "new-value",
 		StagedAt:  time.Now(),
@@ -421,7 +421,7 @@ func TestRun_SSMUpdateAutoUnstageWhenDeleted(t *testing.T) {
 	assert.Contains(t, stderr.String(), "no longer exists")
 
 	// Verify unstaged
-	_, err = store.Get(staging.ServiceSSM, "/app/config")
+	_, err = store.Get(staging.ServiceParam, "/app/config")
 	assert.ErrorIs(t, err, staging.ErrNotStaged)
 }
 
@@ -431,7 +431,7 @@ func TestRun_SMUpdateAutoUnstageWhenDeleted(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
-	err := store.Stage(staging.ServiceSM, "my-secret", staging.Entry{
+	err := store.Stage(staging.ServiceSecret, "my-secret", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     "new-value",
 		StagedAt:  time.Now(),
@@ -458,7 +458,7 @@ func TestRun_SMUpdateAutoUnstageWhenDeleted(t *testing.T) {
 	assert.Contains(t, stderr.String(), "no longer exists")
 
 	// Verify unstaged
-	_, err = store.Get(staging.ServiceSM, "my-secret")
+	_, err = store.Get(staging.ServiceSecret, "my-secret")
 	assert.ErrorIs(t, err, staging.ErrNotStaged)
 }
 
@@ -468,7 +468,7 @@ func TestRun_SMIdenticalValues(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
-	err := store.Stage(staging.ServiceSM, "my-secret", staging.Entry{
+	err := store.Stage(staging.ServiceSecret, "my-secret", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     "same-value",
 		StagedAt:  time.Now(),
@@ -500,7 +500,7 @@ func TestRun_SMIdenticalValues(t *testing.T) {
 	assert.Contains(t, stderr.String(), "unstaged my-secret: identical to AWS current")
 
 	// Verify actually unstaged
-	_, err = store.Get(staging.ServiceSM, "my-secret")
+	_, err = store.Get(staging.ServiceSecret, "my-secret")
 	assert.Equal(t, staging.ErrNotStaged, err)
 }
 
@@ -510,7 +510,7 @@ func TestRun_SMJSONFormat(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
-	err := store.Stage(staging.ServiceSM, "my-secret", staging.Entry{
+	err := store.Stage(staging.ServiceSecret, "my-secret", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     `{"key":"new"}`,
 		StagedAt:  time.Now(),
@@ -549,7 +549,7 @@ func TestRun_SMJSONFormatMixed(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
-	err := store.Stage(staging.ServiceSM, "my-secret", staging.Entry{
+	err := store.Stage(staging.ServiceSecret, "my-secret", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     "not-json",
 		StagedAt:  time.Now(),
@@ -586,7 +586,7 @@ func TestRun_SSMCreateOperation(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
-	err := store.Stage(staging.ServiceSSM, "/app/new-param", staging.Entry{
+	err := store.Stage(staging.ServiceParam, "/app/new-param", staging.Entry{
 		Operation:   staging.OperationCreate,
 		Value:       "new-value",
 		Description: lo.ToPtr("New parameter"),
@@ -629,7 +629,7 @@ func TestRun_SMCreateOperation(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
-	err := store.Stage(staging.ServiceSM, "new-secret", staging.Entry{
+	err := store.Stage(staging.ServiceSecret, "new-secret", staging.Entry{
 		Operation:   staging.OperationCreate,
 		Value:       "secret-value",
 		Description: lo.ToPtr("New secret"),
@@ -671,7 +671,7 @@ func TestRun_CreateWithJSONFormat(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
-	err := store.Stage(staging.ServiceSSM, "/app/config", staging.Entry{
+	err := store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
 		Operation: staging.OperationCreate,
 		Value:     `{"key":"value","nested":{"a":1}}`,
 		StagedAt:  time.Now(),
@@ -707,7 +707,7 @@ func TestRun_DeleteAutoUnstageWhenAlreadyDeleted(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
-	err := store.Stage(staging.ServiceSSM, "/app/config", staging.Entry{
+	err := store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
 		Operation: staging.OperationDelete,
 		StagedAt:  time.Now(),
 	})
@@ -733,7 +733,7 @@ func TestRun_DeleteAutoUnstageWhenAlreadyDeleted(t *testing.T) {
 	assert.Contains(t, stderr.String(), "already deleted")
 
 	// Verify unstaged
-	_, err = store.Get(staging.ServiceSSM, "/app/config")
+	_, err = store.Get(staging.ServiceParam, "/app/config")
 	assert.ErrorIs(t, err, staging.ErrNotStaged)
 }
 
@@ -743,7 +743,7 @@ func TestRun_SMDeleteAutoUnstageWhenAlreadyDeleted(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
-	err := store.Stage(staging.ServiceSM, "my-secret", staging.Entry{
+	err := store.Stage(staging.ServiceSecret, "my-secret", staging.Entry{
 		Operation: staging.OperationDelete,
 		StagedAt:  time.Now(),
 	})
@@ -769,7 +769,7 @@ func TestRun_SMDeleteAutoUnstageWhenAlreadyDeleted(t *testing.T) {
 	assert.Contains(t, stderr.String(), "already deleted")
 
 	// Verify unstaged
-	_, err = store.Get(staging.ServiceSM, "my-secret")
+	_, err = store.Get(staging.ServiceSecret, "my-secret")
 	assert.ErrorIs(t, err, staging.ErrNotStaged)
 }
 
@@ -779,7 +779,7 @@ func TestRun_MetadataWithDescription(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
-	err := store.Stage(staging.ServiceSSM, "/app/config", staging.Entry{
+	err := store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
 		Operation:   staging.OperationUpdate,
 		Value:       "new-value",
 		Description: lo.ToPtr("Updated config"),
@@ -821,7 +821,7 @@ func TestRun_MetadataWithTags(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
-	err := store.Stage(staging.ServiceSSM, "/app/config", staging.Entry{
+	err := store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     "new-value",
 		Tags:      map[string]string{"env": "prod", "team": "platform"},

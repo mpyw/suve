@@ -28,7 +28,7 @@ func Command() *cli.Command {
 
 This does not affect AWS - it only clears the local staging area.
 
-Use 'suve ssm stage reset' or 'suve sm stage reset' for service-specific operations.
+Use 'suve stage param reset' or 'suve stage secret reset' for service-specific operations.
 
 EXAMPLES:
    suve stage reset    Unstage all changes (SSM and SM)`,
@@ -59,8 +59,8 @@ func (r *Runner) Run(_ context.Context) error {
 		return err
 	}
 
-	ssmCount := len(staged[staging.ServiceSSM])
-	smCount := len(staged[staging.ServiceSM])
+	ssmCount := len(staged[staging.ServiceParam])
+	smCount := len(staged[staging.ServiceSecret])
 	totalCount := ssmCount + smCount
 
 	if totalCount == 0 {
@@ -70,14 +70,14 @@ func (r *Runner) Run(_ context.Context) error {
 
 	// Unstage all SSM
 	if ssmCount > 0 {
-		if err := r.Store.UnstageAll(staging.ServiceSSM); err != nil {
+		if err := r.Store.UnstageAll(staging.ServiceParam); err != nil {
 			return err
 		}
 	}
 
 	// Unstage all SM
 	if smCount > 0 {
-		if err := r.Store.UnstageAll(staging.ServiceSM); err != nil {
+		if err := r.Store.UnstageAll(staging.ServiceSecret); err != nil {
 			return err
 		}
 	}

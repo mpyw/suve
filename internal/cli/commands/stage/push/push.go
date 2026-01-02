@@ -23,20 +23,21 @@ type Runner struct {
 	Stderr      io.Writer
 }
 
-// Command returns the global push command.
+// Command returns the global apply command.
 func Command() *cli.Command {
 	return &cli.Command{
-		Name:  "push",
-		Usage: "Apply all staged changes to AWS",
+		Name:    "apply",
+		Aliases: []string{"push"},
+		Usage:   "Apply all staged changes to AWS",
 		Description: `Apply all staged changes (both SSM and SM) to AWS.
 
-After successful push, the staged changes are cleared.
+After successful apply, the staged changes are cleared.
 
-Use 'suve stage status' to view all staged changes before pushing.
-Use 'suve ssm stage push' or 'suve sm stage push' to push service-specific changes.
+Use 'suve stage status' to view all staged changes before applying.
+Use 'suve stage param apply' or 'suve stage secret apply' for service-specific changes.
 
 EXAMPLES:
-   suve stage push    Push all staged changes (SSM and SM)`,
+   suve stage apply    Apply all staged changes (SSM and SM)`,
 		Action: action,
 	}
 }
@@ -48,17 +49,17 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	}
 
 	// Check if there are any staged changes
-	ssmStaged, err := store.List(staging.ServiceSSM)
+	ssmStaged, err := store.List(staging.ServiceParam)
 	if err != nil {
 		return err
 	}
-	smStaged, err := store.List(staging.ServiceSM)
+	smStaged, err := store.List(staging.ServiceSecret)
 	if err != nil {
 		return err
 	}
 
-	hasSSM := len(ssmStaged[staging.ServiceSSM]) > 0
-	hasSM := len(smStaged[staging.ServiceSM]) > 0
+	hasSSM := len(ssmStaged[staging.ServiceParam]) > 0
+	hasSM := len(smStaged[staging.ServiceSecret]) > 0
 
 	if !hasSSM && !hasSM {
 		output.Info(cmd.Root().Writer, "No changes staged.")
@@ -73,7 +74,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 
 	// Initialize strategies only if needed
 	if hasSSM {
-		strat, err := staging.SSMFactory(ctx)
+		strat, err := staging.ParamFactory(ctx)
 		if err != nil {
 			return err
 		}
@@ -81,7 +82,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	}
 
 	if hasSM {
-		strat, err := staging.SMFactory(ctx)
+		strat, err := staging.SecretFactory(ctx)
 		if err != nil {
 			return err
 		}
@@ -99,8 +100,8 @@ func (r *Runner) Run(ctx context.Context) error {
 		return err
 	}
 
-	ssmStaged := allStaged[staging.ServiceSSM]
-	smStaged := allStaged[staging.ServiceSM]
+	ssmStaged := allStaged[staging.ServiceParam]
+	smStaged := allStaged[staging.ServiceSecret]
 
 	var totalSucceeded, totalFailed int
 

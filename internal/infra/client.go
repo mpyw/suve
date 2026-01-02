@@ -15,8 +15,8 @@ func LoadConfig(ctx context.Context) (aws.Config, error) {
 	return config.LoadDefaultConfig(ctx)
 }
 
-// NewSSMClient creates a new SSM client using the default configuration.
-func NewSSMClient(ctx context.Context) (*ssm.Client, error) {
+// NewParamClient creates a new SSM client using the default configuration.
+func NewParamClient(ctx context.Context) (*ssm.Client, error) {
 	cfg, err := LoadConfig(ctx)
 	if err != nil {
 		return nil, err
@@ -24,8 +24,8 @@ func NewSSMClient(ctx context.Context) (*ssm.Client, error) {
 	return ssm.NewFromConfig(cfg), nil
 }
 
-// NewSMClient creates a new Secrets Manager client using the default configuration.
-func NewSMClient(ctx context.Context) (*secretsmanager.Client, error) {
+// NewSecretClient creates a new Secrets Manager client using the default configuration.
+func NewSecretClient(ctx context.Context) (*secretsmanager.Client, error) {
 	cfg, err := LoadConfig(ctx)
 	if err != nil {
 		return nil, err

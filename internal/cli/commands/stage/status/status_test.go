@@ -41,7 +41,7 @@ func TestCommand_ShowSSMChangesOnly(t *testing.T) {
 	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 	now := time.Now()
-	_ = store.Stage(staging.ServiceSSM, "/app/config", staging.Entry{
+	_ = store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     "value1",
 		StagedAt:  now,
@@ -70,7 +70,7 @@ func TestCommand_ShowSMChangesOnly(t *testing.T) {
 	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 	now := time.Now()
-	_ = store.Stage(staging.ServiceSM, "my-secret", staging.Entry{
+	_ = store.Stage(staging.ServiceSecret, "my-secret", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     "secret-value",
 		StagedAt:  now,
@@ -99,12 +99,12 @@ func TestCommand_ShowBothSSMAndSMChanges(t *testing.T) {
 	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 	now := time.Now()
-	_ = store.Stage(staging.ServiceSSM, "/app/config", staging.Entry{
+	_ = store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     "param-value",
 		StagedAt:  now,
 	})
-	_ = store.Stage(staging.ServiceSM, "my-secret", staging.Entry{
+	_ = store.Stage(staging.ServiceSecret, "my-secret", staging.Entry{
 		Operation: staging.OperationDelete,
 		StagedAt:  now,
 	})
@@ -135,12 +135,12 @@ func TestCommand_VerboseOutput(t *testing.T) {
 	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 	now := time.Now()
-	_ = store.Stage(staging.ServiceSSM, "/app/config", staging.Entry{
+	_ = store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     "test-value",
 		StagedAt:  now,
 	})
-	_ = store.Stage(staging.ServiceSM, "my-secret", staging.Entry{
+	_ = store.Stage(staging.ServiceSecret, "my-secret", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     "secret-value",
 		StagedAt:  now,
@@ -170,7 +170,7 @@ func TestCommand_VerboseWithDelete(t *testing.T) {
 	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 	now := time.Now()
-	_ = store.Stage(staging.ServiceSSM, "/app/config", staging.Entry{
+	_ = store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
 		Operation: staging.OperationDelete,
 		StagedAt:  now,
 	})
@@ -199,7 +199,7 @@ func TestCommand_VerboseTruncatesLongValue(t *testing.T) {
 
 	now := time.Now()
 	longValue := "this is a very long value that exceeds one hundred characters and should be truncated in verbose mode output display"
-	_ = store.Stage(staging.ServiceSSM, "/app/config", staging.Entry{
+	_ = store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     longValue,
 		StagedAt:  now,

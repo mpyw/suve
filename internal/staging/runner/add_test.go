@@ -24,7 +24,7 @@ func TestAddRunner_Run(t *testing.T) {
 
 		var buf bytes.Buffer
 		r := &runner.AddRunner{
-			Strategy:   &mockStrategy{service: staging.ServiceSSM},
+			Strategy:   &mockStrategy{service: staging.ServiceParam},
 			Store:      store,
 			Stdout:     &buf,
 			Stderr:     &bytes.Buffer{},
@@ -37,7 +37,7 @@ func TestAddRunner_Run(t *testing.T) {
 		assert.Contains(t, buf.String(), "/app/config")
 
 		// Verify staged with OperationCreate
-		entry, err := store.Get(staging.ServiceSSM, "/app/config")
+		entry, err := store.Get(staging.ServiceParam, "/app/config")
 		require.NoError(t, err)
 		assert.Equal(t, staging.OperationCreate, entry.Operation)
 		assert.Equal(t, "new-value", entry.Value)
@@ -50,14 +50,14 @@ func TestAddRunner_Run(t *testing.T) {
 		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 		// Pre-stage as create
-		_ = store.Stage(staging.ServiceSSM, "/app/config", staging.Entry{
+		_ = store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
 			Operation: staging.OperationCreate,
 			Value:     "original-value",
 		})
 
 		var buf bytes.Buffer
 		r := &runner.AddRunner{
-			Strategy: &mockStrategy{service: staging.ServiceSSM},
+			Strategy: &mockStrategy{service: staging.ServiceParam},
 			Store:    store,
 			Stdout:   &buf,
 			Stderr:   &bytes.Buffer{},
@@ -72,7 +72,7 @@ func TestAddRunner_Run(t *testing.T) {
 		assert.Contains(t, buf.String(), "Staged for creation")
 
 		// Verify updated
-		entry, err := store.Get(staging.ServiceSSM, "/app/config")
+		entry, err := store.Get(staging.ServiceParam, "/app/config")
 		require.NoError(t, err)
 		assert.Equal(t, staging.OperationCreate, entry.Operation)
 		assert.Equal(t, "updated-value", entry.Value)
@@ -86,7 +86,7 @@ func TestAddRunner_Run(t *testing.T) {
 
 		var buf bytes.Buffer
 		r := &runner.AddRunner{
-			Strategy:   &mockStrategy{service: staging.ServiceSSM},
+			Strategy:   &mockStrategy{service: staging.ServiceParam},
 			Store:      store,
 			Stdout:     &buf,
 			Stderr:     &bytes.Buffer{},
@@ -98,7 +98,7 @@ func TestAddRunner_Run(t *testing.T) {
 		assert.Contains(t, buf.String(), "Empty value")
 
 		// Verify not staged
-		_, err = store.Get(staging.ServiceSSM, "/app/config")
+		_, err = store.Get(staging.ServiceParam, "/app/config")
 		assert.Equal(t, staging.ErrNotStaged, err)
 	})
 
@@ -109,14 +109,14 @@ func TestAddRunner_Run(t *testing.T) {
 		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 		// Pre-stage as create
-		_ = store.Stage(staging.ServiceSSM, "/app/config", staging.Entry{
+		_ = store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
 			Operation: staging.OperationCreate,
 			Value:     "same-value",
 		})
 
 		var buf bytes.Buffer
 		r := &runner.AddRunner{
-			Strategy: &mockStrategy{service: staging.ServiceSSM},
+			Strategy: &mockStrategy{service: staging.ServiceParam},
 			Store:    store,
 			Stdout:   &buf,
 			Stderr:   &bytes.Buffer{},
@@ -138,7 +138,7 @@ func TestAddRunner_Run(t *testing.T) {
 
 		var buf bytes.Buffer
 		r := &runner.AddRunner{
-			Strategy:   &mockStrategy{service: staging.ServiceSM},
+			Strategy:   &mockStrategy{service: staging.ServiceSecret},
 			Store:      store,
 			Stdout:     &buf,
 			Stderr:     &bytes.Buffer{},
@@ -149,7 +149,7 @@ func TestAddRunner_Run(t *testing.T) {
 		require.NoError(t, err)
 
 		// Verify staged with correct service
-		entry, err := store.Get(staging.ServiceSM, "my-secret")
+		entry, err := store.Get(staging.ServiceSecret, "my-secret")
 		require.NoError(t, err)
 		assert.Equal(t, staging.OperationCreate, entry.Operation)
 		assert.Equal(t, "secret-value", entry.Value)

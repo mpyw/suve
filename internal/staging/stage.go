@@ -50,18 +50,18 @@ type DeleteOptions struct {
 // State represents the entire staging state.
 type State struct {
 	Version int              `json:"version"`
-	SSM     map[string]Entry `json:"ssm,omitempty"`
-	SM      map[string]Entry `json:"sm,omitempty"`
+	Param   map[string]Entry `json:"param,omitempty"`
+	Secret  map[string]Entry `json:"secret,omitempty"`
 }
 
 // Service represents which AWS service the staged change belongs to.
 type Service string
 
 const (
-	// ServiceSSM represents AWS Systems Manager Parameter Store.
-	ServiceSSM Service = "ssm"
-	// ServiceSM represents AWS Secrets Manager.
-	ServiceSM Service = "sm"
+	// ServiceParam represents AWS Systems Manager Parameter Store.
+	ServiceParam Service = "param"
+	// ServiceSecret represents AWS Secrets Manager.
+	ServiceSecret Service = "secret"
 )
 
 const (
@@ -149,8 +149,8 @@ func (s *Store) loadLocked() (*State, error) {
 		if os.IsNotExist(err) {
 			return &State{
 				Version: stateVersion,
-				SSM:     make(map[string]Entry),
-				SM:      make(map[string]Entry),
+				Param:   make(map[string]Entry),
+				Secret:  make(map[string]Entry),
 			}, nil
 		}
 		return nil, fmt.Errorf("failed to read state file: %w", err)
@@ -162,11 +162,11 @@ func (s *Store) loadLocked() (*State, error) {
 	}
 
 	// Initialize maps if nil
-	if state.SSM == nil {
-		state.SSM = make(map[string]Entry)
+	if state.Param == nil {
+		state.Param = make(map[string]Entry)
 	}
-	if state.SM == nil {
-		state.SM = make(map[string]Entry)
+	if state.Secret == nil {
+		state.Secret = make(map[string]Entry)
 	}
 
 	return &state, nil
@@ -188,7 +188,7 @@ func (s *Store) saveLocked(state *State) error {
 	}
 
 	// Clean up empty maps before saving
-	if len(state.SSM) == 0 && len(state.SM) == 0 {
+	if len(state.Param) == 0 && len(state.Secret) == 0 {
 		// Remove file if no staged changes
 		if err := os.Remove(s.stateFilePath); err != nil && !os.IsNotExist(err) {
 			return fmt.Errorf("failed to remove empty state file: %w", err)
@@ -226,10 +226,10 @@ func (s *Store) Stage(service Service, name string, entry Entry) error {
 	}
 
 	switch service {
-	case ServiceSSM:
-		state.SSM[name] = entry
-	case ServiceSM:
-		state.SM[name] = entry
+	case ServiceParam:
+		state.Param[name] = entry
+	case ServiceSecret:
+		state.Secret[name] = entry
 	default:
 		return fmt.Errorf("unknown service: %s", service)
 	}
@@ -255,16 +255,16 @@ func (s *Store) Unstage(service Service, name string) error {
 	}
 
 	switch service {
-	case ServiceSSM:
-		if _, ok := state.SSM[name]; !ok {
+	case ServiceParam:
+		if _, ok := state.Param[name]; !ok {
 			return ErrNotStaged
 		}
-		delete(state.SSM, name)
-	case ServiceSM:
-		if _, ok := state.SM[name]; !ok {
+		delete(state.Param, name)
+	case ServiceSecret:
+		if _, ok := state.Secret[name]; !ok {
 			return ErrNotStaged
 		}
-		delete(state.SM, name)
+		delete(state.Secret, name)
 	default:
 		return fmt.Errorf("unknown service: %s", service)
 	}
@@ -291,13 +291,13 @@ func (s *Store) UnstageAll(service Service) error {
 	}
 
 	switch service {
-	case ServiceSSM:
-		state.SSM = make(map[string]Entry)
-	case ServiceSM:
-		state.SM = make(map[string]Entry)
+	case ServiceParam:
+		state.Param = make(map[string]Entry)
+	case ServiceSecret:
+		state.Secret = make(map[string]Entry)
 	case "":
-		state.SSM = make(map[string]Entry)
-		state.SM = make(map[string]Entry)
+		state.Param = make(map[string]Entry)
+		state.Secret = make(map[string]Entry)
 	default:
 		return fmt.Errorf("unknown service: %s", service)
 	}
@@ -316,10 +316,10 @@ func (s *Store) Get(service Service, name string) (*Entry, error) {
 	var ok bool
 
 	switch service {
-	case ServiceSSM:
-		entry, ok = state.SSM[name]
-	case ServiceSM:
-		entry, ok = state.SM[name]
+	case ServiceParam:
+		entry, ok = state.Param[name]
+	case ServiceSecret:
+		entry, ok = state.Secret[name]
 	default:
 		return nil, fmt.Errorf("unknown service: %s", service)
 	}
@@ -342,20 +342,20 @@ func (s *Store) List(service Service) (map[Service]map[string]Entry, error) {
 	result := make(map[Service]map[string]Entry)
 
 	switch service {
-	case ServiceSSM:
-		if len(state.SSM) > 0 {
-			result[ServiceSSM] = state.SSM
+	case ServiceParam:
+		if len(state.Param) > 0 {
+			result[ServiceParam] = state.Param
 		}
-	case ServiceSM:
-		if len(state.SM) > 0 {
-			result[ServiceSM] = state.SM
+	case ServiceSecret:
+		if len(state.Secret) > 0 {
+			result[ServiceSecret] = state.Secret
 		}
 	case "":
-		if len(state.SSM) > 0 {
-			result[ServiceSSM] = state.SSM
+		if len(state.Param) > 0 {
+			result[ServiceParam] = state.Param
 		}
-		if len(state.SM) > 0 {
-			result[ServiceSM] = state.SM
+		if len(state.Secret) > 0 {
+			result[ServiceSecret] = state.Secret
 		}
 	default:
 		return nil, fmt.Errorf("unknown service: %s", service)
@@ -372,12 +372,12 @@ func (s *Store) HasChanges(service Service) (bool, error) {
 	}
 
 	switch service {
-	case ServiceSSM:
-		return len(state.SSM) > 0, nil
-	case ServiceSM:
-		return len(state.SM) > 0, nil
+	case ServiceParam:
+		return len(state.Param) > 0, nil
+	case ServiceSecret:
+		return len(state.Secret) > 0, nil
 	case "":
-		return len(state.SSM) > 0 || len(state.SM) > 0, nil
+		return len(state.Param) > 0 || len(state.Secret) > 0, nil
 	default:
 		return false, fmt.Errorf("unknown service: %s", service)
 	}
@@ -391,12 +391,12 @@ func (s *Store) Count(service Service) (int, error) {
 	}
 
 	switch service {
-	case ServiceSSM:
-		return len(state.SSM), nil
-	case ServiceSM:
-		return len(state.SM), nil
+	case ServiceParam:
+		return len(state.Param), nil
+	case ServiceSecret:
+		return len(state.Secret), nil
 	case "":
-		return len(state.SSM) + len(state.SM), nil
+		return len(state.Param) + len(state.Secret), nil
 	default:
 		return 0, fmt.Errorf("unknown service: %s", service)
 	}
