@@ -285,11 +285,11 @@ where ~SHIFT = ~ | ~N  (repeatable, cumulative)
 
 | Command | Options | Description |
 |---------|---------|-------------|
-| [`suve param show`](docs/param.md#show) | `--raw`<br>`--output=<FORMAT>` | Display parameter with metadata |
-| [`suve param log`](docs/param.md#log) | `--number=<N>` (`-n`)<br>`--patch` (`-p`)<br>`--parse-json` (`-j`)<br>`--oneline`<br>`--reverse`<br>`--from=<SPEC>`<br>`--to=<SPEC>`<br>`--output=<FORMAT>` | Show version history |
-| [`suve param diff`](docs/param.md#diff) | `--parse-json` (`-j`)<br>`--output=<FORMAT>` | Compare versions |
-| [`suve param list`](docs/param.md#list) | `--filter=<REGEX>`<br>`--show`<br>`--output=<FORMAT>` | List parameters |
-| [`suve param set`](docs/param.md#set) | `--yes`<br>`--description=<TEXT>`<br>`--tag=<KEY>=<VALUE> --tag=...` | Create or update parameter |
+| [`suve param show`](docs/param.md#show) | `--raw`<br>`--decrypt`<br>`--parse-json` (`-j`)<br>`--no-pager`<br>`--output=<FORMAT>` | Display parameter with metadata |
+| [`suve param log`](docs/param.md#log) | `--number=<N>` (`-n`)<br>`--patch` (`-p`)<br>`--parse-json` (`-j`)<br>`--oneline`<br>`--reverse`<br>`--from=<SPEC>`<br>`--to=<SPEC>`<br>`--no-pager`<br>`--output=<FORMAT>` | Show version history |
+| [`suve param diff`](docs/param.md#diff) | `--parse-json` (`-j`)<br>`--no-pager`<br>`--output=<FORMAT>` | Compare versions |
+| [`suve param list`](docs/param.md#list) | `--recursive` (`-R`)<br>`--filter=<REGEX>`<br>`--show`<br>`--output=<FORMAT>` | List parameters |
+| [`suve param set`](docs/param.md#set) | `--type=<TYPE>`<br>`--secure`<br>`--description=<TEXT>`<br>`--tag=<KEY>=<VALUE> --tag=...`<br>`--untag=<KEY> --untag=...`<br>`--yes` | Create or update parameter |
 | [`suve param delete`](docs/param.md#delete) | `--yes` | Delete parameter |
 
 **Staging commands** (under `suve stage param`):
@@ -297,10 +297,10 @@ where ~SHIFT = ~ | ~N  (repeatable, cumulative)
 | Command | Options | Description |
 |---------|---------|-------------|
 | `suve stage param add` | `--description=<TEXT>`<br>`--tag=<KEY>=<VALUE> --tag=...` | Stage new parameter |
-| `suve stage param edit` | | Stage modification |
+| `suve stage param edit` | `--description=<TEXT>`<br>`--tag=<KEY>=<VALUE> --tag=...` | Stage modification |
 | `suve stage param delete` | | Stage deletion |
-| `suve stage param status` | `--verbose` | Show staged changes |
-| `suve stage param diff` | `--parse-json` (`-j`) | Compare staged vs AWS |
+| `suve stage param status` | `--verbose` (`-v`) | Show staged changes |
+| `suve stage param diff` | `--parse-json` (`-j`)<br>`--no-pager` | Compare staged vs AWS |
 | `suve stage param apply` | `--yes`<br>`--ignore-conflicts` | Apply staged changes |
 | `suve stage param reset` | `--all` | Unstage changes |
 
@@ -308,13 +308,13 @@ where ~SHIFT = ~ | ~N  (repeatable, cumulative)
 
 | Command | Options | Description |
 |---------|---------|-------------|
-| [`suve secret show`](docs/secret.md#show) | `--raw`<br>`--output=<FORMAT>` | Display secret with metadata |
-| [`suve secret log`](docs/secret.md#log) | `--number=<N>` (`-n`)<br>`--patch` (`-p`)<br>`--parse-json` (`-j`)<br>`--oneline`<br>`--reverse`<br>`--output=<FORMAT>` | Show version history |
-| [`suve secret diff`](docs/secret.md#diff) | `--parse-json` (`-j`)<br>`--output=<FORMAT>` | Compare versions |
+| [`suve secret show`](docs/secret.md#show) | `--raw`<br>`--parse-json` (`-j`)<br>`--no-pager`<br>`--output=<FORMAT>` | Display secret with metadata |
+| [`suve secret log`](docs/secret.md#log) | `--number=<N>` (`-n`)<br>`--patch` (`-p`)<br>`--parse-json` (`-j`)<br>`--oneline`<br>`--reverse`<br>`--no-pager`<br>`--output=<FORMAT>` | Show version history |
+| [`suve secret diff`](docs/secret.md#diff) | `--parse-json` (`-j`)<br>`--no-pager`<br>`--output=<FORMAT>` | Compare versions |
 | [`suve secret list`](docs/secret.md#list) | `--filter=<REGEX>`<br>`--show`<br>`--output=<FORMAT>` | List secrets |
 | [`suve secret create`](docs/secret.md#create) | `--description=<TEXT>`<br>`--tag=<KEY>=<VALUE> --tag=...` | Create new secret |
-| [`suve secret update`](docs/secret.md#update) | `--yes`<br>`--description=<TEXT>`<br>`--tag=<KEY>=<VALUE> --tag=...` | Update existing secret |
-| [`suve secret delete`](docs/secret.md#delete) | `--yes`<br>`--force`<br>`--recovery-window=<DAYS>` | Delete secret |
+| [`suve secret update`](docs/secret.md#update) | `--description=<TEXT>`<br>`--tag=<KEY>=<VALUE> --tag=...`<br>`--untag=<KEY> --untag=...`<br>`--yes` | Update existing secret |
+| [`suve secret delete`](docs/secret.md#delete) | `--force`<br>`--recovery-window=<DAYS>`<br>`--yes` | Delete secret |
 | [`suve secret restore`](docs/secret.md#restore) | | Restore deleted secret |
 
 **Staging commands** (under `suve stage secret`):
@@ -322,10 +322,10 @@ where ~SHIFT = ~ | ~N  (repeatable, cumulative)
 | Command | Options | Description |
 |---------|---------|-------------|
 | `suve stage secret add` | `--description=<TEXT>`<br>`--tag=<KEY>=<VALUE> --tag=...` | Stage new secret |
-| `suve stage secret edit` | | Stage modification |
+| `suve stage secret edit` | `--description=<TEXT>`<br>`--tag=<KEY>=<VALUE> --tag=...` | Stage modification |
 | `suve stage secret delete` | `--force`<br>`--recovery-window=<DAYS>` | Stage deletion |
-| `suve stage secret status` | `--verbose` | Show staged changes |
-| `suve stage secret diff` | `--parse-json` (`-j`) | Compare staged vs AWS |
+| `suve stage secret status` | `--verbose` (`-v`) | Show staged changes |
+| `suve stage secret diff` | `--parse-json` (`-j`)<br>`--no-pager` | Compare staged vs AWS |
 | `suve stage secret apply` | `--yes`<br>`--ignore-conflicts` | Apply staged changes |
 | `suve stage secret reset` | `--all` | Unstage changes |
 
@@ -333,10 +333,10 @@ where ~SHIFT = ~ | ~N  (repeatable, cumulative)
 
 | Command | Options | Description |
 |---------|---------|-------------|
-| `suve stage status` | `--verbose` | Show all staged changes |
-| `suve stage diff` | `--parse-json` (`-j`) | Compare all staged vs AWS |
+| `suve stage status` | `--verbose` (`-v`) | Show all staged changes |
+| `suve stage diff` | `--parse-json` (`-j`)<br>`--no-pager` | Compare all staged vs AWS |
 | `suve stage apply` | `--yes`<br>`--ignore-conflicts` | Apply all staged changes |
-| `suve stage reset` | `--all` | Unstage all changes |
+| `suve stage reset` | | Unstage all changes |
 
 ## Environment Variables
 

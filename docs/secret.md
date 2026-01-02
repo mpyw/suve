@@ -34,7 +34,7 @@ suve secret show [options] <name[#VERSION | :LABEL][~SHIFT]*>
 user@host:~$ suve secret show my-database-credentials
 Name: my-database-credentials
 ARN: arn:aws:secretsmanager:us-east-1:123456789012:secret:my-database-credentials-AbCdEf
- VersionId: abc12345-1234-1234-1234-123456789012
+VersionId: abc12345-1234-1234-1234-123456789012
 Stages: [AWSCURRENT]
 Created: 2024-01-15T10:30:45Z
 
@@ -49,6 +49,7 @@ Name: my-database-credentials
 ARN: arn:aws:secretsmanager:us-east-1:123456789012:secret:my-database-credentials-AbCdEf
 VersionId: abc12345-1234-1234-1234-123456789012
 Stages: [AWSCURRENT]
+JsonParsed: true
 Created: 2024-01-15T10:30:45Z
 
   {
@@ -58,7 +59,7 @@ Created: 2024-01-15T10:30:45Z
 ```
 
 > [!NOTE]
-> Keys are sorted alphabetically when using `--parse-json`.
+> `JsonParsed: true` appears only when `--parse-json` is used and the value is valid JSON. Keys are sorted alphabetically.
 
 With `--raw` for scripting (outputs value only, no trailing newline):
 
