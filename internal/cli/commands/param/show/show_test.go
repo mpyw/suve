@@ -129,6 +129,7 @@ func TestRun(t *testing.T) {
 				require.NotEqual(t, -1, appleIdx, "expected apple in output")
 				require.NotEqual(t, -1, zebraIdx, "expected zebra in output")
 				assert.Less(t, appleIdx, zebraIdx, "expected keys to be sorted (apple before zebra)")
+				assert.Contains(t, output, "JsonParsed")
 			},
 		},
 		{
@@ -226,6 +227,7 @@ func TestRun(t *testing.T) {
 			},
 			check: func(t *testing.T, output string) {
 				assert.Contains(t, output, "not json")
+				assert.NotContains(t, output, "JsonParsed")
 			},
 		},
 		{

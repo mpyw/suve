@@ -11,7 +11,6 @@ import (
 	"io"
 	"slices"
 	"strings"
-	"time"
 
 	"github.com/samber/lo"
 	"github.com/urfave/cli/v3"
@@ -22,6 +21,7 @@ import (
 	"github.com/mpyw/suve/internal/infra"
 	"github.com/mpyw/suve/internal/jsonutil"
 	"github.com/mpyw/suve/internal/output"
+	"github.com/mpyw/suve/internal/timeutil"
 	"github.com/mpyw/suve/internal/version/paramversion"
 )
 
@@ -253,7 +253,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 				items[i].Decrypted = lo.ToPtr(true)
 			}
 			if param.LastModifiedDate != nil {
-				items[i].Modified = param.LastModifiedDate.Format(time.RFC3339)
+				items[i].Modified = timeutil.FormatRFC3339(*param.LastModifiedDate)
 			}
 		}
 		enc := json.NewEncoder(r.Stdout)
@@ -298,7 +298,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 		}
 		_, _ = fmt.Fprintln(r.Stdout, colors.Version(versionLabel))
 		if param.LastModifiedDate != nil {
-			_, _ = fmt.Fprintf(r.Stdout, "%s %s\n", colors.FieldLabel("Date:"), param.LastModifiedDate.Format(time.RFC3339))
+			_, _ = fmt.Fprintf(r.Stdout, "%s %s\n", colors.FieldLabel("Date:"), timeutil.FormatRFC3339(*param.LastModifiedDate))
 		}
 
 		if opts.ShowPatch {

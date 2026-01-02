@@ -338,6 +338,22 @@ where ~SHIFT = ~ | ~N  (repeatable, cumulative)
 | `suve stage apply` | `--yes`<br>`--ignore-conflicts` | Apply all staged changes |
 | `suve stage reset` | `--all` | Unstage all changes |
 
+## Environment Variables
+
+### Timezone
+
+suve respects the `TZ` environment variable for date/time formatting:
+
+```bash
+# Show times in UTC
+TZ=UTC suve param show /app/config
+
+# Show times in Japan Standard Time
+TZ=Asia/Tokyo suve param show /app/config
+```
+
+All timestamps are formatted in RFC3339 format with the local timezone offset applied. If `TZ` is not set, the system's local timezone is used. Invalid timezone values fall back to UTC.
+
 ## AWS Configuration
 
 suve uses standard AWS SDK configuration:

@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"io"
 	"sort"
-	"time"
 
 	"github.com/samber/lo"
 	"github.com/urfave/cli/v3"
@@ -21,6 +20,7 @@ import (
 	"github.com/mpyw/suve/internal/infra"
 	"github.com/mpyw/suve/internal/jsonutil"
 	"github.com/mpyw/suve/internal/output"
+	"github.com/mpyw/suve/internal/timeutil"
 	"github.com/mpyw/suve/internal/version/secretversion"
 )
 
@@ -220,7 +220,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 				item.Stages = v.VersionStages
 			}
 			if v.CreatedDate != nil {
-				item.Created = v.CreatedDate.Format(time.RFC3339)
+				item.Created = timeutil.FormatRFC3339(*v.CreatedDate)
 			}
 			secretResult, err := r.Client.GetSecretValue(ctx, &secretapi.GetSecretValueInput{
 				SecretId:  lo.ToPtr(opts.Name),
@@ -284,7 +284,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 		}
 		_, _ = fmt.Fprintln(r.Stdout, colors.Version(versionLabel))
 		if v.CreatedDate != nil {
-			_, _ = fmt.Fprintf(r.Stdout, "%s %s\n", colors.FieldLabel("Date:"), v.CreatedDate.Format(time.RFC3339))
+			_, _ = fmt.Fprintf(r.Stdout, "%s %s\n", colors.FieldLabel("Date:"), timeutil.FormatRFC3339(*v.CreatedDate))
 		}
 
 		if opts.ShowPatch {

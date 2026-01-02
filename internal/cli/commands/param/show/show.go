@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"time"
 
 	"github.com/samber/lo"
 	"github.com/urfave/cli/v3"
@@ -16,6 +15,7 @@ import (
 	"github.com/mpyw/suve/internal/infra"
 	"github.com/mpyw/suve/internal/jsonutil"
 	"github.com/mpyw/suve/internal/output"
+	"github.com/mpyw/suve/internal/timeutil"
 	"github.com/mpyw/suve/internal/version/paramversion"
 )
 
@@ -44,12 +44,13 @@ type Options struct {
 
 // JSONOutput represents the JSON output structure for the show command.
 type JSONOutput struct {
-	Name      string `json:"name"`
-	Version   int64  `json:"version"`
-	Type      string `json:"type"`
-	Decrypted *bool  `json:"decrypted,omitempty"` // Only for SecureString
-	Modified  string `json:"modified,omitempty"`
-	Value     string `json:"value"`
+	Name       string `json:"name"`
+	Version    int64  `json:"version"`
+	Type       string `json:"type"`
+	Decrypted  *bool  `json:"decrypted,omitempty"`   // Only for SecureString
+	JsonParsed *bool  `json:"json_parsed,omitempty"` // Only when --parse-json is used
+	Modified   string `json:"modified,omitempty"`
+	Value      string `json:"value"`
 }
 
 // Command returns the show command.
@@ -157,6 +158,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 	}
 
 	value := lo.FromPtr(param.Value)
+	jsonParsed := false
 
 	// Warn if --parse-json is used in cases where it's not meaningful
 	if opts.ParseJSON {
@@ -166,7 +168,11 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 		case param.Type == paramapi.ParameterTypeSecureString && !opts.Decrypt:
 			output.Warning(r.Stderr, "--parse-json has no effect on encrypted SecureString (use --decrypt to enable)")
 		default:
-			value = jsonutil.TryFormatOrWarn(value, r.Stderr, "")
+			formatted := jsonutil.TryFormatOrWarn(value, r.Stderr, "")
+			if formatted != value {
+				jsonParsed = true
+				value = formatted
+			}
 		}
 	}
 
@@ -188,8 +194,12 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 		if param.Type == paramapi.ParameterTypeSecureString {
 			jsonOut.Decrypted = lo.ToPtr(opts.Decrypt)
 		}
+		// Show json_parsed only when --parse-json was used and succeeded
+		if jsonParsed {
+			jsonOut.JsonParsed = lo.ToPtr(true)
+		}
 		if param.LastModifiedDate != nil {
-			jsonOut.Modified = param.LastModifiedDate.Format(time.RFC3339)
+			jsonOut.Modified = timeutil.FormatRFC3339(*param.LastModifiedDate)
 		}
 		enc := json.NewEncoder(r.Stdout)
 		enc.SetIndent("", "  ")
@@ -205,8 +215,12 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 	if param.Type == paramapi.ParameterTypeSecureString {
 		out.Field("Decrypted", fmt.Sprintf("%t", opts.Decrypt))
 	}
+	// Show json_parsed only when --parse-json was used and succeeded
+	if jsonParsed {
+		out.Field("JsonParsed", "true")
+	}
 	if param.LastModifiedDate != nil {
-		out.Field("Modified", param.LastModifiedDate.Format(time.RFC3339))
+		out.Field("Modified", timeutil.FormatRFC3339(*param.LastModifiedDate))
 	}
 	out.Separator()
 	out.Value(value)

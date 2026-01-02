@@ -50,6 +50,7 @@ Name: /app/config/credentials
 Version: 2
 Type: SecureString
 Decrypted: true
+JsonParsed: true
 Modified: 2024-01-15T10:30:45Z
 
   {
@@ -57,6 +58,9 @@ Modified: 2024-01-15T10:30:45Z
     "username": "admin"
   }
 ```
+
+> [!NOTE]
+> `JsonParsed: true` appears only when `--parse-json` is used and the value is valid JSON. Keys are sorted alphabetically.
 
 With `--raw` for scripting (outputs value only, no trailing newline):
 

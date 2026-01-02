@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"time"
 
 	"github.com/samber/lo"
 	"github.com/urfave/cli/v3"
@@ -16,6 +15,7 @@ import (
 	"github.com/mpyw/suve/internal/infra"
 	"github.com/mpyw/suve/internal/jsonutil"
 	"github.com/mpyw/suve/internal/output"
+	"github.com/mpyw/suve/internal/timeutil"
 	"github.com/mpyw/suve/internal/version/secretversion"
 )
 
@@ -176,7 +176,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 			jsonOut.Stages = secret.VersionStages
 		}
 		if secret.CreatedDate != nil {
-			jsonOut.Created = secret.CreatedDate.Format(time.RFC3339)
+			jsonOut.Created = timeutil.FormatRFC3339(*secret.CreatedDate)
 		}
 		enc := json.NewEncoder(r.Stdout)
 		enc.SetIndent("", "  ")
@@ -194,7 +194,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 		out.Field("Stages", fmt.Sprintf("%v", secret.VersionStages))
 	}
 	if secret.CreatedDate != nil {
-		out.Field("Created", secret.CreatedDate.Format(time.RFC3339))
+		out.Field("Created", timeutil.FormatRFC3339(*secret.CreatedDate))
 	}
 	out.Separator()
 	out.Value(value)
