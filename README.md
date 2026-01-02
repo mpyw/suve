@@ -163,6 +163,9 @@ Output will look like:
 > [!IMPORTANT]
 > The staging workflow lets you prepare changes locally, review them, and apply when ready—just like `git add` → `git diff --staged` → `git commit`.
 
+> [!CAUTION]
+> Staged values are stored in plain text at `~/.suve/stage.json`. If you no longer need pending changes, run `suve stage reset --all` to clear them.
+
 **1. Stage changes** (opens editor or accepts value directly):
 
 ```ShellSession
