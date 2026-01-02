@@ -73,9 +73,8 @@ EXAMPLES:
 				Usage:   "List recursively",
 			},
 			&cli.StringFlag{
-				Name:    "filter",
-				Aliases: []string{"f"},
-				Usage:   "Filter by regex pattern",
+				Name:  "filter",
+				Usage: "Filter by regex pattern",
 			},
 			&cli.BoolFlag{
 				Name:  "show",

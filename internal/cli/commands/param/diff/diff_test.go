@@ -505,7 +505,7 @@ func TestRun(t *testing.T) {
 			opts: paramdiff.Options{
 				Spec1:      &paramversion.Spec{Name: "/app/param", Absolute: paramversion.AbsoluteSpec{Version: lo.ToPtr(int64(1))}},
 				Spec2:      &paramversion.Spec{Name: "/app/param", Absolute: paramversion.AbsoluteSpec{Version: lo.ToPtr(int64(2))}},
-				JSONFormat: true,
+				ParseJSON: true,
 			},
 			mock: &mockClient{
 				getParameterFunc: func(_ context.Context, params *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
@@ -540,7 +540,7 @@ func TestRun(t *testing.T) {
 			opts: paramdiff.Options{
 				Spec1:      &paramversion.Spec{Name: "/app/param", Absolute: paramversion.AbsoluteSpec{Version: lo.ToPtr(int64(1))}},
 				Spec2:      &paramversion.Spec{Name: "/app/param", Absolute: paramversion.AbsoluteSpec{Version: lo.ToPtr(int64(2))}},
-				JSONFormat: true,
+				ParseJSON: true,
 			},
 			mock: &mockClient{
 				getParameterFunc: func(_ context.Context, params *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {

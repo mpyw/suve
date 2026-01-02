@@ -42,7 +42,7 @@ type Runner struct {
 type Options struct {
 	Spec1      *secretversion.Spec
 	Spec2      *secretversion.Spec
-	JSONFormat bool
+	ParseJSON bool
 	NoPager    bool
 }
 
@@ -71,7 +71,7 @@ EXAMPLES:
 For comparing staged values, use: suve stage secret diff`,
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
-				Name:    "json",
+				Name:    "parse-json",
 				Aliases: []string{"j"},
 				Usage:   "Format JSON values before diffing (keys are always sorted)",
 			},
@@ -98,7 +98,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	opts := Options{
 		Spec1:      spec1,
 		Spec2:      spec2,
-		JSONFormat: cmd.Bool("json"),
+		ParseJSON: cmd.Bool("parse-json"),
 		NoPager:    cmd.Bool("no-pager"),
 	}
 
@@ -128,7 +128,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 	value2 := lo.FromPtr(secret2.SecretString)
 
 	// Format as JSON if enabled
-	if opts.JSONFormat {
+	if opts.ParseJSON {
 		value1, value2 = jsonutil.TryFormatOrWarn2(value1, value2, r.Stderr, "")
 	}
 

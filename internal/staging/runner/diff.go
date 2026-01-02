@@ -29,7 +29,7 @@ type DiffRunner struct {
 // DiffOptions holds options for the diff command.
 type DiffOptions struct {
 	Name       string // Optional: diff only this item, otherwise diff all
-	JSONFormat bool
+	ParseJSON bool
 	NoPager    bool
 }
 
@@ -131,7 +131,7 @@ func (r *DiffRunner) outputDiff(opts DiffOptions, name string, entry staging.Ent
 	}
 
 	// Format as JSON if enabled
-	if opts.JSONFormat {
+	if opts.ParseJSON {
 		awsValue, stagedValue = jsonutil.TryFormatOrWarn2(awsValue, stagedValue, r.Stderr, name)
 	}
 
@@ -164,7 +164,7 @@ func (r *DiffRunner) outputDiffCreate(opts DiffOptions, name string, entry stagi
 	stagedValue := entry.Value
 
 	// Format as JSON if enabled
-	if opts.JSONFormat {
+	if opts.ParseJSON {
 		if formatted, ok := jsonutil.TryFormat(stagedValue); ok {
 			stagedValue = formatted
 		}

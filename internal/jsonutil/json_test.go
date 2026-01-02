@@ -87,7 +87,7 @@ func TestTryFormatOrWarn(t *testing.T) {
 
 			if tt.wantWarning {
 				assert.Contains(t, errBuf.String(), "Warning:")
-				assert.Contains(t, errBuf.String(), "--json has no effect")
+				assert.Contains(t, errBuf.String(), "--parse-json has no effect")
 				if tt.itemName != "" {
 					assert.Contains(t, errBuf.String(), tt.itemName)
 				}
@@ -143,7 +143,7 @@ func TestTryFormatOrWarn2(t *testing.T) {
 
 			if tt.wantWarning {
 				assert.Contains(t, errBuf.String(), "Warning:")
-				assert.Contains(t, errBuf.String(), "--json has no effect")
+				assert.Contains(t, errBuf.String(), "--parse-json has no effect")
 				if tt.itemName != "" {
 					assert.Contains(t, errBuf.String(), tt.itemName)
 				}

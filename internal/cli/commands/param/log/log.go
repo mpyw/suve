@@ -41,7 +41,7 @@ type Options struct {
 	Name        string
 	MaxResults  int32
 	ShowPatch   bool
-	JSONFormat  bool
+	ParseJSON  bool
 	Reverse     bool
 	NoPager     bool
 	Oneline     bool
@@ -63,7 +63,7 @@ Output is sorted with the most recent version first (use --reverse to flip).
 Value previews are truncated at 50 characters.
 
 Use -p/--patch to show the diff between consecutive versions (like git log -p).
-Use -j/--json with -p to format JSON values before diffing (keys are always sorted).
+Use -j/--parse-json with -p to format JSON values before diffing (keys are always sorted).
 Use --oneline for a compact one-line-per-version format.
 Use --from/--to to filter by version range (accepts version specs like '#3', '~1').
 
@@ -89,7 +89,7 @@ EXAMPLES:
 				Usage:   "Show diff between consecutive versions",
 			},
 			&cli.BoolFlag{
-				Name:    "json",
+				Name:    "parse-json",
 				Aliases: []string{"j"},
 				Usage:   "Format JSON values before diffing (use with -p; keys are always sorted)",
 			},
@@ -129,7 +129,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		Name:       name,
 		MaxResults: int32(cmd.Int("number")),
 		ShowPatch:  cmd.Bool("patch"),
-		JSONFormat: cmd.Bool("json"),
+		ParseJSON: cmd.Bool("parse-json"),
 		Reverse:    cmd.Bool("reverse"),
 		NoPager:    cmd.Bool("no-pager"),
 		Oneline:    cmd.Bool("oneline"),
@@ -153,9 +153,9 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		opts.ToVersion = toVersion
 	}
 
-	// Warn if --json is used without -p
-	if opts.JSONFormat && !opts.ShowPatch {
-		output.Warning(cmd.Root().ErrWriter, "--json has no effect without -p/--patch")
+	// Warn if --parse-json is used without -p
+	if opts.ParseJSON && !opts.ShowPatch {
+		output.Warning(cmd.Root().ErrWriter, "--parse-json has no effect without -p/--patch")
 	}
 
 	// Warn if --oneline is used with -p
@@ -271,7 +271,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 			if oldIdx >= 0 {
 				oldValue := lo.FromPtr(params[oldIdx].Value)
 				newValue := lo.FromPtr(params[newIdx].Value)
-				if opts.JSONFormat {
+				if opts.ParseJSON {
 					oldValue, newValue = jsonutil.TryFormatOrWarn2(oldValue, newValue, r.Stderr, "")
 				}
 				oldName := fmt.Sprintf("%s#%d", opts.Name, params[oldIdx].Version)

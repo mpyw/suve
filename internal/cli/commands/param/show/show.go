@@ -35,7 +35,7 @@ type Runner struct {
 type Options struct {
 	Spec       *paramversion.Spec
 	Decrypt    bool
-	JSONFormat bool
+	ParseJSON bool
 	NoPager    bool
 	Raw        bool
 }
@@ -69,7 +69,7 @@ EXAMPLES:
 				Usage: "Decrypt SecureString values (use --decrypt=false to disable)",
 			},
 			&cli.BoolFlag{
-				Name:    "json",
+				Name:    "parse-json",
 				Aliases: []string{"j"},
 				Usage:   "Pretty print JSON values (keys are always sorted alphabetically)",
 			},
@@ -104,7 +104,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	opts := Options{
 		Spec:       spec,
 		Decrypt:    cmd.Bool("decrypt"),
-		JSONFormat: cmd.Bool("json"),
+		ParseJSON: cmd.Bool("parse-json"),
 		NoPager:    cmd.Bool("no-pager"),
 		Raw:        cmd.Bool("raw"),
 	}
@@ -131,13 +131,13 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 
 	value := lo.FromPtr(param.Value)
 
-	// Warn if --json is used in cases where it's not meaningful
-	if opts.JSONFormat {
+	// Warn if --parse-json is used in cases where it's not meaningful
+	if opts.ParseJSON {
 		switch {
 		case param.Type == paramapi.ParameterTypeStringList:
-			output.Warning(r.Stderr, "--json has no effect on StringList type (comma-separated values)")
+			output.Warning(r.Stderr, "--parse-json has no effect on StringList type (comma-separated values)")
 		case param.Type == paramapi.ParameterTypeSecureString && !opts.Decrypt:
-			output.Warning(r.Stderr, "--json has no effect on encrypted SecureString (use --decrypt to enable)")
+			output.Warning(r.Stderr, "--parse-json has no effect on encrypted SecureString (use --decrypt to enable)")
 		default:
 			value = jsonutil.TryFormatOrWarn(value, r.Stderr, "")
 		}

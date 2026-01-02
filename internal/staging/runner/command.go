@@ -106,7 +106,7 @@ EXAMPLES:
 			cfg.ServiceName),
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
-				Name:    "json",
+				Name:    "parse-json",
 				Aliases: []string{"j"},
 				Usage:   "Format JSON values before diffing (keys are always sorted)",
 			},
@@ -141,7 +141,7 @@ EXAMPLES:
 
 			opts := DiffOptions{
 				Name:       name,
-				JSONFormat: cmd.Bool("json"),
+				ParseJSON:  cmd.Bool("parse-json"),
 				NoPager:    cmd.Bool("no-pager"),
 			}
 

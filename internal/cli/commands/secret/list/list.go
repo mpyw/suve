@@ -66,9 +66,8 @@ EXAMPLES:
    suve secret list --show prod           List with values`,
 		Flags: []cli.Flag{
 			&cli.StringFlag{
-				Name:    "filter",
-				Aliases: []string{"f"},
-				Usage:   "Filter by regex pattern",
+				Name:  "filter",
+				Usage: "Filter by regex pattern",
 			},
 			&cli.BoolFlag{
 				Name:  "show",

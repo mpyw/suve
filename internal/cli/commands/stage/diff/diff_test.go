@@ -346,7 +346,7 @@ func TestRun_IdenticalValues(t *testing.T) {
 	assert.Equal(t, staging.ErrNotStaged, err)
 }
 
-func TestRun_JSONFormat(t *testing.T) {
+func TestRun_ParseJSON(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
@@ -379,7 +379,7 @@ func TestRun_JSONFormat(t *testing.T) {
 		Stderr:      &stderr,
 	}
 
-	err = r.Run(context.Background(), stagediff.Options{JSONFormat: true})
+	err = r.Run(context.Background(), stagediff.Options{ParseJSON: true})
 	require.NoError(t, err)
 
 	output := stdout.String()
@@ -503,7 +503,7 @@ func TestRun_SecretIdenticalValues(t *testing.T) {
 	assert.Equal(t, staging.ErrNotStaged, err)
 }
 
-func TestRun_SecretJSONFormat(t *testing.T) {
+func TestRun_SecretParseJSON(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
@@ -534,7 +534,7 @@ func TestRun_SecretJSONFormat(t *testing.T) {
 		Stderr:       &stderr,
 	}
 
-	err = r.Run(context.Background(), stagediff.Options{JSONFormat: true})
+	err = r.Run(context.Background(), stagediff.Options{ParseJSON: true})
 	require.NoError(t, err)
 
 	output := stdout.String()
@@ -542,7 +542,7 @@ func TestRun_SecretJSONFormat(t *testing.T) {
 	assert.Contains(t, output, "+")
 }
 
-func TestRun_SecretJSONFormatMixed(t *testing.T) {
+func TestRun_SecretParseJSONMixed(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
@@ -573,10 +573,10 @@ func TestRun_SecretJSONFormatMixed(t *testing.T) {
 		Stderr:       &stderr,
 	}
 
-	err = r.Run(context.Background(), stagediff.Options{JSONFormat: true})
+	err = r.Run(context.Background(), stagediff.Options{ParseJSON: true})
 	require.NoError(t, err)
 
-	assert.Contains(t, stderr.String(), "--json has no effect")
+	assert.Contains(t, stderr.String(), "--parse-json has no effect")
 }
 
 func TestRun_ParamCreateOperation(t *testing.T) {
@@ -664,7 +664,7 @@ func TestRun_SecretCreateOperation(t *testing.T) {
 	assert.Contains(t, output, "env=staging")
 }
 
-func TestRun_CreateWithJSONFormat(t *testing.T) {
+func TestRun_CreateWithParseJSON(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
@@ -691,7 +691,7 @@ func TestRun_CreateWithJSONFormat(t *testing.T) {
 		Stderr:      &stderr,
 	}
 
-	err = r.Run(context.Background(), stagediff.Options{JSONFormat: true})
+	err = r.Run(context.Background(), stagediff.Options{ParseJSON: true})
 	require.NoError(t, err)
 
 	output := stdout.String()

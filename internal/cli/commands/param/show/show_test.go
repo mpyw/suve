@@ -108,7 +108,7 @@ func TestRun(t *testing.T) {
 			name: "show JSON formatted",
 			opts: show.Options{
 				Spec:       &paramversion.Spec{Name: "/my/param"},
-				JSONFormat: true,
+				ParseJSON: true,
 			},
 			mock: &mockClient{
 				getParameterFunc: func(_ context.Context, _ *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
@@ -165,7 +165,7 @@ func TestRun(t *testing.T) {
 			name: "json flag with StringList warns",
 			opts: show.Options{
 				Spec:       &paramversion.Spec{Name: "/my/param"},
-				JSONFormat: true,
+				ParseJSON: true,
 			},
 			mock: &mockClient{
 				getParameterFunc: func(_ context.Context, _ *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
@@ -188,7 +188,7 @@ func TestRun(t *testing.T) {
 			opts: show.Options{
 				Spec:       &paramversion.Spec{Name: "/my/param"},
 				Decrypt:    false,
-				JSONFormat: true,
+				ParseJSON: true,
 			},
 			mock: &mockClient{
 				getParameterFunc: func(_ context.Context, _ *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
@@ -210,7 +210,7 @@ func TestRun(t *testing.T) {
 			name: "json flag with non-JSON value warns",
 			opts: show.Options{
 				Spec:       &paramversion.Spec{Name: "/my/param"},
-				JSONFormat: true,
+				ParseJSON: true,
 			},
 			mock: &mockClient{
 				getParameterFunc: func(_ context.Context, _ *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
@@ -278,7 +278,7 @@ func TestRun(t *testing.T) {
 			opts: show.Options{
 				Spec:       &paramversion.Spec{Name: "/my/param"},
 				Decrypt:    true,
-				JSONFormat: true,
+				ParseJSON: true,
 				Raw:        true,
 			},
 			mock: &mockClient{

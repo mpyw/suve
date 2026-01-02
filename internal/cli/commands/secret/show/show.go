@@ -34,7 +34,7 @@ type Runner struct {
 // Options holds the options for the show command.
 type Options struct {
 	Spec       *secretversion.Spec
-	JSONFormat bool
+	ParseJSON bool
 	NoPager    bool
 	Raw        bool
 }
@@ -64,7 +64,7 @@ EXAMPLES:
   API_KEY=$(suve secret show --raw my-secret)  Use in shell variable`,
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
-				Name:    "json",
+				Name:    "parse-json",
 				Aliases: []string{"j"},
 				Usage:   "Pretty print JSON values (keys are always sorted alphabetically)",
 			},
@@ -98,7 +98,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 
 	opts := Options{
 		Spec:       spec,
-		JSONFormat: cmd.Bool("json"),
+		ParseJSON: cmd.Bool("parse-json"),
 		NoPager:    cmd.Bool("no-pager"),
 		Raw:        cmd.Bool("raw"),
 	}
@@ -126,7 +126,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 	value := lo.FromPtr(secret.SecretString)
 
 	// Format as JSON if enabled
-	if opts.JSONFormat {
+	if opts.ParseJSON {
 		value = jsonutil.TryFormatOrWarn(value, r.Stderr, "")
 	}
 

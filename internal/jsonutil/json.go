@@ -47,7 +47,7 @@ func TryFormatOrWarn2(v1, v2 string, errW io.Writer, name string) (string, strin
 }
 
 func warn(w io.Writer, name, reason string) {
-	msg := "--json has no effect"
+	msg := "--parse-json has no effect"
 	if name != "" {
 		msg += " for " + name
 	}

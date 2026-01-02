@@ -108,7 +108,7 @@ func TestRun(t *testing.T) {
 		},
 		{
 			name: "show JSON formatted with sorted keys",
-			opts: show.Options{Spec: &secretversion.Spec{Name: "my-secret"}, JSONFormat: true},
+			opts: show.Options{Spec: &secretversion.Spec{Name: "my-secret"}, ParseJSON: true},
 			mock: &mockClient{
 				getSecretValueFunc: func(_ context.Context, _ *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) {
 					return &secretapi.GetSecretValueOutput{
@@ -160,7 +160,7 @@ func TestRun(t *testing.T) {
 		},
 		{
 			name: "json flag with non-JSON value warns",
-			opts: show.Options{Spec: &secretversion.Spec{Name: "my-secret"}, JSONFormat: true},
+			opts: show.Options{Spec: &secretversion.Spec{Name: "my-secret"}, ParseJSON: true},
 			mock: &mockClient{
 				getSecretValueFunc: func(_ context.Context, _ *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) {
 					return &secretapi.GetSecretValueOutput{
@@ -214,7 +214,7 @@ func TestRun(t *testing.T) {
 		},
 		{
 			name: "raw mode with JSON formatting",
-			opts: show.Options{Spec: &secretversion.Spec{Name: "my-secret"}, JSONFormat: true, Raw: true},
+			opts: show.Options{Spec: &secretversion.Spec{Name: "my-secret"}, ParseJSON: true, Raw: true},
 			mock: &mockClient{
 				getSecretValueFunc: func(_ context.Context, _ *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) {
 					return &secretapi.GetSecretValueOutput{

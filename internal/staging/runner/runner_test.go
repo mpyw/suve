@@ -360,7 +360,7 @@ func TestDiffRunner_Run(t *testing.T) {
 			Stderr:   &stderr,
 		}
 
-		err := r.Run(context.Background(), runner.DiffOptions{Name: "/app/config", JSONFormat: true})
+		err := r.Run(context.Background(), runner.DiffOptions{Name: "/app/config", ParseJSON: true})
 		require.NoError(t, err)
 		output := stdout.String()
 		// JSON should be formatted with sorted keys
@@ -386,9 +386,9 @@ func TestDiffRunner_Run(t *testing.T) {
 			Stderr:   &stderr,
 		}
 
-		err := r.Run(context.Background(), runner.DiffOptions{Name: "/app/config", JSONFormat: true})
+		err := r.Run(context.Background(), runner.DiffOptions{Name: "/app/config", ParseJSON: true})
 		require.NoError(t, err)
-		assert.Contains(t, stderr.String(), "--json has no effect")
+		assert.Contains(t, stderr.String(), "--parse-json has no effect")
 	})
 
 	t.Run("diff identical values - auto unstage", func(t *testing.T) {
@@ -528,7 +528,7 @@ func TestDiffRunner_Run(t *testing.T) {
 			Stderr:   &stderr,
 		}
 
-		err := r.Run(context.Background(), runner.DiffOptions{Name: "/app/new-json", JSONFormat: true})
+		err := r.Run(context.Background(), runner.DiffOptions{Name: "/app/new-json", ParseJSON: true})
 		require.NoError(t, err)
 		output := stdout.String()
 		// JSON should be formatted

@@ -47,7 +47,7 @@ type Runner struct {
 
 // Options holds the options for the diff command.
 type Options struct {
-	JSONFormat bool
+	ParseJSON bool
 	NoPager    bool
 }
 
@@ -65,7 +65,7 @@ EXAMPLES:
    suve stage diff -j  Show diff with JSON formatting`,
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
-				Name:    "json",
+				Name:    "parse-json",
 				Aliases: []string{"j"},
 				Usage:   "Format JSON values before diffing (keys are always sorted)",
 			},
@@ -129,7 +129,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	}
 
 	opts := Options{
-		JSONFormat: cmd.Bool("json"),
+		ParseJSON: cmd.Bool("parse-json"),
 		NoPager:    cmd.Bool("no-pager"),
 	}
 
@@ -269,7 +269,7 @@ func (r *Runner) outputParamDiff(opts Options, name string, entry staging.Entry,
 	}
 
 	// Format as JSON if enabled
-	if opts.JSONFormat {
+	if opts.ParseJSON {
 		awsValue, stagedValue = jsonutil.TryFormatOrWarn2(awsValue, stagedValue, r.Stderr, name)
 	}
 
@@ -308,7 +308,7 @@ func (r *Runner) outputSecretDiff(opts Options, name string, entry staging.Entry
 	}
 
 	// Format as JSON if enabled
-	if opts.JSONFormat {
+	if opts.ParseJSON {
 		awsValue, stagedValue = jsonutil.TryFormatOrWarn2(awsValue, stagedValue, r.Stderr, name)
 	}
 
@@ -342,7 +342,7 @@ func (r *Runner) outputParamDiffCreate(opts Options, name string, entry staging.
 	stagedValue := entry.Value
 
 	// Format as JSON if enabled
-	if opts.JSONFormat {
+	if opts.ParseJSON {
 		if formatted, ok := jsonutil.TryFormat(stagedValue); ok {
 			stagedValue = formatted
 		}
@@ -364,7 +364,7 @@ func (r *Runner) outputSecretDiffCreate(opts Options, name string, entry staging
 	stagedValue := entry.Value
 
 	// Format as JSON if enabled
-	if opts.JSONFormat {
+	if opts.ParseJSON {
 		if formatted, ok := jsonutil.TryFormat(stagedValue); ok {
 			stagedValue = formatted
 		}

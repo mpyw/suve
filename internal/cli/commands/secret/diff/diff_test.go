@@ -517,7 +517,7 @@ func TestRunnerRun(t *testing.T) {
 			opts: secretdiff.Options{
 				Spec1:      &secretversion.Spec{Name: "my-secret", Absolute: secretversion.AbsoluteSpec{Label: lo.ToPtr("AWSPREVIOUS")}},
 				Spec2:      &secretversion.Spec{Name: "my-secret", Absolute: secretversion.AbsoluteSpec{Label: lo.ToPtr("AWSCURRENT")}},
-				JSONFormat: true,
+				ParseJSON: true,
 			},
 			mock: &mockClient{
 				getSecretValueFunc: func(_ context.Context, params *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) {
@@ -546,7 +546,7 @@ func TestRunnerRun(t *testing.T) {
 			opts: secretdiff.Options{
 				Spec1:      &secretversion.Spec{Name: "my-secret", Absolute: secretversion.AbsoluteSpec{Label: lo.ToPtr("AWSPREVIOUS")}},
 				Spec2:      &secretversion.Spec{Name: "my-secret", Absolute: secretversion.AbsoluteSpec{Label: lo.ToPtr("AWSCURRENT")}},
-				JSONFormat: true,
+				ParseJSON: true,
 			},
 			mock: &mockClient{
 				getSecretValueFunc: func(_ context.Context, params *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) {
@@ -617,7 +617,7 @@ func TestRun_IdenticalWarning(t *testing.T) {
 	opts := secretdiff.Options{
 		Spec1:      &secretversion.Spec{Name: "my-secret", Absolute: secretversion.AbsoluteSpec{}},
 		Spec2:      &secretversion.Spec{Name: "my-secret", Absolute: secretversion.AbsoluteSpec{}},
-		JSONFormat: false,
+		ParseJSON: false,
 	}
 
 	err := r.Run(t.Context(), opts)

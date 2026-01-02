@@ -33,8 +33,8 @@ func TestCommand_Validation(t *testing.T) {
 		var errBuf bytes.Buffer
 		app := appcli.MakeApp()
 		app.ErrWriter = &errBuf
-		_ = app.Run(context.Background(), []string{"suve", "secret", "log", "--json", "my-secret"})
-		assert.Contains(t, errBuf.String(), "--json has no effect")
+		_ = app.Run(context.Background(), []string{"suve", "secret", "log", "--parse-json", "my-secret"})
+		assert.Contains(t, errBuf.String(), "--parse-json has no effect")
 	})
 }
 
@@ -282,7 +282,7 @@ func TestRun(t *testing.T) {
 		},
 		{
 			name: "patch with JSON format",
-			opts: log.Options{Name: "my-secret", MaxResults: 10, ShowPatch: true, JSONFormat: true},
+			opts: log.Options{Name: "my-secret", MaxResults: 10, ShowPatch: true, ParseJSON: true},
 			mock: &mockClient{
 				listSecretVersionIdsFunc: func(_ context.Context, _ *secretapi.ListSecretVersionIdsInput, _ ...func(*secretapi.Options)) (*secretapi.ListSecretVersionIdsOutput, error) {
 					return &secretapi.ListSecretVersionIdsOutput{
@@ -316,7 +316,7 @@ func TestRun(t *testing.T) {
 		},
 		{
 			name: "patch with non-JSON value warns",
-			opts: log.Options{Name: "my-secret", MaxResults: 10, ShowPatch: true, JSONFormat: true},
+			opts: log.Options{Name: "my-secret", MaxResults: 10, ShowPatch: true, ParseJSON: true},
 			mock: &mockClient{
 				listSecretVersionIdsFunc: func(_ context.Context, _ *secretapi.ListSecretVersionIdsInput, _ ...func(*secretapi.Options)) (*secretapi.ListSecretVersionIdsOutput, error) {
 					return &secretapi.ListSecretVersionIdsOutput{
