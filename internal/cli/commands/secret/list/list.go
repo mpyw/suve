@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
-	"github.com/aws/aws-sdk-go-v2/service/secretsmanager/types"
 	"github.com/samber/lo"
 	"github.com/urfave/cli/v3"
 
@@ -73,17 +71,17 @@ func action(ctx context.Context, cmd *cli.Command) error {
 
 // Run executes the list command.
 func (r *Runner) Run(ctx context.Context, opts Options) error {
-	input := &secretsmanager.ListSecretsInput{}
+	input := &secretapi.ListSecretsInput{}
 	if opts.Prefix != "" {
-		input.Filters = []types.Filter{
+		input.Filters = []secretapi.Filter{
 			{
-				Key:    types.FilterNameStringTypeName,
+				Key:    secretapi.FilterNameStringTypeName,
 				Values: []string{opts.Prefix},
 			},
 		}
 	}
 
-	paginator := secretsmanager.NewListSecretsPaginator(r.Client, input)
+	paginator := secretapi.NewListSecretsPaginator(r.Client, input)
 	for paginator.HasMorePages() {
 		page, err := paginator.NextPage(ctx)
 		if err != nil {

@@ -7,7 +7,6 @@ import (
 	"io"
 	"os"
 
-	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
 	"github.com/samber/lo"
 	"github.com/urfave/cli/v3"
 
@@ -142,7 +141,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 // Run executes the update command.
 func (r *Runner) Run(ctx context.Context, opts Options) error {
 	// Update secret value
-	result, err := r.Client.PutSecretValue(ctx, &secretsmanager.PutSecretValueInput{
+	result, err := r.Client.PutSecretValue(ctx, &secretapi.PutSecretValueInput{
 		SecretId:     lo.ToPtr(opts.Name),
 		SecretString: lo.ToPtr(opts.Value),
 	})
@@ -152,7 +151,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 
 	// Update description if provided
 	if opts.Description != "" {
-		_, err := r.Client.UpdateSecret(ctx, &secretsmanager.UpdateSecretInput{
+		_, err := r.Client.UpdateSecret(ctx, &secretapi.UpdateSecretInput{
 			SecretId:    lo.ToPtr(opts.Name),
 			Description: lo.ToPtr(opts.Description),
 		})

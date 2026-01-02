@@ -11,7 +11,6 @@ import (
 	"sort"
 	"time"
 
-	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
 	"github.com/samber/lo"
 	"github.com/urfave/cli/v3"
 
@@ -149,7 +148,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 
 // Run executes the log command.
 func (r *Runner) Run(ctx context.Context, opts Options) error {
-	result, err := r.Client.ListSecretVersionIds(ctx, &secretsmanager.ListSecretVersionIdsInput{
+	result, err := r.Client.ListSecretVersionIds(ctx, &secretapi.ListSecretVersionIdsInput{
 		SecretId:   lo.ToPtr(opts.Name),
 		MaxResults: lo.ToPtr(opts.MaxResults),
 	})
@@ -183,7 +182,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 		secretValues = make(map[string]string)
 		for _, v := range versions {
 			versionID := lo.FromPtr(v.VersionId)
-			secretResult, err := r.Client.GetSecretValue(ctx, &secretsmanager.GetSecretValueInput{
+			secretResult, err := r.Client.GetSecretValue(ctx, &secretapi.GetSecretValueInput{
 				SecretId:  lo.ToPtr(opts.Name),
 				VersionId: lo.ToPtr(versionID),
 			})

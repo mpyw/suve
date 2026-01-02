@@ -7,7 +7,6 @@ import (
 	"io"
 	"os"
 
-	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/samber/lo"
 	"github.com/urfave/cli/v3"
 
@@ -98,7 +97,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 
 // Run executes the delete command.
 func (r *Runner) Run(ctx context.Context, opts Options) error {
-	_, err := r.Client.DeleteParameter(ctx, &ssm.DeleteParameterInput{
+	_, err := r.Client.DeleteParameter(ctx, &paramapi.DeleteParameterInput{
 		Name: lo.ToPtr(opts.Name),
 	})
 	if err != nil {

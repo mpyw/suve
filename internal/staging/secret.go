@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
-	"github.com/aws/aws-sdk-go-v2/service/secretsmanager/types"
 	"github.com/samber/lo"
 
 	"github.com/mpyw/suve/internal/api/secretapi"
@@ -73,7 +71,7 @@ func (s *SecretStrategy) Push(ctx context.Context, name string, entry Entry) err
 }
 
 func (s *SecretStrategy) pushCreate(ctx context.Context, name string, entry Entry) error {
-	input := &secretsmanager.CreateSecretInput{
+	input := &secretapi.CreateSecretInput{
 		Name:         lo.ToPtr(name),
 		SecretString: lo.ToPtr(entry.Value),
 	}
@@ -81,9 +79,9 @@ func (s *SecretStrategy) pushCreate(ctx context.Context, name string, entry Entr
 		input.Description = entry.Description
 	}
 	if len(entry.Tags) > 0 {
-		input.Tags = make([]types.Tag, 0, len(entry.Tags))
+		input.Tags = make([]secretapi.Tag, 0, len(entry.Tags))
 		for k, v := range entry.Tags {
-			input.Tags = append(input.Tags, types.Tag{
+			input.Tags = append(input.Tags, secretapi.Tag{
 				Key:   lo.ToPtr(k),
 				Value: lo.ToPtr(v),
 			})
@@ -99,7 +97,7 @@ func (s *SecretStrategy) pushCreate(ctx context.Context, name string, entry Entr
 
 func (s *SecretStrategy) pushUpdate(ctx context.Context, name string, entry Entry) error {
 	// Update secret value
-	_, err := s.Client.PutSecretValue(ctx, &secretsmanager.PutSecretValueInput{
+	_, err := s.Client.PutSecretValue(ctx, &secretapi.PutSecretValueInput{
 		SecretId:     lo.ToPtr(name),
 		SecretString: lo.ToPtr(entry.Value),
 	})
@@ -109,7 +107,7 @@ func (s *SecretStrategy) pushUpdate(ctx context.Context, name string, entry Entr
 
 	// Update description if provided
 	if entry.Description != nil {
-		_, err := s.Client.UpdateSecret(ctx, &secretsmanager.UpdateSecretInput{
+		_, err := s.Client.UpdateSecret(ctx, &secretapi.UpdateSecretInput{
 			SecretId:    lo.ToPtr(name),
 			Description: entry.Description,
 		})
@@ -135,7 +133,7 @@ func (s *SecretStrategy) pushUpdate(ctx context.Context, name string, entry Entr
 }
 
 func (s *SecretStrategy) pushDelete(ctx context.Context, name string, entry Entry) error {
-	input := &secretsmanager.DeleteSecretInput{
+	input := &secretapi.DeleteSecretInput{
 		SecretId: lo.ToPtr(name),
 	}
 
@@ -151,7 +149,7 @@ func (s *SecretStrategy) pushDelete(ctx context.Context, name string, entry Entr
 	_, err := s.Client.DeleteSecret(ctx, input)
 	if err != nil {
 		// Already deleted is considered success
-		var rnf *types.ResourceNotFoundException
+		var rnf *secretapi.ResourceNotFoundException
 		if errors.As(err, &rnf) {
 			return nil
 		}
@@ -163,11 +161,11 @@ func (s *SecretStrategy) pushDelete(ctx context.Context, name string, entry Entr
 // FetchLastModified returns the last modified time of the secret in AWS.
 // Returns zero time if the secret doesn't exist.
 func (s *SecretStrategy) FetchLastModified(ctx context.Context, name string) (time.Time, error) {
-	result, err := s.Client.GetSecretValue(ctx, &secretsmanager.GetSecretValueInput{
+	result, err := s.Client.GetSecretValue(ctx, &secretapi.GetSecretValueInput{
 		SecretId: lo.ToPtr(name),
 	})
 	if err != nil {
-		var rnf *types.ResourceNotFoundException
+		var rnf *secretapi.ResourceNotFoundException
 		if errors.As(err, &rnf) {
 			return time.Time{}, nil
 		}

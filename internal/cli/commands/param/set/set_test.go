@@ -6,12 +6,11 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/aws/aws-sdk-go-v2/service/ssm"
-	"github.com/aws/aws-sdk-go-v2/service/ssm/types"
 	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/mpyw/suve/internal/api/paramapi"
 	appcli "github.com/mpyw/suve/internal/cli/commands"
 	"github.com/mpyw/suve/internal/cli/commands/param/set"
 	"github.com/mpyw/suve/internal/tagging"
@@ -46,30 +45,30 @@ func TestCommand_Validation(t *testing.T) {
 }
 
 type mockClient struct {
-	putParameterFunc           func(ctx context.Context, params *ssm.PutParameterInput, optFns ...func(*ssm.Options)) (*ssm.PutParameterOutput, error)
-	addTagsToResourceFunc      func(ctx context.Context, params *ssm.AddTagsToResourceInput, optFns ...func(*ssm.Options)) (*ssm.AddTagsToResourceOutput, error)
-	removeTagsFromResourceFunc func(ctx context.Context, params *ssm.RemoveTagsFromResourceInput, optFns ...func(*ssm.Options)) (*ssm.RemoveTagsFromResourceOutput, error)
+	putParameterFunc           func(ctx context.Context, params *paramapi.PutParameterInput, optFns ...func(*paramapi.Options)) (*paramapi.PutParameterOutput, error)
+	addTagsToResourceFunc      func(ctx context.Context, params *paramapi.AddTagsToResourceInput, optFns ...func(*paramapi.Options)) (*paramapi.AddTagsToResourceOutput, error)
+	removeTagsFromResourceFunc func(ctx context.Context, params *paramapi.RemoveTagsFromResourceInput, optFns ...func(*paramapi.Options)) (*paramapi.RemoveTagsFromResourceOutput, error)
 }
 
-func (m *mockClient) PutParameter(ctx context.Context, params *ssm.PutParameterInput, optFns ...func(*ssm.Options)) (*ssm.PutParameterOutput, error) {
+func (m *mockClient) PutParameter(ctx context.Context, params *paramapi.PutParameterInput, optFns ...func(*paramapi.Options)) (*paramapi.PutParameterOutput, error) {
 	if m.putParameterFunc != nil {
 		return m.putParameterFunc(ctx, params, optFns...)
 	}
 	return nil, fmt.Errorf("PutParameter not mocked")
 }
 
-func (m *mockClient) AddTagsToResource(ctx context.Context, params *ssm.AddTagsToResourceInput, optFns ...func(*ssm.Options)) (*ssm.AddTagsToResourceOutput, error) {
+func (m *mockClient) AddTagsToResource(ctx context.Context, params *paramapi.AddTagsToResourceInput, optFns ...func(*paramapi.Options)) (*paramapi.AddTagsToResourceOutput, error) {
 	if m.addTagsToResourceFunc != nil {
 		return m.addTagsToResourceFunc(ctx, params, optFns...)
 	}
-	return &ssm.AddTagsToResourceOutput{}, nil
+	return &paramapi.AddTagsToResourceOutput{}, nil
 }
 
-func (m *mockClient) RemoveTagsFromResource(ctx context.Context, params *ssm.RemoveTagsFromResourceInput, optFns ...func(*ssm.Options)) (*ssm.RemoveTagsFromResourceOutput, error) {
+func (m *mockClient) RemoveTagsFromResource(ctx context.Context, params *paramapi.RemoveTagsFromResourceInput, optFns ...func(*paramapi.Options)) (*paramapi.RemoveTagsFromResourceOutput, error) {
 	if m.removeTagsFromResourceFunc != nil {
 		return m.removeTagsFromResourceFunc(ctx, params, optFns...)
 	}
-	return &ssm.RemoveTagsFromResourceOutput{}, nil
+	return &paramapi.RemoveTagsFromResourceOutput{}, nil
 }
 
 func TestRun(t *testing.T) {
@@ -89,11 +88,11 @@ func TestRun(t *testing.T) {
 				Type:  "SecureString",
 			},
 			mock: &mockClient{
-				putParameterFunc: func(_ context.Context, params *ssm.PutParameterInput, _ ...func(*ssm.Options)) (*ssm.PutParameterOutput, error) {
+				putParameterFunc: func(_ context.Context, params *paramapi.PutParameterInput, _ ...func(*paramapi.Options)) (*paramapi.PutParameterOutput, error) {
 					assert.Equal(t, "/app/param", lo.FromPtr(params.Name))
 					assert.Equal(t, "test-value", lo.FromPtr(params.Value))
-					assert.Equal(t, types.ParameterTypeSecureString, params.Type)
-					return &ssm.PutParameterOutput{
+					assert.Equal(t, paramapi.ParameterTypeSecureString, params.Type)
+					return &paramapi.PutParameterOutput{
 						Version: 1,
 					}, nil
 				},
@@ -112,9 +111,9 @@ func TestRun(t *testing.T) {
 				Description: "Test description",
 			},
 			mock: &mockClient{
-				putParameterFunc: func(_ context.Context, params *ssm.PutParameterInput, _ ...func(*ssm.Options)) (*ssm.PutParameterOutput, error) {
+				putParameterFunc: func(_ context.Context, params *paramapi.PutParameterInput, _ ...func(*paramapi.Options)) (*paramapi.PutParameterOutput, error) {
 					assert.Equal(t, "Test description", lo.FromPtr(params.Description))
-					return &ssm.PutParameterOutput{
+					return &paramapi.PutParameterOutput{
 						Version: 1,
 					}, nil
 				},
@@ -132,12 +131,12 @@ func TestRun(t *testing.T) {
 				},
 			},
 			mock: &mockClient{
-				putParameterFunc: func(_ context.Context, _ *ssm.PutParameterInput, _ ...func(*ssm.Options)) (*ssm.PutParameterOutput, error) {
-					return &ssm.PutParameterOutput{Version: 1}, nil
+				putParameterFunc: func(_ context.Context, _ *paramapi.PutParameterInput, _ ...func(*paramapi.Options)) (*paramapi.PutParameterOutput, error) {
+					return &paramapi.PutParameterOutput{Version: 1}, nil
 				},
-				addTagsToResourceFunc: func(_ context.Context, params *ssm.AddTagsToResourceInput, _ ...func(*ssm.Options)) (*ssm.AddTagsToResourceOutput, error) {
+				addTagsToResourceFunc: func(_ context.Context, params *paramapi.AddTagsToResourceInput, _ ...func(*paramapi.Options)) (*paramapi.AddTagsToResourceOutput, error) {
 					assert.Equal(t, "/app/param", lo.FromPtr(params.ResourceId))
-					return &ssm.AddTagsToResourceOutput{}, nil
+					return &paramapi.AddTagsToResourceOutput{}, nil
 				},
 			},
 			check: func(t *testing.T, output string) {
@@ -149,7 +148,7 @@ func TestRun(t *testing.T) {
 			opts:    set.Options{Name: "/app/param", Value: "test-value", Type: "String"},
 			wantErr: "failed to set parameter",
 			mock: &mockClient{
-				putParameterFunc: func(_ context.Context, _ *ssm.PutParameterInput, _ ...func(*ssm.Options)) (*ssm.PutParameterOutput, error) {
+				putParameterFunc: func(_ context.Context, _ *paramapi.PutParameterInput, _ ...func(*paramapi.Options)) (*paramapi.PutParameterOutput, error) {
 					return nil, fmt.Errorf("AWS error")
 				},
 			},
@@ -167,10 +166,10 @@ func TestRun(t *testing.T) {
 			},
 			wantErr: "failed to add tags",
 			mock: &mockClient{
-				putParameterFunc: func(_ context.Context, _ *ssm.PutParameterInput, _ ...func(*ssm.Options)) (*ssm.PutParameterOutput, error) {
-					return &ssm.PutParameterOutput{Version: 1}, nil
+				putParameterFunc: func(_ context.Context, _ *paramapi.PutParameterInput, _ ...func(*paramapi.Options)) (*paramapi.PutParameterOutput, error) {
+					return &paramapi.PutParameterOutput{Version: 1}, nil
 				},
-				addTagsToResourceFunc: func(_ context.Context, _ *ssm.AddTagsToResourceInput, _ ...func(*ssm.Options)) (*ssm.AddTagsToResourceOutput, error) {
+				addTagsToResourceFunc: func(_ context.Context, _ *paramapi.AddTagsToResourceInput, _ ...func(*paramapi.Options)) (*paramapi.AddTagsToResourceOutput, error) {
 					return nil, fmt.Errorf("tag error")
 				},
 			},

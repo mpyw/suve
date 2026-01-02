@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
 	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/mpyw/suve/internal/api/secretapi"
 	appcli "github.com/mpyw/suve/internal/cli/commands"
 	"github.com/mpyw/suve/internal/cli/commands/secret/create"
 )
@@ -36,10 +36,10 @@ func TestCommand_Validation(t *testing.T) {
 }
 
 type mockClient struct {
-	createSecretFunc func(ctx context.Context, params *secretsmanager.CreateSecretInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.CreateSecretOutput, error)
+	createSecretFunc func(ctx context.Context, params *secretapi.CreateSecretInput, optFns ...func(*secretapi.Options)) (*secretapi.CreateSecretOutput, error)
 }
 
-func (m *mockClient) CreateSecret(ctx context.Context, params *secretsmanager.CreateSecretInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.CreateSecretOutput, error) {
+func (m *mockClient) CreateSecret(ctx context.Context, params *secretapi.CreateSecretInput, optFns ...func(*secretapi.Options)) (*secretapi.CreateSecretOutput, error) {
 	if m.createSecretFunc != nil {
 		return m.createSecretFunc(ctx, params, optFns...)
 	}
@@ -59,10 +59,10 @@ func TestRun(t *testing.T) {
 			name: "create secret",
 			opts: create.Options{Name: "my-secret", Value: "secret-value"},
 			mock: &mockClient{
-				createSecretFunc: func(_ context.Context, params *secretsmanager.CreateSecretInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.CreateSecretOutput, error) {
+				createSecretFunc: func(_ context.Context, params *secretapi.CreateSecretInput, _ ...func(*secretapi.Options)) (*secretapi.CreateSecretOutput, error) {
 					assert.Equal(t, "my-secret", lo.FromPtr(params.Name))
 					assert.Equal(t, "secret-value", lo.FromPtr(params.SecretString))
-					return &secretsmanager.CreateSecretOutput{
+					return &secretapi.CreateSecretOutput{
 						Name:      lo.ToPtr("my-secret"),
 						VersionId: lo.ToPtr("abc123"),
 					}, nil
@@ -77,9 +77,9 @@ func TestRun(t *testing.T) {
 			name: "create with description",
 			opts: create.Options{Name: "my-secret", Value: "secret-value", Description: "Test description"},
 			mock: &mockClient{
-				createSecretFunc: func(_ context.Context, params *secretsmanager.CreateSecretInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.CreateSecretOutput, error) {
+				createSecretFunc: func(_ context.Context, params *secretapi.CreateSecretInput, _ ...func(*secretapi.Options)) (*secretapi.CreateSecretOutput, error) {
 					assert.Equal(t, "Test description", lo.FromPtr(params.Description))
-					return &secretsmanager.CreateSecretOutput{
+					return &secretapi.CreateSecretOutput{
 						Name:      lo.ToPtr("my-secret"),
 						VersionId: lo.ToPtr("abc123"),
 					}, nil
@@ -94,7 +94,7 @@ func TestRun(t *testing.T) {
 				Tags:  map[string]string{"env": "prod", "team": "platform"},
 			},
 			mock: &mockClient{
-				createSecretFunc: func(_ context.Context, params *secretsmanager.CreateSecretInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.CreateSecretOutput, error) {
+				createSecretFunc: func(_ context.Context, params *secretapi.CreateSecretInput, _ ...func(*secretapi.Options)) (*secretapi.CreateSecretOutput, error) {
 					assert.Len(t, params.Tags, 2)
 					tagMap := make(map[string]string)
 					for _, tag := range params.Tags {
@@ -102,7 +102,7 @@ func TestRun(t *testing.T) {
 					}
 					assert.Equal(t, "prod", tagMap["env"])
 					assert.Equal(t, "platform", tagMap["team"])
-					return &secretsmanager.CreateSecretOutput{
+					return &secretapi.CreateSecretOutput{
 						Name:      lo.ToPtr("my-secret"),
 						VersionId: lo.ToPtr("abc123"),
 					}, nil
@@ -117,7 +117,7 @@ func TestRun(t *testing.T) {
 			opts:    create.Options{Name: "my-secret", Value: "secret-value"},
 			wantErr: "failed to create secret",
 			mock: &mockClient{
-				createSecretFunc: func(_ context.Context, _ *secretsmanager.CreateSecretInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.CreateSecretOutput, error) {
+				createSecretFunc: func(_ context.Context, _ *secretapi.CreateSecretInput, _ ...func(*secretapi.Options)) (*secretapi.CreateSecretOutput, error) {
 					return nil, fmt.Errorf("AWS error")
 				},
 			},

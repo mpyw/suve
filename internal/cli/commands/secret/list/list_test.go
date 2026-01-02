@@ -6,12 +6,11 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
-	"github.com/aws/aws-sdk-go-v2/service/secretsmanager/types"
 	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/mpyw/suve/internal/api/secretapi"
 	appcli "github.com/mpyw/suve/internal/cli/commands"
 	"github.com/mpyw/suve/internal/cli/commands/secret/list"
 )
@@ -27,10 +26,10 @@ func TestCommand_Help(t *testing.T) {
 }
 
 type mockClient struct {
-	listSecretsFunc func(ctx context.Context, params *secretsmanager.ListSecretsInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.ListSecretsOutput, error)
+	listSecretsFunc func(ctx context.Context, params *secretapi.ListSecretsInput, optFns ...func(*secretapi.Options)) (*secretapi.ListSecretsOutput, error)
 }
 
-func (m *mockClient) ListSecrets(ctx context.Context, params *secretsmanager.ListSecretsInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.ListSecretsOutput, error) {
+func (m *mockClient) ListSecrets(ctx context.Context, params *secretapi.ListSecretsInput, optFns ...func(*secretapi.Options)) (*secretapi.ListSecretsOutput, error) {
 	if m.listSecretsFunc != nil {
 		return m.listSecretsFunc(ctx, params, optFns...)
 	}
@@ -50,9 +49,9 @@ func TestRun(t *testing.T) {
 			name: "list all secrets",
 			opts: list.Options{},
 			mock: &mockClient{
-				listSecretsFunc: func(_ context.Context, _ *secretsmanager.ListSecretsInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.ListSecretsOutput, error) {
-					return &secretsmanager.ListSecretsOutput{
-						SecretList: []types.SecretListEntry{
+				listSecretsFunc: func(_ context.Context, _ *secretapi.ListSecretsInput, _ ...func(*secretapi.Options)) (*secretapi.ListSecretsOutput, error) {
+					return &secretapi.ListSecretsOutput{
+						SecretList: []secretapi.SecretListEntry{
 							{Name: lo.ToPtr("secret1")},
 							{Name: lo.ToPtr("secret2")},
 						},
@@ -68,10 +67,10 @@ func TestRun(t *testing.T) {
 			name: "list with prefix filter",
 			opts: list.Options{Prefix: "app/"},
 			mock: &mockClient{
-				listSecretsFunc: func(_ context.Context, params *secretsmanager.ListSecretsInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.ListSecretsOutput, error) {
+				listSecretsFunc: func(_ context.Context, params *secretapi.ListSecretsInput, _ ...func(*secretapi.Options)) (*secretapi.ListSecretsOutput, error) {
 					require.NotEmpty(t, params.Filters, "expected filter to be set")
-					return &secretsmanager.ListSecretsOutput{
-						SecretList: []types.SecretListEntry{
+					return &secretapi.ListSecretsOutput{
+						SecretList: []secretapi.SecretListEntry{
 							{Name: lo.ToPtr("app/secret1")},
 						},
 					}, nil
@@ -85,7 +84,7 @@ func TestRun(t *testing.T) {
 			name: "error from AWS",
 			opts: list.Options{},
 			mock: &mockClient{
-				listSecretsFunc: func(_ context.Context, _ *secretsmanager.ListSecretsInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.ListSecretsOutput, error) {
+				listSecretsFunc: func(_ context.Context, _ *secretapi.ListSecretsInput, _ ...func(*secretapi.Options)) (*secretapi.ListSecretsOutput, error) {
 					return nil, fmt.Errorf("AWS error")
 				},
 			},

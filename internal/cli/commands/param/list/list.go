@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/aws/aws-sdk-go-v2/service/ssm"
-	"github.com/aws/aws-sdk-go-v2/service/ssm/types"
 	"github.com/samber/lo"
 	"github.com/urfave/cli/v3"
 
@@ -88,9 +86,9 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 		option = "Recursive"
 	}
 
-	input := &ssm.DescribeParametersInput{}
+	input := &paramapi.DescribeParametersInput{}
 	if opts.Prefix != "" {
-		input.ParameterFilters = []types.ParameterStringFilter{
+		input.ParameterFilters = []paramapi.ParameterStringFilter{
 			{
 				Key:    lo.ToPtr("Path"),
 				Option: lo.ToPtr(option),
@@ -99,7 +97,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 		}
 	}
 
-	paginator := ssm.NewDescribeParametersPaginator(r.Client, input)
+	paginator := paramapi.NewDescribeParametersPaginator(r.Client, input)
 	for paginator.HasMorePages() {
 		page, err := paginator.NextPage(ctx)
 		if err != nil {

@@ -7,8 +7,6 @@ import (
 	"io"
 	"strings"
 
-	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
-	"github.com/aws/aws-sdk-go-v2/service/ssm/types"
 	"github.com/samber/lo"
 	"github.com/urfave/cli/v3"
 
@@ -152,12 +150,12 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 	secretEntries := allEntries[staging.ServiceSecret]
 
 	// Fetch all values in parallel
-	paramResults := parallel.ExecuteMap(ctx, paramEntries, func(ctx context.Context, name string, _ staging.Entry) (*types.ParameterHistory, error) {
+	paramResults := parallel.ExecuteMap(ctx, paramEntries, func(ctx context.Context, name string, _ staging.Entry) (*paramapi.ParameterHistory, error) {
 		spec := &paramversion.Spec{Name: name}
 		return paramversion.GetParameterWithVersion(ctx, r.ParamClient, spec, true)
 	})
 
-	secretResults := parallel.ExecuteMap(ctx, secretEntries, func(ctx context.Context, name string, _ staging.Entry) (*secretsmanager.GetSecretValueOutput, error) {
+	secretResults := parallel.ExecuteMap(ctx, secretEntries, func(ctx context.Context, name string, _ staging.Entry) (*secretapi.GetSecretValueOutput, error) {
 		spec := &secretversion.Spec{Name: name}
 		return secretversion.GetSecretWithVersion(ctx, r.SecretClient, spec)
 	})
@@ -261,7 +259,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 	return nil
 }
 
-func (r *Runner) outputParamDiff(opts Options, name string, entry staging.Entry, param *types.ParameterHistory) error {
+func (r *Runner) outputParamDiff(opts Options, name string, entry staging.Entry, param *paramapi.ParameterHistory) error {
 	awsValue := lo.FromPtr(param.Value)
 	stagedValue := entry.Value
 
@@ -300,7 +298,7 @@ func (r *Runner) outputParamDiff(opts Options, name string, entry staging.Entry,
 	return nil
 }
 
-func (r *Runner) outputSecretDiff(opts Options, name string, entry staging.Entry, secret *secretsmanager.GetSecretValueOutput) error {
+func (r *Runner) outputSecretDiff(opts Options, name string, entry staging.Entry, secret *secretapi.GetSecretValueOutput) error {
 	awsValue := lo.FromPtr(secret.SecretString)
 	stagedValue := entry.Value
 

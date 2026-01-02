@@ -8,8 +8,6 @@ import (
 	"slices"
 	"sort"
 
-	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
-	"github.com/aws/aws-sdk-go-v2/service/secretsmanager/types"
 	"github.com/samber/lo"
 
 	"github.com/mpyw/suve/internal/api/secretapi"
@@ -22,8 +20,8 @@ type Client interface {
 }
 
 // GetSecretWithVersion retrieves a secret with version/shift/label support.
-func GetSecretWithVersion(ctx context.Context, client Client, spec *Spec) (*secretsmanager.GetSecretValueOutput, error) {
-	input := &secretsmanager.GetSecretValueInput{
+func GetSecretWithVersion(ctx context.Context, client Client, spec *Spec) (*secretapi.GetSecretValueOutput, error) {
+	input := &secretapi.GetSecretValueInput{
 		SecretId: lo.ToPtr(spec.Name),
 	}
 
@@ -52,8 +50,8 @@ func TruncateVersionID(id string) string {
 	return id
 }
 
-func getSecretWithShift(ctx context.Context, client Client, spec *Spec) (*secretsmanager.GetSecretValueOutput, error) {
-	versions, err := client.ListSecretVersionIds(ctx, &secretsmanager.ListSecretVersionIdsInput{
+func getSecretWithShift(ctx context.Context, client Client, spec *Spec) (*secretapi.GetSecretValueOutput, error) {
+	versions, err := client.ListSecretVersionIds(ctx, &secretapi.ListSecretVersionIdsInput{
 		SecretId: lo.ToPtr(spec.Name),
 	})
 	if err != nil {
@@ -78,18 +76,18 @@ func getSecretWithShift(ctx context.Context, client Client, spec *Spec) (*secret
 	// Find base index
 	baseIdx := 0
 	var (
-		predicate func(types.SecretVersionsListEntry) bool
+		predicate func(secretapi.SecretVersionsListEntry) bool
 		errMsg    string
 		found     bool
 	)
 	switch {
 	case spec.Absolute.ID != nil:
-		predicate = func(v types.SecretVersionsListEntry) bool {
+		predicate = func(v secretapi.SecretVersionsListEntry) bool {
 			return lo.FromPtr(v.VersionId) == *spec.Absolute.ID
 		}
 		errMsg = fmt.Sprintf("version ID not found: %s", *spec.Absolute.ID)
 	case spec.Absolute.Label != nil:
-		predicate = func(v types.SecretVersionsListEntry) bool {
+		predicate = func(v secretapi.SecretVersionsListEntry) bool {
 			return slices.Contains(v.VersionStages, *spec.Absolute.Label)
 		}
 		errMsg = fmt.Sprintf("version label not found: %s", *spec.Absolute.Label)
@@ -107,7 +105,7 @@ func getSecretWithShift(ctx context.Context, client Client, spec *Spec) (*secret
 	}
 
 	targetVersion := versionList[targetIdx]
-	return client.GetSecretValue(ctx, &secretsmanager.GetSecretValueInput{
+	return client.GetSecretValue(ctx, &secretapi.GetSecretValueInput{
 		SecretId:  lo.ToPtr(spec.Name),
 		VersionId: targetVersion.VersionId,
 	})

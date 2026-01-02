@@ -6,10 +6,10 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/mpyw/suve/internal/api/paramapi"
 	appcli "github.com/mpyw/suve/internal/cli/commands"
 	"github.com/mpyw/suve/internal/cli/commands/param/delete"
 )
@@ -27,10 +27,10 @@ func TestCommand_Validation(t *testing.T) {
 }
 
 type mockClient struct {
-	deleteParameterFunc func(ctx context.Context, params *ssm.DeleteParameterInput, optFns ...func(*ssm.Options)) (*ssm.DeleteParameterOutput, error)
+	deleteParameterFunc func(ctx context.Context, params *paramapi.DeleteParameterInput, optFns ...func(*paramapi.Options)) (*paramapi.DeleteParameterOutput, error)
 }
 
-func (m *mockClient) DeleteParameter(ctx context.Context, params *ssm.DeleteParameterInput, optFns ...func(*ssm.Options)) (*ssm.DeleteParameterOutput, error) {
+func (m *mockClient) DeleteParameter(ctx context.Context, params *paramapi.DeleteParameterInput, optFns ...func(*paramapi.Options)) (*paramapi.DeleteParameterOutput, error) {
 	if m.deleteParameterFunc != nil {
 		return m.deleteParameterFunc(ctx, params, optFns...)
 	}
@@ -50,8 +50,8 @@ func TestRun(t *testing.T) {
 			name: "delete parameter",
 			opts: delete.Options{Name: "/app/param"},
 			mock: &mockClient{
-				deleteParameterFunc: func(_ context.Context, _ *ssm.DeleteParameterInput, _ ...func(*ssm.Options)) (*ssm.DeleteParameterOutput, error) {
-					return &ssm.DeleteParameterOutput{}, nil
+				deleteParameterFunc: func(_ context.Context, _ *paramapi.DeleteParameterInput, _ ...func(*paramapi.Options)) (*paramapi.DeleteParameterOutput, error) {
+					return &paramapi.DeleteParameterOutput{}, nil
 				},
 			},
 			check: func(t *testing.T, output string) {
@@ -63,7 +63,7 @@ func TestRun(t *testing.T) {
 			name: "error from AWS",
 			opts: delete.Options{Name: "/app/param"},
 			mock: &mockClient{
-				deleteParameterFunc: func(_ context.Context, _ *ssm.DeleteParameterInput, _ ...func(*ssm.Options)) (*ssm.DeleteParameterOutput, error) {
+				deleteParameterFunc: func(_ context.Context, _ *paramapi.DeleteParameterInput, _ ...func(*paramapi.Options)) (*paramapi.DeleteParameterOutput, error) {
 					return nil, fmt.Errorf("AWS error")
 				},
 			},

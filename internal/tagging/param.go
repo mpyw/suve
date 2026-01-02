@@ -4,15 +4,15 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/aws/aws-sdk-go-v2/service/ssm"
-	"github.com/aws/aws-sdk-go-v2/service/ssm/types"
 	"github.com/samber/lo"
+
+	"github.com/mpyw/suve/internal/api/paramapi"
 )
 
 // ParamClient is the interface for SSM Parameter Store tag operations.
 type ParamClient interface {
-	AddTagsToResource(ctx context.Context, params *ssm.AddTagsToResourceInput, optFns ...func(*ssm.Options)) (*ssm.AddTagsToResourceOutput, error)
-	RemoveTagsFromResource(ctx context.Context, params *ssm.RemoveTagsFromResourceInput, optFns ...func(*ssm.Options)) (*ssm.RemoveTagsFromResourceOutput, error)
+	AddTagsToResource(ctx context.Context, params *paramapi.AddTagsToResourceInput, optFns ...func(*paramapi.Options)) (*paramapi.AddTagsToResourceOutput, error)
+	RemoveTagsFromResource(ctx context.Context, params *paramapi.RemoveTagsFromResourceInput, optFns ...func(*paramapi.Options)) (*paramapi.RemoveTagsFromResourceOutput, error)
 }
 
 // ApplyParam applies tag changes to an SSM Parameter Store parameter.
@@ -24,15 +24,15 @@ func ApplyParam(ctx context.Context, client ParamClient, resourceID string, chan
 
 	// Add tags
 	if len(change.Add) > 0 {
-		tags := make([]types.Tag, 0, len(change.Add))
+		tags := make([]paramapi.Tag, 0, len(change.Add))
 		for k, v := range change.Add {
-			tags = append(tags, types.Tag{
+			tags = append(tags, paramapi.Tag{
 				Key:   lo.ToPtr(k),
 				Value: lo.ToPtr(v),
 			})
 		}
-		_, err := client.AddTagsToResource(ctx, &ssm.AddTagsToResourceInput{
-			ResourceType: types.ResourceTypeForTaggingParameter,
+		_, err := client.AddTagsToResource(ctx, &paramapi.AddTagsToResourceInput{
+			ResourceType: paramapi.ResourceTypeForTaggingParameter,
 			ResourceId:   lo.ToPtr(resourceID),
 			Tags:         tags,
 		})
@@ -43,8 +43,8 @@ func ApplyParam(ctx context.Context, client ParamClient, resourceID string, chan
 
 	// Remove tags
 	if len(change.Remove) > 0 {
-		_, err := client.RemoveTagsFromResource(ctx, &ssm.RemoveTagsFromResourceInput{
-			ResourceType: types.ResourceTypeForTaggingParameter,
+		_, err := client.RemoveTagsFromResource(ctx, &paramapi.RemoveTagsFromResourceInput{
+			ResourceType: paramapi.ResourceTypeForTaggingParameter,
 			ResourceId:   lo.ToPtr(resourceID),
 			TagKeys:      change.Remove,
 		})

@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
 	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/mpyw/suve/internal/api/secretapi"
 	appcli "github.com/mpyw/suve/internal/cli/commands"
 	"github.com/mpyw/suve/internal/cli/commands/secret/restore"
 )
@@ -28,10 +28,10 @@ func TestCommand_Validation(t *testing.T) {
 }
 
 type mockClient struct {
-	restoreSecretFunc func(ctx context.Context, params *secretsmanager.RestoreSecretInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.RestoreSecretOutput, error)
+	restoreSecretFunc func(ctx context.Context, params *secretapi.RestoreSecretInput, optFns ...func(*secretapi.Options)) (*secretapi.RestoreSecretOutput, error)
 }
 
-func (m *mockClient) RestoreSecret(ctx context.Context, params *secretsmanager.RestoreSecretInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.RestoreSecretOutput, error) {
+func (m *mockClient) RestoreSecret(ctx context.Context, params *secretapi.RestoreSecretInput, optFns ...func(*secretapi.Options)) (*secretapi.RestoreSecretOutput, error) {
 	if m.restoreSecretFunc != nil {
 		return m.restoreSecretFunc(ctx, params, optFns...)
 	}
@@ -51,9 +51,9 @@ func TestRun(t *testing.T) {
 			name: "restore secret",
 			opts: restore.Options{Name: "my-secret"},
 			mock: &mockClient{
-				restoreSecretFunc: func(_ context.Context, params *secretsmanager.RestoreSecretInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.RestoreSecretOutput, error) {
+				restoreSecretFunc: func(_ context.Context, params *secretapi.RestoreSecretInput, _ ...func(*secretapi.Options)) (*secretapi.RestoreSecretOutput, error) {
 					assert.Equal(t, "my-secret", lo.FromPtr(params.SecretId))
-					return &secretsmanager.RestoreSecretOutput{
+					return &secretapi.RestoreSecretOutput{
 						Name: lo.ToPtr("my-secret"),
 					}, nil
 				},
@@ -67,7 +67,7 @@ func TestRun(t *testing.T) {
 			name: "error from AWS",
 			opts: restore.Options{Name: "my-secret"},
 			mock: &mockClient{
-				restoreSecretFunc: func(_ context.Context, _ *secretsmanager.RestoreSecretInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.RestoreSecretOutput, error) {
+				restoreSecretFunc: func(_ context.Context, _ *secretapi.RestoreSecretInput, _ ...func(*secretapi.Options)) (*secretapi.RestoreSecretOutput, error) {
 					return nil, fmt.Errorf("AWS error")
 				},
 			},

@@ -7,7 +7,6 @@ import (
 	"io"
 	"os"
 
-	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
 	"github.com/samber/lo"
 	"github.com/urfave/cli/v3"
 
@@ -121,7 +120,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 
 // Run executes the delete command.
 func (r *Runner) Run(ctx context.Context, opts Options) error {
-	input := &secretsmanager.DeleteSecretInput{
+	input := &secretapi.DeleteSecretInput{
 		SecretId: lo.ToPtr(opts.Name),
 	}
 

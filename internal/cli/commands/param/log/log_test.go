@@ -7,12 +7,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/aws/aws-sdk-go-v2/service/ssm"
-	"github.com/aws/aws-sdk-go-v2/service/ssm/types"
 	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/mpyw/suve/internal/api/paramapi"
 	appcli "github.com/mpyw/suve/internal/cli/commands"
 	"github.com/mpyw/suve/internal/cli/commands/param/log"
 )
@@ -88,10 +87,10 @@ func TestCommand_Validation(t *testing.T) {
 }
 
 type mockClient struct {
-	getParameterHistoryFunc func(ctx context.Context, params *ssm.GetParameterHistoryInput, optFns ...func(*ssm.Options)) (*ssm.GetParameterHistoryOutput, error)
+	getParameterHistoryFunc func(ctx context.Context, params *paramapi.GetParameterHistoryInput, optFns ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error)
 }
 
-func (m *mockClient) GetParameterHistory(ctx context.Context, params *ssm.GetParameterHistoryInput, optFns ...func(*ssm.Options)) (*ssm.GetParameterHistoryOutput, error) {
+func (m *mockClient) GetParameterHistory(ctx context.Context, params *paramapi.GetParameterHistoryInput, optFns ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
 	if m.getParameterHistoryFunc != nil {
 		return m.getParameterHistoryFunc(ctx, params, optFns...)
 	}
@@ -113,10 +112,10 @@ func TestRun(t *testing.T) {
 			name: "show history",
 			opts: log.Options{Name: "/app/param", MaxResults: 10},
 			mock: &mockClient{
-				getParameterHistoryFunc: func(_ context.Context, params *ssm.GetParameterHistoryInput, _ ...func(*ssm.Options)) (*ssm.GetParameterHistoryOutput, error) {
+				getParameterHistoryFunc: func(_ context.Context, params *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
 					assert.Equal(t, "/app/param", lo.FromPtr(params.Name))
-					return &ssm.GetParameterHistoryOutput{
-						Parameters: []types.ParameterHistory{
+					return &paramapi.GetParameterHistoryOutput{
+						Parameters: []paramapi.ParameterHistory{
 							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr("v1"), Version: 1, LastModifiedDate: lo.ToPtr(now.Add(-time.Hour))},
 							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr("v2"), Version: 2, LastModifiedDate: &now},
 						},
@@ -133,10 +132,10 @@ func TestRun(t *testing.T) {
 			name: "truncate long values",
 			opts: log.Options{Name: "/app/param", MaxResults: 10},
 			mock: &mockClient{
-				getParameterHistoryFunc: func(_ context.Context, _ *ssm.GetParameterHistoryInput, _ ...func(*ssm.Options)) (*ssm.GetParameterHistoryOutput, error) {
+				getParameterHistoryFunc: func(_ context.Context, _ *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
 					longValue := "this is a very long value that should be truncated in the preview"
-					return &ssm.GetParameterHistoryOutput{
-						Parameters: []types.ParameterHistory{
+					return &paramapi.GetParameterHistoryOutput{
+						Parameters: []paramapi.ParameterHistory{
 							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr(longValue), Version: 1, LastModifiedDate: &now},
 						},
 					}, nil
@@ -150,9 +149,9 @@ func TestRun(t *testing.T) {
 			name: "show patch between versions",
 			opts: log.Options{Name: "/app/param", MaxResults: 10, ShowPatch: true},
 			mock: &mockClient{
-				getParameterHistoryFunc: func(_ context.Context, _ *ssm.GetParameterHistoryInput, _ ...func(*ssm.Options)) (*ssm.GetParameterHistoryOutput, error) {
-					return &ssm.GetParameterHistoryOutput{
-						Parameters: []types.ParameterHistory{
+				getParameterHistoryFunc: func(_ context.Context, _ *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
+					return &paramapi.GetParameterHistoryOutput{
+						Parameters: []paramapi.ParameterHistory{
 							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr("old-value"), Version: 1, LastModifiedDate: lo.ToPtr(now.Add(-time.Hour))},
 							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr("new-value"), Version: 2, LastModifiedDate: &now},
 						},
@@ -170,9 +169,9 @@ func TestRun(t *testing.T) {
 			name: "patch with single version shows no diff",
 			opts: log.Options{Name: "/app/param", MaxResults: 10, ShowPatch: true},
 			mock: &mockClient{
-				getParameterHistoryFunc: func(_ context.Context, _ *ssm.GetParameterHistoryInput, _ ...func(*ssm.Options)) (*ssm.GetParameterHistoryOutput, error) {
-					return &ssm.GetParameterHistoryOutput{
-						Parameters: []types.ParameterHistory{
+				getParameterHistoryFunc: func(_ context.Context, _ *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
+					return &paramapi.GetParameterHistoryOutput{
+						Parameters: []paramapi.ParameterHistory{
 							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr("only-value"), Version: 1, LastModifiedDate: &now},
 						},
 					}, nil
@@ -187,7 +186,7 @@ func TestRun(t *testing.T) {
 			name: "error from AWS",
 			opts: log.Options{Name: "/app/param", MaxResults: 10},
 			mock: &mockClient{
-				getParameterHistoryFunc: func(_ context.Context, _ *ssm.GetParameterHistoryInput, _ ...func(*ssm.Options)) (*ssm.GetParameterHistoryOutput, error) {
+				getParameterHistoryFunc: func(_ context.Context, _ *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
 					return nil, fmt.Errorf("AWS error")
 				},
 			},
@@ -197,9 +196,9 @@ func TestRun(t *testing.T) {
 			name: "reverse order shows oldest first",
 			opts: log.Options{Name: "/app/param", MaxResults: 10, Reverse: true},
 			mock: &mockClient{
-				getParameterHistoryFunc: func(_ context.Context, _ *ssm.GetParameterHistoryInput, _ ...func(*ssm.Options)) (*ssm.GetParameterHistoryOutput, error) {
-					return &ssm.GetParameterHistoryOutput{
-						Parameters: []types.ParameterHistory{
+				getParameterHistoryFunc: func(_ context.Context, _ *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
+					return &paramapi.GetParameterHistoryOutput{
+						Parameters: []paramapi.ParameterHistory{
 							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr("v1"), Version: 1, LastModifiedDate: lo.ToPtr(now.Add(-time.Hour))},
 							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr("v2"), Version: 2, LastModifiedDate: &now},
 						},
@@ -220,9 +219,9 @@ func TestRun(t *testing.T) {
 			name: "reverse with patch shows diff correctly",
 			opts: log.Options{Name: "/app/param", MaxResults: 10, ShowPatch: true, Reverse: true},
 			mock: &mockClient{
-				getParameterHistoryFunc: func(_ context.Context, _ *ssm.GetParameterHistoryInput, _ ...func(*ssm.Options)) (*ssm.GetParameterHistoryOutput, error) {
-					return &ssm.GetParameterHistoryOutput{
-						Parameters: []types.ParameterHistory{
+				getParameterHistoryFunc: func(_ context.Context, _ *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
+					return &paramapi.GetParameterHistoryOutput{
+						Parameters: []paramapi.ParameterHistory{
 							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr("old-value"), Version: 1, LastModifiedDate: lo.ToPtr(now.Add(-time.Hour))},
 							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr("new-value"), Version: 2, LastModifiedDate: &now},
 						},
@@ -240,9 +239,9 @@ func TestRun(t *testing.T) {
 			name: "empty history",
 			opts: log.Options{Name: "/app/param", MaxResults: 10},
 			mock: &mockClient{
-				getParameterHistoryFunc: func(_ context.Context, _ *ssm.GetParameterHistoryInput, _ ...func(*ssm.Options)) (*ssm.GetParameterHistoryOutput, error) {
-					return &ssm.GetParameterHistoryOutput{
-						Parameters: []types.ParameterHistory{},
+				getParameterHistoryFunc: func(_ context.Context, _ *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
+					return &paramapi.GetParameterHistoryOutput{
+						Parameters: []paramapi.ParameterHistory{},
 					}, nil
 				},
 			},
@@ -254,9 +253,9 @@ func TestRun(t *testing.T) {
 			name: "oneline format",
 			opts: log.Options{Name: "/app/param", MaxResults: 10, Oneline: true},
 			mock: &mockClient{
-				getParameterHistoryFunc: func(_ context.Context, _ *ssm.GetParameterHistoryInput, _ ...func(*ssm.Options)) (*ssm.GetParameterHistoryOutput, error) {
-					return &ssm.GetParameterHistoryOutput{
-						Parameters: []types.ParameterHistory{
+				getParameterHistoryFunc: func(_ context.Context, _ *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
+					return &paramapi.GetParameterHistoryOutput{
+						Parameters: []paramapi.ParameterHistory{
 							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr("v1"), Version: 1, LastModifiedDate: lo.ToPtr(now.Add(-time.Hour))},
 							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr("v2"), Version: 2, LastModifiedDate: &now},
 						},
@@ -276,10 +275,10 @@ func TestRun(t *testing.T) {
 			name: "oneline truncates long values",
 			opts: log.Options{Name: "/app/param", MaxResults: 10, Oneline: true},
 			mock: &mockClient{
-				getParameterHistoryFunc: func(_ context.Context, _ *ssm.GetParameterHistoryInput, _ ...func(*ssm.Options)) (*ssm.GetParameterHistoryOutput, error) {
+				getParameterHistoryFunc: func(_ context.Context, _ *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
 					longValue := "this is a very long value that exceeds forty characters"
-					return &ssm.GetParameterHistoryOutput{
-						Parameters: []types.ParameterHistory{
+					return &paramapi.GetParameterHistoryOutput{
+						Parameters: []paramapi.ParameterHistory{
 							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr(longValue), Version: 1, LastModifiedDate: &now},
 						},
 					}, nil
@@ -295,9 +294,9 @@ func TestRun(t *testing.T) {
 			name: "filter by from version",
 			opts: log.Options{Name: "/app/param", MaxResults: 10, FromVersion: lo.ToPtr(int64(2))},
 			mock: &mockClient{
-				getParameterHistoryFunc: func(_ context.Context, _ *ssm.GetParameterHistoryInput, _ ...func(*ssm.Options)) (*ssm.GetParameterHistoryOutput, error) {
-					return &ssm.GetParameterHistoryOutput{
-						Parameters: []types.ParameterHistory{
+				getParameterHistoryFunc: func(_ context.Context, _ *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
+					return &paramapi.GetParameterHistoryOutput{
+						Parameters: []paramapi.ParameterHistory{
 							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr("v1"), Version: 1, LastModifiedDate: lo.ToPtr(now.Add(-2 * time.Hour))},
 							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr("v2"), Version: 2, LastModifiedDate: lo.ToPtr(now.Add(-time.Hour))},
 							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr("v3"), Version: 3, LastModifiedDate: &now},
@@ -315,9 +314,9 @@ func TestRun(t *testing.T) {
 			name: "filter by to version",
 			opts: log.Options{Name: "/app/param", MaxResults: 10, ToVersion: lo.ToPtr(int64(2))},
 			mock: &mockClient{
-				getParameterHistoryFunc: func(_ context.Context, _ *ssm.GetParameterHistoryInput, _ ...func(*ssm.Options)) (*ssm.GetParameterHistoryOutput, error) {
-					return &ssm.GetParameterHistoryOutput{
-						Parameters: []types.ParameterHistory{
+				getParameterHistoryFunc: func(_ context.Context, _ *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
+					return &paramapi.GetParameterHistoryOutput{
+						Parameters: []paramapi.ParameterHistory{
 							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr("v1"), Version: 1, LastModifiedDate: lo.ToPtr(now.Add(-2 * time.Hour))},
 							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr("v2"), Version: 2, LastModifiedDate: lo.ToPtr(now.Add(-time.Hour))},
 							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr("v3"), Version: 3, LastModifiedDate: &now},
@@ -335,9 +334,9 @@ func TestRun(t *testing.T) {
 			name: "filter by from and to version range",
 			opts: log.Options{Name: "/app/param", MaxResults: 10, FromVersion: lo.ToPtr(int64(2)), ToVersion: lo.ToPtr(int64(4))},
 			mock: &mockClient{
-				getParameterHistoryFunc: func(_ context.Context, _ *ssm.GetParameterHistoryInput, _ ...func(*ssm.Options)) (*ssm.GetParameterHistoryOutput, error) {
-					return &ssm.GetParameterHistoryOutput{
-						Parameters: []types.ParameterHistory{
+				getParameterHistoryFunc: func(_ context.Context, _ *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
+					return &paramapi.GetParameterHistoryOutput{
+						Parameters: []paramapi.ParameterHistory{
 							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr("v1"), Version: 1, LastModifiedDate: lo.ToPtr(now.Add(-3 * time.Hour))},
 							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr("v2"), Version: 2, LastModifiedDate: lo.ToPtr(now.Add(-2 * time.Hour))},
 							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr("v3"), Version: 3, LastModifiedDate: lo.ToPtr(now.Add(-time.Hour))},
@@ -357,9 +356,9 @@ func TestRun(t *testing.T) {
 			name: "filter with no matching versions returns empty",
 			opts: log.Options{Name: "/app/param", MaxResults: 10, FromVersion: lo.ToPtr(int64(10)), ToVersion: lo.ToPtr(int64(20))},
 			mock: &mockClient{
-				getParameterHistoryFunc: func(_ context.Context, _ *ssm.GetParameterHistoryInput, _ ...func(*ssm.Options)) (*ssm.GetParameterHistoryOutput, error) {
-					return &ssm.GetParameterHistoryOutput{
-						Parameters: []types.ParameterHistory{
+				getParameterHistoryFunc: func(_ context.Context, _ *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
+					return &paramapi.GetParameterHistoryOutput{
+						Parameters: []paramapi.ParameterHistory{
 							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr("v1"), Version: 1, LastModifiedDate: &now},
 						},
 					}, nil

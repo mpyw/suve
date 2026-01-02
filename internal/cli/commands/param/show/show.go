@@ -7,7 +7,6 @@ import (
 	"io"
 	"time"
 
-	"github.com/aws/aws-sdk-go-v2/service/ssm/types"
 	"github.com/samber/lo"
 	"github.com/urfave/cli/v3"
 
@@ -135,9 +134,9 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 	// Warn if --json is used in cases where it's not meaningful
 	if opts.JSONFormat {
 		switch {
-		case param.Type == types.ParameterTypeStringList:
+		case param.Type == paramapi.ParameterTypeStringList:
 			output.Warning(r.Stderr, "--json has no effect on StringList type (comma-separated values)")
-		case param.Type == types.ParameterTypeSecureString && !opts.Decrypt:
+		case param.Type == paramapi.ParameterTypeSecureString && !opts.Decrypt:
 			output.Warning(r.Stderr, "--json has no effect on encrypted SecureString (use --decrypt to enable)")
 		default:
 			value = jsonutil.TryFormatOrWarn(value, r.Stderr, "")

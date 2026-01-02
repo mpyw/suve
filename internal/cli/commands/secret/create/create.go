@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
-	"github.com/aws/aws-sdk-go-v2/service/secretsmanager/types"
 	"github.com/samber/lo"
 	"github.com/urfave/cli/v3"
 
@@ -100,7 +98,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 
 // Run executes the create command.
 func (r *Runner) Run(ctx context.Context, opts Options) error {
-	input := &secretsmanager.CreateSecretInput{
+	input := &secretapi.CreateSecretInput{
 		Name:         lo.ToPtr(opts.Name),
 		SecretString: lo.ToPtr(opts.Value),
 	}
@@ -108,9 +106,9 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 		input.Description = lo.ToPtr(opts.Description)
 	}
 	if len(opts.Tags) > 0 {
-		input.Tags = make([]types.Tag, 0, len(opts.Tags))
+		input.Tags = make([]secretapi.Tag, 0, len(opts.Tags))
 		for k, v := range opts.Tags {
-			input.Tags = append(input.Tags, types.Tag{
+			input.Tags = append(input.Tags, secretapi.Tag{
 				Key:   lo.ToPtr(k),
 				Value: lo.ToPtr(v),
 			})

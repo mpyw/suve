@@ -6,12 +6,11 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/aws/aws-sdk-go-v2/service/ssm"
-	"github.com/aws/aws-sdk-go-v2/service/ssm/types"
 	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/mpyw/suve/internal/api/paramapi"
 	appcli "github.com/mpyw/suve/internal/cli/commands"
 	"github.com/mpyw/suve/internal/cli/commands/param/list"
 )
@@ -28,10 +27,10 @@ func TestCommand_Help(t *testing.T) {
 }
 
 type mockClient struct {
-	describeParametersFunc func(ctx context.Context, params *ssm.DescribeParametersInput, optFns ...func(*ssm.Options)) (*ssm.DescribeParametersOutput, error)
+	describeParametersFunc func(ctx context.Context, params *paramapi.DescribeParametersInput, optFns ...func(*paramapi.Options)) (*paramapi.DescribeParametersOutput, error)
 }
 
-func (m *mockClient) DescribeParameters(ctx context.Context, params *ssm.DescribeParametersInput, optFns ...func(*ssm.Options)) (*ssm.DescribeParametersOutput, error) {
+func (m *mockClient) DescribeParameters(ctx context.Context, params *paramapi.DescribeParametersInput, optFns ...func(*paramapi.Options)) (*paramapi.DescribeParametersOutput, error) {
 	if m.describeParametersFunc != nil {
 		return m.describeParametersFunc(ctx, params, optFns...)
 	}
@@ -51,9 +50,9 @@ func TestRun(t *testing.T) {
 			name: "list all parameters",
 			opts: list.Options{},
 			mock: &mockClient{
-				describeParametersFunc: func(_ context.Context, _ *ssm.DescribeParametersInput, _ ...func(*ssm.Options)) (*ssm.DescribeParametersOutput, error) {
-					return &ssm.DescribeParametersOutput{
-						Parameters: []types.ParameterMetadata{
+				describeParametersFunc: func(_ context.Context, _ *paramapi.DescribeParametersInput, _ ...func(*paramapi.Options)) (*paramapi.DescribeParametersOutput, error) {
+					return &paramapi.DescribeParametersOutput{
+						Parameters: []paramapi.ParameterMetadata{
 							{Name: lo.ToPtr("/app/param1")},
 							{Name: lo.ToPtr("/app/param2")},
 						},
@@ -69,10 +68,10 @@ func TestRun(t *testing.T) {
 			name: "list with prefix",
 			opts: list.Options{Prefix: "/app/"},
 			mock: &mockClient{
-				describeParametersFunc: func(_ context.Context, params *ssm.DescribeParametersInput, _ ...func(*ssm.Options)) (*ssm.DescribeParametersOutput, error) {
+				describeParametersFunc: func(_ context.Context, params *paramapi.DescribeParametersInput, _ ...func(*paramapi.Options)) (*paramapi.DescribeParametersOutput, error) {
 					require.NotEmpty(t, params.ParameterFilters, "expected filter to be set")
-					return &ssm.DescribeParametersOutput{
-						Parameters: []types.ParameterMetadata{
+					return &paramapi.DescribeParametersOutput{
+						Parameters: []paramapi.ParameterMetadata{
 							{Name: lo.ToPtr("/app/param1")},
 						},
 					}, nil
@@ -86,11 +85,11 @@ func TestRun(t *testing.T) {
 			name: "recursive listing",
 			opts: list.Options{Prefix: "/app/", Recursive: true},
 			mock: &mockClient{
-				describeParametersFunc: func(_ context.Context, params *ssm.DescribeParametersInput, _ ...func(*ssm.Options)) (*ssm.DescribeParametersOutput, error) {
+				describeParametersFunc: func(_ context.Context, params *paramapi.DescribeParametersInput, _ ...func(*paramapi.Options)) (*paramapi.DescribeParametersOutput, error) {
 					require.NotEmpty(t, params.ParameterFilters, "expected filter to be set")
 					assert.Equal(t, "Recursive", lo.FromPtr(params.ParameterFilters[0].Option))
-					return &ssm.DescribeParametersOutput{
-						Parameters: []types.ParameterMetadata{
+					return &paramapi.DescribeParametersOutput{
+						Parameters: []paramapi.ParameterMetadata{
 							{Name: lo.ToPtr("/app/sub/param")},
 						},
 					}, nil
@@ -104,7 +103,7 @@ func TestRun(t *testing.T) {
 			name: "error from AWS",
 			opts: list.Options{},
 			mock: &mockClient{
-				describeParametersFunc: func(_ context.Context, _ *ssm.DescribeParametersInput, _ ...func(*ssm.Options)) (*ssm.DescribeParametersOutput, error) {
+				describeParametersFunc: func(_ context.Context, _ *paramapi.DescribeParametersInput, _ ...func(*paramapi.Options)) (*paramapi.DescribeParametersOutput, error) {
 					return nil, fmt.Errorf("AWS error")
 				},
 			},

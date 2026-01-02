@@ -12,8 +12,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/aws/aws-sdk-go-v2/service/ssm"
-	"github.com/aws/aws-sdk-go-v2/service/ssm/types"
 	"github.com/samber/lo"
 	"github.com/urfave/cli/v3"
 
@@ -182,7 +180,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 
 // Run executes the log command.
 func (r *Runner) Run(ctx context.Context, opts Options) error {
-	result, err := r.Client.GetParameterHistory(ctx, &ssm.GetParameterHistoryInput{
+	result, err := r.Client.GetParameterHistory(ctx, &paramapi.GetParameterHistoryInput{
 		Name:           lo.ToPtr(opts.Name),
 		MaxResults:     lo.ToPtr(opts.MaxResults),
 		WithDecryption: lo.ToPtr(true),
@@ -330,8 +328,8 @@ func parseVersionSpec(name, spec string) (*int64, error) {
 
 // filterVersionRange filters parameters to only include versions in the specified range.
 // Parameters are expected in oldest-first order (as returned by AWS).
-func filterVersionRange(params []types.ParameterHistory, from, to *int64) []types.ParameterHistory {
-	var filtered []types.ParameterHistory
+func filterVersionRange(params []paramapi.ParameterHistory, from, to *int64) []paramapi.ParameterHistory {
+	var filtered []paramapi.ParameterHistory
 	for _, p := range params {
 		if from != nil && p.Version < *from {
 			continue

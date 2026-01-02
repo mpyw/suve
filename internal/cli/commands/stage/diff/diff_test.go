@@ -8,31 +8,30 @@ import (
 	"testing"
 	"time"
 
-	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
-	"github.com/aws/aws-sdk-go-v2/service/ssm"
-	"github.com/aws/aws-sdk-go-v2/service/ssm/types"
 	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/mpyw/suve/internal/api/paramapi"
+	"github.com/mpyw/suve/internal/api/secretapi"
 	appcli "github.com/mpyw/suve/internal/cli/commands"
 	stagediff "github.com/mpyw/suve/internal/cli/commands/stage/diff"
 	"github.com/mpyw/suve/internal/staging"
 )
 
 type mockParamClient struct {
-	getParameterFunc        func(ctx context.Context, params *ssm.GetParameterInput, optFns ...func(*ssm.Options)) (*ssm.GetParameterOutput, error)
-	getParameterHistoryFunc func(ctx context.Context, params *ssm.GetParameterHistoryInput, optFns ...func(*ssm.Options)) (*ssm.GetParameterHistoryOutput, error)
+	getParameterFunc        func(ctx context.Context, params *paramapi.GetParameterInput, optFns ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error)
+	getParameterHistoryFunc func(ctx context.Context, params *paramapi.GetParameterHistoryInput, optFns ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error)
 }
 
-func (m *mockParamClient) GetParameter(ctx context.Context, params *ssm.GetParameterInput, optFns ...func(*ssm.Options)) (*ssm.GetParameterOutput, error) {
+func (m *mockParamClient) GetParameter(ctx context.Context, params *paramapi.GetParameterInput, optFns ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
 	if m.getParameterFunc != nil {
 		return m.getParameterFunc(ctx, params, optFns...)
 	}
 	return nil, fmt.Errorf("GetParameter not mocked")
 }
 
-func (m *mockParamClient) GetParameterHistory(ctx context.Context, params *ssm.GetParameterHistoryInput, optFns ...func(*ssm.Options)) (*ssm.GetParameterHistoryOutput, error) {
+func (m *mockParamClient) GetParameterHistory(ctx context.Context, params *paramapi.GetParameterHistoryInput, optFns ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
 	if m.getParameterHistoryFunc != nil {
 		return m.getParameterHistoryFunc(ctx, params, optFns...)
 	}
@@ -40,18 +39,18 @@ func (m *mockParamClient) GetParameterHistory(ctx context.Context, params *ssm.G
 }
 
 type mockSecretClient struct {
-	getSecretValueFunc       func(ctx context.Context, params *secretsmanager.GetSecretValueInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.GetSecretValueOutput, error)
-	listSecretVersionIdsFunc func(ctx context.Context, params *secretsmanager.ListSecretVersionIdsInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.ListSecretVersionIdsOutput, error)
+	getSecretValueFunc       func(ctx context.Context, params *secretapi.GetSecretValueInput, optFns ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error)
+	listSecretVersionIdsFunc func(ctx context.Context, params *secretapi.ListSecretVersionIdsInput, optFns ...func(*secretapi.Options)) (*secretapi.ListSecretVersionIdsOutput, error)
 }
 
-func (m *mockSecretClient) GetSecretValue(ctx context.Context, params *secretsmanager.GetSecretValueInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.GetSecretValueOutput, error) {
+func (m *mockSecretClient) GetSecretValue(ctx context.Context, params *secretapi.GetSecretValueInput, optFns ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) {
 	if m.getSecretValueFunc != nil {
 		return m.getSecretValueFunc(ctx, params, optFns...)
 	}
 	return nil, fmt.Errorf("GetSecretValue not mocked")
 }
 
-func (m *mockSecretClient) ListSecretVersionIds(ctx context.Context, params *secretsmanager.ListSecretVersionIdsInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.ListSecretVersionIdsOutput, error) {
+func (m *mockSecretClient) ListSecretVersionIds(ctx context.Context, params *secretapi.ListSecretVersionIdsInput, optFns ...func(*secretapi.Options)) (*secretapi.ListSecretVersionIdsOutput, error) {
 	if m.listSecretVersionIdsFunc != nil {
 		return m.listSecretVersionIdsFunc(ctx, params, optFns...)
 	}
@@ -114,9 +113,9 @@ func TestRun_ParamOnly(t *testing.T) {
 	require.NoError(t, err)
 
 	paramMock := &mockParamClient{
-		getParameterFunc: func(_ context.Context, _ *ssm.GetParameterInput, _ ...func(*ssm.Options)) (*ssm.GetParameterOutput, error) {
-			return &ssm.GetParameterOutput{
-				Parameter: &types.Parameter{
+		getParameterFunc: func(_ context.Context, _ *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
+			return &paramapi.GetParameterOutput{
+				Parameter: &paramapi.Parameter{
 					Name:    lo.ToPtr("/app/config"),
 					Value:   lo.ToPtr("old-value"),
 					Version: 1,
@@ -157,8 +156,8 @@ func TestRun_SecretOnly(t *testing.T) {
 	require.NoError(t, err)
 
 	secretMock := &mockSecretClient{
-		getSecretValueFunc: func(_ context.Context, _ *secretsmanager.GetSecretValueInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.GetSecretValueOutput, error) {
-			return &secretsmanager.GetSecretValueOutput{
+		getSecretValueFunc: func(_ context.Context, _ *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) {
+			return &secretapi.GetSecretValueOutput{
 				Name:         lo.ToPtr("my-secret"),
 				SecretString: lo.ToPtr("old-secret"),
 				VersionId:    lo.ToPtr("abc123def456"),
@@ -203,9 +202,9 @@ func TestRun_BothServices(t *testing.T) {
 	require.NoError(t, err)
 
 	paramMock := &mockParamClient{
-		getParameterFunc: func(_ context.Context, _ *ssm.GetParameterInput, _ ...func(*ssm.Options)) (*ssm.GetParameterOutput, error) {
-			return &ssm.GetParameterOutput{
-				Parameter: &types.Parameter{
+		getParameterFunc: func(_ context.Context, _ *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
+			return &paramapi.GetParameterOutput{
+				Parameter: &paramapi.Parameter{
 					Name:    lo.ToPtr("/app/config"),
 					Value:   lo.ToPtr("param-old"),
 					Version: 1,
@@ -215,8 +214,8 @@ func TestRun_BothServices(t *testing.T) {
 	}
 
 	secretMock := &mockSecretClient{
-		getSecretValueFunc: func(_ context.Context, _ *secretsmanager.GetSecretValueInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.GetSecretValueOutput, error) {
-			return &secretsmanager.GetSecretValueOutput{
+		getSecretValueFunc: func(_ context.Context, _ *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) {
+			return &secretapi.GetSecretValueOutput{
 				Name:         lo.ToPtr("my-secret"),
 				SecretString: lo.ToPtr("secret-old"),
 				VersionId:    lo.ToPtr("abc123def456"),
@@ -264,9 +263,9 @@ func TestRun_DeleteOperations(t *testing.T) {
 	require.NoError(t, err)
 
 	paramMock := &mockParamClient{
-		getParameterFunc: func(_ context.Context, _ *ssm.GetParameterInput, _ ...func(*ssm.Options)) (*ssm.GetParameterOutput, error) {
-			return &ssm.GetParameterOutput{
-				Parameter: &types.Parameter{
+		getParameterFunc: func(_ context.Context, _ *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
+			return &paramapi.GetParameterOutput{
+				Parameter: &paramapi.Parameter{
 					Name:    lo.ToPtr("/app/config"),
 					Value:   lo.ToPtr("existing-value"),
 					Version: 1,
@@ -276,8 +275,8 @@ func TestRun_DeleteOperations(t *testing.T) {
 	}
 
 	secretMock := &mockSecretClient{
-		getSecretValueFunc: func(_ context.Context, _ *secretsmanager.GetSecretValueInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.GetSecretValueOutput, error) {
-			return &secretsmanager.GetSecretValueOutput{
+		getSecretValueFunc: func(_ context.Context, _ *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) {
+			return &secretapi.GetSecretValueOutput{
 				Name:         lo.ToPtr("my-secret"),
 				SecretString: lo.ToPtr("existing-secret"),
 				VersionId:    lo.ToPtr("abc123def456"),
@@ -317,9 +316,9 @@ func TestRun_IdenticalValues(t *testing.T) {
 	require.NoError(t, err)
 
 	paramMock := &mockParamClient{
-		getParameterFunc: func(_ context.Context, _ *ssm.GetParameterInput, _ ...func(*ssm.Options)) (*ssm.GetParameterOutput, error) {
-			return &ssm.GetParameterOutput{
-				Parameter: &types.Parameter{
+		getParameterFunc: func(_ context.Context, _ *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
+			return &paramapi.GetParameterOutput{
+				Parameter: &paramapi.Parameter{
 					Name:    lo.ToPtr("/app/config"),
 					Value:   lo.ToPtr("same-value"),
 					Version: 1,
@@ -361,9 +360,9 @@ func TestRun_JSONFormat(t *testing.T) {
 	require.NoError(t, err)
 
 	paramMock := &mockParamClient{
-		getParameterFunc: func(_ context.Context, _ *ssm.GetParameterInput, _ ...func(*ssm.Options)) (*ssm.GetParameterOutput, error) {
-			return &ssm.GetParameterOutput{
-				Parameter: &types.Parameter{
+		getParameterFunc: func(_ context.Context, _ *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
+			return &paramapi.GetParameterOutput{
+				Parameter: &paramapi.Parameter{
 					Name:    lo.ToPtr("/app/config"),
 					Value:   lo.ToPtr(`{"key":"old"}`),
 					Version: 1,
@@ -402,7 +401,7 @@ func TestRun_ParamUpdateAutoUnstageWhenDeleted(t *testing.T) {
 	require.NoError(t, err)
 
 	paramMock := &mockParamClient{
-		getParameterFunc: func(_ context.Context, _ *ssm.GetParameterInput, _ ...func(*ssm.Options)) (*ssm.GetParameterOutput, error) {
+		getParameterFunc: func(_ context.Context, _ *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
 			return nil, fmt.Errorf("parameter not found")
 		},
 	}
@@ -439,7 +438,7 @@ func TestRun_SecretUpdateAutoUnstageWhenDeleted(t *testing.T) {
 	require.NoError(t, err)
 
 	secretMock := &mockSecretClient{
-		getSecretValueFunc: func(_ context.Context, _ *secretsmanager.GetSecretValueInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.GetSecretValueOutput, error) {
+		getSecretValueFunc: func(_ context.Context, _ *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) {
 			return nil, fmt.Errorf("secret not found")
 		},
 	}
@@ -476,8 +475,8 @@ func TestRun_SecretIdenticalValues(t *testing.T) {
 	require.NoError(t, err)
 
 	secretMock := &mockSecretClient{
-		getSecretValueFunc: func(_ context.Context, _ *secretsmanager.GetSecretValueInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.GetSecretValueOutput, error) {
-			return &secretsmanager.GetSecretValueOutput{
+		getSecretValueFunc: func(_ context.Context, _ *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) {
+			return &secretapi.GetSecretValueOutput{
 				Name:         lo.ToPtr("my-secret"),
 				SecretString: lo.ToPtr("same-value"),
 				VersionId:    lo.ToPtr("abc123def456"),
@@ -518,8 +517,8 @@ func TestRun_SecretJSONFormat(t *testing.T) {
 	require.NoError(t, err)
 
 	secretMock := &mockSecretClient{
-		getSecretValueFunc: func(_ context.Context, _ *secretsmanager.GetSecretValueInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.GetSecretValueOutput, error) {
-			return &secretsmanager.GetSecretValueOutput{
+		getSecretValueFunc: func(_ context.Context, _ *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) {
+			return &secretapi.GetSecretValueOutput{
 				Name:         lo.ToPtr("my-secret"),
 				SecretString: lo.ToPtr(`{"key":"old"}`),
 				VersionId:    lo.ToPtr("abc123def456"),
@@ -557,8 +556,8 @@ func TestRun_SecretJSONFormatMixed(t *testing.T) {
 	require.NoError(t, err)
 
 	secretMock := &mockSecretClient{
-		getSecretValueFunc: func(_ context.Context, _ *secretsmanager.GetSecretValueInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.GetSecretValueOutput, error) {
-			return &secretsmanager.GetSecretValueOutput{
+		getSecretValueFunc: func(_ context.Context, _ *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) {
+			return &secretapi.GetSecretValueOutput{
 				Name:         lo.ToPtr("my-secret"),
 				SecretString: lo.ToPtr(`{"key":"old"}`),
 				VersionId:    lo.ToPtr("abc123def456"),
@@ -596,7 +595,7 @@ func TestRun_ParamCreateOperation(t *testing.T) {
 	require.NoError(t, err)
 
 	paramMock := &mockParamClient{
-		getParameterFunc: func(_ context.Context, _ *ssm.GetParameterInput, _ ...func(*ssm.Options)) (*ssm.GetParameterOutput, error) {
+		getParameterFunc: func(_ context.Context, _ *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
 			return nil, fmt.Errorf("parameter not found")
 		},
 	}
@@ -639,7 +638,7 @@ func TestRun_SecretCreateOperation(t *testing.T) {
 	require.NoError(t, err)
 
 	secretMock := &mockSecretClient{
-		getSecretValueFunc: func(_ context.Context, _ *secretsmanager.GetSecretValueInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.GetSecretValueOutput, error) {
+		getSecretValueFunc: func(_ context.Context, _ *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) {
 			return nil, fmt.Errorf("secret not found")
 		},
 	}
@@ -679,7 +678,7 @@ func TestRun_CreateWithJSONFormat(t *testing.T) {
 	require.NoError(t, err)
 
 	paramMock := &mockParamClient{
-		getParameterFunc: func(_ context.Context, _ *ssm.GetParameterInput, _ ...func(*ssm.Options)) (*ssm.GetParameterOutput, error) {
+		getParameterFunc: func(_ context.Context, _ *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
 			return nil, fmt.Errorf("parameter not found")
 		},
 	}
@@ -714,7 +713,7 @@ func TestRun_DeleteAutoUnstageWhenAlreadyDeleted(t *testing.T) {
 	require.NoError(t, err)
 
 	paramMock := &mockParamClient{
-		getParameterFunc: func(_ context.Context, _ *ssm.GetParameterInput, _ ...func(*ssm.Options)) (*ssm.GetParameterOutput, error) {
+		getParameterFunc: func(_ context.Context, _ *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
 			return nil, fmt.Errorf("parameter not found")
 		},
 	}
@@ -750,7 +749,7 @@ func TestRun_SecretDeleteAutoUnstageWhenAlreadyDeleted(t *testing.T) {
 	require.NoError(t, err)
 
 	secretMock := &mockSecretClient{
-		getSecretValueFunc: func(_ context.Context, _ *secretsmanager.GetSecretValueInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.GetSecretValueOutput, error) {
+		getSecretValueFunc: func(_ context.Context, _ *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) {
 			return nil, fmt.Errorf("secret not found")
 		},
 	}
@@ -788,9 +787,9 @@ func TestRun_MetadataWithDescription(t *testing.T) {
 	require.NoError(t, err)
 
 	paramMock := &mockParamClient{
-		getParameterFunc: func(_ context.Context, _ *ssm.GetParameterInput, _ ...func(*ssm.Options)) (*ssm.GetParameterOutput, error) {
-			return &ssm.GetParameterOutput{
-				Parameter: &types.Parameter{
+		getParameterFunc: func(_ context.Context, _ *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
+			return &paramapi.GetParameterOutput{
+				Parameter: &paramapi.Parameter{
 					Name:    lo.ToPtr("/app/config"),
 					Value:   lo.ToPtr("old-value"),
 					Version: 1,
@@ -830,9 +829,9 @@ func TestRun_MetadataWithTags(t *testing.T) {
 	require.NoError(t, err)
 
 	paramMock := &mockParamClient{
-		getParameterFunc: func(_ context.Context, _ *ssm.GetParameterInput, _ ...func(*ssm.Options)) (*ssm.GetParameterOutput, error) {
-			return &ssm.GetParameterOutput{
-				Parameter: &types.Parameter{
+		getParameterFunc: func(_ context.Context, _ *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
+			return &paramapi.GetParameterOutput{
+				Parameter: &paramapi.Parameter{
 					Name:    lo.ToPtr("/app/config"),
 					Value:   lo.ToPtr("old-value"),
 					Version: 1,

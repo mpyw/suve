@@ -7,11 +7,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
 	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/mpyw/suve/internal/api/secretapi"
 	appcli "github.com/mpyw/suve/internal/cli/commands"
 	"github.com/mpyw/suve/internal/cli/commands/secret/delete"
 )
@@ -29,10 +29,10 @@ func TestCommand_Validation(t *testing.T) {
 }
 
 type mockClient struct {
-	deleteSecretFunc func(ctx context.Context, params *secretsmanager.DeleteSecretInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.DeleteSecretOutput, error)
+	deleteSecretFunc func(ctx context.Context, params *secretapi.DeleteSecretInput, optFns ...func(*secretapi.Options)) (*secretapi.DeleteSecretOutput, error)
 }
 
-func (m *mockClient) DeleteSecret(ctx context.Context, params *secretsmanager.DeleteSecretInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.DeleteSecretOutput, error) {
+func (m *mockClient) DeleteSecret(ctx context.Context, params *secretapi.DeleteSecretInput, optFns ...func(*secretapi.Options)) (*secretapi.DeleteSecretOutput, error) {
 	if m.deleteSecretFunc != nil {
 		return m.deleteSecretFunc(ctx, params, optFns...)
 	}
@@ -55,10 +55,10 @@ func TestRun(t *testing.T) {
 			name: "delete with recovery window",
 			opts: delete.Options{Name: "my-secret", Force: false, RecoveryWindow: 30},
 			mock: &mockClient{
-				deleteSecretFunc: func(_ context.Context, params *secretsmanager.DeleteSecretInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.DeleteSecretOutput, error) {
+				deleteSecretFunc: func(_ context.Context, params *secretapi.DeleteSecretInput, _ ...func(*secretapi.Options)) (*secretapi.DeleteSecretOutput, error) {
 					assert.False(t, lo.FromPtr(params.ForceDeleteWithoutRecovery), "expected ForceDeleteWithoutRecovery to be false")
 					assert.Equal(t, int64(30), lo.FromPtr(params.RecoveryWindowInDays))
-					return &secretsmanager.DeleteSecretOutput{
+					return &secretapi.DeleteSecretOutput{
 						Name:         lo.ToPtr("my-secret"),
 						DeletionDate: &deletionDate,
 					}, nil
@@ -73,9 +73,9 @@ func TestRun(t *testing.T) {
 			name: "force delete",
 			opts: delete.Options{Name: "my-secret", Force: true},
 			mock: &mockClient{
-				deleteSecretFunc: func(_ context.Context, params *secretsmanager.DeleteSecretInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.DeleteSecretOutput, error) {
+				deleteSecretFunc: func(_ context.Context, params *secretapi.DeleteSecretInput, _ ...func(*secretapi.Options)) (*secretapi.DeleteSecretOutput, error) {
 					assert.True(t, lo.FromPtr(params.ForceDeleteWithoutRecovery), "expected ForceDeleteWithoutRecovery to be true")
-					return &secretsmanager.DeleteSecretOutput{
+					return &secretapi.DeleteSecretOutput{
 						Name: lo.ToPtr("my-secret"),
 					}, nil
 				},
@@ -88,7 +88,7 @@ func TestRun(t *testing.T) {
 			name: "error from AWS",
 			opts: delete.Options{Name: "my-secret"},
 			mock: &mockClient{
-				deleteSecretFunc: func(_ context.Context, _ *secretsmanager.DeleteSecretInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.DeleteSecretOutput, error) {
+				deleteSecretFunc: func(_ context.Context, _ *secretapi.DeleteSecretInput, _ ...func(*secretapi.Options)) (*secretapi.DeleteSecretOutput, error) {
 					return nil, fmt.Errorf("AWS error")
 				},
 			},

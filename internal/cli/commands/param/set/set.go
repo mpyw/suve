@@ -7,8 +7,6 @@ import (
 	"io"
 	"os"
 
-	"github.com/aws/aws-sdk-go-v2/service/ssm"
-	"github.com/aws/aws-sdk-go-v2/service/ssm/types"
 	"github.com/samber/lo"
 	"github.com/urfave/cli/v3"
 
@@ -167,10 +165,10 @@ func action(ctx context.Context, cmd *cli.Command) error {
 
 // Run executes the set command.
 func (r *Runner) Run(ctx context.Context, opts Options) error {
-	input := &ssm.PutParameterInput{
+	input := &paramapi.PutParameterInput{
 		Name:      lo.ToPtr(opts.Name),
 		Value:     lo.ToPtr(opts.Value),
-		Type:      types.ParameterType(opts.Type),
+		Type:      paramapi.ParameterType(opts.Type),
 		Overwrite: lo.ToPtr(true),
 	}
 	if opts.Description != "" {

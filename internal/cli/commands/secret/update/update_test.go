@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
 	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/mpyw/suve/internal/api/secretapi"
 	appcli "github.com/mpyw/suve/internal/cli/commands"
 	"github.com/mpyw/suve/internal/cli/commands/secret/update"
 	"github.com/mpyw/suve/internal/tagging"
@@ -37,38 +37,38 @@ func TestCommand_Validation(t *testing.T) {
 }
 
 type mockClient struct {
-	putSecretValueFunc func(ctx context.Context, params *secretsmanager.PutSecretValueInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.PutSecretValueOutput, error)
-	updateSecretFunc   func(ctx context.Context, params *secretsmanager.UpdateSecretInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.UpdateSecretOutput, error)
-	tagResourceFunc    func(ctx context.Context, params *secretsmanager.TagResourceInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.TagResourceOutput, error)
-	untagResourceFunc  func(ctx context.Context, params *secretsmanager.UntagResourceInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.UntagResourceOutput, error)
+	putSecretValueFunc func(ctx context.Context, params *secretapi.PutSecretValueInput, optFns ...func(*secretapi.Options)) (*secretapi.PutSecretValueOutput, error)
+	updateSecretFunc   func(ctx context.Context, params *secretapi.UpdateSecretInput, optFns ...func(*secretapi.Options)) (*secretapi.UpdateSecretOutput, error)
+	tagResourceFunc    func(ctx context.Context, params *secretapi.TagResourceInput, optFns ...func(*secretapi.Options)) (*secretapi.TagResourceOutput, error)
+	untagResourceFunc  func(ctx context.Context, params *secretapi.UntagResourceInput, optFns ...func(*secretapi.Options)) (*secretapi.UntagResourceOutput, error)
 }
 
-func (m *mockClient) PutSecretValue(ctx context.Context, params *secretsmanager.PutSecretValueInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.PutSecretValueOutput, error) {
+func (m *mockClient) PutSecretValue(ctx context.Context, params *secretapi.PutSecretValueInput, optFns ...func(*secretapi.Options)) (*secretapi.PutSecretValueOutput, error) {
 	if m.putSecretValueFunc != nil {
 		return m.putSecretValueFunc(ctx, params, optFns...)
 	}
 	return nil, fmt.Errorf("PutSecretValue not mocked")
 }
 
-func (m *mockClient) UpdateSecret(ctx context.Context, params *secretsmanager.UpdateSecretInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.UpdateSecretOutput, error) {
+func (m *mockClient) UpdateSecret(ctx context.Context, params *secretapi.UpdateSecretInput, optFns ...func(*secretapi.Options)) (*secretapi.UpdateSecretOutput, error) {
 	if m.updateSecretFunc != nil {
 		return m.updateSecretFunc(ctx, params, optFns...)
 	}
-	return &secretsmanager.UpdateSecretOutput{}, nil
+	return &secretapi.UpdateSecretOutput{}, nil
 }
 
-func (m *mockClient) TagResource(ctx context.Context, params *secretsmanager.TagResourceInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.TagResourceOutput, error) {
+func (m *mockClient) TagResource(ctx context.Context, params *secretapi.TagResourceInput, optFns ...func(*secretapi.Options)) (*secretapi.TagResourceOutput, error) {
 	if m.tagResourceFunc != nil {
 		return m.tagResourceFunc(ctx, params, optFns...)
 	}
-	return &secretsmanager.TagResourceOutput{}, nil
+	return &secretapi.TagResourceOutput{}, nil
 }
 
-func (m *mockClient) UntagResource(ctx context.Context, params *secretsmanager.UntagResourceInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.UntagResourceOutput, error) {
+func (m *mockClient) UntagResource(ctx context.Context, params *secretapi.UntagResourceInput, optFns ...func(*secretapi.Options)) (*secretapi.UntagResourceOutput, error) {
 	if m.untagResourceFunc != nil {
 		return m.untagResourceFunc(ctx, params, optFns...)
 	}
-	return &secretsmanager.UntagResourceOutput{}, nil
+	return &secretapi.UntagResourceOutput{}, nil
 }
 
 func TestRun(t *testing.T) {
@@ -84,10 +84,10 @@ func TestRun(t *testing.T) {
 			name: "update secret",
 			opts: update.Options{Name: "my-secret", Value: "new-value"},
 			mock: &mockClient{
-				putSecretValueFunc: func(_ context.Context, params *secretsmanager.PutSecretValueInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.PutSecretValueOutput, error) {
+				putSecretValueFunc: func(_ context.Context, params *secretapi.PutSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.PutSecretValueOutput, error) {
 					assert.Equal(t, "my-secret", lo.FromPtr(params.SecretId))
 					assert.Equal(t, "new-value", lo.FromPtr(params.SecretString))
-					return &secretsmanager.PutSecretValueOutput{
+					return &secretapi.PutSecretValueOutput{
 						Name:      lo.ToPtr("my-secret"),
 						VersionId: lo.ToPtr("new-version-id"),
 					}, nil
@@ -102,16 +102,16 @@ func TestRun(t *testing.T) {
 			name: "update secret with description",
 			opts: update.Options{Name: "my-secret", Value: "new-value", Description: "updated description"},
 			mock: &mockClient{
-				putSecretValueFunc: func(_ context.Context, params *secretsmanager.PutSecretValueInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.PutSecretValueOutput, error) {
-					return &secretsmanager.PutSecretValueOutput{
+				putSecretValueFunc: func(_ context.Context, params *secretapi.PutSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.PutSecretValueOutput, error) {
+					return &secretapi.PutSecretValueOutput{
 						Name:      lo.ToPtr("my-secret"),
 						VersionId: lo.ToPtr("new-version-id"),
 					}, nil
 				},
-				updateSecretFunc: func(_ context.Context, params *secretsmanager.UpdateSecretInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.UpdateSecretOutput, error) {
+				updateSecretFunc: func(_ context.Context, params *secretapi.UpdateSecretInput, _ ...func(*secretapi.Options)) (*secretapi.UpdateSecretOutput, error) {
 					assert.Equal(t, "my-secret", lo.FromPtr(params.SecretId))
 					assert.Equal(t, "updated description", lo.FromPtr(params.Description))
-					return &secretsmanager.UpdateSecretOutput{}, nil
+					return &secretapi.UpdateSecretOutput{}, nil
 				},
 			},
 			check: func(t *testing.T, output string) {
@@ -129,15 +129,15 @@ func TestRun(t *testing.T) {
 				},
 			},
 			mock: &mockClient{
-				putSecretValueFunc: func(_ context.Context, _ *secretsmanager.PutSecretValueInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.PutSecretValueOutput, error) {
-					return &secretsmanager.PutSecretValueOutput{
+				putSecretValueFunc: func(_ context.Context, _ *secretapi.PutSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.PutSecretValueOutput, error) {
+					return &secretapi.PutSecretValueOutput{
 						Name:      lo.ToPtr("my-secret"),
 						VersionId: lo.ToPtr("new-version-id"),
 					}, nil
 				},
-				tagResourceFunc: func(_ context.Context, params *secretsmanager.TagResourceInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.TagResourceOutput, error) {
+				tagResourceFunc: func(_ context.Context, params *secretapi.TagResourceInput, _ ...func(*secretapi.Options)) (*secretapi.TagResourceOutput, error) {
 					assert.Equal(t, "my-secret", lo.FromPtr(params.SecretId))
-					return &secretsmanager.TagResourceOutput{}, nil
+					return &secretapi.TagResourceOutput{}, nil
 				},
 			},
 			check: func(t *testing.T, output string) {
@@ -149,7 +149,7 @@ func TestRun(t *testing.T) {
 			opts:    update.Options{Name: "my-secret", Value: "new-value"},
 			wantErr: "failed to update secret",
 			mock: &mockClient{
-				putSecretValueFunc: func(_ context.Context, _ *secretsmanager.PutSecretValueInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.PutSecretValueOutput, error) {
+				putSecretValueFunc: func(_ context.Context, _ *secretapi.PutSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.PutSecretValueOutput, error) {
 					return nil, fmt.Errorf("AWS error")
 				},
 			},
@@ -159,13 +159,13 @@ func TestRun(t *testing.T) {
 			opts:    update.Options{Name: "my-secret", Value: "new-value", Description: "desc"},
 			wantErr: "failed to update description",
 			mock: &mockClient{
-				putSecretValueFunc: func(_ context.Context, _ *secretsmanager.PutSecretValueInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.PutSecretValueOutput, error) {
-					return &secretsmanager.PutSecretValueOutput{
+				putSecretValueFunc: func(_ context.Context, _ *secretapi.PutSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.PutSecretValueOutput, error) {
+					return &secretapi.PutSecretValueOutput{
 						Name:      lo.ToPtr("my-secret"),
 						VersionId: lo.ToPtr("new-version-id"),
 					}, nil
 				},
-				updateSecretFunc: func(_ context.Context, _ *secretsmanager.UpdateSecretInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.UpdateSecretOutput, error) {
+				updateSecretFunc: func(_ context.Context, _ *secretapi.UpdateSecretInput, _ ...func(*secretapi.Options)) (*secretapi.UpdateSecretOutput, error) {
 					return nil, fmt.Errorf("description update failed")
 				},
 			},
@@ -182,13 +182,13 @@ func TestRun(t *testing.T) {
 			},
 			wantErr: "failed to add tags",
 			mock: &mockClient{
-				putSecretValueFunc: func(_ context.Context, _ *secretsmanager.PutSecretValueInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.PutSecretValueOutput, error) {
-					return &secretsmanager.PutSecretValueOutput{
+				putSecretValueFunc: func(_ context.Context, _ *secretapi.PutSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.PutSecretValueOutput, error) {
+					return &secretapi.PutSecretValueOutput{
 						Name:      lo.ToPtr("my-secret"),
 						VersionId: lo.ToPtr("new-version-id"),
 					}, nil
 				},
-				tagResourceFunc: func(_ context.Context, _ *secretsmanager.TagResourceInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.TagResourceOutput, error) {
+				tagResourceFunc: func(_ context.Context, _ *secretapi.TagResourceInput, _ ...func(*secretapi.Options)) (*secretapi.TagResourceOutput, error) {
 					return nil, fmt.Errorf("tag error")
 				},
 			},

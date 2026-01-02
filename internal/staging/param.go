@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/aws/aws-sdk-go-v2/service/ssm"
-	"github.com/aws/aws-sdk-go-v2/service/ssm/types"
 	"github.com/samber/lo"
 
 	"github.com/mpyw/suve/internal/api/paramapi"
@@ -70,12 +68,12 @@ func (s *ParamStrategy) Push(ctx context.Context, name string, entry Entry) erro
 
 func (s *ParamStrategy) pushSet(ctx context.Context, name string, entry Entry) error {
 	// Try to get existing parameter to preserve type
-	paramType := types.ParameterTypeString
-	existing, err := s.Client.GetParameter(ctx, &ssm.GetParameterInput{
+	paramType := paramapi.ParameterTypeString
+	existing, err := s.Client.GetParameter(ctx, &paramapi.GetParameterInput{
 		Name: lo.ToPtr(name),
 	})
 	if err != nil {
-		var pnf *types.ParameterNotFound
+		var pnf *paramapi.ParameterNotFound
 		if !errors.As(err, &pnf) {
 			return fmt.Errorf("failed to get existing parameter: %w", err)
 		}
@@ -83,7 +81,7 @@ func (s *ParamStrategy) pushSet(ctx context.Context, name string, entry Entry) e
 		paramType = existing.Parameter.Type
 	}
 
-	input := &ssm.PutParameterInput{
+	input := &paramapi.PutParameterInput{
 		Name:      lo.ToPtr(name),
 		Value:     lo.ToPtr(entry.Value),
 		Type:      paramType,
@@ -115,12 +113,12 @@ func (s *ParamStrategy) pushSet(ctx context.Context, name string, entry Entry) e
 }
 
 func (s *ParamStrategy) pushDelete(ctx context.Context, name string) error {
-	_, err := s.Client.DeleteParameter(ctx, &ssm.DeleteParameterInput{
+	_, err := s.Client.DeleteParameter(ctx, &paramapi.DeleteParameterInput{
 		Name: lo.ToPtr(name),
 	})
 	if err != nil {
 		// Already deleted is considered success
-		var pnf *types.ParameterNotFound
+		var pnf *paramapi.ParameterNotFound
 		if errors.As(err, &pnf) {
 			return nil
 		}
@@ -132,11 +130,11 @@ func (s *ParamStrategy) pushDelete(ctx context.Context, name string) error {
 // FetchLastModified returns the last modified time of the parameter in AWS.
 // Returns zero time if the parameter doesn't exist.
 func (s *ParamStrategy) FetchLastModified(ctx context.Context, name string) (time.Time, error) {
-	result, err := s.Client.GetParameter(ctx, &ssm.GetParameterInput{
+	result, err := s.Client.GetParameter(ctx, &paramapi.GetParameterInput{
 		Name: lo.ToPtr(name),
 	})
 	if err != nil {
-		var pnf *types.ParameterNotFound
+		var pnf *paramapi.ParameterNotFound
 		if errors.As(err, &pnf) {
 			return time.Time{}, nil
 		}

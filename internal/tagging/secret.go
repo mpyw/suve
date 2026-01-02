@@ -4,15 +4,15 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
-	"github.com/aws/aws-sdk-go-v2/service/secretsmanager/types"
 	"github.com/samber/lo"
+
+	"github.com/mpyw/suve/internal/api/secretapi"
 )
 
 // SecretClient is the interface for Secrets Manager tag operations.
 type SecretClient interface {
-	TagResource(ctx context.Context, params *secretsmanager.TagResourceInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.TagResourceOutput, error)
-	UntagResource(ctx context.Context, params *secretsmanager.UntagResourceInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.UntagResourceOutput, error)
+	TagResource(ctx context.Context, params *secretapi.TagResourceInput, optFns ...func(*secretapi.Options)) (*secretapi.TagResourceOutput, error)
+	UntagResource(ctx context.Context, params *secretapi.UntagResourceInput, optFns ...func(*secretapi.Options)) (*secretapi.UntagResourceOutput, error)
 }
 
 // ApplySecret applies tag changes to a Secrets Manager secret.
@@ -24,14 +24,14 @@ func ApplySecret(ctx context.Context, client SecretClient, secretID string, chan
 
 	// Add tags
 	if len(change.Add) > 0 {
-		tags := make([]types.Tag, 0, len(change.Add))
+		tags := make([]secretapi.Tag, 0, len(change.Add))
 		for k, v := range change.Add {
-			tags = append(tags, types.Tag{
+			tags = append(tags, secretapi.Tag{
 				Key:   lo.ToPtr(k),
 				Value: lo.ToPtr(v),
 			})
 		}
-		_, err := client.TagResource(ctx, &secretsmanager.TagResourceInput{
+		_, err := client.TagResource(ctx, &secretapi.TagResourceInput{
 			SecretId: lo.ToPtr(secretID),
 			Tags:     tags,
 		})
@@ -42,7 +42,7 @@ func ApplySecret(ctx context.Context, client SecretClient, secretID string, chan
 
 	// Remove tags
 	if len(change.Remove) > 0 {
-		_, err := client.UntagResource(ctx, &secretsmanager.UntagResourceInput{
+		_, err := client.UntagResource(ctx, &secretapi.UntagResourceInput{
 			SecretId: lo.ToPtr(secretID),
 			TagKeys:  change.Remove,
 		})

@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"slices"
 
-	"github.com/aws/aws-sdk-go-v2/service/ssm"
-	"github.com/aws/aws-sdk-go-v2/service/ssm/types"
 	"github.com/samber/lo"
 
 	"github.com/mpyw/suve/internal/api/paramapi"
@@ -20,15 +18,15 @@ type Client interface {
 }
 
 // GetParameterWithVersion retrieves a parameter with version/shift support.
-func GetParameterWithVersion(ctx context.Context, client Client, spec *Spec, decrypt bool) (*types.ParameterHistory, error) {
+func GetParameterWithVersion(ctx context.Context, client Client, spec *Spec, decrypt bool) (*paramapi.ParameterHistory, error) {
 	if spec.HasShift() {
 		return getParameterWithShift(ctx, client, spec, decrypt)
 	}
 	return getParameterDirect(ctx, client, spec, decrypt)
 }
 
-func getParameterWithShift(ctx context.Context, client paramapi.GetParameterHistoryAPI, spec *Spec, decrypt bool) (*types.ParameterHistory, error) {
-	history, err := client.GetParameterHistory(ctx, &ssm.GetParameterHistoryInput{
+func getParameterWithShift(ctx context.Context, client paramapi.GetParameterHistoryAPI, spec *Spec, decrypt bool) (*paramapi.ParameterHistory, error) {
+	history, err := client.GetParameterHistory(ctx, &paramapi.GetParameterHistoryInput{
 		Name:           lo.ToPtr(spec.Name),
 		WithDecryption: lo.ToPtr(decrypt),
 	})
@@ -47,7 +45,7 @@ func getParameterWithShift(ctx context.Context, client paramapi.GetParameterHist
 	baseIdx := 0
 	if spec.Absolute.Version != nil {
 		var found bool
-		_, baseIdx, found = lo.FindIndexOf(params, func(p types.ParameterHistory) bool {
+		_, baseIdx, found = lo.FindIndexOf(params, func(p paramapi.ParameterHistory) bool {
 			return p.Version == *spec.Absolute.Version
 		})
 		if !found {
@@ -63,7 +61,7 @@ func getParameterWithShift(ctx context.Context, client paramapi.GetParameterHist
 	return &params[targetIdx], nil
 }
 
-func getParameterDirect(ctx context.Context, client paramapi.GetParameterAPI, spec *Spec, decrypt bool) (*types.ParameterHistory, error) {
+func getParameterDirect(ctx context.Context, client paramapi.GetParameterAPI, spec *Spec, decrypt bool) (*paramapi.ParameterHistory, error) {
 	var nameWithVersion string
 	if spec.Absolute.Version != nil {
 		nameWithVersion = fmt.Sprintf("%s:%d", spec.Name, *spec.Absolute.Version)
@@ -71,7 +69,7 @@ func getParameterDirect(ctx context.Context, client paramapi.GetParameterAPI, sp
 		nameWithVersion = spec.Name
 	}
 
-	result, err := client.GetParameter(ctx, &ssm.GetParameterInput{
+	result, err := client.GetParameter(ctx, &paramapi.GetParameterInput{
 		Name:           lo.ToPtr(nameWithVersion),
 		WithDecryption: lo.ToPtr(decrypt),
 	})
@@ -80,7 +78,7 @@ func getParameterDirect(ctx context.Context, client paramapi.GetParameterAPI, sp
 	}
 
 	param := result.Parameter
-	return &types.ParameterHistory{
+	return &paramapi.ParameterHistory{
 		Name:             param.Name,
 		Value:            param.Value,
 		Type:             param.Type,

@@ -7,6 +7,8 @@ run:
 
 linters:
   default: standard
+  enable:
+    - depguard
   settings:
     cyclop:
       max-complexity: 30
@@ -17,6 +19,21 @@ linters:
       min-complexity: 60
     exhaustive:
       default-signifies-exhaustive: true
+    depguard:
+      rules:
+        aws-sdk:
+          files:
+            - "!**/internal/api/**"
+            - "!**/internal/infra/**"
+          deny:
+            - pkg: "github.com/aws/aws-sdk-go-v2/service/ssm"
+              desc: "Use github.com/mpyw/suve/internal/api/paramapi instead"
+            - pkg: "github.com/aws/aws-sdk-go-v2/service/ssm/types"
+              desc: "Use github.com/mpyw/suve/internal/api/paramapi instead"
+            - pkg: "github.com/aws/aws-sdk-go-v2/service/secretsmanager"
+              desc: "Use github.com/mpyw/suve/internal/api/secretapi instead"
+            - pkg: "github.com/aws/aws-sdk-go-v2/service/secretsmanager/types"
+              desc: "Use github.com/mpyw/suve/internal/api/secretapi instead"
 
 formatters:
   enable:

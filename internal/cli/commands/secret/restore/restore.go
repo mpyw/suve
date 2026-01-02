@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
 	"github.com/samber/lo"
 	"github.com/urfave/cli/v3"
 
@@ -72,7 +71,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 
 // Run executes the restore command.
 func (r *Runner) Run(ctx context.Context, opts Options) error {
-	result, err := r.Client.RestoreSecret(ctx, &secretsmanager.RestoreSecretInput{
+	result, err := r.Client.RestoreSecret(ctx, &secretapi.RestoreSecretInput{
 		SecretId: lo.ToPtr(opts.Name),
 	})
 	if err != nil {
