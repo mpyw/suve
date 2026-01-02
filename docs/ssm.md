@@ -25,22 +25,24 @@ suve ssm show [options] <name[#VERSION][~SHIFT]*>
 | `--decrypt` | `-d` | `true` | Decrypt SecureString values. Use `--decrypt=false` to disable. |
 | `--json` | `-j` | `false` | Pretty-print JSON values with indentation |
 
-**Output:**
+**Examples:**
 
-```
-Name: /my/parameter
+```ShellSession
+user@host:~$ suve ssm show /app/config/database-url
+Name: /app/config/database-url
 Version: 3
 Type: SecureString
 Modified: 2024-01-15T10:30:45Z
 
-  my-secret-value
+  postgres://db.example.com:5432/myapp
 ```
 
-With `--json`:
+With `--json` for JSON values:
 
-```
-Name: /my/parameter
-Version: 3
+```ShellSession
+user@host:~$ suve ssm show -j /app/config/credentials
+Name: /app/config/credentials
+Version: 2
 Type: SecureString
 Modified: 2024-01-15T10:30:45Z
 
@@ -50,12 +52,7 @@ Modified: 2024-01-15T10:30:45Z
   }
 ```
 
-**Examples:**
-
 ```bash
-# Show latest version
-suve ssm show /app/config/database-url
-
 # Show specific version
 suve ssm show /app/config/database-url#3
 
@@ -64,10 +61,6 @@ suve ssm show /app/config/database-url~1
 
 # Show without decryption (displays encrypted value)
 suve ssm show --decrypt=false /app/config/database-url
-
-# Show with JSON formatting
-suve ssm show -j /app/config/database-credentials
-
 ```
 
 ---
@@ -93,11 +86,15 @@ suve ssm cat [options] <name[#VERSION][~SHIFT]*>
 | `--decrypt` | `-d` | `true` | Decrypt SecureString values. Use `--decrypt=false` to disable. |
 | `--json` | `-j` | `false` | Pretty-print JSON values with indentation |
 
-**Output:**
-
-Raw value without trailing newline.
-
 **Examples:**
+
+```ShellSession
+user@host:~$ suve ssm cat /app/config/database-url
+postgres://db.example.com:5432/myapp
+```
+
+> [!TIP]
+> Use `cat` for scripting and piping. The output has no trailing newline.
 
 ```bash
 # Use in scripts
@@ -111,14 +108,13 @@ suve ssm cat /app/config/ssh-key | ssh-add -
 
 # Pretty print JSON
 suve ssm cat -j /app/config/database-credentials
-
 ```
 
 ---
 
 ## suve ssm log
 
-Show parameter version history.
+Show parameter version history, similar to `git log`.
 
 ```
 suve ssm log [options] <name>
@@ -139,64 +135,60 @@ suve ssm log [options] <name>
 | `--json` | `-j` | `false` | Format JSON values before diffing (use with `-p`) |
 | `--reverse` | `-r` | `false` | Show oldest versions first |
 
-**Output:**
+**Examples:**
 
-```
+Basic version history:
+
+```ShellSession
+user@host:~$ suve ssm log /app/config/database-url
 Version 3 (current)
 Date: 2024-01-15T10:30:45Z
-my-secret-value...
+postgres://db.example.com:5432/myapp...
 
 Version 2
 Date: 2024-01-14T09:20:30Z
-previous-value...
+postgres://old-db.example.com:5432/myapp...
 
 Version 1
 Date: 2024-01-13T08:10:00Z
-initial-value...
+postgres://localhost:5432/myapp...
 ```
 
-Values are truncated at 50 characters with `...` suffix.
+> [!NOTE]
+> Values are truncated at 50 characters with `...` suffix.
 
-**With `--patch`:**
+With `--patch` to see what changed:
 
-```diff
+```ShellSession
+user@host:~$ suve ssm log -p /app/config/database-url
 Version 3 (current)
 Date: 2024-01-15T10:30:45Z
 
 --- /app/config/database-url#2
 +++ /app/config/database-url#3
 @@ -1 +1 @@
--postgres://old-host:5432/db
-+postgres://new-host:5432/db
+-postgres://old-db.example.com:5432/myapp
++postgres://db.example.com:5432/myapp
 
 Version 2
 Date: 2024-01-14T09:20:30Z
 
 --- /app/config/database-url#1
 +++ /app/config/database-url#2
-...
+@@ -1 +1 @@
+-postgres://localhost:5432/myapp
++postgres://old-db.example.com:5432/myapp
 ```
 
 > [!TIP]
 > Use `-p` to review what changed in each version, similar to `git log -p`.
 
-**Examples:**
-
 ```bash
-# Show last 10 versions (default)
-suve ssm log /app/config/database-url
-
 # Show last 5 versions
 suve ssm log -n 5 /app/config/database-url
 
-# Show versions with diffs
-suve ssm log -p /app/config/database-url
-
-# Show diffs with JSON formatting
+# Show diffs with JSON formatting for JSON values
 suve ssm log -p -j /app/config/database-credentials
-
-# Show last 3 versions with diffs
-suve ssm log -n 3 -p /app/config/database-url
 
 # Show oldest versions first
 suve ssm log --reverse /app/config/database-url
@@ -240,54 +232,46 @@ The diff command supports multiple argument formats for flexibility:
 
 Specifiers can be combined: `/param#5~2` means "version 5, then 2 back" = version 3.
 
-### Output
+### Examples
 
-```diff
---- /my/param#2
-+++ /my/param#3
+Compare two versions:
+
+```ShellSession
+user@host:~$ suve ssm diff /app/config/database-url#1 /app/config/database-url#3
+--- /app/config/database-url#1
++++ /app/config/database-url#3
 @@ -1 +1 @@
--old-value
-+new-value
+-postgres://localhost:5432/myapp
++postgres://db.example.com:5432/myapp
 ```
 
-Output is colorized when stdout is a TTY:
-- **Red**: Deleted lines (`-`)
-- **Green**: Added lines (`+`)
-- **Cyan**: Headers (`---`, `+++`, `@@`)
+Compare previous with latest (shorthand):
+
+```ShellSession
+user@host:~$ suve ssm diff /app/config/database-url~1
+--- /app/config/database-url#2
++++ /app/config/database-url#3
+@@ -1 +1 @@
+-postgres://old-db.example.com:5432/myapp
++postgres://db.example.com:5432/myapp
+```
+
+> [!NOTE]
+> Output is colorized when stdout is a TTY:
+> - **Red**: Deleted lines (`-`)
+> - **Green**: Added lines (`+`)
+> - **Cyan**: Headers (`---`, `+++`, `@@`)
 
 ### Identical Version Warning
 
 > [!WARNING]
-> When comparing versions with **identical content**, no diff is produced. Instead, a warning and hint are displayed:
+> When comparing versions with **identical content**, no diff is produced:
 > ```
 > Warning: comparing identical versions
 > Hint: To compare with previous version, use: suve ssm diff /param~1
 > ```
-> This typically happens when you compare the latest version with itself (e.g., `/param` vs `/param`).
 
-### Examples
-
-#### Full Spec Format (Recommended)
-
-```bash
-# Compare version 1 with version 2
-suve ssm diff /app/config/database-url#1 /app/config/database-url#2
-
-# Compare version 3 with latest
-suve ssm diff /app/config/database-url#3
-
-# Compare previous with latest
-suve ssm diff /app/config/database-url~1
-```
-
-#### Mixed Format
-
-```bash
-# Compare version 1 with version 2 (name from first arg)
-suve ssm diff /app/config/database-url#1 '#2'
-```
-
-#### Partial Spec Format
+### Partial Spec Format
 
 > [!IMPORTANT]
 > Partial spec format requires quoting `#` and `~` specifiers to prevent shell interpretation:
@@ -298,24 +282,8 @@ suve ssm diff /app/config/database-url#1 '#2'
 # Compare version 1 with version 2
 suve ssm diff /app/config/database-url '#1' '#2'
 
-# Compare version 2 with latest
-suve ssm diff /app/config/database-url '#2'
-
-# Compare using relative versions
-suve ssm diff /app/config/database-url '~2' '~1'
-
 # Compare previous with latest
 suve ssm diff /app/config/database-url '~'
-```
-
-#### Practical Use Cases
-
-```bash
-# Review what changed in the last update
-suve ssm diff /app/config/database-url~1
-
-# Compare any two versions
-suve ssm diff /app/config/database-url#1 /app/config/database-url#5
 
 # Pipe to a file for review
 suve ssm diff /app/config/database-url~1 > changes.diff
@@ -343,21 +311,27 @@ suve ssm ls [options] [path-prefix]
 |--------|-------|---------|-------------|
 | `--recursive` | `-r` | `false` | List parameters recursively under the path |
 
-**Output:**
+**Examples:**
 
-One parameter name per line.
-
-```
+```ShellSession
+user@host:~$ suve ssm ls /app/config/
 /app/config/database-url
 /app/config/api-key
 /app/config/redis-host
 ```
 
-**Behavior:**
+Recursive listing:
 
-Without `--recursive`, only lists parameters at the specified path level (OneLevel). With `--recursive`, lists all parameters under the path including nested paths.
+```ShellSession
+user@host:~$ suve ssm ls -r /app/
+/app/config/database-url
+/app/config/api-key
+/app/config/nested/param
+/app/secrets/api-token
+```
 
-**Examples:**
+> [!NOTE]
+> Without `--recursive`, only lists parameters at the specified path level (OneLevel). With `--recursive`, lists all parameters under the path including nested paths.
 
 ```bash
 # List all parameters (no filter)
@@ -366,7 +340,7 @@ suve ssm ls
 # List parameters under /app/config/
 suve ssm ls /app/config/
 
-# List recursively (includes /app/config/nested/param)
+# List recursively
 suve ssm ls -r /app/
 ```
 
@@ -395,31 +369,22 @@ suve ssm set [options] <name> <value>
 | `--secure` | `-s` | `false` | Shorthand for `--type SecureString` |
 | `--description` | `-d` | - | Parameter description |
 
-> **Note:** `--secure` and `--type` cannot be used together.
-
-**Output:**
-
-```
-✓ Set parameter /app/config/database-url (version: 1)
-```
-
-**Notes:**
-
-- Always overwrites existing parameters (no confirmation)
-- SecureString is encrypted using the default AWS KMS key (requires KMS permissions)
+> [!NOTE]
+> `--secure` and `--type` cannot be used together.
 
 **Examples:**
+
+```ShellSession
+user@host:~$ suve ssm set --secure /app/config/database-url "postgres://db.example.com:5432/myapp"
+✓ Set parameter /app/config/database-url (version: 1)
+```
 
 ```bash
 # Create/update as String (default)
 suve ssm set /app/config/log-level "debug"
 
 # Create as SecureString (shorthand)
-suve ssm set --secure /app/config/database-url "postgres://..."
 suve ssm set -s /app/config/api-key "sk-1234567890"
-
-# Create as SecureString (explicit)
-suve ssm set --type SecureString /app/config/database-url "postgres://..."
 
 # Create with description
 suve ssm set -d "Database connection string" -s /app/config/database-url "postgres://..."
@@ -427,6 +392,9 @@ suve ssm set -d "Database connection string" -s /app/config/database-url "postgr
 # StringList (comma-separated values)
 suve ssm set --type StringList /app/config/allowed-hosts "host1,host2,host3"
 ```
+
+> [!IMPORTANT]
+> SecureString is encrypted using the default AWS KMS key. Ensure your IAM role has the necessary KMS permissions.
 
 ---
 
@@ -444,32 +412,24 @@ suve ssm delete <name>
 |----------|-------------|
 | `name` | Parameter name to delete |
 
-**Output:**
-
-```
-Deleted /app/config/database-url
-```
-
-**Notes:**
-
-- Deletion is immediate and permanent
-- No confirmation prompt
-- Deleting non-existent parameter results in an error
-
 **Examples:**
 
-```bash
-suve ssm delete /app/config/old-param
+```ShellSession
+user@host:~$ suve ssm delete /app/config/old-param
+Deleted /app/config/old-param
 ```
+
+> [!CAUTION]
+> Deletion is immediate and permanent. There is no confirmation prompt or recovery option.
 
 ---
 
 ## Staging Workflow
 
-The staging workflow allows you to prepare changes locally before applying them to AWS. This is useful for:
-- Reviewing changes before they go live
-- Batch applying multiple changes together
-- Avoiding accidental modifications
+The staging workflow allows you to prepare changes locally before applying them to AWS.
+
+> [!IMPORTANT]
+> The staging workflow lets you prepare changes locally, review them, and apply when ready—just like `git add` → `git diff --staged` → `git commit`.
 
 The stage file is stored at `~/.suve/stage.json`.
 
@@ -495,19 +455,63 @@ The stage file is stored at `~/.suve/stage.json`.
 
 ---
 
-## suve ssm edit
+## suve stage ssm add
 
-Edit a parameter value in your editor and stage the changes.
+Stage a new parameter or modification.
 
 ```
-suve ssm edit [options] <name>
+suve stage ssm add [options] <name> [value]
 ```
 
 **Arguments:**
 
-| Argument | Description |
-|----------|-------------|
-| `name` | Parameter name |
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `name` | Yes | Parameter name |
+| `value` | No | Parameter value (opens editor if not provided) |
+
+**Options:**
+
+| Option | Alias | Default | Description |
+|--------|-------|---------|-------------|
+| `--type` | `-t` | `String` | Parameter type: `String`, `StringList`, or `SecureString` |
+| `--secure` | `-s` | `false` | Shorthand for `--type SecureString` |
+| `--description` | `-d` | - | Parameter description |
+
+**Examples:**
+
+```ShellSession
+user@host:~$ suve stage ssm add /app/config/new-param "my-value"
+✓ Staged for creation: /app/config/new-param
+```
+
+```bash
+# Stage with inline value
+suve stage ssm add /app/config/new-param "my-value"
+
+# Stage via editor
+suve stage ssm add /app/config/new-param
+
+# Stage as SecureString
+suve stage ssm add -s /app/config/api-key "sk-1234567890"
+```
+
+---
+
+## suve stage ssm edit
+
+Edit an existing parameter and stage the changes.
+
+```
+suve stage ssm edit [options] <name> [value]
+```
+
+**Arguments:**
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `name` | Yes | Parameter name |
+| `value` | No | New value (opens editor if not provided) |
 
 **Options:**
 
@@ -519,154 +523,83 @@ suve ssm edit [options] <name>
 
 1. If the parameter is already staged, uses the staged value
 2. Otherwise, fetches the current value from AWS
-3. Opens your editor (`$EDITOR`, defaults to `vim`)
+3. Opens your editor (`$EDITOR`, defaults to `vim`) if value not provided
 4. If the value changed, stages the new value
-
-**Output:**
-
-```
-Staged /app/config/database-url
-```
-
-If no changes were made:
-```
-No changes made
-```
 
 **Examples:**
 
-```bash
-# Edit a parameter
-suve ssm edit /app/config/database-url
+```ShellSession
+user@host:~$ suve stage ssm edit /app/config/database-url
+✓ Staged: /app/config/database-url
+```
 
-# Stage a parameter for deletion
-suve ssm edit --delete /app/config/old-param
+```bash
+# Edit via editor
+suve stage ssm edit /app/config/database-url
+
+# Edit with inline value
+suve stage ssm edit /app/config/database-url "new-value"
+
+# Stage for deletion
+suve stage ssm edit --delete /app/config/old-param
 ```
 
 ---
 
-## suve ssm status
+## suve stage ssm delete
+
+Stage a parameter for deletion.
+
+```
+suve stage ssm delete <name>
+```
+
+**Examples:**
+
+```ShellSession
+user@host:~$ suve stage ssm delete /app/config/old-param
+✓ Staged for deletion: /app/config/old-param
+```
+
+---
+
+## suve stage ssm status
 
 Show staged changes for SSM parameters.
 
 ```
-suve ssm status
+suve stage ssm status
 ```
 
-**Output:**
+**Examples:**
 
-```
-SSM Parameter Store:
-  set    /app/config/database-url
-  delete /app/config/old-param
+```ShellSession
+user@host:~$ suve stage ssm status
+Staged SSM changes (3):
+  A /app/config/new-param
+  M /app/config/database-url
+  D /app/config/old-param
 ```
 
 If no changes are staged:
-```
+
+```ShellSession
+user@host:~$ suve stage ssm status
 SSM Parameter Store:
   (no staged changes)
 ```
 
-**Examples:**
-
-```bash
-# Show SSM staged changes
-suve ssm status
-
-# Show all staged changes (SSM + SM)
-suve status
-```
+> [!TIP]
+> Use `suve stage status` to show all staged changes (SSM + SM combined).
 
 ---
 
-## suve ssm push
+## suve stage ssm diff
 
-Apply staged SSM parameter changes to AWS.
-
-```
-suve ssm push
-```
-
-**Behavior:**
-
-1. Reads all staged SSM changes
-2. For each `set` operation: calls PutParameter
-3. For each `delete` operation: calls DeleteParameter
-4. Removes successfully applied changes from stage
-5. Keeps failed changes in stage for retry
-
-**Output:**
+Compare staged values with current AWS values.
 
 ```
-Pushing SSM parameters...
-✓ /app/config/database-url
-✓ /app/config/old-param (deleted)
-```
-
-If nothing is staged:
-```
-SSM: nothing to push
-```
-
-**Examples:**
-
-```bash
-# Push SSM changes only
-suve ssm push
-
-# Push all changes (SSM + SM)
-suve push
-```
-
----
-
-## suve ssm reset
-
-Unstage SSM parameter changes.
-
-```
-suve ssm reset [name]
-```
-
-**Arguments:**
-
-| Argument | Required | Description |
-|----------|----------|-------------|
-| `name` | No | Specific parameter to unstage (if omitted, unstages all) |
-
-**Output:**
-
-Specific parameter:
-```
-Unstaged /app/config/database-url
-```
-
-All parameters:
-```
-Unstaged all SSM changes
-```
-
-**Examples:**
-
-```bash
-# Unstage a specific parameter
-suve ssm reset /app/config/database-url
-
-# Unstage all SSM parameters
-suve ssm reset
-
-# Unstage everything (SSM + SM)
-suve reset
-```
-
----
-
-## suve ssm stage diff
-
-Compare staged value with current AWS value.
-
-```
-suve ssm stage diff [name]
+suve stage ssm diff [options] [name]
 ```
 
 **Arguments:**
@@ -682,33 +615,85 @@ suve ssm stage diff [name]
 | `--json` | `-j` | `false` | Format JSON values before diffing |
 | `--no-pager` | - | `false` | Disable pager |
 
-**Output:**
+**Examples:**
 
-```diff
---- /app/config/database-url (AWS)
+```ShellSession
+user@host:~$ suve stage ssm diff
+--- /app/config/database-url#3 (AWS)
 +++ /app/config/database-url (staged)
 @@ -1 +1 @@
--postgres://old-host:5432/db
-+postgres://new-host:5432/db
+-postgres://db.example.com:5432/myapp
++postgres://new-db.example.com:5432/myapp
+
+--- /app/config/new-param (not in AWS)
++++ /app/config/new-param (staged for creation)
+@@ -0,0 +1 @@
++my-value
 ```
 
-If parameter is staged for deletion:
-```diff
---- /app/config/old-param (AWS)
-+++ /app/config/old-param (staged for deletion)
-@@ -1 +0,0 @@
--old-value
+> [!CAUTION]
+> Always review the diff before pushing to ensure you're applying the intended changes.
+
+---
+
+## suve stage ssm push
+
+Apply staged SSM parameter changes to AWS.
+
 ```
+suve stage ssm push [options] [name]
+```
+
+**Arguments:**
+
+| Argument | Description |
+|----------|-------------|
+| `name` | Parameter name (optional, pushes all if not specified) |
+
+**Options:**
+
+| Option | Alias | Default | Description |
+|--------|-------|---------|-------------|
+| `--yes` | `-y` | `false` | Skip confirmation prompt |
 
 **Examples:**
 
-```bash
-# Compare all staged vs AWS
-suve ssm stage diff
-
-# Compare specific staged vs AWS
-suve ssm stage diff /app/config/database-url
-
-# Compare with JSON formatting
-suve ssm stage diff --json /app/config/database-credentials
+```ShellSession
+user@host:~$ suve stage ssm push
+Pushing SSM parameters...
+✓ Set /app/config/new-param (version: 1)
+✓ Set /app/config/database-url (version: 4)
+✓ Deleted /app/config/old-param
 ```
+
+> [!CAUTION]
+> `suve stage ssm push` applies changes to AWS immediately. Always review with `suve stage ssm diff` first!
+
+---
+
+## suve stage ssm reset
+
+Unstage SSM parameter changes.
+
+```
+suve stage ssm reset [name]
+```
+
+**Arguments:**
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `name` | No | Specific parameter to unstage (if omitted, unstages all) |
+
+**Examples:**
+
+```ShellSession
+user@host:~$ suve stage ssm reset /app/config/database-url
+Unstaged /app/config/database-url
+
+user@host:~$ suve stage ssm reset
+Unstaged all SSM changes
+```
+
+> [!TIP]
+> Use `suve stage reset` to unstage all changes (SSM + SM combined).
