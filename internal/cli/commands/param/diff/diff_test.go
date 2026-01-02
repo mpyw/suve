@@ -503,8 +503,8 @@ func TestRun(t *testing.T) {
 		{
 			name: "json format with valid JSON values",
 			opts: paramdiff.Options{
-				Spec1:      &paramversion.Spec{Name: "/app/param", Absolute: paramversion.AbsoluteSpec{Version: lo.ToPtr(int64(1))}},
-				Spec2:      &paramversion.Spec{Name: "/app/param", Absolute: paramversion.AbsoluteSpec{Version: lo.ToPtr(int64(2))}},
+				Spec1:     &paramversion.Spec{Name: "/app/param", Absolute: paramversion.AbsoluteSpec{Version: lo.ToPtr(int64(1))}},
+				Spec2:     &paramversion.Spec{Name: "/app/param", Absolute: paramversion.AbsoluteSpec{Version: lo.ToPtr(int64(2))}},
 				ParseJSON: true,
 			},
 			mock: &mockClient{
@@ -538,8 +538,8 @@ func TestRun(t *testing.T) {
 		{
 			name: "json format with non-JSON values warns",
 			opts: paramdiff.Options{
-				Spec1:      &paramversion.Spec{Name: "/app/param", Absolute: paramversion.AbsoluteSpec{Version: lo.ToPtr(int64(1))}},
-				Spec2:      &paramversion.Spec{Name: "/app/param", Absolute: paramversion.AbsoluteSpec{Version: lo.ToPtr(int64(2))}},
+				Spec1:     &paramversion.Spec{Name: "/app/param", Absolute: paramversion.AbsoluteSpec{Version: lo.ToPtr(int64(1))}},
+				Spec2:     &paramversion.Spec{Name: "/app/param", Absolute: paramversion.AbsoluteSpec{Version: lo.ToPtr(int64(2))}},
 				ParseJSON: true,
 			},
 			mock: &mockClient{

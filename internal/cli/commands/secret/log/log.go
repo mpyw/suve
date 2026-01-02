@@ -6,6 +6,7 @@ package log
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"sort"
@@ -41,10 +42,19 @@ type Options struct {
 	Name       string
 	MaxResults int32
 	ShowPatch  bool
-	ParseJSON bool
+	ParseJSON  bool
 	Reverse    bool
 	NoPager    bool
 	Oneline    bool
+	Output     output.Format
+}
+
+// JSONOutputItem represents a single version entry in JSON output.
+type JSONOutputItem struct {
+	VersionID string   `json:"versionId"`
+	Stages    []string `json:"stages,omitempty"`
+	Created   string   `json:"created,omitempty"`
+	Value     string   `json:"value"`
 }
 
 // Command returns the log command.
@@ -64,13 +74,17 @@ Use -p/--patch to show the diff between consecutive versions (like git log -p).
 Use -j/--parse-json with -p to format JSON values before diffing (keys are always sorted).
 Use --oneline for a compact one-line-per-version format.
 
+OUTPUT FORMAT:
+   Use --output=json for structured JSON output.
+
 EXAMPLES:
-   suve secret log my-secret           Show last 10 versions (default)
-   suve secret log -n 5 my-secret      Show last 5 versions
-   suve secret log -p my-secret        Show versions with diffs
-   suve secret log -p -j my-secret     Show diffs with JSON formatting
-   suve secret log --oneline my-secret Compact one-line format
-   suve secret log --reverse my-secret Show oldest first`,
+   suve secret log my-secret             Show last 10 versions (default)
+   suve secret log -n 5 my-secret        Show last 5 versions
+   suve secret log -p my-secret          Show versions with diffs
+   suve secret log -p -j my-secret       Show diffs with JSON formatting
+   suve secret log --oneline my-secret   Compact one-line format
+   suve secret log --reverse my-secret   Show oldest first
+   suve secret log --output=json my-sec  Output as JSON`,
 		Flags: []cli.Flag{
 			&cli.IntFlag{
 				Name:    "number",
@@ -101,6 +115,10 @@ EXAMPLES:
 				Name:  "no-pager",
 				Usage: "Disable pager output",
 			},
+			&cli.StringFlag{
+				Name:  "output",
+				Usage: "Output format: text (default) or json",
+			},
 		},
 		Action: action,
 	}
@@ -115,10 +133,11 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		Name:       cmd.Args().First(),
 		MaxResults: int32(cmd.Int("number")),
 		ShowPatch:  cmd.Bool("patch"),
-		ParseJSON: cmd.Bool("parse-json"),
+		ParseJSON:  cmd.Bool("parse-json"),
 		Reverse:    cmd.Bool("reverse"),
 		NoPager:    cmd.Bool("no-pager"),
 		Oneline:    cmd.Bool("oneline"),
+		Output:     output.ParseFormat(cmd.String("output")),
 	}
 
 	// Warn if --parse-json is used without -p
@@ -131,12 +150,25 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		output.Warning(cmd.Root().ErrWriter, "--oneline has no effect with -p/--patch")
 	}
 
+	// Warn if --output=json is used with incompatible options
+	if opts.Output == output.FormatJSON {
+		if opts.ShowPatch {
+			output.Warning(cmd.Root().ErrWriter, "-p/--patch has no effect with --output=json")
+		}
+		if opts.Oneline {
+			output.Warning(cmd.Root().ErrWriter, "--oneline has no effect with --output=json")
+		}
+	}
+
 	client, err := infra.NewSecretClient(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to initialize AWS client: %w", err)
 	}
 
-	return pager.WithPagerWriter(cmd.Root().Writer, opts.NoPager, func(w io.Writer) error {
+	// JSON output disables pager
+	noPager := opts.NoPager || opts.Output == output.FormatJSON
+
+	return pager.WithPagerWriter(cmd.Root().Writer, noPager, func(w io.Writer) error {
 		r := &Runner{
 			Client: client,
 			Stdout: w,
@@ -175,6 +207,36 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 		// Newest first (default)
 		return versions[i].CreatedDate.After(*versions[j].CreatedDate)
 	})
+
+	// JSON output mode - fetch values and output JSON
+	if opts.Output == output.FormatJSON {
+		items := make([]JSONOutputItem, 0, len(versions))
+		for _, v := range versions {
+			versionID := lo.FromPtr(v.VersionId)
+			secretResult, err := r.Client.GetSecretValue(ctx, &secretapi.GetSecretValueInput{
+				SecretId:  lo.ToPtr(opts.Name),
+				VersionId: lo.ToPtr(versionID),
+			})
+			if err != nil {
+				// Skip versions that can't be retrieved
+				continue
+			}
+			item := JSONOutputItem{
+				VersionID: versionID,
+				Value:     lo.FromPtr(secretResult.SecretString),
+			}
+			if len(v.VersionStages) > 0 {
+				item.Stages = v.VersionStages
+			}
+			if v.CreatedDate != nil {
+				item.Created = v.CreatedDate.Format(time.RFC3339)
+			}
+			items = append(items, item)
+		}
+		enc := json.NewEncoder(r.Stdout)
+		enc.SetIndent("", "  ")
+		return enc.Encode(items)
+	}
 
 	// If showing patches, fetch all secret values upfront
 	var secretValues map[string]string

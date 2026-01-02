@@ -113,11 +113,18 @@ func Info(w io.Writer, format string, args ...any) {
 	_, _ = fmt.Fprintln(w, colors.Warning(msg))
 }
 
-// Diff generates a unified diff between two strings.
+// Diff generates a unified diff between two strings with ANSI colors.
 func Diff(oldName, newName, oldContent, newContent string) string {
 	edits := myers.ComputeEdits(oldContent, newContent)
 	unified, _ := udiff.ToUnifiedDiff(oldName, newName, oldContent, edits)
 	return colorDiff(unified.String())
+}
+
+// DiffRaw generates a unified diff between two strings without colors.
+func DiffRaw(oldName, newName, oldContent, newContent string) string {
+	edits := myers.ComputeEdits(oldContent, newContent)
+	unified, _ := udiff.ToUnifiedDiff(oldName, newName, oldContent, edits)
+	return unified.String()
 }
 
 // colorDiff adds ANSI colors to diff output.

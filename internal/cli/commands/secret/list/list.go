@@ -3,6 +3,7 @@ package list
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"regexp"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/mpyw/suve/internal/api/secretapi"
 	"github.com/mpyw/suve/internal/infra"
+	"github.com/mpyw/suve/internal/output"
 	"github.com/mpyw/suve/internal/parallel"
 )
 
@@ -33,6 +35,13 @@ type Options struct {
 	Prefix string
 	Filter string // Regex filter pattern
 	Show   bool   // Show secret values
+	Output output.Format
+}
+
+// JSONOutputItem represents a single item in JSON output.
+type JSONOutputItem struct {
+	Name  string `json:"name"`
+	Value string `json:"value,omitempty"`
 }
 
 // Command returns the list command.
@@ -58,12 +67,16 @@ VALUE DISPLAY:
    Use --show to display secret values alongside names.
    Output format: <name><TAB><value>
 
+OUTPUT FORMAT:
+   Use --output=json for structured JSON output.
+
 EXAMPLES:
    suve secret list                       List all secrets
    suve secret list prod                  List secrets containing "prod"
    suve secret list my-app/               List secrets starting with "my-app/"
    suve secret list --filter '\.prod$'    List secrets matching regex
-   suve secret list --show prod           List with values`,
+   suve secret list --show prod           List with values
+   suve secret list --output=json prod    List as JSON`,
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:  "filter",
@@ -72,6 +85,10 @@ EXAMPLES:
 			&cli.BoolFlag{
 				Name:  "show",
 				Usage: "Show secret values",
+			},
+			&cli.StringFlag{
+				Name:  "output",
+				Usage: "Output format: text (default) or json",
 			},
 		},
 		Action: action,
@@ -93,6 +110,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		Prefix: cmd.Args().First(),
 		Filter: cmd.String("filter"),
 		Show:   cmd.Bool("show"),
+		Output: output.ParseFormat(cmd.String("output")),
 	})
 }
 
@@ -137,12 +155,23 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 		}
 	}
 
-	// If --show is not specified, just print names
-	if !opts.Show {
+	// If --show is not specified and not JSON output, just print names
+	if !opts.Show && opts.Output != output.FormatJSON {
 		for _, name := range names {
 			_, _ = fmt.Fprintln(r.Stdout, name)
 		}
 		return nil
+	}
+
+	// For JSON output without --show, output names only
+	if opts.Output == output.FormatJSON && !opts.Show {
+		items := make([]JSONOutputItem, len(names))
+		for i, name := range names {
+			items[i] = JSONOutputItem{Name: name}
+		}
+		enc := json.NewEncoder(r.Stdout)
+		enc.SetIndent("", "  ")
+		return enc.Encode(items)
 	}
 
 	// Fetch values in parallel
@@ -161,7 +190,21 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 		return lo.FromPtr(out.SecretString), nil
 	})
 
-	// Output in original order
+	// JSON output with values
+	if opts.Output == output.FormatJSON {
+		items := make([]JSONOutputItem, 0, len(names))
+		for _, name := range names {
+			result := results[name]
+			if result.Err == nil {
+				items = append(items, JSONOutputItem{Name: name, Value: result.Value})
+			}
+		}
+		enc := json.NewEncoder(r.Stdout)
+		enc.SetIndent("", "  ")
+		return enc.Encode(items)
+	}
+
+	// Text output with values
 	for _, name := range names {
 		result := results[name]
 		if result.Err != nil {

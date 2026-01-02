@@ -28,9 +28,9 @@ type DiffRunner struct {
 
 // DiffOptions holds options for the diff command.
 type DiffOptions struct {
-	Name       string // Optional: diff only this item, otherwise diff all
+	Name      string // Optional: diff only this item, otherwise diff all
 	ParseJSON bool
-	NoPager    bool
+	NoPager   bool
 }
 
 // Run executes the diff command.

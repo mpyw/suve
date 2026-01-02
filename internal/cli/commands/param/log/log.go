@@ -6,6 +6,7 @@ package log
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"slices"
@@ -41,12 +42,22 @@ type Options struct {
 	Name        string
 	MaxResults  int32
 	ShowPatch   bool
-	ParseJSON  bool
+	ParseJSON   bool
 	Reverse     bool
 	NoPager     bool
 	Oneline     bool
 	FromVersion *int64
 	ToVersion   *int64
+	Output      output.Format
+}
+
+// JSONOutputItem represents a single version entry in JSON output.
+type JSONOutputItem struct {
+	Version   int64  `json:"version"`
+	Type      string `json:"type"`
+	Decrypted *bool  `json:"decrypted,omitempty"` // Only for SecureString
+	Modified  string `json:"modified,omitempty"`
+	Value     string `json:"value"`
 }
 
 // Command returns the log command.
@@ -67,6 +78,9 @@ Use -j/--parse-json with -p to format JSON values before diffing (keys are alway
 Use --oneline for a compact one-line-per-version format.
 Use --from/--to to filter by version range (accepts version specs like '#3', '~1').
 
+OUTPUT FORMAT:
+   Use --output=json for structured JSON output.
+
 EXAMPLES:
    suve param log /app/config/db-url              Show last 10 versions (default)
    suve param log -n 5 /app/config/db-url         Show last 5 versions
@@ -74,7 +88,8 @@ EXAMPLES:
    suve param log -p -j /app/config/db-url        Show diffs with JSON formatting
    suve param log --oneline /app/config/db-url    Compact one-line format
    suve param log --reverse /app/config/db-url    Show oldest first
-   suve param log --from '#3' --to '#5' /app/...  Show versions 3 to 5`,
+   suve param log --from '#3' --to '#5' /app/...  Show versions 3 to 5
+   suve param log --output=json /app/config       Output as JSON`,
 		Flags: []cli.Flag{
 			&cli.IntFlag{
 				Name:    "number",
@@ -113,6 +128,10 @@ EXAMPLES:
 				Name:  "to",
 				Usage: "End version (e.g., '#5', '~0')",
 			},
+			&cli.StringFlag{
+				Name:  "output",
+				Usage: "Output format: text (default) or json",
+			},
 		},
 		Action: action,
 	}
@@ -129,10 +148,11 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		Name:       name,
 		MaxResults: int32(cmd.Int("number")),
 		ShowPatch:  cmd.Bool("patch"),
-		ParseJSON: cmd.Bool("parse-json"),
+		ParseJSON:  cmd.Bool("parse-json"),
 		Reverse:    cmd.Bool("reverse"),
 		NoPager:    cmd.Bool("no-pager"),
 		Oneline:    cmd.Bool("oneline"),
+		Output:     output.ParseFormat(cmd.String("output")),
 	}
 
 	// Parse --from version spec
@@ -163,12 +183,25 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		output.Warning(cmd.Root().ErrWriter, "--oneline has no effect with -p/--patch")
 	}
 
+	// Warn if --output=json is used with incompatible options
+	if opts.Output == output.FormatJSON {
+		if opts.ShowPatch {
+			output.Warning(cmd.Root().ErrWriter, "-p/--patch has no effect with --output=json")
+		}
+		if opts.Oneline {
+			output.Warning(cmd.Root().ErrWriter, "--oneline has no effect with --output=json")
+		}
+	}
+
 	client, err := infra.NewParamClient(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to initialize AWS client: %w", err)
 	}
 
-	return pager.WithPagerWriter(cmd.Root().Writer, opts.NoPager, func(w io.Writer) error {
+	// JSON output disables pager
+	noPager := opts.NoPager || opts.Output == output.FormatJSON
+
+	return pager.WithPagerWriter(cmd.Root().Writer, noPager, func(w io.Writer) error {
 		r := &Runner{
 			Client: client,
 			Stdout: w,
@@ -205,6 +238,28 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 	// AWS returns oldest first; reverse to show newest first (unless --reverse)
 	if !opts.Reverse {
 		slices.Reverse(params)
+	}
+
+	// JSON output mode
+	if opts.Output == output.FormatJSON {
+		items := make([]JSONOutputItem, len(params))
+		for i, param := range params {
+			items[i] = JSONOutputItem{
+				Version: param.Version,
+				Type:    string(param.Type),
+				Value:   lo.FromPtr(param.Value),
+			}
+			// Show decrypted status only for SecureString (always true for log command)
+			if param.Type == paramapi.ParameterTypeSecureString {
+				items[i].Decrypted = lo.ToPtr(true)
+			}
+			if param.LastModifiedDate != nil {
+				items[i].Modified = param.LastModifiedDate.Format(time.RFC3339)
+			}
+		}
+		enc := json.NewEncoder(r.Stdout)
+		enc.SetIndent("", "  ")
+		return enc.Encode(items)
 	}
 
 	// Find the current (latest) version index

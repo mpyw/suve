@@ -107,7 +107,7 @@ func TestRun(t *testing.T) {
 		{
 			name: "show JSON formatted",
 			opts: show.Options{
-				Spec:       &paramversion.Spec{Name: "/my/param"},
+				Spec:      &paramversion.Spec{Name: "/my/param"},
 				ParseJSON: true,
 			},
 			mock: &mockClient{
@@ -164,7 +164,7 @@ func TestRun(t *testing.T) {
 		{
 			name: "json flag with StringList warns",
 			opts: show.Options{
-				Spec:       &paramversion.Spec{Name: "/my/param"},
+				Spec:      &paramversion.Spec{Name: "/my/param"},
 				ParseJSON: true,
 			},
 			mock: &mockClient{
@@ -186,8 +186,8 @@ func TestRun(t *testing.T) {
 		{
 			name: "json flag with encrypted SecureString warns",
 			opts: show.Options{
-				Spec:       &paramversion.Spec{Name: "/my/param"},
-				Decrypt:    false,
+				Spec:      &paramversion.Spec{Name: "/my/param"},
+				Decrypt:   false,
 				ParseJSON: true,
 			},
 			mock: &mockClient{
@@ -209,7 +209,7 @@ func TestRun(t *testing.T) {
 		{
 			name: "json flag with non-JSON value warns",
 			opts: show.Options{
-				Spec:       &paramversion.Spec{Name: "/my/param"},
+				Spec:      &paramversion.Spec{Name: "/my/param"},
 				ParseJSON: true,
 			},
 			mock: &mockClient{
@@ -276,10 +276,10 @@ func TestRun(t *testing.T) {
 		{
 			name: "raw mode with JSON formatting",
 			opts: show.Options{
-				Spec:       &paramversion.Spec{Name: "/my/param"},
-				Decrypt:    true,
+				Spec:      &paramversion.Spec{Name: "/my/param"},
+				Decrypt:   true,
 				ParseJSON: true,
-				Raw:        true,
+				Raw:       true,
 			},
 			mock: &mockClient{
 				getParameterFunc: func(_ context.Context, _ *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {

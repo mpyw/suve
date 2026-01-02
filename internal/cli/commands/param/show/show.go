@@ -44,11 +44,12 @@ type Options struct {
 
 // JSONOutput represents the JSON output structure for the show command.
 type JSONOutput struct {
-	Name     string `json:"name"`
-	Version  int64  `json:"version"`
-	Type     string `json:"type"`
-	Modified string `json:"modified,omitempty"`
-	Value    string `json:"value"`
+	Name      string `json:"name"`
+	Version   int64  `json:"version"`
+	Type      string `json:"type"`
+	Decrypted *bool  `json:"decrypted,omitempty"` // Only for SecureString
+	Modified  string `json:"modified,omitempty"`
+	Value     string `json:"value"`
 }
 
 // Command returns the show command.
@@ -182,6 +183,10 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 			Version: param.Version,
 			Type:    string(param.Type),
 			Value:   value,
+		}
+		// Show decrypted status only for SecureString
+		if param.Type == paramapi.ParameterTypeSecureString {
+			jsonOut.Decrypted = lo.ToPtr(opts.Decrypt)
 		}
 		if param.LastModifiedDate != nil {
 			jsonOut.Modified = param.LastModifiedDate.Format(time.RFC3339)

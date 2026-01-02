@@ -11,6 +11,7 @@ package diff
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 
@@ -40,10 +41,23 @@ type Runner struct {
 
 // Options holds the options for the diff command.
 type Options struct {
-	Spec1      *secretversion.Spec
-	Spec2      *secretversion.Spec
+	Spec1     *secretversion.Spec
+	Spec2     *secretversion.Spec
 	ParseJSON bool
-	NoPager    bool
+	NoPager   bool
+	Output    output.Format
+}
+
+// JSONOutput represents the JSON output structure for the diff command.
+type JSONOutput struct {
+	OldName      string `json:"oldName"`
+	OldVersionID string `json:"oldVersionId"`
+	OldValue     string `json:"oldValue"`
+	NewName      string `json:"newName"`
+	NewVersionID string `json:"newVersionId"`
+	NewValue     string `json:"newValue"`
+	Identical    bool   `json:"identical"`
+	Diff         string `json:"diff,omitempty"`
 }
 
 // Command returns the diff command.
@@ -60,6 +74,9 @@ VERSION SPECIFIERS:
   :LABEL    Staging label (AWSCURRENT, AWSPREVIOUS)
   ~SHIFT    N versions ago; ~ alone means ~1
 
+OUTPUT FORMAT:
+   Use --output=json for structured JSON output.
+
 EXAMPLES:
   suve secret diff my-secret:AWSPREVIOUS my-secret:AWSCURRENT  Compare labels (full spec)
   suve secret diff my-secret:AWSPREVIOUS                       Compare with current (full spec)
@@ -67,6 +84,7 @@ EXAMPLES:
   suve secret diff my-secret ':AWSPREVIOUS' ':AWSCURRENT'      Compare labels (partial spec)
   suve secret diff my-secret '~'                               Compare previous with current
   suve secret diff -j my-secret:AWSPREVIOUS                    JSON format before diffing
+  suve secret diff --output=json my-secret:AWSPREVIOUS         Output as JSON
 
 For comparing staged values, use: suve stage secret diff`,
 		Flags: []cli.Flag{
@@ -78,6 +96,10 @@ For comparing staged values, use: suve stage secret diff`,
 			&cli.BoolFlag{
 				Name:  "no-pager",
 				Usage: "Disable pager output",
+			},
+			&cli.StringFlag{
+				Name:  "output",
+				Usage: "Output format: text (default) or json",
 			},
 		},
 		Action: action,
@@ -96,13 +118,17 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	}
 
 	opts := Options{
-		Spec1:      spec1,
-		Spec2:      spec2,
+		Spec1:     spec1,
+		Spec2:     spec2,
 		ParseJSON: cmd.Bool("parse-json"),
-		NoPager:    cmd.Bool("no-pager"),
+		NoPager:   cmd.Bool("no-pager"),
+		Output:    output.ParseFormat(cmd.String("output")),
 	}
 
-	return pager.WithPagerWriter(cmd.Root().Writer, opts.NoPager, func(w io.Writer) error {
+	// JSON output disables pager
+	noPager := opts.NoPager || opts.Output == output.FormatJSON
+
+	return pager.WithPagerWriter(cmd.Root().Writer, noPager, func(w io.Writer) error {
 		r := &Runner{
 			Client: client,
 			Stdout: w,
@@ -132,19 +158,44 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 		value1, value2 = jsonutil.TryFormatOrWarn2(value1, value2, r.Stderr, "")
 	}
 
-	if value1 == value2 {
+	v1 := lo.FromPtr(secret1.VersionId)
+	v2 := lo.FromPtr(secret2.VersionId)
+	identical := value1 == value2
+
+	// JSON output mode
+	if opts.Output == output.FormatJSON {
+		jsonOut := JSONOutput{
+			OldName:      opts.Spec1.Name,
+			OldVersionID: v1,
+			OldValue:     value1,
+			NewName:      opts.Spec2.Name,
+			NewVersionID: v2,
+			NewValue:     value2,
+			Identical:    identical,
+		}
+		if !identical {
+			jsonOut.Diff = output.DiffRaw(
+				fmt.Sprintf("%s#%s", opts.Spec1.Name, secretversion.TruncateVersionID(v1)),
+				fmt.Sprintf("%s#%s", opts.Spec2.Name, secretversion.TruncateVersionID(v2)),
+				value1,
+				value2,
+			)
+		}
+		enc := json.NewEncoder(r.Stdout)
+		enc.SetIndent("", "  ")
+		return enc.Encode(jsonOut)
+	}
+
+	if identical {
 		output.Warning(r.Stderr, "comparing identical versions")
 		output.Hint(r.Stderr, "To compare with previous version, use: suve secret diff %s~1", opts.Spec1.Name)
 		output.Hint(r.Stderr, "or: suve secret diff %s:AWSPREVIOUS", opts.Spec1.Name)
 		return nil
 	}
 
-	v1 := secretversion.TruncateVersionID(lo.FromPtr(secret1.VersionId))
-	v2 := secretversion.TruncateVersionID(lo.FromPtr(secret2.VersionId))
-
 	diff := output.Diff(
-		fmt.Sprintf("%s#%s", opts.Spec1.Name, v1),
-		fmt.Sprintf("%s#%s", opts.Spec2.Name, v2),
+		fmt.Sprintf("%s#%s", opts.Spec1.Name, secretversion.TruncateVersionID(v1)),
+		fmt.Sprintf("%s#%s", opts.Spec2.Name, secretversion.TruncateVersionID(v2)),
 		value1,
 		value2,
 	)

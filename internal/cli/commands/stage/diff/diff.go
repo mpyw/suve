@@ -48,7 +48,7 @@ type Runner struct {
 // Options holds the options for the diff command.
 type Options struct {
 	ParseJSON bool
-	NoPager    bool
+	NoPager   bool
 }
 
 // Command returns the diff command.
@@ -130,7 +130,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 
 	opts := Options{
 		ParseJSON: cmd.Bool("parse-json"),
-		NoPager:    cmd.Bool("no-pager"),
+		NoPager:   cmd.Bool("no-pager"),
 	}
 
 	return pager.WithPagerWriter(cmd.Root().Writer, opts.NoPager, func(w io.Writer) error {

@@ -312,8 +312,8 @@ func TestParam_VersionSpecifiers(t *testing.T) {
 	})
 }
 
-// TestParam_JSONFlag tests the --json flag for formatting.
-func TestParam_JSONFlag(t *testing.T) {
+// TestParam_ParseJSONFlag tests the --parse-json/-j flag for formatting.
+func TestParam_ParseJSONFlag(t *testing.T) {
 	setupEnv(t)
 	paramName := "/suve-e2e-test/json/param"
 
@@ -329,7 +329,7 @@ func TestParam_JSONFlag(t *testing.T) {
 	_, _, err = runCommand(t, paramset.Command(), "--yes", paramName, `{"c":3,"b":2,"a":1}`)
 	require.NoError(t, err)
 
-	// Test diff with --json flag (should format and sort keys)
+	// Test diff with -j flag (should format and sort keys)
 	t.Run("diff-json", func(t *testing.T) {
 		stdout, _, err := runCommand(t, paramdiff.Command(), "-j", paramName+"#1", paramName+"#2")
 		require.NoError(t, err)
@@ -337,7 +337,7 @@ func TestParam_JSONFlag(t *testing.T) {
 		assert.Contains(t, stdout, `"a"`)
 		assert.Contains(t, stdout, `"b"`)
 		assert.Contains(t, stdout, `"c"`)
-		t.Logf("diff --json output: %s", stdout)
+		t.Logf("diff -j output: %s", stdout)
 	})
 
 	// Test log with -p -j flags
@@ -1602,10 +1602,10 @@ func TestParam_GlobalDiffWithJSON(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	// Check diff with --json flag
-	stdout, _, err := runCommand(t, globaldiff.Command(), "--json")
+	// Check diff with -j flag (--parse-json)
+	stdout, _, err := runCommand(t, globaldiff.Command(), "-j")
 	require.NoError(t, err)
-	t.Logf("global diff --json output: %s", stdout)
+	t.Logf("global diff -j output: %s", stdout)
 	// Should have formatted JSON
 	assert.Contains(t, stdout, "a")
 }

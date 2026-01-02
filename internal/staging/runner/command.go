@@ -140,9 +140,9 @@ EXAMPLES:
 			}
 
 			opts := DiffOptions{
-				Name:       name,
-				ParseJSON:  cmd.Bool("parse-json"),
-				NoPager:    cmd.Bool("no-pager"),
+				Name:      name,
+				ParseJSON: cmd.Bool("parse-json"),
+				NoPager:   cmd.Bool("no-pager"),
 			}
 
 			return pager.WithPagerWriter(cmd.Root().Writer, opts.NoPager, func(w io.Writer) error {
