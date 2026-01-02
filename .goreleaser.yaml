@@ -1,0 +1,74 @@
+# yaml-language-server: $schema=https://goreleaser.com/static/schema.json
+version: 2
+
+project_name: suve
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: suve
+    main: ./cmd/suve
+    binary: suve
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - darwin
+      - linux
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+      - -X github.com/mpyw/suve/internal/cli/commands.Version={{.Version}}
+
+archives:
+  - id: default
+    formats:
+      - tar.gz
+    format_overrides:
+      - goos: windows
+        formats:
+          - zip
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - README.md
+      - LICENSE
+
+checksum:
+  name_template: "checksums.txt"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
+      - Merge pull request
+      - Merge branch
+
+brews:
+  - name: suve
+    repository:
+      owner: mpyw
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    directory: Formula
+    homepage: "https://github.com/mpyw/suve"
+    description: "Git-like CLI for AWS Parameter Store and Secrets Manager"
+    license: "MIT"
+    install: |
+      bin.install "suve"
+    test: |
+      system "#{bin}/suve", "--version"
+
+release:
+  github:
+    owner: mpyw
+    name: suve
+  draft: false
+  prerelease: auto
+  name_template: "v{{.Version}}"

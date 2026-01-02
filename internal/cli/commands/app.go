@@ -13,12 +13,15 @@ import (
 	"github.com/mpyw/suve/internal/cli/commands/stage"
 )
 
+// Version is set by goreleaser via ldflags.
+var Version = "dev"
+
 // MakeApp creates a new CLI application instance.
 func MakeApp() *cli.Command {
 	return &cli.Command{
 		Name:    "suve",
 		Usage:   "Git-like CLI for AWS Parameter Store and Secrets Manager",
-		Version: "0.1.0",
+		Version: Version,
 		Commands: []*cli.Command{
 			param.Command(),
 			secret.Command(),
