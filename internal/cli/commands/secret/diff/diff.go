@@ -22,7 +22,6 @@ import (
 	"github.com/mpyw/suve/internal/infra"
 	"github.com/mpyw/suve/internal/jsonutil"
 	"github.com/mpyw/suve/internal/output"
-	// smutil removed
 	"github.com/mpyw/suve/internal/version/secretversion"
 )
 

@@ -1144,7 +1144,7 @@ func TestResetRunner_Run(t *testing.T) {
 // Edge Cases
 // =============================================================================
 
-func TestRunners_SMService(t *testing.T) {
+func TestRunners_SecretService(t *testing.T) {
 	t.Parallel()
 
 	t.Run("status runner with Secrets Manager", func(t *testing.T) {

@@ -6,9 +6,9 @@ import (
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
-	smtypes "github.com/aws/aws-sdk-go-v2/service/secretsmanager/types"
+	secrettypes "github.com/aws/aws-sdk-go-v2/service/secretsmanager/types"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
-	ssmtypes "github.com/aws/aws-sdk-go-v2/service/ssm/types"
+	paramtypes "github.com/aws/aws-sdk-go-v2/service/ssm/types"
 	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -328,7 +328,7 @@ func TestApplyParam(t *testing.T) {
 			change:     &Change{Add: map[string]string{"env": "prod", "team": "platform"}, Remove: []string{}},
 			mock: &mockParamClient{
 				addTagsToResourceFunc: func(_ context.Context, params *ssm.AddTagsToResourceInput, _ ...func(*ssm.Options)) (*ssm.AddTagsToResourceOutput, error) {
-					assert.Equal(t, ssmtypes.ResourceTypeForTaggingParameter, params.ResourceType)
+					assert.Equal(t, paramtypes.ResourceTypeForTaggingParameter, params.ResourceType)
 					assert.Equal(t, "/my/param", lo.FromPtr(params.ResourceId))
 					assert.Len(t, params.Tags, 2)
 					tagMap := make(map[string]string)
@@ -347,7 +347,7 @@ func TestApplyParam(t *testing.T) {
 			change:     &Change{Add: map[string]string{}, Remove: []string{"deprecated", "old"}},
 			mock: &mockParamClient{
 				removeTagsFromResourceFunc: func(_ context.Context, params *ssm.RemoveTagsFromResourceInput, _ ...func(*ssm.Options)) (*ssm.RemoveTagsFromResourceOutput, error) {
-					assert.Equal(t, ssmtypes.ResourceTypeForTaggingParameter, params.ResourceType)
+					assert.Equal(t, paramtypes.ResourceTypeForTaggingParameter, params.ResourceType)
 					assert.Equal(t, "/my/param", lo.FromPtr(params.ResourceId))
 					assert.ElementsMatch(t, []string{"deprecated", "old"}, params.TagKeys)
 					return &ssm.RemoveTagsFromResourceOutput{}, nil
@@ -360,7 +360,7 @@ func TestApplyParam(t *testing.T) {
 			change:     &Change{Add: map[string]string{"env": "prod"}, Remove: []string{"deprecated"}},
 			mock: &mockParamClient{
 				addTagsToResourceFunc: func(_ context.Context, params *ssm.AddTagsToResourceInput, _ ...func(*ssm.Options)) (*ssm.AddTagsToResourceOutput, error) {
-					assert.Equal(t, ssmtypes.ResourceTypeForTaggingParameter, params.ResourceType)
+					assert.Equal(t, paramtypes.ResourceTypeForTaggingParameter, params.ResourceType)
 					assert.Equal(t, "/my/param", lo.FromPtr(params.ResourceId))
 					assert.Len(t, params.Tags, 1)
 					assert.Equal(t, "env", lo.FromPtr(params.Tags[0].Key))
@@ -368,7 +368,7 @@ func TestApplyParam(t *testing.T) {
 					return &ssm.AddTagsToResourceOutput{}, nil
 				},
 				removeTagsFromResourceFunc: func(_ context.Context, params *ssm.RemoveTagsFromResourceInput, _ ...func(*ssm.Options)) (*ssm.RemoveTagsFromResourceOutput, error) {
-					assert.Equal(t, ssmtypes.ResourceTypeForTaggingParameter, params.ResourceType)
+					assert.Equal(t, paramtypes.ResourceTypeForTaggingParameter, params.ResourceType)
 					assert.Equal(t, "/my/param", lo.FromPtr(params.ResourceId))
 					assert.Equal(t, []string{"deprecated"}, params.TagKeys)
 					return &ssm.RemoveTagsFromResourceOutput{}, nil
@@ -415,8 +415,8 @@ func TestApplyParam(t *testing.T) {
 	}
 }
 
-// Verify smtypes.Tag is used correctly (compile-time check)
-var _ smtypes.Tag = smtypes.Tag{}
+// Verify secrettypes.Tag is used correctly (compile-time check)
+var _ secrettypes.Tag = secrettypes.Tag{}
 
-// Verify ssmtypes.Tag is used correctly (compile-time check)
-var _ ssmtypes.Tag = ssmtypes.Tag{}
+// Verify paramtypes.Tag is used correctly (compile-time check)
+var _ paramtypes.Tag = paramtypes.Tag{}

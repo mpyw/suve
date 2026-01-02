@@ -23,7 +23,7 @@ func TestCommand_Validation(t *testing.T) {
 	t.Run("missing parameter name", func(t *testing.T) {
 		t.Parallel()
 		app := appcli.MakeApp()
-		err := app.Run(context.Background(), []string{"suve", "ssm", "log"})
+		err := app.Run(context.Background(), []string{"suve", "param", "log"})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "usage: suve param log")
 	})
@@ -31,7 +31,7 @@ func TestCommand_Validation(t *testing.T) {
 	t.Run("invalid from version", func(t *testing.T) {
 		t.Parallel()
 		app := appcli.MakeApp()
-		err := app.Run(context.Background(), []string{"suve", "ssm", "log", "--from", "invalid", "/app/param"})
+		err := app.Run(context.Background(), []string{"suve", "param", "log", "--from", "invalid", "/app/param"})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid --from value")
 	})
@@ -39,7 +39,7 @@ func TestCommand_Validation(t *testing.T) {
 	t.Run("invalid to version", func(t *testing.T) {
 		t.Parallel()
 		app := appcli.MakeApp()
-		err := app.Run(context.Background(), []string{"suve", "ssm", "log", "--to", "invalid", "/app/param"})
+		err := app.Run(context.Background(), []string{"suve", "param", "log", "--to", "invalid", "/app/param"})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid --to value")
 	})
@@ -47,7 +47,7 @@ func TestCommand_Validation(t *testing.T) {
 	t.Run("from with shift syntax not allowed", func(t *testing.T) {
 		t.Parallel()
 		app := appcli.MakeApp()
-		err := app.Run(context.Background(), []string{"suve", "ssm", "log", "--from", "~1", "/app/param"})
+		err := app.Run(context.Background(), []string{"suve", "param", "log", "--from", "~1", "/app/param"})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "shift syntax (~) not supported")
 	})
@@ -55,7 +55,7 @@ func TestCommand_Validation(t *testing.T) {
 	t.Run("to with shift syntax not allowed", func(t *testing.T) {
 		t.Parallel()
 		app := appcli.MakeApp()
-		err := app.Run(context.Background(), []string{"suve", "ssm", "log", "--to", "~1", "/app/param"})
+		err := app.Run(context.Background(), []string{"suve", "param", "log", "--to", "~1", "/app/param"})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "shift syntax (~) not supported")
 	})
@@ -63,7 +63,7 @@ func TestCommand_Validation(t *testing.T) {
 	t.Run("from without version specifier", func(t *testing.T) {
 		t.Parallel()
 		app := appcli.MakeApp()
-		err := app.Run(context.Background(), []string{"suve", "ssm", "log", "--from", "/app/param", "/app/param"})
+		err := app.Run(context.Background(), []string{"suve", "param", "log", "--from", "/app/param", "/app/param"})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "version specifier required")
 	})
@@ -71,7 +71,7 @@ func TestCommand_Validation(t *testing.T) {
 	t.Run("to without version specifier", func(t *testing.T) {
 		t.Parallel()
 		app := appcli.MakeApp()
-		err := app.Run(context.Background(), []string{"suve", "ssm", "log", "--to", "/app/param", "/app/param"})
+		err := app.Run(context.Background(), []string{"suve", "param", "log", "--to", "/app/param", "/app/param"})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "version specifier required")
 	})
@@ -81,7 +81,7 @@ func TestCommand_Validation(t *testing.T) {
 		app := appcli.MakeApp()
 		var buf bytes.Buffer
 		app.Writer = &buf
-		err := app.Run(context.Background(), []string{"suve", "ssm", "log", "--help"})
+		err := app.Run(context.Background(), []string{"suve", "param", "log", "--help"})
 		require.NoError(t, err)
 		assert.Contains(t, buf.String(), "Show parameter version history")
 	})

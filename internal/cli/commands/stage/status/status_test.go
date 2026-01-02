@@ -34,7 +34,7 @@ func TestCommand_NoStagedChanges(t *testing.T) {
 	assert.Contains(t, buf.String(), "No changes staged")
 }
 
-func TestCommand_ShowSSMChangesOnly(t *testing.T) {
+func TestCommand_ShowParamChangesOnly(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
@@ -63,7 +63,7 @@ func TestCommand_ShowSSMChangesOnly(t *testing.T) {
 	assert.NotContains(t, output, "Staged Secrets Manager changes")
 }
 
-func TestCommand_ShowSMChangesOnly(t *testing.T) {
+func TestCommand_ShowSecretChangesOnly(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
@@ -92,7 +92,7 @@ func TestCommand_ShowSMChangesOnly(t *testing.T) {
 	assert.NotContains(t, output, "Staged SSM Parameter Store changes")
 }
 
-func TestCommand_ShowBothSSMAndSMChanges(t *testing.T) {
+func TestCommand_ShowBothParamAndSecretChanges(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()

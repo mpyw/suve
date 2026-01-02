@@ -1,5 +1,5 @@
-// Package ls provides the Secrets Manager ls command.
-package ls
+// Package list provides the Secrets Manager list command.
+package list
 
 import (
 	"context"
@@ -15,19 +15,19 @@ import (
 	"github.com/mpyw/suve/internal/infra"
 )
 
-// Client is the interface for the ls command.
+// Client is the interface for the list command.
 type Client interface {
 	secretapi.ListSecretsAPI
 }
 
-// Runner executes the ls command.
+// Runner executes the list command.
 type Runner struct {
 	Client Client
 	Stdout io.Writer
 	Stderr io.Writer
 }
 
-// Options holds the options for the ls command.
+// Options holds the options for the list command.
 type Options struct {
 	Prefix string
 }
@@ -71,7 +71,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	})
 }
 
-// Run executes the ls command.
+// Run executes the list command.
 func (r *Runner) Run(ctx context.Context, opts Options) error {
 	input := &secretsmanager.ListSecretsInput{}
 	if opts.Prefix != "" {

@@ -59,9 +59,9 @@ func (r *Runner) Run(_ context.Context) error {
 		return err
 	}
 
-	ssmCount := len(staged[staging.ServiceParam])
-	smCount := len(staged[staging.ServiceSecret])
-	totalCount := ssmCount + smCount
+	paramCount := len(staged[staging.ServiceParam])
+	secretCount := len(staged[staging.ServiceSecret])
+	totalCount := paramCount + secretCount
 
 	if totalCount == 0 {
 		_, _ = fmt.Fprintln(r.Stdout, colors.Warning("No changes staged."))
@@ -69,20 +69,20 @@ func (r *Runner) Run(_ context.Context) error {
 	}
 
 	// Unstage all SSM Parameter Store
-	if ssmCount > 0 {
+	if paramCount > 0 {
 		if err := r.Store.UnstageAll(staging.ServiceParam); err != nil {
 			return err
 		}
 	}
 
 	// Unstage all Secrets Manager
-	if smCount > 0 {
+	if secretCount > 0 {
 		if err := r.Store.UnstageAll(staging.ServiceSecret); err != nil {
 			return err
 		}
 	}
 
 	_, _ = fmt.Fprintf(r.Stdout, "%s Unstaged all changes (%d SSM Parameter Store, %d Secrets Manager)\n",
-		colors.Success("✓"), ssmCount, smCount)
+		colors.Success("✓"), paramCount, secretCount)
 	return nil
 }

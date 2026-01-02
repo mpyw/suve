@@ -106,30 +106,30 @@ func TestRun_PushBothServices(t *testing.T) {
 	// Stage SSM Parameter Store parameter
 	_ = store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     "ssm-value",
+		Value:     "param-value",
 		StagedAt:  time.Now(),
 	})
 
 	// Stage Secrets Manager secret
 	_ = store.Stage(staging.ServiceSecret, "my-secret", staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     "sm-value",
+		Value:     "secret-value",
 		StagedAt:  time.Now(),
 	})
 
-	ssmPutCalled := false
-	smPutCalled := false
+	paramPutCalled := false
+	secretPutCalled := false
 
 	paramMock := newParamStrategy()
 	paramMock.pushFunc = func(_ context.Context, name string, _ staging.Entry) error {
-		ssmPutCalled = true
+		paramPutCalled = true
 		assert.Equal(t, "/app/config", name)
 		return nil
 	}
 
 	secretMock := newSecretStrategy()
 	secretMock.pushFunc = func(_ context.Context, name string, _ staging.Entry) error {
-		smPutCalled = true
+		secretPutCalled = true
 		assert.Equal(t, "my-secret", name)
 		return nil
 	}
@@ -145,8 +145,8 @@ func TestRun_PushBothServices(t *testing.T) {
 
 	err := r.Run(context.Background())
 	require.NoError(t, err)
-	assert.True(t, ssmPutCalled)
-	assert.True(t, smPutCalled)
+	assert.True(t, paramPutCalled)
+	assert.True(t, secretPutCalled)
 	assert.Contains(t, buf.String(), "Pushing SSM Parameter Store parameters")
 	assert.Contains(t, buf.String(), "Pushing Secrets Manager secrets")
 	assert.Contains(t, buf.String(), "SSM Parameter Store: Updated /app/config")
@@ -159,7 +159,7 @@ func TestRun_PushBothServices(t *testing.T) {
 	assert.Equal(t, staging.ErrNotStaged, err)
 }
 
-func TestRun_PushSSMOnly(t *testing.T) {
+func TestRun_PushParamOnly(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
@@ -168,14 +168,14 @@ func TestRun_PushSSMOnly(t *testing.T) {
 	// Stage only SSM Parameter Store parameter
 	_ = store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     "ssm-value",
+		Value:     "param-value",
 		StagedAt:  time.Now(),
 	})
 
-	ssmPutCalled := false
+	paramPutCalled := false
 	paramMock := newParamStrategy()
 	paramMock.pushFunc = func(_ context.Context, _ string, _ staging.Entry) error {
-		ssmPutCalled = true
+		paramPutCalled = true
 		return nil
 	}
 
@@ -190,12 +190,12 @@ func TestRun_PushSSMOnly(t *testing.T) {
 
 	err := r.Run(context.Background())
 	require.NoError(t, err)
-	assert.True(t, ssmPutCalled)
+	assert.True(t, paramPutCalled)
 	assert.Contains(t, buf.String(), "Pushing SSM Parameter Store parameters")
 	assert.NotContains(t, buf.String(), "Pushing Secrets Manager secrets")
 }
 
-func TestRun_PushSMOnly(t *testing.T) {
+func TestRun_PushSecretOnly(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
@@ -204,14 +204,14 @@ func TestRun_PushSMOnly(t *testing.T) {
 	// Stage only Secrets Manager secret
 	_ = store.Stage(staging.ServiceSecret, "my-secret", staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     "sm-value",
+		Value:     "secret-value",
 		StagedAt:  time.Now(),
 	})
 
-	smPutCalled := false
+	secretPutCalled := false
 	secretMock := newSecretStrategy()
 	secretMock.pushFunc = func(_ context.Context, _ string, _ staging.Entry) error {
-		smPutCalled = true
+		secretPutCalled = true
 		return nil
 	}
 
@@ -226,7 +226,7 @@ func TestRun_PushSMOnly(t *testing.T) {
 
 	err := r.Run(context.Background())
 	require.NoError(t, err)
-	assert.True(t, smPutCalled)
+	assert.True(t, secretPutCalled)
 	assert.NotContains(t, buf.String(), "Pushing SSM Parameter Store parameters")
 	assert.Contains(t, buf.String(), "Pushing Secrets Manager secrets")
 }
@@ -247,18 +247,18 @@ func TestRun_PushDelete(t *testing.T) {
 		StagedAt:  time.Now(),
 	})
 
-	ssmDeleteCalled := false
-	smDeleteCalled := false
+	paramDeleteCalled := false
+	secretDeleteCalled := false
 
 	paramMock := newParamStrategy()
 	paramMock.pushFunc = func(_ context.Context, _ string, _ staging.Entry) error {
-		ssmDeleteCalled = true
+		paramDeleteCalled = true
 		return nil
 	}
 
 	secretMock := newSecretStrategy()
 	secretMock.pushFunc = func(_ context.Context, _ string, _ staging.Entry) error {
-		smDeleteCalled = true
+		secretDeleteCalled = true
 		return nil
 	}
 
@@ -273,8 +273,8 @@ func TestRun_PushDelete(t *testing.T) {
 
 	err := r.Run(context.Background())
 	require.NoError(t, err)
-	assert.True(t, ssmDeleteCalled)
-	assert.True(t, smDeleteCalled)
+	assert.True(t, paramDeleteCalled)
+	assert.True(t, secretDeleteCalled)
 	assert.Contains(t, buf.String(), "SSM Parameter Store: Deleted /app/old")
 	assert.Contains(t, buf.String(), "Secrets Manager: Deleted old-secret")
 }
@@ -288,12 +288,12 @@ func TestRun_PartialFailure(t *testing.T) {
 	// Stage both
 	_ = store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     "ssm-value",
+		Value:     "param-value",
 		StagedAt:  time.Now(),
 	})
 	_ = store.Stage(staging.ServiceSecret, "my-secret", staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     "sm-value",
+		Value:     "secret-value",
 		StagedAt:  time.Now(),
 	})
 
@@ -323,7 +323,7 @@ func TestRun_PartialFailure(t *testing.T) {
 	// SSM Parameter Store should still be staged (failed)
 	entry, err := store.Get(staging.ServiceParam, "/app/config")
 	require.NoError(t, err)
-	assert.Equal(t, "ssm-value", entry.Value)
+	assert.Equal(t, "param-value", entry.Value)
 
 	// Secrets Manager should be unstaged (succeeded)
 	_, err = store.Get(staging.ServiceSecret, "my-secret")
@@ -355,7 +355,7 @@ func TestRun_StoreError(t *testing.T) {
 	assert.Contains(t, err.Error(), "failed to parse")
 }
 
-func TestRun_SMDeleteWithForce(t *testing.T) {
+func TestRun_SecretDeleteWithForce(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
@@ -391,7 +391,7 @@ func TestRun_SMDeleteWithForce(t *testing.T) {
 	assert.True(t, capturedEntry.DeleteOptions.Force)
 }
 
-func TestRun_SMDeleteWithRecoveryWindow(t *testing.T) {
+func TestRun_SecretDeleteWithRecoveryWindow(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
@@ -427,7 +427,7 @@ func TestRun_SMDeleteWithRecoveryWindow(t *testing.T) {
 	assert.Equal(t, 7, capturedEntry.DeleteOptions.RecoveryWindow)
 }
 
-func TestRun_SSMDeleteError(t *testing.T) {
+func TestRun_ParamDeleteError(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
@@ -456,7 +456,7 @@ func TestRun_SSMDeleteError(t *testing.T) {
 	assert.Contains(t, errBuf.String(), "Failed")
 }
 
-func TestRun_SMSetError(t *testing.T) {
+func TestRun_SecretSetError(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
@@ -486,7 +486,7 @@ func TestRun_SMSetError(t *testing.T) {
 	assert.Contains(t, errBuf.String(), "Failed")
 }
 
-func TestRun_SMDeleteError(t *testing.T) {
+func TestRun_SecretDeleteError(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
@@ -515,7 +515,7 @@ func TestRun_SMDeleteError(t *testing.T) {
 	assert.Contains(t, errBuf.String(), "Failed")
 }
 
-func TestRun_SSMSetError(t *testing.T) {
+func TestRun_ParamSetError(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()

@@ -19,7 +19,7 @@ import (
 
 // CommandConfig holds service-specific configuration for building stage commands.
 type CommandConfig struct {
-	// ServiceName is the service prefix for commands (e.g., "ssm", "sm").
+	// ServiceName is the service prefix for commands (e.g., "param", "secret").
 	ServiceName string
 
 	// ItemName is the item name for messages (e.g., "parameter", "secret").

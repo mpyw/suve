@@ -12,7 +12,7 @@ import (
 	"github.com/mpyw/suve/internal/version/secretversion"
 )
 
-func TestParseArgs_SSM(t *testing.T) {
+func TestParseArgs_Param(t *testing.T) {
 	t.Parallel()
 
 	parse := paramversion.Parse
@@ -214,7 +214,7 @@ func TestParseArgs_SSM(t *testing.T) {
 	}
 }
 
-func TestParseArgs_SM(t *testing.T) {
+func TestParseArgs_Secret(t *testing.T) {
 	t.Parallel()
 
 	parse := secretversion.Parse

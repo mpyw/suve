@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
-	smtypes "github.com/aws/aws-sdk-go-v2/service/secretsmanager/types"
+	secrettypes "github.com/aws/aws-sdk-go-v2/service/secretsmanager/types"
 	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -443,7 +443,7 @@ func TestSecretStrategy_FetchVersion(t *testing.T) {
 			},
 			listSecretVersionIdsFunc: func(_ context.Context, _ *secretsmanager.ListSecretVersionIdsInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.ListSecretVersionIdsOutput, error) {
 				return &secretsmanager.ListSecretVersionIdsOutput{
-					Versions: []smtypes.SecretVersionsListEntry{
+					Versions: []secrettypes.SecretVersionsListEntry{
 						{VersionId: lo.ToPtr("version-current"), VersionStages: []string{"AWSCURRENT"}},
 						{VersionId: lo.ToPtr("version-shifted"), VersionStages: []string{"AWSPREVIOUS"}},
 					},

@@ -82,19 +82,19 @@ func (r *Runner) Run(_ context.Context, opts Options) error {
 	printer := &staging.EntryPrinter{Writer: r.Stdout}
 
 	// Show SSM Parameter Store changes (no DeleteOptions for SSM Parameter Store)
-	if ssmEntries, ok := entries[staging.ServiceParam]; ok && len(ssmEntries) > 0 {
-		_, _ = fmt.Fprintf(r.Stdout, "%s (%d):\n", colors.Warning("Staged SSM Parameter Store changes"), len(ssmEntries))
-		printEntries(printer, ssmEntries, opts.Verbose, false)
+	if paramEntries, ok := entries[staging.ServiceParam]; ok && len(paramEntries) > 0 {
+		_, _ = fmt.Fprintf(r.Stdout, "%s (%d):\n", colors.Warning("Staged SSM Parameter Store changes"), len(paramEntries))
+		printEntries(printer, paramEntries, opts.Verbose, false)
 	}
 
 	// Show Secrets Manager changes (with DeleteOptions)
-	if smEntries, ok := entries[staging.ServiceSecret]; ok && len(smEntries) > 0 {
+	if secretEntries, ok := entries[staging.ServiceSecret]; ok && len(secretEntries) > 0 {
 		// Add spacing if we printed SSM Parameter Store entries
 		if _, ok := entries[staging.ServiceParam]; ok && len(entries[staging.ServiceParam]) > 0 {
 			_, _ = fmt.Fprintln(r.Stdout)
 		}
-		_, _ = fmt.Fprintf(r.Stdout, "%s (%d):\n", colors.Warning("Staged Secrets Manager changes"), len(smEntries))
-		printEntries(printer, smEntries, opts.Verbose, true)
+		_, _ = fmt.Fprintf(r.Stdout, "%s (%d):\n", colors.Warning("Staged Secrets Manager changes"), len(secretEntries))
+		printEntries(printer, secretEntries, opts.Verbose, true)
 	}
 
 	return nil

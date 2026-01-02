@@ -21,7 +21,7 @@ func TestCommand_Validation(t *testing.T) {
 	t.Run("missing arguments", func(t *testing.T) {
 		t.Parallel()
 		app := appcli.MakeApp()
-		err := app.Run(context.Background(), []string{"suve", "sm", "create"})
+		err := app.Run(context.Background(), []string{"suve", "secret", "create"})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "usage:")
 	})
@@ -29,7 +29,7 @@ func TestCommand_Validation(t *testing.T) {
 	t.Run("missing value argument", func(t *testing.T) {
 		t.Parallel()
 		app := appcli.MakeApp()
-		err := app.Run(context.Background(), []string{"suve", "sm", "create", "my-secret"})
+		err := app.Run(context.Background(), []string{"suve", "secret", "create", "my-secret"})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "usage:")
 	})

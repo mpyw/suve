@@ -495,7 +495,7 @@ func TestStore_DirectoryCreation(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestStore_UnstageFromSM(t *testing.T) {
+func TestStore_UnstageFromSecret(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
@@ -652,7 +652,7 @@ func TestStore_CountLoadError(t *testing.T) {
 	assert.Contains(t, err.Error(), "failed to parse state file")
 }
 
-func TestStore_GetSM(t *testing.T) {
+func TestStore_GetSecret(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()

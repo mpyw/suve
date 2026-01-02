@@ -91,19 +91,19 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	}
 
 	// Check if there are any staged changes before creating clients
-	ssmStaged, err := store.List(staging.ServiceParam)
+	paramStaged, err := store.List(staging.ServiceParam)
 	if err != nil {
 		return err
 	}
-	smStaged, err := store.List(staging.ServiceSecret)
+	secretStaged, err := store.List(staging.ServiceSecret)
 	if err != nil {
 		return err
 	}
 
-	hasSSM := len(ssmStaged[staging.ServiceParam]) > 0
-	hasSM := len(smStaged[staging.ServiceSecret]) > 0
+	hasParam := len(paramStaged[staging.ServiceParam]) > 0
+	hasSecret := len(secretStaged[staging.ServiceSecret]) > 0
 
-	if !hasSSM && !hasSM {
+	if !hasParam && !hasSecret {
 		output.Warning(cmd.Root().ErrWriter, "nothing staged")
 		return nil
 	}
@@ -114,20 +114,20 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	}
 
 	// Initialize clients only if needed
-	if hasSSM {
-		ssmClient, err := infra.NewParamClient(ctx)
+	if hasParam {
+		paramClient, err := infra.NewParamClient(ctx)
 		if err != nil {
 			return fmt.Errorf("failed to initialize SSM Parameter Store client: %w", err)
 		}
-		r.ParamClient = ssmClient
+		r.ParamClient = paramClient
 	}
 
-	if hasSM {
-		smClient, err := infra.NewSecretClient(ctx)
+	if hasSecret {
+		secretClient, err := infra.NewSecretClient(ctx)
 		if err != nil {
 			return fmt.Errorf("failed to initialize Secrets Manager client: %w", err)
 		}
-		r.SecretClient = smClient
+		r.SecretClient = secretClient
 	}
 
 	opts := Options{
@@ -148,16 +148,16 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 		return err
 	}
 
-	ssmEntries := allEntries[staging.ServiceParam]
-	smEntries := allEntries[staging.ServiceSecret]
+	paramEntries := allEntries[staging.ServiceParam]
+	secretEntries := allEntries[staging.ServiceSecret]
 
 	// Fetch all values in parallel
-	ssmResults := parallel.ExecuteMap(ctx, ssmEntries, func(ctx context.Context, name string, _ staging.Entry) (*types.ParameterHistory, error) {
+	paramResults := parallel.ExecuteMap(ctx, paramEntries, func(ctx context.Context, name string, _ staging.Entry) (*types.ParameterHistory, error) {
 		spec := &paramversion.Spec{Name: name}
 		return paramversion.GetParameterWithVersion(ctx, r.ParamClient, spec, true)
 	})
 
-	smResults := parallel.ExecuteMap(ctx, smEntries, func(ctx context.Context, name string, _ staging.Entry) (*secretsmanager.GetSecretValueOutput, error) {
+	secretResults := parallel.ExecuteMap(ctx, secretEntries, func(ctx context.Context, name string, _ staging.Entry) (*secretsmanager.GetSecretValueOutput, error) {
 		spec := &secretversion.Spec{Name: name}
 		return secretversion.GetSecretWithVersion(ctx, r.SecretClient, spec)
 	})
@@ -165,9 +165,9 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 	first := true
 
 	// Process SSM Parameter Store entries in sorted order
-	for _, name := range maputil.SortedKeys(ssmEntries) {
-		entry := ssmEntries[name]
-		result := ssmResults[name]
+	for _, name := range maputil.SortedKeys(paramEntries) {
+		entry := paramEntries[name]
+		result := paramResults[name]
 
 		if result.Err != nil {
 			// Handle fetch error based on operation type
@@ -186,7 +186,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 					_, _ = fmt.Fprintln(r.Stdout)
 				}
 				first = false
-				if err := r.outputSSMDiffCreate(opts, name, entry); err != nil {
+				if err := r.outputParamDiffCreate(opts, name, entry); err != nil {
 					return err
 				}
 				continue
@@ -206,15 +206,15 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 		}
 		first = false
 
-		if err := r.outputSSMDiff(opts, name, entry, result.Value); err != nil {
+		if err := r.outputParamDiff(opts, name, entry, result.Value); err != nil {
 			return err
 		}
 	}
 
 	// Process Secrets Manager entries in sorted order
-	for _, name := range maputil.SortedKeys(smEntries) {
-		entry := smEntries[name]
-		result := smResults[name]
+	for _, name := range maputil.SortedKeys(secretEntries) {
+		entry := secretEntries[name]
+		result := secretResults[name]
 
 		if result.Err != nil {
 			// Handle fetch error based on operation type
@@ -233,7 +233,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 					_, _ = fmt.Fprintln(r.Stdout)
 				}
 				first = false
-				if err := r.outputSMDiffCreate(opts, name, entry); err != nil {
+				if err := r.outputSecretDiffCreate(opts, name, entry); err != nil {
 					return err
 				}
 				continue
@@ -253,7 +253,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 		}
 		first = false
 
-		if err := r.outputSMDiff(opts, name, entry, result.Value); err != nil {
+		if err := r.outputSecretDiff(opts, name, entry, result.Value); err != nil {
 			return err
 		}
 	}
@@ -261,7 +261,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 	return nil
 }
 
-func (r *Runner) outputSSMDiff(opts Options, name string, entry staging.Entry, param *types.ParameterHistory) error {
+func (r *Runner) outputParamDiff(opts Options, name string, entry staging.Entry, param *types.ParameterHistory) error {
 	awsValue := lo.FromPtr(param.Value)
 	stagedValue := entry.Value
 
@@ -300,7 +300,7 @@ func (r *Runner) outputSSMDiff(opts Options, name string, entry staging.Entry, p
 	return nil
 }
 
-func (r *Runner) outputSMDiff(opts Options, name string, entry staging.Entry, secret *secretsmanager.GetSecretValueOutput) error {
+func (r *Runner) outputSecretDiff(opts Options, name string, entry staging.Entry, secret *secretsmanager.GetSecretValueOutput) error {
 	awsValue := lo.FromPtr(secret.SecretString)
 	stagedValue := entry.Value
 
@@ -340,7 +340,7 @@ func (r *Runner) outputSMDiff(opts Options, name string, entry staging.Entry, se
 	return nil
 }
 
-func (r *Runner) outputSSMDiffCreate(opts Options, name string, entry staging.Entry) error {
+func (r *Runner) outputParamDiffCreate(opts Options, name string, entry staging.Entry) error {
 	stagedValue := entry.Value
 
 	// Format as JSON if enabled
@@ -362,7 +362,7 @@ func (r *Runner) outputSSMDiffCreate(opts Options, name string, entry staging.En
 	return nil
 }
 
-func (r *Runner) outputSMDiffCreate(opts Options, name string, entry staging.Entry) error {
+func (r *Runner) outputSecretDiffCreate(opts Options, name string, entry staging.Entry) error {
 	stagedValue := entry.Value
 
 	// Format as JSON if enabled

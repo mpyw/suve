@@ -10,14 +10,14 @@ import (
 	"github.com/mpyw/suve/internal/cli/commands/secret/create"
 	secretdelete "github.com/mpyw/suve/internal/cli/commands/secret/delete"
 	"github.com/mpyw/suve/internal/cli/commands/secret/diff"
+	"github.com/mpyw/suve/internal/cli/commands/secret/list"
 	"github.com/mpyw/suve/internal/cli/commands/secret/log"
-	"github.com/mpyw/suve/internal/cli/commands/secret/ls"
 	"github.com/mpyw/suve/internal/cli/commands/secret/restore"
 	"github.com/mpyw/suve/internal/cli/commands/secret/show"
 	"github.com/mpyw/suve/internal/cli/commands/secret/update"
 )
 
-// Command returns the sm command with all subcommands.
+// Command returns the secret command with all subcommands.
 func Command() *cli.Command {
 	return &cli.Command{
 		Name:    "secret",
@@ -27,7 +27,7 @@ func Command() *cli.Command {
 			show.Command(),
 			log.Command(),
 			diff.Command(),
-			ls.Command(),
+			list.Command(),
 			create.Command(),
 			update.Command(),
 			secretdelete.Command(),

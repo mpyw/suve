@@ -57,19 +57,19 @@ func TestRun_UnstageAll(t *testing.T) {
 	// Stage SSM Parameter Store parameters
 	_ = store.Stage(staging.ServiceParam, "/app/config1", staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     "ssm-value1",
+		Value:     "param-value1",
 		StagedAt:  time.Now(),
 	})
 	_ = store.Stage(staging.ServiceParam, "/app/config2", staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     "ssm-value2",
+		Value:     "param-value2",
 		StagedAt:  time.Now(),
 	})
 
 	// Stage Secrets Manager secrets
 	_ = store.Stage(staging.ServiceSecret, "secret1", staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     "sm-value1",
+		Value:     "secret-value1",
 		StagedAt:  time.Now(),
 	})
 
@@ -93,7 +93,7 @@ func TestRun_UnstageAll(t *testing.T) {
 	assert.Equal(t, staging.ErrNotStaged, err)
 }
 
-func TestRun_UnstageSSMOnly(t *testing.T) {
+func TestRun_UnstageParamOnly(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
@@ -102,7 +102,7 @@ func TestRun_UnstageSSMOnly(t *testing.T) {
 	// Stage only SSM Parameter Store parameters
 	_ = store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     "ssm-value",
+		Value:     "param-value",
 		StagedAt:  time.Now(),
 	})
 
@@ -118,7 +118,7 @@ func TestRun_UnstageSSMOnly(t *testing.T) {
 	assert.Contains(t, buf.String(), "Unstaged all changes (1 SSM Parameter Store, 0 Secrets Manager)")
 }
 
-func TestRun_UnstageSMOnly(t *testing.T) {
+func TestRun_UnstageSecretOnly(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
@@ -127,7 +127,7 @@ func TestRun_UnstageSMOnly(t *testing.T) {
 	// Stage only Secrets Manager secrets
 	_ = store.Stage(staging.ServiceSecret, "my-secret", staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     "sm-value",
+		Value:     "secret-value",
 		StagedAt:  time.Now(),
 	})
 

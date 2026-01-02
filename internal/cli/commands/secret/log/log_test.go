@@ -23,7 +23,7 @@ func TestCommand_Validation(t *testing.T) {
 	t.Run("missing secret name", func(t *testing.T) {
 		t.Parallel()
 		app := appcli.MakeApp()
-		err := app.Run(context.Background(), []string{"suve", "sm", "log"})
+		err := app.Run(context.Background(), []string{"suve", "secret", "log"})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "usage: suve secret log")
 	})
@@ -34,7 +34,7 @@ func TestCommand_Validation(t *testing.T) {
 		var errBuf bytes.Buffer
 		app := appcli.MakeApp()
 		app.ErrWriter = &errBuf
-		_ = app.Run(context.Background(), []string{"suve", "sm", "log", "--json", "my-secret"})
+		_ = app.Run(context.Background(), []string{"suve", "secret", "log", "--json", "my-secret"})
 		assert.Contains(t, errBuf.String(), "--json has no effect")
 	})
 }

@@ -31,14 +31,14 @@ import (
 	secretdelete "github.com/mpyw/suve/internal/cli/commands/secret/delete"
 	secretdiff "github.com/mpyw/suve/internal/cli/commands/secret/diff"
 	secretlog "github.com/mpyw/suve/internal/cli/commands/secret/log"
-	secretls "github.com/mpyw/suve/internal/cli/commands/secret/ls"
+	secretlist "github.com/mpyw/suve/internal/cli/commands/secret/list"
 	secretrestore "github.com/mpyw/suve/internal/cli/commands/secret/restore"
 	secretshow "github.com/mpyw/suve/internal/cli/commands/secret/show"
 	secretupdate "github.com/mpyw/suve/internal/cli/commands/secret/update"
 	paramdelete "github.com/mpyw/suve/internal/cli/commands/param/delete"
 	paramdiff "github.com/mpyw/suve/internal/cli/commands/param/diff"
 	paramlog "github.com/mpyw/suve/internal/cli/commands/param/log"
-	paramls "github.com/mpyw/suve/internal/cli/commands/param/ls"
+	paramlist "github.com/mpyw/suve/internal/cli/commands/param/list"
 	paramset "github.com/mpyw/suve/internal/cli/commands/param/set"
 	paramshow "github.com/mpyw/suve/internal/cli/commands/param/show"
 	globalstage "github.com/mpyw/suve/internal/cli/commands/stage"
@@ -120,9 +120,9 @@ func runSubCommand(t *testing.T, parentCmd *cli.Command, subCmdName string, args
 // SSM Parameter Store Basic Commands Tests
 // =============================================================================
 
-// TestSSM_FullWorkflow tests the complete SSM Parameter Store workflow:
-// set → show → show --raw → update → log → diff → ls → delete → verify deletion
-func TestSSM_FullWorkflow(t *testing.T) {
+// TestParam_FullWorkflow tests the complete SSM Parameter Store workflow:
+// set → show → show --raw → update → log → diff → list → delete → verify deletion
+func TestParam_FullWorkflow(t *testing.T) {
 	setupEnv(t)
 	paramName := "/suve-e2e-test/basic/param"
 
@@ -227,14 +227,14 @@ func TestSSM_FullWorkflow(t *testing.T) {
 	})
 
 	// 10. List (note: localstack may not support path filtering perfectly)
-	t.Run("ls", func(t *testing.T) {
-		stdout, _, err := runCommand(t, paramls.Command(), "/suve-e2e-test/basic/")
+	t.Run("list", func(t *testing.T) {
+		stdout, _, err := runCommand(t, paramlist.Command(), "/suve-e2e-test/basic/")
 		require.NoError(t, err)
-		// Localstack might return empty for path-filtered ls, skip assertion if empty
+		// Localstack might return empty for path-filtered list, skip assertion if empty
 		if stdout != "" {
 			assert.Contains(t, stdout, paramName)
 		}
-		t.Logf("ls output: %s", stdout)
+		t.Logf("list output: %s", stdout)
 	})
 
 	// 11. Delete (with -y to skip confirmation)
@@ -251,7 +251,7 @@ func TestSSM_FullWorkflow(t *testing.T) {
 }
 
 // TestParam_VersionSpecifiers tests SSM Parameter Store version specifier syntax.
-func TestSSM_VersionSpecifiers(t *testing.T) {
+func TestParam_VersionSpecifiers(t *testing.T) {
 	setupEnv(t)
 	paramName := "/suve-e2e-test/version/param"
 
@@ -312,8 +312,8 @@ func TestSSM_VersionSpecifiers(t *testing.T) {
 	})
 }
 
-// TestSSM_JSONFlag tests the --json flag for formatting.
-func TestSSM_JSONFlag(t *testing.T) {
+// TestParam_JSONFlag tests the --json flag for formatting.
+func TestParam_JSONFlag(t *testing.T) {
 	setupEnv(t)
 	paramName := "/suve-e2e-test/json/param"
 
@@ -354,7 +354,7 @@ func TestSSM_JSONFlag(t *testing.T) {
 // =============================================================================
 
 // TestParam_StagingWorkflow tests the complete SSM Parameter Store staging workflow.
-func TestSSM_StagingWorkflow(t *testing.T) {
+func TestParam_StagingWorkflow(t *testing.T) {
 	setupEnv(t)
 	tmpHome := setupTempHome(t)
 
@@ -375,7 +375,7 @@ func TestSSM_StagingWorkflow(t *testing.T) {
 	// 2. Stage a new value (using store directly since edit requires interactive editor)
 	t.Run("stage-edit", func(t *testing.T) {
 		store := staging.NewStoreWithPath(filepath.Join(tmpHome, ".suve", "stage.json"))
-		err := store.Stage(staging.ServiceSSM, paramName, staging.Entry{
+		err := store.Stage(staging.ServiceParam, paramName, staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     "staged-value",
 			StagedAt:  time.Now(),
@@ -460,8 +460,8 @@ func TestSSM_StagingWorkflow(t *testing.T) {
 	})
 }
 
-// TestSSM_StagingAdd tests staging a new parameter (create operation).
-func TestSSM_StagingAdd(t *testing.T) {
+// TestParam_StagingAdd tests staging a new parameter (create operation).
+func TestParam_StagingAdd(t *testing.T) {
 	setupEnv(t)
 	tmpHome := setupTempHome(t)
 
@@ -476,7 +476,7 @@ func TestSSM_StagingAdd(t *testing.T) {
 	// 1. Stage add (using store directly since add requires interactive editor)
 	t.Run("stage-add", func(t *testing.T) {
 		store := staging.NewStoreWithPath(filepath.Join(tmpHome, ".suve", "stage.json"))
-		err := store.Stage(staging.ServiceSSM, paramName, staging.Entry{
+		err := store.Stage(staging.ServiceParam, paramName, staging.Entry{
 			Operation: staging.OperationCreate,
 			Value:     "new-param-value",
 			StagedAt:  time.Now(),
@@ -506,8 +506,8 @@ func TestSSM_StagingAdd(t *testing.T) {
 	})
 }
 
-// TestSSM_StagingResetWithVersion tests resetting to a specific version.
-func TestSSM_StagingResetWithVersion(t *testing.T) {
+// TestParam_StagingResetWithVersion tests resetting to a specific version.
+func TestParam_StagingResetWithVersion(t *testing.T) {
 	setupEnv(t)
 	tmpHome := setupTempHome(t)
 
@@ -545,7 +545,7 @@ func TestSSM_StagingResetWithVersion(t *testing.T) {
 	// 3. Verify staged value is from version 1
 	t.Run("verify-staged", func(t *testing.T) {
 		store := staging.NewStoreWithPath(filepath.Join(tmpHome, ".suve", "stage.json"))
-		entry, err := store.Get(staging.ServiceSSM, paramName)
+		entry, err := store.Get(staging.ServiceParam, paramName)
 		require.NoError(t, err)
 		assert.Equal(t, "v1", entry.Value)
 	})
@@ -564,8 +564,8 @@ func TestSSM_StagingResetWithVersion(t *testing.T) {
 	})
 }
 
-// TestSSM_StagingResetAll tests resetting all staged changes.
-func TestSSM_StagingResetAll(t *testing.T) {
+// TestParam_StagingResetAll tests resetting all staged changes.
+func TestParam_StagingResetAll(t *testing.T) {
 	setupEnv(t)
 	tmpHome := setupTempHome(t)
 
@@ -586,12 +586,12 @@ func TestSSM_StagingResetAll(t *testing.T) {
 
 	// Stage both
 	store := staging.NewStoreWithPath(filepath.Join(tmpHome, ".suve", "stage.json"))
-	_ = store.Stage(staging.ServiceSSM, param1, staging.Entry{
+	_ = store.Stage(staging.ServiceParam, param1, staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     "staged1",
 		StagedAt:  time.Now(),
 	})
-	_ = store.Stage(staging.ServiceSSM, param2, staging.Entry{
+	_ = store.Stage(staging.ServiceParam, param2, staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     "staged2",
 		StagedAt:  time.Now(),
@@ -622,8 +622,8 @@ func TestSSM_StagingResetAll(t *testing.T) {
 	})
 }
 
-// TestSSM_StagingPushSingle tests pushing a single parameter.
-func TestSSM_StagingPushSingle(t *testing.T) {
+// TestParam_StagingPushSingle tests pushing a single parameter.
+func TestParam_StagingPushSingle(t *testing.T) {
 	setupEnv(t)
 	tmpHome := setupTempHome(t)
 
@@ -644,12 +644,12 @@ func TestSSM_StagingPushSingle(t *testing.T) {
 
 	// Stage both
 	store := staging.NewStoreWithPath(filepath.Join(tmpHome, ".suve", "stage.json"))
-	_ = store.Stage(staging.ServiceSSM, param1, staging.Entry{
+	_ = store.Stage(staging.ServiceParam, param1, staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     "staged1",
 		StagedAt:  time.Now(),
 	})
-	_ = store.Stage(staging.ServiceSSM, param2, staging.Entry{
+	_ = store.Stage(staging.ServiceParam, param2, staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     "staged2",
 		StagedAt:  time.Now(),
@@ -683,8 +683,8 @@ func TestSSM_StagingPushSingle(t *testing.T) {
 // Secrets Manager Basic Commands Tests
 // =============================================================================
 
-// TestSM_FullWorkflow tests the complete Secrets Manager workflow.
-func TestSM_FullWorkflow(t *testing.T) {
+// TestSecret_FullWorkflow tests the complete Secrets Manager workflow.
+func TestSecret_FullWorkflow(t *testing.T) {
 	setupEnv(t)
 	secretName := "suve-e2e-test/basic/secret"
 
@@ -777,11 +777,11 @@ func TestSM_FullWorkflow(t *testing.T) {
 	})
 
 	// 10. List
-	t.Run("ls", func(t *testing.T) {
-		stdout, _, err := runCommand(t, secretls.Command())
+	t.Run("list", func(t *testing.T) {
+		stdout, _, err := runCommand(t, secretlist.Command())
 		require.NoError(t, err)
 		assert.Contains(t, stdout, secretName)
-		t.Logf("ls output: %s", stdout)
+		t.Logf("list output: %s", stdout)
 	})
 
 	// 11. Delete with recovery window
@@ -816,7 +816,7 @@ func TestSM_FullWorkflow(t *testing.T) {
 }
 
 // TestSecret_VersionSpecifiers tests Secrets Manager version specifier syntax.
-func TestSM_VersionSpecifiers(t *testing.T) {
+func TestSecret_VersionSpecifiers(t *testing.T) {
 	setupEnv(t)
 	secretName := "suve-e2e-test/version/secret"
 
@@ -878,7 +878,7 @@ func TestSM_VersionSpecifiers(t *testing.T) {
 // =============================================================================
 
 // TestSecret_StagingWorkflow tests the complete Secrets Manager staging workflow.
-func TestSM_StagingWorkflow(t *testing.T) {
+func TestSecret_StagingWorkflow(t *testing.T) {
 	setupEnv(t)
 	tmpHome := setupTempHome(t)
 
@@ -899,7 +899,7 @@ func TestSM_StagingWorkflow(t *testing.T) {
 	// 2. Stage update
 	t.Run("stage-update", func(t *testing.T) {
 		store := staging.NewStoreWithPath(filepath.Join(tmpHome, ".suve", "stage.json"))
-		err := store.Stage(staging.ServiceSM, secretName, staging.Entry{
+		err := store.Stage(staging.ServiceSecret, secretName, staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     "staged-secret",
 			StagedAt:  time.Now(),
@@ -965,7 +965,7 @@ func TestSM_StagingWorkflow(t *testing.T) {
 }
 
 // TestSecret_StagingDeleteOptions tests Secrets Manager staging with delete options.
-func TestSM_StagingDeleteOptions(t *testing.T) {
+func TestSecret_StagingDeleteOptions(t *testing.T) {
 	setupEnv(t)
 	tmpHome := setupTempHome(t)
 
@@ -987,7 +987,7 @@ func TestSM_StagingDeleteOptions(t *testing.T) {
 
 		// Verify options are stored
 		store := staging.NewStoreWithPath(filepath.Join(tmpHome, ".suve", "stage.json"))
-		entry, err := store.Get(staging.ServiceSM, secretName)
+		entry, err := store.Get(staging.ServiceSecret, secretName)
 		require.NoError(t, err)
 		require.NotNil(t, entry.DeleteOptions)
 		assert.Equal(t, 14, entry.DeleteOptions.RecoveryWindow)
@@ -1021,12 +1021,12 @@ func TestGlobal_StageWorkflow(t *testing.T) {
 
 	// Stage both
 	store := staging.NewStoreWithPath(filepath.Join(tmpHome, ".suve", "stage.json"))
-	_ = store.Stage(staging.ServiceSSM, paramName, staging.Entry{
+	_ = store.Stage(staging.ServiceParam, paramName, staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     "staged-param",
 		StagedAt:  time.Now(),
 	})
-	_ = store.Stage(staging.ServiceSM, secretName, staging.Entry{
+	_ = store.Stage(staging.ServiceSecret, secretName, staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     "staged-secret",
 		StagedAt:  time.Now(),
@@ -1104,12 +1104,12 @@ func TestGlobal_StageResetAll(t *testing.T) {
 	_, _, _ = runCommand(t, secretcreate.Command(), secretName, "original")
 
 	store := staging.NewStoreWithPath(filepath.Join(tmpHome, ".suve", "stage.json"))
-	_ = store.Stage(staging.ServiceSSM, paramName, staging.Entry{
+	_ = store.Stage(staging.ServiceParam, paramName, staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     "staged",
 		StagedAt:  time.Now(),
 	})
-	_ = store.Stage(staging.ServiceSM, secretName, staging.Entry{
+	_ = store.Stage(staging.ServiceSecret, secretName, staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     "staged",
 		StagedAt:  time.Now(),
@@ -1157,8 +1157,8 @@ func TestGlobal_StageCommand(t *testing.T) {
 // Edge Cases and Error Handling Tests
 // =============================================================================
 
-// TestSSM_ErrorCases tests various error scenarios.
-func TestSSM_ErrorCases(t *testing.T) {
+// TestParam_ErrorCases tests various error scenarios.
+func TestParam_ErrorCases(t *testing.T) {
 	setupEnv(t)
 
 	// Show non-existent parameter
@@ -1198,7 +1198,7 @@ func TestSSM_ErrorCases(t *testing.T) {
 }
 
 // TestSecret_ErrorCases tests various Secrets Manager error scenarios.
-func TestSM_ErrorCases(t *testing.T) {
+func TestSecret_ErrorCases(t *testing.T) {
 	setupEnv(t)
 
 	// Show non-existent secret
@@ -1212,7 +1212,7 @@ func TestSM_ErrorCases(t *testing.T) {
 
 	// Invalid label
 	t.Run("invalid-label", func(t *testing.T) {
-		_, _, err := runCommand(t, smcat.Command(), "secret:INVALIDLABEL")
+		_, _, err := runCommand(t, secretshow.Command(), "secret:INVALIDLABEL")
 		assert.Error(t, err)
 	})
 
@@ -1269,8 +1269,8 @@ func TestStaging_ErrorCases(t *testing.T) {
 // Special Scenarios
 // =============================================================================
 
-// TestSSM_SpecialCharactersInValue tests values with special characters.
-func TestSSM_SpecialCharactersInValue(t *testing.T) {
+// TestParam_SpecialCharactersInValue tests values with special characters.
+func TestParam_SpecialCharactersInValue(t *testing.T) {
 	setupEnv(t)
 	paramName := "/suve-e2e-test/special/param"
 
@@ -1304,8 +1304,8 @@ func TestSSM_SpecialCharactersInValue(t *testing.T) {
 	}
 }
 
-// TestSM_SpecialCharactersInName tests secret names with special characters.
-func TestSM_SpecialCharactersInName(t *testing.T) {
+// TestSecret_SpecialCharactersInName tests secret names with special characters.
+func TestSecret_SpecialCharactersInName(t *testing.T) {
 	setupEnv(t)
 
 	testCases := []struct {
@@ -1335,8 +1335,8 @@ func TestSM_SpecialCharactersInName(t *testing.T) {
 	}
 }
 
-// TestSSM_LongValue tests handling of long parameter values.
-func TestSSM_LongValue(t *testing.T) {
+// TestParam_LongValue tests handling of long parameter values.
+func TestParam_LongValue(t *testing.T) {
 	setupEnv(t)
 	paramName := "/suve-e2e-test/long/param"
 
@@ -1361,8 +1361,8 @@ func TestSSM_LongValue(t *testing.T) {
 // Staging CLI Commands Tests (add/edit via CLI)
 // =============================================================================
 
-// TestSSM_StagingAddViaCLI tests the stage add command via CLI (with value argument).
-func TestSSM_StagingAddViaCLI(t *testing.T) {
+// TestParam_StagingAddViaCLI tests the stage add command via CLI (with value argument).
+func TestParam_StagingAddViaCLI(t *testing.T) {
 	setupEnv(t)
 	_ = setupTempHome(t)
 
@@ -1404,8 +1404,8 @@ func TestSSM_StagingAddViaCLI(t *testing.T) {
 	})
 }
 
-// TestSSM_StagingAddWithOptions tests stage add with description and tags.
-func TestSSM_StagingAddWithOptions(t *testing.T) {
+// TestParam_StagingAddWithOptions tests stage add with description and tags.
+func TestParam_StagingAddWithOptions(t *testing.T) {
 	setupEnv(t)
 	tmpHome := setupTempHome(t)
 
@@ -1432,7 +1432,7 @@ func TestSSM_StagingAddWithOptions(t *testing.T) {
 	// Verify staged entry has options
 	t.Run("verify-staged-options", func(t *testing.T) {
 		store := staging.NewStoreWithPath(filepath.Join(tmpHome, ".suve", "stage.json"))
-		entry, err := store.Get(staging.ServiceSSM, paramName)
+		entry, err := store.Get(staging.ServiceParam, paramName)
 		require.NoError(t, err)
 		assert.Equal(t, "value-with-options", entry.Value)
 		require.NotNil(t, entry.Description)
@@ -1454,7 +1454,7 @@ func TestSSM_StagingAddWithOptions(t *testing.T) {
 }
 
 // TestSecret_StagingAddViaCLI tests the Secrets Manager stage add command via CLI.
-func TestSM_StagingAddViaCLI(t *testing.T) {
+func TestSecret_StagingAddViaCLI(t *testing.T) {
 	setupEnv(t)
 	_ = setupTempHome(t)
 
@@ -1496,8 +1496,8 @@ func TestSM_StagingAddViaCLI(t *testing.T) {
 	})
 }
 
-// TestSSM_StagingEditViaCLI tests re-adding (editing) a staged value via CLI.
-func TestSSM_StagingEditViaCLI(t *testing.T) {
+// TestParam_StagingEditViaCLI tests re-adding (editing) a staged value via CLI.
+func TestParam_StagingEditViaCLI(t *testing.T) {
 	setupEnv(t)
 	_ = setupTempHome(t)
 
@@ -1534,8 +1534,8 @@ func TestSSM_StagingEditViaCLI(t *testing.T) {
 	})
 }
 
-// TestSSM_StagingDiffViaCLI tests the stage diff command via CLI for various operations.
-func TestSSM_StagingDiffViaCLI(t *testing.T) {
+// TestParam_StagingDiffViaCLI tests the stage diff command via CLI for various operations.
+func TestParam_StagingDiffViaCLI(t *testing.T) {
 	setupEnv(t)
 	_ = setupTempHome(t)
 
@@ -1576,8 +1576,8 @@ func TestSSM_StagingDiffViaCLI(t *testing.T) {
 	})
 }
 
-// TestSSM_GlobalDiffWithJSON tests global diff with JSON formatting.
-func TestSSM_GlobalDiffWithJSON(t *testing.T) {
+// TestParam_GlobalDiffWithJSON tests global diff with JSON formatting.
+func TestParam_GlobalDiffWithJSON(t *testing.T) {
 	setupEnv(t)
 	tmpHome := setupTempHome(t)
 
@@ -1595,7 +1595,7 @@ func TestSSM_GlobalDiffWithJSON(t *testing.T) {
 
 	// Stage update with different JSON
 	store := staging.NewStoreWithPath(filepath.Join(tmpHome, ".suve", "stage.json"))
-	err = store.Stage(staging.ServiceSSM, paramName, staging.Entry{
+	err = store.Stage(staging.ServiceParam, paramName, staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     `{"a":1,"b":2}`,
 		StagedAt:  time.Now(),

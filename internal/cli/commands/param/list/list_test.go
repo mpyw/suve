@@ -1,4 +1,4 @@
-package ls_test
+package list_test
 
 import (
 	"bytes"
@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	appcli "github.com/mpyw/suve/internal/cli/commands"
-	"github.com/mpyw/suve/internal/cli/commands/param/ls"
+	"github.com/mpyw/suve/internal/cli/commands/param/list"
 )
 
 func TestCommand_Help(t *testing.T) {
@@ -21,7 +21,7 @@ func TestCommand_Help(t *testing.T) {
 	app := appcli.MakeApp()
 	var buf bytes.Buffer
 	app.Writer = &buf
-	err := app.Run(context.Background(), []string{"suve", "ssm", "ls", "--help"})
+	err := app.Run(context.Background(), []string{"suve", "param", "list", "--help"})
 	require.NoError(t, err)
 	assert.Contains(t, buf.String(), "List parameters")
 	assert.Contains(t, buf.String(), "--recursive")
@@ -42,14 +42,14 @@ func TestRun(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name    string
-		opts    ls.Options
+		opts    list.Options
 		mock    *mockClient
 		wantErr bool
 		check   func(t *testing.T, output string)
 	}{
 		{
 			name: "list all parameters",
-			opts: ls.Options{},
+			opts: list.Options{},
 			mock: &mockClient{
 				describeParametersFunc: func(_ context.Context, _ *ssm.DescribeParametersInput, _ ...func(*ssm.Options)) (*ssm.DescribeParametersOutput, error) {
 					return &ssm.DescribeParametersOutput{
@@ -67,7 +67,7 @@ func TestRun(t *testing.T) {
 		},
 		{
 			name: "list with prefix",
-			opts: ls.Options{Prefix: "/app/"},
+			opts: list.Options{Prefix: "/app/"},
 			mock: &mockClient{
 				describeParametersFunc: func(_ context.Context, params *ssm.DescribeParametersInput, _ ...func(*ssm.Options)) (*ssm.DescribeParametersOutput, error) {
 					require.NotEmpty(t, params.ParameterFilters, "expected filter to be set")
@@ -84,7 +84,7 @@ func TestRun(t *testing.T) {
 		},
 		{
 			name: "recursive listing",
-			opts: ls.Options{Prefix: "/app/", Recursive: true},
+			opts: list.Options{Prefix: "/app/", Recursive: true},
 			mock: &mockClient{
 				describeParametersFunc: func(_ context.Context, params *ssm.DescribeParametersInput, _ ...func(*ssm.Options)) (*ssm.DescribeParametersOutput, error) {
 					require.NotEmpty(t, params.ParameterFilters, "expected filter to be set")
@@ -102,7 +102,7 @@ func TestRun(t *testing.T) {
 		},
 		{
 			name: "error from AWS",
-			opts: ls.Options{},
+			opts: list.Options{},
 			mock: &mockClient{
 				describeParametersFunc: func(_ context.Context, _ *ssm.DescribeParametersInput, _ ...func(*ssm.Options)) (*ssm.DescribeParametersOutput, error) {
 					return nil, fmt.Errorf("AWS error")
@@ -116,7 +116,7 @@ func TestRun(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			var buf, errBuf bytes.Buffer
-			r := &ls.Runner{
+			r := &list.Runner{
 				Client: tt.mock,
 				Stdout: &buf,
 				Stderr: &errBuf,

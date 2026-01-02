@@ -100,7 +100,7 @@ func TestRun_NothingStaged(t *testing.T) {
 	assert.Empty(t, stdout.String())
 }
 
-func TestRun_SSMOnly(t *testing.T) {
+func TestRun_ParamOnly(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
@@ -143,7 +143,7 @@ func TestRun_SSMOnly(t *testing.T) {
 	assert.Contains(t, output, "(staged)")
 }
 
-func TestRun_SMOnly(t *testing.T) {
+func TestRun_SecretOnly(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
@@ -190,14 +190,14 @@ func TestRun_BothServices(t *testing.T) {
 
 	err := store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     "ssm-new",
+		Value:     "param-new",
 		StagedAt:  time.Now(),
 	})
 	require.NoError(t, err)
 
 	err = store.Stage(staging.ServiceSecret, "my-secret", staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     "sm-new",
+		Value:     "secret-new",
 		StagedAt:  time.Now(),
 	})
 	require.NoError(t, err)
@@ -207,7 +207,7 @@ func TestRun_BothServices(t *testing.T) {
 			return &ssm.GetParameterOutput{
 				Parameter: &types.Parameter{
 					Name:    lo.ToPtr("/app/config"),
-					Value:   lo.ToPtr("ssm-old"),
+					Value:   lo.ToPtr("param-old"),
 					Version: 1,
 				},
 			}, nil
@@ -218,7 +218,7 @@ func TestRun_BothServices(t *testing.T) {
 		getSecretValueFunc: func(_ context.Context, _ *secretsmanager.GetSecretValueInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.GetSecretValueOutput, error) {
 			return &secretsmanager.GetSecretValueOutput{
 				Name:         lo.ToPtr("my-secret"),
-				SecretString: lo.ToPtr("sm-old"),
+				SecretString: lo.ToPtr("secret-old"),
 				VersionId:    lo.ToPtr("abc123def456"),
 			}, nil
 		},
@@ -239,10 +239,10 @@ func TestRun_BothServices(t *testing.T) {
 	output := stdout.String()
 	assert.Contains(t, output, "/app/config")
 	assert.Contains(t, output, "my-secret")
-	assert.Contains(t, output, "-ssm-old")
-	assert.Contains(t, output, "+ssm-new")
-	assert.Contains(t, output, "-sm-old")
-	assert.Contains(t, output, "+sm-new")
+	assert.Contains(t, output, "-param-old")
+	assert.Contains(t, output, "+param-new")
+	assert.Contains(t, output, "-secret-old")
+	assert.Contains(t, output, "+secret-new")
 }
 
 func TestRun_DeleteOperations(t *testing.T) {
@@ -388,7 +388,7 @@ func TestRun_JSONFormat(t *testing.T) {
 	assert.Contains(t, output, "+")
 }
 
-func TestRun_SSMUpdateAutoUnstageWhenDeleted(t *testing.T) {
+func TestRun_ParamUpdateAutoUnstageWhenDeleted(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
@@ -425,7 +425,7 @@ func TestRun_SSMUpdateAutoUnstageWhenDeleted(t *testing.T) {
 	assert.ErrorIs(t, err, staging.ErrNotStaged)
 }
 
-func TestRun_SMUpdateAutoUnstageWhenDeleted(t *testing.T) {
+func TestRun_SecretUpdateAutoUnstageWhenDeleted(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
@@ -462,7 +462,7 @@ func TestRun_SMUpdateAutoUnstageWhenDeleted(t *testing.T) {
 	assert.ErrorIs(t, err, staging.ErrNotStaged)
 }
 
-func TestRun_SMIdenticalValues(t *testing.T) {
+func TestRun_SecretIdenticalValues(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
@@ -504,7 +504,7 @@ func TestRun_SMIdenticalValues(t *testing.T) {
 	assert.Equal(t, staging.ErrNotStaged, err)
 }
 
-func TestRun_SMJSONFormat(t *testing.T) {
+func TestRun_SecretJSONFormat(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
@@ -543,7 +543,7 @@ func TestRun_SMJSONFormat(t *testing.T) {
 	assert.Contains(t, output, "+")
 }
 
-func TestRun_SMJSONFormatMixed(t *testing.T) {
+func TestRun_SecretJSONFormatMixed(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
@@ -580,7 +580,7 @@ func TestRun_SMJSONFormatMixed(t *testing.T) {
 	assert.Contains(t, stderr.String(), "--json has no effect")
 }
 
-func TestRun_SSMCreateOperation(t *testing.T) {
+func TestRun_ParamCreateOperation(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
@@ -623,7 +623,7 @@ func TestRun_SSMCreateOperation(t *testing.T) {
 	assert.Contains(t, output, "team=platform")
 }
 
-func TestRun_SMCreateOperation(t *testing.T) {
+func TestRun_SecretCreateOperation(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
@@ -737,7 +737,7 @@ func TestRun_DeleteAutoUnstageWhenAlreadyDeleted(t *testing.T) {
 	assert.ErrorIs(t, err, staging.ErrNotStaged)
 }
 
-func TestRun_SMDeleteAutoUnstageWhenAlreadyDeleted(t *testing.T) {
+func TestRun_SecretDeleteAutoUnstageWhenAlreadyDeleted(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()

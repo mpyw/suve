@@ -6,13 +6,13 @@ import (
 	cliinternal "github.com/mpyw/suve/internal/cli/commands/internal"
 	paramdelete "github.com/mpyw/suve/internal/cli/commands/param/delete"
 	"github.com/mpyw/suve/internal/cli/commands/param/diff"
+	"github.com/mpyw/suve/internal/cli/commands/param/list"
 	"github.com/mpyw/suve/internal/cli/commands/param/log"
-	"github.com/mpyw/suve/internal/cli/commands/param/ls"
 	"github.com/mpyw/suve/internal/cli/commands/param/set"
 	"github.com/mpyw/suve/internal/cli/commands/param/show"
 )
 
-// Command returns the ssm command with all subcommands.
+// Command returns the param command with all subcommands.
 func Command() *cli.Command {
 	return &cli.Command{
 		Name:    "param",
@@ -22,7 +22,7 @@ func Command() *cli.Command {
 			show.Command(),
 			log.Command(),
 			diff.Command(),
-			ls.Command(),
+			list.Command(),
 			set.Command(),
 			paramdelete.Command(),
 		},

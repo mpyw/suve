@@ -49,19 +49,19 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	}
 
 	// Check if there are any staged changes
-	ssmStaged, err := store.List(staging.ServiceParam)
+	paramStaged, err := store.List(staging.ServiceParam)
 	if err != nil {
 		return err
 	}
-	smStaged, err := store.List(staging.ServiceSecret)
+	secretStaged, err := store.List(staging.ServiceSecret)
 	if err != nil {
 		return err
 	}
 
-	hasSSM := len(ssmStaged[staging.ServiceParam]) > 0
-	hasSM := len(smStaged[staging.ServiceSecret]) > 0
+	hasParam := len(paramStaged[staging.ServiceParam]) > 0
+	hasSecret := len(secretStaged[staging.ServiceSecret]) > 0
 
-	if !hasSSM && !hasSM {
+	if !hasParam && !hasSecret {
 		output.Info(cmd.Root().Writer, "No changes staged.")
 		return nil
 	}
@@ -73,7 +73,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	}
 
 	// Initialize strategies only if needed
-	if hasSSM {
+	if hasParam {
 		strat, err := staging.ParamFactory(ctx)
 		if err != nil {
 			return err
@@ -81,7 +81,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		r.ParamStrategy = strat
 	}
 
-	if hasSM {
+	if hasSecret {
 		strat, err := staging.SecretFactory(ctx)
 		if err != nil {
 			return err
@@ -100,23 +100,23 @@ func (r *Runner) Run(ctx context.Context) error {
 		return err
 	}
 
-	ssmStaged := allStaged[staging.ServiceParam]
-	smStaged := allStaged[staging.ServiceSecret]
+	paramStaged := allStaged[staging.ServiceParam]
+	secretStaged := allStaged[staging.ServiceSecret]
 
 	var totalSucceeded, totalFailed int
 
 	// Push SSM Parameter Store changes
-	if len(ssmStaged) > 0 {
+	if len(paramStaged) > 0 {
 		_, _ = fmt.Fprintln(r.Stdout, "Pushing SSM Parameter Store parameters...")
-		succeeded, failed := r.pushService(ctx, r.ParamStrategy, ssmStaged)
+		succeeded, failed := r.pushService(ctx, r.ParamStrategy, paramStaged)
 		totalSucceeded += succeeded
 		totalFailed += failed
 	}
 
 	// Push Secrets Manager changes
-	if len(smStaged) > 0 {
+	if len(secretStaged) > 0 {
 		_, _ = fmt.Fprintln(r.Stdout, "Pushing Secrets Manager secrets...")
-		succeeded, failed := r.pushService(ctx, r.SecretStrategy, smStaged)
+		succeeded, failed := r.pushService(ctx, r.SecretStrategy, secretStaged)
 		totalSucceeded += succeeded
 		totalFailed += failed
 	}

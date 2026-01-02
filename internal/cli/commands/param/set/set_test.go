@@ -23,7 +23,7 @@ func TestCommand_Validation(t *testing.T) {
 	t.Run("missing arguments", func(t *testing.T) {
 		t.Parallel()
 		app := appcli.MakeApp()
-		err := app.Run(context.Background(), []string{"suve", "ssm", "set"})
+		err := app.Run(context.Background(), []string{"suve", "param", "set"})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "usage:")
 	})
@@ -31,7 +31,7 @@ func TestCommand_Validation(t *testing.T) {
 	t.Run("missing value argument", func(t *testing.T) {
 		t.Parallel()
 		app := appcli.MakeApp()
-		err := app.Run(context.Background(), []string{"suve", "ssm", "set", "/app/param"})
+		err := app.Run(context.Background(), []string{"suve", "param", "set", "/app/param"})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "usage:")
 	})
@@ -39,7 +39,7 @@ func TestCommand_Validation(t *testing.T) {
 	t.Run("conflicting secure and type flags", func(t *testing.T) {
 		t.Parallel()
 		app := appcli.MakeApp()
-		err := app.Run(context.Background(), []string{"suve", "ssm", "set", "--secure", "--type", "String", "/app/param", "value"})
+		err := app.Run(context.Background(), []string{"suve", "param", "set", "--secure", "--type", "String", "/app/param", "value"})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "cannot use --secure with --type")
 	})
