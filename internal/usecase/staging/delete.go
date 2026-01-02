@@ -8,12 +8,6 @@ import (
 	"github.com/mpyw/suve/internal/staging"
 )
 
-// DeleteStrategy provides delete-specific operations.
-type DeleteStrategy interface {
-	staging.ServiceStrategy
-	FetchLastModified(ctx context.Context, name string) (time.Time, error)
-}
-
 // DeleteInput holds input for the delete use case.
 type DeleteInput struct {
 	Name           string
@@ -32,7 +26,7 @@ type DeleteOutput struct {
 
 // DeleteUseCase executes delete staging operations.
 type DeleteUseCase struct {
-	Strategy DeleteStrategy
+	Strategy staging.DeleteStrategy
 	Store    *staging.Store
 }
 

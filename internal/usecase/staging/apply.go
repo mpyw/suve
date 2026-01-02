@@ -64,9 +64,6 @@ func (u *ApplyUseCase) Execute(ctx context.Context, input ApplyInput) (*ApplyOut
 	}
 
 	entries := staged[service]
-	if len(entries) == 0 {
-		return output, nil
-	}
 
 	// Filter by name if specified
 	if input.Name != "" {
@@ -75,6 +72,10 @@ func (u *ApplyUseCase) Execute(ctx context.Context, input ApplyInput) (*ApplyOut
 			return nil, fmt.Errorf("%s %s is not staged", itemName, input.Name)
 		}
 		entries = map[string]staging.Entry{input.Name: entry}
+	}
+
+	if len(entries) == 0 {
+		return output, nil
 	}
 
 	// Check for conflicts

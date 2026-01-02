@@ -1,0 +1,184 @@
+package staging_test
+
+import (
+	"context"
+	"errors"
+	"path/filepath"
+	"testing"
+	"time"
+
+	"github.com/samber/lo"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/mpyw/suve/internal/staging"
+	usecasestaging "github.com/mpyw/suve/internal/usecase/staging"
+)
+
+type mockParser struct {
+	*mockServiceStrategy
+	parsedName string
+	parseErr   error
+}
+
+func (m *mockParser) ParseName(input string) (string, error) {
+	if m.parseErr != nil {
+		return "", m.parseErr
+	}
+	if m.parsedName != "" {
+		return m.parsedName, nil
+	}
+	return input, nil
+}
+
+func (m *mockParser) ParseSpec(input string) (string, bool, error) {
+	return input, false, nil
+}
+
+func newMockParser() *mockParser {
+	return &mockParser{
+		mockServiceStrategy: newParamStrategy(),
+	}
+}
+
+func TestAddUseCase_Execute(t *testing.T) {
+	t.Parallel()
+
+	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	uc := &usecasestaging.AddUseCase{
+		Strategy: newMockParser(),
+		Store:    store,
+	}
+
+	output, err := uc.Execute(context.Background(), usecasestaging.AddInput{
+		Name:        "/app/new-param",
+		Value:       "new-value",
+		Description: "test description",
+		Tags:        map[string]string{"env": "test"},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "/app/new-param", output.Name)
+
+	// Verify staged
+	entry, err := store.Get(staging.ServiceParam, "/app/new-param")
+	require.NoError(t, err)
+	assert.Equal(t, staging.OperationCreate, entry.Operation)
+	assert.Equal(t, "new-value", lo.FromPtr(entry.Value))
+	assert.Equal(t, "test description", lo.FromPtr(entry.Description))
+	assert.Equal(t, "test", entry.Tags["env"])
+}
+
+func TestAddUseCase_Execute_MinimalInput(t *testing.T) {
+	t.Parallel()
+
+	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	uc := &usecasestaging.AddUseCase{
+		Strategy: newMockParser(),
+		Store:    store,
+	}
+
+	output, err := uc.Execute(context.Background(), usecasestaging.AddInput{
+		Name:  "/app/simple",
+		Value: "simple-value",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "/app/simple", output.Name)
+
+	entry, err := store.Get(staging.ServiceParam, "/app/simple")
+	require.NoError(t, err)
+	assert.Nil(t, entry.Description)
+	assert.Empty(t, entry.Tags)
+}
+
+func TestAddUseCase_Draft_NotStaged(t *testing.T) {
+	t.Parallel()
+
+	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	uc := &usecasestaging.AddUseCase{
+		Strategy: newMockParser(),
+		Store:    store,
+	}
+
+	output, err := uc.Draft(context.Background(), usecasestaging.DraftInput{Name: "/app/not-exists"})
+	require.NoError(t, err)
+	assert.False(t, output.IsStaged)
+	assert.Empty(t, output.Value)
+}
+
+func TestAddUseCase_Draft_StagedCreate(t *testing.T) {
+	t.Parallel()
+
+	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	require.NoError(t, store.Stage(staging.ServiceParam, "/app/draft", staging.Entry{
+		Operation: staging.OperationCreate,
+		Value:     lo.ToPtr("draft-value"),
+		StagedAt:  time.Now(),
+	}))
+
+	uc := &usecasestaging.AddUseCase{
+		Strategy: newMockParser(),
+		Store:    store,
+	}
+
+	output, err := uc.Draft(context.Background(), usecasestaging.DraftInput{Name: "/app/draft"})
+	require.NoError(t, err)
+	assert.True(t, output.IsStaged)
+	assert.Equal(t, "draft-value", output.Value)
+}
+
+func TestAddUseCase_Draft_StagedUpdate(t *testing.T) {
+	t.Parallel()
+
+	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	// Update operation should not be returned as draft
+	require.NoError(t, store.Stage(staging.ServiceParam, "/app/update", staging.Entry{
+		Operation: staging.OperationUpdate,
+		Value:     lo.ToPtr("update-value"),
+		StagedAt:  time.Now(),
+	}))
+
+	uc := &usecasestaging.AddUseCase{
+		Strategy: newMockParser(),
+		Store:    store,
+	}
+
+	output, err := uc.Draft(context.Background(), usecasestaging.DraftInput{Name: "/app/update"})
+	require.NoError(t, err)
+	assert.False(t, output.IsStaged) // Update is not a draft
+}
+
+func TestAddUseCase_Execute_ParseError(t *testing.T) {
+	t.Parallel()
+
+	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	parser := newMockParser()
+	parser.parseErr = errors.New("invalid name")
+
+	uc := &usecasestaging.AddUseCase{
+		Strategy: parser,
+		Store:    store,
+	}
+
+	_, err := uc.Execute(context.Background(), usecasestaging.AddInput{
+		Name:  "invalid",
+		Value: "value",
+	})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid name")
+}
+
+func TestAddUseCase_Draft_ParseError(t *testing.T) {
+	t.Parallel()
+
+	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	parser := newMockParser()
+	parser.parseErr = errors.New("invalid name")
+
+	uc := &usecasestaging.AddUseCase{
+		Strategy: parser,
+		Store:    store,
+	}
+
+	_, err := uc.Draft(context.Background(), usecasestaging.DraftInput{Name: "invalid"})
+	assert.Error(t, err)
+}

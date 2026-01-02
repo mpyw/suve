@@ -10,12 +10,6 @@ import (
 	"github.com/mpyw/suve/internal/staging"
 )
 
-// VersionFetcher fetches values for specific versions from AWS.
-type VersionFetcher interface {
-	// FetchVersion fetches the value for a specific version.
-	FetchVersion(ctx context.Context, input string) (value string, versionLabel string, err error)
-}
-
 // ResetInput holds input for the reset use case.
 type ResetInput struct {
 	Spec string // Name with optional version spec
@@ -46,7 +40,7 @@ type ResetOutput struct {
 // ResetUseCase executes reset operations.
 type ResetUseCase struct {
 	Parser  staging.Parser
-	Fetcher VersionFetcher
+	Fetcher staging.ResetStrategy
 	Store   *staging.Store
 }
 
@@ -127,7 +121,7 @@ func (u *ResetUseCase) restore(ctx context.Context, spec, name string) (*ResetOu
 	service := u.Parser.Service()
 
 	if u.Fetcher == nil {
-		return nil, errors.New("version fetcher required for restore operation")
+		return nil, errors.New("reset strategy required for restore operation")
 	}
 
 	value, versionLabel, err := u.Fetcher.FetchVersion(ctx, spec)

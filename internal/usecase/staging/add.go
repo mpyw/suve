@@ -58,19 +58,19 @@ func (u *AddUseCase) Execute(_ context.Context, input AddInput) (*AddOutput, err
 	return &AddOutput{Name: name}, nil
 }
 
-// GetStagedValueInput holds input for getting staged value.
-type GetStagedValueInput struct {
+// DraftInput holds input for getting draft (staged create) value.
+type DraftInput struct {
 	Name string
 }
 
-// GetStagedValueOutput holds the staged value if any.
-type GetStagedValueOutput struct {
+// DraftOutput holds the draft value if any.
+type DraftOutput struct {
 	Value    string
 	IsStaged bool
 }
 
-// GetStagedValue returns the currently staged value for editing.
-func (u *AddUseCase) GetStagedValue(_ context.Context, input GetStagedValueInput) (*GetStagedValueOutput, error) {
+// Draft returns the currently staged create value (draft) for re-editing.
+func (u *AddUseCase) Draft(_ context.Context, input DraftInput) (*DraftOutput, error) {
 	service := u.Strategy.Service()
 
 	// Parse and validate name
@@ -82,17 +82,17 @@ func (u *AddUseCase) GetStagedValue(_ context.Context, input GetStagedValueInput
 	stagedEntry, err := u.Store.Get(service, name)
 	if err != nil {
 		if errors.Is(err, staging.ErrNotStaged) {
-			return &GetStagedValueOutput{IsStaged: false}, nil
+			return &DraftOutput{IsStaged: false}, nil
 		}
 		return nil, err
 	}
 
 	if stagedEntry.Operation == staging.OperationCreate {
-		return &GetStagedValueOutput{
+		return &DraftOutput{
 			Value:    lo.FromPtr(stagedEntry.Value),
 			IsStaged: true,
 		}, nil
 	}
 
-	return &GetStagedValueOutput{IsStaged: false}, nil
+	return &DraftOutput{IsStaged: false}, nil
 }

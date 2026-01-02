@@ -83,18 +83,18 @@ func (u *EditUseCase) getBaseModifiedAt(ctx context.Context, name string) (*time
 	return nil, nil
 }
 
-// GetCurrentValueInput holds input for getting current value.
-type GetCurrentValueInput struct {
+// BaselineInput holds input for getting baseline value.
+type BaselineInput struct {
 	Name string
 }
 
-// GetCurrentValueOutput holds the current value.
-type GetCurrentValueOutput struct {
+// BaselineOutput holds the baseline value for editing.
+type BaselineOutput struct {
 	Value string
 }
 
-// GetCurrentValue returns the current value for editing (from staging or AWS).
-func (u *EditUseCase) GetCurrentValue(ctx context.Context, input GetCurrentValueInput) (*GetCurrentValueOutput, error) {
+// Baseline returns the baseline value for editing (staged value if exists, otherwise from AWS).
+func (u *EditUseCase) Baseline(ctx context.Context, input BaselineInput) (*BaselineOutput, error) {
 	service := u.Strategy.Service()
 
 	// Check if already staged
@@ -104,7 +104,7 @@ func (u *EditUseCase) GetCurrentValue(ctx context.Context, input GetCurrentValue
 	}
 
 	if stagedEntry != nil && (stagedEntry.Operation == staging.OperationCreate || stagedEntry.Operation == staging.OperationUpdate) {
-		return &GetCurrentValueOutput{
+		return &BaselineOutput{
 			Value: lo.FromPtr(stagedEntry.Value),
 		}, nil
 	}
@@ -115,5 +115,5 @@ func (u *EditUseCase) GetCurrentValue(ctx context.Context, input GetCurrentValue
 		return nil, err
 	}
 
-	return &GetCurrentValueOutput{Value: result.Value}, nil
+	return &BaselineOutput{Value: result.Value}, nil
 }
