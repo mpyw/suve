@@ -72,6 +72,30 @@ postgres://db.example.com:5432/myapp
 > [!TIP]
 > Use `--raw` for scripting and piping. The output has no trailing newline.
 
+> [!NOTE]
+> Timestamps respect the `TZ` environment variable. Use `TZ=UTC` or `TZ=Asia/Tokyo` to change the displayed timezone.
+
+With `--output=json` for structured output:
+
+```ShellSession
+user@host:~$ suve param show --output=json /app/config/database-url
+{
+  "name": "/app/config/database-url",
+  "version": 3,
+  "type": "SecureString",
+  "decrypted": true,
+  "modified": "2024-01-15T10:30:45Z",
+  "value": "postgres://db.example.com:5432/myapp"
+}
+```
+
+Extract fields with `jq`:
+
+```ShellSession
+user@host:~$ suve param show --output=json /app/config/database-url | jq -r '.value'
+postgres://db.example.com:5432/myapp
+```
+
 ```bash
 # Show specific version
 suve param show /app/config/database-url#3
@@ -186,6 +210,9 @@ suve param log --patch --parse-json /app/config/database-credentials
 
 # Show oldest versions first
 suve param log --reverse /app/config/database-url
+
+# Output as JSON for scripting
+suve param log --output=json /app/config/database-url
 ```
 
 ---
@@ -225,6 +252,9 @@ The diff command supports multiple argument formats for flexibility:
 | `~N` | N versions ago | `~2` = latest - 2 |
 
 Specifiers can be combined: `/param#5~2` means "version 5, then 2 back" = version 3.
+
+> [!TIP]
+> `~` without a number means `~1`. You can chain shifts: `~~` = `~1~1` = `~2`.
 
 **Options:**
 
@@ -365,6 +395,9 @@ suve param list --filter '\.prod\.'
 
 # List with values
 suve param list --show /app/
+
+# Output as JSON for scripting
+suve param list --output=json /app/config/
 ```
 
 ---
@@ -709,8 +742,8 @@ Output will look like:
 +my-value
 ```
 
-> [!CAUTION]
-> Always review the diff before applying to ensure you're applying the intended changes.
+> [!TIP]
+> Use `--parse-json` to normalize JSON formatting before comparing, making it easier to spot actual content changes vs formatting differences.
 
 ---
 
@@ -740,6 +773,14 @@ suve stage param apply [options] [name]
 > [!NOTE]
 > Before applying, suve checks if the AWS resource was modified after staging. If a conflict is detected, the apply is rejected to prevent lost updates. Use `--ignore-conflicts` to force apply despite conflicts.
 
+**Behavior:**
+
+1. Reads all staged SSM changes
+2. For each `set` operation: calls PutParameter
+3. For each `delete` operation: calls DeleteParameter
+4. Removes successfully applied changes from stage
+5. Keeps failed changes in stage for retry
+
 **Examples:**
 
 ```ShellSession
@@ -750,7 +791,7 @@ Set /app/config/database-url (version: 4)
 Deleted /app/config/old-param
 ```
 
-> [!CAUTION]
+> [!WARNING]
 > `suve stage param apply` applies changes to AWS immediately. Always review with `suve stage param diff` first!
 
 ---

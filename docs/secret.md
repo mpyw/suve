@@ -47,7 +47,7 @@ With `--parse-json` for JSON values:
 user@host:~$ suve secret show --parse-json my-database-credentials
 Name: my-database-credentials
 ARN: arn:aws:secretsmanager:us-east-1:123456789012:secret:my-database-credentials-AbCdEf
- VersionId: abc12345-1234-1234-1234-123456789012
+VersionId: abc12345-1234-1234-1234-123456789012
 Stages: [AWSCURRENT]
 Created: 2024-01-15T10:30:45Z
 
@@ -56,6 +56,9 @@ Created: 2024-01-15T10:30:45Z
     "username": "admin"
   }
 ```
+
+> [!NOTE]
+> Keys are sorted alphabetically when using `--parse-json`.
 
 With `--raw` for scripting (outputs value only, no trailing newline):
 
@@ -67,11 +70,28 @@ user@host:~$ suve secret show --raw my-database-credentials
 > [!TIP]
 > Use `--raw` for scripting and piping. The output has no trailing newline.
 
+> [!NOTE]
+> Timestamps respect the `TZ` environment variable. Use `TZ=UTC` or `TZ=Asia/Tokyo` to change the displayed timezone.
+
 Extract JSON fields with `jq`:
 
 ```ShellSession
 user@host:~$ suve secret show --raw my-database-credentials | jq -r '.password'
 secret123
+```
+
+With `--output=json` for structured output:
+
+```ShellSession
+user@host:~$ suve secret show --output=json my-database-credentials
+{
+  "name": "my-database-credentials",
+  "arn": "arn:aws:secretsmanager:us-east-1:123456789012:secret:my-database-credentials-AbCdEf",
+  "versionId": "abc12345-1234-1234-1234-123456789012",
+  "stages": ["AWSCURRENT"],
+  "created": "2024-01-15T10:30:45Z",
+  "value": "{\"username\":\"admin\",\"password\":\"secret123\"}"
+}
 ```
 
 ```bash
@@ -186,6 +206,9 @@ suve secret log --patch --parse-json my-database-credentials
 
 # Show oldest versions first
 suve secret log --reverse my-database-credentials
+
+# Output as JSON for scripting
+suve secret log --output=json my-database-credentials
 ```
 
 ---
@@ -226,6 +249,9 @@ The diff command supports multiple argument formats for flexibility:
 | `~N` | N versions ago | `~2` = current - 2 |
 
 Specifiers can be combined: `secret:AWSCURRENT~1` means "1 version before AWSCURRENT".
+
+> [!TIP]
+> `~` without a number means `~1`. You can chain shifts: `~~` = `~1~1` = `~2`.
 
 > [!NOTE]
 > **Labels vs Shift**: Labels (`:AWSCURRENT`, `:AWSPREVIOUS`) point to specific tagged versions. Shift (`~N`) navigates by creation date order. After a secret update:
@@ -371,6 +397,9 @@ suve secret list --filter '\.prod$'
 
 # List with values
 suve secret list --show production/
+
+# Output as JSON for scripting
+suve secret list --output=json production/
 ```
 
 ---
@@ -833,8 +862,8 @@ Output will look like:
 -{"password":"deleted"}
 ```
 
-> [!CAUTION]
-> Always review the diff before applying to ensure you're applying the intended changes.
+> [!TIP]
+> Use `--parse-json` to normalize JSON formatting before comparing, making it easier to spot actual content changes vs formatting differences.
 
 ---
 
@@ -882,7 +911,7 @@ Updated my-database-credentials (version: def67890)
 Deleted my-old-secret
 ```
 
-> [!CAUTION]
+> [!WARNING]
 > `suve stage secret apply` applies changes to AWS immediately. Always review with `suve stage secret diff` first!
 
 ---
