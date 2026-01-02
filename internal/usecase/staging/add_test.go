@@ -182,3 +182,38 @@ func TestAddUseCase_Draft_ParseError(t *testing.T) {
 	_, err := uc.Draft(context.Background(), usecasestaging.DraftInput{Name: "invalid"})
 	assert.Error(t, err)
 }
+
+func TestAddUseCase_Execute_StageError(t *testing.T) {
+	t.Parallel()
+
+	store := newMockStore()
+	store.stageErr = errors.New("stage error")
+
+	uc := &usecasestaging.AddUseCase{
+		Strategy: newMockParser(),
+		Store:    store,
+	}
+
+	_, err := uc.Execute(context.Background(), usecasestaging.AddInput{
+		Name:  "/app/config",
+		Value: "value",
+	})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "stage error")
+}
+
+func TestAddUseCase_Draft_GetError(t *testing.T) {
+	t.Parallel()
+
+	store := newMockStore()
+	store.getErr = errors.New("get error")
+
+	uc := &usecasestaging.AddUseCase{
+		Strategy: newMockParser(),
+		Store:    store,
+	}
+
+	_, err := uc.Draft(context.Background(), usecasestaging.DraftInput{Name: "/app/config"})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "get error")
+}

@@ -246,3 +246,42 @@ func TestApplyUseCase_Execute_ConflictDetection(t *testing.T) {
 	assert.Len(t, output.Conflicts, 1)
 	assert.Equal(t, "/app/conflict", output.Conflicts[0])
 }
+
+func TestApplyUseCase_Execute_ListError(t *testing.T) {
+	t.Parallel()
+
+	store := newMockStore()
+	store.listErr = errors.New("list error")
+
+	uc := &usecasestaging.ApplyUseCase{
+		Strategy: newMockApplyStrategy(),
+		Store:    store,
+	}
+
+	_, err := uc.Execute(context.Background(), usecasestaging.ApplyInput{})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "list error")
+}
+
+func TestApplyUseCase_Execute_DeleteSuccess(t *testing.T) {
+	t.Parallel()
+
+	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	require.NoError(t, store.Stage(staging.ServiceParam, "/app/to-delete", staging.Entry{
+		Operation: staging.OperationDelete,
+		StagedAt:  time.Now(),
+	}))
+
+	uc := &usecasestaging.ApplyUseCase{
+		Strategy: newMockApplyStrategy(),
+		Store:    store,
+	}
+
+	output, err := uc.Execute(context.Background(), usecasestaging.ApplyInput{
+		IgnoreConflicts: true,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, 1, output.Succeeded)
+	require.Len(t, output.Results, 1)
+	assert.Equal(t, usecasestaging.ApplyResultDeleted, output.Results[0].Status)
+}

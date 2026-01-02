@@ -243,3 +243,79 @@ func TestEditUseCase_Execute_ZeroLastModified(t *testing.T) {
 	require.NoError(t, err)
 	assert.Nil(t, entry.BaseModifiedAt)
 }
+
+func TestEditUseCase_Execute_StageError(t *testing.T) {
+	t.Parallel()
+
+	store := newMockStore()
+	store.stageErr = errors.New("stage error")
+
+	uc := &usecasestaging.EditUseCase{
+		Strategy: newMockEditStrategy(),
+		Store:    store,
+	}
+
+	_, err := uc.Execute(context.Background(), usecasestaging.EditInput{
+		Name:  "/app/config",
+		Value: "value",
+	})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "stage error")
+}
+
+func TestEditUseCase_Execute_GetErrorForBaseModified(t *testing.T) {
+	t.Parallel()
+
+	store := newMockStore()
+	store.getErr = errors.New("get error")
+
+	uc := &usecasestaging.EditUseCase{
+		Strategy: newMockEditStrategy(),
+		Store:    store,
+	}
+
+	_, err := uc.Execute(context.Background(), usecasestaging.EditInput{
+		Name:  "/app/config",
+		Value: "value",
+	})
+	assert.Error(t, err)
+}
+
+func TestEditUseCase_Baseline_GetError(t *testing.T) {
+	t.Parallel()
+
+	store := newMockStore()
+	store.getErr = errors.New("get error")
+
+	uc := &usecasestaging.EditUseCase{
+		Strategy: newMockEditStrategy(),
+		Store:    store,
+	}
+
+	_, err := uc.Baseline(context.Background(), usecasestaging.BaselineInput{Name: "/app/config"})
+	assert.Error(t, err)
+}
+
+func TestEditUseCase_Execute_WithTags(t *testing.T) {
+	t.Parallel()
+
+	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	uc := &usecasestaging.EditUseCase{
+		Strategy: newMockEditStrategy(),
+		Store:    store,
+	}
+
+	output, err := uc.Execute(context.Background(), usecasestaging.EditInput{
+		Name:  "/app/config",
+		Value: "updated-value",
+		Tags:  map[string]string{"env": "prod", "team": "backend"},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "/app/config", output.Name)
+
+	// Verify tags are staged
+	entry, err := store.Get(staging.ServiceParam, "/app/config")
+	require.NoError(t, err)
+	assert.Equal(t, "prod", entry.Tags["env"])
+	assert.Equal(t, "backend", entry.Tags["team"])
+}

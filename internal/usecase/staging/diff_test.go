@@ -305,3 +305,61 @@ func TestDiffUseCase_Execute_WithTags(t *testing.T) {
 	require.Len(t, output.Entries, 1)
 	assert.Equal(t, "test", output.Entries[0].Tags["env"])
 }
+
+func TestDiffUseCase_Execute_ListError(t *testing.T) {
+	t.Parallel()
+
+	store := newMockStore()
+	store.listErr = errors.New("list error")
+
+	uc := &usecasestaging.DiffUseCase{
+		Strategy: newMockDiffStrategy(),
+		Store:    store,
+	}
+
+	_, err := uc.Execute(context.Background(), usecasestaging.DiffInput{})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "list error")
+}
+
+func TestDiffUseCase_Execute_GetError(t *testing.T) {
+	t.Parallel()
+
+	store := newMockStore()
+	store.getErr = errors.New("get error")
+
+	uc := &usecasestaging.DiffUseCase{
+		Strategy: newMockDiffStrategy(),
+		Store:    store,
+	}
+
+	_, err := uc.Execute(context.Background(), usecasestaging.DiffInput{Name: "/app/config"})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "get error")
+}
+
+func TestDiffUseCase_Execute_UnknownOperation(t *testing.T) {
+	t.Parallel()
+
+	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	// Stage an entry with an unknown operation (edge case)
+	require.NoError(t, store.Stage(staging.ServiceParam, "/app/unknown", staging.Entry{
+		Operation: staging.Operation("unknown"), // Invalid operation
+		Value:     lo.ToPtr("value"),
+		StagedAt:  time.Now(),
+	}))
+
+	strategy := newMockDiffStrategy()
+	strategy.fetchErrors["/app/unknown"] = errors.New("fetch error")
+
+	uc := &usecasestaging.DiffUseCase{
+		Strategy: strategy,
+		Store:    store,
+	}
+
+	output, err := uc.Execute(context.Background(), usecasestaging.DiffInput{})
+	require.NoError(t, err)
+	require.Len(t, output.Entries, 1)
+	assert.Equal(t, usecasestaging.DiffEntryWarning, output.Entries[0].Type)
+	assert.Contains(t, output.Entries[0].Warning, "fetch error")
+}

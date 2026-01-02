@@ -26,7 +26,7 @@ type EditOutput struct {
 // EditUseCase executes edit operations.
 type EditUseCase struct {
 	Strategy staging.EditStrategy
-	Store    *staging.Store
+	Store    staging.StoreReadWriter
 }
 
 // Execute runs the edit use case.
