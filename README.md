@@ -21,6 +21,12 @@ A **Git-like CLI** for AWS Parameter Store and Secrets Manager. Familiar command
 
 ## Installation
 
+### Using [Homebrew](https://brew.sh/) (macOS/Linux)
+
+```bash
+brew install mpyw/tap/suve
+```
+
 ### Using [`go install`](https://pkg.go.dev/cmd/go#hdr-Compile_and_install_packages_and_dependencies)
 
 ```bash
