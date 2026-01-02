@@ -45,7 +45,7 @@ func (s *SecretStrategy) Service() Service {
 
 // ServiceName returns the user-friendly service name.
 func (s *SecretStrategy) ServiceName() string {
-	return "SM"
+	return "Secrets Manager"
 }
 
 // ItemName returns the item name for messages.

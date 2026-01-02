@@ -43,7 +43,7 @@ func (s *ParamStrategy) Service() Service {
 
 // ServiceName returns the user-friendly service name.
 func (s *ParamStrategy) ServiceName() string {
-	return "SSM"
+	return "SSM Parameter Store"
 }
 
 // ItemName returns the item name for messages.

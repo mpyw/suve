@@ -12,7 +12,7 @@ type ServiceStrategy interface {
 	// Service returns the service type (ServiceParam or ServiceSecret).
 	Service() Service
 
-	// ServiceName returns the user-friendly service name (e.g., "SSM", "SM").
+	// ServiceName returns the user-friendly service name (e.g., "SSM Parameter Store", "Secrets Manager").
 	ServiceName() string
 
 	// ItemName returns the item name for messages (e.g., "parameter", "secret").

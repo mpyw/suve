@@ -93,7 +93,7 @@ func TestSecretStrategy_BasicMethods(t *testing.T) {
 
 	t.Run("ServiceName", func(t *testing.T) {
 		t.Parallel()
-		assert.Equal(t, "SM", s.ServiceName())
+		assert.Equal(t, "Secrets Manager", s.ServiceName())
 	})
 
 	t.Run("ItemName", func(t *testing.T) {

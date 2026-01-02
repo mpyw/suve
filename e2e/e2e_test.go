@@ -1038,8 +1038,8 @@ func TestGlobal_StageWorkflow(t *testing.T) {
 		require.NoError(t, err)
 		assert.Contains(t, stdout, paramName)
 		assert.Contains(t, stdout, secretName)
-		assert.Contains(t, stdout, "SSM")
-		assert.Contains(t, stdout, "SM")
+		assert.Contains(t, stdout, "SSM Parameter Store")
+		assert.Contains(t, stdout, "Secrets Manager")
 		t.Logf("global status output: %s", stdout)
 	})
 

@@ -46,7 +46,7 @@ func (m *mockStrategy) FetchLastModified(_ context.Context, _ string) (time.Time
 func newSSMStrategy() *mockStrategy {
 	return &mockStrategy{
 		service:          staging.ServiceParam,
-		serviceName:      "SSM",
+		serviceName:      "SSM Parameter Store",
 		itemName:         "parameter",
 		hasDeleteOptions: false,
 	}
@@ -55,7 +55,7 @@ func newSSMStrategy() *mockStrategy {
 func newSMStrategy() *mockStrategy {
 	return &mockStrategy{
 		service:          staging.ServiceSecret,
-		serviceName:      "SM",
+		serviceName:      "Secrets Manager",
 		itemName:         "secret",
 		hasDeleteOptions: true,
 	}
@@ -149,8 +149,8 @@ func TestRun_PushBothServices(t *testing.T) {
 	assert.True(t, smPutCalled)
 	assert.Contains(t, buf.String(), "Pushing SSM parameters")
 	assert.Contains(t, buf.String(), "Pushing SM secrets")
-	assert.Contains(t, buf.String(), "SSM: Updated /app/config")
-	assert.Contains(t, buf.String(), "SM: Updated my-secret")
+	assert.Contains(t, buf.String(), "SSM Parameter Store: Updated /app/config")
+	assert.Contains(t, buf.String(), "Secrets Manager: Updated my-secret")
 
 	// Verify both unstaged
 	_, err = store.Get(staging.ServiceParam, "/app/config")
@@ -275,8 +275,8 @@ func TestRun_PushDelete(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, ssmDeleteCalled)
 	assert.True(t, smDeleteCalled)
-	assert.Contains(t, buf.String(), "SSM: Deleted /app/old")
-	assert.Contains(t, buf.String(), "SM: Deleted old-secret")
+	assert.Contains(t, buf.String(), "SSM Parameter Store: Deleted /app/old")
+	assert.Contains(t, buf.String(), "Secrets Manager: Deleted old-secret")
 }
 
 func TestRun_PartialFailure(t *testing.T) {
