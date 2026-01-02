@@ -13,7 +13,7 @@ A **Git-like CLI** for AWS Parameter Store and Secrets Manager. Familiar command
 
 ## Features
 
-- **Git-like commands**: `show`, `log`, `diff`, `cat`, `ls`, `set`, `delete`
+- **Git-like commands**: `show`, `log`, `diff`, `ls`, `set`, `rm`
 - **Staging workflow**: `edit` → `status` → `diff` → `apply` (review changes before applying)
 - **Version navigation**: `#VERSION`, `~SHIFT`, `:LABEL` syntax
 - **Colored diff output**: Easy-to-read unified diff format
@@ -38,7 +38,7 @@ go tool suve param show /my/param
 ```
 
 > [!TIP]
-> **Using with aws-vault**: Wrap commands with `aws-vault exec` for temporary credentials:
+> **Using with [aws-vault](https://github.com/99designs/aws-vault)**: Wrap commands with `aws-vault exec` for temporary credentials:
 > ```bash
 > aws-vault exec my-profile -- suve param show /my/param
 > ```
@@ -93,6 +93,11 @@ Use `--patch` to see what changed in each version:
 
 ```ShellSession
 user@host:~$ suve param log --patch /app/config/database-url
+```
+
+Output will look like:
+
+```diff
 Version 3 (current)
 Date: 2024-01-15T10:30:45Z
 
@@ -113,7 +118,7 @@ Date: 2024-01-14T09:20:30Z
 ```
 
 > [!TIP]
-> Add `--parse-json` flag to pretty-print JSON values when viewing diffs:
+> Add `--parse-json` to pretty-print JSON values before diffing. This normalizes formatting and sorts keys alphabetically, so you can focus on the actual content changes rather than formatting differences:
 > ```bash
 > suve param log --patch --parse-json /app/config/credentials
 > ```
@@ -124,6 +129,11 @@ Compare previous version with latest (most common use case):
 
 ```ShellSession
 user@host:~$ suve param diff /app/config/database-url~
+```
+
+Output will look like:
+
+```diff
 --- /app/config/database-url#2
 +++ /app/config/database-url#3
 @@ -1 +1 @@
@@ -135,6 +145,11 @@ Compare any two specific versions:
 
 ```ShellSession
 user@host:~$ suve param diff /app/config/database-url#1 /app/config/database-url#3
+```
+
+Output will look like:
+
+```diff
 --- /app/config/database-url#1
 +++ /app/config/database-url#3
 @@ -1 +1 @@
@@ -170,6 +185,11 @@ Staged SSM changes (3):
   D /app/config/old-param
 
 user@host:~$ suve stage diff
+```
+
+Output will look like:
+
+```diff
 --- /app/config/database-url#3 (AWS)
 +++ /app/config/database-url (staged)
 @@ -1 +1 @@
@@ -202,8 +222,8 @@ suve stage param reset /app/config/database-url
 suve stage reset
 ```
 
-> [!CAUTION]
-> `suve stage apply` applies changes to AWS immediately. Always review with `suve stage diff` first!
+> [!TIP]
+> `suve stage apply` prompts for confirmation before applying. Use `--yes` to skip the prompt.
 
 ## Version Specification
 
@@ -332,8 +352,8 @@ suve uses standard AWS SDK configuration:
 
 > [!WARNING]
 > Ensure your IAM role/user has appropriate permissions:
-> - SSM: `ssm:GetParameter`, `ssm:GetParameterHistory`, `ssm:PutParameter`, `ssm:DeleteParameter`, `ssm:DescribeParameters`
-> - SM: `secretsmanager:GetSecretValue`, `secretsmanager:ListSecretVersionIds`, `secretsmanager:PutSecretValue`, `secretsmanager:CreateSecret`, `secretsmanager:DeleteSecret`, `secretsmanager:RestoreSecret`
+> - SSM: `ssm:GetParameter`, `ssm:GetParameterHistory`, `ssm:PutParameter`, `ssm:DeleteParameter`, `ssm:DescribeParameters`, `ssm:AddTagsToResource`, `ssm:RemoveTagsFromResource`
+> - SM: `secretsmanager:GetSecretValue`, `secretsmanager:ListSecretVersionIds`, `secretsmanager:ListSecrets`, `secretsmanager:CreateSecret`, `secretsmanager:PutSecretValue`, `secretsmanager:UpdateSecret`, `secretsmanager:DeleteSecret`, `secretsmanager:RestoreSecret`, `secretsmanager:TagResource`, `secretsmanager:UntagResource`
 
 ## Development
 
