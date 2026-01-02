@@ -11,8 +11,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	appcli "github.com/mpyw/suve/internal/cli"
-	"github.com/mpyw/suve/internal/cli/sm/create"
+	appcli "github.com/mpyw/suve/internal/cli/commands"
+	"github.com/mpyw/suve/internal/cli/commands/sm/create"
 )
 
 func TestCommand_Validation(t *testing.T) {
@@ -52,7 +52,7 @@ func TestRun(t *testing.T) {
 		name    string
 		opts    create.Options
 		mock    *mockClient
-		wantErr bool
+		wantErr string
 		check   func(t *testing.T, output string)
 	}{
 		{
@@ -87,14 +87,40 @@ func TestRun(t *testing.T) {
 			},
 		},
 		{
-			name: "error from AWS",
-			opts: create.Options{Name: "my-secret", Value: "secret-value"},
+			name: "create with tags",
+			opts: create.Options{
+				Name:  "my-secret",
+				Value: "secret-value",
+				Tags:  map[string]string{"env": "prod", "team": "platform"},
+			},
+			mock: &mockClient{
+				createSecretFunc: func(_ context.Context, params *secretsmanager.CreateSecretInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.CreateSecretOutput, error) {
+					assert.Len(t, params.Tags, 2)
+					tagMap := make(map[string]string)
+					for _, tag := range params.Tags {
+						tagMap[lo.FromPtr(tag.Key)] = lo.FromPtr(tag.Value)
+					}
+					assert.Equal(t, "prod", tagMap["env"])
+					assert.Equal(t, "platform", tagMap["team"])
+					return &secretsmanager.CreateSecretOutput{
+						Name:      lo.ToPtr("my-secret"),
+						VersionId: lo.ToPtr("abc123"),
+					}, nil
+				},
+			},
+			check: func(t *testing.T, output string) {
+				assert.Contains(t, output, "Created secret")
+			},
+		},
+		{
+			name:    "error from AWS",
+			opts:    create.Options{Name: "my-secret", Value: "secret-value"},
+			wantErr: "failed to create secret",
 			mock: &mockClient{
 				createSecretFunc: func(_ context.Context, _ *secretsmanager.CreateSecretInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.CreateSecretOutput, error) {
 					return nil, fmt.Errorf("AWS error")
 				},
 			},
-			wantErr: true,
 		},
 	}
 
@@ -109,8 +135,9 @@ func TestRun(t *testing.T) {
 			}
 			err := r.Run(t.Context(), tt.opts)
 
-			if tt.wantErr {
-				assert.Error(t, err)
+			if tt.wantErr != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.wantErr)
 				return
 			}
 

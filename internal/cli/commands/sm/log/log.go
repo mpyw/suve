@@ -12,15 +12,15 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
-	"github.com/fatih/color"
 	"github.com/samber/lo"
 	"github.com/urfave/cli/v3"
 
 	"github.com/mpyw/suve/internal/api/smapi"
-	"github.com/mpyw/suve/internal/awsutil"
+	"github.com/mpyw/suve/internal/cli/colors"
+	"github.com/mpyw/suve/internal/cli/pager"
+	"github.com/mpyw/suve/internal/infra"
 	"github.com/mpyw/suve/internal/jsonutil"
 	"github.com/mpyw/suve/internal/output"
-	"github.com/mpyw/suve/internal/pager"
 	"github.com/mpyw/suve/internal/version/smversion"
 )
 
@@ -131,7 +131,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		output.Warning(cmd.Root().ErrWriter, "--oneline has no effect with -p/--patch")
 	}
 
-	client, err := awsutil.NewSMClient(ctx)
+	client, err := infra.NewSMClient(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to initialize AWS client: %w", err)
 	}
@@ -194,10 +194,6 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 		}
 	}
 
-	yellow := color.New(color.FgYellow).SprintFunc()
-	cyan := color.New(color.FgCyan).SprintFunc()
-	green := color.New(color.FgGreen).SprintFunc()
-
 	for i, v := range versions {
 		versionID := lo.FromPtr(v.VersionId)
 
@@ -209,12 +205,12 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 			}
 			labelsStr := ""
 			if len(v.VersionStages) > 0 {
-				labelsStr = green(fmt.Sprintf(" %v", v.VersionStages))
+				labelsStr = colors.Current(fmt.Sprintf(" %v", v.VersionStages))
 			}
 			_, _ = fmt.Fprintf(r.Stdout, "%s%s  %s%s\n",
-				yellow(smversion.TruncateVersionID(versionID)),
+				colors.Version(smversion.TruncateVersionID(versionID)),
 				labelsStr,
-				cyan(dateStr),
+				colors.FieldLabel(dateStr),
 				"",
 			)
 			continue
@@ -222,11 +218,11 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 
 		versionLabel := fmt.Sprintf("Version %s", smversion.TruncateVersionID(versionID))
 		if len(v.VersionStages) > 0 {
-			versionLabel += " " + green(fmt.Sprintf("%v", v.VersionStages))
+			versionLabel += " " + colors.Current(fmt.Sprintf("%v", v.VersionStages))
 		}
-		_, _ = fmt.Fprintln(r.Stdout, yellow(versionLabel))
+		_, _ = fmt.Fprintln(r.Stdout, colors.Version(versionLabel))
 		if v.CreatedDate != nil {
-			_, _ = fmt.Fprintf(r.Stdout, "%s %s\n", cyan("Date:"), v.CreatedDate.Format(time.RFC3339))
+			_, _ = fmt.Fprintf(r.Stdout, "%s %s\n", colors.FieldLabel("Date:"), v.CreatedDate.Format(time.RFC3339))
 		}
 
 		if opts.ShowPatch {

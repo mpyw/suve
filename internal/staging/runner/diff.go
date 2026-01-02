@@ -8,9 +8,9 @@ import (
 	"io"
 	"strings"
 
-	"github.com/fatih/color"
 	"github.com/samber/lo"
 
+	"github.com/mpyw/suve/internal/cli/colors"
 	"github.com/mpyw/suve/internal/jsonutil"
 	"github.com/mpyw/suve/internal/maputil"
 	"github.com/mpyw/suve/internal/output"
@@ -183,16 +183,14 @@ func (r *DiffRunner) outputDiffCreate(opts DiffOptions, name string, entry stagi
 }
 
 func (r *DiffRunner) outputMetadata(entry staging.Entry) {
-	cyan := color.New(color.FgCyan).SprintFunc()
-
 	if desc := lo.FromPtr(entry.Description); desc != "" {
-		_, _ = fmt.Fprintf(r.Stdout, "%s %s\n", cyan("Description:"), desc)
+		_, _ = fmt.Fprintf(r.Stdout, "%s %s\n", colors.FieldLabel("Description:"), desc)
 	}
 	if len(entry.Tags) > 0 {
 		var tagPairs []string
 		for _, k := range maputil.SortedKeys(entry.Tags) {
 			tagPairs = append(tagPairs, fmt.Sprintf("%s=%s", k, entry.Tags[k]))
 		}
-		_, _ = fmt.Fprintf(r.Stdout, "%s %s\n", cyan("Tags:"), strings.Join(tagPairs, ", "))
+		_, _ = fmt.Fprintf(r.Stdout, "%s %s\n", colors.FieldLabel("Tags:"), strings.Join(tagPairs, ", "))
 	}
 }

@@ -3,14 +3,14 @@ package ssm
 import (
 	"github.com/urfave/cli/v3"
 
-	cliinternal "github.com/mpyw/suve/internal/cli/internal"
-	"github.com/mpyw/suve/internal/cli/ssm/cat"
-	ssmdelete "github.com/mpyw/suve/internal/cli/ssm/delete"
-	"github.com/mpyw/suve/internal/cli/ssm/diff"
-	"github.com/mpyw/suve/internal/cli/ssm/log"
-	"github.com/mpyw/suve/internal/cli/ssm/ls"
-	"github.com/mpyw/suve/internal/cli/ssm/set"
-	"github.com/mpyw/suve/internal/cli/ssm/show"
+	cliinternal "github.com/mpyw/suve/internal/cli/commands/internal"
+	"github.com/mpyw/suve/internal/cli/commands/ssm/cat"
+	ssmdelete "github.com/mpyw/suve/internal/cli/commands/ssm/delete"
+	"github.com/mpyw/suve/internal/cli/commands/ssm/diff"
+	"github.com/mpyw/suve/internal/cli/commands/ssm/log"
+	"github.com/mpyw/suve/internal/cli/commands/ssm/ls"
+	"github.com/mpyw/suve/internal/cli/commands/ssm/set"
+	"github.com/mpyw/suve/internal/cli/commands/ssm/show"
 )
 
 // Command returns the ssm command with all subcommands.

@@ -11,7 +11,7 @@ import (
 	"github.com/samber/lo"
 
 	"github.com/mpyw/suve/internal/api/smapi"
-	"github.com/mpyw/suve/internal/awsutil"
+	"github.com/mpyw/suve/internal/infra"
 	"github.com/mpyw/suve/internal/tagging"
 	"github.com/mpyw/suve/internal/version/smversion"
 )
@@ -241,7 +241,7 @@ func (s *SMStrategy) FetchVersion(ctx context.Context, input string) (value stri
 
 // SMFactory creates a FullStrategy with an initialized AWS client.
 func SMFactory(ctx context.Context) (FullStrategy, error) {
-	client, err := awsutil.NewSMClient(ctx)
+	client, err := infra.NewSMClient(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize AWS client: %w", err)
 	}

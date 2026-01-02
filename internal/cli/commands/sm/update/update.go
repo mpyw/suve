@@ -8,13 +8,13 @@ import (
 	"os"
 
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
-	"github.com/fatih/color"
 	"github.com/samber/lo"
 	"github.com/urfave/cli/v3"
 
 	"github.com/mpyw/suve/internal/api/smapi"
-	"github.com/mpyw/suve/internal/awsutil"
-	"github.com/mpyw/suve/internal/confirm"
+	"github.com/mpyw/suve/internal/cli/colors"
+	"github.com/mpyw/suve/internal/cli/confirm"
+	"github.com/mpyw/suve/internal/infra"
 	"github.com/mpyw/suve/internal/output"
 	"github.com/mpyw/suve/internal/tagging"
 )
@@ -122,7 +122,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		return nil
 	}
 
-	client, err := awsutil.NewSMClient(ctx)
+	client, err := infra.NewSMClient(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to initialize AWS client: %w", err)
 	}
@@ -169,9 +169,8 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 		}
 	}
 
-	green := color.New(color.FgGreen).SprintFunc()
 	_, _ = fmt.Fprintf(r.Stdout, "%s Updated secret %s (version: %s)\n",
-		green("✓"),
+		colors.Success("✓"),
 		lo.FromPtr(result.Name),
 		lo.FromPtr(result.VersionId),
 	)

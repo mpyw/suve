@@ -9,11 +9,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/fatih/color"
 	"github.com/urfave/cli/v3"
 
-	"github.com/mpyw/suve/internal/confirm"
-	"github.com/mpyw/suve/internal/pager"
+	"github.com/mpyw/suve/internal/cli/colors"
+	"github.com/mpyw/suve/internal/cli/confirm"
+	"github.com/mpyw/suve/internal/cli/pager"
 	"github.com/mpyw/suve/internal/staging"
 )
 
@@ -375,8 +375,7 @@ EXAMPLES:
 
 			serviceEntries := entries[service]
 			if len(serviceEntries) == 0 {
-				yellow := color.New(color.FgYellow).SprintFunc()
-				_, _ = fmt.Fprintf(cmd.Root().Writer, "%s No %s changes staged.\n", yellow("!"), parser.ServiceName())
+				_, _ = fmt.Fprintf(cmd.Root().Writer, "%s No %s changes staged.\n", colors.Warning("!"), parser.ServiceName())
 				return nil
 			}
 
@@ -642,15 +641,14 @@ EXAMPLES:
 				return err
 			}
 
-			green := color.New(color.FgGreen).SprintFunc()
 			if hasDeleteOptions && entry.DeleteOptions != nil {
 				if entry.DeleteOptions.Force {
-					_, _ = fmt.Fprintf(cmd.Root().Writer, "%s Staged for immediate deletion: %s\n", green("✓"), name)
+					_, _ = fmt.Fprintf(cmd.Root().Writer, "%s Staged for immediate deletion: %s\n", colors.Success("✓"), name)
 				} else {
-					_, _ = fmt.Fprintf(cmd.Root().Writer, "%s Staged for deletion (%d-day recovery): %s\n", green("✓"), entry.DeleteOptions.RecoveryWindow, name)
+					_, _ = fmt.Fprintf(cmd.Root().Writer, "%s Staged for deletion (%d-day recovery): %s\n", colors.Success("✓"), entry.DeleteOptions.RecoveryWindow, name)
 				}
 			} else {
-				_, _ = fmt.Fprintf(cmd.Root().Writer, "%s Staged for deletion: %s\n", green("✓"), name)
+				_, _ = fmt.Fprintf(cmd.Root().Writer, "%s Staged for deletion: %s\n", colors.Success("✓"), name)
 			}
 			return nil
 		},

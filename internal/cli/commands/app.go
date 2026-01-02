@@ -1,5 +1,5 @@
-// Package cli provides the command-line interface for suve.
-package cli
+// Package commands provides the command-line interface for suve.
+package commands
 
 import (
 	"context"
@@ -8,9 +8,9 @@ import (
 	"github.com/samber/lo"
 	"github.com/urfave/cli/v3"
 
-	"github.com/mpyw/suve/internal/cli/sm"
-	"github.com/mpyw/suve/internal/cli/ssm"
-	"github.com/mpyw/suve/internal/cli/stage"
+	"github.com/mpyw/suve/internal/cli/commands/sm"
+	"github.com/mpyw/suve/internal/cli/commands/ssm"
+	"github.com/mpyw/suve/internal/cli/commands/stage"
 )
 
 // MakeApp creates a new CLI application instance.

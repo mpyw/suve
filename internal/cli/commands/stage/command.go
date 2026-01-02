@@ -4,13 +4,13 @@ package stage
 import (
 	"github.com/urfave/cli/v3"
 
-	cliinternal "github.com/mpyw/suve/internal/cli/internal"
-	"github.com/mpyw/suve/internal/cli/stage/diff"
-	"github.com/mpyw/suve/internal/cli/stage/push"
-	"github.com/mpyw/suve/internal/cli/stage/reset"
-	"github.com/mpyw/suve/internal/cli/stage/sm"
-	"github.com/mpyw/suve/internal/cli/stage/ssm"
-	"github.com/mpyw/suve/internal/cli/stage/status"
+	cliinternal "github.com/mpyw/suve/internal/cli/commands/internal"
+	"github.com/mpyw/suve/internal/cli/commands/stage/diff"
+	"github.com/mpyw/suve/internal/cli/commands/stage/push"
+	"github.com/mpyw/suve/internal/cli/commands/stage/reset"
+	"github.com/mpyw/suve/internal/cli/commands/stage/sm"
+	"github.com/mpyw/suve/internal/cli/commands/stage/ssm"
+	"github.com/mpyw/suve/internal/cli/commands/stage/status"
 )
 
 // Command returns the global stage command with subcommands.

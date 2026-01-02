@@ -9,13 +9,13 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/aws/aws-sdk-go-v2/service/ssm/types"
-	"github.com/fatih/color"
 	"github.com/samber/lo"
 	"github.com/urfave/cli/v3"
 
 	"github.com/mpyw/suve/internal/api/ssmapi"
-	"github.com/mpyw/suve/internal/awsutil"
-	"github.com/mpyw/suve/internal/confirm"
+	"github.com/mpyw/suve/internal/cli/colors"
+	"github.com/mpyw/suve/internal/cli/confirm"
+	"github.com/mpyw/suve/internal/infra"
 	"github.com/mpyw/suve/internal/output"
 	"github.com/mpyw/suve/internal/tagging"
 )
@@ -147,7 +147,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		return nil
 	}
 
-	client, err := awsutil.NewSSMClient(ctx)
+	client, err := infra.NewSSMClient(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to initialize AWS client: %w", err)
 	}
@@ -190,9 +190,8 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 		}
 	}
 
-	green := color.New(color.FgGreen).SprintFunc()
 	_, _ = fmt.Fprintf(r.Stdout, "%s Set parameter %s (version: %d)\n",
-		green("✓"),
+		colors.Success("✓"),
 		opts.Name,
 		result.Version,
 	)

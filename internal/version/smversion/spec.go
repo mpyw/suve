@@ -5,7 +5,7 @@ import (
 
 	"github.com/samber/lo"
 
-	"github.com/mpyw/suve/internal/diffargs"
+	"github.com/mpyw/suve/internal/cli/diffargs"
 	"github.com/mpyw/suve/internal/version"
 	"github.com/mpyw/suve/internal/version/internal"
 )

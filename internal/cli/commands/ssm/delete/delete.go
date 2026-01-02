@@ -8,13 +8,13 @@ import (
 	"os"
 
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
-	"github.com/fatih/color"
 	"github.com/samber/lo"
 	"github.com/urfave/cli/v3"
 
 	"github.com/mpyw/suve/internal/api/ssmapi"
-	"github.com/mpyw/suve/internal/awsutil"
-	"github.com/mpyw/suve/internal/confirm"
+	"github.com/mpyw/suve/internal/cli/colors"
+	"github.com/mpyw/suve/internal/cli/confirm"
+	"github.com/mpyw/suve/internal/infra"
 )
 
 // Client is the interface for the delete command.
@@ -81,7 +81,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		return nil
 	}
 
-	client, err := awsutil.NewSSMClient(ctx)
+	client, err := infra.NewSSMClient(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to initialize AWS client: %w", err)
 	}
@@ -105,8 +105,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 		return fmt.Errorf("failed to delete parameter: %w", err)
 	}
 
-	red := color.New(color.FgRed).SprintFunc()
-	_, _ = fmt.Fprintf(r.Stdout, "%s %s\n", red("Deleted"), opts.Name)
+	_, _ = fmt.Fprintf(r.Stdout, "%s %s\n", colors.OpDelete("Deleted"), opts.Name)
 
 	return nil
 }

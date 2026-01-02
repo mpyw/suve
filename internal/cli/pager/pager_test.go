@@ -9,7 +9,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/mpyw/suve/internal/pager"
+	"github.com/mpyw/suve/internal/cli/pager"
 )
 
 func TestWithPagerWriter_NoPagerTrue(t *testing.T) {

@@ -8,9 +8,8 @@ import (
 	"io"
 	"time"
 
-	"github.com/fatih/color"
-
-	"github.com/mpyw/suve/internal/editor"
+	"github.com/mpyw/suve/internal/cli/colors"
+	"github.com/mpyw/suve/internal/cli/editor"
 	"github.com/mpyw/suve/internal/staging"
 )
 
@@ -71,15 +70,13 @@ func (r *AddRunner) Run(_ context.Context, opts AddOptions) error {
 
 		// Check if value is empty (canceled)
 		if newValue == "" {
-			yellow := color.New(color.FgYellow).SprintFunc()
-			_, _ = fmt.Fprintln(r.Stdout, yellow("Empty value, not staged."))
+			_, _ = fmt.Fprintln(r.Stdout, colors.Warning("Empty value, not staged."))
 			return nil
 		}
 
 		// Check if unchanged from staged value
 		if stagedEntry != nil && newValue == currentValue {
-			yellow := color.New(color.FgYellow).SprintFunc()
-			_, _ = fmt.Fprintln(r.Stdout, yellow("No changes made."))
+			_, _ = fmt.Fprintln(r.Stdout, colors.Warning("No changes made."))
 			return nil
 		}
 	}
@@ -100,7 +97,6 @@ func (r *AddRunner) Run(_ context.Context, opts AddOptions) error {
 		return err
 	}
 
-	green := color.New(color.FgGreen).SprintFunc()
-	_, _ = fmt.Fprintf(r.Stdout, "%s Staged for creation: %s\n", green("✓"), name)
+	_, _ = fmt.Fprintf(r.Stdout, "%s Staged for creation: %s\n", colors.Success("✓"), name)
 	return nil
 }

@@ -184,3 +184,27 @@ func TestError(t *testing.T) {
 	assert.Contains(t, buf.String(), "Error:")
 	assert.Contains(t, buf.String(), "error 42")
 }
+
+func TestSuccess(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
+	Success(&buf, "Set %s", "/app/config")
+	assert.Contains(t, buf.String(), "✓")
+	assert.Contains(t, buf.String(), "Set /app/config")
+}
+
+func TestFailed(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
+	Failed(&buf, "/app/config", assert.AnError)
+	assert.Contains(t, buf.String(), "Failed")
+	assert.Contains(t, buf.String(), "/app/config")
+	assert.Contains(t, buf.String(), assert.AnError.Error())
+}
+
+func TestInfo(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
+	Info(&buf, "No changes %s", "staged")
+	assert.Contains(t, buf.String(), "No changes staged")
+}

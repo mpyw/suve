@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/fatih/color"
+	"github.com/mpyw/suve/internal/cli/colors"
 )
 
 // EntryPrinter prints staged entries to the given writer.
@@ -16,18 +16,14 @@ type EntryPrinter struct {
 // If verbose is true, shows detailed information including timestamp and value.
 // If showDeleteOptions is true, shows delete options (Force/RecoveryWindow) for delete operations.
 func (p *EntryPrinter) PrintEntry(name string, entry Entry, verbose, showDeleteOptions bool) {
-	green := color.New(color.FgGreen).SprintFunc()
-	red := color.New(color.FgRed).SprintFunc()
-	cyan := color.New(color.FgCyan).SprintFunc()
-
 	var opColor string
 	switch entry.Operation {
 	case OperationCreate:
-		opColor = green("A")
+		opColor = colors.OpAdd("A")
 	case OperationUpdate:
-		opColor = green("M")
+		opColor = colors.OpModify("M")
 	case OperationDelete:
-		opColor = red("D")
+		opColor = colors.OpDelete("D")
 	}
 
 	if !verbose {
@@ -36,7 +32,7 @@ func (p *EntryPrinter) PrintEntry(name string, entry Entry, verbose, showDeleteO
 	}
 
 	_, _ = fmt.Fprintf(p.Writer, "\n%s %s\n", opColor, name)
-	_, _ = fmt.Fprintf(p.Writer, "  %s %s\n", cyan("Staged:"), entry.StagedAt.Format("2006-01-02 15:04:05"))
+	_, _ = fmt.Fprintf(p.Writer, "  %s %s\n", colors.FieldLabel("Staged:"), entry.StagedAt.Format("2006-01-02 15:04:05"))
 
 	switch entry.Operation {
 	case OperationCreate, OperationUpdate:
@@ -44,16 +40,16 @@ func (p *EntryPrinter) PrintEntry(name string, entry Entry, verbose, showDeleteO
 		if len(value) > 100 {
 			value = value[:100] + "..."
 		}
-		_, _ = fmt.Fprintf(p.Writer, "  %s %s\n", cyan("Value:"), value)
+		_, _ = fmt.Fprintf(p.Writer, "  %s %s\n", colors.FieldLabel("Value:"), value)
 	case OperationDelete:
 		if !showDeleteOptions || entry.DeleteOptions == nil {
 			return
 		}
 		switch {
 		case entry.DeleteOptions.Force:
-			_, _ = fmt.Fprintf(p.Writer, "  %s force (immediate, no recovery)\n", cyan("Delete:"))
+			_, _ = fmt.Fprintf(p.Writer, "  %s force (immediate, no recovery)\n", colors.FieldLabel("Delete:"))
 		case entry.DeleteOptions.RecoveryWindow > 0:
-			_, _ = fmt.Fprintf(p.Writer, "  %s %d days recovery window\n", cyan("Delete:"), entry.DeleteOptions.RecoveryWindow)
+			_, _ = fmt.Fprintf(p.Writer, "  %s %d days recovery window\n", colors.FieldLabel("Delete:"), entry.DeleteOptions.RecoveryWindow)
 		}
 	}
 }

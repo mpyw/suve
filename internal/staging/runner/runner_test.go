@@ -1225,3 +1225,96 @@ func TestRunners_DeleteOptions(t *testing.T) {
 		assert.Contains(t, output, "my-secret")
 	})
 }
+
+func TestDiffRunner_OutputMetadata(t *testing.T) {
+	t.Parallel()
+
+	t.Run("diff with description", func(t *testing.T) {
+		t.Parallel()
+
+		tmpDir := t.TempDir()
+		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		desc := "Updated config description"
+		_ = store.Stage(staging.ServiceSSM, "/app/config", staging.Entry{
+			Operation:   staging.OperationUpdate,
+			Value:       "new-value",
+			Description: &desc,
+			StagedAt:    time.Now(),
+		})
+
+		var stdout, stderr bytes.Buffer
+		r := &runner.DiffRunner{
+			Strategy: &fullMockStrategy{service: staging.ServiceSSM, fetchCurrentVal: "old-value"},
+			Store:    store,
+			Stdout:   &stdout,
+			Stderr:   &stderr,
+		}
+
+		err := r.Run(context.Background(), runner.DiffOptions{Name: "/app/config"})
+		require.NoError(t, err)
+		output := stdout.String()
+		assert.Contains(t, output, "Description:")
+		assert.Contains(t, output, "Updated config description")
+	})
+
+	t.Run("diff with tags", func(t *testing.T) {
+		t.Parallel()
+
+		tmpDir := t.TempDir()
+		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		_ = store.Stage(staging.ServiceSSM, "/app/config", staging.Entry{
+			Operation: staging.OperationUpdate,
+			Value:     "new-value",
+			Tags:      map[string]string{"env": "prod", "team": "platform"},
+			StagedAt:  time.Now(),
+		})
+
+		var stdout, stderr bytes.Buffer
+		r := &runner.DiffRunner{
+			Strategy: &fullMockStrategy{service: staging.ServiceSSM, fetchCurrentVal: "old-value"},
+			Store:    store,
+			Stdout:   &stdout,
+			Stderr:   &stderr,
+		}
+
+		err := r.Run(context.Background(), runner.DiffOptions{Name: "/app/config"})
+		require.NoError(t, err)
+		output := stdout.String()
+		assert.Contains(t, output, "Tags:")
+		assert.Contains(t, output, "env=prod")
+		assert.Contains(t, output, "team=platform")
+	})
+
+	t.Run("diff create with metadata", func(t *testing.T) {
+		t.Parallel()
+
+		tmpDir := t.TempDir()
+		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		desc := "New parameter"
+		_ = store.Stage(staging.ServiceSSM, "/app/new-param", staging.Entry{
+			Operation:   staging.OperationCreate,
+			Value:       "brand-new",
+			Description: &desc,
+			Tags:        map[string]string{"env": "staging"},
+			StagedAt:    time.Now(),
+		})
+
+		var stdout, stderr bytes.Buffer
+		r := &runner.DiffRunner{
+			Strategy: &fullMockStrategy{service: staging.ServiceSSM, fetchCurrentErr: errors.New("not found")},
+			Store:    store,
+			Stdout:   &stdout,
+			Stderr:   &stderr,
+		}
+
+		err := r.Run(context.Background(), runner.DiffOptions{Name: "/app/new-param"})
+		require.NoError(t, err)
+		output := stdout.String()
+		assert.Contains(t, output, "+brand-new")
+		assert.Contains(t, output, "staged for creation")
+		assert.Contains(t, output, "Description:")
+		assert.Contains(t, output, "New parameter")
+		assert.Contains(t, output, "Tags:")
+		assert.Contains(t, output, "env=staging")
+	})
+}

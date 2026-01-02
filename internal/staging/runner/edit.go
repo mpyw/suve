@@ -8,9 +8,8 @@ import (
 	"io"
 	"time"
 
-	"github.com/fatih/color"
-
-	"github.com/mpyw/suve/internal/editor"
+	"github.com/mpyw/suve/internal/cli/colors"
+	"github.com/mpyw/suve/internal/cli/editor"
 	"github.com/mpyw/suve/internal/staging"
 )
 
@@ -70,8 +69,7 @@ func (r *EditRunner) Run(ctx context.Context, opts EditOptions) error {
 
 		// Check if changed
 		if newValue == currentValue {
-			yellow := color.New(color.FgYellow).SprintFunc()
-			_, _ = fmt.Fprintln(r.Stdout, yellow("No changes made."))
+			_, _ = fmt.Fprintln(r.Stdout, colors.Warning("No changes made."))
 			return nil
 		}
 	}
@@ -92,7 +90,6 @@ func (r *EditRunner) Run(ctx context.Context, opts EditOptions) error {
 		return err
 	}
 
-	green := color.New(color.FgGreen).SprintFunc()
-	_, _ = fmt.Fprintf(r.Stdout, "%s Staged: %s\n", green("✓"), opts.Name)
+	_, _ = fmt.Fprintf(r.Stdout, "%s Staged: %s\n", colors.Success("✓"), opts.Name)
 	return nil
 }

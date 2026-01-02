@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/fatih/color"
 	"github.com/urfave/cli/v3"
 
+	"github.com/mpyw/suve/internal/cli/colors"
 	"github.com/mpyw/suve/internal/staging"
 )
 
@@ -64,8 +64,7 @@ func (r *Runner) Run(_ context.Context) error {
 	totalCount := ssmCount + smCount
 
 	if totalCount == 0 {
-		yellow := color.New(color.FgYellow).SprintFunc()
-		_, _ = fmt.Fprintln(r.Stdout, yellow("No changes staged."))
+		_, _ = fmt.Fprintln(r.Stdout, colors.Warning("No changes staged."))
 		return nil
 	}
 
@@ -83,8 +82,7 @@ func (r *Runner) Run(_ context.Context) error {
 		}
 	}
 
-	green := color.New(color.FgGreen).SprintFunc()
 	_, _ = fmt.Fprintf(r.Stdout, "%s Unstaged all changes (%d SSM, %d SM)\n",
-		green("✓"), ssmCount, smCount)
+		colors.Success("✓"), ssmCount, smCount)
 	return nil
 }

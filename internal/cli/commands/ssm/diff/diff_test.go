@@ -13,9 +13,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	appcli "github.com/mpyw/suve/internal/cli"
-	ssmdiff "github.com/mpyw/suve/internal/cli/ssm/diff"
-	"github.com/mpyw/suve/internal/diffargs"
+	appcli "github.com/mpyw/suve/internal/cli/commands"
+	ssmdiff "github.com/mpyw/suve/internal/cli/commands/ssm/diff"
+	"github.com/mpyw/suve/internal/cli/diffargs"
 	"github.com/mpyw/suve/internal/version/ssmversion"
 )
 

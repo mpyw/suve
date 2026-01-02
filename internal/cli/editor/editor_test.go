@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/mpyw/suve/internal/editor"
+	"github.com/mpyw/suve/internal/cli/editor"
 )
 
 func TestOpen_ModifiesContent(t *testing.T) {

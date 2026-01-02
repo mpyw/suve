@@ -7,7 +7,7 @@ import (
 	"io"
 	"strings"
 
-	"github.com/fatih/color"
+	"github.com/mpyw/suve/internal/cli/colors"
 )
 
 // Prompter handles confirmation prompts.
@@ -24,8 +24,7 @@ func (p *Prompter) Confirm(message string, skipConfirm bool) (bool, error) {
 		return true, nil
 	}
 
-	yellow := color.New(color.FgYellow).SprintFunc()
-	_, _ = fmt.Fprintf(p.Stderr, "%s %s [y/N]: ", yellow("?"), message)
+	_, _ = fmt.Fprintf(p.Stderr, "%s %s [y/N]: ", colors.Warning("?"), message)
 
 	reader := bufio.NewReader(p.Stdin)
 	response, err := reader.ReadString('\n')
@@ -49,11 +48,8 @@ func (p *Prompter) ConfirmDelete(target string, skipConfirm bool) (bool, error) 
 		return true, nil
 	}
 
-	red := color.New(color.FgRed).SprintFunc()
-	yellow := color.New(color.FgYellow).SprintFunc()
-
-	_, _ = fmt.Fprintf(p.Stderr, "%s This will permanently delete: %s\n", red("!"), target)
-	_, _ = fmt.Fprintf(p.Stderr, "%s Continue? [y/N]: ", yellow("?"))
+	_, _ = fmt.Fprintf(p.Stderr, "%s This will permanently delete: %s\n", colors.Error("!"), target)
+	_, _ = fmt.Fprintf(p.Stderr, "%s Continue? [y/N]: ", colors.Warning("?"))
 
 	reader := bufio.NewReader(p.Stdin)
 	response, err := reader.ReadString('\n')

@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/mpyw/suve/internal/confirm"
+	"github.com/mpyw/suve/internal/cli/confirm"
 )
 
 func TestPrompter_Confirm(t *testing.T) {

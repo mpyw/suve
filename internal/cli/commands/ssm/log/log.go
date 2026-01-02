@@ -14,15 +14,15 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/aws/aws-sdk-go-v2/service/ssm/types"
-	"github.com/fatih/color"
 	"github.com/samber/lo"
 	"github.com/urfave/cli/v3"
 
 	"github.com/mpyw/suve/internal/api/ssmapi"
-	"github.com/mpyw/suve/internal/awsutil"
+	"github.com/mpyw/suve/internal/cli/colors"
+	"github.com/mpyw/suve/internal/cli/pager"
+	"github.com/mpyw/suve/internal/infra"
 	"github.com/mpyw/suve/internal/jsonutil"
 	"github.com/mpyw/suve/internal/output"
-	"github.com/mpyw/suve/internal/pager"
 	"github.com/mpyw/suve/internal/version/ssmversion"
 )
 
@@ -164,7 +164,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		output.Warning(cmd.Root().ErrWriter, "--oneline has no effect with -p/--patch")
 	}
 
-	client, err := awsutil.NewSSMClient(ctx)
+	client, err := infra.NewSSMClient(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to initialize AWS client: %w", err)
 	}
@@ -208,10 +208,6 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 		slices.Reverse(params)
 	}
 
-	yellow := color.New(color.FgYellow).SprintFunc()
-	cyan := color.New(color.FgCyan).SprintFunc()
-	green := color.New(color.FgGreen).SprintFunc()
-
 	// Find the current (latest) version index
 	currentIdx := 0
 	if opts.Reverse {
@@ -231,13 +227,13 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 			}
 			currentMark := ""
 			if i == currentIdx {
-				currentMark = green(" (current)")
+				currentMark = colors.Current(" (current)")
 			}
 			_, _ = fmt.Fprintf(r.Stdout, "%s%d%s  %s  %s\n",
-				yellow(""),
+				colors.Version(""),
 				param.Version,
 				currentMark,
-				cyan(dateStr),
+				colors.FieldLabel(dateStr),
 				value,
 			)
 			continue
@@ -245,11 +241,11 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 
 		versionLabel := fmt.Sprintf("Version %d", param.Version)
 		if i == currentIdx {
-			versionLabel += " " + green("(current)")
+			versionLabel += " " + colors.Current("(current)")
 		}
-		_, _ = fmt.Fprintln(r.Stdout, yellow(versionLabel))
+		_, _ = fmt.Fprintln(r.Stdout, colors.Version(versionLabel))
 		if param.LastModifiedDate != nil {
-			_, _ = fmt.Fprintf(r.Stdout, "%s %s\n", cyan("Date:"), param.LastModifiedDate.Format(time.RFC3339))
+			_, _ = fmt.Fprintf(r.Stdout, "%s %s\n", colors.FieldLabel("Date:"), param.LastModifiedDate.Format(time.RFC3339))
 		}
 
 		if opts.ShowPatch {

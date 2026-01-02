@@ -15,8 +15,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	appcli "github.com/mpyw/suve/internal/cli"
-	stagediff "github.com/mpyw/suve/internal/cli/stage/diff"
+	appcli "github.com/mpyw/suve/internal/cli/commands"
+	stagediff "github.com/mpyw/suve/internal/cli/commands/stage/diff"
 	"github.com/mpyw/suve/internal/staging"
 )
 
@@ -578,4 +578,282 @@ func TestRun_SMJSONFormatMixed(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Contains(t, stderr.String(), "--json has no effect")
+}
+
+func TestRun_SSMCreateOperation(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+
+	err := store.Stage(staging.ServiceSSM, "/app/new-param", staging.Entry{
+		Operation:   staging.OperationCreate,
+		Value:       "new-value",
+		Description: lo.ToPtr("New parameter"),
+		Tags:        map[string]string{"env": "prod", "team": "platform"},
+		StagedAt:    time.Now(),
+	})
+	require.NoError(t, err)
+
+	ssmMock := &mockSSMClient{
+		getParameterFunc: func(_ context.Context, _ *ssm.GetParameterInput, _ ...func(*ssm.Options)) (*ssm.GetParameterOutput, error) {
+			return nil, fmt.Errorf("parameter not found")
+		},
+	}
+
+	var stdout, stderr bytes.Buffer
+	r := &stagediff.Runner{
+		SSMClient: ssmMock,
+		Store:     store,
+		Stdout:    &stdout,
+		Stderr:    &stderr,
+	}
+
+	err = r.Run(context.Background(), stagediff.Options{})
+	require.NoError(t, err)
+
+	output := stdout.String()
+	assert.Contains(t, output, "(not in AWS)")
+	assert.Contains(t, output, "(staged for creation)")
+	assert.Contains(t, output, "+new-value")
+	assert.Contains(t, output, "Description:")
+	assert.Contains(t, output, "New parameter")
+	assert.Contains(t, output, "Tags:")
+	assert.Contains(t, output, "env=prod")
+	assert.Contains(t, output, "team=platform")
+}
+
+func TestRun_SMCreateOperation(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+
+	err := store.Stage(staging.ServiceSM, "new-secret", staging.Entry{
+		Operation:   staging.OperationCreate,
+		Value:       "secret-value",
+		Description: lo.ToPtr("New secret"),
+		Tags:        map[string]string{"env": "staging"},
+		StagedAt:    time.Now(),
+	})
+	require.NoError(t, err)
+
+	smMock := &mockSMClient{
+		getSecretValueFunc: func(_ context.Context, _ *secretsmanager.GetSecretValueInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.GetSecretValueOutput, error) {
+			return nil, fmt.Errorf("secret not found")
+		},
+	}
+
+	var stdout, stderr bytes.Buffer
+	r := &stagediff.Runner{
+		SMClient: smMock,
+		Store:    store,
+		Stdout:   &stdout,
+		Stderr:   &stderr,
+	}
+
+	err = r.Run(context.Background(), stagediff.Options{})
+	require.NoError(t, err)
+
+	output := stdout.String()
+	assert.Contains(t, output, "(not in AWS)")
+	assert.Contains(t, output, "(staged for creation)")
+	assert.Contains(t, output, "+secret-value")
+	assert.Contains(t, output, "Description:")
+	assert.Contains(t, output, "New secret")
+	assert.Contains(t, output, "Tags:")
+	assert.Contains(t, output, "env=staging")
+}
+
+func TestRun_CreateWithJSONFormat(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+
+	err := store.Stage(staging.ServiceSSM, "/app/config", staging.Entry{
+		Operation: staging.OperationCreate,
+		Value:     `{"key":"value","nested":{"a":1}}`,
+		StagedAt:  time.Now(),
+	})
+	require.NoError(t, err)
+
+	ssmMock := &mockSSMClient{
+		getParameterFunc: func(_ context.Context, _ *ssm.GetParameterInput, _ ...func(*ssm.Options)) (*ssm.GetParameterOutput, error) {
+			return nil, fmt.Errorf("parameter not found")
+		},
+	}
+
+	var stdout, stderr bytes.Buffer
+	r := &stagediff.Runner{
+		SSMClient: ssmMock,
+		Store:     store,
+		Stdout:    &stdout,
+		Stderr:    &stderr,
+	}
+
+	err = r.Run(context.Background(), stagediff.Options{JSONFormat: true})
+	require.NoError(t, err)
+
+	output := stdout.String()
+	assert.Contains(t, output, "(staged for creation)")
+	// JSON should be formatted (has newlines)
+	assert.Contains(t, output, "\"key\":")
+}
+
+func TestRun_DeleteAutoUnstageWhenAlreadyDeleted(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+
+	err := store.Stage(staging.ServiceSSM, "/app/config", staging.Entry{
+		Operation: staging.OperationDelete,
+		StagedAt:  time.Now(),
+	})
+	require.NoError(t, err)
+
+	ssmMock := &mockSSMClient{
+		getParameterFunc: func(_ context.Context, _ *ssm.GetParameterInput, _ ...func(*ssm.Options)) (*ssm.GetParameterOutput, error) {
+			return nil, fmt.Errorf("parameter not found")
+		},
+	}
+
+	var stdout, stderr bytes.Buffer
+	r := &stagediff.Runner{
+		SSMClient: ssmMock,
+		Store:     store,
+		Stdout:    &stdout,
+		Stderr:    &stderr,
+	}
+
+	err = r.Run(context.Background(), stagediff.Options{})
+	require.NoError(t, err)
+	assert.Contains(t, stderr.String(), "unstaged")
+	assert.Contains(t, stderr.String(), "already deleted")
+
+	// Verify unstaged
+	_, err = store.Get(staging.ServiceSSM, "/app/config")
+	assert.ErrorIs(t, err, staging.ErrNotStaged)
+}
+
+func TestRun_SMDeleteAutoUnstageWhenAlreadyDeleted(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+
+	err := store.Stage(staging.ServiceSM, "my-secret", staging.Entry{
+		Operation: staging.OperationDelete,
+		StagedAt:  time.Now(),
+	})
+	require.NoError(t, err)
+
+	smMock := &mockSMClient{
+		getSecretValueFunc: func(_ context.Context, _ *secretsmanager.GetSecretValueInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.GetSecretValueOutput, error) {
+			return nil, fmt.Errorf("secret not found")
+		},
+	}
+
+	var stdout, stderr bytes.Buffer
+	r := &stagediff.Runner{
+		SMClient: smMock,
+		Store:    store,
+		Stdout:   &stdout,
+		Stderr:   &stderr,
+	}
+
+	err = r.Run(context.Background(), stagediff.Options{})
+	require.NoError(t, err)
+	assert.Contains(t, stderr.String(), "unstaged")
+	assert.Contains(t, stderr.String(), "already deleted")
+
+	// Verify unstaged
+	_, err = store.Get(staging.ServiceSM, "my-secret")
+	assert.ErrorIs(t, err, staging.ErrNotStaged)
+}
+
+func TestRun_MetadataWithDescription(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+
+	err := store.Stage(staging.ServiceSSM, "/app/config", staging.Entry{
+		Operation:   staging.OperationUpdate,
+		Value:       "new-value",
+		Description: lo.ToPtr("Updated config"),
+		StagedAt:    time.Now(),
+	})
+	require.NoError(t, err)
+
+	ssmMock := &mockSSMClient{
+		getParameterFunc: func(_ context.Context, _ *ssm.GetParameterInput, _ ...func(*ssm.Options)) (*ssm.GetParameterOutput, error) {
+			return &ssm.GetParameterOutput{
+				Parameter: &types.Parameter{
+					Name:    lo.ToPtr("/app/config"),
+					Value:   lo.ToPtr("old-value"),
+					Version: 1,
+				},
+			}, nil
+		},
+	}
+
+	var stdout, stderr bytes.Buffer
+	r := &stagediff.Runner{
+		SSMClient: ssmMock,
+		Store:     store,
+		Stdout:    &stdout,
+		Stderr:    &stderr,
+	}
+
+	err = r.Run(context.Background(), stagediff.Options{})
+	require.NoError(t, err)
+
+	output := stdout.String()
+	assert.Contains(t, output, "Description:")
+	assert.Contains(t, output, "Updated config")
+}
+
+func TestRun_MetadataWithTags(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+
+	err := store.Stage(staging.ServiceSSM, "/app/config", staging.Entry{
+		Operation: staging.OperationUpdate,
+		Value:     "new-value",
+		Tags:      map[string]string{"env": "prod", "team": "platform"},
+		StagedAt:  time.Now(),
+	})
+	require.NoError(t, err)
+
+	ssmMock := &mockSSMClient{
+		getParameterFunc: func(_ context.Context, _ *ssm.GetParameterInput, _ ...func(*ssm.Options)) (*ssm.GetParameterOutput, error) {
+			return &ssm.GetParameterOutput{
+				Parameter: &types.Parameter{
+					Name:    lo.ToPtr("/app/config"),
+					Value:   lo.ToPtr("old-value"),
+					Version: 1,
+				},
+			}, nil
+		},
+	}
+
+	var stdout, stderr bytes.Buffer
+	r := &stagediff.Runner{
+		SSMClient: ssmMock,
+		Store:     store,
+		Stdout:    &stdout,
+		Stderr:    &stderr,
+	}
+
+	err = r.Run(context.Background(), stagediff.Options{})
+	require.NoError(t, err)
+
+	output := stdout.String()
+	assert.Contains(t, output, "Tags:")
+	assert.Contains(t, output, "env=prod")
+	assert.Contains(t, output, "team=platform")
 }

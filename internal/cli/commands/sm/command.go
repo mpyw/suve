@@ -6,16 +6,16 @@ import (
 
 	"github.com/urfave/cli/v3"
 
-	cliinternal "github.com/mpyw/suve/internal/cli/internal"
-	"github.com/mpyw/suve/internal/cli/sm/cat"
-	"github.com/mpyw/suve/internal/cli/sm/create"
-	smdelete "github.com/mpyw/suve/internal/cli/sm/delete"
-	"github.com/mpyw/suve/internal/cli/sm/diff"
-	"github.com/mpyw/suve/internal/cli/sm/log"
-	"github.com/mpyw/suve/internal/cli/sm/ls"
-	"github.com/mpyw/suve/internal/cli/sm/restore"
-	"github.com/mpyw/suve/internal/cli/sm/show"
-	"github.com/mpyw/suve/internal/cli/sm/update"
+	cliinternal "github.com/mpyw/suve/internal/cli/commands/internal"
+	"github.com/mpyw/suve/internal/cli/commands/sm/cat"
+	"github.com/mpyw/suve/internal/cli/commands/sm/create"
+	smdelete "github.com/mpyw/suve/internal/cli/commands/sm/delete"
+	"github.com/mpyw/suve/internal/cli/commands/sm/diff"
+	"github.com/mpyw/suve/internal/cli/commands/sm/log"
+	"github.com/mpyw/suve/internal/cli/commands/sm/ls"
+	"github.com/mpyw/suve/internal/cli/commands/sm/restore"
+	"github.com/mpyw/suve/internal/cli/commands/sm/show"
+	"github.com/mpyw/suve/internal/cli/commands/sm/update"
 )
 
 // Command returns the sm command with all subcommands.

@@ -1,6 +1,7 @@
-.PHONY: build test lint e2e e2e-ssm up down clean coverage
+.PHONY: build test lint e2e e2e-ssm e2e-sm up down clean coverage coverage-e2e coverage-all
 
 SUVE_LOCALSTACK_EXTERNAL_PORT ?= 4566
+COVERPKG = $(shell go list ./... | grep -v testutil | grep -v /e2e | tr '\n' ',')
 
 # Build
 build:
@@ -32,12 +33,31 @@ e2e: e2e-ssm
 e2e-ssm: up
 	SUVE_LOCALSTACK_EXTERNAL_PORT=$(SUVE_LOCALSTACK_EXTERNAL_PORT) go test -tags=e2e -v -run TestSSM ./e2e/...
 
+# E2E tests for SM only (requires localstack Pro)
+e2e-sm: up
+	SUVE_LOCALSTACK_EXTERNAL_PORT=$(SUVE_LOCALSTACK_EXTERNAL_PORT) go test -tags=e2e -v -run TestSM ./e2e/...
+
 # Clean
 clean:
-	rm -rf bin/
+	rm -rf bin/ *.out
 	docker compose down -v 2>/dev/null || true
 
-# Coverage (exclude testutil from coverage calculation)
+# Unit test coverage (exclude testutil and e2e)
 coverage:
-	go test -coverprofile=coverage.out -coverpkg=$$(go list ./... | grep -v testutil | tr '\n' ',') ./...
+	go test -coverprofile=coverage.out -coverpkg=$(COVERPKG) ./...
 	go tool cover -func=coverage.out | grep total
+
+# E2E test coverage (requires localstack running)
+coverage-e2e: up
+	SUVE_LOCALSTACK_EXTERNAL_PORT=$(SUVE_LOCALSTACK_EXTERNAL_PORT) go test -tags=e2e -coverprofile=coverage-e2e.out -coverpkg=$(COVERPKG) ./e2e/...
+	go tool cover -func=coverage-e2e.out | grep total
+
+# Combined coverage (unit + E2E)
+coverage-all: up
+	@echo "Running unit tests with coverage..."
+	go test -coverprofile=coverage-unit.out -covermode=atomic -coverpkg=$(COVERPKG) ./...
+	@echo "Running E2E tests with coverage..."
+	SUVE_LOCALSTACK_EXTERNAL_PORT=$(SUVE_LOCALSTACK_EXTERNAL_PORT) go test -tags=e2e -coverprofile=coverage-e2e.out -covermode=atomic -coverpkg=$(COVERPKG) ./e2e/...
+	@echo "Merging coverage profiles..."
+	@go run github.com/wadey/gocovmerge@latest coverage-unit.out coverage-e2e.out > coverage-all.out
+	go tool cover -func=coverage-all.out | grep total

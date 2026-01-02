@@ -8,8 +8,7 @@ import (
 	"io"
 	"time"
 
-	"github.com/fatih/color"
-
+	"github.com/mpyw/suve/internal/cli/colors"
 	"github.com/mpyw/suve/internal/staging"
 )
 
@@ -66,8 +65,7 @@ func (r *ResetRunner) runUnstageAll() error {
 
 	serviceStaged := staged[service]
 	if len(serviceStaged) == 0 {
-		yellow := color.New(color.FgYellow).SprintFunc()
-		_, _ = fmt.Fprintf(r.Stdout, "%s\n", yellow(fmt.Sprintf("No %s changes staged.", serviceName)))
+		_, _ = fmt.Fprintf(r.Stdout, "%s\n", colors.Warning(fmt.Sprintf("No %s changes staged.", serviceName)))
 		return nil
 	}
 
@@ -76,8 +74,7 @@ func (r *ResetRunner) runUnstageAll() error {
 	}
 
 	itemName := r.Parser.ItemName()
-	green := color.New(color.FgGreen).SprintFunc()
-	_, _ = fmt.Fprintf(r.Stdout, "%s Unstaged all %s %ss (%d)\n", green("✓"), serviceName, itemName, len(serviceStaged))
+	_, _ = fmt.Fprintf(r.Stdout, "%s Unstaged all %s %ss (%d)\n", colors.Success("✓"), serviceName, itemName, len(serviceStaged))
 	return nil
 }
 
@@ -87,8 +84,7 @@ func (r *ResetRunner) runUnstage(name string) error {
 	// Check if actually staged
 	_, err := r.Store.Get(service, name)
 	if errors.Is(err, staging.ErrNotStaged) {
-		yellow := color.New(color.FgYellow).SprintFunc()
-		_, _ = fmt.Fprintf(r.Stdout, "%s %s is not staged\n", yellow("!"), name)
+		_, _ = fmt.Fprintf(r.Stdout, "%s %s is not staged\n", colors.Warning("!"), name)
 		return nil
 	}
 	if err != nil {
@@ -99,8 +95,7 @@ func (r *ResetRunner) runUnstage(name string) error {
 		return err
 	}
 
-	green := color.New(color.FgGreen).SprintFunc()
-	_, _ = fmt.Fprintf(r.Stdout, "%s Unstaged %s\n", green("✓"), name)
+	_, _ = fmt.Fprintf(r.Stdout, "%s Unstaged %s\n", colors.Success("✓"), name)
 	return nil
 }
 
@@ -125,8 +120,7 @@ func (r *ResetRunner) runRestore(ctx context.Context, spec, name string) error {
 		return err
 	}
 
-	green := color.New(color.FgGreen).SprintFunc()
 	_, _ = fmt.Fprintf(r.Stdout, "%s Restored %s (staged from version %s)\n",
-		green("✓"), name, versionLabel)
+		colors.Success("✓"), name, versionLabel)
 	return nil
 }

@@ -12,8 +12,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	appcli "github.com/mpyw/suve/internal/cli"
-	"github.com/mpyw/suve/internal/cli/ssm/set"
+	appcli "github.com/mpyw/suve/internal/cli/commands"
+	"github.com/mpyw/suve/internal/cli/commands/ssm/set"
+	"github.com/mpyw/suve/internal/tagging"
 )
 
 func TestCommand_Validation(t *testing.T) {
@@ -77,7 +78,7 @@ func TestRun(t *testing.T) {
 		name    string
 		opts    set.Options
 		mock    *mockClient
-		wantErr bool
+		wantErr string
 		check   func(t *testing.T, output string)
 	}{
 		{
@@ -120,18 +121,59 @@ func TestRun(t *testing.T) {
 			},
 		},
 		{
-			name: "error from AWS",
+			name: "set with tags",
 			opts: set.Options{
 				Name:  "/app/param",
 				Value: "test-value",
 				Type:  "String",
+				TagChange: &tagging.Change{
+					Add:    map[string]string{"env": "prod"},
+					Remove: []string{},
+				},
 			},
+			mock: &mockClient{
+				putParameterFunc: func(_ context.Context, _ *ssm.PutParameterInput, _ ...func(*ssm.Options)) (*ssm.PutParameterOutput, error) {
+					return &ssm.PutParameterOutput{Version: 1}, nil
+				},
+				addTagsToResourceFunc: func(_ context.Context, params *ssm.AddTagsToResourceInput, _ ...func(*ssm.Options)) (*ssm.AddTagsToResourceOutput, error) {
+					assert.Equal(t, "/app/param", lo.FromPtr(params.ResourceId))
+					return &ssm.AddTagsToResourceOutput{}, nil
+				},
+			},
+			check: func(t *testing.T, output string) {
+				assert.Contains(t, output, "/app/param")
+			},
+		},
+		{
+			name:    "put parameter error",
+			opts:    set.Options{Name: "/app/param", Value: "test-value", Type: "String"},
+			wantErr: "failed to set parameter",
 			mock: &mockClient{
 				putParameterFunc: func(_ context.Context, _ *ssm.PutParameterInput, _ ...func(*ssm.Options)) (*ssm.PutParameterOutput, error) {
 					return nil, fmt.Errorf("AWS error")
 				},
 			},
-			wantErr: true,
+		},
+		{
+			name: "tag application error",
+			opts: set.Options{
+				Name:  "/app/param",
+				Value: "test-value",
+				Type:  "String",
+				TagChange: &tagging.Change{
+					Add:    map[string]string{"env": "prod"},
+					Remove: []string{},
+				},
+			},
+			wantErr: "failed to add tags",
+			mock: &mockClient{
+				putParameterFunc: func(_ context.Context, _ *ssm.PutParameterInput, _ ...func(*ssm.Options)) (*ssm.PutParameterOutput, error) {
+					return &ssm.PutParameterOutput{Version: 1}, nil
+				},
+				addTagsToResourceFunc: func(_ context.Context, _ *ssm.AddTagsToResourceInput, _ ...func(*ssm.Options)) (*ssm.AddTagsToResourceOutput, error) {
+					return nil, fmt.Errorf("tag error")
+				},
+			},
 		},
 	}
 
@@ -146,8 +188,9 @@ func TestRun(t *testing.T) {
 			}
 			err := r.Run(t.Context(), tt.opts)
 
-			if tt.wantErr {
-				assert.Error(t, err)
+			if tt.wantErr != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.wantErr)
 				return
 			}
 

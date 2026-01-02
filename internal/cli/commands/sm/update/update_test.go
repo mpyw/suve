@@ -11,8 +11,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	appcli "github.com/mpyw/suve/internal/cli"
-	"github.com/mpyw/suve/internal/cli/sm/update"
+	appcli "github.com/mpyw/suve/internal/cli/commands"
+	"github.com/mpyw/suve/internal/cli/commands/sm/update"
+	"github.com/mpyw/suve/internal/tagging"
 )
 
 func TestCommand_Validation(t *testing.T) {
@@ -76,7 +77,7 @@ func TestRun(t *testing.T) {
 		name    string
 		opts    update.Options
 		mock    *mockClient
-		wantErr bool
+		wantErr string
 		check   func(t *testing.T, output string)
 	}{
 		{
@@ -98,14 +99,99 @@ func TestRun(t *testing.T) {
 			},
 		},
 		{
-			name: "error from AWS",
-			opts: update.Options{Name: "my-secret", Value: "new-value"},
+			name: "update secret with description",
+			opts: update.Options{Name: "my-secret", Value: "new-value", Description: "updated description"},
+			mock: &mockClient{
+				putSecretValueFunc: func(_ context.Context, params *secretsmanager.PutSecretValueInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.PutSecretValueOutput, error) {
+					return &secretsmanager.PutSecretValueOutput{
+						Name:      lo.ToPtr("my-secret"),
+						VersionId: lo.ToPtr("new-version-id"),
+					}, nil
+				},
+				updateSecretFunc: func(_ context.Context, params *secretsmanager.UpdateSecretInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.UpdateSecretOutput, error) {
+					assert.Equal(t, "my-secret", lo.FromPtr(params.SecretId))
+					assert.Equal(t, "updated description", lo.FromPtr(params.Description))
+					return &secretsmanager.UpdateSecretOutput{}, nil
+				},
+			},
+			check: func(t *testing.T, output string) {
+				assert.Contains(t, output, "Updated secret")
+			},
+		},
+		{
+			name: "update secret with tags",
+			opts: update.Options{
+				Name:  "my-secret",
+				Value: "new-value",
+				TagChange: &tagging.Change{
+					Add:    map[string]string{"env": "prod"},
+					Remove: []string{},
+				},
+			},
+			mock: &mockClient{
+				putSecretValueFunc: func(_ context.Context, _ *secretsmanager.PutSecretValueInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.PutSecretValueOutput, error) {
+					return &secretsmanager.PutSecretValueOutput{
+						Name:      lo.ToPtr("my-secret"),
+						VersionId: lo.ToPtr("new-version-id"),
+					}, nil
+				},
+				tagResourceFunc: func(_ context.Context, params *secretsmanager.TagResourceInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.TagResourceOutput, error) {
+					assert.Equal(t, "my-secret", lo.FromPtr(params.SecretId))
+					return &secretsmanager.TagResourceOutput{}, nil
+				},
+			},
+			check: func(t *testing.T, output string) {
+				assert.Contains(t, output, "Updated secret")
+			},
+		},
+		{
+			name:    "put secret value error",
+			opts:    update.Options{Name: "my-secret", Value: "new-value"},
+			wantErr: "failed to update secret",
 			mock: &mockClient{
 				putSecretValueFunc: func(_ context.Context, _ *secretsmanager.PutSecretValueInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.PutSecretValueOutput, error) {
 					return nil, fmt.Errorf("AWS error")
 				},
 			},
-			wantErr: true,
+		},
+		{
+			name:    "update description error",
+			opts:    update.Options{Name: "my-secret", Value: "new-value", Description: "desc"},
+			wantErr: "failed to update description",
+			mock: &mockClient{
+				putSecretValueFunc: func(_ context.Context, _ *secretsmanager.PutSecretValueInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.PutSecretValueOutput, error) {
+					return &secretsmanager.PutSecretValueOutput{
+						Name:      lo.ToPtr("my-secret"),
+						VersionId: lo.ToPtr("new-version-id"),
+					}, nil
+				},
+				updateSecretFunc: func(_ context.Context, _ *secretsmanager.UpdateSecretInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.UpdateSecretOutput, error) {
+					return nil, fmt.Errorf("description update failed")
+				},
+			},
+		},
+		{
+			name: "tag application error",
+			opts: update.Options{
+				Name:  "my-secret",
+				Value: "new-value",
+				TagChange: &tagging.Change{
+					Add:    map[string]string{"env": "prod"},
+					Remove: []string{},
+				},
+			},
+			wantErr: "failed to add tags",
+			mock: &mockClient{
+				putSecretValueFunc: func(_ context.Context, _ *secretsmanager.PutSecretValueInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.PutSecretValueOutput, error) {
+					return &secretsmanager.PutSecretValueOutput{
+						Name:      lo.ToPtr("my-secret"),
+						VersionId: lo.ToPtr("new-version-id"),
+					}, nil
+				},
+				tagResourceFunc: func(_ context.Context, _ *secretsmanager.TagResourceInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.TagResourceOutput, error) {
+					return nil, fmt.Errorf("tag error")
+				},
+			},
 		},
 	}
 
@@ -120,8 +206,9 @@ func TestRun(t *testing.T) {
 			}
 			err := r.Run(t.Context(), tt.opts)
 
-			if tt.wantErr {
-				assert.Error(t, err)
+			if tt.wantErr != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.wantErr)
 				return
 			}
 

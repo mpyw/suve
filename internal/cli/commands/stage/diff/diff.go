@@ -9,17 +9,17 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
 	"github.com/aws/aws-sdk-go-v2/service/ssm/types"
-	"github.com/fatih/color"
 	"github.com/samber/lo"
 	"github.com/urfave/cli/v3"
 
 	"github.com/mpyw/suve/internal/api/smapi"
 	"github.com/mpyw/suve/internal/api/ssmapi"
-	"github.com/mpyw/suve/internal/awsutil"
+	"github.com/mpyw/suve/internal/cli/colors"
+	"github.com/mpyw/suve/internal/cli/pager"
+	"github.com/mpyw/suve/internal/infra"
 	"github.com/mpyw/suve/internal/jsonutil"
 	"github.com/mpyw/suve/internal/maputil"
 	"github.com/mpyw/suve/internal/output"
-	"github.com/mpyw/suve/internal/pager"
 	"github.com/mpyw/suve/internal/parallel"
 	// smutil removed
 	"github.com/mpyw/suve/internal/staging"
@@ -116,7 +116,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 
 	// Initialize clients only if needed
 	if hasSSM {
-		ssmClient, err := awsutil.NewSSMClient(ctx)
+		ssmClient, err := infra.NewSSMClient(ctx)
 		if err != nil {
 			return fmt.Errorf("failed to initialize SSM client: %w", err)
 		}
@@ -124,7 +124,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	}
 
 	if hasSM {
-		smClient, err := awsutil.NewSMClient(ctx)
+		smClient, err := infra.NewSMClient(ctx)
 		if err != nil {
 			return fmt.Errorf("failed to initialize SM client: %w", err)
 		}
@@ -386,16 +386,14 @@ func (r *Runner) outputSMDiffCreate(opts Options, name string, entry staging.Ent
 }
 
 func (r *Runner) outputMetadata(entry staging.Entry) {
-	cyan := color.New(color.FgCyan).SprintFunc()
-
 	if desc := lo.FromPtr(entry.Description); desc != "" {
-		_, _ = fmt.Fprintf(r.Stdout, "%s %s\n", cyan("Description:"), desc)
+		_, _ = fmt.Fprintf(r.Stdout, "%s %s\n", colors.FieldLabel("Description:"), desc)
 	}
 	if len(entry.Tags) > 0 {
 		var tagPairs []string
 		for _, k := range maputil.SortedKeys(entry.Tags) {
 			tagPairs = append(tagPairs, fmt.Sprintf("%s=%s", k, entry.Tags[k]))
 		}
-		_, _ = fmt.Fprintf(r.Stdout, "%s %s\n", cyan("Tags:"), strings.Join(tagPairs, ", "))
+		_, _ = fmt.Fprintf(r.Stdout, "%s %s\n", colors.FieldLabel("Tags:"), strings.Join(tagPairs, ", "))
 	}
 }

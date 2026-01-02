@@ -9,7 +9,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/mpyw/suve/internal/colors"
+	"github.com/mpyw/suve/internal/cli/colors"
 )
 
 // TryFormat attempts to format a JSON string with indentation.

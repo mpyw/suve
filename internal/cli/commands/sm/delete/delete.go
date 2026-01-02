@@ -8,13 +8,13 @@ import (
 	"os"
 
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
-	"github.com/fatih/color"
 	"github.com/samber/lo"
 	"github.com/urfave/cli/v3"
 
 	"github.com/mpyw/suve/internal/api/smapi"
-	"github.com/mpyw/suve/internal/awsutil"
-	"github.com/mpyw/suve/internal/confirm"
+	"github.com/mpyw/suve/internal/cli/colors"
+	"github.com/mpyw/suve/internal/cli/confirm"
+	"github.com/mpyw/suve/internal/infra"
 )
 
 // Client is the interface for the delete command.
@@ -103,7 +103,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		return nil
 	}
 
-	client, err := awsutil.NewSMClient(ctx)
+	client, err := infra.NewSMClient(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to initialize AWS client: %w", err)
 	}
@@ -137,15 +137,14 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 		return fmt.Errorf("failed to delete secret: %w", err)
 	}
 
-	yellow := color.New(color.FgYellow).SprintFunc()
 	if opts.Force {
 		_, _ = fmt.Fprintf(r.Stdout, "%s Permanently deleted secret %s\n",
-			yellow("!"),
+			colors.Warning("!"),
 			lo.FromPtr(result.Name),
 		)
 	} else {
 		_, _ = fmt.Fprintf(r.Stdout, "%s Scheduled deletion of secret %s (deletion date: %s)\n",
-			yellow("!"),
+			colors.Warning("!"),
 			lo.FromPtr(result.Name),
 			result.DeletionDate.Format("2006-01-02"),
 		)

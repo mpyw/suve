@@ -16,38 +16,40 @@ package e2e
 import (
 	"bytes"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/urfave/cli/v3"
 
-	smcat "github.com/mpyw/suve/internal/cli/sm/cat"
-	smcreate "github.com/mpyw/suve/internal/cli/sm/create"
-	smdelete "github.com/mpyw/suve/internal/cli/sm/delete"
-	smdiff "github.com/mpyw/suve/internal/cli/sm/diff"
-	smlog "github.com/mpyw/suve/internal/cli/sm/log"
-	smls "github.com/mpyw/suve/internal/cli/sm/ls"
-	smrestore "github.com/mpyw/suve/internal/cli/sm/restore"
-	smshow "github.com/mpyw/suve/internal/cli/sm/show"
-	smupdate "github.com/mpyw/suve/internal/cli/sm/update"
-	ssmcat "github.com/mpyw/suve/internal/cli/ssm/cat"
-	ssmdelete "github.com/mpyw/suve/internal/cli/ssm/delete"
-	ssmdiff "github.com/mpyw/suve/internal/cli/ssm/diff"
-	ssmlog "github.com/mpyw/suve/internal/cli/ssm/log"
-	ssmls "github.com/mpyw/suve/internal/cli/ssm/ls"
-	ssmset "github.com/mpyw/suve/internal/cli/ssm/set"
-	ssmshow "github.com/mpyw/suve/internal/cli/ssm/show"
-	globalstage "github.com/mpyw/suve/internal/cli/stage"
-	globaldiff "github.com/mpyw/suve/internal/cli/stage/diff"
-	globalpush "github.com/mpyw/suve/internal/cli/stage/push"
-	globalreset "github.com/mpyw/suve/internal/cli/stage/reset"
-	smstage "github.com/mpyw/suve/internal/cli/stage/sm"
-	ssmstage "github.com/mpyw/suve/internal/cli/stage/ssm"
-	globalstatus "github.com/mpyw/suve/internal/cli/stage/status"
+	smcat "github.com/mpyw/suve/internal/cli/commands/sm/cat"
+	smcreate "github.com/mpyw/suve/internal/cli/commands/sm/create"
+	smdelete "github.com/mpyw/suve/internal/cli/commands/sm/delete"
+	smdiff "github.com/mpyw/suve/internal/cli/commands/sm/diff"
+	smlog "github.com/mpyw/suve/internal/cli/commands/sm/log"
+	smls "github.com/mpyw/suve/internal/cli/commands/sm/ls"
+	smrestore "github.com/mpyw/suve/internal/cli/commands/sm/restore"
+	smshow "github.com/mpyw/suve/internal/cli/commands/sm/show"
+	smupdate "github.com/mpyw/suve/internal/cli/commands/sm/update"
+	ssmcat "github.com/mpyw/suve/internal/cli/commands/ssm/cat"
+	ssmdelete "github.com/mpyw/suve/internal/cli/commands/ssm/delete"
+	ssmdiff "github.com/mpyw/suve/internal/cli/commands/ssm/diff"
+	ssmlog "github.com/mpyw/suve/internal/cli/commands/ssm/log"
+	ssmls "github.com/mpyw/suve/internal/cli/commands/ssm/ls"
+	ssmset "github.com/mpyw/suve/internal/cli/commands/ssm/set"
+	ssmshow "github.com/mpyw/suve/internal/cli/commands/ssm/show"
+	globalstage "github.com/mpyw/suve/internal/cli/commands/stage"
+	globaldiff "github.com/mpyw/suve/internal/cli/commands/stage/diff"
+	globalpush "github.com/mpyw/suve/internal/cli/commands/stage/push"
+	globalreset "github.com/mpyw/suve/internal/cli/commands/stage/reset"
+	smstage "github.com/mpyw/suve/internal/cli/commands/stage/sm"
+	ssmstage "github.com/mpyw/suve/internal/cli/commands/stage/ssm"
+	globalstatus "github.com/mpyw/suve/internal/cli/commands/stage/status"
 	"github.com/mpyw/suve/internal/staging"
 )
 
@@ -401,9 +403,9 @@ func TestSSM_StagingWorkflow(t *testing.T) {
 		t.Logf("stage diff output: %s", stdout)
 	})
 
-	// 5. Push - apply staged changes (with -y to skip confirmation)
+	// 5. Push - apply staged changes (with -y to skip confirmation, --ignore-conflicts since we staged directly)
 	t.Run("push", func(t *testing.T) {
-		stdout, _, err := runSubCommand(t, ssmstage.Command(), "push", "-y")
+		stdout, _, err := runSubCommand(t, ssmstage.Command(), "push", "-y", "--ignore-conflicts")
 		require.NoError(t, err)
 		assert.Contains(t, stdout, paramName)
 		t.Logf("push output: %s", stdout)
@@ -550,9 +552,9 @@ func TestSSM_StagingResetWithVersion(t *testing.T) {
 		assert.Equal(t, "v1", entry.Value)
 	})
 
-	// 4. Push to apply
+	// 4. Push to apply (use --ignore-conflicts for robustness in test environment)
 	t.Run("push", func(t *testing.T) {
-		_, _, err := runSubCommand(t, ssmstage.Command(), "push", "-y")
+		_, _, err := runSubCommand(t, ssmstage.Command(), "push", "-y", "--ignore-conflicts")
 		require.NoError(t, err)
 	})
 
@@ -655,9 +657,9 @@ func TestSSM_StagingPushSingle(t *testing.T) {
 		StagedAt:  time.Now(),
 	})
 
-	// Push only param1
+	// Push only param1 (use --ignore-conflicts since we staged without original version)
 	t.Run("push-single", func(t *testing.T) {
-		_, _, err := runSubCommand(t, ssmstage.Command(), "push", "-y", param1)
+		_, _, err := runSubCommand(t, ssmstage.Command(), "push", "-y", "--ignore-conflicts", param1)
 		require.NoError(t, err)
 	})
 
@@ -1355,4 +1357,257 @@ func TestSSM_LongValue(t *testing.T) {
 	stdout, _, err := runCommand(t, ssmcat.Command(), paramName)
 	require.NoError(t, err)
 	assert.Equal(t, longValue, stdout)
+}
+
+// =============================================================================
+// Staging CLI Commands Tests (add/edit via CLI)
+// =============================================================================
+
+// TestSSM_StagingAddViaCLI tests the stage add command via CLI (with value argument).
+func TestSSM_StagingAddViaCLI(t *testing.T) {
+	setupEnv(t)
+	_ = setupTempHome(t)
+
+	paramName := "/suve-e2e-staging/add-cli/param"
+
+	// Cleanup
+	_, _, _ = runCommand(t, ssmdelete.Command(), "-y", paramName)
+	t.Cleanup(func() {
+		_, _, _ = runCommand(t, ssmdelete.Command(), "-y", paramName)
+	})
+
+	// 1. Stage add via CLI (with value argument - no editor needed)
+	t.Run("add-via-cli", func(t *testing.T) {
+		stdout, _, err := runSubCommand(t, ssmstage.Command(), "add", paramName, "cli-staged-value")
+		require.NoError(t, err)
+		assert.Contains(t, stdout, "Staged")
+		t.Logf("stage add output: %s", stdout)
+	})
+
+	// 2. Verify status shows add operation
+	t.Run("status", func(t *testing.T) {
+		stdout, _, err := runSubCommand(t, ssmstage.Command(), "status")
+		require.NoError(t, err)
+		assert.Contains(t, stdout, paramName)
+		assert.Contains(t, stdout, "A") // A = Add
+	})
+
+	// 3. Push to create
+	t.Run("push", func(t *testing.T) {
+		_, _, err := runSubCommand(t, ssmstage.Command(), "push", "-y")
+		require.NoError(t, err)
+	})
+
+	// 4. Verify created
+	t.Run("verify", func(t *testing.T) {
+		stdout, _, err := runCommand(t, ssmcat.Command(), paramName)
+		require.NoError(t, err)
+		assert.Equal(t, "cli-staged-value", stdout)
+	})
+}
+
+// TestSSM_StagingAddWithOptions tests stage add with description and tags.
+func TestSSM_StagingAddWithOptions(t *testing.T) {
+	setupEnv(t)
+	tmpHome := setupTempHome(t)
+
+	paramName := "/suve-e2e-staging/add-options/param"
+
+	// Cleanup
+	_, _, _ = runCommand(t, ssmdelete.Command(), "-y", paramName)
+	t.Cleanup(func() {
+		_, _, _ = runCommand(t, ssmdelete.Command(), "-y", paramName)
+	})
+
+	// Stage add with description and tags
+	t.Run("add-with-options", func(t *testing.T) {
+		stdout, _, err := runSubCommand(t, ssmstage.Command(), "add",
+			"--description", "Test description",
+			"--tag", "env=test",
+			"--tag", "owner=e2e",
+			paramName, "value-with-options")
+		require.NoError(t, err)
+		assert.Contains(t, stdout, "Staged")
+		t.Logf("stage add with options output: %s", stdout)
+	})
+
+	// Verify staged entry has options
+	t.Run("verify-staged-options", func(t *testing.T) {
+		store := staging.NewStoreWithPath(filepath.Join(tmpHome, ".suve", "stage.json"))
+		entry, err := store.Get(staging.ServiceSSM, paramName)
+		require.NoError(t, err)
+		assert.Equal(t, "value-with-options", entry.Value)
+		require.NotNil(t, entry.Description)
+		assert.Equal(t, "Test description", *entry.Description)
+		require.NotNil(t, entry.Tags)
+		assert.Equal(t, "test", entry.Tags["env"])
+		assert.Equal(t, "e2e", entry.Tags["owner"])
+	})
+
+	// Push and verify
+	t.Run("push-and-verify", func(t *testing.T) {
+		_, _, err := runSubCommand(t, ssmstage.Command(), "push", "-y")
+		require.NoError(t, err)
+
+		stdout, _, err := runCommand(t, ssmcat.Command(), paramName)
+		require.NoError(t, err)
+		assert.Equal(t, "value-with-options", stdout)
+	})
+}
+
+// TestSM_StagingAddViaCLI tests the SM stage add command via CLI.
+func TestSM_StagingAddViaCLI(t *testing.T) {
+	setupEnv(t)
+	_ = setupTempHome(t)
+
+	secretName := "suve-e2e-staging/add-cli/secret"
+
+	// Cleanup
+	_, _, _ = runCommand(t, smdelete.Command(), "-y", "-f", secretName)
+	t.Cleanup(func() {
+		_, _, _ = runCommand(t, smdelete.Command(), "-y", "-f", secretName)
+	})
+
+	// 1. Stage add via CLI
+	t.Run("add-via-cli", func(t *testing.T) {
+		stdout, _, err := runSubCommand(t, smstage.Command(), "add", secretName, "cli-staged-secret")
+		require.NoError(t, err)
+		assert.Contains(t, stdout, "Staged")
+		t.Logf("stage add output: %s", stdout)
+	})
+
+	// 2. Verify status
+	t.Run("status", func(t *testing.T) {
+		stdout, _, err := runSubCommand(t, smstage.Command(), "status")
+		require.NoError(t, err)
+		assert.Contains(t, stdout, secretName)
+		assert.Contains(t, stdout, "A")
+	})
+
+	// 3. Push to create
+	t.Run("push", func(t *testing.T) {
+		_, _, err := runSubCommand(t, smstage.Command(), "push", "-y")
+		require.NoError(t, err)
+	})
+
+	// 4. Verify created
+	t.Run("verify", func(t *testing.T) {
+		stdout, _, err := runCommand(t, smcat.Command(), secretName)
+		require.NoError(t, err)
+		assert.Equal(t, "cli-staged-secret", stdout)
+	})
+}
+
+// TestSSM_StagingEditViaCLI tests re-adding (editing) a staged value via CLI.
+func TestSSM_StagingEditViaCLI(t *testing.T) {
+	setupEnv(t)
+	_ = setupTempHome(t)
+
+	paramName := "/suve-e2e-staging/edit-cli/param"
+
+	// Cleanup
+	_, _, _ = runCommand(t, ssmdelete.Command(), "-y", paramName)
+	t.Cleanup(func() {
+		_, _, _ = runCommand(t, ssmdelete.Command(), "-y", paramName)
+	})
+
+	// 1. Stage add first
+	t.Run("stage-add", func(t *testing.T) {
+		_, _, err := runSubCommand(t, ssmstage.Command(), "add", paramName, "initial-value")
+		require.NoError(t, err)
+	})
+
+	// 2. Re-add (edit) the staged value
+	t.Run("re-add-edit", func(t *testing.T) {
+		stdout, _, err := runSubCommand(t, ssmstage.Command(), "add", paramName, "edited-value")
+		require.NoError(t, err)
+		assert.Contains(t, stdout, "Staged")
+		t.Logf("re-add output: %s", stdout)
+	})
+
+	// 3. Push and verify
+	t.Run("push-and-verify", func(t *testing.T) {
+		_, _, err := runSubCommand(t, ssmstage.Command(), "push", "-y")
+		require.NoError(t, err)
+
+		stdout, _, err := runCommand(t, ssmcat.Command(), paramName)
+		require.NoError(t, err)
+		assert.Equal(t, "edited-value", stdout)
+	})
+}
+
+// TestSSM_StagingDiffViaCLI tests the stage diff command via CLI for various operations.
+func TestSSM_StagingDiffViaCLI(t *testing.T) {
+	setupEnv(t)
+	_ = setupTempHome(t)
+
+	paramName := "/suve-e2e-staging/diff-cli/param"
+
+	// Cleanup
+	_, _, _ = runCommand(t, ssmdelete.Command(), "-y", paramName)
+	t.Cleanup(func() {
+		_, _, _ = runCommand(t, ssmdelete.Command(), "-y", paramName)
+	})
+
+	// 1. Stage add and check diff
+	t.Run("diff-for-create", func(t *testing.T) {
+		_, _, err := runSubCommand(t, ssmstage.Command(), "add", paramName, "new-value")
+		require.NoError(t, err)
+
+		stdout, _, err := runSubCommand(t, ssmstage.Command(), "diff", paramName)
+		require.NoError(t, err)
+		assert.Contains(t, stdout, "+new-value")
+		t.Logf("diff output for create: %s", stdout)
+	})
+
+	// 2. Push and setup for update
+	t.Run("push-and-setup", func(t *testing.T) {
+		_, _, err := runSubCommand(t, ssmstage.Command(), "push", "-y")
+		require.NoError(t, err)
+	})
+
+	// 3. Stage delete and check diff
+	t.Run("diff-for-delete", func(t *testing.T) {
+		_, _, err := runSubCommand(t, ssmstage.Command(), "delete", paramName)
+		require.NoError(t, err)
+
+		stdout, _, err := runSubCommand(t, ssmstage.Command(), "diff", paramName)
+		require.NoError(t, err)
+		assert.Contains(t, stdout, "-new-value")
+		t.Logf("diff output for delete: %s", stdout)
+	})
+}
+
+// TestSSM_GlobalDiffWithJSON tests global diff with JSON formatting.
+func TestSSM_GlobalDiffWithJSON(t *testing.T) {
+	setupEnv(t)
+	tmpHome := setupTempHome(t)
+
+	paramName := "/suve-e2e-global/json-diff/param"
+
+	// Cleanup
+	_, _, _ = runCommand(t, ssmdelete.Command(), "-y", paramName)
+	t.Cleanup(func() {
+		_, _, _ = runCommand(t, ssmdelete.Command(), "-y", paramName)
+	})
+
+	// Create param with JSON value
+	_, _, err := runCommand(t, ssmset.Command(), "-y", paramName, `{"a":1}`)
+	require.NoError(t, err)
+
+	// Stage update with different JSON
+	store := staging.NewStoreWithPath(filepath.Join(tmpHome, ".suve", "stage.json"))
+	err = store.Stage(staging.ServiceSSM, paramName, staging.Entry{
+		Operation: staging.OperationUpdate,
+		Value:     `{"a":1,"b":2}`,
+		StagedAt:  time.Now(),
+	})
+	require.NoError(t, err)
+
+	// Check diff with --json flag
+	stdout, _, err := runCommand(t, globaldiff.Command(), "--json")
+	require.NoError(t, err)
+	t.Logf("global diff --json output: %s", stdout)
+	// Should have formatted JSON
+	assert.Contains(t, stdout, "a")
 }

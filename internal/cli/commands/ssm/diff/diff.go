@@ -10,10 +10,10 @@ import (
 	"github.com/urfave/cli/v3"
 
 	"github.com/mpyw/suve/internal/api/ssmapi"
-	"github.com/mpyw/suve/internal/awsutil"
+	"github.com/mpyw/suve/internal/cli/pager"
+	"github.com/mpyw/suve/internal/infra"
 	"github.com/mpyw/suve/internal/jsonutil"
 	"github.com/mpyw/suve/internal/output"
-	"github.com/mpyw/suve/internal/pager"
 	"github.com/mpyw/suve/internal/version/ssmversion"
 )
 
@@ -81,7 +81,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		return err
 	}
 
-	client, err := awsutil.NewSSMClient(ctx)
+	client, err := infra.NewSSMClient(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to initialize AWS client: %w", err)
 	}

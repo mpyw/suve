@@ -7,8 +7,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/fatih/color"
-
+	"github.com/mpyw/suve/internal/cli/colors"
 	"github.com/mpyw/suve/internal/maputil"
 	"github.com/mpyw/suve/internal/staging"
 )
@@ -69,8 +68,7 @@ func (r *StatusRunner) showAll(verbose bool) error {
 		return nil
 	}
 
-	yellow := color.New(color.FgYellow).SprintFunc()
-	_, _ = fmt.Fprintf(r.Stdout, "%s (%d):\n", yellow(fmt.Sprintf("Staged %s changes", serviceName)), len(serviceEntries))
+	_, _ = fmt.Fprintf(r.Stdout, "%s (%d):\n", colors.Warning(fmt.Sprintf("Staged %s changes", serviceName)), len(serviceEntries))
 
 	printer := &staging.EntryPrinter{Writer: r.Stdout}
 	for _, name := range maputil.SortedKeys(serviceEntries) {

@@ -1,5 +1,5 @@
-// Package awsutil provides AWS client initialization.
-package awsutil
+// Package infra provides AWS client initialization.
+package infra
 
 import (
 	"context"

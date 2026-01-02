@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/fatih/color"
 	"github.com/urfave/cli/v3"
 
+	"github.com/mpyw/suve/internal/cli/colors"
 	"github.com/mpyw/suve/internal/maputil"
 	"github.com/mpyw/suve/internal/staging"
 )
@@ -79,12 +79,11 @@ func (r *Runner) Run(_ context.Context, opts Options) error {
 		return nil
 	}
 
-	yellow := color.New(color.FgYellow).SprintFunc()
 	printer := &staging.EntryPrinter{Writer: r.Stdout}
 
 	// Show SSM changes (no DeleteOptions for SSM)
 	if ssmEntries, ok := entries[staging.ServiceSSM]; ok && len(ssmEntries) > 0 {
-		_, _ = fmt.Fprintf(r.Stdout, "%s (%d):\n", yellow("Staged SSM changes"), len(ssmEntries))
+		_, _ = fmt.Fprintf(r.Stdout, "%s (%d):\n", colors.Warning("Staged SSM changes"), len(ssmEntries))
 		printEntries(printer, ssmEntries, opts.Verbose, false)
 	}
 
@@ -94,7 +93,7 @@ func (r *Runner) Run(_ context.Context, opts Options) error {
 		if _, ok := entries[staging.ServiceSSM]; ok && len(entries[staging.ServiceSSM]) > 0 {
 			_, _ = fmt.Fprintln(r.Stdout)
 		}
-		_, _ = fmt.Fprintf(r.Stdout, "%s (%d):\n", yellow("Staged SM changes"), len(smEntries))
+		_, _ = fmt.Fprintf(r.Stdout, "%s (%d):\n", colors.Warning("Staged SM changes"), len(smEntries))
 		printEntries(printer, smEntries, opts.Verbose, true)
 	}
 
