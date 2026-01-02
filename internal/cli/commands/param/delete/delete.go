@@ -14,6 +14,7 @@ import (
 	"github.com/mpyw/suve/internal/cli/colors"
 	"github.com/mpyw/suve/internal/cli/confirm"
 	"github.com/mpyw/suve/internal/infra"
+	"github.com/mpyw/suve/internal/output"
 )
 
 // Client is the interface for the delete command.
@@ -66,6 +67,22 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	name := cmd.Args().First()
 	skipConfirm := cmd.Bool("yes")
 
+	client, err := infra.NewParamClient(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to initialize AWS client: %w", err)
+	}
+
+	// Show current value before confirming
+	if !skipConfirm {
+		currentValue := getCurrentValue(ctx, client, name)
+		if currentValue != "" {
+			_, _ = fmt.Fprintf(cmd.Root().ErrWriter, "%s Current value of %s:\n", colors.Warning("!"), name)
+			_, _ = fmt.Fprintln(cmd.Root().ErrWriter)
+			_, _ = fmt.Fprintln(cmd.Root().ErrWriter, output.Indent(currentValue, "  "))
+			_, _ = fmt.Fprintln(cmd.Root().ErrWriter)
+		}
+	}
+
 	// Confirm deletion
 	prompter := &confirm.Prompter{
 		Stdin:  os.Stdin,
@@ -78,11 +95,6 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	}
 	if !confirmed {
 		return nil
-	}
-
-	client, err := infra.NewParamClient(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to initialize AWS client: %w", err)
 	}
 
 	r := &Runner{
@@ -107,4 +119,20 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 	_, _ = fmt.Fprintf(r.Stdout, "%s %s\n", colors.OpDelete("Deleted"), opts.Name)
 
 	return nil
+}
+
+// getCurrentValue fetches the current parameter value.
+// Returns empty string if not found or error.
+func getCurrentValue(ctx context.Context, client paramapi.GetParameterAPI, name string) string {
+	result, err := client.GetParameter(ctx, &paramapi.GetParameterInput{
+		Name:           lo.ToPtr(name),
+		WithDecryption: lo.ToPtr(true),
+	})
+	if err != nil {
+		return ""
+	}
+	if result.Parameter == nil || result.Parameter.Value == nil {
+		return ""
+	}
+	return *result.Parameter.Value
 }

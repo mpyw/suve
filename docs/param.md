@@ -387,17 +387,26 @@ suve param set [options] <name> <value>
 | `--description` | - | - | Parameter description |
 | `--tag` | - | - | Tag in key=value format (can be specified multiple times, additive) |
 | `--untag` | - | - | Tag key to remove (can be specified multiple times) |
-| `--yes` | - | `false` | Skip confirmation prompt |
+| `--yes` | - | `false` | Skip confirmation prompt (only applies when updating) |
 
 > [!NOTE]
 > `--secure` and `--type` cannot be used together.
 
+> [!TIP]
+> When updating an existing parameter, `suve param set` shows a diff of the changes and prompts for confirmation. Creating a new parameter does not require confirmation.
+
 **Examples:**
 
 ```ShellSession
-user@host:~$ suve param set --secure /app/config/database-url "postgres://db.example.com:5432/myapp"
-? Set parameter /app/config/database-url? [y/N] y
-Set parameter /app/config/database-url (version: 1)
+user@host:~$ suve param set --secure /app/config/database-url "postgres://new-db.example.com:5432/myapp"
+--- /app/config/database-url (AWS)
++++ /app/config/database-url (new)
+@@ -1 +1 @@
+-postgres://db.example.com:5432/myapp
++postgres://new-db.example.com:5432/myapp
+
+? Update parameter /app/config/database-url? [y/N] y
+✓ Set parameter /app/config/database-url (version: 2)
 ```
 
 ```bash
@@ -451,12 +460,17 @@ suve param delete [options] <name>
 
 ```ShellSession
 user@host:~$ suve param delete /app/config/old-param
-? Delete parameter /app/config/old-param? [y/N] y
+! Current value of /app/config/old-param:
+
+  postgres://db.example.com:5432/myapp
+
+! This will permanently delete: /app/config/old-param
+? Continue? [y/N] y
 Deleted /app/config/old-param
 ```
 
 ```bash
-# Delete without confirmation
+# Delete without confirmation (skips value display)
 suve param delete --yes /app/config/old-param
 ```
 

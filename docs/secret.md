@@ -444,17 +444,26 @@ suve secret update [options] <name> <value>
 
 ```ShellSession
 user@host:~$ suve secret update my-database-credentials '{"username":"admin","password":"newpassword"}'
+--- my-database-credentials (AWS)
++++ my-database-credentials (new)
+@@ -1 +1 @@
+-{"username":"admin","password":"oldpassword"}
++{"username":"admin","password":"newpassword"}
+
 ? Update secret my-database-credentials? [y/N] y
-Updated secret my-database-credentials (version: ghi11111-1234-1234-1234-123456789012)
+✓ Updated secret my-database-credentials (version: ghi11111-1234-1234-1234-123456789012)
 ```
 
 ```bash
 # Update with tags
 suve secret update --tag env=prod my-api-key "new-key-value"
 
-# Update without confirmation
+# Update without confirmation (skips diff display)
 suve secret update --yes my-api-key "new-key-value"
 ```
+
+> [!TIP]
+> When updating a secret, `suve secret update` shows a diff of the changes and prompts for confirmation. Use `--yes` to skip this review step.
 
 > [!NOTE]
 > - `update` fails if the secret doesn't exist. Use `suve secret create` to create a new secret.
@@ -492,7 +501,12 @@ With recovery window (default):
 
 ```ShellSession
 user@host:~$ suve secret delete my-old-secret
-? Delete secret my-old-secret? [y/N] y
+! Current value of my-old-secret:
+
+  {"username":"admin","password":"oldpassword"}
+
+! This will permanently delete: my-old-secret
+? Continue? [y/N] y
 ! Scheduled deletion of secret my-old-secret (deletion date: 2024-02-14)
 ```
 
@@ -500,6 +514,12 @@ Immediate deletion:
 
 ```ShellSession
 user@host:~$ suve secret delete --force my-old-secret
+! Current value of my-old-secret:
+
+  {"username":"admin","password":"oldpassword"}
+
+! This will permanently delete: my-old-secret
+? Continue? [y/N] y
 ! Permanently deleted secret my-old-secret
 ```
 

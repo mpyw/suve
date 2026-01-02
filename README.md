@@ -288,8 +288,8 @@ where ~SHIFT = ~ | ~N  (repeatable, cumulative)
 | [`suve param log`](docs/param.md#log) | `--number=<N>` (`-n`)<br>`--patch` (`-p`)<br>`--parse-json` (`-j`)<br>`--oneline`<br>`--reverse`<br>`--from=<SPEC>`<br>`--to=<SPEC>`<br>`--output=<FORMAT>` | Show version history |
 | [`suve param diff`](docs/param.md#diff) | `--parse-json` (`-j`)<br>`--output=<FORMAT>` | Compare versions |
 | [`suve param list`](docs/param.md#list) | `--filter=<REGEX>`<br>`--show`<br>`--output=<FORMAT>` | List parameters |
-| [`suve param set`](docs/param.md#set) | `--description=<TEXT>`<br>`--tag=<KEY>=<VALUE> --tag=...` | Create or update parameter |
-| [`suve param delete`](docs/param.md#delete) | | Delete parameter |
+| [`suve param set`](docs/param.md#set) | `--yes`<br>`--description=<TEXT>`<br>`--tag=<KEY>=<VALUE> --tag=...` | Create or update parameter |
+| [`suve param delete`](docs/param.md#delete) | `--yes` | Delete parameter |
 
 **Staging commands** (under `suve stage param`):
 
@@ -312,8 +312,8 @@ where ~SHIFT = ~ | ~N  (repeatable, cumulative)
 | [`suve secret diff`](docs/secret.md#diff) | `--parse-json` (`-j`)<br>`--output=<FORMAT>` | Compare versions |
 | [`suve secret list`](docs/secret.md#list) | `--filter=<REGEX>`<br>`--show`<br>`--output=<FORMAT>` | List secrets |
 | [`suve secret create`](docs/secret.md#create) | `--description=<TEXT>`<br>`--tag=<KEY>=<VALUE> --tag=...` | Create new secret |
-| [`suve secret update`](docs/secret.md#update) | | Update existing secret |
-| [`suve secret delete`](docs/secret.md#delete) | `--force`<br>`--recovery-window=<DAYS>` | Delete secret |
+| [`suve secret update`](docs/secret.md#update) | `--yes`<br>`--description=<TEXT>`<br>`--tag=<KEY>=<VALUE> --tag=...` | Update existing secret |
+| [`suve secret delete`](docs/secret.md#delete) | `--yes`<br>`--force`<br>`--recovery-window=<DAYS>` | Delete secret |
 | [`suve secret restore`](docs/secret.md#restore) | | Restore deleted secret |
 
 **Staging commands** (under `suve stage secret`):

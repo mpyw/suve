@@ -14,6 +14,7 @@ import (
 	"github.com/mpyw/suve/internal/cli/colors"
 	"github.com/mpyw/suve/internal/cli/confirm"
 	"github.com/mpyw/suve/internal/infra"
+	"github.com/mpyw/suve/internal/output"
 )
 
 // Client is the interface for the delete command.
@@ -87,6 +88,22 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	name := cmd.Args().First()
 	skipConfirm := cmd.Bool("yes")
 
+	client, err := infra.NewSecretClient(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to initialize AWS client: %w", err)
+	}
+
+	// Show current value before confirming
+	if !skipConfirm {
+		currentValue := getCurrentValue(ctx, client, name)
+		if currentValue != "" {
+			_, _ = fmt.Fprintf(cmd.Root().ErrWriter, "%s Current value of %s:\n", colors.Warning("!"), name)
+			_, _ = fmt.Fprintln(cmd.Root().ErrWriter)
+			_, _ = fmt.Fprintln(cmd.Root().ErrWriter, output.Indent(currentValue, "  "))
+			_, _ = fmt.Fprintln(cmd.Root().ErrWriter)
+		}
+	}
+
 	// Confirm deletion
 	prompter := &confirm.Prompter{
 		Stdin:  os.Stdin,
@@ -99,11 +116,6 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	}
 	if !confirmed {
 		return nil
-	}
-
-	client, err := infra.NewSecretClient(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to initialize AWS client: %w", err)
 	}
 
 	r := &Runner{
@@ -149,4 +161,19 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 	}
 
 	return nil
+}
+
+// getCurrentValue fetches the current secret value.
+// Returns empty string if not found or error.
+func getCurrentValue(ctx context.Context, client secretapi.GetSecretValueAPI, name string) string {
+	result, err := client.GetSecretValue(ctx, &secretapi.GetSecretValueInput{
+		SecretId: lo.ToPtr(name),
+	})
+	if err != nil {
+		return ""
+	}
+	if result.SecretString == nil {
+		return ""
+	}
+	return *result.SecretString
 }

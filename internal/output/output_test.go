@@ -245,3 +245,46 @@ func TestDiffRaw_EmptyInputs(t *testing.T) {
 	result := DiffRaw("old", "new", "", "")
 	assert.Empty(t, result)
 }
+
+func TestIndent(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name     string
+		input    string
+		prefix   string
+		expected string
+	}{
+		{
+			name:     "single line",
+			input:    "hello",
+			prefix:   "  ",
+			expected: "  hello",
+		},
+		{
+			name:     "multi line",
+			input:    "line1\nline2\nline3",
+			prefix:   "> ",
+			expected: "> line1\n> line2\n> line3",
+		},
+		{
+			name:     "empty string",
+			input:    "",
+			prefix:   "  ",
+			expected: "",
+		},
+		{
+			name:     "empty lines preserved",
+			input:    "line1\n\nline3",
+			prefix:   "  ",
+			expected: "  line1\n\n  line3",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			result := Indent(tt.input, tt.prefix)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}

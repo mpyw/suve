@@ -154,3 +154,17 @@ func colorDiff(diff string) string {
 
 	return result.String()
 }
+
+// Indent adds a prefix to each line of the input string.
+func Indent(s, prefix string) string {
+	if s == "" {
+		return ""
+	}
+	lines := strings.Split(s, "\n")
+	for i, line := range lines {
+		if line != "" {
+			lines[i] = prefix + line
+		}
+	}
+	return strings.Join(lines, "\n")
+}

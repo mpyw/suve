@@ -20,6 +20,7 @@ import (
 
 // Client is the interface for the set command.
 type Client interface {
+	paramapi.GetParameterAPI
 	paramapi.PutParameterAPI
 	paramapi.AddTagsToResourceAPI
 	paramapi.RemoveTagsFromResourceAPI
@@ -68,7 +69,7 @@ EXAMPLES:
    suve param set --type StringList /app/hosts "a.com,b.com"       Create StringList
    suve param set --tag env=prod --tag team=platform /app/key val  Set with tags
    suve param set --untag deprecated /app/key val                  Remove a tag
-   suve param set --yes /app/config/db-url "postgres://..."        Set without confirmation`,
+   suve param set --yes /app/config/db-url "postgres://..."        Update without confirmation`,
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:  "type",
@@ -93,7 +94,7 @@ EXAMPLES:
 			},
 			&cli.BoolFlag{
 				Name:  "yes",
-				Usage: "Skip confirmation prompt",
+				Usage: "Skip confirmation prompt (only applies when updating existing parameter)",
 			},
 		},
 		Action: action,
@@ -130,23 +131,37 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		output.Warning(cmd.Root().ErrWriter, "%s", w)
 	}
 
-	// Confirm operation
-	prompter := &confirm.Prompter{
-		Stdin:  os.Stdin,
-		Stdout: cmd.Root().Writer,
-		Stderr: cmd.Root().ErrWriter,
-	}
-	confirmed, err := prompter.ConfirmAction("Set parameter", name, skipConfirm)
-	if err != nil {
-		return err
-	}
-	if !confirmed {
-		return nil
-	}
-
 	client, err := infra.NewParamClient(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to initialize AWS client: %w", err)
+	}
+
+	newValue := cmd.Args().Get(1)
+
+	// Check if parameter exists and get current value for diff
+	currentValue, exists := getCurrentValue(ctx, client, name)
+
+	// Only confirm for updates, not creates
+	if exists && !skipConfirm {
+		// Show diff
+		diff := output.Diff(name+" (AWS)", name+" (new)", currentValue, newValue)
+		if diff != "" {
+			_, _ = fmt.Fprintln(cmd.Root().ErrWriter, diff)
+		}
+
+		// Confirm operation
+		prompter := &confirm.Prompter{
+			Stdin:  os.Stdin,
+			Stdout: cmd.Root().Writer,
+			Stderr: cmd.Root().ErrWriter,
+		}
+		confirmed, err := prompter.ConfirmAction("Update parameter", name, false)
+		if err != nil {
+			return err
+		}
+		if !confirmed {
+			return nil
+		}
 	}
 
 	r := &Runner{
@@ -156,7 +171,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	}
 	return r.Run(ctx, Options{
 		Name:        name,
-		Value:       cmd.Args().Get(1),
+		Value:       newValue,
 		Type:        paramType,
 		Description: cmd.String("description"),
 		TagChange:   tagResult.Change,
@@ -194,4 +209,20 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 	)
 
 	return nil
+}
+
+// getCurrentValue fetches the current parameter value.
+// Returns the value and true if exists, empty string and false if not found.
+func getCurrentValue(ctx context.Context, client paramapi.GetParameterAPI, name string) (string, bool) {
+	result, err := client.GetParameter(ctx, &paramapi.GetParameterInput{
+		Name:           lo.ToPtr(name),
+		WithDecryption: lo.ToPtr(true),
+	})
+	if err != nil {
+		return "", false
+	}
+	if result.Parameter == nil || result.Parameter.Value == nil {
+		return "", false
+	}
+	return *result.Parameter.Value, true
 }

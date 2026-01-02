@@ -106,23 +106,36 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		output.Warning(cmd.Root().ErrWriter, "%s", w)
 	}
 
-	// Confirm operation
-	prompter := &confirm.Prompter{
-		Stdin:  os.Stdin,
-		Stdout: cmd.Root().Writer,
-		Stderr: cmd.Root().ErrWriter,
-	}
-	confirmed, err := prompter.ConfirmAction("Update secret", name, skipConfirm)
-	if err != nil {
-		return err
-	}
-	if !confirmed {
-		return nil
-	}
-
 	client, err := infra.NewSecretClient(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to initialize AWS client: %w", err)
+	}
+
+	newValue := cmd.Args().Get(1)
+
+	// Fetch current value and show diff before confirming
+	if !skipConfirm {
+		currentValue := getCurrentValue(ctx, client, name)
+		if currentValue != "" {
+			diff := output.Diff(name+" (AWS)", name+" (new)", currentValue, newValue)
+			if diff != "" {
+				_, _ = fmt.Fprintln(cmd.Root().ErrWriter, diff)
+			}
+		}
+
+		// Confirm operation
+		prompter := &confirm.Prompter{
+			Stdin:  os.Stdin,
+			Stdout: cmd.Root().Writer,
+			Stderr: cmd.Root().ErrWriter,
+		}
+		confirmed, err := prompter.ConfirmAction("Update secret", name, false)
+		if err != nil {
+			return err
+		}
+		if !confirmed {
+			return nil
+		}
 	}
 
 	r := &Runner{
@@ -132,7 +145,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	}
 	return r.Run(ctx, Options{
 		Name:        name,
-		Value:       cmd.Args().Get(1),
+		Value:       newValue,
 		Description: cmd.String("description"),
 		TagChange:   tagResult.Change,
 	})
@@ -174,4 +187,19 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 	)
 
 	return nil
+}
+
+// getCurrentValue fetches the current secret value.
+// Returns empty string if not found or error.
+func getCurrentValue(ctx context.Context, client secretapi.GetSecretValueAPI, name string) string {
+	result, err := client.GetSecretValue(ctx, &secretapi.GetSecretValueInput{
+		SecretId: lo.ToPtr(name),
+	})
+	if err != nil {
+		return ""
+	}
+	if result.SecretString == nil {
+		return ""
+	}
+	return *result.SecretString
 }
