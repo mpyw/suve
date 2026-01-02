@@ -14,7 +14,7 @@ import (
 	"github.com/mpyw/suve/internal/api/paramapi"
 	appcli "github.com/mpyw/suve/internal/cli/commands"
 	"github.com/mpyw/suve/internal/cli/commands/param/log"
-	"github.com/mpyw/suve/internal/output"
+	"github.com/mpyw/suve/internal/cli/output"
 )
 
 func TestCommand_Validation(t *testing.T) {

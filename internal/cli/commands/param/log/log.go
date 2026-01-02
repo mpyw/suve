@@ -17,10 +17,10 @@ import (
 
 	"github.com/mpyw/suve/internal/api/paramapi"
 	"github.com/mpyw/suve/internal/cli/colors"
+	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/cli/pager"
 	"github.com/mpyw/suve/internal/infra"
 	"github.com/mpyw/suve/internal/jsonutil"
-	"github.com/mpyw/suve/internal/output"
 	"github.com/mpyw/suve/internal/timeutil"
 )
 
