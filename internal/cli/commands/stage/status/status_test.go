@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -43,7 +44,7 @@ func TestCommand_ShowParamChangesOnly(t *testing.T) {
 	now := time.Now()
 	_ = store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     "value1",
+		Value:     lo.ToPtr("value1"),
 		StagedAt:  now,
 	})
 
@@ -72,7 +73,7 @@ func TestCommand_ShowSecretChangesOnly(t *testing.T) {
 	now := time.Now()
 	_ = store.Stage(staging.ServiceSecret, "my-secret", staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     "secret-value",
+		Value:     lo.ToPtr("secret-value"),
 		StagedAt:  now,
 	})
 
@@ -101,7 +102,7 @@ func TestCommand_ShowBothParamAndSecretChanges(t *testing.T) {
 	now := time.Now()
 	_ = store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     "param-value",
+		Value:     lo.ToPtr("param-value"),
 		StagedAt:  now,
 	})
 	_ = store.Stage(staging.ServiceSecret, "my-secret", staging.Entry{
@@ -137,12 +138,12 @@ func TestCommand_VerboseOutput(t *testing.T) {
 	now := time.Now()
 	_ = store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     "test-value",
+		Value:     lo.ToPtr("test-value"),
 		StagedAt:  now,
 	})
 	_ = store.Stage(staging.ServiceSecret, "my-secret", staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     "secret-value",
+		Value:     lo.ToPtr("secret-value"),
 		StagedAt:  now,
 	})
 
@@ -201,7 +202,7 @@ func TestCommand_VerboseTruncatesLongValue(t *testing.T) {
 	longValue := "this is a very long value that exceeds one hundred characters and should be truncated in verbose mode output display"
 	_ = store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     longValue,
+		Value:     lo.ToPtr(longValue),
 		StagedAt:  now,
 	})
 

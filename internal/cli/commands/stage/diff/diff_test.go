@@ -107,7 +107,7 @@ func TestRun_ParamOnly(t *testing.T) {
 
 	err := store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     "new-value",
+		Value:     lo.ToPtr("new-value"),
 		StagedAt:  time.Now(),
 	})
 	require.NoError(t, err)
@@ -150,7 +150,7 @@ func TestRun_SecretOnly(t *testing.T) {
 
 	err := store.Stage(staging.ServiceSecret, "my-secret", staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     "new-secret",
+		Value:     lo.ToPtr("new-secret"),
 		StagedAt:  time.Now(),
 	})
 	require.NoError(t, err)
@@ -189,14 +189,14 @@ func TestRun_BothServices(t *testing.T) {
 
 	err := store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     "param-new",
+		Value:     lo.ToPtr("param-new"),
 		StagedAt:  time.Now(),
 	})
 	require.NoError(t, err)
 
 	err = store.Stage(staging.ServiceSecret, "my-secret", staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     "secret-new",
+		Value:     lo.ToPtr("secret-new"),
 		StagedAt:  time.Now(),
 	})
 	require.NoError(t, err)
@@ -310,7 +310,7 @@ func TestRun_IdenticalValues(t *testing.T) {
 
 	err := store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     "same-value",
+		Value:     lo.ToPtr("same-value"),
 		StagedAt:  time.Now(),
 	})
 	require.NoError(t, err)
@@ -354,7 +354,7 @@ func TestRun_ParseJSON(t *testing.T) {
 
 	err := store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     `{"key":"new"}`,
+		Value:     lo.ToPtr(`{"key":"new"}`),
 		StagedAt:  time.Now(),
 	})
 	require.NoError(t, err)
@@ -395,7 +395,7 @@ func TestRun_ParamUpdateAutoUnstageWhenDeleted(t *testing.T) {
 
 	err := store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     "new-value",
+		Value:     lo.ToPtr("new-value"),
 		StagedAt:  time.Now(),
 	})
 	require.NoError(t, err)
@@ -432,7 +432,7 @@ func TestRun_SecretUpdateAutoUnstageWhenDeleted(t *testing.T) {
 
 	err := store.Stage(staging.ServiceSecret, "my-secret", staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     "new-value",
+		Value:     lo.ToPtr("new-value"),
 		StagedAt:  time.Now(),
 	})
 	require.NoError(t, err)
@@ -469,7 +469,7 @@ func TestRun_SecretIdenticalValues(t *testing.T) {
 
 	err := store.Stage(staging.ServiceSecret, "my-secret", staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     "same-value",
+		Value:     lo.ToPtr("same-value"),
 		StagedAt:  time.Now(),
 	})
 	require.NoError(t, err)
@@ -511,7 +511,7 @@ func TestRun_SecretParseJSON(t *testing.T) {
 
 	err := store.Stage(staging.ServiceSecret, "my-secret", staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     `{"key":"new"}`,
+		Value:     lo.ToPtr(`{"key":"new"}`),
 		StagedAt:  time.Now(),
 	})
 	require.NoError(t, err)
@@ -550,7 +550,7 @@ func TestRun_SecretParseJSONMixed(t *testing.T) {
 
 	err := store.Stage(staging.ServiceSecret, "my-secret", staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     "not-json",
+		Value:     lo.ToPtr("not-json"),
 		StagedAt:  time.Now(),
 	})
 	require.NoError(t, err)
@@ -587,7 +587,7 @@ func TestRun_ParamCreateOperation(t *testing.T) {
 
 	err := store.Stage(staging.ServiceParam, "/app/new-param", staging.Entry{
 		Operation:   staging.OperationCreate,
-		Value:       "new-value",
+		Value:       lo.ToPtr("new-value"),
 		Description: lo.ToPtr("New parameter"),
 		Tags:        map[string]string{"env": "prod", "team": "platform"},
 		StagedAt:    time.Now(),
@@ -630,7 +630,7 @@ func TestRun_SecretCreateOperation(t *testing.T) {
 
 	err := store.Stage(staging.ServiceSecret, "new-secret", staging.Entry{
 		Operation:   staging.OperationCreate,
-		Value:       "secret-value",
+		Value:       lo.ToPtr("secret-value"),
 		Description: lo.ToPtr("New secret"),
 		Tags:        map[string]string{"env": "staging"},
 		StagedAt:    time.Now(),
@@ -672,7 +672,7 @@ func TestRun_CreateWithParseJSON(t *testing.T) {
 
 	err := store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
 		Operation: staging.OperationCreate,
-		Value:     `{"key":"value","nested":{"a":1}}`,
+		Value:     lo.ToPtr(`{"key":"value","nested":{"a":1}}`),
 		StagedAt:  time.Now(),
 	})
 	require.NoError(t, err)
@@ -780,7 +780,7 @@ func TestRun_MetadataWithDescription(t *testing.T) {
 
 	err := store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
 		Operation:   staging.OperationUpdate,
-		Value:       "new-value",
+		Value:       lo.ToPtr("new-value"),
 		Description: lo.ToPtr("Updated config"),
 		StagedAt:    time.Now(),
 	})
@@ -822,7 +822,7 @@ func TestRun_MetadataWithTags(t *testing.T) {
 
 	err := store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     "new-value",
+		Value:     lo.ToPtr("new-value"),
 		Tags:      map[string]string{"env": "prod", "team": "platform"},
 		StagedAt:  time.Now(),
 	})

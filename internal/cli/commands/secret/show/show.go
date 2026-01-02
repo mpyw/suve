@@ -68,14 +68,13 @@ VERSION SPECIFIERS:
   ~SHIFT    N versions ago; ~ alone means ~1
 
 EXAMPLES:
-  suve secret show my-secret                 Show current version
-  suve secret show my-secret~                Show previous version
-  suve secret show my-secret:AWSPREVIOUS     Show AWSPREVIOUS label
-  suve secret show my-secret:AWSPREVIOUS~1   Show 1 before AWSPREVIOUS
-  suve secret show -j my-secret              Pretty print JSON value
-  suve secret show --raw my-secret           Output raw value (for piping)
-  suve secret show --output=json my-secret   Output as JSON
-  API_KEY=$(suve secret show --raw my-secret)  Use in shell variable`,
+  suve secret show my-secret                              Show current version
+  suve secret show my-secret~                             Show previous version
+  suve secret show my-secret:AWSPREVIOUS                  Show AWSPREVIOUS label
+  suve secret show --raw my-secret                        Output raw value (for piping)
+  suve secret show --parse-json my-secret                 Pretty print JSON value
+  suve secret show --output=json my-secret                Output as JSON
+  API_KEY=$(suve secret show --raw my-secret)             Use in shell variable`,
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
 				Name:    "parse-json",

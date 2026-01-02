@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/samber/lo"
+
 	"github.com/mpyw/suve/internal/cli/colors"
 )
 
@@ -36,7 +38,7 @@ func (p *EntryPrinter) PrintEntry(name string, entry Entry, verbose, showDeleteO
 
 	switch entry.Operation {
 	case OperationCreate, OperationUpdate:
-		value := entry.Value
+		value := lo.FromPtr(entry.Value)
 		if len(value) > 100 {
 			value = value[:100] + "..."
 		}

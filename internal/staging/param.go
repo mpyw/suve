@@ -83,7 +83,7 @@ func (s *ParamStrategy) applySet(ctx context.Context, name string, entry Entry) 
 
 	input := &paramapi.PutParameterInput{
 		Name:      lo.ToPtr(name),
-		Value:     lo.ToPtr(entry.Value),
+		Value:     entry.Value,
 		Type:      paramType,
 		Overwrite: lo.ToPtr(true),
 	}

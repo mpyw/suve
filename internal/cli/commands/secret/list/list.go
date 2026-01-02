@@ -40,8 +40,9 @@ type Options struct {
 
 // JSONOutputItem represents a single item in JSON output.
 type JSONOutputItem struct {
-	Name  string `json:"name"`
-	Value string `json:"value,omitempty"`
+	Name  string  `json:"name"`
+	Value *string `json:"value,omitempty"` // nil when error or not requested, pointer to distinguish from empty string
+	Error string  `json:"error,omitempty"`
 }
 
 // Command returns the list command.
@@ -195,8 +196,10 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 		items := make([]JSONOutputItem, 0, len(names))
 		for _, name := range names {
 			result := results[name]
-			if result.Err == nil {
-				items = append(items, JSONOutputItem{Name: name, Value: result.Value})
+			if result.Err != nil {
+				items = append(items, JSONOutputItem{Name: name, Error: result.Err.Error()})
+			} else {
+				items = append(items, JSONOutputItem{Name: name, Value: lo.ToPtr(result.Value)})
 			}
 		}
 		enc := json.NewEncoder(r.Stdout)

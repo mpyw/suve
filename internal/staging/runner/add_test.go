@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -40,7 +41,7 @@ func TestAddRunner_Run(t *testing.T) {
 		entry, err := store.Get(staging.ServiceParam, "/app/config")
 		require.NoError(t, err)
 		assert.Equal(t, staging.OperationCreate, entry.Operation)
-		assert.Equal(t, "new-value", entry.Value)
+		assert.Equal(t, "new-value", lo.FromPtr(entry.Value))
 	})
 
 	t.Run("edit already staged create", func(t *testing.T) {
@@ -52,7 +53,7 @@ func TestAddRunner_Run(t *testing.T) {
 		// Pre-stage as create
 		_ = store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
 			Operation: staging.OperationCreate,
-			Value:     "original-value",
+			Value:     lo.ToPtr("original-value"),
 		})
 
 		var buf bytes.Buffer
@@ -75,7 +76,7 @@ func TestAddRunner_Run(t *testing.T) {
 		entry, err := store.Get(staging.ServiceParam, "/app/config")
 		require.NoError(t, err)
 		assert.Equal(t, staging.OperationCreate, entry.Operation)
-		assert.Equal(t, "updated-value", entry.Value)
+		assert.Equal(t, "updated-value", lo.FromPtr(entry.Value))
 	})
 
 	t.Run("empty value not staged", func(t *testing.T) {
@@ -111,7 +112,7 @@ func TestAddRunner_Run(t *testing.T) {
 		// Pre-stage as create
 		_ = store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
 			Operation: staging.OperationCreate,
-			Value:     "same-value",
+			Value:     lo.ToPtr("same-value"),
 		})
 
 		var buf bytes.Buffer
@@ -152,7 +153,7 @@ func TestAddRunner_Run(t *testing.T) {
 		entry, err := store.Get(staging.ServiceSecret, "my-secret")
 		require.NoError(t, err)
 		assert.Equal(t, staging.OperationCreate, entry.Operation)
-		assert.Equal(t, "secret-value", entry.Value)
+		assert.Equal(t, "secret-value", lo.FromPtr(entry.Value))
 	})
 }
 

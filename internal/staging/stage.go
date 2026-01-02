@@ -28,7 +28,7 @@ const (
 // Entry represents a single staged change.
 type Entry struct {
 	Operation   Operation         `json:"operation"`
-	Value       string            `json:"value,omitempty"`
+	Value       *string           `json:"value,omitempty"` // nil for delete, pointer to distinguish from empty string
 	Description *string           `json:"description,omitempty"`
 	Tags        map[string]string `json:"tags,omitempty"`
 	UntagKeys   []string          `json:"untag_keys,omitempty"`

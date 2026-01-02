@@ -73,8 +73,8 @@ number, modification date, and a preview of the value.
 Output is sorted with the most recent version first (use --reverse to flip).
 Value previews are truncated at 50 characters.
 
-Use -p/--patch to show the diff between consecutive versions (like git log -p).
-Use -j/--parse-json with -p to format JSON values before diffing (keys are always sorted).
+Use --patch to show the diff between consecutive versions (like git log -p).
+Use --parse-json with --patch to format JSON values before diffing (keys are always sorted).
 Use --oneline for a compact one-line-per-version format.
 Use --from/--to to filter by version range (accepts version specs like '#3', '~1').
 
@@ -82,14 +82,13 @@ OUTPUT FORMAT:
    Use --output=json for structured JSON output.
 
 EXAMPLES:
-   suve param log /app/config/db-url              Show last 10 versions (default)
-   suve param log -n 5 /app/config/db-url         Show last 5 versions
-   suve param log -p /app/config/db-url           Show versions with diffs
-   suve param log -p -j /app/config/db-url        Show diffs with JSON formatting
-   suve param log --oneline /app/config/db-url    Compact one-line format
-   suve param log --reverse /app/config/db-url    Show oldest first
-   suve param log --from '#3' --to '#5' /app/...  Show versions 3 to 5
-   suve param log --output=json /app/config       Output as JSON`,
+   suve param log /app/config                             Show last 10 versions
+   suve param log --patch /app/config                     Show versions with diffs
+   suve param log --patch --parse-json /app/config        Show diffs with JSON formatting
+   suve param log --oneline /app/config                   Compact one-line format
+   suve param log --number 5 /app/config                  Show last 5 versions
+   suve param log --from '#3' --to '#5' /app/config       Show versions 3 to 5
+   suve param log --output=json /app/config               Output as JSON`,
 		Flags: []cli.Flag{
 			&cli.IntFlag{
 				Name:    "number",

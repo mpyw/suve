@@ -8,6 +8,8 @@ import (
 	"io"
 	"time"
 
+	"github.com/samber/lo"
+
 	"github.com/mpyw/suve/internal/cli/colors"
 	"github.com/mpyw/suve/internal/cli/editor"
 	"github.com/mpyw/suve/internal/staging"
@@ -44,7 +46,7 @@ func (r *EditRunner) Run(ctx context.Context, opts EditOptions) error {
 	var baseModifiedAt *time.Time
 	if stagedEntry != nil && (stagedEntry.Operation == staging.OperationCreate || stagedEntry.Operation == staging.OperationUpdate) {
 		// Use staged value (preserve existing BaseModifiedAt)
-		currentValue = stagedEntry.Value
+		currentValue = lo.FromPtr(stagedEntry.Value)
 		baseModifiedAt = stagedEntry.BaseModifiedAt
 	} else {
 		// Fetch from AWS
@@ -83,7 +85,7 @@ func (r *EditRunner) Run(ctx context.Context, opts EditOptions) error {
 	// Stage the change
 	entry := staging.Entry{
 		Operation:      staging.OperationUpdate,
-		Value:          newValue,
+		Value:          lo.ToPtr(newValue),
 		StagedAt:       time.Now(),
 		BaseModifiedAt: baseModifiedAt,
 	}

@@ -8,6 +8,8 @@ import (
 	"io"
 	"time"
 
+	"github.com/samber/lo"
+
 	"github.com/mpyw/suve/internal/cli/colors"
 	"github.com/mpyw/suve/internal/cli/editor"
 	"github.com/mpyw/suve/internal/staging"
@@ -49,7 +51,7 @@ func (r *AddRunner) Run(_ context.Context, opts AddOptions) error {
 	var currentValue string
 	if stagedEntry != nil && stagedEntry.Operation == staging.OperationCreate {
 		// Already staged as create, allow editing
-		currentValue = stagedEntry.Value
+		currentValue = lo.FromPtr(stagedEntry.Value)
 	}
 	// For new items, currentValue stays empty
 
@@ -84,7 +86,7 @@ func (r *AddRunner) Run(_ context.Context, opts AddOptions) error {
 	// Stage the change with OperationCreate
 	entry := staging.Entry{
 		Operation: staging.OperationCreate,
-		Value:     newValue,
+		Value:     lo.ToPtr(newValue),
 		StagedAt:  time.Now(),
 	}
 	if opts.Description != "" {

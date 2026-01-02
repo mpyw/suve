@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/mpyw/suve/internal/staging"
@@ -30,7 +31,7 @@ func TestEntryPrinter_PrintEntry(t *testing.T) {
 			entryName: "/app/config",
 			entry: staging.Entry{
 				Operation: staging.OperationUpdate,
-				Value:     "test-value",
+				Value:     lo.ToPtr("test-value"),
 				StagedAt:  fixedTime,
 			},
 			verbose:      false,
@@ -51,18 +52,18 @@ func TestEntryPrinter_PrintEntry(t *testing.T) {
 			entryName: "/app/config",
 			entry: staging.Entry{
 				Operation: staging.OperationUpdate,
-				Value:     "test-value",
+				Value:     lo.ToPtr("test-value"),
 				StagedAt:  fixedTime,
 			},
 			verbose:      true,
-			wantContains: []string{"M", "/app/config", "Staged:", "2024-01-15 10:30:00", "Value:", "test-value"},
+			wantContains: []string{"M", "/app/config", "Staged:", "2024-01-15 10:30:00", "Value: test-value"},
 		},
 		{
 			name:      "set operation verbose with long value",
 			entryName: "/app/config",
 			entry: staging.Entry{
 				Operation: staging.OperationUpdate,
-				Value:     strings.Repeat("x", 150),
+				Value:     lo.ToPtr(strings.Repeat("x", 150)),
 				StagedAt:  fixedTime,
 			},
 			verbose:      true,

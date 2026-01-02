@@ -78,13 +78,11 @@ OUTPUT FORMAT:
    Use --output=json for structured JSON output.
 
 EXAMPLES:
-  suve secret diff my-secret:AWSPREVIOUS my-secret:AWSCURRENT  Compare labels (full spec)
-  suve secret diff my-secret:AWSPREVIOUS                       Compare with current (full spec)
-  suve secret diff my-secret:AWSPREVIOUS ':AWSCURRENT'         Compare labels (mixed)
-  suve secret diff my-secret ':AWSPREVIOUS' ':AWSCURRENT'      Compare labels (partial spec)
-  suve secret diff my-secret '~'                               Compare previous with current
-  suve secret diff -j my-secret:AWSPREVIOUS                    JSON format before diffing
-  suve secret diff --output=json my-secret:AWSPREVIOUS         Output as JSON
+  suve secret diff my-secret~                        Compare previous with current
+  suve secret diff my-secret:AWSPREVIOUS             Compare AWSPREVIOUS with AWSCURRENT
+  suve secret diff my-secret#abc my-secret#def       Compare specific version IDs
+  suve secret diff --parse-json my-secret~           Format JSON values before diffing
+  suve secret diff --output=json my-secret~          Output comparison as JSON
 
 For comparing staged values, use: suve stage secret diff`,
 		Flags: []cli.Flag{

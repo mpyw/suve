@@ -54,7 +54,8 @@ type JSONOutputItem struct {
 	VersionID string   `json:"versionId"`
 	Stages    []string `json:"stages,omitempty"`
 	Created   string   `json:"created,omitempty"`
-	Value     string   `json:"value"`
+	Value     *string  `json:"value,omitempty"` // nil when error, pointer to distinguish from empty string
+	Error     string   `json:"error,omitempty"`
 }
 
 // Command returns the log command.
@@ -70,21 +71,20 @@ UUID (truncated), staging labels, and creation date.
 Output is sorted with the most recent version first (use --reverse to flip).
 Version UUIDs are truncated to 8 characters for readability.
 
-Use -p/--patch to show the diff between consecutive versions (like git log -p).
-Use -j/--parse-json with -p to format JSON values before diffing (keys are always sorted).
+Use --patch to show the diff between consecutive versions (like git log -p).
+Use --parse-json with --patch to format JSON values before diffing (keys are always sorted).
 Use --oneline for a compact one-line-per-version format.
 
 OUTPUT FORMAT:
    Use --output=json for structured JSON output.
 
 EXAMPLES:
-   suve secret log my-secret             Show last 10 versions (default)
-   suve secret log -n 5 my-secret        Show last 5 versions
-   suve secret log -p my-secret          Show versions with diffs
-   suve secret log -p -j my-secret       Show diffs with JSON formatting
-   suve secret log --oneline my-secret   Compact one-line format
-   suve secret log --reverse my-secret   Show oldest first
-   suve secret log --output=json my-sec  Output as JSON`,
+   suve secret log my-secret                             Show last 10 versions
+   suve secret log --patch my-secret                     Show versions with diffs
+   suve secret log --patch --parse-json my-secret        Show diffs with JSON formatting
+   suve secret log --oneline my-secret                   Compact one-line format
+   suve secret log --number 5 my-secret                  Show last 5 versions
+   suve secret log --output=json my-secret               Output as JSON`,
 		Flags: []cli.Flag{
 			&cli.IntFlag{
 				Name:    "number",
@@ -213,23 +213,23 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 		items := make([]JSONOutputItem, 0, len(versions))
 		for _, v := range versions {
 			versionID := lo.FromPtr(v.VersionId)
-			secretResult, err := r.Client.GetSecretValue(ctx, &secretapi.GetSecretValueInput{
-				SecretId:  lo.ToPtr(opts.Name),
-				VersionId: lo.ToPtr(versionID),
-			})
-			if err != nil {
-				// Skip versions that can't be retrieved
-				continue
-			}
 			item := JSONOutputItem{
 				VersionID: versionID,
-				Value:     lo.FromPtr(secretResult.SecretString),
 			}
 			if len(v.VersionStages) > 0 {
 				item.Stages = v.VersionStages
 			}
 			if v.CreatedDate != nil {
 				item.Created = v.CreatedDate.Format(time.RFC3339)
+			}
+			secretResult, err := r.Client.GetSecretValue(ctx, &secretapi.GetSecretValueInput{
+				SecretId:  lo.ToPtr(opts.Name),
+				VersionId: lo.ToPtr(versionID),
+			})
+			if err != nil {
+				item.Error = err.Error()
+			} else {
+				item.Value = secretResult.SecretString
 			}
 			items = append(items, item)
 		}

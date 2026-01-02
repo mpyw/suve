@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -106,14 +107,14 @@ func TestRun_ApplyBothServices(t *testing.T) {
 	// Stage SSM Parameter Store parameter
 	_ = store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     "param-value",
+		Value:     lo.ToPtr("param-value"),
 		StagedAt:  time.Now(),
 	})
 
 	// Stage Secrets Manager secret
 	_ = store.Stage(staging.ServiceSecret, "my-secret", staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     "secret-value",
+		Value:     lo.ToPtr("secret-value"),
 		StagedAt:  time.Now(),
 	})
 
@@ -168,7 +169,7 @@ func TestRun_ApplyParamOnly(t *testing.T) {
 	// Stage only SSM Parameter Store parameter
 	_ = store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     "param-value",
+		Value:     lo.ToPtr("param-value"),
 		StagedAt:  time.Now(),
 	})
 
@@ -204,7 +205,7 @@ func TestRun_ApplySecretOnly(t *testing.T) {
 	// Stage only Secrets Manager secret
 	_ = store.Stage(staging.ServiceSecret, "my-secret", staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     "secret-value",
+		Value:     lo.ToPtr("secret-value"),
 		StagedAt:  time.Now(),
 	})
 
@@ -288,12 +289,12 @@ func TestRun_PartialFailure(t *testing.T) {
 	// Stage both
 	_ = store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     "param-value",
+		Value:     lo.ToPtr("param-value"),
 		StagedAt:  time.Now(),
 	})
 	_ = store.Stage(staging.ServiceSecret, "my-secret", staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     "secret-value",
+		Value:     lo.ToPtr("secret-value"),
 		StagedAt:  time.Now(),
 	})
 
@@ -323,7 +324,7 @@ func TestRun_PartialFailure(t *testing.T) {
 	// SSM Parameter Store should still be staged (failed)
 	entry, err := store.Get(staging.ServiceParam, "/app/config")
 	require.NoError(t, err)
-	assert.Equal(t, "param-value", entry.Value)
+	assert.Equal(t, "param-value", lo.FromPtr(entry.Value))
 
 	// Secrets Manager should be unstaged (succeeded)
 	_, err = store.Get(staging.ServiceSecret, "my-secret")
@@ -464,7 +465,7 @@ func TestRun_SecretSetError(t *testing.T) {
 
 	_ = store.Stage(staging.ServiceSecret, "my-secret", staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     "value",
+		Value:     lo.ToPtr("value"),
 		StagedAt:  time.Now(),
 	})
 
@@ -523,7 +524,7 @@ func TestRun_ParamSetError(t *testing.T) {
 
 	_ = store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     "value",
+		Value:     lo.ToPtr("value"),
 		StagedAt:  time.Now(),
 	})
 
@@ -554,7 +555,7 @@ func TestRun_ConflictDetection_CreateConflict(t *testing.T) {
 	// Stage a create operation
 	_ = store.Stage(staging.ServiceParam, "/app/new-param", staging.Entry{
 		Operation: staging.OperationCreate,
-		Value:     "new-value",
+		Value:     lo.ToPtr("new-value"),
 		StagedAt:  time.Now(),
 	})
 
@@ -586,7 +587,7 @@ func TestRun_ConflictDetection_UpdateConflict(t *testing.T) {
 	baseTime := time.Now().Add(-1 * time.Hour)
 	_ = store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
 		Operation:      staging.OperationUpdate,
-		Value:          "updated-value",
+		Value:          lo.ToPtr("updated-value"),
 		StagedAt:       time.Now(),
 		BaseModifiedAt: &baseTime,
 	})
@@ -651,7 +652,7 @@ func TestRun_ConflictDetection_IgnoreConflicts(t *testing.T) {
 	baseTime := time.Now().Add(-1 * time.Hour)
 	_ = store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
 		Operation:      staging.OperationUpdate,
-		Value:          "updated-value",
+		Value:          lo.ToPtr("updated-value"),
 		StagedAt:       time.Now(),
 		BaseModifiedAt: &baseTime,
 	})
@@ -688,7 +689,7 @@ func TestRun_ConflictDetection_NoConflict(t *testing.T) {
 	baseTime := time.Now()
 	_ = store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
 		Operation:      staging.OperationUpdate,
-		Value:          "updated-value",
+		Value:          lo.ToPtr("updated-value"),
 		StagedAt:       time.Now(),
 		BaseModifiedAt: &baseTime,
 	})
@@ -727,7 +728,7 @@ func TestRun_ConflictDetection_BothServices(t *testing.T) {
 	// Stage param with conflict
 	_ = store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
 		Operation:      staging.OperationUpdate,
-		Value:          "param-value",
+		Value:          lo.ToPtr("param-value"),
 		StagedAt:       time.Now(),
 		BaseModifiedAt: &baseTime,
 	})
@@ -735,7 +736,7 @@ func TestRun_ConflictDetection_BothServices(t *testing.T) {
 	// Stage secret with conflict
 	_ = store.Stage(staging.ServiceSecret, "my-secret", staging.Entry{
 		Operation:      staging.OperationUpdate,
-		Value:          "secret-value",
+		Value:          lo.ToPtr("secret-value"),
 		StagedAt:       time.Now(),
 		BaseModifiedAt: &baseTime,
 	})

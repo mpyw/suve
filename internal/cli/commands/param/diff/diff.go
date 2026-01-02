@@ -69,13 +69,11 @@ OUTPUT FORMAT:
    Use --output=json for structured JSON output.
 
 EXAMPLES:
-  suve param diff /app/config#1 /app/config#2   Compare v1 and v2 (full spec)
-  suve param diff /app/config#3                 Compare v3 with latest (full spec)
-  suve param diff /app/config#1 '#2'            Compare v1 and v2 (mixed)
-  suve param diff /app/config '#1' '#2'         Compare v1 and v2 (partial spec)
-  suve param diff /app/config '~'               Compare previous with latest
-  suve param diff -j /app/config#1 /app/config  JSON format before diffing
-  suve param diff --output=json /app/config#1   Output as JSON
+  suve param diff /app/config~                    Compare previous with latest
+  suve param diff /app/config#3                   Compare version 3 with latest
+  suve param diff /app/config#1 /app/config#2     Compare version 1 and 2
+  suve param diff --parse-json /app/config~       Format JSON values before diffing
+  suve param diff --output=json /app/config~      Output comparison as JSON
 
 For comparing staged values, use: suve stage param diff`,
 		Flags: []cli.Flag{

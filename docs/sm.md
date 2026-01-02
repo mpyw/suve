@@ -23,9 +23,10 @@ suve secret show [options] <name[#VERSION | :LABEL][~SHIFT]*>
 
 | Option | Alias | Default | Description |
 |--------|-------|---------|-------------|
-| `--json` | `-j` | `false` | Pretty-print JSON values with indentation |
+| `--parse-json` | `-j` | `false` | Pretty-print JSON values with indentation |
 | `--no-pager` | - | `false` | Disable pager output |
 | `--raw` | - | `false` | Output raw value only without metadata (for piping) |
+| `--output` | - | `text` | Output format: `text` (default) or `json` |
 
 **Examples:**
 
@@ -40,10 +41,10 @@ Created: 2024-01-15T10:30:45Z
   {"username":"admin","password":"secret123"}
 ```
 
-With `--json` for JSON values:
+With `--parse-json` for JSON values:
 
 ```ShellSession
-user@host:~$ suve secret show -j my-database-credentials
+user@host:~$ suve secret show --parse-json my-database-credentials
 Name: my-database-credentials
 ARN: arn:aws:secretsmanager:us-east-1:123456789012:secret:my-database-credentials-AbCdEf
  VersionId: abc12345-1234-1234-1234-123456789012
@@ -90,7 +91,7 @@ CREDS=$(suve secret show --raw my-database-credentials)
 suve secret show --raw my-ssl-certificate > cert.pem
 
 # Pretty print JSON with raw output
-suve secret show --raw -j my-database-credentials
+suve secret show --raw --parse-json my-database-credentials
 ```
 
 ---
@@ -117,10 +118,11 @@ suve secret log [options] <name>
 |--------|-------|---------|-------------|
 | `--number` | `-n` | `10` | Maximum number of versions to show |
 | `--patch` | `-p` | `false` | Show diff between consecutive versions |
-| `--json` | `-j` | `false` | Format JSON values before diffing (use with `-p`) |
+| `--parse-json` | `-j` | `false` | Format JSON values before diffing (use with `--patch`) |
 | `--oneline` | - | `false` | Compact one-line-per-version format |
 | `--reverse` | - | `false` | Show oldest versions first |
 | `--no-pager` | - | `false` | Disable pager output |
+| `--output` | - | `text` | Output format: `text` (default) or `json` |
 
 **Examples:**
 
@@ -144,7 +146,7 @@ Date: 2024-01-13T08:10:00Z
 With `--patch` to see what changed:
 
 ```ShellSession
-user@host:~$ suve secret log -p my-database-credentials
+user@host:~$ suve secret log --patch my-database-credentials
 Version abc12345 [AWSCURRENT]
 Date: 2024-01-15T10:30:45Z
 
@@ -165,17 +167,17 @@ Date: 2024-01-14T09:20:30Z
 ```
 
 > [!TIP]
-> Use `-p` to review what changed in each secret rotation, similar to `git log -p`.
+> Use `--patch` to review what changed in each secret rotation, similar to `git log -p`.
 
 > [!NOTE]
 > When using `--patch`, the command fetches the actual secret values for each version to compute diffs.
 
 ```bash
 # Show last 5 versions
-suve secret log -n 5 my-database-credentials
+suve secret log --number 5 my-database-credentials
 
 # Show diffs with JSON formatting
-suve secret log -p -j my-database-credentials
+suve secret log --patch --parse-json my-database-credentials
 
 # Show oldest versions first
 suve secret log --reverse my-database-credentials
@@ -230,8 +232,9 @@ Specifiers can be combined: `secret:AWSCURRENT~1` means "1 version before AWSCUR
 
 | Option | Alias | Default | Description |
 |--------|-------|---------|-------------|
-| `--json` | `-j` | `false` | Format JSON values before diffing |
+| `--parse-json` | `-j` | `false` | Format JSON values before diffing |
 | `--no-pager` | - | `false` | Disable pager output |
+| `--output` | - | `text` | Output format: `text` (default) or `json` |
 
 ### Examples
 
@@ -314,6 +317,14 @@ suve secret list [filter-prefix]
 |----------|----------|-------------|
 | `filter-prefix` | No | Filter secrets by name prefix |
 
+**Options:**
+
+| Option | Alias | Default | Description |
+|--------|-------|---------|-------------|
+| `--filter` | - | - | Filter by regex pattern |
+| `--show` | - | `false` | Show secret values |
+| `--output` | - | `text` | Output format: `text` (default) or `json` |
+
 **Examples:**
 
 ```ShellSession
@@ -339,6 +350,12 @@ suve secret list
 
 # List secrets with prefix
 suve secret list production/
+
+# Filter by regex pattern
+suve secret list --filter '\.prod$'
+
+# List with values
+suve secret list --show production/
 ```
 
 ---
@@ -742,7 +759,7 @@ suve stage secret diff [options] [name]
 
 | Option | Alias | Default | Description |
 |--------|-------|---------|-------------|
-| `--json` | `-j` | `false` | Format JSON values before diffing |
+| `--parse-json` | `-j` | `false` | Format JSON values before diffing |
 | `--no-pager` | - | `false` | Disable pager |
 
 **Examples:**

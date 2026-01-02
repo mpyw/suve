@@ -43,12 +43,12 @@ func NewStatusCommand(cfg CommandConfig) *cli.Command {
 Without arguments, shows all staged %s changes.
 With a %s name, shows the staged change for that specific %s.
 
-Use -v/--verbose to show detailed information including the staged value.
+Use --verbose to show detailed information including the staged value.
 
 EXAMPLES:
    suve stage %s status              Show all staged %s changes
    suve stage %s status <name>       Show staged change for specific %s
-   suve stage %s status -v           Show detailed information`,
+   suve stage %s status --verbose    Show detailed information`,
 			cfg.ServiceName, cfg.ItemName, cfg.ItemName, cfg.ItemName,
 			cfg.ServiceName, cfg.ItemName,
 			cfg.ServiceName, cfg.ItemName,
@@ -97,9 +97,9 @@ If a %s name is specified, shows diff for that %s only.
 Otherwise, shows diff for all staged %ss.
 
 EXAMPLES:
-   suve stage %s diff              Show diff for all staged %ss
-   suve stage %s diff <name>       Show diff for specific %s
-   suve stage %s diff -j           Show diff with JSON formatting`,
+   suve stage %s diff                   Show diff for all staged %ss
+   suve stage %s diff <name>            Show diff for specific %s
+   suve stage %s diff --parse-json      Show diff with JSON formatting`,
 			cfg.ItemName, cfg.ItemName, cfg.ItemName,
 			cfg.ServiceName, cfg.ItemName,
 			cfg.ServiceName, cfg.ItemName,

@@ -24,9 +24,10 @@ suve param show [options] <name[#VERSION][~SHIFT]*>
 | Option | Alias | Default | Description |
 |--------|-------|---------|-------------|
 | `--decrypt` | - | `true` | Decrypt SecureString values. Use `--decrypt=false` to disable. |
-| `--json` | `-j` | `false` | Pretty-print JSON values with indentation |
+| `--parse-json` | `-j` | `false` | Pretty-print JSON values with indentation |
 | `--no-pager` | - | `false` | Disable pager output |
 | `--raw` | - | `false` | Output raw value only without metadata (for piping) |
+| `--output` | - | `text` | Output format: `text` (default) or `json` |
 
 **Examples:**
 
@@ -40,10 +41,10 @@ Modified: 2024-01-15T10:30:45Z
   postgres://db.example.com:5432/myapp
 ```
 
-With `--json` for JSON values:
+With `--parse-json` for JSON values:
 
 ```ShellSession
-user@host:~$ suve param show -j /app/config/credentials
+user@host:~$ suve param show --parse-json /app/config/credentials
 Name: /app/config/credentials
 Version: 2
 Type: SecureString
@@ -82,7 +83,7 @@ DB_URL=$(suve param show --raw /app/config/database-url)
 suve param show --raw /app/config/ssl-cert > cert.pem
 
 # Pretty print JSON with raw output
-suve param show --raw -j /app/config/database-credentials
+suve param show --raw --parse-json /app/config/database-credentials
 ```
 
 ---
@@ -109,12 +110,13 @@ suve param log [options] <name>
 |--------|-------|---------|-------------|
 | `--number` | `-n` | `10` | Maximum number of versions to show |
 | `--patch` | `-p` | `false` | Show diff between consecutive versions |
-| `--json` | `-j` | `false` | Format JSON values before diffing (use with `-p`) |
+| `--parse-json` | `-j` | `false` | Format JSON values before diffing (use with `--patch`) |
 | `--oneline` | - | `false` | Compact one-line-per-version format |
 | `--reverse` | - | `false` | Show oldest versions first |
 | `--no-pager` | - | `false` | Disable pager output |
 | `--from` | - | - | Start version (e.g., `#3`, `~2`) |
 | `--to` | - | - | End version (e.g., `#5`, `~0`) |
+| `--output` | - | `text` | Output format: `text` (default) or `json` |
 
 **Examples:**
 
@@ -141,7 +143,7 @@ postgres://localhost:5432/myapp...
 With `--patch` to see what changed:
 
 ```ShellSession
-user@host:~$ suve param log -p /app/config/database-url
+user@host:~$ suve param log --patch /app/config/database-url
 Version 3 (current)
 Date: 2024-01-15T10:30:45Z
 
@@ -162,14 +164,14 @@ Date: 2024-01-14T09:20:30Z
 ```
 
 > [!TIP]
-> Use `-p` to review what changed in each version, similar to `git log -p`.
+> Use `--patch` to review what changed in each version, similar to `git log -p`.
 
 ```bash
 # Show last 5 versions
-suve param log -n 5 /app/config/database-url
+suve param log --number 5 /app/config/database-url
 
 # Show diffs with JSON formatting for JSON values
-suve param log -p -j /app/config/database-credentials
+suve param log --patch --parse-json /app/config/database-credentials
 
 # Show oldest versions first
 suve param log --reverse /app/config/database-url
@@ -217,8 +219,9 @@ Specifiers can be combined: `/param#5~2` means "version 5, then 2 back" = versio
 
 | Option | Alias | Default | Description |
 |--------|-------|---------|-------------|
-| `--json` | `-j` | `false` | Format JSON values before diffing |
+| `--parse-json` | `-j` | `false` | Format JSON values before diffing |
 | `--no-pager` | - | `false` | Disable pager output |
+| `--output` | - | `text` | Output format: `text` (default) or `json` |
 
 ### Examples
 
@@ -300,6 +303,9 @@ suve param list [options] [path-prefix]
 | Option | Alias | Default | Description |
 |--------|-------|---------|-------------|
 | `--recursive` | `-R` | `false` | List parameters recursively under the path |
+| `--filter` | - | - | Filter by regex pattern |
+| `--show` | - | `false` | Show parameter values |
+| `--output` | - | `text` | Output format: `text` (default) or `json` |
 
 **Examples:**
 
@@ -313,7 +319,7 @@ user@host:~$ suve param list /app/config/
 Recursive listing:
 
 ```ShellSession
-user@host:~$ suve param list -R /app/
+user@host:~$ suve param list --recursive /app/
 /app/config/database-url
 /app/config/api-key
 /app/config/nested/param
@@ -331,7 +337,13 @@ suve param list
 suve param list /app/config/
 
 # List recursively
-suve param list -R /app/
+suve param list --recursive /app/
+
+# Filter by regex pattern
+suve param list --filter '\.prod\.'
+
+# List with values
+suve param list --show /app/
 ```
 
 ---
@@ -638,7 +650,7 @@ suve stage param diff [options] [name]
 
 | Option | Alias | Default | Description |
 |--------|-------|---------|-------------|
-| `--json` | `-j` | `false` | Format JSON values before diffing |
+| `--parse-json` | `-j` | `false` | Format JSON values before diffing |
 | `--no-pager` | - | `false` | Disable pager |
 
 **Examples:**

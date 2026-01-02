@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -57,19 +58,19 @@ func TestRun_UnstageAll(t *testing.T) {
 	// Stage SSM Parameter Store parameters
 	_ = store.Stage(staging.ServiceParam, "/app/config1", staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     "param-value1",
+		Value:     lo.ToPtr("param-value1"),
 		StagedAt:  time.Now(),
 	})
 	_ = store.Stage(staging.ServiceParam, "/app/config2", staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     "param-value2",
+		Value:     lo.ToPtr("param-value2"),
 		StagedAt:  time.Now(),
 	})
 
 	// Stage Secrets Manager secrets
 	_ = store.Stage(staging.ServiceSecret, "secret1", staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     "secret-value1",
+		Value:     lo.ToPtr("secret-value1"),
 		StagedAt:  time.Now(),
 	})
 
@@ -102,7 +103,7 @@ func TestRun_UnstageParamOnly(t *testing.T) {
 	// Stage only SSM Parameter Store parameters
 	_ = store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     "param-value",
+		Value:     lo.ToPtr("param-value"),
 		StagedAt:  time.Now(),
 	})
 
@@ -127,7 +128,7 @@ func TestRun_UnstageSecretOnly(t *testing.T) {
 	// Stage only Secrets Manager secrets
 	_ = store.Stage(staging.ServiceSecret, "my-secret", staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     "secret-value",
+		Value:     lo.ToPtr("secret-value"),
 		StagedAt:  time.Now(),
 	})
 

@@ -111,7 +111,7 @@ func TestParamStrategy_Apply(t *testing.T) {
 		s := staging.NewParamStrategy(mock)
 		err := s.Apply(context.Background(), "/app/param", staging.Entry{
 			Operation: staging.OperationCreate,
-			Value:     "new-value",
+			Value:     lo.ToPtr("new-value"),
 		})
 		require.NoError(t, err)
 	})
@@ -137,7 +137,7 @@ func TestParamStrategy_Apply(t *testing.T) {
 		s := staging.NewParamStrategy(mock)
 		err := s.Apply(context.Background(), "/app/param", staging.Entry{
 			Operation: staging.OperationUpdate,
-			Value:     "updated-value",
+			Value:     lo.ToPtr("updated-value"),
 		})
 		require.NoError(t, err)
 	})
@@ -179,7 +179,7 @@ func TestParamStrategy_Apply(t *testing.T) {
 		s := staging.NewParamStrategy(mock)
 		err := s.Apply(context.Background(), "/app/param", staging.Entry{
 			Operation: staging.OperationCreate,
-			Value:     "value",
+			Value:     lo.ToPtr("value"),
 		})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to get existing parameter")
@@ -199,7 +199,7 @@ func TestParamStrategy_Apply(t *testing.T) {
 		s := staging.NewParamStrategy(mock)
 		err := s.Apply(context.Background(), "/app/param", staging.Entry{
 			Operation: staging.OperationCreate,
-			Value:     "value",
+			Value:     lo.ToPtr("value"),
 		})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to set parameter")

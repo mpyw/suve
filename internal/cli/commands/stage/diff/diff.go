@@ -261,7 +261,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 
 func (r *Runner) outputParamDiff(opts Options, name string, entry staging.Entry, param *paramapi.ParameterHistory) error {
 	awsValue := lo.FromPtr(param.Value)
-	stagedValue := entry.Value
+	stagedValue := lo.FromPtr(entry.Value)
 
 	// For delete operation, staged value is empty
 	if entry.Operation == staging.OperationDelete {
@@ -300,7 +300,7 @@ func (r *Runner) outputParamDiff(opts Options, name string, entry staging.Entry,
 
 func (r *Runner) outputSecretDiff(opts Options, name string, entry staging.Entry, secret *secretapi.GetSecretValueOutput) error {
 	awsValue := lo.FromPtr(secret.SecretString)
-	stagedValue := entry.Value
+	stagedValue := lo.FromPtr(entry.Value)
 
 	// For delete operation, staged value is empty
 	if entry.Operation == staging.OperationDelete {
@@ -339,7 +339,7 @@ func (r *Runner) outputSecretDiff(opts Options, name string, entry staging.Entry
 }
 
 func (r *Runner) outputParamDiffCreate(opts Options, name string, entry staging.Entry) error {
-	stagedValue := entry.Value
+	stagedValue := lo.FromPtr(entry.Value)
 
 	// Format as JSON if enabled
 	if opts.ParseJSON {
@@ -361,7 +361,7 @@ func (r *Runner) outputParamDiffCreate(opts Options, name string, entry staging.
 }
 
 func (r *Runner) outputSecretDiffCreate(opts Options, name string, entry staging.Entry) error {
-	stagedValue := entry.Value
+	stagedValue := lo.FromPtr(entry.Value)
 
 	// Format as JSON if enabled
 	if opts.ParseJSON {

@@ -377,7 +377,7 @@ func TestParam_StagingWorkflow(t *testing.T) {
 		store := staging.NewStoreWithPath(filepath.Join(tmpHome, ".suve", "stage.json"))
 		err := store.Stage(staging.ServiceParam, paramName, staging.Entry{
 			Operation: staging.OperationUpdate,
-			Value:     "staged-value",
+			Value: lo.ToPtr("staged-value"),
 			StagedAt:  time.Now(),
 		})
 		require.NoError(t, err)
@@ -478,7 +478,7 @@ func TestParam_StagingAdd(t *testing.T) {
 		store := staging.NewStoreWithPath(filepath.Join(tmpHome, ".suve", "stage.json"))
 		err := store.Stage(staging.ServiceParam, paramName, staging.Entry{
 			Operation: staging.OperationCreate,
-			Value:     "new-param-value",
+			Value: lo.ToPtr("new-param-value"),
 			StagedAt:  time.Now(),
 		})
 		require.NoError(t, err)
@@ -547,7 +547,8 @@ func TestParam_StagingResetWithVersion(t *testing.T) {
 		store := staging.NewStoreWithPath(filepath.Join(tmpHome, ".suve", "stage.json"))
 		entry, err := store.Get(staging.ServiceParam, paramName)
 		require.NoError(t, err)
-		assert.Equal(t, "v1", entry.Value)
+		require.NotNil(t, entry.Value)
+		assert.Equal(t, "v1", *entry.Value)
 	})
 
 	// 4. Push to apply (use --ignore-conflicts for robustness in test environment)
@@ -588,12 +589,12 @@ func TestParam_StagingResetAll(t *testing.T) {
 	store := staging.NewStoreWithPath(filepath.Join(tmpHome, ".suve", "stage.json"))
 	_ = store.Stage(staging.ServiceParam, param1, staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     "staged1",
+		Value: lo.ToPtr("staged1"),
 		StagedAt:  time.Now(),
 	})
 	_ = store.Stage(staging.ServiceParam, param2, staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     "staged2",
+		Value: lo.ToPtr("staged2"),
 		StagedAt:  time.Now(),
 	})
 
@@ -646,12 +647,12 @@ func TestParam_StagingApplySingle(t *testing.T) {
 	store := staging.NewStoreWithPath(filepath.Join(tmpHome, ".suve", "stage.json"))
 	_ = store.Stage(staging.ServiceParam, param1, staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     "staged1",
+		Value: lo.ToPtr("staged1"),
 		StagedAt:  time.Now(),
 	})
 	_ = store.Stage(staging.ServiceParam, param2, staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     "staged2",
+		Value: lo.ToPtr("staged2"),
 		StagedAt:  time.Now(),
 	})
 
@@ -901,7 +902,7 @@ func TestSecret_StagingWorkflow(t *testing.T) {
 		store := staging.NewStoreWithPath(filepath.Join(tmpHome, ".suve", "stage.json"))
 		err := store.Stage(staging.ServiceSecret, secretName, staging.Entry{
 			Operation: staging.OperationUpdate,
-			Value:     "staged-secret",
+			Value: lo.ToPtr("staged-secret"),
 			StagedAt:  time.Now(),
 		})
 		require.NoError(t, err)
@@ -1023,12 +1024,12 @@ func TestGlobal_StageWorkflow(t *testing.T) {
 	store := staging.NewStoreWithPath(filepath.Join(tmpHome, ".suve", "stage.json"))
 	_ = store.Stage(staging.ServiceParam, paramName, staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     "staged-param",
+		Value: lo.ToPtr("staged-param"),
 		StagedAt:  time.Now(),
 	})
 	_ = store.Stage(staging.ServiceSecret, secretName, staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     "staged-secret",
+		Value: lo.ToPtr("staged-secret"),
 		StagedAt:  time.Now(),
 	})
 
@@ -1106,12 +1107,12 @@ func TestGlobal_StageResetAll(t *testing.T) {
 	store := staging.NewStoreWithPath(filepath.Join(tmpHome, ".suve", "stage.json"))
 	_ = store.Stage(staging.ServiceParam, paramName, staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     "staged",
+		Value: lo.ToPtr("staged"),
 		StagedAt:  time.Now(),
 	})
 	_ = store.Stage(staging.ServiceSecret, secretName, staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     "staged",
+		Value: lo.ToPtr("staged"),
 		StagedAt:  time.Now(),
 	})
 
@@ -1434,7 +1435,8 @@ func TestParam_StagingAddWithOptions(t *testing.T) {
 		store := staging.NewStoreWithPath(filepath.Join(tmpHome, ".suve", "stage.json"))
 		entry, err := store.Get(staging.ServiceParam, paramName)
 		require.NoError(t, err)
-		assert.Equal(t, "value-with-options", entry.Value)
+		require.NotNil(t, entry.Value)
+		assert.Equal(t, "value-with-options", *entry.Value)
 		require.NotNil(t, entry.Description)
 		assert.Equal(t, "Test description", *entry.Description)
 		require.NotNil(t, entry.Tags)
@@ -1597,7 +1599,7 @@ func TestParam_GlobalDiffWithJSON(t *testing.T) {
 	store := staging.NewStoreWithPath(filepath.Join(tmpHome, ".suve", "stage.json"))
 	err = store.Stage(staging.ServiceParam, paramName, staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     `{"a":1,"b":2}`,
+		Value: lo.ToPtr(`{"a":1,"b":2}`),
 		StagedAt:  time.Now(),
 	})
 	require.NoError(t, err)
@@ -1608,4 +1610,150 @@ func TestParam_GlobalDiffWithJSON(t *testing.T) {
 	t.Logf("global diff -j output: %s", stdout)
 	// Should have formatted JSON
 	assert.Contains(t, stdout, "a")
+}
+
+// TestParam_OutputOption tests --output=json option on various commands.
+func TestParam_OutputOption(t *testing.T) {
+	setupEnv(t)
+	paramName := "/suve-e2e-output/param"
+
+	// Cleanup
+	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	t.Cleanup(func() {
+		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	})
+
+	// Create param
+	_, _, err := runCommand(t, paramset.Command(), "--yes", paramName, "test-value")
+	require.NoError(t, err)
+
+	// Update to create version 2
+	_, _, err = runCommand(t, paramset.Command(), "--yes", paramName, "updated-value")
+	require.NoError(t, err)
+
+	t.Run("show --output=json", func(t *testing.T) {
+		stdout, _, err := runCommand(t, paramshow.Command(), "--output=json", paramName)
+		require.NoError(t, err)
+		assert.Contains(t, stdout, `"name"`)
+		assert.Contains(t, stdout, `"version"`)
+		assert.Contains(t, stdout, `"value"`)
+		assert.Contains(t, stdout, "updated-value")
+		t.Logf("show --output=json: %s", stdout)
+	})
+
+	t.Run("list --output=json", func(t *testing.T) {
+		stdout, _, err := runCommand(t, paramlist.Command(), "--output=json", "/suve-e2e-output")
+		require.NoError(t, err)
+		assert.Contains(t, stdout, `"name"`)
+		assert.Contains(t, stdout, paramName)
+		t.Logf("list --output=json: %s", stdout)
+	})
+
+	t.Run("list --output=json --show", func(t *testing.T) {
+		stdout, _, err := runCommand(t, paramlist.Command(), "--output=json", "--show", "/suve-e2e-output")
+		require.NoError(t, err)
+		assert.Contains(t, stdout, `"name"`)
+		assert.Contains(t, stdout, `"value"`)
+		assert.Contains(t, stdout, "updated-value")
+		t.Logf("list --output=json --show: %s", stdout)
+	})
+
+	t.Run("log --output=json", func(t *testing.T) {
+		stdout, _, err := runCommand(t, paramlog.Command(), "--output=json", paramName)
+		require.NoError(t, err)
+		assert.Contains(t, stdout, `"version"`)
+		assert.Contains(t, stdout, `"value"`)
+		t.Logf("log --output=json: %s", stdout)
+	})
+
+	t.Run("diff --output=json", func(t *testing.T) {
+		stdout, _, err := runCommand(t, paramdiff.Command(), "--output=json", paramName+"#1", paramName+"#2")
+		require.NoError(t, err)
+		assert.Contains(t, stdout, `"oldVersion"`)
+		assert.Contains(t, stdout, `"newVersion"`)
+		assert.Contains(t, stdout, `"identical"`)
+		t.Logf("diff --output=json: %s", stdout)
+	})
+}
+
+// TestParam_FilterOption tests --filter option on list command.
+func TestParam_FilterOption(t *testing.T) {
+	setupEnv(t)
+	prefix := "/suve-e2e-filter"
+
+	// Cleanup
+	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", prefix+"/foo")
+	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", prefix+"/bar")
+	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", prefix+"/baz")
+	t.Cleanup(func() {
+		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", prefix+"/foo")
+		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", prefix+"/bar")
+		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", prefix+"/baz")
+	})
+
+	// Create params
+	_, _, err := runCommand(t, paramset.Command(), "--yes", prefix+"/foo", "foo-val")
+	require.NoError(t, err)
+	_, _, err = runCommand(t, paramset.Command(), "--yes", prefix+"/bar", "bar-val")
+	require.NoError(t, err)
+	_, _, err = runCommand(t, paramset.Command(), "--yes", prefix+"/baz", "baz-val")
+	require.NoError(t, err)
+
+	t.Run("filter ba", func(t *testing.T) {
+		stdout, _, err := runCommand(t, paramlist.Command(), "--filter", "ba", prefix)
+		require.NoError(t, err)
+		assert.Contains(t, stdout, prefix+"/bar")
+		assert.Contains(t, stdout, prefix+"/baz")
+		assert.NotContains(t, stdout, prefix+"/foo")
+		t.Logf("list --filter ba: %s", stdout)
+	})
+
+	t.Run("filter regex", func(t *testing.T) {
+		stdout, _, err := runCommand(t, paramlist.Command(), "--filter", "ba.$", prefix)
+		require.NoError(t, err)
+		assert.Contains(t, stdout, prefix+"/bar")
+		assert.Contains(t, stdout, prefix+"/baz")
+		assert.NotContains(t, stdout, prefix+"/foo")
+	})
+}
+
+// TestParam_ShowOption tests --show option on list command.
+func TestParam_ShowOption(t *testing.T) {
+	setupEnv(t)
+	prefix := "/suve-e2e-show"
+
+	// Cleanup
+	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", prefix+"/param1")
+	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", prefix+"/param2")
+	t.Cleanup(func() {
+		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", prefix+"/param1")
+		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", prefix+"/param2")
+	})
+
+	// Create params
+	_, _, err := runCommand(t, paramset.Command(), "--yes", prefix+"/param1", "value1")
+	require.NoError(t, err)
+	_, _, err = runCommand(t, paramset.Command(), "--yes", prefix+"/param2", "value2")
+	require.NoError(t, err)
+
+	t.Run("list without --show", func(t *testing.T) {
+		stdout, _, err := runCommand(t, paramlist.Command(), prefix)
+		require.NoError(t, err)
+		assert.Contains(t, stdout, prefix+"/param1")
+		assert.Contains(t, stdout, prefix+"/param2")
+		// Without --show, values should not be present
+		assert.NotContains(t, stdout, "value1")
+		assert.NotContains(t, stdout, "value2")
+	})
+
+	t.Run("list with --show", func(t *testing.T) {
+		stdout, _, err := runCommand(t, paramlist.Command(), "--show", prefix)
+		require.NoError(t, err)
+		assert.Contains(t, stdout, prefix+"/param1")
+		assert.Contains(t, stdout, prefix+"/param2")
+		// With --show, values should be present
+		assert.Contains(t, stdout, "value1")
+		assert.Contains(t, stdout, "value2")
+		t.Logf("list --show: %s", stdout)
+	})
 }

@@ -1,0 +1,2820 @@
+
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+		<title>apply: Go Coverage Report</title>
+		<style>
+			body {
+				background: black;
+				color: rgb(80, 80, 80);
+			}
+			body, pre, #legend span {
+				font-family: Menlo, monospace;
+				font-weight: bold;
+			}
+			#topbar {
+				background: black;
+				position: fixed;
+				top: 0; left: 0; right: 0;
+				height: 42px;
+				border-bottom: 1px solid rgb(80, 80, 80);
+			}
+			#content {
+				margin-top: 50px;
+			}
+			#nav, #legend {
+				float: left;
+				margin-left: 10px;
+			}
+			#legend {
+				margin-top: 12px;
+			}
+			#nav {
+				margin-top: 10px;
+			}
+			#legend span {
+				margin: 0 5px;
+			}
+			.cov0 { color: rgb(192, 0, 0) }
+.cov1 { color: rgb(128, 128, 128) }
+.cov2 { color: rgb(116, 140, 131) }
+.cov3 { color: rgb(104, 152, 134) }
+.cov4 { color: rgb(92, 164, 137) }
+.cov5 { color: rgb(80, 176, 140) }
+.cov6 { color: rgb(68, 188, 143) }
+.cov7 { color: rgb(56, 200, 146) }
+.cov8 { color: rgb(44, 212, 149) }
+.cov9 { color: rgb(32, 224, 152) }
+.cov10 { color: rgb(20, 236, 155) }
+
+		</style>
+	</head>
+	<body>
+		<div id="topbar">
+			<div id="nav">
+				<select id="files">
+				
+				<option value="file0">github.com/mpyw/suve/internal/cli/commands/stage/apply/apply.go (58.9%)</option>
+				
+				<option value="file1">github.com/mpyw/suve/internal/staging/conflict.go (90.6%)</option>
+				
+				<option value="file2">github.com/mpyw/suve/internal/staging/param.go (74.1%)</option>
+				
+				<option value="file3">github.com/mpyw/suve/internal/staging/printer.go (100.0%)</option>
+				
+				<option value="file4">github.com/mpyw/suve/internal/staging/runner/add.go (76.5%)</option>
+				
+				<option value="file5">github.com/mpyw/suve/internal/staging/runner/apply.go (94.9%)</option>
+				
+				<option value="file6">github.com/mpyw/suve/internal/staging/runner/command.go (8.9%)</option>
+				
+				<option value="file7">github.com/mpyw/suve/internal/staging/runner/diff.go (90.0%)</option>
+				
+				<option value="file8">github.com/mpyw/suve/internal/staging/runner/edit.go (80.6%)</option>
+				
+				<option value="file9">github.com/mpyw/suve/internal/staging/runner/reset.go (88.4%)</option>
+				
+				<option value="file10">github.com/mpyw/suve/internal/staging/runner/status.go (93.3%)</option>
+				
+				<option value="file11">github.com/mpyw/suve/internal/staging/secret.go (71.0%)</option>
+				
+				<option value="file12">github.com/mpyw/suve/internal/staging/stage.go (93.5%)</option>
+				
+				</select>
+			</div>
+			<div id="legend">
+				<span>not tracked</span>
+			
+				<span class="cov0">not covered</span>
+				<span class="cov8">covered</span>
+			
+			</div>
+		</div>
+		<div id="content">
+		
+		<pre class="file" id="file0" style="display: none">// Package apply provides the global apply command for applying all staged changes.
+package apply
+
+import (
+        "context"
+        "fmt"
+        "io"
+        "os"
+
+        "github.com/urfave/cli/v3"
+
+        "github.com/mpyw/suve/internal/cli/confirm"
+        "github.com/mpyw/suve/internal/maputil"
+        "github.com/mpyw/suve/internal/output"
+        "github.com/mpyw/suve/internal/parallel"
+        "github.com/mpyw/suve/internal/staging"
+)
+
+// serviceConflictCheck holds entries and strategy for a single service's conflict checking.
+type serviceConflictCheck struct {
+        entries  map[string]staging.Entry
+        strategy staging.ApplyStrategy
+}
+
+// Runner executes the apply command.
+type Runner struct {
+        ParamStrategy   staging.ApplyStrategy
+        SecretStrategy  staging.ApplyStrategy
+        Store           *staging.Store
+        Stdout          io.Writer
+        Stderr          io.Writer
+        IgnoreConflicts bool
+}
+
+// Command returns the global apply command.
+func Command() *cli.Command <span class="cov8" title="1">{
+        return &amp;cli.Command{
+                Name:    "apply",
+                Aliases: []string{"push"},
+                Usage:   "Apply all staged changes to AWS",
+                Description: `Apply all staged changes (SSM Parameter Store and Secrets Manager) to AWS.
+
+After successful apply, the staged changes are cleared.
+
+Use 'suve stage status' to view all staged changes before applying.
+Use 'suve stage param apply' or 'suve stage secret apply' for service-specific changes.
+
+CONFLICT DETECTION:
+   Before applying, suve checks for conflicts to prevent lost updates:
+   - For new resources: checks if someone else created it after staging
+   - For existing resources: checks if it was modified after staging
+   Use --ignore-conflicts to force apply despite conflicts.
+
+EXAMPLES:
+   suve stage apply                      Apply all staged changes (with confirmation)
+   suve stage apply --yes                Apply without confirmation
+   suve stage apply --ignore-conflicts   Apply even if conflicts detected`,
+                Flags: []cli.Flag{
+                        &amp;cli.BoolFlag{
+                                Name:  "yes",
+                                Usage: "Skip confirmation prompt",
+                        },
+                        &amp;cli.BoolFlag{
+                                Name:  "ignore-conflicts",
+                                Usage: "Apply even if AWS was modified after staging",
+                        },
+                },
+                Action: action,
+        }
+}</span>
+
+func action(ctx context.Context, cmd *cli.Command) error <span class="cov0" title="0">{
+        store, err := staging.NewStore()
+        if err != nil </span><span class="cov0" title="0">{
+                return fmt.Errorf("failed to initialize stage store: %w", err)
+        }</span>
+
+        // Check if there are any staged changes
+        <span class="cov0" title="0">paramStaged, err := store.List(staging.ServiceParam)
+        if err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+        <span class="cov0" title="0">secretStaged, err := store.List(staging.ServiceSecret)
+        if err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+
+        <span class="cov0" title="0">hasParam := len(paramStaged[staging.ServiceParam]) &gt; 0
+        hasSecret := len(secretStaged[staging.ServiceSecret]) &gt; 0
+
+        if !hasParam &amp;&amp; !hasSecret </span><span class="cov0" title="0">{
+                output.Info(cmd.Root().Writer, "No changes staged.")
+                return nil
+        }</span>
+
+        // Count total staged changes
+        <span class="cov0" title="0">totalStaged := len(paramStaged[staging.ServiceParam]) + len(secretStaged[staging.ServiceSecret])
+
+        // Confirm apply
+        skipConfirm := cmd.Bool("yes")
+        prompter := &amp;confirm.Prompter{
+                Stdin:  os.Stdin,
+                Stdout: cmd.Root().Writer,
+                Stderr: cmd.Root().ErrWriter,
+        }
+
+        message := fmt.Sprintf("Apply %d staged change(s) to AWS?", totalStaged)
+        confirmed, err := prompter.Confirm(message, skipConfirm)
+        if err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+        <span class="cov0" title="0">if !confirmed </span><span class="cov0" title="0">{
+                return nil
+        }</span>
+
+        <span class="cov0" title="0">r := &amp;Runner{
+                Store:           store,
+                Stdout:          cmd.Root().Writer,
+                Stderr:          cmd.Root().ErrWriter,
+                IgnoreConflicts: cmd.Bool("ignore-conflicts"),
+        }
+
+        // Initialize strategies only if needed
+        if hasParam </span><span class="cov0" title="0">{
+                strat, err := staging.ParamFactory(ctx)
+                if err != nil </span><span class="cov0" title="0">{
+                        return err
+                }</span>
+                <span class="cov0" title="0">r.ParamStrategy = strat</span>
+        }
+
+        <span class="cov0" title="0">if hasSecret </span><span class="cov0" title="0">{
+                strat, err := staging.SecretFactory(ctx)
+                if err != nil </span><span class="cov0" title="0">{
+                        return err
+                }</span>
+                <span class="cov0" title="0">r.SecretStrategy = strat</span>
+        }
+
+        <span class="cov0" title="0">return r.Run(ctx)</span>
+}
+
+// Run executes the apply command.
+func (r *Runner) Run(ctx context.Context) error <span class="cov8" title="1">{
+        // Get all staged changes (empty string means all services)
+        allStaged, err := r.Store.List("")
+        if err != nil </span><span class="cov8" title="1">{
+                return err
+        }</span>
+
+        <span class="cov8" title="1">paramStaged := allStaged[staging.ServiceParam]
+        secretStaged := allStaged[staging.ServiceSecret]
+
+        // Check for conflicts unless --ignore-conflicts is specified
+        if !r.IgnoreConflicts </span><span class="cov8" title="1">{
+                var checks []serviceConflictCheck
+                if len(paramStaged) &gt; 0 &amp;&amp; r.ParamStrategy != nil </span><span class="cov8" title="1">{
+                        checks = append(checks, serviceConflictCheck{
+                                entries:  paramStaged,
+                                strategy: r.ParamStrategy,
+                        })
+                }</span>
+                <span class="cov8" title="1">if len(secretStaged) &gt; 0 &amp;&amp; r.SecretStrategy != nil </span><span class="cov8" title="1">{
+                        checks = append(checks, serviceConflictCheck{
+                                entries:  secretStaged,
+                                strategy: r.SecretStrategy,
+                        })
+                }</span>
+
+                <span class="cov8" title="1">allConflicts := r.checkAllConflicts(ctx, checks)
+                if len(allConflicts) &gt; 0 </span><span class="cov8" title="1">{
+                        for _, name := range maputil.SortedKeys(allConflicts) </span><span class="cov8" title="1">{
+                                output.Warning(r.Stderr, "conflict detected for %s: AWS was modified after staging", name)
+                        }</span>
+                        <span class="cov8" title="1">return fmt.Errorf("apply rejected: %d conflict(s) detected (use --ignore-conflicts to force)", len(allConflicts))</span>
+                }
+        }
+
+        <span class="cov8" title="1">var totalSucceeded, totalFailed int
+
+        // Apply SSM Parameter Store changes
+        if len(paramStaged) &gt; 0 </span><span class="cov8" title="1">{
+                _, _ = fmt.Fprintln(r.Stdout, "Applying SSM Parameter Store parameters...")
+                succeeded, failed := r.applyService(ctx, r.ParamStrategy, paramStaged)
+                totalSucceeded += succeeded
+                totalFailed += failed
+        }</span>
+
+        // Apply Secrets Manager changes
+        <span class="cov8" title="1">if len(secretStaged) &gt; 0 </span><span class="cov8" title="1">{
+                _, _ = fmt.Fprintln(r.Stdout, "Applying Secrets Manager secrets...")
+                succeeded, failed := r.applyService(ctx, r.SecretStrategy, secretStaged)
+                totalSucceeded += succeeded
+                totalFailed += failed
+        }</span>
+
+        // Summary
+        <span class="cov8" title="1">if totalFailed &gt; 0 </span><span class="cov8" title="1">{
+                return fmt.Errorf("applied %d, failed %d", totalSucceeded, totalFailed)
+        }</span>
+
+        <span class="cov8" title="1">return nil</span>
+}
+
+func (r *Runner) applyService(ctx context.Context, strat staging.ApplyStrategy, staged map[string]staging.Entry) (succeeded, failed int) <span class="cov8" title="1">{
+        service := strat.Service()
+        serviceName := strat.ServiceName()
+
+        results := parallel.ExecuteMap(ctx, staged, func(ctx context.Context, name string, entry staging.Entry) (staging.Operation, error) </span><span class="cov8" title="1">{
+                err := strat.Apply(ctx, name, entry)
+                return entry.Operation, err
+        }</span>)
+
+        <span class="cov8" title="1">for _, name := range maputil.SortedKeys(staged) </span><span class="cov8" title="1">{
+                result := results[name]
+                if result.Err != nil </span><span class="cov8" title="1">{
+                        output.Failed(r.Stderr, serviceName+": "+name, result.Err)
+                        failed++
+                }</span> else<span class="cov8" title="1"> {
+                        switch result.Value </span>{
+                        case staging.OperationCreate:<span class="cov0" title="0">
+                                output.Success(r.Stdout, "%s: Created %s", serviceName, name)</span>
+                        case staging.OperationUpdate:<span class="cov8" title="1">
+                                output.Success(r.Stdout, "%s: Updated %s", serviceName, name)</span>
+                        case staging.OperationDelete:<span class="cov8" title="1">
+                                output.Success(r.Stdout, "%s: Deleted %s", serviceName, name)</span>
+                        }
+                        <span class="cov8" title="1">if err := r.Store.Unstage(service, name); err != nil </span><span class="cov0" title="0">{
+                                output.Warning(r.Stderr, "failed to clear staging for %s: %v", name, err)
+                        }</span>
+                        <span class="cov8" title="1">succeeded++</span>
+                }
+        }
+
+        <span class="cov8" title="1">return succeeded, failed</span>
+}
+
+// checkAllConflicts checks all services for conflicts and returns a combined map of conflicting names.
+func (r *Runner) checkAllConflicts(ctx context.Context, checks []serviceConflictCheck) map[string]struct{} <span class="cov8" title="1">{
+        allConflicts := make(map[string]struct{})
+
+        for _, check := range checks </span><span class="cov8" title="1">{
+                conflicts := staging.CheckConflicts(ctx, check.strategy, check.entries)
+                for name := range conflicts </span><span class="cov8" title="1">{
+                        allConflicts[name] = struct{}{}
+                }</span>
+        }
+
+        <span class="cov8" title="1">return allConflicts</span>
+}
+</pre>
+		
+		<pre class="file" id="file1" style="display: none">package staging
+
+import (
+        "context"
+        "time"
+
+        "github.com/mpyw/suve/internal/parallel"
+)
+
+// CheckConflicts checks if AWS resources were modified after staging.
+// Returns a map of names that have conflicts.
+//
+// For Create operations: conflicts if resource now exists (someone else created it).
+// For Update/Delete operations with BaseModifiedAt: conflicts if AWS was modified after base.
+func CheckConflicts(ctx context.Context, strategy ApplyStrategy, entries map[string]Entry) map[string]struct{} <span class="cov8" title="1">{
+        conflicts := make(map[string]struct{})
+
+        // Separate entries by check type:
+        // - Create: check if resource now exists (someone else created it)
+        // - Update/Delete with BaseModifiedAt: check if modified after base
+        toCheckCreate := make(map[string]Entry)
+        toCheckModified := make(map[string]Entry)
+
+        for name, entry := range entries </span><span class="cov8" title="1">{
+                switch </span>{
+                case entry.Operation == OperationCreate:<span class="cov8" title="1">
+                        toCheckCreate[name] = entry</span>
+                case (entry.Operation == OperationUpdate || entry.Operation == OperationDelete) &amp;&amp; entry.BaseModifiedAt != nil:<span class="cov8" title="1">
+                        toCheckModified[name] = entry</span>
+                }
+        }
+
+        <span class="cov8" title="1">if len(toCheckCreate) == 0 &amp;&amp; len(toCheckModified) == 0 </span><span class="cov8" title="1">{
+                return conflicts
+        }</span>
+
+        // Combine all entries for parallel fetch
+        <span class="cov8" title="1">allToCheck := make(map[string]Entry)
+        for name, entry := range toCheckCreate </span><span class="cov8" title="1">{
+                allToCheck[name] = entry
+        }</span>
+        <span class="cov8" title="1">for name, entry := range toCheckModified </span><span class="cov8" title="1">{
+                allToCheck[name] = entry
+        }</span>
+
+        // Fetch last modified times in parallel
+        <span class="cov8" title="1">results := parallel.ExecuteMap(ctx, allToCheck, func(ctx context.Context, name string, _ Entry) (time.Time, error) </span><span class="cov8" title="1">{
+                return strategy.FetchLastModified(ctx, name)
+        }</span>)
+
+        // Check for conflicts - Create operations
+        <span class="cov8" title="1">for name := range toCheckCreate </span><span class="cov8" title="1">{
+                result := results[name]
+                if result.Err != nil </span><span class="cov0" title="0">{
+                        // If we can't fetch, assume no conflict (will fail on apply anyway)
+                        continue</span>
+                }
+
+                // For Create: if resource now exists (non-zero time), someone else created it
+                <span class="cov8" title="1">if !result.Value.IsZero() </span><span class="cov8" title="1">{
+                        conflicts[name] = struct{}{}
+                }</span>
+        }
+
+        // Check for conflicts - Update/Delete operations
+        <span class="cov8" title="1">for name, entry := range toCheckModified </span><span class="cov8" title="1">{
+                result := results[name]
+                if result.Err != nil </span><span class="cov0" title="0">{
+                        // If we can't fetch, assume no conflict (will fail on apply anyway)
+                        continue</span>
+                }
+
+                <span class="cov8" title="1">awsModified := result.Value
+
+                // Zero time means resource doesn't exist - no conflict for delete (already gone)
+                if awsModified.IsZero() </span><span class="cov0" title="0">{
+                        continue</span>
+                }
+
+                // If AWS was modified after the base value was fetched, it's a conflict
+                <span class="cov8" title="1">if awsModified.After(*entry.BaseModifiedAt) </span><span class="cov8" title="1">{
+                        conflicts[name] = struct{}{}
+                }</span>
+        }
+
+        <span class="cov8" title="1">return conflicts</span>
+}
+</pre>
+		
+		<pre class="file" id="file2" style="display: none">package staging
+
+import (
+        "context"
+        "errors"
+        "fmt"
+        "time"
+
+        "github.com/samber/lo"
+
+        "github.com/mpyw/suve/internal/api/paramapi"
+        "github.com/mpyw/suve/internal/infra"
+        "github.com/mpyw/suve/internal/tagging"
+        "github.com/mpyw/suve/internal/version/paramversion"
+)
+
+// ParamClient is the combined interface for SSM Parameter Store stage operations.
+type ParamClient interface {
+        paramapi.GetParameterAPI
+        paramapi.GetParameterHistoryAPI
+        paramapi.PutParameterAPI
+        paramapi.DeleteParameterAPI
+        paramapi.AddTagsToResourceAPI
+        paramapi.RemoveTagsFromResourceAPI
+}
+
+// ParamStrategy implements ServiceStrategy for SSM Parameter Store.
+type ParamStrategy struct {
+        Client ParamClient
+}
+
+// NewParamStrategy creates a new SSM Parameter Store strategy.
+func NewParamStrategy(client ParamClient) *ParamStrategy <span class="cov8" title="1">{
+        return &amp;ParamStrategy{Client: client}
+}</span>
+
+// Service returns the service type.
+func (s *ParamStrategy) Service() Service <span class="cov8" title="1">{
+        return ServiceParam
+}</span>
+
+// ServiceName returns the user-friendly service name.
+func (s *ParamStrategy) ServiceName() string <span class="cov8" title="1">{
+        return "SSM Parameter Store"
+}</span>
+
+// ItemName returns the item name for messages.
+func (s *ParamStrategy) ItemName() string <span class="cov8" title="1">{
+        return "parameter"
+}</span>
+
+// HasDeleteOptions returns false as SSM Parameter Store doesn't have delete options.
+func (s *ParamStrategy) HasDeleteOptions() bool <span class="cov8" title="1">{
+        return false
+}</span>
+
+// Apply applies a staged operation to AWS SSM Parameter Store.
+func (s *ParamStrategy) Apply(ctx context.Context, name string, entry Entry) error <span class="cov8" title="1">{
+        switch entry.Operation </span>{
+        case OperationCreate, OperationUpdate:<span class="cov8" title="1">
+                return s.applySet(ctx, name, entry)</span>
+        case OperationDelete:<span class="cov8" title="1">
+                return s.applyDelete(ctx, name)</span>
+        default:<span class="cov8" title="1">
+                return fmt.Errorf("unknown operation: %s", entry.Operation)</span>
+        }
+}
+
+func (s *ParamStrategy) applySet(ctx context.Context, name string, entry Entry) error <span class="cov8" title="1">{
+        // Try to get existing parameter to preserve type
+        paramType := paramapi.ParameterTypeString
+        existing, err := s.Client.GetParameter(ctx, &amp;paramapi.GetParameterInput{
+                Name: lo.ToPtr(name),
+        })
+        if err != nil </span><span class="cov8" title="1">{
+                var pnf *paramapi.ParameterNotFound
+                if !errors.As(err, &amp;pnf) </span><span class="cov8" title="1">{
+                        return fmt.Errorf("failed to get existing parameter: %w", err)
+                }</span>
+        } else<span class="cov8" title="1"> if existing.Parameter != nil </span><span class="cov8" title="1">{
+                paramType = existing.Parameter.Type
+        }</span>
+
+        <span class="cov8" title="1">input := &amp;paramapi.PutParameterInput{
+                Name:      lo.ToPtr(name),
+                Value:     entry.Value,
+                Type:      paramType,
+                Overwrite: lo.ToPtr(true),
+        }
+        if entry.Description != nil </span><span class="cov0" title="0">{
+                input.Description = entry.Description
+        }</span>
+
+        <span class="cov8" title="1">_, err = s.Client.PutParameter(ctx, input)
+        if err != nil </span><span class="cov8" title="1">{
+                return fmt.Errorf("failed to set parameter: %w", err)
+        }</span>
+
+        // Apply tag changes (additive)
+        <span class="cov8" title="1">if len(entry.Tags) &gt; 0 || len(entry.UntagKeys) &gt; 0 </span><span class="cov0" title="0">{
+                change := &amp;tagging.Change{
+                        Add:    entry.Tags,
+                        Remove: entry.UntagKeys,
+                }
+                if !change.IsEmpty() </span><span class="cov0" title="0">{
+                        if err := tagging.ApplyParam(ctx, s.Client, name, change); err != nil </span><span class="cov0" title="0">{
+                                return err
+                        }</span>
+                }
+        }
+
+        <span class="cov8" title="1">return nil</span>
+}
+
+func (s *ParamStrategy) applyDelete(ctx context.Context, name string) error <span class="cov8" title="1">{
+        _, err := s.Client.DeleteParameter(ctx, &amp;paramapi.DeleteParameterInput{
+                Name: lo.ToPtr(name),
+        })
+        if err != nil </span><span class="cov8" title="1">{
+                // Already deleted is considered success
+                var pnf *paramapi.ParameterNotFound
+                if errors.As(err, &amp;pnf) </span><span class="cov0" title="0">{
+                        return nil
+                }</span>
+                <span class="cov8" title="1">return fmt.Errorf("failed to delete parameter: %w", err)</span>
+        }
+        <span class="cov8" title="1">return nil</span>
+}
+
+// FetchLastModified returns the last modified time of the parameter in AWS.
+// Returns zero time if the parameter doesn't exist.
+func (s *ParamStrategy) FetchLastModified(ctx context.Context, name string) (time.Time, error) <span class="cov0" title="0">{
+        result, err := s.Client.GetParameter(ctx, &amp;paramapi.GetParameterInput{
+                Name: lo.ToPtr(name),
+        })
+        if err != nil </span><span class="cov0" title="0">{
+                var pnf *paramapi.ParameterNotFound
+                if errors.As(err, &amp;pnf) </span><span class="cov0" title="0">{
+                        return time.Time{}, nil
+                }</span>
+                <span class="cov0" title="0">return time.Time{}, fmt.Errorf("failed to get parameter: %w", err)</span>
+        }
+        <span class="cov0" title="0">if result.Parameter != nil &amp;&amp; result.Parameter.LastModifiedDate != nil </span><span class="cov0" title="0">{
+                return *result.Parameter.LastModifiedDate, nil
+        }</span>
+        <span class="cov0" title="0">return time.Time{}, nil</span>
+}
+
+// FetchCurrent fetches the current value from AWS SSM Parameter Store for diffing.
+func (s *ParamStrategy) FetchCurrent(ctx context.Context, name string) (*FetchResult, error) <span class="cov8" title="1">{
+        spec := &amp;paramversion.Spec{Name: name}
+        param, err := paramversion.GetParameterWithVersion(ctx, s.Client, spec, true)
+        if err != nil </span><span class="cov8" title="1">{
+                return nil, err
+        }</span>
+        <span class="cov8" title="1">return &amp;FetchResult{
+                Value:      lo.FromPtr(param.Value),
+                Identifier: fmt.Sprintf("#%d", param.Version),
+        }, nil</span>
+}
+
+// ParseName parses and validates a name for editing.
+func (s *ParamStrategy) ParseName(input string) (string, error) <span class="cov8" title="1">{
+        spec, err := paramversion.Parse(input)
+        if err != nil </span><span class="cov0" title="0">{
+                return "", err
+        }</span>
+        <span class="cov8" title="1">if spec.Absolute.Version != nil || spec.Shift &gt; 0 </span><span class="cov8" title="1">{
+                return "", fmt.Errorf("stage diff requires a parameter name without version specifier")
+        }</span>
+        <span class="cov8" title="1">return spec.Name, nil</span>
+}
+
+// FetchCurrentValue fetches the current value from AWS SSM Parameter Store for editing.
+func (s *ParamStrategy) FetchCurrentValue(ctx context.Context, name string) (*EditFetchResult, error) <span class="cov8" title="1">{
+        spec := &amp;paramversion.Spec{Name: name}
+        param, err := paramversion.GetParameterWithVersion(ctx, s.Client, spec, true)
+        if err != nil </span><span class="cov8" title="1">{
+                return nil, err
+        }</span>
+        <span class="cov8" title="1">result := &amp;EditFetchResult{
+                Value: lo.FromPtr(param.Value),
+        }
+        if param.LastModifiedDate != nil </span><span class="cov8" title="1">{
+                result.LastModified = *param.LastModifiedDate
+        }</span>
+        <span class="cov8" title="1">return result, nil</span>
+}
+
+// ParseSpec parses a version spec string for reset.
+func (s *ParamStrategy) ParseSpec(input string) (name string, hasVersion bool, err error) <span class="cov8" title="1">{
+        spec, err := paramversion.Parse(input)
+        if err != nil </span><span class="cov8" title="1">{
+                return "", false, err
+        }</span>
+        <span class="cov8" title="1">hasVersion = spec.Absolute.Version != nil || spec.Shift &gt; 0
+        return spec.Name, hasVersion, nil</span>
+}
+
+// FetchVersion fetches the value for a specific version.
+func (s *ParamStrategy) FetchVersion(ctx context.Context, input string) (value string, versionLabel string, err error) <span class="cov8" title="1">{
+        spec, err := paramversion.Parse(input)
+        if err != nil </span><span class="cov0" title="0">{
+                return "", "", err
+        }</span>
+        <span class="cov8" title="1">param, err := paramversion.GetParameterWithVersion(ctx, s.Client, spec, true)
+        if err != nil </span><span class="cov8" title="1">{
+                return "", "", err
+        }</span>
+        <span class="cov8" title="1">return lo.FromPtr(param.Value), fmt.Sprintf("#%d", param.Version), nil</span>
+}
+
+// ParamFactory creates a FullStrategy with an initialized AWS client.
+func ParamFactory(ctx context.Context) (FullStrategy, error) <span class="cov0" title="0">{
+        client, err := infra.NewParamClient(ctx)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("failed to initialize AWS client: %w", err)
+        }</span>
+        <span class="cov0" title="0">return NewParamStrategy(client), nil</span>
+}
+
+// ParamParserFactory creates a Parser without an AWS client.
+// Use this for operations that don't need AWS access (e.g., status, parsing).
+func ParamParserFactory() Parser <span class="cov8" title="1">{
+        return NewParamStrategy(nil)
+}</span>
+</pre>
+		
+		<pre class="file" id="file3" style="display: none">package staging
+
+import (
+        "fmt"
+        "io"
+
+        "github.com/samber/lo"
+
+        "github.com/mpyw/suve/internal/cli/colors"
+)
+
+// EntryPrinter prints staged entries to the given writer.
+type EntryPrinter struct {
+        Writer io.Writer
+}
+
+// PrintEntry prints a single staged entry.
+// If verbose is true, shows detailed information including timestamp and value.
+// If showDeleteOptions is true, shows delete options (Force/RecoveryWindow) for delete operations.
+func (p *EntryPrinter) PrintEntry(name string, entry Entry, verbose, showDeleteOptions bool) <span class="cov8" title="1">{
+        var opColor string
+        switch entry.Operation </span>{
+        case OperationCreate:<span class="cov8" title="1">
+                opColor = colors.OpAdd("A")</span>
+        case OperationUpdate:<span class="cov8" title="1">
+                opColor = colors.OpModify("M")</span>
+        case OperationDelete:<span class="cov8" title="1">
+                opColor = colors.OpDelete("D")</span>
+        }
+
+        <span class="cov8" title="1">if !verbose </span><span class="cov8" title="1">{
+                _, _ = fmt.Fprintf(p.Writer, "  %s %s\n", opColor, name)
+                return
+        }</span>
+
+        <span class="cov8" title="1">_, _ = fmt.Fprintf(p.Writer, "\n%s %s\n", opColor, name)
+        _, _ = fmt.Fprintf(p.Writer, "  %s %s\n", colors.FieldLabel("Staged:"), entry.StagedAt.Format("2006-01-02 15:04:05"))
+
+        switch entry.Operation </span>{
+        case OperationCreate, OperationUpdate:<span class="cov8" title="1">
+                value := lo.FromPtr(entry.Value)
+                if len(value) &gt; 100 </span><span class="cov8" title="1">{
+                        value = value[:100] + "..."
+                }</span>
+                <span class="cov8" title="1">_, _ = fmt.Fprintf(p.Writer, "  %s %s\n", colors.FieldLabel("Value:"), value)</span>
+        case OperationDelete:<span class="cov8" title="1">
+                if !showDeleteOptions || entry.DeleteOptions == nil </span><span class="cov8" title="1">{
+                        return
+                }</span>
+                <span class="cov8" title="1">switch </span>{
+                case entry.DeleteOptions.Force:<span class="cov8" title="1">
+                        _, _ = fmt.Fprintf(p.Writer, "  %s force (immediate, no recovery)\n", colors.FieldLabel("Delete:"))</span>
+                case entry.DeleteOptions.RecoveryWindow &gt; 0:<span class="cov8" title="1">
+                        _, _ = fmt.Fprintf(p.Writer, "  %s %d days recovery window\n", colors.FieldLabel("Delete:"), entry.DeleteOptions.RecoveryWindow)</span>
+                }
+        }
+}
+</pre>
+		
+		<pre class="file" id="file4" style="display: none">// Package runner provides shared runners and command builders for stage commands.
+package runner
+
+import (
+        "context"
+        "errors"
+        "fmt"
+        "io"
+        "time"
+
+        "github.com/samber/lo"
+
+        "github.com/mpyw/suve/internal/cli/colors"
+        "github.com/mpyw/suve/internal/cli/editor"
+        "github.com/mpyw/suve/internal/staging"
+)
+
+// AddRunner executes add operations using a strategy.
+type AddRunner struct {
+        Strategy   staging.Parser
+        Store      *staging.Store
+        Stdout     io.Writer
+        Stderr     io.Writer
+        OpenEditor editor.OpenFunc // Optional: defaults to editor.Open if nil
+}
+
+// AddOptions holds options for the add command.
+type AddOptions struct {
+        Name        string
+        Value       string // Optional: if set, skip editor and use this value
+        Description string
+        Tags        map[string]string
+}
+
+// Run executes the add command.
+func (r *AddRunner) Run(_ context.Context, opts AddOptions) error <span class="cov8" title="1">{
+        service := r.Strategy.Service()
+
+        // Parse and validate name
+        name, err := r.Strategy.ParseName(opts.Name)
+        if err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+
+        // Check if already staged
+        <span class="cov8" title="1">stagedEntry, err := r.Store.Get(service, name)
+        if err != nil &amp;&amp; !errors.Is(err, staging.ErrNotStaged) </span><span class="cov0" title="0">{
+                return err
+        }</span>
+
+        <span class="cov8" title="1">var currentValue string
+        if stagedEntry != nil &amp;&amp; stagedEntry.Operation == staging.OperationCreate </span><span class="cov8" title="1">{
+                // Already staged as create, allow editing
+                currentValue = lo.FromPtr(stagedEntry.Value)
+        }</span>
+        // For new items, currentValue stays empty
+
+        <span class="cov8" title="1">var newValue string
+        if opts.Value != "" </span><span class="cov0" title="0">{
+                // Use provided value, skip editor
+                newValue = opts.Value
+        }</span> else<span class="cov8" title="1"> {
+                // Open editor
+                editorFn := r.OpenEditor
+                if editorFn == nil </span><span class="cov0" title="0">{
+                        editorFn = editor.Open
+                }</span>
+                <span class="cov8" title="1">newValue, err = editorFn(currentValue)
+                if err != nil </span><span class="cov0" title="0">{
+                        return fmt.Errorf("failed to edit: %w", err)
+                }</span>
+
+                // Check if value is empty (canceled)
+                <span class="cov8" title="1">if newValue == "" </span><span class="cov8" title="1">{
+                        _, _ = fmt.Fprintln(r.Stdout, colors.Warning("Empty value, not staged."))
+                        return nil
+                }</span>
+
+                // Check if unchanged from staged value
+                <span class="cov8" title="1">if stagedEntry != nil &amp;&amp; newValue == currentValue </span><span class="cov8" title="1">{
+                        _, _ = fmt.Fprintln(r.Stdout, colors.Warning("No changes made."))
+                        return nil
+                }</span>
+        }
+
+        // Stage the change with OperationCreate
+        <span class="cov8" title="1">entry := staging.Entry{
+                Operation: staging.OperationCreate,
+                Value:     lo.ToPtr(newValue),
+                StagedAt:  time.Now(),
+        }
+        if opts.Description != "" </span><span class="cov0" title="0">{
+                entry.Description = &amp;opts.Description
+        }</span>
+        <span class="cov8" title="1">if len(opts.Tags) &gt; 0 </span><span class="cov0" title="0">{
+                entry.Tags = opts.Tags
+        }</span>
+        <span class="cov8" title="1">if err := r.Store.Stage(service, name, entry); err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+
+        <span class="cov8" title="1">_, _ = fmt.Fprintf(r.Stdout, "%s Staged for creation: %s\n", colors.Success("✓"), name)
+        return nil</span>
+}
+</pre>
+		
+		<pre class="file" id="file5" style="display: none">// Package runner provides shared runners and command builders for stage commands.
+package runner
+
+import (
+        "context"
+        "fmt"
+        "io"
+
+        "github.com/mpyw/suve/internal/maputil"
+        "github.com/mpyw/suve/internal/output"
+        "github.com/mpyw/suve/internal/parallel"
+        "github.com/mpyw/suve/internal/staging"
+)
+
+// ApplyRunner executes apply operations using a strategy.
+type ApplyRunner struct {
+        Strategy staging.ApplyStrategy
+        Store    *staging.Store
+        Stdout   io.Writer
+        Stderr   io.Writer
+}
+
+// ApplyOptions holds options for the apply command.
+type ApplyOptions struct {
+        Name            string // Optional: apply only this item, otherwise apply all
+        IgnoreConflicts bool   // Skip conflict detection and force apply
+}
+
+// Run executes the apply command.
+func (r *ApplyRunner) Run(ctx context.Context, opts ApplyOptions) error <span class="cov8" title="1">{
+        service := r.Strategy.Service()
+        itemName := r.Strategy.ItemName()
+
+        staged, err := r.Store.List(service)
+        if err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+
+        <span class="cov8" title="1">entries := staged[service]
+        if len(entries) == 0 </span><span class="cov8" title="1">{
+                output.Info(r.Stdout, "No %s changes staged.", r.Strategy.ServiceName())
+                return nil
+        }</span>
+
+        // Filter by name if specified
+        <span class="cov8" title="1">if opts.Name != "" </span><span class="cov8" title="1">{
+                entry, exists := entries[opts.Name]
+                if !exists </span><span class="cov8" title="1">{
+                        return fmt.Errorf("%s %s is not staged", itemName, opts.Name)
+                }</span>
+                <span class="cov8" title="1">entries = map[string]staging.Entry{opts.Name: entry}</span>
+        }
+
+        // Check for conflicts unless --ignore-conflicts is specified
+        <span class="cov8" title="1">if !opts.IgnoreConflicts </span><span class="cov8" title="1">{
+                conflicts := staging.CheckConflicts(ctx, r.Strategy, entries)
+                if len(conflicts) &gt; 0 </span><span class="cov8" title="1">{
+                        for _, name := range maputil.SortedKeys(conflicts) </span><span class="cov8" title="1">{
+                                output.Warning(r.Stderr, "conflict detected for %s: AWS was modified after staging", name)
+                        }</span>
+                        <span class="cov8" title="1">return fmt.Errorf("apply rejected: %d conflict(s) detected (use --ignore-conflicts to force)", len(conflicts))</span>
+                }
+        }
+
+        // Execute apply operations in parallel
+        <span class="cov8" title="1">results := parallel.ExecuteMap(ctx, entries, func(ctx context.Context, name string, entry staging.Entry) (staging.Operation, error) </span><span class="cov8" title="1">{
+                err := r.Strategy.Apply(ctx, name, entry)
+                return entry.Operation, err
+        }</span>)
+
+        // Output results in sorted order
+        <span class="cov8" title="1">var succeeded, failed int
+        for _, name := range maputil.SortedKeys(entries) </span><span class="cov8" title="1">{
+                result := results[name]
+                if result.Err != nil </span><span class="cov8" title="1">{
+                        output.Failed(r.Stderr, name, result.Err)
+                        failed++
+                }</span> else<span class="cov8" title="1"> {
+                        switch result.Value </span>{
+                        case staging.OperationCreate:<span class="cov8" title="1">
+                                output.Success(r.Stdout, "Created %s", name)</span>
+                        case staging.OperationUpdate:<span class="cov8" title="1">
+                                output.Success(r.Stdout, "Updated %s", name)</span>
+                        case staging.OperationDelete:<span class="cov8" title="1">
+                                output.Success(r.Stdout, "Deleted %s", name)</span>
+                        }
+                        <span class="cov8" title="1">if err := r.Store.Unstage(service, name); err != nil </span><span class="cov0" title="0">{
+                                output.Warning(r.Stderr, "failed to clear staging for %s: %v", name, err)
+                        }</span>
+                        <span class="cov8" title="1">succeeded++</span>
+                }
+        }
+
+        <span class="cov8" title="1">if failed &gt; 0 </span><span class="cov8" title="1">{
+                return fmt.Errorf("applied %d, failed %d", succeeded, failed)
+        }</span>
+
+        <span class="cov8" title="1">return nil</span>
+}
+</pre>
+		
+		<pre class="file" id="file6" style="display: none">// Package runner provides shared runners and command builders for stage commands.
+package runner
+
+import (
+        "context"
+        "fmt"
+        "io"
+        "os"
+        "strings"
+        "time"
+
+        "github.com/urfave/cli/v3"
+
+        "github.com/mpyw/suve/internal/cli/colors"
+        "github.com/mpyw/suve/internal/cli/confirm"
+        "github.com/mpyw/suve/internal/cli/pager"
+        "github.com/mpyw/suve/internal/staging"
+)
+
+// CommandConfig holds service-specific configuration for building stage commands.
+type CommandConfig struct {
+        // ServiceName is the service prefix for commands (e.g., "param", "secret").
+        ServiceName string
+
+        // ItemName is the item name for messages (e.g., "parameter", "secret").
+        ItemName string
+
+        // Factory creates a FullStrategy with an initialized AWS client.
+        Factory staging.StrategyFactory
+
+        // ParserFactory creates a Parser without AWS client (for status, parsing).
+        ParserFactory staging.ParserFactory
+}
+
+// NewStatusCommand creates a status command with the given config.
+func NewStatusCommand(cfg CommandConfig) *cli.Command <span class="cov8" title="1">{
+        return &amp;cli.Command{
+                Name:      "status",
+                Usage:     fmt.Sprintf("Show staged %s changes", cfg.ItemName),
+                ArgsUsage: "[name]",
+                Description: fmt.Sprintf(`Display staged changes for %s.
+
+Without arguments, shows all staged %s changes.
+With a %s name, shows the staged change for that specific %s.
+
+Use -v/--verbose to show detailed information including the staged value.
+
+EXAMPLES:
+   suve stage %s status              Show all staged %s changes
+   suve stage %s status &lt;name&gt;       Show staged change for specific %s
+   suve stage %s status -v           Show detailed information`,
+                        cfg.ServiceName, cfg.ItemName, cfg.ItemName, cfg.ItemName,
+                        cfg.ServiceName, cfg.ItemName,
+                        cfg.ServiceName, cfg.ItemName,
+                        cfg.ServiceName),
+                Flags: []cli.Flag{
+                        &amp;cli.BoolFlag{
+                                Name:    "verbose",
+                                Aliases: []string{"v"},
+                                Usage:   "Show detailed information including values",
+                        },
+                },
+                Action: func(ctx context.Context, cmd *cli.Command) error </span><span class="cov0" title="0">{
+                        store, err := staging.NewStore()
+                        if err != nil </span><span class="cov0" title="0">{
+                                return fmt.Errorf("failed to initialize stage store: %w", err)
+                        }</span>
+
+                        <span class="cov0" title="0">r := &amp;StatusRunner{
+                                Strategy: cfg.ParserFactory(),
+                                Store:    store,
+                                Stdout:   cmd.Root().Writer,
+                                Stderr:   cmd.Root().ErrWriter,
+                        }
+
+                        opts := StatusOptions{
+                                Verbose: cmd.Bool("verbose"),
+                        }
+                        if cmd.Args().Len() &gt; 0 </span><span class="cov0" title="0">{
+                                opts.Name = cmd.Args().First()
+                        }</span>
+
+                        <span class="cov0" title="0">return r.Run(ctx, opts)</span>
+                },
+        }
+}
+
+// NewDiffCommand creates a diff command with the given config.
+func NewDiffCommand(cfg CommandConfig) *cli.Command <span class="cov8" title="1">{
+        return &amp;cli.Command{
+                Name:      "diff",
+                Usage:     "Show diff between staged and AWS values",
+                ArgsUsage: "[name]",
+                Description: fmt.Sprintf(`Compare staged values against AWS current values.
+
+If a %s name is specified, shows diff for that %s only.
+Otherwise, shows diff for all staged %ss.
+
+EXAMPLES:
+   suve stage %s diff              Show diff for all staged %ss
+   suve stage %s diff &lt;name&gt;       Show diff for specific %s
+   suve stage %s diff -j           Show diff with JSON formatting`,
+                        cfg.ItemName, cfg.ItemName, cfg.ItemName,
+                        cfg.ServiceName, cfg.ItemName,
+                        cfg.ServiceName, cfg.ItemName,
+                        cfg.ServiceName),
+                Flags: []cli.Flag{
+                        &amp;cli.BoolFlag{
+                                Name:    "parse-json",
+                                Aliases: []string{"j"},
+                                Usage:   "Format JSON values before diffing (keys are always sorted)",
+                        },
+                        &amp;cli.BoolFlag{
+                                Name:  "no-pager",
+                                Usage: "Disable pager output",
+                        },
+                },
+                Action: func(ctx context.Context, cmd *cli.Command) error </span><span class="cov0" title="0">{
+                        var name string
+                        if cmd.Args().Len() &gt; 1 </span><span class="cov0" title="0">{
+                                return fmt.Errorf("usage: suve stage %s diff [name]", cfg.ServiceName)
+                        }</span>
+                        <span class="cov0" title="0">if cmd.Args().Len() == 1 </span><span class="cov0" title="0">{
+                                strat := cfg.ParserFactory()
+                                parsedName, err := strat.ParseName(cmd.Args().First())
+                                if err != nil </span><span class="cov0" title="0">{
+                                        return err
+                                }</span>
+                                <span class="cov0" title="0">name = parsedName</span>
+                        }
+
+                        <span class="cov0" title="0">store, err := staging.NewStore()
+                        if err != nil </span><span class="cov0" title="0">{
+                                return fmt.Errorf("failed to initialize stage store: %w", err)
+                        }</span>
+
+                        <span class="cov0" title="0">strat, err := cfg.Factory(ctx)
+                        if err != nil </span><span class="cov0" title="0">{
+                                return err
+                        }</span>
+
+                        <span class="cov0" title="0">opts := DiffOptions{
+                                Name:      name,
+                                ParseJSON: cmd.Bool("parse-json"),
+                                NoPager:   cmd.Bool("no-pager"),
+                        }
+
+                        return pager.WithPagerWriter(cmd.Root().Writer, opts.NoPager, func(w io.Writer) error </span><span class="cov0" title="0">{
+                                r := &amp;DiffRunner{
+                                        Strategy: strat,
+                                        Store:    store,
+                                        Stdout:   w,
+                                        Stderr:   cmd.Root().ErrWriter,
+                                }
+                                return r.Run(ctx, opts)
+                        }</span>)
+                },
+        }
+}
+
+// NewAddCommand creates an add command with the given config.
+func NewAddCommand(cfg CommandConfig) *cli.Command <span class="cov8" title="1">{
+        return &amp;cli.Command{
+                Name:      "add",
+                Usage:     fmt.Sprintf("Create new %s and stage it", cfg.ItemName),
+                ArgsUsage: "&lt;name&gt; [value]",
+                Description: fmt.Sprintf(`Create a new %s value and stage the change.
+
+If value is provided as an argument, uses that value directly.
+Otherwise, opens an editor to create the value.
+
+If the %s is already staged for creation, edits the staged value.
+The new %s will be created in AWS when you run 'suve stage %s apply'.
+
+Use 'suve stage %s edit' to modify an existing %s.
+Use 'suve stage %s status' to view staged changes.
+
+EXAMPLES:
+   suve stage %s add &lt;name&gt;              Open editor to create new %s
+   suve stage %s add &lt;name&gt; &lt;value&gt;      Create new %s with given value`,
+                        cfg.ItemName,
+                        cfg.ItemName,
+                        cfg.ItemName, cfg.ServiceName,
+                        cfg.ServiceName, cfg.ItemName,
+                        cfg.ServiceName,
+                        cfg.ServiceName, cfg.ItemName,
+                        cfg.ServiceName, cfg.ItemName),
+                Flags: []cli.Flag{
+                        &amp;cli.StringFlag{
+                                Name:  "description",
+                                Usage: fmt.Sprintf("Description for the %s", cfg.ItemName),
+                        },
+                        &amp;cli.StringSliceFlag{
+                                Name:  "tag",
+                                Usage: "Tag in key=value format (can be specified multiple times)",
+                        },
+                },
+                Action: func(ctx context.Context, cmd *cli.Command) error </span><span class="cov0" title="0">{
+                        if cmd.Args().Len() &lt; 1 </span><span class="cov0" title="0">{
+                                return fmt.Errorf("usage: suve stage %s add &lt;name&gt; [value]", cfg.ServiceName)
+                        }</span>
+
+                        <span class="cov0" title="0">name := cmd.Args().First()
+                        var value string
+                        if cmd.Args().Len() &gt;= 2 </span><span class="cov0" title="0">{
+                                value = cmd.Args().Get(1)
+                        }</span>
+
+                        <span class="cov0" title="0">store, err := staging.NewStore()
+                        if err != nil </span><span class="cov0" title="0">{
+                                return fmt.Errorf("failed to initialize stage store: %w", err)
+                        }</span>
+
+                        <span class="cov0" title="0">tags, err := parseTags(cmd.StringSlice("tag"))
+                        if err != nil </span><span class="cov0" title="0">{
+                                return err
+                        }</span>
+
+                        <span class="cov0" title="0">strat := cfg.ParserFactory()
+
+                        r := &amp;AddRunner{
+                                Strategy: strat,
+                                Store:    store,
+                                Stdout:   cmd.Root().Writer,
+                                Stderr:   cmd.Root().ErrWriter,
+                        }
+                        return r.Run(ctx, AddOptions{
+                                Name:        name,
+                                Value:       value,
+                                Description: cmd.String("description"),
+                                Tags:        tags,
+                        })</span>
+                },
+        }
+}
+
+// NewEditCommand creates an edit command with the given config.
+func NewEditCommand(cfg CommandConfig) *cli.Command <span class="cov8" title="1">{
+        return &amp;cli.Command{
+                Name:      "edit",
+                Usage:     fmt.Sprintf("Edit %s value and stage changes", cfg.ItemName),
+                ArgsUsage: "&lt;name&gt; [value]",
+                Description: fmt.Sprintf(`Modify a %s value and stage the change.
+
+If value is provided as an argument, uses that value directly.
+Otherwise, opens an editor to modify the value.
+
+If the %s is already staged, edits the staged value.
+Otherwise, fetches the current value from AWS and opens it for editing.
+Saves the edited value to the staging area (does not immediately apply to AWS).
+
+Use 'suve stage %s delete' to stage a %s for deletion.
+Use 'suve stage %s apply' to apply staged changes to AWS.
+Use 'suve stage %s status' to view staged changes.
+
+EXAMPLES:
+   suve stage %s edit &lt;name&gt;              Open editor to modify %s
+   suve stage %s edit &lt;name&gt; &lt;value&gt;      Set %s to given value`,
+                        cfg.ItemName,
+                        cfg.ItemName,
+                        cfg.ServiceName, cfg.ItemName,
+                        cfg.ServiceName,
+                        cfg.ServiceName,
+                        cfg.ServiceName, cfg.ItemName,
+                        cfg.ServiceName, cfg.ItemName),
+                Flags: []cli.Flag{
+                        &amp;cli.StringFlag{
+                                Name:  "description",
+                                Usage: fmt.Sprintf("Description for the %s", cfg.ItemName),
+                        },
+                        &amp;cli.StringSliceFlag{
+                                Name:  "tag",
+                                Usage: "Tag in key=value format (can be specified multiple times)",
+                        },
+                },
+                Action: func(ctx context.Context, cmd *cli.Command) error </span><span class="cov0" title="0">{
+                        if cmd.Args().Len() &lt; 1 </span><span class="cov0" title="0">{
+                                return fmt.Errorf("usage: suve stage %s edit &lt;name&gt; [value]", cfg.ServiceName)
+                        }</span>
+
+                        <span class="cov0" title="0">name := cmd.Args().First()
+                        var value string
+                        if cmd.Args().Len() &gt;= 2 </span><span class="cov0" title="0">{
+                                value = cmd.Args().Get(1)
+                        }</span>
+
+                        <span class="cov0" title="0">store, err := staging.NewStore()
+                        if err != nil </span><span class="cov0" title="0">{
+                                return fmt.Errorf("failed to initialize stage store: %w", err)
+                        }</span>
+
+                        <span class="cov0" title="0">tags, err := parseTags(cmd.StringSlice("tag"))
+                        if err != nil </span><span class="cov0" title="0">{
+                                return err
+                        }</span>
+
+                        <span class="cov0" title="0">strat, err := cfg.Factory(ctx)
+                        if err != nil </span><span class="cov0" title="0">{
+                                return err
+                        }</span>
+
+                        <span class="cov0" title="0">r := &amp;EditRunner{
+                                Strategy: strat,
+                                Store:    store,
+                                Stdout:   cmd.Root().Writer,
+                                Stderr:   cmd.Root().ErrWriter,
+                        }
+                        return r.Run(ctx, EditOptions{
+                                Name:        name,
+                                Value:       value,
+                                Description: cmd.String("description"),
+                                Tags:        tags,
+                        })</span>
+                },
+        }
+}
+
+// NewApplyCommand creates an apply command with the given config.
+func NewApplyCommand(cfg CommandConfig) *cli.Command <span class="cov8" title="1">{
+        return &amp;cli.Command{
+                Name:      "apply",
+                Aliases:   []string{"push"},
+                Usage:     fmt.Sprintf("Apply staged %s changes to AWS", cfg.ItemName),
+                ArgsUsage: "[name]",
+                Description: fmt.Sprintf(`Apply all staged %s changes to AWS.
+
+If a %s name is specified, only that %s's staged changes are applied.
+Otherwise, all staged %s changes are applied.
+
+After successful apply, the staged changes are cleared.
+
+Use 'suve stage %s status' to view staged changes before applying.
+
+CONFLICT DETECTION:
+   Before applying, suve checks for conflicts to prevent lost updates:
+   - For new resources: checks if someone else created it after staging
+   - For existing resources: checks if it was modified after staging
+   Use --ignore-conflicts to force apply despite conflicts.
+
+EXAMPLES:
+   suve stage %s apply                      Apply all staged %s changes (with confirmation)
+   suve stage %s apply &lt;name&gt;               Apply only the specified %s
+   suve stage %s apply --yes                Apply without confirmation
+   suve stage %s apply --ignore-conflicts   Apply even if AWS was modified after staging`,
+                        cfg.ItemName,
+                        cfg.ItemName, cfg.ItemName,
+                        cfg.ItemName,
+                        cfg.ServiceName,
+                        cfg.ServiceName, cfg.ItemName,
+                        cfg.ServiceName, cfg.ItemName,
+                        cfg.ServiceName,
+                        cfg.ServiceName),
+                Flags: []cli.Flag{
+                        &amp;cli.BoolFlag{
+                                Name:  "yes",
+                                Usage: "Skip confirmation prompt",
+                        },
+                        &amp;cli.BoolFlag{
+                                Name:  "ignore-conflicts",
+                                Usage: "Apply even if AWS was modified after staging",
+                        },
+                },
+                Action: func(ctx context.Context, cmd *cli.Command) error </span><span class="cov0" title="0">{
+                        store, err := staging.NewStore()
+                        if err != nil </span><span class="cov0" title="0">{
+                                return fmt.Errorf("failed to initialize stage store: %w", err)
+                        }</span>
+
+                        // Get entries to show what will be applied
+                        <span class="cov0" title="0">parser := cfg.ParserFactory()
+                        service := parser.Service()
+                        entries, err := store.List(service)
+                        if err != nil </span><span class="cov0" title="0">{
+                                return err
+                        }</span>
+
+                        <span class="cov0" title="0">serviceEntries := entries[service]
+                        if len(serviceEntries) == 0 </span><span class="cov0" title="0">{
+                                _, _ = fmt.Fprintf(cmd.Root().Writer, "%s No %s changes staged.\n", colors.Warning("!"), parser.ServiceName())
+                                return nil
+                        }</span>
+
+                        // Filter by name if specified
+                        <span class="cov0" title="0">opts := ApplyOptions{
+                                IgnoreConflicts: cmd.Bool("ignore-conflicts"),
+                        }
+                        if cmd.Args().Len() &gt; 0 </span><span class="cov0" title="0">{
+                                opts.Name = cmd.Args().First()
+                                if _, ok := serviceEntries[opts.Name]; !ok </span><span class="cov0" title="0">{
+                                        return fmt.Errorf("%s is not staged", opts.Name)
+                                }</span>
+                        }
+
+                        // Confirm apply
+                        <span class="cov0" title="0">skipConfirm := cmd.Bool("yes")
+                        prompter := &amp;confirm.Prompter{
+                                Stdin:  os.Stdin,
+                                Stdout: cmd.Root().Writer,
+                                Stderr: cmd.Root().ErrWriter,
+                        }
+
+                        var message string
+                        if opts.Name != "" </span><span class="cov0" title="0">{
+                                message = fmt.Sprintf("Apply staged changes for %s to AWS?", opts.Name)
+                        }</span> else<span class="cov0" title="0"> {
+                                message = fmt.Sprintf("Apply %d staged %s change(s) to AWS?", len(serviceEntries), parser.ServiceName())
+                        }</span>
+
+                        <span class="cov0" title="0">confirmed, err := prompter.Confirm(message, skipConfirm)
+                        if err != nil </span><span class="cov0" title="0">{
+                                return err
+                        }</span>
+                        <span class="cov0" title="0">if !confirmed </span><span class="cov0" title="0">{
+                                return nil
+                        }</span>
+
+                        <span class="cov0" title="0">strat, err := cfg.Factory(ctx)
+                        if err != nil </span><span class="cov0" title="0">{
+                                return err
+                        }</span>
+
+                        <span class="cov0" title="0">r := &amp;ApplyRunner{
+                                Strategy: strat,
+                                Store:    store,
+                                Stdout:   cmd.Root().Writer,
+                                Stderr:   cmd.Root().ErrWriter,
+                        }
+
+                        return r.Run(ctx, opts)</span>
+                },
+        }
+}
+
+// NewResetCommand creates a reset command with the given config.
+func NewResetCommand(cfg CommandConfig) *cli.Command <span class="cov8" title="1">{
+        return &amp;cli.Command{
+                Name:      "reset",
+                Usage:     fmt.Sprintf("Unstage %s or restore to specific version", cfg.ItemName),
+                ArgsUsage: "[spec]",
+                Description: fmt.Sprintf(`Remove a %s from staging area or restore to a specific version.
+
+Without a version specifier, the %s is simply removed from staging.
+With a version specifier, the value at that version is fetched and staged.
+
+Use 'suve stage %s reset --all' to unstage all %ss at once.
+
+VERSION SPECIFIERS:
+   &lt;name&gt;          Unstage %s (remove from staging)
+   &lt;name&gt;#&lt;ver&gt;    Restore to specific version
+   &lt;name&gt;~1        Restore to 1 version ago
+
+EXAMPLES:
+   suve stage %s reset &lt;name&gt;              Unstage (remove from staging)
+   suve stage %s reset &lt;name&gt;#&lt;ver&gt;        Stage value from specific version
+   suve stage %s reset &lt;name&gt;~1            Stage value from previous version
+   suve stage %s reset --all               Unstage all %ss`,
+                        cfg.ItemName,
+                        cfg.ItemName,
+                        cfg.ServiceName, cfg.ItemName,
+                        cfg.ItemName,
+                        cfg.ServiceName,
+                        cfg.ServiceName,
+                        cfg.ServiceName,
+                        cfg.ServiceName, cfg.ItemName),
+                Flags: []cli.Flag{
+                        &amp;cli.BoolFlag{
+                                Name:  "all",
+                                Usage: fmt.Sprintf("Unstage all %ss", cfg.ItemName),
+                        },
+                },
+                Action: func(ctx context.Context, cmd *cli.Command) error </span><span class="cov0" title="0">{
+                        resetAll := cmd.Bool("all")
+
+                        if !resetAll &amp;&amp; cmd.Args().Len() &lt; 1 </span><span class="cov0" title="0">{
+                                return fmt.Errorf("usage: suve stage %s reset &lt;spec&gt; or suve stage %s reset --all", cfg.ServiceName, cfg.ServiceName)
+                        }</span>
+
+                        <span class="cov0" title="0">store, err := staging.NewStore()
+                        if err != nil </span><span class="cov0" title="0">{
+                                return fmt.Errorf("failed to initialize stage store: %w", err)
+                        }</span>
+
+                        <span class="cov0" title="0">opts := ResetOptions{
+                                All: resetAll,
+                        }
+                        if !resetAll </span><span class="cov0" title="0">{
+                                opts.Spec = cmd.Args().First()
+                        }</span>
+
+                        <span class="cov0" title="0">parser := cfg.ParserFactory()
+
+                        // Check if version spec is provided (need AWS client for FetchVersion)
+                        var fetcher VersionFetcher
+                        if !resetAll &amp;&amp; opts.Spec != "" </span><span class="cov0" title="0">{
+                                _, hasVersion, err := parser.ParseSpec(opts.Spec)
+                                if err != nil </span><span class="cov0" title="0">{
+                                        return err
+                                }</span>
+                                <span class="cov0" title="0">if hasVersion </span><span class="cov0" title="0">{
+                                        strat, err := cfg.Factory(ctx)
+                                        if err != nil </span><span class="cov0" title="0">{
+                                                return err
+                                        }</span>
+                                        <span class="cov0" title="0">fetcher = strat</span>
+                                }
+                        }
+
+                        <span class="cov0" title="0">r := &amp;ResetRunner{
+                                Parser:  parser,
+                                Fetcher: fetcher,
+                                Store:   store,
+                                Stdout:  cmd.Root().Writer,
+                                Stderr:  cmd.Root().ErrWriter,
+                        }
+
+                        return r.Run(ctx, opts)</span>
+                },
+        }
+}
+
+func parseTags(tagSlice []string) (map[string]string, error) <span class="cov0" title="0">{
+        if len(tagSlice) == 0 </span><span class="cov0" title="0">{
+                return nil, nil
+        }</span>
+        <span class="cov0" title="0">tags := make(map[string]string)
+        for _, t := range tagSlice </span><span class="cov0" title="0">{
+                parts := strings.SplitN(t, "=", 2)
+                if len(parts) != 2 </span><span class="cov0" title="0">{
+                        return nil, fmt.Errorf("invalid tag format %q: expected key=value", t)
+                }</span>
+                <span class="cov0" title="0">tags[parts[0]] = parts[1]</span>
+        }
+        <span class="cov0" title="0">return tags, nil</span>
+}
+
+// NewDeleteCommand creates a delete command with the given config.
+func NewDeleteCommand(cfg CommandConfig) *cli.Command <span class="cov8" title="1">{
+        strat := cfg.ParserFactory()
+        hasDeleteOptions := strat.HasDeleteOptions()
+
+        var flags []cli.Flag
+        var description string
+
+        if hasDeleteOptions </span><span class="cov8" title="1">{
+                // Secrets Manager has delete options
+                flags = []cli.Flag{
+                        &amp;cli.BoolFlag{
+                                Name:  "force",
+                                Usage: "Force immediate deletion without recovery window",
+                        },
+                        &amp;cli.IntFlag{
+                                Name:  "recovery-window",
+                                Usage: "Number of days before permanent deletion (7-30)",
+                                Value: 30,
+                        },
+                }
+                description = fmt.Sprintf(`Stage a %s for deletion.
+
+The %s will be deleted from AWS when you run 'suve stage %s apply'.
+Use 'suve stage %s status' to view staged changes.
+Use 'suve stage %s reset &lt;name&gt;' to unstage.
+
+RECOVERY WINDOW:
+   By default, %ss are scheduled for deletion after a 30-day recovery window.
+   During this period, you can restore the %s using 'suve %s restore'.
+   Use --force for immediate permanent deletion without recovery.
+
+   Minimum: 7 days
+   Maximum: 30 days
+   Default: 30 days
+
+EXAMPLES:
+   suve stage %s delete &lt;name&gt;                      Stage with 30-day recovery
+   suve stage %s delete --recovery-window 7 &lt;name&gt;  Stage with 7-day recovery
+   suve stage %s delete --force &lt;name&gt;              Stage for immediate deletion`,
+                        cfg.ItemName,
+                        cfg.ItemName, cfg.ServiceName,
+                        cfg.ServiceName,
+                        cfg.ServiceName,
+                        cfg.ItemName,
+                        cfg.ItemName, cfg.ServiceName,
+                        cfg.ServiceName,
+                        cfg.ServiceName,
+                        cfg.ServiceName)
+        }</span> else<span class="cov8" title="1"> {
+                // SSM Parameter Store doesn't have delete options
+                description = fmt.Sprintf(`Stage a %s for deletion.
+
+The %s will be deleted from AWS when you run 'suve stage %s apply'.
+Use 'suve stage %s status' to view staged changes.
+Use 'suve stage %s reset &lt;name&gt;' to unstage.
+
+EXAMPLES:
+   suve stage %s delete &lt;name&gt;  Stage %s for deletion`,
+                        cfg.ItemName,
+                        cfg.ItemName, cfg.ServiceName,
+                        cfg.ServiceName,
+                        cfg.ServiceName,
+                        cfg.ServiceName, cfg.ItemName)
+        }</span>
+
+        <span class="cov8" title="1">return &amp;cli.Command{
+                Name:        "delete",
+                Usage:       fmt.Sprintf("Stage a %s for deletion", cfg.ItemName),
+                ArgsUsage:   "&lt;name&gt;",
+                Description: description,
+                Flags:       flags,
+                Action: func(ctx context.Context, cmd *cli.Command) error </span><span class="cov0" title="0">{
+                        if cmd.Args().Len() &lt; 1 </span><span class="cov0" title="0">{
+                                return fmt.Errorf("usage: suve stage %s delete &lt;name&gt;", cfg.ServiceName)
+                        }</span>
+
+                        <span class="cov0" title="0">store, err := staging.NewStore()
+                        if err != nil </span><span class="cov0" title="0">{
+                                return fmt.Errorf("failed to initialize stage store: %w", err)
+                        }</span>
+
+                        <span class="cov0" title="0">name := cmd.Args().First()
+
+                        // Initialize strategy to fetch LastModified for conflict detection
+                        strategy, err := cfg.Factory(ctx)
+                        if err != nil </span><span class="cov0" title="0">{
+                                return err
+                        }</span>
+                        <span class="cov0" title="0">service := strategy.Service()
+
+                        // Fetch LastModified for conflict detection
+                        lastModified, err := strategy.FetchLastModified(ctx, name)
+                        if err != nil </span><span class="cov0" title="0">{
+                                return fmt.Errorf("failed to fetch %s: %w", cfg.ItemName, err)
+                        }</span>
+
+                        <span class="cov0" title="0">entry := staging.Entry{
+                                Operation: staging.OperationDelete,
+                                StagedAt:  time.Now(),
+                        }
+                        if !lastModified.IsZero() </span><span class="cov0" title="0">{
+                                entry.BaseModifiedAt = &amp;lastModified
+                        }</span>
+
+                        <span class="cov0" title="0">if hasDeleteOptions </span><span class="cov0" title="0">{
+                                force := cmd.Bool("force")
+                                recoveryWindow := cmd.Int("recovery-window")
+
+                                // Validate recovery window
+                                if !force &amp;&amp; (recoveryWindow &lt; 7 || recoveryWindow &gt; 30) </span><span class="cov0" title="0">{
+                                        return fmt.Errorf("recovery window must be between 7 and 30 days")
+                                }</span>
+
+                                <span class="cov0" title="0">entry.DeleteOptions = &amp;staging.DeleteOptions{
+                                        Force:          force,
+                                        RecoveryWindow: recoveryWindow,
+                                }</span>
+                        }
+
+                        <span class="cov0" title="0">if err := store.Stage(service, name, entry); err != nil </span><span class="cov0" title="0">{
+                                return err
+                        }</span>
+
+                        <span class="cov0" title="0">if hasDeleteOptions &amp;&amp; entry.DeleteOptions != nil </span><span class="cov0" title="0">{
+                                if entry.DeleteOptions.Force </span><span class="cov0" title="0">{
+                                        _, _ = fmt.Fprintf(cmd.Root().Writer, "%s Staged for immediate deletion: %s\n", colors.Success("✓"), name)
+                                }</span> else<span class="cov0" title="0"> {
+                                        _, _ = fmt.Fprintf(cmd.Root().Writer, "%s Staged for deletion (%d-day recovery): %s\n", colors.Success("✓"), entry.DeleteOptions.RecoveryWindow, name)
+                                }</span>
+                        } else<span class="cov0" title="0"> {
+                                _, _ = fmt.Fprintf(cmd.Root().Writer, "%s Staged for deletion: %s\n", colors.Success("✓"), name)
+                        }</span>
+                        <span class="cov0" title="0">return nil</span>
+                },
+        }
+}
+</pre>
+		
+		<pre class="file" id="file7" style="display: none">// Package runner provides shared runners and command builders for stage commands.
+package runner
+
+import (
+        "context"
+        "errors"
+        "fmt"
+        "io"
+        "strings"
+
+        "github.com/samber/lo"
+
+        "github.com/mpyw/suve/internal/cli/colors"
+        "github.com/mpyw/suve/internal/jsonutil"
+        "github.com/mpyw/suve/internal/maputil"
+        "github.com/mpyw/suve/internal/output"
+        "github.com/mpyw/suve/internal/parallel"
+        "github.com/mpyw/suve/internal/staging"
+)
+
+// DiffRunner executes diff operations using a strategy.
+type DiffRunner struct {
+        Strategy staging.DiffStrategy
+        Store    *staging.Store
+        Stdout   io.Writer
+        Stderr   io.Writer
+}
+
+// DiffOptions holds options for the diff command.
+type DiffOptions struct {
+        Name      string // Optional: diff only this item, otherwise diff all
+        ParseJSON bool
+        NoPager   bool
+}
+
+// Run executes the diff command.
+func (r *DiffRunner) Run(ctx context.Context, opts DiffOptions) error <span class="cov8" title="1">{
+        service := r.Strategy.Service()
+        itemName := r.Strategy.ItemName()
+
+        // Get all staged entries for the service
+        allEntries, err := r.Store.List(service)
+        if err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+        <span class="cov8" title="1">entries := allEntries[service]
+
+        // Filter by name if specified
+        if opts.Name != "" </span><span class="cov8" title="1">{
+                entry, err := r.Store.Get(service, opts.Name)
+                if errors.Is(err, staging.ErrNotStaged) </span><span class="cov8" title="1">{
+                        output.Warning(r.Stderr, "%s is not staged", opts.Name)
+                        return nil
+                }</span>
+                <span class="cov8" title="1">if err != nil </span><span class="cov0" title="0">{
+                        return err
+                }</span>
+                <span class="cov8" title="1">entries = map[string]staging.Entry{opts.Name: *entry}</span>
+        }
+
+        <span class="cov8" title="1">if len(entries) == 0 </span><span class="cov8" title="1">{
+                output.Warning(r.Stderr, "no %ss staged", itemName)
+                return nil
+        }</span>
+
+        // Fetch all values in parallel
+        <span class="cov8" title="1">results := parallel.ExecuteMap(ctx, entries, func(ctx context.Context, name string, _ staging.Entry) (*staging.FetchResult, error) </span><span class="cov8" title="1">{
+                return r.Strategy.FetchCurrent(ctx, name)
+        }</span>)
+
+        // Output results in sorted order
+        <span class="cov8" title="1">first := true
+        for _, name := range maputil.SortedKeys(entries) </span><span class="cov8" title="1">{
+                entry := entries[name]
+                result := results[name]
+
+                if result.Err != nil </span><span class="cov8" title="1">{
+                        // Handle fetch error based on operation type
+                        switch entry.Operation </span>{
+                        case staging.OperationDelete:<span class="cov8" title="1">
+                                // Item doesn't exist in AWS anymore - deletion already applied
+                                if err := r.Store.Unstage(service, name); err != nil </span><span class="cov0" title="0">{
+                                        return fmt.Errorf("failed to unstage %s: %w", name, err)
+                                }</span>
+                                <span class="cov8" title="1">output.Warning(r.Stderr, "unstaged %s: already deleted in AWS", name)
+                                continue</span>
+
+                        case staging.OperationCreate:<span class="cov8" title="1">
+                                // Item doesn't exist in AWS - this is expected for create operations
+                                // Show diff from empty to staged value
+                                if !first </span><span class="cov0" title="0">{
+                                        _, _ = fmt.Fprintln(r.Stdout)
+                                }</span>
+                                <span class="cov8" title="1">first = false
+                                if err := r.outputDiffCreate(opts, name, entry); err != nil </span><span class="cov0" title="0">{
+                                        return err
+                                }</span>
+                                <span class="cov8" title="1">continue</span>
+
+                        case staging.OperationUpdate:<span class="cov8" title="1">
+                                // Item doesn't exist in AWS anymore - staged update is invalid
+                                if err := r.Store.Unstage(service, name); err != nil </span><span class="cov0" title="0">{
+                                        return fmt.Errorf("failed to unstage %s: %w", name, err)
+                                }</span>
+                                <span class="cov8" title="1">output.Warning(r.Stderr, "unstaged %s: item no longer exists in AWS", name)
+                                continue</span>
+                        }
+                }
+
+                <span class="cov8" title="1">if !first </span><span class="cov8" title="1">{
+                        _, _ = fmt.Fprintln(r.Stdout)
+                }</span>
+                <span class="cov8" title="1">first = false
+
+                if err := r.outputDiff(opts, name, entry, result.Value); err != nil </span><span class="cov0" title="0">{
+                        return err
+                }</span>
+        }
+
+        <span class="cov8" title="1">return nil</span>
+}
+
+func (r *DiffRunner) outputDiff(opts DiffOptions, name string, entry staging.Entry, fetchResult *staging.FetchResult) error <span class="cov8" title="1">{
+        service := r.Strategy.Service()
+        awsValue := fetchResult.Value
+        stagedValue := lo.FromPtr(entry.Value)
+
+        // For delete operation, staged value is empty
+        if entry.Operation == staging.OperationDelete </span><span class="cov8" title="1">{
+                stagedValue = ""
+        }</span>
+
+        // Format as JSON if enabled
+        <span class="cov8" title="1">if opts.ParseJSON </span><span class="cov8" title="1">{
+                awsValue, stagedValue = jsonutil.TryFormatOrWarn2(awsValue, stagedValue, r.Stderr, name)
+        }</span>
+
+        <span class="cov8" title="1">if awsValue == stagedValue </span><span class="cov8" title="1">{
+                // Auto-unstage since there's no difference
+                if err := r.Store.Unstage(service, name); err != nil </span><span class="cov0" title="0">{
+                        return fmt.Errorf("failed to unstage %s: %w", name, err)
+                }</span>
+                <span class="cov8" title="1">output.Warning(r.Stderr, "unstaged %s: identical to AWS current", name)
+                return nil</span>
+        }
+
+        <span class="cov8" title="1">label1 := fmt.Sprintf("%s%s (AWS)", name, fetchResult.Identifier)
+        label2 := fmt.Sprintf(lo.Ternary(
+                entry.Operation == staging.OperationDelete,
+                "%s (staged for deletion)",
+                "%s (staged)",
+        ), name)
+
+        diff := output.Diff(label1, label2, awsValue, stagedValue)
+        _, _ = fmt.Fprint(r.Stdout, diff)
+
+        // Show staged metadata
+        r.outputMetadata(entry)
+
+        return nil</span>
+}
+
+func (r *DiffRunner) outputDiffCreate(opts DiffOptions, name string, entry staging.Entry) error <span class="cov8" title="1">{
+        stagedValue := lo.FromPtr(entry.Value)
+
+        // Format as JSON if enabled
+        if opts.ParseJSON </span><span class="cov8" title="1">{
+                if formatted, ok := jsonutil.TryFormat(stagedValue); ok </span><span class="cov8" title="1">{
+                        stagedValue = formatted
+                }</span>
+        }
+
+        <span class="cov8" title="1">label1 := fmt.Sprintf("%s (not in AWS)", name)
+        label2 := fmt.Sprintf("%s (staged for creation)", name)
+
+        diff := output.Diff(label1, label2, "", stagedValue)
+        _, _ = fmt.Fprint(r.Stdout, diff)
+
+        // Show staged metadata
+        r.outputMetadata(entry)
+
+        return nil</span>
+}
+
+func (r *DiffRunner) outputMetadata(entry staging.Entry) <span class="cov8" title="1">{
+        if desc := lo.FromPtr(entry.Description); desc != "" </span><span class="cov8" title="1">{
+                _, _ = fmt.Fprintf(r.Stdout, "%s %s\n", colors.FieldLabel("Description:"), desc)
+        }</span>
+        <span class="cov8" title="1">if len(entry.Tags) &gt; 0 </span><span class="cov8" title="1">{
+                var tagPairs []string
+                for _, k := range maputil.SortedKeys(entry.Tags) </span><span class="cov8" title="1">{
+                        tagPairs = append(tagPairs, fmt.Sprintf("%s=%s", k, entry.Tags[k]))
+                }</span>
+                <span class="cov8" title="1">_, _ = fmt.Fprintf(r.Stdout, "%s %s\n", colors.FieldLabel("Tags:"), strings.Join(tagPairs, ", "))</span>
+        }
+}
+</pre>
+		
+		<pre class="file" id="file8" style="display: none">// Package runner provides shared runners and command builders for stage commands.
+package runner
+
+import (
+        "context"
+        "errors"
+        "fmt"
+        "io"
+        "time"
+
+        "github.com/samber/lo"
+
+        "github.com/mpyw/suve/internal/cli/colors"
+        "github.com/mpyw/suve/internal/cli/editor"
+        "github.com/mpyw/suve/internal/staging"
+)
+
+// EditRunner executes edit operations using a strategy.
+type EditRunner struct {
+        Strategy   staging.EditStrategy
+        Store      *staging.Store
+        Stdout     io.Writer
+        Stderr     io.Writer
+        OpenEditor editor.OpenFunc // Optional: defaults to editor.Open if nil
+}
+
+// EditOptions holds options for the edit command.
+type EditOptions struct {
+        Name        string
+        Value       string // Optional: if set, skip editor and use this value
+        Description string
+        Tags        map[string]string
+}
+
+// Run executes the edit command.
+func (r *EditRunner) Run(ctx context.Context, opts EditOptions) error <span class="cov8" title="1">{
+        service := r.Strategy.Service()
+
+        // Check if already staged
+        stagedEntry, err := r.Store.Get(service, opts.Name)
+        if err != nil &amp;&amp; !errors.Is(err, staging.ErrNotStaged) </span><span class="cov0" title="0">{
+                return err
+        }</span>
+
+        <span class="cov8" title="1">var currentValue string
+        var baseModifiedAt *time.Time
+        if stagedEntry != nil &amp;&amp; (stagedEntry.Operation == staging.OperationCreate || stagedEntry.Operation == staging.OperationUpdate) </span><span class="cov8" title="1">{
+                // Use staged value (preserve existing BaseModifiedAt)
+                currentValue = lo.FromPtr(stagedEntry.Value)
+                baseModifiedAt = stagedEntry.BaseModifiedAt
+        }</span> else<span class="cov8" title="1"> {
+                // Fetch from AWS
+                result, err := r.Strategy.FetchCurrentValue(ctx, opts.Name)
+                if err != nil </span><span class="cov8" title="1">{
+                        return err
+                }</span>
+                <span class="cov8" title="1">currentValue = result.Value
+                if !result.LastModified.IsZero() </span><span class="cov0" title="0">{
+                        baseModifiedAt = &amp;result.LastModified
+                }</span>
+        }
+
+        <span class="cov8" title="1">var newValue string
+        if opts.Value != "" </span><span class="cov0" title="0">{
+                // Use provided value, skip editor
+                newValue = opts.Value
+        }</span> else<span class="cov8" title="1"> {
+                // Open editor
+                editorFn := r.OpenEditor
+                if editorFn == nil </span><span class="cov0" title="0">{
+                        editorFn = editor.Open
+                }</span>
+                <span class="cov8" title="1">newValue, err = editorFn(currentValue)
+                if err != nil </span><span class="cov8" title="1">{
+                        return fmt.Errorf("failed to edit: %w", err)
+                }</span>
+
+                // Check if changed
+                <span class="cov8" title="1">if newValue == currentValue </span><span class="cov8" title="1">{
+                        _, _ = fmt.Fprintln(r.Stdout, colors.Warning("No changes made."))
+                        return nil
+                }</span>
+        }
+
+        // Stage the change
+        <span class="cov8" title="1">entry := staging.Entry{
+                Operation:      staging.OperationUpdate,
+                Value:          lo.ToPtr(newValue),
+                StagedAt:       time.Now(),
+                BaseModifiedAt: baseModifiedAt,
+        }
+        if opts.Description != "" </span><span class="cov0" title="0">{
+                entry.Description = &amp;opts.Description
+        }</span>
+        <span class="cov8" title="1">if len(opts.Tags) &gt; 0 </span><span class="cov0" title="0">{
+                entry.Tags = opts.Tags
+        }</span>
+        <span class="cov8" title="1">if err := r.Store.Stage(service, opts.Name, entry); err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+
+        <span class="cov8" title="1">_, _ = fmt.Fprintf(r.Stdout, "%s Staged: %s\n", colors.Success("✓"), opts.Name)
+        return nil</span>
+}
+</pre>
+		
+		<pre class="file" id="file9" style="display: none">// Package runner provides shared runners and command builders for stage commands.
+package runner
+
+import (
+        "context"
+        "errors"
+        "fmt"
+        "io"
+        "time"
+
+        "github.com/samber/lo"
+
+        "github.com/mpyw/suve/internal/cli/colors"
+        "github.com/mpyw/suve/internal/staging"
+)
+
+// VersionFetcher fetches values for specific versions from AWS.
+type VersionFetcher interface {
+        // FetchVersion fetches the value for a specific version.
+        FetchVersion(ctx context.Context, input string) (value string, versionLabel string, err error)
+}
+
+// ResetRunner executes reset operations using a strategy.
+type ResetRunner struct {
+        Parser  staging.Parser
+        Fetcher VersionFetcher // Optional: required only for version restore operations
+        Store   *staging.Store
+        Stdout  io.Writer
+        Stderr  io.Writer
+}
+
+// ResetOptions holds options for the reset command.
+type ResetOptions struct {
+        Spec string // Name with optional version spec
+        All  bool   // Reset all staged items for this service
+}
+
+// Run executes the reset command.
+func (r *ResetRunner) Run(ctx context.Context, opts ResetOptions) error <span class="cov8" title="1">{
+        if opts.All </span><span class="cov8" title="1">{
+                return r.runUnstageAll()
+        }</span>
+
+        <span class="cov8" title="1">name, hasVersion, err := r.Parser.ParseSpec(opts.Spec)
+        if err != nil </span><span class="cov8" title="1">{
+                return err
+        }</span>
+
+        // If version specified, restore to that version
+        <span class="cov8" title="1">if hasVersion </span><span class="cov8" title="1">{
+                return r.runRestore(ctx, opts.Spec, name)
+        }</span>
+
+        // Otherwise, just unstage
+        <span class="cov8" title="1">return r.runUnstage(name)</span>
+}
+
+func (r *ResetRunner) runUnstageAll() error <span class="cov8" title="1">{
+        service := r.Parser.Service()
+        serviceName := r.Parser.ServiceName()
+
+        // Check if there are any staged changes
+        staged, err := r.Store.List(service)
+        if err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+
+        <span class="cov8" title="1">serviceStaged := staged[service]
+        if len(serviceStaged) == 0 </span><span class="cov8" title="1">{
+                _, _ = fmt.Fprintf(r.Stdout, "%s\n", colors.Warning(fmt.Sprintf("No %s changes staged.", serviceName)))
+                return nil
+        }</span>
+
+        <span class="cov8" title="1">if err := r.Store.UnstageAll(service); err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+
+        <span class="cov8" title="1">itemName := r.Parser.ItemName()
+        _, _ = fmt.Fprintf(r.Stdout, "%s Unstaged all %s %ss (%d)\n", colors.Success("✓"), serviceName, itemName, len(serviceStaged))
+        return nil</span>
+}
+
+func (r *ResetRunner) runUnstage(name string) error <span class="cov8" title="1">{
+        service := r.Parser.Service()
+
+        // Check if actually staged
+        _, err := r.Store.Get(service, name)
+        if errors.Is(err, staging.ErrNotStaged) </span><span class="cov8" title="1">{
+                _, _ = fmt.Fprintf(r.Stdout, "%s %s is not staged\n", colors.Warning("!"), name)
+                return nil
+        }</span>
+        <span class="cov8" title="1">if err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+
+        <span class="cov8" title="1">if err := r.Store.Unstage(service, name); err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+
+        <span class="cov8" title="1">_, _ = fmt.Fprintf(r.Stdout, "%s Unstaged %s\n", colors.Success("✓"), name)
+        return nil</span>
+}
+
+func (r *ResetRunner) runRestore(ctx context.Context, spec, name string) error <span class="cov8" title="1">{
+        service := r.Parser.Service()
+
+        // Fetch the specific version (requires Fetcher)
+        if r.Fetcher == nil </span><span class="cov8" title="1">{
+                return fmt.Errorf("version fetcher required for restore operation")
+        }</span>
+        <span class="cov8" title="1">value, versionLabel, err := r.Fetcher.FetchVersion(ctx, spec)
+        if err != nil </span><span class="cov8" title="1">{
+                return err
+        }</span>
+
+        // Stage this value
+        <span class="cov8" title="1">if err := r.Store.Stage(service, name, staging.Entry{
+                Operation: staging.OperationUpdate,
+                Value:     lo.ToPtr(value),
+                StagedAt:  time.Now(),
+        }); err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+
+        <span class="cov8" title="1">_, _ = fmt.Fprintf(r.Stdout, "%s Restored %s (staged from version %s)\n",
+                colors.Success("✓"), name, versionLabel)
+        return nil</span>
+}
+</pre>
+		
+		<pre class="file" id="file10" style="display: none">// Package runner provides shared runners and command builders for stage commands.
+package runner
+
+import (
+        "context"
+        "errors"
+        "fmt"
+        "io"
+
+        "github.com/mpyw/suve/internal/cli/colors"
+        "github.com/mpyw/suve/internal/maputil"
+        "github.com/mpyw/suve/internal/staging"
+)
+
+// StatusRunner executes status operations using a strategy.
+type StatusRunner struct {
+        Strategy staging.ServiceStrategy
+        Store    *staging.Store
+        Stdout   io.Writer
+        Stderr   io.Writer
+}
+
+// StatusOptions holds options for the status command.
+type StatusOptions struct {
+        Name    string
+        Verbose bool
+}
+
+// Run executes the status command.
+func (r *StatusRunner) Run(_ context.Context, opts StatusOptions) error <span class="cov8" title="1">{
+        if opts.Name != "" </span><span class="cov8" title="1">{
+                return r.showSingle(opts.Name, opts.Verbose)
+        }</span>
+        <span class="cov8" title="1">return r.showAll(opts.Verbose)</span>
+}
+
+func (r *StatusRunner) showSingle(name string, verbose bool) error <span class="cov8" title="1">{
+        service := r.Strategy.Service()
+        itemName := r.Strategy.ItemName()
+        showDeleteOptions := r.Strategy.HasDeleteOptions()
+
+        entry, err := r.Store.Get(service, name)
+        if err != nil </span><span class="cov8" title="1">{
+                if errors.Is(err, staging.ErrNotStaged) </span><span class="cov8" title="1">{
+                        return fmt.Errorf("%s %s is not staged", itemName, name)
+                }</span>
+                <span class="cov0" title="0">return err</span>
+        }
+
+        <span class="cov8" title="1">printer := &amp;staging.EntryPrinter{Writer: r.Stdout}
+        printer.PrintEntry(name, *entry, verbose, showDeleteOptions)
+        return nil</span>
+}
+
+func (r *StatusRunner) showAll(verbose bool) error <span class="cov8" title="1">{
+        service := r.Strategy.Service()
+        serviceName := r.Strategy.ServiceName()
+        showDeleteOptions := r.Strategy.HasDeleteOptions()
+
+        entries, err := r.Store.List(service)
+        if err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+
+        <span class="cov8" title="1">serviceEntries := entries[service]
+        if len(serviceEntries) == 0 </span><span class="cov8" title="1">{
+                _, _ = fmt.Fprintf(r.Stdout, "No %s changes staged.\n", serviceName)
+                return nil
+        }</span>
+
+        <span class="cov8" title="1">_, _ = fmt.Fprintf(r.Stdout, "%s (%d):\n", colors.Warning(fmt.Sprintf("Staged %s changes", serviceName)), len(serviceEntries))
+
+        printer := &amp;staging.EntryPrinter{Writer: r.Stdout}
+        for _, name := range maputil.SortedKeys(serviceEntries) </span><span class="cov8" title="1">{
+                entry := serviceEntries[name]
+                printer.PrintEntry(name, entry, verbose, showDeleteOptions)
+        }</span>
+
+        <span class="cov8" title="1">return nil</span>
+}
+</pre>
+		
+		<pre class="file" id="file11" style="display: none">package staging
+
+import (
+        "context"
+        "errors"
+        "fmt"
+        "time"
+
+        "github.com/samber/lo"
+
+        "github.com/mpyw/suve/internal/api/secretapi"
+        "github.com/mpyw/suve/internal/infra"
+        "github.com/mpyw/suve/internal/tagging"
+        "github.com/mpyw/suve/internal/version/secretversion"
+)
+
+// SecretClient is the combined interface for Secrets Manager stage operations.
+type SecretClient interface {
+        secretapi.GetSecretValueAPI
+        secretapi.ListSecretVersionIdsAPI
+        secretapi.CreateSecretAPI
+        secretapi.PutSecretValueAPI
+        secretapi.DeleteSecretAPI
+        secretapi.UpdateSecretAPI
+        secretapi.TagResourceAPI
+        secretapi.UntagResourceAPI
+}
+
+// SecretStrategy implements ServiceStrategy for Secrets Manager.
+type SecretStrategy struct {
+        Client SecretClient
+}
+
+// NewSecretStrategy creates a new Secrets Manager strategy.
+func NewSecretStrategy(client SecretClient) *SecretStrategy <span class="cov8" title="1">{
+        return &amp;SecretStrategy{Client: client}
+}</span>
+
+// Service returns the service type.
+func (s *SecretStrategy) Service() Service <span class="cov8" title="1">{
+        return ServiceSecret
+}</span>
+
+// ServiceName returns the user-friendly service name.
+func (s *SecretStrategy) ServiceName() string <span class="cov8" title="1">{
+        return "Secrets Manager"
+}</span>
+
+// ItemName returns the item name for messages.
+func (s *SecretStrategy) ItemName() string <span class="cov8" title="1">{
+        return "secret"
+}</span>
+
+// HasDeleteOptions returns true as Secrets Manager has delete options.
+func (s *SecretStrategy) HasDeleteOptions() bool <span class="cov8" title="1">{
+        return true
+}</span>
+
+// Apply applies a staged operation to AWS Secrets Manager.
+func (s *SecretStrategy) Apply(ctx context.Context, name string, entry Entry) error <span class="cov8" title="1">{
+        switch entry.Operation </span>{
+        case OperationCreate:<span class="cov8" title="1">
+                return s.applyCreate(ctx, name, entry)</span>
+        case OperationUpdate:<span class="cov8" title="1">
+                return s.applyUpdate(ctx, name, entry)</span>
+        case OperationDelete:<span class="cov8" title="1">
+                return s.applyDelete(ctx, name, entry)</span>
+        default:<span class="cov8" title="1">
+                return fmt.Errorf("unknown operation: %s", entry.Operation)</span>
+        }
+}
+
+func (s *SecretStrategy) applyCreate(ctx context.Context, name string, entry Entry) error <span class="cov8" title="1">{
+        input := &amp;secretapi.CreateSecretInput{
+                Name:         lo.ToPtr(name),
+                SecretString: entry.Value,
+        }
+        if entry.Description != nil </span><span class="cov0" title="0">{
+                input.Description = entry.Description
+        }</span>
+        <span class="cov8" title="1">if len(entry.Tags) &gt; 0 </span><span class="cov0" title="0">{
+                input.Tags = make([]secretapi.Tag, 0, len(entry.Tags))
+                for k, v := range entry.Tags </span><span class="cov0" title="0">{
+                        input.Tags = append(input.Tags, secretapi.Tag{
+                                Key:   lo.ToPtr(k),
+                                Value: lo.ToPtr(v),
+                        })
+                }</span>
+        }
+
+        <span class="cov8" title="1">_, err := s.Client.CreateSecret(ctx, input)
+        if err != nil </span><span class="cov8" title="1">{
+                return fmt.Errorf("failed to create secret: %w", err)
+        }</span>
+        <span class="cov8" title="1">return nil</span>
+}
+
+func (s *SecretStrategy) applyUpdate(ctx context.Context, name string, entry Entry) error <span class="cov8" title="1">{
+        // Update secret value
+        _, err := s.Client.PutSecretValue(ctx, &amp;secretapi.PutSecretValueInput{
+                SecretId:     lo.ToPtr(name),
+                SecretString: entry.Value,
+        })
+        if err != nil </span><span class="cov8" title="1">{
+                return fmt.Errorf("failed to update secret: %w", err)
+        }</span>
+
+        // Update description if provided
+        <span class="cov8" title="1">if entry.Description != nil </span><span class="cov0" title="0">{
+                _, err := s.Client.UpdateSecret(ctx, &amp;secretapi.UpdateSecretInput{
+                        SecretId:    lo.ToPtr(name),
+                        Description: entry.Description,
+                })
+                if err != nil </span><span class="cov0" title="0">{
+                        return fmt.Errorf("failed to update description: %w", err)
+                }</span>
+        }
+
+        // Apply tag changes (additive)
+        <span class="cov8" title="1">if len(entry.Tags) &gt; 0 || len(entry.UntagKeys) &gt; 0 </span><span class="cov0" title="0">{
+                change := &amp;tagging.Change{
+                        Add:    entry.Tags,
+                        Remove: entry.UntagKeys,
+                }
+                if !change.IsEmpty() </span><span class="cov0" title="0">{
+                        if err := tagging.ApplySecret(ctx, s.Client, name, change); err != nil </span><span class="cov0" title="0">{
+                                return err
+                        }</span>
+                }
+        }
+
+        <span class="cov8" title="1">return nil</span>
+}
+
+func (s *SecretStrategy) applyDelete(ctx context.Context, name string, entry Entry) error <span class="cov8" title="1">{
+        input := &amp;secretapi.DeleteSecretInput{
+                SecretId: lo.ToPtr(name),
+        }
+
+        if entry.DeleteOptions != nil </span><span class="cov8" title="1">{
+                switch </span>{
+                case entry.DeleteOptions.Force:<span class="cov8" title="1">
+                        input.ForceDeleteWithoutRecovery = lo.ToPtr(true)</span>
+                case entry.DeleteOptions.RecoveryWindow &gt; 0:<span class="cov8" title="1">
+                        input.RecoveryWindowInDays = lo.ToPtr(int64(entry.DeleteOptions.RecoveryWindow))</span>
+                }
+        }
+
+        <span class="cov8" title="1">_, err := s.Client.DeleteSecret(ctx, input)
+        if err != nil </span><span class="cov8" title="1">{
+                // Already deleted is considered success
+                var rnf *secretapi.ResourceNotFoundException
+                if errors.As(err, &amp;rnf) </span><span class="cov0" title="0">{
+                        return nil
+                }</span>
+                <span class="cov8" title="1">return fmt.Errorf("failed to delete secret: %w", err)</span>
+        }
+        <span class="cov8" title="1">return nil</span>
+}
+
+// FetchLastModified returns the last modified time of the secret in AWS.
+// Returns zero time if the secret doesn't exist.
+func (s *SecretStrategy) FetchLastModified(ctx context.Context, name string) (time.Time, error) <span class="cov0" title="0">{
+        result, err := s.Client.GetSecretValue(ctx, &amp;secretapi.GetSecretValueInput{
+                SecretId: lo.ToPtr(name),
+        })
+        if err != nil </span><span class="cov0" title="0">{
+                var rnf *secretapi.ResourceNotFoundException
+                if errors.As(err, &amp;rnf) </span><span class="cov0" title="0">{
+                        return time.Time{}, nil
+                }</span>
+                <span class="cov0" title="0">return time.Time{}, fmt.Errorf("failed to get secret: %w", err)</span>
+        }
+        <span class="cov0" title="0">if result.CreatedDate != nil </span><span class="cov0" title="0">{
+                return *result.CreatedDate, nil
+        }</span>
+        <span class="cov0" title="0">return time.Time{}, nil</span>
+}
+
+// FetchCurrent fetches the current value from AWS Secrets Manager for diffing.
+func (s *SecretStrategy) FetchCurrent(ctx context.Context, name string) (*FetchResult, error) <span class="cov8" title="1">{
+        spec := &amp;secretversion.Spec{Name: name}
+        secret, err := secretversion.GetSecretWithVersion(ctx, s.Client, spec)
+        if err != nil </span><span class="cov8" title="1">{
+                return nil, err
+        }</span>
+        <span class="cov8" title="1">versionID := secretversion.TruncateVersionID(lo.FromPtr(secret.VersionId))
+        return &amp;FetchResult{
+                Value:      lo.FromPtr(secret.SecretString),
+                Identifier: "#" + versionID,
+        }, nil</span>
+}
+
+// ParseName parses and validates a name for editing.
+func (s *SecretStrategy) ParseName(input string) (string, error) <span class="cov8" title="1">{
+        spec, err := secretversion.Parse(input)
+        if err != nil </span><span class="cov0" title="0">{
+                return "", err
+        }</span>
+        <span class="cov8" title="1">if spec.Absolute.ID != nil || spec.Absolute.Label != nil || spec.Shift &gt; 0 </span><span class="cov8" title="1">{
+                return "", fmt.Errorf("stage diff requires a secret name without version specifier")
+        }</span>
+        <span class="cov8" title="1">return spec.Name, nil</span>
+}
+
+// FetchCurrentValue fetches the current value from AWS Secrets Manager for editing.
+func (s *SecretStrategy) FetchCurrentValue(ctx context.Context, name string) (*EditFetchResult, error) <span class="cov8" title="1">{
+        spec := &amp;secretversion.Spec{Name: name}
+        secret, err := secretversion.GetSecretWithVersion(ctx, s.Client, spec)
+        if err != nil </span><span class="cov8" title="1">{
+                return nil, err
+        }</span>
+        <span class="cov8" title="1">result := &amp;EditFetchResult{
+                Value: lo.FromPtr(secret.SecretString),
+        }
+        if secret.CreatedDate != nil </span><span class="cov8" title="1">{
+                result.LastModified = *secret.CreatedDate
+        }</span>
+        <span class="cov8" title="1">return result, nil</span>
+}
+
+// ParseSpec parses a version spec string for reset.
+func (s *SecretStrategy) ParseSpec(input string) (name string, hasVersion bool, err error) <span class="cov8" title="1">{
+        spec, err := secretversion.Parse(input)
+        if err != nil </span><span class="cov0" title="0">{
+                return "", false, err
+        }</span>
+        <span class="cov8" title="1">hasVersion = spec.Absolute.ID != nil || spec.Absolute.Label != nil || spec.Shift &gt; 0
+        return spec.Name, hasVersion, nil</span>
+}
+
+// FetchVersion fetches the value for a specific version.
+func (s *SecretStrategy) FetchVersion(ctx context.Context, input string) (value string, versionLabel string, err error) <span class="cov8" title="1">{
+        spec, err := secretversion.Parse(input)
+        if err != nil </span><span class="cov8" title="1">{
+                return "", "", err
+        }</span>
+        <span class="cov8" title="1">secret, err := secretversion.GetSecretWithVersion(ctx, s.Client, spec)
+        if err != nil </span><span class="cov8" title="1">{
+                return "", "", err
+        }</span>
+        <span class="cov8" title="1">versionID := secretversion.TruncateVersionID(lo.FromPtr(secret.VersionId))
+        return lo.FromPtr(secret.SecretString), "#" + versionID, nil</span>
+}
+
+// SecretFactory creates a FullStrategy with an initialized AWS client.
+func SecretFactory(ctx context.Context) (FullStrategy, error) <span class="cov0" title="0">{
+        client, err := infra.NewSecretClient(ctx)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("failed to initialize AWS client: %w", err)
+        }</span>
+        <span class="cov0" title="0">return NewSecretStrategy(client), nil</span>
+}
+
+// SecretParserFactory creates a Parser without an AWS client.
+// Use this for operations that don't need AWS access (e.g., status, parsing).
+func SecretParserFactory() Parser <span class="cov8" title="1">{
+        return NewSecretStrategy(nil)
+}</span>
+</pre>
+		
+		<pre class="file" id="file12" style="display: none">// Package staging provides staging functionality for AWS parameter and secret changes.
+package staging
+
+import (
+        "encoding/json"
+        "errors"
+        "fmt"
+        "os"
+        "path/filepath"
+        "sync"
+        "time"
+
+        "github.com/gofrs/flock"
+)
+
+// Operation represents the type of staged change.
+type Operation string
+
+const (
+        // OperationCreate represents a create operation (new item).
+        OperationCreate Operation = "create"
+        // OperationUpdate represents an update operation (existing item).
+        OperationUpdate Operation = "update"
+        // OperationDelete represents a delete operation.
+        OperationDelete Operation = "delete"
+)
+
+// Entry represents a single staged change.
+type Entry struct {
+        Operation   Operation         `json:"operation"`
+        Value       *string           `json:"value,omitempty"` // nil for delete, pointer to distinguish from empty string
+        Description *string           `json:"description,omitempty"`
+        Tags        map[string]string `json:"tags,omitempty"`
+        UntagKeys   []string          `json:"untag_keys,omitempty"`
+        StagedAt    time.Time         `json:"staged_at"`
+        // BaseModifiedAt records the AWS LastModified time when the value was fetched.
+        // Used for conflict detection: if AWS was modified after this time, it's a conflict.
+        // Only set for update/delete operations (nil for create since there's no base).
+        BaseModifiedAt *time.Time `json:"base_modified_at,omitempty"`
+        // DeleteOptions holds Secrets Manager-specific delete options.
+        // Only used when Operation is OperationDelete and service is Secrets Manager.
+        DeleteOptions *DeleteOptions `json:"delete_options,omitempty"`
+}
+
+// DeleteOptions holds options for Secrets Manager delete operations.
+type DeleteOptions struct {
+        // Force enables immediate permanent deletion without recovery window.
+        Force bool `json:"force,omitempty"`
+        // RecoveryWindow is the number of days before permanent deletion (7-30).
+        // Only used when Force is false. 0 means default (30 days).
+        RecoveryWindow int `json:"recovery_window,omitempty"`
+}
+
+// State represents the entire staging state.
+type State struct {
+        Version int              `json:"version"`
+        Param   map[string]Entry `json:"param,omitempty"`
+        Secret  map[string]Entry `json:"secret,omitempty"`
+}
+
+// Service represents which AWS service the staged change belongs to.
+type Service string
+
+const (
+        // ServiceParam represents AWS Systems Manager Parameter Store.
+        ServiceParam Service = "param"
+        // ServiceSecret represents AWS Secrets Manager.
+        ServiceSecret Service = "secret"
+)
+
+const (
+        stateVersion  = 1
+        stateFileName = "stage.json"
+        stateDirName  = ".suve"
+)
+
+var (
+        // ErrNotStaged is returned when a parameter/secret is not staged.
+        ErrNotStaged = errors.New("not staged")
+)
+
+// fileMu protects concurrent access to the state file within a process.
+var fileMu sync.Mutex
+
+// Store manages the staging state.
+type Store struct {
+        stateFilePath string
+        lockFilePath  string
+}
+
+// NewStore creates a new Store with the default state file path.
+func NewStore() (*Store, error) <span class="cov8" title="1">{
+        homeDir, err := os.UserHomeDir()
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("failed to get home directory: %w", err)
+        }</span>
+        <span class="cov8" title="1">stateDir := filepath.Join(homeDir, stateDirName)
+        return &amp;Store{
+                stateFilePath: filepath.Join(stateDir, stateFileName),
+                lockFilePath:  filepath.Join(stateDir, stateFileName+".lock"),
+        }, nil</span>
+}
+
+// NewStoreWithPath creates a new Store with a custom state file path.
+// This is primarily for testing.
+func NewStoreWithPath(path string) *Store <span class="cov8" title="1">{
+        return &amp;Store{
+                stateFilePath: path,
+                lockFilePath:  path + ".lock",
+        }
+}</span>
+
+// acquireFileLock acquires an exclusive file lock for cross-process synchronization.
+// Returns the flock that must be unlocked to release the lock.
+func (s *Store) acquireFileLock() (*flock.Flock, error) <span class="cov8" title="1">{
+        // Ensure directory exists
+        dir := filepath.Dir(s.lockFilePath)
+        if err := os.MkdirAll(dir, 0o700); err != nil </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("failed to create lock directory: %w", err)
+        }</span>
+
+        <span class="cov8" title="1">fileLock := flock.New(s.lockFilePath)
+
+        // Acquire exclusive lock (blocks until lock is available)
+        if err := fileLock.Lock(); err != nil </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("failed to acquire file lock: %w", errors.Join(
+                        err,
+                        fileLock.Close(),
+                ))
+        }</span>
+
+        <span class="cov8" title="1">return fileLock, nil</span>
+}
+
+// releaseFileLock releases the file lock.
+func (s *Store) releaseFileLock(fileLock *flock.Flock) <span class="cov8" title="1">{
+        if fileLock != nil </span><span class="cov8" title="1">{
+                _ = fileLock.Unlock()
+        }</span>
+}
+
+// Load loads the current staging state from disk.
+func (s *Store) Load() (*State, error) <span class="cov8" title="1">{
+        fileMu.Lock()
+        defer fileMu.Unlock()
+
+        return s.loadLocked()
+}</span>
+
+func (s *Store) loadLocked() (*State, error) <span class="cov8" title="1">{
+        data, err := os.ReadFile(s.stateFilePath)
+        if err != nil </span><span class="cov8" title="1">{
+                if os.IsNotExist(err) </span><span class="cov8" title="1">{
+                        return &amp;State{
+                                Version: stateVersion,
+                                Param:   make(map[string]Entry),
+                                Secret:  make(map[string]Entry),
+                        }, nil
+                }</span>
+                <span class="cov8" title="1">return nil, fmt.Errorf("failed to read state file: %w", err)</span>
+        }
+
+        <span class="cov8" title="1">var state State
+        if err := json.Unmarshal(data, &amp;state); err != nil </span><span class="cov8" title="1">{
+                return nil, fmt.Errorf("failed to parse state file: %w", err)
+        }</span>
+
+        // Initialize maps if nil
+        <span class="cov8" title="1">if state.Param == nil </span><span class="cov8" title="1">{
+                state.Param = make(map[string]Entry)
+        }</span>
+        <span class="cov8" title="1">if state.Secret == nil </span><span class="cov8" title="1">{
+                state.Secret = make(map[string]Entry)
+        }</span>
+
+        <span class="cov8" title="1">return &amp;state, nil</span>
+}
+
+// Save saves the staging state to disk.
+func (s *Store) Save(state *State) error <span class="cov8" title="1">{
+        fileMu.Lock()
+        defer fileMu.Unlock()
+
+        return s.saveLocked(state)
+}</span>
+
+func (s *Store) saveLocked(state *State) error <span class="cov8" title="1">{
+        // Ensure directory exists
+        dir := filepath.Dir(s.stateFilePath)
+        if err := os.MkdirAll(dir, 0o700); err != nil </span><span class="cov8" title="1">{
+                return fmt.Errorf("failed to create state directory: %w", err)
+        }</span>
+
+        // Clean up empty maps before saving
+        <span class="cov8" title="1">if len(state.Param) == 0 &amp;&amp; len(state.Secret) == 0 </span><span class="cov8" title="1">{
+                // Remove file if no staged changes
+                if err := os.Remove(s.stateFilePath); err != nil &amp;&amp; !os.IsNotExist(err) </span><span class="cov0" title="0">{
+                        return fmt.Errorf("failed to remove empty state file: %w", err)
+                }</span>
+                <span class="cov8" title="1">return nil</span>
+        }
+
+        <span class="cov8" title="1">data, err := json.MarshalIndent(state, "", "  ")
+        if err != nil </span><span class="cov0" title="0">{
+                return fmt.Errorf("failed to marshal state: %w", err)
+        }</span>
+
+        <span class="cov8" title="1">if err := os.WriteFile(s.stateFilePath, data, 0o600); err != nil </span><span class="cov0" title="0">{
+                return fmt.Errorf("failed to write state file: %w", err)
+        }</span>
+
+        <span class="cov8" title="1">return nil</span>
+}
+
+// Stage adds or updates a staged change.
+func (s *Store) Stage(service Service, name string, entry Entry) error <span class="cov8" title="1">{
+        // Acquire cross-process file lock
+        lockFile, err := s.acquireFileLock()
+        if err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+        <span class="cov8" title="1">defer s.releaseFileLock(lockFile)
+
+        fileMu.Lock()
+        defer fileMu.Unlock()
+
+        state, err := s.loadLocked()
+        if err != nil </span><span class="cov8" title="1">{
+                return err
+        }</span>
+
+        <span class="cov8" title="1">switch service </span>{
+        case ServiceParam:<span class="cov8" title="1">
+                state.Param[name] = entry</span>
+        case ServiceSecret:<span class="cov8" title="1">
+                state.Secret[name] = entry</span>
+        default:<span class="cov8" title="1">
+                return fmt.Errorf("unknown service: %s", service)</span>
+        }
+
+        <span class="cov8" title="1">return s.saveLocked(state)</span>
+}
+
+// Unstage removes a staged change.
+func (s *Store) Unstage(service Service, name string) error <span class="cov8" title="1">{
+        // Acquire cross-process file lock
+        lockFile, err := s.acquireFileLock()
+        if err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+        <span class="cov8" title="1">defer s.releaseFileLock(lockFile)
+
+        fileMu.Lock()
+        defer fileMu.Unlock()
+
+        state, err := s.loadLocked()
+        if err != nil </span><span class="cov8" title="1">{
+                return err
+        }</span>
+
+        <span class="cov8" title="1">switch service </span>{
+        case ServiceParam:<span class="cov8" title="1">
+                if _, ok := state.Param[name]; !ok </span><span class="cov8" title="1">{
+                        return ErrNotStaged
+                }</span>
+                <span class="cov8" title="1">delete(state.Param, name)</span>
+        case ServiceSecret:<span class="cov8" title="1">
+                if _, ok := state.Secret[name]; !ok </span><span class="cov8" title="1">{
+                        return ErrNotStaged
+                }</span>
+                <span class="cov8" title="1">delete(state.Secret, name)</span>
+        default:<span class="cov8" title="1">
+                return fmt.Errorf("unknown service: %s", service)</span>
+        }
+
+        <span class="cov8" title="1">return s.saveLocked(state)</span>
+}
+
+// UnstageAll removes all staged changes for a service.
+// If service is empty, removes all staged changes.
+func (s *Store) UnstageAll(service Service) error <span class="cov8" title="1">{
+        // Acquire cross-process file lock
+        lockFile, err := s.acquireFileLock()
+        if err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+        <span class="cov8" title="1">defer s.releaseFileLock(lockFile)
+
+        fileMu.Lock()
+        defer fileMu.Unlock()
+
+        state, err := s.loadLocked()
+        if err != nil </span><span class="cov8" title="1">{
+                return err
+        }</span>
+
+        <span class="cov8" title="1">switch service </span>{
+        case ServiceParam:<span class="cov8" title="1">
+                state.Param = make(map[string]Entry)</span>
+        case ServiceSecret:<span class="cov8" title="1">
+                state.Secret = make(map[string]Entry)</span>
+        case "":<span class="cov8" title="1">
+                state.Param = make(map[string]Entry)
+                state.Secret = make(map[string]Entry)</span>
+        default:<span class="cov8" title="1">
+                return fmt.Errorf("unknown service: %s", service)</span>
+        }
+
+        <span class="cov8" title="1">return s.saveLocked(state)</span>
+}
+
+// Get retrieves a staged change.
+func (s *Store) Get(service Service, name string) (*Entry, error) <span class="cov8" title="1">{
+        state, err := s.Load()
+        if err != nil </span><span class="cov8" title="1">{
+                return nil, err
+        }</span>
+
+        <span class="cov8" title="1">var entry Entry
+        var ok bool
+
+        switch service </span>{
+        case ServiceParam:<span class="cov8" title="1">
+                entry, ok = state.Param[name]</span>
+        case ServiceSecret:<span class="cov8" title="1">
+                entry, ok = state.Secret[name]</span>
+        default:<span class="cov8" title="1">
+                return nil, fmt.Errorf("unknown service: %s", service)</span>
+        }
+
+        <span class="cov8" title="1">if !ok </span><span class="cov8" title="1">{
+                return nil, ErrNotStaged
+        }</span>
+
+        <span class="cov8" title="1">return &amp;entry, nil</span>
+}
+
+// List returns all staged changes for a service.
+// If service is empty, returns all staged changes.
+func (s *Store) List(service Service) (map[Service]map[string]Entry, error) <span class="cov8" title="1">{
+        state, err := s.Load()
+        if err != nil </span><span class="cov8" title="1">{
+                return nil, err
+        }</span>
+
+        <span class="cov8" title="1">result := make(map[Service]map[string]Entry)
+
+        switch service </span>{
+        case ServiceParam:<span class="cov8" title="1">
+                if len(state.Param) &gt; 0 </span><span class="cov8" title="1">{
+                        result[ServiceParam] = state.Param
+                }</span>
+        case ServiceSecret:<span class="cov8" title="1">
+                if len(state.Secret) &gt; 0 </span><span class="cov8" title="1">{
+                        result[ServiceSecret] = state.Secret
+                }</span>
+        case "":<span class="cov8" title="1">
+                if len(state.Param) &gt; 0 </span><span class="cov8" title="1">{
+                        result[ServiceParam] = state.Param
+                }</span>
+                <span class="cov8" title="1">if len(state.Secret) &gt; 0 </span><span class="cov8" title="1">{
+                        result[ServiceSecret] = state.Secret
+                }</span>
+        default:<span class="cov8" title="1">
+                return nil, fmt.Errorf("unknown service: %s", service)</span>
+        }
+
+        <span class="cov8" title="1">return result, nil</span>
+}
+
+// HasChanges returns true if there are any staged changes.
+func (s *Store) HasChanges(service Service) (bool, error) <span class="cov8" title="1">{
+        state, err := s.Load()
+        if err != nil </span><span class="cov8" title="1">{
+                return false, err
+        }</span>
+
+        <span class="cov8" title="1">switch service </span>{
+        case ServiceParam:<span class="cov8" title="1">
+                return len(state.Param) &gt; 0, nil</span>
+        case ServiceSecret:<span class="cov8" title="1">
+                return len(state.Secret) &gt; 0, nil</span>
+        case "":<span class="cov8" title="1">
+                return len(state.Param) &gt; 0 || len(state.Secret) &gt; 0, nil</span>
+        default:<span class="cov8" title="1">
+                return false, fmt.Errorf("unknown service: %s", service)</span>
+        }
+}
+
+// Count returns the number of staged changes.
+func (s *Store) Count(service Service) (int, error) <span class="cov8" title="1">{
+        state, err := s.Load()
+        if err != nil </span><span class="cov8" title="1">{
+                return 0, err
+        }</span>
+
+        <span class="cov8" title="1">switch service </span>{
+        case ServiceParam:<span class="cov8" title="1">
+                return len(state.Param), nil</span>
+        case ServiceSecret:<span class="cov8" title="1">
+                return len(state.Secret), nil</span>
+        case "":<span class="cov8" title="1">
+                return len(state.Param) + len(state.Secret), nil</span>
+        default:<span class="cov8" title="1">
+                return 0, fmt.Errorf("unknown service: %s", service)</span>
+        }
+}
+</pre>
+		
+		</div>
+	</body>
+	<script>
+	(function() {
+		var files = document.getElementById('files');
+		var visible;
+		files.addEventListener('change', onChange, false);
+		function select(part) {
+			if (visible)
+				visible.style.display = 'none';
+			visible = document.getElementById(part);
+			if (!visible)
+				return;
+			files.value = part;
+			visible.style.display = 'block';
+			location.hash = part;
+		}
+		function onChange() {
+			select(files.value);
+			window.scrollTo(0, 0);
+		}
+		if (location.hash != "") {
+			select(location.hash.substr(1));
+		}
+		if (!visible) {
+			select("file0");
+		}
+	})();
+	</script>
+</html>

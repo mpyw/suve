@@ -123,7 +123,7 @@ func (r *DiffRunner) Run(ctx context.Context, opts DiffOptions) error {
 func (r *DiffRunner) outputDiff(opts DiffOptions, name string, entry staging.Entry, fetchResult *staging.FetchResult) error {
 	service := r.Strategy.Service()
 	awsValue := fetchResult.Value
-	stagedValue := entry.Value
+	stagedValue := lo.FromPtr(entry.Value)
 
 	// For delete operation, staged value is empty
 	if entry.Operation == staging.OperationDelete {
@@ -161,7 +161,7 @@ func (r *DiffRunner) outputDiff(opts DiffOptions, name string, entry staging.Ent
 }
 
 func (r *DiffRunner) outputDiffCreate(opts DiffOptions, name string, entry staging.Entry) error {
-	stagedValue := entry.Value
+	stagedValue := lo.FromPtr(entry.Value)
 
 	// Format as JSON if enabled
 	if opts.ParseJSON {

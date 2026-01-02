@@ -8,6 +8,8 @@ import (
 	"io"
 	"time"
 
+	"github.com/samber/lo"
+
 	"github.com/mpyw/suve/internal/cli/colors"
 	"github.com/mpyw/suve/internal/staging"
 )
@@ -114,7 +116,7 @@ func (r *ResetRunner) runRestore(ctx context.Context, spec, name string) error {
 	// Stage this value
 	if err := r.Store.Stage(service, name, staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     value,
+		Value:     lo.ToPtr(value),
 		StagedAt:  time.Now(),
 	}); err != nil {
 		return err

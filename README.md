@@ -14,7 +14,7 @@ A **Git-like CLI** for AWS Parameter Store and Secrets Manager. Familiar command
 ## Features
 
 - **Git-like commands**: `show`, `log`, `diff`, `cat`, `ls`, `set`, `delete`
-- **Staging workflow**: `edit` → `status` → `diff` → `push` (review changes before applying)
+- **Staging workflow**: `edit` → `status` → `diff` → `apply` (review changes before applying)
 - **Version navigation**: `#VERSION`, `~SHIFT`, `:LABEL` syntax
 - **Colored diff output**: Easy-to-read unified diff format
 - **Both services**: SSM Parameter Store and Secrets Manager
@@ -34,13 +34,13 @@ go install github.com/mpyw/suve/cmd/suve@latest
 go get -tool github.com/mpyw/suve/cmd/suve@latest
 
 # Run via go tool
-go tool suve ssm show /my/param
+go tool suve param show /my/param
 ```
 
 > [!TIP]
 > **Using with aws-vault**: Wrap commands with `aws-vault exec` for temporary credentials:
 > ```bash
-> aws-vault exec my-profile -- suve ssm show /my/param
+> aws-vault exec my-profile -- suve param show /my/param
 > ```
 
 ## Getting Started
@@ -48,7 +48,7 @@ go tool suve ssm show /my/param
 ### Basic Commands
 
 ```ShellSession
-user@host:~$ suve ssm show /app/config/database-url
+user@host:~$ suve param show /app/config/database-url
 Name: /app/config/database-url
 Version: 3
 Type: SecureString
@@ -56,18 +56,18 @@ Modified: 2024-01-15T10:30:45Z
 
   postgres://db.example.com:5432/myapp
 
-user@host:~$ suve ssm cat /app/config/database-url
+user@host:~$ suve param show --raw /app/config/database-url
 postgres://db.example.com:5432/myapp
 ```
 
-The `show` command displays value with metadata; `cat` outputs raw value for piping:
+The `show` command displays value with metadata; `--raw` outputs raw value for piping:
 
 ```bash
 # Use in scripts
-DB_URL=$(suve ssm cat /app/config/database-url)
+DB_URL=$(suve param show --raw /app/config/database-url)
 
 # Pipe to file
-suve ssm cat /app/config/ssl-cert > cert.pem
+suve param show --raw /app/config/ssl-cert > cert.pem
 ```
 
 ### Version History with `log`
@@ -75,7 +75,7 @@ suve ssm cat /app/config/ssl-cert > cert.pem
 View version history, just like `git log`:
 
 ```ShellSession
-user@host:~$ suve ssm log /app/config/database-url
+user@host:~$ suve param log /app/config/database-url
 Version 3 (current)
 Date: 2024-01-15T10:30:45Z
 postgres://db.example.com:5432/myapp...
@@ -89,10 +89,10 @@ Date: 2024-01-13T08:10:00Z
 postgres://localhost:5432/myapp...
 ```
 
-Use `-p` (patch) to see what changed in each version:
+Use `--patch` to see what changed in each version:
 
 ```ShellSession
-user@host:~$ suve ssm log -p /app/config/database-url
+user@host:~$ suve param log --patch /app/config/database-url
 Version 3 (current)
 Date: 2024-01-15T10:30:45Z
 
@@ -113,32 +113,32 @@ Date: 2024-01-14T09:20:30Z
 ```
 
 > [!TIP]
-> Add `-j` flag to pretty-print JSON values when viewing diffs:
+> Add `--parse-json` flag to pretty-print JSON values when viewing diffs:
 > ```bash
-> suve ssm log -p -j /app/config/credentials
+> suve param log --patch --parse-json /app/config/credentials
 > ```
 
 ### Comparing Versions with `diff`
 
-Compare any two versions:
+Compare previous version with latest (most common use case):
 
 ```ShellSession
-user@host:~$ suve ssm diff /app/config/database-url#1 /app/config/database-url#3
---- /app/config/database-url#1
-+++ /app/config/database-url#3
-@@ -1 +1 @@
--postgres://localhost:5432/myapp
-+postgres://db.example.com:5432/myapp
-```
-
-Shorthand: compare previous version with current:
-
-```ShellSession
-user@host:~$ suve ssm diff /app/config/database-url~1
+user@host:~$ suve param diff /app/config/database-url~
 --- /app/config/database-url#2
 +++ /app/config/database-url#3
 @@ -1 +1 @@
 -postgres://old-db.example.com:5432/myapp
++postgres://db.example.com:5432/myapp
+```
+
+Compare any two specific versions:
+
+```ShellSession
+user@host:~$ suve param diff /app/config/database-url#1 /app/config/database-url#3
+--- /app/config/database-url#1
++++ /app/config/database-url#3
+@@ -1 +1 @@
+-postgres://localhost:5432/myapp
 +postgres://db.example.com:5432/myapp
 ```
 
@@ -150,13 +150,13 @@ user@host:~$ suve ssm diff /app/config/database-url~1
 **1. Stage changes** (opens editor or accepts value directly):
 
 ```ShellSession
-user@host:~$ suve stage ssm add /app/config/new-param "my-value"
+user@host:~$ suve stage param add /app/config/new-param "my-value"
 ✓ Staged for creation: /app/config/new-param
 
-user@host:~$ suve stage ssm edit /app/config/database-url
+user@host:~$ suve stage param edit /app/config/database-url
 ✓ Staged: /app/config/database-url
 
-user@host:~$ suve stage ssm delete /app/config/old-param
+user@host:~$ suve stage param delete /app/config/old-param
 ✓ Staged for deletion: /app/config/old-param
 ```
 
@@ -185,10 +185,10 @@ user@host:~$ suve stage diff
 **3. Apply changes**:
 
 ```ShellSession
-user@host:~$ suve stage push
-Pushing SSM parameters...
-✓ Set /app/config/new-param (version: 1)
-✓ Set /app/config/database-url (version: 4)
+user@host:~$ suve stage apply
+Applying SSM Parameter Store parameters...
+✓ Created /app/config/new-param
+✓ Updated /app/config/database-url
 ✓ Deleted /app/config/old-param
 ```
 
@@ -196,14 +196,14 @@ Pushing SSM parameters...
 
 ```bash
 # Unstage specific parameter
-suve stage ssm reset /app/config/database-url
+suve stage param reset /app/config/database-url
 
 # Unstage all
 suve stage reset
 ```
 
 > [!CAUTION]
-> `suve stage push` applies changes to AWS immediately. Always review with `suve stage diff` first!
+> `suve stage apply` applies changes to AWS immediately. Always review with `suve stage diff` first!
 
 ## Version Specification
 
@@ -240,66 +240,66 @@ where ~SHIFT = ~ | ~N  (repeatable, cumulative)
 
 | Service | Aliases | Documentation |
 |---------|---------|---------------|
-| SSM Parameter Store | `ssm`, `ps`, `param` | [docs/ssm.md](docs/ssm.md) |
-| Secrets Manager | `sm`, `secret` | [docs/sm.md](docs/sm.md) |
+| SSM Parameter Store | `param`, `ssm`, `ps` | [docs/ssm.md](docs/ssm.md) |
+| Secrets Manager | `secret`, `sm` | [docs/sm.md](docs/sm.md) |
 
 ### SSM Parameter Store
 
 | Command | Description |
 |---------|-------------|
-| `suve ssm show <name>` | Display parameter with metadata |
-| `suve ssm cat <name>` | Output raw value (for piping) |
-| `suve ssm log <name>` | Show version history |
-| `suve ssm diff <spec1> [spec2]` | Compare versions |
-| `suve ssm ls [path]` | List parameters |
-| `suve ssm set <name> <value>` | Create or update parameter |
-| `suve ssm delete <name>` | Delete parameter |
+| `suve param show <name>` | Display parameter with metadata |
+| `suve param show --raw <name>` | Output raw value (for piping) |
+| `suve param log <name>` | Show version history |
+| `suve param diff <spec1> [spec2]` | Compare versions |
+| `suve param list [path]` | List parameters |
+| `suve param set <name> <value>` | Create or update parameter |
+| `suve param delete <name>` | Delete parameter |
 
-**Staging commands** (under `suve stage ssm`):
+**Staging commands** (under `suve stage param`):
 
 | Command | Description |
 |---------|-------------|
-| `suve stage ssm add <name> [value]` | Stage new parameter |
-| `suve stage ssm edit <name> [value]` | Stage modification |
-| `suve stage ssm delete <name>` | Stage deletion |
-| `suve stage ssm status` | Show staged changes |
-| `suve stage ssm diff [name]` | Compare staged vs AWS |
-| `suve stage ssm push [name]` | Apply staged changes |
-| `suve stage ssm reset [name]` | Unstage changes |
+| `suve stage param add <name> [value]` | Stage new parameter |
+| `suve stage param edit <name> [value]` | Stage modification |
+| `suve stage param delete <name>` | Stage deletion |
+| `suve stage param status` | Show staged changes |
+| `suve stage param diff [name]` | Compare staged vs AWS |
+| `suve stage param apply [name]` | Apply staged changes |
+| `suve stage param reset [name]` | Unstage changes |
 
 ### Secrets Manager
 
 | Command | Description |
 |---------|-------------|
-| `suve sm show <name>` | Display secret with metadata |
-| `suve sm cat <name>` | Output raw value (for piping) |
-| `suve sm log <name>` | Show version history |
-| `suve sm diff <spec1> [spec2]` | Compare versions |
-| `suve sm ls [prefix]` | List secrets |
-| `suve sm create <name> <value>` | Create new secret |
-| `suve sm update <name> <value>` | Update existing secret |
-| `suve sm delete <name>` | Delete secret |
-| `suve sm restore <name>` | Restore deleted secret |
+| `suve secret show <name>` | Display secret with metadata |
+| `suve secret show --raw <name>` | Output raw value (for piping) |
+| `suve secret log <name>` | Show version history |
+| `suve secret diff <spec1> [spec2]` | Compare versions |
+| `suve secret list [prefix]` | List secrets |
+| `suve secret create <name> <value>` | Create new secret |
+| `suve secret update <name> <value>` | Update existing secret |
+| `suve secret delete <name>` | Delete secret |
+| `suve secret restore <name>` | Restore deleted secret |
 
-**Staging commands** (under `suve stage sm`):
+**Staging commands** (under `suve stage secret`):
 
 | Command | Description |
 |---------|-------------|
-| `suve stage sm add <name> [value]` | Stage new secret |
-| `suve stage sm edit <name> [value]` | Stage modification |
-| `suve stage sm delete <name>` | Stage deletion |
-| `suve stage sm status` | Show staged changes |
-| `suve stage sm diff [name]` | Compare staged vs AWS |
-| `suve stage sm push [name]` | Apply staged changes |
-| `suve stage sm reset [name]` | Unstage changes |
+| `suve stage secret add <name> [value]` | Stage new secret |
+| `suve stage secret edit <name> [value]` | Stage modification |
+| `suve stage secret delete <name>` | Stage deletion |
+| `suve stage secret status` | Show staged changes |
+| `suve stage secret diff [name]` | Compare staged vs AWS |
+| `suve stage secret apply [name]` | Apply staged changes |
+| `suve stage secret reset [name]` | Unstage changes |
 
 ### Global Stage Commands
 
 | Command | Description |
 |---------|-------------|
-| `suve stage status` | Show all staged changes (SSM + SM) |
+| `suve stage status` | Show all staged changes |
 | `suve stage diff` | Compare all staged vs AWS |
-| `suve stage push` | Apply all staged changes |
+| `suve stage apply` | Apply all staged changes |
 | `suve stage reset` | Unstage all changes |
 
 ## AWS Configuration

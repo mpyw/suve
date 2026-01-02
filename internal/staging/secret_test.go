@@ -123,7 +123,7 @@ func TestSecretStrategy_Apply(t *testing.T) {
 		s := staging.NewSecretStrategy(mock)
 		err := s.Apply(context.Background(), "my-secret", staging.Entry{
 			Operation: staging.OperationCreate,
-			Value:     "secret-value",
+			Value:     lo.ToPtr("secret-value"),
 		})
 		require.NoError(t, err)
 	})
@@ -139,7 +139,7 @@ func TestSecretStrategy_Apply(t *testing.T) {
 		s := staging.NewSecretStrategy(mock)
 		err := s.Apply(context.Background(), "my-secret", staging.Entry{
 			Operation: staging.OperationCreate,
-			Value:     "secret-value",
+			Value:     lo.ToPtr("secret-value"),
 		})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to create secret")
@@ -158,7 +158,7 @@ func TestSecretStrategy_Apply(t *testing.T) {
 		s := staging.NewSecretStrategy(mock)
 		err := s.Apply(context.Background(), "my-secret", staging.Entry{
 			Operation: staging.OperationUpdate,
-			Value:     "updated-value",
+			Value:     lo.ToPtr("updated-value"),
 		})
 		require.NoError(t, err)
 	})
@@ -174,7 +174,7 @@ func TestSecretStrategy_Apply(t *testing.T) {
 		s := staging.NewSecretStrategy(mock)
 		err := s.Apply(context.Background(), "my-secret", staging.Entry{
 			Operation: staging.OperationUpdate,
-			Value:     "updated-value",
+			Value:     lo.ToPtr("updated-value"),
 		})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to update secret")
