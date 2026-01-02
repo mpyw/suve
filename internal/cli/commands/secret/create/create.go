@@ -1,4 +1,4 @@
-// Package create provides the SM create command.
+// Package create provides the Secrets Manager create command.
 package create
 
 import (

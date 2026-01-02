@@ -117,7 +117,7 @@ func runSubCommand(t *testing.T, parentCmd *cli.Command, subCmdName string, args
 }
 
 // =============================================================================
-// SSM Basic Commands Tests
+// SSM Parameter Store Basic Commands Tests
 // =============================================================================
 
 // TestSSM_FullWorkflow tests the complete SSM Parameter Store workflow:
@@ -250,7 +250,7 @@ func TestSSM_FullWorkflow(t *testing.T) {
 	})
 }
 
-// TestSSM_VersionSpecifiers tests SSM version specifier syntax.
+// TestParam_VersionSpecifiers tests SSM Parameter Store version specifier syntax.
 func TestSSM_VersionSpecifiers(t *testing.T) {
 	setupEnv(t)
 	paramName := "/suve-e2e-test/version/param"
@@ -350,10 +350,10 @@ func TestSSM_JSONFlag(t *testing.T) {
 }
 
 // =============================================================================
-// SSM Staging Workflow Tests
+// SSM Parameter Store Staging Workflow Tests
 // =============================================================================
 
-// TestSSM_StagingWorkflow tests the complete SSM staging workflow.
+// TestParam_StagingWorkflow tests the complete SSM Parameter Store staging workflow.
 func TestSSM_StagingWorkflow(t *testing.T) {
 	setupEnv(t)
 	tmpHome := setupTempHome(t)
@@ -680,7 +680,7 @@ func TestSSM_StagingPushSingle(t *testing.T) {
 }
 
 // =============================================================================
-// SM Basic Commands Tests
+// Secrets Manager Basic Commands Tests
 // =============================================================================
 
 // TestSM_FullWorkflow tests the complete Secrets Manager workflow.
@@ -764,7 +764,7 @@ func TestSM_FullWorkflow(t *testing.T) {
 	})
 
 	// 9. Diff with ~SHIFT
-	// Note: SM shift (~) may not work correctly in localstack due to version history limitations
+	// Note: Secrets Manager shift (~) may not work correctly in localstack due to version history limitations
 	t.Run("diff-shift", func(t *testing.T) {
 		stdout, stderr, err := runCommand(t, secretdiff.Command(), secretName+"~1")
 		t.Logf("diff-shift stdout: %s", stdout)
@@ -815,7 +815,7 @@ func TestSM_FullWorkflow(t *testing.T) {
 	})
 }
 
-// TestSM_VersionSpecifiers tests SM version specifier syntax.
+// TestSecret_VersionSpecifiers tests Secrets Manager version specifier syntax.
 func TestSM_VersionSpecifiers(t *testing.T) {
 	setupEnv(t)
 	secretName := "suve-e2e-test/version/secret"
@@ -846,7 +846,7 @@ func TestSM_VersionSpecifiers(t *testing.T) {
 	})
 
 	// Test ~SHIFT
-	// Note: SM shift (~) may not work correctly in localstack due to version history limitations
+	// Note: Secrets Manager shift (~) may not work correctly in localstack due to version history limitations
 	t.Run("shift", func(t *testing.T) {
 		// ~1 = 1 version ago
 		stdout, _, err := runCommand(t, secretshow.Command(), "--raw", secretName+"~1")
@@ -874,10 +874,10 @@ func TestSM_VersionSpecifiers(t *testing.T) {
 }
 
 // =============================================================================
-// SM Staging Workflow Tests
+// Secrets Manager Staging Workflow Tests
 // =============================================================================
 
-// TestSM_StagingWorkflow tests the complete SM staging workflow.
+// TestSecret_StagingWorkflow tests the complete Secrets Manager staging workflow.
 func TestSM_StagingWorkflow(t *testing.T) {
 	setupEnv(t)
 	tmpHome := setupTempHome(t)
@@ -964,7 +964,7 @@ func TestSM_StagingWorkflow(t *testing.T) {
 	})
 }
 
-// TestSM_StagingDeleteOptions tests SM staging with delete options.
+// TestSecret_StagingDeleteOptions tests Secrets Manager staging with delete options.
 func TestSM_StagingDeleteOptions(t *testing.T) {
 	setupEnv(t)
 	tmpHome := setupTempHome(t)
@@ -1197,7 +1197,7 @@ func TestSSM_ErrorCases(t *testing.T) {
 	})
 }
 
-// TestSM_ErrorCases tests various SM error scenarios.
+// TestSecret_ErrorCases tests various Secrets Manager error scenarios.
 func TestSM_ErrorCases(t *testing.T) {
 	setupEnv(t)
 
@@ -1232,7 +1232,7 @@ func TestStaging_ErrorCases(t *testing.T) {
 	t.Run("push-nothing-staged", func(t *testing.T) {
 		stdout, _, err := runSubCommand(t, paramstage.Command(), "apply", "--yes")
 		require.NoError(t, err)
-		// Message might say "No SSM changes staged" or similar
+		// Message might say "No SSM Parameter Store changes staged" or similar
 		assert.Contains(t, stdout, "No")
 		t.Logf("push nothing staged output: %s", stdout)
 	})
@@ -1250,7 +1250,7 @@ func TestStaging_ErrorCases(t *testing.T) {
 	t.Run("reset-all-nothing-staged", func(t *testing.T) {
 		stdout, _, err := runSubCommand(t, paramstage.Command(), "reset", "--all")
 		require.NoError(t, err)
-		// Message might say "No SSM parameters staged" or similar
+		// Message might say "No SSM Parameter Store parameters staged" or similar
 		assert.Contains(t, stdout, "No")
 		t.Logf("reset all nothing staged output: %s", stdout)
 	})
@@ -1346,7 +1346,7 @@ func TestSSM_LongValue(t *testing.T) {
 		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
 	})
 
-	// Create a long value (SSM limit is 4KB for standard, 8KB for advanced)
+	// Create a long value (SSM Parameter Store limit is 4KB for standard, 8KB for advanced)
 	longValue := strings.Repeat("a", 4000)
 
 	_, _, err := runCommand(t, paramset.Command(), "--yes", paramName, longValue)
@@ -1453,7 +1453,7 @@ func TestSSM_StagingAddWithOptions(t *testing.T) {
 	})
 }
 
-// TestSM_StagingAddViaCLI tests the SM stage add command via CLI.
+// TestSecret_StagingAddViaCLI tests the Secrets Manager stage add command via CLI.
 func TestSM_StagingAddViaCLI(t *testing.T) {
 	setupEnv(t)
 	_ = setupTempHome(t)

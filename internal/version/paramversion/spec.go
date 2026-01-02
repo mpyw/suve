@@ -14,12 +14,12 @@ import (
 // ErrInvalidVersion is returned when # is not followed by a version number.
 var ErrInvalidVersion = errors.New("# must be followed by a version number")
 
-// AbsoluteSpec represents the absolute version specifier for SSM.
+// AbsoluteSpec represents the absolute version specifier for SSM Parameter Store.
 type AbsoluteSpec struct {
 	Version *int64 // Explicit version number (#VERSION)
 }
 
-// Spec represents a parsed SSM parameter version specification.
+// Spec represents a parsed SSM Parameter Store parameter version specification.
 //
 // Grammar: <name>[#<N>]<shift>*
 //   - #<N>     optional version number (0 or 1)
@@ -28,7 +28,7 @@ type AbsoluteSpec struct {
 // Examples: /my/param, /my/param#3, /my/param~1, /my/param#5~2, /my/param~~
 type Spec = version.Spec[AbsoluteSpec]
 
-// parser defines the SSM-specific parsing logic.
+// parser defines the SSM Parameter Store-specific parsing logic.
 var parser = version.AbsoluteParser[AbsoluteSpec]{
 	Parsers: []version.SpecifierParser[AbsoluteSpec]{
 		{
@@ -53,7 +53,7 @@ var parser = version.AbsoluteParser[AbsoluteSpec]{
 	},
 }
 
-// Parse parses an SSM version specification string.
+// Parse parses an SSM Parameter Store version specification string.
 //
 // Grammar: <name>[#<N>]<shift>*
 //
@@ -66,8 +66,8 @@ func Parse(input string) (*Spec, error) {
 	return version.Parse(input, parser)
 }
 
-// ParseDiffArgs parses diff command arguments for SSM parameters.
-// This is a convenience wrapper around diff.ParseArgs with SSM-specific settings.
+// ParseDiffArgs parses diff command arguments for SSM Parameter Store parameters.
+// This is a convenience wrapper around diff.ParseArgs with SSM Parameter Store-specific settings.
 func ParseDiffArgs(args []string) (*Spec, *Spec, error) {
 	return diffargs.ParseArgs(
 		args,

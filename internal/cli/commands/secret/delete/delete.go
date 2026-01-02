@@ -1,4 +1,4 @@
-// Package delete provides the SM delete command.
+// Package delete provides the Secrets Manager delete command.
 package delete
 
 import (

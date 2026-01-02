@@ -1,4 +1,4 @@
-// Package show provides the SM show command.
+// Package show provides the Secrets Manager show command.
 package show
 
 import (

@@ -1,4 +1,4 @@
-// Package restore provides the SM restore command.
+// Package restore provides the Secrets Manager restore command.
 package restore
 
 import (

@@ -20,38 +20,38 @@ import (
 	"github.com/mpyw/suve/internal/staging"
 )
 
-type mockSSMClient struct {
+type mockParamClient struct {
 	getParameterFunc        func(ctx context.Context, params *ssm.GetParameterInput, optFns ...func(*ssm.Options)) (*ssm.GetParameterOutput, error)
 	getParameterHistoryFunc func(ctx context.Context, params *ssm.GetParameterHistoryInput, optFns ...func(*ssm.Options)) (*ssm.GetParameterHistoryOutput, error)
 }
 
-func (m *mockSSMClient) GetParameter(ctx context.Context, params *ssm.GetParameterInput, optFns ...func(*ssm.Options)) (*ssm.GetParameterOutput, error) {
+func (m *mockParamClient) GetParameter(ctx context.Context, params *ssm.GetParameterInput, optFns ...func(*ssm.Options)) (*ssm.GetParameterOutput, error) {
 	if m.getParameterFunc != nil {
 		return m.getParameterFunc(ctx, params, optFns...)
 	}
 	return nil, fmt.Errorf("GetParameter not mocked")
 }
 
-func (m *mockSSMClient) GetParameterHistory(ctx context.Context, params *ssm.GetParameterHistoryInput, optFns ...func(*ssm.Options)) (*ssm.GetParameterHistoryOutput, error) {
+func (m *mockParamClient) GetParameterHistory(ctx context.Context, params *ssm.GetParameterHistoryInput, optFns ...func(*ssm.Options)) (*ssm.GetParameterHistoryOutput, error) {
 	if m.getParameterHistoryFunc != nil {
 		return m.getParameterHistoryFunc(ctx, params, optFns...)
 	}
 	return nil, fmt.Errorf("GetParameterHistory not mocked")
 }
 
-type mockSMClient struct {
+type mockSecretClient struct {
 	getSecretValueFunc       func(ctx context.Context, params *secretsmanager.GetSecretValueInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.GetSecretValueOutput, error)
 	listSecretVersionIdsFunc func(ctx context.Context, params *secretsmanager.ListSecretVersionIdsInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.ListSecretVersionIdsOutput, error)
 }
 
-func (m *mockSMClient) GetSecretValue(ctx context.Context, params *secretsmanager.GetSecretValueInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.GetSecretValueOutput, error) {
+func (m *mockSecretClient) GetSecretValue(ctx context.Context, params *secretsmanager.GetSecretValueInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.GetSecretValueOutput, error) {
 	if m.getSecretValueFunc != nil {
 		return m.getSecretValueFunc(ctx, params, optFns...)
 	}
 	return nil, fmt.Errorf("GetSecretValue not mocked")
 }
 
-func (m *mockSMClient) ListSecretVersionIds(ctx context.Context, params *secretsmanager.ListSecretVersionIdsInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.ListSecretVersionIdsOutput, error) {
+func (m *mockSecretClient) ListSecretVersionIds(ctx context.Context, params *secretsmanager.ListSecretVersionIdsInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.ListSecretVersionIdsOutput, error) {
 	if m.listSecretVersionIdsFunc != nil {
 		return m.listSecretVersionIdsFunc(ctx, params, optFns...)
 	}
@@ -113,7 +113,7 @@ func TestRun_SSMOnly(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	ssmMock := &mockSSMClient{
+	paramMock := &mockParamClient{
 		getParameterFunc: func(_ context.Context, _ *ssm.GetParameterInput, _ ...func(*ssm.Options)) (*ssm.GetParameterOutput, error) {
 			return &ssm.GetParameterOutput{
 				Parameter: &types.Parameter{
@@ -127,10 +127,10 @@ func TestRun_SSMOnly(t *testing.T) {
 
 	var stdout, stderr bytes.Buffer
 	r := &stagediff.Runner{
-		SSMClient: ssmMock,
-		Store:     store,
-		Stdout:    &stdout,
-		Stderr:    &stderr,
+		ParamClient: paramMock,
+		Store:       store,
+		Stdout:      &stdout,
+		Stderr:      &stderr,
 	}
 
 	err = r.Run(context.Background(), stagediff.Options{})
@@ -156,7 +156,7 @@ func TestRun_SMOnly(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	smMock := &mockSMClient{
+	secretMock := &mockSecretClient{
 		getSecretValueFunc: func(_ context.Context, _ *secretsmanager.GetSecretValueInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.GetSecretValueOutput, error) {
 			return &secretsmanager.GetSecretValueOutput{
 				Name:         lo.ToPtr("my-secret"),
@@ -168,10 +168,10 @@ func TestRun_SMOnly(t *testing.T) {
 
 	var stdout, stderr bytes.Buffer
 	r := &stagediff.Runner{
-		SMClient: smMock,
-		Store:    store,
-		Stdout:   &stdout,
-		Stderr:   &stderr,
+		SecretClient: secretMock,
+		Store:        store,
+		Stdout:       &stdout,
+		Stderr:       &stderr,
 	}
 
 	err = r.Run(context.Background(), stagediff.Options{})
@@ -202,7 +202,7 @@ func TestRun_BothServices(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	ssmMock := &mockSSMClient{
+	paramMock := &mockParamClient{
 		getParameterFunc: func(_ context.Context, _ *ssm.GetParameterInput, _ ...func(*ssm.Options)) (*ssm.GetParameterOutput, error) {
 			return &ssm.GetParameterOutput{
 				Parameter: &types.Parameter{
@@ -214,7 +214,7 @@ func TestRun_BothServices(t *testing.T) {
 		},
 	}
 
-	smMock := &mockSMClient{
+	secretMock := &mockSecretClient{
 		getSecretValueFunc: func(_ context.Context, _ *secretsmanager.GetSecretValueInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.GetSecretValueOutput, error) {
 			return &secretsmanager.GetSecretValueOutput{
 				Name:         lo.ToPtr("my-secret"),
@@ -226,11 +226,11 @@ func TestRun_BothServices(t *testing.T) {
 
 	var stdout, stderr bytes.Buffer
 	r := &stagediff.Runner{
-		SSMClient: ssmMock,
-		SMClient:  smMock,
-		Store:     store,
-		Stdout:    &stdout,
-		Stderr:    &stderr,
+		ParamClient:  paramMock,
+		SecretClient: secretMock,
+		Store:        store,
+		Stdout:       &stdout,
+		Stderr:       &stderr,
 	}
 
 	err = r.Run(context.Background(), stagediff.Options{})
@@ -263,7 +263,7 @@ func TestRun_DeleteOperations(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	ssmMock := &mockSSMClient{
+	paramMock := &mockParamClient{
 		getParameterFunc: func(_ context.Context, _ *ssm.GetParameterInput, _ ...func(*ssm.Options)) (*ssm.GetParameterOutput, error) {
 			return &ssm.GetParameterOutput{
 				Parameter: &types.Parameter{
@@ -275,7 +275,7 @@ func TestRun_DeleteOperations(t *testing.T) {
 		},
 	}
 
-	smMock := &mockSMClient{
+	secretMock := &mockSecretClient{
 		getSecretValueFunc: func(_ context.Context, _ *secretsmanager.GetSecretValueInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.GetSecretValueOutput, error) {
 			return &secretsmanager.GetSecretValueOutput{
 				Name:         lo.ToPtr("my-secret"),
@@ -287,11 +287,11 @@ func TestRun_DeleteOperations(t *testing.T) {
 
 	var stdout, stderr bytes.Buffer
 	r := &stagediff.Runner{
-		SSMClient: ssmMock,
-		SMClient:  smMock,
-		Store:     store,
-		Stdout:    &stdout,
-		Stderr:    &stderr,
+		ParamClient:  paramMock,
+		SecretClient: secretMock,
+		Store:        store,
+		Stdout:       &stdout,
+		Stderr:       &stderr,
 	}
 
 	err = r.Run(context.Background(), stagediff.Options{})
@@ -316,7 +316,7 @@ func TestRun_IdenticalValues(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	ssmMock := &mockSSMClient{
+	paramMock := &mockParamClient{
 		getParameterFunc: func(_ context.Context, _ *ssm.GetParameterInput, _ ...func(*ssm.Options)) (*ssm.GetParameterOutput, error) {
 			return &ssm.GetParameterOutput{
 				Parameter: &types.Parameter{
@@ -330,10 +330,10 @@ func TestRun_IdenticalValues(t *testing.T) {
 
 	var stdout, stderr bytes.Buffer
 	r := &stagediff.Runner{
-		SSMClient: ssmMock,
-		Store:     store,
-		Stdout:    &stdout,
-		Stderr:    &stderr,
+		ParamClient: paramMock,
+		Store:       store,
+		Stdout:      &stdout,
+		Stderr:      &stderr,
 	}
 
 	err = r.Run(context.Background(), stagediff.Options{})
@@ -360,7 +360,7 @@ func TestRun_JSONFormat(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	ssmMock := &mockSSMClient{
+	paramMock := &mockParamClient{
 		getParameterFunc: func(_ context.Context, _ *ssm.GetParameterInput, _ ...func(*ssm.Options)) (*ssm.GetParameterOutput, error) {
 			return &ssm.GetParameterOutput{
 				Parameter: &types.Parameter{
@@ -374,10 +374,10 @@ func TestRun_JSONFormat(t *testing.T) {
 
 	var stdout, stderr bytes.Buffer
 	r := &stagediff.Runner{
-		SSMClient: ssmMock,
-		Store:     store,
-		Stdout:    &stdout,
-		Stderr:    &stderr,
+		ParamClient: paramMock,
+		Store:       store,
+		Stdout:      &stdout,
+		Stderr:      &stderr,
 	}
 
 	err = r.Run(context.Background(), stagediff.Options{JSONFormat: true})
@@ -401,7 +401,7 @@ func TestRun_SSMUpdateAutoUnstageWhenDeleted(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	ssmMock := &mockSSMClient{
+	paramMock := &mockParamClient{
 		getParameterFunc: func(_ context.Context, _ *ssm.GetParameterInput, _ ...func(*ssm.Options)) (*ssm.GetParameterOutput, error) {
 			return nil, fmt.Errorf("parameter not found")
 		},
@@ -409,10 +409,10 @@ func TestRun_SSMUpdateAutoUnstageWhenDeleted(t *testing.T) {
 
 	var stdout, stderr bytes.Buffer
 	r := &stagediff.Runner{
-		SSMClient: ssmMock,
-		Store:     store,
-		Stdout:    &stdout,
-		Stderr:    &stderr,
+		ParamClient: paramMock,
+		Store:       store,
+		Stdout:      &stdout,
+		Stderr:      &stderr,
 	}
 
 	err = r.Run(context.Background(), stagediff.Options{})
@@ -438,7 +438,7 @@ func TestRun_SMUpdateAutoUnstageWhenDeleted(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	smMock := &mockSMClient{
+	secretMock := &mockSecretClient{
 		getSecretValueFunc: func(_ context.Context, _ *secretsmanager.GetSecretValueInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.GetSecretValueOutput, error) {
 			return nil, fmt.Errorf("secret not found")
 		},
@@ -446,10 +446,10 @@ func TestRun_SMUpdateAutoUnstageWhenDeleted(t *testing.T) {
 
 	var stdout, stderr bytes.Buffer
 	r := &stagediff.Runner{
-		SMClient: smMock,
-		Store:    store,
-		Stdout:   &stdout,
-		Stderr:   &stderr,
+		SecretClient: secretMock,
+		Store:        store,
+		Stdout:       &stdout,
+		Stderr:       &stderr,
 	}
 
 	err = r.Run(context.Background(), stagediff.Options{})
@@ -475,7 +475,7 @@ func TestRun_SMIdenticalValues(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	smMock := &mockSMClient{
+	secretMock := &mockSecretClient{
 		getSecretValueFunc: func(_ context.Context, _ *secretsmanager.GetSecretValueInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.GetSecretValueOutput, error) {
 			return &secretsmanager.GetSecretValueOutput{
 				Name:         lo.ToPtr("my-secret"),
@@ -487,10 +487,10 @@ func TestRun_SMIdenticalValues(t *testing.T) {
 
 	var stdout, stderr bytes.Buffer
 	r := &stagediff.Runner{
-		SMClient: smMock,
-		Store:    store,
-		Stdout:   &stdout,
-		Stderr:   &stderr,
+		SecretClient: secretMock,
+		Store:        store,
+		Stdout:       &stdout,
+		Stderr:       &stderr,
 	}
 
 	err = r.Run(context.Background(), stagediff.Options{})
@@ -517,7 +517,7 @@ func TestRun_SMJSONFormat(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	smMock := &mockSMClient{
+	secretMock := &mockSecretClient{
 		getSecretValueFunc: func(_ context.Context, _ *secretsmanager.GetSecretValueInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.GetSecretValueOutput, error) {
 			return &secretsmanager.GetSecretValueOutput{
 				Name:         lo.ToPtr("my-secret"),
@@ -529,10 +529,10 @@ func TestRun_SMJSONFormat(t *testing.T) {
 
 	var stdout, stderr bytes.Buffer
 	r := &stagediff.Runner{
-		SMClient: smMock,
-		Store:    store,
-		Stdout:   &stdout,
-		Stderr:   &stderr,
+		SecretClient: secretMock,
+		Store:        store,
+		Stdout:       &stdout,
+		Stderr:       &stderr,
 	}
 
 	err = r.Run(context.Background(), stagediff.Options{JSONFormat: true})
@@ -556,7 +556,7 @@ func TestRun_SMJSONFormatMixed(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	smMock := &mockSMClient{
+	secretMock := &mockSecretClient{
 		getSecretValueFunc: func(_ context.Context, _ *secretsmanager.GetSecretValueInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.GetSecretValueOutput, error) {
 			return &secretsmanager.GetSecretValueOutput{
 				Name:         lo.ToPtr("my-secret"),
@@ -568,10 +568,10 @@ func TestRun_SMJSONFormatMixed(t *testing.T) {
 
 	var stdout, stderr bytes.Buffer
 	r := &stagediff.Runner{
-		SMClient: smMock,
-		Store:    store,
-		Stdout:   &stdout,
-		Stderr:   &stderr,
+		SecretClient: secretMock,
+		Store:        store,
+		Stdout:       &stdout,
+		Stderr:       &stderr,
 	}
 
 	err = r.Run(context.Background(), stagediff.Options{JSONFormat: true})
@@ -595,7 +595,7 @@ func TestRun_SSMCreateOperation(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	ssmMock := &mockSSMClient{
+	paramMock := &mockParamClient{
 		getParameterFunc: func(_ context.Context, _ *ssm.GetParameterInput, _ ...func(*ssm.Options)) (*ssm.GetParameterOutput, error) {
 			return nil, fmt.Errorf("parameter not found")
 		},
@@ -603,10 +603,10 @@ func TestRun_SSMCreateOperation(t *testing.T) {
 
 	var stdout, stderr bytes.Buffer
 	r := &stagediff.Runner{
-		SSMClient: ssmMock,
-		Store:     store,
-		Stdout:    &stdout,
-		Stderr:    &stderr,
+		ParamClient: paramMock,
+		Store:       store,
+		Stdout:      &stdout,
+		Stderr:      &stderr,
 	}
 
 	err = r.Run(context.Background(), stagediff.Options{})
@@ -638,7 +638,7 @@ func TestRun_SMCreateOperation(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	smMock := &mockSMClient{
+	secretMock := &mockSecretClient{
 		getSecretValueFunc: func(_ context.Context, _ *secretsmanager.GetSecretValueInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.GetSecretValueOutput, error) {
 			return nil, fmt.Errorf("secret not found")
 		},
@@ -646,10 +646,10 @@ func TestRun_SMCreateOperation(t *testing.T) {
 
 	var stdout, stderr bytes.Buffer
 	r := &stagediff.Runner{
-		SMClient: smMock,
-		Store:    store,
-		Stdout:   &stdout,
-		Stderr:   &stderr,
+		SecretClient: secretMock,
+		Store:        store,
+		Stdout:       &stdout,
+		Stderr:       &stderr,
 	}
 
 	err = r.Run(context.Background(), stagediff.Options{})
@@ -678,7 +678,7 @@ func TestRun_CreateWithJSONFormat(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	ssmMock := &mockSSMClient{
+	paramMock := &mockParamClient{
 		getParameterFunc: func(_ context.Context, _ *ssm.GetParameterInput, _ ...func(*ssm.Options)) (*ssm.GetParameterOutput, error) {
 			return nil, fmt.Errorf("parameter not found")
 		},
@@ -686,10 +686,10 @@ func TestRun_CreateWithJSONFormat(t *testing.T) {
 
 	var stdout, stderr bytes.Buffer
 	r := &stagediff.Runner{
-		SSMClient: ssmMock,
-		Store:     store,
-		Stdout:    &stdout,
-		Stderr:    &stderr,
+		ParamClient: paramMock,
+		Store:       store,
+		Stdout:      &stdout,
+		Stderr:      &stderr,
 	}
 
 	err = r.Run(context.Background(), stagediff.Options{JSONFormat: true})
@@ -713,7 +713,7 @@ func TestRun_DeleteAutoUnstageWhenAlreadyDeleted(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	ssmMock := &mockSSMClient{
+	paramMock := &mockParamClient{
 		getParameterFunc: func(_ context.Context, _ *ssm.GetParameterInput, _ ...func(*ssm.Options)) (*ssm.GetParameterOutput, error) {
 			return nil, fmt.Errorf("parameter not found")
 		},
@@ -721,10 +721,10 @@ func TestRun_DeleteAutoUnstageWhenAlreadyDeleted(t *testing.T) {
 
 	var stdout, stderr bytes.Buffer
 	r := &stagediff.Runner{
-		SSMClient: ssmMock,
-		Store:     store,
-		Stdout:    &stdout,
-		Stderr:    &stderr,
+		ParamClient: paramMock,
+		Store:       store,
+		Stdout:      &stdout,
+		Stderr:      &stderr,
 	}
 
 	err = r.Run(context.Background(), stagediff.Options{})
@@ -749,7 +749,7 @@ func TestRun_SMDeleteAutoUnstageWhenAlreadyDeleted(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	smMock := &mockSMClient{
+	secretMock := &mockSecretClient{
 		getSecretValueFunc: func(_ context.Context, _ *secretsmanager.GetSecretValueInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.GetSecretValueOutput, error) {
 			return nil, fmt.Errorf("secret not found")
 		},
@@ -757,10 +757,10 @@ func TestRun_SMDeleteAutoUnstageWhenAlreadyDeleted(t *testing.T) {
 
 	var stdout, stderr bytes.Buffer
 	r := &stagediff.Runner{
-		SMClient: smMock,
-		Store:    store,
-		Stdout:   &stdout,
-		Stderr:   &stderr,
+		SecretClient: secretMock,
+		Store:        store,
+		Stdout:       &stdout,
+		Stderr:       &stderr,
 	}
 
 	err = r.Run(context.Background(), stagediff.Options{})
@@ -787,7 +787,7 @@ func TestRun_MetadataWithDescription(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	ssmMock := &mockSSMClient{
+	paramMock := &mockParamClient{
 		getParameterFunc: func(_ context.Context, _ *ssm.GetParameterInput, _ ...func(*ssm.Options)) (*ssm.GetParameterOutput, error) {
 			return &ssm.GetParameterOutput{
 				Parameter: &types.Parameter{
@@ -801,10 +801,10 @@ func TestRun_MetadataWithDescription(t *testing.T) {
 
 	var stdout, stderr bytes.Buffer
 	r := &stagediff.Runner{
-		SSMClient: ssmMock,
-		Store:     store,
-		Stdout:    &stdout,
-		Stderr:    &stderr,
+		ParamClient: paramMock,
+		Store:       store,
+		Stdout:      &stdout,
+		Stderr:      &stderr,
 	}
 
 	err = r.Run(context.Background(), stagediff.Options{})
@@ -829,7 +829,7 @@ func TestRun_MetadataWithTags(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	ssmMock := &mockSSMClient{
+	paramMock := &mockParamClient{
 		getParameterFunc: func(_ context.Context, _ *ssm.GetParameterInput, _ ...func(*ssm.Options)) (*ssm.GetParameterOutput, error) {
 			return &ssm.GetParameterOutput{
 				Parameter: &types.Parameter{
@@ -843,10 +843,10 @@ func TestRun_MetadataWithTags(t *testing.T) {
 
 	var stdout, stderr bytes.Buffer
 	r := &stagediff.Runner{
-		SSMClient: ssmMock,
-		Store:     store,
-		Stdout:    &stdout,
-		Stderr:    &stderr,
+		ParamClient: paramMock,
+		Store:       store,
+		Stdout:      &stdout,
+		Stderr:      &stderr,
 	}
 
 	err = r.Run(context.Background(), stagediff.Options{})

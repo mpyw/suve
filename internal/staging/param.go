@@ -16,7 +16,7 @@ import (
 	"github.com/mpyw/suve/internal/version/paramversion"
 )
 
-// ParamClient is the combined interface for SSM stage operations.
+// ParamClient is the combined interface for SSM Parameter Store stage operations.
 type ParamClient interface {
 	paramapi.GetParameterAPI
 	paramapi.GetParameterHistoryAPI
@@ -31,7 +31,7 @@ type ParamStrategy struct {
 	Client ParamClient
 }
 
-// NewParamStrategy creates a new SSM strategy.
+// NewParamStrategy creates a new SSM Parameter Store strategy.
 func NewParamStrategy(client ParamClient) *ParamStrategy {
 	return &ParamStrategy{Client: client}
 }
@@ -51,12 +51,12 @@ func (s *ParamStrategy) ItemName() string {
 	return "parameter"
 }
 
-// HasDeleteOptions returns false as SSM doesn't have delete options.
+// HasDeleteOptions returns false as SSM Parameter Store doesn't have delete options.
 func (s *ParamStrategy) HasDeleteOptions() bool {
 	return false
 }
 
-// Push applies a staged operation to AWS SSM.
+// Push applies a staged operation to AWS SSM Parameter Store.
 func (s *ParamStrategy) Push(ctx context.Context, name string, entry Entry) error {
 	switch entry.Operation {
 	case OperationCreate, OperationUpdate:
@@ -105,7 +105,7 @@ func (s *ParamStrategy) pushSet(ctx context.Context, name string, entry Entry) e
 			Remove: entry.UntagKeys,
 		}
 		if !change.IsEmpty() {
-			if err := tagging.ApplySSM(ctx, s.Client, name, change); err != nil {
+			if err := tagging.ApplyParam(ctx, s.Client, name, change); err != nil {
 				return err
 			}
 		}
@@ -148,7 +148,7 @@ func (s *ParamStrategy) FetchLastModified(ctx context.Context, name string) (tim
 	return time.Time{}, nil
 }
 
-// FetchCurrent fetches the current value from AWS SSM for diffing.
+// FetchCurrent fetches the current value from AWS SSM Parameter Store for diffing.
 func (s *ParamStrategy) FetchCurrent(ctx context.Context, name string) (*FetchResult, error) {
 	spec := &paramversion.Spec{Name: name}
 	param, err := paramversion.GetParameterWithVersion(ctx, s.Client, spec, true)
@@ -173,7 +173,7 @@ func (s *ParamStrategy) ParseName(input string) (string, error) {
 	return spec.Name, nil
 }
 
-// FetchCurrentValue fetches the current value from AWS SSM for editing.
+// FetchCurrentValue fetches the current value from AWS SSM Parameter Store for editing.
 func (s *ParamStrategy) FetchCurrentValue(ctx context.Context, name string) (string, error) {
 	spec := &paramversion.Spec{Name: name}
 	param, err := paramversion.GetParameterWithVersion(ctx, s.Client, spec, true)

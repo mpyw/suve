@@ -245,7 +245,7 @@ func TestParse(t *testing.T) {
 			wantLabel: lo.ToPtr("AWSCURRENT"),
 		},
 
-		// @ in name (allowed in SM secret names)
+		// @ in name (allowed in Secrets Manager secret names)
 		{
 			name:     "at sign at end",
 			input:    "my-secret@",

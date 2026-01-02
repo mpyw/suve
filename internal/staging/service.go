@@ -7,7 +7,7 @@ import (
 )
 
 // ServiceStrategy defines the common interface for service-specific operations.
-// This enables Strategy Pattern to consolidate duplicate code across SSM and SM commands.
+// This enables Strategy Pattern to consolidate duplicate code across SSM Parameter Store and Secrets Manager commands.
 type ServiceStrategy interface {
 	// Service returns the service type (ServiceParam or ServiceSecret).
 	Service() Service
@@ -56,7 +56,7 @@ type PushStrategy interface {
 type FetchResult struct {
 	// Value is the current value in AWS.
 	Value string
-	// Identifier is a display string for the version (e.g., "#3" for SSM, "#abc123" for SM).
+	// Identifier is a display string for the version (e.g., "#3" for SSM Parameter Store, "#abc123" for Secrets Manager).
 	Identifier string
 }
 
@@ -86,7 +86,7 @@ type ResetStrategy interface {
 }
 
 // FullStrategy combines all service-specific strategy interfaces.
-// This enables unified stage commands that work with either SSM or SM.
+// This enables unified stage commands that work with either SSM Parameter Store or Secrets Manager.
 type FullStrategy interface {
 	PushStrategy
 	DiffStrategy

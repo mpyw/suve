@@ -10,19 +10,19 @@ import (
 	"github.com/mpyw/suve/internal/version/internal"
 )
 
-// SM-specific errors.
+// Secrets Manager-specific errors.
 var (
 	ErrInvalidID    = errors.New("# must be followed by a version ID")
 	ErrInvalidLabel = errors.New(": must be followed by a label")
 )
 
-// AbsoluteSpec represents the absolute version specifier for SM.
+// AbsoluteSpec represents the absolute version specifier for Secrets Manager.
 type AbsoluteSpec struct {
 	ID    *string // Version ID (#VERSION)
 	Label *string // Staging label (:LABEL)
 }
 
-// Spec represents a parsed SM secret version specification.
+// Spec represents a parsed Secrets Manager secret version specification.
 //
 // Grammar: <name>[#<id> | :<label>]<shift>*
 //   - #<id>    optional version ID (0 or 1, mutually exclusive with :LABEL)
@@ -37,7 +37,7 @@ func hasAbsoluteSpec(abs AbsoluteSpec) bool {
 	return abs.ID != nil || abs.Label != nil
 }
 
-// parser defines the SM-specific parsing logic.
+// parser defines the Secrets Manager-specific parsing logic.
 var parser = version.AbsoluteParser[AbsoluteSpec]{
 	Parsers: []version.SpecifierParser[AbsoluteSpec]{
 		{
@@ -66,7 +66,7 @@ var parser = version.AbsoluteParser[AbsoluteSpec]{
 	},
 }
 
-// Parse parses an SM version specification string.
+// Parse parses a Secrets Manager version specification string.
 //
 // Grammar: <name>[#<id> | :<label>]<shift>*
 //
@@ -80,7 +80,7 @@ func Parse(input string) (*Spec, error) {
 }
 
 // ParseDiffArgs parses diff command arguments for Secrets Manager.
-// This is a convenience wrapper around diff.ParseArgs with SM-specific settings.
+// This is a convenience wrapper around diff.ParseArgs with Secrets Manager-specific settings.
 func ParseDiffArgs(args []string) (*Spec, *Spec, error) {
 	return diffargs.ParseArgs(
 		args,

@@ -541,7 +541,7 @@ func NewDeleteCommand(cfg CommandConfig) *cli.Command {
 	var description string
 
 	if hasDeleteOptions {
-		// SM has delete options
+		// Secrets Manager has delete options
 		flags = []cli.Flag{
 			&cli.BoolFlag{
 				Name:  "force",
@@ -582,7 +582,7 @@ EXAMPLES:
 			cfg.ServiceName,
 			cfg.ServiceName)
 	} else {
-		// SSM doesn't have delete options
+		// SSM Parameter Store doesn't have delete options
 		description = fmt.Sprintf(`Stage a %s for deletion.
 
 The %s will be deleted from AWS when you run 'suve stage %s apply'.

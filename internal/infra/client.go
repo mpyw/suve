@@ -15,7 +15,7 @@ func LoadConfig(ctx context.Context) (aws.Config, error) {
 	return config.LoadDefaultConfig(ctx)
 }
 
-// NewParamClient creates a new SSM client using the default configuration.
+// NewParamClient creates a new SSM Parameter Store client using the default configuration.
 func NewParamClient(ctx context.Context) (*ssm.Client, error) {
 	cfg, err := LoadConfig(ctx)
 	if err != nil {

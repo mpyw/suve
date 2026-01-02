@@ -54,7 +54,7 @@ func TestRun_UnstageAll(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
-	// Stage SSM parameters
+	// Stage SSM Parameter Store parameters
 	_ = store.Stage(staging.ServiceParam, "/app/config1", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     "ssm-value1",
@@ -66,7 +66,7 @@ func TestRun_UnstageAll(t *testing.T) {
 		StagedAt:  time.Now(),
 	})
 
-	// Stage SM secrets
+	// Stage Secrets Manager secrets
 	_ = store.Stage(staging.ServiceSecret, "secret1", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     "sm-value1",
@@ -82,7 +82,7 @@ func TestRun_UnstageAll(t *testing.T) {
 
 	err := r.Run(context.Background())
 	require.NoError(t, err)
-	assert.Contains(t, buf.String(), "Unstaged all changes (2 SSM, 1 SM)")
+	assert.Contains(t, buf.String(), "Unstaged all changes (2 SSM Parameter Store, 1 Secrets Manager)")
 
 	// Verify all unstaged
 	_, err = store.Get(staging.ServiceParam, "/app/config1")
@@ -99,7 +99,7 @@ func TestRun_UnstageSSMOnly(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
-	// Stage only SSM parameters
+	// Stage only SSM Parameter Store parameters
 	_ = store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     "ssm-value",
@@ -115,7 +115,7 @@ func TestRun_UnstageSSMOnly(t *testing.T) {
 
 	err := r.Run(context.Background())
 	require.NoError(t, err)
-	assert.Contains(t, buf.String(), "Unstaged all changes (1 SSM, 0 SM)")
+	assert.Contains(t, buf.String(), "Unstaged all changes (1 SSM Parameter Store, 0 Secrets Manager)")
 }
 
 func TestRun_UnstageSMOnly(t *testing.T) {
@@ -124,7 +124,7 @@ func TestRun_UnstageSMOnly(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
-	// Stage only SM secrets
+	// Stage only Secrets Manager secrets
 	_ = store.Stage(staging.ServiceSecret, "my-secret", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     "sm-value",
@@ -140,7 +140,7 @@ func TestRun_UnstageSMOnly(t *testing.T) {
 
 	err := r.Run(context.Background())
 	require.NoError(t, err)
-	assert.Contains(t, buf.String(), "Unstaged all changes (0 SSM, 1 SM)")
+	assert.Contains(t, buf.String(), "Unstaged all changes (0 SSM Parameter Store, 1 Secrets Manager)")
 }
 
 func TestRun_StoreError(t *testing.T) {

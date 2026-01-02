@@ -1,6 +1,6 @@
-// Package diffargs provides shared diff command argument parsing logic for SSM and SM.
+// Package diffargs provides shared diff command argument parsing logic for SSM Parameter Store and Secrets Manager.
 //
-// The diff command compares two versions of a parameter (SSM) or secret (SM).
+// The diff command compares two versions of a parameter (SSM Parameter Store) or secret (Secrets Manager).
 // This package provides a generic ParseArgs function that handles the various
 // argument patterns supported by both services.
 //
@@ -63,7 +63,7 @@ import (
 // ParseArgs parses diff command arguments into two version specifications.
 //
 // This function is generic over the absolute specifier type A, which differs
-// between SSM (AbsoluteSpec with Version *int64) and SM (AbsoluteSpec with
+// between SSM Parameter Store (AbsoluteSpec with Version *int64) and Secrets Manager (AbsoluteSpec with
 // ID *string and Label *string).
 //
 // # Parameters
@@ -72,9 +72,9 @@ import (
 //   - parse: Service-specific parser function (e.g., paramversion.Parse, secretversion.Parse)
 //   - hasAbsolute: Returns true if the absolute specifier is set (non-zero).
 //     Used to distinguish "mixed" pattern from "partial spec" pattern in 2-arg case.
-//     For SSM: func(abs) bool { return abs.Version != nil }
-//     For SM: func(abs) bool { return abs.ID != nil || abs.Label != nil }
-//   - prefixes: Characters that start a specifier (e.g., "#~" for SSM, "#:~" for SM).
+//     For SSM Parameter Store: func(abs) bool { return abs.Version != nil }
+//     For Secrets Manager: func(abs) bool { return abs.ID != nil || abs.Label != nil }
+//   - prefixes: Characters that start a specifier (e.g., "#~" for SSM Parameter Store, "#:~" for Secrets Manager).
 //     Used to detect if second argument is specifier-only.
 //   - usage: Error message to show when argument count is invalid.
 //
@@ -88,7 +88,7 @@ import (
 //
 // # Examples
 //
-// SSM usage:
+// SSM Parameter Store usage:
 //
 //	spec1, spec2, err := ParseArgs(
 //	    args,
@@ -98,7 +98,7 @@ import (
 //	    "usage: suve param diff <spec1> [spec2] | <name> <version1> [version2]",
 //	)
 //
-// SM usage:
+// Secrets Manager usage:
 //
 //	spec1, spec2, err := ParseArgs(
 //	    args,
@@ -133,7 +133,7 @@ func ParseArgs[A any](
 // Pattern: "name#v" or "name~N" or "name:LABEL"
 //
 // The single argument specifies the "from" version, and it will be compared
-// against the default version (latest for SSM, AWSCURRENT for SM).
+// against the default version (latest for SSM Parameter Store, AWSCURRENT for Secrets Manager).
 //
 // Examples:
 //
@@ -153,8 +153,8 @@ func parseOneArg[A any](
 	}
 
 	// spec2 is the default version (zero absolute specifier, no shift).
-	// For SSM: latest version
-	// For SM: AWSCURRENT label
+	// For SSM Parameter Store: latest version
+	// For Secrets Manager: AWSCURRENT label
 	var zero A
 	spec2 := &version.Spec[A]{Name: spec.Name, Absolute: zero, Shift: 0}
 

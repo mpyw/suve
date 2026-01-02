@@ -24,14 +24,14 @@ func Command() *cli.Command {
 	return &cli.Command{
 		Name:  "reset",
 		Usage: "Unstage all changes",
-		Description: `Remove all staged changes (both SSM and SM) from the staging area.
+		Description: `Remove all staged changes (SSM Parameter Store and Secrets Manager) from the staging area.
 
 This does not affect AWS - it only clears the local staging area.
 
 Use 'suve stage param reset' or 'suve stage secret reset' for service-specific operations.
 
 EXAMPLES:
-   suve stage reset    Unstage all changes (SSM and SM)`,
+   suve stage reset    Unstage all changes (SSM Parameter Store and Secrets Manager)`,
 		Action: action,
 	}
 }
@@ -68,21 +68,21 @@ func (r *Runner) Run(_ context.Context) error {
 		return nil
 	}
 
-	// Unstage all SSM
+	// Unstage all SSM Parameter Store
 	if ssmCount > 0 {
 		if err := r.Store.UnstageAll(staging.ServiceParam); err != nil {
 			return err
 		}
 	}
 
-	// Unstage all SM
+	// Unstage all Secrets Manager
 	if smCount > 0 {
 		if err := r.Store.UnstageAll(staging.ServiceSecret); err != nil {
 			return err
 		}
 	}
 
-	_, _ = fmt.Fprintf(r.Stdout, "%s Unstaged all changes (%d SSM, %d SM)\n",
+	_, _ = fmt.Fprintf(r.Stdout, "%s Unstaged all changes (%d SSM Parameter Store, %d Secrets Manager)\n",
 		colors.Success("✓"), ssmCount, smCount)
 	return nil
 }

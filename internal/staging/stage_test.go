@@ -41,7 +41,7 @@ func TestStore_StageAndLoad(t *testing.T) {
 
 	now := time.Now().Truncate(time.Second)
 
-	// Stage SSM entry
+	// Stage SSM Parameter Store entry
 	err := store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     "test-value",
@@ -49,7 +49,7 @@ func TestStore_StageAndLoad(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	// Stage SM entry
+	// Stage Secrets Manager entry
 	err = store.Stage(staging.ServiceSecret, "my-secret", staging.Entry{
 		Operation: staging.OperationDelete,
 		StagedAt:  now,
@@ -139,7 +139,7 @@ func TestStore_UnstageNotStaged(t *testing.T) {
 func TestStore_UnstageAll(t *testing.T) {
 	t.Parallel()
 
-	t.Run("unstage all SSM", func(t *testing.T) {
+	t.Run("unstage all SSM Parameter Store", func(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
@@ -152,18 +152,18 @@ func TestStore_UnstageAll(t *testing.T) {
 		_ = store.Stage(staging.ServiceParam, "/app/config2", staging.Entry{Operation: staging.OperationUpdate, Value: "v2", StagedAt: now})
 		_ = store.Stage(staging.ServiceSecret, "secret1", staging.Entry{Operation: staging.OperationUpdate, Value: "s1", StagedAt: now})
 
-		// Unstage all SSM
+		// Unstage all SSM Parameter Store
 		err := store.UnstageAll(staging.ServiceParam)
 		require.NoError(t, err)
 
-		// Verify SSM cleared, SM intact
+		// Verify SSM Parameter Store cleared, Secrets Manager intact
 		state, err := store.Load()
 		require.NoError(t, err)
 		assert.Empty(t, state.Param)
 		assert.Len(t, state.Secret, 1)
 	})
 
-	t.Run("unstage all SM", func(t *testing.T) {
+	t.Run("unstage all Secrets Manager", func(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
@@ -251,7 +251,7 @@ func TestStore_List(t *testing.T) {
 	_ = store.Stage(staging.ServiceParam, "/app/config2", staging.Entry{Operation: staging.OperationDelete, StagedAt: now})
 	_ = store.Stage(staging.ServiceSecret, "secret1", staging.Entry{Operation: staging.OperationUpdate, Value: "s1", StagedAt: now})
 
-	t.Run("list SSM only", func(t *testing.T) {
+	t.Run("list SSM Parameter Store only", func(t *testing.T) {
 		t.Parallel()
 		result, err := store.List(staging.ServiceParam)
 		require.NoError(t, err)
@@ -259,7 +259,7 @@ func TestStore_List(t *testing.T) {
 		assert.Len(t, result[staging.ServiceParam], 2)
 	})
 
-	t.Run("list SM only", func(t *testing.T) {
+	t.Run("list Secrets Manager only", func(t *testing.T) {
 		t.Parallel()
 		result, err := store.List(staging.ServiceSecret)
 		require.NoError(t, err)
@@ -303,7 +303,7 @@ func TestStore_HasChanges(t *testing.T) {
 	require.NoError(t, err)
 	assert.False(t, has)
 
-	// Add SSM change
+	// Add SSM Parameter Store change
 	now := time.Now()
 	_ = store.Stage(staging.ServiceParam, "/app/config", staging.Entry{Operation: staging.OperationUpdate, Value: "v", StagedAt: now})
 
@@ -503,7 +503,7 @@ func TestStore_UnstageFromSM(t *testing.T) {
 
 	now := time.Now()
 
-	// Stage SM entry
+	// Stage Secrets Manager entry
 	err := store.Stage(staging.ServiceSecret, "my-secret", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     "secret-value",

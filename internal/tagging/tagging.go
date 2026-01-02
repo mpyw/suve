@@ -1,4 +1,4 @@
-// Package tagging provides unified tag management for SSM and SM.
+// Package tagging provides unified tag management for SSM Parameter Store and Secrets Manager.
 package tagging
 
 import (

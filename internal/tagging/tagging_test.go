@@ -163,46 +163,46 @@ func TestChange_IsEmpty(t *testing.T) {
 	}
 }
 
-// Mock SM client for testing
-type mockSMClient struct {
+// Mock Secrets Manager client for testing
+type mockSecretClient struct {
 	tagResourceFunc   func(ctx context.Context, params *secretsmanager.TagResourceInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.TagResourceOutput, error)
 	untagResourceFunc func(ctx context.Context, params *secretsmanager.UntagResourceInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.UntagResourceOutput, error)
 }
 
-func (m *mockSMClient) TagResource(ctx context.Context, params *secretsmanager.TagResourceInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.TagResourceOutput, error) {
+func (m *mockSecretClient) TagResource(ctx context.Context, params *secretsmanager.TagResourceInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.TagResourceOutput, error) {
 	if m.tagResourceFunc != nil {
 		return m.tagResourceFunc(ctx, params, optFns...)
 	}
 	return &secretsmanager.TagResourceOutput{}, nil
 }
 
-func (m *mockSMClient) UntagResource(ctx context.Context, params *secretsmanager.UntagResourceInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.UntagResourceOutput, error) {
+func (m *mockSecretClient) UntagResource(ctx context.Context, params *secretsmanager.UntagResourceInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.UntagResourceOutput, error) {
 	if m.untagResourceFunc != nil {
 		return m.untagResourceFunc(ctx, params, optFns...)
 	}
 	return &secretsmanager.UntagResourceOutput{}, nil
 }
 
-func TestApplySM(t *testing.T) {
+func TestApplySecret(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name     string
 		secretID string
 		change   *Change
-		mock     *mockSMClient
+		mock     *mockSecretClient
 		wantErr  string
 	}{
 		{
 			name:     "empty change does nothing",
 			secretID: "my-secret",
 			change:   &Change{Add: map[string]string{}, Remove: []string{}},
-			mock:     &mockSMClient{},
+			mock:     &mockSecretClient{},
 		},
 		{
 			name:     "add tags",
 			secretID: "my-secret",
 			change:   &Change{Add: map[string]string{"env": "prod", "team": "platform"}, Remove: []string{}},
-			mock: &mockSMClient{
+			mock: &mockSecretClient{
 				tagResourceFunc: func(_ context.Context, params *secretsmanager.TagResourceInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.TagResourceOutput, error) {
 					assert.Equal(t, "my-secret", lo.FromPtr(params.SecretId))
 					assert.Len(t, params.Tags, 2)
@@ -220,7 +220,7 @@ func TestApplySM(t *testing.T) {
 			name:     "remove tags",
 			secretID: "my-secret",
 			change:   &Change{Add: map[string]string{}, Remove: []string{"deprecated", "old"}},
-			mock: &mockSMClient{
+			mock: &mockSecretClient{
 				untagResourceFunc: func(_ context.Context, params *secretsmanager.UntagResourceInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.UntagResourceOutput, error) {
 					assert.Equal(t, "my-secret", lo.FromPtr(params.SecretId))
 					assert.ElementsMatch(t, []string{"deprecated", "old"}, params.TagKeys)
@@ -232,7 +232,7 @@ func TestApplySM(t *testing.T) {
 			name:     "add and remove tags",
 			secretID: "my-secret",
 			change:   &Change{Add: map[string]string{"env": "prod"}, Remove: []string{"deprecated"}},
-			mock: &mockSMClient{
+			mock: &mockSecretClient{
 				tagResourceFunc: func(_ context.Context, params *secretsmanager.TagResourceInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.TagResourceOutput, error) {
 					assert.Equal(t, "my-secret", lo.FromPtr(params.SecretId))
 					assert.Len(t, params.Tags, 1)
@@ -251,7 +251,7 @@ func TestApplySM(t *testing.T) {
 			name:     "tag resource error",
 			secretID: "my-secret",
 			change:   &Change{Add: map[string]string{"env": "prod"}, Remove: []string{}},
-			mock: &mockSMClient{
+			mock: &mockSecretClient{
 				tagResourceFunc: func(_ context.Context, _ *secretsmanager.TagResourceInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.TagResourceOutput, error) {
 					return nil, fmt.Errorf("access denied")
 				},
@@ -262,7 +262,7 @@ func TestApplySM(t *testing.T) {
 			name:     "untag resource error",
 			secretID: "my-secret",
 			change:   &Change{Add: map[string]string{}, Remove: []string{"deprecated"}},
-			mock: &mockSMClient{
+			mock: &mockSecretClient{
 				untagResourceFunc: func(_ context.Context, _ *secretsmanager.UntagResourceInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.UntagResourceOutput, error) {
 					return nil, fmt.Errorf("access denied")
 				},
@@ -274,7 +274,7 @@ func TestApplySM(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			err := ApplySM(t.Context(), tt.mock, tt.secretID, tt.change)
+			err := ApplySecret(t.Context(), tt.mock, tt.secretID, tt.change)
 
 			if tt.wantErr != "" {
 				require.Error(t, err)
@@ -287,46 +287,46 @@ func TestApplySM(t *testing.T) {
 	}
 }
 
-// Mock SSM client for testing
-type mockSSMClient struct {
+// Mock SSM Parameter Store client for testing
+type mockParamClient struct {
 	addTagsToResourceFunc      func(ctx context.Context, params *ssm.AddTagsToResourceInput, optFns ...func(*ssm.Options)) (*ssm.AddTagsToResourceOutput, error)
 	removeTagsFromResourceFunc func(ctx context.Context, params *ssm.RemoveTagsFromResourceInput, optFns ...func(*ssm.Options)) (*ssm.RemoveTagsFromResourceOutput, error)
 }
 
-func (m *mockSSMClient) AddTagsToResource(ctx context.Context, params *ssm.AddTagsToResourceInput, optFns ...func(*ssm.Options)) (*ssm.AddTagsToResourceOutput, error) {
+func (m *mockParamClient) AddTagsToResource(ctx context.Context, params *ssm.AddTagsToResourceInput, optFns ...func(*ssm.Options)) (*ssm.AddTagsToResourceOutput, error) {
 	if m.addTagsToResourceFunc != nil {
 		return m.addTagsToResourceFunc(ctx, params, optFns...)
 	}
 	return &ssm.AddTagsToResourceOutput{}, nil
 }
 
-func (m *mockSSMClient) RemoveTagsFromResource(ctx context.Context, params *ssm.RemoveTagsFromResourceInput, optFns ...func(*ssm.Options)) (*ssm.RemoveTagsFromResourceOutput, error) {
+func (m *mockParamClient) RemoveTagsFromResource(ctx context.Context, params *ssm.RemoveTagsFromResourceInput, optFns ...func(*ssm.Options)) (*ssm.RemoveTagsFromResourceOutput, error) {
 	if m.removeTagsFromResourceFunc != nil {
 		return m.removeTagsFromResourceFunc(ctx, params, optFns...)
 	}
 	return &ssm.RemoveTagsFromResourceOutput{}, nil
 }
 
-func TestApplySSM(t *testing.T) {
+func TestApplyParam(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name       string
 		resourceID string
 		change     *Change
-		mock       *mockSSMClient
+		mock       *mockParamClient
 		wantErr    string
 	}{
 		{
 			name:       "empty change does nothing",
 			resourceID: "/my/param",
 			change:     &Change{Add: map[string]string{}, Remove: []string{}},
-			mock:       &mockSSMClient{},
+			mock:       &mockParamClient{},
 		},
 		{
 			name:       "add tags",
 			resourceID: "/my/param",
 			change:     &Change{Add: map[string]string{"env": "prod", "team": "platform"}, Remove: []string{}},
-			mock: &mockSSMClient{
+			mock: &mockParamClient{
 				addTagsToResourceFunc: func(_ context.Context, params *ssm.AddTagsToResourceInput, _ ...func(*ssm.Options)) (*ssm.AddTagsToResourceOutput, error) {
 					assert.Equal(t, ssmtypes.ResourceTypeForTaggingParameter, params.ResourceType)
 					assert.Equal(t, "/my/param", lo.FromPtr(params.ResourceId))
@@ -345,7 +345,7 @@ func TestApplySSM(t *testing.T) {
 			name:       "remove tags",
 			resourceID: "/my/param",
 			change:     &Change{Add: map[string]string{}, Remove: []string{"deprecated", "old"}},
-			mock: &mockSSMClient{
+			mock: &mockParamClient{
 				removeTagsFromResourceFunc: func(_ context.Context, params *ssm.RemoveTagsFromResourceInput, _ ...func(*ssm.Options)) (*ssm.RemoveTagsFromResourceOutput, error) {
 					assert.Equal(t, ssmtypes.ResourceTypeForTaggingParameter, params.ResourceType)
 					assert.Equal(t, "/my/param", lo.FromPtr(params.ResourceId))
@@ -358,7 +358,7 @@ func TestApplySSM(t *testing.T) {
 			name:       "add and remove tags",
 			resourceID: "/my/param",
 			change:     &Change{Add: map[string]string{"env": "prod"}, Remove: []string{"deprecated"}},
-			mock: &mockSSMClient{
+			mock: &mockParamClient{
 				addTagsToResourceFunc: func(_ context.Context, params *ssm.AddTagsToResourceInput, _ ...func(*ssm.Options)) (*ssm.AddTagsToResourceOutput, error) {
 					assert.Equal(t, ssmtypes.ResourceTypeForTaggingParameter, params.ResourceType)
 					assert.Equal(t, "/my/param", lo.FromPtr(params.ResourceId))
@@ -379,7 +379,7 @@ func TestApplySSM(t *testing.T) {
 			name:       "add tags error",
 			resourceID: "/my/param",
 			change:     &Change{Add: map[string]string{"env": "prod"}, Remove: []string{}},
-			mock: &mockSSMClient{
+			mock: &mockParamClient{
 				addTagsToResourceFunc: func(_ context.Context, _ *ssm.AddTagsToResourceInput, _ ...func(*ssm.Options)) (*ssm.AddTagsToResourceOutput, error) {
 					return nil, fmt.Errorf("access denied")
 				},
@@ -390,7 +390,7 @@ func TestApplySSM(t *testing.T) {
 			name:       "remove tags error",
 			resourceID: "/my/param",
 			change:     &Change{Add: map[string]string{}, Remove: []string{"deprecated"}},
-			mock: &mockSSMClient{
+			mock: &mockParamClient{
 				removeTagsFromResourceFunc: func(_ context.Context, _ *ssm.RemoveTagsFromResourceInput, _ ...func(*ssm.Options)) (*ssm.RemoveTagsFromResourceOutput, error) {
 					return nil, fmt.Errorf("access denied")
 				},
@@ -402,7 +402,7 @@ func TestApplySSM(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			err := ApplySSM(t.Context(), tt.mock, tt.resourceID, tt.change)
+			err := ApplyParam(t.Context(), tt.mock, tt.resourceID, tt.change)
 
 			if tt.wantErr != "" {
 				require.Error(t, err)

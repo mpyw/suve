@@ -1,4 +1,4 @@
-// Package set provides the SSM set command.
+// Package set provides the SSM Parameter Store set command.
 package set
 
 import (
@@ -184,7 +184,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 
 	// Apply tag changes (additive)
 	if opts.TagChange != nil && !opts.TagChange.IsEmpty() {
-		if err := tagging.ApplySSM(ctx, r.Client, opts.Name, opts.TagChange); err != nil {
+		if err := tagging.ApplyParam(ctx, r.Client, opts.Name, opts.TagChange); err != nil {
 			return err
 		}
 	}

@@ -16,11 +16,11 @@ import (
 
 // Runner executes the push command.
 type Runner struct {
-	SSMStrategy staging.PushStrategy
-	SMStrategy  staging.PushStrategy
-	Store       *staging.Store
-	Stdout      io.Writer
-	Stderr      io.Writer
+	ParamStrategy  staging.PushStrategy
+	SecretStrategy staging.PushStrategy
+	Store          *staging.Store
+	Stdout         io.Writer
+	Stderr         io.Writer
 }
 
 // Command returns the global apply command.
@@ -29,7 +29,7 @@ func Command() *cli.Command {
 		Name:    "apply",
 		Aliases: []string{"push"},
 		Usage:   "Apply all staged changes to AWS",
-		Description: `Apply all staged changes (both SSM and SM) to AWS.
+		Description: `Apply all staged changes (SSM Parameter Store and Secrets Manager) to AWS.
 
 After successful apply, the staged changes are cleared.
 
@@ -37,7 +37,7 @@ Use 'suve stage status' to view all staged changes before applying.
 Use 'suve stage param apply' or 'suve stage secret apply' for service-specific changes.
 
 EXAMPLES:
-   suve stage apply    Apply all staged changes (SSM and SM)`,
+   suve stage apply    Apply all staged changes (SSM Parameter Store and Secrets Manager)`,
 		Action: action,
 	}
 }
@@ -78,7 +78,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		if err != nil {
 			return err
 		}
-		r.SSMStrategy = strat
+		r.ParamStrategy = strat
 	}
 
 	if hasSM {
@@ -86,7 +86,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		if err != nil {
 			return err
 		}
-		r.SMStrategy = strat
+		r.SecretStrategy = strat
 	}
 
 	return r.Run(ctx)
@@ -105,18 +105,18 @@ func (r *Runner) Run(ctx context.Context) error {
 
 	var totalSucceeded, totalFailed int
 
-	// Push SSM changes
+	// Push SSM Parameter Store changes
 	if len(ssmStaged) > 0 {
-		_, _ = fmt.Fprintln(r.Stdout, "Pushing SSM parameters...")
-		succeeded, failed := r.pushService(ctx, r.SSMStrategy, ssmStaged)
+		_, _ = fmt.Fprintln(r.Stdout, "Pushing SSM Parameter Store parameters...")
+		succeeded, failed := r.pushService(ctx, r.ParamStrategy, ssmStaged)
 		totalSucceeded += succeeded
 		totalFailed += failed
 	}
 
-	// Push SM changes
+	// Push Secrets Manager changes
 	if len(smStaged) > 0 {
-		_, _ = fmt.Fprintln(r.Stdout, "Pushing SM secrets...")
-		succeeded, failed := r.pushService(ctx, r.SMStrategy, smStaged)
+		_, _ = fmt.Fprintln(r.Stdout, "Pushing Secrets Manager secrets...")
+		succeeded, failed := r.pushService(ctx, r.SecretStrategy, smStaged)
 		totalSucceeded += succeeded
 		totalFailed += failed
 	}

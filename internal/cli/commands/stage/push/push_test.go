@@ -43,7 +43,7 @@ func (m *mockStrategy) FetchLastModified(_ context.Context, _ string) (time.Time
 	return m.fetchLastModifiedVal, nil
 }
 
-func newSSMStrategy() *mockStrategy {
+func newParamStrategy() *mockStrategy {
 	return &mockStrategy{
 		service:          staging.ServiceParam,
 		serviceName:      "SSM Parameter Store",
@@ -52,7 +52,7 @@ func newSSMStrategy() *mockStrategy {
 	}
 }
 
-func newSMStrategy() *mockStrategy {
+func newSecretStrategy() *mockStrategy {
 	return &mockStrategy{
 		service:          staging.ServiceSecret,
 		serviceName:      "Secrets Manager",
@@ -83,11 +83,11 @@ func TestRun_NoChanges(t *testing.T) {
 
 	var buf bytes.Buffer
 	r := &push.Runner{
-		SSMStrategy: newSSMStrategy(),
-		SMStrategy:  newSMStrategy(),
-		Store:       store,
-		Stdout:      &buf,
-		Stderr:      &bytes.Buffer{},
+		ParamStrategy:  newParamStrategy(),
+		SecretStrategy: newSecretStrategy(),
+		Store:          store,
+		Stdout:         &buf,
+		Stderr:         &bytes.Buffer{},
 	}
 
 	// When called with empty store, Run should return without error
@@ -103,14 +103,14 @@ func TestRun_PushBothServices(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
-	// Stage SSM parameter
+	// Stage SSM Parameter Store parameter
 	_ = store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     "ssm-value",
 		StagedAt:  time.Now(),
 	})
 
-	// Stage SM secret
+	// Stage Secrets Manager secret
 	_ = store.Stage(staging.ServiceSecret, "my-secret", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     "sm-value",
@@ -120,15 +120,15 @@ func TestRun_PushBothServices(t *testing.T) {
 	ssmPutCalled := false
 	smPutCalled := false
 
-	ssmMock := newSSMStrategy()
-	ssmMock.pushFunc = func(_ context.Context, name string, _ staging.Entry) error {
+	paramMock := newParamStrategy()
+	paramMock.pushFunc = func(_ context.Context, name string, _ staging.Entry) error {
 		ssmPutCalled = true
 		assert.Equal(t, "/app/config", name)
 		return nil
 	}
 
-	smMock := newSMStrategy()
-	smMock.pushFunc = func(_ context.Context, name string, _ staging.Entry) error {
+	secretMock := newSecretStrategy()
+	secretMock.pushFunc = func(_ context.Context, name string, _ staging.Entry) error {
 		smPutCalled = true
 		assert.Equal(t, "my-secret", name)
 		return nil
@@ -136,19 +136,19 @@ func TestRun_PushBothServices(t *testing.T) {
 
 	var buf bytes.Buffer
 	r := &push.Runner{
-		SSMStrategy: ssmMock,
-		SMStrategy:  smMock,
-		Store:       store,
-		Stdout:      &buf,
-		Stderr:      &bytes.Buffer{},
+		ParamStrategy:  paramMock,
+		SecretStrategy: secretMock,
+		Store:          store,
+		Stdout:         &buf,
+		Stderr:         &bytes.Buffer{},
 	}
 
 	err := r.Run(context.Background())
 	require.NoError(t, err)
 	assert.True(t, ssmPutCalled)
 	assert.True(t, smPutCalled)
-	assert.Contains(t, buf.String(), "Pushing SSM parameters")
-	assert.Contains(t, buf.String(), "Pushing SM secrets")
+	assert.Contains(t, buf.String(), "Pushing SSM Parameter Store parameters")
+	assert.Contains(t, buf.String(), "Pushing Secrets Manager secrets")
 	assert.Contains(t, buf.String(), "SSM Parameter Store: Updated /app/config")
 	assert.Contains(t, buf.String(), "Secrets Manager: Updated my-secret")
 
@@ -165,7 +165,7 @@ func TestRun_PushSSMOnly(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
-	// Stage only SSM parameter
+	// Stage only SSM Parameter Store parameter
 	_ = store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     "ssm-value",
@@ -173,26 +173,26 @@ func TestRun_PushSSMOnly(t *testing.T) {
 	})
 
 	ssmPutCalled := false
-	ssmMock := newSSMStrategy()
-	ssmMock.pushFunc = func(_ context.Context, _ string, _ staging.Entry) error {
+	paramMock := newParamStrategy()
+	paramMock.pushFunc = func(_ context.Context, _ string, _ staging.Entry) error {
 		ssmPutCalled = true
 		return nil
 	}
 
 	var buf bytes.Buffer
 	r := &push.Runner{
-		SSMStrategy: ssmMock,
-		SMStrategy:  nil, // Should not be needed
-		Store:       store,
-		Stdout:      &buf,
-		Stderr:      &bytes.Buffer{},
+		ParamStrategy:  paramMock,
+		SecretStrategy: nil, // Should not be needed
+		Store:          store,
+		Stdout:         &buf,
+		Stderr:         &bytes.Buffer{},
 	}
 
 	err := r.Run(context.Background())
 	require.NoError(t, err)
 	assert.True(t, ssmPutCalled)
-	assert.Contains(t, buf.String(), "Pushing SSM parameters")
-	assert.NotContains(t, buf.String(), "Pushing SM secrets")
+	assert.Contains(t, buf.String(), "Pushing SSM Parameter Store parameters")
+	assert.NotContains(t, buf.String(), "Pushing Secrets Manager secrets")
 }
 
 func TestRun_PushSMOnly(t *testing.T) {
@@ -201,7 +201,7 @@ func TestRun_PushSMOnly(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
-	// Stage only SM secret
+	// Stage only Secrets Manager secret
 	_ = store.Stage(staging.ServiceSecret, "my-secret", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     "sm-value",
@@ -209,26 +209,26 @@ func TestRun_PushSMOnly(t *testing.T) {
 	})
 
 	smPutCalled := false
-	smMock := newSMStrategy()
-	smMock.pushFunc = func(_ context.Context, _ string, _ staging.Entry) error {
+	secretMock := newSecretStrategy()
+	secretMock.pushFunc = func(_ context.Context, _ string, _ staging.Entry) error {
 		smPutCalled = true
 		return nil
 	}
 
 	var buf bytes.Buffer
 	r := &push.Runner{
-		SSMStrategy: nil, // Should not be needed
-		SMStrategy:  smMock,
-		Store:       store,
-		Stdout:      &buf,
-		Stderr:      &bytes.Buffer{},
+		ParamStrategy:  nil, // Should not be needed
+		SecretStrategy: secretMock,
+		Store:          store,
+		Stdout:         &buf,
+		Stderr:         &bytes.Buffer{},
 	}
 
 	err := r.Run(context.Background())
 	require.NoError(t, err)
 	assert.True(t, smPutCalled)
-	assert.NotContains(t, buf.String(), "Pushing SSM parameters")
-	assert.Contains(t, buf.String(), "Pushing SM secrets")
+	assert.NotContains(t, buf.String(), "Pushing SSM Parameter Store parameters")
+	assert.Contains(t, buf.String(), "Pushing Secrets Manager secrets")
 }
 
 func TestRun_PushDelete(t *testing.T) {
@@ -250,25 +250,25 @@ func TestRun_PushDelete(t *testing.T) {
 	ssmDeleteCalled := false
 	smDeleteCalled := false
 
-	ssmMock := newSSMStrategy()
-	ssmMock.pushFunc = func(_ context.Context, _ string, _ staging.Entry) error {
+	paramMock := newParamStrategy()
+	paramMock.pushFunc = func(_ context.Context, _ string, _ staging.Entry) error {
 		ssmDeleteCalled = true
 		return nil
 	}
 
-	smMock := newSMStrategy()
-	smMock.pushFunc = func(_ context.Context, _ string, _ staging.Entry) error {
+	secretMock := newSecretStrategy()
+	secretMock.pushFunc = func(_ context.Context, _ string, _ staging.Entry) error {
 		smDeleteCalled = true
 		return nil
 	}
 
 	var buf bytes.Buffer
 	r := &push.Runner{
-		SSMStrategy: ssmMock,
-		SMStrategy:  smMock,
-		Store:       store,
-		Stdout:      &buf,
-		Stderr:      &bytes.Buffer{},
+		ParamStrategy:  paramMock,
+		SecretStrategy: secretMock,
+		Store:          store,
+		Stdout:         &buf,
+		Stderr:         &bytes.Buffer{},
 	}
 
 	err := r.Run(context.Background())
@@ -297,35 +297,35 @@ func TestRun_PartialFailure(t *testing.T) {
 		StagedAt:  time.Now(),
 	})
 
-	ssmMock := newSSMStrategy()
-	ssmMock.pushFunc = func(_ context.Context, _ string, _ staging.Entry) error {
-		return fmt.Errorf("SSM error")
+	paramMock := newParamStrategy()
+	paramMock.pushFunc = func(_ context.Context, _ string, _ staging.Entry) error {
+		return fmt.Errorf("SSM Parameter Store error")
 	}
 
-	smMock := newSMStrategy()
-	smMock.pushFunc = func(_ context.Context, _ string, _ staging.Entry) error {
+	secretMock := newSecretStrategy()
+	secretMock.pushFunc = func(_ context.Context, _ string, _ staging.Entry) error {
 		return nil
 	}
 
 	var buf, errBuf bytes.Buffer
 	r := &push.Runner{
-		SSMStrategy: ssmMock,
-		SMStrategy:  smMock,
-		Store:       store,
-		Stdout:      &buf,
-		Stderr:      &errBuf,
+		ParamStrategy:  paramMock,
+		SecretStrategy: secretMock,
+		Store:          store,
+		Stdout:         &buf,
+		Stderr:         &errBuf,
 	}
 
 	err := r.Run(context.Background())
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "pushed 1, failed 1")
 
-	// SSM should still be staged (failed)
+	// SSM Parameter Store should still be staged (failed)
 	entry, err := store.Get(staging.ServiceParam, "/app/config")
 	require.NoError(t, err)
 	assert.Equal(t, "ssm-value", entry.Value)
 
-	// SM should be unstaged (succeeded)
+	// Secrets Manager should be unstaged (succeeded)
 	_, err = store.Get(staging.ServiceSecret, "my-secret")
 	assert.Equal(t, staging.ErrNotStaged, err)
 }
@@ -343,11 +343,11 @@ func TestRun_StoreError(t *testing.T) {
 
 	var buf bytes.Buffer
 	r := &push.Runner{
-		SSMStrategy: newSSMStrategy(),
-		SMStrategy:  newSMStrategy(),
-		Store:       store,
-		Stdout:      &buf,
-		Stderr:      &bytes.Buffer{},
+		ParamStrategy:  newParamStrategy(),
+		SecretStrategy: newSecretStrategy(),
+		Store:          store,
+		Stdout:         &buf,
+		Stderr:         &bytes.Buffer{},
 	}
 
 	err := r.Run(context.Background())
@@ -361,7 +361,7 @@ func TestRun_SMDeleteWithForce(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
-	// Stage SM delete with force option
+	// Stage Secrets Manager delete with force option
 	_ = store.Stage(staging.ServiceSecret, "my-secret", staging.Entry{
 		Operation: staging.OperationDelete,
 		StagedAt:  time.Now(),
@@ -371,18 +371,18 @@ func TestRun_SMDeleteWithForce(t *testing.T) {
 	})
 
 	var capturedEntry staging.Entry
-	smMock := newSMStrategy()
-	smMock.pushFunc = func(_ context.Context, _ string, entry staging.Entry) error {
+	secretMock := newSecretStrategy()
+	secretMock.pushFunc = func(_ context.Context, _ string, entry staging.Entry) error {
 		capturedEntry = entry
 		return nil
 	}
 
 	var buf bytes.Buffer
 	r := &push.Runner{
-		SMStrategy: smMock,
-		Store:      store,
-		Stdout:     &buf,
-		Stderr:     &bytes.Buffer{},
+		SecretStrategy: secretMock,
+		Store:          store,
+		Stdout:         &buf,
+		Stderr:         &bytes.Buffer{},
 	}
 
 	err := r.Run(context.Background())
@@ -397,7 +397,7 @@ func TestRun_SMDeleteWithRecoveryWindow(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
-	// Stage SM delete with custom recovery window
+	// Stage Secrets Manager delete with custom recovery window
 	_ = store.Stage(staging.ServiceSecret, "my-secret", staging.Entry{
 		Operation: staging.OperationDelete,
 		StagedAt:  time.Now(),
@@ -407,18 +407,18 @@ func TestRun_SMDeleteWithRecoveryWindow(t *testing.T) {
 	})
 
 	var capturedEntry staging.Entry
-	smMock := newSMStrategy()
-	smMock.pushFunc = func(_ context.Context, _ string, entry staging.Entry) error {
+	secretMock := newSecretStrategy()
+	secretMock.pushFunc = func(_ context.Context, _ string, entry staging.Entry) error {
 		capturedEntry = entry
 		return nil
 	}
 
 	var buf bytes.Buffer
 	r := &push.Runner{
-		SMStrategy: smMock,
-		Store:      store,
-		Stdout:     &buf,
-		Stderr:     &bytes.Buffer{},
+		SecretStrategy: secretMock,
+		Store:          store,
+		Stdout:         &buf,
+		Stderr:         &bytes.Buffer{},
 	}
 
 	err := r.Run(context.Background())
@@ -438,17 +438,17 @@ func TestRun_SSMDeleteError(t *testing.T) {
 		StagedAt:  time.Now(),
 	})
 
-	ssmMock := newSSMStrategy()
-	ssmMock.pushFunc = func(_ context.Context, _ string, _ staging.Entry) error {
+	paramMock := newParamStrategy()
+	paramMock.pushFunc = func(_ context.Context, _ string, _ staging.Entry) error {
 		return fmt.Errorf("delete failed")
 	}
 
 	var buf, errBuf bytes.Buffer
 	r := &push.Runner{
-		SSMStrategy: ssmMock,
-		Store:       store,
-		Stdout:      &buf,
-		Stderr:      &errBuf,
+		ParamStrategy: paramMock,
+		Store:         store,
+		Stdout:        &buf,
+		Stderr:        &errBuf,
 	}
 
 	err := r.Run(context.Background())
@@ -468,17 +468,17 @@ func TestRun_SMSetError(t *testing.T) {
 		StagedAt:  time.Now(),
 	})
 
-	smMock := newSMStrategy()
-	smMock.pushFunc = func(_ context.Context, _ string, _ staging.Entry) error {
+	secretMock := newSecretStrategy()
+	secretMock.pushFunc = func(_ context.Context, _ string, _ staging.Entry) error {
 		return fmt.Errorf("put secret failed")
 	}
 
 	var buf, errBuf bytes.Buffer
 	r := &push.Runner{
-		SMStrategy: smMock,
-		Store:      store,
-		Stdout:     &buf,
-		Stderr:     &errBuf,
+		SecretStrategy: secretMock,
+		Store:          store,
+		Stdout:         &buf,
+		Stderr:         &errBuf,
 	}
 
 	err := r.Run(context.Background())
@@ -497,17 +497,17 @@ func TestRun_SMDeleteError(t *testing.T) {
 		StagedAt:  time.Now(),
 	})
 
-	smMock := newSMStrategy()
-	smMock.pushFunc = func(_ context.Context, _ string, _ staging.Entry) error {
+	secretMock := newSecretStrategy()
+	secretMock.pushFunc = func(_ context.Context, _ string, _ staging.Entry) error {
 		return fmt.Errorf("delete secret failed")
 	}
 
 	var buf, errBuf bytes.Buffer
 	r := &push.Runner{
-		SMStrategy: smMock,
-		Store:      store,
-		Stdout:     &buf,
-		Stderr:     &errBuf,
+		SecretStrategy: secretMock,
+		Store:          store,
+		Stdout:         &buf,
+		Stderr:         &errBuf,
 	}
 
 	err := r.Run(context.Background())
@@ -527,17 +527,17 @@ func TestRun_SSMSetError(t *testing.T) {
 		StagedAt:  time.Now(),
 	})
 
-	ssmMock := newSSMStrategy()
-	ssmMock.pushFunc = func(_ context.Context, _ string, _ staging.Entry) error {
+	paramMock := newParamStrategy()
+	paramMock.pushFunc = func(_ context.Context, _ string, _ staging.Entry) error {
 		return fmt.Errorf("put parameter failed")
 	}
 
 	var buf, errBuf bytes.Buffer
 	r := &push.Runner{
-		SSMStrategy: ssmMock,
-		Store:       store,
-		Stdout:      &buf,
-		Stderr:      &errBuf,
+		ParamStrategy: paramMock,
+		Store:         store,
+		Stdout:        &buf,
+		Stderr:        &errBuf,
 	}
 
 	err := r.Run(context.Background())

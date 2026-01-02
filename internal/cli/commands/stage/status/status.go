@@ -29,7 +29,7 @@ type Options struct {
 func Command() *cli.Command {
 	return &cli.Command{
 		Name:  "status",
-		Usage: "Show all staged changes (SSM and SM)",
+		Usage: "Show all staged changes (SSM Parameter Store and Secrets Manager)",
 		Description: `Display all staged changes for both SSM Parameter Store and Secrets Manager.
 
 Use -v/--verbose to show detailed information including the staged values.
@@ -81,19 +81,19 @@ func (r *Runner) Run(_ context.Context, opts Options) error {
 
 	printer := &staging.EntryPrinter{Writer: r.Stdout}
 
-	// Show SSM changes (no DeleteOptions for SSM)
+	// Show SSM Parameter Store changes (no DeleteOptions for SSM Parameter Store)
 	if ssmEntries, ok := entries[staging.ServiceParam]; ok && len(ssmEntries) > 0 {
-		_, _ = fmt.Fprintf(r.Stdout, "%s (%d):\n", colors.Warning("Staged SSM changes"), len(ssmEntries))
+		_, _ = fmt.Fprintf(r.Stdout, "%s (%d):\n", colors.Warning("Staged SSM Parameter Store changes"), len(ssmEntries))
 		printEntries(printer, ssmEntries, opts.Verbose, false)
 	}
 
-	// Show SM changes (with DeleteOptions)
+	// Show Secrets Manager changes (with DeleteOptions)
 	if smEntries, ok := entries[staging.ServiceSecret]; ok && len(smEntries) > 0 {
-		// Add spacing if we printed SSM entries
+		// Add spacing if we printed SSM Parameter Store entries
 		if _, ok := entries[staging.ServiceParam]; ok && len(entries[staging.ServiceParam]) > 0 {
 			_, _ = fmt.Fprintln(r.Stdout)
 		}
-		_, _ = fmt.Fprintf(r.Stdout, "%s (%d):\n", colors.Warning("Staged SM changes"), len(smEntries))
+		_, _ = fmt.Fprintf(r.Stdout, "%s (%d):\n", colors.Warning("Staged Secrets Manager changes"), len(smEntries))
 		printEntries(printer, smEntries, opts.Verbose, true)
 	}
 

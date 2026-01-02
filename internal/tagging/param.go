@@ -9,15 +9,15 @@ import (
 	"github.com/samber/lo"
 )
 
-// SSMClient is the interface for SSM tag operations.
-type SSMClient interface {
+// ParamClient is the interface for SSM Parameter Store tag operations.
+type ParamClient interface {
 	AddTagsToResource(ctx context.Context, params *ssm.AddTagsToResourceInput, optFns ...func(*ssm.Options)) (*ssm.AddTagsToResourceOutput, error)
 	RemoveTagsFromResource(ctx context.Context, params *ssm.RemoveTagsFromResourceInput, optFns ...func(*ssm.Options)) (*ssm.RemoveTagsFromResourceOutput, error)
 }
 
-// ApplySSM applies tag changes to an SSM parameter.
+// ApplyParam applies tag changes to an SSM Parameter Store parameter.
 // The resourceID should be the parameter name (e.g., "/my/param").
-func ApplySSM(ctx context.Context, client SSMClient, resourceID string, change *Change) error {
+func ApplyParam(ctx context.Context, client ParamClient, resourceID string, change *Change) error {
 	if change.IsEmpty() {
 		return nil
 	}

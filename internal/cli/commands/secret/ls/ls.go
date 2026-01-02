@@ -1,4 +1,4 @@
-// Package ls provides the SM ls command.
+// Package ls provides the Secrets Manager ls command.
 package ls
 
 import (

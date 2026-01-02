@@ -24,13 +24,13 @@ Use 'suve stage param' for SSM Parameter Store operations.
 Use 'suve stage secret' for Secrets Manager operations.
 
 Global commands operate on all staged changes:
-   status    Show all staged changes (SSM and SM)
+   status    Show all staged changes (SSM Parameter Store and Secrets Manager)
    diff      Show diff of all staged changes vs AWS
    apply     Apply all staged changes to AWS
    reset     Unstage all changes
 
 EXAMPLES:
-   suve stage param add /my/param       Stage a new SSM parameter
+   suve stage param add /my/param       Stage a new SSM Parameter Store parameter
    suve stage secret edit my-secret     Edit and stage a secret
    suve stage status                    View all staged changes
    suve stage apply                     Apply all staged changes`,

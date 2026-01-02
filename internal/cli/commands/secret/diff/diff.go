@@ -1,4 +1,4 @@
-// Package diff provides the SM diff command for comparing secret versions.
+// Package diff provides the Secrets Manager diff command for comparing secret versions.
 //
 // The diff command supports multiple argument formats:
 //   - Full Spec: Both arguments include name and version (e.g., secret:AWSPREVIOUS secret:AWSCURRENT)

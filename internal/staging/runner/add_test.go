@@ -130,7 +130,7 @@ func TestAddRunner_Run(t *testing.T) {
 		assert.Contains(t, buf.String(), "No changes made")
 	})
 
-	t.Run("SM service", func(t *testing.T) {
+	t.Run("Secrets Manager service", func(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()

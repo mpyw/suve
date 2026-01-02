@@ -1,4 +1,4 @@
-// Package delete provides the SSM delete command.
+// Package delete provides the SSM Parameter Store delete command.
 package delete
 
 import (

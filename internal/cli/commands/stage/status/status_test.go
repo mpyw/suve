@@ -58,9 +58,9 @@ func TestCommand_ShowSSMChangesOnly(t *testing.T) {
 	require.NoError(t, err)
 
 	output := buf.String()
-	assert.Contains(t, output, "Staged SSM changes")
+	assert.Contains(t, output, "Staged SSM Parameter Store changes")
 	assert.Contains(t, output, "/app/config")
-	assert.NotContains(t, output, "Staged SM changes")
+	assert.NotContains(t, output, "Staged Secrets Manager changes")
 }
 
 func TestCommand_ShowSMChangesOnly(t *testing.T) {
@@ -87,9 +87,9 @@ func TestCommand_ShowSMChangesOnly(t *testing.T) {
 	require.NoError(t, err)
 
 	output := buf.String()
-	assert.Contains(t, output, "Staged SM changes")
+	assert.Contains(t, output, "Staged Secrets Manager changes")
 	assert.Contains(t, output, "my-secret")
-	assert.NotContains(t, output, "Staged SSM changes")
+	assert.NotContains(t, output, "Staged SSM Parameter Store changes")
 }
 
 func TestCommand_ShowBothSSMAndSMChanges(t *testing.T) {
@@ -120,10 +120,10 @@ func TestCommand_ShowBothSSMAndSMChanges(t *testing.T) {
 	require.NoError(t, err)
 
 	output := buf.String()
-	assert.Contains(t, output, "Staged SSM changes")
+	assert.Contains(t, output, "Staged SSM Parameter Store changes")
 	assert.Contains(t, output, "/app/config")
 	assert.Contains(t, output, "M")
-	assert.Contains(t, output, "Staged SM changes")
+	assert.Contains(t, output, "Staged Secrets Manager changes")
 	assert.Contains(t, output, "my-secret")
 	assert.Contains(t, output, "D")
 }

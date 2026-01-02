@@ -21,7 +21,7 @@ func Command() *cli.Command {
 	return &cli.Command{
 		Name:    "param",
 		Aliases: []string{"ssm", "ps"},
-		Usage:   "Staging operations for SSM parameters",
+		Usage:   "Staging operations for SSM Parameter Store parameters",
 		Description: `Stage changes locally before pushing to AWS.
 
 Use 'suve stage param add' to create and stage a new parameter.

@@ -16,7 +16,7 @@ import (
 	"github.com/mpyw/suve/internal/version/secretversion"
 )
 
-// SecretClient is the combined interface for SM stage operations.
+// SecretClient is the combined interface for Secrets Manager stage operations.
 type SecretClient interface {
 	secretapi.GetSecretValueAPI
 	secretapi.ListSecretVersionIdsAPI
@@ -33,7 +33,7 @@ type SecretStrategy struct {
 	Client SecretClient
 }
 
-// NewSecretStrategy creates a new SM strategy.
+// NewSecretStrategy creates a new Secrets Manager strategy.
 func NewSecretStrategy(client SecretClient) *SecretStrategy {
 	return &SecretStrategy{Client: client}
 }
@@ -53,7 +53,7 @@ func (s *SecretStrategy) ItemName() string {
 	return "secret"
 }
 
-// HasDeleteOptions returns true as SM has delete options.
+// HasDeleteOptions returns true as Secrets Manager has delete options.
 func (s *SecretStrategy) HasDeleteOptions() bool {
 	return true
 }
@@ -125,7 +125,7 @@ func (s *SecretStrategy) pushUpdate(ctx context.Context, name string, entry Entr
 			Remove: entry.UntagKeys,
 		}
 		if !change.IsEmpty() {
-			if err := tagging.ApplySM(ctx, s.Client, name, change); err != nil {
+			if err := tagging.ApplySecret(ctx, s.Client, name, change); err != nil {
 				return err
 			}
 		}

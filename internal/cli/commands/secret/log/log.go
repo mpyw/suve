@@ -1,4 +1,4 @@
-// Package log provides the SM log command for viewing secret version history.
+// Package log provides the Secrets Manager log command for viewing secret version history.
 //
 // The log command displays version history with optional patch/diff output,
 // similar to git log. Use -p/--patch to show differences between consecutive versions.

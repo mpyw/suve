@@ -1,4 +1,4 @@
-// Package log provides the SSM log command for viewing parameter version history.
+// Package log provides the SSM Parameter Store log command for viewing parameter version history.
 //
 // The log command displays version history with optional patch/diff output,
 // similar to git log. Use -p/--patch to show differences between consecutive versions.

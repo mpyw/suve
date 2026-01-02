@@ -211,7 +211,7 @@ func TestStatusRunner_Run(t *testing.T) {
 		assert.Contains(t, output, "/app/config3")
 	})
 
-	t.Run("show all - SM service with delete options", func(t *testing.T) {
+	t.Run("show all - Secrets Manager service with delete options", func(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
@@ -1147,7 +1147,7 @@ func TestResetRunner_Run(t *testing.T) {
 func TestRunners_SMService(t *testing.T) {
 	t.Parallel()
 
-	t.Run("status runner with SM", func(t *testing.T) {
+	t.Run("status runner with Secrets Manager", func(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
@@ -1171,7 +1171,7 @@ func TestRunners_SMService(t *testing.T) {
 		assert.Contains(t, stdout.String(), "my-secret")
 	})
 
-	t.Run("push runner with SM", func(t *testing.T) {
+	t.Run("push runner with Secrets Manager", func(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()

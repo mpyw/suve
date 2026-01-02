@@ -1,4 +1,4 @@
-// Package update provides the SM update command.
+// Package update provides the Secrets Manager update command.
 package update
 
 import (
@@ -163,7 +163,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 
 	// Apply tag changes (additive)
 	if opts.TagChange != nil && !opts.TagChange.IsEmpty() {
-		if err := tagging.ApplySM(ctx, r.Client, opts.Name, opts.TagChange); err != nil {
+		if err := tagging.ApplySecret(ctx, r.Client, opts.Name, opts.TagChange); err != nil {
 			return err
 		}
 	}

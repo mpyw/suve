@@ -33,12 +33,12 @@ type Entry struct {
 	Tags        map[string]string `json:"tags,omitempty"`
 	UntagKeys   []string          `json:"untag_keys,omitempty"`
 	StagedAt    time.Time         `json:"staged_at"`
-	// DeleteOptions holds SM-specific delete options.
-	// Only used when Operation is OperationDelete and service is SM.
+	// DeleteOptions holds Secrets Manager-specific delete options.
+	// Only used when Operation is OperationDelete and service is Secrets Manager.
 	DeleteOptions *DeleteOptions `json:"delete_options,omitempty"`
 }
 
-// DeleteOptions holds options for SM delete operations.
+// DeleteOptions holds options for Secrets Manager delete operations.
 type DeleteOptions struct {
 	// Force enables immediate permanent deletion without recovery window.
 	Force bool `json:"force,omitempty"`

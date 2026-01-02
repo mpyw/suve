@@ -1,4 +1,4 @@
-// Package show provides the SSM show command.
+// Package show provides the SSM Parameter Store show command.
 package show
 
 import (

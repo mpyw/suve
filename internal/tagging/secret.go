@@ -9,15 +9,15 @@ import (
 	"github.com/samber/lo"
 )
 
-// SMClient is the interface for Secrets Manager tag operations.
-type SMClient interface {
+// SecretClient is the interface for Secrets Manager tag operations.
+type SecretClient interface {
 	TagResource(ctx context.Context, params *secretsmanager.TagResourceInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.TagResourceOutput, error)
 	UntagResource(ctx context.Context, params *secretsmanager.UntagResourceInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.UntagResourceOutput, error)
 }
 
-// ApplySM applies tag changes to a Secrets Manager secret.
+// ApplySecret applies tag changes to a Secrets Manager secret.
 // The secretID should be the secret name or ARN.
-func ApplySM(ctx context.Context, client SMClient, secretID string, change *Change) error {
+func ApplySecret(ctx context.Context, client SecretClient, secretID string, change *Change) error {
 	if change.IsEmpty() {
 		return nil
 	}

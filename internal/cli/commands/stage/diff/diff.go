@@ -26,25 +26,25 @@ import (
 	"github.com/mpyw/suve/internal/version/secretversion"
 )
 
-// SSMClient is the interface for SSM operations.
-type SSMClient interface {
+// ParamClient is the interface for SSM Parameter Store operations.
+type ParamClient interface {
 	paramapi.GetParameterAPI
 	paramapi.GetParameterHistoryAPI
 }
 
-// SMClient is the interface for SM operations.
-type SMClient interface {
+// SecretClient is the interface for Secrets Manager operations.
+type SecretClient interface {
 	secretapi.GetSecretValueAPI
 	secretapi.ListSecretVersionIdsAPI
 }
 
 // Runner executes the diff command.
 type Runner struct {
-	SSMClient SSMClient
-	SMClient  SMClient
-	Store     *staging.Store
-	Stdout    io.Writer
-	Stderr    io.Writer
+	ParamClient  ParamClient
+	SecretClient SecretClient
+	Store        *staging.Store
+	Stdout       io.Writer
+	Stderr       io.Writer
 }
 
 // Options holds the options for the diff command.
@@ -57,7 +57,7 @@ type Options struct {
 func Command() *cli.Command {
 	return &cli.Command{
 		Name:  "diff",
-		Usage: "Show diff of all staged changes (SSM and SM)",
+		Usage: "Show diff of all staged changes (SSM Parameter Store and Secrets Manager)",
 		Description: `Compare all staged changes against AWS current values.
 
 For comparing specific versions, use 'suve param diff' or 'suve secret diff'.
@@ -117,17 +117,17 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	if hasSSM {
 		ssmClient, err := infra.NewParamClient(ctx)
 		if err != nil {
-			return fmt.Errorf("failed to initialize SSM client: %w", err)
+			return fmt.Errorf("failed to initialize SSM Parameter Store client: %w", err)
 		}
-		r.SSMClient = ssmClient
+		r.ParamClient = ssmClient
 	}
 
 	if hasSM {
 		smClient, err := infra.NewSecretClient(ctx)
 		if err != nil {
-			return fmt.Errorf("failed to initialize SM client: %w", err)
+			return fmt.Errorf("failed to initialize Secrets Manager client: %w", err)
 		}
-		r.SMClient = smClient
+		r.SecretClient = smClient
 	}
 
 	opts := Options{
@@ -154,17 +154,17 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 	// Fetch all values in parallel
 	ssmResults := parallel.ExecuteMap(ctx, ssmEntries, func(ctx context.Context, name string, _ staging.Entry) (*types.ParameterHistory, error) {
 		spec := &paramversion.Spec{Name: name}
-		return paramversion.GetParameterWithVersion(ctx, r.SSMClient, spec, true)
+		return paramversion.GetParameterWithVersion(ctx, r.ParamClient, spec, true)
 	})
 
 	smResults := parallel.ExecuteMap(ctx, smEntries, func(ctx context.Context, name string, _ staging.Entry) (*secretsmanager.GetSecretValueOutput, error) {
 		spec := &secretversion.Spec{Name: name}
-		return secretversion.GetSecretWithVersion(ctx, r.SMClient, spec)
+		return secretversion.GetSecretWithVersion(ctx, r.SecretClient, spec)
 	})
 
 	first := true
 
-	// Process SSM entries in sorted order
+	// Process SSM Parameter Store entries in sorted order
 	for _, name := range maputil.SortedKeys(ssmEntries) {
 		entry := ssmEntries[name]
 		result := ssmResults[name]
@@ -211,7 +211,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 		}
 	}
 
-	// Process SM entries in sorted order
+	// Process Secrets Manager entries in sorted order
 	for _, name := range maputil.SortedKeys(smEntries) {
 		entry := smEntries[name]
 		result := smResults[name]

@@ -1,4 +1,4 @@
-// Package ls provides the SSM ls command.
+// Package ls provides the SSM Parameter Store ls command.
 package ls
 
 import (

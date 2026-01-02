@@ -11,8 +11,8 @@
 //   - <shift>    is ~ or ~N for relative version shift (optional, repeatable)
 //
 // Examples:
-//   - SSM: /my/param, /my/param#3, /my/param~1, /my/param#5~2
-//   - SM:  my-secret, my-secret#abc123, my-secret:AWSCURRENT, my-secret~1
+//   - SSM Parameter Store: /my/param, /my/param#3, /my/param~1, /my/param#5~2
+//   - Secrets Manager: my-secret, my-secret#abc123, my-secret:AWSCURRENT, my-secret~1
 package version
 
 import (
@@ -33,7 +33,7 @@ var (
 
 // Spec represents a parsed version specification.
 // The type parameter A holds service-specific absolute version info
-// (e.g., version number for SSM, version ID or label for SM).
+// (e.g., version number for SSM Parameter Store, version ID or label for Secrets Manager).
 type Spec[A any] struct {
 	Name     string // Parameter/secret name (e.g., "/my/param", "my-secret")
 	Absolute A      // Absolute version specifier (type-specific, zero value if not specified)
@@ -46,10 +46,10 @@ func (s *Spec[A]) HasShift() bool {
 }
 
 // SpecifierParser defines how to parse a single type of absolute specifier.
-// Each service (SSM/SM) defines its own set of SpecifierParsers.
+// Each service (SSM Parameter Store/Secrets Manager) defines its own set of SpecifierParsers.
 //
-// For example, SSM has one parser for "#" (version number),
-// while SM has two parsers for "#" (version ID) and ":" (label).
+// For example, SSM Parameter Store has one parser for "#" (version number),
+// while Secrets Manager has two parsers for "#" (version ID) and ":" (label).
 type SpecifierParser[A any] struct {
 	// PrefixChar is the character that starts this specifier (e.g., '#', ':').
 	PrefixChar byte
@@ -65,7 +65,7 @@ type SpecifierParser[A any] struct {
 	Error error
 
 	// Duplicated returns true if this specifier type is already set in abs.
-	// Used to detect conflicting specifiers (e.g., both #id and :label in SM).
+	// Used to detect conflicting specifiers (e.g., both #id and :label in Secrets Manager).
 	// Can be nil if duplicate checking is not needed.
 	Duplicated func(abs A) bool
 
@@ -76,7 +76,7 @@ type SpecifierParser[A any] struct {
 }
 
 // AbsoluteParser holds the configuration for parsing absolute specifiers.
-// Each service (SSM/SM) creates its own AbsoluteParser instance.
+// Each service (SSM Parameter Store/Secrets Manager) creates its own AbsoluteParser instance.
 type AbsoluteParser[A any] struct {
 	// Parsers is the list of specifier parsers to try, in order.
 	Parsers []SpecifierParser[A]
@@ -191,7 +191,7 @@ func findNameEnd[A any](input string, parsers []SpecifierParser[A]) (int, error)
 // Repeatedly matches PrefixChar + value until no more matches.
 // Stops when encountering '~' (shift) or unrecognized character.
 //
-// Example: "#3:LABEL" with SM parser -> parses "#3", then ":LABEL"
+// Example: "#3:LABEL" with Secrets Manager parser -> parses "#3", then ":LABEL"
 // Example: "#3~1" -> parses "#3", returns "~1" as remaining
 //
 // Returns error for duplicate/conflicting specifiers or Apply failures.

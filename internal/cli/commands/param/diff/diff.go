@@ -1,4 +1,4 @@
-// Package diff provides the SSM diff command for comparing parameter versions.
+// Package diff provides the SSM Parameter Store diff command for comparing parameter versions.
 package diff
 
 import (
