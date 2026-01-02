@@ -95,6 +95,15 @@ type ResetStrategy interface {
 	FetchVersion(ctx context.Context, input string) (value string, versionLabel string, err error)
 }
 
+// DeleteStrategy defines service-specific delete staging operations.
+type DeleteStrategy interface {
+	ServiceStrategy
+
+	// FetchLastModified returns the last modified time of the resource in AWS.
+	// Used for conflict detection when applying delete operations.
+	FetchLastModified(ctx context.Context, name string) (time.Time, error)
+}
+
 // FullStrategy combines all service-specific strategy interfaces.
 // This enables unified stage commands that work with either SSM Parameter Store or Secrets Manager.
 type FullStrategy interface {
