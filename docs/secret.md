@@ -1,6 +1,6 @@
 # Secrets Manager Commands
 
-[<- Back to README](../README.md) | [<- SSM Parameter Store Commands](ssm.md)
+[<- Back to README](../README.md) | [<- SSM Parameter Store Commands](param.md)
 
 Primary command: `secret`
 Aliases: `sm`
@@ -147,6 +147,11 @@ With `--patch` to see what changed:
 
 ```ShellSession
 user@host:~$ suve secret log --patch my-database-credentials
+```
+
+Output will look like:
+
+```diff
 Version abc12345 [AWSCURRENT]
 Date: 2024-01-15T10:30:45Z
 
@@ -242,6 +247,11 @@ Compare AWSPREVIOUS with AWSCURRENT:
 
 ```ShellSession
 user@host:~$ suve secret diff my-database-credentials:AWSPREVIOUS
+```
+
+Output will look like:
+
+```diff
 --- my-database-credentials#def67890
 +++ my-database-credentials#abc12345
 @@ -1 +1 @@
@@ -253,6 +263,11 @@ Compare using shift syntax:
 
 ```ShellSession
 user@host:~$ suve secret diff my-database-credentials~1
+```
+
+Output will look like:
+
+```diff
 --- my-database-credentials#def67890
 +++ my-database-credentials#abc12345
 @@ -1 +1 @@
@@ -766,6 +781,11 @@ suve stage secret diff [options] [name]
 
 ```ShellSession
 user@host:~$ suve stage secret diff
+```
+
+Output will look like:
+
+```diff
 --- my-database-credentials (AWS)
 +++ my-database-credentials (staged)
 @@ -1 +1 @@
@@ -782,6 +802,11 @@ For secrets staged for deletion:
 
 ```ShellSession
 user@host:~$ suve stage secret diff my-old-secret
+```
+
+Output will look like:
+
+```diff
 --- my-old-secret (AWS)
 +++ my-old-secret (staged for deletion)
 @@ -1 +0,0 @@

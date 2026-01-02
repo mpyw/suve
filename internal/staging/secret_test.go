@@ -490,3 +490,258 @@ func TestSecretParserFactory(t *testing.T) {
 	require.NotNil(t, parser)
 	assert.Equal(t, staging.ServiceSecret, parser.Service())
 }
+
+func TestSecretStrategy_FetchLastModified(t *testing.T) {
+	t.Parallel()
+
+	now := time.Now()
+
+	t.Run("success - returns created date", func(t *testing.T) {
+		t.Parallel()
+		mock := &secretMockClient{
+			getSecretValueFunc: func(_ context.Context, _ *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) {
+				return &secretapi.GetSecretValueOutput{
+					Name:        lo.ToPtr("my-secret"),
+					CreatedDate: &now,
+				}, nil
+			},
+		}
+
+		s := staging.NewSecretStrategy(mock)
+		result, err := s.FetchLastModified(context.Background(), "my-secret")
+		require.NoError(t, err)
+		assert.Equal(t, now, result)
+	})
+
+	t.Run("not found - returns zero time", func(t *testing.T) {
+		t.Parallel()
+		mock := &secretMockClient{
+			getSecretValueFunc: func(_ context.Context, _ *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) {
+				return nil, &secretapi.ResourceNotFoundException{}
+			},
+		}
+
+		s := staging.NewSecretStrategy(mock)
+		result, err := s.FetchLastModified(context.Background(), "my-secret")
+		require.NoError(t, err)
+		assert.True(t, result.IsZero())
+	})
+
+	t.Run("other error - returns error", func(t *testing.T) {
+		t.Parallel()
+		mock := &secretMockClient{
+			getSecretValueFunc: func(_ context.Context, _ *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) {
+				return nil, errors.New("access denied")
+			},
+		}
+
+		s := staging.NewSecretStrategy(mock)
+		_, err := s.FetchLastModified(context.Background(), "my-secret")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to get secret")
+	})
+
+	t.Run("nil CreatedDate - returns zero time", func(t *testing.T) {
+		t.Parallel()
+		mock := &secretMockClient{
+			getSecretValueFunc: func(_ context.Context, _ *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) {
+				return &secretapi.GetSecretValueOutput{
+					Name:        lo.ToPtr("my-secret"),
+					CreatedDate: nil,
+				}, nil
+			},
+		}
+
+		s := staging.NewSecretStrategy(mock)
+		result, err := s.FetchLastModified(context.Background(), "my-secret")
+		require.NoError(t, err)
+		assert.True(t, result.IsZero())
+	})
+}
+
+func TestSecretStrategy_Apply_WithOptions(t *testing.T) {
+	t.Parallel()
+
+	t.Run("create with description", func(t *testing.T) {
+		t.Parallel()
+		mock := &secretMockClient{
+			createSecretFunc: func(_ context.Context, params *secretapi.CreateSecretInput, _ ...func(*secretapi.Options)) (*secretapi.CreateSecretOutput, error) {
+				assert.Equal(t, "Test description", lo.FromPtr(params.Description))
+				return &secretapi.CreateSecretOutput{}, nil
+			},
+		}
+
+		s := staging.NewSecretStrategy(mock)
+		err := s.Apply(context.Background(), "my-secret", staging.Entry{
+			Operation:   staging.OperationCreate,
+			Value:       lo.ToPtr("secret-value"),
+			Description: lo.ToPtr("Test description"),
+		})
+		require.NoError(t, err)
+	})
+
+	t.Run("create with tags", func(t *testing.T) {
+		t.Parallel()
+		mock := &secretMockClient{
+			createSecretFunc: func(_ context.Context, params *secretapi.CreateSecretInput, _ ...func(*secretapi.Options)) (*secretapi.CreateSecretOutput, error) {
+				assert.Len(t, params.Tags, 2)
+				return &secretapi.CreateSecretOutput{}, nil
+			},
+		}
+
+		s := staging.NewSecretStrategy(mock)
+		err := s.Apply(context.Background(), "my-secret", staging.Entry{
+			Operation: staging.OperationCreate,
+			Value:     lo.ToPtr("secret-value"),
+			Tags:      map[string]string{"env": "test", "owner": "team"},
+		})
+		require.NoError(t, err)
+	})
+
+	t.Run("update with description", func(t *testing.T) {
+		t.Parallel()
+		updateSecretCalled := false
+		mock := &secretMockClient{
+			putSecretValueFunc: func(_ context.Context, _ *secretapi.PutSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.PutSecretValueOutput, error) {
+				return &secretapi.PutSecretValueOutput{}, nil
+			},
+			updateSecretFunc: func(_ context.Context, params *secretapi.UpdateSecretInput, _ ...func(*secretapi.Options)) (*secretapi.UpdateSecretOutput, error) {
+				updateSecretCalled = true
+				assert.Equal(t, "Updated description", lo.FromPtr(params.Description))
+				return &secretapi.UpdateSecretOutput{}, nil
+			},
+		}
+
+		s := staging.NewSecretStrategy(mock)
+		err := s.Apply(context.Background(), "my-secret", staging.Entry{
+			Operation:   staging.OperationUpdate,
+			Value:       lo.ToPtr("updated-value"),
+			Description: lo.ToPtr("Updated description"),
+		})
+		require.NoError(t, err)
+		assert.True(t, updateSecretCalled)
+	})
+
+	t.Run("update with description error", func(t *testing.T) {
+		t.Parallel()
+		mock := &secretMockClient{
+			putSecretValueFunc: func(_ context.Context, _ *secretapi.PutSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.PutSecretValueOutput, error) {
+				return &secretapi.PutSecretValueOutput{}, nil
+			},
+			updateSecretFunc: func(_ context.Context, _ *secretapi.UpdateSecretInput, _ ...func(*secretapi.Options)) (*secretapi.UpdateSecretOutput, error) {
+				return nil, errors.New("update description failed")
+			},
+		}
+
+		s := staging.NewSecretStrategy(mock)
+		err := s.Apply(context.Background(), "my-secret", staging.Entry{
+			Operation:   staging.OperationUpdate,
+			Value:       lo.ToPtr("updated-value"),
+			Description: lo.ToPtr("Updated description"),
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to update description")
+	})
+
+	t.Run("update with tags", func(t *testing.T) {
+		t.Parallel()
+		tagResourceCalled := false
+		mock := &secretMockClient{
+			putSecretValueFunc: func(_ context.Context, _ *secretapi.PutSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.PutSecretValueOutput, error) {
+				return &secretapi.PutSecretValueOutput{}, nil
+			},
+			tagResourceFunc: func(_ context.Context, params *secretapi.TagResourceInput, _ ...func(*secretapi.Options)) (*secretapi.TagResourceOutput, error) {
+				tagResourceCalled = true
+				assert.Len(t, params.Tags, 1)
+				return &secretapi.TagResourceOutput{}, nil
+			},
+		}
+
+		s := staging.NewSecretStrategy(mock)
+		err := s.Apply(context.Background(), "my-secret", staging.Entry{
+			Operation: staging.OperationUpdate,
+			Value:     lo.ToPtr("updated-value"),
+			Tags:      map[string]string{"env": "prod"},
+		})
+		require.NoError(t, err)
+		assert.True(t, tagResourceCalled)
+	})
+
+	t.Run("update with untag keys", func(t *testing.T) {
+		t.Parallel()
+		untagResourceCalled := false
+		mock := &secretMockClient{
+			putSecretValueFunc: func(_ context.Context, _ *secretapi.PutSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.PutSecretValueOutput, error) {
+				return &secretapi.PutSecretValueOutput{}, nil
+			},
+			untagResourceFunc: func(_ context.Context, params *secretapi.UntagResourceInput, _ ...func(*secretapi.Options)) (*secretapi.UntagResourceOutput, error) {
+				untagResourceCalled = true
+				assert.Contains(t, params.TagKeys, "old-tag")
+				return &secretapi.UntagResourceOutput{}, nil
+			},
+		}
+
+		s := staging.NewSecretStrategy(mock)
+		err := s.Apply(context.Background(), "my-secret", staging.Entry{
+			Operation: staging.OperationUpdate,
+			Value:     lo.ToPtr("updated-value"),
+			UntagKeys: []string{"old-tag"},
+		})
+		require.NoError(t, err)
+		assert.True(t, untagResourceCalled)
+	})
+
+	t.Run("update tagging error", func(t *testing.T) {
+		t.Parallel()
+		mock := &secretMockClient{
+			putSecretValueFunc: func(_ context.Context, _ *secretapi.PutSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.PutSecretValueOutput, error) {
+				return &secretapi.PutSecretValueOutput{}, nil
+			},
+			tagResourceFunc: func(_ context.Context, _ *secretapi.TagResourceInput, _ ...func(*secretapi.Options)) (*secretapi.TagResourceOutput, error) {
+				return nil, errors.New("tagging failed")
+			},
+		}
+
+		s := staging.NewSecretStrategy(mock)
+		err := s.Apply(context.Background(), "my-secret", staging.Entry{
+			Operation: staging.OperationUpdate,
+			Value:     lo.ToPtr("updated-value"),
+			Tags:      map[string]string{"env": "prod"},
+		})
+		require.Error(t, err)
+	})
+
+	t.Run("delete already deleted", func(t *testing.T) {
+		t.Parallel()
+		mock := &secretMockClient{
+			deleteSecretFunc: func(_ context.Context, _ *secretapi.DeleteSecretInput, _ ...func(*secretapi.Options)) (*secretapi.DeleteSecretOutput, error) {
+				return nil, &secretapi.ResourceNotFoundException{}
+			},
+		}
+
+		s := staging.NewSecretStrategy(mock)
+		err := s.Apply(context.Background(), "my-secret", staging.Entry{
+			Operation: staging.OperationDelete,
+		})
+		require.NoError(t, err) // Should succeed even if already deleted
+	})
+}
+
+func TestSecretStrategy_FetchCurrentValue_NoCreatedDate(t *testing.T) {
+	t.Parallel()
+
+	mock := &secretMockClient{
+		getSecretValueFunc: func(_ context.Context, _ *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) {
+			return &secretapi.GetSecretValueOutput{
+				SecretString: lo.ToPtr("secret-value"),
+				CreatedDate:  nil,
+			}, nil
+		},
+	}
+
+	s := staging.NewSecretStrategy(mock)
+	result, err := s.FetchCurrentValue(context.Background(), "my-secret")
+	require.NoError(t, err)
+	assert.Equal(t, "secret-value", result.Value)
+	assert.True(t, result.LastModified.IsZero())
+}

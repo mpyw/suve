@@ -207,29 +207,46 @@ suve stage reset
 
 ## Version Specification
 
-Navigate versions with Git-like syntax:
+Navigate versions with Git-like syntax.
+
+### SSM Parameter Store
+
+> [!NOTE]
+> SSM Parameter Store uses numeric version numbers (1, 2, 3, ...) that auto-increment on each update.
 
 ```
-# SSM Parameter Store
 <name>[#VERSION][~SHIFT]*
-
-# Secrets Manager
-<name>[#VERSION | :LABEL][~SHIFT]*
-
 where ~SHIFT = ~ | ~N  (repeatable, cumulative)
 ```
 
-| Syntax | Description | Service |
-|--------|-------------|---------|
-| `/my/param` | Latest version | SSM |
-| `/my/param#3` | Version 3 | SSM |
-| `/my/param~1` | 1 version ago | SSM |
-| `/my/param#5~2` | Version 5 minus 2 = Version 3 | SSM |
-| `/my/param~~` | 2 versions ago (`~1~1`) | SSM |
-| `my-secret` | Current (AWSCURRENT) | SM |
-| `my-secret:AWSPREVIOUS` | Previous staging label | SM |
-| `my-secret#abc123` | Specific version ID | SM |
-| `my-secret~1` | 1 version ago | SM |
+| Syntax | Description |
+|--------|-------------|
+| `/my/param` | Latest version |
+| `/my/param#3` | Version 3 |
+| `/my/param~1` | 1 version ago |
+| `/my/param#5~2` | Version 5 minus 2 = Version 3 |
+| `/my/param~~` | 2 versions ago (`~1~1`) |
+
+### Secrets Manager
+
+> [!NOTE]
+> Secrets Manager uses UUID version IDs and staging labels instead of numeric versions.
+> `AWSCURRENT` and `AWSPREVIOUS` are special labels automatically managed by AWS—`AWSCURRENT` always points to the latest version.
+
+```
+<name>[#VERSION | :LABEL][~SHIFT]*
+where ~SHIFT = ~ | ~N  (repeatable, cumulative)
+```
+
+| Syntax | Description |
+|--------|-------------|
+| `my-secret` | Current (AWSCURRENT) |
+| `my-secret:AWSPREVIOUS` | Previous staging label |
+| `my-secret#abc123` | Specific version ID |
+| `my-secret~1` | 1 version ago |
+
+> [!IMPORTANT]
+> When specifying version-only syntax like `'#3'` or `':AWSPREVIOUS'`, you must use quotes to prevent shell interpretation of the `#` (comment) or `:` characters.
 
 > [!TIP]
 > `~` without a number means `~1`. You can chain them: `~~` = `~1~1` = `~2`
@@ -238,69 +255,67 @@ where ~SHIFT = ~ | ~N  (repeatable, cumulative)
 
 ### Services
 
-| Service | Aliases | Documentation |
-|---------|---------|---------------|
-| SSM Parameter Store | `param`, `ssm`, `ps` | [docs/ssm.md](docs/ssm.md) |
-| Secrets Manager | `secret`, `sm` | [docs/sm.md](docs/sm.md) |
+| Service | Aliases |
+|---------|---------|
+| [SSM Parameter Store](docs/param.md) | `param`, `ssm`, `ps` |
+| [Secrets Manager](docs/secret.md) | `secret`, `sm` |
 
 ### SSM Parameter Store
 
-| Command | Description |
-|---------|-------------|
-| `suve param show <name>` | Display parameter with metadata |
-| `suve param show --raw <name>` | Output raw value (for piping) |
-| `suve param log <name>` | Show version history |
-| `suve param diff <spec1> [spec2]` | Compare versions |
-| `suve param list [path]` | List parameters |
-| `suve param set <name> <value>` | Create or update parameter |
-| `suve param delete <name>` | Delete parameter |
+| Command | Options | Description |
+|---------|---------|-------------|
+| [`suve param show`](docs/param.md#show) | `--raw`<br>`--output=<FORMAT>` | Display parameter with metadata |
+| [`suve param log`](docs/param.md#log) | `--number=<N>` (`-n`)<br>`--patch` (`-p`)<br>`--parse-json` (`-j`)<br>`--oneline`<br>`--reverse`<br>`--from=<SPEC>`<br>`--to=<SPEC>`<br>`--output=<FORMAT>` | Show version history |
+| [`suve param diff`](docs/param.md#diff) | `--parse-json` (`-j`)<br>`--output=<FORMAT>` | Compare versions |
+| [`suve param list`](docs/param.md#list) | `--filter=<REGEX>`<br>`--show`<br>`--output=<FORMAT>` | List parameters |
+| [`suve param set`](docs/param.md#set) | `--description=<TEXT>`<br>`--tag=<KEY>=<VALUE> --tag=...` | Create or update parameter |
+| [`suve param delete`](docs/param.md#delete) | | Delete parameter |
 
 **Staging commands** (under `suve stage param`):
 
-| Command | Description |
-|---------|-------------|
-| `suve stage param add <name> [value]` | Stage new parameter |
-| `suve stage param edit <name> [value]` | Stage modification |
-| `suve stage param delete <name>` | Stage deletion |
-| `suve stage param status` | Show staged changes |
-| `suve stage param diff [name]` | Compare staged vs AWS |
-| `suve stage param apply [name]` | Apply staged changes |
-| `suve stage param reset [name]` | Unstage changes |
+| Command | Options | Description |
+|---------|---------|-------------|
+| `suve stage param add` | `--description=<TEXT>`<br>`--tag=<KEY>=<VALUE> --tag=...` | Stage new parameter |
+| `suve stage param edit` | | Stage modification |
+| `suve stage param delete` | | Stage deletion |
+| `suve stage param status` | `--verbose` | Show staged changes |
+| `suve stage param diff` | `--parse-json` (`-j`) | Compare staged vs AWS |
+| `suve stage param apply` | `--yes`<br>`--ignore-conflicts` | Apply staged changes |
+| `suve stage param reset` | `--all` | Unstage changes |
 
 ### Secrets Manager
 
-| Command | Description |
-|---------|-------------|
-| `suve secret show <name>` | Display secret with metadata |
-| `suve secret show --raw <name>` | Output raw value (for piping) |
-| `suve secret log <name>` | Show version history |
-| `suve secret diff <spec1> [spec2]` | Compare versions |
-| `suve secret list [prefix]` | List secrets |
-| `suve secret create <name> <value>` | Create new secret |
-| `suve secret update <name> <value>` | Update existing secret |
-| `suve secret delete <name>` | Delete secret |
-| `suve secret restore <name>` | Restore deleted secret |
+| Command | Options | Description |
+|---------|---------|-------------|
+| [`suve secret show`](docs/secret.md#show) | `--raw`<br>`--output=<FORMAT>` | Display secret with metadata |
+| [`suve secret log`](docs/secret.md#log) | `--number=<N>` (`-n`)<br>`--patch` (`-p`)<br>`--parse-json` (`-j`)<br>`--oneline`<br>`--reverse`<br>`--output=<FORMAT>` | Show version history |
+| [`suve secret diff`](docs/secret.md#diff) | `--parse-json` (`-j`)<br>`--output=<FORMAT>` | Compare versions |
+| [`suve secret list`](docs/secret.md#list) | `--filter=<REGEX>`<br>`--show`<br>`--output=<FORMAT>` | List secrets |
+| [`suve secret create`](docs/secret.md#create) | `--description=<TEXT>`<br>`--tag=<KEY>=<VALUE> --tag=...` | Create new secret |
+| [`suve secret update`](docs/secret.md#update) | | Update existing secret |
+| [`suve secret delete`](docs/secret.md#delete) | `--force`<br>`--recovery-window=<DAYS>` | Delete secret |
+| [`suve secret restore`](docs/secret.md#restore) | | Restore deleted secret |
 
 **Staging commands** (under `suve stage secret`):
 
-| Command | Description |
-|---------|-------------|
-| `suve stage secret add <name> [value]` | Stage new secret |
-| `suve stage secret edit <name> [value]` | Stage modification |
-| `suve stage secret delete <name>` | Stage deletion |
-| `suve stage secret status` | Show staged changes |
-| `suve stage secret diff [name]` | Compare staged vs AWS |
-| `suve stage secret apply [name]` | Apply staged changes |
-| `suve stage secret reset [name]` | Unstage changes |
+| Command | Options | Description |
+|---------|---------|-------------|
+| `suve stage secret add` | `--description=<TEXT>`<br>`--tag=<KEY>=<VALUE> --tag=...` | Stage new secret |
+| `suve stage secret edit` | | Stage modification |
+| `suve stage secret delete` | `--force`<br>`--recovery-window=<DAYS>` | Stage deletion |
+| `suve stage secret status` | `--verbose` | Show staged changes |
+| `suve stage secret diff` | `--parse-json` (`-j`) | Compare staged vs AWS |
+| `suve stage secret apply` | `--yes`<br>`--ignore-conflicts` | Apply staged changes |
+| `suve stage secret reset` | `--all` | Unstage changes |
 
 ### Global Stage Commands
 
-| Command | Description |
-|---------|-------------|
-| `suve stage status` | Show all staged changes |
-| `suve stage diff` | Compare all staged vs AWS |
-| `suve stage apply` | Apply all staged changes |
-| `suve stage reset` | Unstage all changes |
+| Command | Options | Description |
+|---------|---------|-------------|
+| `suve stage status` | `--verbose` | Show all staged changes |
+| `suve stage diff` | `--parse-json` (`-j`) | Compare all staged vs AWS |
+| `suve stage apply` | `--yes`<br>`--ignore-conflicts` | Apply all staged changes |
+| `suve stage reset` | `--all` | Unstage all changes |
 
 ## AWS Configuration
 

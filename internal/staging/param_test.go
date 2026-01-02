@@ -443,3 +443,230 @@ func TestParamParserFactory(t *testing.T) {
 	require.NotNil(t, parser)
 	assert.Equal(t, staging.ServiceParam, parser.Service())
 }
+
+func TestParamStrategy_FetchLastModified(t *testing.T) {
+	t.Parallel()
+
+	now := time.Now()
+
+	t.Run("success - returns last modified time", func(t *testing.T) {
+		t.Parallel()
+		mock := &paramMockClient{
+			getParameterFunc: func(_ context.Context, _ *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
+				return &paramapi.GetParameterOutput{
+					Parameter: &paramapi.Parameter{
+						Name:             lo.ToPtr("/app/param"),
+						LastModifiedDate: &now,
+					},
+				}, nil
+			},
+		}
+
+		s := staging.NewParamStrategy(mock)
+		result, err := s.FetchLastModified(context.Background(), "/app/param")
+		require.NoError(t, err)
+		assert.Equal(t, now, result)
+	})
+
+	t.Run("not found - returns zero time", func(t *testing.T) {
+		t.Parallel()
+		mock := &paramMockClient{
+			getParameterFunc: func(_ context.Context, _ *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
+				return nil, &paramapi.ParameterNotFound{}
+			},
+		}
+
+		s := staging.NewParamStrategy(mock)
+		result, err := s.FetchLastModified(context.Background(), "/app/param")
+		require.NoError(t, err)
+		assert.True(t, result.IsZero())
+	})
+
+	t.Run("other error - returns error", func(t *testing.T) {
+		t.Parallel()
+		mock := &paramMockClient{
+			getParameterFunc: func(_ context.Context, _ *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
+				return nil, errors.New("access denied")
+			},
+		}
+
+		s := staging.NewParamStrategy(mock)
+		_, err := s.FetchLastModified(context.Background(), "/app/param")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to get parameter")
+	})
+
+	t.Run("nil LastModifiedDate - returns zero time", func(t *testing.T) {
+		t.Parallel()
+		mock := &paramMockClient{
+			getParameterFunc: func(_ context.Context, _ *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
+				return &paramapi.GetParameterOutput{
+					Parameter: &paramapi.Parameter{
+						Name:             lo.ToPtr("/app/param"),
+						LastModifiedDate: nil,
+					},
+				}, nil
+			},
+		}
+
+		s := staging.NewParamStrategy(mock)
+		result, err := s.FetchLastModified(context.Background(), "/app/param")
+		require.NoError(t, err)
+		assert.True(t, result.IsZero())
+	})
+
+	t.Run("nil Parameter - returns zero time", func(t *testing.T) {
+		t.Parallel()
+		mock := &paramMockClient{
+			getParameterFunc: func(_ context.Context, _ *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
+				return &paramapi.GetParameterOutput{Parameter: nil}, nil
+			},
+		}
+
+		s := staging.NewParamStrategy(mock)
+		result, err := s.FetchLastModified(context.Background(), "/app/param")
+		require.NoError(t, err)
+		assert.True(t, result.IsZero())
+	})
+}
+
+func TestParamStrategy_Apply_WithTags(t *testing.T) {
+	t.Parallel()
+
+	t.Run("create with description", func(t *testing.T) {
+		t.Parallel()
+		mock := &paramMockClient{
+			getParameterFunc: func(_ context.Context, _ *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
+				return nil, &paramapi.ParameterNotFound{}
+			},
+			putParameterFunc: func(_ context.Context, params *paramapi.PutParameterInput, _ ...func(*paramapi.Options)) (*paramapi.PutParameterOutput, error) {
+				assert.Equal(t, "Test description", lo.FromPtr(params.Description))
+				return &paramapi.PutParameterOutput{Version: 1}, nil
+			},
+		}
+
+		s := staging.NewParamStrategy(mock)
+		err := s.Apply(context.Background(), "/app/param", staging.Entry{
+			Operation:   staging.OperationCreate,
+			Value:       lo.ToPtr("value"),
+			Description: lo.ToPtr("Test description"),
+		})
+		require.NoError(t, err)
+	})
+
+	t.Run("create with tags", func(t *testing.T) {
+		t.Parallel()
+		addTagsCalled := false
+		mock := &paramMockClient{
+			getParameterFunc: func(_ context.Context, _ *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
+				return nil, &paramapi.ParameterNotFound{}
+			},
+			putParameterFunc: func(_ context.Context, _ *paramapi.PutParameterInput, _ ...func(*paramapi.Options)) (*paramapi.PutParameterOutput, error) {
+				return &paramapi.PutParameterOutput{Version: 1}, nil
+			},
+			addTagsToResourceFunc: func(_ context.Context, params *paramapi.AddTagsToResourceInput, _ ...func(*paramapi.Options)) (*paramapi.AddTagsToResourceOutput, error) {
+				addTagsCalled = true
+				assert.Len(t, params.Tags, 1)
+				return &paramapi.AddTagsToResourceOutput{}, nil
+			},
+		}
+
+		s := staging.NewParamStrategy(mock)
+		err := s.Apply(context.Background(), "/app/param", staging.Entry{
+			Operation: staging.OperationCreate,
+			Value:     lo.ToPtr("value"),
+			Tags:      map[string]string{"env": "test"},
+		})
+		require.NoError(t, err)
+		assert.True(t, addTagsCalled)
+	})
+
+	t.Run("update with untag keys", func(t *testing.T) {
+		t.Parallel()
+		removeTagsCalled := false
+		mock := &paramMockClient{
+			getParameterFunc: func(_ context.Context, _ *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
+				return &paramapi.GetParameterOutput{
+					Parameter: &paramapi.Parameter{Type: paramapi.ParameterTypeString},
+				}, nil
+			},
+			putParameterFunc: func(_ context.Context, _ *paramapi.PutParameterInput, _ ...func(*paramapi.Options)) (*paramapi.PutParameterOutput, error) {
+				return &paramapi.PutParameterOutput{Version: 2}, nil
+			},
+			removeTagsFromResourceFunc: func(_ context.Context, params *paramapi.RemoveTagsFromResourceInput, _ ...func(*paramapi.Options)) (*paramapi.RemoveTagsFromResourceOutput, error) {
+				removeTagsCalled = true
+				assert.Contains(t, params.TagKeys, "old-tag")
+				return &paramapi.RemoveTagsFromResourceOutput{}, nil
+			},
+		}
+
+		s := staging.NewParamStrategy(mock)
+		err := s.Apply(context.Background(), "/app/param", staging.Entry{
+			Operation: staging.OperationUpdate,
+			Value:     lo.ToPtr("updated"),
+			UntagKeys: []string{"old-tag"},
+		})
+		require.NoError(t, err)
+		assert.True(t, removeTagsCalled)
+	})
+
+	t.Run("tagging error", func(t *testing.T) {
+		t.Parallel()
+		mock := &paramMockClient{
+			getParameterFunc: func(_ context.Context, _ *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
+				return nil, &paramapi.ParameterNotFound{}
+			},
+			putParameterFunc: func(_ context.Context, _ *paramapi.PutParameterInput, _ ...func(*paramapi.Options)) (*paramapi.PutParameterOutput, error) {
+				return &paramapi.PutParameterOutput{Version: 1}, nil
+			},
+			addTagsToResourceFunc: func(_ context.Context, _ *paramapi.AddTagsToResourceInput, _ ...func(*paramapi.Options)) (*paramapi.AddTagsToResourceOutput, error) {
+				return nil, errors.New("tagging failed")
+			},
+		}
+
+		s := staging.NewParamStrategy(mock)
+		err := s.Apply(context.Background(), "/app/param", staging.Entry{
+			Operation: staging.OperationCreate,
+			Value:     lo.ToPtr("value"),
+			Tags:      map[string]string{"env": "test"},
+		})
+		require.Error(t, err)
+	})
+}
+
+func TestParamStrategy_Apply_DeleteAlreadyDeleted(t *testing.T) {
+	t.Parallel()
+
+	mock := &paramMockClient{
+		deleteParameterFunc: func(_ context.Context, _ *paramapi.DeleteParameterInput, _ ...func(*paramapi.Options)) (*paramapi.DeleteParameterOutput, error) {
+			return nil, &paramapi.ParameterNotFound{}
+		},
+	}
+
+	s := staging.NewParamStrategy(mock)
+	err := s.Apply(context.Background(), "/app/param", staging.Entry{
+		Operation: staging.OperationDelete,
+	})
+	require.NoError(t, err) // Should succeed even if already deleted
+}
+
+func TestParamStrategy_FetchCurrentValue_NoLastModified(t *testing.T) {
+	t.Parallel()
+
+	mock := &paramMockClient{
+		getParameterFunc: func(_ context.Context, _ *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
+			return &paramapi.GetParameterOutput{
+				Parameter: &paramapi.Parameter{
+					Value:            lo.ToPtr("value"),
+					LastModifiedDate: nil,
+				},
+			}, nil
+		},
+	}
+
+	s := staging.NewParamStrategy(mock)
+	result, err := s.FetchCurrentValue(context.Background(), "/app/param")
+	require.NoError(t, err)
+	assert.Equal(t, "value", result.Value)
+	assert.True(t, result.LastModified.IsZero())
+}

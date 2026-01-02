@@ -208,3 +208,40 @@ func TestInfo(t *testing.T) {
 	Info(&buf, "No changes %s", "staged")
 	assert.Contains(t, buf.String(), "No changes staged")
 }
+
+func TestParseFormat(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		input    string
+		expected Format
+	}{
+		{"json", FormatJSON},
+		{"JSON", FormatText}, // Not case-insensitive
+		{"text", FormatText},
+		{"", FormatText},
+		{"invalid", FormatText},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			t.Parallel()
+			result := ParseFormat(tt.input)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestDiffRaw(t *testing.T) {
+	t.Parallel()
+	result := DiffRaw("old", "new", "old-value", "new-value")
+	assert.Contains(t, result, "--- old")
+	assert.Contains(t, result, "+++ new")
+	assert.Contains(t, result, "-old-value")
+	assert.Contains(t, result, "+new-value")
+}
+
+func TestDiffRaw_EmptyInputs(t *testing.T) {
+	t.Parallel()
+	result := DiffRaw("old", "new", "", "")
+	assert.Empty(t, result)
+}

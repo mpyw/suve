@@ -1,6 +1,6 @@
 # SSM Parameter Store Commands
 
-[<- Back to README](../README.md) | [Secrets Manager Commands ->](sm.md)
+[<- Back to README](../README.md) | [Secrets Manager Commands ->](secret.md)
 
 Primary command: `param`
 Aliases: `ssm`, `ps`
@@ -144,6 +144,11 @@ With `--patch` to see what changed:
 
 ```ShellSession
 user@host:~$ suve param log --patch /app/config/database-url
+```
+
+Output will look like:
+
+```diff
 Version 3 (current)
 Date: 2024-01-15T10:30:45Z
 
@@ -229,6 +234,11 @@ Compare two versions:
 
 ```ShellSession
 user@host:~$ suve param diff /app/config/database-url#1 /app/config/database-url#3
+```
+
+Output will look like:
+
+```diff
 --- /app/config/database-url#1
 +++ /app/config/database-url#3
 @@ -1 +1 @@
@@ -240,6 +250,11 @@ Compare previous with latest (shorthand):
 
 ```ShellSession
 user@host:~$ suve param diff /app/config/database-url~1
+```
+
+Output will look like:
+
+```diff
 --- /app/config/database-url#2
 +++ /app/config/database-url#3
 @@ -1 +1 @@
@@ -657,6 +672,11 @@ suve stage param diff [options] [name]
 
 ```ShellSession
 user@host:~$ suve stage param diff
+```
+
+Output will look like:
+
+```diff
 --- /app/config/database-url#3 (AWS)
 +++ /app/config/database-url (staged)
 @@ -1 +1 @@
