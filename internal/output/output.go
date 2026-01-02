@@ -20,6 +20,27 @@ import (
 	"github.com/mpyw/suve/internal/cli/colors"
 )
 
+// Format represents the output format.
+type Format string
+
+const (
+	// FormatText is the default human-readable text format.
+	FormatText Format = "text"
+	// FormatJSON outputs structured JSON.
+	FormatJSON Format = "json"
+)
+
+// ParseFormat parses a format string and returns the Format.
+// Returns FormatText for empty string or invalid values.
+func ParseFormat(s string) Format {
+	switch s {
+	case "json":
+		return FormatJSON
+	default:
+		return FormatText
+	}
+}
+
 // Writer provides formatted output methods.
 type Writer struct {
 	w io.Writer

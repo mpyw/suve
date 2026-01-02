@@ -3,6 +3,7 @@ package show
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"time"
@@ -33,10 +34,21 @@ type Runner struct {
 
 // Options holds the options for the show command.
 type Options struct {
-	Spec       *secretversion.Spec
+	Spec      *secretversion.Spec
 	ParseJSON bool
-	NoPager    bool
-	Raw        bool
+	NoPager   bool
+	Raw       bool
+	Output    output.Format
+}
+
+// JSONOutput represents the JSON output structure for the show command.
+type JSONOutput struct {
+	Name      string   `json:"name"`
+	ARN       string   `json:"arn"`
+	VersionID string   `json:"versionId,omitempty"`
+	Stages    []string `json:"stages,omitempty"`
+	Created   string   `json:"created,omitempty"`
+	Value     string   `json:"value"`
 }
 
 // Command returns the show command.
@@ -48,6 +60,7 @@ func Command() *cli.Command {
 		Description: `Display a secret's value along with its metadata.
 
 Use --raw to output only the value without metadata (for piping/scripting).
+Use --output=json for structured JSON output (cannot be used with --raw).
 
 VERSION SPECIFIERS:
   #VERSION  Specific version by VersionId
@@ -61,6 +74,7 @@ EXAMPLES:
   suve secret show my-secret:AWSPREVIOUS~1   Show 1 before AWSPREVIOUS
   suve secret show -j my-secret              Pretty print JSON value
   suve secret show --raw my-secret           Output raw value (for piping)
+  suve secret show --output=json my-secret   Output as JSON
   API_KEY=$(suve secret show --raw my-secret)  Use in shell variable`,
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
@@ -75,6 +89,10 @@ EXAMPLES:
 			&cli.BoolFlag{
 				Name:  "raw",
 				Usage: "Output raw value only without metadata (for piping)",
+			},
+			&cli.StringFlag{
+				Name:  "output",
+				Usage: "Output format: text (default) or json",
 			},
 		},
 		Action: action,
@@ -91,20 +109,29 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		return err
 	}
 
+	outputFormat := output.ParseFormat(cmd.String("output"))
+	raw := cmd.Bool("raw")
+
+	// Check mutually exclusive options
+	if raw && outputFormat == output.FormatJSON {
+		return fmt.Errorf("--raw and --output=json cannot be used together")
+	}
+
 	client, err := infra.NewSecretClient(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to initialize AWS client: %w", err)
 	}
 
 	opts := Options{
-		Spec:       spec,
+		Spec:      spec,
 		ParseJSON: cmd.Bool("parse-json"),
-		NoPager:    cmd.Bool("no-pager"),
-		Raw:        cmd.Bool("raw"),
+		NoPager:   cmd.Bool("no-pager"),
+		Raw:       raw,
+		Output:    outputFormat,
 	}
 
-	// Raw mode disables pager
-	noPager := opts.NoPager || opts.Raw
+	// Raw mode and JSON output disable pager
+	noPager := opts.NoPager || opts.Raw || opts.Output == output.FormatJSON
 
 	return pager.WithPagerWriter(cmd.Root().Writer, noPager, func(w io.Writer) error {
 		r := &Runner{
@@ -134,6 +161,27 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 	if opts.Raw {
 		_, _ = fmt.Fprint(r.Stdout, value)
 		return nil
+	}
+
+	// JSON output mode
+	if opts.Output == output.FormatJSON {
+		jsonOut := JSONOutput{
+			Name:  lo.FromPtr(secret.Name),
+			ARN:   lo.FromPtr(secret.ARN),
+			Value: value,
+		}
+		if secret.VersionId != nil {
+			jsonOut.VersionID = lo.FromPtr(secret.VersionId)
+		}
+		if len(secret.VersionStages) > 0 {
+			jsonOut.Stages = secret.VersionStages
+		}
+		if secret.CreatedDate != nil {
+			jsonOut.Created = secret.CreatedDate.Format(time.RFC3339)
+		}
+		enc := json.NewEncoder(r.Stdout)
+		enc.SetIndent("", "  ")
+		return enc.Encode(jsonOut)
 	}
 
 	// Normal mode: show metadata + value
