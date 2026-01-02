@@ -241,3 +241,95 @@ type mockParserWithParseSpecErr struct {
 func (m *mockParserWithParseSpecErr) ParseSpec(_ string) (string, bool, error) {
 	return "", false, m.parseErr
 }
+
+func TestResetUseCase_Execute_ListError(t *testing.T) {
+	t.Parallel()
+
+	store := newMockStore()
+	store.listErr = errors.New("list error")
+
+	uc := &usecasestaging.ResetUseCase{
+		Parser: newMockParser(),
+		Store:  store,
+	}
+
+	_, err := uc.Execute(context.Background(), usecasestaging.ResetInput{All: true})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "list error")
+}
+
+func TestResetUseCase_Execute_UnstageAllError(t *testing.T) {
+	t.Parallel()
+
+	store := newMockStore()
+	store.addEntry(staging.ServiceParam, "/app/config", staging.Entry{
+		Operation: staging.OperationUpdate,
+	})
+	store.unstageAllErr = errors.New("unstage all error")
+
+	uc := &usecasestaging.ResetUseCase{
+		Parser: newMockParser(),
+		Store:  store,
+	}
+
+	_, err := uc.Execute(context.Background(), usecasestaging.ResetInput{All: true})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "unstage all error")
+}
+
+func TestResetUseCase_Execute_GetError(t *testing.T) {
+	t.Parallel()
+
+	store := newMockStore()
+	store.getErr = errors.New("get error")
+
+	uc := &usecasestaging.ResetUseCase{
+		Parser: newMockParser(),
+		Store:  store,
+	}
+
+	_, err := uc.Execute(context.Background(), usecasestaging.ResetInput{Spec: "/app/config"})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "get error")
+}
+
+func TestResetUseCase_Execute_UnstageError(t *testing.T) {
+	t.Parallel()
+
+	store := newMockStore()
+	store.addEntry(staging.ServiceParam, "/app/config", staging.Entry{
+		Operation: staging.OperationUpdate,
+	})
+	store.unstageErr = errors.New("unstage error")
+
+	uc := &usecasestaging.ResetUseCase{
+		Parser: newMockParser(),
+		Store:  store,
+	}
+
+	_, err := uc.Execute(context.Background(), usecasestaging.ResetInput{Spec: "/app/config"})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "unstage error")
+}
+
+func TestResetUseCase_Execute_RestoreStageError(t *testing.T) {
+	t.Parallel()
+
+	store := newMockStore()
+	store.stageErr = errors.New("stage error")
+
+	parser := &mockParserWithVersion{
+		mockParser: newMockParser(),
+		hasVersion: true,
+	}
+
+	uc := &usecasestaging.ResetUseCase{
+		Parser:  parser,
+		Fetcher: newMockResetStrategy(),
+		Store:   store,
+	}
+
+	_, err := uc.Execute(context.Background(), usecasestaging.ResetInput{Spec: "/app/config#3"})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "stage error")
+}

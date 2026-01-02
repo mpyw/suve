@@ -2,6 +2,7 @@ package staging_test
 
 import (
 	"context"
+	"errors"
 	"path/filepath"
 	"testing"
 	"time"
@@ -143,4 +144,36 @@ func TestStatusUseCase_Execute_SecretWithDeleteOptions(t *testing.T) {
 	assert.True(t, output.Entries[0].ShowDeleteOptions)
 	assert.NotNil(t, output.Entries[0].DeleteOptions)
 	assert.Equal(t, 14, output.Entries[0].DeleteOptions.RecoveryWindow)
+}
+
+func TestStatusUseCase_Execute_GetError(t *testing.T) {
+	t.Parallel()
+
+	store := newMockStore()
+	store.getErr = errors.New("store error")
+
+	uc := &usecasestaging.StatusUseCase{
+		Strategy: newParamStrategy(),
+		Store:    store,
+	}
+
+	_, err := uc.Execute(context.Background(), usecasestaging.StatusInput{Name: "/app/config"})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "store error")
+}
+
+func TestStatusUseCase_Execute_ListError(t *testing.T) {
+	t.Parallel()
+
+	store := newMockStore()
+	store.listErr = errors.New("list error")
+
+	uc := &usecasestaging.StatusUseCase{
+		Strategy: newParamStrategy(),
+		Store:    store,
+	}
+
+	_, err := uc.Execute(context.Background(), usecasestaging.StatusInput{})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "list error")
 }

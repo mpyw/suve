@@ -152,3 +152,45 @@ func TestDeleteUseCase_Execute_FetchError(t *testing.T) {
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to fetch")
 }
+
+func TestDeleteUseCase_Execute_ZeroLastModified(t *testing.T) {
+	t.Parallel()
+
+	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	strategy := newMockDeleteStrategy(false)
+	strategy.lastModified = time.Time{} // Zero time
+
+	uc := &usecasestaging.DeleteUseCase{
+		Strategy: strategy,
+		Store:    store,
+	}
+
+	output, err := uc.Execute(context.Background(), usecasestaging.DeleteInput{
+		Name: "/app/to-delete",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "/app/to-delete", output.Name)
+
+	// Verify BaseModifiedAt is nil when lastModified is zero
+	entry, err := store.Get(staging.ServiceParam, "/app/to-delete")
+	require.NoError(t, err)
+	assert.Nil(t, entry.BaseModifiedAt)
+}
+
+func TestDeleteUseCase_Execute_StageError(t *testing.T) {
+	t.Parallel()
+
+	store := newMockStore()
+	store.stageErr = errors.New("stage error")
+
+	uc := &usecasestaging.DeleteUseCase{
+		Strategy: newMockDeleteStrategy(false),
+		Store:    store,
+	}
+
+	_, err := uc.Execute(context.Background(), usecasestaging.DeleteInput{
+		Name: "/app/config",
+	})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "stage error")
+}

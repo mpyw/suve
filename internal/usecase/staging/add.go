@@ -26,7 +26,7 @@ type AddOutput struct {
 // AddUseCase executes add operations.
 type AddUseCase struct {
 	Strategy staging.Parser
-	Store    *staging.Store
+	Store    staging.StoreReadWriter
 }
 
 // Execute runs the add use case.
