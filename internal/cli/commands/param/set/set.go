@@ -13,8 +13,8 @@ import (
 	"github.com/mpyw/suve/internal/api/paramapi"
 	"github.com/mpyw/suve/internal/cli/colors"
 	"github.com/mpyw/suve/internal/cli/confirm"
+	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/infra"
-	"github.com/mpyw/suve/internal/output"
 	"github.com/mpyw/suve/internal/tagging"
 )
 

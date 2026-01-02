@@ -10,8 +10,8 @@ import (
 	"github.com/urfave/cli/v3"
 
 	"github.com/mpyw/suve/internal/cli/confirm"
+	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/maputil"
-	"github.com/mpyw/suve/internal/output"
 	"github.com/mpyw/suve/internal/parallel"
 	"github.com/mpyw/suve/internal/staging"
 )

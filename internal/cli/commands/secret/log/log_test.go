@@ -14,7 +14,7 @@ import (
 	"github.com/mpyw/suve/internal/api/secretapi"
 	appcli "github.com/mpyw/suve/internal/cli/commands"
 	"github.com/mpyw/suve/internal/cli/commands/secret/log"
-	"github.com/mpyw/suve/internal/output"
+	"github.com/mpyw/suve/internal/cli/output"
 )
 
 func TestCommand_Validation(t *testing.T) {

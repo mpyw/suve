@@ -5,7 +5,7 @@ import (
 	"os"
 
 	"github.com/mpyw/suve/internal/cli/commands"
-	"github.com/mpyw/suve/internal/output"
+	"github.com/mpyw/suve/internal/cli/output"
 )
 
 func main() {
