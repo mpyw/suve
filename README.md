@@ -168,6 +168,9 @@ Output will look like:
 
 **1. Stage changes** (opens editor or accepts value directly):
 
+> [!TIP]
+> To use VSCode or Cursor as your editor, set `export VISUAL='code --wait'` or `export VISUAL='cursor --wait'` in your shell profile.
+
 ```ShellSession
 user@host:~$ suve stage param add /app/config/new-param "my-value"
 ✓ Staged for creation: /app/config/new-param
