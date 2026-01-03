@@ -7,9 +7,11 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
+	"github.com/mpyw/suve/internal/cli/terminal"
 )
 
-// mockFdWriter is a writer that implements fder interface for testing TTY code path.
+// mockFdWriter is a writer that implements terminal.Fder interface for testing TTY code path.
 type mockFdWriter struct {
 	buf bytes.Buffer
 	fd  uintptr
@@ -36,12 +38,12 @@ func TestFitsInTerminal_InvalidFd(t *testing.T) {
 }
 
 func TestFitsInTerminal_ContentFits(t *testing.T) {
-	// Not parallel because we override getTermSize
-	original := getTermSize
-	defer func() { getTermSize = original }()
+	// Not parallel because we override terminal.GetSize
+	original := terminal.GetSize
+	defer func() { terminal.GetSize = original }()
 
 	// Mock terminal height of 10 lines
-	getTermSize = func(fd int) (width, height int, err error) {
+	terminal.GetSize = func(fd int) (width, height int, err error) {
 		return 80, 10, nil
 	}
 
@@ -51,12 +53,12 @@ func TestFitsInTerminal_ContentFits(t *testing.T) {
 }
 
 func TestFitsInTerminal_ContentDoesNotFit(t *testing.T) {
-	// Not parallel because we override getTermSize
-	original := getTermSize
-	defer func() { getTermSize = original }()
+	// Not parallel because we override terminal.GetSize
+	original := terminal.GetSize
+	defer func() { terminal.GetSize = original }()
 
 	// Mock terminal height of 5 lines
-	getTermSize = func(fd int) (width, height int, err error) {
+	terminal.GetSize = func(fd int) (width, height int, err error) {
 		return 80, 5, nil
 	}
 
@@ -67,12 +69,12 @@ func TestFitsInTerminal_ContentDoesNotFit(t *testing.T) {
 }
 
 func TestFitsInTerminal_ContentWithoutTrailingNewline(t *testing.T) {
-	// Not parallel because we override getTermSize
-	original := getTermSize
-	defer func() { getTermSize = original }()
+	// Not parallel because we override terminal.GetSize
+	original := terminal.GetSize
+	defer func() { terminal.GetSize = original }()
 
 	// Mock terminal height of 10 lines
-	getTermSize = func(fd int) (width, height int, err error) {
+	terminal.GetSize = func(fd int) (width, height int, err error) {
 		return 80, 10, nil
 	}
 
@@ -82,12 +84,12 @@ func TestFitsInTerminal_ContentWithoutTrailingNewline(t *testing.T) {
 }
 
 func TestFitsInTerminal_ExactlyFits(t *testing.T) {
-	// Not parallel because we override getTermSize
-	original := getTermSize
-	defer func() { getTermSize = original }()
+	// Not parallel because we override terminal.GetSize
+	original := terminal.GetSize
+	defer func() { terminal.GetSize = original }()
 
 	// Mock terminal height of 5 lines
-	getTermSize = func(fd int) (width, height int, err error) {
+	terminal.GetSize = func(fd int) (width, height int, err error) {
 		return 80, 5, nil
 	}
 
@@ -97,12 +99,12 @@ func TestFitsInTerminal_ExactlyFits(t *testing.T) {
 }
 
 func TestFitsInTerminal_ZeroHeight(t *testing.T) {
-	// Not parallel because we override getTermSize
-	original := getTermSize
-	defer func() { getTermSize = original }()
+	// Not parallel because we override terminal.GetSize
+	original := terminal.GetSize
+	defer func() { terminal.GetSize = original }()
 
 	// Mock zero height terminal
-	getTermSize = func(fd int) (width, height int, err error) {
+	terminal.GetSize = func(fd int) (width, height int, err error) {
 		return 80, 0, nil
 	}
 
@@ -111,12 +113,12 @@ func TestFitsInTerminal_ZeroHeight(t *testing.T) {
 }
 
 func TestFitsInTerminal_EmptyContent(t *testing.T) {
-	// Not parallel because we override getTermSize
-	original := getTermSize
-	defer func() { getTermSize = original }()
+	// Not parallel because we override terminal.GetSize
+	original := terminal.GetSize
+	defer func() { terminal.GetSize = original }()
 
 	// Mock terminal height of 10 lines
-	getTermSize = func(fd int) (width, height int, err error) {
+	terminal.GetSize = func(fd int) (width, height int, err error) {
 		return 80, 10, nil
 	}
 
@@ -127,15 +129,15 @@ func TestFitsInTerminal_EmptyContent(t *testing.T) {
 
 func TestWithPagerWriter_TTY_EmptyOutput(t *testing.T) {
 	// Not parallel because we override globals
-	origIsTTY := isTTY
-	origGetTermSize := getTermSize
+	origIsTTY := terminal.IsTTY
+	origGetSize := terminal.GetSize
 	defer func() {
-		isTTY = origIsTTY
-		getTermSize = origGetTermSize
+		terminal.IsTTY = origIsTTY
+		terminal.GetSize = origGetSize
 	}()
 
-	isTTY = func(fd uintptr) bool { return true }
-	getTermSize = func(fd int) (width, height int, err error) {
+	terminal.IsTTY = func(fd uintptr) bool { return true }
+	terminal.GetSize = func(fd int) (width, height int, err error) {
 		return 80, 10, nil
 	}
 
@@ -151,15 +153,15 @@ func TestWithPagerWriter_TTY_EmptyOutput(t *testing.T) {
 
 func TestWithPagerWriter_TTY_FitsInTerminal(t *testing.T) {
 	// Not parallel because we override globals
-	origIsTTY := isTTY
-	origGetTermSize := getTermSize
+	origIsTTY := terminal.IsTTY
+	origGetSize := terminal.GetSize
 	defer func() {
-		isTTY = origIsTTY
-		getTermSize = origGetTermSize
+		terminal.IsTTY = origIsTTY
+		terminal.GetSize = origGetSize
 	}()
 
-	isTTY = func(fd uintptr) bool { return true }
-	getTermSize = func(fd int) (width, height int, err error) {
+	terminal.IsTTY = func(fd uintptr) bool { return true }
+	terminal.GetSize = func(fd int) (width, height int, err error) {
 		return 80, 10, nil
 	}
 
@@ -175,10 +177,10 @@ func TestWithPagerWriter_TTY_FitsInTerminal(t *testing.T) {
 
 func TestWithPagerWriter_TTY_ErrorFromFn(t *testing.T) {
 	// Not parallel because we override globals
-	origIsTTY := isTTY
-	defer func() { isTTY = origIsTTY }()
+	origIsTTY := terminal.IsTTY
+	defer func() { terminal.IsTTY = origIsTTY }()
 
-	isTTY = func(fd uintptr) bool { return true }
+	terminal.IsTTY = func(fd uintptr) bool { return true }
 
 	w := &mockFdWriter{fd: 1}
 	expectedErr := errors.New("test error")

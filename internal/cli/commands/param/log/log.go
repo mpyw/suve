@@ -16,6 +16,7 @@ import (
 	"github.com/mpyw/suve/internal/cli/colors"
 	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/cli/pager"
+	"github.com/mpyw/suve/internal/cli/terminal"
 	"github.com/mpyw/suve/internal/infra"
 	"github.com/mpyw/suve/internal/jsonutil"
 	"github.com/mpyw/suve/internal/timeutil"
@@ -31,16 +32,17 @@ type Runner struct {
 
 // Options holds the options for the log command.
 type Options struct {
-	Name       string
-	MaxResults int32
-	ShowPatch  bool
-	ParseJSON  bool
-	Reverse    bool
-	NoPager    bool
-	Oneline    bool
-	Since      *time.Time
-	Until      *time.Time
-	Output     output.Format
+	Name           string
+	MaxResults     int32
+	ShowPatch      bool
+	ParseJSON      bool
+	Reverse        bool
+	NoPager        bool
+	Oneline        bool
+	Since          *time.Time
+	Until          *time.Time
+	Output         output.Format
+	MaxValueLength int
 }
 
 // JSONOutputItem represents a single version entry in JSON output.
@@ -62,8 +64,11 @@ func Command() *cli.Command {
 number, modification date, and a preview of the value.
 
 Output is sorted with the most recent version first (use --reverse to flip).
-Value previews are truncated at 50 characters.
+Value preview truncation depends on the mode:
+  - Normal mode: Full value is shown (no truncation)
+  - Oneline mode: Truncated to fit terminal width (default 50 if width unavailable)
 
+Use --max-value-length to override the automatic truncation.
 Use --patch to show the diff between consecutive versions (like git log -p).
 Use --parse-json with --patch to format JSON values before diffing (keys are always sorted).
 Use --oneline for a compact one-line-per-version format.
@@ -77,6 +82,7 @@ EXAMPLES:
    suve param log --patch /app/config                     Show versions with diffs
    suve param log --patch --parse-json /app/config        Show diffs with JSON formatting
    suve param log --oneline /app/config                   Compact one-line format
+   suve param log --oneline --max-value-length 80 /app/config  Custom truncation length
    suve param log --number 5 /app/config                  Show last 5 versions
    suve param log --since 2024-01-01T00:00:00Z /app/config  Show versions since date
    suve param log --output=json /app/config               Output as JSON`,
@@ -122,6 +128,11 @@ EXAMPLES:
 				Name:  "output",
 				Usage: "Output format: text (default) or json",
 			},
+			&cli.IntFlag{
+				Name:  "max-value-length",
+				Value: 0,
+				Usage: "Maximum value preview length (0 = auto: unlimited for normal, terminal width for oneline)",
+			},
 		},
 		Action: action,
 	}
@@ -135,14 +146,15 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	name := cmd.Args().First()
 
 	opts := Options{
-		Name:       name,
-		MaxResults: int32(cmd.Int("number")),
-		ShowPatch:  cmd.Bool("patch"),
-		ParseJSON:  cmd.Bool("parse-json"),
-		Reverse:    cmd.Bool("reverse"),
-		NoPager:    cmd.Bool("no-pager"),
-		Oneline:    cmd.Bool("oneline"),
-		Output:     output.ParseFormat(cmd.String("output")),
+		Name:           name,
+		MaxResults:     int32(cmd.Int("number")),
+		ShowPatch:      cmd.Bool("patch"),
+		ParseJSON:      cmd.Bool("parse-json"),
+		Reverse:        cmd.Bool("reverse"),
+		NoPager:        cmd.Bool("no-pager"),
+		Oneline:        cmd.Bool("oneline"),
+		Output:         output.ParseFormat(cmd.String("output")),
+		MaxValueLength: int(cmd.Int("max-value-length")),
 	}
 
 	// Parse --since timestamp
@@ -245,8 +257,19 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 				dateStr = entry.LastModified.Format("2006-01-02")
 			}
 			value := entry.Value
-			if len(value) > 40 {
-				value = value[:40] + "..."
+			// Determine max length for oneline mode
+			maxLen := opts.MaxValueLength
+			if maxLen == 0 {
+				// Auto: use terminal width minus overhead for metadata
+				// Reserve ~30 chars for: version (6) + current mark (10) + date (10) + separators (4)
+				termWidth := terminal.GetWidthFromWriter(r.Stdout)
+				maxLen = termWidth - 30
+				if maxLen < 10 {
+					maxLen = 10
+				}
+			}
+			if maxLen > 0 && len(value) > maxLen {
+				value = value[:maxLen] + "..."
 			}
 			currentMark := ""
 			if entry.IsCurrent {
@@ -300,10 +323,10 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 				}
 			}
 		} else {
-			// Show truncated value preview
+			// Show value preview (unlimited unless --max-value-length specified)
 			value := entry.Value
-			if len(value) > 50 {
-				value = value[:50] + "..."
+			if opts.MaxValueLength > 0 && len(value) > opts.MaxValueLength {
+				value = value[:opts.MaxValueLength] + "..."
 			}
 			_, _ = fmt.Fprintf(r.Stdout, "%s\n", value)
 		}

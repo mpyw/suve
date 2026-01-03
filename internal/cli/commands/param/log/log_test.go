@@ -135,11 +135,30 @@ func TestRun(t *testing.T) {
 			},
 		},
 		{
-			name: "truncate long values",
+			name: "normal mode shows full value without truncation",
 			opts: log.Options{Name: "/app/param", MaxResults: 10},
 			mock: &mockClient{
 				getParameterHistoryFunc: func(_ context.Context, _ *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
-					longValue := "this is a very long value that should be truncated in the preview"
+					longValue := "this is a very long value that should NOT be truncated in normal mode"
+					return &paramapi.GetParameterHistoryOutput{
+						Parameters: []paramapi.ParameterHistory{
+							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr(longValue), Version: 1, LastModifiedDate: &now},
+						},
+					}, nil
+				},
+			},
+			check: func(t *testing.T, output string) {
+				// Normal mode shows full value without truncation
+				assert.Contains(t, output, "should NOT be truncated in normal mode")
+				assert.NotContains(t, output, "...")
+			},
+		},
+		{
+			name: "max-value-length truncates in normal mode",
+			opts: log.Options{Name: "/app/param", MaxResults: 10, MaxValueLength: 20},
+			mock: &mockClient{
+				getParameterHistoryFunc: func(_ context.Context, _ *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
+					longValue := "this is a very long value that should be truncated"
 					return &paramapi.GetParameterHistoryOutput{
 						Parameters: []paramapi.ParameterHistory{
 							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr(longValue), Version: 1, LastModifiedDate: &now},
@@ -149,6 +168,8 @@ func TestRun(t *testing.T) {
 			},
 			check: func(t *testing.T, output string) {
 				assert.Contains(t, output, "...")
+				// Full value should not appear
+				assert.NotContains(t, output, "should be truncated")
 			},
 		},
 		{

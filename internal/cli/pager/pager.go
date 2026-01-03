@@ -6,23 +6,10 @@ import (
 	"io"
 	"strings"
 
-	"github.com/mattn/go-isatty"
 	"github.com/walles/moor/v2/pkg/moor"
-	"golang.org/x/term"
+
+	"github.com/mpyw/suve/internal/cli/terminal"
 )
-
-// fder is an interface for types that have a file descriptor.
-type fder interface {
-	Fd() uintptr
-}
-
-// getTermSize is the function used to get terminal size.
-// It can be overridden in tests.
-var getTermSize = term.GetSize
-
-// isTTY checks if the file descriptor is a TTY.
-// It can be overridden in tests.
-var isTTY = isatty.IsTerminal
 
 // WithPagerWriter executes fn with pager support.
 // If noPager is true or stdout is not a TTY, output goes directly to the provided writer.
@@ -34,8 +21,8 @@ func WithPagerWriter(stdout io.Writer, noPager bool, fn func(w io.Writer) error)
 	}
 
 	// Check if stdout supports Fd() for TTY detection
-	f, ok := stdout.(fder)
-	if !ok || !isTTY(f.Fd()) {
+	f, ok := stdout.(terminal.Fder)
+	if !ok || !terminal.IsTTY(f.Fd()) {
 		// Not a TTY or doesn't support Fd() - write directly
 		return fn(stdout)
 	}
@@ -62,7 +49,7 @@ func WithPagerWriter(stdout io.Writer, noPager bool, fn func(w io.Writer) error)
 // fitsInTerminal returns true if the content fits within the terminal height.
 // Returns false if terminal size cannot be determined.
 func fitsInTerminal(fd int, content string) bool {
-	_, height, err := getTermSize(fd)
+	_, height, err := terminal.GetSize(fd)
 	if err != nil || height <= 0 {
 		return false
 	}
