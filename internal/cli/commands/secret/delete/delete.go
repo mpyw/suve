@@ -7,26 +7,20 @@ import (
 	"io"
 	"os"
 
-	"github.com/samber/lo"
 	"github.com/urfave/cli/v3"
 
-	"github.com/mpyw/suve/internal/api/secretapi"
 	"github.com/mpyw/suve/internal/cli/colors"
 	"github.com/mpyw/suve/internal/cli/confirm"
 	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/infra"
+	"github.com/mpyw/suve/internal/usecase/secret"
 )
-
-// Client is the interface for the delete command.
-type Client interface {
-	secretapi.DeleteSecretAPI
-}
 
 // Runner executes the delete command.
 type Runner struct {
-	Client Client
-	Stdout io.Writer
-	Stderr io.Writer
+	UseCase *secret.DeleteUseCase
+	Stdout  io.Writer
+	Stderr  io.Writer
 }
 
 // Options holds the options for the delete command.
@@ -93,9 +87,11 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		return fmt.Errorf("failed to initialize AWS client: %w", err)
 	}
 
+	uc := &secret.DeleteUseCase{Client: client}
+
 	// Show current value before confirming
 	if !skipConfirm {
-		currentValue := getCurrentValue(ctx, client, name)
+		currentValue, _ := uc.GetCurrentValue(ctx, name)
 		if currentValue != "" {
 			_, _ = fmt.Fprintf(cmd.Root().ErrWriter, "%s Current value of %s:\n", colors.Warning("!"), name)
 			_, _ = fmt.Fprintln(cmd.Root().ErrWriter)
@@ -119,9 +115,9 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	}
 
 	r := &Runner{
-		Client: client,
-		Stdout: cmd.Root().Writer,
-		Stderr: cmd.Root().ErrWriter,
+		UseCase: uc,
+		Stdout:  cmd.Root().Writer,
+		Stderr:  cmd.Root().ErrWriter,
 	}
 	return r.Run(ctx, Options{
 		Name:           name,
@@ -132,48 +128,27 @@ func action(ctx context.Context, cmd *cli.Command) error {
 
 // Run executes the delete command.
 func (r *Runner) Run(ctx context.Context, opts Options) error {
-	input := &secretapi.DeleteSecretInput{
-		SecretId: lo.ToPtr(opts.Name),
-	}
-
-	if opts.Force {
-		input.ForceDeleteWithoutRecovery = lo.ToPtr(true)
-	} else {
-		input.RecoveryWindowInDays = lo.ToPtr(int64(opts.RecoveryWindow))
-	}
-
-	result, err := r.Client.DeleteSecret(ctx, input)
+	result, err := r.UseCase.Execute(ctx, secret.DeleteInput{
+		Name:           opts.Name,
+		Force:          opts.Force,
+		RecoveryWindow: int64(opts.RecoveryWindow),
+	})
 	if err != nil {
-		return fmt.Errorf("failed to delete secret: %w", err)
+		return err
 	}
 
 	if opts.Force {
 		_, _ = fmt.Fprintf(r.Stdout, "%s Permanently deleted secret %s\n",
 			colors.Warning("!"),
-			lo.FromPtr(result.Name),
+			result.Name,
 		)
 	} else {
 		_, _ = fmt.Fprintf(r.Stdout, "%s Scheduled deletion of secret %s (deletion date: %s)\n",
 			colors.Warning("!"),
-			lo.FromPtr(result.Name),
+			result.Name,
 			result.DeletionDate.Format("2006-01-02"),
 		)
 	}
 
 	return nil
-}
-
-// getCurrentValue fetches the current secret value.
-// Returns empty string if not found or error.
-func getCurrentValue(ctx context.Context, client secretapi.GetSecretValueAPI, name string) string {
-	result, err := client.GetSecretValue(ctx, &secretapi.GetSecretValueInput{
-		SecretId: lo.ToPtr(name),
-	})
-	if err != nil {
-		return ""
-	}
-	if result.SecretString == nil {
-		return ""
-	}
-	return *result.SecretString
 }
