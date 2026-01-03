@@ -3,6 +3,7 @@ package list_test
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"testing"
 
@@ -13,6 +14,7 @@ import (
 	"github.com/mpyw/suve/internal/api/paramapi"
 	appcli "github.com/mpyw/suve/internal/cli/commands"
 	"github.com/mpyw/suve/internal/cli/commands/param/list"
+	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/usecase/param"
 )
 
@@ -179,6 +181,90 @@ func TestRun(t *testing.T) {
 			check: func(t *testing.T, output string) {
 				assert.Contains(t, output, "/app/param1\tvalue1")
 				assert.Contains(t, output, "/app/param2\tvalue2")
+			},
+		},
+		{
+			name: "JSON output without show",
+			opts: list.Options{Output: output.FormatJSON},
+			mock: &mockClient{
+				describeParametersFunc: func(_ context.Context, _ *paramapi.DescribeParametersInput, _ ...func(*paramapi.Options)) (*paramapi.DescribeParametersOutput, error) {
+					return &paramapi.DescribeParametersOutput{
+						Parameters: []paramapi.ParameterMetadata{
+							{Name: lo.ToPtr("/app/param1")},
+							{Name: lo.ToPtr("/app/param2")},
+						},
+					}, nil
+				},
+			},
+			check: func(t *testing.T, out string) {
+				assert.Contains(t, out, `"name": "/app/param1"`)
+				assert.Contains(t, out, `"name": "/app/param2"`)
+				assert.NotContains(t, out, `"value"`)
+			},
+		},
+		{
+			name: "JSON output with show",
+			opts: list.Options{Output: output.FormatJSON, Show: true},
+			mock: &mockClient{
+				describeParametersFunc: func(_ context.Context, _ *paramapi.DescribeParametersInput, _ ...func(*paramapi.Options)) (*paramapi.DescribeParametersOutput, error) {
+					return &paramapi.DescribeParametersOutput{
+						Parameters: []paramapi.ParameterMetadata{
+							{Name: lo.ToPtr("/app/param1")},
+						},
+					}, nil
+				},
+				getParameterFunc: func(_ context.Context, params *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
+					return &paramapi.GetParameterOutput{
+						Parameter: &paramapi.Parameter{
+							Name:  params.Name,
+							Value: lo.ToPtr("secret-value"),
+						},
+					}, nil
+				},
+			},
+			check: func(t *testing.T, out string) {
+				assert.Contains(t, out, `"name": "/app/param1"`)
+				assert.Contains(t, out, `"value": "secret-value"`)
+			},
+		},
+		{
+			name: "JSON output with show and error",
+			opts: list.Options{Output: output.FormatJSON, Show: true},
+			mock: &mockClient{
+				describeParametersFunc: func(_ context.Context, _ *paramapi.DescribeParametersInput, _ ...func(*paramapi.Options)) (*paramapi.DescribeParametersOutput, error) {
+					return &paramapi.DescribeParametersOutput{
+						Parameters: []paramapi.ParameterMetadata{
+							{Name: lo.ToPtr("/app/error-param")},
+						},
+					}, nil
+				},
+				getParameterFunc: func(_ context.Context, _ *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
+					return nil, errors.New("access denied")
+				},
+			},
+			check: func(t *testing.T, out string) {
+				assert.Contains(t, out, `"name": "/app/error-param"`)
+				assert.Contains(t, out, `"error": "access denied"`)
+			},
+		},
+		{
+			name: "text output with error",
+			opts: list.Options{Show: true},
+			mock: &mockClient{
+				describeParametersFunc: func(_ context.Context, _ *paramapi.DescribeParametersInput, _ ...func(*paramapi.Options)) (*paramapi.DescribeParametersOutput, error) {
+					return &paramapi.DescribeParametersOutput{
+						Parameters: []paramapi.ParameterMetadata{
+							{Name: lo.ToPtr("/app/error-param")},
+						},
+					}, nil
+				},
+				getParameterFunc: func(_ context.Context, _ *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
+					return nil, errors.New("fetch error")
+				},
+			},
+			check: func(t *testing.T, out string) {
+				assert.Contains(t, out, "/app/error-param")
+				assert.Contains(t, out, "<error:")
 			},
 		},
 	}

@@ -3,6 +3,7 @@ package list_test
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"testing"
 
@@ -13,6 +14,7 @@ import (
 	"github.com/mpyw/suve/internal/api/secretapi"
 	appcli "github.com/mpyw/suve/internal/cli/commands"
 	"github.com/mpyw/suve/internal/cli/commands/secret/list"
+	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/usecase/secret"
 )
 
@@ -155,9 +157,91 @@ func TestRun(t *testing.T) {
 					}, nil
 				},
 			},
-			check: func(t *testing.T, output string) {
-				assert.Contains(t, output, "secret1\tvalue1")
-				assert.Contains(t, output, "secret2\tvalue2")
+			check: func(t *testing.T, out string) {
+				assert.Contains(t, out, "secret1\tvalue1")
+				assert.Contains(t, out, "secret2\tvalue2")
+			},
+		},
+		{
+			name: "JSON output without show",
+			opts: list.Options{Output: output.FormatJSON},
+			mock: &mockClient{
+				listSecretsFunc: func(_ context.Context, _ *secretapi.ListSecretsInput, _ ...func(*secretapi.Options)) (*secretapi.ListSecretsOutput, error) {
+					return &secretapi.ListSecretsOutput{
+						SecretList: []secretapi.SecretListEntry{
+							{Name: lo.ToPtr("secret1")},
+							{Name: lo.ToPtr("secret2")},
+						},
+					}, nil
+				},
+			},
+			check: func(t *testing.T, out string) {
+				assert.Contains(t, out, `"name": "secret1"`)
+				assert.Contains(t, out, `"name": "secret2"`)
+				assert.NotContains(t, out, `"value"`)
+			},
+		},
+		{
+			name: "JSON output with show",
+			opts: list.Options{Output: output.FormatJSON, Show: true},
+			mock: &mockClient{
+				listSecretsFunc: func(_ context.Context, _ *secretapi.ListSecretsInput, _ ...func(*secretapi.Options)) (*secretapi.ListSecretsOutput, error) {
+					return &secretapi.ListSecretsOutput{
+						SecretList: []secretapi.SecretListEntry{
+							{Name: lo.ToPtr("secret1")},
+						},
+					}, nil
+				},
+				getSecretValueFunc: func(_ context.Context, params *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) {
+					return &secretapi.GetSecretValueOutput{
+						Name:         params.SecretId,
+						SecretString: lo.ToPtr("secret-value"),
+					}, nil
+				},
+			},
+			check: func(t *testing.T, out string) {
+				assert.Contains(t, out, `"name": "secret1"`)
+				assert.Contains(t, out, `"value": "secret-value"`)
+			},
+		},
+		{
+			name: "JSON output with show and error",
+			opts: list.Options{Output: output.FormatJSON, Show: true},
+			mock: &mockClient{
+				listSecretsFunc: func(_ context.Context, _ *secretapi.ListSecretsInput, _ ...func(*secretapi.Options)) (*secretapi.ListSecretsOutput, error) {
+					return &secretapi.ListSecretsOutput{
+						SecretList: []secretapi.SecretListEntry{
+							{Name: lo.ToPtr("error-secret")},
+						},
+					}, nil
+				},
+				getSecretValueFunc: func(_ context.Context, _ *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) {
+					return nil, errors.New("access denied")
+				},
+			},
+			check: func(t *testing.T, out string) {
+				assert.Contains(t, out, `"name": "error-secret"`)
+				assert.Contains(t, out, `"error": "access denied"`)
+			},
+		},
+		{
+			name: "text output with error",
+			opts: list.Options{Show: true},
+			mock: &mockClient{
+				listSecretsFunc: func(_ context.Context, _ *secretapi.ListSecretsInput, _ ...func(*secretapi.Options)) (*secretapi.ListSecretsOutput, error) {
+					return &secretapi.ListSecretsOutput{
+						SecretList: []secretapi.SecretListEntry{
+							{Name: lo.ToPtr("error-secret")},
+						},
+					}, nil
+				},
+				getSecretValueFunc: func(_ context.Context, _ *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) {
+					return nil, errors.New("fetch error")
+				},
+			},
+			check: func(t *testing.T, out string) {
+				assert.Contains(t, out, "error-secret")
+				assert.Contains(t, out, "<error:")
 			},
 		},
 	}
