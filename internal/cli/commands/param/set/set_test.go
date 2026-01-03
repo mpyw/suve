@@ -13,7 +13,6 @@ import (
 	"github.com/mpyw/suve/internal/api/paramapi"
 	appcli "github.com/mpyw/suve/internal/cli/commands"
 	"github.com/mpyw/suve/internal/cli/commands/param/set"
-	"github.com/mpyw/suve/internal/tagging"
 	"github.com/mpyw/suve/internal/usecase/param"
 )
 
@@ -46,10 +45,8 @@ func TestCommand_Validation(t *testing.T) {
 }
 
 type mockClient struct {
-	getParameterFunc           func(ctx context.Context, params *paramapi.GetParameterInput, optFns ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error)
-	putParameterFunc           func(ctx context.Context, params *paramapi.PutParameterInput, optFns ...func(*paramapi.Options)) (*paramapi.PutParameterOutput, error)
-	addTagsToResourceFunc      func(ctx context.Context, params *paramapi.AddTagsToResourceInput, optFns ...func(*paramapi.Options)) (*paramapi.AddTagsToResourceOutput, error)
-	removeTagsFromResourceFunc func(ctx context.Context, params *paramapi.RemoveTagsFromResourceInput, optFns ...func(*paramapi.Options)) (*paramapi.RemoveTagsFromResourceOutput, error)
+	getParameterFunc func(ctx context.Context, params *paramapi.GetParameterInput, optFns ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error)
+	putParameterFunc func(ctx context.Context, params *paramapi.PutParameterInput, optFns ...func(*paramapi.Options)) (*paramapi.PutParameterOutput, error)
 }
 
 func (m *mockClient) GetParameter(ctx context.Context, params *paramapi.GetParameterInput, optFns ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
@@ -64,20 +61,6 @@ func (m *mockClient) PutParameter(ctx context.Context, params *paramapi.PutParam
 		return m.putParameterFunc(ctx, params, optFns...)
 	}
 	return nil, fmt.Errorf("PutParameter not mocked")
-}
-
-func (m *mockClient) AddTagsToResource(ctx context.Context, params *paramapi.AddTagsToResourceInput, optFns ...func(*paramapi.Options)) (*paramapi.AddTagsToResourceOutput, error) {
-	if m.addTagsToResourceFunc != nil {
-		return m.addTagsToResourceFunc(ctx, params, optFns...)
-	}
-	return &paramapi.AddTagsToResourceOutput{}, nil
-}
-
-func (m *mockClient) RemoveTagsFromResource(ctx context.Context, params *paramapi.RemoveTagsFromResourceInput, optFns ...func(*paramapi.Options)) (*paramapi.RemoveTagsFromResourceOutput, error) {
-	if m.removeTagsFromResourceFunc != nil {
-		return m.removeTagsFromResourceFunc(ctx, params, optFns...)
-	}
-	return &paramapi.RemoveTagsFromResourceOutput{}, nil
 }
 
 func TestRun(t *testing.T) {
@@ -138,31 +121,6 @@ func TestRun(t *testing.T) {
 			},
 		},
 		{
-			name: "set with tags",
-			opts: set.Options{
-				Name:  "/app/param",
-				Value: "test-value",
-				Type:  "String",
-				TagChange: &tagging.Change{
-					Add:    map[string]string{"env": "prod"},
-					Remove: []string{},
-				},
-			},
-			mock: &mockClient{
-				getParameterFunc: defaultGetParameter,
-				putParameterFunc: func(_ context.Context, _ *paramapi.PutParameterInput, _ ...func(*paramapi.Options)) (*paramapi.PutParameterOutput, error) {
-					return &paramapi.PutParameterOutput{Version: 1}, nil
-				},
-				addTagsToResourceFunc: func(_ context.Context, params *paramapi.AddTagsToResourceInput, _ ...func(*paramapi.Options)) (*paramapi.AddTagsToResourceOutput, error) {
-					assert.Equal(t, "/app/param", lo.FromPtr(params.ResourceId))
-					return &paramapi.AddTagsToResourceOutput{}, nil
-				},
-			},
-			check: func(t *testing.T, output string) {
-				assert.Contains(t, output, "/app/param")
-			},
-		},
-		{
 			name:    "put parameter error",
 			opts:    set.Options{Name: "/app/param", Value: "test-value", Type: "String"},
 			wantErr: "failed to put parameter",
@@ -170,28 +128,6 @@ func TestRun(t *testing.T) {
 				getParameterFunc: defaultGetParameter,
 				putParameterFunc: func(_ context.Context, _ *paramapi.PutParameterInput, _ ...func(*paramapi.Options)) (*paramapi.PutParameterOutput, error) {
 					return nil, fmt.Errorf("AWS error")
-				},
-			},
-		},
-		{
-			name: "tag application error",
-			opts: set.Options{
-				Name:  "/app/param",
-				Value: "test-value",
-				Type:  "String",
-				TagChange: &tagging.Change{
-					Add:    map[string]string{"env": "prod"},
-					Remove: []string{},
-				},
-			},
-			wantErr: "failed to add tags",
-			mock: &mockClient{
-				getParameterFunc: defaultGetParameter,
-				putParameterFunc: func(_ context.Context, _ *paramapi.PutParameterInput, _ ...func(*paramapi.Options)) (*paramapi.PutParameterOutput, error) {
-					return &paramapi.PutParameterOutput{Version: 1}, nil
-				},
-				addTagsToResourceFunc: func(_ context.Context, _ *paramapi.AddTagsToResourceInput, _ ...func(*paramapi.Options)) (*paramapi.AddTagsToResourceOutput, error) {
-					return nil, fmt.Errorf("tag error")
 				},
 			},
 		},

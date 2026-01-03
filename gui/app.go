@@ -283,6 +283,34 @@ func (a *App) ParamDelete(name string) (*ParamDeleteResult, error) {
 	return &ParamDeleteResult{Name: result.Name}, nil
 }
 
+// ParamAddTag adds or updates a tag on a parameter.
+func (a *App) ParamAddTag(name, key, value string) error {
+	client, err := a.getParamClient()
+	if err != nil {
+		return err
+	}
+
+	uc := &param.TagUseCase{Client: client}
+	return uc.Execute(a.ctx, param.TagInput{
+		Name: name,
+		Add:  map[string]string{key: value},
+	})
+}
+
+// ParamRemoveTag removes a tag from a parameter.
+func (a *App) ParamRemoveTag(name, key string) error {
+	client, err := a.getParamClient()
+	if err != nil {
+		return err
+	}
+
+	uc := &param.TagUseCase{Client: client}
+	return uc.Execute(a.ctx, param.TagInput{
+		Name:   name,
+		Remove: []string{key},
+	})
+}
+
 // =============================================================================
 // Secret Operations
 // =============================================================================
@@ -396,6 +424,8 @@ type SecretLogResult struct {
 type SecretLogEntry struct {
 	VersionID string   `json:"versionId"`
 	Stages    []string `json:"stages"`
+	Value     string   `json:"value"`
+	IsCurrent bool     `json:"isCurrent"`
 	Created   string   `json:"created,omitempty"`
 }
 
@@ -420,6 +450,8 @@ func (a *App) SecretLog(name string, maxResults int32) (*SecretLogResult, error)
 		entry := SecretLogEntry{
 			VersionID: e.VersionID,
 			Stages:    e.VersionStage,
+			Value:     e.Value,
+			IsCurrent: e.IsCurrent,
 		}
 		if e.CreatedDate != nil {
 			entry.Created = e.CreatedDate.Format("2006-01-02T15:04:05Z07:00")
@@ -523,6 +555,34 @@ func (a *App) SecretDelete(name string, force bool) (*SecretDeleteResult, error)
 	return r, nil
 }
 
+// SecretAddTag adds or updates a tag on a secret.
+func (a *App) SecretAddTag(name, key, value string) error {
+	client, err := a.getSecretClient()
+	if err != nil {
+		return err
+	}
+
+	uc := &secret.TagUseCase{Client: client}
+	return uc.Execute(a.ctx, secret.TagInput{
+		Name: name,
+		Add:  map[string]string{key: value},
+	})
+}
+
+// SecretRemoveTag removes a tag from a secret.
+func (a *App) SecretRemoveTag(name, key string) error {
+	client, err := a.getSecretClient()
+	if err != nil {
+		return err
+	}
+
+	uc := &secret.TagUseCase{Client: client}
+	return uc.Execute(a.ctx, secret.TagInput{
+		Name:   name,
+		Remove: []string{key},
+	})
+}
+
 // SecretDiffResult represents the result of comparing secrets.
 type SecretDiffResult struct {
 	OldName      string `json:"oldName"`
@@ -605,10 +665,12 @@ type StagingStatusResult struct {
 
 // StagingEntry represents a staged change.
 type StagingEntry struct {
-	Name      string  `json:"name"`
-	Operation string  `json:"operation"`
-	Value     *string `json:"value,omitempty"`
-	StagedAt  string  `json:"stagedAt"`
+	Name      string            `json:"name"`
+	Operation string            `json:"operation"`
+	Value     *string           `json:"value,omitempty"`
+	Tags      map[string]string `json:"tags,omitempty"`
+	UntagKeys []string          `json:"untagKeys,omitempty"`
+	StagedAt  string            `json:"stagedAt"`
 }
 
 // StagingStatus gets the current staging status.
@@ -648,6 +710,8 @@ func (a *App) StagingStatus() (*StagingStatusResult, error) {
 			Name:      e.Name,
 			Operation: string(e.Operation),
 			Value:     e.Value,
+			Tags:      e.Tags,
+			UntagKeys: e.UntagKeys,
 			StagedAt:  e.StagedAt.Format("2006-01-02T15:04:05Z07:00"),
 		}
 	}
@@ -657,6 +721,8 @@ func (a *App) StagingStatus() (*StagingStatusResult, error) {
 			Name:      e.Name,
 			Operation: string(e.Operation),
 			Value:     e.Value,
+			Tags:      e.Tags,
+			UntagKeys: e.UntagKeys,
 			StagedAt:  e.StagedAt.Format("2006-01-02T15:04:05Z07:00"),
 		}
 	}
@@ -666,9 +732,11 @@ func (a *App) StagingStatus() (*StagingStatusResult, error) {
 
 // StagingApplyResultEntry represents a single apply result.
 type StagingApplyResultEntry struct {
-	Name   string `json:"name"`
-	Status string `json:"status"`
-	Error  string `json:"error,omitempty"`
+	Name      string            `json:"name"`
+	Status    string            `json:"status"`
+	Error     string            `json:"error,omitempty"`
+	Tags      map[string]string `json:"tags,omitempty"`
+	UntagKeys []string          `json:"untagKeys,omitempty"`
 }
 
 // StagingApplyResult represents the result of applying staged changes.
@@ -721,7 +789,11 @@ func (a *App) StagingApply(service string, ignoreConflicts bool) (*StagingApplyR
 	}
 
 	for _, r := range result.Results {
-		entry := StagingApplyResultEntry{Name: r.Name}
+		entry := StagingApplyResultEntry{
+			Name:      r.Name,
+			Tags:      r.Tags,
+			UntagKeys: r.UntagKeys,
+		}
 		switch r.Status {
 		case stagingusecase.ApplyResultCreated:
 			entry.Status = "created"
@@ -954,6 +1026,96 @@ func (a *App) StagingUnstage(service, name string) (*StagingUnstageResult, error
 	return &StagingUnstageResult{Name: name}, nil
 }
 
+// StagingAddTagResult represents the result of staging a tag addition.
+type StagingAddTagResult struct {
+	Name string `json:"name"`
+}
+
+// StagingAddTag stages adding a tag to an item.
+func (a *App) StagingAddTag(service, name, key, value string) (*StagingAddTagResult, error) {
+	store, err := a.getStagingStore()
+	if err != nil {
+		return nil, err
+	}
+
+	var strategy staging.EditStrategy
+	switch service {
+	case "ssm":
+		client, err := a.getParamClient()
+		if err != nil {
+			return nil, err
+		}
+		strategy = staging.NewParamStrategy(client)
+	case "sm":
+		client, err := a.getSecretClient()
+		if err != nil {
+			return nil, err
+		}
+		strategy = staging.NewSecretStrategy(client)
+	default:
+		return nil, errInvalidService
+	}
+
+	uc := &stagingusecase.TagUseCase{
+		Strategy: strategy,
+		Store:    store,
+	}
+	result, err := uc.Execute(a.ctx, stagingusecase.TagInput{
+		Name:    name,
+		AddTags: map[string]string{key: value},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return &StagingAddTagResult{Name: result.Name}, nil
+}
+
+// StagingRemoveTagResult represents the result of staging a tag removal.
+type StagingRemoveTagResult struct {
+	Name string `json:"name"`
+}
+
+// StagingRemoveTag stages removing a tag from an item.
+func (a *App) StagingRemoveTag(service, name, key string) (*StagingRemoveTagResult, error) {
+	store, err := a.getStagingStore()
+	if err != nil {
+		return nil, err
+	}
+
+	var strategy staging.EditStrategy
+	switch service {
+	case "ssm":
+		client, err := a.getParamClient()
+		if err != nil {
+			return nil, err
+		}
+		strategy = staging.NewParamStrategy(client)
+	case "sm":
+		client, err := a.getSecretClient()
+		if err != nil {
+			return nil, err
+		}
+		strategy = staging.NewSecretStrategy(client)
+	default:
+		return nil, errInvalidService
+	}
+
+	uc := &stagingusecase.TagUseCase{
+		Strategy: strategy,
+		Store:    store,
+	}
+	result, err := uc.Execute(a.ctx, stagingusecase.TagInput{
+		Name:       name,
+		RemoveTags: []string{key},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return &StagingRemoveTagResult{Name: result.Name}, nil
+}
+
 // StagingDiffResult represents the result of diffing staged changes.
 type StagingDiffResult struct {
 	ItemName string             `json:"itemName"`
@@ -970,6 +1132,7 @@ type StagingDiffEntry struct {
 	StagedValue   string            `json:"stagedValue,omitempty"`
 	Description   *string           `json:"description,omitempty"`
 	Tags          map[string]string `json:"tags,omitempty"`
+	UntagKeys     []string          `json:"untagKeys,omitempty"`
 	Warning       string            `json:"warning,omitempty"`
 }
 
@@ -1017,6 +1180,7 @@ func (a *App) StagingDiff(service string, name string) (*StagingDiffResult, erro
 			StagedValue:   e.StagedValue,
 			Description:   e.Description,
 			Tags:          e.Tags,
+			UntagKeys:     e.UntagKeys,
 			Warning:       e.Warning,
 		}
 		switch e.Type {

@@ -78,6 +78,7 @@ func toStagingEntry(e stagingusecase.StatusEntry) staging.Entry {
 		Value:         e.Value,
 		Description:   e.Description,
 		Tags:          e.Tags,
+		UntagKeys:     e.UntagKeys,
 		DeleteOptions: e.DeleteOptions,
 		StagedAt:      e.StagedAt,
 	}

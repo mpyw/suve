@@ -67,33 +67,36 @@ func (s *ParamStrategy) Apply(ctx context.Context, name string, entry Entry) err
 }
 
 func (s *ParamStrategy) applySet(ctx context.Context, name string, entry Entry) error {
-	// Try to get existing parameter to preserve type
-	paramType := paramapi.ParameterTypeString
-	existing, err := s.Client.GetParameter(ctx, &paramapi.GetParameterInput{
-		Name: lo.ToPtr(name),
-	})
-	if err != nil {
-		var pnf *paramapi.ParameterNotFound
-		if !errors.As(err, &pnf) {
-			return fmt.Errorf("failed to get existing parameter: %w", err)
+	// If Value is set, update the parameter value
+	if entry.Value != nil {
+		// Try to get existing parameter to preserve type
+		paramType := paramapi.ParameterTypeString
+		existing, err := s.Client.GetParameter(ctx, &paramapi.GetParameterInput{
+			Name: lo.ToPtr(name),
+		})
+		if err != nil {
+			var pnf *paramapi.ParameterNotFound
+			if !errors.As(err, &pnf) {
+				return fmt.Errorf("failed to get existing parameter: %w", err)
+			}
+		} else if existing.Parameter != nil {
+			paramType = existing.Parameter.Type
 		}
-	} else if existing.Parameter != nil {
-		paramType = existing.Parameter.Type
-	}
 
-	input := &paramapi.PutParameterInput{
-		Name:      lo.ToPtr(name),
-		Value:     entry.Value,
-		Type:      paramType,
-		Overwrite: lo.ToPtr(true),
-	}
-	if entry.Description != nil {
-		input.Description = entry.Description
-	}
+		input := &paramapi.PutParameterInput{
+			Name:      lo.ToPtr(name),
+			Value:     entry.Value,
+			Type:      paramType,
+			Overwrite: lo.ToPtr(true),
+		}
+		if entry.Description != nil {
+			input.Description = entry.Description
+		}
 
-	_, err = s.Client.PutParameter(ctx, input)
-	if err != nil {
-		return fmt.Errorf("failed to set parameter: %w", err)
+		_, err = s.Client.PutParameter(ctx, input)
+		if err != nil {
+			return fmt.Errorf("failed to set parameter: %w", err)
+		}
 	}
 
 	// Apply tag changes (additive)

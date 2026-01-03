@@ -745,3 +745,103 @@ func TestSecretStrategy_FetchCurrentValue_NoCreatedDate(t *testing.T) {
 	assert.Equal(t, "secret-value", result.Value)
 	assert.True(t, result.LastModified.IsZero())
 }
+
+func TestSecretStrategy_Apply_TagOnlyUpdate(t *testing.T) {
+	t.Parallel()
+
+	t.Run("tag-only update without value change", func(t *testing.T) {
+		t.Parallel()
+		tagResourceCalled := false
+		putSecretValueCalled := false
+
+		mock := &secretMockClient{
+			putSecretValueFunc: func(_ context.Context, _ *secretapi.PutSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.PutSecretValueOutput, error) {
+				putSecretValueCalled = true
+				return &secretapi.PutSecretValueOutput{}, nil
+			},
+			tagResourceFunc: func(_ context.Context, params *secretapi.TagResourceInput, _ ...func(*secretapi.Options)) (*secretapi.TagResourceOutput, error) {
+				tagResourceCalled = true
+				assert.Equal(t, "my-secret", lo.FromPtr(params.SecretId))
+				assert.Len(t, params.Tags, 1)
+				return &secretapi.TagResourceOutput{}, nil
+			},
+		}
+
+		s := staging.NewSecretStrategy(mock)
+		err := s.Apply(context.Background(), "my-secret", staging.Entry{
+			Operation: staging.OperationUpdate,
+			Value:     nil, // No value change
+			Tags:      map[string]string{"env": "prod"},
+		})
+		require.NoError(t, err)
+		assert.True(t, tagResourceCalled, "TagResource should be called")
+		assert.False(t, putSecretValueCalled, "PutSecretValue should NOT be called when Value is nil")
+	})
+
+	t.Run("untag-only update without value change", func(t *testing.T) {
+		t.Parallel()
+		untagResourceCalled := false
+		putSecretValueCalled := false
+
+		mock := &secretMockClient{
+			putSecretValueFunc: func(_ context.Context, _ *secretapi.PutSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.PutSecretValueOutput, error) {
+				putSecretValueCalled = true
+				return &secretapi.PutSecretValueOutput{}, nil
+			},
+			untagResourceFunc: func(_ context.Context, params *secretapi.UntagResourceInput, _ ...func(*secretapi.Options)) (*secretapi.UntagResourceOutput, error) {
+				untagResourceCalled = true
+				assert.Equal(t, "my-secret", lo.FromPtr(params.SecretId))
+				assert.Equal(t, []string{"old-tag"}, params.TagKeys)
+				return &secretapi.UntagResourceOutput{}, nil
+			},
+		}
+
+		s := staging.NewSecretStrategy(mock)
+		err := s.Apply(context.Background(), "my-secret", staging.Entry{
+			Operation: staging.OperationUpdate,
+			Value:     nil, // No value change
+			UntagKeys: []string{"old-tag"},
+		})
+		require.NoError(t, err)
+		assert.True(t, untagResourceCalled, "UntagResource should be called")
+		assert.False(t, putSecretValueCalled, "PutSecretValue should NOT be called when Value is nil")
+	})
+}
+
+func TestSecretStrategy_Apply_DeleteIgnoresTags(t *testing.T) {
+	t.Parallel()
+
+	t.Run("delete ignores tags and untag keys", func(t *testing.T) {
+		t.Parallel()
+		deleteSecretCalled := false
+		tagResourceCalled := false
+		untagResourceCalled := false
+
+		mock := &secretMockClient{
+			deleteSecretFunc: func(_ context.Context, params *secretapi.DeleteSecretInput, _ ...func(*secretapi.Options)) (*secretapi.DeleteSecretOutput, error) {
+				deleteSecretCalled = true
+				assert.Equal(t, "my-secret", lo.FromPtr(params.SecretId))
+				return &secretapi.DeleteSecretOutput{}, nil
+			},
+			tagResourceFunc: func(_ context.Context, _ *secretapi.TagResourceInput, _ ...func(*secretapi.Options)) (*secretapi.TagResourceOutput, error) {
+				tagResourceCalled = true
+				return &secretapi.TagResourceOutput{}, nil
+			},
+			untagResourceFunc: func(_ context.Context, _ *secretapi.UntagResourceInput, _ ...func(*secretapi.Options)) (*secretapi.UntagResourceOutput, error) {
+				untagResourceCalled = true
+				return &secretapi.UntagResourceOutput{}, nil
+			},
+		}
+
+		s := staging.NewSecretStrategy(mock)
+		err := s.Apply(context.Background(), "my-secret", staging.Entry{
+			Operation: staging.OperationDelete,
+			Tags:      map[string]string{"env": "prod"}, // Should be ignored
+			UntagKeys: []string{"old-tag"},              // Should be ignored
+		})
+		require.NoError(t, err)
+		assert.True(t, deleteSecretCalled, "DeleteSecret should be called")
+		assert.False(t, tagResourceCalled, "TagResource should NOT be called during delete")
+		assert.False(t, untagResourceCalled, "UntagResource should NOT be called during delete")
+	})
+}

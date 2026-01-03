@@ -2,6 +2,7 @@
   import { createEventDispatcher } from 'svelte';
 
   export let activeView: 'param' | 'secret' | 'staging' = 'param';
+  export let stagingCount: number = 0;
 
   const dispatch = createEventDispatcher<{ navigate: 'param' | 'secret' | 'staging' }>();
 
@@ -44,6 +45,9 @@
     >
       <span class="nav-icon">*</span>
       <span class="nav-label">Staging</span>
+      {#if stagingCount > 0}
+        <span class="staging-count">{stagingCount}</span>
+      {/if}
     </button>
   </nav>
 </aside>
@@ -134,5 +138,24 @@
 
   .nav-item.active .nav-badge {
     background: rgba(255, 255, 255, 0.2);
+  }
+
+  .staging-count {
+    min-width: 18px;
+    height: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    font-weight: bold;
+    background: #e94560;
+    color: #fff;
+    border-radius: 50%;
+    padding: 0 4px;
+  }
+
+  .nav-item.active .staging-count {
+    background: #fff;
+    color: #e94560;
   }
 </style>

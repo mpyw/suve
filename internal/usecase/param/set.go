@@ -8,15 +8,12 @@ import (
 	"github.com/samber/lo"
 
 	"github.com/mpyw/suve/internal/api/paramapi"
-	"github.com/mpyw/suve/internal/tagging"
 )
 
 // SetClient is the interface for the set use case.
 type SetClient interface {
 	paramapi.GetParameterAPI
 	paramapi.PutParameterAPI
-	paramapi.AddTagsToResourceAPI
-	paramapi.RemoveTagsFromResourceAPI
 }
 
 // SetInput holds input for the set use case.
@@ -25,7 +22,6 @@ type SetInput struct {
 	Value       string
 	Type        paramapi.ParameterType
 	Description string
-	TagChange   *tagging.Change
 }
 
 // SetOutput holds the result of the set use case.
@@ -77,40 +73,6 @@ func (u *SetUseCase) Execute(ctx context.Context, input SetInput) (*SetOutput, e
 	putOutput, err := u.Client.PutParameter(ctx, putInput)
 	if err != nil {
 		return nil, fmt.Errorf("failed to put parameter: %w", err)
-	}
-
-	// Handle tagging
-	if input.TagChange != nil && !input.TagChange.IsEmpty() {
-		// Add tags
-		if len(input.TagChange.Add) > 0 {
-			tags := make([]paramapi.Tag, 0, len(input.TagChange.Add))
-			for k, v := range input.TagChange.Add {
-				tags = append(tags, paramapi.Tag{
-					Key:   lo.ToPtr(k),
-					Value: lo.ToPtr(v),
-				})
-			}
-			_, err := u.Client.AddTagsToResource(ctx, &paramapi.AddTagsToResourceInput{
-				ResourceId:   lo.ToPtr(input.Name),
-				ResourceType: paramapi.ResourceTypeForTaggingParameter,
-				Tags:         tags,
-			})
-			if err != nil {
-				return nil, fmt.Errorf("failed to add tags: %w", err)
-			}
-		}
-
-		// Remove tags
-		if len(input.TagChange.Remove) > 0 {
-			_, err := u.Client.RemoveTagsFromResource(ctx, &paramapi.RemoveTagsFromResourceInput{
-				ResourceId:   lo.ToPtr(input.Name),
-				ResourceType: paramapi.ResourceTypeForTaggingParameter,
-				TagKeys:      input.TagChange.Remove,
-			})
-			if err != nil {
-				return nil, fmt.Errorf("failed to remove tags: %w", err)
-			}
-		}
 	}
 
 	return &SetOutput{

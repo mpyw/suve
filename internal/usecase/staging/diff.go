@@ -35,6 +35,7 @@ type DiffEntry struct {
 	StagedValue   string
 	Description   *string
 	Tags          map[string]string
+	UntagKeys     []string
 	Warning       string // For warnings like "already deleted in AWS"
 }
 
@@ -137,6 +138,7 @@ func (u *DiffUseCase) processDiffResult(name string, entry staging.Entry, result
 		StagedValue:   stagedValue,
 		Description:   entry.Description,
 		Tags:          entry.Tags,
+		UntagKeys:     entry.UntagKeys,
 	}
 }
 
@@ -160,6 +162,7 @@ func (u *DiffUseCase) handleFetchError(name string, entry staging.Entry, err err
 			StagedValue: lo.FromPtr(entry.Value),
 			Description: entry.Description,
 			Tags:        entry.Tags,
+			UntagKeys:   entry.UntagKeys,
 		}
 
 	case staging.OperationUpdate:

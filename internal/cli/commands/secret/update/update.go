@@ -13,7 +13,6 @@ import (
 	"github.com/mpyw/suve/internal/cli/confirm"
 	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/infra"
-	"github.com/mpyw/suve/internal/tagging"
 	"github.com/mpyw/suve/internal/usecase/secret"
 )
 
@@ -29,7 +28,6 @@ type Options struct {
 	Name        string
 	Value       string
 	Description string
-	TagChange   *tagging.Change
 }
 
 // Command returns the update command.
@@ -44,30 +42,16 @@ This creates a new version of the secret. The previous version will
 have its AWSCURRENT label moved to AWSPREVIOUS.
 
 Use 'suve secret create' to create a new secret.
-
-TAGGING:
-   --tag adds or updates tags (additive, does not remove existing tags)
-   --untag removes specific tags by key
-   If the same key appears in both, the later flag wins with a warning.
+To manage tags, use 'suve secret tag' and 'suve secret untag' commands.
 
 EXAMPLES:
-  suve secret update my-api-key "new-key-value"             Update with new value
-  suve secret update my-config '{"host":"new-db.com"}'      Update JSON secret
-  suve secret update --yes my-api-key "new-key-value"       Update without confirmation
-  suve secret update --tag env=prod my-api-key "value"      Update with tags
-  suve secret update --untag deprecated my-api-key "value"  Remove a tag`,
+  suve secret update my-api-key "new-key-value"         Update with new value
+  suve secret update my-config '{"host":"new-db.com"}'  Update JSON secret
+  suve secret update --yes my-api-key "new-key-value"   Update without confirmation`,
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:  "description",
 				Usage: "Update secret description",
-			},
-			&cli.StringSliceFlag{
-				Name:  "tag",
-				Usage: "Tag in key=value format (can be specified multiple times, additive)",
-			},
-			&cli.StringSliceFlag{
-				Name:  "untag",
-				Usage: "Tag key to remove (can be specified multiple times)",
 			},
 			&cli.BoolFlag{
 				Name:  "yes",
@@ -85,17 +69,6 @@ func action(ctx context.Context, cmd *cli.Command) error {
 
 	name := cmd.Args().Get(0)
 	skipConfirm := cmd.Bool("yes")
-
-	// Parse tags
-	tagResult, err := tagging.ParseFlags(cmd.StringSlice("tag"), cmd.StringSlice("untag"))
-	if err != nil {
-		return err
-	}
-
-	// Output warnings
-	for _, w := range tagResult.Warnings {
-		output.Warning(cmd.Root().ErrWriter, "%s", w)
-	}
 
 	client, err := infra.NewSecretClient(ctx)
 	if err != nil {
@@ -139,7 +112,6 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		Name:        name,
 		Value:       newValue,
 		Description: cmd.String("description"),
-		TagChange:   tagResult.Change,
 	})
 }
 
@@ -149,7 +121,6 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 		Name:        opts.Name,
 		Value:       opts.Value,
 		Description: opts.Description,
-		TagChange:   opts.TagChange,
 	})
 	if err != nil {
 		return err

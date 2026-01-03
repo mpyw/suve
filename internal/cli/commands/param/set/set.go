@@ -15,7 +15,6 @@ import (
 	"github.com/mpyw/suve/internal/cli/confirm"
 	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/infra"
-	"github.com/mpyw/suve/internal/tagging"
 	"github.com/mpyw/suve/internal/usecase/param"
 )
 
@@ -32,7 +31,6 @@ type Options struct {
 	Value       string
 	Type        string
 	Description string
-	TagChange   *tagging.Change
 }
 
 // Command returns the set command.
@@ -51,18 +49,13 @@ PARAMETER TYPES:
 The --secure flag is a shorthand for --type SecureString.
 You cannot use both --secure and --type together.
 
-TAGGING:
-   --tag adds or updates tags (additive, does not remove existing tags)
-   --untag removes specific tags by key
-   If the same key appears in both, the later flag wins with a warning.
+To manage tags, use 'suve param tag' and 'suve param untag' commands.
 
 EXAMPLES:
-   suve param set /app/config/db-url "postgres://..."              Create String parameter
-   suve param set --secure /app/config/api-key "secret123"         Create SecureString
-   suve param set --type StringList /app/hosts "a.com,b.com"       Create StringList
-   suve param set --tag env=prod --tag team=platform /app/key val  Set with tags
-   suve param set --untag deprecated /app/key val                  Remove a tag
-   suve param set --yes /app/config/db-url "postgres://..."        Update without confirmation`,
+   suve param set /app/config/db-url "postgres://..."       Create String parameter
+   suve param set --secure /app/config/api-key "secret123"  Create SecureString
+   suve param set --type StringList /app/hosts "a.com,b.com" Create StringList
+   suve param set --yes /app/config/db-url "postgres://..." Update without confirmation`,
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:  "type",
@@ -76,14 +69,6 @@ EXAMPLES:
 			&cli.StringFlag{
 				Name:  "description",
 				Usage: "Parameter description",
-			},
-			&cli.StringSliceFlag{
-				Name:  "tag",
-				Usage: "Tag in key=value format (can be specified multiple times, additive)",
-			},
-			&cli.StringSliceFlag{
-				Name:  "untag",
-				Usage: "Tag key to remove (can be specified multiple times)",
 			},
 			&cli.BoolFlag{
 				Name:  "yes",
@@ -112,17 +97,6 @@ func action(ctx context.Context, cmd *cli.Command) error {
 
 	name := cmd.Args().Get(0)
 	skipConfirm := cmd.Bool("yes")
-
-	// Parse tags
-	tagResult, err := tagging.ParseFlags(cmd.StringSlice("tag"), cmd.StringSlice("untag"))
-	if err != nil {
-		return err
-	}
-
-	// Output warnings
-	for _, w := range tagResult.Warnings {
-		output.Warning(cmd.Root().ErrWriter, "%s", w)
-	}
 
 	client, err := infra.NewParamClient(ctx)
 	if err != nil {
@@ -168,7 +142,6 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		Value:       newValue,
 		Type:        paramType,
 		Description: cmd.String("description"),
-		TagChange:   tagResult.Change,
 	})
 }
 
@@ -179,7 +152,6 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 		Value:       opts.Value,
 		Type:        paramapi.ParameterType(opts.Type),
 		Description: opts.Description,
-		TagChange:   opts.TagChange,
 	})
 	if err != nil {
 		return err

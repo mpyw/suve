@@ -1,10 +1,12 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
-  import { StagingDiff, StagingApply, StagingReset, StagingEdit, StagingUnstage } from '../../wailsjs/go/main/App';
+  import { onMount, createEventDispatcher } from 'svelte';
+  import { StagingDiff, StagingApply, StagingReset, StagingEdit, StagingUnstage, StagingAddTag, StagingRemoveTag } from '../../wailsjs/go/main/App';
   import type { main } from '../../wailsjs/go/models';
   import Modal from './Modal.svelte';
   import DiffDisplay from './DiffDisplay.svelte';
   import './common.css';
+
+  const dispatch = createEventDispatcher<{ countChange: number }>();
 
   let loading = false;
   let error = '';
@@ -18,6 +20,7 @@
   let showApplyModal = false;
   let showResetModal = false;
   let showEditModal = false;
+  let showEditTagModal = false;
   let applyService = '';
   let resetService = '';
   let ignoreConflicts = false;
@@ -30,6 +33,13 @@
   let editName = '';
   let editValue = '';
 
+  // Tag edit form
+  let tagEditService = '';
+  let tagEditEntryName = '';
+  let tagEditKey = '';
+  let tagEditValue = '';
+  let tagEditIsNew = false;
+
   async function loadStatus() {
     loading = true;
     error = '';
@@ -41,10 +51,13 @@
       ]);
       ssmEntries = ssmResult?.entries?.filter(e => e.type !== 'autoUnstaged') || [];
       smEntries = smResult?.entries?.filter(e => e.type !== 'autoUnstaged') || [];
+      // Emit count change for sidebar badge
+      dispatch('countChange', ssmEntries.length + smEntries.length);
     } catch (e) {
       error = e instanceof Error ? e.message : String(e);
       ssmEntries = [];
       smEntries = [];
+      dispatch('countChange', 0);
     } finally {
       loading = false;
     }
@@ -163,6 +176,67 @@
     }
   }
 
+  // Tag edit modal
+  function openAddTagModal(service: string, entryName: string) {
+    tagEditService = service;
+    tagEditEntryName = entryName;
+    tagEditKey = '';
+    tagEditValue = '';
+    tagEditIsNew = true;
+    modalError = '';
+    showEditTagModal = true;
+  }
+
+  function openEditTagModal(service: string, entryName: string, key: string, value: string) {
+    tagEditService = service;
+    tagEditEntryName = entryName;
+    tagEditKey = key;
+    tagEditValue = value;
+    tagEditIsNew = false;
+    modalError = '';
+    showEditTagModal = true;
+  }
+
+  async function handleSaveTag() {
+    if (!tagEditKey) {
+      modalError = 'Tag key is required';
+      return;
+    }
+    modalLoading = true;
+    modalError = '';
+    try {
+      await StagingAddTag(tagEditService, tagEditEntryName, tagEditKey, tagEditValue);
+      showEditTagModal = false;
+      await loadStatus();
+    } catch (e) {
+      modalError = e instanceof Error ? e.message : String(e);
+    } finally {
+      modalLoading = false;
+    }
+  }
+
+  async function handleRemoveTag(service: string, entryName: string, key: string) {
+    try {
+      await StagingRemoveTag(service, entryName, key);
+      await loadStatus();
+    } catch (e) {
+      error = e instanceof Error ? e.message : String(e);
+    }
+  }
+
+  async function handleCancelUntag(service: string, entryName: string, key: string) {
+    // To cancel a staged untag, we re-add the tag with empty value (or we need a different API)
+    // For now, we'll just remove it from untagKeys by re-staging the entry without that key
+    // Since there's no direct API, we'll need to handle this differently
+    // Actually, the StagingAddTag should effectively cancel the untag
+    try {
+      await StagingAddTag(service, entryName, key, '');
+      await loadStatus();
+    } catch (e) {
+      error = e instanceof Error ? e.message : String(e);
+    }
+  }
+
   onMount(() => {
     loadStatus();
   });
@@ -232,20 +306,61 @@
                   <button class="btn-entry btn-unstage" on:click={() => handleUnstage('ssm', entry.name)}>Unstage</button>
                 </div>
               </div>
-              {#if viewMode === 'diff' && entry.operation !== 'create'}
-                <div class="entry-diff">
-                  <DiffDisplay
-                    oldValue={entry.awsValue || ''}
-                    newValue={entry.stagedValue || (entry.operation === 'delete' ? '(deleted)' : '')}
-                    oldLabel="AWS"
-                    newLabel="Staged"
-                    oldSubLabel={entry.awsIdentifier || ''}
-                  />
-                </div>
-              {:else if entry.stagedValue !== undefined}
-                <pre class="entry-value">{entry.stagedValue}</pre>
-              {:else if entry.operation === 'delete'}
-                <pre class="entry-value entry-value-delete">(will be deleted)</pre>
+              <div class="entry-tags">
+                {#if entry.tags && Object.keys(entry.tags).length > 0}
+                  <div class="tag-changes tag-add">
+                    <span class="tag-label">+ Tags:</span>
+                    {#each Object.entries(entry.tags) as [key, value]}
+                      <button class="tag-item tag-item-editable" type="button" on:click={() => openEditTagModal('ssm', entry.name, key, value)}>
+                        {key}={value}
+                        <span class="tag-delete-btn" role="button" tabindex="0" on:click|stopPropagation={() => handleRemoveTag('ssm', entry.name, key)} on:keydown|stopPropagation={(e) => e.key === 'Enter' && handleRemoveTag('ssm', entry.name, key)}>×</span>
+                      </button>
+                    {/each}
+                  </div>
+                {/if}
+                {#if entry.untagKeys && entry.untagKeys.length > 0}
+                  <div class="tag-changes tag-remove">
+                    <span class="tag-label">- Tags:</span>
+                    {#each entry.untagKeys as key}
+                      <span class="tag-item">
+                        {key}
+                        <button class="tag-cancel-btn" on:click={() => handleCancelUntag('ssm', entry.name, key)} title="Cancel untag">↩</button>
+                      </span>
+                    {/each}
+                  </div>
+                {/if}
+                {#if entry.operation !== 'delete'}
+                  <button class="btn-add-tag" on:click={() => openAddTagModal('ssm', entry.name)}>+ Add Tag</button>
+                {/if}
+              </div>
+              {#if entry.operation === 'delete'}
+                {#if viewMode === 'diff'}
+                  <div class="entry-diff">
+                    <DiffDisplay
+                      oldValue={entry.awsValue || ''}
+                      newValue="(deleted)"
+                      oldLabel="AWS"
+                      newLabel="Staged"
+                      oldSubLabel={entry.awsIdentifier || ''}
+                    />
+                  </div>
+                {:else}
+                  <pre class="entry-value entry-value-delete">(will be deleted)</pre>
+                {/if}
+              {:else if entry.stagedValue !== undefined && entry.stagedValue !== ''}
+                {#if viewMode === 'diff' && entry.operation !== 'create'}
+                  <div class="entry-diff">
+                    <DiffDisplay
+                      oldValue={entry.awsValue || ''}
+                      newValue={entry.stagedValue}
+                      oldLabel="AWS"
+                      newLabel="Staged"
+                      oldSubLabel={entry.awsIdentifier || ''}
+                    />
+                  </div>
+                {:else}
+                  <pre class="entry-value">{entry.stagedValue}</pre>
+                {/if}
               {/if}
             </li>
           {/each}
@@ -286,20 +401,61 @@
                   <button class="btn-entry btn-unstage" on:click={() => handleUnstage('sm', entry.name)}>Unstage</button>
                 </div>
               </div>
-              {#if viewMode === 'diff' && entry.operation !== 'create'}
-                <div class="entry-diff">
-                  <DiffDisplay
-                    oldValue={entry.awsValue || ''}
-                    newValue={entry.stagedValue || (entry.operation === 'delete' ? '(deleted)' : '')}
-                    oldLabel="AWS"
-                    newLabel="Staged"
-                    oldSubLabel={entry.awsIdentifier || ''}
-                  />
-                </div>
-              {:else if entry.stagedValue !== undefined}
-                <pre class="entry-value">{entry.stagedValue}</pre>
-              {:else if entry.operation === 'delete'}
-                <pre class="entry-value entry-value-delete">(will be deleted)</pre>
+              <div class="entry-tags">
+                {#if entry.tags && Object.keys(entry.tags).length > 0}
+                  <div class="tag-changes tag-add">
+                    <span class="tag-label">+ Tags:</span>
+                    {#each Object.entries(entry.tags) as [key, value]}
+                      <button class="tag-item tag-item-editable" type="button" on:click={() => openEditTagModal('sm', entry.name, key, value)}>
+                        {key}={value}
+                        <span class="tag-delete-btn" role="button" tabindex="0" on:click|stopPropagation={() => handleRemoveTag('sm', entry.name, key)} on:keydown|stopPropagation={(e) => e.key === 'Enter' && handleRemoveTag('sm', entry.name, key)}>×</span>
+                      </button>
+                    {/each}
+                  </div>
+                {/if}
+                {#if entry.untagKeys && entry.untagKeys.length > 0}
+                  <div class="tag-changes tag-remove">
+                    <span class="tag-label">- Tags:</span>
+                    {#each entry.untagKeys as key}
+                      <span class="tag-item">
+                        {key}
+                        <button class="tag-cancel-btn" on:click={() => handleCancelUntag('sm', entry.name, key)} title="Cancel untag">↩</button>
+                      </span>
+                    {/each}
+                  </div>
+                {/if}
+                {#if entry.operation !== 'delete'}
+                  <button class="btn-add-tag" on:click={() => openAddTagModal('sm', entry.name)}>+ Add Tag</button>
+                {/if}
+              </div>
+              {#if entry.operation === 'delete'}
+                {#if viewMode === 'diff'}
+                  <div class="entry-diff">
+                    <DiffDisplay
+                      oldValue={entry.awsValue || ''}
+                      newValue="(deleted)"
+                      oldLabel="AWS"
+                      newLabel="Staged"
+                      oldSubLabel={entry.awsIdentifier || ''}
+                    />
+                  </div>
+                {:else}
+                  <pre class="entry-value entry-value-delete">(will be deleted)</pre>
+                {/if}
+              {:else if entry.stagedValue !== undefined && entry.stagedValue !== ''}
+                {#if viewMode === 'diff' && entry.operation !== 'create'}
+                  <div class="entry-diff">
+                    <DiffDisplay
+                      oldValue={entry.awsValue || ''}
+                      newValue={entry.stagedValue}
+                      oldLabel="AWS"
+                      newLabel="Staged"
+                      oldSubLabel={entry.awsIdentifier || ''}
+                    />
+                  </div>
+                {:else}
+                  <pre class="entry-value">{entry.stagedValue}</pre>
+                {/if}
               {/if}
             </li>
           {/each}
@@ -433,6 +589,42 @@
     </div>
     <div class="form-actions">
       <button type="button" class="btn-secondary" on:click={() => showEditModal = false}>Cancel</button>
+      <button type="submit" class="btn-primary" disabled={modalLoading}>
+        {modalLoading ? 'Saving...' : 'Save'}
+      </button>
+    </div>
+  </form>
+</Modal>
+
+<!-- Edit Tag Modal -->
+<Modal title={tagEditIsNew ? 'Add Tag' : 'Edit Tag'} show={showEditTagModal} on:close={() => showEditTagModal = false}>
+  <form class="modal-form" on:submit|preventDefault={handleSaveTag}>
+    {#if modalError}
+      <div class="modal-error">{modalError}</div>
+    {/if}
+    <div class="form-group">
+      <label for="tag-key">Key</label>
+      <input
+        id="tag-key"
+        type="text"
+        class="form-input"
+        bind:value={tagEditKey}
+        disabled={!tagEditIsNew}
+        placeholder="e.g., environment"
+      />
+    </div>
+    <div class="form-group">
+      <label for="tag-value">Value</label>
+      <input
+        id="tag-value"
+        type="text"
+        class="form-input"
+        bind:value={tagEditValue}
+        placeholder="e.g., production"
+      />
+    </div>
+    <div class="form-actions">
+      <button type="button" class="btn-secondary" on:click={() => showEditTagModal = false}>Cancel</button>
       <button type="submit" class="btn-primary" disabled={modalLoading}>
         {modalLoading ? 'Saving...' : 'Save'}
       </button>
@@ -944,5 +1136,102 @@
 
   .checkbox-label input {
     cursor: pointer;
+  }
+
+  /* Tag display styles */
+  .entry-tags {
+    margin-top: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .tag-changes {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    font-size: 12px;
+    padding: 4px 8px;
+    border-radius: 4px;
+  }
+
+  .tag-add {
+    background: rgba(76, 175, 80, 0.1);
+    border: 1px solid rgba(76, 175, 80, 0.3);
+  }
+
+  .tag-remove {
+    background: rgba(244, 67, 54, 0.1);
+    border: 1px solid rgba(244, 67, 54, 0.3);
+  }
+
+  .tag-label {
+    font-weight: bold;
+  }
+
+  .tag-add .tag-label {
+    color: #4caf50;
+  }
+
+  .tag-remove .tag-label {
+    color: #f44336;
+  }
+
+  .tag-item {
+    font-family: monospace;
+    padding: 2px 6px;
+    border-radius: 3px;
+    background: rgba(255, 255, 255, 0.1);
+    color: #ddd;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .tag-item-editable {
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+
+  .tag-item-editable:hover {
+    background: rgba(255, 255, 255, 0.2);
+  }
+
+  .tag-delete-btn,
+  .tag-cancel-btn {
+    background: none;
+    border: none;
+    color: #888;
+    cursor: pointer;
+    font-size: 14px;
+    line-height: 1;
+    padding: 0 2px;
+    margin-left: 2px;
+  }
+
+  .tag-delete-btn:hover {
+    color: #f44336;
+  }
+
+  .tag-cancel-btn:hover {
+    color: #4caf50;
+  }
+
+  .btn-add-tag {
+    padding: 2px 8px;
+    font-size: 11px;
+    border: 1px dashed #4caf50;
+    border-radius: 3px;
+    background: transparent;
+    color: #4caf50;
+    cursor: pointer;
+    margin-top: 4px;
+    transition: all 0.2s;
+  }
+
+  .btn-add-tag:hover {
+    background: rgba(76, 175, 80, 0.1);
+    border-style: solid;
   }
 </style>

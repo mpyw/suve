@@ -3,7 +3,9 @@ package runner
 
 import (
 	"context"
+	"fmt"
 	"io"
+	"strings"
 
 	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/maputil"
@@ -57,9 +59,9 @@ func (r *ApplyRunner) Run(ctx context.Context, opts ApplyOptions) error {
 			} else {
 				switch entry.Status {
 				case stagingusecase.ApplyResultCreated:
-					output.Success(r.Stdout, "Created %s", name)
+					output.Success(r.Stdout, "Created %s%s", name, formatTagSummary(entry))
 				case stagingusecase.ApplyResultUpdated:
-					output.Success(r.Stdout, "Updated %s", name)
+					output.Success(r.Stdout, "Updated %s%s", name, formatTagSummary(entry))
 				case stagingusecase.ApplyResultDeleted:
 					output.Success(r.Stdout, "Deleted %s", name)
 				}
@@ -86,4 +88,18 @@ func sliceToMap(slice []string) map[string]struct{} {
 		m[s] = struct{}{}
 	}
 	return m
+}
+
+func formatTagSummary(entry stagingusecase.ApplyResultEntry) string {
+	parts := []string{}
+	if len(entry.Tags) > 0 {
+		parts = append(parts, fmt.Sprintf("+%d tag(s)", len(entry.Tags)))
+	}
+	if len(entry.UntagKeys) > 0 {
+		parts = append(parts, fmt.Sprintf("-%d tag(s)", len(entry.UntagKeys)))
+	}
+	if len(parts) == 0 {
+		return ""
+	}
+	return " [" + strings.Join(parts, ", ") + "]"
 }

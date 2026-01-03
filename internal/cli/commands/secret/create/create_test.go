@@ -88,32 +88,6 @@ func TestRun(t *testing.T) {
 			},
 		},
 		{
-			name: "create with tags",
-			opts: create.Options{
-				Name:  "my-secret",
-				Value: "secret-value",
-				Tags:  map[string]string{"env": "prod", "team": "platform"},
-			},
-			mock: &mockClient{
-				createSecretFunc: func(_ context.Context, params *secretapi.CreateSecretInput, _ ...func(*secretapi.Options)) (*secretapi.CreateSecretOutput, error) {
-					assert.Len(t, params.Tags, 2)
-					tagMap := make(map[string]string)
-					for _, tag := range params.Tags {
-						tagMap[lo.FromPtr(tag.Key)] = lo.FromPtr(tag.Value)
-					}
-					assert.Equal(t, "prod", tagMap["env"])
-					assert.Equal(t, "platform", tagMap["team"])
-					return &secretapi.CreateSecretOutput{
-						Name:      lo.ToPtr("my-secret"),
-						VersionId: lo.ToPtr("abc123"),
-					}, nil
-				},
-			},
-			check: func(t *testing.T, output string) {
-				assert.Contains(t, output, "Created secret")
-			},
-		},
-		{
 			name:    "error from AWS",
 			opts:    create.Options{Name: "my-secret", Value: "secret-value"},
 			wantErr: "failed to create secret",
