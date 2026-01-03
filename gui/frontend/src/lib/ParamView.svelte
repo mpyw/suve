@@ -11,6 +11,24 @@
   let withValue = false;
   let loading = false;
   let error = '';
+  let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+  // Reactive: auto-fetch when checkbox changes
+  $: recursive, withValue, handleFilterChange();
+
+  function handleFilterChange() {
+    // Skip initial mount (handled by onMount)
+    if (typeof window !== 'undefined' && entries !== undefined) {
+      loadParams();
+    }
+  }
+
+  function handlePrefixInput() {
+    if (debounceTimer) clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(() => {
+      loadParams();
+    }, 300);
+  }
 
   let entries: main.ParamListEntry[] = [];
   let selectedParam: string | null = null;
@@ -136,7 +154,7 @@
       class="filter-input"
       placeholder="Prefix filter (e.g., /prod/)"
       bind:value={prefix}
-      on:keydown={(e) => e.key === 'Enter' && loadParams()}
+      on:input={handlePrefixInput}
     />
     <label class="checkbox-label">
       <input type="checkbox" bind:checked={recursive} />
