@@ -235,6 +235,21 @@
     }
   }
 
+  // Computed helpers for entry display logic
+  function hasValueChange(entry: main.StagingDiffEntry): boolean {
+    return entry.stagedValue !== undefined && entry.stagedValue !== '';
+  }
+
+  function hasTagChanges(entry: main.StagingDiffEntry): boolean {
+    const hasAddTags = entry.tags && Object.keys(entry.tags).length > 0;
+    const hasRemoveTags = entry.untagKeys && entry.untagKeys.length > 0;
+    return hasAddTags || hasRemoveTags;
+  }
+
+  function showEditButton(entry: main.StagingDiffEntry): boolean {
+    return entry.operation !== 'delete' && hasValueChange(entry);
+  }
+
   onMount(() => {
     loadStatus();
   });
@@ -298,7 +313,7 @@
                 </span>
                 <span class="entry-name">{entry.name}</span>
                 <div class="entry-actions">
-                  {#if entry.operation !== 'delete'}
+                  {#if showEditButton(entry)}
                     <button class="btn-entry" on:click={() => openEditModal('ssm', entry)}>Edit</button>
                   {/if}
                   <button class="btn-entry btn-unstage" on:click={() => handleUnstage('ssm', entry.name)}>Unstage</button>
@@ -393,7 +408,7 @@
                 </span>
                 <span class="entry-name">{entry.name}</span>
                 <div class="entry-actions">
-                  {#if entry.operation !== 'delete'}
+                  {#if showEditButton(entry)}
                     <button class="btn-entry" on:click={() => openEditModal('sm', entry)}>Edit</button>
                   {/if}
                   <button class="btn-entry btn-unstage" on:click={() => handleUnstage('sm', entry.name)}>Unstage</button>
