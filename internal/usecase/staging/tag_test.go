@@ -180,9 +180,9 @@ func TestTagUseCase_Execute_RemoveTagDeletesFromAddList(t *testing.T) {
 
 	entry, err := store.Get(staging.ServiceParam, "/app/config")
 	require.NoError(t, err)
-	assert.NotContains(t, entry.Tags, "env")         // "env" removed from tags
-	assert.Equal(t, "backend", entry.Tags["team"])   // "team" still in tags
-	assert.True(t, entry.UntagKeys.Contains("env"))  // "env" added to untag list
+	assert.NotContains(t, entry.Tags, "env")        // "env" removed from tags
+	assert.Equal(t, "backend", entry.Tags["team"])  // "team" still in tags
+	assert.True(t, entry.UntagKeys.Contains("env")) // "env" added to untag list
 }
 
 func TestTagUseCase_Execute_ParseError(t *testing.T) {
@@ -346,9 +346,9 @@ func TestTagUseCase_Execute_CancelAddTags(t *testing.T) {
 
 	entry, err := store.Get(staging.ServiceParam, "/app/config")
 	require.NoError(t, err)
-	assert.NotContains(t, entry.Tags, "env")          // "env" removed from tags
-	assert.Equal(t, "backend", entry.Tags["team"])    // "team" still in tags
-	assert.False(t, entry.UntagKeys.Contains("env"))  // "env" NOT added to untag list (cancel, not remove)
+	assert.NotContains(t, entry.Tags, "env")         // "env" removed from tags
+	assert.Equal(t, "backend", entry.Tags["team"])   // "team" still in tags
+	assert.False(t, entry.UntagKeys.Contains("env")) // "env" NOT added to untag list (cancel, not remove)
 }
 
 func TestTagUseCase_Execute_CancelRemoveTags(t *testing.T) {
@@ -377,9 +377,9 @@ func TestTagUseCase_Execute_CancelRemoveTags(t *testing.T) {
 
 	entry, err := store.Get(staging.ServiceParam, "/app/config")
 	require.NoError(t, err)
-	assert.False(t, entry.UntagKeys.Contains("env"))  // "env" removed from untag list
-	assert.True(t, entry.UntagKeys.Contains("team"))  // "team" still in untag list
-	assert.NotContains(t, entry.Tags, "env")          // "env" NOT added to tags (cancel, not add)
+	assert.False(t, entry.UntagKeys.Contains("env")) // "env" removed from untag list
+	assert.True(t, entry.UntagKeys.Contains("team")) // "team" still in untag list
+	assert.NotContains(t, entry.Tags, "env")         // "env" NOT added to tags (cancel, not add)
 }
 
 func TestTagUseCase_Execute_CancelAllTags_UnstagesEntry(t *testing.T) {
