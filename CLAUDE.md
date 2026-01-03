@@ -13,6 +13,8 @@ This file provides guidance to Claude Code when working with code in this reposi
    - `log` - Version history (like `git log`)
    - `diff` - Compare versions (like `git diff`)
    - `list` - List parameters/secrets (aliased as `ls`)
+   - `tag` - Add or update tags on a resource
+   - `untag` - Remove tags from a resource
 
 2. **Version Specification**: Git-like revision syntax
    ```
@@ -51,8 +53,8 @@ suve/
 │   ├── cli/
 │   │   ├── commands/
 │   │   │   ├── app.go         # urfave/cli v3 app definition
-│   │   │   ├── param/         # param subcommands (delete, diff, log, ls, set, show)
-│   │   │   ├── secret/        # secret subcommands (create, delete, diff, log, ls, restore, show, update)
+│   │   │   ├── param/         # param subcommands (delete, diff, log, ls, set, show, tag, untag)
+│   │   │   ├── secret/        # secret subcommands (create, delete, diff, log, ls, restore, show, tag, untag, update)
 │   │   │   └── stage/         # staging subcommands
 │   │   └── ...
 │   │
@@ -66,6 +68,12 @@ suve/
 │   │   └── secretversion/     # SM version spec parser (#VERSION, :LABEL, ~SHIFT)
 │   │
 │   ├── staging/               # Staging functionality
+│   ├── usecase/               # Business logic layer
+│   │   ├── param/             # SSM use cases (show, log, list, set, delete, tag)
+│   │   ├── secret/            # SM use cases (show, log, list, create, update, delete, restore, tag)
+│   │   └── staging/           # Staging use cases (add, edit, delete, status, diff, apply, reset)
+│   ├── maputil/               # Generic map utilities (Set type)
+│   ├── tagging/               # Tag operations (add/remove tags)
 │   ├── output/                # Output formatting (diff, colors)
 │   ├── jsonutil/              # JSON formatting
 │   └── infra/                 # AWS client initialization

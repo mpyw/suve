@@ -418,8 +418,6 @@ suve param set [options] <name> <value>
 | `--type` | - | `String` | Parameter type: `String`, `StringList`, or `SecureString` |
 | `--secure` | - | `false` | Shorthand for `--type SecureString` |
 | `--description` | - | - | Parameter description |
-| `--tag` | - | - | Tag in key=value format (can be specified multiple times, additive) |
-| `--untag` | - | - | Tag key to remove (can be specified multiple times) |
 | `--yes` | - | `false` | Skip confirmation prompt (only applies when updating) |
 
 > [!NOTE]
@@ -454,9 +452,6 @@ suve param set --description "Database connection string" --secure /app/config/d
 
 # StringList (comma-separated values)
 suve param set --type StringList /app/config/allowed-hosts "host1,host2,host3"
-
-# Set with tags
-suve param set --tag env=prod --tag team=platform /app/config/key "value"
 
 # Skip confirmation
 suve param set --yes /app/config/log-level "debug"
@@ -509,6 +504,70 @@ suve param delete --yes /app/config/old-param
 
 > [!CAUTION]
 > Deletion is immediate and permanent. There is no recovery option.
+
+---
+
+## suve param tag
+
+Add or update tags on an existing parameter.
+
+```
+suve param tag <name> <key=value>...
+```
+
+**Arguments:**
+
+| Argument | Description |
+|----------|-------------|
+| `name` | Parameter name |
+| `key=value` | Tag in key=value format (one or more) |
+
+**Examples:**
+
+```ShellSession
+user@host:~$ suve param tag /app/config/database-url env=prod team=platform
+✓ Tagged parameter /app/config/database-url (2 tag(s))
+```
+
+```bash
+# Add single tag
+suve param tag /app/config/key env=prod
+
+# Add multiple tags
+suve param tag /app/config/key env=prod team=platform
+```
+
+---
+
+## suve param untag
+
+Remove tags from an existing parameter.
+
+```
+suve param untag <name> <key>...
+```
+
+**Arguments:**
+
+| Argument | Description |
+|----------|-------------|
+| `name` | Parameter name |
+| `key` | Tag key to remove (one or more) |
+
+**Examples:**
+
+```ShellSession
+user@host:~$ suve param untag /app/config/database-url deprecated old-tag
+✓ Untagged parameter /app/config/database-url (2 key(s))
+```
+
+```bash
+# Remove single tag
+suve param untag /app/config/key deprecated
+
+# Remove multiple tags
+suve param untag /app/config/key deprecated old-tag
+```
 
 ---
 
@@ -653,7 +712,7 @@ Staged for deletion: /app/config/old-param
 
 ## suve stage param status
 
-Show staged changes for SSM parameters.
+Show staged changes for SSM Parameter Store parameters.
 
 ```
 suve stage param status [options] [name]
@@ -675,7 +734,7 @@ suve stage param status [options] [name]
 
 ```ShellSession
 user@host:~$ suve stage param status
-Staged SSM changes (3):
+Staged SSM Parameter Store changes (3):
   A /app/config/new-param
   M /app/config/database-url
   D /app/config/old-param
@@ -690,7 +749,7 @@ SSM Parameter Store:
 ```
 
 > [!TIP]
-> Use `suve stage status` to show all staged changes (SSM + SM combined).
+> Use `suve stage status` to show all staged changes (SSM Parameter Store + Secrets Manager combined).
 
 ---
 
@@ -743,7 +802,7 @@ Output will look like:
 
 ## suve stage param apply
 
-Apply staged SSM parameter changes to AWS.
+Apply staged SSM Parameter Store parameter changes to AWS.
 
 Command aliases: `push`
 
@@ -769,7 +828,7 @@ suve stage param apply [options] [name]
 
 **Behavior:**
 
-1. Reads all staged SSM changes
+1. Reads all staged SSM Parameter Store changes
 2. For each `set` operation: calls PutParameter
 3. For each `delete` operation: calls DeleteParameter
 4. Removes successfully applied changes from stage
@@ -779,7 +838,7 @@ suve stage param apply [options] [name]
 
 ```ShellSession
 user@host:~$ suve stage param apply
-Applying SSM parameters...
+Applying SSM Parameter Store parameters...
 Set /app/config/new-param (version: 1)
 Set /app/config/database-url (version: 4)
 Deleted /app/config/old-param
@@ -792,7 +851,7 @@ Deleted /app/config/old-param
 
 ## suve stage param reset
 
-Unstage SSM parameter changes or restore to a specific version.
+Unstage SSM Parameter Store parameter changes or restore to a specific version.
 
 ```
 suve stage param reset [options] [spec]
@@ -808,7 +867,7 @@ suve stage param reset [options] [spec]
 
 | Option | Alias | Default | Description |
 |--------|-------|---------|-------------|
-| `--all` | - | `false` | Unstage all SSM parameters |
+| `--all` | - | `false` | Unstage all SSM Parameter Store parameters |
 
 **Version Specifiers:**
 
@@ -825,7 +884,7 @@ user@host:~$ suve stage param reset /app/config/database-url
 Unstaged /app/config/database-url
 
 user@host:~$ suve stage param reset --all
-Unstaged all SSM changes
+Unstaged all SSM Parameter Store changes
 ```
 
 ```bash
@@ -838,9 +897,9 @@ suve stage param reset /app/config/database-url#3
 # Restore to previous version and stage
 suve stage param reset /app/config/database-url~1
 
-# Unstage all SSM parameters
+# Unstage all SSM Parameter Store parameters
 suve stage param reset --all
 ```
 
 > [!TIP]
-> Use `suve stage reset` to unstage all changes (SSM + SM combined).
+> Use `suve stage reset` to unstage all changes (SSM Parameter Store + Secrets Manager combined).
