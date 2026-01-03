@@ -10,7 +10,7 @@ import (
 )
 
 var config = runner.CommandConfig{
-	ServiceName:   "param",
+	CommandName:   "param",
 	ItemName:      "parameter",
 	Factory:       staging.ParamFactory,
 	ParserFactory: staging.ParamParserFactory,

@@ -10,7 +10,7 @@ import (
 )
 
 var config = runner.CommandConfig{
-	ServiceName:   "secret",
+	CommandName:   "secret",
 	ItemName:      "secret",
 	Factory:       staging.SecretFactory,
 	ParserFactory: staging.SecretParserFactory,
