@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { SecretList, SecretShow, SecretLog, SecretCreate, SecretUpdate, SecretDelete } from '../../wailsjs/go/main/App';
+  import { SecretList, SecretShow, SecretLog, SecretCreate, SecretUpdate, SecretDelete, SecretDiff, SecretRestore } from '../../wailsjs/go/main/App';
   import type { main } from '../../wailsjs/go/models';
   import CloseIcon from './icons/CloseIcon.svelte';
   import EyeIcon from './icons/EyeIcon.svelte';
@@ -42,12 +42,22 @@
   let showCreateModal = false;
   let showEditModal = false;
   let showDeleteModal = false;
+  let showDiffModal = false;
+  let showRestoreModal = false;
   let createForm = { name: '', value: '' };
   let editForm = { name: '', value: '' };
   let deleteTarget = '';
   let forceDelete = false;
   let modalLoading = false;
   let modalError = '';
+
+  // Diff state
+  let diffMode = false;
+  let diffSelectedVersions: string[] = [];
+  let diffResult: main.SecretDiffResult | null = null;
+
+  // Restore state
+  let restoreTarget = '';
 
   async function loadSecrets() {
     loading = true;
@@ -190,6 +200,66 @@
     }
   }
 
+  // Diff functions
+  function toggleDiffMode() {
+    diffMode = !diffMode;
+    diffSelectedVersions = [];
+  }
+
+  function toggleVersionSelection(versionId: string) {
+    const idx = diffSelectedVersions.indexOf(versionId);
+    if (idx >= 0) {
+      diffSelectedVersions = diffSelectedVersions.filter(v => v !== versionId);
+    } else if (diffSelectedVersions.length < 2) {
+      diffSelectedVersions = [...diffSelectedVersions, versionId];
+    }
+  }
+
+  async function executeDiff() {
+    if (!selectedSecret || diffSelectedVersions.length !== 2) return;
+
+    modalLoading = true;
+    modalError = '';
+    try {
+      const spec1 = `${selectedSecret}#${diffSelectedVersions[0]}`;
+      const spec2 = `${selectedSecret}#${diffSelectedVersions[1]}`;
+      diffResult = await SecretDiff(spec1, spec2);
+      showDiffModal = true;
+    } catch (e) {
+      error = e instanceof Error ? e.message : String(e);
+    } finally {
+      modalLoading = false;
+    }
+  }
+
+  function closeDiffModal() {
+    showDiffModal = false;
+    diffResult = null;
+    diffMode = false;
+    diffSelectedVersions = [];
+  }
+
+  // Restore functions
+  function openRestoreModal(name: string) {
+    restoreTarget = name;
+    modalError = '';
+    showRestoreModal = true;
+  }
+
+  async function handleRestore() {
+    modalLoading = true;
+    modalError = '';
+    try {
+      await SecretRestore(restoreTarget);
+      showRestoreModal = false;
+      await loadSecrets();
+    } catch (e) {
+      modalError = e instanceof Error ? e.message : String(e);
+    } finally {
+      modalLoading = false;
+    }
+  }
+
   onMount(() => {
     loadSecrets();
   });
@@ -213,6 +283,9 @@
     </button>
     <button class="btn-secondary" on:click={openCreateModal}>
       + New
+    </button>
+    <button class="btn-secondary btn-restore" on:click={() => openRestoreModal('')}>
+      Restore
     </button>
   </div>
 
@@ -249,6 +322,11 @@
           <div class="detail-actions">
             <button class="btn-action-sm" on:click={openEditModal}>Edit</button>
             <button class="btn-action-sm btn-danger" on:click={() => selectedSecret && openDeleteModal(selectedSecret)}>Delete</button>
+            {#if secretLog.length >= 2}
+              <button class="btn-action-sm" class:active={diffMode} on:click={toggleDiffMode}>
+                {diffMode ? 'Cancel' : 'Compare'}
+              </button>
+            {/if}
             <button class="btn-close" on:click={closeDetail}>
               <CloseIcon />
             </button>
@@ -306,18 +384,45 @@
 
             {#if secretLog.length > 0}
               <div class="detail-section">
-                <h4>Version History</h4>
+                <div class="section-header-history">
+                  <h4>Version History</h4>
+                  {#if diffMode && diffSelectedVersions.length === 2}
+                    <button class="btn-action-sm btn-compare" on:click={executeDiff} disabled={modalLoading}>
+                      {modalLoading ? 'Comparing...' : 'Show Diff'}
+                    </button>
+                  {/if}
+                </div>
+                {#if diffMode}
+                  <p class="diff-hint">Select 2 versions to compare</p>
+                {/if}
                 <ul class="history-list">
                   {#each secretLog as logEntry}
-                    <li class="history-item" class:current-secret={logEntry.stages?.includes('AWSCURRENT')}>
-                      <div class="history-header">
-                        <span class="history-version mono" title={logEntry.versionId}>{logEntry.versionId}</span>
-                        <span class="history-date">{formatDate(logEntry.created)}</span>
-                      </div>
-                      <div class="history-labels">
-                        {#each logEntry.stages || [] as stage}
-                          <span class="badge badge-stage small">{stage}</span>
-                        {/each}
+                    <li
+                      class="history-item"
+                      class:current-secret={logEntry.stages?.includes('AWSCURRENT')}
+                      class:selectable={diffMode}
+                      class:selected={diffSelectedVersions.includes(logEntry.versionId)}
+                    >
+                      {#if diffMode}
+                        <label class="diff-checkbox">
+                          <input
+                            type="checkbox"
+                            checked={diffSelectedVersions.includes(logEntry.versionId)}
+                            disabled={!diffSelectedVersions.includes(logEntry.versionId) && diffSelectedVersions.length >= 2}
+                            on:change={() => toggleVersionSelection(logEntry.versionId)}
+                          />
+                        </label>
+                      {/if}
+                      <div class="history-content">
+                        <div class="history-header">
+                          <span class="history-version mono" title={logEntry.versionId}>{logEntry.versionId}</span>
+                          <span class="history-date">{formatDate(logEntry.created)}</span>
+                        </div>
+                        <div class="history-labels">
+                          {#each logEntry.stages || [] as stage}
+                            <span class="badge badge-stage small">{stage}</span>
+                          {/each}
+                        </div>
                       </div>
                     </li>
                   {/each}
@@ -423,6 +528,57 @@
       <button type="button" class="btn-secondary" on:click={() => showDeleteModal = false}>Cancel</button>
       <button type="button" class="btn-danger" on:click={handleDelete} disabled={modalLoading}>
         {modalLoading ? 'Deleting...' : 'Delete'}
+      </button>
+    </div>
+  </div>
+</Modal>
+
+<!-- Diff Modal -->
+<Modal title="Version Comparison" show={showDiffModal} on:close={closeDiffModal}>
+  {#if diffResult}
+    <div class="diff-container">
+      <div class="diff-side">
+        <div class="diff-side-header">
+          <span class="diff-version">Old</span>
+          <span class="diff-version-id" title={diffResult.oldVersionId}>{diffResult.oldVersionId.substring(0, 12)}...</span>
+        </div>
+        <pre class="diff-value diff-old">{formatValue(diffResult.oldValue)}</pre>
+      </div>
+      <div class="diff-side">
+        <div class="diff-side-header">
+          <span class="diff-version">New</span>
+          <span class="diff-version-id" title={diffResult.newVersionId}>{diffResult.newVersionId.substring(0, 12)}...</span>
+        </div>
+        <pre class="diff-value diff-new">{formatValue(diffResult.newValue)}</pre>
+      </div>
+    </div>
+    <div class="form-actions">
+      <button type="button" class="btn-secondary" on:click={closeDiffModal}>Close</button>
+    </div>
+  {/if}
+</Modal>
+
+<!-- Restore Modal -->
+<Modal title="Restore Secret" show={showRestoreModal} on:close={() => showRestoreModal = false}>
+  <div class="modal-form">
+    {#if modalError}
+      <div class="modal-error">{modalError}</div>
+    {/if}
+    <p class="restore-info">Restore a previously deleted secret that is still within its recovery window.</p>
+    <div class="form-group">
+      <label for="restore-name">Secret Name</label>
+      <input
+        id="restore-name"
+        type="text"
+        class="form-input"
+        bind:value={restoreTarget}
+        placeholder="my-deleted-secret"
+      />
+    </div>
+    <div class="form-actions">
+      <button type="button" class="btn-secondary" on:click={() => showRestoreModal = false}>Cancel</button>
+      <button type="button" class="btn-primary btn-restore-confirm" on:click={handleRestore} disabled={modalLoading || !restoreTarget}>
+        {modalLoading ? 'Restoring...' : 'Restore'}
       </button>
     </div>
   </div>
@@ -572,5 +728,151 @@
   .warning {
     color: #ff9800 !important;
     font-size: 13px;
+  }
+
+  /* Restore button */
+  .btn-restore {
+    background: #4caf50;
+  }
+
+  .btn-restore:hover {
+    background: #43a047;
+  }
+
+  .restore-info {
+    color: #888;
+    font-size: 13px;
+    margin: 0 0 16px 0;
+  }
+
+  .btn-restore-confirm {
+    background: #4caf50;
+  }
+
+  .btn-restore-confirm:hover {
+    background: #43a047;
+  }
+
+  /* Diff mode styles */
+  .btn-action-sm.active {
+    background: #e94560;
+  }
+
+  .section-header-history {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+  }
+
+  .section-header-history h4 {
+    margin: 0;
+    font-size: 12px;
+    text-transform: uppercase;
+    color: #888;
+    letter-spacing: 0.5px;
+  }
+
+  .btn-compare {
+    background: #4caf50;
+  }
+
+  .btn-compare:hover {
+    background: #43a047;
+  }
+
+  .diff-hint {
+    color: #888;
+    font-size: 12px;
+    margin: 0 0 12px 0;
+  }
+
+  .history-item.selectable {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    cursor: pointer;
+  }
+
+  .history-item.selectable:hover {
+    background: #1a1a2e;
+  }
+
+  .history-item.selected {
+    background: rgba(233, 69, 96, 0.15);
+    border-left: 3px solid #e94560;
+  }
+
+  .diff-checkbox {
+    display: flex;
+    align-items: center;
+    padding-top: 2px;
+  }
+
+  .diff-checkbox input {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+  }
+
+  .history-content {
+    flex: 1;
+    min-width: 0;
+  }
+
+  /* Diff modal styles */
+  .diff-container {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+
+  .diff-side {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .diff-side-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+
+  .diff-version {
+    font-size: 12px;
+    font-weight: bold;
+    color: #888;
+  }
+
+  .diff-version-id {
+    font-family: monospace;
+    font-size: 10px;
+    color: #666;
+  }
+
+  .diff-value {
+    margin: 0;
+    padding: 12px;
+    border-radius: 4px;
+    font-family: monospace;
+    font-size: 12px;
+    white-space: pre-wrap;
+    word-break: break-all;
+    min-height: 100px;
+    max-height: 300px;
+    overflow-y: auto;
+  }
+
+  .diff-old {
+    background: rgba(244, 67, 54, 0.1);
+    border: 1px solid rgba(244, 67, 54, 0.3);
+    color: #ef9a9a;
+  }
+
+  .diff-new {
+    background: rgba(76, 175, 80, 0.1);
+    border: 1px solid rgba(76, 175, 80, 0.3);
+    color: #a5d6a7;
   }
 </style>
