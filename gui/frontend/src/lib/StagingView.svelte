@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { StagingStatus } from '../../wailsjs/go/main/App';
   import type { main } from '../../wailsjs/go/models';
+  import './common.css';
 
   let loading = false;
   let error = '';
@@ -47,10 +48,10 @@
   });
 </script>
 
-<div class="staging-view">
+<div class="view-container">
   <div class="header">
     <h2 class="title">Staging Area</h2>
-    <button class="btn-refresh" on:click={loadStatus} disabled={loading}>
+    <button class="btn-primary" on:click={loadStatus} disabled={loading}>
       {loading ? 'Loading...' : 'Refresh'}
     </button>
   </div>
@@ -59,7 +60,7 @@
     <div class="error-banner">{error}</div>
   {/if}
 
-  <div class="content">
+  <div class="staging-content">
     <div class="section">
       <div class="section-header">
         <h3 class="section-title">
@@ -136,13 +137,6 @@
 </div>
 
 <style>
-  .staging-view {
-    display: flex;
-    flex-direction: column;
-    height: 100%;
-    background: #0f0f1a;
-  }
-
   .header {
     display: flex;
     align-items: center;
@@ -158,33 +152,7 @@
     color: #fff;
   }
 
-  .btn-refresh {
-    padding: 8px 16px;
-    background: #e94560;
-    color: #fff;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 14px;
-  }
-
-  .btn-refresh:hover {
-    background: #d63050;
-  }
-
-  .btn-refresh:disabled {
-    background: #666;
-    cursor: not-allowed;
-  }
-
-  .error-banner {
-    padding: 12px 16px;
-    background: #ff4444;
-    color: #fff;
-    font-size: 14px;
-  }
-
-  .content {
+  .staging-content {
     flex: 1;
     overflow-y: auto;
     padding: 16px;
@@ -235,13 +203,6 @@
     background: rgba(255, 255, 255, 0.1);
     border-radius: 10px;
     color: #888;
-  }
-
-  .empty-state {
-    padding: 24px;
-    text-align: center;
-    color: #666;
-    font-size: 14px;
   }
 
   .entry-list {

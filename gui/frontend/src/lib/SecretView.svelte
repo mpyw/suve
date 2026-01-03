@@ -2,6 +2,10 @@
   import { onMount } from 'svelte';
   import { SecretList, SecretShow, SecretLog } from '../../wailsjs/go/main/App';
   import type { main } from '../../wailsjs/go/models';
+  import CloseIcon from './icons/CloseIcon.svelte';
+  import EyeIcon from './icons/EyeIcon.svelte';
+  import EyeOffIcon from './icons/EyeOffIcon.svelte';
+  import './common.css';
 
   let prefix = '';
   let withValue = false;
@@ -13,6 +17,7 @@
   let secretDetail: main.SecretShowResult | null = null;
   let secretLog: main.SecretLogEntry[] = [];
   let detailLoading = false;
+  let showValue = false;
 
   async function loadSecrets() {
     loading = true;
@@ -31,6 +36,7 @@
   async function selectSecret(name: string) {
     selectedSecret = name;
     detailLoading = true;
+    showValue = false;
     try {
       const [detail, log] = await Promise.all([
         SecretShow(name),
@@ -49,6 +55,11 @@
     selectedSecret = null;
     secretDetail = null;
     secretLog = [];
+    showValue = false;
+  }
+
+  function toggleShowValue() {
+    showValue = !showValue;
   }
 
   function formatDate(dateStr: string | undefined): string {
@@ -57,7 +68,6 @@
   }
 
   function formatValue(value: string): string {
-    // Try to format as JSON if it looks like JSON
     try {
       const parsed = JSON.parse(value);
       return JSON.stringify(parsed, null, 2);
@@ -66,12 +76,16 @@
     }
   }
 
+  function maskValue(value: string): string {
+    return '*'.repeat(Math.min(value.length, 32));
+  }
+
   onMount(() => {
     loadSecrets();
   });
 </script>
 
-<div class="secret-view">
+<div class="view-container">
   <div class="filter-bar">
     <input
       type="text"
@@ -84,7 +98,7 @@
       <input type="checkbox" bind:checked={withValue} />
       Show Values
     </label>
-    <button class="btn-refresh" on:click={loadSecrets} disabled={loading}>
+    <button class="btn-primary" on:click={loadSecrets} disabled={loading}>
       {loading ? 'Loading...' : 'Refresh'}
     </button>
   </div>
@@ -100,13 +114,13 @@
           No secrets found. Try adjusting the prefix filter.
         </div>
       {:else}
-        <ul class="secret-list">
+        <ul class="item-list">
           {#each entries as entry}
-            <li class="secret-item" class:selected={selectedSecret === entry.name}>
-              <button class="secret-button" on:click={() => selectSecret(entry.name)}>
-                <span class="secret-name">{entry.name}</span>
+            <li class="item-entry" class:selected={selectedSecret === entry.name}>
+              <button class="item-button" on:click={() => selectSecret(entry.name)}>
+                <span class="item-name secret">{entry.name}</span>
                 {#if entry.value !== undefined}
-                  <span class="secret-value">{entry.value}</span>
+                  <span class="item-value">{entry.value}</span>
                 {/if}
               </button>
             </li>
@@ -118,8 +132,10 @@
     {#if selectedSecret}
       <div class="detail-panel">
         <div class="detail-header">
-          <h3 class="detail-title">{selectedSecret}</h3>
-          <button class="btn-close" on:click={closeDetail}>x</button>
+          <h3 class="detail-title secret">{selectedSecret}</h3>
+          <button class="btn-close" on:click={closeDetail}>
+            <CloseIcon />
+          </button>
         </div>
 
         {#if detailLoading}
@@ -127,8 +143,26 @@
         {:else if secretDetail}
           <div class="detail-content">
             <div class="detail-section">
-              <h4>Current Value</h4>
-              <pre class="value-display">{formatValue(secretDetail.value)}</pre>
+              <div class="section-header">
+                <h4>Current Value</h4>
+                <button
+                  class="btn-toggle"
+                  class:active={showValue}
+                  on:click={toggleShowValue}
+                  title={showValue ? 'Hide value' : 'Show value'}
+                >
+                  {#if showValue}
+                    <EyeOffIcon />
+                    Hide
+                  {:else}
+                    <EyeIcon />
+                    Show
+                  {/if}
+                </button>
+              </div>
+              <pre class="value-display" class:masked={!showValue}>
+                {showValue ? formatValue(secretDetail.value) : maskValue(secretDetail.value)}
+              </pre>
             </div>
 
             <div class="detail-meta">
@@ -140,7 +174,7 @@
                 <span class="meta-label">Stages</span>
                 <span class="meta-value">
                   {#each secretDetail.versionStage || [] as stage}
-                    <span class="stage-badge">{stage}</span>
+                    <span class="badge badge-stage">{stage}</span>
                   {/each}
                 </span>
               </div>
@@ -160,11 +194,11 @@
                 <h4>Version History</h4>
                 <ul class="history-list">
                   {#each secretLog as logEntry}
-                    <li class="history-item" class:current={logEntry.stages?.includes('AWSCURRENT')}>
+                    <li class="history-item" class:current-secret={logEntry.stages?.includes('AWSCURRENT')}>
                       <div class="history-header">
                         <span class="history-version">{logEntry.versionId?.substring(0, 8)}...</span>
                         {#each logEntry.stages || [] as stage}
-                          <span class="stage-badge small">{stage}</span>
+                          <span class="badge badge-stage small">{stage}</span>
                         {/each}
                         <span class="history-date">{formatDate(logEntry.created)}</span>
                       </div>
@@ -181,310 +215,18 @@
 </div>
 
 <style>
-  .secret-view {
-    display: flex;
-    flex-direction: column;
-    height: 100%;
-    background: #0f0f1a;
-  }
-
-  .filter-bar {
-    display: flex;
-    gap: 12px;
-    padding: 16px;
-    background: #1a1a2e;
-    border-bottom: 1px solid #2d2d44;
-    align-items: center;
-  }
-
-  .filter-input {
-    flex: 1;
-    padding: 8px 12px;
-    border: 1px solid #2d2d44;
-    border-radius: 4px;
-    background: #0f0f1a;
-    color: #fff;
-    font-size: 14px;
-  }
-
-  .filter-input:focus {
-    outline: none;
-    border-color: #e94560;
-  }
-
-  .checkbox-label {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    color: #a0a0a0;
-    font-size: 14px;
-    cursor: pointer;
-  }
-
-  .btn-refresh {
-    padding: 8px 16px;
-    background: #e94560;
-    color: #fff;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 14px;
-  }
-
-  .btn-refresh:hover {
-    background: #d63050;
-  }
-
-  .btn-refresh:disabled {
-    background: #666;
-    cursor: not-allowed;
-  }
-
-  .error-banner {
-    padding: 12px 16px;
-    background: #ff4444;
-    color: #fff;
-    font-size: 14px;
-  }
-
-  .content {
-    flex: 1;
-    display: flex;
-    overflow: hidden;
-  }
-
-  .list-panel {
-    flex: 1;
-    overflow-y: auto;
-    transition: flex 0.3s;
-  }
-
-  .list-panel.collapsed {
-    flex: 0.4;
-    min-width: 250px;
-  }
-
-  .empty-state {
-    padding: 40px;
-    text-align: center;
-    color: #666;
-  }
-
-  .secret-list {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-  }
-
-  .secret-item {
-    border-bottom: 1px solid #1a1a2e;
-  }
-
-  .secret-item.selected {
-    background: #1a1a2e;
-  }
-
-  .secret-button {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    width: 100%;
-    padding: 12px 16px;
-    background: transparent;
-    border: none;
-    text-align: left;
-    cursor: pointer;
-    color: #fff;
-  }
-
-  .secret-button:hover {
-    background: #252542;
-  }
-
-  .secret-name {
-    font-family: monospace;
-    font-size: 13px;
-    color: #ffb74d;
-  }
-
-  .secret-value {
-    font-family: monospace;
-    font-size: 12px;
-    color: #888;
-    max-width: 100%;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .detail-panel {
-    flex: 0.6;
-    border-left: 1px solid #2d2d44;
-    display: flex;
-    flex-direction: column;
-    background: #1a1a2e;
-  }
-
-  .detail-header {
+  .section-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 16px;
-    border-bottom: 1px solid #2d2d44;
+    margin-bottom: 12px;
   }
 
-  .detail-title {
+  .section-header h4 {
     margin: 0;
-    font-size: 14px;
-    font-family: monospace;
-    color: #ffb74d;
-  }
-
-  .btn-close {
-    width: 28px;
-    height: 28px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: transparent;
-    border: 1px solid #2d2d44;
-    border-radius: 4px;
-    color: #888;
-    cursor: pointer;
-    font-size: 16px;
-  }
-
-  .btn-close:hover {
-    background: #e94560;
-    border-color: #e94560;
-    color: #fff;
-  }
-
-  .loading {
-    padding: 40px;
-    text-align: center;
-    color: #666;
-  }
-
-  .detail-content {
-    flex: 1;
-    overflow-y: auto;
-    padding: 16px;
-  }
-
-  .detail-section {
-    margin-bottom: 24px;
-  }
-
-  .detail-section h4 {
-    margin: 0 0 12px 0;
     font-size: 12px;
     text-transform: uppercase;
     color: #888;
     letter-spacing: 0.5px;
-  }
-
-  .value-display {
-    margin: 0;
-    padding: 12px;
-    background: #0f0f1a;
-    border-radius: 4px;
-    font-family: monospace;
-    font-size: 13px;
-    color: #a5d6a7;
-    white-space: pre-wrap;
-    word-break: break-all;
-  }
-
-  .arn-display {
-    display: block;
-    padding: 8px 12px;
-    background: #0f0f1a;
-    border-radius: 4px;
-    font-family: monospace;
-    font-size: 11px;
-    color: #888;
-    word-break: break-all;
-  }
-
-  .detail-meta {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 12px;
-    margin-bottom: 24px;
-  }
-
-  .meta-item {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-  }
-
-  .meta-label {
-    font-size: 11px;
-    text-transform: uppercase;
-    color: #666;
-  }
-
-  .meta-value {
-    font-size: 14px;
-    color: #fff;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 4px;
-  }
-
-  .meta-value.mono {
-    font-family: monospace;
-    font-size: 12px;
-  }
-
-  .stage-badge {
-    font-size: 10px;
-    padding: 2px 6px;
-    background: #4caf50;
-    color: #fff;
-    border-radius: 3px;
-  }
-
-  .stage-badge.small {
-    font-size: 9px;
-    padding: 1px 4px;
-  }
-
-  .history-list {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-  }
-
-  .history-item {
-    padding: 12px;
-    background: #0f0f1a;
-    border-radius: 4px;
-    margin-bottom: 8px;
-  }
-
-  .history-item.current {
-    border-left: 3px solid #4caf50;
-  }
-
-  .history-header {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex-wrap: wrap;
-  }
-
-  .history-version {
-    font-family: monospace;
-    font-weight: bold;
-    color: #fff;
-  }
-
-  .history-date {
-    font-size: 12px;
-    color: #666;
-    margin-left: auto;
   }
 </style>
