@@ -19,7 +19,8 @@ type ListClient interface {
 
 // ListInput holds input for the list use case.
 type ListInput struct {
-	Filter    string // Regex filter pattern
+	Prefix    string // AWS-side name filter (substring match)
+	Filter    string // Regex filter pattern (client-side)
 	WithValue bool   // Include secret values
 }
 
@@ -52,9 +53,20 @@ func (u *ListUseCase) Execute(ctx context.Context, input ListInput) (*ListOutput
 		}
 	}
 
+	// Build list input with optional prefix filter
+	listInput := &secretapi.ListSecretsInput{}
+	if input.Prefix != "" {
+		listInput.Filters = []secretapi.Filter{
+			{
+				Key:    secretapi.FilterNameStringTypeName,
+				Values: []string{input.Prefix},
+			},
+		}
+	}
+
 	// Collect all secret names
 	var names []string
-	paginator := secretapi.NewListSecretsPaginator(u.Client, &secretapi.ListSecretsInput{})
+	paginator := secretapi.NewListSecretsPaginator(u.Client, listInput)
 	for paginator.HasMorePages() {
 		page, err := paginator.NextPage(ctx)
 		if err != nil {

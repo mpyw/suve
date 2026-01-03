@@ -7,29 +7,22 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/samber/lo"
 	"github.com/urfave/cli/v3"
 
-	"github.com/mpyw/suve/internal/api/secretapi"
 	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/cli/pager"
 	"github.com/mpyw/suve/internal/infra"
 	"github.com/mpyw/suve/internal/jsonutil"
 	"github.com/mpyw/suve/internal/timeutil"
+	"github.com/mpyw/suve/internal/usecase/secret"
 	"github.com/mpyw/suve/internal/version/secretversion"
 )
 
-// Client is the interface for the show command.
-type Client interface {
-	secretapi.GetSecretValueAPI
-	secretapi.ListSecretVersionIdsAPI
-}
-
 // Runner executes the show command.
 type Runner struct {
-	Client Client
-	Stdout io.Writer
-	Stderr io.Writer
+	UseCase *secret.ShowUseCase
+	Stdout  io.Writer
+	Stderr  io.Writer
 }
 
 // Options holds the options for the show command.
@@ -134,9 +127,9 @@ func action(ctx context.Context, cmd *cli.Command) error {
 
 	return pager.WithPagerWriter(cmd.Root().Writer, noPager, func(w io.Writer) error {
 		r := &Runner{
-			Client: client,
-			Stdout: w,
-			Stderr: cmd.Root().ErrWriter,
+			UseCase: &secret.ShowUseCase{Client: client},
+			Stdout:  w,
+			Stderr:  cmd.Root().ErrWriter,
 		}
 		return r.Run(ctx, opts)
 	})
@@ -144,12 +137,14 @@ func action(ctx context.Context, cmd *cli.Command) error {
 
 // Run executes the show command.
 func (r *Runner) Run(ctx context.Context, opts Options) error {
-	secret, err := secretversion.GetSecretWithVersion(ctx, r.Client, opts.Spec)
+	result, err := r.UseCase.Execute(ctx, secret.ShowInput{
+		Spec: opts.Spec,
+	})
 	if err != nil {
 		return err
 	}
 
-	value := lo.FromPtr(secret.SecretString)
+	value := result.Value
 
 	// Format as JSON if enabled
 	if opts.ParseJSON {
@@ -165,18 +160,18 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 	// JSON output mode
 	if opts.Output == output.FormatJSON {
 		jsonOut := JSONOutput{
-			Name:  lo.FromPtr(secret.Name),
-			ARN:   lo.FromPtr(secret.ARN),
+			Name:  result.Name,
+			ARN:   result.ARN,
 			Value: value,
 		}
-		if secret.VersionId != nil {
-			jsonOut.VersionID = lo.FromPtr(secret.VersionId)
+		if result.VersionID != "" {
+			jsonOut.VersionID = result.VersionID
 		}
-		if len(secret.VersionStages) > 0 {
-			jsonOut.Stages = secret.VersionStages
+		if len(result.VersionStage) > 0 {
+			jsonOut.Stages = result.VersionStage
 		}
-		if secret.CreatedDate != nil {
-			jsonOut.Created = timeutil.FormatRFC3339(*secret.CreatedDate)
+		if result.CreatedDate != nil {
+			jsonOut.Created = timeutil.FormatRFC3339(*result.CreatedDate)
 		}
 		enc := json.NewEncoder(r.Stdout)
 		enc.SetIndent("", "  ")
@@ -185,16 +180,16 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 
 	// Normal mode: show metadata + value
 	out := output.New(r.Stdout)
-	out.Field("Name", lo.FromPtr(secret.Name))
-	out.Field("ARN", lo.FromPtr(secret.ARN))
-	if secret.VersionId != nil {
-		out.Field("VersionId", lo.FromPtr(secret.VersionId))
+	out.Field("Name", result.Name)
+	out.Field("ARN", result.ARN)
+	if result.VersionID != "" {
+		out.Field("VersionId", result.VersionID)
 	}
-	if len(secret.VersionStages) > 0 {
-		out.Field("Stages", fmt.Sprintf("%v", secret.VersionStages))
+	if len(result.VersionStage) > 0 {
+		out.Field("Stages", fmt.Sprintf("%v", result.VersionStage))
 	}
-	if secret.CreatedDate != nil {
-		out.Field("Created", timeutil.FormatRFC3339(*secret.CreatedDate))
+	if result.CreatedDate != nil {
+		out.Field("Created", timeutil.FormatRFC3339(*result.CreatedDate))
 	}
 	out.Separator()
 	out.Value(value)

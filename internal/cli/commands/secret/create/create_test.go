@@ -13,6 +13,7 @@ import (
 	"github.com/mpyw/suve/internal/api/secretapi"
 	appcli "github.com/mpyw/suve/internal/cli/commands"
 	"github.com/mpyw/suve/internal/cli/commands/secret/create"
+	"github.com/mpyw/suve/internal/usecase/secret"
 )
 
 func TestCommand_Validation(t *testing.T) {
@@ -129,9 +130,9 @@ func TestRun(t *testing.T) {
 			t.Parallel()
 			var buf, errBuf bytes.Buffer
 			r := &create.Runner{
-				Client: tt.mock,
-				Stdout: &buf,
-				Stderr: &errBuf,
+				UseCase: &secret.CreateUseCase{Client: tt.mock},
+				Stdout:  &buf,
+				Stderr:  &errBuf,
 			}
 			err := r.Run(t.Context(), tt.opts)
 

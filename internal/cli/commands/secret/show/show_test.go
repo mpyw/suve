@@ -14,6 +14,7 @@ import (
 	"github.com/mpyw/suve/internal/api/secretapi"
 	appcli "github.com/mpyw/suve/internal/cli/commands"
 	"github.com/mpyw/suve/internal/cli/commands/secret/show"
+	"github.com/mpyw/suve/internal/usecase/secret"
 	"github.com/mpyw/suve/internal/version/secretversion"
 )
 
@@ -238,9 +239,9 @@ func TestRun(t *testing.T) {
 			t.Parallel()
 			var buf, errBuf bytes.Buffer
 			r := &show.Runner{
-				Client: tt.mock,
-				Stdout: &buf,
-				Stderr: &errBuf,
+				UseCase: &secret.ShowUseCase{Client: tt.mock},
+				Stdout:  &buf,
+				Stderr:  &errBuf,
 			}
 			err := r.Run(t.Context(), tt.opts)
 

@@ -13,6 +13,7 @@ import (
 
 	"github.com/mpyw/suve/internal/staging"
 	"github.com/mpyw/suve/internal/staging/runner"
+	stagingusecase "github.com/mpyw/suve/internal/usecase/staging"
 )
 
 func TestAddRunner_Run(t *testing.T) {
@@ -26,8 +27,10 @@ func TestAddRunner_Run(t *testing.T) {
 
 		var buf bytes.Buffer
 		r := &runner.AddRunner{
-			Strategy:   &mockStrategy{service: staging.ServiceParam},
-			Store:      store,
+			UseCase: &stagingusecase.AddUseCase{
+				Strategy: &mockStrategy{service: staging.ServiceParam},
+				Store:    store,
+			},
 			Stdout:     &buf,
 			Stderr:     &bytes.Buffer{},
 			OpenEditor: func(_ string) (string, error) { return "new-value", nil },
@@ -59,10 +62,12 @@ func TestAddRunner_Run(t *testing.T) {
 
 		var buf bytes.Buffer
 		r := &runner.AddRunner{
-			Strategy: &mockStrategy{service: staging.ServiceParam},
-			Store:    store,
-			Stdout:   &buf,
-			Stderr:   &bytes.Buffer{},
+			UseCase: &stagingusecase.AddUseCase{
+				Strategy: &mockStrategy{service: staging.ServiceParam},
+				Store:    store,
+			},
+			Stdout: &buf,
+			Stderr: &bytes.Buffer{},
 			OpenEditor: func(current string) (string, error) {
 				assert.Equal(t, "original-value", current)
 				return "updated-value", nil
@@ -88,8 +93,10 @@ func TestAddRunner_Run(t *testing.T) {
 
 		var buf bytes.Buffer
 		r := &runner.AddRunner{
-			Strategy:   &mockStrategy{service: staging.ServiceParam},
-			Store:      store,
+			UseCase: &stagingusecase.AddUseCase{
+				Strategy: &mockStrategy{service: staging.ServiceParam},
+				Store:    store,
+			},
 			Stdout:     &buf,
 			Stderr:     &bytes.Buffer{},
 			OpenEditor: func(_ string) (string, error) { return "", nil },
@@ -118,10 +125,12 @@ func TestAddRunner_Run(t *testing.T) {
 
 		var buf bytes.Buffer
 		r := &runner.AddRunner{
-			Strategy: &mockStrategy{service: staging.ServiceParam},
-			Store:    store,
-			Stdout:   &buf,
-			Stderr:   &bytes.Buffer{},
+			UseCase: &stagingusecase.AddUseCase{
+				Strategy: &mockStrategy{service: staging.ServiceParam},
+				Store:    store,
+			},
+			Stdout: &buf,
+			Stderr: &bytes.Buffer{},
 			OpenEditor: func(_ string) (string, error) {
 				return "same-value", nil
 			},
@@ -140,8 +149,10 @@ func TestAddRunner_Run(t *testing.T) {
 
 		var buf bytes.Buffer
 		r := &runner.AddRunner{
-			Strategy:   &mockStrategy{service: staging.ServiceSecret},
-			Store:      store,
+			UseCase: &stagingusecase.AddUseCase{
+				Strategy: &mockStrategy{service: staging.ServiceSecret},
+				Store:    store,
+			},
 			Stdout:     &buf,
 			Stderr:     &bytes.Buffer{},
 			OpenEditor: func(_ string) (string, error) { return "secret-value", nil },
@@ -189,10 +200,12 @@ func TestAddRunner_ErrorCases(t *testing.T) {
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.AddRunner{
-			Strategy: &mockStrategy{service: staging.ServiceParam, parseNameErr: errors.New("invalid name")},
-			Store:    store,
-			Stdout:   &stdout,
-			Stderr:   &stderr,
+			UseCase: &stagingusecase.AddUseCase{
+				Strategy: &mockStrategy{service: staging.ServiceParam, parseNameErr: errors.New("invalid name")},
+				Store:    store,
+			},
+			Stdout: &stdout,
+			Stderr: &stderr,
 		}
 
 		err := r.Run(context.Background(), runner.AddOptions{Name: "invalid"})
@@ -208,10 +221,12 @@ func TestAddRunner_ErrorCases(t *testing.T) {
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.AddRunner{
-			Strategy: &mockStrategy{service: staging.ServiceParam},
-			Store:    store,
-			Stdout:   &stdout,
-			Stderr:   &stderr,
+			UseCase: &stagingusecase.AddUseCase{
+				Strategy: &mockStrategy{service: staging.ServiceParam},
+				Store:    store,
+			},
+			Stdout: &stdout,
+			Stderr: &stderr,
 			OpenEditor: func(_ string) (string, error) {
 				return "", errors.New("editor crashed")
 			},
@@ -234,10 +249,12 @@ func TestAddRunner_WithOptions(t *testing.T) {
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.AddRunner{
-			Strategy: &mockStrategy{service: staging.ServiceParam},
-			Store:    store,
-			Stdout:   &stdout,
-			Stderr:   &stderr,
+			UseCase: &stagingusecase.AddUseCase{
+				Strategy: &mockStrategy{service: staging.ServiceParam},
+				Store:    store,
+			},
+			Stdout: &stdout,
+			Stderr: &stderr,
 			// No OpenEditor set - with Value provided, editor should not be called
 		}
 
@@ -262,10 +279,12 @@ func TestAddRunner_WithOptions(t *testing.T) {
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.AddRunner{
-			Strategy: &mockStrategy{service: staging.ServiceParam},
-			Store:    store,
-			Stdout:   &stdout,
-			Stderr:   &stderr,
+			UseCase: &stagingusecase.AddUseCase{
+				Strategy: &mockStrategy{service: staging.ServiceParam},
+				Store:    store,
+			},
+			Stdout: &stdout,
+			Stderr: &stderr,
 		}
 
 		err := r.Run(context.Background(), runner.AddOptions{

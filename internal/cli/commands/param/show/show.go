@@ -16,20 +16,15 @@ import (
 	"github.com/mpyw/suve/internal/infra"
 	"github.com/mpyw/suve/internal/jsonutil"
 	"github.com/mpyw/suve/internal/timeutil"
+	"github.com/mpyw/suve/internal/usecase/param"
 	"github.com/mpyw/suve/internal/version/paramversion"
 )
 
-// Client is the interface for the show command.
-type Client interface {
-	paramapi.GetParameterAPI
-	paramapi.GetParameterHistoryAPI
-}
-
 // Runner executes the show command.
 type Runner struct {
-	Client Client
-	Stdout io.Writer
-	Stderr io.Writer
+	UseCase *param.ShowUseCase
+	Stdout  io.Writer
+	Stderr  io.Writer
 }
 
 // Options holds the options for the show command.
@@ -142,9 +137,9 @@ func action(ctx context.Context, cmd *cli.Command) error {
 
 	return pager.WithPagerWriter(cmd.Root().Writer, noPager, func(w io.Writer) error {
 		r := &Runner{
-			Client: client,
-			Stdout: w,
-			Stderr: cmd.Root().ErrWriter,
+			UseCase: &param.ShowUseCase{Client: client},
+			Stdout:  w,
+			Stderr:  cmd.Root().ErrWriter,
 		}
 		return r.Run(ctx, opts)
 	})
@@ -152,20 +147,23 @@ func action(ctx context.Context, cmd *cli.Command) error {
 
 // Run executes the show command.
 func (r *Runner) Run(ctx context.Context, opts Options) error {
-	param, err := paramversion.GetParameterWithVersion(ctx, r.Client, opts.Spec, opts.Decrypt)
+	result, err := r.UseCase.Execute(ctx, param.ShowInput{
+		Spec:    opts.Spec,
+		Decrypt: opts.Decrypt,
+	})
 	if err != nil {
 		return err
 	}
 
-	value := lo.FromPtr(param.Value)
+	value := result.Value
 	jsonParsed := false
 
 	// Warn if --parse-json is used in cases where it's not meaningful
 	if opts.ParseJSON {
 		switch {
-		case param.Type == paramapi.ParameterTypeStringList:
+		case result.Type == paramapi.ParameterTypeStringList:
 			output.Warning(r.Stderr, "--parse-json has no effect on StringList type (comma-separated values)")
-		case param.Type == paramapi.ParameterTypeSecureString && !opts.Decrypt:
+		case result.Type == paramapi.ParameterTypeSecureString && !opts.Decrypt:
 			output.Warning(r.Stderr, "--parse-json has no effect on encrypted SecureString (use --decrypt to enable)")
 		default:
 			formatted := jsonutil.TryFormatOrWarn(value, r.Stderr, "")
@@ -185,21 +183,21 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 	// JSON output mode
 	if opts.Output == output.FormatJSON {
 		jsonOut := JSONOutput{
-			Name:    lo.FromPtr(param.Name),
-			Version: param.Version,
-			Type:    string(param.Type),
+			Name:    result.Name,
+			Version: result.Version,
+			Type:    string(result.Type),
 			Value:   value,
 		}
 		// Show decrypted status only for SecureString
-		if param.Type == paramapi.ParameterTypeSecureString {
+		if result.Type == paramapi.ParameterTypeSecureString {
 			jsonOut.Decrypted = lo.ToPtr(opts.Decrypt)
 		}
 		// Show json_parsed only when --parse-json was used and succeeded
 		if jsonParsed {
 			jsonOut.JsonParsed = lo.ToPtr(true)
 		}
-		if param.LastModifiedDate != nil {
-			jsonOut.Modified = timeutil.FormatRFC3339(*param.LastModifiedDate)
+		if result.LastModified != nil {
+			jsonOut.Modified = timeutil.FormatRFC3339(*result.LastModified)
 		}
 		enc := json.NewEncoder(r.Stdout)
 		enc.SetIndent("", "  ")
@@ -208,19 +206,19 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 
 	// Normal mode: show metadata + value
 	out := output.New(r.Stdout)
-	out.Field("Name", lo.FromPtr(param.Name))
-	out.Field("Version", fmt.Sprintf("%d", param.Version))
-	out.Field("Type", string(param.Type))
+	out.Field("Name", result.Name)
+	out.Field("Version", fmt.Sprintf("%d", result.Version))
+	out.Field("Type", string(result.Type))
 	// Show decrypted status only for SecureString
-	if param.Type == paramapi.ParameterTypeSecureString {
+	if result.Type == paramapi.ParameterTypeSecureString {
 		out.Field("Decrypted", fmt.Sprintf("%t", opts.Decrypt))
 	}
 	// Show json_parsed only when --parse-json was used and succeeded
 	if jsonParsed {
 		out.Field("JsonParsed", "true")
 	}
-	if param.LastModifiedDate != nil {
-		out.Field("Modified", timeutil.FormatRFC3339(*param.LastModifiedDate))
+	if result.LastModified != nil {
+		out.Field("Modified", timeutil.FormatRFC3339(*result.LastModified))
 	}
 	out.Separator()
 	out.Value(value)

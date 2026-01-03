@@ -6,28 +6,20 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"regexp"
 
 	"github.com/samber/lo"
 	"github.com/urfave/cli/v3"
 
-	"github.com/mpyw/suve/internal/api/paramapi"
 	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/infra"
-	"github.com/mpyw/suve/internal/parallel"
+	"github.com/mpyw/suve/internal/usecase/param"
 )
-
-// Client is the interface for the list command.
-type Client interface {
-	paramapi.DescribeParametersAPI
-	paramapi.GetParameterAPI
-}
 
 // Runner executes the list command.
 type Runner struct {
-	Client Client
-	Stdout io.Writer
-	Stderr io.Writer
+	UseCase *param.ListUseCase
+	Stdout  io.Writer
+	Stderr  io.Writer
 }
 
 // Options holds the options for the list command.
@@ -110,9 +102,9 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	}
 
 	r := &Runner{
-		Client: client,
-		Stdout: cmd.Root().Writer,
-		Stderr: cmd.Root().ErrWriter,
+		UseCase: &param.ListUseCase{Client: client},
+		Stdout:  cmd.Root().Writer,
+		Stderr:  cmd.Root().ErrWriter,
 	}
 	return r.Run(ctx, Options{
 		Prefix:    cmd.Args().First(),
@@ -125,96 +117,43 @@ func action(ctx context.Context, cmd *cli.Command) error {
 
 // Run executes the list command.
 func (r *Runner) Run(ctx context.Context, opts Options) error {
-	// Compile regex filter if specified
-	var filterRegex *regexp.Regexp
-	if opts.Filter != "" {
-		var err error
-		filterRegex, err = regexp.Compile(opts.Filter)
-		if err != nil {
-			return fmt.Errorf("invalid filter regex: %w", err)
-		}
-	}
-
-	option := "OneLevel"
-	if opts.Recursive {
-		option = "Recursive"
-	}
-
-	input := &paramapi.DescribeParametersInput{}
-	if opts.Prefix != "" {
-		input.ParameterFilters = []paramapi.ParameterStringFilter{
-			{
-				Key:    lo.ToPtr("Path"),
-				Option: lo.ToPtr(option),
-				Values: []string{opts.Prefix},
-			},
-		}
-	}
-
-	// Collect all parameter names first
-	var names []string
-	paginator := paramapi.NewDescribeParametersPaginator(r.Client, input)
-	for paginator.HasMorePages() {
-		page, err := paginator.NextPage(ctx)
-		if err != nil {
-			return fmt.Errorf("failed to describe parameters: %w", err)
-		}
-
-		for _, param := range page.Parameters {
-			name := lo.FromPtr(param.Name)
-			// Apply regex filter if specified
-			if filterRegex != nil && !filterRegex.MatchString(name) {
-				continue
-			}
-			names = append(names, name)
-		}
+	result, err := r.UseCase.Execute(ctx, param.ListInput{
+		Prefix:    opts.Prefix,
+		Recursive: opts.Recursive,
+		Filter:    opts.Filter,
+		WithValue: opts.Show,
+	})
+	if err != nil {
+		return err
 	}
 
 	// If --show is not specified and not JSON output, just print names
 	if !opts.Show && opts.Output != output.FormatJSON {
-		for _, name := range names {
-			_, _ = fmt.Fprintln(r.Stdout, name)
+		for _, entry := range result.Entries {
+			_, _ = fmt.Fprintln(r.Stdout, entry.Name)
 		}
 		return nil
 	}
 
 	// For JSON output without --show, output names only
 	if opts.Output == output.FormatJSON && !opts.Show {
-		items := make([]JSONOutputItem, len(names))
-		for i, name := range names {
-			items[i] = JSONOutputItem{Name: name}
+		items := make([]JSONOutputItem, len(result.Entries))
+		for i, entry := range result.Entries {
+			items[i] = JSONOutputItem{Name: entry.Name}
 		}
 		enc := json.NewEncoder(r.Stdout)
 		enc.SetIndent("", "  ")
 		return enc.Encode(items)
 	}
 
-	// Fetch values in parallel
-	namesMap := make(map[string]struct{}, len(names))
-	for _, name := range names {
-		namesMap[name] = struct{}{}
-	}
-
-	results := parallel.ExecuteMap(ctx, namesMap, func(ctx context.Context, name string, _ struct{}) (string, error) {
-		out, err := r.Client.GetParameter(ctx, &paramapi.GetParameterInput{
-			Name:           lo.ToPtr(name),
-			WithDecryption: lo.ToPtr(true),
-		})
-		if err != nil {
-			return "", err
-		}
-		return lo.FromPtr(out.Parameter.Value), nil
-	})
-
 	// JSON output with values
 	if opts.Output == output.FormatJSON {
-		items := make([]JSONOutputItem, 0, len(names))
-		for _, name := range names {
-			result := results[name]
-			if result.Err != nil {
-				items = append(items, JSONOutputItem{Name: name, Error: result.Err.Error()})
+		items := make([]JSONOutputItem, 0, len(result.Entries))
+		for _, entry := range result.Entries {
+			if entry.Error != nil {
+				items = append(items, JSONOutputItem{Name: entry.Name, Error: entry.Error.Error()})
 			} else {
-				items = append(items, JSONOutputItem{Name: name, Value: lo.ToPtr(result.Value)})
+				items = append(items, JSONOutputItem{Name: entry.Name, Value: entry.Value})
 			}
 		}
 		enc := json.NewEncoder(r.Stdout)
@@ -223,12 +162,11 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 	}
 
 	// Text output with values
-	for _, name := range names {
-		result := results[name]
-		if result.Err != nil {
-			_, _ = fmt.Fprintf(r.Stdout, "%s\t<error: %v>\n", name, result.Err)
+	for _, entry := range result.Entries {
+		if entry.Error != nil {
+			_, _ = fmt.Fprintf(r.Stdout, "%s\t<error: %v>\n", entry.Name, entry.Error)
 		} else {
-			_, _ = fmt.Fprintf(r.Stdout, "%s\t%s\n", name, result.Value)
+			_, _ = fmt.Fprintf(r.Stdout, "%s\t%s\n", entry.Name, lo.FromPtr(entry.Value))
 		}
 	}
 

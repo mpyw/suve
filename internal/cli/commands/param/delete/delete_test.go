@@ -12,6 +12,7 @@ import (
 	"github.com/mpyw/suve/internal/api/paramapi"
 	appcli "github.com/mpyw/suve/internal/cli/commands"
 	"github.com/mpyw/suve/internal/cli/commands/param/delete"
+	"github.com/mpyw/suve/internal/usecase/param"
 )
 
 func TestCommand_Validation(t *testing.T) {
@@ -28,6 +29,7 @@ func TestCommand_Validation(t *testing.T) {
 
 type mockClient struct {
 	deleteParameterFunc func(ctx context.Context, params *paramapi.DeleteParameterInput, optFns ...func(*paramapi.Options)) (*paramapi.DeleteParameterOutput, error)
+	getParameterFunc    func(ctx context.Context, params *paramapi.GetParameterInput, optFns ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error)
 }
 
 func (m *mockClient) DeleteParameter(ctx context.Context, params *paramapi.DeleteParameterInput, optFns ...func(*paramapi.Options)) (*paramapi.DeleteParameterOutput, error) {
@@ -35,6 +37,13 @@ func (m *mockClient) DeleteParameter(ctx context.Context, params *paramapi.Delet
 		return m.deleteParameterFunc(ctx, params, optFns...)
 	}
 	return nil, fmt.Errorf("DeleteParameter not mocked")
+}
+
+func (m *mockClient) GetParameter(ctx context.Context, params *paramapi.GetParameterInput, optFns ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
+	if m.getParameterFunc != nil {
+		return m.getParameterFunc(ctx, params, optFns...)
+	}
+	return nil, &paramapi.ParameterNotFound{}
 }
 
 func TestRun(t *testing.T) {
@@ -76,9 +85,9 @@ func TestRun(t *testing.T) {
 			t.Parallel()
 			var buf, errBuf bytes.Buffer
 			r := &delete.Runner{
-				Client: tt.mock,
-				Stdout: &buf,
-				Stderr: &errBuf,
+				UseCase: &param.DeleteUseCase{Client: tt.mock},
+				Stdout:  &buf,
+				Stderr:  &errBuf,
 			}
 			err := r.Run(t.Context(), tt.opts)
 

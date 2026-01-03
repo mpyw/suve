@@ -13,6 +13,7 @@ import (
 	"github.com/mpyw/suve/internal/api/paramapi"
 	appcli "github.com/mpyw/suve/internal/cli/commands"
 	"github.com/mpyw/suve/internal/cli/commands/param/list"
+	"github.com/mpyw/suve/internal/usecase/param"
 )
 
 func TestCommand_Help(t *testing.T) {
@@ -187,9 +188,9 @@ func TestRun(t *testing.T) {
 			t.Parallel()
 			var buf, errBuf bytes.Buffer
 			r := &list.Runner{
-				Client: tt.mock,
-				Stdout: &buf,
-				Stderr: &errBuf,
+				UseCase: &param.ListUseCase{Client: tt.mock},
+				Stdout:  &buf,
+				Stderr:  &errBuf,
 			}
 			err := r.Run(t.Context(), tt.opts)
 

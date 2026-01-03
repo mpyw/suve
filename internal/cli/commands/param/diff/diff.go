@@ -7,28 +7,21 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/samber/lo"
 	"github.com/urfave/cli/v3"
 
-	"github.com/mpyw/suve/internal/api/paramapi"
 	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/cli/pager"
 	"github.com/mpyw/suve/internal/infra"
 	"github.com/mpyw/suve/internal/jsonutil"
+	"github.com/mpyw/suve/internal/usecase/param"
 	"github.com/mpyw/suve/internal/version/paramversion"
 )
 
-// Client is the interface for the diff command.
-type Client interface {
-	paramapi.GetParameterAPI
-	paramapi.GetParameterHistoryAPI
-}
-
 // Runner executes the diff command.
 type Runner struct {
-	Client Client
-	Stdout io.Writer
-	Stderr io.Writer
+	UseCase *param.DiffUseCase
+	Stdout  io.Writer
+	Stderr  io.Writer
 }
 
 // Options holds the options for the diff command.
@@ -119,9 +112,9 @@ func action(ctx context.Context, cmd *cli.Command) error {
 
 	return pager.WithPagerWriter(cmd.Root().Writer, noPager, func(w io.Writer) error {
 		r := &Runner{
-			Client: client,
-			Stdout: w,
-			Stderr: cmd.Root().ErrWriter,
+			UseCase: &param.DiffUseCase{Client: client},
+			Stdout:  w,
+			Stderr:  cmd.Root().ErrWriter,
 		}
 		return r.Run(ctx, opts)
 	})
@@ -129,18 +122,16 @@ func action(ctx context.Context, cmd *cli.Command) error {
 
 // Run executes the diff command.
 func (r *Runner) Run(ctx context.Context, opts Options) error {
-	param1, err := paramversion.GetParameterWithVersion(ctx, r.Client, opts.Spec1, true)
+	result, err := r.UseCase.Execute(ctx, param.DiffInput{
+		Spec1: opts.Spec1,
+		Spec2: opts.Spec2,
+	})
 	if err != nil {
-		return fmt.Errorf("failed to get first version: %w", err)
+		return err
 	}
 
-	param2, err := paramversion.GetParameterWithVersion(ctx, r.Client, opts.Spec2, true)
-	if err != nil {
-		return fmt.Errorf("failed to get second version: %w", err)
-	}
-
-	value1 := lo.FromPtr(param1.Value)
-	value2 := lo.FromPtr(param2.Value)
+	value1 := result.OldValue
+	value2 := result.NewValue
 
 	// Format as JSON if enabled
 	if opts.ParseJSON {
@@ -152,18 +143,18 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 	// JSON output mode
 	if opts.Output == output.FormatJSON {
 		jsonOut := JSONOutput{
-			OldName:    opts.Spec1.Name,
-			OldVersion: param1.Version,
+			OldName:    result.OldName,
+			OldVersion: result.OldVersion,
 			OldValue:   value1,
-			NewName:    opts.Spec2.Name,
-			NewVersion: param2.Version,
+			NewName:    result.NewName,
+			NewVersion: result.NewVersion,
 			NewValue:   value2,
 			Identical:  identical,
 		}
 		if !identical {
 			jsonOut.Diff = output.DiffRaw(
-				fmt.Sprintf("%s#%d", opts.Spec1.Name, param1.Version),
-				fmt.Sprintf("%s#%d", opts.Spec2.Name, param2.Version),
+				fmt.Sprintf("%s#%d", result.OldName, result.OldVersion),
+				fmt.Sprintf("%s#%d", result.NewName, result.NewVersion),
 				value1,
 				value2,
 			)
@@ -180,8 +171,8 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 	}
 
 	diff := output.Diff(
-		fmt.Sprintf("%s#%d", opts.Spec1.Name, param1.Version),
-		fmt.Sprintf("%s#%d", opts.Spec2.Name, param2.Version),
+		fmt.Sprintf("%s#%d", result.OldName, result.OldVersion),
+		fmt.Sprintf("%s#%d", result.NewName, result.NewVersion),
 		value1,
 		value2,
 	)

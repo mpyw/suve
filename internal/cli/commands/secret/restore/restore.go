@@ -6,24 +6,18 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/samber/lo"
 	"github.com/urfave/cli/v3"
 
-	"github.com/mpyw/suve/internal/api/secretapi"
 	"github.com/mpyw/suve/internal/cli/colors"
 	"github.com/mpyw/suve/internal/infra"
+	"github.com/mpyw/suve/internal/usecase/secret"
 )
-
-// Client is the interface for the restore command.
-type Client interface {
-	secretapi.RestoreSecretAPI
-}
 
 // Runner executes the restore command.
 type Runner struct {
-	Client Client
-	Stdout io.Writer
-	Stderr io.Writer
+	UseCase *secret.RestoreUseCase
+	Stdout  io.Writer
+	Stderr  io.Writer
 }
 
 // Options holds the options for the restore command.
@@ -60,9 +54,9 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	}
 
 	r := &Runner{
-		Client: client,
-		Stdout: cmd.Root().Writer,
-		Stderr: cmd.Root().ErrWriter,
+		UseCase: &secret.RestoreUseCase{Client: client},
+		Stdout:  cmd.Root().Writer,
+		Stderr:  cmd.Root().ErrWriter,
 	}
 	return r.Run(ctx, Options{
 		Name: cmd.Args().First(),
@@ -71,16 +65,16 @@ func action(ctx context.Context, cmd *cli.Command) error {
 
 // Run executes the restore command.
 func (r *Runner) Run(ctx context.Context, opts Options) error {
-	result, err := r.Client.RestoreSecret(ctx, &secretapi.RestoreSecretInput{
-		SecretId: lo.ToPtr(opts.Name),
+	result, err := r.UseCase.Execute(ctx, secret.RestoreInput{
+		Name: opts.Name,
 	})
 	if err != nil {
-		return fmt.Errorf("failed to restore secret: %w", err)
+		return err
 	}
 
 	_, _ = fmt.Fprintf(r.Stdout, "%s Restored secret %s\n",
 		colors.Success("✓"),
-		lo.FromPtr(result.Name),
+		result.Name,
 	)
 
 	return nil

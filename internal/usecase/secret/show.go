@@ -25,6 +25,7 @@ type ShowInput struct {
 // ShowOutput holds the result of the show use case.
 type ShowOutput struct {
 	Name         string
+	ARN          string
 	Value        string
 	VersionID    string
 	VersionStage []string
@@ -45,6 +46,7 @@ func (u *ShowUseCase) Execute(ctx context.Context, input ShowInput) (*ShowOutput
 
 	return &ShowOutput{
 		Name:         lo.FromPtr(secret.Name),
+		ARN:          lo.FromPtr(secret.ARN),
 		Value:        lo.FromPtr(secret.SecretString),
 		VersionID:    lo.FromPtr(secret.VersionId),
 		VersionStage: secret.VersionStages,

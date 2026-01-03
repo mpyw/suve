@@ -3,22 +3,17 @@ package runner
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
-	"time"
-
-	"github.com/samber/lo"
 
 	"github.com/mpyw/suve/internal/cli/colors"
 	"github.com/mpyw/suve/internal/cli/editor"
-	"github.com/mpyw/suve/internal/staging"
+	stagingusecase "github.com/mpyw/suve/internal/usecase/staging"
 )
 
-// EditRunner executes edit operations using a strategy.
+// EditRunner executes edit operations using a usecase.
 type EditRunner struct {
-	Strategy   staging.EditStrategy
-	Store      *staging.Store
+	UseCase    *stagingusecase.EditUseCase
 	Stdout     io.Writer
 	Stderr     io.Writer
 	OpenEditor editor.OpenFunc // Optional: defaults to editor.Open if nil
@@ -34,30 +29,10 @@ type EditOptions struct {
 
 // Run executes the edit command.
 func (r *EditRunner) Run(ctx context.Context, opts EditOptions) error {
-	service := r.Strategy.Service()
-
-	// Check if already staged
-	stagedEntry, err := r.Store.Get(service, opts.Name)
-	if err != nil && !errors.Is(err, staging.ErrNotStaged) {
+	// Get baseline value (staged value if exists, otherwise from AWS)
+	baseline, err := r.UseCase.Baseline(ctx, stagingusecase.BaselineInput{Name: opts.Name})
+	if err != nil {
 		return err
-	}
-
-	var currentValue string
-	var baseModifiedAt *time.Time
-	if stagedEntry != nil && (stagedEntry.Operation == staging.OperationCreate || stagedEntry.Operation == staging.OperationUpdate) {
-		// Use staged value (preserve existing BaseModifiedAt)
-		currentValue = lo.FromPtr(stagedEntry.Value)
-		baseModifiedAt = stagedEntry.BaseModifiedAt
-	} else {
-		// Fetch from AWS
-		result, err := r.Strategy.FetchCurrentValue(ctx, opts.Name)
-		if err != nil {
-			return err
-		}
-		currentValue = result.Value
-		if !result.LastModified.IsZero() {
-			baseModifiedAt = &result.LastModified
-		}
 	}
 
 	var newValue string
@@ -70,35 +45,29 @@ func (r *EditRunner) Run(ctx context.Context, opts EditOptions) error {
 		if editorFn == nil {
 			editorFn = editor.Open
 		}
-		newValue, err = editorFn(currentValue)
+		newValue, err = editorFn(baseline.Value)
 		if err != nil {
 			return fmt.Errorf("failed to edit: %w", err)
 		}
 
 		// Check if changed
-		if newValue == currentValue {
+		if newValue == baseline.Value {
 			_, _ = fmt.Fprintln(r.Stdout, colors.Warning("No changes made."))
 			return nil
 		}
 	}
 
-	// Stage the change
-	entry := staging.Entry{
-		Operation:      staging.OperationUpdate,
-		Value:          lo.ToPtr(newValue),
-		StagedAt:       time.Now(),
-		BaseModifiedAt: baseModifiedAt,
-	}
-	if opts.Description != "" {
-		entry.Description = &opts.Description
-	}
-	if len(opts.Tags) > 0 {
-		entry.Tags = opts.Tags
-	}
-	if err := r.Store.Stage(service, opts.Name, entry); err != nil {
+	// Execute the edit use case
+	result, err := r.UseCase.Execute(ctx, stagingusecase.EditInput{
+		Name:        opts.Name,
+		Value:       newValue,
+		Description: opts.Description,
+		Tags:        opts.Tags,
+	})
+	if err != nil {
 		return err
 	}
 
-	_, _ = fmt.Fprintf(r.Stdout, "%s Staged: %s\n", colors.Success("✓"), opts.Name)
+	_, _ = fmt.Fprintf(r.Stdout, "%s Staged: %s\n", colors.Success("✓"), result.Name)
 	return nil
 }

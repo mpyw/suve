@@ -3,21 +3,18 @@ package runner
 
 import (
 	"context"
-	"fmt"
 	"io"
 
 	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/maputil"
-	"github.com/mpyw/suve/internal/parallel"
-	"github.com/mpyw/suve/internal/staging"
+	stagingusecase "github.com/mpyw/suve/internal/usecase/staging"
 )
 
-// ApplyRunner executes apply operations using a strategy.
+// ApplyRunner executes apply operations using a usecase.
 type ApplyRunner struct {
-	Strategy staging.ApplyStrategy
-	Store    *staging.Store
-	Stdout   io.Writer
-	Stderr   io.Writer
+	UseCase *stagingusecase.ApplyUseCase
+	Stdout  io.Writer
+	Stderr  io.Writer
 }
 
 // ApplyOptions holds options for the apply command.
@@ -28,72 +25,65 @@ type ApplyOptions struct {
 
 // Run executes the apply command.
 func (r *ApplyRunner) Run(ctx context.Context, opts ApplyOptions) error {
-	service := r.Strategy.Service()
-	itemName := r.Strategy.ItemName()
+	result, err := r.UseCase.Execute(ctx, stagingusecase.ApplyInput{
+		Name:            opts.Name,
+		IgnoreConflicts: opts.IgnoreConflicts,
+	})
 
-	staged, err := r.Store.List(service)
-	if err != nil {
+	// Handle nil result (shouldn't happen but be safe)
+	if result == nil {
 		return err
 	}
 
-	entries := staged[service]
-	if len(entries) == 0 {
-		output.Info(r.Stdout, "No %s changes staged.", r.Strategy.ServiceName())
+	// Output conflicts if any
+	for _, name := range maputil.SortedKeys(sliceToMap(result.Conflicts)) {
+		output.Warning(r.Stderr, "conflict detected for %s: AWS was modified after staging", name)
+	}
+
+	// Handle "nothing staged" case
+	if len(result.Results) == 0 && err == nil {
+		output.Info(r.Stdout, "No %s changes staged.", result.ServiceName)
 		return nil
 	}
 
-	// Filter by name if specified
-	if opts.Name != "" {
-		entry, exists := entries[opts.Name]
-		if !exists {
-			return fmt.Errorf("%s %s is not staged", itemName, opts.Name)
-		}
-		entries = map[string]staging.Entry{opts.Name: entry}
-	}
-
-	// Check for conflicts unless --ignore-conflicts is specified
-	if !opts.IgnoreConflicts {
-		conflicts := staging.CheckConflicts(ctx, r.Strategy, entries)
-		if len(conflicts) > 0 {
-			for _, name := range maputil.SortedKeys(conflicts) {
-				output.Warning(r.Stderr, "conflict detected for %s: AWS was modified after staging", name)
-			}
-			return fmt.Errorf("apply rejected: %d conflict(s) detected (use --ignore-conflicts to force)", len(conflicts))
-		}
-	}
-
-	// Execute apply operations in parallel
-	results := parallel.ExecuteMap(ctx, entries, func(ctx context.Context, name string, entry staging.Entry) (staging.Operation, error) {
-		err := r.Strategy.Apply(ctx, name, entry)
-		return entry.Operation, err
-	})
-
 	// Output results in sorted order
-	var succeeded, failed int
-	for _, name := range maputil.SortedKeys(entries) {
-		result := results[name]
-		if result.Err != nil {
-			output.Failed(r.Stderr, name, result.Err)
-			failed++
-		} else {
-			switch result.Value {
-			case staging.OperationCreate:
-				output.Success(r.Stdout, "Created %s", name)
-			case staging.OperationUpdate:
-				output.Success(r.Stdout, "Updated %s", name)
-			case staging.OperationDelete:
-				output.Success(r.Stdout, "Deleted %s", name)
+	for _, name := range r.sortedResultNames(result.Results) {
+		for _, entry := range result.Results {
+			if entry.Name != name {
+				continue
 			}
-			if err := r.Store.Unstage(service, name); err != nil {
-				output.Warning(r.Stderr, "failed to clear staging for %s: %v", name, err)
+			if entry.Error != nil {
+				output.Failed(r.Stderr, name, entry.Error)
+			} else {
+				switch entry.Status {
+				case stagingusecase.ApplyResultCreated:
+					output.Success(r.Stdout, "Created %s", name)
+				case stagingusecase.ApplyResultUpdated:
+					output.Success(r.Stdout, "Updated %s", name)
+				case stagingusecase.ApplyResultDeleted:
+					output.Success(r.Stdout, "Deleted %s", name)
+				}
 			}
-			succeeded++
+			break
 		}
 	}
 
-	if failed > 0 {
-		return fmt.Errorf("applied %d, failed %d", succeeded, failed)
-	}
+	// Return the original error if any (e.g., from conflict detection or failures)
+	return err
+}
 
-	return nil
+func (r *ApplyRunner) sortedResultNames(results []stagingusecase.ApplyResultEntry) []string {
+	names := make(map[string]struct{})
+	for _, e := range results {
+		names[e.Name] = struct{}{}
+	}
+	return maputil.SortedKeys(names)
+}
+
+func sliceToMap(slice []string) map[string]struct{} {
+	m := make(map[string]struct{})
+	for _, s := range slice {
+		m[s] = struct{}{}
+	}
+	return m
 }

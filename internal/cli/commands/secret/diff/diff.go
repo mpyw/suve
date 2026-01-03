@@ -15,28 +15,21 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/samber/lo"
 	"github.com/urfave/cli/v3"
 
-	"github.com/mpyw/suve/internal/api/secretapi"
 	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/cli/pager"
 	"github.com/mpyw/suve/internal/infra"
 	"github.com/mpyw/suve/internal/jsonutil"
+	"github.com/mpyw/suve/internal/usecase/secret"
 	"github.com/mpyw/suve/internal/version/secretversion"
 )
 
-// Client is the interface for the diff command.
-type Client interface {
-	secretapi.GetSecretValueAPI
-	secretapi.ListSecretVersionIdsAPI
-}
-
 // Runner executes the diff command.
 type Runner struct {
-	Client Client
-	Stdout io.Writer
-	Stderr io.Writer
+	UseCase *secret.DiffUseCase
+	Stdout  io.Writer
+	Stderr  io.Writer
 }
 
 // Options holds the options for the diff command.
@@ -128,9 +121,9 @@ func action(ctx context.Context, cmd *cli.Command) error {
 
 	return pager.WithPagerWriter(cmd.Root().Writer, noPager, func(w io.Writer) error {
 		r := &Runner{
-			Client: client,
-			Stdout: w,
-			Stderr: cmd.Root().ErrWriter,
+			UseCase: &secret.DiffUseCase{Client: client},
+			Stdout:  w,
+			Stderr:  cmd.Root().ErrWriter,
 		}
 		return r.Run(ctx, opts)
 	})
@@ -138,43 +131,41 @@ func action(ctx context.Context, cmd *cli.Command) error {
 
 // Run executes the diff command.
 func (r *Runner) Run(ctx context.Context, opts Options) error {
-	secret1, err := secretversion.GetSecretWithVersion(ctx, r.Client, opts.Spec1)
+	result, err := r.UseCase.Execute(ctx, secret.DiffInput{
+		Spec1: opts.Spec1,
+		Spec2: opts.Spec2,
+	})
 	if err != nil {
-		return fmt.Errorf("failed to get first version: %w", err)
+		return err
 	}
 
-	secret2, err := secretversion.GetSecretWithVersion(ctx, r.Client, opts.Spec2)
-	if err != nil {
-		return fmt.Errorf("failed to get second version: %w", err)
-	}
-
-	value1 := lo.FromPtr(secret1.SecretString)
-	value2 := lo.FromPtr(secret2.SecretString)
+	value1 := result.OldValue
+	value2 := result.NewValue
 
 	// Format as JSON if enabled
 	if opts.ParseJSON {
 		value1, value2 = jsonutil.TryFormatOrWarn2(value1, value2, r.Stderr, "")
 	}
 
-	v1 := lo.FromPtr(secret1.VersionId)
-	v2 := lo.FromPtr(secret2.VersionId)
+	v1 := result.OldVersionID
+	v2 := result.NewVersionID
 	identical := value1 == value2
 
 	// JSON output mode
 	if opts.Output == output.FormatJSON {
 		jsonOut := JSONOutput{
-			OldName:      opts.Spec1.Name,
+			OldName:      result.OldName,
 			OldVersionID: v1,
 			OldValue:     value1,
-			NewName:      opts.Spec2.Name,
+			NewName:      result.NewName,
 			NewVersionID: v2,
 			NewValue:     value2,
 			Identical:    identical,
 		}
 		if !identical {
 			jsonOut.Diff = output.DiffRaw(
-				fmt.Sprintf("%s#%s", opts.Spec1.Name, secretversion.TruncateVersionID(v1)),
-				fmt.Sprintf("%s#%s", opts.Spec2.Name, secretversion.TruncateVersionID(v2)),
+				fmt.Sprintf("%s#%s", result.OldName, secretversion.TruncateVersionID(v1)),
+				fmt.Sprintf("%s#%s", result.NewName, secretversion.TruncateVersionID(v2)),
 				value1,
 				value2,
 			)
@@ -186,14 +177,14 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 
 	if identical {
 		output.Warning(r.Stderr, "comparing identical versions")
-		output.Hint(r.Stderr, "To compare with previous version, use: suve secret diff %s~1", opts.Spec1.Name)
-		output.Hint(r.Stderr, "or: suve secret diff %s:AWSPREVIOUS", opts.Spec1.Name)
+		output.Hint(r.Stderr, "To compare with previous version, use: suve secret diff %s~1", result.OldName)
+		output.Hint(r.Stderr, "or: suve secret diff %s:AWSPREVIOUS", result.OldName)
 		return nil
 	}
 
 	diff := output.Diff(
-		fmt.Sprintf("%s#%s", opts.Spec1.Name, secretversion.TruncateVersionID(v1)),
-		fmt.Sprintf("%s#%s", opts.Spec2.Name, secretversion.TruncateVersionID(v2)),
+		fmt.Sprintf("%s#%s", result.OldName, secretversion.TruncateVersionID(v1)),
+		fmt.Sprintf("%s#%s", result.NewName, secretversion.TruncateVersionID(v2)),
 		value1,
 		value2,
 	)

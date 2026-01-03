@@ -71,8 +71,11 @@ func (u *LogUseCase) Execute(ctx context.Context, input LogInput) (*LogOutput, e
 	// Convert to entries and apply date filters
 	var entries []LogEntry
 	for _, history := range params {
-		// Apply date filters
-		if history.LastModifiedDate != nil {
+		// Apply date filters (skip entries without LastModifiedDate when filters are applied)
+		if input.Since != nil || input.Until != nil {
+			if history.LastModifiedDate == nil {
+				continue
+			}
 			if input.Since != nil && history.LastModifiedDate.Before(*input.Since) {
 				continue
 			}

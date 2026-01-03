@@ -14,6 +14,7 @@ import (
 	"github.com/mpyw/suve/internal/api/secretapi"
 	appcli "github.com/mpyw/suve/internal/cli/commands"
 	"github.com/mpyw/suve/internal/cli/commands/secret/delete"
+	"github.com/mpyw/suve/internal/usecase/secret"
 )
 
 func TestCommand_Validation(t *testing.T) {
@@ -29,7 +30,15 @@ func TestCommand_Validation(t *testing.T) {
 }
 
 type mockClient struct {
-	deleteSecretFunc func(ctx context.Context, params *secretapi.DeleteSecretInput, optFns ...func(*secretapi.Options)) (*secretapi.DeleteSecretOutput, error)
+	getSecretValueFunc func(ctx context.Context, params *secretapi.GetSecretValueInput, optFns ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error)
+	deleteSecretFunc   func(ctx context.Context, params *secretapi.DeleteSecretInput, optFns ...func(*secretapi.Options)) (*secretapi.DeleteSecretOutput, error)
+}
+
+func (m *mockClient) GetSecretValue(ctx context.Context, params *secretapi.GetSecretValueInput, optFns ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) {
+	if m.getSecretValueFunc != nil {
+		return m.getSecretValueFunc(ctx, params, optFns...)
+	}
+	return nil, &secretapi.ResourceNotFoundException{Message: lo.ToPtr("not found")}
 }
 
 func (m *mockClient) DeleteSecret(ctx context.Context, params *secretapi.DeleteSecretInput, optFns ...func(*secretapi.Options)) (*secretapi.DeleteSecretOutput, error) {
@@ -101,9 +110,9 @@ func TestRun(t *testing.T) {
 			t.Parallel()
 			var buf, errBuf bytes.Buffer
 			r := &delete.Runner{
-				Client: tt.mock,
-				Stdout: &buf,
-				Stderr: &errBuf,
+				UseCase: &secret.DeleteUseCase{Client: tt.mock},
+				Stdout:  &buf,
+				Stderr:  &errBuf,
 			}
 			err := r.Run(t.Context(), tt.opts)
 

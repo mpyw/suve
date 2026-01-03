@@ -9,7 +9,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"slices"
 	"time"
 
 	"github.com/samber/lo"
@@ -22,18 +21,14 @@ import (
 	"github.com/mpyw/suve/internal/infra"
 	"github.com/mpyw/suve/internal/jsonutil"
 	"github.com/mpyw/suve/internal/timeutil"
+	"github.com/mpyw/suve/internal/usecase/param"
 )
-
-// Client is the interface for the log command.
-type Client interface {
-	paramapi.GetParameterHistoryAPI
-}
 
 // Runner executes the log command.
 type Runner struct {
-	Client Client
-	Stdout io.Writer
-	Stderr io.Writer
+	UseCase *param.LogUseCase
+	Stdout  io.Writer
+	Stderr  io.Writer
 }
 
 // Options holds the options for the log command.
@@ -201,9 +196,9 @@ func action(ctx context.Context, cmd *cli.Command) error {
 
 	return pager.WithPagerWriter(cmd.Root().Writer, noPager, func(w io.Writer) error {
 		r := &Runner{
-			Client: client,
-			Stdout: w,
-			Stderr: cmd.Root().ErrWriter,
+			UseCase: &param.LogUseCase{Client: client},
+			Stdout:  w,
+			Stderr:  cmd.Root().ErrWriter,
 		}
 		return r.Run(ctx, opts)
 	})
@@ -211,48 +206,37 @@ func action(ctx context.Context, cmd *cli.Command) error {
 
 // Run executes the log command.
 func (r *Runner) Run(ctx context.Context, opts Options) error {
-	result, err := r.Client.GetParameterHistory(ctx, &paramapi.GetParameterHistoryInput{
-		Name:           lo.ToPtr(opts.Name),
-		MaxResults:     lo.ToPtr(opts.MaxResults),
-		WithDecryption: lo.ToPtr(true),
+	result, err := r.UseCase.Execute(ctx, param.LogInput{
+		Name:       opts.Name,
+		MaxResults: opts.MaxResults,
+		Since:      opts.Since,
+		Until:      opts.Until,
+		Reverse:    opts.Reverse,
 	})
 	if err != nil {
-		return fmt.Errorf("failed to get parameter history: %w", err)
+		return err
 	}
 
-	params := result.Parameters
-	if len(params) == 0 {
+	entries := result.Entries
+	if len(entries) == 0 {
 		return nil
-	}
-
-	// Filter by date range if specified
-	if opts.Since != nil || opts.Until != nil {
-		params = filterDateRange(params, opts.Since, opts.Until)
-		if len(params) == 0 {
-			return nil
-		}
-	}
-
-	// AWS returns oldest first; reverse to show newest first (unless --reverse)
-	if !opts.Reverse {
-		slices.Reverse(params)
 	}
 
 	// JSON output mode
 	if opts.Output == output.FormatJSON {
-		items := make([]JSONOutputItem, len(params))
-		for i, param := range params {
+		items := make([]JSONOutputItem, len(entries))
+		for i, entry := range entries {
 			items[i] = JSONOutputItem{
-				Version: param.Version,
-				Type:    string(param.Type),
-				Value:   lo.FromPtr(param.Value),
+				Version: entry.Version,
+				Type:    string(entry.Type),
+				Value:   entry.Value,
 			}
 			// Show decrypted status only for SecureString (always true for log command)
-			if param.Type == paramapi.ParameterTypeSecureString {
+			if entry.Type == paramapi.ParameterTypeSecureString {
 				items[i].Decrypted = lo.ToPtr(true)
 			}
-			if param.LastModifiedDate != nil {
-				items[i].Modified = timeutil.FormatRFC3339(*param.LastModifiedDate)
+			if entry.LastModified != nil {
+				items[i].Modified = timeutil.FormatRFC3339(*entry.LastModified)
 			}
 		}
 		enc := json.NewEncoder(r.Stdout)
@@ -260,30 +244,24 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 		return enc.Encode(items)
 	}
 
-	// Find the current (latest) version index
-	currentIdx := 0
-	if opts.Reverse {
-		currentIdx = len(params) - 1
-	}
-
-	for i, param := range params {
+	for i, entry := range entries {
 		if opts.Oneline && !opts.ShowPatch {
 			// Compact one-line format: VERSION  DATE  VALUE_PREVIEW
 			dateStr := ""
-			if param.LastModifiedDate != nil {
-				dateStr = param.LastModifiedDate.Format("2006-01-02")
+			if entry.LastModified != nil {
+				dateStr = entry.LastModified.Format("2006-01-02")
 			}
-			value := lo.FromPtr(param.Value)
+			value := entry.Value
 			if len(value) > 40 {
 				value = value[:40] + "..."
 			}
 			currentMark := ""
-			if i == currentIdx {
+			if entry.IsCurrent {
 				currentMark = colors.Current(" (current)")
 			}
 			_, _ = fmt.Fprintf(r.Stdout, "%s%d%s  %s  %s\n",
 				colors.Version(""),
-				param.Version,
+				entry.Version,
 				currentMark,
 				colors.FieldLabel(dateStr),
 				value,
@@ -291,44 +269,37 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 			continue
 		}
 
-		versionLabel := fmt.Sprintf("Version %d", param.Version)
-		if i == currentIdx {
+		versionLabel := fmt.Sprintf("Version %d", entry.Version)
+		if entry.IsCurrent {
 			versionLabel += " " + colors.Current("(current)")
 		}
 		_, _ = fmt.Fprintln(r.Stdout, colors.Version(versionLabel))
-		if param.LastModifiedDate != nil {
-			_, _ = fmt.Fprintf(r.Stdout, "%s %s\n", colors.FieldLabel("Date:"), timeutil.FormatRFC3339(*param.LastModifiedDate))
+		if entry.LastModified != nil {
+			_, _ = fmt.Fprintf(r.Stdout, "%s %s\n", colors.FieldLabel("Date:"), timeutil.FormatRFC3339(*entry.LastModified))
 		}
 
 		if opts.ShowPatch {
-			// Determine old/new indices based on order
-			var oldIdx, newIdx int
-			if opts.Reverse {
-				// In reverse mode: comparing with next version (newer)
-				if i < len(params)-1 {
-					oldIdx = i
-					newIdx = i + 1
+			// For patch mode, we need to compare with the next entry in the list
+			// The list is ordered by the usecase based on opts.Reverse
+			if i < len(entries)-1 {
+				var oldEntry, newEntry param.LogEntry
+				if opts.Reverse {
+					// In reverse mode (oldest first): current is old, next is new
+					oldEntry = entry
+					newEntry = entries[i+1]
 				} else {
-					oldIdx = -1 // No diff for the last (current) version
+					// In normal mode (newest first): next is old, current is new
+					oldEntry = entries[i+1]
+					newEntry = entry
 				}
-			} else {
-				// In normal mode: comparing with previous version (older)
-				if i < len(params)-1 {
-					oldIdx = i + 1
-					newIdx = i
-				} else {
-					oldIdx = -1 // No diff for the oldest version
-				}
-			}
 
-			if oldIdx >= 0 {
-				oldValue := lo.FromPtr(params[oldIdx].Value)
-				newValue := lo.FromPtr(params[newIdx].Value)
+				oldValue := oldEntry.Value
+				newValue := newEntry.Value
 				if opts.ParseJSON {
 					oldValue, newValue = jsonutil.TryFormatOrWarn2(oldValue, newValue, r.Stderr, "")
 				}
-				oldName := fmt.Sprintf("%s#%d", opts.Name, params[oldIdx].Version)
-				newName := fmt.Sprintf("%s#%d", opts.Name, params[newIdx].Version)
+				oldName := fmt.Sprintf("%s#%d", result.Name, oldEntry.Version)
+				newName := fmt.Sprintf("%s#%d", result.Name, newEntry.Version)
 				diff := output.Diff(oldName, newName, oldValue, newValue)
 				if diff != "" {
 					_, _ = fmt.Fprintln(r.Stdout)
@@ -337,36 +308,17 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 			}
 		} else {
 			// Show truncated value preview
-			value := lo.FromPtr(param.Value)
+			value := entry.Value
 			if len(value) > 50 {
 				value = value[:50] + "..."
 			}
 			_, _ = fmt.Fprintf(r.Stdout, "%s\n", value)
 		}
 
-		if i < len(params)-1 {
+		if i < len(entries)-1 {
 			_, _ = fmt.Fprintln(r.Stdout)
 		}
 	}
 
 	return nil
-}
-
-// filterDateRange filters parameters to only include versions within the specified date range.
-// Parameters are expected in oldest-first order (as returned by AWS).
-func filterDateRange(params []paramapi.ParameterHistory, since, until *time.Time) []paramapi.ParameterHistory {
-	var filtered []paramapi.ParameterHistory
-	for _, p := range params {
-		if p.LastModifiedDate == nil {
-			continue
-		}
-		if since != nil && p.LastModifiedDate.Before(*since) {
-			continue
-		}
-		if until != nil && p.LastModifiedDate.After(*until) {
-			continue
-		}
-		filtered = append(filtered, p)
-	}
-	return filtered
 }

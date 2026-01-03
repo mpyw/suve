@@ -14,6 +14,7 @@ import (
 	appcli "github.com/mpyw/suve/internal/cli/commands"
 	secretdiff "github.com/mpyw/suve/internal/cli/commands/secret/diff"
 	"github.com/mpyw/suve/internal/cli/diffargs"
+	"github.com/mpyw/suve/internal/usecase/secret"
 	"github.com/mpyw/suve/internal/version/secretversion"
 )
 
@@ -577,9 +578,9 @@ func TestRunnerRun(t *testing.T) {
 			t.Parallel()
 			var stdout, stderr bytes.Buffer
 			r := &secretdiff.Runner{
-				Client: tt.mock,
-				Stdout: &stdout,
-				Stderr: &stderr,
+				UseCase: &secret.DiffUseCase{Client: tt.mock},
+				Stdout:  &stdout,
+				Stderr:  &stderr,
 			}
 			err := r.Run(t.Context(), tt.opts)
 
@@ -610,9 +611,9 @@ func TestRun_IdenticalWarning(t *testing.T) {
 
 	var stdout, stderr bytes.Buffer
 	r := &secretdiff.Runner{
-		Client: mock,
-		Stdout: &stdout,
-		Stderr: &stderr,
+		UseCase: &secret.DiffUseCase{Client: mock},
+		Stdout:  &stdout,
+		Stderr:  &stderr,
 	}
 	opts := secretdiff.Options{
 		Spec1:     &secretversion.Spec{Name: "my-secret", Absolute: secretversion.AbsoluteSpec{}},

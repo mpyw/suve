@@ -16,21 +16,14 @@ import (
 	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/infra"
 	"github.com/mpyw/suve/internal/tagging"
+	"github.com/mpyw/suve/internal/usecase/param"
 )
-
-// Client is the interface for the set command.
-type Client interface {
-	paramapi.GetParameterAPI
-	paramapi.PutParameterAPI
-	paramapi.AddTagsToResourceAPI
-	paramapi.RemoveTagsFromResourceAPI
-}
 
 // Runner executes the set command.
 type Runner struct {
-	Client Client
-	Stdout io.Writer
-	Stderr io.Writer
+	UseCase *param.SetUseCase
+	Stdout  io.Writer
+	Stderr  io.Writer
 }
 
 // Options holds the options for the set command.
@@ -136,6 +129,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		return fmt.Errorf("failed to initialize AWS client: %w", err)
 	}
 
+	useCase := &param.SetUseCase{Client: client}
 	newValue := cmd.Args().Get(1)
 
 	// Check if parameter exists and get current value for diff
@@ -165,9 +159,9 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	}
 
 	r := &Runner{
-		Client: client,
-		Stdout: cmd.Root().Writer,
-		Stderr: cmd.Root().ErrWriter,
+		UseCase: useCase,
+		Stdout:  cmd.Root().Writer,
+		Stderr:  cmd.Root().ErrWriter,
 	}
 	return r.Run(ctx, Options{
 		Name:        name,
@@ -180,31 +174,20 @@ func action(ctx context.Context, cmd *cli.Command) error {
 
 // Run executes the set command.
 func (r *Runner) Run(ctx context.Context, opts Options) error {
-	input := &paramapi.PutParameterInput{
-		Name:      lo.ToPtr(opts.Name),
-		Value:     lo.ToPtr(opts.Value),
-		Type:      paramapi.ParameterType(opts.Type),
-		Overwrite: lo.ToPtr(true),
-	}
-	if opts.Description != "" {
-		input.Description = lo.ToPtr(opts.Description)
-	}
-
-	result, err := r.Client.PutParameter(ctx, input)
+	result, err := r.UseCase.Execute(ctx, param.SetInput{
+		Name:        opts.Name,
+		Value:       opts.Value,
+		Type:        paramapi.ParameterType(opts.Type),
+		Description: opts.Description,
+		TagChange:   opts.TagChange,
+	})
 	if err != nil {
-		return fmt.Errorf("failed to set parameter: %w", err)
-	}
-
-	// Apply tag changes (additive)
-	if opts.TagChange != nil && !opts.TagChange.IsEmpty() {
-		if err := tagging.ApplyParam(ctx, r.Client, opts.Name, opts.TagChange); err != nil {
-			return err
-		}
+		return err
 	}
 
 	_, _ = fmt.Fprintf(r.Stdout, "%s Set parameter %s (version: %d)\n",
 		colors.Success("✓"),
-		opts.Name,
+		result.Name,
 		result.Version,
 	)
 

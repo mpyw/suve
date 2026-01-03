@@ -3,28 +3,16 @@ package runner
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
-	"time"
-
-	"github.com/samber/lo"
 
 	"github.com/mpyw/suve/internal/cli/colors"
-	"github.com/mpyw/suve/internal/staging"
+	stagingusecase "github.com/mpyw/suve/internal/usecase/staging"
 )
 
-// VersionFetcher fetches values for specific versions from AWS.
-type VersionFetcher interface {
-	// FetchVersion fetches the value for a specific version.
-	FetchVersion(ctx context.Context, input string) (value string, versionLabel string, err error)
-}
-
-// ResetRunner executes reset operations using a strategy.
+// ResetRunner executes reset operations using a usecase.
 type ResetRunner struct {
-	Parser  staging.Parser
-	Fetcher VersionFetcher // Optional: required only for version restore operations
-	Store   *staging.Store
+	UseCase *stagingusecase.ResetUseCase
 	Stdout  io.Writer
 	Stderr  io.Writer
 }
@@ -37,92 +25,27 @@ type ResetOptions struct {
 
 // Run executes the reset command.
 func (r *ResetRunner) Run(ctx context.Context, opts ResetOptions) error {
-	if opts.All {
-		return r.runUnstageAll()
-	}
-
-	name, hasVersion, err := r.Parser.ParseSpec(opts.Spec)
+	result, err := r.UseCase.Execute(ctx, stagingusecase.ResetInput{
+		Spec: opts.Spec,
+		All:  opts.All,
+	})
 	if err != nil {
 		return err
 	}
 
-	// If version specified, restore to that version
-	if hasVersion {
-		return r.runRestore(ctx, opts.Spec, name)
+	switch result.Type {
+	case stagingusecase.ResetResultNothingStaged:
+		_, _ = fmt.Fprintf(r.Stdout, "%s\n", colors.Warning(fmt.Sprintf("No %s changes staged.", result.ServiceName)))
+	case stagingusecase.ResetResultUnstagedAll:
+		_, _ = fmt.Fprintf(r.Stdout, "%s Unstaged all %s %ss (%d)\n", colors.Success("✓"), result.ServiceName, result.ItemName, result.Count)
+	case stagingusecase.ResetResultNotStaged:
+		_, _ = fmt.Fprintf(r.Stdout, "%s %s is not staged\n", colors.Warning("!"), result.Name)
+	case stagingusecase.ResetResultUnstaged:
+		_, _ = fmt.Fprintf(r.Stdout, "%s Unstaged %s\n", colors.Success("✓"), result.Name)
+	case stagingusecase.ResetResultRestored:
+		_, _ = fmt.Fprintf(r.Stdout, "%s Restored %s (staged from version %s)\n",
+			colors.Success("✓"), result.Name, result.VersionLabel)
 	}
 
-	// Otherwise, just unstage
-	return r.runUnstage(name)
-}
-
-func (r *ResetRunner) runUnstageAll() error {
-	service := r.Parser.Service()
-	serviceName := r.Parser.ServiceName()
-
-	// Check if there are any staged changes
-	staged, err := r.Store.List(service)
-	if err != nil {
-		return err
-	}
-
-	serviceStaged := staged[service]
-	if len(serviceStaged) == 0 {
-		_, _ = fmt.Fprintf(r.Stdout, "%s\n", colors.Warning(fmt.Sprintf("No %s changes staged.", serviceName)))
-		return nil
-	}
-
-	if err := r.Store.UnstageAll(service); err != nil {
-		return err
-	}
-
-	itemName := r.Parser.ItemName()
-	_, _ = fmt.Fprintf(r.Stdout, "%s Unstaged all %s %ss (%d)\n", colors.Success("✓"), serviceName, itemName, len(serviceStaged))
-	return nil
-}
-
-func (r *ResetRunner) runUnstage(name string) error {
-	service := r.Parser.Service()
-
-	// Check if actually staged
-	_, err := r.Store.Get(service, name)
-	if errors.Is(err, staging.ErrNotStaged) {
-		_, _ = fmt.Fprintf(r.Stdout, "%s %s is not staged\n", colors.Warning("!"), name)
-		return nil
-	}
-	if err != nil {
-		return err
-	}
-
-	if err := r.Store.Unstage(service, name); err != nil {
-		return err
-	}
-
-	_, _ = fmt.Fprintf(r.Stdout, "%s Unstaged %s\n", colors.Success("✓"), name)
-	return nil
-}
-
-func (r *ResetRunner) runRestore(ctx context.Context, spec, name string) error {
-	service := r.Parser.Service()
-
-	// Fetch the specific version (requires Fetcher)
-	if r.Fetcher == nil {
-		return fmt.Errorf("version fetcher required for restore operation")
-	}
-	value, versionLabel, err := r.Fetcher.FetchVersion(ctx, spec)
-	if err != nil {
-		return err
-	}
-
-	// Stage this value
-	if err := r.Store.Stage(service, name, staging.Entry{
-		Operation: staging.OperationUpdate,
-		Value:     lo.ToPtr(value),
-		StagedAt:  time.Now(),
-	}); err != nil {
-		return err
-	}
-
-	_, _ = fmt.Fprintf(r.Stdout, "%s Restored %s (staged from version %s)\n",
-		colors.Success("✓"), name, versionLabel)
 	return nil
 }
