@@ -418,8 +418,6 @@ suve param set [options] <name> <value>
 | `--type` | - | `String` | Parameter type: `String`, `StringList`, or `SecureString` |
 | `--secure` | - | `false` | Shorthand for `--type SecureString` |
 | `--description` | - | - | Parameter description |
-| `--tag` | - | - | Tag in key=value format (can be specified multiple times, additive) |
-| `--untag` | - | - | Tag key to remove (can be specified multiple times) |
 | `--yes` | - | `false` | Skip confirmation prompt (only applies when updating) |
 
 > [!NOTE]
@@ -454,9 +452,6 @@ suve param set --description "Database connection string" --secure /app/config/d
 
 # StringList (comma-separated values)
 suve param set --type StringList /app/config/allowed-hosts "host1,host2,host3"
-
-# Set with tags
-suve param set --tag env=prod --tag team=platform /app/config/key "value"
 
 # Skip confirmation
 suve param set --yes /app/config/log-level "debug"
@@ -509,6 +504,70 @@ suve param delete --yes /app/config/old-param
 
 > [!CAUTION]
 > Deletion is immediate and permanent. There is no recovery option.
+
+---
+
+## suve param tag
+
+Add or update tags on an existing parameter.
+
+```
+suve param tag <name> <key=value>...
+```
+
+**Arguments:**
+
+| Argument | Description |
+|----------|-------------|
+| `name` | Parameter name |
+| `key=value` | Tag in key=value format (one or more) |
+
+**Examples:**
+
+```ShellSession
+user@host:~$ suve param tag /app/config/database-url env=prod team=platform
+✓ Tagged parameter /app/config/database-url (2 tag(s))
+```
+
+```bash
+# Add single tag
+suve param tag /app/config/key env=prod
+
+# Add multiple tags
+suve param tag /app/config/key env=prod team=platform
+```
+
+---
+
+## suve param untag
+
+Remove tags from an existing parameter.
+
+```
+suve param untag <name> <key>...
+```
+
+**Arguments:**
+
+| Argument | Description |
+|----------|-------------|
+| `name` | Parameter name |
+| `key` | Tag key to remove (one or more) |
+
+**Examples:**
+
+```ShellSession
+user@host:~$ suve param untag /app/config/database-url deprecated old-tag
+✓ Untagged parameter /app/config/database-url (2 key(s))
+```
+
+```bash
+# Remove single tag
+suve param untag /app/config/key deprecated
+
+# Remove multiple tags
+suve param untag /app/config/key deprecated old-tag
+```
 
 ---
 

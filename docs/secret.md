@@ -427,7 +427,6 @@ suve secret create [options] <name> <value>
 | Option | Alias | Default | Description |
 |--------|-------|---------|-------------|
 | `--description` | - | - | Description for the secret |
-| `--tag` | - | - | Tag in key=value format (can be specified multiple times) |
 
 **Examples:**
 
@@ -468,8 +467,6 @@ suve secret update [options] <name> <value>
 | Option | Alias | Default | Description |
 |--------|-------|---------|-------------|
 | `--description` | - | - | Update secret description |
-| `--tag` | - | - | Tag in key=value format (can be specified multiple times, additive) |
-| `--untag` | - | - | Tag key to remove (can be specified multiple times) |
 | `--yes` | - | `false` | Skip confirmation prompt |
 
 **Examples:**
@@ -487,9 +484,6 @@ user@host:~$ suve secret update my-database-credentials '{"username":"admin","pa
 ```
 
 ```bash
-# Update with tags
-suve secret update --tag env=prod my-api-key "new-key-value"
-
 # Update without confirmation (skips diff display)
 suve secret update --yes my-api-key "new-key-value"
 ```
@@ -599,6 +593,70 @@ Restored secret my-accidentally-deleted-secret
 > - Only works for secrets deleted without `--force`
 > - Must be done before the scheduled deletion date
 > - Cannot restore secrets that have been permanently deleted
+
+---
+
+## suve secret tag
+
+Add or update tags on an existing secret.
+
+```
+suve secret tag <name> <key=value>...
+```
+
+**Arguments:**
+
+| Argument | Description |
+|----------|-------------|
+| `name` | Secret name |
+| `key=value` | Tag in key=value format (one or more) |
+
+**Examples:**
+
+```ShellSession
+user@host:~$ suve secret tag my-database-credentials env=prod team=platform
+✓ Tagged secret my-database-credentials (2 tag(s))
+```
+
+```bash
+# Add single tag
+suve secret tag my-api-key env=prod
+
+# Add multiple tags
+suve secret tag my-api-key env=prod team=platform
+```
+
+---
+
+## suve secret untag
+
+Remove tags from an existing secret.
+
+```
+suve secret untag <name> <key>...
+```
+
+**Arguments:**
+
+| Argument | Description |
+|----------|-------------|
+| `name` | Secret name |
+| `key` | Tag key to remove (one or more) |
+
+**Examples:**
+
+```ShellSession
+user@host:~$ suve secret untag my-database-credentials deprecated old-tag
+✓ Untagged secret my-database-credentials (2 key(s))
+```
+
+```bash
+# Remove single tag
+suve secret untag my-api-key deprecated
+
+# Remove multiple tags
+suve secret untag my-api-key deprecated old-tag
+```
 
 ---
 

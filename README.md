@@ -300,8 +300,10 @@ where ~SHIFT = ~ | ~N  (repeatable, cumulative)
 | [`suve param log`](docs/param.md#log) | `--number=<N>` (`-n`)<br>`--patch` (`-p`)<br>`--parse-json` (`-j`)<br>`--oneline`<br>`--reverse`<br>`--since=<DATE>`<br>`--until=<DATE>`<br>`--no-pager`<br>`--output=<FORMAT>` | Show version history |
 | [`suve param diff`](docs/param.md#diff) | `--parse-json` (`-j`)<br>`--no-pager`<br>`--output=<FORMAT>` | Compare versions |
 | [`suve param list`](docs/param.md#list) | `--recursive` (`-R`)<br>`--filter=<REGEX>`<br>`--show`<br>`--output=<FORMAT>` | List parameters |
-| [`suve param set`](docs/param.md#set) | `--type=<TYPE>`<br>`--secure`<br>`--description=<TEXT>`<br>`--tag=<KEY>=<VALUE> --tag=...`<br>`--untag=<KEY> --untag=...`<br>`--yes` | Create or update parameter |
+| [`suve param set`](docs/param.md#set) | `--type=<TYPE>`<br>`--secure`<br>`--description=<TEXT>`<br>`--yes` | Create or update parameter |
 | [`suve param delete`](docs/param.md#delete) | `--yes` | Delete parameter |
+| [`suve param tag`](docs/param.md#tag) | `<KEY>=<VALUE>...` | Add or update tags |
+| [`suve param untag`](docs/param.md#untag) | `<KEY>...` | Remove tags |
 
 **Staging commands** (under `suve stage param`):
 
@@ -323,10 +325,12 @@ where ~SHIFT = ~ | ~N  (repeatable, cumulative)
 | [`suve secret log`](docs/secret.md#log) | `--number=<N>` (`-n`)<br>`--patch` (`-p`)<br>`--parse-json` (`-j`)<br>`--oneline`<br>`--reverse`<br>`--since=<DATE>`<br>`--until=<DATE>`<br>`--no-pager`<br>`--output=<FORMAT>` | Show version history |
 | [`suve secret diff`](docs/secret.md#diff) | `--parse-json` (`-j`)<br>`--no-pager`<br>`--output=<FORMAT>` | Compare versions |
 | [`suve secret list`](docs/secret.md#list) | `--filter=<REGEX>`<br>`--show`<br>`--output=<FORMAT>` | List secrets |
-| [`suve secret create`](docs/secret.md#create) | `--description=<TEXT>`<br>`--tag=<KEY>=<VALUE> --tag=...` | Create new secret |
-| [`suve secret update`](docs/secret.md#update) | `--description=<TEXT>`<br>`--tag=<KEY>=<VALUE> --tag=...`<br>`--untag=<KEY> --untag=...`<br>`--yes` | Update existing secret |
+| [`suve secret create`](docs/secret.md#create) | `--description=<TEXT>` | Create new secret |
+| [`suve secret update`](docs/secret.md#update) | `--description=<TEXT>`<br>`--yes` | Update existing secret |
 | [`suve secret delete`](docs/secret.md#delete) | `--force`<br>`--recovery-window=<DAYS>`<br>`--yes` | Delete secret |
 | [`suve secret restore`](docs/secret.md#restore) | | Restore deleted secret |
+| [`suve secret tag`](docs/secret.md#tag) | `<KEY>=<VALUE>...` | Add or update tags |
+| [`suve secret untag`](docs/secret.md#untag) | `<KEY>...` | Remove tags |
 
 **Staging commands** (under `suve stage secret`):
 
