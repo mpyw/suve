@@ -85,17 +85,26 @@ func (u *TagUseCase) Execute(ctx context.Context, input TagInput) (*TagOutput, e
 			return &TagOutput{Name: name}, nil
 		}
 
-		// Fetch base time from AWS for conflict detection
-		result, err := u.Strategy.FetchCurrentValue(ctx, name)
-		if err != nil {
-			return nil, err
-		}
-
 		tagEntry = staging.TagEntry{
 			StagedAt: time.Now(),
 		}
-		if !result.LastModified.IsZero() {
-			tagEntry.BaseModifiedAt = &result.LastModified
+
+		// Check if there's a staged entry for CREATE (new resource)
+		existingEntry, err := u.Store.GetEntry(service, name)
+		if err != nil && !errors.Is(err, staging.ErrNotStaged) {
+			return nil, err
+		}
+
+		// Only fetch from AWS if the resource exists or is being updated (not created)
+		if existingEntry == nil || existingEntry.Operation != staging.OperationCreate {
+			// Fetch base time from AWS for conflict detection
+			result, err := u.Strategy.FetchCurrentValue(ctx, name)
+			if err != nil {
+				return nil, err
+			}
+			if !result.LastModified.IsZero() {
+				tagEntry.BaseModifiedAt = &result.LastModified
+			}
 		}
 
 		if len(input.AddTags) > 0 {

@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -333,4 +334,39 @@ func TestTagUseCase_Execute_AddAndRemoveSameKey(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "prod", tagEntry.Add["env"])
 	assert.False(t, tagEntry.Remove.Contains("env"))
+}
+
+func TestTagUseCase_Execute_StagedForCreate_NoFetch(t *testing.T) {
+	t.Parallel()
+
+	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+
+	// First, stage an entry for CREATE (new resource that doesn't exist in AWS)
+	require.NoError(t, store.StageEntry(staging.ServiceParam, "/app/new-param", staging.Entry{
+		Operation: staging.OperationCreate,
+		Value:     lo.ToPtr("new-value"),
+		StagedAt:  time.Now(),
+	}))
+
+	// Create strategy that would fail if FetchCurrentValue is called
+	strategy := newMockTagStrategy()
+	strategy.fetchErr = errors.New("should not be called - resource doesn't exist")
+
+	uc := &usecasestaging.TagUseCase{
+		Strategy: strategy,
+		Store:    store,
+	}
+
+	// Tag the staged CREATE entry - should NOT call FetchCurrentValue
+	_, err := uc.Execute(context.Background(), usecasestaging.TagInput{
+		Name:    "/app/new-param",
+		AddTags: map[string]string{"env": "prod"},
+	})
+	require.NoError(t, err)
+
+	// Verify tag was staged
+	tagEntry, err := store.GetTag(staging.ServiceParam, "/app/new-param")
+	require.NoError(t, err)
+	assert.Equal(t, "prod", tagEntry.Add["env"])
+	assert.Nil(t, tagEntry.BaseModifiedAt) // No base time since resource doesn't exist
 }
