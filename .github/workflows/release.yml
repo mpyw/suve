@@ -195,11 +195,6 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
-
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
@@ -210,12 +205,64 @@ jobs:
       - name: List dist contents
         run: find dist -type f | sort
 
-      - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v6
-        with:
-          distribution: goreleaser
-          version: latest
-          args: release --clean --skip=build
+      - name: Create archives
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          mkdir -p releases
+
+          # Process each build directory
+          for dir in dist/*/; do
+            build_name=$(basename "$dir")
+
+            # Parse build name to get binary, os, arch
+            # Format: binary_os_arch or binary-variant_os_arch
+            if [[ "$build_name" == suve-cli* ]]; then
+              binary="suve-cli"
+              archive_prefix="suve-cli_${VERSION}"
+            elif [[ "$build_name" == suve-gui* ]]; then
+              binary="suve-gui"
+              archive_prefix="suve-gui_${VERSION}"
+            else
+              binary="suve"
+              archive_prefix="suve_${VERSION}"
+            fi
+
+            # Extract os and arch from directory name
+            os_arch="${build_name#*_}"  # Remove binary prefix
+
+            # Create staging directory
+            staging="staging_${build_name}"
+            mkdir -p "$staging"
+
+            # Copy binary
+            if [[ "$os_arch" == *"windows"* ]]; then
+              cp "$dir"*.exe "$staging/" 2>/dev/null || cp "$dir"* "$staging/"
+              archive_name="${archive_prefix}_${os_arch}.zip"
+              cp README.md LICENSE "$staging/"
+              (cd "$staging" && zip -r "../releases/${archive_name}" .)
+            else
+              cp "$dir"* "$staging/"
+              archive_name="${archive_prefix}_${os_arch}.tar.gz"
+              cp README.md LICENSE "$staging/"
+              tar -czvf "releases/${archive_name}" -C "$staging" .
+            fi
+
+            rm -rf "$staging"
+          done
+
+          ls -la releases/
+
+      - name: Generate checksums
+        run: |
+          cd releases
+          sha256sum *.tar.gz *.zip > checksums.txt
+          cat checksums.txt
+
+      - name: Create GitHub Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          gh release create ${{ github.ref_name }} \
+            --title "${{ github.ref_name }}" \
+            --generate-notes \
+            releases/*
