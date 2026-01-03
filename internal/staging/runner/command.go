@@ -497,7 +497,7 @@ EXAMPLES:
 			parser := cfg.ParserFactory()
 
 			// Check if version spec is provided (need AWS client for FetchVersion)
-			var fetcher VersionFetcher
+			var fetcher staging.ResetStrategy
 			if !resetAll && opts.Spec != "" {
 				_, hasVersion, err := parser.ParseSpec(opts.Spec)
 				if err != nil {
@@ -513,11 +513,13 @@ EXAMPLES:
 			}
 
 			r := &ResetRunner{
-				Parser:  parser,
-				Fetcher: fetcher,
-				Store:   store,
-				Stdout:  cmd.Root().Writer,
-				Stderr:  cmd.Root().ErrWriter,
+				UseCase: &stagingusecase.ResetUseCase{
+					Parser:  parser,
+					Fetcher: fetcher,
+					Store:   store,
+				},
+				Stdout: cmd.Root().Writer,
+				Stderr: cmd.Root().ErrWriter,
 			}
 
 			return r.Run(ctx, opts)

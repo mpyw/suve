@@ -1186,8 +1186,10 @@ func TestResetRunner_Run(t *testing.T) {
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.ResetRunner{
-			Parser: &fullMockStrategy{service: staging.ServiceParam},
-			Store:  store,
+			UseCase: &stagingusecase.ResetUseCase{
+				Parser: &fullMockStrategy{service: staging.ServiceParam},
+				Store:  store,
+			},
 			Stdout: &stdout,
 			Stderr: &stderr,
 		}
@@ -1210,8 +1212,10 @@ func TestResetRunner_Run(t *testing.T) {
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.ResetRunner{
-			Parser: &fullMockStrategy{service: staging.ServiceParam},
-			Store:  store,
+			UseCase: &stagingusecase.ResetUseCase{
+				Parser: &fullMockStrategy{service: staging.ServiceParam},
+				Store:  store,
+			},
 			Stdout: &stdout,
 			Stderr: &stderr,
 		}
@@ -1234,8 +1238,10 @@ func TestResetRunner_Run(t *testing.T) {
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.ResetRunner{
-			Parser: &fullMockStrategy{service: staging.ServiceParam},
-			Store:  store,
+			UseCase: &stagingusecase.ResetUseCase{
+				Parser: &fullMockStrategy{service: staging.ServiceParam},
+				Store:  store,
+			},
 			Stdout: &stdout,
 			Stderr: &stderr,
 		}
@@ -1256,8 +1262,10 @@ func TestResetRunner_Run(t *testing.T) {
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.ResetRunner{
-			Parser: &fullMockStrategy{service: staging.ServiceParam},
-			Store:  store,
+			UseCase: &stagingusecase.ResetUseCase{
+				Parser: &fullMockStrategy{service: staging.ServiceParam},
+				Store:  store,
+			},
 			Stdout: &stdout,
 			Stderr: &stderr,
 		}
@@ -1281,11 +1289,13 @@ func TestResetRunner_Run(t *testing.T) {
 			fetchVersionLbl:  "#1",
 		}
 		r := &runner.ResetRunner{
-			Parser:  fetcher,
-			Fetcher: fetcher,
-			Store:   store,
-			Stdout:  &stdout,
-			Stderr:  &stderr,
+			UseCase: &stagingusecase.ResetUseCase{
+				Parser:  fetcher,
+				Fetcher: fetcher,
+				Store:   store,
+			},
+			Stdout: &stdout,
+			Stderr: &stderr,
 		}
 
 		err := r.Run(context.Background(), runner.ResetOptions{Spec: "/app/config#1"})
@@ -1306,16 +1316,18 @@ func TestResetRunner_Run(t *testing.T) {
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.ResetRunner{
-			Parser:  &fullMockStrategy{service: staging.ServiceParam, parseSpecVersion: true},
-			Fetcher: nil, // No fetcher
-			Store:   store,
-			Stdout:  &stdout,
-			Stderr:  &stderr,
+			UseCase: &stagingusecase.ResetUseCase{
+				Parser:  &fullMockStrategy{service: staging.ServiceParam, parseSpecVersion: true},
+				Fetcher: nil, // No fetcher
+				Store:   store,
+			},
+			Stdout: &stdout,
+			Stderr: &stderr,
 		}
 
 		err := r.Run(context.Background(), runner.ResetOptions{Spec: "/app/config#1"})
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "version fetcher required")
+		assert.Contains(t, err.Error(), "reset strategy required")
 	})
 
 	t.Run("restore version - fetch error", func(t *testing.T) {
@@ -1331,11 +1343,13 @@ func TestResetRunner_Run(t *testing.T) {
 			fetchVersionErr:  errors.New("version not found"),
 		}
 		r := &runner.ResetRunner{
-			Parser:  fetcher,
-			Fetcher: fetcher,
-			Store:   store,
-			Stdout:  &stdout,
-			Stderr:  &stderr,
+			UseCase: &stagingusecase.ResetUseCase{
+				Parser:  fetcher,
+				Fetcher: fetcher,
+				Store:   store,
+			},
+			Stdout: &stdout,
+			Stderr: &stderr,
 		}
 
 		err := r.Run(context.Background(), runner.ResetOptions{Spec: "/app/config#999"})
@@ -1351,11 +1365,13 @@ func TestResetRunner_Run(t *testing.T) {
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.ResetRunner{
-			Parser: &fullMockStrategy{
-				service:      staging.ServiceParam,
-				parseSpecErr: errors.New("invalid spec"),
+			UseCase: &stagingusecase.ResetUseCase{
+				Parser: &fullMockStrategy{
+					service:      staging.ServiceParam,
+					parseSpecErr: errors.New("invalid spec"),
+				},
+				Store: store,
 			},
-			Store:  store,
 			Stdout: &stdout,
 			Stderr: &stderr,
 		}
