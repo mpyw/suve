@@ -9,8 +9,6 @@
 //
 // Environment variables:
 //   - SUVE_LOCALSTACK_EXTERNAL_PORT: Custom localstack port (default: 4566)
-//
-// Note: Secrets Manager tests require localstack Pro for full functionality.
 package e2e
 
 import (

@@ -8,9 +8,10 @@ before:
     - go mod tidy
 
 builds:
-  - id: suve
-    main: ./cmd/suve
-    binary: suve
+  # suve-cli: CLI only, no CGO, all platforms
+  - id: suve-cli
+    main: ./cmd/suve-cli
+    binary: suve-cli
     env:
       - CGO_ENABLED=0
     goos:
@@ -24,14 +25,116 @@ builds:
       - -s -w
       - -X github.com/mpyw/suve/internal/cli/commands.Version={{.Version}}
 
+  # suve-gui: GUI only, CGO required, darwin/linux only
+  - id: suve-gui-darwin
+    main: ./cmd/suve-gui
+    binary: suve-gui
+    env:
+      - CGO_ENABLED=1
+    goos:
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    tags:
+      - production
+    ldflags:
+      - -s -w
+
+  - id: suve-gui-linux
+    main: ./cmd/suve-gui
+    binary: suve-gui
+    env:
+      - CGO_ENABLED=1
+    goos:
+      - linux
+    goarch:
+      - amd64
+      - arm64
+    tags:
+      - production
+    ldflags:
+      - -s -w
+
+  # suve: integrated CLI + GUI
+  - id: suve-darwin
+    main: ./cmd/suve
+    binary: suve
+    env:
+      - CGO_ENABLED=1
+    goos:
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    tags:
+      - production
+    ldflags:
+      - -s -w
+      - -X github.com/mpyw/suve/internal/cli/commands.Version={{.Version}}
+
+  - id: suve-linux
+    main: ./cmd/suve
+    binary: suve
+    env:
+      - CGO_ENABLED=1
+    goos:
+      - linux
+    goarch:
+      - amd64
+      - arm64
+    tags:
+      - production
+    ldflags:
+      - -s -w
+      - -X github.com/mpyw/suve/internal/cli/commands.Version={{.Version}}
+
+  # suve for Windows: CLI only (no GUI, stub used)
+  - id: suve-windows
+    main: ./cmd/suve
+    binary: suve
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+      - -X github.com/mpyw/suve/internal/cli/commands.Version={{.Version}}
+
 archives:
-  - id: default
+  - id: darwin
+    builds:
+      - suve-cli
+      - suve-gui-darwin
+      - suve-darwin
     formats:
       - tar.gz
-    format_overrides:
-      - goos: windows
-        formats:
-          - zip
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - README.md
+      - LICENSE
+
+  - id: linux
+    builds:
+      - suve-cli
+      - suve-gui-linux
+      - suve-linux
+    formats:
+      - tar.gz
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - README.md
+      - LICENSE
+
+  - id: windows
+    builds:
+      - suve-cli
+      - suve-windows
+    formats:
+      - zip
     name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
     files:
       - README.md
@@ -62,8 +165,11 @@ brews:
     license: "MIT"
     install: |
       bin.install "suve"
+      bin.install "suve-cli"
+      bin.install "suve-gui"
     test: |
       system "#{bin}/suve", "--version"
+      system "#{bin}/suve-cli", "--version"
 
 release:
   github:

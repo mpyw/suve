@@ -1,15 +1,15 @@
-.PHONY: build test lint e2e e2e-ssm e2e-sm up down clean coverage coverage-e2e coverage-all
+.PHONY: build test lint e2e up down clean coverage coverage-e2e coverage-all
 
 SUVE_LOCALSTACK_EXTERNAL_PORT ?= 4566
-COVERPKG = $(shell go list ./... | grep -v testutil | grep -v /e2e | tr '\n' ',')
+COVERPKG = $(shell go list ./... | grep -v testutil | grep -v /e2e | grep -v internal/gui | grep -v /cmd/ | tr '\n' ',')
 
 # Build
 build:
 	go build -o bin/suve ./cmd/suve
 
-# Unit tests
+# Unit tests (exclude internal/gui and cmd/)
 test:
-	go test ./...
+	go test $(shell go list ./... | grep -v internal/gui | grep -v /cmd/)
 
 # Lint
 lint:
@@ -26,25 +26,18 @@ up:
 down:
 	docker compose down
 
-# E2E tests (SSM only, SM requires localstack Pro)
-e2e: e2e-ssm
-
-# E2E tests for SSM only
-e2e-ssm: up
-	SUVE_LOCALSTACK_EXTERNAL_PORT=$(SUVE_LOCALSTACK_EXTERNAL_PORT) go test -tags=e2e -v -run TestSSM ./e2e/...
-
-# E2E tests for SM only (requires localstack Pro)
-e2e-sm: up
-	SUVE_LOCALSTACK_EXTERNAL_PORT=$(SUVE_LOCALSTACK_EXTERNAL_PORT) go test -tags=e2e -v -run TestSM ./e2e/...
+# E2E tests (SSM + SM)
+e2e: up
+	SUVE_LOCALSTACK_EXTERNAL_PORT=$(SUVE_LOCALSTACK_EXTERNAL_PORT) go test -tags=e2e -v ./e2e/...
 
 # Clean
 clean:
 	rm -rf bin/ *.out
 	docker compose down -v 2>/dev/null || true
 
-# Unit test coverage (exclude testutil and e2e)
+# Unit test coverage (exclude testutil, e2e, internal/gui, and cmd/)
 coverage:
-	go test -coverprofile=coverage.out -coverpkg=$(COVERPKG) ./...
+	go test -coverprofile=coverage.out -coverpkg=$(COVERPKG) $(shell go list ./... | grep -v internal/gui | grep -v /cmd/)
 	go tool cover -func=coverage.out | grep total
 
 # E2E test coverage (requires localstack running)
@@ -55,7 +48,7 @@ coverage-e2e: up
 # Combined coverage (unit + E2E)
 coverage-all: up
 	@echo "Running unit tests with coverage..."
-	go test -coverprofile=coverage-unit.out -covermode=atomic -coverpkg=$(COVERPKG) ./...
+	go test -coverprofile=coverage-unit.out -covermode=atomic -coverpkg=$(COVERPKG) $(shell go list ./... | grep -v internal/gui | grep -v /cmd/)
 	@echo "Running E2E tests with coverage..."
 	SUVE_LOCALSTACK_EXTERNAL_PORT=$(SUVE_LOCALSTACK_EXTERNAL_PORT) go test -tags=e2e -coverprofile=coverage-e2e.out -covermode=atomic -coverpkg=$(COVERPKG) ./e2e/...
 	@echo "Merging coverage profiles..."

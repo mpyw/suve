@@ -18,6 +18,7 @@ A **Git-like CLI** for AWS Parameter Store and Secrets Manager. Familiar command
 - **Version navigation**: `#VERSION`, `~SHIFT`, `:LABEL` syntax
 - **Colored diff output**: Easy-to-read unified diff format
 - **Both services**: SSM Parameter Store and Secrets Manager
+- **GUI mode**: Desktop application via `--gui` flag (built with [Wails](https://wails.io/))
 
 ## Installation
 
@@ -27,20 +28,35 @@ A **Git-like CLI** for AWS Parameter Store and Secrets Manager. Familiar command
 brew install mpyw/tap/suve
 ```
 
+This installs three binaries:
+
+| Binary | Description |
+|--------|-------------|
+| `suve` | CLI + GUI integrated (use `suve --gui` to launch GUI) |
+| `suve-cli` | CLI only (lightweight, no GUI dependencies) |
+| `suve-gui` | GUI only (standalone desktop app) |
+
 ### Using [`go install`](https://pkg.go.dev/cmd/go#hdr-Compile_and_install_packages_and_dependencies)
 
 ```bash
-go install github.com/mpyw/suve/cmd/suve@latest
+# CLI only (recommended)
+go install github.com/mpyw/suve/cmd/suve-cli@latest
+
+# CLI + GUI integrated (requires CGO)
+CGO_ENABLED=1 go install -tags production github.com/mpyw/suve/cmd/suve@latest
 ```
+
+> [!NOTE]
+> The `--gui` flag in `suve` requires building with `-tags production` and CGO. For CLI-only usage, `suve-cli` is recommended as it has no CGO dependencies.
 
 ### Using [`go tool`](https://pkg.go.dev/cmd/go#hdr-Run_specified_go_tool) (Go 1.24+)
 
 ```bash
 # Add to go.mod as a tool dependency
-go get -tool github.com/mpyw/suve/cmd/suve@latest
+go get -tool github.com/mpyw/suve/cmd/suve-cli@latest
 
 # Run via go tool
-go tool suve param show /my/param
+go tool suve-cli param show /my/param
 ```
 
 > [!TIP]
@@ -400,8 +416,11 @@ make test
 # Run linter
 make lint
 
-# Build CLI
+# Build CLI (without GUI)
 make build
+
+# Build with GUI support
+go build -tags production -o bin/suve ./cmd/suve
 
 # Run E2E tests (requires Docker)
 make e2e
@@ -409,6 +428,35 @@ make e2e
 # Coverage (unit + E2E combined)
 make coverage-all
 ```
+
+### Local Development with Localstack
+
+To test against [localstack](https://localstack.cloud/) instead of real AWS:
+
+```bash
+# Start localstack
+SUVE_LOCALSTACK_EXTERNAL_PORT=4566 docker compose up -d
+
+# Run commands with localstack
+AWS_ENDPOINT_URL=http://127.0.0.1:4566 \
+AWS_ACCESS_KEY_ID=dummy \
+AWS_SECRET_ACCESS_KEY=dummy \
+AWS_DEFAULT_REGION=us-east-1 \
+suve param ls
+
+# GUI with localstack
+AWS_ENDPOINT_URL=http://127.0.0.1:4566 \
+AWS_ACCESS_KEY_ID=dummy \
+AWS_SECRET_ACCESS_KEY=dummy \
+AWS_DEFAULT_REGION=us-east-1 \
+suve --gui
+
+# Stop localstack
+docker compose down
+```
+
+> [!IMPORTANT]
+> Dummy credentials (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`) are required to prevent the SDK from attempting IAM role credential fetching.
 
 ## License
 
