@@ -212,10 +212,14 @@ func TestEditUseCase_Execute_WithStagedCreate(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	// BaseModifiedAt should remain nil for create operations
 	entry, err := store.Get(staging.ServiceParam, "/app/new")
 	require.NoError(t, err)
+	// Operation should remain Create (not become Update)
+	assert.Equal(t, staging.OperationCreate, entry.Operation)
+	// BaseModifiedAt should remain nil for create operations
 	assert.Nil(t, entry.BaseModifiedAt)
+	// Value should be updated
+	assert.Equal(t, "updated", lo.FromPtr(entry.Value))
 }
 
 func TestEditUseCase_Execute_ZeroLastModified(t *testing.T) {
@@ -318,4 +322,93 @@ func TestEditUseCase_Execute_WithTags(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "prod", entry.Tags["env"])
 	assert.Equal(t, "backend", entry.Tags["team"])
+}
+
+func TestEditUseCase_Execute_ConvertsDeleteToUpdate(t *testing.T) {
+	t.Parallel()
+
+	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	// Pre-stage a DELETE operation
+	require.NoError(t, store.Stage(staging.ServiceParam, "/app/deleted", staging.Entry{
+		Operation: staging.OperationDelete,
+		StagedAt:  time.Now(),
+	}))
+
+	uc := &usecasestaging.EditUseCase{
+		Strategy: newMockEditStrategy(),
+		Store:    store,
+	}
+
+	// Editing a staged DELETE should convert it to UPDATE
+	_, err := uc.Execute(context.Background(), usecasestaging.EditInput{
+		Name:  "/app/deleted",
+		Value: "new-value",
+	})
+	require.NoError(t, err)
+
+	// Verify the operation changed to UPDATE
+	entry, err := store.Get(staging.ServiceParam, "/app/deleted")
+	require.NoError(t, err)
+	assert.Equal(t, staging.OperationUpdate, entry.Operation)
+	assert.Equal(t, "new-value", lo.FromPtr(entry.Value))
+}
+
+func TestEditUseCase_Baseline_FetchesFromAWSWhenDeleteStaged(t *testing.T) {
+	t.Parallel()
+
+	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	// Pre-stage a DELETE operation
+	require.NoError(t, store.Stage(staging.ServiceParam, "/app/deleted", staging.Entry{
+		Operation: staging.OperationDelete,
+		StagedAt:  time.Now(),
+	}))
+
+	strategy := newMockEditStrategy()
+	strategy.fetchResult = &staging.EditFetchResult{
+		Value:        "aws-current-value",
+		LastModified: time.Now(),
+	}
+
+	uc := &usecasestaging.EditUseCase{
+		Strategy: strategy,
+		Store:    store,
+	}
+
+	// When DELETE is staged, Baseline should fetch from AWS
+	output, err := uc.Baseline(context.Background(), usecasestaging.BaselineInput{Name: "/app/deleted"})
+	require.NoError(t, err)
+	assert.Equal(t, "aws-current-value", output.Value)
+}
+
+func TestEditUseCase_Execute_PreservesUpdateOperation(t *testing.T) {
+	t.Parallel()
+
+	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	baseTime := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
+
+	// Pre-stage an UPDATE operation
+	require.NoError(t, store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
+		Operation:      staging.OperationUpdate,
+		Value:          lo.ToPtr("old-value"),
+		StagedAt:       time.Now(),
+		BaseModifiedAt: &baseTime,
+	}))
+
+	uc := &usecasestaging.EditUseCase{
+		Strategy: newMockEditStrategy(),
+		Store:    store,
+	}
+
+	// Re-edit should preserve UPDATE operation
+	_, err := uc.Execute(context.Background(), usecasestaging.EditInput{
+		Name:  "/app/config",
+		Value: "newer-value",
+	})
+	require.NoError(t, err)
+
+	entry, err := store.Get(staging.ServiceParam, "/app/config")
+	require.NoError(t, err)
+	assert.Equal(t, staging.OperationUpdate, entry.Operation)
+	assert.Equal(t, "newer-value", lo.FromPtr(entry.Value))
+	assert.Equal(t, baseTime, *entry.BaseModifiedAt)
 }

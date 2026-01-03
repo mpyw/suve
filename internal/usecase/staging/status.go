@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/mpyw/suve/internal/maputil"
 	"github.com/mpyw/suve/internal/staging"
 )
 
@@ -22,6 +23,7 @@ type StatusEntry struct {
 	Value             *string
 	Description       *string
 	Tags              map[string]string
+	UntagKeys         maputil.Set[string]
 	DeleteOptions     *staging.DeleteOptions
 	StagedAt          time.Time
 	ShowDeleteOptions bool
@@ -88,6 +90,7 @@ func toStatusEntry(name string, entry staging.Entry, showDeleteOptions bool) Sta
 		Value:             entry.Value,
 		Description:       entry.Description,
 		Tags:              entry.Tags,
+		UntagKeys:         entry.UntagKeys,
 		DeleteOptions:     entry.DeleteOptions,
 		StagedAt:          entry.StagedAt,
 		ShowDeleteOptions: showDeleteOptions,
