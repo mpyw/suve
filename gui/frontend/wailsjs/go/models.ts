@@ -32,6 +32,7 @@ export namespace main {
 	}
 	export class ParamListEntry {
 	    name: string;
+	    type: string;
 	    value?: string;
 	
 	    static createFrom(source: any = {}) {
@@ -41,11 +42,13 @@ export namespace main {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.name = source["name"];
+	        this.type = source["type"];
 	        this.value = source["value"];
 	    }
 	}
 	export class ParamListResult {
 	    entries: ParamListEntry[];
+	    nextToken?: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new ParamListResult(source);
@@ -54,6 +57,7 @@ export namespace main {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.entries = this.convertValues(source["entries"], ParamListEntry);
+	        this.nextToken = source["nextToken"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -142,12 +146,28 @@ export namespace main {
 	        this.isCreated = source["isCreated"];
 	    }
 	}
+	export class ParamShowTag {
+	    key: string;
+	    value: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ParamShowTag(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.key = source["key"];
+	        this.value = source["value"];
+	    }
+	}
 	export class ParamShowResult {
 	    name: string;
 	    value: string;
 	    version: number;
 	    type: string;
+	    description?: string;
 	    lastModified?: string;
+	    tags: ParamShowTag[];
 	
 	    static createFrom(source: any = {}) {
 	        return new ParamShowResult(source);
@@ -159,9 +179,30 @@ export namespace main {
 	        this.value = source["value"];
 	        this.version = source["version"];
 	        this.type = source["type"];
+	        this.description = source["description"];
 	        this.lastModified = source["lastModified"];
+	        this.tags = this.convertValues(source["tags"], ParamShowTag);
 	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
+	
 	export class SecretCreateResult {
 	    name: string;
 	    versionId: string;
@@ -232,6 +273,7 @@ export namespace main {
 	}
 	export class SecretListResult {
 	    entries: SecretListEntry[];
+	    nextToken?: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new SecretListResult(source);
@@ -240,6 +282,7 @@ export namespace main {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.entries = this.convertValues(source["entries"], SecretListEntry);
+	        this.nextToken = source["nextToken"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -322,13 +365,29 @@ export namespace main {
 	        this.arn = source["arn"];
 	    }
 	}
+	export class SecretShowTag {
+	    key: string;
+	    value: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new SecretShowTag(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.key = source["key"];
+	        this.value = source["value"];
+	    }
+	}
 	export class SecretShowResult {
 	    name: string;
 	    arn: string;
 	    versionId: string;
 	    versionStage: string[];
 	    value: string;
+	    description?: string;
 	    createdDate?: string;
+	    tags: SecretShowTag[];
 	
 	    static createFrom(source: any = {}) {
 	        return new SecretShowResult(source);
@@ -341,9 +400,30 @@ export namespace main {
 	        this.versionId = source["versionId"];
 	        this.versionStage = source["versionStage"];
 	        this.value = source["value"];
+	        this.description = source["description"];
 	        this.createdDate = source["createdDate"];
+	        this.tags = this.convertValues(source["tags"], SecretShowTag);
 	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
+	
 	export class SecretUpdateResult {
 	    name: string;
 	    versionId: string;

@@ -6,7 +6,7 @@ export function ParamDelete(arg1:string):Promise<main.ParamDeleteResult>;
 
 export function ParamDiff(arg1:string,arg2:string):Promise<main.ParamDiffResult>;
 
-export function ParamList(arg1:string,arg2:boolean,arg3:boolean,arg4:string):Promise<main.ParamListResult>;
+export function ParamList(arg1:string,arg2:boolean,arg3:boolean,arg4:string,arg5:number,arg6:string):Promise<main.ParamListResult>;
 
 export function ParamLog(arg1:string,arg2:number):Promise<main.ParamLogResult>;
 
@@ -20,7 +20,7 @@ export function SecretDelete(arg1:string,arg2:boolean):Promise<main.SecretDelete
 
 export function SecretDiff(arg1:string,arg2:string):Promise<main.SecretDiffResult>;
 
-export function SecretList(arg1:string,arg2:boolean,arg3:string):Promise<main.SecretListResult>;
+export function SecretList(arg1:string,arg2:boolean,arg3:string,arg4:number,arg5:string):Promise<main.SecretListResult>;
 
 export function SecretLog(arg1:string,arg2:number):Promise<main.SecretLogResult>;
 

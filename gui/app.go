@@ -44,17 +44,19 @@ func (a *App) startup(ctx context.Context) {
 
 // ParamListResult represents the result of listing parameters.
 type ParamListResult struct {
-	Entries []ParamListEntry `json:"entries"`
+	Entries   []ParamListEntry `json:"entries"`
+	NextToken string           `json:"nextToken,omitempty"`
 }
 
 // ParamListEntry represents a single parameter in the list.
 type ParamListEntry struct {
 	Name  string  `json:"name"`
+	Type  string  `json:"type"`
 	Value *string `json:"value,omitempty"`
 }
 
 // ParamList lists SSM parameters.
-func (a *App) ParamList(prefix string, recursive bool, withValue bool, filter string) (*ParamListResult, error) {
+func (a *App) ParamList(prefix string, recursive bool, withValue bool, filter string, maxResults int, nextToken string) (*ParamListResult, error) {
 	client, err := a.getParamClient()
 	if err != nil {
 		return nil, err
@@ -62,10 +64,12 @@ func (a *App) ParamList(prefix string, recursive bool, withValue bool, filter st
 
 	uc := &param.ListUseCase{Client: client}
 	result, err := uc.Execute(a.ctx, param.ListInput{
-		Prefix:    prefix,
-		Recursive: recursive,
-		WithValue: withValue,
-		Filter:    filter,
+		Prefix:     prefix,
+		Recursive:  recursive,
+		WithValue:  withValue,
+		Filter:     filter,
+		MaxResults: maxResults,
+		NextToken:  nextToken,
 	})
 	if err != nil {
 		return nil, err
@@ -75,20 +79,29 @@ func (a *App) ParamList(prefix string, recursive bool, withValue bool, filter st
 	for i, e := range result.Entries {
 		entries[i] = ParamListEntry{
 			Name:  e.Name,
+			Type:  e.Type,
 			Value: e.Value,
 		}
 	}
 
-	return &ParamListResult{Entries: entries}, nil
+	return &ParamListResult{Entries: entries, NextToken: result.NextToken}, nil
+}
+
+// ParamShowTag represents a tag key-value pair.
+type ParamShowTag struct {
+	Key   string `json:"key"`
+	Value string `json:"value"`
 }
 
 // ParamShowResult represents the result of showing a parameter.
 type ParamShowResult struct {
-	Name         string `json:"name"`
-	Value        string `json:"value"`
-	Version      int64  `json:"version"`
-	Type         string `json:"type"`
-	LastModified string `json:"lastModified,omitempty"`
+	Name         string         `json:"name"`
+	Value        string         `json:"value"`
+	Version      int64          `json:"version"`
+	Type         string         `json:"type"`
+	Description  string         `json:"description,omitempty"`
+	LastModified string         `json:"lastModified,omitempty"`
+	Tags         []ParamShowTag `json:"tags"`
 }
 
 // ParamShow shows a parameter value.
@@ -110,13 +123,21 @@ func (a *App) ParamShow(specStr string) (*ParamShowResult, error) {
 	}
 
 	r := &ParamShowResult{
-		Name:    result.Name,
-		Value:   result.Value,
-		Version: result.Version,
-		Type:    string(result.Type),
+		Name:        result.Name,
+		Value:       result.Value,
+		Version:     result.Version,
+		Type:        string(result.Type),
+		Description: result.Description,
+		Tags:        make([]ParamShowTag, 0, len(result.Tags)),
 	}
 	if result.LastModified != nil {
 		r.LastModified = result.LastModified.Format("2006-01-02T15:04:05Z07:00")
+	}
+	for _, tag := range result.Tags {
+		r.Tags = append(r.Tags, ParamShowTag{
+			Key:   tag.Key,
+			Value: tag.Value,
+		})
 	}
 	return r, nil
 }
@@ -268,7 +289,8 @@ func (a *App) ParamDelete(name string) (*ParamDeleteResult, error) {
 
 // SecretListResult represents the result of listing secrets.
 type SecretListResult struct {
-	Entries []SecretListEntry `json:"entries"`
+	Entries   []SecretListEntry `json:"entries"`
+	NextToken string            `json:"nextToken,omitempty"`
 }
 
 // SecretListEntry represents a single secret in the list.
@@ -278,7 +300,7 @@ type SecretListEntry struct {
 }
 
 // SecretList lists Secrets Manager secrets.
-func (a *App) SecretList(prefix string, withValue bool, filter string) (*SecretListResult, error) {
+func (a *App) SecretList(prefix string, withValue bool, filter string, maxResults int, nextToken string) (*SecretListResult, error) {
 	client, err := a.getSecretClient()
 	if err != nil {
 		return nil, err
@@ -286,9 +308,11 @@ func (a *App) SecretList(prefix string, withValue bool, filter string) (*SecretL
 
 	uc := &secret.ListUseCase{Client: client}
 	result, err := uc.Execute(a.ctx, secret.ListInput{
-		Prefix:    prefix,
-		WithValue: withValue,
-		Filter:    filter,
+		Prefix:     prefix,
+		WithValue:  withValue,
+		Filter:     filter,
+		MaxResults: maxResults,
+		NextToken:  nextToken,
 	})
 	if err != nil {
 		return nil, err
@@ -302,17 +326,25 @@ func (a *App) SecretList(prefix string, withValue bool, filter string) (*SecretL
 		}
 	}
 
-	return &SecretListResult{Entries: entries}, nil
+	return &SecretListResult{Entries: entries, NextToken: result.NextToken}, nil
+}
+
+// SecretShowTag represents a tag key-value pair.
+type SecretShowTag struct {
+	Key   string `json:"key"`
+	Value string `json:"value"`
 }
 
 // SecretShowResult represents the result of showing a secret.
 type SecretShowResult struct {
-	Name         string   `json:"name"`
-	ARN          string   `json:"arn"`
-	VersionID    string   `json:"versionId"`
-	VersionStage []string `json:"versionStage"`
-	Value        string   `json:"value"`
-	CreatedDate  string   `json:"createdDate,omitempty"`
+	Name         string          `json:"name"`
+	ARN          string          `json:"arn"`
+	VersionID    string          `json:"versionId"`
+	VersionStage []string        `json:"versionStage"`
+	Value        string          `json:"value"`
+	Description  string          `json:"description,omitempty"`
+	CreatedDate  string          `json:"createdDate,omitempty"`
+	Tags         []SecretShowTag `json:"tags"`
 }
 
 // SecretShow shows a secret value.
@@ -339,9 +371,17 @@ func (a *App) SecretShow(specStr string) (*SecretShowResult, error) {
 		VersionID:    result.VersionID,
 		VersionStage: result.VersionStage,
 		Value:        result.Value,
+		Description:  result.Description,
+		Tags:         make([]SecretShowTag, 0, len(result.Tags)),
 	}
 	if result.CreatedDate != nil {
 		r.CreatedDate = result.CreatedDate.Format("2006-01-02T15:04:05Z07:00")
+	}
+	for _, tag := range result.Tags {
+		r.Tags = append(r.Tags, SecretShowTag{
+			Key:   tag.Key,
+			Value: tag.Value,
+		})
 	}
 	return r, nil
 }

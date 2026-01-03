@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, onDestroy } from 'svelte';
   import { SecretList, SecretShow, SecretLog, SecretCreate, SecretUpdate, SecretDelete, SecretDiff, SecretRestore, StagingAdd, StagingEdit, StagingDelete } from '../../wailsjs/go/main/App';
   import type { main } from '../../wailsjs/go/models';
   import CloseIcon from './icons/CloseIcon.svelte';
@@ -9,10 +9,14 @@
   import DiffDisplay from './DiffDisplay.svelte';
   import './common.css';
 
+  const PAGE_SIZE = 50;
+
   let prefix = '';
   let filter = '';
   let withValue = false;
   let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+  let nextToken = '';
+  let loadingMore = false;
 
   // Reactive: auto-fetch when checkbox changes
   $: withValue, handleFilterChange();
@@ -69,12 +73,18 @@
   // Restore state
   let restoreTarget = '';
 
+  // Infinite scroll
+  let sentinelElement: HTMLDivElement;
+  let observer: IntersectionObserver | null = null;
+
   async function loadSecrets() {
     loading = true;
     error = '';
+    nextToken = '';
     try {
-      const result = await SecretList(prefix, withValue, filter);
+      const result = await SecretList(prefix, withValue, filter, PAGE_SIZE, '');
       entries = result?.entries || [];
+      nextToken = result?.nextToken || '';
     } catch (e) {
       error = e instanceof Error ? e.message : String(e);
       entries = [];
@@ -82,6 +92,46 @@
       loading = false;
     }
   }
+
+  async function loadMore() {
+    if (!nextToken || loadingMore || loading) return;
+
+    loadingMore = true;
+    try {
+      const result = await SecretList(prefix, withValue, filter, PAGE_SIZE, nextToken);
+      entries = [...entries, ...(result?.entries || [])];
+      nextToken = result?.nextToken || '';
+    } catch (e) {
+      error = e instanceof Error ? e.message : String(e);
+    } finally {
+      loadingMore = false;
+    }
+  }
+
+  function setupIntersectionObserver() {
+    if (observer) observer.disconnect();
+
+    observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && nextToken && !loadingMore && !loading) {
+          loadMore();
+        }
+      },
+      { rootMargin: '100px' }
+    );
+
+    if (sentinelElement) {
+      observer.observe(sentinelElement);
+    }
+  }
+
+  $: if (sentinelElement) {
+    setupIntersectionObserver();
+  }
+
+  onDestroy(() => {
+    if (observer) observer.disconnect();
+  });
 
   async function selectSecret(name: string) {
     selectedSecret = name;
@@ -342,6 +392,14 @@
             </li>
           {/each}
         </ul>
+        <!-- Sentinel for infinite scroll -->
+        <div bind:this={sentinelElement} class="scroll-sentinel">
+          {#if loadingMore}
+            <div class="loading-more">Loading more...</div>
+          {:else if nextToken}
+            <div class="load-more-hint">Scroll for more</div>
+          {/if}
+        </div>
       {/if}
     </div>
 
@@ -407,10 +465,32 @@
               </div>
             </div>
 
+            {#if secretDetail.description}
+              <div class="detail-section">
+                <h4>Description</h4>
+                <p class="description-text">{secretDetail.description}</p>
+              </div>
+            {/if}
+
             <div class="detail-section">
               <h4>ARN</h4>
               <code class="arn-display">{secretDetail.arn}</code>
             </div>
+
+            {#if secretDetail.tags && secretDetail.tags.length > 0}
+              <div class="detail-section">
+                <h4>Tags</h4>
+                <div class="tags-list">
+                  {#each secretDetail.tags as tag}
+                    <div class="tag-item">
+                      <span class="tag-key">{tag.key}</span>
+                      <span class="tag-separator">=</span>
+                      <span class="tag-value">{tag.value}</span>
+                    </div>
+                  {/each}
+                </div>
+              </div>
+            {/if}
 
             {#if secretLog.length > 0}
               <div class="detail-section">
@@ -873,5 +953,65 @@
     background: rgba(255, 152, 0, 0.1);
     border: 1px solid rgba(255, 152, 0, 0.3);
     border-radius: 4px;
+  }
+
+  /* Infinite scroll styles */
+  .scroll-sentinel {
+    padding: 16px;
+    text-align: center;
+    min-height: 50px;
+  }
+
+  .loading-more {
+    color: #888;
+    font-size: 14px;
+  }
+
+  .load-more-hint {
+    color: #555;
+    font-size: 12px;
+  }
+
+  /* Tags styles */
+  .tags-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .tag-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    background: #1a1a2e;
+    border-radius: 4px;
+    font-family: monospace;
+    font-size: 13px;
+  }
+
+  .tag-key {
+    color: #ffb74d;
+    font-weight: 600;
+  }
+
+  .tag-separator {
+    color: #666;
+  }
+
+  .tag-value {
+    color: #a5d6a7;
+  }
+
+  /* Description styles */
+  .description-text {
+    margin: 0;
+    padding: 12px;
+    background: #1a1a2e;
+    border-radius: 4px;
+    color: #ccc;
+    font-size: 14px;
+    line-height: 1.5;
+    white-space: pre-wrap;
   }
 </style>
