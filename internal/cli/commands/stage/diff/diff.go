@@ -152,7 +152,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 	// Fetch all values in parallel
 	paramResults := parallel.ExecuteMap(ctx, paramEntries, func(ctx context.Context, name string, _ staging.Entry) (*paramapi.ParameterHistory, error) {
 		spec := &paramversion.Spec{Name: name}
-		return paramversion.GetParameterWithVersion(ctx, r.ParamClient, spec, true)
+		return paramversion.GetParameterWithVersion(ctx, r.ParamClient, spec)
 	})
 
 	secretResults := parallel.ExecuteMap(ctx, secretEntries, func(ctx context.Context, name string, _ staging.Entry) (*secretapi.GetSecretValueOutput, error) {

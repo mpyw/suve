@@ -189,7 +189,6 @@ func TestRun(t *testing.T) {
 			name: "json flag with encrypted SecureString warns",
 			opts: show.Options{
 				Spec:      &paramversion.Spec{Name: "/my/param"},
-				Decrypt:   false,
 				ParseJSON: true,
 			},
 			mock: &mockClient{
@@ -234,9 +233,8 @@ func TestRun(t *testing.T) {
 		{
 			name: "raw mode outputs only value",
 			opts: show.Options{
-				Spec:    &paramversion.Spec{Name: "/my/param"},
-				Decrypt: true,
-				Raw:     true,
+				Spec: &paramversion.Spec{Name: "/my/param"},
+				Raw:  true,
 			},
 			mock: &mockClient{
 				getParameterFunc: func(_ context.Context, _ *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
@@ -258,9 +256,8 @@ func TestRun(t *testing.T) {
 		{
 			name: "raw mode with shift",
 			opts: show.Options{
-				Spec:    &paramversion.Spec{Name: "/my/param", Shift: 1},
-				Decrypt: true,
-				Raw:     true,
+				Spec: &paramversion.Spec{Name: "/my/param", Shift: 1},
+				Raw:  true,
 			},
 			mock: &mockClient{
 				getParameterHistoryFunc: func(_ context.Context, _ *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
@@ -280,7 +277,6 @@ func TestRun(t *testing.T) {
 			name: "raw mode with JSON formatting",
 			opts: show.Options{
 				Spec:      &paramversion.Spec{Name: "/my/param"},
-				Decrypt:   true,
 				ParseJSON: true,
 				Raw:       true,
 			},

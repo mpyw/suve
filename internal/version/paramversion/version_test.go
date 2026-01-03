@@ -52,7 +52,7 @@ func TestGetParameterWithVersion_Latest(t *testing.T) {
 	}
 
 	spec := &paramversion.Spec{Name: "/my/param"}
-	result, err := paramversion.GetParameterWithVersion(t.Context(), mock, spec, true)
+	result, err := paramversion.GetParameterWithVersion(t.Context(), mock, spec)
 
 	require.NoError(t, err)
 	assert.Equal(t, "/my/param", lo.FromPtr(result.Name))
@@ -78,7 +78,7 @@ func TestGetParameterWithVersion_SpecificVersion(t *testing.T) {
 
 	v := int64(2)
 	spec := &paramversion.Spec{Name: "/my/param", Absolute: paramversion.AbsoluteSpec{Version: &v}}
-	result, err := paramversion.GetParameterWithVersion(t.Context(), mock, spec, true)
+	result, err := paramversion.GetParameterWithVersion(t.Context(), mock, spec)
 
 	require.NoError(t, err)
 	assert.Equal(t, "old-value", lo.FromPtr(result.Value))
@@ -103,7 +103,7 @@ func TestGetParameterWithVersion_Shift(t *testing.T) {
 	}
 
 	spec := &paramversion.Spec{Name: "/my/param", Shift: 1}
-	result, err := paramversion.GetParameterWithVersion(t.Context(), mock, spec, true)
+	result, err := paramversion.GetParameterWithVersion(t.Context(), mock, spec)
 
 	require.NoError(t, err)
 	// Shift 1 means one version back from latest (v3), so v2
@@ -128,7 +128,7 @@ func TestGetParameterWithVersion_ShiftFromSpecificVersion(t *testing.T) {
 
 	v := int64(3)
 	spec := &paramversion.Spec{Name: "/my/param", Absolute: paramversion.AbsoluteSpec{Version: &v}, Shift: 2}
-	result, err := paramversion.GetParameterWithVersion(t.Context(), mock, spec, true)
+	result, err := paramversion.GetParameterWithVersion(t.Context(), mock, spec)
 
 	require.NoError(t, err)
 	// Version 3, shift 2 means v3 -> v2 -> v1
@@ -149,7 +149,7 @@ func TestGetParameterWithVersion_ShiftOutOfRange(t *testing.T) {
 	}
 
 	spec := &paramversion.Spec{Name: "/my/param", Shift: 5}
-	_, err := paramversion.GetParameterWithVersion(t.Context(), mock, spec, true)
+	_, err := paramversion.GetParameterWithVersion(t.Context(), mock, spec)
 
 	require.Error(t, err)
 	assert.Equal(t, "version shift out of range: ~5", err.Error())
@@ -170,7 +170,7 @@ func TestGetParameterWithVersion_VersionNotFound(t *testing.T) {
 
 	v := int64(99)
 	spec := &paramversion.Spec{Name: "/my/param", Absolute: paramversion.AbsoluteSpec{Version: &v}, Shift: 1}
-	_, err := paramversion.GetParameterWithVersion(t.Context(), mock, spec, true)
+	_, err := paramversion.GetParameterWithVersion(t.Context(), mock, spec)
 
 	require.Error(t, err)
 	assert.Equal(t, "version 99 not found", err.Error())
@@ -187,7 +187,7 @@ func TestGetParameterWithVersion_EmptyHistory(t *testing.T) {
 	}
 
 	spec := &paramversion.Spec{Name: "/my/param", Shift: 1}
-	_, err := paramversion.GetParameterWithVersion(t.Context(), mock, spec, true)
+	_, err := paramversion.GetParameterWithVersion(t.Context(), mock, spec)
 
 	require.Error(t, err)
 	assert.Equal(t, "parameter not found: /my/param", err.Error())
@@ -202,7 +202,7 @@ func TestGetParameterWithVersion_GetParameterError(t *testing.T) {
 	}
 
 	spec := &paramversion.Spec{Name: "/my/param"}
-	_, err := paramversion.GetParameterWithVersion(t.Context(), mock, spec, true)
+	_, err := paramversion.GetParameterWithVersion(t.Context(), mock, spec)
 
 	require.Error(t, err)
 	assert.Equal(t, "failed to get parameter: AWS error", err.Error())
@@ -217,16 +217,17 @@ func TestGetParameterWithVersion_GetParameterHistoryError(t *testing.T) {
 	}
 
 	spec := &paramversion.Spec{Name: "/my/param", Shift: 1}
-	_, err := paramversion.GetParameterWithVersion(t.Context(), mock, spec, true)
+	_, err := paramversion.GetParameterWithVersion(t.Context(), mock, spec)
 
 	require.Error(t, err)
 	assert.Equal(t, "failed to get parameter history: AWS error", err.Error())
 }
 
-func TestGetParameterWithVersion_DecryptFlag(t *testing.T) {
+func TestGetParameterWithVersion_AlwaysDecrypts(t *testing.T) {
 	t.Parallel()
 	mock := &mockClient{
 		getParameterFunc: func(_ context.Context, params *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
+			// Verify that WithDecryption is always true
 			assert.True(t, lo.FromPtr(params.WithDecryption))
 			return &paramapi.GetParameterOutput{
 				Parameter: &paramapi.Parameter{
@@ -240,7 +241,7 @@ func TestGetParameterWithVersion_DecryptFlag(t *testing.T) {
 	}
 
 	spec := &paramversion.Spec{Name: "/my/param"}
-	result, err := paramversion.GetParameterWithVersion(t.Context(), mock, spec, true)
+	result, err := paramversion.GetParameterWithVersion(t.Context(), mock, spec)
 
 	require.NoError(t, err)
 	assert.Equal(t, "decrypted-value", lo.FromPtr(result.Value))

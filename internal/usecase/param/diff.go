@@ -38,12 +38,12 @@ type DiffUseCase struct {
 
 // Execute runs the diff use case.
 func (u *DiffUseCase) Execute(ctx context.Context, input DiffInput) (*DiffOutput, error) {
-	param1, err := paramversion.GetParameterWithVersion(ctx, u.Client, input.Spec1, true)
+	param1, err := paramversion.GetParameterWithVersion(ctx, u.Client, input.Spec1)
 	if err != nil {
 		return nil, err
 	}
 
-	param2, err := paramversion.GetParameterWithVersion(ctx, u.Client, input.Spec2, true)
+	param2, err := paramversion.GetParameterWithVersion(ctx, u.Client, input.Spec2)
 	if err != nil {
 		return nil, err
 	}

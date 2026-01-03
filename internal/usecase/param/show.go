@@ -19,8 +19,7 @@ type ShowClient interface {
 
 // ShowInput holds input for the show use case.
 type ShowInput struct {
-	Spec    *paramversion.Spec
-	Decrypt bool
+	Spec *paramversion.Spec
 }
 
 // ShowOutput holds the result of the show use case.
@@ -39,7 +38,7 @@ type ShowUseCase struct {
 
 // Execute runs the show use case.
 func (u *ShowUseCase) Execute(ctx context.Context, input ShowInput) (*ShowOutput, error) {
-	param, err := paramversion.GetParameterWithVersion(ctx, u.Client, input.Spec, input.Decrypt)
+	param, err := paramversion.GetParameterWithVersion(ctx, u.Client, input.Spec)
 	if err != nil {
 		return nil, err
 	}

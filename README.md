@@ -58,7 +58,6 @@ user@host:~$ suve param show /app/config/database-url
 Name: /app/config/database-url
 Version: 3
 Type: SecureString
-Decrypted: true
 Modified: 2024-01-15T10:30:45Z
 
   postgres://db.example.com:5432/myapp
@@ -297,7 +296,7 @@ where ~SHIFT = ~ | ~N  (repeatable, cumulative)
 
 | Command | Options | Description |
 |---------|---------|-------------|
-| [`suve param show`](docs/param.md#show) | `--raw`<br>`--decrypt`<br>`--parse-json` (`-j`)<br>`--no-pager`<br>`--output=<FORMAT>` | Display parameter with metadata |
+| [`suve param show`](docs/param.md#show) | `--raw`<br>`--parse-json` (`-j`)<br>`--no-pager`<br>`--output=<FORMAT>` | Display parameter with metadata |
 | [`suve param log`](docs/param.md#log) | `--number=<N>` (`-n`)<br>`--patch` (`-p`)<br>`--parse-json` (`-j`)<br>`--oneline`<br>`--reverse`<br>`--since=<DATE>`<br>`--until=<DATE>`<br>`--no-pager`<br>`--output=<FORMAT>` | Show version history |
 | [`suve param diff`](docs/param.md#diff) | `--parse-json` (`-j`)<br>`--no-pager`<br>`--output=<FORMAT>` | Compare versions |
 | [`suve param list`](docs/param.md#list) | `--recursive` (`-R`)<br>`--filter=<REGEX>`<br>`--show`<br>`--output=<FORMAT>` | List parameters |

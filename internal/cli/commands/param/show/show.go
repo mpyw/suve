@@ -30,7 +30,6 @@ type Runner struct {
 // Options holds the options for the show command.
 type Options struct {
 	Spec      *paramversion.Spec
-	Decrypt   bool
 	ParseJSON bool
 	NoPager   bool
 	Raw       bool
@@ -42,7 +41,6 @@ type JSONOutput struct {
 	Name       string `json:"name"`
 	Version    int64  `json:"version"`
 	Type       string `json:"type"`
-	Decrypted  *bool  `json:"decrypted,omitempty"`   // Only for SecureString
 	JsonParsed *bool  `json:"json_parsed,omitempty"` // Only when --parse-json is used
 	Modified   string `json:"modified,omitempty"`
 	Value      string `json:"value"`
@@ -69,15 +67,9 @@ EXAMPLES:
   suve param show /app/config#3                             Show version 3
   suve param show --raw /app/config                         Output raw value (for piping)
   suve param show --parse-json /app/config                  Pretty print JSON value
-  suve param show --decrypt=false /app/secret               Show without decryption
   suve param show --output=json /app/config                 Output as JSON
   DB_URL=$(suve param show --raw /app/config)               Use in shell variable`,
 		Flags: []cli.Flag{
-			&cli.BoolFlag{
-				Name:  "decrypt",
-				Value: true,
-				Usage: "Decrypt SecureString values (use --decrypt=false to disable)",
-			},
 			&cli.BoolFlag{
 				Name:    "parse-json",
 				Aliases: []string{"j"},
@@ -125,7 +117,6 @@ func action(ctx context.Context, cmd *cli.Command) error {
 
 	opts := Options{
 		Spec:      spec,
-		Decrypt:   cmd.Bool("decrypt"),
 		ParseJSON: cmd.Bool("parse-json"),
 		NoPager:   cmd.Bool("no-pager"),
 		Raw:       raw,
@@ -148,8 +139,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 // Run executes the show command.
 func (r *Runner) Run(ctx context.Context, opts Options) error {
 	result, err := r.UseCase.Execute(ctx, param.ShowInput{
-		Spec:    opts.Spec,
-		Decrypt: opts.Decrypt,
+		Spec: opts.Spec,
 	})
 	if err != nil {
 		return err
@@ -160,11 +150,9 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 
 	// Warn if --parse-json is used in cases where it's not meaningful
 	if opts.ParseJSON {
-		switch {
-		case result.Type == paramapi.ParameterTypeStringList:
+		switch result.Type {
+		case paramapi.ParameterTypeStringList:
 			output.Warning(r.Stderr, "--parse-json has no effect on StringList type (comma-separated values)")
-		case result.Type == paramapi.ParameterTypeSecureString && !opts.Decrypt:
-			output.Warning(r.Stderr, "--parse-json has no effect on encrypted SecureString (use --decrypt to enable)")
 		default:
 			formatted := jsonutil.TryFormatOrWarn(value, r.Stderr, "")
 			if formatted != value {
@@ -188,10 +176,6 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 			Type:    string(result.Type),
 			Value:   value,
 		}
-		// Show decrypted status only for SecureString
-		if result.Type == paramapi.ParameterTypeSecureString {
-			jsonOut.Decrypted = lo.ToPtr(opts.Decrypt)
-		}
 		// Show json_parsed only when --parse-json was used and succeeded
 		if jsonParsed {
 			jsonOut.JsonParsed = lo.ToPtr(true)
@@ -209,10 +193,6 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 	out.Field("Name", result.Name)
 	out.Field("Version", fmt.Sprintf("%d", result.Version))
 	out.Field("Type", string(result.Type))
-	// Show decrypted status only for SecureString
-	if result.Type == paramapi.ParameterTypeSecureString {
-		out.Field("Decrypted", fmt.Sprintf("%t", opts.Decrypt))
-	}
 	// Show json_parsed only when --parse-json was used and succeeded
 	if jsonParsed {
 		out.Field("JsonParsed", "true")

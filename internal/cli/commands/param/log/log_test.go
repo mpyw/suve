@@ -410,7 +410,6 @@ func TestRun(t *testing.T) {
 				assert.Contains(t, output, `"value"`)
 				assert.Contains(t, output, `"type"`)
 				assert.Contains(t, output, `"SecureString"`)
-				assert.Contains(t, output, `"decrypted"`)
 			},
 		},
 		{

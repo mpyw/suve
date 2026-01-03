@@ -11,10 +11,8 @@ import (
 	"io"
 	"time"
 
-	"github.com/samber/lo"
 	"github.com/urfave/cli/v3"
 
-	"github.com/mpyw/suve/internal/api/paramapi"
 	"github.com/mpyw/suve/internal/cli/colors"
 	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/cli/pager"
@@ -47,11 +45,10 @@ type Options struct {
 
 // JSONOutputItem represents a single version entry in JSON output.
 type JSONOutputItem struct {
-	Version   int64  `json:"version"`
-	Type      string `json:"type"`
-	Decrypted *bool  `json:"decrypted,omitempty"` // Only for SecureString
-	Modified  string `json:"modified,omitempty"`
-	Value     string `json:"value"`
+	Version  int64  `json:"version"`
+	Type     string `json:"type"`
+	Modified string `json:"modified,omitempty"`
+	Value    string `json:"value"`
 }
 
 // Command returns the log command.
@@ -230,10 +227,6 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 				Version: entry.Version,
 				Type:    string(entry.Type),
 				Value:   entry.Value,
-			}
-			// Show decrypted status only for SecureString (always true for log command)
-			if entry.Type == paramapi.ParameterTypeSecureString {
-				items[i].Decrypted = lo.ToPtr(true)
 			}
 			if entry.LastModified != nil {
 				items[i].Modified = timeutil.FormatRFC3339(*entry.LastModified)

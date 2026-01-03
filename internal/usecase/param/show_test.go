@@ -61,8 +61,7 @@ func TestShowUseCase_Execute(t *testing.T) {
 	require.NoError(t, err)
 
 	output, err := uc.Execute(context.Background(), param.ShowInput{
-		Spec:    spec,
-		Decrypt: true,
+		Spec: spec,
 	})
 	require.NoError(t, err)
 	assert.Equal(t, "/app/config", output.Name)
@@ -93,8 +92,7 @@ func TestShowUseCase_Execute_WithVersion(t *testing.T) {
 	require.NoError(t, err)
 
 	output, err := uc.Execute(context.Background(), param.ShowInput{
-		Spec:    spec,
-		Decrypt: true,
+		Spec: spec,
 	})
 	require.NoError(t, err)
 	assert.Equal(t, "/app/config", output.Name)
@@ -122,8 +120,7 @@ func TestShowUseCase_Execute_WithShift(t *testing.T) {
 	require.NoError(t, err)
 
 	output, err := uc.Execute(context.Background(), param.ShowInput{
-		Spec:    spec,
-		Decrypt: true,
+		Spec: spec,
 	})
 	require.NoError(t, err)
 	assert.Equal(t, "/app/config", output.Name)
@@ -144,8 +141,7 @@ func TestShowUseCase_Execute_Error(t *testing.T) {
 	require.NoError(t, err)
 
 	_, err = uc.Execute(context.Background(), param.ShowInput{
-		Spec:    spec,
-		Decrypt: true,
+		Spec: spec,
 	})
 	assert.Error(t, err)
 }
@@ -170,8 +166,7 @@ func TestShowUseCase_Execute_NoLastModified(t *testing.T) {
 	require.NoError(t, err)
 
 	output, err := uc.Execute(context.Background(), param.ShowInput{
-		Spec:    spec,
-		Decrypt: true,
+		Spec: spec,
 	})
 	require.NoError(t, err)
 	assert.Nil(t, output.LastModified)
