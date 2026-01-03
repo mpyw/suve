@@ -15,11 +15,18 @@ import (
 type ShowClient interface {
 	secretapi.GetSecretValueAPI
 	secretapi.ListSecretVersionIdsAPI
+	secretapi.DescribeSecretAPI
 }
 
 // ShowInput holds input for the show use case.
 type ShowInput struct {
 	Spec *secretversion.Spec
+}
+
+// ShowTag represents a tag key-value pair.
+type ShowTag struct {
+	Key   string
+	Value string
 }
 
 // ShowOutput holds the result of the show use case.
@@ -29,7 +36,9 @@ type ShowOutput struct {
 	Value        string
 	VersionID    string
 	VersionStage []string
+	Description  string
 	CreatedDate  *time.Time
+	Tags         []ShowTag
 }
 
 // ShowUseCase executes show operations.
@@ -44,12 +53,28 @@ func (u *ShowUseCase) Execute(ctx context.Context, input ShowInput) (*ShowOutput
 		return nil, err
 	}
 
-	return &ShowOutput{
+	output := &ShowOutput{
 		Name:         lo.FromPtr(secret.Name),
 		ARN:          lo.FromPtr(secret.ARN),
 		Value:        lo.FromPtr(secret.SecretString),
 		VersionID:    lo.FromPtr(secret.VersionId),
 		VersionStage: secret.VersionStages,
 		CreatedDate:  secret.CreatedDate,
-	}, nil
+	}
+
+	// Fetch tags and description via DescribeSecret
+	describeOutput, err := u.Client.DescribeSecret(ctx, &secretapi.DescribeSecretInput{
+		SecretId: secret.Name,
+	})
+	if err == nil && describeOutput != nil {
+		output.Description = lo.FromPtr(describeOutput.Description)
+		for _, tag := range describeOutput.Tags {
+			output.Tags = append(output.Tags, ShowTag{
+				Key:   lo.FromPtr(tag.Key),
+				Value: lo.FromPtr(tag.Value),
+			})
+		}
+	}
+
+	return output, nil
 }

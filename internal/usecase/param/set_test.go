@@ -10,7 +10,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/mpyw/suve/internal/api/paramapi"
-	"github.com/mpyw/suve/internal/tagging"
 	"github.com/mpyw/suve/internal/usecase/param"
 )
 
@@ -19,8 +18,6 @@ type mockSetClient struct {
 	getParameterErr    error
 	putParameterResult *paramapi.PutParameterOutput
 	putParameterErr    error
-	addTagsErr         error
-	removeTagsErr      error
 }
 
 func (m *mockSetClient) GetParameter(_ context.Context, _ *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
@@ -35,20 +32,6 @@ func (m *mockSetClient) PutParameter(_ context.Context, _ *paramapi.PutParameter
 		return nil, m.putParameterErr
 	}
 	return m.putParameterResult, nil
-}
-
-func (m *mockSetClient) AddTagsToResource(_ context.Context, _ *paramapi.AddTagsToResourceInput, _ ...func(*paramapi.Options)) (*paramapi.AddTagsToResourceOutput, error) {
-	if m.addTagsErr != nil {
-		return nil, m.addTagsErr
-	}
-	return &paramapi.AddTagsToResourceOutput{}, nil
-}
-
-func (m *mockSetClient) RemoveTagsFromResource(_ context.Context, _ *paramapi.RemoveTagsFromResourceInput, _ ...func(*paramapi.Options)) (*paramapi.RemoveTagsFromResourceOutput, error) {
-	if m.removeTagsErr != nil {
-		return nil, m.removeTagsErr
-	}
-	return &paramapi.RemoveTagsFromResourceOutput{}, nil
 }
 
 func TestSetUseCase_Exists(t *testing.T) {
@@ -171,90 +154,4 @@ func TestSetUseCase_Execute_PutError(t *testing.T) {
 	})
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to put parameter")
-}
-
-func TestSetUseCase_Execute_WithTags(t *testing.T) {
-	t.Parallel()
-
-	client := &mockSetClient{
-		getParameterErr:    &paramapi.ParameterNotFound{Message: lo.ToPtr("not found")},
-		putParameterResult: &paramapi.PutParameterOutput{Version: 1},
-	}
-
-	uc := &param.SetUseCase{Client: client}
-
-	output, err := uc.Execute(context.Background(), param.SetInput{
-		Name:  "/app/new",
-		Value: "value",
-		Type:  paramapi.ParameterTypeString,
-		TagChange: &tagging.Change{
-			Add:    map[string]string{"env": "prod"},
-			Remove: []string{"old-tag"},
-		},
-	})
-	require.NoError(t, err)
-	assert.Equal(t, "/app/new", output.Name)
-}
-
-func TestSetUseCase_Execute_AddTagsError(t *testing.T) {
-	t.Parallel()
-
-	client := &mockSetClient{
-		getParameterErr:    &paramapi.ParameterNotFound{Message: lo.ToPtr("not found")},
-		putParameterResult: &paramapi.PutParameterOutput{Version: 1},
-		addTagsErr:         errors.New("add tags failed"),
-	}
-
-	uc := &param.SetUseCase{Client: client}
-
-	_, err := uc.Execute(context.Background(), param.SetInput{
-		Name:  "/app/new",
-		Value: "value",
-		TagChange: &tagging.Change{
-			Add: map[string]string{"env": "prod"},
-		},
-	})
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to add tags")
-}
-
-func TestSetUseCase_Execute_RemoveTagsError(t *testing.T) {
-	t.Parallel()
-
-	client := &mockSetClient{
-		getParameterErr:    &paramapi.ParameterNotFound{Message: lo.ToPtr("not found")},
-		putParameterResult: &paramapi.PutParameterOutput{Version: 1},
-		removeTagsErr:      errors.New("remove tags failed"),
-	}
-
-	uc := &param.SetUseCase{Client: client}
-
-	_, err := uc.Execute(context.Background(), param.SetInput{
-		Name:  "/app/new",
-		Value: "value",
-		TagChange: &tagging.Change{
-			Remove: []string{"old-tag"},
-		},
-	})
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to remove tags")
-}
-
-func TestSetUseCase_Execute_EmptyTagChange(t *testing.T) {
-	t.Parallel()
-
-	client := &mockSetClient{
-		getParameterErr:    &paramapi.ParameterNotFound{Message: lo.ToPtr("not found")},
-		putParameterResult: &paramapi.PutParameterOutput{Version: 1},
-	}
-
-	uc := &param.SetUseCase{Client: client}
-
-	output, err := uc.Execute(context.Background(), param.SetInput{
-		Name:      "/app/new",
-		Value:     "value",
-		TagChange: &tagging.Change{},
-	})
-	require.NoError(t, err)
-	assert.Equal(t, "/app/new", output.Name)
 }

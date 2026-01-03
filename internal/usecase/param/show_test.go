@@ -39,6 +39,10 @@ func (m *mockShowClient) GetParameterHistory(_ context.Context, _ *paramapi.GetP
 	return m.getHistoryResult, nil
 }
 
+func (m *mockShowClient) ListTagsForResource(_ context.Context, _ *paramapi.ListTagsForResourceInput, _ ...func(*paramapi.Options)) (*paramapi.ListTagsForResourceOutput, error) {
+	return &paramapi.ListTagsForResourceOutput{}, nil
+}
+
 func TestShowUseCase_Execute(t *testing.T) {
 	t.Parallel()
 
