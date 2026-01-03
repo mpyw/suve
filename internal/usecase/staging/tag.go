@@ -79,14 +79,6 @@ func (u *TagUseCase) Execute(ctx context.Context, input TagInput) (*TagOutput, e
 			}
 			return &TagOutput{Name: name}, nil
 		}
-
-		// If entry has no meaningful content after cancellation, unstage it
-		if entry.Value == nil && entry.Description == nil && len(entry.Tags) == 0 && entry.UntagKeys.Len() == 0 {
-			if err := u.Store.Unstage(service, name); err != nil {
-				return nil, err
-			}
-			return &TagOutput{Name: name}, nil
-		}
 	} else {
 		// No existing tag entry - only create if there's something to stage
 		if len(input.AddTags) == 0 && input.RemoveTags.Len() == 0 {

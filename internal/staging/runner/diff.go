@@ -172,7 +172,4 @@ func (r *DiffRunner) outputTagEntry(tagEntry stagingusecase.DiffTagEntry) {
 	if tagEntry.Remove.Len() > 0 {
 		_, _ = fmt.Fprintf(r.Stdout, "  %s %s\n", colors.OpDelete("-"), strings.Join(tagEntry.Remove.Values(), ", "))
 	}
-	if entry.UntagKeys.Len() > 0 {
-		_, _ = fmt.Fprintf(r.Stdout, "%s %s\n", colors.FieldLabel("Untag:"), strings.Join(entry.UntagKeys.Values(), ", "))
-	}
 }
