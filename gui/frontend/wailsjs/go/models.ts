@@ -1,5 +1,17 @@
 export namespace main {
 	
+	export class ParamDeleteResult {
+	    name: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ParamDeleteResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	    }
+	}
 	export class ParamDiffResult {
 	    oldName: string;
 	    newName: string;
@@ -114,6 +126,22 @@ export namespace main {
 		    return a;
 		}
 	}
+	export class ParamSetResult {
+	    name: string;
+	    version: number;
+	    isCreated: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new ParamSetResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.version = source["version"];
+	        this.isCreated = source["isCreated"];
+	    }
+	}
 	export class ParamShowResult {
 	    name: string;
 	    value: string;
@@ -132,6 +160,38 @@ export namespace main {
 	        this.version = source["version"];
 	        this.type = source["type"];
 	        this.lastModified = source["lastModified"];
+	    }
+	}
+	export class SecretCreateResult {
+	    name: string;
+	    versionId: string;
+	    arn: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new SecretCreateResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.versionId = source["versionId"];
+	        this.arn = source["arn"];
+	    }
+	}
+	export class SecretDeleteResult {
+	    name: string;
+	    deletionDate?: string;
+	    arn: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new SecretDeleteResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.deletionDate = source["deletionDate"];
+	        this.arn = source["arn"];
 	    }
 	}
 	export class SecretListEntry {
@@ -248,6 +308,77 @@ export namespace main {
 	        this.createdDate = source["createdDate"];
 	    }
 	}
+	export class SecretUpdateResult {
+	    name: string;
+	    versionId: string;
+	    arn: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new SecretUpdateResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.versionId = source["versionId"];
+	        this.arn = source["arn"];
+	    }
+	}
+	export class StagingApplyResultEntry {
+	    name: string;
+	    status: string;
+	    error?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new StagingApplyResultEntry(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.status = source["status"];
+	        this.error = source["error"];
+	    }
+	}
+	export class StagingApplyResult {
+	    serviceName: string;
+	    results: StagingApplyResultEntry[];
+	    conflicts?: string[];
+	    succeeded: number;
+	    failed: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new StagingApplyResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.serviceName = source["serviceName"];
+	        this.results = this.convertValues(source["results"], StagingApplyResultEntry);
+	        this.conflicts = source["conflicts"];
+	        this.succeeded = source["succeeded"];
+	        this.failed = source["failed"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
 	export class StagingEntry {
 	    name: string;
 	    operation: string;
@@ -264,6 +395,24 @@ export namespace main {
 	        this.operation = source["operation"];
 	        this.value = source["value"];
 	        this.stagedAt = source["stagedAt"];
+	    }
+	}
+	export class StagingResetResult {
+	    type: string;
+	    name?: string;
+	    count?: number;
+	    serviceName: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new StagingResetResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.type = source["type"];
+	        this.name = source["name"];
+	        this.count = source["count"];
+	        this.serviceName = source["serviceName"];
 	    }
 	}
 	export class StagingStatusResult {
