@@ -68,7 +68,7 @@ func (u *ResetUseCase) Execute(ctx context.Context, input ResetInput) (*ResetOut
 func (u *ResetUseCase) unstageAll(serviceName, itemName string) (*ResetOutput, error) {
 	service := u.Parser.Service()
 
-	staged, err := u.Store.List(service)
+	staged, err := u.Store.ListEntries(service)
 	if err != nil {
 		return nil, err
 	}
@@ -96,7 +96,7 @@ func (u *ResetUseCase) unstageAll(serviceName, itemName string) (*ResetOutput, e
 func (u *ResetUseCase) unstage(name, serviceName, itemName string) (*ResetOutput, error) {
 	service := u.Parser.Service()
 
-	_, err := u.Store.Get(service, name)
+	_, err := u.Store.GetEntry(service, name)
 	if errors.Is(err, staging.ErrNotStaged) {
 		return &ResetOutput{
 			Type: ResetResultNotStaged,
@@ -107,7 +107,7 @@ func (u *ResetUseCase) unstage(name, serviceName, itemName string) (*ResetOutput
 		return nil, err
 	}
 
-	if err := u.Store.Unstage(service, name); err != nil {
+	if err := u.Store.UnstageEntry(service, name); err != nil {
 		return nil, err
 	}
 
@@ -129,7 +129,7 @@ func (u *ResetUseCase) restore(ctx context.Context, spec, name string) (*ResetOu
 		return nil, err
 	}
 
-	if err := u.Store.Stage(service, name, staging.Entry{
+	if err := u.Store.StageEntry(service, name, staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr(value),
 		StagedAt:  time.Now(),

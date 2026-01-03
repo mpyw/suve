@@ -109,14 +109,14 @@ func TestRun_ApplyBothServices(t *testing.T) {
 	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 	// Stage SSM Parameter Store parameter
-	_ = store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
+	_ = store.StageEntry(staging.ServiceParam, "/app/config", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("param-value"),
 		StagedAt:  time.Now(),
 	})
 
 	// Stage Secrets Manager secret
-	_ = store.Stage(staging.ServiceSecret, "my-secret", staging.Entry{
+	_ = store.StageEntry(staging.ServiceSecret, "my-secret", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("secret-value"),
 		StagedAt:  time.Now(),
@@ -158,9 +158,9 @@ func TestRun_ApplyBothServices(t *testing.T) {
 	assert.Contains(t, buf.String(), "Secrets Manager: Updated my-secret")
 
 	// Verify both unstaged
-	_, err = store.Get(staging.ServiceParam, "/app/config")
+	_, err = store.GetEntry(staging.ServiceParam, "/app/config")
 	assert.Equal(t, staging.ErrNotStaged, err)
-	_, err = store.Get(staging.ServiceSecret, "my-secret")
+	_, err = store.GetEntry(staging.ServiceSecret, "my-secret")
 	assert.Equal(t, staging.ErrNotStaged, err)
 }
 
@@ -171,7 +171,7 @@ func TestRun_ApplyParamOnly(t *testing.T) {
 	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 	// Stage only SSM Parameter Store parameter
-	_ = store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
+	_ = store.StageEntry(staging.ServiceParam, "/app/config", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("param-value"),
 		StagedAt:  time.Now(),
@@ -207,7 +207,7 @@ func TestRun_ApplySecretOnly(t *testing.T) {
 	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 	// Stage only Secrets Manager secret
-	_ = store.Stage(staging.ServiceSecret, "my-secret", staging.Entry{
+	_ = store.StageEntry(staging.ServiceSecret, "my-secret", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("secret-value"),
 		StagedAt:  time.Now(),
@@ -243,11 +243,11 @@ func TestRun_ApplyDelete(t *testing.T) {
 	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 	// Stage deletes
-	_ = store.Stage(staging.ServiceParam, "/app/old", staging.Entry{
+	_ = store.StageEntry(staging.ServiceParam, "/app/old", staging.Entry{
 		Operation: staging.OperationDelete,
 		StagedAt:  time.Now(),
 	})
-	_ = store.Stage(staging.ServiceSecret, "old-secret", staging.Entry{
+	_ = store.StageEntry(staging.ServiceSecret, "old-secret", staging.Entry{
 		Operation: staging.OperationDelete,
 		StagedAt:  time.Now(),
 	})
@@ -291,12 +291,12 @@ func TestRun_PartialFailure(t *testing.T) {
 	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 	// Stage both
-	_ = store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
+	_ = store.StageEntry(staging.ServiceParam, "/app/config", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("param-value"),
 		StagedAt:  time.Now(),
 	})
-	_ = store.Stage(staging.ServiceSecret, "my-secret", staging.Entry{
+	_ = store.StageEntry(staging.ServiceSecret, "my-secret", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("secret-value"),
 		StagedAt:  time.Now(),
@@ -326,12 +326,12 @@ func TestRun_PartialFailure(t *testing.T) {
 	assert.Contains(t, err.Error(), "applied 1, failed 1")
 
 	// SSM Parameter Store should still be staged (failed)
-	entry, err := store.Get(staging.ServiceParam, "/app/config")
+	entry, err := store.GetEntry(staging.ServiceParam, "/app/config")
 	require.NoError(t, err)
 	assert.Equal(t, "param-value", lo.FromPtr(entry.Value))
 
 	// Secrets Manager should be unstaged (succeeded)
-	_, err = store.Get(staging.ServiceSecret, "my-secret")
+	_, err = store.GetEntry(staging.ServiceSecret, "my-secret")
 	assert.Equal(t, staging.ErrNotStaged, err)
 }
 
@@ -367,7 +367,7 @@ func TestRun_SecretDeleteWithForce(t *testing.T) {
 	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 	// Stage Secrets Manager delete with force option
-	_ = store.Stage(staging.ServiceSecret, "my-secret", staging.Entry{
+	_ = store.StageEntry(staging.ServiceSecret, "my-secret", staging.Entry{
 		Operation: staging.OperationDelete,
 		StagedAt:  time.Now(),
 		DeleteOptions: &staging.DeleteOptions{
@@ -403,7 +403,7 @@ func TestRun_SecretDeleteWithRecoveryWindow(t *testing.T) {
 	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 	// Stage Secrets Manager delete with custom recovery window
-	_ = store.Stage(staging.ServiceSecret, "my-secret", staging.Entry{
+	_ = store.StageEntry(staging.ServiceSecret, "my-secret", staging.Entry{
 		Operation: staging.OperationDelete,
 		StagedAt:  time.Now(),
 		DeleteOptions: &staging.DeleteOptions{
@@ -438,7 +438,7 @@ func TestRun_ParamDeleteError(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
-	_ = store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
+	_ = store.StageEntry(staging.ServiceParam, "/app/config", staging.Entry{
 		Operation: staging.OperationDelete,
 		StagedAt:  time.Now(),
 	})
@@ -467,7 +467,7 @@ func TestRun_SecretSetError(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
-	_ = store.Stage(staging.ServiceSecret, "my-secret", staging.Entry{
+	_ = store.StageEntry(staging.ServiceSecret, "my-secret", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("value"),
 		StagedAt:  time.Now(),
@@ -497,7 +497,7 @@ func TestRun_SecretDeleteError(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
-	_ = store.Stage(staging.ServiceSecret, "my-secret", staging.Entry{
+	_ = store.StageEntry(staging.ServiceSecret, "my-secret", staging.Entry{
 		Operation: staging.OperationDelete,
 		StagedAt:  time.Now(),
 	})
@@ -526,7 +526,7 @@ func TestRun_ParamSetError(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
-	_ = store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
+	_ = store.StageEntry(staging.ServiceParam, "/app/config", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("value"),
 		StagedAt:  time.Now(),
@@ -557,7 +557,7 @@ func TestRun_ConflictDetection_CreateConflict(t *testing.T) {
 	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 	// Stage a create operation
-	_ = store.Stage(staging.ServiceParam, "/app/new-param", staging.Entry{
+	_ = store.StageEntry(staging.ServiceParam, "/app/new-param", staging.Entry{
 		Operation: staging.OperationCreate,
 		Value:     lo.ToPtr("new-value"),
 		StagedAt:  time.Now(),
@@ -589,7 +589,7 @@ func TestRun_ConflictDetection_UpdateConflict(t *testing.T) {
 	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 	baseTime := time.Now().Add(-1 * time.Hour)
-	_ = store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
+	_ = store.StageEntry(staging.ServiceParam, "/app/config", staging.Entry{
 		Operation:      staging.OperationUpdate,
 		Value:          lo.ToPtr("updated-value"),
 		StagedAt:       time.Now(),
@@ -622,7 +622,7 @@ func TestRun_ConflictDetection_DeleteConflict(t *testing.T) {
 	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 	baseTime := time.Now().Add(-1 * time.Hour)
-	_ = store.Stage(staging.ServiceSecret, "my-secret", staging.Entry{
+	_ = store.StageEntry(staging.ServiceSecret, "my-secret", staging.Entry{
 		Operation:      staging.OperationDelete,
 		StagedAt:       time.Now(),
 		BaseModifiedAt: &baseTime,
@@ -654,7 +654,7 @@ func TestRun_ConflictDetection_IgnoreConflicts(t *testing.T) {
 	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 	baseTime := time.Now().Add(-1 * time.Hour)
-	_ = store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
+	_ = store.StageEntry(staging.ServiceParam, "/app/config", staging.Entry{
 		Operation:      staging.OperationUpdate,
 		Value:          lo.ToPtr("updated-value"),
 		StagedAt:       time.Now(),
@@ -691,7 +691,7 @@ func TestRun_ConflictDetection_NoConflict(t *testing.T) {
 	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 	baseTime := time.Now()
-	_ = store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
+	_ = store.StageEntry(staging.ServiceParam, "/app/config", staging.Entry{
 		Operation:      staging.OperationUpdate,
 		Value:          lo.ToPtr("updated-value"),
 		StagedAt:       time.Now(),
@@ -730,7 +730,7 @@ func TestRun_ConflictDetection_BothServices(t *testing.T) {
 	baseTime := time.Now().Add(-1 * time.Hour)
 
 	// Stage param with conflict
-	_ = store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
+	_ = store.StageEntry(staging.ServiceParam, "/app/config", staging.Entry{
 		Operation:      staging.OperationUpdate,
 		Value:          lo.ToPtr("param-value"),
 		StagedAt:       time.Now(),
@@ -738,7 +738,7 @@ func TestRun_ConflictDetection_BothServices(t *testing.T) {
 	})
 
 	// Stage secret with conflict
-	_ = store.Stage(staging.ServiceSecret, "my-secret", staging.Entry{
+	_ = store.StageEntry(staging.ServiceSecret, "my-secret", staging.Entry{
 		Operation:      staging.OperationUpdate,
 		Value:          lo.ToPtr("secret-value"),
 		StagedAt:       time.Now(),

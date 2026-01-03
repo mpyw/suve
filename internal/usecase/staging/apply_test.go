@@ -73,7 +73,7 @@ func TestApplyUseCase_Execute_SingleCreate(t *testing.T) {
 	t.Parallel()
 
 	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
-	require.NoError(t, store.Stage(staging.ServiceParam, "/app/new", staging.Entry{
+	require.NoError(t, store.StageEntry(staging.ServiceParam, "/app/new", staging.Entry{
 		Operation: staging.OperationCreate,
 		Value:     lo.ToPtr("new-value"),
 		StagedAt:  time.Now(),
@@ -94,7 +94,7 @@ func TestApplyUseCase_Execute_SingleCreate(t *testing.T) {
 	assert.Equal(t, usecasestaging.ApplyResultCreated, output.EntryResults[0].Status)
 
 	// Verify unstaged after apply
-	_, err = store.Get(staging.ServiceParam, "/app/new")
+	_, err = store.GetEntry(staging.ServiceParam, "/app/new")
 	assert.ErrorIs(t, err, staging.ErrNotStaged)
 }
 
@@ -102,17 +102,17 @@ func TestApplyUseCase_Execute_MultipleOperations(t *testing.T) {
 	t.Parallel()
 
 	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
-	require.NoError(t, store.Stage(staging.ServiceParam, "/app/create", staging.Entry{
+	require.NoError(t, store.StageEntry(staging.ServiceParam, "/app/create", staging.Entry{
 		Operation: staging.OperationCreate,
 		Value:     lo.ToPtr("create"),
 		StagedAt:  time.Now(),
 	}))
-	require.NoError(t, store.Stage(staging.ServiceParam, "/app/update", staging.Entry{
+	require.NoError(t, store.StageEntry(staging.ServiceParam, "/app/update", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("update"),
 		StagedAt:  time.Now(),
 	}))
-	require.NoError(t, store.Stage(staging.ServiceParam, "/app/delete", staging.Entry{
+	require.NoError(t, store.StageEntry(staging.ServiceParam, "/app/delete", staging.Entry{
 		Operation: staging.OperationDelete,
 		StagedAt:  time.Now(),
 	}))
@@ -134,12 +134,12 @@ func TestApplyUseCase_Execute_FilterByName(t *testing.T) {
 	t.Parallel()
 
 	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
-	require.NoError(t, store.Stage(staging.ServiceParam, "/app/one", staging.Entry{
+	require.NoError(t, store.StageEntry(staging.ServiceParam, "/app/one", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("one"),
 		StagedAt:  time.Now(),
 	}))
-	require.NoError(t, store.Stage(staging.ServiceParam, "/app/two", staging.Entry{
+	require.NoError(t, store.StageEntry(staging.ServiceParam, "/app/two", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("two"),
 		StagedAt:  time.Now(),
@@ -160,7 +160,7 @@ func TestApplyUseCase_Execute_FilterByName(t *testing.T) {
 	assert.Equal(t, "/app/one", output.EntryResults[0].Name)
 
 	// /app/two should still be staged
-	_, err = store.Get(staging.ServiceParam, "/app/two")
+	_, err = store.GetEntry(staging.ServiceParam, "/app/two")
 	require.NoError(t, err)
 }
 
@@ -184,12 +184,12 @@ func TestApplyUseCase_Execute_PartialFailure(t *testing.T) {
 	t.Parallel()
 
 	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
-	require.NoError(t, store.Stage(staging.ServiceParam, "/app/success", staging.Entry{
+	require.NoError(t, store.StageEntry(staging.ServiceParam, "/app/success", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("success"),
 		StagedAt:  time.Now(),
 	}))
-	require.NoError(t, store.Stage(staging.ServiceParam, "/app/fail", staging.Entry{
+	require.NoError(t, store.StageEntry(staging.ServiceParam, "/app/fail", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("fail"),
 		StagedAt:  time.Now(),
@@ -212,11 +212,11 @@ func TestApplyUseCase_Execute_PartialFailure(t *testing.T) {
 	assert.Equal(t, 1, output.EntryFailed)
 
 	// Failed entry should still be staged
-	_, err = store.Get(staging.ServiceParam, "/app/fail")
+	_, err = store.GetEntry(staging.ServiceParam, "/app/fail")
 	require.NoError(t, err)
 
 	// Successful entry should be unstaged
-	_, err = store.Get(staging.ServiceParam, "/app/success")
+	_, err = store.GetEntry(staging.ServiceParam, "/app/success")
 	assert.ErrorIs(t, err, staging.ErrNotStaged)
 }
 
@@ -227,7 +227,7 @@ func TestApplyUseCase_Execute_ConflictDetection(t *testing.T) {
 	awsTime := time.Date(2024, 1, 2, 0, 0, 0, 0, time.UTC) // Modified after staging
 
 	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
-	require.NoError(t, store.Stage(staging.ServiceParam, "/app/conflict", staging.Entry{
+	require.NoError(t, store.StageEntry(staging.ServiceParam, "/app/conflict", staging.Entry{
 		Operation:      staging.OperationUpdate,
 		Value:          lo.ToPtr("staged"),
 		StagedAt:       time.Now(),
@@ -271,7 +271,7 @@ func TestApplyUseCase_Execute_DeleteSuccess(t *testing.T) {
 	t.Parallel()
 
 	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
-	require.NoError(t, store.Stage(staging.ServiceParam, "/app/to-delete", staging.Entry{
+	require.NoError(t, store.StageEntry(staging.ServiceParam, "/app/to-delete", staging.Entry{
 		Operation: staging.OperationDelete,
 		StagedAt:  time.Now(),
 	}))
@@ -370,7 +370,7 @@ func TestApplyUseCase_Execute_EntriesAndTags(t *testing.T) {
 	t.Parallel()
 
 	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
-	require.NoError(t, store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
+	require.NoError(t, store.StageEntry(staging.ServiceParam, "/app/config", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("new-value"),
 		StagedAt:  time.Now(),

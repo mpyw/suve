@@ -67,7 +67,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 // Run executes the reset command.
 func (r *Runner) Run(_ context.Context) error {
 	// Get counts before reset
-	staged, err := r.Store.List("")
+	staged, err := r.Store.ListEntries("")
 	if err != nil {
 		return err
 	}

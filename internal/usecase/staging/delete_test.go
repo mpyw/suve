@@ -54,7 +54,7 @@ func TestDeleteUseCase_Execute_Param(t *testing.T) {
 	assert.False(t, output.HasDeleteOptions)
 
 	// Verify staged
-	entry, err := store.Get(staging.ServiceParam, "/app/to-delete")
+	entry, err := store.GetEntry(staging.ServiceParam, "/app/to-delete")
 	require.NoError(t, err)
 	assert.Equal(t, staging.OperationDelete, entry.Operation)
 	assert.NotNil(t, entry.BaseModifiedAt)
@@ -81,7 +81,7 @@ func TestDeleteUseCase_Execute_SecretWithRecoveryWindow(t *testing.T) {
 	assert.Equal(t, 14, output.RecoveryWindow)
 	assert.False(t, output.Force)
 
-	entry, err := store.Get(staging.ServiceSecret, "my-secret")
+	entry, err := store.GetEntry(staging.ServiceSecret, "my-secret")
 	require.NoError(t, err)
 	assert.NotNil(t, entry.DeleteOptions)
 	assert.Equal(t, 14, entry.DeleteOptions.RecoveryWindow)
@@ -173,7 +173,7 @@ func TestDeleteUseCase_Execute_ZeroLastModified(t *testing.T) {
 	assert.Equal(t, "/app/to-delete", output.Name)
 
 	// Verify BaseModifiedAt is nil when lastModified is zero
-	entry, err := store.Get(staging.ServiceParam, "/app/to-delete")
+	entry, err := store.GetEntry(staging.ServiceParam, "/app/to-delete")
 	require.NoError(t, err)
 	assert.Nil(t, entry.BaseModifiedAt)
 }
@@ -242,7 +242,7 @@ func TestDeleteUseCase_Execute_UnstagesCreate(t *testing.T) {
 
 	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
 	// Pre-stage a CREATE operation
-	require.NoError(t, store.Stage(staging.ServiceParam, "/app/new", staging.Entry{
+	require.NoError(t, store.StageEntry(staging.ServiceParam, "/app/new", staging.Entry{
 		Operation: staging.OperationCreate,
 		Value:     lo.ToPtr("new-value"),
 		StagedAt:  time.Now(),
@@ -261,7 +261,7 @@ func TestDeleteUseCase_Execute_UnstagesCreate(t *testing.T) {
 	assert.Equal(t, "/app/new", output.Name)
 
 	// Verify the entry was unstaged (removed), not staged as DELETE
-	_, err = store.Get(staging.ServiceParam, "/app/new")
+	_, err = store.GetEntry(staging.ServiceParam, "/app/new")
 	assert.ErrorIs(t, err, staging.ErrNotStaged)
 }
 
@@ -270,7 +270,7 @@ func TestDeleteUseCase_Execute_DeleteOnUpdate(t *testing.T) {
 
 	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
 	// Pre-stage an UPDATE operation
-	require.NoError(t, store.Stage(staging.ServiceParam, "/app/existing", staging.Entry{
+	require.NoError(t, store.StageEntry(staging.ServiceParam, "/app/existing", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("updated-value"),
 		StagedAt:  time.Now(),
@@ -288,7 +288,7 @@ func TestDeleteUseCase_Execute_DeleteOnUpdate(t *testing.T) {
 	assert.False(t, output.Unstaged) // Not unstaged, it was re-staged as DELETE
 
 	// Verify the operation changed to DELETE
-	entry, err := store.Get(staging.ServiceParam, "/app/existing")
+	entry, err := store.GetEntry(staging.ServiceParam, "/app/existing")
 	require.NoError(t, err)
 	assert.Equal(t, staging.OperationDelete, entry.Operation)
 }

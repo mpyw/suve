@@ -69,12 +69,12 @@ func TestStatusUseCase_Execute_WithEntries(t *testing.T) {
 	now := time.Now().Truncate(time.Second)
 
 	// Stage some entries
-	require.NoError(t, store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
+	require.NoError(t, store.StageEntry(staging.ServiceParam, "/app/config", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("new-value"),
 		StagedAt:  now,
 	}))
-	require.NoError(t, store.Stage(staging.ServiceParam, "/app/secret", staging.Entry{
+	require.NoError(t, store.StageEntry(staging.ServiceParam, "/app/secret", staging.Entry{
 		Operation: staging.OperationDelete,
 		StagedAt:  now,
 	}))
@@ -95,7 +95,7 @@ func TestStatusUseCase_Execute_FilterByName(t *testing.T) {
 	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
 	now := time.Now()
 
-	require.NoError(t, store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
+	require.NoError(t, store.StageEntry(staging.ServiceParam, "/app/config", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("value"),
 		StagedAt:  now,
@@ -124,7 +124,7 @@ func TestStatusUseCase_Execute_SecretWithDeleteOptions(t *testing.T) {
 	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
 	now := time.Now()
 
-	require.NoError(t, store.Stage(staging.ServiceSecret, "my-secret", staging.Entry{
+	require.NoError(t, store.StageEntry(staging.ServiceSecret, "my-secret", staging.Entry{
 		Operation: staging.OperationDelete,
 		StagedAt:  now,
 		DeleteOptions: &staging.DeleteOptions{
@@ -255,7 +255,7 @@ func TestStatusUseCase_Execute_FilterByName_BothEntryAndTag(t *testing.T) {
 	now := time.Now()
 
 	// Stage both regular entry and tag entry
-	require.NoError(t, store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
+	require.NoError(t, store.StageEntry(staging.ServiceParam, "/app/config", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("new-value"),
 		StagedAt:  now,

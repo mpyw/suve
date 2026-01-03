@@ -103,7 +103,7 @@ func TestStatusRunner_Run(t *testing.T) {
 
 		tmpDir := t.TempDir()
 		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
-		_ = store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
+		_ = store.StageEntry(staging.ServiceParam, "/app/config", staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("staged-value"),
 			StagedAt:  time.Now(),
@@ -151,7 +151,7 @@ func TestStatusRunner_Run(t *testing.T) {
 
 		tmpDir := t.TempDir()
 		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
-		_ = store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
+		_ = store.StageEntry(staging.ServiceParam, "/app/config", staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("staged-value"),
 			StagedAt:  time.Now(),
@@ -198,17 +198,17 @@ func TestStatusRunner_Run(t *testing.T) {
 
 		tmpDir := t.TempDir()
 		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
-		_ = store.Stage(staging.ServiceParam, "/app/config1", staging.Entry{
+		_ = store.StageEntry(staging.ServiceParam, "/app/config1", staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("value1"),
 			StagedAt:  time.Now(),
 		})
-		_ = store.Stage(staging.ServiceParam, "/app/config2", staging.Entry{
+		_ = store.StageEntry(staging.ServiceParam, "/app/config2", staging.Entry{
 			Operation: staging.OperationCreate,
 			Value:     lo.ToPtr("value2"),
 			StagedAt:  time.Now(),
 		})
-		_ = store.Stage(staging.ServiceParam, "/app/config3", staging.Entry{
+		_ = store.StageEntry(staging.ServiceParam, "/app/config3", staging.Entry{
 			Operation: staging.OperationDelete,
 			StagedAt:  time.Now(),
 		})
@@ -238,7 +238,7 @@ func TestStatusRunner_Run(t *testing.T) {
 
 		tmpDir := t.TempDir()
 		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
-		_ = store.Stage(staging.ServiceSecret, "my-secret", staging.Entry{
+		_ = store.StageEntry(staging.ServiceSecret, "my-secret", staging.Entry{
 			Operation:     staging.OperationDelete,
 			StagedAt:      time.Now(),
 			DeleteOptions: &staging.DeleteOptions{Force: true},
@@ -272,7 +272,7 @@ func TestDiffRunner_Run(t *testing.T) {
 
 		tmpDir := t.TempDir()
 		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
-		_ = store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
+		_ = store.StageEntry(staging.ServiceParam, "/app/config", staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("new-value"),
 			StagedAt:  time.Now(),
@@ -300,12 +300,12 @@ func TestDiffRunner_Run(t *testing.T) {
 
 		tmpDir := t.TempDir()
 		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
-		_ = store.Stage(staging.ServiceParam, "/app/config1", staging.Entry{
+		_ = store.StageEntry(staging.ServiceParam, "/app/config1", staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("new1"),
 			StagedAt:  time.Now(),
 		})
-		_ = store.Stage(staging.ServiceParam, "/app/config2", staging.Entry{
+		_ = store.StageEntry(staging.ServiceParam, "/app/config2", staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("new2"),
 			StagedAt:  time.Now(),
@@ -375,7 +375,7 @@ func TestDiffRunner_Run(t *testing.T) {
 
 		tmpDir := t.TempDir()
 		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
-		_ = store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
+		_ = store.StageEntry(staging.ServiceParam, "/app/config", staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr(`{"b":2,"a":1}`),
 			StagedAt:  time.Now(),
@@ -403,7 +403,7 @@ func TestDiffRunner_Run(t *testing.T) {
 
 		tmpDir := t.TempDir()
 		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
-		_ = store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
+		_ = store.StageEntry(staging.ServiceParam, "/app/config", staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("not-json"),
 			StagedAt:  time.Now(),
@@ -429,7 +429,7 @@ func TestDiffRunner_Run(t *testing.T) {
 
 		tmpDir := t.TempDir()
 		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
-		_ = store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
+		_ = store.StageEntry(staging.ServiceParam, "/app/config", staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("same-value"),
 			StagedAt:  time.Now(),
@@ -451,7 +451,7 @@ func TestDiffRunner_Run(t *testing.T) {
 		assert.Contains(t, stderr.String(), "identical")
 
 		// Verify unstaged
-		_, err = store.Get(staging.ServiceParam, "/app/config")
+		_, err = store.GetEntry(staging.ServiceParam, "/app/config")
 		assert.ErrorIs(t, err, staging.ErrNotStaged)
 	})
 
@@ -460,7 +460,7 @@ func TestDiffRunner_Run(t *testing.T) {
 
 		tmpDir := t.TempDir()
 		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
-		_ = store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
+		_ = store.StageEntry(staging.ServiceParam, "/app/config", staging.Entry{
 			Operation: staging.OperationDelete,
 			StagedAt:  time.Now(),
 		})
@@ -487,7 +487,7 @@ func TestDiffRunner_Run(t *testing.T) {
 
 		tmpDir := t.TempDir()
 		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
-		_ = store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
+		_ = store.StageEntry(staging.ServiceParam, "/app/config", staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("new-value"),
 			StagedAt:  time.Now(),
@@ -510,7 +510,7 @@ func TestDiffRunner_Run(t *testing.T) {
 		assert.Contains(t, stderr.String(), "no longer exists")
 
 		// Verify unstaged
-		_, err = store.Get(staging.ServiceParam, "/app/config")
+		_, err = store.GetEntry(staging.ServiceParam, "/app/config")
 		assert.ErrorIs(t, err, staging.ErrNotStaged)
 	})
 
@@ -519,7 +519,7 @@ func TestDiffRunner_Run(t *testing.T) {
 
 		tmpDir := t.TempDir()
 		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
-		_ = store.Stage(staging.ServiceParam, "/app/new-param", staging.Entry{
+		_ = store.StageEntry(staging.ServiceParam, "/app/new-param", staging.Entry{
 			Operation: staging.OperationCreate,
 			Value:     lo.ToPtr("brand-new-value"),
 			StagedAt:  time.Now(),
@@ -545,7 +545,7 @@ func TestDiffRunner_Run(t *testing.T) {
 		assert.Contains(t, output, "staged for creation")
 
 		// Verify still staged (not auto-unstaged)
-		entry, err := store.Get(staging.ServiceParam, "/app/new-param")
+		entry, err := store.GetEntry(staging.ServiceParam, "/app/new-param")
 		require.NoError(t, err)
 		assert.Equal(t, staging.OperationCreate, entry.Operation)
 	})
@@ -555,7 +555,7 @@ func TestDiffRunner_Run(t *testing.T) {
 
 		tmpDir := t.TempDir()
 		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
-		_ = store.Stage(staging.ServiceParam, "/app/new-json", staging.Entry{
+		_ = store.StageEntry(staging.ServiceParam, "/app/new-json", staging.Entry{
 			Operation: staging.OperationCreate,
 			Value:     lo.ToPtr(`{"b":2,"a":1}`),
 			StagedAt:  time.Now(),
@@ -584,7 +584,7 @@ func TestDiffRunner_Run(t *testing.T) {
 
 		tmpDir := t.TempDir()
 		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
-		_ = store.Stage(staging.ServiceParam, "/app/param", staging.Entry{
+		_ = store.StageEntry(staging.ServiceParam, "/app/param", staging.Entry{
 			Operation: staging.OperationCreate,
 			Value:     lo.ToPtr("same-value"),
 			StagedAt:  time.Now(),
@@ -607,7 +607,7 @@ func TestDiffRunner_Run(t *testing.T) {
 		assert.Contains(t, stderr.String(), "identical")
 
 		// Verify unstaged
-		_, err = store.Get(staging.ServiceParam, "/app/param")
+		_, err = store.GetEntry(staging.ServiceParam, "/app/param")
 		assert.ErrorIs(t, err, staging.ErrNotStaged)
 	})
 
@@ -616,7 +616,7 @@ func TestDiffRunner_Run(t *testing.T) {
 
 		tmpDir := t.TempDir()
 		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
-		_ = store.Stage(staging.ServiceParam, "/app/param", staging.Entry{
+		_ = store.StageEntry(staging.ServiceParam, "/app/param", staging.Entry{
 			Operation: staging.OperationCreate,
 			Value:     lo.ToPtr("new-value"),
 			StagedAt:  time.Now(),
@@ -645,7 +645,7 @@ func TestDiffRunner_Run(t *testing.T) {
 
 		tmpDir := t.TempDir()
 		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
-		_ = store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
+		_ = store.StageEntry(staging.ServiceParam, "/app/config", staging.Entry{
 			Operation: staging.OperationDelete,
 			StagedAt:  time.Now(),
 		})
@@ -667,7 +667,7 @@ func TestDiffRunner_Run(t *testing.T) {
 		assert.Contains(t, stderr.String(), "already deleted")
 
 		// Verify unstaged
-		_, err = store.Get(staging.ServiceParam, "/app/config")
+		_, err = store.GetEntry(staging.ServiceParam, "/app/config")
 		assert.ErrorIs(t, err, staging.ErrNotStaged)
 	})
 }
@@ -703,7 +703,7 @@ func TestEditRunner_Run(t *testing.T) {
 		require.NoError(t, err)
 		assert.Contains(t, stdout.String(), "Staged")
 
-		entry, err := store.Get(staging.ServiceParam, "/app/config")
+		entry, err := store.GetEntry(staging.ServiceParam, "/app/config")
 		require.NoError(t, err)
 		assert.Equal(t, staging.OperationUpdate, entry.Operation)
 		assert.Equal(t, "edited-value", lo.FromPtr(entry.Value))
@@ -714,7 +714,7 @@ func TestEditRunner_Run(t *testing.T) {
 
 		tmpDir := t.TempDir()
 		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
-		_ = store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
+		_ = store.StageEntry(staging.ServiceParam, "/app/config", staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("staged-value"),
 			StagedAt:  time.Now(),
@@ -737,7 +737,7 @@ func TestEditRunner_Run(t *testing.T) {
 		err := r.Run(context.Background(), runner.EditOptions{Name: "/app/config"})
 		require.NoError(t, err)
 
-		entry, err := store.Get(staging.ServiceParam, "/app/config")
+		entry, err := store.GetEntry(staging.ServiceParam, "/app/config")
 		require.NoError(t, err)
 		assert.Equal(t, "new-value", lo.FromPtr(entry.Value))
 	})
@@ -747,7 +747,7 @@ func TestEditRunner_Run(t *testing.T) {
 
 		tmpDir := t.TempDir()
 		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
-		_ = store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
+		_ = store.StageEntry(staging.ServiceParam, "/app/config", staging.Entry{
 			Operation: staging.OperationCreate,
 			Value:     lo.ToPtr("create-value"),
 			StagedAt:  time.Now(),
@@ -856,17 +856,17 @@ func TestApplyRunner_Run(t *testing.T) {
 
 		tmpDir := t.TempDir()
 		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
-		_ = store.Stage(staging.ServiceParam, "/app/config1", staging.Entry{
+		_ = store.StageEntry(staging.ServiceParam, "/app/config1", staging.Entry{
 			Operation: staging.OperationCreate,
 			Value:     lo.ToPtr("value1"),
 			StagedAt:  time.Now(),
 		})
-		_ = store.Stage(staging.ServiceParam, "/app/config2", staging.Entry{
+		_ = store.StageEntry(staging.ServiceParam, "/app/config2", staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("value2"),
 			StagedAt:  time.Now(),
 		})
-		_ = store.Stage(staging.ServiceParam, "/app/config3", staging.Entry{
+		_ = store.StageEntry(staging.ServiceParam, "/app/config3", staging.Entry{
 			Operation: staging.OperationDelete,
 			StagedAt:  time.Now(),
 		})
@@ -889,11 +889,11 @@ func TestApplyRunner_Run(t *testing.T) {
 		assert.Contains(t, output, "Deleted")
 
 		// Verify all unstaged
-		_, err = store.Get(staging.ServiceParam, "/app/config1")
+		_, err = store.GetEntry(staging.ServiceParam, "/app/config1")
 		assert.ErrorIs(t, err, staging.ErrNotStaged)
-		_, err = store.Get(staging.ServiceParam, "/app/config2")
+		_, err = store.GetEntry(staging.ServiceParam, "/app/config2")
 		assert.ErrorIs(t, err, staging.ErrNotStaged)
-		_, err = store.Get(staging.ServiceParam, "/app/config3")
+		_, err = store.GetEntry(staging.ServiceParam, "/app/config3")
 		assert.ErrorIs(t, err, staging.ErrNotStaged)
 	})
 
@@ -902,12 +902,12 @@ func TestApplyRunner_Run(t *testing.T) {
 
 		tmpDir := t.TempDir()
 		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
-		_ = store.Stage(staging.ServiceParam, "/app/config1", staging.Entry{
+		_ = store.StageEntry(staging.ServiceParam, "/app/config1", staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("value1"),
 			StagedAt:  time.Now(),
 		})
-		_ = store.Stage(staging.ServiceParam, "/app/config2", staging.Entry{
+		_ = store.StageEntry(staging.ServiceParam, "/app/config2", staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("value2"),
 			StagedAt:  time.Now(),
@@ -927,9 +927,9 @@ func TestApplyRunner_Run(t *testing.T) {
 		require.NoError(t, err)
 
 		// Only config1 should be unstaged
-		_, err = store.Get(staging.ServiceParam, "/app/config1")
+		_, err = store.GetEntry(staging.ServiceParam, "/app/config1")
 		assert.ErrorIs(t, err, staging.ErrNotStaged)
-		_, err = store.Get(staging.ServiceParam, "/app/config2")
+		_, err = store.GetEntry(staging.ServiceParam, "/app/config2")
 		assert.NoError(t, err) // Still staged
 	})
 
@@ -939,7 +939,7 @@ func TestApplyRunner_Run(t *testing.T) {
 		tmpDir := t.TempDir()
 		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 		// Stage a different item so we can test "specific item not staged"
-		_ = store.Stage(staging.ServiceParam, "/app/other", staging.Entry{
+		_ = store.StageEntry(staging.ServiceParam, "/app/other", staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("value"),
 			StagedAt:  time.Now(),
@@ -986,7 +986,7 @@ func TestApplyRunner_Run(t *testing.T) {
 
 		tmpDir := t.TempDir()
 		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
-		_ = store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
+		_ = store.StageEntry(staging.ServiceParam, "/app/config", staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("value"),
 			StagedAt:  time.Now(),
@@ -1013,7 +1013,7 @@ func TestApplyRunner_Run(t *testing.T) {
 
 		tmpDir := t.TempDir()
 		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
-		_ = store.Stage(staging.ServiceParam, "/app/new-config", staging.Entry{
+		_ = store.StageEntry(staging.ServiceParam, "/app/new-config", staging.Entry{
 			Operation: staging.OperationCreate,
 			Value:     lo.ToPtr("new-value"),
 			StagedAt:  time.Now(),
@@ -1043,7 +1043,7 @@ func TestApplyRunner_Run(t *testing.T) {
 		tmpDir := t.TempDir()
 		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 		baseTime := time.Now().Add(-time.Hour)
-		_ = store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
+		_ = store.StageEntry(staging.ServiceParam, "/app/config", staging.Entry{
 			Operation:      staging.OperationUpdate,
 			Value:          lo.ToPtr("updated-value"),
 			StagedAt:       time.Now(),
@@ -1073,7 +1073,7 @@ func TestApplyRunner_Run(t *testing.T) {
 		tmpDir := t.TempDir()
 		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 		baseTime := time.Now().Add(-time.Hour)
-		_ = store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
+		_ = store.StageEntry(staging.ServiceParam, "/app/config", staging.Entry{
 			Operation:      staging.OperationDelete,
 			StagedAt:       time.Now(),
 			BaseModifiedAt: &baseTime,
@@ -1100,7 +1100,7 @@ func TestApplyRunner_Run(t *testing.T) {
 		tmpDir := t.TempDir()
 		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 		baseTime := time.Now()
-		_ = store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
+		_ = store.StageEntry(staging.ServiceParam, "/app/config", staging.Entry{
 			Operation:      staging.OperationUpdate,
 			Value:          lo.ToPtr("updated-value"),
 			StagedAt:       time.Now(),
@@ -1129,7 +1129,7 @@ func TestApplyRunner_Run(t *testing.T) {
 		tmpDir := t.TempDir()
 		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 		baseTime := time.Now().Add(-time.Hour)
-		_ = store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
+		_ = store.StageEntry(staging.ServiceParam, "/app/config", staging.Entry{
 			Operation:      staging.OperationUpdate,
 			Value:          lo.ToPtr("updated-value"),
 			StagedAt:       time.Now(),
@@ -1157,7 +1157,7 @@ func TestApplyRunner_Run(t *testing.T) {
 
 		tmpDir := t.TempDir()
 		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
-		_ = store.Stage(staging.ServiceParam, "/app/new-config", staging.Entry{
+		_ = store.StageEntry(staging.ServiceParam, "/app/new-config", staging.Entry{
 			Operation: staging.OperationCreate,
 			Value:     lo.ToPtr("new-value"),
 			StagedAt:  time.Now(),
@@ -1192,12 +1192,12 @@ func TestResetRunner_Run(t *testing.T) {
 
 		tmpDir := t.TempDir()
 		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
-		_ = store.Stage(staging.ServiceParam, "/app/config1", staging.Entry{
+		_ = store.StageEntry(staging.ServiceParam, "/app/config1", staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("value1"),
 			StagedAt:  time.Now(),
 		})
-		_ = store.Stage(staging.ServiceParam, "/app/config2", staging.Entry{
+		_ = store.StageEntry(staging.ServiceParam, "/app/config2", staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("value2"),
 			StagedAt:  time.Now(),
@@ -1219,7 +1219,7 @@ func TestResetRunner_Run(t *testing.T) {
 		assert.Contains(t, stdout.String(), "(2)")
 
 		// Verify all unstaged
-		_, err = store.Get(staging.ServiceParam, "/app/config1")
+		_, err = store.GetEntry(staging.ServiceParam, "/app/config1")
 		assert.ErrorIs(t, err, staging.ErrNotStaged)
 	})
 
@@ -1249,7 +1249,7 @@ func TestResetRunner_Run(t *testing.T) {
 
 		tmpDir := t.TempDir()
 		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
-		_ = store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
+		_ = store.StageEntry(staging.ServiceParam, "/app/config", staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("value"),
 			StagedAt:  time.Now(),
@@ -1269,7 +1269,7 @@ func TestResetRunner_Run(t *testing.T) {
 		require.NoError(t, err)
 		assert.Contains(t, stdout.String(), "Unstaged")
 
-		_, err = store.Get(staging.ServiceParam, "/app/config")
+		_, err = store.GetEntry(staging.ServiceParam, "/app/config")
 		assert.ErrorIs(t, err, staging.ErrNotStaged)
 	})
 
@@ -1322,7 +1322,7 @@ func TestResetRunner_Run(t *testing.T) {
 		assert.Contains(t, stdout.String(), "Restored")
 		assert.Contains(t, stdout.String(), "#1")
 
-		entry, err := store.Get(staging.ServiceParam, "/app/config#1")
+		entry, err := store.GetEntry(staging.ServiceParam, "/app/config#1")
 		require.NoError(t, err)
 		assert.Equal(t, "old-value", lo.FromPtr(entry.Value))
 	})
@@ -1413,7 +1413,7 @@ func TestRunners_SecretService(t *testing.T) {
 
 		tmpDir := t.TempDir()
 		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
-		_ = store.Stage(staging.ServiceSecret, "my-secret", staging.Entry{
+		_ = store.StageEntry(staging.ServiceSecret, "my-secret", staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("secret-value"),
 			StagedAt:  time.Now(),
@@ -1439,7 +1439,7 @@ func TestRunners_SecretService(t *testing.T) {
 
 		tmpDir := t.TempDir()
 		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
-		_ = store.Stage(staging.ServiceSecret, "my-secret", staging.Entry{
+		_ = store.StageEntry(staging.ServiceSecret, "my-secret", staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("secret-value"),
 			StagedAt:  time.Now(),
@@ -1469,7 +1469,7 @@ func TestRunners_DeleteOptions(t *testing.T) {
 
 		tmpDir := t.TempDir()
 		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
-		_ = store.Stage(staging.ServiceSecret, "my-secret", staging.Entry{
+		_ = store.StageEntry(staging.ServiceSecret, "my-secret", staging.Entry{
 			Operation:     staging.OperationDelete,
 			StagedAt:      time.Now(),
 			DeleteOptions: &staging.DeleteOptions{RecoveryWindow: 14},
@@ -1502,7 +1502,7 @@ func TestDiffRunner_OutputMetadata(t *testing.T) {
 		tmpDir := t.TempDir()
 		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 		desc := "Updated config description"
-		_ = store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
+		_ = store.StageEntry(staging.ServiceParam, "/app/config", staging.Entry{
 			Operation:   staging.OperationUpdate,
 			Value:       lo.ToPtr("new-value"),
 			Description: &desc,
@@ -1628,7 +1628,7 @@ func TestEditRunner_WithMetadata(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		entry, err := store.Get(staging.ServiceParam, "/app/config")
+		entry, err := store.GetEntry(staging.ServiceParam, "/app/config")
 		require.NoError(t, err)
 		assert.Equal(t, "Updated description", lo.FromPtr(entry.Description))
 	})
@@ -1660,7 +1660,7 @@ func TestEditRunner_WithMetadata(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		entry, err := store.Get(staging.ServiceParam, "/app/config")
+		entry, err := store.GetEntry(staging.ServiceParam, "/app/config")
 		require.NoError(t, err)
 		require.NotNil(t, entry.BaseModifiedAt)
 		assert.WithinDuration(t, awsTime, *entry.BaseModifiedAt, time.Second)
@@ -1672,7 +1672,7 @@ func TestEditRunner_WithMetadata(t *testing.T) {
 		tmpDir := t.TempDir()
 		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 		// Stage a delete operation
-		_ = store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
+		_ = store.StageEntry(staging.ServiceParam, "/app/config", staging.Entry{
 			Operation: staging.OperationDelete,
 			StagedAt:  time.Now(),
 		})
@@ -1695,7 +1695,7 @@ func TestEditRunner_WithMetadata(t *testing.T) {
 		err := r.Run(context.Background(), runner.EditOptions{Name: "/app/config"})
 		require.NoError(t, err)
 
-		entry, err := store.Get(staging.ServiceParam, "/app/config")
+		entry, err := store.GetEntry(staging.ServiceParam, "/app/config")
 		require.NoError(t, err)
 		assert.Equal(t, staging.OperationUpdate, entry.Operation)
 		assert.Equal(t, "edited-value", lo.FromPtr(entry.Value))
@@ -1931,7 +1931,7 @@ func TestStatusRunner_WithTagEntries(t *testing.T) {
 
 		tmpDir := t.TempDir()
 		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
-		_ = store.Stage(staging.ServiceParam, "/app/value", staging.Entry{
+		_ = store.StageEntry(staging.ServiceParam, "/app/value", staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("new-value"),
 			StagedAt:  time.Now(),
@@ -2012,7 +2012,7 @@ func TestDeleteRunner_Run(t *testing.T) {
 		require.NoError(t, err)
 		assert.Contains(t, stdout.String(), "Staged for deletion: /app/config")
 
-		entry, err := store.Get(staging.ServiceParam, "/app/config")
+		entry, err := store.GetEntry(staging.ServiceParam, "/app/config")
 		require.NoError(t, err)
 		assert.Equal(t, staging.OperationDelete, entry.Operation)
 		assert.Nil(t, entry.DeleteOptions) // SSM has no delete options
@@ -2041,7 +2041,7 @@ func TestDeleteRunner_Run(t *testing.T) {
 		require.NoError(t, err)
 		assert.Contains(t, stdout.String(), "Staged for deletion (14-day recovery): my-secret")
 
-		entry, err := store.Get(staging.ServiceSecret, "my-secret")
+		entry, err := store.GetEntry(staging.ServiceSecret, "my-secret")
 		require.NoError(t, err)
 		assert.Equal(t, staging.OperationDelete, entry.Operation)
 		require.NotNil(t, entry.DeleteOptions)
@@ -2072,7 +2072,7 @@ func TestDeleteRunner_Run(t *testing.T) {
 		require.NoError(t, err)
 		assert.Contains(t, stdout.String(), "Staged for immediate deletion: my-secret")
 
-		entry, err := store.Get(staging.ServiceSecret, "my-secret")
+		entry, err := store.GetEntry(staging.ServiceSecret, "my-secret")
 		require.NoError(t, err)
 		assert.Equal(t, staging.OperationDelete, entry.Operation)
 		require.NotNil(t, entry.DeleteOptions)

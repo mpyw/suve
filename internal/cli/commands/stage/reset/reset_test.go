@@ -56,19 +56,19 @@ func TestRun_UnstageAll(t *testing.T) {
 	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 	// Stage SSM Parameter Store parameters
-	_ = store.Stage(staging.ServiceParam, "/app/config1", staging.Entry{
+	_ = store.StageEntry(staging.ServiceParam, "/app/config1", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("param-value1"),
 		StagedAt:  time.Now(),
 	})
-	_ = store.Stage(staging.ServiceParam, "/app/config2", staging.Entry{
+	_ = store.StageEntry(staging.ServiceParam, "/app/config2", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("param-value2"),
 		StagedAt:  time.Now(),
 	})
 
 	// Stage Secrets Manager secrets
-	_ = store.Stage(staging.ServiceSecret, "secret1", staging.Entry{
+	_ = store.StageEntry(staging.ServiceSecret, "secret1", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("secret-value1"),
 		StagedAt:  time.Now(),
@@ -86,11 +86,11 @@ func TestRun_UnstageAll(t *testing.T) {
 	assert.Contains(t, buf.String(), "Unstaged all changes (2 SSM Parameter Store, 1 Secrets Manager)")
 
 	// Verify all unstaged
-	_, err = store.Get(staging.ServiceParam, "/app/config1")
+	_, err = store.GetEntry(staging.ServiceParam, "/app/config1")
 	assert.Equal(t, staging.ErrNotStaged, err)
-	_, err = store.Get(staging.ServiceParam, "/app/config2")
+	_, err = store.GetEntry(staging.ServiceParam, "/app/config2")
 	assert.Equal(t, staging.ErrNotStaged, err)
-	_, err = store.Get(staging.ServiceSecret, "secret1")
+	_, err = store.GetEntry(staging.ServiceSecret, "secret1")
 	assert.Equal(t, staging.ErrNotStaged, err)
 }
 
@@ -101,7 +101,7 @@ func TestRun_UnstageParamOnly(t *testing.T) {
 	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 	// Stage only SSM Parameter Store parameters
-	_ = store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
+	_ = store.StageEntry(staging.ServiceParam, "/app/config", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("param-value"),
 		StagedAt:  time.Now(),
@@ -126,7 +126,7 @@ func TestRun_UnstageSecretOnly(t *testing.T) {
 	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 	// Stage only Secrets Manager secrets
-	_ = store.Stage(staging.ServiceSecret, "my-secret", staging.Entry{
+	_ = store.StageEntry(staging.ServiceSecret, "my-secret", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("secret-value"),
 		StagedAt:  time.Now(),

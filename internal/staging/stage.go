@@ -257,12 +257,6 @@ func (s *Store) saveLocked(state *State) error {
 	return nil
 }
 
-// Stage adds or updates a staged entry change.
-// Deprecated: Use StageEntry instead.
-func (s *Store) Stage(service Service, name string, entry Entry) error {
-	return s.StageEntry(service, name, entry)
-}
-
 // StageEntry adds or updates a staged entry change.
 func (s *Store) StageEntry(service Service, name string, entry Entry) error {
 	// Acquire cross-process file lock
@@ -315,12 +309,6 @@ func (s *Store) StageTag(service Service, name string, tagEntry TagEntry) error 
 	}
 
 	return s.saveLocked(state)
-}
-
-// Unstage removes a staged entry change.
-// Deprecated: Use UnstageEntry instead.
-func (s *Store) Unstage(service Service, name string) error {
-	return s.UnstageEntry(service, name)
 }
 
 // UnstageEntry removes a staged entry change.
@@ -420,12 +408,6 @@ func (s *Store) UnstageAll(service Service) error {
 	return s.saveLocked(state)
 }
 
-// Get retrieves a staged entry.
-// Deprecated: Use GetEntry instead.
-func (s *Store) Get(service Service, name string) (*Entry, error) {
-	return s.GetEntry(service, name)
-}
-
 // GetEntry retrieves a staged entry.
 func (s *Store) GetEntry(service Service, name string) (*Entry, error) {
 	state, err := s.Load()
@@ -462,13 +444,6 @@ func (s *Store) GetTag(service Service, name string) (*TagEntry, error) {
 	default:
 		return nil, fmt.Errorf("unknown service: %s", service)
 	}
-}
-
-// List returns all staged entries for a service.
-// If service is empty, returns all staged entries.
-// Deprecated: Use ListEntries instead.
-func (s *Store) List(service Service) (map[Service]map[string]Entry, error) {
-	return s.ListEntries(service)
 }
 
 // ListEntries returns all staged entries for a service.

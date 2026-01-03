@@ -56,7 +56,7 @@ func TestEditUseCase_Execute(t *testing.T) {
 	assert.Equal(t, "/app/config", output.Name)
 
 	// Verify staged
-	entry, err := store.Get(staging.ServiceParam, "/app/config")
+	entry, err := store.GetEntry(staging.ServiceParam, "/app/config")
 	require.NoError(t, err)
 	assert.Equal(t, staging.OperationUpdate, entry.Operation)
 	assert.Equal(t, "updated-value", lo.FromPtr(entry.Value))
@@ -70,7 +70,7 @@ func TestEditUseCase_Execute_PreservesBaseModifiedAt(t *testing.T) {
 	baseTime := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
 
 	// Pre-stage an entry
-	require.NoError(t, store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
+	require.NoError(t, store.StageEntry(staging.ServiceParam, "/app/config", staging.Entry{
 		Operation:      staging.OperationUpdate,
 		Value:          lo.ToPtr("old-value"),
 		StagedAt:       time.Now(),
@@ -89,7 +89,7 @@ func TestEditUseCase_Execute_PreservesBaseModifiedAt(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	entry, err := store.Get(staging.ServiceParam, "/app/config")
+	entry, err := store.GetEntry(staging.ServiceParam, "/app/config")
 	require.NoError(t, err)
 	assert.Equal(t, baseTime, *entry.BaseModifiedAt)
 }
@@ -118,7 +118,7 @@ func TestEditUseCase_Baseline_FromStaging(t *testing.T) {
 	t.Parallel()
 
 	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
-	require.NoError(t, store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
+	require.NoError(t, store.StageEntry(staging.ServiceParam, "/app/config", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("staged-value"),
 		StagedAt:  time.Now(),
@@ -138,7 +138,7 @@ func TestEditUseCase_Baseline_FromStagingCreate(t *testing.T) {
 	t.Parallel()
 
 	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
-	require.NoError(t, store.Stage(staging.ServiceParam, "/app/new", staging.Entry{
+	require.NoError(t, store.StageEntry(staging.ServiceParam, "/app/new", staging.Entry{
 		Operation: staging.OperationCreate,
 		Value:     lo.ToPtr("create-value"),
 		StagedAt:  time.Now(),
@@ -195,7 +195,7 @@ func TestEditUseCase_Execute_WithStagedCreate(t *testing.T) {
 
 	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
 	// Pre-stage a create operation (no BaseModifiedAt)
-	require.NoError(t, store.Stage(staging.ServiceParam, "/app/new", staging.Entry{
+	require.NoError(t, store.StageEntry(staging.ServiceParam, "/app/new", staging.Entry{
 		Operation: staging.OperationCreate,
 		Value:     lo.ToPtr("initial"),
 		StagedAt:  time.Now(),
@@ -212,7 +212,7 @@ func TestEditUseCase_Execute_WithStagedCreate(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	entry, err := store.Get(staging.ServiceParam, "/app/new")
+	entry, err := store.GetEntry(staging.ServiceParam, "/app/new")
 	require.NoError(t, err)
 	// Operation should remain Create (not become Update)
 	assert.Equal(t, staging.OperationCreate, entry.Operation)
@@ -243,7 +243,7 @@ func TestEditUseCase_Execute_ZeroLastModified(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	entry, err := store.Get(staging.ServiceParam, "/app/config")
+	entry, err := store.GetEntry(staging.ServiceParam, "/app/config")
 	require.NoError(t, err)
 	assert.Nil(t, entry.BaseModifiedAt)
 }
@@ -305,7 +305,7 @@ func TestEditUseCase_Execute_ConvertsDeleteToUpdate(t *testing.T) {
 
 	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
 	// Pre-stage a DELETE operation
-	require.NoError(t, store.Stage(staging.ServiceParam, "/app/deleted", staging.Entry{
+	require.NoError(t, store.StageEntry(staging.ServiceParam, "/app/deleted", staging.Entry{
 		Operation: staging.OperationDelete,
 		StagedAt:  time.Now(),
 	}))
@@ -323,7 +323,7 @@ func TestEditUseCase_Execute_ConvertsDeleteToUpdate(t *testing.T) {
 	require.NoError(t, err)
 
 	// Verify the operation changed to UPDATE
-	entry, err := store.Get(staging.ServiceParam, "/app/deleted")
+	entry, err := store.GetEntry(staging.ServiceParam, "/app/deleted")
 	require.NoError(t, err)
 	assert.Equal(t, staging.OperationUpdate, entry.Operation)
 	assert.Equal(t, "new-value", lo.FromPtr(entry.Value))
@@ -334,7 +334,7 @@ func TestEditUseCase_Baseline_FetchesFromAWSWhenDeleteStaged(t *testing.T) {
 
 	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
 	// Pre-stage a DELETE operation
-	require.NoError(t, store.Stage(staging.ServiceParam, "/app/deleted", staging.Entry{
+	require.NoError(t, store.StageEntry(staging.ServiceParam, "/app/deleted", staging.Entry{
 		Operation: staging.OperationDelete,
 		StagedAt:  time.Now(),
 	}))
@@ -363,7 +363,7 @@ func TestEditUseCase_Execute_PreservesUpdateOperation(t *testing.T) {
 	baseTime := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
 
 	// Pre-stage an UPDATE operation
-	require.NoError(t, store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
+	require.NoError(t, store.StageEntry(staging.ServiceParam, "/app/config", staging.Entry{
 		Operation:      staging.OperationUpdate,
 		Value:          lo.ToPtr("old-value"),
 		StagedAt:       time.Now(),
@@ -382,7 +382,7 @@ func TestEditUseCase_Execute_PreservesUpdateOperation(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	entry, err := store.Get(staging.ServiceParam, "/app/config")
+	entry, err := store.GetEntry(staging.ServiceParam, "/app/config")
 	require.NoError(t, err)
 	assert.Equal(t, staging.OperationUpdate, entry.Operation)
 	assert.Equal(t, "newer-value", lo.FromPtr(entry.Value))

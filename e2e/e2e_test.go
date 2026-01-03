@@ -1422,7 +1422,7 @@ func TestParam_StagingAddViaCLI(t *testing.T) {
 	})
 }
 
-// TestParam_StagingAddWithOptions tests stage add with description and tags.
+// TestParam_StagingAddWithOptions tests stage add with description and stage tag for tags.
 func TestParam_StagingAddWithOptions(t *testing.T) {
 	setupEnv(t)
 	tmpHome := setupTempHome(t)
@@ -1435,30 +1435,42 @@ func TestParam_StagingAddWithOptions(t *testing.T) {
 		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
 	})
 
-	// Stage add with description and tags
-	t.Run("add-with-options", func(t *testing.T) {
+	// Stage add with description
+	t.Run("add-with-description", func(t *testing.T) {
 		stdout, _, err := runSubCommand(t, paramstage.Command(), "add",
 			"--description", "Test description",
-			"--tag", "env=test",
-			"--tag", "owner=e2e",
 			paramName, "value-with-options")
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "Staged")
 		t.Logf("stage add with options output: %s", stdout)
 	})
 
+	// Stage tags separately
+	t.Run("add-tags", func(t *testing.T) {
+		stdout, _, err := runSubCommand(t, paramstage.Command(), "tag",
+			paramName, "env=test", "owner=e2e")
+		require.NoError(t, err)
+		assert.Contains(t, stdout, "Staged")
+		t.Logf("stage tag output: %s", stdout)
+	})
+
 	// Verify staged entry has options
 	t.Run("verify-staged-options", func(t *testing.T) {
 		store := staging.NewStoreWithPath(filepath.Join(tmpHome, ".suve", "stage.json"))
+
+		// Verify entry
 		entry, err := store.Get(staging.ServiceParam, paramName)
 		require.NoError(t, err)
 		require.NotNil(t, entry.Value)
 		assert.Equal(t, "value-with-options", *entry.Value)
 		require.NotNil(t, entry.Description)
 		assert.Equal(t, "Test description", *entry.Description)
-		require.NotNil(t, entry.Tags)
-		assert.Equal(t, "test", entry.Tags["env"])
-		assert.Equal(t, "e2e", entry.Tags["owner"])
+
+		// Verify tags (now stored separately)
+		tagEntry, err := store.GetTag(staging.ServiceParam, paramName)
+		require.NoError(t, err)
+		assert.Equal(t, "test", tagEntry.Add["env"])
+		assert.Equal(t, "e2e", tagEntry.Add["owner"])
 	})
 
 	// Push and verify

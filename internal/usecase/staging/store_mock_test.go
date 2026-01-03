@@ -32,11 +32,6 @@ func newMockStore() *mockStore {
 	}
 }
 
-// Deprecated: Use GetEntry instead
-func (m *mockStore) Get(service staging.Service, name string) (*staging.Entry, error) {
-	return m.GetEntry(service, name)
-}
-
 func (m *mockStore) GetEntry(service staging.Service, name string) (*staging.Entry, error) {
 	if m.getErr != nil {
 		return nil, m.getErr
@@ -59,11 +54,6 @@ func (m *mockStore) GetTag(service staging.Service, name string) (*staging.TagEn
 		}
 	}
 	return nil, staging.ErrNotStaged
-}
-
-// Deprecated: Use ListEntries instead
-func (m *mockStore) List(service staging.Service) (map[staging.Service]map[string]staging.Entry, error) {
-	return m.ListEntries(service)
 }
 
 func (m *mockStore) ListEntries(service staging.Service) (map[staging.Service]map[string]staging.Entry, error) {
@@ -100,11 +90,6 @@ func (m *mockStore) ListTags(service staging.Service) (map[staging.Service]map[s
 	return result, nil
 }
 
-// Deprecated: Use StageEntry instead
-func (m *mockStore) Stage(service staging.Service, name string, entry staging.Entry) error {
-	return m.StageEntry(service, name, entry)
-}
-
 func (m *mockStore) StageEntry(service staging.Service, name string, entry staging.Entry) error {
 	if m.stageErr != nil {
 		return m.stageErr
@@ -125,11 +110,6 @@ func (m *mockStore) StageTag(service staging.Service, name string, tagEntry stag
 	}
 	m.tags[service][name] = tagEntry
 	return nil
-}
-
-// Deprecated: Use UnstageEntry instead
-func (m *mockStore) Unstage(service staging.Service, name string) error {
-	return m.UnstageEntry(service, name)
 }
 
 func (m *mockStore) UnstageEntry(service staging.Service, name string) error {

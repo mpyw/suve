@@ -42,7 +42,7 @@ func TestAddRunner_Run(t *testing.T) {
 		assert.Contains(t, buf.String(), "/app/config")
 
 		// Verify staged with OperationCreate
-		entry, err := store.Get(staging.ServiceParam, "/app/config")
+		entry, err := store.GetEntry(staging.ServiceParam, "/app/config")
 		require.NoError(t, err)
 		assert.Equal(t, staging.OperationCreate, entry.Operation)
 		assert.Equal(t, "new-value", lo.FromPtr(entry.Value))
@@ -55,7 +55,7 @@ func TestAddRunner_Run(t *testing.T) {
 		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 		// Pre-stage as create
-		_ = store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
+		_ = store.StageEntry(staging.ServiceParam, "/app/config", staging.Entry{
 			Operation: staging.OperationCreate,
 			Value:     lo.ToPtr("original-value"),
 		})
@@ -79,7 +79,7 @@ func TestAddRunner_Run(t *testing.T) {
 		assert.Contains(t, buf.String(), "Staged for creation")
 
 		// Verify updated
-		entry, err := store.Get(staging.ServiceParam, "/app/config")
+		entry, err := store.GetEntry(staging.ServiceParam, "/app/config")
 		require.NoError(t, err)
 		assert.Equal(t, staging.OperationCreate, entry.Operation)
 		assert.Equal(t, "updated-value", lo.FromPtr(entry.Value))
@@ -107,7 +107,7 @@ func TestAddRunner_Run(t *testing.T) {
 		assert.Contains(t, buf.String(), "Empty value")
 
 		// Verify not staged
-		_, err = store.Get(staging.ServiceParam, "/app/config")
+		_, err = store.GetEntry(staging.ServiceParam, "/app/config")
 		assert.Equal(t, staging.ErrNotStaged, err)
 	})
 
@@ -118,7 +118,7 @@ func TestAddRunner_Run(t *testing.T) {
 		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 		// Pre-stage as create
-		_ = store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
+		_ = store.StageEntry(staging.ServiceParam, "/app/config", staging.Entry{
 			Operation: staging.OperationCreate,
 			Value:     lo.ToPtr("same-value"),
 		})
@@ -162,7 +162,7 @@ func TestAddRunner_Run(t *testing.T) {
 		require.NoError(t, err)
 
 		// Verify staged with correct service
-		entry, err := store.Get(staging.ServiceSecret, "my-secret")
+		entry, err := store.GetEntry(staging.ServiceSecret, "my-secret")
 		require.NoError(t, err)
 		assert.Equal(t, staging.OperationCreate, entry.Operation)
 		assert.Equal(t, "secret-value", lo.FromPtr(entry.Value))
@@ -265,7 +265,7 @@ func TestAddRunner_WithOptions(t *testing.T) {
 		require.NoError(t, err)
 		assert.Contains(t, stdout.String(), "Staged for creation")
 
-		entry, err := store.Get(staging.ServiceParam, "/app/new-config")
+		entry, err := store.GetEntry(staging.ServiceParam, "/app/new-config")
 		require.NoError(t, err)
 		assert.Equal(t, staging.OperationCreate, entry.Operation)
 		assert.Equal(t, "direct-value", lo.FromPtr(entry.Value))
@@ -294,7 +294,7 @@ func TestAddRunner_WithOptions(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		entry, err := store.Get(staging.ServiceParam, "/app/new-config")
+		entry, err := store.GetEntry(staging.ServiceParam, "/app/new-config")
 		require.NoError(t, err)
 		assert.Equal(t, "Test description", lo.FromPtr(entry.Description))
 	})
