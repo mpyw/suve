@@ -23,7 +23,6 @@ suve param show [options] <name[#VERSION][~SHIFT]*>
 
 | Option | Alias | Default | Description |
 |--------|-------|---------|-------------|
-| `--decrypt` | - | `true` | Decrypt SecureString values. Use `--decrypt=false` to disable. |
 | `--parse-json` | `-j` | `false` | Pretty-print JSON values with indentation |
 | `--no-pager` | - | `false` | Disable pager output |
 | `--raw` | - | `false` | Output raw value only without metadata (for piping) |
@@ -36,7 +35,6 @@ user@host:~$ suve param show /app/config/database-url
 Name: /app/config/database-url
 Version: 3
 Type: SecureString
-Decrypted: true
 Modified: 2024-01-15T10:30:45Z
 
   postgres://db.example.com:5432/myapp
@@ -49,7 +47,6 @@ user@host:~$ suve param show --parse-json /app/config/credentials
 Name: /app/config/credentials
 Version: 2
 Type: SecureString
-Decrypted: true
 JsonParsed: true
 Modified: 2024-01-15T10:30:45Z
 
@@ -83,7 +80,6 @@ user@host:~$ suve param show --output=json /app/config/database-url
   "name": "/app/config/database-url",
   "version": 3,
   "type": "SecureString",
-  "decrypted": true,
   "modified": "2024-01-15T10:30:45Z",
   "value": "postgres://db.example.com:5432/myapp"
 }
@@ -102,9 +98,6 @@ suve param show /app/config/database-url#3
 
 # Show previous version
 suve param show /app/config/database-url~1
-
-# Show without decryption (displays encrypted value)
-suve param show --decrypt=false /app/config/database-url
 
 # Use in scripts
 DB_URL=$(suve param show --raw /app/config/database-url)

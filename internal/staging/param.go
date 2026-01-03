@@ -149,7 +149,7 @@ func (s *ParamStrategy) FetchLastModified(ctx context.Context, name string) (tim
 // FetchCurrent fetches the current value from AWS SSM Parameter Store for diffing.
 func (s *ParamStrategy) FetchCurrent(ctx context.Context, name string) (*FetchResult, error) {
 	spec := &paramversion.Spec{Name: name}
-	param, err := paramversion.GetParameterWithVersion(ctx, s.Client, spec, true)
+	param, err := paramversion.GetParameterWithVersion(ctx, s.Client, spec)
 	if err != nil {
 		return nil, err
 	}
@@ -174,7 +174,7 @@ func (s *ParamStrategy) ParseName(input string) (string, error) {
 // FetchCurrentValue fetches the current value from AWS SSM Parameter Store for editing.
 func (s *ParamStrategy) FetchCurrentValue(ctx context.Context, name string) (*EditFetchResult, error) {
 	spec := &paramversion.Spec{Name: name}
-	param, err := paramversion.GetParameterWithVersion(ctx, s.Client, spec, true)
+	param, err := paramversion.GetParameterWithVersion(ctx, s.Client, spec)
 	if err != nil {
 		return nil, err
 	}
@@ -203,7 +203,7 @@ func (s *ParamStrategy) FetchVersion(ctx context.Context, input string) (value s
 	if err != nil {
 		return "", "", err
 	}
-	param, err := paramversion.GetParameterWithVersion(ctx, s.Client, spec, true)
+	param, err := paramversion.GetParameterWithVersion(ctx, s.Client, spec)
 	if err != nil {
 		return "", "", err
 	}

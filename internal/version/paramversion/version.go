@@ -18,17 +18,18 @@ type Client interface {
 }
 
 // GetParameterWithVersion retrieves a parameter with version/shift support.
-func GetParameterWithVersion(ctx context.Context, client Client, spec *Spec, decrypt bool) (*paramapi.ParameterHistory, error) {
+// SecureString values are always decrypted.
+func GetParameterWithVersion(ctx context.Context, client Client, spec *Spec) (*paramapi.ParameterHistory, error) {
 	if spec.HasShift() {
-		return getParameterWithShift(ctx, client, spec, decrypt)
+		return getParameterWithShift(ctx, client, spec)
 	}
-	return getParameterDirect(ctx, client, spec, decrypt)
+	return getParameterDirect(ctx, client, spec)
 }
 
-func getParameterWithShift(ctx context.Context, client paramapi.GetParameterHistoryAPI, spec *Spec, decrypt bool) (*paramapi.ParameterHistory, error) {
+func getParameterWithShift(ctx context.Context, client paramapi.GetParameterHistoryAPI, spec *Spec) (*paramapi.ParameterHistory, error) {
 	history, err := client.GetParameterHistory(ctx, &paramapi.GetParameterHistoryInput{
 		Name:           lo.ToPtr(spec.Name),
-		WithDecryption: lo.ToPtr(decrypt),
+		WithDecryption: lo.ToPtr(true),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to get parameter history: %w", err)
@@ -61,7 +62,7 @@ func getParameterWithShift(ctx context.Context, client paramapi.GetParameterHist
 	return &params[targetIdx], nil
 }
 
-func getParameterDirect(ctx context.Context, client paramapi.GetParameterAPI, spec *Spec, decrypt bool) (*paramapi.ParameterHistory, error) {
+func getParameterDirect(ctx context.Context, client paramapi.GetParameterAPI, spec *Spec) (*paramapi.ParameterHistory, error) {
 	var nameWithVersion string
 	if spec.Absolute.Version != nil {
 		nameWithVersion = fmt.Sprintf("%s:%d", spec.Name, *spec.Absolute.Version)
@@ -71,7 +72,7 @@ func getParameterDirect(ctx context.Context, client paramapi.GetParameterAPI, sp
 
 	result, err := client.GetParameter(ctx, &paramapi.GetParameterInput{
 		Name:           lo.ToPtr(nameWithVersion),
-		WithDecryption: lo.ToPtr(decrypt),
+		WithDecryption: lo.ToPtr(true),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to get parameter: %w", err)
