@@ -107,8 +107,9 @@ jobs:
           retention-days: 1
 
   # ===========================================================================
-  # suve & suve-gui (Linux): CGO required
+  # suve & suve-gui (Linux): CGO required, amd64 only
   # Ubuntu 22.04 needed for libwebkit2gtk-4.0-dev (not available in 24.04)
+  # Note: Linux arm64 GUI requires native arm64 runner (CGO cross-compile not supported)
   # ===========================================================================
   build-linux:
     runs-on: ubuntu-22.04
@@ -126,7 +127,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev gcc-aarch64-linux-gnu
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev
 
       - name: Build frontend
         run: |
@@ -143,30 +144,10 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Upload amd64 artifacts
+      - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: dist-linux-amd64
-          path: dist/
-          retention-days: 1
-
-      - name: Clean dist for arm64 build
-        run: rm -rf dist/
-
-      - name: Build suve & suve-gui (linux-arm64)
-        uses: goreleaser/goreleaser-action@v6
-        with:
-          distribution: goreleaser
-          version: latest
-          args: build --clean --id suve-linux-arm64 --id suve-gui-linux-arm64
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          CC: aarch64-linux-gnu-gcc
-
-      - name: Upload arm64 artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: dist-linux-arm64
           path: dist/
           retention-days: 1
 

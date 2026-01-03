@@ -12,6 +12,7 @@ builds:
   # suve: Integrated CLI + GUI (--gui flag)
   # macOS/Linux: CGO enabled, production tag
   # Windows: CGO disabled (CLI only, GUI stub)
+  # Note: Linux arm64 GUI requires native arm64 runner (CGO cross-compile not supported)
   # =============================================================================
   - id: suve-darwin-amd64
     main: ./cmd/suve
@@ -52,22 +53,6 @@ builds:
       - linux
     goarch:
       - amd64
-    tags:
-      - production
-    ldflags:
-      - -s -w
-      - -X github.com/mpyw/suve/internal/cli/commands.Version={{.Version}}
-
-  - id: suve-linux-arm64
-    main: ./cmd/suve
-    binary: suve
-    env:
-      - CGO_ENABLED=1
-      - CC=aarch64-linux-gnu-gcc
-    goos:
-      - linux
-    goarch:
-      - arm64
     tags:
       - production
     ldflags:
@@ -182,7 +167,8 @@ builds:
       - -X github.com/mpyw/suve/internal/cli/commands.Version={{.Version}}
 
   # =============================================================================
-  # suve-gui: GUI only (CGO required, macOS/Linux only)
+  # suve-gui: GUI only (CGO required, macOS/Linux amd64 only)
+  # Note: Linux arm64 requires native arm64 runner (CGO cross-compile not supported)
   # =============================================================================
   - id: suve-gui-darwin-amd64
     main: ./cmd/suve-gui
@@ -226,21 +212,6 @@ builds:
     ldflags:
       - -s -w
 
-  - id: suve-gui-linux-arm64
-    main: ./cmd/suve-gui
-    binary: suve-gui
-    env:
-      - CGO_ENABLED=1
-      - CC=aarch64-linux-gnu-gcc
-    goos:
-      - linux
-    goarch:
-      - arm64
-    tags:
-      - production
-    ldflags:
-      - -s -w
-
 # =============================================================================
 # Archives: Separate per binary type
 # =============================================================================
@@ -251,7 +222,6 @@ archives:
       - suve-darwin-amd64
       - suve-darwin-arm64
       - suve-linux-amd64
-      - suve-linux-arm64
       - suve-windows-amd64
       - suve-windows-arm64
     formats:
@@ -285,13 +255,12 @@ archives:
       - README.md
       - LICENSE
 
-  # suve-gui (GUI only, macOS/Linux)
+  # suve-gui (GUI only, macOS/Linux amd64)
   - id: suve-gui
     builds:
       - suve-gui-darwin-amd64
       - suve-gui-darwin-arm64
       - suve-gui-linux-amd64
-      - suve-gui-linux-arm64
     formats:
       - tar.gz
     name_template: "{{ .ProjectName }}-gui_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
