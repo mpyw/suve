@@ -1,3 +1,5 @@
+//go:build production || dev
+
 package gui
 
 import "embed"

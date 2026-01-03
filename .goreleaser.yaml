@@ -8,18 +8,92 @@ before:
     - go mod tidy
 
 builds:
-  - id: suve
+  - id: suve-darwin-amd64
+    main: ./cmd/suve
+    binary: suve
+    env:
+      - CGO_ENABLED=1
+    goos:
+      - darwin
+    goarch:
+      - amd64
+    tags:
+      - production
+    ldflags:
+      - -s -w
+      - -X github.com/mpyw/suve/internal/cli/commands.Version={{.Version}}
+
+  - id: suve-darwin-arm64
+    main: ./cmd/suve
+    binary: suve
+    env:
+      - CGO_ENABLED=1
+    goos:
+      - darwin
+    goarch:
+      - arm64
+    tags:
+      - production
+    ldflags:
+      - -s -w
+      - -X github.com/mpyw/suve/internal/cli/commands.Version={{.Version}}
+
+  - id: suve-linux-amd64
+    main: ./cmd/suve
+    binary: suve
+    env:
+      - CGO_ENABLED=1
+    goos:
+      - linux
+    goarch:
+      - amd64
+    tags:
+      - production
+    ldflags:
+      - -s -w
+      - -X github.com/mpyw/suve/internal/cli/commands.Version={{.Version}}
+
+  - id: suve-linux-arm64
+    main: ./cmd/suve
+    binary: suve
+    env:
+      - CGO_ENABLED=1
+    goos:
+      - linux
+    goarch:
+      - arm64
+    tags:
+      - production
+    ldflags:
+      - -s -w
+      - -X github.com/mpyw/suve/internal/cli/commands.Version={{.Version}}
+
+  - id: suve-windows-amd64
     main: ./cmd/suve
     binary: suve
     env:
       - CGO_ENABLED=0
     goos:
-      - darwin
-      - linux
       - windows
     goarch:
       - amd64
+    tags:
+      - production
+    ldflags:
+      - -s -w
+      - -X github.com/mpyw/suve/internal/cli/commands.Version={{.Version}}
+
+  - id: suve-windows-arm64
+    main: ./cmd/suve
+    binary: suve
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - windows
+    goarch:
       - arm64
+    tags:
+      - production
     ldflags:
       - -s -w
       - -X github.com/mpyw/suve/internal/cli/commands.Version={{.Version}}
