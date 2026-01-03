@@ -6,25 +6,19 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/samber/lo"
 	"github.com/urfave/cli/v3"
 
-	"github.com/mpyw/suve/internal/api/secretapi"
 	"github.com/mpyw/suve/internal/cli/colors"
 	"github.com/mpyw/suve/internal/infra"
 	"github.com/mpyw/suve/internal/tagging"
+	"github.com/mpyw/suve/internal/usecase/secret"
 )
-
-// Client is the interface for the create command.
-type Client interface {
-	secretapi.CreateSecretAPI
-}
 
 // Runner executes the create command.
 type Runner struct {
-	Client Client
-	Stdout io.Writer
-	Stderr io.Writer
+	UseCase *secret.CreateUseCase
+	Stdout  io.Writer
+	Stderr  io.Writer
 }
 
 // Options holds the options for the create command.
@@ -84,9 +78,9 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	}
 
 	r := &Runner{
-		Client: client,
-		Stdout: cmd.Root().Writer,
-		Stderr: cmd.Root().ErrWriter,
+		UseCase: &secret.CreateUseCase{Client: client},
+		Stdout:  cmd.Root().Writer,
+		Stderr:  cmd.Root().ErrWriter,
 	}
 	return r.Run(ctx, Options{
 		Name:        cmd.Args().Get(0),
@@ -98,32 +92,20 @@ func action(ctx context.Context, cmd *cli.Command) error {
 
 // Run executes the create command.
 func (r *Runner) Run(ctx context.Context, opts Options) error {
-	input := &secretapi.CreateSecretInput{
-		Name:         lo.ToPtr(opts.Name),
-		SecretString: lo.ToPtr(opts.Value),
-	}
-	if opts.Description != "" {
-		input.Description = lo.ToPtr(opts.Description)
-	}
-	if len(opts.Tags) > 0 {
-		input.Tags = make([]secretapi.Tag, 0, len(opts.Tags))
-		for k, v := range opts.Tags {
-			input.Tags = append(input.Tags, secretapi.Tag{
-				Key:   lo.ToPtr(k),
-				Value: lo.ToPtr(v),
-			})
-		}
-	}
-
-	result, err := r.Client.CreateSecret(ctx, input)
+	result, err := r.UseCase.Execute(ctx, secret.CreateInput{
+		Name:        opts.Name,
+		Value:       opts.Value,
+		Description: opts.Description,
+		Tags:        opts.Tags,
+	})
 	if err != nil {
-		return fmt.Errorf("failed to create secret: %w", err)
+		return err
 	}
 
 	_, _ = fmt.Fprintf(r.Stdout, "%s Created secret %s (version: %s)\n",
 		colors.Success("✓"),
-		lo.FromPtr(result.Name),
-		lo.FromPtr(result.VersionId),
+		result.Name,
+		result.VersionID,
 	)
 
 	return nil
