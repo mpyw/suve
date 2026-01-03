@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { ParamList, ParamShow, ParamLog, ParamSet, ParamDelete } from '../../wailsjs/go/main/App';
+  import { ParamList, ParamShow, ParamLog, ParamSet, ParamDelete, ParamDiff } from '../../wailsjs/go/main/App';
   import type { main } from '../../wailsjs/go/models';
   import CloseIcon from './icons/CloseIcon.svelte';
   import Modal from './Modal.svelte';
@@ -39,10 +39,16 @@
   // Modal states
   let showSetModal = false;
   let showDeleteModal = false;
+  let showDiffModal = false;
   let setForm = { name: '', value: '', type: 'String' };
   let deleteTarget = '';
   let modalLoading = false;
   let modalError = '';
+
+  // Diff state
+  let diffMode = false;
+  let diffSelectedVersions: number[] = [];
+  let diffResult: main.ParamDiffResult | null = null;
 
   async function loadParams() {
     loading = true;
@@ -142,6 +148,46 @@
     }
   }
 
+  // Diff functions
+  function toggleDiffMode() {
+    diffMode = !diffMode;
+    diffSelectedVersions = [];
+  }
+
+  function toggleVersionSelection(version: number) {
+    const idx = diffSelectedVersions.indexOf(version);
+    if (idx >= 0) {
+      diffSelectedVersions = diffSelectedVersions.filter(v => v !== version);
+    } else if (diffSelectedVersions.length < 2) {
+      diffSelectedVersions = [...diffSelectedVersions, version];
+    }
+  }
+
+  async function executeDiff() {
+    if (!selectedParam || diffSelectedVersions.length !== 2) return;
+
+    modalLoading = true;
+    modalError = '';
+    try {
+      const sorted = [...diffSelectedVersions].sort((a, b) => a - b);
+      const spec1 = `${selectedParam}#${sorted[0]}`;
+      const spec2 = `${selectedParam}#${sorted[1]}`;
+      diffResult = await ParamDiff(spec1, spec2);
+      showDiffModal = true;
+    } catch (e) {
+      error = e instanceof Error ? e.message : String(e);
+    } finally {
+      modalLoading = false;
+    }
+  }
+
+  function closeDiffModal() {
+    showDiffModal = false;
+    diffResult = null;
+    diffMode = false;
+    diffSelectedVersions = [];
+  }
+
   onMount(() => {
     loadParams();
   });
@@ -205,6 +251,11 @@
           <div class="detail-actions">
             <button class="btn-action-sm" on:click={() => selectedParam && openSetModal(selectedParam)}>Edit</button>
             <button class="btn-action-sm btn-danger" on:click={() => selectedParam && openDeleteModal(selectedParam)}>Delete</button>
+            {#if paramLog.length >= 2}
+              <button class="btn-action-sm" class:active={diffMode} on:click={toggleDiffMode}>
+                {diffMode ? 'Cancel' : 'Compare'}
+              </button>
+            {/if}
             <button class="btn-close" on:click={closeDetail}>
               <CloseIcon />
             </button>
@@ -237,18 +288,45 @@
 
             {#if paramLog.length > 0}
               <div class="detail-section">
-                <h4>Version History</h4>
+                <div class="section-header">
+                  <h4>Version History</h4>
+                  {#if diffMode && diffSelectedVersions.length === 2}
+                    <button class="btn-action-sm btn-compare" on:click={executeDiff} disabled={modalLoading}>
+                      {modalLoading ? 'Comparing...' : 'Show Diff'}
+                    </button>
+                  {/if}
+                </div>
+                {#if diffMode}
+                  <p class="diff-hint">Select 2 versions to compare</p>
+                {/if}
                 <ul class="history-list">
                   {#each paramLog as logEntry}
-                    <li class="history-item" class:current={logEntry.isCurrent}>
-                      <div class="history-header">
-                        <span class="history-version">v{logEntry.version}</span>
-                        {#if logEntry.isCurrent}
-                          <span class="badge badge-current">current</span>
-                        {/if}
-                        <span class="history-date">{formatDate(logEntry.lastModified)}</span>
+                    <li
+                      class="history-item"
+                      class:current={logEntry.isCurrent}
+                      class:selectable={diffMode}
+                      class:selected={diffSelectedVersions.includes(logEntry.version)}
+                    >
+                      {#if diffMode}
+                        <label class="diff-checkbox">
+                          <input
+                            type="checkbox"
+                            checked={diffSelectedVersions.includes(logEntry.version)}
+                            disabled={!diffSelectedVersions.includes(logEntry.version) && diffSelectedVersions.length >= 2}
+                            on:change={() => toggleVersionSelection(logEntry.version)}
+                          />
+                        </label>
+                      {/if}
+                      <div class="history-content">
+                        <div class="history-header">
+                          <span class="history-version">v{logEntry.version}</span>
+                          {#if logEntry.isCurrent}
+                            <span class="badge badge-current">current</span>
+                          {/if}
+                          <span class="history-date">{formatDate(logEntry.lastModified)}</span>
+                        </div>
+                        <pre class="history-value">{logEntry.value}</pre>
                       </div>
-                      <pre class="history-value">{logEntry.value}</pre>
                     </li>
                   {/each}
                 </ul>
@@ -321,6 +399,29 @@
       </button>
     </div>
   </div>
+</Modal>
+
+<!-- Diff Modal -->
+<Modal title="Version Comparison" show={showDiffModal} on:close={closeDiffModal}>
+  {#if diffResult}
+    <div class="diff-container">
+      <div class="diff-side">
+        <div class="diff-side-header">
+          <span class="diff-version">Old: v{diffSelectedVersions[0]}</span>
+        </div>
+        <pre class="diff-value diff-old">{diffResult.oldValue}</pre>
+      </div>
+      <div class="diff-side">
+        <div class="diff-side-header">
+          <span class="diff-version">New: v{diffSelectedVersions[1]}</span>
+        </div>
+        <pre class="diff-value diff-new">{diffResult.newValue}</pre>
+      </div>
+    </div>
+    <div class="form-actions">
+      <button type="button" class="btn-secondary" on:click={closeDiffModal}>Close</button>
+    </div>
+  {/if}
 </Modal>
 
 <style>
@@ -442,5 +543,119 @@
   .warning {
     color: #ff9800 !important;
     font-size: 13px;
+  }
+
+  /* Diff mode styles */
+  .btn-action-sm.active {
+    background: #e94560;
+  }
+
+  .section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+  }
+
+  .section-header h4 {
+    margin: 0;
+    font-size: 12px;
+    text-transform: uppercase;
+    color: #888;
+    letter-spacing: 0.5px;
+  }
+
+  .btn-compare {
+    background: #4caf50;
+  }
+
+  .btn-compare:hover {
+    background: #43a047;
+  }
+
+  .diff-hint {
+    color: #888;
+    font-size: 12px;
+    margin: 0 0 12px 0;
+  }
+
+  .history-item.selectable {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    cursor: pointer;
+  }
+
+  .history-item.selectable:hover {
+    background: #1a1a2e;
+  }
+
+  .history-item.selected {
+    background: rgba(233, 69, 96, 0.15);
+    border-left: 3px solid #e94560;
+  }
+
+  .diff-checkbox {
+    display: flex;
+    align-items: center;
+    padding-top: 2px;
+  }
+
+  .diff-checkbox input {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+  }
+
+  .history-content {
+    flex: 1;
+    min-width: 0;
+  }
+
+  /* Diff modal styles */
+  .diff-container {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+
+  .diff-side {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .diff-side-header {
+    margin-bottom: 8px;
+  }
+
+  .diff-version {
+    font-size: 12px;
+    font-weight: bold;
+    color: #888;
+  }
+
+  .diff-value {
+    margin: 0;
+    padding: 12px;
+    border-radius: 4px;
+    font-family: monospace;
+    font-size: 12px;
+    white-space: pre-wrap;
+    word-break: break-all;
+    min-height: 100px;
+    max-height: 300px;
+    overflow-y: auto;
+  }
+
+  .diff-old {
+    background: rgba(244, 67, 54, 0.1);
+    border: 1px solid rgba(244, 67, 54, 0.3);
+    color: #ef9a9a;
+  }
+
+  .diff-new {
+    background: rgba(76, 175, 80, 0.1);
+    border: 1px solid rgba(76, 175, 80, 0.3);
+    color: #a5d6a7;
   }
 </style>
