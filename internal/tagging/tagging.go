@@ -5,18 +5,18 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/samber/lo"
+	"github.com/mpyw/suve/internal/maputil"
 )
 
 // Change represents tag modifications to apply.
 type Change struct {
-	Add    map[string]string // Tags to add or update
-	Remove []string          // Tag keys to remove
+	Add    map[string]string   // Tags to add or update
+	Remove maputil.Set[string] // Tag keys to remove
 }
 
 // IsEmpty returns true if no changes are specified.
 func (c *Change) IsEmpty() bool {
-	return len(c.Add) == 0 && len(c.Remove) == 0
+	return len(c.Add) == 0 && c.Remove.Len() == 0
 }
 
 // ParseResult contains parsed tag changes and any warnings.
@@ -34,7 +34,7 @@ func ParseFlags(tags []string, untags []string) (*ParseResult, error) {
 	result := &ParseResult{
 		Change: &Change{
 			Add:    make(map[string]string),
-			Remove: make([]string, 0),
+			Remove: maputil.NewSet[string](),
 		},
 		Warnings: make([]string, 0),
 	}
@@ -77,14 +77,17 @@ func ParseFlags(tags []string, untags []string) (*ParseResult, error) {
 	for _, op := range ops {
 		if prev, exists := seen[op.key]; exists {
 			// Conflict detected
-			prevAction := lo.Ternary(prev.isAdd,
-				fmt.Sprintf("--tag %s=%s", prev.key, prev.value),
-				fmt.Sprintf("--untag %s", prev.key),
-			)
-			newAction := lo.Ternary(op.isAdd,
-				fmt.Sprintf("--tag %s=%s", op.key, op.value),
-				fmt.Sprintf("--untag %s", op.key),
-			)
+			var prevAction, newAction string
+			if prev.isAdd {
+				prevAction = fmt.Sprintf("--tag %s=%s", prev.key, prev.value)
+			} else {
+				prevAction = fmt.Sprintf("--untag %s", prev.key)
+			}
+			if op.isAdd {
+				newAction = fmt.Sprintf("--tag %s=%s", op.key, op.value)
+			} else {
+				newAction = fmt.Sprintf("--untag %s", op.key)
+			}
 			result.Warnings = append(result.Warnings,
 				fmt.Sprintf("tag %q: %s overrides %s", op.key, newAction, prevAction))
 		}
@@ -96,7 +99,7 @@ func ParseFlags(tags []string, untags []string) (*ParseResult, error) {
 		if op.isAdd {
 			result.Change.Add[key] = op.value
 		} else {
-			result.Change.Remove = append(result.Change.Remove, key)
+			result.Change.Remove.Add(key)
 		}
 	}
 
