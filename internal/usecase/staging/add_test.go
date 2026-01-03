@@ -218,6 +218,25 @@ func TestAddUseCase_Draft_GetError(t *testing.T) {
 	assert.Contains(t, err.Error(), "get error")
 }
 
+func TestAddUseCase_Execute_GetError(t *testing.T) {
+	t.Parallel()
+
+	store := newMockStore()
+	store.getErr = errors.New("store get error")
+
+	uc := &usecasestaging.AddUseCase{
+		Strategy: newMockParser(),
+		Store:    store,
+	}
+
+	_, err := uc.Execute(context.Background(), usecasestaging.AddInput{
+		Name:  "/app/config",
+		Value: "value",
+	})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "store get error")
+}
+
 func TestAddUseCase_Execute_RejectsWhenUpdateStaged(t *testing.T) {
 	t.Parallel()
 

@@ -196,6 +196,47 @@ func TestDeleteUseCase_Execute_StageError(t *testing.T) {
 	assert.Contains(t, err.Error(), "stage error")
 }
 
+func TestDeleteUseCase_Execute_GetError(t *testing.T) {
+	t.Parallel()
+
+	store := newMockStore()
+	store.getErr = errors.New("store get error")
+
+	uc := &usecasestaging.DeleteUseCase{
+		Strategy: newMockDeleteStrategy(false),
+		Store:    store,
+	}
+
+	_, err := uc.Execute(context.Background(), usecasestaging.DeleteInput{
+		Name: "/app/config",
+	})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "store get error")
+}
+
+func TestDeleteUseCase_Execute_UnstageError(t *testing.T) {
+	t.Parallel()
+
+	store := newMockStore()
+	// Simulate existing CREATE entry by staging it
+	store.entries[staging.ServiceParam]["/app/new"] = staging.Entry{
+		Operation: staging.OperationCreate,
+		Value:     lo.ToPtr("value"),
+	}
+	store.unstageErr = errors.New("unstage error")
+
+	uc := &usecasestaging.DeleteUseCase{
+		Strategy: newMockDeleteStrategy(false),
+		Store:    store,
+	}
+
+	_, err := uc.Execute(context.Background(), usecasestaging.DeleteInput{
+		Name: "/app/new",
+	})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "unstage error")
+}
+
 func TestDeleteUseCase_Execute_UnstagesCreate(t *testing.T) {
 	t.Parallel()
 

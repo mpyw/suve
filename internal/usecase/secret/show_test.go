@@ -20,6 +20,8 @@ type mockShowClient struct {
 	getSecretValueErr    error
 	listVersionsResult   *secretapi.ListSecretVersionIdsOutput
 	listVersionsErr      error
+	describeSecretResult *secretapi.DescribeSecretOutput
+	describeSecretErr    error
 }
 
 func (m *mockShowClient) GetSecretValue(_ context.Context, _ *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) {
@@ -37,6 +39,12 @@ func (m *mockShowClient) ListSecretVersionIds(_ context.Context, _ *secretapi.Li
 }
 
 func (m *mockShowClient) DescribeSecret(_ context.Context, _ *secretapi.DescribeSecretInput, _ ...func(*secretapi.Options)) (*secretapi.DescribeSecretOutput, error) {
+	if m.describeSecretErr != nil {
+		return nil, m.describeSecretErr
+	}
+	if m.describeSecretResult != nil {
+		return m.describeSecretResult, nil
+	}
 	return &secretapi.DescribeSecretOutput{}, nil
 }
 
@@ -191,4 +199,37 @@ func TestShowUseCase_Execute_WithShift(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "v2-id", output.VersionID)
 	assert.Equal(t, "v2-value", output.Value)
+}
+
+func TestShowUseCase_Execute_WithTags(t *testing.T) {
+	t.Parallel()
+
+	client := &mockShowClient{
+		getSecretValueResult: &secretapi.GetSecretValueOutput{
+			Name:         lo.ToPtr("my-secret"),
+			SecretString: lo.ToPtr("secret-value"),
+			VersionId:    lo.ToPtr("abc123"),
+		},
+		describeSecretResult: &secretapi.DescribeSecretOutput{
+			Tags: []secretapi.Tag{
+				{Key: lo.ToPtr("env"), Value: lo.ToPtr("prod")},
+				{Key: lo.ToPtr("team"), Value: lo.ToPtr("backend")},
+			},
+		},
+	}
+
+	uc := &secret.ShowUseCase{Client: client}
+
+	spec, err := secretversion.Parse("my-secret")
+	require.NoError(t, err)
+
+	output, err := uc.Execute(context.Background(), secret.ShowInput{
+		Spec: spec,
+	})
+	require.NoError(t, err)
+	assert.Len(t, output.Tags, 2)
+	assert.Equal(t, "env", output.Tags[0].Key)
+	assert.Equal(t, "prod", output.Tags[0].Value)
+	assert.Equal(t, "team", output.Tags[1].Key)
+	assert.Equal(t, "backend", output.Tags[1].Value)
 }

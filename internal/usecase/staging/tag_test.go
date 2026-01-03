@@ -471,3 +471,29 @@ func TestTagUseCase_Execute_CancelWithValueRemains(t *testing.T) {
 	assert.Equal(t, "some-value", lo.FromPtr(entry.Value))
 	assert.Empty(t, entry.Tags)
 }
+
+func TestTagUseCase_Execute_AutoUnstageError(t *testing.T) {
+	t.Parallel()
+
+	store := newMockStore()
+	// Pre-stage with only tags (no value, no description)
+	store.entries[staging.ServiceParam]["/app/config"] = staging.Entry{
+		Operation: staging.OperationUpdate,
+		Tags:      map[string]string{"env": "prod"},
+		StagedAt:  time.Now(),
+	}
+	store.unstageErr = errors.New("unstage error")
+
+	uc := &usecasestaging.TagUseCase{
+		Strategy: newMockTagStrategy(),
+		Store:    store,
+	}
+
+	// Cancel the only tag, which should trigger auto-unstage
+	_, err := uc.Execute(context.Background(), usecasestaging.TagInput{
+		Name:          "/app/config",
+		CancelAddTags: maputil.NewSet("env"),
+	})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "unstage error")
+}

@@ -20,6 +20,8 @@ type mockShowClient struct {
 	getParameterErr    error
 	getHistoryResult   *paramapi.GetParameterHistoryOutput
 	getHistoryErr      error
+	listTagsResult     *paramapi.ListTagsForResourceOutput
+	listTagsErr        error
 }
 
 func (m *mockShowClient) GetParameter(_ context.Context, _ *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
@@ -40,6 +42,12 @@ func (m *mockShowClient) GetParameterHistory(_ context.Context, _ *paramapi.GetP
 }
 
 func (m *mockShowClient) ListTagsForResource(_ context.Context, _ *paramapi.ListTagsForResourceInput, _ ...func(*paramapi.Options)) (*paramapi.ListTagsForResourceOutput, error) {
+	if m.listTagsErr != nil {
+		return nil, m.listTagsErr
+	}
+	if m.listTagsResult != nil {
+		return m.listTagsResult, nil
+	}
 	return &paramapi.ListTagsForResourceOutput{}, nil
 }
 
@@ -174,4 +182,40 @@ func TestShowUseCase_Execute_NoLastModified(t *testing.T) {
 	})
 	require.NoError(t, err)
 	assert.Nil(t, output.LastModified)
+}
+
+func TestShowUseCase_Execute_WithTags(t *testing.T) {
+	t.Parallel()
+
+	client := &mockShowClient{
+		getParameterResult: &paramapi.GetParameterOutput{
+			Parameter: &paramapi.Parameter{
+				Name:    lo.ToPtr("/app/config"),
+				Value:   lo.ToPtr("value"),
+				Version: 1,
+				Type:    paramapi.ParameterTypeString,
+			},
+		},
+		listTagsResult: &paramapi.ListTagsForResourceOutput{
+			TagList: []paramapi.Tag{
+				{Key: lo.ToPtr("env"), Value: lo.ToPtr("prod")},
+				{Key: lo.ToPtr("team"), Value: lo.ToPtr("backend")},
+			},
+		},
+	}
+
+	uc := &param.ShowUseCase{Client: client}
+
+	spec, err := paramversion.Parse("/app/config")
+	require.NoError(t, err)
+
+	output, err := uc.Execute(context.Background(), param.ShowInput{
+		Spec: spec,
+	})
+	require.NoError(t, err)
+	assert.Len(t, output.Tags, 2)
+	assert.Equal(t, "env", output.Tags[0].Key)
+	assert.Equal(t, "prod", output.Tags[0].Value)
+	assert.Equal(t, "team", output.Tags[1].Key)
+	assert.Equal(t, "backend", output.Tags[1].Value)
 }

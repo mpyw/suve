@@ -15,14 +15,25 @@ import (
 
 type mockListClient struct {
 	describeResult    *paramapi.DescribeParametersOutput
+	describeResults   []*paramapi.DescribeParametersOutput // For pagination tests
+	describeCallCount int
 	describeErr       error
 	getParameterValue map[string]string
 	getParameterErr   map[string]error
 }
 
-func (m *mockListClient) DescribeParameters(_ context.Context, _ *paramapi.DescribeParametersInput, _ ...func(*paramapi.Options)) (*paramapi.DescribeParametersOutput, error) {
+func (m *mockListClient) DescribeParameters(_ context.Context, input *paramapi.DescribeParametersInput, _ ...func(*paramapi.Options)) (*paramapi.DescribeParametersOutput, error) {
 	if m.describeErr != nil {
 		return nil, m.describeErr
+	}
+	// Support paginated results for testing
+	if len(m.describeResults) > 0 {
+		idx := m.describeCallCount
+		m.describeCallCount++
+		if idx < len(m.describeResults) {
+			return m.describeResults[idx], nil
+		}
+		return &paramapi.DescribeParametersOutput{}, nil
 	}
 	return m.describeResult, nil
 }
@@ -222,4 +233,138 @@ func TestListUseCase_Execute_WithValue_PartialError(t *testing.T) {
 	}
 	assert.True(t, hasValue)
 	assert.True(t, hasError)
+}
+
+func TestListUseCase_Execute_WithPagination(t *testing.T) {
+	t.Parallel()
+
+	client := &mockListClient{
+		describeResults: []*paramapi.DescribeParametersOutput{
+			{
+				Parameters: []paramapi.ParameterMetadata{
+					{Name: lo.ToPtr("/app/p1")},
+					{Name: lo.ToPtr("/app/p2")},
+				},
+				NextToken: lo.ToPtr("token1"),
+			},
+			{
+				Parameters: []paramapi.ParameterMetadata{
+					{Name: lo.ToPtr("/app/p3")},
+				},
+			},
+		},
+	}
+
+	uc := &param.ListUseCase{Client: client}
+
+	output, err := uc.Execute(context.Background(), param.ListInput{
+		MaxResults: 2,
+	})
+	require.NoError(t, err)
+	assert.Len(t, output.Entries, 2)
+	assert.NotEmpty(t, output.NextToken)
+}
+
+func TestListUseCase_Execute_WithPagination_ContinueToken(t *testing.T) {
+	t.Parallel()
+
+	client := &mockListClient{
+		describeResults: []*paramapi.DescribeParametersOutput{
+			{
+				Parameters: []paramapi.ParameterMetadata{
+					{Name: lo.ToPtr("/app/p3")},
+					{Name: lo.ToPtr("/app/p4")},
+				},
+			},
+		},
+	}
+
+	uc := &param.ListUseCase{Client: client}
+
+	output, err := uc.Execute(context.Background(), param.ListInput{
+		MaxResults: 5,
+		NextToken:  "token1",
+	})
+	require.NoError(t, err)
+	assert.Len(t, output.Entries, 2)
+	assert.Empty(t, output.NextToken)
+}
+
+func TestListUseCase_Execute_WithPagination_FilterApplied(t *testing.T) {
+	t.Parallel()
+
+	client := &mockListClient{
+		describeResults: []*paramapi.DescribeParametersOutput{
+			{
+				Parameters: []paramapi.ParameterMetadata{
+					{Name: lo.ToPtr("/app/config1")},
+					{Name: lo.ToPtr("/app/secret1")},
+					{Name: lo.ToPtr("/app/config2")},
+				},
+				NextToken: lo.ToPtr("token1"),
+			},
+			{
+				Parameters: []paramapi.ParameterMetadata{
+					{Name: lo.ToPtr("/app/config3")},
+				},
+			},
+		},
+	}
+
+	uc := &param.ListUseCase{Client: client}
+
+	output, err := uc.Execute(context.Background(), param.ListInput{
+		MaxResults: 2,
+		Filter:     "config",
+	})
+	require.NoError(t, err)
+	assert.Len(t, output.Entries, 2)
+	for _, entry := range output.Entries {
+		assert.Contains(t, entry.Name, "config")
+	}
+}
+
+func TestListUseCase_Execute_WithPagination_Error(t *testing.T) {
+	t.Parallel()
+
+	client := &mockListClient{
+		describeErr: errors.New("aws error"),
+	}
+
+	uc := &param.ListUseCase{Client: client}
+
+	_, err := uc.Execute(context.Background(), param.ListInput{
+		MaxResults: 10,
+	})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to describe parameters")
+}
+
+func TestListUseCase_Execute_WithPagination_TrimResults(t *testing.T) {
+	t.Parallel()
+
+	// Return more results than requested to trigger trimming
+	client := &mockListClient{
+		describeResults: []*paramapi.DescribeParametersOutput{
+			{
+				Parameters: []paramapi.ParameterMetadata{
+					{Name: lo.ToPtr("/app/p1")},
+					{Name: lo.ToPtr("/app/p2")},
+					{Name: lo.ToPtr("/app/p3")},
+					{Name: lo.ToPtr("/app/p4")},
+				},
+				NextToken: lo.ToPtr("token1"),
+			},
+		},
+	}
+
+	uc := &param.ListUseCase{Client: client}
+
+	output, err := uc.Execute(context.Background(), param.ListInput{
+		MaxResults: 2,
+	})
+	require.NoError(t, err)
+	assert.Len(t, output.Entries, 2)
+	assert.Equal(t, "/app/p1", output.Entries[0].Name)
+	assert.Equal(t, "/app/p2", output.Entries[1].Name)
 }
