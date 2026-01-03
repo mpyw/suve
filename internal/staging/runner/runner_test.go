@@ -826,10 +826,12 @@ func TestApplyRunner_Run(t *testing.T) {
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.ApplyRunner{
-			Strategy: &fullMockStrategy{service: staging.ServiceParam},
-			Store:    store,
-			Stdout:   &stdout,
-			Stderr:   &stderr,
+			UseCase: &stagingusecase.ApplyUseCase{
+				Strategy: &fullMockStrategy{service: staging.ServiceParam},
+				Store:    store,
+			},
+			Stdout: &stdout,
+			Stderr: &stderr,
 		}
 
 		err := r.Run(context.Background(), runner.ApplyOptions{})
@@ -866,10 +868,12 @@ func TestApplyRunner_Run(t *testing.T) {
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.ApplyRunner{
-			Strategy: &fullMockStrategy{service: staging.ServiceParam},
-			Store:    store,
-			Stdout:   &stdout,
-			Stderr:   &stderr,
+			UseCase: &stagingusecase.ApplyUseCase{
+				Strategy: &fullMockStrategy{service: staging.ServiceParam},
+				Store:    store,
+			},
+			Stdout: &stdout,
+			Stderr: &stderr,
 		}
 
 		err := r.Run(context.Background(), runner.ApplyOptions{Name: "/app/config1"})
@@ -896,10 +900,12 @@ func TestApplyRunner_Run(t *testing.T) {
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.ApplyRunner{
-			Strategy: &fullMockStrategy{service: staging.ServiceParam},
-			Store:    store,
-			Stdout:   &stdout,
-			Stderr:   &stderr,
+			UseCase: &stagingusecase.ApplyUseCase{
+				Strategy: &fullMockStrategy{service: staging.ServiceParam},
+				Store:    store,
+			},
+			Stdout: &stdout,
+			Stderr: &stderr,
 		}
 
 		err := r.Run(context.Background(), runner.ApplyOptions{Name: "/app/config"})
@@ -915,10 +921,12 @@ func TestApplyRunner_Run(t *testing.T) {
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.ApplyRunner{
-			Strategy: &fullMockStrategy{service: staging.ServiceParam},
-			Store:    store,
-			Stdout:   &stdout,
-			Stderr:   &stderr,
+			UseCase: &stagingusecase.ApplyUseCase{
+				Strategy: &fullMockStrategy{service: staging.ServiceParam},
+				Store:    store,
+			},
+			Stdout: &stdout,
+			Stderr: &stderr,
 		}
 
 		err := r.Run(context.Background(), runner.ApplyOptions{})
@@ -939,10 +947,12 @@ func TestApplyRunner_Run(t *testing.T) {
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.ApplyRunner{
-			Strategy: &fullMockStrategy{service: staging.ServiceParam, applyErr: errors.New("apply failed")},
-			Store:    store,
-			Stdout:   &stdout,
-			Stderr:   &stderr,
+			UseCase: &stagingusecase.ApplyUseCase{
+				Strategy: &fullMockStrategy{service: staging.ServiceParam, applyErr: errors.New("apply failed")},
+				Store:    store,
+			},
+			Stdout: &stdout,
+			Stderr: &stderr,
 		}
 
 		err := r.Run(context.Background(), runner.ApplyOptions{})
@@ -965,11 +975,13 @@ func TestApplyRunner_Run(t *testing.T) {
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.ApplyRunner{
-			// FetchLastModified returns non-zero time = resource exists now
-			Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchLastModifiedVal: time.Now()},
-			Store:    store,
-			Stdout:   &stdout,
-			Stderr:   &stderr,
+			UseCase: &stagingusecase.ApplyUseCase{
+				// FetchLastModified returns non-zero time = resource exists now
+				Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchLastModifiedVal: time.Now()},
+				Store:    store,
+			},
+			Stdout: &stdout,
+			Stderr: &stderr,
 		}
 
 		err := r.Run(context.Background(), runner.ApplyOptions{})
@@ -993,11 +1005,13 @@ func TestApplyRunner_Run(t *testing.T) {
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.ApplyRunner{
-			// FetchLastModified returns time AFTER BaseModifiedAt = conflict
-			Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchLastModifiedVal: time.Now()},
-			Store:    store,
-			Stdout:   &stdout,
-			Stderr:   &stderr,
+			UseCase: &stagingusecase.ApplyUseCase{
+				// FetchLastModified returns time AFTER BaseModifiedAt = conflict
+				Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchLastModifiedVal: time.Now()},
+				Store:    store,
+			},
+			Stdout: &stdout,
+			Stderr: &stderr,
 		}
 
 		err := r.Run(context.Background(), runner.ApplyOptions{})
@@ -1020,10 +1034,12 @@ func TestApplyRunner_Run(t *testing.T) {
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.ApplyRunner{
-			Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchLastModifiedVal: time.Now()},
-			Store:    store,
-			Stdout:   &stdout,
-			Stderr:   &stderr,
+			UseCase: &stagingusecase.ApplyUseCase{
+				Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchLastModifiedVal: time.Now()},
+				Store:    store,
+			},
+			Stdout: &stdout,
+			Stderr: &stderr,
 		}
 
 		err := r.Run(context.Background(), runner.ApplyOptions{})
@@ -1046,11 +1062,13 @@ func TestApplyRunner_Run(t *testing.T) {
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.ApplyRunner{
-			// FetchLastModified returns same time as BaseModifiedAt = no conflict
-			Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchLastModifiedVal: baseTime},
-			Store:    store,
-			Stdout:   &stdout,
-			Stderr:   &stderr,
+			UseCase: &stagingusecase.ApplyUseCase{
+				// FetchLastModified returns same time as BaseModifiedAt = no conflict
+				Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchLastModifiedVal: baseTime},
+				Store:    store,
+			},
+			Stdout: &stdout,
+			Stderr: &stderr,
 		}
 
 		err := r.Run(context.Background(), runner.ApplyOptions{})
@@ -1073,10 +1091,12 @@ func TestApplyRunner_Run(t *testing.T) {
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.ApplyRunner{
-			Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchLastModifiedVal: time.Now()},
-			Store:    store,
-			Stdout:   &stdout,
-			Stderr:   &stderr,
+			UseCase: &stagingusecase.ApplyUseCase{
+				Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchLastModifiedVal: time.Now()},
+				Store:    store,
+			},
+			Stdout: &stdout,
+			Stderr: &stderr,
 		}
 
 		// With IgnoreConflicts, apply should proceed despite conflict
@@ -1098,11 +1118,13 @@ func TestApplyRunner_Run(t *testing.T) {
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.ApplyRunner{
-			// FetchLastModified returns zero time = resource doesn't exist = no conflict
-			Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchLastModifiedVal: time.Time{}},
-			Store:    store,
-			Stdout:   &stdout,
-			Stderr:   &stderr,
+			UseCase: &stagingusecase.ApplyUseCase{
+				// FetchLastModified returns zero time = resource doesn't exist = no conflict
+				Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchLastModifiedVal: time.Time{}},
+				Store:    store,
+			},
+			Stdout: &stdout,
+			Stderr: &stderr,
 		}
 
 		err := r.Run(context.Background(), runner.ApplyOptions{})
@@ -1362,10 +1384,12 @@ func TestRunners_SecretService(t *testing.T) {
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.ApplyRunner{
-			Strategy: &fullMockStrategy{service: staging.ServiceSecret},
-			Store:    store,
-			Stdout:   &stdout,
-			Stderr:   &stderr,
+			UseCase: &stagingusecase.ApplyUseCase{
+				Strategy: &fullMockStrategy{service: staging.ServiceSecret},
+				Store:    store,
+			},
+			Stdout: &stdout,
+			Stderr: &stderr,
 		}
 
 		err := r.Run(context.Background(), runner.ApplyOptions{})

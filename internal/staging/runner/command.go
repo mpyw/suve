@@ -423,10 +423,12 @@ EXAMPLES:
 			}
 
 			r := &ApplyRunner{
-				Strategy: strat,
-				Store:    store,
-				Stdout:   cmd.Root().Writer,
-				Stderr:   cmd.Root().ErrWriter,
+				UseCase: &stagingusecase.ApplyUseCase{
+					Strategy: strat,
+					Store:    store,
+				},
+				Stdout: cmd.Root().Writer,
+				Stderr: cmd.Root().ErrWriter,
 			}
 
 			return r.Run(ctx, opts)
