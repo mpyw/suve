@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/mpyw/suve/internal/api/paramapi"
+	"github.com/mpyw/suve/internal/maputil"
 	"github.com/mpyw/suve/internal/staging"
 )
 
@@ -604,7 +605,7 @@ func TestParamStrategy_Apply_WithTags(t *testing.T) {
 		err := s.Apply(context.Background(), "/app/param", staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("updated"),
-			UntagKeys: []string{"old-tag"},
+			UntagKeys: maputil.NewSet("old-tag"),
 		})
 		require.NoError(t, err)
 		assert.True(t, removeTagsCalled)
@@ -648,6 +649,100 @@ func TestParamStrategy_Apply_DeleteAlreadyDeleted(t *testing.T) {
 		Operation: staging.OperationDelete,
 	})
 	require.NoError(t, err) // Should succeed even if already deleted
+}
+
+func TestParamStrategy_Apply_TagOnlyUpdate(t *testing.T) {
+	t.Parallel()
+
+	t.Run("tag-only update does not call PutParameter", func(t *testing.T) {
+		t.Parallel()
+		putCalled := false
+		addTagsCalled := false
+		mock := &paramMockClient{
+			getParameterFunc: func(_ context.Context, _ *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
+				return &paramapi.GetParameterOutput{
+					Parameter: &paramapi.Parameter{Type: paramapi.ParameterTypeString},
+				}, nil
+			},
+			putParameterFunc: func(_ context.Context, _ *paramapi.PutParameterInput, _ ...func(*paramapi.Options)) (*paramapi.PutParameterOutput, error) {
+				putCalled = true
+				return &paramapi.PutParameterOutput{Version: 2}, nil
+			},
+			addTagsToResourceFunc: func(_ context.Context, params *paramapi.AddTagsToResourceInput, _ ...func(*paramapi.Options)) (*paramapi.AddTagsToResourceOutput, error) {
+				addTagsCalled = true
+				assert.Len(t, params.Tags, 1)
+				return &paramapi.AddTagsToResourceOutput{}, nil
+			},
+		}
+
+		s := staging.NewParamStrategy(mock)
+		err := s.Apply(context.Background(), "/app/param", staging.Entry{
+			Operation: staging.OperationUpdate,
+			Value:     nil, // No value change
+			Tags:      map[string]string{"env": "prod"},
+		})
+		require.NoError(t, err)
+		assert.False(t, putCalled, "PutParameter should not be called for tag-only update")
+		assert.True(t, addTagsCalled, "AddTags should be called")
+	})
+
+	t.Run("tag-only update with untag does not call PutParameter", func(t *testing.T) {
+		t.Parallel()
+		putCalled := false
+		removeTagsCalled := false
+		mock := &paramMockClient{
+			putParameterFunc: func(_ context.Context, _ *paramapi.PutParameterInput, _ ...func(*paramapi.Options)) (*paramapi.PutParameterOutput, error) {
+				putCalled = true
+				return &paramapi.PutParameterOutput{Version: 2}, nil
+			},
+			removeTagsFromResourceFunc: func(_ context.Context, params *paramapi.RemoveTagsFromResourceInput, _ ...func(*paramapi.Options)) (*paramapi.RemoveTagsFromResourceOutput, error) {
+				removeTagsCalled = true
+				assert.Contains(t, params.TagKeys, "deprecated")
+				return &paramapi.RemoveTagsFromResourceOutput{}, nil
+			},
+		}
+
+		s := staging.NewParamStrategy(mock)
+		err := s.Apply(context.Background(), "/app/param", staging.Entry{
+			Operation: staging.OperationUpdate,
+			Value:     nil, // No value change
+			UntagKeys: maputil.NewSet("deprecated"),
+		})
+		require.NoError(t, err)
+		assert.False(t, putCalled, "PutParameter should not be called for tag-only update")
+		assert.True(t, removeTagsCalled, "RemoveTags should be called")
+	})
+}
+
+func TestParamStrategy_Apply_DeleteIgnoresTags(t *testing.T) {
+	t.Parallel()
+
+	addTagsCalled := false
+	removeTagsCalled := false
+	mock := &paramMockClient{
+		deleteParameterFunc: func(_ context.Context, _ *paramapi.DeleteParameterInput, _ ...func(*paramapi.Options)) (*paramapi.DeleteParameterOutput, error) {
+			return &paramapi.DeleteParameterOutput{}, nil
+		},
+		addTagsToResourceFunc: func(_ context.Context, _ *paramapi.AddTagsToResourceInput, _ ...func(*paramapi.Options)) (*paramapi.AddTagsToResourceOutput, error) {
+			addTagsCalled = true
+			return &paramapi.AddTagsToResourceOutput{}, nil
+		},
+		removeTagsFromResourceFunc: func(_ context.Context, _ *paramapi.RemoveTagsFromResourceInput, _ ...func(*paramapi.Options)) (*paramapi.RemoveTagsFromResourceOutput, error) {
+			removeTagsCalled = true
+			return &paramapi.RemoveTagsFromResourceOutput{}, nil
+		},
+	}
+
+	s := staging.NewParamStrategy(mock)
+	// Even if entry has tags and untag keys, they should be ignored for delete
+	err := s.Apply(context.Background(), "/app/param", staging.Entry{
+		Operation: staging.OperationDelete,
+		Tags:      map[string]string{"env": "prod"},
+		UntagKeys: maputil.NewSet("deprecated"),
+	})
+	require.NoError(t, err)
+	assert.False(t, addTagsCalled, "Tags should be ignored for delete operation")
+	assert.False(t, removeTagsCalled, "UntagKeys should be ignored for delete operation")
 }
 
 func TestParamStrategy_FetchCurrentValue_NoLastModified(t *testing.T) {

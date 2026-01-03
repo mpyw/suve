@@ -70,31 +70,6 @@ func TestCreateUseCase_Execute_WithDescription(t *testing.T) {
 	assert.Equal(t, "my-secret", output.Name)
 }
 
-func TestCreateUseCase_Execute_WithTags(t *testing.T) {
-	t.Parallel()
-
-	client := &mockCreateClient{
-		createResult: &secretapi.CreateSecretOutput{
-			Name:      lo.ToPtr("my-secret"),
-			VersionId: lo.ToPtr("abc123"),
-			ARN:       lo.ToPtr("arn:aws:secretsmanager:us-east-1:123456789012:secret:my-secret"),
-		},
-	}
-
-	uc := &secret.CreateUseCase{Client: client}
-
-	output, err := uc.Execute(context.Background(), secret.CreateInput{
-		Name:  "my-secret",
-		Value: "secret-value",
-		Tags: map[string]string{
-			"env":     "prod",
-			"project": "test",
-		},
-	})
-	require.NoError(t, err)
-	assert.Equal(t, "my-secret", output.Name)
-}
-
 func TestCreateUseCase_Execute_Error(t *testing.T) {
 	t.Parallel()
 

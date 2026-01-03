@@ -14,6 +14,8 @@ import (
 	"github.com/mpyw/suve/internal/cli/commands/secret/log"
 	"github.com/mpyw/suve/internal/cli/commands/secret/restore"
 	"github.com/mpyw/suve/internal/cli/commands/secret/show"
+	"github.com/mpyw/suve/internal/cli/commands/secret/tag"
+	"github.com/mpyw/suve/internal/cli/commands/secret/untag"
 	"github.com/mpyw/suve/internal/cli/commands/secret/update"
 )
 
@@ -32,6 +34,8 @@ func Command() *cli.Command {
 			update.Command(),
 			secretdelete.Command(),
 			restore.Command(),
+			tag.Command(),
+			untag.Command(),
 			{
 				Name:   "set",
 				Hidden: true,

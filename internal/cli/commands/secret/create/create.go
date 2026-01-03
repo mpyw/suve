@@ -10,7 +10,6 @@ import (
 
 	"github.com/mpyw/suve/internal/cli/colors"
 	"github.com/mpyw/suve/internal/infra"
-	"github.com/mpyw/suve/internal/tagging"
 	"github.com/mpyw/suve/internal/usecase/secret"
 )
 
@@ -26,7 +25,6 @@ type Options struct {
 	Name        string
 	Value       string
 	Description string
-	Tags        map[string]string
 }
 
 // Command returns the create command.
@@ -43,6 +41,8 @@ use 'suve secret update' instead.
 Secret values are automatically encrypted by Secrets Manager using
 the default KMS key or a custom KMS key configured in the account.
 
+To add tags after creation, use 'suve secret tag' command.
+
 EXAMPLES:
    suve secret create my-api-key "sk-12345"                    Create simple secret
    suve secret create --description "API Key for X" my-key "..." With description
@@ -52,10 +52,6 @@ EXAMPLES:
 				Name:  "description",
 				Usage: "Description for the secret",
 			},
-			&cli.StringSliceFlag{
-				Name:  "tag",
-				Usage: "Tag in key=value format (can be specified multiple times)",
-			},
 		},
 		Action: action,
 	}
@@ -64,12 +60,6 @@ EXAMPLES:
 func action(ctx context.Context, cmd *cli.Command) error {
 	if cmd.Args().Len() < 2 {
 		return fmt.Errorf("usage: suve secret create <name> <value>")
-	}
-
-	// Parse tags (untag doesn't make sense for create)
-	tagResult, err := tagging.ParseFlags(cmd.StringSlice("tag"), nil)
-	if err != nil {
-		return err
 	}
 
 	client, err := infra.NewSecretClient(ctx)
@@ -86,7 +76,6 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		Name:        cmd.Args().Get(0),
 		Value:       cmd.Args().Get(1),
 		Description: cmd.String("description"),
-		Tags:        tagResult.Change.Add,
 	})
 }
 
@@ -96,7 +85,6 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 		Name:        opts.Name,
 		Value:       opts.Value,
 		Description: opts.Description,
-		Tags:        opts.Tags,
 	})
 	if err != nil {
 		return err

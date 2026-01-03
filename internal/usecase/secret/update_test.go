@@ -10,7 +10,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/mpyw/suve/internal/api/secretapi"
-	"github.com/mpyw/suve/internal/tagging"
 	"github.com/mpyw/suve/internal/usecase/secret"
 )
 
@@ -21,8 +20,6 @@ type mockUpdateClient struct {
 	updateSecretErr      error
 	putSecretValueResult *secretapi.PutSecretValueOutput
 	putSecretValueErr    error
-	tagResourceErr       error
-	untagResourceErr     error
 }
 
 func (m *mockUpdateClient) GetSecretValue(_ context.Context, _ *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) {
@@ -44,20 +41,6 @@ func (m *mockUpdateClient) PutSecretValue(_ context.Context, _ *secretapi.PutSec
 		return nil, m.putSecretValueErr
 	}
 	return m.putSecretValueResult, nil
-}
-
-func (m *mockUpdateClient) TagResource(_ context.Context, _ *secretapi.TagResourceInput, _ ...func(*secretapi.Options)) (*secretapi.TagResourceOutput, error) {
-	if m.tagResourceErr != nil {
-		return nil, m.tagResourceErr
-	}
-	return &secretapi.TagResourceOutput{}, nil
-}
-
-func (m *mockUpdateClient) UntagResource(_ context.Context, _ *secretapi.UntagResourceInput, _ ...func(*secretapi.Options)) (*secretapi.UntagResourceOutput, error) {
-	if m.untagResourceErr != nil {
-		return nil, m.untagResourceErr
-	}
-	return &secretapi.UntagResourceOutput{}, nil
 }
 
 func TestUpdateUseCase_GetCurrentValue(t *testing.T) {
@@ -189,133 +172,4 @@ func TestUpdateUseCase_Execute_UpdateDescriptionError(t *testing.T) {
 	})
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to update secret description")
-}
-
-func TestUpdateUseCase_Execute_WithTags(t *testing.T) {
-	t.Parallel()
-
-	client := &mockUpdateClient{
-		getSecretValueResult: &secretapi.GetSecretValueOutput{
-			ARN: lo.ToPtr("arn:aws:secretsmanager:us-east-1:123456789012:secret:my-secret"),
-		},
-	}
-
-	uc := &secret.UpdateUseCase{Client: client}
-
-	output, err := uc.Execute(context.Background(), secret.UpdateInput{
-		Name: "my-secret",
-		TagChange: &tagging.Change{
-			Add:    map[string]string{"env": "prod"},
-			Remove: []string{"old-tag"},
-		},
-	})
-	require.NoError(t, err)
-	assert.Equal(t, "my-secret", output.Name)
-}
-
-func TestUpdateUseCase_Execute_TagsWithARNFromPutValue(t *testing.T) {
-	t.Parallel()
-
-	client := &mockUpdateClient{
-		putSecretValueResult: &secretapi.PutSecretValueOutput{
-			VersionId: lo.ToPtr("new-version-id"),
-			ARN:       lo.ToPtr("arn:aws:secretsmanager:us-east-1:123456789012:secret:my-secret"),
-		},
-	}
-
-	uc := &secret.UpdateUseCase{Client: client}
-
-	output, err := uc.Execute(context.Background(), secret.UpdateInput{
-		Name:  "my-secret",
-		Value: "new-value",
-		TagChange: &tagging.Change{
-			Add: map[string]string{"env": "prod"},
-		},
-	})
-	require.NoError(t, err)
-	assert.Equal(t, "new-version-id", output.VersionID)
-}
-
-func TestUpdateUseCase_Execute_GetARNError(t *testing.T) {
-	t.Parallel()
-
-	client := &mockUpdateClient{
-		getSecretValueErr: errors.New("get failed"),
-	}
-
-	uc := &secret.UpdateUseCase{Client: client}
-
-	_, err := uc.Execute(context.Background(), secret.UpdateInput{
-		Name: "my-secret",
-		TagChange: &tagging.Change{
-			Add: map[string]string{"env": "prod"},
-		},
-	})
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to get secret ARN")
-}
-
-func TestUpdateUseCase_Execute_TagResourceError(t *testing.T) {
-	t.Parallel()
-
-	client := &mockUpdateClient{
-		getSecretValueResult: &secretapi.GetSecretValueOutput{
-			ARN: lo.ToPtr("arn:aws:secretsmanager:us-east-1:123456789012:secret:my-secret"),
-		},
-		tagResourceErr: errors.New("tag failed"),
-	}
-
-	uc := &secret.UpdateUseCase{Client: client}
-
-	_, err := uc.Execute(context.Background(), secret.UpdateInput{
-		Name: "my-secret",
-		TagChange: &tagging.Change{
-			Add: map[string]string{"env": "prod"},
-		},
-	})
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to add tags")
-}
-
-func TestUpdateUseCase_Execute_UntagResourceError(t *testing.T) {
-	t.Parallel()
-
-	client := &mockUpdateClient{
-		getSecretValueResult: &secretapi.GetSecretValueOutput{
-			ARN: lo.ToPtr("arn:aws:secretsmanager:us-east-1:123456789012:secret:my-secret"),
-		},
-		untagResourceErr: errors.New("untag failed"),
-	}
-
-	uc := &secret.UpdateUseCase{Client: client}
-
-	_, err := uc.Execute(context.Background(), secret.UpdateInput{
-		Name: "my-secret",
-		TagChange: &tagging.Change{
-			Remove: []string{"old-tag"},
-		},
-	})
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to remove tags")
-}
-
-func TestUpdateUseCase_Execute_EmptyTagChange(t *testing.T) {
-	t.Parallel()
-
-	client := &mockUpdateClient{
-		putSecretValueResult: &secretapi.PutSecretValueOutput{
-			VersionId: lo.ToPtr("new-version-id"),
-			ARN:       lo.ToPtr("arn:aws:secretsmanager:us-east-1:123456789012:secret:my-secret"),
-		},
-	}
-
-	uc := &secret.UpdateUseCase{Client: client}
-
-	output, err := uc.Execute(context.Background(), secret.UpdateInput{
-		Name:      "my-secret",
-		Value:     "new-value",
-		TagChange: &tagging.Change{},
-	})
-	require.NoError(t, err)
-	assert.Equal(t, "new-version-id", output.VersionID)
 }

@@ -13,7 +13,6 @@ import (
 	"github.com/mpyw/suve/internal/api/secretapi"
 	appcli "github.com/mpyw/suve/internal/cli/commands"
 	"github.com/mpyw/suve/internal/cli/commands/secret/update"
-	"github.com/mpyw/suve/internal/tagging"
 	"github.com/mpyw/suve/internal/usecase/secret"
 )
 
@@ -41,8 +40,6 @@ type mockClient struct {
 	getSecretValueFunc func(ctx context.Context, params *secretapi.GetSecretValueInput, optFns ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error)
 	putSecretValueFunc func(ctx context.Context, params *secretapi.PutSecretValueInput, optFns ...func(*secretapi.Options)) (*secretapi.PutSecretValueOutput, error)
 	updateSecretFunc   func(ctx context.Context, params *secretapi.UpdateSecretInput, optFns ...func(*secretapi.Options)) (*secretapi.UpdateSecretOutput, error)
-	tagResourceFunc    func(ctx context.Context, params *secretapi.TagResourceInput, optFns ...func(*secretapi.Options)) (*secretapi.TagResourceOutput, error)
-	untagResourceFunc  func(ctx context.Context, params *secretapi.UntagResourceInput, optFns ...func(*secretapi.Options)) (*secretapi.UntagResourceOutput, error)
 }
 
 func (m *mockClient) GetSecretValue(ctx context.Context, params *secretapi.GetSecretValueInput, optFns ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) {
@@ -66,20 +63,6 @@ func (m *mockClient) UpdateSecret(ctx context.Context, params *secretapi.UpdateS
 		return m.updateSecretFunc(ctx, params, optFns...)
 	}
 	return &secretapi.UpdateSecretOutput{}, nil
-}
-
-func (m *mockClient) TagResource(ctx context.Context, params *secretapi.TagResourceInput, optFns ...func(*secretapi.Options)) (*secretapi.TagResourceOutput, error) {
-	if m.tagResourceFunc != nil {
-		return m.tagResourceFunc(ctx, params, optFns...)
-	}
-	return &secretapi.TagResourceOutput{}, nil
-}
-
-func (m *mockClient) UntagResource(ctx context.Context, params *secretapi.UntagResourceInput, optFns ...func(*secretapi.Options)) (*secretapi.UntagResourceOutput, error) {
-	if m.untagResourceFunc != nil {
-		return m.untagResourceFunc(ctx, params, optFns...)
-	}
-	return &secretapi.UntagResourceOutput{}, nil
 }
 
 func TestRun(t *testing.T) {
@@ -134,34 +117,6 @@ func TestRun(t *testing.T) {
 			},
 		},
 		{
-			name: "update secret with tags",
-			opts: update.Options{
-				Name:  "my-secret",
-				Value: "new-value",
-				TagChange: &tagging.Change{
-					Add:    map[string]string{"env": "prod"},
-					Remove: []string{},
-				},
-			},
-			mock: &mockClient{
-				putSecretValueFunc: func(_ context.Context, _ *secretapi.PutSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.PutSecretValueOutput, error) {
-					return &secretapi.PutSecretValueOutput{
-						Name:      lo.ToPtr("my-secret"),
-						VersionId: lo.ToPtr("new-version-id"),
-						ARN:       lo.ToPtr("arn:aws:secretsmanager:us-east-1:123456789012:secret:my-secret"),
-					}, nil
-				},
-				tagResourceFunc: func(_ context.Context, params *secretapi.TagResourceInput, _ ...func(*secretapi.Options)) (*secretapi.TagResourceOutput, error) {
-					// The usecase uses the ARN from PutSecretValue
-					assert.Contains(t, lo.FromPtr(params.SecretId), "arn:")
-					return &secretapi.TagResourceOutput{}, nil
-				},
-			},
-			check: func(t *testing.T, output string) {
-				assert.Contains(t, output, "Updated secret")
-			},
-		},
-		{
 			name:    "put secret value error",
 			opts:    update.Options{Name: "my-secret", Value: "new-value"},
 			wantErr: "failed to update secret value",
@@ -185,30 +140,6 @@ func TestRun(t *testing.T) {
 				},
 				updateSecretFunc: func(_ context.Context, _ *secretapi.UpdateSecretInput, _ ...func(*secretapi.Options)) (*secretapi.UpdateSecretOutput, error) {
 					return nil, fmt.Errorf("description update failed")
-				},
-			},
-		},
-		{
-			name: "tag application error",
-			opts: update.Options{
-				Name:  "my-secret",
-				Value: "new-value",
-				TagChange: &tagging.Change{
-					Add:    map[string]string{"env": "prod"},
-					Remove: []string{},
-				},
-			},
-			wantErr: "failed to add tags",
-			mock: &mockClient{
-				putSecretValueFunc: func(_ context.Context, _ *secretapi.PutSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.PutSecretValueOutput, error) {
-					return &secretapi.PutSecretValueOutput{
-						Name:      lo.ToPtr("my-secret"),
-						VersionId: lo.ToPtr("new-version-id"),
-						ARN:       lo.ToPtr("arn:aws:secretsmanager:us-east-1:123456789012:secret:my-secret"),
-					}, nil
-				},
-				tagResourceFunc: func(_ context.Context, _ *secretapi.TagResourceInput, _ ...func(*secretapi.Options)) (*secretapi.TagResourceOutput, error) {
-					return nil, fmt.Errorf("tag error")
 				},
 			},
 		},

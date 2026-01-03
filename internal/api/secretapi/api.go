@@ -54,3 +54,8 @@ type TagResourceAPI interface {
 type UntagResourceAPI interface {
 	UntagResource(ctx context.Context, params *UntagResourceInput, optFns ...func(*Options)) (*UntagResourceOutput, error)
 }
+
+// DescribeSecretAPI is the interface for getting secret metadata including tags.
+type DescribeSecretAPI interface {
+	DescribeSecret(ctx context.Context, params *DescribeSecretInput, optFns ...func(*Options)) (*DescribeSecretOutput, error)
+}

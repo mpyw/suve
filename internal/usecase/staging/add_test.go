@@ -217,3 +217,100 @@ func TestAddUseCase_Draft_GetError(t *testing.T) {
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "get error")
 }
+
+func TestAddUseCase_Execute_GetError(t *testing.T) {
+	t.Parallel()
+
+	store := newMockStore()
+	store.getErr = errors.New("store get error")
+
+	uc := &usecasestaging.AddUseCase{
+		Strategy: newMockParser(),
+		Store:    store,
+	}
+
+	_, err := uc.Execute(context.Background(), usecasestaging.AddInput{
+		Name:  "/app/config",
+		Value: "value",
+	})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "store get error")
+}
+
+func TestAddUseCase_Execute_RejectsWhenUpdateStaged(t *testing.T) {
+	t.Parallel()
+
+	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	// Pre-stage an UPDATE operation
+	require.NoError(t, store.Stage(staging.ServiceParam, "/app/existing", staging.Entry{
+		Operation: staging.OperationUpdate,
+		Value:     lo.ToPtr("update-value"),
+		StagedAt:  time.Now(),
+	}))
+
+	uc := &usecasestaging.AddUseCase{
+		Strategy: newMockParser(),
+		Store:    store,
+	}
+
+	_, err := uc.Execute(context.Background(), usecasestaging.AddInput{
+		Name:  "/app/existing",
+		Value: "new-value",
+	})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "already staged for update")
+}
+
+func TestAddUseCase_Execute_RejectsWhenDeleteStaged(t *testing.T) {
+	t.Parallel()
+
+	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	// Pre-stage a DELETE operation
+	require.NoError(t, store.Stage(staging.ServiceParam, "/app/deleted", staging.Entry{
+		Operation: staging.OperationDelete,
+		StagedAt:  time.Now(),
+	}))
+
+	uc := &usecasestaging.AddUseCase{
+		Strategy: newMockParser(),
+		Store:    store,
+	}
+
+	_, err := uc.Execute(context.Background(), usecasestaging.AddInput{
+		Name:  "/app/deleted",
+		Value: "new-value",
+	})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "already staged for deletion")
+}
+
+func TestAddUseCase_Execute_AllowsReEditOfCreate(t *testing.T) {
+	t.Parallel()
+
+	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	// Pre-stage a CREATE operation
+	require.NoError(t, store.Stage(staging.ServiceParam, "/app/new", staging.Entry{
+		Operation: staging.OperationCreate,
+		Value:     lo.ToPtr("initial-value"),
+		StagedAt:  time.Now(),
+	}))
+
+	uc := &usecasestaging.AddUseCase{
+		Strategy: newMockParser(),
+		Store:    store,
+	}
+
+	// Should allow updating the value
+	output, err := uc.Execute(context.Background(), usecasestaging.AddInput{
+		Name:  "/app/new",
+		Value: "updated-value",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "/app/new", output.Name)
+
+	// Verify the value was updated but operation remains CREATE
+	entry, err := store.Get(staging.ServiceParam, "/app/new")
+	require.NoError(t, err)
+	assert.Equal(t, staging.OperationCreate, entry.Operation)
+	assert.Equal(t, "updated-value", lo.FromPtr(entry.Value))
+}

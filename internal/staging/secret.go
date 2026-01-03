@@ -96,13 +96,15 @@ func (s *SecretStrategy) applyCreate(ctx context.Context, name string, entry Ent
 }
 
 func (s *SecretStrategy) applyUpdate(ctx context.Context, name string, entry Entry) error {
-	// Update secret value
-	_, err := s.Client.PutSecretValue(ctx, &secretapi.PutSecretValueInput{
-		SecretId:     lo.ToPtr(name),
-		SecretString: entry.Value,
-	})
-	if err != nil {
-		return fmt.Errorf("failed to update secret: %w", err)
+	// Update secret value if provided
+	if entry.Value != nil {
+		_, err := s.Client.PutSecretValue(ctx, &secretapi.PutSecretValueInput{
+			SecretId:     lo.ToPtr(name),
+			SecretString: entry.Value,
+		})
+		if err != nil {
+			return fmt.Errorf("failed to update secret: %w", err)
+		}
 	}
 
 	// Update description if provided

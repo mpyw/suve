@@ -39,3 +39,8 @@ type AddTagsToResourceAPI interface {
 type RemoveTagsFromResourceAPI interface {
 	RemoveTagsFromResource(ctx context.Context, params *RemoveTagsFromResourceInput, optFns ...func(*Options)) (*RemoveTagsFromResourceOutput, error)
 }
+
+// ListTagsForResourceAPI is the interface for listing tags for a resource.
+type ListTagsForResourceAPI interface {
+	ListTagsForResource(ctx context.Context, params *ListTagsForResourceInput, optFns ...func(*Options)) (*ListTagsForResourceOutput, error)
+}

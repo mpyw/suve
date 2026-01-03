@@ -2,6 +2,7 @@ package staging
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -18,6 +19,7 @@ type DeleteInput struct {
 // DeleteOutput holds the result of the delete use case.
 type DeleteOutput struct {
 	Name              string
+	Unstaged          bool // True if a staged CREATE was removed instead of staging DELETE
 	HasDeleteOptions  bool
 	Force             bool
 	RecoveryWindow    int
@@ -27,7 +29,7 @@ type DeleteOutput struct {
 // DeleteUseCase executes delete staging operations.
 type DeleteUseCase struct {
 	Strategy staging.DeleteStrategy
-	Store    staging.StoreWriter
+	Store    staging.StoreReadWriter
 }
 
 // Execute runs the delete use case.
@@ -35,6 +37,22 @@ func (u *DeleteUseCase) Execute(ctx context.Context, input DeleteInput) (*Delete
 	service := u.Strategy.Service()
 	itemName := u.Strategy.ItemName()
 	hasDeleteOptions := u.Strategy.HasDeleteOptions()
+
+	// Check if CREATE is staged - if so, just unstage instead of staging DELETE
+	existingEntry, err := u.Store.Get(service, input.Name)
+	if err != nil && !errors.Is(err, staging.ErrNotStaged) {
+		return nil, err
+	}
+	if existingEntry != nil && existingEntry.Operation == staging.OperationCreate {
+		// Unstage the CREATE instead of staging DELETE
+		if err := u.Store.Unstage(service, input.Name); err != nil {
+			return nil, err
+		}
+		return &DeleteOutput{
+			Name:     input.Name,
+			Unstaged: true,
+		}, nil
+	}
 
 	// Validate recovery window if delete options are supported
 	if hasDeleteOptions && !input.Force {

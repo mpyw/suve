@@ -10,6 +10,8 @@ import (
 	"github.com/mpyw/suve/internal/cli/commands/param/log"
 	"github.com/mpyw/suve/internal/cli/commands/param/set"
 	"github.com/mpyw/suve/internal/cli/commands/param/show"
+	"github.com/mpyw/suve/internal/cli/commands/param/tag"
+	"github.com/mpyw/suve/internal/cli/commands/param/untag"
 )
 
 // Command returns the param command with all subcommands.
@@ -25,6 +27,8 @@ func Command() *cli.Command {
 			list.Command(),
 			set.Command(),
 			paramdelete.Command(),
+			tag.Command(),
+			untag.Command(),
 		},
 		CommandNotFound: cliinternal.CommandNotFound,
 	}

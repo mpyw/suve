@@ -51,6 +51,10 @@ func (m *mockClient) ListSecretVersionIds(ctx context.Context, params *secretapi
 	return m.listSecretVersionIdsFunc(ctx, params, optFns...)
 }
 
+func (m *mockClient) DescribeSecret(_ context.Context, _ *secretapi.DescribeSecretInput, _ ...func(*secretapi.Options)) (*secretapi.DescribeSecretOutput, error) {
+	return &secretapi.DescribeSecretOutput{}, nil
+}
+
 func TestRun(t *testing.T) {
 	t.Parallel()
 	now := time.Now()

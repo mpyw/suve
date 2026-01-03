@@ -19,7 +19,6 @@ type CreateInput struct {
 	Name        string
 	Value       string
 	Description string
-	Tags        map[string]string
 }
 
 // CreateOutput holds the result of the create use case.
@@ -42,16 +41,6 @@ func (u *CreateUseCase) Execute(ctx context.Context, input CreateInput) (*Create
 	}
 	if input.Description != "" {
 		createInput.Description = lo.ToPtr(input.Description)
-	}
-	if len(input.Tags) > 0 {
-		tags := make([]secretapi.Tag, 0, len(input.Tags))
-		for k, v := range input.Tags {
-			tags = append(tags, secretapi.Tag{
-				Key:   lo.ToPtr(k),
-				Value: lo.ToPtr(v),
-			})
-		}
-		createInput.Tags = tags
 	}
 
 	result, err := u.Client.CreateSecret(ctx, createInput)

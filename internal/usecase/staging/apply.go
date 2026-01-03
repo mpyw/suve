@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/mpyw/suve/internal/maputil"
 	"github.com/mpyw/suve/internal/parallel"
 	"github.com/mpyw/suve/internal/staging"
 )
@@ -26,9 +27,11 @@ const (
 
 // ApplyResultEntry represents the result of applying a single entry.
 type ApplyResultEntry struct {
-	Name   string
-	Status ApplyResultStatus
-	Error  error
+	Name      string
+	Status    ApplyResultStatus
+	Error     error
+	Tags      map[string]string   // Tags that were applied
+	UntagKeys maputil.Set[string] // Tag keys that were removed
 }
 
 // ApplyOutput holds the result of the apply use case.
@@ -96,9 +99,13 @@ func (u *ApplyUseCase) Execute(ctx context.Context, input ApplyInput) (*ApplyOut
 	})
 
 	// Collect results
-	for name := range entries {
+	for name, entry := range entries {
 		result := results[name]
-		resultEntry := ApplyResultEntry{Name: name}
+		resultEntry := ApplyResultEntry{
+			Name:      name,
+			Tags:      entry.Tags,
+			UntagKeys: entry.UntagKeys,
+		}
 
 		if result.Err != nil {
 			resultEntry.Status = ApplyResultFailed

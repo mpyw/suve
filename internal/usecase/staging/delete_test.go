@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -193,4 +194,101 @@ func TestDeleteUseCase_Execute_StageError(t *testing.T) {
 	})
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "stage error")
+}
+
+func TestDeleteUseCase_Execute_GetError(t *testing.T) {
+	t.Parallel()
+
+	store := newMockStore()
+	store.getErr = errors.New("store get error")
+
+	uc := &usecasestaging.DeleteUseCase{
+		Strategy: newMockDeleteStrategy(false),
+		Store:    store,
+	}
+
+	_, err := uc.Execute(context.Background(), usecasestaging.DeleteInput{
+		Name: "/app/config",
+	})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "store get error")
+}
+
+func TestDeleteUseCase_Execute_UnstageError(t *testing.T) {
+	t.Parallel()
+
+	store := newMockStore()
+	// Simulate existing CREATE entry by staging it
+	store.entries[staging.ServiceParam]["/app/new"] = staging.Entry{
+		Operation: staging.OperationCreate,
+		Value:     lo.ToPtr("value"),
+	}
+	store.unstageErr = errors.New("unstage error")
+
+	uc := &usecasestaging.DeleteUseCase{
+		Strategy: newMockDeleteStrategy(false),
+		Store:    store,
+	}
+
+	_, err := uc.Execute(context.Background(), usecasestaging.DeleteInput{
+		Name: "/app/new",
+	})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "unstage error")
+}
+
+func TestDeleteUseCase_Execute_UnstagesCreate(t *testing.T) {
+	t.Parallel()
+
+	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	// Pre-stage a CREATE operation
+	require.NoError(t, store.Stage(staging.ServiceParam, "/app/new", staging.Entry{
+		Operation: staging.OperationCreate,
+		Value:     lo.ToPtr("new-value"),
+		StagedAt:  time.Now(),
+	}))
+
+	uc := &usecasestaging.DeleteUseCase{
+		Strategy: newMockDeleteStrategy(false),
+		Store:    store,
+	}
+
+	output, err := uc.Execute(context.Background(), usecasestaging.DeleteInput{
+		Name: "/app/new",
+	})
+	require.NoError(t, err)
+	assert.True(t, output.Unstaged)
+	assert.Equal(t, "/app/new", output.Name)
+
+	// Verify the entry was unstaged (removed), not staged as DELETE
+	_, err = store.Get(staging.ServiceParam, "/app/new")
+	assert.ErrorIs(t, err, staging.ErrNotStaged)
+}
+
+func TestDeleteUseCase_Execute_DeleteOnUpdate(t *testing.T) {
+	t.Parallel()
+
+	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	// Pre-stage an UPDATE operation
+	require.NoError(t, store.Stage(staging.ServiceParam, "/app/existing", staging.Entry{
+		Operation: staging.OperationUpdate,
+		Value:     lo.ToPtr("updated-value"),
+		StagedAt:  time.Now(),
+	}))
+
+	uc := &usecasestaging.DeleteUseCase{
+		Strategy: newMockDeleteStrategy(false),
+		Store:    store,
+	}
+
+	output, err := uc.Execute(context.Background(), usecasestaging.DeleteInput{
+		Name: "/app/existing",
+	})
+	require.NoError(t, err)
+	assert.False(t, output.Unstaged) // Not unstaged, it was re-staged as DELETE
+
+	// Verify the operation changed to DELETE
+	entry, err := store.Get(staging.ServiceParam, "/app/existing")
+	require.NoError(t, err)
+	assert.Equal(t, staging.OperationDelete, entry.Operation)
 }
