@@ -140,6 +140,7 @@ suve param log [options] <name>
 | `--until` | - | - | Show versions modified before this date (RFC3339 format) |
 | `--no-pager` | - | `false` | Disable pager output |
 | `--output` | - | `text` | Output format: `text` (default) or `json` |
+| `--max-value-length` | - | `0` | Maximum value preview length (0 = auto) |
 
 **Examples:**
 
@@ -161,7 +162,7 @@ postgres://localhost:5432/myapp...
 ```
 
 > [!NOTE]
-> Values are truncated at 50 characters with `...` suffix.
+> In normal mode, full values are shown. In `--oneline` mode, values are truncated to fit terminal width (default 50 if unavailable). Use `--max-value-length` to override.
 
 With `--patch` to see what changed:
 
