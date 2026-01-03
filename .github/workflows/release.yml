@@ -108,9 +108,10 @@ jobs:
 
   # ===========================================================================
   # suve & suve-gui (Linux): CGO required
+  # Ubuntu 22.04 needed for libwebkit2gtk-4.0-dev (not available in 24.04)
   # ===========================================================================
   build-linux:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
       - name: Checkout
         uses: actions/checkout@v4
