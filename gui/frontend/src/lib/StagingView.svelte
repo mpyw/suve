@@ -1,22 +1,23 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { StagingStatus, StagingApply, StagingReset, StagingAdd, StagingEdit, StagingUnstage, StagingDelete } from '../../wailsjs/go/main/App';
+  import { StagingDiff, StagingApply, StagingReset, StagingEdit, StagingUnstage } from '../../wailsjs/go/main/App';
   import type { main } from '../../wailsjs/go/models';
   import Modal from './Modal.svelte';
-  import CloseIcon from './icons/CloseIcon.svelte';
+  import DiffDisplay from './DiffDisplay.svelte';
   import './common.css';
 
   let loading = false;
   let error = '';
-  let ssmEntries: main.StagingEntry[] = [];
-  let smEntries: main.StagingEntry[] = [];
+  let ssmEntries: main.StagingDiffEntry[] = [];
+  let smEntries: main.StagingDiffEntry[] = [];
+
+  // View mode: 'diff' (default) or 'value'
+  let viewMode: 'diff' | 'value' = 'diff';
 
   // Modal states
   let showApplyModal = false;
   let showResetModal = false;
-  let showAddModal = false;
   let showEditModal = false;
-  let showDeleteModal = false;
   let applyService = '';
   let resetService = '';
   let ignoreConflicts = false;
@@ -24,25 +25,22 @@
   let modalError = '';
   let applyResult: main.StagingApplyResult | null = null;
 
-  // Add/Edit form
-  let addEditService = 'ssm';
-  let addEditName = '';
-  let addEditValue = '';
-  let isEditMode = false;
-
-  // Delete form
-  let deleteService = '';
-  let deleteName = '';
-  let deleteForce = false;
-  let deleteRecoveryWindow = 7;
+  // Edit form
+  let editService = '';
+  let editName = '';
+  let editValue = '';
 
   async function loadStatus() {
     loading = true;
     error = '';
     try {
-      const result = await StagingStatus();
-      ssmEntries = result?.ssm || [];
-      smEntries = result?.sm || [];
+      // Load diff data which includes AWS values
+      const [ssmResult, smResult] = await Promise.all([
+        StagingDiff('ssm', ''),
+        StagingDiff('sm', '')
+      ]);
+      ssmEntries = ssmResult?.entries?.filter(e => e.type !== 'autoUnstaged') || [];
+      smEntries = smResult?.entries?.filter(e => e.type !== 'autoUnstaged') || [];
     } catch (e) {
       error = e instanceof Error ? e.message : String(e);
       ssmEntries = [];
@@ -57,7 +55,7 @@
   }
 
   function getOperationColor(op: string): string {
-    switch (op.toLowerCase()) {
+    switch (op?.toLowerCase()) {
       case 'set':
       case 'create':
         return '#4caf50';
@@ -128,53 +126,24 @@
     return service === 'ssm' ? 'Parameters (SSM)' : 'Secrets (SM)';
   }
 
-  // Add modal
-  function openAddModal(service: string) {
-    addEditService = service;
-    addEditName = '';
-    addEditValue = '';
-    isEditMode = false;
-    modalError = '';
-    showAddModal = true;
-  }
-
-  async function handleAdd() {
-    if (!addEditName || !addEditValue) {
-      modalError = 'Name and value are required';
-      return;
-    }
-    modalLoading = true;
-    modalError = '';
-    try {
-      await StagingAdd(addEditService, addEditName, addEditValue);
-      showAddModal = false;
-      await loadStatus();
-    } catch (e) {
-      modalError = e instanceof Error ? e.message : String(e);
-    } finally {
-      modalLoading = false;
-    }
-  }
-
   // Edit modal
-  function openEditModal(service: string, entry: main.StagingEntry) {
-    addEditService = service;
-    addEditName = entry.name;
-    addEditValue = entry.value || '';
-    isEditMode = true;
+  function openEditModal(service: string, entry: main.StagingDiffEntry) {
+    editService = service;
+    editName = entry.name;
+    editValue = entry.stagedValue || '';
     modalError = '';
     showEditModal = true;
   }
 
   async function handleEdit() {
-    if (!addEditValue) {
+    if (!editValue) {
       modalError = 'Value is required';
       return;
     }
     modalLoading = true;
     modalError = '';
     try {
-      await StagingEdit(addEditService, addEditName, addEditValue);
+      await StagingEdit(editService, editName, editValue);
       showEditModal = false;
       await loadStatus();
     } catch (e) {
@@ -194,34 +163,6 @@
     }
   }
 
-  // Stage delete modal
-  function openDeleteModal(service: string) {
-    deleteService = service;
-    deleteName = '';
-    deleteForce = false;
-    deleteRecoveryWindow = 7;
-    modalError = '';
-    showDeleteModal = true;
-  }
-
-  async function handleStageDelete() {
-    if (!deleteName) {
-      modalError = 'Name is required';
-      return;
-    }
-    modalLoading = true;
-    modalError = '';
-    try {
-      await StagingDelete(deleteService, deleteName, deleteForce, deleteRecoveryWindow);
-      showDeleteModal = false;
-      await loadStatus();
-    } catch (e) {
-      modalError = e instanceof Error ? e.message : String(e);
-    } finally {
-      modalLoading = false;
-    }
-  }
-
   onMount(() => {
     loadStatus();
   });
@@ -230,9 +171,27 @@
 <div class="view-container">
   <div class="header">
     <h2 class="title">Staging Area</h2>
-    <button class="btn-primary" on:click={loadStatus} disabled={loading}>
-      {loading ? 'Loading...' : 'Refresh'}
-    </button>
+    <div class="header-actions">
+      <div class="view-toggle">
+        <button
+          class="toggle-btn"
+          class:active={viewMode === 'diff'}
+          on:click={() => viewMode = 'diff'}
+        >
+          Diff
+        </button>
+        <button
+          class="toggle-btn"
+          class:active={viewMode === 'value'}
+          on:click={() => viewMode = 'value'}
+        >
+          Value
+        </button>
+      </div>
+      <button class="btn-primary" on:click={loadStatus} disabled={loading}>
+        {loading ? 'Loading...' : 'Refresh'}
+      </button>
+    </div>
   </div>
 
   {#if error}
@@ -248,8 +207,6 @@
         </h3>
         <span class="count-badge">{ssmEntries.length}</span>
         <div class="section-actions">
-          <button class="btn-section btn-add" on:click={() => openAddModal('ssm')}>+ Add</button>
-          <button class="btn-section btn-delete-stage" on:click={() => openDeleteModal('ssm')}>Stage Delete</button>
           {#if ssmEntries.length > 0}
             <button class="btn-section btn-apply-sm" on:click={() => openApplyModal('ssm')}>Apply</button>
             <button class="btn-section btn-reset-sm" on:click={() => openResetModal('ssm')}>Reset</button>
@@ -264,11 +221,10 @@
           {#each ssmEntries as entry}
             <li class="entry-item">
               <div class="entry-header">
-                <span class="operation-badge" style="background: {getOperationColor(entry.operation)}">
+                <span class="operation-badge" style="background: {getOperationColor(entry.operation || '')}">
                   {entry.operation}
                 </span>
                 <span class="entry-name">{entry.name}</span>
-                <span class="entry-date">{formatDate(entry.stagedAt)}</span>
                 <div class="entry-actions">
                   {#if entry.operation !== 'delete'}
                     <button class="btn-entry" on:click={() => openEditModal('ssm', entry)}>Edit</button>
@@ -276,8 +232,20 @@
                   <button class="btn-entry btn-unstage" on:click={() => handleUnstage('ssm', entry.name)}>Unstage</button>
                 </div>
               </div>
-              {#if entry.value !== undefined}
-                <pre class="entry-value">{entry.value}</pre>
+              {#if viewMode === 'diff' && entry.operation !== 'create'}
+                <div class="entry-diff">
+                  <DiffDisplay
+                    oldValue={entry.awsValue || ''}
+                    newValue={entry.stagedValue || (entry.operation === 'delete' ? '(deleted)' : '')}
+                    oldLabel="AWS"
+                    newLabel="Staged"
+                    oldSubLabel={entry.awsIdentifier || ''}
+                  />
+                </div>
+              {:else if entry.stagedValue !== undefined}
+                <pre class="entry-value">{entry.stagedValue}</pre>
+              {:else if entry.operation === 'delete'}
+                <pre class="entry-value entry-value-delete">(will be deleted)</pre>
               {/if}
             </li>
           {/each}
@@ -293,8 +261,6 @@
         </h3>
         <span class="count-badge">{smEntries.length}</span>
         <div class="section-actions">
-          <button class="btn-section btn-add" on:click={() => openAddModal('sm')}>+ Add</button>
-          <button class="btn-section btn-delete-stage" on:click={() => openDeleteModal('sm')}>Stage Delete</button>
           {#if smEntries.length > 0}
             <button class="btn-section btn-apply-sm" on:click={() => openApplyModal('sm')}>Apply</button>
             <button class="btn-section btn-reset-sm" on:click={() => openResetModal('sm')}>Reset</button>
@@ -309,11 +275,10 @@
           {#each smEntries as entry}
             <li class="entry-item">
               <div class="entry-header">
-                <span class="operation-badge" style="background: {getOperationColor(entry.operation)}">
+                <span class="operation-badge" style="background: {getOperationColor(entry.operation || '')}">
                   {entry.operation}
                 </span>
                 <span class="entry-name">{entry.name}</span>
-                <span class="entry-date">{formatDate(entry.stagedAt)}</span>
                 <div class="entry-actions">
                   {#if entry.operation !== 'delete'}
                     <button class="btn-entry" on:click={() => openEditModal('sm', entry)}>Edit</button>
@@ -321,8 +286,20 @@
                   <button class="btn-entry btn-unstage" on:click={() => handleUnstage('sm', entry.name)}>Unstage</button>
                 </div>
               </div>
-              {#if entry.value !== undefined}
-                <pre class="entry-value">{entry.value}</pre>
+              {#if viewMode === 'diff' && entry.operation !== 'create'}
+                <div class="entry-diff">
+                  <DiffDisplay
+                    oldValue={entry.awsValue || ''}
+                    newValue={entry.stagedValue || (entry.operation === 'delete' ? '(deleted)' : '')}
+                    oldLabel="AWS"
+                    newLabel="Staged"
+                    oldSubLabel={entry.awsIdentifier || ''}
+                  />
+                </div>
+              {:else if entry.stagedValue !== undefined}
+                <pre class="entry-value">{entry.stagedValue}</pre>
+              {:else if entry.operation === 'delete'}
+                <pre class="entry-value entry-value-delete">(will be deleted)</pre>
               {/if}
             </li>
           {/each}
@@ -429,43 +406,8 @@
   </div>
 </Modal>
 
-<!-- Add Modal -->
-<Modal title="Stage New {addEditService === 'ssm' ? 'Parameter' : 'Secret'}" show={showAddModal} on:close={() => showAddModal = false}>
-  <form class="modal-form" on:submit|preventDefault={handleAdd}>
-    {#if modalError}
-      <div class="modal-error">{modalError}</div>
-    {/if}
-    <div class="form-group">
-      <label for="add-name">Name</label>
-      <input
-        id="add-name"
-        type="text"
-        class="form-input"
-        bind:value={addEditName}
-        placeholder={addEditService === 'ssm' ? '/path/to/parameter' : 'my-secret-name'}
-      />
-    </div>
-    <div class="form-group">
-      <label for="add-value">Value</label>
-      <textarea
-        id="add-value"
-        class="form-input form-textarea"
-        bind:value={addEditValue}
-        placeholder="Value"
-        rows="5"
-      ></textarea>
-    </div>
-    <div class="form-actions">
-      <button type="button" class="btn-secondary" on:click={() => showAddModal = false}>Cancel</button>
-      <button type="submit" class="btn-primary" disabled={modalLoading}>
-        {modalLoading ? 'Staging...' : 'Stage'}
-      </button>
-    </div>
-  </form>
-</Modal>
-
 <!-- Edit Modal -->
-<Modal title="Edit Staged {addEditService === 'ssm' ? 'Parameter' : 'Secret'}" show={showEditModal} on:close={() => showEditModal = false}>
+<Modal title="Edit Staged {editService === 'ssm' ? 'Parameter' : 'Secret'}" show={showEditModal} on:close={() => showEditModal = false}>
   <form class="modal-form" on:submit|preventDefault={handleEdit}>
     {#if modalError}
       <div class="modal-error">{modalError}</div>
@@ -476,7 +418,7 @@
         id="edit-name"
         type="text"
         class="form-input"
-        value={addEditName}
+        value={editName}
         disabled
       />
     </div>
@@ -485,7 +427,7 @@
       <textarea
         id="edit-value"
         class="form-input form-textarea"
-        bind:value={addEditValue}
+        bind:value={editValue}
         rows="8"
       ></textarea>
     </div>
@@ -493,52 +435,6 @@
       <button type="button" class="btn-secondary" on:click={() => showEditModal = false}>Cancel</button>
       <button type="submit" class="btn-primary" disabled={modalLoading}>
         {modalLoading ? 'Saving...' : 'Save'}
-      </button>
-    </div>
-  </form>
-</Modal>
-
-<!-- Stage Delete Modal -->
-<Modal title="Stage Delete {deleteService === 'ssm' ? 'Parameter' : 'Secret'}" show={showDeleteModal} on:close={() => showDeleteModal = false}>
-  <form class="modal-form" on:submit|preventDefault={handleStageDelete}>
-    {#if modalError}
-      <div class="modal-error">{modalError}</div>
-    {/if}
-    <div class="form-group">
-      <label for="delete-name">Name</label>
-      <input
-        id="delete-name"
-        type="text"
-        class="form-input"
-        bind:value={deleteName}
-        placeholder={deleteService === 'ssm' ? '/path/to/parameter' : 'my-secret-name'}
-      />
-    </div>
-    {#if deleteService === 'sm'}
-      <div class="form-group">
-        <label class="checkbox-label">
-          <input type="checkbox" bind:checked={deleteForce} />
-          <span>Force delete (skip recovery window)</span>
-        </label>
-      </div>
-      {#if !deleteForce}
-        <div class="form-group">
-          <label for="recovery-window">Recovery Window (days)</label>
-          <input
-            id="recovery-window"
-            type="number"
-            class="form-input"
-            bind:value={deleteRecoveryWindow}
-            min="7"
-            max="30"
-          />
-        </div>
-      {/if}
-    {/if}
-    <div class="form-actions">
-      <button type="button" class="btn-secondary" on:click={() => showDeleteModal = false}>Cancel</button>
-      <button type="submit" class="btn-danger" disabled={modalLoading}>
-        {modalLoading ? 'Staging...' : 'Stage Delete'}
       </button>
     </div>
   </form>
@@ -552,6 +448,38 @@
     padding: 16px;
     background: #1a1a2e;
     border-bottom: 1px solid #2d2d44;
+  }
+
+  .header-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .view-toggle {
+    display: flex;
+    background: #0f0f1a;
+    border-radius: 4px;
+    overflow: hidden;
+  }
+
+  .toggle-btn {
+    padding: 6px 12px;
+    border: none;
+    background: transparent;
+    color: #888;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .toggle-btn:hover {
+    color: #fff;
+  }
+
+  .toggle-btn.active {
+    background: #e94560;
+    color: #fff;
   }
 
   .title {
@@ -644,24 +572,6 @@
     background: #e53935;
   }
 
-  .btn-add {
-    background: #2196f3;
-    color: #fff;
-  }
-
-  .btn-add:hover {
-    background: #1976d2;
-  }
-
-  .btn-delete-stage {
-    background: #ff9800;
-    color: #fff;
-  }
-
-  .btn-delete-stage:hover {
-    background: #f57c00;
-  }
-
   .entry-actions {
     display: flex;
     gap: 6px;
@@ -727,9 +637,8 @@
     color: #4fc3f7;
   }
 
-  .entry-date {
-    font-size: 12px;
-    color: #666;
+  .entry-diff {
+    margin-top: 12px;
   }
 
   .entry-value {
@@ -742,6 +651,10 @@
     color: #a5d6a7;
     white-space: pre-wrap;
     word-break: break-all;
+  }
+
+  .entry-value-delete {
+    color: #ef9a9a;
   }
 
   .actions {
@@ -1019,5 +932,17 @@
   .btn-primary:disabled {
     background: #666;
     cursor: not-allowed;
+  }
+
+  .checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #ccc;
+    cursor: pointer;
+  }
+
+  .checkbox-label input {
+    cursor: pointer;
   }
 </style>
