@@ -7,7 +7,6 @@ import (
 	"io"
 	"os"
 	"strings"
-	"time"
 
 	"github.com/urfave/cli/v3"
 
@@ -307,10 +306,12 @@ EXAMPLES:
 			}
 
 			r := &EditRunner{
-				Strategy: strat,
-				Store:    store,
-				Stdout:   cmd.Root().Writer,
-				Stderr:   cmd.Root().ErrWriter,
+				UseCase: &stagingusecase.EditUseCase{
+					Strategy: strat,
+					Store:    store,
+				},
+				Stdout: cmd.Root().Writer,
+				Stderr: cmd.Root().ErrWriter,
 			}
 			return r.Run(ctx, EditOptions{
 				Name:        name,
@@ -626,58 +627,28 @@ EXAMPLES:
 				return fmt.Errorf("failed to initialize stage store: %w", err)
 			}
 
+			strat, err := cfg.Factory(ctx)
+			if err != nil {
+				return err
+			}
+
 			name := cmd.Args().First()
+			force := cmd.Bool("force")
+			recoveryWindow := cmd.Int("recovery-window")
 
-			// Initialize strategy to fetch LastModified for conflict detection
-			strategy, err := cfg.Factory(ctx)
-			if err != nil {
-				return err
+			r := &DeleteRunner{
+				UseCase: &stagingusecase.DeleteUseCase{
+					Strategy: strat,
+					Store:    store,
+				},
+				Stdout: cmd.Root().Writer,
+				Stderr: cmd.Root().ErrWriter,
 			}
-			service := strategy.Service()
-
-			// Fetch LastModified for conflict detection
-			lastModified, err := strategy.FetchLastModified(ctx, name)
-			if err != nil {
-				return fmt.Errorf("failed to fetch %s: %w", cfg.ItemName, err)
-			}
-
-			entry := staging.Entry{
-				Operation: staging.OperationDelete,
-				StagedAt:  time.Now(),
-			}
-			if !lastModified.IsZero() {
-				entry.BaseModifiedAt = &lastModified
-			}
-
-			if hasDeleteOptions {
-				force := cmd.Bool("force")
-				recoveryWindow := cmd.Int("recovery-window")
-
-				// Validate recovery window
-				if !force && (recoveryWindow < 7 || recoveryWindow > 30) {
-					return fmt.Errorf("recovery window must be between 7 and 30 days")
-				}
-
-				entry.DeleteOptions = &staging.DeleteOptions{
-					Force:          force,
-					RecoveryWindow: recoveryWindow,
-				}
-			}
-
-			if err := store.Stage(service, name, entry); err != nil {
-				return err
-			}
-
-			if hasDeleteOptions && entry.DeleteOptions != nil {
-				if entry.DeleteOptions.Force {
-					_, _ = fmt.Fprintf(cmd.Root().Writer, "%s Staged for immediate deletion: %s\n", colors.Success("✓"), name)
-				} else {
-					_, _ = fmt.Fprintf(cmd.Root().Writer, "%s Staged for deletion (%d-day recovery): %s\n", colors.Success("✓"), entry.DeleteOptions.RecoveryWindow, name)
-				}
-			} else {
-				_, _ = fmt.Fprintf(cmd.Root().Writer, "%s Staged for deletion: %s\n", colors.Success("✓"), name)
-			}
-			return nil
+			return r.Run(ctx, DeleteOptions{
+				Name:           name,
+				Force:          force,
+				RecoveryWindow: recoveryWindow,
+			})
 		},
 	}
 }

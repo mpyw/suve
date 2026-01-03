@@ -35,6 +35,7 @@ type fullMockStrategy struct {
 	fetchVersionLbl      string
 	applyErr             error
 	fetchLastModifiedVal time.Time
+	fetchLastModifiedErr error
 }
 
 func (m *fullMockStrategy) Service() staging.Service { return m.service }
@@ -81,6 +82,9 @@ func (m *fullMockStrategy) Apply(_ context.Context, _ string, _ staging.Entry) e
 	return m.applyErr
 }
 func (m *fullMockStrategy) FetchLastModified(_ context.Context, _ string) (time.Time, error) {
+	if m.fetchLastModifiedErr != nil {
+		return time.Time{}, m.fetchLastModifiedErr
+	}
 	return m.fetchLastModifiedVal, nil
 }
 
@@ -680,10 +684,12 @@ func TestEditRunner_Run(t *testing.T) {
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.EditRunner{
-			Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentVal: "aws-value"},
-			Store:    store,
-			Stdout:   &stdout,
-			Stderr:   &stderr,
+			UseCase: &stagingusecase.EditUseCase{
+				Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentVal: "aws-value"},
+				Store:    store,
+			},
+			Stdout: &stdout,
+			Stderr: &stderr,
 			OpenEditor: func(current string) (string, error) {
 				assert.Equal(t, "aws-value", current)
 				return "edited-value", nil
@@ -713,10 +719,12 @@ func TestEditRunner_Run(t *testing.T) {
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.EditRunner{
-			Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentVal: "aws-value"},
-			Store:    store,
-			Stdout:   &stdout,
-			Stderr:   &stderr,
+			UseCase: &stagingusecase.EditUseCase{
+				Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentVal: "aws-value"},
+				Store:    store,
+			},
+			Stdout: &stdout,
+			Stderr: &stderr,
 			OpenEditor: func(current string) (string, error) {
 				assert.Equal(t, "staged-value", current) // Should use staged, not AWS
 				return "new-value", nil
@@ -744,10 +752,12 @@ func TestEditRunner_Run(t *testing.T) {
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.EditRunner{
-			Strategy: &fullMockStrategy{service: staging.ServiceParam},
-			Store:    store,
-			Stdout:   &stdout,
-			Stderr:   &stderr,
+			UseCase: &stagingusecase.EditUseCase{
+				Strategy: &fullMockStrategy{service: staging.ServiceParam},
+				Store:    store,
+			},
+			Stdout: &stdout,
+			Stderr: &stderr,
 			OpenEditor: func(current string) (string, error) {
 				assert.Equal(t, "create-value", current)
 				return "edited-create-value", nil
@@ -766,10 +776,12 @@ func TestEditRunner_Run(t *testing.T) {
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.EditRunner{
-			Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentVal: "same-value"},
-			Store:    store,
-			Stdout:   &stdout,
-			Stderr:   &stderr,
+			UseCase: &stagingusecase.EditUseCase{
+				Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentVal: "same-value"},
+				Store:    store,
+			},
+			Stdout: &stdout,
+			Stderr: &stderr,
 			OpenEditor: func(current string) (string, error) {
 				return current, nil // Return unchanged
 			},
@@ -788,10 +800,12 @@ func TestEditRunner_Run(t *testing.T) {
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.EditRunner{
-			Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentVal: "value"},
-			Store:    store,
-			Stdout:   &stdout,
-			Stderr:   &stderr,
+			UseCase: &stagingusecase.EditUseCase{
+				Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentVal: "value"},
+				Store:    store,
+			},
+			Stdout: &stdout,
+			Stderr: &stderr,
 			OpenEditor: func(_ string) (string, error) {
 				return "", errors.New("editor crashed")
 			},
@@ -810,10 +824,12 @@ func TestEditRunner_Run(t *testing.T) {
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.EditRunner{
-			Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentErr: errors.New("not found")},
-			Store:    store,
-			Stdout:   &stdout,
-			Stderr:   &stderr,
+			UseCase: &stagingusecase.EditUseCase{
+				Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentErr: errors.New("not found")},
+				Store:    store,
+			},
+			Stdout: &stdout,
+			Stderr: &stderr,
 			OpenEditor: func(_ string) (string, error) {
 				return "value", nil
 			},
@@ -1588,10 +1604,12 @@ func TestEditRunner_WithMetadata(t *testing.T) {
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.EditRunner{
-			Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentVal: "current"},
-			Store:    store,
-			Stdout:   &stdout,
-			Stderr:   &stderr,
+			UseCase: &stagingusecase.EditUseCase{
+				Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentVal: "current"},
+				Store:    store,
+			},
+			Stdout: &stdout,
+			Stderr: &stderr,
 		}
 
 		err := r.Run(context.Background(), runner.EditOptions{
@@ -1617,12 +1635,14 @@ func TestEditRunner_WithMetadata(t *testing.T) {
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.EditRunner{
-			Strategy: &fullMockStrategy{
-				service:              staging.ServiceParam,
-				fetchCurrentVal:      "current",
-				fetchLastModifiedVal: awsTime,
+			UseCase: &stagingusecase.EditUseCase{
+				Strategy: &fullMockStrategy{
+					service:              staging.ServiceParam,
+					fetchCurrentVal:      "current",
+					fetchLastModifiedVal: awsTime,
+				},
+				Store: store,
 			},
-			Store:  store,
 			Stdout: &stdout,
 			Stderr: &stderr,
 		}
@@ -1652,10 +1672,12 @@ func TestEditRunner_WithMetadata(t *testing.T) {
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.EditRunner{
-			Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentVal: "aws-value"},
-			Store:    store,
-			Stdout:   &stdout,
-			Stderr:   &stderr,
+			UseCase: &stagingusecase.EditUseCase{
+				Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentVal: "aws-value"},
+				Store:    store,
+			},
+			Stdout: &stdout,
+			Stderr: &stderr,
 			OpenEditor: func(current string) (string, error) {
 				// Should fetch from AWS, not use empty staged value
 				assert.Equal(t, "aws-value", current)
@@ -1670,5 +1692,141 @@ func TestEditRunner_WithMetadata(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, staging.OperationUpdate, entry.Operation)
 		assert.Equal(t, "edited-value", lo.FromPtr(entry.Value))
+	})
+}
+
+func TestDeleteRunner_Run(t *testing.T) {
+	t.Parallel()
+
+	t.Run("delete SSM parameter", func(t *testing.T) {
+		t.Parallel()
+
+		tmpDir := t.TempDir()
+		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+
+		var stdout, stderr bytes.Buffer
+		r := &runner.DeleteRunner{
+			UseCase: &stagingusecase.DeleteUseCase{
+				Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchLastModifiedVal: time.Now()},
+				Store:    store,
+			},
+			Stdout: &stdout,
+			Stderr: &stderr,
+		}
+
+		err := r.Run(context.Background(), runner.DeleteOptions{Name: "/app/config"})
+		require.NoError(t, err)
+		assert.Contains(t, stdout.String(), "Staged for deletion: /app/config")
+
+		entry, err := store.Get(staging.ServiceParam, "/app/config")
+		require.NoError(t, err)
+		assert.Equal(t, staging.OperationDelete, entry.Operation)
+		assert.Nil(t, entry.DeleteOptions) // SSM has no delete options
+	})
+
+	t.Run("delete secret with recovery window", func(t *testing.T) {
+		t.Parallel()
+
+		tmpDir := t.TempDir()
+		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+
+		var stdout, stderr bytes.Buffer
+		r := &runner.DeleteRunner{
+			UseCase: &stagingusecase.DeleteUseCase{
+				Strategy: &fullMockStrategy{service: staging.ServiceSecret, hasDeleteOptions: true, fetchLastModifiedVal: time.Now()},
+				Store:    store,
+			},
+			Stdout: &stdout,
+			Stderr: &stderr,
+		}
+
+		err := r.Run(context.Background(), runner.DeleteOptions{
+			Name:           "my-secret",
+			RecoveryWindow: 14,
+		})
+		require.NoError(t, err)
+		assert.Contains(t, stdout.String(), "Staged for deletion (14-day recovery): my-secret")
+
+		entry, err := store.Get(staging.ServiceSecret, "my-secret")
+		require.NoError(t, err)
+		assert.Equal(t, staging.OperationDelete, entry.Operation)
+		require.NotNil(t, entry.DeleteOptions)
+		assert.Equal(t, 14, entry.DeleteOptions.RecoveryWindow)
+		assert.False(t, entry.DeleteOptions.Force)
+	})
+
+	t.Run("delete secret with force", func(t *testing.T) {
+		t.Parallel()
+
+		tmpDir := t.TempDir()
+		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+
+		var stdout, stderr bytes.Buffer
+		r := &runner.DeleteRunner{
+			UseCase: &stagingusecase.DeleteUseCase{
+				Strategy: &fullMockStrategy{service: staging.ServiceSecret, hasDeleteOptions: true, fetchLastModifiedVal: time.Now()},
+				Store:    store,
+			},
+			Stdout: &stdout,
+			Stderr: &stderr,
+		}
+
+		err := r.Run(context.Background(), runner.DeleteOptions{
+			Name:  "my-secret",
+			Force: true,
+		})
+		require.NoError(t, err)
+		assert.Contains(t, stdout.String(), "Staged for immediate deletion: my-secret")
+
+		entry, err := store.Get(staging.ServiceSecret, "my-secret")
+		require.NoError(t, err)
+		assert.Equal(t, staging.OperationDelete, entry.Operation)
+		require.NotNil(t, entry.DeleteOptions)
+		assert.True(t, entry.DeleteOptions.Force)
+	})
+
+	t.Run("delete with fetch error", func(t *testing.T) {
+		t.Parallel()
+
+		tmpDir := t.TempDir()
+		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+
+		var stdout, stderr bytes.Buffer
+		r := &runner.DeleteRunner{
+			UseCase: &stagingusecase.DeleteUseCase{
+				Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchLastModifiedErr: errors.New("not found")},
+				Store:    store,
+			},
+			Stdout: &stdout,
+			Stderr: &stderr,
+		}
+
+		err := r.Run(context.Background(), runner.DeleteOptions{Name: "/app/config"})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "not found")
+	})
+
+	t.Run("delete secret with invalid recovery window", func(t *testing.T) {
+		t.Parallel()
+
+		tmpDir := t.TempDir()
+		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+
+		var stdout, stderr bytes.Buffer
+		r := &runner.DeleteRunner{
+			UseCase: &stagingusecase.DeleteUseCase{
+				Strategy: &fullMockStrategy{service: staging.ServiceSecret, hasDeleteOptions: true, fetchLastModifiedVal: time.Now()},
+				Store:    store,
+			},
+			Stdout: &stdout,
+			Stderr: &stderr,
+		}
+
+		err := r.Run(context.Background(), runner.DeleteOptions{
+			Name:           "my-secret",
+			RecoveryWindow: 5, // Invalid: must be 7-30
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "recovery window must be between 7 and 30 days")
 	})
 }
