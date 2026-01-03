@@ -69,12 +69,12 @@ func TestStatusUseCase_Execute_WithEntries(t *testing.T) {
 	now := time.Now().Truncate(time.Second)
 
 	// Stage some entries
-	require.NoError(t, store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
+	require.NoError(t, store.StageEntry(staging.ServiceParam, "/app/config", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("new-value"),
 		StagedAt:  now,
 	}))
-	require.NoError(t, store.Stage(staging.ServiceParam, "/app/secret", staging.Entry{
+	require.NoError(t, store.StageEntry(staging.ServiceParam, "/app/secret", staging.Entry{
 		Operation: staging.OperationDelete,
 		StagedAt:  now,
 	}))
@@ -95,7 +95,7 @@ func TestStatusUseCase_Execute_FilterByName(t *testing.T) {
 	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
 	now := time.Now()
 
-	require.NoError(t, store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
+	require.NoError(t, store.StageEntry(staging.ServiceParam, "/app/config", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("value"),
 		StagedAt:  now,
@@ -124,7 +124,7 @@ func TestStatusUseCase_Execute_SecretWithDeleteOptions(t *testing.T) {
 	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
 	now := time.Now()
 
-	require.NoError(t, store.Stage(staging.ServiceSecret, "my-secret", staging.Entry{
+	require.NoError(t, store.StageEntry(staging.ServiceSecret, "my-secret", staging.Entry{
 		Operation: staging.OperationDelete,
 		StagedAt:  now,
 		DeleteOptions: &staging.DeleteOptions{
@@ -176,4 +176,136 @@ func TestStatusUseCase_Execute_ListError(t *testing.T) {
 	_, err := uc.Execute(context.Background(), usecasestaging.StatusInput{})
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "list error")
+}
+
+func TestStatusUseCase_Execute_WithTagEntries(t *testing.T) {
+	t.Parallel()
+
+	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	now := time.Now().Truncate(time.Second)
+
+	// Stage tag entries
+	require.NoError(t, store.StageTag(staging.ServiceParam, "/app/config", staging.TagEntry{
+		Add:      map[string]string{"env": "prod", "team": "backend"},
+		StagedAt: now,
+	}))
+	require.NoError(t, store.StageTag(staging.ServiceParam, "/app/secret", staging.TagEntry{
+		Remove:   map[string]struct{}{"deprecated": {}},
+		StagedAt: now,
+	}))
+
+	uc := &usecasestaging.StatusUseCase{
+		Strategy: newParamStrategy(),
+		Store:    store,
+	}
+
+	output, err := uc.Execute(context.Background(), usecasestaging.StatusInput{})
+	require.NoError(t, err)
+	assert.Len(t, output.TagEntries, 2)
+
+	// Find the specific entries
+	var configEntry, secretEntry *usecasestaging.StatusTagEntry
+	for i := range output.TagEntries {
+		if output.TagEntries[i].Name == "/app/config" {
+			configEntry = &output.TagEntries[i]
+		}
+		if output.TagEntries[i].Name == "/app/secret" {
+			secretEntry = &output.TagEntries[i]
+		}
+	}
+
+	require.NotNil(t, configEntry)
+	assert.Equal(t, "prod", configEntry.Add["env"])
+	assert.Equal(t, "backend", configEntry.Add["team"])
+
+	require.NotNil(t, secretEntry)
+	assert.True(t, secretEntry.Remove.Contains("deprecated"))
+}
+
+func TestStatusUseCase_Execute_FilterByName_TagEntry(t *testing.T) {
+	t.Parallel()
+
+	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	now := time.Now()
+
+	// Stage only tag entry (no regular entry)
+	require.NoError(t, store.StageTag(staging.ServiceParam, "/app/config", staging.TagEntry{
+		Add:      map[string]string{"env": "prod"},
+		StagedAt: now,
+	}))
+
+	uc := &usecasestaging.StatusUseCase{
+		Strategy: newParamStrategy(),
+		Store:    store,
+	}
+
+	// Existing tag entry
+	output, err := uc.Execute(context.Background(), usecasestaging.StatusInput{Name: "/app/config"})
+	require.NoError(t, err)
+	assert.Empty(t, output.Entries)
+	assert.Len(t, output.TagEntries, 1)
+	assert.Equal(t, "/app/config", output.TagEntries[0].Name)
+	assert.Equal(t, "prod", output.TagEntries[0].Add["env"])
+}
+
+func TestStatusUseCase_Execute_FilterByName_BothEntryAndTag(t *testing.T) {
+	t.Parallel()
+
+	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	now := time.Now()
+
+	// Stage both regular entry and tag entry
+	require.NoError(t, store.StageEntry(staging.ServiceParam, "/app/config", staging.Entry{
+		Operation: staging.OperationUpdate,
+		Value:     lo.ToPtr("new-value"),
+		StagedAt:  now,
+	}))
+	require.NoError(t, store.StageTag(staging.ServiceParam, "/app/config", staging.TagEntry{
+		Add:      map[string]string{"env": "prod"},
+		StagedAt: now,
+	}))
+
+	uc := &usecasestaging.StatusUseCase{
+		Strategy: newParamStrategy(),
+		Store:    store,
+	}
+
+	output, err := uc.Execute(context.Background(), usecasestaging.StatusInput{Name: "/app/config"})
+	require.NoError(t, err)
+	assert.Len(t, output.Entries, 1)
+	assert.Len(t, output.TagEntries, 1)
+	assert.Equal(t, "/app/config", output.Entries[0].Name)
+	assert.Equal(t, "/app/config", output.TagEntries[0].Name)
+}
+
+func TestStatusUseCase_Execute_GetTagError(t *testing.T) {
+	t.Parallel()
+
+	store := newMockStore()
+	store.getTagErr = errors.New("get tag error")
+
+	uc := &usecasestaging.StatusUseCase{
+		Strategy: newParamStrategy(),
+		Store:    store,
+	}
+
+	_, err := uc.Execute(context.Background(), usecasestaging.StatusInput{Name: "/app/config"})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "get tag error")
+}
+
+func TestStatusUseCase_Execute_ListTagsError(t *testing.T) {
+	t.Parallel()
+
+	store := newMockStore()
+	store.listTagsErr = errors.New("list tags error")
+
+	uc := &usecasestaging.StatusUseCase{
+		Strategy: newParamStrategy(),
+		Store:    store,
+	}
+
+	_, err := uc.Execute(context.Background(), usecasestaging.StatusInput{})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "list tags error")
 }

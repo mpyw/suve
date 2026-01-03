@@ -99,19 +99,20 @@ func (s *ParamStrategy) applySet(ctx context.Context, name string, entry Entry) 
 		}
 	}
 
-	// Apply tag changes (additive)
-	if len(entry.Tags) > 0 || len(entry.UntagKeys) > 0 {
-		change := &tagging.Change{
-			Add:    entry.Tags,
-			Remove: entry.UntagKeys,
-		}
-		if !change.IsEmpty() {
-			if err := tagging.ApplyParam(ctx, s.Client, name, change); err != nil {
-				return err
-			}
+	return nil
+}
+
+// ApplyTags applies staged tag changes to AWS SSM Parameter Store.
+func (s *ParamStrategy) ApplyTags(ctx context.Context, name string, tagEntry TagEntry) error {
+	change := &tagging.Change{
+		Add:    tagEntry.Add,
+		Remove: tagEntry.Remove,
+	}
+	if !change.IsEmpty() {
+		if err := tagging.ApplyParam(ctx, s.Client, name, change); err != nil {
+			return err
 		}
 	}
-
 	return nil
 }
 

@@ -42,7 +42,7 @@ func TestCommand_ShowParamChangesOnly(t *testing.T) {
 	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 	now := time.Now()
-	_ = store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
+	_ = store.StageEntry(staging.ServiceParam, "/app/config", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("value1"),
 		StagedAt:  now,
@@ -71,7 +71,7 @@ func TestCommand_ShowSecretChangesOnly(t *testing.T) {
 	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 	now := time.Now()
-	_ = store.Stage(staging.ServiceSecret, "my-secret", staging.Entry{
+	_ = store.StageEntry(staging.ServiceSecret, "my-secret", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("secret-value"),
 		StagedAt:  now,
@@ -100,12 +100,12 @@ func TestCommand_ShowBothParamAndSecretChanges(t *testing.T) {
 	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 	now := time.Now()
-	_ = store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
+	_ = store.StageEntry(staging.ServiceParam, "/app/config", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("param-value"),
 		StagedAt:  now,
 	})
-	_ = store.Stage(staging.ServiceSecret, "my-secret", staging.Entry{
+	_ = store.StageEntry(staging.ServiceSecret, "my-secret", staging.Entry{
 		Operation: staging.OperationDelete,
 		StagedAt:  now,
 	})
@@ -136,12 +136,12 @@ func TestCommand_VerboseOutput(t *testing.T) {
 	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 	now := time.Now()
-	_ = store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
+	_ = store.StageEntry(staging.ServiceParam, "/app/config", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("test-value"),
 		StagedAt:  now,
 	})
-	_ = store.Stage(staging.ServiceSecret, "my-secret", staging.Entry{
+	_ = store.StageEntry(staging.ServiceSecret, "my-secret", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("secret-value"),
 		StagedAt:  now,
@@ -171,7 +171,7 @@ func TestCommand_VerboseWithDelete(t *testing.T) {
 	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 	now := time.Now()
-	_ = store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
+	_ = store.StageEntry(staging.ServiceParam, "/app/config", staging.Entry{
 		Operation: staging.OperationDelete,
 		StagedAt:  now,
 	})
@@ -200,7 +200,7 @@ func TestCommand_VerboseTruncatesLongValue(t *testing.T) {
 
 	now := time.Now()
 	longValue := "this is a very long value that exceeds one hundred characters and should be truncated in verbose mode output display"
-	_ = store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
+	_ = store.StageEntry(staging.ServiceParam, "/app/config", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr(longValue),
 		StagedAt:  now,

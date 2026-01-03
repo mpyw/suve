@@ -11,11 +11,9 @@ import (
 
 // TagInput holds input for the tag staging use case.
 type TagInput struct {
-	Name             string
-	AddTags          map[string]string   // Tags to add or update
-	RemoveTags       maputil.Set[string] // Tag keys to remove
-	CancelAddTags    maputil.Set[string] // Cancel staged tag additions (remove from Tags only)
-	CancelRemoveTags maputil.Set[string] // Cancel staged tag removals (remove from UntagKeys only)
+	Name       string
+	AddTags    map[string]string   // Tags to add or update
+	RemoveTags maputil.Set[string] // Tag keys to remove
 }
 
 // TagOutput holds the result of the tag staging use case.
@@ -39,87 +37,94 @@ func (u *TagUseCase) Execute(ctx context.Context, input TagInput) (*TagOutput, e
 		return nil, err
 	}
 
-	// Get existing staged entry
-	existingEntry, err := u.Store.Get(service, name)
+	// Get existing staged tag entry
+	existingTagEntry, err := u.Store.GetTag(service, name)
 	if err != nil && !errors.Is(err, staging.ErrNotStaged) {
 		return nil, err
 	}
 
-	var entry staging.Entry
-	if existingEntry != nil {
-		// Merge with existing entry
-		entry = *existingEntry
-		entry.StagedAt = time.Now()
+	var tagEntry staging.TagEntry
+	if existingTagEntry != nil {
+		// Merge with existing tag entry
+		tagEntry = *existingTagEntry
+		tagEntry.StagedAt = time.Now()
 
-		// Merge tags
-		if entry.Tags == nil {
-			entry.Tags = make(map[string]string)
+		// Ensure maps are initialized
+		if tagEntry.Add == nil {
+			tagEntry.Add = make(map[string]string)
 		}
-		if entry.UntagKeys == nil {
-			entry.UntagKeys = maputil.NewSet[string]()
+		if tagEntry.Remove == nil {
+			tagEntry.Remove = maputil.NewSet[string]()
 		}
+
+		// Process add tags
 		for k, v := range input.AddTags {
-			entry.Tags[k] = v
-			// Remove from untag list if present
-			entry.UntagKeys.Remove(k)
+			tagEntry.Add[k] = v
+			// Remove from remove list if present (adding takes precedence)
+			tagEntry.Remove.Remove(k)
 		}
 
-		// Merge untag keys
+		// Process remove tags
 		for k := range input.RemoveTags {
-			// Remove from tags if present
-			delete(entry.Tags, k)
-			// Add to untag list
-			entry.UntagKeys.Add(k)
+			// Remove from add list if present
+			delete(tagEntry.Add, k)
+			// Add to remove list
+			tagEntry.Remove.Add(k)
 		}
 
-		// Cancel staged tag additions (remove from Tags only, don't add to UntagKeys)
-		for k := range input.CancelAddTags {
-			delete(entry.Tags, k)
-		}
-
-		// Cancel staged tag removals (remove from UntagKeys only, don't add to Tags)
-		for k := range input.CancelRemoveTags {
-			entry.UntagKeys.Remove(k)
-		}
-
-		// If entry has no meaningful content after cancellation, unstage it
-		if entry.Value == nil && entry.Description == nil && len(entry.Tags) == 0 && entry.UntagKeys.Len() == 0 {
-			if err := u.Store.Unstage(service, name); err != nil {
+		// If tag entry has no meaningful content after merging, unstage it
+		if len(tagEntry.Add) == 0 && tagEntry.Remove.Len() == 0 {
+			if err := u.Store.UnstageTag(service, name); err != nil {
 				return nil, err
 			}
 			return &TagOutput{Name: name}, nil
 		}
 	} else {
-		// No existing entry - only create new entry if there's something to add
-		// CancelAddTags and CancelRemoveTags are no-ops on non-existent entries
+		// No existing tag entry - only create if there's something to stage
 		if len(input.AddTags) == 0 && input.RemoveTags.Len() == 0 {
 			return &TagOutput{Name: name}, nil
 		}
 
-		// Create new entry for tag-only change
-		// Fetch base time from AWS for conflict detection
-		result, err := u.Strategy.FetchCurrentValue(ctx, name)
-		if err != nil {
+		tagEntry = staging.TagEntry{
+			StagedAt: time.Now(),
+		}
+
+		// Check if there's a staged entry for CREATE (new resource)
+		existingEntry, err := u.Store.GetEntry(service, name)
+		if err != nil && !errors.Is(err, staging.ErrNotStaged) {
 			return nil, err
 		}
 
-		entry = staging.Entry{
-			Operation: staging.OperationUpdate,
-			StagedAt:  time.Now(),
-		}
-		if !result.LastModified.IsZero() {
-			entry.BaseModifiedAt = &result.LastModified
+		// Only fetch from AWS if the resource exists or is being updated (not created)
+		if existingEntry == nil || existingEntry.Operation != staging.OperationCreate {
+			// Fetch base time from AWS for conflict detection
+			result, err := u.Strategy.FetchCurrentValue(ctx, name)
+			if err != nil {
+				return nil, err
+			}
+			if !result.LastModified.IsZero() {
+				tagEntry.BaseModifiedAt = &result.LastModified
+			}
 		}
 
 		if len(input.AddTags) > 0 {
-			entry.Tags = input.AddTags
+			tagEntry.Add = make(map[string]string)
+			for k, v := range input.AddTags {
+				tagEntry.Add[k] = v
+			}
 		}
 		if input.RemoveTags.Len() > 0 {
-			entry.UntagKeys = input.RemoveTags
+			// Filter out keys that are being added (add takes precedence)
+			tagEntry.Remove = maputil.NewSet[string]()
+			for k := range input.RemoveTags {
+				if _, inAdd := input.AddTags[k]; !inAdd {
+					tagEntry.Remove.Add(k)
+				}
+			}
 		}
 	}
 
-	if err := u.Store.Stage(service, name, entry); err != nil {
+	if err := u.Store.StageTag(service, name, tagEntry); err != nil {
 		return nil, err
 	}
 

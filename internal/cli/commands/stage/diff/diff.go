@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"strings"
 
 	"github.com/samber/lo"
 	"github.com/urfave/cli/v3"
@@ -89,11 +88,11 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	}
 
 	// Check if there are any staged changes before creating clients
-	paramStaged, err := store.List(staging.ServiceParam)
+	paramStaged, err := store.ListEntries(staging.ServiceParam)
 	if err != nil {
 		return err
 	}
-	secretStaged, err := store.List(staging.ServiceSecret)
+	secretStaged, err := store.ListEntries(staging.ServiceSecret)
 	if err != nil {
 		return err
 	}
@@ -141,7 +140,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 
 // Run executes the diff command.
 func (r *Runner) Run(ctx context.Context, opts Options) error {
-	allEntries, err := r.Store.List("")
+	allEntries, err := r.Store.ListEntries("")
 	if err != nil {
 		return err
 	}
@@ -172,7 +171,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 			switch entry.Operation {
 			case staging.OperationDelete:
 				// Item doesn't exist in AWS anymore - deletion already applied
-				if err := r.Store.Unstage(staging.ServiceParam, name); err != nil {
+				if err := r.Store.UnstageEntry(staging.ServiceParam, name); err != nil {
 					return fmt.Errorf("failed to unstage %s: %w", name, err)
 				}
 				output.Warning(r.Stderr, "unstaged %s: already deleted in AWS", name)
@@ -191,7 +190,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 
 			case staging.OperationUpdate:
 				// Item doesn't exist in AWS anymore - staged update is invalid
-				if err := r.Store.Unstage(staging.ServiceParam, name); err != nil {
+				if err := r.Store.UnstageEntry(staging.ServiceParam, name); err != nil {
 					return fmt.Errorf("failed to unstage %s: %w", name, err)
 				}
 				output.Warning(r.Stderr, "unstaged %s: item no longer exists in AWS", name)
@@ -219,7 +218,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 			switch entry.Operation {
 			case staging.OperationDelete:
 				// Item doesn't exist in AWS anymore - deletion already applied
-				if err := r.Store.Unstage(staging.ServiceSecret, name); err != nil {
+				if err := r.Store.UnstageEntry(staging.ServiceSecret, name); err != nil {
 					return fmt.Errorf("failed to unstage %s: %w", name, err)
 				}
 				output.Warning(r.Stderr, "unstaged %s: already deleted in AWS", name)
@@ -238,7 +237,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 
 			case staging.OperationUpdate:
 				// Item doesn't exist in AWS anymore - staged update is invalid
-				if err := r.Store.Unstage(staging.ServiceSecret, name); err != nil {
+				if err := r.Store.UnstageEntry(staging.ServiceSecret, name); err != nil {
 					return fmt.Errorf("failed to unstage %s: %w", name, err)
 				}
 				output.Warning(r.Stderr, "unstaged %s: item no longer exists in AWS", name)
@@ -275,7 +274,7 @@ func (r *Runner) outputParamDiff(opts Options, name string, entry staging.Entry,
 
 	if awsValue == stagedValue {
 		// Auto-unstage since there's no difference
-		if err := r.Store.Unstage(staging.ServiceParam, name); err != nil {
+		if err := r.Store.UnstageEntry(staging.ServiceParam, name); err != nil {
 			return fmt.Errorf("failed to unstage %s: %w", name, err)
 		}
 		output.Warning(r.Stderr, "unstaged %s: identical to AWS current", name)
@@ -314,7 +313,7 @@ func (r *Runner) outputSecretDiff(opts Options, name string, entry staging.Entry
 
 	if awsValue == stagedValue {
 		// Auto-unstage since there's no difference
-		if err := r.Store.Unstage(staging.ServiceSecret, name); err != nil {
+		if err := r.Store.UnstageEntry(staging.ServiceSecret, name); err != nil {
 			return fmt.Errorf("failed to unstage %s: %w", name, err)
 		}
 		output.Warning(r.Stderr, "unstaged %s: identical to AWS current", name)
@@ -385,12 +384,5 @@ func (r *Runner) outputSecretDiffCreate(opts Options, name string, entry staging
 func (r *Runner) outputMetadata(entry staging.Entry) {
 	if desc := lo.FromPtr(entry.Description); desc != "" {
 		_, _ = fmt.Fprintf(r.Stdout, "%s %s\n", colors.FieldLabel("Description:"), desc)
-	}
-	if len(entry.Tags) > 0 {
-		var tagPairs []string
-		for _, k := range maputil.SortedKeys(entry.Tags) {
-			tagPairs = append(tagPairs, fmt.Sprintf("%s=%s", k, entry.Tags[k]))
-		}
-		_, _ = fmt.Fprintf(r.Stdout, "%s %s\n", colors.FieldLabel("Tags:"), strings.Join(tagPairs, ", "))
 	}
 }

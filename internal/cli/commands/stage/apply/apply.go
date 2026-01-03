@@ -76,11 +76,11 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	}
 
 	// Check if there are any staged changes
-	paramStaged, err := store.List(staging.ServiceParam)
+	paramStaged, err := store.ListEntries(staging.ServiceParam)
 	if err != nil {
 		return err
 	}
-	secretStaged, err := store.List(staging.ServiceSecret)
+	secretStaged, err := store.ListEntries(staging.ServiceSecret)
 	if err != nil {
 		return err
 	}
@@ -143,7 +143,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 // Run executes the apply command.
 func (r *Runner) Run(ctx context.Context) error {
 	// Get all staged changes (empty string means all services)
-	allStaged, err := r.Store.List("")
+	allStaged, err := r.Store.ListEntries("")
 	if err != nil {
 		return err
 	}
@@ -225,7 +225,7 @@ func (r *Runner) applyService(ctx context.Context, strat staging.ApplyStrategy, 
 			case staging.OperationDelete:
 				output.Success(r.Stdout, "%s: Deleted %s", serviceName, name)
 			}
-			if err := r.Store.Unstage(service, name); err != nil {
+			if err := r.Store.UnstageEntry(service, name); err != nil {
 				output.Warning(r.Stderr, "failed to clear staging for %s: %v", name, err)
 			}
 			succeeded++

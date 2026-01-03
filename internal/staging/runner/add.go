@@ -24,7 +24,6 @@ type AddOptions struct {
 	Name        string
 	Value       string // Optional: if set, skip editor and use this value
 	Description string
-	Tags        map[string]string
 }
 
 // Run executes the add command.
@@ -68,7 +67,6 @@ func (r *AddRunner) Run(ctx context.Context, opts AddOptions) error {
 		Name:        opts.Name,
 		Value:       newValue,
 		Description: opts.Description,
-		Tags:        opts.Tags,
 	})
 	if err != nil {
 		return err

@@ -41,7 +41,7 @@ func TestResetUseCase_Execute_Unstage(t *testing.T) {
 	t.Parallel()
 
 	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
-	require.NoError(t, store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
+	require.NoError(t, store.StageEntry(staging.ServiceParam, "/app/config", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("value"),
 		StagedAt:  time.Now(),
@@ -60,7 +60,7 @@ func TestResetUseCase_Execute_Unstage(t *testing.T) {
 	assert.Equal(t, "/app/config", output.Name)
 
 	// Verify unstaged
-	_, err = store.Get(staging.ServiceParam, "/app/config")
+	_, err = store.GetEntry(staging.ServiceParam, "/app/config")
 	assert.ErrorIs(t, err, staging.ErrNotStaged)
 }
 
@@ -84,12 +84,12 @@ func TestResetUseCase_Execute_UnstageAll(t *testing.T) {
 	t.Parallel()
 
 	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
-	require.NoError(t, store.Stage(staging.ServiceParam, "/app/one", staging.Entry{
+	require.NoError(t, store.StageEntry(staging.ServiceParam, "/app/one", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("one"),
 		StagedAt:  time.Now(),
 	}))
-	require.NoError(t, store.Stage(staging.ServiceParam, "/app/two", staging.Entry{
+	require.NoError(t, store.StageEntry(staging.ServiceParam, "/app/two", staging.Entry{
 		Operation: staging.OperationCreate,
 		Value:     lo.ToPtr("two"),
 		StagedAt:  time.Now(),
@@ -108,7 +108,7 @@ func TestResetUseCase_Execute_UnstageAll(t *testing.T) {
 	assert.Equal(t, 2, output.Count)
 
 	// Verify all unstaged
-	entries, err := store.List(staging.ServiceParam)
+	entries, err := store.ListEntries(staging.ServiceParam)
 	require.NoError(t, err)
 	assert.Empty(t, entries[staging.ServiceParam])
 }
@@ -152,7 +152,7 @@ func TestResetUseCase_Execute_Restore(t *testing.T) {
 	assert.Equal(t, "#3", output.VersionLabel)
 
 	// Verify staged
-	entry, err := store.Get(staging.ServiceParam, "/app/config#3")
+	entry, err := store.GetEntry(staging.ServiceParam, "/app/config#3")
 	require.NoError(t, err)
 	assert.Equal(t, staging.OperationUpdate, entry.Operation)
 	assert.Equal(t, "version-value", lo.FromPtr(entry.Value))

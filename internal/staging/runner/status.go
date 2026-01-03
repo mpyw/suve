@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/mpyw/suve/internal/cli/colors"
 	"github.com/mpyw/suve/internal/maputil"
@@ -34,7 +35,8 @@ func (r *StatusRunner) Run(ctx context.Context, opts StatusOptions) error {
 		return err
 	}
 
-	if len(result.Entries) == 0 {
+	totalCount := len(result.Entries) + len(result.TagEntries)
+	if totalCount == 0 {
 		_, _ = fmt.Fprintf(r.Stdout, "No %s changes staged.\n", result.ServiceName)
 		return nil
 	}
@@ -45,11 +47,14 @@ func (r *StatusRunner) Run(ctx context.Context, opts StatusOptions) error {
 		for _, entry := range result.Entries {
 			printer.PrintEntry(entry.Name, toStagingEntry(entry), opts.Verbose, entry.ShowDeleteOptions)
 		}
+		for _, tagEntry := range result.TagEntries {
+			r.printTagEntry(tagEntry, opts.Verbose)
+		}
 		return nil
 	}
 
 	// For all items, show header and entries
-	_, _ = fmt.Fprintf(r.Stdout, "%s (%d):\n", colors.Warning(fmt.Sprintf("Staged %s changes", result.ServiceName)), len(result.Entries))
+	_, _ = fmt.Fprintf(r.Stdout, "%s (%d):\n", colors.Warning(fmt.Sprintf("Staged %s changes", result.ServiceName)), totalCount)
 
 	printer := &staging.EntryPrinter{Writer: r.Stdout}
 	for _, name := range r.sortedEntryNames(result.Entries) {
@@ -61,10 +66,49 @@ func (r *StatusRunner) Run(ctx context.Context, opts StatusOptions) error {
 		}
 	}
 
+	// Print tag entries
+	for _, name := range r.sortedTagEntryNames(result.TagEntries) {
+		for _, tagEntry := range result.TagEntries {
+			if tagEntry.Name == name {
+				r.printTagEntry(tagEntry, opts.Verbose)
+				break
+			}
+		}
+	}
+
 	return nil
 }
 
+func (r *StatusRunner) printTagEntry(e stagingusecase.StatusTagEntry, verbose bool) {
+	parts := []string{}
+	if len(e.Add) > 0 {
+		parts = append(parts, fmt.Sprintf("+%d tag(s)", len(e.Add)))
+	}
+	if e.Remove.Len() > 0 {
+		parts = append(parts, fmt.Sprintf("-%d tag(s)", e.Remove.Len()))
+	}
+	summary := strings.Join(parts, ", ")
+	_, _ = fmt.Fprintf(r.Stdout, "  %s %s [%s]\n", colors.Info("T"), e.Name, summary)
+
+	if verbose {
+		for key, value := range e.Add {
+			_, _ = fmt.Fprintf(r.Stdout, "      + %s=%s\n", key, value)
+		}
+		for key := range e.Remove {
+			_, _ = fmt.Fprintf(r.Stdout, "      - %s\n", key)
+		}
+	}
+}
+
 func (r *StatusRunner) sortedEntryNames(entries []stagingusecase.StatusEntry) []string {
+	names := make(map[string]struct{})
+	for _, e := range entries {
+		names[e.Name] = struct{}{}
+	}
+	return maputil.SortedKeys(names)
+}
+
+func (r *StatusRunner) sortedTagEntryNames(entries []stagingusecase.StatusTagEntry) []string {
 	names := make(map[string]struct{})
 	for _, e := range entries {
 		names[e.Name] = struct{}{}
@@ -77,8 +121,6 @@ func toStagingEntry(e stagingusecase.StatusEntry) staging.Entry {
 		Operation:     e.Operation,
 		Value:         e.Value,
 		Description:   e.Description,
-		Tags:          e.Tags,
-		UntagKeys:     e.UntagKeys,
 		DeleteOptions: e.DeleteOptions,
 		StagedAt:      e.StagedAt,
 	}

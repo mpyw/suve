@@ -78,15 +78,6 @@ func (s *SecretStrategy) applyCreate(ctx context.Context, name string, entry Ent
 	if entry.Description != nil {
 		input.Description = entry.Description
 	}
-	if len(entry.Tags) > 0 {
-		input.Tags = make([]secretapi.Tag, 0, len(entry.Tags))
-		for k, v := range entry.Tags {
-			input.Tags = append(input.Tags, secretapi.Tag{
-				Key:   lo.ToPtr(k),
-				Value: lo.ToPtr(v),
-			})
-		}
-	}
 
 	_, err := s.Client.CreateSecret(ctx, input)
 	if err != nil {
@@ -118,19 +109,20 @@ func (s *SecretStrategy) applyUpdate(ctx context.Context, name string, entry Ent
 		}
 	}
 
-	// Apply tag changes (additive)
-	if len(entry.Tags) > 0 || len(entry.UntagKeys) > 0 {
-		change := &tagging.Change{
-			Add:    entry.Tags,
-			Remove: entry.UntagKeys,
-		}
-		if !change.IsEmpty() {
-			if err := tagging.ApplySecret(ctx, s.Client, name, change); err != nil {
-				return err
-			}
+	return nil
+}
+
+// ApplyTags applies staged tag changes to AWS Secrets Manager.
+func (s *SecretStrategy) ApplyTags(ctx context.Context, name string, tagEntry TagEntry) error {
+	change := &tagging.Change{
+		Add:    tagEntry.Add,
+		Remove: tagEntry.Remove,
+	}
+	if !change.IsEmpty() {
+		if err := tagging.ApplySecret(ctx, s.Client, name, change); err != nil {
+			return err
 		}
 	}
-
 	return nil
 }
 

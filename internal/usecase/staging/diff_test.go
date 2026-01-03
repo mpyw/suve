@@ -58,7 +58,7 @@ func TestDiffUseCase_Execute_UpdateDiff(t *testing.T) {
 	t.Parallel()
 
 	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
-	require.NoError(t, store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
+	require.NoError(t, store.StageEntry(staging.ServiceParam, "/app/config", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("new-value"),
 		StagedAt:  time.Now(),
@@ -91,7 +91,7 @@ func TestDiffUseCase_Execute_CreateDiff(t *testing.T) {
 	t.Parallel()
 
 	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
-	require.NoError(t, store.Stage(staging.ServiceParam, "/app/new", staging.Entry{
+	require.NoError(t, store.StageEntry(staging.ServiceParam, "/app/new", staging.Entry{
 		Operation:   staging.OperationCreate,
 		Value:       lo.ToPtr("new-value"),
 		Description: lo.ToPtr("new param"),
@@ -120,7 +120,7 @@ func TestDiffUseCase_Execute_DeleteDiff(t *testing.T) {
 	t.Parallel()
 
 	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
-	require.NoError(t, store.Stage(staging.ServiceParam, "/app/delete", staging.Entry{
+	require.NoError(t, store.StageEntry(staging.ServiceParam, "/app/delete", staging.Entry{
 		Operation: staging.OperationDelete,
 		StagedAt:  time.Now(),
 	}))
@@ -151,7 +151,7 @@ func TestDiffUseCase_Execute_AutoUnstage_Identical(t *testing.T) {
 	t.Parallel()
 
 	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
-	require.NoError(t, store.Stage(staging.ServiceParam, "/app/same", staging.Entry{
+	require.NoError(t, store.StageEntry(staging.ServiceParam, "/app/same", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("same-value"),
 		StagedAt:  time.Now(),
@@ -177,7 +177,7 @@ func TestDiffUseCase_Execute_AutoUnstage_Identical(t *testing.T) {
 	assert.Contains(t, entry.Warning, "identical")
 
 	// Verify auto-unstaged
-	_, err = store.Get(staging.ServiceParam, "/app/same")
+	_, err = store.GetEntry(staging.ServiceParam, "/app/same")
 	assert.ErrorIs(t, err, staging.ErrNotStaged)
 }
 
@@ -185,7 +185,7 @@ func TestDiffUseCase_Execute_AutoUnstage_AlreadyDeleted(t *testing.T) {
 	t.Parallel()
 
 	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
-	require.NoError(t, store.Stage(staging.ServiceParam, "/app/gone", staging.Entry{
+	require.NoError(t, store.StageEntry(staging.ServiceParam, "/app/gone", staging.Entry{
 		Operation: staging.OperationDelete,
 		StagedAt:  time.Now(),
 	}))
@@ -211,12 +211,12 @@ func TestDiffUseCase_Execute_FilterByName(t *testing.T) {
 	t.Parallel()
 
 	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
-	require.NoError(t, store.Stage(staging.ServiceParam, "/app/one", staging.Entry{
+	require.NoError(t, store.StageEntry(staging.ServiceParam, "/app/one", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("one"),
 		StagedAt:  time.Now(),
 	}))
-	require.NoError(t, store.Stage(staging.ServiceParam, "/app/two", staging.Entry{
+	require.NoError(t, store.StageEntry(staging.ServiceParam, "/app/two", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("two"),
 		StagedAt:  time.Now(),
@@ -254,7 +254,7 @@ func TestDiffUseCase_Execute_AutoUnstage_UpdateNoLongerExists(t *testing.T) {
 
 	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
 	// Stage an update for something that no longer exists
-	require.NoError(t, store.Stage(staging.ServiceParam, "/app/gone", staging.Entry{
+	require.NoError(t, store.StageEntry(staging.ServiceParam, "/app/gone", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("update-value"),
 		StagedAt:  time.Now(),
@@ -277,33 +277,8 @@ func TestDiffUseCase_Execute_AutoUnstage_UpdateNoLongerExists(t *testing.T) {
 	assert.Contains(t, entry.Warning, "no longer exists")
 
 	// Verify auto-unstaged
-	_, err = store.Get(staging.ServiceParam, "/app/gone")
+	_, err = store.GetEntry(staging.ServiceParam, "/app/gone")
 	assert.ErrorIs(t, err, staging.ErrNotStaged)
-}
-
-func TestDiffUseCase_Execute_WithTags(t *testing.T) {
-	t.Parallel()
-
-	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
-	require.NoError(t, store.Stage(staging.ServiceParam, "/app/tagged", staging.Entry{
-		Operation: staging.OperationCreate,
-		Value:     lo.ToPtr("value"),
-		Tags:      map[string]string{"env": "test"},
-		StagedAt:  time.Now(),
-	}))
-
-	strategy := newMockDiffStrategy()
-	strategy.fetchErrors["/app/tagged"] = errors.New("not found")
-
-	uc := &usecasestaging.DiffUseCase{
-		Strategy: strategy,
-		Store:    store,
-	}
-
-	output, err := uc.Execute(context.Background(), usecasestaging.DiffInput{})
-	require.NoError(t, err)
-	require.Len(t, output.Entries, 1)
-	assert.Equal(t, "test", output.Entries[0].Tags["env"])
 }
 
 func TestDiffUseCase_Execute_ListError(t *testing.T) {
@@ -338,12 +313,44 @@ func TestDiffUseCase_Execute_GetError(t *testing.T) {
 	assert.Contains(t, err.Error(), "get error")
 }
 
+func TestDiffUseCase_Execute_GetTagError(t *testing.T) {
+	t.Parallel()
+
+	store := newMockStore()
+	store.getTagErr = errors.New("get tag error")
+
+	uc := &usecasestaging.DiffUseCase{
+		Strategy: newMockDiffStrategy(),
+		Store:    store,
+	}
+
+	_, err := uc.Execute(context.Background(), usecasestaging.DiffInput{Name: "/app/config"})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "get tag error")
+}
+
+func TestDiffUseCase_Execute_ListTagsError(t *testing.T) {
+	t.Parallel()
+
+	store := newMockStore()
+	store.listTagsErr = errors.New("list tags error")
+
+	uc := &usecasestaging.DiffUseCase{
+		Strategy: newMockDiffStrategy(),
+		Store:    store,
+	}
+
+	_, err := uc.Execute(context.Background(), usecasestaging.DiffInput{})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "list tags error")
+}
+
 func TestDiffUseCase_Execute_UnknownOperation(t *testing.T) {
 	t.Parallel()
 
 	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
 	// Stage an entry with an unknown operation (edge case)
-	require.NoError(t, store.Stage(staging.ServiceParam, "/app/unknown", staging.Entry{
+	require.NoError(t, store.StageEntry(staging.ServiceParam, "/app/unknown", staging.Entry{
 		Operation: staging.Operation("unknown"), // Invalid operation
 		Value:     lo.ToPtr("value"),
 		StagedAt:  time.Now(),

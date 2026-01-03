@@ -39,13 +39,13 @@ func (u *DeleteUseCase) Execute(ctx context.Context, input DeleteInput) (*Delete
 	hasDeleteOptions := u.Strategy.HasDeleteOptions()
 
 	// Check if CREATE is staged - if so, just unstage instead of staging DELETE
-	existingEntry, err := u.Store.Get(service, input.Name)
+	existingEntry, err := u.Store.GetEntry(service, input.Name)
 	if err != nil && !errors.Is(err, staging.ErrNotStaged) {
 		return nil, err
 	}
 	if existingEntry != nil && existingEntry.Operation == staging.OperationCreate {
 		// Unstage the CREATE instead of staging DELETE
-		if err := u.Store.Unstage(service, input.Name); err != nil {
+		if err := u.Store.UnstageEntry(service, input.Name); err != nil {
 			return nil, err
 		}
 		return &DeleteOutput{
@@ -82,7 +82,7 @@ func (u *DeleteUseCase) Execute(ctx context.Context, input DeleteInput) (*Delete
 		}
 	}
 
-	if err := u.Store.Stage(service, input.Name, entry); err != nil {
+	if err := u.Store.StageEntry(service, input.Name, entry); err != nil {
 		return nil, err
 	}
 

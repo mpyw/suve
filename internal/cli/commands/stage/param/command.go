@@ -39,6 +39,8 @@ Use 'suve stage param reset' to unstage or restore from a version.`,
 			runner.NewDiffCommand(config),
 			runner.NewApplyCommand(config),
 			runner.NewResetCommand(config),
+			runner.NewTagCommand(config),
+			runner.NewUntagCommand(config),
 		},
 		CommandNotFound: cliinternal.CommandNotFound,
 	}

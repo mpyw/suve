@@ -69,7 +69,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 
 // Run executes the status command.
 func (r *Runner) Run(_ context.Context, opts Options) error {
-	entries, err := r.Store.List("")
+	entries, err := r.Store.ListEntries("")
 	if err != nil {
 		return err
 	}

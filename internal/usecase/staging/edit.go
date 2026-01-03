@@ -15,7 +15,6 @@ type EditInput struct {
 	Name        string
 	Value       string
 	Description string
-	Tags        map[string]string
 }
 
 // EditOutput holds the result of the edit use case.
@@ -55,10 +54,7 @@ func (u *EditUseCase) Execute(ctx context.Context, input EditInput) (*EditOutput
 	if input.Description != "" {
 		entry.Description = &input.Description
 	}
-	if len(input.Tags) > 0 {
-		entry.Tags = input.Tags
-	}
-	if err := u.Store.Stage(service, input.Name, entry); err != nil {
+	if err := u.Store.StageEntry(service, input.Name, entry); err != nil {
 		return nil, err
 	}
 
@@ -70,7 +66,7 @@ func (u *EditUseCase) getExistingState(ctx context.Context, name string) (*stagi
 	service := u.Strategy.Service()
 
 	// Check if already staged
-	stagedEntry, err := u.Store.Get(service, name)
+	stagedEntry, err := u.Store.GetEntry(service, name)
 	if err != nil && !errors.Is(err, staging.ErrNotStaged) {
 		return nil, nil, err
 	}
@@ -111,7 +107,7 @@ func (u *EditUseCase) Baseline(ctx context.Context, input BaselineInput) (*Basel
 	service := u.Strategy.Service()
 
 	// Check if already staged
-	stagedEntry, err := u.Store.Get(service, input.Name)
+	stagedEntry, err := u.Store.GetEntry(service, input.Name)
 	if err != nil && !errors.Is(err, staging.ErrNotStaged) {
 		return nil, err
 	}

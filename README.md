@@ -309,13 +309,15 @@ where ~SHIFT = ~ | ~N  (repeatable, cumulative)
 
 | Command | Options | Description |
 |---------|---------|-------------|
-| `suve stage param add` | `--description=<TEXT>`<br>`--tag=<KEY>=<VALUE> --tag=...` | Stage new parameter |
-| `suve stage param edit` | `--description=<TEXT>`<br>`--tag=<KEY>=<VALUE> --tag=...` | Stage modification |
+| `suve stage param add` | `--description=<TEXT>` | Stage new parameter |
+| `suve stage param edit` | `--description=<TEXT>` | Stage modification |
 | `suve stage param delete` | | Stage deletion |
 | `suve stage param status` | `--verbose` (`-v`) | Show staged changes |
 | `suve stage param diff` | `--parse-json` (`-j`)<br>`--no-pager` | Compare staged vs AWS |
 | `suve stage param apply` | `--yes`<br>`--ignore-conflicts` | Apply staged changes |
 | `suve stage param reset` | `--all` | Unstage changes |
+| `suve stage param tag` | `<KEY>=<VALUE>...` | Stage tag additions |
+| `suve stage param untag` | `<KEY>...` | Stage tag removals |
 
 ### Secrets Manager
 
@@ -336,13 +338,15 @@ where ~SHIFT = ~ | ~N  (repeatable, cumulative)
 
 | Command | Options | Description |
 |---------|---------|-------------|
-| `suve stage secret add` | `--description=<TEXT>`<br>`--tag=<KEY>=<VALUE> --tag=...` | Stage new secret |
-| `suve stage secret edit` | `--description=<TEXT>`<br>`--tag=<KEY>=<VALUE> --tag=...` | Stage modification |
+| `suve stage secret add` | `--description=<TEXT>` | Stage new secret |
+| `suve stage secret edit` | `--description=<TEXT>` | Stage modification |
 | `suve stage secret delete` | `--force`<br>`--recovery-window=<DAYS>` | Stage deletion |
 | `suve stage secret status` | `--verbose` (`-v`) | Show staged changes |
 | `suve stage secret diff` | `--parse-json` (`-j`)<br>`--no-pager` | Compare staged vs AWS |
 | `suve stage secret apply` | `--yes`<br>`--ignore-conflicts` | Apply staged changes |
 | `suve stage secret reset` | `--all` | Unstage changes |
+| `suve stage secret tag` | `<KEY>=<VALUE>...` | Stage tag additions |
+| `suve stage secret untag` | `<KEY>...` | Stage tag removals |
 
 ### Global Stage Commands
 

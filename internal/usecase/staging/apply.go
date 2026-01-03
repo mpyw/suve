@@ -25,23 +25,35 @@ const (
 	ApplyResultFailed
 )
 
-// ApplyResultEntry represents the result of applying a single entry.
-type ApplyResultEntry struct {
+// ApplyEntryResult represents the result of applying a single entry.
+type ApplyEntryResult struct {
+	Name   string
+	Status ApplyResultStatus
+	Error  error
+}
+
+// ApplyTagResult represents the result of applying tag changes.
+type ApplyTagResult struct {
 	Name      string
-	Status    ApplyResultStatus
+	AddTags   map[string]string   // Tags that were added/updated
+	RemoveTag maputil.Set[string] // Tag keys that were removed
 	Error     error
-	Tags      map[string]string   // Tags that were applied
-	UntagKeys maputil.Set[string] // Tag keys that were removed
 }
 
 // ApplyOutput holds the result of the apply use case.
 type ApplyOutput struct {
 	ServiceName string
 	ItemName    string
-	Results     []ApplyResultEntry
-	Conflicts   []string
-	Succeeded   int
-	Failed      int
+	// Entry results
+	EntryResults   []ApplyEntryResult
+	EntrySucceeded int
+	EntryFailed    int
+	// Tag results
+	TagResults   []ApplyTagResult
+	TagSucceeded int
+	TagFailed    int
+	// Conflicts
+	Conflicts []string
 }
 
 // ApplyUseCase executes apply operations.
@@ -61,28 +73,44 @@ func (u *ApplyUseCase) Execute(ctx context.Context, input ApplyInput) (*ApplyOut
 		ItemName:    itemName,
 	}
 
-	staged, err := u.Store.List(service)
+	// Get staged entries and tags
+	stagedEntries, err := u.Store.ListEntries(service)
+	if err != nil {
+		return nil, err
+	}
+	stagedTags, err := u.Store.ListTags(service)
 	if err != nil {
 		return nil, err
 	}
 
-	entries := staged[service]
+	entries := stagedEntries[service]
+	tags := stagedTags[service]
 
 	// Filter by name if specified
 	if input.Name != "" {
-		entry, exists := entries[input.Name]
-		if !exists {
+		filteredEntries := make(map[string]staging.Entry)
+		filteredTags := make(map[string]staging.TagEntry)
+
+		if entry, exists := entries[input.Name]; exists {
+			filteredEntries[input.Name] = entry
+		}
+		if tagEntry, exists := tags[input.Name]; exists {
+			filteredTags[input.Name] = tagEntry
+		}
+
+		if len(filteredEntries) == 0 && len(filteredTags) == 0 {
 			return nil, fmt.Errorf("%s %s is not staged", itemName, input.Name)
 		}
-		entries = map[string]staging.Entry{input.Name: entry}
+		entries = filteredEntries
+		tags = filteredTags
 	}
 
-	if len(entries) == 0 {
+	if len(entries) == 0 && len(tags) == 0 {
 		return output, nil
 	}
 
-	// Check for conflicts
-	if !input.IgnoreConflicts {
+	// Check for conflicts (only for entries, as tags don't have value conflicts)
+	if !input.IgnoreConflicts && len(entries) > 0 {
 		conflicts := staging.CheckConflicts(ctx, u.Strategy, entries)
 		if len(conflicts) > 0 {
 			for name := range conflicts {
@@ -92,6 +120,27 @@ func (u *ApplyUseCase) Execute(ctx context.Context, input ApplyInput) (*ApplyOut
 		}
 	}
 
+	// Apply entries
+	if len(entries) > 0 {
+		u.applyEntries(ctx, service, entries, output)
+	}
+
+	// Apply tags
+	if len(tags) > 0 {
+		u.applyTags(ctx, service, tags, output)
+	}
+
+	// Calculate total failures
+	totalFailed := output.EntryFailed + output.TagFailed
+	if totalFailed > 0 {
+		return output, fmt.Errorf("applied %d entries, %d tags; failed %d entries, %d tags",
+			output.EntrySucceeded, output.TagSucceeded, output.EntryFailed, output.TagFailed)
+	}
+
+	return output, nil
+}
+
+func (u *ApplyUseCase) applyEntries(ctx context.Context, service staging.Service, entries map[string]staging.Entry, output *ApplyOutput) {
 	// Execute apply operations in parallel
 	results := parallel.ExecuteMap(ctx, entries, func(ctx context.Context, name string, entry staging.Entry) (staging.Operation, error) {
 		err := u.Strategy.Apply(ctx, name, entry)
@@ -99,18 +148,16 @@ func (u *ApplyUseCase) Execute(ctx context.Context, input ApplyInput) (*ApplyOut
 	})
 
 	// Collect results
-	for name, entry := range entries {
+	for name := range entries {
 		result := results[name]
-		resultEntry := ApplyResultEntry{
-			Name:      name,
-			Tags:      entry.Tags,
-			UntagKeys: entry.UntagKeys,
+		resultEntry := ApplyEntryResult{
+			Name: name,
 		}
 
 		if result.Err != nil {
 			resultEntry.Status = ApplyResultFailed
 			resultEntry.Error = result.Err
-			output.Failed++
+			output.EntryFailed++
 		} else {
 			switch result.Value {
 			case staging.OperationCreate:
@@ -121,15 +168,37 @@ func (u *ApplyUseCase) Execute(ctx context.Context, input ApplyInput) (*ApplyOut
 				resultEntry.Status = ApplyResultDeleted
 			}
 			// Unstage successful operations
-			_ = u.Store.Unstage(service, name)
-			output.Succeeded++
+			_ = u.Store.UnstageEntry(service, name)
+			output.EntrySucceeded++
 		}
-		output.Results = append(output.Results, resultEntry)
+		output.EntryResults = append(output.EntryResults, resultEntry)
 	}
+}
 
-	if output.Failed > 0 {
-		return output, fmt.Errorf("applied %d, failed %d", output.Succeeded, output.Failed)
+func (u *ApplyUseCase) applyTags(ctx context.Context, service staging.Service, tags map[string]staging.TagEntry, output *ApplyOutput) {
+	// Execute tag apply operations in parallel
+	results := parallel.ExecuteMap(ctx, tags, func(ctx context.Context, name string, tagEntry staging.TagEntry) (struct{}, error) {
+		err := u.Strategy.ApplyTags(ctx, name, tagEntry)
+		return struct{}{}, err
+	})
+
+	// Collect results
+	for name, tagEntry := range tags {
+		result := results[name]
+		resultTag := ApplyTagResult{
+			Name:      name,
+			AddTags:   tagEntry.Add,
+			RemoveTag: tagEntry.Remove,
+		}
+
+		if result.Err != nil {
+			resultTag.Error = result.Err
+			output.TagFailed++
+		} else {
+			// Unstage successful operations
+			_ = u.Store.UnstageTag(service, name)
+			output.TagSucceeded++
+		}
+		output.TagResults = append(output.TagResults, resultTag)
 	}
-
-	return output, nil
 }
