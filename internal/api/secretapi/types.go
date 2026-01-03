@@ -34,6 +34,8 @@ type (
 	TagResourceOutput          = secretsmanager.TagResourceOutput
 	UntagResourceInput         = secretsmanager.UntagResourceInput
 	UntagResourceOutput        = secretsmanager.UntagResourceOutput
+	DescribeSecretInput        = secretsmanager.DescribeSecretInput
+	DescribeSecretOutput       = secretsmanager.DescribeSecretOutput
 )
 
 // Re-exported Secrets Manager model types.

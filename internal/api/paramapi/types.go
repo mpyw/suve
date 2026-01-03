@@ -28,6 +28,8 @@ type (
 	AddTagsToResourceOutput      = ssm.AddTagsToResourceOutput
 	RemoveTagsFromResourceInput  = ssm.RemoveTagsFromResourceInput
 	RemoveTagsFromResourceOutput = ssm.RemoveTagsFromResourceOutput
+	ListTagsForResourceInput     = ssm.ListTagsForResourceInput
+	ListTagsForResourceOutput    = ssm.ListTagsForResourceOutput
 )
 
 // Re-exported SSM model types.

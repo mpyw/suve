@@ -51,6 +51,10 @@ func (m *mockClient) GetParameterHistory(ctx context.Context, params *paramapi.G
 	return m.getParameterHistoryFunc(ctx, params, optFns...)
 }
 
+func (m *mockClient) ListTagsForResource(_ context.Context, _ *paramapi.ListTagsForResourceInput, _ ...func(*paramapi.Options)) (*paramapi.ListTagsForResourceOutput, error) {
+	return &paramapi.ListTagsForResourceOutput{}, nil
+}
+
 func TestRun(t *testing.T) {
 	t.Parallel()
 	now := time.Now()

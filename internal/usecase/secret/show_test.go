@@ -36,6 +36,10 @@ func (m *mockShowClient) ListSecretVersionIds(_ context.Context, _ *secretapi.Li
 	return m.listVersionsResult, nil
 }
 
+func (m *mockShowClient) DescribeSecret(_ context.Context, _ *secretapi.DescribeSecretInput, _ ...func(*secretapi.Options)) (*secretapi.DescribeSecretOutput, error) {
+	return &secretapi.DescribeSecretOutput{}, nil
+}
+
 func TestShowUseCase_Execute(t *testing.T) {
 	t.Parallel()
 

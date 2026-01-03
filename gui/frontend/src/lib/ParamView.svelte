@@ -1,19 +1,25 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, onDestroy } from 'svelte';
   import { ParamList, ParamShow, ParamLog, ParamSet, ParamDelete, ParamDiff, StagingAdd, StagingEdit, StagingDelete } from '../../wailsjs/go/main/App';
   import type { main } from '../../wailsjs/go/models';
   import CloseIcon from './icons/CloseIcon.svelte';
+  import EyeIcon from './icons/EyeIcon.svelte';
+  import EyeOffIcon from './icons/EyeOffIcon.svelte';
   import Modal from './Modal.svelte';
   import DiffDisplay from './DiffDisplay.svelte';
   import './common.css';
+
+  const PAGE_SIZE = 50;
 
   let prefix = '';
   let filter = '';
   let recursive = true;
   let withValue = false;
   let loading = false;
+  let loadingMore = false;
   let error = '';
   let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+  let nextToken = '';
 
   // Reactive: auto-fetch when checkbox changes
   $: recursive, withValue, handleFilterChange();
@@ -44,6 +50,7 @@
   let paramDetail: main.ParamShowResult | null = null;
   let paramLog: main.ParamLogEntry[] = [];
   let detailLoading = false;
+  let showValue = false; // For SecureString masking
 
   // Modal states
   let showSetModal = false;
@@ -60,12 +67,18 @@
   let diffSelectedVersions: number[] = [];
   let diffResult: main.ParamDiffResult | null = null;
 
+  // Infinite scroll
+  let sentinelElement: HTMLDivElement;
+  let observer: IntersectionObserver | null = null;
+
   async function loadParams() {
     loading = true;
     error = '';
+    nextToken = '';
     try {
-      const result = await ParamList(prefix, recursive, withValue, filter);
+      const result = await ParamList(prefix, recursive, withValue, filter, PAGE_SIZE, '');
       entries = result?.entries || [];
+      nextToken = result?.nextToken || '';
     } catch (e) {
       error = e instanceof Error ? e.message : String(e);
       entries = [];
@@ -74,9 +87,50 @@
     }
   }
 
+  async function loadMore() {
+    if (!nextToken || loadingMore || loading) return;
+
+    loadingMore = true;
+    try {
+      const result = await ParamList(prefix, recursive, withValue, filter, PAGE_SIZE, nextToken);
+      entries = [...entries, ...(result?.entries || [])];
+      nextToken = result?.nextToken || '';
+    } catch (e) {
+      error = e instanceof Error ? e.message : String(e);
+    } finally {
+      loadingMore = false;
+    }
+  }
+
+  function setupIntersectionObserver() {
+    if (observer) observer.disconnect();
+
+    observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && nextToken && !loadingMore && !loading) {
+          loadMore();
+        }
+      },
+      { rootMargin: '100px' }
+    );
+
+    if (sentinelElement) {
+      observer.observe(sentinelElement);
+    }
+  }
+
+  $: if (sentinelElement) {
+    setupIntersectionObserver();
+  }
+
+  onDestroy(() => {
+    if (observer) observer.disconnect();
+  });
+
   async function selectParam(name: string) {
     selectedParam = name;
     detailLoading = true;
+    showValue = false;
     try {
       const [detail, log] = await Promise.all([
         ParamShow(name),
@@ -95,6 +149,15 @@
     selectedParam = null;
     paramDetail = null;
     paramLog = [];
+    showValue = false;
+  }
+
+  function toggleShowValue() {
+    showValue = !showValue;
+  }
+
+  function maskValue(value: string): string {
+    return '*'.repeat(Math.min(value.length, 32));
   }
 
   function formatDate(dateStr: string | undefined): string {
@@ -266,13 +329,26 @@
             <li class="item-entry" class:selected={selectedParam === entry.name}>
               <button class="item-button" on:click={() => selectParam(entry.name)}>
                 <span class="item-name param">{entry.name}</span>
+                {#if entry.type === 'SecureString'}
+                  <span class="item-badge secure">SecureString</span>
+                {/if}
                 {#if entry.value !== undefined}
-                  <span class="item-value">{entry.value}</span>
+                  <span class="item-value" class:masked={entry.type === 'SecureString'}>
+                    {entry.type === 'SecureString' ? '*****' : entry.value}
+                  </span>
                 {/if}
               </button>
             </li>
           {/each}
         </ul>
+        <!-- Sentinel for infinite scroll -->
+        <div bind:this={sentinelElement} class="scroll-sentinel">
+          {#if loadingMore}
+            <div class="loading-more">Loading more...</div>
+          {:else if nextToken}
+            <div class="load-more-hint">Scroll for more</div>
+          {/if}
+        </div>
       {/if}
     </div>
 
@@ -299,8 +375,28 @@
         {:else if paramDetail}
           <div class="detail-content">
             <div class="detail-section">
-              <h4>Current Value</h4>
-              <pre class="value-display">{paramDetail.value}</pre>
+              <div class="section-header-value">
+                <h4>Current Value</h4>
+                {#if paramDetail.type === 'SecureString'}
+                  <button
+                    class="btn-toggle"
+                    class:active={showValue}
+                    on:click={toggleShowValue}
+                    title={showValue ? 'Hide value' : 'Show value'}
+                  >
+                    {#if showValue}
+                      <EyeOffIcon />
+                      Hide
+                    {:else}
+                      <EyeIcon />
+                      Show
+                    {/if}
+                  </button>
+                {/if}
+              </div>
+              <pre class="value-display" class:masked={paramDetail.type === 'SecureString' && !showValue}>
+                {paramDetail.type === 'SecureString' && !showValue ? maskValue(paramDetail.value) : paramDetail.value}
+              </pre>
             </div>
 
             <div class="detail-meta">
@@ -317,6 +413,28 @@
                 <span class="meta-value">{formatDate(paramDetail.lastModified)}</span>
               </div>
             </div>
+
+            {#if paramDetail.description}
+              <div class="detail-section">
+                <h4>Description</h4>
+                <p class="description-text">{paramDetail.description}</p>
+              </div>
+            {/if}
+
+            {#if paramDetail.tags && paramDetail.tags.length > 0}
+              <div class="detail-section">
+                <h4>Tags</h4>
+                <div class="tags-list">
+                  {#each paramDetail.tags as tag}
+                    <div class="tag-item">
+                      <span class="tag-key">{tag.key}</span>
+                      <span class="tag-separator">=</span>
+                      <span class="tag-value">{tag.value}</span>
+                    </div>
+                  {/each}
+                </div>
+              </div>
+            {/if}
 
             {#if paramLog.length > 0}
               <div class="detail-section">
@@ -661,5 +779,122 @@
     background: rgba(255, 152, 0, 0.1);
     border: 1px solid rgba(255, 152, 0, 0.3);
     border-radius: 4px;
+  }
+
+  /* Infinite scroll styles */
+  .scroll-sentinel {
+    padding: 16px;
+    text-align: center;
+    min-height: 50px;
+  }
+
+  .loading-more {
+    color: #888;
+    font-size: 14px;
+  }
+
+  .load-more-hint {
+    color: #555;
+    font-size: 12px;
+  }
+
+  /* Masking styles */
+  .item-badge.secure {
+    background: #ff9800;
+    color: #000;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 10px;
+    font-weight: 600;
+    margin-left: 8px;
+  }
+
+  .item-value.masked {
+    color: #888;
+    font-style: italic;
+  }
+
+  .section-header-value {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+  }
+
+  .section-header-value h4 {
+    margin: 0;
+    font-size: 12px;
+    text-transform: uppercase;
+    color: #888;
+    letter-spacing: 0.5px;
+  }
+
+  .btn-toggle {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px;
+    background: #2d2d44;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+  }
+
+  .btn-toggle:hover {
+    background: #3d3d54;
+  }
+
+  .btn-toggle.active {
+    background: #e94560;
+  }
+
+  .value-display.masked {
+    color: #888;
+    font-style: italic;
+  }
+
+  /* Tags styles */
+  .tags-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .tag-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    background: #1a1a2e;
+    border-radius: 4px;
+    font-family: monospace;
+    font-size: 13px;
+  }
+
+  .tag-key {
+    color: #4fc3f7;
+    font-weight: 600;
+  }
+
+  .tag-separator {
+    color: #666;
+  }
+
+  .tag-value {
+    color: #a5d6a7;
+  }
+
+  /* Description styles */
+  .description-text {
+    margin: 0;
+    padding: 12px;
+    background: #1a1a2e;
+    border-radius: 4px;
+    color: #ccc;
+    font-size: 14px;
+    line-height: 1.5;
+    white-space: pre-wrap;
   }
 </style>
