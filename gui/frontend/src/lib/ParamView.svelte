@@ -1,12 +1,14 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { ParamList, ParamShow, ParamLog, ParamSet, ParamDelete, ParamDiff } from '../../wailsjs/go/main/App';
+  import { ParamList, ParamShow, ParamLog, ParamSet, ParamDelete, ParamDiff, StagingAdd, StagingEdit, StagingDelete } from '../../wailsjs/go/main/App';
   import type { main } from '../../wailsjs/go/models';
   import CloseIcon from './icons/CloseIcon.svelte';
   import Modal from './Modal.svelte';
+  import DiffDisplay from './DiffDisplay.svelte';
   import './common.css';
 
   let prefix = '';
+  let filter = '';
   let recursive = true;
   let withValue = false;
   let loading = false;
@@ -30,6 +32,13 @@
     }, 300);
   }
 
+  function handleFilterInput() {
+    if (debounceTimer) clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(() => {
+      loadParams();
+    }, 300);
+  }
+
   let entries: main.ParamListEntry[] = [];
   let selectedParam: string | null = null;
   let paramDetail: main.ParamShowResult | null = null;
@@ -44,6 +53,7 @@
   let deleteTarget = '';
   let modalLoading = false;
   let modalError = '';
+  let immediateMode = false; // When false (default), changes are staged
 
   // Diff state
   let diffMode = false;
@@ -54,7 +64,7 @@
     loading = true;
     error = '';
     try {
-      const result = await ParamList(prefix, recursive, withValue);
+      const result = await ParamList(prefix, recursive, withValue, filter);
       entries = result?.entries || [];
     } catch (e) {
       error = e instanceof Error ? e.message : String(e);
@@ -111,12 +121,22 @@
     modalLoading = true;
     modalError = '';
     try {
-      await ParamSet(setForm.name, setForm.value, setForm.type);
-      showSetModal = false;
-      await loadParams();
-      if (selectedParam === setForm.name) {
-        await selectParam(setForm.name);
+      const isEdit = paramDetail && selectedParam === setForm.name;
+      if (immediateMode) {
+        await ParamSet(setForm.name, setForm.value, setForm.type);
+        await loadParams();
+        if (isEdit) {
+          await selectParam(setForm.name);
+        }
+      } else {
+        // Stage the change
+        if (isEdit) {
+          await StagingEdit('ssm', setForm.name, setForm.value);
+        } else {
+          await StagingAdd('ssm', setForm.name, setForm.value);
+        }
       }
+      showSetModal = false;
     } catch (e) {
       modalError = e instanceof Error ? e.message : String(e);
     } finally {
@@ -135,12 +155,17 @@
     modalLoading = true;
     modalError = '';
     try {
-      await ParamDelete(deleteTarget);
-      showDeleteModal = false;
-      if (selectedParam === deleteTarget) {
-        closeDetail();
+      if (immediateMode) {
+        await ParamDelete(deleteTarget);
+        if (selectedParam === deleteTarget) {
+          closeDetail();
+        }
+        await loadParams();
+      } else {
+        // Stage the delete
+        await StagingDelete('ssm', deleteTarget, false, 0);
       }
-      await loadParams();
+      showDeleteModal = false;
     } catch (e) {
       modalError = e instanceof Error ? e.message : String(e);
     } finally {
@@ -197,10 +222,17 @@
   <div class="filter-bar">
     <input
       type="text"
-      class="filter-input"
-      placeholder="Prefix filter (e.g., /prod/)"
+      class="filter-input prefix-input"
+      placeholder="Prefix (e.g., /prod/)"
       bind:value={prefix}
       on:input={handlePrefixInput}
+    />
+    <input
+      type="text"
+      class="filter-input regex-input"
+      placeholder="Filter (regex)"
+      bind:value={filter}
+      on:input={handleFilterInput}
     />
     <label class="checkbox-label">
       <input type="checkbox" bind:checked={recursive} />
@@ -374,10 +406,14 @@
         rows="5"
       ></textarea>
     </div>
+    <label class="checkbox-label immediate-checkbox">
+      <input type="checkbox" bind:checked={immediateMode} />
+      <span>Apply immediately (skip staging)</span>
+    </label>
     <div class="form-actions">
       <button type="button" class="btn-secondary" on:click={() => showSetModal = false}>Cancel</button>
       <button type="submit" class="btn-primary" disabled={modalLoading}>
-        {modalLoading ? 'Saving...' : 'Save'}
+        {modalLoading ? (immediateMode ? 'Saving...' : 'Staging...') : (immediateMode ? 'Save' : 'Stage')}
       </button>
     </div>
   </form>
@@ -391,11 +427,15 @@
     {/if}
     <p>Are you sure you want to delete this parameter?</p>
     <code class="delete-target">{deleteTarget}</code>
-    <p class="warning">This action cannot be undone.</p>
+    <p class="warning">{immediateMode ? 'This action cannot be undone.' : 'This will stage a delete operation.'}</p>
+    <label class="checkbox-label immediate-checkbox">
+      <input type="checkbox" bind:checked={immediateMode} />
+      <span>Apply immediately (skip staging)</span>
+    </label>
     <div class="form-actions">
       <button type="button" class="btn-secondary" on:click={() => showDeleteModal = false}>Cancel</button>
       <button type="button" class="btn-danger" on:click={handleDelete} disabled={modalLoading}>
-        {modalLoading ? 'Deleting...' : 'Delete'}
+        {modalLoading ? (immediateMode ? 'Deleting...' : 'Staging...') : (immediateMode ? 'Delete' : 'Stage Delete')}
       </button>
     </div>
   </div>
@@ -404,20 +444,14 @@
 <!-- Diff Modal -->
 <Modal title="Version Comparison" show={showDiffModal} on:close={closeDiffModal}>
   {#if diffResult}
-    <div class="diff-container">
-      <div class="diff-side">
-        <div class="diff-side-header">
-          <span class="diff-version">Old: v{diffSelectedVersions[0]}</span>
-        </div>
-        <pre class="diff-value diff-old">{diffResult.oldValue}</pre>
-      </div>
-      <div class="diff-side">
-        <div class="diff-side-header">
-          <span class="diff-version">New: v{diffSelectedVersions[1]}</span>
-        </div>
-        <pre class="diff-value diff-new">{diffResult.newValue}</pre>
-      </div>
-    </div>
+    <DiffDisplay
+      oldValue={diffResult.oldValue}
+      newValue={diffResult.newValue}
+      oldLabel="Old"
+      newLabel="New"
+      oldSubLabel={`v${diffSelectedVersions[0]}`}
+      newSubLabel={`v${diffSelectedVersions[1]}`}
+    />
     <div class="form-actions">
       <button type="button" class="btn-secondary" on:click={closeDiffModal}>Close</button>
     </div>
@@ -612,50 +646,20 @@
     min-width: 0;
   }
 
-  /* Diff modal styles */
-  .diff-container {
-    display: flex;
-    gap: 16px;
-    margin-bottom: 16px;
+  /* Filter inputs */
+  .prefix-input {
+    flex: 0.4;
   }
 
-  .diff-side {
-    flex: 1;
-    min-width: 0;
+  .regex-input {
+    flex: 0.6;
   }
 
-  .diff-side-header {
-    margin-bottom: 8px;
-  }
-
-  .diff-version {
-    font-size: 12px;
-    font-weight: bold;
-    color: #888;
-  }
-
-  .diff-value {
-    margin: 0;
-    padding: 12px;
+  .immediate-checkbox {
+    margin-top: 8px;
+    padding: 8px 12px;
+    background: rgba(255, 152, 0, 0.1);
+    border: 1px solid rgba(255, 152, 0, 0.3);
     border-radius: 4px;
-    font-family: monospace;
-    font-size: 12px;
-    white-space: pre-wrap;
-    word-break: break-all;
-    min-height: 100px;
-    max-height: 300px;
-    overflow-y: auto;
-  }
-
-  .diff-old {
-    background: rgba(244, 67, 54, 0.1);
-    border: 1px solid rgba(244, 67, 54, 0.3);
-    color: #ef9a9a;
-  }
-
-  .diff-new {
-    background: rgba(76, 175, 80, 0.1);
-    border: 1px solid rgba(76, 175, 80, 0.3);
-    color: #a5d6a7;
   }
 </style>
