@@ -1,8 +1,9 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { ParamList, ParamShow, ParamLog } from '../../wailsjs/go/main/App';
+  import { ParamList, ParamShow, ParamLog, ParamSet, ParamDelete } from '../../wailsjs/go/main/App';
   import type { main } from '../../wailsjs/go/models';
   import CloseIcon from './icons/CloseIcon.svelte';
+  import Modal from './Modal.svelte';
   import './common.css';
 
   let prefix = '';
@@ -16,6 +17,14 @@
   let paramDetail: main.ParamShowResult | null = null;
   let paramLog: main.ParamLogEntry[] = [];
   let detailLoading = false;
+
+  // Modal states
+  let showSetModal = false;
+  let showDeleteModal = false;
+  let setForm = { name: '', value: '', type: 'String' };
+  let deleteTarget = '';
+  let modalLoading = false;
+  let modalError = '';
 
   async function loadParams() {
     loading = true;
@@ -59,6 +68,62 @@
     return new Date(dateStr).toLocaleString();
   }
 
+  // Set modal
+  function openSetModal(name?: string) {
+    if (name && paramDetail) {
+      setForm = { name, value: paramDetail.value, type: paramDetail.type };
+    } else {
+      setForm = { name: prefix || '', value: '', type: 'String' };
+    }
+    modalError = '';
+    showSetModal = true;
+  }
+
+  async function handleSet() {
+    if (!setForm.name || !setForm.value) {
+      modalError = 'Name and value are required';
+      return;
+    }
+    modalLoading = true;
+    modalError = '';
+    try {
+      await ParamSet(setForm.name, setForm.value, setForm.type);
+      showSetModal = false;
+      await loadParams();
+      if (selectedParam === setForm.name) {
+        await selectParam(setForm.name);
+      }
+    } catch (e) {
+      modalError = e instanceof Error ? e.message : String(e);
+    } finally {
+      modalLoading = false;
+    }
+  }
+
+  // Delete modal
+  function openDeleteModal(name: string) {
+    deleteTarget = name;
+    modalError = '';
+    showDeleteModal = true;
+  }
+
+  async function handleDelete() {
+    modalLoading = true;
+    modalError = '';
+    try {
+      await ParamDelete(deleteTarget);
+      showDeleteModal = false;
+      if (selectedParam === deleteTarget) {
+        closeDetail();
+      }
+      await loadParams();
+    } catch (e) {
+      modalError = e instanceof Error ? e.message : String(e);
+    } finally {
+      modalLoading = false;
+    }
+  }
+
   onMount(() => {
     loadParams();
   });
@@ -83,6 +148,9 @@
     </label>
     <button class="btn-primary" on:click={loadParams} disabled={loading}>
       {loading ? 'Loading...' : 'Refresh'}
+    </button>
+    <button class="btn-secondary" on:click={() => openSetModal()}>
+      + New
     </button>
   </div>
 
@@ -116,9 +184,13 @@
       <div class="detail-panel">
         <div class="detail-header">
           <h3 class="detail-title param">{selectedParam}</h3>
-          <button class="btn-close" on:click={closeDetail}>
-            <CloseIcon />
-          </button>
+          <div class="detail-actions">
+            <button class="btn-action-sm" on:click={() => selectedParam && openSetModal(selectedParam)}>Edit</button>
+            <button class="btn-action-sm btn-danger" on:click={() => selectedParam && openDeleteModal(selectedParam)}>Delete</button>
+            <button class="btn-close" on:click={closeDetail}>
+              <CloseIcon />
+            </button>
+          </div>
         </div>
 
         {#if detailLoading}
@@ -170,3 +242,187 @@
     {/if}
   </div>
 </div>
+
+<!-- Set Modal -->
+<Modal title={setForm.name ? 'Edit Parameter' : 'New Parameter'} show={showSetModal} on:close={() => showSetModal = false}>
+  <form class="modal-form" on:submit|preventDefault={handleSet}>
+    {#if modalError}
+      <div class="modal-error">{modalError}</div>
+    {/if}
+    <div class="form-group">
+      <label for="param-name">Name</label>
+      <input
+        id="param-name"
+        type="text"
+        class="form-input"
+        bind:value={setForm.name}
+        placeholder="/path/to/parameter"
+        disabled={!!paramDetail && selectedParam === setForm.name}
+      />
+    </div>
+    <div class="form-group">
+      <label for="param-type">Type</label>
+      <select id="param-type" class="form-input" bind:value={setForm.type}>
+        <option value="String">String</option>
+        <option value="SecureString">SecureString</option>
+        <option value="StringList">StringList</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label for="param-value">Value</label>
+      <textarea
+        id="param-value"
+        class="form-input form-textarea"
+        bind:value={setForm.value}
+        placeholder="Parameter value"
+        rows="5"
+      ></textarea>
+    </div>
+    <div class="form-actions">
+      <button type="button" class="btn-secondary" on:click={() => showSetModal = false}>Cancel</button>
+      <button type="submit" class="btn-primary" disabled={modalLoading}>
+        {modalLoading ? 'Saving...' : 'Save'}
+      </button>
+    </div>
+  </form>
+</Modal>
+
+<!-- Delete Modal -->
+<Modal title="Delete Parameter" show={showDeleteModal} on:close={() => showDeleteModal = false}>
+  <div class="modal-confirm">
+    {#if modalError}
+      <div class="modal-error">{modalError}</div>
+    {/if}
+    <p>Are you sure you want to delete this parameter?</p>
+    <code class="delete-target">{deleteTarget}</code>
+    <p class="warning">This action cannot be undone.</p>
+    <div class="form-actions">
+      <button type="button" class="btn-secondary" on:click={() => showDeleteModal = false}>Cancel</button>
+      <button type="button" class="btn-danger" on:click={handleDelete} disabled={modalLoading}>
+        {modalLoading ? 'Deleting...' : 'Delete'}
+      </button>
+    </div>
+  </div>
+</Modal>
+
+<style>
+  .detail-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+
+  .btn-secondary {
+    padding: 8px 16px;
+    background: #2d2d44;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+  }
+
+  .btn-secondary:hover {
+    background: #3d3d54;
+  }
+
+  .btn-action-sm {
+    padding: 6px 12px;
+    background: #2d2d44;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+  }
+
+  .btn-action-sm:hover {
+    background: #3d3d54;
+  }
+
+  .btn-danger {
+    background: #f44336;
+  }
+
+  .btn-danger:hover {
+    background: #e53935;
+  }
+
+  .modal-form {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .form-group label {
+    font-size: 12px;
+    color: #888;
+    text-transform: uppercase;
+  }
+
+  .form-input {
+    padding: 10px 12px;
+    background: #0f0f1a;
+    border: 1px solid #2d2d44;
+    border-radius: 4px;
+    color: #fff;
+    font-size: 14px;
+  }
+
+  .form-input:focus {
+    outline: none;
+    border-color: #e94560;
+  }
+
+  .form-textarea {
+    font-family: monospace;
+    resize: vertical;
+    min-height: 100px;
+  }
+
+  .form-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+    margin-top: 8px;
+  }
+
+  .modal-error {
+    padding: 10px 12px;
+    background: rgba(244, 67, 54, 0.2);
+    border: 1px solid #f44336;
+    border-radius: 4px;
+    color: #f44336;
+    font-size: 13px;
+  }
+
+  .modal-confirm {
+    text-align: center;
+  }
+
+  .modal-confirm p {
+    color: #ccc;
+    margin: 0 0 16px 0;
+  }
+
+  .delete-target {
+    display: block;
+    padding: 12px;
+    background: #0f0f1a;
+    border-radius: 4px;
+    color: #4fc3f7;
+    font-size: 14px;
+    margin-bottom: 16px;
+  }
+
+  .warning {
+    color: #ff9800 !important;
+    font-size: 13px;
+  }
+</style>

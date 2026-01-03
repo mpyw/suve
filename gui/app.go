@@ -6,6 +6,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 
+	"github.com/mpyw/suve/internal/api/paramapi"
 	"github.com/mpyw/suve/internal/infra"
 	"github.com/mpyw/suve/internal/staging"
 	"github.com/mpyw/suve/internal/usecase/param"
@@ -208,6 +209,58 @@ func (a *App) ParamDiff(spec1Str, spec2Str string) (*ParamDiffResult, error) {
 	}, nil
 }
 
+// ParamSetResult represents the result of setting a parameter.
+type ParamSetResult struct {
+	Name      string `json:"name"`
+	Version   int64  `json:"version"`
+	IsCreated bool   `json:"isCreated"`
+}
+
+// ParamSet creates or updates a parameter.
+func (a *App) ParamSet(name, value, paramType string) (*ParamSetResult, error) {
+	client, err := a.getParamClient()
+	if err != nil {
+		return nil, err
+	}
+
+	uc := &param.SetUseCase{Client: client}
+	result, err := uc.Execute(a.ctx, param.SetInput{
+		Name:  name,
+		Value: value,
+		Type:  paramapi.ParameterType(paramType),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return &ParamSetResult{
+		Name:      result.Name,
+		Version:   result.Version,
+		IsCreated: result.IsCreated,
+	}, nil
+}
+
+// ParamDeleteResult represents the result of deleting a parameter.
+type ParamDeleteResult struct {
+	Name string `json:"name"`
+}
+
+// ParamDelete deletes a parameter.
+func (a *App) ParamDelete(name string) (*ParamDeleteResult, error) {
+	client, err := a.getParamClient()
+	if err != nil {
+		return nil, err
+	}
+
+	uc := &param.DeleteUseCase{Client: client}
+	result, err := uc.Execute(a.ctx, param.DeleteInput{Name: name})
+	if err != nil {
+		return nil, err
+	}
+
+	return &ParamDeleteResult{Name: result.Name}, nil
+}
+
 // =============================================================================
 // Secret Operations
 // =============================================================================
@@ -335,6 +388,99 @@ func (a *App) SecretLog(name string, maxResults int32) (*SecretLogResult, error)
 	return &SecretLogResult{Name: result.Name, Entries: entries}, nil
 }
 
+// SecretCreateResult represents the result of creating a secret.
+type SecretCreateResult struct {
+	Name      string `json:"name"`
+	VersionID string `json:"versionId"`
+	ARN       string `json:"arn"`
+}
+
+// SecretCreate creates a new secret.
+func (a *App) SecretCreate(name, value string) (*SecretCreateResult, error) {
+	client, err := a.getSecretClient()
+	if err != nil {
+		return nil, err
+	}
+
+	uc := &secret.CreateUseCase{Client: client}
+	result, err := uc.Execute(a.ctx, secret.CreateInput{
+		Name:  name,
+		Value: value,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return &SecretCreateResult{
+		Name:      result.Name,
+		VersionID: result.VersionID,
+		ARN:       result.ARN,
+	}, nil
+}
+
+// SecretUpdateResult represents the result of updating a secret.
+type SecretUpdateResult struct {
+	Name      string `json:"name"`
+	VersionID string `json:"versionId"`
+	ARN       string `json:"arn"`
+}
+
+// SecretUpdate updates an existing secret.
+func (a *App) SecretUpdate(name, value string) (*SecretUpdateResult, error) {
+	client, err := a.getSecretClient()
+	if err != nil {
+		return nil, err
+	}
+
+	uc := &secret.UpdateUseCase{Client: client}
+	result, err := uc.Execute(a.ctx, secret.UpdateInput{
+		Name:  name,
+		Value: value,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return &SecretUpdateResult{
+		Name:      result.Name,
+		VersionID: result.VersionID,
+		ARN:       result.ARN,
+	}, nil
+}
+
+// SecretDeleteResult represents the result of deleting a secret.
+type SecretDeleteResult struct {
+	Name         string `json:"name"`
+	DeletionDate string `json:"deletionDate,omitempty"`
+	ARN          string `json:"arn"`
+}
+
+// SecretDelete deletes a secret (with recovery window).
+func (a *App) SecretDelete(name string, force bool) (*SecretDeleteResult, error) {
+	client, err := a.getSecretClient()
+	if err != nil {
+		return nil, err
+	}
+
+	uc := &secret.DeleteUseCase{Client: client}
+	result, err := uc.Execute(a.ctx, secret.DeleteInput{
+		Name:  name,
+		Force: force,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	r := &SecretDeleteResult{
+		Name: result.Name,
+		ARN:  result.ARN,
+	}
+	if result.DeletionDate != nil {
+		r.DeletionDate = result.DeletionDate.Format("2006-01-02T15:04:05Z07:00")
+	}
+	return r, nil
+}
+
 // =============================================================================
 // Staging Operations
 // =============================================================================
@@ -405,6 +551,146 @@ func (a *App) StagingStatus() (*StagingStatusResult, error) {
 
 	return result, nil
 }
+
+// StagingApplyResultEntry represents a single apply result.
+type StagingApplyResultEntry struct {
+	Name   string `json:"name"`
+	Status string `json:"status"`
+	Error  string `json:"error,omitempty"`
+}
+
+// StagingApplyResult represents the result of applying staged changes.
+type StagingApplyResult struct {
+	ServiceName string                    `json:"serviceName"`
+	Results     []StagingApplyResultEntry `json:"results"`
+	Conflicts   []string                  `json:"conflicts,omitempty"`
+	Succeeded   int                       `json:"succeeded"`
+	Failed      int                       `json:"failed"`
+}
+
+// StagingApply applies staged changes for a service.
+func (a *App) StagingApply(service string, ignoreConflicts bool) (*StagingApplyResult, error) {
+	store, err := a.getStagingStore()
+	if err != nil {
+		return nil, err
+	}
+
+	var strategy staging.ApplyStrategy
+	switch service {
+	case "ssm":
+		client, err := a.getParamClient()
+		if err != nil {
+			return nil, err
+		}
+		strategy = &staging.ParamStrategy{Client: client}
+	case "sm":
+		client, err := a.getSecretClient()
+		if err != nil {
+			return nil, err
+		}
+		strategy = &staging.SecretStrategy{Client: client}
+	default:
+		return nil, errInvalidService
+	}
+
+	uc := &stagingusecase.ApplyUseCase{
+		Strategy: strategy,
+		Store:    store,
+	}
+	result, err := uc.Execute(a.ctx, stagingusecase.ApplyInput{
+		IgnoreConflicts: ignoreConflicts,
+	})
+
+	output := &StagingApplyResult{
+		ServiceName: result.ServiceName,
+		Conflicts:   result.Conflicts,
+		Succeeded:   result.Succeeded,
+		Failed:      result.Failed,
+	}
+
+	for _, r := range result.Results {
+		entry := StagingApplyResultEntry{Name: r.Name}
+		switch r.Status {
+		case stagingusecase.ApplyResultCreated:
+			entry.Status = "created"
+		case stagingusecase.ApplyResultUpdated:
+			entry.Status = "updated"
+		case stagingusecase.ApplyResultDeleted:
+			entry.Status = "deleted"
+		case stagingusecase.ApplyResultFailed:
+			entry.Status = "failed"
+			if r.Error != nil {
+				entry.Error = r.Error.Error()
+			}
+		}
+		output.Results = append(output.Results, entry)
+	}
+
+	return output, err
+}
+
+// StagingResetResult represents the result of resetting staged changes.
+type StagingResetResult struct {
+	Type        string `json:"type"`
+	Name        string `json:"name,omitempty"`
+	Count       int    `json:"count,omitempty"`
+	ServiceName string `json:"serviceName"`
+}
+
+// StagingReset resets (unstages) all staged changes for a service.
+func (a *App) StagingReset(service string) (*StagingResetResult, error) {
+	store, err := a.getStagingStore()
+	if err != nil {
+		return nil, err
+	}
+
+	var parser staging.Parser
+	switch service {
+	case "ssm":
+		parser = &staging.ParamStrategy{}
+	case "sm":
+		parser = &staging.SecretStrategy{}
+	default:
+		return nil, errInvalidService
+	}
+
+	uc := &stagingusecase.ResetUseCase{
+		Parser: parser,
+		Store:  store,
+	}
+	result, err := uc.Execute(a.ctx, stagingusecase.ResetInput{All: true})
+	if err != nil {
+		return nil, err
+	}
+
+	output := &StagingResetResult{
+		ServiceName: result.ServiceName,
+		Name:        result.Name,
+		Count:       result.Count,
+	}
+
+	switch result.Type {
+	case stagingusecase.ResetResultUnstaged:
+		output.Type = "unstaged"
+	case stagingusecase.ResetResultUnstagedAll:
+		output.Type = "unstagedAll"
+	case stagingusecase.ResetResultRestored:
+		output.Type = "restored"
+	case stagingusecase.ResetResultNotStaged:
+		output.Type = "notStaged"
+	case stagingusecase.ResetResultNothingStaged:
+		output.Type = "nothingStaged"
+	}
+
+	return output, nil
+}
+
+// errInvalidService is returned when an invalid service is specified.
+var errInvalidService = errorString("invalid service: must be 'ssm' or 'sm'")
+
+type errorString string
+
+func (e errorString) Error() string { return string(e) }
 
 // =============================================================================
 // Helper methods
