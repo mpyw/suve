@@ -12,6 +12,8 @@
   let error = '';
   let ssmEntries: main.StagingDiffEntry[] = [];
   let smEntries: main.StagingDiffEntry[] = [];
+  let ssmTagEntries: main.StagingDiffTagEntry[] = [];
+  let smTagEntries: main.StagingDiffTagEntry[] = [];
 
   // View mode: 'diff' (default) or 'value'
   let viewMode: 'diff' | 'value' = 'diff';
@@ -51,12 +53,17 @@
       ]);
       ssmEntries = ssmResult?.entries?.filter(e => e.type !== 'autoUnstaged') || [];
       smEntries = smResult?.entries?.filter(e => e.type !== 'autoUnstaged') || [];
+      ssmTagEntries = ssmResult?.tagEntries || [];
+      smTagEntries = smResult?.tagEntries || [];
       // Emit count change for sidebar badge
-      dispatch('countChange', ssmEntries.length + smEntries.length);
+      const totalCount = ssmEntries.length + smEntries.length + ssmTagEntries.length + smTagEntries.length;
+      dispatch('countChange', totalCount);
     } catch (e) {
       error = e instanceof Error ? e.message : String(e);
       ssmEntries = [];
       smEntries = [];
+      ssmTagEntries = [];
+      smTagEntries = [];
       dispatch('countChange', 0);
     } finally {
       loading = false;
@@ -97,7 +104,7 @@
     try {
       const result = await StagingApply(applyService, ignoreConflicts);
       applyResult = result;
-      if (result.failed === 0 && result.conflicts?.length === 0) {
+      if (result.entryFailed === 0 && result.tagFailed === 0 && result.conflicts?.length === 0) {
         await loadStatus();
       }
     } catch (e) {
@@ -109,7 +116,7 @@
 
   function closeApplyModal() {
     showApplyModal = false;
-    if (applyResult && applyResult.failed === 0) {
+    if (applyResult && applyResult.entryFailed === 0 && applyResult.tagFailed === 0) {
       loadStatus();
     }
   }
@@ -240,14 +247,14 @@
     return entry.stagedValue !== undefined && entry.stagedValue !== '';
   }
 
-  function hasTagChanges(entry: main.StagingDiffEntry): boolean {
-    const hasAddTags = entry.tags && Object.keys(entry.tags).length > 0;
-    const hasRemoveTags = entry.untagKeys && entry.untagKeys.length > 0;
-    return hasAddTags || hasRemoveTags;
-  }
-
   function showEditButton(entry: main.StagingDiffEntry): boolean {
     return entry.operation !== 'delete' && hasValueChange(entry);
+  }
+
+  // Find tag entry for a given name
+  function findTagEntry(service: string, name: string): main.StagingDiffTagEntry | undefined {
+    const tagEntries = service === 'ssm' ? ssmTagEntries : smTagEntries;
+    return tagEntries.find(t => t.name === name);
   }
 
   onMount(() => {
@@ -306,6 +313,7 @@
       {:else}
         <ul class="entry-list">
           {#each ssmEntries as entry}
+            {@const tagEntry = findTagEntry('ssm', entry.name)}
             <li class="entry-item">
               <div class="entry-header">
                 <span class="operation-badge" style="background: {getOperationColor(entry.operation || '')}">
@@ -320,10 +328,10 @@
                 </div>
               </div>
               <div class="entry-tags">
-                {#if entry.tags && Object.keys(entry.tags).length > 0}
+                {#if tagEntry?.addTags && Object.keys(tagEntry.addTags).length > 0}
                   <div class="tag-changes tag-add">
                     <span class="tag-label">+ Tags:</span>
-                    {#each Object.entries(entry.tags) as [key, value]}
+                    {#each Object.entries(tagEntry.addTags) as [key, value]}
                       <button class="tag-item tag-item-editable" type="button" on:click={() => openEditTagModal('ssm', entry.name, key, value)}>
                         {key}={value}
                         <span class="tag-delete-btn" role="button" tabindex="0" on:click|stopPropagation={() => handleRemoveTag('ssm', entry.name, key)} on:keydown|stopPropagation={(e) => e.key === 'Enter' && handleRemoveTag('ssm', entry.name, key)}>×</span>
@@ -331,10 +339,10 @@
                     {/each}
                   </div>
                 {/if}
-                {#if entry.untagKeys && entry.untagKeys.length > 0}
+                {#if tagEntry?.removeTags && tagEntry.removeTags.length > 0}
                   <div class="tag-changes tag-remove">
                     <span class="tag-label">- Tags:</span>
-                    {#each entry.untagKeys as key}
+                    {#each tagEntry.removeTags as key}
                       <span class="tag-item">
                         {key}
                         <button class="tag-cancel-btn" on:click={() => handleCancelUntag('ssm', entry.name, key)} title="Cancel untag">↩</button>
@@ -401,6 +409,7 @@
       {:else}
         <ul class="entry-list">
           {#each smEntries as entry}
+            {@const tagEntry = findTagEntry('sm', entry.name)}
             <li class="entry-item">
               <div class="entry-header">
                 <span class="operation-badge" style="background: {getOperationColor(entry.operation || '')}">
@@ -415,10 +424,10 @@
                 </div>
               </div>
               <div class="entry-tags">
-                {#if entry.tags && Object.keys(entry.tags).length > 0}
+                {#if tagEntry?.addTags && Object.keys(tagEntry.addTags).length > 0}
                   <div class="tag-changes tag-add">
                     <span class="tag-label">+ Tags:</span>
-                    {#each Object.entries(entry.tags) as [key, value]}
+                    {#each Object.entries(tagEntry.addTags) as [key, value]}
                       <button class="tag-item tag-item-editable" type="button" on:click={() => openEditTagModal('sm', entry.name, key, value)}>
                         {key}={value}
                         <span class="tag-delete-btn" role="button" tabindex="0" on:click|stopPropagation={() => handleRemoveTag('sm', entry.name, key)} on:keydown|stopPropagation={(e) => e.key === 'Enter' && handleRemoveTag('sm', entry.name, key)}>×</span>
@@ -426,10 +435,10 @@
                     {/each}
                   </div>
                 {/if}
-                {#if entry.untagKeys && entry.untagKeys.length > 0}
+                {#if tagEntry?.removeTags && tagEntry.removeTags.length > 0}
                   <div class="tag-changes tag-remove">
                     <span class="tag-label">- Tags:</span>
-                    {#each entry.untagKeys as key}
+                    {#each tagEntry.removeTags as key}
                       <span class="tag-item">
                         {key}
                         <button class="tag-cancel-btn" on:click={() => handleCancelUntag('sm', entry.name, key)} title="Cancel untag">↩</button>
@@ -519,23 +528,51 @@
           </div>
         {/if}
         <div class="result-summary">
-          <span class="result-success">Succeeded: {applyResult.succeeded}</span>
-          <span class="result-failed">Failed: {applyResult.failed}</span>
+          <span class="result-success">Entries: {applyResult.entrySucceeded} succeeded</span>
+          {#if applyResult.entryFailed > 0}
+            <span class="result-failed">{applyResult.entryFailed} failed</span>
+          {/if}
+          {#if applyResult.tagSucceeded > 0 || applyResult.tagFailed > 0}
+            <span class="result-divider">|</span>
+            <span class="result-success">Tags: {applyResult.tagSucceeded} succeeded</span>
+            {#if applyResult.tagFailed > 0}
+              <span class="result-failed">{applyResult.tagFailed} failed</span>
+            {/if}
+          {/if}
         </div>
-        {#if applyResult.results && applyResult.results.length > 0}
-          <ul class="result-list">
-            {#each applyResult.results as result}
-              <li class="result-item" class:failed={result.status === 'failed'}>
-                <span class="result-name">{result.name}</span>
-                <span class="result-status" class:status-created={result.status === 'created'} class:status-updated={result.status === 'updated'} class:status-deleted={result.status === 'deleted'} class:status-failed={result.status === 'failed'}>
-                  {result.status}
-                </span>
-                {#if result.error}
-                  <span class="result-error">{result.error}</span>
-                {/if}
-              </li>
-            {/each}
-          </ul>
+        {#if applyResult.entryResults && applyResult.entryResults.length > 0}
+          <div class="result-section">
+            <h5 class="result-section-title">Entry Changes</h5>
+            <ul class="result-list">
+              {#each applyResult.entryResults as result}
+                <li class="result-item" class:failed={result.status === 'failed'}>
+                  <span class="result-name">{result.name}</span>
+                  <span class="result-status" class:status-created={result.status === 'created'} class:status-updated={result.status === 'updated'} class:status-deleted={result.status === 'deleted'} class:status-failed={result.status === 'failed'}>
+                    {result.status}
+                  </span>
+                  {#if result.error}
+                    <span class="result-error">{result.error}</span>
+                  {/if}
+                </li>
+              {/each}
+            </ul>
+          </div>
+        {/if}
+        {#if applyResult.tagResults && applyResult.tagResults.length > 0}
+          <div class="result-section">
+            <h5 class="result-section-title">Tag Changes</h5>
+            <ul class="result-list">
+              {#each applyResult.tagResults as result}
+                <li class="result-item" class:failed={!!result.error}>
+                  <span class="result-name">{result.name}</span>
+                  <span class="result-status status-updated">tags</span>
+                  {#if result.error}
+                    <span class="result-error">{result.error}</span>
+                  {/if}
+                </li>
+              {/each}
+            </ul>
+          </div>
         {/if}
         <div class="form-actions">
           <button type="button" class="btn-primary" on:click={closeApplyModal}>Close</button>
@@ -1011,6 +1048,22 @@
   .result-failed {
     color: #f44336;
     font-weight: bold;
+  }
+
+  .result-divider {
+    color: #666;
+    margin: 0 4px;
+  }
+
+  .result-section {
+    margin-bottom: 16px;
+  }
+
+  .result-section-title {
+    margin: 0 0 8px 0;
+    font-size: 12px;
+    color: #888;
+    text-transform: uppercase;
   }
 
   .result-list {

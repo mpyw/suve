@@ -1,4 +1,4 @@
-.PHONY: build test lint e2e e2e-ssm e2e-sm up down clean coverage coverage-e2e coverage-all
+.PHONY: build test lint e2e up down clean coverage coverage-e2e coverage-all
 
 SUVE_LOCALSTACK_EXTERNAL_PORT ?= 4566
 COVERPKG = $(shell go list ./... | grep -v testutil | grep -v /e2e | tr '\n' ',')
@@ -26,16 +26,9 @@ up:
 down:
 	docker compose down
 
-# E2E tests (SSM only, SM requires localstack Pro)
-e2e: e2e-ssm
-
-# E2E tests for SSM only
-e2e-ssm: up
-	SUVE_LOCALSTACK_EXTERNAL_PORT=$(SUVE_LOCALSTACK_EXTERNAL_PORT) go test -tags=e2e -v -run TestSSM ./e2e/...
-
-# E2E tests for SM only (requires localstack Pro)
-e2e-sm: up
-	SUVE_LOCALSTACK_EXTERNAL_PORT=$(SUVE_LOCALSTACK_EXTERNAL_PORT) go test -tags=e2e -v -run TestSM ./e2e/...
+# E2E tests (SSM + SM)
+e2e: up
+	SUVE_LOCALSTACK_EXTERNAL_PORT=$(SUVE_LOCALSTACK_EXTERNAL_PORT) go test -tags=e2e -v ./e2e/...
 
 # Clean
 clean:
