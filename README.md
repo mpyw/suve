@@ -191,7 +191,7 @@ user@host:~$ suve stage param delete /app/config/old-param
 
 ```ShellSession
 user@host:~$ suve stage status
-Staged SSM changes (3):
+Staged SSM Parameter Store changes (3):
   A /app/config/new-param
   M /app/config/database-url
   D /app/config/old-param

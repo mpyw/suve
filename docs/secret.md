@@ -847,7 +847,7 @@ suve stage secret status [options] [name]
 
 ```ShellSession
 user@host:~$ suve stage secret status
-Staged SM changes (3):
+Staged Secrets Manager changes (3):
   A my-new-secret
   M my-database-credentials
   D my-old-secret
@@ -862,7 +862,7 @@ Secrets Manager:
 ```
 
 > [!TIP]
-> Use `suve stage status` to show all staged changes (SSM + SM combined).
+> Use `suve stage status` to show all staged changes (SSM Parameter Store + Secrets Manager combined).
 
 ---
 
@@ -956,7 +956,7 @@ suve stage secret apply [options] [name]
 
 **Behavior:**
 
-1. Reads all staged SM changes
+1. Reads all staged Secrets Manager changes
 2. For each `set` operation: calls UpdateSecret (or CreateSecret if new)
 3. For each `delete` operation: calls DeleteSecret
 4. Removes successfully applied changes from stage
@@ -995,7 +995,7 @@ suve stage secret reset [options] [spec]
 
 | Option | Alias | Default | Description |
 |--------|-------|---------|-------------|
-| `--all` | - | `false` | Unstage all SM secrets |
+| `--all` | - | `false` | Unstage all Secrets Manager secrets |
 
 **Version Specifiers:**
 
@@ -1012,7 +1012,7 @@ user@host:~$ suve stage secret reset my-database-credentials
 Unstaged my-database-credentials
 
 user@host:~$ suve stage secret reset --all
-Unstaged all SM changes
+Unstaged all Secrets Manager changes
 ```
 
 ```bash
@@ -1025,9 +1025,9 @@ suve stage secret reset my-database-credentials#abc12345
 # Restore to previous version and stage
 suve stage secret reset my-database-credentials~1
 
-# Unstage all SM secrets
+# Unstage all Secrets Manager secrets
 suve stage secret reset --all
 ```
 
 > [!TIP]
-> Use `suve stage reset` to unstage all changes (SSM + SM combined).
+> Use `suve stage reset` to unstage all changes (SSM Parameter Store + Secrets Manager combined).
