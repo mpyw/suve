@@ -9,6 +9,7 @@ import (
 	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 
+	"github.com/mpyw/suve/internal/maputil"
 	"github.com/mpyw/suve/internal/staging"
 )
 
@@ -117,6 +118,52 @@ func TestEntryPrinter_PrintEntry(t *testing.T) {
 			showDeleteOptions: false,
 			wantContains:      []string{"D", "/app/secret", "Staged:"},
 			wantNotContains:   []string{"Delete:"},
+		},
+		{
+			name:      "create operation non-verbose",
+			entryName: "/app/new-config",
+			entry: staging.Entry{
+				Operation: staging.OperationCreate,
+				Value:     lo.ToPtr("new-value"),
+				StagedAt:  fixedTime,
+			},
+			verbose:      false,
+			wantContains: []string{"A", "/app/new-config"},
+		},
+		{
+			name:      "create operation verbose",
+			entryName: "/app/new-config",
+			entry: staging.Entry{
+				Operation: staging.OperationCreate,
+				Value:     lo.ToPtr("new-value"),
+				StagedAt:  fixedTime,
+			},
+			verbose:      true,
+			wantContains: []string{"A", "/app/new-config", "Staged:", "Value: new-value"},
+		},
+		{
+			name:      "update operation verbose with tags",
+			entryName: "/app/config",
+			entry: staging.Entry{
+				Operation: staging.OperationUpdate,
+				Value:     lo.ToPtr("value"),
+				Tags:      map[string]string{"env": "prod", "team": "backend"},
+				StagedAt:  fixedTime,
+			},
+			verbose:      true,
+			wantContains: []string{"M", "/app/config", "Tags:", "env=prod", "team=backend"},
+		},
+		{
+			name:      "update operation verbose with untag keys",
+			entryName: "/app/config",
+			entry: staging.Entry{
+				Operation: staging.OperationUpdate,
+				Value:     lo.ToPtr("value"),
+				UntagKeys: maputil.NewSet("deprecated", "old"),
+				StagedAt:  fixedTime,
+			},
+			verbose:      true,
+			wantContains: []string{"M", "/app/config", "Untag:"},
 		},
 	}
 

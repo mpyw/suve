@@ -1695,6 +1695,102 @@ func TestEditRunner_WithMetadata(t *testing.T) {
 	})
 }
 
+func TestApplyRunner_WithTags(t *testing.T) {
+	t.Parallel()
+
+	t.Run("apply with tags only", func(t *testing.T) {
+		t.Parallel()
+
+		tmpDir := t.TempDir()
+		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		_ = store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
+			Operation: staging.OperationUpdate,
+			Tags:      map[string]string{"env": "prod", "team": "backend"},
+			StagedAt:  time.Now(),
+		})
+
+		var stdout, stderr bytes.Buffer
+		r := &runner.ApplyRunner{
+			UseCase: &stagingusecase.ApplyUseCase{
+				Strategy: &fullMockStrategy{service: staging.ServiceParam},
+				Store:    store,
+			},
+			Stdout: &stdout,
+			Stderr: &stderr,
+		}
+
+		err := r.Run(context.Background(), runner.ApplyOptions{})
+		require.NoError(t, err)
+		output := stdout.String()
+		assert.Contains(t, output, "Updated")
+		assert.Contains(t, output, "+2 tag(s)")
+	})
+
+	t.Run("apply with untag keys only", func(t *testing.T) {
+		t.Parallel()
+
+		tmpDir := t.TempDir()
+		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		untagKeys := make(map[string]struct{})
+		untagKeys["deprecated"] = struct{}{}
+		untagKeys["old"] = struct{}{}
+		_ = store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
+			Operation: staging.OperationUpdate,
+			UntagKeys: untagKeys,
+			StagedAt:  time.Now(),
+		})
+
+		var stdout, stderr bytes.Buffer
+		r := &runner.ApplyRunner{
+			UseCase: &stagingusecase.ApplyUseCase{
+				Strategy: &fullMockStrategy{service: staging.ServiceParam},
+				Store:    store,
+			},
+			Stdout: &stdout,
+			Stderr: &stderr,
+		}
+
+		err := r.Run(context.Background(), runner.ApplyOptions{})
+		require.NoError(t, err)
+		output := stdout.String()
+		assert.Contains(t, output, "Updated")
+		assert.Contains(t, output, "-2 tag(s)")
+	})
+
+	t.Run("apply with both tags and untag keys", func(t *testing.T) {
+		t.Parallel()
+
+		tmpDir := t.TempDir()
+		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		untagKeys := make(map[string]struct{})
+		untagKeys["deprecated"] = struct{}{}
+		_ = store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
+			Operation: staging.OperationUpdate,
+			Value:     lo.ToPtr("new-value"),
+			Tags:      map[string]string{"env": "prod"},
+			UntagKeys: untagKeys,
+			StagedAt:  time.Now(),
+		})
+
+		var stdout, stderr bytes.Buffer
+		r := &runner.ApplyRunner{
+			UseCase: &stagingusecase.ApplyUseCase{
+				Strategy: &fullMockStrategy{service: staging.ServiceParam},
+				Store:    store,
+			},
+			Stdout: &stdout,
+			Stderr: &stderr,
+		}
+
+		err := r.Run(context.Background(), runner.ApplyOptions{})
+		require.NoError(t, err)
+		output := stdout.String()
+		assert.Contains(t, output, "Updated")
+		assert.Contains(t, output, "+1 tag(s)")
+		assert.Contains(t, output, "-1 tag(s)")
+	})
+}
+
 func TestDeleteRunner_Run(t *testing.T) {
 	t.Parallel()
 
