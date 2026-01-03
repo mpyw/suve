@@ -273,10 +273,12 @@ func TestDiffRunner_Run(t *testing.T) {
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.DiffRunner{
-			Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentVal: "old-value"},
-			Store:    store,
-			Stdout:   &stdout,
-			Stderr:   &stderr,
+			UseCase: &stagingusecase.DiffUseCase{
+				Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentVal: "old-value"},
+				Store:    store,
+			},
+			Stdout: &stdout,
+			Stderr: &stderr,
 		}
 
 		err := r.Run(context.Background(), runner.DiffOptions{Name: "/app/config"})
@@ -304,10 +306,12 @@ func TestDiffRunner_Run(t *testing.T) {
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.DiffRunner{
-			Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentVal: "old"},
-			Store:    store,
-			Stdout:   &stdout,
-			Stderr:   &stderr,
+			UseCase: &stagingusecase.DiffUseCase{
+				Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentVal: "old"},
+				Store:    store,
+			},
+			Stdout: &stdout,
+			Stderr: &stderr,
 		}
 
 		err := r.Run(context.Background(), runner.DiffOptions{})
@@ -325,10 +329,12 @@ func TestDiffRunner_Run(t *testing.T) {
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.DiffRunner{
-			Strategy: &fullMockStrategy{service: staging.ServiceParam},
-			Store:    store,
-			Stdout:   &stdout,
-			Stderr:   &stderr,
+			UseCase: &stagingusecase.DiffUseCase{
+				Strategy: &fullMockStrategy{service: staging.ServiceParam},
+				Store:    store,
+			},
+			Stdout: &stdout,
+			Stderr: &stderr,
 		}
 
 		err := r.Run(context.Background(), runner.DiffOptions{Name: "/app/config"})
@@ -344,10 +350,12 @@ func TestDiffRunner_Run(t *testing.T) {
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.DiffRunner{
-			Strategy: &fullMockStrategy{service: staging.ServiceParam},
-			Store:    store,
-			Stdout:   &stdout,
-			Stderr:   &stderr,
+			UseCase: &stagingusecase.DiffUseCase{
+				Strategy: &fullMockStrategy{service: staging.ServiceParam},
+				Store:    store,
+			},
+			Stdout: &stdout,
+			Stderr: &stderr,
 		}
 
 		err := r.Run(context.Background(), runner.DiffOptions{})
@@ -368,10 +376,12 @@ func TestDiffRunner_Run(t *testing.T) {
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.DiffRunner{
-			Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentVal: `{"a":1}`},
-			Store:    store,
-			Stdout:   &stdout,
-			Stderr:   &stderr,
+			UseCase: &stagingusecase.DiffUseCase{
+				Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentVal: `{"a":1}`},
+				Store:    store,
+			},
+			Stdout: &stdout,
+			Stderr: &stderr,
 		}
 
 		err := r.Run(context.Background(), runner.DiffOptions{Name: "/app/config", ParseJSON: true})
@@ -394,10 +404,12 @@ func TestDiffRunner_Run(t *testing.T) {
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.DiffRunner{
-			Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentVal: `{"valid": "json"}`},
-			Store:    store,
-			Stdout:   &stdout,
-			Stderr:   &stderr,
+			UseCase: &stagingusecase.DiffUseCase{
+				Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentVal: `{"valid": "json"}`},
+				Store:    store,
+			},
+			Stdout: &stdout,
+			Stderr: &stderr,
 		}
 
 		err := r.Run(context.Background(), runner.DiffOptions{Name: "/app/config", ParseJSON: true})
@@ -418,10 +430,12 @@ func TestDiffRunner_Run(t *testing.T) {
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.DiffRunner{
-			Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentVal: "same-value"},
-			Store:    store,
-			Stdout:   &stdout,
-			Stderr:   &stderr,
+			UseCase: &stagingusecase.DiffUseCase{
+				Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentVal: "same-value"},
+				Store:    store,
+			},
+			Stdout: &stdout,
+			Stderr: &stderr,
 		}
 
 		err := r.Run(context.Background(), runner.DiffOptions{Name: "/app/config"})
@@ -446,10 +460,12 @@ func TestDiffRunner_Run(t *testing.T) {
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.DiffRunner{
-			Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentVal: "current-value"},
-			Store:    store,
-			Stdout:   &stdout,
-			Stderr:   &stderr,
+			UseCase: &stagingusecase.DiffUseCase{
+				Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentVal: "current-value"},
+				Store:    store,
+			},
+			Stdout: &stdout,
+			Stderr: &stderr,
 		}
 
 		err := r.Run(context.Background(), runner.DiffOptions{Name: "/app/config"})
@@ -472,11 +488,13 @@ func TestDiffRunner_Run(t *testing.T) {
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.DiffRunner{
-			// FetchCurrent returns error because item was deleted from AWS
-			Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentErr: errors.New("parameter not found")},
-			Store:    store,
-			Stdout:   &stdout,
-			Stderr:   &stderr,
+			UseCase: &stagingusecase.DiffUseCase{
+				// FetchCurrent returns error because item was deleted from AWS
+				Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentErr: errors.New("parameter not found")},
+				Store:    store,
+			},
+			Stdout: &stdout,
+			Stderr: &stderr,
 		}
 
 		err := r.Run(context.Background(), runner.DiffOptions{Name: "/app/config"})
@@ -502,11 +520,13 @@ func TestDiffRunner_Run(t *testing.T) {
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.DiffRunner{
-			// FetchCurrent returns error because item doesn't exist yet
-			Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentErr: errors.New("parameter not found")},
-			Store:    store,
-			Stdout:   &stdout,
-			Stderr:   &stderr,
+			UseCase: &stagingusecase.DiffUseCase{
+				// FetchCurrent returns error because item doesn't exist yet
+				Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentErr: errors.New("parameter not found")},
+				Store:    store,
+			},
+			Stdout: &stdout,
+			Stderr: &stderr,
 		}
 
 		err := r.Run(context.Background(), runner.DiffOptions{Name: "/app/new-param"})
@@ -536,10 +556,12 @@ func TestDiffRunner_Run(t *testing.T) {
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.DiffRunner{
-			Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentErr: errors.New("parameter not found")},
-			Store:    store,
-			Stdout:   &stdout,
-			Stderr:   &stderr,
+			UseCase: &stagingusecase.DiffUseCase{
+				Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentErr: errors.New("parameter not found")},
+				Store:    store,
+			},
+			Stdout: &stdout,
+			Stderr: &stderr,
 		}
 
 		err := r.Run(context.Background(), runner.DiffOptions{Name: "/app/new-json", ParseJSON: true})
@@ -563,11 +585,13 @@ func TestDiffRunner_Run(t *testing.T) {
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.DiffRunner{
-			// Item already exists in AWS with same value
-			Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentVal: "same-value"},
-			Store:    store,
-			Stdout:   &stdout,
-			Stderr:   &stderr,
+			UseCase: &stagingusecase.DiffUseCase{
+				// Item already exists in AWS with same value
+				Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentVal: "same-value"},
+				Store:    store,
+			},
+			Stdout: &stdout,
+			Stderr: &stderr,
 		}
 
 		err := r.Run(context.Background(), runner.DiffOptions{Name: "/app/param"})
@@ -593,11 +617,13 @@ func TestDiffRunner_Run(t *testing.T) {
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.DiffRunner{
-			// Item already exists in AWS with different value
-			Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentVal: "old-value"},
-			Store:    store,
-			Stdout:   &stdout,
-			Stderr:   &stderr,
+			UseCase: &stagingusecase.DiffUseCase{
+				// Item already exists in AWS with different value
+				Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentVal: "old-value"},
+				Store:    store,
+			},
+			Stdout: &stdout,
+			Stderr: &stderr,
 		}
 
 		err := r.Run(context.Background(), runner.DiffOptions{Name: "/app/param"})
@@ -619,11 +645,13 @@ func TestDiffRunner_Run(t *testing.T) {
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.DiffRunner{
-			// FetchCurrent returns error because item doesn't exist in AWS anymore
-			Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentErr: errors.New("parameter not found")},
-			Store:    store,
-			Stdout:   &stdout,
-			Stderr:   &stderr,
+			UseCase: &stagingusecase.DiffUseCase{
+				// FetchCurrent returns error because item doesn't exist in AWS anymore
+				Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentErr: errors.New("parameter not found")},
+				Store:    store,
+			},
+			Stdout: &stdout,
+			Stderr: &stderr,
 		}
 
 		err := r.Run(context.Background(), runner.DiffOptions{Name: "/app/config"})
@@ -1448,10 +1476,12 @@ func TestDiffRunner_OutputMetadata(t *testing.T) {
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.DiffRunner{
-			Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentVal: "old-value"},
-			Store:    store,
-			Stdout:   &stdout,
-			Stderr:   &stderr,
+			UseCase: &stagingusecase.DiffUseCase{
+				Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentVal: "old-value"},
+				Store:    store,
+			},
+			Stdout: &stdout,
+			Stderr: &stderr,
 		}
 
 		err := r.Run(context.Background(), runner.DiffOptions{Name: "/app/config"})
@@ -1475,10 +1505,12 @@ func TestDiffRunner_OutputMetadata(t *testing.T) {
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.DiffRunner{
-			Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentVal: "old-value"},
-			Store:    store,
-			Stdout:   &stdout,
-			Stderr:   &stderr,
+			UseCase: &stagingusecase.DiffUseCase{
+				Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentVal: "old-value"},
+				Store:    store,
+			},
+			Stdout: &stdout,
+			Stderr: &stderr,
 		}
 
 		err := r.Run(context.Background(), runner.DiffOptions{Name: "/app/config"})
@@ -1505,10 +1537,12 @@ func TestDiffRunner_OutputMetadata(t *testing.T) {
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.DiffRunner{
-			Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentErr: errors.New("not found")},
-			Store:    store,
-			Stdout:   &stdout,
-			Stderr:   &stderr,
+			UseCase: &stagingusecase.DiffUseCase{
+				Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentErr: errors.New("not found")},
+				Store:    store,
+			},
+			Stdout: &stdout,
+			Stderr: &stderr,
 		}
 
 		err := r.Run(context.Background(), runner.DiffOptions{Name: "/app/new-param"})

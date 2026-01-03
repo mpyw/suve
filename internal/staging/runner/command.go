@@ -150,10 +150,12 @@ EXAMPLES:
 
 			return pager.WithPagerWriter(cmd.Root().Writer, opts.NoPager, func(w io.Writer) error {
 				r := &DiffRunner{
-					Strategy: strat,
-					Store:    store,
-					Stdout:   w,
-					Stderr:   cmd.Root().ErrWriter,
+					UseCase: &stagingusecase.DiffUseCase{
+						Strategy: strat,
+						Store:    store,
+					},
+					Stdout: w,
+					Stderr: cmd.Root().ErrWriter,
 				}
 				return r.Run(ctx, opts)
 			})
