@@ -15,6 +15,7 @@ import (
 	appcli "github.com/mpyw/suve/internal/cli/commands"
 	paramdiff "github.com/mpyw/suve/internal/cli/commands/param/diff"
 	"github.com/mpyw/suve/internal/cli/diffargs"
+	"github.com/mpyw/suve/internal/usecase/param"
 	"github.com/mpyw/suve/internal/version/paramversion"
 )
 
@@ -577,9 +578,9 @@ func TestRun(t *testing.T) {
 			t.Parallel()
 			var buf, errBuf bytes.Buffer
 			r := &paramdiff.Runner{
-				Client: tt.mock,
-				Stdout: &buf,
-				Stderr: &errBuf,
+				UseCase: &param.DiffUseCase{Client: tt.mock},
+				Stdout:  &buf,
+				Stderr:  &errBuf,
 			}
 			err := r.Run(t.Context(), tt.opts)
 
@@ -613,9 +614,9 @@ func TestRun_IdenticalWarning(t *testing.T) {
 
 	var stdout, stderr bytes.Buffer
 	r := &paramdiff.Runner{
-		Client: mock,
-		Stdout: &stdout,
-		Stderr: &stderr,
+		UseCase: &param.DiffUseCase{Client: mock},
+		Stdout:  &stdout,
+		Stderr:  &stderr,
 	}
 	opts := paramdiff.Options{
 		Spec1: &paramversion.Spec{Name: "/app/param", Absolute: paramversion.AbsoluteSpec{}},
