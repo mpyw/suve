@@ -1,0 +1,15 @@
+# Build outputs
+build/
+gui
+
+# Dependencies
+node_modules/
+
+# Frontend build output
+frontend/dist/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
