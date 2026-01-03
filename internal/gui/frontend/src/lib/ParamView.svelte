@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
-  import { ParamList, ParamShow, ParamLog, ParamSet, ParamDelete, ParamDiff, ParamAddTag, ParamRemoveTag, StagingAdd, StagingEdit, StagingDelete, StagingAddTag, StagingRemoveTag } from '../../wailsjs/go/main/App';
-  import type { main } from '../../wailsjs/go/models';
+  import { ParamList, ParamShow, ParamLog, ParamSet, ParamDelete, ParamDiff, ParamAddTag, ParamRemoveTag, StagingAdd, StagingEdit, StagingDelete, StagingAddTag, StagingRemoveTag } from '../../wailsjs/go/gui/App';
+  import type { gui } from '../../wailsjs/go/models';
   import CloseIcon from './icons/CloseIcon.svelte';
   import EyeIcon from './icons/EyeIcon.svelte';
   import EyeOffIcon from './icons/EyeOffIcon.svelte';
@@ -45,10 +45,10 @@
     }, 300);
   }
 
-  let entries: main.ParamListEntry[] = [];
+  let entries: gui.ParamListEntry[] = [];
   let selectedParam: string | null = null;
-  let paramDetail: main.ParamShowResult | null = null;
-  let paramLog: main.ParamLogEntry[] = [];
+  let paramDetail: gui.ParamShowResult | null = null;
+  let paramLog: gui.ParamLogEntry[] = [];
   let detailLoading = false;
   let showValue = false; // For SecureString masking
 
@@ -65,7 +65,7 @@
   // Diff state
   let diffMode = false;
   let diffSelectedVersions: number[] = [];
-  let diffResult: main.ParamDiffResult | null = null;
+  let diffResult: gui.ParamDiffResult | null = null;
 
   // Tag state
   let showTagModal = false;

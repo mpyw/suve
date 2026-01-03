@@ -288,7 +288,7 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
       },
     };
 
-    (window as any).go = { main: { App: mockApp } };
+    (window as any).go = { gui: { App: mockApp } };
     (window as any).runtime = {
       EventsOn: () => {},
       EventsOff: () => {},

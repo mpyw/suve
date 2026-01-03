@@ -1,4 +1,4 @@
-export namespace main {
+export namespace gui {
 	
 	export class ParamDeleteResult {
 	    name: string;

@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
-  import { SecretList, SecretShow, SecretLog, SecretCreate, SecretUpdate, SecretDelete, SecretDiff, SecretRestore, SecretAddTag, SecretRemoveTag, StagingAdd, StagingEdit, StagingDelete, StagingAddTag, StagingRemoveTag } from '../../wailsjs/go/main/App';
-  import type { main } from '../../wailsjs/go/models';
+  import { SecretList, SecretShow, SecretLog, SecretCreate, SecretUpdate, SecretDelete, SecretDiff, SecretRestore, SecretAddTag, SecretRemoveTag, StagingAdd, StagingEdit, StagingDelete, StagingAddTag, StagingRemoveTag } from '../../wailsjs/go/gui/App';
+  import type { gui } from '../../wailsjs/go/models';
   import CloseIcon from './icons/CloseIcon.svelte';
   import EyeIcon from './icons/EyeIcon.svelte';
   import EyeOffIcon from './icons/EyeOffIcon.svelte';
@@ -44,10 +44,10 @@
   let loading = false;
   let error = '';
 
-  let entries: main.SecretListEntry[] = [];
+  let entries: gui.SecretListEntry[] = [];
   let selectedSecret: string | null = null;
-  let secretDetail: main.SecretShowResult | null = null;
-  let secretLog: main.SecretLogEntry[] = [];
+  let secretDetail: gui.SecretShowResult | null = null;
+  let secretLog: gui.SecretLogEntry[] = [];
   let detailLoading = false;
   let showValue = false;
 
@@ -68,7 +68,7 @@
   // Diff state
   let diffMode = false;
   let diffSelectedVersions: string[] = [];
-  let diffResult: main.SecretDiffResult | null = null;
+  let diffResult: gui.SecretDiffResult | null = null;
 
   // Restore state
   let restoreTarget = '';

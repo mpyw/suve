@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount, createEventDispatcher } from 'svelte';
-  import { StagingDiff, StagingApply, StagingReset, StagingEdit, StagingUnstage, StagingAddTag, StagingCancelAddTag, StagingCancelRemoveTag } from '../../wailsjs/go/main/App';
-  import type { main } from '../../wailsjs/go/models';
+  import { StagingDiff, StagingApply, StagingReset, StagingEdit, StagingUnstage, StagingAddTag, StagingCancelAddTag, StagingCancelRemoveTag } from '../../wailsjs/go/gui/App';
+  import type { gui } from '../../wailsjs/go/models';
   import Modal from './Modal.svelte';
   import DiffDisplay from './DiffDisplay.svelte';
   import './common.css';
@@ -10,10 +10,10 @@
 
   let loading = false;
   let error = '';
-  let ssmEntries: main.StagingDiffEntry[] = [];
-  let smEntries: main.StagingDiffEntry[] = [];
-  let ssmTagEntries: main.StagingDiffTagEntry[] = [];
-  let smTagEntries: main.StagingDiffTagEntry[] = [];
+  let ssmEntries: gui.StagingDiffEntry[] = [];
+  let smEntries: gui.StagingDiffEntry[] = [];
+  let ssmTagEntries: gui.StagingDiffTagEntry[] = [];
+  let smTagEntries: gui.StagingDiffTagEntry[] = [];
 
   // View mode: 'diff' (default) or 'value'
   let viewMode: 'diff' | 'value' = 'diff';
@@ -28,7 +28,7 @@
   let ignoreConflicts = false;
   let modalLoading = false;
   let modalError = '';
-  let applyResult: main.StagingApplyResult | null = null;
+  let applyResult: gui.StagingApplyResult | null = null;
 
   // Edit form
   let editService = '';
@@ -147,7 +147,7 @@
   }
 
   // Edit modal
-  function openEditModal(service: string, entry: main.StagingDiffEntry) {
+  function openEditModal(service: string, entry: gui.StagingDiffEntry) {
     editService = service;
     editName = entry.name;
     editValue = entry.stagedValue || '';
@@ -243,16 +243,16 @@
   }
 
   // Computed helpers for entry display logic
-  function hasValueChange(entry: main.StagingDiffEntry): boolean {
+  function hasValueChange(entry: gui.StagingDiffEntry): boolean {
     return entry.stagedValue !== undefined && entry.stagedValue !== '';
   }
 
-  function showEditButton(entry: main.StagingDiffEntry): boolean {
+  function showEditButton(entry: gui.StagingDiffEntry): boolean {
     return entry.operation !== 'delete' && hasValueChange(entry);
   }
 
   // Find tag entry for a given name
-  function findTagEntry(service: string, name: string): main.StagingDiffTagEntry | undefined {
+  function findTagEntry(service: string, name: string): gui.StagingDiffTagEntry | undefined {
     const tagEntries = service === 'ssm' ? ssmTagEntries : smTagEntries;
     return tagEntries.find(t => t.name === name);
   }

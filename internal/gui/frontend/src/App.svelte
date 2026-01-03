@@ -4,7 +4,7 @@
   import ParamView from './lib/ParamView.svelte';
   import SecretView from './lib/SecretView.svelte';
   import StagingView from './lib/StagingView.svelte';
-  import { StagingStatus } from '../wailsjs/go/main/App';
+  import { StagingStatus } from '../wailsjs/go/gui/App';
 
   let activeView: 'param' | 'secret' | 'staging' = 'param';
   let stagingCount = 0;

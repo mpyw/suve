@@ -1,12 +1,10 @@
-package main
+package gui
 
 import (
 	"context"
 
-	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
-	"github.com/aws/aws-sdk-go-v2/service/ssm"
-
 	"github.com/mpyw/suve/internal/api/paramapi"
+	"github.com/mpyw/suve/internal/api/secretapi"
 	"github.com/mpyw/suve/internal/infra"
 	"github.com/mpyw/suve/internal/maputil"
 	"github.com/mpyw/suve/internal/staging"
@@ -17,13 +15,32 @@ import (
 	"github.com/mpyw/suve/internal/version/secretversion"
 )
 
+// ParamClient is the combined interface for all SSM Parameter Store operations.
+type ParamClient interface {
+	// For staging
+	staging.ParamClient
+	// For usecases (additional methods not in staging.ParamClient)
+	paramapi.DescribeParametersAPI
+	paramapi.ListTagsForResourceAPI
+}
+
+// SecretClient is the combined interface for all Secrets Manager operations.
+type SecretClient interface {
+	// For staging
+	staging.SecretClient
+	// For usecases (additional methods not in staging.SecretClient)
+	secretapi.ListSecretsAPI
+	secretapi.DescribeSecretAPI
+	secretapi.RestoreSecretAPI
+}
+
 // App struct holds application state and dependencies.
 type App struct {
 	ctx context.Context
 
 	// AWS clients (lazily initialized)
-	paramClient  *ssm.Client
-	secretClient *secretsmanager.Client
+	paramClient  ParamClient
+	secretClient SecretClient
 
 	// Staging store
 	stagingStore *staging.Store
@@ -34,8 +51,8 @@ func NewApp() *App {
 	return &App{}
 }
 
-// startup is called when the app starts.
-func (a *App) startup(ctx context.Context) {
+// Startup is called when the app starts.
+func (a *App) Startup(ctx context.Context) {
 	a.ctx = ctx
 }
 
@@ -1269,7 +1286,7 @@ func (e errorString) Error() string { return string(e) }
 // Helper methods
 // =============================================================================
 
-func (a *App) getParamClient() (*ssm.Client, error) {
+func (a *App) getParamClient() (ParamClient, error) {
 	if a.paramClient != nil {
 		return a.paramClient, nil
 	}
@@ -1282,7 +1299,7 @@ func (a *App) getParamClient() (*ssm.Client, error) {
 	return client, nil
 }
 
-func (a *App) getSecretClient() (*secretsmanager.Client, error) {
+func (a *App) getSecretClient() (SecretClient, error) {
 	if a.secretClient != nil {
 		return a.secretClient, nil
 	}

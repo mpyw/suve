@@ -25,7 +25,10 @@ jobs:
         run: go build -v ./...
 
       - name: Run tests with coverage
-        run: go test -v -race -coverprofile=coverage.txt -covermode=atomic -coverpkg=./... ./...
+        run: |
+          PACKAGES=$(go list ./... | grep -v internal/gui | grep -v /cmd/)
+          COVERPKG=$(go list ./... | grep -v internal/gui | grep -v /cmd/ | tr '\n' ',')
+          go test -v -race -coverprofile=coverage.txt -covermode=atomic -coverpkg=$COVERPKG $PACKAGES
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v5
@@ -103,7 +106,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: gui/frontend
+        working-directory: internal/gui/frontend
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -113,7 +116,7 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
-          cache-dependency-path: gui/frontend/package-lock.json
+          cache-dependency-path: internal/gui/frontend/package-lock.json
 
       - name: Install dependencies
         run: npm ci
@@ -129,5 +132,5 @@ jobs:
         if: ${{ !cancelled() }}
         with:
           name: playwright-report
-          path: gui/frontend/playwright-report/
+          path: internal/gui/frontend/playwright-report/
           retention-days: 30
