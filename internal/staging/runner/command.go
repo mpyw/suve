@@ -224,10 +224,12 @@ EXAMPLES:
 			strat := cfg.ParserFactory()
 
 			r := &AddRunner{
-				Strategy: strat,
-				Store:    store,
-				Stdout:   cmd.Root().Writer,
-				Stderr:   cmd.Root().ErrWriter,
+				UseCase: &stagingusecase.AddUseCase{
+					Strategy: strat,
+					Store:    store,
+				},
+				Stdout: cmd.Root().Writer,
+				Stderr: cmd.Root().ErrWriter,
 			}
 			return r.Run(ctx, AddOptions{
 				Name:        name,
