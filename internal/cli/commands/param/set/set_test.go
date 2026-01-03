@@ -14,6 +14,7 @@ import (
 	appcli "github.com/mpyw/suve/internal/cli/commands"
 	"github.com/mpyw/suve/internal/cli/commands/param/set"
 	"github.com/mpyw/suve/internal/tagging"
+	"github.com/mpyw/suve/internal/usecase/param"
 )
 
 func TestCommand_Validation(t *testing.T) {
@@ -81,6 +82,13 @@ func (m *mockClient) RemoveTagsFromResource(ctx context.Context, params *paramap
 
 func TestRun(t *testing.T) {
 	t.Parallel()
+
+	// Default mock for GetParameter (returns not found)
+	notFoundErr := &paramapi.ParameterNotFound{}
+	defaultGetParameter := func(_ context.Context, _ *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
+		return nil, notFoundErr
+	}
+
 	tests := []struct {
 		name    string
 		opts    set.Options
@@ -96,6 +104,7 @@ func TestRun(t *testing.T) {
 				Type:  "SecureString",
 			},
 			mock: &mockClient{
+				getParameterFunc: defaultGetParameter,
 				putParameterFunc: func(_ context.Context, params *paramapi.PutParameterInput, _ ...func(*paramapi.Options)) (*paramapi.PutParameterOutput, error) {
 					assert.Equal(t, "/app/param", lo.FromPtr(params.Name))
 					assert.Equal(t, "test-value", lo.FromPtr(params.Value))
@@ -119,6 +128,7 @@ func TestRun(t *testing.T) {
 				Description: "Test description",
 			},
 			mock: &mockClient{
+				getParameterFunc: defaultGetParameter,
 				putParameterFunc: func(_ context.Context, params *paramapi.PutParameterInput, _ ...func(*paramapi.Options)) (*paramapi.PutParameterOutput, error) {
 					assert.Equal(t, "Test description", lo.FromPtr(params.Description))
 					return &paramapi.PutParameterOutput{
@@ -139,6 +149,7 @@ func TestRun(t *testing.T) {
 				},
 			},
 			mock: &mockClient{
+				getParameterFunc: defaultGetParameter,
 				putParameterFunc: func(_ context.Context, _ *paramapi.PutParameterInput, _ ...func(*paramapi.Options)) (*paramapi.PutParameterOutput, error) {
 					return &paramapi.PutParameterOutput{Version: 1}, nil
 				},
@@ -154,8 +165,9 @@ func TestRun(t *testing.T) {
 		{
 			name:    "put parameter error",
 			opts:    set.Options{Name: "/app/param", Value: "test-value", Type: "String"},
-			wantErr: "failed to set parameter",
+			wantErr: "failed to put parameter",
 			mock: &mockClient{
+				getParameterFunc: defaultGetParameter,
 				putParameterFunc: func(_ context.Context, _ *paramapi.PutParameterInput, _ ...func(*paramapi.Options)) (*paramapi.PutParameterOutput, error) {
 					return nil, fmt.Errorf("AWS error")
 				},
@@ -174,6 +186,7 @@ func TestRun(t *testing.T) {
 			},
 			wantErr: "failed to add tags",
 			mock: &mockClient{
+				getParameterFunc: defaultGetParameter,
 				putParameterFunc: func(_ context.Context, _ *paramapi.PutParameterInput, _ ...func(*paramapi.Options)) (*paramapi.PutParameterOutput, error) {
 					return &paramapi.PutParameterOutput{Version: 1}, nil
 				},
@@ -189,9 +202,9 @@ func TestRun(t *testing.T) {
 			t.Parallel()
 			var buf, errBuf bytes.Buffer
 			r := &set.Runner{
-				Client: tt.mock,
-				Stdout: &buf,
-				Stderr: &errBuf,
+				UseCase: &param.SetUseCase{Client: tt.mock},
+				Stdout:  &buf,
+				Stderr:  &errBuf,
 			}
 			err := r.Run(t.Context(), tt.opts)
 
