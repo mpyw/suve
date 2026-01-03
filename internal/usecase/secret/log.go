@@ -33,6 +33,7 @@ type LogEntry struct {
 	Value        string
 	CreatedDate  *time.Time
 	IsCurrent    bool
+	Error        error // Error from fetching value, if any
 }
 
 // LogOutput holds the result of the log use case.
@@ -84,8 +85,11 @@ func (u *LogUseCase) Execute(ctx context.Context, input LogInput) (*LogOutput, e
 	// Build entries
 	var entries []LogEntry
 	for _, v := range versions {
-		// Apply date filters
-		if v.CreatedDate != nil {
+		// Apply date filters (skip entries without CreatedDate when filters are applied)
+		if input.Since != nil || input.Until != nil {
+			if v.CreatedDate == nil {
+				continue
+			}
 			if input.Since != nil && v.CreatedDate.Before(*input.Since) {
 				continue
 			}
@@ -95,13 +99,16 @@ func (u *LogUseCase) Execute(ctx context.Context, input LogInput) (*LogOutput, e
 		}
 
 		// Fetch the value for this version
-		value := ""
+		var value string
+		var fetchErr error
 		if v.VersionId != nil {
 			secretOut, err := u.Client.GetSecretValue(ctx, &secretapi.GetSecretValueInput{
 				SecretId:  lo.ToPtr(input.Name),
 				VersionId: v.VersionId,
 			})
-			if err == nil {
+			if err != nil {
+				fetchErr = err
+			} else {
 				value = lo.FromPtr(secretOut.SecretString)
 			}
 		}
@@ -115,6 +122,7 @@ func (u *LogUseCase) Execute(ctx context.Context, input LogInput) (*LogOutput, e
 			Value:        value,
 			CreatedDate:  v.CreatedDate,
 			IsCurrent:    isCurrent,
+			Error:        fetchErr,
 		})
 	}
 

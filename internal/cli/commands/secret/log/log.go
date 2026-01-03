@@ -9,33 +9,25 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"sort"
 	"time"
 
-	"github.com/samber/lo"
 	"github.com/urfave/cli/v3"
 
-	"github.com/mpyw/suve/internal/api/secretapi"
 	"github.com/mpyw/suve/internal/cli/colors"
 	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/cli/pager"
 	"github.com/mpyw/suve/internal/infra"
 	"github.com/mpyw/suve/internal/jsonutil"
 	"github.com/mpyw/suve/internal/timeutil"
+	"github.com/mpyw/suve/internal/usecase/secret"
 	"github.com/mpyw/suve/internal/version/secretversion"
 )
 
-// Client is the interface for the log command.
-type Client interface {
-	secretapi.ListSecretVersionIdsAPI
-	secretapi.GetSecretValueAPI
-}
-
 // Runner executes the log command.
 type Runner struct {
-	Client Client
-	Stdout io.Writer
-	Stderr io.Writer
+	UseCase *secret.LogUseCase
+	Stdout  io.Writer
+	Stderr  io.Writer
 }
 
 // Options holds the options for the log command.
@@ -201,9 +193,9 @@ func action(ctx context.Context, cmd *cli.Command) error {
 
 	return pager.WithPagerWriter(cmd.Root().Writer, noPager, func(w io.Writer) error {
 		r := &Runner{
-			Client: client,
-			Stdout: w,
-			Stderr: cmd.Root().ErrWriter,
+			UseCase: &secret.LogUseCase{Client: client},
+			Stdout:  w,
+			Stderr:  cmd.Root().ErrWriter,
 		}
 		return r.Run(ctx, opts)
 	})
@@ -211,64 +203,39 @@ func action(ctx context.Context, cmd *cli.Command) error {
 
 // Run executes the log command.
 func (r *Runner) Run(ctx context.Context, opts Options) error {
-	result, err := r.Client.ListSecretVersionIds(ctx, &secretapi.ListSecretVersionIdsInput{
-		SecretId:   lo.ToPtr(opts.Name),
-		MaxResults: lo.ToPtr(opts.MaxResults),
+	result, err := r.UseCase.Execute(ctx, secret.LogInput{
+		Name:       opts.Name,
+		MaxResults: opts.MaxResults,
+		Since:      opts.Since,
+		Until:      opts.Until,
+		Reverse:    opts.Reverse,
 	})
 	if err != nil {
-		return fmt.Errorf("failed to list secret versions: %w", err)
+		return err
 	}
 
-	versions := result.Versions
-	if len(versions) == 0 {
+	entries := result.Entries
+	if len(entries) == 0 {
 		return nil
 	}
 
-	// Filter by date range if specified (before sorting for efficiency)
-	if opts.Since != nil || opts.Until != nil {
-		versions = filterDateRange(versions, opts.Since, opts.Until)
-		if len(versions) == 0 {
-			return nil
-		}
-	}
-
-	sort.Slice(versions, func(i, j int) bool {
-		if versions[i].CreatedDate == nil {
-			return false
-		}
-		if versions[j].CreatedDate == nil {
-			return true
-		}
-		if opts.Reverse {
-			// Oldest first
-			return versions[i].CreatedDate.Before(*versions[j].CreatedDate)
-		}
-		// Newest first (default)
-		return versions[i].CreatedDate.After(*versions[j].CreatedDate)
-	})
-
-	// JSON output mode - fetch values and output JSON
+	// JSON output mode
 	if opts.Output == output.FormatJSON {
-		items := make([]JSONOutputItem, 0, len(versions))
-		for _, v := range versions {
-			versionID := lo.FromPtr(v.VersionId)
+		items := make([]JSONOutputItem, 0, len(entries))
+		for _, entry := range entries {
 			item := JSONOutputItem{
-				VersionID: versionID,
+				VersionID: entry.VersionID,
 			}
-			if len(v.VersionStages) > 0 {
-				item.Stages = v.VersionStages
+			if len(entry.VersionStage) > 0 {
+				item.Stages = entry.VersionStage
 			}
-			if v.CreatedDate != nil {
-				item.Created = timeutil.FormatRFC3339(*v.CreatedDate)
+			if entry.CreatedDate != nil {
+				item.Created = timeutil.FormatRFC3339(*entry.CreatedDate)
 			}
-			secretResult, err := r.Client.GetSecretValue(ctx, &secretapi.GetSecretValueInput{
-				SecretId:  lo.ToPtr(opts.Name),
-				VersionId: lo.ToPtr(versionID),
-			})
-			if err != nil {
-				item.Error = err.Error()
+			if entry.Error != nil {
+				item.Error = entry.Error.Error()
 			} else {
-				item.Value = secretResult.SecretString
+				item.Value = &entry.Value
 			}
 			items = append(items, item)
 		}
@@ -277,36 +244,26 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 		return enc.Encode(items)
 	}
 
-	// If showing patches, fetch all secret values upfront
-	var secretValues map[string]string
-	if opts.ShowPatch {
-		secretValues = make(map[string]string)
-		for _, v := range versions {
-			versionID := lo.FromPtr(v.VersionId)
-			secretResult, err := r.Client.GetSecretValue(ctx, &secretapi.GetSecretValueInput{
-				SecretId:  lo.ToPtr(opts.Name),
-				VersionId: lo.ToPtr(versionID),
-			})
-			if err != nil {
-				// Skip versions that can't be retrieved
-				continue
-			}
-			secretValues[versionID] = lo.FromPtr(secretResult.SecretString)
+	// Build secret values map for patch mode
+	secretValues := make(map[string]string)
+	for _, entry := range entries {
+		if entry.Error == nil {
+			secretValues[entry.VersionID] = entry.Value
 		}
 	}
 
-	for i, v := range versions {
-		versionID := lo.FromPtr(v.VersionId)
+	for i, entry := range entries {
+		versionID := entry.VersionID
 
 		if opts.Oneline && !opts.ShowPatch {
 			// Compact one-line format: VERSION_ID  DATE  [LABELS]
 			dateStr := ""
-			if v.CreatedDate != nil {
-				dateStr = v.CreatedDate.Format("2006-01-02")
+			if entry.CreatedDate != nil {
+				dateStr = entry.CreatedDate.Format("2006-01-02")
 			}
 			labelsStr := ""
-			if len(v.VersionStages) > 0 {
-				labelsStr = colors.Current(fmt.Sprintf(" %v", v.VersionStages))
+			if len(entry.VersionStage) > 0 {
+				labelsStr = colors.Current(fmt.Sprintf(" %v", entry.VersionStage))
 			}
 			_, _ = fmt.Fprintf(r.Stdout, "%s%s  %s%s\n",
 				colors.Version(secretversion.TruncateVersionID(versionID)),
@@ -318,12 +275,12 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 		}
 
 		versionLabel := fmt.Sprintf("Version %s", secretversion.TruncateVersionID(versionID))
-		if len(v.VersionStages) > 0 {
-			versionLabel += " " + colors.Current(fmt.Sprintf("%v", v.VersionStages))
+		if len(entry.VersionStage) > 0 {
+			versionLabel += " " + colors.Current(fmt.Sprintf("%v", entry.VersionStage))
 		}
 		_, _ = fmt.Fprintln(r.Stdout, colors.Version(versionLabel))
-		if v.CreatedDate != nil {
-			_, _ = fmt.Fprintf(r.Stdout, "%s %s\n", colors.FieldLabel("Date:"), timeutil.FormatRFC3339(*v.CreatedDate))
+		if entry.CreatedDate != nil {
+			_, _ = fmt.Fprintf(r.Stdout, "%s %s\n", colors.FieldLabel("Date:"), timeutil.FormatRFC3339(*entry.CreatedDate))
 		}
 
 		if opts.ShowPatch {
@@ -331,7 +288,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 			var oldIdx, newIdx int
 			if opts.Reverse {
 				// In reverse mode: comparing with next version (newer)
-				if i < len(versions)-1 {
+				if i < len(entries)-1 {
 					oldIdx = i
 					newIdx = i + 1
 				} else {
@@ -339,7 +296,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 				}
 			} else {
 				// In normal mode: comparing with previous version (older)
-				if i < len(versions)-1 {
+				if i < len(entries)-1 {
 					oldIdx = i + 1
 					newIdx = i
 				} else {
@@ -348,8 +305,8 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 			}
 
 			if oldIdx >= 0 {
-				oldVersionID := lo.FromPtr(versions[oldIdx].VersionId)
-				newVersionID := lo.FromPtr(versions[newIdx].VersionId)
+				oldVersionID := entries[oldIdx].VersionID
+				newVersionID := entries[newIdx].VersionID
 				oldValue, oldOk := secretValues[oldVersionID]
 				newValue, newOk := secretValues[newVersionID]
 				if oldOk && newOk {
@@ -367,28 +324,10 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 			}
 		}
 
-		if i < len(versions)-1 {
+		if i < len(entries)-1 {
 			_, _ = fmt.Fprintln(r.Stdout)
 		}
 	}
 
 	return nil
-}
-
-// filterDateRange filters secret versions to only include those within the specified date range.
-func filterDateRange(versions []secretapi.SecretVersionsListEntry, since, until *time.Time) []secretapi.SecretVersionsListEntry {
-	var filtered []secretapi.SecretVersionsListEntry
-	for _, v := range versions {
-		if v.CreatedDate == nil {
-			continue
-		}
-		if since != nil && v.CreatedDate.Before(*since) {
-			continue
-		}
-		if until != nil && v.CreatedDate.After(*until) {
-			continue
-		}
-		filtered = append(filtered, v)
-	}
-	return filtered
 }

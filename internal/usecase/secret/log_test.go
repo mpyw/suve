@@ -378,7 +378,7 @@ func TestLogUseCase_Execute_FilterWithNilCreatedDate(t *testing.T) {
 	t.Parallel()
 
 	now := time.Now()
-	// Test date filtering when entry has nil CreatedDate (should not be filtered)
+	// Test date filtering when entry has nil CreatedDate (should be filtered out when date filter is applied)
 	client := &mockLogClient{
 		listVersionsResult: &secretapi.ListSecretVersionIdsOutput{
 			Versions: []secretapi.SecretVersionsListEntry{
@@ -400,6 +400,7 @@ func TestLogUseCase_Execute_FilterWithNilCreatedDate(t *testing.T) {
 		Since: &since,
 	})
 	require.NoError(t, err)
-	// v1 has nil CreatedDate, so filter is skipped; v2 is after since
-	assert.Len(t, output.Entries, 2)
+	// v1 has nil CreatedDate, so it is skipped when date filter is applied; only v2 remains
+	assert.Len(t, output.Entries, 1)
+	assert.Equal(t, "v2-id", output.Entries[0].VersionID)
 }
