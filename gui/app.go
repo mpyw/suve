@@ -54,7 +54,7 @@ type ParamListEntry struct {
 }
 
 // ParamList lists SSM parameters.
-func (a *App) ParamList(prefix string, recursive bool, withValue bool) (*ParamListResult, error) {
+func (a *App) ParamList(prefix string, recursive bool, withValue bool, filter string) (*ParamListResult, error) {
 	client, err := a.getParamClient()
 	if err != nil {
 		return nil, err
@@ -65,6 +65,7 @@ func (a *App) ParamList(prefix string, recursive bool, withValue bool) (*ParamLi
 		Prefix:    prefix,
 		Recursive: recursive,
 		WithValue: withValue,
+		Filter:    filter,
 	})
 	if err != nil {
 		return nil, err
@@ -277,7 +278,7 @@ type SecretListEntry struct {
 }
 
 // SecretList lists Secrets Manager secrets.
-func (a *App) SecretList(prefix string, withValue bool) (*SecretListResult, error) {
+func (a *App) SecretList(prefix string, withValue bool, filter string) (*SecretListResult, error) {
 	client, err := a.getSecretClient()
 	if err != nil {
 		return nil, err
@@ -287,6 +288,7 @@ func (a *App) SecretList(prefix string, withValue bool) (*SecretListResult, erro
 	result, err := uc.Execute(a.ctx, secret.ListInput{
 		Prefix:    prefix,
 		WithValue: withValue,
+		Filter:    filter,
 	})
 	if err != nil {
 		return nil, err

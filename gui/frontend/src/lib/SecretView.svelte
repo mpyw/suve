@@ -1,14 +1,16 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { SecretList, SecretShow, SecretLog, SecretCreate, SecretUpdate, SecretDelete, SecretDiff, SecretRestore } from '../../wailsjs/go/main/App';
+  import { SecretList, SecretShow, SecretLog, SecretCreate, SecretUpdate, SecretDelete, SecretDiff, SecretRestore, StagingAdd, StagingEdit, StagingDelete } from '../../wailsjs/go/main/App';
   import type { main } from '../../wailsjs/go/models';
   import CloseIcon from './icons/CloseIcon.svelte';
   import EyeIcon from './icons/EyeIcon.svelte';
   import EyeOffIcon from './icons/EyeOffIcon.svelte';
   import Modal from './Modal.svelte';
+  import DiffDisplay from './DiffDisplay.svelte';
   import './common.css';
 
   let prefix = '';
+  let filter = '';
   let withValue = false;
   let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -23,6 +25,13 @@
   }
 
   function handlePrefixInput() {
+    if (debounceTimer) clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(() => {
+      loadSecrets();
+    }, 300);
+  }
+
+  function handleFilterInput() {
     if (debounceTimer) clearTimeout(debounceTimer);
     debounceTimer = setTimeout(() => {
       loadSecrets();
@@ -50,6 +59,7 @@
   let forceDelete = false;
   let modalLoading = false;
   let modalError = '';
+  let immediateMode = false; // When false (default), changes are staged
 
   // Diff state
   let diffMode = false;
@@ -63,7 +73,7 @@
     loading = true;
     error = '';
     try {
-      const result = await SecretList(prefix, withValue);
+      const result = await SecretList(prefix, withValue, filter);
       entries = result?.entries || [];
     } catch (e) {
       error = e instanceof Error ? e.message : String(e);
@@ -135,9 +145,13 @@
     modalLoading = true;
     modalError = '';
     try {
-      await SecretCreate(createForm.name, createForm.value);
+      if (immediateMode) {
+        await SecretCreate(createForm.name, createForm.value);
+        await loadSecrets();
+      } else {
+        await StagingAdd('sm', createForm.name, createForm.value);
+      }
       showCreateModal = false;
-      await loadSecrets();
     } catch (e) {
       modalError = e instanceof Error ? e.message : String(e);
     } finally {
@@ -162,12 +176,16 @@
     modalLoading = true;
     modalError = '';
     try {
-      await SecretUpdate(editForm.name, editForm.value);
+      if (immediateMode) {
+        await SecretUpdate(editForm.name, editForm.value);
+        await Promise.all([
+          loadSecrets(),
+          selectSecret(editForm.name)
+        ]);
+      } else {
+        await StagingEdit('sm', editForm.name, editForm.value);
+      }
       showEditModal = false;
-      await Promise.all([
-        loadSecrets(),
-        selectSecret(editForm.name)
-      ]);
     } catch (e) {
       modalError = e instanceof Error ? e.message : String(e);
     } finally {
@@ -187,12 +205,17 @@
     modalLoading = true;
     modalError = '';
     try {
-      await SecretDelete(deleteTarget, forceDelete);
-      showDeleteModal = false;
-      if (selectedSecret === deleteTarget) {
-        closeDetail();
+      if (immediateMode) {
+        await SecretDelete(deleteTarget, forceDelete);
+        if (selectedSecret === deleteTarget) {
+          closeDetail();
+        }
+        await loadSecrets();
+      } else {
+        // Stage delete with recovery window (default 30 days unless force)
+        await StagingDelete('sm', deleteTarget, forceDelete, forceDelete ? 0 : 30);
       }
-      await loadSecrets();
+      showDeleteModal = false;
     } catch (e) {
       modalError = e instanceof Error ? e.message : String(e);
     } finally {
@@ -269,10 +292,17 @@
   <div class="filter-bar">
     <input
       type="text"
-      class="filter-input"
-      placeholder="Prefix filter"
+      class="filter-input prefix-input"
+      placeholder="Prefix"
       bind:value={prefix}
       on:input={handlePrefixInput}
+    />
+    <input
+      type="text"
+      class="filter-input regex-input"
+      placeholder="Filter (regex)"
+      bind:value={filter}
+      on:input={handleFilterInput}
     />
     <label class="checkbox-label">
       <input type="checkbox" bind:checked={withValue} />
@@ -462,10 +492,14 @@
         rows="5"
       ></textarea>
     </div>
+    <label class="checkbox-label immediate-checkbox">
+      <input type="checkbox" bind:checked={immediateMode} />
+      <span>Apply immediately (skip staging)</span>
+    </label>
     <div class="form-actions">
       <button type="button" class="btn-secondary" on:click={() => showCreateModal = false}>Cancel</button>
       <button type="submit" class="btn-primary" disabled={modalLoading}>
-        {modalLoading ? 'Creating...' : 'Create'}
+        {modalLoading ? (immediateMode ? 'Creating...' : 'Staging...') : (immediateMode ? 'Create' : 'Stage')}
       </button>
     </div>
   </form>
@@ -496,10 +530,14 @@
         rows="8"
       ></textarea>
     </div>
+    <label class="checkbox-label immediate-checkbox">
+      <input type="checkbox" bind:checked={immediateMode} />
+      <span>Apply immediately (skip staging)</span>
+    </label>
     <div class="form-actions">
       <button type="button" class="btn-secondary" on:click={() => showEditModal = false}>Cancel</button>
       <button type="submit" class="btn-primary" disabled={modalLoading}>
-        {modalLoading ? 'Saving...' : 'Save'}
+        {modalLoading ? (immediateMode ? 'Saving...' : 'Staging...') : (immediateMode ? 'Save' : 'Stage')}
       </button>
     </div>
   </form>
@@ -518,16 +556,24 @@
       <span>Force delete (skip recovery window)</span>
     </label>
     <p class="warning">
-      {#if forceDelete}
-        This will permanently delete the secret immediately!
+      {#if immediateMode}
+        {#if forceDelete}
+          This will permanently delete the secret immediately!
+        {:else}
+          The secret will be scheduled for deletion with a recovery window.
+        {/if}
       {:else}
-        The secret will be scheduled for deletion with a recovery window.
+        This will stage a delete operation.
       {/if}
     </p>
+    <label class="checkbox-label immediate-checkbox">
+      <input type="checkbox" bind:checked={immediateMode} />
+      <span>Apply immediately (skip staging)</span>
+    </label>
     <div class="form-actions">
       <button type="button" class="btn-secondary" on:click={() => showDeleteModal = false}>Cancel</button>
       <button type="button" class="btn-danger" on:click={handleDelete} disabled={modalLoading}>
-        {modalLoading ? 'Deleting...' : 'Delete'}
+        {modalLoading ? (immediateMode ? 'Deleting...' : 'Staging...') : (immediateMode ? 'Delete' : 'Stage Delete')}
       </button>
     </div>
   </div>
@@ -536,22 +582,14 @@
 <!-- Diff Modal -->
 <Modal title="Version Comparison" show={showDiffModal} on:close={closeDiffModal}>
   {#if diffResult}
-    <div class="diff-container">
-      <div class="diff-side">
-        <div class="diff-side-header">
-          <span class="diff-version">Old</span>
-          <span class="diff-version-id" title={diffResult.oldVersionId}>{diffResult.oldVersionId.substring(0, 12)}...</span>
-        </div>
-        <pre class="diff-value diff-old">{formatValue(diffResult.oldValue)}</pre>
-      </div>
-      <div class="diff-side">
-        <div class="diff-side-header">
-          <span class="diff-version">New</span>
-          <span class="diff-version-id" title={diffResult.newVersionId}>{diffResult.newVersionId.substring(0, 12)}...</span>
-        </div>
-        <pre class="diff-value diff-new">{formatValue(diffResult.newValue)}</pre>
-      </div>
-    </div>
+    <DiffDisplay
+      oldValue={formatValue(diffResult.oldValue)}
+      newValue={formatValue(diffResult.newValue)}
+      oldLabel="Old"
+      newLabel="New"
+      oldSubLabel={diffResult.oldVersionId}
+      newSubLabel={diffResult.newVersionId}
+    />
     <div class="form-actions">
       <button type="button" class="btn-secondary" on:click={closeDiffModal}>Close</button>
     </div>
@@ -820,59 +858,20 @@
     min-width: 0;
   }
 
-  /* Diff modal styles */
-  .diff-container {
-    display: flex;
-    gap: 16px;
-    margin-bottom: 16px;
+  /* Filter inputs */
+  .prefix-input {
+    flex: 0.4;
   }
 
-  .diff-side {
-    flex: 1;
-    min-width: 0;
+  .regex-input {
+    flex: 0.6;
   }
 
-  .diff-side-header {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-bottom: 8px;
-  }
-
-  .diff-version {
-    font-size: 12px;
-    font-weight: bold;
-    color: #888;
-  }
-
-  .diff-version-id {
-    font-family: monospace;
-    font-size: 10px;
-    color: #666;
-  }
-
-  .diff-value {
-    margin: 0;
-    padding: 12px;
+  .immediate-checkbox {
+    margin-top: 8px;
+    padding: 8px 12px;
+    background: rgba(255, 152, 0, 0.1);
+    border: 1px solid rgba(255, 152, 0, 0.3);
     border-radius: 4px;
-    font-family: monospace;
-    font-size: 12px;
-    white-space: pre-wrap;
-    word-break: break-all;
-    min-height: 100px;
-    max-height: 300px;
-    overflow-y: auto;
-  }
-
-  .diff-old {
-    background: rgba(244, 67, 54, 0.1);
-    border: 1px solid rgba(244, 67, 54, 0.3);
-    color: #ef9a9a;
-  }
-
-  .diff-new {
-    background: rgba(76, 175, 80, 0.1);
-    border: 1px solid rgba(76, 175, 80, 0.3);
-    color: #a5d6a7;
   }
 </style>
