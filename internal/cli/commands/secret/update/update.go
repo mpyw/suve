@@ -7,30 +7,21 @@ import (
 	"io"
 	"os"
 
-	"github.com/samber/lo"
 	"github.com/urfave/cli/v3"
 
-	"github.com/mpyw/suve/internal/api/secretapi"
 	"github.com/mpyw/suve/internal/cli/colors"
 	"github.com/mpyw/suve/internal/cli/confirm"
 	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/infra"
 	"github.com/mpyw/suve/internal/tagging"
+	"github.com/mpyw/suve/internal/usecase/secret"
 )
-
-// Client is the interface for the update command.
-type Client interface {
-	secretapi.PutSecretValueAPI
-	secretapi.UpdateSecretAPI
-	secretapi.TagResourceAPI
-	secretapi.UntagResourceAPI
-}
 
 // Runner executes the update command.
 type Runner struct {
-	Client Client
-	Stdout io.Writer
-	Stderr io.Writer
+	UseCase *secret.UpdateUseCase
+	Stdout  io.Writer
+	Stderr  io.Writer
 }
 
 // Options holds the options for the update command.
@@ -111,11 +102,12 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		return fmt.Errorf("failed to initialize AWS client: %w", err)
 	}
 
+	uc := &secret.UpdateUseCase{Client: client}
 	newValue := cmd.Args().Get(1)
 
 	// Fetch current value and show diff before confirming
 	if !skipConfirm {
-		currentValue := getCurrentValue(ctx, client, name)
+		currentValue, _ := uc.GetCurrentValue(ctx, name)
 		if currentValue != "" {
 			diff := output.Diff(name+" (AWS)", name+" (new)", currentValue, newValue)
 			if diff != "" {
@@ -139,9 +131,9 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	}
 
 	r := &Runner{
-		Client: client,
-		Stdout: cmd.Root().Writer,
-		Stderr: cmd.Root().ErrWriter,
+		UseCase: uc,
+		Stdout:  cmd.Root().Writer,
+		Stderr:  cmd.Root().ErrWriter,
 	}
 	return r.Run(ctx, Options{
 		Name:        name,
@@ -153,53 +145,21 @@ func action(ctx context.Context, cmd *cli.Command) error {
 
 // Run executes the update command.
 func (r *Runner) Run(ctx context.Context, opts Options) error {
-	// Update secret value
-	result, err := r.Client.PutSecretValue(ctx, &secretapi.PutSecretValueInput{
-		SecretId:     lo.ToPtr(opts.Name),
-		SecretString: lo.ToPtr(opts.Value),
+	result, err := r.UseCase.Execute(ctx, secret.UpdateInput{
+		Name:        opts.Name,
+		Value:       opts.Value,
+		Description: opts.Description,
+		TagChange:   opts.TagChange,
 	})
 	if err != nil {
-		return fmt.Errorf("failed to update secret: %w", err)
-	}
-
-	// Update description if provided
-	if opts.Description != "" {
-		_, err := r.Client.UpdateSecret(ctx, &secretapi.UpdateSecretInput{
-			SecretId:    lo.ToPtr(opts.Name),
-			Description: lo.ToPtr(opts.Description),
-		})
-		if err != nil {
-			return fmt.Errorf("failed to update description: %w", err)
-		}
-	}
-
-	// Apply tag changes (additive)
-	if opts.TagChange != nil && !opts.TagChange.IsEmpty() {
-		if err := tagging.ApplySecret(ctx, r.Client, opts.Name, opts.TagChange); err != nil {
-			return err
-		}
+		return err
 	}
 
 	_, _ = fmt.Fprintf(r.Stdout, "%s Updated secret %s (version: %s)\n",
 		colors.Success("✓"),
-		lo.FromPtr(result.Name),
-		lo.FromPtr(result.VersionId),
+		result.Name,
+		result.VersionID,
 	)
 
 	return nil
-}
-
-// getCurrentValue fetches the current secret value.
-// Returns empty string if not found or error.
-func getCurrentValue(ctx context.Context, client secretapi.GetSecretValueAPI, name string) string {
-	result, err := client.GetSecretValue(ctx, &secretapi.GetSecretValueInput{
-		SecretId: lo.ToPtr(name),
-	})
-	if err != nil {
-		return ""
-	}
-	if result.SecretString == nil {
-		return ""
-	}
-	return *result.SecretString
 }
