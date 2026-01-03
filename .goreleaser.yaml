@@ -56,6 +56,21 @@ builds:
     ldflags:
       - -s -w
 
+  - id: suve-gui-windows
+    main: ./cmd/suve-gui
+    binary: suve-gui
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    tags:
+      - production
+    ldflags:
+      - -s -w
+
   # suve: integrated CLI + GUI
   - id: suve-darwin
     main: ./cmd/suve
@@ -132,6 +147,7 @@ archives:
   - id: windows
     builds:
       - suve-cli
+      - suve-gui-windows
       - suve-windows
     formats:
       - zip
