@@ -33,3 +33,8 @@ Thumbs.db
 .mcp.json
 .kiri/
 coverage.html
+
+# Playwright
+gui/frontend/test-results/
+gui/frontend/playwright-report/
+gui/frontend/playwright/.cache/
