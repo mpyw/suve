@@ -1,0 +1,85 @@
+// Package untag provides the SSM Parameter Store untag command.
+package untag
+
+import (
+	"context"
+	"fmt"
+	"io"
+
+	"github.com/urfave/cli/v3"
+
+	"github.com/mpyw/suve/internal/cli/colors"
+	"github.com/mpyw/suve/internal/infra"
+	"github.com/mpyw/suve/internal/usecase/param"
+)
+
+// Runner executes the untag command.
+type Runner struct {
+	UseCase *param.TagUseCase
+	Stdout  io.Writer
+}
+
+// Options holds the options for the untag command.
+type Options struct {
+	Name string
+	Keys []string
+}
+
+// Command returns the untag command.
+func Command() *cli.Command {
+	return &cli.Command{
+		Name:      "untag",
+		Usage:     "Remove tags from a parameter",
+		ArgsUsage: "<name> <key>...",
+		Description: `Remove one or more tags from an existing parameter.
+
+Specify the tag keys to remove. Non-existent keys are silently ignored.
+
+EXAMPLES:
+   suve param untag /app/config deprecated              Remove single tag
+   suve param untag /app/config env team                Remove multiple tags`,
+		Action: action,
+	}
+}
+
+func action(ctx context.Context, cmd *cli.Command) error {
+	if cmd.Args().Len() < 2 {
+		return fmt.Errorf("usage: suve param untag <name> <key> [key]")
+	}
+
+	name := cmd.Args().Get(0)
+	keys := cmd.Args().Slice()[1:]
+
+	client, err := infra.NewParamClient(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to initialize AWS client: %w", err)
+	}
+
+	r := &Runner{
+		UseCase: &param.TagUseCase{Client: client},
+		Stdout:  cmd.Root().Writer,
+	}
+	return r.Run(ctx, Options{
+		Name: name,
+		Keys: keys,
+	})
+}
+
+// Run executes the untag command.
+func (r *Runner) Run(ctx context.Context, opts Options) error {
+	err := r.UseCase.Execute(ctx, param.TagInput{
+		Name:   opts.Name,
+		Remove: opts.Keys,
+	})
+	if err != nil {
+		return err
+	}
+
+	_, _ = fmt.Fprintf(r.Stdout, "%s Untagged parameter %s (%d key(s))\n",
+		colors.Success("✓"),
+		opts.Name,
+		len(opts.Keys),
+	)
+
+	return nil
+}
