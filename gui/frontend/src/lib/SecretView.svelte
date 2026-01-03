@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
-  import { SecretList, SecretShow, SecretLog, SecretCreate, SecretUpdate, SecretDelete, SecretDiff, SecretRestore, StagingAdd, StagingEdit, StagingDelete } from '../../wailsjs/go/main/App';
+  import { SecretList, SecretShow, SecretLog, SecretCreate, SecretUpdate, SecretDelete, SecretDiff, SecretRestore, SecretAddTag, SecretRemoveTag, StagingAdd, StagingEdit, StagingDelete, StagingAddTag, StagingRemoveTag } from '../../wailsjs/go/main/App';
   import type { main } from '../../wailsjs/go/models';
   import CloseIcon from './icons/CloseIcon.svelte';
   import EyeIcon from './icons/EyeIcon.svelte';
@@ -73,6 +73,18 @@
   // Restore state
   let restoreTarget = '';
 
+  // Tag state
+  let showTagModal = false;
+  let tagForm = { key: '', value: '' };
+  let tagLoading = false;
+  let tagError = '';
+
+  // Tag remove state
+  let showRemoveTagModal = false;
+  let removeTagTarget = '';
+  let removeTagLoading = false;
+  let removeTagError = '';
+
   // Infinite scroll
   let sentinelElement: HTMLDivElement;
   let observer: IntersectionObserver | null = null;
@@ -136,7 +148,7 @@
   async function selectSecret(name: string) {
     selectedSecret = name;
     detailLoading = true;
-    showValue = false;
+    showValue = withValue;
     try {
       const [detail, log] = await Promise.all([
         SecretShow(name),
@@ -333,6 +345,60 @@
     }
   }
 
+  // Tag functions
+  function openTagModal() {
+    tagForm = { key: '', value: '' };
+    tagError = '';
+    showTagModal = true;
+  }
+
+  async function handleAddTag() {
+    if (!selectedSecret || !tagForm.key) {
+      tagError = 'Key is required';
+      return;
+    }
+    tagLoading = true;
+    tagError = '';
+    try {
+      if (immediateMode) {
+        await SecretAddTag(selectedSecret, tagForm.key, tagForm.value);
+      } else {
+        await StagingAddTag('sm', selectedSecret, tagForm.key, tagForm.value);
+      }
+      showTagModal = false;
+      await selectSecret(selectedSecret);
+    } catch (e) {
+      tagError = e instanceof Error ? e.message : String(e);
+    } finally {
+      tagLoading = false;
+    }
+  }
+
+  function openRemoveTagModal(key: string) {
+    removeTagTarget = key;
+    removeTagError = '';
+    showRemoveTagModal = true;
+  }
+
+  async function handleRemoveTag() {
+    if (!selectedSecret || !removeTagTarget) return;
+    removeTagLoading = true;
+    removeTagError = '';
+    try {
+      if (immediateMode) {
+        await SecretRemoveTag(selectedSecret, removeTagTarget);
+      } else {
+        await StagingRemoveTag('sm', selectedSecret, removeTagTarget);
+      }
+      showRemoveTagModal = false;
+      await selectSecret(selectedSecret);
+    } catch (e) {
+      removeTagError = e instanceof Error ? e.message : String(e);
+    } finally {
+      removeTagLoading = false;
+    }
+  }
+
   onMount(() => {
     loadSecrets();
   });
@@ -477,20 +543,26 @@
               <code class="arn-display">{secretDetail.arn}</code>
             </div>
 
-            {#if secretDetail.tags && secretDetail.tags.length > 0}
-              <div class="detail-section">
+            <div class="detail-section">
+              <div class="section-header-tags">
                 <h4>Tags</h4>
+                <button class="btn-action-sm" on:click={openTagModal}>+ Add</button>
+              </div>
+              {#if secretDetail.tags && secretDetail.tags.length > 0}
                 <div class="tags-list">
                   {#each secretDetail.tags as tag}
                     <div class="tag-item">
                       <span class="tag-key">{tag.key}</span>
                       <span class="tag-separator">=</span>
                       <span class="tag-value">{tag.value}</span>
+                      <button class="btn-tag-remove" on:click={() => openRemoveTagModal(tag.key)} title="Remove tag">×</button>
                     </div>
                   {/each}
                 </div>
-              </div>
-            {/if}
+              {:else}
+                <p class="no-tags">No tags</p>
+              {/if}
+            </div>
 
             {#if secretLog.length > 0}
               <div class="detail-section">
@@ -509,7 +581,7 @@
                   {#each secretLog as logEntry}
                     <li
                       class="history-item"
-                      class:current-secret={logEntry.stages?.includes('AWSCURRENT')}
+                      class:current-secret={logEntry.isCurrent}
                       class:selectable={diffMode}
                       class:selected={diffSelectedVersions.includes(logEntry.versionId)}
                     >
@@ -526,6 +598,9 @@
                       <div class="history-content">
                         <div class="history-header">
                           <span class="history-version mono" title={logEntry.versionId}>{logEntry.versionId}</span>
+                          {#if logEntry.isCurrent}
+                            <span class="badge badge-current">current</span>
+                          {/if}
                           <span class="history-date">{formatDate(logEntry.created)}</span>
                         </div>
                         <div class="history-labels">
@@ -533,6 +608,7 @@
                             <span class="badge badge-stage small">{stage}</span>
                           {/each}
                         </div>
+                        <pre class="history-value" class:masked={!showValue}>{showValue ? formatValue(logEntry.value) : maskValue(logEntry.value)}</pre>
                       </div>
                     </li>
                   {/each}
@@ -697,6 +773,67 @@
       <button type="button" class="btn-secondary" on:click={() => showRestoreModal = false}>Cancel</button>
       <button type="button" class="btn-primary btn-restore-confirm" on:click={handleRestore} disabled={modalLoading || !restoreTarget}>
         {modalLoading ? 'Restoring...' : 'Restore'}
+      </button>
+    </div>
+  </div>
+</Modal>
+
+<!-- Tag Modal -->
+<Modal title="Add Tag" show={showTagModal} on:close={() => showTagModal = false}>
+  <form class="modal-form" on:submit|preventDefault={handleAddTag}>
+    {#if tagError}
+      <div class="modal-error">{tagError}</div>
+    {/if}
+    <div class="form-group">
+      <label for="tag-key">Key</label>
+      <input
+        id="tag-key"
+        type="text"
+        class="form-input"
+        bind:value={tagForm.key}
+        placeholder="tag-key"
+      />
+    </div>
+    <div class="form-group">
+      <label for="tag-value">Value</label>
+      <input
+        id="tag-value"
+        type="text"
+        class="form-input"
+        bind:value={tagForm.value}
+        placeholder="tag-value"
+      />
+    </div>
+    <label class="checkbox-label immediate-checkbox">
+      <input type="checkbox" bind:checked={immediateMode} />
+      <span>Apply immediately (skip staging)</span>
+    </label>
+    <div class="form-actions">
+      <button type="button" class="btn-secondary" on:click={() => showTagModal = false}>Cancel</button>
+      <button type="submit" class="btn-primary" disabled={tagLoading}>
+        {tagLoading ? (immediateMode ? 'Adding...' : 'Staging...') : (immediateMode ? 'Add Tag' : 'Stage Tag')}
+      </button>
+    </div>
+  </form>
+</Modal>
+
+<!-- Remove Tag Modal -->
+<Modal title="Remove Tag" show={showRemoveTagModal} on:close={() => showRemoveTagModal = false}>
+  <div class="modal-confirm">
+    {#if removeTagError}
+      <div class="modal-error">{removeTagError}</div>
+    {/if}
+    <p>Are you sure you want to remove this tag?</p>
+    <code class="delete-target">{removeTagTarget}</code>
+    <p class="warning">{immediateMode ? 'This action will take effect immediately.' : 'This will stage a tag removal operation.'}</p>
+    <label class="checkbox-label immediate-checkbox">
+      <input type="checkbox" bind:checked={immediateMode} />
+      <span>Apply immediately (skip staging)</span>
+    </label>
+    <div class="form-actions">
+      <button type="button" class="btn-secondary" on:click={() => showRemoveTagModal = false}>Cancel</button>
+      <button type="button" class="btn-danger" on:click={handleRemoveTag} disabled={removeTagLoading}>
+        {removeTagLoading ? (immediateMode ? 'Removing...' : 'Staging...') : (immediateMode ? 'Remove' : 'Stage Remove')}
       </button>
     </div>
   </div>
@@ -1013,5 +1150,45 @@
     font-size: 14px;
     line-height: 1.5;
     white-space: pre-wrap;
+  }
+
+  /* Tag button styles */
+  .section-header-tags {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+  }
+
+  .section-header-tags h4 {
+    margin: 0;
+    font-size: 12px;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .btn-tag-remove {
+    margin-left: auto;
+    padding: 2px 8px;
+    background: transparent;
+    border: 1px solid #444;
+    border-radius: 4px;
+    color: #888;
+    cursor: pointer;
+    font-size: 14px;
+    line-height: 1;
+  }
+
+  .btn-tag-remove:hover {
+    background: #f44336;
+    border-color: #f44336;
+    color: #fff;
+  }
+
+  .no-tags {
+    color: #666;
+    font-size: 13px;
+    margin: 0;
   }
 </style>

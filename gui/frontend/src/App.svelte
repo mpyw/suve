@@ -1,18 +1,38 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import Sidebar from './lib/Sidebar.svelte';
   import ParamView from './lib/ParamView.svelte';
   import SecretView from './lib/SecretView.svelte';
   import StagingView from './lib/StagingView.svelte';
+  import { StagingStatus } from '../wailsjs/go/main/App';
 
   let activeView: 'param' | 'secret' | 'staging' = 'param';
+  let stagingCount = 0;
 
   function handleNavigate(event: CustomEvent<'param' | 'secret' | 'staging'>) {
     activeView = event.detail;
   }
+
+  function handleStagingCountChange(event: CustomEvent<number>) {
+    stagingCount = event.detail;
+  }
+
+  async function loadStagingCount() {
+    try {
+      const status = await StagingStatus();
+      stagingCount = (status?.ssm?.length || 0) + (status?.sm?.length || 0);
+    } catch (e) {
+      stagingCount = 0;
+    }
+  }
+
+  onMount(() => {
+    loadStagingCount();
+  });
 </script>
 
 <div class="app">
-  <Sidebar {activeView} on:navigate={handleNavigate} />
+  <Sidebar {activeView} {stagingCount} on:navigate={handleNavigate} />
 
   <main class="main-content">
     {#if activeView === 'param'}
@@ -20,7 +40,7 @@
     {:else if activeView === 'secret'}
       <SecretView />
     {:else if activeView === 'staging'}
-      <StagingView />
+      <StagingView on:countChange={handleStagingCountChange} />
     {/if}
   </main>
 </div>

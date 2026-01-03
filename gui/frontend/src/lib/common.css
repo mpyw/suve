@@ -340,6 +340,11 @@
   word-break: break-all;
 }
 
+.history-value.masked {
+  color: #555;
+  user-select: none;
+}
+
 /* Badges */
 .badge {
   font-size: 10px;

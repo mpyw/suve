@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
-  import { ParamList, ParamShow, ParamLog, ParamSet, ParamDelete, ParamDiff, StagingAdd, StagingEdit, StagingDelete } from '../../wailsjs/go/main/App';
+  import { ParamList, ParamShow, ParamLog, ParamSet, ParamDelete, ParamDiff, ParamAddTag, ParamRemoveTag, StagingAdd, StagingEdit, StagingDelete, StagingAddTag, StagingRemoveTag } from '../../wailsjs/go/main/App';
   import type { main } from '../../wailsjs/go/models';
   import CloseIcon from './icons/CloseIcon.svelte';
   import EyeIcon from './icons/EyeIcon.svelte';
@@ -67,6 +67,18 @@
   let diffSelectedVersions: number[] = [];
   let diffResult: main.ParamDiffResult | null = null;
 
+  // Tag state
+  let showTagModal = false;
+  let tagForm = { key: '', value: '' };
+  let tagLoading = false;
+  let tagError = '';
+
+  // Tag remove state
+  let showRemoveTagModal = false;
+  let removeTagTarget = '';
+  let removeTagLoading = false;
+  let removeTagError = '';
+
   // Infinite scroll
   let sentinelElement: HTMLDivElement;
   let observer: IntersectionObserver | null = null;
@@ -130,7 +142,7 @@
   async function selectParam(name: string) {
     selectedParam = name;
     detailLoading = true;
-    showValue = false;
+    showValue = withValue;
     try {
       const [detail, log] = await Promise.all([
         ParamShow(name),
@@ -276,6 +288,60 @@
     diffSelectedVersions = [];
   }
 
+  // Tag functions
+  function openTagModal() {
+    tagForm = { key: '', value: '' };
+    tagError = '';
+    showTagModal = true;
+  }
+
+  async function handleAddTag() {
+    if (!selectedParam || !tagForm.key) {
+      tagError = 'Key is required';
+      return;
+    }
+    tagLoading = true;
+    tagError = '';
+    try {
+      if (immediateMode) {
+        await ParamAddTag(selectedParam, tagForm.key, tagForm.value);
+      } else {
+        await StagingAddTag('ssm', selectedParam, tagForm.key, tagForm.value);
+      }
+      showTagModal = false;
+      await selectParam(selectedParam);
+    } catch (e) {
+      tagError = e instanceof Error ? e.message : String(e);
+    } finally {
+      tagLoading = false;
+    }
+  }
+
+  function openRemoveTagModal(key: string) {
+    removeTagTarget = key;
+    removeTagError = '';
+    showRemoveTagModal = true;
+  }
+
+  async function handleRemoveTag() {
+    if (!selectedParam || !removeTagTarget) return;
+    removeTagLoading = true;
+    removeTagError = '';
+    try {
+      if (immediateMode) {
+        await ParamRemoveTag(selectedParam, removeTagTarget);
+      } else {
+        await StagingRemoveTag('ssm', selectedParam, removeTagTarget);
+      }
+      showRemoveTagModal = false;
+      await selectParam(selectedParam);
+    } catch (e) {
+      removeTagError = e instanceof Error ? e.message : String(e);
+    } finally {
+      removeTagLoading = false;
+    }
+  }
+
   onMount(() => {
     loadParams();
   });
@@ -329,13 +395,8 @@
             <li class="item-entry" class:selected={selectedParam === entry.name}>
               <button class="item-button" on:click={() => selectParam(entry.name)}>
                 <span class="item-name param">{entry.name}</span>
-                {#if entry.type === 'SecureString'}
-                  <span class="item-badge secure">SecureString</span>
-                {/if}
                 {#if entry.value !== undefined}
-                  <span class="item-value" class:masked={entry.type === 'SecureString'}>
-                    {entry.type === 'SecureString' ? '*****' : entry.value}
-                  </span>
+                  <span class="item-value">{entry.value}</span>
                 {/if}
               </button>
             </li>
@@ -394,9 +455,7 @@
                   </button>
                 {/if}
               </div>
-              <pre class="value-display" class:masked={paramDetail.type === 'SecureString' && !showValue}>
-                {paramDetail.type === 'SecureString' && !showValue ? maskValue(paramDetail.value) : paramDetail.value}
-              </pre>
+              <pre class="value-display" class:masked={paramDetail.type === 'SecureString' && !showValue}>{paramDetail.type === 'SecureString' && !showValue ? maskValue(paramDetail.value) : paramDetail.value}</pre>
             </div>
 
             <div class="detail-meta">
@@ -421,20 +480,26 @@
               </div>
             {/if}
 
-            {#if paramDetail.tags && paramDetail.tags.length > 0}
-              <div class="detail-section">
+            <div class="detail-section">
+              <div class="section-header">
                 <h4>Tags</h4>
+                <button class="btn-action-sm" on:click={openTagModal}>+ Add</button>
+              </div>
+              {#if paramDetail.tags && paramDetail.tags.length > 0}
                 <div class="tags-list">
                   {#each paramDetail.tags as tag}
                     <div class="tag-item">
                       <span class="tag-key">{tag.key}</span>
                       <span class="tag-separator">=</span>
                       <span class="tag-value">{tag.value}</span>
+                      <button class="btn-tag-remove" on:click={() => openRemoveTagModal(tag.key)} title="Remove tag">×</button>
                     </div>
                   {/each}
                 </div>
-              </div>
-            {/if}
+              {:else}
+                <p class="no-tags">No tags</p>
+              {/if}
+            </div>
 
             {#if paramLog.length > 0}
               <div class="detail-section">
@@ -475,7 +540,7 @@
                           {/if}
                           <span class="history-date">{formatDate(logEntry.lastModified)}</span>
                         </div>
-                        <pre class="history-value">{logEntry.value}</pre>
+                        <pre class="history-value" class:masked={logEntry.type === 'SecureString' && !showValue}>{logEntry.type === 'SecureString' && !showValue ? maskValue(logEntry.value) : logEntry.value}</pre>
                       </div>
                     </li>
                   {/each}
@@ -559,6 +624,28 @@
   </div>
 </Modal>
 
+<!-- Remove Tag Modal -->
+<Modal title="Remove Tag" show={showRemoveTagModal} on:close={() => showRemoveTagModal = false}>
+  <div class="modal-confirm">
+    {#if removeTagError}
+      <div class="modal-error">{removeTagError}</div>
+    {/if}
+    <p>Are you sure you want to remove this tag?</p>
+    <code class="delete-target">{removeTagTarget}</code>
+    <p class="warning">{immediateMode ? 'This action will take effect immediately.' : 'This will stage a tag removal operation.'}</p>
+    <label class="checkbox-label immediate-checkbox">
+      <input type="checkbox" bind:checked={immediateMode} />
+      <span>Apply immediately (skip staging)</span>
+    </label>
+    <div class="form-actions">
+      <button type="button" class="btn-secondary" on:click={() => showRemoveTagModal = false}>Cancel</button>
+      <button type="button" class="btn-danger" on:click={handleRemoveTag} disabled={removeTagLoading}>
+        {removeTagLoading ? (immediateMode ? 'Removing...' : 'Staging...') : (immediateMode ? 'Remove' : 'Stage Remove')}
+      </button>
+    </div>
+  </div>
+</Modal>
+
 <!-- Diff Modal -->
 <Modal title="Version Comparison" show={showDiffModal} on:close={closeDiffModal}>
   {#if diffResult}
@@ -574,6 +661,45 @@
       <button type="button" class="btn-secondary" on:click={closeDiffModal}>Close</button>
     </div>
   {/if}
+</Modal>
+
+<!-- Tag Modal -->
+<Modal title="Add Tag" show={showTagModal} on:close={() => showTagModal = false}>
+  <form class="modal-form" on:submit|preventDefault={handleAddTag}>
+    {#if tagError}
+      <div class="modal-error">{tagError}</div>
+    {/if}
+    <div class="form-group">
+      <label for="tag-key">Key</label>
+      <input
+        id="tag-key"
+        type="text"
+        class="form-input"
+        bind:value={tagForm.key}
+        placeholder="tag-key"
+      />
+    </div>
+    <div class="form-group">
+      <label for="tag-value">Value</label>
+      <input
+        id="tag-value"
+        type="text"
+        class="form-input"
+        bind:value={tagForm.value}
+        placeholder="tag-value"
+      />
+    </div>
+    <label class="checkbox-label immediate-checkbox">
+      <input type="checkbox" bind:checked={immediateMode} />
+      <span>Apply immediately (skip staging)</span>
+    </label>
+    <div class="form-actions">
+      <button type="button" class="btn-secondary" on:click={() => showTagModal = false}>Cancel</button>
+      <button type="submit" class="btn-primary" disabled={tagLoading}>
+        {tagLoading ? (immediateMode ? 'Adding...' : 'Staging...') : (immediateMode ? 'Add Tag' : 'Stage Tag')}
+      </button>
+    </div>
+  </form>
 </Modal>
 
 <style>
@@ -798,22 +924,6 @@
     font-size: 12px;
   }
 
-  /* Masking styles */
-  .item-badge.secure {
-    background: #ff9800;
-    color: #000;
-    padding: 2px 6px;
-    border-radius: 3px;
-    font-size: 10px;
-    font-weight: 600;
-    margin-left: 8px;
-  }
-
-  .item-value.masked {
-    color: #888;
-    font-style: italic;
-  }
-
   .section-header-value {
     display: flex;
     align-items: center;
@@ -896,5 +1006,30 @@
     font-size: 14px;
     line-height: 1.5;
     white-space: pre-wrap;
+  }
+
+  /* Tag styles */
+  .btn-tag-remove {
+    margin-left: auto;
+    padding: 2px 8px;
+    background: transparent;
+    border: 1px solid #444;
+    border-radius: 4px;
+    color: #888;
+    cursor: pointer;
+    font-size: 14px;
+    line-height: 1;
+  }
+
+  .btn-tag-remove:hover {
+    background: #f44336;
+    border-color: #f44336;
+    color: #fff;
+  }
+
+  .no-tags {
+    color: #666;
+    font-size: 13px;
+    margin: 0;
   }
 </style>

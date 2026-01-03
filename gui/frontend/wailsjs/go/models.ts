@@ -306,6 +306,8 @@ export namespace main {
 	export class SecretLogEntry {
 	    versionId: string;
 	    stages: string[];
+	    value: string;
+	    isCurrent: boolean;
 	    created?: string;
 	
 	    static createFrom(source: any = {}) {
@@ -316,6 +318,8 @@ export namespace main {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.versionId = source["versionId"];
 	        this.stages = source["stages"];
+	        this.value = source["value"];
+	        this.isCurrent = source["isCurrent"];
 	        this.created = source["created"];
 	    }
 	}
@@ -452,10 +456,24 @@ export namespace main {
 	        this.name = source["name"];
 	    }
 	}
+	export class StagingAddTagResult {
+	    name: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new StagingAddTagResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	    }
+	}
 	export class StagingApplyResultEntry {
 	    name: string;
 	    status: string;
 	    error?: string;
+	    tags?: Record<string, string>;
+	    untagKeys?: string[];
 	
 	    static createFrom(source: any = {}) {
 	        return new StagingApplyResultEntry(source);
@@ -466,6 +484,8 @@ export namespace main {
 	        this.name = source["name"];
 	        this.status = source["status"];
 	        this.error = source["error"];
+	        this.tags = source["tags"];
+	        this.untagKeys = source["untagKeys"];
 	    }
 	}
 	export class StagingApplyResult {
@@ -528,6 +548,7 @@ export namespace main {
 	    stagedValue?: string;
 	    description?: string;
 	    tags?: Record<string, string>;
+	    untagKeys?: string[];
 	    warning?: string;
 	
 	    static createFrom(source: any = {}) {
@@ -544,6 +565,7 @@ export namespace main {
 	        this.stagedValue = source["stagedValue"];
 	        this.description = source["description"];
 	        this.tags = source["tags"];
+	        this.untagKeys = source["untagKeys"];
 	        this.warning = source["warning"];
 	    }
 	}
@@ -595,6 +617,8 @@ export namespace main {
 	    name: string;
 	    operation: string;
 	    value?: string;
+	    tags?: Record<string, string>;
+	    untagKeys?: string[];
 	    stagedAt: string;
 	
 	    static createFrom(source: any = {}) {
@@ -606,7 +630,21 @@ export namespace main {
 	        this.name = source["name"];
 	        this.operation = source["operation"];
 	        this.value = source["value"];
+	        this.tags = source["tags"];
+	        this.untagKeys = source["untagKeys"];
 	        this.stagedAt = source["stagedAt"];
+	    }
+	}
+	export class StagingRemoveTagResult {
+	    name: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new StagingRemoveTagResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
 	    }
 	}
 	export class StagingResetResult {

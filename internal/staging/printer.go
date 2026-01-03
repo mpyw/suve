@@ -3,10 +3,12 @@ package staging
 import (
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/samber/lo"
 
 	"github.com/mpyw/suve/internal/cli/colors"
+	"github.com/mpyw/suve/internal/maputil"
 )
 
 // EntryPrinter prints staged entries to the given writer.
@@ -54,5 +56,19 @@ func (p *EntryPrinter) PrintEntry(name string, entry Entry, verbose, showDeleteO
 				_, _ = fmt.Fprintf(p.Writer, "  %s %d days recovery window\n", colors.FieldLabel("Delete:"), entry.DeleteOptions.RecoveryWindow)
 			}
 		}
+	}
+
+	// Show tags
+	if len(entry.Tags) > 0 {
+		var tagPairs []string
+		for _, k := range maputil.SortedKeys(entry.Tags) {
+			tagPairs = append(tagPairs, fmt.Sprintf("%s=%s", k, entry.Tags[k]))
+		}
+		_, _ = fmt.Fprintf(p.Writer, "  %s %s\n", colors.FieldLabel("Tags:"), strings.Join(tagPairs, ", "))
+	}
+
+	// Show untag keys
+	if len(entry.UntagKeys) > 0 {
+		_, _ = fmt.Fprintf(p.Writer, "  %s %s\n", colors.FieldLabel("Untag:"), strings.Join(entry.UntagKeys, ", "))
 	}
 }
