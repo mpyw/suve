@@ -622,7 +622,6 @@ suve stage param add [options] <name> [value]
 | Option | Alias | Default | Description |
 |--------|-------|---------|-------------|
 | `--description` | - | - | Parameter description |
-| `--tag` | - | - | Tag in key=value format (can be specified multiple times) |
 
 **Examples:**
 
@@ -638,8 +637,8 @@ suve stage param add /app/config/new-param "my-value"
 # Stage via editor
 suve stage param add /app/config/new-param
 
-# Stage with description and tags
-suve stage param add --description "API key" --tag env=prod /app/config/api-key "sk-1234567890"
+# Stage with description
+suve stage param add --description "API key" /app/config/api-key "sk-1234567890"
 ```
 
 ---
@@ -664,7 +663,6 @@ suve stage param edit [options] <name> [value]
 | Option | Alias | Default | Description |
 |--------|-------|---------|-------------|
 | `--description` | - | - | Parameter description |
-| `--tag` | - | - | Tag in key=value format (can be specified multiple times) |
 
 **Behavior:**
 
@@ -686,9 +684,6 @@ suve stage param edit /app/config/database-url
 
 # Edit with inline value
 suve stage param edit /app/config/database-url "new-value"
-
-# Edit with tags
-suve stage param edit --tag env=prod /app/config/database-url "new-value"
 ```
 
 ---
@@ -903,3 +898,73 @@ suve stage param reset --all
 
 > [!TIP]
 > Use `suve stage reset` to unstage all changes (SSM Parameter Store + Secrets Manager combined).
+
+---
+
+## suve stage param tag
+
+Stage tag additions for a parameter.
+
+```
+suve stage param tag <name> <key=value>...
+```
+
+**Arguments:**
+
+| Argument | Description |
+|----------|-------------|
+| `name` | Parameter name |
+| `key=value` | Tag in key=value format (one or more) |
+
+**Examples:**
+
+```ShellSession
+user@host:~$ suve stage param tag /app/config/database-url env=prod team=platform
+✓ Staged tags for: /app/config/database-url
+```
+
+```bash
+# Stage single tag
+suve stage param tag /app/config/key env=prod
+
+# Stage multiple tags
+suve stage param tag /app/config/key env=prod team=platform
+```
+
+> [!NOTE]
+> If the parameter is not already staged, a tag-only change is created.
+
+---
+
+## suve stage param untag
+
+Stage tag removals for a parameter.
+
+```
+suve stage param untag <name> <key>...
+```
+
+**Arguments:**
+
+| Argument | Description |
+|----------|-------------|
+| `name` | Parameter name |
+| `key` | Tag key to remove (one or more) |
+
+**Examples:**
+
+```ShellSession
+user@host:~$ suve stage param untag /app/config/database-url deprecated old-tag
+✓ Staged tag removal for: /app/config/database-url
+```
+
+```bash
+# Stage single tag removal
+suve stage param untag /app/config/key deprecated
+
+# Stage multiple tag removals
+suve stage param untag /app/config/key deprecated old-tag
+```
+
+> [!NOTE]
+> If the parameter is not already staged, a tag-only change is created.

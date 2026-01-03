@@ -300,30 +300,6 @@ func TestEditUseCase_Baseline_GetError(t *testing.T) {
 	assert.Error(t, err)
 }
 
-func TestEditUseCase_Execute_WithTags(t *testing.T) {
-	t.Parallel()
-
-	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
-	uc := &usecasestaging.EditUseCase{
-		Strategy: newMockEditStrategy(),
-		Store:    store,
-	}
-
-	output, err := uc.Execute(context.Background(), usecasestaging.EditInput{
-		Name:  "/app/config",
-		Value: "updated-value",
-		Tags:  map[string]string{"env": "prod", "team": "backend"},
-	})
-	require.NoError(t, err)
-	assert.Equal(t, "/app/config", output.Name)
-
-	// Verify tags are staged
-	entry, err := store.Get(staging.ServiceParam, "/app/config")
-	require.NoError(t, err)
-	assert.Equal(t, "prod", entry.Tags["env"])
-	assert.Equal(t, "backend", entry.Tags["team"])
-}
-
 func TestEditUseCase_Execute_ConvertsDeleteToUpdate(t *testing.T) {
 	t.Parallel()
 

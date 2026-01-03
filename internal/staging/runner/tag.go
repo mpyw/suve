@@ -1,0 +1,88 @@
+// Package runner provides shared runners and command builders for stage commands.
+package runner
+
+import (
+	"context"
+	"fmt"
+	"io"
+	"strings"
+
+	"github.com/mpyw/suve/internal/cli/colors"
+	"github.com/mpyw/suve/internal/maputil"
+	stagingusecase "github.com/mpyw/suve/internal/usecase/staging"
+)
+
+// TagRunner executes tag staging operations using a usecase.
+type TagRunner struct {
+	UseCase *stagingusecase.TagUseCase
+	Stdout  io.Writer
+	Stderr  io.Writer
+}
+
+// TagOptions holds options for the tag command.
+type TagOptions struct {
+	Name string
+	Tags []string // key=value pairs to add
+}
+
+// Run executes the tag command.
+func (r *TagRunner) Run(ctx context.Context, opts TagOptions) error {
+	tags, err := parseTags(opts.Tags)
+	if err != nil {
+		return err
+	}
+
+	result, err := r.UseCase.Execute(ctx, stagingusecase.TagInput{
+		Name:    opts.Name,
+		AddTags: tags,
+	})
+	if err != nil {
+		return err
+	}
+
+	_, _ = fmt.Fprintf(r.Stdout, "%s Staged tags for: %s\n", colors.Success("✓"), result.Name)
+	return nil
+}
+
+// UntagRunner executes untag staging operations using a usecase.
+type UntagRunner struct {
+	UseCase *stagingusecase.TagUseCase
+	Stdout  io.Writer
+	Stderr  io.Writer
+}
+
+// UntagOptions holds options for the untag command.
+type UntagOptions struct {
+	Name string
+	Keys []string // tag keys to remove
+}
+
+// Run executes the untag command.
+func (r *UntagRunner) Run(ctx context.Context, opts UntagOptions) error {
+	result, err := r.UseCase.Execute(ctx, stagingusecase.TagInput{
+		Name:       opts.Name,
+		RemoveTags: maputil.NewSet(opts.Keys...),
+	})
+	if err != nil {
+		return err
+	}
+
+	_, _ = fmt.Fprintf(r.Stdout, "%s Staged tag removal for: %s\n", colors.Success("✓"), result.Name)
+	return nil
+}
+
+// parseTags parses key=value pairs into a map.
+func parseTags(tagSlice []string) (map[string]string, error) {
+	if len(tagSlice) == 0 {
+		return nil, nil
+	}
+	tags := make(map[string]string)
+	for _, t := range tagSlice {
+		parts := strings.SplitN(t, "=", 2)
+		if len(parts) != 2 {
+			return nil, fmt.Errorf("invalid tag format %q: expected key=value", t)
+		}
+		tags[parts[0]] = parts[1]
+	}
+	return tags, nil
+}

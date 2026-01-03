@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"strings"
 
 	"github.com/urfave/cli/v3"
 
@@ -194,10 +193,6 @@ EXAMPLES:
 				Name:  "description",
 				Usage: fmt.Sprintf("Description for the %s", cfg.ItemName),
 			},
-			&cli.StringSliceFlag{
-				Name:  "tag",
-				Usage: "Tag in key=value format (can be specified multiple times)",
-			},
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			if cmd.Args().Len() < 1 {
@@ -215,11 +210,6 @@ EXAMPLES:
 				return fmt.Errorf("failed to initialize stage store: %w", err)
 			}
 
-			tags, err := parseTags(cmd.StringSlice("tag"))
-			if err != nil {
-				return err
-			}
-
 			strat := cfg.ParserFactory()
 
 			r := &AddRunner{
@@ -234,7 +224,6 @@ EXAMPLES:
 				Name:        name,
 				Value:       value,
 				Description: cmd.String("description"),
-				Tags:        tags,
 			})
 		},
 	}
@@ -274,10 +263,6 @@ EXAMPLES:
 				Name:  "description",
 				Usage: fmt.Sprintf("Description for the %s", cfg.ItemName),
 			},
-			&cli.StringSliceFlag{
-				Name:  "tag",
-				Usage: "Tag in key=value format (can be specified multiple times)",
-			},
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			if cmd.Args().Len() < 1 {
@@ -293,11 +278,6 @@ EXAMPLES:
 			store, err := staging.NewStore()
 			if err != nil {
 				return fmt.Errorf("failed to initialize stage store: %w", err)
-			}
-
-			tags, err := parseTags(cmd.StringSlice("tag"))
-			if err != nil {
-				return err
 			}
 
 			strat, err := cfg.Factory(ctx)
@@ -317,7 +297,6 @@ EXAMPLES:
 				Name:        name,
 				Value:       value,
 				Description: cmd.String("description"),
-				Tags:        tags,
 			})
 		},
 	}
@@ -530,21 +509,6 @@ EXAMPLES:
 	}
 }
 
-func parseTags(tagSlice []string) (map[string]string, error) {
-	if len(tagSlice) == 0 {
-		return nil, nil
-	}
-	tags := make(map[string]string)
-	for _, t := range tagSlice {
-		parts := strings.SplitN(t, "=", 2)
-		if len(parts) != 2 {
-			return nil, fmt.Errorf("invalid tag format %q: expected key=value", t)
-		}
-		tags[parts[0]] = parts[1]
-	}
-	return tags, nil
-}
-
 // NewDeleteCommand creates a delete command with the given config.
 func NewDeleteCommand(cfg CommandConfig) *cli.Command {
 	strat := cfg.ParserFactory()
@@ -648,6 +612,122 @@ EXAMPLES:
 				Name:           name,
 				Force:          force,
 				RecoveryWindow: recoveryWindow,
+			})
+		},
+	}
+}
+
+// NewTagCommand creates a tag command with the given config.
+func NewTagCommand(cfg CommandConfig) *cli.Command {
+	return &cli.Command{
+		Name:      "tag",
+		Usage:     fmt.Sprintf("Stage tags for a %s", cfg.ItemName),
+		ArgsUsage: "<name> <key>=<value>...",
+		Description: fmt.Sprintf(`Stage tags to add or update for a %s.
+
+Tags are staged locally and applied when you run 'suve stage %s apply'.
+If the %s is not already staged, a tag-only change is created.
+
+Use 'suve stage %s untag' to stage tag removals.
+Use 'suve stage %s status' to view staged changes.
+
+EXAMPLES:
+   suve stage %s tag <name> env=prod              Stage single tag
+   suve stage %s tag <name> env=prod team=api     Stage multiple tags`,
+			cfg.ItemName,
+			cfg.CommandName,
+			cfg.ItemName,
+			cfg.CommandName,
+			cfg.CommandName,
+			cfg.CommandName,
+			cfg.CommandName),
+		Action: func(ctx context.Context, cmd *cli.Command) error {
+			if cmd.Args().Len() < 2 {
+				return fmt.Errorf("usage: suve stage %s tag <name> <key>=<value>", cfg.CommandName)
+			}
+
+			name := cmd.Args().First()
+			tags := cmd.Args().Slice()[1:]
+
+			store, err := staging.NewStore()
+			if err != nil {
+				return fmt.Errorf("failed to initialize stage store: %w", err)
+			}
+
+			strat, err := cfg.Factory(ctx)
+			if err != nil {
+				return err
+			}
+
+			r := &TagRunner{
+				UseCase: &stagingusecase.TagUseCase{
+					Strategy: strat,
+					Store:    store,
+				},
+				Stdout: cmd.Root().Writer,
+				Stderr: cmd.Root().ErrWriter,
+			}
+			return r.Run(ctx, TagOptions{
+				Name: name,
+				Tags: tags,
+			})
+		},
+	}
+}
+
+// NewUntagCommand creates an untag command with the given config.
+func NewUntagCommand(cfg CommandConfig) *cli.Command {
+	return &cli.Command{
+		Name:      "untag",
+		Usage:     fmt.Sprintf("Stage tag removal for a %s", cfg.ItemName),
+		ArgsUsage: "<name> <key>...",
+		Description: fmt.Sprintf(`Stage tags to remove from a %s.
+
+Tag removals are staged locally and applied when you run 'suve stage %s apply'.
+If the %s is not already staged, a tag-only change is created.
+
+Use 'suve stage %s tag' to stage tag additions.
+Use 'suve stage %s status' to view staged changes.
+
+EXAMPLES:
+   suve stage %s untag <name> env              Stage single tag removal
+   suve stage %s untag <name> env team         Stage multiple tag removals`,
+			cfg.ItemName,
+			cfg.CommandName,
+			cfg.ItemName,
+			cfg.CommandName,
+			cfg.CommandName,
+			cfg.CommandName,
+			cfg.CommandName),
+		Action: func(ctx context.Context, cmd *cli.Command) error {
+			if cmd.Args().Len() < 2 {
+				return fmt.Errorf("usage: suve stage %s untag <name> <key>", cfg.CommandName)
+			}
+
+			name := cmd.Args().First()
+			keys := cmd.Args().Slice()[1:]
+
+			store, err := staging.NewStore()
+			if err != nil {
+				return fmt.Errorf("failed to initialize stage store: %w", err)
+			}
+
+			strat, err := cfg.Factory(ctx)
+			if err != nil {
+				return err
+			}
+
+			r := &UntagRunner{
+				UseCase: &stagingusecase.TagUseCase{
+					Strategy: strat,
+					Store:    store,
+				},
+				Stdout: cmd.Root().Writer,
+				Stderr: cmd.Root().ErrWriter,
+			}
+			return r.Run(ctx, UntagOptions{
+				Name: name,
+				Keys: keys,
 			})
 		},
 	}

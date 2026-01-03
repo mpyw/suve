@@ -43,14 +43,14 @@ func (r *ApplyRunner) Run(ctx context.Context, opts ApplyOptions) error {
 	}
 
 	// Handle "nothing staged" case
-	if len(result.Results) == 0 && err == nil {
+	if len(result.EntryResults) == 0 && len(result.TagResults) == 0 && err == nil {
 		output.Info(r.Stdout, "No %s changes staged.", result.ServiceName)
 		return nil
 	}
 
-	// Output results in sorted order
-	for _, name := range r.sortedResultNames(result.Results) {
-		for _, entry := range result.Results {
+	// Output entry results in sorted order
+	for _, name := range r.sortedEntryResultNames(result.EntryResults) {
+		for _, entry := range result.EntryResults {
 			if entry.Name != name {
 				continue
 			}
@@ -59,12 +59,27 @@ func (r *ApplyRunner) Run(ctx context.Context, opts ApplyOptions) error {
 			} else {
 				switch entry.Status {
 				case stagingusecase.ApplyResultCreated:
-					output.Success(r.Stdout, "Created %s%s", name, formatTagSummary(entry))
+					output.Success(r.Stdout, "Created %s", name)
 				case stagingusecase.ApplyResultUpdated:
-					output.Success(r.Stdout, "Updated %s%s", name, formatTagSummary(entry))
+					output.Success(r.Stdout, "Updated %s", name)
 				case stagingusecase.ApplyResultDeleted:
 					output.Success(r.Stdout, "Deleted %s", name)
 				}
+			}
+			break
+		}
+	}
+
+	// Output tag results in sorted order
+	for _, name := range r.sortedTagResultNames(result.TagResults) {
+		for _, tag := range result.TagResults {
+			if tag.Name != name {
+				continue
+			}
+			if tag.Error != nil {
+				output.Failed(r.Stderr, name+" (tags)", tag.Error)
+			} else {
+				output.Success(r.Stdout, "Tagged %s%s", name, formatTagApplySummary(tag))
 			}
 			break
 		}
@@ -74,7 +89,15 @@ func (r *ApplyRunner) Run(ctx context.Context, opts ApplyOptions) error {
 	return err
 }
 
-func (r *ApplyRunner) sortedResultNames(results []stagingusecase.ApplyResultEntry) []string {
+func (r *ApplyRunner) sortedEntryResultNames(results []stagingusecase.ApplyEntryResult) []string {
+	names := make(map[string]struct{})
+	for _, e := range results {
+		names[e.Name] = struct{}{}
+	}
+	return maputil.SortedKeys(names)
+}
+
+func (r *ApplyRunner) sortedTagResultNames(results []stagingusecase.ApplyTagResult) []string {
 	names := make(map[string]struct{})
 	for _, e := range results {
 		names[e.Name] = struct{}{}
@@ -90,13 +113,13 @@ func sliceToMap(slice []string) map[string]struct{} {
 	return m
 }
 
-func formatTagSummary(entry stagingusecase.ApplyResultEntry) string {
+func formatTagApplySummary(tag stagingusecase.ApplyTagResult) string {
 	parts := []string{}
-	if len(entry.Tags) > 0 {
-		parts = append(parts, fmt.Sprintf("+%d tag(s)", len(entry.Tags)))
+	if len(tag.AddTags) > 0 {
+		parts = append(parts, fmt.Sprintf("+%d", len(tag.AddTags)))
 	}
-	if len(entry.UntagKeys) > 0 {
-		parts = append(parts, fmt.Sprintf("-%d tag(s)", len(entry.UntagKeys)))
+	if tag.RemoveTag.Len() > 0 {
+		parts = append(parts, fmt.Sprintf("-%d", tag.RemoveTag.Len()))
 	}
 	if len(parts) == 0 {
 		return ""

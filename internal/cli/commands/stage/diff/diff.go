@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"strings"
 
 	"github.com/samber/lo"
 	"github.com/urfave/cli/v3"
@@ -385,12 +384,5 @@ func (r *Runner) outputSecretDiffCreate(opts Options, name string, entry staging
 func (r *Runner) outputMetadata(entry staging.Entry) {
 	if desc := lo.FromPtr(entry.Description); desc != "" {
 		_, _ = fmt.Fprintf(r.Stdout, "%s %s\n", colors.FieldLabel("Description:"), desc)
-	}
-	if len(entry.Tags) > 0 {
-		var tagPairs []string
-		for _, k := range maputil.SortedKeys(entry.Tags) {
-			tagPairs = append(tagPairs, fmt.Sprintf("%s=%s", k, entry.Tags[k]))
-		}
-		_, _ = fmt.Fprintf(r.Stdout, "%s %s\n", colors.FieldLabel("Tags:"), strings.Join(tagPairs, ", "))
 	}
 }

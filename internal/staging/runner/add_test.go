@@ -271,7 +271,7 @@ func TestAddRunner_WithOptions(t *testing.T) {
 		assert.Equal(t, "direct-value", lo.FromPtr(entry.Value))
 	})
 
-	t.Run("with description and tags", func(t *testing.T) {
+	t.Run("with description", func(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
@@ -291,13 +291,11 @@ func TestAddRunner_WithOptions(t *testing.T) {
 			Name:        "/app/new-config",
 			Value:       "test-value",
 			Description: "Test description",
-			Tags:        map[string]string{"env": "prod"},
 		})
 		require.NoError(t, err)
 
 		entry, err := store.Get(staging.ServiceParam, "/app/new-config")
 		require.NoError(t, err)
 		assert.Equal(t, "Test description", lo.FromPtr(entry.Description))
-		assert.Equal(t, map[string]string{"env": "prod"}, entry.Tags)
 	})
 }

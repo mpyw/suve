@@ -54,7 +54,6 @@ func TestAddUseCase_Execute(t *testing.T) {
 		Name:        "/app/new-param",
 		Value:       "new-value",
 		Description: "test description",
-		Tags:        map[string]string{"env": "test"},
 	})
 	require.NoError(t, err)
 	assert.Equal(t, "/app/new-param", output.Name)
@@ -65,7 +64,6 @@ func TestAddUseCase_Execute(t *testing.T) {
 	assert.Equal(t, staging.OperationCreate, entry.Operation)
 	assert.Equal(t, "new-value", lo.FromPtr(entry.Value))
 	assert.Equal(t, "test description", lo.FromPtr(entry.Description))
-	assert.Equal(t, "test", entry.Tags["env"])
 }
 
 func TestAddUseCase_Execute_MinimalInput(t *testing.T) {
@@ -87,7 +85,6 @@ func TestAddUseCase_Execute_MinimalInput(t *testing.T) {
 	entry, err := store.Get(staging.ServiceParam, "/app/simple")
 	require.NoError(t, err)
 	assert.Nil(t, entry.Description)
-	assert.Empty(t, entry.Tags)
 }
 
 func TestAddUseCase_Draft_NotStaged(t *testing.T) {

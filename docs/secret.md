@@ -711,7 +711,6 @@ suve stage secret add [options] <name> [value]
 | Option | Alias | Default | Description |
 |--------|-------|---------|-------------|
 | `--description` | - | - | Secret description |
-| `--tag` | - | - | Tag in key=value format (can be specified multiple times) |
 
 **Examples:**
 
@@ -727,8 +726,8 @@ suve stage secret add my-new-secret '{"key":"value"}'
 # Stage via editor
 suve stage secret add my-new-secret
 
-# Stage with description and tags
-suve stage secret add --description "API key for production" --tag env=prod my-api-key "sk-1234567890"
+# Stage with description
+suve stage secret add --description "API key for production" my-api-key "sk-1234567890"
 ```
 
 ---
@@ -753,7 +752,6 @@ suve stage secret edit [options] <name> [value]
 | Option | Alias | Default | Description |
 |--------|-------|---------|-------------|
 | `--description` | - | - | Secret description |
-| `--tag` | - | - | Tag in key=value format (can be specified multiple times) |
 
 **Behavior:**
 
@@ -775,9 +773,6 @@ suve stage secret edit my-database-credentials
 
 # Edit with inline value
 suve stage secret edit my-database-credentials '{"username":"admin","password":"newpassword"}'
-
-# Edit with tags
-suve stage secret edit --tag env=prod my-database-credentials '{"password":"new"}'
 ```
 
 ---
@@ -1031,3 +1026,73 @@ suve stage secret reset --all
 
 > [!TIP]
 > Use `suve stage reset` to unstage all changes (SSM Parameter Store + Secrets Manager combined).
+
+---
+
+## suve stage secret tag
+
+Stage tag additions for a secret.
+
+```
+suve stage secret tag <name> <key=value>...
+```
+
+**Arguments:**
+
+| Argument | Description |
+|----------|-------------|
+| `name` | Secret name |
+| `key=value` | Tag in key=value format (one or more) |
+
+**Examples:**
+
+```ShellSession
+user@host:~$ suve stage secret tag my-database-credentials env=prod team=platform
+✓ Staged tags for: my-database-credentials
+```
+
+```bash
+# Stage single tag
+suve stage secret tag my-secret env=prod
+
+# Stage multiple tags
+suve stage secret tag my-secret env=prod team=platform
+```
+
+> [!NOTE]
+> If the secret is not already staged, a tag-only change is created.
+
+---
+
+## suve stage secret untag
+
+Stage tag removals for a secret.
+
+```
+suve stage secret untag <name> <key>...
+```
+
+**Arguments:**
+
+| Argument | Description |
+|----------|-------------|
+| `name` | Secret name |
+| `key` | Tag key to remove (one or more) |
+
+**Examples:**
+
+```ShellSession
+user@host:~$ suve stage secret untag my-database-credentials deprecated old-tag
+✓ Staged tag removal for: my-database-credentials
+```
+
+```bash
+# Stage single tag removal
+suve stage secret untag my-secret deprecated
+
+# Stage multiple tag removals
+suve stage secret untag my-secret deprecated old-tag
+```
+
+> [!NOTE]
+> If the secret is not already staged, a tag-only change is created.

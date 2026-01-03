@@ -43,9 +43,12 @@ type ParserFactory func() Parser
 type ApplyStrategy interface {
 	ServiceStrategy
 
-	// Apply applies a staged operation to AWS.
+	// Apply applies a staged entry operation to AWS.
 	// Handles OperationCreate, OperationUpdate, and OperationDelete based on entry.Operation.
 	Apply(ctx context.Context, name string, entry Entry) error
+
+	// ApplyTags applies staged tag changes to AWS.
+	ApplyTags(ctx context.Context, name string, tagEntry TagEntry) error
 
 	// FetchLastModified returns the last modified time of the resource in AWS.
 	// Returns zero time if the resource doesn't exist (for create operations).

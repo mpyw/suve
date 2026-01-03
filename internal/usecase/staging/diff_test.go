@@ -281,31 +281,6 @@ func TestDiffUseCase_Execute_AutoUnstage_UpdateNoLongerExists(t *testing.T) {
 	assert.ErrorIs(t, err, staging.ErrNotStaged)
 }
 
-func TestDiffUseCase_Execute_WithTags(t *testing.T) {
-	t.Parallel()
-
-	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
-	require.NoError(t, store.Stage(staging.ServiceParam, "/app/tagged", staging.Entry{
-		Operation: staging.OperationCreate,
-		Value:     lo.ToPtr("value"),
-		Tags:      map[string]string{"env": "test"},
-		StagedAt:  time.Now(),
-	}))
-
-	strategy := newMockDiffStrategy()
-	strategy.fetchErrors["/app/tagged"] = errors.New("not found")
-
-	uc := &usecasestaging.DiffUseCase{
-		Strategy: strategy,
-		Store:    store,
-	}
-
-	output, err := uc.Execute(context.Background(), usecasestaging.DiffInput{})
-	require.NoError(t, err)
-	require.Len(t, output.Entries, 1)
-	assert.Equal(t, "test", output.Entries[0].Tags["env"])
-}
-
 func TestDiffUseCase_Execute_ListError(t *testing.T) {
 	t.Parallel()
 
@@ -336,6 +311,38 @@ func TestDiffUseCase_Execute_GetError(t *testing.T) {
 	_, err := uc.Execute(context.Background(), usecasestaging.DiffInput{Name: "/app/config"})
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "get error")
+}
+
+func TestDiffUseCase_Execute_GetTagError(t *testing.T) {
+	t.Parallel()
+
+	store := newMockStore()
+	store.getTagErr = errors.New("get tag error")
+
+	uc := &usecasestaging.DiffUseCase{
+		Strategy: newMockDiffStrategy(),
+		Store:    store,
+	}
+
+	_, err := uc.Execute(context.Background(), usecasestaging.DiffInput{Name: "/app/config"})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "get tag error")
+}
+
+func TestDiffUseCase_Execute_ListTagsError(t *testing.T) {
+	t.Parallel()
+
+	store := newMockStore()
+	store.listTagsErr = errors.New("list tags error")
+
+	uc := &usecasestaging.DiffUseCase{
+		Strategy: newMockDiffStrategy(),
+		Store:    store,
+	}
+
+	_, err := uc.Execute(context.Background(), usecasestaging.DiffInput{})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "list tags error")
 }
 
 func TestDiffUseCase_Execute_UnknownOperation(t *testing.T) {

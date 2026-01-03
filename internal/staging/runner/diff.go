@@ -40,7 +40,7 @@ func (r *DiffRunner) Run(ctx context.Context, opts DiffOptions) error {
 		return err
 	}
 
-	if len(result.Entries) == 0 {
+	if len(result.Entries) == 0 && len(result.TagEntries) == 0 {
 		output.Warning(r.Stderr, "no %ss staged", result.ItemName)
 		return nil
 	}
@@ -75,10 +75,33 @@ func (r *DiffRunner) Run(ctx context.Context, opts DiffOptions) error {
 		}
 	}
 
+	// Output tag entries
+	for _, name := range r.sortedTagEntryNames(result.TagEntries) {
+		for _, tagEntry := range result.TagEntries {
+			if tagEntry.Name != name {
+				continue
+			}
+			if !first {
+				_, _ = fmt.Fprintln(r.Stdout)
+			}
+			first = false
+			r.outputTagEntry(tagEntry)
+			break
+		}
+	}
+
 	return nil
 }
 
 func (r *DiffRunner) sortedEntryNames(entries []stagingusecase.DiffEntry) []string {
+	names := make(map[string]struct{})
+	for _, e := range entries {
+		names[e.Name] = struct{}{}
+	}
+	return maputil.SortedKeys(names)
+}
+
+func (r *DiffRunner) sortedTagEntryNames(entries []stagingusecase.DiffTagEntry) []string {
 	names := make(map[string]struct{})
 	for _, e := range entries {
 		names[e.Name] = struct{}{}
@@ -133,14 +156,20 @@ func (r *DiffRunner) outputMetadata(entry stagingusecase.DiffEntry) {
 	if desc := lo.FromPtr(entry.Description); desc != "" {
 		_, _ = fmt.Fprintf(r.Stdout, "%s %s\n", colors.FieldLabel("Description:"), desc)
 	}
-	if len(entry.Tags) > 0 {
+}
+
+func (r *DiffRunner) outputTagEntry(tagEntry stagingusecase.DiffTagEntry) {
+	_, _ = fmt.Fprintf(r.Stdout, "%s %s (staged tag changes)\n", colors.Info("Tags:"), tagEntry.Name)
+
+	if len(tagEntry.Add) > 0 {
 		var tagPairs []string
-		for _, k := range maputil.SortedKeys(entry.Tags) {
-			tagPairs = append(tagPairs, fmt.Sprintf("%s=%s", k, entry.Tags[k]))
+		for _, k := range maputil.SortedKeys(tagEntry.Add) {
+			tagPairs = append(tagPairs, fmt.Sprintf("%s=%s", k, tagEntry.Add[k]))
 		}
-		_, _ = fmt.Fprintf(r.Stdout, "%s %s\n", colors.FieldLabel("Tags:"), strings.Join(tagPairs, ", "))
+		_, _ = fmt.Fprintf(r.Stdout, "  %s %s\n", colors.OpAdd("+"), strings.Join(tagPairs, ", "))
 	}
-	if entry.UntagKeys.Len() > 0 {
-		_, _ = fmt.Fprintf(r.Stdout, "%s %s\n", colors.FieldLabel("Untag:"), strings.Join(entry.UntagKeys.Values(), ", "))
+
+	if tagEntry.Remove.Len() > 0 {
+		_, _ = fmt.Fprintf(r.Stdout, "  %s %s\n", colors.OpDelete("-"), strings.Join(tagEntry.Remove.Values(), ", "))
 	}
 }

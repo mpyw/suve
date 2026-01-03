@@ -43,6 +43,10 @@ func (m *mockApplyStrategy) Apply(_ context.Context, _ string, _ staging.Entry) 
 	return nil
 }
 
+func (m *mockApplyStrategy) ApplyTags(_ context.Context, _ string, _ staging.TagEntry) error {
+	return nil
+}
+
 func TestCheckConflicts(t *testing.T) {
 	t.Parallel()
 

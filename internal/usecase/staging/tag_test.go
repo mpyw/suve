@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -39,7 +38,7 @@ func newMockTagStrategy() *mockTagStrategy {
 	}
 }
 
-func TestTagUseCase_Execute_NewEntry(t *testing.T) {
+func TestTagUseCase_Execute_NewTagEntry(t *testing.T) {
 	t.Parallel()
 
 	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
@@ -55,14 +54,12 @@ func TestTagUseCase_Execute_NewEntry(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "/app/config", output.Name)
 
-	// Verify staged
-	entry, err := store.Get(staging.ServiceParam, "/app/config")
+	// Verify staged as tag entry
+	tagEntry, err := store.GetTag(staging.ServiceParam, "/app/config")
 	require.NoError(t, err)
-	assert.Equal(t, staging.OperationUpdate, entry.Operation)
-	assert.Nil(t, entry.Value) // Value should be nil for tag-only changes
-	assert.Equal(t, "prod", entry.Tags["env"])
-	assert.Equal(t, "backend", entry.Tags["team"])
-	assert.NotNil(t, entry.BaseModifiedAt)
+	assert.Equal(t, "prod", tagEntry.Add["env"])
+	assert.Equal(t, "backend", tagEntry.Add["team"])
+	assert.NotNil(t, tagEntry.BaseModifiedAt)
 }
 
 func TestTagUseCase_Execute_RemoveTags(t *testing.T) {
@@ -82,10 +79,10 @@ func TestTagUseCase_Execute_RemoveTags(t *testing.T) {
 	assert.Equal(t, "/app/config", output.Name)
 
 	// Verify staged
-	entry, err := store.Get(staging.ServiceParam, "/app/config")
+	tagEntry, err := store.GetTag(staging.ServiceParam, "/app/config")
 	require.NoError(t, err)
-	assert.True(t, entry.UntagKeys.Contains("old-tag"))
-	assert.True(t, entry.UntagKeys.Contains("deprecated"))
+	assert.True(t, tagEntry.Remove.Contains("old-tag"))
+	assert.True(t, tagEntry.Remove.Contains("deprecated"))
 }
 
 func TestTagUseCase_Execute_MergeWithExisting(t *testing.T) {
@@ -94,11 +91,9 @@ func TestTagUseCase_Execute_MergeWithExisting(t *testing.T) {
 	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
 	baseTime := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
 
-	// Pre-stage an entry with a value
-	require.NoError(t, store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
-		Operation:      staging.OperationUpdate,
-		Value:          lo.ToPtr("existing-value"),
-		Tags:           map[string]string{"existing": "tag"},
+	// Pre-stage a tag entry
+	require.NoError(t, store.StageTag(staging.ServiceParam, "/app/config", staging.TagEntry{
+		Add:            map[string]string{"existing": "tag"},
 		StagedAt:       time.Now(),
 		BaseModifiedAt: &baseTime,
 	}))
@@ -115,12 +110,11 @@ func TestTagUseCase_Execute_MergeWithExisting(t *testing.T) {
 	require.NoError(t, err)
 
 	// Verify merged
-	entry, err := store.Get(staging.ServiceParam, "/app/config")
+	tagEntry, err := store.GetTag(staging.ServiceParam, "/app/config")
 	require.NoError(t, err)
-	assert.Equal(t, "existing-value", lo.FromPtr(entry.Value)) // Value preserved
-	assert.Equal(t, "tag", entry.Tags["existing"])             // Existing tag preserved
-	assert.Equal(t, "tag", entry.Tags["new"])                  // New tag added
-	assert.Equal(t, baseTime, *entry.BaseModifiedAt)           // BaseModifiedAt preserved
+	assert.Equal(t, "tag", tagEntry.Add["existing"]) // Existing tag preserved
+	assert.Equal(t, "tag", tagEntry.Add["new"])      // New tag added
+	assert.Equal(t, baseTime, *tagEntry.BaseModifiedAt)
 }
 
 func TestTagUseCase_Execute_AddTagRemovesFromUntagList(t *testing.T) {
@@ -128,11 +122,10 @@ func TestTagUseCase_Execute_AddTagRemovesFromUntagList(t *testing.T) {
 
 	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
 
-	// Pre-stage with untag keys
-	require.NoError(t, store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
-		Operation: staging.OperationUpdate,
-		UntagKeys: maputil.NewSet("env", "team"),
-		StagedAt:  time.Now(),
+	// Pre-stage with remove tags
+	require.NoError(t, store.StageTag(staging.ServiceParam, "/app/config", staging.TagEntry{
+		Remove:   maputil.NewSet("env", "team"),
+		StagedAt: time.Now(),
 	}))
 
 	uc := &usecasestaging.TagUseCase{
@@ -140,18 +133,18 @@ func TestTagUseCase_Execute_AddTagRemovesFromUntagList(t *testing.T) {
 		Store:    store,
 	}
 
-	// Add a tag that was previously in untag list
+	// Add a tag that was previously in remove list
 	_, err := uc.Execute(context.Background(), usecasestaging.TagInput{
 		Name:    "/app/config",
 		AddTags: map[string]string{"env": "prod"},
 	})
 	require.NoError(t, err)
 
-	entry, err := store.Get(staging.ServiceParam, "/app/config")
+	tagEntry, err := store.GetTag(staging.ServiceParam, "/app/config")
 	require.NoError(t, err)
-	assert.Equal(t, "prod", entry.Tags["env"])
-	assert.False(t, entry.UntagKeys.Contains("env")) // "env" removed from untag list
-	assert.True(t, entry.UntagKeys.Contains("team")) // "team" still in untag list
+	assert.Equal(t, "prod", tagEntry.Add["env"])
+	assert.False(t, tagEntry.Remove.Contains("env")) // "env" removed from remove list
+	assert.True(t, tagEntry.Remove.Contains("team")) // "team" still in remove list
 }
 
 func TestTagUseCase_Execute_RemoveTagDeletesFromAddList(t *testing.T) {
@@ -160,10 +153,9 @@ func TestTagUseCase_Execute_RemoveTagDeletesFromAddList(t *testing.T) {
 	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
 
 	// Pre-stage with tags to add
-	require.NoError(t, store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
-		Operation: staging.OperationUpdate,
-		Tags:      map[string]string{"env": "prod", "team": "backend"},
-		StagedAt:  time.Now(),
+	require.NoError(t, store.StageTag(staging.ServiceParam, "/app/config", staging.TagEntry{
+		Add:      map[string]string{"env": "prod", "team": "backend"},
+		StagedAt: time.Now(),
 	}))
 
 	uc := &usecasestaging.TagUseCase{
@@ -178,11 +170,11 @@ func TestTagUseCase_Execute_RemoveTagDeletesFromAddList(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	entry, err := store.Get(staging.ServiceParam, "/app/config")
+	tagEntry, err := store.GetTag(staging.ServiceParam, "/app/config")
 	require.NoError(t, err)
-	assert.NotContains(t, entry.Tags, "env")        // "env" removed from tags
-	assert.Equal(t, "backend", entry.Tags["team"])  // "team" still in tags
-	assert.True(t, entry.UntagKeys.Contains("env")) // "env" added to untag list
+	assert.NotContains(t, tagEntry.Add, "env")       // "env" removed from add list
+	assert.Equal(t, "backend", tagEntry.Add["team"]) // "team" still in add list
+	assert.True(t, tagEntry.Remove.Contains("env"))  // "env" added to remove list
 }
 
 func TestTagUseCase_Execute_ParseError(t *testing.T) {
@@ -229,7 +221,7 @@ func TestTagUseCase_Execute_StageError(t *testing.T) {
 	t.Parallel()
 
 	store := newMockStore()
-	store.stageErr = errors.New("stage error")
+	store.stageTagErr = errors.New("stage error")
 
 	uc := &usecasestaging.TagUseCase{
 		Strategy: newMockTagStrategy(),
@@ -248,7 +240,7 @@ func TestTagUseCase_Execute_GetError(t *testing.T) {
 	t.Parallel()
 
 	store := newMockStore()
-	store.getErr = errors.New("get error")
+	store.getTagErr = errors.New("get error")
 
 	uc := &usecasestaging.TagUseCase{
 		Strategy: newMockTagStrategy(),
@@ -284,21 +276,20 @@ func TestTagUseCase_Execute_ZeroLastModified(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	entry, err := store.Get(staging.ServiceParam, "/app/config")
+	tagEntry, err := store.GetTag(staging.ServiceParam, "/app/config")
 	require.NoError(t, err)
-	assert.Nil(t, entry.BaseModifiedAt)
+	assert.Nil(t, tagEntry.BaseModifiedAt)
 }
 
-func TestTagUseCase_Execute_DuplicateUntagKeys(t *testing.T) {
+func TestTagUseCase_Execute_DuplicateRemoveKeys(t *testing.T) {
 	t.Parallel()
 
 	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
 
-	// Pre-stage with untag key
-	require.NoError(t, store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
-		Operation: staging.OperationUpdate,
-		UntagKeys: maputil.NewSet("env"),
-		StagedAt:  time.Now(),
+	// Pre-stage with remove key
+	require.NoError(t, store.StageTag(staging.ServiceParam, "/app/config", staging.TagEntry{
+		Remove:   maputil.NewSet("env"),
+		StagedAt: time.Now(),
 	}))
 
 	uc := &usecasestaging.TagUseCase{
@@ -313,233 +304,33 @@ func TestTagUseCase_Execute_DuplicateUntagKeys(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	entry, err := store.Get(staging.ServiceParam, "/app/config")
+	tagEntry, err := store.GetTag(staging.ServiceParam, "/app/config")
 	require.NoError(t, err)
 	// Set guarantees uniqueness - "env" should be in the set exactly once
-	assert.True(t, entry.UntagKeys.Contains("env"))
-	assert.Equal(t, 1, entry.UntagKeys.Len())
+	assert.True(t, tagEntry.Remove.Contains("env"))
+	assert.Equal(t, 1, tagEntry.Remove.Len())
 }
 
-func TestTagUseCase_Execute_CancelAddTags(t *testing.T) {
+func TestTagUseCase_Execute_AddAndRemoveSameKey(t *testing.T) {
 	t.Parallel()
 
 	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
-
-	// Pre-stage with tags to add
-	require.NoError(t, store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
-		Operation: staging.OperationUpdate,
-		Tags:      map[string]string{"env": "prod", "team": "backend"},
-		StagedAt:  time.Now(),
-	}))
 
 	uc := &usecasestaging.TagUseCase{
 		Strategy: newMockTagStrategy(),
 		Store:    store,
 	}
 
-	// Cancel a staged tag addition
+	// Add and remove the same key - add wins
 	_, err := uc.Execute(context.Background(), usecasestaging.TagInput{
-		Name:          "/app/config",
-		CancelAddTags: maputil.NewSet("env"),
+		Name:       "/app/config",
+		AddTags:    map[string]string{"env": "prod"},
+		RemoveTags: maputil.NewSet("env"),
 	})
 	require.NoError(t, err)
 
-	entry, err := store.Get(staging.ServiceParam, "/app/config")
+	tagEntry, err := store.GetTag(staging.ServiceParam, "/app/config")
 	require.NoError(t, err)
-	assert.NotContains(t, entry.Tags, "env")         // "env" removed from tags
-	assert.Equal(t, "backend", entry.Tags["team"])   // "team" still in tags
-	assert.False(t, entry.UntagKeys.Contains("env")) // "env" NOT added to untag list (cancel, not remove)
-}
-
-func TestTagUseCase_Execute_CancelRemoveTags(t *testing.T) {
-	t.Parallel()
-
-	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
-
-	// Pre-stage with untag keys
-	require.NoError(t, store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
-		Operation: staging.OperationUpdate,
-		UntagKeys: maputil.NewSet("env", "team"),
-		StagedAt:  time.Now(),
-	}))
-
-	uc := &usecasestaging.TagUseCase{
-		Strategy: newMockTagStrategy(),
-		Store:    store,
-	}
-
-	// Cancel a staged tag removal
-	_, err := uc.Execute(context.Background(), usecasestaging.TagInput{
-		Name:             "/app/config",
-		CancelRemoveTags: maputil.NewSet("env"),
-	})
-	require.NoError(t, err)
-
-	entry, err := store.Get(staging.ServiceParam, "/app/config")
-	require.NoError(t, err)
-	assert.False(t, entry.UntagKeys.Contains("env")) // "env" removed from untag list
-	assert.True(t, entry.UntagKeys.Contains("team")) // "team" still in untag list
-	assert.NotContains(t, entry.Tags, "env")         // "env" NOT added to tags (cancel, not add)
-}
-
-func TestTagUseCase_Execute_CancelAllTags_UnstagesEntry(t *testing.T) {
-	t.Parallel()
-
-	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
-
-	// Pre-stage with only a tag (no value, no description)
-	require.NoError(t, store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
-		Operation: staging.OperationUpdate,
-		Tags:      map[string]string{"env": "prod"},
-		StagedAt:  time.Now(),
-	}))
-
-	uc := &usecasestaging.TagUseCase{
-		Strategy: newMockTagStrategy(),
-		Store:    store,
-	}
-
-	// Cancel the only staged tag
-	_, err := uc.Execute(context.Background(), usecasestaging.TagInput{
-		Name:          "/app/config",
-		CancelAddTags: maputil.NewSet("env"),
-	})
-	require.NoError(t, err)
-
-	// Entry should be completely unstaged since there's nothing left
-	_, err = store.Get(staging.ServiceParam, "/app/config")
-	assert.ErrorIs(t, err, staging.ErrNotStaged)
-}
-
-func TestTagUseCase_Execute_CancelAllUntags_UnstagesEntry(t *testing.T) {
-	t.Parallel()
-
-	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
-
-	// Pre-stage with only untag keys (no value, no description, no tags)
-	require.NoError(t, store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
-		Operation: staging.OperationUpdate,
-		UntagKeys: maputil.NewSet("env"),
-		StagedAt:  time.Now(),
-	}))
-
-	uc := &usecasestaging.TagUseCase{
-		Strategy: newMockTagStrategy(),
-		Store:    store,
-	}
-
-	// Cancel the only staged untag
-	_, err := uc.Execute(context.Background(), usecasestaging.TagInput{
-		Name:             "/app/config",
-		CancelRemoveTags: maputil.NewSet("env"),
-	})
-	require.NoError(t, err)
-
-	// Entry should be completely unstaged since there's nothing left
-	_, err = store.Get(staging.ServiceParam, "/app/config")
-	assert.ErrorIs(t, err, staging.ErrNotStaged)
-}
-
-func TestTagUseCase_Execute_CancelWithValueRemains(t *testing.T) {
-	t.Parallel()
-
-	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
-
-	// Pre-stage with value AND tag
-	require.NoError(t, store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
-		Operation: staging.OperationUpdate,
-		Value:     lo.ToPtr("some-value"),
-		Tags:      map[string]string{"env": "prod"},
-		StagedAt:  time.Now(),
-	}))
-
-	uc := &usecasestaging.TagUseCase{
-		Strategy: newMockTagStrategy(),
-		Store:    store,
-	}
-
-	// Cancel the tag, but value should keep entry staged
-	_, err := uc.Execute(context.Background(), usecasestaging.TagInput{
-		Name:          "/app/config",
-		CancelAddTags: maputil.NewSet("env"),
-	})
-	require.NoError(t, err)
-
-	// Entry should still be staged because value exists
-	entry, err := store.Get(staging.ServiceParam, "/app/config")
-	require.NoError(t, err)
-	assert.Equal(t, "some-value", lo.FromPtr(entry.Value))
-	assert.Empty(t, entry.Tags)
-}
-
-func TestTagUseCase_Execute_AutoUnstageError(t *testing.T) {
-	t.Parallel()
-
-	store := newMockStore()
-	// Pre-stage with only tags (no value, no description)
-	store.entries[staging.ServiceParam]["/app/config"] = staging.Entry{
-		Operation: staging.OperationUpdate,
-		Tags:      map[string]string{"env": "prod"},
-		StagedAt:  time.Now(),
-	}
-	store.unstageErr = errors.New("unstage error")
-
-	uc := &usecasestaging.TagUseCase{
-		Strategy: newMockTagStrategy(),
-		Store:    store,
-	}
-
-	// Cancel the only tag, which should trigger auto-unstage
-	_, err := uc.Execute(context.Background(), usecasestaging.TagInput{
-		Name:          "/app/config",
-		CancelAddTags: maputil.NewSet("env"),
-	})
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "unstage error")
-}
-
-func TestTagUseCase_Execute_CancelOnNonExistentEntry_NoOp(t *testing.T) {
-	t.Parallel()
-
-	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
-
-	uc := &usecasestaging.TagUseCase{
-		Strategy: newMockTagStrategy(),
-		Store:    store,
-	}
-
-	// Try to cancel tags on a non-existent entry - should be no-op
-	output, err := uc.Execute(context.Background(), usecasestaging.TagInput{
-		Name:          "/app/config",
-		CancelAddTags: maputil.NewSet("env"),
-	})
-	require.NoError(t, err)
-	assert.Equal(t, "/app/config", output.Name)
-
-	// No entry should be created
-	_, err = store.Get(staging.ServiceParam, "/app/config")
-	assert.ErrorIs(t, err, staging.ErrNotStaged)
-}
-
-func TestTagUseCase_Execute_CancelRemoveOnNonExistentEntry_NoOp(t *testing.T) {
-	t.Parallel()
-
-	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
-
-	uc := &usecasestaging.TagUseCase{
-		Strategy: newMockTagStrategy(),
-		Store:    store,
-	}
-
-	// Try to cancel untags on a non-existent entry - should be no-op
-	output, err := uc.Execute(context.Background(), usecasestaging.TagInput{
-		Name:             "/app/config",
-		CancelRemoveTags: maputil.NewSet("env"),
-	})
-	require.NoError(t, err)
-	assert.Equal(t, "/app/config", output.Name)
-
-	// No entry should be created
-	_, err = store.Get(staging.ServiceParam, "/app/config")
-	assert.ErrorIs(t, err, staging.ErrNotStaged)
+	assert.Equal(t, "prod", tagEntry.Add["env"])
+	assert.False(t, tagEntry.Remove.Contains("env"))
 }

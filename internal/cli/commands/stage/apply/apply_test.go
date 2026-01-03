@@ -44,6 +44,10 @@ func (m *mockStrategy) FetchLastModified(_ context.Context, _ string) (time.Time
 	return m.fetchLastModifiedVal, nil
 }
 
+func (m *mockStrategy) ApplyTags(_ context.Context, _ string, _ staging.TagEntry) error {
+	return nil
+}
+
 func newParamStrategy() *mockStrategy {
 	return &mockStrategy{
 		service:          staging.ServiceParam,

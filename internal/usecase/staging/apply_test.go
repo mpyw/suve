@@ -29,6 +29,10 @@ func (m *mockApplyStrategy) Apply(_ context.Context, name string, _ staging.Entr
 	return nil
 }
 
+func (m *mockApplyStrategy) ApplyTags(_ context.Context, _ string, _ staging.TagEntry) error {
+	return nil
+}
+
 func (m *mockApplyStrategy) FetchLastModified(_ context.Context, name string) (time.Time, error) {
 	if m.fetchModifiedErr != nil {
 		return time.Time{}, m.fetchModifiedErr
@@ -60,9 +64,9 @@ func TestApplyUseCase_Execute_Empty(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "SSM Parameter Store", output.ServiceName)
 	assert.Equal(t, "parameter", output.ItemName)
-	assert.Empty(t, output.Results)
-	assert.Equal(t, 0, output.Succeeded)
-	assert.Equal(t, 0, output.Failed)
+	assert.Empty(t, output.EntryResults)
+	assert.Equal(t, 0, output.EntrySucceeded)
+	assert.Equal(t, 0, output.EntryFailed)
 }
 
 func TestApplyUseCase_Execute_SingleCreate(t *testing.T) {
@@ -84,10 +88,10 @@ func TestApplyUseCase_Execute_SingleCreate(t *testing.T) {
 		IgnoreConflicts: true,
 	})
 	require.NoError(t, err)
-	assert.Equal(t, 1, output.Succeeded)
-	assert.Equal(t, 0, output.Failed)
-	require.Len(t, output.Results, 1)
-	assert.Equal(t, usecasestaging.ApplyResultCreated, output.Results[0].Status)
+	assert.Equal(t, 1, output.EntrySucceeded)
+	assert.Equal(t, 0, output.EntryFailed)
+	require.Len(t, output.EntryResults, 1)
+	assert.Equal(t, usecasestaging.ApplyResultCreated, output.EntryResults[0].Status)
 
 	// Verify unstaged after apply
 	_, err = store.Get(staging.ServiceParam, "/app/new")
@@ -122,8 +126,8 @@ func TestApplyUseCase_Execute_MultipleOperations(t *testing.T) {
 		IgnoreConflicts: true,
 	})
 	require.NoError(t, err)
-	assert.Equal(t, 3, output.Succeeded)
-	assert.Equal(t, 0, output.Failed)
+	assert.Equal(t, 3, output.EntrySucceeded)
+	assert.Equal(t, 0, output.EntryFailed)
 }
 
 func TestApplyUseCase_Execute_FilterByName(t *testing.T) {
@@ -151,9 +155,9 @@ func TestApplyUseCase_Execute_FilterByName(t *testing.T) {
 		IgnoreConflicts: true,
 	})
 	require.NoError(t, err)
-	assert.Equal(t, 1, output.Succeeded)
-	require.Len(t, output.Results, 1)
-	assert.Equal(t, "/app/one", output.Results[0].Name)
+	assert.Equal(t, 1, output.EntrySucceeded)
+	require.Len(t, output.EntryResults, 1)
+	assert.Equal(t, "/app/one", output.EntryResults[0].Name)
 
 	// /app/two should still be staged
 	_, err = store.Get(staging.ServiceParam, "/app/two")
@@ -203,9 +207,9 @@ func TestApplyUseCase_Execute_PartialFailure(t *testing.T) {
 		IgnoreConflicts: true,
 	})
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "applied 1, failed 1")
-	assert.Equal(t, 1, output.Succeeded)
-	assert.Equal(t, 1, output.Failed)
+	assert.Contains(t, err.Error(), "applied 1 entries")
+	assert.Equal(t, 1, output.EntrySucceeded)
+	assert.Equal(t, 1, output.EntryFailed)
 
 	// Failed entry should still be staged
 	_, err = store.Get(staging.ServiceParam, "/app/fail")
@@ -281,7 +285,223 @@ func TestApplyUseCase_Execute_DeleteSuccess(t *testing.T) {
 		IgnoreConflicts: true,
 	})
 	require.NoError(t, err)
-	assert.Equal(t, 1, output.Succeeded)
-	require.Len(t, output.Results, 1)
-	assert.Equal(t, usecasestaging.ApplyResultDeleted, output.Results[0].Status)
+	assert.Equal(t, 1, output.EntrySucceeded)
+	require.Len(t, output.EntryResults, 1)
+	assert.Equal(t, usecasestaging.ApplyResultDeleted, output.EntryResults[0].Status)
+}
+
+// =============================================================================
+// Tag Apply Tests
+// =============================================================================
+
+type mockApplyTagStrategy struct {
+	*mockApplyStrategy
+	applyTagsErrors map[string]error
+}
+
+func (m *mockApplyTagStrategy) ApplyTags(_ context.Context, name string, _ staging.TagEntry) error {
+	if err, ok := m.applyTagsErrors[name]; ok {
+		return err
+	}
+	return nil
+}
+
+func newMockApplyTagStrategy() *mockApplyTagStrategy {
+	return &mockApplyTagStrategy{
+		mockApplyStrategy: newMockApplyStrategy(),
+		applyTagsErrors:   make(map[string]error),
+	}
+}
+
+func TestApplyUseCase_Execute_TagsOnly(t *testing.T) {
+	t.Parallel()
+
+	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	require.NoError(t, store.StageTag(staging.ServiceParam, "/app/config", staging.TagEntry{
+		Add:      map[string]string{"env": "prod", "team": "backend"},
+		StagedAt: time.Now(),
+	}))
+
+	uc := &usecasestaging.ApplyUseCase{
+		Strategy: newMockApplyTagStrategy(),
+		Store:    store,
+	}
+
+	output, err := uc.Execute(context.Background(), usecasestaging.ApplyInput{})
+	require.NoError(t, err)
+	assert.Equal(t, 0, output.EntrySucceeded)
+	assert.Equal(t, 0, output.EntryFailed)
+	assert.Equal(t, 1, output.TagSucceeded)
+	assert.Equal(t, 0, output.TagFailed)
+	require.Len(t, output.TagResults, 1)
+	assert.Equal(t, "/app/config", output.TagResults[0].Name)
+	assert.Equal(t, "prod", output.TagResults[0].AddTags["env"])
+
+	// Verify unstaged after apply
+	_, err = store.GetTag(staging.ServiceParam, "/app/config")
+	assert.ErrorIs(t, err, staging.ErrNotStaged)
+}
+
+func TestApplyUseCase_Execute_TagsWithRemove(t *testing.T) {
+	t.Parallel()
+
+	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	removeKeys := map[string]struct{}{"deprecated": {}, "old": {}}
+	require.NoError(t, store.StageTag(staging.ServiceParam, "/app/config", staging.TagEntry{
+		Add:      map[string]string{"env": "prod"},
+		Remove:   removeKeys,
+		StagedAt: time.Now(),
+	}))
+
+	uc := &usecasestaging.ApplyUseCase{
+		Strategy: newMockApplyTagStrategy(),
+		Store:    store,
+	}
+
+	output, err := uc.Execute(context.Background(), usecasestaging.ApplyInput{})
+	require.NoError(t, err)
+	assert.Equal(t, 1, output.TagSucceeded)
+	require.Len(t, output.TagResults, 1)
+	assert.True(t, output.TagResults[0].RemoveTag.Contains("deprecated"))
+	assert.True(t, output.TagResults[0].RemoveTag.Contains("old"))
+}
+
+func TestApplyUseCase_Execute_EntriesAndTags(t *testing.T) {
+	t.Parallel()
+
+	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	require.NoError(t, store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
+		Operation: staging.OperationUpdate,
+		Value:     lo.ToPtr("new-value"),
+		StagedAt:  time.Now(),
+	}))
+	require.NoError(t, store.StageTag(staging.ServiceParam, "/app/config", staging.TagEntry{
+		Add:      map[string]string{"env": "prod"},
+		StagedAt: time.Now(),
+	}))
+
+	uc := &usecasestaging.ApplyUseCase{
+		Strategy: newMockApplyTagStrategy(),
+		Store:    store,
+	}
+
+	output, err := uc.Execute(context.Background(), usecasestaging.ApplyInput{
+		IgnoreConflicts: true,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, 1, output.EntrySucceeded)
+	assert.Equal(t, 1, output.TagSucceeded)
+}
+
+func TestApplyUseCase_Execute_TagFailure(t *testing.T) {
+	t.Parallel()
+
+	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	require.NoError(t, store.StageTag(staging.ServiceParam, "/app/config", staging.TagEntry{
+		Add:      map[string]string{"env": "prod"},
+		StagedAt: time.Now(),
+	}))
+
+	strategy := newMockApplyTagStrategy()
+	strategy.applyTagsErrors["/app/config"] = errors.New("tag api error")
+
+	uc := &usecasestaging.ApplyUseCase{
+		Strategy: strategy,
+		Store:    store,
+	}
+
+	output, err := uc.Execute(context.Background(), usecasestaging.ApplyInput{})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "failed 0 entries, 1 tags")
+	assert.Equal(t, 0, output.TagSucceeded)
+	assert.Equal(t, 1, output.TagFailed)
+	require.Len(t, output.TagResults, 1)
+	assert.Error(t, output.TagResults[0].Error)
+
+	// Failed tag should still be staged
+	_, err = store.GetTag(staging.ServiceParam, "/app/config")
+	require.NoError(t, err)
+}
+
+func TestApplyUseCase_Execute_PartialTagFailure(t *testing.T) {
+	t.Parallel()
+
+	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	require.NoError(t, store.StageTag(staging.ServiceParam, "/app/success", staging.TagEntry{
+		Add:      map[string]string{"env": "prod"},
+		StagedAt: time.Now(),
+	}))
+	require.NoError(t, store.StageTag(staging.ServiceParam, "/app/fail", staging.TagEntry{
+		Add:      map[string]string{"env": "dev"},
+		StagedAt: time.Now(),
+	}))
+
+	strategy := newMockApplyTagStrategy()
+	strategy.applyTagsErrors["/app/fail"] = errors.New("tag api error")
+
+	uc := &usecasestaging.ApplyUseCase{
+		Strategy: strategy,
+		Store:    store,
+	}
+
+	output, err := uc.Execute(context.Background(), usecasestaging.ApplyInput{})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "failed 0 entries, 1 tags")
+	assert.Equal(t, 1, output.TagSucceeded)
+	assert.Equal(t, 1, output.TagFailed)
+
+	// Success should be unstaged
+	_, err = store.GetTag(staging.ServiceParam, "/app/success")
+	assert.ErrorIs(t, err, staging.ErrNotStaged)
+
+	// Failure should still be staged
+	_, err = store.GetTag(staging.ServiceParam, "/app/fail")
+	require.NoError(t, err)
+}
+
+func TestApplyUseCase_Execute_FilterByName_TagOnly(t *testing.T) {
+	t.Parallel()
+
+	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	require.NoError(t, store.StageTag(staging.ServiceParam, "/app/one", staging.TagEntry{
+		Add:      map[string]string{"env": "prod"},
+		StagedAt: time.Now(),
+	}))
+	require.NoError(t, store.StageTag(staging.ServiceParam, "/app/two", staging.TagEntry{
+		Add:      map[string]string{"env": "dev"},
+		StagedAt: time.Now(),
+	}))
+
+	uc := &usecasestaging.ApplyUseCase{
+		Strategy: newMockApplyTagStrategy(),
+		Store:    store,
+	}
+
+	output, err := uc.Execute(context.Background(), usecasestaging.ApplyInput{
+		Name: "/app/one",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, 1, output.TagSucceeded)
+	require.Len(t, output.TagResults, 1)
+	assert.Equal(t, "/app/one", output.TagResults[0].Name)
+
+	// /app/two should still be staged
+	_, err = store.GetTag(staging.ServiceParam, "/app/two")
+	require.NoError(t, err)
+}
+
+func TestApplyUseCase_Execute_ListTagsError(t *testing.T) {
+	t.Parallel()
+
+	store := newMockStore()
+	store.listTagsErr = errors.New("list tags error")
+
+	uc := &usecasestaging.ApplyUseCase{
+		Strategy: newMockApplyTagStrategy(),
+		Store:    store,
+	}
+
+	_, err := uc.Execute(context.Background(), usecasestaging.ApplyInput{})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "list tags error")
 }

@@ -16,7 +16,6 @@ type AddInput struct {
 	Name        string
 	Value       string
 	Description string
-	Tags        map[string]string
 }
 
 // AddOutput holds the result of the add use case.
@@ -63,9 +62,6 @@ func (u *AddUseCase) Execute(_ context.Context, input AddInput) (*AddOutput, err
 	}
 	if input.Description != "" {
 		entry.Description = &input.Description
-	}
-	if len(input.Tags) > 0 {
-		entry.Tags = input.Tags
 	}
 	if err := u.Store.Stage(service, name, entry); err != nil {
 		return nil, err
