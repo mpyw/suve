@@ -660,17 +660,25 @@ func (a *App) SecretRestore(name string) (*SecretRestoreResult, error) {
 
 // StagingStatusResult represents the result of staging status.
 type StagingStatusResult struct {
-	SSM []StagingEntry `json:"ssm"`
-	SM  []StagingEntry `json:"sm"`
+	SSM     []StagingEntry    `json:"ssm"`
+	SM      []StagingEntry    `json:"sm"`
+	SSMTags []StagingTagEntry `json:"ssmTags"`
+	SMTags  []StagingTagEntry `json:"smTags"`
 }
 
-// StagingEntry represents a staged change.
+// StagingEntry represents a staged entry change.
 type StagingEntry struct {
+	Name      string  `json:"name"`
+	Operation string  `json:"operation"`
+	Value     *string `json:"value,omitempty"`
+	StagedAt  string  `json:"stagedAt"`
+}
+
+// StagingTagEntry represents a staged tag change.
+type StagingTagEntry struct {
 	Name      string              `json:"name"`
-	Operation string              `json:"operation"`
-	Value     *string             `json:"value,omitempty"`
-	Tags      map[string]string   `json:"tags,omitempty"`
-	UntagKeys maputil.Set[string] `json:"untagKeys,omitempty"`
+	AddTags   map[string]string   `json:"addTags,omitempty"`
+	RemoveTags maputil.Set[string] `json:"removeTags,omitempty"`
 	StagedAt  string              `json:"stagedAt"`
 }
 
@@ -705,8 +713,10 @@ func (a *App) StagingStatus() (*StagingStatusResult, error) {
 	}
 
 	result := &StagingStatusResult{
-		SSM: make([]StagingEntry, len(ssmResult.Entries)),
-		SM:  make([]StagingEntry, len(smResult.Entries)),
+		SSM:     make([]StagingEntry, len(ssmResult.Entries)),
+		SM:      make([]StagingEntry, len(smResult.Entries)),
+		SSMTags: make([]StagingTagEntry, len(ssmResult.TagEntries)),
+		SMTags:  make([]StagingTagEntry, len(smResult.TagEntries)),
 	}
 
 	for i, e := range ssmResult.Entries {
@@ -714,8 +724,6 @@ func (a *App) StagingStatus() (*StagingStatusResult, error) {
 			Name:      e.Name,
 			Operation: string(e.Operation),
 			Value:     e.Value,
-			Tags:      e.Tags,
-			UntagKeys: e.UntagKeys,
 			StagedAt:  e.StagedAt.Format("2006-01-02T15:04:05Z07:00"),
 		}
 	}
@@ -725,31 +733,56 @@ func (a *App) StagingStatus() (*StagingStatusResult, error) {
 			Name:      e.Name,
 			Operation: string(e.Operation),
 			Value:     e.Value,
-			Tags:      e.Tags,
-			UntagKeys: e.UntagKeys,
 			StagedAt:  e.StagedAt.Format("2006-01-02T15:04:05Z07:00"),
+		}
+	}
+
+	for i, t := range ssmResult.TagEntries {
+		result.SSMTags[i] = StagingTagEntry{
+			Name:       t.Name,
+			AddTags:    t.Add,
+			RemoveTags: t.Remove,
+			StagedAt:   t.StagedAt.Format("2006-01-02T15:04:05Z07:00"),
+		}
+	}
+
+	for i, t := range smResult.TagEntries {
+		result.SMTags[i] = StagingTagEntry{
+			Name:       t.Name,
+			AddTags:    t.Add,
+			RemoveTags: t.Remove,
+			StagedAt:   t.StagedAt.Format("2006-01-02T15:04:05Z07:00"),
 		}
 	}
 
 	return result, nil
 }
 
-// StagingApplyResultEntry represents a single apply result.
-type StagingApplyResultEntry struct {
-	Name      string              `json:"name"`
-	Status    string              `json:"status"`
-	Error     string              `json:"error,omitempty"`
-	Tags      map[string]string   `json:"tags,omitempty"`
-	UntagKeys maputil.Set[string] `json:"untagKeys,omitempty"`
+// StagingApplyEntryResult represents a single entry apply result.
+type StagingApplyEntryResult struct {
+	Name   string `json:"name"`
+	Status string `json:"status"`
+	Error  string `json:"error,omitempty"`
+}
+
+// StagingApplyTagResult represents a single tag apply result.
+type StagingApplyTagResult struct {
+	Name       string              `json:"name"`
+	AddTags    map[string]string   `json:"addTags,omitempty"`
+	RemoveTags maputil.Set[string] `json:"removeTags,omitempty"`
+	Error      string              `json:"error,omitempty"`
 }
 
 // StagingApplyResult represents the result of applying staged changes.
 type StagingApplyResult struct {
-	ServiceName string                    `json:"serviceName"`
-	Results     []StagingApplyResultEntry `json:"results"`
-	Conflicts   []string                  `json:"conflicts,omitempty"`
-	Succeeded   int                       `json:"succeeded"`
-	Failed      int                       `json:"failed"`
+	ServiceName    string                    `json:"serviceName"`
+	EntryResults   []StagingApplyEntryResult `json:"entryResults"`
+	TagResults     []StagingApplyTagResult   `json:"tagResults"`
+	Conflicts      []string                  `json:"conflicts,omitempty"`
+	EntrySucceeded int                       `json:"entrySucceeded"`
+	EntryFailed    int                       `json:"entryFailed"`
+	TagSucceeded   int                       `json:"tagSucceeded"`
+	TagFailed      int                       `json:"tagFailed"`
 }
 
 // StagingApply applies staged changes for a service.
@@ -773,17 +806,17 @@ func (a *App) StagingApply(service string, ignoreConflicts bool) (*StagingApplyR
 	})
 
 	output := &StagingApplyResult{
-		ServiceName: result.ServiceName,
-		Conflicts:   result.Conflicts,
-		Succeeded:   result.Succeeded,
-		Failed:      result.Failed,
+		ServiceName:    result.ServiceName,
+		Conflicts:      result.Conflicts,
+		EntrySucceeded: result.EntrySucceeded,
+		EntryFailed:    result.EntryFailed,
+		TagSucceeded:   result.TagSucceeded,
+		TagFailed:      result.TagFailed,
 	}
 
-	for _, r := range result.Results {
-		entry := StagingApplyResultEntry{
-			Name:      r.Name,
-			Tags:      r.Tags,
-			UntagKeys: r.UntagKeys,
+	for _, r := range result.EntryResults {
+		entry := StagingApplyEntryResult{
+			Name: r.Name,
 		}
 		switch r.Status {
 		case stagingusecase.ApplyResultCreated:
@@ -798,7 +831,19 @@ func (a *App) StagingApply(service string, ignoreConflicts bool) (*StagingApplyR
 				entry.Error = r.Error.Error()
 			}
 		}
-		output.Results = append(output.Results, entry)
+		output.EntryResults = append(output.EntryResults, entry)
+	}
+
+	for _, r := range result.TagResults {
+		tagResult := StagingApplyTagResult{
+			Name:       r.Name,
+			AddTags:    r.AddTags,
+			RemoveTags: r.RemoveTag,
+		}
+		if r.Error != nil {
+			tagResult.Error = r.Error.Error()
+		}
+		output.TagResults = append(output.TagResults, tagResult)
 	}
 
 	return output, err
@@ -957,7 +1002,7 @@ type StagingUnstageResult struct {
 	Name string `json:"name"`
 }
 
-// StagingUnstage removes an item from staging.
+// StagingUnstage removes an item from staging (both entry and tags).
 func (a *App) StagingUnstage(service, name string) (*StagingUnstageResult, error) {
 	store, err := a.getStagingStore()
 	if err != nil {
@@ -969,7 +1014,13 @@ func (a *App) StagingUnstage(service, name string) (*StagingUnstageResult, error
 		return nil, err
 	}
 
-	if err := store.Unstage(svc, name); err != nil {
+	// Unstage entry (ignore ErrNotStaged)
+	if err := store.UnstageEntry(svc, name); err != nil && err != staging.ErrNotStaged {
+		return nil, err
+	}
+
+	// Unstage tags (ignore ErrNotStaged)
+	if err := store.UnstageTag(svc, name); err != nil && err != staging.ErrNotStaged {
 		return nil, err
 	}
 
@@ -1045,31 +1096,39 @@ type StagingCancelAddTagResult struct {
 	Name string `json:"name"`
 }
 
-// StagingCancelAddTag cancels a staged tag addition (removes from Tags only).
+// StagingCancelAddTag cancels a staged tag addition (removes from Add only).
 func (a *App) StagingCancelAddTag(service, name, key string) (*StagingCancelAddTagResult, error) {
 	store, err := a.getStagingStore()
 	if err != nil {
 		return nil, err
 	}
 
-	strategy, err := a.getEditStrategy(service)
+	svc, err := a.getService(service)
 	if err != nil {
 		return nil, err
 	}
 
-	uc := &stagingusecase.TagUseCase{
-		Strategy: strategy,
-		Store:    store,
-	}
-	result, err := uc.Execute(a.ctx, stagingusecase.TagInput{
-		Name:          name,
-		CancelAddTags: maputil.NewSet(key),
-	})
+	// Get existing tag entry
+	tagEntry, err := store.GetTag(svc, name)
 	if err != nil {
 		return nil, err
 	}
 
-	return &StagingCancelAddTagResult{Name: result.Name}, nil
+	// Remove key from Add
+	delete(tagEntry.Add, key)
+
+	// If tag entry has no meaningful content, unstage it
+	if len(tagEntry.Add) == 0 && tagEntry.Remove.Len() == 0 {
+		if err := store.UnstageTag(svc, name); err != nil {
+			return nil, err
+		}
+	} else {
+		if err := store.StageTag(svc, name, *tagEntry); err != nil {
+			return nil, err
+		}
+	}
+
+	return &StagingCancelAddTagResult{Name: name}, nil
 }
 
 // StagingCancelRemoveTagResult represents the result of canceling a staged tag removal.
@@ -1077,51 +1136,65 @@ type StagingCancelRemoveTagResult struct {
 	Name string `json:"name"`
 }
 
-// StagingCancelRemoveTag cancels a staged tag removal (removes from UntagKeys only).
+// StagingCancelRemoveTag cancels a staged tag removal (removes from Remove only).
 func (a *App) StagingCancelRemoveTag(service, name, key string) (*StagingCancelRemoveTagResult, error) {
 	store, err := a.getStagingStore()
 	if err != nil {
 		return nil, err
 	}
 
-	strategy, err := a.getEditStrategy(service)
+	svc, err := a.getService(service)
 	if err != nil {
 		return nil, err
 	}
 
-	uc := &stagingusecase.TagUseCase{
-		Strategy: strategy,
-		Store:    store,
-	}
-	result, err := uc.Execute(a.ctx, stagingusecase.TagInput{
-		Name:             name,
-		CancelRemoveTags: maputil.NewSet(key),
-	})
+	// Get existing tag entry
+	tagEntry, err := store.GetTag(svc, name)
 	if err != nil {
 		return nil, err
 	}
 
-	return &StagingCancelRemoveTagResult{Name: result.Name}, nil
+	// Remove key from Remove set
+	tagEntry.Remove.Remove(key)
+
+	// If tag entry has no meaningful content, unstage it
+	if len(tagEntry.Add) == 0 && tagEntry.Remove.Len() == 0 {
+		if err := store.UnstageTag(svc, name); err != nil {
+			return nil, err
+		}
+	} else {
+		if err := store.StageTag(svc, name, *tagEntry); err != nil {
+			return nil, err
+		}
+	}
+
+	return &StagingCancelRemoveTagResult{Name: name}, nil
 }
 
 // StagingDiffResult represents the result of diffing staged changes.
 type StagingDiffResult struct {
-	ItemName string             `json:"itemName"`
-	Entries  []StagingDiffEntry `json:"entries"`
+	ItemName   string                `json:"itemName"`
+	Entries    []StagingDiffEntry    `json:"entries"`
+	TagEntries []StagingDiffTagEntry `json:"tagEntries"`
 }
 
 // StagingDiffEntry represents a single diff entry.
 type StagingDiffEntry struct {
-	Name          string              `json:"name"`
-	Type          string              `json:"type"` // "normal", "create", "autoUnstaged", "warning"
-	Operation     string              `json:"operation,omitempty"`
-	AWSValue      string              `json:"awsValue,omitempty"`
-	AWSIdentifier string              `json:"awsIdentifier,omitempty"`
-	StagedValue   string              `json:"stagedValue,omitempty"`
-	Description   *string             `json:"description,omitempty"`
-	Tags          map[string]string   `json:"tags,omitempty"`
-	UntagKeys     maputil.Set[string] `json:"untagKeys,omitempty"`
-	Warning       string              `json:"warning,omitempty"`
+	Name          string  `json:"name"`
+	Type          string  `json:"type"` // "normal", "create", "autoUnstaged", "warning"
+	Operation     string  `json:"operation,omitempty"`
+	AWSValue      string  `json:"awsValue,omitempty"`
+	AWSIdentifier string  `json:"awsIdentifier,omitempty"`
+	StagedValue   string  `json:"stagedValue,omitempty"`
+	Description   *string `json:"description,omitempty"`
+	Warning       string  `json:"warning,omitempty"`
+}
+
+// StagingDiffTagEntry represents a single diff tag entry.
+type StagingDiffTagEntry struct {
+	Name       string              `json:"name"`
+	AddTags    map[string]string   `json:"addTags,omitempty"`
+	RemoveTags maputil.Set[string] `json:"removeTags,omitempty"`
 }
 
 // StagingDiff shows diff between staged changes and AWS.
@@ -1154,8 +1227,6 @@ func (a *App) StagingDiff(service string, name string) (*StagingDiffResult, erro
 			AWSIdentifier: e.AWSIdentifier,
 			StagedValue:   e.StagedValue,
 			Description:   e.Description,
-			Tags:          e.Tags,
-			UntagKeys:     e.UntagKeys,
 			Warning:       e.Warning,
 		}
 		switch e.Type {
@@ -1171,9 +1242,19 @@ func (a *App) StagingDiff(service string, name string) (*StagingDiffResult, erro
 		entries[i] = entry
 	}
 
+	tagEntries := make([]StagingDiffTagEntry, len(result.TagEntries))
+	for i, t := range result.TagEntries {
+		tagEntries[i] = StagingDiffTagEntry{
+			Name:       t.Name,
+			AddTags:    t.Add,
+			RemoveTags: t.Remove,
+		}
+	}
+
 	return &StagingDiffResult{
-		ItemName: result.ItemName,
-		Entries:  entries,
+		ItemName:   result.ItemName,
+		Entries:    entries,
+		TagEntries: tagEntries,
 	}, nil
 }
 
