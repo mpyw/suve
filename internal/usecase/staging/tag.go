@@ -81,6 +81,14 @@ func (u *TagUseCase) Execute(ctx context.Context, input TagInput) (*TagOutput, e
 		for k := range input.CancelRemoveTags {
 			entry.UntagKeys.Remove(k)
 		}
+
+		// If entry has no meaningful content after cancellation, unstage it
+		if entry.Value == nil && entry.Description == nil && len(entry.Tags) == 0 && entry.UntagKeys.Len() == 0 {
+			if err := u.Store.Unstage(service, name); err != nil {
+				return nil, err
+			}
+			return &TagOutput{Name: name}, nil
+		}
 	} else {
 		// Create new entry for tag-only change
 		// Fetch base time from AWS for conflict detection

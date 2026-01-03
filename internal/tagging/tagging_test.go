@@ -104,6 +104,13 @@ func TestParseFlags(t *testing.T) {
 			wantRemove:   maputil.NewSet[string](),
 			wantWarnings: []string{`tag "env": --tag env=prod overrides --tag env=dev`},
 		},
+		{
+			name:         "duplicate untag - last wins with warning",
+			untags:       []string{"env", "env"},
+			wantAdd:      map[string]string{},
+			wantRemove:   maputil.NewSet("env"),
+			wantWarnings: []string{`tag "env": --untag env overrides --untag env`},
+		},
 	}
 
 	for _, tt := range tests {
