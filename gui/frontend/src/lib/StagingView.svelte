@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount, createEventDispatcher } from 'svelte';
-  import { StagingDiff, StagingApply, StagingReset, StagingEdit, StagingUnstage, StagingAddTag, StagingRemoveTag } from '../../wailsjs/go/main/App';
+  import { StagingDiff, StagingApply, StagingReset, StagingEdit, StagingUnstage, StagingAddTag, StagingCancelAddTag, StagingCancelRemoveTag } from '../../wailsjs/go/main/App';
   import type { main } from '../../wailsjs/go/models';
   import Modal from './Modal.svelte';
   import DiffDisplay from './DiffDisplay.svelte';
@@ -216,8 +216,9 @@
   }
 
   async function handleRemoveTag(service: string, entryName: string, key: string) {
+    // Cancel a staged tag addition (remove from Tags only, don't add to UntagKeys)
     try {
-      await StagingRemoveTag(service, entryName, key);
+      await StagingCancelAddTag(service, entryName, key);
       await loadStatus();
     } catch (e) {
       error = e instanceof Error ? e.message : String(e);
@@ -225,12 +226,9 @@
   }
 
   async function handleCancelUntag(service: string, entryName: string, key: string) {
-    // To cancel a staged untag, we re-add the tag with empty value (or we need a different API)
-    // For now, we'll just remove it from untagKeys by re-staging the entry without that key
-    // Since there's no direct API, we'll need to handle this differently
-    // Actually, the StagingAddTag should effectively cancel the untag
+    // Cancel a staged tag removal (remove from UntagKeys only, don't add to Tags)
     try {
-      await StagingAddTag(service, entryName, key, '');
+      await StagingCancelRemoveTag(service, entryName, key);
       await loadStatus();
     } catch (e) {
       error = e instanceof Error ? e.message : String(e);

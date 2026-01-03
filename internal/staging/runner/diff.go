@@ -140,7 +140,7 @@ func (r *DiffRunner) outputMetadata(entry stagingusecase.DiffEntry) {
 		}
 		_, _ = fmt.Fprintf(r.Stdout, "%s %s\n", colors.FieldLabel("Tags:"), strings.Join(tagPairs, ", "))
 	}
-	if len(entry.UntagKeys) > 0 {
-		_, _ = fmt.Fprintf(r.Stdout, "%s %s\n", colors.FieldLabel("Untag:"), strings.Join(entry.UntagKeys, ", "))
+	if entry.UntagKeys.Len() > 0 {
+		_, _ = fmt.Fprintf(r.Stdout, "%s %s\n", colors.FieldLabel("Untag:"), strings.Join(entry.UntagKeys.Values(), ", "))
 	}
 }

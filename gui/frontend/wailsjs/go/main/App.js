@@ -86,6 +86,14 @@ export function StagingApply(arg1, arg2) {
   return window['go']['main']['App']['StagingApply'](arg1, arg2);
 }
 
+export function StagingCancelAddTag(arg1, arg2, arg3) {
+  return window['go']['main']['App']['StagingCancelAddTag'](arg1, arg2, arg3);
+}
+
+export function StagingCancelRemoveTag(arg1, arg2, arg3) {
+  return window['go']['main']['App']['StagingCancelRemoveTag'](arg1, arg2, arg3);
+}
+
 export function StagingDelete(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['StagingDelete'](arg1, arg2, arg3, arg4);
 }

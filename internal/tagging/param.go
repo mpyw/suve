@@ -42,11 +42,11 @@ func ApplyParam(ctx context.Context, client ParamClient, resourceID string, chan
 	}
 
 	// Remove tags
-	if len(change.Remove) > 0 {
+	if change.Remove.Len() > 0 {
 		_, err := client.RemoveTagsFromResource(ctx, &paramapi.RemoveTagsFromResourceInput{
 			ResourceType: paramapi.ResourceTypeForTaggingParameter,
 			ResourceId:   lo.ToPtr(resourceID),
-			TagKeys:      change.Remove,
+			TagKeys:      change.Remove.Values(),
 		})
 		if err != nil {
 			return fmt.Errorf("failed to remove tags: %w", err)

@@ -11,6 +11,7 @@ import (
 
 	"github.com/mpyw/suve/internal/api/paramapi"
 	"github.com/mpyw/suve/internal/api/secretapi"
+	"github.com/mpyw/suve/internal/maputil"
 )
 
 func TestParseFlags(t *testing.T) {
@@ -19,7 +20,7 @@ func TestParseFlags(t *testing.T) {
 		tags         []string
 		untags       []string
 		wantAdd      map[string]string
-		wantRemove   []string
+		wantRemove   maputil.Set[string]
 		wantWarnings []string
 		wantErr      string
 	}{
@@ -28,58 +29,58 @@ func TestParseFlags(t *testing.T) {
 			tags:       nil,
 			untags:     nil,
 			wantAdd:    map[string]string{},
-			wantRemove: []string{},
+			wantRemove: maputil.NewSet[string](),
 		},
 		{
 			name:       "add single tag",
 			tags:       []string{"env=prod"},
 			wantAdd:    map[string]string{"env": "prod"},
-			wantRemove: []string{},
+			wantRemove: maputil.NewSet[string](),
 		},
 		{
 			name:       "add multiple tags",
 			tags:       []string{"env=prod", "team=platform"},
 			wantAdd:    map[string]string{"env": "prod", "team": "platform"},
-			wantRemove: []string{},
+			wantRemove: maputil.NewSet[string](),
 		},
 		{
 			name:       "remove single tag",
 			untags:     []string{"env"},
 			wantAdd:    map[string]string{},
-			wantRemove: []string{"env"},
+			wantRemove: maputil.NewSet("env"),
 		},
 		{
 			name:       "remove multiple tags",
 			untags:     []string{"env", "team"},
 			wantAdd:    map[string]string{},
-			wantRemove: []string{"env", "team"},
+			wantRemove: maputil.NewSet("env", "team"),
 		},
 		{
 			name:       "add and remove different tags",
 			tags:       []string{"env=prod"},
 			untags:     []string{"deprecated"},
 			wantAdd:    map[string]string{"env": "prod"},
-			wantRemove: []string{"deprecated"},
+			wantRemove: maputil.NewSet("deprecated"),
 		},
 		{
 			name:         "conflict - untag wins over tag",
 			tags:         []string{"env=prod"},
 			untags:       []string{"env"},
 			wantAdd:      map[string]string{},
-			wantRemove:   []string{"env"},
+			wantRemove:   maputil.NewSet("env"),
 			wantWarnings: []string{`tag "env": --untag env overrides --tag env=prod`},
 		},
 		{
 			name:       "tag with equals in value",
 			tags:       []string{"config=key=value"},
 			wantAdd:    map[string]string{"config": "key=value"},
-			wantRemove: []string{},
+			wantRemove: maputil.NewSet[string](),
 		},
 		{
 			name:       "tag with empty value",
 			tags:       []string{"empty="},
 			wantAdd:    map[string]string{"empty": ""},
-			wantRemove: []string{},
+			wantRemove: maputil.NewSet[string](),
 		},
 		{
 			name:    "invalid tag format - no equals",
@@ -100,7 +101,7 @@ func TestParseFlags(t *testing.T) {
 			name:         "duplicate tag - last wins",
 			tags:         []string{"env=dev", "env=prod"},
 			wantAdd:      map[string]string{"env": "prod"},
-			wantRemove:   []string{},
+			wantRemove:   maputil.NewSet[string](),
 			wantWarnings: []string{`tag "env": --tag env=prod overrides --tag env=dev`},
 		},
 	}
@@ -117,7 +118,7 @@ func TestParseFlags(t *testing.T) {
 
 			require.NoError(t, err)
 			assert.Equal(t, tt.wantAdd, result.Change.Add)
-			assert.ElementsMatch(t, tt.wantRemove, result.Change.Remove)
+			assert.ElementsMatch(t, tt.wantRemove.Values(), result.Change.Remove.Values())
 			if tt.wantWarnings == nil {
 				assert.Empty(t, result.Warnings)
 			} else {
@@ -135,22 +136,22 @@ func TestChange_IsEmpty(t *testing.T) {
 	}{
 		{
 			name:   "empty",
-			change: &Change{Add: map[string]string{}, Remove: []string{}},
+			change: &Change{Add: map[string]string{}, Remove: maputil.NewSet[string]()},
 			want:   true,
 		},
 		{
 			name:   "has add",
-			change: &Change{Add: map[string]string{"k": "v"}, Remove: []string{}},
+			change: &Change{Add: map[string]string{"k": "v"}, Remove: maputil.NewSet[string]()},
 			want:   false,
 		},
 		{
 			name:   "has remove",
-			change: &Change{Add: map[string]string{}, Remove: []string{"k"}},
+			change: &Change{Add: map[string]string{}, Remove: maputil.NewSet("k")},
 			want:   false,
 		},
 		{
 			name:   "has both",
-			change: &Change{Add: map[string]string{"k": "v"}, Remove: []string{"x"}},
+			change: &Change{Add: map[string]string{"k": "v"}, Remove: maputil.NewSet("x")},
 			want:   false,
 		},
 	}
@@ -194,13 +195,13 @@ func TestApplySecret(t *testing.T) {
 		{
 			name:     "empty change does nothing",
 			secretID: "my-secret",
-			change:   &Change{Add: map[string]string{}, Remove: []string{}},
+			change:   &Change{Add: map[string]string{}, Remove: maputil.NewSet[string]()},
 			mock:     &mockSecretClient{},
 		},
 		{
 			name:     "add tags",
 			secretID: "my-secret",
-			change:   &Change{Add: map[string]string{"env": "prod", "team": "platform"}, Remove: []string{}},
+			change:   &Change{Add: map[string]string{"env": "prod", "team": "platform"}, Remove: maputil.NewSet[string]()},
 			mock: &mockSecretClient{
 				tagResourceFunc: func(_ context.Context, params *secretapi.TagResourceInput, _ ...func(*secretapi.Options)) (*secretapi.TagResourceOutput, error) {
 					assert.Equal(t, "my-secret", lo.FromPtr(params.SecretId))
@@ -218,7 +219,7 @@ func TestApplySecret(t *testing.T) {
 		{
 			name:     "remove tags",
 			secretID: "my-secret",
-			change:   &Change{Add: map[string]string{}, Remove: []string{"deprecated", "old"}},
+			change:   &Change{Add: map[string]string{}, Remove: maputil.NewSet("deprecated", "old")},
 			mock: &mockSecretClient{
 				untagResourceFunc: func(_ context.Context, params *secretapi.UntagResourceInput, _ ...func(*secretapi.Options)) (*secretapi.UntagResourceOutput, error) {
 					assert.Equal(t, "my-secret", lo.FromPtr(params.SecretId))
@@ -230,7 +231,7 @@ func TestApplySecret(t *testing.T) {
 		{
 			name:     "add and remove tags",
 			secretID: "my-secret",
-			change:   &Change{Add: map[string]string{"env": "prod"}, Remove: []string{"deprecated"}},
+			change:   &Change{Add: map[string]string{"env": "prod"}, Remove: maputil.NewSet("deprecated")},
 			mock: &mockSecretClient{
 				tagResourceFunc: func(_ context.Context, params *secretapi.TagResourceInput, _ ...func(*secretapi.Options)) (*secretapi.TagResourceOutput, error) {
 					assert.Equal(t, "my-secret", lo.FromPtr(params.SecretId))
@@ -249,7 +250,7 @@ func TestApplySecret(t *testing.T) {
 		{
 			name:     "tag resource error",
 			secretID: "my-secret",
-			change:   &Change{Add: map[string]string{"env": "prod"}, Remove: []string{}},
+			change:   &Change{Add: map[string]string{"env": "prod"}, Remove: maputil.NewSet[string]()},
 			mock: &mockSecretClient{
 				tagResourceFunc: func(_ context.Context, _ *secretapi.TagResourceInput, _ ...func(*secretapi.Options)) (*secretapi.TagResourceOutput, error) {
 					return nil, fmt.Errorf("access denied")
@@ -260,7 +261,7 @@ func TestApplySecret(t *testing.T) {
 		{
 			name:     "untag resource error",
 			secretID: "my-secret",
-			change:   &Change{Add: map[string]string{}, Remove: []string{"deprecated"}},
+			change:   &Change{Add: map[string]string{}, Remove: maputil.NewSet("deprecated")},
 			mock: &mockSecretClient{
 				untagResourceFunc: func(_ context.Context, _ *secretapi.UntagResourceInput, _ ...func(*secretapi.Options)) (*secretapi.UntagResourceOutput, error) {
 					return nil, fmt.Errorf("access denied")
@@ -318,13 +319,13 @@ func TestApplyParam(t *testing.T) {
 		{
 			name:       "empty change does nothing",
 			resourceID: "/my/param",
-			change:     &Change{Add: map[string]string{}, Remove: []string{}},
+			change:     &Change{Add: map[string]string{}, Remove: maputil.NewSet[string]()},
 			mock:       &mockParamClient{},
 		},
 		{
 			name:       "add tags",
 			resourceID: "/my/param",
-			change:     &Change{Add: map[string]string{"env": "prod", "team": "platform"}, Remove: []string{}},
+			change:     &Change{Add: map[string]string{"env": "prod", "team": "platform"}, Remove: maputil.NewSet[string]()},
 			mock: &mockParamClient{
 				addTagsToResourceFunc: func(_ context.Context, params *paramapi.AddTagsToResourceInput, _ ...func(*paramapi.Options)) (*paramapi.AddTagsToResourceOutput, error) {
 					assert.Equal(t, paramapi.ResourceTypeForTaggingParameter, params.ResourceType)
@@ -343,7 +344,7 @@ func TestApplyParam(t *testing.T) {
 		{
 			name:       "remove tags",
 			resourceID: "/my/param",
-			change:     &Change{Add: map[string]string{}, Remove: []string{"deprecated", "old"}},
+			change:     &Change{Add: map[string]string{}, Remove: maputil.NewSet("deprecated", "old")},
 			mock: &mockParamClient{
 				removeTagsFromResourceFunc: func(_ context.Context, params *paramapi.RemoveTagsFromResourceInput, _ ...func(*paramapi.Options)) (*paramapi.RemoveTagsFromResourceOutput, error) {
 					assert.Equal(t, paramapi.ResourceTypeForTaggingParameter, params.ResourceType)
@@ -356,7 +357,7 @@ func TestApplyParam(t *testing.T) {
 		{
 			name:       "add and remove tags",
 			resourceID: "/my/param",
-			change:     &Change{Add: map[string]string{"env": "prod"}, Remove: []string{"deprecated"}},
+			change:     &Change{Add: map[string]string{"env": "prod"}, Remove: maputil.NewSet("deprecated")},
 			mock: &mockParamClient{
 				addTagsToResourceFunc: func(_ context.Context, params *paramapi.AddTagsToResourceInput, _ ...func(*paramapi.Options)) (*paramapi.AddTagsToResourceOutput, error) {
 					assert.Equal(t, paramapi.ResourceTypeForTaggingParameter, params.ResourceType)
@@ -377,7 +378,7 @@ func TestApplyParam(t *testing.T) {
 		{
 			name:       "add tags error",
 			resourceID: "/my/param",
-			change:     &Change{Add: map[string]string{"env": "prod"}, Remove: []string{}},
+			change:     &Change{Add: map[string]string{"env": "prod"}, Remove: maputil.NewSet[string]()},
 			mock: &mockParamClient{
 				addTagsToResourceFunc: func(_ context.Context, _ *paramapi.AddTagsToResourceInput, _ ...func(*paramapi.Options)) (*paramapi.AddTagsToResourceOutput, error) {
 					return nil, fmt.Errorf("access denied")
@@ -388,7 +389,7 @@ func TestApplyParam(t *testing.T) {
 		{
 			name:       "remove tags error",
 			resourceID: "/my/param",
-			change:     &Change{Add: map[string]string{}, Remove: []string{"deprecated"}},
+			change:     &Change{Add: map[string]string{}, Remove: maputil.NewSet("deprecated")},
 			mock: &mockParamClient{
 				removeTagsFromResourceFunc: func(_ context.Context, _ *paramapi.RemoveTagsFromResourceInput, _ ...func(*paramapi.Options)) (*paramapi.RemoveTagsFromResourceOutput, error) {
 					return nil, fmt.Errorf("access denied")

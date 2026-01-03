@@ -6,6 +6,7 @@ import (
 
 	"github.com/samber/lo"
 
+	"github.com/mpyw/suve/internal/maputil"
 	"github.com/mpyw/suve/internal/parallel"
 	"github.com/mpyw/suve/internal/staging"
 )
@@ -35,7 +36,7 @@ type DiffEntry struct {
 	StagedValue   string
 	Description   *string
 	Tags          map[string]string
-	UntagKeys     []string
+	UntagKeys     maputil.Set[string]
 	Warning       string // For warnings like "already deleted in AWS"
 }
 

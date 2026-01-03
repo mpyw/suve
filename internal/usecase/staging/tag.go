@@ -5,16 +5,17 @@ import (
 	"errors"
 	"time"
 
-	"github.com/samber/lo"
-
+	"github.com/mpyw/suve/internal/maputil"
 	"github.com/mpyw/suve/internal/staging"
 )
 
 // TagInput holds input for the tag staging use case.
 type TagInput struct {
-	Name       string
-	AddTags    map[string]string // Tags to add or update
-	RemoveTags []string          // Tag keys to remove
+	Name             string
+	AddTags          map[string]string   // Tags to add or update
+	RemoveTags       maputil.Set[string] // Tag keys to remove
+	CancelAddTags    maputil.Set[string] // Cancel staged tag additions (remove from Tags only)
+	CancelRemoveTags maputil.Set[string] // Cancel staged tag removals (remove from UntagKeys only)
 }
 
 // TagOutput holds the result of the tag staging use case.
@@ -54,20 +55,31 @@ func (u *TagUseCase) Execute(ctx context.Context, input TagInput) (*TagOutput, e
 		if entry.Tags == nil {
 			entry.Tags = make(map[string]string)
 		}
+		if entry.UntagKeys == nil {
+			entry.UntagKeys = maputil.NewSet[string]()
+		}
 		for k, v := range input.AddTags {
 			entry.Tags[k] = v
 			// Remove from untag list if present
-			entry.UntagKeys = lo.Without(entry.UntagKeys, k)
+			entry.UntagKeys.Remove(k)
 		}
 
 		// Merge untag keys
-		for _, k := range input.RemoveTags {
+		for k := range input.RemoveTags {
 			// Remove from tags if present
 			delete(entry.Tags, k)
-			// Add to untag list if not already present
-			if !lo.Contains(entry.UntagKeys, k) {
-				entry.UntagKeys = append(entry.UntagKeys, k)
-			}
+			// Add to untag list
+			entry.UntagKeys.Add(k)
+		}
+
+		// Cancel staged tag additions (remove from Tags only, don't add to UntagKeys)
+		for k := range input.CancelAddTags {
+			delete(entry.Tags, k)
+		}
+
+		// Cancel staged tag removals (remove from UntagKeys only, don't add to Tags)
+		for k := range input.CancelRemoveTags {
+			entry.UntagKeys.Remove(k)
 		}
 	} else {
 		// Create new entry for tag-only change
@@ -88,7 +100,7 @@ func (u *TagUseCase) Execute(ctx context.Context, input TagInput) (*TagOutput, e
 		if len(input.AddTags) > 0 {
 			entry.Tags = input.AddTags
 		}
-		if len(input.RemoveTags) > 0 {
+		if input.RemoveTags.Len() > 0 {
 			entry.UntagKeys = input.RemoveTags
 		}
 	}

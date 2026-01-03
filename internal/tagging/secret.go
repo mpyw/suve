@@ -41,10 +41,10 @@ func ApplySecret(ctx context.Context, client SecretClient, secretID string, chan
 	}
 
 	// Remove tags
-	if len(change.Remove) > 0 {
+	if change.Remove.Len() > 0 {
 		_, err := client.UntagResource(ctx, &secretapi.UntagResourceInput{
 			SecretId: lo.ToPtr(secretID),
-			TagKeys:  change.Remove,
+			TagKeys:  change.Remove.Values(),
 		})
 		if err != nil {
 			return fmt.Errorf("failed to remove tags: %w", err)

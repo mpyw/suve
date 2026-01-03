@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/mpyw/suve/internal/api/paramapi"
+	"github.com/mpyw/suve/internal/maputil"
 	"github.com/mpyw/suve/internal/staging"
 )
 
@@ -604,7 +605,7 @@ func TestParamStrategy_Apply_WithTags(t *testing.T) {
 		err := s.Apply(context.Background(), "/app/param", staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("updated"),
-			UntagKeys: []string{"old-tag"},
+			UntagKeys: maputil.NewSet("old-tag"),
 		})
 		require.NoError(t, err)
 		assert.True(t, removeTagsCalled)
@@ -705,7 +706,7 @@ func TestParamStrategy_Apply_TagOnlyUpdate(t *testing.T) {
 		err := s.Apply(context.Background(), "/app/param", staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     nil, // No value change
-			UntagKeys: []string{"deprecated"},
+			UntagKeys: maputil.NewSet("deprecated"),
 		})
 		require.NoError(t, err)
 		assert.False(t, putCalled, "PutParameter should not be called for tag-only update")
@@ -737,7 +738,7 @@ func TestParamStrategy_Apply_DeleteIgnoresTags(t *testing.T) {
 	err := s.Apply(context.Background(), "/app/param", staging.Entry{
 		Operation: staging.OperationDelete,
 		Tags:      map[string]string{"env": "prod"},
-		UntagKeys: []string{"deprecated"},
+		UntagKeys: maputil.NewSet("deprecated"),
 	})
 	require.NoError(t, err)
 	assert.False(t, addTagsCalled, "Tags should be ignored for delete operation")

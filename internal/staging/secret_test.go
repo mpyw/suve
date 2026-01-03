@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/mpyw/suve/internal/api/secretapi"
+	"github.com/mpyw/suve/internal/maputil"
 	"github.com/mpyw/suve/internal/staging"
 )
 
@@ -685,7 +686,7 @@ func TestSecretStrategy_Apply_WithOptions(t *testing.T) {
 		err := s.Apply(context.Background(), "my-secret", staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("updated-value"),
-			UntagKeys: []string{"old-tag"},
+			UntagKeys: maputil.NewSet("old-tag"),
 		})
 		require.NoError(t, err)
 		assert.True(t, untagResourceCalled)
@@ -800,7 +801,7 @@ func TestSecretStrategy_Apply_TagOnlyUpdate(t *testing.T) {
 		err := s.Apply(context.Background(), "my-secret", staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     nil, // No value change
-			UntagKeys: []string{"old-tag"},
+			UntagKeys: maputil.NewSet("old-tag"),
 		})
 		require.NoError(t, err)
 		assert.True(t, untagResourceCalled, "UntagResource should be called")
@@ -837,7 +838,7 @@ func TestSecretStrategy_Apply_DeleteIgnoresTags(t *testing.T) {
 		err := s.Apply(context.Background(), "my-secret", staging.Entry{
 			Operation: staging.OperationDelete,
 			Tags:      map[string]string{"env": "prod"}, // Should be ignored
-			UntagKeys: []string{"old-tag"},              // Should be ignored
+			UntagKeys: maputil.NewSet("old-tag"),        // Should be ignored
 		})
 		require.NoError(t, err)
 		assert.True(t, deleteSecretCalled, "DeleteSecret should be called")

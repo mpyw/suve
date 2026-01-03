@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/mpyw/suve/internal/maputil"
 	"github.com/mpyw/suve/internal/parallel"
 	"github.com/mpyw/suve/internal/staging"
 )
@@ -29,8 +30,8 @@ type ApplyResultEntry struct {
 	Name      string
 	Status    ApplyResultStatus
 	Error     error
-	Tags      map[string]string // Tags that were applied
-	UntagKeys []string          // Tag keys that were removed
+	Tags      map[string]string   // Tags that were applied
+	UntagKeys maputil.Set[string] // Tag keys that were removed
 }
 
 // ApplyOutput holds the result of the apply use case.

@@ -468,12 +468,24 @@ export namespace main {
 	        this.name = source["name"];
 	    }
 	}
+	export class  {
+	
+	
+	    static createFrom(source: any = {}) {
+	        return new (source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	
+	    }
+	}
 	export class StagingApplyResultEntry {
 	    name: string;
 	    status: string;
 	    error?: string;
 	    tags?: Record<string, string>;
-	    untagKeys?: string[];
+	    untagKeys?: Record<string, >;
 	
 	    static createFrom(source: any = {}) {
 	        return new StagingApplyResultEntry(source);
@@ -485,8 +497,26 @@ export namespace main {
 	        this.status = source["status"];
 	        this.error = source["error"];
 	        this.tags = source["tags"];
-	        this.untagKeys = source["untagKeys"];
+	        this.untagKeys = this.convertValues(source["untagKeys"], , true);
 	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 	export class StagingApplyResult {
 	    serviceName: string;
@@ -527,6 +557,30 @@ export namespace main {
 		}
 	}
 	
+	export class StagingCancelAddTagResult {
+	    name: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new StagingCancelAddTagResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	    }
+	}
+	export class StagingCancelRemoveTagResult {
+	    name: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new StagingCancelRemoveTagResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	    }
+	}
 	export class StagingDeleteResult {
 	    name: string;
 	
@@ -548,7 +602,7 @@ export namespace main {
 	    stagedValue?: string;
 	    description?: string;
 	    tags?: Record<string, string>;
-	    untagKeys?: string[];
+	    untagKeys?: Record<string, >;
 	    warning?: string;
 	
 	    static createFrom(source: any = {}) {
@@ -565,9 +619,27 @@ export namespace main {
 	        this.stagedValue = source["stagedValue"];
 	        this.description = source["description"];
 	        this.tags = source["tags"];
-	        this.untagKeys = source["untagKeys"];
+	        this.untagKeys = this.convertValues(source["untagKeys"], , true);
 	        this.warning = source["warning"];
 	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 	export class StagingDiffResult {
 	    itemName: string;
@@ -618,7 +690,7 @@ export namespace main {
 	    operation: string;
 	    value?: string;
 	    tags?: Record<string, string>;
-	    untagKeys?: string[];
+	    untagKeys?: Record<string, >;
 	    stagedAt: string;
 	
 	    static createFrom(source: any = {}) {
@@ -631,9 +703,27 @@ export namespace main {
 	        this.operation = source["operation"];
 	        this.value = source["value"];
 	        this.tags = source["tags"];
-	        this.untagKeys = source["untagKeys"];
+	        this.untagKeys = this.convertValues(source["untagKeys"], , true);
 	        this.stagedAt = source["stagedAt"];
 	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 	export class StagingRemoveTagResult {
 	    name: string;

@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/mpyw/suve/internal/maputil"
 	"github.com/mpyw/suve/internal/staging"
 	usecasestaging "github.com/mpyw/suve/internal/usecase/staging"
 )
@@ -75,7 +76,7 @@ func TestTagUseCase_Execute_RemoveTags(t *testing.T) {
 
 	output, err := uc.Execute(context.Background(), usecasestaging.TagInput{
 		Name:       "/app/config",
-		RemoveTags: []string{"old-tag", "deprecated"},
+		RemoveTags: maputil.NewSet("old-tag", "deprecated"),
 	})
 	require.NoError(t, err)
 	assert.Equal(t, "/app/config", output.Name)
@@ -83,8 +84,8 @@ func TestTagUseCase_Execute_RemoveTags(t *testing.T) {
 	// Verify staged
 	entry, err := store.Get(staging.ServiceParam, "/app/config")
 	require.NoError(t, err)
-	assert.Contains(t, entry.UntagKeys, "old-tag")
-	assert.Contains(t, entry.UntagKeys, "deprecated")
+	assert.True(t, entry.UntagKeys.Contains("old-tag"))
+	assert.True(t, entry.UntagKeys.Contains("deprecated"))
 }
 
 func TestTagUseCase_Execute_MergeWithExisting(t *testing.T) {
@@ -130,7 +131,7 @@ func TestTagUseCase_Execute_AddTagRemovesFromUntagList(t *testing.T) {
 	// Pre-stage with untag keys
 	require.NoError(t, store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
 		Operation: staging.OperationUpdate,
-		UntagKeys: []string{"env", "team"},
+		UntagKeys: maputil.NewSet("env", "team"),
 		StagedAt:  time.Now(),
 	}))
 
@@ -149,8 +150,8 @@ func TestTagUseCase_Execute_AddTagRemovesFromUntagList(t *testing.T) {
 	entry, err := store.Get(staging.ServiceParam, "/app/config")
 	require.NoError(t, err)
 	assert.Equal(t, "prod", entry.Tags["env"])
-	assert.NotContains(t, entry.UntagKeys, "env") // "env" removed from untag list
-	assert.Contains(t, entry.UntagKeys, "team")   // "team" still in untag list
+	assert.False(t, entry.UntagKeys.Contains("env")) // "env" removed from untag list
+	assert.True(t, entry.UntagKeys.Contains("team")) // "team" still in untag list
 }
 
 func TestTagUseCase_Execute_RemoveTagDeletesFromAddList(t *testing.T) {
@@ -173,15 +174,15 @@ func TestTagUseCase_Execute_RemoveTagDeletesFromAddList(t *testing.T) {
 	// Remove a tag that was previously in add list
 	_, err := uc.Execute(context.Background(), usecasestaging.TagInput{
 		Name:       "/app/config",
-		RemoveTags: []string{"env"},
+		RemoveTags: maputil.NewSet("env"),
 	})
 	require.NoError(t, err)
 
 	entry, err := store.Get(staging.ServiceParam, "/app/config")
 	require.NoError(t, err)
-	assert.NotContains(t, entry.Tags, "env")       // "env" removed from tags
-	assert.Equal(t, "backend", entry.Tags["team"]) // "team" still in tags
-	assert.Contains(t, entry.UntagKeys, "env")     // "env" added to untag list
+	assert.NotContains(t, entry.Tags, "env")         // "env" removed from tags
+	assert.Equal(t, "backend", entry.Tags["team"])   // "team" still in tags
+	assert.True(t, entry.UntagKeys.Contains("env"))  // "env" added to untag list
 }
 
 func TestTagUseCase_Execute_ParseError(t *testing.T) {
@@ -296,7 +297,7 @@ func TestTagUseCase_Execute_DuplicateUntagKeys(t *testing.T) {
 	// Pre-stage with untag key
 	require.NoError(t, store.Stage(staging.ServiceParam, "/app/config", staging.Entry{
 		Operation: staging.OperationUpdate,
-		UntagKeys: []string{"env"},
+		UntagKeys: maputil.NewSet("env"),
 		StagedAt:  time.Now(),
 	}))
 
@@ -308,18 +309,13 @@ func TestTagUseCase_Execute_DuplicateUntagKeys(t *testing.T) {
 	// Try to remove the same key again
 	_, err := uc.Execute(context.Background(), usecasestaging.TagInput{
 		Name:       "/app/config",
-		RemoveTags: []string{"env"},
+		RemoveTags: maputil.NewSet("env"),
 	})
 	require.NoError(t, err)
 
 	entry, err := store.Get(staging.ServiceParam, "/app/config")
 	require.NoError(t, err)
-	// Should only have one "env" in untag list
-	count := 0
-	for _, k := range entry.UntagKeys {
-		if k == "env" {
-			count++
-		}
-	}
-	assert.Equal(t, 1, count)
+	// Set guarantees uniqueness - "env" should be in the set exactly once
+	assert.True(t, entry.UntagKeys.Contains("env"))
+	assert.Equal(t, 1, entry.UntagKeys.Len())
 }
