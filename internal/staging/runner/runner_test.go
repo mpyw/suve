@@ -14,6 +14,7 @@ import (
 
 	"github.com/mpyw/suve/internal/staging"
 	"github.com/mpyw/suve/internal/staging/runner"
+	stagingusecase "github.com/mpyw/suve/internal/usecase/staging"
 )
 
 // =============================================================================
@@ -103,10 +104,12 @@ func TestStatusRunner_Run(t *testing.T) {
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.StatusRunner{
-			Strategy: &fullMockStrategy{service: staging.ServiceParam},
-			Store:    store,
-			Stdout:   &stdout,
-			Stderr:   &stderr,
+			UseCase: &stagingusecase.StatusUseCase{
+				Strategy: &fullMockStrategy{service: staging.ServiceParam},
+				Store:    store,
+			},
+			Stdout: &stdout,
+			Stderr: &stderr,
 		}
 
 		err := r.Run(context.Background(), runner.StatusOptions{Name: "/app/config"})
@@ -123,10 +126,12 @@ func TestStatusRunner_Run(t *testing.T) {
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.StatusRunner{
-			Strategy: &fullMockStrategy{service: staging.ServiceParam},
-			Store:    store,
-			Stdout:   &stdout,
-			Stderr:   &stderr,
+			UseCase: &stagingusecase.StatusUseCase{
+				Strategy: &fullMockStrategy{service: staging.ServiceParam},
+				Store:    store,
+			},
+			Stdout: &stdout,
+			Stderr: &stderr,
 		}
 
 		err := r.Run(context.Background(), runner.StatusOptions{Name: "/app/config"})
@@ -147,10 +152,12 @@ func TestStatusRunner_Run(t *testing.T) {
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.StatusRunner{
-			Strategy: &fullMockStrategy{service: staging.ServiceParam},
-			Store:    store,
-			Stdout:   &stdout,
-			Stderr:   &stderr,
+			UseCase: &stagingusecase.StatusUseCase{
+				Strategy: &fullMockStrategy{service: staging.ServiceParam},
+				Store:    store,
+			},
+			Stdout: &stdout,
+			Stderr: &stderr,
 		}
 
 		err := r.Run(context.Background(), runner.StatusOptions{Name: "/app/config", Verbose: true})
@@ -166,10 +173,12 @@ func TestStatusRunner_Run(t *testing.T) {
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.StatusRunner{
-			Strategy: &fullMockStrategy{service: staging.ServiceParam},
-			Store:    store,
-			Stdout:   &stdout,
-			Stderr:   &stderr,
+			UseCase: &stagingusecase.StatusUseCase{
+				Strategy: &fullMockStrategy{service: staging.ServiceParam},
+				Store:    store,
+			},
+			Stdout: &stdout,
+			Stderr: &stderr,
 		}
 
 		err := r.Run(context.Background(), runner.StatusOptions{})
@@ -199,10 +208,12 @@ func TestStatusRunner_Run(t *testing.T) {
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.StatusRunner{
-			Strategy: &fullMockStrategy{service: staging.ServiceParam},
-			Store:    store,
-			Stdout:   &stdout,
-			Stderr:   &stderr,
+			UseCase: &stagingusecase.StatusUseCase{
+				Strategy: &fullMockStrategy{service: staging.ServiceParam},
+				Store:    store,
+			},
+			Stdout: &stdout,
+			Stderr: &stderr,
 		}
 
 		err := r.Run(context.Background(), runner.StatusOptions{})
@@ -228,10 +239,12 @@ func TestStatusRunner_Run(t *testing.T) {
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.StatusRunner{
-			Strategy: &fullMockStrategy{service: staging.ServiceSecret, hasDeleteOptions: true},
-			Store:    store,
-			Stdout:   &stdout,
-			Stderr:   &stderr,
+			UseCase: &stagingusecase.StatusUseCase{
+				Strategy: &fullMockStrategy{service: staging.ServiceSecret, hasDeleteOptions: true},
+				Store:    store,
+			},
+			Stdout: &stdout,
+			Stderr: &stderr,
 		}
 
 		err := r.Run(context.Background(), runner.StatusOptions{Verbose: true})
@@ -1323,10 +1336,12 @@ func TestRunners_SecretService(t *testing.T) {
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.StatusRunner{
-			Strategy: &fullMockStrategy{service: staging.ServiceSecret},
-			Store:    store,
-			Stdout:   &stdout,
-			Stderr:   &stderr,
+			UseCase: &stagingusecase.StatusUseCase{
+				Strategy: &fullMockStrategy{service: staging.ServiceSecret},
+				Store:    store,
+			},
+			Stdout: &stdout,
+			Stderr: &stderr,
 		}
 
 		err := r.Run(context.Background(), runner.StatusOptions{})
@@ -1375,10 +1390,12 @@ func TestRunners_DeleteOptions(t *testing.T) {
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.StatusRunner{
-			Strategy: &fullMockStrategy{service: staging.ServiceSecret, hasDeleteOptions: true},
-			Store:    store,
-			Stdout:   &stdout,
-			Stderr:   &stderr,
+			UseCase: &stagingusecase.StatusUseCase{
+				Strategy: &fullMockStrategy{service: staging.ServiceSecret, hasDeleteOptions: true},
+				Store:    store,
+			},
+			Stdout: &stdout,
+			Stderr: &stderr,
 		}
 
 		err := r.Run(context.Background(), runner.StatusOptions{Name: "my-secret", Verbose: true})

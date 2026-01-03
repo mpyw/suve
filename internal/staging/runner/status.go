@@ -3,21 +3,20 @@ package runner
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 
 	"github.com/mpyw/suve/internal/cli/colors"
 	"github.com/mpyw/suve/internal/maputil"
 	"github.com/mpyw/suve/internal/staging"
+	stagingusecase "github.com/mpyw/suve/internal/usecase/staging"
 )
 
-// StatusRunner executes status operations using a strategy.
+// StatusRunner executes status operations using a usecase.
 type StatusRunner struct {
-	Strategy staging.ServiceStrategy
-	Store    *staging.Store
-	Stdout   io.Writer
-	Stderr   io.Writer
+	UseCase *stagingusecase.StatusUseCase
+	Stdout  io.Writer
+	Stderr  io.Writer
 }
 
 // StatusOptions holds options for the status command.
@@ -27,54 +26,59 @@ type StatusOptions struct {
 }
 
 // Run executes the status command.
-func (r *StatusRunner) Run(_ context.Context, opts StatusOptions) error {
-	if opts.Name != "" {
-		return r.showSingle(opts.Name, opts.Verbose)
-	}
-	return r.showAll(opts.Verbose)
-}
-
-func (r *StatusRunner) showSingle(name string, verbose bool) error {
-	service := r.Strategy.Service()
-	itemName := r.Strategy.ItemName()
-	showDeleteOptions := r.Strategy.HasDeleteOptions()
-
-	entry, err := r.Store.Get(service, name)
-	if err != nil {
-		if errors.Is(err, staging.ErrNotStaged) {
-			return fmt.Errorf("%s %s is not staged", itemName, name)
-		}
-		return err
-	}
-
-	printer := &staging.EntryPrinter{Writer: r.Stdout}
-	printer.PrintEntry(name, *entry, verbose, showDeleteOptions)
-	return nil
-}
-
-func (r *StatusRunner) showAll(verbose bool) error {
-	service := r.Strategy.Service()
-	serviceName := r.Strategy.ServiceName()
-	showDeleteOptions := r.Strategy.HasDeleteOptions()
-
-	entries, err := r.Store.List(service)
+func (r *StatusRunner) Run(ctx context.Context, opts StatusOptions) error {
+	result, err := r.UseCase.Execute(ctx, stagingusecase.StatusInput{
+		Name: opts.Name,
+	})
 	if err != nil {
 		return err
 	}
 
-	serviceEntries := entries[service]
-	if len(serviceEntries) == 0 {
-		_, _ = fmt.Fprintf(r.Stdout, "No %s changes staged.\n", serviceName)
+	if len(result.Entries) == 0 {
+		_, _ = fmt.Fprintf(r.Stdout, "No %s changes staged.\n", result.ServiceName)
 		return nil
 	}
 
-	_, _ = fmt.Fprintf(r.Stdout, "%s (%d):\n", colors.Warning(fmt.Sprintf("Staged %s changes", serviceName)), len(serviceEntries))
+	// For single item query, just print the entry
+	if opts.Name != "" {
+		printer := &staging.EntryPrinter{Writer: r.Stdout}
+		for _, entry := range result.Entries {
+			printer.PrintEntry(entry.Name, toStagingEntry(entry), opts.Verbose, entry.ShowDeleteOptions)
+		}
+		return nil
+	}
+
+	// For all items, show header and entries
+	_, _ = fmt.Fprintf(r.Stdout, "%s (%d):\n", colors.Warning(fmt.Sprintf("Staged %s changes", result.ServiceName)), len(result.Entries))
 
 	printer := &staging.EntryPrinter{Writer: r.Stdout}
-	for _, name := range maputil.SortedKeys(serviceEntries) {
-		entry := serviceEntries[name]
-		printer.PrintEntry(name, entry, verbose, showDeleteOptions)
+	for _, name := range r.sortedEntryNames(result.Entries) {
+		for _, entry := range result.Entries {
+			if entry.Name == name {
+				printer.PrintEntry(entry.Name, toStagingEntry(entry), opts.Verbose, entry.ShowDeleteOptions)
+				break
+			}
+		}
 	}
 
 	return nil
+}
+
+func (r *StatusRunner) sortedEntryNames(entries []stagingusecase.StatusEntry) []string {
+	names := make(map[string]struct{})
+	for _, e := range entries {
+		names[e.Name] = struct{}{}
+	}
+	return maputil.SortedKeys(names)
+}
+
+func toStagingEntry(e stagingusecase.StatusEntry) staging.Entry {
+	return staging.Entry{
+		Operation:     e.Operation,
+		Value:         e.Value,
+		Description:   e.Description,
+		Tags:          e.Tags,
+		DeleteOptions: e.DeleteOptions,
+		StagedAt:      e.StagedAt,
+	}
 }

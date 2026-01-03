@@ -15,6 +15,7 @@ import (
 	"github.com/mpyw/suve/internal/cli/confirm"
 	"github.com/mpyw/suve/internal/cli/pager"
 	"github.com/mpyw/suve/internal/staging"
+	stagingusecase "github.com/mpyw/suve/internal/usecase/staging"
 )
 
 // CommandConfig holds service-specific configuration for building stage commands.
@@ -67,10 +68,12 @@ EXAMPLES:
 			}
 
 			r := &StatusRunner{
-				Strategy: cfg.ParserFactory(),
-				Store:    store,
-				Stdout:   cmd.Root().Writer,
-				Stderr:   cmd.Root().ErrWriter,
+				UseCase: &stagingusecase.StatusUseCase{
+					Strategy: cfg.ParserFactory(),
+					Store:    store,
+				},
+				Stdout: cmd.Root().Writer,
+				Stderr: cmd.Root().ErrWriter,
 			}
 
 			opts := StatusOptions{
