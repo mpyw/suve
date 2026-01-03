@@ -254,6 +254,7 @@ func TestLogUseCase_Execute_FilterWithNilLastModifiedDate(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	// v1 has nil LastModifiedDate, so filter is skipped; v2 is after since
-	assert.Len(t, output.Entries, 2)
+	// v1 has nil LastModifiedDate, so it is skipped when date filter is applied; only v2 remains
+	assert.Len(t, output.Entries, 1)
+	assert.Equal(t, int64(2), output.Entries[0].Version)
 }
