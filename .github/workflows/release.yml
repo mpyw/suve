@@ -49,44 +49,9 @@ jobs:
           retention-days: 1
 
   # ===========================================================================
-  # suve & suve-gui (Darwin): CGO required, native macOS builds
+  # suve & suve-gui (Darwin): CGO required, build both archs on ARM64 runner
   # ===========================================================================
-  build-darwin-amd64:
-    runs-on: macos-13
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
-
-      - name: Build frontend
-        run: |
-          cd internal/gui/frontend
-          npm ci
-          npm run build
-
-      - name: Build suve & suve-gui (darwin-amd64)
-        uses: goreleaser/goreleaser-action@v6
-        with:
-          distribution: goreleaser
-          version: latest
-          args: build --clean --id suve-darwin-amd64 --id suve-gui-darwin-amd64
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: dist-darwin-amd64
-          path: dist/
-          retention-days: 1
-
-  build-darwin-arm64:
+  build-darwin:
     runs-on: macos-latest
     steps:
       - name: Checkout
@@ -114,10 +79,30 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Upload artifacts
+      - name: Upload arm64 artifacts
         uses: actions/upload-artifact@v4
         with:
           name: dist-darwin-arm64
+          path: dist/
+          retention-days: 1
+
+      - name: Clean dist for amd64 build
+        run: rm -rf dist/
+
+      - name: Build suve & suve-gui (darwin-amd64, cross-compile)
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          distribution: goreleaser
+          version: latest
+          args: build --clean --id suve-darwin-amd64 --id suve-gui-darwin-amd64
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GOARCH: amd64
+
+      - name: Upload amd64 artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-darwin-amd64
           path: dist/
           retention-days: 1
 
@@ -220,7 +205,7 @@ jobs:
   # Release: Combine all artifacts and publish
   # ===========================================================================
   release:
-    needs: [build-cli, build-darwin-amd64, build-darwin-arm64, build-linux, build-windows]
+    needs: [build-cli, build-darwin, build-linux, build-windows]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
