@@ -68,7 +68,7 @@ func (p *EntryPrinter) PrintEntry(name string, entry Entry, verbose, showDeleteO
 	}
 
 	// Show untag keys
-	if len(entry.UntagKeys) > 0 {
-		_, _ = fmt.Fprintf(p.Writer, "  %s %s\n", colors.FieldLabel("Untag:"), strings.Join(entry.UntagKeys, ", "))
+	if entry.UntagKeys.Len() > 0 {
+		_, _ = fmt.Fprintf(p.Writer, "  %s %s\n", colors.FieldLabel("Untag:"), strings.Join(entry.UntagKeys.Values(), ", "))
 	}
 }

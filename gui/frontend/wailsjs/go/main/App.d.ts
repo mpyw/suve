@@ -44,6 +44,10 @@ export function StagingAddTag(arg1:string,arg2:string,arg3:string,arg4:string):P
 
 export function StagingApply(arg1:string,arg2:boolean):Promise<main.StagingApplyResult>;
 
+export function StagingCancelAddTag(arg1:string,arg2:string,arg3:string):Promise<main.StagingCancelAddTagResult>;
+
+export function StagingCancelRemoveTag(arg1:string,arg2:string,arg3:string):Promise<main.StagingCancelRemoveTagResult>;
+
 export function StagingDelete(arg1:string,arg2:string,arg3:boolean,arg4:number):Promise<main.StagingDeleteResult>;
 
 export function StagingDiff(arg1:string,arg2:string):Promise<main.StagingDiffResult>;

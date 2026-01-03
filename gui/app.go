@@ -8,6 +8,7 @@ import (
 
 	"github.com/mpyw/suve/internal/api/paramapi"
 	"github.com/mpyw/suve/internal/infra"
+	"github.com/mpyw/suve/internal/maputil"
 	"github.com/mpyw/suve/internal/staging"
 	"github.com/mpyw/suve/internal/usecase/param"
 	"github.com/mpyw/suve/internal/usecase/secret"
@@ -665,12 +666,12 @@ type StagingStatusResult struct {
 
 // StagingEntry represents a staged change.
 type StagingEntry struct {
-	Name      string            `json:"name"`
-	Operation string            `json:"operation"`
-	Value     *string           `json:"value,omitempty"`
-	Tags      map[string]string `json:"tags,omitempty"`
-	UntagKeys []string          `json:"untagKeys,omitempty"`
-	StagedAt  string            `json:"stagedAt"`
+	Name      string              `json:"name"`
+	Operation string              `json:"operation"`
+	Value     *string             `json:"value,omitempty"`
+	Tags      map[string]string   `json:"tags,omitempty"`
+	UntagKeys maputil.Set[string] `json:"untagKeys,omitempty"`
+	StagedAt  string              `json:"stagedAt"`
 }
 
 // StagingStatus gets the current staging status.
@@ -680,9 +681,12 @@ func (a *App) StagingStatus() (*StagingStatusResult, error) {
 		return nil, err
 	}
 
+	ssmParser, _ := a.getParser("ssm")
+	smParser, _ := a.getParser("sm")
+
 	// SSM status
 	ssmUC := &stagingusecase.StatusUseCase{
-		Strategy: &staging.ParamStrategy{},
+		Strategy: ssmParser,
 		Store:    store,
 	}
 	ssmResult, err := ssmUC.Execute(a.ctx, stagingusecase.StatusInput{})
@@ -692,7 +696,7 @@ func (a *App) StagingStatus() (*StagingStatusResult, error) {
 
 	// SM status
 	smUC := &stagingusecase.StatusUseCase{
-		Strategy: &staging.SecretStrategy{},
+		Strategy: smParser,
 		Store:    store,
 	}
 	smResult, err := smUC.Execute(a.ctx, stagingusecase.StatusInput{})
@@ -732,11 +736,11 @@ func (a *App) StagingStatus() (*StagingStatusResult, error) {
 
 // StagingApplyResultEntry represents a single apply result.
 type StagingApplyResultEntry struct {
-	Name      string            `json:"name"`
-	Status    string            `json:"status"`
-	Error     string            `json:"error,omitempty"`
-	Tags      map[string]string `json:"tags,omitempty"`
-	UntagKeys []string          `json:"untagKeys,omitempty"`
+	Name      string              `json:"name"`
+	Status    string              `json:"status"`
+	Error     string              `json:"error,omitempty"`
+	Tags      map[string]string   `json:"tags,omitempty"`
+	UntagKeys maputil.Set[string] `json:"untagKeys,omitempty"`
 }
 
 // StagingApplyResult represents the result of applying staged changes.
@@ -755,22 +759,9 @@ func (a *App) StagingApply(service string, ignoreConflicts bool) (*StagingApplyR
 		return nil, err
 	}
 
-	var strategy staging.ApplyStrategy
-	switch service {
-	case "ssm":
-		client, err := a.getParamClient()
-		if err != nil {
-			return nil, err
-		}
-		strategy = &staging.ParamStrategy{Client: client}
-	case "sm":
-		client, err := a.getSecretClient()
-		if err != nil {
-			return nil, err
-		}
-		strategy = &staging.SecretStrategy{Client: client}
-	default:
-		return nil, errInvalidService
+	strategy, err := a.getApplyStrategy(service)
+	if err != nil {
+		return nil, err
 	}
 
 	uc := &stagingusecase.ApplyUseCase{
@@ -828,14 +819,9 @@ func (a *App) StagingReset(service string) (*StagingResetResult, error) {
 		return nil, err
 	}
 
-	var parser staging.Parser
-	switch service {
-	case "ssm":
-		parser = &staging.ParamStrategy{}
-	case "sm":
-		parser = &staging.SecretStrategy{}
-	default:
-		return nil, errInvalidService
+	parser, err := a.getParser(service)
+	if err != nil {
+		return nil, err
 	}
 
 	uc := &stagingusecase.ResetUseCase{
@@ -881,18 +867,13 @@ func (a *App) StagingAdd(service, name, value string) (*StagingAddResult, error)
 		return nil, err
 	}
 
-	var strategy staging.Parser
-	switch service {
-	case "ssm":
-		strategy = &staging.ParamStrategy{}
-	case "sm":
-		strategy = &staging.SecretStrategy{}
-	default:
-		return nil, errInvalidService
+	parser, err := a.getParser(service)
+	if err != nil {
+		return nil, err
 	}
 
 	uc := &stagingusecase.AddUseCase{
-		Strategy: strategy,
+		Strategy: parser,
 		Store:    store,
 	}
 	result, err := uc.Execute(a.ctx, stagingusecase.AddInput{
@@ -918,22 +899,9 @@ func (a *App) StagingEdit(service, name, value string) (*StagingEditResult, erro
 		return nil, err
 	}
 
-	var strategy staging.EditStrategy
-	switch service {
-	case "ssm":
-		client, err := a.getParamClient()
-		if err != nil {
-			return nil, err
-		}
-		strategy = staging.NewParamStrategy(client)
-	case "sm":
-		client, err := a.getSecretClient()
-		if err != nil {
-			return nil, err
-		}
-		strategy = staging.NewSecretStrategy(client)
-	default:
-		return nil, errInvalidService
+	strategy, err := a.getEditStrategy(service)
+	if err != nil {
+		return nil, err
 	}
 
 	uc := &stagingusecase.EditUseCase{
@@ -963,22 +931,9 @@ func (a *App) StagingDelete(service, name string, force bool, recoveryWindow int
 		return nil, err
 	}
 
-	var strategy staging.DeleteStrategy
-	switch service {
-	case "ssm":
-		client, err := a.getParamClient()
-		if err != nil {
-			return nil, err
-		}
-		strategy = staging.NewParamStrategy(client)
-	case "sm":
-		client, err := a.getSecretClient()
-		if err != nil {
-			return nil, err
-		}
-		strategy = staging.NewSecretStrategy(client)
-	default:
-		return nil, errInvalidService
+	strategy, err := a.getDeleteStrategy(service)
+	if err != nil {
+		return nil, err
 	}
 
 	uc := &stagingusecase.DeleteUseCase{
@@ -1009,14 +964,9 @@ func (a *App) StagingUnstage(service, name string) (*StagingUnstageResult, error
 		return nil, err
 	}
 
-	var svc staging.Service
-	switch service {
-	case "ssm":
-		svc = staging.ServiceParam
-	case "sm":
-		svc = staging.ServiceSecret
-	default:
-		return nil, errInvalidService
+	svc, err := a.getService(service)
+	if err != nil {
+		return nil, err
 	}
 
 	if err := store.Unstage(svc, name); err != nil {
@@ -1038,22 +988,9 @@ func (a *App) StagingAddTag(service, name, key, value string) (*StagingAddTagRes
 		return nil, err
 	}
 
-	var strategy staging.EditStrategy
-	switch service {
-	case "ssm":
-		client, err := a.getParamClient()
-		if err != nil {
-			return nil, err
-		}
-		strategy = staging.NewParamStrategy(client)
-	case "sm":
-		client, err := a.getSecretClient()
-		if err != nil {
-			return nil, err
-		}
-		strategy = staging.NewSecretStrategy(client)
-	default:
-		return nil, errInvalidService
+	strategy, err := a.getEditStrategy(service)
+	if err != nil {
+		return nil, err
 	}
 
 	uc := &stagingusecase.TagUseCase{
@@ -1083,22 +1020,9 @@ func (a *App) StagingRemoveTag(service, name, key string) (*StagingRemoveTagResu
 		return nil, err
 	}
 
-	var strategy staging.EditStrategy
-	switch service {
-	case "ssm":
-		client, err := a.getParamClient()
-		if err != nil {
-			return nil, err
-		}
-		strategy = staging.NewParamStrategy(client)
-	case "sm":
-		client, err := a.getSecretClient()
-		if err != nil {
-			return nil, err
-		}
-		strategy = staging.NewSecretStrategy(client)
-	default:
-		return nil, errInvalidService
+	strategy, err := a.getEditStrategy(service)
+	if err != nil {
+		return nil, err
 	}
 
 	uc := &stagingusecase.TagUseCase{
@@ -1107,13 +1031,77 @@ func (a *App) StagingRemoveTag(service, name, key string) (*StagingRemoveTagResu
 	}
 	result, err := uc.Execute(a.ctx, stagingusecase.TagInput{
 		Name:       name,
-		RemoveTags: []string{key},
+		RemoveTags: maputil.NewSet(key),
 	})
 	if err != nil {
 		return nil, err
 	}
 
 	return &StagingRemoveTagResult{Name: result.Name}, nil
+}
+
+// StagingCancelAddTagResult represents the result of canceling a staged tag addition.
+type StagingCancelAddTagResult struct {
+	Name string `json:"name"`
+}
+
+// StagingCancelAddTag cancels a staged tag addition (removes from Tags only).
+func (a *App) StagingCancelAddTag(service, name, key string) (*StagingCancelAddTagResult, error) {
+	store, err := a.getStagingStore()
+	if err != nil {
+		return nil, err
+	}
+
+	strategy, err := a.getEditStrategy(service)
+	if err != nil {
+		return nil, err
+	}
+
+	uc := &stagingusecase.TagUseCase{
+		Strategy: strategy,
+		Store:    store,
+	}
+	result, err := uc.Execute(a.ctx, stagingusecase.TagInput{
+		Name:          name,
+		CancelAddTags: maputil.NewSet(key),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return &StagingCancelAddTagResult{Name: result.Name}, nil
+}
+
+// StagingCancelRemoveTagResult represents the result of canceling a staged tag removal.
+type StagingCancelRemoveTagResult struct {
+	Name string `json:"name"`
+}
+
+// StagingCancelRemoveTag cancels a staged tag removal (removes from UntagKeys only).
+func (a *App) StagingCancelRemoveTag(service, name, key string) (*StagingCancelRemoveTagResult, error) {
+	store, err := a.getStagingStore()
+	if err != nil {
+		return nil, err
+	}
+
+	strategy, err := a.getEditStrategy(service)
+	if err != nil {
+		return nil, err
+	}
+
+	uc := &stagingusecase.TagUseCase{
+		Strategy: strategy,
+		Store:    store,
+	}
+	result, err := uc.Execute(a.ctx, stagingusecase.TagInput{
+		Name:             name,
+		CancelRemoveTags: maputil.NewSet(key),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return &StagingCancelRemoveTagResult{Name: result.Name}, nil
 }
 
 // StagingDiffResult represents the result of diffing staged changes.
@@ -1124,16 +1112,16 @@ type StagingDiffResult struct {
 
 // StagingDiffEntry represents a single diff entry.
 type StagingDiffEntry struct {
-	Name          string            `json:"name"`
-	Type          string            `json:"type"` // "normal", "create", "autoUnstaged", "warning"
-	Operation     string            `json:"operation,omitempty"`
-	AWSValue      string            `json:"awsValue,omitempty"`
-	AWSIdentifier string            `json:"awsIdentifier,omitempty"`
-	StagedValue   string            `json:"stagedValue,omitempty"`
-	Description   *string           `json:"description,omitempty"`
-	Tags          map[string]string `json:"tags,omitempty"`
-	UntagKeys     []string          `json:"untagKeys,omitempty"`
-	Warning       string            `json:"warning,omitempty"`
+	Name          string              `json:"name"`
+	Type          string              `json:"type"` // "normal", "create", "autoUnstaged", "warning"
+	Operation     string              `json:"operation,omitempty"`
+	AWSValue      string              `json:"awsValue,omitempty"`
+	AWSIdentifier string              `json:"awsIdentifier,omitempty"`
+	StagedValue   string              `json:"stagedValue,omitempty"`
+	Description   *string             `json:"description,omitempty"`
+	Tags          map[string]string   `json:"tags,omitempty"`
+	UntagKeys     maputil.Set[string] `json:"untagKeys,omitempty"`
+	Warning       string              `json:"warning,omitempty"`
 }
 
 // StagingDiff shows diff between staged changes and AWS.
@@ -1143,22 +1131,9 @@ func (a *App) StagingDiff(service string, name string) (*StagingDiffResult, erro
 		return nil, err
 	}
 
-	var strategy staging.DiffStrategy
-	switch service {
-	case "ssm":
-		client, err := a.getParamClient()
-		if err != nil {
-			return nil, err
-		}
-		strategy = staging.NewParamStrategy(client)
-	case "sm":
-		client, err := a.getSecretClient()
-		if err != nil {
-			return nil, err
-		}
-		strategy = staging.NewSecretStrategy(client)
-	default:
-		return nil, errInvalidService
+	strategy, err := a.getDiffStrategy(service)
+	if err != nil {
+		return nil, err
 	}
 
 	uc := &stagingusecase.DiffUseCase{
@@ -1250,4 +1225,102 @@ func (a *App) getStagingStore() (*staging.Store, error) {
 	}
 	a.stagingStore = store
 	return store, nil
+}
+
+func (a *App) getService(service string) (staging.Service, error) {
+	switch service {
+	case "ssm":
+		return staging.ServiceParam, nil
+	case "sm":
+		return staging.ServiceSecret, nil
+	default:
+		return "", errInvalidService
+	}
+}
+
+func (a *App) getParser(service string) (staging.Parser, error) {
+	switch service {
+	case "ssm":
+		return &staging.ParamStrategy{}, nil
+	case "sm":
+		return &staging.SecretStrategy{}, nil
+	default:
+		return nil, errInvalidService
+	}
+}
+
+func (a *App) getEditStrategy(service string) (staging.EditStrategy, error) {
+	switch service {
+	case "ssm":
+		client, err := a.getParamClient()
+		if err != nil {
+			return nil, err
+		}
+		return staging.NewParamStrategy(client), nil
+	case "sm":
+		client, err := a.getSecretClient()
+		if err != nil {
+			return nil, err
+		}
+		return staging.NewSecretStrategy(client), nil
+	default:
+		return nil, errInvalidService
+	}
+}
+
+func (a *App) getDeleteStrategy(service string) (staging.DeleteStrategy, error) {
+	switch service {
+	case "ssm":
+		client, err := a.getParamClient()
+		if err != nil {
+			return nil, err
+		}
+		return staging.NewParamStrategy(client), nil
+	case "sm":
+		client, err := a.getSecretClient()
+		if err != nil {
+			return nil, err
+		}
+		return staging.NewSecretStrategy(client), nil
+	default:
+		return nil, errInvalidService
+	}
+}
+
+func (a *App) getApplyStrategy(service string) (staging.ApplyStrategy, error) {
+	switch service {
+	case "ssm":
+		client, err := a.getParamClient()
+		if err != nil {
+			return nil, err
+		}
+		return staging.NewParamStrategy(client), nil
+	case "sm":
+		client, err := a.getSecretClient()
+		if err != nil {
+			return nil, err
+		}
+		return staging.NewSecretStrategy(client), nil
+	default:
+		return nil, errInvalidService
+	}
+}
+
+func (a *App) getDiffStrategy(service string) (staging.DiffStrategy, error) {
+	switch service {
+	case "ssm":
+		client, err := a.getParamClient()
+		if err != nil {
+			return nil, err
+		}
+		return staging.NewParamStrategy(client), nil
+	case "sm":
+		client, err := a.getSecretClient()
+		if err != nil {
+			return nil, err
+		}
+		return staging.NewSecretStrategy(client), nil
+	default:
+		return nil, errInvalidService
+	}
 }
