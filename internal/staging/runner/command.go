@@ -19,8 +19,8 @@ import (
 
 // CommandConfig holds service-specific configuration for building stage commands.
 type CommandConfig struct {
-	// ServiceName is the service prefix for commands (e.g., "param", "secret").
-	ServiceName string
+	// CommandName is the subcommand name (e.g., "param", "secret").
+	CommandName string
 
 	// ItemName is the item name for messages (e.g., "parameter", "secret").
 	ItemName string
@@ -49,10 +49,10 @@ EXAMPLES:
    suve stage %s status              Show all staged %s changes
    suve stage %s status <name>       Show staged change for specific %s
    suve stage %s status --verbose    Show detailed information`,
-			cfg.ServiceName, cfg.ItemName, cfg.ItemName, cfg.ItemName,
-			cfg.ServiceName, cfg.ItemName,
-			cfg.ServiceName, cfg.ItemName,
-			cfg.ServiceName),
+			cfg.CommandName, cfg.ItemName, cfg.ItemName, cfg.ItemName,
+			cfg.CommandName, cfg.ItemName,
+			cfg.CommandName, cfg.ItemName,
+			cfg.CommandName),
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
 				Name:    "verbose",
@@ -103,9 +103,9 @@ EXAMPLES:
    suve stage %s diff <name>            Show diff for specific %s
    suve stage %s diff --parse-json      Show diff with JSON formatting`,
 			cfg.ItemName, cfg.ItemName, cfg.ItemName,
-			cfg.ServiceName, cfg.ItemName,
-			cfg.ServiceName, cfg.ItemName,
-			cfg.ServiceName),
+			cfg.CommandName, cfg.ItemName,
+			cfg.CommandName, cfg.ItemName,
+			cfg.CommandName),
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
 				Name:    "parse-json",
@@ -120,7 +120,7 @@ EXAMPLES:
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			var name string
 			if cmd.Args().Len() > 1 {
-				return fmt.Errorf("usage: suve stage %s diff [name]", cfg.ServiceName)
+				return fmt.Errorf("usage: suve stage %s diff [name]", cfg.CommandName)
 			}
 			if cmd.Args().Len() == 1 {
 				strat := cfg.ParserFactory()
@@ -184,11 +184,11 @@ EXAMPLES:
    suve stage %s add <name> <value>      Create new %s with given value`,
 			cfg.ItemName,
 			cfg.ItemName,
-			cfg.ItemName, cfg.ServiceName,
-			cfg.ServiceName, cfg.ItemName,
-			cfg.ServiceName,
-			cfg.ServiceName, cfg.ItemName,
-			cfg.ServiceName, cfg.ItemName),
+			cfg.ItemName, cfg.CommandName,
+			cfg.CommandName, cfg.ItemName,
+			cfg.CommandName,
+			cfg.CommandName, cfg.ItemName,
+			cfg.CommandName, cfg.ItemName),
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:  "description",
@@ -201,7 +201,7 @@ EXAMPLES:
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			if cmd.Args().Len() < 1 {
-				return fmt.Errorf("usage: suve stage %s add <name> [value]", cfg.ServiceName)
+				return fmt.Errorf("usage: suve stage %s add <name> [value]", cfg.CommandName)
 			}
 
 			name := cmd.Args().First()
@@ -264,11 +264,11 @@ EXAMPLES:
    suve stage %s edit <name> <value>      Set %s to given value`,
 			cfg.ItemName,
 			cfg.ItemName,
-			cfg.ServiceName, cfg.ItemName,
-			cfg.ServiceName,
-			cfg.ServiceName,
-			cfg.ServiceName, cfg.ItemName,
-			cfg.ServiceName, cfg.ItemName),
+			cfg.CommandName, cfg.ItemName,
+			cfg.CommandName,
+			cfg.CommandName,
+			cfg.CommandName, cfg.ItemName,
+			cfg.CommandName, cfg.ItemName),
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:  "description",
@@ -281,7 +281,7 @@ EXAMPLES:
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			if cmd.Args().Len() < 1 {
-				return fmt.Errorf("usage: suve stage %s edit <name> [value]", cfg.ServiceName)
+				return fmt.Errorf("usage: suve stage %s edit <name> [value]", cfg.CommandName)
 			}
 
 			name := cmd.Args().First()
@@ -353,11 +353,11 @@ EXAMPLES:
 			cfg.ItemName,
 			cfg.ItemName, cfg.ItemName,
 			cfg.ItemName,
-			cfg.ServiceName,
-			cfg.ServiceName, cfg.ItemName,
-			cfg.ServiceName, cfg.ItemName,
-			cfg.ServiceName,
-			cfg.ServiceName),
+			cfg.CommandName,
+			cfg.CommandName, cfg.ItemName,
+			cfg.CommandName, cfg.ItemName,
+			cfg.CommandName,
+			cfg.CommandName),
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
 				Name:  "yes",
@@ -466,12 +466,12 @@ EXAMPLES:
    suve stage %s reset --all               Unstage all %ss`,
 			cfg.ItemName,
 			cfg.ItemName,
-			cfg.ServiceName, cfg.ItemName,
+			cfg.CommandName, cfg.ItemName,
 			cfg.ItemName,
-			cfg.ServiceName,
-			cfg.ServiceName,
-			cfg.ServiceName,
-			cfg.ServiceName, cfg.ItemName),
+			cfg.CommandName,
+			cfg.CommandName,
+			cfg.CommandName,
+			cfg.CommandName, cfg.ItemName),
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
 				Name:  "all",
@@ -482,7 +482,7 @@ EXAMPLES:
 			resetAll := cmd.Bool("all")
 
 			if !resetAll && cmd.Args().Len() < 1 {
-				return fmt.Errorf("usage: suve stage %s reset <spec> or suve stage %s reset --all", cfg.ServiceName, cfg.ServiceName)
+				return fmt.Errorf("usage: suve stage %s reset <spec> or suve stage %s reset --all", cfg.CommandName, cfg.CommandName)
 			}
 
 			store, err := staging.NewStore()
@@ -586,14 +586,14 @@ EXAMPLES:
    suve stage %s delete --recovery-window 7 <name>  Stage with 7-day recovery
    suve stage %s delete --force <name>              Stage for immediate deletion`,
 			cfg.ItemName,
-			cfg.ItemName, cfg.ServiceName,
-			cfg.ServiceName,
-			cfg.ServiceName,
+			cfg.ItemName, cfg.CommandName,
+			cfg.CommandName,
+			cfg.CommandName,
 			cfg.ItemName,
-			cfg.ItemName, cfg.ServiceName,
-			cfg.ServiceName,
-			cfg.ServiceName,
-			cfg.ServiceName)
+			cfg.ItemName, cfg.CommandName,
+			cfg.CommandName,
+			cfg.CommandName,
+			cfg.CommandName)
 	} else {
 		// SSM Parameter Store doesn't have delete options
 		description = fmt.Sprintf(`Stage a %s for deletion.
@@ -605,10 +605,10 @@ Use 'suve stage %s reset <name>' to unstage.
 EXAMPLES:
    suve stage %s delete <name>  Stage %s for deletion`,
 			cfg.ItemName,
-			cfg.ItemName, cfg.ServiceName,
-			cfg.ServiceName,
-			cfg.ServiceName,
-			cfg.ServiceName, cfg.ItemName)
+			cfg.ItemName, cfg.CommandName,
+			cfg.CommandName,
+			cfg.CommandName,
+			cfg.CommandName, cfg.ItemName)
 	}
 
 	return &cli.Command{
@@ -619,7 +619,7 @@ EXAMPLES:
 		Flags:       flags,
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			if cmd.Args().Len() < 1 {
-				return fmt.Errorf("usage: suve stage %s delete <name>", cfg.ServiceName)
+				return fmt.Errorf("usage: suve stage %s delete <name>", cfg.CommandName)
 			}
 
 			store, err := staging.NewStore()
