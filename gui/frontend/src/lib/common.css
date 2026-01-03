@@ -313,6 +313,18 @@
   color: #fff;
 }
 
+.history-version.mono {
+  font-family: monospace;
+  font-size: 11px;
+  word-break: break-all;
+}
+
+.history-labels {
+  display: flex;
+  gap: 4px;
+  margin-top: 6px;
+}
+
 .history-date {
   font-size: 12px;
   color: #666;

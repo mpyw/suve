@@ -10,6 +10,24 @@
 
   let prefix = '';
   let withValue = false;
+  let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+  // Reactive: auto-fetch when checkbox changes
+  $: withValue, handleFilterChange();
+
+  function handleFilterChange() {
+    // Skip initial mount (handled by onMount)
+    if (typeof window !== 'undefined' && entries !== undefined) {
+      loadSecrets();
+    }
+  }
+
+  function handlePrefixInput() {
+    if (debounceTimer) clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(() => {
+      loadSecrets();
+    }, 300);
+  }
   let loading = false;
   let error = '';
 
@@ -136,7 +154,10 @@
     try {
       await SecretUpdate(editForm.name, editForm.value);
       showEditModal = false;
-      await selectSecret(editForm.name);
+      await Promise.all([
+        loadSecrets(),
+        selectSecret(editForm.name)
+      ]);
     } catch (e) {
       modalError = e instanceof Error ? e.message : String(e);
     } finally {
@@ -181,7 +202,7 @@
       class="filter-input"
       placeholder="Prefix filter"
       bind:value={prefix}
-      on:keydown={(e) => e.key === 'Enter' && loadSecrets()}
+      on:input={handlePrefixInput}
     />
     <label class="checkbox-label">
       <input type="checkbox" bind:checked={withValue} />
@@ -256,9 +277,7 @@
                   {/if}
                 </button>
               </div>
-              <pre class="value-display" class:masked={!showValue}>
-                {showValue ? formatValue(secretDetail.value) : maskValue(secretDetail.value)}
-              </pre>
+              <pre class="value-display" class:masked={!showValue}>{showValue ? formatValue(secretDetail.value) : maskValue(secretDetail.value)}</pre>
             </div>
 
             <div class="detail-meta">
@@ -267,7 +286,7 @@
                 <span class="meta-value mono">{secretDetail.versionId}</span>
               </div>
               <div class="meta-item">
-                <span class="meta-label">Stages</span>
+                <span class="meta-label">Labels</span>
                 <span class="meta-value">
                   {#each secretDetail.versionStage || [] as stage}
                     <span class="badge badge-stage">{stage}</span>
@@ -292,11 +311,13 @@
                   {#each secretLog as logEntry}
                     <li class="history-item" class:current-secret={logEntry.stages?.includes('AWSCURRENT')}>
                       <div class="history-header">
-                        <span class="history-version">{logEntry.versionId?.substring(0, 8)}...</span>
+                        <span class="history-version mono" title={logEntry.versionId}>{logEntry.versionId}</span>
+                        <span class="history-date">{formatDate(logEntry.created)}</span>
+                      </div>
+                      <div class="history-labels">
                         {#each logEntry.stages || [] as stage}
                           <span class="badge badge-stage small">{stage}</span>
                         {/each}
-                        <span class="history-date">{formatDate(logEntry.created)}</span>
                       </div>
                     </li>
                   {/each}
