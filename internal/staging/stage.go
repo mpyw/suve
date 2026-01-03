@@ -11,6 +11,8 @@ import (
 	"time"
 
 	"github.com/gofrs/flock"
+
+	"github.com/mpyw/suve/internal/maputil"
 )
 
 // Operation represents the type of staged change.
@@ -27,12 +29,12 @@ const (
 
 // Entry represents a single staged change.
 type Entry struct {
-	Operation   Operation         `json:"operation"`
-	Value       *string           `json:"value,omitempty"` // nil for delete, pointer to distinguish from empty string
-	Description *string           `json:"description,omitempty"`
-	Tags        map[string]string `json:"tags,omitempty"`
-	UntagKeys   []string          `json:"untag_keys,omitempty"`
-	StagedAt    time.Time         `json:"staged_at"`
+	Operation   Operation           `json:"operation"`
+	Value       *string             `json:"value,omitempty"` // nil for delete, pointer to distinguish from empty string
+	Description *string             `json:"description,omitempty"`
+	Tags        map[string]string   `json:"tags,omitempty"`
+	UntagKeys   maputil.Set[string] `json:"untag_keys,omitempty"`
+	StagedAt    time.Time           `json:"staged_at"`
 	// BaseModifiedAt records the AWS LastModified time when the value was fetched.
 	// Used for conflict detection: if AWS was modified after this time, it's a conflict.
 	// Only set for update/delete operations (nil for create since there's no base).

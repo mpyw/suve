@@ -3,10 +3,12 @@ package staging
 import (
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/samber/lo"
 
 	"github.com/mpyw/suve/internal/cli/colors"
+	"github.com/mpyw/suve/internal/maputil"
 )
 
 // EntryPrinter prints staged entries to the given writer.
@@ -38,20 +40,35 @@ func (p *EntryPrinter) PrintEntry(name string, entry Entry, verbose, showDeleteO
 
 	switch entry.Operation {
 	case OperationCreate, OperationUpdate:
-		value := lo.FromPtr(entry.Value)
-		if len(value) > 100 {
-			value = value[:100] + "..."
+		if entry.Value != nil {
+			value := lo.FromPtr(entry.Value)
+			if len(value) > 100 {
+				value = value[:100] + "..."
+			}
+			_, _ = fmt.Fprintf(p.Writer, "  %s %s\n", colors.FieldLabel("Value:"), value)
 		}
-		_, _ = fmt.Fprintf(p.Writer, "  %s %s\n", colors.FieldLabel("Value:"), value)
 	case OperationDelete:
-		if !showDeleteOptions || entry.DeleteOptions == nil {
-			return
+		if showDeleteOptions && entry.DeleteOptions != nil {
+			switch {
+			case entry.DeleteOptions.Force:
+				_, _ = fmt.Fprintf(p.Writer, "  %s force (immediate, no recovery)\n", colors.FieldLabel("Delete:"))
+			case entry.DeleteOptions.RecoveryWindow > 0:
+				_, _ = fmt.Fprintf(p.Writer, "  %s %d days recovery window\n", colors.FieldLabel("Delete:"), entry.DeleteOptions.RecoveryWindow)
+			}
 		}
-		switch {
-		case entry.DeleteOptions.Force:
-			_, _ = fmt.Fprintf(p.Writer, "  %s force (immediate, no recovery)\n", colors.FieldLabel("Delete:"))
-		case entry.DeleteOptions.RecoveryWindow > 0:
-			_, _ = fmt.Fprintf(p.Writer, "  %s %d days recovery window\n", colors.FieldLabel("Delete:"), entry.DeleteOptions.RecoveryWindow)
+	}
+
+	// Show tags
+	if len(entry.Tags) > 0 {
+		var tagPairs []string
+		for _, k := range maputil.SortedKeys(entry.Tags) {
+			tagPairs = append(tagPairs, fmt.Sprintf("%s=%s", k, entry.Tags[k]))
 		}
+		_, _ = fmt.Fprintf(p.Writer, "  %s %s\n", colors.FieldLabel("Tags:"), strings.Join(tagPairs, ", "))
+	}
+
+	// Show untag keys
+	if entry.UntagKeys.Len() > 0 {
+		_, _ = fmt.Fprintf(p.Writer, "  %s %s\n", colors.FieldLabel("Untag:"), strings.Join(entry.UntagKeys.Values(), ", "))
 	}
 }
