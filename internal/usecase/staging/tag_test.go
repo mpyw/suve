@@ -497,3 +497,49 @@ func TestTagUseCase_Execute_AutoUnstageError(t *testing.T) {
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "unstage error")
 }
+
+func TestTagUseCase_Execute_CancelOnNonExistentEntry_NoOp(t *testing.T) {
+	t.Parallel()
+
+	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+
+	uc := &usecasestaging.TagUseCase{
+		Strategy: newMockTagStrategy(),
+		Store:    store,
+	}
+
+	// Try to cancel tags on a non-existent entry - should be no-op
+	output, err := uc.Execute(context.Background(), usecasestaging.TagInput{
+		Name:          "/app/config",
+		CancelAddTags: maputil.NewSet("env"),
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "/app/config", output.Name)
+
+	// No entry should be created
+	_, err = store.Get(staging.ServiceParam, "/app/config")
+	assert.ErrorIs(t, err, staging.ErrNotStaged)
+}
+
+func TestTagUseCase_Execute_CancelRemoveOnNonExistentEntry_NoOp(t *testing.T) {
+	t.Parallel()
+
+	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+
+	uc := &usecasestaging.TagUseCase{
+		Strategy: newMockTagStrategy(),
+		Store:    store,
+	}
+
+	// Try to cancel untags on a non-existent entry - should be no-op
+	output, err := uc.Execute(context.Background(), usecasestaging.TagInput{
+		Name:             "/app/config",
+		CancelRemoveTags: maputil.NewSet("env"),
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "/app/config", output.Name)
+
+	// No entry should be created
+	_, err = store.Get(staging.ServiceParam, "/app/config")
+	assert.ErrorIs(t, err, staging.ErrNotStaged)
+}

@@ -90,6 +90,12 @@ func (u *TagUseCase) Execute(ctx context.Context, input TagInput) (*TagOutput, e
 			return &TagOutput{Name: name}, nil
 		}
 	} else {
+		// No existing entry - only create new entry if there's something to add
+		// CancelAddTags and CancelRemoveTags are no-ops on non-existent entries
+		if len(input.AddTags) == 0 && input.RemoveTags.Len() == 0 {
+			return &TagOutput{Name: name}, nil
+		}
+
 		// Create new entry for tag-only change
 		// Fetch base time from AWS for conflict detection
 		result, err := u.Strategy.FetchCurrentValue(ctx, name)
