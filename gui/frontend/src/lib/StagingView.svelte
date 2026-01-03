@@ -1,8 +1,9 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { StagingStatus, StagingApply, StagingReset } from '../../wailsjs/go/main/App';
+  import { StagingStatus, StagingApply, StagingReset, StagingAdd, StagingEdit, StagingUnstage, StagingDelete } from '../../wailsjs/go/main/App';
   import type { main } from '../../wailsjs/go/models';
   import Modal from './Modal.svelte';
+  import CloseIcon from './icons/CloseIcon.svelte';
   import './common.css';
 
   let loading = false;
@@ -13,12 +14,27 @@
   // Modal states
   let showApplyModal = false;
   let showResetModal = false;
+  let showAddModal = false;
+  let showEditModal = false;
+  let showDeleteModal = false;
   let applyService = '';
   let resetService = '';
   let ignoreConflicts = false;
   let modalLoading = false;
   let modalError = '';
   let applyResult: main.StagingApplyResult | null = null;
+
+  // Add/Edit form
+  let addEditService = 'ssm';
+  let addEditName = '';
+  let addEditValue = '';
+  let isEditMode = false;
+
+  // Delete form
+  let deleteService = '';
+  let deleteName = '';
+  let deleteForce = false;
+  let deleteRecoveryWindow = 7;
 
   async function loadStatus() {
     loading = true;
@@ -112,6 +128,100 @@
     return service === 'ssm' ? 'Parameters (SSM)' : 'Secrets (SM)';
   }
 
+  // Add modal
+  function openAddModal(service: string) {
+    addEditService = service;
+    addEditName = '';
+    addEditValue = '';
+    isEditMode = false;
+    modalError = '';
+    showAddModal = true;
+  }
+
+  async function handleAdd() {
+    if (!addEditName || !addEditValue) {
+      modalError = 'Name and value are required';
+      return;
+    }
+    modalLoading = true;
+    modalError = '';
+    try {
+      await StagingAdd(addEditService, addEditName, addEditValue);
+      showAddModal = false;
+      await loadStatus();
+    } catch (e) {
+      modalError = e instanceof Error ? e.message : String(e);
+    } finally {
+      modalLoading = false;
+    }
+  }
+
+  // Edit modal
+  function openEditModal(service: string, entry: main.StagingEntry) {
+    addEditService = service;
+    addEditName = entry.name;
+    addEditValue = entry.value || '';
+    isEditMode = true;
+    modalError = '';
+    showEditModal = true;
+  }
+
+  async function handleEdit() {
+    if (!addEditValue) {
+      modalError = 'Value is required';
+      return;
+    }
+    modalLoading = true;
+    modalError = '';
+    try {
+      await StagingEdit(addEditService, addEditName, addEditValue);
+      showEditModal = false;
+      await loadStatus();
+    } catch (e) {
+      modalError = e instanceof Error ? e.message : String(e);
+    } finally {
+      modalLoading = false;
+    }
+  }
+
+  // Unstage
+  async function handleUnstage(service: string, name: string) {
+    try {
+      await StagingUnstage(service, name);
+      await loadStatus();
+    } catch (e) {
+      error = e instanceof Error ? e.message : String(e);
+    }
+  }
+
+  // Stage delete modal
+  function openDeleteModal(service: string) {
+    deleteService = service;
+    deleteName = '';
+    deleteForce = false;
+    deleteRecoveryWindow = 7;
+    modalError = '';
+    showDeleteModal = true;
+  }
+
+  async function handleStageDelete() {
+    if (!deleteName) {
+      modalError = 'Name is required';
+      return;
+    }
+    modalLoading = true;
+    modalError = '';
+    try {
+      await StagingDelete(deleteService, deleteName, deleteForce, deleteRecoveryWindow);
+      showDeleteModal = false;
+      await loadStatus();
+    } catch (e) {
+      modalError = e instanceof Error ? e.message : String(e);
+    } finally {
+      modalLoading = false;
+    }
+  }
+
   onMount(() => {
     loadStatus();
   });
@@ -137,12 +247,14 @@
           Parameters (SSM)
         </h3>
         <span class="count-badge">{ssmEntries.length}</span>
-        {#if ssmEntries.length > 0}
-          <div class="section-actions">
+        <div class="section-actions">
+          <button class="btn-section btn-add" on:click={() => openAddModal('ssm')}>+ Add</button>
+          <button class="btn-section btn-delete-stage" on:click={() => openDeleteModal('ssm')}>Stage Delete</button>
+          {#if ssmEntries.length > 0}
             <button class="btn-section btn-apply-sm" on:click={() => openApplyModal('ssm')}>Apply</button>
             <button class="btn-section btn-reset-sm" on:click={() => openResetModal('ssm')}>Reset</button>
-          </div>
-        {/if}
+          {/if}
+        </div>
       </div>
 
       {#if ssmEntries.length === 0}
@@ -157,6 +269,12 @@
                 </span>
                 <span class="entry-name">{entry.name}</span>
                 <span class="entry-date">{formatDate(entry.stagedAt)}</span>
+                <div class="entry-actions">
+                  {#if entry.operation !== 'delete'}
+                    <button class="btn-entry" on:click={() => openEditModal('ssm', entry)}>Edit</button>
+                  {/if}
+                  <button class="btn-entry btn-unstage" on:click={() => handleUnstage('ssm', entry.name)}>Unstage</button>
+                </div>
               </div>
               {#if entry.value !== undefined}
                 <pre class="entry-value">{entry.value}</pre>
@@ -174,12 +292,14 @@
           Secrets (SM)
         </h3>
         <span class="count-badge">{smEntries.length}</span>
-        {#if smEntries.length > 0}
-          <div class="section-actions">
+        <div class="section-actions">
+          <button class="btn-section btn-add" on:click={() => openAddModal('sm')}>+ Add</button>
+          <button class="btn-section btn-delete-stage" on:click={() => openDeleteModal('sm')}>Stage Delete</button>
+          {#if smEntries.length > 0}
             <button class="btn-section btn-apply-sm" on:click={() => openApplyModal('sm')}>Apply</button>
             <button class="btn-section btn-reset-sm" on:click={() => openResetModal('sm')}>Reset</button>
-          </div>
-        {/if}
+          {/if}
+        </div>
       </div>
 
       {#if smEntries.length === 0}
@@ -194,6 +314,12 @@
                 </span>
                 <span class="entry-name">{entry.name}</span>
                 <span class="entry-date">{formatDate(entry.stagedAt)}</span>
+                <div class="entry-actions">
+                  {#if entry.operation !== 'delete'}
+                    <button class="btn-entry" on:click={() => openEditModal('sm', entry)}>Edit</button>
+                  {/if}
+                  <button class="btn-entry btn-unstage" on:click={() => handleUnstage('sm', entry.name)}>Unstage</button>
+                </div>
               </div>
               {#if entry.value !== undefined}
                 <pre class="entry-value">{entry.value}</pre>
@@ -303,6 +429,121 @@
   </div>
 </Modal>
 
+<!-- Add Modal -->
+<Modal title="Stage New {addEditService === 'ssm' ? 'Parameter' : 'Secret'}" show={showAddModal} on:close={() => showAddModal = false}>
+  <form class="modal-form" on:submit|preventDefault={handleAdd}>
+    {#if modalError}
+      <div class="modal-error">{modalError}</div>
+    {/if}
+    <div class="form-group">
+      <label for="add-name">Name</label>
+      <input
+        id="add-name"
+        type="text"
+        class="form-input"
+        bind:value={addEditName}
+        placeholder={addEditService === 'ssm' ? '/path/to/parameter' : 'my-secret-name'}
+      />
+    </div>
+    <div class="form-group">
+      <label for="add-value">Value</label>
+      <textarea
+        id="add-value"
+        class="form-input form-textarea"
+        bind:value={addEditValue}
+        placeholder="Value"
+        rows="5"
+      ></textarea>
+    </div>
+    <div class="form-actions">
+      <button type="button" class="btn-secondary" on:click={() => showAddModal = false}>Cancel</button>
+      <button type="submit" class="btn-primary" disabled={modalLoading}>
+        {modalLoading ? 'Staging...' : 'Stage'}
+      </button>
+    </div>
+  </form>
+</Modal>
+
+<!-- Edit Modal -->
+<Modal title="Edit Staged {addEditService === 'ssm' ? 'Parameter' : 'Secret'}" show={showEditModal} on:close={() => showEditModal = false}>
+  <form class="modal-form" on:submit|preventDefault={handleEdit}>
+    {#if modalError}
+      <div class="modal-error">{modalError}</div>
+    {/if}
+    <div class="form-group">
+      <label for="edit-name">Name</label>
+      <input
+        id="edit-name"
+        type="text"
+        class="form-input"
+        value={addEditName}
+        disabled
+      />
+    </div>
+    <div class="form-group">
+      <label for="edit-value">Value</label>
+      <textarea
+        id="edit-value"
+        class="form-input form-textarea"
+        bind:value={addEditValue}
+        rows="8"
+      ></textarea>
+    </div>
+    <div class="form-actions">
+      <button type="button" class="btn-secondary" on:click={() => showEditModal = false}>Cancel</button>
+      <button type="submit" class="btn-primary" disabled={modalLoading}>
+        {modalLoading ? 'Saving...' : 'Save'}
+      </button>
+    </div>
+  </form>
+</Modal>
+
+<!-- Stage Delete Modal -->
+<Modal title="Stage Delete {deleteService === 'ssm' ? 'Parameter' : 'Secret'}" show={showDeleteModal} on:close={() => showDeleteModal = false}>
+  <form class="modal-form" on:submit|preventDefault={handleStageDelete}>
+    {#if modalError}
+      <div class="modal-error">{modalError}</div>
+    {/if}
+    <div class="form-group">
+      <label for="delete-name">Name</label>
+      <input
+        id="delete-name"
+        type="text"
+        class="form-input"
+        bind:value={deleteName}
+        placeholder={deleteService === 'ssm' ? '/path/to/parameter' : 'my-secret-name'}
+      />
+    </div>
+    {#if deleteService === 'sm'}
+      <div class="form-group">
+        <label class="checkbox-label">
+          <input type="checkbox" bind:checked={deleteForce} />
+          <span>Force delete (skip recovery window)</span>
+        </label>
+      </div>
+      {#if !deleteForce}
+        <div class="form-group">
+          <label for="recovery-window">Recovery Window (days)</label>
+          <input
+            id="recovery-window"
+            type="number"
+            class="form-input"
+            bind:value={deleteRecoveryWindow}
+            min="7"
+            max="30"
+          />
+        </div>
+      {/if}
+    {/if}
+    <div class="form-actions">
+      <button type="button" class="btn-secondary" on:click={() => showDeleteModal = false}>Cancel</button>
+      <button type="submit" class="btn-danger" disabled={modalLoading}>
+        {modalLoading ? 'Staging...' : 'Stage Delete'}
+      </button>
+    </div>
+  </form>
+</Modal>
+
 <style>
   .header {
     display: flex;
@@ -401,6 +642,52 @@
 
   .btn-reset-sm:hover {
     background: #e53935;
+  }
+
+  .btn-add {
+    background: #2196f3;
+    color: #fff;
+  }
+
+  .btn-add:hover {
+    background: #1976d2;
+  }
+
+  .btn-delete-stage {
+    background: #ff9800;
+    color: #fff;
+  }
+
+  .btn-delete-stage:hover {
+    background: #f57c00;
+  }
+
+  .entry-actions {
+    display: flex;
+    gap: 6px;
+    margin-left: auto;
+  }
+
+  .btn-entry {
+    padding: 2px 8px;
+    font-size: 11px;
+    border: none;
+    border-radius: 3px;
+    cursor: pointer;
+    background: #2d2d44;
+    color: #fff;
+  }
+
+  .btn-entry:hover {
+    background: #3d3d54;
+  }
+
+  .btn-unstage {
+    background: #666;
+  }
+
+  .btn-unstage:hover {
+    background: #888;
   }
 
   .entry-list {
@@ -669,5 +956,68 @@
     color: #f44336;
     width: 100%;
     margin-top: 4px;
+  }
+
+  /* Form styles for modals */
+  .modal-form {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .form-group label {
+    font-size: 12px;
+    color: #888;
+    text-transform: uppercase;
+  }
+
+  .form-input {
+    padding: 10px 12px;
+    background: #0f0f1a;
+    border: 1px solid #2d2d44;
+    border-radius: 4px;
+    color: #fff;
+    font-size: 14px;
+  }
+
+  .form-input:focus {
+    outline: none;
+    border-color: #e94560;
+  }
+
+  .form-input:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  .form-textarea {
+    font-family: monospace;
+    resize: vertical;
+    min-height: 100px;
+  }
+
+  .btn-primary {
+    padding: 8px 16px;
+    background: #e94560;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+  }
+
+  .btn-primary:hover {
+    background: #d63050;
+  }
+
+  .btn-primary:disabled {
+    background: #666;
+    cursor: not-allowed;
   }
 </style>

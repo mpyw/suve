@@ -34,12 +34,20 @@ export function SecretDelete(arg1, arg2) {
   return window['go']['main']['App']['SecretDelete'](arg1, arg2);
 }
 
+export function SecretDiff(arg1, arg2) {
+  return window['go']['main']['App']['SecretDiff'](arg1, arg2);
+}
+
 export function SecretList(arg1, arg2) {
   return window['go']['main']['App']['SecretList'](arg1, arg2);
 }
 
 export function SecretLog(arg1, arg2) {
   return window['go']['main']['App']['SecretLog'](arg1, arg2);
+}
+
+export function SecretRestore(arg1) {
+  return window['go']['main']['App']['SecretRestore'](arg1);
 }
 
 export function SecretShow(arg1) {
@@ -50,8 +58,24 @@ export function SecretUpdate(arg1, arg2) {
   return window['go']['main']['App']['SecretUpdate'](arg1, arg2);
 }
 
+export function StagingAdd(arg1, arg2, arg3) {
+  return window['go']['main']['App']['StagingAdd'](arg1, arg2, arg3);
+}
+
 export function StagingApply(arg1, arg2) {
   return window['go']['main']['App']['StagingApply'](arg1, arg2);
+}
+
+export function StagingDelete(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['StagingDelete'](arg1, arg2, arg3, arg4);
+}
+
+export function StagingDiff(arg1, arg2) {
+  return window['go']['main']['App']['StagingDiff'](arg1, arg2);
+}
+
+export function StagingEdit(arg1, arg2, arg3) {
+  return window['go']['main']['App']['StagingEdit'](arg1, arg2, arg3);
 }
 
 export function StagingReset(arg1) {
@@ -60,4 +84,8 @@ export function StagingReset(arg1) {
 
 export function StagingStatus() {
   return window['go']['main']['App']['StagingStatus']();
+}
+
+export function StagingUnstage(arg1, arg2) {
+  return window['go']['main']['App']['StagingUnstage'](arg1, arg2);
 }

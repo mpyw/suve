@@ -18,16 +18,30 @@ export function SecretCreate(arg1:string,arg2:string):Promise<main.SecretCreateR
 
 export function SecretDelete(arg1:string,arg2:boolean):Promise<main.SecretDeleteResult>;
 
+export function SecretDiff(arg1:string,arg2:string):Promise<main.SecretDiffResult>;
+
 export function SecretList(arg1:string,arg2:boolean):Promise<main.SecretListResult>;
 
 export function SecretLog(arg1:string,arg2:number):Promise<main.SecretLogResult>;
+
+export function SecretRestore(arg1:string):Promise<main.SecretRestoreResult>;
 
 export function SecretShow(arg1:string):Promise<main.SecretShowResult>;
 
 export function SecretUpdate(arg1:string,arg2:string):Promise<main.SecretUpdateResult>;
 
+export function StagingAdd(arg1:string,arg2:string,arg3:string):Promise<main.StagingAddResult>;
+
 export function StagingApply(arg1:string,arg2:boolean):Promise<main.StagingApplyResult>;
+
+export function StagingDelete(arg1:string,arg2:string,arg3:boolean,arg4:number):Promise<main.StagingDeleteResult>;
+
+export function StagingDiff(arg1:string,arg2:string):Promise<main.StagingDiffResult>;
+
+export function StagingEdit(arg1:string,arg2:string,arg3:string):Promise<main.StagingEditResult>;
 
 export function StagingReset(arg1:string):Promise<main.StagingResetResult>;
 
 export function StagingStatus():Promise<main.StagingStatusResult>;
+
+export function StagingUnstage(arg1:string,arg2:string):Promise<main.StagingUnstageResult>;

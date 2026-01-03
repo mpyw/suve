@@ -481,6 +481,76 @@ func (a *App) SecretDelete(name string, force bool) (*SecretDeleteResult, error)
 	return r, nil
 }
 
+// SecretDiffResult represents the result of comparing secrets.
+type SecretDiffResult struct {
+	OldName      string `json:"oldName"`
+	OldVersionID string `json:"oldVersionId"`
+	OldValue     string `json:"oldValue"`
+	NewName      string `json:"newName"`
+	NewVersionID string `json:"newVersionId"`
+	NewValue     string `json:"newValue"`
+}
+
+// SecretDiff compares two secret versions.
+func (a *App) SecretDiff(spec1Str, spec2Str string) (*SecretDiffResult, error) {
+	spec1, err := secretversion.Parse(spec1Str)
+	if err != nil {
+		return nil, err
+	}
+	spec2, err := secretversion.Parse(spec2Str)
+	if err != nil {
+		return nil, err
+	}
+
+	client, err := a.getSecretClient()
+	if err != nil {
+		return nil, err
+	}
+
+	uc := &secret.DiffUseCase{Client: client}
+	result, err := uc.Execute(a.ctx, secret.DiffInput{
+		Spec1: spec1,
+		Spec2: spec2,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return &SecretDiffResult{
+		OldName:      result.OldName,
+		OldVersionID: result.OldVersionID,
+		OldValue:     result.OldValue,
+		NewName:      result.NewName,
+		NewVersionID: result.NewVersionID,
+		NewValue:     result.NewValue,
+	}, nil
+}
+
+// SecretRestoreResult represents the result of restoring a secret.
+type SecretRestoreResult struct {
+	Name string `json:"name"`
+	ARN  string `json:"arn"`
+}
+
+// SecretRestore restores a deleted secret.
+func (a *App) SecretRestore(name string) (*SecretRestoreResult, error) {
+	client, err := a.getSecretClient()
+	if err != nil {
+		return nil, err
+	}
+
+	uc := &secret.RestoreUseCase{Client: client}
+	result, err := uc.Execute(a.ctx, secret.RestoreInput{Name: name})
+	if err != nil {
+		return nil, err
+	}
+
+	return &SecretRestoreResult{
+		Name: result.Name,
+		ARN:  result.ARN,
+	}, nil
+}
+
 // =============================================================================
 // Staging Operations
 // =============================================================================
@@ -683,6 +753,247 @@ func (a *App) StagingReset(service string) (*StagingResetResult, error) {
 	}
 
 	return output, nil
+}
+
+// StagingAddResult represents the result of staging an add operation.
+type StagingAddResult struct {
+	Name string `json:"name"`
+}
+
+// StagingAdd stages a create operation for a new item.
+func (a *App) StagingAdd(service, name, value string) (*StagingAddResult, error) {
+	store, err := a.getStagingStore()
+	if err != nil {
+		return nil, err
+	}
+
+	var strategy staging.Parser
+	switch service {
+	case "ssm":
+		strategy = &staging.ParamStrategy{}
+	case "sm":
+		strategy = &staging.SecretStrategy{}
+	default:
+		return nil, errInvalidService
+	}
+
+	uc := &stagingusecase.AddUseCase{
+		Strategy: strategy,
+		Store:    store,
+	}
+	result, err := uc.Execute(a.ctx, stagingusecase.AddInput{
+		Name:  name,
+		Value: value,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return &StagingAddResult{Name: result.Name}, nil
+}
+
+// StagingEditResult represents the result of staging an edit operation.
+type StagingEditResult struct {
+	Name string `json:"name"`
+}
+
+// StagingEdit stages an update operation for an existing item.
+func (a *App) StagingEdit(service, name, value string) (*StagingEditResult, error) {
+	store, err := a.getStagingStore()
+	if err != nil {
+		return nil, err
+	}
+
+	var strategy staging.EditStrategy
+	switch service {
+	case "ssm":
+		client, err := a.getParamClient()
+		if err != nil {
+			return nil, err
+		}
+		strategy = staging.NewParamStrategy(client)
+	case "sm":
+		client, err := a.getSecretClient()
+		if err != nil {
+			return nil, err
+		}
+		strategy = staging.NewSecretStrategy(client)
+	default:
+		return nil, errInvalidService
+	}
+
+	uc := &stagingusecase.EditUseCase{
+		Strategy: strategy,
+		Store:    store,
+	}
+	result, err := uc.Execute(a.ctx, stagingusecase.EditInput{
+		Name:  name,
+		Value: value,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return &StagingEditResult{Name: result.Name}, nil
+}
+
+// StagingDeleteResult represents the result of staging a delete operation.
+type StagingDeleteResult struct {
+	Name string `json:"name"`
+}
+
+// StagingDelete stages a delete operation for an existing item.
+func (a *App) StagingDelete(service, name string, force bool, recoveryWindow int) (*StagingDeleteResult, error) {
+	store, err := a.getStagingStore()
+	if err != nil {
+		return nil, err
+	}
+
+	var strategy staging.DeleteStrategy
+	switch service {
+	case "ssm":
+		client, err := a.getParamClient()
+		if err != nil {
+			return nil, err
+		}
+		strategy = staging.NewParamStrategy(client)
+	case "sm":
+		client, err := a.getSecretClient()
+		if err != nil {
+			return nil, err
+		}
+		strategy = staging.NewSecretStrategy(client)
+	default:
+		return nil, errInvalidService
+	}
+
+	uc := &stagingusecase.DeleteUseCase{
+		Strategy: strategy,
+		Store:    store,
+	}
+	result, err := uc.Execute(a.ctx, stagingusecase.DeleteInput{
+		Name:           name,
+		Force:          force,
+		RecoveryWindow: recoveryWindow,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return &StagingDeleteResult{Name: result.Name}, nil
+}
+
+// StagingUnstageResult represents the result of unstaging an item.
+type StagingUnstageResult struct {
+	Name string `json:"name"`
+}
+
+// StagingUnstage removes an item from staging.
+func (a *App) StagingUnstage(service, name string) (*StagingUnstageResult, error) {
+	store, err := a.getStagingStore()
+	if err != nil {
+		return nil, err
+	}
+
+	var svc staging.Service
+	switch service {
+	case "ssm":
+		svc = staging.ServiceParam
+	case "sm":
+		svc = staging.ServiceSecret
+	default:
+		return nil, errInvalidService
+	}
+
+	if err := store.Unstage(svc, name); err != nil {
+		return nil, err
+	}
+
+	return &StagingUnstageResult{Name: name}, nil
+}
+
+// StagingDiffResult represents the result of diffing staged changes.
+type StagingDiffResult struct {
+	ItemName string             `json:"itemName"`
+	Entries  []StagingDiffEntry `json:"entries"`
+}
+
+// StagingDiffEntry represents a single diff entry.
+type StagingDiffEntry struct {
+	Name          string            `json:"name"`
+	Type          string            `json:"type"` // "normal", "create", "autoUnstaged", "warning"
+	Operation     string            `json:"operation,omitempty"`
+	AWSValue      string            `json:"awsValue,omitempty"`
+	AWSIdentifier string            `json:"awsIdentifier,omitempty"`
+	StagedValue   string            `json:"stagedValue,omitempty"`
+	Description   *string           `json:"description,omitempty"`
+	Tags          map[string]string `json:"tags,omitempty"`
+	Warning       string            `json:"warning,omitempty"`
+}
+
+// StagingDiff shows diff between staged changes and AWS.
+func (a *App) StagingDiff(service string, name string) (*StagingDiffResult, error) {
+	store, err := a.getStagingStore()
+	if err != nil {
+		return nil, err
+	}
+
+	var strategy staging.DiffStrategy
+	switch service {
+	case "ssm":
+		client, err := a.getParamClient()
+		if err != nil {
+			return nil, err
+		}
+		strategy = staging.NewParamStrategy(client)
+	case "sm":
+		client, err := a.getSecretClient()
+		if err != nil {
+			return nil, err
+		}
+		strategy = staging.NewSecretStrategy(client)
+	default:
+		return nil, errInvalidService
+	}
+
+	uc := &stagingusecase.DiffUseCase{
+		Strategy: strategy,
+		Store:    store,
+	}
+	result, err := uc.Execute(a.ctx, stagingusecase.DiffInput{Name: name})
+	if err != nil {
+		return nil, err
+	}
+
+	entries := make([]StagingDiffEntry, len(result.Entries))
+	for i, e := range result.Entries {
+		entry := StagingDiffEntry{
+			Name:          e.Name,
+			Operation:     string(e.Operation),
+			AWSValue:      e.AWSValue,
+			AWSIdentifier: e.AWSIdentifier,
+			StagedValue:   e.StagedValue,
+			Description:   e.Description,
+			Tags:          e.Tags,
+			Warning:       e.Warning,
+		}
+		switch e.Type {
+		case stagingusecase.DiffEntryNormal:
+			entry.Type = "normal"
+		case stagingusecase.DiffEntryCreate:
+			entry.Type = "create"
+		case stagingusecase.DiffEntryAutoUnstaged:
+			entry.Type = "autoUnstaged"
+		case stagingusecase.DiffEntryWarning:
+			entry.Type = "warning"
+		}
+		entries[i] = entry
+	}
+
+	return &StagingDiffResult{
+		ItemName: result.ItemName,
+		Entries:  entries,
+	}, nil
 }
 
 // errInvalidService is returned when an invalid service is specified.
