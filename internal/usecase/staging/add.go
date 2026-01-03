@@ -3,6 +3,7 @@ package staging
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/samber/lo"
@@ -37,6 +38,21 @@ func (u *AddUseCase) Execute(_ context.Context, input AddInput) (*AddOutput, err
 	name, err := u.Strategy.ParseName(input.Name)
 	if err != nil {
 		return nil, err
+	}
+
+	// Check existing staged state
+	existingEntry, err := u.Store.Get(service, name)
+	if err != nil && !errors.Is(err, staging.ErrNotStaged) {
+		return nil, err
+	}
+	if existingEntry != nil {
+		switch existingEntry.Operation {
+		case staging.OperationUpdate:
+			return nil, fmt.Errorf("cannot add: already staged for update")
+		case staging.OperationDelete:
+			return nil, fmt.Errorf("cannot add: already staged for deletion")
+		}
+		// OperationCreate: allow updating the draft value
 	}
 
 	// Stage the change with OperationCreate

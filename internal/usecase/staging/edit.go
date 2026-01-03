@@ -33,15 +33,21 @@ type EditUseCase struct {
 func (u *EditUseCase) Execute(ctx context.Context, input EditInput) (*EditOutput, error) {
 	service := u.Strategy.Service()
 
-	// Get base modified time
-	baseModifiedAt, err := u.getBaseModifiedAt(ctx, input.Name)
+	// Get existing staged entry to preserve operation type
+	existingOp, baseModifiedAt, err := u.getExistingState(ctx, input.Name)
 	if err != nil {
 		return nil, err
 	}
 
+	// Determine operation: preserve existing staged operation, default to Update
+	operation := staging.OperationUpdate
+	if existingOp != nil {
+		operation = *existingOp
+	}
+
 	// Stage the change
 	entry := staging.Entry{
-		Operation:      staging.OperationUpdate,
+		Operation:      operation,
 		Value:          lo.ToPtr(input.Value),
 		StagedAt:       time.Now(),
 		BaseModifiedAt: baseModifiedAt,
@@ -59,28 +65,35 @@ func (u *EditUseCase) Execute(ctx context.Context, input EditInput) (*EditOutput
 	return &EditOutput{Name: input.Name}, nil
 }
 
-func (u *EditUseCase) getBaseModifiedAt(ctx context.Context, name string) (*time.Time, error) {
+// getExistingState returns the existing staged operation (if any) and base modified time.
+func (u *EditUseCase) getExistingState(ctx context.Context, name string) (*staging.Operation, *time.Time, error) {
 	service := u.Strategy.Service()
 
 	// Check if already staged
 	stagedEntry, err := u.Store.Get(service, name)
 	if err != nil && !errors.Is(err, staging.ErrNotStaged) {
-		return nil, err
+		return nil, nil, err
 	}
 
-	if stagedEntry != nil && (stagedEntry.Operation == staging.OperationCreate || stagedEntry.Operation == staging.OperationUpdate) {
-		return stagedEntry.BaseModifiedAt, nil
+	if stagedEntry != nil {
+		switch stagedEntry.Operation {
+		case staging.OperationCreate, staging.OperationUpdate:
+			// Preserve existing operation type
+			return &stagedEntry.Operation, stagedEntry.BaseModifiedAt, nil
+		case staging.OperationDelete:
+			// Cancel deletion and convert to UPDATE - fall through to fetch from AWS
+		}
 	}
 
-	// Fetch from AWS
+	// Not staged or staged for deletion - fetch base time from AWS for Update operation
 	result, err := u.Strategy.FetchCurrentValue(ctx, name)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if !result.LastModified.IsZero() {
-		return &result.LastModified, nil
+		return nil, &result.LastModified, nil
 	}
-	return nil, nil
+	return nil, nil, nil
 }
 
 // BaselineInput holds input for getting baseline value.
@@ -103,10 +116,16 @@ func (u *EditUseCase) Baseline(ctx context.Context, input BaselineInput) (*Basel
 		return nil, err
 	}
 
-	if stagedEntry != nil && (stagedEntry.Operation == staging.OperationCreate || stagedEntry.Operation == staging.OperationUpdate) {
-		return &BaselineOutput{
-			Value: lo.FromPtr(stagedEntry.Value),
-		}, nil
+	if stagedEntry != nil {
+		switch stagedEntry.Operation {
+		case staging.OperationCreate, staging.OperationUpdate:
+			return &BaselineOutput{
+				Value: lo.FromPtr(stagedEntry.Value),
+			}, nil
+		case staging.OperationDelete:
+			// When editing a staged deletion, fetch from AWS to allow editing
+			// Fall through to fetch from AWS
+		}
 	}
 
 	// Fetch from AWS
