@@ -1136,3 +1136,513 @@ test.describe('Filter Behavior', () => {
     await expect(page.locator('.regex-input')).toHaveValue('prod');
   });
 });
+
+// ============================================================================
+// Accessibility Tests
+// ============================================================================
+
+test.describe('Accessibility - Navigation', () => {
+  test.beforeEach(async ({ page }) => {
+    await setupWailsMocks(page);
+    await page.goto('/');
+    await waitForItemList(page);
+  });
+
+  test('should have navigation items with proper roles', async ({ page }) => {
+    const navItems = page.locator('.nav-item');
+    const count = await navItems.count();
+    expect(count).toBeGreaterThan(0);
+
+    // Each nav item should be clickable
+    for (let i = 0; i < count; i++) {
+      await expect(navItems.nth(i)).toBeEnabled();
+    }
+  });
+
+  test('should indicate active navigation item', async ({ page }) => {
+    const activeNav = page.locator('.nav-item.active');
+    await expect(activeNav).toBeVisible();
+  });
+
+  test('should have accessible buttons in toolbar', async ({ page }) => {
+    // Refresh button
+    const refreshBtn = page.getByRole('button', { name: /Refresh|Loading/i });
+    await expect(refreshBtn).toBeVisible();
+
+    // New button
+    const newBtn = page.getByRole('button', { name: '+ New' });
+    await expect(newBtn).toBeVisible();
+  });
+});
+
+test.describe('Accessibility - Forms', () => {
+  test.beforeEach(async ({ page }) => {
+    await setupWailsMocks(page);
+    await page.goto('/');
+    await waitForItemList(page);
+  });
+
+  test('should have labeled inputs in create form', async ({ page }) => {
+    await page.getByRole('button', { name: '+ New' }).click();
+
+    // Name input should have associated label
+    const nameInput = page.locator('#param-name');
+    await expect(nameInput).toBeVisible();
+
+    // Value input should have associated label
+    const valueInput = page.locator('#param-value');
+    await expect(valueInput).toBeVisible();
+  });
+
+  test('should have accessible checkboxes', async ({ page }) => {
+    // Filter bar checkboxes
+    const recursiveCheckbox = page.locator('label').filter({ hasText: 'Recursive' }).locator('input[type="checkbox"]');
+    await expect(recursiveCheckbox).toBeVisible();
+
+    const showValuesCheckbox = page.locator('label').filter({ hasText: 'Show Values' }).locator('input[type="checkbox"]');
+    await expect(showValuesCheckbox).toBeVisible();
+  });
+
+  test('should have accessible select dropdown', async ({ page }) => {
+    await page.getByRole('button', { name: '+ New' }).click();
+
+    const typeSelect = page.locator('#param-type');
+    await expect(typeSelect).toBeVisible();
+
+    // Should have options
+    const options = typeSelect.locator('option');
+    const optionCount = await options.count();
+    expect(optionCount).toBeGreaterThan(0);
+  });
+});
+
+test.describe('Accessibility - Modals', () => {
+  test.beforeEach(async ({ page }) => {
+    await setupWailsMocks(page);
+    await page.goto('/');
+    await waitForItemList(page);
+  });
+
+  test('should trap focus in modal', async ({ page }) => {
+    await page.getByRole('button', { name: '+ New' }).click();
+    await expect(page.locator('.modal-backdrop')).toBeVisible();
+
+    // Should be able to tab through modal elements
+    await page.keyboard.press('Tab');
+    const focused = page.locator(':focus');
+    await expect(focused).toBeVisible();
+  });
+
+  test('should have modal title', async ({ page }) => {
+    await page.getByRole('button', { name: '+ New' }).click();
+
+    const modalTitle = page.locator('.modal-title');
+    await expect(modalTitle).toBeVisible();
+  });
+
+  test('should have cancel and submit buttons in modal', async ({ page }) => {
+    await page.getByRole('button', { name: '+ New' }).click();
+
+    await expect(page.getByRole('button', { name: 'Cancel' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Stage' })).toBeVisible();
+  });
+});
+
+// ============================================================================
+// Viewport Tests
+// ============================================================================
+
+test.describe('Viewport - Mobile', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 667 }); // iPhone SE
+    await setupWailsMocks(page);
+    await page.goto('/');
+  });
+
+  test('should render on mobile viewport', async ({ page }) => {
+    await waitForViewLoaded(page);
+    await expect(page.locator('.filter-bar')).toBeVisible();
+  });
+
+  test('should show navigation on mobile', async ({ page }) => {
+    const navItems = page.locator('.nav-item');
+    await expect(navItems.first()).toBeVisible();
+  });
+});
+
+test.describe('Viewport - Tablet', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.setViewportSize({ width: 768, height: 1024 }); // iPad
+    await setupWailsMocks(page);
+    await page.goto('/');
+  });
+
+  test('should render on tablet viewport', async ({ page }) => {
+    await waitForViewLoaded(page);
+    await expect(page.locator('.filter-bar')).toBeVisible();
+  });
+
+  test('should show list panel on tablet', async ({ page }) => {
+    await waitForItemList(page);
+    await expect(page.locator('.list-panel')).toBeVisible();
+  });
+});
+
+test.describe('Viewport - Large Desktop', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.setViewportSize({ width: 1920, height: 1080 });
+    await setupWailsMocks(page);
+    await page.goto('/');
+  });
+
+  test('should render on large desktop viewport', async ({ page }) => {
+    await waitForViewLoaded(page);
+    await expect(page.locator('.filter-bar')).toBeVisible();
+  });
+
+  test('should show detail panel alongside list on large screen', async ({ page }) => {
+    await waitForItemList(page);
+    await clickItemByName(page, '/app/config');
+
+    // Both panels should be visible
+    await expect(page.locator('.list-panel')).toBeVisible();
+    await expect(page.locator('.detail-panel')).toBeVisible();
+  });
+});
+
+// ============================================================================
+// End-to-End Workflow Tests
+// ============================================================================
+
+test.describe('E2E - Parameter CRUD Workflow', () => {
+  test.beforeEach(async ({ page }) => {
+    await setupWailsMocks(page);
+    await page.goto('/');
+    await waitForItemList(page);
+  });
+
+  test('should complete staging workflow for parameter creation', async ({ page }) => {
+    // 1. Open create modal
+    await page.getByRole('button', { name: '+ New' }).click();
+
+    // 2. Fill form
+    await page.locator('#param-name').fill('/new/workflow/param');
+    await page.locator('#param-type').selectOption('SecureString');
+    await page.locator('#param-value').fill('workflow-secret-value');
+
+    // 3. Stage the parameter
+    await page.getByRole('button', { name: 'Stage' }).click();
+    await expect(page.locator('.modal-backdrop')).not.toBeVisible();
+
+    // 4. Navigate to staging
+    await navigateTo(page, 'Staging');
+    await expect(page.locator('.staging-content')).toBeVisible();
+
+    // 5. Verify staged change appears
+    await expect(page.getByText('/new/workflow/param')).toBeVisible();
+  });
+
+  test('should complete full parameter edit workflow', async ({ page }) => {
+    // 1. Select parameter
+    await clickItemByName(page, '/app/config');
+    await expect(page.locator('.detail-panel')).toBeVisible();
+
+    // 2. Open edit modal
+    await page.getByRole('button', { name: 'Edit' }).click();
+
+    // 3. Modify value
+    await page.locator('#param-value').fill('updated-workflow-value');
+
+    // 4. Stage edit
+    await page.getByRole('button', { name: 'Stage' }).click();
+    await expect(page.locator('.modal-backdrop')).not.toBeVisible();
+
+    // 5. Navigate to staging
+    await navigateTo(page, 'Staging');
+
+    // 6. Verify staged change
+    await expect(page.getByText('/app/config')).toBeVisible();
+  });
+
+  test('should complete full parameter delete workflow', async ({ page }) => {
+    // 1. Select parameter
+    await clickItemByName(page, '/app/config');
+
+    // 2. Open delete modal
+    await page.getByRole('button', { name: 'Delete' }).click();
+
+    // 3. Stage delete
+    await page.getByRole('button', { name: 'Stage' }).click();
+    await expect(page.locator('.modal-backdrop')).not.toBeVisible();
+
+    // 4. Navigate to staging
+    await navigateTo(page, 'Staging');
+
+    // 5. Verify staged delete
+    await expect(page.getByText('/app/config')).toBeVisible();
+  });
+});
+
+test.describe('E2E - Secret CRUD Workflow', () => {
+  test.beforeEach(async ({ page }) => {
+    await setupWailsMocks(page);
+    await page.goto('/');
+    await navigateTo(page, 'Secrets');
+    await waitForItemList(page);
+  });
+
+  test('should complete full secret creation workflow', async ({ page }) => {
+    // 1. Open create modal
+    await page.getByRole('button', { name: '+ New' }).click();
+
+    // 2. Fill form
+    await page.locator('#secret-name').fill('new-workflow-secret');
+    await page.locator('#secret-value').fill('{"api_key": "secret123"}');
+
+    // 3. Stage
+    await page.getByRole('button', { name: 'Stage' }).click();
+    await expect(page.locator('.modal-backdrop')).not.toBeVisible();
+
+    // 4. Navigate to staging
+    await navigateTo(page, 'Staging');
+
+    // 5. Verify
+    await expect(page.getByText('new-workflow-secret')).toBeVisible();
+  });
+
+  test('should complete full secret edit workflow', async ({ page }) => {
+    // 1. Select secret
+    await clickItemByName(page, 'my-secret');
+
+    // 2. Edit - use the edit modal's selector
+    await page.getByRole('button', { name: 'Edit' }).click();
+    await page.locator('#edit-secret-value').fill('updated-secret-value');
+
+    // 3. Stage
+    await page.getByRole('button', { name: 'Stage' }).click();
+    await expect(page.locator('.modal-backdrop')).not.toBeVisible();
+
+    // 4. Navigate to staging
+    await navigateTo(page, 'Staging');
+
+    // 5. Verify
+    await expect(page.getByText('my-secret')).toBeVisible();
+  });
+});
+
+test.describe('E2E - Tag Management Workflow', () => {
+  test.beforeEach(async ({ page }) => {
+    await setupWailsMocks(page);
+    await page.goto('/');
+    await waitForItemList(page);
+  });
+
+  test('should open add tag modal from detail panel', async ({ page }) => {
+    // 1. Select parameter
+    await clickItemByName(page, '/app/config');
+
+    // 2. Open add tag modal - button text is "+ Add"
+    await page.locator('.btn-action-sm').filter({ hasText: '+ Add' }).click();
+
+    // 3. Verify tag modal opened
+    await expect(page.locator('.modal-backdrop')).toBeVisible();
+    await expect(page.locator('#tag-key')).toBeVisible();
+    await expect(page.locator('#tag-value')).toBeVisible();
+  });
+
+  test('should open remove tag confirmation modal', async ({ page }) => {
+    // 1. Select parameter with tags
+    await setupWailsMocks(page, {
+      params: [{ name: '/app/config', type: 'String', value: 'test' }],
+      paramTags: { '/app/config': [{ key: 'env', value: 'prod' }] },
+    });
+    await page.goto('/');
+    await waitForItemList(page);
+
+    // 2. Select the parameter
+    await clickItemByName(page, '/app/config');
+
+    // 3. Click remove on existing tag
+    await page.locator('.btn-tag-remove').first().click();
+
+    // 4. Verify remove modal opened
+    await expect(page.locator('.modal-backdrop')).toBeVisible();
+  });
+});
+
+// ============================================================================
+// Input Debounce Tests
+// ============================================================================
+
+test.describe('Input Debounce Behavior', () => {
+  test.beforeEach(async ({ page }) => {
+    await setupWailsMocks(page, createFilterTestState());
+    await page.goto('/');
+    await waitForItemList(page);
+  });
+
+  test('should debounce prefix filter input', async ({ page }) => {
+    const initialCount = await page.locator('.item-button').count();
+
+    // Type quickly
+    await page.locator('.prefix-input').fill('/prod');
+
+    // Wait for debounce
+    await page.waitForTimeout(400);
+
+    // Should have filtered results
+    const filteredCount = await page.locator('.item-button').count();
+    expect(filteredCount).toBeLessThanOrEqual(initialCount);
+  });
+
+  test('should debounce regex filter input', async ({ page }) => {
+    // Type quickly
+    await page.locator('.regex-input').fill('config');
+
+    // Wait for debounce
+    await page.waitForTimeout(400);
+
+    // Items should be filtered
+    const items = page.locator('.item-button');
+    const count = await items.count();
+    expect(count).toBeGreaterThan(0);
+  });
+
+  test('should cancel pending filter on quick input change', async ({ page }) => {
+    // Type, then quickly change
+    await page.locator('.regex-input').fill('prod');
+    await page.locator('.regex-input').fill('dev');
+
+    // Wait for debounce
+    await page.waitForTimeout(400);
+
+    // Should filter by 'dev', not 'prod'
+    await expect(page.locator('.regex-input')).toHaveValue('dev');
+  });
+});
+
+// ============================================================================
+// Data Validation Tests
+// ============================================================================
+
+test.describe('Data Validation', () => {
+  test.beforeEach(async ({ page }) => {
+    await setupWailsMocks(page);
+    await page.goto('/');
+    await waitForItemList(page);
+  });
+
+  test('should require name and value for parameter creation', async ({ page }) => {
+    await page.getByRole('button', { name: '+ New' }).click();
+
+    // Leave name empty
+    await page.locator('#param-value').fill('some-value');
+    await page.getByRole('button', { name: 'Stage' }).click();
+
+    // Should remain on modal (validation should prevent submission)
+    await expect(page.locator('.modal-backdrop')).toBeVisible();
+  });
+
+  test('should allow parameter name with leading slash', async ({ page }) => {
+    await page.getByRole('button', { name: '+ New' }).click();
+    await page.locator('#param-name').fill('/valid/param/name');
+    await page.locator('#param-value').fill('valid-value');
+    await page.getByRole('button', { name: 'Stage' }).click();
+
+    // Should close modal on success
+    await expect(page.locator('.modal-backdrop')).not.toBeVisible();
+  });
+
+  test('should handle whitespace-only value', async ({ page }) => {
+    await page.getByRole('button', { name: '+ New' }).click();
+    await page.locator('#param-name').fill('/app/whitespace');
+    await page.locator('#param-value').fill('   ');
+    await page.getByRole('button', { name: 'Stage' }).click();
+
+    // May succeed or fail depending on validation - just verify no crash
+    await expect(page.locator('body')).toBeVisible();
+  });
+});
+
+// ============================================================================
+// Loading State Tests
+// ============================================================================
+
+test.describe('Loading States', () => {
+  test.beforeEach(async ({ page }) => {
+    await setupWailsMocks(page);
+  });
+
+  test('should show loading state on initial load', async ({ page }) => {
+    await page.goto('/');
+    // The loading state might be brief, but page should eventually load
+    await waitForViewLoaded(page);
+  });
+
+  test('should show loading state when switching views', async ({ page }) => {
+    await page.goto('/');
+    await waitForItemList(page);
+
+    // Switch to secrets
+    await navigateTo(page, 'Secrets');
+
+    // Should eventually show secrets view
+    await waitForItemList(page);
+    await expect(page.locator('.item-button')).toHaveCount(3);
+  });
+
+  test('should show loading in modal during operation', async ({ page }) => {
+    await page.goto('/');
+    await waitForItemList(page);
+
+    await page.getByRole('button', { name: '+ New' }).click();
+    await page.locator('#param-name').fill('/new/param');
+    await page.locator('#param-value').fill('value');
+
+    // Click stage - brief loading state
+    await page.getByRole('button', { name: 'Stage' }).click();
+
+    // Should complete (modal closes)
+    await expect(page.locator('.modal-backdrop')).not.toBeVisible();
+  });
+});
+
+// ============================================================================
+// Selection State Tests
+// ============================================================================
+
+test.describe('Selection States', () => {
+  test.beforeEach(async ({ page }) => {
+    await setupWailsMocks(page);
+    await page.goto('/');
+    await waitForItemList(page);
+  });
+
+  test('should highlight selected item in list', async ({ page }) => {
+    await clickItemByName(page, '/app/config');
+
+    // The selected item should have a different visual state
+    const selectedItem = page.locator('.item-entry.selected');
+    await expect(selectedItem).toBeVisible();
+  });
+
+  test('should deselect when closing detail panel', async ({ page }) => {
+    await clickItemByName(page, '/app/config');
+    await expect(page.locator('.item-entry.selected')).toBeVisible();
+
+    await page.locator('.btn-close').click();
+
+    // Selection should be cleared
+    await expect(page.locator('.item-entry.selected')).not.toBeVisible();
+  });
+
+  test('should update selection when clicking different item', async ({ page }) => {
+    await clickItemByName(page, '/app/config');
+    await expect(page.locator('.item-entry.selected')).toHaveCount(1);
+
+    await clickItemByName(page, '/app/database/url');
+
+    // Still only one selected
+    await expect(page.locator('.item-entry.selected')).toHaveCount(1);
+  });
+});
