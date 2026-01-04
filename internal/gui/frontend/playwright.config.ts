@@ -8,8 +8,9 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 1 : undefined,
-  reporter: process.env.CI ? 'github' : 'html',
+  // Use more workers locally, and configurable in CI via env
+  workers: process.env.CI ? (process.env.PW_WORKERS ? parseInt(process.env.PW_WORKERS) : 4) : undefined,
+  reporter: process.env.CI ? [['github'], ['html', { open: 'never' }]] : 'html',
   use: {
     baseURL: BASE_URL,
     trace: 'on-first-retry',
@@ -20,6 +21,17 @@ export default defineConfig({
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
     },
+    // Enable Firefox and WebKit for cross-browser testing in CI
+    ...(process.env.CI ? [
+      {
+        name: 'firefox',
+        use: { ...devices['Desktop Firefox'] },
+      },
+      {
+        name: 'webkit',
+        use: { ...devices['Desktop Safari'] },
+      },
+    ] : []),
   ],
   webServer: {
     command: `npx vite --port ${PORT}`,
