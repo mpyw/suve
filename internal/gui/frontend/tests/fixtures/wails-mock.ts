@@ -34,6 +34,22 @@ export interface StagedTagEntry {
   removeTags: string[];
 }
 
+export interface ParamLogEntry {
+  version: number;
+  value: string;
+  type: string;
+  isCurrent: boolean;
+  lastModified: string;
+}
+
+export interface SecretLogEntry {
+  versionId: string;
+  stages: string[];
+  value: string;
+  isCurrent: boolean;
+  created: string;
+}
+
 export interface MockState {
   params: Parameter[];
   secrets: Secret[];
@@ -43,6 +59,17 @@ export interface MockState {
   stagedSMTags: StagedTagEntry[];
   paramTags: Record<string, Tag[]>;
   secretTags: Record<string, Tag[]>;
+  // Advanced: version history for diff testing
+  paramVersions: Record<string, ParamLogEntry[]>;
+  secretVersions: Record<string, SecretLogEntry[]>;
+  // Pagination support
+  enablePagination: boolean;
+  pageSize: number;
+  // Error simulation
+  simulateError?: {
+    operation: string;
+    message: string;
+  };
 }
 
 // ============================================================================
@@ -114,6 +141,23 @@ export const defaultMockState: MockState = {
   secretTags: {
     'my-secret': [{ key: 'team', value: 'backend' }],
   },
+  // Default version history for diff testing
+  paramVersions: {
+    '/app/config': [
+      { version: 3, value: 'config-value', type: 'String', isCurrent: true, lastModified: new Date().toISOString() },
+      { version: 2, value: 'old-config-value', type: 'String', isCurrent: false, lastModified: new Date(Date.now() - 86400000).toISOString() },
+      { version: 1, value: 'initial-config', type: 'String', isCurrent: false, lastModified: new Date(Date.now() - 172800000).toISOString() },
+    ],
+  },
+  secretVersions: {
+    'my-secret': [
+      { versionId: 'v3-current', stages: ['AWSCURRENT'], value: 'secret-value-1', isCurrent: true, created: new Date().toISOString() },
+      { versionId: 'v2-previous', stages: ['AWSPREVIOUS'], value: 'secret-value-old', isCurrent: false, created: new Date(Date.now() - 86400000).toISOString() },
+      { versionId: 'v1-initial', stages: [], value: 'secret-value-initial', isCurrent: false, created: new Date(Date.now() - 172800000).toISOString() },
+    ],
+  },
+  enablePagination: false,
+  pageSize: 50,
 };
 
 /**
@@ -209,6 +253,80 @@ export function createNoTagsState(): Partial<MockState> {
   };
 }
 
+/**
+ * State with multiple parameters for filter testing
+ */
+export function createFilterTestState(): Partial<MockState> {
+  return {
+    params: [
+      createParam('/prod/app/config', 'prod-config', 'String'),
+      createParam('/prod/app/secret', 'prod-secret', 'SecureString'),
+      createParam('/prod/database/url', 'prod-db', 'SecureString'),
+      createParam('/dev/app/config', 'dev-config', 'String'),
+      createParam('/dev/app/secret', 'dev-secret', 'SecureString'),
+      createParam('/staging/app/config', 'staging-config', 'String'),
+    ],
+    secrets: [
+      createSecret('prod-api-key', '{"key": "prod-value"}'),
+      createSecret('prod-database', 'prod-db-pass'),
+      createSecret('dev-api-key', '{"key": "dev-value"}'),
+      createSecret('dev-database', 'dev-db-pass'),
+      createSecret('staging-api-key', '{"key": "staging-value"}'),
+    ],
+  };
+}
+
+/**
+ * State with version history for diff testing
+ */
+export function createVersionHistoryState(): Partial<MockState> {
+  return {
+    paramVersions: {
+      '/app/config': [
+        { version: 3, value: 'current-value-v3', type: 'String', isCurrent: true, lastModified: new Date().toISOString() },
+        { version: 2, value: 'previous-value-v2', type: 'String', isCurrent: false, lastModified: new Date(Date.now() - 86400000).toISOString() },
+        { version: 1, value: 'initial-value-v1', type: 'String', isCurrent: false, lastModified: new Date(Date.now() - 172800000).toISOString() },
+      ],
+    },
+    secretVersions: {
+      'my-secret': [
+        { versionId: 'ver-003', stages: ['AWSCURRENT'], value: '{"current": "v3"}', isCurrent: true, created: new Date().toISOString() },
+        { versionId: 'ver-002', stages: ['AWSPREVIOUS'], value: '{"previous": "v2"}', isCurrent: false, created: new Date(Date.now() - 86400000).toISOString() },
+        { versionId: 'ver-001', stages: [], value: '{"initial": "v1"}', isCurrent: false, created: new Date(Date.now() - 172800000).toISOString() },
+      ],
+    },
+  };
+}
+
+/**
+ * State with large dataset for pagination testing
+ */
+export function createPaginationTestState(itemCount: number = 25): Partial<MockState> {
+  const params: Parameter[] = [];
+  const secrets: Secret[] = [];
+
+  for (let i = 1; i <= itemCount; i++) {
+    params.push(createParam(`/app/param-${String(i).padStart(3, '0')}`, `value-${i}`, 'String'));
+    secrets.push(createSecret(`secret-${String(i).padStart(3, '0')}`, `secret-value-${i}`));
+  }
+
+  return {
+    params,
+    secrets,
+    enablePagination: true,
+    pageSize: 10,
+  };
+}
+
+/**
+ * State that simulates API errors
+ */
+export function createErrorState(operation: string, message: string): Partial<MockState> {
+  return {
+    simulateError: { operation, message },
+  };
+}
+
 // ============================================================================
 // Main Mock Setup Function
 // ============================================================================
@@ -222,30 +340,82 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
 
     const mockApp = {
       // Parameter operations
-      ParamList: async (_prefix: string, _recursive: boolean, _withValue: boolean, _filter: string) => ({
-        entries: state.params.map((p: any) => ({ name: p.name, type: p.type, value: p.value })),
-        nextToken: '',
-      }),
+      ParamList: async (prefix: string, _recursive: boolean, withValue: boolean, filter: string, pageSize?: number, nextToken?: string) => {
+        // Simulate error if configured
+        if (state.simulateError?.operation === 'ParamList') {
+          throw new Error(state.simulateError.message);
+        }
+
+        let filtered = state.params;
+
+        // Apply prefix filter
+        if (prefix) {
+          filtered = filtered.filter((p: any) => p.name.startsWith(prefix));
+        }
+
+        // Apply regex filter
+        if (filter) {
+          try {
+            const regex = new RegExp(filter, 'i');
+            filtered = filtered.filter((p: any) => regex.test(p.name));
+          } catch {
+            // Invalid regex, ignore
+          }
+        }
+
+        // Handle pagination
+        if (state.enablePagination && pageSize) {
+          const startIndex = nextToken ? parseInt(nextToken) : 0;
+          const endIndex = startIndex + pageSize;
+          const hasMore = endIndex < filtered.length;
+          return {
+            entries: filtered.slice(startIndex, endIndex).map((p: any) => ({
+              name: p.name,
+              type: p.type,
+              value: withValue ? p.value : undefined
+            })),
+            nextToken: hasMore ? String(endIndex) : '',
+          };
+        }
+
+        return {
+          entries: filtered.map((p: any) => ({
+            name: p.name,
+            type: p.type,
+            value: withValue ? p.value : undefined
+          })),
+          nextToken: '',
+        };
+      },
       ParamShow: async (name: string) => {
         const param = state.params.find((p: any) => p.name === name);
         const tags = state.paramTags[name] || [];
+        const versions = state.paramVersions[name];
+        const currentVersion = versions ? versions.find((v: any) => v.isCurrent) : null;
         return {
           name,
           value: param?.value || 'mock-value',
-          version: 1,
+          version: currentVersion?.version || 1,
           type: param?.type || 'String',
           description: '',
-          lastModified: new Date().toISOString(),
+          lastModified: currentVersion?.lastModified || new Date().toISOString(),
           tags,
         };
       },
-      ParamLog: async (name: string) => ({
-        name,
-        entries: [
+      ParamLog: async (name: string, _limit?: number) => {
+        const versions = state.paramVersions[name] || [
           { version: 1, value: 'current', type: 'String', isCurrent: true, lastModified: new Date().toISOString() },
-        ],
-      }),
+        ];
+        return {
+          name,
+          entries: versions,
+        };
+      },
       ParamSet: async (name: string, value: string, _type: string) => {
+        // Simulate error if configured
+        if (state.simulateError?.operation === 'ParamSet') {
+          throw new Error(state.simulateError.message);
+        }
         const existing = state.params.find((p: any) => p.name === name);
         if (existing) {
           existing.value = value;
@@ -258,7 +428,24 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
         state.params = state.params.filter((p: any) => p.name !== name);
         return { name };
       },
-      ParamDiff: async () => ({ oldName: '', newName: '', oldValue: '', newValue: '' }),
+      ParamDiff: async (spec1: string, spec2: string) => {
+        // Parse specs like "/app/config#1" and "/app/config#2"
+        const parseSpec = (s: string) => {
+          const [name, ver] = s.split('#');
+          return { name, version: parseInt(ver) };
+        };
+        const s1 = parseSpec(spec1);
+        const s2 = parseSpec(spec2);
+        const versions = state.paramVersions[s1.name] || [];
+        const v1 = versions.find((v: any) => v.version === s1.version);
+        const v2 = versions.find((v: any) => v.version === s2.version);
+        return {
+          oldName: s1.name,
+          newName: s2.name,
+          oldValue: v1?.value || '',
+          newValue: v2?.value || '',
+        };
+      },
       ParamAddTag: async (name: string, key: string, value: string) => {
         if (!state.paramTags[name]) state.paramTags[name] = [];
         const existing = state.paramTags[name].find((t: any) => t.key === key);
@@ -277,10 +464,51 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
       },
 
       // Secret operations
-      SecretList: async () => ({
-        entries: state.secrets.map((s: any) => ({ name: s.name, value: s.value })),
-        nextToken: '',
-      }),
+      SecretList: async (prefix: string, withValue: boolean, filter: string, pageSize?: number, nextToken?: string) => {
+        // Simulate error if configured
+        if (state.simulateError?.operation === 'SecretList') {
+          throw new Error(state.simulateError.message);
+        }
+
+        let filtered = state.secrets;
+
+        // Apply prefix filter
+        if (prefix) {
+          filtered = filtered.filter((s: any) => s.name.startsWith(prefix));
+        }
+
+        // Apply regex filter
+        if (filter) {
+          try {
+            const regex = new RegExp(filter, 'i');
+            filtered = filtered.filter((s: any) => regex.test(s.name));
+          } catch {
+            // Invalid regex, ignore
+          }
+        }
+
+        // Handle pagination
+        if (state.enablePagination && pageSize) {
+          const startIndex = nextToken ? parseInt(nextToken) : 0;
+          const endIndex = startIndex + pageSize;
+          const hasMore = endIndex < filtered.length;
+          return {
+            entries: filtered.slice(startIndex, endIndex).map((s: any) => ({
+              name: s.name,
+              value: withValue ? s.value : undefined
+            })),
+            nextToken: hasMore ? String(endIndex) : '',
+          };
+        }
+
+        return {
+          entries: filtered.map((s: any) => ({
+            name: s.name,
+            value: withValue ? s.value : undefined
+          })),
+          nextToken: '',
+        };
+      },
       SecretShow: async (name: string) => {
         const secret = state.secrets.find((s: any) => s.name === name);
         const tags = state.secretTags[name] || [];
@@ -295,13 +523,20 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
           tags,
         };
       },
-      SecretLog: async (name: string) => ({
-        name,
-        entries: [
+      SecretLog: async (name: string, _limit?: number) => {
+        const versions = state.secretVersions[name] || [
           { versionId: 'v1', stages: ['AWSCURRENT'], value: 'current', isCurrent: true, created: new Date().toISOString() },
-        ],
-      }),
+        ];
+        return {
+          name,
+          entries: versions,
+        };
+      },
       SecretCreate: async (name: string, value: string) => {
+        // Simulate error if configured
+        if (state.simulateError?.operation === 'SecretCreate') {
+          throw new Error(state.simulateError.message);
+        }
         state.secrets.push({ name, value });
         return { name, versionId: 'v1', arn: `arn:aws:secretsmanager:us-east-1:123456789:secret:${name}` };
       },
@@ -314,7 +549,27 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
         state.secrets = state.secrets.filter((s: any) => s.name !== name);
         return { name, deletionDate: new Date().toISOString(), arn: '' };
       },
-      SecretDiff: async () => ({ oldName: '', oldVersionId: '', oldValue: '', newName: '', newVersionId: '', newValue: '' }),
+      SecretDiff: async (spec1: string, spec2: string) => {
+        // Parse specs like "my-secret#v1" and "my-secret#v2"
+        const parseSpec = (s: string) => {
+          const hashIdx = s.lastIndexOf('#');
+          if (hashIdx === -1) return { name: s, versionId: '' };
+          return { name: s.substring(0, hashIdx), versionId: s.substring(hashIdx + 1) };
+        };
+        const s1 = parseSpec(spec1);
+        const s2 = parseSpec(spec2);
+        const versions = state.secretVersions[s1.name] || [];
+        const v1 = versions.find((v: any) => v.versionId === s1.versionId);
+        const v2 = versions.find((v: any) => v.versionId === s2.versionId);
+        return {
+          oldName: s1.name,
+          oldVersionId: s1.versionId,
+          oldValue: v1?.value || '',
+          newName: s2.name,
+          newVersionId: s2.versionId,
+          newValue: v2?.value || '',
+        };
+      },
       SecretRestore: async (name: string) => {
         return { name, arn: `arn:aws:secretsmanager:us-east-1:123456789:secret:${name}` };
       },
