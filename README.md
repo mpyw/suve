@@ -28,36 +28,34 @@ A **Git-like CLI** for AWS Parameter Store and Secrets Manager. Familiar command
 brew install mpyw/tap/suve
 ```
 
-This installs three binaries:
-
-| Binary | Description |
-|--------|-------------|
-| `suve` | CLI + GUI integrated (use `suve --gui` to launch GUI) |
-| `suve-cli` | CLI only (lightweight, no GUI dependencies) |
-| `suve-gui` | GUI only (standalone desktop app) |
-
 ### Using [`go install`](https://pkg.go.dev/cmd/go#hdr-Compile_and_install_packages_and_dependencies)
 
 ```bash
-# CLI only (recommended)
-go install github.com/mpyw/suve/cmd/suve-cli@latest
+# CLI only
+go install github.com/mpyw/suve/cmd/suve@latest
 
-# CLI + GUI integrated (requires CGO)
+# CLI + GUI (macOS/Linux: requires CGO, Windows: no CGO needed)
 CGO_ENABLED=1 go install -tags production github.com/mpyw/suve/cmd/suve@latest
+
+# Windows CLI + GUI (no CGO required)
+go install -tags production github.com/mpyw/suve/cmd/suve@latest
 ```
 
 > [!NOTE]
-> The `--gui` flag in `suve` requires building with `-tags production` and CGO. For CLI-only usage, `suve-cli` is recommended as it has no CGO dependencies.
+> The `--gui` flag requires building with `-tags production`. CGO is required on macOS/Linux (for webkit2gtk), but not on Windows (Wails uses pure Go webview2loader).
 
 ### Using [`go tool`](https://pkg.go.dev/cmd/go#hdr-Run_specified_go_tool) (Go 1.24+)
 
 ```bash
-# Add to go.mod as a tool dependency
-go get -tool github.com/mpyw/suve/cmd/suve-cli@latest
+# Add to go.mod as a tool dependency (CLI only)
+go get -tool github.com/mpyw/suve/cmd/suve@latest
 
 # Run via go tool
-go tool suve-cli param show /my/param
+go tool suve param show /my/param
 ```
+
+> [!NOTE]
+> `go tool` does not support build tags, so GUI is not available. Use `go install` with `-tags production` for GUI support.
 
 > [!TIP]
 > **Using with [aws-vault](https://github.com/99designs/aws-vault)**: Wrap commands with `aws-vault exec` for temporary credentials:
