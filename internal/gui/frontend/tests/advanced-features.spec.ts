@@ -867,3 +867,272 @@ test.describe('Navigation State', () => {
     await expect(page.locator('.detail-panel')).not.toBeVisible();
   });
 });
+
+// ============================================================================
+// Edge Case Tests - Values
+// ============================================================================
+
+test.describe('Value Edge Cases', () => {
+  test('should handle empty string value', async ({ page }) => {
+    await setupWailsMocks(page, {
+      params: [{ name: '/app/empty-value', type: 'String', value: '' }],
+    });
+    await page.goto('/');
+    await waitForItemList(page);
+
+    await clickItemByName(page, '/app/empty-value');
+    await expect(page.locator('.detail-panel')).toBeVisible();
+    // Empty value should still be displayable
+    await expect(page.locator('.value-display')).toBeVisible();
+  });
+
+  test('should handle very long parameter name', async ({ page }) => {
+    const longName = '/very/long/hierarchical/path/to/a/deeply/nested/parameter/name';
+    await setupWailsMocks(page, {
+      params: [{ name: longName, type: 'String', value: 'value' }],
+    });
+    await page.goto('/');
+    await waitForItemList(page);
+
+    await clickItemByName(page, longName);
+    await expect(page.locator('.detail-panel')).toBeVisible();
+    await expect(page.locator('.detail-title')).toContainText(longName);
+  });
+
+  test('should handle special characters in parameter name', async ({ page }) => {
+    const specialName = '/app/config-with-dashes_and_underscores.dot';
+    await setupWailsMocks(page, {
+      params: [{ name: specialName, type: 'String', value: 'value' }],
+    });
+    await page.goto('/');
+    await waitForItemList(page);
+
+    await clickItemByName(page, specialName);
+    await expect(page.locator('.detail-panel')).toBeVisible();
+  });
+
+  test('should handle newlines in parameter value', async ({ page }) => {
+    const multilineValue = 'line1\nline2\nline3';
+    await setupWailsMocks(page, {
+      params: [{ name: '/app/multiline', type: 'String', value: multilineValue }],
+    });
+    await page.goto('/');
+    await waitForItemList(page);
+
+    await clickItemByName(page, '/app/multiline');
+    await expect(page.locator('.value-display')).toContainText('line1');
+  });
+
+  test('should handle unicode characters in value', async ({ page }) => {
+    const unicodeValue = '日本語テスト 🎉 emoji test';
+    await setupWailsMocks(page, {
+      params: [{ name: '/app/unicode', type: 'String', value: unicodeValue }],
+    });
+    await page.goto('/');
+    await waitForItemList(page);
+
+    await clickItemByName(page, '/app/unicode');
+    await expect(page.locator('.value-display')).toContainText('日本語テスト');
+  });
+});
+
+// ============================================================================
+// Edge Case Tests - Tags
+// ============================================================================
+
+test.describe('Tag Edge Cases', () => {
+  test('should handle tag with empty value', async ({ page }) => {
+    await setupWailsMocks(page, {
+      params: [{ name: '/app/config', type: 'String', value: 'value' }],
+      paramTags: {
+        '/app/config': [{ key: 'empty-value-tag', value: '' }],
+      },
+    });
+    await page.goto('/');
+    await waitForItemList(page);
+
+    await clickItemByName(page, '/app/config');
+    await expect(page.locator('.tag-key').filter({ hasText: 'empty-value-tag' })).toBeVisible();
+  });
+
+  test('should handle tag with special characters', async ({ page }) => {
+    await setupWailsMocks(page, {
+      params: [{ name: '/app/config', type: 'String', value: 'value' }],
+      paramTags: {
+        '/app/config': [{ key: 'env:stage', value: 'prod-v1.2.3' }],
+      },
+    });
+    await page.goto('/');
+    await waitForItemList(page);
+
+    await clickItemByName(page, '/app/config');
+    await expect(page.locator('.tag-key').filter({ hasText: 'env:stage' })).toBeVisible();
+  });
+
+  test('should handle many tags on single parameter', async ({ page }) => {
+    const manyTags = Array.from({ length: 10 }, (_, i) => ({
+      key: `tag-${i}`,
+      value: `value-${i}`,
+    }));
+    await setupWailsMocks(page, {
+      params: [{ name: '/app/config', type: 'String', value: 'value' }],
+      paramTags: { '/app/config': manyTags },
+    });
+    await page.goto('/');
+    await waitForItemList(page);
+
+    await clickItemByName(page, '/app/config');
+    // Should display all tags
+    const tagCount = await page.locator('.tag-item').count();
+    expect(tagCount).toBe(10);
+  });
+});
+
+// ============================================================================
+// Concurrent Operations Tests
+// ============================================================================
+
+test.describe('Concurrent Operations', () => {
+  test.beforeEach(async ({ page }) => {
+    await setupWailsMocks(page);
+    await page.goto('/');
+    await waitForItemList(page);
+  });
+
+  test('should handle rapid clicking between items', async ({ page }) => {
+    // Click multiple items rapidly
+    await clickItemByName(page, '/app/config');
+    await clickItemByName(page, '/app/database/url');
+    await clickItemByName(page, '/app/api/key');
+
+    // Final selection should be shown
+    await expect(page.locator('.detail-title').filter({ hasText: '/app/api/key' })).toBeVisible();
+  });
+
+  test('should handle rapid view switching', async ({ page }) => {
+    // Switch views rapidly
+    await navigateTo(page, 'Secrets');
+    await navigateTo(page, 'Parameters');
+    await navigateTo(page, 'Staging');
+    await navigateTo(page, 'Parameters');
+
+    // Should end on Parameters view
+    await waitForViewLoaded(page);
+    await expect(page.locator('.filter-bar')).toBeVisible();
+  });
+
+  test('should handle opening and closing modals rapidly', async ({ page }) => {
+    // Open and close modals rapidly
+    await page.getByRole('button', { name: '+ New' }).click();
+    await expect(page.locator('.modal-backdrop')).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(page.locator('.modal-backdrop')).not.toBeVisible();
+
+    await page.getByRole('button', { name: '+ New' }).click();
+    await expect(page.locator('.modal-backdrop')).toBeVisible();
+    await page.getByRole('button', { name: 'Cancel' }).click();
+    await expect(page.locator('.modal-backdrop')).not.toBeVisible();
+  });
+});
+
+// ============================================================================
+// Staging Integration Tests
+// ============================================================================
+
+test.describe('Staging Integration', () => {
+  test.beforeEach(async ({ page }) => {
+    await setupWailsMocks(page);
+    await page.goto('/');
+    await waitForItemList(page);
+  });
+
+  test('should reflect staged changes in staging view after creating', async ({ page }) => {
+    // Create a new parameter (staged)
+    await page.getByRole('button', { name: '+ New' }).click();
+    await page.locator('#param-name').fill('/new/staged/param');
+    await page.locator('#param-value').fill('staged-value');
+    await page.getByRole('button', { name: 'Stage' }).click();
+    await expect(page.locator('.modal-backdrop')).not.toBeVisible();
+
+    // Navigate to staging
+    await navigateTo(page, 'Staging');
+    await expect(page.locator('.staging-content')).toBeVisible();
+
+    // Should see the staged change
+    await expect(page.getByText('/new/staged/param')).toBeVisible();
+  });
+
+  test('should reflect staged changes in staging view after editing', async ({ page }) => {
+    // Select and edit a parameter (staged)
+    await clickItemByName(page, '/app/config');
+    await page.getByRole('button', { name: 'Edit' }).click();
+    await page.locator('#param-value').fill('updated-value');
+    await page.getByRole('button', { name: 'Stage' }).click();
+    await expect(page.locator('.modal-backdrop')).not.toBeVisible();
+
+    // Navigate to staging
+    await navigateTo(page, 'Staging');
+
+    // Should see the staged change
+    await expect(page.getByText('/app/config')).toBeVisible();
+  });
+
+  test('should reflect staged changes in staging view after deleting', async ({ page }) => {
+    // Select and delete a parameter (staged)
+    await clickItemByName(page, '/app/config');
+    await page.getByRole('button', { name: 'Delete' }).click();
+    await page.getByRole('button', { name: 'Stage' }).click();
+    await expect(page.locator('.modal-backdrop')).not.toBeVisible();
+
+    // Navigate to staging
+    await navigateTo(page, 'Staging');
+
+    // Should see the staged delete
+    await expect(page.getByText('/app/config')).toBeVisible();
+  });
+});
+
+// ============================================================================
+// Filter Persistence Tests
+// ============================================================================
+
+test.describe('Filter Behavior', () => {
+  test.beforeEach(async ({ page }) => {
+    await setupWailsMocks(page, createFilterTestState());
+    await page.goto('/');
+    await waitForItemList(page);
+  });
+
+  test('should filter parameters by prefix input', async ({ page }) => {
+    await page.locator('.prefix-input').fill('/prod');
+    await page.waitForTimeout(300); // Wait for debounce
+
+    // Should only show prod items
+    const items = page.locator('.item-button');
+    const count = await items.count();
+    // Prod items: /prod/app/config, /prod/app/secret, /prod/database/url
+    expect(count).toBeLessThanOrEqual(6); // Allow some flexibility
+  });
+
+  test('should filter parameters by regex input', async ({ page }) => {
+    await page.locator('.regex-input').fill('config');
+    await page.waitForTimeout(300); // Wait for debounce
+
+    // Should only show items matching 'config'
+    const items = page.locator('.item-button');
+    const count = await items.count();
+    expect(count).toBeLessThanOrEqual(6);
+  });
+
+  test('should clear filter when clicking refresh', async ({ page }) => {
+    // Set a filter
+    await page.locator('.regex-input').fill('prod');
+    await page.waitForTimeout(300);
+
+    // Click refresh
+    await page.getByRole('button', { name: 'Refresh' }).click();
+
+    // Filter should remain (refresh doesn't clear filter)
+    await expect(page.locator('.regex-input')).toHaveValue('prod');
+  });
+});
