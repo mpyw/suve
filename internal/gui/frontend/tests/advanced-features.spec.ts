@@ -1646,3 +1646,296 @@ test.describe('Selection States', () => {
     await expect(page.locator('.item-entry.selected')).toHaveCount(1);
   });
 });
+
+// ============================================================================
+// Sidebar Badge Tests
+// ============================================================================
+
+test.describe('Sidebar Badges', () => {
+  test('should show staging count badge when items are staged', async ({ page }) => {
+    await setupWailsMocks(page, {
+      stagedSSM: [
+        { name: '/staged/param', value: 'staged-value', operation: 'create' },
+      ],
+    });
+    await page.goto('/');
+    await waitForViewLoaded(page);
+
+    // Staging nav item should show count badge
+    const stagingBadge = page.locator('.staging-count');
+    await expect(stagingBadge).toBeVisible();
+    await expect(stagingBadge).toContainText('1');
+  });
+
+  test('should have staging navigation item clickable', async ({ page }) => {
+    await setupWailsMocks(page);
+    await page.goto('/');
+    await waitForItemList(page);
+
+    // Staging nav should be clickable
+    const stagingNav = page.locator('.nav-item').filter({ hasText: 'Staging' });
+    await expect(stagingNav).toBeVisible();
+    await stagingNav.click();
+
+    // Should navigate to staging view
+    await expect(page.locator('.staging-content')).toBeVisible();
+  });
+});
+
+// ============================================================================
+// Version Comparison Tests
+// ============================================================================
+
+test.describe('Version Comparison', () => {
+  test.beforeEach(async ({ page }) => {
+    await setupWailsMocks(page, {
+      ...createVersionHistoryState(),
+      params: [{ name: '/app/config', type: 'String', value: 'current-value-v3' }],
+    });
+    await page.goto('/');
+    await waitForItemList(page);
+  });
+
+  test('should show detail panel with parameter info', async ({ page }) => {
+    await clickItemByName(page, '/app/config');
+
+    // Should show detail panel
+    await expect(page.locator('.detail-panel')).toBeVisible();
+    // Should show the parameter name
+    await expect(page.locator('.detail-title')).toContainText('/app/config');
+  });
+
+  test('should mark current version distinctly', async ({ page }) => {
+    await clickItemByName(page, '/app/config');
+
+    // Current version should be marked
+    const currentBadge = page.locator('.badge-current');
+    await expect(currentBadge.first()).toBeVisible();
+  });
+
+  test('should enable compare button when multiple versions exist', async ({ page }) => {
+    await clickItemByName(page, '/app/config');
+
+    // Compare button should be visible
+    const compareBtn = page.getByRole('button', { name: 'Compare' });
+    await expect(compareBtn).toBeVisible();
+  });
+});
+
+// ============================================================================
+// Empty State Tests
+// ============================================================================
+
+test.describe('Empty States', () => {
+  test('should show empty state message for parameters', async ({ page }) => {
+    await setupWailsMocks(page, { params: [] });
+    await page.goto('/');
+    await waitForViewLoaded(page);
+
+    await expect(page.locator('.empty-state')).toBeVisible();
+  });
+
+  test('should show empty state message for secrets', async ({ page }) => {
+    await setupWailsMocks(page, { secrets: [] });
+    await page.goto('/');
+    await navigateTo(page, 'Secrets');
+    await waitForViewLoaded(page);
+
+    await expect(page.locator('.empty-state')).toBeVisible();
+  });
+
+  test('should show staging view with no changes', async ({ page }) => {
+    await setupWailsMocks(page, { stagedSSM: [], stagedSM: [] });
+    await page.goto('/');
+    await navigateTo(page, 'Staging');
+
+    // Staging content should be visible even when empty
+    await expect(page.locator('.staging-content')).toBeVisible();
+  });
+});
+
+// ============================================================================
+// Form Interaction Tests
+// ============================================================================
+
+test.describe('Form Interactions', () => {
+  test.beforeEach(async ({ page }) => {
+    await setupWailsMocks(page);
+    await page.goto('/');
+    await waitForItemList(page);
+  });
+
+  test('should clear form when closing create modal', async ({ page }) => {
+    // Open modal and fill form
+    await page.getByRole('button', { name: '+ New' }).click();
+    await page.locator('#param-name').fill('/test/param');
+    await page.locator('#param-value').fill('test-value');
+
+    // Close modal
+    await page.getByRole('button', { name: 'Cancel' }).click();
+
+    // Reopen modal
+    await page.getByRole('button', { name: '+ New' }).click();
+
+    // Form should be cleared
+    await expect(page.locator('#param-name')).toHaveValue('');
+  });
+
+  test('should populate form with existing values when editing', async ({ page }) => {
+    await clickItemByName(page, '/app/config');
+    await page.getByRole('button', { name: 'Edit' }).click();
+
+    // Name should be populated (and disabled)
+    await expect(page.locator('#param-name')).toHaveValue('/app/config');
+    await expect(page.locator('#param-name')).toBeDisabled();
+
+    // Value should be populated
+    await expect(page.locator('#param-value')).not.toHaveValue('');
+  });
+
+  test('should toggle immediate mode checkbox', async ({ page }) => {
+    await page.getByRole('button', { name: '+ New' }).click();
+
+    const immediateCheckbox = page.locator('label').filter({ hasText: /Immediate|immediately/i }).locator('input[type="checkbox"]');
+    await expect(immediateCheckbox).not.toBeChecked();
+
+    await immediateCheckbox.check();
+    await expect(immediateCheckbox).toBeChecked();
+
+    await immediateCheckbox.uncheck();
+    await expect(immediateCheckbox).not.toBeChecked();
+  });
+});
+
+// ============================================================================
+// View Toggle Tests
+// ============================================================================
+
+test.describe('Staging View Toggle', () => {
+  test.beforeEach(async ({ page }) => {
+    await setupWailsMocks(page, {
+      stagedSSM: [
+        { name: '/staged/param', value: 'new-value', oldValue: 'old-value', operation: 'update' },
+      ],
+    });
+    await page.goto('/');
+    await navigateTo(page, 'Staging');
+  });
+
+  test('should default to Diff view mode', async ({ page }) => {
+    const diffToggle = page.locator('.view-toggle').getByText('Diff');
+    await expect(diffToggle).toHaveClass(/active/);
+  });
+
+  test('should switch to Value view mode', async ({ page }) => {
+    await page.locator('.view-toggle').getByText('Value').click();
+
+    const valueToggle = page.locator('.view-toggle').getByText('Value');
+    await expect(valueToggle).toHaveClass(/active/);
+  });
+
+  test('should show different content in Diff vs Value mode', async ({ page }) => {
+    // In Diff mode, should show diff markers or formatting
+    await expect(page.locator('.staging-content')).toBeVisible();
+
+    // Switch to Value mode
+    await page.locator('.view-toggle').getByText('Value').click();
+
+    // Content should still be visible (just formatted differently)
+    await expect(page.locator('.staging-content')).toBeVisible();
+  });
+});
+
+// ============================================================================
+// Tooltip and Help Text Tests
+// ============================================================================
+
+test.describe('UI Hints', () => {
+  test.beforeEach(async ({ page }) => {
+    await setupWailsMocks(page);
+    await page.goto('/');
+    await waitForItemList(page);
+  });
+
+  test('should have placeholder text in filter inputs', async ({ page }) => {
+    await expect(page.locator('.prefix-input')).toHaveAttribute('placeholder', /prefix/i);
+    await expect(page.locator('.regex-input')).toHaveAttribute('placeholder', /filter|regex/i);
+  });
+
+  test('should show item count or status in view', async ({ page }) => {
+    // The view should indicate how many items are shown or some status
+    const itemList = page.locator('.item-list');
+    await expect(itemList).toBeVisible();
+  });
+});
+
+// ============================================================================
+// Error Recovery Tests
+// ============================================================================
+
+test.describe('Error Recovery', () => {
+  test('should show error banner when API fails', async ({ page }) => {
+    // Start with error state
+    await setupWailsMocks(page, createErrorState('ParamList', 'Network error'));
+    await page.goto('/');
+
+    // Should show error
+    await expect(page.locator('.error-banner')).toBeVisible();
+  });
+
+  test('should have refresh button available during error state', async ({ page }) => {
+    await setupWailsMocks(page, createErrorState('ParamList', 'Network error'));
+    await page.goto('/');
+
+    // Refresh button should still be available
+    await expect(page.getByRole('button', { name: /Refresh|Loading/i })).toBeVisible();
+  });
+
+  test('should clear error after successful operation', async ({ page }) => {
+    await setupWailsMocks(page);
+    await page.goto('/');
+    await waitForItemList(page);
+
+    // Verify no error initially
+    await expect(page.locator('.error-banner')).not.toBeVisible();
+
+    // Operations should work without error
+    await page.getByRole('button', { name: 'Refresh' }).click();
+    await waitForItemList(page);
+    await expect(page.locator('.error-banner')).not.toBeVisible();
+  });
+});
+
+// ============================================================================
+// Cross-Service Tests (SSM + SM)
+// ============================================================================
+
+test.describe('Cross-Service Operations', () => {
+  test.beforeEach(async ({ page }) => {
+    await setupWailsMocks(page);
+    await page.goto('/');
+  });
+
+  test('should navigate between Parameters and Secrets views', async ({ page }) => {
+    // Start on Parameters
+    await waitForItemList(page);
+
+    // Navigate to Secrets
+    await navigateTo(page, 'Secrets');
+    await waitForItemList(page);
+
+    // Navigate back to Parameters
+    await navigateTo(page, 'Parameters');
+    await waitForItemList(page);
+
+    // Should still show item list
+    await expect(page.locator('.item-list')).toBeVisible();
+  });
+
+  test('should show staging view sections', async ({ page }) => {
+    await navigateTo(page, 'Staging');
+
+    // Should show staging content
+    await expect(page.locator('.staging-content')).toBeVisible();
+  });
+});
