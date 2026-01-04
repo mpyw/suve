@@ -1,27 +1,108 @@
 import { Page } from '@playwright/test';
 
-// Shared mock state for testing
-export interface MockState {
-  params: Array<{ name: string; type: string; value: string }>;
-  secrets: Array<{ name: string; value: string }>;
-  stagedSSM: Array<{ name: string; operation: string; value?: string }>;
-  stagedSM: Array<{ name: string; operation: string; value?: string }>;
-  stagedSSMTags: Array<{ name: string; addTags: Record<string, string>; removeTags: string[] }>;
-  stagedSMTags: Array<{ name: string; addTags: Record<string, string>; removeTags: string[] }>;
-  paramTags: Record<string, Array<{ key: string; value: string }>>;
-  secretTags: Record<string, Array<{ key: string; value: string }>>;
+// ============================================================================
+// Type Definitions
+// ============================================================================
+
+export interface Parameter {
+  name: string;
+  type: 'String' | 'SecureString' | 'StringList';
+  value: string;
 }
+
+export interface Secret {
+  name: string;
+  value: string;
+}
+
+export interface Tag {
+  key: string;
+  value: string;
+}
+
+export type StagedOperation = 'create' | 'update' | 'delete';
+
+export interface StagedEntry {
+  name: string;
+  operation: StagedOperation;
+  value?: string;
+}
+
+export interface StagedTagEntry {
+  name: string;
+  addTags: Record<string, string>;
+  removeTags: string[];
+}
+
+export interface MockState {
+  params: Parameter[];
+  secrets: Secret[];
+  stagedSSM: StagedEntry[];
+  stagedSM: StagedEntry[];
+  stagedSSMTags: StagedTagEntry[];
+  stagedSMTags: StagedTagEntry[];
+  paramTags: Record<string, Tag[]>;
+  secretTags: Record<string, Tag[]>;
+}
+
+// ============================================================================
+// Factory Functions for Test Data
+// ============================================================================
+
+/**
+ * Create a parameter entry for mock state
+ */
+export function createParam(
+  name: string,
+  value: string = 'test-value',
+  type: Parameter['type'] = 'String'
+): Parameter {
+  return { name, type, value };
+}
+
+/**
+ * Create a secret entry for mock state
+ */
+export function createSecret(name: string, value: string = 'secret-value'): Secret {
+  return { name, value };
+}
+
+/**
+ * Create a staged value operation (create/update/delete)
+ */
+export function createStagedValue(
+  name: string,
+  operation: StagedOperation,
+  value?: string
+): StagedEntry {
+  return { name, operation, value };
+}
+
+/**
+ * Create a staged tag operation
+ */
+export function createStagedTags(
+  name: string,
+  addTags: Record<string, string> = {},
+  removeTags: string[] = []
+): StagedTagEntry {
+  return { name, addTags, removeTags };
+}
+
+// ============================================================================
+// Preset States for Common Test Scenarios
+// ============================================================================
 
 export const defaultMockState: MockState = {
   params: [
-    { name: '/app/config', type: 'String', value: 'config-value' },
-    { name: '/app/database/url', type: 'SecureString', value: 'postgres://localhost' },
-    { name: '/app/api/key', type: 'SecureString', value: 'secret-api-key' },
+    createParam('/app/config', 'config-value', 'String'),
+    createParam('/app/database/url', 'postgres://localhost', 'SecureString'),
+    createParam('/app/api/key', 'secret-api-key', 'SecureString'),
   ],
   secrets: [
-    { name: 'my-secret', value: 'secret-value-1' },
-    { name: 'api-credentials', value: '{"key": "value"}' },
-    { name: 'database-password', value: 'super-secret-password' },
+    createSecret('my-secret', 'secret-value-1'),
+    createSecret('api-credentials', '{"key": "value"}'),
+    createSecret('database-password', 'super-secret-password'),
   ],
   stagedSSM: [],
   stagedSM: [],
@@ -34,6 +115,103 @@ export const defaultMockState: MockState = {
     'my-secret': [{ key: 'team', value: 'backend' }],
   },
 };
+
+/**
+ * Empty state - no parameters, secrets, or staged changes
+ */
+export const emptyMockState: Partial<MockState> = {
+  params: [],
+  secrets: [],
+  stagedSSM: [],
+  stagedSM: [],
+  stagedSSMTags: [],
+  stagedSMTags: [],
+  paramTags: {},
+  secretTags: {},
+};
+
+/**
+ * State with SSM staged changes only
+ */
+export function createSSMStagedState(entries: StagedEntry[]): Partial<MockState> {
+  return {
+    stagedSSM: entries,
+    stagedSM: [],
+  };
+}
+
+/**
+ * State with SM staged changes only
+ */
+export function createSMStagedState(entries: StagedEntry[]): Partial<MockState> {
+  return {
+    stagedSSM: [],
+    stagedSM: entries,
+  };
+}
+
+/**
+ * State with both SSM and SM staged changes
+ */
+export function createMixedStagedState(
+  ssmEntries: StagedEntry[],
+  smEntries: StagedEntry[]
+): Partial<MockState> {
+  return {
+    stagedSSM: ssmEntries,
+    stagedSM: smEntries,
+  };
+}
+
+/**
+ * State with tag-only staged changes
+ */
+export function createTagOnlyStagedState(
+  ssmTags: StagedTagEntry[],
+  smTags: StagedTagEntry[]
+): Partial<MockState> {
+  return {
+    stagedSSM: [],
+    stagedSM: [],
+    stagedSSMTags: ssmTags,
+    stagedSMTags: smTags,
+  };
+}
+
+/**
+ * State with parameter that has multiple tags
+ */
+export function createMultiTagState(): Partial<MockState> {
+  return {
+    paramTags: {
+      '/app/config': [
+        { key: 'env', value: 'production' },
+        { key: 'team', value: 'backend' },
+        { key: 'project', value: 'suve' },
+      ],
+    },
+    secretTags: {
+      'my-secret': [
+        { key: 'team', value: 'backend' },
+        { key: 'env', value: 'staging' },
+      ],
+    },
+  };
+}
+
+/**
+ * State with parameters/secrets that have no tags
+ */
+export function createNoTagsState(): Partial<MockState> {
+  return {
+    paramTags: {},
+    secretTags: {},
+  };
+}
+
+// ============================================================================
+// Main Mock Setup Function
+// ============================================================================
 
 export async function setupWailsMocks(page: Page, customState?: Partial<MockState>) {
   const state = { ...defaultMockState, ...customState };
@@ -173,8 +351,8 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
             name: s.name,
             type: s.operation === 'create' ? 'create' : 'normal',
             operation: s.operation,
-            awsValue: 'aws-value',
-            awsIdentifier: '#1',
+            awsValue: s.operation === 'create' ? '' : 'aws-value',
+            awsIdentifier: s.operation === 'create' ? '' : '#1',
             stagedValue: s.value || '',
             description: '',
             warning: '',
@@ -188,7 +366,9 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
       },
       StagingApply: async (service: string) => {
         const staged = service === 'ssm' ? state.stagedSSM : state.stagedSM;
-        const count = staged.length;
+        const tagStaged = service === 'ssm' ? state.stagedSSMTags : state.stagedSMTags;
+        const entryCount = staged.length;
+        const tagCount = tagStaged.length;
         if (service === 'ssm') {
           state.stagedSSM = [];
           state.stagedSSMTags = [];
@@ -199,22 +379,22 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
         return {
           serviceName: service,
           entryResults: staged.map((s: any) => ({ name: s.name, status: s.operation === 'delete' ? 'deleted' : 'updated' })),
-          tagResults: [],
+          tagResults: tagStaged.map((t: any) => ({ name: t.name, status: 'updated' })),
           conflicts: [],
-          entrySucceeded: count,
+          entrySucceeded: entryCount,
           entryFailed: 0,
-          tagSucceeded: 0,
+          tagSucceeded: tagCount,
           tagFailed: 0,
         };
       },
       StagingReset: async (service: string) => {
         if (service === 'ssm') {
-          const count = state.stagedSSM.length;
+          const count = state.stagedSSM.length + state.stagedSSMTags.length;
           state.stagedSSM = [];
           state.stagedSSMTags = [];
           return { type: 'all', serviceName: 'ssm', count };
         } else {
-          const count = state.stagedSM.length;
+          const count = state.stagedSM.length + state.stagedSMTags.length;
           state.stagedSM = [];
           state.stagedSMTags = [];
           return { type: 'all', serviceName: 'sm', count };
@@ -297,4 +477,51 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
       BrowserOpenURL: () => {},
     };
   }, state);
+}
+
+// ============================================================================
+// Test Helpers
+// ============================================================================
+
+/**
+ * Wait for the item list to be ready after navigation/refresh
+ */
+export async function waitForItemList(page: Page) {
+  await page.waitForSelector('.item-list');
+}
+
+/**
+ * Wait for the view to be loaded (works even when list is empty)
+ */
+export async function waitForViewLoaded(page: Page) {
+  // Wait for the filter bar which is always present even when list is empty
+  await page.waitForSelector('.filter-bar');
+}
+
+/**
+ * Navigate to a specific view
+ */
+export async function navigateTo(page: Page, view: 'Parameters' | 'Secrets' | 'Staging') {
+  await page.getByRole('button', { name: new RegExp(view, 'i') }).click();
+}
+
+/**
+ * Click on an item by its name (more reliable than nth())
+ */
+export async function clickItemByName(page: Page, name: string) {
+  await page.locator('.item-button').filter({ hasText: name }).click();
+}
+
+/**
+ * Open the create modal for parameters or secrets
+ */
+export async function openCreateModal(page: Page) {
+  await page.getByRole('button', { name: '+ New' }).click();
+}
+
+/**
+ * Close any open modal by clicking Cancel
+ */
+export async function closeModal(page: Page) {
+  await page.getByRole('button', { name: 'Cancel' }).click();
 }
