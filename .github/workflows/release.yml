@@ -170,6 +170,12 @@ jobs:
         with:
           go-version-file: go.mod
 
+      - name: Build frontend
+        run: |
+          cd internal/gui/frontend
+          npm ci
+          npm run build
+
       - name: Build suve (windows)
         uses: goreleaser/goreleaser-action@v6
         with:
@@ -213,21 +219,32 @@ jobs:
           VERSION="${GITHUB_REF_NAME#v}"
           mkdir -p releases
 
+          # Directory format: suve-{id}_{goos}_{goarch}_{variant}
+          # Example: suve-darwin-arm64_darwin_arm64_v8.0
           for dir in dist/*/; do
             build_name=$(basename "$dir")
-            os_arch="${build_name#suve_}"
+
+            # Extract goos and goarch using cut
+            # Field 2 = goos, Field 3 = goarch
+            goos=$(echo "$build_name" | cut -d'_' -f2)
+            goarch=$(echo "$build_name" | cut -d'_' -f3)
+
+            if [[ -z "$goos" || -z "$goarch" ]]; then
+              echo "Warning: Could not parse directory name: $build_name"
+              continue
+            fi
 
             staging="staging_${build_name}"
             mkdir -p "$staging"
 
-            if [[ "$os_arch" == *"windows"* ]]; then
+            if [[ "$goos" == "windows" ]]; then
               cp "$dir"*.exe "$staging/" 2>/dev/null || cp "$dir"* "$staging/"
-              archive_name="suve_${VERSION}_${os_arch}.zip"
+              archive_name="suve_${VERSION}_${goos}_${goarch}.zip"
               cp README.md LICENSE "$staging/"
               (cd "$staging" && zip -r "../releases/${archive_name}" .)
             else
               cp "$dir"* "$staging/"
-              archive_name="suve_${VERSION}_${os_arch}.tar.gz"
+              archive_name="suve_${VERSION}_${goos}_${goarch}.tar.gz"
               cp README.md LICENSE "$staging/"
               tar -czvf "releases/${archive_name}" -C "$staging" .
             fi
@@ -251,3 +268,62 @@ jobs:
             --title "${{ github.ref_name }}" \
             --generate-notes \
             releases/*
+
+      - name: Update Homebrew formula
+        env:
+          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          if [[ -z "$HOMEBREW_TAP_TOKEN" ]]; then
+            echo "HOMEBREW_TAP_TOKEN not set, skipping Homebrew update"
+            exit 0
+          fi
+
+          VERSION="${GITHUB_REF_NAME#v}"
+
+          # Get SHA256 checksums
+          SHA256_DARWIN_AMD64=$(grep "darwin_amd64.tar.gz" releases/checksums.txt | cut -d' ' -f1)
+          SHA256_DARWIN_ARM64=$(grep "darwin_arm64.tar.gz" releases/checksums.txt | cut -d' ' -f1)
+
+          # Generate formula
+          cat > suve.rb <<EOF
+          class Suve < Formula
+            desc "Git-like CLI for AWS Parameter Store and Secrets Manager"
+            homepage "https://github.com/mpyw/suve"
+            license "MIT"
+            version "${VERSION}"
+
+            on_macos do
+              on_arm do
+                url "https://github.com/mpyw/suve/releases/download/v${VERSION}/suve_${VERSION}_darwin_arm64.tar.gz"
+                sha256 "${SHA256_DARWIN_ARM64}"
+              end
+              on_intel do
+                url "https://github.com/mpyw/suve/releases/download/v${VERSION}/suve_${VERSION}_darwin_amd64.tar.gz"
+                sha256 "${SHA256_DARWIN_AMD64}"
+              end
+            end
+
+            def install
+              bin.install "suve"
+            end
+
+            test do
+              system bin/"suve", "--version"
+            end
+          end
+          EOF
+
+          # Remove leading spaces
+          sed -i 's/^          //' suve.rb
+          cat suve.rb
+
+          # Push to homebrew-tap
+          git clone "https://x-access-token:${HOMEBREW_TAP_TOKEN}@github.com/mpyw/homebrew-tap.git"
+          mkdir -p homebrew-tap/Formula
+          cp suve.rb homebrew-tap/Formula/
+          cd homebrew-tap
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Formula/suve.rb
+          git commit -m "Update suve to ${VERSION}"
+          git push
