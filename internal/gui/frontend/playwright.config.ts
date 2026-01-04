@@ -21,8 +21,8 @@ export default defineConfig({
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
     },
-    // Enable Firefox and WebKit for cross-browser testing in CI
-    ...(process.env.CI ? [
+    // Enable cross-browser testing locally (CI only installs chromium for speed)
+    ...(!process.env.CI ? [
       {
         name: 'firefox',
         use: { ...devices['Desktop Firefox'] },
