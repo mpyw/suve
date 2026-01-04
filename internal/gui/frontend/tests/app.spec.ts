@@ -1,63 +1,5 @@
-import { test, expect, Page } from '@playwright/test';
-
-// Setup Wails mock before each test
-async function setupWailsMocks(page: Page) {
-  await page.addInitScript(() => {
-    // Mock window.go object that Wails provides
-    const mockApp = {
-      ParamList: async () => ({
-        entries: [{ name: '/app/config', type: 'String', value: 'test-value' }],
-        nextToken: '',
-      }),
-      ParamShow: async () => ({
-        name: '/app/config', value: 'test-value', version: 1, type: 'String', tags: [],
-      }),
-      ParamLog: async () => ({ name: '/app/config', entries: [] }),
-      ParamSet: async () => ({ name: '/app/config', version: 2, isCreated: false }),
-      ParamDelete: async () => ({ name: '/app/config' }),
-      ParamDiff: async () => ({ oldName: '', newName: '', oldValue: '', newValue: '' }),
-      ParamAddTag: async () => ({ name: '/app/config' }),
-      ParamRemoveTag: async () => ({ name: '/app/config' }),
-      SecretList: async () => ({
-        entries: [{ name: 'my-secret', value: 'secret-value' }],
-        nextToken: '',
-      }),
-      SecretShow: async () => ({
-        name: 'my-secret', arn: '', versionId: 'v1', versionStage: ['AWSCURRENT'],
-        value: 'secret-value', tags: [],
-      }),
-      SecretLog: async () => ({ name: 'my-secret', entries: [] }),
-      SecretCreate: async () => ({ name: 'my-secret', versionId: 'v1', arn: '' }),
-      SecretUpdate: async () => ({ name: 'my-secret', versionId: 'v2', arn: '' }),
-      SecretDelete: async () => ({ name: 'my-secret', arn: '' }),
-      SecretDiff: async () => ({ oldName: '', oldVersionId: '', oldValue: '', newName: '', newVersionId: '', newValue: '' }),
-      SecretRestore: async () => ({ name: 'my-secret', arn: '' }),
-      SecretAddTag: async () => ({ name: 'my-secret' }),
-      SecretRemoveTag: async () => ({ name: 'my-secret' }),
-      StagingStatus: async () => ({ ssm: [], sm: [], ssmTags: [], smTags: [] }),
-      StagingDiff: async () => ({ itemName: 'parameter', entries: [], tagEntries: [] }),
-      StagingApply: async () => ({
-        serviceName: 'ssm', entryResults: [], tagResults: [], conflicts: [],
-        entrySucceeded: 0, entryFailed: 0, tagSucceeded: 0, tagFailed: 0,
-      }),
-      StagingReset: async () => ({ type: 'all', serviceName: 'ssm', count: 0 }),
-      StagingAdd: async () => ({ name: '/app/config' }),
-      StagingEdit: async () => ({ name: '/app/config' }),
-      StagingDelete: async () => ({ name: '/app/config' }),
-      StagingUnstage: async () => ({ name: '/app/config' }),
-      StagingAddTag: async () => ({ name: '/app/config' }),
-      StagingRemoveTag: async () => ({ name: '/app/config' }),
-      StagingCancelAddTag: async () => ({ name: '/app/config' }),
-      StagingCancelRemoveTag: async () => ({ name: '/app/config' }),
-    };
-
-    (window as any).go = { main: { App: mockApp } };
-    (window as any).runtime = {
-      EventsOn: () => {}, EventsOff: () => {}, EventsEmit: () => {},
-      WindowSetTitle: () => {}, BrowserOpenURL: () => {},
-    };
-  });
-}
+import { test, expect } from '@playwright/test';
+import { setupWailsMocks, type MockState } from './fixtures/wails-mock';
 
 test.describe('App Navigation', () => {
   test.beforeEach(async ({ page }) => {
@@ -88,9 +30,20 @@ test.describe('App Navigation', () => {
     await page.getByRole('button', { name: /Staging/i }).click();
     await expect(page.getByRole('button', { name: /Staging/i })).toHaveClass(/active/);
   });
+
+  test('should persist active view when refreshing data', async ({ page }) => {
+    // Navigate to Secrets
+    await page.getByRole('button', { name: /Secrets/i }).click();
+    await expect(page.getByRole('button', { name: /Secrets/i })).toHaveClass(/active/);
+
+    // Click refresh - view should stay on Secrets
+    const refreshBtn = page.getByRole('button', { name: /Refresh/i });
+    await refreshBtn.click();
+    await expect(page.getByRole('button', { name: /Secrets/i })).toHaveClass(/active/);
+  });
 });
 
-test.describe('Parameters View', () => {
+test.describe('Parameters View Initial State', () => {
   test.beforeEach(async ({ page }) => {
     await setupWailsMocks(page);
     await page.goto('/');
@@ -100,14 +53,17 @@ test.describe('Parameters View', () => {
     await expect(page.getByRole('button', { name: /Refresh/i })).toBeVisible();
   });
 
-  test('should show loading state initially', async ({ page }) => {
-    // The button shows "Loading..." when data is being fetched
-    const refreshBtn = page.getByRole('button', { name: /Refresh|Loading/i });
-    await expect(refreshBtn).toBeVisible();
+  test('should have "+ New" button', async ({ page }) => {
+    await expect(page.getByRole('button', { name: '+ New' })).toBeVisible();
+  });
+
+  test('should display parameter list after load', async ({ page }) => {
+    await page.waitForSelector('.item-list');
+    await expect(page.locator('.item-list')).toBeVisible();
   });
 });
 
-test.describe('Secrets View', () => {
+test.describe('Secrets View Initial State', () => {
   test.beforeEach(async ({ page }) => {
     await setupWailsMocks(page);
     await page.goto('/');
@@ -118,50 +74,83 @@ test.describe('Secrets View', () => {
     await expect(page.getByRole('button', { name: /Refresh/i })).toBeVisible();
   });
 
-  test('should show loading state initially', async ({ page }) => {
-    const refreshBtn = page.getByRole('button', { name: /Refresh|Loading/i });
-    await expect(refreshBtn).toBeVisible();
+  test('should have "+ New" button', async ({ page }) => {
+    await expect(page.getByRole('button', { name: '+ New' })).toBeVisible();
+  });
+
+  test('should have "Restore" button (unique to secrets)', async ({ page }) => {
+    await expect(page.getByRole('button', { name: 'Restore' })).toBeVisible();
+  });
+
+  test('should display secret list after load', async ({ page }) => {
+    await page.waitForSelector('.item-list');
+    await expect(page.locator('.item-list')).toBeVisible();
   });
 });
 
-test.describe('Staging View', () => {
-  test.beforeEach(async ({ page }) => {
+test.describe('Empty State Handling', () => {
+  test('should show empty state for parameters when list is empty', async ({ page }) => {
+    const emptyState: Partial<MockState> = {
+      params: [],
+      secrets: [],
+    };
+    await setupWailsMocks(page, emptyState);
+    await page.goto('/');
+    // Wait for filter bar (always present even when list is empty)
+    await page.waitForSelector('.filter-bar');
+
+    // Should show empty list (no items)
+    await expect(page.locator('.item-button')).toHaveCount(0);
+  });
+
+  test('should show empty state for secrets when list is empty', async ({ page }) => {
+    const emptyState: Partial<MockState> = {
+      params: [],
+      secrets: [],
+    };
+    await setupWailsMocks(page, emptyState);
+    await page.goto('/');
+    await page.getByRole('button', { name: /Secrets/i }).click();
+    await page.waitForSelector('.filter-bar');
+
+    await expect(page.locator('.item-button')).toHaveCount(0);
+  });
+});
+
+test.describe('Error Recovery', () => {
+  test('should allow navigation after closing detail panel', async ({ page }) => {
     await setupWailsMocks(page);
     await page.goto('/');
+    await page.waitForSelector('.item-list');
+
+    // Open detail panel
+    await page.locator('.item-button').first().click();
+    await expect(page.locator('.detail-panel')).toBeVisible();
+
+    // Close it
+    await page.locator('.btn-close').click();
+    await expect(page.locator('.detail-panel')).not.toBeVisible();
+
+    // Should be able to navigate to another view
+    await page.getByRole('button', { name: /Secrets/i }).click();
+    await expect(page.getByRole('button', { name: /Secrets/i })).toHaveClass(/active/);
+  });
+
+  test('should allow navigation after cancelling modal', async ({ page }) => {
+    await setupWailsMocks(page);
+    await page.goto('/');
+    await page.waitForSelector('.item-list');
+
+    // Open create modal
+    await page.getByRole('button', { name: '+ New' }).click();
+    await expect(page.locator('.modal-backdrop')).toBeVisible();
+
+    // Cancel it
+    await page.getByRole('button', { name: 'Cancel' }).click();
+    await expect(page.locator('.modal-backdrop')).not.toBeVisible();
+
+    // Should be able to navigate
     await page.getByRole('button', { name: /Staging/i }).click();
-  });
-
-  test('should display staging area title', async ({ page }) => {
-    await expect(page.getByText('Staging Area')).toBeVisible();
-  });
-
-  test('should display SSM and SM sections', async ({ page }) => {
-    await expect(page.getByText(/Parameters \(SSM\)/i)).toBeVisible();
-    await expect(page.getByText(/Secrets \(SM\)/i)).toBeVisible();
-  });
-
-  test('should show empty state when no staged changes', async ({ page }) => {
-    await page.waitForTimeout(500);
-    await expect(page.getByText(/No staged/i).first()).toBeVisible();
-  });
-
-  test('should have view mode toggle', async ({ page }) => {
-    await expect(page.getByRole('button', { name: 'Diff' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Value' })).toBeVisible();
-  });
-
-  test('should switch view mode when toggle clicked', async ({ page }) => {
-    const diffBtn = page.getByRole('button', { name: 'Diff' });
-    const valueBtn = page.getByRole('button', { name: 'Value' });
-
-    // Diff should be active by default
-    await expect(diffBtn).toHaveClass(/active/);
-
-    // Click Value and verify it becomes active
-    await valueBtn.click();
-    await expect(valueBtn).toHaveClass(/active/);
-
-    // Diff should no longer be active
-    await expect(diffBtn).not.toHaveClass(/active/);
+    await expect(page.getByRole('button', { name: /Staging/i })).toHaveClass(/active/);
   });
 });
