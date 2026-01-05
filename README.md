@@ -9,7 +9,7 @@
 > [!NOTE]
 > This project was written by AI (Claude Code).
 
-A **Git-like CLI** for AWS Parameter Store and Secrets Manager. Familiar commands like `show`, `log`, `diff`, and a **staging workflow** for safe, reviewable changes.
+A **Git-like CLI/GUI** for AWS Parameter Store and Secrets Manager. Familiar commands like `show`, `log`, `diff`, and a **staging workflow** for safe, reviewable changes.
 
 ## Features
 
