@@ -43,20 +43,20 @@ echo "Clearing staging..."
 # - /demo/legacy/endpoint -> will be deleted
 # - /demo/config          -> untouched
 echo "Creating demo parameters..."
-aws ssm put-parameter --endpoint-url=http://localhost:4566 \
+aws ssm put-parameter --endpoint-url="$AWS_ENDPOINT_URL" \
     --name "/demo/api/url" \
     --value "https://api-v1.example.com" \
     --type String --overwrite >/dev/null
-aws ssm add-tags-to-resource --endpoint-url=http://localhost:4566 \
+aws ssm add-tags-to-resource --endpoint-url="$AWS_ENDPOINT_URL" \
     --resource-type "Parameter" --resource-id "/demo/api/url" \
     --tags "Key=Version,Value=v1" >/dev/null
 
-aws ssm put-parameter --endpoint-url=http://localhost:4566 \
+aws ssm put-parameter --endpoint-url="$AWS_ENDPOINT_URL" \
     --name "/demo/legacy/endpoint" \
     --value "https://old.example.com" \
     --type String --overwrite >/dev/null
 
-aws ssm put-parameter --endpoint-url=http://localhost:4566 \
+aws ssm put-parameter --endpoint-url="$AWS_ENDPOINT_URL" \
     --name "/demo/config" \
     --value '{"timeout":30}' \
     --type String --overwrite >/dev/null
@@ -66,7 +66,11 @@ echo "Demo data ready:"
 
 echo ""
 echo "=== Recording CLI demo ==="
-PATH="$PROJECT_DIR/bin:$PATH" vhs demo/cli-demo.tape
+# Create temp tape with correct endpoint URL
+TEMP_TAPE=$(mktemp)
+sed "s|http://localhost:4566|$AWS_ENDPOINT_URL|g" demo/cli-demo.tape > "$TEMP_TAPE"
+PATH="$PROJECT_DIR/bin:$PATH" vhs "$TEMP_TAPE"
+rm -f "$TEMP_TAPE"
 
 echo ""
 echo "=== Done ==="

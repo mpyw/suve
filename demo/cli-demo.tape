@@ -22,11 +22,11 @@ Type "# suve - Git-like CLI for AWS Parameter Store"
 Enter
 Sleep 1s
 
-Type "# List existing parameters"
+Type "# List existing parameters with tags"
 Enter
 Sleep 500ms
 
-Type "suve param ls -R /demo"
+Type "suve param ls -R /demo --show"
 Enter
 Sleep 2s
 Enter
