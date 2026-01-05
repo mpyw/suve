@@ -16,6 +16,7 @@ import (
 	"github.com/mpyw/suve/internal/api/secretapi"
 	appcli "github.com/mpyw/suve/internal/cli/commands"
 	stagediff "github.com/mpyw/suve/internal/cli/commands/stage/diff"
+	"github.com/mpyw/suve/internal/maputil"
 	"github.com/mpyw/suve/internal/staging"
 )
 
@@ -865,4 +866,190 @@ func TestRun_MetadataWithTags(t *testing.T) {
 	assert.Contains(t, output, "--- /app/config")
 	assert.Contains(t, output, "+++ /app/config")
 	// Tags are now staged separately and would be displayed in tag diff section
+}
+
+func TestRun_TagOnlyDiff(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+
+	// Stage only tag changes (no entry change)
+	err := store.StageTag(staging.ServiceParam, "/app/config", staging.TagEntry{
+		Add:      map[string]string{"env": "prod", "team": "api"},
+		StagedAt: time.Now(),
+	})
+	require.NoError(t, err)
+
+	var stdout, stderr bytes.Buffer
+	r := &stagediff.Runner{
+		Store:  store,
+		Stdout: &stdout,
+		Stderr: &stderr,
+	}
+
+	err = r.Run(context.Background(), stagediff.Options{})
+	require.NoError(t, err)
+
+	output := stdout.String()
+	assert.Contains(t, output, "Tags:")
+	assert.Contains(t, output, "/app/config")
+	assert.Contains(t, output, "(staged tag changes)")
+	assert.Contains(t, output, "+")
+	assert.Contains(t, output, "env=prod")
+	assert.Contains(t, output, "team=api")
+}
+
+func TestRun_TagOnlyRemovalsDiff(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+
+	// Stage only tag removals (no additions)
+	err := store.StageTag(staging.ServiceParam, "/app/config", staging.TagEntry{
+		Remove:   maputil.NewSet("deprecated", "old-tag"),
+		StagedAt: time.Now(),
+	})
+	require.NoError(t, err)
+
+	var stdout, stderr bytes.Buffer
+	r := &stagediff.Runner{
+		Store:  store,
+		Stdout: &stdout,
+		Stderr: &stderr,
+	}
+
+	err = r.Run(context.Background(), stagediff.Options{})
+	require.NoError(t, err)
+
+	output := stdout.String()
+	assert.Contains(t, output, "Tags:")
+	assert.Contains(t, output, "/app/config")
+	assert.Contains(t, output, "-")
+	assert.Contains(t, output, "deprecated")
+	assert.Contains(t, output, "old-tag")
+}
+
+func TestRun_SecretTagDiff(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+
+	// Stage secret tag changes
+	err := store.StageTag(staging.ServiceSecret, "my-secret", staging.TagEntry{
+		Add:      map[string]string{"env": "staging"},
+		Remove:   maputil.NewSet("deprecated"),
+		StagedAt: time.Now(),
+	})
+	require.NoError(t, err)
+
+	var stdout, stderr bytes.Buffer
+	r := &stagediff.Runner{
+		Store:  store,
+		Stdout: &stdout,
+		Stderr: &stderr,
+	}
+
+	err = r.Run(context.Background(), stagediff.Options{})
+	require.NoError(t, err)
+
+	output := stdout.String()
+	assert.Contains(t, output, "Tags:")
+	assert.Contains(t, output, "my-secret")
+	assert.Contains(t, output, "+")
+	assert.Contains(t, output, "env=staging")
+	assert.Contains(t, output, "-")
+	assert.Contains(t, output, "deprecated")
+}
+
+func TestRun_SecretCreateWithParseJSON(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+
+	err := store.StageEntry(staging.ServiceSecret, "new-secret", staging.Entry{
+		Operation: staging.OperationCreate,
+		Value:     lo.ToPtr(`{"key":"value","nested":{"a":1}}`),
+		StagedAt:  time.Now(),
+	})
+	require.NoError(t, err)
+
+	secretMock := &mockSecretClient{
+		getSecretValueFunc: func(_ context.Context, _ *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) {
+			return nil, fmt.Errorf("secret not found")
+		},
+	}
+
+	var stdout, stderr bytes.Buffer
+	r := &stagediff.Runner{
+		SecretClient: secretMock,
+		Store:        store,
+		Stdout:       &stdout,
+		Stderr:       &stderr,
+	}
+
+	err = r.Run(context.Background(), stagediff.Options{ParseJSON: true})
+	require.NoError(t, err)
+
+	output := stdout.String()
+	assert.Contains(t, output, "(staged for creation)")
+	// JSON should be formatted (has newlines)
+	assert.Contains(t, output, "\"key\":")
+}
+
+func TestRun_BothEntriesAndTags(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+
+	// Stage entry change
+	err := store.StageEntry(staging.ServiceParam, "/app/config", staging.Entry{
+		Operation: staging.OperationUpdate,
+		Value:     lo.ToPtr("new-value"),
+		StagedAt:  time.Now(),
+	})
+	require.NoError(t, err)
+
+	// Stage tag change (different resource)
+	err = store.StageTag(staging.ServiceParam, "/app/other", staging.TagEntry{
+		Add:      map[string]string{"env": "prod"},
+		StagedAt: time.Now(),
+	})
+	require.NoError(t, err)
+
+	paramMock := &mockParamClient{
+		getParameterFunc: func(_ context.Context, _ *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
+			return &paramapi.GetParameterOutput{
+				Parameter: &paramapi.Parameter{
+					Name:    lo.ToPtr("/app/config"),
+					Value:   lo.ToPtr("old-value"),
+					Version: 1,
+				},
+			}, nil
+		},
+	}
+
+	var stdout, stderr bytes.Buffer
+	r := &stagediff.Runner{
+		ParamClient: paramMock,
+		Store:       store,
+		Stdout:      &stdout,
+		Stderr:      &stderr,
+	}
+
+	err = r.Run(context.Background(), stagediff.Options{})
+	require.NoError(t, err)
+
+	output := stdout.String()
+	// Entry diff
+	assert.Contains(t, output, "/app/config")
+	assert.Contains(t, output, "-old-value")
+	assert.Contains(t, output, "+new-value")
+	// Tag diff
+	assert.Contains(t, output, "Tags:")
+	assert.Contains(t, output, "/app/other")
 }

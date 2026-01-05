@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 
 	"github.com/urfave/cli/v3"
 
@@ -89,9 +90,17 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	if err != nil {
 		return err
 	}
+	paramTagStaged, err := store.ListTags(staging.ServiceParam)
+	if err != nil {
+		return err
+	}
+	secretTagStaged, err := store.ListTags(staging.ServiceSecret)
+	if err != nil {
+		return err
+	}
 
-	hasParam := len(paramStaged[staging.ServiceParam]) > 0
-	hasSecret := len(secretStaged[staging.ServiceSecret]) > 0
+	hasParam := len(paramStaged[staging.ServiceParam]) > 0 || len(paramTagStaged[staging.ServiceParam]) > 0
+	hasSecret := len(secretStaged[staging.ServiceSecret]) > 0 || len(secretTagStaged[staging.ServiceSecret]) > 0
 
 	if !hasParam && !hasSecret {
 		output.Info(cmd.Root().Writer, "No changes staged.")
@@ -99,7 +108,8 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	}
 
 	// Count total staged changes
-	totalStaged := len(paramStaged[staging.ServiceParam]) + len(secretStaged[staging.ServiceSecret])
+	totalStaged := len(paramStaged[staging.ServiceParam]) + len(secretStaged[staging.ServiceSecret]) +
+		len(paramTagStaged[staging.ServiceParam]) + len(secretTagStaged[staging.ServiceSecret])
 
 	// Confirm apply
 	skipConfirm := cmd.Bool("yes")
@@ -156,8 +166,15 @@ func (r *Runner) Run(ctx context.Context) error {
 		return err
 	}
 
+	allTagStaged, err := r.Store.ListTags("")
+	if err != nil {
+		return err
+	}
+
 	paramStaged := allStaged[staging.ServiceParam]
 	secretStaged := allStaged[staging.ServiceSecret]
+	paramTagStaged := allTagStaged[staging.ServiceParam]
+	secretTagStaged := allTagStaged[staging.ServiceSecret]
 
 	// Check for conflicts unless --ignore-conflicts is specified
 	if !r.IgnoreConflicts {
@@ -202,6 +219,22 @@ func (r *Runner) Run(ctx context.Context) error {
 		totalFailed += failed
 	}
 
+	// Apply SSM Parameter Store tag changes
+	if len(paramTagStaged) > 0 {
+		_, _ = fmt.Fprintln(r.Stdout, "Applying SSM Parameter Store tags...")
+		succeeded, failed := r.applyTagService(ctx, r.ParamStrategy, paramTagStaged)
+		totalSucceeded += succeeded
+		totalFailed += failed
+	}
+
+	// Apply Secrets Manager tag changes
+	if len(secretTagStaged) > 0 {
+		_, _ = fmt.Fprintln(r.Stdout, "Applying Secrets Manager tags...")
+		succeeded, failed := r.applyTagService(ctx, r.SecretStrategy, secretTagStaged)
+		totalSucceeded += succeeded
+		totalFailed += failed
+	}
+
 	// Summary
 	if totalFailed > 0 {
 		return fmt.Errorf("applied %d, failed %d", totalSucceeded, totalFailed)
@@ -241,6 +274,47 @@ func (r *Runner) applyService(ctx context.Context, strat staging.ApplyStrategy, 
 	}
 
 	return succeeded, failed
+}
+
+func (r *Runner) applyTagService(ctx context.Context, strat staging.ApplyStrategy, staged map[string]staging.TagEntry) (succeeded, failed int) {
+	service := strat.Service()
+	serviceName := strat.ServiceName()
+
+	results := parallel.ExecuteMap(ctx, staged, func(ctx context.Context, name string, tagEntry staging.TagEntry) (struct{}, error) {
+		err := strat.ApplyTags(ctx, name, tagEntry)
+		return struct{}{}, err
+	})
+
+	for _, name := range maputil.SortedKeys(staged) {
+		tagEntry := staged[name]
+		result := results[name]
+		if result.Err != nil {
+			output.Failed(r.Stderr, serviceName+": "+name+" (tags)", result.Err)
+			failed++
+		} else {
+			output.Success(r.Stdout, "%s: Tagged %s%s", serviceName, name, formatTagApplySummary(tagEntry))
+			if err := r.Store.UnstageTag(service, name); err != nil {
+				output.Warning(r.Stderr, "failed to clear staging for %s tags: %v", name, err)
+			}
+			succeeded++
+		}
+	}
+
+	return succeeded, failed
+}
+
+func formatTagApplySummary(tagEntry staging.TagEntry) string {
+	var parts []string
+	if len(tagEntry.Add) > 0 {
+		parts = append(parts, fmt.Sprintf("+%d", len(tagEntry.Add)))
+	}
+	if tagEntry.Remove.Len() > 0 {
+		parts = append(parts, fmt.Sprintf("-%d", tagEntry.Remove.Len()))
+	}
+	if len(parts) == 0 {
+		return ""
+	}
+	return " [" + strings.Join(parts, ", ") + "]"
 }
 
 // checkAllConflicts checks all services for conflicts and returns a combined map of conflicting names.
