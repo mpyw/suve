@@ -41,7 +41,7 @@ type JSONOutput struct {
 	VersionID string            `json:"versionId,omitempty"`
 	Stages    []string          `json:"stages,omitempty"`
 	Created   string            `json:"created,omitempty"`
-	Tags      map[string]string `json:"tags,omitempty"`
+	Tags      map[string]string `json:"tags"`
 	Value     string            `json:"value"`
 }
 
@@ -174,11 +174,9 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 		if result.CreatedDate != nil {
 			jsonOut.Created = timeutil.FormatRFC3339(*result.CreatedDate)
 		}
-		if len(result.Tags) > 0 {
-			jsonOut.Tags = make(map[string]string)
-			for _, tag := range result.Tags {
-				jsonOut.Tags[tag.Key] = tag.Value
-			}
+		jsonOut.Tags = make(map[string]string)
+		for _, tag := range result.Tags {
+			jsonOut.Tags[tag.Key] = tag.Value
 		}
 		enc := json.NewEncoder(r.Stdout)
 		enc.SetIndent("", "  ")

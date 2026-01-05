@@ -43,7 +43,7 @@ type JSONOutput struct {
 	Type       string            `json:"type"`
 	JsonParsed *bool             `json:"json_parsed,omitempty"` // Only when --parse-json is used
 	Modified   string            `json:"modified,omitempty"`
-	Tags       map[string]string `json:"tags,omitempty"`
+	Tags       map[string]string `json:"tags"`
 	Value      string            `json:"value"`
 }
 
@@ -184,11 +184,9 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 		if result.LastModified != nil {
 			jsonOut.Modified = timeutil.FormatRFC3339(*result.LastModified)
 		}
-		if len(result.Tags) > 0 {
-			jsonOut.Tags = make(map[string]string)
-			for _, tag := range result.Tags {
-				jsonOut.Tags[tag.Key] = tag.Value
-			}
+		jsonOut.Tags = make(map[string]string)
+		for _, tag := range result.Tags {
+			jsonOut.Tags[tag.Key] = tag.Value
 		}
 		enc := json.NewEncoder(r.Stdout)
 		enc.SetIndent("", "  ")
