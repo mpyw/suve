@@ -138,10 +138,8 @@ func (u *ResetUseCase) restore(ctx context.Context, spec, name string) (*ResetOu
 	if err != nil {
 		return nil, err
 	}
-	var currentValue *string
-	if fetchResult.Value != "" {
-		currentValue = &fetchResult.Value
-	}
+	// Always use the value pointer - empty string is a valid AWS value
+	currentValue := &fetchResult.Value
 
 	// Load current state with AWS value for auto-skip
 	entryState, err := transition.LoadEntryState(u.Store, service, name, currentValue)

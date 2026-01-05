@@ -90,10 +90,8 @@ func (u *EditUseCase) fetchCurrentState(ctx context.Context, name string) (*stri
 		return nil, nil, err
 	}
 
-	var currentValue *string
-	if result.Value != "" {
-		currentValue = &result.Value
-	}
+	// Always use the value pointer - empty string is a valid AWS value
+	currentValue := &result.Value
 
 	var baseModifiedAt *time.Time
 	if !result.LastModified.IsZero() {

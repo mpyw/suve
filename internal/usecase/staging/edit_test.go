@@ -484,3 +484,67 @@ func TestEditUseCase_Execute_NotSkipped_DifferentFromAWS(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "new-value", lo.FromPtr(entry.Value))
 }
+
+func TestEditUseCase_Execute_EmptyStringValue_AutoSkip(t *testing.T) {
+	t.Parallel()
+
+	// Test that empty string is treated as a valid AWS value (not "non-existing")
+	// This is critical for Secrets Manager where empty string secrets are valid
+	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	strategy := &mockEditStrategy{
+		mockParser: newMockParser(),
+		fetchResult: &staging.EditFetchResult{
+			Value:        "", // AWS has empty string
+			LastModified: time.Now(),
+		},
+	}
+
+	uc := &usecasestaging.EditUseCase{
+		Strategy: strategy,
+		Store:    store,
+	}
+
+	// Edit with empty string (same as AWS) - should auto-skip
+	output, err := uc.Execute(context.Background(), usecasestaging.EditInput{
+		Name:  "/app/config",
+		Value: "", // Same as AWS empty string
+	})
+	require.NoError(t, err)
+	assert.True(t, output.Skipped, "should auto-skip when editing to same empty string")
+
+	// Verify nothing was staged
+	_, err = store.GetEntry(staging.ServiceParam, "/app/config")
+	assert.ErrorIs(t, err, staging.ErrNotStaged)
+}
+
+func TestEditUseCase_Execute_EmptyStringValue_Stage(t *testing.T) {
+	t.Parallel()
+
+	// Test that we can stage a non-empty value when AWS has empty string
+	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	strategy := &mockEditStrategy{
+		mockParser: newMockParser(),
+		fetchResult: &staging.EditFetchResult{
+			Value:        "", // AWS has empty string
+			LastModified: time.Now(),
+		},
+	}
+
+	uc := &usecasestaging.EditUseCase{
+		Strategy: strategy,
+		Store:    store,
+	}
+
+	// Edit to non-empty value - should stage
+	output, err := uc.Execute(context.Background(), usecasestaging.EditInput{
+		Name:  "/app/config",
+		Value: "new-value",
+	})
+	require.NoError(t, err)
+	assert.False(t, output.Skipped)
+
+	// Verify entry was staged
+	entry, err := store.GetEntry(staging.ServiceParam, "/app/config")
+	require.NoError(t, err)
+	assert.Equal(t, "new-value", lo.FromPtr(entry.Value))
+}
