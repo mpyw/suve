@@ -164,6 +164,37 @@ test.describe('AWS Identity Display', () => {
     // AWS info section should not be displayed
     await expect(page.locator('.aws-info')).not.toBeVisible();
   });
+
+  test('should not display AWS info section when GetAWSIdentity fails', async ({ page }) => {
+    await setupWailsMocks(page, {
+      simulateError: { operation: 'GetAWSIdentity', message: 'No credentials found' },
+    });
+    await page.goto('/');
+
+    // Wait for sidebar to be visible
+    await expect(page.locator('.sidebar')).toBeVisible();
+
+    // AWS info section should not be displayed when API fails
+    await expect(page.locator('.aws-info')).not.toBeVisible();
+  });
+
+  test('should not display AWS info section when only accountId is available', async ({ page }) => {
+    await setupWailsMocks(page, createAWSIdentityState('123456789012', '', ''));
+    await page.goto('/');
+
+    await expect(page.locator('.sidebar')).toBeVisible();
+    // Both accountId AND region are required
+    await expect(page.locator('.aws-info')).not.toBeVisible();
+  });
+
+  test('should not display AWS info section when only region is available', async ({ page }) => {
+    await setupWailsMocks(page, createAWSIdentityState('', 'ap-northeast-1', ''));
+    await page.goto('/');
+
+    await expect(page.locator('.sidebar')).toBeVisible();
+    // Both accountId AND region are required
+    await expect(page.locator('.aws-info')).not.toBeVisible();
+  });
 });
 
 test.describe('Error Recovery', () => {

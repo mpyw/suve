@@ -376,6 +376,9 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
     const mockApp = {
       // AWS Identity
       GetAWSIdentity: async () => {
+        if (state.simulateError?.operation === 'GetAWSIdentity') {
+          throw new Error(state.simulateError.message);
+        }
         return state.awsIdentity;
       },
 
