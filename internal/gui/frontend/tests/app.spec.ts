@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { setupWailsMocks, type MockState } from './fixtures/wails-mock';
+import { setupWailsMocks, type MockState, createAWSIdentityState, createNoAWSIdentityState } from './fixtures/wails-mock';
 
 test.describe('App Navigation', () => {
   test.beforeEach(async ({ page }) => {
@@ -114,6 +114,55 @@ test.describe('Empty State Handling', () => {
     await page.waitForSelector('.filter-bar');
 
     await expect(page.locator('.item-button')).toHaveCount(0);
+  });
+});
+
+test.describe('AWS Identity Display', () => {
+  test('should display AWS identity with profile in sidebar', async ({ page }) => {
+    await setupWailsMocks(page, createAWSIdentityState('123456789012', 'ap-northeast-1', 'production'));
+    await page.goto('/');
+
+    // Wait for sidebar to be visible
+    await expect(page.locator('.sidebar')).toBeVisible();
+
+    // Check AWS info section is displayed
+    const awsInfo = page.locator('.aws-info');
+    await expect(awsInfo).toBeVisible();
+
+    // Check profile is displayed
+    await expect(awsInfo.locator('.aws-info-profile')).toContainText('production');
+
+    // Check account is displayed
+    await expect(awsInfo).toContainText('123456789012');
+
+    // Check region is displayed
+    await expect(awsInfo).toContainText('ap-northeast-1');
+  });
+
+  test('should display AWS identity without profile', async ({ page }) => {
+    await setupWailsMocks(page, createAWSIdentityState('987654321098', 'us-east-1', ''));
+    await page.goto('/');
+
+    const awsInfo = page.locator('.aws-info');
+    await expect(awsInfo).toBeVisible();
+
+    // Profile row should not be displayed
+    await expect(awsInfo.locator('.aws-info-profile')).not.toBeVisible();
+
+    // Account and region should still be displayed
+    await expect(awsInfo).toContainText('987654321098');
+    await expect(awsInfo).toContainText('us-east-1');
+  });
+
+  test('should not display AWS info section when identity is unavailable', async ({ page }) => {
+    await setupWailsMocks(page, createNoAWSIdentityState());
+    await page.goto('/');
+
+    // Wait for sidebar to be visible
+    await expect(page.locator('.sidebar')).toBeVisible();
+
+    // AWS info section should not be displayed
+    await expect(page.locator('.aws-info')).not.toBeVisible();
   });
 });
 

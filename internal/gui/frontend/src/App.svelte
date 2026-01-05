@@ -4,7 +4,7 @@
   import ParamView from './lib/ParamView.svelte';
   import SecretView from './lib/SecretView.svelte';
   import StagingView from './lib/StagingView.svelte';
-  import { StagingStatus, GetAWSIdentity } from '../wailsjs/go/gui/App';
+  import { GetAWSIdentity, StagingStatus } from '../wailsjs/go/gui/App';
 
   let activeView: 'param' | 'secret' | 'staging' = $state('param');
   let stagingCount = $state(0);
@@ -32,11 +32,14 @@
   async function loadAWSIdentity() {
     try {
       const identity = await GetAWSIdentity();
-      accountId = identity.accountId;
-      region = identity.region;
-      profile = identity.profile;
+      accountId = identity?.accountId || '';
+      region = identity?.region || '';
+      profile = identity?.profile || '';
     } catch (e) {
-      console.error('Failed to get AWS identity:', e);
+      // AWS identity may not be available (e.g., no credentials)
+      accountId = '';
+      region = '';
+      profile = '';
     }
   }
 

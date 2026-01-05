@@ -50,6 +50,12 @@ export interface SecretLogEntry {
   created: string;
 }
 
+export interface AWSIdentity {
+  accountId: string;
+  region: string;
+  profile: string;
+}
+
 export interface MockState {
   params: Parameter[];
   secrets: Secret[];
@@ -65,6 +71,8 @@ export interface MockState {
   // Pagination support
   enablePagination: boolean;
   pageSize: number;
+  // AWS Identity
+  awsIdentity: AWSIdentity;
   // Error simulation
   simulateError?: {
     operation: string;
@@ -158,6 +166,11 @@ export const defaultMockState: MockState = {
   },
   enablePagination: false,
   pageSize: 50,
+  awsIdentity: {
+    accountId: '123456789012',
+    region: 'ap-northeast-1',
+    profile: 'production',
+  },
 };
 
 /**
@@ -327,6 +340,28 @@ export function createErrorState(operation: string, message: string): Partial<Mo
   };
 }
 
+/**
+ * State with custom AWS identity
+ */
+export function createAWSIdentityState(
+  accountId: string,
+  region: string,
+  profile: string = ''
+): Partial<MockState> {
+  return {
+    awsIdentity: { accountId, region, profile },
+  };
+}
+
+/**
+ * State with no AWS identity (simulates no AWS credentials)
+ */
+export function createNoAWSIdentityState(): Partial<MockState> {
+  return {
+    awsIdentity: { accountId: '', region: '', profile: '' },
+  };
+}
+
 // ============================================================================
 // Main Mock Setup Function
 // ============================================================================
@@ -339,6 +374,11 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
     const state = JSON.parse(JSON.stringify(mockState));
 
     const mockApp = {
+      // AWS Identity
+      GetAWSIdentity: async () => {
+        return state.awsIdentity;
+      },
+
       // Parameter operations
       ParamList: async (prefix: string, _recursive: boolean, withValue: boolean, filter: string, pageSize?: number, nextToken?: string) => {
         // Simulate error if configured
