@@ -38,12 +38,13 @@ type Options struct {
 
 // JSONOutput represents the JSON output structure for the show command.
 type JSONOutput struct {
-	Name       string `json:"name"`
-	Version    int64  `json:"version"`
-	Type       string `json:"type"`
-	JsonParsed *bool  `json:"json_parsed,omitempty"` // Only when --parse-json is used
-	Modified   string `json:"modified,omitempty"`
-	Value      string `json:"value"`
+	Name       string            `json:"name"`
+	Version    int64             `json:"version"`
+	Type       string            `json:"type"`
+	JsonParsed *bool             `json:"json_parsed,omitempty"` // Only when --parse-json is used
+	Modified   string            `json:"modified,omitempty"`
+	Tags       map[string]string `json:"tags"`
+	Value      string            `json:"value"`
 }
 
 // Command returns the show command.
@@ -183,6 +184,10 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 		if result.LastModified != nil {
 			jsonOut.Modified = timeutil.FormatRFC3339(*result.LastModified)
 		}
+		jsonOut.Tags = make(map[string]string)
+		for _, tag := range result.Tags {
+			jsonOut.Tags[tag.Key] = tag.Value
+		}
 		enc := json.NewEncoder(r.Stdout)
 		enc.SetIndent("", "  ")
 		return enc.Encode(jsonOut)
@@ -199,6 +204,12 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 	}
 	if result.LastModified != nil {
 		out.Field("Modified", timeutil.FormatRFC3339(*result.LastModified))
+	}
+	if len(result.Tags) > 0 {
+		out.Field("Tags", fmt.Sprintf("%d tag(s)", len(result.Tags)))
+		for _, tag := range result.Tags {
+			out.Field("  "+tag.Key, tag.Value)
+		}
 	}
 	out.Separator()
 	out.Value(value)

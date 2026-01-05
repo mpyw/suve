@@ -45,3 +45,4 @@ internal/gui/frontend/playwright/.cache/
 # Frontend build artifacts
 internal/gui/frontend/node_modules/
 internal/gui/frontend/dist/
+cover.html

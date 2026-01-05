@@ -14,6 +14,7 @@ import (
 	"github.com/mpyw/suve/internal/api/paramapi"
 	appcli "github.com/mpyw/suve/internal/cli/commands"
 	"github.com/mpyw/suve/internal/cli/commands/param/show"
+	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/usecase/param"
 	"github.com/mpyw/suve/internal/version/paramversion"
 )
@@ -41,6 +42,7 @@ func TestCommand_Validation(t *testing.T) {
 type mockClient struct {
 	getParameterFunc        func(ctx context.Context, params *paramapi.GetParameterInput, optFns ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error)
 	getParameterHistoryFunc func(ctx context.Context, params *paramapi.GetParameterHistoryInput, optFns ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error)
+	listTagsForResourceFunc func(ctx context.Context, params *paramapi.ListTagsForResourceInput, optFns ...func(*paramapi.Options)) (*paramapi.ListTagsForResourceOutput, error)
 }
 
 func (m *mockClient) GetParameter(ctx context.Context, params *paramapi.GetParameterInput, optFns ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
@@ -51,7 +53,10 @@ func (m *mockClient) GetParameterHistory(ctx context.Context, params *paramapi.G
 	return m.getParameterHistoryFunc(ctx, params, optFns...)
 }
 
-func (m *mockClient) ListTagsForResource(_ context.Context, _ *paramapi.ListTagsForResourceInput, _ ...func(*paramapi.Options)) (*paramapi.ListTagsForResourceOutput, error) {
+func (m *mockClient) ListTagsForResource(ctx context.Context, params *paramapi.ListTagsForResourceInput, optFns ...func(*paramapi.Options)) (*paramapi.ListTagsForResourceOutput, error) {
+	if m.listTagsForResourceFunc != nil {
+		return m.listTagsForResourceFunc(ctx, params, optFns...)
+	}
 	return &paramapi.ListTagsForResourceOutput{}, nil
 }
 
@@ -303,6 +308,98 @@ func TestRun(t *testing.T) {
 				require.NotEqual(t, -1, appleIdx, "expected apple in output")
 				require.NotEqual(t, -1, zebraIdx, "expected zebra in output")
 				assert.Less(t, appleIdx, zebraIdx, "expected keys to be sorted (apple before zebra)")
+			},
+		},
+		{
+			name: "show with tags",
+			opts: show.Options{
+				Spec: &paramversion.Spec{Name: "/my/param"},
+			},
+			mock: &mockClient{
+				getParameterFunc: func(_ context.Context, _ *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
+					return &paramapi.GetParameterOutput{
+						Parameter: &paramapi.Parameter{
+							Name:             lo.ToPtr("/my/param"),
+							Value:            lo.ToPtr("test-value"),
+							Version:          1,
+							Type:             paramapi.ParameterTypeString,
+							LastModifiedDate: &now,
+						},
+					}, nil
+				},
+				listTagsForResourceFunc: func(_ context.Context, _ *paramapi.ListTagsForResourceInput, _ ...func(*paramapi.Options)) (*paramapi.ListTagsForResourceOutput, error) {
+					return &paramapi.ListTagsForResourceOutput{
+						TagList: []paramapi.Tag{
+							{Key: lo.ToPtr("Environment"), Value: lo.ToPtr("production")},
+							{Key: lo.ToPtr("Team"), Value: lo.ToPtr("backend")},
+						},
+					}, nil
+				},
+			},
+			check: func(t *testing.T, output string) {
+				assert.Contains(t, output, "Tags")
+				assert.Contains(t, output, "2 tag(s)")
+				assert.Contains(t, output, "Environment")
+				assert.Contains(t, output, "production")
+				assert.Contains(t, output, "Team")
+				assert.Contains(t, output, "backend")
+			},
+		},
+		{
+			name: "show with tags in JSON output",
+			opts: show.Options{
+				Spec:   &paramversion.Spec{Name: "/my/param"},
+				Output: output.FormatJSON,
+			},
+			mock: &mockClient{
+				getParameterFunc: func(_ context.Context, _ *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
+					return &paramapi.GetParameterOutput{
+						Parameter: &paramapi.Parameter{
+							Name:             lo.ToPtr("/my/param"),
+							Value:            lo.ToPtr("test-value"),
+							Version:          1,
+							Type:             paramapi.ParameterTypeString,
+							LastModifiedDate: &now,
+						},
+					}, nil
+				},
+				listTagsForResourceFunc: func(_ context.Context, _ *paramapi.ListTagsForResourceInput, _ ...func(*paramapi.Options)) (*paramapi.ListTagsForResourceOutput, error) {
+					return &paramapi.ListTagsForResourceOutput{
+						TagList: []paramapi.Tag{
+							{Key: lo.ToPtr("Environment"), Value: lo.ToPtr("production")},
+							{Key: lo.ToPtr("Team"), Value: lo.ToPtr("backend")},
+						},
+					}, nil
+				},
+			},
+			check: func(t *testing.T, output string) {
+				assert.Contains(t, output, `"tags"`)
+				assert.Contains(t, output, `"Environment"`)
+				assert.Contains(t, output, `"production"`)
+				assert.Contains(t, output, `"Team"`)
+				assert.Contains(t, output, `"backend"`)
+			},
+		},
+		{
+			name: "JSON output with empty tags shows empty object",
+			opts: show.Options{
+				Spec:   &paramversion.Spec{Name: "/my/param"},
+				Output: output.FormatJSON,
+			},
+			mock: &mockClient{
+				getParameterFunc: func(_ context.Context, _ *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
+					return &paramapi.GetParameterOutput{
+						Parameter: &paramapi.Parameter{
+							Name:    lo.ToPtr("/my/param"),
+							Value:   lo.ToPtr("test-value"),
+							Version: 1,
+							Type:    paramapi.ParameterTypeString,
+						},
+					}, nil
+				},
+			},
+			check: func(t *testing.T, output string) {
+				assert.Contains(t, output, `"tags": {}`)
 			},
 		},
 	}
