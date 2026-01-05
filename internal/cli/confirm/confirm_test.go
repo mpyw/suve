@@ -44,6 +44,38 @@ func TestPrompter_Confirm(t *testing.T) {
 		assert.Contains(t, stderr.String(), "[y/N]")
 	})
 
+	t.Run("confirm with identity displays target info", func(t *testing.T) {
+		t.Parallel()
+		var stderr bytes.Buffer
+		p := &confirm.Prompter{
+			Stdin:     strings.NewReader("y\n"),
+			Stdout:    io.Discard,
+			Stderr:    &stderr,
+			AccountID: "123456789012",
+			Region:    "ap-northeast-1",
+		}
+
+		result, err := p.Confirm("test message", false)
+		require.NoError(t, err)
+		assert.True(t, result)
+		assert.Contains(t, stderr.String(), "Target: 123456789012 / ap-northeast-1")
+	})
+
+	t.Run("confirm without identity does not display target info", func(t *testing.T) {
+		t.Parallel()
+		var stderr bytes.Buffer
+		p := &confirm.Prompter{
+			Stdin:  strings.NewReader("y\n"),
+			Stdout: io.Discard,
+			Stderr: &stderr,
+		}
+
+		result, err := p.Confirm("test message", false)
+		require.NoError(t, err)
+		assert.True(t, result)
+		assert.NotContains(t, stderr.String(), "Target:")
+	})
+
 	t.Run("confirm with yes", func(t *testing.T) {
 		t.Parallel()
 		p := &confirm.Prompter{
@@ -166,6 +198,58 @@ func TestPrompter_ConfirmAction(t *testing.T) {
 		require.NoError(t, err)
 		assert.True(t, result)
 	})
+
+	t.Run("confirm action with identity displays target info", func(t *testing.T) {
+		t.Parallel()
+		var stderr bytes.Buffer
+		p := &confirm.Prompter{
+			Stdin:     strings.NewReader("y\n"),
+			Stdout:    io.Discard,
+			Stderr:    &stderr,
+			AccountID: "123456789012",
+			Region:    "ap-northeast-1",
+		}
+
+		result, err := p.ConfirmAction("Update", "/my/param", false)
+		require.NoError(t, err)
+		assert.True(t, result)
+		assert.Contains(t, stderr.String(), "Target: 123456789012 / ap-northeast-1")
+		assert.Contains(t, stderr.String(), "Update /my/param?")
+	})
+}
+
+func TestPrompter_PartialIdentity(t *testing.T) {
+	t.Parallel()
+
+	t.Run("account only does not display target info", func(t *testing.T) {
+		t.Parallel()
+		var stderr bytes.Buffer
+		p := &confirm.Prompter{
+			Stdin:     strings.NewReader("y\n"),
+			Stdout:    io.Discard,
+			Stderr:    &stderr,
+			AccountID: "123456789012",
+		}
+
+		_, err := p.Confirm("test message", false)
+		require.NoError(t, err)
+		assert.NotContains(t, stderr.String(), "Target:")
+	})
+
+	t.Run("region only does not display target info", func(t *testing.T) {
+		t.Parallel()
+		var stderr bytes.Buffer
+		p := &confirm.Prompter{
+			Stdin:  strings.NewReader("y\n"),
+			Stdout: io.Discard,
+			Stderr: &stderr,
+			Region: "ap-northeast-1",
+		}
+
+		_, err := p.Confirm("test message", false)
+		require.NoError(t, err)
+		assert.NotContains(t, stderr.String(), "Target:")
+	})
 }
 
 func TestPrompter_ConfirmDelete(t *testing.T) {
@@ -199,6 +283,24 @@ func TestPrompter_ConfirmDelete(t *testing.T) {
 		assert.Contains(t, stderr.String(), "permanently delete")
 		assert.Contains(t, stderr.String(), "/my/param")
 		assert.Contains(t, stderr.String(), "Continue?")
+	})
+
+	t.Run("confirm delete with identity displays target info", func(t *testing.T) {
+		t.Parallel()
+		var stderr bytes.Buffer
+		p := &confirm.Prompter{
+			Stdin:     strings.NewReader("y\n"),
+			Stdout:    io.Discard,
+			Stderr:    &stderr,
+			AccountID: "123456789012",
+			Region:    "ap-northeast-1",
+		}
+
+		result, err := p.ConfirmDelete("/my/param", false)
+		require.NoError(t, err)
+		assert.True(t, result)
+		assert.Contains(t, stderr.String(), "Target: 123456789012 / ap-northeast-1")
+		assert.Contains(t, stderr.String(), "permanently delete")
 	})
 
 	t.Run("decline delete", func(t *testing.T) {

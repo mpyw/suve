@@ -2,10 +2,12 @@
   interface Props {
     activeView?: 'param' | 'secret' | 'staging';
     stagingCount?: number;
+    accountId?: string;
+    region?: string;
     onnavigate?: (view: 'param' | 'secret' | 'staging') => void;
   }
 
-  let { activeView = 'param', stagingCount = 0, onnavigate }: Props = $props();
+  let { activeView = 'param', stagingCount = 0, accountId = '', region = '', onnavigate }: Props = $props();
 
   function navigate(view: 'param' | 'secret' | 'staging') {
     onnavigate?.(view);
@@ -49,6 +51,19 @@
       {/if}
     </button>
   </nav>
+
+  {#if accountId && region}
+    <div class="aws-info">
+      <div class="aws-info-row">
+        <span class="aws-info-label">Account</span>
+        <span class="aws-info-value">{accountId}</span>
+      </div>
+      <div class="aws-info-row">
+        <span class="aws-info-label">Region</span>
+        <span class="aws-info-value">{region}</span>
+      </div>
+    </div>
+  {/if}
 </aside>
 
 <style>
@@ -145,5 +160,29 @@
   .nav-item.active .staging-count {
     background: #fff;
     color: #e94560;
+  }
+
+  .aws-info {
+    margin-top: auto;
+    padding: 12px 16px;
+    border-top: 1px solid #2d2d44;
+    font-size: 11px;
+  }
+
+  .aws-info-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 4px 0;
+  }
+
+  .aws-info-label {
+    color: #666;
+  }
+
+  .aws-info-value {
+    color: #a0a0a0;
+    font-family: monospace;
+    font-size: 10px;
   }
 </style>

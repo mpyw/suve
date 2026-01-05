@@ -1,5 +1,19 @@
 export namespace gui {
-	
+
+	export class AWSIdentityResult {
+	    accountId: string;
+	    region: string;
+
+	    static createFrom(source: any = {}) {
+	        return new AWSIdentityResult(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.accountId = source["accountId"];
+	        this.region = source["region"];
+	    }
+	}
 	export class ParamDeleteResult {
 	    name: string;
 	

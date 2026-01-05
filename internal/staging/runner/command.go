@@ -12,6 +12,7 @@ import (
 	"github.com/mpyw/suve/internal/cli/colors"
 	"github.com/mpyw/suve/internal/cli/confirm"
 	"github.com/mpyw/suve/internal/cli/pager"
+	"github.com/mpyw/suve/internal/infra"
 	"github.com/mpyw/suve/internal/staging"
 	stagingusecase "github.com/mpyw/suve/internal/usecase/staging"
 )
@@ -60,7 +61,11 @@ EXAMPLES:
 			},
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
-			store, err := staging.NewStore()
+			identity, err := infra.GetAWSIdentity(ctx)
+			if err != nil {
+				return fmt.Errorf("failed to get AWS identity: %w", err)
+			}
+			store, err := staging.NewStore(identity.AccountID, identity.Region)
 			if err != nil {
 				return fmt.Errorf("failed to initialize stage store: %w", err)
 			}
@@ -130,7 +135,11 @@ EXAMPLES:
 				name = parsedName
 			}
 
-			store, err := staging.NewStore()
+			identity, err := infra.GetAWSIdentity(ctx)
+			if err != nil {
+				return fmt.Errorf("failed to get AWS identity: %w", err)
+			}
+			store, err := staging.NewStore(identity.AccountID, identity.Region)
 			if err != nil {
 				return fmt.Errorf("failed to initialize stage store: %w", err)
 			}
@@ -205,7 +214,11 @@ EXAMPLES:
 				value = cmd.Args().Get(1)
 			}
 
-			store, err := staging.NewStore()
+			identity, err := infra.GetAWSIdentity(ctx)
+			if err != nil {
+				return fmt.Errorf("failed to get AWS identity: %w", err)
+			}
+			store, err := staging.NewStore(identity.AccountID, identity.Region)
 			if err != nil {
 				return fmt.Errorf("failed to initialize stage store: %w", err)
 			}
@@ -275,7 +288,11 @@ EXAMPLES:
 				value = cmd.Args().Get(1)
 			}
 
-			store, err := staging.NewStore()
+			identity, err := infra.GetAWSIdentity(ctx)
+			if err != nil {
+				return fmt.Errorf("failed to get AWS identity: %w", err)
+			}
+			store, err := staging.NewStore(identity.AccountID, identity.Region)
 			if err != nil {
 				return fmt.Errorf("failed to initialize stage store: %w", err)
 			}
@@ -348,7 +365,11 @@ EXAMPLES:
 			},
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
-			store, err := staging.NewStore()
+			identity, err := infra.GetAWSIdentity(ctx)
+			if err != nil {
+				return fmt.Errorf("failed to get AWS identity: %w", err)
+			}
+			store, err := staging.NewStore(identity.AccountID, identity.Region)
 			if err != nil {
 				return fmt.Errorf("failed to initialize stage store: %w", err)
 			}
@@ -464,7 +485,11 @@ EXAMPLES:
 				return fmt.Errorf("usage: suve stage %s reset <spec> or suve stage %s reset --all", cfg.CommandName, cfg.CommandName)
 			}
 
-			store, err := staging.NewStore()
+			identity, err := infra.GetAWSIdentity(ctx)
+			if err != nil {
+				return fmt.Errorf("failed to get AWS identity: %w", err)
+			}
+			store, err := staging.NewStore(identity.AccountID, identity.Region)
 			if err != nil {
 				return fmt.Errorf("failed to initialize stage store: %w", err)
 			}
@@ -586,7 +611,11 @@ EXAMPLES:
 				return fmt.Errorf("usage: suve stage %s delete <name>", cfg.CommandName)
 			}
 
-			store, err := staging.NewStore()
+			identity, err := infra.GetAWSIdentity(ctx)
+			if err != nil {
+				return fmt.Errorf("failed to get AWS identity: %w", err)
+			}
+			store, err := staging.NewStore(identity.AccountID, identity.Region)
 			if err != nil {
 				return fmt.Errorf("failed to initialize stage store: %w", err)
 			}
@@ -649,7 +678,11 @@ EXAMPLES:
 			name := cmd.Args().First()
 			tags := cmd.Args().Slice()[1:]
 
-			store, err := staging.NewStore()
+			identity, err := infra.GetAWSIdentity(ctx)
+			if err != nil {
+				return fmt.Errorf("failed to get AWS identity: %w", err)
+			}
+			store, err := staging.NewStore(identity.AccountID, identity.Region)
 			if err != nil {
 				return fmt.Errorf("failed to initialize stage store: %w", err)
 			}
@@ -707,7 +740,11 @@ EXAMPLES:
 			name := cmd.Args().First()
 			keys := cmd.Args().Slice()[1:]
 
-			store, err := staging.NewStore()
+			identity, err := infra.GetAWSIdentity(ctx)
+			if err != nil {
+				return fmt.Errorf("failed to get AWS identity: %w", err)
+			}
+			store, err := staging.NewStore(identity.AccountID, identity.Region)
 			if err != nil {
 				return fmt.Errorf("failed to initialize stage store: %w", err)
 			}

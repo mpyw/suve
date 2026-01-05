@@ -87,6 +87,12 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		return fmt.Errorf("failed to initialize AWS client: %w", err)
 	}
 
+	// Get AWS identity for confirmation display
+	var identity *infra.AWSIdentity
+	if !skipConfirm {
+		identity, _ = infra.GetAWSIdentity(ctx)
+	}
+
 	uc := &secret.DeleteUseCase{Client: client}
 
 	// Show current value before confirming
@@ -105,6 +111,10 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		Stdin:  os.Stdin,
 		Stdout: cmd.Root().Writer,
 		Stderr: cmd.Root().ErrWriter,
+	}
+	if identity != nil {
+		prompter.AccountID = identity.AccountID
+		prompter.Region = identity.Region
 	}
 	confirmed, err := prompter.ConfirmDelete(name, skipConfirm)
 	if err != nil {

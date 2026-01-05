@@ -12,9 +12,18 @@ import (
 
 // Prompter handles confirmation prompts.
 type Prompter struct {
-	Stdin  io.Reader
-	Stdout io.Writer
-	Stderr io.Writer
+	Stdin     io.Reader
+	Stdout    io.Writer
+	Stderr    io.Writer
+	AccountID string
+	Region    string
+}
+
+// printTargetInfo prints AWS account and region information if available.
+func (p *Prompter) printTargetInfo() {
+	if p.AccountID != "" && p.Region != "" {
+		_, _ = fmt.Fprintf(p.Stderr, "%s Target: %s / %s\n", colors.Info("i"), p.AccountID, p.Region)
+	}
 }
 
 // Confirm displays a confirmation prompt and returns true if the user confirms.
@@ -24,6 +33,7 @@ func (p *Prompter) Confirm(message string, skipConfirm bool) (bool, error) {
 		return true, nil
 	}
 
+	p.printTargetInfo()
 	_, _ = fmt.Fprintf(p.Stderr, "%s %s [y/N]: ", colors.Warning("?"), message)
 
 	reader := bufio.NewReader(p.Stdin)
@@ -48,6 +58,7 @@ func (p *Prompter) ConfirmDelete(target string, skipConfirm bool) (bool, error) 
 		return true, nil
 	}
 
+	p.printTargetInfo()
 	_, _ = fmt.Fprintf(p.Stderr, "%s This will permanently delete: %s\n", colors.Error("!"), target)
 	_, _ = fmt.Fprintf(p.Stderr, "%s Continue? [y/N]: ", colors.Warning("?"))
 

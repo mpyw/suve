@@ -16,7 +16,7 @@ import (
 func TestNewStore(t *testing.T) {
 	t.Parallel()
 
-	store, err := staging.NewStore()
+	store, err := staging.NewStore("123456789012", "ap-northeast-1")
 	require.NoError(t, err)
 	assert.NotNil(t, store)
 }
