@@ -14,7 +14,7 @@ PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 cd "$PROJECT_DIR"
 
 # LocalStack configuration
-export AWS_ENDPOINT_URL="http://localhost:4566"
+export AWS_ENDPOINT_URL="http://localhost:${SUVE_LOCALSTACK_EXTERNAL_PORT:-4566}"
 export AWS_ACCESS_KEY_ID="test"
 export AWS_SECRET_ACCESS_KEY="test"
 export AWS_DEFAULT_REGION="us-east-1"
@@ -27,17 +27,16 @@ if [[ ! -f bin/suve ]]; then
     make build
 fi
 
+# Reset LocalStack (clean slate)
+echo "Resetting LocalStack..."
+docker compose down -v
+docker compose up -d
+echo "Waiting for LocalStack to be ready..."
+sleep 3
+
 # Clear staging
 echo "Clearing staging..."
 ./bin/suve stage reset --all 2>/dev/null || true
-
-# Clean up demo params
-echo "Cleaning up existing demo params..."
-aws ssm delete-parameter --endpoint-url=http://localhost:4566 --name "/demo/api/url" 2>/dev/null || true
-aws ssm delete-parameter --endpoint-url=http://localhost:4566 --name "/demo/legacy/endpoint" 2>/dev/null || true
-aws ssm delete-parameter --endpoint-url=http://localhost:4566 --name "/demo/config" 2>/dev/null || true
-aws ssm delete-parameter --endpoint-url=http://localhost:4566 --name "/demo/cache/ttl" 2>/dev/null || true
-aws ssm delete-parameter --endpoint-url=http://localhost:4566 --name "/demo/feature/enabled" 2>/dev/null || true
 
 # Set up 3 existing parameters:
 # - /demo/api/url        -> will be edited
@@ -48,6 +47,9 @@ aws ssm put-parameter --endpoint-url=http://localhost:4566 \
     --name "/demo/api/url" \
     --value "https://api-v1.example.com" \
     --type String --overwrite >/dev/null
+aws ssm add-tags-to-resource --endpoint-url=http://localhost:4566 \
+    --resource-type "Parameter" --resource-id "/demo/api/url" \
+    --tags "Key=Version,Value=v1" >/dev/null
 
 aws ssm put-parameter --endpoint-url=http://localhost:4566 \
     --name "/demo/legacy/endpoint" \

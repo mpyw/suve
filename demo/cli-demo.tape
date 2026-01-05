@@ -72,6 +72,16 @@ Sleep 1.5s
 Enter
 Sleep 500ms
 
+Type "# Remove old tag from the edited parameter"
+Enter
+Sleep 500ms
+
+Type "suve stage param untag /demo/api/url Version"
+Enter
+Sleep 1.5s
+Enter
+Sleep 500ms
+
 Type "# Stage a deletion"
 Enter
 Sleep 500ms
@@ -115,11 +125,11 @@ Sleep 2.5s
 Enter
 Sleep 500ms
 
-Type "# Verify: list parameters"
+Type "# Verify: list parameters with tags"
 Enter
 Sleep 500ms
 
-Type "suve param ls -R /demo"
+Type "suve param ls -R /demo --show"
 Enter
 Sleep 2s
 Enter
