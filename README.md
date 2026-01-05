@@ -15,6 +15,10 @@
 
 A **Git-like CLI/GUI** for AWS Parameter Store and Secrets Manager. Familiar commands like `show`, `log`, `diff`, and a **staging workflow** for safe, reviewable changes.
 
+<p align="center">
+  <img src="demo/cli-demo.gif" alt="CLI Demo" width="800">
+</p>
+
 ## Features
 
 - **Git-like commands**: `show`, `log`, `diff`, `ls`, `set`, `rm`
