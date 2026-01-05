@@ -35,6 +35,12 @@ func (r *DeleteRunner) Run(ctx context.Context, opts DeleteOptions) error {
 		return err
 	}
 
+	// Handle CREATE -> NotStaged (unstage instead of delete)
+	if result.Unstaged {
+		_, _ = fmt.Fprintf(r.Stdout, "%s Unstaged creation: %s\n", colors.Success("✓"), result.Name)
+		return nil
+	}
+
 	if result.ShowDeleteOptions {
 		if result.Force {
 			_, _ = fmt.Fprintf(r.Stdout, "%s Staged for immediate deletion: %s\n", colors.Success("✓"), result.Name)

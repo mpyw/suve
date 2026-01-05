@@ -57,7 +57,7 @@ func (r *StatusRunner) Run(ctx context.Context, opts StatusOptions) error {
 	_, _ = fmt.Fprintf(r.Stdout, "%s (%d):\n", colors.Warning(fmt.Sprintf("Staged %s changes", result.ServiceName)), totalCount)
 
 	printer := &staging.EntryPrinter{Writer: r.Stdout}
-	for _, name := range r.sortedEntryNames(result.Entries) {
+	for _, name := range maputil.SortedNames(result.Entries, func(e stagingusecase.StatusEntry) string { return e.Name }) {
 		for _, entry := range result.Entries {
 			if entry.Name == name {
 				printer.PrintEntry(entry.Name, toStagingEntry(entry), opts.Verbose, entry.ShowDeleteOptions)
@@ -67,7 +67,7 @@ func (r *StatusRunner) Run(ctx context.Context, opts StatusOptions) error {
 	}
 
 	// Print tag entries
-	for _, name := range r.sortedTagEntryNames(result.TagEntries) {
+	for _, name := range maputil.SortedNames(result.TagEntries, func(e stagingusecase.StatusTagEntry) string { return e.Name }) {
 		for _, tagEntry := range result.TagEntries {
 			if tagEntry.Name == name {
 				r.printTagEntry(tagEntry, opts.Verbose)
@@ -98,22 +98,6 @@ func (r *StatusRunner) printTagEntry(e stagingusecase.StatusTagEntry, verbose bo
 			_, _ = fmt.Fprintf(r.Stdout, "      - %s\n", key)
 		}
 	}
-}
-
-func (r *StatusRunner) sortedEntryNames(entries []stagingusecase.StatusEntry) []string {
-	names := make(map[string]struct{})
-	for _, e := range entries {
-		names[e.Name] = struct{}{}
-	}
-	return maputil.SortedKeys(names)
-}
-
-func (r *StatusRunner) sortedTagEntryNames(entries []stagingusecase.StatusTagEntry) []string {
-	names := make(map[string]struct{})
-	for _, e := range entries {
-		names[e.Name] = struct{}{}
-	}
-	return maputil.SortedKeys(names)
 }
 
 func toStagingEntry(e stagingusecase.StatusEntry) staging.Entry {

@@ -47,7 +47,7 @@ func (r *DiffRunner) Run(ctx context.Context, opts DiffOptions) error {
 
 	// Output results in sorted order
 	first := true
-	for _, name := range r.sortedEntryNames(result.Entries) {
+	for _, name := range maputil.SortedNames(result.Entries, func(e stagingusecase.DiffEntry) string { return e.Name }) {
 		for _, entry := range result.Entries {
 			if entry.Name != name {
 				continue
@@ -76,7 +76,7 @@ func (r *DiffRunner) Run(ctx context.Context, opts DiffOptions) error {
 	}
 
 	// Output tag entries
-	for _, name := range r.sortedTagEntryNames(result.TagEntries) {
+	for _, name := range maputil.SortedNames(result.TagEntries, func(e stagingusecase.DiffTagEntry) string { return e.Name }) {
 		for _, tagEntry := range result.TagEntries {
 			if tagEntry.Name != name {
 				continue
@@ -91,22 +91,6 @@ func (r *DiffRunner) Run(ctx context.Context, opts DiffOptions) error {
 	}
 
 	return nil
-}
-
-func (r *DiffRunner) sortedEntryNames(entries []stagingusecase.DiffEntry) []string {
-	names := make(map[string]struct{})
-	for _, e := range entries {
-		names[e.Name] = struct{}{}
-	}
-	return maputil.SortedKeys(names)
-}
-
-func (r *DiffRunner) sortedTagEntryNames(entries []stagingusecase.DiffTagEntry) []string {
-	names := make(map[string]struct{})
-	for _, e := range entries {
-		names[e.Name] = struct{}{}
-	}
-	return maputil.SortedKeys(names)
 }
 
 func (r *DiffRunner) outputDiff(opts DiffOptions, entry stagingusecase.DiffEntry) {

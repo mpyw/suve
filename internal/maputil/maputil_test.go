@@ -47,3 +47,41 @@ func TestSortedKeys(t *testing.T) {
 		assert.Equal(t, []string{"only"}, keys)
 	})
 }
+
+func TestSortedNames(t *testing.T) {
+	t.Parallel()
+
+	type item struct {
+		Name  string
+		Value int
+	}
+
+	t.Run("multiple items", func(t *testing.T) {
+		t.Parallel()
+		items := []item{
+			{Name: "charlie", Value: 3},
+			{Name: "alice", Value: 1},
+			{Name: "bob", Value: 2},
+		}
+		names := maputil.SortedNames(items, func(i item) string { return i.Name })
+		assert.Equal(t, []string{"alice", "bob", "charlie"}, names)
+	})
+
+	t.Run("duplicate names", func(t *testing.T) {
+		t.Parallel()
+		items := []item{
+			{Name: "alice", Value: 1},
+			{Name: "alice", Value: 2},
+			{Name: "bob", Value: 3},
+		}
+		names := maputil.SortedNames(items, func(i item) string { return i.Name })
+		assert.Equal(t, []string{"alice", "bob"}, names)
+	})
+
+	t.Run("empty slice", func(t *testing.T) {
+		t.Parallel()
+		items := []item{}
+		names := maputil.SortedNames(items, func(i item) string { return i.Name })
+		assert.Empty(t, names)
+	})
+}

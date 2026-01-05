@@ -8,6 +8,7 @@ import (
 	"github.com/samber/lo"
 
 	"github.com/mpyw/suve/internal/staging"
+	"github.com/mpyw/suve/internal/staging/transition"
 )
 
 // EditInput holds input for the edit use case.
@@ -19,7 +20,9 @@ type EditInput struct {
 
 // EditOutput holds the result of the edit use case.
 type EditOutput struct {
-	Name string
+	Name     string
+	Skipped  bool // True if the edit was skipped because value matches AWS
+	Unstaged bool // True if the entry was auto-unstaged
 }
 
 // EditUseCase executes edit operations.
@@ -32,64 +35,70 @@ type EditUseCase struct {
 func (u *EditUseCase) Execute(ctx context.Context, input EditInput) (*EditOutput, error) {
 	service := u.Strategy.Service()
 
-	// Get existing staged entry to preserve operation type
-	existingOp, baseModifiedAt, err := u.getExistingState(ctx, input.Name)
+	// Load current state from AWS
+	currentValue, awsBaseModifiedAt, err := u.fetchCurrentState(ctx, input.Name)
 	if err != nil {
 		return nil, err
 	}
 
-	// Determine operation: preserve existing staged operation, default to Update
-	operation := staging.OperationUpdate
-	if existingOp != nil {
-		operation = *existingOp
-	}
-
-	// Stage the change
-	entry := staging.Entry{
-		Operation:      operation,
-		Value:          lo.ToPtr(input.Value),
-		StagedAt:       time.Now(),
-		BaseModifiedAt: baseModifiedAt,
-	}
-	if input.Description != "" {
-		entry.Description = &input.Description
-	}
-	if err := u.Store.StageEntry(service, input.Name, entry); err != nil {
+	// Load staged entry state with metadata
+	entryState, existingBaseModifiedAt, err := transition.LoadEntryStateWithMetadata(u.Store, service, input.Name, currentValue)
+	if err != nil {
 		return nil, err
 	}
 
-	return &EditOutput{Name: input.Name}, nil
+	// Use existing BaseModifiedAt if available, otherwise use AWS
+	baseModifiedAt := existingBaseModifiedAt
+	if baseModifiedAt == nil {
+		baseModifiedAt = awsBaseModifiedAt
+	}
+
+	// Build options with metadata
+	opts := &transition.EntryExecuteOptions{
+		BaseModifiedAt: baseModifiedAt,
+	}
+	if input.Description != "" {
+		opts.Description = &input.Description
+	}
+
+	// Execute the transition
+	executor := transition.NewExecutor(u.Store)
+	_, wasNotStaged := entryState.StagedState.(transition.EntryStagedStateNotStaged)
+
+	result, err := executor.ExecuteEntry(service, input.Name, entryState, transition.EntryActionEdit{Value: input.Value}, opts)
+	if err != nil {
+		return nil, err
+	}
+
+	// Check if skipped or unstaged
+	output := &EditOutput{Name: input.Name}
+	_, isNotStaged := result.NewState.StagedState.(transition.EntryStagedStateNotStaged)
+
+	if wasNotStaged && isNotStaged {
+		output.Skipped = true
+	} else if !wasNotStaged && isNotStaged {
+		output.Unstaged = true
+	}
+
+	return output, nil
 }
 
-// getExistingState returns the existing staged operation (if any) and base modified time.
-func (u *EditUseCase) getExistingState(ctx context.Context, name string) (*staging.Operation, *time.Time, error) {
-	service := u.Strategy.Service()
-
-	// Check if already staged
-	stagedEntry, err := u.Store.GetEntry(service, name)
-	if err != nil && !errors.Is(err, staging.ErrNotStaged) {
-		return nil, nil, err
-	}
-
-	if stagedEntry != nil {
-		switch stagedEntry.Operation {
-		case staging.OperationCreate, staging.OperationUpdate:
-			// Preserve existing operation type
-			return &stagedEntry.Operation, stagedEntry.BaseModifiedAt, nil
-		case staging.OperationDelete:
-			// Cancel deletion and convert to UPDATE - fall through to fetch from AWS
-		}
-	}
-
-	// Not staged or staged for deletion - fetch base time from AWS for Update operation
+// fetchCurrentState fetches the current AWS value and last modified time.
+func (u *EditUseCase) fetchCurrentState(ctx context.Context, name string) (*string, *time.Time, error) {
 	result, err := u.Strategy.FetchCurrentValue(ctx, name)
 	if err != nil {
 		return nil, nil, err
 	}
+
+	// Always use the value pointer - empty string is a valid AWS value
+	currentValue := &result.Value
+
+	var baseModifiedAt *time.Time
 	if !result.LastModified.IsZero() {
-		return nil, &result.LastModified, nil
+		baseModifiedAt = &result.LastModified
 	}
-	return nil, nil, nil
+
+	return currentValue, baseModifiedAt, nil
 }
 
 // BaselineInput holds input for getting baseline value.
@@ -99,7 +108,8 @@ type BaselineInput struct {
 
 // BaselineOutput holds the baseline value for editing.
 type BaselineOutput struct {
-	Value string
+	Value        string
+	IsStagedEdit bool // True if the baseline is from a staged edit (not AWS)
 }
 
 // Baseline returns the baseline value for editing (staged value if exists, otherwise from AWS).
@@ -116,11 +126,12 @@ func (u *EditUseCase) Baseline(ctx context.Context, input BaselineInput) (*Basel
 		switch stagedEntry.Operation {
 		case staging.OperationCreate, staging.OperationUpdate:
 			return &BaselineOutput{
-				Value: lo.FromPtr(stagedEntry.Value),
+				Value:        lo.FromPtr(stagedEntry.Value),
+				IsStagedEdit: true,
 			}, nil
 		case staging.OperationDelete:
-			// When editing a staged deletion, fetch from AWS to allow editing
-			// Fall through to fetch from AWS
+			// BLOCKED: Cannot edit something staged for deletion
+			return nil, transition.ErrCannotEditDelete
 		}
 	}
 

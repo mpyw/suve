@@ -7,6 +7,8 @@ import (
 	"io"
 	"strings"
 
+	"github.com/samber/lo"
+
 	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/maputil"
 	stagingusecase "github.com/mpyw/suve/internal/usecase/staging"
@@ -38,7 +40,7 @@ func (r *ApplyRunner) Run(ctx context.Context, opts ApplyOptions) error {
 	}
 
 	// Output conflicts if any
-	for _, name := range maputil.SortedKeys(sliceToMap(result.Conflicts)) {
+	for _, name := range maputil.SortedKeys(lo.SliceToMap(result.Conflicts, func(s string) (string, struct{}) { return s, struct{}{} })) {
 		output.Warning(r.Stderr, "conflict detected for %s: AWS was modified after staging", name)
 	}
 
@@ -49,7 +51,7 @@ func (r *ApplyRunner) Run(ctx context.Context, opts ApplyOptions) error {
 	}
 
 	// Output entry results in sorted order
-	for _, name := range r.sortedEntryResultNames(result.EntryResults) {
+	for _, name := range maputil.SortedNames(result.EntryResults, func(e stagingusecase.ApplyEntryResult) string { return e.Name }) {
 		for _, entry := range result.EntryResults {
 			if entry.Name != name {
 				continue
@@ -71,7 +73,7 @@ func (r *ApplyRunner) Run(ctx context.Context, opts ApplyOptions) error {
 	}
 
 	// Output tag results in sorted order
-	for _, name := range r.sortedTagResultNames(result.TagResults) {
+	for _, name := range maputil.SortedNames(result.TagResults, func(e stagingusecase.ApplyTagResult) string { return e.Name }) {
 		for _, tag := range result.TagResults {
 			if tag.Name != name {
 				continue
@@ -89,32 +91,8 @@ func (r *ApplyRunner) Run(ctx context.Context, opts ApplyOptions) error {
 	return err
 }
 
-func (r *ApplyRunner) sortedEntryResultNames(results []stagingusecase.ApplyEntryResult) []string {
-	names := make(map[string]struct{})
-	for _, e := range results {
-		names[e.Name] = struct{}{}
-	}
-	return maputil.SortedKeys(names)
-}
-
-func (r *ApplyRunner) sortedTagResultNames(results []stagingusecase.ApplyTagResult) []string {
-	names := make(map[string]struct{})
-	for _, e := range results {
-		names[e.Name] = struct{}{}
-	}
-	return maputil.SortedKeys(names)
-}
-
-func sliceToMap(slice []string) map[string]struct{} {
-	m := make(map[string]struct{})
-	for _, s := range slice {
-		m[s] = struct{}{}
-	}
-	return m
-}
-
 func formatTagApplySummary(tag stagingusecase.ApplyTagResult) string {
-	parts := []string{}
+	var parts []string
 	if len(tag.AddTags) > 0 {
 		parts = append(parts, fmt.Sprintf("+%d", len(tag.AddTags)))
 	}
@@ -122,6 +100,8 @@ func formatTagApplySummary(tag stagingusecase.ApplyTagResult) string {
 		parts = append(parts, fmt.Sprintf("-%d", tag.RemoveTag.Len()))
 	}
 	if len(parts) == 0 {
+		// Unreachable: TagEntry with empty Add and Remove is unstaged by persistTagState,
+		// so ApplyTagResult should always have at least one non-empty field.
 		return ""
 	}
 	return " [" + strings.Join(parts, ", ") + "]"

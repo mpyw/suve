@@ -66,6 +66,13 @@ func (r *EditRunner) Run(ctx context.Context, opts EditOptions) error {
 		return err
 	}
 
-	_, _ = fmt.Fprintf(r.Stdout, "%s Staged: %s\n", colors.Success("✓"), result.Name)
+	switch {
+	case result.Skipped:
+		_, _ = fmt.Fprintf(r.Stdout, "%s Skipped %s (same as AWS)\n", colors.Warning("!"), result.Name)
+	case result.Unstaged:
+		_, _ = fmt.Fprintf(r.Stdout, "%s Unstaged %s (reverted to AWS)\n", colors.Success("✓"), result.Name)
+	default:
+		_, _ = fmt.Fprintf(r.Stdout, "%s Staged: %s\n", colors.Success("✓"), result.Name)
+	}
 	return nil
 }

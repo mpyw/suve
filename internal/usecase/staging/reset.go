@@ -3,11 +3,9 @@ package staging
 import (
 	"context"
 	"errors"
-	"time"
-
-	"github.com/samber/lo"
 
 	"github.com/mpyw/suve/internal/staging"
+	"github.com/mpyw/suve/internal/staging/transition"
 )
 
 // ResetInput holds input for the reset use case.
@@ -25,6 +23,7 @@ const (
 	ResetResultRestored
 	ResetResultNotStaged
 	ResetResultNothingStaged
+	ResetResultSkipped // Restore was skipped because value matches current AWS
 )
 
 // ResetOutput holds the result of the reset use case.
@@ -96,18 +95,23 @@ func (u *ResetUseCase) unstageAll(serviceName, itemName string) (*ResetOutput, e
 func (u *ResetUseCase) unstage(name, serviceName, itemName string) (*ResetOutput, error) {
 	service := u.Parser.Service()
 
-	_, err := u.Store.GetEntry(service, name)
-	if errors.Is(err, staging.ErrNotStaged) {
+	// Load current state (nil CurrentValue since we don't care about AWS state for reset)
+	entryState, err := transition.LoadEntryState(u.Store, service, name, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	// Check if already not staged
+	if _, isNotStaged := entryState.StagedState.(transition.EntryStagedStateNotStaged); isNotStaged {
 		return &ResetOutput{
 			Type: ResetResultNotStaged,
 			Name: name,
 		}, nil
 	}
-	if err != nil {
-		return nil, err
-	}
 
-	if err := u.Store.UnstageEntry(service, name); err != nil {
+	// Execute the reset transition
+	executor := transition.NewExecutor(u.Store)
+	if _, err := executor.ExecuteEntry(service, name, entryState, transition.EntryActionReset{}, nil); err != nil {
 		return nil, err
 	}
 
@@ -129,12 +133,38 @@ func (u *ResetUseCase) restore(ctx context.Context, spec, name string) (*ResetOu
 		return nil, err
 	}
 
-	if err := u.Store.StageEntry(service, name, staging.Entry{
-		Operation: staging.OperationUpdate,
-		Value:     lo.ToPtr(value),
-		StagedAt:  time.Now(),
-	}); err != nil {
+	// Fetch current AWS value for auto-skip detection
+	fetchResult, err := u.Fetcher.FetchCurrentValue(ctx, name)
+	if err != nil {
 		return nil, err
+	}
+	// Always use the value pointer - empty string is a valid AWS value
+	currentValue := &fetchResult.Value
+
+	// Load current state with AWS value for auto-skip
+	entryState, err := transition.LoadEntryState(u.Store, service, name, currentValue)
+	if err != nil {
+		return nil, err
+	}
+
+	// Check if value matches current AWS (would be auto-skipped)
+	_, wasNotStaged := entryState.StagedState.(transition.EntryStagedStateNotStaged)
+
+	// Execute the edit transition with the restored value
+	executor := transition.NewExecutor(u.Store)
+	result, err := executor.ExecuteEntry(service, name, entryState, transition.EntryActionEdit{Value: value}, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	// Check if auto-skipped (was NotStaged and still NotStaged)
+	_, isNotStaged := result.NewState.StagedState.(transition.EntryStagedStateNotStaged)
+	if wasNotStaged && isNotStaged {
+		return &ResetOutput{
+			Type:         ResetResultSkipped,
+			Name:         name,
+			VersionLabel: versionLabel,
+		}, nil
 	}
 
 	return &ResetOutput{
