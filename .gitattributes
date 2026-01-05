@@ -1,1 +1,2 @@
 .mcp.json.example linguist-language=json
+*.gif filter=lfs diff=lfs merge=lfs -text
