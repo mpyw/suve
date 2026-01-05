@@ -6,6 +6,22 @@ import (
 	"time"
 )
 
+// ResourceNotFoundError indicates a resource was not found in AWS.
+type ResourceNotFoundError struct {
+	Err error
+}
+
+func (e *ResourceNotFoundError) Error() string {
+	if e.Err != nil {
+		return e.Err.Error()
+	}
+	return "resource not found"
+}
+
+func (e *ResourceNotFoundError) Unwrap() error {
+	return e.Err
+}
+
 // ServiceStrategy defines the common interface for service-specific operations.
 // This enables Strategy Pattern to consolidate duplicate code across SSM Parameter Store and Secrets Manager commands.
 type ServiceStrategy interface {

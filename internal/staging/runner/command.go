@@ -223,7 +223,10 @@ EXAMPLES:
 				return fmt.Errorf("failed to initialize stage store: %w", err)
 			}
 
-			strat := cfg.ParserFactory()
+			strat, err := cfg.Factory(ctx)
+			if err != nil {
+				return fmt.Errorf("failed to initialize strategy: %w", err)
+			}
 
 			r := &AddRunner{
 				UseCase: &stagingusecase.AddUseCase{

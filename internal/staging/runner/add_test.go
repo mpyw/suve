@@ -169,7 +169,7 @@ func TestAddRunner_Run(t *testing.T) {
 	})
 }
 
-// mockStrategy implements staging.Parser for testing.
+// mockStrategy implements staging.EditStrategy for testing.
 type mockStrategy struct {
 	service      staging.Service
 	parseNameErr error
@@ -187,6 +187,11 @@ func (m *mockStrategy) ParseName(input string) (string, error) {
 }
 func (m *mockStrategy) ParseSpec(input string) (string, bool, error) {
 	return input, false, nil
+}
+
+// FetchCurrentValue returns not-found for add scenarios (new resource)
+func (m *mockStrategy) FetchCurrentValue(_ context.Context, _ string) (*staging.EditFetchResult, error) {
+	return nil, &staging.ResourceNotFoundError{Err: errors.New("resource not found")}
 }
 
 func TestAddRunner_ErrorCases(t *testing.T) {

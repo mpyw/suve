@@ -38,6 +38,14 @@ func newMockEditStrategy() *mockEditStrategy {
 	}
 }
 
+// newMockEditStrategyNotFound creates a mock that returns ResourceNotFoundError.
+func newMockEditStrategyNotFound() *mockEditStrategy {
+	return &mockEditStrategy{
+		mockParser: newMockParser(),
+		fetchErr:   &staging.ResourceNotFoundError{Err: errors.New("resource not found")},
+	}
+}
+
 func TestEditUseCase_Execute(t *testing.T) {
 	t.Parallel()
 

@@ -198,10 +198,15 @@ func (s *SecretStrategy) ParseName(input string) (string, error) {
 }
 
 // FetchCurrentValue fetches the current value from AWS Secrets Manager for editing.
+// Returns *ResourceNotFoundError if the secret doesn't exist.
 func (s *SecretStrategy) FetchCurrentValue(ctx context.Context, name string) (*EditFetchResult, error) {
 	spec := &secretversion.Spec{Name: name}
 	secret, err := secretversion.GetSecretWithVersion(ctx, s.Client, spec)
 	if err != nil {
+		var rnf *secretapi.ResourceNotFoundException
+		if errors.As(err, &rnf) {
+			return nil, &ResourceNotFoundError{Err: err}
+		}
 		return nil, err
 	}
 	result := &EditFetchResult{

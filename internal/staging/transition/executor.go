@@ -51,7 +51,7 @@ func (e *Executor) ExecuteEntry(service staging.Service, name string, state Entr
 }
 
 // ExecuteTag executes a tag action and persists the result.
-func (e *Executor) ExecuteTag(service staging.Service, name string, entryState EntryStagedState, stagedTags StagedTags, action TagAction, baseModifiedAt *time.Time) (TagTransitionResult, error) {
+func (e *Executor) ExecuteTag(service staging.Service, name string, entryState EntryState, stagedTags StagedTags, action TagAction, baseModifiedAt *time.Time) (TagTransitionResult, error) {
 	result := ReduceTag(entryState, stagedTags, action)
 	if result.Error != nil {
 		return result, result.Error

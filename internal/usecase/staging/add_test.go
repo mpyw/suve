@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/mpyw/suve/internal/staging"
+	"github.com/mpyw/suve/internal/staging/transition"
 	usecasestaging "github.com/mpyw/suve/internal/usecase/staging"
 )
 
@@ -46,7 +47,7 @@ func TestAddUseCase_Execute(t *testing.T) {
 
 	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
 	uc := &usecasestaging.AddUseCase{
-		Strategy: newMockParser(),
+		Strategy: newMockEditStrategyNotFound(), // Resource doesn't exist - expected for add
 		Store:    store,
 	}
 
@@ -66,12 +67,30 @@ func TestAddUseCase_Execute(t *testing.T) {
 	assert.Equal(t, "test description", lo.FromPtr(entry.Description))
 }
 
+func TestAddUseCase_Execute_RejectsWhenResourceExists(t *testing.T) {
+	t.Parallel()
+
+	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	// Resource exists on AWS
+	uc := &usecasestaging.AddUseCase{
+		Strategy: newMockEditStrategy(), // Returns existing value
+		Store:    store,
+	}
+
+	_, err := uc.Execute(context.Background(), usecasestaging.AddInput{
+		Name:  "/app/existing",
+		Value: "new-value",
+	})
+	assert.Error(t, err)
+	assert.ErrorIs(t, err, transition.ErrCannotAddToExisting)
+}
+
 func TestAddUseCase_Execute_MinimalInput(t *testing.T) {
 	t.Parallel()
 
 	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
 	uc := &usecasestaging.AddUseCase{
-		Strategy: newMockParser(),
+		Strategy: newMockEditStrategyNotFound(),
 		Store:    store,
 	}
 
@@ -92,7 +111,7 @@ func TestAddUseCase_Draft_NotStaged(t *testing.T) {
 
 	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
 	uc := &usecasestaging.AddUseCase{
-		Strategy: newMockParser(),
+		Strategy: newMockEditStrategyNotFound(),
 		Store:    store,
 	}
 
@@ -113,7 +132,7 @@ func TestAddUseCase_Draft_StagedCreate(t *testing.T) {
 	}))
 
 	uc := &usecasestaging.AddUseCase{
-		Strategy: newMockParser(),
+		Strategy: newMockEditStrategyNotFound(),
 		Store:    store,
 	}
 
@@ -135,7 +154,7 @@ func TestAddUseCase_Draft_StagedUpdate(t *testing.T) {
 	}))
 
 	uc := &usecasestaging.AddUseCase{
-		Strategy: newMockParser(),
+		Strategy: newMockEditStrategyNotFound(),
 		Store:    store,
 	}
 
@@ -148,11 +167,11 @@ func TestAddUseCase_Execute_ParseError(t *testing.T) {
 	t.Parallel()
 
 	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
-	parser := newMockParser()
-	parser.parseErr = errors.New("invalid name")
+	strategy := newMockEditStrategyNotFound()
+	strategy.parseErr = errors.New("invalid name")
 
 	uc := &usecasestaging.AddUseCase{
-		Strategy: parser,
+		Strategy: strategy,
 		Store:    store,
 	}
 
@@ -168,11 +187,11 @@ func TestAddUseCase_Draft_ParseError(t *testing.T) {
 	t.Parallel()
 
 	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
-	parser := newMockParser()
-	parser.parseErr = errors.New("invalid name")
+	strategy := newMockEditStrategyNotFound()
+	strategy.parseErr = errors.New("invalid name")
 
 	uc := &usecasestaging.AddUseCase{
-		Strategy: parser,
+		Strategy: strategy,
 		Store:    store,
 	}
 
@@ -187,7 +206,7 @@ func TestAddUseCase_Execute_StageError(t *testing.T) {
 	store.stageErr = errors.New("stage error")
 
 	uc := &usecasestaging.AddUseCase{
-		Strategy: newMockParser(),
+		Strategy: newMockEditStrategyNotFound(),
 		Store:    store,
 	}
 
@@ -206,7 +225,7 @@ func TestAddUseCase_Draft_GetError(t *testing.T) {
 	store.getErr = errors.New("get error")
 
 	uc := &usecasestaging.AddUseCase{
-		Strategy: newMockParser(),
+		Strategy: newMockEditStrategyNotFound(),
 		Store:    store,
 	}
 
@@ -222,7 +241,7 @@ func TestAddUseCase_Execute_GetError(t *testing.T) {
 	store.getErr = errors.New("store get error")
 
 	uc := &usecasestaging.AddUseCase{
-		Strategy: newMockParser(),
+		Strategy: newMockEditStrategyNotFound(),
 		Store:    store,
 	}
 
@@ -246,7 +265,7 @@ func TestAddUseCase_Execute_RejectsWhenUpdateStaged(t *testing.T) {
 	}))
 
 	uc := &usecasestaging.AddUseCase{
-		Strategy: newMockParser(),
+		Strategy: newMockEditStrategyNotFound(),
 		Store:    store,
 	}
 
@@ -269,7 +288,7 @@ func TestAddUseCase_Execute_RejectsWhenDeleteStaged(t *testing.T) {
 	}))
 
 	uc := &usecasestaging.AddUseCase{
-		Strategy: newMockParser(),
+		Strategy: newMockEditStrategyNotFound(),
 		Store:    store,
 	}
 
@@ -293,7 +312,7 @@ func TestAddUseCase_Execute_AllowsReEditOfCreate(t *testing.T) {
 	}))
 
 	uc := &usecasestaging.AddUseCase{
-		Strategy: newMockParser(),
+		Strategy: newMockEditStrategyNotFound(),
 		Store:    store,
 	}
 
@@ -310,4 +329,24 @@ func TestAddUseCase_Execute_AllowsReEditOfCreate(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, staging.OperationCreate, entry.Operation)
 	assert.Equal(t, "updated-value", lo.FromPtr(entry.Value))
+}
+
+func TestAddUseCase_Execute_FetchError(t *testing.T) {
+	t.Parallel()
+
+	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	strategy := newMockEditStrategy()
+	strategy.fetchErr = errors.New("AWS connection error")
+
+	uc := &usecasestaging.AddUseCase{
+		Strategy: strategy,
+		Store:    store,
+	}
+
+	_, err := uc.Execute(context.Background(), usecasestaging.AddInput{
+		Name:  "/app/config",
+		Value: "value",
+	})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "AWS connection error")
 }

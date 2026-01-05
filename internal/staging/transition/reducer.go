@@ -4,11 +4,15 @@ import "errors"
 
 // Error definitions for transition failures.
 var (
-	ErrCannotAddToUpdate = errors.New("cannot add: already staged for update")
-	ErrCannotAddToDelete = errors.New("cannot add: already staged for deletion")
-	ErrCannotEditDelete  = errors.New("cannot edit: staged for deletion, reset first")
-	ErrCannotTagDelete   = errors.New("cannot tag: resource staged for deletion")
-	ErrCannotUntagDelete = errors.New("cannot untag: resource staged for deletion")
+	ErrCannotAddToUpdate    = errors.New("cannot add: already staged for update")
+	ErrCannotAddToDelete    = errors.New("cannot add: already staged for deletion")
+	ErrCannotAddToExisting  = errors.New("cannot add: resource already exists, use edit instead")
+	ErrCannotEditDelete     = errors.New("cannot edit: staged for deletion, reset first")
+	ErrCannotDeleteNotFound = errors.New("cannot delete: resource not found")
+	ErrCannotTagNotFound    = errors.New("cannot tag: resource not found")
+	ErrCannotTagDelete      = errors.New("cannot tag: resource staged for deletion")
+	ErrCannotUntagNotFound  = errors.New("cannot untag: resource not found")
+	ErrCannotUntagDelete    = errors.New("cannot untag: resource staged for deletion")
 )
 
 // EntryTransitionResult holds the result of an entry state transition.
@@ -41,7 +45,7 @@ func ReduceEntry(state EntryState, action EntryAction) EntryTransitionResult {
 }
 
 // ReduceTag applies a tag action to produce new staged tags.
-func ReduceTag(entryState EntryStagedState, stagedTags StagedTags, action TagAction) TagTransitionResult {
+func ReduceTag(entryState EntryState, stagedTags StagedTags, action TagAction) TagTransitionResult {
 	var result TagTransitionResult
 	switch a := action.(type) {
 	case TagActionTag:
@@ -55,12 +59,17 @@ func ReduceTag(entryState EntryStagedState, stagedTags StagedTags, action TagAct
 // reduceAdd handles the ADD action.
 //
 // Transition rules:
-//   - NotStaged → Create     (stage as create)
-//   - Create    → Create     (update draft value)
-//   - Update    → ERROR      (cannot add to update)
-//   - Delete    → ERROR      (cannot add to delete)
+//   - CurrentValue!=nil            → ERROR      (resource already exists)
+//   - CurrentValue=nil + NotStaged → Create     (stage as create)
+//   - CurrentValue=nil + Create    → Create     (update draft value)
+//   - CurrentValue=nil + Update    → ERROR      (cannot add to update)
+//   - CurrentValue=nil + Delete    → ERROR      (cannot add to delete)
 func reduceAdd(state EntryState, action EntryActionAdd) EntryTransitionResult {
 	var err error
+	// Check if resource already exists on AWS
+	if state.CurrentValue != nil {
+		return EntryTransitionResult{NewState: state, Error: ErrCannotAddToExisting}
+	}
 	switch state.StagedState.(type) {
 	case EntryStagedStateNotStaged, EntryStagedStateCreate:
 		state.StagedState = EntryStagedStateCreate{DraftValue: action.Value}
@@ -107,12 +116,23 @@ func reduceEdit(state EntryState, action EntryActionEdit) EntryTransitionResult 
 // reduceDelete handles the DELETE action.
 //
 // Transition rules:
-//   - NotStaged → Delete     (stage for deletion)
-//   - Create    → NotStaged  (unstage, also unstage tags)
-//   - Update    → Delete     (convert to delete)
-//   - Delete    → Delete     (no-op)
+//   - CurrentValue=nil + NotStaged → ERROR      (resource not found)
+//   - CurrentValue=nil + Create    → NotStaged  (unstage, also unstage tags)
+//   - CurrentValue=nil + Update    → ERROR      (should not happen)
+//   - CurrentValue=nil + Delete    → ERROR      (should not happen)
+//   - CurrentValue!=nil + NotStaged → Delete    (stage for deletion)
+//   - CurrentValue!=nil + Create    → NotStaged (unstage, also unstage tags) - should not happen
+//   - CurrentValue!=nil + Update    → Delete    (convert to delete)
+//   - CurrentValue!=nil + Delete    → Delete    (no-op)
 func reduceDelete(state EntryState) EntryTransitionResult {
 	var discardTags bool
+
+	// Check if resource exists on AWS or is staged for CREATE
+	_, isCreate := state.StagedState.(EntryStagedStateCreate)
+	if state.CurrentValue == nil && !isCreate {
+		return EntryTransitionResult{NewState: state, Error: ErrCannotDeleteNotFound}
+	}
+
 	switch state.StagedState.(type) {
 	case EntryStagedStateNotStaged, EntryStagedStateUpdate:
 		state.StagedState = EntryStagedStateDelete{}
@@ -138,15 +158,25 @@ func reduceReset(state EntryState) EntryTransitionResult {
 // reduceTag handles the TAG action.
 //
 // Transition rules:
-//   - Entry=Delete      → ERROR  (cannot tag resource staged for deletion)
-//   - AWS same          → skip   (auto-skip tags matching AWS, unless CurrentAWSTags is nil)
-//   - Otherwise         → ToSet  (add to staged tags)
-func reduceTag(entryState EntryStagedState, stagedTags StagedTags, action TagActionTag) TagTransitionResult {
+//   - Entry=Delete                        → ERROR  (cannot tag resource staged for deletion)
+//   - CurrentValue=nil + Entry=NotStaged  → ERROR  (resource not found)
+//   - AWS same                            → skip   (auto-skip tags matching AWS, unless CurrentAWSTags is nil)
+//   - Otherwise                           → ToSet  (add to staged tags)
+func reduceTag(entryState EntryState, stagedTags StagedTags, action TagActionTag) TagTransitionResult {
 	// Block tagging if entry is staged for deletion
-	if _, isDelete := entryState.(EntryStagedStateDelete); isDelete {
+	if _, isDelete := entryState.StagedState.(EntryStagedStateDelete); isDelete {
 		return TagTransitionResult{
 			NewStagedTags: stagedTags,
 			Error:         ErrCannotTagDelete,
+		}
+	}
+
+	// Block tagging if resource doesn't exist and not staged
+	_, isNotStaged := entryState.StagedState.(EntryStagedStateNotStaged)
+	if entryState.CurrentValue == nil && isNotStaged {
+		return TagTransitionResult{
+			NewStagedTags: stagedTags,
+			Error:         ErrCannotTagNotFound,
 		}
 	}
 
@@ -174,15 +204,25 @@ func reduceTag(entryState EntryStagedState, stagedTags StagedTags, action TagAct
 // reduceUntag handles the UNTAG action.
 //
 // Transition rules:
-//   - Entry=Delete      → ERROR  (cannot untag resource staged for deletion)
-//   - Not on AWS        → skip   (auto-skip non-existent tags, unless CurrentAWSTagKeys is nil)
-//   - Otherwise         → ToUnset (add to staged untags)
-func reduceUntag(entryState EntryStagedState, stagedTags StagedTags, action TagActionUntag) TagTransitionResult {
+//   - Entry=Delete                        → ERROR  (cannot untag resource staged for deletion)
+//   - CurrentValue=nil + Entry=NotStaged  → ERROR  (resource not found)
+//   - Not on AWS                          → skip   (auto-skip non-existent tags, unless CurrentAWSTagKeys is nil)
+//   - Otherwise                           → ToUnset (add to staged untags)
+func reduceUntag(entryState EntryState, stagedTags StagedTags, action TagActionUntag) TagTransitionResult {
 	// Block untagging if entry is staged for deletion
-	if _, isDelete := entryState.(EntryStagedStateDelete); isDelete {
+	if _, isDelete := entryState.StagedState.(EntryStagedStateDelete); isDelete {
 		return TagTransitionResult{
 			NewStagedTags: stagedTags,
 			Error:         ErrCannotUntagDelete,
+		}
+	}
+
+	// Block untagging if resource doesn't exist and not staged
+	_, isNotStaged := entryState.StagedState.(EntryStagedStateNotStaged)
+	if entryState.CurrentValue == nil && isNotStaged {
+		return TagTransitionResult{
+			NewStagedTags: stagedTags,
+			Error:         ErrCannotUntagNotFound,
 		}
 	}
 

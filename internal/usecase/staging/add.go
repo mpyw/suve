@@ -24,12 +24,12 @@ type AddOutput struct {
 
 // AddUseCase executes add operations.
 type AddUseCase struct {
-	Strategy staging.Parser
+	Strategy staging.EditStrategy
 	Store    staging.StoreReadWriter
 }
 
 // Execute runs the add use case.
-func (u *AddUseCase) Execute(_ context.Context, input AddInput) (*AddOutput, error) {
+func (u *AddUseCase) Execute(ctx context.Context, input AddInput) (*AddOutput, error) {
 	service := u.Strategy.Service()
 
 	// Parse and validate name
@@ -38,8 +38,23 @@ func (u *AddUseCase) Execute(_ context.Context, input AddInput) (*AddOutput, err
 		return nil, err
 	}
 
-	// Load current state (nil CurrentValue since it's a new resource)
-	entryState, err := transition.LoadEntryState(u.Store, service, name, nil)
+	// Check if resource already exists on AWS
+	var currentValue *string
+	result, err := u.Strategy.FetchCurrentValue(ctx, name)
+	if err != nil {
+		// ResourceNotFoundError means resource doesn't exist - that's expected for add
+		var notFoundErr *staging.ResourceNotFoundError
+		if !errors.As(err, &notFoundErr) {
+			return nil, err
+		}
+		// Resource doesn't exist, currentValue remains nil
+	} else {
+		// Resource exists, set currentValue
+		currentValue = &result.Value
+	}
+
+	// Load current state with AWS existence check
+	entryState, err := transition.LoadEntryState(u.Store, service, name, currentValue)
 	if err != nil {
 		return nil, err
 	}

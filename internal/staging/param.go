@@ -176,10 +176,15 @@ func (s *ParamStrategy) ParseName(input string) (string, error) {
 }
 
 // FetchCurrentValue fetches the current value from AWS SSM Parameter Store for editing.
+// Returns *ResourceNotFoundError if the parameter doesn't exist.
 func (s *ParamStrategy) FetchCurrentValue(ctx context.Context, name string) (*EditFetchResult, error) {
 	spec := &paramversion.Spec{Name: name}
 	param, err := paramversion.GetParameterWithVersion(ctx, s.Client, spec)
 	if err != nil {
+		var pnf *paramapi.ParameterNotFound
+		if errors.As(err, &pnf) {
+			return nil, &ResourceNotFoundError{Err: err}
+		}
 		return nil, err
 	}
 	result := &EditFetchResult{
