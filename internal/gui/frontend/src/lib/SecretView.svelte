@@ -7,14 +7,17 @@
   import EyeOffIcon from './icons/EyeOffIcon.svelte';
   import Modal from './Modal.svelte';
   import DiffDisplay from './DiffDisplay.svelte';
+  import { maskValue, formatDate, formatJsonValue, parseError, createDebouncer } from './viewUtils';
+  import { createDiffMode } from './useDiffMode.svelte';
   import './common.css';
 
   const PAGE_SIZE = 50;
+  const debounce = createDebouncer(300);
+  const diffMode = createDiffMode<string>();
 
   let prefix = $state('');
   let filter = $state('');
   let withValue = $state(false);
-  let debounceTimer: ReturnType<typeof setTimeout> | null = $state(null);
   let nextToken = $state('');
   let loadingMore = $state(false);
 
@@ -31,17 +34,11 @@
   });
 
   function handlePrefixInput() {
-    if (debounceTimer) clearTimeout(debounceTimer);
-    debounceTimer = setTimeout(() => {
-      loadSecrets();
-    }, 300);
+    debounce(() => loadSecrets());
   }
 
   function handleFilterInput() {
-    if (debounceTimer) clearTimeout(debounceTimer);
-    debounceTimer = setTimeout(() => {
-      loadSecrets();
-    }, 300);
+    debounce(() => loadSecrets());
   }
   let loading = $state(false);
   let error = $state('');
@@ -68,8 +65,6 @@
   let immediateMode = $state(false); // When false (default), changes are staged
 
   // Diff state
-  let diffMode = $state(false);
-  let diffSelectedVersions: string[] = $state([]);
   let diffResult: gui.SecretDiffResult | null = $state(null);
 
   // Restore state
@@ -100,7 +95,7 @@
       entries = result?.entries || [];
       nextToken = result?.nextToken || '';
     } catch (e) {
-      error = e instanceof Error ? e.message : String(e);
+      error = parseError(e);
       entries = [];
     } finally {
       loading = false;
@@ -116,7 +111,7 @@
       entries = [...entries, ...(result?.entries || [])];
       nextToken = result?.nextToken || '';
     } catch (e) {
-      error = e instanceof Error ? e.message : String(e);
+      error = parseError(e);
     } finally {
       loadingMore = false;
     }
@@ -160,7 +155,7 @@
       secretDetail = detail;
       secretLog = log?.entries || [];
     } catch (e) {
-      error = e instanceof Error ? e.message : String(e);
+      error = parseError(e);
     } finally {
       detailLoading = false;
     }
@@ -175,24 +170,6 @@
 
   function toggleShowValue() {
     showValue = !showValue;
-  }
-
-  function formatDate(dateStr: string | undefined): string {
-    if (!dateStr) return '-';
-    return new Date(dateStr).toLocaleString();
-  }
-
-  function formatValue(value: string): string {
-    try {
-      const parsed = JSON.parse(value);
-      return JSON.stringify(parsed, null, 2);
-    } catch {
-      return value;
-    }
-  }
-
-  function maskValue(value: string): string {
-    return '*'.repeat(Math.min(value.length, 32));
   }
 
   // Create modal
@@ -218,8 +195,8 @@
         await StagingAdd('secret', createForm.name, createForm.value);
       }
       showCreateModal = false;
-    } catch (e) {
-      modalError = e instanceof Error ? e.message : String(e);
+    } catch (err) {
+      modalError = parseError(err);
     } finally {
       modalLoading = false;
     }
@@ -253,8 +230,8 @@
         await StagingEdit('secret', editForm.name, editForm.value);
       }
       showEditModal = false;
-    } catch (e) {
-      modalError = e instanceof Error ? e.message : String(e);
+    } catch (err) {
+      modalError = parseError(err);
     } finally {
       modalLoading = false;
     }
@@ -283,40 +260,26 @@
         await StagingDelete('secret', deleteTarget, forceDelete, forceDelete ? 0 : 30);
       }
       showDeleteModal = false;
-    } catch (e) {
-      modalError = e instanceof Error ? e.message : String(e);
+    } catch (err) {
+      modalError = parseError(err);
     } finally {
       modalLoading = false;
     }
   }
 
   // Diff functions
-  function toggleDiffMode() {
-    diffMode = !diffMode;
-    diffSelectedVersions = [];
-  }
-
-  function toggleVersionSelection(versionId: string) {
-    const idx = diffSelectedVersions.indexOf(versionId);
-    if (idx >= 0) {
-      diffSelectedVersions = diffSelectedVersions.filter(v => v !== versionId);
-    } else if (diffSelectedVersions.length < 2) {
-      diffSelectedVersions = [...diffSelectedVersions, versionId];
-    }
-  }
-
   async function executeDiff() {
-    if (!selectedSecret || diffSelectedVersions.length !== 2) return;
+    if (!selectedSecret || !diffMode.canCompare) return;
 
     modalLoading = true;
     modalError = '';
     try {
-      const spec1 = `${selectedSecret}#${diffSelectedVersions[0]}`;
-      const spec2 = `${selectedSecret}#${diffSelectedVersions[1]}`;
+      const spec1 = `${selectedSecret}#${diffMode.selectedVersions[0]}`;
+      const spec2 = `${selectedSecret}#${diffMode.selectedVersions[1]}`;
       diffResult = await SecretDiff(spec1, spec2);
       showDiffModal = true;
-    } catch (e) {
-      error = e instanceof Error ? e.message : String(e);
+    } catch (err) {
+      error = parseError(err);
     } finally {
       modalLoading = false;
     }
@@ -325,8 +288,7 @@
   function closeDiffModal() {
     showDiffModal = false;
     diffResult = null;
-    diffMode = false;
-    diffSelectedVersions = [];
+    diffMode.reset();
   }
 
   // Restore functions
@@ -343,8 +305,8 @@
       await SecretRestore(restoreTarget);
       showRestoreModal = false;
       await loadSecrets();
-    } catch (e) {
-      modalError = e instanceof Error ? e.message : String(e);
+    } catch (err) {
+      modalError = parseError(err);
     } finally {
       modalLoading = false;
     }
@@ -373,8 +335,8 @@
       }
       showTagModal = false;
       await selectSecret(selectedSecret);
-    } catch (e) {
-      tagError = e instanceof Error ? e.message : String(e);
+    } catch (err) {
+      tagError = parseError(err);
     } finally {
       tagLoading = false;
     }
@@ -398,8 +360,8 @@
       }
       showRemoveTagModal = false;
       await selectSecret(selectedSecret);
-    } catch (e) {
-      removeTagError = e instanceof Error ? e.message : String(e);
+    } catch (err) {
+      removeTagError = parseError(err);
     } finally {
       removeTagLoading = false;
     }
@@ -485,8 +447,8 @@
             <button class="btn-action-sm" onclick={openEditModal}>Edit</button>
             <button class="btn-action-sm btn-danger" onclick={() => selectedSecret && openDeleteModal(selectedSecret)}>Delete</button>
             {#if secretLog.length >= 2}
-              <button class="btn-action-sm" class:active={diffMode} onclick={toggleDiffMode}>
-                {diffMode ? 'Cancel' : 'Compare'}
+              <button class="btn-action-sm" class:active={diffMode.active} onclick={diffMode.toggle}>
+                {diffMode.active ? 'Cancel' : 'Compare'}
               </button>
             {/if}
             <button class="btn-close" onclick={closeDetail}>
@@ -517,7 +479,7 @@
                   {/if}
                 </button>
               </div>
-              <pre class="value-display" class:masked={!showValue}>{showValue ? formatValue(secretDetail.value) : maskValue(secretDetail.value)}</pre>
+              <pre class="value-display" class:masked={!showValue}>{showValue ? formatJsonValue(secretDetail.value) : maskValue(secretDetail.value)}</pre>
             </div>
 
             <div class="detail-meta">
@@ -552,7 +514,7 @@
             </div>
 
             <div class="detail-section">
-              <div class="section-header-tags">
+              <div class="section-header">
                 <h4>Tags</h4>
                 <button class="btn-action-sm" onclick={openTagModal}>+ Add</button>
               </div>
@@ -560,7 +522,7 @@
                 <div class="tags-list">
                   {#each secretDetail.tags as tag}
                     <div class="tag-item">
-                      <span class="tag-key">{tag.key}</span>
+                      <span class="tag-key secret">{tag.key}</span>
                       <span class="tag-separator">=</span>
                       <span class="tag-value">{tag.value}</span>
                       <button class="btn-tag-remove" onclick={() => openRemoveTagModal(tag.key)} title="Remove tag">×</button>
@@ -576,13 +538,13 @@
               <div class="detail-section">
                 <div class="section-header-history">
                   <h4>Version History</h4>
-                  {#if diffMode && diffSelectedVersions.length === 2}
+                  {#if diffMode.canCompare}
                     <button class="btn-action-sm btn-compare" onclick={executeDiff} disabled={modalLoading}>
                       {modalLoading ? 'Comparing...' : 'Show Diff'}
                     </button>
                   {/if}
                 </div>
-                {#if diffMode}
+                {#if diffMode.active}
                   <p class="diff-hint">Select 2 versions to compare</p>
                 {/if}
                 <ul class="history-list">
@@ -590,16 +552,16 @@
                     <li
                       class="history-item"
                       class:current-secret={logEntry.isCurrent}
-                      class:selectable={diffMode}
-                      class:selected={diffSelectedVersions.includes(logEntry.versionId)}
+                      class:selectable={diffMode.active}
+                      class:selected={diffMode.isSelected(logEntry.versionId)}
                     >
-                      {#if diffMode}
+                      {#if diffMode.active}
                         <label class="diff-checkbox">
                           <input
                             type="checkbox"
-                            checked={diffSelectedVersions.includes(logEntry.versionId)}
-                            disabled={!diffSelectedVersions.includes(logEntry.versionId) && diffSelectedVersions.length >= 2}
-                            onchange={() => toggleVersionSelection(logEntry.versionId)}
+                            checked={diffMode.isSelected(logEntry.versionId)}
+                            disabled={diffMode.isDisabled(logEntry.versionId)}
+                            onchange={() => diffMode.toggleSelection(logEntry.versionId)}
                           />
                         </label>
                       {/if}
@@ -616,7 +578,7 @@
                             <span class="badge badge-stage small">{stage}</span>
                           {/each}
                         </div>
-                        <pre class="history-value" class:masked={!showValue}>{showValue ? formatValue(logEntry.value) : maskValue(logEntry.value)}</pre>
+                        <pre class="history-value" class:masked={!showValue}>{showValue ? formatJsonValue(logEntry.value) : maskValue(logEntry.value)}</pre>
                       </div>
                     </li>
                   {/each}
@@ -714,7 +676,7 @@
       <div class="modal-error">{modalError}</div>
     {/if}
     <p>Are you sure you want to delete this secret?</p>
-    <code class="delete-target">{deleteTarget}</code>
+    <code class="delete-target secret">{deleteTarget}</code>
     <label class="checkbox-label force-delete">
       <input type="checkbox" bind:checked={forceDelete} />
       <span>Force delete (skip recovery window)</span>
@@ -747,8 +709,8 @@
 <Modal title="Version Comparison" show={showDiffModal} onclose={closeDiffModal}>
   {#if diffResult}
     <DiffDisplay
-      oldValue={formatValue(diffResult.oldValue)}
-      newValue={formatValue(diffResult.newValue)}
+      oldValue={formatJsonValue(diffResult.oldValue)}
+      newValue={formatJsonValue(diffResult.newValue)}
       oldLabel="Old"
       newLabel="New"
       oldSubLabel={diffResult.oldVersionId}
@@ -832,7 +794,7 @@
       <div class="modal-error">{removeTagError}</div>
     {/if}
     <p>Are you sure you want to remove this tag?</p>
-    <code class="delete-target">{removeTagTarget}</code>
+    <code class="delete-target secret">{removeTagTarget}</code>
     <p class="warning">{immediateMode ? 'This action will take effect immediately.' : 'This will stage a tag removal operation.'}</p>
     <label class="checkbox-label immediate-checkbox">
       <input type="checkbox" bind:checked={immediateMode} />
@@ -848,178 +810,7 @@
 </Modal>
 
 <style>
-  .section-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 12px;
-  }
-
-  .section-header h4 {
-    margin: 0;
-    font-size: 12px;
-    text-transform: uppercase;
-    color: #888;
-    letter-spacing: 0.5px;
-  }
-
-  .detail-actions {
-    display: flex;
-    gap: 8px;
-    align-items: center;
-  }
-
-  .btn-secondary {
-    padding: 8px 16px;
-    background: #2d2d44;
-    color: #fff;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 14px;
-  }
-
-  .btn-secondary:hover {
-    background: #3d3d54;
-  }
-
-  .btn-action-sm {
-    padding: 6px 12px;
-    background: #2d2d44;
-    color: #fff;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 12px;
-  }
-
-  .btn-action-sm:hover {
-    background: #3d3d54;
-  }
-
-  .btn-danger {
-    background: #f44336;
-  }
-
-  .btn-danger:hover {
-    background: #e53935;
-  }
-
-  .modal-form {
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-  }
-
-  .form-group {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-  }
-
-  .form-group label {
-    font-size: 12px;
-    color: #888;
-    text-transform: uppercase;
-  }
-
-  .form-input {
-    padding: 10px 12px;
-    background: #0f0f1a;
-    border: 1px solid #2d2d44;
-    border-radius: 4px;
-    color: #fff;
-    font-size: 14px;
-  }
-
-  .form-input:focus {
-    outline: none;
-    border-color: #e94560;
-  }
-
-  .form-input:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-  }
-
-  .form-textarea {
-    font-family: monospace;
-    resize: vertical;
-    min-height: 100px;
-  }
-
-  .form-actions {
-    display: flex;
-    gap: 12px;
-    justify-content: flex-end;
-    margin-top: 8px;
-  }
-
-  .modal-error {
-    padding: 10px 12px;
-    background: rgba(244, 67, 54, 0.2);
-    border: 1px solid #f44336;
-    border-radius: 4px;
-    color: #f44336;
-    font-size: 13px;
-  }
-
-  .modal-confirm {
-    text-align: center;
-  }
-
-  .modal-confirm p {
-    color: #ccc;
-    margin: 0 0 16px 0;
-  }
-
-  .delete-target {
-    display: block;
-    padding: 12px;
-    background: #0f0f1a;
-    border-radius: 4px;
-    color: #ffb74d;
-    font-size: 14px;
-    margin-bottom: 16px;
-  }
-
-  .force-delete {
-    justify-content: center;
-    margin-bottom: 12px;
-  }
-
-  .warning {
-    color: #ff9800 !important;
-    font-size: 13px;
-  }
-
-  /* Restore button */
-  .btn-restore {
-    background: #4caf50;
-  }
-
-  .btn-restore:hover {
-    background: #43a047;
-  }
-
-  .restore-info {
-    color: #888;
-    font-size: 13px;
-    margin: 0 0 16px 0;
-  }
-
-  .btn-restore-confirm {
-    background: #4caf50;
-  }
-
-  .btn-restore-confirm:hover {
-    background: #43a047;
-  }
-
-  /* Diff mode styles */
-  .btn-action-sm.active {
-    background: #e94560;
-  }
+  /* SecretView-specific styles - shared styles are in common.css */
 
   .section-header-history {
     display: flex;
@@ -1036,167 +827,17 @@
     letter-spacing: 0.5px;
   }
 
-  .btn-compare {
+  .restore-info {
+    color: #888;
+    font-size: 13px;
+    margin: 0 0 16px 0;
+  }
+
+  .btn-restore-confirm {
     background: #4caf50;
   }
 
-  .btn-compare:hover {
+  .btn-restore-confirm:hover {
     background: #43a047;
-  }
-
-  .diff-hint {
-    color: #888;
-    font-size: 12px;
-    margin: 0 0 12px 0;
-  }
-
-  .history-item.selectable {
-    display: flex;
-    align-items: flex-start;
-    gap: 12px;
-    cursor: pointer;
-  }
-
-  .history-item.selectable:hover {
-    background: #1a1a2e;
-  }
-
-  .history-item.selected {
-    background: rgba(233, 69, 96, 0.15);
-    border-left: 3px solid #e94560;
-  }
-
-  .diff-checkbox {
-    display: flex;
-    align-items: center;
-    padding-top: 2px;
-  }
-
-  .diff-checkbox input {
-    width: 16px;
-    height: 16px;
-    cursor: pointer;
-  }
-
-  .history-content {
-    flex: 1;
-    min-width: 0;
-  }
-
-  /* Filter inputs */
-  .prefix-input {
-    flex: 0.4;
-  }
-
-  .regex-input {
-    flex: 0.6;
-  }
-
-  .immediate-checkbox {
-    margin-top: 8px;
-    padding: 8px 12px;
-    background: rgba(255, 152, 0, 0.1);
-    border: 1px solid rgba(255, 152, 0, 0.3);
-    border-radius: 4px;
-  }
-
-  /* Infinite scroll styles */
-  .scroll-sentinel {
-    padding: 16px;
-    text-align: center;
-    min-height: 50px;
-  }
-
-  .loading-more {
-    color: #888;
-    font-size: 14px;
-  }
-
-  .load-more-hint {
-    color: #555;
-    font-size: 12px;
-  }
-
-  /* Tags styles */
-  .tags-list {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-  }
-
-  .tag-item {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 8px 12px;
-    background: #1a1a2e;
-    border-radius: 4px;
-    font-family: monospace;
-    font-size: 13px;
-  }
-
-  .tag-key {
-    color: #ffb74d;
-    font-weight: 600;
-  }
-
-  .tag-separator {
-    color: #666;
-  }
-
-  .tag-value {
-    color: #a5d6a7;
-  }
-
-  /* Description styles */
-  .description-text {
-    margin: 0;
-    padding: 12px;
-    background: #1a1a2e;
-    border-radius: 4px;
-    color: #ccc;
-    font-size: 14px;
-    line-height: 1.5;
-    white-space: pre-wrap;
-  }
-
-  /* Tag button styles */
-  .section-header-tags {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 12px;
-  }
-
-  .section-header-tags h4 {
-    margin: 0;
-    font-size: 12px;
-    color: #888;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-  }
-
-  .btn-tag-remove {
-    margin-left: auto;
-    padding: 2px 8px;
-    background: transparent;
-    border: 1px solid #444;
-    border-radius: 4px;
-    color: #888;
-    cursor: pointer;
-    font-size: 14px;
-    line-height: 1;
-  }
-
-  .btn-tag-remove:hover {
-    background: #f44336;
-    border-color: #f44336;
-    color: #fff;
-  }
-
-  .no-tags {
-    color: #666;
-    font-size: 13px;
-    margin: 0;
   }
 </style>
