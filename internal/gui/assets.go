@@ -2,7 +2,13 @@
 
 package gui
 
-import "embed"
+import (
+	_ "embed"
+	"embed"
+)
 
 //go:embed all:frontend/dist
 var Assets embed.FS
+
+//go:embed appicon.png
+var AppIcon []byte
