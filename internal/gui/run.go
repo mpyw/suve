@@ -6,6 +6,9 @@ import (
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
+	"github.com/wailsapp/wails/v2/pkg/options/linux"
+	"github.com/wailsapp/wails/v2/pkg/options/mac"
+	"github.com/wailsapp/wails/v2/pkg/options/windows"
 )
 
 // Run starts the GUI application.
@@ -23,6 +26,20 @@ func Run() error {
 		OnStartup:        app.Startup,
 		Bind: []interface{}{
 			app,
+		},
+		Mac: &mac.Options{
+			About: &mac.AboutInfo{
+				Title:   "suve",
+				Message: "Secret Unified Versioning Explorer\nGit-like CLI/GUI for AWS Parameter Store & Secrets Manager",
+				Icon:    AppIcon,
+			},
+		},
+		Windows: &windows.Options{
+			WebviewIsTransparent: false,
+			WindowIsTranslucent:  false,
+		},
+		Linux: &linux.Options{
+			Icon: AppIcon,
 		},
 	})
 }
