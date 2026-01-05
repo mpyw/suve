@@ -100,6 +100,8 @@ func formatTagApplySummary(tag stagingusecase.ApplyTagResult) string {
 		parts = append(parts, fmt.Sprintf("-%d", tag.RemoveTag.Len()))
 	}
 	if len(parts) == 0 {
+		// Unreachable: TagEntry with empty Add and Remove is unstaged by persistTagState,
+		// so ApplyTagResult should always have at least one non-empty field.
 		return ""
 	}
 	return " [" + strings.Join(parts, ", ") + "]"
