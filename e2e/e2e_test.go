@@ -1458,6 +1458,24 @@ func TestParam_StagingAddWithOptions(t *testing.T) {
 		t.Logf("stage tag output: %s", stdout)
 	})
 
+	// Verify service-specific status shows tag changes
+	t.Run("service-status-shows-tags", func(t *testing.T) {
+		stdout, _, err := runSubCommand(t, paramstage.Command(), "status")
+		require.NoError(t, err)
+		assert.Contains(t, stdout, "T")           // T = Tag change marker
+		assert.Contains(t, stdout, "+2 tag(s)")   // Two tags being added
+		t.Logf("service status output: %s", stdout)
+	})
+
+	// Verify global status shows tag changes
+	t.Run("global-status-shows-tags", func(t *testing.T) {
+		stdout, _, err := runCommand(t, globalstatus.Command())
+		require.NoError(t, err)
+		assert.Contains(t, stdout, "T")           // T = Tag change marker
+		assert.Contains(t, stdout, "+2 tag(s)")   // Two tags being added
+		t.Logf("global status output: %s", stdout)
+	})
+
 	// Verify staged entry has options
 	t.Run("verify-staged-options", func(t *testing.T) {
 		store := staging.NewStoreWithPath(stagingFilePath(tmpHome))
@@ -1643,6 +1661,113 @@ func TestParam_GlobalDiffWithJSON(t *testing.T) {
 	t.Logf("global diff -j output: %s", stdout)
 	// Should have formatted JSON
 	assert.Contains(t, stdout, "a")
+}
+
+// TestGlobal_StagingWithTags tests the global stage commands (diff, apply, reset) with tag entries.
+func TestGlobal_StagingWithTags(t *testing.T) {
+	setupEnv(t)
+	tmpHome := setupTempHome(t)
+
+	paramName := "/suve-e2e-global/stage-tags/param"
+
+	// Cleanup
+	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	t.Cleanup(func() {
+		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	})
+
+	// Create a parameter first
+	_, _, err := runCommand(t, paramset.Command(), "--yes", paramName, "initial-value")
+	require.NoError(t, err)
+
+	// Stage tag changes using the staging store directly
+	store := staging.NewStoreWithPath(stagingFilePath(tmpHome))
+	err = store.StageTag(staging.ServiceParam, paramName, staging.TagEntry{
+		Add:      map[string]string{"env": "test", "team": "e2e"},
+		StagedAt: time.Now(),
+	})
+	require.NoError(t, err)
+
+	// Test global diff shows tag changes
+	t.Run("global-diff-shows-tags", func(t *testing.T) {
+		stdout, _, err := runCommand(t, globaldiff.Command())
+		require.NoError(t, err)
+		assert.Contains(t, stdout, "Tags:")
+		assert.Contains(t, stdout, paramName)
+		assert.Contains(t, stdout, "env=test")
+		t.Logf("global diff with tags output: %s", stdout)
+	})
+
+	// Test global status shows tag changes
+	t.Run("global-status-shows-tags", func(t *testing.T) {
+		stdout, _, err := runCommand(t, globalstatus.Command())
+		require.NoError(t, err)
+		assert.Contains(t, stdout, "T")           // T = Tag change marker
+		assert.Contains(t, stdout, "+2 tag(s)")   // Two tags being added
+		t.Logf("global status with tags output: %s", stdout)
+	})
+
+	// Test global apply applies tag changes
+	t.Run("global-apply-applies-tags", func(t *testing.T) {
+		stdout, _, err := runCommand(t, globalapply.Command(), "--yes")
+		require.NoError(t, err)
+		assert.Contains(t, stdout, "Applying SSM Parameter Store tags")
+		assert.Contains(t, stdout, "Tagged")
+		t.Logf("global apply with tags output: %s", stdout)
+
+		// Verify tags were applied by checking show output
+		stdout, _, err = runCommand(t, paramshow.Command(), paramName)
+		require.NoError(t, err)
+		assert.Contains(t, stdout, "env: test")
+		assert.Contains(t, stdout, "team: e2e")
+	})
+}
+
+// TestGlobal_ResetWithTags tests the global reset command with tag entries.
+func TestGlobal_ResetWithTags(t *testing.T) {
+	setupEnv(t)
+	tmpHome := setupTempHome(t)
+
+	paramName := "/suve-e2e-global/reset-tags/param"
+
+	// Cleanup
+	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	t.Cleanup(func() {
+		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	})
+
+	// Create a parameter first
+	_, _, err := runCommand(t, paramset.Command(), "--yes", paramName, "initial-value")
+	require.NoError(t, err)
+
+	// Stage entry and tag changes
+	store := staging.NewStoreWithPath(stagingFilePath(tmpHome))
+	err = store.StageEntry(staging.ServiceParam, paramName, staging.Entry{
+		Operation: staging.OperationUpdate,
+		Value:     lo.ToPtr("updated-value"),
+		StagedAt:  time.Now(),
+	})
+	require.NoError(t, err)
+	err = store.StageTag(staging.ServiceParam, paramName, staging.TagEntry{
+		Add:      map[string]string{"env": "test"},
+		StagedAt: time.Now(),
+	})
+	require.NoError(t, err)
+
+	// Test global reset clears both entries and tags
+	t.Run("global-reset-clears-all", func(t *testing.T) {
+		stdout, _, err := runCommand(t, globalreset.Command(), "--all")
+		require.NoError(t, err)
+		assert.Contains(t, stdout, "Unstaged all changes")
+		assert.Contains(t, stdout, "2 SSM Parameter Store") // 1 entry + 1 tag
+		t.Logf("global reset output: %s", stdout)
+
+		// Verify staging is empty
+		_, err = store.GetEntry(staging.ServiceParam, paramName)
+		assert.Equal(t, staging.ErrNotStaged, err)
+		_, err = store.GetTag(staging.ServiceParam, paramName)
+		assert.Equal(t, staging.ErrNotStaged, err)
+	})
 }
 
 // TestParam_OutputOption tests --output=json option on various commands.

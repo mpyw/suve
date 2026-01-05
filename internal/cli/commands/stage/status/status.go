@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/urfave/cli/v3"
 
@@ -79,7 +80,29 @@ func (r *Runner) Run(_ context.Context, opts Options) error {
 		return err
 	}
 
-	if len(entries) == 0 {
+	tagEntries, err := r.Store.ListTags("")
+	if err != nil {
+		return err
+	}
+
+	// Check if there are any changes
+	hasChanges := false
+	for _, serviceEntries := range entries {
+		if len(serviceEntries) > 0 {
+			hasChanges = true
+			break
+		}
+	}
+	if !hasChanges {
+		for _, serviceTags := range tagEntries {
+			if len(serviceTags) > 0 {
+				hasChanges = true
+				break
+			}
+		}
+	}
+
+	if !hasChanges {
 		_, _ = fmt.Fprintln(r.Stdout, "No changes staged.")
 		return nil
 	}
@@ -87,19 +110,27 @@ func (r *Runner) Run(_ context.Context, opts Options) error {
 	printer := &staging.EntryPrinter{Writer: r.Stdout}
 
 	// Show SSM Parameter Store changes (no DeleteOptions for SSM Parameter Store)
-	if paramEntries, ok := entries[staging.ServiceParam]; ok && len(paramEntries) > 0 {
-		_, _ = fmt.Fprintf(r.Stdout, "%s (%d):\n", colors.Warning("Staged SSM Parameter Store changes"), len(paramEntries))
+	paramEntries := entries[staging.ServiceParam]
+	paramTagEntries := tagEntries[staging.ServiceParam]
+	paramTotal := len(paramEntries) + len(paramTagEntries)
+	if paramTotal > 0 {
+		_, _ = fmt.Fprintf(r.Stdout, "%s (%d):\n", colors.Warning("Staged SSM Parameter Store changes"), paramTotal)
 		printEntries(printer, paramEntries, opts.Verbose, false)
+		printTagEntries(r.Stdout, paramTagEntries, opts.Verbose)
 	}
 
 	// Show Secrets Manager changes (with DeleteOptions)
-	if secretEntries, ok := entries[staging.ServiceSecret]; ok && len(secretEntries) > 0 {
+	secretEntries := entries[staging.ServiceSecret]
+	secretTagEntries := tagEntries[staging.ServiceSecret]
+	secretTotal := len(secretEntries) + len(secretTagEntries)
+	if secretTotal > 0 {
 		// Add spacing if we printed SSM Parameter Store entries
-		if _, ok := entries[staging.ServiceParam]; ok && len(entries[staging.ServiceParam]) > 0 {
+		if paramTotal > 0 {
 			_, _ = fmt.Fprintln(r.Stdout)
 		}
-		_, _ = fmt.Fprintf(r.Stdout, "%s (%d):\n", colors.Warning("Staged Secrets Manager changes"), len(secretEntries))
+		_, _ = fmt.Fprintf(r.Stdout, "%s (%d):\n", colors.Warning("Staged Secrets Manager changes"), secretTotal)
 		printEntries(printer, secretEntries, opts.Verbose, true)
+		printTagEntries(r.Stdout, secretTagEntries, opts.Verbose)
 	}
 
 	return nil
@@ -109,5 +140,29 @@ func printEntries(printer *staging.EntryPrinter, entries map[string]staging.Entr
 	// Sort names for consistent output
 	for _, name := range maputil.SortedKeys(entries) {
 		printer.PrintEntry(name, entries[name], verbose, showDeleteOptions)
+	}
+}
+
+func printTagEntries(w io.Writer, tagEntries map[string]staging.TagEntry, verbose bool) {
+	for _, name := range maputil.SortedKeys(tagEntries) {
+		entry := tagEntries[name]
+		parts := []string{}
+		if len(entry.Add) > 0 {
+			parts = append(parts, fmt.Sprintf("+%d tag(s)", len(entry.Add)))
+		}
+		if entry.Remove.Len() > 0 {
+			parts = append(parts, fmt.Sprintf("-%d tag(s)", entry.Remove.Len()))
+		}
+		summary := strings.Join(parts, ", ")
+		_, _ = fmt.Fprintf(w, "  %s %s [%s]\n", colors.Info("T"), name, summary)
+
+		if verbose {
+			for key, value := range entry.Add {
+				_, _ = fmt.Fprintf(w, "      + %s=%s\n", key, value)
+			}
+			for key := range entry.Remove {
+				_, _ = fmt.Fprintf(w, "      - %s\n", key)
+			}
+		}
 	}
 }

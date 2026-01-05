@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/samber/lo"
 	"github.com/urfave/cli/v3"
@@ -100,9 +101,17 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	if err != nil {
 		return err
 	}
+	paramTagStaged, err := store.ListTags(staging.ServiceParam)
+	if err != nil {
+		return err
+	}
+	secretTagStaged, err := store.ListTags(staging.ServiceSecret)
+	if err != nil {
+		return err
+	}
 
-	hasParam := len(paramStaged[staging.ServiceParam]) > 0
-	hasSecret := len(secretStaged[staging.ServiceSecret]) > 0
+	hasParam := len(paramStaged[staging.ServiceParam]) > 0 || len(paramTagStaged[staging.ServiceParam]) > 0
+	hasSecret := len(secretStaged[staging.ServiceSecret]) > 0 || len(secretTagStaged[staging.ServiceSecret]) > 0
 
 	if !hasParam && !hasSecret {
 		output.Warning(cmd.Root().ErrWriter, "nothing staged")
@@ -149,8 +158,15 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 		return err
 	}
 
+	allTagEntries, err := r.Store.ListTags("")
+	if err != nil {
+		return err
+	}
+
 	paramEntries := allEntries[staging.ServiceParam]
 	secretEntries := allEntries[staging.ServiceSecret]
+	paramTagEntries := allTagEntries[staging.ServiceParam]
+	secretTagEntries := allTagEntries[staging.ServiceSecret]
 
 	// Fetch all values in parallel
 	paramResults := parallel.ExecuteMap(ctx, paramEntries, func(ctx context.Context, name string, _ staging.Entry) (*paramapi.ParameterHistory, error) {
@@ -257,6 +273,26 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 		if err := r.outputSecretDiff(opts, name, entry, result.Value); err != nil {
 			return err
 		}
+	}
+
+	// Process SSM Parameter Store tag entries
+	for _, name := range maputil.SortedKeys(paramTagEntries) {
+		tagEntry := paramTagEntries[name]
+		if !first {
+			_, _ = fmt.Fprintln(r.Stdout)
+		}
+		first = false
+		r.outputTagDiff(name, tagEntry)
+	}
+
+	// Process Secrets Manager tag entries
+	for _, name := range maputil.SortedKeys(secretTagEntries) {
+		tagEntry := secretTagEntries[name]
+		if !first {
+			_, _ = fmt.Fprintln(r.Stdout)
+		}
+		first = false
+		r.outputTagDiff(name, tagEntry)
 	}
 
 	return nil
@@ -388,5 +424,21 @@ func (r *Runner) outputSecretDiffCreate(opts Options, name string, entry staging
 func (r *Runner) outputMetadata(entry staging.Entry) {
 	if desc := lo.FromPtr(entry.Description); desc != "" {
 		_, _ = fmt.Fprintf(r.Stdout, "%s %s\n", colors.FieldLabel("Description:"), desc)
+	}
+}
+
+func (r *Runner) outputTagDiff(name string, tagEntry staging.TagEntry) {
+	_, _ = fmt.Fprintf(r.Stdout, "%s %s (staged tag changes)\n", colors.Info("Tags:"), name)
+
+	if len(tagEntry.Add) > 0 {
+		var tagPairs []string
+		for _, k := range maputil.SortedKeys(tagEntry.Add) {
+			tagPairs = append(tagPairs, fmt.Sprintf("%s=%s", k, tagEntry.Add[k]))
+		}
+		_, _ = fmt.Fprintf(r.Stdout, "  %s %s\n", colors.OpAdd("+"), strings.Join(tagPairs, ", "))
+	}
+
+	if tagEntry.Remove.Len() > 0 {
+		_, _ = fmt.Fprintf(r.Stdout, "  %s %s\n", colors.OpDelete("-"), strings.Join(tagEntry.Remove.Values(), ", "))
 	}
 }

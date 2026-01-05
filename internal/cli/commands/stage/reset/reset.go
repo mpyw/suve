@@ -77,8 +77,19 @@ func (r *Runner) Run(_ context.Context) error {
 		return err
 	}
 
-	paramCount := len(staged[staging.ServiceParam])
-	secretCount := len(staged[staging.ServiceSecret])
+	tagStaged, err := r.Store.ListTags("")
+	if err != nil {
+		return err
+	}
+
+	paramEntryCount := len(staged[staging.ServiceParam])
+	paramTagCount := len(tagStaged[staging.ServiceParam])
+	paramCount := paramEntryCount + paramTagCount
+
+	secretEntryCount := len(staged[staging.ServiceSecret])
+	secretTagCount := len(tagStaged[staging.ServiceSecret])
+	secretCount := secretEntryCount + secretTagCount
+
 	totalCount := paramCount + secretCount
 
 	if totalCount == 0 {
@@ -86,14 +97,14 @@ func (r *Runner) Run(_ context.Context) error {
 		return nil
 	}
 
-	// Unstage all SSM Parameter Store
+	// Unstage all SSM Parameter Store (UnstageAll clears both entries and tags)
 	if paramCount > 0 {
 		if err := r.Store.UnstageAll(staging.ServiceParam); err != nil {
 			return err
 		}
 	}
 
-	// Unstage all Secrets Manager
+	// Unstage all Secrets Manager (UnstageAll clears both entries and tags)
 	if secretCount > 0 {
 		if err := r.Store.UnstageAll(staging.ServiceSecret); err != nil {
 			return err

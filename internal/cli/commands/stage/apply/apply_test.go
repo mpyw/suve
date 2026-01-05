@@ -15,6 +15,7 @@ import (
 
 	appcli "github.com/mpyw/suve/internal/cli/commands"
 	"github.com/mpyw/suve/internal/cli/commands/stage/apply"
+	"github.com/mpyw/suve/internal/maputil"
 	"github.com/mpyw/suve/internal/staging"
 )
 
@@ -25,6 +26,7 @@ type mockStrategy struct {
 	itemName             string
 	hasDeleteOptions     bool
 	applyFunc            func(ctx context.Context, name string, entry staging.Entry) error
+	applyTagsFunc        func(ctx context.Context, name string, tagEntry staging.TagEntry) error
 	fetchLastModifiedVal time.Time
 }
 
@@ -44,7 +46,10 @@ func (m *mockStrategy) FetchLastModified(_ context.Context, _ string) (time.Time
 	return m.fetchLastModifiedVal, nil
 }
 
-func (m *mockStrategy) ApplyTags(_ context.Context, _ string, _ staging.TagEntry) error {
+func (m *mockStrategy) ApplyTags(ctx context.Context, name string, tagEntry staging.TagEntry) error {
+	if m.applyTagsFunc != nil {
+		return m.applyTagsFunc(ctx, name, tagEntry)
+	}
 	return nil
 }
 
@@ -766,4 +771,260 @@ func TestRun_ConflictDetection_BothServices(t *testing.T) {
 	assert.Contains(t, err.Error(), "2 conflict(s) detected")
 	assert.Contains(t, errBuf.String(), "conflict detected for /app/config")
 	assert.Contains(t, errBuf.String(), "conflict detected for my-secret")
+}
+
+func TestRun_ApplyCreate(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+
+	// Stage create operation
+	_ = store.StageEntry(staging.ServiceParam, "/app/new-param", staging.Entry{
+		Operation: staging.OperationCreate,
+		Value:     lo.ToPtr("new-value"),
+		StagedAt:  time.Now(),
+	})
+
+	paramMock := newParamStrategy()
+	paramMock.applyFunc = func(_ context.Context, _ string, _ staging.Entry) error {
+		return nil
+	}
+
+	var buf bytes.Buffer
+	r := &apply.Runner{
+		ParamStrategy: paramMock,
+		Store:         store,
+		Stdout:        &buf,
+		Stderr:        &bytes.Buffer{},
+	}
+
+	err := r.Run(context.Background())
+	require.NoError(t, err)
+	assert.Contains(t, buf.String(), "SSM Parameter Store: Created /app/new-param")
+}
+
+func TestRun_ApplyTagsSuccess(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+
+	// Stage tag changes
+	_ = store.StageTag(staging.ServiceParam, "/app/config", staging.TagEntry{
+		Add:      map[string]string{"env": "prod", "team": "api"},
+		Remove:   maputil.NewSet("deprecated"),
+		StagedAt: time.Now(),
+	})
+
+	applyTagsCalled := false
+	paramMock := newParamStrategy()
+	paramMock.applyTagsFunc = func(_ context.Context, name string, tagEntry staging.TagEntry) error {
+		applyTagsCalled = true
+		assert.Equal(t, "/app/config", name)
+		assert.Equal(t, map[string]string{"env": "prod", "team": "api"}, tagEntry.Add)
+		assert.True(t, tagEntry.Remove.Contains("deprecated"))
+		return nil
+	}
+
+	var buf bytes.Buffer
+	r := &apply.Runner{
+		ParamStrategy: paramMock,
+		Store:         store,
+		Stdout:        &buf,
+		Stderr:        &bytes.Buffer{},
+	}
+
+	err := r.Run(context.Background())
+	require.NoError(t, err)
+	assert.True(t, applyTagsCalled)
+	assert.Contains(t, buf.String(), "Applying SSM Parameter Store tags")
+	assert.Contains(t, buf.String(), "SSM Parameter Store: Tagged /app/config")
+	assert.Contains(t, buf.String(), "+2")
+	assert.Contains(t, buf.String(), "-1")
+
+	// Verify tag was unstaged
+	_, err = store.GetTag(staging.ServiceParam, "/app/config")
+	assert.Equal(t, staging.ErrNotStaged, err)
+}
+
+func TestRun_ApplyTagsError(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+
+	// Stage tag changes
+	_ = store.StageTag(staging.ServiceParam, "/app/config", staging.TagEntry{
+		Add:      map[string]string{"env": "prod"},
+		StagedAt: time.Now(),
+	})
+
+	paramMock := newParamStrategy()
+	paramMock.applyTagsFunc = func(_ context.Context, _ string, _ staging.TagEntry) error {
+		return fmt.Errorf("tag operation failed")
+	}
+
+	var buf, errBuf bytes.Buffer
+	r := &apply.Runner{
+		ParamStrategy: paramMock,
+		Store:         store,
+		Stdout:        &buf,
+		Stderr:        &errBuf,
+	}
+
+	err := r.Run(context.Background())
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "applied 0, failed 1")
+	assert.Contains(t, errBuf.String(), "Failed")
+	assert.Contains(t, errBuf.String(), "(tags)")
+
+	// Verify tag was NOT unstaged (failed)
+	_, err = store.GetTag(staging.ServiceParam, "/app/config")
+	require.NoError(t, err)
+}
+
+func TestRun_ApplyTagsSecretService(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+
+	// Stage secret tag changes
+	_ = store.StageTag(staging.ServiceSecret, "my-secret", staging.TagEntry{
+		Add:      map[string]string{"env": "staging"},
+		StagedAt: time.Now(),
+	})
+
+	applyTagsCalled := false
+	secretMock := newSecretStrategy()
+	secretMock.applyTagsFunc = func(_ context.Context, name string, _ staging.TagEntry) error {
+		applyTagsCalled = true
+		assert.Equal(t, "my-secret", name)
+		return nil
+	}
+
+	var buf bytes.Buffer
+	r := &apply.Runner{
+		SecretStrategy: secretMock,
+		Store:          store,
+		Stdout:         &buf,
+		Stderr:         &bytes.Buffer{},
+	}
+
+	err := r.Run(context.Background())
+	require.NoError(t, err)
+	assert.True(t, applyTagsCalled)
+	assert.Contains(t, buf.String(), "Applying Secrets Manager tags")
+	assert.Contains(t, buf.String(), "Secrets Manager: Tagged my-secret")
+}
+
+func TestRun_ApplyBothEntriesAndTags(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+
+	// Stage entry change
+	_ = store.StageEntry(staging.ServiceParam, "/app/config", staging.Entry{
+		Operation: staging.OperationUpdate,
+		Value:     lo.ToPtr("updated-value"),
+		StagedAt:  time.Now(),
+	})
+
+	// Stage tag change (different resource)
+	_ = store.StageTag(staging.ServiceParam, "/app/other", staging.TagEntry{
+		Add:      map[string]string{"env": "prod"},
+		StagedAt: time.Now(),
+	})
+
+	entryCalled := false
+	tagCalled := false
+
+	paramMock := newParamStrategy()
+	paramMock.applyFunc = func(_ context.Context, _ string, _ staging.Entry) error {
+		entryCalled = true
+		return nil
+	}
+	paramMock.applyTagsFunc = func(_ context.Context, _ string, _ staging.TagEntry) error {
+		tagCalled = true
+		return nil
+	}
+
+	var buf bytes.Buffer
+	r := &apply.Runner{
+		ParamStrategy: paramMock,
+		Store:         store,
+		Stdout:        &buf,
+		Stderr:        &bytes.Buffer{},
+	}
+
+	err := r.Run(context.Background())
+	require.NoError(t, err)
+	assert.True(t, entryCalled)
+	assert.True(t, tagCalled)
+	assert.Contains(t, buf.String(), "Applying SSM Parameter Store parameters")
+	assert.Contains(t, buf.String(), "Applying SSM Parameter Store tags")
+}
+
+func TestRun_ApplyTagsOnlyAdditions(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+
+	// Stage tag changes with only additions
+	_ = store.StageTag(staging.ServiceParam, "/app/config", staging.TagEntry{
+		Add:      map[string]string{"env": "prod"},
+		StagedAt: time.Now(),
+	})
+
+	paramMock := newParamStrategy()
+	paramMock.applyTagsFunc = func(_ context.Context, _ string, _ staging.TagEntry) error {
+		return nil
+	}
+
+	var buf bytes.Buffer
+	r := &apply.Runner{
+		ParamStrategy: paramMock,
+		Store:         store,
+		Stdout:        &buf,
+		Stderr:        &bytes.Buffer{},
+	}
+
+	err := r.Run(context.Background())
+	require.NoError(t, err)
+	assert.Contains(t, buf.String(), "[+1]")
+	assert.NotContains(t, buf.String(), "-")
+}
+
+func TestRun_ApplyTagsOnlyRemovals(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+
+	// Stage tag changes with only removals
+	_ = store.StageTag(staging.ServiceParam, "/app/config", staging.TagEntry{
+		Remove:   maputil.NewSet("old-tag", "deprecated"),
+		StagedAt: time.Now(),
+	})
+
+	paramMock := newParamStrategy()
+	paramMock.applyTagsFunc = func(_ context.Context, _ string, _ staging.TagEntry) error {
+		return nil
+	}
+
+	var buf bytes.Buffer
+	r := &apply.Runner{
+		ParamStrategy: paramMock,
+		Store:         store,
+		Stdout:        &buf,
+		Stderr:        &bytes.Buffer{},
+	}
+
+	err := r.Run(context.Background())
+	require.NoError(t, err)
+	assert.Contains(t, buf.String(), "[-2]")
+	assert.NotContains(t, buf.String(), "+")
 }
