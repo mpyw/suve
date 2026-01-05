@@ -14,6 +14,7 @@ import (
 	"github.com/mpyw/suve/internal/api/paramapi"
 	appcli "github.com/mpyw/suve/internal/cli/commands"
 	"github.com/mpyw/suve/internal/cli/commands/param/show"
+	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/usecase/param"
 	"github.com/mpyw/suve/internal/version/paramversion"
 )
@@ -342,6 +343,41 @@ func TestRun(t *testing.T) {
 				assert.Contains(t, output, "production")
 				assert.Contains(t, output, "Team")
 				assert.Contains(t, output, "backend")
+			},
+		},
+		{
+			name: "show with tags in JSON output",
+			opts: show.Options{
+				Spec:   &paramversion.Spec{Name: "/my/param"},
+				Output: output.FormatJSON,
+			},
+			mock: &mockClient{
+				getParameterFunc: func(_ context.Context, _ *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
+					return &paramapi.GetParameterOutput{
+						Parameter: &paramapi.Parameter{
+							Name:             lo.ToPtr("/my/param"),
+							Value:            lo.ToPtr("test-value"),
+							Version:          1,
+							Type:             paramapi.ParameterTypeString,
+							LastModifiedDate: &now,
+						},
+					}, nil
+				},
+				listTagsForResourceFunc: func(_ context.Context, _ *paramapi.ListTagsForResourceInput, _ ...func(*paramapi.Options)) (*paramapi.ListTagsForResourceOutput, error) {
+					return &paramapi.ListTagsForResourceOutput{
+						TagList: []paramapi.Tag{
+							{Key: lo.ToPtr("Environment"), Value: lo.ToPtr("production")},
+							{Key: lo.ToPtr("Team"), Value: lo.ToPtr("backend")},
+						},
+					}, nil
+				},
+			},
+			check: func(t *testing.T, output string) {
+				assert.Contains(t, output, `"tags"`)
+				assert.Contains(t, output, `"Environment"`)
+				assert.Contains(t, output, `"production"`)
+				assert.Contains(t, output, `"Team"`)
+				assert.Contains(t, output, `"backend"`)
 			},
 		},
 	}

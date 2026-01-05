@@ -14,6 +14,7 @@ import (
 	"github.com/mpyw/suve/internal/api/secretapi"
 	appcli "github.com/mpyw/suve/internal/cli/commands"
 	"github.com/mpyw/suve/internal/cli/commands/secret/show"
+	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/usecase/secret"
 	"github.com/mpyw/suve/internal/version/secretversion"
 )
@@ -270,6 +271,37 @@ func TestRun(t *testing.T) {
 				assert.Contains(t, output, "production")
 				assert.Contains(t, output, "Team")
 				assert.Contains(t, output, "backend")
+			},
+		},
+		{
+			name: "show with tags in JSON output",
+			opts: show.Options{Spec: &secretversion.Spec{Name: "my-secret"}, Output: output.FormatJSON},
+			mock: &mockClient{
+				getSecretValueFunc: func(_ context.Context, _ *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) {
+					return &secretapi.GetSecretValueOutput{
+						Name:          lo.ToPtr("my-secret"),
+						ARN:           lo.ToPtr("arn:aws:secretsmanager:us-east-1:123456789012:secret:my-secret-AbCdEf"),
+						VersionId:     lo.ToPtr("abc123"),
+						SecretString:  lo.ToPtr("secret-value"),
+						VersionStages: []string{"AWSCURRENT"},
+						CreatedDate:   &now,
+					}, nil
+				},
+				describeSecretFunc: func(_ context.Context, _ *secretapi.DescribeSecretInput, _ ...func(*secretapi.Options)) (*secretapi.DescribeSecretOutput, error) {
+					return &secretapi.DescribeSecretOutput{
+						Tags: []secretapi.Tag{
+							{Key: lo.ToPtr("Environment"), Value: lo.ToPtr("production")},
+							{Key: lo.ToPtr("Team"), Value: lo.ToPtr("backend")},
+						},
+					}, nil
+				},
+			},
+			check: func(t *testing.T, output string) {
+				assert.Contains(t, output, `"tags"`)
+				assert.Contains(t, output, `"Environment"`)
+				assert.Contains(t, output, `"production"`)
+				assert.Contains(t, output, `"Team"`)
+				assert.Contains(t, output, `"backend"`)
 			},
 		},
 	}
