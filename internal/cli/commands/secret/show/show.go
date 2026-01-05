@@ -36,12 +36,13 @@ type Options struct {
 
 // JSONOutput represents the JSON output structure for the show command.
 type JSONOutput struct {
-	Name      string   `json:"name"`
-	ARN       string   `json:"arn"`
-	VersionID string   `json:"versionId,omitempty"`
-	Stages    []string `json:"stages,omitempty"`
-	Created   string   `json:"created,omitempty"`
-	Value     string   `json:"value"`
+	Name      string            `json:"name"`
+	ARN       string            `json:"arn"`
+	VersionID string            `json:"versionId,omitempty"`
+	Stages    []string          `json:"stages,omitempty"`
+	Created   string            `json:"created,omitempty"`
+	Tags      map[string]string `json:"tags,omitempty"`
+	Value     string            `json:"value"`
 }
 
 // Command returns the show command.
@@ -173,6 +174,12 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 		if result.CreatedDate != nil {
 			jsonOut.Created = timeutil.FormatRFC3339(*result.CreatedDate)
 		}
+		if len(result.Tags) > 0 {
+			jsonOut.Tags = make(map[string]string)
+			for _, tag := range result.Tags {
+				jsonOut.Tags[tag.Key] = tag.Value
+			}
+		}
 		enc := json.NewEncoder(r.Stdout)
 		enc.SetIndent("", "  ")
 		return enc.Encode(jsonOut)
@@ -190,6 +197,12 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 	}
 	if result.CreatedDate != nil {
 		out.Field("Created", timeutil.FormatRFC3339(*result.CreatedDate))
+	}
+	if len(result.Tags) > 0 {
+		out.Field("Tags", fmt.Sprintf("%d tag(s)", len(result.Tags)))
+		for _, tag := range result.Tags {
+			out.Field("  "+tag.Key, tag.Value)
+		}
 	}
 	out.Separator()
 	out.Value(value)

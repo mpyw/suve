@@ -41,6 +41,7 @@ func TestCommand_Validation(t *testing.T) {
 type mockClient struct {
 	getSecretValueFunc       func(ctx context.Context, params *secretapi.GetSecretValueInput, optFns ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error)
 	listSecretVersionIdsFunc func(ctx context.Context, params *secretapi.ListSecretVersionIdsInput, optFns ...func(*secretapi.Options)) (*secretapi.ListSecretVersionIdsOutput, error)
+	describeSecretFunc       func(ctx context.Context, params *secretapi.DescribeSecretInput, optFns ...func(*secretapi.Options)) (*secretapi.DescribeSecretOutput, error)
 }
 
 func (m *mockClient) GetSecretValue(ctx context.Context, params *secretapi.GetSecretValueInput, optFns ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) {
@@ -51,7 +52,10 @@ func (m *mockClient) ListSecretVersionIds(ctx context.Context, params *secretapi
 	return m.listSecretVersionIdsFunc(ctx, params, optFns...)
 }
 
-func (m *mockClient) DescribeSecret(_ context.Context, _ *secretapi.DescribeSecretInput, _ ...func(*secretapi.Options)) (*secretapi.DescribeSecretOutput, error) {
+func (m *mockClient) DescribeSecret(ctx context.Context, params *secretapi.DescribeSecretInput, optFns ...func(*secretapi.Options)) (*secretapi.DescribeSecretOutput, error) {
+	if m.describeSecretFunc != nil {
+		return m.describeSecretFunc(ctx, params, optFns...)
+	}
 	return &secretapi.DescribeSecretOutput{}, nil
 }
 
@@ -234,6 +238,38 @@ func TestRun(t *testing.T) {
 				require.NotEqual(t, -1, appleIdx, "expected apple in output")
 				require.NotEqual(t, -1, zebraIdx, "expected zebra in output")
 				assert.Less(t, appleIdx, zebraIdx, "expected keys to be sorted (apple before zebra)")
+			},
+		},
+		{
+			name: "show with tags",
+			opts: show.Options{Spec: &secretversion.Spec{Name: "my-secret"}},
+			mock: &mockClient{
+				getSecretValueFunc: func(_ context.Context, _ *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) {
+					return &secretapi.GetSecretValueOutput{
+						Name:          lo.ToPtr("my-secret"),
+						ARN:           lo.ToPtr("arn:aws:secretsmanager:us-east-1:123456789012:secret:my-secret-AbCdEf"),
+						VersionId:     lo.ToPtr("abc123"),
+						SecretString:  lo.ToPtr("secret-value"),
+						VersionStages: []string{"AWSCURRENT"},
+						CreatedDate:   &now,
+					}, nil
+				},
+				describeSecretFunc: func(_ context.Context, _ *secretapi.DescribeSecretInput, _ ...func(*secretapi.Options)) (*secretapi.DescribeSecretOutput, error) {
+					return &secretapi.DescribeSecretOutput{
+						Tags: []secretapi.Tag{
+							{Key: lo.ToPtr("Environment"), Value: lo.ToPtr("production")},
+							{Key: lo.ToPtr("Team"), Value: lo.ToPtr("backend")},
+						},
+					}, nil
+				},
+			},
+			check: func(t *testing.T, output string) {
+				assert.Contains(t, output, "Tags")
+				assert.Contains(t, output, "2 tag(s)")
+				assert.Contains(t, output, "Environment")
+				assert.Contains(t, output, "production")
+				assert.Contains(t, output, "Team")
+				assert.Contains(t, output, "backend")
 			},
 		},
 	}
