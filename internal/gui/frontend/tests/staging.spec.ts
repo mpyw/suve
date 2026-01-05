@@ -4,8 +4,8 @@ import {
   type MockState,
   createStagedValue,
   createStagedTags,
-  createSSMStagedState,
-  createSMStagedState,
+  createParamStagedState,
+  createSecretStagedState,
   createMixedStagedState,
   createTagOnlyStagedState,
   navigateTo,
@@ -31,9 +31,9 @@ test.describe('Staging View Basics', () => {
       await expect(page.getByText('Staging Area')).toBeVisible();
     });
 
-    test('should display SSM and SM sections', async ({ page }) => {
-      await expect(page.getByText(/Parameters \(SSM\)/i)).toBeVisible();
-      await expect(page.getByText(/Secrets \(SM\)/i)).toBeVisible();
+    test('should display Parameters and Secrets sections', async ({ page }) => {
+      await expect(page.getByRole('heading', { name: /Parameters/i })).toBeVisible();
+      await expect(page.getByRole('heading', { name: /Secrets/i })).toBeVisible();
     });
 
     test('should show empty state when no staged changes', async ({ page }) => {
@@ -180,60 +180,60 @@ test.describe('Staging from Secret View', () => {
 // ============================================================================
 
 test.describe('Staging State Combinations', () => {
-  test.describe('SSM Only Staged', () => {
-    test('should display SSM staged changes when SM is empty', async ({ page }) => {
-      const ssmOnly = createSSMStagedState([
+  test.describe('Param Only Staged', () => {
+    test('should display Param staged changes when Secret is empty', async ({ page }) => {
+      const paramOnly = createParamStagedState([
         createStagedValue('/test/param', 'create', 'new-value'),
       ]);
-      await setupWailsMocks(page, ssmOnly);
+      await setupWailsMocks(page, paramOnly);
       await page.goto('/');
       await navigateTo(page, 'Staging');
       await page.waitForFunction(() => document.querySelector('.entry-item') !== null);
       await expect(page.locator('.entry-item')).toBeVisible();
     });
 
-    test('should show empty state in SM section when only SSM has changes', async ({ page }) => {
-      const ssmOnly = createSSMStagedState([
+    test('should show empty state in Secret section when only Param has changes', async ({ page }) => {
+      const paramOnly = createParamStagedState([
         createStagedValue('/test/param', 'update', 'updated'),
       ]);
-      await setupWailsMocks(page, ssmOnly);
+      await setupWailsMocks(page, paramOnly);
       await page.goto('/');
       await navigateTo(page, 'Staging');
       await page.waitForFunction(() => document.querySelector('.section') !== null);
-      // SM section should show empty message
-      const smSection = page.locator('.section').nth(1);
-      await expect(smSection.getByText(/No staged/i)).toBeVisible();
+      // Secret section should show empty message
+      const secretSection = page.locator('.section').nth(1);
+      await expect(secretSection.getByText(/No staged/i)).toBeVisible();
     });
   });
 
-  test.describe('SM Only Staged', () => {
-    test('should display SM staged changes when SSM is empty', async ({ page }) => {
-      const smOnly = createSMStagedState([
+  test.describe('Secret Only Staged', () => {
+    test('should display Secret staged changes when Param is empty', async ({ page }) => {
+      const secretOnly = createSecretStagedState([
         createStagedValue('new-secret', 'create', '{"new": true}'),
       ]);
-      await setupWailsMocks(page, smOnly);
+      await setupWailsMocks(page, secretOnly);
       await page.goto('/');
       await navigateTo(page, 'Staging');
       await page.waitForFunction(() => document.querySelector('.entry-item') !== null);
       await expect(page.locator('.entry-item')).toBeVisible();
     });
 
-    test('should show empty state in SSM section when only SM has changes', async ({ page }) => {
-      const smOnly = createSMStagedState([
+    test('should show empty state in Param section when only Secret has changes', async ({ page }) => {
+      const secretOnly = createSecretStagedState([
         createStagedValue('secret', 'update', 'updated'),
       ]);
-      await setupWailsMocks(page, smOnly);
+      await setupWailsMocks(page, secretOnly);
       await page.goto('/');
       await navigateTo(page, 'Staging');
       await page.waitForFunction(() => document.querySelector('.section') !== null);
-      // SSM section should show empty message
-      const ssmSection = page.locator('.section').first();
-      await expect(ssmSection.getByText(/No staged/i)).toBeVisible();
+      // Param section should show empty message
+      const paramSection = page.locator('.section').first();
+      await expect(paramSection.getByText(/No staged/i)).toBeVisible();
     });
   });
 
-  test.describe('Both SSM and SM Staged', () => {
-    test('should display both SSM and SM staged changes', async ({ page }) => {
+  test.describe('Both Param and Secret Staged', () => {
+    test('should display both Param and Secret staged changes', async ({ page }) => {
       const mixed = createMixedStagedState(
         [createStagedValue('/test/param', 'create', 'value')],
         [createStagedValue('test-secret', 'create', 'secret')]
@@ -253,7 +253,7 @@ test.describe('Staging State Combinations', () => {
 
 test.describe('Operation Type Display', () => {
   test('should show create badge for new items', async ({ page }) => {
-    const createOnly = createSSMStagedState([
+    const createOnly = createParamStagedState([
       createStagedValue('/new/param', 'create', 'new-value'),
     ]);
     await setupWailsMocks(page, createOnly);
@@ -264,7 +264,7 @@ test.describe('Operation Type Display', () => {
   });
 
   test('should show update badge for edited items', async ({ page }) => {
-    const updateOnly = createSSMStagedState([
+    const updateOnly = createParamStagedState([
       createStagedValue('/app/config', 'update', 'updated-value'),
     ]);
     await setupWailsMocks(page, updateOnly);
@@ -275,7 +275,7 @@ test.describe('Operation Type Display', () => {
   });
 
   test('should show delete badge for deleted items', async ({ page }) => {
-    const deleteOnly = createSSMStagedState([
+    const deleteOnly = createParamStagedState([
       createStagedValue('/app/config', 'delete'),
     ]);
     await setupWailsMocks(page, deleteOnly);
@@ -287,12 +287,12 @@ test.describe('Operation Type Display', () => {
 
   test('should display mixed operations correctly', async ({ page }) => {
     const mixed: Partial<MockState> = {
-      stagedSSM: [
+      stagedParam: [
         createStagedValue('/new/param', 'create', 'new'),
         createStagedValue('/app/config', 'update', 'updated'),
         createStagedValue('/app/api/key', 'delete'),
       ],
-      stagedSM: [],
+      stagedSecret: [],
     };
     await setupWailsMocks(page, mixed);
     await page.goto('/');
@@ -355,10 +355,10 @@ test.describe('Tag Staging Display', () => {
 
   test('should display value change with tag changes', async ({ page }) => {
     const valueAndTags: Partial<MockState> = {
-      stagedSSM: [createStagedValue('/app/config', 'update', 'new-value')],
-      stagedSSMTags: [createStagedTags('/app/config', { 'version': '2' }, [])],
-      stagedSM: [],
-      stagedSMTags: [],
+      stagedParam: [createStagedValue('/app/config', 'update', 'new-value')],
+      stagedParamTags: [createStagedTags('/app/config', { 'version': '2' }, [])],
+      stagedSecret: [],
+      stagedSecretTags: [],
     };
     await setupWailsMocks(page, valueAndTags);
     await page.goto('/');
@@ -374,8 +374,8 @@ test.describe('Tag Staging Display', () => {
 test.describe('Apply Operations', () => {
   test.beforeEach(async ({ page }) => {
     const staged: Partial<MockState> = {
-      stagedSSM: [createStagedValue('/test/param', 'create', 'test-value')],
-      stagedSM: [createStagedValue('test-secret', 'create', 'secret-value')],
+      stagedParam: [createStagedValue('/test/param', 'create', 'test-value')],
+      stagedSecret: [createStagedValue('test-secret', 'create', 'secret-value')],
     };
     await setupWailsMocks(page, staged);
     await page.goto('/');
@@ -414,8 +414,8 @@ test.describe('Apply Operations', () => {
 test.describe('Reset Operations', () => {
   test.beforeEach(async ({ page }) => {
     const staged: Partial<MockState> = {
-      stagedSSM: [createStagedValue('/test/param', 'create', 'test-value')],
-      stagedSM: [createStagedValue('test-secret', 'update', 'updated')],
+      stagedParam: [createStagedValue('/test/param', 'create', 'test-value')],
+      stagedSecret: [createStagedValue('test-secret', 'update', 'updated')],
     };
     await setupWailsMocks(page, staged);
     await page.goto('/');
@@ -452,11 +452,11 @@ test.describe('Reset Operations', () => {
 test.describe('Unstage Individual Items', () => {
   test.beforeEach(async ({ page }) => {
     const staged: Partial<MockState> = {
-      stagedSSM: [
+      stagedParam: [
         createStagedValue('/test/param-1', 'create', 'value-1'),
         createStagedValue('/test/param-2', 'update', 'value-2'),
       ],
-      stagedSM: [],
+      stagedSecret: [],
     };
     await setupWailsMocks(page, staged);
     await page.goto('/');
@@ -504,8 +504,8 @@ test.describe('Navigation and State', () => {
 
   test('should refresh staging view when navigating back', async ({ page }) => {
     const staged: Partial<MockState> = {
-      stagedSSM: [createStagedValue('/test/param', 'create', 'value')],
-      stagedSM: [],
+      stagedParam: [createStagedValue('/test/param', 'create', 'value')],
+      stagedSecret: [],
     };
     await setupWailsMocks(page, staged);
     await page.goto('/');
@@ -532,10 +532,10 @@ test.describe('Navigation and State', () => {
 test.describe('Staging Edge Cases', () => {
   test('should handle large number of staged changes', async ({ page }) => {
     const manyChanges: Partial<MockState> = {
-      stagedSSM: Array.from({ length: 10 }, (_, i) =>
+      stagedParam: Array.from({ length: 10 }, (_, i) =>
         createStagedValue(`/test/param-${i}`, i % 3 === 0 ? 'create' : i % 3 === 1 ? 'update' : 'delete', `value-${i}`)
       ),
-      stagedSM: [],
+      stagedSecret: [],
     };
     await setupWailsMocks(page, manyChanges);
     await page.goto('/');
@@ -565,8 +565,8 @@ test.describe('Staging Edge Cases', () => {
 
   test('should handle empty value in staged change', async ({ page }) => {
     const emptyValue: Partial<MockState> = {
-      stagedSSM: [createStagedValue('/test/empty', 'update', '')],
-      stagedSM: [],
+      stagedParam: [createStagedValue('/test/empty', 'update', '')],
+      stagedSecret: [],
     };
     await setupWailsMocks(page, emptyValue);
     await page.goto('/');
@@ -577,8 +577,8 @@ test.describe('Staging Edge Cases', () => {
 
   test('should handle special characters in staged values', async ({ page }) => {
     const specialChars: Partial<MockState> = {
-      stagedSSM: [createStagedValue('/test/special', 'create', '<script>alert("xss")</script>')],
-      stagedSM: [],
+      stagedParam: [createStagedValue('/test/special', 'create', '<script>alert("xss")</script>')],
+      stagedSecret: [],
     };
     await setupWailsMocks(page, specialChars);
     await page.goto('/');

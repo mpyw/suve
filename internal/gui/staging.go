@@ -14,10 +14,10 @@ import (
 
 // StagingStatusResult represents the result of staging status.
 type StagingStatusResult struct {
-	SSM     []StagingEntry    `json:"ssm"`
-	SM      []StagingEntry    `json:"sm"`
-	SSMTags []StagingTagEntry `json:"ssmTags"`
-	SMTags  []StagingTagEntry `json:"smTags"`
+	Param      []StagingEntry    `json:"param"`
+	Secret     []StagingEntry    `json:"secret"`
+	ParamTags  []StagingTagEntry `json:"paramTags"`
+	SecretTags []StagingTagEntry `json:"secretTags"`
 }
 
 // StagingEntry represents a staged entry change.
@@ -148,38 +148,38 @@ func (a *App) StagingStatus() (*StagingStatusResult, error) {
 		return nil, err
 	}
 
-	ssmParser, _ := a.getParser("ssm")
-	smParser, _ := a.getParser("sm")
+	paramParser, _ := a.getParser("ssm")
+	secretParser, _ := a.getParser("sm")
 
-	// SSM status
-	ssmUC := &stagingusecase.StatusUseCase{
-		Strategy: ssmParser,
+	// SSM Parameter Store status
+	paramUC := &stagingusecase.StatusUseCase{
+		Strategy: paramParser,
 		Store:    store,
 	}
-	ssmResult, err := ssmUC.Execute(a.ctx, stagingusecase.StatusInput{})
+	paramResult, err := paramUC.Execute(a.ctx, stagingusecase.StatusInput{})
 	if err != nil {
 		return nil, err
 	}
 
-	// SM status
-	smUC := &stagingusecase.StatusUseCase{
-		Strategy: smParser,
+	// Secrets Manager status
+	secretUC := &stagingusecase.StatusUseCase{
+		Strategy: secretParser,
 		Store:    store,
 	}
-	smResult, err := smUC.Execute(a.ctx, stagingusecase.StatusInput{})
+	secretResult, err := secretUC.Execute(a.ctx, stagingusecase.StatusInput{})
 	if err != nil {
 		return nil, err
 	}
 
 	result := &StagingStatusResult{
-		SSM:     make([]StagingEntry, len(ssmResult.Entries)),
-		SM:      make([]StagingEntry, len(smResult.Entries)),
-		SSMTags: make([]StagingTagEntry, len(ssmResult.TagEntries)),
-		SMTags:  make([]StagingTagEntry, len(smResult.TagEntries)),
+		Param:      make([]StagingEntry, len(paramResult.Entries)),
+		Secret:     make([]StagingEntry, len(secretResult.Entries)),
+		ParamTags:  make([]StagingTagEntry, len(paramResult.TagEntries)),
+		SecretTags: make([]StagingTagEntry, len(secretResult.TagEntries)),
 	}
 
-	for i, e := range ssmResult.Entries {
-		result.SSM[i] = StagingEntry{
+	for i, e := range paramResult.Entries {
+		result.Param[i] = StagingEntry{
 			Name:      e.Name,
 			Operation: string(e.Operation),
 			Value:     e.Value,
@@ -187,8 +187,8 @@ func (a *App) StagingStatus() (*StagingStatusResult, error) {
 		}
 	}
 
-	for i, e := range smResult.Entries {
-		result.SM[i] = StagingEntry{
+	for i, e := range secretResult.Entries {
+		result.Secret[i] = StagingEntry{
 			Name:      e.Name,
 			Operation: string(e.Operation),
 			Value:     e.Value,
@@ -196,8 +196,8 @@ func (a *App) StagingStatus() (*StagingStatusResult, error) {
 		}
 	}
 
-	for i, t := range ssmResult.TagEntries {
-		result.SSMTags[i] = StagingTagEntry{
+	for i, t := range paramResult.TagEntries {
+		result.ParamTags[i] = StagingTagEntry{
 			Name:       t.Name,
 			AddTags:    t.Add,
 			RemoveTags: t.Remove.Values(),
@@ -205,8 +205,8 @@ func (a *App) StagingStatus() (*StagingStatusResult, error) {
 		}
 	}
 
-	for i, t := range smResult.TagEntries {
-		result.SMTags[i] = StagingTagEntry{
+	for i, t := range secretResult.TagEntries {
+		result.SecretTags[i] = StagingTagEntry{
 			Name:       t.Name,
 			AddTags:    t.Add,
 			RemoveTags: t.Remove.Values(),

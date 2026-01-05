@@ -20,7 +20,7 @@
   async function loadStagingCount() {
     try {
       const status = await StagingStatus();
-      stagingCount = (status?.ssm?.length || 0) + (status?.sm?.length || 0);
+      stagingCount = (status?.param?.length || 0) + (status?.secret?.length || 0);
     } catch (e) {
       stagingCount = 0;
     }

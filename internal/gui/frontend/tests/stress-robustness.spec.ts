@@ -169,7 +169,7 @@ test.describe('Large Dataset Handling', () => {
       operation: 'create',
     }));
 
-    await setupWailsMocks(page, { stagedSSM: manyStaged });
+    await setupWailsMocks(page, { stagedParam: manyStaged });
     await page.goto('/');
     await navigateTo(page, 'Staging');
 

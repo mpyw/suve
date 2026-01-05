@@ -53,10 +53,10 @@ export interface SecretLogEntry {
 export interface MockState {
   params: Parameter[];
   secrets: Secret[];
-  stagedSSM: StagedEntry[];
-  stagedSM: StagedEntry[];
-  stagedSSMTags: StagedTagEntry[];
-  stagedSMTags: StagedTagEntry[];
+  stagedParam: StagedEntry[];
+  stagedSecret: StagedEntry[];
+  stagedParamTags: StagedTagEntry[];
+  stagedSecretTags: StagedTagEntry[];
   paramTags: Record<string, Tag[]>;
   secretTags: Record<string, Tag[]>;
   // Advanced: version history for diff testing
@@ -131,10 +131,10 @@ export const defaultMockState: MockState = {
     createSecret('api-credentials', '{"key": "value"}'),
     createSecret('database-password', 'super-secret-password'),
   ],
-  stagedSSM: [],
-  stagedSM: [],
-  stagedSSMTags: [],
-  stagedSMTags: [],
+  stagedParam: [],
+  stagedSecret: [],
+  stagedParamTags: [],
+  stagedSecretTags: [],
   paramTags: {
     '/app/config': [{ key: 'env', value: 'production' }],
   },
@@ -166,44 +166,44 @@ export const defaultMockState: MockState = {
 export const emptyMockState: Partial<MockState> = {
   params: [],
   secrets: [],
-  stagedSSM: [],
-  stagedSM: [],
-  stagedSSMTags: [],
-  stagedSMTags: [],
+  stagedParam: [],
+  stagedSecret: [],
+  stagedParamTags: [],
+  stagedSecretTags: [],
   paramTags: {},
   secretTags: {},
 };
 
 /**
- * State with SSM staged changes only
+ * State with Param staged changes only
  */
-export function createSSMStagedState(entries: StagedEntry[]): Partial<MockState> {
+export function createParamStagedState(entries: StagedEntry[]): Partial<MockState> {
   return {
-    stagedSSM: entries,
-    stagedSM: [],
+    stagedParam: entries,
+    stagedSecret: [],
   };
 }
 
 /**
- * State with SM staged changes only
+ * State with Secret staged changes only
  */
-export function createSMStagedState(entries: StagedEntry[]): Partial<MockState> {
+export function createSecretStagedState(entries: StagedEntry[]): Partial<MockState> {
   return {
-    stagedSSM: [],
-    stagedSM: entries,
+    stagedParam: [],
+    stagedSecret: entries,
   };
 }
 
 /**
- * State with both SSM and SM staged changes
+ * State with both Param and Secret staged changes
  */
 export function createMixedStagedState(
-  ssmEntries: StagedEntry[],
-  smEntries: StagedEntry[]
+  paramEntries: StagedEntry[],
+  secretEntries: StagedEntry[]
 ): Partial<MockState> {
   return {
-    stagedSSM: ssmEntries,
-    stagedSM: smEntries,
+    stagedParam: paramEntries,
+    stagedSecret: secretEntries,
   };
 }
 
@@ -211,14 +211,14 @@ export function createMixedStagedState(
  * State with tag-only staged changes
  */
 export function createTagOnlyStagedState(
-  ssmTags: StagedTagEntry[],
-  smTags: StagedTagEntry[]
+  paramTags: StagedTagEntry[],
+  secretTags: StagedTagEntry[]
 ): Partial<MockState> {
   return {
-    stagedSSM: [],
-    stagedSM: [],
-    stagedSSMTags: ssmTags,
-    stagedSMTags: smTags,
+    stagedParam: [],
+    stagedSecret: [],
+    stagedParamTags: paramTags,
+    stagedSecretTags: secretTags,
   };
 }
 
@@ -592,14 +592,14 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
 
       // Staging operations
       StagingStatus: async () => ({
-        ssm: state.stagedSSM,
-        sm: state.stagedSM,
-        ssmTags: state.stagedSSMTags,
-        smTags: state.stagedSMTags,
+        param: state.stagedParam,
+        secret: state.stagedSecret,
+        paramTags: state.stagedParamTags,
+        secretTags: state.stagedSecretTags,
       }),
       StagingDiff: async (service: string) => {
-        const staged = service === 'ssm' ? state.stagedSSM : state.stagedSM;
-        const tagStaged = service === 'ssm' ? state.stagedSSMTags : state.stagedSMTags;
+        const staged = service === 'ssm' ? state.stagedParam : state.stagedSecret;
+        const tagStaged = service === 'ssm' ? state.stagedParamTags : state.stagedSecretTags;
         return {
           itemName: service === 'ssm' ? 'parameter' : 'secret',
           entries: staged.map((s: any) => ({
@@ -620,16 +620,16 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
         };
       },
       StagingApply: async (service: string) => {
-        const staged = service === 'ssm' ? state.stagedSSM : state.stagedSM;
-        const tagStaged = service === 'ssm' ? state.stagedSSMTags : state.stagedSMTags;
+        const staged = service === 'ssm' ? state.stagedParam : state.stagedSecret;
+        const tagStaged = service === 'ssm' ? state.stagedParamTags : state.stagedSecretTags;
         const entryCount = staged.length;
         const tagCount = tagStaged.length;
         if (service === 'ssm') {
-          state.stagedSSM = [];
-          state.stagedSSMTags = [];
+          state.stagedParam = [];
+          state.stagedParamTags = [];
         } else {
-          state.stagedSM = [];
-          state.stagedSMTags = [];
+          state.stagedSecret = [];
+          state.stagedSecretTags = [];
         }
         return {
           serviceName: service,
@@ -644,24 +644,24 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
       },
       StagingReset: async (service: string) => {
         if (service === 'ssm') {
-          const count = state.stagedSSM.length + state.stagedSSMTags.length;
-          state.stagedSSM = [];
-          state.stagedSSMTags = [];
+          const count = state.stagedParam.length + state.stagedParamTags.length;
+          state.stagedParam = [];
+          state.stagedParamTags = [];
           return { type: 'all', serviceName: 'ssm', count };
         } else {
-          const count = state.stagedSM.length + state.stagedSMTags.length;
-          state.stagedSM = [];
-          state.stagedSMTags = [];
+          const count = state.stagedSecret.length + state.stagedSecretTags.length;
+          state.stagedSecret = [];
+          state.stagedSecretTags = [];
           return { type: 'all', serviceName: 'sm', count };
         }
       },
       StagingAdd: async (service: string, name: string, value: string) => {
-        const staged = service === 'ssm' ? state.stagedSSM : state.stagedSM;
+        const staged = service === 'ssm' ? state.stagedParam : state.stagedSecret;
         staged.push({ name, operation: 'create', value });
         return { name };
       },
       StagingEdit: async (service: string, name: string, value: string) => {
-        const staged = service === 'ssm' ? state.stagedSSM : state.stagedSM;
+        const staged = service === 'ssm' ? state.stagedParam : state.stagedSecret;
         const existing = staged.find((s: any) => s.name === name);
         if (existing) {
           existing.value = value;
@@ -671,22 +671,22 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
         return { name };
       },
       StagingDelete: async (service: string, name: string) => {
-        const staged = service === 'ssm' ? state.stagedSSM : state.stagedSM;
+        const staged = service === 'ssm' ? state.stagedParam : state.stagedSecret;
         staged.push({ name, operation: 'delete' });
         return { name };
       },
       StagingUnstage: async (service: string, name: string) => {
         if (service === 'ssm') {
-          state.stagedSSM = state.stagedSSM.filter((s: any) => s.name !== name);
-          state.stagedSSMTags = state.stagedSSMTags.filter((s: any) => s.name !== name);
+          state.stagedParam = state.stagedParam.filter((s: any) => s.name !== name);
+          state.stagedParamTags = state.stagedParamTags.filter((s: any) => s.name !== name);
         } else {
-          state.stagedSM = state.stagedSM.filter((s: any) => s.name !== name);
-          state.stagedSMTags = state.stagedSMTags.filter((s: any) => s.name !== name);
+          state.stagedSecret = state.stagedSecret.filter((s: any) => s.name !== name);
+          state.stagedSecretTags = state.stagedSecretTags.filter((s: any) => s.name !== name);
         }
         return { name };
       },
       StagingAddTag: async (service: string, name: string, key: string, value: string) => {
-        const tagStaged = service === 'ssm' ? state.stagedSSMTags : state.stagedSMTags;
+        const tagStaged = service === 'ssm' ? state.stagedParamTags : state.stagedSecretTags;
         let entry = tagStaged.find((t: any) => t.name === name);
         if (!entry) {
           entry = { name, addTags: {}, removeTags: [] };
@@ -696,7 +696,7 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
         return { name };
       },
       StagingRemoveTag: async (service: string, name: string, key: string) => {
-        const tagStaged = service === 'ssm' ? state.stagedSSMTags : state.stagedSMTags;
+        const tagStaged = service === 'ssm' ? state.stagedParamTags : state.stagedSecretTags;
         let entry = tagStaged.find((t: any) => t.name === name);
         if (!entry) {
           entry = { name, addTags: {}, removeTags: [] };
@@ -706,7 +706,7 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
         return { name };
       },
       StagingCancelAddTag: async (service: string, name: string, key: string) => {
-        const tagStaged = service === 'ssm' ? state.stagedSSMTags : state.stagedSMTags;
+        const tagStaged = service === 'ssm' ? state.stagedParamTags : state.stagedSecretTags;
         const entry = tagStaged.find((t: any) => t.name === name);
         if (entry) {
           delete entry.addTags[key];
@@ -714,7 +714,7 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
         return { name };
       },
       StagingCancelRemoveTag: async (service: string, name: string, key: string) => {
-        const tagStaged = service === 'ssm' ? state.stagedSSMTags : state.stagedSMTags;
+        const tagStaged = service === 'ssm' ? state.stagedParamTags : state.stagedSecretTags;
         const entry = tagStaged.find((t: any) => t.name === name);
         if (entry) {
           entry.removeTags = entry.removeTags.filter((k: string) => k !== key);

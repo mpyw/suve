@@ -232,7 +232,7 @@ test.describe('Staging Integration', () => {
 });
 
 // ============================================================================
-// Cross-Service Tests (SSM + SM)
+// Cross-Service Tests (Param + Secret)
 // ============================================================================
 
 test.describe('Cross-Service Operations', () => {

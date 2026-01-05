@@ -143,7 +143,7 @@
   }
 
   function getServiceName(service: string): string {
-    return service === 'ssm' ? 'Parameters (SSM)' : 'Secrets (SM)';
+    return service === 'ssm' ? 'Parameters' : 'Secrets';
   }
 
   // Edit modal
@@ -297,7 +297,7 @@
       <div class="section-header">
         <h3 class="section-title">
           <span class="section-icon">P</span>
-          Parameters (SSM)
+          Parameters
         </h3>
         <span class="count-badge">{ssmEntries.length}</span>
         <div class="section-actions">
@@ -393,7 +393,7 @@
       <div class="section-header">
         <h3 class="section-title">
           <span class="section-icon">S</span>
-          Secrets (SM)
+          Secrets
         </h3>
         <span class="count-badge">{smEntries.length}</span>
         <div class="section-actions">

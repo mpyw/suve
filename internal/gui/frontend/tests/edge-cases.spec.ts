@@ -416,7 +416,7 @@ test.describe('Empty States', () => {
   });
 
   test('should show staging view with no changes', async ({ page }) => {
-    await setupWailsMocks(page, { stagedSSM: [], stagedSM: [] });
+    await setupWailsMocks(page, { stagedParam: [], stagedSecret: [] });
     await page.goto('/');
     await navigateTo(page, 'Staging');
 
