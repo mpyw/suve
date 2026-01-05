@@ -373,8 +373,10 @@ func TestExecuteTag_Add(t *testing.T) {
 		Tags:           map[string]string{"env": "prod"},
 		CurrentAWSTags: nil, // nil disables auto-skip
 	}
+	existingValue := "existing-value"
+	entryState := EntryState{CurrentValue: &existingValue, StagedState: EntryStagedStateNotStaged{}}
 
-	result, err := executor.ExecuteTag(staging.ServiceParam, "/app/config", EntryStagedStateNotStaged{}, StagedTags{}, action, &baseTime)
+	result, err := executor.ExecuteTag(staging.ServiceParam, "/app/config", entryState, StagedTags{}, action, &baseTime)
 	require.NoError(t, err)
 
 	assert.Equal(t, "prod", result.NewStagedTags.ToSet["env"])
@@ -396,8 +398,10 @@ func TestExecuteTag_Remove(t *testing.T) {
 		Keys:              maputil.NewSet("deprecated"),
 		CurrentAWSTagKeys: nil, // nil disables auto-skip
 	}
+	existingValue := "existing-value"
+	entryState := EntryState{CurrentValue: &existingValue, StagedState: EntryStagedStateNotStaged{}}
 
-	result, err := executor.ExecuteTag(staging.ServiceParam, "/app/config", EntryStagedStateNotStaged{}, StagedTags{}, action, nil)
+	result, err := executor.ExecuteTag(staging.ServiceParam, "/app/config", entryState, StagedTags{}, action, nil)
 	require.NoError(t, err)
 
 	assert.True(t, result.NewStagedTags.ToUnset.Contains("deprecated"))
@@ -417,9 +421,11 @@ func TestExecuteTag_Error(t *testing.T) {
 	action := TagActionTag{
 		Tags: map[string]string{"env": "prod"},
 	}
+	existingValue := "existing-value"
+	entryState := EntryState{CurrentValue: &existingValue, StagedState: EntryStagedStateDelete{}}
 
 	// Tag on DELETE should error
-	result, err := executor.ExecuteTag(staging.ServiceParam, "/app/config", EntryStagedStateDelete{}, StagedTags{}, action, nil)
+	result, err := executor.ExecuteTag(staging.ServiceParam, "/app/config", entryState, StagedTags{}, action, nil)
 	assert.ErrorIs(t, err, ErrCannotTagDelete)
 	assert.Equal(t, ErrCannotTagDelete, result.Error)
 }
@@ -445,8 +451,10 @@ func TestExecuteTag_UnstageWhenEmpty(t *testing.T) {
 		Keys:              maputil.NewSet("env"),
 		CurrentAWSTagKeys: maputil.NewSet("env"),
 	}
+	existingValue := "existing-value"
+	entryState := EntryState{CurrentValue: &existingValue, StagedState: EntryStagedStateNotStaged{}}
 
-	result, err := executor.ExecuteTag(staging.ServiceParam, "/app/config", EntryStagedStateNotStaged{}, existingTags, action, nil)
+	result, err := executor.ExecuteTag(staging.ServiceParam, "/app/config", entryState, existingTags, action, nil)
 	require.NoError(t, err)
 
 	// Result should have only ToUnset, no ToSet
@@ -481,8 +489,10 @@ func TestExecuteTag_UnstageWhenCompletelyEmpty(t *testing.T) {
 		Tags:           map[string]string{"env": "prod"},
 		CurrentAWSTags: map[string]string{"env": "prod"}, // Same value on AWS - auto-skip
 	}
+	existingValue := "existing-value"
+	entryState := EntryState{CurrentValue: &existingValue, StagedState: EntryStagedStateNotStaged{}}
 
-	result, err := executor.ExecuteTag(staging.ServiceParam, "/app/config", EntryStagedStateNotStaged{}, existingTags, action, nil)
+	result, err := executor.ExecuteTag(staging.ServiceParam, "/app/config", entryState, existingTags, action, nil)
 	require.NoError(t, err)
 
 	// Result should be completely empty (no ToSet, no ToUnset)
@@ -507,8 +517,10 @@ func TestExecuteTag_UnstageWhenAlreadyNotStaged(t *testing.T) {
 		Tags:           map[string]string{"env": "prod"},
 		CurrentAWSTags: map[string]string{"env": "prod"}, // Same value on AWS - auto-skip
 	}
+	existingValue := "existing-value"
+	entryState := EntryState{CurrentValue: &existingValue, StagedState: EntryStagedStateNotStaged{}}
 
-	result, err := executor.ExecuteTag(staging.ServiceParam, "/app/config", EntryStagedStateNotStaged{}, existingTags, action, nil)
+	result, err := executor.ExecuteTag(staging.ServiceParam, "/app/config", entryState, existingTags, action, nil)
 	require.NoError(t, err)
 
 	// Result is empty, and unstaging non-existing tags should not error
@@ -662,9 +674,11 @@ func TestExecuteTag_PersistError(t *testing.T) {
 		Tags:           map[string]string{"env": "prod"},
 		CurrentAWSTags: nil, // nil disables auto-skip
 	}
+	existingValue := "existing-value"
+	entryState := EntryState{CurrentValue: &existingValue, StagedState: EntryStagedStateNotStaged{}}
 
 	// Tag should fail due to StageTag error
-	_, err := executor.ExecuteTag(staging.ServiceParam, "/app/config", EntryStagedStateNotStaged{}, StagedTags{}, action, nil)
+	_, err := executor.ExecuteTag(staging.ServiceParam, "/app/config", entryState, StagedTags{}, action, nil)
 	assert.ErrorIs(t, err, errMock)
 }
 

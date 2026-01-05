@@ -51,13 +51,21 @@ func (u *DeleteUseCase) Execute(ctx context.Context, input DeleteInput) (*Delete
 		return nil, fmt.Errorf("failed to fetch %s: %w", itemName, err)
 	}
 
-	// Load current state
-	entryState, err := transition.LoadEntryState(u.Store, service, input.Name, nil)
+	// Determine CurrentValue based on AWS existence
+	var currentValue *string
+	if !lastModified.IsZero() {
+		// Resource exists on AWS - set a non-nil value to indicate existence
+		// The actual value doesn't matter for delete, only existence check
+		currentValue = new(string)
+	}
+
+	// Load current state with CurrentValue for existence check
+	entryState, err := transition.LoadEntryState(u.Store, service, input.Name, currentValue)
 	if err != nil {
 		return nil, err
 	}
 
-	// Use reducer to determine transition (without persisting yet)
+	// Use reducer to determine transition - existence check is done in reducer
 	result := transition.ReduceEntry(entryState, transition.EntryActionDelete{})
 	if result.Error != nil {
 		return nil, result.Error

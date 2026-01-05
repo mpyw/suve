@@ -57,20 +57,20 @@ func (u *TagUseCase) loadTagContext(ctx context.Context, inputName string) (*tag
 		return nil, err
 	}
 
-	// Load current entry state to check for DELETE
-	entryState, err := transition.LoadEntryState(u.Store, service, name, nil)
+	// Fetch AWS resource to check existence and get base modified time
+	currentValue, awsBaseModifiedAt, err := u.fetchAWSCurrentValue(ctx, name)
+	if err != nil {
+		return nil, err
+	}
+
+	// Load current entry state with CurrentValue for existence check in reducer
+	entryState, err := transition.LoadEntryState(u.Store, service, name, currentValue)
 	if err != nil {
 		return nil, err
 	}
 
 	// Load current staged tags
 	stagedTags, baseModifiedAt, err := transition.LoadStagedTags(u.Store, service, name)
-	if err != nil {
-		return nil, err
-	}
-
-	// Fetch AWS base modified time
-	awsBaseModifiedAt, err := u.fetchAWSBaseModifiedAt(ctx, name, entryState.StagedState)
 	if err != nil {
 		return nil, err
 	}
@@ -89,29 +89,24 @@ func (u *TagUseCase) loadTagContext(ctx context.Context, inputName string) (*tag
 	}, nil
 }
 
-// fetchAWSBaseModifiedAt fetches the base modified time from AWS.
-// For CREATE operations, returns nil (resource doesn't exist yet).
-func (u *TagUseCase) fetchAWSBaseModifiedAt(ctx context.Context, name string, stagedState transition.EntryStagedState) (*time.Time, error) {
-	// For CREATE, resource doesn't exist yet
-	if _, isCreate := stagedState.(transition.EntryStagedStateCreate); isCreate {
-		return nil, nil
-	}
-
-	// Fetch from AWS
+// fetchAWSCurrentValue fetches the current value from AWS.
+// Returns (value, lastModified, nil) if resource exists, (nil, nil, nil) if not found.
+func (u *TagUseCase) fetchAWSCurrentValue(ctx context.Context, name string) (*string, *time.Time, error) {
 	result, err := u.Strategy.FetchCurrentValue(ctx, name)
 	if err != nil {
 		// If resource doesn't exist, return nil
-		var notFoundErr interface{ NotFound() bool }
-		if errors.As(err, &notFoundErr) && notFoundErr.NotFound() {
-			return nil, nil
+		var notFoundErr *staging.ResourceNotFoundError
+		if errors.As(err, &notFoundErr) {
+			return nil, nil, nil
 		}
-		return nil, err
+		return nil, nil, err
 	}
 
-	if result.LastModified.IsZero() {
-		return nil, nil
+	var baseModifiedAt *time.Time
+	if !result.LastModified.IsZero() {
+		baseModifiedAt = &result.LastModified
 	}
-	return &result.LastModified, nil
+	return &result.Value, baseModifiedAt, nil
 }
 
 // Tag adds or updates tags on a staged resource.
@@ -135,7 +130,7 @@ func (u *TagUseCase) Tag(ctx context.Context, input TagInput) (*TagOutput, error
 
 	// Execute the transition
 	executor := transition.NewExecutor(u.Store)
-	_, err = executor.ExecuteTag(tc.service, tc.name, tc.entryState.StagedState, tc.stagedTags, action, tc.baseModifiedAt)
+	_, err = executor.ExecuteTag(tc.service, tc.name, tc.entryState, tc.stagedTags, action, tc.baseModifiedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -169,7 +164,7 @@ func (u *TagUseCase) Untag(ctx context.Context, input UntagInput) (*UntagOutput,
 
 	// Execute the transition
 	executor := transition.NewExecutor(u.Store)
-	_, err = executor.ExecuteTag(tc.service, tc.name, tc.entryState.StagedState, tc.stagedTags, action, tc.baseModifiedAt)
+	_, err = executor.ExecuteTag(tc.service, tc.name, tc.entryState, tc.stagedTags, action, tc.baseModifiedAt)
 	if err != nil {
 		return nil, err
 	}

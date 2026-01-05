@@ -37,9 +37,9 @@ func TestReduceEntry_Add(t *testing.T) {
 			wantState: EntryStagedStateCreate{DraftValue: "new-value"},
 		},
 		{
-			name: "Update -> ERROR",
+			name: "Update -> ERROR (inconsistent state: staged for update but resource not on AWS)",
 			state: EntryState{
-				CurrentValue: lo.ToPtr("current"),
+				CurrentValue: nil, // Resource doesn't exist on AWS
 				StagedState:  EntryStagedStateUpdate{DraftValue: "updated"},
 			},
 			action:    EntryActionAdd{Value: "new-value"},
@@ -47,14 +47,24 @@ func TestReduceEntry_Add(t *testing.T) {
 			wantError: ErrCannotAddToUpdate,
 		},
 		{
-			name: "Delete -> ERROR",
+			name: "Delete -> ERROR (inconsistent state: staged for delete but resource not on AWS)",
 			state: EntryState{
-				CurrentValue: lo.ToPtr("current"),
+				CurrentValue: nil, // Resource doesn't exist on AWS
 				StagedState:  EntryStagedStateDelete{},
 			},
 			action:    EntryActionAdd{Value: "new-value"},
 			wantState: EntryStagedStateDelete{},
 			wantError: ErrCannotAddToDelete,
+		},
+		{
+			name: "ERROR when resource already exists on AWS",
+			state: EntryState{
+				CurrentValue: lo.ToPtr("current"),
+				StagedState:  EntryStagedStateNotStaged{},
+			},
+			action:    EntryActionAdd{Value: "new-value"},
+			wantState: EntryStagedStateNotStaged{},
+			wantError: ErrCannotAddToExisting,
 		},
 	}
 
@@ -256,9 +266,10 @@ func TestReduceEntry_Reset(t *testing.T) {
 }
 
 func TestReduceTag_Tag(t *testing.T) {
+	existingValue := "existing-value"
 	tests := []struct {
 		name          string
-		entryState    EntryStagedState
+		entryState    EntryState
 		stagedTags    StagedTags
 		action        TagActionTag
 		wantStagedTag StagedTags
@@ -266,7 +277,7 @@ func TestReduceTag_Tag(t *testing.T) {
 	}{
 		{
 			name:       "Add tag to empty staged tags",
-			entryState: EntryStagedStateNotStaged{},
+			entryState: EntryState{CurrentValue: &existingValue, StagedState: EntryStagedStateNotStaged{}},
 			stagedTags: StagedTags{},
 			action: TagActionTag{
 				Tags:           map[string]string{"env": "prod"},
@@ -279,7 +290,7 @@ func TestReduceTag_Tag(t *testing.T) {
 		},
 		{
 			name:       "Auto-skip tag matching AWS",
-			entryState: EntryStagedStateNotStaged{},
+			entryState: EntryState{CurrentValue: &existingValue, StagedState: EntryStagedStateNotStaged{}},
 			stagedTags: StagedTags{},
 			action: TagActionTag{
 				Tags:           map[string]string{"env": "prod"},
@@ -292,7 +303,7 @@ func TestReduceTag_Tag(t *testing.T) {
 		},
 		{
 			name:       "Update tag with different value than AWS",
-			entryState: EntryStagedStateNotStaged{},
+			entryState: EntryState{CurrentValue: &existingValue, StagedState: EntryStagedStateNotStaged{}},
 			stagedTags: StagedTags{},
 			action: TagActionTag{
 				Tags:           map[string]string{"env": "prod"},
@@ -305,7 +316,7 @@ func TestReduceTag_Tag(t *testing.T) {
 		},
 		{
 			name:       "Tag removes from ToUnset",
-			entryState: EntryStagedStateNotStaged{},
+			entryState: EntryState{CurrentValue: &existingValue, StagedState: EntryStagedStateNotStaged{}},
 			stagedTags: StagedTags{
 				ToSet:   map[string]string{},
 				ToUnset: maputil.NewSet("env"),
@@ -321,7 +332,7 @@ func TestReduceTag_Tag(t *testing.T) {
 		},
 		{
 			name:       "ERROR when entry is Delete",
-			entryState: EntryStagedStateDelete{},
+			entryState: EntryState{CurrentValue: &existingValue, StagedState: EntryStagedStateDelete{}},
 			stagedTags: StagedTags{},
 			action: TagActionTag{
 				Tags:           map[string]string{"env": "prod"},
@@ -332,7 +343,7 @@ func TestReduceTag_Tag(t *testing.T) {
 		},
 		{
 			name:       "Allow tag when entry is Create",
-			entryState: EntryStagedStateCreate{DraftValue: "new"},
+			entryState: EntryState{CurrentValue: nil, StagedState: EntryStagedStateCreate{DraftValue: "new"}},
 			stagedTags: StagedTags{},
 			action: TagActionTag{
 				Tags:           map[string]string{"env": "prod"},
@@ -345,7 +356,7 @@ func TestReduceTag_Tag(t *testing.T) {
 		},
 		{
 			name:       "Allow tag when entry is Update",
-			entryState: EntryStagedStateUpdate{DraftValue: "updated"},
+			entryState: EntryState{CurrentValue: &existingValue, StagedState: EntryStagedStateUpdate{DraftValue: "updated"}},
 			stagedTags: StagedTags{},
 			action: TagActionTag{
 				Tags:           map[string]string{"env": "prod"},
@@ -358,7 +369,7 @@ func TestReduceTag_Tag(t *testing.T) {
 		},
 		{
 			name:       "Auto-skip also clears ToUnset (cancel previous untag)",
-			entryState: EntryStagedStateNotStaged{},
+			entryState: EntryState{CurrentValue: &existingValue, StagedState: EntryStagedStateNotStaged{}},
 			stagedTags: StagedTags{
 				ToSet:   map[string]string{},
 				ToUnset: maputil.NewSet("env"), // Previously staged untag
@@ -374,7 +385,7 @@ func TestReduceTag_Tag(t *testing.T) {
 		},
 		{
 			name:       "Nil CurrentAWSTags disables auto-skip",
-			entryState: EntryStagedStateNotStaged{},
+			entryState: EntryState{CurrentValue: &existingValue, StagedState: EntryStagedStateNotStaged{}},
 			stagedTags: StagedTags{},
 			action: TagActionTag{
 				Tags:           map[string]string{"env": "prod"},
@@ -384,6 +395,17 @@ func TestReduceTag_Tag(t *testing.T) {
 				ToSet:   map[string]string{"env": "prod"}, // Should be staged since we don't know AWS state
 				ToUnset: maputil.NewSet[string](),
 			},
+		},
+		{
+			name:       "ERROR when resource not found and not staged",
+			entryState: EntryState{CurrentValue: nil, StagedState: EntryStagedStateNotStaged{}},
+			stagedTags: StagedTags{},
+			action: TagActionTag{
+				Tags:           map[string]string{"env": "prod"},
+				CurrentAWSTags: map[string]string{},
+			},
+			wantStagedTag: StagedTags{},
+			wantError:     ErrCannotTagNotFound,
 		},
 	}
 
@@ -398,9 +420,10 @@ func TestReduceTag_Tag(t *testing.T) {
 }
 
 func TestReduceTag_Untag(t *testing.T) {
+	existingValue := "existing-value"
 	tests := []struct {
 		name          string
-		entryState    EntryStagedState
+		entryState    EntryState
 		stagedTags    StagedTags
 		action        TagActionUntag
 		wantStagedTag StagedTags
@@ -408,7 +431,7 @@ func TestReduceTag_Untag(t *testing.T) {
 	}{
 		{
 			name:       "Untag existing AWS tag",
-			entryState: EntryStagedStateNotStaged{},
+			entryState: EntryState{CurrentValue: &existingValue, StagedState: EntryStagedStateNotStaged{}},
 			stagedTags: StagedTags{},
 			action: TagActionUntag{
 				Keys:              maputil.NewSet("env"),
@@ -421,7 +444,7 @@ func TestReduceTag_Untag(t *testing.T) {
 		},
 		{
 			name:       "Auto-skip untag for non-existent AWS tag",
-			entryState: EntryStagedStateNotStaged{},
+			entryState: EntryState{CurrentValue: &existingValue, StagedState: EntryStagedStateNotStaged{}},
 			stagedTags: StagedTags{},
 			action: TagActionUntag{
 				Keys:              maputil.NewSet("env"),
@@ -434,7 +457,7 @@ func TestReduceTag_Untag(t *testing.T) {
 		},
 		{
 			name:       "Untag removes from ToSet (AWS has tag)",
-			entryState: EntryStagedStateNotStaged{},
+			entryState: EntryState{CurrentValue: &existingValue, StagedState: EntryStagedStateNotStaged{}},
 			stagedTags: StagedTags{
 				ToSet:   map[string]string{"env": "prod"},
 				ToUnset: maputil.NewSet[string](),
@@ -450,7 +473,7 @@ func TestReduceTag_Untag(t *testing.T) {
 		},
 		{
 			name:       "Untag removes from ToSet only (AWS has no tag, auto-skip)",
-			entryState: EntryStagedStateCreate{DraftValue: "new"}, // Creating new resource
+			entryState: EntryState{CurrentValue: nil, StagedState: EntryStagedStateCreate{DraftValue: "new"}}, // Creating new resource
 			stagedTags: StagedTags{
 				ToSet:   map[string]string{"env": "prod"}, // Previously staged tag
 				ToUnset: maputil.NewSet[string](),
@@ -466,7 +489,7 @@ func TestReduceTag_Untag(t *testing.T) {
 		},
 		{
 			name:       "ERROR when entry is Delete",
-			entryState: EntryStagedStateDelete{},
+			entryState: EntryState{CurrentValue: &existingValue, StagedState: EntryStagedStateDelete{}},
 			stagedTags: StagedTags{},
 			action: TagActionUntag{
 				Keys:              maputil.NewSet("env"),
@@ -477,7 +500,7 @@ func TestReduceTag_Untag(t *testing.T) {
 		},
 		{
 			name:       "Auto-skip also clears ToSet (cancel previous tag)",
-			entryState: EntryStagedStateNotStaged{},
+			entryState: EntryState{CurrentValue: &existingValue, StagedState: EntryStagedStateNotStaged{}},
 			stagedTags: StagedTags{
 				ToSet:   map[string]string{"env": "prod"}, // Previously staged tag
 				ToUnset: maputil.NewSet[string](),
@@ -493,7 +516,7 @@ func TestReduceTag_Untag(t *testing.T) {
 		},
 		{
 			name:       "Nil CurrentAWSTagKeys disables auto-skip",
-			entryState: EntryStagedStateNotStaged{},
+			entryState: EntryState{CurrentValue: &existingValue, StagedState: EntryStagedStateNotStaged{}},
 			stagedTags: StagedTags{},
 			action: TagActionUntag{
 				Keys:              maputil.NewSet("env"),
@@ -503,6 +526,17 @@ func TestReduceTag_Untag(t *testing.T) {
 				ToSet:   map[string]string{},
 				ToUnset: maputil.NewSet("env"), // Should be staged since we don't know AWS state
 			},
+		},
+		{
+			name:       "ERROR when resource not found and not staged",
+			entryState: EntryState{CurrentValue: nil, StagedState: EntryStagedStateNotStaged{}},
+			stagedTags: StagedTags{},
+			action: TagActionUntag{
+				Keys:              maputil.NewSet("env"),
+				CurrentAWSTagKeys: maputil.NewSet("env"),
+			},
+			wantStagedTag: StagedTags{},
+			wantError:     ErrCannotUntagNotFound,
 		},
 	}
 

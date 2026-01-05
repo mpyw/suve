@@ -1915,3 +1915,209 @@ func TestParam_ShowOption(t *testing.T) {
 		t.Logf("list --show: %s", stdout)
 	})
 }
+
+// =============================================================================
+// Resource Existence Check Tests
+// =============================================================================
+
+// TestParam_StagingAddExistingResourceFails tests that adding an existing resource fails.
+func TestParam_StagingAddExistingResourceFails(t *testing.T) {
+	setupEnv(t)
+	_ = setupTempHome(t)
+
+	paramName := "/suve-e2e-staging/add-existing/param"
+
+	// Cleanup
+	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	t.Cleanup(func() {
+		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	})
+
+	// Create the parameter first
+	_, _, err := runCommand(t, paramset.Command(), "--yes", paramName, "existing-value")
+	require.NoError(t, err)
+
+	// Try to stage add - should fail because resource already exists
+	t.Run("add-existing-fails", func(t *testing.T) {
+		_, _, err := runSubCommand(t, paramstage.Command(), "add", paramName, "new-value")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "already exists")
+		t.Logf("expected error: %v", err)
+	})
+}
+
+// TestParam_StagingDeleteNonExistingResourceFails tests that deleting a non-existing resource fails.
+func TestParam_StagingDeleteNonExistingResourceFails(t *testing.T) {
+	setupEnv(t)
+	_ = setupTempHome(t)
+
+	paramName := "/suve-e2e-staging/delete-nonexisting/param-does-not-exist"
+
+	// Ensure parameter doesn't exist
+	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+
+	// Try to stage delete - should fail because resource doesn't exist
+	t.Run("delete-nonexisting-fails", func(t *testing.T) {
+		_, _, err := runSubCommand(t, paramstage.Command(), "delete", paramName)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "not found")
+		t.Logf("expected error: %v", err)
+	})
+}
+
+// TestParam_StagingTagNonExistingResourceFails tests that tagging a non-existing resource fails.
+func TestParam_StagingTagNonExistingResourceFails(t *testing.T) {
+	setupEnv(t)
+	_ = setupTempHome(t)
+
+	paramName := "/suve-e2e-staging/tag-nonexisting/param-does-not-exist"
+
+	// Ensure parameter doesn't exist
+	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+
+	// Try to stage tag - should fail because resource doesn't exist
+	t.Run("tag-nonexisting-fails", func(t *testing.T) {
+		_, _, err := runSubCommand(t, paramstage.Command(), "tag", paramName, "env=test")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "not found")
+		t.Logf("expected error: %v", err)
+	})
+}
+
+// TestParam_StagingUntagNonExistingResourceFails tests that untagging a non-existing resource fails.
+func TestParam_StagingUntagNonExistingResourceFails(t *testing.T) {
+	setupEnv(t)
+	_ = setupTempHome(t)
+
+	paramName := "/suve-e2e-staging/untag-nonexisting/param-does-not-exist"
+
+	// Ensure parameter doesn't exist
+	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+
+	// Try to stage untag - should fail because resource doesn't exist
+	t.Run("untag-nonexisting-fails", func(t *testing.T) {
+		_, _, err := runSubCommand(t, paramstage.Command(), "untag", paramName, "env")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "not found")
+		t.Logf("expected error: %v", err)
+	})
+}
+
+// TestParam_StagingDeleteStagedCreateSucceeds tests that deleting a staged CREATE unstages it.
+func TestParam_StagingDeleteStagedCreateSucceeds(t *testing.T) {
+	setupEnv(t)
+	_ = setupTempHome(t)
+
+	paramName := "/suve-e2e-staging/delete-staged-create/param"
+
+	// Ensure parameter doesn't exist
+	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	t.Cleanup(func() {
+		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	})
+
+	// Stage add first
+	t.Run("stage-add", func(t *testing.T) {
+		stdout, _, err := runSubCommand(t, paramstage.Command(), "add", paramName, "new-value")
+		require.NoError(t, err)
+		assert.Contains(t, stdout, "Staged")
+	})
+
+	// Verify it's staged
+	t.Run("verify-staged", func(t *testing.T) {
+		stdout, _, err := runSubCommand(t, paramstage.Command(), "status")
+		require.NoError(t, err)
+		assert.Contains(t, stdout, paramName)
+		assert.Contains(t, stdout, "A") // A = Add
+	})
+
+	// Delete the staged CREATE - should unstage it
+	t.Run("delete-staged-create", func(t *testing.T) {
+		stdout, _, err := runSubCommand(t, paramstage.Command(), "delete", paramName)
+		require.NoError(t, err)
+		assert.Contains(t, stdout, "Unstaged") // Should say "Unstaged" not "Staged for deletion"
+		t.Logf("delete staged create output: %s", stdout)
+	})
+
+	// Verify it's no longer staged
+	t.Run("verify-unstaged", func(t *testing.T) {
+		stdout, _, err := runSubCommand(t, paramstage.Command(), "status")
+		require.NoError(t, err)
+		assert.NotContains(t, stdout, paramName)
+	})
+}
+
+// TestParam_StagingTagStagedCreateSucceeds tests that tagging a staged CREATE succeeds.
+func TestParam_StagingTagStagedCreateSucceeds(t *testing.T) {
+	setupEnv(t)
+	_ = setupTempHome(t)
+
+	paramName := "/suve-e2e-staging/tag-staged-create/param"
+
+	// Ensure parameter doesn't exist
+	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	t.Cleanup(func() {
+		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	})
+
+	// Stage add first
+	t.Run("stage-add", func(t *testing.T) {
+		stdout, _, err := runSubCommand(t, paramstage.Command(), "add", paramName, "new-value")
+		require.NoError(t, err)
+		assert.Contains(t, stdout, "Staged")
+	})
+
+	// Tag the staged CREATE - should succeed
+	t.Run("tag-staged-create", func(t *testing.T) {
+		stdout, _, err := runSubCommand(t, paramstage.Command(), "tag", paramName, "env=test")
+		require.NoError(t, err)
+		assert.Contains(t, stdout, "Staged")
+		t.Logf("tag staged create output: %s", stdout)
+	})
+
+	// Verify both entry and tag are staged
+	t.Run("verify-staged-with-tags", func(t *testing.T) {
+		stdout, _, err := runSubCommand(t, paramstage.Command(), "status")
+		require.NoError(t, err)
+		assert.Contains(t, stdout, paramName)
+		assert.Contains(t, stdout, "A") // A = Add
+		assert.Contains(t, stdout, "T") // T = Tag change
+	})
+
+	// Apply and verify
+	t.Run("apply-and-verify", func(t *testing.T) {
+		_, _, err := runSubCommand(t, paramstage.Command(), "apply", "--yes")
+		require.NoError(t, err)
+
+		stdout, _, err := runCommand(t, paramshow.Command(), paramName)
+		require.NoError(t, err)
+		assert.Contains(t, stdout, "new-value")
+		assert.Contains(t, stdout, "env: test")
+	})
+}
+
+// TestSecret_StagingAddExistingResourceFails tests that adding an existing secret fails.
+func TestSecret_StagingAddExistingResourceFails(t *testing.T) {
+	setupEnv(t)
+	_ = setupTempHome(t)
+
+	secretName := "suve-e2e-staging/add-existing/secret"
+
+	// Cleanup
+	_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
+	t.Cleanup(func() {
+		_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
+	})
+
+	// Create the secret first
+	_, _, err := runCommand(t, secretcreate.Command(), secretName, "existing-value")
+	require.NoError(t, err)
+
+	// Try to stage add - should fail because resource already exists
+	t.Run("add-existing-fails", func(t *testing.T) {
+		_, _, err := runSubCommand(t, secretstage.Command(), "add", secretName, "new-value")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "already exists")
+		t.Logf("expected error: %v", err)
+	})
+}

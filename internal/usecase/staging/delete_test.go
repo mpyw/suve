@@ -154,28 +154,57 @@ func TestDeleteUseCase_Execute_FetchError(t *testing.T) {
 	assert.Contains(t, err.Error(), "failed to fetch")
 }
 
-func TestDeleteUseCase_Execute_ZeroLastModified(t *testing.T) {
+func TestDeleteUseCase_Execute_ZeroLastModified_ResourceNotFound(t *testing.T) {
 	t.Parallel()
 
 	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
 	strategy := newMockDeleteStrategy(false)
-	strategy.lastModified = time.Time{} // Zero time
+	strategy.lastModified = time.Time{} // Zero time means resource doesn't exist
 
 	uc := &usecasestaging.DeleteUseCase{
 		Strategy: strategy,
 		Store:    store,
 	}
 
-	output, err := uc.Execute(context.Background(), usecasestaging.DeleteInput{
+	// Delete should fail when resource doesn't exist on AWS and not staged
+	_, err := uc.Execute(context.Background(), usecasestaging.DeleteInput{
 		Name: "/app/to-delete",
 	})
-	require.NoError(t, err)
-	assert.Equal(t, "/app/to-delete", output.Name)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "resource not found")
+}
 
-	// Verify BaseModifiedAt is nil when lastModified is zero
-	entry, err := store.GetEntry(staging.ServiceParam, "/app/to-delete")
+func TestDeleteUseCase_Execute_ZeroLastModified_StagedCreate(t *testing.T) {
+	t.Parallel()
+
+	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+
+	// Pre-stage a CREATE operation
+	require.NoError(t, store.StageEntry(staging.ServiceParam, "/app/new-param", staging.Entry{
+		Operation: staging.OperationCreate,
+		Value:     lo.ToPtr("new-value"),
+		StagedAt:  time.Now(),
+	}))
+
+	strategy := newMockDeleteStrategy(false)
+	strategy.lastModified = time.Time{} // Zero time means resource doesn't exist on AWS
+
+	uc := &usecasestaging.DeleteUseCase{
+		Strategy: strategy,
+		Store:    store,
+	}
+
+	// Delete should succeed by unstaging the CREATE
+	output, err := uc.Execute(context.Background(), usecasestaging.DeleteInput{
+		Name: "/app/new-param",
+	})
 	require.NoError(t, err)
-	assert.Nil(t, entry.BaseModifiedAt)
+	assert.Equal(t, "/app/new-param", output.Name)
+	assert.True(t, output.Unstaged) // Should be unstaged, not deleted
+
+	// Verify entry is removed
+	_, err = store.GetEntry(staging.ServiceParam, "/app/new-param")
+	assert.ErrorIs(t, err, staging.ErrNotStaged)
 }
 
 func TestDeleteUseCase_Execute_StageError(t *testing.T) {

@@ -233,7 +233,7 @@ func TestTagUseCase_Tag_ZeroLastModified(t *testing.T) {
 	assert.Nil(t, tagEntry.BaseModifiedAt)
 }
 
-func TestTagUseCase_Tag_StagedForCreate_NoFetch(t *testing.T) {
+func TestTagUseCase_Tag_StagedForCreate_ResourceNotFound(t *testing.T) {
 	t.Parallel()
 
 	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
@@ -245,16 +245,16 @@ func TestTagUseCase_Tag_StagedForCreate_NoFetch(t *testing.T) {
 		StagedAt:  time.Now(),
 	}))
 
-	// Create strategy that would fail if FetchCurrentValue is called
+	// Create strategy that returns not-found (resource doesn't exist on AWS)
 	strategy := newMockTagStrategy()
-	strategy.fetchErr = errors.New("should not be called - resource doesn't exist")
+	strategy.fetchErr = &staging.ResourceNotFoundError{Err: errors.New("resource not found")}
 
 	uc := &usecasestaging.TagUseCase{
 		Strategy: strategy,
 		Store:    store,
 	}
 
-	// Tag the staged CREATE entry - should NOT call FetchCurrentValue
+	// Tag the staged CREATE entry - should succeed despite resource not existing on AWS
 	_, err := uc.Tag(context.Background(), usecasestaging.TagInput{
 		Name: "/app/new-param",
 		Tags: map[string]string{"env": "prod"},
@@ -538,16 +538,16 @@ func TestTagUseCase_Untag_StagedForCreate_WithExistingTags(t *testing.T) {
 		StagedAt: time.Now(),
 	}))
 
-	// Strategy that would fail if FetchCurrentValue is called
+	// Strategy that returns not-found (resource doesn't exist on AWS)
 	strategy := newMockTagStrategy()
-	strategy.fetchErr = errors.New("should not be called")
+	strategy.fetchErr = &staging.ResourceNotFoundError{Err: errors.New("resource not found")}
 
 	uc := &usecasestaging.TagUseCase{
 		Strategy: strategy,
 		Store:    store,
 	}
 
-	// Untag "env" from the staged CREATE entry - should NOT call FetchCurrentValue
+	// Untag "env" from the staged CREATE entry - should succeed despite resource not existing
 	_, err := uc.Untag(context.Background(), usecasestaging.UntagInput{
 		Name:    "/app/new-param",
 		TagKeys: maputil.NewSet("env"),
@@ -575,9 +575,9 @@ func TestTagUseCase_Untag_StagedForCreate_AutoSkip(t *testing.T) {
 		StagedAt:  time.Now(),
 	}))
 
-	// Strategy that would fail if FetchCurrentValue is called
+	// Strategy that returns not-found (resource doesn't exist on AWS)
 	strategy := newMockTagStrategy()
-	strategy.fetchErr = errors.New("should not be called")
+	strategy.fetchErr = &staging.ResourceNotFoundError{Err: errors.New("resource not found")}
 
 	uc := &usecasestaging.TagUseCase{
 		Strategy: strategy,

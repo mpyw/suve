@@ -27,10 +27,10 @@ The staging system manages two types of state:
 stateDiagram-v2
     [*] --> NotStaged
 
-    NotStaged --> Create: add
+    NotStaged --> Create: add (resource NOT in AWS)
     NotStaged --> Update: edit (value != AWS)
     NotStaged --> NotStaged: edit (value = AWS) [auto-skip]
-    NotStaged --> Delete: delete
+    NotStaged --> Delete: delete (resource in AWS)
 
     Create --> Create: add (update draft)
     Create --> Create: edit (update draft)
@@ -45,6 +45,12 @@ stateDiagram-v2
     Delete --> NotStaged: reset
     Delete --> Delete: delete [no-op]
 
+    note right of NotStaged
+        add (resource in AWS) -> ERROR
+        delete (resource NOT in AWS) -> ERROR
+        tag/untag (resource NOT in AWS) -> ERROR
+    end note
+
     note right of Delete
         edit -> ERROR
         add -> ERROR
@@ -56,14 +62,18 @@ stateDiagram-v2
 
 | Current State | Action | Condition | New State | Notes |
 |---------------|--------|-----------|-----------|-------|
-| NotStaged | `add` | - | Create | Stage new resource |
+| NotStaged | `add` | resource NOT in AWS | Create | Stage new resource |
+| NotStaged | `add` | resource in AWS | **ERROR** | Use `edit` instead |
 | NotStaged | `edit` | value != AWS | Update | Stage modification |
 | NotStaged | `edit` | value = AWS | NotStaged | Auto-skip (no change needed) |
-| NotStaged | `delete` | - | Delete | Stage deletion |
+| NotStaged | `delete` | resource in AWS | Delete | Stage deletion |
+| NotStaged | `delete` | resource NOT in AWS | **ERROR** | Resource doesn't exist |
+| NotStaged | `tag/untag` | resource NOT in AWS | **ERROR** | Resource doesn't exist |
 | Create | `add` | - | Create | Update draft value |
 | Create | `edit` | - | Create | Update draft value |
 | Create | `delete` | - | NotStaged | Unstage + discard tags |
 | Create | `reset` | - | NotStaged | Unstage only |
+| Create | `tag/untag` | - | HasChanges | Tags apply on resource creation |
 | Update | `edit` | value != AWS | Update | Update draft value |
 | Update | `edit` | value = AWS | NotStaged | Auto-unstage (reverted) |
 | Update | `delete` | - | Delete | Convert to delete |
@@ -101,6 +111,24 @@ When a `Create`-staged resource is deleted (unstaged), any associated tag change
 -> delete /app/new -> Both entry and tags unstaged
 ```
 
+#### Resource Existence Checks
+Before staging operations, suve validates that the resource state in AWS is compatible with the requested action:
+
+| Action | Requirement | Error |
+|--------|-------------|-------|
+| `add` | Resource must NOT exist in AWS | "cannot add: resource already exists, use edit instead" |
+| `delete` | Resource must exist in AWS (or be staged as Create) | "cannot delete: resource not found" |
+| `tag/untag` | Resource must exist in AWS (or be staged as Create) | "cannot tag/untag: resource not found" |
+
+This prevents common mistakes like:
+```
+-> add /app/existing   -> ERROR (resource exists, use edit)
+-> delete /app/missing -> ERROR (resource not found)
+-> tag /app/missing    -> ERROR (resource not found)
+```
+
+For staged `Create` resources, `delete` unstages instead of erroring, and `tag/untag` is allowed (tags will be applied when the resource is created).
+
 ## Tag State Machine
 
 ### States
@@ -124,6 +152,12 @@ stateDiagram-v2
     HasChanges --> HasChanges: tag (add/update)
     HasChanges --> HasChanges: untag
     HasChanges --> Empty: all changes cleared [auto-unstage]
+
+    note right of Empty
+        Resource NOT in AWS
+        AND NOT staged as Create
+        -> ERROR for tag/untag
+    end note
 
     note right of HasChanges
         Entry=Delete -> ERROR for tag/untag
