@@ -1,5 +1,5 @@
 # Build outputs
-build/
+build/bin/
 gui
 
 # Dependencies

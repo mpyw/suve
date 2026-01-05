@@ -260,14 +260,42 @@ jobs:
           sha256sum *.tar.gz *.zip > checksums.txt
           cat checksums.txt
 
-      - name: Create GitHub Release
+      - name: Create or Update GitHub Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release create ${{ github.ref_name }} \
-            --title "${{ github.ref_name }}" \
-            --generate-notes \
-            releases/*
+          TAG="${{ github.ref_name }}"
+
+          # Check if release already exists
+          if gh release view "$TAG" &>/dev/null; then
+            echo "Release $TAG already exists, updating..."
+
+            # Get existing release body to preserve What's Changed
+            EXISTING_BODY=$(gh release view "$TAG" --json body -q .body)
+
+            # Generate new release notes
+            NEW_NOTES=$(gh api repos/${{ github.repository }}/releases/generate-notes \
+              -f tag_name="$TAG" \
+              --jq .body)
+
+            # Merge: keep existing What's Changed, append new notes if different
+            if [[ -n "$EXISTING_BODY" ]]; then
+              # Use existing body (preserves manually added What's Changed)
+              FINAL_BODY="$EXISTING_BODY"
+            else
+              FINAL_BODY="$NEW_NOTES"
+            fi
+
+            # Update release with new body and upload assets
+            gh release edit "$TAG" --notes "$FINAL_BODY"
+            gh release upload "$TAG" releases/* --clobber
+          else
+            echo "Creating new release $TAG..."
+            gh release create "$TAG" \
+              --title "$TAG" \
+              --generate-notes \
+              releases/*
+          fi
 
       - name: Update Homebrew formula
         env:

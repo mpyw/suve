@@ -15,7 +15,7 @@
 <aside class="sidebar">
   <div class="logo">
     <span class="logo-text">suve</span>
-    <span class="logo-sub">AWS Secrets Viewer</span>
+    <span class="logo-sub">Secret Unified Versioning Explorer</span>
   </div>
 
   <nav class="nav">
