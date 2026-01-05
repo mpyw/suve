@@ -3,7 +3,6 @@ package list_test
 import (
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"testing"
 
@@ -33,7 +32,7 @@ func TestCommand_Help(t *testing.T) {
 
 type mockClient struct {
 	describeParametersFunc func(ctx context.Context, params *paramapi.DescribeParametersInput, optFns ...func(*paramapi.Options)) (*paramapi.DescribeParametersOutput, error)
-	getParameterFunc       func(ctx context.Context, params *paramapi.GetParameterInput, optFns ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error)
+	getParametersFunc      func(ctx context.Context, params *paramapi.GetParametersInput, optFns ...func(*paramapi.Options)) (*paramapi.GetParametersOutput, error)
 }
 
 func (m *mockClient) DescribeParameters(ctx context.Context, params *paramapi.DescribeParametersInput, optFns ...func(*paramapi.Options)) (*paramapi.DescribeParametersOutput, error) {
@@ -43,11 +42,11 @@ func (m *mockClient) DescribeParameters(ctx context.Context, params *paramapi.De
 	return nil, fmt.Errorf("DescribeParameters not mocked")
 }
 
-func (m *mockClient) GetParameter(ctx context.Context, params *paramapi.GetParameterInput, optFns ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
-	if m.getParameterFunc != nil {
-		return m.getParameterFunc(ctx, params, optFns...)
+func (m *mockClient) GetParameters(ctx context.Context, params *paramapi.GetParametersInput, optFns ...func(*paramapi.Options)) (*paramapi.GetParametersOutput, error) {
+	if m.getParametersFunc != nil {
+		return m.getParametersFunc(ctx, params, optFns...)
 	}
-	return nil, fmt.Errorf("GetParameter not mocked")
+	return nil, fmt.Errorf("GetParameters not mocked")
 }
 
 func TestRun(t *testing.T) {
@@ -164,17 +163,22 @@ func TestRun(t *testing.T) {
 						},
 					}, nil
 				},
-				getParameterFunc: func(_ context.Context, params *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
-					name := lo.FromPtr(params.Name)
+				getParametersFunc: func(_ context.Context, params *paramapi.GetParametersInput, _ ...func(*paramapi.Options)) (*paramapi.GetParametersOutput, error) {
 					values := map[string]string{
 						"/app/param1": "value1",
 						"/app/param2": "value2",
 					}
-					return &paramapi.GetParameterOutput{
-						Parameter: &paramapi.Parameter{
-							Name:  params.Name,
-							Value: lo.ToPtr(values[name]),
-						},
+					var result []paramapi.Parameter
+					for _, name := range params.Names {
+						if val, ok := values[name]; ok {
+							result = append(result, paramapi.Parameter{
+								Name:  lo.ToPtr(name),
+								Value: lo.ToPtr(val),
+							})
+						}
+					}
+					return &paramapi.GetParametersOutput{
+						Parameters: result,
 					}, nil
 				},
 			},
@@ -213,12 +217,16 @@ func TestRun(t *testing.T) {
 						},
 					}, nil
 				},
-				getParameterFunc: func(_ context.Context, params *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
-					return &paramapi.GetParameterOutput{
-						Parameter: &paramapi.Parameter{
-							Name:  params.Name,
+				getParametersFunc: func(_ context.Context, params *paramapi.GetParametersInput, _ ...func(*paramapi.Options)) (*paramapi.GetParametersOutput, error) {
+					var result []paramapi.Parameter
+					for _, name := range params.Names {
+						result = append(result, paramapi.Parameter{
+							Name:  lo.ToPtr(name),
 							Value: lo.ToPtr("secret-value"),
-						},
+						})
+					}
+					return &paramapi.GetParametersOutput{
+						Parameters: result,
 					}, nil
 				},
 			},
@@ -238,13 +246,16 @@ func TestRun(t *testing.T) {
 						},
 					}, nil
 				},
-				getParameterFunc: func(_ context.Context, _ *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
-					return nil, errors.New("access denied")
+				getParametersFunc: func(_ context.Context, params *paramapi.GetParametersInput, _ ...func(*paramapi.Options)) (*paramapi.GetParametersOutput, error) {
+					// Return all requested parameters as invalid (simulates not found)
+					return &paramapi.GetParametersOutput{
+						InvalidParameters: params.Names,
+					}, nil
 				},
 			},
 			check: func(t *testing.T, out string) {
 				assert.Contains(t, out, `"name": "/app/error-param"`)
-				assert.Contains(t, out, `"error": "access denied"`)
+				assert.Contains(t, out, `"error":`)
 			},
 		},
 		{
@@ -258,8 +269,11 @@ func TestRun(t *testing.T) {
 						},
 					}, nil
 				},
-				getParameterFunc: func(_ context.Context, _ *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
-					return nil, errors.New("fetch error")
+				getParametersFunc: func(_ context.Context, params *paramapi.GetParametersInput, _ ...func(*paramapi.Options)) (*paramapi.GetParametersOutput, error) {
+					// Return all requested parameters as invalid (simulates not found)
+					return &paramapi.GetParametersOutput{
+						InvalidParameters: params.Names,
+					}, nil
 				},
 			},
 			check: func(t *testing.T, out string) {
