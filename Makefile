@@ -1,4 +1,4 @@
-.PHONY: build test lint e2e up down clean coverage coverage-e2e coverage-all
+.PHONY: build test lint e2e up down clean coverage coverage-e2e coverage-all gui-dev gui-build gui-bindings
 
 SUVE_LOCALSTACK_EXTERNAL_PORT ?= 4566
 COVERPKG = $(shell go list ./... | grep -v testutil | grep -v /e2e | grep -v internal/gui | grep -v /cmd/ | tr '\n' ',')
@@ -54,3 +54,21 @@ coverage-all: up
 	@echo "Merging coverage profiles..."
 	@go run github.com/wadey/gocovmerge@latest coverage-unit.out coverage-e2e.out > coverage-all.out
 	go tool cover -func=coverage-all.out | grep total
+
+# GUI development server
+gui-dev:
+	cd gui && wails dev -skipbindings -tags dev
+
+# GUI production build
+gui-build:
+	cd gui && wails build -tags production -skipbindings
+
+# GUI bindings regeneration (temporarily removes build constraints)
+gui-bindings:
+	@echo "Temporarily removing build constraints..."
+	@find gui internal/gui -name '*.go' -exec sed -i.bak 's|^//go:build.*||' {} \;
+	@echo "Generating bindings..."
+	@cd gui && timeout 30 wails dev -tags dev 2>&1 | head -30 || true
+	@echo "Restoring build constraints..."
+	@find gui internal/gui -name '*.go.bak' -exec sh -c 'mv "$$1" "$${1%.bak}"' _ {} \;
+	@echo "Done. Check internal/gui/frontend/wailsjs/go/ for updated bindings."

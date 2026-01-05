@@ -1067,9 +1067,9 @@ func (a *App) StagingAddTag(service, name, key, value string) (*StagingAddTagRes
 		Strategy: strategy,
 		Store:    store,
 	}
-	result, err := uc.Execute(a.ctx, stagingusecase.TagInput{
-		Name:    name,
-		AddTags: map[string]string{key: value},
+	result, err := uc.Tag(a.ctx, stagingusecase.TagInput{
+		Name: name,
+		Tags: map[string]string{key: value},
 	})
 	if err != nil {
 		return nil, err
@@ -1099,9 +1099,9 @@ func (a *App) StagingRemoveTag(service, name, key string) (*StagingRemoveTagResu
 		Strategy: strategy,
 		Store:    store,
 	}
-	result, err := uc.Execute(a.ctx, stagingusecase.TagInput{
-		Name:       name,
-		RemoveTags: maputil.NewSet(key),
+	result, err := uc.Untag(a.ctx, stagingusecase.UntagInput{
+		Name:    name,
+		TagKeys: maputil.NewSet(key),
 	})
 	if err != nil {
 		return nil, err
