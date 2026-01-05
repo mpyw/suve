@@ -27,24 +27,29 @@
   let nextToken = $state('');
   let loadingMore = $state(false);
 
-  // Track previous withValue for effect
-  let prevWithValue = false;
-  let mounted = false;
+  // Track if initial load has happened
+  let initialLoadDone = $state(false);
 
+  interface LoadSecretsOptions {
+    prefix: string;
+    filter: string;
+    withValue: boolean;
+  }
+
+  // Reload when filter options change
   $effect(() => {
-    const currentWithValue = withValue;
-    if (mounted && currentWithValue !== prevWithValue) {
-      prevWithValue = currentWithValue;
-      loadSecrets();
+    const opts = { prefix, filter, withValue }; // read values to create dependencies
+    if (initialLoadDone) {
+      loadSecrets(opts);
     }
   });
 
   function handlePrefixInput() {
-    debounce(() => loadSecrets());
+    debounce(() => loadSecrets({ prefix, filter, withValue }));
   }
 
   function handleFilterInput() {
-    debounce(() => loadSecrets());
+    debounce(() => loadSecrets({ prefix, filter, withValue }));
   }
   let loading = $state(false);
   let error = $state('');
@@ -95,12 +100,12 @@
   let sentinelElement: HTMLDivElement | undefined = $state(undefined);
   let observer: IntersectionObserver | null = null;
 
-  async function loadSecrets() {
+  async function loadSecrets(opts: LoadSecretsOptions) {
     loading = true;
     error = '';
     nextToken = '';
     try {
-      const result = await SecretList(prefix, withValue, filter, PAGE_SIZE, '');
+      const result = await SecretList(opts.prefix, opts.withValue, opts.filter, PAGE_SIZE, '');
       entries = result?.entries || [];
       nextToken = result?.nextToken || '';
     } catch (e) {
@@ -393,10 +398,9 @@
     }
   }
 
-  onMount(() => {
-    mounted = true;
-    prevWithValue = withValue;
-    loadSecrets();
+  onMount(async () => {
+    await loadSecrets({ prefix, filter, withValue });
+    initialLoadDone = true;
   });
 </script>
 

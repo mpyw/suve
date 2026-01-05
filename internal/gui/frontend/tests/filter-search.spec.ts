@@ -224,6 +224,95 @@ test.describe('View Mode - Show Values Toggle', () => {
     await showValuesCheckbox.check();
     await expect(showValuesCheckbox).toBeChecked();
   });
+
+  test('should not show values in list when checkbox is unchecked', async ({ page }) => {
+    // Show Values is unchecked by default
+    const showValuesCheckbox = page.locator('label').filter({ hasText: 'Show Values' }).locator('input[type="checkbox"]');
+    await expect(showValuesCheckbox).not.toBeChecked();
+
+    // Values should not be displayed in list items
+    const itemValues = page.locator('.item-value');
+    await expect(itemValues).toHaveCount(0);
+  });
+
+  test('should show values in list when checkbox is checked', async ({ page }) => {
+    // Check Show Values
+    const showValuesCheckbox = page.locator('label').filter({ hasText: 'Show Values' }).locator('input[type="checkbox"]');
+    await showValuesCheckbox.check();
+
+    // Wait for data to reload
+    await page.waitForTimeout(100);
+
+    // Values should be displayed in list items
+    const itemValues = page.locator('.item-value');
+    await expect(itemValues).toHaveCount(6); // 6 parameters in createFilterTestState
+  });
+
+  test('should hide values when checkbox is unchecked after being checked', async ({ page }) => {
+    const showValuesCheckbox = page.locator('label').filter({ hasText: 'Show Values' }).locator('input[type="checkbox"]');
+
+    // First check the checkbox
+    await showValuesCheckbox.check();
+    await page.waitForTimeout(100);
+
+    // Verify values are shown
+    await expect(page.locator('.item-value')).toHaveCount(6);
+
+    // Now uncheck the checkbox
+    await showValuesCheckbox.uncheck();
+    await page.waitForTimeout(100);
+
+    // Values should be hidden
+    await expect(page.locator('.item-value')).toHaveCount(0);
+  });
+});
+
+// ============================================================================
+// Secret View Mode Tests
+// ============================================================================
+
+test.describe('Secret View Mode - Show Values Toggle', () => {
+  test.beforeEach(async ({ page }) => {
+    await setupWailsMocks(page, createFilterTestState());
+    await page.goto('/');
+    await navigateTo(page, 'Secrets');
+    await waitForViewLoaded(page);
+  });
+
+  test('should not show secret values in list when checkbox is unchecked', async ({ page }) => {
+    const showValuesCheckbox = page.locator('label').filter({ hasText: 'Show Values' }).locator('input[type="checkbox"]');
+    await expect(showValuesCheckbox).not.toBeChecked();
+
+    // Values should not be displayed in list items
+    const itemValues = page.locator('.item-value');
+    await expect(itemValues).toHaveCount(0);
+  });
+
+  test('should show secret values in list when checkbox is checked', async ({ page }) => {
+    const showValuesCheckbox = page.locator('label').filter({ hasText: 'Show Values' }).locator('input[type="checkbox"]');
+    await showValuesCheckbox.check();
+    await page.waitForTimeout(100);
+
+    // Values should be displayed - 5 secrets in createFilterTestState
+    const itemValues = page.locator('.item-value');
+    await expect(itemValues).toHaveCount(5);
+  });
+
+  test('should hide secret values when checkbox is unchecked after being checked', async ({ page }) => {
+    const showValuesCheckbox = page.locator('label').filter({ hasText: 'Show Values' }).locator('input[type="checkbox"]');
+
+    // First check the checkbox
+    await showValuesCheckbox.check();
+    await page.waitForTimeout(100);
+    await expect(page.locator('.item-value')).toHaveCount(5);
+
+    // Now uncheck the checkbox
+    await showValuesCheckbox.uncheck();
+    await page.waitForTimeout(100);
+
+    // Values should be hidden
+    await expect(page.locator('.item-value')).toHaveCount(0);
+  });
 });
 
 // ============================================================================

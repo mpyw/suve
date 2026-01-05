@@ -69,17 +69,21 @@
   let sentinelElement: HTMLDivElement | undefined = $state(undefined);
   let observer: IntersectionObserver | null = null;
 
-  // Track previous values for effect
-  let prevRecursive = recursive;
-  let prevWithValue = withValue;
-  let mounted = false;
+  // Track if initial load has happened
+  let initialLoadDone = $state(false);
 
+  interface LoadParamsOptions {
+    prefix: string;
+    filter: string;
+    recursive: boolean;
+    withValue: boolean;
+  }
+
+  // Reload when filter options change
   $effect(() => {
-    // Watch recursive and withValue changes
-    if (mounted && (recursive !== prevRecursive || withValue !== prevWithValue)) {
-      prevRecursive = recursive;
-      prevWithValue = withValue;
-      loadParams();
+    const opts = { prefix, filter, recursive, withValue }; // read values to create dependencies
+    if (initialLoadDone) {
+      loadParams(opts);
     }
   });
 
@@ -90,19 +94,19 @@
   });
 
   function handlePrefixInput() {
-    debounce(() => loadParams());
+    debounce(() => loadParams({ prefix, filter, recursive, withValue }));
   }
 
   function handleFilterInput() {
-    debounce(() => loadParams());
+    debounce(() => loadParams({ prefix, filter, recursive, withValue }));
   }
 
-  async function loadParams() {
+  async function loadParams(opts: LoadParamsOptions) {
     loading = true;
     error = '';
     nextToken = '';
     try {
-      const result = await ParamList(prefix, recursive, withValue, filter, PAGE_SIZE, '');
+      const result = await ParamList(opts.prefix, opts.recursive, opts.withValue, opts.filter, PAGE_SIZE, '');
       entries = result?.entries || [];
       nextToken = result?.nextToken || '';
     } catch (e) {
@@ -345,9 +349,9 @@
     }
   }
 
-  onMount(() => {
-    mounted = true;
-    loadParams();
+  onMount(async () => {
+    await loadParams({ prefix, filter, recursive, withValue });
+    initialLoadDone = true;
   });
 </script>
 
