@@ -380,6 +380,28 @@ func TestRun(t *testing.T) {
 				assert.Contains(t, output, `"backend"`)
 			},
 		},
+		{
+			name: "JSON output with empty tags shows empty object",
+			opts: show.Options{
+				Spec:   &paramversion.Spec{Name: "/my/param"},
+				Output: output.FormatJSON,
+			},
+			mock: &mockClient{
+				getParameterFunc: func(_ context.Context, _ *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
+					return &paramapi.GetParameterOutput{
+						Parameter: &paramapi.Parameter{
+							Name:    lo.ToPtr("/my/param"),
+							Value:   lo.ToPtr("test-value"),
+							Version: 1,
+							Type:    paramapi.ParameterTypeString,
+						},
+					}, nil
+				},
+			},
+			check: func(t *testing.T, output string) {
+				assert.Contains(t, output, `"tags": {}`)
+			},
+		},
 	}
 
 	for _, tt := range tests {

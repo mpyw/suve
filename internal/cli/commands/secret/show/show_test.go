@@ -304,6 +304,22 @@ func TestRun(t *testing.T) {
 				assert.Contains(t, output, `"backend"`)
 			},
 		},
+		{
+			name: "JSON output with empty tags shows empty object",
+			opts: show.Options{Spec: &secretversion.Spec{Name: "my-secret"}, Output: output.FormatJSON},
+			mock: &mockClient{
+				getSecretValueFunc: func(_ context.Context, _ *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) {
+					return &secretapi.GetSecretValueOutput{
+						Name:         lo.ToPtr("my-secret"),
+						ARN:          lo.ToPtr("arn:aws:secretsmanager:us-east-1:123456789012:secret:my-secret-AbCdEf"),
+						SecretString: lo.ToPtr("secret-value"),
+					}, nil
+				},
+			},
+			check: func(t *testing.T, output string) {
+				assert.Contains(t, output, `"tags": {}`)
+			},
+		},
 	}
 
 	for _, tt := range tests {
