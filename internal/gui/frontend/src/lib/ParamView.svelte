@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
-  import { ParamList, ParamShow, ParamLog, ParamSet, ParamDelete, ParamDiff, ParamAddTag, ParamRemoveTag, StagingAdd, StagingEdit, StagingDelete, StagingAddTag, StagingRemoveTag } from '../../wailsjs/go/gui/App';
+  import { ParamList, ParamShow, ParamLog, ParamSet, ParamDelete, ParamDiff, ParamAddTag, ParamRemoveTag, StagingAdd, StagingEdit, StagingDelete, StagingAddTag, StagingRemoveTag, StagingCheckStatus } from '../../wailsjs/go/gui/App';
   import type { gui } from '../../wailsjs/go/models';
   import CloseIcon from './icons/CloseIcon.svelte';
   import EyeIcon from './icons/EyeIcon.svelte';
@@ -10,6 +10,12 @@
   import { maskValue, formatDate, parseError, createDebouncer } from './viewUtils';
   import { createDiffMode } from './useDiffMode.svelte';
   import './common.css';
+
+  interface Props {
+    onnavigatetostaging?: () => void;
+  }
+
+  let { onnavigatetostaging }: Props = $props();
 
   const PAGE_SIZE = 50;
   const debounce = createDebouncer(300);
@@ -30,6 +36,9 @@
   let paramLog: gui.ParamLogEntry[] = $state([]);
   let detailLoading = $state(false);
   let showValue = $state(false);
+
+  // Staging status for the selected item
+  let stagingStatus: { hasEntry: boolean; hasTags: boolean } | null = $state(null);
 
   // Modal states
   let showSetModal = $state(false);
@@ -144,13 +153,16 @@
     selectedParam = name;
     detailLoading = true;
     showValue = withValue;
+    stagingStatus = null;
     try {
-      const [detail, log] = await Promise.all([
+      const [detail, log, staging] = await Promise.all([
         ParamShow(name),
-        ParamLog(name, 10)
+        ParamLog(name, 10),
+        StagingCheckStatus('param', name)
       ]);
       paramDetail = detail;
       paramLog = log?.entries || [];
+      stagingStatus = staging;
     } catch (e) {
       error = parseError(e);
     } finally {
@@ -163,6 +175,20 @@
     paramDetail = null;
     paramLog = [];
     showValue = false;
+    stagingStatus = null;
+  }
+
+  function getStagingMessage(): string | null {
+    if (!stagingStatus || (!stagingStatus.hasEntry && !stagingStatus.hasTags)) {
+      return null;
+    }
+    if (stagingStatus.hasEntry && stagingStatus.hasTags) {
+      return 'This item has staged value and tag changes';
+    }
+    if (stagingStatus.hasEntry) {
+      return 'This item has staged value changes';
+    }
+    return 'This item has staged tag changes';
   }
 
   function toggleShowValue() {
@@ -408,6 +434,14 @@
             </button>
           </div>
         </div>
+
+        {#if getStagingMessage()}
+          <button class="staging-banner" onclick={onnavigatetostaging}>
+            <span class="staging-icon">⚠</span>
+            <span class="staging-text">{getStagingMessage()}</span>
+            <span class="staging-link">View in Staging →</span>
+          </button>
+        {/if}
 
         {#if detailLoading}
           <div class="loading">Loading...</div>
@@ -700,5 +734,44 @@
 
   .value-display.masked {
     font-style: italic;
+  }
+
+  .staging-banner {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 10px 12px;
+    margin: 8px 0 0 0;
+    background: rgba(255, 193, 7, 0.15);
+    border: 1px solid rgba(255, 193, 7, 0.4);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background-color 0.2s, border-color 0.2s;
+    text-align: left;
+  }
+
+  .staging-banner:hover {
+    background: rgba(255, 193, 7, 0.25);
+    border-color: rgba(255, 193, 7, 0.6);
+  }
+
+  .staging-icon {
+    color: #ffc107;
+    font-size: 14px;
+    flex-shrink: 0;
+  }
+
+  .staging-text {
+    color: #e0e0e0;
+    font-size: 13px;
+    flex: 1;
+  }
+
+  .staging-link {
+    color: #ffc107;
+    font-size: 12px;
+    font-weight: 500;
+    flex-shrink: 0;
   }
 </style>

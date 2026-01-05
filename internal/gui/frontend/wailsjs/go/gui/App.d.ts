@@ -50,6 +50,8 @@ export function StagingCancelAddTag(arg1:string,arg2:string,arg3:string):Promise
 
 export function StagingCancelRemoveTag(arg1:string,arg2:string,arg3:string):Promise<gui.StagingCancelRemoveTagResult>;
 
+export function StagingCheckStatus(arg1:string,arg2:string):Promise<gui.StagingCheckStatusResult>;
+
 export function StagingDelete(arg1:string,arg2:string,arg3:boolean,arg4:number):Promise<gui.StagingDeleteResult>;
 
 export function StagingDiff(arg1:string,arg2:string):Promise<gui.StagingDiffResult>;
