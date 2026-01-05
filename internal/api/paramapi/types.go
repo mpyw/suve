@@ -16,6 +16,8 @@ type (
 type (
 	GetParameterInput            = ssm.GetParameterInput
 	GetParameterOutput           = ssm.GetParameterOutput
+	GetParametersInput           = ssm.GetParametersInput
+	GetParametersOutput          = ssm.GetParametersOutput
 	GetParameterHistoryInput     = ssm.GetParameterHistoryInput
 	GetParameterHistoryOutput    = ssm.GetParameterHistoryOutput
 	PutParameterInput            = ssm.PutParameterInput

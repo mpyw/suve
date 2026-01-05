@@ -3,6 +3,7 @@ package param_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/samber/lo"
@@ -19,10 +20,11 @@ type mockListClient struct {
 	describeCallCount int
 	describeErr       error
 	getParameterValue map[string]string
-	getParameterErr   map[string]error
+	invalidParameters []string // Parameters that should be returned as invalid
+	getParametersErr  error    // Error to return from GetParameters
 }
 
-func (m *mockListClient) DescribeParameters(_ context.Context, input *paramapi.DescribeParametersInput, _ ...func(*paramapi.Options)) (*paramapi.DescribeParametersOutput, error) {
+func (m *mockListClient) DescribeParameters(_ context.Context, _ *paramapi.DescribeParametersInput, _ ...func(*paramapi.Options)) (*paramapi.DescribeParametersOutput, error) {
 	if m.describeErr != nil {
 		return nil, m.describeErr
 	}
@@ -38,21 +40,38 @@ func (m *mockListClient) DescribeParameters(_ context.Context, input *paramapi.D
 	return m.describeResult, nil
 }
 
-func (m *mockListClient) GetParameter(_ context.Context, input *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
-	name := lo.FromPtr(input.Name)
-	if m.getParameterErr != nil {
-		if err, ok := m.getParameterErr[name]; ok {
-			return nil, err
+func (m *mockListClient) GetParameters(_ context.Context, input *paramapi.GetParametersInput, _ ...func(*paramapi.Options)) (*paramapi.GetParametersOutput, error) {
+	if m.getParametersErr != nil {
+		return nil, m.getParametersErr
+	}
+
+	var params []paramapi.Parameter
+	var invalidParams []string
+
+	invalidSet := make(map[string]bool)
+	for _, name := range m.invalidParameters {
+		invalidSet[name] = true
+	}
+
+	for _, name := range input.Names {
+		if invalidSet[name] {
+			invalidParams = append(invalidParams, name)
+			continue
+		}
+		if m.getParameterValue != nil {
+			if value, ok := m.getParameterValue[name]; ok {
+				params = append(params, paramapi.Parameter{
+					Name:  lo.ToPtr(name),
+					Value: lo.ToPtr(value),
+				})
+			}
 		}
 	}
-	if m.getParameterValue != nil {
-		if value, ok := m.getParameterValue[name]; ok {
-			return &paramapi.GetParameterOutput{
-				Parameter: &paramapi.Parameter{Value: lo.ToPtr(value)},
-			}, nil
-		}
-	}
-	return nil, &paramapi.ParameterNotFound{Message: lo.ToPtr("not found")}
+
+	return &paramapi.GetParametersOutput{
+		Parameters:        params,
+		InvalidParameters: invalidParams,
+	}, nil
 }
 
 func TestListUseCase_Execute_Empty(t *testing.T) {
@@ -190,10 +209,15 @@ func TestListUseCase_Execute_WithValue(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, output.Entries, 2)
 
+	// Verify actual values are returned correctly
+	valueMap := make(map[string]string)
 	for _, entry := range output.Entries {
-		assert.NotNil(t, entry.Value)
-		assert.Nil(t, entry.Error)
+		require.NotNil(t, entry.Value, "entry %s should have value", entry.Name)
+		assert.Nil(t, entry.Error, "entry %s should not have error", entry.Name)
+		valueMap[entry.Name] = *entry.Value
 	}
+	assert.Equal(t, "config-value", valueMap["/app/config"])
+	assert.Equal(t, "secret-value", valueMap["/app/secret"])
 }
 
 func TestListUseCase_Execute_WithValue_PartialError(t *testing.T) {
@@ -203,15 +227,13 @@ func TestListUseCase_Execute_WithValue_PartialError(t *testing.T) {
 		describeResult: &paramapi.DescribeParametersOutput{
 			Parameters: []paramapi.ParameterMetadata{
 				{Name: lo.ToPtr("/app/config")},
-				{Name: lo.ToPtr("/app/error")},
+				{Name: lo.ToPtr("/app/invalid")},
 			},
 		},
 		getParameterValue: map[string]string{
 			"/app/config": "config-value",
 		},
-		getParameterErr: map[string]error{
-			"/app/error": errors.New("fetch error"),
-		},
+		invalidParameters: []string{"/app/invalid"},
 	}
 
 	uc := &param.ListUseCase{Client: client}
@@ -222,17 +244,21 @@ func TestListUseCase_Execute_WithValue_PartialError(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, output.Entries, 2)
 
-	var hasValue, hasError bool
+	// Verify specific entries
 	for _, entry := range output.Entries {
-		if entry.Value != nil {
-			hasValue = true
-		}
-		if entry.Error != nil {
-			hasError = true
+		switch entry.Name {
+		case "/app/config":
+			require.NotNil(t, entry.Value)
+			assert.Equal(t, "config-value", *entry.Value)
+			assert.Nil(t, entry.Error)
+		case "/app/invalid":
+			assert.Nil(t, entry.Value)
+			require.NotNil(t, entry.Error)
+			assert.Contains(t, entry.Error.Error(), "parameter not found")
+		default:
+			t.Errorf("unexpected entry: %s", entry.Name)
 		}
 	}
-	assert.True(t, hasValue)
-	assert.True(t, hasError)
 }
 
 func TestListUseCase_Execute_WithPagination(t *testing.T) {
@@ -367,4 +393,87 @@ func TestListUseCase_Execute_WithPagination_TrimResults(t *testing.T) {
 	assert.Len(t, output.Entries, 2)
 	assert.Equal(t, "/app/p1", output.Entries[0].Name)
 	assert.Equal(t, "/app/p2", output.Entries[1].Name)
+}
+
+func TestListUseCase_Execute_WithValue_GetParametersError(t *testing.T) {
+	t.Parallel()
+
+	client := &mockListClient{
+		describeResult: &paramapi.DescribeParametersOutput{
+			Parameters: []paramapi.ParameterMetadata{
+				{Name: lo.ToPtr("/app/param1")},
+				{Name: lo.ToPtr("/app/param2")},
+			},
+		},
+		getParametersErr: errors.New("access denied"),
+	}
+
+	uc := &param.ListUseCase{Client: client}
+
+	output, err := uc.Execute(context.Background(), param.ListInput{
+		WithValue: true,
+	})
+	require.NoError(t, err)
+	assert.Len(t, output.Entries, 2)
+
+	// All entries should have errors since GetParameters failed
+	for _, entry := range output.Entries {
+		assert.Nil(t, entry.Value)
+		assert.NotNil(t, entry.Error)
+		assert.Contains(t, entry.Error.Error(), "access denied")
+	}
+}
+
+func TestListUseCase_Execute_WithValue_LargeBatch(t *testing.T) {
+	t.Parallel()
+
+	// Create 15 parameters to test batching (should split into 10 + 5)
+	const numParams = 15
+	metadata := make([]paramapi.ParameterMetadata, numParams)
+	expectedValues := make(map[string]string, numParams)
+	for i := range numParams {
+		name := fmt.Sprintf("/app/param%d", i)
+		metadata[i] = paramapi.ParameterMetadata{Name: lo.ToPtr(name)}
+		expectedValues[name] = fmt.Sprintf("value%d", i)
+	}
+
+	client := &mockListClient{
+		describeResult: &paramapi.DescribeParametersOutput{
+			Parameters: metadata,
+		},
+		getParameterValue: expectedValues,
+	}
+
+	uc := &param.ListUseCase{Client: client}
+
+	output, err := uc.Execute(context.Background(), param.ListInput{
+		WithValue: true,
+	})
+	require.NoError(t, err)
+	assert.Len(t, output.Entries, numParams)
+
+	// Verify all entries have correct values (ensures batching works correctly)
+	for _, entry := range output.Entries {
+		require.NotNil(t, entry.Value, "entry %s should have value", entry.Name)
+		assert.Nil(t, entry.Error, "entry %s should not have error", entry.Name)
+		assert.Equal(t, expectedValues[entry.Name], *entry.Value, "entry %s should have correct value", entry.Name)
+	}
+}
+
+func TestListUseCase_Execute_WithValue_Empty(t *testing.T) {
+	t.Parallel()
+
+	client := &mockListClient{
+		describeResult: &paramapi.DescribeParametersOutput{
+			Parameters: []paramapi.ParameterMetadata{},
+		},
+	}
+
+	uc := &param.ListUseCase{Client: client}
+
+	output, err := uc.Execute(context.Background(), param.ListInput{
+		WithValue: true,
+	})
+	require.NoError(t, err)
+	assert.Empty(t, output.Entries)
 }

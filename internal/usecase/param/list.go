@@ -11,10 +11,20 @@ import (
 	"github.com/mpyw/suve/internal/parallel"
 )
 
+const (
+	// getParametersBatchSize is the maximum number of parameters per GetParameters API call.
+	// AWS SSM GetParameters API allows up to 10 parameters per request.
+	getParametersBatchSize = 10
+
+	// describeParametersMaxResults is the maximum results per DescribeParameters API call.
+	// AWS SSM DescribeParameters API allows up to 50 parameters per request.
+	describeParametersMaxResults int32 = 50
+)
+
 // ListClient is the interface for the list use case.
 type ListClient interface {
 	paramapi.DescribeParametersAPI
-	paramapi.GetParameterAPI
+	paramapi.GetParametersAPI
 }
 
 // ListInput holds input for the list use case.
@@ -120,12 +130,9 @@ func (u *ListUseCase) executeWithPagination(ctx context.Context, input ListInput
 	var params []paramInfo
 	nextToken := input.NextToken
 
-	// AWS DescribeParameters max is 50, request more to account for filtering
-	const awsMaxResults int32 = 50
-
 	for {
 		// Set pagination params
-		apiInput.MaxResults = lo.ToPtr(awsMaxResults)
+		apiInput.MaxResults = lo.ToPtr(describeParametersMaxResults)
 		if nextToken != "" {
 			apiInput.NextToken = lo.ToPtr(nextToken)
 		} else {
@@ -179,34 +186,70 @@ func (u *ListUseCase) buildOutput(ctx context.Context, withValue bool, params []
 		return output, nil
 	}
 
-	// Fetch values in parallel
-	namesMap := make(map[string]struct{}, len(params))
-	for _, p := range params {
-		namesMap[p.Name] = struct{}{}
-	}
-
-	results := parallel.ExecuteMap(ctx, namesMap, func(ctx context.Context, name string, _ struct{}) (string, error) {
-		out, err := u.Client.GetParameter(ctx, &paramapi.GetParameterInput{
-			Name:           lo.ToPtr(name),
-			WithDecryption: lo.ToPtr(true),
-		})
-		if err != nil {
-			return "", err
-		}
-		return lo.FromPtr(out.Parameter.Value), nil
-	})
+	// Fetch values using batched GetParameters calls
+	values, errs := u.fetchValuesBatched(ctx, params)
 
 	// Collect results in order
 	for _, p := range params {
-		result := results[p.Name]
 		entry := ListEntry{Name: p.Name, Type: p.Type}
-		if result.Err != nil {
-			entry.Error = result.Err
-		} else {
-			entry.Value = lo.ToPtr(result.Value)
+		if err, hasErr := errs[p.Name]; hasErr {
+			entry.Error = err
+		} else if val, hasVal := values[p.Name]; hasVal {
+			entry.Value = lo.ToPtr(val)
 		}
 		output.Entries = append(output.Entries, entry)
 	}
 
 	return output, nil
+}
+
+// fetchValuesBatched fetches parameter values in batches using GetParameters API.
+// Returns maps of name->value and name->error.
+func (u *ListUseCase) fetchValuesBatched(ctx context.Context, params []paramInfo) (map[string]string, map[string]error) {
+	if len(params) == 0 {
+		return nil, nil
+	}
+
+	// Extract names and create batches using lo.Chunk
+	names := lo.Map(params, func(p paramInfo, _ int) string { return p.Name })
+	batches := lo.Chunk(names, getParametersBatchSize)
+
+	// Create batch map for parallel execution
+	batchMap := lo.SliceToMap(lo.Range(len(batches)), func(i int) (int, []string) {
+		return i, batches[i]
+	})
+
+	// Execute batches in parallel
+	results := parallel.ExecuteMap(ctx, batchMap, func(ctx context.Context, _ int, names []string) (*paramapi.GetParametersOutput, error) {
+		return u.Client.GetParameters(ctx, &paramapi.GetParametersInput{
+			Names:          names,
+			WithDecryption: lo.ToPtr(true),
+		})
+	})
+
+	// Collect results
+	values := make(map[string]string)
+	errs := make(map[string]error)
+
+	for batchIdx, result := range results {
+		if result.Err != nil {
+			// If the entire batch failed, mark all parameters in that batch with the error
+			for _, name := range batchMap[batchIdx] {
+				errs[name] = fmt.Errorf("failed to get parameter: %w", result.Err)
+			}
+			continue
+		}
+
+		// Map successful parameters
+		for _, param := range result.Value.Parameters {
+			values[lo.FromPtr(param.Name)] = lo.FromPtr(param.Value)
+		}
+
+		// Map invalid parameters (not found)
+		for _, name := range result.Value.InvalidParameters {
+			errs[name] = fmt.Errorf("parameter not found: %s", name)
+		}
+	}
+
+	return values, errs
 }

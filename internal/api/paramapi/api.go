@@ -10,6 +10,11 @@ type GetParameterAPI interface {
 	GetParameter(ctx context.Context, params *GetParameterInput, optFns ...func(*Options)) (*GetParameterOutput, error)
 }
 
+// GetParametersAPI is the interface for getting multiple parameters in a single call.
+type GetParametersAPI interface {
+	GetParameters(ctx context.Context, params *GetParametersInput, optFns ...func(*Options)) (*GetParametersOutput, error)
+}
+
 // GetParameterHistoryAPI is the interface for getting parameter history.
 type GetParameterHistoryAPI interface {
 	GetParameterHistory(ctx context.Context, params *GetParameterHistoryInput, optFns ...func(*Options)) (*GetParameterHistoryOutput, error)
