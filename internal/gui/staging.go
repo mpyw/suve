@@ -555,6 +555,39 @@ func (a *App) StagingCancelRemoveTag(service, name, key string) (*StagingCancelR
 	return &StagingCancelRemoveTagResult{Name: name}, nil
 }
 
+// StagingCheckStatus checks if a specific item has staged changes.
+type StagingCheckStatusResult struct {
+	HasEntry bool `json:"hasEntry"`
+	HasTags  bool `json:"hasTags"`
+}
+
+// StagingCheckStatus checks if a specific item has staged entry or tag changes.
+func (a *App) StagingCheckStatus(service, name string) (*StagingCheckStatusResult, error) {
+	store, err := a.getStagingStore()
+	if err != nil {
+		return nil, err
+	}
+
+	svc, err := a.getService(service)
+	if err != nil {
+		return nil, err
+	}
+
+	result := &StagingCheckStatusResult{}
+
+	// Check for staged entry
+	if _, err := store.GetEntry(svc, name); err == nil {
+		result.HasEntry = true
+	}
+
+	// Check for staged tags
+	if _, err := store.GetTag(svc, name); err == nil {
+		result.HasTags = true
+	}
+
+	return result, nil
+}
+
 // StagingDiff shows diff between staged changes and AWS.
 func (a *App) StagingDiff(service string, name string) (*StagingDiffResult, error) {
 	store, err := a.getStagingStore()

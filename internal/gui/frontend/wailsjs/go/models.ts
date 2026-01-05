@@ -1,14 +1,14 @@
 export namespace gui {
-
+	
 	export class AWSIdentityResult {
 	    accountId: string;
 	    region: string;
 	    profile: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new AWSIdentityResult(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.accountId = source["accountId"];
@@ -585,6 +585,20 @@ export namespace gui {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.name = source["name"];
+	    }
+	}
+	export class StagingCheckStatusResult {
+	    hasEntry: boolean;
+	    hasTags: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new StagingCheckStatusResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.hasEntry = source["hasEntry"];
+	        this.hasTags = source["hasTags"];
 	    }
 	}
 	export class StagingDeleteResult {

@@ -54,9 +54,9 @@
 
   <main class="main-content">
     {#if activeView === 'param'}
-      <ParamView />
+      <ParamView onnavigatetostaging={() => handleNavigate('staging')} />
     {:else if activeView === 'secret'}
-      <SecretView />
+      <SecretView onnavigatetostaging={() => handleNavigate('staging')} />
     {:else if activeView === 'staging'}
       <StagingView oncountchange={handleStagingCountChange} />
     {/if}

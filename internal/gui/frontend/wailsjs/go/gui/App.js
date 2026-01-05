@@ -98,6 +98,10 @@ export function StagingCancelRemoveTag(arg1, arg2, arg3) {
   return window['go']['gui']['App']['StagingCancelRemoveTag'](arg1, arg2, arg3);
 }
 
+export function StagingCheckStatus(arg1, arg2) {
+  return window['go']['gui']['App']['StagingCheckStatus'](arg1, arg2);
+}
+
 export function StagingDelete(arg1, arg2, arg3, arg4) {
   return window['go']['gui']['App']['StagingDelete'](arg1, arg2, arg3, arg4);
 }
