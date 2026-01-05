@@ -216,13 +216,14 @@ func (a *App) getDiffStrategy(service string) (staging.DiffStrategy, error) {
 // AWS Identity
 // =============================================================================
 
-// AWSIdentityResult contains AWS account ID and region for frontend display.
+// AWSIdentityResult contains AWS account ID, region, and profile for frontend display.
 type AWSIdentityResult struct {
 	AccountID string `json:"accountId"`
 	Region    string `json:"region"`
+	Profile   string `json:"profile"`
 }
 
-// GetAWSIdentity returns the current AWS account ID and region.
+// GetAWSIdentity returns the current AWS account ID, region, and profile.
 func (a *App) GetAWSIdentity() (*AWSIdentityResult, error) {
 	identity, err := infra.GetAWSIdentity(a.ctx)
 	if err != nil {
@@ -231,5 +232,6 @@ func (a *App) GetAWSIdentity() (*AWSIdentityResult, error) {
 	return &AWSIdentityResult{
 		AccountID: identity.AccountID,
 		Region:    identity.Region,
+		Profile:   identity.Profile,
 	}, nil
 }

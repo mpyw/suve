@@ -4,10 +4,11 @@
     stagingCount?: number;
     accountId?: string;
     region?: string;
+    profile?: string;
     onnavigate?: (view: 'param' | 'secret' | 'staging') => void;
   }
 
-  let { activeView = 'param', stagingCount = 0, accountId = '', region = '', onnavigate }: Props = $props();
+  let { activeView = 'param', stagingCount = 0, accountId = '', region = '', profile = '', onnavigate }: Props = $props();
 
   function navigate(view: 'param' | 'secret' | 'staging') {
     onnavigate?.(view);
@@ -54,6 +55,12 @@
 
   {#if accountId && region}
     <div class="aws-info">
+      {#if profile}
+        <div class="aws-info-row">
+          <span class="aws-info-label">Profile</span>
+          <span class="aws-info-value aws-info-profile">{profile}</span>
+        </div>
+      {/if}
       <div class="aws-info-row">
         <span class="aws-info-label">Account</span>
         <span class="aws-info-value">{accountId}</span>
@@ -184,5 +191,10 @@
     color: #a0a0a0;
     font-family: monospace;
     font-size: 10px;
+  }
+
+  .aws-info-profile {
+    color: #e94560;
+    font-weight: bold;
   }
 </style>

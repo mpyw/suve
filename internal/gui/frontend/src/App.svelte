@@ -10,6 +10,7 @@
   let stagingCount = $state(0);
   let accountId = $state('');
   let region = $state('');
+  let profile = $state('');
 
   function handleNavigate(view: 'param' | 'secret' | 'staging') {
     activeView = view;
@@ -33,6 +34,7 @@
       const identity = await GetAWSIdentity();
       accountId = identity.accountId;
       region = identity.region;
+      profile = identity.profile;
     } catch (e) {
       console.error('Failed to get AWS identity:', e);
     }
@@ -45,7 +47,7 @@
 </script>
 
 <div class="app">
-  <Sidebar {activeView} {stagingCount} {accountId} {region} onnavigate={handleNavigate} />
+  <Sidebar {activeView} {stagingCount} {accountId} {region} {profile} onnavigate={handleNavigate} />
 
   <main class="main-content">
     {#if activeView === 'param'}

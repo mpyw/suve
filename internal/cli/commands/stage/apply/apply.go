@@ -110,6 +110,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	}
 	prompter.AccountID = identity.AccountID
 	prompter.Region = identity.Region
+	prompter.Profile = identity.Profile
 
 	message := fmt.Sprintf("Apply %d staged change(s) to AWS?", totalStaged)
 	confirmed, err := prompter.Confirm(message, skipConfirm)

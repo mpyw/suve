@@ -17,11 +17,17 @@ type Prompter struct {
 	Stderr    io.Writer
 	AccountID string
 	Region    string
+	Profile   string
 }
 
-// printTargetInfo prints AWS account and region information if available.
+// printTargetInfo prints AWS profile, account, and region information if available.
 func (p *Prompter) printTargetInfo() {
-	if p.AccountID != "" && p.Region != "" {
+	if p.AccountID == "" || p.Region == "" {
+		return
+	}
+	if p.Profile != "" {
+		_, _ = fmt.Fprintf(p.Stderr, "%s Target: %s (%s / %s)\n", colors.Info("i"), p.Profile, p.AccountID, p.Region)
+	} else {
 		_, _ = fmt.Fprintf(p.Stderr, "%s Target: %s / %s\n", colors.Info("i"), p.AccountID, p.Region)
 	}
 }

@@ -94,6 +94,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	if identity != nil {
 		prompter.AccountID = identity.AccountID
 		prompter.Region = identity.Region
+		prompter.Profile = identity.Profile
 	}
 	confirmed, err := prompter.ConfirmDelete(name, skipConfirm)
 	if err != nil {

@@ -19,6 +19,7 @@ require (
 	github.com/walles/moor/v2 v2.10.0
 	golang.org/x/sync v0.19.0
 	golang.org/x/term v0.29.0
+	gopkg.in/ini.v1 v1.67.0
 )
 
 require (

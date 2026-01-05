@@ -3,6 +3,7 @@ export namespace gui {
 	export class AWSIdentityResult {
 	    accountId: string;
 	    region: string;
+	    profile: string;
 
 	    static createFrom(source: any = {}) {
 	        return new AWSIdentityResult(source);
@@ -12,6 +13,7 @@ export namespace gui {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.accountId = source["accountId"];
 	        this.region = source["region"];
+	        this.profile = source["profile"];
 	    }
 	}
 	export class ParamDeleteResult {
