@@ -94,6 +94,10 @@ func action(ctx context.Context, cmd *cli.Command) error {
 			Stdout: cmd.Root().Writer,
 			Stderr: cmd.Root().ErrWriter,
 		}
+		if identity, _ := infra.GetAWSIdentity(ctx); identity != nil {
+			prompter.AccountID = identity.AccountID
+			prompter.Region = identity.Region
+		}
 		confirmed, err := prompter.ConfirmAction("Update secret", name, false)
 		if err != nil {
 			return err

@@ -4,10 +4,12 @@
   import ParamView from './lib/ParamView.svelte';
   import SecretView from './lib/SecretView.svelte';
   import StagingView from './lib/StagingView.svelte';
-  import { StagingStatus } from '../wailsjs/go/gui/App';
+  import { StagingStatus, GetAWSIdentity } from '../wailsjs/go/gui/App';
 
   let activeView: 'param' | 'secret' | 'staging' = $state('param');
   let stagingCount = $state(0);
+  let accountId = $state('');
+  let region = $state('');
 
   function handleNavigate(view: 'param' | 'secret' | 'staging') {
     activeView = view;
@@ -26,13 +28,24 @@
     }
   }
 
+  async function loadAWSIdentity() {
+    try {
+      const identity = await GetAWSIdentity();
+      accountId = identity.accountId;
+      region = identity.region;
+    } catch (e) {
+      console.error('Failed to get AWS identity:', e);
+    }
+  }
+
   onMount(() => {
     loadStagingCount();
+    loadAWSIdentity();
   });
 </script>
 
 <div class="app">
-  <Sidebar {activeView} {stagingCount} onnavigate={handleNavigate} />
+  <Sidebar {activeView} {stagingCount} {accountId} {region} onnavigate={handleNavigate} />
 
   <main class="main-content">
     {#if activeView === 'param'}
