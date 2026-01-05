@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount, onDestroy } from 'svelte';
+  import { onMount } from 'svelte';
   import { SecretList, SecretShow, SecretLog, SecretCreate, SecretUpdate, SecretDelete, SecretDiff, SecretRestore, SecretAddTag, SecretRemoveTag, StagingAdd, StagingEdit, StagingDelete, StagingAddTag, StagingRemoveTag } from '../../wailsjs/go/gui/App';
   import type { gui } from '../../wailsjs/go/models';
   import CloseIcon from './icons/CloseIcon.svelte';
@@ -11,22 +11,24 @@
 
   const PAGE_SIZE = 50;
 
-  let prefix = '';
-  let filter = '';
-  let withValue = false;
-  let debounceTimer: ReturnType<typeof setTimeout> | null = null;
-  let nextToken = '';
-  let loadingMore = false;
+  let prefix = $state('');
+  let filter = $state('');
+  let withValue = $state(false);
+  let debounceTimer: ReturnType<typeof setTimeout> | null = $state(null);
+  let nextToken = $state('');
+  let loadingMore = $state(false);
 
-  // Reactive: auto-fetch when checkbox changes
-  $: withValue, handleFilterChange();
+  // Track previous withValue for effect
+  let prevWithValue = false;
+  let mounted = false;
 
-  function handleFilterChange() {
-    // Skip initial mount (handled by onMount)
-    if (typeof window !== 'undefined' && entries !== undefined) {
+  $effect(() => {
+    const currentWithValue = withValue;
+    if (mounted && currentWithValue !== prevWithValue) {
+      prevWithValue = currentWithValue;
       loadSecrets();
     }
-  }
+  });
 
   function handlePrefixInput() {
     if (debounceTimer) clearTimeout(debounceTimer);
@@ -41,52 +43,52 @@
       loadSecrets();
     }, 300);
   }
-  let loading = false;
-  let error = '';
+  let loading = $state(false);
+  let error = $state('');
 
-  let entries: gui.SecretListEntry[] = [];
-  let selectedSecret: string | null = null;
-  let secretDetail: gui.SecretShowResult | null = null;
-  let secretLog: gui.SecretLogEntry[] = [];
-  let detailLoading = false;
-  let showValue = false;
+  let entries: gui.SecretListEntry[] = $state([]);
+  let selectedSecret: string | null = $state(null);
+  let secretDetail: gui.SecretShowResult | null = $state(null);
+  let secretLog: gui.SecretLogEntry[] = $state([]);
+  let detailLoading = $state(false);
+  let showValue = $state(false);
 
   // Modal states
-  let showCreateModal = false;
-  let showEditModal = false;
-  let showDeleteModal = false;
-  let showDiffModal = false;
-  let showRestoreModal = false;
-  let createForm = { name: '', value: '' };
-  let editForm = { name: '', value: '' };
-  let deleteTarget = '';
-  let forceDelete = false;
-  let modalLoading = false;
-  let modalError = '';
-  let immediateMode = false; // When false (default), changes are staged
+  let showCreateModal = $state(false);
+  let showEditModal = $state(false);
+  let showDeleteModal = $state(false);
+  let showDiffModal = $state(false);
+  let showRestoreModal = $state(false);
+  let createForm = $state({ name: '', value: '' });
+  let editForm = $state({ name: '', value: '' });
+  let deleteTarget = $state('');
+  let forceDelete = $state(false);
+  let modalLoading = $state(false);
+  let modalError = $state('');
+  let immediateMode = $state(false); // When false (default), changes are staged
 
   // Diff state
-  let diffMode = false;
-  let diffSelectedVersions: string[] = [];
-  let diffResult: gui.SecretDiffResult | null = null;
+  let diffMode = $state(false);
+  let diffSelectedVersions: string[] = $state([]);
+  let diffResult: gui.SecretDiffResult | null = $state(null);
 
   // Restore state
-  let restoreTarget = '';
+  let restoreTarget = $state('');
 
   // Tag state
-  let showTagModal = false;
-  let tagForm = { key: '', value: '' };
-  let tagLoading = false;
-  let tagError = '';
+  let showTagModal = $state(false);
+  let tagForm = $state({ key: '', value: '' });
+  let tagLoading = $state(false);
+  let tagError = $state('');
 
   // Tag remove state
-  let showRemoveTagModal = false;
-  let removeTagTarget = '';
-  let removeTagLoading = false;
-  let removeTagError = '';
+  let showRemoveTagModal = $state(false);
+  let removeTagTarget = $state('');
+  let removeTagLoading = $state(false);
+  let removeTagError = $state('');
 
   // Infinite scroll
-  let sentinelElement: HTMLDivElement;
+  let sentinelElement: HTMLDivElement | undefined = $state(undefined);
   let observer: IntersectionObserver | null = null;
 
   async function loadSecrets() {
@@ -124,8 +126,8 @@
     if (observer) observer.disconnect();
 
     observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting && nextToken && !loadingMore && !loading) {
+      (observedEntries) => {
+        if (observedEntries[0].isIntersecting && nextToken && !loadingMore && !loading) {
           loadMore();
         }
       },
@@ -137,12 +139,13 @@
     }
   }
 
-  $: if (sentinelElement) {
-    setupIntersectionObserver();
-  }
-
-  onDestroy(() => {
-    if (observer) observer.disconnect();
+  $effect(() => {
+    if (sentinelElement) {
+      setupIntersectionObserver();
+    }
+    return () => {
+      if (observer) observer.disconnect();
+    };
   });
 
   async function selectSecret(name: string) {
@@ -199,7 +202,8 @@
     showCreateModal = true;
   }
 
-  async function handleCreate() {
+  async function handleCreate(e: SubmitEvent) {
+    e.preventDefault();
     if (!createForm.name || !createForm.value) {
       modalError = 'Name and value are required';
       return;
@@ -230,7 +234,8 @@
     showEditModal = true;
   }
 
-  async function handleEdit() {
+  async function handleEdit(e: SubmitEvent) {
+    e.preventDefault();
     if (!editForm.value) {
       modalError = 'Value is required';
       return;
@@ -352,7 +357,8 @@
     showTagModal = true;
   }
 
-  async function handleAddTag() {
+  async function handleAddTag(e: SubmitEvent) {
+    e.preventDefault();
     if (!selectedSecret || !tagForm.key) {
       tagError = 'Key is required';
       return;
@@ -400,6 +406,8 @@
   }
 
   onMount(() => {
+    mounted = true;
+    prevWithValue = withValue;
     loadSecrets();
   });
 </script>
@@ -411,26 +419,26 @@
       class="filter-input prefix-input"
       placeholder="Prefix"
       bind:value={prefix}
-      on:input={handlePrefixInput}
+      oninput={handlePrefixInput}
     />
     <input
       type="text"
       class="filter-input regex-input"
       placeholder="Filter (regex)"
       bind:value={filter}
-      on:input={handleFilterInput}
+      oninput={handleFilterInput}
     />
     <label class="checkbox-label">
       <input type="checkbox" bind:checked={withValue} />
       Show Values
     </label>
-    <button class="btn-primary" on:click={loadSecrets} disabled={loading}>
+    <button class="btn-primary" onclick={loadSecrets} disabled={loading}>
       {loading ? 'Loading...' : 'Refresh'}
     </button>
-    <button class="btn-secondary" on:click={openCreateModal}>
+    <button class="btn-secondary" onclick={openCreateModal}>
       + New
     </button>
-    <button class="btn-secondary btn-restore" on:click={() => openRestoreModal('')}>
+    <button class="btn-secondary btn-restore" onclick={() => openRestoreModal('')}>
       Restore
     </button>
   </div>
@@ -449,7 +457,7 @@
         <ul class="item-list">
           {#each entries as entry}
             <li class="item-entry" class:selected={selectedSecret === entry.name}>
-              <button class="item-button" on:click={() => selectSecret(entry.name)}>
+              <button class="item-button" onclick={() => selectSecret(entry.name)}>
                 <span class="item-name secret">{entry.name}</span>
                 {#if entry.value !== undefined}
                   <span class="item-value">{entry.value}</span>
@@ -474,14 +482,14 @@
         <div class="detail-header">
           <h3 class="detail-title secret">{selectedSecret}</h3>
           <div class="detail-actions">
-            <button class="btn-action-sm" on:click={openEditModal}>Edit</button>
-            <button class="btn-action-sm btn-danger" on:click={() => selectedSecret && openDeleteModal(selectedSecret)}>Delete</button>
+            <button class="btn-action-sm" onclick={openEditModal}>Edit</button>
+            <button class="btn-action-sm btn-danger" onclick={() => selectedSecret && openDeleteModal(selectedSecret)}>Delete</button>
             {#if secretLog.length >= 2}
-              <button class="btn-action-sm" class:active={diffMode} on:click={toggleDiffMode}>
+              <button class="btn-action-sm" class:active={diffMode} onclick={toggleDiffMode}>
                 {diffMode ? 'Cancel' : 'Compare'}
               </button>
             {/if}
-            <button class="btn-close" on:click={closeDetail}>
+            <button class="btn-close" onclick={closeDetail}>
               <CloseIcon />
             </button>
           </div>
@@ -497,7 +505,7 @@
                 <button
                   class="btn-toggle"
                   class:active={showValue}
-                  on:click={toggleShowValue}
+                  onclick={toggleShowValue}
                   title={showValue ? 'Hide value' : 'Show value'}
                 >
                   {#if showValue}
@@ -546,7 +554,7 @@
             <div class="detail-section">
               <div class="section-header-tags">
                 <h4>Tags</h4>
-                <button class="btn-action-sm" on:click={openTagModal}>+ Add</button>
+                <button class="btn-action-sm" onclick={openTagModal}>+ Add</button>
               </div>
               {#if secretDetail.tags && secretDetail.tags.length > 0}
                 <div class="tags-list">
@@ -555,7 +563,7 @@
                       <span class="tag-key">{tag.key}</span>
                       <span class="tag-separator">=</span>
                       <span class="tag-value">{tag.value}</span>
-                      <button class="btn-tag-remove" on:click={() => openRemoveTagModal(tag.key)} title="Remove tag">×</button>
+                      <button class="btn-tag-remove" onclick={() => openRemoveTagModal(tag.key)} title="Remove tag">×</button>
                     </div>
                   {/each}
                 </div>
@@ -569,7 +577,7 @@
                 <div class="section-header-history">
                   <h4>Version History</h4>
                   {#if diffMode && diffSelectedVersions.length === 2}
-                    <button class="btn-action-sm btn-compare" on:click={executeDiff} disabled={modalLoading}>
+                    <button class="btn-action-sm btn-compare" onclick={executeDiff} disabled={modalLoading}>
                       {modalLoading ? 'Comparing...' : 'Show Diff'}
                     </button>
                   {/if}
@@ -591,7 +599,7 @@
                             type="checkbox"
                             checked={diffSelectedVersions.includes(logEntry.versionId)}
                             disabled={!diffSelectedVersions.includes(logEntry.versionId) && diffSelectedVersions.length >= 2}
-                            on:change={() => toggleVersionSelection(logEntry.versionId)}
+                            onchange={() => toggleVersionSelection(logEntry.versionId)}
                           />
                         </label>
                       {/if}
@@ -623,8 +631,8 @@
 </div>
 
 <!-- Create Modal -->
-<Modal title="New Secret" show={showCreateModal} on:close={() => showCreateModal = false}>
-  <form class="modal-form" on:submit|preventDefault={handleCreate}>
+<Modal title="New Secret" show={showCreateModal} onclose={() => showCreateModal = false}>
+  <form class="modal-form" onsubmit={handleCreate}>
     {#if modalError}
       <div class="modal-error">{modalError}</div>
     {/if}
@@ -653,7 +661,7 @@
       <span>Apply immediately (skip staging)</span>
     </label>
     <div class="form-actions">
-      <button type="button" class="btn-secondary" on:click={() => showCreateModal = false}>Cancel</button>
+      <button type="button" class="btn-secondary" onclick={() => showCreateModal = false}>Cancel</button>
       <button type="submit" class="btn-primary" disabled={modalLoading}>
         {modalLoading ? (immediateMode ? 'Creating...' : 'Staging...') : (immediateMode ? 'Create' : 'Stage')}
       </button>
@@ -662,8 +670,8 @@
 </Modal>
 
 <!-- Edit Modal -->
-<Modal title="Edit Secret" show={showEditModal} on:close={() => showEditModal = false}>
-  <form class="modal-form" on:submit|preventDefault={handleEdit}>
+<Modal title="Edit Secret" show={showEditModal} onclose={() => showEditModal = false}>
+  <form class="modal-form" onsubmit={handleEdit}>
     {#if modalError}
       <div class="modal-error">{modalError}</div>
     {/if}
@@ -691,7 +699,7 @@
       <span>Apply immediately (skip staging)</span>
     </label>
     <div class="form-actions">
-      <button type="button" class="btn-secondary" on:click={() => showEditModal = false}>Cancel</button>
+      <button type="button" class="btn-secondary" onclick={() => showEditModal = false}>Cancel</button>
       <button type="submit" class="btn-primary" disabled={modalLoading}>
         {modalLoading ? (immediateMode ? 'Saving...' : 'Staging...') : (immediateMode ? 'Save' : 'Stage')}
       </button>
@@ -700,7 +708,7 @@
 </Modal>
 
 <!-- Delete Modal -->
-<Modal title="Delete Secret" show={showDeleteModal} on:close={() => showDeleteModal = false}>
+<Modal title="Delete Secret" show={showDeleteModal} onclose={() => showDeleteModal = false}>
   <div class="modal-confirm">
     {#if modalError}
       <div class="modal-error">{modalError}</div>
@@ -727,8 +735,8 @@
       <span>Apply immediately (skip staging)</span>
     </label>
     <div class="form-actions">
-      <button type="button" class="btn-secondary" on:click={() => showDeleteModal = false}>Cancel</button>
-      <button type="button" class="btn-danger" on:click={handleDelete} disabled={modalLoading}>
+      <button type="button" class="btn-secondary" onclick={() => showDeleteModal = false}>Cancel</button>
+      <button type="button" class="btn-danger" onclick={handleDelete} disabled={modalLoading}>
         {modalLoading ? (immediateMode ? 'Deleting...' : 'Staging...') : (immediateMode ? 'Delete' : 'Stage Delete')}
       </button>
     </div>
@@ -736,7 +744,7 @@
 </Modal>
 
 <!-- Diff Modal -->
-<Modal title="Version Comparison" show={showDiffModal} on:close={closeDiffModal}>
+<Modal title="Version Comparison" show={showDiffModal} onclose={closeDiffModal}>
   {#if diffResult}
     <DiffDisplay
       oldValue={formatValue(diffResult.oldValue)}
@@ -747,13 +755,13 @@
       newSubLabel={diffResult.newVersionId}
     />
     <div class="form-actions">
-      <button type="button" class="btn-secondary" on:click={closeDiffModal}>Close</button>
+      <button type="button" class="btn-secondary" onclick={closeDiffModal}>Close</button>
     </div>
   {/if}
 </Modal>
 
 <!-- Restore Modal -->
-<Modal title="Restore Secret" show={showRestoreModal} on:close={() => showRestoreModal = false}>
+<Modal title="Restore Secret" show={showRestoreModal} onclose={() => showRestoreModal = false}>
   <div class="modal-form">
     {#if modalError}
       <div class="modal-error">{modalError}</div>
@@ -770,8 +778,8 @@
       />
     </div>
     <div class="form-actions">
-      <button type="button" class="btn-secondary" on:click={() => showRestoreModal = false}>Cancel</button>
-      <button type="button" class="btn-primary btn-restore-confirm" on:click={handleRestore} disabled={modalLoading || !restoreTarget}>
+      <button type="button" class="btn-secondary" onclick={() => showRestoreModal = false}>Cancel</button>
+      <button type="button" class="btn-primary btn-restore-confirm" onclick={handleRestore} disabled={modalLoading || !restoreTarget}>
         {modalLoading ? 'Restoring...' : 'Restore'}
       </button>
     </div>
@@ -779,8 +787,8 @@
 </Modal>
 
 <!-- Tag Modal -->
-<Modal title="Add Tag" show={showTagModal} on:close={() => showTagModal = false}>
-  <form class="modal-form" on:submit|preventDefault={handleAddTag}>
+<Modal title="Add Tag" show={showTagModal} onclose={() => showTagModal = false}>
+  <form class="modal-form" onsubmit={handleAddTag}>
     {#if tagError}
       <div class="modal-error">{tagError}</div>
     {/if}
@@ -809,7 +817,7 @@
       <span>Apply immediately (skip staging)</span>
     </label>
     <div class="form-actions">
-      <button type="button" class="btn-secondary" on:click={() => showTagModal = false}>Cancel</button>
+      <button type="button" class="btn-secondary" onclick={() => showTagModal = false}>Cancel</button>
       <button type="submit" class="btn-primary" disabled={tagLoading}>
         {tagLoading ? (immediateMode ? 'Adding...' : 'Staging...') : (immediateMode ? 'Add Tag' : 'Stage Tag')}
       </button>
@@ -818,7 +826,7 @@
 </Modal>
 
 <!-- Remove Tag Modal -->
-<Modal title="Remove Tag" show={showRemoveTagModal} on:close={() => showRemoveTagModal = false}>
+<Modal title="Remove Tag" show={showRemoveTagModal} onclose={() => showRemoveTagModal = false}>
   <div class="modal-confirm">
     {#if removeTagError}
       <div class="modal-error">{removeTagError}</div>
@@ -831,8 +839,8 @@
       <span>Apply immediately (skip staging)</span>
     </label>
     <div class="form-actions">
-      <button type="button" class="btn-secondary" on:click={() => showRemoveTagModal = false}>Cancel</button>
-      <button type="button" class="btn-danger" on:click={handleRemoveTag} disabled={removeTagLoading}>
+      <button type="button" class="btn-secondary" onclick={() => showRemoveTagModal = false}>Cancel</button>
+      <button type="button" class="btn-danger" onclick={handleRemoveTag} disabled={removeTagLoading}>
         {removeTagLoading ? (immediateMode ? 'Removing...' : 'Staging...') : (immediateMode ? 'Remove' : 'Stage Remove')}
       </button>
     </div>

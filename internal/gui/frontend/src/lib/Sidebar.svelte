@@ -1,13 +1,14 @@
 <script lang="ts">
-  import { createEventDispatcher } from 'svelte';
+  interface Props {
+    activeView?: 'param' | 'secret' | 'staging';
+    stagingCount?: number;
+    onnavigate?: (view: 'param' | 'secret' | 'staging') => void;
+  }
 
-  export let activeView: 'param' | 'secret' | 'staging' = 'param';
-  export let stagingCount: number = 0;
-
-  const dispatch = createEventDispatcher<{ navigate: 'param' | 'secret' | 'staging' }>();
+  let { activeView = 'param', stagingCount = 0, onnavigate }: Props = $props();
 
   function navigate(view: 'param' | 'secret' | 'staging') {
-    dispatch('navigate', view);
+    onnavigate?.(view);
   }
 </script>
 
@@ -21,7 +22,7 @@
     <button
       class="nav-item"
       class:active={activeView === 'param'}
-      on:click={() => navigate('param')}
+      onclick={() => navigate('param')}
     >
       <span class="nav-icon">P</span>
       <span class="nav-label">Parameters</span>
@@ -30,7 +31,7 @@
     <button
       class="nav-item"
       class:active={activeView === 'secret'}
-      on:click={() => navigate('secret')}
+      onclick={() => navigate('secret')}
     >
       <span class="nav-icon">S</span>
       <span class="nav-label">Secrets</span>
@@ -39,7 +40,7 @@
     <button
       class="nav-item"
       class:active={activeView === 'staging'}
-      on:click={() => navigate('staging')}
+      onclick={() => navigate('staging')}
     >
       <span class="nav-icon">*</span>
       <span class="nav-label">Staging</span>

@@ -1,46 +1,50 @@
 <script lang="ts">
-  import { onMount, createEventDispatcher } from 'svelte';
+  import { onMount } from 'svelte';
   import { StagingDiff, StagingApply, StagingReset, StagingEdit, StagingUnstage, StagingAddTag, StagingCancelAddTag, StagingCancelRemoveTag } from '../../wailsjs/go/gui/App';
   import type { gui } from '../../wailsjs/go/models';
   import Modal from './Modal.svelte';
   import DiffDisplay from './DiffDisplay.svelte';
   import './common.css';
 
-  const dispatch = createEventDispatcher<{ countChange: number }>();
+  interface Props {
+    oncountchange?: (count: number) => void;
+  }
 
-  let loading = false;
-  let error = '';
-  let paramEntries: gui.StagingDiffEntry[] = [];
-  let secretEntries: gui.StagingDiffEntry[] = [];
-  let paramTagEntries: gui.StagingDiffTagEntry[] = [];
-  let secretTagEntries: gui.StagingDiffTagEntry[] = [];
+  let { oncountchange }: Props = $props();
+
+  let loading = $state(false);
+  let error = $state('');
+  let paramEntries: gui.StagingDiffEntry[] = $state([]);
+  let secretEntries: gui.StagingDiffEntry[] = $state([]);
+  let paramTagEntries: gui.StagingDiffTagEntry[] = $state([]);
+  let secretTagEntries: gui.StagingDiffTagEntry[] = $state([]);
 
   // View mode: 'diff' (default) or 'value'
-  let viewMode: 'diff' | 'value' = 'diff';
+  let viewMode: 'diff' | 'value' = $state('diff');
 
   // Modal states
-  let showApplyModal = false;
-  let showResetModal = false;
-  let showEditModal = false;
-  let showEditTagModal = false;
-  let applyService = '';
-  let resetService = '';
-  let ignoreConflicts = false;
-  let modalLoading = false;
-  let modalError = '';
-  let applyResult: gui.StagingApplyResult | null = null;
+  let showApplyModal = $state(false);
+  let showResetModal = $state(false);
+  let showEditModal = $state(false);
+  let showEditTagModal = $state(false);
+  let applyService = $state('');
+  let resetService = $state('');
+  let ignoreConflicts = $state(false);
+  let modalLoading = $state(false);
+  let modalError = $state('');
+  let applyResult: gui.StagingApplyResult | null = $state(null);
 
   // Edit form
-  let editService = '';
-  let editName = '';
-  let editValue = '';
+  let editService = $state('');
+  let editName = $state('');
+  let editValue = $state('');
 
   // Tag edit form
-  let tagEditService = '';
-  let tagEditEntryName = '';
-  let tagEditKey = '';
-  let tagEditValue = '';
-  let tagEditIsNew = false;
+  let tagEditService = $state('');
+  let tagEditEntryName = $state('');
+  let tagEditKey = $state('');
+  let tagEditValue = $state('');
+  let tagEditIsNew = $state(false);
 
   async function loadStatus() {
     loading = true;
@@ -57,14 +61,14 @@
       secretTagEntries = smResult?.tagEntries || [];
       // Emit count change for sidebar badge
       const totalCount = paramEntries.length + secretEntries.length + paramTagEntries.length + secretTagEntries.length;
-      dispatch('countChange', totalCount);
+      oncountchange?.(totalCount);
     } catch (e) {
       error = e instanceof Error ? e.message : String(e);
       paramEntries = [];
       secretEntries = [];
       paramTagEntries = [];
       secretTagEntries = [];
-      dispatch('countChange', 0);
+      oncountchange?.(0);
     } finally {
       loading = false;
     }
@@ -155,7 +159,8 @@
     showEditModal = true;
   }
 
-  async function handleEdit() {
+  async function handleEdit(e: SubmitEvent) {
+    e.preventDefault();
     if (!editValue) {
       modalError = 'Value is required';
       return;
@@ -204,7 +209,8 @@
     showEditTagModal = true;
   }
 
-  async function handleSaveTag() {
+  async function handleSaveTag(e: SubmitEvent) {
+    e.preventDefault();
     if (!tagEditKey) {
       modalError = 'Tag key is required';
       return;
@@ -270,19 +276,19 @@
         <button
           class="toggle-btn"
           class:active={viewMode === 'diff'}
-          on:click={() => viewMode = 'diff'}
+          onclick={() => viewMode = 'diff'}
         >
           Diff
         </button>
         <button
           class="toggle-btn"
           class:active={viewMode === 'value'}
-          on:click={() => viewMode = 'value'}
+          onclick={() => viewMode = 'value'}
         >
           Value
         </button>
       </div>
-      <button class="btn-primary" on:click={loadStatus} disabled={loading}>
+      <button class="btn-primary" onclick={loadStatus} disabled={loading}>
         {loading ? 'Loading...' : 'Refresh'}
       </button>
     </div>
@@ -302,8 +308,8 @@
         <span class="count-badge">{paramEntries.length}</span>
         <div class="section-actions">
           {#if paramEntries.length > 0}
-            <button class="btn-section btn-apply-sm" on:click={() => openApplyModal('param')}>Apply</button>
-            <button class="btn-section btn-reset-sm" on:click={() => openResetModal('param')}>Reset</button>
+            <button class="btn-section btn-apply-sm" onclick={() => openApplyModal('param')}>Apply</button>
+            <button class="btn-section btn-reset-sm" onclick={() => openResetModal('param')}>Reset</button>
           {/if}
         </div>
       </div>
@@ -322,9 +328,9 @@
                 <span class="entry-name">{entry.name}</span>
                 <div class="entry-actions">
                   {#if showEditButton(entry)}
-                    <button class="btn-entry" on:click={() => openEditModal('param', entry)}>Edit</button>
+                    <button class="btn-entry" onclick={() => openEditModal('param', entry)}>Edit</button>
                   {/if}
-                  <button class="btn-entry btn-unstage" on:click={() => handleUnstage('param', entry.name)}>Unstage</button>
+                  <button class="btn-entry btn-unstage" onclick={() => handleUnstage('param', entry.name)}>Unstage</button>
                 </div>
               </div>
               <div class="entry-tags">
@@ -332,9 +338,9 @@
                   <div class="tag-changes tag-add">
                     <span class="tag-label">+ Tags:</span>
                     {#each Object.entries(tagEntry.addTags) as [key, value]}
-                      <button class="tag-item tag-item-editable" type="button" on:click={() => openEditTagModal('param', entry.name, key, value)}>
+                      <button class="tag-item tag-item-editable" type="button" onclick={() => openEditTagModal('param', entry.name, key, value)}>
                         {key}={value}
-                        <span class="tag-delete-btn" role="button" tabindex="0" on:click|stopPropagation={() => handleRemoveTag('param', entry.name, key)} on:keydown|stopPropagation={(e) => e.key === 'Enter' && handleRemoveTag('param', entry.name, key)}>×</span>
+                        <span class="tag-delete-btn" role="button" tabindex="0" onclick={(e: MouseEvent) => { e.stopPropagation(); handleRemoveTag('param', entry.name, key); }} onkeydown={(e: KeyboardEvent) => { e.stopPropagation(); if (e.key === 'Enter') handleRemoveTag('param', entry.name, key); }}>×</span>
                       </button>
                     {/each}
                   </div>
@@ -345,13 +351,13 @@
                     {#each tagEntry.removeTags as key}
                       <span class="tag-item">
                         {key}
-                        <button class="tag-cancel-btn" on:click={() => handleCancelUntag('param', entry.name, key)} title="Cancel untag">↩</button>
+                        <button class="tag-cancel-btn" onclick={() => handleCancelUntag('param', entry.name, key)} title="Cancel untag">↩</button>
                       </span>
                     {/each}
                   </div>
                 {/if}
                 {#if entry.operation !== 'delete'}
-                  <button class="btn-add-tag" on:click={() => openAddTagModal('param', entry.name)}>+ Add Tag</button>
+                  <button class="btn-add-tag" onclick={() => openAddTagModal('param', entry.name)}>+ Add Tag</button>
                 {/if}
               </div>
               {#if entry.operation === 'delete'}
@@ -398,8 +404,8 @@
         <span class="count-badge">{secretEntries.length}</span>
         <div class="section-actions">
           {#if secretEntries.length > 0}
-            <button class="btn-section btn-apply-sm" on:click={() => openApplyModal('secret')}>Apply</button>
-            <button class="btn-section btn-reset-sm" on:click={() => openResetModal('secret')}>Reset</button>
+            <button class="btn-section btn-apply-sm" onclick={() => openApplyModal('secret')}>Apply</button>
+            <button class="btn-section btn-reset-sm" onclick={() => openResetModal('secret')}>Reset</button>
           {/if}
         </div>
       </div>
@@ -418,9 +424,9 @@
                 <span class="entry-name">{entry.name}</span>
                 <div class="entry-actions">
                   {#if showEditButton(entry)}
-                    <button class="btn-entry" on:click={() => openEditModal('secret', entry)}>Edit</button>
+                    <button class="btn-entry" onclick={() => openEditModal('secret', entry)}>Edit</button>
                   {/if}
-                  <button class="btn-entry btn-unstage" on:click={() => handleUnstage('secret', entry.name)}>Unstage</button>
+                  <button class="btn-entry btn-unstage" onclick={() => handleUnstage('secret', entry.name)}>Unstage</button>
                 </div>
               </div>
               <div class="entry-tags">
@@ -428,9 +434,9 @@
                   <div class="tag-changes tag-add">
                     <span class="tag-label">+ Tags:</span>
                     {#each Object.entries(tagEntry.addTags) as [key, value]}
-                      <button class="tag-item tag-item-editable" type="button" on:click={() => openEditTagModal('secret', entry.name, key, value)}>
+                      <button class="tag-item tag-item-editable" type="button" onclick={() => openEditTagModal('secret', entry.name, key, value)}>
                         {key}={value}
-                        <span class="tag-delete-btn" role="button" tabindex="0" on:click|stopPropagation={() => handleRemoveTag('secret', entry.name, key)} on:keydown|stopPropagation={(e) => e.key === 'Enter' && handleRemoveTag('secret', entry.name, key)}>×</span>
+                        <span class="tag-delete-btn" role="button" tabindex="0" onclick={(e: MouseEvent) => { e.stopPropagation(); handleRemoveTag('secret', entry.name, key); }} onkeydown={(e: KeyboardEvent) => { e.stopPropagation(); if (e.key === 'Enter') handleRemoveTag('secret', entry.name, key); }}>×</span>
                       </button>
                     {/each}
                   </div>
@@ -441,13 +447,13 @@
                     {#each tagEntry.removeTags as key}
                       <span class="tag-item">
                         {key}
-                        <button class="tag-cancel-btn" on:click={() => handleCancelUntag('secret', entry.name, key)} title="Cancel untag">↩</button>
+                        <button class="tag-cancel-btn" onclick={() => handleCancelUntag('secret', entry.name, key)} title="Cancel untag">↩</button>
                       </span>
                     {/each}
                   </div>
                 {/if}
                 {#if entry.operation !== 'delete'}
-                  <button class="btn-add-tag" on:click={() => openAddTagModal('secret', entry.name)}>+ Add Tag</button>
+                  <button class="btn-add-tag" onclick={() => openAddTagModal('secret', entry.name)}>+ Add Tag</button>
                 {/if}
               </div>
               {#if entry.operation === 'delete'}
@@ -490,13 +496,13 @@
     <div class="actions">
       <button
         class="btn-action btn-apply"
-        on:click={() => openApplyModal(paramEntries.length > 0 ? 'param' : 'secret')}
+        onclick={() => openApplyModal(paramEntries.length > 0 ? 'param' : 'secret')}
       >
         Apply All Changes
       </button>
       <button
         class="btn-action btn-reset"
-        on:click={() => {
+        onclick={() => {
           if (paramEntries.length > 0) openResetModal('param');
           if (secretEntries.length > 0) openResetModal('secret');
         }}
@@ -508,7 +514,7 @@
 </div>
 
 <!-- Apply Modal -->
-<Modal title="Apply Staged Changes" show={showApplyModal} on:close={closeApplyModal}>
+<Modal title="Apply Staged Changes" show={showApplyModal} onclose={closeApplyModal}>
   <div class="modal-apply">
     {#if modalError}
       <div class="modal-error">{modalError}</div>
@@ -575,7 +581,7 @@
           </div>
         {/if}
         <div class="form-actions">
-          <button type="button" class="btn-primary" on:click={closeApplyModal}>Close</button>
+          <button type="button" class="btn-primary" onclick={closeApplyModal}>Close</button>
         </div>
       </div>
     {:else}
@@ -586,8 +592,8 @@
         <span>Ignore conflicts</span>
       </label>
       <div class="form-actions">
-        <button type="button" class="btn-secondary" on:click={closeApplyModal}>Cancel</button>
-        <button type="button" class="btn-apply" on:click={handleApply} disabled={modalLoading}>
+        <button type="button" class="btn-secondary" onclick={closeApplyModal}>Cancel</button>
+        <button type="button" class="btn-apply" onclick={handleApply} disabled={modalLoading}>
           {modalLoading ? 'Applying...' : 'Apply'}
         </button>
       </div>
@@ -596,7 +602,7 @@
 </Modal>
 
 <!-- Reset Modal -->
-<Modal title="Reset Staged Changes" show={showResetModal} on:close={() => showResetModal = false}>
+<Modal title="Reset Staged Changes" show={showResetModal} onclose={() => showResetModal = false}>
   <div class="modal-confirm">
     {#if modalError}
       <div class="modal-error">{modalError}</div>
@@ -604,8 +610,8 @@
     <p>Reset all staged changes for {getServiceName(resetService)}?</p>
     <p class="warning">This will discard all staged changes without applying them.</p>
     <div class="form-actions">
-      <button type="button" class="btn-secondary" on:click={() => showResetModal = false}>Cancel</button>
-      <button type="button" class="btn-danger" on:click={handleReset} disabled={modalLoading}>
+      <button type="button" class="btn-secondary" onclick={() => showResetModal = false}>Cancel</button>
+      <button type="button" class="btn-danger" onclick={handleReset} disabled={modalLoading}>
         {modalLoading ? 'Resetting...' : 'Reset'}
       </button>
     </div>
@@ -613,8 +619,8 @@
 </Modal>
 
 <!-- Edit Modal -->
-<Modal title="Edit Staged {editService === 'param' ? 'Parameter' : 'Secret'}" show={showEditModal} on:close={() => showEditModal = false}>
-  <form class="modal-form" on:submit|preventDefault={handleEdit}>
+<Modal title="Edit Staged {editService === 'param' ? 'Parameter' : 'Secret'}" show={showEditModal} onclose={() => showEditModal = false}>
+  <form class="modal-form" onsubmit={handleEdit}>
     {#if modalError}
       <div class="modal-error">{modalError}</div>
     {/if}
@@ -638,7 +644,7 @@
       ></textarea>
     </div>
     <div class="form-actions">
-      <button type="button" class="btn-secondary" on:click={() => showEditModal = false}>Cancel</button>
+      <button type="button" class="btn-secondary" onclick={() => showEditModal = false}>Cancel</button>
       <button type="submit" class="btn-primary" disabled={modalLoading}>
         {modalLoading ? 'Saving...' : 'Save'}
       </button>
@@ -647,8 +653,8 @@
 </Modal>
 
 <!-- Edit Tag Modal -->
-<Modal title={tagEditIsNew ? 'Add Tag' : 'Edit Tag'} show={showEditTagModal} on:close={() => showEditTagModal = false}>
-  <form class="modal-form" on:submit|preventDefault={handleSaveTag}>
+<Modal title={tagEditIsNew ? 'Add Tag' : 'Edit Tag'} show={showEditTagModal} onclose={() => showEditTagModal = false}>
+  <form class="modal-form" onsubmit={handleSaveTag}>
     {#if modalError}
       <div class="modal-error">{modalError}</div>
     {/if}
@@ -674,7 +680,7 @@
       />
     </div>
     <div class="form-actions">
-      <button type="button" class="btn-secondary" on:click={() => showEditTagModal = false}>Cancel</button>
+      <button type="button" class="btn-secondary" onclick={() => showEditTagModal = false}>Cancel</button>
       <button type="submit" class="btn-primary" disabled={modalLoading}>
         {modalLoading ? 'Saving...' : 'Save'}
       </button>
