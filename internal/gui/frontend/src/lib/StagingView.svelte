@@ -4,6 +4,7 @@
   import type { gui } from '../../wailsjs/go/models';
   import Modal from './Modal.svelte';
   import DiffDisplay from './DiffDisplay.svelte';
+  import { formatDate, parseError } from './viewUtils';
   import './common.css';
 
   interface Props {
@@ -63,7 +64,7 @@
       const totalCount = paramEntries.length + secretEntries.length + paramTagEntries.length + secretTagEntries.length;
       oncountchange?.(totalCount);
     } catch (e) {
-      error = e instanceof Error ? e.message : String(e);
+      error = parseError(e);
       paramEntries = [];
       secretEntries = [];
       paramTagEntries = [];
@@ -72,10 +73,6 @@
     } finally {
       loading = false;
     }
-  }
-
-  function formatDate(dateStr: string): string {
-    return new Date(dateStr).toLocaleString();
   }
 
   function getOperationColor(op: string): string {
@@ -112,7 +109,7 @@
         await loadStatus();
       }
     } catch (e) {
-      modalError = e instanceof Error ? e.message : String(e);
+      modalError = parseError(e);
     } finally {
       modalLoading = false;
     }
@@ -140,7 +137,7 @@
       showResetModal = false;
       await loadStatus();
     } catch (e) {
-      modalError = e instanceof Error ? e.message : String(e);
+      modalError = parseError(e);
     } finally {
       modalLoading = false;
     }
@@ -172,7 +169,7 @@
       showEditModal = false;
       await loadStatus();
     } catch (e) {
-      modalError = e instanceof Error ? e.message : String(e);
+      modalError = parseError(e);
     } finally {
       modalLoading = false;
     }
@@ -184,7 +181,7 @@
       await StagingUnstage(service, name);
       await loadStatus();
     } catch (e) {
-      error = e instanceof Error ? e.message : String(e);
+      error = parseError(e);
     }
   }
 
@@ -222,7 +219,7 @@
       showEditTagModal = false;
       await loadStatus();
     } catch (e) {
-      modalError = e instanceof Error ? e.message : String(e);
+      modalError = parseError(e);
     } finally {
       modalLoading = false;
     }
@@ -234,7 +231,7 @@
       await StagingCancelAddTag(service, entryName, key);
       await loadStatus();
     } catch (e) {
-      error = e instanceof Error ? e.message : String(e);
+      error = parseError(e);
     }
   }
 
@@ -244,7 +241,7 @@
       await StagingCancelRemoveTag(service, entryName, key);
       await loadStatus();
     } catch (e) {
-      error = e instanceof Error ? e.message : String(e);
+      error = parseError(e);
     }
   }
 

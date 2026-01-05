@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount, onDestroy } from 'svelte';
+  import { onMount } from 'svelte';
   import { ParamList, ParamShow, ParamLog, ParamSet, ParamDelete, ParamDiff, ParamAddTag, ParamRemoveTag, StagingAdd, StagingEdit, StagingDelete, StagingAddTag, StagingRemoveTag, StagingCheckStatus } from '../../wailsjs/go/gui/App';
   import type { gui } from '../../wailsjs/go/models';
   import CloseIcon from './icons/CloseIcon.svelte';
@@ -13,9 +13,10 @@
 
   interface Props {
     onnavigatetostaging?: () => void;
+    onstagingchange?: () => void;
   }
 
-  let { onnavigatetostaging }: Props = $props();
+  let { onnavigatetostaging, onstagingchange }: Props = $props();
 
   const PAGE_SIZE = 50;
   const debounce = createDebouncer(300);
@@ -69,17 +70,21 @@
   let sentinelElement: HTMLDivElement | undefined = $state(undefined);
   let observer: IntersectionObserver | null = null;
 
-  // Track previous values for effect
-  let prevRecursive = recursive;
-  let prevWithValue = withValue;
-  let mounted = false;
+  // Track if initial load has happened
+  let initialLoadDone = $state(false);
 
+  interface LoadParamsOptions {
+    prefix: string;
+    filter: string;
+    recursive: boolean;
+    withValue: boolean;
+  }
+
+  // Reload when filter options change
   $effect(() => {
-    // Watch recursive and withValue changes
-    if (mounted && (recursive !== prevRecursive || withValue !== prevWithValue)) {
-      prevRecursive = recursive;
-      prevWithValue = withValue;
-      loadParams();
+    const opts = { prefix, filter, recursive, withValue }; // read values to create dependencies
+    if (initialLoadDone) {
+      loadParams(opts);
     }
   });
 
@@ -87,22 +92,25 @@
     if (sentinelElement) {
       setupIntersectionObserver();
     }
+    return () => {
+      if (observer) observer.disconnect();
+    };
   });
 
   function handlePrefixInput() {
-    debounce(() => loadParams());
+    debounce(() => loadParams({ prefix, filter, recursive, withValue }));
   }
 
   function handleFilterInput() {
-    debounce(() => loadParams());
+    debounce(() => loadParams({ prefix, filter, recursive, withValue }));
   }
 
-  async function loadParams() {
+  async function loadParams(opts: LoadParamsOptions) {
     loading = true;
     error = '';
     nextToken = '';
     try {
-      const result = await ParamList(prefix, recursive, withValue, filter, PAGE_SIZE, '');
+      const result = await ParamList(opts.prefix, opts.recursive, opts.withValue, opts.filter, PAGE_SIZE, '');
       entries = result?.entries || [];
       nextToken = result?.nextToken || '';
     } catch (e) {
@@ -113,12 +121,12 @@
     }
   }
 
-  async function loadMore() {
+  async function loadMore(opts: LoadParamsOptions) {
     if (!nextToken || loadingMore || loading) return;
 
     loadingMore = true;
     try {
-      const result = await ParamList(prefix, recursive, withValue, filter, PAGE_SIZE, nextToken);
+      const result = await ParamList(opts.prefix, opts.recursive, opts.withValue, opts.filter, PAGE_SIZE, nextToken);
       entries = [...entries, ...(result?.entries || [])];
       nextToken = result?.nextToken || '';
     } catch (e) {
@@ -134,7 +142,7 @@
     observer = new IntersectionObserver(
       (observerEntries) => {
         if (observerEntries[0].isIntersecting && nextToken && !loadingMore && !loading) {
-          loadMore();
+          loadMore({ prefix, filter, recursive, withValue });
         }
       },
       { rootMargin: '100px' }
@@ -144,10 +152,6 @@
       observer.observe(sentinelElement);
     }
   }
-
-  onDestroy(() => {
-    if (observer) observer.disconnect();
-  });
 
   async function selectParam(name: string) {
     selectedParam = name;
@@ -218,7 +222,7 @@
       const isEdit = paramDetail && selectedParam === setForm.name;
       if (immediateMode) {
         await ParamSet(setForm.name, setForm.value, setForm.type);
-        await loadParams();
+        await loadParams({ prefix, filter, recursive, withValue });
         if (isEdit) {
           await selectParam(setForm.name);
         }
@@ -228,6 +232,7 @@
         } else {
           await StagingAdd('param', setForm.name, setForm.value);
         }
+        onstagingchange?.();
       }
       showSetModal = false;
     } catch (err) {
@@ -253,9 +258,10 @@
         if (selectedParam === deleteTarget) {
           closeDetail();
         }
-        await loadParams();
+        await loadParams({ prefix, filter, recursive, withValue });
       } else {
         await StagingDelete('param', deleteTarget, false, 0);
+        onstagingchange?.();
       }
       showDeleteModal = false;
     } catch (err) {
@@ -310,6 +316,7 @@
         await ParamAddTag(selectedParam, tagForm.key, tagForm.value);
       } else {
         await StagingAddTag('param', selectedParam, tagForm.key, tagForm.value);
+        onstagingchange?.();
       }
       showTagModal = false;
       await selectParam(selectedParam);
@@ -335,6 +342,7 @@
         await ParamRemoveTag(selectedParam, removeTagTarget);
       } else {
         await StagingRemoveTag('param', selectedParam, removeTagTarget);
+        onstagingchange?.();
       }
       showRemoveTagModal = false;
       await selectParam(selectedParam);
@@ -345,9 +353,9 @@
     }
   }
 
-  onMount(() => {
-    mounted = true;
-    loadParams();
+  onMount(async () => {
+    await loadParams({ prefix, filter, recursive, withValue });
+    initialLoadDone = true;
   });
 </script>
 
@@ -375,7 +383,7 @@
       <input type="checkbox" bind:checked={withValue} />
       Show Values
     </label>
-    <button class="btn-primary" onclick={loadParams} disabled={loading}>
+    <button class="btn-primary" onclick={() => loadParams({ prefix, filter, recursive, withValue })} disabled={loading}>
       {loading ? 'Loading...' : 'Refresh'}
     </button>
     <button class="btn-secondary" onclick={() => openSetModal()}>

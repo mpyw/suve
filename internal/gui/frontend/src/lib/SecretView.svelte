@@ -13,9 +13,10 @@
 
   interface Props {
     onnavigatetostaging?: () => void;
+    onstagingchange?: () => void;
   }
 
-  let { onnavigatetostaging }: Props = $props();
+  let { onnavigatetostaging, onstagingchange }: Props = $props();
 
   const PAGE_SIZE = 50;
   const debounce = createDebouncer(300);
@@ -27,24 +28,29 @@
   let nextToken = $state('');
   let loadingMore = $state(false);
 
-  // Track previous withValue for effect
-  let prevWithValue = false;
-  let mounted = false;
+  // Track if initial load has happened
+  let initialLoadDone = $state(false);
 
+  interface LoadSecretsOptions {
+    prefix: string;
+    filter: string;
+    withValue: boolean;
+  }
+
+  // Reload when filter options change
   $effect(() => {
-    const currentWithValue = withValue;
-    if (mounted && currentWithValue !== prevWithValue) {
-      prevWithValue = currentWithValue;
-      loadSecrets();
+    const opts = { prefix, filter, withValue }; // read values to create dependencies
+    if (initialLoadDone) {
+      loadSecrets(opts);
     }
   });
 
   function handlePrefixInput() {
-    debounce(() => loadSecrets());
+    debounce(() => loadSecrets({ prefix, filter, withValue }));
   }
 
   function handleFilterInput() {
-    debounce(() => loadSecrets());
+    debounce(() => loadSecrets({ prefix, filter, withValue }));
   }
   let loading = $state(false);
   let error = $state('');
@@ -95,12 +101,12 @@
   let sentinelElement: HTMLDivElement | undefined = $state(undefined);
   let observer: IntersectionObserver | null = null;
 
-  async function loadSecrets() {
+  async function loadSecrets(opts: LoadSecretsOptions) {
     loading = true;
     error = '';
     nextToken = '';
     try {
-      const result = await SecretList(prefix, withValue, filter, PAGE_SIZE, '');
+      const result = await SecretList(opts.prefix, opts.withValue, opts.filter, PAGE_SIZE, '');
       entries = result?.entries || [];
       nextToken = result?.nextToken || '';
     } catch (e) {
@@ -111,12 +117,12 @@
     }
   }
 
-  async function loadMore() {
+  async function loadMore(opts: LoadSecretsOptions) {
     if (!nextToken || loadingMore || loading) return;
 
     loadingMore = true;
     try {
-      const result = await SecretList(prefix, withValue, filter, PAGE_SIZE, nextToken);
+      const result = await SecretList(opts.prefix, opts.withValue, opts.filter, PAGE_SIZE, nextToken);
       entries = [...entries, ...(result?.entries || [])];
       nextToken = result?.nextToken || '';
     } catch (e) {
@@ -132,7 +138,7 @@
     observer = new IntersectionObserver(
       (observedEntries) => {
         if (observedEntries[0].isIntersecting && nextToken && !loadingMore && !loading) {
-          loadMore();
+          loadMore({ prefix, filter, withValue });
         }
       },
       { rootMargin: '100px' }
@@ -216,9 +222,10 @@
     try {
       if (immediateMode) {
         await SecretCreate(createForm.name, createForm.value);
-        await loadSecrets();
+        await loadSecrets({ prefix, filter, withValue });
       } else {
         await StagingAdd('secret', createForm.name, createForm.value);
+        onstagingchange?.();
       }
       showCreateModal = false;
     } catch (err) {
@@ -249,11 +256,12 @@
       if (immediateMode) {
         await SecretUpdate(editForm.name, editForm.value);
         await Promise.all([
-          loadSecrets(),
+          loadSecrets({ prefix, filter, withValue }),
           selectSecret(editForm.name)
         ]);
       } else {
         await StagingEdit('secret', editForm.name, editForm.value);
+        onstagingchange?.();
       }
       showEditModal = false;
     } catch (err) {
@@ -280,10 +288,11 @@
         if (selectedSecret === deleteTarget) {
           closeDetail();
         }
-        await loadSecrets();
+        await loadSecrets({ prefix, filter, withValue });
       } else {
         // Stage delete with recovery window (default 30 days unless force)
         await StagingDelete('secret', deleteTarget, forceDelete, forceDelete ? 0 : 30);
+        onstagingchange?.();
       }
       showDeleteModal = false;
     } catch (err) {
@@ -330,7 +339,7 @@
     try {
       await SecretRestore(restoreTarget);
       showRestoreModal = false;
-      await loadSecrets();
+      await loadSecrets({ prefix, filter, withValue });
     } catch (err) {
       modalError = parseError(err);
     } finally {
@@ -358,6 +367,7 @@
         await SecretAddTag(selectedSecret, tagForm.key, tagForm.value);
       } else {
         await StagingAddTag('secret', selectedSecret, tagForm.key, tagForm.value);
+        onstagingchange?.();
       }
       showTagModal = false;
       await selectSecret(selectedSecret);
@@ -383,6 +393,7 @@
         await SecretRemoveTag(selectedSecret, removeTagTarget);
       } else {
         await StagingRemoveTag('secret', selectedSecret, removeTagTarget);
+        onstagingchange?.();
       }
       showRemoveTagModal = false;
       await selectSecret(selectedSecret);
@@ -393,10 +404,9 @@
     }
   }
 
-  onMount(() => {
-    mounted = true;
-    prevWithValue = withValue;
-    loadSecrets();
+  onMount(async () => {
+    await loadSecrets({ prefix, filter, withValue });
+    initialLoadDone = true;
   });
 </script>
 
@@ -420,7 +430,7 @@
       <input type="checkbox" bind:checked={withValue} />
       Show Values
     </label>
-    <button class="btn-primary" onclick={loadSecrets} disabled={loading}>
+    <button class="btn-primary" onclick={() => loadSecrets({ prefix, filter, withValue })} disabled={loading}>
       {loading ? 'Loading...' : 'Refresh'}
     </button>
     <button class="btn-secondary" onclick={openCreateModal}>

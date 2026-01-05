@@ -29,6 +29,10 @@
     }
   }
 
+  function handleStagingChange() {
+    loadStagingCount();
+  }
+
   async function loadAWSIdentity() {
     try {
       const identity = await GetAWSIdentity();
@@ -54,9 +58,9 @@
 
   <main class="main-content">
     {#if activeView === 'param'}
-      <ParamView onnavigatetostaging={() => handleNavigate('staging')} />
+      <ParamView onnavigatetostaging={() => handleNavigate('staging')} onstagingchange={handleStagingChange} />
     {:else if activeView === 'secret'}
-      <SecretView onnavigatetostaging={() => handleNavigate('staging')} />
+      <SecretView onnavigatetostaging={() => handleNavigate('staging')} onstagingchange={handleStagingChange} />
     {:else if activeView === 'staging'}
       <StagingView oncountchange={handleStagingCountChange} />
     {/if}
