@@ -8,10 +8,12 @@
   import Modal from './Modal.svelte';
   import DiffDisplay from './DiffDisplay.svelte';
   import { maskValue, formatDate, formatJsonValue, parseError, createDebouncer } from './viewUtils';
+  import { createDiffMode } from './useDiffMode.svelte';
   import './common.css';
 
   const PAGE_SIZE = 50;
   const debounce = createDebouncer(300);
+  const diffMode = createDiffMode<string>();
 
   let prefix = $state('');
   let filter = $state('');
@@ -63,8 +65,6 @@
   let immediateMode = $state(false); // When false (default), changes are staged
 
   // Diff state
-  let diffMode = $state(false);
-  let diffSelectedVersions: string[] = $state([]);
   let diffResult: gui.SecretDiffResult | null = $state(null);
 
   // Restore state
@@ -268,28 +268,14 @@
   }
 
   // Diff functions
-  function toggleDiffMode() {
-    diffMode = !diffMode;
-    diffSelectedVersions = [];
-  }
-
-  function toggleVersionSelection(versionId: string) {
-    const idx = diffSelectedVersions.indexOf(versionId);
-    if (idx >= 0) {
-      diffSelectedVersions = diffSelectedVersions.filter(v => v !== versionId);
-    } else if (diffSelectedVersions.length < 2) {
-      diffSelectedVersions = [...diffSelectedVersions, versionId];
-    }
-  }
-
   async function executeDiff() {
-    if (!selectedSecret || diffSelectedVersions.length !== 2) return;
+    if (!selectedSecret || !diffMode.canCompare) return;
 
     modalLoading = true;
     modalError = '';
     try {
-      const spec1 = `${selectedSecret}#${diffSelectedVersions[0]}`;
-      const spec2 = `${selectedSecret}#${diffSelectedVersions[1]}`;
+      const spec1 = `${selectedSecret}#${diffMode.selectedVersions[0]}`;
+      const spec2 = `${selectedSecret}#${diffMode.selectedVersions[1]}`;
       diffResult = await SecretDiff(spec1, spec2);
       showDiffModal = true;
     } catch (err) {
@@ -302,8 +288,7 @@
   function closeDiffModal() {
     showDiffModal = false;
     diffResult = null;
-    diffMode = false;
-    diffSelectedVersions = [];
+    diffMode.reset();
   }
 
   // Restore functions
@@ -462,8 +447,8 @@
             <button class="btn-action-sm" onclick={openEditModal}>Edit</button>
             <button class="btn-action-sm btn-danger" onclick={() => selectedSecret && openDeleteModal(selectedSecret)}>Delete</button>
             {#if secretLog.length >= 2}
-              <button class="btn-action-sm" class:active={diffMode} onclick={toggleDiffMode}>
-                {diffMode ? 'Cancel' : 'Compare'}
+              <button class="btn-action-sm" class:active={diffMode.active} onclick={diffMode.toggle}>
+                {diffMode.active ? 'Cancel' : 'Compare'}
               </button>
             {/if}
             <button class="btn-close" onclick={closeDetail}>
@@ -553,13 +538,13 @@
               <div class="detail-section">
                 <div class="section-header-history">
                   <h4>Version History</h4>
-                  {#if diffMode && diffSelectedVersions.length === 2}
+                  {#if diffMode.canCompare}
                     <button class="btn-action-sm btn-compare" onclick={executeDiff} disabled={modalLoading}>
                       {modalLoading ? 'Comparing...' : 'Show Diff'}
                     </button>
                   {/if}
                 </div>
-                {#if diffMode}
+                {#if diffMode.active}
                   <p class="diff-hint">Select 2 versions to compare</p>
                 {/if}
                 <ul class="history-list">
@@ -567,16 +552,16 @@
                     <li
                       class="history-item"
                       class:current-secret={logEntry.isCurrent}
-                      class:selectable={diffMode}
-                      class:selected={diffSelectedVersions.includes(logEntry.versionId)}
+                      class:selectable={diffMode.active}
+                      class:selected={diffMode.isSelected(logEntry.versionId)}
                     >
-                      {#if diffMode}
+                      {#if diffMode.active}
                         <label class="diff-checkbox">
                           <input
                             type="checkbox"
-                            checked={diffSelectedVersions.includes(logEntry.versionId)}
-                            disabled={!diffSelectedVersions.includes(logEntry.versionId) && diffSelectedVersions.length >= 2}
-                            onchange={() => toggleVersionSelection(logEntry.versionId)}
+                            checked={diffMode.isSelected(logEntry.versionId)}
+                            disabled={diffMode.isDisabled(logEntry.versionId)}
+                            onchange={() => diffMode.toggleSelection(logEntry.versionId)}
                           />
                         </label>
                       {/if}
