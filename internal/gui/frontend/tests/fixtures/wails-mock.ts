@@ -764,6 +764,13 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
         }
         return { name };
       },
+      StagingCheckStatus: async (service: string, name: string) => {
+        const staged = service === 'param' ? state.stagedParam : state.stagedSecret;
+        const tagStaged = service === 'param' ? state.stagedParamTags : state.stagedSecretTags;
+        const hasEntry = staged.some((s: any) => s.name === name);
+        const hasTags = tagStaged.some((t: any) => t.name === name);
+        return { hasEntry, hasTags };
+      },
     };
 
     (window as any).go = { gui: { App: mockApp } };
