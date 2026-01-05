@@ -97,6 +97,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		if identity, _ := infra.GetAWSIdentity(ctx); identity != nil {
 			prompter.AccountID = identity.AccountID
 			prompter.Region = identity.Region
+			prompter.Profile = identity.Profile
 		}
 		confirmed, err := prompter.ConfirmAction("Update secret", name, false)
 		if err != nil {
