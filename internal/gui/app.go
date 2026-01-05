@@ -106,7 +106,12 @@ func (a *App) getStagingStore() (*staging.Store, error) {
 		return a.stagingStore, nil
 	}
 
-	store, err := staging.NewStore()
+	identity, err := infra.GetAWSIdentity(a.ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	store, err := staging.NewStore(identity.AccountID, identity.Region)
 	if err != nil {
 		return nil, err
 	}
