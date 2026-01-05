@@ -148,8 +148,8 @@ func (a *App) StagingStatus() (*StagingStatusResult, error) {
 		return nil, err
 	}
 
-	paramParser, _ := a.getParser("ssm")
-	secretParser, _ := a.getParser("sm")
+	paramParser, _ := a.getParser(string(staging.ServiceParam))
+	secretParser, _ := a.getParser(string(staging.ServiceSecret))
 
 	// SSM Parameter Store status
 	paramUC := &stagingusecase.StatusUseCase{
