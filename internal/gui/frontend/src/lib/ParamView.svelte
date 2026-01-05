@@ -7,9 +7,11 @@
   import EyeOffIcon from './icons/EyeOffIcon.svelte';
   import Modal from './Modal.svelte';
   import DiffDisplay from './DiffDisplay.svelte';
+  import { maskValue, formatDate, parseError, createDebouncer } from './viewUtils';
   import './common.css';
 
   const PAGE_SIZE = 50;
+  const debounce = createDebouncer(300);
 
   let prefix = $state('');
   let filter = $state('');
@@ -18,7 +20,6 @@
   let loading = $state(false);
   let loadingMore = $state(false);
   let error = $state('');
-  let debounceTimer: ReturnType<typeof setTimeout> | null = null;
   let nextToken = $state('');
 
   let entries: gui.ParamListEntry[] = $state([]);
@@ -80,17 +81,11 @@
   });
 
   function handlePrefixInput() {
-    if (debounceTimer) clearTimeout(debounceTimer);
-    debounceTimer = setTimeout(() => {
-      loadParams();
-    }, 300);
+    debounce(() => loadParams());
   }
 
   function handleFilterInput() {
-    if (debounceTimer) clearTimeout(debounceTimer);
-    debounceTimer = setTimeout(() => {
-      loadParams();
-    }, 300);
+    debounce(() => loadParams());
   }
 
   async function loadParams() {
@@ -102,7 +97,7 @@
       entries = result?.entries || [];
       nextToken = result?.nextToken || '';
     } catch (e) {
-      error = e instanceof Error ? e.message : String(e);
+      error = parseError(e);
       entries = [];
     } finally {
       loading = false;
@@ -118,7 +113,7 @@
       entries = [...entries, ...(result?.entries || [])];
       nextToken = result?.nextToken || '';
     } catch (e) {
-      error = e instanceof Error ? e.message : String(e);
+      error = parseError(e);
     } finally {
       loadingMore = false;
     }
@@ -157,7 +152,7 @@
       paramDetail = detail;
       paramLog = log?.entries || [];
     } catch (e) {
-      error = e instanceof Error ? e.message : String(e);
+      error = parseError(e);
     } finally {
       detailLoading = false;
     }
@@ -172,15 +167,6 @@
 
   function toggleShowValue() {
     showValue = !showValue;
-  }
-
-  function maskValue(value: string): string {
-    return '*'.repeat(Math.min(value.length, 32));
-  }
-
-  function formatDate(dateStr: string | undefined): string {
-    if (!dateStr) return '-';
-    return new Date(dateStr).toLocaleString();
   }
 
   // Set modal
@@ -218,8 +204,8 @@
         }
       }
       showSetModal = false;
-    } catch (e) {
-      modalError = e instanceof Error ? e.message : String(e);
+    } catch (err) {
+      modalError = parseError(err);
     } finally {
       modalLoading = false;
     }
@@ -246,8 +232,8 @@
         await StagingDelete('param', deleteTarget, false, 0);
       }
       showDeleteModal = false;
-    } catch (e) {
-      modalError = e instanceof Error ? e.message : String(e);
+    } catch (err) {
+      modalError = parseError(err);
     } finally {
       modalLoading = false;
     }
@@ -279,8 +265,8 @@
       const spec2 = `${selectedParam}#${sorted[1]}`;
       diffResult = await ParamDiff(spec1, spec2);
       showDiffModal = true;
-    } catch (e) {
-      error = e instanceof Error ? e.message : String(e);
+    } catch (err) {
+      error = parseError(err);
     } finally {
       modalLoading = false;
     }
@@ -316,8 +302,8 @@
       }
       showTagModal = false;
       await selectParam(selectedParam);
-    } catch (e) {
-      tagError = e instanceof Error ? e.message : String(e);
+    } catch (err) {
+      tagError = parseError(err);
     } finally {
       tagLoading = false;
     }
@@ -341,8 +327,8 @@
       }
       showRemoveTagModal = false;
       await selectParam(selectedParam);
-    } catch (e) {
-      removeTagError = e instanceof Error ? e.message : String(e);
+    } catch (err) {
+      removeTagError = parseError(err);
     } finally {
       removeTagLoading = false;
     }
@@ -496,7 +482,7 @@
                 <div class="tags-list">
                   {#each paramDetail.tags as tag}
                     <div class="tag-item">
-                      <span class="tag-key">{tag.key}</span>
+                      <span class="tag-key param">{tag.key}</span>
                       <span class="tag-separator">=</span>
                       <span class="tag-value">{tag.value}</span>
                       <button class="btn-tag-remove" onclick={() => openRemoveTagModal(tag.key)} title="Remove tag">×</button>
@@ -616,7 +602,7 @@
       <div class="modal-error">{modalError}</div>
     {/if}
     <p>Are you sure you want to delete this parameter?</p>
-    <code class="delete-target">{deleteTarget}</code>
+    <code class="delete-target param">{deleteTarget}</code>
     <p class="warning">{immediateMode ? 'This action cannot be undone.' : 'This will stage a delete operation.'}</p>
     <label class="checkbox-label immediate-checkbox">
       <input type="checkbox" bind:checked={immediateMode} />
@@ -638,7 +624,7 @@
       <div class="modal-error">{removeTagError}</div>
     {/if}
     <p>Are you sure you want to remove this tag?</p>
-    <code class="delete-target">{removeTagTarget}</code>
+    <code class="delete-target param">{removeTagTarget}</code>
     <p class="warning">{immediateMode ? 'This action will take effect immediately.' : 'This will stage a tag removal operation.'}</p>
     <label class="checkbox-label immediate-checkbox">
       <input type="checkbox" bind:checked={immediateMode} />
@@ -710,226 +696,7 @@
 </Modal>
 
 <style>
-  .detail-actions {
-    display: flex;
-    gap: 8px;
-    align-items: center;
-  }
-
-  .btn-secondary {
-    padding: 8px 16px;
-    background: #2d2d44;
-    color: #fff;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 14px;
-  }
-
-  .btn-secondary:hover {
-    background: #3d3d54;
-  }
-
-  .btn-action-sm {
-    padding: 6px 12px;
-    background: #2d2d44;
-    color: #fff;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 12px;
-  }
-
-  .btn-action-sm:hover {
-    background: #3d3d54;
-  }
-
-  .btn-danger {
-    background: #f44336;
-  }
-
-  .btn-danger:hover {
-    background: #e53935;
-  }
-
-  .modal-form {
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-  }
-
-  .form-group {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-  }
-
-  .form-group label {
-    font-size: 12px;
-    color: #888;
-    text-transform: uppercase;
-  }
-
-  .form-input {
-    padding: 10px 12px;
-    background: #0f0f1a;
-    border: 1px solid #2d2d44;
-    border-radius: 4px;
-    color: #fff;
-    font-size: 14px;
-  }
-
-  .form-input:focus {
-    outline: none;
-    border-color: #e94560;
-  }
-
-  .form-textarea {
-    font-family: monospace;
-    resize: vertical;
-    min-height: 100px;
-  }
-
-  .form-actions {
-    display: flex;
-    gap: 12px;
-    justify-content: flex-end;
-    margin-top: 8px;
-  }
-
-  .modal-error {
-    padding: 10px 12px;
-    background: rgba(244, 67, 54, 0.2);
-    border: 1px solid #f44336;
-    border-radius: 4px;
-    color: #f44336;
-    font-size: 13px;
-  }
-
-  .modal-confirm {
-    text-align: center;
-  }
-
-  .modal-confirm p {
-    color: #ccc;
-    margin: 0 0 16px 0;
-  }
-
-  .delete-target {
-    display: block;
-    padding: 12px;
-    background: #0f0f1a;
-    border-radius: 4px;
-    color: #4fc3f7;
-    font-size: 14px;
-    margin-bottom: 16px;
-  }
-
-  .warning {
-    color: #ff9800 !important;
-    font-size: 13px;
-  }
-
-  /* Diff mode styles */
-  .btn-action-sm.active {
-    background: #e94560;
-  }
-
-  .section-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 12px;
-  }
-
-  .section-header h4 {
-    margin: 0;
-    font-size: 12px;
-    text-transform: uppercase;
-    color: #888;
-    letter-spacing: 0.5px;
-  }
-
-  .btn-compare {
-    background: #4caf50;
-  }
-
-  .btn-compare:hover {
-    background: #43a047;
-  }
-
-  .diff-hint {
-    color: #888;
-    font-size: 12px;
-    margin: 0 0 12px 0;
-  }
-
-  .history-item.selectable {
-    display: flex;
-    align-items: flex-start;
-    gap: 12px;
-    cursor: pointer;
-  }
-
-  .history-item.selectable:hover {
-    background: #1a1a2e;
-  }
-
-  .history-item.selected {
-    background: rgba(233, 69, 96, 0.15);
-    border-left: 3px solid #e94560;
-  }
-
-  .diff-checkbox {
-    display: flex;
-    align-items: center;
-    padding-top: 2px;
-  }
-
-  .diff-checkbox input {
-    width: 16px;
-    height: 16px;
-    cursor: pointer;
-  }
-
-  .history-content {
-    flex: 1;
-    min-width: 0;
-  }
-
-  /* Filter inputs */
-  .prefix-input {
-    flex: 0.4;
-  }
-
-  .regex-input {
-    flex: 0.6;
-  }
-
-  .immediate-checkbox {
-    margin-top: 8px;
-    padding: 8px 12px;
-    background: rgba(255, 152, 0, 0.1);
-    border: 1px solid rgba(255, 152, 0, 0.3);
-    border-radius: 4px;
-  }
-
-  /* Infinite scroll styles */
-  .scroll-sentinel {
-    padding: 16px;
-    text-align: center;
-    min-height: 50px;
-  }
-
-  .loading-more {
-    color: #888;
-    font-size: 14px;
-  }
-
-  .load-more-hint {
-    color: #555;
-    font-size: 12px;
-  }
+  /* ParamView-specific styles - shared styles are in common.css */
 
   .section-header-value {
     display: flex;
@@ -946,97 +713,7 @@
     letter-spacing: 0.5px;
   }
 
-  .btn-toggle {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    padding: 4px 8px;
-    background: #2d2d44;
-    color: #fff;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 12px;
-  }
-
-  .btn-toggle:hover {
-    background: #3d3d54;
-  }
-
-  .btn-toggle.active {
-    background: #e94560;
-  }
-
   .value-display.masked {
-    color: #888;
     font-style: italic;
-  }
-
-  /* Tags styles */
-  .tags-list {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-  }
-
-  .tag-item {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 8px 12px;
-    background: #1a1a2e;
-    border-radius: 4px;
-    font-family: monospace;
-    font-size: 13px;
-  }
-
-  .tag-key {
-    color: #4fc3f7;
-    font-weight: 600;
-  }
-
-  .tag-separator {
-    color: #666;
-  }
-
-  .tag-value {
-    color: #a5d6a7;
-  }
-
-  /* Description styles */
-  .description-text {
-    margin: 0;
-    padding: 12px;
-    background: #1a1a2e;
-    border-radius: 4px;
-    color: #ccc;
-    font-size: 14px;
-    line-height: 1.5;
-    white-space: pre-wrap;
-  }
-
-  /* Tag styles */
-  .btn-tag-remove {
-    margin-left: auto;
-    padding: 2px 8px;
-    background: transparent;
-    border: 1px solid #444;
-    border-radius: 4px;
-    color: #888;
-    cursor: pointer;
-    font-size: 14px;
-    line-height: 1;
-  }
-
-  .btn-tag-remove:hover {
-    background: #f44336;
-    border-color: #f44336;
-    color: #fff;
-  }
-
-  .no-tags {
-    color: #666;
-    font-size: 13px;
-    margin: 0;
   }
 </style>
