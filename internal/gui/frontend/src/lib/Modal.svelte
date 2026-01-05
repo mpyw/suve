@@ -17,7 +17,8 @@
   }
 
   function handleKeydown(e: KeyboardEvent) {
-    if (e.key === 'Escape') {
+    // Only handle Escape when modal is shown
+    if (show && e.key === 'Escape') {
       handleClose();
     }
   }
