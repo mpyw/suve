@@ -103,12 +103,14 @@ type Store struct {
 }
 
 // NewStore creates a new Store with the default state file path.
-func NewStore() (*Store, error) {
+// The state file is stored under ~/.suve/{accountID}/{region}/stage.json
+// to isolate staging state per AWS account and region.
+func NewStore(accountID, region string) (*Store, error) {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get home directory: %w", err)
 	}
-	stateDir := filepath.Join(homeDir, stateDirName)
+	stateDir := filepath.Join(homeDir, stateDirName, accountID, region)
 	return &Store{
 		stateFilePath: filepath.Join(stateDir, stateFileName),
 		lockFilePath:  filepath.Join(stateDir, stateFileName+".lock"),

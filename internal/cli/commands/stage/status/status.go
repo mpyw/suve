@@ -9,6 +9,7 @@ import (
 	"github.com/urfave/cli/v3"
 
 	"github.com/mpyw/suve/internal/cli/colors"
+	"github.com/mpyw/suve/internal/infra"
 	"github.com/mpyw/suve/internal/maputil"
 	"github.com/mpyw/suve/internal/staging"
 )
@@ -49,7 +50,11 @@ EXAMPLES:
 }
 
 func action(ctx context.Context, cmd *cli.Command) error {
-	store, err := staging.NewStore()
+	identity, err := infra.GetAWSIdentity(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get AWS identity: %w", err)
+	}
+	store, err := staging.NewStore(identity.AccountID, identity.Region)
 	if err != nil {
 		return fmt.Errorf("failed to initialize stage store: %w", err)
 	}

@@ -76,6 +76,12 @@ func setupTempHome(t *testing.T) string {
 	return tmpHome
 }
 
+// stagingFilePath returns the staging file path for localstack environment.
+// localstack uses account ID "000000000000" and region "us-east-1".
+func stagingFilePath(tmpHome string) string {
+	return filepath.Join(tmpHome, ".suve", "000000000000", "us-east-1", "stage.json")
+}
+
 // runCommand executes a CLI command and returns stdout, stderr, and error.
 func runCommand(t *testing.T, cmd *cli.Command, args ...string) (stdout, stderr string, err error) {
 	t.Helper()
@@ -372,7 +378,7 @@ func TestParam_StagingWorkflow(t *testing.T) {
 
 	// 2. Stage a new value (using store directly since edit requires interactive editor)
 	t.Run("stage-edit", func(t *testing.T) {
-		store := staging.NewStoreWithPath(filepath.Join(tmpHome, ".suve", "stage.json"))
+		store := staging.NewStoreWithPath(stagingFilePath(tmpHome))
 		err := store.StageEntry(staging.ServiceParam, paramName, staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value: lo.ToPtr("staged-value"),
@@ -473,7 +479,7 @@ func TestParam_StagingAdd(t *testing.T) {
 
 	// 1. Stage add (using store directly since add requires interactive editor)
 	t.Run("stage-add", func(t *testing.T) {
-		store := staging.NewStoreWithPath(filepath.Join(tmpHome, ".suve", "stage.json"))
+		store := staging.NewStoreWithPath(stagingFilePath(tmpHome))
 		err := store.StageEntry(staging.ServiceParam, paramName, staging.Entry{
 			Operation: staging.OperationCreate,
 			Value: lo.ToPtr("new-param-value"),
@@ -542,7 +548,7 @@ func TestParam_StagingResetWithVersion(t *testing.T) {
 
 	// 3. Verify staged value is from version 1
 	t.Run("verify-staged", func(t *testing.T) {
-		store := staging.NewStoreWithPath(filepath.Join(tmpHome, ".suve", "stage.json"))
+		store := staging.NewStoreWithPath(stagingFilePath(tmpHome))
 		entry, err := store.GetEntry(staging.ServiceParam, paramName)
 		require.NoError(t, err)
 		require.NotNil(t, entry.Value)
@@ -584,7 +590,7 @@ func TestParam_StagingResetAll(t *testing.T) {
 	_, _, _ = runCommand(t, paramset.Command(), "--yes", param2, "value2")
 
 	// Stage both
-	store := staging.NewStoreWithPath(filepath.Join(tmpHome, ".suve", "stage.json"))
+	store := staging.NewStoreWithPath(stagingFilePath(tmpHome))
 	_ = store.StageEntry(staging.ServiceParam, param1, staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value: lo.ToPtr("staged1"),
@@ -642,7 +648,7 @@ func TestParam_StagingApplySingle(t *testing.T) {
 	_, _, _ = runCommand(t, paramset.Command(), "--yes", param2, "original2")
 
 	// Stage both
-	store := staging.NewStoreWithPath(filepath.Join(tmpHome, ".suve", "stage.json"))
+	store := staging.NewStoreWithPath(stagingFilePath(tmpHome))
 	_ = store.StageEntry(staging.ServiceParam, param1, staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value: lo.ToPtr("staged1"),
@@ -897,7 +903,7 @@ func TestSecret_StagingWorkflow(t *testing.T) {
 
 	// 2. Stage update
 	t.Run("stage-update", func(t *testing.T) {
-		store := staging.NewStoreWithPath(filepath.Join(tmpHome, ".suve", "stage.json"))
+		store := staging.NewStoreWithPath(stagingFilePath(tmpHome))
 		err := store.StageEntry(staging.ServiceSecret, secretName, staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value: lo.ToPtr("staged-secret"),
@@ -985,7 +991,7 @@ func TestSecret_StagingDeleteOptions(t *testing.T) {
 		require.NoError(t, err)
 
 		// Verify options are stored
-		store := staging.NewStoreWithPath(filepath.Join(tmpHome, ".suve", "stage.json"))
+		store := staging.NewStoreWithPath(stagingFilePath(tmpHome))
 		entry, err := store.GetEntry(staging.ServiceSecret, secretName)
 		require.NoError(t, err)
 		require.NotNil(t, entry.DeleteOptions)
@@ -1019,7 +1025,7 @@ func TestGlobal_StageWorkflow(t *testing.T) {
 	_, _, _ = runCommand(t, secretcreate.Command(), secretName, "original-secret")
 
 	// Stage both
-	store := staging.NewStoreWithPath(filepath.Join(tmpHome, ".suve", "stage.json"))
+	store := staging.NewStoreWithPath(stagingFilePath(tmpHome))
 	_ = store.StageEntry(staging.ServiceParam, paramName, staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value: lo.ToPtr("staged-param"),
@@ -1102,7 +1108,7 @@ func TestGlobal_StageResetAll(t *testing.T) {
 	_, _, _ = runCommand(t, paramset.Command(), "--yes", paramName, "original")
 	_, _, _ = runCommand(t, secretcreate.Command(), secretName, "original")
 
-	store := staging.NewStoreWithPath(filepath.Join(tmpHome, ".suve", "stage.json"))
+	store := staging.NewStoreWithPath(stagingFilePath(tmpHome))
 	_ = store.StageEntry(staging.ServiceParam, paramName, staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("staged"),
@@ -1454,7 +1460,7 @@ func TestParam_StagingAddWithOptions(t *testing.T) {
 
 	// Verify staged entry has options
 	t.Run("verify-staged-options", func(t *testing.T) {
-		store := staging.NewStoreWithPath(filepath.Join(tmpHome, ".suve", "stage.json"))
+		store := staging.NewStoreWithPath(stagingFilePath(tmpHome))
 
 		// Verify entry
 		entry, err := store.GetEntry(staging.ServiceParam, paramName)
@@ -1623,7 +1629,7 @@ func TestParam_GlobalDiffWithJSON(t *testing.T) {
 	require.NoError(t, err)
 
 	// Stage update with different JSON
-	store := staging.NewStoreWithPath(filepath.Join(tmpHome, ".suve", "stage.json"))
+	store := staging.NewStoreWithPath(stagingFilePath(tmpHome))
 	err = store.StageEntry(staging.ServiceParam, paramName, staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value: lo.ToPtr(`{"a":1,"b":2}`),

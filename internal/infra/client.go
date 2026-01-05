@@ -8,6 +8,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
+	"github.com/aws/aws-sdk-go-v2/service/sts"
 )
 
 // LoadConfig loads the default AWS configuration.
@@ -31,4 +32,29 @@ func NewSecretClient(ctx context.Context) (*secretsmanager.Client, error) {
 		return nil, err
 	}
 	return secretsmanager.NewFromConfig(cfg), nil
+}
+
+// AWSIdentity contains AWS account ID and region.
+type AWSIdentity struct {
+	AccountID string
+	Region    string
+}
+
+// GetAWSIdentity retrieves the current AWS account ID and region.
+func GetAWSIdentity(ctx context.Context) (*AWSIdentity, error) {
+	cfg, err := LoadConfig(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	stsClient := sts.NewFromConfig(cfg)
+	output, err := stsClient.GetCallerIdentity(ctx, &sts.GetCallerIdentityInput{})
+	if err != nil {
+		return nil, err
+	}
+
+	return &AWSIdentity{
+		AccountID: aws.ToString(output.Account),
+		Region:    cfg.Region,
+	}, nil
 }

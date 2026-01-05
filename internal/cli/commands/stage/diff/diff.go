@@ -82,7 +82,11 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		return fmt.Errorf("usage: suve stage diff (no arguments)")
 	}
 
-	store, err := staging.NewStore()
+	identity, err := infra.GetAWSIdentity(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get AWS identity: %w", err)
+	}
+	store, err := staging.NewStore(identity.AccountID, identity.Region)
 	if err != nil {
 		return fmt.Errorf("failed to initialize stage store: %w", err)
 	}
