@@ -65,7 +65,7 @@ func (a *App) Startup(ctx context.Context) {
 // =============================================================================
 
 // errInvalidService is returned when an invalid service is specified.
-var errInvalidService = errorString("invalid service: must be 'ssm' or 'sm'")
+var errInvalidService = errorString("invalid service: must be 'param' or 'secret'")
 
 type errorString string
 
@@ -116,9 +116,9 @@ func (a *App) getStagingStore() (*staging.Store, error) {
 
 func (a *App) getService(service string) (staging.Service, error) {
 	switch service {
-	case "ssm":
+	case string(staging.ServiceParam):
 		return staging.ServiceParam, nil
-	case "sm":
+	case string(staging.ServiceSecret):
 		return staging.ServiceSecret, nil
 	default:
 		return "", errInvalidService
@@ -127,9 +127,9 @@ func (a *App) getService(service string) (staging.Service, error) {
 
 func (a *App) getParser(service string) (staging.Parser, error) {
 	switch service {
-	case "ssm":
+	case string(staging.ServiceParam):
 		return &staging.ParamStrategy{}, nil
-	case "sm":
+	case string(staging.ServiceSecret):
 		return &staging.SecretStrategy{}, nil
 	default:
 		return nil, errInvalidService
@@ -138,13 +138,13 @@ func (a *App) getParser(service string) (staging.Parser, error) {
 
 func (a *App) getEditStrategy(service string) (staging.EditStrategy, error) {
 	switch service {
-	case "ssm":
+	case string(staging.ServiceParam):
 		client, err := a.getParamClient()
 		if err != nil {
 			return nil, err
 		}
 		return staging.NewParamStrategy(client), nil
-	case "sm":
+	case string(staging.ServiceSecret):
 		client, err := a.getSecretClient()
 		if err != nil {
 			return nil, err
@@ -157,13 +157,13 @@ func (a *App) getEditStrategy(service string) (staging.EditStrategy, error) {
 
 func (a *App) getDeleteStrategy(service string) (staging.DeleteStrategy, error) {
 	switch service {
-	case "ssm":
+	case string(staging.ServiceParam):
 		client, err := a.getParamClient()
 		if err != nil {
 			return nil, err
 		}
 		return staging.NewParamStrategy(client), nil
-	case "sm":
+	case string(staging.ServiceSecret):
 		client, err := a.getSecretClient()
 		if err != nil {
 			return nil, err
@@ -176,13 +176,13 @@ func (a *App) getDeleteStrategy(service string) (staging.DeleteStrategy, error) 
 
 func (a *App) getApplyStrategy(service string) (staging.ApplyStrategy, error) {
 	switch service {
-	case "ssm":
+	case string(staging.ServiceParam):
 		client, err := a.getParamClient()
 		if err != nil {
 			return nil, err
 		}
 		return staging.NewParamStrategy(client), nil
-	case "sm":
+	case string(staging.ServiceSecret):
 		client, err := a.getSecretClient()
 		if err != nil {
 			return nil, err
@@ -195,13 +195,13 @@ func (a *App) getApplyStrategy(service string) (staging.ApplyStrategy, error) {
 
 func (a *App) getDiffStrategy(service string) (staging.DiffStrategy, error) {
 	switch service {
-	case "ssm":
+	case string(staging.ServiceParam):
 		client, err := a.getParamClient()
 		if err != nil {
 			return nil, err
 		}
 		return staging.NewParamStrategy(client), nil
-	case "sm":
+	case string(staging.ServiceSecret):
 		client, err := a.getSecretClient()
 		if err != nil {
 			return nil, err

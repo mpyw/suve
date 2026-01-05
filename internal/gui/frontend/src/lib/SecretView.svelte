@@ -211,7 +211,7 @@
         await SecretCreate(createForm.name, createForm.value);
         await loadSecrets();
       } else {
-        await StagingAdd('sm', createForm.name, createForm.value);
+        await StagingAdd('secret', createForm.name, createForm.value);
       }
       showCreateModal = false;
     } catch (e) {
@@ -245,7 +245,7 @@
           selectSecret(editForm.name)
         ]);
       } else {
-        await StagingEdit('sm', editForm.name, editForm.value);
+        await StagingEdit('secret', editForm.name, editForm.value);
       }
       showEditModal = false;
     } catch (e) {
@@ -275,7 +275,7 @@
         await loadSecrets();
       } else {
         // Stage delete with recovery window (default 30 days unless force)
-        await StagingDelete('sm', deleteTarget, forceDelete, forceDelete ? 0 : 30);
+        await StagingDelete('secret', deleteTarget, forceDelete, forceDelete ? 0 : 30);
       }
       showDeleteModal = false;
     } catch (e) {
@@ -363,7 +363,7 @@
       if (immediateMode) {
         await SecretAddTag(selectedSecret, tagForm.key, tagForm.value);
       } else {
-        await StagingAddTag('sm', selectedSecret, tagForm.key, tagForm.value);
+        await StagingAddTag('secret', selectedSecret, tagForm.key, tagForm.value);
       }
       showTagModal = false;
       await selectSecret(selectedSecret);
@@ -388,7 +388,7 @@
       if (immediateMode) {
         await SecretRemoveTag(selectedSecret, removeTagTarget);
       } else {
-        await StagingRemoveTag('sm', selectedSecret, removeTagTarget);
+        await StagingRemoveTag('secret', selectedSecret, removeTagTarget);
       }
       showRemoveTagModal = false;
       await selectSecret(selectedSecret);

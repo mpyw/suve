@@ -13,7 +13,7 @@ import {
 test.describe('Staging View Toggle', () => {
   test.beforeEach(async ({ page }) => {
     await setupWailsMocks(page, {
-      stagedSSM: [
+      stagedParam: [
         { name: '/staged/param', value: 'new-value', oldValue: 'old-value', operation: 'update' },
       ],
     });
@@ -52,7 +52,7 @@ test.describe('Staging View Toggle', () => {
 test.describe('Sidebar Badges', () => {
   test('should show staging count badge when items are staged', async ({ page }) => {
     await setupWailsMocks(page, {
-      stagedSSM: [
+      stagedParam: [
         { name: '/staged/param', value: 'staged-value', operation: 'create' },
       ],
     });

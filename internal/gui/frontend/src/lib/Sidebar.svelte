@@ -25,7 +25,6 @@
     >
       <span class="nav-icon">P</span>
       <span class="nav-label">Parameters</span>
-      <span class="nav-badge">SSM</span>
     </button>
 
     <button
@@ -35,7 +34,6 @@
     >
       <span class="nav-icon">S</span>
       <span class="nav-label">Secrets</span>
-      <span class="nav-badge">SM</span>
     </button>
 
     <button
@@ -127,17 +125,6 @@
 
   .nav-label {
     flex: 1;
-  }
-
-  .nav-badge {
-    font-size: 10px;
-    padding: 2px 6px;
-    background: rgba(255, 255, 255, 0.1);
-    border-radius: 4px;
-  }
-
-  .nav-item.active .nav-badge {
-    background: rgba(255, 255, 255, 0.2);
   }
 
   .staging-count {

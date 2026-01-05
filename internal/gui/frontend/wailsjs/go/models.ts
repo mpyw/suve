@@ -739,10 +739,10 @@ export namespace gui {
 	    }
 	}
 	export class StagingStatusResult {
-	    ssm: StagingEntry[];
-	    sm: StagingEntry[];
-	    ssmTags: StagingTagEntry[];
-	    smTags: StagingTagEntry[];
+	    param: StagingEntry[];
+	    secret: StagingEntry[];
+	    paramTags: StagingTagEntry[];
+	    secretTags: StagingTagEntry[];
 	
 	    static createFrom(source: any = {}) {
 	        return new StagingStatusResult(source);
@@ -750,10 +750,10 @@ export namespace gui {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.ssm = this.convertValues(source["ssm"], StagingEntry);
-	        this.sm = this.convertValues(source["sm"], StagingEntry);
-	        this.ssmTags = this.convertValues(source["ssmTags"], StagingTagEntry);
-	        this.smTags = this.convertValues(source["smTags"], StagingTagEntry);
+	        this.param = this.convertValues(source["param"], StagingEntry);
+	        this.secret = this.convertValues(source["secret"], StagingEntry);
+	        this.paramTags = this.convertValues(source["paramTags"], StagingTagEntry);
+	        this.secretTags = this.convertValues(source["secretTags"], StagingTagEntry);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
