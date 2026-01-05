@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/mpyw/suve/internal/staging"
+	"github.com/mpyw/suve/internal/staging/transition"
 )
 
 // DeleteInput holds input for the delete use case.
@@ -20,10 +21,9 @@ type DeleteInput struct {
 type DeleteOutput struct {
 	Name              string
 	Unstaged          bool // True if a staged CREATE was removed instead of staging DELETE
-	HasDeleteOptions  bool
+	ShowDeleteOptions bool // True if delete options (Force/RecoveryWindow) should be shown
 	Force             bool
 	RecoveryWindow    int
-	ShowDeleteOptions bool
 }
 
 // DeleteUseCase executes delete staging operations.
@@ -38,14 +38,39 @@ func (u *DeleteUseCase) Execute(ctx context.Context, input DeleteInput) (*Delete
 	itemName := u.Strategy.ItemName()
 	hasDeleteOptions := u.Strategy.HasDeleteOptions()
 
-	// Check if CREATE is staged - if so, just unstage instead of staging DELETE
-	existingEntry, err := u.Store.GetEntry(service, input.Name)
-	if err != nil && !errors.Is(err, staging.ErrNotStaged) {
+	// Validate recovery window if delete options are supported
+	if hasDeleteOptions && !input.Force {
+		if input.RecoveryWindow < 7 || input.RecoveryWindow > 30 {
+			return nil, fmt.Errorf("recovery window must be between 7 and 30 days")
+		}
+	}
+
+	// Fetch LastModified for conflict detection (needed for non-CREATE cases)
+	lastModified, err := u.Strategy.FetchLastModified(ctx, input.Name)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch %s: %w", itemName, err)
+	}
+
+	// Load current state
+	entryState, err := transition.LoadEntryState(u.Store, service, input.Name, nil)
+	if err != nil {
 		return nil, err
 	}
-	if existingEntry != nil && existingEntry.Operation == staging.OperationCreate {
-		// Unstage the CREATE instead of staging DELETE
+
+	// Use reducer to determine transition (without persisting yet)
+	result := transition.ReduceEntry(entryState, transition.EntryActionDelete{})
+	if result.Error != nil {
+		return nil, result.Error
+	}
+
+	// Check if we should unstage a CREATE
+	if result.DiscardTags {
+		// CREATE -> NotStaged: unstage entry and tags
 		if err := u.Store.UnstageEntry(service, input.Name); err != nil {
+			return nil, err
+		}
+		// Unstage tags too (ignore ErrNotStaged)
+		if err := u.Store.UnstageTag(service, input.Name); err != nil && !errors.Is(err, staging.ErrNotStaged) {
 			return nil, err
 		}
 		return &DeleteOutput{
@@ -54,19 +79,25 @@ func (u *DeleteUseCase) Execute(ctx context.Context, input DeleteInput) (*Delete
 		}, nil
 	}
 
-	// Validate recovery window if delete options are supported
-	if hasDeleteOptions && !input.Force {
-		if input.RecoveryWindow < 7 || input.RecoveryWindow > 30 {
-			return nil, fmt.Errorf("recovery window must be between 7 and 30 days")
-		}
+	// Stage delete with options (single persist)
+	if err := u.stageDeleteWithOptions(service, input.Name, lastModified, hasDeleteOptions, input.Force, input.RecoveryWindow); err != nil {
+		return nil, err
 	}
 
-	// Fetch LastModified for conflict detection
-	lastModified, err := u.Strategy.FetchLastModified(ctx, input.Name)
-	if err != nil {
-		return nil, fmt.Errorf("failed to fetch %s: %w", itemName, err)
+	output := &DeleteOutput{
+		Name:              input.Name,
+		ShowDeleteOptions: hasDeleteOptions,
+	}
+	if hasDeleteOptions {
+		output.Force = input.Force
+		output.RecoveryWindow = input.RecoveryWindow
 	}
 
+	return output, nil
+}
+
+// stageDeleteWithOptions stages a delete entry with optional delete options.
+func (u *DeleteUseCase) stageDeleteWithOptions(service staging.Service, name string, lastModified time.Time, hasDeleteOptions, force bool, recoveryWindow int) error {
 	entry := staging.Entry{
 		Operation: staging.OperationDelete,
 		StagedAt:  time.Now(),
@@ -77,24 +108,10 @@ func (u *DeleteUseCase) Execute(ctx context.Context, input DeleteInput) (*Delete
 
 	if hasDeleteOptions {
 		entry.DeleteOptions = &staging.DeleteOptions{
-			Force:          input.Force,
-			RecoveryWindow: input.RecoveryWindow,
+			Force:          force,
+			RecoveryWindow: recoveryWindow,
 		}
 	}
 
-	if err := u.Store.StageEntry(service, input.Name, entry); err != nil {
-		return nil, err
-	}
-
-	output := &DeleteOutput{
-		Name:              input.Name,
-		HasDeleteOptions:  hasDeleteOptions,
-		ShowDeleteOptions: hasDeleteOptions,
-	}
-	if hasDeleteOptions && entry.DeleteOptions != nil {
-		output.Force = entry.DeleteOptions.Force
-		output.RecoveryWindow = entry.DeleteOptions.RecoveryWindow
-	}
-
-	return output, nil
+	return u.Store.StageEntry(service, name, entry)
 }

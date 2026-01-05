@@ -32,9 +32,9 @@ func (r *TagRunner) Run(ctx context.Context, opts TagOptions) error {
 		return err
 	}
 
-	result, err := r.UseCase.Execute(ctx, stagingusecase.TagInput{
-		Name:    opts.Name,
-		AddTags: tags,
+	result, err := r.UseCase.Tag(ctx, stagingusecase.TagInput{
+		Name: opts.Name,
+		Tags: tags,
 	})
 	if err != nil {
 		return err
@@ -59,9 +59,9 @@ type UntagOptions struct {
 
 // Run executes the untag command.
 func (r *UntagRunner) Run(ctx context.Context, opts UntagOptions) error {
-	result, err := r.UseCase.Execute(ctx, stagingusecase.TagInput{
-		Name:       opts.Name,
-		RemoveTags: maputil.NewSet(opts.Keys...),
+	result, err := r.UseCase.Untag(ctx, stagingusecase.UntagInput{
+		Name:    opts.Name,
+		TagKeys: maputil.NewSet(opts.Keys...),
 	})
 	if err != nil {
 		return err

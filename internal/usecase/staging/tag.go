@@ -7,17 +7,28 @@ import (
 
 	"github.com/mpyw/suve/internal/maputil"
 	"github.com/mpyw/suve/internal/staging"
+	"github.com/mpyw/suve/internal/staging/transition"
 )
 
 // TagInput holds input for the tag staging use case.
 type TagInput struct {
-	Name       string
-	AddTags    map[string]string   // Tags to add or update
-	RemoveTags maputil.Set[string] // Tag keys to remove
+	Name string
+	Tags map[string]string
 }
 
 // TagOutput holds the result of the tag staging use case.
 type TagOutput struct {
+	Name string
+}
+
+// UntagInput holds input for the untag staging use case.
+type UntagInput struct {
+	Name    string
+	TagKeys maputil.Set[string]
+}
+
+// UntagOutput holds the result of the untag staging use case.
+type UntagOutput struct {
 	Name string
 }
 
@@ -27,106 +38,141 @@ type TagUseCase struct {
 	Store    staging.StoreReadWriter
 }
 
-// Execute runs the tag staging use case.
-func (u *TagUseCase) Execute(ctx context.Context, input TagInput) (*TagOutput, error) {
+// tagContext holds common context for tag operations.
+type tagContext struct {
+	service        staging.Service
+	name           string
+	entryState     transition.EntryState
+	stagedTags     transition.StagedTags
+	baseModifiedAt *time.Time
+}
+
+// loadTagContext loads common context needed for both Tag and Untag operations.
+func (u *TagUseCase) loadTagContext(ctx context.Context, inputName string) (*tagContext, error) {
 	service := u.Strategy.Service()
 
 	// Parse and validate name
-	name, err := u.Strategy.ParseName(input.Name)
+	name, err := u.Strategy.ParseName(inputName)
 	if err != nil {
 		return nil, err
 	}
 
-	// Get existing staged tag entry
-	existingTagEntry, err := u.Store.GetTag(service, name)
-	if err != nil && !errors.Is(err, staging.ErrNotStaged) {
+	// Load current entry state to check for DELETE
+	entryState, err := transition.LoadEntryState(u.Store, service, name, nil)
+	if err != nil {
 		return nil, err
 	}
 
-	var tagEntry staging.TagEntry
-	if existingTagEntry != nil {
-		// Merge with existing tag entry
-		tagEntry = *existingTagEntry
-		tagEntry.StagedAt = time.Now()
-
-		// Ensure maps are initialized
-		if tagEntry.Add == nil {
-			tagEntry.Add = make(map[string]string)
-		}
-		if tagEntry.Remove == nil {
-			tagEntry.Remove = maputil.NewSet[string]()
-		}
-
-		// Process add tags
-		for k, v := range input.AddTags {
-			tagEntry.Add[k] = v
-			// Remove from remove list if present (adding takes precedence)
-			tagEntry.Remove.Remove(k)
-		}
-
-		// Process remove tags
-		for k := range input.RemoveTags {
-			// Remove from add list if present
-			delete(tagEntry.Add, k)
-			// Add to remove list
-			tagEntry.Remove.Add(k)
-		}
-
-		// If tag entry has no meaningful content after merging, unstage it
-		if len(tagEntry.Add) == 0 && tagEntry.Remove.Len() == 0 {
-			if err := u.Store.UnstageTag(service, name); err != nil {
-				return nil, err
-			}
-			return &TagOutput{Name: name}, nil
-		}
-	} else {
-		// No existing tag entry - only create if there's something to stage
-		if len(input.AddTags) == 0 && input.RemoveTags.Len() == 0 {
-			return &TagOutput{Name: name}, nil
-		}
-
-		tagEntry = staging.TagEntry{
-			StagedAt: time.Now(),
-		}
-
-		// Check if there's a staged entry for CREATE (new resource)
-		existingEntry, err := u.Store.GetEntry(service, name)
-		if err != nil && !errors.Is(err, staging.ErrNotStaged) {
-			return nil, err
-		}
-
-		// Only fetch from AWS if the resource exists or is being updated (not created)
-		if existingEntry == nil || existingEntry.Operation != staging.OperationCreate {
-			// Fetch base time from AWS for conflict detection
-			result, err := u.Strategy.FetchCurrentValue(ctx, name)
-			if err != nil {
-				return nil, err
-			}
-			if !result.LastModified.IsZero() {
-				tagEntry.BaseModifiedAt = &result.LastModified
-			}
-		}
-
-		if len(input.AddTags) > 0 {
-			tagEntry.Add = make(map[string]string)
-			for k, v := range input.AddTags {
-				tagEntry.Add[k] = v
-			}
-		}
-		if input.RemoveTags.Len() > 0 {
-			// Filter out keys that are being added (add takes precedence)
-			tagEntry.Remove = maputil.NewSet[string]()
-			for k := range input.RemoveTags {
-				if _, inAdd := input.AddTags[k]; !inAdd {
-					tagEntry.Remove.Add(k)
-				}
-			}
-		}
-	}
-
-	if err := u.Store.StageTag(service, name, tagEntry); err != nil {
+	// Load current staged tags
+	stagedTags, baseModifiedAt, err := transition.LoadStagedTags(u.Store, service, name)
+	if err != nil {
 		return nil, err
 	}
 
-	return &TagOutput{Name: name}, nil
+	// Fetch AWS base modified time
+	awsBaseModifiedAt, err := u.fetchAWSBaseModifiedAt(ctx, name, entryState.StagedState)
+	if err != nil {
+		return nil, err
+	}
+
+	// Use AWS base modified time if we don't have one yet
+	if baseModifiedAt == nil {
+		baseModifiedAt = awsBaseModifiedAt
+	}
+
+	return &tagContext{
+		service:        service,
+		name:           name,
+		entryState:     entryState,
+		stagedTags:     stagedTags,
+		baseModifiedAt: baseModifiedAt,
+	}, nil
+}
+
+// fetchAWSBaseModifiedAt fetches the base modified time from AWS.
+// For CREATE operations, returns nil (resource doesn't exist yet).
+func (u *TagUseCase) fetchAWSBaseModifiedAt(ctx context.Context, name string, stagedState transition.EntryStagedState) (*time.Time, error) {
+	// For CREATE, resource doesn't exist yet
+	if _, isCreate := stagedState.(transition.EntryStagedStateCreate); isCreate {
+		return nil, nil
+	}
+
+	// Fetch from AWS
+	result, err := u.Strategy.FetchCurrentValue(ctx, name)
+	if err != nil {
+		// If resource doesn't exist, return nil
+		var notFoundErr interface{ NotFound() bool }
+		if errors.As(err, &notFoundErr) && notFoundErr.NotFound() {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	if result.LastModified.IsZero() {
+		return nil, nil
+	}
+	return &result.LastModified, nil
+}
+
+// Tag adds or updates tags on a staged resource.
+func (u *TagUseCase) Tag(ctx context.Context, input TagInput) (*TagOutput, error) {
+	if len(input.Tags) == 0 {
+		return nil, errors.New("no tags specified")
+	}
+
+	tc, err := u.loadTagContext(ctx, input.Name)
+	if err != nil {
+		return nil, err
+	}
+
+	// Build tag action
+	// CurrentAWSTags is nil to disable auto-skip (conservative approach)
+	// TODO: Extend Strategy interface to fetch current tags for proper auto-skip
+	action := transition.TagActionTag{
+		Tags:           input.Tags,
+		CurrentAWSTags: nil,
+	}
+
+	// Execute the transition
+	executor := transition.NewExecutor(u.Store)
+	_, err = executor.ExecuteTag(tc.service, tc.name, tc.entryState.StagedState, tc.stagedTags, action, tc.baseModifiedAt)
+	if err != nil {
+		return nil, err
+	}
+
+	return &TagOutput{Name: tc.name}, nil
+}
+
+// Untag removes tags from a staged resource.
+func (u *TagUseCase) Untag(ctx context.Context, input UntagInput) (*UntagOutput, error) {
+	if input.TagKeys.Len() == 0 {
+		return nil, errors.New("no tag keys specified")
+	}
+
+	tc, err := u.loadTagContext(ctx, input.Name)
+	if err != nil {
+		return nil, err
+	}
+
+	// For CREATE, use empty set (no tags on AWS) to enable auto-skip
+	// For others, use nil to disable auto-skip (conservative approach)
+	var currentAWSTagKeys maputil.Set[string]
+	if _, isCreate := tc.entryState.StagedState.(transition.EntryStagedStateCreate); isCreate {
+		currentAWSTagKeys = maputil.NewSet[string]()
+	}
+
+	// Build untag action
+	action := transition.TagActionUntag{
+		Keys:              input.TagKeys,
+		CurrentAWSTagKeys: currentAWSTagKeys,
+	}
+
+	// Execute the transition
+	executor := transition.NewExecutor(u.Store)
+	_, err = executor.ExecuteTag(tc.service, tc.name, tc.entryState.StagedState, tc.stagedTags, action, tc.baseModifiedAt)
+	if err != nil {
+		return nil, err
+	}
+
+	return &UntagOutput{Name: tc.name}, nil
 }

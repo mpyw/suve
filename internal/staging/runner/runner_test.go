@@ -1666,7 +1666,7 @@ func TestEditRunner_WithMetadata(t *testing.T) {
 		assert.WithinDuration(t, awsTime, *entry.BaseModifiedAt, time.Second)
 	})
 
-	t.Run("edit staged delete operation fetches from AWS", func(t *testing.T) {
+	t.Run("edit staged delete operation is blocked", func(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
@@ -1686,19 +1686,19 @@ func TestEditRunner_WithMetadata(t *testing.T) {
 			Stdout: &stdout,
 			Stderr: &stderr,
 			OpenEditor: func(current string) (string, error) {
-				// Should fetch from AWS, not use empty staged value
-				assert.Equal(t, "aws-value", current)
-				return "edited-value", nil
+				t.Fatal("OpenEditor should not be called when delete is staged")
+				return "", nil
 			},
 		}
 
 		err := r.Run(context.Background(), runner.EditOptions{Name: "/app/config"})
-		require.NoError(t, err)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "staged for deletion")
 
+		// Entry should still be DELETE
 		entry, err := store.GetEntry(staging.ServiceParam, "/app/config")
 		require.NoError(t, err)
-		assert.Equal(t, staging.OperationUpdate, entry.Operation)
-		assert.Equal(t, "edited-value", lo.FromPtr(entry.Value))
+		assert.Equal(t, staging.OperationDelete, entry.Operation)
 	})
 }
 
@@ -2122,5 +2122,152 @@ func TestDeleteRunner_Run(t *testing.T) {
 		})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "recovery window must be between 7 and 30 days")
+	})
+
+	t.Run("delete staged CREATE - unstages instead of delete", func(t *testing.T) {
+		t.Parallel()
+
+		tmpDir := t.TempDir()
+		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+
+		// Pre-stage a CREATE operation
+		_ = store.StageEntry(staging.ServiceParam, "/app/new-config", staging.Entry{
+			Operation: staging.OperationCreate,
+			Value:     lo.ToPtr("new-value"),
+			StagedAt:  time.Now(),
+		})
+
+		var stdout, stderr bytes.Buffer
+		r := &runner.DeleteRunner{
+			UseCase: &stagingusecase.DeleteUseCase{
+				Strategy: &fullMockStrategy{service: staging.ServiceParam},
+				Store:    store,
+			},
+			Stdout: &stdout,
+			Stderr: &stderr,
+		}
+
+		err := r.Run(context.Background(), runner.DeleteOptions{Name: "/app/new-config"})
+		require.NoError(t, err)
+		assert.Contains(t, stdout.String(), "Unstaged creation: /app/new-config")
+
+		// Verify entry was unstaged (not converted to delete)
+		_, err = store.GetEntry(staging.ServiceParam, "/app/new-config")
+		assert.ErrorIs(t, err, staging.ErrNotStaged)
+	})
+}
+
+// =============================================================================
+// EditRunner Skipped/Unstaged Tests
+// =============================================================================
+
+func TestEditRunner_Skipped_Unstaged(t *testing.T) {
+	t.Parallel()
+
+	t.Run("edit skipped - same as AWS", func(t *testing.T) {
+		t.Parallel()
+
+		tmpDir := t.TempDir()
+		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+
+		var stdout, stderr bytes.Buffer
+		r := &runner.EditRunner{
+			UseCase: &stagingusecase.EditUseCase{
+				Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentVal: "aws-value"},
+				Store:    store,
+			},
+			Stdout: &stdout,
+			Stderr: &stderr,
+		}
+
+		// Edit with value that matches AWS - should be skipped
+		err := r.Run(context.Background(), runner.EditOptions{
+			Name:  "/app/config",
+			Value: "aws-value", // Same as current AWS value
+		})
+		require.NoError(t, err)
+		assert.Contains(t, stdout.String(), "Skipped /app/config (same as AWS)")
+
+		// Verify nothing was staged
+		_, err = store.GetEntry(staging.ServiceParam, "/app/config")
+		assert.ErrorIs(t, err, staging.ErrNotStaged)
+	})
+
+	t.Run("edit unstaged - reverted to AWS", func(t *testing.T) {
+		t.Parallel()
+
+		tmpDir := t.TempDir()
+		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+
+		// Pre-stage an UPDATE operation
+		_ = store.StageEntry(staging.ServiceParam, "/app/config", staging.Entry{
+			Operation: staging.OperationUpdate,
+			Value:     lo.ToPtr("staged-value"),
+			StagedAt:  time.Now(),
+		})
+
+		var stdout, stderr bytes.Buffer
+		r := &runner.EditRunner{
+			UseCase: &stagingusecase.EditUseCase{
+				Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentVal: "aws-value"},
+				Store:    store,
+			},
+			Stdout: &stdout,
+			Stderr: &stderr,
+		}
+
+		// Edit back to AWS value - should auto-unstage
+		err := r.Run(context.Background(), runner.EditOptions{
+			Name:  "/app/config",
+			Value: "aws-value", // Reverted to AWS value
+		})
+		require.NoError(t, err)
+		assert.Contains(t, stdout.String(), "Unstaged /app/config (reverted to AWS)")
+
+		// Verify entry was unstaged
+		_, err = store.GetEntry(staging.ServiceParam, "/app/config")
+		assert.ErrorIs(t, err, staging.ErrNotStaged)
+	})
+}
+
+// =============================================================================
+// ResetRunner Skipped Tests
+// =============================================================================
+
+func TestResetRunner_Skipped(t *testing.T) {
+	t.Parallel()
+
+	t.Run("restore version skipped - same as current AWS", func(t *testing.T) {
+		t.Parallel()
+
+		tmpDir := t.TempDir()
+		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+
+		var stdout, stderr bytes.Buffer
+		// Fetcher returns version value that matches current AWS value
+		fetcher := &fullMockStrategy{
+			service:          staging.ServiceParam,
+			parseSpecVersion: true,
+			fetchVersionVal:  "current-value", // Version value
+			fetchVersionLbl:  "#3",
+			fetchCurrentVal:  "current-value", // Same as version - triggers skip
+		}
+		r := &runner.ResetRunner{
+			UseCase: &stagingusecase.ResetUseCase{
+				Parser:  fetcher,
+				Fetcher: fetcher,
+				Store:   store,
+			},
+			Stdout: &stdout,
+			Stderr: &stderr,
+		}
+
+		err := r.Run(context.Background(), runner.ResetOptions{Spec: "/app/config#3"})
+		require.NoError(t, err)
+		assert.Contains(t, stdout.String(), "Skipped /app/config#3 (version #3 matches current value)")
+
+		// Verify nothing was staged (auto-skipped)
+		_, err = store.GetEntry(staging.ServiceParam, "/app/config#3")
+		assert.ErrorIs(t, err, staging.ErrNotStaged)
 	})
 }

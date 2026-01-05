@@ -17,9 +17,11 @@ import (
 
 type mockResetStrategy struct {
 	*mockParser
-	fetchValue   string
-	versionLabel string
-	fetchErr     error
+	fetchValue        string
+	versionLabel      string
+	fetchErr          error
+	currentValue      string
+	fetchCurrentError error
 }
 
 func (m *mockResetStrategy) FetchVersion(_ context.Context, _ string) (string, string, error) {
@@ -29,11 +31,19 @@ func (m *mockResetStrategy) FetchVersion(_ context.Context, _ string) (string, s
 	return m.fetchValue, m.versionLabel, nil
 }
 
+func (m *mockResetStrategy) FetchCurrentValue(_ context.Context, _ string) (*staging.EditFetchResult, error) {
+	if m.fetchCurrentError != nil {
+		return nil, m.fetchCurrentError
+	}
+	return &staging.EditFetchResult{Value: m.currentValue}, nil
+}
+
 func newMockResetStrategy() *mockResetStrategy {
 	return &mockResetStrategy{
 		mockParser:   newMockParser(),
 		fetchValue:   "version-value",
 		versionLabel: "#3",
+		currentValue: "current-value",
 	}
 }
 
@@ -332,4 +342,96 @@ func TestResetUseCase_Execute_RestoreStageError(t *testing.T) {
 	_, err := uc.Execute(context.Background(), usecasestaging.ResetInput{Spec: "/app/config#3"})
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "stage error")
+}
+
+func TestResetUseCase_Execute_RestoreSkipped_SameAsAWS(t *testing.T) {
+	t.Parallel()
+
+	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	parser := &mockParserWithVersion{
+		mockParser: newMockParser(),
+		hasVersion: true,
+	}
+
+	// Fetcher returns value that matches current AWS
+	fetcher := newMockResetStrategy()
+	fetcher.fetchValue = "current-value"
+	fetcher.currentValue = "current-value" // Same as fetched version
+	fetcher.versionLabel = "#3"
+
+	uc := &usecasestaging.ResetUseCase{
+		Parser:  parser,
+		Fetcher: fetcher,
+		Store:   store,
+	}
+
+	output, err := uc.Execute(context.Background(), usecasestaging.ResetInput{
+		Spec: "/app/config#3",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, usecasestaging.ResetResultSkipped, output.Type)
+	assert.Equal(t, "#3", output.VersionLabel)
+
+	// Verify nothing was staged (auto-skipped)
+	_, err = store.GetEntry(staging.ServiceParam, "/app/config#3")
+	assert.ErrorIs(t, err, staging.ErrNotStaged)
+}
+
+func TestResetUseCase_Execute_RestoreNotSkipped_DifferentFromAWS(t *testing.T) {
+	t.Parallel()
+
+	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	parser := &mockParserWithVersion{
+		mockParser: newMockParser(),
+		hasVersion: true,
+	}
+
+	// Fetcher returns value different from current AWS
+	fetcher := newMockResetStrategy()
+	fetcher.fetchValue = "old-version-value"
+	fetcher.currentValue = "current-value" // Different from fetched version
+	fetcher.versionLabel = "#3"
+
+	uc := &usecasestaging.ResetUseCase{
+		Parser:  parser,
+		Fetcher: fetcher,
+		Store:   store,
+	}
+
+	output, err := uc.Execute(context.Background(), usecasestaging.ResetInput{
+		Spec: "/app/config#3",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, usecasestaging.ResetResultRestored, output.Type)
+	assert.Equal(t, "#3", output.VersionLabel)
+
+	// Verify entry was staged
+	entry, err := store.GetEntry(staging.ServiceParam, "/app/config#3")
+	require.NoError(t, err)
+	assert.Equal(t, "old-version-value", lo.FromPtr(entry.Value))
+}
+
+func TestResetUseCase_Execute_RestoreFetchCurrentError(t *testing.T) {
+	t.Parallel()
+
+	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	parser := &mockParserWithVersion{
+		mockParser: newMockParser(),
+		hasVersion: true,
+	}
+
+	fetcher := newMockResetStrategy()
+	fetcher.fetchCurrentError = errors.New("aws error")
+
+	uc := &usecasestaging.ResetUseCase{
+		Parser:  parser,
+		Fetcher: fetcher,
+		Store:   store,
+	}
+
+	_, err := uc.Execute(context.Background(), usecasestaging.ResetInput{
+		Spec: "/app/config#3",
+	})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "aws error")
 }

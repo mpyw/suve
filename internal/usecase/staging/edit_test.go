@@ -300,7 +300,7 @@ func TestEditUseCase_Baseline_GetError(t *testing.T) {
 	assert.Error(t, err)
 }
 
-func TestEditUseCase_Execute_ConvertsDeleteToUpdate(t *testing.T) {
+func TestEditUseCase_Execute_BlocksEditOnDelete(t *testing.T) {
 	t.Parallel()
 
 	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
@@ -315,21 +315,21 @@ func TestEditUseCase_Execute_ConvertsDeleteToUpdate(t *testing.T) {
 		Store:    store,
 	}
 
-	// Editing a staged DELETE should convert it to UPDATE
+	// Editing a staged DELETE should be blocked
 	_, err := uc.Execute(context.Background(), usecasestaging.EditInput{
 		Name:  "/app/deleted",
 		Value: "new-value",
 	})
-	require.NoError(t, err)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "staged for deletion")
 
-	// Verify the operation changed to UPDATE
+	// Verify the operation is still DELETE
 	entry, err := store.GetEntry(staging.ServiceParam, "/app/deleted")
 	require.NoError(t, err)
-	assert.Equal(t, staging.OperationUpdate, entry.Operation)
-	assert.Equal(t, "new-value", lo.FromPtr(entry.Value))
+	assert.Equal(t, staging.OperationDelete, entry.Operation)
 }
 
-func TestEditUseCase_Baseline_FetchesFromAWSWhenDeleteStaged(t *testing.T) {
+func TestEditUseCase_Baseline_BlocksWhenDeleteStaged(t *testing.T) {
 	t.Parallel()
 
 	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
@@ -350,10 +350,10 @@ func TestEditUseCase_Baseline_FetchesFromAWSWhenDeleteStaged(t *testing.T) {
 		Store:    store,
 	}
 
-	// When DELETE is staged, Baseline should fetch from AWS
-	output, err := uc.Baseline(context.Background(), usecasestaging.BaselineInput{Name: "/app/deleted"})
-	require.NoError(t, err)
-	assert.Equal(t, "aws-current-value", output.Value)
+	// When DELETE is staged, Baseline should return an error
+	_, err := uc.Baseline(context.Background(), usecasestaging.BaselineInput{Name: "/app/deleted"})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "staged for deletion")
 }
 
 func TestEditUseCase_Execute_PreservesUpdateOperation(t *testing.T) {
@@ -387,4 +387,100 @@ func TestEditUseCase_Execute_PreservesUpdateOperation(t *testing.T) {
 	assert.Equal(t, staging.OperationUpdate, entry.Operation)
 	assert.Equal(t, "newer-value", lo.FromPtr(entry.Value))
 	assert.Equal(t, baseTime, *entry.BaseModifiedAt)
+}
+
+func TestEditUseCase_Execute_Skipped_SameAsAWS(t *testing.T) {
+	t.Parallel()
+
+	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	strategy := newMockEditStrategy()
+	strategy.fetchResult = &staging.EditFetchResult{
+		Value:        "aws-value",
+		LastModified: time.Now(),
+	}
+
+	uc := &usecasestaging.EditUseCase{
+		Strategy: strategy,
+		Store:    store,
+	}
+
+	// Edit with same value as AWS - should be skipped
+	output, err := uc.Execute(context.Background(), usecasestaging.EditInput{
+		Name:  "/app/config",
+		Value: "aws-value", // Same as AWS
+	})
+	require.NoError(t, err)
+	assert.True(t, output.Skipped)
+	assert.False(t, output.Unstaged)
+
+	// Verify nothing was staged
+	_, err = store.GetEntry(staging.ServiceParam, "/app/config")
+	assert.ErrorIs(t, err, staging.ErrNotStaged)
+}
+
+func TestEditUseCase_Execute_Unstaged_RevertedToAWS(t *testing.T) {
+	t.Parallel()
+
+	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+
+	// Pre-stage an UPDATE operation
+	require.NoError(t, store.StageEntry(staging.ServiceParam, "/app/config", staging.Entry{
+		Operation: staging.OperationUpdate,
+		Value:     lo.ToPtr("staged-value"),
+		StagedAt:  time.Now(),
+	}))
+
+	strategy := newMockEditStrategy()
+	strategy.fetchResult = &staging.EditFetchResult{
+		Value:        "aws-value",
+		LastModified: time.Now(),
+	}
+
+	uc := &usecasestaging.EditUseCase{
+		Strategy: strategy,
+		Store:    store,
+	}
+
+	// Edit back to AWS value - should auto-unstage
+	output, err := uc.Execute(context.Background(), usecasestaging.EditInput{
+		Name:  "/app/config",
+		Value: "aws-value", // Reverted to AWS value
+	})
+	require.NoError(t, err)
+	assert.False(t, output.Skipped)
+	assert.True(t, output.Unstaged)
+
+	// Verify entry was unstaged
+	_, err = store.GetEntry(staging.ServiceParam, "/app/config")
+	assert.ErrorIs(t, err, staging.ErrNotStaged)
+}
+
+func TestEditUseCase_Execute_NotSkipped_DifferentFromAWS(t *testing.T) {
+	t.Parallel()
+
+	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	strategy := newMockEditStrategy()
+	strategy.fetchResult = &staging.EditFetchResult{
+		Value:        "aws-value",
+		LastModified: time.Now(),
+	}
+
+	uc := &usecasestaging.EditUseCase{
+		Strategy: strategy,
+		Store:    store,
+	}
+
+	// Edit with different value - should be staged
+	output, err := uc.Execute(context.Background(), usecasestaging.EditInput{
+		Name:  "/app/config",
+		Value: "new-value", // Different from AWS
+	})
+	require.NoError(t, err)
+	assert.False(t, output.Skipped)
+	assert.False(t, output.Unstaged)
+
+	// Verify entry was staged
+	entry, err := store.GetEntry(staging.ServiceParam, "/app/config")
+	require.NoError(t, err)
+	assert.Equal(t, "new-value", lo.FromPtr(entry.Value))
 }

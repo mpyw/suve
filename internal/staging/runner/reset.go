@@ -45,6 +45,9 @@ func (r *ResetRunner) Run(ctx context.Context, opts ResetOptions) error {
 	case stagingusecase.ResetResultRestored:
 		_, _ = fmt.Fprintf(r.Stdout, "%s Restored %s (staged from version %s)\n",
 			colors.Success("✓"), result.Name, result.VersionLabel)
+	case stagingusecase.ResetResultSkipped:
+		_, _ = fmt.Fprintf(r.Stdout, "%s Skipped %s (version %s matches current value)\n",
+			colors.Warning("!"), result.Name, result.VersionLabel)
 	}
 
 	return nil

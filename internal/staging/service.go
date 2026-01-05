@@ -96,6 +96,10 @@ type ResetStrategy interface {
 	// FetchVersion fetches the value for a specific version.
 	// Returns the value and a version label for display.
 	FetchVersion(ctx context.Context, input string) (value string, versionLabel string, err error)
+
+	// FetchCurrentValue fetches the current value from AWS for auto-skip detection.
+	// Uses same signature as EditStrategy for implementation reuse.
+	FetchCurrentValue(ctx context.Context, name string) (*EditFetchResult, error)
 }
 
 // DeleteStrategy defines service-specific delete staging operations.

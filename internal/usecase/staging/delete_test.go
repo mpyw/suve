@@ -51,7 +51,7 @@ func TestDeleteUseCase_Execute_Param(t *testing.T) {
 	})
 	require.NoError(t, err)
 	assert.Equal(t, "/app/to-delete", output.Name)
-	assert.False(t, output.HasDeleteOptions)
+	assert.False(t, output.ShowDeleteOptions)
 
 	// Verify staged
 	entry, err := store.GetEntry(staging.ServiceParam, "/app/to-delete")
@@ -77,7 +77,7 @@ func TestDeleteUseCase_Execute_SecretWithRecoveryWindow(t *testing.T) {
 		RecoveryWindow: 14,
 	})
 	require.NoError(t, err)
-	assert.True(t, output.HasDeleteOptions)
+	assert.True(t, output.ShowDeleteOptions)
 	assert.Equal(t, 14, output.RecoveryWindow)
 	assert.False(t, output.Force)
 

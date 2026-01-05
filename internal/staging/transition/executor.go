@@ -135,9 +135,16 @@ func (e *Executor) persistTagState(service staging.Service, name string, stagedT
 
 // LoadEntryState loads the current entry state from the store and AWS info.
 func LoadEntryState(store staging.StoreReader, service staging.Service, name string, currentAWSValue *string) (EntryState, error) {
+	state, _, err := LoadEntryStateWithMetadata(store, service, name, currentAWSValue)
+	return state, err
+}
+
+// LoadEntryStateWithMetadata loads the current entry state and returns BaseModifiedAt metadata.
+// BaseModifiedAt is used for conflict detection when applying changes.
+func LoadEntryStateWithMetadata(store staging.StoreReader, service staging.Service, name string, currentAWSValue *string) (EntryState, *time.Time, error) {
 	stagedEntry, err := store.GetEntry(service, name)
 	if err != nil && !errors.Is(err, staging.ErrNotStaged) {
-		return EntryState{}, err
+		return EntryState{}, nil, err
 	}
 
 	state := EntryState{
@@ -145,7 +152,9 @@ func LoadEntryState(store staging.StoreReader, service staging.Service, name str
 		StagedState:  EntryStagedStateNotStaged{},
 	}
 
+	var baseModifiedAt *time.Time
 	if stagedEntry != nil {
+		baseModifiedAt = stagedEntry.BaseModifiedAt
 		switch stagedEntry.Operation {
 		case staging.OperationCreate:
 			state.StagedState = EntryStagedStateCreate{
@@ -160,7 +169,7 @@ func LoadEntryState(store staging.StoreReader, service staging.Service, name str
 		}
 	}
 
-	return state, nil
+	return state, baseModifiedAt, nil
 }
 
 // LoadStagedTags loads the current staged tags from the store.

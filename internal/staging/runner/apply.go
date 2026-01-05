@@ -7,6 +7,8 @@ import (
 	"io"
 	"strings"
 
+	"github.com/samber/lo"
+
 	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/maputil"
 	stagingusecase "github.com/mpyw/suve/internal/usecase/staging"
@@ -38,7 +40,7 @@ func (r *ApplyRunner) Run(ctx context.Context, opts ApplyOptions) error {
 	}
 
 	// Output conflicts if any
-	for _, name := range maputil.SortedKeys(sliceToMap(result.Conflicts)) {
+	for _, name := range maputil.SortedKeys(lo.SliceToMap(result.Conflicts, func(s string) (string, struct{}) { return s, struct{}{} })) {
 		output.Warning(r.Stderr, "conflict detected for %s: AWS was modified after staging", name)
 	}
 
@@ -105,16 +107,8 @@ func (r *ApplyRunner) sortedTagResultNames(results []stagingusecase.ApplyTagResu
 	return maputil.SortedKeys(names)
 }
 
-func sliceToMap(slice []string) map[string]struct{} {
-	m := make(map[string]struct{})
-	for _, s := range slice {
-		m[s] = struct{}{}
-	}
-	return m
-}
-
 func formatTagApplySummary(tag stagingusecase.ApplyTagResult) string {
-	parts := []string{}
+	var parts []string
 	if len(tag.AddTags) > 0 {
 		parts = append(parts, fmt.Sprintf("+%d", len(tag.AddTags)))
 	}

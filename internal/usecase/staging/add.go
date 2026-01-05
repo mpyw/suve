@@ -3,12 +3,11 @@ package staging
 import (
 	"context"
 	"errors"
-	"fmt"
-	"time"
 
 	"github.com/samber/lo"
 
 	"github.com/mpyw/suve/internal/staging"
+	"github.com/mpyw/suve/internal/staging/transition"
 )
 
 // AddInput holds input for the add use case.
@@ -39,31 +38,20 @@ func (u *AddUseCase) Execute(_ context.Context, input AddInput) (*AddOutput, err
 		return nil, err
 	}
 
-	// Check existing staged state
-	existingEntry, err := u.Store.GetEntry(service, name)
-	if err != nil && !errors.Is(err, staging.ErrNotStaged) {
+	// Load current state (nil CurrentValue since it's a new resource)
+	entryState, err := transition.LoadEntryState(u.Store, service, name, nil)
+	if err != nil {
 		return nil, err
 	}
-	if existingEntry != nil {
-		switch existingEntry.Operation {
-		case staging.OperationUpdate:
-			return nil, fmt.Errorf("cannot add: already staged for update")
-		case staging.OperationDelete:
-			return nil, fmt.Errorf("cannot add: already staged for deletion")
-		}
-		// OperationCreate: allow updating the draft value
-	}
 
-	// Stage the change with OperationCreate
-	entry := staging.Entry{
-		Operation: staging.OperationCreate,
-		Value:     lo.ToPtr(input.Value),
-		StagedAt:  time.Now(),
-	}
+	// Execute the transition
+	executor := transition.NewExecutor(u.Store)
+	opts := &transition.EntryExecuteOptions{}
 	if input.Description != "" {
-		entry.Description = &input.Description
+		opts.Description = &input.Description
 	}
-	if err := u.Store.StageEntry(service, name, entry); err != nil {
+	_, err = executor.ExecuteEntry(service, name, entryState, transition.EntryActionAdd{Value: input.Value}, opts)
+	if err != nil {
 		return nil, err
 	}
 
