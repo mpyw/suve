@@ -10,10 +10,10 @@
 
   let loading = false;
   let error = '';
-  let ssmEntries: gui.StagingDiffEntry[] = [];
-  let smEntries: gui.StagingDiffEntry[] = [];
-  let ssmTagEntries: gui.StagingDiffTagEntry[] = [];
-  let smTagEntries: gui.StagingDiffTagEntry[] = [];
+  let paramEntries: gui.StagingDiffEntry[] = [];
+  let secretEntries: gui.StagingDiffEntry[] = [];
+  let paramTagEntries: gui.StagingDiffTagEntry[] = [];
+  let secretTagEntries: gui.StagingDiffTagEntry[] = [];
 
   // View mode: 'diff' (default) or 'value'
   let viewMode: 'diff' | 'value' = 'diff';
@@ -48,22 +48,22 @@
     try {
       // Load diff data which includes AWS values
       const [ssmResult, smResult] = await Promise.all([
-        StagingDiff('ssm', ''),
-        StagingDiff('sm', '')
+        StagingDiff('param', ''),
+        StagingDiff('secret', '')
       ]);
-      ssmEntries = ssmResult?.entries?.filter(e => e.type !== 'autoUnstaged') || [];
-      smEntries = smResult?.entries?.filter(e => e.type !== 'autoUnstaged') || [];
-      ssmTagEntries = ssmResult?.tagEntries || [];
-      smTagEntries = smResult?.tagEntries || [];
+      paramEntries = ssmResult?.entries?.filter(e => e.type !== 'autoUnstaged') || [];
+      secretEntries = smResult?.entries?.filter(e => e.type !== 'autoUnstaged') || [];
+      paramTagEntries = ssmResult?.tagEntries || [];
+      secretTagEntries = smResult?.tagEntries || [];
       // Emit count change for sidebar badge
-      const totalCount = ssmEntries.length + smEntries.length + ssmTagEntries.length + smTagEntries.length;
+      const totalCount = paramEntries.length + secretEntries.length + paramTagEntries.length + secretTagEntries.length;
       dispatch('countChange', totalCount);
     } catch (e) {
       error = e instanceof Error ? e.message : String(e);
-      ssmEntries = [];
-      smEntries = [];
-      ssmTagEntries = [];
-      smTagEntries = [];
+      paramEntries = [];
+      secretEntries = [];
+      paramTagEntries = [];
+      secretTagEntries = [];
       dispatch('countChange', 0);
     } finally {
       loading = false;
@@ -143,7 +143,7 @@
   }
 
   function getServiceName(service: string): string {
-    return service === 'ssm' ? 'Parameters' : 'Secrets';
+    return service === 'param' ? 'Parameters' : 'Secrets';
   }
 
   // Edit modal
@@ -253,7 +253,7 @@
 
   // Find tag entry for a given name
   function findTagEntry(service: string, name: string): gui.StagingDiffTagEntry | undefined {
-    const tagEntries = service === 'ssm' ? ssmTagEntries : smTagEntries;
+    const tagEntries = service === 'param' ? paramTagEntries : secretTagEntries;
     return tagEntries.find(t => t.name === name);
   }
 
@@ -299,21 +299,21 @@
           <span class="section-icon">P</span>
           Parameters
         </h3>
-        <span class="count-badge">{ssmEntries.length}</span>
+        <span class="count-badge">{paramEntries.length}</span>
         <div class="section-actions">
-          {#if ssmEntries.length > 0}
-            <button class="btn-section btn-apply-sm" on:click={() => openApplyModal('ssm')}>Apply</button>
-            <button class="btn-section btn-reset-sm" on:click={() => openResetModal('ssm')}>Reset</button>
+          {#if paramEntries.length > 0}
+            <button class="btn-section btn-apply-sm" on:click={() => openApplyModal('param')}>Apply</button>
+            <button class="btn-section btn-reset-sm" on:click={() => openResetModal('param')}>Reset</button>
           {/if}
         </div>
       </div>
 
-      {#if ssmEntries.length === 0}
+      {#if paramEntries.length === 0}
         <div class="empty-state">No staged parameter changes</div>
       {:else}
         <ul class="entry-list">
-          {#each ssmEntries as entry}
-            {@const tagEntry = findTagEntry('ssm', entry.name)}
+          {#each paramEntries as entry}
+            {@const tagEntry = findTagEntry('param', entry.name)}
             <li class="entry-item">
               <div class="entry-header">
                 <span class="operation-badge" style="background: {getOperationColor(entry.operation || '')}">
@@ -322,9 +322,9 @@
                 <span class="entry-name">{entry.name}</span>
                 <div class="entry-actions">
                   {#if showEditButton(entry)}
-                    <button class="btn-entry" on:click={() => openEditModal('ssm', entry)}>Edit</button>
+                    <button class="btn-entry" on:click={() => openEditModal('param', entry)}>Edit</button>
                   {/if}
-                  <button class="btn-entry btn-unstage" on:click={() => handleUnstage('ssm', entry.name)}>Unstage</button>
+                  <button class="btn-entry btn-unstage" on:click={() => handleUnstage('param', entry.name)}>Unstage</button>
                 </div>
               </div>
               <div class="entry-tags">
@@ -332,9 +332,9 @@
                   <div class="tag-changes tag-add">
                     <span class="tag-label">+ Tags:</span>
                     {#each Object.entries(tagEntry.addTags) as [key, value]}
-                      <button class="tag-item tag-item-editable" type="button" on:click={() => openEditTagModal('ssm', entry.name, key, value)}>
+                      <button class="tag-item tag-item-editable" type="button" on:click={() => openEditTagModal('param', entry.name, key, value)}>
                         {key}={value}
-                        <span class="tag-delete-btn" role="button" tabindex="0" on:click|stopPropagation={() => handleRemoveTag('ssm', entry.name, key)} on:keydown|stopPropagation={(e) => e.key === 'Enter' && handleRemoveTag('ssm', entry.name, key)}>×</span>
+                        <span class="tag-delete-btn" role="button" tabindex="0" on:click|stopPropagation={() => handleRemoveTag('param', entry.name, key)} on:keydown|stopPropagation={(e) => e.key === 'Enter' && handleRemoveTag('param', entry.name, key)}>×</span>
                       </button>
                     {/each}
                   </div>
@@ -345,13 +345,13 @@
                     {#each tagEntry.removeTags as key}
                       <span class="tag-item">
                         {key}
-                        <button class="tag-cancel-btn" on:click={() => handleCancelUntag('ssm', entry.name, key)} title="Cancel untag">↩</button>
+                        <button class="tag-cancel-btn" on:click={() => handleCancelUntag('param', entry.name, key)} title="Cancel untag">↩</button>
                       </span>
                     {/each}
                   </div>
                 {/if}
                 {#if entry.operation !== 'delete'}
-                  <button class="btn-add-tag" on:click={() => openAddTagModal('ssm', entry.name)}>+ Add Tag</button>
+                  <button class="btn-add-tag" on:click={() => openAddTagModal('param', entry.name)}>+ Add Tag</button>
                 {/if}
               </div>
               {#if entry.operation === 'delete'}
@@ -395,21 +395,21 @@
           <span class="section-icon">S</span>
           Secrets
         </h3>
-        <span class="count-badge">{smEntries.length}</span>
+        <span class="count-badge">{secretEntries.length}</span>
         <div class="section-actions">
-          {#if smEntries.length > 0}
-            <button class="btn-section btn-apply-sm" on:click={() => openApplyModal('sm')}>Apply</button>
-            <button class="btn-section btn-reset-sm" on:click={() => openResetModal('sm')}>Reset</button>
+          {#if secretEntries.length > 0}
+            <button class="btn-section btn-apply-sm" on:click={() => openApplyModal('secret')}>Apply</button>
+            <button class="btn-section btn-reset-sm" on:click={() => openResetModal('secret')}>Reset</button>
           {/if}
         </div>
       </div>
 
-      {#if smEntries.length === 0}
+      {#if secretEntries.length === 0}
         <div class="empty-state">No staged secret changes</div>
       {:else}
         <ul class="entry-list">
-          {#each smEntries as entry}
-            {@const tagEntry = findTagEntry('sm', entry.name)}
+          {#each secretEntries as entry}
+            {@const tagEntry = findTagEntry('secret', entry.name)}
             <li class="entry-item">
               <div class="entry-header">
                 <span class="operation-badge" style="background: {getOperationColor(entry.operation || '')}">
@@ -418,9 +418,9 @@
                 <span class="entry-name">{entry.name}</span>
                 <div class="entry-actions">
                   {#if showEditButton(entry)}
-                    <button class="btn-entry" on:click={() => openEditModal('sm', entry)}>Edit</button>
+                    <button class="btn-entry" on:click={() => openEditModal('secret', entry)}>Edit</button>
                   {/if}
-                  <button class="btn-entry btn-unstage" on:click={() => handleUnstage('sm', entry.name)}>Unstage</button>
+                  <button class="btn-entry btn-unstage" on:click={() => handleUnstage('secret', entry.name)}>Unstage</button>
                 </div>
               </div>
               <div class="entry-tags">
@@ -428,9 +428,9 @@
                   <div class="tag-changes tag-add">
                     <span class="tag-label">+ Tags:</span>
                     {#each Object.entries(tagEntry.addTags) as [key, value]}
-                      <button class="tag-item tag-item-editable" type="button" on:click={() => openEditTagModal('sm', entry.name, key, value)}>
+                      <button class="tag-item tag-item-editable" type="button" on:click={() => openEditTagModal('secret', entry.name, key, value)}>
                         {key}={value}
-                        <span class="tag-delete-btn" role="button" tabindex="0" on:click|stopPropagation={() => handleRemoveTag('sm', entry.name, key)} on:keydown|stopPropagation={(e) => e.key === 'Enter' && handleRemoveTag('sm', entry.name, key)}>×</span>
+                        <span class="tag-delete-btn" role="button" tabindex="0" on:click|stopPropagation={() => handleRemoveTag('secret', entry.name, key)} on:keydown|stopPropagation={(e) => e.key === 'Enter' && handleRemoveTag('secret', entry.name, key)}>×</span>
                       </button>
                     {/each}
                   </div>
@@ -441,13 +441,13 @@
                     {#each tagEntry.removeTags as key}
                       <span class="tag-item">
                         {key}
-                        <button class="tag-cancel-btn" on:click={() => handleCancelUntag('sm', entry.name, key)} title="Cancel untag">↩</button>
+                        <button class="tag-cancel-btn" on:click={() => handleCancelUntag('secret', entry.name, key)} title="Cancel untag">↩</button>
                       </span>
                     {/each}
                   </div>
                 {/if}
                 {#if entry.operation !== 'delete'}
-                  <button class="btn-add-tag" on:click={() => openAddTagModal('sm', entry.name)}>+ Add Tag</button>
+                  <button class="btn-add-tag" on:click={() => openAddTagModal('secret', entry.name)}>+ Add Tag</button>
                 {/if}
               </div>
               {#if entry.operation === 'delete'}
@@ -486,19 +486,19 @@
     </div>
   </div>
 
-  {#if ssmEntries.length > 0 || smEntries.length > 0}
+  {#if paramEntries.length > 0 || secretEntries.length > 0}
     <div class="actions">
       <button
         class="btn-action btn-apply"
-        on:click={() => openApplyModal(ssmEntries.length > 0 ? 'ssm' : 'sm')}
+        on:click={() => openApplyModal(paramEntries.length > 0 ? 'param' : 'secret')}
       >
         Apply All Changes
       </button>
       <button
         class="btn-action btn-reset"
         on:click={() => {
-          if (ssmEntries.length > 0) openResetModal('ssm');
-          if (smEntries.length > 0) openResetModal('sm');
+          if (paramEntries.length > 0) openResetModal('param');
+          if (secretEntries.length > 0) openResetModal('secret');
         }}
       >
         Reset All
@@ -613,7 +613,7 @@
 </Modal>
 
 <!-- Edit Modal -->
-<Modal title="Edit Staged {editService === 'ssm' ? 'Parameter' : 'Secret'}" show={showEditModal} on:close={() => showEditModal = false}>
+<Modal title="Edit Staged {editService === 'param' ? 'Parameter' : 'Secret'}" show={showEditModal} on:close={() => showEditModal = false}>
   <form class="modal-form" on:submit|preventDefault={handleEdit}>
     {#if modalError}
       <div class="modal-error">{modalError}</div>

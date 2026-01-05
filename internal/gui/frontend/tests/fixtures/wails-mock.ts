@@ -598,10 +598,10 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
         secretTags: state.stagedSecretTags,
       }),
       StagingDiff: async (service: string) => {
-        const staged = service === 'ssm' ? state.stagedParam : state.stagedSecret;
-        const tagStaged = service === 'ssm' ? state.stagedParamTags : state.stagedSecretTags;
+        const staged = service === 'param' ? state.stagedParam : state.stagedSecret;
+        const tagStaged = service === 'param' ? state.stagedParamTags : state.stagedSecretTags;
         return {
-          itemName: service === 'ssm' ? 'parameter' : 'secret',
+          itemName: service === 'param' ? 'parameter' : 'secret',
           entries: staged.map((s: any) => ({
             name: s.name,
             type: s.operation === 'create' ? 'create' : 'normal',
@@ -620,11 +620,11 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
         };
       },
       StagingApply: async (service: string) => {
-        const staged = service === 'ssm' ? state.stagedParam : state.stagedSecret;
-        const tagStaged = service === 'ssm' ? state.stagedParamTags : state.stagedSecretTags;
+        const staged = service === 'param' ? state.stagedParam : state.stagedSecret;
+        const tagStaged = service === 'param' ? state.stagedParamTags : state.stagedSecretTags;
         const entryCount = staged.length;
         const tagCount = tagStaged.length;
-        if (service === 'ssm') {
+        if (service === 'param') {
           state.stagedParam = [];
           state.stagedParamTags = [];
         } else {
@@ -643,25 +643,25 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
         };
       },
       StagingReset: async (service: string) => {
-        if (service === 'ssm') {
+        if (service === 'param') {
           const count = state.stagedParam.length + state.stagedParamTags.length;
           state.stagedParam = [];
           state.stagedParamTags = [];
-          return { type: 'all', serviceName: 'ssm', count };
+          return { type: 'all', serviceName: 'param', count };
         } else {
           const count = state.stagedSecret.length + state.stagedSecretTags.length;
           state.stagedSecret = [];
           state.stagedSecretTags = [];
-          return { type: 'all', serviceName: 'sm', count };
+          return { type: 'all', serviceName: 'secret', count };
         }
       },
       StagingAdd: async (service: string, name: string, value: string) => {
-        const staged = service === 'ssm' ? state.stagedParam : state.stagedSecret;
+        const staged = service === 'param' ? state.stagedParam : state.stagedSecret;
         staged.push({ name, operation: 'create', value });
         return { name };
       },
       StagingEdit: async (service: string, name: string, value: string) => {
-        const staged = service === 'ssm' ? state.stagedParam : state.stagedSecret;
+        const staged = service === 'param' ? state.stagedParam : state.stagedSecret;
         const existing = staged.find((s: any) => s.name === name);
         if (existing) {
           existing.value = value;
@@ -671,12 +671,12 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
         return { name };
       },
       StagingDelete: async (service: string, name: string) => {
-        const staged = service === 'ssm' ? state.stagedParam : state.stagedSecret;
+        const staged = service === 'param' ? state.stagedParam : state.stagedSecret;
         staged.push({ name, operation: 'delete' });
         return { name };
       },
       StagingUnstage: async (service: string, name: string) => {
-        if (service === 'ssm') {
+        if (service === 'param') {
           state.stagedParam = state.stagedParam.filter((s: any) => s.name !== name);
           state.stagedParamTags = state.stagedParamTags.filter((s: any) => s.name !== name);
         } else {
@@ -686,7 +686,7 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
         return { name };
       },
       StagingAddTag: async (service: string, name: string, key: string, value: string) => {
-        const tagStaged = service === 'ssm' ? state.stagedParamTags : state.stagedSecretTags;
+        const tagStaged = service === 'param' ? state.stagedParamTags : state.stagedSecretTags;
         let entry = tagStaged.find((t: any) => t.name === name);
         if (!entry) {
           entry = { name, addTags: {}, removeTags: [] };
@@ -696,7 +696,7 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
         return { name };
       },
       StagingRemoveTag: async (service: string, name: string, key: string) => {
-        const tagStaged = service === 'ssm' ? state.stagedParamTags : state.stagedSecretTags;
+        const tagStaged = service === 'param' ? state.stagedParamTags : state.stagedSecretTags;
         let entry = tagStaged.find((t: any) => t.name === name);
         if (!entry) {
           entry = { name, addTags: {}, removeTags: [] };
@@ -706,7 +706,7 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
         return { name };
       },
       StagingCancelAddTag: async (service: string, name: string, key: string) => {
-        const tagStaged = service === 'ssm' ? state.stagedParamTags : state.stagedSecretTags;
+        const tagStaged = service === 'param' ? state.stagedParamTags : state.stagedSecretTags;
         const entry = tagStaged.find((t: any) => t.name === name);
         if (entry) {
           delete entry.addTags[key];
@@ -714,7 +714,7 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
         return { name };
       },
       StagingCancelRemoveTag: async (service: string, name: string, key: string) => {
-        const tagStaged = service === 'ssm' ? state.stagedParamTags : state.stagedSecretTags;
+        const tagStaged = service === 'param' ? state.stagedParamTags : state.stagedSecretTags;
         const entry = tagStaged.find((t: any) => t.name === name);
         if (entry) {
           entry.removeTags = entry.removeTags.filter((k: string) => k !== key);

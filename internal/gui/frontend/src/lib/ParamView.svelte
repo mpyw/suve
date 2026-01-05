@@ -206,9 +206,9 @@
       } else {
         // Stage the change
         if (isEdit) {
-          await StagingEdit('ssm', setForm.name, setForm.value);
+          await StagingEdit('param', setForm.name, setForm.value);
         } else {
-          await StagingAdd('ssm', setForm.name, setForm.value);
+          await StagingAdd('param', setForm.name, setForm.value);
         }
       }
       showSetModal = false;
@@ -238,7 +238,7 @@
         await loadParams();
       } else {
         // Stage the delete
-        await StagingDelete('ssm', deleteTarget, false, 0);
+        await StagingDelete('param', deleteTarget, false, 0);
       }
       showDeleteModal = false;
     } catch (e) {
@@ -306,7 +306,7 @@
       if (immediateMode) {
         await ParamAddTag(selectedParam, tagForm.key, tagForm.value);
       } else {
-        await StagingAddTag('ssm', selectedParam, tagForm.key, tagForm.value);
+        await StagingAddTag('param', selectedParam, tagForm.key, tagForm.value);
       }
       showTagModal = false;
       await selectParam(selectedParam);
@@ -331,7 +331,7 @@
       if (immediateMode) {
         await ParamRemoveTag(selectedParam, removeTagTarget);
       } else {
-        await StagingRemoveTag('ssm', selectedParam, removeTagTarget);
+        await StagingRemoveTag('param', selectedParam, removeTagTarget);
       }
       showRemoveTagModal = false;
       await selectParam(selectedParam);
