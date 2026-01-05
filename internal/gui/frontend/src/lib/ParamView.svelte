@@ -11,25 +11,73 @@
 
   const PAGE_SIZE = 50;
 
-  let prefix = '';
-  let filter = '';
-  let recursive = true;
-  let withValue = false;
-  let loading = false;
-  let loadingMore = false;
-  let error = '';
+  let prefix = $state('');
+  let filter = $state('');
+  let recursive = $state(true);
+  let withValue = $state(false);
+  let loading = $state(false);
+  let loadingMore = $state(false);
+  let error = $state('');
   let debounceTimer: ReturnType<typeof setTimeout> | null = null;
-  let nextToken = '';
+  let nextToken = $state('');
 
-  // Reactive: auto-fetch when checkbox changes
-  $: recursive, withValue, handleFilterChange();
+  let entries: gui.ParamListEntry[] = $state([]);
+  let selectedParam: string | null = $state(null);
+  let paramDetail: gui.ParamShowResult | null = $state(null);
+  let paramLog: gui.ParamLogEntry[] = $state([]);
+  let detailLoading = $state(false);
+  let showValue = $state(false);
 
-  function handleFilterChange() {
-    // Skip initial mount (handled by onMount)
-    if (typeof window !== 'undefined' && entries !== undefined) {
+  // Modal states
+  let showSetModal = $state(false);
+  let showDeleteModal = $state(false);
+  let showDiffModal = $state(false);
+  let setForm = $state({ name: '', value: '', type: 'String' });
+  let deleteTarget = $state('');
+  let modalLoading = $state(false);
+  let modalError = $state('');
+  let immediateMode = $state(false);
+
+  // Diff state
+  let diffMode = $state(false);
+  let diffSelectedVersions: number[] = $state([]);
+  let diffResult: gui.ParamDiffResult | null = $state(null);
+
+  // Tag state
+  let showTagModal = $state(false);
+  let tagForm = $state({ key: '', value: '' });
+  let tagLoading = $state(false);
+  let tagError = $state('');
+
+  // Tag remove state
+  let showRemoveTagModal = $state(false);
+  let removeTagTarget = $state('');
+  let removeTagLoading = $state(false);
+  let removeTagError = $state('');
+
+  // Infinite scroll
+  let sentinelElement: HTMLDivElement | undefined = $state(undefined);
+  let observer: IntersectionObserver | null = null;
+
+  // Track previous values for effect
+  let prevRecursive = recursive;
+  let prevWithValue = withValue;
+  let mounted = false;
+
+  $effect(() => {
+    // Watch recursive and withValue changes
+    if (mounted && (recursive !== prevRecursive || withValue !== prevWithValue)) {
+      prevRecursive = recursive;
+      prevWithValue = withValue;
       loadParams();
     }
-  }
+  });
+
+  $effect(() => {
+    if (sentinelElement) {
+      setupIntersectionObserver();
+    }
+  });
 
   function handlePrefixInput() {
     if (debounceTimer) clearTimeout(debounceTimer);
@@ -44,44 +92,6 @@
       loadParams();
     }, 300);
   }
-
-  let entries: gui.ParamListEntry[] = [];
-  let selectedParam: string | null = null;
-  let paramDetail: gui.ParamShowResult | null = null;
-  let paramLog: gui.ParamLogEntry[] = [];
-  let detailLoading = false;
-  let showValue = false; // For SecureString masking
-
-  // Modal states
-  let showSetModal = false;
-  let showDeleteModal = false;
-  let showDiffModal = false;
-  let setForm = { name: '', value: '', type: 'String' };
-  let deleteTarget = '';
-  let modalLoading = false;
-  let modalError = '';
-  let immediateMode = false; // When false (default), changes are staged
-
-  // Diff state
-  let diffMode = false;
-  let diffSelectedVersions: number[] = [];
-  let diffResult: gui.ParamDiffResult | null = null;
-
-  // Tag state
-  let showTagModal = false;
-  let tagForm = { key: '', value: '' };
-  let tagLoading = false;
-  let tagError = '';
-
-  // Tag remove state
-  let showRemoveTagModal = false;
-  let removeTagTarget = '';
-  let removeTagLoading = false;
-  let removeTagError = '';
-
-  // Infinite scroll
-  let sentinelElement: HTMLDivElement;
-  let observer: IntersectionObserver | null = null;
 
   async function loadParams() {
     loading = true;
@@ -118,8 +128,8 @@
     if (observer) observer.disconnect();
 
     observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting && nextToken && !loadingMore && !loading) {
+      (observerEntries) => {
+        if (observerEntries[0].isIntersecting && nextToken && !loadingMore && !loading) {
           loadMore();
         }
       },
@@ -129,10 +139,6 @@
     if (sentinelElement) {
       observer.observe(sentinelElement);
     }
-  }
-
-  $: if (sentinelElement) {
-    setupIntersectionObserver();
   }
 
   onDestroy(() => {
@@ -188,7 +194,8 @@
     showSetModal = true;
   }
 
-  async function handleSet() {
+  async function handleSet(e: SubmitEvent) {
+    e.preventDefault();
     if (!setForm.name || !setForm.value) {
       modalError = 'Name and value are required';
       return;
@@ -204,7 +211,6 @@
           await selectParam(setForm.name);
         }
       } else {
-        // Stage the change
         if (isEdit) {
           await StagingEdit('param', setForm.name, setForm.value);
         } else {
@@ -237,7 +243,6 @@
         }
         await loadParams();
       } else {
-        // Stage the delete
         await StagingDelete('param', deleteTarget, false, 0);
       }
       showDeleteModal = false;
@@ -295,7 +300,8 @@
     showTagModal = true;
   }
 
-  async function handleAddTag() {
+  async function handleAddTag(e: SubmitEvent) {
+    e.preventDefault();
     if (!selectedParam || !tagForm.key) {
       tagError = 'Key is required';
       return;
@@ -343,6 +349,7 @@
   }
 
   onMount(() => {
+    mounted = true;
     loadParams();
   });
 </script>
@@ -354,14 +361,14 @@
       class="filter-input prefix-input"
       placeholder="Prefix (e.g., /prod/)"
       bind:value={prefix}
-      on:input={handlePrefixInput}
+      oninput={handlePrefixInput}
     />
     <input
       type="text"
       class="filter-input regex-input"
       placeholder="Filter (regex)"
       bind:value={filter}
-      on:input={handleFilterInput}
+      oninput={handleFilterInput}
     />
     <label class="checkbox-label">
       <input type="checkbox" bind:checked={recursive} />
@@ -371,10 +378,10 @@
       <input type="checkbox" bind:checked={withValue} />
       Show Values
     </label>
-    <button class="btn-primary" on:click={loadParams} disabled={loading}>
+    <button class="btn-primary" onclick={loadParams} disabled={loading}>
       {loading ? 'Loading...' : 'Refresh'}
     </button>
-    <button class="btn-secondary" on:click={() => openSetModal()}>
+    <button class="btn-secondary" onclick={() => openSetModal()}>
       + New
     </button>
   </div>
@@ -393,7 +400,7 @@
         <ul class="item-list">
           {#each entries as entry}
             <li class="item-entry" class:selected={selectedParam === entry.name}>
-              <button class="item-button" on:click={() => selectParam(entry.name)}>
+              <button class="item-button" onclick={() => selectParam(entry.name)}>
                 <span class="item-name param">{entry.name}</span>
                 {#if entry.value !== undefined}
                   <span class="item-value">{entry.value}</span>
@@ -418,14 +425,14 @@
         <div class="detail-header">
           <h3 class="detail-title param">{selectedParam}</h3>
           <div class="detail-actions">
-            <button class="btn-action-sm" on:click={() => selectedParam && openSetModal(selectedParam)}>Edit</button>
-            <button class="btn-action-sm btn-danger" on:click={() => selectedParam && openDeleteModal(selectedParam)}>Delete</button>
+            <button class="btn-action-sm" onclick={() => selectedParam && openSetModal(selectedParam)}>Edit</button>
+            <button class="btn-action-sm btn-danger" onclick={() => selectedParam && openDeleteModal(selectedParam)}>Delete</button>
             {#if paramLog.length >= 2}
-              <button class="btn-action-sm" class:active={diffMode} on:click={toggleDiffMode}>
+              <button class="btn-action-sm" class:active={diffMode} onclick={toggleDiffMode}>
                 {diffMode ? 'Cancel' : 'Compare'}
               </button>
             {/if}
-            <button class="btn-close" on:click={closeDetail}>
+            <button class="btn-close" onclick={closeDetail}>
               <CloseIcon />
             </button>
           </div>
@@ -442,7 +449,7 @@
                   <button
                     class="btn-toggle"
                     class:active={showValue}
-                    on:click={toggleShowValue}
+                    onclick={toggleShowValue}
                     title={showValue ? 'Hide value' : 'Show value'}
                   >
                     {#if showValue}
@@ -483,7 +490,7 @@
             <div class="detail-section">
               <div class="section-header">
                 <h4>Tags</h4>
-                <button class="btn-action-sm" on:click={openTagModal}>+ Add</button>
+                <button class="btn-action-sm" onclick={openTagModal}>+ Add</button>
               </div>
               {#if paramDetail.tags && paramDetail.tags.length > 0}
                 <div class="tags-list">
@@ -492,7 +499,7 @@
                       <span class="tag-key">{tag.key}</span>
                       <span class="tag-separator">=</span>
                       <span class="tag-value">{tag.value}</span>
-                      <button class="btn-tag-remove" on:click={() => openRemoveTagModal(tag.key)} title="Remove tag">×</button>
+                      <button class="btn-tag-remove" onclick={() => openRemoveTagModal(tag.key)} title="Remove tag">×</button>
                     </div>
                   {/each}
                 </div>
@@ -506,7 +513,7 @@
                 <div class="section-header">
                   <h4>Version History</h4>
                   {#if diffMode && diffSelectedVersions.length === 2}
-                    <button class="btn-action-sm btn-compare" on:click={executeDiff} disabled={modalLoading}>
+                    <button class="btn-action-sm btn-compare" onclick={executeDiff} disabled={modalLoading}>
                       {modalLoading ? 'Comparing...' : 'Show Diff'}
                     </button>
                   {/if}
@@ -528,7 +535,7 @@
                             type="checkbox"
                             checked={diffSelectedVersions.includes(logEntry.version)}
                             disabled={!diffSelectedVersions.includes(logEntry.version) && diffSelectedVersions.length >= 2}
-                            on:change={() => toggleVersionSelection(logEntry.version)}
+                            onchange={() => toggleVersionSelection(logEntry.version)}
                           />
                         </label>
                       {/if}
@@ -555,8 +562,8 @@
 </div>
 
 <!-- Set Modal -->
-<Modal title={setForm.name ? 'Edit Parameter' : 'New Parameter'} show={showSetModal} on:close={() => showSetModal = false}>
-  <form class="modal-form" on:submit|preventDefault={handleSet}>
+<Modal title={setForm.name ? 'Edit Parameter' : 'New Parameter'} show={showSetModal} onclose={() => showSetModal = false}>
+  <form class="modal-form" onsubmit={handleSet}>
     {#if modalError}
       <div class="modal-error">{modalError}</div>
     {/if}
@@ -594,7 +601,7 @@
       <span>Apply immediately (skip staging)</span>
     </label>
     <div class="form-actions">
-      <button type="button" class="btn-secondary" on:click={() => showSetModal = false}>Cancel</button>
+      <button type="button" class="btn-secondary" onclick={() => showSetModal = false}>Cancel</button>
       <button type="submit" class="btn-primary" disabled={modalLoading}>
         {modalLoading ? (immediateMode ? 'Saving...' : 'Staging...') : (immediateMode ? 'Save' : 'Stage')}
       </button>
@@ -603,7 +610,7 @@
 </Modal>
 
 <!-- Delete Modal -->
-<Modal title="Delete Parameter" show={showDeleteModal} on:close={() => showDeleteModal = false}>
+<Modal title="Delete Parameter" show={showDeleteModal} onclose={() => showDeleteModal = false}>
   <div class="modal-confirm">
     {#if modalError}
       <div class="modal-error">{modalError}</div>
@@ -616,8 +623,8 @@
       <span>Apply immediately (skip staging)</span>
     </label>
     <div class="form-actions">
-      <button type="button" class="btn-secondary" on:click={() => showDeleteModal = false}>Cancel</button>
-      <button type="button" class="btn-danger" on:click={handleDelete} disabled={modalLoading}>
+      <button type="button" class="btn-secondary" onclick={() => showDeleteModal = false}>Cancel</button>
+      <button type="button" class="btn-danger" onclick={handleDelete} disabled={modalLoading}>
         {modalLoading ? (immediateMode ? 'Deleting...' : 'Staging...') : (immediateMode ? 'Delete' : 'Stage Delete')}
       </button>
     </div>
@@ -625,7 +632,7 @@
 </Modal>
 
 <!-- Remove Tag Modal -->
-<Modal title="Remove Tag" show={showRemoveTagModal} on:close={() => showRemoveTagModal = false}>
+<Modal title="Remove Tag" show={showRemoveTagModal} onclose={() => showRemoveTagModal = false}>
   <div class="modal-confirm">
     {#if removeTagError}
       <div class="modal-error">{removeTagError}</div>
@@ -638,8 +645,8 @@
       <span>Apply immediately (skip staging)</span>
     </label>
     <div class="form-actions">
-      <button type="button" class="btn-secondary" on:click={() => showRemoveTagModal = false}>Cancel</button>
-      <button type="button" class="btn-danger" on:click={handleRemoveTag} disabled={removeTagLoading}>
+      <button type="button" class="btn-secondary" onclick={() => showRemoveTagModal = false}>Cancel</button>
+      <button type="button" class="btn-danger" onclick={handleRemoveTag} disabled={removeTagLoading}>
         {removeTagLoading ? (immediateMode ? 'Removing...' : 'Staging...') : (immediateMode ? 'Remove' : 'Stage Remove')}
       </button>
     </div>
@@ -647,7 +654,7 @@
 </Modal>
 
 <!-- Diff Modal -->
-<Modal title="Version Comparison" show={showDiffModal} on:close={closeDiffModal}>
+<Modal title="Version Comparison" show={showDiffModal} onclose={closeDiffModal}>
   {#if diffResult}
     <DiffDisplay
       oldValue={diffResult.oldValue}
@@ -658,14 +665,14 @@
       newSubLabel={`v${diffSelectedVersions[1]}`}
     />
     <div class="form-actions">
-      <button type="button" class="btn-secondary" on:click={closeDiffModal}>Close</button>
+      <button type="button" class="btn-secondary" onclick={closeDiffModal}>Close</button>
     </div>
   {/if}
 </Modal>
 
 <!-- Tag Modal -->
-<Modal title="Add Tag" show={showTagModal} on:close={() => showTagModal = false}>
-  <form class="modal-form" on:submit|preventDefault={handleAddTag}>
+<Modal title="Add Tag" show={showTagModal} onclose={() => showTagModal = false}>
+  <form class="modal-form" onsubmit={handleAddTag}>
     {#if tagError}
       <div class="modal-error">{tagError}</div>
     {/if}
@@ -694,7 +701,7 @@
       <span>Apply immediately (skip staging)</span>
     </label>
     <div class="form-actions">
-      <button type="button" class="btn-secondary" on:click={() => showTagModal = false}>Cancel</button>
+      <button type="button" class="btn-secondary" onclick={() => showTagModal = false}>Cancel</button>
       <button type="submit" class="btn-primary" disabled={tagLoading}>
         {tagLoading ? (immediateMode ? 'Adding...' : 'Staging...') : (immediateMode ? 'Add Tag' : 'Stage Tag')}
       </button>

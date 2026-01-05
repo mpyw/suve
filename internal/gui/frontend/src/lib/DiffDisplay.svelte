@@ -1,14 +1,18 @@
 <script lang="ts">
-  import { computeInlineDiff, type DiffSegment } from './diff-utils';
+  import { computeInlineDiff } from './diff-utils';
 
-  export let oldValue: string;
-  export let newValue: string;
-  export let oldLabel = 'Old';
-  export let newLabel = 'New';
-  export let oldSubLabel = '';
-  export let newSubLabel = '';
+  interface Props {
+    oldValue: string;
+    newValue: string;
+    oldLabel?: string;
+    newLabel?: string;
+    oldSubLabel?: string;
+    newSubLabel?: string;
+  }
 
-  $: diff = computeInlineDiff(oldValue, newValue);
+  let { oldValue, newValue, oldLabel = 'Old', newLabel = 'New', oldSubLabel = '', newSubLabel = '' }: Props = $props();
+
+  let diff = $derived(computeInlineDiff(oldValue, newValue));
 </script>
 
 <div class="diff-container">

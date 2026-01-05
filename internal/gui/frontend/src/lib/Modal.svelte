@@ -1,15 +1,19 @@
 <script lang="ts">
-  import { createEventDispatcher } from 'svelte';
+  import type { Snippet } from 'svelte';
   import CloseIcon from './icons/CloseIcon.svelte';
   import './common.css';
 
-  export let title: string;
-  export let show = false;
+  interface Props {
+    title: string;
+    show?: boolean;
+    onclose?: () => void;
+    children?: Snippet;
+  }
 
-  const dispatch = createEventDispatcher<{ close: void }>();
+  let { title, show = false, onclose, children }: Props = $props();
 
   function handleClose() {
-    dispatch('close');
+    onclose?.();
   }
 
   function handleKeydown(e: KeyboardEvent) {
@@ -25,20 +29,20 @@
   }
 </script>
 
-<svelte:window on:keydown={handleKeydown} />
+<svelte:window onkeydown={handleKeydown} />
 
 {#if show}
-  <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
-  <div class="modal-backdrop" on:click={handleBackdropClick}>
+  <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+  <div class="modal-backdrop" onclick={handleBackdropClick}>
     <div class="modal">
       <div class="modal-header">
         <h3 class="modal-title">{title}</h3>
-        <button class="btn-close" on:click={handleClose}>
+        <button class="btn-close" onclick={handleClose}>
           <CloseIcon />
         </button>
       </div>
       <div class="modal-content">
-        <slot />
+        {@render children?.()}
       </div>
     </div>
   </div>
