@@ -51,7 +51,7 @@ func (r *ApplyRunner) Run(ctx context.Context, opts ApplyOptions) error {
 	}
 
 	// Output entry results in sorted order
-	for _, name := range r.sortedEntryResultNames(result.EntryResults) {
+	for _, name := range maputil.SortedNames(result.EntryResults, func(e stagingusecase.ApplyEntryResult) string { return e.Name }) {
 		for _, entry := range result.EntryResults {
 			if entry.Name != name {
 				continue
@@ -73,7 +73,7 @@ func (r *ApplyRunner) Run(ctx context.Context, opts ApplyOptions) error {
 	}
 
 	// Output tag results in sorted order
-	for _, name := range r.sortedTagResultNames(result.TagResults) {
+	for _, name := range maputil.SortedNames(result.TagResults, func(e stagingusecase.ApplyTagResult) string { return e.Name }) {
 		for _, tag := range result.TagResults {
 			if tag.Name != name {
 				continue
@@ -89,22 +89,6 @@ func (r *ApplyRunner) Run(ctx context.Context, opts ApplyOptions) error {
 
 	// Return the original error if any (e.g., from conflict detection or failures)
 	return err
-}
-
-func (r *ApplyRunner) sortedEntryResultNames(results []stagingusecase.ApplyEntryResult) []string {
-	names := make(map[string]struct{})
-	for _, e := range results {
-		names[e.Name] = struct{}{}
-	}
-	return maputil.SortedKeys(names)
-}
-
-func (r *ApplyRunner) sortedTagResultNames(results []stagingusecase.ApplyTagResult) []string {
-	names := make(map[string]struct{})
-	for _, e := range results {
-		names[e.Name] = struct{}{}
-	}
-	return maputil.SortedKeys(names)
 }
 
 func formatTagApplySummary(tag stagingusecase.ApplyTagResult) string {
