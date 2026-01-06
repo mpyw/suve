@@ -199,13 +199,13 @@ jobs:
       "Major": __MAJOR__,
       "Minor": __MINOR__,
       "Patch": __PATCH__,
-      "Build": 0
+      "Build": __BUILD__
     },
     "ProductVersion": {
       "Major": __MAJOR__,
       "Minor": __MINOR__,
       "Patch": __PATCH__,
-      "Build": 0
+      "Build": __BUILD__
     },
     "FileFlagsMask": "3f",
     "FileFlags": "00",
@@ -239,7 +239,7 @@ jobs:
 EOF
 
           # Replace placeholders with actual version values
-          sed -i "s/__MAJOR__/${MAJOR}/g; s/__MINOR__/${MINOR}/g; s/__PATCH__/${PATCH}/g; s/__VERSION__/v${VERSION}/g" cmd/suve/versioninfo.json
+          sed -i "s/__MAJOR__/${MAJOR}/g; s/__MINOR__/${MINOR}/g; s/__PATCH__/${PATCH}/g; s/__BUILD__/${GITHUB_RUN_NUMBER}/g; s/__VERSION__/v${VERSION}/g" cmd/suve/versioninfo.json
 
           # Generate resource_windows.syso for both AMD64 and ARM64
           cd cmd/suve
