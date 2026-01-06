@@ -512,7 +512,7 @@ jobs:
 
           FINAL_BODY="${NEW_NOTES}
 
-${DOWNLOAD_TABLE}"
+          ${DOWNLOAD_TABLE}"
 
           gh release create "$TAG" \
             --title "$TAG" \
