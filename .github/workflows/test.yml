@@ -307,6 +307,43 @@ jobs:
           # - invalid-license: MIT is valid but rpmlint wants SPDX format
           rpmlint "suve-cli-test.${{ matrix.rpm_arch }}.rpm" "suve-test.${{ matrix.rpm_arch }}.rpm" || true
 
+      - name: Test .deb installation
+        run: |
+          echo "=== Installing suve-cli .deb package ==="
+          sudo dpkg -i "suve-cli_test_${{ matrix.deb_arch }}.deb"
+          which suve
+          suve --version
+          suve --help
+
+          echo "=== Removing suve-cli and installing suve (GUI) ==="
+          sudo dpkg -r suve-cli
+          sudo dpkg -i "suve_test_${{ matrix.deb_arch }}.deb"
+          which suve
+          suve --version
+          suve --help
+
+          echo "=== Cleanup ==="
+          sudo dpkg -r suve
+
+      - name: Test .rpm installation (Fedora container)
+        run: |
+          # Use Fedora container to test rpm installation
+          docker run --rm -v "$PWD:/work" -w /work fedora:latest bash -c '
+            set -e
+            echo "=== Installing suve-cli .rpm package ==="
+            dnf install -y "./suve-cli-test.${{ matrix.rpm_arch }}.rpm"
+            which suve
+            suve --version
+            suve --help
+
+            echo "=== Removing suve-cli and installing suve (GUI) ==="
+            dnf remove -y suve-cli
+            dnf install -y "./suve-test.${{ matrix.rpm_arch }}.rpm"
+            which suve
+            suve --version
+            suve --help
+          '
+
   gui-test-windows:
     name: GUI Test (Playwright) (Windows)
     runs-on: windows-latest
