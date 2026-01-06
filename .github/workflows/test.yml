@@ -170,6 +170,20 @@ jobs:
           go build -o suve ./cmd/suve
           go build -o suve-cli ./cmd/suve
 
+      - name: Verify binaries run correctly
+        run: |
+          echo "=== Testing suve --help ==="
+          ./suve --help
+
+          echo "=== Testing suve-cli --help ==="
+          ./suve-cli --help
+
+          echo "=== Testing suve --version ==="
+          ./suve --version
+
+          echo "=== Testing suve-cli --version ==="
+          ./suve-cli --version
+
       - name: Install nfpm
         run: go install github.com/goreleaser/nfpm/v2/cmd/nfpm@v2.41.1
 
