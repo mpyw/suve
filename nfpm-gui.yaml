@@ -28,16 +28,16 @@ rpm:
 depends: []
 
 # GUI dependencies - recommended but not strictly required
-# Built against webkit2gtk-4.0 on Ubuntu 22.04
+# WebKit version is detected from Wails source in CI
 recommends:
   - libgtk-3-0
-  - libwebkit2gtk-4.0-37
+  - libwebkit2gtk-${WEBKIT_VERSION}-37
 
 overrides:
   rpm:
     recommends:
       - gtk3
-      - webkit2gtk4.0
+      - webkit2gtk${WEBKIT_VERSION}
 
 conflicts:
   - suve-cli
