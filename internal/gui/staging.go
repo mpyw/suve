@@ -331,13 +331,13 @@ func (a *App) StagingAdd(service, name, value string) (*StagingAddResult, error)
 		return nil, err
 	}
 
-	parser, err := a.getParser(service)
+	strategy, err := a.getEditStrategy(service)
 	if err != nil {
 		return nil, err
 	}
 
 	uc := &stagingusecase.AddUseCase{
-		Strategy: parser,
+		Strategy: strategy,
 		Store:    store,
 	}
 	result, err := uc.Execute(a.ctx, stagingusecase.AddInput{
