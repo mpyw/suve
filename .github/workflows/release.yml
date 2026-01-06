@@ -1,9 +1,12 @@
 name: Release
 
 on:
-  push:
-    tags:
-      - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release (e.g., v0.6.3)"
+        required: true
+        type: string
 
 permissions:
   contents: write
@@ -231,7 +234,8 @@ jobs:
           set -e
 
           # Parse version from tag (e.g., v0.5.3 -> 0.5.3)
-          export VERSION="${GITHUB_REF_NAME#v}"
+          export VERSION="${{ inputs.version }}"
+          VERSION="${VERSION#v}"
           export MAJOR=$(echo "$VERSION" | cut -d. -f1)
           export MINOR=$(echo "$VERSION" | cut -d. -f2)
           export PATCH=$(echo "$VERSION" | cut -d. -f3)
@@ -289,8 +293,10 @@ jobs:
         run: find dist -type f | sort
 
       - name: Create archives
+        env:
+          VERSION: ${{ inputs.version }}
         run: |
-          VERSION="${GITHUB_REF_NAME#v}"
+          VERSION="${VERSION#v}"
           mkdir -p releases
 
           # Directory format: suve-{id}_{goos}_{goarch}_{variant}
@@ -346,6 +352,7 @@ jobs:
 
       - name: Create Linux packages (.deb, .rpm)
         env:
+          VERSION: ${{ inputs.version }}
           GTK_DEB_AMD64: ${{ needs.build-linux-amd64.outputs.gtk-deb }}
           GTK_RPM_AMD64: ${{ needs.build-linux-amd64.outputs.gtk-rpm }}
           WEBKIT_DEB_AMD64: ${{ needs.build-linux-amd64.outputs.webkit-deb }}
@@ -356,7 +363,7 @@ jobs:
           WEBKIT_RPM_ARM64: ${{ needs.build-linux-arm64.outputs.webkit-rpm }}
         run: |
           set -euo pipefail
-          VERSION="${GITHUB_REF_NAME#v}"
+          VERSION="${VERSION#v}"
 
           # Install nfpm (pinned version for reproducibility)
           go install github.com/goreleaser/nfpm/v2/cmd/nfpm@v2.41.1
@@ -446,78 +453,51 @@ jobs:
           sha256sum *.tar.gz *.zip *.deb *.rpm > checksums.txt
           cat checksums.txt
 
-      - name: Create or Update GitHub Release
+      - name: Create tag
+        env:
+          TAG: ${{ inputs.version }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG" -m "Release $TAG"
+          git push origin "$TAG"
+
+      - name: Create GitHub Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ inputs.version }}
         run: |
-          TAG="${{ github.ref_name }}"
           export VERSION="${TAG#v}"
           export BASE_URL="https://github.com/${{ github.repository }}/releases/download/${TAG}"
 
           # Generate download table from template
           DOWNLOAD_TABLE=$(envsubst < .github/templates/release-notes-downloads.md)
 
-          # Check if release already exists
-          if gh release view "$TAG" &>/dev/null; then
-            echo "Release $TAG already exists, updating..."
+          # Generate release notes
+          NEW_NOTES=$(gh api repos/${{ github.repository }}/releases/generate-notes \
+            -f tag_name="$TAG" \
+            --jq .body)
 
-            # Get existing release body to preserve What's Changed
-            EXISTING_BODY=$(gh release view "$TAG" --json body -q .body)
+          FINAL_BODY="${NEW_NOTES}
 
-            # Generate new release notes
-            NEW_NOTES=$(gh api repos/${{ github.repository }}/releases/generate-notes \
-              -f tag_name="$TAG" \
-              --jq .body)
+${DOWNLOAD_TABLE}"
 
-            # Merge: keep existing What's Changed, append new notes if different
-            if [[ -n "$EXISTING_BODY" ]]; then
-              # Check if download table already exists
-              if echo "$EXISTING_BODY" | grep -q "## Downloads"; then
-                # Replace existing download table (everything from ## Downloads to end or next major section)
-                FINAL_BODY=$(echo "$EXISTING_BODY" | sed '/## Downloads/,$d')
-                FINAL_BODY="${FINAL_BODY}${DOWNLOAD_TABLE}"
-              else
-                FINAL_BODY="${EXISTING_BODY}
-
-          ${DOWNLOAD_TABLE}"
-              fi
-            else
-              FINAL_BODY="${NEW_NOTES}
-
-          ${DOWNLOAD_TABLE}"
-            fi
-
-            # Update release with new body and upload assets
-            gh release edit "$TAG" --notes "$FINAL_BODY"
-            gh release upload "$TAG" releases/* --clobber
-          else
-            echo "Creating new release $TAG..."
-
-            # Generate release notes first
-            NEW_NOTES=$(gh api repos/${{ github.repository }}/releases/generate-notes \
-              -f tag_name="$TAG" \
-              --jq .body)
-
-            FINAL_BODY="${NEW_NOTES}
-
-          ${DOWNLOAD_TABLE}"
-
-            gh release create "$TAG" \
-              --title "$TAG" \
-              --notes "$FINAL_BODY" \
-              releases/*
-          fi
+          gh release create "$TAG" \
+            --title "$TAG" \
+            --notes "$FINAL_BODY" \
+            releases/*
 
       - name: Update Homebrew formulas
         env:
           HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          TAG: ${{ inputs.version }}
         run: |
           if [[ -z "$HOMEBREW_TAP_TOKEN" ]]; then
             echo "HOMEBREW_TAP_TOKEN not set, skipping Homebrew update"
             exit 0
           fi
 
-          export VERSION="${GITHUB_REF_NAME#v}"
+          export VERSION="${TAG#v}"
           export SHA256_DARWIN_AMD64=$(grep "suve_.*_darwin_amd64.tar.gz" releases/checksums.txt | cut -d' ' -f1)
           export SHA256_DARWIN_ARM64=$(grep "suve_.*_darwin_arm64.tar.gz" releases/checksums.txt | cut -d' ' -f1)
           export SHA256_LINUX_AMD64=$(grep "suve_.*_linux_amd64.tar.gz" releases/checksums.txt | cut -d' ' -f1)
@@ -544,13 +524,14 @@ jobs:
       - name: Update Scoop manifest
         env:
           SCOOP_BUCKET_TOKEN: ${{ secrets.SCOOP_BUCKET_TOKEN }}
+          TAG: ${{ inputs.version }}
         run: |
           if [[ -z "$SCOOP_BUCKET_TOKEN" ]]; then
             echo "SCOOP_BUCKET_TOKEN not set, skipping Scoop update"
             exit 0
           fi
 
-          export VERSION="${GITHUB_REF_NAME#v}"
+          export VERSION="${TAG#v}"
           export SHA256_WINDOWS_AMD64=$(grep "windows_amd64.zip" releases/checksums.txt | cut -d' ' -f1)
           export SHA256_WINDOWS_ARM64=$(grep "windows_arm64.zip" releases/checksums.txt | cut -d' ' -f1)
 
