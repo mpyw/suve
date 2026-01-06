@@ -73,6 +73,11 @@ jobs:
   # ===========================================================================
   build-linux-amd64:
     runs-on: ubuntu-22.04
+    outputs:
+      gtk-deb: ${{ steps.gui-deps.outputs.gtk-deb }}
+      gtk-rpm: ${{ steps.gui-deps.outputs.gtk-rpm }}
+      webkit-deb: ${{ steps.gui-deps.outputs.webkit-deb }}
+      webkit-rpm: ${{ steps.gui-deps.outputs.webkit-rpm }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -88,6 +93,10 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev
+
+      - name: Detect GUI dependencies
+        id: gui-deps
+        uses: ./.github/actions/detect-gui-deps
 
       - name: Build frontend
         run: |
@@ -116,6 +125,11 @@ jobs:
   # ===========================================================================
   build-linux-arm64:
     runs-on: ubuntu-22.04-arm
+    outputs:
+      gtk-deb: ${{ steps.gui-deps.outputs.gtk-deb }}
+      gtk-rpm: ${{ steps.gui-deps.outputs.gtk-rpm }}
+      webkit-deb: ${{ steps.gui-deps.outputs.webkit-deb }}
+      webkit-rpm: ${{ steps.gui-deps.outputs.webkit-rpm }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -131,6 +145,10 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev
+
+      - name: Detect GUI dependencies
+        id: gui-deps
+        uses: ./.github/actions/detect-gui-deps
 
       - name: Build frontend
         run: |
@@ -326,16 +344,16 @@ jobs:
 
           ls -la releases/
 
-      - name: Detect GUI dependencies from Wails
-        id: gui-deps
-        uses: ./.github/actions/detect-gui-deps
-
       - name: Create Linux packages (.deb, .rpm)
         env:
-          GTK_DEB: ${{ steps.gui-deps.outputs.gtk-deb }}
-          GTK_RPM: ${{ steps.gui-deps.outputs.gtk-rpm }}
-          WEBKIT_DEB: ${{ steps.gui-deps.outputs.webkit-deb }}
-          WEBKIT_RPM: ${{ steps.gui-deps.outputs.webkit-rpm }}
+          GTK_DEB_AMD64: ${{ needs.build-linux-amd64.outputs.gtk-deb }}
+          GTK_RPM_AMD64: ${{ needs.build-linux-amd64.outputs.gtk-rpm }}
+          WEBKIT_DEB_AMD64: ${{ needs.build-linux-amd64.outputs.webkit-deb }}
+          WEBKIT_RPM_AMD64: ${{ needs.build-linux-amd64.outputs.webkit-rpm }}
+          GTK_DEB_ARM64: ${{ needs.build-linux-arm64.outputs.gtk-deb }}
+          GTK_RPM_ARM64: ${{ needs.build-linux-arm64.outputs.gtk-rpm }}
+          WEBKIT_DEB_ARM64: ${{ needs.build-linux-arm64.outputs.webkit-deb }}
+          WEBKIT_RPM_ARM64: ${{ needs.build-linux-arm64.outputs.webkit-rpm }}
         run: |
           set -euo pipefail
           VERSION="${GITHUB_REF_NAME#v}"
@@ -344,15 +362,28 @@ jobs:
           go install github.com/goreleaser/nfpm/v2/cmd/nfpm@v2.41.1
           export PATH="$(go env GOPATH)/bin:$PATH"
 
-          echo "Using GTK: ${GTK_DEB} / ${GTK_RPM}"
-          echo "Using WebKit: ${WEBKIT_DEB} / ${WEBKIT_RPM}"
-
           for arch in amd64 arm64; do
-            # Map Go arch to package arch names
+            # Map Go arch to package arch names and select GUI deps
             case "$arch" in
-              amd64) deb_arch="amd64"; rpm_arch="x86_64" ;;
-              arm64) deb_arch="arm64"; rpm_arch="aarch64" ;;
+              amd64)
+                deb_arch="amd64"; rpm_arch="x86_64"
+                export GTK_DEB="${GTK_DEB_AMD64}"
+                export GTK_RPM="${GTK_RPM_AMD64}"
+                export WEBKIT_DEB="${WEBKIT_DEB_AMD64}"
+                export WEBKIT_RPM="${WEBKIT_RPM_AMD64}"
+                ;;
+              arm64)
+                deb_arch="arm64"; rpm_arch="aarch64"
+                export GTK_DEB="${GTK_DEB_ARM64}"
+                export GTK_RPM="${GTK_RPM_ARM64}"
+                export WEBKIT_DEB="${WEBKIT_DEB_ARM64}"
+                export WEBKIT_RPM="${WEBKIT_RPM_ARM64}"
+                ;;
             esac
+
+            echo "=== Building ${arch} packages ==="
+            echo "Using GTK: ${GTK_DEB} / ${GTK_RPM}"
+            echo "Using WebKit: ${WEBKIT_DEB} / ${WEBKIT_RPM}"
 
             # Set environment variables for nfpm
             export VERSION="${VERSION}"
