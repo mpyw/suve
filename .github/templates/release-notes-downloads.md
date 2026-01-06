@@ -7,12 +7,21 @@
 | Apple Silicon (M1/M2/M3/M4) | [suve_${VERSION}_darwin_arm64.tar.gz](${BASE_URL}/suve_${VERSION}_darwin_arm64.tar.gz) |
 | Intel | [suve_${VERSION}_darwin_amd64.tar.gz](${BASE_URL}/suve_${VERSION}_darwin_amd64.tar.gz) |
 
+> [!TIP]
+> If macOS shows "cannot be opened because the developer cannot be verified", run:
+> ```bash
+> xattr -d com.apple.quarantine /path/to/suve
+> ```
+
 ### Windows (GUI with CLI)
 
 | Architecture | Download |
 |--------------|----------|
 | x86_64 | [suve_${VERSION}_windows_amd64.zip](${BASE_URL}/suve_${VERSION}_windows_amd64.zip) |
 | ARM64 | [suve_${VERSION}_windows_arm64.zip](${BASE_URL}/suve_${VERSION}_windows_arm64.zip) |
+
+> [!TIP]
+> On first run, if Windows SmartScreen shows "Windows protected your PC", click **More info** → **Run anyway**.
 
 ### Linux GUI (requires libgtk-3, libwebkit2gtk-4.0)
 
