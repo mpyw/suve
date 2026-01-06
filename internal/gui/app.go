@@ -21,6 +21,7 @@ type ParamClient interface {
 	staging.ParamClient
 	// For usecases (additional methods not in staging.ParamClient)
 	paramapi.DescribeParametersAPI
+	paramapi.GetParametersAPI
 	paramapi.ListTagsForResourceAPI
 }
 
