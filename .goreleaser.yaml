@@ -137,23 +137,6 @@ changelog:
       - Merge pull request
       - Merge branch
 
-brews:
-  - name: suve
-    ids:
-      - suve
-    repository:
-      owner: mpyw
-      name: homebrew-tap
-      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
-    directory: Formula
-    homepage: "https://github.com/mpyw/suve"
-    description: "Git-like CLI for AWS Parameter Store and Secrets Manager"
-    license: "MIT"
-    install: |
-      bin.install "suve"
-    test: |
-      system "#{bin}/suve", "--version"
-
 release:
   github:
     owner: mpyw

@@ -1,6 +1,6 @@
 services:
   localstack:
-    image: localstack/localstack:latest
+    image: localstack/localstack:4
     ports:
       - "127.0.0.1:${SUVE_LOCALSTACK_EXTERNAL_PORT:-4566}:4566/tcp"
     environment:

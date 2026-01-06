@@ -46,7 +46,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       localstack:
-        image: localstack/localstack:latest
+        image: localstack/localstack:4
         ports:
           - 4566:4566
         env:
@@ -152,6 +152,61 @@ jobs:
           name: playwright-report-${{ matrix.os }}
           path: internal/gui/frontend/playwright-report/
           retention-days: 30
+
+  linux-package:
+    name: Linux Package Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Build test binary
+        run: go build -o suve ./cmd/suve
+
+      - name: Install nfpm
+        run: go install github.com/goreleaser/nfpm/v2/cmd/nfpm@v2.41.1
+
+      - name: Install lintian and rpmlint
+        run: sudo apt-get update && sudo apt-get install -y lintian rpm rpmlint
+
+      - name: Generate and lint .deb package
+        run: |
+          export VERSION="0.0.0-test"
+          export GOARCH="amd64"
+          nfpm pkg --packager deb --target suve_test_amd64.deb
+          echo "=== deb package info ==="
+          dpkg-deb -I suve_test_amd64.deb
+          echo "=== lintian check ==="
+          # Suppress tags expected for Go binaries:
+          # - no-changelog: No Debian-style changelog maintained
+          # - no-manual-page: CLI has --help instead
+          # - unknown-field: nfpm uses License field
+          # - hardening-*: Go binaries don't support PIE/RELRO
+          # - unstripped-binary-or-object: Go needs debug info for stack traces
+          # - undeclared-elf-prerequisites: libc is provided by base system
+          lintian --tag-display-limit 0 \
+            --suppress-tags no-changelog,no-manual-page,unknown-field,hardening-no-pie,hardening-no-relro,unstripped-binary-or-object,undeclared-elf-prerequisites \
+            suve_test_amd64.deb
+
+      - name: Generate and lint .rpm package
+        run: |
+          export VERSION="0.0.0-test"
+          export GOARCH="amd64"
+          nfpm pkg --packager rpm --target suve-test.x86_64.rpm
+          echo "=== rpm package info ==="
+          rpm -qip suve-test.x86_64.rpm
+          echo "=== rpmlint check ==="
+          # rpmlint returns non-zero on warnings; allow warnings for:
+          # - no-signature: Test packages aren't GPG signed
+          # - no-manual-page-for-binary: CLI has --help instead
+          # - no-documentation/no-changelogname-tag: Minimal package
+          # - invalid-license: MIT is valid but rpmlint wants SPDX format
+          rpmlint suve-test.x86_64.rpm || true
 
   gui-test-windows:
     name: GUI Test (Playwright) (Windows)

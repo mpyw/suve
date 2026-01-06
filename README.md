@@ -47,6 +47,46 @@ scoop bucket add mpyw https://github.com/mpyw/scoop-bucket.git
 scoop install suve
 ```
 
+### Debian/Ubuntu (.deb)
+
+Download the `.deb` package from [GitHub Releases](https://github.com/mpyw/suve/releases):
+
+```bash
+# Download (replace VERSION and ARCH as needed)
+curl -LO https://github.com/mpyw/suve/releases/download/vVERSION/suve_VERSION-1_ARCH.deb
+
+# Install
+sudo dpkg -i suve_VERSION-1_ARCH.deb
+```
+
+Available architectures: `amd64`, `arm64`
+
+> [!NOTE]
+> The CLI works standalone. For GUI support (`--gui`), install the recommended dependencies:
+> ```bash
+> sudo apt install libgtk-3-0 libayatana-appindicator3-1
+> ```
+
+### Red Hat/Fedora (.rpm)
+
+Download the `.rpm` package from [GitHub Releases](https://github.com/mpyw/suve/releases):
+
+```bash
+# Download (replace VERSION and ARCH as needed)
+curl -LO https://github.com/mpyw/suve/releases/download/vVERSION/suve-VERSION-1.ARCH.rpm
+
+# Install
+sudo rpm -i suve-VERSION-1.ARCH.rpm
+```
+
+Available architectures: `x86_64`, `aarch64`
+
+> [!NOTE]
+> The CLI works standalone. For GUI support (`--gui`), install GTK3:
+> ```bash
+> sudo dnf install gtk3
+> ```
+
 ### Using [`go install`](https://pkg.go.dev/cmd/go#hdr-Compile_and_install_packages_and_dependencies)
 
 ```bash

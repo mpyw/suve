@@ -10,6 +10,11 @@ import (
 
 // Run starts the GUI application.
 func Run() error {
+	// Check for required GUI dependencies (platform-specific)
+	if err := checkGUIDependencies(); err != nil {
+		return err
+	}
+
 	app := NewApp()
 
 	opts := &options.App{
