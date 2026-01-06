@@ -1,16 +1,50 @@
-# README
+# suve GUI
 
-## About
+Desktop GUI for suve built with [Wails](https://wails.io/) + Svelte.
 
-This is the official Wails Svelte-TS template.
+## Development
 
-## Live Development
+```bash
+# From project root
+make gui-dev
+```
 
-To run in live development mode, run `wails dev` in the project directory. This will run a Vite development
-server that will provide very fast hot reload of your frontend changes. If you want to develop in a browser
-and have access to your Go methods, there is also a dev server that runs on http://localhost:34115. Connect
-to this in your browser, and you can call your Go code from devtools.
+This starts the Wails development server with hot reload at http://localhost:34115.
 
 ## Building
 
-To build a redistributable, production mode package, use `wails build`.
+```bash
+# Build production binary with GUI support
+go build -tags production -o bin/suve ./cmd/suve
+
+# Or use wails directly
+cd gui && wails build
+```
+
+## Architecture
+
+```
+gui/
+├── main.go              # Wails app entry point
+├── app.go               # Go backend (bindings exposed to frontend)
+└── build/               # Build assets (icons, Info.plist, etc.)
+
+internal/gui/frontend/
+├── src/
+│   ├── App.svelte       # Main app component with navigation
+│   └── lib/
+│       ├── ParamView.svelte    # SSM Parameter Store view
+│       ├── SecretView.svelte   # Secrets Manager view
+│       └── StagingView.svelte  # Staging workflow view
+└── wailsjs/             # Auto-generated Go bindings
+```
+
+## Testing
+
+```bash
+# Run Playwright tests
+cd internal/gui/frontend && npm test
+
+# Record GUI demo
+./demo/gui-record.sh
+```
