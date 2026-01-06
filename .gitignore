@@ -54,4 +54,5 @@ coverage.html
 # Windows icon resources (generated during build)
 /cmd/suve/versioninfo.json
 /cmd/suve/appicon.ico
-/cmd/suve/resource_windows.syso
+/cmd/suve/resource_windows_amd64.syso
+/cmd/suve/resource_windows_arm64.syso

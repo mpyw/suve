@@ -2,14 +2,9 @@
 
 package gui
 
-import (
-	"github.com/wailsapp/wails/v2/pkg/options"
-	"github.com/wailsapp/wails/v2/pkg/options/windows"
-)
+import "github.com/wailsapp/wails/v2/pkg/options"
 
-func applyPlatformOptions(opts *options.App) {
-	opts.Windows = &windows.Options{
-		WebviewIsTransparent: false,
-		WindowIsTranslucent:  false,
-	}
+func applyPlatformOptions(_ *options.App) {
+	// Windows: No platform-specific options needed.
+	// Icon is embedded via resource_windows_*.syso files generated during CI build.
 }
