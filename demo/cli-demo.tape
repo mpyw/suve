@@ -4,7 +4,7 @@
 # Recorded with VHS: https://github.com/charmbracelet/vhs
 # Run: vhs demo/cli-demo.tape
 
-Output demo/cli-demo.gif
+Output "demo/cli-demo.gif"
 
 Set FontSize 16
 Set Width 1200
