@@ -101,6 +101,9 @@ jobs:
         with:
           args: --timeout=5m
 
+      - name: Create dummy frontend dist for production lint
+        run: mkdir -p internal/gui/frontend/dist && touch internal/gui/frontend/dist/index.html
+
       - name: Run golangci-lint (production build)
         uses: golangci/golangci-lint-action@v7
         with:
