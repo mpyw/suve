@@ -1,4 +1,4 @@
-.PHONY: build test lint e2e up down clean coverage coverage-e2e coverage-all gui-dev gui-build gui-bindings
+.PHONY: build test lint e2e up down clean coverage coverage-e2e coverage-all gui-dev gui-build gui-bindings linux-gui linux-gui-build linux-gui-test linux-gui-setup
 
 SUVE_LOCALSTACK_EXTERNAL_PORT ?= 4566
 COVERPKG = $(shell go list ./... | grep -v testutil | grep -v /e2e | grep -v internal/gui | grep -v /cmd/ | tr '\n' ',')
@@ -73,3 +73,20 @@ gui-bindings:
 	@echo "Restoring build constraints..."
 	@find gui internal/gui -name '*.go.bak' -exec sh -c 'mv "$$1" "$${1%.bak}"' _ {} \;
 	@echo "Done. Check internal/gui/frontend/wailsjs/go/ for updated bindings."
+
+# Linux GUI test environment (requires XQuartz on macOS)
+linux-gui-setup:
+	@echo "Setting up X11 forwarding for Linux GUI..."
+	@bash docker/linux-gui/start.sh
+
+linux-gui: linux-gui-setup
+	@echo "Starting Linux GUI container..."
+	docker compose --profile linux-gui run --rm linux-gui
+
+linux-gui-build:
+	@echo "Building GUI in Linux container..."
+	docker compose --profile linux-gui run --rm linux-gui bash -c "cd gui && wails build -tags production -skipbindings"
+
+linux-gui-test:
+	@echo "Running GUI tests in Linux container..."
+	docker compose --profile linux-gui run --rm linux-gui bash -c "go test -tags=production ./internal/gui/..."
