@@ -376,8 +376,8 @@ jobs:
             cp "${cli_dir}/suve-cli" ./suve-cli
 
             echo "Generating suve-cli packages for ${arch}..."
-            nfpm pkg --config nfpm.yaml --packager deb --target "releases/suve-cli_${VERSION}-1_${deb_arch}.deb"
-            nfpm pkg --config nfpm.yaml --packager rpm --target "releases/suve-cli-${VERSION}-1.${rpm_arch}.rpm"
+            nfpm pkg --config .github/templates/nfpm.yaml --packager deb --target "releases/suve-cli_${VERSION}-1_${deb_arch}.deb"
+            nfpm pkg --config .github/templates/nfpm.yaml --packager rpm --target "releases/suve-cli-${VERSION}-1.${rpm_arch}.rpm"
             rm ./suve-cli
 
             # --- GUI package (suve) ---
@@ -389,8 +389,8 @@ jobs:
             cp "${gui_dir}/suve" ./suve
 
             echo "Generating suve packages for ${arch}..."
-            nfpm pkg --config nfpm-gui.yaml --packager deb --target "releases/suve_${VERSION}-1_${deb_arch}.deb"
-            nfpm pkg --config nfpm-gui.yaml --packager rpm --target "releases/suve-${VERSION}-1.${rpm_arch}.rpm"
+            nfpm pkg --config .github/templates/nfpm-gui.yaml --packager deb --target "releases/suve_${VERSION}-1_${deb_arch}.deb"
+            nfpm pkg --config .github/templates/nfpm-gui.yaml --packager rpm --target "releases/suve-${VERSION}-1.${rpm_arch}.rpm"
             rm ./suve
           done
 
