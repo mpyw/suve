@@ -1,9 +1,6 @@
 package param
 
 import (
-	"context"
-	"fmt"
-
 	"github.com/urfave/cli/v3"
 
 	cliinternal "github.com/mpyw/suve/internal/cli/commands/internal"
@@ -34,17 +31,6 @@ func Command() *cli.Command {
 			paramdelete.Command(),
 			tag.Command(),
 			untag.Command(),
-			{
-				Name:   "set",
-				Hidden: true,
-				Action: func(_ context.Context, _ *cli.Command) error {
-					return fmt.Errorf(`'suve param set' is not available
-
-Use create or update instead:
-  suve param create <name> <value>   Create a new parameter
-  suve param update <name> <value>   Update an existing parameter`)
-				},
-			},
 		},
 		CommandNotFound: cliinternal.CommandNotFound,
 	}

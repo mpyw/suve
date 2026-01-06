@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # CLI Demo Recording Script for suve
 #
 # This script sets up demo data and records the CLI demo
