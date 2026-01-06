@@ -30,7 +30,7 @@ A **Git-like CLI/GUI** for AWS Parameter Store and Secrets Manager. Familiar com
 - **Version navigation**: `#VERSION`, `~SHIFT`, `:LABEL` syntax
 - **Colored diff output**: Easy-to-read unified diff format
 - **Both services**: SSM Parameter Store and Secrets Manager
-- **GUI mode**: Desktop application via `--gui` flag (built with [Wails](https://wails.io/))
+- **GUI mode**: Desktop application via `-gui` flag (built with [Wails](https://wails.io/))
 
 ## Installation
 
@@ -102,7 +102,7 @@ go install -tags production github.com/mpyw/suve/cmd/suve@latest
 ```
 
 > [!NOTE]
-> The `--gui` flag requires building with `-tags production`. CGO is required on macOS/Linux (for webkit2gtk), but not on Windows (Wails uses pure Go webview2loader).
+> The `-gui` flag requires building with `-tags production`. CGO is required on macOS/Linux (for webkit2gtk), but not on Windows (Wails uses pure Go webview2loader).
 
 ### Using [`go tool`](https://pkg.go.dev/cmd/go#hdr-Run_specified_go_tool) (Go 1.24+)
 
@@ -510,7 +510,7 @@ AWS_ENDPOINT_URL=http://127.0.0.1:4566 \
 AWS_ACCESS_KEY_ID=dummy \
 AWS_SECRET_ACCESS_KEY=dummy \
 AWS_DEFAULT_REGION=us-east-1 \
-suve --gui
+suve -gui
 
 # Stop localstack
 docker compose down
