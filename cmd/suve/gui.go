@@ -13,12 +13,6 @@ import (
 	"github.com/mpyw/suve/internal/gui"
 )
 
-// runGUIIfRequested is kept for interface compatibility with gui_stub.go.
-// GUI is now launched via Before hook in registerGUIFlag().
-func runGUIIfRequested() bool {
-	return false
-}
-
 func registerGUIFlag() {
 	commands.App.Flags = append(commands.App.Flags, &cli.BoolFlag{
 		Name:  "gui",
