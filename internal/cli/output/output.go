@@ -15,7 +15,6 @@ import (
 	"strings"
 
 	"github.com/aymanbagabas/go-udiff"
-	"github.com/aymanbagabas/go-udiff/myers"
 
 	"github.com/mpyw/suve/internal/cli/colors"
 )
@@ -115,15 +114,15 @@ func Info(w io.Writer, format string, args ...any) {
 
 // Diff generates a unified diff between two strings with ANSI colors.
 func Diff(oldName, newName, oldContent, newContent string) string {
-	edits := myers.ComputeEdits(oldContent, newContent)
-	unified, _ := udiff.ToUnifiedDiff(oldName, newName, oldContent, edits)
+	edits := udiff.Strings(oldContent, newContent)
+	unified, _ := udiff.ToUnifiedDiff(oldName, newName, oldContent, edits, udiff.DefaultContextLines)
 	return colorDiff(unified.String())
 }
 
 // DiffRaw generates a unified diff between two strings without colors.
 func DiffRaw(oldName, newName, oldContent, newContent string) string {
-	edits := myers.ComputeEdits(oldContent, newContent)
-	unified, _ := udiff.ToUnifiedDiff(oldName, newName, oldContent, edits)
+	edits := udiff.Strings(oldContent, newContent)
+	unified, _ := udiff.ToUnifiedDiff(oldName, newName, oldContent, edits, udiff.DefaultContextLines)
 	return unified.String()
 }
 
