@@ -311,14 +311,14 @@ jobs:
         run: |
           echo "=== Installing suve-cli .deb package ==="
           sudo dpkg -i "suve-cli_test_${{ matrix.deb_arch }}.deb"
-          which suve
+          command -v suve
           suve --version
           suve --help
 
           echo "=== Removing suve-cli and installing suve (GUI) ==="
           sudo dpkg -r suve-cli
           sudo dpkg -i "suve_test_${{ matrix.deb_arch }}.deb"
-          which suve
+          command -v suve
           suve --version
           suve --help
 
@@ -332,14 +332,14 @@ jobs:
             set -e
             echo "=== Installing suve-cli .rpm package ==="
             dnf install -y "./suve-cli-test.${{ matrix.rpm_arch }}.rpm"
-            which suve
+            command -v suve
             suve --version
             suve --help
 
             echo "=== Removing suve-cli and installing suve (GUI) ==="
             dnf remove -y suve-cli
             dnf install -y "./suve-test.${{ matrix.rpm_arch }}.rpm"
-            which suve
+            command -v suve
             suve --version
             suve --help
           '
