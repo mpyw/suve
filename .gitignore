@@ -39,8 +39,12 @@ gui/frontend/test-results/
 gui/frontend/playwright-report/
 gui/frontend/playwright/.cache/
 internal/gui/frontend/test-results/
+internal/gui/frontend/test-results-recording/
 internal/gui/frontend/playwright-report/
 internal/gui/frontend/playwright/.cache/
+
+# Demo recording artifacts
+*.webm
 
 # Frontend build artifacts
 internal/gui/frontend/node_modules/
