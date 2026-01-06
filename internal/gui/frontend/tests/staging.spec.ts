@@ -109,6 +109,7 @@ test.describe('Staging from Parameter View', () => {
   test('should stage parameter tag addition', async ({ page }) => {
     await clickItemByName(page, '/app/config');
     await page.getByRole('button', { name: '+ Add' }).click();
+    await page.locator('#tag-key').waitFor();
     await page.locator('#tag-key').fill('staged-tag');
     await page.locator('#tag-value').fill('staged-value');
     await page.getByRole('button', { name: 'Stage Tag' }).click();
@@ -161,6 +162,7 @@ test.describe('Staging from Secret View', () => {
   test('should stage secret tag addition', async ({ page }) => {
     await clickItemByName(page, 'my-secret');
     await page.getByRole('button', { name: '+ Add' }).click();
+    await page.locator('#tag-key').waitFor();
     await page.locator('#tag-key').fill('staged-tag');
     await page.locator('#tag-value').fill('staged-value');
     await page.getByRole('button', { name: 'Stage Tag' }).click();
