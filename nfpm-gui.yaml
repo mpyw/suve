@@ -1,20 +1,20 @@
-# nfpm configuration for generating .deb and .rpm packages (CLI-only)
+# nfpm configuration for generating .deb and .rpm packages (GUI version)
 # https://nfpm.goreleaser.com/configuration/
 
-name: suve-cli
+name: suve
 arch: "${GOARCH}"
 platform: linux
 version: "${VERSION}"
 release: "1"
 maintainer: "mpyw <mpyw628@gmail.com>"
 description: |
-  Git-like CLI for AWS Parameter Store and Secrets Manager (CLI-only)
+  Git-like CLI/GUI for AWS Parameter Store and Secrets Manager
   .
   Provides familiar commands like show, log, diff, and a staging workflow
   for safe, reviewable changes to your AWS secrets and parameters.
   .
-  This package contains the CLI-only version with no GUI dependencies.
-  For GUI support, install the 'suve' package instead.
+  This package includes GUI support via the --gui flag.
+  Requires GTK3 and WebKit2GTK runtime libraries.
 homepage: "https://github.com/mpyw/suve"
 license: "MIT"
 
@@ -26,18 +26,28 @@ rpm:
   group: "Applications/System"
 
 depends: []
-recommends: []
+
+# GUI dependencies - recommended but not strictly required
+recommends:
+  - libgtk-3-0
+  - libwebkit2gtk-4.1-0
+
+overrides:
+  rpm:
+    recommends:
+      - gtk3
+      - webkit2gtk4.1
 
 conflicts:
-  - suve
+  - suve-cli
 
 contents:
-  - src: ./suve-cli
+  - src: ./suve
     dst: /usr/bin/suve
     file_info:
       mode: 0755
 
   - src: ./LICENSE
-    dst: /usr/share/doc/suve-cli/copyright
+    dst: /usr/share/doc/suve/copyright
     file_info:
       mode: 0644
