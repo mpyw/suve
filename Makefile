@@ -72,18 +72,23 @@ gui-bindings: ## Regenerate GUI bindings
 	@find gui internal/gui -name '*.go.bak' -exec sh -c 'mv "$$1" "$${1%.bak}"' _ {} \;
 	@echo "Done. Check internal/gui/frontend/wailsjs/go/ for updated bindings."
 
+# Linux GUI test environment
+# Prerequisites (macOS):
+#   1. brew install --cask xquartz
+#   2. XQuartz preferences -> Security -> "Allow connections from network clients"
+#   3. Restart XQuartz after changing the setting
 linux-gui-setup:
 	@echo "Setting up X11 forwarding for Linux GUI..."
 	@bash docker/linux-gui/start.sh
 
 linux-gui: linux-gui-setup ## Start Linux GUI container (requires XQuartz)
 	@echo "Starting Linux GUI container..."
-	docker compose --profile linux-gui run --rm linux-gui
+	HOST_DISPLAY=host.docker.internal:0 docker compose --profile linux-gui run --rm linux-gui
 
-linux-gui-build: ## Build GUI in Linux container
+linux-gui-build: linux-gui-setup ## Build GUI in Linux container
 	@echo "Building GUI in Linux container..."
-	docker compose --profile linux-gui run --rm linux-gui bash -c "cd gui && wails build -tags production -skipbindings"
+	HOST_DISPLAY=host.docker.internal:0 docker compose --profile linux-gui run --rm linux-gui bash -c "cd gui && wails build -tags production -skipbindings"
 
-linux-gui-test: ## Run GUI tests in Linux container
+linux-gui-test: linux-gui-setup ## Run GUI tests in Linux container
 	@echo "Running GUI tests in Linux container..."
-	docker compose --profile linux-gui run --rm linux-gui bash -c "go test -tags=production ./internal/gui/..."
+	HOST_DISPLAY=host.docker.internal:0 docker compose --profile linux-gui run --rm linux-gui bash -c "go test -tags=production ./internal/gui/..."
