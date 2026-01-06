@@ -451,6 +451,46 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           TAG="${{ github.ref_name }}"
+          VERSION="${TAG#v}"
+          BASE_URL="https://github.com/${{ github.repository }}/releases/download/${TAG}"
+
+          # Generate download table
+          DOWNLOAD_TABLE=$(cat <<EOF
+          ## Downloads
+
+          ### macOS (GUI with CLI)
+
+          | Architecture | Download |
+          |--------------|----------|
+          | Apple Silicon (M1/M2/M3/M4) | [suve_${VERSION}_darwin_arm64.tar.gz](${BASE_URL}/suve_${VERSION}_darwin_arm64.tar.gz) |
+          | Intel | [suve_${VERSION}_darwin_amd64.tar.gz](${BASE_URL}/suve_${VERSION}_darwin_amd64.tar.gz) |
+
+          ### Windows (GUI with CLI)
+
+          | Architecture | Download |
+          |--------------|----------|
+          | x86_64 | [suve_${VERSION}_windows_amd64.zip](${BASE_URL}/suve_${VERSION}_windows_amd64.zip) |
+          | ARM64 | [suve_${VERSION}_windows_arm64.zip](${BASE_URL}/suve_${VERSION}_windows_arm64.zip) |
+
+          ### Linux GUI (requires libgtk-3, libwebkit2gtk-4.0)
+
+          | Architecture | Tarball | Debian/Ubuntu | RHEL/Fedora |
+          |--------------|---------|---------------|-------------|
+          | x86_64 | [suve_${VERSION}_linux_amd64.tar.gz](${BASE_URL}/suve_${VERSION}_linux_amd64.tar.gz) | [suve_${VERSION}-1_amd64.deb](${BASE_URL}/suve_${VERSION}-1_amd64.deb) | [suve-${VERSION}-1.x86_64.rpm](${BASE_URL}/suve-${VERSION}-1.x86_64.rpm) |
+          | ARM64 | [suve_${VERSION}_linux_arm64.tar.gz](${BASE_URL}/suve_${VERSION}_linux_arm64.tar.gz) | [suve_${VERSION}-1_arm64.deb](${BASE_URL}/suve_${VERSION}-1_arm64.deb) | [suve-${VERSION}-1.aarch64.rpm](${BASE_URL}/suve-${VERSION}-1.aarch64.rpm) |
+
+          ### Linux CLI-only (no dependencies)
+
+          | Architecture | Tarball | Debian/Ubuntu | RHEL/Fedora |
+          |--------------|---------|---------------|-------------|
+          | x86_64 | [suve-cli_${VERSION}_linux_amd64.tar.gz](${BASE_URL}/suve-cli_${VERSION}_linux_amd64.tar.gz) | [suve-cli_${VERSION}-1_amd64.deb](${BASE_URL}/suve-cli_${VERSION}-1_amd64.deb) | [suve-cli-${VERSION}-1.x86_64.rpm](${BASE_URL}/suve-cli-${VERSION}-1.x86_64.rpm) |
+          | ARM64 | [suve-cli_${VERSION}_linux_arm64.tar.gz](${BASE_URL}/suve-cli_${VERSION}_linux_arm64.tar.gz) | [suve-cli_${VERSION}-1_arm64.deb](${BASE_URL}/suve-cli_${VERSION}-1_arm64.deb) | [suve-cli-${VERSION}-1.aarch64.rpm](${BASE_URL}/suve-cli-${VERSION}-1.aarch64.rpm) |
+
+          ### Checksums
+
+          [checksums.txt](${BASE_URL}/checksums.txt)
+          EOF
+          )
 
           # Check if release already exists
           if gh release view "$TAG" &>/dev/null; then
@@ -466,10 +506,20 @@ jobs:
 
             # Merge: keep existing What's Changed, append new notes if different
             if [[ -n "$EXISTING_BODY" ]]; then
-              # Use existing body (preserves manually added What's Changed)
-              FINAL_BODY="$EXISTING_BODY"
+              # Check if download table already exists
+              if echo "$EXISTING_BODY" | grep -q "## Downloads"; then
+                # Replace existing download table (everything from ## Downloads to end or next major section)
+                FINAL_BODY=$(echo "$EXISTING_BODY" | sed '/## Downloads/,$d')
+                FINAL_BODY="${FINAL_BODY}${DOWNLOAD_TABLE}"
+              else
+                FINAL_BODY="${EXISTING_BODY}
+
+          ${DOWNLOAD_TABLE}"
+              fi
             else
-              FINAL_BODY="$NEW_NOTES"
+              FINAL_BODY="${NEW_NOTES}
+
+          ${DOWNLOAD_TABLE}"
             fi
 
             # Update release with new body and upload assets
@@ -477,9 +527,19 @@ jobs:
             gh release upload "$TAG" releases/* --clobber
           else
             echo "Creating new release $TAG..."
+
+            # Generate release notes first
+            NEW_NOTES=$(gh api repos/${{ github.repository }}/releases/generate-notes \
+              -f tag_name="$TAG" \
+              --jq .body)
+
+            FINAL_BODY="${NEW_NOTES}
+
+          ${DOWNLOAD_TABLE}"
+
             gh release create "$TAG" \
               --title "$TAG" \
-              --generate-notes \
+              --notes "$FINAL_BODY" \
               releases/*
           fi
 
