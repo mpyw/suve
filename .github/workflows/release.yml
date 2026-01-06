@@ -13,9 +13,37 @@ permissions:
 
 jobs:
   # ===========================================================================
+  # Validate version format before any builds
+  # ===========================================================================
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate version format
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          if [[ ! "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Error: Invalid version format '$VERSION'"
+            echo "Expected format: vX.Y.Z (e.g., v0.6.3)"
+            exit 1
+          fi
+          echo "Version format valid: $VERSION"
+
+      - name: Check tag does not exist
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          if git ls-remote --tags origin | grep -q "refs/tags/${VERSION}$"; then
+            echo "Error: Tag '$VERSION' already exists"
+            exit 1
+          fi
+          echo "Tag does not exist: $VERSION"
+
+  # ===========================================================================
   # Darwin: CGO required for GUI, build both archs on ARM64 runner
   # ===========================================================================
   build-darwin:
+    needs: [validate]
     runs-on: macos-latest
     steps:
       - name: Checkout
@@ -75,6 +103,7 @@ jobs:
   # Ubuntu 22.04 needed for libwebkit2gtk-4.0-dev (not available in 24.04)
   # ===========================================================================
   build-linux-amd64:
+    needs: [validate]
     runs-on: ubuntu-22.04
     outputs:
       gtk-deb: ${{ steps.gui-deps.outputs.gtk-deb }}
@@ -127,6 +156,7 @@ jobs:
   # Linux GUI (arm64): CGO required for webkit2gtk, native ARM64 runner
   # ===========================================================================
   build-linux-arm64:
+    needs: [validate]
     runs-on: ubuntu-22.04-arm
     outputs:
       gtk-deb: ${{ steps.gui-deps.outputs.gtk-deb }}
@@ -179,6 +209,7 @@ jobs:
   # Linux CLI-only: No CGO, no webkit2gtk dependency, cross-compile both archs
   # ===========================================================================
   build-linux-cli:
+    needs: [validate]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -211,6 +242,7 @@ jobs:
   # Windows: No CGO needed (Wails uses pure Go webview2loader)
   # ===========================================================================
   build-windows:
+    needs: [validate]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
