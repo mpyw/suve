@@ -194,28 +194,83 @@ jobs:
       - name: Install lintian and rpmlint
         run: sudo apt-get update && sudo apt-get install -y lintian rpm rpmlint
 
-      - name: Generate and lint .deb packages
+      - name: Generate and verify Linux packages
         env:
           GTK_DEB: ${{ steps.gui-deps.outputs.gtk-deb }}
           GTK_RPM: ${{ steps.gui-deps.outputs.gtk-rpm }}
           WEBKIT_DEB: ${{ steps.gui-deps.outputs.webkit-deb }}
           WEBKIT_RPM: ${{ steps.gui-deps.outputs.webkit-rpm }}
         run: |
+          set -euo pipefail
           export VERSION="0.0.0-test"
           export GOARCH="amd64"
 
-          # CLI-only package
-          nfpm pkg --config .github/templates/nfpm.yaml --packager deb --target suve-cli_test_amd64.deb
+          # Show rendered templates in step summary
+          {
+            echo "## Detected GUI Dependencies"
+            echo ""
+            echo "| Package | Debian | RPM |"
+            echo "|---------|--------|-----|"
+            echo "| GTK | \`${GTK_DEB}\` | \`${GTK_RPM}\` |"
+            echo "| WebKit | \`${WEBKIT_DEB}\` | \`${WEBKIT_RPM}\` |"
+            echo ""
+            echo "## Rendered nfpm Templates"
+            echo ""
+            echo "### nfpm.yaml (CLI-only)"
+            echo ""
+            echo '```yaml'
+            envsubst < .github/templates/nfpm.yaml
+            echo '```'
+            echo ""
+            echo "### nfpm-gui.yaml (GUI)"
+            echo ""
+            echo '```yaml'
+            envsubst < .github/templates/nfpm-gui.yaml
+            echo '```'
+          } >> $GITHUB_STEP_SUMMARY
 
-          # GUI package
+          # Generate packages
+          echo "Generating .deb packages..."
+          nfpm pkg --config .github/templates/nfpm.yaml --packager deb --target suve-cli_test_amd64.deb
           nfpm pkg --config .github/templates/nfpm-gui.yaml --packager deb --target suve_test_amd64.deb
 
-          echo "=== deb package info (CLI) ==="
-          dpkg-deb -I suve-cli_test_amd64.deb
-          echo "=== deb package info (GUI) ==="
-          dpkg-deb -I suve_test_amd64.deb
+          echo "Generating .rpm packages..."
+          nfpm pkg --config .github/templates/nfpm.yaml --packager rpm --target suve-cli-test.x86_64.rpm
+          nfpm pkg --config .github/templates/nfpm-gui.yaml --packager rpm --target suve-test.x86_64.rpm
 
-          echo "=== lintian check ==="
+          # Show package info in step summary
+          {
+            echo ""
+            echo "## Generated Packages"
+            echo ""
+            echo "### .deb packages"
+            echo ""
+            echo "#### suve-cli (CLI-only)"
+            echo '```'
+            dpkg-deb -I suve-cli_test_amd64.deb
+            echo '```'
+            echo ""
+            echo "#### suve (GUI)"
+            echo '```'
+            dpkg-deb -I suve_test_amd64.deb
+            echo '```'
+            echo ""
+            echo "### .rpm packages"
+            echo ""
+            echo "#### suve-cli (CLI-only)"
+            echo '```'
+            rpm -qip suve-cli-test.x86_64.rpm
+            echo '```'
+            echo ""
+            echo "#### suve (GUI)"
+            echo '```'
+            rpm -qip suve-test.x86_64.rpm
+            echo '```'
+          } >> $GITHUB_STEP_SUMMARY
+
+      - name: Lint Linux packages
+        run: |
+          echo "=== lintian check (.deb) ==="
           # Suppress tags expected for Go binaries:
           # - no-changelog: No Debian-style changelog maintained
           # - no-manual-page: CLI has --help instead
@@ -227,28 +282,7 @@ jobs:
             --suppress-tags no-changelog,no-manual-page,unknown-field,hardening-no-pie,hardening-no-relro,unstripped-binary-or-object,undeclared-elf-prerequisites \
             suve-cli_test_amd64.deb suve_test_amd64.deb
 
-      - name: Generate and lint .rpm packages
-        env:
-          GTK_DEB: ${{ steps.gui-deps.outputs.gtk-deb }}
-          GTK_RPM: ${{ steps.gui-deps.outputs.gtk-rpm }}
-          WEBKIT_DEB: ${{ steps.gui-deps.outputs.webkit-deb }}
-          WEBKIT_RPM: ${{ steps.gui-deps.outputs.webkit-rpm }}
-        run: |
-          export VERSION="0.0.0-test"
-          export GOARCH="amd64"
-
-          # CLI-only package
-          nfpm pkg --config .github/templates/nfpm.yaml --packager rpm --target suve-cli-test.x86_64.rpm
-
-          # GUI package
-          nfpm pkg --config .github/templates/nfpm-gui.yaml --packager rpm --target suve-test.x86_64.rpm
-
-          echo "=== rpm package info (CLI) ==="
-          rpm -qip suve-cli-test.x86_64.rpm
-          echo "=== rpm package info (GUI) ==="
-          rpm -qip suve-test.x86_64.rpm
-
-          echo "=== rpmlint check ==="
+          echo "=== rpmlint check (.rpm) ==="
           # rpmlint returns non-zero on warnings; allow warnings for:
           # - no-signature: Test packages aren't GPG signed
           # - no-manual-page-for-binary: CLI has --help instead
