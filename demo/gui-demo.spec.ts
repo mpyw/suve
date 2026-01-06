@@ -47,14 +47,12 @@ test.describe('GUI Demo Recording', () => {
     await expect(page.locator('.item-list')).toBeVisible();
     // Wait for any initial animations/loading to complete
     await page.waitForLoadState('networkidle');
-    // Extra wait to ensure the UI is stable before recording starts
-    await pause(PAUSE_LONG);
 
     // =========================================================================
     // 1. List existing parameters
     // =========================================================================
     console.log('Step 1: Viewing existing parameters');
-    await pause(PAUSE_LONG);
+    await pause(PAUSE_MEDIUM);
 
     // Enable "Show Values"
     await page.locator('input[type="checkbox"]').first().check();
