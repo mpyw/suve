@@ -22,6 +22,16 @@ Type "# suve - Git-like CLI for AWS Parameter Store"
 Enter
 Sleep 1s
 
+Type "# Set vim as editor (or: export EDITOR=vim)"
+Enter
+Sleep 500ms
+
+Type "export VISUAL=vim"
+Enter
+Sleep 500ms
+Enter
+Sleep 500ms
+
 Type "# List existing parameters with tags"
 Enter
 Sleep 500ms
@@ -32,11 +42,21 @@ Sleep 2s
 Enter
 Sleep 500ms
 
-Type "# Stage a new parameter"
+Type "# Stage a new parameter (opens vim)"
 Enter
 Sleep 500ms
 
-Type "suve stage param add /demo/cache/ttl 3600"
+Type "suve stage param add /demo/cache/ttl"
+Enter
+Sleep 1.5s
+
+# vim opens with empty file, enter the value
+Type "i"
+Sleep 300ms
+Type "3600"
+Escape
+Sleep 500ms
+Type ":wq"
 Enter
 Sleep 1.5s
 Enter
@@ -56,7 +76,7 @@ Type "# Stage an update to existing parameter (opens vim)"
 Enter
 Sleep 500ms
 
-Type "EDITOR=vim suve stage param edit /demo/api/url"
+Type "suve stage param edit /demo/api/url"
 Enter
 Sleep 1.5s
 
