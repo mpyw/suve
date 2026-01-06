@@ -98,13 +98,11 @@ func TestParamStrategy_Apply(t *testing.T) {
 	t.Run("create operation - new parameter", func(t *testing.T) {
 		t.Parallel()
 		mock := &paramMockClient{
-			getParameterFunc: func(_ context.Context, _ *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
-				return nil, &paramapi.ParameterNotFound{}
-			},
 			putParameterFunc: func(_ context.Context, params *paramapi.PutParameterInput, _ ...func(*paramapi.Options)) (*paramapi.PutParameterOutput, error) {
 				assert.Equal(t, "/app/param", lo.FromPtr(params.Name))
 				assert.Equal(t, "new-value", lo.FromPtr(params.Value))
 				assert.Equal(t, paramapi.ParameterTypeString, params.Type)
+				assert.False(t, lo.FromPtr(params.Overwrite)) // Create uses Overwrite=false
 				return &paramapi.PutParameterOutput{Version: 1}, nil
 			},
 		}
@@ -131,6 +129,7 @@ func TestParamStrategy_Apply(t *testing.T) {
 			},
 			putParameterFunc: func(_ context.Context, params *paramapi.PutParameterInput, _ ...func(*paramapi.Options)) (*paramapi.PutParameterOutput, error) {
 				assert.Equal(t, paramapi.ParameterTypeSecureString, params.Type)
+				assert.True(t, lo.FromPtr(params.Overwrite)) // Update uses Overwrite=true
 				return &paramapi.PutParameterOutput{Version: 2}, nil
 			},
 		}
@@ -169,7 +168,7 @@ func TestParamStrategy_Apply(t *testing.T) {
 		assert.Contains(t, err.Error(), "unknown operation")
 	})
 
-	t.Run("get parameter error (not ParameterNotFound)", func(t *testing.T) {
+	t.Run("update get parameter error (not ParameterNotFound)", func(t *testing.T) {
 		t.Parallel()
 		mock := &paramMockClient{
 			getParameterFunc: func(_ context.Context, _ *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
@@ -179,19 +178,33 @@ func TestParamStrategy_Apply(t *testing.T) {
 
 		s := staging.NewParamStrategy(mock)
 		err := s.Apply(context.Background(), "/app/param", staging.Entry{
-			Operation: staging.OperationCreate,
+			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("value"),
 		})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to get existing parameter")
 	})
 
-	t.Run("put parameter error", func(t *testing.T) {
+	t.Run("update parameter not found error", func(t *testing.T) {
 		t.Parallel()
 		mock := &paramMockClient{
 			getParameterFunc: func(_ context.Context, _ *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
 				return nil, &paramapi.ParameterNotFound{}
 			},
+		}
+
+		s := staging.NewParamStrategy(mock)
+		err := s.Apply(context.Background(), "/app/param", staging.Entry{
+			Operation: staging.OperationUpdate,
+			Value:     lo.ToPtr("value"),
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "parameter not found")
+	})
+
+	t.Run("create put parameter error", func(t *testing.T) {
+		t.Parallel()
+		mock := &paramMockClient{
 			putParameterFunc: func(_ context.Context, _ *paramapi.PutParameterInput, _ ...func(*paramapi.Options)) (*paramapi.PutParameterOutput, error) {
 				return nil, errors.New("put failed")
 			},
@@ -203,7 +216,32 @@ func TestParamStrategy_Apply(t *testing.T) {
 			Value:     lo.ToPtr("value"),
 		})
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "failed to set parameter")
+		assert.Contains(t, err.Error(), "failed to create parameter")
+	})
+
+	t.Run("update put parameter error", func(t *testing.T) {
+		t.Parallel()
+		mock := &paramMockClient{
+			getParameterFunc: func(_ context.Context, _ *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
+				return &paramapi.GetParameterOutput{
+					Parameter: &paramapi.Parameter{
+						Name:  lo.ToPtr("/app/param"),
+						Value: lo.ToPtr("old-value"),
+					},
+				}, nil
+			},
+			putParameterFunc: func(_ context.Context, _ *paramapi.PutParameterInput, _ ...func(*paramapi.Options)) (*paramapi.PutParameterOutput, error) {
+				return nil, errors.New("put failed")
+			},
+		}
+
+		s := staging.NewParamStrategy(mock)
+		err := s.Apply(context.Background(), "/app/param", staging.Entry{
+			Operation: staging.OperationUpdate,
+			Value:     lo.ToPtr("value"),
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to update parameter")
 	})
 
 	t.Run("delete parameter error", func(t *testing.T) {
@@ -537,17 +575,15 @@ func TestParamStrategy_FetchLastModified(t *testing.T) {
 	})
 }
 
-func TestParamStrategy_Apply_WithTags(t *testing.T) {
+func TestParamStrategy_Apply_WithDescription(t *testing.T) {
 	t.Parallel()
 
 	t.Run("create with description", func(t *testing.T) {
 		t.Parallel()
 		mock := &paramMockClient{
-			getParameterFunc: func(_ context.Context, _ *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
-				return nil, &paramapi.ParameterNotFound{}
-			},
 			putParameterFunc: func(_ context.Context, params *paramapi.PutParameterInput, _ ...func(*paramapi.Options)) (*paramapi.PutParameterOutput, error) {
 				assert.Equal(t, "Test description", lo.FromPtr(params.Description))
+				assert.False(t, lo.FromPtr(params.Overwrite))
 				return &paramapi.PutParameterOutput{Version: 1}, nil
 			},
 		}
@@ -561,6 +597,32 @@ func TestParamStrategy_Apply_WithTags(t *testing.T) {
 		require.NoError(t, err)
 	})
 
+	t.Run("update with description", func(t *testing.T) {
+		t.Parallel()
+		mock := &paramMockClient{
+			getParameterFunc: func(_ context.Context, _ *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
+				return &paramapi.GetParameterOutput{
+					Parameter: &paramapi.Parameter{
+						Name:  lo.ToPtr("/app/param"),
+						Value: lo.ToPtr("old-value"),
+					},
+				}, nil
+			},
+			putParameterFunc: func(_ context.Context, params *paramapi.PutParameterInput, _ ...func(*paramapi.Options)) (*paramapi.PutParameterOutput, error) {
+				assert.Equal(t, "Test description", lo.FromPtr(params.Description))
+				assert.True(t, lo.FromPtr(params.Overwrite))
+				return &paramapi.PutParameterOutput{Version: 2}, nil
+			},
+		}
+
+		s := staging.NewParamStrategy(mock)
+		err := s.Apply(context.Background(), "/app/param", staging.Entry{
+			Operation:   staging.OperationUpdate,
+			Value:       lo.ToPtr("value"),
+			Description: lo.ToPtr("Test description"),
+		})
+		require.NoError(t, err)
+	})
 }
 
 func TestParamStrategy_Apply_DeleteAlreadyDeleted(t *testing.T) {

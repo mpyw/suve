@@ -4,7 +4,7 @@ This file provides guidance to Claude Code when working with code in this reposi
 
 ## Project Overview
 
-**suve** (**S**ecret **U**nified **V**ersioning **E**xplorer) is a Git-like CLI for AWS Parameter Store and Secrets Manager. It provides familiar Git-style commands (`show`, `log`, `diff`, `list`, `set`, `delete`) with version specification syntax (`#VERSION`, `~SHIFT`, `:LABEL`).
+**suve** (**S**ecret **U**nified **V**ersioning **E**xplorer) is a Git-like CLI for AWS Parameter Store and Secrets Manager. It provides familiar Git-style commands (`show`, `log`, `diff`, `list`, `create`, `update`, `delete`) with version specification syntax (`#VERSION`, `~SHIFT`, `:LABEL`).
 
 ### Core Concepts
 
@@ -53,7 +53,7 @@ suve/
 │   ├── cli/
 │   │   ├── commands/
 │   │   │   ├── app.go         # urfave/cli v3 app definition
-│   │   │   ├── param/         # param subcommands (delete, diff, log, ls, set, show, tag, untag)
+│   │   │   ├── param/         # param subcommands (create, delete, diff, log, ls, show, tag, untag, update)
 │   │   │   ├── secret/        # secret subcommands (create, delete, diff, log, ls, restore, show, tag, untag, update)
 │   │   │   └── stage/         # staging subcommands
 │   │   └── ...
@@ -69,7 +69,7 @@ suve/
 │   │
 │   ├── staging/               # Staging functionality
 │   ├── usecase/               # Business logic layer
-│   │   ├── param/             # SSM use cases (show, log, list, set, delete, tag)
+│   │   ├── param/             # SSM use cases (show, log, list, create, update, delete, tag)
 │   │   ├── secret/            # SM use cases (show, log, list, create, update, delete, restore, tag)
 │   │   └── staging/           # Staging use cases (add, edit, delete, status, diff, apply, reset)
 │   ├── maputil/               # Generic map utilities (Set type)

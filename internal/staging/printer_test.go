@@ -27,7 +27,7 @@ func TestEntryPrinter_PrintEntry(t *testing.T) {
 		wantNotContains   []string
 	}{
 		{
-			name:      "set operation non-verbose",
+			name:      "update operation non-verbose",
 			entryName: "/app/config",
 			entry: staging.Entry{
 				Operation: staging.OperationUpdate,
@@ -48,7 +48,7 @@ func TestEntryPrinter_PrintEntry(t *testing.T) {
 			wantContains: []string{"D", "/app/secret"},
 		},
 		{
-			name:      "set operation verbose",
+			name:      "update operation verbose",
 			entryName: "/app/config",
 			entry: staging.Entry{
 				Operation: staging.OperationUpdate,
@@ -59,7 +59,7 @@ func TestEntryPrinter_PrintEntry(t *testing.T) {
 			wantContains: []string{"M", "/app/config", "Staged:", "2024-01-15 10:30:00", "Value: test-value"},
 		},
 		{
-			name:      "set operation verbose with long value",
+			name:      "update operation verbose with long value",
 			entryName: "/app/config",
 			entry: staging.Entry{
 				Operation: staging.OperationUpdate,

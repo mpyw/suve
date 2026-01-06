@@ -33,12 +33,13 @@ import (
 	secretrestore "github.com/mpyw/suve/internal/cli/commands/secret/restore"
 	secretshow "github.com/mpyw/suve/internal/cli/commands/secret/show"
 	secretupdate "github.com/mpyw/suve/internal/cli/commands/secret/update"
+	paramcreate "github.com/mpyw/suve/internal/cli/commands/param/create"
 	paramdelete "github.com/mpyw/suve/internal/cli/commands/param/delete"
 	paramdiff "github.com/mpyw/suve/internal/cli/commands/param/diff"
 	paramlog "github.com/mpyw/suve/internal/cli/commands/param/log"
 	paramlist "github.com/mpyw/suve/internal/cli/commands/param/list"
-	paramset "github.com/mpyw/suve/internal/cli/commands/param/set"
 	paramshow "github.com/mpyw/suve/internal/cli/commands/param/show"
+	paramupdate "github.com/mpyw/suve/internal/cli/commands/param/update"
 	globalstage "github.com/mpyw/suve/internal/cli/commands/stage"
 	globaldiff "github.com/mpyw/suve/internal/cli/commands/stage/diff"
 	globalapply "github.com/mpyw/suve/internal/cli/commands/stage/apply"
@@ -125,7 +126,7 @@ func runSubCommand(t *testing.T, parentCmd *cli.Command, subCmdName string, args
 // =============================================================================
 
 // TestParam_FullWorkflow tests the complete SSM Parameter Store workflow:
-// set → show → show --raw → update → log → diff → list → delete → verify deletion
+// create → show → show --raw → update → log → diff → list → delete → verify deletion
 func TestParam_FullWorkflow(t *testing.T) {
 	setupEnv(t)
 	paramName := "/suve-e2e-test/basic/param"
@@ -136,11 +137,11 @@ func TestParam_FullWorkflow(t *testing.T) {
 		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
 	})
 
-	// 1. Set parameter (with -y to skip confirmation)
-	t.Run("set", func(t *testing.T) {
-		stdout, _, err := runCommand(t, paramset.Command(), "--yes", paramName, "initial-value")
+	// 1. Create parameter
+	t.Run("create", func(t *testing.T) {
+		stdout, _, err := runCommand(t, paramcreate.Command(), paramName, "initial-value")
 		require.NoError(t, err)
-		t.Logf("set output: %s", stdout)
+		t.Logf("create output: %s", stdout)
 	})
 
 	// 2. Show parameter
@@ -161,7 +162,7 @@ func TestParam_FullWorkflow(t *testing.T) {
 
 	// 4. Update parameter
 	t.Run("update", func(t *testing.T) {
-		_, _, err := runCommand(t, paramset.Command(), "--yes", paramName, "updated-value")
+		_, _, err := runCommand(t, paramupdate.Command(), "--yes", paramName, "updated-value")
 		require.NoError(t, err)
 	})
 
@@ -266,11 +267,11 @@ func TestParam_VersionSpecifiers(t *testing.T) {
 	})
 
 	// Create 3 versions
-	_, _, err := runCommand(t, paramset.Command(), "--yes", paramName, "v1")
+	_, _, err := runCommand(t, paramcreate.Command(), paramName, "v1")
 	require.NoError(t, err)
-	_, _, err = runCommand(t, paramset.Command(), "--yes", paramName, "v2")
+	_, _, err = runCommand(t, paramupdate.Command(), "--yes", paramName, "v2")
 	require.NoError(t, err)
-	_, _, err = runCommand(t, paramset.Command(), "--yes", paramName, "v3")
+	_, _, err = runCommand(t, paramupdate.Command(), "--yes", paramName, "v3")
 	require.NoError(t, err)
 
 	// Test #VERSION
@@ -328,9 +329,9 @@ func TestParam_ParseJSONFlag(t *testing.T) {
 	})
 
 	// Create with JSON value
-	_, _, err := runCommand(t, paramset.Command(), "--yes", paramName, `{"b":2,"a":1}`)
+	_, _, err := runCommand(t, paramcreate.Command(), paramName, `{"b":2,"a":1}`)
 	require.NoError(t, err)
-	_, _, err = runCommand(t, paramset.Command(), "--yes", paramName, `{"c":3,"b":2,"a":1}`)
+	_, _, err = runCommand(t, paramupdate.Command(), "--yes", paramName, `{"c":3,"b":2,"a":1}`)
 	require.NoError(t, err)
 
 	// Test diff with -j flag (should format and sort keys)
@@ -372,7 +373,7 @@ func TestParam_StagingWorkflow(t *testing.T) {
 
 	// 1. Create initial parameter
 	t.Run("setup", func(t *testing.T) {
-		_, _, err := runCommand(t, paramset.Command(), "--yes", paramName, "original-value")
+		_, _, err := runCommand(t, paramcreate.Command(), paramName, "original-value")
 		require.NoError(t, err)
 	})
 
@@ -524,11 +525,11 @@ func TestParam_StagingResetWithVersion(t *testing.T) {
 	})
 
 	// Create parameter with multiple versions
-	_, _, err := runCommand(t, paramset.Command(), "--yes", paramName, "v1")
+	_, _, err := runCommand(t, paramcreate.Command(), paramName, "v1")
 	require.NoError(t, err)
-	_, _, err = runCommand(t, paramset.Command(), "--yes", paramName, "v2")
+	_, _, err = runCommand(t, paramupdate.Command(), "--yes", paramName, "v2")
 	require.NoError(t, err)
-	_, _, err = runCommand(t, paramset.Command(), "--yes", paramName, "v3")
+	_, _, err = runCommand(t, paramupdate.Command(), "--yes", paramName, "v3")
 	require.NoError(t, err)
 
 	// 1. Reset with version spec (restore old version to staging)
@@ -586,8 +587,8 @@ func TestParam_StagingResetAll(t *testing.T) {
 	})
 
 	// Create parameters
-	_, _, _ = runCommand(t, paramset.Command(), "--yes", param1, "value1")
-	_, _, _ = runCommand(t, paramset.Command(), "--yes", param2, "value2")
+	_, _, _ = runCommand(t, paramcreate.Command(), param1, "value1")
+	_, _, _ = runCommand(t, paramcreate.Command(), param2, "value2")
 
 	// Stage both
 	store := staging.NewStoreWithPath(stagingFilePath(tmpHome))
@@ -644,8 +645,8 @@ func TestParam_StagingApplySingle(t *testing.T) {
 	})
 
 	// Create parameters
-	_, _, _ = runCommand(t, paramset.Command(), "--yes", param1, "original1")
-	_, _, _ = runCommand(t, paramset.Command(), "--yes", param2, "original2")
+	_, _, _ = runCommand(t, paramcreate.Command(), param1, "original1")
+	_, _, _ = runCommand(t, paramcreate.Command(), param2, "original2")
 
 	// Stage both
 	store := staging.NewStoreWithPath(stagingFilePath(tmpHome))
@@ -1021,7 +1022,7 @@ func TestGlobal_StageWorkflow(t *testing.T) {
 	})
 
 	// Create resources
-	_, _, _ = runCommand(t, paramset.Command(), "--yes", paramName, "original-param")
+	_, _, _ = runCommand(t, paramcreate.Command(), paramName, "original-param")
 	_, _, _ = runCommand(t, secretcreate.Command(), secretName, "original-secret")
 
 	// Stage both
@@ -1105,7 +1106,7 @@ func TestGlobal_StageResetAll(t *testing.T) {
 	})
 
 	// Create and stage
-	_, _, _ = runCommand(t, paramset.Command(), "--yes", paramName, "original")
+	_, _, _ = runCommand(t, paramcreate.Command(), paramName, "original")
 	_, _, _ = runCommand(t, secretcreate.Command(), secretName, "original")
 
 	store := staging.NewStoreWithPath(stagingFilePath(tmpHome))
@@ -1208,8 +1209,8 @@ func TestParam_ErrorCases(t *testing.T) {
 	})
 
 	// Missing required args
-	t.Run("missing-args-set", func(t *testing.T) {
-		_, _, err := runCommand(t, paramset.Command())
+	t.Run("missing-args-create", func(t *testing.T) {
+		_, _, err := runCommand(t, paramcreate.Command())
 		assert.Error(t, err)
 	})
 
@@ -1316,7 +1317,9 @@ func TestParam_SpecialCharactersInValue(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			_, _, err := runCommand(t, paramset.Command(), "--yes", paramName, tc.value)
+			// Ensure clean state before each test case
+			_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+			_, _, err := runCommand(t, paramcreate.Command(), paramName, tc.value)
 			require.NoError(t, err)
 
 			stdout, _, err := runCommand(t, paramshow.Command(), "--raw", paramName)
@@ -1371,7 +1374,7 @@ func TestParam_LongValue(t *testing.T) {
 	// Create a long value (SSM Parameter Store limit is 4KB for standard, 8KB for advanced)
 	longValue := strings.Repeat("a", 4000)
 
-	_, _, err := runCommand(t, paramset.Command(), "--yes", paramName, longValue)
+	_, _, err := runCommand(t, paramcreate.Command(), paramName, longValue)
 	require.NoError(t, err)
 
 	stdout, _, err := runCommand(t, paramshow.Command(), "--raw", paramName)
@@ -1643,7 +1646,7 @@ func TestParam_GlobalDiffWithJSON(t *testing.T) {
 	})
 
 	// Create param with JSON value
-	_, _, err := runCommand(t, paramset.Command(), "--yes", paramName, `{"a":1}`)
+	_, _, err := runCommand(t, paramcreate.Command(), paramName, `{"a":1}`)
 	require.NoError(t, err)
 
 	// Stage update with different JSON
@@ -1677,7 +1680,7 @@ func TestGlobal_StagingWithTags(t *testing.T) {
 	})
 
 	// Create a parameter first
-	_, _, err := runCommand(t, paramset.Command(), "--yes", paramName, "initial-value")
+	_, _, err := runCommand(t, paramcreate.Command(), paramName, "initial-value")
 	require.NoError(t, err)
 
 	// Stage tag changes using the staging store directly
@@ -1737,7 +1740,7 @@ func TestGlobal_ResetWithTags(t *testing.T) {
 	})
 
 	// Create a parameter first
-	_, _, err := runCommand(t, paramset.Command(), "--yes", paramName, "initial-value")
+	_, _, err := runCommand(t, paramcreate.Command(), paramName, "initial-value")
 	require.NoError(t, err)
 
 	// Stage entry and tag changes
@@ -1782,11 +1785,11 @@ func TestParam_OutputOption(t *testing.T) {
 	})
 
 	// Create param
-	_, _, err := runCommand(t, paramset.Command(), "--yes", paramName, "test-value")
+	_, _, err := runCommand(t, paramcreate.Command(), paramName, "test-value")
 	require.NoError(t, err)
 
 	// Update to create version 2
-	_, _, err = runCommand(t, paramset.Command(), "--yes", paramName, "updated-value")
+	_, _, err = runCommand(t, paramupdate.Command(), "--yes", paramName, "updated-value")
 	require.NoError(t, err)
 
 	t.Run("show --output=json", func(t *testing.T) {
@@ -1850,11 +1853,11 @@ func TestParam_FilterOption(t *testing.T) {
 	})
 
 	// Create params
-	_, _, err := runCommand(t, paramset.Command(), "--yes", prefix+"/foo", "foo-val")
+	_, _, err := runCommand(t, paramcreate.Command(), prefix+"/foo", "foo-val")
 	require.NoError(t, err)
-	_, _, err = runCommand(t, paramset.Command(), "--yes", prefix+"/bar", "bar-val")
+	_, _, err = runCommand(t, paramcreate.Command(), prefix+"/bar", "bar-val")
 	require.NoError(t, err)
-	_, _, err = runCommand(t, paramset.Command(), "--yes", prefix+"/baz", "baz-val")
+	_, _, err = runCommand(t, paramcreate.Command(), prefix+"/baz", "baz-val")
 	require.NoError(t, err)
 
 	t.Run("filter ba", func(t *testing.T) {
@@ -1889,9 +1892,9 @@ func TestParam_ShowOption(t *testing.T) {
 	})
 
 	// Create params
-	_, _, err := runCommand(t, paramset.Command(), "--yes", prefix+"/param1", "value1")
+	_, _, err := runCommand(t, paramcreate.Command(), prefix+"/param1", "value1")
 	require.NoError(t, err)
-	_, _, err = runCommand(t, paramset.Command(), "--yes", prefix+"/param2", "value2")
+	_, _, err = runCommand(t, paramcreate.Command(), prefix+"/param2", "value2")
 	require.NoError(t, err)
 
 	t.Run("list without --show", func(t *testing.T) {
@@ -1934,7 +1937,7 @@ func TestParam_StagingAddExistingResourceFails(t *testing.T) {
 	})
 
 	// Create the parameter first
-	_, _, err := runCommand(t, paramset.Command(), "--yes", paramName, "existing-value")
+	_, _, err := runCommand(t, paramcreate.Command(), paramName, "existing-value")
 	require.NoError(t, err)
 
 	// Try to stage add - should fail because resource already exists

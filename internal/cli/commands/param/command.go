@@ -4,14 +4,15 @@ import (
 	"github.com/urfave/cli/v3"
 
 	cliinternal "github.com/mpyw/suve/internal/cli/commands/internal"
+	"github.com/mpyw/suve/internal/cli/commands/param/create"
 	paramdelete "github.com/mpyw/suve/internal/cli/commands/param/delete"
 	"github.com/mpyw/suve/internal/cli/commands/param/diff"
 	"github.com/mpyw/suve/internal/cli/commands/param/list"
 	"github.com/mpyw/suve/internal/cli/commands/param/log"
-	"github.com/mpyw/suve/internal/cli/commands/param/set"
 	"github.com/mpyw/suve/internal/cli/commands/param/show"
 	"github.com/mpyw/suve/internal/cli/commands/param/tag"
 	"github.com/mpyw/suve/internal/cli/commands/param/untag"
+	"github.com/mpyw/suve/internal/cli/commands/param/update"
 )
 
 // Command returns the param command with all subcommands.
@@ -25,7 +26,8 @@ func Command() *cli.Command {
 			log.Command(),
 			diff.Command(),
 			list.Command(),
-			set.Command(),
+			create.Command(),
+			update.Command(),
 			paramdelete.Command(),
 			tag.Command(),
 			untag.Command(),

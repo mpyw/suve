@@ -4,7 +4,7 @@
 # Recorded with VHS: https://github.com/charmbracelet/vhs
 # Run: vhs demo/cli-demo.tape
 
-Output demo/cli-demo.gif
+Output "demo/cli-demo.gif"
 
 Set FontSize 16
 Set Width 1200
@@ -22,6 +22,16 @@ Type "# suve - Git-like CLI for AWS Parameter Store"
 Enter
 Sleep 1s
 
+Type "# Set vim as editor (or: export EDITOR=vim)"
+Enter
+Sleep 500ms
+
+Type "export VISUAL=vim"
+Enter
+Sleep 500ms
+Enter
+Sleep 500ms
+
 Type "# List existing parameters with tags"
 Enter
 Sleep 500ms
@@ -32,11 +42,21 @@ Sleep 2s
 Enter
 Sleep 500ms
 
-Type "# Stage a new parameter"
+Type "# Stage a new parameter (opens vim)"
 Enter
 Sleep 500ms
 
-Type "suve stage param add /demo/cache/ttl 3600"
+Type "suve stage param add /demo/cache/ttl"
+Enter
+Sleep 1.5s
+
+# vim opens with empty file, enter the value
+Type "i"
+Sleep 300ms
+Type "3600"
+Escape
+Sleep 500ms
+Type ":wq"
 Enter
 Sleep 1.5s
 Enter
@@ -52,11 +72,25 @@ Sleep 1.5s
 Enter
 Sleep 500ms
 
-Type "# Stage an update to existing parameter"
+Type "# Stage an update to existing parameter (opens vim)"
 Enter
 Sleep 500ms
 
-Type "suve stage param edit /demo/api/url https://api-v2.example.com"
+Type "suve stage param edit /demo/api/url"
+Enter
+Sleep 1.5s
+
+# vim opens with current value: https://api-v1.example.com
+# Search for "v1" and change to "v2"
+Type "/v1"
+Enter
+Sleep 500ms
+Type "cw"
+Sleep 300ms
+Type "v2"
+Escape
+Sleep 500ms
+Type ":wq"
 Enter
 Sleep 1.5s
 Enter
@@ -116,10 +150,7 @@ Type "# Apply all staged changes"
 Enter
 Sleep 500ms
 
-Type "suve stage apply"
-Enter
-Sleep 1s
-Type "y"
+Type "suve stage apply --yes"
 Enter
 Sleep 2.5s
 Enter

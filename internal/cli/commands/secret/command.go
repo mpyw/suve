@@ -1,9 +1,6 @@
 package secret
 
 import (
-	"context"
-	"fmt"
-
 	"github.com/urfave/cli/v3"
 
 	cliinternal "github.com/mpyw/suve/internal/cli/commands/internal"
@@ -36,19 +33,6 @@ func Command() *cli.Command {
 			restore.Command(),
 			tag.Command(),
 			untag.Command(),
-			{
-				Name:   "set",
-				Hidden: true,
-				Action: func(_ context.Context, _ *cli.Command) error {
-					return fmt.Errorf(`'suve secret set' is not available
-
-Secrets Manager distinguishes between creating and updating secrets:
-  suve secret create <name> <value>   Create a new secret
-  suve secret update <name> <value>   Update an existing secret
-
-Unlike SSM Parameter Store, these operations use different AWS APIs`)
-				},
-			},
 		},
 		CommandNotFound: cliinternal.CommandNotFound,
 	}
