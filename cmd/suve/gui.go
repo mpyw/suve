@@ -5,6 +5,7 @@ package main
 import (
 	"log"
 	"os"
+	"strings"
 
 	"github.com/urfave/cli/v3"
 
@@ -29,4 +30,8 @@ func registerGUIFlag() {
 		Name:  "gui",
 		Usage: "Launch GUI mode",
 	})
+}
+
+func registerGUIDescription() {
+	commands.App.Usage = strings.Replace(commands.App.Usage, "CLI", "CLI/GUI", 1)
 }
