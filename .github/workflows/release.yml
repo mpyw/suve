@@ -294,22 +294,28 @@ jobs:
             # Determine if this is CLI-only build
             if [[ "$build_name" == suve-cli-* ]]; then
               archive_prefix="suve-cli"
-              binary_name="suve-cli"
+              src_binary="suve-cli"
             else
               archive_prefix="suve"
-              binary_name="suve"
+              src_binary="suve"
             fi
 
             staging="staging_${build_name}"
             mkdir -p "$staging"
 
             if [[ "$goos" == "windows" ]]; then
-              cp "$dir"*.exe "$staging/" 2>/dev/null || cp "$dir"* "$staging/"
+              # Windows: copy .exe, rename suve-cli.exe to suve.exe if needed
+              if [[ -f "$dir/${src_binary}.exe" ]]; then
+                cp "$dir/${src_binary}.exe" "$staging/suve.exe"
+              else
+                cp "$dir"*.exe "$staging/"
+              fi
               archive_name="${archive_prefix}_${VERSION}_${goos}_${goarch}.zip"
               cp README.md LICENSE "$staging/"
               (cd "$staging" && zip -r "../releases/${archive_name}" .)
             else
-              cp "$dir"* "$staging/"
+              # Linux/macOS: rename suve-cli to suve for consistent UX
+              cp "$dir/${src_binary}" "$staging/suve"
               archive_name="${archive_prefix}_${VERSION}_${goos}_${goarch}.tar.gz"
               cp README.md LICENSE "$staging/"
               tar -czvf "releases/${archive_name}" -C "$staging" .
