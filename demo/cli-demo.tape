@@ -52,11 +52,25 @@ Sleep 1.5s
 Enter
 Sleep 500ms
 
-Type "# Stage an update to existing parameter"
+Type "# Stage an update to existing parameter (opens vim)"
 Enter
 Sleep 500ms
 
-Type "suve stage param edit /demo/api/url https://api-v2.example.com"
+Type "EDITOR=vim suve stage param edit /demo/api/url"
+Enter
+Sleep 1.5s
+
+# vim opens with current value: https://api-v1.example.com
+# Search for "v1" and change to "v2"
+Type "/v1"
+Enter
+Sleep 500ms
+Type "cw"
+Sleep 300ms
+Type "v2"
+Escape
+Sleep 500ms
+Type ":wq"
 Enter
 Sleep 1.5s
 Enter
