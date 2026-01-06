@@ -18,7 +18,7 @@ require (
 	github.com/wailsapp/wails/v2 v2.11.0
 	github.com/walles/moor/v2 v2.10.0
 	golang.org/x/sync v0.19.0
-	golang.org/x/term v0.29.0
+	golang.org/x/term v0.37.0
 	gopkg.in/ini.v1 v1.67.0
 )
 
@@ -66,10 +66,10 @@ require (
 	github.com/valyala/fasttemplate v1.2.2 // indirect
 	github.com/wailsapp/go-webview2 v1.0.22 // indirect
 	github.com/wailsapp/mimetype v1.4.1 // indirect
-	golang.org/x/crypto v0.33.0 // indirect
+	golang.org/x/crypto v0.45.0 // indirect
 	golang.org/x/exp v0.0.0-20240103183307-be819d1f06fc // indirect
-	golang.org/x/net v0.35.0 // indirect
-	golang.org/x/sys v0.37.0 // indirect
-	golang.org/x/text v0.22.0 // indirect
+	golang.org/x/net v0.47.0 // indirect
+	golang.org/x/sys v0.38.0 // indirect
+	golang.org/x/text v0.31.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
