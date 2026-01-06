@@ -8,17 +8,17 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/secretsmanager v1.41.0
 	github.com/aws/aws-sdk-go-v2/service/ssm v1.67.7
 	github.com/aws/aws-sdk-go-v2/service/sts v1.41.5
-	github.com/aymanbagabas/go-udiff v0.1.2
-	github.com/fatih/color v1.15.0
+	github.com/aymanbagabas/go-udiff v0.3.1
+	github.com/fatih/color v1.18.0
 	github.com/gofrs/flock v0.13.0
 	github.com/mattn/go-isatty v0.0.20
 	github.com/samber/lo v1.52.0
 	github.com/stretchr/testify v1.11.1
 	github.com/urfave/cli/v3 v3.6.1
 	github.com/wailsapp/wails/v2 v2.11.0
-	github.com/walles/moor/v2 v2.10.0
+	github.com/walles/moor/v2 v2.10.1
 	golang.org/x/sync v0.19.0
-	golang.org/x/term v0.37.0
+	golang.org/x/term v0.38.0
 	gopkg.in/ini.v1 v1.67.0
 )
 
@@ -69,7 +69,7 @@ require (
 	golang.org/x/crypto v0.45.0 // indirect
 	golang.org/x/exp v0.0.0-20240103183307-be819d1f06fc // indirect
 	golang.org/x/net v0.47.0 // indirect
-	golang.org/x/sys v0.38.0 // indirect
+	golang.org/x/sys v0.39.0 // indirect
 	golang.org/x/text v0.31.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
