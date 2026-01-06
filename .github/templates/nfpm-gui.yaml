@@ -1,4 +1,4 @@
-# nfpm configuration for generating .deb and .rpm packages
+# nfpm configuration for generating .deb and .rpm packages (GUI version)
 # https://nfpm.goreleaser.com/configuration/
 
 name: suve
@@ -12,34 +12,35 @@ description: |
   .
   Provides familiar commands like show, log, diff, and a staging workflow
   for safe, reviewable changes to your AWS secrets and parameters.
+  .
+  This package includes GUI support via the --gui flag.
+  Requires GTK3 and WebKit2GTK runtime libraries.
 homepage: "https://github.com/mpyw/suve"
 license: "MIT"
 
-# RPM uses first line of description as Summary (without trailing dot)
 vendor: "mpyw"
 section: "utils"
 priority: "optional"
 
-# RPM-specific
 rpm:
   group: "Applications/System"
 
-# No hard dependencies - CLI works without GUI libs
-# GUI dependencies are recommended but not required
 depends: []
 
-# DEB: recommended packages for GUI support
+# GUI dependencies - recommended but not strictly required
+# Versions are detected from Wails source in CI
 recommends:
-  - libgtk-3-0
-  - libayatana-appindicator3-1
+  - ${GTK_DEB}
+  - ${WEBKIT_DEB}
 
-# RPM overrides
-# Note: RPM only recommends gtk3 because appindicator package names
-# vary across distros (libappindicator-gtk3, ayatana-appindicator, etc.)
 overrides:
   rpm:
     recommends:
-      - gtk3
+      - ${GTK_RPM}
+      - ${WEBKIT_RPM}
+
+conflicts:
+  - suve-cli
 
 contents:
   - src: ./suve
@@ -47,7 +48,6 @@ contents:
     file_info:
       mode: 0755
 
-  # Copyright file (required by Debian policy)
   - src: ./LICENSE
     dst: /usr/share/doc/suve/copyright
     file_info:

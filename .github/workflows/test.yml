@@ -154,8 +154,19 @@ jobs:
           retention-days: 30
 
   linux-package:
-    name: Linux Package Lint
-    runs-on: ubuntu-latest
+    name: Linux Package Lint (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+            deb_arch: amd64
+            rpm_arch: x86_64
+          - arch: arm64
+            runner: ubuntu-22.04-arm
+            deb_arch: arm64
+            rpm_arch: aarch64
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
@@ -165,8 +176,22 @@ jobs:
         with:
           go-version-file: go.mod
 
-      - name: Build test binary
-        run: go build -o suve ./cmd/suve
+      - name: Detect GUI dependencies from Wails
+        id: gui-deps
+        uses: ./.github/actions/detect-gui-deps
+
+      - name: Build test binaries
+        run: |
+          go build -o suve ./cmd/suve
+          go build -o suve-cli ./cmd/suve
+          file suve suve-cli
+
+      - name: Verify binaries run correctly
+        run: |
+          ./suve --help
+          ./suve --version
+          ./suve-cli --help
+          ./suve-cli --version
 
       - name: Install nfpm
         run: go install github.com/goreleaser/nfpm/v2/cmd/nfpm@v2.41.1
@@ -174,39 +199,150 @@ jobs:
       - name: Install lintian and rpmlint
         run: sudo apt-get update && sudo apt-get install -y lintian rpm rpmlint
 
-      - name: Generate and lint .deb package
+      - name: Generate and verify Linux packages
+        env:
+          GTK_DEB: ${{ steps.gui-deps.outputs.gtk-deb }}
+          GTK_RPM: ${{ steps.gui-deps.outputs.gtk-rpm }}
+          WEBKIT_DEB: ${{ steps.gui-deps.outputs.webkit-deb }}
+          WEBKIT_RPM: ${{ steps.gui-deps.outputs.webkit-rpm }}
+          VERSION: "0.0.0-test"
+          GOARCH: ${{ matrix.arch }}
         run: |
-          export VERSION="0.0.0-test"
-          export GOARCH="amd64"
-          nfpm pkg --packager deb --target suve_test_amd64.deb
-          echo "=== deb package info ==="
-          dpkg-deb -I suve_test_amd64.deb
-          echo "=== lintian check ==="
-          # Suppress tags expected for Go binaries:
+          set -euo pipefail
+
+          # Show rendered templates in step summary
+          {
+            echo "## Linux Package Test (${{ matrix.arch }})"
+            echo ""
+            echo "### Detected GUI Dependencies"
+            echo ""
+            echo "| Package | Debian | RPM |"
+            echo "|---------|--------|-----|"
+            echo "| GTK | \`${GTK_DEB}\` | \`${GTK_RPM}\` |"
+            echo "| WebKit | \`${WEBKIT_DEB}\` | \`${WEBKIT_RPM}\` |"
+            echo ""
+            echo "### Rendered nfpm Templates"
+            echo ""
+            echo "<details><summary>nfpm.yaml (CLI-only)</summary>"
+            echo ""
+            echo '```yaml'
+            envsubst < .github/templates/nfpm.yaml
+            echo '```'
+            echo "</details>"
+            echo ""
+            echo "<details><summary>nfpm-gui.yaml (GUI)</summary>"
+            echo ""
+            echo '```yaml'
+            envsubst < .github/templates/nfpm-gui.yaml
+            echo '```'
+            echo "</details>"
+          } >> $GITHUB_STEP_SUMMARY
+
+          # Generate .deb packages
+          nfpm pkg --config .github/templates/nfpm.yaml --packager deb --target "suve-cli_test_${{ matrix.deb_arch }}.deb"
+          nfpm pkg --config .github/templates/nfpm-gui.yaml --packager deb --target "suve_test_${{ matrix.deb_arch }}.deb"
+
+          # Generate .rpm packages
+          nfpm pkg --config .github/templates/nfpm.yaml --packager rpm --target "suve-cli-test.${{ matrix.rpm_arch }}.rpm"
+          nfpm pkg --config .github/templates/nfpm-gui.yaml --packager rpm --target "suve-test.${{ matrix.rpm_arch }}.rpm"
+
+          # Show package info in step summary
+          {
+            echo ""
+            echo "### Generated Packages"
+            echo ""
+            echo "#### .deb packages"
+            echo ""
+            echo "<details><summary>suve-cli_test_${{ matrix.deb_arch }}.deb</summary>"
+            echo ""
+            echo '```'
+            dpkg-deb -I "suve-cli_test_${{ matrix.deb_arch }}.deb"
+            echo '```'
+            echo "</details>"
+            echo ""
+            echo "<details><summary>suve_test_${{ matrix.deb_arch }}.deb</summary>"
+            echo ""
+            echo '```'
+            dpkg-deb -I "suve_test_${{ matrix.deb_arch }}.deb"
+            echo '```'
+            echo "</details>"
+            echo ""
+            echo "#### .rpm packages"
+            echo ""
+            echo "<details><summary>suve-cli-test.${{ matrix.rpm_arch }}.rpm</summary>"
+            echo ""
+            echo '```'
+            rpm -qip "suve-cli-test.${{ matrix.rpm_arch }}.rpm"
+            echo '```'
+            echo "</details>"
+            echo ""
+            echo "<details><summary>suve-test.${{ matrix.rpm_arch }}.rpm</summary>"
+            echo ""
+            echo '```'
+            rpm -qip "suve-test.${{ matrix.rpm_arch }}.rpm"
+            echo '```'
+            echo "</details>"
+          } >> $GITHUB_STEP_SUMMARY
+
+      - name: Lint Linux packages
+        run: |
+          echo "=== lintian check (.deb) ==="
+          # Suppress tags expected for Go binaries and nfpm quirks:
           # - no-changelog: No Debian-style changelog maintained
           # - no-manual-page: CLI has --help instead
           # - unknown-field: nfpm uses License field
           # - hardening-*: Go binaries don't support PIE/RELRO
           # - unstripped-binary-or-object: Go needs debug info for stack traces
           # - undeclared-elf-prerequisites: libc is provided by base system
+          # - extended-description-contains-empty-paragraph: nfpm uses "." for paragraph breaks
           lintian --tag-display-limit 0 \
-            --suppress-tags no-changelog,no-manual-page,unknown-field,hardening-no-pie,hardening-no-relro,unstripped-binary-or-object,undeclared-elf-prerequisites \
-            suve_test_amd64.deb
+            --suppress-tags no-changelog,no-manual-page,unknown-field,hardening-no-pie,hardening-no-relro,unstripped-binary-or-object,undeclared-elf-prerequisites,extended-description-contains-empty-paragraph \
+            "suve-cli_test_${{ matrix.deb_arch }}.deb" "suve_test_${{ matrix.deb_arch }}.deb"
 
-      - name: Generate and lint .rpm package
-        run: |
-          export VERSION="0.0.0-test"
-          export GOARCH="amd64"
-          nfpm pkg --packager rpm --target suve-test.x86_64.rpm
-          echo "=== rpm package info ==="
-          rpm -qip suve-test.x86_64.rpm
-          echo "=== rpmlint check ==="
+          echo "=== rpmlint check (.rpm) ==="
           # rpmlint returns non-zero on warnings; allow warnings for:
           # - no-signature: Test packages aren't GPG signed
           # - no-manual-page-for-binary: CLI has --help instead
           # - no-documentation/no-changelogname-tag: Minimal package
           # - invalid-license: MIT is valid but rpmlint wants SPDX format
-          rpmlint suve-test.x86_64.rpm || true
+          rpmlint "suve-cli-test.${{ matrix.rpm_arch }}.rpm" "suve-test.${{ matrix.rpm_arch }}.rpm" || true
+
+      - name: Test .deb installation
+        run: |
+          echo "=== Installing suve-cli .deb package ==="
+          sudo dpkg -i "suve-cli_test_${{ matrix.deb_arch }}.deb"
+          command -v suve
+          suve --version
+          suve --help
+
+          echo "=== Removing suve-cli and installing suve (GUI) ==="
+          sudo dpkg -r suve-cli
+          sudo dpkg -i "suve_test_${{ matrix.deb_arch }}.deb"
+          command -v suve
+          suve --version
+          suve --help
+
+          echo "=== Cleanup ==="
+          sudo dpkg -r suve
+
+      - name: Test .rpm installation (Fedora container)
+        run: |
+          # Use Fedora container to test rpm installation
+          docker run --rm -v "$PWD:/work" -w /work fedora:latest bash -c '
+            set -e
+            echo "=== Installing suve-cli .rpm package ==="
+            dnf install -y "./suve-cli-test.${{ matrix.rpm_arch }}.rpm"
+            command -v suve
+            suve --version
+            suve --help
+
+            echo "=== Removing suve-cli and installing suve (GUI) ==="
+            dnf remove -y suve-cli
+            dnf install -y "./suve-test.${{ matrix.rpm_arch }}.rpm"
+            command -v suve
+            suve --version
+            suve --help
+          '
 
   gui-test-windows:
     name: GUI Test (Playwright) (Windows)

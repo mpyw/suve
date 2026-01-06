@@ -68,7 +68,7 @@ jobs:
           retention-days: 1
 
   # ===========================================================================
-  # Linux amd64: CGO required for GUI
+  # Linux GUI (amd64): CGO required for webkit2gtk
   # Ubuntu 22.04 needed for libwebkit2gtk-4.0-dev (not available in 24.04)
   # ===========================================================================
   build-linux-amd64:
@@ -112,7 +112,7 @@ jobs:
           retention-days: 1
 
   # ===========================================================================
-  # Linux arm64: CGO required for GUI, native ARM64 runner
+  # Linux GUI (arm64): CGO required for webkit2gtk, native ARM64 runner
   # ===========================================================================
   build-linux-arm64:
     runs-on: ubuntu-22.04-arm
@@ -151,6 +151,38 @@ jobs:
         uses: actions/upload-artifact@v6
         with:
           name: dist-linux-arm64
+          path: dist/
+          retention-days: 1
+
+  # ===========================================================================
+  # Linux CLI-only: No CGO, no webkit2gtk dependency, cross-compile both archs
+  # ===========================================================================
+  build-linux-cli:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
+      - name: Build suve-cli (linux-amd64, linux-arm64)
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          distribution: goreleaser
+          version: latest
+          args: build --clean --id suve-cli-linux-amd64 --id suve-cli-linux-arm64
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v6
+        with:
+          name: dist-linux-cli
           path: dist/
           retention-days: 1
 
@@ -220,7 +252,7 @@ jobs:
   # Release: Combine all artifacts and publish
   # ===========================================================================
   release:
-    needs: [build-darwin, build-linux-amd64, build-linux-arm64, build-windows]
+    needs: [build-darwin, build-linux-amd64, build-linux-arm64, build-linux-cli, build-windows]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -245,6 +277,7 @@ jobs:
 
           # Directory format: suve-{id}_{goos}_{goarch}_{variant}
           # Example: suve-darwin-arm64_darwin_arm64_v8.0
+          # CLI-only: suve-cli-linux-amd64_linux_amd64
           for dir in dist/*/; do
             build_name=$(basename "$dir")
 
@@ -258,17 +291,32 @@ jobs:
               continue
             fi
 
+            # Determine if this is CLI-only build
+            if [[ "$build_name" == suve-cli-* ]]; then
+              archive_prefix="suve-cli"
+              src_binary="suve-cli"
+            else
+              archive_prefix="suve"
+              src_binary="suve"
+            fi
+
             staging="staging_${build_name}"
             mkdir -p "$staging"
 
             if [[ "$goos" == "windows" ]]; then
-              cp "$dir"*.exe "$staging/" 2>/dev/null || cp "$dir"* "$staging/"
-              archive_name="suve_${VERSION}_${goos}_${goarch}.zip"
+              # Windows: copy .exe, rename suve-cli.exe to suve.exe if needed
+              if [[ -f "$dir/${src_binary}.exe" ]]; then
+                cp "$dir/${src_binary}.exe" "$staging/suve.exe"
+              else
+                cp "$dir"*.exe "$staging/"
+              fi
+              archive_name="${archive_prefix}_${VERSION}_${goos}_${goarch}.zip"
               cp README.md LICENSE "$staging/"
               (cd "$staging" && zip -r "../releases/${archive_name}" .)
             else
-              cp "$dir"* "$staging/"
-              archive_name="suve_${VERSION}_${goos}_${goarch}.tar.gz"
+              # Linux/macOS: rename suve-cli to suve for consistent UX
+              cp "$dir/${src_binary}" "$staging/suve"
+              archive_name="${archive_prefix}_${VERSION}_${goos}_${goarch}.tar.gz"
               cp README.md LICENSE "$staging/"
               tar -czvf "releases/${archive_name}" -C "$staging" .
             fi
@@ -278,7 +326,16 @@ jobs:
 
           ls -la releases/
 
+      - name: Detect GUI dependencies from Wails
+        id: gui-deps
+        uses: ./.github/actions/detect-gui-deps
+
       - name: Create Linux packages (.deb, .rpm)
+        env:
+          GTK_DEB: ${{ steps.gui-deps.outputs.gtk-deb }}
+          GTK_RPM: ${{ steps.gui-deps.outputs.gtk-rpm }}
+          WEBKIT_DEB: ${{ steps.gui-deps.outputs.webkit-deb }}
+          WEBKIT_RPM: ${{ steps.gui-deps.outputs.webkit-rpm }}
         run: |
           set -euo pipefail
           VERSION="${GITHUB_REF_NAME#v}"
@@ -287,37 +344,44 @@ jobs:
           go install github.com/goreleaser/nfpm/v2/cmd/nfpm@v2.41.1
           export PATH="$(go env GOPATH)/bin:$PATH"
 
-          for arch in amd64 arm64; do
-            # Find Linux binary
-            linux_dir=$(find dist -type d -name "*linux_${arch}*" | head -n 1)
-            if [[ -z "$linux_dir" ]]; then
-              echo "Error: No Linux ${arch} build found"
-              exit 1
-            fi
+          echo "Using GTK: ${GTK_DEB} / ${GTK_RPM}"
+          echo "Using WebKit: ${WEBKIT_DEB} / ${WEBKIT_RPM}"
 
+          for arch in amd64 arm64; do
             # Map Go arch to package arch names
             case "$arch" in
               amd64) deb_arch="amd64"; rpm_arch="x86_64" ;;
               arm64) deb_arch="arm64"; rpm_arch="aarch64" ;;
             esac
 
-            # Copy binary to working directory
-            cp "${linux_dir}/suve" ./suve
-
             # Set environment variables for nfpm
             export VERSION="${VERSION}"
             export GOARCH="${arch}"
 
-            # Generate .deb (Debian naming: name_version-revision_arch.deb)
-            deb_file="releases/suve_${VERSION}-1_${deb_arch}.deb"
-            echo "Generating ${deb_file}..."
-            nfpm pkg --packager deb --target "${deb_file}"
+            # --- CLI-only package (suve-cli) ---
+            cli_dir=$(find dist -type d -name "suve-cli-linux*_linux_${arch}*" | head -n 1)
+            if [[ -z "$cli_dir" ]]; then
+              echo "Error: No Linux CLI ${arch} build found"
+              exit 1
+            fi
+            cp "${cli_dir}/suve-cli" ./suve-cli
 
-            # Generate .rpm (RPM naming: name-version-release.arch.rpm)
-            rpm_file="releases/suve-${VERSION}-1.${rpm_arch}.rpm"
-            echo "Generating ${rpm_file}..."
-            nfpm pkg --packager rpm --target "${rpm_file}"
+            echo "Generating suve-cli packages for ${arch}..."
+            nfpm pkg --config .github/templates/nfpm.yaml --packager deb --target "releases/suve-cli_${VERSION}-1_${deb_arch}.deb"
+            nfpm pkg --config .github/templates/nfpm.yaml --packager rpm --target "releases/suve-cli-${VERSION}-1.${rpm_arch}.rpm"
+            rm ./suve-cli
 
+            # --- GUI package (suve) ---
+            gui_dir=$(find dist -type d -name "suve-linux-${arch}_linux_${arch}*" | head -n 1)
+            if [[ -z "$gui_dir" ]]; then
+              echo "Error: No Linux GUI ${arch} build found"
+              exit 1
+            fi
+            cp "${gui_dir}/suve" ./suve
+
+            echo "Generating suve packages for ${arch}..."
+            nfpm pkg --config .github/templates/nfpm-gui.yaml --packager deb --target "releases/suve_${VERSION}-1_${deb_arch}.deb"
+            nfpm pkg --config .github/templates/nfpm-gui.yaml --packager rpm --target "releases/suve-${VERSION}-1.${rpm_arch}.rpm"
             rm ./suve
           done
 
@@ -388,7 +452,7 @@ jobs:
               releases/*
           fi
 
-      - name: Update Homebrew formula
+      - name: Update Homebrew formulas
         env:
           HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
         run: |
@@ -398,21 +462,26 @@ jobs:
           fi
 
           export VERSION="${GITHUB_REF_NAME#v}"
-          export SHA256_DARWIN_AMD64=$(grep "darwin_amd64.tar.gz" releases/checksums.txt | cut -d' ' -f1)
-          export SHA256_DARWIN_ARM64=$(grep "darwin_arm64.tar.gz" releases/checksums.txt | cut -d' ' -f1)
-          export SHA256_LINUX_AMD64=$(grep "linux_amd64.tar.gz" releases/checksums.txt | cut -d' ' -f1)
-          export SHA256_LINUX_ARM64=$(grep "linux_arm64.tar.gz" releases/checksums.txt | cut -d' ' -f1)
+          export SHA256_DARWIN_AMD64=$(grep "suve_.*_darwin_amd64.tar.gz" releases/checksums.txt | cut -d' ' -f1)
+          export SHA256_DARWIN_ARM64=$(grep "suve_.*_darwin_arm64.tar.gz" releases/checksums.txt | cut -d' ' -f1)
+          export SHA256_LINUX_AMD64=$(grep "suve_.*_linux_amd64.tar.gz" releases/checksums.txt | cut -d' ' -f1)
+          export SHA256_LINUX_ARM64=$(grep "suve_.*_linux_arm64.tar.gz" releases/checksums.txt | cut -d' ' -f1)
+          export SHA256_LINUX_CLI_AMD64=$(grep "suve-cli_.*_linux_amd64.tar.gz" releases/checksums.txt | cut -d' ' -f1)
+          export SHA256_LINUX_CLI_ARM64=$(grep "suve-cli_.*_linux_arm64.tar.gz" releases/checksums.txt | cut -d' ' -f1)
 
+          # Generate both formulas
           envsubst < .github/templates/homebrew-formula.rb > suve.rb
-          cat suve.rb
+          envsubst < .github/templates/homebrew-formula-cli.rb > suve-cli.rb
+          echo "=== suve.rb ===" && cat suve.rb
+          echo "=== suve-cli.rb ===" && cat suve-cli.rb
 
           git clone "https://x-access-token:${HOMEBREW_TAP_TOKEN}@github.com/mpyw/homebrew-tap.git"
           mkdir -p homebrew-tap/Formula
-          cp suve.rb homebrew-tap/Formula/
+          cp suve.rb suve-cli.rb homebrew-tap/Formula/
           cd homebrew-tap
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add Formula/suve.rb
+          git add Formula/suve.rb Formula/suve-cli.rb
           git commit -m "Update suve to ${VERSION}"
           git push
 

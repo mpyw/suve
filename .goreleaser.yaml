@@ -44,6 +44,9 @@ builds:
       - -s -w
       - -X github.com/mpyw/suve/internal/cli/commands.Version={{.Version}}
 
+  # =============================================================================
+  # Linux GUI: CGO enabled (required for webkit2gtk)
+  # =============================================================================
   - id: suve-linux-amd64
     main: ./cmd/suve
     binary: suve
@@ -70,6 +73,35 @@ builds:
       - arm64
     tags:
       - production
+    ldflags:
+      - -s -w
+      - -X github.com/mpyw/suve/internal/cli/commands.Version={{.Version}}
+
+  # =============================================================================
+  # Linux CLI-only: No CGO, no webkit2gtk dependency
+  # =============================================================================
+  - id: suve-cli-linux-amd64
+    main: ./cmd/suve
+    binary: suve-cli
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+    goarch:
+      - amd64
+    ldflags:
+      - -s -w
+      - -X github.com/mpyw/suve/internal/cli/commands.Version={{.Version}}
+
+  - id: suve-cli-linux-arm64
+    main: ./cmd/suve
+    binary: suve-cli
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+    goarch:
+      - arm64
     ldflags:
       - -s -w
       - -X github.com/mpyw/suve/internal/cli/commands.Version={{.Version}}

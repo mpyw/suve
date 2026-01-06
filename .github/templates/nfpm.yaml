@@ -1,0 +1,43 @@
+# nfpm configuration for generating .deb and .rpm packages (CLI-only)
+# https://nfpm.goreleaser.com/configuration/
+
+name: suve-cli
+arch: "${GOARCH}"
+platform: linux
+version: "${VERSION}"
+release: "1"
+maintainer: "mpyw <mpyw628@gmail.com>"
+description: |
+  Git-like CLI for AWS Parameter Store and Secrets Manager (CLI-only)
+  .
+  Provides familiar commands like show, log, diff, and a staging workflow
+  for safe, reviewable changes to your AWS secrets and parameters.
+  .
+  This package contains the CLI-only version with no GUI dependencies.
+  For GUI support, install the 'suve' package instead.
+homepage: "https://github.com/mpyw/suve"
+license: "MIT"
+
+vendor: "mpyw"
+section: "utils"
+priority: "optional"
+
+rpm:
+  group: "Applications/System"
+
+depends: []
+recommends: []
+
+conflicts:
+  - suve
+
+contents:
+  - src: ./suve-cli
+    dst: /usr/bin/suve
+    file_info:
+      mode: 0755
+
+  - src: ./LICENSE
+    dst: /usr/share/doc/suve-cli/copyright
+    file_info:
+      mode: 0644

@@ -37,8 +37,15 @@ A **Git-like CLI/GUI** for AWS Parameter Store and Secrets Manager. Familiar com
 ### Using [Homebrew](https://brew.sh/) (macOS/Linux)
 
 ```bash
+# Full version (CLI + GUI)
 brew install mpyw/tap/suve
+
+# CLI-only version (no GUI dependencies, recommended for Linux)
+brew install mpyw/tap/suve-cli
 ```
+
+> [!NOTE]
+> On Linux, `suve` requires GTK3 and WebKit2GTK for GUI support. Use `suve-cli` if you only need CLI functionality.
 
 ### Using [Scoop](https://scoop.sh/) (Windows)
 
@@ -52,40 +59,32 @@ scoop install suve
 Download the `.deb` package from [GitHub Releases](https://github.com/mpyw/suve/releases):
 
 ```bash
-# Download (replace VERSION and ARCH as needed)
-curl -LO https://github.com/mpyw/suve/releases/download/vVERSION/suve_VERSION-1_ARCH.deb
+# CLI-only (recommended, no GUI dependencies)
+curl -LO https://github.com/mpyw/suve/releases/download/vVERSION/suve-cli_VERSION-1_ARCH.deb
+sudo dpkg -i suve-cli_VERSION-1_ARCH.deb
 
-# Install
+# Full version (CLI + GUI, requires GTK3 and WebKit2GTK)
+curl -LO https://github.com/mpyw/suve/releases/download/vVERSION/suve_VERSION-1_ARCH.deb
 sudo dpkg -i suve_VERSION-1_ARCH.deb
 ```
 
 Available architectures: `amd64`, `arm64`
-
-> [!NOTE]
-> The CLI works standalone. For GUI support (`--gui`), install the recommended dependencies:
-> ```bash
-> sudo apt install libgtk-3-0 libayatana-appindicator3-1
-> ```
 
 ### Red Hat/Fedora (.rpm)
 
 Download the `.rpm` package from [GitHub Releases](https://github.com/mpyw/suve/releases):
 
 ```bash
-# Download (replace VERSION and ARCH as needed)
-curl -LO https://github.com/mpyw/suve/releases/download/vVERSION/suve-VERSION-1.ARCH.rpm
+# CLI-only (recommended, no GUI dependencies)
+curl -LO https://github.com/mpyw/suve/releases/download/vVERSION/suve-cli-VERSION-1.ARCH.rpm
+sudo rpm -i suve-cli-VERSION-1.ARCH.rpm
 
-# Install
+# Full version (CLI + GUI, requires GTK3 and WebKit2GTK)
+curl -LO https://github.com/mpyw/suve/releases/download/vVERSION/suve-VERSION-1.ARCH.rpm
 sudo rpm -i suve-VERSION-1.ARCH.rpm
 ```
 
 Available architectures: `x86_64`, `aarch64`
-
-> [!NOTE]
-> The CLI works standalone. For GUI support (`--gui`), install GTK3:
-> ```bash
-> sudo dnf install gtk3
-> ```
 
 ### Using [`go install`](https://pkg.go.dev/cmd/go#hdr-Compile_and_install_packages_and_dependencies)
 
