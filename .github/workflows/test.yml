@@ -292,26 +292,27 @@ jobs:
       - name: Lint Linux packages
         run: |
           echo "=== lintian check (.deb) ==="
-          # Suppress tags expected for Go binaries:
+          # Only lint amd64 packages (arm64 packages contain amd64 test binary)
+          # Suppress tags expected for Go binaries and nfpm quirks:
           # - no-changelog: No Debian-style changelog maintained
           # - no-manual-page: CLI has --help instead
           # - unknown-field: nfpm uses License field
           # - hardening-*: Go binaries don't support PIE/RELRO
           # - unstripped-binary-or-object: Go needs debug info for stack traces
           # - undeclared-elf-prerequisites: libc is provided by base system
+          # - extended-description-contains-empty-paragraph: nfpm uses "." for paragraph breaks
           lintian --tag-display-limit 0 \
-            --suppress-tags no-changelog,no-manual-page,unknown-field,hardening-no-pie,hardening-no-relro,unstripped-binary-or-object,undeclared-elf-prerequisites \
-            suve-cli_test_amd64.deb suve_test_amd64.deb \
-            suve-cli_test_arm64.deb suve_test_arm64.deb
+            --suppress-tags no-changelog,no-manual-page,unknown-field,hardening-no-pie,hardening-no-relro,unstripped-binary-or-object,undeclared-elf-prerequisites,extended-description-contains-empty-paragraph \
+            suve-cli_test_amd64.deb suve_test_amd64.deb
 
           echo "=== rpmlint check (.rpm) ==="
+          # Only lint x86_64 packages (aarch64 packages contain amd64 test binary)
           # rpmlint returns non-zero on warnings; allow warnings for:
           # - no-signature: Test packages aren't GPG signed
           # - no-manual-page-for-binary: CLI has --help instead
           # - no-documentation/no-changelogname-tag: Minimal package
           # - invalid-license: MIT is valid but rpmlint wants SPDX format
-          rpmlint suve-cli-test.x86_64.rpm suve-test.x86_64.rpm \
-            suve-cli-test.aarch64.rpm suve-test.aarch64.rpm || true
+          rpmlint suve-cli-test.x86_64.rpm suve-test.x86_64.rpm || true
 
   gui-test-windows:
     name: GUI Test (Playwright) (Windows)
