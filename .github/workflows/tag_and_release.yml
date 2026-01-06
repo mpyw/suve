@@ -1,0 +1,22 @@
+name: Tag and Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release (e.g., v1.2.3)"
+        required: true
+        type: string
+
+jobs:
+  tag:
+    uses: ./.github/workflows/tag.yml
+    with:
+      version: ${{ inputs.version }}
+
+  release:
+    needs: [tag]
+    uses: ./.github/workflows/release.yml
+    with:
+      version: ${{ inputs.version }}
+    secrets: inherit
