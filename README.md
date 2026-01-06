@@ -40,6 +40,13 @@ A **Git-like CLI/GUI** for AWS Parameter Store and Secrets Manager. Familiar com
 brew install mpyw/tap/suve
 ```
 
+### Using [Scoop](https://scoop.sh/) (Windows)
+
+```powershell
+scoop bucket add mpyw https://github.com/mpyw/scoop-bucket.git
+scoop install suve
+```
+
 ### Using [`go install`](https://pkg.go.dev/cmd/go#hdr-Compile_and_install_packages_and_dependencies)
 
 ```bash

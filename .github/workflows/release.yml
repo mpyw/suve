@@ -355,3 +355,61 @@ jobs:
           git add Formula/suve.rb
           git commit -m "Update suve to ${VERSION}"
           git push
+
+      - name: Update Scoop manifest
+        env:
+          SCOOP_BUCKET_TOKEN: ${{ secrets.SCOOP_BUCKET_TOKEN }}
+        run: |
+          if [[ -z "$SCOOP_BUCKET_TOKEN" ]]; then
+            echo "SCOOP_BUCKET_TOKEN not set, skipping Scoop update"
+            exit 0
+          fi
+
+          VERSION="${GITHUB_REF_NAME#v}"
+
+          # Get SHA256 checksums for Windows builds
+          SHA256_WINDOWS_AMD64=$(grep "windows_amd64.zip" releases/checksums.txt | cut -d' ' -f1)
+          SHA256_WINDOWS_ARM64=$(grep "windows_arm64.zip" releases/checksums.txt | cut -d' ' -f1)
+
+          # Validate checksums were found
+          if [[ -z "$SHA256_WINDOWS_AMD64" || -z "$SHA256_WINDOWS_ARM64" ]]; then
+            echo "Error: Could not find SHA256 checksums for Windows builds"
+            echo "Contents of releases/checksums.txt:"
+            cat releases/checksums.txt
+            exit 1
+          fi
+
+          # Generate Scoop manifest
+          cat > suve.json <<EOF
+          {
+            "version": "${VERSION}",
+            "description": "Git-like CLI for AWS Parameter Store and Secrets Manager",
+            "homepage": "https://github.com/mpyw/suve",
+            "license": "MIT",
+            "architecture": {
+              "64bit": {
+                "url": "https://github.com/mpyw/suve/releases/download/v${VERSION}/suve_${VERSION}_windows_amd64.zip",
+                "hash": "${SHA256_WINDOWS_AMD64}"
+              },
+              "arm64": {
+                "url": "https://github.com/mpyw/suve/releases/download/v${VERSION}/suve_${VERSION}_windows_arm64.zip",
+                "hash": "${SHA256_WINDOWS_ARM64}"
+              }
+            },
+            "bin": "suve.exe"
+          }
+          EOF
+
+          # Remove leading spaces from heredoc
+          sed -i 's/^          //' suve.json
+          cat suve.json
+
+          # Push to scoop-bucket
+          git clone "https://x-access-token:${SCOOP_BUCKET_TOKEN}@github.com/mpyw/scoop-bucket.git"
+          cp suve.json scoop-bucket/
+          cd scoop-bucket
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add suve.json
+          git commit -m "Update suve to ${VERSION}"
+          git push
