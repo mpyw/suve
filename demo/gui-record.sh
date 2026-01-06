@@ -128,11 +128,12 @@ if [[ -n "$VIDEO_FILE" ]]; then
         echo ""
         echo "Converting to GIF..."
         # High quality GIF conversion:
+        # - ss 1.5: skip first 1.5 seconds to remove white screen
         # - fps=15: smoother animation
         # - scale=1280: match video resolution
         # - lanczos: high quality scaling
         # - palettegen with max_colors=256 and stats_mode=diff for better color accuracy
-        ffmpeg -y -i "$SCRIPT_DIR/gui-demo.webm" \
+        ffmpeg -y -ss 1.5 -i "$SCRIPT_DIR/gui-demo.webm" \
             -vf "fps=15,scale=1280:-1:flags=lanczos,split[s0][s1];[s0]palettegen=max_colors=256:stats_mode=diff[p];[s1][p]paletteuse=dither=floyd_steinberg" \
             "$SCRIPT_DIR/gui-demo.gif" 2>/dev/null
         echo "GIF saved to: demo/gui-demo.gif"

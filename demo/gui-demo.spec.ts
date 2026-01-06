@@ -47,7 +47,8 @@ test.describe('GUI Demo Recording', () => {
     await expect(page.locator('.item-list')).toBeVisible();
     // Wait for any initial animations/loading to complete
     await page.waitForLoadState('networkidle');
-    await pause(PAUSE_MEDIUM);
+    // Extra wait to ensure the UI is stable before recording starts
+    await pause(PAUSE_LONG);
 
     // =========================================================================
     // 1. List existing parameters
