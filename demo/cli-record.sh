@@ -8,7 +8,7 @@
 
 set -e
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 
 cd "$PROJECT_DIR"
@@ -43,23 +43,12 @@ echo "Clearing staging..."
 # - /demo/legacy/endpoint -> will be deleted
 # - /demo/config          -> untouched
 echo "Creating demo parameters..."
-aws ssm put-parameter --endpoint-url="$AWS_ENDPOINT_URL" \
-    --name "/demo/api/url" \
-    --value "https://api-v1.example.com" \
-    --type String --overwrite >/dev/null
-aws ssm add-tags-to-resource --endpoint-url="$AWS_ENDPOINT_URL" \
-    --resource-type "Parameter" --resource-id "/demo/api/url" \
-    --tags "Key=Version,Value=v1" >/dev/null
+./bin/suve param create /demo/api/url "https://api-v1.example.com"
+./bin/suve param tag /demo/api/url Version=v1
 
-aws ssm put-parameter --endpoint-url="$AWS_ENDPOINT_URL" \
-    --name "/demo/legacy/endpoint" \
-    --value "https://old.example.com" \
-    --type String --overwrite >/dev/null
+./bin/suve param create /demo/legacy/endpoint "https://old.example.com"
 
-aws ssm put-parameter --endpoint-url="$AWS_ENDPOINT_URL" \
-    --name "/demo/config" \
-    --value '{"timeout":30}' \
-    --type String --overwrite >/dev/null
+./bin/suve param create /demo/config '{"timeout":30}'
 
 echo "Demo data ready:"
 ./bin/suve param ls -R /demo

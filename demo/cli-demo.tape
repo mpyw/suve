@@ -116,10 +116,7 @@ Type "# Apply all staged changes"
 Enter
 Sleep 500ms
 
-Type "suve stage apply"
-Enter
-Sleep 1s
-Type "y"
+Type "suve stage apply --yes"
 Enter
 Sleep 2.5s
 Enter
