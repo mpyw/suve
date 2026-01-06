@@ -1,3 +1,10 @@
+# Linux GUI test environment for Wails apps
+# Requires X11 forwarding from macOS host via XQuartz
+#
+# Prerequisites (macOS):
+#   1. brew install --cask xquartz
+#   2. XQuartz preferences -> Security -> "Allow connections from network clients"
+#   3. Restart XQuartz after changing the setting
 FROM ubuntu:24.04
 
 ENV DEBIAN_FRONTEND=noninteractive

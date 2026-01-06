@@ -1,5 +1,11 @@
 #!/bin/bash
 # Script to start Linux GUI container with X11 forwarding on macOS
+#
+# Prerequisites:
+#   1. Install XQuartz: brew install --cask xquartz
+#   2. Open XQuartz preferences (Cmd+,) -> Security tab
+#   3. Check "Allow connections from network clients"
+#   4. Restart XQuartz after changing the setting
 
 set -e
 
@@ -9,10 +15,13 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
+# XQuartz paths
+XHOST="/opt/X11/bin/xhost"
+
 echo -e "${GREEN}=== Linux GUI Test Environment ===${NC}"
 
 # Check XQuartz
-if ! command -v xquartz &> /dev/null && [ ! -d "/Applications/Utilities/XQuartz.app" ]; then
+if [ ! -d "/Applications/Utilities/XQuartz.app" ]; then
     echo -e "${RED}Error: XQuartz is not installed${NC}"
     echo "Install with: brew install --cask xquartz"
     exit 1
@@ -25,24 +34,17 @@ if ! pgrep -x "XQuartz" > /dev/null && ! pgrep -x "X11.bin" > /dev/null; then
     sleep 3
 fi
 
-# Allow connections from localhost
-echo -e "${YELLOW}Allowing X11 connections from localhost...${NC}"
-xhost +localhost 2>/dev/null || xhost + 2>/dev/null || true
-
-# Get host IP for Docker
-HOST_IP=$(ifconfig en0 | grep 'inet ' | awk '{print $2}')
-if [ -z "$HOST_IP" ]; then
-    HOST_IP="host.docker.internal"
+# Set DISPLAY if not set
+if [ -z "$DISPLAY" ]; then
+    export DISPLAY=:0
 fi
 
-echo -e "${GREEN}Host IP: $HOST_IP${NC}"
-echo -e "${GREEN}DISPLAY will be set to: $HOST_IP:0${NC}"
+# Allow connections from localhost
+echo -e "${YELLOW}Allowing X11 connections (DISPLAY=$DISPLAY)...${NC}"
+"$XHOST" +localhost 2>/dev/null || "$XHOST" + 2>/dev/null || true
 
-# Export for docker compose
-export HOST_DISPLAY="$HOST_IP:0"
+# Export HOST_DISPLAY for docker compose
+export HOST_DISPLAY="host.docker.internal:0"
 
-echo ""
-echo -e "${GREEN}Environment ready! You can now run:${NC}"
-echo "  make linux-gui        # Start interactive shell"
-echo "  make linux-gui-build  # Build GUI in Linux"
-echo "  make linux-gui-test   # Run GUI tests"
+echo -e "${GREEN}HOST_DISPLAY=$HOST_DISPLAY${NC}"
+echo -e "${GREEN}X11 forwarding ready!${NC}"
