@@ -451,6 +451,11 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           TAG="${{ github.ref_name }}"
+          export VERSION="${TAG#v}"
+          export BASE_URL="https://github.com/${{ github.repository }}/releases/download/${TAG}"
+
+          # Generate download table from template
+          DOWNLOAD_TABLE=$(envsubst < .github/templates/release-notes-downloads.md)
 
           # Check if release already exists
           if gh release view "$TAG" &>/dev/null; then
@@ -466,10 +471,20 @@ jobs:
 
             # Merge: keep existing What's Changed, append new notes if different
             if [[ -n "$EXISTING_BODY" ]]; then
-              # Use existing body (preserves manually added What's Changed)
-              FINAL_BODY="$EXISTING_BODY"
+              # Check if download table already exists
+              if echo "$EXISTING_BODY" | grep -q "## Downloads"; then
+                # Replace existing download table (everything from ## Downloads to end or next major section)
+                FINAL_BODY=$(echo "$EXISTING_BODY" | sed '/## Downloads/,$d')
+                FINAL_BODY="${FINAL_BODY}${DOWNLOAD_TABLE}"
+              else
+                FINAL_BODY="${EXISTING_BODY}
+
+          ${DOWNLOAD_TABLE}"
+              fi
             else
-              FINAL_BODY="$NEW_NOTES"
+              FINAL_BODY="${NEW_NOTES}
+
+          ${DOWNLOAD_TABLE}"
             fi
 
             # Update release with new body and upload assets
@@ -477,9 +492,19 @@ jobs:
             gh release upload "$TAG" releases/* --clobber
           else
             echo "Creating new release $TAG..."
+
+            # Generate release notes first
+            NEW_NOTES=$(gh api repos/${{ github.repository }}/releases/generate-notes \
+              -f tag_name="$TAG" \
+              --jq .body)
+
+            FINAL_BODY="${NEW_NOTES}
+
+          ${DOWNLOAD_TABLE}"
+
             gh release create "$TAG" \
               --title "$TAG" \
-              --generate-notes \
+              --notes "$FINAL_BODY" \
               releases/*
           fi
 
