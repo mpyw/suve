@@ -1,4 +1,4 @@
-.PHONY: build test lint e2e up down clean coverage coverage-e2e coverage-all gui-dev gui-build gui-bindings linux-gui linux-gui-build linux-gui-test linux-gui-setup help
+.PHONY: build test lint e2e up down clean coverage coverage-e2e coverage-all gui-dev gui-build gui-bindings linux-gui linux-gui-build linux-gui-test linux-gui-setup linux-desktop help
 
 .DEFAULT_GOAL := help
 
@@ -92,3 +92,7 @@ linux-gui-build: linux-gui-setup ## Build GUI in Linux container
 linux-gui-test: linux-gui-setup ## Run GUI tests in Linux container
 	@echo "Running GUI tests in Linux container..."
 	HOST_DISPLAY=host.docker.internal:0 docker compose --profile linux-gui run --rm linux-gui bash -c "go test -tags=production ./internal/gui/..."
+
+linux-desktop: linux-gui-setup ## Start Linux XFCE desktop (requires XQuartz)
+	@echo "Starting Linux XFCE desktop..."
+	HOST_DISPLAY=host.docker.internal:0 docker compose --profile linux-desktop run --rm linux-desktop
