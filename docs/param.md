@@ -396,12 +396,12 @@ suve param list --output=json /app/config/
 
 ---
 
-## suve param set
+## suve param create
 
-Create or update a parameter value.
+Create a new parameter.
 
 ```
-suve param set [options] <name> <value>
+suve param create [options] <name> <value>
 ```
 
 **Arguments:**
@@ -418,18 +418,70 @@ suve param set [options] <name> <value>
 | `--type` | - | `String` | Parameter type: `String`, `StringList`, or `SecureString` |
 | `--secure` | - | `false` | Shorthand for `--type SecureString` |
 | `--description` | - | - | Parameter description |
-| `--yes` | - | `false` | Skip confirmation prompt (only applies when updating) |
 
 > [!NOTE]
 > `--secure` and `--type` cannot be used together.
 
-> [!TIP]
-> When updating an existing parameter, `suve param set` shows a diff of the changes and prompts for confirmation. Creating a new parameter does not require confirmation.
+**Examples:**
+
+```ShellSession
+user@host:~$ suve param create /app/config/log-level "debug"
+✓ Created parameter /app/config/log-level (version: 1)
+```
+
+```bash
+# Create as String (default)
+suve param create /app/config/log-level "debug"
+
+# Create as SecureString
+suve param create --secure /app/config/api-key "sk-1234567890"
+
+# Create with description
+suve param create --description "Database connection string" --secure /app/config/database-url "postgres://..."
+
+# StringList (comma-separated values)
+suve param create --type StringList /app/config/allowed-hosts "host1,host2,host3"
+```
+
+> [!NOTE]
+> `create` fails if the parameter already exists. Use `suve param update` to update an existing parameter.
+
+> [!IMPORTANT]
+> SecureString is encrypted using the default AWS KMS key. Ensure your IAM role has the necessary KMS permissions.
+
+---
+
+## suve param update
+
+Update an existing parameter's value.
+
+```
+suve param update [options] <name> <value>
+```
+
+**Arguments:**
+
+| Argument | Description |
+|----------|-------------|
+| `name` | Parameter name |
+| `value` | New parameter value |
+
+**Options:**
+
+| Option | Alias | Default | Description |
+|--------|-------|---------|-------------|
+| `--type` | - | `String` | Parameter type: `String`, `StringList`, or `SecureString` |
+| `--secure` | - | `false` | Shorthand for `--type SecureString` |
+| `--description` | - | - | Parameter description |
+| `--yes` | - | `false` | Skip confirmation prompt |
+
+> [!NOTE]
+> `--secure` and `--type` cannot be used together.
 
 **Examples:**
 
 ```ShellSession
-user@host:~$ suve param set --secure /app/config/database-url "postgres://new-db.example.com:5432/myapp"
+user@host:~$ suve param update --secure /app/config/database-url "postgres://new-db.example.com:5432/myapp"
 --- /app/config/database-url (AWS)
 +++ /app/config/database-url (new)
 @@ -1 +1 @@
@@ -437,28 +489,22 @@ user@host:~$ suve param set --secure /app/config/database-url "postgres://new-db
 +postgres://new-db.example.com:5432/myapp
 
 ? Update parameter /app/config/database-url? [y/N] y
-✓ Set parameter /app/config/database-url (version: 2)
+✓ Updated parameter /app/config/database-url (version: 2)
 ```
 
 ```bash
-# Create/update as String (default)
-suve param set /app/config/log-level "debug"
+# Update parameter
+suve param update /app/config/log-level "info"
 
-# Create as SecureString
-suve param set --secure /app/config/api-key "sk-1234567890"
-
-# Create with description
-suve param set --description "Database connection string" --secure /app/config/database-url "postgres://..."
-
-# StringList (comma-separated values)
-suve param set --type StringList /app/config/allowed-hosts "host1,host2,host3"
-
-# Skip confirmation
-suve param set --yes /app/config/log-level "debug"
+# Update without confirmation
+suve param update --yes /app/config/log-level "debug"
 ```
 
-> [!IMPORTANT]
-> SecureString is encrypted using the default AWS KMS key. Ensure your IAM role has the necessary KMS permissions.
+> [!TIP]
+> When updating a parameter, `suve param update` shows a diff of the changes and prompts for confirmation. Use `--yes` to skip this review step.
+
+> [!NOTE]
+> `update` fails if the parameter doesn't exist. Use `suve param create` to create a new parameter.
 
 ---
 
@@ -824,18 +870,19 @@ suve stage param apply [options] [name]
 **Behavior:**
 
 1. Reads all staged SSM Parameter Store changes
-2. For each `set` operation: calls PutParameter
-3. For each `delete` operation: calls DeleteParameter
-4. Removes successfully applied changes from stage
-5. Keeps failed changes in stage for retry
+2. For each `create` operation: calls PutParameter (with Overwrite=false)
+3. For each `update` operation: calls PutParameter (with Overwrite=true)
+4. For each `delete` operation: calls DeleteParameter
+5. Removes successfully applied changes from stage
+6. Keeps failed changes in stage for retry
 
 **Examples:**
 
 ```ShellSession
 user@host:~$ suve stage param apply
 Applying SSM Parameter Store parameters...
-Set /app/config/new-param (version: 1)
-Set /app/config/database-url (version: 4)
+Created /app/config/new-param (version: 1)
+Updated /app/config/database-url (version: 4)
 Deleted /app/config/old-param
 ```
 

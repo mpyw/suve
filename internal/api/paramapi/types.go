@@ -55,7 +55,8 @@ const (
 
 // Re-exported SSM error types.
 type (
-	ParameterNotFound = types.ParameterNotFound
+	ParameterNotFound      = types.ParameterNotFound
+	ParameterAlreadyExists = types.ParameterAlreadyExists
 )
 
 // Re-exported SSM functions.

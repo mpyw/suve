@@ -42,11 +42,9 @@ func Command() *cli.Command {
 				Action: func(_ context.Context, _ *cli.Command) error {
 					return fmt.Errorf(`'suve secret set' is not available
 
-Secrets Manager distinguishes between creating and updating secrets:
+Use create or update instead:
   suve secret create <name> <value>   Create a new secret
-  suve secret update <name> <value>   Update an existing secret
-
-Unlike SSM Parameter Store, these operations use different AWS APIs`)
+  suve secret update <name> <value>   Update an existing secret`)
 				},
 			},
 		},

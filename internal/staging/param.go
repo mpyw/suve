@@ -57,8 +57,10 @@ func (s *ParamStrategy) HasDeleteOptions() bool {
 // Apply applies a staged operation to AWS SSM Parameter Store.
 func (s *ParamStrategy) Apply(ctx context.Context, name string, entry Entry) error {
 	switch entry.Operation {
-	case OperationCreate, OperationUpdate:
-		return s.applySet(ctx, name, entry)
+	case OperationCreate:
+		return s.applyCreate(ctx, name, entry)
+	case OperationUpdate:
+		return s.applyUpdate(ctx, name, entry)
 	case OperationDelete:
 		return s.applyDelete(ctx, name)
 	default:
@@ -66,37 +68,65 @@ func (s *ParamStrategy) Apply(ctx context.Context, name string, entry Entry) err
 	}
 }
 
-func (s *ParamStrategy) applySet(ctx context.Context, name string, entry Entry) error {
-	// If Value is set, update the parameter value
-	if entry.Value != nil {
-		// Try to get existing parameter to preserve type
-		paramType := paramapi.ParameterTypeString
-		existing, err := s.Client.GetParameter(ctx, &paramapi.GetParameterInput{
-			Name: lo.ToPtr(name),
-		})
-		if err != nil {
-			var pnf *paramapi.ParameterNotFound
-			if !errors.As(err, &pnf) {
-				return fmt.Errorf("failed to get existing parameter: %w", err)
-			}
-		} else if existing.Parameter != nil {
-			paramType = existing.Parameter.Type
-		}
+func (s *ParamStrategy) applyCreate(ctx context.Context, name string, entry Entry) error {
+	if entry.Value == nil {
+		return nil
+	}
 
-		input := &paramapi.PutParameterInput{
-			Name:      lo.ToPtr(name),
-			Value:     entry.Value,
-			Type:      paramType,
-			Overwrite: lo.ToPtr(true),
-		}
-		if entry.Description != nil {
-			input.Description = entry.Description
-		}
+	input := &paramapi.PutParameterInput{
+		Name:      lo.ToPtr(name),
+		Value:     entry.Value,
+		Type:      paramapi.ParameterTypeString,
+		Overwrite: lo.ToPtr(false), // Do not overwrite existing parameters
+	}
+	if entry.Description != nil {
+		input.Description = entry.Description
+	}
 
-		_, err = s.Client.PutParameter(ctx, input)
-		if err != nil {
-			return fmt.Errorf("failed to set parameter: %w", err)
+	_, err := s.Client.PutParameter(ctx, input)
+	if err != nil {
+		return fmt.Errorf("failed to create parameter: %w", err)
+	}
+
+	return nil
+}
+
+func (s *ParamStrategy) applyUpdate(ctx context.Context, name string, entry Entry) error {
+	if entry.Value == nil {
+		return nil
+	}
+
+	// Check if parameter exists
+	existing, err := s.Client.GetParameter(ctx, &paramapi.GetParameterInput{
+		Name: lo.ToPtr(name),
+	})
+	if err != nil {
+		var pnf *paramapi.ParameterNotFound
+		if errors.As(err, &pnf) {
+			return fmt.Errorf("parameter not found: %s", name)
 		}
+		return fmt.Errorf("failed to get existing parameter: %w", err)
+	}
+
+	// Preserve existing parameter type
+	paramType := paramapi.ParameterTypeString
+	if existing.Parameter != nil {
+		paramType = existing.Parameter.Type
+	}
+
+	input := &paramapi.PutParameterInput{
+		Name:      lo.ToPtr(name),
+		Value:     entry.Value,
+		Type:      paramType,
+		Overwrite: lo.ToPtr(true),
+	}
+	if entry.Description != nil {
+		input.Description = entry.Description
+	}
+
+	_, err = s.Client.PutParameter(ctx, input)
+	if err != nil {
+		return fmt.Errorf("failed to update parameter: %w", err)
 	}
 
 	return nil

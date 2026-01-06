@@ -952,10 +952,11 @@ suve stage secret apply [options] [name]
 **Behavior:**
 
 1. Reads all staged Secrets Manager changes
-2. For each `set` operation: calls UpdateSecret (or CreateSecret if new)
-3. For each `delete` operation: calls DeleteSecret
-4. Removes successfully applied changes from stage
-5. Keeps failed changes in stage for retry
+2. For each `create` operation: calls CreateSecret
+3. For each `update` operation: calls PutSecretValue
+4. For each `delete` operation: calls DeleteSecret
+5. Removes successfully applied changes from stage
+6. Keeps failed changes in stage for retry
 
 **Examples:**
 

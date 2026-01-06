@@ -10,34 +10,33 @@ import (
 	"github.com/mpyw/suve/internal/api/paramapi"
 )
 
-// SetClient is the interface for the set use case.
-type SetClient interface {
+// UpdateClient is the interface for the update use case.
+type UpdateClient interface {
 	paramapi.GetParameterAPI
 	paramapi.PutParameterAPI
 }
 
-// SetInput holds input for the set use case.
-type SetInput struct {
+// UpdateInput holds input for the update use case.
+type UpdateInput struct {
 	Name        string
 	Value       string
 	Type        paramapi.ParameterType
 	Description string
 }
 
-// SetOutput holds the result of the set use case.
-type SetOutput struct {
-	Name      string
-	Version   int64
-	IsCreated bool // true if created, false if updated
+// UpdateOutput holds the result of the update use case.
+type UpdateOutput struct {
+	Name    string
+	Version int64
 }
 
-// SetUseCase executes set operations.
-type SetUseCase struct {
-	Client SetClient
+// UpdateUseCase executes update operations.
+type UpdateUseCase struct {
+	Client UpdateClient
 }
 
 // Exists checks if a parameter exists.
-func (u *SetUseCase) Exists(ctx context.Context, name string) (bool, error) {
+func (u *UpdateUseCase) Exists(ctx context.Context, name string) (bool, error) {
 	_, err := u.Client.GetParameter(ctx, &paramapi.GetParameterInput{
 		Name: lo.ToPtr(name),
 	})
@@ -51,15 +50,19 @@ func (u *SetUseCase) Exists(ctx context.Context, name string) (bool, error) {
 	return true, nil
 }
 
-// Execute runs the set use case.
-func (u *SetUseCase) Execute(ctx context.Context, input SetInput) (*SetOutput, error) {
-	// Check if parameter exists (for determining create vs update)
+// Execute runs the update use case.
+// It updates an existing parameter. If the parameter doesn't exist, returns an error.
+func (u *UpdateUseCase) Execute(ctx context.Context, input UpdateInput) (*UpdateOutput, error) {
+	// Check if parameter exists
 	exists, err := u.Exists(ctx, input.Name)
 	if err != nil {
 		return nil, err
 	}
+	if !exists {
+		return nil, fmt.Errorf("parameter not found: %s", input.Name)
+	}
 
-	// Put parameter
+	// Update parameter
 	putInput := &paramapi.PutParameterInput{
 		Name:      lo.ToPtr(input.Name),
 		Value:     lo.ToPtr(input.Value),
@@ -72,12 +75,11 @@ func (u *SetUseCase) Execute(ctx context.Context, input SetInput) (*SetOutput, e
 
 	putOutput, err := u.Client.PutParameter(ctx, putInput)
 	if err != nil {
-		return nil, fmt.Errorf("failed to put parameter: %w", err)
+		return nil, fmt.Errorf("failed to update parameter: %w", err)
 	}
 
-	return &SetOutput{
-		Name:      input.Name,
-		Version:   putOutput.Version,
-		IsCreated: !exists,
+	return &UpdateOutput{
+		Name:    input.Name,
+		Version: putOutput.Version,
 	}, nil
 }

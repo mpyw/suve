@@ -21,7 +21,7 @@ A **Git-like CLI/GUI** for AWS Parameter Store and Secrets Manager. Familiar com
 
 ## Features
 
-- **Git-like commands**: `show`, `log`, `diff`, `ls`, `set`, `rm`
+- **Git-like commands**: `show`, `log`, `diff`, `ls`, `create`, `update`, `rm`
 - **Staging workflow**: `edit` → `status` → `diff` → `apply` (review changes before applying)
 - **Version navigation**: `#VERSION`, `~SHIFT`, `:LABEL` syntax
 - **Colored diff output**: Easy-to-read unified diff format
@@ -323,7 +323,8 @@ where ~SHIFT = ~ | ~N  (repeatable, cumulative)
 | [`suve param log`](docs/param.md#log) | `--number=<N>` (`-n`)<br>`--patch` (`-p`)<br>`--parse-json` (`-j`)<br>`--oneline`<br>`--reverse`<br>`--since=<DATE>`<br>`--until=<DATE>`<br>`--no-pager`<br>`--output=<FORMAT>` | Show version history |
 | [`suve param diff`](docs/param.md#diff) | `--parse-json` (`-j`)<br>`--no-pager`<br>`--output=<FORMAT>` | Compare versions |
 | [`suve param list`](docs/param.md#list) | `--recursive` (`-R`)<br>`--filter=<REGEX>`<br>`--show`<br>`--output=<FORMAT>` | List parameters |
-| [`suve param set`](docs/param.md#set) | `--type=<TYPE>`<br>`--secure`<br>`--description=<TEXT>`<br>`--yes` | Create or update parameter |
+| [`suve param create`](docs/param.md#create) | `--type=<TYPE>`<br>`--secure`<br>`--description=<TEXT>` | Create a new parameter |
+| [`suve param update`](docs/param.md#update) | `--type=<TYPE>`<br>`--secure`<br>`--description=<TEXT>`<br>`--yes` | Update an existing parameter |
 | [`suve param delete`](docs/param.md#delete) | `--yes` | Delete parameter |
 | [`suve param tag`](docs/param.md#tag) | `<KEY>=<VALUE>...` | Add or update tags |
 | [`suve param untag`](docs/param.md#untag) | `<KEY>...` | Remove tags |

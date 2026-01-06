@@ -3,6 +3,8 @@
 package gui
 
 import (
+	"errors"
+
 	"github.com/mpyw/suve/internal/api/paramapi"
 	"github.com/mpyw/suve/internal/usecase/param"
 	"github.com/mpyw/suve/internal/version/paramversion"
@@ -218,27 +220,48 @@ func (a *App) ParamDiff(spec1Str, spec2Str string) (*ParamDiffResult, error) {
 }
 
 // ParamSet creates or updates a parameter.
+// It first tries to create the parameter; if it already exists, it updates instead.
 func (a *App) ParamSet(name, value, paramType string) (*ParamSetResult, error) {
 	client, err := a.getParamClient()
 	if err != nil {
 		return nil, err
 	}
 
-	uc := &param.SetUseCase{Client: client}
-	result, err := uc.Execute(a.ctx, param.SetInput{
+	// Try to create first
+	createUC := &param.CreateUseCase{Client: client}
+	createResult, err := createUC.Execute(a.ctx, param.CreateInput{
 		Name:  name,
 		Value: value,
 		Type:  paramapi.ParameterType(paramType),
 	})
-	if err != nil {
-		return nil, err
+	if err == nil {
+		return &ParamSetResult{
+			Name:      createResult.Name,
+			Version:   createResult.Version,
+			IsCreated: true,
+		}, nil
 	}
 
-	return &ParamSetResult{
-		Name:      result.Name,
-		Version:   result.Version,
-		IsCreated: result.IsCreated,
-	}, nil
+	// If parameter already exists, update it
+	var pae *paramapi.ParameterAlreadyExists
+	if errors.As(err, &pae) {
+		updateUC := &param.UpdateUseCase{Client: client}
+		updateResult, err := updateUC.Execute(a.ctx, param.UpdateInput{
+			Name:  name,
+			Value: value,
+			Type:  paramapi.ParameterType(paramType),
+		})
+		if err != nil {
+			return nil, err
+		}
+		return &ParamSetResult{
+			Name:      updateResult.Name,
+			Version:   updateResult.Version,
+			IsCreated: false,
+		}, nil
+	}
+
+	return nil, err
 }
 
 // ParamDelete deletes a parameter.

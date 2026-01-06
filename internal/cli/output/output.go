@@ -94,7 +94,7 @@ func Error(w io.Writer, format string, args ...any) {
 }
 
 // Success prints a success message with green checkmark.
-// Example: "✓ Set /app/config"
+// Example: "✓ Created parameter /app/config"
 func Success(w io.Writer, format string, args ...any) {
 	msg := fmt.Sprintf(format, args...)
 	_, _ = fmt.Fprintf(w, "%s %s\n", colors.Success("✓"), msg)

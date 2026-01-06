@@ -188,9 +188,9 @@ func TestError(t *testing.T) {
 func TestSuccess(t *testing.T) {
 	t.Parallel()
 	var buf bytes.Buffer
-	Success(&buf, "Set %s", "/app/config")
+	Success(&buf, "Created parameter %s", "/app/config")
 	assert.Contains(t, buf.String(), "✓")
-	assert.Contains(t, buf.String(), "Set /app/config")
+	assert.Contains(t, buf.String(), "Created parameter /app/config")
 }
 
 func TestFailed(t *testing.T) {

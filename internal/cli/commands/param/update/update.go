@@ -1,5 +1,5 @@
-// Package set provides the SSM Parameter Store set command.
-package set
+// Package update provides the SSM Parameter Store update command.
+package update
 
 import (
 	"context"
@@ -18,14 +18,14 @@ import (
 	"github.com/mpyw/suve/internal/usecase/param"
 )
 
-// Runner executes the set command.
+// Runner executes the update command.
 type Runner struct {
-	UseCase *param.SetUseCase
+	UseCase *param.UpdateUseCase
 	Stdout  io.Writer
 	Stderr  io.Writer
 }
 
-// Options holds the options for the set command.
+// Options holds the options for the update command.
 type Options struct {
 	Name        string
 	Value       string
@@ -33,13 +33,18 @@ type Options struct {
 	Description string
 }
 
-// Command returns the set command.
+// Command returns the update command.
 func Command() *cli.Command {
 	return &cli.Command{
-		Name:      "set",
-		Usage:     "Set parameter value",
+		Name:      "update",
+		Usage:     "Update a parameter value",
 		ArgsUsage: "<name> <value>",
-		Description: `Create a new parameter or update an existing one.
+		Description: `Update the value of an existing parameter.
+
+This creates a new version of the parameter in AWS Systems Manager Parameter Store.
+
+Use 'suve param create' to create a new parameter.
+To manage tags, use 'suve param tag' and 'suve param untag' commands.
 
 PARAMETER TYPES:
    String        Plain text value (default)
@@ -49,13 +54,10 @@ PARAMETER TYPES:
 The --secure flag is a shorthand for --type SecureString.
 You cannot use both --secure and --type together.
 
-To manage tags, use 'suve param tag' and 'suve param untag' commands.
-
 EXAMPLES:
-   suve param set /app/config/db-url "postgres://..."       Create String parameter
-   suve param set --secure /app/config/api-key "secret123"  Create SecureString
-   suve param set --type StringList /app/hosts "a.com,b.com" Create StringList
-   suve param set --yes /app/config/db-url "postgres://..." Update without confirmation`,
+   suve param update /app/config/db-url "postgres://..."       Update parameter
+   suve param update --secure /app/config/api-key "secret123"  Update as SecureString
+   suve param update --yes /app/config/db-url "postgres://..." Update without confirmation`,
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:  "type",
@@ -72,7 +74,7 @@ EXAMPLES:
 			},
 			&cli.BoolFlag{
 				Name:  "yes",
-				Usage: "Skip confirmation prompt (only applies when updating existing parameter)",
+				Usage: "Skip confirmation prompt",
 			},
 		},
 		Action: action,
@@ -81,7 +83,7 @@ EXAMPLES:
 
 func action(ctx context.Context, cmd *cli.Command) error {
 	if cmd.Args().Len() < 2 {
-		return fmt.Errorf("usage: suve param set <name> <value>")
+		return fmt.Errorf("usage: suve param update <name> <value>")
 	}
 
 	secure := cmd.Bool("secure")
@@ -103,18 +105,17 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		return fmt.Errorf("failed to initialize AWS client: %w", err)
 	}
 
-	useCase := &param.SetUseCase{Client: client}
+	uc := &param.UpdateUseCase{Client: client}
 	newValue := cmd.Args().Get(1)
 
-	// Check if parameter exists and get current value for diff
-	currentValue, exists := getCurrentValue(ctx, client, name)
-
-	// Only confirm for updates, not creates
-	if exists && !skipConfirm {
-		// Show diff
-		diff := output.Diff(name+" (AWS)", name+" (new)", currentValue, newValue)
-		if diff != "" {
-			_, _ = fmt.Fprintln(cmd.Root().ErrWriter, diff)
+	// Fetch current value and show diff before confirming
+	if !skipConfirm {
+		currentValue, _ := getCurrentValue(ctx, client, name)
+		if currentValue != "" {
+			diff := output.Diff(name+" (AWS)", name+" (new)", currentValue, newValue)
+			if diff != "" {
+				_, _ = fmt.Fprintln(cmd.Root().ErrWriter, diff)
+			}
 		}
 
 		// Confirm operation
@@ -138,7 +139,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	}
 
 	r := &Runner{
-		UseCase: useCase,
+		UseCase: uc,
 		Stdout:  cmd.Root().Writer,
 		Stderr:  cmd.Root().ErrWriter,
 	}
@@ -150,9 +151,9 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	})
 }
 
-// Run executes the set command.
+// Run executes the update command.
 func (r *Runner) Run(ctx context.Context, opts Options) error {
-	result, err := r.UseCase.Execute(ctx, param.SetInput{
+	result, err := r.UseCase.Execute(ctx, param.UpdateInput{
 		Name:        opts.Name,
 		Value:       opts.Value,
 		Type:        paramapi.ParameterType(opts.Type),
@@ -162,7 +163,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 		return err
 	}
 
-	_, _ = fmt.Fprintf(r.Stdout, "%s Set parameter %s (version: %d)\n",
+	_, _ = fmt.Fprintf(r.Stdout, "%s Updated parameter %s (version: %d)\n",
 		colors.Success("✓"),
 		result.Name,
 		result.Version,
@@ -172,7 +173,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 }
 
 // getCurrentValue fetches the current parameter value.
-// Returns the value and true if exists, empty string and false if not found.
+// Returns the value if exists, empty string if not found.
 func getCurrentValue(ctx context.Context, client paramapi.GetParameterAPI, name string) (string, bool) {
 	result, err := client.GetParameter(ctx, &paramapi.GetParameterInput{
 		Name:           lo.ToPtr(name),
