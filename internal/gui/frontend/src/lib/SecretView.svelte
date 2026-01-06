@@ -262,6 +262,8 @@
       } else {
         await StagingEdit('secret', editForm.name, editForm.value);
         onstagingchange?.();
+        // Refresh staging status to update the indicator
+        await selectSecret(editForm.name);
       }
       showEditModal = false;
     } catch (err) {
@@ -494,11 +496,12 @@
         </div>
 
         {#if getStagingMessage()}
-          <button class="staging-banner" onclick={onnavigatetostaging}>
+          <!-- Using div instead of button to avoid conflicts with Playwright button selectors -->
+          <div class="staging-banner" role="link" tabindex="0" onclick={onnavigatetostaging} onkeydown={(e) => e.key === 'Enter' && onnavigatetostaging?.()}>
             <span class="staging-icon">⚠</span>
             <span class="staging-text">{getStagingMessage()}</span>
             <span class="staging-link">View in Staging →</span>
-          </button>
+          </div>
         {/if}
 
         {#if detailLoading}
