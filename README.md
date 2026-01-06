@@ -414,7 +414,8 @@ suve uses standard AWS SDK configuration:
 
 **Authentication** (in order of precedence):
 1. Environment variables (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_SESSION_TOKEN`)
-2. Shared credentials file (`~/.aws/credentials`)
+2. Shared credentials file (`~/.aws/credentials`) and config (`~/.aws/config`)
+   - Use `AWS_PROFILE` to specify which profile to load (default: `default`)
 3. IAM role (EC2, ECS, Lambda)
 
 **Region**:
@@ -423,7 +424,7 @@ suve uses standard AWS SDK configuration:
 
 > [!WARNING]
 > Ensure your IAM role/user has appropriate permissions:
-> - SSM: `ssm:GetParameter`, `ssm:GetParameterHistory`, `ssm:PutParameter`, `ssm:DeleteParameter`, `ssm:DescribeParameters`, `ssm:AddTagsToResource`, `ssm:RemoveTagsFromResource`
+> - SSM: `ssm:GetParameter`, `ssm:GetParameters`, `ssm:GetParameterHistory`, `ssm:PutParameter`, `ssm:DeleteParameter`, `ssm:DescribeParameters`, `ssm:AddTagsToResource`, `ssm:RemoveTagsFromResource`
 > - SM: `secretsmanager:GetSecretValue`, `secretsmanager:ListSecretVersionIds`, `secretsmanager:ListSecrets`, `secretsmanager:CreateSecret`, `secretsmanager:PutSecretValue`, `secretsmanager:UpdateSecret`, `secretsmanager:DeleteSecret`, `secretsmanager:RestoreSecret`, `secretsmanager:TagResource`, `secretsmanager:UntagResource`
 
 ## Development
