@@ -451,46 +451,11 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           TAG="${{ github.ref_name }}"
-          VERSION="${TAG#v}"
-          BASE_URL="https://github.com/${{ github.repository }}/releases/download/${TAG}"
+          export VERSION="${TAG#v}"
+          export BASE_URL="https://github.com/${{ github.repository }}/releases/download/${TAG}"
 
-          # Generate download table
-          DOWNLOAD_TABLE=$(cat <<EOF
-          ## Downloads
-
-          ### macOS (GUI with CLI)
-
-          | Architecture | Download |
-          |--------------|----------|
-          | Apple Silicon (M1/M2/M3/M4) | [suve_${VERSION}_darwin_arm64.tar.gz](${BASE_URL}/suve_${VERSION}_darwin_arm64.tar.gz) |
-          | Intel | [suve_${VERSION}_darwin_amd64.tar.gz](${BASE_URL}/suve_${VERSION}_darwin_amd64.tar.gz) |
-
-          ### Windows (GUI with CLI)
-
-          | Architecture | Download |
-          |--------------|----------|
-          | x86_64 | [suve_${VERSION}_windows_amd64.zip](${BASE_URL}/suve_${VERSION}_windows_amd64.zip) |
-          | ARM64 | [suve_${VERSION}_windows_arm64.zip](${BASE_URL}/suve_${VERSION}_windows_arm64.zip) |
-
-          ### Linux GUI (requires libgtk-3, libwebkit2gtk-4.0)
-
-          | Architecture | Tarball | Debian/Ubuntu | RHEL/Fedora |
-          |--------------|---------|---------------|-------------|
-          | x86_64 | [suve_${VERSION}_linux_amd64.tar.gz](${BASE_URL}/suve_${VERSION}_linux_amd64.tar.gz) | [suve_${VERSION}-1_amd64.deb](${BASE_URL}/suve_${VERSION}-1_amd64.deb) | [suve-${VERSION}-1.x86_64.rpm](${BASE_URL}/suve-${VERSION}-1.x86_64.rpm) |
-          | ARM64 | [suve_${VERSION}_linux_arm64.tar.gz](${BASE_URL}/suve_${VERSION}_linux_arm64.tar.gz) | [suve_${VERSION}-1_arm64.deb](${BASE_URL}/suve_${VERSION}-1_arm64.deb) | [suve-${VERSION}-1.aarch64.rpm](${BASE_URL}/suve-${VERSION}-1.aarch64.rpm) |
-
-          ### Linux CLI-only (no dependencies)
-
-          | Architecture | Tarball | Debian/Ubuntu | RHEL/Fedora |
-          |--------------|---------|---------------|-------------|
-          | x86_64 | [suve-cli_${VERSION}_linux_amd64.tar.gz](${BASE_URL}/suve-cli_${VERSION}_linux_amd64.tar.gz) | [suve-cli_${VERSION}-1_amd64.deb](${BASE_URL}/suve-cli_${VERSION}-1_amd64.deb) | [suve-cli-${VERSION}-1.x86_64.rpm](${BASE_URL}/suve-cli-${VERSION}-1.x86_64.rpm) |
-          | ARM64 | [suve-cli_${VERSION}_linux_arm64.tar.gz](${BASE_URL}/suve-cli_${VERSION}_linux_arm64.tar.gz) | [suve-cli_${VERSION}-1_arm64.deb](${BASE_URL}/suve-cli_${VERSION}-1_arm64.deb) | [suve-cli-${VERSION}-1.aarch64.rpm](${BASE_URL}/suve-cli-${VERSION}-1.aarch64.rpm) |
-
-          ### Checksums
-
-          [checksums.txt](${BASE_URL}/checksums.txt)
-          EOF
-          )
+          # Generate download table from template
+          DOWNLOAD_TABLE=$(envsubst < .github/templates/release-notes-downloads.md)
 
           # Check if release already exists
           if gh release view "$TAG" &>/dev/null; then
