@@ -196,7 +196,7 @@ Output will look like:
 > For detailed state transition rules, see [Staging State Transitions](docs/staging-state-transitions.md).
 
 > [!CAUTION]
-> Staged values are stored in plain text at `~/.suve/stage.json`. If you no longer need pending changes, run `suve stage reset --all` to clear them.
+> Staged values are stored in plain text at `~/.suve/<ACCOUNT_ID>/<REGION>/stage.json`. If you no longer need pending changes, run `suve stage reset --all` to clear them.
 
 **1. Stage changes** (opens editor or accepts value directly):
 
