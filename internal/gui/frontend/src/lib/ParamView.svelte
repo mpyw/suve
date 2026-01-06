@@ -46,6 +46,7 @@
   let showDeleteModal = $state(false);
   let showDiffModal = $state(false);
   let setForm = $state({ name: '', value: '', type: 'String' });
+  let isEditMode = $state(false);
   let deleteTarget = $state('');
   let modalLoading = $state(false);
   let modalError = $state('');
@@ -203,8 +204,10 @@
   function openSetModal(name?: string) {
     if (name && paramDetail) {
       setForm = { name, value: paramDetail.value, type: paramDetail.type };
+      isEditMode = true;
     } else {
       setForm = { name: prefix || '', value: '', type: 'String' };
+      isEditMode = false;
     }
     modalError = '';
     showSetModal = true;
@@ -233,6 +236,10 @@
           await StagingAdd('param', setForm.name, setForm.value);
         }
         onstagingchange?.();
+        // Refresh staging status to update the indicator
+        if (isEdit) {
+          await selectParam(setForm.name);
+        }
       }
       showSetModal = false;
     } catch (err) {
@@ -444,11 +451,12 @@
         </div>
 
         {#if getStagingMessage()}
-          <button class="staging-banner" onclick={onnavigatetostaging}>
+          <!-- Using div instead of button to avoid conflicts with Playwright button selectors -->
+          <div class="staging-banner" role="link" tabindex="0" onclick={onnavigatetostaging} onkeydown={(e) => e.key === 'Enter' && onnavigatetostaging?.()}>
             <span class="staging-icon">⚠</span>
             <span class="staging-text">{getStagingMessage()}</span>
             <span class="staging-link">View in Staging →</span>
-          </button>
+          </div>
         {/if}
 
         {#if detailLoading}
@@ -575,7 +583,7 @@
 </div>
 
 <!-- Set Modal -->
-<Modal title={setForm.name ? 'Edit Parameter' : 'New Parameter'} show={showSetModal} onclose={() => showSetModal = false}>
+<Modal title={isEditMode ? 'Edit Parameter' : 'New Parameter'} show={showSetModal} onclose={() => showSetModal = false}>
   <form class="modal-form" onsubmit={handleSet}>
     {#if modalError}
       <div class="modal-error">{modalError}</div>
