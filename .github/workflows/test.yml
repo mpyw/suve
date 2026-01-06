@@ -96,10 +96,15 @@ jobs:
         with:
           go-version: '1.24'
 
-      - name: Run golangci-lint
+      - name: Run golangci-lint (default build)
         uses: golangci/golangci-lint-action@v7
         with:
           args: --timeout=5m
+
+      - name: Run golangci-lint (production build)
+        uses: golangci/golangci-lint-action@v7
+        with:
+          args: --timeout=5m --build-tags=production
 
   gui-test:
     name: GUI Test (Playwright)

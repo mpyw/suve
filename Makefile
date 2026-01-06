@@ -11,9 +11,10 @@ build:
 test:
 	go test $(shell go list ./... | grep -v internal/gui | grep -v /cmd/)
 
-# Lint
+# Lint (both default and production builds)
 lint:
 	golangci-lint run ./...
+	golangci-lint run --build-tags=production ./...
 
 # Start localstack container
 up:

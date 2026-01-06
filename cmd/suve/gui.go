@@ -3,7 +3,7 @@
 package main
 
 import (
-	"log"
+	"context"
 	"os"
 	"strings"
 
@@ -13,15 +13,9 @@ import (
 	"github.com/mpyw/suve/internal/gui"
 )
 
+// runGUIIfRequested is kept for interface compatibility with gui_stub.go.
+// GUI is now launched via Before hook in registerGUIFlag().
 func runGUIIfRequested() bool {
-	for _, arg := range os.Args[1:] {
-		if arg == "--gui" {
-			if err := gui.Run(); err != nil {
-				log.Fatal("Error: ", err.Error())
-			}
-			return true
-		}
-	}
 	return false
 }
 
@@ -30,6 +24,15 @@ func registerGUIFlag() {
 		Name:  "gui",
 		Usage: "Launch GUI mode",
 	})
+	commands.App.Before = func(ctx context.Context, cmd *cli.Command) (context.Context, error) {
+		if cmd.Bool("gui") {
+			if err := gui.Run(); err != nil {
+				return ctx, err
+			}
+			os.Exit(0)
+		}
+		return ctx, nil
+	}
 }
 
 func registerGUIDescription() {
