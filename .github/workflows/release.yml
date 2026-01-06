@@ -383,6 +383,8 @@ jobs:
           # Get SHA256 checksums
           SHA256_DARWIN_AMD64=$(grep "darwin_amd64.tar.gz" releases/checksums.txt | cut -d' ' -f1)
           SHA256_DARWIN_ARM64=$(grep "darwin_arm64.tar.gz" releases/checksums.txt | cut -d' ' -f1)
+          SHA256_LINUX_AMD64=$(grep "linux_amd64.tar.gz" releases/checksums.txt | cut -d' ' -f1)
+          SHA256_LINUX_ARM64=$(grep "linux_arm64.tar.gz" releases/checksums.txt | cut -d' ' -f1)
 
           # Generate formula
           cat > suve.rb <<EOF
@@ -400,6 +402,17 @@ jobs:
               on_intel do
                 url "https://github.com/mpyw/suve/releases/download/v${VERSION}/suve_${VERSION}_darwin_amd64.tar.gz"
                 sha256 "${SHA256_DARWIN_AMD64}"
+              end
+            end
+
+            on_linux do
+              on_arm do
+                url "https://github.com/mpyw/suve/releases/download/v${VERSION}/suve_${VERSION}_linux_arm64.tar.gz"
+                sha256 "${SHA256_LINUX_ARM64}"
+              end
+              on_intel do
+                url "https://github.com/mpyw/suve/releases/download/v${VERSION}/suve_${VERSION}_linux_amd64.tar.gz"
+                sha256 "${SHA256_LINUX_AMD64}"
               end
             end
 
