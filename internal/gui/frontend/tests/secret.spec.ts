@@ -237,6 +237,7 @@ test.describe('Secret CRUD Operations', () => {
     test('should add tag in staged mode', async ({ page }) => {
       await clickItemByName(page, 'my-secret');
       await page.getByRole('button', { name: '+ Add' }).click();
+      await page.locator('#tag-key').waitFor();
       await page.locator('#tag-key').fill('new-tag');
       await page.locator('#tag-value').fill('tag-value');
       await page.getByRole('button', { name: 'Stage Tag' }).click();
@@ -246,6 +247,7 @@ test.describe('Secret CRUD Operations', () => {
     test('should add tag immediately when immediate mode checked', async ({ page }) => {
       await clickItemByName(page, 'my-secret');
       await page.getByRole('button', { name: '+ Add' }).click();
+      await page.locator('#tag-key').waitFor();
       await page.locator('#tag-key').fill('new-tag');
       await page.locator('#tag-value').fill('tag-value');
       await page.locator('.immediate-checkbox input').check();
@@ -360,6 +362,7 @@ test.describe('Secret Edge Cases', () => {
       await waitForItemList(page);
       await clickItemByName(page, 'my-secret');
       await page.getByRole('button', { name: '+ Add' }).click();
+      await page.locator('#tag-key').waitFor();
       await page.locator('#tag-key').fill('new-tag');
       await page.locator('#tag-value').fill('new-value');
       await page.getByRole('button', { name: 'Stage Tag' }).click();

@@ -107,7 +107,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        os: [ubuntu-latest, macos-latest]
     defaults:
       run:
         working-directory: internal/gui/frontend
@@ -136,5 +136,42 @@ jobs:
         if: ${{ !cancelled() }}
         with:
           name: playwright-report-${{ matrix.os }}
+          path: internal/gui/frontend/playwright-report/
+          retention-days: 30
+
+  gui-test-windows:
+    name: GUI Test (Playwright) (Windows)
+    runs-on: windows-latest
+    if: >-
+      github.ref == 'refs/heads/main' ||
+      contains(github.event.head_commit.message, '[CI: windows]')
+    defaults:
+      run:
+        working-directory: internal/gui/frontend
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: internal/gui/frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Run Playwright tests
+        run: npm test
+
+      - name: Upload Playwright report
+        uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: playwright-report-windows-latest
           path: internal/gui/frontend/playwright-report/
           retention-days: 30
