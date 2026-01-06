@@ -12,3 +12,26 @@ services:
       timeout: 5s
       retries: 10
       start_period: 15s
+
+  linux-gui:
+    profiles:
+      - linux-gui
+    build:
+      context: .
+      dockerfile: docker/linux-gui/Dockerfile
+    environment:
+      - DISPLAY=${HOST_DISPLAY:-host.docker.internal:0}
+    volumes:
+      - .:/app
+      - go-cache:/root/go
+      - go-build-cache:/root/.cache/go-build
+    working_dir: /app
+    stdin_open: true
+    tty: true
+    # For X11 forwarding
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+volumes:
+  go-cache:
+  go-build-cache:
