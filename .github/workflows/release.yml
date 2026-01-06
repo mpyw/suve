@@ -4,7 +4,13 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Version to release (e.g., v0.6.3)"
+        description: "Version to release (e.g., v1.2.3) - tag must already exist"
+        required: true
+        type: string
+  workflow_call:
+    inputs:
+      version:
+        description: "Version to release (e.g., v1.2.3) - tag must already exist"
         required: true
         type: string
 
@@ -13,7 +19,7 @@ permissions:
 
 jobs:
   # ===========================================================================
-  # Validate version format before any builds
+  # Validate that tag exists before any builds
   # ===========================================================================
   validate:
     runs-on: ubuntu-latest
@@ -24,20 +30,22 @@ jobs:
         run: |
           if [[ ! "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             echo "Error: Invalid version format '$VERSION'"
-            echo "Expected format: vX.Y.Z (e.g., v0.6.3)"
+            echo "Expected format: vX.Y.Z (e.g., v1.2.3)"
             exit 1
           fi
           echo "Version format valid: $VERSION"
 
-      - name: Check tag does not exist
+      - name: Check tag exists
         env:
           VERSION: ${{ inputs.version }}
+          GH_TOKEN: ${{ github.token }}
         run: |
-          if git ls-remote --tags origin | grep -q "refs/tags/${VERSION}$"; then
-            echo "Error: Tag '$VERSION' already exists"
+          if ! git ls-remote --tags https://github.com/${{ github.repository }} | grep -q "refs/tags/${VERSION}$"; then
+            echo "Error: Tag '$VERSION' does not exist"
+            echo "Please create the tag first using the 'Tag' workflow"
             exit 1
           fi
-          echo "Tag does not exist: $VERSION"
+          echo "Tag exists: $VERSION"
 
   # ===========================================================================
   # Darwin: CGO required for GUI, build both archs on ARM64 runner
@@ -49,6 +57,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
         with:
+          ref: ${{ inputs.version }}
           fetch-depth: 0
 
       - name: Set up Go
@@ -114,6 +123,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
         with:
+          ref: ${{ inputs.version }}
           fetch-depth: 0
 
       - name: Set up Go
@@ -167,6 +177,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
         with:
+          ref: ${{ inputs.version }}
           fetch-depth: 0
 
       - name: Set up Go
@@ -215,6 +226,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
         with:
+          ref: ${{ inputs.version }}
           fetch-depth: 0
 
       - name: Set up Go
@@ -248,6 +260,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
         with:
+          ref: ${{ inputs.version }}
           fetch-depth: 0
 
       - name: Set up Go
@@ -312,6 +325,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
         with:
+          ref: ${{ inputs.version }}
           fetch-depth: 0
 
       - name: Download all artifacts
@@ -484,15 +498,6 @@ jobs:
           cd releases
           sha256sum *.tar.gz *.zip *.deb *.rpm > checksums.txt
           cat checksums.txt
-
-      - name: Create tag
-        env:
-          TAG: ${{ inputs.version }}
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git tag -a "$TAG" -m "Release $TAG"
-          git push origin "$TAG"
 
       - name: Create GitHub Release
         env:
