@@ -112,7 +112,7 @@ jobs:
       - name: Run golangci-lint (production build)
         uses: golangci/golangci-lint-action@v7
         with:
-          args: --timeout=5m --build-tags=production
+          args: --timeout=5m --build-tags=production,webkit2_41
 
   gui-test:
     name: GUI Test (Playwright)
