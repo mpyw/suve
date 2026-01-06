@@ -27,6 +27,13 @@ async function slowType(locator: Locator, text: string) {
   await locator.pressSequentially(text, { delay: TYPING_DELAY });
 }
 
+async function slowBackspace(locator: Locator, count: number) {
+  for (let i = 0; i < count; i++) {
+    await locator.press('Backspace');
+    await pause(TYPING_DELAY);
+  }
+}
+
 test.describe('GUI Demo Recording', () => {
   test('Full staging workflow demo', async ({ page }) => {
     test.setTimeout(300000);
@@ -38,7 +45,9 @@ test.describe('GUI Demo Recording', () => {
     // Wait for app to be fully rendered before starting demo
     // This minimizes white screen at the beginning of the recording
     await expect(page.locator('.item-list')).toBeVisible();
-    await pause(PAUSE_SHORT);
+    // Wait for any initial animations/loading to complete
+    await page.waitForLoadState('networkidle');
+    await pause(PAUSE_MEDIUM);
 
     // =========================================================================
     // 1. List existing parameters
@@ -88,6 +97,7 @@ test.describe('GUI Demo Recording', () => {
     console.log('Step 4: Staging update to existing parameter');
     await navigateTo(page, 'Parameters');
     await waitForItemList(page);
+    await pause(PAUSE_MEDIUM); // Wait for view transition to complete
 
     await clickItemByName(page, '/demo/api/url');
     await pause(PAUSE_MEDIUM);
@@ -95,8 +105,13 @@ test.describe('GUI Demo Recording', () => {
     await page.getByRole('button', { name: 'Edit' }).click();
     await pause(PAUSE_SHORT); // Brief pause after opening
 
-    await page.locator('#param-value').clear();
-    await slowType(page.locator('#param-value'), 'https://api-v2.example.com');
+    // Vim-style edit: delete only the part that needs to change
+    // https://api-v1.example.com -> https://api-v2.example.com
+    // Delete from end: `.example.com` (12 chars) + `1` (1 char) = 13 backspaces
+    const valueInput = page.locator('#param-value');
+    await valueInput.focus();
+    await slowBackspace(valueInput, 13);
+    await slowType(valueInput, '2.example.com');
 
     await pause(PAUSE_LONG); // Show edited value before closing
     await page.getByRole('button', { name: 'Stage' }).click();

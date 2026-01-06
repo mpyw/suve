@@ -68,12 +68,26 @@ cd "$GUI_DIR"
 wails dev -skipbindings -tags dev &
 WAILS_PID=$!
 
-# Wait for wails dev to start (Vite server)
-echo "Waiting for wails dev to start..."
-sleep 10
-
 # Wails dev server port (exposes Go methods to browser)
 WAILS_PORT="${WAILS_PORT:-34115}"
+
+# Wait for wails dev to be fully ready
+echo "Waiting for wails dev to start..."
+echo "Checking http://localhost:$WAILS_PORT ..."
+MAX_RETRIES=60
+RETRY_COUNT=0
+while ! curl -s "http://localhost:$WAILS_PORT" > /dev/null 2>&1; do
+    RETRY_COUNT=$((RETRY_COUNT + 1))
+    if [ $RETRY_COUNT -ge $MAX_RETRIES ]; then
+        echo "Error: wails dev did not start within ${MAX_RETRIES} seconds"
+        kill $WAILS_PID 2>/dev/null || true
+        exit 1
+    fi
+    sleep 1
+done
+echo "wails dev is ready!"
+# Additional wait for app to be fully initialized
+sleep 3
 
 echo ""
 echo "=== Recording GUI demo ==="
