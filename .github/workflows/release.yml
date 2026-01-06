@@ -192,51 +192,53 @@ jobs:
           convert internal/gui/appicon.png -define icon:auto-resize=256,128,64,48,32,16 cmd/suve/appicon.ico
 
           # Generate versioninfo.json
-          cat > cmd/suve/versioninfo.json <<'EOF'
-{
-  "FixedFileInfo": {
-    "FileVersion": {
-      "Major": __MAJOR__,
-      "Minor": __MINOR__,
-      "Patch": __PATCH__,
-      "Build": __BUILD__
-    },
-    "ProductVersion": {
-      "Major": __MAJOR__,
-      "Minor": __MINOR__,
-      "Patch": __PATCH__,
-      "Build": __BUILD__
-    },
-    "FileFlagsMask": "3f",
-    "FileFlags": "00",
-    "FileOS": "040004",
-    "FileType": "01",
-    "FileSubType": "00"
-  },
-  "StringFileInfo": {
-    "Comments": "",
-    "CompanyName": "",
-    "FileDescription": "Git-like CLI/GUI for AWS Parameter Store & Secrets Manager",
-    "FileVersion": "__VERSION__",
-    "InternalName": "suve",
-    "LegalCopyright": "",
-    "LegalTrademarks": "",
-    "OriginalFilename": "suve.exe",
-    "PrivateBuild": "",
-    "ProductName": "suve",
-    "ProductVersion": "__VERSION__",
-    "SpecialBuild": ""
-  },
-  "VarFileInfo": {
-    "Translation": {
-      "LangID": "0409",
-      "CharsetID": "04B0"
-    }
-  },
-  "IconPath": "appicon.ico",
-  "ManifestPath": ""
-}
-EOF
+          cat > cmd/suve/versioninfo.json << 'VERSIONINFO_EOF'
+          {
+            "FixedFileInfo": {
+              "FileVersion": {
+                "Major": __MAJOR__,
+                "Minor": __MINOR__,
+                "Patch": __PATCH__,
+                "Build": __BUILD__
+              },
+              "ProductVersion": {
+                "Major": __MAJOR__,
+                "Minor": __MINOR__,
+                "Patch": __PATCH__,
+                "Build": __BUILD__
+              },
+              "FileFlagsMask": "3f",
+              "FileFlags": "00",
+              "FileOS": "040004",
+              "FileType": "01",
+              "FileSubType": "00"
+            },
+            "StringFileInfo": {
+              "Comments": "",
+              "CompanyName": "",
+              "FileDescription": "Git-like CLI/GUI for AWS Parameter Store & Secrets Manager",
+              "FileVersion": "__VERSION__",
+              "InternalName": "suve",
+              "LegalCopyright": "",
+              "LegalTrademarks": "",
+              "OriginalFilename": "suve.exe",
+              "PrivateBuild": "",
+              "ProductName": "suve",
+              "ProductVersion": "__VERSION__",
+              "SpecialBuild": ""
+            },
+            "VarFileInfo": {
+              "Translation": {
+                "LangID": "0409",
+                "CharsetID": "04B0"
+              }
+            },
+            "IconPath": "appicon.ico",
+            "ManifestPath": ""
+          }
+          VERSIONINFO_EOF
+          # Remove leading whitespace from heredoc (heredoc was indented for YAML compatibility)
+          sed -i 's/^          //' cmd/suve/versioninfo.json
 
           # Replace placeholders with actual version values
           sed -i "s/__MAJOR__/${MAJOR}/g; s/__MINOR__/${MINOR}/g; s/__PATCH__/${PATCH}/g; s/__BUILD__/${GITHUB_RUN_NUMBER}/g; s/__VERSION__/v${VERSION}/g" cmd/suve/versioninfo.json
