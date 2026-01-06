@@ -1,5 +1,5 @@
 # Binaries
-bin/
+/bin/
 /suve
 *.exe
 *.exe~
@@ -35,18 +35,24 @@ Thumbs.db
 coverage.html
 
 # Playwright
-gui/frontend/test-results/
-gui/frontend/playwright-report/
-gui/frontend/playwright/.cache/
-internal/gui/frontend/test-results/
-internal/gui/frontend/test-results-recording/
-internal/gui/frontend/playwright-report/
-internal/gui/frontend/playwright/.cache/
+/gui/frontend/test-results/
+/gui/frontend/playwright-report/
+/gui/frontend/playwright/.cache/
+/internal/gui/frontend/test-results/
+/internal/gui/frontend/test-results-recording/
+/internal/gui/frontend/playwright-report/
+/internal/gui/frontend/playwright/.cache/
 
 # Demo recording artifacts
 *.webm
 
 # Frontend build artifacts
-internal/gui/frontend/node_modules/
-internal/gui/frontend/dist/
-cover.html
+/internal/gui/frontend/node_modules/
+/internal/gui/frontend/dist/
+/cover.html
+
+# Windows icon resources (generated during build)
+/cmd/suve/versioninfo.json
+/cmd/suve/appicon.ico
+/cmd/suve/resource_windows_amd64.syso
+/cmd/suve/resource_windows_arm64.syso

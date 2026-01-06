@@ -9,12 +9,7 @@ import (
 )
 
 func main() {
-	// Check for --gui flag (only effective when built with -tags production)
-	if runGUIIfRequested() {
-		return
-	}
-
-	// Run CLI
+	// Register GUI flag (only effective when built with -tags production)
 	registerGUIFlag()
 	registerGUIDescription()
 	if err := commands.App.Run(context.Background(), os.Args); err != nil {
