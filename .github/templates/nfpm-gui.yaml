@@ -13,7 +13,7 @@ description: |
   Provides familiar commands like show, log, diff, and a staging workflow
   for safe, reviewable changes to your AWS secrets and parameters.
   .
-  This package includes GUI support via the -gui flag.
+  This package includes GUI support via the --gui flag.
   Requires GTK3 and WebKit2GTK runtime libraries.
 homepage: "https://github.com/mpyw/suve"
 license: "MIT"
