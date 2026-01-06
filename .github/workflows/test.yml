@@ -165,6 +165,10 @@ jobs:
         with:
           go-version-file: go.mod
 
+      - name: Detect GUI dependencies from Wails
+        id: gui-deps
+        uses: ./.github/actions/detect-gui-deps
+
       - name: Build test binaries
         run: |
           go build -o suve ./cmd/suve
@@ -191,10 +195,14 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y lintian rpm rpmlint
 
       - name: Generate and lint .deb packages
+        env:
+          GTK_DEB: ${{ steps.gui-deps.outputs.gtk-deb }}
+          GTK_RPM: ${{ steps.gui-deps.outputs.gtk-rpm }}
+          WEBKIT_DEB: ${{ steps.gui-deps.outputs.webkit-deb }}
+          WEBKIT_RPM: ${{ steps.gui-deps.outputs.webkit-rpm }}
         run: |
           export VERSION="0.0.0-test"
           export GOARCH="amd64"
-          export WEBKIT_VERSION="4.0"
 
           # CLI-only package
           nfpm pkg --config .github/templates/nfpm.yaml --packager deb --target suve-cli_test_amd64.deb
@@ -220,10 +228,14 @@ jobs:
             suve-cli_test_amd64.deb suve_test_amd64.deb
 
       - name: Generate and lint .rpm packages
+        env:
+          GTK_DEB: ${{ steps.gui-deps.outputs.gtk-deb }}
+          GTK_RPM: ${{ steps.gui-deps.outputs.gtk-rpm }}
+          WEBKIT_DEB: ${{ steps.gui-deps.outputs.webkit-deb }}
+          WEBKIT_RPM: ${{ steps.gui-deps.outputs.webkit-rpm }}
         run: |
           export VERSION="0.0.0-test"
           export GOARCH="amd64"
-          export WEBKIT_VERSION="4.0"
 
           # CLI-only package
           nfpm pkg --config .github/templates/nfpm.yaml --packager rpm --target suve-cli-test.x86_64.rpm

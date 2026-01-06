@@ -28,16 +28,16 @@ rpm:
 depends: []
 
 # GUI dependencies - recommended but not strictly required
-# WebKit version is detected from Wails source in CI
+# Versions are detected from Wails source in CI
 recommends:
-  - libgtk-3-0
-  - libwebkit2gtk-${WEBKIT_VERSION}-37
+  - ${GTK_DEB}
+  - ${WEBKIT_DEB}
 
 overrides:
   rpm:
     recommends:
-      - gtk3
-      - webkit2gtk${WEBKIT_VERSION}
+      - ${GTK_RPM}
+      - ${WEBKIT_RPM}
 
 conflicts:
   - suve-cli

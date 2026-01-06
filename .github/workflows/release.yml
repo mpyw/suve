@@ -320,32 +320,16 @@ jobs:
 
           ls -la releases/
 
-      - name: Detect WebKit version from Wails
-        id: webkit
-        run: |
-          # Extract Wails version from go.mod
-          WAILS_VERSION=$(grep 'github.com/wailsapp/wails/v2' go.mod | awk '{print $2}')
-          echo "Wails version: ${WAILS_VERSION}"
-
-          # Fetch apt.go from Wails source and extract webkit package name
-          WEBKIT_PKG=$(curl -sf "https://raw.githubusercontent.com/wailsapp/wails/${WAILS_VERSION}/v2/internal/system/packagemanager/apt.go" \
-            | grep -oP 'libwebkit2gtk-[0-9.]+-dev' | head -1)
-
-          if [[ -z "$WEBKIT_PKG" ]]; then
-            echo "Error: Could not detect webkit version from Wails source"
-            exit 1
-          fi
-
-          # Extract version (e.g., "4.0" from "libwebkit2gtk-4.0-dev")
-          WEBKIT_VERSION=$(echo "$WEBKIT_PKG" | grep -oP '[0-9]+\.[0-9]+')
-          echo "WebKit package: ${WEBKIT_PKG}"
-          echo "WebKit version: ${WEBKIT_VERSION}"
-
-          echo "WEBKIT_VERSION=${WEBKIT_VERSION}" >> $GITHUB_OUTPUT
+      - name: Detect GUI dependencies from Wails
+        id: gui-deps
+        uses: ./.github/actions/detect-gui-deps
 
       - name: Create Linux packages (.deb, .rpm)
         env:
-          WEBKIT_VERSION: ${{ steps.webkit.outputs.WEBKIT_VERSION }}
+          GTK_DEB: ${{ steps.gui-deps.outputs.gtk-deb }}
+          GTK_RPM: ${{ steps.gui-deps.outputs.gtk-rpm }}
+          WEBKIT_DEB: ${{ steps.gui-deps.outputs.webkit-deb }}
+          WEBKIT_RPM: ${{ steps.gui-deps.outputs.webkit-rpm }}
         run: |
           set -euo pipefail
           VERSION="${GITHUB_REF_NAME#v}"
@@ -354,7 +338,8 @@ jobs:
           go install github.com/goreleaser/nfpm/v2/cmd/nfpm@v2.41.1
           export PATH="$(go env GOPATH)/bin:$PATH"
 
-          echo "Using WebKit version: ${WEBKIT_VERSION}"
+          echo "Using GTK: ${GTK_DEB} / ${GTK_RPM}"
+          echo "Using WebKit: ${WEBKIT_DEB} / ${WEBKIT_RPM}"
 
           for arch in amd64 arm64; do
             # Map Go arch to package arch names

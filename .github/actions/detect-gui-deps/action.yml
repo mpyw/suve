@@ -1,0 +1,85 @@
+name: 'Detect GUI Dependencies'
+description: 'Detects required GTK and WebKit versions from Wails source based on go.mod'
+
+outputs:
+  webkit-version:
+    description: 'WebKit version (e.g., "4.0")'
+    value: ${{ steps.detect.outputs.webkit_version }}
+  webkit-deb:
+    description: 'WebKit Debian runtime package (e.g., "libwebkit2gtk-4.0-37")'
+    value: ${{ steps.detect.outputs.webkit_deb }}
+  webkit-rpm:
+    description: 'WebKit RPM package (e.g., "webkit2gtk4.0")'
+    value: ${{ steps.detect.outputs.webkit_rpm }}
+  gtk-version:
+    description: 'GTK major version (e.g., "3")'
+    value: ${{ steps.detect.outputs.gtk_version }}
+  gtk-deb:
+    description: 'GTK Debian runtime package (e.g., "libgtk-3-0")'
+    value: ${{ steps.detect.outputs.gtk_deb }}
+  gtk-rpm:
+    description: 'GTK RPM package (e.g., "gtk3")'
+    value: ${{ steps.detect.outputs.gtk_rpm }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Detect GUI dependencies from Wails
+      id: detect
+      shell: bash
+      run: |
+        # Extract Wails version from go.mod
+        WAILS_VERSION=$(grep 'github.com/wailsapp/wails/v2' go.mod | awk '{print $2}')
+        echo "Wails version: ${WAILS_VERSION}"
+
+        # Fetch apt.go from Wails source
+        APT_GO=$(curl -sf "https://raw.githubusercontent.com/wailsapp/wails/${WAILS_VERSION}/v2/internal/system/packagemanager/apt.go")
+
+        if [[ -z "$APT_GO" ]]; then
+          echo "Error: Could not fetch Wails apt.go"
+          exit 1
+        fi
+
+        # Extract WebKit package (e.g., "libwebkit2gtk-4.0-dev")
+        # Pattern supports potential future webkit3gtk, etc.
+        WEBKIT_PKG=$(echo "$APT_GO" | grep -oP 'libwebkit[0-9]*gtk-[0-9.]+-dev' | head -1)
+        if [[ -z "$WEBKIT_PKG" ]]; then
+          echo "Error: Could not detect webkit version"
+          exit 1
+        fi
+        # Extract full library name (e.g., "webkit2gtk") and version (e.g., "4.0")
+        WEBKIT_LIB=$(echo "$WEBKIT_PKG" | grep -oP 'webkit[0-9]*gtk')
+        WEBKIT_VERSION=$(echo "$WEBKIT_PKG" | grep -oP '[0-9]+\.[0-9]+')
+
+        # Extract GTK package (e.g., "libgtk-3-dev")
+        GTK_PKG=$(echo "$APT_GO" | grep -oP 'libgtk-[0-9]+-dev' | head -1)
+        if [[ -z "$GTK_PKG" ]]; then
+          echo "Error: Could not detect gtk version"
+          exit 1
+        fi
+        GTK_VERSION=$(echo "$GTK_PKG" | grep -oP '[0-9]+')
+
+        echo "=== Detected versions ==="
+        echo "WebKit: ${WEBKIT_LIB} ${WEBKIT_VERSION} (from ${WEBKIT_PKG})"
+        echo "GTK: ${GTK_VERSION} (from ${GTK_PKG})"
+
+        # Detect actual runtime package names from installed packages (if available)
+        # This works when running on a system with these packages installed
+        WEBKIT_DEB_INSTALLED=$(dpkg -l "lib${WEBKIT_LIB}-${WEBKIT_VERSION}-*" 2>/dev/null | grep '^ii' | grep -v '\-dev' | awk '{print $2}' | head -1 || true)
+        GTK_DEB_INSTALLED=$(dpkg -l "libgtk-${GTK_VERSION}-*" 2>/dev/null | grep '^ii' | grep -v '\-dev' | awk '{print $2}' | head -1 || true)
+
+        # Fallback to pattern-based names if not installed
+        WEBKIT_DEB="${WEBKIT_DEB_INSTALLED:-lib${WEBKIT_LIB}-${WEBKIT_VERSION}-0}"
+        GTK_DEB="${GTK_DEB_INSTALLED:-libgtk-${GTK_VERSION}-0}"
+
+        echo "WebKit deb: ${WEBKIT_DEB}"
+        echo "GTK deb: ${GTK_DEB}"
+
+        # Output values
+        echo "webkit_version=${WEBKIT_VERSION}" >> $GITHUB_OUTPUT
+        echo "webkit_deb=${WEBKIT_DEB}" >> $GITHUB_OUTPUT
+        echo "webkit_rpm=${WEBKIT_LIB}${WEBKIT_VERSION}" >> $GITHUB_OUTPUT
+
+        echo "gtk_version=${GTK_VERSION}" >> $GITHUB_OUTPUT
+        echo "gtk_deb=${GTK_DEB}" >> $GITHUB_OUTPUT
+        echo "gtk_rpm=gtk${GTK_VERSION}" >> $GITHUB_OUTPUT
