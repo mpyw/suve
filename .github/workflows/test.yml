@@ -104,6 +104,11 @@ jobs:
       - name: Create dummy frontend dist for production lint
         run: mkdir -p internal/gui/frontend/dist && touch internal/gui/frontend/dist/index.html
 
+      - name: Install Wails dependencies (CGO)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev build-essential pkg-config
+
       - name: Run golangci-lint (production build)
         uses: golangci/golangci-lint-action@v7
         with:
