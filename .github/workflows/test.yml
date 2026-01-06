@@ -203,9 +203,9 @@ jobs:
         run: |
           set -euo pipefail
           export VERSION="0.0.0-test"
-          export GOARCH="amd64"
 
-          # Show rendered templates in step summary
+          # Show rendered templates in step summary (using amd64 as example)
+          export GOARCH="amd64"
           {
             echo "## Detected GUI Dependencies"
             echo ""
@@ -227,46 +227,67 @@ jobs:
             echo '```yaml'
             envsubst < .github/templates/nfpm-gui.yaml
             echo '```'
-          } >> $GITHUB_STEP_SUMMARY
-
-          # Generate packages
-          echo "Generating .deb packages..."
-          nfpm pkg --config .github/templates/nfpm.yaml --packager deb --target suve-cli_test_amd64.deb
-          nfpm pkg --config .github/templates/nfpm-gui.yaml --packager deb --target suve_test_amd64.deb
-
-          echo "Generating .rpm packages..."
-          nfpm pkg --config .github/templates/nfpm.yaml --packager rpm --target suve-cli-test.x86_64.rpm
-          nfpm pkg --config .github/templates/nfpm-gui.yaml --packager rpm --target suve-test.x86_64.rpm
-
-          # Show package info in step summary
-          {
             echo ""
             echo "## Generated Packages"
-            echo ""
-            echo "### .deb packages"
-            echo ""
-            echo "#### suve-cli (CLI-only)"
-            echo '```'
-            dpkg-deb -I suve-cli_test_amd64.deb
-            echo '```'
-            echo ""
-            echo "#### suve (GUI)"
-            echo '```'
-            dpkg-deb -I suve_test_amd64.deb
-            echo '```'
-            echo ""
-            echo "### .rpm packages"
-            echo ""
-            echo "#### suve-cli (CLI-only)"
-            echo '```'
-            rpm -qip suve-cli-test.x86_64.rpm
-            echo '```'
-            echo ""
-            echo "#### suve (GUI)"
-            echo '```'
-            rpm -qip suve-test.x86_64.rpm
-            echo '```'
           } >> $GITHUB_STEP_SUMMARY
+
+          # Generate packages for both architectures
+          for arch in amd64 arm64; do
+            export GOARCH="${arch}"
+
+            case "$arch" in
+              amd64) deb_arch="amd64"; rpm_arch="x86_64" ;;
+              arm64) deb_arch="arm64"; rpm_arch="aarch64" ;;
+            esac
+
+            echo "=== Generating packages for ${arch} ==="
+
+            # Generate .deb packages
+            nfpm pkg --config .github/templates/nfpm.yaml --packager deb --target "suve-cli_test_${deb_arch}.deb"
+            nfpm pkg --config .github/templates/nfpm-gui.yaml --packager deb --target "suve_test_${deb_arch}.deb"
+
+            # Generate .rpm packages
+            nfpm pkg --config .github/templates/nfpm.yaml --packager rpm --target "suve-cli-test.${rpm_arch}.rpm"
+            nfpm pkg --config .github/templates/nfpm-gui.yaml --packager rpm --target "suve-test.${rpm_arch}.rpm"
+
+            # Show package info in step summary
+            {
+              echo ""
+              echo "### ${arch}"
+              echo ""
+              echo "#### .deb packages"
+              echo ""
+              echo "<details><summary>suve-cli_test_${deb_arch}.deb</summary>"
+              echo ""
+              echo '```'
+              dpkg-deb -I "suve-cli_test_${deb_arch}.deb"
+              echo '```'
+              echo "</details>"
+              echo ""
+              echo "<details><summary>suve_test_${deb_arch}.deb</summary>"
+              echo ""
+              echo '```'
+              dpkg-deb -I "suve_test_${deb_arch}.deb"
+              echo '```'
+              echo "</details>"
+              echo ""
+              echo "#### .rpm packages"
+              echo ""
+              echo "<details><summary>suve-cli-test.${rpm_arch}.rpm</summary>"
+              echo ""
+              echo '```'
+              rpm -qip "suve-cli-test.${rpm_arch}.rpm"
+              echo '```'
+              echo "</details>"
+              echo ""
+              echo "<details><summary>suve-test.${rpm_arch}.rpm</summary>"
+              echo ""
+              echo '```'
+              rpm -qip "suve-test.${rpm_arch}.rpm"
+              echo '```'
+              echo "</details>"
+            } >> $GITHUB_STEP_SUMMARY
+          done
 
       - name: Lint Linux packages
         run: |
@@ -280,7 +301,8 @@ jobs:
           # - undeclared-elf-prerequisites: libc is provided by base system
           lintian --tag-display-limit 0 \
             --suppress-tags no-changelog,no-manual-page,unknown-field,hardening-no-pie,hardening-no-relro,unstripped-binary-or-object,undeclared-elf-prerequisites \
-            suve-cli_test_amd64.deb suve_test_amd64.deb
+            suve-cli_test_amd64.deb suve_test_amd64.deb \
+            suve-cli_test_arm64.deb suve_test_arm64.deb
 
           echo "=== rpmlint check (.rpm) ==="
           # rpmlint returns non-zero on warnings; allow warnings for:
@@ -288,7 +310,8 @@ jobs:
           # - no-manual-page-for-binary: CLI has --help instead
           # - no-documentation/no-changelogname-tag: Minimal package
           # - invalid-license: MIT is valid but rpmlint wants SPDX format
-          rpmlint suve-cli-test.x86_64.rpm suve-test.x86_64.rpm || true
+          rpmlint suve-cli-test.x86_64.rpm suve-test.x86_64.rpm \
+            suve-cli-test.aarch64.rpm suve-test.aarch64.rpm || true
 
   gui-test-windows:
     name: GUI Test (Playwright) (Windows)
