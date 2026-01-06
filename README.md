@@ -59,32 +59,34 @@ scoop install suve
 Download the `.deb` package from [GitHub Releases](https://github.com/mpyw/suve/releases):
 
 ```bash
+export VERSION=0.0.0
+export ARCH=amd64  # or arm64
+
 # CLI-only (recommended, no GUI dependencies)
-curl -LO https://github.com/mpyw/suve/releases/download/vVERSION/suve-cli_VERSION-1_ARCH.deb
-sudo dpkg -i suve-cli_VERSION-1_ARCH.deb
+curl -LO "https://github.com/mpyw/suve/releases/download/v${VERSION}/suve-cli_${VERSION}-1_${ARCH}.deb"
+sudo dpkg -i "suve-cli_${VERSION}-1_${ARCH}.deb"
 
 # Full version (CLI + GUI, requires GTK3 and WebKit2GTK)
-curl -LO https://github.com/mpyw/suve/releases/download/vVERSION/suve_VERSION-1_ARCH.deb
-sudo dpkg -i suve_VERSION-1_ARCH.deb
+curl -LO "https://github.com/mpyw/suve/releases/download/v${VERSION}/suve_${VERSION}-1_${ARCH}.deb"
+sudo dpkg -i "suve_${VERSION}-1_${ARCH}.deb"
 ```
-
-Available architectures: `amd64`, `arm64`
 
 ### Red Hat/Fedora (.rpm)
 
 Download the `.rpm` package from [GitHub Releases](https://github.com/mpyw/suve/releases):
 
 ```bash
+export VERSION=0.0.0
+export ARCH=x86_64  # or aarch64
+
 # CLI-only (recommended, no GUI dependencies)
-curl -LO https://github.com/mpyw/suve/releases/download/vVERSION/suve-cli-VERSION-1.ARCH.rpm
-sudo rpm -i suve-cli-VERSION-1.ARCH.rpm
+curl -LO "https://github.com/mpyw/suve/releases/download/v${VERSION}/suve-cli-${VERSION}-1.${ARCH}.rpm"
+sudo rpm -i "suve-cli-${VERSION}-1.${ARCH}.rpm"
 
 # Full version (CLI + GUI, requires GTK3 and WebKit2GTK)
-curl -LO https://github.com/mpyw/suve/releases/download/vVERSION/suve-VERSION-1.ARCH.rpm
-sudo rpm -i suve-VERSION-1.ARCH.rpm
+curl -LO "https://github.com/mpyw/suve/releases/download/v${VERSION}/suve-${VERSION}-1.${ARCH}.rpm"
+sudo rpm -i "suve-${VERSION}-1.${ARCH}.rpm"
 ```
-
-Available architectures: `x86_64`, `aarch64`
 
 ### Using [`go install`](https://pkg.go.dev/cmd/go#hdr-Compile_and_install_packages_and_dependencies)
 
