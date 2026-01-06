@@ -47,6 +47,32 @@ scoop bucket add mpyw https://github.com/mpyw/scoop-bucket.git
 scoop install suve
 ```
 
+### Using [aqua](https://aquaproj.github.io/)
+
+Add to your `aqua.yaml`:
+
+```yaml
+registries:
+  - type: standard
+    ref: v4.311.0
+  - name: mpyw
+    type: github_content
+    repo_owner: mpyw
+    repo_name: suve
+    ref: v0.5.3  # use the version you want
+    path: registry.yaml
+
+packages:
+  - name: mpyw/suve
+    registry: mpyw
+```
+
+Then run:
+
+```bash
+aqua i
+```
+
 ### Using [`go install`](https://pkg.go.dev/cmd/go#hdr-Compile_and_install_packages_and_dependencies)
 
 ```bash

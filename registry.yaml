@@ -1,0 +1,15 @@
+packages:
+  - type: github_release
+    repo_owner: mpyw
+    repo_name: suve
+    description: Git-like CLI for AWS Parameter Store and Secrets Manager
+    asset: suve_{{trimV .Version}}_{{.OS}}_{{.Arch}}.tar.gz
+    format: tar.gz
+    overrides:
+      - goos: windows
+        format: zip
+        asset: suve_{{trimV .Version}}_{{.OS}}_{{.Arch}}.zip
+    supported_envs:
+      - darwin
+      - linux
+      - windows
