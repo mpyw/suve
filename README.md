@@ -61,15 +61,19 @@ Download the `.deb` package from [GitHub Releases](https://github.com/mpyw/suve/
 ```bash
 export VERSION=0.0.0
 export ARCH=amd64  # or arm64
+export WEBKIT_SUFFIX=""  # use "_webkit2_41" for Ubuntu 24.04+
 
 # CLI-only (recommended, no GUI dependencies)
 curl -LO "https://github.com/mpyw/suve/releases/download/v${VERSION}/suve-cli_${VERSION}-1_${ARCH}.deb"
 sudo dpkg -i "suve-cli_${VERSION}-1_${ARCH}.deb"
 
 # Full version (CLI + GUI, requires GTK3 and WebKit2GTK)
-curl -LO "https://github.com/mpyw/suve/releases/download/v${VERSION}/suve_${VERSION}-1_${ARCH}.deb"
-sudo dpkg -i "suve_${VERSION}-1_${ARCH}.deb"
+curl -LO "https://github.com/mpyw/suve/releases/download/v${VERSION}/suve${WEBKIT_SUFFIX}_${VERSION}-1_${ARCH}.deb"
+sudo dpkg -i "suve${WEBKIT_SUFFIX}_${VERSION}-1_${ARCH}.deb"
 ```
+
+> [!NOTE]
+> Ubuntu 22.04/Debian uses webkit2gtk-4.0 (default). Ubuntu 24.04+ uses webkit2gtk-4.1 (set `WEBKIT_SUFFIX="_webkit2_41"`).
 
 ### Red Hat/Fedora (.rpm)
 
@@ -78,15 +82,19 @@ Download the `.rpm` package from [GitHub Releases](https://github.com/mpyw/suve/
 ```bash
 export VERSION=0.0.0
 export ARCH=x86_64  # or aarch64
+export WEBKIT_SUFFIX=""  # use "_webkit2_41" for Fedora 40+
 
 # CLI-only (recommended, no GUI dependencies)
 curl -LO "https://github.com/mpyw/suve/releases/download/v${VERSION}/suve-cli-${VERSION}-1.${ARCH}.rpm"
 sudo rpm -i "suve-cli-${VERSION}-1.${ARCH}.rpm"
 
 # Full version (CLI + GUI, requires GTK3 and WebKit2GTK)
-curl -LO "https://github.com/mpyw/suve/releases/download/v${VERSION}/suve-${VERSION}-1.${ARCH}.rpm"
-sudo rpm -i "suve-${VERSION}-1.${ARCH}.rpm"
+curl -LO "https://github.com/mpyw/suve/releases/download/v${VERSION}/suve${WEBKIT_SUFFIX}-${VERSION}-1.${ARCH}.rpm"
+sudo rpm -i "suve${WEBKIT_SUFFIX}-${VERSION}-1.${ARCH}.rpm"
 ```
+
+> [!NOTE]
+> Fedora 39 and earlier uses webkit2gtk-4.0 (default). Fedora 40+ uses webkit2gtk-4.1 (set `WEBKIT_SUFFIX="_webkit2_41"`).
 
 ### Using [`go install`](https://pkg.go.dev/cmd/go#hdr-Compile_and_install_packages_and_dependencies)
 
@@ -97,12 +105,18 @@ go install github.com/mpyw/suve/cmd/suve@latest
 # CLI + GUI (macOS/Linux: requires CGO, Windows: no CGO needed)
 CGO_ENABLED=1 go install -tags production github.com/mpyw/suve/cmd/suve@latest
 
+# Linux CLI + GUI with webkit2gtk-4.1 (Ubuntu 24.04+, Fedora 40+)
+CGO_ENABLED=1 go install -tags production,webkit2_41 github.com/mpyw/suve/cmd/suve@latest
+
 # Windows CLI + GUI (no CGO required)
 go install -tags production github.com/mpyw/suve/cmd/suve@latest
 ```
 
 > [!NOTE]
 > The `--gui` flag requires building with `-tags production`. CGO is required on macOS/Linux (for webkit2gtk), but not on Windows (Wails uses pure Go webview2loader).
+> On Linux, install the appropriate dev package first:
+> - Ubuntu 22.04/Debian: `sudo apt install libgtk-3-dev libwebkit2gtk-4.0-dev`
+> - Ubuntu 24.04+: `sudo apt install libgtk-3-dev libwebkit2gtk-4.1-dev` (use `-tags production,webkit2_41`)
 
 ### Using [`go tool`](https://pkg.go.dev/cmd/go#hdr-Run_specified_go_tool) (Go 1.24+)
 

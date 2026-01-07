@@ -13,12 +13,12 @@ services:
       retries: 10
       start_period: 15s
 
-  linux-gui:
+  ubuntu-22:
     profiles:
-      - linux-gui
+      - ubuntu-22
     build:
       context: .
-      dockerfile: docker/linux-gui/Dockerfile
+      dockerfile: docker/ubuntu-22/Dockerfile
     environment:
       - DISPLAY=${HOST_DISPLAY:-host.docker.internal:0}
     volumes:
@@ -28,16 +28,15 @@ services:
     working_dir: /app
     stdin_open: true
     tty: true
-    # For X11 forwarding
     extra_hosts:
       - "host.docker.internal:host-gateway"
 
-  linux-desktop:
+  ubuntu-24:
     profiles:
-      - linux-desktop
+      - ubuntu-24
     build:
       context: .
-      dockerfile: docker/linux-desktop/Dockerfile
+      dockerfile: docker/ubuntu-24/Dockerfile
     environment:
       - DISPLAY=${HOST_DISPLAY:-host.docker.internal:0}
     volumes:
