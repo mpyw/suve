@@ -105,7 +105,7 @@ go install github.com/mpyw/suve/cmd/suve@latest
 # CLI + GUI (macOS/Linux: requires CGO, Windows: no CGO needed)
 CGO_ENABLED=1 go install -tags production github.com/mpyw/suve/cmd/suve@latest
 
-# Linux CLI + GUI with webkit2gtk-4.1 (Ubuntu 24.04+, Fedora 40+)
+# Linux CLI + GUI with webkit2gtk-4.1 (Ubuntu 24.04+, Fedora 40+, Arch Linux)
 CGO_ENABLED=1 go install -tags production,webkit2_41 github.com/mpyw/suve/cmd/suve@latest
 
 # Windows CLI + GUI (no CGO required)
@@ -119,6 +119,7 @@ go install -tags production github.com/mpyw/suve/cmd/suve@latest
 > - Ubuntu 24.04+: `sudo apt install libgtk-3-dev libwebkit2gtk-4.1-dev` (use `-tags production,webkit2_41`)
 > - Fedora 39: `sudo dnf install gtk3-devel webkit2gtk4.0-devel`
 > - Fedora 40+: `sudo dnf install gtk3-devel webkit2gtk4.1-devel` (use `-tags production,webkit2_41`)
+> - Arch Linux: `sudo pacman -S gtk3 webkit2gtk-4.1` (use `-tags production,webkit2_41`)
 
 ### Using [`go tool`](https://pkg.go.dev/cmd/go#hdr-Run_specified_go_tool) (Go 1.24+)
 
