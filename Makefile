@@ -1,4 +1,4 @@
-.PHONY: build test lint e2e up down clean coverage coverage-e2e coverage-all gui-dev gui-build gui-bindings linux-gui linux-gui-build linux-gui-test linux-gui-setup linux-desktop help
+.PHONY: build test lint e2e up down clean coverage coverage-e2e coverage-all gui-dev gui-build gui-bindings ubuntu-22 ubuntu-24 x11-setup help
 
 .DEFAULT_GOAL := help
 
@@ -6,7 +6,7 @@ SUVE_LOCALSTACK_EXTERNAL_PORT ?= 4566
 COVERPKG = $(shell go list ./... | grep -v testutil | grep -v /e2e | grep -v internal/gui | grep -v /cmd/ | tr '\n' ',')
 
 help: ## Show this help
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
+	@grep -E '^[a-zA-Z0-9_-]+:.*## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
 
 %:
 	@echo "make: *** Unknown target '$@'. See available targets below:" >&2
@@ -77,22 +77,14 @@ gui-bindings: ## Regenerate GUI bindings
 #   1. brew install --cask xquartz
 #   2. XQuartz preferences -> Security -> "Allow connections from network clients"
 #   3. Restart XQuartz after changing the setting
-linux-gui-setup:
+x11-setup:
 	@echo "Setting up X11 forwarding for Linux GUI..."
-	@bash docker/linux-gui/start.sh
+	@xhost +localhost 2>/dev/null || true
 
-linux-gui: linux-gui-setup ## Start Linux GUI container (requires XQuartz)
-	@echo "Starting Linux GUI container..."
-	HOST_DISPLAY=host.docker.internal:0 docker compose --profile linux-gui run --rm linux-gui
+ubuntu-22: x11-setup ## Start Ubuntu 22.04 desktop (webkit2gtk-4.0, requires XQuartz)
+	@echo "Starting Ubuntu 22.04 desktop..."
+	HOST_DISPLAY=host.docker.internal:0 docker compose --profile ubuntu-22 run --rm ubuntu-22
 
-linux-gui-build: linux-gui-setup ## Build GUI in Linux container
-	@echo "Building GUI in Linux container..."
-	HOST_DISPLAY=host.docker.internal:0 docker compose --profile linux-gui run --rm linux-gui bash -c "cd gui && wails build -tags production -skipbindings"
-
-linux-gui-test: linux-gui-setup ## Run GUI tests in Linux container
-	@echo "Running GUI tests in Linux container..."
-	HOST_DISPLAY=host.docker.internal:0 docker compose --profile linux-gui run --rm linux-gui bash -c "go test -tags=production ./internal/gui/..."
-
-linux-desktop: linux-gui-setup ## Start Linux XFCE desktop (requires XQuartz)
-	@echo "Starting Linux XFCE desktop..."
-	HOST_DISPLAY=host.docker.internal:0 docker compose --profile linux-desktop run --rm linux-desktop
+ubuntu-24: x11-setup ## Start Ubuntu 24.04 desktop (webkit2gtk-4.1, requires XQuartz)
+	@echo "Starting Ubuntu 24.04 desktop..."
+	HOST_DISPLAY=host.docker.internal:0 docker compose --profile ubuntu-24 run --rm ubuntu-24

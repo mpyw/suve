@@ -45,7 +45,7 @@ builds:
       - -X github.com/mpyw/suve/internal/cli/commands.Version={{.Version}}
 
   # =============================================================================
-  # Linux GUI: CGO enabled (required for webkit2gtk)
+  # Linux GUI (webkit2gtk-4.0): Ubuntu 22.04, Debian 11/12, etc.
   # =============================================================================
   - id: suve-linux-amd64
     main: ./cmd/suve
@@ -73,6 +73,41 @@ builds:
       - arm64
     tags:
       - production
+    ldflags:
+      - -s -w
+      - -X github.com/mpyw/suve/internal/cli/commands.Version={{.Version}}
+
+  # =============================================================================
+  # Linux GUI (webkit2gtk-4.1): Ubuntu 24.04+, Fedora 40+, etc.
+  # =============================================================================
+  - id: suve-linux-amd64-webkit2_41
+    main: ./cmd/suve
+    binary: suve
+    env:
+      - CGO_ENABLED=1
+    goos:
+      - linux
+    goarch:
+      - amd64
+    tags:
+      - production
+      - webkit2_41
+    ldflags:
+      - -s -w
+      - -X github.com/mpyw/suve/internal/cli/commands.Version={{.Version}}
+
+  - id: suve-linux-arm64-webkit2_41
+    main: ./cmd/suve
+    binary: suve
+    env:
+      - CGO_ENABLED=1
+    goos:
+      - linux
+    goarch:
+      - arm64
+    tags:
+      - production
+      - webkit2_41
     ldflags:
       - -s -w
       - -X github.com/mpyw/suve/internal/cli/commands.Version={{.Version}}
@@ -137,12 +172,11 @@ builds:
       - -X github.com/mpyw/suve/internal/cli/commands.Version={{.Version}}
 
 archives:
+  # macOS and Windows archives (Linux GUI archives are created separately in release.yml)
   - id: suve
     builds:
       - suve-darwin-amd64
       - suve-darwin-arm64
-      - suve-linux-amd64
-      - suve-linux-arm64
       - suve-windows-amd64
       - suve-windows-arm64
     formats:

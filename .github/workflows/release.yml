@@ -108,17 +108,11 @@ jobs:
           retention-days: 1
 
   # ===========================================================================
-  # Linux GUI (amd64): CGO required for webkit2gtk
-  # Ubuntu 22.04 needed for libwebkit2gtk-4.0-dev (not available in 24.04)
+  # Linux GUI (webkit2gtk-4.0): Ubuntu 22.04, Debian 11/12, etc.
   # ===========================================================================
   build-linux-amd64:
     needs: [validate]
     runs-on: ubuntu-22.04
-    outputs:
-      gtk-deb: ${{ steps.gui-deps.outputs.gtk-deb }}
-      gtk-rpm: ${{ steps.gui-deps.outputs.gtk-rpm }}
-      webkit-deb: ${{ steps.gui-deps.outputs.webkit-deb }}
-      webkit-rpm: ${{ steps.gui-deps.outputs.webkit-rpm }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -135,10 +129,6 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev
-
-      - name: Detect GUI dependencies
-        id: gui-deps
-        uses: ./.github/actions/detect-gui-deps
 
       - name: Build frontend
         run: |
@@ -162,17 +152,9 @@ jobs:
           path: dist/
           retention-days: 1
 
-  # ===========================================================================
-  # Linux GUI (arm64): CGO required for webkit2gtk, native ARM64 runner
-  # ===========================================================================
   build-linux-arm64:
     needs: [validate]
     runs-on: ubuntu-22.04-arm
-    outputs:
-      gtk-deb: ${{ steps.gui-deps.outputs.gtk-deb }}
-      gtk-rpm: ${{ steps.gui-deps.outputs.gtk-rpm }}
-      webkit-deb: ${{ steps.gui-deps.outputs.webkit-deb }}
-      webkit-rpm: ${{ steps.gui-deps.outputs.webkit-rpm }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -189,10 +171,6 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev
-
-      - name: Detect GUI dependencies
-        id: gui-deps
-        uses: ./.github/actions/detect-gui-deps
 
       - name: Build frontend
         run: |
@@ -213,6 +191,93 @@ jobs:
         uses: actions/upload-artifact@v6
         with:
           name: dist-linux-arm64
+          path: dist/
+          retention-days: 1
+
+  # ===========================================================================
+  # Linux GUI (webkit2gtk-4.1): Ubuntu 24.04+, Fedora 40+, etc.
+  # ===========================================================================
+  build-linux-amd64-webkit2_41:
+    needs: [validate]
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.version }}
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev
+
+      - name: Build frontend
+        run: |
+          cd internal/gui/frontend
+          npm ci
+          npm run build
+
+      - name: Build suve (linux-amd64-webkit2_41)
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          distribution: goreleaser
+          version: latest
+          args: build --clean --id suve-linux-amd64-webkit2_41
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v6
+        with:
+          name: dist-linux-amd64-webkit2_41
+          path: dist/
+          retention-days: 1
+
+  build-linux-arm64-webkit2_41:
+    needs: [validate]
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.version }}
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev
+
+      - name: Build frontend
+        run: |
+          cd internal/gui/frontend
+          npm ci
+          npm run build
+
+      - name: Build suve (linux-arm64-webkit2_41)
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          distribution: goreleaser
+          version: latest
+          args: build --clean --id suve-linux-arm64-webkit2_41
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v6
+        with:
+          name: dist-linux-arm64-webkit2_41
           path: dist/
           retention-days: 1
 
@@ -319,7 +384,14 @@ jobs:
   # Release: Combine all artifacts and publish
   # ===========================================================================
   release:
-    needs: [build-darwin, build-linux-amd64, build-linux-arm64, build-linux-cli, build-windows]
+    needs:
+      - build-darwin
+      - build-linux-amd64
+      - build-linux-arm64
+      - build-linux-amd64-webkit2_41
+      - build-linux-arm64-webkit2_41
+      - build-linux-cli
+      - build-windows
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -345,52 +417,47 @@ jobs:
           VERSION="${VERSION#v}"
           mkdir -p releases
 
-          # Directory format: suve-{id}_{goos}_{goarch}_{variant}
-          # Example: suve-darwin-arm64_darwin_arm64_v8.0
-          # CLI-only: suve-cli-linux-amd64_linux_amd64
+          # All builds use goreleaser format: dist/{id}_{goos}_{goarch}/
           for dir in dist/*/; do
+            [[ -d "$dir" ]] || continue
             build_name=$(basename "$dir")
-
-            # Extract goos and goarch using cut
-            # Field 2 = goos, Field 3 = goarch
             goos=$(echo "$build_name" | cut -d'_' -f2)
             goarch=$(echo "$build_name" | cut -d'_' -f3)
 
-            if [[ -z "$goos" || -z "$goarch" ]]; then
-              echo "Warning: Could not parse directory name: $build_name"
-              continue
-            fi
-
-            # Determine if this is CLI-only build
+            # Determine archive name based on build type
             if [[ "$build_name" == suve-cli-* ]]; then
-              archive_prefix="suve-cli"
+              # CLI-only: suve-cli_{version}_linux_{arch}.tar.gz
+              archive_name="suve-cli_${VERSION}_${goos}_${goarch}.tar.gz"
               src_binary="suve-cli"
-            else
-              archive_prefix="suve"
+              dst_binary="suve"
+            elif [[ "$build_name" == *-webkit2_41_* ]]; then
+              # webkit2gtk-4.1: suve_{version}_linux_{arch}_webkit2_41.tar.gz
+              archive_name="suve_${VERSION}_${goos}_${goarch}_webkit2_41.tar.gz"
               src_binary="suve"
+              dst_binary="suve"
+            else
+              # Default (darwin/windows/linux webkit2gtk-4.0)
+              src_binary="suve"
+              dst_binary="suve"
+              if [[ "$goos" == "windows" ]]; then
+                archive_name="suve_${VERSION}_${goos}_${goarch}.zip"
+              else
+                archive_name="suve_${VERSION}_${goos}_${goarch}.tar.gz"
+              fi
             fi
 
             staging="staging_${build_name}"
             mkdir -p "$staging"
 
             if [[ "$goos" == "windows" ]]; then
-              # Windows: copy .exe, rename suve-cli.exe to suve.exe if needed
-              if [[ -f "$dir/${src_binary}.exe" ]]; then
-                cp "$dir/${src_binary}.exe" "$staging/suve.exe"
-              else
-                cp "$dir"*.exe "$staging/"
-              fi
-              archive_name="${archive_prefix}_${VERSION}_${goos}_${goarch}.zip"
+              cp "$dir/${src_binary}.exe" "$staging/${dst_binary}.exe"
               cp README.md LICENSE "$staging/"
               (cd "$staging" && zip -r "../releases/${archive_name}" .)
             else
-              # Linux/macOS: rename suve-cli to suve for consistent UX
-              cp "$dir/${src_binary}" "$staging/suve"
-              archive_name="${archive_prefix}_${VERSION}_${goos}_${goarch}.tar.gz"
+              cp "$dir/${src_binary}" "$staging/${dst_binary}"
               cp README.md LICENSE "$staging/"
               tar -czvf "releases/${archive_name}" -C "$staging" .
             fi
-
             rm -rf "$staging"
           done
 
@@ -399,14 +466,6 @@ jobs:
       - name: Create Linux packages (.deb, .rpm)
         env:
           VERSION: ${{ inputs.version }}
-          GTK_DEB_AMD64: ${{ needs.build-linux-amd64.outputs.gtk-deb }}
-          GTK_RPM_AMD64: ${{ needs.build-linux-amd64.outputs.gtk-rpm }}
-          WEBKIT_DEB_AMD64: ${{ needs.build-linux-amd64.outputs.webkit-deb }}
-          WEBKIT_RPM_AMD64: ${{ needs.build-linux-amd64.outputs.webkit-rpm }}
-          GTK_DEB_ARM64: ${{ needs.build-linux-arm64.outputs.gtk-deb }}
-          GTK_RPM_ARM64: ${{ needs.build-linux-arm64.outputs.gtk-rpm }}
-          WEBKIT_DEB_ARM64: ${{ needs.build-linux-arm64.outputs.webkit-deb }}
-          WEBKIT_RPM_ARM64: ${{ needs.build-linux-arm64.outputs.webkit-rpm }}
         run: |
           set -euo pipefail
           VERSION="${VERSION#v}"
@@ -416,56 +475,59 @@ jobs:
           export PATH="$(go env GOPATH)/bin:$PATH"
 
           for arch in amd64 arm64; do
-            # Map Go arch to package arch names and select GUI deps
             case "$arch" in
-              amd64)
-                deb_arch="amd64"; rpm_arch="x86_64"
-                export GTK_DEB="${GTK_DEB_AMD64}"
-                export GTK_RPM="${GTK_RPM_AMD64}"
-                export WEBKIT_DEB="${WEBKIT_DEB_AMD64}"
-                export WEBKIT_RPM="${WEBKIT_RPM_AMD64}"
-                ;;
-              arm64)
-                deb_arch="arm64"; rpm_arch="aarch64"
-                export GTK_DEB="${GTK_DEB_ARM64}"
-                export GTK_RPM="${GTK_RPM_ARM64}"
-                export WEBKIT_DEB="${WEBKIT_DEB_ARM64}"
-                export WEBKIT_RPM="${WEBKIT_RPM_ARM64}"
-                ;;
+              amd64) deb_arch="amd64"; rpm_arch="x86_64" ;;
+              arm64) deb_arch="arm64"; rpm_arch="aarch64" ;;
             esac
 
-            echo "=== Building ${arch} packages ==="
-            echo "Using GTK: ${GTK_DEB} / ${GTK_RPM}"
-            echo "Using WebKit: ${WEBKIT_DEB} / ${WEBKIT_RPM}"
-
-            # Set environment variables for nfpm
             export VERSION="${VERSION}"
             export GOARCH="${arch}"
 
             # --- CLI-only package (suve-cli) ---
-            cli_dir=$(find dist -type d -name "suve-cli-linux*_linux_${arch}*" | head -n 1)
-            if [[ -z "$cli_dir" ]]; then
-              echo "Error: No Linux CLI ${arch} build found"
+            cli_dir="dist/suve-cli-linux-${arch}_linux_${arch}"
+            if [[ ! -d "$cli_dir" ]]; then
+              echo "Error: CLI directory not found: $cli_dir"
               exit 1
             fi
             cp "${cli_dir}/suve-cli" ./suve-cli
 
-            echo "Generating suve-cli packages for ${arch}..."
+            echo "=== Generating suve-cli packages for ${arch} ==="
             nfpm pkg --config .github/templates/nfpm.yaml --packager deb --target "releases/suve-cli_${VERSION}-1_${deb_arch}.deb"
             nfpm pkg --config .github/templates/nfpm.yaml --packager rpm --target "releases/suve-cli-${VERSION}-1.${rpm_arch}.rpm"
             rm ./suve-cli
 
-            # --- GUI package (suve) ---
-            gui_dir=$(find dist -type d -name "suve-linux-${arch}_linux_${arch}*" | head -n 1)
-            if [[ -z "$gui_dir" ]]; then
-              echo "Error: No Linux GUI ${arch} build found"
+            # --- GUI package (webkit2gtk-4.0) ---
+            export GTK_DEB="libgtk-3-0"
+            export GTK_RPM="gtk3"
+            export WEBKIT_DEB="libwebkit2gtk-4.0-37"
+            export WEBKIT_RPM="webkit2gtk4.0"
+
+            gui_dir="dist/suve-linux-${arch}_linux_${arch}"
+            if [[ ! -d "$gui_dir" ]]; then
+              echo "Error: GUI directory not found: $gui_dir"
               exit 1
             fi
             cp "${gui_dir}/suve" ./suve
 
-            echo "Generating suve packages for ${arch}..."
+            echo "=== Generating suve packages for ${arch} (webkit2gtk-4.0) ==="
             nfpm pkg --config .github/templates/nfpm-gui.yaml --packager deb --target "releases/suve_${VERSION}-1_${deb_arch}.deb"
             nfpm pkg --config .github/templates/nfpm-gui.yaml --packager rpm --target "releases/suve-${VERSION}-1.${rpm_arch}.rpm"
+            rm ./suve
+
+            # --- GUI package (webkit2gtk-4.1) ---
+            export WEBKIT_DEB="libwebkit2gtk-4.1-0"
+            export WEBKIT_RPM="webkit2gtk4.1"
+
+            gui41_dir="dist/suve-linux-${arch}-webkit2_41_linux_${arch}"
+            if [[ ! -d "$gui41_dir" ]]; then
+              echo "Error: GUI webkit2_41 directory not found: $gui41_dir"
+              exit 1
+            fi
+            cp "${gui41_dir}/suve" ./suve
+
+            echo "=== Generating suve_webkit2_41 packages for ${arch} (webkit2gtk-4.1) ==="
+            nfpm pkg --config .github/templates/nfpm-gui.yaml --packager deb --target "releases/suve_webkit2_41_${VERSION}-1_${deb_arch}.deb"
+            nfpm pkg --config .github/templates/nfpm-gui.yaml --packager rpm --target "releases/suve_webkit2_41-${VERSION}-1.${rpm_arch}.rpm"
             rm ./suve
           done
 
@@ -481,8 +543,8 @@ jobs:
             dpkg-deb -I "${deb_pkg}"
             echo "--- lintian ${deb_pkg} ---"
             lintian --tag-display-limit 0 \
-              --suppress-tags no-changelog,no-manual-page,unknown-field,hardening-no-pie,hardening-no-relro,unstripped-binary-or-object,undeclared-elf-prerequisites \
-              "${deb_pkg}" || true
+              --suppress-tags no-changelog,no-manual-page,unknown-field,hardening-no-pie,hardening-no-relro,unstripped-binary-or-object,undeclared-elf-prerequisites,extended-description-contains-empty-paragraph,statically-linked-binary \
+              "${deb_pkg}"
           done
 
           echo "=== Verifying .rpm packages ==="
@@ -537,8 +599,8 @@ jobs:
           export VERSION="${TAG#v}"
           export SHA256_DARWIN_AMD64=$(grep "suve_.*_darwin_amd64.tar.gz" releases/checksums.txt | cut -d' ' -f1)
           export SHA256_DARWIN_ARM64=$(grep "suve_.*_darwin_arm64.tar.gz" releases/checksums.txt | cut -d' ' -f1)
-          export SHA256_LINUX_AMD64=$(grep "suve_.*_linux_amd64.tar.gz" releases/checksums.txt | cut -d' ' -f1)
-          export SHA256_LINUX_ARM64=$(grep "suve_.*_linux_arm64.tar.gz" releases/checksums.txt | cut -d' ' -f1)
+          export SHA256_LINUX_AMD64=$(grep -E "suve_[0-9.]+_linux_amd64\.tar\.gz$" releases/checksums.txt | cut -d' ' -f1)
+          export SHA256_LINUX_ARM64=$(grep -E "suve_[0-9.]+_linux_arm64\.tar\.gz$" releases/checksums.txt | cut -d' ' -f1)
           export SHA256_LINUX_CLI_AMD64=$(grep "suve-cli_.*_linux_amd64.tar.gz" releases/checksums.txt | cut -d' ' -f1)
           export SHA256_LINUX_CLI_ARM64=$(grep "suve-cli_.*_linux_arm64.tar.gz" releases/checksums.txt | cut -d' ' -f1)
 
