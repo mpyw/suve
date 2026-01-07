@@ -484,9 +484,10 @@ jobs:
             export GOARCH="${arch}"
 
             # --- CLI-only package (suve-cli) ---
-            cli_dir="dist/suve-cli-linux-${arch}_linux_${arch}"
-            if [[ ! -d "$cli_dir" ]]; then
-              echo "Error: CLI directory not found: $cli_dir"
+            cli_dir=$(find dist -maxdepth 1 -type d -name "suve-cli-linux-${arch}_linux_${arch}*" | head -1)
+            if [[ -z "$cli_dir" || ! -d "$cli_dir" ]]; then
+              echo "Error: CLI directory not found for ${arch}"
+              find dist -maxdepth 1 -type d
               exit 1
             fi
             cp "${cli_dir}/suve-cli" ./suve-cli
@@ -502,9 +503,10 @@ jobs:
             export WEBKIT_DEB="libwebkit2gtk-4.0-37"
             export WEBKIT_RPM="webkit2gtk4.0"
 
-            gui_dir="dist/suve-linux-${arch}_linux_${arch}"
-            if [[ ! -d "$gui_dir" ]]; then
-              echo "Error: GUI directory not found: $gui_dir"
+            gui_dir=$(find dist -maxdepth 1 -type d -name "suve-linux-${arch}_linux_${arch}*" ! -name "*webkit2_41*" | head -1)
+            if [[ -z "$gui_dir" || ! -d "$gui_dir" ]]; then
+              echo "Error: GUI directory not found for ${arch}"
+              find dist -maxdepth 1 -type d
               exit 1
             fi
             cp "${gui_dir}/suve" ./suve
@@ -518,9 +520,10 @@ jobs:
             export WEBKIT_DEB="libwebkit2gtk-4.1-0"
             export WEBKIT_RPM="webkit2gtk4.1"
 
-            gui41_dir="dist/suve-linux-${arch}-webkit2_41_linux_${arch}"
-            if [[ ! -d "$gui41_dir" ]]; then
-              echo "Error: GUI webkit2_41 directory not found: $gui41_dir"
+            gui41_dir=$(find dist -maxdepth 1 -type d -name "suve-linux-${arch}-webkit2_41_linux_${arch}*" | head -1)
+            if [[ -z "$gui41_dir" || ! -d "$gui41_dir" ]]; then
+              echo "Error: GUI webkit2_41 directory not found for ${arch}"
+              find dist -maxdepth 1 -type d
               exit 1
             fi
             cp "${gui41_dir}/suve" ./suve
