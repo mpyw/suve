@@ -81,6 +81,7 @@ test.describe('Parameter CRUD Operations', () => {
 
     test('should create parameter immediately when immediate mode checked', async ({ page }) => {
       await openCreateModal(page);
+      await expect(page.locator('.modal-backdrop')).toBeVisible();
       await page.locator('#param-name').fill('/app/new-param');
       await page.locator('#param-value').fill('new-value');
       await page.locator('.immediate-checkbox input').check();
@@ -146,6 +147,7 @@ test.describe('Parameter CRUD Operations', () => {
     test('should apply edit immediately when immediate mode checked', async ({ page }) => {
       await clickItemByName(page, '/app/config');
       await page.getByRole('button', { name: 'Edit' }).click();
+      await expect(page.locator('.modal-backdrop')).toBeVisible();
       await page.locator('#param-value').fill('updated-value');
       await page.locator('.immediate-checkbox input').check();
       await page.getByRole('button', { name: 'Save' }).click();
@@ -179,6 +181,7 @@ test.describe('Parameter CRUD Operations', () => {
     test('should delete immediately when immediate mode checked', async ({ page }) => {
       await clickItemByName(page, '/app/config');
       await page.locator('.detail-actions').getByRole('button', { name: 'Delete' }).click();
+      await expect(page.locator('.modal-backdrop')).toBeVisible();
       await page.locator('.immediate-checkbox input').check();
       await page.locator('.modal-content').getByRole('button', { name: 'Delete' }).click();
       await expect(page.locator('.modal-backdrop')).not.toBeVisible();
@@ -246,6 +249,7 @@ test.describe('Parameter CRUD Operations', () => {
     test('should remove tag immediately when immediate mode checked', async ({ page }) => {
       await clickItemByName(page, '/app/config');
       await page.locator('.btn-tag-remove').click();
+      await expect(page.locator('.modal-backdrop')).toBeVisible();
       await page.locator('.immediate-checkbox input').check();
       await page.getByRole('button', { name: 'Remove' }).click();
       await expect(page.locator('.modal-backdrop')).not.toBeVisible();

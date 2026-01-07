@@ -50,7 +50,7 @@ jobs:
         ports:
           - 4566:4566
         env:
-          SERVICES: ssm,secretsmanager
+          SERVICES: ssm,secretsmanager,events
           DEBUG: 0
         options: >-
           --health-cmd "curl -f http://localhost:4566/_localstack/health"

@@ -75,7 +75,7 @@ jobs:
         uses: goreleaser/goreleaser-action@v6
         with:
           distribution: goreleaser
-          version: latest
+          version: "~> v2"
           args: build --clean --id suve-darwin-arm64
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -94,7 +94,7 @@ jobs:
         uses: goreleaser/goreleaser-action@v6
         with:
           distribution: goreleaser
-          version: latest
+          version: "~> v2"
           args: build --clean --id suve-darwin-amd64
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -140,7 +140,7 @@ jobs:
         uses: goreleaser/goreleaser-action@v6
         with:
           distribution: goreleaser
-          version: latest
+          version: "~> v2"
           args: build --clean --id suve-linux-amd64
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -182,7 +182,7 @@ jobs:
         uses: goreleaser/goreleaser-action@v6
         with:
           distribution: goreleaser
-          version: latest
+          version: "~> v2"
           args: build --clean --id suve-linux-arm64
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -227,7 +227,7 @@ jobs:
         uses: goreleaser/goreleaser-action@v6
         with:
           distribution: goreleaser
-          version: latest
+          version: "~> v2"
           args: build --clean --id suve-linux-amd64-webkit2_41
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -269,7 +269,7 @@ jobs:
         uses: goreleaser/goreleaser-action@v6
         with:
           distribution: goreleaser
-          version: latest
+          version: "~> v2"
           args: build --clean --id suve-linux-arm64-webkit2_41
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -303,7 +303,7 @@ jobs:
         uses: goreleaser/goreleaser-action@v6
         with:
           distribution: goreleaser
-          version: latest
+          version: "~> v2"
           args: build --clean --id suve-cli-linux-amd64 --id suve-cli-linux-arm64
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -368,7 +368,7 @@ jobs:
         uses: goreleaser/goreleaser-action@v6
         with:
           distribution: goreleaser
-          version: latest
+          version: "~> v2"
           args: build --clean --id suve-windows-amd64 --id suve-windows-arm64
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -88,6 +88,7 @@ test.describe('Secret CRUD Operations', () => {
 
     test('should create secret immediately when immediate mode checked', async ({ page }) => {
       await openCreateModal(page);
+      await expect(page.locator('.modal-backdrop')).toBeVisible();
       await page.locator('#secret-name').fill('new-secret');
       await page.locator('#secret-value').fill('{"key": "value"}');
       await page.locator('.immediate-checkbox input').check();
@@ -153,6 +154,7 @@ test.describe('Secret CRUD Operations', () => {
     test('should apply edit immediately when immediate mode checked', async ({ page }) => {
       await clickItemByName(page, 'my-secret');
       await page.getByRole('button', { name: 'Edit' }).click();
+      await expect(page.locator('.modal-backdrop')).toBeVisible();
       await page.locator('#edit-secret-value').fill('{"updated": "value"}');
       await page.locator('.immediate-checkbox input').check();
       await page.getByRole('button', { name: 'Save' }).click();
@@ -192,6 +194,7 @@ test.describe('Secret CRUD Operations', () => {
     test('should delete immediately when immediate mode checked', async ({ page }) => {
       await clickItemByName(page, 'my-secret');
       await page.locator('.detail-actions').getByRole('button', { name: 'Delete' }).click();
+      await expect(page.locator('.modal-backdrop')).toBeVisible();
       await page.locator('.immediate-checkbox input').check();
       await page.locator('.modal-content').getByRole('button', { name: 'Delete' }).click();
       await expect(page.locator('.modal-backdrop')).not.toBeVisible();
@@ -247,7 +250,7 @@ test.describe('Secret CRUD Operations', () => {
     test('should add tag immediately when immediate mode checked', async ({ page }) => {
       await clickItemByName(page, 'my-secret');
       await page.getByRole('button', { name: '+ Add' }).click();
-      await page.locator('#tag-key').waitFor();
+      await expect(page.locator('.modal-backdrop')).toBeVisible();
       await page.locator('#tag-key').fill('new-tag');
       await page.locator('#tag-value').fill('tag-value');
       await page.locator('.immediate-checkbox input').check();
@@ -280,6 +283,7 @@ test.describe('Secret CRUD Operations', () => {
     test('should remove tag immediately when immediate mode checked', async ({ page }) => {
       await clickItemByName(page, 'my-secret');
       await page.locator('.btn-tag-remove').click();
+      await expect(page.locator('.modal-backdrop')).toBeVisible();
       await page.locator('.immediate-checkbox input').check();
       await page.getByRole('button', { name: 'Remove' }).click();
       await expect(page.locator('.modal-backdrop')).not.toBeVisible();
