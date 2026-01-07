@@ -50,7 +50,7 @@ jobs:
         ports:
           - 4566:4566
         env:
-          SERVICES: ssm,secretsmanager
+          SERVICES: ssm,secretsmanager,events
           DEBUG: 0
         options: >-
           --health-cmd "curl -f http://localhost:4566/_localstack/health"
@@ -107,8 +107,8 @@ jobs:
 
       - name: Install Wails dependencies (CGO)
         run: |
-          sudo apt-get update
-          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev build-essential pkg-config
+          for i in {1..5}; do sudo apt-get update && break || sleep $((i * 5)); done
+          for i in {1..5}; do sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev build-essential pkg-config && break || sleep $((i * 5)); done
 
       - name: Run golangci-lint (production build)
         uses: golangci/golangci-lint-action@v9
@@ -180,8 +180,8 @@ jobs:
 
       - name: Install lintian and rpmlint
         run: |
-          sudo apt-get update
-          sudo apt-get install -y lintian rpm rpmlint
+          for i in {1..5}; do sudo apt-get update && break || sleep $((i * 5)); done
+          for i in {1..5}; do sudo apt-get install -y lintian rpm rpmlint && break || sleep $((i * 5)); done
 
       - name: Generate CLI packages
         env:
@@ -194,13 +194,9 @@ jobs:
 
       - name: Lint CLI packages
         run: |
-          echo "=== lintian check (.deb) ==="
           lintian --tag-display-limit 0 \
             --suppress-tags no-changelog,no-manual-page,unknown-field,hardening-no-pie,hardening-no-relro,unstripped-binary-or-object,undeclared-elf-prerequisites,extended-description-contains-empty-paragraph,statically-linked-binary \
             "suve-cli_test_amd64.deb"
-
-          echo "=== rpmlint check (.rpm) ==="
-          rpmlint "suve-cli-test.x86_64.rpm" || true
 
       - name: Test .deb installation
         run: |
@@ -258,8 +254,8 @@ jobs:
 
       - name: Install build dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-${{ matrix.webkit }}-dev
+          for i in {1..5}; do sudo apt-get update && break || sleep $((i * 5)); done
+          for i in {1..5}; do sudo apt-get install -y libgtk-3-dev libwebkit2gtk-${{ matrix.webkit }}-dev && break || sleep $((i * 5)); done
 
       - name: Setup Node.js
         uses: actions/setup-node@v6
@@ -292,7 +288,7 @@ jobs:
         run: go install github.com/goreleaser/nfpm/v2/cmd/nfpm@v2.41.1
 
       - name: Install lintian and rpmlint
-        run: sudo apt-get install -y lintian rpm rpmlint
+        run: for i in {1..5}; do sudo apt-get install -y lintian rpm rpmlint && break || sleep $((i * 5)); done
 
       - name: Generate GUI packages
         env:
@@ -319,8 +315,8 @@ jobs:
 
       - name: Test .deb installation
         run: |
-          sudo apt-get update
-          sudo apt-get install -y libgtk-3-0 ${{ matrix.webkit_deb }}
+          for i in {1..5}; do sudo apt-get update && break || sleep $((i * 5)); done
+          for i in {1..5}; do sudo apt-get install -y libgtk-3-0 ${{ matrix.webkit_deb }} && break || sleep $((i * 5)); done
           sudo dpkg -i "suve${{ matrix.pkg_suffix }}_test_${{ matrix.deb_arch }}.deb"
           command -v suve
           suve --version

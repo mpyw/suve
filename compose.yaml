@@ -4,7 +4,7 @@ services:
     ports:
       - "127.0.0.1:${SUVE_LOCALSTACK_EXTERNAL_PORT:-4566}:4566/tcp"
     environment:
-      - SERVICES=ssm
+      - SERVICES=ssm,secretsmanager,events
       - DEBUG=0
     healthcheck:
       test: ["CMD", "curl", "-sf", "http://localhost:4566/_localstack/health"]
