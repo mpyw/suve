@@ -41,8 +41,7 @@ func (u *UpdateUseCase) Exists(ctx context.Context, name string) (bool, error) {
 		Name: lo.ToPtr(name),
 	})
 	if err != nil {
-		var pnf *paramapi.ParameterNotFound
-		if errors.As(err, &pnf) {
+		if pnf := (*paramapi.ParameterNotFound)(nil); errors.As(err, &pnf) {
 			return false, nil
 		}
 		return false, err

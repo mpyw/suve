@@ -101,8 +101,7 @@ func (s *ParamStrategy) applyUpdate(ctx context.Context, name string, entry Entr
 		Name: lo.ToPtr(name),
 	})
 	if err != nil {
-		var pnf *paramapi.ParameterNotFound
-		if errors.As(err, &pnf) {
+		if pnf := (*paramapi.ParameterNotFound)(nil); errors.As(err, &pnf) {
 			return fmt.Errorf("parameter not found: %s", name)
 		}
 		return fmt.Errorf("failed to get existing parameter: %w", err)
@@ -152,8 +151,7 @@ func (s *ParamStrategy) applyDelete(ctx context.Context, name string) error {
 	})
 	if err != nil {
 		// Already deleted is considered success
-		var pnf *paramapi.ParameterNotFound
-		if errors.As(err, &pnf) {
+		if pnf := (*paramapi.ParameterNotFound)(nil); errors.As(err, &pnf) {
 			return nil
 		}
 		return fmt.Errorf("failed to delete parameter: %w", err)
@@ -168,8 +166,7 @@ func (s *ParamStrategy) FetchLastModified(ctx context.Context, name string) (tim
 		Name: lo.ToPtr(name),
 	})
 	if err != nil {
-		var pnf *paramapi.ParameterNotFound
-		if errors.As(err, &pnf) {
+		if pnf := (*paramapi.ParameterNotFound)(nil); errors.As(err, &pnf) {
 			return time.Time{}, nil
 		}
 		return time.Time{}, fmt.Errorf("failed to get parameter: %w", err)
@@ -211,8 +208,7 @@ func (s *ParamStrategy) FetchCurrentValue(ctx context.Context, name string) (*Ed
 	spec := &paramversion.Spec{Name: name}
 	param, err := paramversion.GetParameterWithVersion(ctx, s.Client, spec)
 	if err != nil {
-		var pnf *paramapi.ParameterNotFound
-		if errors.As(err, &pnf) {
+		if pnf := (*paramapi.ParameterNotFound)(nil); errors.As(err, &pnf) {
 			return nil, &ResourceNotFoundError{Err: err}
 		}
 		return nil, err
