@@ -143,8 +143,7 @@ func (s *SecretStrategy) applyDelete(ctx context.Context, name string, entry Ent
 	_, err := s.Client.DeleteSecret(ctx, input)
 	if err != nil {
 		// Already deleted is considered success
-		var rnf *secretapi.ResourceNotFoundException
-		if errors.As(err, &rnf) {
+		if rnf := (*secretapi.ResourceNotFoundException)(nil); errors.As(err, &rnf) {
 			return nil
 		}
 		return fmt.Errorf("failed to delete secret: %w", err)
@@ -159,8 +158,7 @@ func (s *SecretStrategy) FetchLastModified(ctx context.Context, name string) (ti
 		SecretId: lo.ToPtr(name),
 	})
 	if err != nil {
-		var rnf *secretapi.ResourceNotFoundException
-		if errors.As(err, &rnf) {
+		if rnf := (*secretapi.ResourceNotFoundException)(nil); errors.As(err, &rnf) {
 			return time.Time{}, nil
 		}
 		return time.Time{}, fmt.Errorf("failed to get secret: %w", err)
@@ -203,8 +201,7 @@ func (s *SecretStrategy) FetchCurrentValue(ctx context.Context, name string) (*E
 	spec := &secretversion.Spec{Name: name}
 	secret, err := secretversion.GetSecretWithVersion(ctx, s.Client, spec)
 	if err != nil {
-		var rnf *secretapi.ResourceNotFoundException
-		if errors.As(err, &rnf) {
+		if rnf := (*secretapi.ResourceNotFoundException)(nil); errors.As(err, &rnf) {
 			return nil, &ResourceNotFoundError{Err: err}
 		}
 		return nil, err

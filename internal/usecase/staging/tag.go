@@ -95,8 +95,7 @@ func (u *TagUseCase) fetchAWSCurrentValue(ctx context.Context, name string) (*st
 	result, err := u.Strategy.FetchCurrentValue(ctx, name)
 	if err != nil {
 		// If resource doesn't exist, return nil
-		var notFoundErr *staging.ResourceNotFoundError
-		if errors.As(err, &notFoundErr) {
+		if notFoundErr := (*staging.ResourceNotFoundError)(nil); errors.As(err, &notFoundErr) {
 			return nil, nil, nil
 		}
 		return nil, nil, err

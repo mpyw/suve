@@ -243,8 +243,7 @@ func (a *App) ParamSet(name, value, paramType string) (*ParamSetResult, error) {
 	}
 
 	// If parameter already exists, update it
-	var pae *paramapi.ParameterAlreadyExists
-	if errors.As(err, &pae) {
+	if pae := (*paramapi.ParameterAlreadyExists)(nil); errors.As(err, &pae) {
 		updateUC := &param.UpdateUseCase{Client: client}
 		updateResult, err := updateUC.Execute(a.ctx, param.UpdateInput{
 			Name:  name,

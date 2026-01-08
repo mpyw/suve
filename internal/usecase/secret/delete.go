@@ -42,8 +42,7 @@ func (u *DeleteUseCase) GetCurrentValue(ctx context.Context, name string) (strin
 		SecretId: lo.ToPtr(name),
 	})
 	if err != nil {
-		var rnf *secretapi.ResourceNotFoundException
-		if errors.As(err, &rnf) {
+		if rnf := (*secretapi.ResourceNotFoundException)(nil); errors.As(err, &rnf) {
 			return "", nil
 		}
 		return "", err
