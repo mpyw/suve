@@ -304,6 +304,11 @@ Output will look like:
 +++ /app/config/new-param (staged for creation)
 @@ -0,0 +1 @@
 +my-value
+
+--- /app/config/old-param#2 (AWS)
++++ /app/config/old-param (staged for deletion)
+@@ -1 +0,0 @@
+-deprecated-value
 ```
 
 **3. Apply changes**:
