@@ -3,6 +3,8 @@
 package gui
 
 import (
+	"errors"
+
 	"github.com/mpyw/suve/internal/maputil"
 	"github.com/mpyw/suve/internal/staging"
 	stagingusecase "github.com/mpyw/suve/internal/usecase/staging"
@@ -419,12 +421,12 @@ func (a *App) StagingUnstage(service, name string) (*StagingUnstageResult, error
 	}
 
 	// Unstage entry (ignore ErrNotStaged)
-	if err := store.UnstageEntry(a.ctx, svc, name); err != nil && err != staging.ErrNotStaged {
+	if err := store.UnstageEntry(a.ctx, svc, name); err != nil && !errors.Is(err, staging.ErrNotStaged) {
 		return nil, err
 	}
 
 	// Unstage tags (ignore ErrNotStaged)
-	if err := store.UnstageTag(a.ctx, svc, name); err != nil && err != staging.ErrNotStaged {
+	if err := store.UnstageTag(a.ctx, svc, name); err != nil && !errors.Is(err, staging.ErrNotStaged) {
 		return nil, err
 	}
 
