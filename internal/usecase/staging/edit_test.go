@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/mpyw/suve/internal/staging"
+	"github.com/mpyw/suve/internal/staging/file"
 	usecasestaging "github.com/mpyw/suve/internal/usecase/staging"
 )
 
@@ -49,7 +50,7 @@ func newMockEditStrategyNotFound() *mockEditStrategy {
 func TestEditUseCase_Execute(t *testing.T) {
 	t.Parallel()
 
-	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
 	uc := &usecasestaging.EditUseCase{
 		Strategy: newMockEditStrategy(),
 		Store:    store,
@@ -74,7 +75,7 @@ func TestEditUseCase_Execute(t *testing.T) {
 func TestEditUseCase_Execute_PreservesBaseModifiedAt(t *testing.T) {
 	t.Parallel()
 
-	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
 	baseTime := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
 
 	// Pre-stage an entry
@@ -105,7 +106,7 @@ func TestEditUseCase_Execute_PreservesBaseModifiedAt(t *testing.T) {
 func TestEditUseCase_Baseline_FromAWS(t *testing.T) {
 	t.Parallel()
 
-	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
 	strategy := newMockEditStrategy()
 	strategy.fetchResult = &staging.EditFetchResult{
 		Value:        "aws-current-value",
@@ -125,7 +126,7 @@ func TestEditUseCase_Baseline_FromAWS(t *testing.T) {
 func TestEditUseCase_Baseline_FromStaging(t *testing.T) {
 	t.Parallel()
 
-	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("staged-value"),
@@ -145,7 +146,7 @@ func TestEditUseCase_Baseline_FromStaging(t *testing.T) {
 func TestEditUseCase_Baseline_FromStagingCreate(t *testing.T) {
 	t.Parallel()
 
-	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/new", staging.Entry{
 		Operation: staging.OperationCreate,
 		Value:     lo.ToPtr("create-value"),
@@ -165,7 +166,7 @@ func TestEditUseCase_Baseline_FromStagingCreate(t *testing.T) {
 func TestEditUseCase_Execute_FetchError(t *testing.T) {
 	t.Parallel()
 
-	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
 	strategy := newMockEditStrategy()
 	strategy.fetchErr = errors.New("aws error")
 
@@ -185,7 +186,7 @@ func TestEditUseCase_Execute_FetchError(t *testing.T) {
 func TestEditUseCase_Baseline_FetchError(t *testing.T) {
 	t.Parallel()
 
-	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
 	strategy := newMockEditStrategy()
 	strategy.fetchErr = errors.New("aws error")
 
@@ -201,7 +202,7 @@ func TestEditUseCase_Baseline_FetchError(t *testing.T) {
 func TestEditUseCase_Execute_WithStagedCreate(t *testing.T) {
 	t.Parallel()
 
-	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
 	// Pre-stage a create operation (no BaseModifiedAt)
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/new", staging.Entry{
 		Operation: staging.OperationCreate,
@@ -233,7 +234,7 @@ func TestEditUseCase_Execute_WithStagedCreate(t *testing.T) {
 func TestEditUseCase_Execute_ZeroLastModified(t *testing.T) {
 	t.Parallel()
 
-	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
 	strategy := newMockEditStrategy()
 	strategy.fetchResult = &staging.EditFetchResult{
 		Value:        "aws-value",
@@ -311,7 +312,7 @@ func TestEditUseCase_Baseline_GetError(t *testing.T) {
 func TestEditUseCase_Execute_BlocksEditOnDelete(t *testing.T) {
 	t.Parallel()
 
-	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
 	// Pre-stage a DELETE operation
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/deleted", staging.Entry{
 		Operation: staging.OperationDelete,
@@ -340,7 +341,7 @@ func TestEditUseCase_Execute_BlocksEditOnDelete(t *testing.T) {
 func TestEditUseCase_Baseline_BlocksWhenDeleteStaged(t *testing.T) {
 	t.Parallel()
 
-	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
 	// Pre-stage a DELETE operation
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/deleted", staging.Entry{
 		Operation: staging.OperationDelete,
@@ -367,7 +368,7 @@ func TestEditUseCase_Baseline_BlocksWhenDeleteStaged(t *testing.T) {
 func TestEditUseCase_Execute_PreservesUpdateOperation(t *testing.T) {
 	t.Parallel()
 
-	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
 	baseTime := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
 
 	// Pre-stage an UPDATE operation
@@ -400,7 +401,7 @@ func TestEditUseCase_Execute_PreservesUpdateOperation(t *testing.T) {
 func TestEditUseCase_Execute_Skipped_SameAsAWS(t *testing.T) {
 	t.Parallel()
 
-	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
 	strategy := newMockEditStrategy()
 	strategy.fetchResult = &staging.EditFetchResult{
 		Value:        "aws-value",
@@ -429,7 +430,7 @@ func TestEditUseCase_Execute_Skipped_SameAsAWS(t *testing.T) {
 func TestEditUseCase_Execute_Unstaged_RevertedToAWS(t *testing.T) {
 	t.Parallel()
 
-	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
 
 	// Pre-stage an UPDATE operation
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
@@ -466,7 +467,7 @@ func TestEditUseCase_Execute_Unstaged_RevertedToAWS(t *testing.T) {
 func TestEditUseCase_Execute_NotSkipped_DifferentFromAWS(t *testing.T) {
 	t.Parallel()
 
-	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
 	strategy := newMockEditStrategy()
 	strategy.fetchResult = &staging.EditFetchResult{
 		Value:        "aws-value",
@@ -498,7 +499,7 @@ func TestEditUseCase_Execute_EmptyStringValue_AutoSkip(t *testing.T) {
 
 	// Test that empty string is treated as a valid AWS value (not "non-existing")
 	// This is critical for Secrets Manager where empty string secrets are valid
-	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
 	strategy := &mockEditStrategy{
 		mockParser: newMockParser(),
 		fetchResult: &staging.EditFetchResult{
@@ -529,7 +530,7 @@ func TestEditUseCase_Execute_EmptyStringValue_Stage(t *testing.T) {
 	t.Parallel()
 
 	// Test that we can stage a non-empty value when AWS has empty string
-	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
 	strategy := &mockEditStrategy{
 		mockParser: newMockParser(),
 		fetchResult: &staging.EditFetchResult{

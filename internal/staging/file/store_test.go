@@ -1,4 +1,4 @@
-package staging_test
+package file_test
 
 import (
 	"os"
@@ -11,12 +11,13 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/mpyw/suve/internal/staging"
+	"github.com/mpyw/suve/internal/staging/file"
 )
 
 func TestNewStore(t *testing.T) {
 	t.Parallel()
 
-	store, err := staging.NewStore("123456789012", "ap-northeast-1")
+	store, err := file.NewStore("123456789012", "ap-northeast-1")
 	require.NoError(t, err)
 	assert.NotNil(t, store)
 }
@@ -25,7 +26,7 @@ func TestStore_LoadEmpty(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "staging.json"))
+	store := file.NewStoreWithPath(filepath.Join(tmpDir, "staging.json"))
 
 	state, err := store.Load(t.Context())
 	require.NoError(t, err)
@@ -38,7 +39,7 @@ func TestStore_StageAndLoad(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "staging.json"))
+	store := file.NewStoreWithPath(filepath.Join(tmpDir, "staging.json"))
 
 	now := time.Now().Truncate(time.Second)
 
@@ -73,7 +74,7 @@ func TestStore_StageOverwrite(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "staging.json"))
+	store := file.NewStoreWithPath(filepath.Join(tmpDir, "staging.json"))
 
 	now := time.Now()
 
@@ -103,7 +104,7 @@ func TestStore_Unstage(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "staging.json"))
+	store := file.NewStoreWithPath(filepath.Join(tmpDir, "staging.json"))
 
 	now := time.Now()
 
@@ -128,7 +129,7 @@ func TestStore_UnstageNotStaged(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "staging.json"))
+	store := file.NewStoreWithPath(filepath.Join(tmpDir, "staging.json"))
 
 	err := store.UnstageEntry(t.Context(), staging.ServiceParam, "/not/staged")
 	assert.ErrorIs(t, err, staging.ErrNotStaged)
@@ -144,7 +145,7 @@ func TestStore_UnstageAll(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
-		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "staging.json"))
+		store := file.NewStoreWithPath(filepath.Join(tmpDir, "staging.json"))
 
 		now := time.Now()
 
@@ -168,7 +169,7 @@ func TestStore_UnstageAll(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
-		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "staging.json"))
+		store := file.NewStoreWithPath(filepath.Join(tmpDir, "staging.json"))
 
 		now := time.Now()
 
@@ -189,7 +190,7 @@ func TestStore_UnstageAll(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
-		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "staging.json"))
+		store := file.NewStoreWithPath(filepath.Join(tmpDir, "staging.json"))
 
 		now := time.Now()
 
@@ -210,7 +211,7 @@ func TestStore_Get(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "staging.json"))
+	store := file.NewStoreWithPath(filepath.Join(tmpDir, "staging.json"))
 
 	now := time.Now()
 
@@ -244,7 +245,7 @@ func TestStore_List(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "staging.json"))
+	store := file.NewStoreWithPath(filepath.Join(tmpDir, "staging.json"))
 
 	now := time.Now()
 
@@ -282,7 +283,7 @@ func TestStore_ListEmpty(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "staging.json"))
+	store := file.NewStoreWithPath(filepath.Join(tmpDir, "staging.json"))
 
 	result, err := store.ListEntries(t.Context(), "")
 	require.NoError(t, err)
@@ -293,7 +294,7 @@ func TestStore_HasChanges(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "staging.json"))
+	store := file.NewStoreWithPath(filepath.Join(tmpDir, "staging.json"))
 
 	// Initially no changes
 	has, err := store.HasChanges(t.Context(), "")
@@ -325,7 +326,7 @@ func TestStore_Count(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "staging.json"))
+	store := file.NewStoreWithPath(filepath.Join(tmpDir, "staging.json"))
 
 	now := time.Now()
 
@@ -350,7 +351,7 @@ func TestStore_UnknownService(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "staging.json"))
+	store := file.NewStoreWithPath(filepath.Join(tmpDir, "staging.json"))
 
 	unknownService := staging.Service("unknown")
 
@@ -392,7 +393,7 @@ func TestStore_CorruptedFile(t *testing.T) {
 	err := os.WriteFile(path, []byte("not valid json"), 0o600)
 	require.NoError(t, err)
 
-	store := staging.NewStoreWithPath(path)
+	store := file.NewStoreWithPath(path)
 	_, err = store.Load(t.Context())
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to parse state file")
@@ -403,7 +404,7 @@ func TestStore_SaveRemovesEmptyFile(t *testing.T) {
 
 	tmpDir := t.TempDir()
 	path := filepath.Join(tmpDir, "staging.json")
-	store := staging.NewStoreWithPath(path)
+	store := file.NewStoreWithPath(path)
 
 	now := time.Now()
 
@@ -434,7 +435,7 @@ func TestStore_NilMapsInLoadedState(t *testing.T) {
 	err := os.WriteFile(path, []byte(`{"version":1,"param":null,"secret":null}`), 0o600)
 	require.NoError(t, err)
 
-	store := staging.NewStoreWithPath(path)
+	store := file.NewStoreWithPath(path)
 	state, err := store.Load(t.Context())
 	require.NoError(t, err)
 
@@ -448,7 +449,7 @@ func TestStore_Save(t *testing.T) {
 
 	tmpDir := t.TempDir()
 	path := filepath.Join(tmpDir, "staging.json")
-	store := staging.NewStoreWithPath(path)
+	store := file.NewStoreWithPath(path)
 
 	state := &staging.State{
 		Version: 2,
@@ -487,7 +488,7 @@ func TestStore_DirectoryCreation(t *testing.T) {
 
 	tmpDir := t.TempDir()
 	path := filepath.Join(tmpDir, "subdir", "nested", "staging.json")
-	store := staging.NewStoreWithPath(path)
+	store := file.NewStoreWithPath(path)
 
 	now := time.Now()
 	err := store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
@@ -506,7 +507,7 @@ func TestStore_UnstageFromSecret(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "staging.json"))
+	store := file.NewStoreWithPath(filepath.Join(tmpDir, "staging.json"))
 
 	now := time.Now()
 
@@ -537,7 +538,7 @@ func TestStore_LoadReadError(t *testing.T) {
 	err := os.Mkdir(path, 0o755)
 	require.NoError(t, err)
 
-	store := staging.NewStoreWithPath(path)
+	store := file.NewStoreWithPath(path)
 	_, err = store.Load(t.Context())
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to read state file")
@@ -553,7 +554,7 @@ func TestStore_StageLoadError(t *testing.T) {
 	err := os.WriteFile(path, []byte("invalid json"), 0o600)
 	require.NoError(t, err)
 
-	store := staging.NewStoreWithPath(path)
+	store := file.NewStoreWithPath(path)
 	err = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("test"),
@@ -573,7 +574,7 @@ func TestStore_UnstageLoadError(t *testing.T) {
 	err := os.WriteFile(path, []byte("invalid json"), 0o600)
 	require.NoError(t, err)
 
-	store := staging.NewStoreWithPath(path)
+	store := file.NewStoreWithPath(path)
 	err = store.UnstageEntry(t.Context(), staging.ServiceParam, "/app/config")
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to parse state file")
@@ -589,7 +590,7 @@ func TestStore_UnstageAllLoadError(t *testing.T) {
 	err := os.WriteFile(path, []byte("invalid json"), 0o600)
 	require.NoError(t, err)
 
-	store := staging.NewStoreWithPath(path)
+	store := file.NewStoreWithPath(path)
 	err = store.UnstageAll(t.Context(), staging.ServiceParam)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to parse state file")
@@ -605,7 +606,7 @@ func TestStore_GetLoadError(t *testing.T) {
 	err := os.WriteFile(path, []byte("invalid json"), 0o600)
 	require.NoError(t, err)
 
-	store := staging.NewStoreWithPath(path)
+	store := file.NewStoreWithPath(path)
 	_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/config")
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to parse state file")
@@ -621,7 +622,7 @@ func TestStore_ListLoadError(t *testing.T) {
 	err := os.WriteFile(path, []byte("invalid json"), 0o600)
 	require.NoError(t, err)
 
-	store := staging.NewStoreWithPath(path)
+	store := file.NewStoreWithPath(path)
 	_, err = store.ListEntries(t.Context(), staging.ServiceParam)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to parse state file")
@@ -637,7 +638,7 @@ func TestStore_HasChangesLoadError(t *testing.T) {
 	err := os.WriteFile(path, []byte("invalid json"), 0o600)
 	require.NoError(t, err)
 
-	store := staging.NewStoreWithPath(path)
+	store := file.NewStoreWithPath(path)
 	_, err = store.HasChanges(t.Context(), staging.ServiceParam)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to parse state file")
@@ -653,7 +654,7 @@ func TestStore_CountLoadError(t *testing.T) {
 	err := os.WriteFile(path, []byte("invalid json"), 0o600)
 	require.NoError(t, err)
 
-	store := staging.NewStoreWithPath(path)
+	store := file.NewStoreWithPath(path)
 	_, err = store.Count(t.Context(), staging.ServiceParam)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to parse state file")
@@ -663,7 +664,7 @@ func TestStore_GetSecret(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "staging.json"))
+	store := file.NewStoreWithPath(filepath.Join(tmpDir, "staging.json"))
 
 	now := time.Now()
 
@@ -688,7 +689,7 @@ func TestStore_SaveWriteError(t *testing.T) {
 	require.NoError(t, err)
 
 	path := filepath.Join(readOnlyDir, "subdir", "staging.json")
-	store := staging.NewStoreWithPath(path)
+	store := file.NewStoreWithPath(path)
 
 	state := &staging.State{
 		Version: 2,
@@ -721,7 +722,7 @@ func TestStore_StageTag(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "staging.json"))
+	store := file.NewStoreWithPath(filepath.Join(tmpDir, "staging.json"))
 
 	now := time.Now().Truncate(time.Second)
 
@@ -757,7 +758,7 @@ func TestStore_StageTagOverwrite(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "staging.json"))
+	store := file.NewStoreWithPath(filepath.Join(tmpDir, "staging.json"))
 
 	now := time.Now()
 
@@ -791,7 +792,7 @@ func TestStore_StageTagLoadError(t *testing.T) {
 	err := os.WriteFile(path, []byte("invalid json"), 0o600)
 	require.NoError(t, err)
 
-	store := staging.NewStoreWithPath(path)
+	store := file.NewStoreWithPath(path)
 	err = store.StageTag(t.Context(), staging.ServiceParam, "/app/config", staging.TagEntry{
 		Add:      map[string]string{"env": "prod"},
 		StagedAt: time.Now(),
@@ -804,7 +805,7 @@ func TestStore_StageTagUnknownService(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "staging.json"))
+	store := file.NewStoreWithPath(filepath.Join(tmpDir, "staging.json"))
 
 	unknownService := staging.Service("unknown")
 
@@ -820,7 +821,7 @@ func TestStore_GetTag(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "staging.json"))
+	store := file.NewStoreWithPath(filepath.Join(tmpDir, "staging.json"))
 
 	now := time.Now()
 
@@ -859,7 +860,7 @@ func TestStore_GetTagLoadError(t *testing.T) {
 	err := os.WriteFile(path, []byte("invalid json"), 0o600)
 	require.NoError(t, err)
 
-	store := staging.NewStoreWithPath(path)
+	store := file.NewStoreWithPath(path)
 	_, err = store.GetTag(t.Context(), staging.ServiceParam, "/app/config")
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to parse state file")
@@ -869,7 +870,7 @@ func TestStore_GetTagUnknownService(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "staging.json"))
+	store := file.NewStoreWithPath(filepath.Join(tmpDir, "staging.json"))
 
 	unknownService := staging.Service("unknown")
 
@@ -882,7 +883,7 @@ func TestStore_UnstageTag(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "staging.json"))
+	store := file.NewStoreWithPath(filepath.Join(tmpDir, "staging.json"))
 
 	now := time.Now()
 
@@ -906,7 +907,7 @@ func TestStore_UnstageTagNotStaged(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "staging.json"))
+	store := file.NewStoreWithPath(filepath.Join(tmpDir, "staging.json"))
 
 	err := store.UnstageTag(t.Context(), staging.ServiceParam, "/not/staged")
 	assert.ErrorIs(t, err, staging.ErrNotStaged)
@@ -925,7 +926,7 @@ func TestStore_UnstageTagLoadError(t *testing.T) {
 	err := os.WriteFile(path, []byte("invalid json"), 0o600)
 	require.NoError(t, err)
 
-	store := staging.NewStoreWithPath(path)
+	store := file.NewStoreWithPath(path)
 	err = store.UnstageTag(t.Context(), staging.ServiceParam, "/app/config")
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to parse state file")
@@ -935,7 +936,7 @@ func TestStore_UnstageTagUnknownService(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "staging.json"))
+	store := file.NewStoreWithPath(filepath.Join(tmpDir, "staging.json"))
 
 	unknownService := staging.Service("unknown")
 
@@ -948,7 +949,7 @@ func TestStore_UnstageTagFromSecret(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "staging.json"))
+	store := file.NewStoreWithPath(filepath.Join(tmpDir, "staging.json"))
 
 	now := time.Now()
 
@@ -972,7 +973,7 @@ func TestStore_ListTags(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "staging.json"))
+	store := file.NewStoreWithPath(filepath.Join(tmpDir, "staging.json"))
 
 	now := time.Now()
 
@@ -1010,7 +1011,7 @@ func TestStore_ListTagsEmpty(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "staging.json"))
+	store := file.NewStoreWithPath(filepath.Join(tmpDir, "staging.json"))
 
 	result, err := store.ListTags(t.Context(), "")
 	require.NoError(t, err)
@@ -1027,7 +1028,7 @@ func TestStore_ListTagsLoadError(t *testing.T) {
 	err := os.WriteFile(path, []byte("invalid json"), 0o600)
 	require.NoError(t, err)
 
-	store := staging.NewStoreWithPath(path)
+	store := file.NewStoreWithPath(path)
 	_, err = store.ListTags(t.Context(), staging.ServiceParam)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to parse state file")
@@ -1037,7 +1038,7 @@ func TestStore_ListTagsUnknownService(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "staging.json"))
+	store := file.NewStoreWithPath(filepath.Join(tmpDir, "staging.json"))
 
 	unknownService := staging.Service("unknown")
 
@@ -1053,7 +1054,7 @@ func TestStore_UnstageAllClearsTags(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
-		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "staging.json"))
+		store := file.NewStoreWithPath(filepath.Join(tmpDir, "staging.json"))
 
 		now := time.Now()
 
@@ -1077,7 +1078,7 @@ func TestStore_UnstageAllClearsTags(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
-		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "staging.json"))
+		store := file.NewStoreWithPath(filepath.Join(tmpDir, "staging.json"))
 
 		now := time.Now()
 
@@ -1098,7 +1099,7 @@ func TestStore_UnstageAllClearsTags(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
-		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "staging.json"))
+		store := file.NewStoreWithPath(filepath.Join(tmpDir, "staging.json"))
 
 		now := time.Now()
 
@@ -1120,7 +1121,7 @@ func TestStore_SaveRemovesEmptyFileWithOnlyTags(t *testing.T) {
 
 	tmpDir := t.TempDir()
 	path := filepath.Join(tmpDir, "staging.json")
-	store := staging.NewStoreWithPath(path)
+	store := file.NewStoreWithPath(path)
 
 	now := time.Now()
 

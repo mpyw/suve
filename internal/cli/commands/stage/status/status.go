@@ -13,11 +13,12 @@ import (
 	"github.com/mpyw/suve/internal/infra"
 	"github.com/mpyw/suve/internal/maputil"
 	"github.com/mpyw/suve/internal/staging"
+	"github.com/mpyw/suve/internal/staging/file"
 )
 
 // Runner executes the status command.
 type Runner struct {
-	Store  *staging.Store
+	Store  *file.Store
 	Stdout io.Writer
 	Stderr io.Writer
 }
@@ -55,7 +56,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	if err != nil {
 		return fmt.Errorf("failed to get AWS identity: %w", err)
 	}
-	store, err := staging.NewStore(identity.AccountID, identity.Region)
+	store, err := file.NewStore(identity.AccountID, identity.Region)
 	if err != nil {
 		return fmt.Errorf("failed to initialize stage store: %w", err)
 	}

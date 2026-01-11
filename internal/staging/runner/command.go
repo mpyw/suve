@@ -14,6 +14,7 @@ import (
 	"github.com/mpyw/suve/internal/cli/pager"
 	"github.com/mpyw/suve/internal/infra"
 	"github.com/mpyw/suve/internal/staging"
+	"github.com/mpyw/suve/internal/staging/file"
 	stagingusecase "github.com/mpyw/suve/internal/usecase/staging"
 )
 
@@ -65,7 +66,7 @@ EXAMPLES:
 			if err != nil {
 				return fmt.Errorf("failed to get AWS identity: %w", err)
 			}
-			store, err := staging.NewStore(identity.AccountID, identity.Region)
+			store, err := file.NewStore(identity.AccountID, identity.Region)
 			if err != nil {
 				return fmt.Errorf("failed to initialize stage store: %w", err)
 			}
@@ -139,7 +140,7 @@ EXAMPLES:
 			if err != nil {
 				return fmt.Errorf("failed to get AWS identity: %w", err)
 			}
-			store, err := staging.NewStore(identity.AccountID, identity.Region)
+			store, err := file.NewStore(identity.AccountID, identity.Region)
 			if err != nil {
 				return fmt.Errorf("failed to initialize stage store: %w", err)
 			}
@@ -218,7 +219,7 @@ EXAMPLES:
 			if err != nil {
 				return fmt.Errorf("failed to get AWS identity: %w", err)
 			}
-			store, err := staging.NewStore(identity.AccountID, identity.Region)
+			store, err := file.NewStore(identity.AccountID, identity.Region)
 			if err != nil {
 				return fmt.Errorf("failed to initialize stage store: %w", err)
 			}
@@ -295,7 +296,7 @@ EXAMPLES:
 			if err != nil {
 				return fmt.Errorf("failed to get AWS identity: %w", err)
 			}
-			store, err := staging.NewStore(identity.AccountID, identity.Region)
+			store, err := file.NewStore(identity.AccountID, identity.Region)
 			if err != nil {
 				return fmt.Errorf("failed to initialize stage store: %w", err)
 			}
@@ -372,7 +373,7 @@ EXAMPLES:
 			if err != nil {
 				return fmt.Errorf("failed to get AWS identity: %w", err)
 			}
-			store, err := staging.NewStore(identity.AccountID, identity.Region)
+			store, err := file.NewStore(identity.AccountID, identity.Region)
 			if err != nil {
 				return fmt.Errorf("failed to initialize stage store: %w", err)
 			}
@@ -492,7 +493,7 @@ EXAMPLES:
 			if err != nil {
 				return fmt.Errorf("failed to get AWS identity: %w", err)
 			}
-			store, err := staging.NewStore(identity.AccountID, identity.Region)
+			store, err := file.NewStore(identity.AccountID, identity.Region)
 			if err != nil {
 				return fmt.Errorf("failed to initialize stage store: %w", err)
 			}
@@ -618,7 +619,7 @@ EXAMPLES:
 			if err != nil {
 				return fmt.Errorf("failed to get AWS identity: %w", err)
 			}
-			store, err := staging.NewStore(identity.AccountID, identity.Region)
+			store, err := file.NewStore(identity.AccountID, identity.Region)
 			if err != nil {
 				return fmt.Errorf("failed to initialize stage store: %w", err)
 			}
@@ -685,7 +686,7 @@ EXAMPLES:
 			if err != nil {
 				return fmt.Errorf("failed to get AWS identity: %w", err)
 			}
-			store, err := staging.NewStore(identity.AccountID, identity.Region)
+			store, err := file.NewStore(identity.AccountID, identity.Region)
 			if err != nil {
 				return fmt.Errorf("failed to initialize stage store: %w", err)
 			}
@@ -747,7 +748,7 @@ EXAMPLES:
 			if err != nil {
 				return fmt.Errorf("failed to get AWS identity: %w", err)
 			}
-			store, err := staging.NewStore(identity.AccountID, identity.Region)
+			store, err := file.NewStore(identity.AccountID, identity.Region)
 			if err != nil {
 				return fmt.Errorf("failed to initialize stage store: %w", err)
 			}

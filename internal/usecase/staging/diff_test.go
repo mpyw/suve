@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/mpyw/suve/internal/staging"
+	"github.com/mpyw/suve/internal/staging/file"
 	usecasestaging "github.com/mpyw/suve/internal/usecase/staging"
 )
 
@@ -42,7 +43,7 @@ func newMockDiffStrategy() *mockDiffStrategy {
 func TestDiffUseCase_Execute_Empty(t *testing.T) {
 	t.Parallel()
 
-	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
 	uc := &usecasestaging.DiffUseCase{
 		Strategy: newMockDiffStrategy(),
 		Store:    store,
@@ -57,7 +58,7 @@ func TestDiffUseCase_Execute_Empty(t *testing.T) {
 func TestDiffUseCase_Execute_UpdateDiff(t *testing.T) {
 	t.Parallel()
 
-	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("new-value"),
@@ -90,7 +91,7 @@ func TestDiffUseCase_Execute_UpdateDiff(t *testing.T) {
 func TestDiffUseCase_Execute_CreateDiff(t *testing.T) {
 	t.Parallel()
 
-	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/new", staging.Entry{
 		Operation:   staging.OperationCreate,
 		Value:       lo.ToPtr("new-value"),
@@ -119,7 +120,7 @@ func TestDiffUseCase_Execute_CreateDiff(t *testing.T) {
 func TestDiffUseCase_Execute_DeleteDiff(t *testing.T) {
 	t.Parallel()
 
-	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/delete", staging.Entry{
 		Operation: staging.OperationDelete,
 		StagedAt:  time.Now(),
@@ -150,7 +151,7 @@ func TestDiffUseCase_Execute_DeleteDiff(t *testing.T) {
 func TestDiffUseCase_Execute_AutoUnstage_Identical(t *testing.T) {
 	t.Parallel()
 
-	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/same", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("same-value"),
@@ -184,7 +185,7 @@ func TestDiffUseCase_Execute_AutoUnstage_Identical(t *testing.T) {
 func TestDiffUseCase_Execute_AutoUnstage_AlreadyDeleted(t *testing.T) {
 	t.Parallel()
 
-	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/gone", staging.Entry{
 		Operation: staging.OperationDelete,
 		StagedAt:  time.Now(),
@@ -210,7 +211,7 @@ func TestDiffUseCase_Execute_AutoUnstage_AlreadyDeleted(t *testing.T) {
 func TestDiffUseCase_Execute_FilterByName(t *testing.T) {
 	t.Parallel()
 
-	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/one", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("one"),
@@ -236,7 +237,7 @@ func TestDiffUseCase_Execute_FilterByName(t *testing.T) {
 func TestDiffUseCase_Execute_FilterByName_NotStaged(t *testing.T) {
 	t.Parallel()
 
-	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
 	uc := &usecasestaging.DiffUseCase{
 		Strategy: newMockDiffStrategy(),
 		Store:    store,
@@ -252,7 +253,7 @@ func TestDiffUseCase_Execute_FilterByName_NotStaged(t *testing.T) {
 func TestDiffUseCase_Execute_AutoUnstage_UpdateNoLongerExists(t *testing.T) {
 	t.Parallel()
 
-	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
 	// Stage an update for something that no longer exists
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/gone", staging.Entry{
 		Operation: staging.OperationUpdate,
@@ -348,7 +349,7 @@ func TestDiffUseCase_Execute_ListTagsError(t *testing.T) {
 func TestDiffUseCase_Execute_UnknownOperation(t *testing.T) {
 	t.Parallel()
 
-	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
 	// Stage an entry with an unknown operation (edge case)
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/unknown", staging.Entry{
 		Operation: staging.Operation("unknown"), // Invalid operation
