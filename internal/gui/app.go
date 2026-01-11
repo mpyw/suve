@@ -49,7 +49,7 @@ type App struct {
 	secretClient SecretClient
 
 	// Staging store
-	stagingStore *file.Store
+	stagingStore staging.StoreReadWriter
 }
 
 // NewApp creates a new App application struct.
@@ -103,7 +103,7 @@ func (a *App) getSecretClient() (SecretClient, error) {
 	return client, nil
 }
 
-func (a *App) getStagingStore() (*file.Store, error) {
+func (a *App) getStagingStore() (staging.StoreReadWriter, error) {
 	if a.stagingStore != nil {
 		return a.stagingStore, nil
 	}

@@ -3,6 +3,7 @@ module github.com/mpyw/suve
 go 1.24.0
 
 require (
+	github.com/awnumar/memguard v0.23.0
 	github.com/aws/aws-sdk-go-v2 v1.41.0
 	github.com/aws/aws-sdk-go-v2/config v1.32.6
 	github.com/aws/aws-sdk-go-v2/service/secretsmanager v1.41.0
@@ -17,7 +18,9 @@ require (
 	github.com/urfave/cli/v3 v3.6.1
 	github.com/wailsapp/wails/v2 v2.11.0
 	github.com/walles/moor/v2 v2.10.1
+	golang.org/x/crypto v0.45.0
 	golang.org/x/sync v0.19.0
+	golang.org/x/sys v0.39.0
 	golang.org/x/term v0.38.0
 	gopkg.in/ini.v1 v1.67.0
 )
@@ -25,6 +28,7 @@ require (
 require (
 	github.com/adrg/xdg v0.5.3 // indirect
 	github.com/alecthomas/chroma/v2 v2.21.1 // indirect
+	github.com/awnumar/memcall v0.4.0 // indirect
 	github.com/aws/aws-sdk-go-v2/credentials v1.19.6 // indirect
 	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.18.16 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/configsources v1.4.16 // indirect
@@ -66,10 +70,8 @@ require (
 	github.com/valyala/fasttemplate v1.2.2 // indirect
 	github.com/wailsapp/go-webview2 v1.0.22 // indirect
 	github.com/wailsapp/mimetype v1.4.1 // indirect
-	golang.org/x/crypto v0.45.0 // indirect
 	golang.org/x/exp v0.0.0-20240103183307-be819d1f06fc // indirect
 	golang.org/x/net v0.47.0 // indirect
-	golang.org/x/sys v0.39.0 // indirect
 	golang.org/x/text v0.31.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

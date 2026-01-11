@@ -16,7 +16,7 @@ import (
 
 // Runner executes the reset command.
 type Runner struct {
-	Store  *file.Store
+	Store  staging.StoreReadWriter
 	Stdout io.Writer
 	Stderr io.Writer
 }

@@ -65,6 +65,24 @@ type State struct {
 	Tags    map[Service]map[string]TagEntry `json:"tags,omitempty"`
 }
 
+// IsEmpty checks if a state has no entries and no tags.
+func (s *State) IsEmpty() bool {
+	if s == nil {
+		return true
+	}
+	for _, entries := range s.Entries {
+		if len(entries) > 0 {
+			return false
+		}
+	}
+	for _, tags := range s.Tags {
+		if len(tags) > 0 {
+			return false
+		}
+	}
+	return true
+}
+
 // Service represents which AWS service the staged change belongs to.
 type Service string
 

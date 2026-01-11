@@ -1,0 +1,132 @@
+package agent
+
+import (
+	"context"
+
+	"github.com/mpyw/suve/internal/staging"
+)
+
+// AgentStore implements staging.StoreReadWriter using the daemon.
+type AgentStore struct {
+	client    *Client
+	accountID string
+	region    string
+}
+
+// NewAgentStore creates a new AgentStore.
+func NewAgentStore(accountID, region string) *AgentStore {
+	return &AgentStore{
+		client:    NewClient(),
+		accountID: accountID,
+		region:    region,
+	}
+}
+
+// GetEntry retrieves a staged entry.
+func (s *AgentStore) GetEntry(ctx context.Context, service staging.Service, name string) (*staging.Entry, error) {
+	entry, err := s.client.GetEntry(ctx, s.accountID, s.region, service, name)
+	if err != nil {
+		return nil, err
+	}
+	if entry == nil {
+		return nil, staging.ErrNotStaged
+	}
+	return entry, nil
+}
+
+// GetTag retrieves staged tag changes.
+func (s *AgentStore) GetTag(ctx context.Context, service staging.Service, name string) (*staging.TagEntry, error) {
+	tagEntry, err := s.client.GetTag(ctx, s.accountID, s.region, service, name)
+	if err != nil {
+		return nil, err
+	}
+	if tagEntry == nil {
+		return nil, staging.ErrNotStaged
+	}
+	return tagEntry, nil
+}
+
+// ListEntries returns all staged entries for a service.
+func (s *AgentStore) ListEntries(ctx context.Context, service staging.Service) (map[staging.Service]map[string]staging.Entry, error) {
+	entries, err := s.client.ListEntries(ctx, s.accountID, s.region, service)
+	if err != nil {
+		return nil, err
+	}
+
+	// Filter by service if specified
+	if service != "" {
+		result := make(map[staging.Service]map[string]staging.Entry)
+		if svcEntries, ok := entries[service]; ok && len(svcEntries) > 0 {
+			result[service] = svcEntries
+		}
+		return result, nil
+	}
+
+	// Remove empty service maps
+	result := make(map[staging.Service]map[string]staging.Entry)
+	for svc, svcEntries := range entries {
+		if len(svcEntries) > 0 {
+			result[svc] = svcEntries
+		}
+	}
+	return result, nil
+}
+
+// ListTags returns all staged tag changes for a service.
+func (s *AgentStore) ListTags(ctx context.Context, service staging.Service) (map[staging.Service]map[string]staging.TagEntry, error) {
+	tags, err := s.client.ListTags(ctx, s.accountID, s.region, service)
+	if err != nil {
+		return nil, err
+	}
+
+	// Filter by service if specified
+	if service != "" {
+		result := make(map[staging.Service]map[string]staging.TagEntry)
+		if svcTags, ok := tags[service]; ok && len(svcTags) > 0 {
+			result[service] = svcTags
+		}
+		return result, nil
+	}
+
+	// Remove empty service maps
+	result := make(map[staging.Service]map[string]staging.TagEntry)
+	for svc, svcTags := range tags {
+		if len(svcTags) > 0 {
+			result[svc] = svcTags
+		}
+	}
+	return result, nil
+}
+
+// Load loads the current staging state.
+func (s *AgentStore) Load(ctx context.Context) (*staging.State, error) {
+	return s.client.Load(ctx, s.accountID, s.region)
+}
+
+// StageEntry adds or updates a staged entry.
+func (s *AgentStore) StageEntry(ctx context.Context, service staging.Service, name string, entry staging.Entry) error {
+	return s.client.StageEntry(ctx, s.accountID, s.region, service, name, entry)
+}
+
+// StageTag adds or updates staged tag changes.
+func (s *AgentStore) StageTag(ctx context.Context, service staging.Service, name string, tagEntry staging.TagEntry) error {
+	return s.client.StageTag(ctx, s.accountID, s.region, service, name, tagEntry)
+}
+
+// UnstageEntry removes a staged entry.
+func (s *AgentStore) UnstageEntry(ctx context.Context, service staging.Service, name string) error {
+	return s.client.UnstageEntry(ctx, s.accountID, s.region, service, name)
+}
+
+// UnstageTag removes staged tag changes.
+func (s *AgentStore) UnstageTag(ctx context.Context, service staging.Service, name string) error {
+	return s.client.UnstageTag(ctx, s.accountID, s.region, service, name)
+}
+
+// UnstageAll removes all staged changes for a service.
+func (s *AgentStore) UnstageAll(ctx context.Context, service staging.Service) error {
+	return s.client.UnstageAll(ctx, s.accountID, s.region, service)
+}
+
+// Compile-time check that AgentStore implements StoreReadWriter.
+var _ staging.StoreReadWriter = (*AgentStore)(nil)

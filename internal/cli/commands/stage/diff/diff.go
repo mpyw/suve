@@ -41,7 +41,7 @@ type SecretClient interface {
 type Runner struct {
 	ParamClient  ParamClient
 	SecretClient SecretClient
-	Store        *file.Store
+	Store        staging.StoreReadWriter
 	Stdout       io.Writer
 	Stderr       io.Writer
 }
@@ -204,7 +204,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 					_, _ = fmt.Fprintln(r.Stdout)
 				}
 				first = false
-				if err := r.outputParamDiffCreate(opts, name, entry); err != nil {
+				if err := r.outputDiffCreate(opts, name, entry); err != nil {
 					return err
 				}
 				continue
@@ -251,7 +251,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 					_, _ = fmt.Fprintln(r.Stdout)
 				}
 				first = false
-				if err := r.outputSecretDiffCreate(opts, name, entry); err != nil {
+				if err := r.outputDiffCreate(opts, name, entry); err != nil {
 					return err
 				}
 				continue
@@ -378,29 +378,7 @@ func (r *Runner) outputSecretDiff(ctx context.Context, opts Options, name string
 	return nil
 }
 
-func (r *Runner) outputParamDiffCreate(opts Options, name string, entry staging.Entry) error {
-	stagedValue := lo.FromPtr(entry.Value)
-
-	// Format as JSON if enabled
-	if opts.ParseJSON {
-		if formatted, ok := jsonutil.TryFormat(stagedValue); ok {
-			stagedValue = formatted
-		}
-	}
-
-	label1 := fmt.Sprintf("%s (not in AWS)", name)
-	label2 := fmt.Sprintf("%s (staged for creation)", name)
-
-	diff := output.Diff(label1, label2, "", stagedValue)
-	_, _ = fmt.Fprint(r.Stdout, diff)
-
-	// Show staged metadata
-	r.outputMetadata(entry)
-
-	return nil
-}
-
-func (r *Runner) outputSecretDiffCreate(opts Options, name string, entry staging.Entry) error {
+func (r *Runner) outputDiffCreate(opts Options, name string, entry staging.Entry) error {
 	stagedValue := lo.FromPtr(entry.Value)
 
 	// Format as JSON if enabled

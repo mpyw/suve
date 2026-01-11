@@ -18,7 +18,7 @@ import (
 
 // Runner executes the status command.
 type Runner struct {
-	Store  *file.Store
+	Store  staging.StoreReadWriter
 	Stdout io.Writer
 	Stderr io.Writer
 }

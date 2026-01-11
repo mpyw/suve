@@ -32,6 +32,18 @@ func (p *Prompter) printTargetInfo() {
 	}
 }
 
+// readYesNo reads a yes/no response from stdin.
+func (p *Prompter) readYesNo() (bool, error) {
+	reader := bufio.NewReader(p.Stdin)
+	response, err := reader.ReadString('\n')
+	if err != nil {
+		return false, fmt.Errorf("failed to read response: %w", err)
+	}
+
+	response = strings.TrimSpace(strings.ToLower(response))
+	return response == "y" || response == "yes", nil
+}
+
 // Confirm displays a confirmation prompt and returns true if the user confirms.
 // If skipConfirm is true, returns true without prompting.
 func (p *Prompter) Confirm(message string, skipConfirm bool) (bool, error) {
@@ -41,15 +53,7 @@ func (p *Prompter) Confirm(message string, skipConfirm bool) (bool, error) {
 
 	p.printTargetInfo()
 	_, _ = fmt.Fprintf(p.Stderr, "%s %s [y/N]: ", colors.Warning("?"), message)
-
-	reader := bufio.NewReader(p.Stdin)
-	response, err := reader.ReadString('\n')
-	if err != nil {
-		return false, fmt.Errorf("failed to read response: %w", err)
-	}
-
-	response = strings.TrimSpace(strings.ToLower(response))
-	return response == "y" || response == "yes", nil
+	return p.readYesNo()
 }
 
 // ConfirmAction is a convenience function for confirming an action.
@@ -67,13 +71,5 @@ func (p *Prompter) ConfirmDelete(target string, skipConfirm bool) (bool, error) 
 	p.printTargetInfo()
 	_, _ = fmt.Fprintf(p.Stderr, "%s This will permanently delete: %s\n", colors.Error("!"), target)
 	_, _ = fmt.Fprintf(p.Stderr, "%s Continue? [y/N]: ", colors.Warning("?"))
-
-	reader := bufio.NewReader(p.Stdin)
-	response, err := reader.ReadString('\n')
-	if err != nil {
-		return false, fmt.Errorf("failed to read response: %w", err)
-	}
-
-	response = strings.TrimSpace(strings.ToLower(response))
-	return response == "y" || response == "yes", nil
+	return p.readYesNo()
 }

@@ -29,7 +29,7 @@ type serviceConflictCheck struct {
 type Runner struct {
 	ParamStrategy   staging.ApplyStrategy
 	SecretStrategy  staging.ApplyStrategy
-	Store           *file.Store
+	Store           staging.StoreReadWriter
 	Stdout          io.Writer
 	Stderr          io.Writer
 	IgnoreConflicts bool

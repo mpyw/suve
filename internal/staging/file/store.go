@@ -13,6 +13,7 @@ import (
 	"github.com/gofrs/flock"
 
 	"github.com/mpyw/suve/internal/staging"
+	"github.com/mpyw/suve/internal/staging/crypt"
 )
 
 const (
@@ -185,6 +186,97 @@ func (s *Store) saveLocked(state *staging.State) error {
 	}
 
 	return nil
+}
+
+// SaveWithPassphrase saves the staging state to disk, encrypting if passphrase is non-empty.
+func (s *Store) SaveWithPassphrase(state *staging.State, passphrase string) error {
+	fileMu.Lock()
+	defer fileMu.Unlock()
+
+	// Ensure directory exists
+	dir := filepath.Dir(s.stateFilePath)
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return fmt.Errorf("failed to create state directory: %w", err)
+	}
+
+	// Check if there are any staged changes
+	hasEntries := len(state.Entries[staging.ServiceParam]) > 0 || len(state.Entries[staging.ServiceSecret]) > 0
+	hasTags := len(state.Tags[staging.ServiceParam]) > 0 || len(state.Tags[staging.ServiceSecret]) > 0
+
+	if !hasEntries && !hasTags {
+		// Remove file if no staged changes
+		if err := os.Remove(s.stateFilePath); err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("failed to remove empty state file: %w", err)
+		}
+		return nil
+	}
+
+	data, err := json.MarshalIndent(state, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal state: %w", err)
+	}
+
+	// Encrypt if passphrase is provided
+	if passphrase != "" {
+		data, err = crypt.Encrypt(data, passphrase)
+		if err != nil {
+			return fmt.Errorf("failed to encrypt state: %w", err)
+		}
+	}
+
+	if err := os.WriteFile(s.stateFilePath, data, 0o600); err != nil {
+		return fmt.Errorf("failed to write state file: %w", err)
+	}
+
+	return nil
+}
+
+// LoadWithPassphrase loads the staging state from disk, decrypting if necessary.
+// If the file is encrypted and passphrase is empty, returns crypt.ErrDecryptionFailed.
+func (s *Store) LoadWithPassphrase(passphrase string) (*staging.State, error) {
+	fileMu.Lock()
+	defer fileMu.Unlock()
+
+	data, err := os.ReadFile(s.stateFilePath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return newEmptyState(), nil
+		}
+		return nil, fmt.Errorf("failed to read state file: %w", err)
+	}
+
+	// Decrypt if encrypted
+	if crypt.IsEncrypted(data) {
+		if passphrase == "" {
+			return nil, crypt.ErrDecryptionFailed
+		}
+		data, err = crypt.Decrypt(data, passphrase)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	var state staging.State
+	if err := json.Unmarshal(data, &state); err != nil {
+		return nil, fmt.Errorf("failed to parse state file: %w", err)
+	}
+
+	// Initialize maps if nil
+	initializeStateMaps(&state)
+
+	return &state, nil
+}
+
+// IsEncrypted checks if the stored file is encrypted.
+func (s *Store) IsEncrypted() (bool, error) {
+	data, err := os.ReadFile(s.stateFilePath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return false, nil
+		}
+		return false, fmt.Errorf("failed to read state file: %w", err)
+	}
+	return crypt.IsEncrypted(data), nil
 }
 
 // StageEntry adds or updates a staged entry change.

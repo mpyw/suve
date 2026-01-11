@@ -5,9 +5,12 @@ import (
 	"github.com/urfave/cli/v3"
 
 	cliinternal "github.com/mpyw/suve/internal/cli/commands/internal"
+	"github.com/mpyw/suve/internal/cli/commands/stage/agent"
 	"github.com/mpyw/suve/internal/cli/commands/stage/apply"
 	"github.com/mpyw/suve/internal/cli/commands/stage/diff"
+	"github.com/mpyw/suve/internal/cli/commands/stage/drain"
 	"github.com/mpyw/suve/internal/cli/commands/stage/param"
+	"github.com/mpyw/suve/internal/cli/commands/stage/persist"
 	"github.com/mpyw/suve/internal/cli/commands/stage/reset"
 	"github.com/mpyw/suve/internal/cli/commands/stage/secret"
 	"github.com/mpyw/suve/internal/cli/commands/stage/status"
@@ -41,6 +44,9 @@ EXAMPLES:
 			diff.Command(),
 			apply.Command(),
 			reset.Command(),
+			persist.Command(),
+			drain.Command(),
+			agent.Command(),
 		},
 		CommandNotFound: cliinternal.CommandNotFound,
 	}
