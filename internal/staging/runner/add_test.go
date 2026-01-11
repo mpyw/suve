@@ -36,13 +36,13 @@ func TestAddRunner_Run(t *testing.T) {
 			OpenEditor: func(_ string) (string, error) { return "new-value", nil },
 		}
 
-		err := r.Run(context.Background(), runner.AddOptions{Name: "/app/config"})
+		err := r.Run(t.Context(), runner.AddOptions{Name: "/app/config"})
 		require.NoError(t, err)
 		assert.Contains(t, buf.String(), "Staged for creation")
 		assert.Contains(t, buf.String(), "/app/config")
 
 		// Verify staged with OperationCreate
-		entry, err := store.GetEntry(staging.ServiceParam, "/app/config")
+		entry, err := store.GetEntry(t.Context(), staging.ServiceParam, "/app/config")
 		require.NoError(t, err)
 		assert.Equal(t, staging.OperationCreate, entry.Operation)
 		assert.Equal(t, "new-value", lo.FromPtr(entry.Value))
@@ -55,7 +55,7 @@ func TestAddRunner_Run(t *testing.T) {
 		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 		// Pre-stage as create
-		_ = store.StageEntry(staging.ServiceParam, "/app/config", staging.Entry{
+		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
 			Operation: staging.OperationCreate,
 			Value:     lo.ToPtr("original-value"),
 		})
@@ -74,12 +74,12 @@ func TestAddRunner_Run(t *testing.T) {
 			},
 		}
 
-		err := r.Run(context.Background(), runner.AddOptions{Name: "/app/config"})
+		err := r.Run(t.Context(), runner.AddOptions{Name: "/app/config"})
 		require.NoError(t, err)
 		assert.Contains(t, buf.String(), "Staged for creation")
 
 		// Verify updated
-		entry, err := store.GetEntry(staging.ServiceParam, "/app/config")
+		entry, err := store.GetEntry(t.Context(), staging.ServiceParam, "/app/config")
 		require.NoError(t, err)
 		assert.Equal(t, staging.OperationCreate, entry.Operation)
 		assert.Equal(t, "updated-value", lo.FromPtr(entry.Value))
@@ -102,12 +102,12 @@ func TestAddRunner_Run(t *testing.T) {
 			OpenEditor: func(_ string) (string, error) { return "", nil },
 		}
 
-		err := r.Run(context.Background(), runner.AddOptions{Name: "/app/config"})
+		err := r.Run(t.Context(), runner.AddOptions{Name: "/app/config"})
 		require.NoError(t, err)
 		assert.Contains(t, buf.String(), "Empty value")
 
 		// Verify not staged
-		_, err = store.GetEntry(staging.ServiceParam, "/app/config")
+		_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/config")
 		assert.Equal(t, staging.ErrNotStaged, err)
 	})
 
@@ -118,7 +118,7 @@ func TestAddRunner_Run(t *testing.T) {
 		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 		// Pre-stage as create
-		_ = store.StageEntry(staging.ServiceParam, "/app/config", staging.Entry{
+		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
 			Operation: staging.OperationCreate,
 			Value:     lo.ToPtr("same-value"),
 		})
@@ -136,7 +136,7 @@ func TestAddRunner_Run(t *testing.T) {
 			},
 		}
 
-		err := r.Run(context.Background(), runner.AddOptions{Name: "/app/config"})
+		err := r.Run(t.Context(), runner.AddOptions{Name: "/app/config"})
 		require.NoError(t, err)
 		assert.Contains(t, buf.String(), "No changes made")
 	})
@@ -158,11 +158,11 @@ func TestAddRunner_Run(t *testing.T) {
 			OpenEditor: func(_ string) (string, error) { return "secret-value", nil },
 		}
 
-		err := r.Run(context.Background(), runner.AddOptions{Name: "my-secret"})
+		err := r.Run(t.Context(), runner.AddOptions{Name: "my-secret"})
 		require.NoError(t, err)
 
 		// Verify staged with correct service
-		entry, err := store.GetEntry(staging.ServiceSecret, "my-secret")
+		entry, err := store.GetEntry(t.Context(), staging.ServiceSecret, "my-secret")
 		require.NoError(t, err)
 		assert.Equal(t, staging.OperationCreate, entry.Operation)
 		assert.Equal(t, "secret-value", lo.FromPtr(entry.Value))
@@ -213,7 +213,7 @@ func TestAddRunner_ErrorCases(t *testing.T) {
 			Stderr: &stderr,
 		}
 
-		err := r.Run(context.Background(), runner.AddOptions{Name: "invalid"})
+		err := r.Run(t.Context(), runner.AddOptions{Name: "invalid"})
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid name")
 	})
@@ -237,7 +237,7 @@ func TestAddRunner_ErrorCases(t *testing.T) {
 			},
 		}
 
-		err := r.Run(context.Background(), runner.AddOptions{Name: "/app/config"})
+		err := r.Run(t.Context(), runner.AddOptions{Name: "/app/config"})
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to edit")
 	})
@@ -263,14 +263,14 @@ func TestAddRunner_WithOptions(t *testing.T) {
 			// No OpenEditor set - with Value provided, editor should not be called
 		}
 
-		err := r.Run(context.Background(), runner.AddOptions{
+		err := r.Run(t.Context(), runner.AddOptions{
 			Name:  "/app/new-config",
 			Value: "direct-value",
 		})
 		require.NoError(t, err)
 		assert.Contains(t, stdout.String(), "Staged for creation")
 
-		entry, err := store.GetEntry(staging.ServiceParam, "/app/new-config")
+		entry, err := store.GetEntry(t.Context(), staging.ServiceParam, "/app/new-config")
 		require.NoError(t, err)
 		assert.Equal(t, staging.OperationCreate, entry.Operation)
 		assert.Equal(t, "direct-value", lo.FromPtr(entry.Value))
@@ -292,14 +292,14 @@ func TestAddRunner_WithOptions(t *testing.T) {
 			Stderr: &stderr,
 		}
 
-		err := r.Run(context.Background(), runner.AddOptions{
+		err := r.Run(t.Context(), runner.AddOptions{
 			Name:        "/app/new-config",
 			Value:       "test-value",
 			Description: "Test description",
 		})
 		require.NoError(t, err)
 
-		entry, err := store.GetEntry(staging.ServiceParam, "/app/new-config")
+		entry, err := store.GetEntry(t.Context(), staging.ServiceParam, "/app/new-config")
 		require.NoError(t, err)
 		assert.Equal(t, "Test description", lo.FromPtr(entry.Description))
 	})

@@ -62,7 +62,7 @@ func TestDiffUseCase_Execute(t *testing.T) {
 	spec1, _ := paramversion.Parse("/app/config#1")
 	spec2, _ := paramversion.Parse("/app/config#2")
 
-	output, err := uc.Execute(context.Background(), param.DiffInput{
+	output, err := uc.Execute(t.Context(), param.DiffInput{
 		Spec1: spec1,
 		Spec2: spec2,
 	})
@@ -87,7 +87,7 @@ func TestDiffUseCase_Execute_Spec1Error(t *testing.T) {
 	spec1, _ := paramversion.Parse("/app/config#1")
 	spec2, _ := paramversion.Parse("/app/config#2")
 
-	_, err := uc.Execute(context.Background(), param.DiffInput{
+	_, err := uc.Execute(t.Context(), param.DiffInput{
 		Spec1: spec1,
 		Spec2: spec2,
 	})
@@ -109,7 +109,7 @@ func TestDiffUseCase_Execute_Spec2Error(t *testing.T) {
 	spec1, _ := paramversion.Parse("/app/config#1")
 	spec2, _ := paramversion.Parse("/app/config#2")
 
-	_, err := uc.Execute(context.Background(), param.DiffInput{
+	_, err := uc.Execute(t.Context(), param.DiffInput{
 		Spec1: spec1,
 		Spec2: spec2,
 	})
@@ -132,7 +132,7 @@ func TestDiffUseCase_Execute_WithLatest(t *testing.T) {
 	spec1, _ := paramversion.Parse("/app/config#3")
 	spec2, _ := paramversion.Parse("/app/config")
 
-	output, err := uc.Execute(context.Background(), param.DiffInput{
+	output, err := uc.Execute(t.Context(), param.DiffInput{
 		Spec1: spec1,
 		Spec2: spec2,
 	})
@@ -158,7 +158,7 @@ func TestDiffUseCase_Execute_WithShift(t *testing.T) {
 	spec1, _ := paramversion.Parse("/app/config~2") // 2 versions back from latest (v3 -> v1)
 	spec2, _ := paramversion.Parse("/app/config~1") // 1 version back from latest (v3 -> v2)
 
-	output, err := uc.Execute(context.Background(), param.DiffInput{
+	output, err := uc.Execute(t.Context(), param.DiffInput{
 		Spec1: spec1,
 		Spec2: spec2,
 	})
@@ -181,7 +181,7 @@ func TestDiffUseCase_Execute_WithShift_Error(t *testing.T) {
 	spec1, _ := paramversion.Parse("/app/config~1")
 	spec2, _ := paramversion.Parse("/app/config")
 
-	_, err := uc.Execute(context.Background(), param.DiffInput{
+	_, err := uc.Execute(t.Context(), param.DiffInput{
 		Spec1: spec1,
 		Spec2: spec2,
 	})

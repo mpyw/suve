@@ -37,7 +37,7 @@ func TestRestoreUseCase_Execute(t *testing.T) {
 
 	uc := &secret.RestoreUseCase{Client: client}
 
-	output, err := uc.Execute(context.Background(), secret.RestoreInput{
+	output, err := uc.Execute(t.Context(), secret.RestoreInput{
 		Name: "my-secret",
 	})
 	require.NoError(t, err)
@@ -54,7 +54,7 @@ func TestRestoreUseCase_Execute_Error(t *testing.T) {
 
 	uc := &secret.RestoreUseCase{Client: client}
 
-	_, err := uc.Execute(context.Background(), secret.RestoreInput{
+	_, err := uc.Execute(t.Context(), secret.RestoreInput{
 		Name: "my-secret",
 	})
 	assert.Error(t, err)

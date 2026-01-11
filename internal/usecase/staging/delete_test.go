@@ -46,7 +46,7 @@ func TestDeleteUseCase_Execute_Param(t *testing.T) {
 		Store:    store,
 	}
 
-	output, err := uc.Execute(context.Background(), usecasestaging.DeleteInput{
+	output, err := uc.Execute(t.Context(), usecasestaging.DeleteInput{
 		Name: "/app/to-delete",
 	})
 	require.NoError(t, err)
@@ -54,7 +54,7 @@ func TestDeleteUseCase_Execute_Param(t *testing.T) {
 	assert.False(t, output.ShowDeleteOptions)
 
 	// Verify staged
-	entry, err := store.GetEntry(staging.ServiceParam, "/app/to-delete")
+	entry, err := store.GetEntry(t.Context(), staging.ServiceParam, "/app/to-delete")
 	require.NoError(t, err)
 	assert.Equal(t, staging.OperationDelete, entry.Operation)
 	assert.NotNil(t, entry.BaseModifiedAt)
@@ -72,7 +72,7 @@ func TestDeleteUseCase_Execute_SecretWithRecoveryWindow(t *testing.T) {
 		Store:    store,
 	}
 
-	output, err := uc.Execute(context.Background(), usecasestaging.DeleteInput{
+	output, err := uc.Execute(t.Context(), usecasestaging.DeleteInput{
 		Name:           "my-secret",
 		RecoveryWindow: 14,
 	})
@@ -81,7 +81,7 @@ func TestDeleteUseCase_Execute_SecretWithRecoveryWindow(t *testing.T) {
 	assert.Equal(t, 14, output.RecoveryWindow)
 	assert.False(t, output.Force)
 
-	entry, err := store.GetEntry(staging.ServiceSecret, "my-secret")
+	entry, err := store.GetEntry(t.Context(), staging.ServiceSecret, "my-secret")
 	require.NoError(t, err)
 	assert.NotNil(t, entry.DeleteOptions)
 	assert.Equal(t, 14, entry.DeleteOptions.RecoveryWindow)
@@ -99,7 +99,7 @@ func TestDeleteUseCase_Execute_SecretForceDelete(t *testing.T) {
 		Store:    store,
 	}
 
-	output, err := uc.Execute(context.Background(), usecasestaging.DeleteInput{
+	output, err := uc.Execute(t.Context(), usecasestaging.DeleteInput{
 		Name:  "my-secret",
 		Force: true,
 	})
@@ -120,7 +120,7 @@ func TestDeleteUseCase_Execute_InvalidRecoveryWindow(t *testing.T) {
 	}
 
 	// Too short
-	_, err := uc.Execute(context.Background(), usecasestaging.DeleteInput{
+	_, err := uc.Execute(t.Context(), usecasestaging.DeleteInput{
 		Name:           "my-secret",
 		RecoveryWindow: 5,
 	})
@@ -128,7 +128,7 @@ func TestDeleteUseCase_Execute_InvalidRecoveryWindow(t *testing.T) {
 	assert.Contains(t, err.Error(), "recovery window")
 
 	// Too long
-	_, err = uc.Execute(context.Background(), usecasestaging.DeleteInput{
+	_, err = uc.Execute(t.Context(), usecasestaging.DeleteInput{
 		Name:           "my-secret",
 		RecoveryWindow: 31,
 	})
@@ -147,7 +147,7 @@ func TestDeleteUseCase_Execute_FetchError(t *testing.T) {
 		Store:    store,
 	}
 
-	_, err := uc.Execute(context.Background(), usecasestaging.DeleteInput{
+	_, err := uc.Execute(t.Context(), usecasestaging.DeleteInput{
 		Name: "/app/not-exists",
 	})
 	assert.Error(t, err)
@@ -167,7 +167,7 @@ func TestDeleteUseCase_Execute_ZeroLastModified_ResourceNotFound(t *testing.T) {
 	}
 
 	// Delete should fail when resource doesn't exist on AWS and not staged
-	_, err := uc.Execute(context.Background(), usecasestaging.DeleteInput{
+	_, err := uc.Execute(t.Context(), usecasestaging.DeleteInput{
 		Name: "/app/to-delete",
 	})
 	require.Error(t, err)
@@ -180,7 +180,7 @@ func TestDeleteUseCase_Execute_ZeroLastModified_StagedCreate(t *testing.T) {
 	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
 
 	// Pre-stage a CREATE operation
-	require.NoError(t, store.StageEntry(staging.ServiceParam, "/app/new-param", staging.Entry{
+	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/new-param", staging.Entry{
 		Operation: staging.OperationCreate,
 		Value:     lo.ToPtr("new-value"),
 		StagedAt:  time.Now(),
@@ -195,7 +195,7 @@ func TestDeleteUseCase_Execute_ZeroLastModified_StagedCreate(t *testing.T) {
 	}
 
 	// Delete should succeed by unstaging the CREATE
-	output, err := uc.Execute(context.Background(), usecasestaging.DeleteInput{
+	output, err := uc.Execute(t.Context(), usecasestaging.DeleteInput{
 		Name: "/app/new-param",
 	})
 	require.NoError(t, err)
@@ -203,7 +203,7 @@ func TestDeleteUseCase_Execute_ZeroLastModified_StagedCreate(t *testing.T) {
 	assert.True(t, output.Unstaged) // Should be unstaged, not deleted
 
 	// Verify entry is removed
-	_, err = store.GetEntry(staging.ServiceParam, "/app/new-param")
+	_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/new-param")
 	assert.ErrorIs(t, err, staging.ErrNotStaged)
 }
 
@@ -218,7 +218,7 @@ func TestDeleteUseCase_Execute_StageError(t *testing.T) {
 		Store:    store,
 	}
 
-	_, err := uc.Execute(context.Background(), usecasestaging.DeleteInput{
+	_, err := uc.Execute(t.Context(), usecasestaging.DeleteInput{
 		Name: "/app/config",
 	})
 	assert.Error(t, err)
@@ -236,7 +236,7 @@ func TestDeleteUseCase_Execute_GetError(t *testing.T) {
 		Store:    store,
 	}
 
-	_, err := uc.Execute(context.Background(), usecasestaging.DeleteInput{
+	_, err := uc.Execute(t.Context(), usecasestaging.DeleteInput{
 		Name: "/app/config",
 	})
 	assert.Error(t, err)
@@ -259,7 +259,7 @@ func TestDeleteUseCase_Execute_UnstageError(t *testing.T) {
 		Store:    store,
 	}
 
-	_, err := uc.Execute(context.Background(), usecasestaging.DeleteInput{
+	_, err := uc.Execute(t.Context(), usecasestaging.DeleteInput{
 		Name: "/app/new",
 	})
 	assert.Error(t, err)
@@ -271,7 +271,7 @@ func TestDeleteUseCase_Execute_UnstagesCreate(t *testing.T) {
 
 	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
 	// Pre-stage a CREATE operation
-	require.NoError(t, store.StageEntry(staging.ServiceParam, "/app/new", staging.Entry{
+	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/new", staging.Entry{
 		Operation: staging.OperationCreate,
 		Value:     lo.ToPtr("new-value"),
 		StagedAt:  time.Now(),
@@ -282,7 +282,7 @@ func TestDeleteUseCase_Execute_UnstagesCreate(t *testing.T) {
 		Store:    store,
 	}
 
-	output, err := uc.Execute(context.Background(), usecasestaging.DeleteInput{
+	output, err := uc.Execute(t.Context(), usecasestaging.DeleteInput{
 		Name: "/app/new",
 	})
 	require.NoError(t, err)
@@ -290,7 +290,7 @@ func TestDeleteUseCase_Execute_UnstagesCreate(t *testing.T) {
 	assert.Equal(t, "/app/new", output.Name)
 
 	// Verify the entry was unstaged (removed), not staged as DELETE
-	_, err = store.GetEntry(staging.ServiceParam, "/app/new")
+	_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/new")
 	assert.ErrorIs(t, err, staging.ErrNotStaged)
 }
 
@@ -299,7 +299,7 @@ func TestDeleteUseCase_Execute_DeleteOnUpdate(t *testing.T) {
 
 	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
 	// Pre-stage an UPDATE operation
-	require.NoError(t, store.StageEntry(staging.ServiceParam, "/app/existing", staging.Entry{
+	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/existing", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("updated-value"),
 		StagedAt:  time.Now(),
@@ -310,14 +310,14 @@ func TestDeleteUseCase_Execute_DeleteOnUpdate(t *testing.T) {
 		Store:    store,
 	}
 
-	output, err := uc.Execute(context.Background(), usecasestaging.DeleteInput{
+	output, err := uc.Execute(t.Context(), usecasestaging.DeleteInput{
 		Name: "/app/existing",
 	})
 	require.NoError(t, err)
 	assert.False(t, output.Unstaged) // Not unstaged, it was re-staged as DELETE
 
 	// Verify the operation changed to DELETE
-	entry, err := store.GetEntry(staging.ServiceParam, "/app/existing")
+	entry, err := store.GetEntry(t.Context(), staging.ServiceParam, "/app/existing")
 	require.NoError(t, err)
 	assert.Equal(t, staging.OperationDelete, entry.Operation)
 }

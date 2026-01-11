@@ -64,7 +64,7 @@ func TestLogUseCase_Execute(t *testing.T) {
 
 	uc := &secret.LogUseCase{Client: client}
 
-	output, err := uc.Execute(context.Background(), secret.LogInput{
+	output, err := uc.Execute(t.Context(), secret.LogInput{
 		Name: "my-secret",
 	})
 	require.NoError(t, err)
@@ -89,7 +89,7 @@ func TestLogUseCase_Execute_Empty(t *testing.T) {
 
 	uc := &secret.LogUseCase{Client: client}
 
-	output, err := uc.Execute(context.Background(), secret.LogInput{
+	output, err := uc.Execute(t.Context(), secret.LogInput{
 		Name: "my-secret",
 	})
 	require.NoError(t, err)
@@ -105,7 +105,7 @@ func TestLogUseCase_Execute_Error(t *testing.T) {
 
 	uc := &secret.LogUseCase{Client: client}
 
-	_, err := uc.Execute(context.Background(), secret.LogInput{
+	_, err := uc.Execute(t.Context(), secret.LogInput{
 		Name: "my-secret",
 	})
 	assert.Error(t, err)
@@ -133,7 +133,7 @@ func TestLogUseCase_Execute_Reverse(t *testing.T) {
 
 	uc := &secret.LogUseCase{Client: client}
 
-	output, err := uc.Execute(context.Background(), secret.LogInput{
+	output, err := uc.Execute(t.Context(), secret.LogInput{
 		Name:    "my-secret",
 		Reverse: true,
 	})
@@ -166,7 +166,7 @@ func TestLogUseCase_Execute_SinceFilter(t *testing.T) {
 	uc := &secret.LogUseCase{Client: client}
 
 	since := now.Add(-2 * time.Hour)
-	output, err := uc.Execute(context.Background(), secret.LogInput{
+	output, err := uc.Execute(t.Context(), secret.LogInput{
 		Name:  "my-secret",
 		Since: &since,
 	})
@@ -197,7 +197,7 @@ func TestLogUseCase_Execute_UntilFilter(t *testing.T) {
 	uc := &secret.LogUseCase{Client: client}
 
 	until := now.Add(-30 * time.Minute)
-	output, err := uc.Execute(context.Background(), secret.LogInput{
+	output, err := uc.Execute(t.Context(), secret.LogInput{
 		Name:  "my-secret",
 		Until: &until,
 	})
@@ -224,7 +224,7 @@ func TestLogUseCase_Execute_GetValueError(t *testing.T) {
 
 	uc := &secret.LogUseCase{Client: client}
 
-	output, err := uc.Execute(context.Background(), secret.LogInput{
+	output, err := uc.Execute(t.Context(), secret.LogInput{
 		Name: "my-secret",
 	})
 	require.NoError(t, err)
@@ -249,7 +249,7 @@ func TestLogUseCase_Execute_NilCreatedDate(t *testing.T) {
 
 	uc := &secret.LogUseCase{Client: client}
 
-	output, err := uc.Execute(context.Background(), secret.LogInput{
+	output, err := uc.Execute(t.Context(), secret.LogInput{
 		Name: "my-secret",
 	})
 	require.NoError(t, err)
@@ -271,7 +271,7 @@ func TestLogUseCase_Execute_NilVersionId(t *testing.T) {
 
 	uc := &secret.LogUseCase{Client: client}
 
-	output, err := uc.Execute(context.Background(), secret.LogInput{
+	output, err := uc.Execute(t.Context(), secret.LogInput{
 		Name: "my-secret",
 	})
 	require.NoError(t, err)
@@ -302,7 +302,7 @@ func TestLogUseCase_Execute_SortWithNilCreatedDate(t *testing.T) {
 
 	uc := &secret.LogUseCase{Client: client}
 
-	output, err := uc.Execute(context.Background(), secret.LogInput{
+	output, err := uc.Execute(t.Context(), secret.LogInput{
 		Name: "my-secret",
 	})
 	require.NoError(t, err)
@@ -329,7 +329,7 @@ func TestLogUseCase_Execute_SortWithEqualDates(t *testing.T) {
 
 	uc := &secret.LogUseCase{Client: client}
 
-	output, err := uc.Execute(context.Background(), secret.LogInput{
+	output, err := uc.Execute(t.Context(), secret.LogInput{
 		Name: "my-secret",
 	})
 	require.NoError(t, err)
@@ -362,7 +362,7 @@ func TestLogUseCase_Execute_SortUnsortedInput(t *testing.T) {
 
 	uc := &secret.LogUseCase{Client: client}
 
-	output, err := uc.Execute(context.Background(), secret.LogInput{
+	output, err := uc.Execute(t.Context(), secret.LogInput{
 		Name: "my-secret",
 	})
 	require.NoError(t, err)
@@ -395,7 +395,7 @@ func TestLogUseCase_Execute_FilterWithNilCreatedDate(t *testing.T) {
 	uc := &secret.LogUseCase{Client: client}
 
 	since := now.Add(-1 * time.Hour)
-	output, err := uc.Execute(context.Background(), secret.LogInput{
+	output, err := uc.Execute(t.Context(), secret.LogInput{
 		Name:  "my-secret",
 		Since: &since,
 	})

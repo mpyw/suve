@@ -74,11 +74,11 @@ func (u *ApplyUseCase) Execute(ctx context.Context, input ApplyInput) (*ApplyOut
 	}
 
 	// Get staged entries and tags
-	stagedEntries, err := u.Store.ListEntries(service)
+	stagedEntries, err := u.Store.ListEntries(ctx, service)
 	if err != nil {
 		return nil, err
 	}
-	stagedTags, err := u.Store.ListTags(service)
+	stagedTags, err := u.Store.ListTags(ctx, service)
 	if err != nil {
 		return nil, err
 	}
@@ -168,7 +168,7 @@ func (u *ApplyUseCase) applyEntries(ctx context.Context, service staging.Service
 				resultEntry.Status = ApplyResultDeleted
 			}
 			// Unstage successful operations
-			_ = u.Store.UnstageEntry(service, name)
+			_ = u.Store.UnstageEntry(ctx, service, name)
 			output.EntrySucceeded++
 		}
 		output.EntryResults = append(output.EntryResults, resultEntry)
@@ -196,7 +196,7 @@ func (u *ApplyUseCase) applyTags(ctx context.Context, service staging.Service, t
 			output.TagFailed++
 		} else {
 			// Unstage successful operations
-			_ = u.Store.UnstageTag(service, name)
+			_ = u.Store.UnstageTag(ctx, service, name)
 			output.TagSucceeded++
 		}
 		output.TagResults = append(output.TagResults, resultTag)

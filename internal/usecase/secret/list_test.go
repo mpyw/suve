@@ -64,7 +64,7 @@ func TestListUseCase_Execute_Empty(t *testing.T) {
 
 	uc := &secret.ListUseCase{Client: client}
 
-	output, err := uc.Execute(context.Background(), secret.ListInput{})
+	output, err := uc.Execute(t.Context(), secret.ListInput{})
 	require.NoError(t, err)
 	assert.Empty(t, output.Entries)
 }
@@ -83,7 +83,7 @@ func TestListUseCase_Execute_WithSecrets(t *testing.T) {
 
 	uc := &secret.ListUseCase{Client: client}
 
-	output, err := uc.Execute(context.Background(), secret.ListInput{})
+	output, err := uc.Execute(t.Context(), secret.ListInput{})
 	require.NoError(t, err)
 	assert.Len(t, output.Entries, 2)
 	assert.Equal(t, "secret-a", output.Entries[0].Name)
@@ -104,7 +104,7 @@ func TestListUseCase_Execute_WithPrefix(t *testing.T) {
 
 	uc := &secret.ListUseCase{Client: client}
 
-	output, err := uc.Execute(context.Background(), secret.ListInput{
+	output, err := uc.Execute(t.Context(), secret.ListInput{
 		Prefix: "app/",
 	})
 	require.NoError(t, err)
@@ -126,7 +126,7 @@ func TestListUseCase_Execute_WithFilter(t *testing.T) {
 
 	uc := &secret.ListUseCase{Client: client}
 
-	output, err := uc.Execute(context.Background(), secret.ListInput{
+	output, err := uc.Execute(t.Context(), secret.ListInput{
 		Filter: "config",
 	})
 	require.NoError(t, err)
@@ -142,7 +142,7 @@ func TestListUseCase_Execute_InvalidFilter(t *testing.T) {
 
 	uc := &secret.ListUseCase{Client: client}
 
-	_, err := uc.Execute(context.Background(), secret.ListInput{
+	_, err := uc.Execute(t.Context(), secret.ListInput{
 		Filter: "[invalid",
 	})
 	assert.Error(t, err)
@@ -158,7 +158,7 @@ func TestListUseCase_Execute_ListError(t *testing.T) {
 
 	uc := &secret.ListUseCase{Client: client}
 
-	_, err := uc.Execute(context.Background(), secret.ListInput{})
+	_, err := uc.Execute(t.Context(), secret.ListInput{})
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to list secrets")
 }
@@ -181,7 +181,7 @@ func TestListUseCase_Execute_WithValue(t *testing.T) {
 
 	uc := &secret.ListUseCase{Client: client}
 
-	output, err := uc.Execute(context.Background(), secret.ListInput{
+	output, err := uc.Execute(t.Context(), secret.ListInput{
 		WithValue: true,
 	})
 	require.NoError(t, err)
@@ -213,7 +213,7 @@ func TestListUseCase_Execute_WithValue_PartialError(t *testing.T) {
 
 	uc := &secret.ListUseCase{Client: client}
 
-	output, err := uc.Execute(context.Background(), secret.ListInput{
+	output, err := uc.Execute(t.Context(), secret.ListInput{
 		WithValue: true,
 	})
 	require.NoError(t, err)
@@ -254,7 +254,7 @@ func TestListUseCase_Execute_WithPagination(t *testing.T) {
 
 	uc := &secret.ListUseCase{Client: client}
 
-	output, err := uc.Execute(context.Background(), secret.ListInput{
+	output, err := uc.Execute(t.Context(), secret.ListInput{
 		MaxResults: 2,
 	})
 	require.NoError(t, err)
@@ -278,7 +278,7 @@ func TestListUseCase_Execute_WithPagination_ContinueToken(t *testing.T) {
 
 	uc := &secret.ListUseCase{Client: client}
 
-	output, err := uc.Execute(context.Background(), secret.ListInput{
+	output, err := uc.Execute(t.Context(), secret.ListInput{
 		MaxResults: 5,
 		NextToken:  "token1",
 	})
@@ -310,7 +310,7 @@ func TestListUseCase_Execute_WithPagination_FilterApplied(t *testing.T) {
 
 	uc := &secret.ListUseCase{Client: client}
 
-	output, err := uc.Execute(context.Background(), secret.ListInput{
+	output, err := uc.Execute(t.Context(), secret.ListInput{
 		MaxResults: 2,
 		Filter:     "config",
 	})
@@ -330,7 +330,7 @@ func TestListUseCase_Execute_WithPagination_Error(t *testing.T) {
 
 	uc := &secret.ListUseCase{Client: client}
 
-	_, err := uc.Execute(context.Background(), secret.ListInput{
+	_, err := uc.Execute(t.Context(), secret.ListInput{
 		MaxResults: 10,
 	})
 	assert.Error(t, err)
@@ -357,7 +357,7 @@ func TestListUseCase_Execute_WithPagination_TrimResults(t *testing.T) {
 
 	uc := &secret.ListUseCase{Client: client}
 
-	output, err := uc.Execute(context.Background(), secret.ListInput{
+	output, err := uc.Execute(t.Context(), secret.ListInput{
 		MaxResults: 2,
 	})
 	require.NoError(t, err)

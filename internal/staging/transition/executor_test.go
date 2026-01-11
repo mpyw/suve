@@ -1,6 +1,7 @@
 package transition
 
 import (
+	"context"
 	"errors"
 	"path/filepath"
 	"testing"
@@ -25,33 +26,33 @@ type mockStore struct {
 	unstageEntryErr error
 }
 
-func (m *mockStore) GetEntry(_ staging.Service, _ string) (*staging.Entry, error) {
+func (m *mockStore) GetEntry(_ context.Context, _ staging.Service, _ string) (*staging.Entry, error) {
 	if m.getEntryErr != nil {
 		return nil, m.getEntryErr
 	}
 	return nil, staging.ErrNotStaged
 }
 
-func (m *mockStore) GetTag(_ staging.Service, _ string) (*staging.TagEntry, error) {
+func (m *mockStore) GetTag(_ context.Context, _ staging.Service, _ string) (*staging.TagEntry, error) {
 	if m.getTagErr != nil {
 		return nil, m.getTagErr
 	}
 	return nil, staging.ErrNotStaged
 }
 
-func (m *mockStore) StageEntry(_ staging.Service, _ string, _ staging.Entry) error {
+func (m *mockStore) StageEntry(_ context.Context, _ staging.Service, _ string, _ staging.Entry) error {
 	return m.stageEntryErr
 }
 
-func (m *mockStore) StageTag(_ staging.Service, _ string, _ staging.TagEntry) error {
+func (m *mockStore) StageTag(_ context.Context, _ staging.Service, _ string, _ staging.TagEntry) error {
 	return m.stageTagErr
 }
 
-func (m *mockStore) UnstageEntry(_ staging.Service, _ string) error {
+func (m *mockStore) UnstageEntry(_ context.Context, _ staging.Service, _ string) error {
 	return m.unstageEntryErr
 }
 
-func (m *mockStore) UnstageTag(_ staging.Service, _ string) error {
+func (m *mockStore) UnstageTag(_ context.Context, _ staging.Service, _ string) error {
 	return m.unstageTagErr
 }
 
@@ -73,7 +74,7 @@ func TestExecuteEntry_Add(t *testing.T) {
 		StagedState:  EntryStagedStateNotStaged{},
 	}
 
-	result, err := executor.ExecuteEntry(staging.ServiceParam, "/app/new", state, EntryActionAdd{Value: "new-value"}, nil)
+	result, err := executor.ExecuteEntry(t.Context(), staging.ServiceParam, "/app/new", state, EntryActionAdd{Value: "new-value"}, nil)
 	require.NoError(t, err)
 
 	// Check result
@@ -81,7 +82,7 @@ func TestExecuteEntry_Add(t *testing.T) {
 	assert.True(t, isCreate)
 
 	// Check persisted
-	entry, err := store.GetEntry(staging.ServiceParam, "/app/new")
+	entry, err := store.GetEntry(t.Context(), staging.ServiceParam, "/app/new")
 	require.NoError(t, err)
 	assert.Equal(t, staging.OperationCreate, entry.Operation)
 	assert.Equal(t, "new-value", lo.FromPtr(entry.Value))
@@ -100,14 +101,14 @@ func TestExecuteEntry_AddWithDescription(t *testing.T) {
 
 	description := "test description"
 	opts := &EntryExecuteOptions{Description: &description}
-	result, err := executor.ExecuteEntry(staging.ServiceParam, "/app/new", state, EntryActionAdd{Value: "new-value"}, opts)
+	result, err := executor.ExecuteEntry(t.Context(), staging.ServiceParam, "/app/new", state, EntryActionAdd{Value: "new-value"}, opts)
 	require.NoError(t, err)
 
 	_, isCreate := result.NewState.StagedState.(EntryStagedStateCreate)
 	assert.True(t, isCreate)
 
 	// Check persisted with description
-	entry, err := store.GetEntry(staging.ServiceParam, "/app/new")
+	entry, err := store.GetEntry(t.Context(), staging.ServiceParam, "/app/new")
 	require.NoError(t, err)
 	assert.Equal(t, staging.OperationCreate, entry.Operation)
 	assert.Equal(t, "test description", lo.FromPtr(entry.Description))
@@ -125,7 +126,7 @@ func TestExecuteEntry_Edit(t *testing.T) {
 		StagedState:  EntryStagedStateNotStaged{},
 	}
 
-	result, err := executor.ExecuteEntry(staging.ServiceParam, "/app/config", state, EntryActionEdit{Value: "updated"}, nil)
+	result, err := executor.ExecuteEntry(t.Context(), staging.ServiceParam, "/app/config", state, EntryActionEdit{Value: "updated"}, nil)
 	require.NoError(t, err)
 
 	// Check result
@@ -133,7 +134,7 @@ func TestExecuteEntry_Edit(t *testing.T) {
 	assert.True(t, isUpdate)
 
 	// Check persisted
-	entry, err := store.GetEntry(staging.ServiceParam, "/app/config")
+	entry, err := store.GetEntry(t.Context(), staging.ServiceParam, "/app/config")
 	require.NoError(t, err)
 	assert.Equal(t, staging.OperationUpdate, entry.Operation)
 }
@@ -157,14 +158,14 @@ func TestExecuteEntry_EditWithMetadata(t *testing.T) {
 		Description:    &description,
 	}
 
-	result, err := executor.ExecuteEntry(staging.ServiceParam, "/app/config", state, EntryActionEdit{Value: "updated"}, opts)
+	result, err := executor.ExecuteEntry(t.Context(), staging.ServiceParam, "/app/config", state, EntryActionEdit{Value: "updated"}, opts)
 	require.NoError(t, err)
 
 	_, isUpdate := result.NewState.StagedState.(EntryStagedStateUpdate)
 	assert.True(t, isUpdate)
 
 	// Check persisted with metadata
-	entry, err := store.GetEntry(staging.ServiceParam, "/app/config")
+	entry, err := store.GetEntry(t.Context(), staging.ServiceParam, "/app/config")
 	require.NoError(t, err)
 	assert.Equal(t, staging.OperationUpdate, entry.Operation)
 	assert.Equal(t, baseTime, *entry.BaseModifiedAt)
@@ -183,7 +184,7 @@ func TestExecuteEntry_Delete(t *testing.T) {
 		StagedState:  EntryStagedStateNotStaged{},
 	}
 
-	result, err := executor.ExecuteEntry(staging.ServiceParam, "/app/config", state, EntryActionDelete{}, nil)
+	result, err := executor.ExecuteEntry(t.Context(), staging.ServiceParam, "/app/config", state, EntryActionDelete{}, nil)
 	require.NoError(t, err)
 
 	// Check result
@@ -191,7 +192,7 @@ func TestExecuteEntry_Delete(t *testing.T) {
 	assert.True(t, isDelete)
 
 	// Check persisted
-	entry, err := store.GetEntry(staging.ServiceParam, "/app/config")
+	entry, err := store.GetEntry(t.Context(), staging.ServiceParam, "/app/config")
 	require.NoError(t, err)
 	assert.Equal(t, staging.OperationDelete, entry.Operation)
 }
@@ -213,14 +214,14 @@ func TestExecuteEntry_DeleteWithMetadata(t *testing.T) {
 		BaseModifiedAt: &baseTime,
 	}
 
-	result, err := executor.ExecuteEntry(staging.ServiceParam, "/app/config", state, EntryActionDelete{}, opts)
+	result, err := executor.ExecuteEntry(t.Context(), staging.ServiceParam, "/app/config", state, EntryActionDelete{}, opts)
 	require.NoError(t, err)
 
 	_, isDelete := result.NewState.StagedState.(EntryStagedStateDelete)
 	assert.True(t, isDelete)
 
 	// Check persisted with metadata
-	entry, err := store.GetEntry(staging.ServiceParam, "/app/config")
+	entry, err := store.GetEntry(t.Context(), staging.ServiceParam, "/app/config")
 	require.NoError(t, err)
 	assert.Equal(t, staging.OperationDelete, entry.Operation)
 	assert.Equal(t, baseTime, *entry.BaseModifiedAt)
@@ -232,12 +233,12 @@ func TestExecuteEntry_DeleteCreate_UnstagesTags(t *testing.T) {
 	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "stage.json"))
 
 	// Pre-stage CREATE and tags
-	require.NoError(t, store.StageEntry(staging.ServiceParam, "/app/new", staging.Entry{
+	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/new", staging.Entry{
 		Operation: staging.OperationCreate,
 		Value:     lo.ToPtr("draft"),
 		StagedAt:  time.Now(),
 	}))
-	require.NoError(t, store.StageTag(staging.ServiceParam, "/app/new", staging.TagEntry{
+	require.NoError(t, store.StageTag(t.Context(), staging.ServiceParam, "/app/new", staging.TagEntry{
 		Add:      map[string]string{"env": "prod"},
 		StagedAt: time.Now(),
 	}))
@@ -249,18 +250,18 @@ func TestExecuteEntry_DeleteCreate_UnstagesTags(t *testing.T) {
 		StagedState:  EntryStagedStateCreate{DraftValue: "draft"},
 	}
 
-	result, err := executor.ExecuteEntry(staging.ServiceParam, "/app/new", state, EntryActionDelete{}, nil)
+	result, err := executor.ExecuteEntry(t.Context(), staging.ServiceParam, "/app/new", state, EntryActionDelete{}, nil)
 	require.NoError(t, err)
 
 	// Check DiscardTags flag
 	assert.True(t, result.DiscardTags)
 
 	// Check entry unstaged
-	_, err = store.GetEntry(staging.ServiceParam, "/app/new")
+	_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/new")
 	assert.ErrorIs(t, err, staging.ErrNotStaged)
 
 	// Check tags unstaged
-	_, err = store.GetTag(staging.ServiceParam, "/app/new")
+	_, err = store.GetTag(t.Context(), staging.ServiceParam, "/app/new")
 	assert.ErrorIs(t, err, staging.ErrNotStaged)
 }
 
@@ -270,7 +271,7 @@ func TestExecuteEntry_DeleteCreate_NoTags(t *testing.T) {
 	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "stage.json"))
 
 	// Pre-stage CREATE but no tags
-	require.NoError(t, store.StageEntry(staging.ServiceParam, "/app/new", staging.Entry{
+	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/new", staging.Entry{
 		Operation: staging.OperationCreate,
 		Value:     lo.ToPtr("draft"),
 		StagedAt:  time.Now(),
@@ -284,14 +285,14 @@ func TestExecuteEntry_DeleteCreate_NoTags(t *testing.T) {
 	}
 
 	// Delete CREATE without tags - should succeed (ErrNotStaged ignored)
-	result, err := executor.ExecuteEntry(staging.ServiceParam, "/app/new", state, EntryActionDelete{}, nil)
+	result, err := executor.ExecuteEntry(t.Context(), staging.ServiceParam, "/app/new", state, EntryActionDelete{}, nil)
 	require.NoError(t, err)
 
 	// Check DiscardTags flag is set
 	assert.True(t, result.DiscardTags)
 
 	// Check entry unstaged
-	_, err = store.GetEntry(staging.ServiceParam, "/app/new")
+	_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/new")
 	assert.ErrorIs(t, err, staging.ErrNotStaged)
 }
 
@@ -301,7 +302,7 @@ func TestExecuteEntry_Reset(t *testing.T) {
 	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "stage.json"))
 
 	// Pre-stage an entry
-	require.NoError(t, store.StageEntry(staging.ServiceParam, "/app/config", staging.Entry{
+	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("updated"),
 		StagedAt:  time.Now(),
@@ -314,7 +315,7 @@ func TestExecuteEntry_Reset(t *testing.T) {
 		StagedState:  EntryStagedStateUpdate{DraftValue: "updated"},
 	}
 
-	result, err := executor.ExecuteEntry(staging.ServiceParam, "/app/config", state, EntryActionReset{}, nil)
+	result, err := executor.ExecuteEntry(t.Context(), staging.ServiceParam, "/app/config", state, EntryActionReset{}, nil)
 	require.NoError(t, err)
 
 	// Check result
@@ -322,7 +323,7 @@ func TestExecuteEntry_Reset(t *testing.T) {
 	assert.True(t, isNotStaged)
 
 	// Check unstaged
-	_, err = store.GetEntry(staging.ServiceParam, "/app/config")
+	_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/config")
 	assert.ErrorIs(t, err, staging.ErrNotStaged)
 }
 
@@ -338,7 +339,7 @@ func TestExecuteEntry_Error(t *testing.T) {
 	}
 
 	// Edit on DELETE should error
-	result, err := executor.ExecuteEntry(staging.ServiceParam, "/app/config", state, EntryActionEdit{Value: "new"}, nil)
+	result, err := executor.ExecuteEntry(t.Context(), staging.ServiceParam, "/app/config", state, EntryActionEdit{Value: "new"}, nil)
 	assert.ErrorIs(t, err, ErrCannotEditDelete)
 	assert.Equal(t, ErrCannotEditDelete, result.Error)
 }
@@ -355,7 +356,7 @@ func TestExecuteEntry_ResetNotStaged(t *testing.T) {
 	}
 
 	// Reset on NotStaged should succeed (no-op)
-	result, err := executor.ExecuteEntry(staging.ServiceParam, "/app/config", state, EntryActionReset{}, nil)
+	result, err := executor.ExecuteEntry(t.Context(), staging.ServiceParam, "/app/config", state, EntryActionReset{}, nil)
 	require.NoError(t, err)
 
 	_, isNotStaged := result.NewState.StagedState.(EntryStagedStateNotStaged)
@@ -376,13 +377,13 @@ func TestExecuteTag_Add(t *testing.T) {
 	existingValue := "existing-value"
 	entryState := EntryState{CurrentValue: &existingValue, StagedState: EntryStagedStateNotStaged{}}
 
-	result, err := executor.ExecuteTag(staging.ServiceParam, "/app/config", entryState, StagedTags{}, action, &baseTime)
+	result, err := executor.ExecuteTag(t.Context(), staging.ServiceParam, "/app/config", entryState, StagedTags{}, action, &baseTime)
 	require.NoError(t, err)
 
 	assert.Equal(t, "prod", result.NewStagedTags.ToSet["env"])
 
 	// Check persisted
-	tagEntry, err := store.GetTag(staging.ServiceParam, "/app/config")
+	tagEntry, err := store.GetTag(t.Context(), staging.ServiceParam, "/app/config")
 	require.NoError(t, err)
 	assert.Equal(t, "prod", tagEntry.Add["env"])
 	assert.Equal(t, baseTime, *tagEntry.BaseModifiedAt)
@@ -401,13 +402,13 @@ func TestExecuteTag_Remove(t *testing.T) {
 	existingValue := "existing-value"
 	entryState := EntryState{CurrentValue: &existingValue, StagedState: EntryStagedStateNotStaged{}}
 
-	result, err := executor.ExecuteTag(staging.ServiceParam, "/app/config", entryState, StagedTags{}, action, nil)
+	result, err := executor.ExecuteTag(t.Context(), staging.ServiceParam, "/app/config", entryState, StagedTags{}, action, nil)
 	require.NoError(t, err)
 
 	assert.True(t, result.NewStagedTags.ToUnset.Contains("deprecated"))
 
 	// Check persisted
-	tagEntry, err := store.GetTag(staging.ServiceParam, "/app/config")
+	tagEntry, err := store.GetTag(t.Context(), staging.ServiceParam, "/app/config")
 	require.NoError(t, err)
 	assert.True(t, tagEntry.Remove.Contains("deprecated"))
 }
@@ -425,7 +426,7 @@ func TestExecuteTag_Error(t *testing.T) {
 	entryState := EntryState{CurrentValue: &existingValue, StagedState: EntryStagedStateDelete{}}
 
 	// Tag on DELETE should error
-	result, err := executor.ExecuteTag(staging.ServiceParam, "/app/config", entryState, StagedTags{}, action, nil)
+	result, err := executor.ExecuteTag(t.Context(), staging.ServiceParam, "/app/config", entryState, StagedTags{}, action, nil)
 	assert.ErrorIs(t, err, ErrCannotTagDelete)
 	assert.Equal(t, ErrCannotTagDelete, result.Error)
 }
@@ -436,7 +437,7 @@ func TestExecuteTag_UnstageWhenEmpty(t *testing.T) {
 	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "stage.json"))
 
 	// Pre-stage tags
-	require.NoError(t, store.StageTag(staging.ServiceParam, "/app/config", staging.TagEntry{
+	require.NoError(t, store.StageTag(t.Context(), staging.ServiceParam, "/app/config", staging.TagEntry{
 		Add:      map[string]string{"env": "prod"},
 		StagedAt: time.Now(),
 	}))
@@ -454,7 +455,7 @@ func TestExecuteTag_UnstageWhenEmpty(t *testing.T) {
 	existingValue := "existing-value"
 	entryState := EntryState{CurrentValue: &existingValue, StagedState: EntryStagedStateNotStaged{}}
 
-	result, err := executor.ExecuteTag(staging.ServiceParam, "/app/config", entryState, existingTags, action, nil)
+	result, err := executor.ExecuteTag(t.Context(), staging.ServiceParam, "/app/config", entryState, existingTags, action, nil)
 	require.NoError(t, err)
 
 	// Result should have only ToUnset, no ToSet
@@ -462,7 +463,7 @@ func TestExecuteTag_UnstageWhenEmpty(t *testing.T) {
 	assert.True(t, result.NewStagedTags.ToUnset.Contains("env"))
 
 	// But since it's not empty (has ToUnset), it should remain staged
-	tagEntry, err := store.GetTag(staging.ServiceParam, "/app/config")
+	tagEntry, err := store.GetTag(t.Context(), staging.ServiceParam, "/app/config")
 	require.NoError(t, err)
 	assert.True(t, tagEntry.Remove.Contains("env"))
 }
@@ -473,7 +474,7 @@ func TestExecuteTag_UnstageWhenCompletelyEmpty(t *testing.T) {
 	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "stage.json"))
 
 	// Pre-stage tags to add "env": "prod"
-	require.NoError(t, store.StageTag(staging.ServiceParam, "/app/config", staging.TagEntry{
+	require.NoError(t, store.StageTag(t.Context(), staging.ServiceParam, "/app/config", staging.TagEntry{
 		Add:      map[string]string{"env": "prod"},
 		StagedAt: time.Now(),
 	}))
@@ -492,7 +493,7 @@ func TestExecuteTag_UnstageWhenCompletelyEmpty(t *testing.T) {
 	existingValue := "existing-value"
 	entryState := EntryState{CurrentValue: &existingValue, StagedState: EntryStagedStateNotStaged{}}
 
-	result, err := executor.ExecuteTag(staging.ServiceParam, "/app/config", entryState, existingTags, action, nil)
+	result, err := executor.ExecuteTag(t.Context(), staging.ServiceParam, "/app/config", entryState, existingTags, action, nil)
 	require.NoError(t, err)
 
 	// Result should be completely empty (no ToSet, no ToUnset)
@@ -501,7 +502,7 @@ func TestExecuteTag_UnstageWhenCompletelyEmpty(t *testing.T) {
 	assert.True(t, result.NewStagedTags.IsEmpty())
 
 	// Should be unstaged
-	_, err = store.GetTag(staging.ServiceParam, "/app/config")
+	_, err = store.GetTag(t.Context(), staging.ServiceParam, "/app/config")
 	assert.ErrorIs(t, err, staging.ErrNotStaged)
 }
 
@@ -520,7 +521,7 @@ func TestExecuteTag_UnstageWhenAlreadyNotStaged(t *testing.T) {
 	existingValue := "existing-value"
 	entryState := EntryState{CurrentValue: &existingValue, StagedState: EntryStagedStateNotStaged{}}
 
-	result, err := executor.ExecuteTag(staging.ServiceParam, "/app/config", entryState, existingTags, action, nil)
+	result, err := executor.ExecuteTag(t.Context(), staging.ServiceParam, "/app/config", entryState, existingTags, action, nil)
 	require.NoError(t, err)
 
 	// Result is empty, and unstaging non-existing tags should not error
@@ -535,7 +536,7 @@ func TestLoadEntryState(t *testing.T) {
 		store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "stage.json"))
 
 		currentValue := "aws-value"
-		state, err := LoadEntryState(store, staging.ServiceParam, "/app/config", &currentValue)
+		state, err := LoadEntryState(t.Context(), store, staging.ServiceParam, "/app/config", &currentValue)
 		require.NoError(t, err)
 
 		assert.Equal(t, &currentValue, state.CurrentValue)
@@ -546,13 +547,13 @@ func TestLoadEntryState(t *testing.T) {
 	t.Run("staged create", func(t *testing.T) {
 		t.Parallel()
 		store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "stage.json"))
-		require.NoError(t, store.StageEntry(staging.ServiceParam, "/app/new", staging.Entry{
+		require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/new", staging.Entry{
 			Operation: staging.OperationCreate,
 			Value:     lo.ToPtr("draft"),
 			StagedAt:  time.Now(),
 		}))
 
-		state, err := LoadEntryState(store, staging.ServiceParam, "/app/new", nil)
+		state, err := LoadEntryState(t.Context(), store, staging.ServiceParam, "/app/new", nil)
 		require.NoError(t, err)
 
 		create, isCreate := state.StagedState.(EntryStagedStateCreate)
@@ -563,14 +564,14 @@ func TestLoadEntryState(t *testing.T) {
 	t.Run("staged update", func(t *testing.T) {
 		t.Parallel()
 		store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "stage.json"))
-		require.NoError(t, store.StageEntry(staging.ServiceParam, "/app/config", staging.Entry{
+		require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("updated"),
 			StagedAt:  time.Now(),
 		}))
 
 		currentValue := "current"
-		state, err := LoadEntryState(store, staging.ServiceParam, "/app/config", &currentValue)
+		state, err := LoadEntryState(t.Context(), store, staging.ServiceParam, "/app/config", &currentValue)
 		require.NoError(t, err)
 
 		update, isUpdate := state.StagedState.(EntryStagedStateUpdate)
@@ -581,12 +582,12 @@ func TestLoadEntryState(t *testing.T) {
 	t.Run("staged delete", func(t *testing.T) {
 		t.Parallel()
 		store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "stage.json"))
-		require.NoError(t, store.StageEntry(staging.ServiceParam, "/app/config", staging.Entry{
+		require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
 			Operation: staging.OperationDelete,
 			StagedAt:  time.Now(),
 		}))
 
-		state, err := LoadEntryState(store, staging.ServiceParam, "/app/config", nil)
+		state, err := LoadEntryState(t.Context(), store, staging.ServiceParam, "/app/config", nil)
 		require.NoError(t, err)
 
 		_, isDelete := state.StagedState.(EntryStagedStateDelete)
@@ -601,7 +602,7 @@ func TestLoadStagedTags(t *testing.T) {
 		t.Parallel()
 		store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "stage.json"))
 
-		tags, baseModifiedAt, err := LoadStagedTags(store, staging.ServiceParam, "/app/config")
+		tags, baseModifiedAt, err := LoadStagedTags(t.Context(), store, staging.ServiceParam, "/app/config")
 		require.NoError(t, err)
 
 		assert.True(t, tags.IsEmpty())
@@ -612,14 +613,14 @@ func TestLoadStagedTags(t *testing.T) {
 		t.Parallel()
 		store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "stage.json"))
 		baseTime := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
-		require.NoError(t, store.StageTag(staging.ServiceParam, "/app/config", staging.TagEntry{
+		require.NoError(t, store.StageTag(t.Context(), staging.ServiceParam, "/app/config", staging.TagEntry{
 			Add:            map[string]string{"env": "prod"},
 			Remove:         maputil.NewSet("deprecated"),
 			StagedAt:       time.Now(),
 			BaseModifiedAt: &baseTime,
 		}))
 
-		tags, baseModifiedAt, err := LoadStagedTags(store, staging.ServiceParam, "/app/config")
+		tags, baseModifiedAt, err := LoadStagedTags(t.Context(), store, staging.ServiceParam, "/app/config")
 		require.NoError(t, err)
 
 		assert.Equal(t, "prod", tags.ToSet["env"])
@@ -644,7 +645,7 @@ func TestExecuteEntry_PersistError(t *testing.T) {
 	}
 
 	// Add should fail due to StageEntry error
-	_, err := executor.ExecuteEntry(staging.ServiceParam, "/app/new", state, EntryActionAdd{Value: "new-value"}, nil)
+	_, err := executor.ExecuteEntry(t.Context(), staging.ServiceParam, "/app/new", state, EntryActionAdd{Value: "new-value"}, nil)
 	assert.ErrorIs(t, err, errMock)
 }
 
@@ -660,7 +661,7 @@ func TestExecuteEntry_UnstageTagError(t *testing.T) {
 	}
 
 	// Delete CREATE with UnstageTag error (not ErrNotStaged)
-	_, err := executor.ExecuteEntry(staging.ServiceParam, "/app/new", state, EntryActionDelete{}, nil)
+	_, err := executor.ExecuteEntry(t.Context(), staging.ServiceParam, "/app/new", state, EntryActionDelete{}, nil)
 	assert.ErrorIs(t, err, errMock)
 }
 
@@ -678,7 +679,7 @@ func TestExecuteTag_PersistError(t *testing.T) {
 	entryState := EntryState{CurrentValue: &existingValue, StagedState: EntryStagedStateNotStaged{}}
 
 	// Tag should fail due to StageTag error
-	_, err := executor.ExecuteTag(staging.ServiceParam, "/app/config", entryState, StagedTags{}, action, nil)
+	_, err := executor.ExecuteTag(t.Context(), staging.ServiceParam, "/app/config", entryState, StagedTags{}, action, nil)
 	assert.ErrorIs(t, err, errMock)
 }
 
@@ -687,7 +688,7 @@ func TestLoadEntryState_Error(t *testing.T) {
 
 	store := &mockStore{getEntryErr: errMock}
 
-	_, err := LoadEntryState(store, staging.ServiceParam, "/app/config", nil)
+	_, err := LoadEntryState(t.Context(), store, staging.ServiceParam, "/app/config", nil)
 	assert.ErrorIs(t, err, errMock)
 }
 
@@ -696,6 +697,6 @@ func TestLoadStagedTags_Error(t *testing.T) {
 
 	store := &mockStore{getTagErr: errMock}
 
-	_, _, err := LoadStagedTags(store, staging.ServiceParam, "/app/config")
+	_, _, err := LoadStagedTags(t.Context(), store, staging.ServiceParam, "/app/config")
 	assert.ErrorIs(t, err, errMock)
 }

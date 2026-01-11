@@ -2,6 +2,7 @@
 package staging
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -156,7 +157,7 @@ func (s *Store) releaseFileLock(fileLock *flock.Flock) {
 }
 
 // Load loads the current staging state from disk.
-func (s *Store) Load() (*State, error) {
+func (s *Store) Load(_ context.Context) (*State, error) {
 	fileMu.Lock()
 	defer fileMu.Unlock()
 
@@ -260,7 +261,7 @@ func (s *Store) saveLocked(state *State) error {
 }
 
 // StageEntry adds or updates a staged entry change.
-func (s *Store) StageEntry(service Service, name string, entry Entry) error {
+func (s *Store) StageEntry(_ context.Context, service Service, name string, entry Entry) error {
 	// Acquire cross-process file lock
 	lockFile, err := s.acquireFileLock()
 	if err != nil {
@@ -287,7 +288,7 @@ func (s *Store) StageEntry(service Service, name string, entry Entry) error {
 }
 
 // StageTag adds or updates staged tag changes.
-func (s *Store) StageTag(service Service, name string, tagEntry TagEntry) error {
+func (s *Store) StageTag(_ context.Context, service Service, name string, tagEntry TagEntry) error {
 	// Acquire cross-process file lock
 	lockFile, err := s.acquireFileLock()
 	if err != nil {
@@ -314,7 +315,7 @@ func (s *Store) StageTag(service Service, name string, tagEntry TagEntry) error 
 }
 
 // UnstageEntry removes a staged entry change.
-func (s *Store) UnstageEntry(service Service, name string) error {
+func (s *Store) UnstageEntry(_ context.Context, service Service, name string) error {
 	// Acquire cross-process file lock
 	lockFile, err := s.acquireFileLock()
 	if err != nil {
@@ -344,7 +345,7 @@ func (s *Store) UnstageEntry(service Service, name string) error {
 }
 
 // UnstageTag removes staged tag changes.
-func (s *Store) UnstageTag(service Service, name string) error {
+func (s *Store) UnstageTag(_ context.Context, service Service, name string) error {
 	// Acquire cross-process file lock
 	lockFile, err := s.acquireFileLock()
 	if err != nil {
@@ -375,7 +376,7 @@ func (s *Store) UnstageTag(service Service, name string) error {
 
 // UnstageAll removes all staged changes for a service.
 // If service is empty, removes all staged changes.
-func (s *Store) UnstageAll(service Service) error {
+func (s *Store) UnstageAll(_ context.Context, service Service) error {
 	// Acquire cross-process file lock
 	lockFile, err := s.acquireFileLock()
 	if err != nil {
@@ -411,8 +412,8 @@ func (s *Store) UnstageAll(service Service) error {
 }
 
 // GetEntry retrieves a staged entry.
-func (s *Store) GetEntry(service Service, name string) (*Entry, error) {
-	state, err := s.Load()
+func (s *Store) GetEntry(ctx context.Context, service Service, name string) (*Entry, error) {
+	state, err := s.Load(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -430,8 +431,8 @@ func (s *Store) GetEntry(service Service, name string) (*Entry, error) {
 }
 
 // GetTag retrieves staged tag changes.
-func (s *Store) GetTag(service Service, name string) (*TagEntry, error) {
-	state, err := s.Load()
+func (s *Store) GetTag(ctx context.Context, service Service, name string) (*TagEntry, error) {
+	state, err := s.Load(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -450,8 +451,8 @@ func (s *Store) GetTag(service Service, name string) (*TagEntry, error) {
 
 // ListEntries returns all staged entries for a service.
 // If service is empty, returns all staged entries.
-func (s *Store) ListEntries(service Service) (map[Service]map[string]Entry, error) {
-	state, err := s.Load()
+func (s *Store) ListEntries(ctx context.Context, service Service) (map[Service]map[string]Entry, error) {
+	state, err := s.Load(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -483,8 +484,8 @@ func (s *Store) ListEntries(service Service) (map[Service]map[string]Entry, erro
 
 // ListTags returns all staged tag changes for a service.
 // If service is empty, returns all staged tag changes.
-func (s *Store) ListTags(service Service) (map[Service]map[string]TagEntry, error) {
-	state, err := s.Load()
+func (s *Store) ListTags(ctx context.Context, service Service) (map[Service]map[string]TagEntry, error) {
+	state, err := s.Load(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -515,8 +516,8 @@ func (s *Store) ListTags(service Service) (map[Service]map[string]TagEntry, erro
 }
 
 // HasChanges returns true if there are any staged changes (entries or tags).
-func (s *Store) HasChanges(service Service) (bool, error) {
-	state, err := s.Load()
+func (s *Store) HasChanges(ctx context.Context, service Service) (bool, error) {
+	state, err := s.Load(ctx)
 	if err != nil {
 		return false, err
 	}
@@ -536,8 +537,8 @@ func (s *Store) HasChanges(service Service) (bool, error) {
 
 // Count returns the number of staged entry changes.
 // Note: This counts entries only, not tag changes. Use CountAll for total count.
-func (s *Store) Count(service Service) (int, error) {
-	state, err := s.Load()
+func (s *Store) Count(ctx context.Context, service Service) (int, error) {
+	state, err := s.Load(ctx)
 	if err != nil {
 		return 0, err
 	}

@@ -54,7 +54,7 @@ func TestUpdateUseCase_GetCurrentValue(t *testing.T) {
 
 	uc := &secret.UpdateUseCase{Client: client}
 
-	value, err := uc.GetCurrentValue(context.Background(), "my-secret")
+	value, err := uc.GetCurrentValue(t.Context(), "my-secret")
 	require.NoError(t, err)
 	assert.Equal(t, "current-value", value)
 }
@@ -68,7 +68,7 @@ func TestUpdateUseCase_GetCurrentValue_Error(t *testing.T) {
 
 	uc := &secret.UpdateUseCase{Client: client}
 
-	_, err := uc.GetCurrentValue(context.Background(), "my-secret")
+	_, err := uc.GetCurrentValue(t.Context(), "my-secret")
 	assert.Error(t, err)
 }
 
@@ -84,7 +84,7 @@ func TestUpdateUseCase_Execute_UpdateValue(t *testing.T) {
 
 	uc := &secret.UpdateUseCase{Client: client}
 
-	output, err := uc.Execute(context.Background(), secret.UpdateInput{
+	output, err := uc.Execute(t.Context(), secret.UpdateInput{
 		Name:  "my-secret",
 		Value: "new-value",
 	})
@@ -105,7 +105,7 @@ func TestUpdateUseCase_Execute_UpdateDescription(t *testing.T) {
 
 	uc := &secret.UpdateUseCase{Client: client}
 
-	output, err := uc.Execute(context.Background(), secret.UpdateInput{
+	output, err := uc.Execute(t.Context(), secret.UpdateInput{
 		Name:        "my-secret",
 		Description: "new description",
 	})
@@ -130,7 +130,7 @@ func TestUpdateUseCase_Execute_UpdateValueAndDescription(t *testing.T) {
 
 	uc := &secret.UpdateUseCase{Client: client}
 
-	output, err := uc.Execute(context.Background(), secret.UpdateInput{
+	output, err := uc.Execute(t.Context(), secret.UpdateInput{
 		Name:        "my-secret",
 		Value:       "new-value",
 		Description: "new description",
@@ -149,7 +149,7 @@ func TestUpdateUseCase_Execute_PutValueError(t *testing.T) {
 
 	uc := &secret.UpdateUseCase{Client: client}
 
-	_, err := uc.Execute(context.Background(), secret.UpdateInput{
+	_, err := uc.Execute(t.Context(), secret.UpdateInput{
 		Name:  "my-secret",
 		Value: "new-value",
 	})
@@ -166,7 +166,7 @@ func TestUpdateUseCase_Execute_UpdateDescriptionError(t *testing.T) {
 
 	uc := &secret.UpdateUseCase{Client: client}
 
-	_, err := uc.Execute(context.Background(), secret.UpdateInput{
+	_, err := uc.Execute(t.Context(), secret.UpdateInput{
 		Name:        "my-secret",
 		Description: "new description",
 	})

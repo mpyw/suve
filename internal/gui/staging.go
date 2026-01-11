@@ -3,6 +3,8 @@
 package gui
 
 import (
+	"errors"
+
 	"github.com/mpyw/suve/internal/maputil"
 	"github.com/mpyw/suve/internal/staging"
 	stagingusecase "github.com/mpyw/suve/internal/usecase/staging"
@@ -419,12 +421,12 @@ func (a *App) StagingUnstage(service, name string) (*StagingUnstageResult, error
 	}
 
 	// Unstage entry (ignore ErrNotStaged)
-	if err := store.UnstageEntry(svc, name); err != nil && err != staging.ErrNotStaged {
+	if err := store.UnstageEntry(a.ctx, svc, name); err != nil && !errors.Is(err, staging.ErrNotStaged) {
 		return nil, err
 	}
 
 	// Unstage tags (ignore ErrNotStaged)
-	if err := store.UnstageTag(svc, name); err != nil && err != staging.ErrNotStaged {
+	if err := store.UnstageTag(a.ctx, svc, name); err != nil && !errors.Is(err, staging.ErrNotStaged) {
 		return nil, err
 	}
 
@@ -498,7 +500,7 @@ func (a *App) StagingCancelAddTag(service, name, key string) (*StagingCancelAddT
 	}
 
 	// Get existing tag entry
-	tagEntry, err := store.GetTag(svc, name)
+	tagEntry, err := store.GetTag(a.ctx, svc, name)
 	if err != nil {
 		return nil, err
 	}
@@ -508,11 +510,11 @@ func (a *App) StagingCancelAddTag(service, name, key string) (*StagingCancelAddT
 
 	// If tag entry has no meaningful content, unstage it
 	if len(tagEntry.Add) == 0 && tagEntry.Remove.Len() == 0 {
-		if err := store.UnstageTag(svc, name); err != nil {
+		if err := store.UnstageTag(a.ctx, svc, name); err != nil {
 			return nil, err
 		}
 	} else {
-		if err := store.StageTag(svc, name, *tagEntry); err != nil {
+		if err := store.StageTag(a.ctx, svc, name, *tagEntry); err != nil {
 			return nil, err
 		}
 	}
@@ -533,7 +535,7 @@ func (a *App) StagingCancelRemoveTag(service, name, key string) (*StagingCancelR
 	}
 
 	// Get existing tag entry
-	tagEntry, err := store.GetTag(svc, name)
+	tagEntry, err := store.GetTag(a.ctx, svc, name)
 	if err != nil {
 		return nil, err
 	}
@@ -543,11 +545,11 @@ func (a *App) StagingCancelRemoveTag(service, name, key string) (*StagingCancelR
 
 	// If tag entry has no meaningful content, unstage it
 	if len(tagEntry.Add) == 0 && tagEntry.Remove.Len() == 0 {
-		if err := store.UnstageTag(svc, name); err != nil {
+		if err := store.UnstageTag(a.ctx, svc, name); err != nil {
 			return nil, err
 		}
 	} else {
-		if err := store.StageTag(svc, name, *tagEntry); err != nil {
+		if err := store.StageTag(a.ctx, svc, name, *tagEntry); err != nil {
 			return nil, err
 		}
 	}
@@ -576,12 +578,12 @@ func (a *App) StagingCheckStatus(service, name string) (*StagingCheckStatusResul
 	result := &StagingCheckStatusResult{}
 
 	// Check for staged entry
-	if _, err := store.GetEntry(svc, name); err == nil {
+	if _, err := store.GetEntry(a.ctx, svc, name); err == nil {
 		result.HasEntry = true
 	}
 
 	// Check for staged tags
-	if _, err := store.GetTag(svc, name); err == nil {
+	if _, err := store.GetTag(a.ctx, svc, name); err == nil {
 		result.HasTags = true
 	}
 

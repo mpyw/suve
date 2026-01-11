@@ -24,7 +24,7 @@ func TestExecuteMap(t *testing.T) {
 			"c": 3,
 		}
 
-		results := parallel.ExecuteMap(context.Background(), entries, func(_ context.Context, key string, value int) (int, error) {
+		results := parallel.ExecuteMap(t.Context(), entries, func(_ context.Context, key string, value int) (int, error) {
 			return value * 2, nil
 		})
 
@@ -44,7 +44,7 @@ func TestExecuteMap(t *testing.T) {
 			"b": 2,
 		}
 
-		results := parallel.ExecuteMap(context.Background(), entries, func(_ context.Context, key string, _ int) (int, error) {
+		results := parallel.ExecuteMap(t.Context(), entries, func(_ context.Context, key string, _ int) (int, error) {
 			if key == "b" {
 				return 0, errors.New("error for b")
 			}
@@ -62,7 +62,7 @@ func TestExecuteMap(t *testing.T) {
 		t.Parallel()
 		entries := map[string]int{}
 
-		results := parallel.ExecuteMap(context.Background(), entries, func(_ context.Context, _ string, value int) (int, error) {
+		results := parallel.ExecuteMap(t.Context(), entries, func(_ context.Context, _ string, value int) (int, error) {
 			return value, nil
 		})
 
@@ -80,7 +80,7 @@ func TestExecuteMap(t *testing.T) {
 		var running int32
 		var maxConcurrent int32
 
-		results := parallel.ExecuteMap(context.Background(), entries, func(_ context.Context, _ int, _ string) (bool, error) {
+		results := parallel.ExecuteMap(t.Context(), entries, func(_ context.Context, _ int, _ string) (bool, error) {
 			current := atomic.AddInt32(&running, 1)
 			// Update max if current is higher
 			for {
@@ -116,7 +116,7 @@ func TestExecuteMapWithLimit(t *testing.T) {
 		var maxConcurrent int32
 		var running int32
 
-		results := parallel.ExecuteMapWithLimit(context.Background(), entries, 2, func(_ context.Context, _ int, _ string) (bool, error) {
+		results := parallel.ExecuteMapWithLimit(t.Context(), entries, 2, func(_ context.Context, _ int, _ string) (bool, error) {
 			current := atomic.AddInt32(&running, 1)
 			for {
 				max := atomic.LoadInt32(&maxConcurrent)
@@ -145,7 +145,7 @@ func TestExecuteMapWithLimit(t *testing.T) {
 		var maxConcurrent int32
 		var running int32
 
-		results := parallel.ExecuteMapWithLimit(context.Background(), entries, 1, func(_ context.Context, _ int, _ string) (bool, error) {
+		results := parallel.ExecuteMapWithLimit(t.Context(), entries, 1, func(_ context.Context, _ int, _ string) (bool, error) {
 			current := atomic.AddInt32(&running, 1)
 			for {
 				max := atomic.LoadInt32(&maxConcurrent)

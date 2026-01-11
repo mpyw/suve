@@ -2,7 +2,6 @@ package status_test
 
 import (
 	"bytes"
-	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -31,7 +30,7 @@ func TestCommand_NoStagedChanges(t *testing.T) {
 		Stderr: &bytes.Buffer{},
 	}
 
-	err := r.Run(context.Background(), status.Options{})
+	err := r.Run(t.Context(), status.Options{})
 	require.NoError(t, err)
 	assert.Contains(t, buf.String(), "No changes staged")
 }
@@ -43,7 +42,7 @@ func TestCommand_ShowParamChangesOnly(t *testing.T) {
 	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 	now := time.Now()
-	_ = store.StageEntry(staging.ServiceParam, "/app/config", staging.Entry{
+	_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("value1"),
 		StagedAt:  now,
@@ -56,7 +55,7 @@ func TestCommand_ShowParamChangesOnly(t *testing.T) {
 		Stderr: &bytes.Buffer{},
 	}
 
-	err := r.Run(context.Background(), status.Options{})
+	err := r.Run(t.Context(), status.Options{})
 	require.NoError(t, err)
 
 	output := buf.String()
@@ -72,7 +71,7 @@ func TestCommand_ShowSecretChangesOnly(t *testing.T) {
 	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 	now := time.Now()
-	_ = store.StageEntry(staging.ServiceSecret, "my-secret", staging.Entry{
+	_ = store.StageEntry(t.Context(), staging.ServiceSecret, "my-secret", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("secret-value"),
 		StagedAt:  now,
@@ -85,7 +84,7 @@ func TestCommand_ShowSecretChangesOnly(t *testing.T) {
 		Stderr: &bytes.Buffer{},
 	}
 
-	err := r.Run(context.Background(), status.Options{})
+	err := r.Run(t.Context(), status.Options{})
 	require.NoError(t, err)
 
 	output := buf.String()
@@ -101,12 +100,12 @@ func TestCommand_ShowBothParamAndSecretChanges(t *testing.T) {
 	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 	now := time.Now()
-	_ = store.StageEntry(staging.ServiceParam, "/app/config", staging.Entry{
+	_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("param-value"),
 		StagedAt:  now,
 	})
-	_ = store.StageEntry(staging.ServiceSecret, "my-secret", staging.Entry{
+	_ = store.StageEntry(t.Context(), staging.ServiceSecret, "my-secret", staging.Entry{
 		Operation: staging.OperationDelete,
 		StagedAt:  now,
 	})
@@ -118,7 +117,7 @@ func TestCommand_ShowBothParamAndSecretChanges(t *testing.T) {
 		Stderr: &bytes.Buffer{},
 	}
 
-	err := r.Run(context.Background(), status.Options{})
+	err := r.Run(t.Context(), status.Options{})
 	require.NoError(t, err)
 
 	output := buf.String()
@@ -137,12 +136,12 @@ func TestCommand_VerboseOutput(t *testing.T) {
 	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 	now := time.Now()
-	_ = store.StageEntry(staging.ServiceParam, "/app/config", staging.Entry{
+	_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("test-value"),
 		StagedAt:  now,
 	})
-	_ = store.StageEntry(staging.ServiceSecret, "my-secret", staging.Entry{
+	_ = store.StageEntry(t.Context(), staging.ServiceSecret, "my-secret", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("secret-value"),
 		StagedAt:  now,
@@ -155,7 +154,7 @@ func TestCommand_VerboseOutput(t *testing.T) {
 		Stderr: &bytes.Buffer{},
 	}
 
-	err := r.Run(context.Background(), status.Options{Verbose: true})
+	err := r.Run(t.Context(), status.Options{Verbose: true})
 	require.NoError(t, err)
 
 	output := buf.String()
@@ -172,7 +171,7 @@ func TestCommand_VerboseWithDelete(t *testing.T) {
 	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 	now := time.Now()
-	_ = store.StageEntry(staging.ServiceParam, "/app/config", staging.Entry{
+	_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
 		Operation: staging.OperationDelete,
 		StagedAt:  now,
 	})
@@ -184,7 +183,7 @@ func TestCommand_VerboseWithDelete(t *testing.T) {
 		Stderr: &bytes.Buffer{},
 	}
 
-	err := r.Run(context.Background(), status.Options{Verbose: true})
+	err := r.Run(t.Context(), status.Options{Verbose: true})
 	require.NoError(t, err)
 
 	output := buf.String()
@@ -201,7 +200,7 @@ func TestCommand_VerboseTruncatesLongValue(t *testing.T) {
 
 	now := time.Now()
 	longValue := "this is a very long value that exceeds one hundred characters and should be truncated in verbose mode output display"
-	_ = store.StageEntry(staging.ServiceParam, "/app/config", staging.Entry{
+	_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr(longValue),
 		StagedAt:  now,
@@ -214,7 +213,7 @@ func TestCommand_VerboseTruncatesLongValue(t *testing.T) {
 		Stderr: &bytes.Buffer{},
 	}
 
-	err := r.Run(context.Background(), status.Options{Verbose: true})
+	err := r.Run(t.Context(), status.Options{Verbose: true})
 	require.NoError(t, err)
 
 	output := buf.String()
@@ -230,7 +229,7 @@ func TestCommand_Validation(t *testing.T) {
 	app.Writer = &buf
 
 	// Test that the command exists and works
-	err := app.Run(context.Background(), []string{"suve", "status", "--help"})
+	err := app.Run(t.Context(), []string{"suve", "status", "--help"})
 	require.NoError(t, err)
 	assert.Contains(t, buf.String(), "staged changes")
 }
@@ -254,7 +253,7 @@ func TestCommand_StoreError(t *testing.T) {
 		Stderr: &bytes.Buffer{},
 	}
 
-	err = r.Run(context.Background(), status.Options{})
+	err = r.Run(t.Context(), status.Options{})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to parse")
 }
@@ -266,7 +265,7 @@ func TestCommand_ShowParamTagChangesOnly(t *testing.T) {
 	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 	now := time.Now()
-	_ = store.StageTag(staging.ServiceParam, "/app/config", staging.TagEntry{
+	_ = store.StageTag(t.Context(), staging.ServiceParam, "/app/config", staging.TagEntry{
 		Add:      map[string]string{"env": "prod", "team": "api"},
 		StagedAt: now,
 	})
@@ -278,7 +277,7 @@ func TestCommand_ShowParamTagChangesOnly(t *testing.T) {
 		Stderr: &bytes.Buffer{},
 	}
 
-	err := r.Run(context.Background(), status.Options{})
+	err := r.Run(t.Context(), status.Options{})
 	require.NoError(t, err)
 
 	output := buf.String()
@@ -296,7 +295,7 @@ func TestCommand_ShowSecretTagChangesOnly(t *testing.T) {
 	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 	now := time.Now()
-	_ = store.StageTag(staging.ServiceSecret, "my-secret", staging.TagEntry{
+	_ = store.StageTag(t.Context(), staging.ServiceSecret, "my-secret", staging.TagEntry{
 		Add:      map[string]string{"env": "prod"},
 		Remove:   maputil.NewSet("deprecated"),
 		StagedAt: now,
@@ -309,7 +308,7 @@ func TestCommand_ShowSecretTagChangesOnly(t *testing.T) {
 		Stderr: &bytes.Buffer{},
 	}
 
-	err := r.Run(context.Background(), status.Options{})
+	err := r.Run(t.Context(), status.Options{})
 	require.NoError(t, err)
 
 	output := buf.String()
@@ -329,13 +328,13 @@ func TestCommand_ShowMixedEntryAndTagChanges(t *testing.T) {
 
 	now := time.Now()
 	// Entry change
-	_ = store.StageEntry(staging.ServiceParam, "/app/config", staging.Entry{
+	_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("new-value"),
 		StagedAt:  now,
 	})
 	// Tag change (different resource)
-	_ = store.StageTag(staging.ServiceParam, "/app/other", staging.TagEntry{
+	_ = store.StageTag(t.Context(), staging.ServiceParam, "/app/other", staging.TagEntry{
 		Add:      map[string]string{"env": "prod"},
 		StagedAt: now,
 	})
@@ -347,7 +346,7 @@ func TestCommand_ShowMixedEntryAndTagChanges(t *testing.T) {
 		Stderr: &bytes.Buffer{},
 	}
 
-	err := r.Run(context.Background(), status.Options{})
+	err := r.Run(t.Context(), status.Options{})
 	require.NoError(t, err)
 
 	output := buf.String()
@@ -365,7 +364,7 @@ func TestCommand_TagChangesVerbose(t *testing.T) {
 	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 	now := time.Now()
-	_ = store.StageTag(staging.ServiceParam, "/app/config", staging.TagEntry{
+	_ = store.StageTag(t.Context(), staging.ServiceParam, "/app/config", staging.TagEntry{
 		Add:      map[string]string{"env": "prod", "team": "api"},
 		Remove:   maputil.NewSet("deprecated", "old"),
 		StagedAt: now,
@@ -378,7 +377,7 @@ func TestCommand_TagChangesVerbose(t *testing.T) {
 		Stderr: &bytes.Buffer{},
 	}
 
-	err := r.Run(context.Background(), status.Options{Verbose: true})
+	err := r.Run(t.Context(), status.Options{Verbose: true})
 	require.NoError(t, err)
 
 	output := buf.String()
@@ -399,11 +398,11 @@ func TestCommand_TagOnlyChangesNoEntries(t *testing.T) {
 
 	now := time.Now()
 	// Only tag changes, no entry changes
-	_ = store.StageTag(staging.ServiceParam, "/app/param", staging.TagEntry{
+	_ = store.StageTag(t.Context(), staging.ServiceParam, "/app/param", staging.TagEntry{
 		Add:      map[string]string{"key": "value"},
 		StagedAt: now,
 	})
-	_ = store.StageTag(staging.ServiceSecret, "my-secret", staging.TagEntry{
+	_ = store.StageTag(t.Context(), staging.ServiceSecret, "my-secret", staging.TagEntry{
 		Remove:   maputil.NewSet("old-tag"),
 		StagedAt: now,
 	})
@@ -415,7 +414,7 @@ func TestCommand_TagOnlyChangesNoEntries(t *testing.T) {
 		Stderr: &bytes.Buffer{},
 	}
 
-	err := r.Run(context.Background(), status.Options{})
+	err := r.Run(t.Context(), status.Options{})
 	require.NoError(t, err)
 
 	output := buf.String()

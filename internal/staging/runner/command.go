@@ -380,7 +380,7 @@ EXAMPLES:
 			// Get entries to show what will be applied
 			parser := cfg.ParserFactory()
 			service := parser.Service()
-			entries, err := store.ListEntries(service)
+			entries, err := store.ListEntries(ctx, service)
 			if err != nil {
 				return err
 			}

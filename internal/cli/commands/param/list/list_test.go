@@ -22,7 +22,7 @@ func TestCommand_Help(t *testing.T) {
 	app := appcli.MakeApp()
 	var buf bytes.Buffer
 	app.Writer = &buf
-	err := app.Run(context.Background(), []string{"suve", "param", "list", "--help"})
+	err := app.Run(t.Context(), []string{"suve", "param", "list", "--help"})
 	require.NoError(t, err)
 	assert.Contains(t, buf.String(), "List parameters")
 	assert.Contains(t, buf.String(), "--recursive")

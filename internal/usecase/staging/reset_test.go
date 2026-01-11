@@ -51,7 +51,7 @@ func TestResetUseCase_Execute_Unstage(t *testing.T) {
 	t.Parallel()
 
 	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
-	require.NoError(t, store.StageEntry(staging.ServiceParam, "/app/config", staging.Entry{
+	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("value"),
 		StagedAt:  time.Now(),
@@ -62,7 +62,7 @@ func TestResetUseCase_Execute_Unstage(t *testing.T) {
 		Store:  store,
 	}
 
-	output, err := uc.Execute(context.Background(), usecasestaging.ResetInput{
+	output, err := uc.Execute(t.Context(), usecasestaging.ResetInput{
 		Spec: "/app/config",
 	})
 	require.NoError(t, err)
@@ -70,7 +70,7 @@ func TestResetUseCase_Execute_Unstage(t *testing.T) {
 	assert.Equal(t, "/app/config", output.Name)
 
 	// Verify unstaged
-	_, err = store.GetEntry(staging.ServiceParam, "/app/config")
+	_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/config")
 	assert.ErrorIs(t, err, staging.ErrNotStaged)
 }
 
@@ -83,7 +83,7 @@ func TestResetUseCase_Execute_NotStaged(t *testing.T) {
 		Store:  store,
 	}
 
-	output, err := uc.Execute(context.Background(), usecasestaging.ResetInput{
+	output, err := uc.Execute(t.Context(), usecasestaging.ResetInput{
 		Spec: "/app/not-staged",
 	})
 	require.NoError(t, err)
@@ -94,12 +94,12 @@ func TestResetUseCase_Execute_UnstageAll(t *testing.T) {
 	t.Parallel()
 
 	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
-	require.NoError(t, store.StageEntry(staging.ServiceParam, "/app/one", staging.Entry{
+	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/one", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("one"),
 		StagedAt:  time.Now(),
 	}))
-	require.NoError(t, store.StageEntry(staging.ServiceParam, "/app/two", staging.Entry{
+	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/two", staging.Entry{
 		Operation: staging.OperationCreate,
 		Value:     lo.ToPtr("two"),
 		StagedAt:  time.Now(),
@@ -110,7 +110,7 @@ func TestResetUseCase_Execute_UnstageAll(t *testing.T) {
 		Store:  store,
 	}
 
-	output, err := uc.Execute(context.Background(), usecasestaging.ResetInput{
+	output, err := uc.Execute(t.Context(), usecasestaging.ResetInput{
 		All: true,
 	})
 	require.NoError(t, err)
@@ -118,7 +118,7 @@ func TestResetUseCase_Execute_UnstageAll(t *testing.T) {
 	assert.Equal(t, 2, output.Count)
 
 	// Verify all unstaged
-	entries, err := store.ListEntries(staging.ServiceParam)
+	entries, err := store.ListEntries(t.Context(), staging.ServiceParam)
 	require.NoError(t, err)
 	assert.Empty(t, entries[staging.ServiceParam])
 }
@@ -132,7 +132,7 @@ func TestResetUseCase_Execute_UnstageAll_Empty(t *testing.T) {
 		Store:  store,
 	}
 
-	output, err := uc.Execute(context.Background(), usecasestaging.ResetInput{
+	output, err := uc.Execute(t.Context(), usecasestaging.ResetInput{
 		All: true,
 	})
 	require.NoError(t, err)
@@ -154,7 +154,7 @@ func TestResetUseCase_Execute_Restore(t *testing.T) {
 		Store:   store,
 	}
 
-	output, err := uc.Execute(context.Background(), usecasestaging.ResetInput{
+	output, err := uc.Execute(t.Context(), usecasestaging.ResetInput{
 		Spec: "/app/config#3",
 	})
 	require.NoError(t, err)
@@ -162,7 +162,7 @@ func TestResetUseCase_Execute_Restore(t *testing.T) {
 	assert.Equal(t, "#3", output.VersionLabel)
 
 	// Verify staged
-	entry, err := store.GetEntry(staging.ServiceParam, "/app/config#3")
+	entry, err := store.GetEntry(t.Context(), staging.ServiceParam, "/app/config#3")
 	require.NoError(t, err)
 	assert.Equal(t, staging.OperationUpdate, entry.Operation)
 	assert.Equal(t, "version-value", lo.FromPtr(entry.Value))
@@ -183,7 +183,7 @@ func TestResetUseCase_Execute_Restore_NoFetcher(t *testing.T) {
 		// No Fetcher
 	}
 
-	_, err := uc.Execute(context.Background(), usecasestaging.ResetInput{
+	_, err := uc.Execute(t.Context(), usecasestaging.ResetInput{
 		Spec: "/app/config#3",
 	})
 	assert.Error(t, err)
@@ -207,7 +207,7 @@ func TestResetUseCase_Execute_Restore_FetchError(t *testing.T) {
 		Store:   store,
 	}
 
-	_, err := uc.Execute(context.Background(), usecasestaging.ResetInput{
+	_, err := uc.Execute(t.Context(), usecasestaging.ResetInput{
 		Spec: "/app/config#999",
 	})
 	assert.Error(t, err)
@@ -237,7 +237,7 @@ func TestResetUseCase_Execute_ParseError(t *testing.T) {
 		Store:  store,
 	}
 
-	_, err := uc.Execute(context.Background(), usecasestaging.ResetInput{
+	_, err := uc.Execute(t.Context(), usecasestaging.ResetInput{
 		Spec: "invalid",
 	})
 	assert.Error(t, err)
@@ -263,7 +263,7 @@ func TestResetUseCase_Execute_ListError(t *testing.T) {
 		Store:  store,
 	}
 
-	_, err := uc.Execute(context.Background(), usecasestaging.ResetInput{All: true})
+	_, err := uc.Execute(t.Context(), usecasestaging.ResetInput{All: true})
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "list error")
 }
@@ -282,7 +282,7 @@ func TestResetUseCase_Execute_UnstageAllError(t *testing.T) {
 		Store:  store,
 	}
 
-	_, err := uc.Execute(context.Background(), usecasestaging.ResetInput{All: true})
+	_, err := uc.Execute(t.Context(), usecasestaging.ResetInput{All: true})
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "unstage all error")
 }
@@ -298,7 +298,7 @@ func TestResetUseCase_Execute_GetError(t *testing.T) {
 		Store:  store,
 	}
 
-	_, err := uc.Execute(context.Background(), usecasestaging.ResetInput{Spec: "/app/config"})
+	_, err := uc.Execute(t.Context(), usecasestaging.ResetInput{Spec: "/app/config"})
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "get error")
 }
@@ -317,7 +317,7 @@ func TestResetUseCase_Execute_UnstageError(t *testing.T) {
 		Store:  store,
 	}
 
-	_, err := uc.Execute(context.Background(), usecasestaging.ResetInput{Spec: "/app/config"})
+	_, err := uc.Execute(t.Context(), usecasestaging.ResetInput{Spec: "/app/config"})
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "unstage error")
 }
@@ -339,7 +339,7 @@ func TestResetUseCase_Execute_RestoreStageError(t *testing.T) {
 		Store:   store,
 	}
 
-	_, err := uc.Execute(context.Background(), usecasestaging.ResetInput{Spec: "/app/config#3"})
+	_, err := uc.Execute(t.Context(), usecasestaging.ResetInput{Spec: "/app/config#3"})
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "stage error")
 }
@@ -365,7 +365,7 @@ func TestResetUseCase_Execute_RestoreSkipped_SameAsAWS(t *testing.T) {
 		Store:   store,
 	}
 
-	output, err := uc.Execute(context.Background(), usecasestaging.ResetInput{
+	output, err := uc.Execute(t.Context(), usecasestaging.ResetInput{
 		Spec: "/app/config#3",
 	})
 	require.NoError(t, err)
@@ -373,7 +373,7 @@ func TestResetUseCase_Execute_RestoreSkipped_SameAsAWS(t *testing.T) {
 	assert.Equal(t, "#3", output.VersionLabel)
 
 	// Verify nothing was staged (auto-skipped)
-	_, err = store.GetEntry(staging.ServiceParam, "/app/config#3")
+	_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/config#3")
 	assert.ErrorIs(t, err, staging.ErrNotStaged)
 }
 
@@ -398,7 +398,7 @@ func TestResetUseCase_Execute_RestoreNotSkipped_DifferentFromAWS(t *testing.T) {
 		Store:   store,
 	}
 
-	output, err := uc.Execute(context.Background(), usecasestaging.ResetInput{
+	output, err := uc.Execute(t.Context(), usecasestaging.ResetInput{
 		Spec: "/app/config#3",
 	})
 	require.NoError(t, err)
@@ -406,7 +406,7 @@ func TestResetUseCase_Execute_RestoreNotSkipped_DifferentFromAWS(t *testing.T) {
 	assert.Equal(t, "#3", output.VersionLabel)
 
 	// Verify entry was staged
-	entry, err := store.GetEntry(staging.ServiceParam, "/app/config#3")
+	entry, err := store.GetEntry(t.Context(), staging.ServiceParam, "/app/config#3")
 	require.NoError(t, err)
 	assert.Equal(t, "old-version-value", lo.FromPtr(entry.Value))
 }
@@ -429,7 +429,7 @@ func TestResetUseCase_Execute_RestoreFetchCurrentError(t *testing.T) {
 		Store:   store,
 	}
 
-	_, err := uc.Execute(context.Background(), usecasestaging.ResetInput{
+	_, err := uc.Execute(t.Context(), usecasestaging.ResetInput{
 		Spec: "/app/config#3",
 	})
 	assert.Error(t, err)

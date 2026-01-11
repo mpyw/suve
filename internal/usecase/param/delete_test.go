@@ -47,7 +47,7 @@ func TestDeleteUseCase_GetCurrentValue(t *testing.T) {
 
 	uc := &param.DeleteUseCase{Client: client}
 
-	value, err := uc.GetCurrentValue(context.Background(), "/app/config")
+	value, err := uc.GetCurrentValue(t.Context(), "/app/config")
 	require.NoError(t, err)
 	assert.Equal(t, "current-value", value)
 }
@@ -61,7 +61,7 @@ func TestDeleteUseCase_GetCurrentValue_NotFound(t *testing.T) {
 
 	uc := &param.DeleteUseCase{Client: client}
 
-	value, err := uc.GetCurrentValue(context.Background(), "/app/not-exists")
+	value, err := uc.GetCurrentValue(t.Context(), "/app/not-exists")
 	require.NoError(t, err)
 	assert.Empty(t, value)
 }
@@ -75,7 +75,7 @@ func TestDeleteUseCase_GetCurrentValue_Error(t *testing.T) {
 
 	uc := &param.DeleteUseCase{Client: client}
 
-	_, err := uc.GetCurrentValue(context.Background(), "/app/config")
+	_, err := uc.GetCurrentValue(t.Context(), "/app/config")
 	assert.Error(t, err)
 }
 
@@ -88,7 +88,7 @@ func TestDeleteUseCase_Execute(t *testing.T) {
 
 	uc := &param.DeleteUseCase{Client: client}
 
-	output, err := uc.Execute(context.Background(), param.DeleteInput{
+	output, err := uc.Execute(t.Context(), param.DeleteInput{
 		Name: "/app/to-delete",
 	})
 	require.NoError(t, err)
@@ -104,7 +104,7 @@ func TestDeleteUseCase_Execute_Error(t *testing.T) {
 
 	uc := &param.DeleteUseCase{Client: client}
 
-	_, err := uc.Execute(context.Background(), param.DeleteInput{
+	_, err := uc.Execute(t.Context(), param.DeleteInput{
 		Name: "/app/config",
 	})
 	assert.Error(t, err)

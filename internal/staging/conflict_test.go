@@ -56,7 +56,7 @@ func TestCheckConflicts(t *testing.T) {
 	t.Run("empty entries returns empty conflicts", func(t *testing.T) {
 		t.Parallel()
 		strategy := &mockApplyStrategy{}
-		conflicts := staging.CheckConflicts(context.Background(), strategy, map[string]staging.Entry{})
+		conflicts := staging.CheckConflicts(t.Context(), strategy, map[string]staging.Entry{})
 		assert.Empty(t, conflicts)
 	})
 
@@ -67,7 +67,7 @@ func TestCheckConflicts(t *testing.T) {
 			"item1": {Operation: staging.OperationUpdate},
 			"item2": {Operation: staging.OperationDelete},
 		}
-		conflicts := staging.CheckConflicts(context.Background(), strategy, entries)
+		conflicts := staging.CheckConflicts(t.Context(), strategy, entries)
 		assert.Empty(t, conflicts)
 	})
 
@@ -81,7 +81,7 @@ func TestCheckConflicts(t *testing.T) {
 		entries := map[string]staging.Entry{
 			"new-item": {Operation: staging.OperationCreate, Value: lo.ToPtr("value")},
 		}
-		conflicts := staging.CheckConflicts(context.Background(), strategy, entries)
+		conflicts := staging.CheckConflicts(t.Context(), strategy, entries)
 		assert.Contains(t, conflicts, "new-item")
 	})
 
@@ -95,7 +95,7 @@ func TestCheckConflicts(t *testing.T) {
 		entries := map[string]staging.Entry{
 			"new-item": {Operation: staging.OperationCreate, Value: lo.ToPtr("value")},
 		}
-		conflicts := staging.CheckConflicts(context.Background(), strategy, entries)
+		conflicts := staging.CheckConflicts(t.Context(), strategy, entries)
 		assert.Empty(t, conflicts)
 	})
 
@@ -109,7 +109,7 @@ func TestCheckConflicts(t *testing.T) {
 		entries := map[string]staging.Entry{
 			"new-item": {Operation: staging.OperationCreate, Value: lo.ToPtr("value")},
 		}
-		conflicts := staging.CheckConflicts(context.Background(), strategy, entries)
+		conflicts := staging.CheckConflicts(t.Context(), strategy, entries)
 		assert.Empty(t, conflicts)
 	})
 
@@ -127,7 +127,7 @@ func TestCheckConflicts(t *testing.T) {
 				BaseModifiedAt: &baseTime,
 			},
 		}
-		conflicts := staging.CheckConflicts(context.Background(), strategy, entries)
+		conflicts := staging.CheckConflicts(t.Context(), strategy, entries)
 		assert.Contains(t, conflicts, "existing-item")
 	})
 
@@ -145,7 +145,7 @@ func TestCheckConflicts(t *testing.T) {
 				BaseModifiedAt: &baseTime,
 			},
 		}
-		conflicts := staging.CheckConflicts(context.Background(), strategy, entries)
+		conflicts := staging.CheckConflicts(t.Context(), strategy, entries)
 		assert.Empty(t, conflicts)
 	})
 
@@ -163,7 +163,7 @@ func TestCheckConflicts(t *testing.T) {
 				BaseModifiedAt: &baseTime,
 			},
 		}
-		conflicts := staging.CheckConflicts(context.Background(), strategy, entries)
+		conflicts := staging.CheckConflicts(t.Context(), strategy, entries)
 		assert.Empty(t, conflicts)
 	})
 
@@ -180,7 +180,7 @@ func TestCheckConflicts(t *testing.T) {
 				BaseModifiedAt: &baseTime,
 			},
 		}
-		conflicts := staging.CheckConflicts(context.Background(), strategy, entries)
+		conflicts := staging.CheckConflicts(t.Context(), strategy, entries)
 		assert.Contains(t, conflicts, "delete-item")
 	})
 
@@ -197,7 +197,7 @@ func TestCheckConflicts(t *testing.T) {
 				BaseModifiedAt: &baseTime,
 			},
 		}
-		conflicts := staging.CheckConflicts(context.Background(), strategy, entries)
+		conflicts := staging.CheckConflicts(t.Context(), strategy, entries)
 		assert.Empty(t, conflicts)
 	})
 
@@ -225,7 +225,7 @@ func TestCheckConflicts(t *testing.T) {
 			"delete-item":        {Operation: staging.OperationDelete, BaseModifiedAt: &baseTime},
 			"update-no-conflict": {Operation: staging.OperationUpdate, Value: lo.ToPtr("v"), BaseModifiedAt: &baseTime},
 		}
-		conflicts := staging.CheckConflicts(context.Background(), strategy, entries)
+		conflicts := staging.CheckConflicts(t.Context(), strategy, entries)
 		assert.Len(t, conflicts, 2)
 		assert.Contains(t, conflicts, "create-item")
 		assert.Contains(t, conflicts, "update-item")

@@ -24,7 +24,7 @@ func TestCommand_Validation(t *testing.T) {
 	t.Run("missing arguments", func(t *testing.T) {
 		t.Parallel()
 		app := appcli.MakeApp()
-		err := app.Run(context.Background(), []string{"suve", "secret", "diff"})
+		err := app.Run(t.Context(), []string{"suve", "secret", "diff"})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "usage:")
 	})
@@ -32,7 +32,7 @@ func TestCommand_Validation(t *testing.T) {
 	t.Run("invalid version spec", func(t *testing.T) {
 		t.Parallel()
 		app := appcli.MakeApp()
-		err := app.Run(context.Background(), []string{"suve", "secret", "diff", "my-secret#"})
+		err := app.Run(t.Context(), []string{"suve", "secret", "diff", "my-secret#"})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "must be followed by")
 	})
@@ -40,7 +40,7 @@ func TestCommand_Validation(t *testing.T) {
 	t.Run("invalid label spec", func(t *testing.T) {
 		t.Parallel()
 		app := appcli.MakeApp()
-		err := app.Run(context.Background(), []string{"suve", "secret", "diff", "my-secret:"})
+		err := app.Run(t.Context(), []string{"suve", "secret", "diff", "my-secret:"})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "must be followed by")
 	})
@@ -48,7 +48,7 @@ func TestCommand_Validation(t *testing.T) {
 	t.Run("too many arguments", func(t *testing.T) {
 		t.Parallel()
 		app := appcli.MakeApp()
-		err := app.Run(context.Background(), []string{"suve", "secret", "diff", "my-secret", ":AWSPREVIOUS", ":AWSCURRENT", ":extra"})
+		err := app.Run(t.Context(), []string{"suve", "secret", "diff", "my-secret", ":AWSPREVIOUS", ":AWSCURRENT", ":extra"})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "usage:")
 	})

@@ -59,7 +59,7 @@ func TestDiffUseCase_Execute(t *testing.T) {
 	spec1, _ := secretversion.Parse("my-secret#v1-id")
 	spec2, _ := secretversion.Parse("my-secret#v2-id")
 
-	output, err := uc.Execute(context.Background(), secret.DiffInput{
+	output, err := uc.Execute(t.Context(), secret.DiffInput{
 		Spec1: spec1,
 		Spec2: spec2,
 	})
@@ -84,7 +84,7 @@ func TestDiffUseCase_Execute_Spec1Error(t *testing.T) {
 	spec1, _ := secretversion.Parse("my-secret#v1-id")
 	spec2, _ := secretversion.Parse("my-secret#v2-id")
 
-	_, err := uc.Execute(context.Background(), secret.DiffInput{
+	_, err := uc.Execute(t.Context(), secret.DiffInput{
 		Spec1: spec1,
 		Spec2: spec2,
 	})
@@ -106,7 +106,7 @@ func TestDiffUseCase_Execute_Spec2Error(t *testing.T) {
 	spec1, _ := secretversion.Parse("my-secret#v1-id")
 	spec2, _ := secretversion.Parse("my-secret#v2-id")
 
-	_, err := uc.Execute(context.Background(), secret.DiffInput{
+	_, err := uc.Execute(t.Context(), secret.DiffInput{
 		Spec1: spec1,
 		Spec2: spec2,
 	})
@@ -129,7 +129,7 @@ func TestDiffUseCase_Execute_WithLabel(t *testing.T) {
 	spec1, _ := secretversion.Parse("my-secret:AWSPREVIOUS")
 	spec2, _ := secretversion.Parse("my-secret:AWSCURRENT")
 
-	output, err := uc.Execute(context.Background(), secret.DiffInput{
+	output, err := uc.Execute(t.Context(), secret.DiffInput{
 		Spec1: spec1,
 		Spec2: spec2,
 	})
@@ -162,7 +162,7 @@ func TestDiffUseCase_Execute_WithShift(t *testing.T) {
 	spec1, _ := secretversion.Parse("my-secret~2") // 2 versions back from latest
 	spec2, _ := secretversion.Parse("my-secret~1") // 1 version back from latest
 
-	output, err := uc.Execute(context.Background(), secret.DiffInput{
+	output, err := uc.Execute(t.Context(), secret.DiffInput{
 		Spec1: spec1,
 		Spec2: spec2,
 	})

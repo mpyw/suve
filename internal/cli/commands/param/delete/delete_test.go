@@ -21,7 +21,7 @@ func TestCommand_Validation(t *testing.T) {
 	t.Run("missing parameter name", func(t *testing.T) {
 		t.Parallel()
 		app := appcli.MakeApp()
-		err := app.Run(context.Background(), []string{"suve", "param", "delete"})
+		err := app.Run(t.Context(), []string{"suve", "param", "delete"})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "usage: suve param delete")
 	})

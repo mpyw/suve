@@ -2,7 +2,6 @@ package runner_test
 
 import (
 	"bytes"
-	"context"
 	"path/filepath"
 	"testing"
 
@@ -33,7 +32,7 @@ func TestTagRunner_Run(t *testing.T) {
 			Stderr: &stderr,
 		}
 
-		err := r.Run(context.Background(), runner.TagOptions{
+		err := r.Run(t.Context(), runner.TagOptions{
 			Name: "/app/config",
 			Tags: []string{"env=prod", "team=platform"},
 		})
@@ -41,7 +40,7 @@ func TestTagRunner_Run(t *testing.T) {
 
 		assert.Contains(t, stdout.String(), "Staged tags for: /app/config")
 
-		tagEntry, err := store.GetTag(staging.ServiceParam, "/app/config")
+		tagEntry, err := store.GetTag(t.Context(), staging.ServiceParam, "/app/config")
 		require.NoError(t, err)
 		assert.Equal(t, map[string]string{"env": "prod", "team": "platform"}, tagEntry.Add)
 	})
@@ -62,7 +61,7 @@ func TestTagRunner_Run(t *testing.T) {
 			Stderr: &stderr,
 		}
 
-		err := r.Run(context.Background(), runner.TagOptions{
+		err := r.Run(t.Context(), runner.TagOptions{
 			Name: "/app/config",
 			Tags: []string{"invalid-tag-without-equals"},
 		})
@@ -86,7 +85,7 @@ func TestTagRunner_Run(t *testing.T) {
 			Stderr: &stderr,
 		}
 
-		err := r.Run(context.Background(), runner.TagOptions{
+		err := r.Run(t.Context(), runner.TagOptions{
 			Name: "/app/config",
 			Tags: []string{"env=prod"},
 		})
@@ -113,7 +112,7 @@ func TestUntagRunner_Run(t *testing.T) {
 			Stderr: &stderr,
 		}
 
-		err := r.Run(context.Background(), runner.UntagOptions{
+		err := r.Run(t.Context(), runner.UntagOptions{
 			Name: "/app/config",
 			Keys: []string{"deprecated", "old-tag"},
 		})
@@ -121,7 +120,7 @@ func TestUntagRunner_Run(t *testing.T) {
 
 		assert.Contains(t, stdout.String(), "Staged tag removal for: /app/config")
 
-		tagEntry, err := store.GetTag(staging.ServiceParam, "/app/config")
+		tagEntry, err := store.GetTag(t.Context(), staging.ServiceParam, "/app/config")
 		require.NoError(t, err)
 		assert.True(t, tagEntry.Remove.Contains("deprecated"))
 		assert.True(t, tagEntry.Remove.Contains("old-tag"))
@@ -143,7 +142,7 @@ func TestUntagRunner_Run(t *testing.T) {
 			Stderr: &stderr,
 		}
 
-		err := r.Run(context.Background(), runner.UntagOptions{
+		err := r.Run(t.Context(), runner.UntagOptions{
 			Name: "/app/config",
 			Keys: []string{"deprecated"},
 		})

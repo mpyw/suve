@@ -42,7 +42,7 @@ func (u *EditUseCase) Execute(ctx context.Context, input EditInput) (*EditOutput
 	}
 
 	// Load staged entry state with metadata
-	entryState, existingBaseModifiedAt, err := transition.LoadEntryStateWithMetadata(u.Store, service, input.Name, currentValue)
+	entryState, existingBaseModifiedAt, err := transition.LoadEntryStateWithMetadata(ctx, u.Store, service, input.Name, currentValue)
 	if err != nil {
 		return nil, err
 	}
@@ -65,7 +65,7 @@ func (u *EditUseCase) Execute(ctx context.Context, input EditInput) (*EditOutput
 	executor := transition.NewExecutor(u.Store)
 	_, wasNotStaged := entryState.StagedState.(transition.EntryStagedStateNotStaged)
 
-	result, err := executor.ExecuteEntry(service, input.Name, entryState, transition.EntryActionEdit{Value: input.Value}, opts)
+	result, err := executor.ExecuteEntry(ctx, service, input.Name, entryState, transition.EntryActionEdit{Value: input.Value}, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -117,7 +117,7 @@ func (u *EditUseCase) Baseline(ctx context.Context, input BaselineInput) (*Basel
 	service := u.Strategy.Service()
 
 	// Check if already staged
-	stagedEntry, err := u.Store.GetEntry(service, input.Name)
+	stagedEntry, err := u.Store.GetEntry(ctx, service, input.Name)
 	if err != nil && !errors.Is(err, staging.ErrNotStaged) {
 		return nil, err
 	}

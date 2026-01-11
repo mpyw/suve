@@ -51,7 +51,7 @@ type StatusUseCase struct {
 }
 
 // Execute runs the status use case.
-func (u *StatusUseCase) Execute(_ context.Context, input StatusInput) (*StatusOutput, error) {
+func (u *StatusUseCase) Execute(ctx context.Context, input StatusInput) (*StatusOutput, error) {
 	service := u.Strategy.Service()
 	serviceName := u.Strategy.ServiceName()
 	itemName := u.Strategy.ItemName()
@@ -65,7 +65,7 @@ func (u *StatusUseCase) Execute(_ context.Context, input StatusInput) (*StatusOu
 
 	if input.Name != "" {
 		// Get specific entry
-		entry, entryErr := u.Store.GetEntry(service, input.Name)
+		entry, entryErr := u.Store.GetEntry(ctx, service, input.Name)
 		if entryErr != nil && !errors.Is(entryErr, staging.ErrNotStaged) {
 			return nil, entryErr
 		}
@@ -74,7 +74,7 @@ func (u *StatusUseCase) Execute(_ context.Context, input StatusInput) (*StatusOu
 		}
 
 		// Get specific tag entry
-		tagEntry, tagErr := u.Store.GetTag(service, input.Name)
+		tagEntry, tagErr := u.Store.GetTag(ctx, service, input.Name)
 		if tagErr != nil && !errors.Is(tagErr, staging.ErrNotStaged) {
 			return nil, tagErr
 		}
@@ -91,7 +91,7 @@ func (u *StatusUseCase) Execute(_ context.Context, input StatusInput) (*StatusOu
 	}
 
 	// Get all entries
-	entries, err := u.Store.ListEntries(service)
+	entries, err := u.Store.ListEntries(ctx, service)
 	if err != nil {
 		return nil, err
 	}
@@ -101,7 +101,7 @@ func (u *StatusUseCase) Execute(_ context.Context, input StatusInput) (*StatusOu
 	}
 
 	// Get all tag entries
-	tagEntries, err := u.Store.ListTags(service)
+	tagEntries, err := u.Store.ListTags(ctx, service)
 	if err != nil {
 		return nil, err
 	}

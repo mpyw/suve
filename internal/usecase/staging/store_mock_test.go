@@ -1,6 +1,8 @@
 package staging_test
 
 import (
+	"context"
+
 	"github.com/mpyw/suve/internal/staging"
 )
 
@@ -32,7 +34,7 @@ func newMockStore() *mockStore {
 	}
 }
 
-func (m *mockStore) GetEntry(service staging.Service, name string) (*staging.Entry, error) {
+func (m *mockStore) GetEntry(_ context.Context, service staging.Service, name string) (*staging.Entry, error) {
 	if m.getErr != nil {
 		return nil, m.getErr
 	}
@@ -44,7 +46,7 @@ func (m *mockStore) GetEntry(service staging.Service, name string) (*staging.Ent
 	return nil, staging.ErrNotStaged
 }
 
-func (m *mockStore) GetTag(service staging.Service, name string) (*staging.TagEntry, error) {
+func (m *mockStore) GetTag(_ context.Context, service staging.Service, name string) (*staging.TagEntry, error) {
 	if m.getTagErr != nil {
 		return nil, m.getTagErr
 	}
@@ -56,7 +58,7 @@ func (m *mockStore) GetTag(service staging.Service, name string) (*staging.TagEn
 	return nil, staging.ErrNotStaged
 }
 
-func (m *mockStore) ListEntries(service staging.Service) (map[staging.Service]map[string]staging.Entry, error) {
+func (m *mockStore) ListEntries(_ context.Context, service staging.Service) (map[staging.Service]map[string]staging.Entry, error) {
 	if m.listErr != nil {
 		return nil, m.listErr
 	}
@@ -73,7 +75,7 @@ func (m *mockStore) ListEntries(service staging.Service) (map[staging.Service]ma
 	return result, nil
 }
 
-func (m *mockStore) ListTags(service staging.Service) (map[staging.Service]map[string]staging.TagEntry, error) {
+func (m *mockStore) ListTags(_ context.Context, service staging.Service) (map[staging.Service]map[string]staging.TagEntry, error) {
 	if m.listTagsErr != nil {
 		return nil, m.listTagsErr
 	}
@@ -90,7 +92,7 @@ func (m *mockStore) ListTags(service staging.Service) (map[staging.Service]map[s
 	return result, nil
 }
 
-func (m *mockStore) StageEntry(service staging.Service, name string, entry staging.Entry) error {
+func (m *mockStore) StageEntry(_ context.Context, service staging.Service, name string, entry staging.Entry) error {
 	if m.stageErr != nil {
 		return m.stageErr
 	}
@@ -101,7 +103,7 @@ func (m *mockStore) StageEntry(service staging.Service, name string, entry stagi
 	return nil
 }
 
-func (m *mockStore) StageTag(service staging.Service, name string, tagEntry staging.TagEntry) error {
+func (m *mockStore) StageTag(_ context.Context, service staging.Service, name string, tagEntry staging.TagEntry) error {
 	if m.stageTagErr != nil {
 		return m.stageTagErr
 	}
@@ -112,7 +114,7 @@ func (m *mockStore) StageTag(service staging.Service, name string, tagEntry stag
 	return nil
 }
 
-func (m *mockStore) UnstageEntry(service staging.Service, name string) error {
+func (m *mockStore) UnstageEntry(_ context.Context, service staging.Service, name string) error {
 	if m.unstageErr != nil {
 		return m.unstageErr
 	}
@@ -125,7 +127,7 @@ func (m *mockStore) UnstageEntry(service staging.Service, name string) error {
 	return staging.ErrNotStaged
 }
 
-func (m *mockStore) UnstageTag(service staging.Service, name string) error {
+func (m *mockStore) UnstageTag(_ context.Context, service staging.Service, name string) error {
 	if m.unstageTagErr != nil {
 		return m.unstageTagErr
 	}
@@ -138,7 +140,7 @@ func (m *mockStore) UnstageTag(service staging.Service, name string) error {
 	return staging.ErrNotStaged
 }
 
-func (m *mockStore) UnstageAll(service staging.Service) error {
+func (m *mockStore) UnstageAll(_ context.Context, service staging.Service) error {
 	if m.unstageAllErr != nil {
 		return m.unstageAllErr
 	}
@@ -158,7 +160,7 @@ func (m *mockStore) UnstageAll(service staging.Service) error {
 	return nil
 }
 
-func (m *mockStore) UnstageAllEntries(service staging.Service) error {
+func (m *mockStore) UnstageAllEntries(_ context.Context, service staging.Service) error {
 	if m.unstageAllErr != nil {
 		return m.unstageAllErr
 	}
@@ -173,7 +175,7 @@ func (m *mockStore) UnstageAllEntries(service staging.Service) error {
 	return nil
 }
 
-func (m *mockStore) UnstageAllTags(service staging.Service) error {
+func (m *mockStore) UnstageAllTags(_ context.Context, service staging.Service) error {
 	if m.unstageAllErr != nil {
 		return m.unstageAllErr
 	}
@@ -196,7 +198,7 @@ func (m *mockStore) addEntry(service staging.Service, name string, entry staging
 	m.entries[service][name] = entry
 }
 
-func (m *mockStore) Load() (*staging.State, error) {
+func (m *mockStore) Load(_ context.Context) (*staging.State, error) {
 	return &staging.State{
 		Version: 2,
 		Entries: m.entries,

@@ -23,7 +23,7 @@ func TestCommand_Validation(t *testing.T) {
 	t.Run("missing secret name", func(t *testing.T) {
 		t.Parallel()
 		app := appcli.MakeApp()
-		err := app.Run(context.Background(), []string{"suve", "secret", "delete"})
+		err := app.Run(t.Context(), []string{"suve", "secret", "delete"})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "usage:")
 	})

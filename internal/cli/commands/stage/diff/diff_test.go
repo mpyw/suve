@@ -66,7 +66,7 @@ func TestCommand_Validation(t *testing.T) {
 		app := appcli.MakeApp()
 		var buf bytes.Buffer
 		app.Writer = &buf
-		err := app.Run(context.Background(), []string{"suve", "stage", "diff", "--help"})
+		err := app.Run(t.Context(), []string{"suve", "stage", "diff", "--help"})
 		require.NoError(t, err)
 		assert.Contains(t, buf.String(), "Show diff of all staged changes")
 	})
@@ -74,7 +74,7 @@ func TestCommand_Validation(t *testing.T) {
 	t.Run("no arguments allowed", func(t *testing.T) {
 		t.Parallel()
 		app := appcli.MakeApp()
-		err := app.Run(context.Background(), []string{"suve", "stage", "diff", "extra-arg"})
+		err := app.Run(t.Context(), []string{"suve", "stage", "diff", "extra-arg"})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "usage:")
 	})
@@ -95,7 +95,7 @@ func TestRun_NothingStaged(t *testing.T) {
 
 	// When called with empty store, Run should return without error
 	// and produce no output (action handles the warning)
-	err := r.Run(context.Background(), stagediff.Options{})
+	err := r.Run(t.Context(), stagediff.Options{})
 	require.NoError(t, err)
 	assert.Empty(t, stdout.String())
 }
@@ -106,7 +106,7 @@ func TestRun_ParamOnly(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
-	err := store.StageEntry(staging.ServiceParam, "/app/config", staging.Entry{
+	err := store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("new-value"),
 		StagedAt:  time.Now(),
@@ -133,7 +133,7 @@ func TestRun_ParamOnly(t *testing.T) {
 		Stderr:      &stderr,
 	}
 
-	err = r.Run(context.Background(), stagediff.Options{})
+	err = r.Run(t.Context(), stagediff.Options{})
 	require.NoError(t, err)
 
 	output := stdout.String()
@@ -149,7 +149,7 @@ func TestRun_SecretOnly(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
-	err := store.StageEntry(staging.ServiceSecret, "my-secret", staging.Entry{
+	err := store.StageEntry(t.Context(), staging.ServiceSecret, "my-secret", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("new-secret"),
 		StagedAt:  time.Now(),
@@ -174,7 +174,7 @@ func TestRun_SecretOnly(t *testing.T) {
 		Stderr:       &stderr,
 	}
 
-	err = r.Run(context.Background(), stagediff.Options{})
+	err = r.Run(t.Context(), stagediff.Options{})
 	require.NoError(t, err)
 
 	output := stdout.String()
@@ -188,14 +188,14 @@ func TestRun_BothServices(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
-	err := store.StageEntry(staging.ServiceParam, "/app/config", staging.Entry{
+	err := store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("param-new"),
 		StagedAt:  time.Now(),
 	})
 	require.NoError(t, err)
 
-	err = store.StageEntry(staging.ServiceSecret, "my-secret", staging.Entry{
+	err = store.StageEntry(t.Context(), staging.ServiceSecret, "my-secret", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("secret-new"),
 		StagedAt:  time.Now(),
@@ -233,7 +233,7 @@ func TestRun_BothServices(t *testing.T) {
 		Stderr:       &stderr,
 	}
 
-	err = r.Run(context.Background(), stagediff.Options{})
+	err = r.Run(t.Context(), stagediff.Options{})
 	require.NoError(t, err)
 
 	output := stdout.String()
@@ -251,13 +251,13 @@ func TestRun_DeleteOperations(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
-	err := store.StageEntry(staging.ServiceParam, "/app/config", staging.Entry{
+	err := store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
 		Operation: staging.OperationDelete,
 		StagedAt:  time.Now(),
 	})
 	require.NoError(t, err)
 
-	err = store.StageEntry(staging.ServiceSecret, "my-secret", staging.Entry{
+	err = store.StageEntry(t.Context(), staging.ServiceSecret, "my-secret", staging.Entry{
 		Operation: staging.OperationDelete,
 		StagedAt:  time.Now(),
 	})
@@ -294,7 +294,7 @@ func TestRun_DeleteOperations(t *testing.T) {
 		Stderr:       &stderr,
 	}
 
-	err = r.Run(context.Background(), stagediff.Options{})
+	err = r.Run(t.Context(), stagediff.Options{})
 	require.NoError(t, err)
 
 	output := stdout.String()
@@ -309,7 +309,7 @@ func TestRun_IdenticalValues(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
-	err := store.StageEntry(staging.ServiceParam, "/app/config", staging.Entry{
+	err := store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("same-value"),
 		StagedAt:  time.Now(),
@@ -336,14 +336,14 @@ func TestRun_IdenticalValues(t *testing.T) {
 		Stderr:      &stderr,
 	}
 
-	err = r.Run(context.Background(), stagediff.Options{})
+	err = r.Run(t.Context(), stagediff.Options{})
 	require.NoError(t, err)
 
 	assert.Empty(t, stdout.String())
 	assert.Contains(t, stderr.String(), "unstaged /app/config: identical to AWS current")
 
 	// Verify actually unstaged
-	_, err = store.GetEntry(staging.ServiceParam, "/app/config")
+	_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/config")
 	assert.Equal(t, staging.ErrNotStaged, err)
 }
 
@@ -353,7 +353,7 @@ func TestRun_ParseJSON(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
-	err := store.StageEntry(staging.ServiceParam, "/app/config", staging.Entry{
+	err := store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr(`{"key":"new"}`),
 		StagedAt:  time.Now(),
@@ -380,7 +380,7 @@ func TestRun_ParseJSON(t *testing.T) {
 		Stderr:      &stderr,
 	}
 
-	err = r.Run(context.Background(), stagediff.Options{ParseJSON: true})
+	err = r.Run(t.Context(), stagediff.Options{ParseJSON: true})
 	require.NoError(t, err)
 
 	output := stdout.String()
@@ -394,7 +394,7 @@ func TestRun_ParamUpdateAutoUnstageWhenDeleted(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
-	err := store.StageEntry(staging.ServiceParam, "/app/config", staging.Entry{
+	err := store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("new-value"),
 		StagedAt:  time.Now(),
@@ -415,13 +415,13 @@ func TestRun_ParamUpdateAutoUnstageWhenDeleted(t *testing.T) {
 		Stderr:      &stderr,
 	}
 
-	err = r.Run(context.Background(), stagediff.Options{})
+	err = r.Run(t.Context(), stagediff.Options{})
 	require.NoError(t, err)
 	assert.Contains(t, stderr.String(), "unstaged")
 	assert.Contains(t, stderr.String(), "no longer exists")
 
 	// Verify unstaged
-	_, err = store.GetEntry(staging.ServiceParam, "/app/config")
+	_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/config")
 	assert.ErrorIs(t, err, staging.ErrNotStaged)
 }
 
@@ -431,7 +431,7 @@ func TestRun_SecretUpdateAutoUnstageWhenDeleted(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
-	err := store.StageEntry(staging.ServiceSecret, "my-secret", staging.Entry{
+	err := store.StageEntry(t.Context(), staging.ServiceSecret, "my-secret", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("new-value"),
 		StagedAt:  time.Now(),
@@ -452,13 +452,13 @@ func TestRun_SecretUpdateAutoUnstageWhenDeleted(t *testing.T) {
 		Stderr:       &stderr,
 	}
 
-	err = r.Run(context.Background(), stagediff.Options{})
+	err = r.Run(t.Context(), stagediff.Options{})
 	require.NoError(t, err)
 	assert.Contains(t, stderr.String(), "unstaged")
 	assert.Contains(t, stderr.String(), "no longer exists")
 
 	// Verify unstaged
-	_, err = store.GetEntry(staging.ServiceSecret, "my-secret")
+	_, err = store.GetEntry(t.Context(), staging.ServiceSecret, "my-secret")
 	assert.ErrorIs(t, err, staging.ErrNotStaged)
 }
 
@@ -468,7 +468,7 @@ func TestRun_SecretIdenticalValues(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
-	err := store.StageEntry(staging.ServiceSecret, "my-secret", staging.Entry{
+	err := store.StageEntry(t.Context(), staging.ServiceSecret, "my-secret", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("same-value"),
 		StagedAt:  time.Now(),
@@ -493,14 +493,14 @@ func TestRun_SecretIdenticalValues(t *testing.T) {
 		Stderr:       &stderr,
 	}
 
-	err = r.Run(context.Background(), stagediff.Options{})
+	err = r.Run(t.Context(), stagediff.Options{})
 	require.NoError(t, err)
 
 	assert.Empty(t, stdout.String())
 	assert.Contains(t, stderr.String(), "unstaged my-secret: identical to AWS current")
 
 	// Verify actually unstaged
-	_, err = store.GetEntry(staging.ServiceSecret, "my-secret")
+	_, err = store.GetEntry(t.Context(), staging.ServiceSecret, "my-secret")
 	assert.Equal(t, staging.ErrNotStaged, err)
 }
 
@@ -510,7 +510,7 @@ func TestRun_SecretParseJSON(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
-	err := store.StageEntry(staging.ServiceSecret, "my-secret", staging.Entry{
+	err := store.StageEntry(t.Context(), staging.ServiceSecret, "my-secret", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr(`{"key":"new"}`),
 		StagedAt:  time.Now(),
@@ -535,7 +535,7 @@ func TestRun_SecretParseJSON(t *testing.T) {
 		Stderr:       &stderr,
 	}
 
-	err = r.Run(context.Background(), stagediff.Options{ParseJSON: true})
+	err = r.Run(t.Context(), stagediff.Options{ParseJSON: true})
 	require.NoError(t, err)
 
 	output := stdout.String()
@@ -549,7 +549,7 @@ func TestRun_SecretParseJSONMixed(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
-	err := store.StageEntry(staging.ServiceSecret, "my-secret", staging.Entry{
+	err := store.StageEntry(t.Context(), staging.ServiceSecret, "my-secret", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("not-json"),
 		StagedAt:  time.Now(),
@@ -574,7 +574,7 @@ func TestRun_SecretParseJSONMixed(t *testing.T) {
 		Stderr:       &stderr,
 	}
 
-	err = r.Run(context.Background(), stagediff.Options{ParseJSON: true})
+	err = r.Run(t.Context(), stagediff.Options{ParseJSON: true})
 	require.NoError(t, err)
 
 	assert.Contains(t, stderr.String(), "--parse-json has no effect")
@@ -586,14 +586,14 @@ func TestRun_ParamCreateOperation(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
-	err := store.StageEntry(staging.ServiceParam, "/app/new-param", staging.Entry{
+	err := store.StageEntry(t.Context(), staging.ServiceParam, "/app/new-param", staging.Entry{
 		Operation:   staging.OperationCreate,
 		Value:       lo.ToPtr("new-value"),
 		Description: lo.ToPtr("New parameter"),
 		StagedAt:    time.Now(),
 	})
 	require.NoError(t, err)
-	err = store.StageTag(staging.ServiceParam, "/app/new-param", staging.TagEntry{
+	err = store.StageTag(t.Context(), staging.ServiceParam, "/app/new-param", staging.TagEntry{
 		Add:      map[string]string{"env": "prod", "team": "platform"},
 		StagedAt: time.Now(),
 	})
@@ -613,7 +613,7 @@ func TestRun_ParamCreateOperation(t *testing.T) {
 		Stderr:      &stderr,
 	}
 
-	err = r.Run(context.Background(), stagediff.Options{})
+	err = r.Run(t.Context(), stagediff.Options{})
 	require.NoError(t, err)
 
 	output := stdout.String()
@@ -631,14 +631,14 @@ func TestRun_SecretCreateOperation(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
-	err := store.StageEntry(staging.ServiceSecret, "new-secret", staging.Entry{
+	err := store.StageEntry(t.Context(), staging.ServiceSecret, "new-secret", staging.Entry{
 		Operation:   staging.OperationCreate,
 		Value:       lo.ToPtr("secret-value"),
 		Description: lo.ToPtr("New secret"),
 		StagedAt:    time.Now(),
 	})
 	require.NoError(t, err)
-	err = store.StageTag(staging.ServiceSecret, "new-secret", staging.TagEntry{
+	err = store.StageTag(t.Context(), staging.ServiceSecret, "new-secret", staging.TagEntry{
 		Add:      map[string]string{"env": "staging"},
 		StagedAt: time.Now(),
 	})
@@ -658,7 +658,7 @@ func TestRun_SecretCreateOperation(t *testing.T) {
 		Stderr:       &stderr,
 	}
 
-	err = r.Run(context.Background(), stagediff.Options{})
+	err = r.Run(t.Context(), stagediff.Options{})
 	require.NoError(t, err)
 
 	output := stdout.String()
@@ -676,7 +676,7 @@ func TestRun_CreateWithParseJSON(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
-	err := store.StageEntry(staging.ServiceParam, "/app/config", staging.Entry{
+	err := store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
 		Operation: staging.OperationCreate,
 		Value:     lo.ToPtr(`{"key":"value","nested":{"a":1}}`),
 		StagedAt:  time.Now(),
@@ -697,7 +697,7 @@ func TestRun_CreateWithParseJSON(t *testing.T) {
 		Stderr:      &stderr,
 	}
 
-	err = r.Run(context.Background(), stagediff.Options{ParseJSON: true})
+	err = r.Run(t.Context(), stagediff.Options{ParseJSON: true})
 	require.NoError(t, err)
 
 	output := stdout.String()
@@ -712,7 +712,7 @@ func TestRun_DeleteAutoUnstageWhenAlreadyDeleted(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
-	err := store.StageEntry(staging.ServiceParam, "/app/config", staging.Entry{
+	err := store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
 		Operation: staging.OperationDelete,
 		StagedAt:  time.Now(),
 	})
@@ -732,13 +732,13 @@ func TestRun_DeleteAutoUnstageWhenAlreadyDeleted(t *testing.T) {
 		Stderr:      &stderr,
 	}
 
-	err = r.Run(context.Background(), stagediff.Options{})
+	err = r.Run(t.Context(), stagediff.Options{})
 	require.NoError(t, err)
 	assert.Contains(t, stderr.String(), "unstaged")
 	assert.Contains(t, stderr.String(), "already deleted")
 
 	// Verify unstaged
-	_, err = store.GetEntry(staging.ServiceParam, "/app/config")
+	_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/config")
 	assert.ErrorIs(t, err, staging.ErrNotStaged)
 }
 
@@ -748,7 +748,7 @@ func TestRun_SecretDeleteAutoUnstageWhenAlreadyDeleted(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
-	err := store.StageEntry(staging.ServiceSecret, "my-secret", staging.Entry{
+	err := store.StageEntry(t.Context(), staging.ServiceSecret, "my-secret", staging.Entry{
 		Operation: staging.OperationDelete,
 		StagedAt:  time.Now(),
 	})
@@ -768,13 +768,13 @@ func TestRun_SecretDeleteAutoUnstageWhenAlreadyDeleted(t *testing.T) {
 		Stderr:       &stderr,
 	}
 
-	err = r.Run(context.Background(), stagediff.Options{})
+	err = r.Run(t.Context(), stagediff.Options{})
 	require.NoError(t, err)
 	assert.Contains(t, stderr.String(), "unstaged")
 	assert.Contains(t, stderr.String(), "already deleted")
 
 	// Verify unstaged
-	_, err = store.GetEntry(staging.ServiceSecret, "my-secret")
+	_, err = store.GetEntry(t.Context(), staging.ServiceSecret, "my-secret")
 	assert.ErrorIs(t, err, staging.ErrNotStaged)
 }
 
@@ -784,7 +784,7 @@ func TestRun_MetadataWithDescription(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
-	err := store.StageEntry(staging.ServiceParam, "/app/config", staging.Entry{
+	err := store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
 		Operation:   staging.OperationUpdate,
 		Value:       lo.ToPtr("new-value"),
 		Description: lo.ToPtr("Updated config"),
@@ -812,7 +812,7 @@ func TestRun_MetadataWithDescription(t *testing.T) {
 		Stderr:      &stderr,
 	}
 
-	err = r.Run(context.Background(), stagediff.Options{})
+	err = r.Run(t.Context(), stagediff.Options{})
 	require.NoError(t, err)
 
 	output := stdout.String()
@@ -826,13 +826,13 @@ func TestRun_MetadataWithTags(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
-	err := store.StageEntry(staging.ServiceParam, "/app/config", staging.Entry{
+	err := store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("new-value"),
 		StagedAt:  time.Now(),
 	})
 	require.NoError(t, err)
-	err = store.StageTag(staging.ServiceParam, "/app/config", staging.TagEntry{
+	err = store.StageTag(t.Context(), staging.ServiceParam, "/app/config", staging.TagEntry{
 		Add:      map[string]string{"env": "prod", "team": "platform"},
 		StagedAt: time.Now(),
 	})
@@ -858,7 +858,7 @@ func TestRun_MetadataWithTags(t *testing.T) {
 		Stderr:      &stderr,
 	}
 
-	err = r.Run(context.Background(), stagediff.Options{})
+	err = r.Run(t.Context(), stagediff.Options{})
 	require.NoError(t, err)
 
 	output := stdout.String()
@@ -875,7 +875,7 @@ func TestRun_TagOnlyDiff(t *testing.T) {
 	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 	// Stage only tag changes (no entry change)
-	err := store.StageTag(staging.ServiceParam, "/app/config", staging.TagEntry{
+	err := store.StageTag(t.Context(), staging.ServiceParam, "/app/config", staging.TagEntry{
 		Add:      map[string]string{"env": "prod", "team": "api"},
 		StagedAt: time.Now(),
 	})
@@ -888,7 +888,7 @@ func TestRun_TagOnlyDiff(t *testing.T) {
 		Stderr: &stderr,
 	}
 
-	err = r.Run(context.Background(), stagediff.Options{})
+	err = r.Run(t.Context(), stagediff.Options{})
 	require.NoError(t, err)
 
 	output := stdout.String()
@@ -907,7 +907,7 @@ func TestRun_TagOnlyRemovalsDiff(t *testing.T) {
 	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 	// Stage only tag removals (no additions)
-	err := store.StageTag(staging.ServiceParam, "/app/config", staging.TagEntry{
+	err := store.StageTag(t.Context(), staging.ServiceParam, "/app/config", staging.TagEntry{
 		Remove:   maputil.NewSet("deprecated", "old-tag"),
 		StagedAt: time.Now(),
 	})
@@ -920,7 +920,7 @@ func TestRun_TagOnlyRemovalsDiff(t *testing.T) {
 		Stderr: &stderr,
 	}
 
-	err = r.Run(context.Background(), stagediff.Options{})
+	err = r.Run(t.Context(), stagediff.Options{})
 	require.NoError(t, err)
 
 	output := stdout.String()
@@ -938,7 +938,7 @@ func TestRun_SecretTagDiff(t *testing.T) {
 	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 	// Stage secret tag changes
-	err := store.StageTag(staging.ServiceSecret, "my-secret", staging.TagEntry{
+	err := store.StageTag(t.Context(), staging.ServiceSecret, "my-secret", staging.TagEntry{
 		Add:      map[string]string{"env": "staging"},
 		Remove:   maputil.NewSet("deprecated"),
 		StagedAt: time.Now(),
@@ -952,7 +952,7 @@ func TestRun_SecretTagDiff(t *testing.T) {
 		Stderr: &stderr,
 	}
 
-	err = r.Run(context.Background(), stagediff.Options{})
+	err = r.Run(t.Context(), stagediff.Options{})
 	require.NoError(t, err)
 
 	output := stdout.String()
@@ -970,7 +970,7 @@ func TestRun_SecretCreateWithParseJSON(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
-	err := store.StageEntry(staging.ServiceSecret, "new-secret", staging.Entry{
+	err := store.StageEntry(t.Context(), staging.ServiceSecret, "new-secret", staging.Entry{
 		Operation: staging.OperationCreate,
 		Value:     lo.ToPtr(`{"key":"value","nested":{"a":1}}`),
 		StagedAt:  time.Now(),
@@ -991,7 +991,7 @@ func TestRun_SecretCreateWithParseJSON(t *testing.T) {
 		Stderr:       &stderr,
 	}
 
-	err = r.Run(context.Background(), stagediff.Options{ParseJSON: true})
+	err = r.Run(t.Context(), stagediff.Options{ParseJSON: true})
 	require.NoError(t, err)
 
 	output := stdout.String()
@@ -1007,7 +1007,7 @@ func TestRun_BothEntriesAndTags(t *testing.T) {
 	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 	// Stage entry change
-	err := store.StageEntry(staging.ServiceParam, "/app/config", staging.Entry{
+	err := store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("new-value"),
 		StagedAt:  time.Now(),
@@ -1015,7 +1015,7 @@ func TestRun_BothEntriesAndTags(t *testing.T) {
 	require.NoError(t, err)
 
 	// Stage tag change (different resource)
-	err = store.StageTag(staging.ServiceParam, "/app/other", staging.TagEntry{
+	err = store.StageTag(t.Context(), staging.ServiceParam, "/app/other", staging.TagEntry{
 		Add:      map[string]string{"env": "prod"},
 		StagedAt: time.Now(),
 	})
@@ -1041,7 +1041,7 @@ func TestRun_BothEntriesAndTags(t *testing.T) {
 		Stderr:      &stderr,
 	}
 
-	err = r.Run(context.Background(), stagediff.Options{})
+	err = r.Run(t.Context(), stagediff.Options{})
 	require.NoError(t, err)
 
 	output := stdout.String()
