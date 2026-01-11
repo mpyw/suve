@@ -46,7 +46,7 @@ func TestDeleteUseCase_GetCurrentValue(t *testing.T) {
 
 	uc := &secret.DeleteUseCase{Client: client}
 
-	value, err := uc.GetCurrentValue(context.Background(), "my-secret")
+	value, err := uc.GetCurrentValue(t.Context(), "my-secret")
 	require.NoError(t, err)
 	assert.Equal(t, "current-value", value)
 }
@@ -60,7 +60,7 @@ func TestDeleteUseCase_GetCurrentValue_NotFound(t *testing.T) {
 
 	uc := &secret.DeleteUseCase{Client: client}
 
-	value, err := uc.GetCurrentValue(context.Background(), "not-exists")
+	value, err := uc.GetCurrentValue(t.Context(), "not-exists")
 	require.NoError(t, err)
 	assert.Empty(t, value)
 }
@@ -74,7 +74,7 @@ func TestDeleteUseCase_GetCurrentValue_Error(t *testing.T) {
 
 	uc := &secret.DeleteUseCase{Client: client}
 
-	_, err := uc.GetCurrentValue(context.Background(), "my-secret")
+	_, err := uc.GetCurrentValue(t.Context(), "my-secret")
 	assert.Error(t, err)
 }
 
@@ -92,7 +92,7 @@ func TestDeleteUseCase_Execute(t *testing.T) {
 
 	uc := &secret.DeleteUseCase{Client: client}
 
-	output, err := uc.Execute(context.Background(), secret.DeleteInput{
+	output, err := uc.Execute(t.Context(), secret.DeleteInput{
 		Name: "my-secret",
 	})
 	require.NoError(t, err)
@@ -112,7 +112,7 @@ func TestDeleteUseCase_Execute_Force(t *testing.T) {
 
 	uc := &secret.DeleteUseCase{Client: client}
 
-	output, err := uc.Execute(context.Background(), secret.DeleteInput{
+	output, err := uc.Execute(t.Context(), secret.DeleteInput{
 		Name:  "my-secret",
 		Force: true,
 	})
@@ -134,7 +134,7 @@ func TestDeleteUseCase_Execute_RecoveryWindow(t *testing.T) {
 
 	uc := &secret.DeleteUseCase{Client: client}
 
-	output, err := uc.Execute(context.Background(), secret.DeleteInput{
+	output, err := uc.Execute(t.Context(), secret.DeleteInput{
 		Name:           "my-secret",
 		RecoveryWindow: 30,
 	})
@@ -152,7 +152,7 @@ func TestDeleteUseCase_Execute_Error(t *testing.T) {
 
 	uc := &secret.DeleteUseCase{Client: client}
 
-	_, err := uc.Execute(context.Background(), secret.DeleteInput{
+	_, err := uc.Execute(t.Context(), secret.DeleteInput{
 		Name: "my-secret",
 	})
 	assert.Error(t, err)

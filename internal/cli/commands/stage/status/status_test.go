@@ -2,7 +2,6 @@ package status_test
 
 import (
 	"bytes"
-	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -31,7 +30,7 @@ func TestCommand_NoStagedChanges(t *testing.T) {
 		Stderr: &bytes.Buffer{},
 	}
 
-	err := r.Run(context.Background(), status.Options{})
+	err := r.Run(t.Context(), status.Options{})
 	require.NoError(t, err)
 	assert.Contains(t, buf.String(), "No changes staged")
 }
@@ -56,7 +55,7 @@ func TestCommand_ShowParamChangesOnly(t *testing.T) {
 		Stderr: &bytes.Buffer{},
 	}
 
-	err := r.Run(context.Background(), status.Options{})
+	err := r.Run(t.Context(), status.Options{})
 	require.NoError(t, err)
 
 	output := buf.String()
@@ -85,7 +84,7 @@ func TestCommand_ShowSecretChangesOnly(t *testing.T) {
 		Stderr: &bytes.Buffer{},
 	}
 
-	err := r.Run(context.Background(), status.Options{})
+	err := r.Run(t.Context(), status.Options{})
 	require.NoError(t, err)
 
 	output := buf.String()
@@ -118,7 +117,7 @@ func TestCommand_ShowBothParamAndSecretChanges(t *testing.T) {
 		Stderr: &bytes.Buffer{},
 	}
 
-	err := r.Run(context.Background(), status.Options{})
+	err := r.Run(t.Context(), status.Options{})
 	require.NoError(t, err)
 
 	output := buf.String()
@@ -155,7 +154,7 @@ func TestCommand_VerboseOutput(t *testing.T) {
 		Stderr: &bytes.Buffer{},
 	}
 
-	err := r.Run(context.Background(), status.Options{Verbose: true})
+	err := r.Run(t.Context(), status.Options{Verbose: true})
 	require.NoError(t, err)
 
 	output := buf.String()
@@ -184,7 +183,7 @@ func TestCommand_VerboseWithDelete(t *testing.T) {
 		Stderr: &bytes.Buffer{},
 	}
 
-	err := r.Run(context.Background(), status.Options{Verbose: true})
+	err := r.Run(t.Context(), status.Options{Verbose: true})
 	require.NoError(t, err)
 
 	output := buf.String()
@@ -214,7 +213,7 @@ func TestCommand_VerboseTruncatesLongValue(t *testing.T) {
 		Stderr: &bytes.Buffer{},
 	}
 
-	err := r.Run(context.Background(), status.Options{Verbose: true})
+	err := r.Run(t.Context(), status.Options{Verbose: true})
 	require.NoError(t, err)
 
 	output := buf.String()
@@ -230,7 +229,7 @@ func TestCommand_Validation(t *testing.T) {
 	app.Writer = &buf
 
 	// Test that the command exists and works
-	err := app.Run(context.Background(), []string{"suve", "status", "--help"})
+	err := app.Run(t.Context(), []string{"suve", "status", "--help"})
 	require.NoError(t, err)
 	assert.Contains(t, buf.String(), "staged changes")
 }
@@ -254,7 +253,7 @@ func TestCommand_StoreError(t *testing.T) {
 		Stderr: &bytes.Buffer{},
 	}
 
-	err = r.Run(context.Background(), status.Options{})
+	err = r.Run(t.Context(), status.Options{})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to parse")
 }
@@ -278,7 +277,7 @@ func TestCommand_ShowParamTagChangesOnly(t *testing.T) {
 		Stderr: &bytes.Buffer{},
 	}
 
-	err := r.Run(context.Background(), status.Options{})
+	err := r.Run(t.Context(), status.Options{})
 	require.NoError(t, err)
 
 	output := buf.String()
@@ -309,7 +308,7 @@ func TestCommand_ShowSecretTagChangesOnly(t *testing.T) {
 		Stderr: &bytes.Buffer{},
 	}
 
-	err := r.Run(context.Background(), status.Options{})
+	err := r.Run(t.Context(), status.Options{})
 	require.NoError(t, err)
 
 	output := buf.String()
@@ -347,7 +346,7 @@ func TestCommand_ShowMixedEntryAndTagChanges(t *testing.T) {
 		Stderr: &bytes.Buffer{},
 	}
 
-	err := r.Run(context.Background(), status.Options{})
+	err := r.Run(t.Context(), status.Options{})
 	require.NoError(t, err)
 
 	output := buf.String()
@@ -378,7 +377,7 @@ func TestCommand_TagChangesVerbose(t *testing.T) {
 		Stderr: &bytes.Buffer{},
 	}
 
-	err := r.Run(context.Background(), status.Options{Verbose: true})
+	err := r.Run(t.Context(), status.Options{Verbose: true})
 	require.NoError(t, err)
 
 	output := buf.String()
@@ -415,7 +414,7 @@ func TestCommand_TagOnlyChangesNoEntries(t *testing.T) {
 		Stderr: &bytes.Buffer{},
 	}
 
-	err := r.Run(context.Background(), status.Options{})
+	err := r.Run(t.Context(), status.Options{})
 	require.NoError(t, err)
 
 	output := buf.String()

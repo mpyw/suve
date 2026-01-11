@@ -119,7 +119,7 @@ func TestStatusRunner_Run(t *testing.T) {
 			Stderr: &stderr,
 		}
 
-		err := r.Run(context.Background(), runner.StatusOptions{Name: "/app/config"})
+		err := r.Run(t.Context(), runner.StatusOptions{Name: "/app/config"})
 		require.NoError(t, err)
 		assert.Contains(t, stdout.String(), "/app/config")
 		assert.Contains(t, stdout.String(), "M") // Modified
@@ -141,7 +141,7 @@ func TestStatusRunner_Run(t *testing.T) {
 			Stderr: &stderr,
 		}
 
-		err := r.Run(context.Background(), runner.StatusOptions{Name: "/app/config"})
+		err := r.Run(t.Context(), runner.StatusOptions{Name: "/app/config"})
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "not staged")
 	})
@@ -167,7 +167,7 @@ func TestStatusRunner_Run(t *testing.T) {
 			Stderr: &stderr,
 		}
 
-		err := r.Run(context.Background(), runner.StatusOptions{Name: "/app/config", Verbose: true})
+		err := r.Run(t.Context(), runner.StatusOptions{Name: "/app/config", Verbose: true})
 		require.NoError(t, err)
 		assert.Contains(t, stdout.String(), "staged-value")
 	})
@@ -188,7 +188,7 @@ func TestStatusRunner_Run(t *testing.T) {
 			Stderr: &stderr,
 		}
 
-		err := r.Run(context.Background(), runner.StatusOptions{})
+		err := r.Run(t.Context(), runner.StatusOptions{})
 		require.NoError(t, err)
 		assert.Contains(t, stdout.String(), "No")
 	})
@@ -223,7 +223,7 @@ func TestStatusRunner_Run(t *testing.T) {
 			Stderr: &stderr,
 		}
 
-		err := r.Run(context.Background(), runner.StatusOptions{})
+		err := r.Run(t.Context(), runner.StatusOptions{})
 		require.NoError(t, err)
 		output := stdout.String()
 		assert.Contains(t, output, "Staged")
@@ -254,7 +254,7 @@ func TestStatusRunner_Run(t *testing.T) {
 			Stderr: &stderr,
 		}
 
-		err := r.Run(context.Background(), runner.StatusOptions{Verbose: true})
+		err := r.Run(t.Context(), runner.StatusOptions{Verbose: true})
 		require.NoError(t, err)
 		assert.Contains(t, stdout.String(), "my-secret")
 	})
@@ -288,7 +288,7 @@ func TestDiffRunner_Run(t *testing.T) {
 			Stderr: &stderr,
 		}
 
-		err := r.Run(context.Background(), runner.DiffOptions{Name: "/app/config"})
+		err := r.Run(t.Context(), runner.DiffOptions{Name: "/app/config"})
 		require.NoError(t, err)
 		output := stdout.String()
 		assert.Contains(t, output, "-old-value")
@@ -321,7 +321,7 @@ func TestDiffRunner_Run(t *testing.T) {
 			Stderr: &stderr,
 		}
 
-		err := r.Run(context.Background(), runner.DiffOptions{})
+		err := r.Run(t.Context(), runner.DiffOptions{})
 		require.NoError(t, err)
 		output := stdout.String()
 		assert.Contains(t, output, "/app/config1")
@@ -344,7 +344,7 @@ func TestDiffRunner_Run(t *testing.T) {
 			Stderr: &stderr,
 		}
 
-		err := r.Run(context.Background(), runner.DiffOptions{Name: "/app/config"})
+		err := r.Run(t.Context(), runner.DiffOptions{Name: "/app/config"})
 		require.NoError(t, err)
 		assert.Contains(t, stderr.String(), "not staged")
 	})
@@ -365,7 +365,7 @@ func TestDiffRunner_Run(t *testing.T) {
 			Stderr: &stderr,
 		}
 
-		err := r.Run(context.Background(), runner.DiffOptions{})
+		err := r.Run(t.Context(), runner.DiffOptions{})
 		require.NoError(t, err)
 		assert.Contains(t, stderr.String(), "no")
 	})
@@ -391,7 +391,7 @@ func TestDiffRunner_Run(t *testing.T) {
 			Stderr: &stderr,
 		}
 
-		err := r.Run(context.Background(), runner.DiffOptions{Name: "/app/config", ParseJSON: true})
+		err := r.Run(t.Context(), runner.DiffOptions{Name: "/app/config", ParseJSON: true})
 		require.NoError(t, err)
 		output := stdout.String()
 		// JSON should be formatted with sorted keys
@@ -419,7 +419,7 @@ func TestDiffRunner_Run(t *testing.T) {
 			Stderr: &stderr,
 		}
 
-		err := r.Run(context.Background(), runner.DiffOptions{Name: "/app/config", ParseJSON: true})
+		err := r.Run(t.Context(), runner.DiffOptions{Name: "/app/config", ParseJSON: true})
 		require.NoError(t, err)
 		assert.Contains(t, stderr.String(), "--parse-json has no effect")
 	})
@@ -445,7 +445,7 @@ func TestDiffRunner_Run(t *testing.T) {
 			Stderr: &stderr,
 		}
 
-		err := r.Run(context.Background(), runner.DiffOptions{Name: "/app/config"})
+		err := r.Run(t.Context(), runner.DiffOptions{Name: "/app/config"})
 		require.NoError(t, err)
 		assert.Contains(t, stderr.String(), "unstaged")
 		assert.Contains(t, stderr.String(), "identical")
@@ -475,7 +475,7 @@ func TestDiffRunner_Run(t *testing.T) {
 			Stderr: &stderr,
 		}
 
-		err := r.Run(context.Background(), runner.DiffOptions{Name: "/app/config"})
+		err := r.Run(t.Context(), runner.DiffOptions{Name: "/app/config"})
 		require.NoError(t, err)
 		output := stdout.String()
 		assert.Contains(t, output, "-current-value")
@@ -504,7 +504,7 @@ func TestDiffRunner_Run(t *testing.T) {
 			Stderr: &stderr,
 		}
 
-		err := r.Run(context.Background(), runner.DiffOptions{Name: "/app/config"})
+		err := r.Run(t.Context(), runner.DiffOptions{Name: "/app/config"})
 		require.NoError(t, err)
 		assert.Contains(t, stderr.String(), "unstaged")
 		assert.Contains(t, stderr.String(), "no longer exists")
@@ -536,7 +536,7 @@ func TestDiffRunner_Run(t *testing.T) {
 			Stderr: &stderr,
 		}
 
-		err := r.Run(context.Background(), runner.DiffOptions{Name: "/app/new-param"})
+		err := r.Run(t.Context(), runner.DiffOptions{Name: "/app/new-param"})
 		require.NoError(t, err)
 
 		output := stdout.String()
@@ -571,7 +571,7 @@ func TestDiffRunner_Run(t *testing.T) {
 			Stderr: &stderr,
 		}
 
-		err := r.Run(context.Background(), runner.DiffOptions{Name: "/app/new-json", ParseJSON: true})
+		err := r.Run(t.Context(), runner.DiffOptions{Name: "/app/new-json", ParseJSON: true})
 		require.NoError(t, err)
 		output := stdout.String()
 		// JSON should be formatted
@@ -601,7 +601,7 @@ func TestDiffRunner_Run(t *testing.T) {
 			Stderr: &stderr,
 		}
 
-		err := r.Run(context.Background(), runner.DiffOptions{Name: "/app/param"})
+		err := r.Run(t.Context(), runner.DiffOptions{Name: "/app/param"})
 		require.NoError(t, err)
 		assert.Contains(t, stderr.String(), "unstaged")
 		assert.Contains(t, stderr.String(), "identical")
@@ -633,7 +633,7 @@ func TestDiffRunner_Run(t *testing.T) {
 			Stderr: &stderr,
 		}
 
-		err := r.Run(context.Background(), runner.DiffOptions{Name: "/app/param"})
+		err := r.Run(t.Context(), runner.DiffOptions{Name: "/app/param"})
 		require.NoError(t, err)
 		output := stdout.String()
 		assert.Contains(t, output, "-old-value")
@@ -661,7 +661,7 @@ func TestDiffRunner_Run(t *testing.T) {
 			Stderr: &stderr,
 		}
 
-		err := r.Run(context.Background(), runner.DiffOptions{Name: "/app/config"})
+		err := r.Run(t.Context(), runner.DiffOptions{Name: "/app/config"})
 		require.NoError(t, err)
 		assert.Contains(t, stderr.String(), "unstaged")
 		assert.Contains(t, stderr.String(), "already deleted")
@@ -699,7 +699,7 @@ func TestEditRunner_Run(t *testing.T) {
 			},
 		}
 
-		err := r.Run(context.Background(), runner.EditOptions{Name: "/app/config"})
+		err := r.Run(t.Context(), runner.EditOptions{Name: "/app/config"})
 		require.NoError(t, err)
 		assert.Contains(t, stdout.String(), "Staged")
 
@@ -734,7 +734,7 @@ func TestEditRunner_Run(t *testing.T) {
 			},
 		}
 
-		err := r.Run(context.Background(), runner.EditOptions{Name: "/app/config"})
+		err := r.Run(t.Context(), runner.EditOptions{Name: "/app/config"})
 		require.NoError(t, err)
 
 		entry, err := store.GetEntry(staging.ServiceParam, "/app/config")
@@ -767,7 +767,7 @@ func TestEditRunner_Run(t *testing.T) {
 			},
 		}
 
-		err := r.Run(context.Background(), runner.EditOptions{Name: "/app/config"})
+		err := r.Run(t.Context(), runner.EditOptions{Name: "/app/config"})
 		require.NoError(t, err)
 	})
 
@@ -790,7 +790,7 @@ func TestEditRunner_Run(t *testing.T) {
 			},
 		}
 
-		err := r.Run(context.Background(), runner.EditOptions{Name: "/app/config"})
+		err := r.Run(t.Context(), runner.EditOptions{Name: "/app/config"})
 		require.NoError(t, err)
 		assert.Contains(t, stdout.String(), "No changes made")
 	})
@@ -814,7 +814,7 @@ func TestEditRunner_Run(t *testing.T) {
 			},
 		}
 
-		err := r.Run(context.Background(), runner.EditOptions{Name: "/app/config"})
+		err := r.Run(t.Context(), runner.EditOptions{Name: "/app/config"})
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to edit")
 	})
@@ -838,7 +838,7 @@ func TestEditRunner_Run(t *testing.T) {
 			},
 		}
 
-		err := r.Run(context.Background(), runner.EditOptions{Name: "/app/config"})
+		err := r.Run(t.Context(), runner.EditOptions{Name: "/app/config"})
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "not found")
 	})
@@ -881,7 +881,7 @@ func TestApplyRunner_Run(t *testing.T) {
 			Stderr: &stderr,
 		}
 
-		err := r.Run(context.Background(), runner.ApplyOptions{})
+		err := r.Run(t.Context(), runner.ApplyOptions{})
 		require.NoError(t, err)
 		output := stdout.String()
 		assert.Contains(t, output, "Created")
@@ -923,7 +923,7 @@ func TestApplyRunner_Run(t *testing.T) {
 			Stderr: &stderr,
 		}
 
-		err := r.Run(context.Background(), runner.ApplyOptions{Name: "/app/config1"})
+		err := r.Run(t.Context(), runner.ApplyOptions{Name: "/app/config1"})
 		require.NoError(t, err)
 
 		// Only config1 should be unstaged
@@ -955,7 +955,7 @@ func TestApplyRunner_Run(t *testing.T) {
 			Stderr: &stderr,
 		}
 
-		err := r.Run(context.Background(), runner.ApplyOptions{Name: "/app/config"})
+		err := r.Run(t.Context(), runner.ApplyOptions{Name: "/app/config"})
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "not staged")
 	})
@@ -976,7 +976,7 @@ func TestApplyRunner_Run(t *testing.T) {
 			Stderr: &stderr,
 		}
 
-		err := r.Run(context.Background(), runner.ApplyOptions{})
+		err := r.Run(t.Context(), runner.ApplyOptions{})
 		require.NoError(t, err)
 		assert.Contains(t, stdout.String(), "No")
 	})
@@ -1002,7 +1002,7 @@ func TestApplyRunner_Run(t *testing.T) {
 			Stderr: &stderr,
 		}
 
-		err := r.Run(context.Background(), runner.ApplyOptions{})
+		err := r.Run(t.Context(), runner.ApplyOptions{})
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "failed 1")
 		assert.Contains(t, stderr.String(), "apply failed")
@@ -1031,7 +1031,7 @@ func TestApplyRunner_Run(t *testing.T) {
 			Stderr: &stderr,
 		}
 
-		err := r.Run(context.Background(), runner.ApplyOptions{})
+		err := r.Run(t.Context(), runner.ApplyOptions{})
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "conflict")
 		assert.Contains(t, stderr.String(), "conflict detected")
@@ -1061,7 +1061,7 @@ func TestApplyRunner_Run(t *testing.T) {
 			Stderr: &stderr,
 		}
 
-		err := r.Run(context.Background(), runner.ApplyOptions{})
+		err := r.Run(t.Context(), runner.ApplyOptions{})
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "conflict")
 		assert.Contains(t, stderr.String(), "conflict detected")
@@ -1089,7 +1089,7 @@ func TestApplyRunner_Run(t *testing.T) {
 			Stderr: &stderr,
 		}
 
-		err := r.Run(context.Background(), runner.ApplyOptions{})
+		err := r.Run(t.Context(), runner.ApplyOptions{})
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "conflict")
 	})
@@ -1118,7 +1118,7 @@ func TestApplyRunner_Run(t *testing.T) {
 			Stderr: &stderr,
 		}
 
-		err := r.Run(context.Background(), runner.ApplyOptions{})
+		err := r.Run(t.Context(), runner.ApplyOptions{})
 		require.NoError(t, err)
 		assert.Contains(t, stdout.String(), "Updated")
 	})
@@ -1147,7 +1147,7 @@ func TestApplyRunner_Run(t *testing.T) {
 		}
 
 		// With IgnoreConflicts, apply should proceed despite conflict
-		err := r.Run(context.Background(), runner.ApplyOptions{IgnoreConflicts: true})
+		err := r.Run(t.Context(), runner.ApplyOptions{IgnoreConflicts: true})
 		require.NoError(t, err)
 		assert.Contains(t, stdout.String(), "Updated")
 	})
@@ -1174,7 +1174,7 @@ func TestApplyRunner_Run(t *testing.T) {
 			Stderr: &stderr,
 		}
 
-		err := r.Run(context.Background(), runner.ApplyOptions{})
+		err := r.Run(t.Context(), runner.ApplyOptions{})
 		require.NoError(t, err)
 		assert.Contains(t, stdout.String(), "Created")
 	})
@@ -1213,7 +1213,7 @@ func TestResetRunner_Run(t *testing.T) {
 			Stderr: &stderr,
 		}
 
-		err := r.Run(context.Background(), runner.ResetOptions{All: true})
+		err := r.Run(t.Context(), runner.ResetOptions{All: true})
 		require.NoError(t, err)
 		assert.Contains(t, stdout.String(), "Unstaged all")
 		assert.Contains(t, stdout.String(), "(2)")
@@ -1239,7 +1239,7 @@ func TestResetRunner_Run(t *testing.T) {
 			Stderr: &stderr,
 		}
 
-		err := r.Run(context.Background(), runner.ResetOptions{All: true})
+		err := r.Run(t.Context(), runner.ResetOptions{All: true})
 		require.NoError(t, err)
 		assert.Contains(t, stdout.String(), "No")
 	})
@@ -1265,7 +1265,7 @@ func TestResetRunner_Run(t *testing.T) {
 			Stderr: &stderr,
 		}
 
-		err := r.Run(context.Background(), runner.ResetOptions{Spec: "/app/config"})
+		err := r.Run(t.Context(), runner.ResetOptions{Spec: "/app/config"})
 		require.NoError(t, err)
 		assert.Contains(t, stdout.String(), "Unstaged")
 
@@ -1289,7 +1289,7 @@ func TestResetRunner_Run(t *testing.T) {
 			Stderr: &stderr,
 		}
 
-		err := r.Run(context.Background(), runner.ResetOptions{Spec: "/app/config"})
+		err := r.Run(t.Context(), runner.ResetOptions{Spec: "/app/config"})
 		require.NoError(t, err)
 		assert.Contains(t, stdout.String(), "not staged")
 	})
@@ -1317,7 +1317,7 @@ func TestResetRunner_Run(t *testing.T) {
 			Stderr: &stderr,
 		}
 
-		err := r.Run(context.Background(), runner.ResetOptions{Spec: "/app/config#1"})
+		err := r.Run(t.Context(), runner.ResetOptions{Spec: "/app/config#1"})
 		require.NoError(t, err)
 		assert.Contains(t, stdout.String(), "Restored")
 		assert.Contains(t, stdout.String(), "#1")
@@ -1344,7 +1344,7 @@ func TestResetRunner_Run(t *testing.T) {
 			Stderr: &stderr,
 		}
 
-		err := r.Run(context.Background(), runner.ResetOptions{Spec: "/app/config#1"})
+		err := r.Run(t.Context(), runner.ResetOptions{Spec: "/app/config#1"})
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "reset strategy required")
 	})
@@ -1371,7 +1371,7 @@ func TestResetRunner_Run(t *testing.T) {
 			Stderr: &stderr,
 		}
 
-		err := r.Run(context.Background(), runner.ResetOptions{Spec: "/app/config#999"})
+		err := r.Run(t.Context(), runner.ResetOptions{Spec: "/app/config#999"})
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "version not found")
 	})
@@ -1395,7 +1395,7 @@ func TestResetRunner_Run(t *testing.T) {
 			Stderr: &stderr,
 		}
 
-		err := r.Run(context.Background(), runner.ResetOptions{Spec: "invalid"})
+		err := r.Run(t.Context(), runner.ResetOptions{Spec: "invalid"})
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid spec")
 	})
@@ -1429,7 +1429,7 @@ func TestRunners_SecretService(t *testing.T) {
 			Stderr: &stderr,
 		}
 
-		err := r.Run(context.Background(), runner.StatusOptions{})
+		err := r.Run(t.Context(), runner.StatusOptions{})
 		require.NoError(t, err)
 		assert.Contains(t, stdout.String(), "my-secret")
 	})
@@ -1455,7 +1455,7 @@ func TestRunners_SecretService(t *testing.T) {
 			Stderr: &stderr,
 		}
 
-		err := r.Run(context.Background(), runner.ApplyOptions{})
+		err := r.Run(t.Context(), runner.ApplyOptions{})
 		require.NoError(t, err)
 		assert.Contains(t, stdout.String(), "Updated")
 	})
@@ -1485,7 +1485,7 @@ func TestRunners_DeleteOptions(t *testing.T) {
 			Stderr: &stderr,
 		}
 
-		err := r.Run(context.Background(), runner.StatusOptions{Name: "my-secret", Verbose: true})
+		err := r.Run(t.Context(), runner.StatusOptions{Name: "my-secret", Verbose: true})
 		require.NoError(t, err)
 		// With verbose, should show delete options
 		output := stdout.String()
@@ -1519,7 +1519,7 @@ func TestDiffRunner_OutputMetadata(t *testing.T) {
 			Stderr: &stderr,
 		}
 
-		err := r.Run(context.Background(), runner.DiffOptions{Name: "/app/config"})
+		err := r.Run(t.Context(), runner.DiffOptions{Name: "/app/config"})
 		require.NoError(t, err)
 		output := stdout.String()
 		assert.Contains(t, output, "Description:")
@@ -1551,7 +1551,7 @@ func TestDiffRunner_OutputMetadata(t *testing.T) {
 			Stderr: &stderr,
 		}
 
-		err := r.Run(context.Background(), runner.DiffOptions{Name: "/app/config"})
+		err := r.Run(t.Context(), runner.DiffOptions{Name: "/app/config"})
 		require.NoError(t, err)
 		output := stdout.String()
 		assert.Contains(t, output, "Tags:")
@@ -1586,7 +1586,7 @@ func TestDiffRunner_OutputMetadata(t *testing.T) {
 			Stderr: &stderr,
 		}
 
-		err := r.Run(context.Background(), runner.DiffOptions{Name: "/app/new-param"})
+		err := r.Run(t.Context(), runner.DiffOptions{Name: "/app/new-param"})
 		require.NoError(t, err)
 		output := stdout.String()
 		assert.Contains(t, output, "+brand-new")
@@ -1621,7 +1621,7 @@ func TestEditRunner_WithMetadata(t *testing.T) {
 			Stderr: &stderr,
 		}
 
-		err := r.Run(context.Background(), runner.EditOptions{
+		err := r.Run(t.Context(), runner.EditOptions{
 			Name:        "/app/config",
 			Value:       "new-value",
 			Description: "Updated description",
@@ -1654,7 +1654,7 @@ func TestEditRunner_WithMetadata(t *testing.T) {
 			Stderr: &stderr,
 		}
 
-		err := r.Run(context.Background(), runner.EditOptions{
+		err := r.Run(t.Context(), runner.EditOptions{
 			Name:  "/app/config",
 			Value: "new-value",
 		})
@@ -1691,7 +1691,7 @@ func TestEditRunner_WithMetadata(t *testing.T) {
 			},
 		}
 
-		err := r.Run(context.Background(), runner.EditOptions{Name: "/app/config"})
+		err := r.Run(t.Context(), runner.EditOptions{Name: "/app/config"})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "staged for deletion")
 
@@ -1725,7 +1725,7 @@ func TestApplyRunner_WithTags(t *testing.T) {
 			Stderr: &stderr,
 		}
 
-		err := r.Run(context.Background(), runner.ApplyOptions{})
+		err := r.Run(t.Context(), runner.ApplyOptions{})
 		require.NoError(t, err)
 		output := stdout.String()
 		assert.Contains(t, output, "Tagged")
@@ -1755,7 +1755,7 @@ func TestApplyRunner_WithTags(t *testing.T) {
 			Stderr: &stderr,
 		}
 
-		err := r.Run(context.Background(), runner.ApplyOptions{})
+		err := r.Run(t.Context(), runner.ApplyOptions{})
 		require.NoError(t, err)
 		output := stdout.String()
 		assert.Contains(t, output, "Tagged")
@@ -1790,7 +1790,7 @@ func TestApplyRunner_WithTags(t *testing.T) {
 			Stderr: &stderr,
 		}
 
-		err := r.Run(context.Background(), runner.ApplyOptions{})
+		err := r.Run(t.Context(), runner.ApplyOptions{})
 		require.NoError(t, err)
 		output := stdout.String()
 		assert.Contains(t, output, "Updated")
@@ -1827,7 +1827,7 @@ func TestStatusRunner_WithTagEntries(t *testing.T) {
 			Stderr: &stderr,
 		}
 
-		err := r.Run(context.Background(), runner.StatusOptions{Name: "/app/config"})
+		err := r.Run(t.Context(), runner.StatusOptions{Name: "/app/config"})
 		require.NoError(t, err)
 		output := stdout.String()
 		assert.Contains(t, output, "/app/config")
@@ -1857,7 +1857,7 @@ func TestStatusRunner_WithTagEntries(t *testing.T) {
 			Stderr: &stderr,
 		}
 
-		err := r.Run(context.Background(), runner.StatusOptions{Name: "/app/config"})
+		err := r.Run(t.Context(), runner.StatusOptions{Name: "/app/config"})
 		require.NoError(t, err)
 		output := stdout.String()
 		assert.Contains(t, output, "+1 tag(s)")
@@ -1886,7 +1886,7 @@ func TestStatusRunner_WithTagEntries(t *testing.T) {
 			Stderr: &stderr,
 		}
 
-		err := r.Run(context.Background(), runner.StatusOptions{Name: "/app/config", Verbose: true})
+		err := r.Run(t.Context(), runner.StatusOptions{Name: "/app/config", Verbose: true})
 		require.NoError(t, err)
 		output := stdout.String()
 		assert.Contains(t, output, "+ env=prod")
@@ -1917,7 +1917,7 @@ func TestStatusRunner_WithTagEntries(t *testing.T) {
 			Stderr: &stderr,
 		}
 
-		err := r.Run(context.Background(), runner.StatusOptions{})
+		err := r.Run(t.Context(), runner.StatusOptions{})
 		require.NoError(t, err)
 		output := stdout.String()
 		assert.Contains(t, output, "Staged")
@@ -1951,7 +1951,7 @@ func TestStatusRunner_WithTagEntries(t *testing.T) {
 			Stderr: &stderr,
 		}
 
-		err := r.Run(context.Background(), runner.StatusOptions{})
+		err := r.Run(t.Context(), runner.StatusOptions{})
 		require.NoError(t, err)
 		output := stdout.String()
 		assert.Contains(t, output, "(2)") // 1 entry + 1 tag
@@ -1981,7 +1981,7 @@ func TestStatusRunner_WithTagEntries(t *testing.T) {
 			Stderr: &stderr,
 		}
 
-		err := r.Run(context.Background(), runner.StatusOptions{Verbose: true})
+		err := r.Run(t.Context(), runner.StatusOptions{Verbose: true})
 		require.NoError(t, err)
 		output := stdout.String()
 		assert.Contains(t, output, "+ env=prod")
@@ -2008,7 +2008,7 @@ func TestDeleteRunner_Run(t *testing.T) {
 			Stderr: &stderr,
 		}
 
-		err := r.Run(context.Background(), runner.DeleteOptions{Name: "/app/config"})
+		err := r.Run(t.Context(), runner.DeleteOptions{Name: "/app/config"})
 		require.NoError(t, err)
 		assert.Contains(t, stdout.String(), "Staged for deletion: /app/config")
 
@@ -2034,7 +2034,7 @@ func TestDeleteRunner_Run(t *testing.T) {
 			Stderr: &stderr,
 		}
 
-		err := r.Run(context.Background(), runner.DeleteOptions{
+		err := r.Run(t.Context(), runner.DeleteOptions{
 			Name:           "my-secret",
 			RecoveryWindow: 14,
 		})
@@ -2065,7 +2065,7 @@ func TestDeleteRunner_Run(t *testing.T) {
 			Stderr: &stderr,
 		}
 
-		err := r.Run(context.Background(), runner.DeleteOptions{
+		err := r.Run(t.Context(), runner.DeleteOptions{
 			Name:  "my-secret",
 			Force: true,
 		})
@@ -2095,7 +2095,7 @@ func TestDeleteRunner_Run(t *testing.T) {
 			Stderr: &stderr,
 		}
 
-		err := r.Run(context.Background(), runner.DeleteOptions{Name: "/app/config"})
+		err := r.Run(t.Context(), runner.DeleteOptions{Name: "/app/config"})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "not found")
 	})
@@ -2116,7 +2116,7 @@ func TestDeleteRunner_Run(t *testing.T) {
 			Stderr: &stderr,
 		}
 
-		err := r.Run(context.Background(), runner.DeleteOptions{
+		err := r.Run(t.Context(), runner.DeleteOptions{
 			Name:           "my-secret",
 			RecoveryWindow: 5, // Invalid: must be 7-30
 		})
@@ -2147,7 +2147,7 @@ func TestDeleteRunner_Run(t *testing.T) {
 			Stderr: &stderr,
 		}
 
-		err := r.Run(context.Background(), runner.DeleteOptions{Name: "/app/new-config"})
+		err := r.Run(t.Context(), runner.DeleteOptions{Name: "/app/new-config"})
 		require.NoError(t, err)
 		assert.Contains(t, stdout.String(), "Unstaged creation: /app/new-config")
 
@@ -2181,7 +2181,7 @@ func TestEditRunner_Skipped_Unstaged(t *testing.T) {
 		}
 
 		// Edit with value that matches AWS - should be skipped
-		err := r.Run(context.Background(), runner.EditOptions{
+		err := r.Run(t.Context(), runner.EditOptions{
 			Name:  "/app/config",
 			Value: "aws-value", // Same as current AWS value
 		})
@@ -2217,7 +2217,7 @@ func TestEditRunner_Skipped_Unstaged(t *testing.T) {
 		}
 
 		// Edit back to AWS value - should auto-unstage
-		err := r.Run(context.Background(), runner.EditOptions{
+		err := r.Run(t.Context(), runner.EditOptions{
 			Name:  "/app/config",
 			Value: "aws-value", // Reverted to AWS value
 		})
@@ -2262,7 +2262,7 @@ func TestResetRunner_Skipped(t *testing.T) {
 			Stderr: &stderr,
 		}
 
-		err := r.Run(context.Background(), runner.ResetOptions{Spec: "/app/config#3"})
+		err := r.Run(t.Context(), runner.ResetOptions{Spec: "/app/config#3"})
 		require.NoError(t, err)
 		assert.Contains(t, stdout.String(), "Skipped /app/config#3 (version #3 matches current value)")
 

@@ -25,7 +25,7 @@ func TestCommand_Validation(t *testing.T) {
 	t.Run("missing arguments", func(t *testing.T) {
 		t.Parallel()
 		app := appcli.MakeApp()
-		err := app.Run(context.Background(), []string{"suve", "param", "diff"})
+		err := app.Run(t.Context(), []string{"suve", "param", "diff"})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "usage:")
 	})
@@ -33,7 +33,7 @@ func TestCommand_Validation(t *testing.T) {
 	t.Run("invalid version spec", func(t *testing.T) {
 		t.Parallel()
 		app := appcli.MakeApp()
-		err := app.Run(context.Background(), []string{"suve", "param", "diff", "/app/param#"})
+		err := app.Run(t.Context(), []string{"suve", "param", "diff", "/app/param#"})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "must be followed by")
 	})
@@ -41,7 +41,7 @@ func TestCommand_Validation(t *testing.T) {
 	t.Run("too many arguments", func(t *testing.T) {
 		t.Parallel()
 		app := appcli.MakeApp()
-		err := app.Run(context.Background(), []string{"suve", "param", "diff", "/a", "#1", "#2", "#3"})
+		err := app.Run(t.Context(), []string{"suve", "param", "diff", "/a", "#1", "#2", "#3"})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "usage:")
 	})

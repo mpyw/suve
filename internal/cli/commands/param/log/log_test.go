@@ -24,7 +24,7 @@ func TestCommand_Validation(t *testing.T) {
 	t.Run("missing parameter name", func(t *testing.T) {
 		t.Parallel()
 		app := appcli.MakeApp()
-		err := app.Run(context.Background(), []string{"suve", "param", "log"})
+		err := app.Run(t.Context(), []string{"suve", "param", "log"})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "usage: suve param log")
 	})
@@ -32,7 +32,7 @@ func TestCommand_Validation(t *testing.T) {
 	t.Run("invalid since timestamp", func(t *testing.T) {
 		t.Parallel()
 		app := appcli.MakeApp()
-		err := app.Run(context.Background(), []string{"suve", "param", "log", "--since", "invalid", "/app/param"})
+		err := app.Run(t.Context(), []string{"suve", "param", "log", "--since", "invalid", "/app/param"})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid --since value")
 	})
@@ -40,7 +40,7 @@ func TestCommand_Validation(t *testing.T) {
 	t.Run("invalid until timestamp", func(t *testing.T) {
 		t.Parallel()
 		app := appcli.MakeApp()
-		err := app.Run(context.Background(), []string{"suve", "param", "log", "--until", "invalid", "/app/param"})
+		err := app.Run(t.Context(), []string{"suve", "param", "log", "--until", "invalid", "/app/param"})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid --until value")
 	})
@@ -50,7 +50,7 @@ func TestCommand_Validation(t *testing.T) {
 		app := appcli.MakeApp()
 		var buf bytes.Buffer
 		app.Writer = &buf
-		err := app.Run(context.Background(), []string{"suve", "param", "log", "--help"})
+		err := app.Run(t.Context(), []string{"suve", "param", "log", "--help"})
 		require.NoError(t, err)
 		assert.Contains(t, buf.String(), "Show parameter version history")
 	})
@@ -60,7 +60,7 @@ func TestCommand_Validation(t *testing.T) {
 		var errBuf bytes.Buffer
 		app := appcli.MakeApp()
 		app.ErrWriter = &errBuf
-		_ = app.Run(context.Background(), []string{"suve", "param", "log", "--parse-json", "/app/param"})
+		_ = app.Run(t.Context(), []string{"suve", "param", "log", "--parse-json", "/app/param"})
 		assert.Contains(t, errBuf.String(), "--parse-json has no effect")
 	})
 
@@ -69,7 +69,7 @@ func TestCommand_Validation(t *testing.T) {
 		var errBuf bytes.Buffer
 		app := appcli.MakeApp()
 		app.ErrWriter = &errBuf
-		_ = app.Run(context.Background(), []string{"suve", "param", "log", "--oneline", "--patch", "/app/param"})
+		_ = app.Run(t.Context(), []string{"suve", "param", "log", "--oneline", "--patch", "/app/param"})
 		assert.Contains(t, errBuf.String(), "--oneline has no effect")
 	})
 
@@ -78,7 +78,7 @@ func TestCommand_Validation(t *testing.T) {
 		var errBuf bytes.Buffer
 		app := appcli.MakeApp()
 		app.ErrWriter = &errBuf
-		_ = app.Run(context.Background(), []string{"suve", "param", "log", "--output=json", "--patch", "/app/param"})
+		_ = app.Run(t.Context(), []string{"suve", "param", "log", "--output=json", "--patch", "/app/param"})
 		assert.Contains(t, errBuf.String(), "-p/--patch has no effect")
 	})
 
@@ -87,7 +87,7 @@ func TestCommand_Validation(t *testing.T) {
 		var errBuf bytes.Buffer
 		app := appcli.MakeApp()
 		app.ErrWriter = &errBuf
-		_ = app.Run(context.Background(), []string{"suve", "param", "log", "--output=json", "--oneline", "/app/param"})
+		_ = app.Run(t.Context(), []string{"suve", "param", "log", "--output=json", "--oneline", "/app/param"})
 		assert.Contains(t, errBuf.String(), "--oneline has no effect")
 	})
 }

@@ -24,7 +24,7 @@ func TestCommand_Validation(t *testing.T) {
 	t.Run("missing secret name", func(t *testing.T) {
 		t.Parallel()
 		app := appcli.MakeApp()
-		err := app.Run(context.Background(), []string{"suve", "secret", "log"})
+		err := app.Run(t.Context(), []string{"suve", "secret", "log"})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "usage: suve secret log")
 	})
@@ -35,14 +35,14 @@ func TestCommand_Validation(t *testing.T) {
 		var errBuf bytes.Buffer
 		app := appcli.MakeApp()
 		app.ErrWriter = &errBuf
-		_ = app.Run(context.Background(), []string{"suve", "secret", "log", "--parse-json", "my-secret"})
+		_ = app.Run(t.Context(), []string{"suve", "secret", "log", "--parse-json", "my-secret"})
 		assert.Contains(t, errBuf.String(), "--parse-json has no effect")
 	})
 
 	t.Run("invalid since timestamp", func(t *testing.T) {
 		t.Parallel()
 		app := appcli.MakeApp()
-		err := app.Run(context.Background(), []string{"suve", "secret", "log", "--since", "invalid", "my-secret"})
+		err := app.Run(t.Context(), []string{"suve", "secret", "log", "--since", "invalid", "my-secret"})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid --since value")
 	})
@@ -50,7 +50,7 @@ func TestCommand_Validation(t *testing.T) {
 	t.Run("invalid until timestamp", func(t *testing.T) {
 		t.Parallel()
 		app := appcli.MakeApp()
-		err := app.Run(context.Background(), []string{"suve", "secret", "log", "--until", "not-a-date", "my-secret"})
+		err := app.Run(t.Context(), []string{"suve", "secret", "log", "--until", "not-a-date", "my-secret"})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid --until value")
 	})
@@ -60,7 +60,7 @@ func TestCommand_Validation(t *testing.T) {
 		var errBuf bytes.Buffer
 		app := appcli.MakeApp()
 		app.ErrWriter = &errBuf
-		_ = app.Run(context.Background(), []string{"suve", "secret", "log", "--oneline", "--patch", "my-secret"})
+		_ = app.Run(t.Context(), []string{"suve", "secret", "log", "--oneline", "--patch", "my-secret"})
 		assert.Contains(t, errBuf.String(), "--oneline has no effect")
 	})
 
@@ -69,7 +69,7 @@ func TestCommand_Validation(t *testing.T) {
 		var errBuf bytes.Buffer
 		app := appcli.MakeApp()
 		app.ErrWriter = &errBuf
-		_ = app.Run(context.Background(), []string{"suve", "secret", "log", "--output=json", "--patch", "my-secret"})
+		_ = app.Run(t.Context(), []string{"suve", "secret", "log", "--output=json", "--patch", "my-secret"})
 		assert.Contains(t, errBuf.String(), "-p/--patch has no effect")
 	})
 
@@ -78,7 +78,7 @@ func TestCommand_Validation(t *testing.T) {
 		var errBuf bytes.Buffer
 		app := appcli.MakeApp()
 		app.ErrWriter = &errBuf
-		_ = app.Run(context.Background(), []string{"suve", "secret", "log", "--output=json", "--oneline", "my-secret"})
+		_ = app.Run(t.Context(), []string{"suve", "secret", "log", "--output=json", "--oneline", "my-secret"})
 		assert.Contains(t, errBuf.String(), "--oneline has no effect")
 	})
 }

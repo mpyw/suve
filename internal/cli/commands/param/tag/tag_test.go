@@ -22,7 +22,7 @@ func TestCommand_Validation(t *testing.T) {
 	t.Run("missing arguments", func(t *testing.T) {
 		t.Parallel()
 		app := appcli.MakeApp()
-		err := app.Run(context.Background(), []string{"suve", "param", "tag"})
+		err := app.Run(t.Context(), []string{"suve", "param", "tag"})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "usage:")
 	})
@@ -30,7 +30,7 @@ func TestCommand_Validation(t *testing.T) {
 	t.Run("missing tag argument", func(t *testing.T) {
 		t.Parallel()
 		app := appcli.MakeApp()
-		err := app.Run(context.Background(), []string{"suve", "param", "tag", "/app/param"})
+		err := app.Run(t.Context(), []string{"suve", "param", "tag", "/app/param"})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "usage:")
 	})
@@ -38,7 +38,7 @@ func TestCommand_Validation(t *testing.T) {
 	t.Run("invalid tag format", func(t *testing.T) {
 		t.Parallel()
 		app := appcli.MakeApp()
-		err := app.Run(context.Background(), []string{"suve", "param", "tag", "/app/param", "invalid"})
+		err := app.Run(t.Context(), []string{"suve", "param", "tag", "/app/param", "invalid"})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "expected key=value")
 	})
@@ -46,7 +46,7 @@ func TestCommand_Validation(t *testing.T) {
 	t.Run("empty key", func(t *testing.T) {
 		t.Parallel()
 		app := appcli.MakeApp()
-		err := app.Run(context.Background(), []string{"suve", "param", "tag", "/app/param", "=value"})
+		err := app.Run(t.Context(), []string{"suve", "param", "tag", "/app/param", "=value"})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "key cannot be empty")
 	})

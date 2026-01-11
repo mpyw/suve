@@ -85,7 +85,7 @@ func TestListUseCase_Execute_Empty(t *testing.T) {
 
 	uc := &param.ListUseCase{Client: client}
 
-	output, err := uc.Execute(context.Background(), param.ListInput{})
+	output, err := uc.Execute(t.Context(), param.ListInput{})
 	require.NoError(t, err)
 	assert.Empty(t, output.Entries)
 }
@@ -104,7 +104,7 @@ func TestListUseCase_Execute_WithPrefix(t *testing.T) {
 
 	uc := &param.ListUseCase{Client: client}
 
-	output, err := uc.Execute(context.Background(), param.ListInput{
+	output, err := uc.Execute(t.Context(), param.ListInput{
 		Prefix: "/app",
 	})
 	require.NoError(t, err)
@@ -125,7 +125,7 @@ func TestListUseCase_Execute_Recursive(t *testing.T) {
 
 	uc := &param.ListUseCase{Client: client}
 
-	output, err := uc.Execute(context.Background(), param.ListInput{
+	output, err := uc.Execute(t.Context(), param.ListInput{
 		Prefix:    "/app",
 		Recursive: true,
 	})
@@ -148,7 +148,7 @@ func TestListUseCase_Execute_WithFilter(t *testing.T) {
 
 	uc := &param.ListUseCase{Client: client}
 
-	output, err := uc.Execute(context.Background(), param.ListInput{
+	output, err := uc.Execute(t.Context(), param.ListInput{
 		Filter: "config|secret",
 	})
 	require.NoError(t, err)
@@ -164,7 +164,7 @@ func TestListUseCase_Execute_InvalidFilter(t *testing.T) {
 
 	uc := &param.ListUseCase{Client: client}
 
-	_, err := uc.Execute(context.Background(), param.ListInput{
+	_, err := uc.Execute(t.Context(), param.ListInput{
 		Filter: "[invalid",
 	})
 	assert.Error(t, err)
@@ -180,7 +180,7 @@ func TestListUseCase_Execute_DescribeError(t *testing.T) {
 
 	uc := &param.ListUseCase{Client: client}
 
-	_, err := uc.Execute(context.Background(), param.ListInput{})
+	_, err := uc.Execute(t.Context(), param.ListInput{})
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to describe parameters")
 }
@@ -203,7 +203,7 @@ func TestListUseCase_Execute_WithValue(t *testing.T) {
 
 	uc := &param.ListUseCase{Client: client}
 
-	output, err := uc.Execute(context.Background(), param.ListInput{
+	output, err := uc.Execute(t.Context(), param.ListInput{
 		WithValue: true,
 	})
 	require.NoError(t, err)
@@ -238,7 +238,7 @@ func TestListUseCase_Execute_WithValue_PartialError(t *testing.T) {
 
 	uc := &param.ListUseCase{Client: client}
 
-	output, err := uc.Execute(context.Background(), param.ListInput{
+	output, err := uc.Execute(t.Context(), param.ListInput{
 		WithValue: true,
 	})
 	require.NoError(t, err)
@@ -283,7 +283,7 @@ func TestListUseCase_Execute_WithPagination(t *testing.T) {
 
 	uc := &param.ListUseCase{Client: client}
 
-	output, err := uc.Execute(context.Background(), param.ListInput{
+	output, err := uc.Execute(t.Context(), param.ListInput{
 		MaxResults: 2,
 	})
 	require.NoError(t, err)
@@ -307,7 +307,7 @@ func TestListUseCase_Execute_WithPagination_ContinueToken(t *testing.T) {
 
 	uc := &param.ListUseCase{Client: client}
 
-	output, err := uc.Execute(context.Background(), param.ListInput{
+	output, err := uc.Execute(t.Context(), param.ListInput{
 		MaxResults: 5,
 		NextToken:  "token1",
 	})
@@ -339,7 +339,7 @@ func TestListUseCase_Execute_WithPagination_FilterApplied(t *testing.T) {
 
 	uc := &param.ListUseCase{Client: client}
 
-	output, err := uc.Execute(context.Background(), param.ListInput{
+	output, err := uc.Execute(t.Context(), param.ListInput{
 		MaxResults: 2,
 		Filter:     "config",
 	})
@@ -359,7 +359,7 @@ func TestListUseCase_Execute_WithPagination_Error(t *testing.T) {
 
 	uc := &param.ListUseCase{Client: client}
 
-	_, err := uc.Execute(context.Background(), param.ListInput{
+	_, err := uc.Execute(t.Context(), param.ListInput{
 		MaxResults: 10,
 	})
 	assert.Error(t, err)
@@ -386,7 +386,7 @@ func TestListUseCase_Execute_WithPagination_TrimResults(t *testing.T) {
 
 	uc := &param.ListUseCase{Client: client}
 
-	output, err := uc.Execute(context.Background(), param.ListInput{
+	output, err := uc.Execute(t.Context(), param.ListInput{
 		MaxResults: 2,
 	})
 	require.NoError(t, err)
@@ -410,7 +410,7 @@ func TestListUseCase_Execute_WithValue_GetParametersError(t *testing.T) {
 
 	uc := &param.ListUseCase{Client: client}
 
-	output, err := uc.Execute(context.Background(), param.ListInput{
+	output, err := uc.Execute(t.Context(), param.ListInput{
 		WithValue: true,
 	})
 	require.NoError(t, err)
@@ -446,7 +446,7 @@ func TestListUseCase_Execute_WithValue_LargeBatch(t *testing.T) {
 
 	uc := &param.ListUseCase{Client: client}
 
-	output, err := uc.Execute(context.Background(), param.ListInput{
+	output, err := uc.Execute(t.Context(), param.ListInput{
 		WithValue: true,
 	})
 	require.NoError(t, err)
@@ -471,7 +471,7 @@ func TestListUseCase_Execute_WithValue_Empty(t *testing.T) {
 
 	uc := &param.ListUseCase{Client: client}
 
-	output, err := uc.Execute(context.Background(), param.ListInput{
+	output, err := uc.Execute(t.Context(), param.ListInput{
 		WithValue: true,
 	})
 	require.NoError(t, err)

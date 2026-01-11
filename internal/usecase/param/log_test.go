@@ -42,7 +42,7 @@ func TestLogUseCase_Execute(t *testing.T) {
 
 	uc := &param.LogUseCase{Client: client}
 
-	output, err := uc.Execute(context.Background(), param.LogInput{
+	output, err := uc.Execute(t.Context(), param.LogInput{
 		Name: "/app/config",
 	})
 	require.NoError(t, err)
@@ -71,7 +71,7 @@ func TestLogUseCase_Execute_Empty(t *testing.T) {
 
 	uc := &param.LogUseCase{Client: client}
 
-	output, err := uc.Execute(context.Background(), param.LogInput{
+	output, err := uc.Execute(t.Context(), param.LogInput{
 		Name: "/app/config",
 	})
 	require.NoError(t, err)
@@ -88,7 +88,7 @@ func TestLogUseCase_Execute_Error(t *testing.T) {
 
 	uc := &param.LogUseCase{Client: client}
 
-	_, err := uc.Execute(context.Background(), param.LogInput{
+	_, err := uc.Execute(t.Context(), param.LogInput{
 		Name: "/app/config",
 	})
 	assert.Error(t, err)
@@ -111,7 +111,7 @@ func TestLogUseCase_Execute_Reverse(t *testing.T) {
 
 	uc := &param.LogUseCase{Client: client}
 
-	output, err := uc.Execute(context.Background(), param.LogInput{
+	output, err := uc.Execute(t.Context(), param.LogInput{
 		Name:    "/app/config",
 		Reverse: true,
 	})
@@ -140,7 +140,7 @@ func TestLogUseCase_Execute_SinceFilter(t *testing.T) {
 	uc := &param.LogUseCase{Client: client}
 
 	since := now.Add(-2 * time.Hour)
-	output, err := uc.Execute(context.Background(), param.LogInput{
+	output, err := uc.Execute(t.Context(), param.LogInput{
 		Name:  "/app/config",
 		Since: &since,
 	})
@@ -169,7 +169,7 @@ func TestLogUseCase_Execute_UntilFilter(t *testing.T) {
 	uc := &param.LogUseCase{Client: client}
 
 	until := now.Add(-30 * time.Minute)
-	output, err := uc.Execute(context.Background(), param.LogInput{
+	output, err := uc.Execute(t.Context(), param.LogInput{
 		Name:  "/app/config",
 		Until: &until,
 	})
@@ -199,7 +199,7 @@ func TestLogUseCase_Execute_DateRangeFilter(t *testing.T) {
 
 	since := now.Add(-3 * time.Hour)
 	until := now.Add(-1 * time.Hour)
-	output, err := uc.Execute(context.Background(), param.LogInput{
+	output, err := uc.Execute(t.Context(), param.LogInput{
 		Name:  "/app/config",
 		Since: &since,
 		Until: &until,
@@ -224,7 +224,7 @@ func TestLogUseCase_Execute_NoLastModifiedDate(t *testing.T) {
 
 	uc := &param.LogUseCase{Client: client}
 
-	output, err := uc.Execute(context.Background(), param.LogInput{
+	output, err := uc.Execute(t.Context(), param.LogInput{
 		Name: "/app/config",
 	})
 	require.NoError(t, err)
@@ -248,7 +248,7 @@ func TestLogUseCase_Execute_FilterWithNilLastModifiedDate(t *testing.T) {
 	uc := &param.LogUseCase{Client: client}
 
 	since := now.Add(-1 * time.Hour)
-	output, err := uc.Execute(context.Background(), param.LogInput{
+	output, err := uc.Execute(t.Context(), param.LogInput{
 		Name:  "/app/config",
 		Since: &since,
 	})

@@ -67,7 +67,7 @@ func TestShowUseCase_Execute(t *testing.T) {
 	spec, err := secretversion.Parse("my-secret")
 	require.NoError(t, err)
 
-	output, err := uc.Execute(context.Background(), secret.ShowInput{
+	output, err := uc.Execute(t.Context(), secret.ShowInput{
 		Spec: spec,
 	})
 	require.NoError(t, err)
@@ -95,7 +95,7 @@ func TestShowUseCase_Execute_WithVersionID(t *testing.T) {
 	spec, err := secretversion.Parse("my-secret#old-version-id")
 	require.NoError(t, err)
 
-	output, err := uc.Execute(context.Background(), secret.ShowInput{
+	output, err := uc.Execute(t.Context(), secret.ShowInput{
 		Spec: spec,
 	})
 	require.NoError(t, err)
@@ -121,7 +121,7 @@ func TestShowUseCase_Execute_WithLabel(t *testing.T) {
 	spec, err := secretversion.Parse("my-secret:AWSCURRENT")
 	require.NoError(t, err)
 
-	output, err := uc.Execute(context.Background(), secret.ShowInput{
+	output, err := uc.Execute(t.Context(), secret.ShowInput{
 		Spec: spec,
 	})
 	require.NoError(t, err)
@@ -140,7 +140,7 @@ func TestShowUseCase_Execute_Error(t *testing.T) {
 	spec, err := secretversion.Parse("my-secret")
 	require.NoError(t, err)
 
-	_, err = uc.Execute(context.Background(), secret.ShowInput{
+	_, err = uc.Execute(t.Context(), secret.ShowInput{
 		Spec: spec,
 	})
 	assert.Error(t, err)
@@ -162,7 +162,7 @@ func TestShowUseCase_Execute_NoCreatedDate(t *testing.T) {
 	spec, err := secretversion.Parse("my-secret")
 	require.NoError(t, err)
 
-	output, err := uc.Execute(context.Background(), secret.ShowInput{
+	output, err := uc.Execute(t.Context(), secret.ShowInput{
 		Spec: spec,
 	})
 	require.NoError(t, err)
@@ -193,7 +193,7 @@ func TestShowUseCase_Execute_WithShift(t *testing.T) {
 	spec, err := secretversion.Parse("my-secret~1") // 1 version back from latest
 	require.NoError(t, err)
 
-	output, err := uc.Execute(context.Background(), secret.ShowInput{
+	output, err := uc.Execute(t.Context(), secret.ShowInput{
 		Spec: spec,
 	})
 	require.NoError(t, err)
@@ -223,7 +223,7 @@ func TestShowUseCase_Execute_WithTags(t *testing.T) {
 	spec, err := secretversion.Parse("my-secret")
 	require.NoError(t, err)
 
-	output, err := uc.Execute(context.Background(), secret.ShowInput{
+	output, err := uc.Execute(t.Context(), secret.ShowInput{
 		Spec: spec,
 	})
 	require.NoError(t, err)

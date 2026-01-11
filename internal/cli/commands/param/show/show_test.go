@@ -25,7 +25,7 @@ func TestCommand_Validation(t *testing.T) {
 	t.Run("missing parameter name", func(t *testing.T) {
 		t.Parallel()
 		app := appcli.MakeApp()
-		err := app.Run(context.Background(), []string{"suve", "param", "show"})
+		err := app.Run(t.Context(), []string{"suve", "param", "show"})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "usage: suve param show")
 	})
@@ -33,7 +33,7 @@ func TestCommand_Validation(t *testing.T) {
 	t.Run("invalid version spec", func(t *testing.T) {
 		t.Parallel()
 		app := appcli.MakeApp()
-		err := app.Run(context.Background(), []string{"suve", "param", "show", "/app/param#"})
+		err := app.Run(t.Context(), []string{"suve", "param", "show", "/app/param#"})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "must be followed by")
 	})

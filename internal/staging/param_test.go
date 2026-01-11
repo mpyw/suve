@@ -108,7 +108,7 @@ func TestParamStrategy_Apply(t *testing.T) {
 		}
 
 		s := staging.NewParamStrategy(mock)
-		err := s.Apply(context.Background(), "/app/param", staging.Entry{
+		err := s.Apply(t.Context(), "/app/param", staging.Entry{
 			Operation: staging.OperationCreate,
 			Value:     lo.ToPtr("new-value"),
 		})
@@ -135,7 +135,7 @@ func TestParamStrategy_Apply(t *testing.T) {
 		}
 
 		s := staging.NewParamStrategy(mock)
-		err := s.Apply(context.Background(), "/app/param", staging.Entry{
+		err := s.Apply(t.Context(), "/app/param", staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("updated-value"),
 		})
@@ -152,7 +152,7 @@ func TestParamStrategy_Apply(t *testing.T) {
 		}
 
 		s := staging.NewParamStrategy(mock)
-		err := s.Apply(context.Background(), "/app/param", staging.Entry{
+		err := s.Apply(t.Context(), "/app/param", staging.Entry{
 			Operation: staging.OperationDelete,
 		})
 		require.NoError(t, err)
@@ -161,7 +161,7 @@ func TestParamStrategy_Apply(t *testing.T) {
 	t.Run("unknown operation", func(t *testing.T) {
 		t.Parallel()
 		s := staging.NewParamStrategy(&paramMockClient{})
-		err := s.Apply(context.Background(), "/app/param", staging.Entry{
+		err := s.Apply(t.Context(), "/app/param", staging.Entry{
 			Operation: staging.Operation("unknown"),
 		})
 		require.Error(t, err)
@@ -177,7 +177,7 @@ func TestParamStrategy_Apply(t *testing.T) {
 		}
 
 		s := staging.NewParamStrategy(mock)
-		err := s.Apply(context.Background(), "/app/param", staging.Entry{
+		err := s.Apply(t.Context(), "/app/param", staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("value"),
 		})
@@ -194,7 +194,7 @@ func TestParamStrategy_Apply(t *testing.T) {
 		}
 
 		s := staging.NewParamStrategy(mock)
-		err := s.Apply(context.Background(), "/app/param", staging.Entry{
+		err := s.Apply(t.Context(), "/app/param", staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("value"),
 		})
@@ -211,7 +211,7 @@ func TestParamStrategy_Apply(t *testing.T) {
 		}
 
 		s := staging.NewParamStrategy(mock)
-		err := s.Apply(context.Background(), "/app/param", staging.Entry{
+		err := s.Apply(t.Context(), "/app/param", staging.Entry{
 			Operation: staging.OperationCreate,
 			Value:     lo.ToPtr("value"),
 		})
@@ -236,7 +236,7 @@ func TestParamStrategy_Apply(t *testing.T) {
 		}
 
 		s := staging.NewParamStrategy(mock)
-		err := s.Apply(context.Background(), "/app/param", staging.Entry{
+		err := s.Apply(t.Context(), "/app/param", staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("value"),
 		})
@@ -253,7 +253,7 @@ func TestParamStrategy_Apply(t *testing.T) {
 		}
 
 		s := staging.NewParamStrategy(mock)
-		err := s.Apply(context.Background(), "/app/param", staging.Entry{
+		err := s.Apply(t.Context(), "/app/param", staging.Entry{
 			Operation: staging.OperationDelete,
 		})
 		require.Error(t, err)
@@ -279,7 +279,7 @@ func TestParamStrategy_FetchCurrent(t *testing.T) {
 		}
 
 		s := staging.NewParamStrategy(mock)
-		result, err := s.FetchCurrent(context.Background(), "/app/param")
+		result, err := s.FetchCurrent(t.Context(), "/app/param")
 		require.NoError(t, err)
 		assert.Equal(t, "current-value", result.Value)
 		assert.Equal(t, "#5", result.Identifier)
@@ -294,7 +294,7 @@ func TestParamStrategy_FetchCurrent(t *testing.T) {
 		}
 
 		s := staging.NewParamStrategy(mock)
-		_, err := s.FetchCurrent(context.Background(), "/app/param")
+		_, err := s.FetchCurrent(t.Context(), "/app/param")
 		require.Error(t, err)
 	})
 }
@@ -358,7 +358,7 @@ func TestParamStrategy_FetchCurrentValue(t *testing.T) {
 		}
 
 		s := staging.NewParamStrategy(mock)
-		result, err := s.FetchCurrentValue(context.Background(), "/app/param")
+		result, err := s.FetchCurrentValue(t.Context(), "/app/param")
 		require.NoError(t, err)
 		assert.Equal(t, "fetched-value", result.Value)
 		assert.Equal(t, now, result.LastModified)
@@ -373,7 +373,7 @@ func TestParamStrategy_FetchCurrentValue(t *testing.T) {
 		}
 
 		s := staging.NewParamStrategy(mock)
-		_, err := s.FetchCurrentValue(context.Background(), "/app/param")
+		_, err := s.FetchCurrentValue(t.Context(), "/app/param")
 		require.Error(t, err)
 	})
 }
@@ -433,7 +433,7 @@ func TestParamStrategy_FetchVersion(t *testing.T) {
 		}
 
 		s := staging.NewParamStrategy(mock)
-		value, label, err := s.FetchVersion(context.Background(), "/app/param#2")
+		value, label, err := s.FetchVersion(t.Context(), "/app/param#2")
 		require.NoError(t, err)
 		assert.Equal(t, "v2", value)
 		assert.Equal(t, "#2", label)
@@ -454,7 +454,7 @@ func TestParamStrategy_FetchVersion(t *testing.T) {
 		}
 
 		s := staging.NewParamStrategy(mock)
-		value, label, err := s.FetchVersion(context.Background(), "/app/param~1")
+		value, label, err := s.FetchVersion(t.Context(), "/app/param~1")
 		require.NoError(t, err)
 		assert.Equal(t, "v2", value)
 		assert.Equal(t, "#2", label)
@@ -463,7 +463,7 @@ func TestParamStrategy_FetchVersion(t *testing.T) {
 	t.Run("parse error - invalid version format", func(t *testing.T) {
 		t.Parallel()
 		s := staging.NewParamStrategy(&paramMockClient{})
-		_, _, err := s.FetchVersion(context.Background(), "/app/param#abc")
+		_, _, err := s.FetchVersion(t.Context(), "/app/param#abc")
 		require.Error(t, err)
 	})
 
@@ -476,7 +476,7 @@ func TestParamStrategy_FetchVersion(t *testing.T) {
 		}
 
 		s := staging.NewParamStrategy(mock)
-		_, _, err := s.FetchVersion(context.Background(), "/app/param#2")
+		_, _, err := s.FetchVersion(t.Context(), "/app/param#2")
 		require.Error(t, err)
 	})
 }
@@ -508,7 +508,7 @@ func TestParamStrategy_FetchLastModified(t *testing.T) {
 		}
 
 		s := staging.NewParamStrategy(mock)
-		result, err := s.FetchLastModified(context.Background(), "/app/param")
+		result, err := s.FetchLastModified(t.Context(), "/app/param")
 		require.NoError(t, err)
 		assert.Equal(t, now, result)
 	})
@@ -522,7 +522,7 @@ func TestParamStrategy_FetchLastModified(t *testing.T) {
 		}
 
 		s := staging.NewParamStrategy(mock)
-		result, err := s.FetchLastModified(context.Background(), "/app/param")
+		result, err := s.FetchLastModified(t.Context(), "/app/param")
 		require.NoError(t, err)
 		assert.True(t, result.IsZero())
 	})
@@ -536,7 +536,7 @@ func TestParamStrategy_FetchLastModified(t *testing.T) {
 		}
 
 		s := staging.NewParamStrategy(mock)
-		_, err := s.FetchLastModified(context.Background(), "/app/param")
+		_, err := s.FetchLastModified(t.Context(), "/app/param")
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to get parameter")
 	})
@@ -555,7 +555,7 @@ func TestParamStrategy_FetchLastModified(t *testing.T) {
 		}
 
 		s := staging.NewParamStrategy(mock)
-		result, err := s.FetchLastModified(context.Background(), "/app/param")
+		result, err := s.FetchLastModified(t.Context(), "/app/param")
 		require.NoError(t, err)
 		assert.True(t, result.IsZero())
 	})
@@ -569,7 +569,7 @@ func TestParamStrategy_FetchLastModified(t *testing.T) {
 		}
 
 		s := staging.NewParamStrategy(mock)
-		result, err := s.FetchLastModified(context.Background(), "/app/param")
+		result, err := s.FetchLastModified(t.Context(), "/app/param")
 		require.NoError(t, err)
 		assert.True(t, result.IsZero())
 	})
@@ -589,7 +589,7 @@ func TestParamStrategy_Apply_WithDescription(t *testing.T) {
 		}
 
 		s := staging.NewParamStrategy(mock)
-		err := s.Apply(context.Background(), "/app/param", staging.Entry{
+		err := s.Apply(t.Context(), "/app/param", staging.Entry{
 			Operation:   staging.OperationCreate,
 			Value:       lo.ToPtr("value"),
 			Description: lo.ToPtr("Test description"),
@@ -616,7 +616,7 @@ func TestParamStrategy_Apply_WithDescription(t *testing.T) {
 		}
 
 		s := staging.NewParamStrategy(mock)
-		err := s.Apply(context.Background(), "/app/param", staging.Entry{
+		err := s.Apply(t.Context(), "/app/param", staging.Entry{
 			Operation:   staging.OperationUpdate,
 			Value:       lo.ToPtr("value"),
 			Description: lo.ToPtr("Test description"),
@@ -635,7 +635,7 @@ func TestParamStrategy_Apply_DeleteAlreadyDeleted(t *testing.T) {
 	}
 
 	s := staging.NewParamStrategy(mock)
-	err := s.Apply(context.Background(), "/app/param", staging.Entry{
+	err := s.Apply(t.Context(), "/app/param", staging.Entry{
 		Operation: staging.OperationDelete,
 	})
 	require.NoError(t, err) // Should succeed even if already deleted
@@ -656,7 +656,7 @@ func TestParamStrategy_ApplyTags(t *testing.T) {
 		}
 
 		s := staging.NewParamStrategy(mock)
-		err := s.ApplyTags(context.Background(), "/app/param", staging.TagEntry{
+		err := s.ApplyTags(t.Context(), "/app/param", staging.TagEntry{
 			Add: map[string]string{"env": "prod"},
 		})
 		require.NoError(t, err)
@@ -675,7 +675,7 @@ func TestParamStrategy_ApplyTags(t *testing.T) {
 		}
 
 		s := staging.NewParamStrategy(mock)
-		err := s.ApplyTags(context.Background(), "/app/param", staging.TagEntry{
+		err := s.ApplyTags(t.Context(), "/app/param", staging.TagEntry{
 			Remove: maputil.NewSet("old-tag"),
 		})
 		require.NoError(t, err)
@@ -700,7 +700,7 @@ func TestParamStrategy_ApplyTags(t *testing.T) {
 		}
 
 		s := staging.NewParamStrategy(mock)
-		err := s.ApplyTags(context.Background(), "/app/param", staging.TagEntry{
+		err := s.ApplyTags(t.Context(), "/app/param", staging.TagEntry{
 			Add:    map[string]string{"env": "prod"},
 			Remove: maputil.NewSet("deprecated"),
 		})
@@ -718,7 +718,7 @@ func TestParamStrategy_ApplyTags(t *testing.T) {
 		}
 
 		s := staging.NewParamStrategy(mock)
-		err := s.ApplyTags(context.Background(), "/app/param", staging.TagEntry{
+		err := s.ApplyTags(t.Context(), "/app/param", staging.TagEntry{
 			Add: map[string]string{"env": "test"},
 		})
 		require.Error(t, err)
@@ -733,7 +733,7 @@ func TestParamStrategy_ApplyTags(t *testing.T) {
 		}
 
 		s := staging.NewParamStrategy(mock)
-		err := s.ApplyTags(context.Background(), "/app/param", staging.TagEntry{
+		err := s.ApplyTags(t.Context(), "/app/param", staging.TagEntry{
 			Remove: maputil.NewSet("old-tag"),
 		})
 		require.Error(t, err)
@@ -755,7 +755,7 @@ func TestParamStrategy_FetchCurrentValue_NoLastModified(t *testing.T) {
 	}
 
 	s := staging.NewParamStrategy(mock)
-	result, err := s.FetchCurrentValue(context.Background(), "/app/param")
+	result, err := s.FetchCurrentValue(t.Context(), "/app/param")
 	require.NoError(t, err)
 	assert.Equal(t, "value", result.Value)
 	assert.True(t, result.LastModified.IsZero())

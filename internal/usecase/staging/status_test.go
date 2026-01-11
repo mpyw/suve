@@ -1,7 +1,6 @@
 package staging_test
 
 import (
-	"context"
 	"errors"
 	"path/filepath"
 	"testing"
@@ -54,7 +53,7 @@ func TestStatusUseCase_Execute_Empty(t *testing.T) {
 		Store:    store,
 	}
 
-	output, err := uc.Execute(context.Background(), usecasestaging.StatusInput{})
+	output, err := uc.Execute(t.Context(), usecasestaging.StatusInput{})
 	require.NoError(t, err)
 	assert.Equal(t, staging.ServiceParam, output.Service)
 	assert.Equal(t, "SSM Parameter Store", output.ServiceName)
@@ -84,7 +83,7 @@ func TestStatusUseCase_Execute_WithEntries(t *testing.T) {
 		Store:    store,
 	}
 
-	output, err := uc.Execute(context.Background(), usecasestaging.StatusInput{})
+	output, err := uc.Execute(t.Context(), usecasestaging.StatusInput{})
 	require.NoError(t, err)
 	assert.Len(t, output.Entries, 2)
 }
@@ -107,13 +106,13 @@ func TestStatusUseCase_Execute_FilterByName(t *testing.T) {
 	}
 
 	// Existing entry
-	output, err := uc.Execute(context.Background(), usecasestaging.StatusInput{Name: "/app/config"})
+	output, err := uc.Execute(t.Context(), usecasestaging.StatusInput{Name: "/app/config"})
 	require.NoError(t, err)
 	assert.Len(t, output.Entries, 1)
 	assert.Equal(t, "/app/config", output.Entries[0].Name)
 
 	// Non-existent entry
-	_, err = uc.Execute(context.Background(), usecasestaging.StatusInput{Name: "/app/other"})
+	_, err = uc.Execute(t.Context(), usecasestaging.StatusInput{Name: "/app/other"})
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "not staged")
 }
@@ -138,7 +137,7 @@ func TestStatusUseCase_Execute_SecretWithDeleteOptions(t *testing.T) {
 		Store:    store,
 	}
 
-	output, err := uc.Execute(context.Background(), usecasestaging.StatusInput{})
+	output, err := uc.Execute(t.Context(), usecasestaging.StatusInput{})
 	require.NoError(t, err)
 	assert.Len(t, output.Entries, 1)
 	assert.True(t, output.Entries[0].ShowDeleteOptions)
@@ -157,7 +156,7 @@ func TestStatusUseCase_Execute_GetError(t *testing.T) {
 		Store:    store,
 	}
 
-	_, err := uc.Execute(context.Background(), usecasestaging.StatusInput{Name: "/app/config"})
+	_, err := uc.Execute(t.Context(), usecasestaging.StatusInput{Name: "/app/config"})
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "store error")
 }
@@ -173,7 +172,7 @@ func TestStatusUseCase_Execute_ListError(t *testing.T) {
 		Store:    store,
 	}
 
-	_, err := uc.Execute(context.Background(), usecasestaging.StatusInput{})
+	_, err := uc.Execute(t.Context(), usecasestaging.StatusInput{})
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "list error")
 }
@@ -199,7 +198,7 @@ func TestStatusUseCase_Execute_WithTagEntries(t *testing.T) {
 		Store:    store,
 	}
 
-	output, err := uc.Execute(context.Background(), usecasestaging.StatusInput{})
+	output, err := uc.Execute(t.Context(), usecasestaging.StatusInput{})
 	require.NoError(t, err)
 	assert.Len(t, output.TagEntries, 2)
 
@@ -240,7 +239,7 @@ func TestStatusUseCase_Execute_FilterByName_TagEntry(t *testing.T) {
 	}
 
 	// Existing tag entry
-	output, err := uc.Execute(context.Background(), usecasestaging.StatusInput{Name: "/app/config"})
+	output, err := uc.Execute(t.Context(), usecasestaging.StatusInput{Name: "/app/config"})
 	require.NoError(t, err)
 	assert.Empty(t, output.Entries)
 	assert.Len(t, output.TagEntries, 1)
@@ -270,7 +269,7 @@ func TestStatusUseCase_Execute_FilterByName_BothEntryAndTag(t *testing.T) {
 		Store:    store,
 	}
 
-	output, err := uc.Execute(context.Background(), usecasestaging.StatusInput{Name: "/app/config"})
+	output, err := uc.Execute(t.Context(), usecasestaging.StatusInput{Name: "/app/config"})
 	require.NoError(t, err)
 	assert.Len(t, output.Entries, 1)
 	assert.Len(t, output.TagEntries, 1)
@@ -289,7 +288,7 @@ func TestStatusUseCase_Execute_GetTagError(t *testing.T) {
 		Store:    store,
 	}
 
-	_, err := uc.Execute(context.Background(), usecasestaging.StatusInput{Name: "/app/config"})
+	_, err := uc.Execute(t.Context(), usecasestaging.StatusInput{Name: "/app/config"})
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "get tag error")
 }
@@ -305,7 +304,7 @@ func TestStatusUseCase_Execute_ListTagsError(t *testing.T) {
 		Store:    store,
 	}
 
-	_, err := uc.Execute(context.Background(), usecasestaging.StatusInput{})
+	_, err := uc.Execute(t.Context(), usecasestaging.StatusInput{})
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "list tags error")
 }

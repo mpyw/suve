@@ -48,7 +48,7 @@ func TestDiffUseCase_Execute_Empty(t *testing.T) {
 		Store:    store,
 	}
 
-	output, err := uc.Execute(context.Background(), usecasestaging.DiffInput{})
+	output, err := uc.Execute(t.Context(), usecasestaging.DiffInput{})
 	require.NoError(t, err)
 	assert.Equal(t, "parameter", output.ItemName)
 	assert.Empty(t, output.Entries)
@@ -75,7 +75,7 @@ func TestDiffUseCase_Execute_UpdateDiff(t *testing.T) {
 		Store:    store,
 	}
 
-	output, err := uc.Execute(context.Background(), usecasestaging.DiffInput{})
+	output, err := uc.Execute(t.Context(), usecasestaging.DiffInput{})
 	require.NoError(t, err)
 	require.Len(t, output.Entries, 1)
 
@@ -106,7 +106,7 @@ func TestDiffUseCase_Execute_CreateDiff(t *testing.T) {
 		Store:    store,
 	}
 
-	output, err := uc.Execute(context.Background(), usecasestaging.DiffInput{})
+	output, err := uc.Execute(t.Context(), usecasestaging.DiffInput{})
 	require.NoError(t, err)
 	require.Len(t, output.Entries, 1)
 
@@ -136,7 +136,7 @@ func TestDiffUseCase_Execute_DeleteDiff(t *testing.T) {
 		Store:    store,
 	}
 
-	output, err := uc.Execute(context.Background(), usecasestaging.DiffInput{})
+	output, err := uc.Execute(t.Context(), usecasestaging.DiffInput{})
 	require.NoError(t, err)
 	require.Len(t, output.Entries, 1)
 
@@ -168,7 +168,7 @@ func TestDiffUseCase_Execute_AutoUnstage_Identical(t *testing.T) {
 		Store:    store,
 	}
 
-	output, err := uc.Execute(context.Background(), usecasestaging.DiffInput{})
+	output, err := uc.Execute(t.Context(), usecasestaging.DiffInput{})
 	require.NoError(t, err)
 	require.Len(t, output.Entries, 1)
 
@@ -198,7 +198,7 @@ func TestDiffUseCase_Execute_AutoUnstage_AlreadyDeleted(t *testing.T) {
 		Store:    store,
 	}
 
-	output, err := uc.Execute(context.Background(), usecasestaging.DiffInput{})
+	output, err := uc.Execute(t.Context(), usecasestaging.DiffInput{})
 	require.NoError(t, err)
 	require.Len(t, output.Entries, 1)
 
@@ -227,7 +227,7 @@ func TestDiffUseCase_Execute_FilterByName(t *testing.T) {
 		Store:    store,
 	}
 
-	output, err := uc.Execute(context.Background(), usecasestaging.DiffInput{Name: "/app/one"})
+	output, err := uc.Execute(t.Context(), usecasestaging.DiffInput{Name: "/app/one"})
 	require.NoError(t, err)
 	require.Len(t, output.Entries, 1)
 	assert.Equal(t, "/app/one", output.Entries[0].Name)
@@ -242,7 +242,7 @@ func TestDiffUseCase_Execute_FilterByName_NotStaged(t *testing.T) {
 		Store:    store,
 	}
 
-	output, err := uc.Execute(context.Background(), usecasestaging.DiffInput{Name: "/app/not-staged"})
+	output, err := uc.Execute(t.Context(), usecasestaging.DiffInput{Name: "/app/not-staged"})
 	require.NoError(t, err)
 	require.Len(t, output.Entries, 1)
 	assert.Equal(t, usecasestaging.DiffEntryWarning, output.Entries[0].Type)
@@ -268,7 +268,7 @@ func TestDiffUseCase_Execute_AutoUnstage_UpdateNoLongerExists(t *testing.T) {
 		Store:    store,
 	}
 
-	output, err := uc.Execute(context.Background(), usecasestaging.DiffInput{})
+	output, err := uc.Execute(t.Context(), usecasestaging.DiffInput{})
 	require.NoError(t, err)
 	require.Len(t, output.Entries, 1)
 
@@ -292,7 +292,7 @@ func TestDiffUseCase_Execute_ListError(t *testing.T) {
 		Store:    store,
 	}
 
-	_, err := uc.Execute(context.Background(), usecasestaging.DiffInput{})
+	_, err := uc.Execute(t.Context(), usecasestaging.DiffInput{})
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "list error")
 }
@@ -308,7 +308,7 @@ func TestDiffUseCase_Execute_GetError(t *testing.T) {
 		Store:    store,
 	}
 
-	_, err := uc.Execute(context.Background(), usecasestaging.DiffInput{Name: "/app/config"})
+	_, err := uc.Execute(t.Context(), usecasestaging.DiffInput{Name: "/app/config"})
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "get error")
 }
@@ -324,7 +324,7 @@ func TestDiffUseCase_Execute_GetTagError(t *testing.T) {
 		Store:    store,
 	}
 
-	_, err := uc.Execute(context.Background(), usecasestaging.DiffInput{Name: "/app/config"})
+	_, err := uc.Execute(t.Context(), usecasestaging.DiffInput{Name: "/app/config"})
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "get tag error")
 }
@@ -340,7 +340,7 @@ func TestDiffUseCase_Execute_ListTagsError(t *testing.T) {
 		Store:    store,
 	}
 
-	_, err := uc.Execute(context.Background(), usecasestaging.DiffInput{})
+	_, err := uc.Execute(t.Context(), usecasestaging.DiffInput{})
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "list tags error")
 }
@@ -364,7 +364,7 @@ func TestDiffUseCase_Execute_UnknownOperation(t *testing.T) {
 		Store:    store,
 	}
 
-	output, err := uc.Execute(context.Background(), usecasestaging.DiffInput{})
+	output, err := uc.Execute(t.Context(), usecasestaging.DiffInput{})
 	require.NoError(t, err)
 	require.Len(t, output.Entries, 1)
 	assert.Equal(t, usecasestaging.DiffEntryWarning, output.Entries[0].Type)

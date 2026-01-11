@@ -51,7 +51,7 @@ func TestTagUseCase_Execute_AddTags(t *testing.T) {
 	}
 	uc := &secret.TagUseCase{Client: client}
 
-	err := uc.Execute(context.Background(), secret.TagInput{
+	err := uc.Execute(t.Context(), secret.TagInput{
 		Name: "my-secret",
 		Add:  map[string]string{"env": "prod", "team": "backend"},
 	})
@@ -68,7 +68,7 @@ func TestTagUseCase_Execute_RemoveTags(t *testing.T) {
 	}
 	uc := &secret.TagUseCase{Client: client}
 
-	err := uc.Execute(context.Background(), secret.TagInput{
+	err := uc.Execute(t.Context(), secret.TagInput{
 		Name:   "my-secret",
 		Remove: []string{"old-tag", "deprecated"},
 	})
@@ -85,7 +85,7 @@ func TestTagUseCase_Execute_AddAndRemoveTags(t *testing.T) {
 	}
 	uc := &secret.TagUseCase{Client: client}
 
-	err := uc.Execute(context.Background(), secret.TagInput{
+	err := uc.Execute(t.Context(), secret.TagInput{
 		Name:   "my-secret",
 		Add:    map[string]string{"env": "prod"},
 		Remove: []string{"old-tag"},
@@ -103,7 +103,7 @@ func TestTagUseCase_Execute_NoTags(t *testing.T) {
 	}
 	uc := &secret.TagUseCase{Client: client}
 
-	err := uc.Execute(context.Background(), secret.TagInput{
+	err := uc.Execute(t.Context(), secret.TagInput{
 		Name: "my-secret",
 	})
 	require.NoError(t, err)
@@ -117,7 +117,7 @@ func TestTagUseCase_Execute_DescribeError(t *testing.T) {
 	}
 	uc := &secret.TagUseCase{Client: client}
 
-	err := uc.Execute(context.Background(), secret.TagInput{
+	err := uc.Execute(t.Context(), secret.TagInput{
 		Name: "my-secret",
 		Add:  map[string]string{"env": "prod"},
 	})
@@ -136,7 +136,7 @@ func TestTagUseCase_Execute_AddTagsError(t *testing.T) {
 	}
 	uc := &secret.TagUseCase{Client: client}
 
-	err := uc.Execute(context.Background(), secret.TagInput{
+	err := uc.Execute(t.Context(), secret.TagInput{
 		Name: "my-secret",
 		Add:  map[string]string{"env": "prod"},
 	})
@@ -155,7 +155,7 @@ func TestTagUseCase_Execute_RemoveTagsError(t *testing.T) {
 	}
 	uc := &secret.TagUseCase{Client: client}
 
-	err := uc.Execute(context.Background(), secret.TagInput{
+	err := uc.Execute(t.Context(), secret.TagInput{
 		Name:   "my-secret",
 		Remove: []string{"old-tag"},
 	})

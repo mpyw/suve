@@ -66,7 +66,7 @@ func TestCommand_Validation(t *testing.T) {
 		app := appcli.MakeApp()
 		var buf bytes.Buffer
 		app.Writer = &buf
-		err := app.Run(context.Background(), []string{"suve", "stage", "diff", "--help"})
+		err := app.Run(t.Context(), []string{"suve", "stage", "diff", "--help"})
 		require.NoError(t, err)
 		assert.Contains(t, buf.String(), "Show diff of all staged changes")
 	})
@@ -74,7 +74,7 @@ func TestCommand_Validation(t *testing.T) {
 	t.Run("no arguments allowed", func(t *testing.T) {
 		t.Parallel()
 		app := appcli.MakeApp()
-		err := app.Run(context.Background(), []string{"suve", "stage", "diff", "extra-arg"})
+		err := app.Run(t.Context(), []string{"suve", "stage", "diff", "extra-arg"})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "usage:")
 	})
@@ -95,7 +95,7 @@ func TestRun_NothingStaged(t *testing.T) {
 
 	// When called with empty store, Run should return without error
 	// and produce no output (action handles the warning)
-	err := r.Run(context.Background(), stagediff.Options{})
+	err := r.Run(t.Context(), stagediff.Options{})
 	require.NoError(t, err)
 	assert.Empty(t, stdout.String())
 }
@@ -133,7 +133,7 @@ func TestRun_ParamOnly(t *testing.T) {
 		Stderr:      &stderr,
 	}
 
-	err = r.Run(context.Background(), stagediff.Options{})
+	err = r.Run(t.Context(), stagediff.Options{})
 	require.NoError(t, err)
 
 	output := stdout.String()
@@ -174,7 +174,7 @@ func TestRun_SecretOnly(t *testing.T) {
 		Stderr:       &stderr,
 	}
 
-	err = r.Run(context.Background(), stagediff.Options{})
+	err = r.Run(t.Context(), stagediff.Options{})
 	require.NoError(t, err)
 
 	output := stdout.String()
@@ -233,7 +233,7 @@ func TestRun_BothServices(t *testing.T) {
 		Stderr:       &stderr,
 	}
 
-	err = r.Run(context.Background(), stagediff.Options{})
+	err = r.Run(t.Context(), stagediff.Options{})
 	require.NoError(t, err)
 
 	output := stdout.String()
@@ -294,7 +294,7 @@ func TestRun_DeleteOperations(t *testing.T) {
 		Stderr:       &stderr,
 	}
 
-	err = r.Run(context.Background(), stagediff.Options{})
+	err = r.Run(t.Context(), stagediff.Options{})
 	require.NoError(t, err)
 
 	output := stdout.String()
@@ -336,7 +336,7 @@ func TestRun_IdenticalValues(t *testing.T) {
 		Stderr:      &stderr,
 	}
 
-	err = r.Run(context.Background(), stagediff.Options{})
+	err = r.Run(t.Context(), stagediff.Options{})
 	require.NoError(t, err)
 
 	assert.Empty(t, stdout.String())
@@ -380,7 +380,7 @@ func TestRun_ParseJSON(t *testing.T) {
 		Stderr:      &stderr,
 	}
 
-	err = r.Run(context.Background(), stagediff.Options{ParseJSON: true})
+	err = r.Run(t.Context(), stagediff.Options{ParseJSON: true})
 	require.NoError(t, err)
 
 	output := stdout.String()
@@ -415,7 +415,7 @@ func TestRun_ParamUpdateAutoUnstageWhenDeleted(t *testing.T) {
 		Stderr:      &stderr,
 	}
 
-	err = r.Run(context.Background(), stagediff.Options{})
+	err = r.Run(t.Context(), stagediff.Options{})
 	require.NoError(t, err)
 	assert.Contains(t, stderr.String(), "unstaged")
 	assert.Contains(t, stderr.String(), "no longer exists")
@@ -452,7 +452,7 @@ func TestRun_SecretUpdateAutoUnstageWhenDeleted(t *testing.T) {
 		Stderr:       &stderr,
 	}
 
-	err = r.Run(context.Background(), stagediff.Options{})
+	err = r.Run(t.Context(), stagediff.Options{})
 	require.NoError(t, err)
 	assert.Contains(t, stderr.String(), "unstaged")
 	assert.Contains(t, stderr.String(), "no longer exists")
@@ -493,7 +493,7 @@ func TestRun_SecretIdenticalValues(t *testing.T) {
 		Stderr:       &stderr,
 	}
 
-	err = r.Run(context.Background(), stagediff.Options{})
+	err = r.Run(t.Context(), stagediff.Options{})
 	require.NoError(t, err)
 
 	assert.Empty(t, stdout.String())
@@ -535,7 +535,7 @@ func TestRun_SecretParseJSON(t *testing.T) {
 		Stderr:       &stderr,
 	}
 
-	err = r.Run(context.Background(), stagediff.Options{ParseJSON: true})
+	err = r.Run(t.Context(), stagediff.Options{ParseJSON: true})
 	require.NoError(t, err)
 
 	output := stdout.String()
@@ -574,7 +574,7 @@ func TestRun_SecretParseJSONMixed(t *testing.T) {
 		Stderr:       &stderr,
 	}
 
-	err = r.Run(context.Background(), stagediff.Options{ParseJSON: true})
+	err = r.Run(t.Context(), stagediff.Options{ParseJSON: true})
 	require.NoError(t, err)
 
 	assert.Contains(t, stderr.String(), "--parse-json has no effect")
@@ -613,7 +613,7 @@ func TestRun_ParamCreateOperation(t *testing.T) {
 		Stderr:      &stderr,
 	}
 
-	err = r.Run(context.Background(), stagediff.Options{})
+	err = r.Run(t.Context(), stagediff.Options{})
 	require.NoError(t, err)
 
 	output := stdout.String()
@@ -658,7 +658,7 @@ func TestRun_SecretCreateOperation(t *testing.T) {
 		Stderr:       &stderr,
 	}
 
-	err = r.Run(context.Background(), stagediff.Options{})
+	err = r.Run(t.Context(), stagediff.Options{})
 	require.NoError(t, err)
 
 	output := stdout.String()
@@ -697,7 +697,7 @@ func TestRun_CreateWithParseJSON(t *testing.T) {
 		Stderr:      &stderr,
 	}
 
-	err = r.Run(context.Background(), stagediff.Options{ParseJSON: true})
+	err = r.Run(t.Context(), stagediff.Options{ParseJSON: true})
 	require.NoError(t, err)
 
 	output := stdout.String()
@@ -732,7 +732,7 @@ func TestRun_DeleteAutoUnstageWhenAlreadyDeleted(t *testing.T) {
 		Stderr:      &stderr,
 	}
 
-	err = r.Run(context.Background(), stagediff.Options{})
+	err = r.Run(t.Context(), stagediff.Options{})
 	require.NoError(t, err)
 	assert.Contains(t, stderr.String(), "unstaged")
 	assert.Contains(t, stderr.String(), "already deleted")
@@ -768,7 +768,7 @@ func TestRun_SecretDeleteAutoUnstageWhenAlreadyDeleted(t *testing.T) {
 		Stderr:       &stderr,
 	}
 
-	err = r.Run(context.Background(), stagediff.Options{})
+	err = r.Run(t.Context(), stagediff.Options{})
 	require.NoError(t, err)
 	assert.Contains(t, stderr.String(), "unstaged")
 	assert.Contains(t, stderr.String(), "already deleted")
@@ -812,7 +812,7 @@ func TestRun_MetadataWithDescription(t *testing.T) {
 		Stderr:      &stderr,
 	}
 
-	err = r.Run(context.Background(), stagediff.Options{})
+	err = r.Run(t.Context(), stagediff.Options{})
 	require.NoError(t, err)
 
 	output := stdout.String()
@@ -858,7 +858,7 @@ func TestRun_MetadataWithTags(t *testing.T) {
 		Stderr:      &stderr,
 	}
 
-	err = r.Run(context.Background(), stagediff.Options{})
+	err = r.Run(t.Context(), stagediff.Options{})
 	require.NoError(t, err)
 
 	output := stdout.String()
@@ -888,7 +888,7 @@ func TestRun_TagOnlyDiff(t *testing.T) {
 		Stderr: &stderr,
 	}
 
-	err = r.Run(context.Background(), stagediff.Options{})
+	err = r.Run(t.Context(), stagediff.Options{})
 	require.NoError(t, err)
 
 	output := stdout.String()
@@ -920,7 +920,7 @@ func TestRun_TagOnlyRemovalsDiff(t *testing.T) {
 		Stderr: &stderr,
 	}
 
-	err = r.Run(context.Background(), stagediff.Options{})
+	err = r.Run(t.Context(), stagediff.Options{})
 	require.NoError(t, err)
 
 	output := stdout.String()
@@ -952,7 +952,7 @@ func TestRun_SecretTagDiff(t *testing.T) {
 		Stderr: &stderr,
 	}
 
-	err = r.Run(context.Background(), stagediff.Options{})
+	err = r.Run(t.Context(), stagediff.Options{})
 	require.NoError(t, err)
 
 	output := stdout.String()
@@ -991,7 +991,7 @@ func TestRun_SecretCreateWithParseJSON(t *testing.T) {
 		Stderr:       &stderr,
 	}
 
-	err = r.Run(context.Background(), stagediff.Options{ParseJSON: true})
+	err = r.Run(t.Context(), stagediff.Options{ParseJSON: true})
 	require.NoError(t, err)
 
 	output := stdout.String()
@@ -1041,7 +1041,7 @@ func TestRun_BothEntriesAndTags(t *testing.T) {
 		Stderr:      &stderr,
 	}
 
-	err = r.Run(context.Background(), stagediff.Options{})
+	err = r.Run(t.Context(), stagediff.Options{})
 	require.NoError(t, err)
 
 	output := stdout.String()

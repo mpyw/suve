@@ -25,27 +25,27 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/urfave/cli/v3"
 
-	secretcreate "github.com/mpyw/suve/internal/cli/commands/secret/create"
-	secretdelete "github.com/mpyw/suve/internal/cli/commands/secret/delete"
-	secretdiff "github.com/mpyw/suve/internal/cli/commands/secret/diff"
-	secretlog "github.com/mpyw/suve/internal/cli/commands/secret/log"
-	secretlist "github.com/mpyw/suve/internal/cli/commands/secret/list"
-	secretrestore "github.com/mpyw/suve/internal/cli/commands/secret/restore"
-	secretshow "github.com/mpyw/suve/internal/cli/commands/secret/show"
-	secretupdate "github.com/mpyw/suve/internal/cli/commands/secret/update"
 	paramcreate "github.com/mpyw/suve/internal/cli/commands/param/create"
 	paramdelete "github.com/mpyw/suve/internal/cli/commands/param/delete"
 	paramdiff "github.com/mpyw/suve/internal/cli/commands/param/diff"
-	paramlog "github.com/mpyw/suve/internal/cli/commands/param/log"
 	paramlist "github.com/mpyw/suve/internal/cli/commands/param/list"
+	paramlog "github.com/mpyw/suve/internal/cli/commands/param/log"
 	paramshow "github.com/mpyw/suve/internal/cli/commands/param/show"
 	paramupdate "github.com/mpyw/suve/internal/cli/commands/param/update"
+	secretcreate "github.com/mpyw/suve/internal/cli/commands/secret/create"
+	secretdelete "github.com/mpyw/suve/internal/cli/commands/secret/delete"
+	secretdiff "github.com/mpyw/suve/internal/cli/commands/secret/diff"
+	secretlist "github.com/mpyw/suve/internal/cli/commands/secret/list"
+	secretlog "github.com/mpyw/suve/internal/cli/commands/secret/log"
+	secretrestore "github.com/mpyw/suve/internal/cli/commands/secret/restore"
+	secretshow "github.com/mpyw/suve/internal/cli/commands/secret/show"
+	secretupdate "github.com/mpyw/suve/internal/cli/commands/secret/update"
 	globalstage "github.com/mpyw/suve/internal/cli/commands/stage"
-	globaldiff "github.com/mpyw/suve/internal/cli/commands/stage/diff"
 	globalapply "github.com/mpyw/suve/internal/cli/commands/stage/apply"
+	globaldiff "github.com/mpyw/suve/internal/cli/commands/stage/diff"
+	paramstage "github.com/mpyw/suve/internal/cli/commands/stage/param"
 	globalreset "github.com/mpyw/suve/internal/cli/commands/stage/reset"
 	secretstage "github.com/mpyw/suve/internal/cli/commands/stage/secret"
-	paramstage "github.com/mpyw/suve/internal/cli/commands/stage/param"
 	globalstatus "github.com/mpyw/suve/internal/cli/commands/stage/status"
 	"github.com/mpyw/suve/internal/staging"
 )
@@ -382,7 +382,7 @@ func TestParam_StagingWorkflow(t *testing.T) {
 		store := staging.NewStoreWithPath(stagingFilePath(tmpHome))
 		err := store.StageEntry(staging.ServiceParam, paramName, staging.Entry{
 			Operation: staging.OperationUpdate,
-			Value: lo.ToPtr("staged-value"),
+			Value:     lo.ToPtr("staged-value"),
 			StagedAt:  time.Now(),
 		})
 		require.NoError(t, err)
@@ -483,7 +483,7 @@ func TestParam_StagingAdd(t *testing.T) {
 		store := staging.NewStoreWithPath(stagingFilePath(tmpHome))
 		err := store.StageEntry(staging.ServiceParam, paramName, staging.Entry{
 			Operation: staging.OperationCreate,
-			Value: lo.ToPtr("new-param-value"),
+			Value:     lo.ToPtr("new-param-value"),
 			StagedAt:  time.Now(),
 		})
 		require.NoError(t, err)
@@ -594,12 +594,12 @@ func TestParam_StagingResetAll(t *testing.T) {
 	store := staging.NewStoreWithPath(stagingFilePath(tmpHome))
 	_ = store.StageEntry(staging.ServiceParam, param1, staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value: lo.ToPtr("staged1"),
+		Value:     lo.ToPtr("staged1"),
 		StagedAt:  time.Now(),
 	})
 	_ = store.StageEntry(staging.ServiceParam, param2, staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value: lo.ToPtr("staged2"),
+		Value:     lo.ToPtr("staged2"),
 		StagedAt:  time.Now(),
 	})
 
@@ -652,12 +652,12 @@ func TestParam_StagingApplySingle(t *testing.T) {
 	store := staging.NewStoreWithPath(stagingFilePath(tmpHome))
 	_ = store.StageEntry(staging.ServiceParam, param1, staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value: lo.ToPtr("staged1"),
+		Value:     lo.ToPtr("staged1"),
 		StagedAt:  time.Now(),
 	})
 	_ = store.StageEntry(staging.ServiceParam, param2, staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value: lo.ToPtr("staged2"),
+		Value:     lo.ToPtr("staged2"),
 		StagedAt:  time.Now(),
 	})
 
@@ -907,7 +907,7 @@ func TestSecret_StagingWorkflow(t *testing.T) {
 		store := staging.NewStoreWithPath(stagingFilePath(tmpHome))
 		err := store.StageEntry(staging.ServiceSecret, secretName, staging.Entry{
 			Operation: staging.OperationUpdate,
-			Value: lo.ToPtr("staged-secret"),
+			Value:     lo.ToPtr("staged-secret"),
 			StagedAt:  time.Now(),
 		})
 		require.NoError(t, err)
@@ -1029,12 +1029,12 @@ func TestGlobal_StageWorkflow(t *testing.T) {
 	store := staging.NewStoreWithPath(stagingFilePath(tmpHome))
 	_ = store.StageEntry(staging.ServiceParam, paramName, staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value: lo.ToPtr("staged-param"),
+		Value:     lo.ToPtr("staged-param"),
 		StagedAt:  time.Now(),
 	})
 	_ = store.StageEntry(staging.ServiceSecret, secretName, staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value: lo.ToPtr("staged-secret"),
+		Value:     lo.ToPtr("staged-secret"),
 		StagedAt:  time.Now(),
 	})
 
@@ -1465,8 +1465,8 @@ func TestParam_StagingAddWithOptions(t *testing.T) {
 	t.Run("service-status-shows-tags", func(t *testing.T) {
 		stdout, _, err := runSubCommand(t, paramstage.Command(), "status")
 		require.NoError(t, err)
-		assert.Contains(t, stdout, "T")           // T = Tag change marker
-		assert.Contains(t, stdout, "+2 tag(s)")   // Two tags being added
+		assert.Contains(t, stdout, "T")         // T = Tag change marker
+		assert.Contains(t, stdout, "+2 tag(s)") // Two tags being added
 		t.Logf("service status output: %s", stdout)
 	})
 
@@ -1474,8 +1474,8 @@ func TestParam_StagingAddWithOptions(t *testing.T) {
 	t.Run("global-status-shows-tags", func(t *testing.T) {
 		stdout, _, err := runCommand(t, globalstatus.Command())
 		require.NoError(t, err)
-		assert.Contains(t, stdout, "T")           // T = Tag change marker
-		assert.Contains(t, stdout, "+2 tag(s)")   // Two tags being added
+		assert.Contains(t, stdout, "T")         // T = Tag change marker
+		assert.Contains(t, stdout, "+2 tag(s)") // Two tags being added
 		t.Logf("global status output: %s", stdout)
 	})
 
@@ -1653,7 +1653,7 @@ func TestParam_GlobalDiffWithJSON(t *testing.T) {
 	store := staging.NewStoreWithPath(stagingFilePath(tmpHome))
 	err = store.StageEntry(staging.ServiceParam, paramName, staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value: lo.ToPtr(`{"a":1,"b":2}`),
+		Value:     lo.ToPtr(`{"a":1,"b":2}`),
 		StagedAt:  time.Now(),
 	})
 	require.NoError(t, err)
@@ -1705,8 +1705,8 @@ func TestGlobal_StagingWithTags(t *testing.T) {
 	t.Run("global-status-shows-tags", func(t *testing.T) {
 		stdout, _, err := runCommand(t, globalstatus.Command())
 		require.NoError(t, err)
-		assert.Contains(t, stdout, "T")           // T = Tag change marker
-		assert.Contains(t, stdout, "+2 tag(s)")   // Two tags being added
+		assert.Contains(t, stdout, "T")         // T = Tag change marker
+		assert.Contains(t, stdout, "+2 tag(s)") // Two tags being added
 		t.Logf("global status with tags output: %s", stdout)
 	})
 

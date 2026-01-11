@@ -38,7 +38,7 @@ func TestCreateUseCase_Execute(t *testing.T) {
 
 	uc := &secret.CreateUseCase{Client: client}
 
-	output, err := uc.Execute(context.Background(), secret.CreateInput{
+	output, err := uc.Execute(t.Context(), secret.CreateInput{
 		Name:  "my-secret",
 		Value: "secret-value",
 	})
@@ -61,7 +61,7 @@ func TestCreateUseCase_Execute_WithDescription(t *testing.T) {
 
 	uc := &secret.CreateUseCase{Client: client}
 
-	output, err := uc.Execute(context.Background(), secret.CreateInput{
+	output, err := uc.Execute(t.Context(), secret.CreateInput{
 		Name:        "my-secret",
 		Value:       "secret-value",
 		Description: "my description",
@@ -79,7 +79,7 @@ func TestCreateUseCase_Execute_Error(t *testing.T) {
 
 	uc := &secret.CreateUseCase{Client: client}
 
-	_, err := uc.Execute(context.Background(), secret.CreateInput{
+	_, err := uc.Execute(t.Context(), secret.CreateInput{
 		Name:  "my-secret",
 		Value: "secret-value",
 	})

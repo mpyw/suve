@@ -25,7 +25,7 @@ func TestCommand_Validation(t *testing.T) {
 	t.Run("missing secret name", func(t *testing.T) {
 		t.Parallel()
 		app := appcli.MakeApp()
-		err := app.Run(context.Background(), []string{"suve", "secret", "show"})
+		err := app.Run(t.Context(), []string{"suve", "secret", "show"})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "usage: suve secret show")
 	})
@@ -33,7 +33,7 @@ func TestCommand_Validation(t *testing.T) {
 	t.Run("invalid version spec", func(t *testing.T) {
 		t.Parallel()
 		app := appcli.MakeApp()
-		err := app.Run(context.Background(), []string{"suve", "secret", "show", "my-secret#"})
+		err := app.Run(t.Context(), []string{"suve", "secret", "show", "my-secret#"})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "must be followed by")
 	})

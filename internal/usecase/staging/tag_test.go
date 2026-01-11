@@ -52,7 +52,7 @@ func TestTagUseCase_Tag_NewTagEntry(t *testing.T) {
 		Store:    store,
 	}
 
-	output, err := uc.Tag(context.Background(), usecasestaging.TagInput{
+	output, err := uc.Tag(t.Context(), usecasestaging.TagInput{
 		Name: "/app/config",
 		Tags: map[string]string{"env": "prod", "team": "backend"},
 	})
@@ -85,7 +85,7 @@ func TestTagUseCase_Tag_MergeWithExisting(t *testing.T) {
 		Store:    store,
 	}
 
-	_, err := uc.Tag(context.Background(), usecasestaging.TagInput{
+	_, err := uc.Tag(t.Context(), usecasestaging.TagInput{
 		Name: "/app/config",
 		Tags: map[string]string{"new": "tag"},
 	})
@@ -116,7 +116,7 @@ func TestTagUseCase_Tag_AddTagRemovesFromUntagList(t *testing.T) {
 	}
 
 	// Add a tag that was previously in remove list
-	_, err := uc.Tag(context.Background(), usecasestaging.TagInput{
+	_, err := uc.Tag(t.Context(), usecasestaging.TagInput{
 		Name: "/app/config",
 		Tags: map[string]string{"env": "prod"},
 	})
@@ -141,7 +141,7 @@ func TestTagUseCase_Tag_ParseError(t *testing.T) {
 		Store:    store,
 	}
 
-	_, err := uc.Tag(context.Background(), usecasestaging.TagInput{
+	_, err := uc.Tag(t.Context(), usecasestaging.TagInput{
 		Name: "invalid",
 		Tags: map[string]string{"env": "prod"},
 	})
@@ -161,7 +161,7 @@ func TestTagUseCase_Tag_FetchError(t *testing.T) {
 		Store:    store,
 	}
 
-	_, err := uc.Tag(context.Background(), usecasestaging.TagInput{
+	_, err := uc.Tag(t.Context(), usecasestaging.TagInput{
 		Name: "/app/config",
 		Tags: map[string]string{"env": "prod"},
 	})
@@ -180,7 +180,7 @@ func TestTagUseCase_Tag_StageError(t *testing.T) {
 		Store:    store,
 	}
 
-	_, err := uc.Tag(context.Background(), usecasestaging.TagInput{
+	_, err := uc.Tag(t.Context(), usecasestaging.TagInput{
 		Name: "/app/config",
 		Tags: map[string]string{"env": "prod"},
 	})
@@ -199,7 +199,7 @@ func TestTagUseCase_Tag_GetError(t *testing.T) {
 		Store:    store,
 	}
 
-	_, err := uc.Tag(context.Background(), usecasestaging.TagInput{
+	_, err := uc.Tag(t.Context(), usecasestaging.TagInput{
 		Name: "/app/config",
 		Tags: map[string]string{"env": "prod"},
 	})
@@ -222,7 +222,7 @@ func TestTagUseCase_Tag_ZeroLastModified(t *testing.T) {
 		Store:    store,
 	}
 
-	_, err := uc.Tag(context.Background(), usecasestaging.TagInput{
+	_, err := uc.Tag(t.Context(), usecasestaging.TagInput{
 		Name: "/app/config",
 		Tags: map[string]string{"env": "prod"},
 	})
@@ -255,7 +255,7 @@ func TestTagUseCase_Tag_StagedForCreate_ResourceNotFound(t *testing.T) {
 	}
 
 	// Tag the staged CREATE entry - should succeed despite resource not existing on AWS
-	_, err := uc.Tag(context.Background(), usecasestaging.TagInput{
+	_, err := uc.Tag(t.Context(), usecasestaging.TagInput{
 		Name: "/app/new-param",
 		Tags: map[string]string{"env": "prod"},
 	})
@@ -278,7 +278,7 @@ func TestTagUseCase_Tag_EmptyTags(t *testing.T) {
 	}
 
 	// Execute with empty tags - should error
-	_, err := uc.Tag(context.Background(), usecasestaging.TagInput{
+	_, err := uc.Tag(t.Context(), usecasestaging.TagInput{
 		Name: "/app/config",
 		Tags: map[string]string{},
 	})
@@ -303,7 +303,7 @@ func TestTagUseCase_Tag_BlockedOnDelete(t *testing.T) {
 	}
 
 	// Attempting to tag a DELETE should fail
-	_, err := uc.Tag(context.Background(), usecasestaging.TagInput{
+	_, err := uc.Tag(t.Context(), usecasestaging.TagInput{
 		Name: "/app/config",
 		Tags: map[string]string{"env": "prod"},
 	})
@@ -322,7 +322,7 @@ func TestTagUseCase_Tag_GetEntryError(t *testing.T) {
 		Store:    store,
 	}
 
-	_, err := uc.Tag(context.Background(), usecasestaging.TagInput{
+	_, err := uc.Tag(t.Context(), usecasestaging.TagInput{
 		Name: "/app/config",
 		Tags: map[string]string{"env": "prod"},
 	})
@@ -343,7 +343,7 @@ func TestTagUseCase_Untag_Success(t *testing.T) {
 		Store:    store,
 	}
 
-	output, err := uc.Untag(context.Background(), usecasestaging.UntagInput{
+	output, err := uc.Untag(t.Context(), usecasestaging.UntagInput{
 		Name:    "/app/config",
 		TagKeys: maputil.NewSet("old-tag", "deprecated"),
 	})
@@ -374,7 +374,7 @@ func TestTagUseCase_Untag_RemoveTagDeletesFromAddList(t *testing.T) {
 	}
 
 	// Remove a tag that was previously in add list
-	_, err := uc.Untag(context.Background(), usecasestaging.UntagInput{
+	_, err := uc.Untag(t.Context(), usecasestaging.UntagInput{
 		Name:    "/app/config",
 		TagKeys: maputil.NewSet("env"),
 	})
@@ -404,7 +404,7 @@ func TestTagUseCase_Untag_DuplicateRemoveKeys(t *testing.T) {
 	}
 
 	// Try to remove the same key again
-	_, err := uc.Untag(context.Background(), usecasestaging.UntagInput{
+	_, err := uc.Untag(t.Context(), usecasestaging.UntagInput{
 		Name:    "/app/config",
 		TagKeys: maputil.NewSet("env"),
 	})
@@ -429,7 +429,7 @@ func TestTagUseCase_Untag_ParseError(t *testing.T) {
 		Store:    store,
 	}
 
-	_, err := uc.Untag(context.Background(), usecasestaging.UntagInput{
+	_, err := uc.Untag(t.Context(), usecasestaging.UntagInput{
 		Name:    "invalid",
 		TagKeys: maputil.NewSet("env"),
 	})
@@ -448,7 +448,7 @@ func TestTagUseCase_Untag_GetEntryError(t *testing.T) {
 		Store:    store,
 	}
 
-	_, err := uc.Untag(context.Background(), usecasestaging.UntagInput{
+	_, err := uc.Untag(t.Context(), usecasestaging.UntagInput{
 		Name:    "/app/config",
 		TagKeys: maputil.NewSet("env"),
 	})
@@ -467,7 +467,7 @@ func TestTagUseCase_Untag_GetTagError(t *testing.T) {
 		Store:    store,
 	}
 
-	_, err := uc.Untag(context.Background(), usecasestaging.UntagInput{
+	_, err := uc.Untag(t.Context(), usecasestaging.UntagInput{
 		Name:    "/app/config",
 		TagKeys: maputil.NewSet("env"),
 	})
@@ -487,7 +487,7 @@ func TestTagUseCase_Untag_FetchError(t *testing.T) {
 		Store:    store,
 	}
 
-	_, err := uc.Untag(context.Background(), usecasestaging.UntagInput{
+	_, err := uc.Untag(t.Context(), usecasestaging.UntagInput{
 		Name:    "/app/config",
 		TagKeys: maputil.NewSet("env"),
 	})
@@ -512,7 +512,7 @@ func TestTagUseCase_Untag_BlockedOnDelete(t *testing.T) {
 	}
 
 	// Attempting to untag a DELETE should fail
-	_, err := uc.Untag(context.Background(), usecasestaging.UntagInput{
+	_, err := uc.Untag(t.Context(), usecasestaging.UntagInput{
 		Name:    "/app/config",
 		TagKeys: maputil.NewSet("env"),
 	})
@@ -548,7 +548,7 @@ func TestTagUseCase_Untag_StagedForCreate_WithExistingTags(t *testing.T) {
 	}
 
 	// Untag "env" from the staged CREATE entry - should succeed despite resource not existing
-	_, err := uc.Untag(context.Background(), usecasestaging.UntagInput{
+	_, err := uc.Untag(t.Context(), usecasestaging.UntagInput{
 		Name:    "/app/new-param",
 		TagKeys: maputil.NewSet("env"),
 	})
@@ -585,7 +585,7 @@ func TestTagUseCase_Untag_StagedForCreate_AutoSkip(t *testing.T) {
 	}
 
 	// Untag "env" - auto-skipped since tag doesn't exist
-	_, err := uc.Untag(context.Background(), usecasestaging.UntagInput{
+	_, err := uc.Untag(t.Context(), usecasestaging.UntagInput{
 		Name:    "/app/new-param",
 		TagKeys: maputil.NewSet("env"),
 	})
@@ -606,7 +606,7 @@ func TestTagUseCase_Untag_EmptyTagKeys(t *testing.T) {
 	}
 
 	// Execute with empty tag keys - should error
-	_, err := uc.Untag(context.Background(), usecasestaging.UntagInput{
+	_, err := uc.Untag(t.Context(), usecasestaging.UntagInput{
 		Name:    "/app/config",
 		TagKeys: maputil.NewSet[string](),
 	})
@@ -625,7 +625,7 @@ func TestTagUseCase_Untag_StageError(t *testing.T) {
 		Store:    store,
 	}
 
-	_, err := uc.Untag(context.Background(), usecasestaging.UntagInput{
+	_, err := uc.Untag(t.Context(), usecasestaging.UntagInput{
 		Name:    "/app/config",
 		TagKeys: maputil.NewSet("env"),
 	})
@@ -651,7 +651,7 @@ func TestTagUseCase_Untag_PreservesBaseModifiedAt(t *testing.T) {
 		Store:    store,
 	}
 
-	_, err := uc.Untag(context.Background(), usecasestaging.UntagInput{
+	_, err := uc.Untag(t.Context(), usecasestaging.UntagInput{
 		Name:    "/app/config",
 		TagKeys: maputil.NewSet("env"),
 	})
@@ -677,7 +677,7 @@ func TestTagUseCase_Untag_ZeroLastModified(t *testing.T) {
 		Store:    store,
 	}
 
-	_, err := uc.Untag(context.Background(), usecasestaging.UntagInput{
+	_, err := uc.Untag(t.Context(), usecasestaging.UntagInput{
 		Name:    "/app/config",
 		TagKeys: maputil.NewSet("env"),
 	})

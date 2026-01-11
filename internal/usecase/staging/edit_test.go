@@ -55,7 +55,7 @@ func TestEditUseCase_Execute(t *testing.T) {
 		Store:    store,
 	}
 
-	output, err := uc.Execute(context.Background(), usecasestaging.EditInput{
+	output, err := uc.Execute(t.Context(), usecasestaging.EditInput{
 		Name:        "/app/config",
 		Value:       "updated-value",
 		Description: "updated desc",
@@ -91,7 +91,7 @@ func TestEditUseCase_Execute_PreservesBaseModifiedAt(t *testing.T) {
 	}
 
 	// Re-edit should preserve original BaseModifiedAt
-	_, err := uc.Execute(context.Background(), usecasestaging.EditInput{
+	_, err := uc.Execute(t.Context(), usecasestaging.EditInput{
 		Name:  "/app/config",
 		Value: "newer-value",
 	})
@@ -117,7 +117,7 @@ func TestEditUseCase_Baseline_FromAWS(t *testing.T) {
 		Store:    store,
 	}
 
-	output, err := uc.Baseline(context.Background(), usecasestaging.BaselineInput{Name: "/app/config"})
+	output, err := uc.Baseline(t.Context(), usecasestaging.BaselineInput{Name: "/app/config"})
 	require.NoError(t, err)
 	assert.Equal(t, "aws-current-value", output.Value)
 }
@@ -137,7 +137,7 @@ func TestEditUseCase_Baseline_FromStaging(t *testing.T) {
 		Store:    store,
 	}
 
-	output, err := uc.Baseline(context.Background(), usecasestaging.BaselineInput{Name: "/app/config"})
+	output, err := uc.Baseline(t.Context(), usecasestaging.BaselineInput{Name: "/app/config"})
 	require.NoError(t, err)
 	assert.Equal(t, "staged-value", output.Value)
 }
@@ -157,7 +157,7 @@ func TestEditUseCase_Baseline_FromStagingCreate(t *testing.T) {
 		Store:    store,
 	}
 
-	output, err := uc.Baseline(context.Background(), usecasestaging.BaselineInput{Name: "/app/new"})
+	output, err := uc.Baseline(t.Context(), usecasestaging.BaselineInput{Name: "/app/new"})
 	require.NoError(t, err)
 	assert.Equal(t, "create-value", output.Value)
 }
@@ -174,7 +174,7 @@ func TestEditUseCase_Execute_FetchError(t *testing.T) {
 		Store:    store,
 	}
 
-	_, err := uc.Execute(context.Background(), usecasestaging.EditInput{
+	_, err := uc.Execute(t.Context(), usecasestaging.EditInput{
 		Name:  "/app/config",
 		Value: "new-value",
 	})
@@ -194,7 +194,7 @@ func TestEditUseCase_Baseline_FetchError(t *testing.T) {
 		Store:    store,
 	}
 
-	_, err := uc.Baseline(context.Background(), usecasestaging.BaselineInput{Name: "/app/config"})
+	_, err := uc.Baseline(t.Context(), usecasestaging.BaselineInput{Name: "/app/config"})
 	assert.Error(t, err)
 }
 
@@ -214,7 +214,7 @@ func TestEditUseCase_Execute_WithStagedCreate(t *testing.T) {
 		Store:    store,
 	}
 
-	_, err := uc.Execute(context.Background(), usecasestaging.EditInput{
+	_, err := uc.Execute(t.Context(), usecasestaging.EditInput{
 		Name:  "/app/new",
 		Value: "updated",
 	})
@@ -245,7 +245,7 @@ func TestEditUseCase_Execute_ZeroLastModified(t *testing.T) {
 		Store:    store,
 	}
 
-	_, err := uc.Execute(context.Background(), usecasestaging.EditInput{
+	_, err := uc.Execute(t.Context(), usecasestaging.EditInput{
 		Name:  "/app/config",
 		Value: "new-value",
 	})
@@ -267,7 +267,7 @@ func TestEditUseCase_Execute_StageError(t *testing.T) {
 		Store:    store,
 	}
 
-	_, err := uc.Execute(context.Background(), usecasestaging.EditInput{
+	_, err := uc.Execute(t.Context(), usecasestaging.EditInput{
 		Name:  "/app/config",
 		Value: "value",
 	})
@@ -286,7 +286,7 @@ func TestEditUseCase_Execute_GetErrorForBaseModified(t *testing.T) {
 		Store:    store,
 	}
 
-	_, err := uc.Execute(context.Background(), usecasestaging.EditInput{
+	_, err := uc.Execute(t.Context(), usecasestaging.EditInput{
 		Name:  "/app/config",
 		Value: "value",
 	})
@@ -304,7 +304,7 @@ func TestEditUseCase_Baseline_GetError(t *testing.T) {
 		Store:    store,
 	}
 
-	_, err := uc.Baseline(context.Background(), usecasestaging.BaselineInput{Name: "/app/config"})
+	_, err := uc.Baseline(t.Context(), usecasestaging.BaselineInput{Name: "/app/config"})
 	assert.Error(t, err)
 }
 
@@ -324,7 +324,7 @@ func TestEditUseCase_Execute_BlocksEditOnDelete(t *testing.T) {
 	}
 
 	// Editing a staged DELETE should be blocked
-	_, err := uc.Execute(context.Background(), usecasestaging.EditInput{
+	_, err := uc.Execute(t.Context(), usecasestaging.EditInput{
 		Name:  "/app/deleted",
 		Value: "new-value",
 	})
@@ -359,7 +359,7 @@ func TestEditUseCase_Baseline_BlocksWhenDeleteStaged(t *testing.T) {
 	}
 
 	// When DELETE is staged, Baseline should return an error
-	_, err := uc.Baseline(context.Background(), usecasestaging.BaselineInput{Name: "/app/deleted"})
+	_, err := uc.Baseline(t.Context(), usecasestaging.BaselineInput{Name: "/app/deleted"})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "staged for deletion")
 }
@@ -384,7 +384,7 @@ func TestEditUseCase_Execute_PreservesUpdateOperation(t *testing.T) {
 	}
 
 	// Re-edit should preserve UPDATE operation
-	_, err := uc.Execute(context.Background(), usecasestaging.EditInput{
+	_, err := uc.Execute(t.Context(), usecasestaging.EditInput{
 		Name:  "/app/config",
 		Value: "newer-value",
 	})
@@ -413,7 +413,7 @@ func TestEditUseCase_Execute_Skipped_SameAsAWS(t *testing.T) {
 	}
 
 	// Edit with same value as AWS - should be skipped
-	output, err := uc.Execute(context.Background(), usecasestaging.EditInput{
+	output, err := uc.Execute(t.Context(), usecasestaging.EditInput{
 		Name:  "/app/config",
 		Value: "aws-value", // Same as AWS
 	})
@@ -450,7 +450,7 @@ func TestEditUseCase_Execute_Unstaged_RevertedToAWS(t *testing.T) {
 	}
 
 	// Edit back to AWS value - should auto-unstage
-	output, err := uc.Execute(context.Background(), usecasestaging.EditInput{
+	output, err := uc.Execute(t.Context(), usecasestaging.EditInput{
 		Name:  "/app/config",
 		Value: "aws-value", // Reverted to AWS value
 	})
@@ -479,7 +479,7 @@ func TestEditUseCase_Execute_NotSkipped_DifferentFromAWS(t *testing.T) {
 	}
 
 	// Edit with different value - should be staged
-	output, err := uc.Execute(context.Background(), usecasestaging.EditInput{
+	output, err := uc.Execute(t.Context(), usecasestaging.EditInput{
 		Name:  "/app/config",
 		Value: "new-value", // Different from AWS
 	})
@@ -513,7 +513,7 @@ func TestEditUseCase_Execute_EmptyStringValue_AutoSkip(t *testing.T) {
 	}
 
 	// Edit with empty string (same as AWS) - should auto-skip
-	output, err := uc.Execute(context.Background(), usecasestaging.EditInput{
+	output, err := uc.Execute(t.Context(), usecasestaging.EditInput{
 		Name:  "/app/config",
 		Value: "", // Same as AWS empty string
 	})
@@ -544,7 +544,7 @@ func TestEditUseCase_Execute_EmptyStringValue_Stage(t *testing.T) {
 	}
 
 	// Edit to non-empty value - should stage
-	output, err := uc.Execute(context.Background(), usecasestaging.EditInput{
+	output, err := uc.Execute(t.Context(), usecasestaging.EditInput{
 		Name:  "/app/config",
 		Value: "new-value",
 	})

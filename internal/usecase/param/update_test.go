@@ -45,7 +45,7 @@ func TestUpdateUseCase_Exists(t *testing.T) {
 
 	uc := &param.UpdateUseCase{Client: client}
 
-	exists, err := uc.Exists(context.Background(), "/app/config")
+	exists, err := uc.Exists(t.Context(), "/app/config")
 	require.NoError(t, err)
 	assert.True(t, exists)
 }
@@ -59,7 +59,7 @@ func TestUpdateUseCase_Exists_NotFound(t *testing.T) {
 
 	uc := &param.UpdateUseCase{Client: client}
 
-	exists, err := uc.Exists(context.Background(), "/app/not-exists")
+	exists, err := uc.Exists(t.Context(), "/app/not-exists")
 	require.NoError(t, err)
 	assert.False(t, exists)
 }
@@ -73,7 +73,7 @@ func TestUpdateUseCase_Exists_Error(t *testing.T) {
 
 	uc := &param.UpdateUseCase{Client: client}
 
-	_, err := uc.Exists(context.Background(), "/app/config")
+	_, err := uc.Exists(t.Context(), "/app/config")
 	assert.Error(t, err)
 }
 
@@ -89,7 +89,7 @@ func TestUpdateUseCase_Execute(t *testing.T) {
 
 	uc := &param.UpdateUseCase{Client: client}
 
-	output, err := uc.Execute(context.Background(), param.UpdateInput{
+	output, err := uc.Execute(t.Context(), param.UpdateInput{
 		Name:        "/app/config",
 		Value:       "updated-value",
 		Type:        paramapi.ParameterTypeString,
@@ -109,7 +109,7 @@ func TestUpdateUseCase_Execute_NotFound(t *testing.T) {
 
 	uc := &param.UpdateUseCase{Client: client}
 
-	_, err := uc.Execute(context.Background(), param.UpdateInput{
+	_, err := uc.Execute(t.Context(), param.UpdateInput{
 		Name:  "/app/not-exists",
 		Value: "value",
 		Type:  paramapi.ParameterTypeString,
@@ -127,7 +127,7 @@ func TestUpdateUseCase_Execute_ExistsError(t *testing.T) {
 
 	uc := &param.UpdateUseCase{Client: client}
 
-	_, err := uc.Execute(context.Background(), param.UpdateInput{
+	_, err := uc.Execute(t.Context(), param.UpdateInput{
 		Name:  "/app/config",
 		Value: "value",
 		Type:  paramapi.ParameterTypeString,
@@ -147,7 +147,7 @@ func TestUpdateUseCase_Execute_PutError(t *testing.T) {
 
 	uc := &param.UpdateUseCase{Client: client}
 
-	_, err := uc.Execute(context.Background(), param.UpdateInput{
+	_, err := uc.Execute(t.Context(), param.UpdateInput{
 		Name:  "/app/config",
 		Value: "value",
 		Type:  paramapi.ParameterTypeString,

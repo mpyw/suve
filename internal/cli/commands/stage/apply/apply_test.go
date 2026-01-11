@@ -79,7 +79,7 @@ func TestCommand_Validation(t *testing.T) {
 		app := appcli.MakeApp()
 		var buf bytes.Buffer
 		app.Writer = &buf
-		err := app.Run(context.Background(), []string{"suve", "stage", "push", "--help"})
+		err := app.Run(t.Context(), []string{"suve", "stage", "push", "--help"})
 		require.NoError(t, err)
 		assert.Contains(t, buf.String(), "Apply all staged changes")
 	})
@@ -102,7 +102,7 @@ func TestRun_NoChanges(t *testing.T) {
 
 	// When called with empty store, Run should return without error
 	// and produce no output (action handles the warning)
-	err := r.Run(context.Background())
+	err := r.Run(t.Context())
 	require.NoError(t, err)
 	assert.Empty(t, buf.String())
 }
@@ -153,7 +153,7 @@ func TestRun_ApplyBothServices(t *testing.T) {
 		Stderr:         &bytes.Buffer{},
 	}
 
-	err := r.Run(context.Background())
+	err := r.Run(t.Context())
 	require.NoError(t, err)
 	assert.True(t, paramPutCalled)
 	assert.True(t, secretPutCalled)
@@ -198,7 +198,7 @@ func TestRun_ApplyParamOnly(t *testing.T) {
 		Stderr:         &bytes.Buffer{},
 	}
 
-	err := r.Run(context.Background())
+	err := r.Run(t.Context())
 	require.NoError(t, err)
 	assert.True(t, paramPutCalled)
 	assert.Contains(t, buf.String(), "Applying SSM Parameter Store parameters")
@@ -234,7 +234,7 @@ func TestRun_ApplySecretOnly(t *testing.T) {
 		Stderr:         &bytes.Buffer{},
 	}
 
-	err := r.Run(context.Background())
+	err := r.Run(t.Context())
 	require.NoError(t, err)
 	assert.True(t, secretPutCalled)
 	assert.NotContains(t, buf.String(), "Applying SSM Parameter Store parameters")
@@ -281,7 +281,7 @@ func TestRun_ApplyDelete(t *testing.T) {
 		Stderr:         &bytes.Buffer{},
 	}
 
-	err := r.Run(context.Background())
+	err := r.Run(t.Context())
 	require.NoError(t, err)
 	assert.True(t, paramDeleteCalled)
 	assert.True(t, secretDeleteCalled)
@@ -326,7 +326,7 @@ func TestRun_PartialFailure(t *testing.T) {
 		Stderr:         &errBuf,
 	}
 
-	err := r.Run(context.Background())
+	err := r.Run(t.Context())
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "applied 1, failed 1")
 
@@ -360,7 +360,7 @@ func TestRun_StoreError(t *testing.T) {
 		Stderr:         &bytes.Buffer{},
 	}
 
-	err := r.Run(context.Background())
+	err := r.Run(t.Context())
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to parse")
 }
@@ -395,7 +395,7 @@ func TestRun_SecretDeleteWithForce(t *testing.T) {
 		Stderr:         &bytes.Buffer{},
 	}
 
-	err := r.Run(context.Background())
+	err := r.Run(t.Context())
 	require.NoError(t, err)
 	require.NotNil(t, capturedEntry.DeleteOptions)
 	assert.True(t, capturedEntry.DeleteOptions.Force)
@@ -431,7 +431,7 @@ func TestRun_SecretDeleteWithRecoveryWindow(t *testing.T) {
 		Stderr:         &bytes.Buffer{},
 	}
 
-	err := r.Run(context.Background())
+	err := r.Run(t.Context())
 	require.NoError(t, err)
 	require.NotNil(t, capturedEntry.DeleteOptions)
 	assert.Equal(t, 7, capturedEntry.DeleteOptions.RecoveryWindow)
@@ -461,7 +461,7 @@ func TestRun_ParamDeleteError(t *testing.T) {
 		Stderr:        &errBuf,
 	}
 
-	err := r.Run(context.Background())
+	err := r.Run(t.Context())
 	require.Error(t, err)
 	assert.Contains(t, errBuf.String(), "Failed")
 }
@@ -491,7 +491,7 @@ func TestRun_SecretSetError(t *testing.T) {
 		Stderr:         &errBuf,
 	}
 
-	err := r.Run(context.Background())
+	err := r.Run(t.Context())
 	require.Error(t, err)
 	assert.Contains(t, errBuf.String(), "Failed")
 }
@@ -520,7 +520,7 @@ func TestRun_SecretDeleteError(t *testing.T) {
 		Stderr:         &errBuf,
 	}
 
-	err := r.Run(context.Background())
+	err := r.Run(t.Context())
 	require.Error(t, err)
 	assert.Contains(t, errBuf.String(), "Failed")
 }
@@ -550,7 +550,7 @@ func TestRun_ParamSetError(t *testing.T) {
 		Stderr:        &errBuf,
 	}
 
-	err := r.Run(context.Background())
+	err := r.Run(t.Context())
 	require.Error(t, err)
 	assert.Contains(t, errBuf.String(), "Failed")
 }
@@ -581,7 +581,7 @@ func TestRun_ConflictDetection_CreateConflict(t *testing.T) {
 		IgnoreConflicts: false,
 	}
 
-	err := r.Run(context.Background())
+	err := r.Run(t.Context())
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "conflict(s) detected")
 	assert.Contains(t, errBuf.String(), "conflict detected for /app/new-param")
@@ -614,7 +614,7 @@ func TestRun_ConflictDetection_UpdateConflict(t *testing.T) {
 		IgnoreConflicts: false,
 	}
 
-	err := r.Run(context.Background())
+	err := r.Run(t.Context())
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "conflict(s) detected")
 	assert.Contains(t, errBuf.String(), "conflict detected for /app/config")
@@ -646,7 +646,7 @@ func TestRun_ConflictDetection_DeleteConflict(t *testing.T) {
 		IgnoreConflicts: false,
 	}
 
-	err := r.Run(context.Background())
+	err := r.Run(t.Context())
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "conflict(s) detected")
 	assert.Contains(t, errBuf.String(), "conflict detected for my-secret")
@@ -684,7 +684,7 @@ func TestRun_ConflictDetection_IgnoreConflicts(t *testing.T) {
 		IgnoreConflicts: true, // Should bypass conflict check
 	}
 
-	err := r.Run(context.Background())
+	err := r.Run(t.Context())
 	require.NoError(t, err)
 	assert.True(t, applyCalled, "Apply should be called when IgnoreConflicts is true")
 }
@@ -721,7 +721,7 @@ func TestRun_ConflictDetection_NoConflict(t *testing.T) {
 		IgnoreConflicts: false,
 	}
 
-	err := r.Run(context.Background())
+	err := r.Run(t.Context())
 	require.NoError(t, err)
 	assert.True(t, applyCalled, "Apply should be called when there's no conflict")
 }
@@ -766,7 +766,7 @@ func TestRun_ConflictDetection_BothServices(t *testing.T) {
 		IgnoreConflicts: false,
 	}
 
-	err := r.Run(context.Background())
+	err := r.Run(t.Context())
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "2 conflict(s) detected")
 	assert.Contains(t, errBuf.String(), "conflict detected for /app/config")
@@ -799,7 +799,7 @@ func TestRun_ApplyCreate(t *testing.T) {
 		Stderr:        &bytes.Buffer{},
 	}
 
-	err := r.Run(context.Background())
+	err := r.Run(t.Context())
 	require.NoError(t, err)
 	assert.Contains(t, buf.String(), "SSM Parameter Store: Created /app/new-param")
 }
@@ -835,7 +835,7 @@ func TestRun_ApplyTagsSuccess(t *testing.T) {
 		Stderr:        &bytes.Buffer{},
 	}
 
-	err := r.Run(context.Background())
+	err := r.Run(t.Context())
 	require.NoError(t, err)
 	assert.True(t, applyTagsCalled)
 	assert.Contains(t, buf.String(), "Applying SSM Parameter Store tags")
@@ -873,7 +873,7 @@ func TestRun_ApplyTagsError(t *testing.T) {
 		Stderr:        &errBuf,
 	}
 
-	err := r.Run(context.Background())
+	err := r.Run(t.Context())
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "applied 0, failed 1")
 	assert.Contains(t, errBuf.String(), "Failed")
@@ -912,7 +912,7 @@ func TestRun_ApplyTagsSecretService(t *testing.T) {
 		Stderr:         &bytes.Buffer{},
 	}
 
-	err := r.Run(context.Background())
+	err := r.Run(t.Context())
 	require.NoError(t, err)
 	assert.True(t, applyTagsCalled)
 	assert.Contains(t, buf.String(), "Applying Secrets Manager tags")
@@ -959,7 +959,7 @@ func TestRun_ApplyBothEntriesAndTags(t *testing.T) {
 		Stderr:        &bytes.Buffer{},
 	}
 
-	err := r.Run(context.Background())
+	err := r.Run(t.Context())
 	require.NoError(t, err)
 	assert.True(t, entryCalled)
 	assert.True(t, tagCalled)
@@ -992,7 +992,7 @@ func TestRun_ApplyTagsOnlyAdditions(t *testing.T) {
 		Stderr:        &bytes.Buffer{},
 	}
 
-	err := r.Run(context.Background())
+	err := r.Run(t.Context())
 	require.NoError(t, err)
 	assert.Contains(t, buf.String(), "[+1]")
 	assert.NotContains(t, buf.String(), "-")
@@ -1023,7 +1023,7 @@ func TestRun_ApplyTagsOnlyRemovals(t *testing.T) {
 		Stderr:        &bytes.Buffer{},
 	}
 
-	err := r.Run(context.Background())
+	err := r.Run(t.Context())
 	require.NoError(t, err)
 	assert.Contains(t, buf.String(), "[-2]")
 	assert.NotContains(t, buf.String(), "+")

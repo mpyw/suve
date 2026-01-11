@@ -72,7 +72,7 @@ func TestShowUseCase_Execute(t *testing.T) {
 	spec, err := paramversion.Parse("/app/config")
 	require.NoError(t, err)
 
-	output, err := uc.Execute(context.Background(), param.ShowInput{
+	output, err := uc.Execute(t.Context(), param.ShowInput{
 		Spec: spec,
 	})
 	require.NoError(t, err)
@@ -103,7 +103,7 @@ func TestShowUseCase_Execute_WithVersion(t *testing.T) {
 	spec, err := paramversion.Parse("/app/config#3")
 	require.NoError(t, err)
 
-	output, err := uc.Execute(context.Background(), param.ShowInput{
+	output, err := uc.Execute(t.Context(), param.ShowInput{
 		Spec: spec,
 	})
 	require.NoError(t, err)
@@ -131,7 +131,7 @@ func TestShowUseCase_Execute_WithShift(t *testing.T) {
 	spec, err := paramversion.Parse("/app/config~1") // 1 version back from latest
 	require.NoError(t, err)
 
-	output, err := uc.Execute(context.Background(), param.ShowInput{
+	output, err := uc.Execute(t.Context(), param.ShowInput{
 		Spec: spec,
 	})
 	require.NoError(t, err)
@@ -152,7 +152,7 @@ func TestShowUseCase_Execute_Error(t *testing.T) {
 	spec, err := paramversion.Parse("/app/config")
 	require.NoError(t, err)
 
-	_, err = uc.Execute(context.Background(), param.ShowInput{
+	_, err = uc.Execute(t.Context(), param.ShowInput{
 		Spec: spec,
 	})
 	assert.Error(t, err)
@@ -177,7 +177,7 @@ func TestShowUseCase_Execute_NoLastModified(t *testing.T) {
 	spec, err := paramversion.Parse("/app/config")
 	require.NoError(t, err)
 
-	output, err := uc.Execute(context.Background(), param.ShowInput{
+	output, err := uc.Execute(t.Context(), param.ShowInput{
 		Spec: spec,
 	})
 	require.NoError(t, err)
@@ -209,7 +209,7 @@ func TestShowUseCase_Execute_WithTags(t *testing.T) {
 	spec, err := paramversion.Parse("/app/config")
 	require.NoError(t, err)
 
-	output, err := uc.Execute(context.Background(), param.ShowInput{
+	output, err := uc.Execute(t.Context(), param.ShowInput{
 		Spec: spec,
 	})
 	require.NoError(t, err)

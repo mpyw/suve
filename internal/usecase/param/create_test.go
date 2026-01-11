@@ -34,7 +34,7 @@ func TestCreateUseCase_Execute(t *testing.T) {
 
 	uc := &param.CreateUseCase{Client: client}
 
-	output, err := uc.Execute(context.Background(), param.CreateInput{
+	output, err := uc.Execute(t.Context(), param.CreateInput{
 		Name:  "/app/new",
 		Value: "new-value",
 		Type:  paramapi.ParameterTypeString,
@@ -53,7 +53,7 @@ func TestCreateUseCase_Execute_WithDescription(t *testing.T) {
 
 	uc := &param.CreateUseCase{Client: client}
 
-	output, err := uc.Execute(context.Background(), param.CreateInput{
+	output, err := uc.Execute(t.Context(), param.CreateInput{
 		Name:        "/app/new",
 		Value:       "new-value",
 		Type:        paramapi.ParameterTypeString,
@@ -73,7 +73,7 @@ func TestCreateUseCase_Execute_AlreadyExists(t *testing.T) {
 
 	uc := &param.CreateUseCase{Client: client}
 
-	_, err := uc.Execute(context.Background(), param.CreateInput{
+	_, err := uc.Execute(t.Context(), param.CreateInput{
 		Name:  "/app/existing",
 		Value: "value",
 		Type:  paramapi.ParameterTypeString,
@@ -91,7 +91,7 @@ func TestCreateUseCase_Execute_PutError(t *testing.T) {
 
 	uc := &param.CreateUseCase{Client: client}
 
-	_, err := uc.Execute(context.Background(), param.CreateInput{
+	_, err := uc.Execute(t.Context(), param.CreateInput{
 		Name:  "/app/config",
 		Value: "value",
 		Type:  paramapi.ParameterTypeString,

@@ -2,7 +2,6 @@ package reset_test
 
 import (
 	"bytes"
-	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -26,7 +25,7 @@ func TestCommand_Validation(t *testing.T) {
 		app := appcli.MakeApp()
 		var buf bytes.Buffer
 		app.Writer = &buf
-		err := app.Run(context.Background(), []string{"suve", "stage", "reset", "--help"})
+		err := app.Run(t.Context(), []string{"suve", "stage", "reset", "--help"})
 		require.NoError(t, err)
 		assert.Contains(t, buf.String(), "Unstage all changes")
 	})
@@ -45,7 +44,7 @@ func TestRun_NoChanges(t *testing.T) {
 		Stderr: &bytes.Buffer{},
 	}
 
-	err := r.Run(context.Background())
+	err := r.Run(t.Context())
 	require.NoError(t, err)
 	assert.Contains(t, buf.String(), "No changes staged")
 }
@@ -82,7 +81,7 @@ func TestRun_UnstageAll(t *testing.T) {
 		Stderr: &bytes.Buffer{},
 	}
 
-	err := r.Run(context.Background())
+	err := r.Run(t.Context())
 	require.NoError(t, err)
 	assert.Contains(t, buf.String(), "Unstaged all changes (2 SSM Parameter Store, 1 Secrets Manager)")
 
@@ -115,7 +114,7 @@ func TestRun_UnstageParamOnly(t *testing.T) {
 		Stderr: &bytes.Buffer{},
 	}
 
-	err := r.Run(context.Background())
+	err := r.Run(t.Context())
 	require.NoError(t, err)
 	assert.Contains(t, buf.String(), "Unstaged all changes (1 SSM Parameter Store, 0 Secrets Manager)")
 }
@@ -140,7 +139,7 @@ func TestRun_UnstageSecretOnly(t *testing.T) {
 		Stderr: &bytes.Buffer{},
 	}
 
-	err := r.Run(context.Background())
+	err := r.Run(t.Context())
 	require.NoError(t, err)
 	assert.Contains(t, buf.String(), "Unstaged all changes (0 SSM Parameter Store, 1 Secrets Manager)")
 }
@@ -163,7 +162,7 @@ func TestRun_StoreError(t *testing.T) {
 		Stderr: &bytes.Buffer{},
 	}
 
-	err := r.Run(context.Background())
+	err := r.Run(t.Context())
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to parse")
 }
@@ -191,7 +190,7 @@ func TestRun_UnstageTagsOnly(t *testing.T) {
 		Stderr: &bytes.Buffer{},
 	}
 
-	err := r.Run(context.Background())
+	err := r.Run(t.Context())
 	require.NoError(t, err)
 	assert.Contains(t, buf.String(), "Unstaged all changes (1 SSM Parameter Store, 1 Secrets Manager)")
 
@@ -241,7 +240,7 @@ func TestRun_UnstageEntriesAndTags(t *testing.T) {
 		Stderr: &bytes.Buffer{},
 	}
 
-	err := r.Run(context.Background())
+	err := r.Run(t.Context())
 	require.NoError(t, err)
 	// 1 entry + 1 tag = 2 for param, 1 entry + 1 tag = 2 for secret
 	assert.Contains(t, buf.String(), "Unstaged all changes (2 SSM Parameter Store, 2 Secrets Manager)")

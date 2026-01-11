@@ -60,7 +60,7 @@ func TestApplyUseCase_Execute_Empty(t *testing.T) {
 		Store:    store,
 	}
 
-	output, err := uc.Execute(context.Background(), usecasestaging.ApplyInput{})
+	output, err := uc.Execute(t.Context(), usecasestaging.ApplyInput{})
 	require.NoError(t, err)
 	assert.Equal(t, "SSM Parameter Store", output.ServiceName)
 	assert.Equal(t, "parameter", output.ItemName)
@@ -84,7 +84,7 @@ func TestApplyUseCase_Execute_SingleCreate(t *testing.T) {
 		Store:    store,
 	}
 
-	output, err := uc.Execute(context.Background(), usecasestaging.ApplyInput{
+	output, err := uc.Execute(t.Context(), usecasestaging.ApplyInput{
 		IgnoreConflicts: true,
 	})
 	require.NoError(t, err)
@@ -122,7 +122,7 @@ func TestApplyUseCase_Execute_MultipleOperations(t *testing.T) {
 		Store:    store,
 	}
 
-	output, err := uc.Execute(context.Background(), usecasestaging.ApplyInput{
+	output, err := uc.Execute(t.Context(), usecasestaging.ApplyInput{
 		IgnoreConflicts: true,
 	})
 	require.NoError(t, err)
@@ -150,7 +150,7 @@ func TestApplyUseCase_Execute_FilterByName(t *testing.T) {
 		Store:    store,
 	}
 
-	output, err := uc.Execute(context.Background(), usecasestaging.ApplyInput{
+	output, err := uc.Execute(t.Context(), usecasestaging.ApplyInput{
 		Name:            "/app/one",
 		IgnoreConflicts: true,
 	})
@@ -173,7 +173,7 @@ func TestApplyUseCase_Execute_FilterByName_NotStaged(t *testing.T) {
 		Store:    store,
 	}
 
-	_, err := uc.Execute(context.Background(), usecasestaging.ApplyInput{
+	_, err := uc.Execute(t.Context(), usecasestaging.ApplyInput{
 		Name: "/app/not-staged",
 	})
 	assert.Error(t, err)
@@ -203,7 +203,7 @@ func TestApplyUseCase_Execute_PartialFailure(t *testing.T) {
 		Store:    store,
 	}
 
-	output, err := uc.Execute(context.Background(), usecasestaging.ApplyInput{
+	output, err := uc.Execute(t.Context(), usecasestaging.ApplyInput{
 		IgnoreConflicts: true,
 	})
 	assert.Error(t, err)
@@ -242,7 +242,7 @@ func TestApplyUseCase_Execute_ConflictDetection(t *testing.T) {
 		Store:    store,
 	}
 
-	output, err := uc.Execute(context.Background(), usecasestaging.ApplyInput{
+	output, err := uc.Execute(t.Context(), usecasestaging.ApplyInput{
 		IgnoreConflicts: false,
 	})
 	assert.Error(t, err)
@@ -262,7 +262,7 @@ func TestApplyUseCase_Execute_ListError(t *testing.T) {
 		Store:    store,
 	}
 
-	_, err := uc.Execute(context.Background(), usecasestaging.ApplyInput{})
+	_, err := uc.Execute(t.Context(), usecasestaging.ApplyInput{})
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "list error")
 }
@@ -281,7 +281,7 @@ func TestApplyUseCase_Execute_DeleteSuccess(t *testing.T) {
 		Store:    store,
 	}
 
-	output, err := uc.Execute(context.Background(), usecasestaging.ApplyInput{
+	output, err := uc.Execute(t.Context(), usecasestaging.ApplyInput{
 		IgnoreConflicts: true,
 	})
 	require.NoError(t, err)
@@ -327,7 +327,7 @@ func TestApplyUseCase_Execute_TagsOnly(t *testing.T) {
 		Store:    store,
 	}
 
-	output, err := uc.Execute(context.Background(), usecasestaging.ApplyInput{})
+	output, err := uc.Execute(t.Context(), usecasestaging.ApplyInput{})
 	require.NoError(t, err)
 	assert.Equal(t, 0, output.EntrySucceeded)
 	assert.Equal(t, 0, output.EntryFailed)
@@ -358,7 +358,7 @@ func TestApplyUseCase_Execute_TagsWithRemove(t *testing.T) {
 		Store:    store,
 	}
 
-	output, err := uc.Execute(context.Background(), usecasestaging.ApplyInput{})
+	output, err := uc.Execute(t.Context(), usecasestaging.ApplyInput{})
 	require.NoError(t, err)
 	assert.Equal(t, 1, output.TagSucceeded)
 	require.Len(t, output.TagResults, 1)
@@ -385,7 +385,7 @@ func TestApplyUseCase_Execute_EntriesAndTags(t *testing.T) {
 		Store:    store,
 	}
 
-	output, err := uc.Execute(context.Background(), usecasestaging.ApplyInput{
+	output, err := uc.Execute(t.Context(), usecasestaging.ApplyInput{
 		IgnoreConflicts: true,
 	})
 	require.NoError(t, err)
@@ -410,7 +410,7 @@ func TestApplyUseCase_Execute_TagFailure(t *testing.T) {
 		Store:    store,
 	}
 
-	output, err := uc.Execute(context.Background(), usecasestaging.ApplyInput{})
+	output, err := uc.Execute(t.Context(), usecasestaging.ApplyInput{})
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "failed 0 entries, 1 tags")
 	assert.Equal(t, 0, output.TagSucceeded)
@@ -444,7 +444,7 @@ func TestApplyUseCase_Execute_PartialTagFailure(t *testing.T) {
 		Store:    store,
 	}
 
-	output, err := uc.Execute(context.Background(), usecasestaging.ApplyInput{})
+	output, err := uc.Execute(t.Context(), usecasestaging.ApplyInput{})
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "failed 0 entries, 1 tags")
 	assert.Equal(t, 1, output.TagSucceeded)
@@ -477,7 +477,7 @@ func TestApplyUseCase_Execute_FilterByName_TagOnly(t *testing.T) {
 		Store:    store,
 	}
 
-	output, err := uc.Execute(context.Background(), usecasestaging.ApplyInput{
+	output, err := uc.Execute(t.Context(), usecasestaging.ApplyInput{
 		Name: "/app/one",
 	})
 	require.NoError(t, err)
@@ -501,7 +501,7 @@ func TestApplyUseCase_Execute_ListTagsError(t *testing.T) {
 		Store:    store,
 	}
 
-	_, err := uc.Execute(context.Background(), usecasestaging.ApplyInput{})
+	_, err := uc.Execute(t.Context(), usecasestaging.ApplyInput{})
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "list tags error")
 }

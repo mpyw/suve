@@ -46,7 +46,7 @@ func TestDeleteUseCase_Execute_Param(t *testing.T) {
 		Store:    store,
 	}
 
-	output, err := uc.Execute(context.Background(), usecasestaging.DeleteInput{
+	output, err := uc.Execute(t.Context(), usecasestaging.DeleteInput{
 		Name: "/app/to-delete",
 	})
 	require.NoError(t, err)
@@ -72,7 +72,7 @@ func TestDeleteUseCase_Execute_SecretWithRecoveryWindow(t *testing.T) {
 		Store:    store,
 	}
 
-	output, err := uc.Execute(context.Background(), usecasestaging.DeleteInput{
+	output, err := uc.Execute(t.Context(), usecasestaging.DeleteInput{
 		Name:           "my-secret",
 		RecoveryWindow: 14,
 	})
@@ -99,7 +99,7 @@ func TestDeleteUseCase_Execute_SecretForceDelete(t *testing.T) {
 		Store:    store,
 	}
 
-	output, err := uc.Execute(context.Background(), usecasestaging.DeleteInput{
+	output, err := uc.Execute(t.Context(), usecasestaging.DeleteInput{
 		Name:  "my-secret",
 		Force: true,
 	})
@@ -120,7 +120,7 @@ func TestDeleteUseCase_Execute_InvalidRecoveryWindow(t *testing.T) {
 	}
 
 	// Too short
-	_, err := uc.Execute(context.Background(), usecasestaging.DeleteInput{
+	_, err := uc.Execute(t.Context(), usecasestaging.DeleteInput{
 		Name:           "my-secret",
 		RecoveryWindow: 5,
 	})
@@ -128,7 +128,7 @@ func TestDeleteUseCase_Execute_InvalidRecoveryWindow(t *testing.T) {
 	assert.Contains(t, err.Error(), "recovery window")
 
 	// Too long
-	_, err = uc.Execute(context.Background(), usecasestaging.DeleteInput{
+	_, err = uc.Execute(t.Context(), usecasestaging.DeleteInput{
 		Name:           "my-secret",
 		RecoveryWindow: 31,
 	})
@@ -147,7 +147,7 @@ func TestDeleteUseCase_Execute_FetchError(t *testing.T) {
 		Store:    store,
 	}
 
-	_, err := uc.Execute(context.Background(), usecasestaging.DeleteInput{
+	_, err := uc.Execute(t.Context(), usecasestaging.DeleteInput{
 		Name: "/app/not-exists",
 	})
 	assert.Error(t, err)
@@ -167,7 +167,7 @@ func TestDeleteUseCase_Execute_ZeroLastModified_ResourceNotFound(t *testing.T) {
 	}
 
 	// Delete should fail when resource doesn't exist on AWS and not staged
-	_, err := uc.Execute(context.Background(), usecasestaging.DeleteInput{
+	_, err := uc.Execute(t.Context(), usecasestaging.DeleteInput{
 		Name: "/app/to-delete",
 	})
 	require.Error(t, err)
@@ -195,7 +195,7 @@ func TestDeleteUseCase_Execute_ZeroLastModified_StagedCreate(t *testing.T) {
 	}
 
 	// Delete should succeed by unstaging the CREATE
-	output, err := uc.Execute(context.Background(), usecasestaging.DeleteInput{
+	output, err := uc.Execute(t.Context(), usecasestaging.DeleteInput{
 		Name: "/app/new-param",
 	})
 	require.NoError(t, err)
@@ -218,7 +218,7 @@ func TestDeleteUseCase_Execute_StageError(t *testing.T) {
 		Store:    store,
 	}
 
-	_, err := uc.Execute(context.Background(), usecasestaging.DeleteInput{
+	_, err := uc.Execute(t.Context(), usecasestaging.DeleteInput{
 		Name: "/app/config",
 	})
 	assert.Error(t, err)
@@ -236,7 +236,7 @@ func TestDeleteUseCase_Execute_GetError(t *testing.T) {
 		Store:    store,
 	}
 
-	_, err := uc.Execute(context.Background(), usecasestaging.DeleteInput{
+	_, err := uc.Execute(t.Context(), usecasestaging.DeleteInput{
 		Name: "/app/config",
 	})
 	assert.Error(t, err)
@@ -259,7 +259,7 @@ func TestDeleteUseCase_Execute_UnstageError(t *testing.T) {
 		Store:    store,
 	}
 
-	_, err := uc.Execute(context.Background(), usecasestaging.DeleteInput{
+	_, err := uc.Execute(t.Context(), usecasestaging.DeleteInput{
 		Name: "/app/new",
 	})
 	assert.Error(t, err)
@@ -282,7 +282,7 @@ func TestDeleteUseCase_Execute_UnstagesCreate(t *testing.T) {
 		Store:    store,
 	}
 
-	output, err := uc.Execute(context.Background(), usecasestaging.DeleteInput{
+	output, err := uc.Execute(t.Context(), usecasestaging.DeleteInput{
 		Name: "/app/new",
 	})
 	require.NoError(t, err)
@@ -310,7 +310,7 @@ func TestDeleteUseCase_Execute_DeleteOnUpdate(t *testing.T) {
 		Store:    store,
 	}
 
-	output, err := uc.Execute(context.Background(), usecasestaging.DeleteInput{
+	output, err := uc.Execute(t.Context(), usecasestaging.DeleteInput{
 		Name: "/app/existing",
 	})
 	require.NoError(t, err)
