@@ -49,7 +49,7 @@ func (u *ResetUseCase) Execute(ctx context.Context, input ResetInput) (*ResetOut
 	itemName := u.Parser.ItemName()
 
 	if input.All {
-		return u.unstageAll(serviceName, itemName)
+		return u.unstageAll(ctx, serviceName, itemName)
 	}
 
 	name, hasVersion, err := u.Parser.ParseSpec(input.Spec)
@@ -61,13 +61,13 @@ func (u *ResetUseCase) Execute(ctx context.Context, input ResetInput) (*ResetOut
 		return u.restore(ctx, input.Spec, name)
 	}
 
-	return u.unstage(name, serviceName, itemName)
+	return u.unstage(ctx, name, serviceName, itemName)
 }
 
-func (u *ResetUseCase) unstageAll(serviceName, itemName string) (*ResetOutput, error) {
+func (u *ResetUseCase) unstageAll(ctx context.Context, serviceName, itemName string) (*ResetOutput, error) {
 	service := u.Parser.Service()
 
-	staged, err := u.Store.ListEntries(service)
+	staged, err := u.Store.ListEntries(ctx, service)
 	if err != nil {
 		return nil, err
 	}
@@ -80,7 +80,7 @@ func (u *ResetUseCase) unstageAll(serviceName, itemName string) (*ResetOutput, e
 		}, nil
 	}
 
-	if err := u.Store.UnstageAll(service); err != nil {
+	if err := u.Store.UnstageAll(ctx, service); err != nil {
 		return nil, err
 	}
 
@@ -92,11 +92,11 @@ func (u *ResetUseCase) unstageAll(serviceName, itemName string) (*ResetOutput, e
 	}, nil
 }
 
-func (u *ResetUseCase) unstage(name, serviceName, itemName string) (*ResetOutput, error) {
+func (u *ResetUseCase) unstage(ctx context.Context, name, serviceName, itemName string) (*ResetOutput, error) {
 	service := u.Parser.Service()
 
 	// Load current state (nil CurrentValue since we don't care about AWS state for reset)
-	entryState, err := transition.LoadEntryState(u.Store, service, name, nil)
+	entryState, err := transition.LoadEntryState(ctx, u.Store, service, name, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -111,7 +111,7 @@ func (u *ResetUseCase) unstage(name, serviceName, itemName string) (*ResetOutput
 
 	// Execute the reset transition
 	executor := transition.NewExecutor(u.Store)
-	if _, err := executor.ExecuteEntry(service, name, entryState, transition.EntryActionReset{}, nil); err != nil {
+	if _, err := executor.ExecuteEntry(ctx, service, name, entryState, transition.EntryActionReset{}, nil); err != nil {
 		return nil, err
 	}
 
@@ -142,7 +142,7 @@ func (u *ResetUseCase) restore(ctx context.Context, spec, name string) (*ResetOu
 	currentValue := &fetchResult.Value
 
 	// Load current state with AWS value for auto-skip
-	entryState, err := transition.LoadEntryState(u.Store, service, name, currentValue)
+	entryState, err := transition.LoadEntryState(ctx, u.Store, service, name, currentValue)
 	if err != nil {
 		return nil, err
 	}
@@ -152,7 +152,7 @@ func (u *ResetUseCase) restore(ctx context.Context, spec, name string) (*ResetOu
 
 	// Execute the edit transition with the restored value
 	executor := transition.NewExecutor(u.Store)
-	result, err := executor.ExecuteEntry(service, name, entryState, transition.EntryActionEdit{Value: value}, nil)
+	result, err := executor.ExecuteEntry(ctx, service, name, entryState, transition.EntryActionEdit{Value: value}, nil)
 	if err != nil {
 		return nil, err
 	}

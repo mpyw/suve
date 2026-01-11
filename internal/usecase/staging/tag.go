@@ -64,13 +64,13 @@ func (u *TagUseCase) loadTagContext(ctx context.Context, inputName string) (*tag
 	}
 
 	// Load current entry state with CurrentValue for existence check in reducer
-	entryState, err := transition.LoadEntryState(u.Store, service, name, currentValue)
+	entryState, err := transition.LoadEntryState(ctx, u.Store, service, name, currentValue)
 	if err != nil {
 		return nil, err
 	}
 
 	// Load current staged tags
-	stagedTags, baseModifiedAt, err := transition.LoadStagedTags(u.Store, service, name)
+	stagedTags, baseModifiedAt, err := transition.LoadStagedTags(ctx, u.Store, service, name)
 	if err != nil {
 		return nil, err
 	}
@@ -129,7 +129,7 @@ func (u *TagUseCase) Tag(ctx context.Context, input TagInput) (*TagOutput, error
 
 	// Execute the transition
 	executor := transition.NewExecutor(u.Store)
-	_, err = executor.ExecuteTag(tc.service, tc.name, tc.entryState, tc.stagedTags, action, tc.baseModifiedAt)
+	_, err = executor.ExecuteTag(ctx, tc.service, tc.name, tc.entryState, tc.stagedTags, action, tc.baseModifiedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -163,7 +163,7 @@ func (u *TagUseCase) Untag(ctx context.Context, input UntagInput) (*UntagOutput,
 
 	// Execute the transition
 	executor := transition.NewExecutor(u.Store)
-	_, err = executor.ExecuteTag(tc.service, tc.name, tc.entryState, tc.stagedTags, action, tc.baseModifiedAt)
+	_, err = executor.ExecuteTag(ctx, tc.service, tc.name, tc.entryState, tc.stagedTags, action, tc.baseModifiedAt)
 	if err != nil {
 		return nil, err
 	}

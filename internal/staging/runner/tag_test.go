@@ -40,7 +40,7 @@ func TestTagRunner_Run(t *testing.T) {
 
 		assert.Contains(t, stdout.String(), "Staged tags for: /app/config")
 
-		tagEntry, err := store.GetTag(staging.ServiceParam, "/app/config")
+		tagEntry, err := store.GetTag(t.Context(), staging.ServiceParam, "/app/config")
 		require.NoError(t, err)
 		assert.Equal(t, map[string]string{"env": "prod", "team": "platform"}, tagEntry.Add)
 	})
@@ -120,7 +120,7 @@ func TestUntagRunner_Run(t *testing.T) {
 
 		assert.Contains(t, stdout.String(), "Staged tag removal for: /app/config")
 
-		tagEntry, err := store.GetTag(staging.ServiceParam, "/app/config")
+		tagEntry, err := store.GetTag(t.Context(), staging.ServiceParam, "/app/config")
 		require.NoError(t, err)
 		assert.True(t, tagEntry.Remove.Contains("deprecated"))
 		assert.True(t, tagEntry.Remove.Contains("old-tag"))

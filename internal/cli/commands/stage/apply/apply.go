@@ -82,19 +82,19 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	}
 
 	// Check if there are any staged changes
-	paramStaged, err := store.ListEntries(staging.ServiceParam)
+	paramStaged, err := store.ListEntries(ctx, staging.ServiceParam)
 	if err != nil {
 		return err
 	}
-	secretStaged, err := store.ListEntries(staging.ServiceSecret)
+	secretStaged, err := store.ListEntries(ctx, staging.ServiceSecret)
 	if err != nil {
 		return err
 	}
-	paramTagStaged, err := store.ListTags(staging.ServiceParam)
+	paramTagStaged, err := store.ListTags(ctx, staging.ServiceParam)
 	if err != nil {
 		return err
 	}
-	secretTagStaged, err := store.ListTags(staging.ServiceSecret)
+	secretTagStaged, err := store.ListTags(ctx, staging.ServiceSecret)
 	if err != nil {
 		return err
 	}
@@ -161,12 +161,12 @@ func action(ctx context.Context, cmd *cli.Command) error {
 // Run executes the apply command.
 func (r *Runner) Run(ctx context.Context) error {
 	// Get all staged changes (empty string means all services)
-	allStaged, err := r.Store.ListEntries("")
+	allStaged, err := r.Store.ListEntries(ctx, "")
 	if err != nil {
 		return err
 	}
 
-	allTagStaged, err := r.Store.ListTags("")
+	allTagStaged, err := r.Store.ListTags(ctx, "")
 	if err != nil {
 		return err
 	}
@@ -266,7 +266,7 @@ func (r *Runner) applyService(ctx context.Context, strat staging.ApplyStrategy, 
 			case staging.OperationDelete:
 				output.Success(r.Stdout, "%s: Deleted %s", serviceName, name)
 			}
-			if err := r.Store.UnstageEntry(service, name); err != nil {
+			if err := r.Store.UnstageEntry(ctx, service, name); err != nil {
 				output.Warning(r.Stderr, "failed to clear staging for %s: %v", name, err)
 			}
 			succeeded++
@@ -293,7 +293,7 @@ func (r *Runner) applyTagService(ctx context.Context, strat staging.ApplyStrateg
 			failed++
 		} else {
 			output.Success(r.Stdout, "%s: Tagged %s%s", serviceName, name, formatTagApplySummary(tagEntry))
-			if err := r.Store.UnstageTag(service, name); err != nil {
+			if err := r.Store.UnstageTag(ctx, service, name); err != nil {
 				output.Warning(r.Stderr, "failed to clear staging for %s tags: %v", name, err)
 			}
 			succeeded++

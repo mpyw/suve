@@ -59,7 +59,7 @@ func TestAddUseCase_Execute(t *testing.T) {
 	assert.Equal(t, "/app/new-param", output.Name)
 
 	// Verify staged
-	entry, err := store.GetEntry(staging.ServiceParam, "/app/new-param")
+	entry, err := store.GetEntry(t.Context(), staging.ServiceParam, "/app/new-param")
 	require.NoError(t, err)
 	assert.Equal(t, staging.OperationCreate, entry.Operation)
 	assert.Equal(t, "new-value", lo.FromPtr(entry.Value))
@@ -100,7 +100,7 @@ func TestAddUseCase_Execute_MinimalInput(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "/app/simple", output.Name)
 
-	entry, err := store.GetEntry(staging.ServiceParam, "/app/simple")
+	entry, err := store.GetEntry(t.Context(), staging.ServiceParam, "/app/simple")
 	require.NoError(t, err)
 	assert.Nil(t, entry.Description)
 }
@@ -124,7 +124,7 @@ func TestAddUseCase_Draft_StagedCreate(t *testing.T) {
 	t.Parallel()
 
 	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
-	require.NoError(t, store.StageEntry(staging.ServiceParam, "/app/draft", staging.Entry{
+	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/draft", staging.Entry{
 		Operation: staging.OperationCreate,
 		Value:     lo.ToPtr("draft-value"),
 		StagedAt:  time.Now(),
@@ -146,7 +146,7 @@ func TestAddUseCase_Draft_StagedUpdate(t *testing.T) {
 
 	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
 	// Update operation should not be returned as draft
-	require.NoError(t, store.StageEntry(staging.ServiceParam, "/app/update", staging.Entry{
+	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/update", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("update-value"),
 		StagedAt:  time.Now(),
@@ -257,7 +257,7 @@ func TestAddUseCase_Execute_RejectsWhenUpdateStaged(t *testing.T) {
 
 	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
 	// Pre-stage an UPDATE operation
-	require.NoError(t, store.StageEntry(staging.ServiceParam, "/app/existing", staging.Entry{
+	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/existing", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("update-value"),
 		StagedAt:  time.Now(),
@@ -281,7 +281,7 @@ func TestAddUseCase_Execute_RejectsWhenDeleteStaged(t *testing.T) {
 
 	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
 	// Pre-stage a DELETE operation
-	require.NoError(t, store.StageEntry(staging.ServiceParam, "/app/deleted", staging.Entry{
+	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/deleted", staging.Entry{
 		Operation: staging.OperationDelete,
 		StagedAt:  time.Now(),
 	}))
@@ -304,7 +304,7 @@ func TestAddUseCase_Execute_AllowsReEditOfCreate(t *testing.T) {
 
 	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
 	// Pre-stage a CREATE operation
-	require.NoError(t, store.StageEntry(staging.ServiceParam, "/app/new", staging.Entry{
+	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/new", staging.Entry{
 		Operation: staging.OperationCreate,
 		Value:     lo.ToPtr("initial-value"),
 		StagedAt:  time.Now(),
@@ -324,7 +324,7 @@ func TestAddUseCase_Execute_AllowsReEditOfCreate(t *testing.T) {
 	assert.Equal(t, "/app/new", output.Name)
 
 	// Verify the value was updated but operation remains CREATE
-	entry, err := store.GetEntry(staging.ServiceParam, "/app/new")
+	entry, err := store.GetEntry(t.Context(), staging.ServiceParam, "/app/new")
 	require.NoError(t, err)
 	assert.Equal(t, staging.OperationCreate, entry.Operation)
 	assert.Equal(t, "updated-value", lo.FromPtr(entry.Value))

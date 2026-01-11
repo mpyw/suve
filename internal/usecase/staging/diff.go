@@ -68,14 +68,14 @@ func (u *DiffUseCase) Execute(ctx context.Context, input DiffInput) (*DiffOutput
 	}
 
 	// Get all staged entries for the service
-	allEntries, err := u.Store.ListEntries(service)
+	allEntries, err := u.Store.ListEntries(ctx, service)
 	if err != nil {
 		return nil, err
 	}
 	entries := allEntries[service]
 
 	// Get all staged tag entries for the service
-	allTagEntries, err := u.Store.ListTags(service)
+	allTagEntries, err := u.Store.ListTags(ctx, service)
 	if err != nil {
 		return nil, err
 	}
@@ -84,13 +84,13 @@ func (u *DiffUseCase) Execute(ctx context.Context, input DiffInput) (*DiffOutput
 	// Filter by name if specified
 	if input.Name != "" {
 		// Get specific entry
-		entry, entryErr := u.Store.GetEntry(service, input.Name)
+		entry, entryErr := u.Store.GetEntry(ctx, service, input.Name)
 		if entryErr != nil && !errors.Is(entryErr, staging.ErrNotStaged) {
 			return nil, entryErr
 		}
 
 		// Get specific tag entry
-		tagEntry, tagErr := u.Store.GetTag(service, input.Name)
+		tagEntry, tagErr := u.Store.GetTag(ctx, service, input.Name)
 		if tagErr != nil && !errors.Is(tagErr, staging.ErrNotStaged) {
 			return nil, tagErr
 		}
@@ -128,7 +128,7 @@ func (u *DiffUseCase) Execute(ctx context.Context, input DiffInput) (*DiffOutput
 		// Process results
 		for name, entry := range entries {
 			result := results[name]
-			diffEntry := u.processDiffResult(name, entry, result)
+			diffEntry := u.processDiffResult(ctx, name, entry, result)
 			output.Entries = append(output.Entries, diffEntry)
 		}
 	}
@@ -145,11 +145,11 @@ func (u *DiffUseCase) Execute(ctx context.Context, input DiffInput) (*DiffOutput
 	return output, nil
 }
 
-func (u *DiffUseCase) processDiffResult(name string, entry staging.Entry, result *parallel.Result[*staging.FetchResult]) DiffEntry {
+func (u *DiffUseCase) processDiffResult(ctx context.Context, name string, entry staging.Entry, result *parallel.Result[*staging.FetchResult]) DiffEntry {
 	service := u.Strategy.Service()
 
 	if result.Err != nil {
-		return u.handleFetchError(name, entry, result.Err)
+		return u.handleFetchError(ctx, name, entry, result.Err)
 	}
 
 	fetchResult := result.Value
@@ -163,7 +163,7 @@ func (u *DiffUseCase) processDiffResult(name string, entry staging.Entry, result
 
 	// Check if identical and auto-unstage
 	if awsValue == stagedValue {
-		_ = u.Store.UnstageEntry(service, name)
+		_ = u.Store.UnstageEntry(ctx, service, name)
 		return DiffEntry{
 			Name:    name,
 			Type:    DiffEntryAutoUnstaged,
@@ -182,12 +182,12 @@ func (u *DiffUseCase) processDiffResult(name string, entry staging.Entry, result
 	}
 }
 
-func (u *DiffUseCase) handleFetchError(name string, entry staging.Entry, err error) DiffEntry {
+func (u *DiffUseCase) handleFetchError(ctx context.Context, name string, entry staging.Entry, err error) DiffEntry {
 	service := u.Strategy.Service()
 
 	switch entry.Operation {
 	case staging.OperationDelete:
-		_ = u.Store.UnstageEntry(service, name)
+		_ = u.Store.UnstageEntry(ctx, service, name)
 		return DiffEntry{
 			Name:    name,
 			Type:    DiffEntryAutoUnstaged,
@@ -204,7 +204,7 @@ func (u *DiffUseCase) handleFetchError(name string, entry staging.Entry, err err
 		}
 
 	case staging.OperationUpdate:
-		_ = u.Store.UnstageEntry(service, name)
+		_ = u.Store.UnstageEntry(ctx, service, name)
 		return DiffEntry{
 			Name:    name,
 			Type:    DiffEntryAutoUnstaged,

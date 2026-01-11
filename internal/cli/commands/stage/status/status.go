@@ -74,13 +74,13 @@ func action(ctx context.Context, cmd *cli.Command) error {
 }
 
 // Run executes the status command.
-func (r *Runner) Run(_ context.Context, opts Options) error {
-	entries, err := r.Store.ListEntries("")
+func (r *Runner) Run(ctx context.Context, opts Options) error {
+	entries, err := r.Store.ListEntries(ctx, "")
 	if err != nil {
 		return err
 	}
 
-	tagEntries, err := r.Store.ListTags("")
+	tagEntries, err := r.Store.ListTags(ctx, "")
 	if err != nil {
 		return err
 	}

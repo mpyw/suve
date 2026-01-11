@@ -380,7 +380,7 @@ func TestParam_StagingWorkflow(t *testing.T) {
 	// 2. Stage a new value (using store directly since edit requires interactive editor)
 	t.Run("stage-edit", func(t *testing.T) {
 		store := staging.NewStoreWithPath(stagingFilePath(tmpHome))
-		err := store.StageEntry(staging.ServiceParam, paramName, staging.Entry{
+		err := store.StageEntry(t.Context(), staging.ServiceParam, paramName, staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("staged-value"),
 			StagedAt:  time.Now(),
@@ -481,7 +481,7 @@ func TestParam_StagingAdd(t *testing.T) {
 	// 1. Stage add (using store directly since add requires interactive editor)
 	t.Run("stage-add", func(t *testing.T) {
 		store := staging.NewStoreWithPath(stagingFilePath(tmpHome))
-		err := store.StageEntry(staging.ServiceParam, paramName, staging.Entry{
+		err := store.StageEntry(t.Context(), staging.ServiceParam, paramName, staging.Entry{
 			Operation: staging.OperationCreate,
 			Value:     lo.ToPtr("new-param-value"),
 			StagedAt:  time.Now(),
@@ -550,7 +550,7 @@ func TestParam_StagingResetWithVersion(t *testing.T) {
 	// 3. Verify staged value is from version 1
 	t.Run("verify-staged", func(t *testing.T) {
 		store := staging.NewStoreWithPath(stagingFilePath(tmpHome))
-		entry, err := store.GetEntry(staging.ServiceParam, paramName)
+		entry, err := store.GetEntry(t.Context(), staging.ServiceParam, paramName)
 		require.NoError(t, err)
 		require.NotNil(t, entry.Value)
 		assert.Equal(t, "v1", *entry.Value)
@@ -592,12 +592,12 @@ func TestParam_StagingResetAll(t *testing.T) {
 
 	// Stage both
 	store := staging.NewStoreWithPath(stagingFilePath(tmpHome))
-	_ = store.StageEntry(staging.ServiceParam, param1, staging.Entry{
+	_ = store.StageEntry(t.Context(), staging.ServiceParam, param1, staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("staged1"),
 		StagedAt:  time.Now(),
 	})
-	_ = store.StageEntry(staging.ServiceParam, param2, staging.Entry{
+	_ = store.StageEntry(t.Context(), staging.ServiceParam, param2, staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("staged2"),
 		StagedAt:  time.Now(),
@@ -650,12 +650,12 @@ func TestParam_StagingApplySingle(t *testing.T) {
 
 	// Stage both
 	store := staging.NewStoreWithPath(stagingFilePath(tmpHome))
-	_ = store.StageEntry(staging.ServiceParam, param1, staging.Entry{
+	_ = store.StageEntry(t.Context(), staging.ServiceParam, param1, staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("staged1"),
 		StagedAt:  time.Now(),
 	})
-	_ = store.StageEntry(staging.ServiceParam, param2, staging.Entry{
+	_ = store.StageEntry(t.Context(), staging.ServiceParam, param2, staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("staged2"),
 		StagedAt:  time.Now(),
@@ -905,7 +905,7 @@ func TestSecret_StagingWorkflow(t *testing.T) {
 	// 2. Stage update
 	t.Run("stage-update", func(t *testing.T) {
 		store := staging.NewStoreWithPath(stagingFilePath(tmpHome))
-		err := store.StageEntry(staging.ServiceSecret, secretName, staging.Entry{
+		err := store.StageEntry(t.Context(), staging.ServiceSecret, secretName, staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("staged-secret"),
 			StagedAt:  time.Now(),
@@ -993,7 +993,7 @@ func TestSecret_StagingDeleteOptions(t *testing.T) {
 
 		// Verify options are stored
 		store := staging.NewStoreWithPath(stagingFilePath(tmpHome))
-		entry, err := store.GetEntry(staging.ServiceSecret, secretName)
+		entry, err := store.GetEntry(t.Context(), staging.ServiceSecret, secretName)
 		require.NoError(t, err)
 		require.NotNil(t, entry.DeleteOptions)
 		assert.Equal(t, 14, entry.DeleteOptions.RecoveryWindow)
@@ -1027,12 +1027,12 @@ func TestGlobal_StageWorkflow(t *testing.T) {
 
 	// Stage both
 	store := staging.NewStoreWithPath(stagingFilePath(tmpHome))
-	_ = store.StageEntry(staging.ServiceParam, paramName, staging.Entry{
+	_ = store.StageEntry(t.Context(), staging.ServiceParam, paramName, staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("staged-param"),
 		StagedAt:  time.Now(),
 	})
-	_ = store.StageEntry(staging.ServiceSecret, secretName, staging.Entry{
+	_ = store.StageEntry(t.Context(), staging.ServiceSecret, secretName, staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("staged-secret"),
 		StagedAt:  time.Now(),
@@ -1110,12 +1110,12 @@ func TestGlobal_StageResetAll(t *testing.T) {
 	_, _, _ = runCommand(t, secretcreate.Command(), secretName, "original")
 
 	store := staging.NewStoreWithPath(stagingFilePath(tmpHome))
-	_ = store.StageEntry(staging.ServiceParam, paramName, staging.Entry{
+	_ = store.StageEntry(t.Context(), staging.ServiceParam, paramName, staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("staged"),
 		StagedAt:  time.Now(),
 	})
-	_ = store.StageEntry(staging.ServiceSecret, secretName, staging.Entry{
+	_ = store.StageEntry(t.Context(), staging.ServiceSecret, secretName, staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("staged"),
 		StagedAt:  time.Now(),
@@ -1484,7 +1484,7 @@ func TestParam_StagingAddWithOptions(t *testing.T) {
 		store := staging.NewStoreWithPath(stagingFilePath(tmpHome))
 
 		// Verify entry
-		entry, err := store.GetEntry(staging.ServiceParam, paramName)
+		entry, err := store.GetEntry(t.Context(), staging.ServiceParam, paramName)
 		require.NoError(t, err)
 		require.NotNil(t, entry.Value)
 		assert.Equal(t, "value-with-options", *entry.Value)
@@ -1492,7 +1492,7 @@ func TestParam_StagingAddWithOptions(t *testing.T) {
 		assert.Equal(t, "Test description", *entry.Description)
 
 		// Verify tags (now stored separately)
-		tagEntry, err := store.GetTag(staging.ServiceParam, paramName)
+		tagEntry, err := store.GetTag(t.Context(), staging.ServiceParam, paramName)
 		require.NoError(t, err)
 		assert.Equal(t, "test", tagEntry.Add["env"])
 		assert.Equal(t, "e2e", tagEntry.Add["owner"])
@@ -1651,7 +1651,7 @@ func TestParam_GlobalDiffWithJSON(t *testing.T) {
 
 	// Stage update with different JSON
 	store := staging.NewStoreWithPath(stagingFilePath(tmpHome))
-	err = store.StageEntry(staging.ServiceParam, paramName, staging.Entry{
+	err = store.StageEntry(t.Context(), staging.ServiceParam, paramName, staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr(`{"a":1,"b":2}`),
 		StagedAt:  time.Now(),
@@ -1685,7 +1685,7 @@ func TestGlobal_StagingWithTags(t *testing.T) {
 
 	// Stage tag changes using the staging store directly
 	store := staging.NewStoreWithPath(stagingFilePath(tmpHome))
-	err = store.StageTag(staging.ServiceParam, paramName, staging.TagEntry{
+	err = store.StageTag(t.Context(), staging.ServiceParam, paramName, staging.TagEntry{
 		Add:      map[string]string{"env": "test", "team": "e2e"},
 		StagedAt: time.Now(),
 	})
@@ -1745,13 +1745,13 @@ func TestGlobal_ResetWithTags(t *testing.T) {
 
 	// Stage entry and tag changes
 	store := staging.NewStoreWithPath(stagingFilePath(tmpHome))
-	err = store.StageEntry(staging.ServiceParam, paramName, staging.Entry{
+	err = store.StageEntry(t.Context(), staging.ServiceParam, paramName, staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("updated-value"),
 		StagedAt:  time.Now(),
 	})
 	require.NoError(t, err)
-	err = store.StageTag(staging.ServiceParam, paramName, staging.TagEntry{
+	err = store.StageTag(t.Context(), staging.ServiceParam, paramName, staging.TagEntry{
 		Add:      map[string]string{"env": "test"},
 		StagedAt: time.Now(),
 	})
@@ -1766,9 +1766,9 @@ func TestGlobal_ResetWithTags(t *testing.T) {
 		t.Logf("global reset output: %s", stdout)
 
 		// Verify staging is empty
-		_, err = store.GetEntry(staging.ServiceParam, paramName)
+		_, err = store.GetEntry(t.Context(), staging.ServiceParam, paramName)
 		assert.Equal(t, staging.ErrNotStaged, err)
-		_, err = store.GetTag(staging.ServiceParam, paramName)
+		_, err = store.GetTag(t.Context(), staging.ServiceParam, paramName)
 		assert.Equal(t, staging.ErrNotStaged, err)
 	})
 }

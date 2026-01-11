@@ -70,14 +70,14 @@ func action(ctx context.Context, cmd *cli.Command) error {
 }
 
 // Run executes the reset command.
-func (r *Runner) Run(_ context.Context) error {
+func (r *Runner) Run(ctx context.Context) error {
 	// Get counts before reset
-	staged, err := r.Store.ListEntries("")
+	staged, err := r.Store.ListEntries(ctx, "")
 	if err != nil {
 		return err
 	}
 
-	tagStaged, err := r.Store.ListTags("")
+	tagStaged, err := r.Store.ListTags(ctx, "")
 	if err != nil {
 		return err
 	}
@@ -99,14 +99,14 @@ func (r *Runner) Run(_ context.Context) error {
 
 	// Unstage all SSM Parameter Store (UnstageAll clears both entries and tags)
 	if paramCount > 0 {
-		if err := r.Store.UnstageAll(staging.ServiceParam); err != nil {
+		if err := r.Store.UnstageAll(ctx, staging.ServiceParam); err != nil {
 			return err
 		}
 	}
 
 	// Unstage all Secrets Manager (UnstageAll clears both entries and tags)
 	if secretCount > 0 {
-		if err := r.Store.UnstageAll(staging.ServiceSecret); err != nil {
+		if err := r.Store.UnstageAll(ctx, staging.ServiceSecret); err != nil {
 			return err
 		}
 	}
