@@ -54,9 +54,12 @@ scoop bucket add mpyw https://github.com/mpyw/scoop-bucket.git
 scoop install suve
 ```
 
-### Debian/Ubuntu (.deb)
+<details>
+<summary>Linux (.deb / .rpm)</summary>
 
-Download the `.deb` package from [GitHub Releases](https://github.com/mpyw/suve/releases):
+Download packages from [GitHub Releases](https://github.com/mpyw/suve/releases):
+
+**Debian/Ubuntu (.deb):**
 
 ```bash
 export VERSION=0.0.0
@@ -72,12 +75,9 @@ curl -LO "https://github.com/mpyw/suve/releases/download/v${VERSION}/suve${WEBKI
 sudo dpkg -i "suve${WEBKIT_SUFFIX}_${VERSION}-1_${ARCH}.deb"
 ```
 
-> [!NOTE]
-> Ubuntu 22.04/Debian uses webkit2gtk-4.0 (default). Ubuntu 24.04+ uses webkit2gtk-4.1 (set `WEBKIT_SUFFIX="_webkit2_41"`).
+**Note:** Ubuntu 22.04/Debian uses webkit2gtk-4.0 (default). Ubuntu 24.04+ uses webkit2gtk-4.1 (set `WEBKIT_SUFFIX="_webkit2_41"`).
 
-### Red Hat/Fedora (.rpm)
-
-Download the `.rpm` package from [GitHub Releases](https://github.com/mpyw/suve/releases):
+**Red Hat/Fedora (.rpm):**
 
 ```bash
 export VERSION=0.0.0
@@ -93,46 +93,89 @@ curl -LO "https://github.com/mpyw/suve/releases/download/v${VERSION}/suve${WEBKI
 sudo rpm -i "suve${WEBKIT_SUFFIX}-${VERSION}-1.${ARCH}.rpm"
 ```
 
-> [!NOTE]
-> Fedora 39 and earlier uses webkit2gtk-4.0 (default). Fedora 40+ uses webkit2gtk-4.1 (set `WEBKIT_SUFFIX="_webkit2_41"`).
+**Note:** Fedora 39 and earlier uses webkit2gtk-4.0 (default). Fedora 40+ uses webkit2gtk-4.1 (set `WEBKIT_SUFFIX="_webkit2_41"`).
 
-### Using [`go install`](https://pkg.go.dev/cmd/go#hdr-Compile_and_install_packages_and_dependencies)
+</details>
+
+<details>
+<summary>Using <code>go install</code> (CLI only)</summary>
 
 ```bash
-# CLI only
 go install github.com/mpyw/suve/cmd/suve@latest
-
-# CLI + GUI (macOS/Linux: requires CGO, Windows: no CGO needed)
-CGO_ENABLED=1 go install -tags production github.com/mpyw/suve/cmd/suve@latest
-
-# Linux CLI + GUI with webkit2gtk-4.1 (Ubuntu 24.04+, Fedora 40+, Arch Linux)
-CGO_ENABLED=1 go install -tags production,webkit2_41 github.com/mpyw/suve/cmd/suve@latest
-
-# Windows CLI + GUI (no CGO required)
-go install -tags production github.com/mpyw/suve/cmd/suve@latest
 ```
 
-> [!NOTE]
-> The `--gui` flag requires building with `-tags production`. CGO is required on macOS/Linux (for webkit2gtk), but not on Windows (Wails uses pure Go webview2loader).
-> On Linux, install the appropriate dev package first:
-> - Ubuntu 22.04/Debian: `sudo apt install libgtk-3-dev libwebkit2gtk-4.0-dev`
-> - Ubuntu 24.04+: `sudo apt install libgtk-3-dev libwebkit2gtk-4.1-dev` (use `-tags production,webkit2_41`)
-> - Fedora 39: `sudo dnf install gtk3-devel webkit2gtk4.0-devel`
-> - Fedora 40+: `sudo dnf install gtk3-devel webkit2gtk4.1-devel` (use `-tags production,webkit2_41`)
-> - Arch Linux: `sudo pacman -S gtk3 webkit2gtk-4.1` (use `-tags production,webkit2_41`)
+**Note:** `go install` builds CLI only. GUI requires pre-built assets that are not included in the Go module. For GUI support, use a [package manager](#installation) or [build from source](#building-from-source).
 
-### Using [`go tool`](https://pkg.go.dev/cmd/go#hdr-Run_specified_go_tool) (Go 1.24+)
+</details>
+
+<details>
+<summary>Using <code>go tool</code> (CLI only, Go 1.24+)</summary>
 
 ```bash
-# Add to go.mod as a tool dependency (CLI only)
+# Add to go.mod as a tool dependency
 go get -tool github.com/mpyw/suve/cmd/suve@latest
 
 # Run via go tool
 go tool suve param show /my/param
 ```
 
-> [!NOTE]
-> `go tool` does not support build tags, so GUI is not available. Use `go install` with `-tags production` for GUI support.
+</details>
+
+<details>
+<summary>Building from Source</summary>
+
+For platforms without pre-built packages (e.g., Arch Linux) or if you need the latest development version with GUI:
+
+```bash
+git clone https://github.com/mpyw/suve.git
+cd suve
+```
+
+**CLI only:**
+
+```bash
+make build
+# Binary: bin/suve
+```
+
+**CLI + GUI** (requires [Wails CLI](https://wails.io/) and [Node.js](https://nodejs.org/)):
+
+```bash
+go install github.com/wailsapp/wails/v2/cmd/wails@latest
+cd gui && wails build -tags production -skipbindings
+# Binary: gui/build/bin/gui
+```
+
+**Build dependencies for GUI:**
+
+| Platform | Dependencies |
+|----------|-------------|
+| All | [Node.js](https://nodejs.org/) (for frontend build) |
+| macOS | Xcode Command Line Tools |
+| Windows | [WebView2 Runtime](https://developer.microsoft.com/en-us/microsoft-edge/webview2/) (usually pre-installed) |
+
+<details>
+<summary>Linux build dependencies and webkit2gtk-4.1 support</summary>
+
+Linux requires GTK3 and WebKit2GTK:
+
+| Platform | Dependencies |
+|----------|-------------|
+| Ubuntu 22.04/Debian | `sudo apt install libgtk-3-dev libwebkit2gtk-4.0-dev` |
+| Ubuntu 24.04+ | `sudo apt install libgtk-3-dev libwebkit2gtk-4.1-dev` |
+| Fedora 39 | `sudo dnf install gtk3-devel webkit2gtk4.0-devel` |
+| Fedora 40+ | `sudo dnf install gtk3-devel webkit2gtk4.1-devel` |
+| Arch Linux | `sudo pacman -S gtk3 webkit2gtk-4.1` |
+
+For **webkit2gtk-4.1** (Ubuntu 24.04+, Fedora 40+, Arch Linux), use the `webkit2_41` build tag:
+
+```bash
+cd gui && wails build -tags production,webkit2_41 -skipbindings
+```
+
+</details>
+
+</details>
 
 > [!TIP]
 > **Using with [aws-vault](https://github.com/99designs/aws-vault)**: Wrap commands with `aws-vault exec` for temporary credentials:
