@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/mpyw/suve/internal/staging"
+	"github.com/mpyw/suve/internal/staging/file"
 	"github.com/mpyw/suve/internal/staging/runner"
 	stagingusecase "github.com/mpyw/suve/internal/usecase/staging"
 )
@@ -102,7 +103,7 @@ func TestStatusRunner_Run(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
-		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("staged-value"),
@@ -129,7 +130,7 @@ func TestStatusRunner_Run(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
-		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.StatusRunner{
@@ -150,7 +151,7 @@ func TestStatusRunner_Run(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
-		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("staged-value"),
@@ -176,7 +177,7 @@ func TestStatusRunner_Run(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
-		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.StatusRunner{
@@ -197,7 +198,7 @@ func TestStatusRunner_Run(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
-		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config1", staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("value1"),
@@ -237,7 +238,7 @@ func TestStatusRunner_Run(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
-		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 		_ = store.StageEntry(t.Context(), staging.ServiceSecret, "my-secret", staging.Entry{
 			Operation:     staging.OperationDelete,
 			StagedAt:      time.Now(),
@@ -271,7 +272,7 @@ func TestDiffRunner_Run(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
-		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("new-value"),
@@ -299,7 +300,7 @@ func TestDiffRunner_Run(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
-		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config1", staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("new1"),
@@ -332,7 +333,7 @@ func TestDiffRunner_Run(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
-		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.DiffRunner{
@@ -353,7 +354,7 @@ func TestDiffRunner_Run(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
-		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.DiffRunner{
@@ -374,7 +375,7 @@ func TestDiffRunner_Run(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
-		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr(`{"b":2,"a":1}`),
@@ -402,7 +403,7 @@ func TestDiffRunner_Run(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
-		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("not-json"),
@@ -428,7 +429,7 @@ func TestDiffRunner_Run(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
-		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("same-value"),
@@ -459,7 +460,7 @@ func TestDiffRunner_Run(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
-		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
 			Operation: staging.OperationDelete,
 			StagedAt:  time.Now(),
@@ -486,7 +487,7 @@ func TestDiffRunner_Run(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
-		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("new-value"),
@@ -518,7 +519,7 @@ func TestDiffRunner_Run(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
-		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/new-param", staging.Entry{
 			Operation: staging.OperationCreate,
 			Value:     lo.ToPtr("brand-new-value"),
@@ -554,7 +555,7 @@ func TestDiffRunner_Run(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
-		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/new-json", staging.Entry{
 			Operation: staging.OperationCreate,
 			Value:     lo.ToPtr(`{"b":2,"a":1}`),
@@ -583,7 +584,7 @@ func TestDiffRunner_Run(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
-		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/param", staging.Entry{
 			Operation: staging.OperationCreate,
 			Value:     lo.ToPtr("same-value"),
@@ -615,7 +616,7 @@ func TestDiffRunner_Run(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
-		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/param", staging.Entry{
 			Operation: staging.OperationCreate,
 			Value:     lo.ToPtr("new-value"),
@@ -644,7 +645,7 @@ func TestDiffRunner_Run(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
-		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
 			Operation: staging.OperationDelete,
 			StagedAt:  time.Now(),
@@ -683,7 +684,7 @@ func TestEditRunner_Run(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
-		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.EditRunner{
@@ -713,7 +714,7 @@ func TestEditRunner_Run(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
-		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("staged-value"),
@@ -746,7 +747,7 @@ func TestEditRunner_Run(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
-		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
 			Operation: staging.OperationCreate,
 			Value:     lo.ToPtr("create-value"),
@@ -775,7 +776,7 @@ func TestEditRunner_Run(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
-		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.EditRunner{
@@ -799,7 +800,7 @@ func TestEditRunner_Run(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
-		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.EditRunner{
@@ -823,7 +824,7 @@ func TestEditRunner_Run(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
-		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.EditRunner{
@@ -855,7 +856,7 @@ func TestApplyRunner_Run(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
-		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config1", staging.Entry{
 			Operation: staging.OperationCreate,
 			Value:     lo.ToPtr("value1"),
@@ -901,7 +902,7 @@ func TestApplyRunner_Run(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
-		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config1", staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("value1"),
@@ -937,7 +938,7 @@ func TestApplyRunner_Run(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
-		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 		// Stage a different item so we can test "specific item not staged"
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/other", staging.Entry{
 			Operation: staging.OperationUpdate,
@@ -964,7 +965,7 @@ func TestApplyRunner_Run(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
-		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.ApplyRunner{
@@ -985,7 +986,7 @@ func TestApplyRunner_Run(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
-		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("value"),
@@ -1012,7 +1013,7 @@ func TestApplyRunner_Run(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
-		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/new-config", staging.Entry{
 			Operation: staging.OperationCreate,
 			Value:     lo.ToPtr("new-value"),
@@ -1041,7 +1042,7 @@ func TestApplyRunner_Run(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
-		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 		baseTime := time.Now().Add(-time.Hour)
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
 			Operation:      staging.OperationUpdate,
@@ -1071,7 +1072,7 @@ func TestApplyRunner_Run(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
-		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 		baseTime := time.Now().Add(-time.Hour)
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
 			Operation:      staging.OperationDelete,
@@ -1098,7 +1099,7 @@ func TestApplyRunner_Run(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
-		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 		baseTime := time.Now()
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
 			Operation:      staging.OperationUpdate,
@@ -1127,7 +1128,7 @@ func TestApplyRunner_Run(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
-		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 		baseTime := time.Now().Add(-time.Hour)
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
 			Operation:      staging.OperationUpdate,
@@ -1156,7 +1157,7 @@ func TestApplyRunner_Run(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
-		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/new-config", staging.Entry{
 			Operation: staging.OperationCreate,
 			Value:     lo.ToPtr("new-value"),
@@ -1191,7 +1192,7 @@ func TestResetRunner_Run(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
-		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config1", staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("value1"),
@@ -1227,7 +1228,7 @@ func TestResetRunner_Run(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
-		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.ResetRunner{
@@ -1248,7 +1249,7 @@ func TestResetRunner_Run(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
-		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("value"),
@@ -1277,7 +1278,7 @@ func TestResetRunner_Run(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
-		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.ResetRunner{
@@ -1298,7 +1299,7 @@ func TestResetRunner_Run(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
-		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 		var stdout, stderr bytes.Buffer
 		fetcher := &fullMockStrategy{
@@ -1331,7 +1332,7 @@ func TestResetRunner_Run(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
-		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.ResetRunner{
@@ -1353,7 +1354,7 @@ func TestResetRunner_Run(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
-		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 		var stdout, stderr bytes.Buffer
 		fetcher := &fullMockStrategy{
@@ -1380,7 +1381,7 @@ func TestResetRunner_Run(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
-		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.ResetRunner{
@@ -1412,7 +1413,7 @@ func TestRunners_SecretService(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
-		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 		_ = store.StageEntry(t.Context(), staging.ServiceSecret, "my-secret", staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("secret-value"),
@@ -1438,7 +1439,7 @@ func TestRunners_SecretService(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
-		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 		_ = store.StageEntry(t.Context(), staging.ServiceSecret, "my-secret", staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("secret-value"),
@@ -1468,7 +1469,7 @@ func TestRunners_DeleteOptions(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
-		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 		_ = store.StageEntry(t.Context(), staging.ServiceSecret, "my-secret", staging.Entry{
 			Operation:     staging.OperationDelete,
 			StagedAt:      time.Now(),
@@ -1500,7 +1501,7 @@ func TestDiffRunner_OutputMetadata(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
-		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 		desc := "Updated config description"
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
 			Operation:   staging.OperationUpdate,
@@ -1530,7 +1531,7 @@ func TestDiffRunner_OutputMetadata(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
-		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("new-value"),
@@ -1563,7 +1564,7 @@ func TestDiffRunner_OutputMetadata(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
-		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 		desc := "New parameter"
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/new-param", staging.Entry{
 			Operation:   staging.OperationCreate,
@@ -1609,7 +1610,7 @@ func TestEditRunner_WithMetadata(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
-		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.EditRunner{
@@ -1637,7 +1638,7 @@ func TestEditRunner_WithMetadata(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
-		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 		awsTime := time.Now().Add(-time.Hour).Truncate(time.Second)
 
 		var stdout, stderr bytes.Buffer
@@ -1670,7 +1671,7 @@ func TestEditRunner_WithMetadata(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
-		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 		// Stage a delete operation
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
 			Operation: staging.OperationDelete,
@@ -1709,7 +1710,7 @@ func TestApplyRunner_WithTags(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
-		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 		_ = store.StageTag(t.Context(), staging.ServiceParam, "/app/config", staging.TagEntry{
 			Add:      map[string]string{"env": "prod", "team": "backend"},
 			StagedAt: time.Now(),
@@ -1736,7 +1737,7 @@ func TestApplyRunner_WithTags(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
-		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 		removeKeys := make(map[string]struct{})
 		removeKeys["deprecated"] = struct{}{}
 		removeKeys["old"] = struct{}{}
@@ -1766,7 +1767,7 @@ func TestApplyRunner_WithTags(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
-		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 		removeKeys := make(map[string]struct{})
 		removeKeys["deprecated"] = struct{}{}
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
@@ -1811,7 +1812,7 @@ func TestStatusRunner_WithTagEntries(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
-		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 		_ = store.StageTag(t.Context(), staging.ServiceParam, "/app/config", staging.TagEntry{
 			Add:      map[string]string{"env": "prod", "team": "backend"},
 			StagedAt: time.Now(),
@@ -1839,7 +1840,7 @@ func TestStatusRunner_WithTagEntries(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
-		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 		removeKeys := map[string]struct{}{"deprecated": {}, "old": {}}
 		_ = store.StageTag(t.Context(), staging.ServiceParam, "/app/config", staging.TagEntry{
 			Add:      map[string]string{"env": "prod"},
@@ -1868,7 +1869,7 @@ func TestStatusRunner_WithTagEntries(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
-		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 		removeKeys := map[string]struct{}{"deprecated": {}}
 		_ = store.StageTag(t.Context(), staging.ServiceParam, "/app/config", staging.TagEntry{
 			Add:      map[string]string{"env": "prod"},
@@ -1897,7 +1898,7 @@ func TestStatusRunner_WithTagEntries(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
-		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 		_ = store.StageTag(t.Context(), staging.ServiceParam, "/app/config1", staging.TagEntry{
 			Add:      map[string]string{"env": "prod"},
 			StagedAt: time.Now(),
@@ -1930,7 +1931,7 @@ func TestStatusRunner_WithTagEntries(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
-		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/value", staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("new-value"),
@@ -1963,7 +1964,7 @@ func TestStatusRunner_WithTagEntries(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
-		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 		removeKeys := map[string]struct{}{"old": {}}
 		_ = store.StageTag(t.Context(), staging.ServiceParam, "/app/config", staging.TagEntry{
 			Add:      map[string]string{"env": "prod"},
@@ -1996,7 +1997,7 @@ func TestDeleteRunner_Run(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
-		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.DeleteRunner{
@@ -2022,7 +2023,7 @@ func TestDeleteRunner_Run(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
-		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.DeleteRunner{
@@ -2053,7 +2054,7 @@ func TestDeleteRunner_Run(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
-		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.DeleteRunner{
@@ -2083,7 +2084,7 @@ func TestDeleteRunner_Run(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
-		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.DeleteRunner{
@@ -2104,7 +2105,7 @@ func TestDeleteRunner_Run(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
-		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.DeleteRunner{
@@ -2128,7 +2129,7 @@ func TestDeleteRunner_Run(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
-		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 		// Pre-stage a CREATE operation
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/new-config", staging.Entry{
@@ -2168,7 +2169,7 @@ func TestEditRunner_Skipped_Unstaged(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
-		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.EditRunner{
@@ -2197,7 +2198,7 @@ func TestEditRunner_Skipped_Unstaged(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
-		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 		// Pre-stage an UPDATE operation
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
@@ -2241,7 +2242,7 @@ func TestResetRunner_Skipped(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
-		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 		var stdout, stderr bytes.Buffer
 		// Fetcher returns version value that matches current AWS value

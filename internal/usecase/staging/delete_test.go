@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/mpyw/suve/internal/staging"
+	"github.com/mpyw/suve/internal/staging/file"
 	usecasestaging "github.com/mpyw/suve/internal/usecase/staging"
 )
 
@@ -40,7 +41,7 @@ func newMockDeleteStrategy(hasDeleteOptions bool) *mockDeleteStrategy {
 func TestDeleteUseCase_Execute_Param(t *testing.T) {
 	t.Parallel()
 
-	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
 	uc := &usecasestaging.DeleteUseCase{
 		Strategy: newMockDeleteStrategy(false),
 		Store:    store,
@@ -63,7 +64,7 @@ func TestDeleteUseCase_Execute_Param(t *testing.T) {
 func TestDeleteUseCase_Execute_SecretWithRecoveryWindow(t *testing.T) {
 	t.Parallel()
 
-	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
 	strategy := newMockDeleteStrategy(true)
 	strategy.mockServiceStrategy = newSecretStrategy()
 
@@ -90,7 +91,7 @@ func TestDeleteUseCase_Execute_SecretWithRecoveryWindow(t *testing.T) {
 func TestDeleteUseCase_Execute_SecretForceDelete(t *testing.T) {
 	t.Parallel()
 
-	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
 	strategy := newMockDeleteStrategy(true)
 	strategy.mockServiceStrategy = newSecretStrategy()
 
@@ -110,7 +111,7 @@ func TestDeleteUseCase_Execute_SecretForceDelete(t *testing.T) {
 func TestDeleteUseCase_Execute_InvalidRecoveryWindow(t *testing.T) {
 	t.Parallel()
 
-	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
 	strategy := newMockDeleteStrategy(true)
 	strategy.mockServiceStrategy = newSecretStrategy()
 
@@ -138,7 +139,7 @@ func TestDeleteUseCase_Execute_InvalidRecoveryWindow(t *testing.T) {
 func TestDeleteUseCase_Execute_FetchError(t *testing.T) {
 	t.Parallel()
 
-	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
 	strategy := newMockDeleteStrategy(false)
 	strategy.fetchErr = errors.New("not found")
 
@@ -157,7 +158,7 @@ func TestDeleteUseCase_Execute_FetchError(t *testing.T) {
 func TestDeleteUseCase_Execute_ZeroLastModified_ResourceNotFound(t *testing.T) {
 	t.Parallel()
 
-	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
 	strategy := newMockDeleteStrategy(false)
 	strategy.lastModified = time.Time{} // Zero time means resource doesn't exist
 
@@ -177,7 +178,7 @@ func TestDeleteUseCase_Execute_ZeroLastModified_ResourceNotFound(t *testing.T) {
 func TestDeleteUseCase_Execute_ZeroLastModified_StagedCreate(t *testing.T) {
 	t.Parallel()
 
-	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
 
 	// Pre-stage a CREATE operation
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/new-param", staging.Entry{
@@ -269,7 +270,7 @@ func TestDeleteUseCase_Execute_UnstageError(t *testing.T) {
 func TestDeleteUseCase_Execute_UnstagesCreate(t *testing.T) {
 	t.Parallel()
 
-	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
 	// Pre-stage a CREATE operation
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/new", staging.Entry{
 		Operation: staging.OperationCreate,
@@ -297,7 +298,7 @@ func TestDeleteUseCase_Execute_UnstagesCreate(t *testing.T) {
 func TestDeleteUseCase_Execute_DeleteOnUpdate(t *testing.T) {
 	t.Parallel()
 
-	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
 	// Pre-stage an UPDATE operation
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/existing", staging.Entry{
 		Operation: staging.OperationUpdate,

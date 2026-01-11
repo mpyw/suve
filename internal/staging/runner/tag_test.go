@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/mpyw/suve/internal/staging"
+	"github.com/mpyw/suve/internal/staging/file"
 	"github.com/mpyw/suve/internal/staging/runner"
 	stagingusecase "github.com/mpyw/suve/internal/usecase/staging"
 )
@@ -20,7 +21,7 @@ func TestTagRunner_Run(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
-		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.TagRunner{
@@ -49,7 +50,7 @@ func TestTagRunner_Run(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
-		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.TagRunner{
@@ -73,7 +74,7 @@ func TestTagRunner_Run(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
-		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.TagRunner{
@@ -100,7 +101,7 @@ func TestUntagRunner_Run(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
-		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.UntagRunner{
@@ -130,7 +131,7 @@ func TestUntagRunner_Run(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
-		store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.UntagRunner{

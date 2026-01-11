@@ -9,6 +9,7 @@ import (
 	"github.com/mpyw/suve/internal/api/secretapi"
 	"github.com/mpyw/suve/internal/infra"
 	"github.com/mpyw/suve/internal/staging"
+	"github.com/mpyw/suve/internal/staging/file"
 )
 
 // =============================================================================
@@ -48,7 +49,7 @@ type App struct {
 	secretClient SecretClient
 
 	// Staging store
-	stagingStore *staging.Store
+	stagingStore *file.Store
 }
 
 // NewApp creates a new App application struct.
@@ -102,7 +103,7 @@ func (a *App) getSecretClient() (SecretClient, error) {
 	return client, nil
 }
 
-func (a *App) getStagingStore() (*staging.Store, error) {
+func (a *App) getStagingStore() (*file.Store, error) {
 	if a.stagingStore != nil {
 		return a.stagingStore, nil
 	}
@@ -112,7 +113,7 @@ func (a *App) getStagingStore() (*staging.Store, error) {
 		return nil, err
 	}
 
-	store, err := staging.NewStore(identity.AccountID, identity.Region)
+	store, err := file.NewStore(identity.AccountID, identity.Region)
 	if err != nil {
 		return nil, err
 	}

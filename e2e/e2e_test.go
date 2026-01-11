@@ -48,6 +48,7 @@ import (
 	secretstage "github.com/mpyw/suve/internal/cli/commands/stage/secret"
 	globalstatus "github.com/mpyw/suve/internal/cli/commands/stage/status"
 	"github.com/mpyw/suve/internal/staging"
+	"github.com/mpyw/suve/internal/staging/file"
 )
 
 func getEndpoint() string {
@@ -379,7 +380,7 @@ func TestParam_StagingWorkflow(t *testing.T) {
 
 	// 2. Stage a new value (using store directly since edit requires interactive editor)
 	t.Run("stage-edit", func(t *testing.T) {
-		store := staging.NewStoreWithPath(stagingFilePath(tmpHome))
+		store := file.NewStoreWithPath(stagingFilePath(tmpHome))
 		err := store.StageEntry(t.Context(), staging.ServiceParam, paramName, staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("staged-value"),
@@ -480,7 +481,7 @@ func TestParam_StagingAdd(t *testing.T) {
 
 	// 1. Stage add (using store directly since add requires interactive editor)
 	t.Run("stage-add", func(t *testing.T) {
-		store := staging.NewStoreWithPath(stagingFilePath(tmpHome))
+		store := file.NewStoreWithPath(stagingFilePath(tmpHome))
 		err := store.StageEntry(t.Context(), staging.ServiceParam, paramName, staging.Entry{
 			Operation: staging.OperationCreate,
 			Value:     lo.ToPtr("new-param-value"),
@@ -549,7 +550,7 @@ func TestParam_StagingResetWithVersion(t *testing.T) {
 
 	// 3. Verify staged value is from version 1
 	t.Run("verify-staged", func(t *testing.T) {
-		store := staging.NewStoreWithPath(stagingFilePath(tmpHome))
+		store := file.NewStoreWithPath(stagingFilePath(tmpHome))
 		entry, err := store.GetEntry(t.Context(), staging.ServiceParam, paramName)
 		require.NoError(t, err)
 		require.NotNil(t, entry.Value)
@@ -591,7 +592,7 @@ func TestParam_StagingResetAll(t *testing.T) {
 	_, _, _ = runCommand(t, paramcreate.Command(), param2, "value2")
 
 	// Stage both
-	store := staging.NewStoreWithPath(stagingFilePath(tmpHome))
+	store := file.NewStoreWithPath(stagingFilePath(tmpHome))
 	_ = store.StageEntry(t.Context(), staging.ServiceParam, param1, staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("staged1"),
@@ -649,7 +650,7 @@ func TestParam_StagingApplySingle(t *testing.T) {
 	_, _, _ = runCommand(t, paramcreate.Command(), param2, "original2")
 
 	// Stage both
-	store := staging.NewStoreWithPath(stagingFilePath(tmpHome))
+	store := file.NewStoreWithPath(stagingFilePath(tmpHome))
 	_ = store.StageEntry(t.Context(), staging.ServiceParam, param1, staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("staged1"),
@@ -904,7 +905,7 @@ func TestSecret_StagingWorkflow(t *testing.T) {
 
 	// 2. Stage update
 	t.Run("stage-update", func(t *testing.T) {
-		store := staging.NewStoreWithPath(stagingFilePath(tmpHome))
+		store := file.NewStoreWithPath(stagingFilePath(tmpHome))
 		err := store.StageEntry(t.Context(), staging.ServiceSecret, secretName, staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("staged-secret"),
@@ -992,7 +993,7 @@ func TestSecret_StagingDeleteOptions(t *testing.T) {
 		require.NoError(t, err)
 
 		// Verify options are stored
-		store := staging.NewStoreWithPath(stagingFilePath(tmpHome))
+		store := file.NewStoreWithPath(stagingFilePath(tmpHome))
 		entry, err := store.GetEntry(t.Context(), staging.ServiceSecret, secretName)
 		require.NoError(t, err)
 		require.NotNil(t, entry.DeleteOptions)
@@ -1026,7 +1027,7 @@ func TestGlobal_StageWorkflow(t *testing.T) {
 	_, _, _ = runCommand(t, secretcreate.Command(), secretName, "original-secret")
 
 	// Stage both
-	store := staging.NewStoreWithPath(stagingFilePath(tmpHome))
+	store := file.NewStoreWithPath(stagingFilePath(tmpHome))
 	_ = store.StageEntry(t.Context(), staging.ServiceParam, paramName, staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("staged-param"),
@@ -1109,7 +1110,7 @@ func TestGlobal_StageResetAll(t *testing.T) {
 	_, _, _ = runCommand(t, paramcreate.Command(), paramName, "original")
 	_, _, _ = runCommand(t, secretcreate.Command(), secretName, "original")
 
-	store := staging.NewStoreWithPath(stagingFilePath(tmpHome))
+	store := file.NewStoreWithPath(stagingFilePath(tmpHome))
 	_ = store.StageEntry(t.Context(), staging.ServiceParam, paramName, staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("staged"),
@@ -1481,7 +1482,7 @@ func TestParam_StagingAddWithOptions(t *testing.T) {
 
 	// Verify staged entry has options
 	t.Run("verify-staged-options", func(t *testing.T) {
-		store := staging.NewStoreWithPath(stagingFilePath(tmpHome))
+		store := file.NewStoreWithPath(stagingFilePath(tmpHome))
 
 		// Verify entry
 		entry, err := store.GetEntry(t.Context(), staging.ServiceParam, paramName)
@@ -1650,7 +1651,7 @@ func TestParam_GlobalDiffWithJSON(t *testing.T) {
 	require.NoError(t, err)
 
 	// Stage update with different JSON
-	store := staging.NewStoreWithPath(stagingFilePath(tmpHome))
+	store := file.NewStoreWithPath(stagingFilePath(tmpHome))
 	err = store.StageEntry(t.Context(), staging.ServiceParam, paramName, staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr(`{"a":1,"b":2}`),
@@ -1684,7 +1685,7 @@ func TestGlobal_StagingWithTags(t *testing.T) {
 	require.NoError(t, err)
 
 	// Stage tag changes using the staging store directly
-	store := staging.NewStoreWithPath(stagingFilePath(tmpHome))
+	store := file.NewStoreWithPath(stagingFilePath(tmpHome))
 	err = store.StageTag(t.Context(), staging.ServiceParam, paramName, staging.TagEntry{
 		Add:      map[string]string{"env": "test", "team": "e2e"},
 		StagedAt: time.Now(),
@@ -1744,7 +1745,7 @@ func TestGlobal_ResetWithTags(t *testing.T) {
 	require.NoError(t, err)
 
 	// Stage entry and tag changes
-	store := staging.NewStoreWithPath(stagingFilePath(tmpHome))
+	store := file.NewStoreWithPath(stagingFilePath(tmpHome))
 	err = store.StageEntry(t.Context(), staging.ServiceParam, paramName, staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("updated-value"),

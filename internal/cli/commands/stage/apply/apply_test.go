@@ -17,6 +17,7 @@ import (
 	"github.com/mpyw/suve/internal/cli/commands/stage/apply"
 	"github.com/mpyw/suve/internal/maputil"
 	"github.com/mpyw/suve/internal/staging"
+	"github.com/mpyw/suve/internal/staging/file"
 )
 
 // mockStrategy implements staging.ApplyStrategy for testing.
@@ -89,7 +90,7 @@ func TestRun_NoChanges(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 	var buf bytes.Buffer
 	r := &apply.Runner{
@@ -111,7 +112,7 @@ func TestRun_ApplyBothServices(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 	// Stage SSM Parameter Store parameter
 	_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
@@ -173,7 +174,7 @@ func TestRun_ApplyParamOnly(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 	// Stage only SSM Parameter Store parameter
 	_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
@@ -209,7 +210,7 @@ func TestRun_ApplySecretOnly(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 	// Stage only Secrets Manager secret
 	_ = store.StageEntry(t.Context(), staging.ServiceSecret, "my-secret", staging.Entry{
@@ -245,7 +246,7 @@ func TestRun_ApplyDelete(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 	// Stage deletes
 	_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/old", staging.Entry{
@@ -293,7 +294,7 @@ func TestRun_PartialFailure(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 	// Stage both
 	_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
@@ -349,7 +350,7 @@ func TestRun_StoreError(t *testing.T) {
 	// Create invalid JSON
 	require.NoError(t, os.WriteFile(path, []byte("invalid json"), 0o644))
 
-	store := staging.NewStoreWithPath(path)
+	store := file.NewStoreWithPath(path)
 
 	var buf bytes.Buffer
 	r := &apply.Runner{
@@ -369,7 +370,7 @@ func TestRun_SecretDeleteWithForce(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 	// Stage Secrets Manager delete with force option
 	_ = store.StageEntry(t.Context(), staging.ServiceSecret, "my-secret", staging.Entry{
@@ -405,7 +406,7 @@ func TestRun_SecretDeleteWithRecoveryWindow(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 	// Stage Secrets Manager delete with custom recovery window
 	_ = store.StageEntry(t.Context(), staging.ServiceSecret, "my-secret", staging.Entry{
@@ -441,7 +442,7 @@ func TestRun_ParamDeleteError(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 	_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
 		Operation: staging.OperationDelete,
@@ -470,7 +471,7 @@ func TestRun_SecretSetError(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 	_ = store.StageEntry(t.Context(), staging.ServiceSecret, "my-secret", staging.Entry{
 		Operation: staging.OperationUpdate,
@@ -500,7 +501,7 @@ func TestRun_SecretDeleteError(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 	_ = store.StageEntry(t.Context(), staging.ServiceSecret, "my-secret", staging.Entry{
 		Operation: staging.OperationDelete,
@@ -529,7 +530,7 @@ func TestRun_ParamSetError(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 	_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
 		Operation: staging.OperationUpdate,
@@ -559,7 +560,7 @@ func TestRun_ConflictDetection_CreateConflict(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 	// Stage a create operation
 	_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/new-param", staging.Entry{
@@ -591,7 +592,7 @@ func TestRun_ConflictDetection_UpdateConflict(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 	baseTime := time.Now().Add(-1 * time.Hour)
 	_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
@@ -624,7 +625,7 @@ func TestRun_ConflictDetection_DeleteConflict(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 	baseTime := time.Now().Add(-1 * time.Hour)
 	_ = store.StageEntry(t.Context(), staging.ServiceSecret, "my-secret", staging.Entry{
@@ -656,7 +657,7 @@ func TestRun_ConflictDetection_IgnoreConflicts(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 	baseTime := time.Now().Add(-1 * time.Hour)
 	_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
@@ -693,7 +694,7 @@ func TestRun_ConflictDetection_NoConflict(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 	baseTime := time.Now()
 	_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
@@ -730,7 +731,7 @@ func TestRun_ConflictDetection_BothServices(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 	baseTime := time.Now().Add(-1 * time.Hour)
 
@@ -777,7 +778,7 @@ func TestRun_ApplyCreate(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 	// Stage create operation
 	_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/new-param", staging.Entry{
@@ -808,7 +809,7 @@ func TestRun_ApplyTagsSuccess(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 	// Stage tag changes
 	_ = store.StageTag(t.Context(), staging.ServiceParam, "/app/config", staging.TagEntry{
@@ -852,7 +853,7 @@ func TestRun_ApplyTagsError(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 	// Stage tag changes
 	_ = store.StageTag(t.Context(), staging.ServiceParam, "/app/config", staging.TagEntry{
@@ -888,7 +889,7 @@ func TestRun_ApplyTagsSecretService(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 	// Stage secret tag changes
 	_ = store.StageTag(t.Context(), staging.ServiceSecret, "my-secret", staging.TagEntry{
@@ -923,7 +924,7 @@ func TestRun_ApplyBothEntriesAndTags(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 	// Stage entry change
 	_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
@@ -971,7 +972,7 @@ func TestRun_ApplyTagsOnlyAdditions(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 	// Stage tag changes with only additions
 	_ = store.StageTag(t.Context(), staging.ServiceParam, "/app/config", staging.TagEntry{
@@ -1002,7 +1003,7 @@ func TestRun_ApplyTagsOnlyRemovals(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 	// Stage tag changes with only removals
 	_ = store.StageTag(t.Context(), staging.ServiceParam, "/app/config", staging.TagEntry{

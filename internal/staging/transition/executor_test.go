@@ -13,6 +13,7 @@ import (
 
 	"github.com/mpyw/suve/internal/maputil"
 	"github.com/mpyw/suve/internal/staging"
+	"github.com/mpyw/suve/internal/staging/file"
 )
 
 // mockStore implements staging.StoreReadWriter for testing error paths.
@@ -57,7 +58,7 @@ func (m *mockStore) UnstageTag(_ context.Context, _ staging.Service, _ string) e
 }
 
 func TestNewExecutor(t *testing.T) {
-	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "stage.json"))
+	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "stage.json"))
 	executor := NewExecutor(store)
 	assert.NotNil(t, executor)
 	assert.Equal(t, store, executor.Store)
@@ -66,7 +67,7 @@ func TestNewExecutor(t *testing.T) {
 func TestExecuteEntry_Add(t *testing.T) {
 	t.Parallel()
 
-	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "stage.json"))
+	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "stage.json"))
 	executor := NewExecutor(store)
 
 	state := EntryState{
@@ -91,7 +92,7 @@ func TestExecuteEntry_Add(t *testing.T) {
 func TestExecuteEntry_AddWithDescription(t *testing.T) {
 	t.Parallel()
 
-	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "stage.json"))
+	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "stage.json"))
 	executor := NewExecutor(store)
 
 	state := EntryState{
@@ -117,7 +118,7 @@ func TestExecuteEntry_AddWithDescription(t *testing.T) {
 func TestExecuteEntry_Edit(t *testing.T) {
 	t.Parallel()
 
-	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "stage.json"))
+	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "stage.json"))
 	executor := NewExecutor(store)
 
 	currentValue := "current"
@@ -142,7 +143,7 @@ func TestExecuteEntry_Edit(t *testing.T) {
 func TestExecuteEntry_EditWithMetadata(t *testing.T) {
 	t.Parallel()
 
-	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "stage.json"))
+	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "stage.json"))
 	executor := NewExecutor(store)
 
 	currentValue := "current"
@@ -175,7 +176,7 @@ func TestExecuteEntry_EditWithMetadata(t *testing.T) {
 func TestExecuteEntry_Delete(t *testing.T) {
 	t.Parallel()
 
-	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "stage.json"))
+	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "stage.json"))
 	executor := NewExecutor(store)
 
 	currentValue := "current"
@@ -200,7 +201,7 @@ func TestExecuteEntry_Delete(t *testing.T) {
 func TestExecuteEntry_DeleteWithMetadata(t *testing.T) {
 	t.Parallel()
 
-	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "stage.json"))
+	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "stage.json"))
 	executor := NewExecutor(store)
 
 	currentValue := "current"
@@ -230,7 +231,7 @@ func TestExecuteEntry_DeleteWithMetadata(t *testing.T) {
 func TestExecuteEntry_DeleteCreate_UnstagesTags(t *testing.T) {
 	t.Parallel()
 
-	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "stage.json"))
+	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "stage.json"))
 
 	// Pre-stage CREATE and tags
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/new", staging.Entry{
@@ -268,7 +269,7 @@ func TestExecuteEntry_DeleteCreate_UnstagesTags(t *testing.T) {
 func TestExecuteEntry_DeleteCreate_NoTags(t *testing.T) {
 	t.Parallel()
 
-	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "stage.json"))
+	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "stage.json"))
 
 	// Pre-stage CREATE but no tags
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/new", staging.Entry{
@@ -299,7 +300,7 @@ func TestExecuteEntry_DeleteCreate_NoTags(t *testing.T) {
 func TestExecuteEntry_Reset(t *testing.T) {
 	t.Parallel()
 
-	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "stage.json"))
+	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "stage.json"))
 
 	// Pre-stage an entry
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
@@ -330,7 +331,7 @@ func TestExecuteEntry_Reset(t *testing.T) {
 func TestExecuteEntry_Error(t *testing.T) {
 	t.Parallel()
 
-	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "stage.json"))
+	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "stage.json"))
 	executor := NewExecutor(store)
 
 	state := EntryState{
@@ -347,7 +348,7 @@ func TestExecuteEntry_Error(t *testing.T) {
 func TestExecuteEntry_ResetNotStaged(t *testing.T) {
 	t.Parallel()
 
-	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "stage.json"))
+	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "stage.json"))
 	executor := NewExecutor(store)
 
 	state := EntryState{
@@ -366,7 +367,7 @@ func TestExecuteEntry_ResetNotStaged(t *testing.T) {
 func TestExecuteTag_Add(t *testing.T) {
 	t.Parallel()
 
-	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "stage.json"))
+	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "stage.json"))
 	executor := NewExecutor(store)
 
 	baseTime := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
@@ -392,7 +393,7 @@ func TestExecuteTag_Add(t *testing.T) {
 func TestExecuteTag_Remove(t *testing.T) {
 	t.Parallel()
 
-	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "stage.json"))
+	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "stage.json"))
 	executor := NewExecutor(store)
 
 	action := TagActionUntag{
@@ -416,7 +417,7 @@ func TestExecuteTag_Remove(t *testing.T) {
 func TestExecuteTag_Error(t *testing.T) {
 	t.Parallel()
 
-	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "stage.json"))
+	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "stage.json"))
 	executor := NewExecutor(store)
 
 	action := TagActionTag{
@@ -434,7 +435,7 @@ func TestExecuteTag_Error(t *testing.T) {
 func TestExecuteTag_UnstageWhenEmpty(t *testing.T) {
 	t.Parallel()
 
-	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "stage.json"))
+	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "stage.json"))
 
 	// Pre-stage tags
 	require.NoError(t, store.StageTag(t.Context(), staging.ServiceParam, "/app/config", staging.TagEntry{
@@ -471,7 +472,7 @@ func TestExecuteTag_UnstageWhenEmpty(t *testing.T) {
 func TestExecuteTag_UnstageWhenCompletelyEmpty(t *testing.T) {
 	t.Parallel()
 
-	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "stage.json"))
+	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "stage.json"))
 
 	// Pre-stage tags to add "env": "prod"
 	require.NoError(t, store.StageTag(t.Context(), staging.ServiceParam, "/app/config", staging.TagEntry{
@@ -509,7 +510,7 @@ func TestExecuteTag_UnstageWhenCompletelyEmpty(t *testing.T) {
 func TestExecuteTag_UnstageWhenAlreadyNotStaged(t *testing.T) {
 	t.Parallel()
 
-	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "stage.json"))
+	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "stage.json"))
 	executor := NewExecutor(store)
 
 	// No pre-staged tags, and action with auto-skip results in empty tags
@@ -533,7 +534,7 @@ func TestLoadEntryState(t *testing.T) {
 
 	t.Run("not staged", func(t *testing.T) {
 		t.Parallel()
-		store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "stage.json"))
+		store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "stage.json"))
 
 		currentValue := "aws-value"
 		state, err := LoadEntryState(t.Context(), store, staging.ServiceParam, "/app/config", &currentValue)
@@ -546,7 +547,7 @@ func TestLoadEntryState(t *testing.T) {
 
 	t.Run("staged create", func(t *testing.T) {
 		t.Parallel()
-		store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "stage.json"))
+		store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "stage.json"))
 		require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/new", staging.Entry{
 			Operation: staging.OperationCreate,
 			Value:     lo.ToPtr("draft"),
@@ -563,7 +564,7 @@ func TestLoadEntryState(t *testing.T) {
 
 	t.Run("staged update", func(t *testing.T) {
 		t.Parallel()
-		store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "stage.json"))
+		store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "stage.json"))
 		require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("updated"),
@@ -581,7 +582,7 @@ func TestLoadEntryState(t *testing.T) {
 
 	t.Run("staged delete", func(t *testing.T) {
 		t.Parallel()
-		store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "stage.json"))
+		store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "stage.json"))
 		require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
 			Operation: staging.OperationDelete,
 			StagedAt:  time.Now(),
@@ -600,7 +601,7 @@ func TestLoadStagedTags(t *testing.T) {
 
 	t.Run("not staged", func(t *testing.T) {
 		t.Parallel()
-		store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "stage.json"))
+		store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "stage.json"))
 
 		tags, baseModifiedAt, err := LoadStagedTags(t.Context(), store, staging.ServiceParam, "/app/config")
 		require.NoError(t, err)
@@ -611,7 +612,7 @@ func TestLoadStagedTags(t *testing.T) {
 
 	t.Run("staged", func(t *testing.T) {
 		t.Parallel()
-		store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "stage.json"))
+		store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "stage.json"))
 		baseTime := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
 		require.NoError(t, store.StageTag(t.Context(), staging.ServiceParam, "/app/config", staging.TagEntry{
 			Add:            map[string]string{"env": "prod"},

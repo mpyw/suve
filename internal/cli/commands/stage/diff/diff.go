@@ -20,6 +20,7 @@ import (
 	"github.com/mpyw/suve/internal/maputil"
 	"github.com/mpyw/suve/internal/parallel"
 	"github.com/mpyw/suve/internal/staging"
+	"github.com/mpyw/suve/internal/staging/file"
 	"github.com/mpyw/suve/internal/version/paramversion"
 	"github.com/mpyw/suve/internal/version/secretversion"
 )
@@ -40,7 +41,7 @@ type SecretClient interface {
 type Runner struct {
 	ParamClient  ParamClient
 	SecretClient SecretClient
-	Store        *staging.Store
+	Store        *file.Store
 	Stdout       io.Writer
 	Stderr       io.Writer
 }
@@ -87,7 +88,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	if err != nil {
 		return fmt.Errorf("failed to get AWS identity: %w", err)
 	}
-	store, err := staging.NewStore(identity.AccountID, identity.Region)
+	store, err := file.NewStore(identity.AccountID, identity.Region)
 	if err != nil {
 		return fmt.Errorf("failed to initialize stage store: %w", err)
 	}

@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/mpyw/suve/internal/staging"
+	"github.com/mpyw/suve/internal/staging/file"
 	usecasestaging "github.com/mpyw/suve/internal/usecase/staging"
 )
 
@@ -47,7 +48,7 @@ func newSecretStrategy() *mockServiceStrategy {
 func TestStatusUseCase_Execute_Empty(t *testing.T) {
 	t.Parallel()
 
-	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
 	uc := &usecasestaging.StatusUseCase{
 		Strategy: newParamStrategy(),
 		Store:    store,
@@ -64,7 +65,7 @@ func TestStatusUseCase_Execute_Empty(t *testing.T) {
 func TestStatusUseCase_Execute_WithEntries(t *testing.T) {
 	t.Parallel()
 
-	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
 	now := time.Now().Truncate(time.Second)
 
 	// Stage some entries
@@ -91,7 +92,7 @@ func TestStatusUseCase_Execute_WithEntries(t *testing.T) {
 func TestStatusUseCase_Execute_FilterByName(t *testing.T) {
 	t.Parallel()
 
-	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
 	now := time.Now()
 
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
@@ -120,7 +121,7 @@ func TestStatusUseCase_Execute_FilterByName(t *testing.T) {
 func TestStatusUseCase_Execute_SecretWithDeleteOptions(t *testing.T) {
 	t.Parallel()
 
-	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
 	now := time.Now()
 
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceSecret, "my-secret", staging.Entry{
@@ -180,7 +181,7 @@ func TestStatusUseCase_Execute_ListError(t *testing.T) {
 func TestStatusUseCase_Execute_WithTagEntries(t *testing.T) {
 	t.Parallel()
 
-	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
 	now := time.Now().Truncate(time.Second)
 
 	// Stage tag entries
@@ -224,7 +225,7 @@ func TestStatusUseCase_Execute_WithTagEntries(t *testing.T) {
 func TestStatusUseCase_Execute_FilterByName_TagEntry(t *testing.T) {
 	t.Parallel()
 
-	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
 	now := time.Now()
 
 	// Stage only tag entry (no regular entry)
@@ -250,7 +251,7 @@ func TestStatusUseCase_Execute_FilterByName_TagEntry(t *testing.T) {
 func TestStatusUseCase_Execute_FilterByName_BothEntryAndTag(t *testing.T) {
 	t.Parallel()
 
-	store := staging.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
 	now := time.Now()
 
 	// Stage both regular entry and tag entry

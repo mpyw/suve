@@ -15,6 +15,7 @@ import (
 	"github.com/mpyw/suve/internal/cli/commands/stage/reset"
 	"github.com/mpyw/suve/internal/maputil"
 	"github.com/mpyw/suve/internal/staging"
+	"github.com/mpyw/suve/internal/staging/file"
 )
 
 func TestCommand_Validation(t *testing.T) {
@@ -35,7 +36,7 @@ func TestRun_NoChanges(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 	var buf bytes.Buffer
 	r := &reset.Runner{
@@ -53,7 +54,7 @@ func TestRun_UnstageAll(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 	// Stage SSM Parameter Store parameters
 	_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config1", staging.Entry{
@@ -98,7 +99,7 @@ func TestRun_UnstageParamOnly(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 	// Stage only SSM Parameter Store parameters
 	_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
@@ -123,7 +124,7 @@ func TestRun_UnstageSecretOnly(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 	// Stage only Secrets Manager secrets
 	_ = store.StageEntry(t.Context(), staging.ServiceSecret, "my-secret", staging.Entry{
@@ -153,7 +154,7 @@ func TestRun_StoreError(t *testing.T) {
 	// Create invalid JSON
 	require.NoError(t, os.WriteFile(path, []byte("invalid json"), 0o644))
 
-	store := staging.NewStoreWithPath(path)
+	store := file.NewStoreWithPath(path)
 
 	var buf bytes.Buffer
 	r := &reset.Runner{
@@ -171,7 +172,7 @@ func TestRun_UnstageTagsOnly(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 	// Stage only tag changes (no entry changes)
 	_ = store.StageTag(t.Context(), staging.ServiceParam, "/app/config", staging.TagEntry{
@@ -205,7 +206,7 @@ func TestRun_UnstageEntriesAndTags(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	store := staging.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
 
 	// Stage entry change
 	_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
