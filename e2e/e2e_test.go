@@ -13,9 +13,9 @@ package e2e
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -48,8 +48,71 @@ import (
 	secretstage "github.com/mpyw/suve/internal/cli/commands/stage/secret"
 	globalstatus "github.com/mpyw/suve/internal/cli/commands/stage/status"
 	"github.com/mpyw/suve/internal/staging"
-	"github.com/mpyw/suve/internal/staging/file"
+	"github.com/mpyw/suve/internal/staging/agent/client"
+	"github.com/mpyw/suve/internal/staging/agent/server"
+	"github.com/mpyw/suve/internal/staging/runner"
 )
+
+// testDaemon is the shared staging agent daemon for all E2E tests.
+var testDaemon *server.Daemon
+
+// TestMain sets up the staging agent daemon before running tests.
+func TestMain(m *testing.M) {
+	// Create isolated temp directory for socket path
+	tmpDir, err := os.MkdirTemp("", "suve-e2e-*")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "failed to create temp dir: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Set TMPDIR so protocol.SocketPath() uses our isolated directory
+	os.Setenv("TMPDIR", tmpDir)
+
+	// Disable daemon auto-start to prevent fork bomb from test binary
+	os.Setenv("SUVE_DAEMON_AUTO_START", "0")
+
+	// Start daemon
+	testDaemon = server.NewDaemon()
+	go func() { _ = testDaemon.Run() }()
+
+	// Wait for daemon to be ready by polling with ping
+	if err := waitForDaemon(5 * time.Second); err != nil {
+		fmt.Fprintf(os.Stderr, "failed to start daemon: %v\n", err)
+		testDaemon.Shutdown()
+		_ = os.RemoveAll(tmpDir)
+		os.Exit(1)
+	}
+
+	// Run tests
+	code := m.Run()
+
+	// Cleanup
+	testDaemon.Shutdown()
+	_ = os.RemoveAll(tmpDir)
+	os.Exit(code)
+}
+
+// waitForDaemon waits for the daemon to be ready by polling with ping.
+func waitForDaemon(timeout time.Duration) error {
+	c := client.NewClient()
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	ticker := time.NewTicker(50 * time.Millisecond)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("daemon did not become ready within %v", timeout)
+		case <-ticker.C:
+			// Try to check if daemon is empty (any successful request means it's ready)
+			if _, err := c.IsEmpty(ctx); err == nil {
+				return nil
+			}
+		}
+	}
+}
 
 func getEndpoint() string {
 	return fmt.Sprintf(
@@ -78,10 +141,10 @@ func setupTempHome(t *testing.T) string {
 	return tmpHome
 }
 
-// stagingFilePath returns the staging file path for localstack environment.
+// newStore creates a new staging store for E2E tests.
 // localstack uses account ID "000000000000" and region "us-east-1".
-func stagingFilePath(tmpHome string) string {
-	return filepath.Join(tmpHome, ".suve", "000000000000", "us-east-1", "stage.json")
+func newStore() staging.StoreReadWriteOperator {
+	return runner.NewStore("000000000000", "us-east-1")
 }
 
 // runCommand executes a CLI command and returns stdout, stderr, and error.
@@ -362,7 +425,7 @@ func TestParam_ParseJSONFlag(t *testing.T) {
 // TestParam_StagingWorkflow tests the complete SSM Parameter Store staging workflow.
 func TestParam_StagingWorkflow(t *testing.T) {
 	setupEnv(t)
-	tmpHome := setupTempHome(t)
+	setupTempHome(t)
 
 	paramName := "/suve-e2e-staging/workflow/param"
 
@@ -380,7 +443,7 @@ func TestParam_StagingWorkflow(t *testing.T) {
 
 	// 2. Stage a new value (using store directly since edit requires interactive editor)
 	t.Run("stage-edit", func(t *testing.T) {
-		store := file.NewStoreWithPath(stagingFilePath(tmpHome))
+		store := newStore()
 		err := store.StageEntry(t.Context(), staging.ServiceParam, paramName, staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("staged-value"),
@@ -469,7 +532,7 @@ func TestParam_StagingWorkflow(t *testing.T) {
 // TestParam_StagingAdd tests staging a new parameter (create operation).
 func TestParam_StagingAdd(t *testing.T) {
 	setupEnv(t)
-	tmpHome := setupTempHome(t)
+	setupTempHome(t)
 
 	paramName := "/suve-e2e-staging/add/newparam"
 
@@ -481,7 +544,7 @@ func TestParam_StagingAdd(t *testing.T) {
 
 	// 1. Stage add (using store directly since add requires interactive editor)
 	t.Run("stage-add", func(t *testing.T) {
-		store := file.NewStoreWithPath(stagingFilePath(tmpHome))
+		store := newStore()
 		err := store.StageEntry(t.Context(), staging.ServiceParam, paramName, staging.Entry{
 			Operation: staging.OperationCreate,
 			Value:     lo.ToPtr("new-param-value"),
@@ -515,7 +578,7 @@ func TestParam_StagingAdd(t *testing.T) {
 // TestParam_StagingResetWithVersion tests resetting to a specific version.
 func TestParam_StagingResetWithVersion(t *testing.T) {
 	setupEnv(t)
-	tmpHome := setupTempHome(t)
+	setupTempHome(t)
 
 	paramName := "/suve-e2e-staging/reset-version/param"
 
@@ -550,7 +613,7 @@ func TestParam_StagingResetWithVersion(t *testing.T) {
 
 	// 3. Verify staged value is from version 1
 	t.Run("verify-staged", func(t *testing.T) {
-		store := file.NewStoreWithPath(stagingFilePath(tmpHome))
+		store := newStore()
 		entry, err := store.GetEntry(t.Context(), staging.ServiceParam, paramName)
 		require.NoError(t, err)
 		require.NotNil(t, entry.Value)
@@ -574,7 +637,7 @@ func TestParam_StagingResetWithVersion(t *testing.T) {
 // TestParam_StagingResetAll tests resetting all staged changes.
 func TestParam_StagingResetAll(t *testing.T) {
 	setupEnv(t)
-	tmpHome := setupTempHome(t)
+	setupTempHome(t)
 
 	param1 := "/suve-e2e-staging/reset-all/param1"
 	param2 := "/suve-e2e-staging/reset-all/param2"
@@ -592,7 +655,7 @@ func TestParam_StagingResetAll(t *testing.T) {
 	_, _, _ = runCommand(t, paramcreate.Command(), param2, "value2")
 
 	// Stage both
-	store := file.NewStoreWithPath(stagingFilePath(tmpHome))
+	store := newStore()
 	_ = store.StageEntry(t.Context(), staging.ServiceParam, param1, staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("staged1"),
@@ -632,7 +695,7 @@ func TestParam_StagingResetAll(t *testing.T) {
 // TestParam_StagingApplySingle tests applying a single parameter.
 func TestParam_StagingApplySingle(t *testing.T) {
 	setupEnv(t)
-	tmpHome := setupTempHome(t)
+	setupTempHome(t)
 
 	param1 := "/suve-e2e-staging/apply-single/param1"
 	param2 := "/suve-e2e-staging/apply-single/param2"
@@ -650,7 +713,7 @@ func TestParam_StagingApplySingle(t *testing.T) {
 	_, _, _ = runCommand(t, paramcreate.Command(), param2, "original2")
 
 	// Stage both
-	store := file.NewStoreWithPath(stagingFilePath(tmpHome))
+	store := newStore()
 	_ = store.StageEntry(t.Context(), staging.ServiceParam, param1, staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("staged1"),
@@ -887,7 +950,7 @@ func TestSecret_VersionSpecifiers(t *testing.T) {
 // TestSecret_StagingWorkflow tests the complete Secrets Manager staging workflow.
 func TestSecret_StagingWorkflow(t *testing.T) {
 	setupEnv(t)
-	tmpHome := setupTempHome(t)
+	setupTempHome(t)
 
 	secretName := "suve-e2e-staging/workflow/secret"
 
@@ -905,7 +968,7 @@ func TestSecret_StagingWorkflow(t *testing.T) {
 
 	// 2. Stage update
 	t.Run("stage-update", func(t *testing.T) {
-		store := file.NewStoreWithPath(stagingFilePath(tmpHome))
+		store := newStore()
 		err := store.StageEntry(t.Context(), staging.ServiceSecret, secretName, staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("staged-secret"),
@@ -974,7 +1037,7 @@ func TestSecret_StagingWorkflow(t *testing.T) {
 // TestSecret_StagingDeleteOptions tests Secrets Manager staging with delete options.
 func TestSecret_StagingDeleteOptions(t *testing.T) {
 	setupEnv(t)
-	tmpHome := setupTempHome(t)
+	setupTempHome(t)
 
 	secretName := "suve-e2e-staging/delete-opts/secret"
 
@@ -993,7 +1056,7 @@ func TestSecret_StagingDeleteOptions(t *testing.T) {
 		require.NoError(t, err)
 
 		// Verify options are stored
-		store := file.NewStoreWithPath(stagingFilePath(tmpHome))
+		store := newStore()
 		entry, err := store.GetEntry(t.Context(), staging.ServiceSecret, secretName)
 		require.NoError(t, err)
 		require.NotNil(t, entry.DeleteOptions)
@@ -1009,7 +1072,7 @@ func TestSecret_StagingDeleteOptions(t *testing.T) {
 // TestGlobal_StageWorkflow tests the global stage commands that work across services.
 func TestGlobal_StageWorkflow(t *testing.T) {
 	setupEnv(t)
-	tmpHome := setupTempHome(t)
+	setupTempHome(t)
 
 	paramName := "/suve-e2e-global/param"
 	secretName := "suve-e2e-global/secret"
@@ -1027,7 +1090,7 @@ func TestGlobal_StageWorkflow(t *testing.T) {
 	_, _, _ = runCommand(t, secretcreate.Command(), secretName, "original-secret")
 
 	// Stage both
-	store := file.NewStoreWithPath(stagingFilePath(tmpHome))
+	store := newStore()
 	_ = store.StageEntry(t.Context(), staging.ServiceParam, paramName, staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("staged-param"),
@@ -1093,7 +1156,7 @@ func TestGlobal_StageWorkflow(t *testing.T) {
 // TestGlobal_StageResetAll tests global reset --all.
 func TestGlobal_StageResetAll(t *testing.T) {
 	setupEnv(t)
-	tmpHome := setupTempHome(t)
+	setupTempHome(t)
 
 	paramName := "/suve-e2e-global-reset/param"
 	secretName := "suve-e2e-global-reset/secret"
@@ -1110,7 +1173,7 @@ func TestGlobal_StageResetAll(t *testing.T) {
 	_, _, _ = runCommand(t, paramcreate.Command(), paramName, "original")
 	_, _, _ = runCommand(t, secretcreate.Command(), secretName, "original")
 
-	store := file.NewStoreWithPath(stagingFilePath(tmpHome))
+	store := newStore()
 	_ = store.StageEntry(t.Context(), staging.ServiceParam, paramName, staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("staged"),
@@ -1433,7 +1496,7 @@ func TestParam_StagingAddViaCLI(t *testing.T) {
 // TestParam_StagingAddWithOptions tests stage add with description and stage tag for tags.
 func TestParam_StagingAddWithOptions(t *testing.T) {
 	setupEnv(t)
-	tmpHome := setupTempHome(t)
+	setupTempHome(t)
 
 	paramName := "/suve-e2e-staging/add-options/param"
 
@@ -1482,7 +1545,7 @@ func TestParam_StagingAddWithOptions(t *testing.T) {
 
 	// Verify staged entry has options
 	t.Run("verify-staged-options", func(t *testing.T) {
-		store := file.NewStoreWithPath(stagingFilePath(tmpHome))
+		store := newStore()
 
 		// Verify entry
 		entry, err := store.GetEntry(t.Context(), staging.ServiceParam, paramName)
@@ -1636,7 +1699,7 @@ func TestParam_StagingDiffViaCLI(t *testing.T) {
 // TestParam_GlobalDiffWithJSON tests global diff with JSON formatting.
 func TestParam_GlobalDiffWithJSON(t *testing.T) {
 	setupEnv(t)
-	tmpHome := setupTempHome(t)
+	setupTempHome(t)
 
 	paramName := "/suve-e2e-global/json-diff/param"
 
@@ -1651,7 +1714,7 @@ func TestParam_GlobalDiffWithJSON(t *testing.T) {
 	require.NoError(t, err)
 
 	// Stage update with different JSON
-	store := file.NewStoreWithPath(stagingFilePath(tmpHome))
+	store := newStore()
 	err = store.StageEntry(t.Context(), staging.ServiceParam, paramName, staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr(`{"a":1,"b":2}`),
@@ -1670,7 +1733,7 @@ func TestParam_GlobalDiffWithJSON(t *testing.T) {
 // TestGlobal_StagingWithTags tests the global stage commands (diff, apply, reset) with tag entries.
 func TestGlobal_StagingWithTags(t *testing.T) {
 	setupEnv(t)
-	tmpHome := setupTempHome(t)
+	setupTempHome(t)
 
 	paramName := "/suve-e2e-global/stage-tags/param"
 
@@ -1685,7 +1748,7 @@ func TestGlobal_StagingWithTags(t *testing.T) {
 	require.NoError(t, err)
 
 	// Stage tag changes using the staging store directly
-	store := file.NewStoreWithPath(stagingFilePath(tmpHome))
+	store := newStore()
 	err = store.StageTag(t.Context(), staging.ServiceParam, paramName, staging.TagEntry{
 		Add:      map[string]string{"env": "test", "team": "e2e"},
 		StagedAt: time.Now(),
@@ -1730,7 +1793,7 @@ func TestGlobal_StagingWithTags(t *testing.T) {
 // TestGlobal_ResetWithTags tests the global reset command with tag entries.
 func TestGlobal_ResetWithTags(t *testing.T) {
 	setupEnv(t)
-	tmpHome := setupTempHome(t)
+	setupTempHome(t)
 
 	paramName := "/suve-e2e-global/reset-tags/param"
 
@@ -1745,7 +1808,7 @@ func TestGlobal_ResetWithTags(t *testing.T) {
 	require.NoError(t, err)
 
 	// Stage entry and tag changes
-	store := file.NewStoreWithPath(stagingFilePath(tmpHome))
+	store := newStore()
 	err = store.StageEntry(t.Context(), staging.ServiceParam, paramName, staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("updated-value"),

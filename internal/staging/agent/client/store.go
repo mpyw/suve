@@ -14,9 +14,9 @@ type Store struct {
 }
 
 // NewStore creates a new Store.
-func NewStore(accountID, region string) *Store {
+func NewStore(accountID, region string, opts ...ClientOption) *Store {
 	return &Store{
-		client:    NewClient(),
+		client:    NewClient(opts...),
 		accountID: accountID,
 		region:    region,
 	}

@@ -26,17 +26,32 @@ const (
 // ErrDaemonNotRunning is returned when the daemon is not running.
 var ErrDaemonNotRunning = errors.New("daemon not running")
 
+// ClientOption configures a Client.
+type ClientOption func(*Client)
+
+// WithAutoStartDisabled disables automatic daemon startup.
+func WithAutoStartDisabled() ClientOption {
+	return func(c *Client) {
+		c.autoStartDisabled = true
+	}
+}
+
 // Client provides communication with the staging agent daemon.
 type Client struct {
-	socketPath string
-	mu         sync.Mutex
+	socketPath        string
+	autoStartDisabled bool
+	mu                sync.Mutex
 }
 
 // NewClient creates a new client.
-func NewClient() *Client {
-	return &Client{
+func NewClient(opts ...ClientOption) *Client {
+	c := &Client{
 		socketPath: protocol.SocketPath(),
 	}
+	for _, opt := range opts {
+		opt(c)
+	}
+	return c
 }
 
 // ensureDaemon ensures the daemon is running, starting it if necessary.
@@ -75,6 +90,11 @@ func (c *Client) ensureDaemon(ctx context.Context) error {
 
 // startDaemon starts a new daemon process.
 func (c *Client) startDaemon(_ context.Context) error {
+	// Check if auto-start is disabled
+	if c.autoStartDisabled {
+		return fmt.Errorf("daemon auto-start is disabled")
+	}
+
 	// Get the current executable path
 	executable, err := os.Executable()
 	if err != nil {
