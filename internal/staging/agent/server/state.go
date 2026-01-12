@@ -5,7 +5,7 @@ import (
 	"sync"
 
 	"github.com/mpyw/suve/internal/staging"
-	"github.com/mpyw/suve/internal/staging/agent/secmem"
+	"github.com/mpyw/suve/internal/staging/agent/server/secmem"
 )
 
 // stateKey uniquely identifies a staging state by account and region.
