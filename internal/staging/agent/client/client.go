@@ -92,7 +92,7 @@ func (c *Client) ensureDaemon(ctx context.Context) error {
 func (c *Client) startDaemon(_ context.Context) error {
 	// Check if auto-start is disabled
 	if c.autoStartDisabled {
-		return fmt.Errorf("daemon auto-start is disabled")
+		return fmt.Errorf("daemon not running and auto-start is disabled; run 'suve stage agent start' manually")
 	}
 
 	// Get the current executable path

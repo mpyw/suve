@@ -4,10 +4,10 @@ package agent
 import (
 	"context"
 	"fmt"
-	"os"
 
 	"github.com/urfave/cli/v3"
 
+	agentcfg "github.com/mpyw/suve/internal/staging/agent"
 	"github.com/mpyw/suve/internal/staging/agent/client"
 	"github.com/mpyw/suve/internal/staging/agent/server"
 )
@@ -47,15 +47,9 @@ This command is usually called automatically when staging operations are perform
 
 The daemon will automatically shut down when all staged changes are cleared.
 
-Set SUVE_DAEMON_AUTO_START=0 to disable auto-start and auto-shutdown.`,
+Set ` + agentcfg.EnvDaemonAutoStart + `=0 to enable manual mode (disables auto-start and auto-shutdown).`,
 		Action: func(_ context.Context, _ *cli.Command) error {
-			var opts []server.DaemonOption
-			// When auto-start is disabled, also disable auto-shutdown
-			// (manual daemon management mode)
-			if os.Getenv("SUVE_DAEMON_AUTO_START") == "0" {
-				opts = append(opts, server.WithAutoShutdownDisabled())
-			}
-			daemon := server.NewDaemon(opts...)
+			daemon := server.NewDaemon(agentcfg.DaemonOptions()...)
 			return daemon.Run()
 		},
 	}
@@ -70,7 +64,7 @@ func stopCommand() *cli.Command {
 This command sends a shutdown signal to the running daemon.
 Note: Any staged changes in memory will be lost unless persisted first.`,
 		Action: func(ctx context.Context, cmd *cli.Command) error {
-			c := client.NewClient()
+			c := client.NewClient(agentcfg.ClientOptions()...)
 			if err := c.Shutdown(ctx); err != nil {
 				_, _ = fmt.Fprintf(cmd.Root().ErrWriter, "Warning: %v\n", err)
 				return nil

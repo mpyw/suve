@@ -12,6 +12,7 @@ import (
 	"github.com/mpyw/suve/internal/cli/terminal"
 	"github.com/mpyw/suve/internal/infra"
 	"github.com/mpyw/suve/internal/staging"
+	"github.com/mpyw/suve/internal/staging/agent"
 	"github.com/mpyw/suve/internal/staging/agent/client"
 	"github.com/mpyw/suve/internal/staging/file"
 )
@@ -140,7 +141,7 @@ EXAMPLES:
 			}
 
 			// Set state in agent
-			c := client.NewClient()
+			c := client.NewClient(agent.ClientOptions()...)
 			if err := c.SetState(ctx, identity.AccountID, identity.Region, finalState); err != nil {
 				return fmt.Errorf("failed to set state in agent: %w", err)
 			}

@@ -48,6 +48,7 @@ import (
 	secretstage "github.com/mpyw/suve/internal/cli/commands/stage/secret"
 	globalstatus "github.com/mpyw/suve/internal/cli/commands/stage/status"
 	"github.com/mpyw/suve/internal/staging"
+	"github.com/mpyw/suve/internal/staging/agent"
 	"github.com/mpyw/suve/internal/staging/agent/client"
 	"github.com/mpyw/suve/internal/staging/agent/server"
 	"github.com/mpyw/suve/internal/staging/runner"
@@ -68,16 +69,12 @@ func TestMain(m *testing.M) {
 	// Set TMPDIR so protocol.SocketPath() uses our isolated directory
 	os.Setenv("TMPDIR", tmpDir)
 
-	// Disable daemon auto-start to prevent fork bomb from test binary
-	os.Setenv("SUVE_DAEMON_AUTO_START", "0")
+	// Enable manual mode to prevent fork bomb from test binary
+	// This disables both auto-start and auto-shutdown
+	os.Setenv(agent.EnvDaemonAutoStart, "0")
 
 	// Start daemon with error channel
-	// SUVE_DAEMON_AUTO_START=0 disables both auto-start and auto-shutdown
-	var daemonOpts []server.DaemonOption
-	if os.Getenv("SUVE_DAEMON_AUTO_START") == "0" {
-		daemonOpts = append(daemonOpts, server.WithAutoShutdownDisabled())
-	}
-	testDaemon = server.NewDaemon(daemonOpts...)
+	testDaemon = server.NewDaemon(agent.DaemonOptions()...)
 	daemonErrCh := make(chan error, 1)
 	go func() {
 		daemonErrCh <- testDaemon.Run()
@@ -102,7 +99,7 @@ func TestMain(m *testing.M) {
 
 // waitForDaemon waits for the daemon to be ready by polling with ping.
 func waitForDaemon(timeout time.Duration, daemonErrCh <-chan error) error {
-	c := client.NewClient()
+	c := client.NewClient(agent.ClientOptions()...)
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
