@@ -4,6 +4,7 @@ package agent
 import (
 	"context"
 	"fmt"
+	"os"
 
 	"github.com/urfave/cli/v3"
 
@@ -44,9 +45,17 @@ func startCommand() *cli.Command {
 The daemon stores staged changes in secure memory (mlock'd, encrypted).
 This command is usually called automatically when staging operations are performed.
 
-The daemon will automatically shut down when all staged changes are cleared.`,
+The daemon will automatically shut down when all staged changes are cleared.
+
+Set SUVE_DAEMON_AUTO_START=0 to disable auto-start and auto-shutdown.`,
 		Action: func(_ context.Context, _ *cli.Command) error {
-			daemon := server.NewDaemon()
+			var opts []server.DaemonOption
+			// When auto-start is disabled, also disable auto-shutdown
+			// (manual daemon management mode)
+			if os.Getenv("SUVE_DAEMON_AUTO_START") == "0" {
+				opts = append(opts, server.WithAutoShutdownDisabled())
+			}
+			daemon := server.NewDaemon(opts...)
 			return daemon.Run()
 		},
 	}

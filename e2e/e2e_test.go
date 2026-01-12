@@ -72,8 +72,12 @@ func TestMain(m *testing.M) {
 	os.Setenv("SUVE_DAEMON_AUTO_START", "0")
 
 	// Start daemon with error channel
-	// Disable auto-shutdown so daemon stays running across all tests
-	testDaemon = server.NewDaemon(server.WithAutoShutdownDisabled())
+	// SUVE_DAEMON_AUTO_START=0 disables both auto-start and auto-shutdown
+	var daemonOpts []server.DaemonOption
+	if os.Getenv("SUVE_DAEMON_AUTO_START") == "0" {
+		daemonOpts = append(daemonOpts, server.WithAutoShutdownDisabled())
+	}
+	testDaemon = server.NewDaemon(daemonOpts...)
 	daemonErrCh := make(chan error, 1)
 	go func() {
 		daemonErrCh <- testDaemon.Run()
