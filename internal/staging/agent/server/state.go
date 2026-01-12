@@ -5,7 +5,7 @@ import (
 	"sync"
 
 	"github.com/mpyw/suve/internal/staging"
-	"github.com/mpyw/suve/internal/staging/agent/server/secmem"
+	"github.com/mpyw/suve/internal/staging/agent/server/security"
 )
 
 // stateKey uniquely identifies a staging state by account and region.
@@ -17,13 +17,13 @@ type stateKey struct {
 // secureState holds the staging state in secure memory.
 type secureState struct {
 	mu     sync.RWMutex
-	states map[stateKey]*secmem.Buffer
+	states map[stateKey]*security.Buffer
 }
 
 // newSecureState creates a new secure state store.
 func newSecureState() *secureState {
 	return &secureState{
-		states: make(map[stateKey]*secmem.Buffer),
+		states: make(map[stateKey]*security.Buffer),
 	}
 }
 
@@ -74,7 +74,7 @@ func (s *secureState) set(accountID, region string, state *staging.State) error 
 		return err
 	}
 	// NewBuffer zeros the input data
-	s.states[key] = secmem.NewBuffer(data)
+	s.states[key] = security.NewBuffer(data)
 	return nil
 }
 
@@ -93,7 +93,7 @@ func (s *secureState) destroy() {
 	for _, buf := range s.states {
 		buf.Destroy()
 	}
-	s.states = make(map[stateKey]*secmem.Buffer)
+	s.states = make(map[stateKey]*security.Buffer)
 }
 
 // newEmptyState creates a new empty staging state.

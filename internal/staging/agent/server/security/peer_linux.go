@@ -1,6 +1,6 @@
 //go:build linux
 
-package server
+package security
 
 import (
 	"fmt"
@@ -10,16 +10,8 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-// setupProcessSecurity configures Linux-specific security measures.
-func (d *Daemon) setupProcessSecurity() error {
-	if err := unix.Prctl(unix.PR_SET_DUMPABLE, 0, 0, 0, 0); err != nil {
-		return fmt.Errorf("failed to disable core dumps: %w", err)
-	}
-	return nil
-}
-
-// verifyPeerCredentials checks peer credentials on Linux.
-func (d *Daemon) verifyPeerCredentials(conn net.Conn) error {
+// VerifyPeerCredentials checks peer credentials on Linux.
+func VerifyPeerCredentials(conn net.Conn) error {
 	unixConn, ok := conn.(*net.UnixConn)
 	if !ok {
 		return fmt.Errorf("connection is not a Unix socket")

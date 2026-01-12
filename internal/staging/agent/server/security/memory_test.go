@@ -1,4 +1,4 @@
-package secmem
+package security
 
 import (
 	"bytes"

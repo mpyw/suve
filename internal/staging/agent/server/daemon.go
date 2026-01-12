@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/mpyw/suve/internal/staging/agent/protocol"
+	"github.com/mpyw/suve/internal/staging/agent/server/security"
 )
 
 // Daemon represents the staging agent daemon.
@@ -45,7 +46,7 @@ func NewDaemon() *Daemon {
 // Run starts the daemon and blocks until shutdown.
 func (d *Daemon) Run() error {
 	// Setup process security
-	if err := d.setupProcessSecurity(); err != nil {
+	if err := security.SetupProcess(); err != nil {
 		return fmt.Errorf("failed to setup process security: %w", err)
 	}
 
@@ -125,7 +126,7 @@ func (d *Daemon) handleConnection(conn net.Conn) {
 	_ = conn.SetDeadline(time.Now().Add(5 * time.Second))
 
 	// Verify peer credentials
-	if err := d.verifyPeerCredentials(conn); err != nil {
+	if err := security.VerifyPeerCredentials(conn); err != nil {
 		d.sendError(conn, err.Error())
 		return
 	}

@@ -1,7 +1,6 @@
-// Package secmem provides secure memory handling for sensitive data.
-// It wraps memguard to provide mlock'd, encrypted memory buffers.
-// TODO(go1.26): Replace with crypto/secret when available.
-package secmem
+// Package security provides security-related functionality for the agent server.
+// This includes secure memory handling, process security, and peer verification.
+package security
 
 import (
 	"github.com/awnumar/memguard"
