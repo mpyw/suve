@@ -10,8 +10,8 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-// setupProcessSecurityPlatform configures Linux-specific security measures.
-func setupProcessSecurityPlatform() error {
+// setupProcessSecurity configures Linux-specific security measures.
+func (d *Daemon) setupProcessSecurity() error {
 	// Disable core dumps to prevent memory leaks
 	if err := unix.Prctl(unix.PR_SET_DUMPABLE, 0, 0, 0, 0); err != nil {
 		return fmt.Errorf("failed to disable core dumps: %w", err)
@@ -19,8 +19,8 @@ func setupProcessSecurityPlatform() error {
 	return nil
 }
 
-// verifyPeerCredentialsPlatform checks peer credentials on Linux.
-func verifyPeerCredentialsPlatform(conn net.Conn) error {
+// verifyPeerCredentials checks peer credentials on Linux.
+func (d *Daemon) verifyPeerCredentials(conn net.Conn) error {
 	unixConn, ok := conn.(*net.UnixConn)
 	if !ok {
 		return fmt.Errorf("connection is not a Unix socket")

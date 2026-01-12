@@ -63,11 +63,9 @@ func (b *Buffer) IsEmpty() bool {
 // Destroy securely destroys the buffer.
 // After calling Destroy, the buffer should not be used.
 func (b *Buffer) Destroy() {
-	if b.enclave != nil {
-		// Enclave doesn't have Destroy, but the underlying data
-		// is encrypted and will be GC'd
-		b.enclave = nil
-	}
+	// Enclave doesn't have Destroy, but the underlying data
+	// is encrypted and will be GC'd
+	b.enclave = nil
 }
 
 // init initializes memguard's secure memory core.

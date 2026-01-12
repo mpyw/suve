@@ -9,6 +9,7 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"sync"
 	"syscall"
 	"time"
@@ -43,17 +44,17 @@ func NewDaemon() *Daemon {
 // Run starts the daemon and blocks until shutdown.
 func (d *Daemon) Run() error {
 	// Setup process security
-	if err := setupProcessSecurity(); err != nil {
+	if err := d.setupProcessSecurity(); err != nil {
 		return fmt.Errorf("failed to setup process security: %w", err)
 	}
 
 	// Create socket directory
-	if err := createSocketDir(d.socketPath); err != nil {
+	if err := d.createSocketDir(); err != nil {
 		return err
 	}
 
 	// Remove existing socket
-	if err := removeExistingSocket(d.socketPath); err != nil {
+	if err := d.removeExistingSocket(); err != nil {
 		return err
 	}
 
@@ -65,7 +66,7 @@ func (d *Daemon) Run() error {
 	d.listener = listener
 
 	// Set socket permissions
-	if err := setSocketPermissions(d.socketPath); err != nil {
+	if err := d.setSocketPermissions(); err != nil {
 		_ = listener.Close()
 		return err
 	}
@@ -121,7 +122,7 @@ func (d *Daemon) handleConnection(conn net.Conn) {
 	_ = conn.SetDeadline(time.Now().Add(5 * time.Second))
 
 	// Verify peer credentials
-	if err := verifyPeerCredentials(conn); err != nil {
+	if err := d.verifyPeerCredentials(conn); err != nil {
 		d.sendError(conn, err.Error())
 		return
 	}
@@ -202,4 +203,33 @@ func (d *Daemon) sendError(conn net.Conn, msg string) {
 // GetSocketPath returns the socket path for clients.
 func GetSocketPath() string {
 	return getSocketPath()
+}
+
+// createSocketDir creates the socket directory with secure permissions.
+func (d *Daemon) createSocketDir() error {
+	dir := filepath.Dir(d.socketPath)
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return fmt.Errorf("failed to create socket directory: %w", err)
+	}
+	// Ensure directory permissions are correct
+	if err := os.Chmod(dir, 0o700); err != nil {
+		return fmt.Errorf("failed to set socket directory permissions: %w", err)
+	}
+	return nil
+}
+
+// removeExistingSocket removes any existing socket file.
+func (d *Daemon) removeExistingSocket() error {
+	if err := os.Remove(d.socketPath); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("failed to remove existing socket: %w", err)
+	}
+	return nil
+}
+
+// setSocketPermissions sets secure permissions on the socket file.
+func (d *Daemon) setSocketPermissions() error {
+	if err := os.Chmod(d.socketPath, 0o600); err != nil {
+		return fmt.Errorf("failed to set socket permissions: %w", err)
+	}
+	return nil
 }
