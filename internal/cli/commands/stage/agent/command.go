@@ -8,8 +8,8 @@ import (
 	"github.com/urfave/cli/v3"
 
 	agentcfg "github.com/mpyw/suve/internal/staging/agent"
-	"github.com/mpyw/suve/internal/staging/agent/client"
 	"github.com/mpyw/suve/internal/staging/agent/server"
+	"github.com/mpyw/suve/internal/staging/agent/transport"
 )
 
 // Command returns the stage agent command.
@@ -64,7 +64,7 @@ func stopCommand() *cli.Command {
 This command sends a shutdown signal to the running daemon.
 Note: Any staged changes in memory will be lost unless persisted first.`,
 		Action: func(ctx context.Context, cmd *cli.Command) error {
-			c := client.NewClient(agentcfg.ClientOptions()...)
+			c := transport.NewClient(agentcfg.ClientOptions()...)
 			if err := c.Shutdown(ctx); err != nil {
 				_, _ = fmt.Fprintf(cmd.Root().ErrWriter, "Warning: %v\n", err)
 				return nil

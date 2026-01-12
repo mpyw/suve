@@ -11,23 +11,6 @@ import (
 	"github.com/mpyw/suve/internal/staging/agent/transport"
 )
 
-// Re-export transport types for convenience.
-type (
-	ClientOption = transport.ClientOption
-)
-
-// Re-export transport functions for convenience.
-var (
-	WithAutoStartDisabled = transport.WithAutoStartDisabled
-	ErrDaemonNotRunning   = transport.ErrDaemonNotRunning
-)
-
-// Client is an alias for transport.Client for daemon management operations.
-type Client = transport.Client
-
-// NewClient creates a new transport client for daemon management.
-var NewClient = transport.NewClient
-
 // Store implements staging.StoreReadWriteOperator using the daemon.
 type Store struct {
 	client    *transport.Client

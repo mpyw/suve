@@ -49,8 +49,8 @@ import (
 	globalstatus "github.com/mpyw/suve/internal/cli/commands/stage/status"
 	"github.com/mpyw/suve/internal/staging"
 	"github.com/mpyw/suve/internal/staging/agent"
-	"github.com/mpyw/suve/internal/staging/agent/client"
 	"github.com/mpyw/suve/internal/staging/agent/server"
+	"github.com/mpyw/suve/internal/staging/agent/transport"
 	"github.com/mpyw/suve/internal/staging/runner"
 )
 
@@ -99,7 +99,7 @@ func TestMain(m *testing.M) {
 
 // waitForDaemon waits for the daemon to be ready by polling with ping.
 func waitForDaemon(timeout time.Duration, daemonErrCh <-chan error) error {
-	c := client.NewClient(agent.ClientOptions()...)
+	c := transport.NewClient(agent.ClientOptions()...)
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
