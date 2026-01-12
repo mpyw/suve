@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"path/filepath"
 	"testing"
 	"time"
 
@@ -18,7 +17,7 @@ import (
 	stagediff "github.com/mpyw/suve/internal/cli/commands/stage/diff"
 	"github.com/mpyw/suve/internal/maputil"
 	"github.com/mpyw/suve/internal/staging"
-	"github.com/mpyw/suve/internal/staging/file"
+	"github.com/mpyw/suve/internal/staging/testutil"
 )
 
 type mockParamClient struct {
@@ -84,8 +83,7 @@ func TestCommand_Validation(t *testing.T) {
 func TestRun_NothingStaged(t *testing.T) {
 	t.Parallel()
 
-	tmpDir := t.TempDir()
-	store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := testutil.NewMockStore()
 
 	var stdout, stderr bytes.Buffer
 	r := &stagediff.Runner{
@@ -104,8 +102,7 @@ func TestRun_NothingStaged(t *testing.T) {
 func TestRun_ParamOnly(t *testing.T) {
 	t.Parallel()
 
-	tmpDir := t.TempDir()
-	store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := testutil.NewMockStore()
 
 	err := store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
 		Operation: staging.OperationUpdate,
@@ -147,8 +144,7 @@ func TestRun_ParamOnly(t *testing.T) {
 func TestRun_SecretOnly(t *testing.T) {
 	t.Parallel()
 
-	tmpDir := t.TempDir()
-	store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := testutil.NewMockStore()
 
 	err := store.StageEntry(t.Context(), staging.ServiceSecret, "my-secret", staging.Entry{
 		Operation: staging.OperationUpdate,
@@ -186,8 +182,7 @@ func TestRun_SecretOnly(t *testing.T) {
 func TestRun_BothServices(t *testing.T) {
 	t.Parallel()
 
-	tmpDir := t.TempDir()
-	store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := testutil.NewMockStore()
 
 	err := store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
 		Operation: staging.OperationUpdate,
@@ -249,8 +244,7 @@ func TestRun_BothServices(t *testing.T) {
 func TestRun_DeleteOperations(t *testing.T) {
 	t.Parallel()
 
-	tmpDir := t.TempDir()
-	store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := testutil.NewMockStore()
 
 	err := store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
 		Operation: staging.OperationDelete,
@@ -307,8 +301,7 @@ func TestRun_DeleteOperations(t *testing.T) {
 func TestRun_IdenticalValues(t *testing.T) {
 	t.Parallel()
 
-	tmpDir := t.TempDir()
-	store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := testutil.NewMockStore()
 
 	err := store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
 		Operation: staging.OperationUpdate,
@@ -351,8 +344,7 @@ func TestRun_IdenticalValues(t *testing.T) {
 func TestRun_ParseJSON(t *testing.T) {
 	t.Parallel()
 
-	tmpDir := t.TempDir()
-	store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := testutil.NewMockStore()
 
 	err := store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
 		Operation: staging.OperationUpdate,
@@ -392,8 +384,7 @@ func TestRun_ParseJSON(t *testing.T) {
 func TestRun_ParamUpdateAutoUnstageWhenDeleted(t *testing.T) {
 	t.Parallel()
 
-	tmpDir := t.TempDir()
-	store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := testutil.NewMockStore()
 
 	err := store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
 		Operation: staging.OperationUpdate,
@@ -429,8 +420,7 @@ func TestRun_ParamUpdateAutoUnstageWhenDeleted(t *testing.T) {
 func TestRun_SecretUpdateAutoUnstageWhenDeleted(t *testing.T) {
 	t.Parallel()
 
-	tmpDir := t.TempDir()
-	store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := testutil.NewMockStore()
 
 	err := store.StageEntry(t.Context(), staging.ServiceSecret, "my-secret", staging.Entry{
 		Operation: staging.OperationUpdate,
@@ -466,8 +456,7 @@ func TestRun_SecretUpdateAutoUnstageWhenDeleted(t *testing.T) {
 func TestRun_SecretIdenticalValues(t *testing.T) {
 	t.Parallel()
 
-	tmpDir := t.TempDir()
-	store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := testutil.NewMockStore()
 
 	err := store.StageEntry(t.Context(), staging.ServiceSecret, "my-secret", staging.Entry{
 		Operation: staging.OperationUpdate,
@@ -508,8 +497,7 @@ func TestRun_SecretIdenticalValues(t *testing.T) {
 func TestRun_SecretParseJSON(t *testing.T) {
 	t.Parallel()
 
-	tmpDir := t.TempDir()
-	store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := testutil.NewMockStore()
 
 	err := store.StageEntry(t.Context(), staging.ServiceSecret, "my-secret", staging.Entry{
 		Operation: staging.OperationUpdate,
@@ -547,8 +535,7 @@ func TestRun_SecretParseJSON(t *testing.T) {
 func TestRun_SecretParseJSONMixed(t *testing.T) {
 	t.Parallel()
 
-	tmpDir := t.TempDir()
-	store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := testutil.NewMockStore()
 
 	err := store.StageEntry(t.Context(), staging.ServiceSecret, "my-secret", staging.Entry{
 		Operation: staging.OperationUpdate,
@@ -584,8 +571,7 @@ func TestRun_SecretParseJSONMixed(t *testing.T) {
 func TestRun_ParamCreateOperation(t *testing.T) {
 	t.Parallel()
 
-	tmpDir := t.TempDir()
-	store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := testutil.NewMockStore()
 
 	err := store.StageEntry(t.Context(), staging.ServiceParam, "/app/new-param", staging.Entry{
 		Operation:   staging.OperationCreate,
@@ -629,8 +615,7 @@ func TestRun_ParamCreateOperation(t *testing.T) {
 func TestRun_SecretCreateOperation(t *testing.T) {
 	t.Parallel()
 
-	tmpDir := t.TempDir()
-	store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := testutil.NewMockStore()
 
 	err := store.StageEntry(t.Context(), staging.ServiceSecret, "new-secret", staging.Entry{
 		Operation:   staging.OperationCreate,
@@ -674,8 +659,7 @@ func TestRun_SecretCreateOperation(t *testing.T) {
 func TestRun_CreateWithParseJSON(t *testing.T) {
 	t.Parallel()
 
-	tmpDir := t.TempDir()
-	store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := testutil.NewMockStore()
 
 	err := store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
 		Operation: staging.OperationCreate,
@@ -710,8 +694,7 @@ func TestRun_CreateWithParseJSON(t *testing.T) {
 func TestRun_DeleteAutoUnstageWhenAlreadyDeleted(t *testing.T) {
 	t.Parallel()
 
-	tmpDir := t.TempDir()
-	store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := testutil.NewMockStore()
 
 	err := store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
 		Operation: staging.OperationDelete,
@@ -746,8 +729,7 @@ func TestRun_DeleteAutoUnstageWhenAlreadyDeleted(t *testing.T) {
 func TestRun_SecretDeleteAutoUnstageWhenAlreadyDeleted(t *testing.T) {
 	t.Parallel()
 
-	tmpDir := t.TempDir()
-	store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := testutil.NewMockStore()
 
 	err := store.StageEntry(t.Context(), staging.ServiceSecret, "my-secret", staging.Entry{
 		Operation: staging.OperationDelete,
@@ -782,8 +764,7 @@ func TestRun_SecretDeleteAutoUnstageWhenAlreadyDeleted(t *testing.T) {
 func TestRun_MetadataWithDescription(t *testing.T) {
 	t.Parallel()
 
-	tmpDir := t.TempDir()
-	store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := testutil.NewMockStore()
 
 	err := store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
 		Operation:   staging.OperationUpdate,
@@ -824,8 +805,7 @@ func TestRun_MetadataWithDescription(t *testing.T) {
 func TestRun_MetadataWithTags(t *testing.T) {
 	t.Parallel()
 
-	tmpDir := t.TempDir()
-	store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := testutil.NewMockStore()
 
 	err := store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
 		Operation: staging.OperationUpdate,
@@ -872,8 +852,7 @@ func TestRun_MetadataWithTags(t *testing.T) {
 func TestRun_TagOnlyDiff(t *testing.T) {
 	t.Parallel()
 
-	tmpDir := t.TempDir()
-	store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := testutil.NewMockStore()
 
 	// Stage only tag changes (no entry change)
 	err := store.StageTag(t.Context(), staging.ServiceParam, "/app/config", staging.TagEntry{
@@ -904,8 +883,7 @@ func TestRun_TagOnlyDiff(t *testing.T) {
 func TestRun_TagOnlyRemovalsDiff(t *testing.T) {
 	t.Parallel()
 
-	tmpDir := t.TempDir()
-	store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := testutil.NewMockStore()
 
 	// Stage only tag removals (no additions)
 	err := store.StageTag(t.Context(), staging.ServiceParam, "/app/config", staging.TagEntry{
@@ -935,8 +913,7 @@ func TestRun_TagOnlyRemovalsDiff(t *testing.T) {
 func TestRun_SecretTagDiff(t *testing.T) {
 	t.Parallel()
 
-	tmpDir := t.TempDir()
-	store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := testutil.NewMockStore()
 
 	// Stage secret tag changes
 	err := store.StageTag(t.Context(), staging.ServiceSecret, "my-secret", staging.TagEntry{
@@ -968,8 +945,7 @@ func TestRun_SecretTagDiff(t *testing.T) {
 func TestRun_SecretCreateWithParseJSON(t *testing.T) {
 	t.Parallel()
 
-	tmpDir := t.TempDir()
-	store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := testutil.NewMockStore()
 
 	err := store.StageEntry(t.Context(), staging.ServiceSecret, "new-secret", staging.Entry{
 		Operation: staging.OperationCreate,
@@ -1004,8 +980,7 @@ func TestRun_SecretCreateWithParseJSON(t *testing.T) {
 func TestRun_BothEntriesAndTags(t *testing.T) {
 	t.Parallel()
 
-	tmpDir := t.TempDir()
-	store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := testutil.NewMockStore()
 
 	// Stage entry change
 	err := store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{

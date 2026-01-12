@@ -128,5 +128,30 @@ func (s *AgentStore) UnstageAll(ctx context.Context, service staging.Service) er
 	return s.client.UnstageAll(ctx, s.accountID, s.region, service)
 }
 
-// Compile-time check that AgentStore implements StoreReadWriter.
-var _ staging.StoreReadWriter = (*AgentStore)(nil)
+// Drain retrieves the state from the daemon, optionally clearing memory.
+// This implements StateDrainer for agent-based storage.
+// If keep is false, the daemon memory is cleared after reading.
+func (s *AgentStore) Drain(ctx context.Context, keep bool) (*staging.State, error) {
+	state, err := s.client.GetState(ctx, s.accountID, s.region)
+	if err != nil {
+		return nil, err
+	}
+	if state == nil {
+		state = staging.NewEmptyState()
+	}
+
+	// Clear memory if keep is false
+	if !keep {
+		if err := s.client.UnstageAll(ctx, s.accountID, s.region, ""); err != nil {
+			return nil, err
+		}
+	}
+
+	return state, nil
+}
+
+// Compile-time check that AgentStore implements StoreReadWriteOperator.
+var _ staging.StoreReadWriteOperator = (*AgentStore)(nil)
+
+// Compile-time check that AgentStore implements StateDrainer.
+var _ staging.StateDrainer = (*AgentStore)(nil)

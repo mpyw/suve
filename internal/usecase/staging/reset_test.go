@@ -3,7 +3,6 @@ package staging_test
 import (
 	"context"
 	"errors"
-	"path/filepath"
 	"testing"
 	"time"
 
@@ -12,7 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/mpyw/suve/internal/staging"
-	"github.com/mpyw/suve/internal/staging/file"
+	"github.com/mpyw/suve/internal/staging/testutil"
 	usecasestaging "github.com/mpyw/suve/internal/usecase/staging"
 )
 
@@ -51,7 +50,7 @@ func newMockResetStrategy() *mockResetStrategy {
 func TestResetUseCase_Execute_Unstage(t *testing.T) {
 	t.Parallel()
 
-	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := testutil.NewMockStore()
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("value"),
@@ -78,7 +77,7 @@ func TestResetUseCase_Execute_Unstage(t *testing.T) {
 func TestResetUseCase_Execute_NotStaged(t *testing.T) {
 	t.Parallel()
 
-	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := testutil.NewMockStore()
 	uc := &usecasestaging.ResetUseCase{
 		Parser: newMockParser(),
 		Store:  store,
@@ -94,7 +93,7 @@ func TestResetUseCase_Execute_NotStaged(t *testing.T) {
 func TestResetUseCase_Execute_UnstageAll(t *testing.T) {
 	t.Parallel()
 
-	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := testutil.NewMockStore()
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/one", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("one"),
@@ -127,7 +126,7 @@ func TestResetUseCase_Execute_UnstageAll(t *testing.T) {
 func TestResetUseCase_Execute_UnstageAll_Empty(t *testing.T) {
 	t.Parallel()
 
-	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := testutil.NewMockStore()
 	uc := &usecasestaging.ResetUseCase{
 		Parser: newMockParser(),
 		Store:  store,
@@ -143,7 +142,7 @@ func TestResetUseCase_Execute_UnstageAll_Empty(t *testing.T) {
 func TestResetUseCase_Execute_Restore(t *testing.T) {
 	t.Parallel()
 
-	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := testutil.NewMockStore()
 	parser := &mockParserWithVersion{
 		mockParser: newMockParser(),
 		hasVersion: true,
@@ -172,7 +171,7 @@ func TestResetUseCase_Execute_Restore(t *testing.T) {
 func TestResetUseCase_Execute_Restore_NoFetcher(t *testing.T) {
 	t.Parallel()
 
-	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := testutil.NewMockStore()
 	parser := &mockParserWithVersion{
 		mockParser: newMockParser(),
 		hasVersion: true,
@@ -194,7 +193,7 @@ func TestResetUseCase_Execute_Restore_NoFetcher(t *testing.T) {
 func TestResetUseCase_Execute_Restore_FetchError(t *testing.T) {
 	t.Parallel()
 
-	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := testutil.NewMockStore()
 	parser := &mockParserWithVersion{
 		mockParser: newMockParser(),
 		hasVersion: true,
@@ -227,7 +226,7 @@ func (m *mockParserWithVersion) ParseSpec(input string) (string, bool, error) {
 func TestResetUseCase_Execute_ParseError(t *testing.T) {
 	t.Parallel()
 
-	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := testutil.NewMockStore()
 	parser := &mockParserWithParseSpecErr{
 		mockParser: newMockParser(),
 		parseErr:   errors.New("parse error"),
@@ -348,7 +347,7 @@ func TestResetUseCase_Execute_RestoreStageError(t *testing.T) {
 func TestResetUseCase_Execute_RestoreSkipped_SameAsAWS(t *testing.T) {
 	t.Parallel()
 
-	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := testutil.NewMockStore()
 	parser := &mockParserWithVersion{
 		mockParser: newMockParser(),
 		hasVersion: true,
@@ -381,7 +380,7 @@ func TestResetUseCase_Execute_RestoreSkipped_SameAsAWS(t *testing.T) {
 func TestResetUseCase_Execute_RestoreNotSkipped_DifferentFromAWS(t *testing.T) {
 	t.Parallel()
 
-	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := testutil.NewMockStore()
 	parser := &mockParserWithVersion{
 		mockParser: newMockParser(),
 		hasVersion: true,
@@ -415,7 +414,7 @@ func TestResetUseCase_Execute_RestoreNotSkipped_DifferentFromAWS(t *testing.T) {
 func TestResetUseCase_Execute_RestoreFetchCurrentError(t *testing.T) {
 	t.Parallel()
 
-	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := testutil.NewMockStore()
 	parser := &mockParserWithVersion{
 		mockParser: newMockParser(),
 		hasVersion: true,

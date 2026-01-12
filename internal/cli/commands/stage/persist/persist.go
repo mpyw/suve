@@ -49,10 +49,11 @@ EXAMPLES:
 				return fmt.Errorf("failed to get AWS identity: %w", err)
 			}
 
-			client := agent.NewClient()
+			agentStore := agent.NewAgentStore(identity.AccountID, identity.Region)
+			keep := cmd.Bool("keep")
 
-			// Get state from agent
-			state, err := client.GetState(ctx, identity.AccountID, identity.Region)
+			// Drain state from agent (keep for now, will clear after successful file write if needed)
+			state, err := agentStore.Drain(ctx, true)
 			if err != nil {
 				return fmt.Errorf("failed to get state from agent: %w", err)
 			}
@@ -60,12 +61,6 @@ EXAMPLES:
 			// Check if there's anything to persist
 			if state.IsEmpty() {
 				return errors.New("no staged changes to persist")
-			}
-
-			// Save to file store
-			fileStore, err := file.NewStore(identity.AccountID, identity.Region)
-			if err != nil {
-				return fmt.Errorf("failed to create file store: %w", err)
 			}
 
 			// Get passphrase
@@ -94,14 +89,21 @@ EXAMPLES:
 				// pass remains empty = plain text
 			}
 
-			if err := fileStore.SaveWithPassphrase(state, pass); err != nil {
+			// Create file store with passphrase for Persist operation
+			fileStore, err := file.NewStoreWithPassphrase(identity.AccountID, identity.Region, pass)
+			if err != nil {
+				return fmt.Errorf("failed to create file store: %w", err)
+			}
+
+			if err := fileStore.Persist(ctx, state); err != nil {
 				return fmt.Errorf("failed to save state to file: %w", err)
 			}
 
 			// Clear agent memory unless --keep is specified
 			encrypted := pass != ""
-			if !cmd.Bool("keep") {
-				if err := client.UnstageAll(ctx, identity.AccountID, identity.Region, ""); err != nil {
+			if !keep {
+				// Drain with keep=false to clear memory
+				if _, err := agentStore.Drain(ctx, false); err != nil {
 					return fmt.Errorf("failed to clear agent memory: %w", err)
 				}
 				if encrypted {

@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"path/filepath"
 	"testing"
 	"time"
 
@@ -13,8 +12,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/mpyw/suve/internal/staging"
-	"github.com/mpyw/suve/internal/staging/file"
 	"github.com/mpyw/suve/internal/staging/runner"
+	"github.com/mpyw/suve/internal/staging/testutil"
 	stagingusecase "github.com/mpyw/suve/internal/usecase/staging"
 )
 
@@ -102,8 +101,7 @@ func TestStatusRunner_Run(t *testing.T) {
 	t.Run("show single - staged item", func(t *testing.T) {
 		t.Parallel()
 
-		tmpDir := t.TempDir()
-		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := testutil.NewMockStore()
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("staged-value"),
@@ -129,8 +127,7 @@ func TestStatusRunner_Run(t *testing.T) {
 	t.Run("show single - not staged", func(t *testing.T) {
 		t.Parallel()
 
-		tmpDir := t.TempDir()
-		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := testutil.NewMockStore()
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.StatusRunner{
@@ -150,8 +147,7 @@ func TestStatusRunner_Run(t *testing.T) {
 	t.Run("show single - with verbose", func(t *testing.T) {
 		t.Parallel()
 
-		tmpDir := t.TempDir()
-		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := testutil.NewMockStore()
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("staged-value"),
@@ -176,8 +172,7 @@ func TestStatusRunner_Run(t *testing.T) {
 	t.Run("show all - no items staged", func(t *testing.T) {
 		t.Parallel()
 
-		tmpDir := t.TempDir()
-		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := testutil.NewMockStore()
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.StatusRunner{
@@ -197,8 +192,7 @@ func TestStatusRunner_Run(t *testing.T) {
 	t.Run("show all - multiple items", func(t *testing.T) {
 		t.Parallel()
 
-		tmpDir := t.TempDir()
-		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := testutil.NewMockStore()
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config1", staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("value1"),
@@ -237,8 +231,7 @@ func TestStatusRunner_Run(t *testing.T) {
 	t.Run("show all - Secrets Manager service with delete options", func(t *testing.T) {
 		t.Parallel()
 
-		tmpDir := t.TempDir()
-		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := testutil.NewMockStore()
 		_ = store.StageEntry(t.Context(), staging.ServiceSecret, "my-secret", staging.Entry{
 			Operation:     staging.OperationDelete,
 			StagedAt:      time.Now(),
@@ -271,8 +264,7 @@ func TestDiffRunner_Run(t *testing.T) {
 	t.Run("diff single item", func(t *testing.T) {
 		t.Parallel()
 
-		tmpDir := t.TempDir()
-		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := testutil.NewMockStore()
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("new-value"),
@@ -299,8 +291,7 @@ func TestDiffRunner_Run(t *testing.T) {
 	t.Run("diff all items", func(t *testing.T) {
 		t.Parallel()
 
-		tmpDir := t.TempDir()
-		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := testutil.NewMockStore()
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config1", staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("new1"),
@@ -332,8 +323,7 @@ func TestDiffRunner_Run(t *testing.T) {
 	t.Run("diff item not staged", func(t *testing.T) {
 		t.Parallel()
 
-		tmpDir := t.TempDir()
-		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := testutil.NewMockStore()
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.DiffRunner{
@@ -353,8 +343,7 @@ func TestDiffRunner_Run(t *testing.T) {
 	t.Run("diff no items staged", func(t *testing.T) {
 		t.Parallel()
 
-		tmpDir := t.TempDir()
-		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := testutil.NewMockStore()
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.DiffRunner{
@@ -374,8 +363,7 @@ func TestDiffRunner_Run(t *testing.T) {
 	t.Run("diff with JSON format", func(t *testing.T) {
 		t.Parallel()
 
-		tmpDir := t.TempDir()
-		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := testutil.NewMockStore()
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr(`{"b":2,"a":1}`),
@@ -402,8 +390,7 @@ func TestDiffRunner_Run(t *testing.T) {
 	t.Run("diff with JSON format - non-JSON value", func(t *testing.T) {
 		t.Parallel()
 
-		tmpDir := t.TempDir()
-		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := testutil.NewMockStore()
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("not-json"),
@@ -428,8 +415,7 @@ func TestDiffRunner_Run(t *testing.T) {
 	t.Run("diff identical values - auto unstage", func(t *testing.T) {
 		t.Parallel()
 
-		tmpDir := t.TempDir()
-		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := testutil.NewMockStore()
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("same-value"),
@@ -459,8 +445,7 @@ func TestDiffRunner_Run(t *testing.T) {
 	t.Run("diff delete operation", func(t *testing.T) {
 		t.Parallel()
 
-		tmpDir := t.TempDir()
-		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := testutil.NewMockStore()
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
 			Operation: staging.OperationDelete,
 			StagedAt:  time.Now(),
@@ -486,8 +471,7 @@ func TestDiffRunner_Run(t *testing.T) {
 	t.Run("diff update - auto unstage when item deleted from AWS", func(t *testing.T) {
 		t.Parallel()
 
-		tmpDir := t.TempDir()
-		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := testutil.NewMockStore()
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("new-value"),
@@ -518,8 +502,7 @@ func TestDiffRunner_Run(t *testing.T) {
 	t.Run("diff create - show diff from empty when item not in AWS", func(t *testing.T) {
 		t.Parallel()
 
-		tmpDir := t.TempDir()
-		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := testutil.NewMockStore()
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/new-param", staging.Entry{
 			Operation: staging.OperationCreate,
 			Value:     lo.ToPtr("brand-new-value"),
@@ -554,8 +537,7 @@ func TestDiffRunner_Run(t *testing.T) {
 	t.Run("diff create with JSON format - item not in AWS", func(t *testing.T) {
 		t.Parallel()
 
-		tmpDir := t.TempDir()
-		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := testutil.NewMockStore()
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/new-json", staging.Entry{
 			Operation: staging.OperationCreate,
 			Value:     lo.ToPtr(`{"b":2,"a":1}`),
@@ -583,8 +565,7 @@ func TestDiffRunner_Run(t *testing.T) {
 	t.Run("diff create - auto unstage when item exists in AWS with same value", func(t *testing.T) {
 		t.Parallel()
 
-		tmpDir := t.TempDir()
-		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := testutil.NewMockStore()
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/param", staging.Entry{
 			Operation: staging.OperationCreate,
 			Value:     lo.ToPtr("same-value"),
@@ -615,8 +596,7 @@ func TestDiffRunner_Run(t *testing.T) {
 	t.Run("diff create - show diff when item exists in AWS with different value", func(t *testing.T) {
 		t.Parallel()
 
-		tmpDir := t.TempDir()
-		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := testutil.NewMockStore()
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/param", staging.Entry{
 			Operation: staging.OperationCreate,
 			Value:     lo.ToPtr("new-value"),
@@ -644,8 +624,7 @@ func TestDiffRunner_Run(t *testing.T) {
 	t.Run("diff delete - auto unstage when already deleted in AWS", func(t *testing.T) {
 		t.Parallel()
 
-		tmpDir := t.TempDir()
-		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := testutil.NewMockStore()
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
 			Operation: staging.OperationDelete,
 			StagedAt:  time.Now(),
@@ -683,8 +662,7 @@ func TestEditRunner_Run(t *testing.T) {
 	t.Run("edit existing - fetch from AWS", func(t *testing.T) {
 		t.Parallel()
 
-		tmpDir := t.TempDir()
-		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := testutil.NewMockStore()
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.EditRunner{
@@ -713,8 +691,7 @@ func TestEditRunner_Run(t *testing.T) {
 	t.Run("edit existing - use staged value", func(t *testing.T) {
 		t.Parallel()
 
-		tmpDir := t.TempDir()
-		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := testutil.NewMockStore()
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("staged-value"),
@@ -746,8 +723,7 @@ func TestEditRunner_Run(t *testing.T) {
 	t.Run("edit existing - use staged create value", func(t *testing.T) {
 		t.Parallel()
 
-		tmpDir := t.TempDir()
-		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := testutil.NewMockStore()
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
 			Operation: staging.OperationCreate,
 			Value:     lo.ToPtr("create-value"),
@@ -775,8 +751,7 @@ func TestEditRunner_Run(t *testing.T) {
 	t.Run("edit - no changes", func(t *testing.T) {
 		t.Parallel()
 
-		tmpDir := t.TempDir()
-		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := testutil.NewMockStore()
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.EditRunner{
@@ -799,8 +774,7 @@ func TestEditRunner_Run(t *testing.T) {
 	t.Run("edit - editor error", func(t *testing.T) {
 		t.Parallel()
 
-		tmpDir := t.TempDir()
-		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := testutil.NewMockStore()
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.EditRunner{
@@ -823,8 +797,7 @@ func TestEditRunner_Run(t *testing.T) {
 	t.Run("edit - fetch error", func(t *testing.T) {
 		t.Parallel()
 
-		tmpDir := t.TempDir()
-		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := testutil.NewMockStore()
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.EditRunner{
@@ -855,8 +828,7 @@ func TestApplyRunner_Run(t *testing.T) {
 	t.Run("apply all - success", func(t *testing.T) {
 		t.Parallel()
 
-		tmpDir := t.TempDir()
-		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := testutil.NewMockStore()
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config1", staging.Entry{
 			Operation: staging.OperationCreate,
 			Value:     lo.ToPtr("value1"),
@@ -901,8 +873,7 @@ func TestApplyRunner_Run(t *testing.T) {
 	t.Run("apply single - success", func(t *testing.T) {
 		t.Parallel()
 
-		tmpDir := t.TempDir()
-		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := testutil.NewMockStore()
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config1", staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("value1"),
@@ -937,8 +908,7 @@ func TestApplyRunner_Run(t *testing.T) {
 	t.Run("apply single - not staged", func(t *testing.T) {
 		t.Parallel()
 
-		tmpDir := t.TempDir()
-		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := testutil.NewMockStore()
 		// Stage a different item so we can test "specific item not staged"
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/other", staging.Entry{
 			Operation: staging.OperationUpdate,
@@ -964,8 +934,7 @@ func TestApplyRunner_Run(t *testing.T) {
 	t.Run("apply - nothing staged", func(t *testing.T) {
 		t.Parallel()
 
-		tmpDir := t.TempDir()
-		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := testutil.NewMockStore()
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.ApplyRunner{
@@ -985,8 +954,7 @@ func TestApplyRunner_Run(t *testing.T) {
 	t.Run("apply - with failures", func(t *testing.T) {
 		t.Parallel()
 
-		tmpDir := t.TempDir()
-		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := testutil.NewMockStore()
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("value"),
@@ -1012,8 +980,7 @@ func TestApplyRunner_Run(t *testing.T) {
 	t.Run("conflict - create operation (resource already exists)", func(t *testing.T) {
 		t.Parallel()
 
-		tmpDir := t.TempDir()
-		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := testutil.NewMockStore()
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/new-config", staging.Entry{
 			Operation: staging.OperationCreate,
 			Value:     lo.ToPtr("new-value"),
@@ -1041,8 +1008,7 @@ func TestApplyRunner_Run(t *testing.T) {
 	t.Run("conflict - update operation (resource modified after staging)", func(t *testing.T) {
 		t.Parallel()
 
-		tmpDir := t.TempDir()
-		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := testutil.NewMockStore()
 		baseTime := time.Now().Add(-time.Hour)
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
 			Operation:      staging.OperationUpdate,
@@ -1071,8 +1037,7 @@ func TestApplyRunner_Run(t *testing.T) {
 	t.Run("conflict - delete operation (resource modified after staging)", func(t *testing.T) {
 		t.Parallel()
 
-		tmpDir := t.TempDir()
-		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := testutil.NewMockStore()
 		baseTime := time.Now().Add(-time.Hour)
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
 			Operation:      staging.OperationDelete,
@@ -1098,8 +1063,7 @@ func TestApplyRunner_Run(t *testing.T) {
 	t.Run("no conflict - update with same time", func(t *testing.T) {
 		t.Parallel()
 
-		tmpDir := t.TempDir()
-		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := testutil.NewMockStore()
 		baseTime := time.Now()
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
 			Operation:      staging.OperationUpdate,
@@ -1127,8 +1091,7 @@ func TestApplyRunner_Run(t *testing.T) {
 	t.Run("conflict ignored with --ignore-conflicts", func(t *testing.T) {
 		t.Parallel()
 
-		tmpDir := t.TempDir()
-		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := testutil.NewMockStore()
 		baseTime := time.Now().Add(-time.Hour)
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
 			Operation:      staging.OperationUpdate,
@@ -1156,8 +1119,7 @@ func TestApplyRunner_Run(t *testing.T) {
 	t.Run("no conflict - create when resource doesn't exist", func(t *testing.T) {
 		t.Parallel()
 
-		tmpDir := t.TempDir()
-		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := testutil.NewMockStore()
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/new-config", staging.Entry{
 			Operation: staging.OperationCreate,
 			Value:     lo.ToPtr("new-value"),
@@ -1191,8 +1153,7 @@ func TestResetRunner_Run(t *testing.T) {
 	t.Run("unstage all - success", func(t *testing.T) {
 		t.Parallel()
 
-		tmpDir := t.TempDir()
-		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := testutil.NewMockStore()
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config1", staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("value1"),
@@ -1227,8 +1188,7 @@ func TestResetRunner_Run(t *testing.T) {
 	t.Run("unstage all - nothing staged", func(t *testing.T) {
 		t.Parallel()
 
-		tmpDir := t.TempDir()
-		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := testutil.NewMockStore()
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.ResetRunner{
@@ -1248,8 +1208,7 @@ func TestResetRunner_Run(t *testing.T) {
 	t.Run("unstage single - success", func(t *testing.T) {
 		t.Parallel()
 
-		tmpDir := t.TempDir()
-		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := testutil.NewMockStore()
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("value"),
@@ -1277,8 +1236,7 @@ func TestResetRunner_Run(t *testing.T) {
 	t.Run("unstage single - not staged", func(t *testing.T) {
 		t.Parallel()
 
-		tmpDir := t.TempDir()
-		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := testutil.NewMockStore()
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.ResetRunner{
@@ -1298,8 +1256,7 @@ func TestResetRunner_Run(t *testing.T) {
 	t.Run("restore version - success", func(t *testing.T) {
 		t.Parallel()
 
-		tmpDir := t.TempDir()
-		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := testutil.NewMockStore()
 
 		var stdout, stderr bytes.Buffer
 		fetcher := &fullMockStrategy{
@@ -1331,8 +1288,7 @@ func TestResetRunner_Run(t *testing.T) {
 	t.Run("restore version - no fetcher", func(t *testing.T) {
 		t.Parallel()
 
-		tmpDir := t.TempDir()
-		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := testutil.NewMockStore()
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.ResetRunner{
@@ -1353,8 +1309,7 @@ func TestResetRunner_Run(t *testing.T) {
 	t.Run("restore version - fetch error", func(t *testing.T) {
 		t.Parallel()
 
-		tmpDir := t.TempDir()
-		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := testutil.NewMockStore()
 
 		var stdout, stderr bytes.Buffer
 		fetcher := &fullMockStrategy{
@@ -1380,8 +1335,7 @@ func TestResetRunner_Run(t *testing.T) {
 	t.Run("parse spec error", func(t *testing.T) {
 		t.Parallel()
 
-		tmpDir := t.TempDir()
-		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := testutil.NewMockStore()
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.ResetRunner{
@@ -1412,8 +1366,7 @@ func TestRunners_SecretService(t *testing.T) {
 	t.Run("status runner with Secrets Manager", func(t *testing.T) {
 		t.Parallel()
 
-		tmpDir := t.TempDir()
-		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := testutil.NewMockStore()
 		_ = store.StageEntry(t.Context(), staging.ServiceSecret, "my-secret", staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("secret-value"),
@@ -1438,8 +1391,7 @@ func TestRunners_SecretService(t *testing.T) {
 	t.Run("apply runner with Secrets Manager", func(t *testing.T) {
 		t.Parallel()
 
-		tmpDir := t.TempDir()
-		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := testutil.NewMockStore()
 		_ = store.StageEntry(t.Context(), staging.ServiceSecret, "my-secret", staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("secret-value"),
@@ -1468,8 +1420,7 @@ func TestRunners_DeleteOptions(t *testing.T) {
 	t.Run("status with delete options verbose", func(t *testing.T) {
 		t.Parallel()
 
-		tmpDir := t.TempDir()
-		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := testutil.NewMockStore()
 		_ = store.StageEntry(t.Context(), staging.ServiceSecret, "my-secret", staging.Entry{
 			Operation:     staging.OperationDelete,
 			StagedAt:      time.Now(),
@@ -1500,8 +1451,7 @@ func TestDiffRunner_OutputMetadata(t *testing.T) {
 	t.Run("diff with description", func(t *testing.T) {
 		t.Parallel()
 
-		tmpDir := t.TempDir()
-		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := testutil.NewMockStore()
 		desc := "Updated config description"
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
 			Operation:   staging.OperationUpdate,
@@ -1530,8 +1480,7 @@ func TestDiffRunner_OutputMetadata(t *testing.T) {
 	t.Run("diff with tags", func(t *testing.T) {
 		t.Parallel()
 
-		tmpDir := t.TempDir()
-		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := testutil.NewMockStore()
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("new-value"),
@@ -1563,8 +1512,7 @@ func TestDiffRunner_OutputMetadata(t *testing.T) {
 	t.Run("diff create with metadata", func(t *testing.T) {
 		t.Parallel()
 
-		tmpDir := t.TempDir()
-		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := testutil.NewMockStore()
 		desc := "New parameter"
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/new-param", staging.Entry{
 			Operation:   staging.OperationCreate,
@@ -1609,8 +1557,7 @@ func TestEditRunner_WithMetadata(t *testing.T) {
 	t.Run("edit with description", func(t *testing.T) {
 		t.Parallel()
 
-		tmpDir := t.TempDir()
-		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := testutil.NewMockStore()
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.EditRunner{
@@ -1637,8 +1584,7 @@ func TestEditRunner_WithMetadata(t *testing.T) {
 	t.Run("edit preserves BaseModifiedAt from AWS", func(t *testing.T) {
 		t.Parallel()
 
-		tmpDir := t.TempDir()
-		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := testutil.NewMockStore()
 		awsTime := time.Now().Add(-time.Hour).Truncate(time.Second)
 
 		var stdout, stderr bytes.Buffer
@@ -1670,8 +1616,7 @@ func TestEditRunner_WithMetadata(t *testing.T) {
 	t.Run("edit staged delete operation is blocked", func(t *testing.T) {
 		t.Parallel()
 
-		tmpDir := t.TempDir()
-		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := testutil.NewMockStore()
 		// Stage a delete operation
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
 			Operation: staging.OperationDelete,
@@ -1709,8 +1654,7 @@ func TestApplyRunner_WithTags(t *testing.T) {
 	t.Run("apply with tags only", func(t *testing.T) {
 		t.Parallel()
 
-		tmpDir := t.TempDir()
-		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := testutil.NewMockStore()
 		_ = store.StageTag(t.Context(), staging.ServiceParam, "/app/config", staging.TagEntry{
 			Add:      map[string]string{"env": "prod", "team": "backend"},
 			StagedAt: time.Now(),
@@ -1736,8 +1680,7 @@ func TestApplyRunner_WithTags(t *testing.T) {
 	t.Run("apply with untag keys only", func(t *testing.T) {
 		t.Parallel()
 
-		tmpDir := t.TempDir()
-		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := testutil.NewMockStore()
 		removeKeys := make(map[string]struct{})
 		removeKeys["deprecated"] = struct{}{}
 		removeKeys["old"] = struct{}{}
@@ -1766,8 +1709,7 @@ func TestApplyRunner_WithTags(t *testing.T) {
 	t.Run("apply with both tags and untag keys", func(t *testing.T) {
 		t.Parallel()
 
-		tmpDir := t.TempDir()
-		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := testutil.NewMockStore()
 		removeKeys := make(map[string]struct{})
 		removeKeys["deprecated"] = struct{}{}
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
@@ -1811,8 +1753,7 @@ func TestStatusRunner_WithTagEntries(t *testing.T) {
 	t.Run("show single - tag entry only", func(t *testing.T) {
 		t.Parallel()
 
-		tmpDir := t.TempDir()
-		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := testutil.NewMockStore()
 		_ = store.StageTag(t.Context(), staging.ServiceParam, "/app/config", staging.TagEntry{
 			Add:      map[string]string{"env": "prod", "team": "backend"},
 			StagedAt: time.Now(),
@@ -1839,8 +1780,7 @@ func TestStatusRunner_WithTagEntries(t *testing.T) {
 	t.Run("show single - tag entry with remove", func(t *testing.T) {
 		t.Parallel()
 
-		tmpDir := t.TempDir()
-		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := testutil.NewMockStore()
 		removeKeys := map[string]struct{}{"deprecated": {}, "old": {}}
 		_ = store.StageTag(t.Context(), staging.ServiceParam, "/app/config", staging.TagEntry{
 			Add:      map[string]string{"env": "prod"},
@@ -1868,8 +1808,7 @@ func TestStatusRunner_WithTagEntries(t *testing.T) {
 	t.Run("show single - tag entry with verbose", func(t *testing.T) {
 		t.Parallel()
 
-		tmpDir := t.TempDir()
-		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := testutil.NewMockStore()
 		removeKeys := map[string]struct{}{"deprecated": {}}
 		_ = store.StageTag(t.Context(), staging.ServiceParam, "/app/config", staging.TagEntry{
 			Add:      map[string]string{"env": "prod"},
@@ -1897,8 +1836,7 @@ func TestStatusRunner_WithTagEntries(t *testing.T) {
 	t.Run("show all - multiple tag entries", func(t *testing.T) {
 		t.Parallel()
 
-		tmpDir := t.TempDir()
-		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := testutil.NewMockStore()
 		_ = store.StageTag(t.Context(), staging.ServiceParam, "/app/config1", staging.TagEntry{
 			Add:      map[string]string{"env": "prod"},
 			StagedAt: time.Now(),
@@ -1930,8 +1868,7 @@ func TestStatusRunner_WithTagEntries(t *testing.T) {
 	t.Run("show all - mixed entries and tags", func(t *testing.T) {
 		t.Parallel()
 
-		tmpDir := t.TempDir()
-		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := testutil.NewMockStore()
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/value", staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("new-value"),
@@ -1963,8 +1900,7 @@ func TestStatusRunner_WithTagEntries(t *testing.T) {
 	t.Run("show all - tag entries with verbose", func(t *testing.T) {
 		t.Parallel()
 
-		tmpDir := t.TempDir()
-		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := testutil.NewMockStore()
 		removeKeys := map[string]struct{}{"old": {}}
 		_ = store.StageTag(t.Context(), staging.ServiceParam, "/app/config", staging.TagEntry{
 			Add:      map[string]string{"env": "prod"},
@@ -1996,8 +1932,7 @@ func TestDeleteRunner_Run(t *testing.T) {
 	t.Run("delete SSM parameter", func(t *testing.T) {
 		t.Parallel()
 
-		tmpDir := t.TempDir()
-		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := testutil.NewMockStore()
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.DeleteRunner{
@@ -2022,8 +1957,7 @@ func TestDeleteRunner_Run(t *testing.T) {
 	t.Run("delete secret with recovery window", func(t *testing.T) {
 		t.Parallel()
 
-		tmpDir := t.TempDir()
-		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := testutil.NewMockStore()
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.DeleteRunner{
@@ -2053,8 +1987,7 @@ func TestDeleteRunner_Run(t *testing.T) {
 	t.Run("delete secret with force", func(t *testing.T) {
 		t.Parallel()
 
-		tmpDir := t.TempDir()
-		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := testutil.NewMockStore()
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.DeleteRunner{
@@ -2083,8 +2016,7 @@ func TestDeleteRunner_Run(t *testing.T) {
 	t.Run("delete with fetch error", func(t *testing.T) {
 		t.Parallel()
 
-		tmpDir := t.TempDir()
-		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := testutil.NewMockStore()
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.DeleteRunner{
@@ -2104,8 +2036,7 @@ func TestDeleteRunner_Run(t *testing.T) {
 	t.Run("delete secret with invalid recovery window", func(t *testing.T) {
 		t.Parallel()
 
-		tmpDir := t.TempDir()
-		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := testutil.NewMockStore()
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.DeleteRunner{
@@ -2128,8 +2059,7 @@ func TestDeleteRunner_Run(t *testing.T) {
 	t.Run("delete staged CREATE - unstages instead of delete", func(t *testing.T) {
 		t.Parallel()
 
-		tmpDir := t.TempDir()
-		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := testutil.NewMockStore()
 
 		// Pre-stage a CREATE operation
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/new-config", staging.Entry{
@@ -2168,8 +2098,7 @@ func TestEditRunner_Skipped_Unstaged(t *testing.T) {
 	t.Run("edit skipped - same as AWS", func(t *testing.T) {
 		t.Parallel()
 
-		tmpDir := t.TempDir()
-		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := testutil.NewMockStore()
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.EditRunner{
@@ -2197,8 +2126,7 @@ func TestEditRunner_Skipped_Unstaged(t *testing.T) {
 	t.Run("edit unstaged - reverted to AWS", func(t *testing.T) {
 		t.Parallel()
 
-		tmpDir := t.TempDir()
-		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := testutil.NewMockStore()
 
 		// Pre-stage an UPDATE operation
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
@@ -2241,8 +2169,7 @@ func TestResetRunner_Skipped(t *testing.T) {
 	t.Run("restore version skipped - same as current AWS", func(t *testing.T) {
 		t.Parallel()
 
-		tmpDir := t.TempDir()
-		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := testutil.NewMockStore()
 
 		var stdout, stderr bytes.Buffer
 		// Fetcher returns version value that matches current AWS value

@@ -2,8 +2,7 @@ package reset_test
 
 import (
 	"bytes"
-	"os"
-	"path/filepath"
+	"errors"
 	"testing"
 	"time"
 
@@ -15,7 +14,7 @@ import (
 	"github.com/mpyw/suve/internal/cli/commands/stage/reset"
 	"github.com/mpyw/suve/internal/maputil"
 	"github.com/mpyw/suve/internal/staging"
-	"github.com/mpyw/suve/internal/staging/file"
+	"github.com/mpyw/suve/internal/staging/testutil"
 )
 
 func TestCommand_Validation(t *testing.T) {
@@ -35,8 +34,7 @@ func TestCommand_Validation(t *testing.T) {
 func TestRun_NoChanges(t *testing.T) {
 	t.Parallel()
 
-	tmpDir := t.TempDir()
-	store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := testutil.NewMockStore()
 
 	var buf bytes.Buffer
 	r := &reset.Runner{
@@ -53,8 +51,7 @@ func TestRun_NoChanges(t *testing.T) {
 func TestRun_UnstageAll(t *testing.T) {
 	t.Parallel()
 
-	tmpDir := t.TempDir()
-	store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := testutil.NewMockStore()
 
 	// Stage SSM Parameter Store parameters
 	_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config1", staging.Entry{
@@ -98,8 +95,7 @@ func TestRun_UnstageAll(t *testing.T) {
 func TestRun_UnstageParamOnly(t *testing.T) {
 	t.Parallel()
 
-	tmpDir := t.TempDir()
-	store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := testutil.NewMockStore()
 
 	// Stage only SSM Parameter Store parameters
 	_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
@@ -123,8 +119,7 @@ func TestRun_UnstageParamOnly(t *testing.T) {
 func TestRun_UnstageSecretOnly(t *testing.T) {
 	t.Parallel()
 
-	tmpDir := t.TempDir()
-	store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := testutil.NewMockStore()
 
 	// Stage only Secrets Manager secrets
 	_ = store.StageEntry(t.Context(), staging.ServiceSecret, "my-secret", staging.Entry{
@@ -148,13 +143,8 @@ func TestRun_UnstageSecretOnly(t *testing.T) {
 func TestRun_StoreError(t *testing.T) {
 	t.Parallel()
 
-	tmpDir := t.TempDir()
-	path := filepath.Join(tmpDir, "stage.json")
-
-	// Create invalid JSON
-	require.NoError(t, os.WriteFile(path, []byte("invalid json"), 0o644))
-
-	store := file.NewStoreWithPath(path)
+	store := testutil.NewMockStore()
+	store.ListEntriesErr = errors.New("mock store error")
 
 	var buf bytes.Buffer
 	r := &reset.Runner{
@@ -165,14 +155,13 @@ func TestRun_StoreError(t *testing.T) {
 
 	err := r.Run(t.Context())
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to parse")
+	assert.Contains(t, err.Error(), "mock store error")
 }
 
 func TestRun_UnstageTagsOnly(t *testing.T) {
 	t.Parallel()
 
-	tmpDir := t.TempDir()
-	store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := testutil.NewMockStore()
 
 	// Stage only tag changes (no entry changes)
 	_ = store.StageTag(t.Context(), staging.ServiceParam, "/app/config", staging.TagEntry{
@@ -205,8 +194,7 @@ func TestRun_UnstageTagsOnly(t *testing.T) {
 func TestRun_UnstageEntriesAndTags(t *testing.T) {
 	t.Parallel()
 
-	tmpDir := t.TempDir()
-	store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := testutil.NewMockStore()
 
 	// Stage entry change
 	_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{

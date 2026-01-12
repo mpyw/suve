@@ -63,14 +63,13 @@ EXAMPLES:
 				return fmt.Errorf("failed to get AWS identity: %w", err)
 			}
 
-			// Load from file store
-			fileStore, err := file.NewStore(identity.AccountID, identity.Region)
+			// Check if file is encrypted (need a basic store to check)
+			basicFileStore, err := file.NewStore(identity.AccountID, identity.Region)
 			if err != nil {
 				return fmt.Errorf("failed to create file store: %w", err)
 			}
 
-			// Check if file is encrypted
-			isEnc, err := fileStore.IsEncrypted()
+			isEnc, err := basicFileStore.IsEncrypted()
 			if err != nil {
 				return fmt.Errorf("failed to check file encryption: %w", err)
 			}
@@ -97,7 +96,14 @@ EXAMPLES:
 				}
 			}
 
-			fileState, err := fileStore.LoadWithPassphrase(pass)
+			// Create file store with passphrase for Drain operation
+			fileStore, err := file.NewStoreWithPassphrase(identity.AccountID, identity.Region, pass)
+			if err != nil {
+				return fmt.Errorf("failed to create file store: %w", err)
+			}
+
+			// Drain from file (keep file for now, we'll delete after successful agent write)
+			fileState, err := fileStore.Drain(ctx, true)
 			if err != nil {
 				return fmt.Errorf("failed to load state from file: %w", err)
 			}
@@ -107,15 +113,16 @@ EXAMPLES:
 				return errors.New("no staged changes in file to drain")
 			}
 
-			client := agent.NewClient()
+			agentStore := agent.NewAgentStore(identity.AccountID, identity.Region)
 			force := cmd.Bool("force")
 			merge := cmd.Bool("merge")
+			keep := cmd.Bool("keep")
 
 			// Check if agent already has staged changes
-			agentState, err := client.GetState(ctx, identity.AccountID, identity.Region)
+			agentState, err := agentStore.Drain(ctx, true) // keep=true to not clear yet
 			if err != nil {
-				// Agent might not be running, which is fine
-				agentState = nil
+				// Agent might not be running, which is fine - treat as empty
+				agentState = staging.NewEmptyState()
 			}
 
 			if !agentState.IsEmpty() && !force && !merge {
@@ -124,33 +131,24 @@ EXAMPLES:
 
 			var finalState *staging.State
 			if merge && !agentState.IsEmpty() {
-				// Merge states
-				finalState = mergeStates(agentState, fileState)
+				// Merge states: start with agent state, merge file state (file takes precedence)
+				finalState = agentState
+				finalState.Merge(fileState)
 			} else {
 				// Use file state directly
 				finalState = fileState
 			}
 
 			// Set state in agent
+			client := agent.NewClient()
 			if err := client.SetState(ctx, identity.AccountID, identity.Region, finalState); err != nil {
 				return fmt.Errorf("failed to set state in agent: %w", err)
 			}
 
 			// Delete file unless --keep is specified
-			if !cmd.Bool("keep") {
-				// Clear the file by saving empty state
-				emptyState := &staging.State{
-					Version: finalState.Version,
-					Entries: map[staging.Service]map[string]staging.Entry{
-						staging.ServiceParam:  {},
-						staging.ServiceSecret: {},
-					},
-					Tags: map[staging.Service]map[string]staging.TagEntry{
-						staging.ServiceParam:  {},
-						staging.ServiceSecret: {},
-					},
-				}
-				if err := fileStore.Save(emptyState); err != nil {
+			if !keep {
+				// Drain again with keep=false to delete the file
+				if _, err := fileStore.Drain(ctx, false); err != nil {
 					_, _ = fmt.Fprintf(cmd.Root().ErrWriter, "Warning: failed to delete file: %v\n", err)
 				}
 				_, _ = fmt.Fprintln(cmd.Root().Writer, "Staged changes loaded from file and file deleted")
@@ -161,53 +159,4 @@ EXAMPLES:
 			return nil
 		},
 	}
-}
-
-// mergeStates merges two states, with fileState taking precedence for conflicts.
-func mergeStates(agentState, fileState *staging.State) *staging.State {
-	version := 2 // Default version
-	if fileState != nil {
-		version = fileState.Version
-	}
-	result := &staging.State{
-		Version: version,
-		Entries: make(map[staging.Service]map[string]staging.Entry),
-		Tags:    make(map[staging.Service]map[string]staging.TagEntry),
-	}
-
-	// Initialize maps
-	for _, svc := range []staging.Service{staging.ServiceParam, staging.ServiceSecret} {
-		result.Entries[svc] = make(map[string]staging.Entry)
-		result.Tags[svc] = make(map[string]staging.TagEntry)
-	}
-
-	// Copy agent state first
-	if agentState != nil {
-		for svc, entries := range agentState.Entries {
-			for name, entry := range entries {
-				result.Entries[svc][name] = entry
-			}
-		}
-		for svc, tags := range agentState.Tags {
-			for name, tag := range tags {
-				result.Tags[svc][name] = tag
-			}
-		}
-	}
-
-	// Overlay file state (takes precedence)
-	if fileState != nil {
-		for svc, entries := range fileState.Entries {
-			for name, entry := range entries {
-				result.Entries[svc][name] = entry
-			}
-		}
-		for svc, tags := range fileState.Tags {
-			for name, tag := range tags {
-				result.Tags[svc][name] = tag
-			}
-		}
-	}
-
-	return result
 }

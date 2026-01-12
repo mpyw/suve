@@ -2,15 +2,14 @@ package runner_test
 
 import (
 	"bytes"
-	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/mpyw/suve/internal/staging"
-	"github.com/mpyw/suve/internal/staging/file"
 	"github.com/mpyw/suve/internal/staging/runner"
+	"github.com/mpyw/suve/internal/staging/testutil"
 	stagingusecase "github.com/mpyw/suve/internal/usecase/staging"
 )
 
@@ -20,8 +19,7 @@ func TestTagRunner_Run(t *testing.T) {
 	t.Run("stages tags successfully", func(t *testing.T) {
 		t.Parallel()
 
-		tmpDir := t.TempDir()
-		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := testutil.NewMockStore()
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.TagRunner{
@@ -49,8 +47,7 @@ func TestTagRunner_Run(t *testing.T) {
 	t.Run("error on invalid tag format", func(t *testing.T) {
 		t.Parallel()
 
-		tmpDir := t.TempDir()
-		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := testutil.NewMockStore()
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.TagRunner{
@@ -73,8 +70,7 @@ func TestTagRunner_Run(t *testing.T) {
 	t.Run("error on usecase failure", func(t *testing.T) {
 		t.Parallel()
 
-		tmpDir := t.TempDir()
-		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := testutil.NewMockStore()
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.TagRunner{
@@ -100,8 +96,7 @@ func TestUntagRunner_Run(t *testing.T) {
 	t.Run("stages tag removal successfully", func(t *testing.T) {
 		t.Parallel()
 
-		tmpDir := t.TempDir()
-		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := testutil.NewMockStore()
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.UntagRunner{
@@ -130,8 +125,7 @@ func TestUntagRunner_Run(t *testing.T) {
 	t.Run("error on usecase failure", func(t *testing.T) {
 		t.Parallel()
 
-		tmpDir := t.TempDir()
-		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := testutil.NewMockStore()
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.UntagRunner{

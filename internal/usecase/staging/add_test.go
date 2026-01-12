@@ -2,7 +2,6 @@ package staging_test
 
 import (
 	"errors"
-	"path/filepath"
 	"testing"
 	"time"
 
@@ -11,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/mpyw/suve/internal/staging"
-	"github.com/mpyw/suve/internal/staging/file"
+	"github.com/mpyw/suve/internal/staging/testutil"
 	"github.com/mpyw/suve/internal/staging/transition"
 	usecasestaging "github.com/mpyw/suve/internal/usecase/staging"
 )
@@ -45,7 +44,7 @@ func newMockParser() *mockParser {
 func TestAddUseCase_Execute(t *testing.T) {
 	t.Parallel()
 
-	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := testutil.NewMockStore()
 	uc := &usecasestaging.AddUseCase{
 		Strategy: newMockEditStrategyNotFound(), // Resource doesn't exist - expected for add
 		Store:    store,
@@ -70,7 +69,7 @@ func TestAddUseCase_Execute(t *testing.T) {
 func TestAddUseCase_Execute_RejectsWhenResourceExists(t *testing.T) {
 	t.Parallel()
 
-	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := testutil.NewMockStore()
 	// Resource exists on AWS
 	uc := &usecasestaging.AddUseCase{
 		Strategy: newMockEditStrategy(), // Returns existing value
@@ -88,7 +87,7 @@ func TestAddUseCase_Execute_RejectsWhenResourceExists(t *testing.T) {
 func TestAddUseCase_Execute_MinimalInput(t *testing.T) {
 	t.Parallel()
 
-	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := testutil.NewMockStore()
 	uc := &usecasestaging.AddUseCase{
 		Strategy: newMockEditStrategyNotFound(),
 		Store:    store,
@@ -109,7 +108,7 @@ func TestAddUseCase_Execute_MinimalInput(t *testing.T) {
 func TestAddUseCase_Draft_NotStaged(t *testing.T) {
 	t.Parallel()
 
-	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := testutil.NewMockStore()
 	uc := &usecasestaging.AddUseCase{
 		Strategy: newMockEditStrategyNotFound(),
 		Store:    store,
@@ -124,7 +123,7 @@ func TestAddUseCase_Draft_NotStaged(t *testing.T) {
 func TestAddUseCase_Draft_StagedCreate(t *testing.T) {
 	t.Parallel()
 
-	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := testutil.NewMockStore()
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/draft", staging.Entry{
 		Operation: staging.OperationCreate,
 		Value:     lo.ToPtr("draft-value"),
@@ -145,7 +144,7 @@ func TestAddUseCase_Draft_StagedCreate(t *testing.T) {
 func TestAddUseCase_Draft_StagedUpdate(t *testing.T) {
 	t.Parallel()
 
-	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := testutil.NewMockStore()
 	// Update operation should not be returned as draft
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/update", staging.Entry{
 		Operation: staging.OperationUpdate,
@@ -166,7 +165,7 @@ func TestAddUseCase_Draft_StagedUpdate(t *testing.T) {
 func TestAddUseCase_Execute_ParseError(t *testing.T) {
 	t.Parallel()
 
-	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := testutil.NewMockStore()
 	strategy := newMockEditStrategyNotFound()
 	strategy.parseErr = errors.New("invalid name")
 
@@ -186,7 +185,7 @@ func TestAddUseCase_Execute_ParseError(t *testing.T) {
 func TestAddUseCase_Draft_ParseError(t *testing.T) {
 	t.Parallel()
 
-	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := testutil.NewMockStore()
 	strategy := newMockEditStrategyNotFound()
 	strategy.parseErr = errors.New("invalid name")
 
@@ -256,7 +255,7 @@ func TestAddUseCase_Execute_GetError(t *testing.T) {
 func TestAddUseCase_Execute_RejectsWhenUpdateStaged(t *testing.T) {
 	t.Parallel()
 
-	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := testutil.NewMockStore()
 	// Pre-stage an UPDATE operation
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/existing", staging.Entry{
 		Operation: staging.OperationUpdate,
@@ -280,7 +279,7 @@ func TestAddUseCase_Execute_RejectsWhenUpdateStaged(t *testing.T) {
 func TestAddUseCase_Execute_RejectsWhenDeleteStaged(t *testing.T) {
 	t.Parallel()
 
-	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := testutil.NewMockStore()
 	// Pre-stage a DELETE operation
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/deleted", staging.Entry{
 		Operation: staging.OperationDelete,
@@ -303,7 +302,7 @@ func TestAddUseCase_Execute_RejectsWhenDeleteStaged(t *testing.T) {
 func TestAddUseCase_Execute_AllowsReEditOfCreate(t *testing.T) {
 	t.Parallel()
 
-	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := testutil.NewMockStore()
 	// Pre-stage a CREATE operation
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/new", staging.Entry{
 		Operation: staging.OperationCreate,
@@ -334,7 +333,7 @@ func TestAddUseCase_Execute_AllowsReEditOfCreate(t *testing.T) {
 func TestAddUseCase_Execute_FetchError(t *testing.T) {
 	t.Parallel()
 
-	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := testutil.NewMockStore()
 	strategy := newMockEditStrategy()
 	strategy.fetchErr = errors.New("AWS connection error")
 

@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"path/filepath"
 	"testing"
 
 	"github.com/samber/lo"
@@ -12,8 +11,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/mpyw/suve/internal/staging"
-	"github.com/mpyw/suve/internal/staging/file"
 	"github.com/mpyw/suve/internal/staging/runner"
+	"github.com/mpyw/suve/internal/staging/testutil"
 	stagingusecase "github.com/mpyw/suve/internal/usecase/staging"
 )
 
@@ -23,8 +22,7 @@ func TestAddRunner_Run(t *testing.T) {
 	t.Run("create new item", func(t *testing.T) {
 		t.Parallel()
 
-		tmpDir := t.TempDir()
-		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := testutil.NewMockStore()
 
 		var buf bytes.Buffer
 		r := &runner.AddRunner{
@@ -52,8 +50,7 @@ func TestAddRunner_Run(t *testing.T) {
 	t.Run("edit already staged create", func(t *testing.T) {
 		t.Parallel()
 
-		tmpDir := t.TempDir()
-		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := testutil.NewMockStore()
 
 		// Pre-stage as create
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
@@ -89,8 +86,7 @@ func TestAddRunner_Run(t *testing.T) {
 	t.Run("empty value not staged", func(t *testing.T) {
 		t.Parallel()
 
-		tmpDir := t.TempDir()
-		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := testutil.NewMockStore()
 
 		var buf bytes.Buffer
 		r := &runner.AddRunner{
@@ -115,8 +111,7 @@ func TestAddRunner_Run(t *testing.T) {
 	t.Run("no changes made", func(t *testing.T) {
 		t.Parallel()
 
-		tmpDir := t.TempDir()
-		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := testutil.NewMockStore()
 
 		// Pre-stage as create
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
@@ -145,8 +140,7 @@ func TestAddRunner_Run(t *testing.T) {
 	t.Run("Secrets Manager service", func(t *testing.T) {
 		t.Parallel()
 
-		tmpDir := t.TempDir()
-		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := testutil.NewMockStore()
 
 		var buf bytes.Buffer
 		r := &runner.AddRunner{
@@ -201,8 +195,7 @@ func TestAddRunner_ErrorCases(t *testing.T) {
 	t.Run("parse name error", func(t *testing.T) {
 		t.Parallel()
 
-		tmpDir := t.TempDir()
-		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := testutil.NewMockStore()
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.AddRunner{
@@ -222,8 +215,7 @@ func TestAddRunner_ErrorCases(t *testing.T) {
 	t.Run("editor error", func(t *testing.T) {
 		t.Parallel()
 
-		tmpDir := t.TempDir()
-		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := testutil.NewMockStore()
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.AddRunner{
@@ -250,8 +242,7 @@ func TestAddRunner_WithOptions(t *testing.T) {
 	t.Run("with provided value (skip editor)", func(t *testing.T) {
 		t.Parallel()
 
-		tmpDir := t.TempDir()
-		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := testutil.NewMockStore()
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.AddRunner{
@@ -280,8 +271,7 @@ func TestAddRunner_WithOptions(t *testing.T) {
 	t.Run("with description", func(t *testing.T) {
 		t.Parallel()
 
-		tmpDir := t.TempDir()
-		store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+		store := testutil.NewMockStore()
 
 		var stdout, stderr bytes.Buffer
 		r := &runner.AddRunner{

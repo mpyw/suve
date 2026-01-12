@@ -2,8 +2,8 @@ package staging
 
 import "context"
 
-// StoreReader provides read-only access to staging state.
-type StoreReader interface {
+// StoreReadOperator provides read-only access to individual staging entries.
+type StoreReadOperator interface {
 	// GetEntry retrieves a staged entry.
 	GetEntry(ctx context.Context, service Service, name string) (*Entry, error)
 	// GetTag retrieves staged tag changes.
@@ -12,12 +12,10 @@ type StoreReader interface {
 	ListEntries(ctx context.Context, service Service) (map[Service]map[string]Entry, error)
 	// ListTags returns all staged tag changes for a service.
 	ListTags(ctx context.Context, service Service) (map[Service]map[string]TagEntry, error)
-	// Load loads the current staging state from disk.
-	Load(ctx context.Context) (*State, error)
 }
 
-// StoreWriter provides write access to staging state.
-type StoreWriter interface {
+// StoreWriteOperator provides write access to individual staging entries.
+type StoreWriteOperator interface {
 	// StageEntry adds or updates a staged entry.
 	StageEntry(ctx context.Context, service Service, name string, entry Entry) error
 	// StageTag adds or updates staged tag changes.
@@ -30,8 +28,36 @@ type StoreWriter interface {
 	UnstageAll(ctx context.Context, service Service) error
 }
 
-// StoreReadWriter combines read and write access to staging state.
-type StoreReadWriter interface {
-	StoreReader
-	StoreWriter
+// StoreReadWriteOperator combines read and write access to staging entries.
+type StoreReadWriteOperator interface {
+	StoreReadOperator
+	StoreWriteOperator
 }
+
+// StateDrainer provides bulk read access to staging state (for drain command).
+type StateDrainer interface {
+	// Drain retrieves the entire state from storage.
+	// If keep is false, the source storage is cleared after reading.
+	Drain(ctx context.Context, keep bool) (*State, error)
+}
+
+// StatePersister provides bulk write access to staging state (for persist command).
+type StatePersister interface {
+	// Persist saves the entire state to storage.
+	// If keep is false, the source (memory) should be cleared by the caller.
+	Persist(ctx context.Context, state *State) error
+}
+
+// StateIO combines drain and persist operations for file storage.
+type StateIO interface {
+	StateDrainer
+	StatePersister
+}
+
+// Deprecated aliases for backward compatibility.
+// TODO: Remove these after updating all references.
+type (
+	StoreReader     = StoreReadOperator
+	StoreWriter     = StoreWriteOperator
+	StoreReadWriter = StoreReadWriteOperator
+)

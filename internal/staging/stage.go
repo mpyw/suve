@@ -3,6 +3,7 @@ package staging
 
 import (
 	"errors"
+	"maps"
 	"time"
 
 	"github.com/mpyw/suve/internal/maputil"
@@ -81,6 +82,48 @@ func (s *State) IsEmpty() bool {
 		}
 	}
 	return true
+}
+
+// Merge merges another state into this state.
+// The other state takes precedence for conflicting entries.
+func (s *State) Merge(other *State) {
+	if other == nil {
+		return
+	}
+	if s.Entries == nil {
+		s.Entries = make(map[Service]map[string]Entry)
+	}
+	if s.Tags == nil {
+		s.Tags = make(map[Service]map[string]TagEntry)
+	}
+
+	for svc, entries := range other.Entries {
+		if s.Entries[svc] == nil {
+			s.Entries[svc] = make(map[string]Entry)
+		}
+		maps.Copy(s.Entries[svc], entries)
+	}
+	for svc, tags := range other.Tags {
+		if s.Tags[svc] == nil {
+			s.Tags[svc] = make(map[string]TagEntry)
+		}
+		maps.Copy(s.Tags[svc], tags)
+	}
+}
+
+// NewEmptyState creates a new empty state with initialized maps.
+func NewEmptyState() *State {
+	return &State{
+		Version: 2,
+		Entries: map[Service]map[string]Entry{
+			ServiceParam:  make(map[string]Entry),
+			ServiceSecret: make(map[string]Entry),
+		},
+		Tags: map[Service]map[string]TagEntry{
+			ServiceParam:  make(map[string]TagEntry),
+			ServiceSecret: make(map[string]TagEntry),
+		},
+	}
 }
 
 // Service represents which AWS service the staged change belongs to.

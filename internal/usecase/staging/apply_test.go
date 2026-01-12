@@ -3,7 +3,6 @@ package staging_test
 import (
 	"context"
 	"errors"
-	"path/filepath"
 	"testing"
 	"time"
 
@@ -12,7 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/mpyw/suve/internal/staging"
-	"github.com/mpyw/suve/internal/staging/file"
+	"github.com/mpyw/suve/internal/staging/testutil"
 	usecasestaging "github.com/mpyw/suve/internal/usecase/staging"
 )
 
@@ -55,7 +54,7 @@ func newMockApplyStrategy() *mockApplyStrategy {
 func TestApplyUseCase_Execute_Empty(t *testing.T) {
 	t.Parallel()
 
-	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := testutil.NewMockStore()
 	uc := &usecasestaging.ApplyUseCase{
 		Strategy: newMockApplyStrategy(),
 		Store:    store,
@@ -73,7 +72,7 @@ func TestApplyUseCase_Execute_Empty(t *testing.T) {
 func TestApplyUseCase_Execute_SingleCreate(t *testing.T) {
 	t.Parallel()
 
-	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := testutil.NewMockStore()
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/new", staging.Entry{
 		Operation: staging.OperationCreate,
 		Value:     lo.ToPtr("new-value"),
@@ -102,7 +101,7 @@ func TestApplyUseCase_Execute_SingleCreate(t *testing.T) {
 func TestApplyUseCase_Execute_MultipleOperations(t *testing.T) {
 	t.Parallel()
 
-	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := testutil.NewMockStore()
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/create", staging.Entry{
 		Operation: staging.OperationCreate,
 		Value:     lo.ToPtr("create"),
@@ -134,7 +133,7 @@ func TestApplyUseCase_Execute_MultipleOperations(t *testing.T) {
 func TestApplyUseCase_Execute_FilterByName(t *testing.T) {
 	t.Parallel()
 
-	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := testutil.NewMockStore()
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/one", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("one"),
@@ -168,7 +167,7 @@ func TestApplyUseCase_Execute_FilterByName(t *testing.T) {
 func TestApplyUseCase_Execute_FilterByName_NotStaged(t *testing.T) {
 	t.Parallel()
 
-	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := testutil.NewMockStore()
 	uc := &usecasestaging.ApplyUseCase{
 		Strategy: newMockApplyStrategy(),
 		Store:    store,
@@ -184,7 +183,7 @@ func TestApplyUseCase_Execute_FilterByName_NotStaged(t *testing.T) {
 func TestApplyUseCase_Execute_PartialFailure(t *testing.T) {
 	t.Parallel()
 
-	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := testutil.NewMockStore()
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/success", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("success"),
@@ -227,7 +226,7 @@ func TestApplyUseCase_Execute_ConflictDetection(t *testing.T) {
 	baseTime := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
 	awsTime := time.Date(2024, 1, 2, 0, 0, 0, 0, time.UTC) // Modified after staging
 
-	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := testutil.NewMockStore()
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/conflict", staging.Entry{
 		Operation:      staging.OperationUpdate,
 		Value:          lo.ToPtr("staged"),
@@ -271,7 +270,7 @@ func TestApplyUseCase_Execute_ListError(t *testing.T) {
 func TestApplyUseCase_Execute_DeleteSuccess(t *testing.T) {
 	t.Parallel()
 
-	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := testutil.NewMockStore()
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/to-delete", staging.Entry{
 		Operation: staging.OperationDelete,
 		StagedAt:  time.Now(),
@@ -317,7 +316,7 @@ func newMockApplyTagStrategy() *mockApplyTagStrategy {
 func TestApplyUseCase_Execute_TagsOnly(t *testing.T) {
 	t.Parallel()
 
-	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := testutil.NewMockStore()
 	require.NoError(t, store.StageTag(t.Context(), staging.ServiceParam, "/app/config", staging.TagEntry{
 		Add:      map[string]string{"env": "prod", "team": "backend"},
 		StagedAt: time.Now(),
@@ -346,7 +345,7 @@ func TestApplyUseCase_Execute_TagsOnly(t *testing.T) {
 func TestApplyUseCase_Execute_TagsWithRemove(t *testing.T) {
 	t.Parallel()
 
-	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := testutil.NewMockStore()
 	removeKeys := map[string]struct{}{"deprecated": {}, "old": {}}
 	require.NoError(t, store.StageTag(t.Context(), staging.ServiceParam, "/app/config", staging.TagEntry{
 		Add:      map[string]string{"env": "prod"},
@@ -370,7 +369,7 @@ func TestApplyUseCase_Execute_TagsWithRemove(t *testing.T) {
 func TestApplyUseCase_Execute_EntriesAndTags(t *testing.T) {
 	t.Parallel()
 
-	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := testutil.NewMockStore()
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("new-value"),
@@ -397,7 +396,7 @@ func TestApplyUseCase_Execute_EntriesAndTags(t *testing.T) {
 func TestApplyUseCase_Execute_TagFailure(t *testing.T) {
 	t.Parallel()
 
-	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := testutil.NewMockStore()
 	require.NoError(t, store.StageTag(t.Context(), staging.ServiceParam, "/app/config", staging.TagEntry{
 		Add:      map[string]string{"env": "prod"},
 		StagedAt: time.Now(),
@@ -427,7 +426,7 @@ func TestApplyUseCase_Execute_TagFailure(t *testing.T) {
 func TestApplyUseCase_Execute_PartialTagFailure(t *testing.T) {
 	t.Parallel()
 
-	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := testutil.NewMockStore()
 	require.NoError(t, store.StageTag(t.Context(), staging.ServiceParam, "/app/success", staging.TagEntry{
 		Add:      map[string]string{"env": "prod"},
 		StagedAt: time.Now(),
@@ -463,7 +462,7 @@ func TestApplyUseCase_Execute_PartialTagFailure(t *testing.T) {
 func TestApplyUseCase_Execute_FilterByName_TagOnly(t *testing.T) {
 	t.Parallel()
 
-	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := testutil.NewMockStore()
 	require.NoError(t, store.StageTag(t.Context(), staging.ServiceParam, "/app/one", staging.TagEntry{
 		Add:      map[string]string{"env": "prod"},
 		StagedAt: time.Now(),

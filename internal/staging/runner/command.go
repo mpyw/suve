@@ -65,10 +65,7 @@ EXAMPLES:
 			if err != nil {
 				return fmt.Errorf("failed to get AWS identity: %w", err)
 			}
-			store, err := NewStore(identity.AccountID, identity.Region)
-			if err != nil {
-				return fmt.Errorf("failed to initialize stage store: %w", err)
-			}
+			store := NewStore(identity.AccountID, identity.Region)
 
 			r := &StatusRunner{
 				UseCase: &stagingusecase.StatusUseCase{
@@ -139,10 +136,7 @@ EXAMPLES:
 			if err != nil {
 				return fmt.Errorf("failed to get AWS identity: %w", err)
 			}
-			store, err := NewStore(identity.AccountID, identity.Region)
-			if err != nil {
-				return fmt.Errorf("failed to initialize stage store: %w", err)
-			}
+			store := NewStore(identity.AccountID, identity.Region)
 
 			strat, err := cfg.Factory(ctx)
 			if err != nil {
@@ -218,10 +212,7 @@ EXAMPLES:
 			if err != nil {
 				return fmt.Errorf("failed to get AWS identity: %w", err)
 			}
-			store, err := NewStore(identity.AccountID, identity.Region)
-			if err != nil {
-				return fmt.Errorf("failed to initialize stage store: %w", err)
-			}
+			store := NewStore(identity.AccountID, identity.Region)
 
 			strat, err := cfg.Factory(ctx)
 			if err != nil {
@@ -295,10 +286,7 @@ EXAMPLES:
 			if err != nil {
 				return fmt.Errorf("failed to get AWS identity: %w", err)
 			}
-			store, err := NewStore(identity.AccountID, identity.Region)
-			if err != nil {
-				return fmt.Errorf("failed to initialize stage store: %w", err)
-			}
+			store := NewStore(identity.AccountID, identity.Region)
 
 			strat, err := cfg.Factory(ctx)
 			if err != nil {
@@ -372,10 +360,7 @@ EXAMPLES:
 			if err != nil {
 				return fmt.Errorf("failed to get AWS identity: %w", err)
 			}
-			store, err := NewStore(identity.AccountID, identity.Region)
-			if err != nil {
-				return fmt.Errorf("failed to initialize stage store: %w", err)
-			}
+			store := NewStore(identity.AccountID, identity.Region)
 
 			// Get entries to show what will be applied
 			parser := cfg.ParserFactory()
@@ -492,10 +477,7 @@ EXAMPLES:
 			if err != nil {
 				return fmt.Errorf("failed to get AWS identity: %w", err)
 			}
-			store, err := NewStore(identity.AccountID, identity.Region)
-			if err != nil {
-				return fmt.Errorf("failed to initialize stage store: %w", err)
-			}
+			store := NewStore(identity.AccountID, identity.Region)
 
 			opts := ResetOptions{
 				All: resetAll,
@@ -618,10 +600,7 @@ EXAMPLES:
 			if err != nil {
 				return fmt.Errorf("failed to get AWS identity: %w", err)
 			}
-			store, err := NewStore(identity.AccountID, identity.Region)
-			if err != nil {
-				return fmt.Errorf("failed to initialize stage store: %w", err)
-			}
+			store := NewStore(identity.AccountID, identity.Region)
 
 			strat, err := cfg.Factory(ctx)
 			if err != nil {
@@ -685,10 +664,7 @@ EXAMPLES:
 			if err != nil {
 				return fmt.Errorf("failed to get AWS identity: %w", err)
 			}
-			store, err := NewStore(identity.AccountID, identity.Region)
-			if err != nil {
-				return fmt.Errorf("failed to initialize stage store: %w", err)
-			}
+			store := NewStore(identity.AccountID, identity.Region)
 
 			strat, err := cfg.Factory(ctx)
 			if err != nil {
@@ -747,10 +723,7 @@ EXAMPLES:
 			if err != nil {
 				return fmt.Errorf("failed to get AWS identity: %w", err)
 			}
-			store, err := NewStore(identity.AccountID, identity.Region)
-			if err != nil {
-				return fmt.Errorf("failed to initialize stage store: %w", err)
-			}
+			store := NewStore(identity.AccountID, identity.Region)
 
 			strat, err := cfg.Factory(ctx)
 			if err != nil {
