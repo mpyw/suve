@@ -205,6 +205,11 @@ func GetSocketPath() string {
 	return getSocketPath()
 }
 
+// getSocketPathFallback returns the fallback socket path.
+func getSocketPathFallback() string {
+	return filepath.Join(fmt.Sprintf("/tmp/suve-%d", os.Getuid()), "agent.sock")
+}
+
 // createSocketDir creates the socket directory with secure permissions.
 func (d *Daemon) createSocketDir() error {
 	dir := filepath.Dir(d.socketPath)
