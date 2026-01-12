@@ -1,3 +1,4 @@
+// Package client provides the domain-level client for the staging agent.
 package client
 
 import (
@@ -7,19 +8,37 @@ import (
 
 	"github.com/mpyw/suve/internal/staging"
 	"github.com/mpyw/suve/internal/staging/agent/protocol"
+	"github.com/mpyw/suve/internal/staging/agent/transport"
 )
+
+// Re-export transport types for convenience.
+type (
+	ClientOption = transport.ClientOption
+)
+
+// Re-export transport functions for convenience.
+var (
+	WithAutoStartDisabled = transport.WithAutoStartDisabled
+	ErrDaemonNotRunning   = transport.ErrDaemonNotRunning
+)
+
+// Client is an alias for transport.Client for daemon management operations.
+type Client = transport.Client
+
+// NewClient creates a new transport client for daemon management.
+var NewClient = transport.NewClient
 
 // Store implements staging.StoreReadWriteOperator using the daemon.
 type Store struct {
-	client    *Client
+	client    *transport.Client
 	accountID string
 	region    string
 }
 
 // NewStore creates a new Store.
-func NewStore(accountID, region string, opts ...ClientOption) *Store {
+func NewStore(accountID, region string, opts ...transport.ClientOption) *Store {
 	return &Store{
-		client:    NewClient(opts...),
+		client:    transport.NewClient(opts...),
 		accountID: accountID,
 		region:    region,
 	}
@@ -147,8 +166,6 @@ func (s *Store) UnstageAll(ctx context.Context, service staging.Service) error {
 }
 
 // Drain retrieves the state from the daemon, optionally clearing memory.
-// This implements StateDrainer for agent-based storage.
-// If keep is false, the daemon memory is cleared after reading.
 func (s *Store) Drain(ctx context.Context, keep bool) (*staging.State, error) {
 	state, err := doRequestWithResult(s, ctx, &protocol.Request{
 		Method:    protocol.MethodGetState,
@@ -162,7 +179,6 @@ func (s *Store) Drain(ctx context.Context, keep bool) (*staging.State, error) {
 		state = staging.NewEmptyState()
 	}
 
-	// Clear memory if keep is false
 	if !keep {
 		if err := s.doSimpleRequestEnsuringDaemon(ctx, &protocol.Request{
 			Method:    protocol.MethodUnstageAll,
@@ -187,7 +203,7 @@ func (s *Store) SetState(ctx context.Context, state *staging.State) error {
 	})
 }
 
-// doRequestWithResult sends a request to the daemon and unmarshals the response.
+// doRequestWithResult sends a request and unmarshals the response.
 func doRequestWithResult[Resp any, Result any](
 	s *Store,
 	ctx context.Context,
@@ -196,7 +212,7 @@ func doRequestWithResult[Resp any, Result any](
 ) (Result, error) {
 	var zero Result
 
-	resp, err := s.client.sendRequest(ctx, req)
+	resp, err := s.client.SendRequest(ctx, req)
 	if err != nil {
 		return zero, err
 	}
@@ -211,7 +227,7 @@ func doRequestWithResult[Resp any, Result any](
 	return extract(&result), nil
 }
 
-// doRequestWithResultEnsuringDaemon ensures the daemon is running, then sends a request and unmarshals the response.
+// doRequestWithResultEnsuringDaemon ensures daemon is running, then sends request.
 func doRequestWithResultEnsuringDaemon[Resp any, Result any](
 	s *Store,
 	ctx context.Context,
@@ -219,22 +235,22 @@ func doRequestWithResultEnsuringDaemon[Resp any, Result any](
 	extract func(*Resp) Result,
 ) (Result, error) {
 	var zero Result
-	if err := s.client.ensureDaemon(ctx); err != nil {
+	if err := s.client.EnsureDaemon(ctx); err != nil {
 		return zero, err
 	}
 	return doRequestWithResult(s, ctx, req, extract)
 }
 
-// doSimpleRequestEnsuringDaemon ensures the daemon is running, then sends a simple request.
+// doSimpleRequestEnsuringDaemon ensures daemon is running, then sends simple request.
 func (s *Store) doSimpleRequestEnsuringDaemon(ctx context.Context, req *protocol.Request) error {
-	if err := s.client.ensureDaemon(ctx); err != nil {
+	if err := s.client.EnsureDaemon(ctx); err != nil {
 		return err
 	}
-	return s.client.doSimpleRequest(ctx, req)
+	return s.client.DoSimpleRequest(ctx, req)
 }
 
-// Compile-time check that Store implements StoreReadWriteOperator.
-var _ staging.StoreReadWriteOperator = (*Store)(nil)
-
-// Compile-time check that Store implements StateDrainer.
-var _ staging.StateDrainer = (*Store)(nil)
+// Compile-time checks.
+var (
+	_ staging.StoreReadWriteOperator = (*Store)(nil)
+	_ staging.StateDrainer           = (*Store)(nil)
+)

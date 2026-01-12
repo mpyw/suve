@@ -2,26 +2,12 @@
 package server
 
 import (
-	"context"
-	"encoding/json"
-	"errors"
-	"fmt"
-	"io"
-	"net"
 	"os"
 	"os/signal"
-	"path/filepath"
-	"sync"
 	"syscall"
-	"time"
 
 	"github.com/mpyw/suve/internal/staging/agent/protocol"
-	"github.com/mpyw/suve/internal/staging/agent/server/security"
-)
-
-const (
-	// connectionTimeout is the deadline for reading/writing on a connection.
-	connectionTimeout = 5 * time.Second
+	"github.com/mpyw/suve/internal/staging/agent/transport"
 )
 
 // DaemonOption configures a Daemon.
@@ -36,12 +22,8 @@ func WithAutoShutdownDisabled() DaemonOption {
 
 // Daemon represents the staging agent daemon.
 type Daemon struct {
-	listener             net.Listener
+	server               *transport.Server
 	state                *secureState
-	wg                   sync.WaitGroup
-	ctx                  context.Context
-	cancel               context.CancelFunc
-	shutdownCh           chan struct{}
 	autoShutdownDisabled bool
 }
 
@@ -50,48 +32,20 @@ type Daemon struct {
 // CLI command that started it and manages its own lifecycle via OS signals
 // (SIGTERM/SIGINT) rather than parent context cancellation.
 func NewDaemon(opts ...DaemonOption) *Daemon {
-	ctx, cancel := context.WithCancel(context.Background())
 	d := &Daemon{
-		state:      newSecureState(),
-		ctx:        ctx,
-		cancel:     cancel,
-		shutdownCh: make(chan struct{}),
+		state: newSecureState(),
 	}
 	for _, opt := range opts {
 		opt(d)
 	}
+	d.server = transport.NewServer(d.handleRequest)
+	d.server.OnResponse = d.onResponse
 	return d
 }
 
 // Run starts the daemon and blocks until shutdown.
 func (d *Daemon) Run() error {
-	// Setup process security
-	if err := security.SetupProcess(); err != nil {
-		return fmt.Errorf("failed to setup process security: %w", err)
-	}
-
-	socketPath := protocol.SocketPath()
-
-	// Create socket directory
-	if err := d.createSocketDir(socketPath); err != nil {
-		return err
-	}
-
-	// Remove existing socket
-	if err := d.removeExistingSocket(socketPath); err != nil {
-		return err
-	}
-
-	// Listen on Unix socket
-	listener, err := net.Listen("unix", socketPath)
-	if err != nil {
-		return fmt.Errorf("failed to listen on socket: %w", err)
-	}
-	d.listener = listener
-
-	// Set socket permissions
-	if err := d.setSocketPermissions(socketPath); err != nil {
-		_ = listener.Close()
+	if err := d.server.Start(); err != nil {
 		return err
 	}
 
@@ -102,78 +56,29 @@ func (d *Daemon) Run() error {
 		select {
 		case <-sigCh:
 			d.Shutdown()
-		case <-d.ctx.Done():
+		case <-d.server.Done():
 		}
 	}()
 
-	// Accept connections
-	for {
-		conn, err := listener.Accept()
-		if err != nil {
-			select {
-			case <-d.ctx.Done():
-				return nil
-			default:
-				// Log error and continue
-				continue
-			}
-		}
-
-		d.wg.Add(1)
-		go func() {
-			defer d.wg.Done()
-			d.handleConnection(conn)
-		}()
-	}
+	d.server.Serve()
+	return nil
 }
 
 // Shutdown gracefully shuts down the daemon.
 func (d *Daemon) Shutdown() {
-	d.cancel()
-	if d.listener != nil {
-		_ = d.listener.Close()
-	}
-	d.wg.Wait()
+	d.server.Shutdown()
 	d.state.destroy()
-	close(d.shutdownCh)
 }
 
-// handleConnection handles a single client connection.
-func (d *Daemon) handleConnection(conn net.Conn) {
-	defer func() { _ = conn.Close() }()
-
-	// Set read deadline
-	_ = conn.SetDeadline(time.Now().Add(connectionTimeout))
-
-	// Verify peer credentials
-	if err := security.VerifyPeerCredentials(conn); err != nil {
-		d.sendError(conn, err.Error())
-		return
-	}
-
-	// Read request
-	decoder := json.NewDecoder(conn)
-	var req protocol.Request
-	if err := decoder.Decode(&req); err != nil {
-		if !errors.Is(err, io.EOF) {
-			d.sendError(conn, fmt.Sprintf("failed to decode request: %v", err))
-		}
-		return
-	}
-
-	// Handle request
-	resp := d.handleRequest(&req)
-
-	// Send response
-	_ = conn.SetDeadline(time.Now().Add(connectionTimeout))
-	encoder := json.NewEncoder(conn)
-	_ = encoder.Encode(resp)
-
+// onResponse is called after each response to check for auto-shutdown.
+func (d *Daemon) onResponse(req *protocol.Request, resp *protocol.Response) {
 	// Check for auto-shutdown after UnstageEntry, UnstageTag, or UnstageAll
-	if !d.autoShutdownDisabled && resp.Success && (req.Method == protocol.MethodUnstageEntry || req.Method == protocol.MethodUnstageTag || req.Method == protocol.MethodUnstageAll) {
-		if d.state.isEmpty() {
-			// Schedule shutdown
-			go d.Shutdown()
+	if !d.autoShutdownDisabled && resp.Success {
+		switch req.Method {
+		case protocol.MethodUnstageEntry, protocol.MethodUnstageTag, protocol.MethodUnstageAll:
+			if d.state.isEmpty() {
+				go d.Shutdown()
+			}
 		}
 	}
 }
@@ -213,42 +118,6 @@ func (d *Daemon) handleRequest(req *protocol.Request) *protocol.Response {
 	case protocol.MethodIsEmpty:
 		return d.handleIsEmpty()
 	default:
-		return errorMessageResponse(fmt.Sprintf("unknown method: %s", req.Method))
+		return errorMessageResponse("unknown method: " + string(req.Method))
 	}
-}
-
-// sendError sends an error response.
-func (d *Daemon) sendError(conn net.Conn, msg string) {
-	resp := protocol.Response{Success: false, Error: msg}
-	encoder := json.NewEncoder(conn)
-	_ = encoder.Encode(resp)
-}
-
-// createSocketDir creates the socket directory with secure permissions.
-func (d *Daemon) createSocketDir(socketPath string) error {
-	dir := filepath.Dir(socketPath)
-	if err := os.MkdirAll(dir, 0o700); err != nil {
-		return fmt.Errorf("failed to create socket directory: %w", err)
-	}
-	// Ensure directory permissions are correct
-	if err := os.Chmod(dir, 0o700); err != nil {
-		return fmt.Errorf("failed to set socket directory permissions: %w", err)
-	}
-	return nil
-}
-
-// removeExistingSocket removes any existing socket file.
-func (d *Daemon) removeExistingSocket(socketPath string) error {
-	if err := os.Remove(socketPath); err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf("failed to remove existing socket: %w", err)
-	}
-	return nil
-}
-
-// setSocketPermissions sets secure permissions on the socket file.
-func (d *Daemon) setSocketPermissions(socketPath string) error {
-	if err := os.Chmod(socketPath, 0o600); err != nil {
-		return fmt.Errorf("failed to set socket permissions: %w", err)
-	}
-	return nil
 }

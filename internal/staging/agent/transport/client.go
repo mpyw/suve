@@ -1,5 +1,5 @@
-// Package client provides the client for communicating with the staging agent daemon.
-package client
+// Package transport provides low-level IPC communication for the staging agent.
+package transport
 
 import (
 	"context"
@@ -35,15 +35,14 @@ func WithAutoStartDisabled() ClientOption {
 	}
 }
 
-// Client provides low-level communication with the staging agent daemon.
-// For data operations, use Store which wraps Client with account/region binding.
+// Client provides low-level IPC communication with the daemon.
 type Client struct {
 	socketPath        string
 	autoStartDisabled bool
 	mu                sync.Mutex
 }
 
-// NewClient creates a new client.
+// NewClient creates a new transport client.
 func NewClient(opts ...ClientOption) *Client {
 	c := &Client{
 		socketPath: protocol.SocketPath(),
@@ -54,8 +53,8 @@ func NewClient(opts ...ClientOption) *Client {
 	return c
 }
 
-// ensureDaemon ensures the daemon is running, starting it if necessary.
-func (c *Client) ensureDaemon(ctx context.Context) error {
+// EnsureDaemon ensures the daemon is running, starting it if necessary.
+func (c *Client) EnsureDaemon(ctx context.Context) error {
 	// Try to ping first
 	if err := c.ping(ctx); err == nil {
 		return nil
@@ -90,29 +89,24 @@ func (c *Client) ensureDaemon(ctx context.Context) error {
 
 // startDaemon starts a new daemon process.
 func (c *Client) startDaemon(_ context.Context) error {
-	// Check if auto-start is disabled
 	if c.autoStartDisabled {
 		return fmt.Errorf("daemon not running and auto-start is disabled; run 'suve stage agent start' manually")
 	}
 
-	// Get the current executable path
 	executable, err := os.Executable()
 	if err != nil {
 		return fmt.Errorf("failed to get executable path: %w", err)
 	}
 
-	// Start daemon as background process
 	cmd := exec.Command(executable, "stage", "agent", "start")
 	cmd.Stdout = nil
 	cmd.Stderr = nil
 	cmd.Stdin = nil
 
-	// Detach from current process group
 	if err := cmd.Start(); err != nil {
 		return fmt.Errorf("failed to start daemon process: %w", err)
 	}
 
-	// Release the process so it continues running after we exit
 	if err := cmd.Process.Release(); err != nil {
 		return fmt.Errorf("failed to release daemon process: %w", err)
 	}
@@ -122,17 +116,17 @@ func (c *Client) startDaemon(_ context.Context) error {
 
 // ping checks if the daemon is running.
 func (c *Client) ping(ctx context.Context) error {
-	return c.doSimpleRequest(ctx, &protocol.Request{Method: protocol.MethodPing})
+	return c.DoSimpleRequest(ctx, &protocol.Request{Method: protocol.MethodPing})
 }
 
 // Shutdown sends a shutdown request to the daemon.
 func (c *Client) Shutdown(ctx context.Context) error {
-	return c.doSimpleRequest(ctx, &protocol.Request{Method: protocol.MethodShutdown})
+	return c.DoSimpleRequest(ctx, &protocol.Request{Method: protocol.MethodShutdown})
 }
 
 // IsEmpty checks if the daemon state is empty.
 func (c *Client) IsEmpty(ctx context.Context) (bool, error) {
-	resp, err := c.sendRequest(ctx, &protocol.Request{Method: protocol.MethodIsEmpty})
+	resp, err := c.SendRequest(ctx, &protocol.Request{Method: protocol.MethodIsEmpty})
 	if err != nil {
 		return false, err
 	}
@@ -147,12 +141,11 @@ func (c *Client) IsEmpty(ctx context.Context) (bool, error) {
 	return result.Empty, nil
 }
 
-// sendRequest sends a request to the daemon and returns the response.
-func (c *Client) sendRequest(ctx context.Context, req *protocol.Request) (*protocol.Response, error) {
+// SendRequest sends a request to the daemon and returns the response.
+func (c *Client) SendRequest(ctx context.Context, req *protocol.Request) (*protocol.Response, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	// Connect with timeout
 	dialer := net.Dialer{Timeout: requestTimeout}
 	conn, err := dialer.DialContext(ctx, "unix", c.socketPath)
 	if err != nil {
@@ -160,18 +153,15 @@ func (c *Client) sendRequest(ctx context.Context, req *protocol.Request) (*proto
 	}
 	defer func() { _ = conn.Close() }()
 
-	// Set deadline
 	if err := conn.SetDeadline(time.Now().Add(requestTimeout)); err != nil {
 		return nil, fmt.Errorf("failed to set deadline: %w", err)
 	}
 
-	// Send request
 	encoder := json.NewEncoder(conn)
 	if err := encoder.Encode(req); err != nil {
 		return nil, fmt.Errorf("failed to send request: %w", err)
 	}
 
-	// Read response
 	decoder := json.NewDecoder(conn)
 	var resp protocol.Response
 	if err := decoder.Decode(&resp); err != nil {
@@ -184,9 +174,9 @@ func (c *Client) sendRequest(ctx context.Context, req *protocol.Request) (*proto
 	return &resp, nil
 }
 
-// doSimpleRequest sends a request and returns only the error status.
-func (c *Client) doSimpleRequest(ctx context.Context, req *protocol.Request) error {
-	resp, err := c.sendRequest(ctx, req)
+// DoSimpleRequest sends a request and returns only the error status.
+func (c *Client) DoSimpleRequest(ctx context.Context, req *protocol.Request) error {
+	resp, err := c.SendRequest(ctx, req)
 	if err != nil {
 		return err
 	}
