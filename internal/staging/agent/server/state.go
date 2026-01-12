@@ -1,4 +1,4 @@
-package agent
+package server
 
 import (
 	"encoding/json"

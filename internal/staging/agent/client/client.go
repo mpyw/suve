@@ -1,4 +1,5 @@
-package agent
+// Package client provides the client for communicating with the staging agent daemon.
+package client
 
 import (
 	"context"
@@ -13,6 +14,7 @@ import (
 	"time"
 
 	"github.com/mpyw/suve/internal/staging"
+	"github.com/mpyw/suve/internal/staging/agent/protocol"
 )
 
 const (
@@ -33,7 +35,7 @@ type Client struct {
 // NewClient creates a new client.
 func NewClient() *Client {
 	return &Client{
-		socketPath: getSocketPath(),
+		socketPath: protocol.SocketPath(),
 	}
 }
 
@@ -100,68 +102,68 @@ func (c *Client) startDaemon(_ context.Context) error {
 
 // ping checks if the daemon is running.
 func (c *Client) ping(ctx context.Context) error {
-	return c.doSimpleRequest(ctx, &Request{Method: MethodPing})
+	return c.doSimpleRequest(ctx, &protocol.Request{Method: protocol.MethodPing})
 }
 
 // Shutdown sends a shutdown request to the daemon.
 func (c *Client) Shutdown(ctx context.Context) error {
-	return c.doSimpleRequest(ctx, &Request{Method: MethodShutdown})
+	return c.doSimpleRequest(ctx, &protocol.Request{Method: protocol.MethodShutdown})
 }
 
 // IsEmpty checks if the daemon state is empty.
 func (c *Client) IsEmpty(ctx context.Context) (bool, error) {
-	return doRequestWithResult(c, ctx, &Request{Method: MethodIsEmpty}, func(r *IsEmptyResponse) bool { return r.Empty })
+	return doRequestWithResult(c, ctx, &protocol.Request{Method: protocol.MethodIsEmpty}, func(r *protocol.IsEmptyResponse) bool { return r.Empty })
 }
 
 // GetEntry retrieves a staged entry from the daemon.
 func (c *Client) GetEntry(ctx context.Context, accountID, region string, service staging.Service, name string) (*staging.Entry, error) {
-	return doRequestWithResultEnsuringDaemon(c, ctx, &Request{
-		Method:    MethodGetEntry,
+	return doRequestWithResultEnsuringDaemon(c, ctx, &protocol.Request{
+		Method:    protocol.MethodGetEntry,
 		AccountID: accountID,
 		Region:    region,
 		Service:   service,
 		Name:      name,
-	}, func(r *EntryResponse) *staging.Entry { return r.Entry })
+	}, func(r *protocol.EntryResponse) *staging.Entry { return r.Entry })
 }
 
 // GetTag retrieves staged tag changes from the daemon.
 func (c *Client) GetTag(ctx context.Context, accountID, region string, service staging.Service, name string) (*staging.TagEntry, error) {
-	return doRequestWithResultEnsuringDaemon(c, ctx, &Request{
-		Method:    MethodGetTag,
+	return doRequestWithResultEnsuringDaemon(c, ctx, &protocol.Request{
+		Method:    protocol.MethodGetTag,
 		AccountID: accountID,
 		Region:    region,
 		Service:   service,
 		Name:      name,
-	}, func(r *TagResponse) *staging.TagEntry { return r.TagEntry })
+	}, func(r *protocol.TagResponse) *staging.TagEntry { return r.TagEntry })
 }
 
 // ListEntries returns all staged entries from the daemon.
 func (c *Client) ListEntries(ctx context.Context, accountID, region string, service staging.Service) (map[staging.Service]map[string]staging.Entry, error) {
-	return doRequestWithResultEnsuringDaemon(c, ctx, &Request{
-		Method:    MethodListEntries,
+	return doRequestWithResultEnsuringDaemon(c, ctx, &protocol.Request{
+		Method:    protocol.MethodListEntries,
 		AccountID: accountID,
 		Region:    region,
 		Service:   service,
-	}, func(r *ListEntriesResponse) map[staging.Service]map[string]staging.Entry { return r.Entries })
+	}, func(r *protocol.ListEntriesResponse) map[staging.Service]map[string]staging.Entry { return r.Entries })
 }
 
 // ListTags returns all staged tag changes from the daemon.
 func (c *Client) ListTags(ctx context.Context, accountID, region string, service staging.Service) (map[staging.Service]map[string]staging.TagEntry, error) {
-	return doRequestWithResultEnsuringDaemon(c, ctx, &Request{
-		Method:    MethodListTags,
+	return doRequestWithResultEnsuringDaemon(c, ctx, &protocol.Request{
+		Method:    protocol.MethodListTags,
 		AccountID: accountID,
 		Region:    region,
 		Service:   service,
-	}, func(r *ListTagsResponse) map[staging.Service]map[string]staging.TagEntry { return r.Tags })
+	}, func(r *protocol.ListTagsResponse) map[staging.Service]map[string]staging.TagEntry { return r.Tags })
 }
 
 // Load loads the full state from the daemon.
 func (c *Client) Load(ctx context.Context, accountID, region string) (*staging.State, error) {
-	return doRequestWithResultEnsuringDaemon(c, ctx, &Request{
-		Method:    MethodLoad,
+	return doRequestWithResultEnsuringDaemon(c, ctx, &protocol.Request{
+		Method:    protocol.MethodLoad,
 		AccountID: accountID,
 		Region:    region,
-	}, func(r *StateResponse) *staging.State { return r.State })
+	}, func(r *protocol.StateResponse) *staging.State { return r.State })
 }
 
 // StageEntry adds or updates a staged entry in the daemon.
@@ -169,8 +171,8 @@ func (c *Client) StageEntry(ctx context.Context, accountID, region string, servi
 	if err := c.ensureDaemon(ctx); err != nil {
 		return err
 	}
-	return c.doSimpleRequest(ctx, &Request{
-		Method:    MethodStageEntry,
+	return c.doSimpleRequest(ctx, &protocol.Request{
+		Method:    protocol.MethodStageEntry,
 		AccountID: accountID,
 		Region:    region,
 		Service:   service,
@@ -184,8 +186,8 @@ func (c *Client) StageTag(ctx context.Context, accountID, region string, service
 	if err := c.ensureDaemon(ctx); err != nil {
 		return err
 	}
-	return c.doSimpleRequest(ctx, &Request{
-		Method:    MethodStageTag,
+	return c.doSimpleRequest(ctx, &protocol.Request{
+		Method:    protocol.MethodStageTag,
 		AccountID: accountID,
 		Region:    region,
 		Service:   service,
@@ -199,8 +201,8 @@ func (c *Client) UnstageEntry(ctx context.Context, accountID, region string, ser
 	if err := c.ensureDaemon(ctx); err != nil {
 		return err
 	}
-	return c.doSimpleRequest(ctx, &Request{
-		Method:    MethodUnstageEntry,
+	return c.doSimpleRequest(ctx, &protocol.Request{
+		Method:    protocol.MethodUnstageEntry,
 		AccountID: accountID,
 		Region:    region,
 		Service:   service,
@@ -213,8 +215,8 @@ func (c *Client) UnstageTag(ctx context.Context, accountID, region string, servi
 	if err := c.ensureDaemon(ctx); err != nil {
 		return err
 	}
-	return c.doSimpleRequest(ctx, &Request{
-		Method:    MethodUnstageTag,
+	return c.doSimpleRequest(ctx, &protocol.Request{
+		Method:    protocol.MethodUnstageTag,
 		AccountID: accountID,
 		Region:    region,
 		Service:   service,
@@ -227,8 +229,8 @@ func (c *Client) UnstageAll(ctx context.Context, accountID, region string, servi
 	if err := c.ensureDaemon(ctx); err != nil {
 		return err
 	}
-	return c.doSimpleRequest(ctx, &Request{
-		Method:    MethodUnstageAll,
+	return c.doSimpleRequest(ctx, &protocol.Request{
+		Method:    protocol.MethodUnstageAll,
 		AccountID: accountID,
 		Region:    region,
 		Service:   service,
@@ -237,11 +239,11 @@ func (c *Client) UnstageAll(ctx context.Context, accountID, region string, servi
 
 // GetState retrieves the full state for persist operations.
 func (c *Client) GetState(ctx context.Context, accountID, region string) (*staging.State, error) {
-	return doRequestWithResult(c, ctx, &Request{
-		Method:    MethodGetState,
+	return doRequestWithResult(c, ctx, &protocol.Request{
+		Method:    protocol.MethodGetState,
 		AccountID: accountID,
 		Region:    region,
-	}, func(r *StateResponse) *staging.State { return r.State })
+	}, func(r *protocol.StateResponse) *staging.State { return r.State })
 }
 
 // SetState sets the full state for drain operations.
@@ -250,8 +252,8 @@ func (c *Client) SetState(ctx context.Context, accountID, region string, state *
 		return err
 	}
 
-	resp, err := c.sendRequest(ctx, &Request{
-		Method:    MethodSetState,
+	resp, err := c.sendRequest(ctx, &protocol.Request{
+		Method:    protocol.MethodSetState,
 		AccountID: accountID,
 		Region:    region,
 		State:     state,
@@ -266,7 +268,7 @@ func (c *Client) SetState(ctx context.Context, accountID, region string, state *
 func doRequestWithResult[Resp any, Result any](
 	c *Client,
 	ctx context.Context,
-	req *Request,
+	req *protocol.Request,
 	extract func(*Resp) Result,
 ) (Result, error) {
 	var zero Result
@@ -290,7 +292,7 @@ func doRequestWithResult[Resp any, Result any](
 func doRequestWithResultEnsuringDaemon[Resp any, Result any](
 	c *Client,
 	ctx context.Context,
-	req *Request,
+	req *protocol.Request,
 	extract func(*Resp) Result,
 ) (Result, error) {
 	var zero Result
@@ -301,7 +303,7 @@ func doRequestWithResultEnsuringDaemon[Resp any, Result any](
 }
 
 // sendRequest sends a request to the daemon and returns the response.
-func (c *Client) sendRequest(ctx context.Context, req *Request) (*Response, error) {
+func (c *Client) sendRequest(ctx context.Context, req *protocol.Request) (*protocol.Response, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -326,7 +328,7 @@ func (c *Client) sendRequest(ctx context.Context, req *Request) (*Response, erro
 
 	// Read response
 	decoder := json.NewDecoder(conn)
-	var resp Response
+	var resp protocol.Response
 	if err := decoder.Decode(&resp); err != nil {
 		if errors.Is(err, io.EOF) {
 			return nil, fmt.Errorf("daemon closed connection unexpectedly")
@@ -338,7 +340,7 @@ func (c *Client) sendRequest(ctx context.Context, req *Request) (*Response, erro
 }
 
 // doSimpleRequest sends a request and returns only the error status.
-func (c *Client) doSimpleRequest(ctx context.Context, req *Request) error {
+func (c *Client) doSimpleRequest(ctx context.Context, req *protocol.Request) error {
 	resp, err := c.sendRequest(ctx, req)
 	if err != nil {
 		return err

@@ -7,7 +7,8 @@ import (
 
 	"github.com/urfave/cli/v3"
 
-	"github.com/mpyw/suve/internal/staging/agent"
+	"github.com/mpyw/suve/internal/staging/agent/client"
+	"github.com/mpyw/suve/internal/staging/agent/server"
 )
 
 // Command returns the stage agent command.
@@ -45,7 +46,7 @@ This command is usually called automatically when staging operations are perform
 
 The daemon will automatically shut down when all staged changes are cleared.`,
 		Action: func(_ context.Context, _ *cli.Command) error {
-			daemon := agent.NewDaemon()
+			daemon := server.NewDaemon()
 			return daemon.Run()
 		},
 	}
@@ -60,8 +61,8 @@ func stopCommand() *cli.Command {
 This command sends a shutdown signal to the running daemon.
 Note: Any staged changes in memory will be lost unless persisted first.`,
 		Action: func(ctx context.Context, cmd *cli.Command) error {
-			client := agent.NewClient()
-			if err := client.Shutdown(ctx); err != nil {
+			c := client.NewClient()
+			if err := c.Shutdown(ctx); err != nil {
 				_, _ = fmt.Fprintf(cmd.Root().ErrWriter, "Warning: %v\n", err)
 				return nil
 			}

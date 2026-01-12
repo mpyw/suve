@@ -12,7 +12,7 @@ import (
 	"github.com/mpyw/suve/internal/cli/terminal"
 	"github.com/mpyw/suve/internal/infra"
 	"github.com/mpyw/suve/internal/staging"
-	"github.com/mpyw/suve/internal/staging/agent"
+	"github.com/mpyw/suve/internal/staging/agent/client"
 	"github.com/mpyw/suve/internal/staging/file"
 )
 
@@ -113,7 +113,7 @@ EXAMPLES:
 				return errors.New("no staged changes in file to drain")
 			}
 
-			agentStore := agent.NewAgentStore(identity.AccountID, identity.Region)
+			agentStore := client.NewStore(identity.AccountID, identity.Region)
 			force := cmd.Bool("force")
 			merge := cmd.Bool("merge")
 			keep := cmd.Bool("keep")
@@ -140,8 +140,8 @@ EXAMPLES:
 			}
 
 			// Set state in agent
-			client := agent.NewClient()
-			if err := client.SetState(ctx, identity.AccountID, identity.Region, finalState); err != nil {
+			c := client.NewClient()
+			if err := c.SetState(ctx, identity.AccountID, identity.Region, finalState); err != nil {
 				return fmt.Errorf("failed to set state in agent: %w", err)
 			}
 

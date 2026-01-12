@@ -12,7 +12,7 @@ import (
 	"github.com/mpyw/suve/internal/cli/passphrase"
 	"github.com/mpyw/suve/internal/cli/terminal"
 	"github.com/mpyw/suve/internal/infra"
-	"github.com/mpyw/suve/internal/staging/agent"
+	"github.com/mpyw/suve/internal/staging/agent/client"
 	"github.com/mpyw/suve/internal/staging/file"
 )
 
@@ -49,7 +49,7 @@ EXAMPLES:
 				return fmt.Errorf("failed to get AWS identity: %w", err)
 			}
 
-			agentStore := agent.NewAgentStore(identity.AccountID, identity.Region)
+			agentStore := client.NewStore(identity.AccountID, identity.Region)
 			keep := cmd.Bool("keep")
 
 			// Drain state from agent (keep for now, will clear after successful file write if needed)

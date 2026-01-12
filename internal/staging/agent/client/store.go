@@ -1,4 +1,4 @@
-package agent
+package client
 
 import (
 	"context"
@@ -6,16 +6,16 @@ import (
 	"github.com/mpyw/suve/internal/staging"
 )
 
-// AgentStore implements staging.StoreReadWriteOperator using the daemon.
-type AgentStore struct {
+// Store implements staging.StoreReadWriteOperator using the daemon.
+type Store struct {
 	client    *Client
 	accountID string
 	region    string
 }
 
-// NewAgentStore creates a new AgentStore.
-func NewAgentStore(accountID, region string) *AgentStore {
-	return &AgentStore{
+// NewStore creates a new Store.
+func NewStore(accountID, region string) *Store {
+	return &Store{
 		client:    NewClient(),
 		accountID: accountID,
 		region:    region,
@@ -23,7 +23,7 @@ func NewAgentStore(accountID, region string) *AgentStore {
 }
 
 // GetEntry retrieves a staged entry.
-func (s *AgentStore) GetEntry(ctx context.Context, service staging.Service, name string) (*staging.Entry, error) {
+func (s *Store) GetEntry(ctx context.Context, service staging.Service, name string) (*staging.Entry, error) {
 	entry, err := s.client.GetEntry(ctx, s.accountID, s.region, service, name)
 	if err != nil {
 		return nil, err
@@ -35,7 +35,7 @@ func (s *AgentStore) GetEntry(ctx context.Context, service staging.Service, name
 }
 
 // GetTag retrieves staged tag changes.
-func (s *AgentStore) GetTag(ctx context.Context, service staging.Service, name string) (*staging.TagEntry, error) {
+func (s *Store) GetTag(ctx context.Context, service staging.Service, name string) (*staging.TagEntry, error) {
 	tagEntry, err := s.client.GetTag(ctx, s.accountID, s.region, service, name)
 	if err != nil {
 		return nil, err
@@ -47,7 +47,7 @@ func (s *AgentStore) GetTag(ctx context.Context, service staging.Service, name s
 }
 
 // ListEntries returns all staged entries for a service.
-func (s *AgentStore) ListEntries(ctx context.Context, service staging.Service) (map[staging.Service]map[string]staging.Entry, error) {
+func (s *Store) ListEntries(ctx context.Context, service staging.Service) (map[staging.Service]map[string]staging.Entry, error) {
 	entries, err := s.client.ListEntries(ctx, s.accountID, s.region, service)
 	if err != nil {
 		return nil, err
@@ -73,7 +73,7 @@ func (s *AgentStore) ListEntries(ctx context.Context, service staging.Service) (
 }
 
 // ListTags returns all staged tag changes for a service.
-func (s *AgentStore) ListTags(ctx context.Context, service staging.Service) (map[staging.Service]map[string]staging.TagEntry, error) {
+func (s *Store) ListTags(ctx context.Context, service staging.Service) (map[staging.Service]map[string]staging.TagEntry, error) {
 	tags, err := s.client.ListTags(ctx, s.accountID, s.region, service)
 	if err != nil {
 		return nil, err
@@ -99,39 +99,39 @@ func (s *AgentStore) ListTags(ctx context.Context, service staging.Service) (map
 }
 
 // Load loads the current staging state.
-func (s *AgentStore) Load(ctx context.Context) (*staging.State, error) {
+func (s *Store) Load(ctx context.Context) (*staging.State, error) {
 	return s.client.Load(ctx, s.accountID, s.region)
 }
 
 // StageEntry adds or updates a staged entry.
-func (s *AgentStore) StageEntry(ctx context.Context, service staging.Service, name string, entry staging.Entry) error {
+func (s *Store) StageEntry(ctx context.Context, service staging.Service, name string, entry staging.Entry) error {
 	return s.client.StageEntry(ctx, s.accountID, s.region, service, name, entry)
 }
 
 // StageTag adds or updates staged tag changes.
-func (s *AgentStore) StageTag(ctx context.Context, service staging.Service, name string, tagEntry staging.TagEntry) error {
+func (s *Store) StageTag(ctx context.Context, service staging.Service, name string, tagEntry staging.TagEntry) error {
 	return s.client.StageTag(ctx, s.accountID, s.region, service, name, tagEntry)
 }
 
 // UnstageEntry removes a staged entry.
-func (s *AgentStore) UnstageEntry(ctx context.Context, service staging.Service, name string) error {
+func (s *Store) UnstageEntry(ctx context.Context, service staging.Service, name string) error {
 	return s.client.UnstageEntry(ctx, s.accountID, s.region, service, name)
 }
 
 // UnstageTag removes staged tag changes.
-func (s *AgentStore) UnstageTag(ctx context.Context, service staging.Service, name string) error {
+func (s *Store) UnstageTag(ctx context.Context, service staging.Service, name string) error {
 	return s.client.UnstageTag(ctx, s.accountID, s.region, service, name)
 }
 
 // UnstageAll removes all staged changes for a service.
-func (s *AgentStore) UnstageAll(ctx context.Context, service staging.Service) error {
+func (s *Store) UnstageAll(ctx context.Context, service staging.Service) error {
 	return s.client.UnstageAll(ctx, s.accountID, s.region, service)
 }
 
 // Drain retrieves the state from the daemon, optionally clearing memory.
 // This implements StateDrainer for agent-based storage.
 // If keep is false, the daemon memory is cleared after reading.
-func (s *AgentStore) Drain(ctx context.Context, keep bool) (*staging.State, error) {
+func (s *Store) Drain(ctx context.Context, keep bool) (*staging.State, error) {
 	state, err := s.client.GetState(ctx, s.accountID, s.region)
 	if err != nil {
 		return nil, err
@@ -150,8 +150,8 @@ func (s *AgentStore) Drain(ctx context.Context, keep bool) (*staging.State, erro
 	return state, nil
 }
 
-// Compile-time check that AgentStore implements StoreReadWriteOperator.
-var _ staging.StoreReadWriteOperator = (*AgentStore)(nil)
+// Compile-time check that Store implements StoreReadWriteOperator.
+var _ staging.StoreReadWriteOperator = (*Store)(nil)
 
-// Compile-time check that AgentStore implements StateDrainer.
-var _ staging.StateDrainer = (*AgentStore)(nil)
+// Compile-time check that Store implements StateDrainer.
+var _ staging.StateDrainer = (*Store)(nil)

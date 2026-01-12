@@ -1,23 +1,14 @@
 //go:build linux
 
-package agent
+package server
 
 import (
 	"fmt"
 	"net"
 	"os"
-	"path/filepath"
 
 	"golang.org/x/sys/unix"
 )
-
-// getSocketPath returns the path for the daemon socket on Linux.
-func getSocketPath() string {
-	if xdgRuntime := os.Getenv("XDG_RUNTIME_DIR"); xdgRuntime != "" {
-		return filepath.Join(xdgRuntime, "suve", "agent.sock")
-	}
-	return getSocketPathFallback()
-}
 
 // setupProcessSecurity configures Linux-specific security measures.
 func (d *Daemon) setupProcessSecurity() error {

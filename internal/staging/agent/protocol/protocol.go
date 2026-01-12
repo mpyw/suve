@@ -1,5 +1,5 @@
-// Package agent provides the staging daemon and client for in-memory storage.
-package agent
+// Package protocol defines the IPC protocol between the agent client and server.
+package protocol
 
 import (
 	"encoding/json"
