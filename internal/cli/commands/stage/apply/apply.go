@@ -16,7 +16,7 @@ import (
 	"github.com/mpyw/suve/internal/maputil"
 	"github.com/mpyw/suve/internal/parallel"
 	"github.com/mpyw/suve/internal/staging"
-	"github.com/mpyw/suve/internal/staging/runner"
+	"github.com/mpyw/suve/internal/staging/agent"
 )
 
 // serviceConflictCheck holds entries and strategy for a single service's conflict checking.
@@ -77,7 +77,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	if err != nil {
 		return fmt.Errorf("failed to get AWS identity: %w", err)
 	}
-	store := runner.NewStore(identity.AccountID, identity.Region)
+	store := agent.NewStore(identity.AccountID, identity.Region)
 
 	// Check if there are any staged changes
 	paramStaged, err := store.ListEntries(ctx, staging.ServiceParam)

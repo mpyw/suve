@@ -9,7 +9,7 @@ import (
 	"github.com/mpyw/suve/internal/api/secretapi"
 	"github.com/mpyw/suve/internal/infra"
 	"github.com/mpyw/suve/internal/staging"
-	"github.com/mpyw/suve/internal/staging/runner"
+	"github.com/mpyw/suve/internal/staging/agent"
 )
 
 // =============================================================================
@@ -113,7 +113,7 @@ func (a *App) getStagingStore() (staging.StoreReadWriteOperator, error) {
 		return nil, err
 	}
 
-	store := runner.NewStore(identity.AccountID, identity.Region)
+	store := agent.NewStore(identity.AccountID, identity.Region)
 	a.stagingStore = store
 	return store, nil
 }

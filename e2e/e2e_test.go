@@ -51,7 +51,6 @@ import (
 	"github.com/mpyw/suve/internal/staging/agent"
 	"github.com/mpyw/suve/internal/staging/agent/server"
 	"github.com/mpyw/suve/internal/staging/agent/transport"
-	"github.com/mpyw/suve/internal/staging/runner"
 )
 
 // testDaemon is the shared staging agent daemon for all E2E tests.
@@ -155,7 +154,7 @@ func setupTempHome(t *testing.T) string {
 // newStore creates a new staging store for E2E tests.
 // localstack uses account ID "000000000000" and region "us-east-1".
 func newStore() staging.StoreReadWriteOperator {
-	return runner.NewStore("000000000000", "us-east-1")
+	return agent.NewStore("000000000000", "us-east-1")
 }
 
 // runCommand executes a CLI command and returns stdout, stderr, and error.
