@@ -28,7 +28,7 @@ jobs:
       - name: Run tests with coverage
         run: |
           PACKAGES=$(go list ./... | grep -v internal/gui | grep -v /cmd/)
-          COVERPKG=$(go list ./... | grep -v internal/gui | grep -v /cmd/ | tr '\n' ',')
+          COVERPKG=$(go list ./... | grep -v testutil | grep -v /e2e | grep -v internal/gui | grep -v /cmd/ | tr '\n' ',')
           go test -v -race -coverprofile=coverage.txt -covermode=atomic -coverpkg=$COVERPKG $PACKAGES
 
       - name: Upload coverage to Codecov
@@ -71,7 +71,9 @@ jobs:
           timeout 60 bash -c 'until curl -sf http://localhost:4566/_localstack/health; do sleep 2; done'
 
       - name: Run e2e tests with coverage
-        run: go test -v -race -tags e2e -coverprofile=coverage-e2e.txt -covermode=atomic -coverpkg=./... ./e2e/...
+        run: |
+          COVERPKG=$(go list ./... | grep -v testutil | grep -v /e2e | grep -v internal/gui | grep -v /cmd/ | tr '\n' ',')
+          go test -v -race -tags e2e -coverprofile=coverage-e2e.txt -covermode=atomic -coverpkg=$COVERPKG ./e2e/...
         env:
           SUVE_LOCALSTACK_EXTERNAL_PORT: 4566
 
