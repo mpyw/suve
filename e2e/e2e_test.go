@@ -71,12 +71,15 @@ func TestMain(m *testing.M) {
 	// Disable daemon auto-start to prevent fork bomb from test binary
 	os.Setenv("SUVE_DAEMON_AUTO_START", "0")
 
-	// Start daemon
+	// Start daemon with error channel
 	testDaemon = server.NewDaemon()
-	go func() { _ = testDaemon.Run() }()
+	daemonErrCh := make(chan error, 1)
+	go func() {
+		daemonErrCh <- testDaemon.Run()
+	}()
 
 	// Wait for daemon to be ready by polling with ping
-	if err := waitForDaemon(5 * time.Second); err != nil {
+	if err := waitForDaemon(5*time.Second, daemonErrCh); err != nil {
 		fmt.Fprintf(os.Stderr, "failed to start daemon: %v\n", err)
 		testDaemon.Shutdown()
 		_ = os.RemoveAll(tmpDir)
@@ -93,7 +96,7 @@ func TestMain(m *testing.M) {
 }
 
 // waitForDaemon waits for the daemon to be ready by polling with ping.
-func waitForDaemon(timeout time.Duration) error {
+func waitForDaemon(timeout time.Duration, daemonErrCh <-chan error) error {
 	c := client.NewClient()
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
@@ -101,14 +104,20 @@ func waitForDaemon(timeout time.Duration) error {
 	ticker := time.NewTicker(50 * time.Millisecond)
 	defer ticker.Stop()
 
+	var lastErr error
 	for {
 		select {
+		case err := <-daemonErrCh:
+			// Daemon exited with error
+			return fmt.Errorf("daemon exited: %w", err)
 		case <-ctx.Done():
-			return fmt.Errorf("daemon did not become ready within %v", timeout)
+			return fmt.Errorf("daemon did not become ready within %v (last error: %v)", timeout, lastErr)
 		case <-ticker.C:
 			// Try to check if daemon is empty (any successful request means it's ready)
 			if _, err := c.IsEmpty(ctx); err == nil {
 				return nil
+			} else {
+				lastErr = err
 			}
 		}
 	}
