@@ -10,7 +10,7 @@ import (
 // SocketPath returns the path for the daemon socket on macOS.
 func SocketPath() string {
 	if tmpdir := os.Getenv("TMPDIR"); tmpdir != "" {
-		return filepath.Join(tmpdir, "suve", "agent.sock")
+		return filepath.Join(tmpdir, socketDirName, socketFileName)
 	}
 	return socketPathFallback()
 }

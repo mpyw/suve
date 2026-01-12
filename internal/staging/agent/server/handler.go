@@ -7,25 +7,40 @@ import (
 	"github.com/mpyw/suve/internal/staging/agent/protocol"
 )
 
-// handlePing handles the Ping method.
-func (d *Daemon) handlePing() *protocol.Response {
+// successResponse returns a successful response without data.
+func successResponse() *protocol.Response {
 	return &protocol.Response{Success: true}
+}
+
+// errorResponse returns an error response.
+func errorResponse(err error) *protocol.Response {
+	return &protocol.Response{Success: false, Error: err.Error()}
+}
+
+// errorMessageResponse returns an error response with a message.
+func errorMessageResponse(msg string) *protocol.Response {
+	return &protocol.Response{Success: false, Error: msg}
 }
 
 // marshalResponse is a helper to marshal data and return a response.
 func marshalResponse(v any) *protocol.Response {
 	data, err := json.Marshal(v)
 	if err != nil {
-		return &protocol.Response{Success: false, Error: err.Error()}
+		return errorResponse(err)
 	}
 	return &protocol.Response{Success: true, Data: data}
+}
+
+// handlePing handles the Ping method.
+func (d *Daemon) handlePing() *protocol.Response {
+	return successResponse()
 }
 
 // handleGetEntry handles the GetEntry method.
 func (d *Daemon) handleGetEntry(req *protocol.Request) *protocol.Response {
 	state, err := d.state.get(req.AccountID, req.Region)
 	if err != nil {
-		return &protocol.Response{Success: false, Error: err.Error()}
+		return errorResponse(err)
 	}
 
 	var entry *staging.Entry
@@ -41,7 +56,7 @@ func (d *Daemon) handleGetEntry(req *protocol.Request) *protocol.Response {
 func (d *Daemon) handleGetTag(req *protocol.Request) *protocol.Response {
 	state, err := d.state.get(req.AccountID, req.Region)
 	if err != nil {
-		return &protocol.Response{Success: false, Error: err.Error()}
+		return errorResponse(err)
 	}
 
 	var tagEntry *staging.TagEntry
@@ -57,18 +72,36 @@ func (d *Daemon) handleGetTag(req *protocol.Request) *protocol.Response {
 func (d *Daemon) handleListEntries(req *protocol.Request) *protocol.Response {
 	state, err := d.state.get(req.AccountID, req.Region)
 	if err != nil {
-		return &protocol.Response{Success: false, Error: err.Error()}
+		return errorResponse(err)
 	}
-	return marshalResponse(protocol.ListEntriesResponse{Entries: state.Entries})
+
+	entries := state.Entries
+	if req.Service != "" {
+		// Filter by service
+		entries = make(map[staging.Service]map[string]staging.Entry)
+		if svcEntries, ok := state.Entries[req.Service]; ok {
+			entries[req.Service] = svcEntries
+		}
+	}
+	return marshalResponse(protocol.ListEntriesResponse{Entries: entries})
 }
 
 // handleListTags handles the ListTags method.
 func (d *Daemon) handleListTags(req *protocol.Request) *protocol.Response {
 	state, err := d.state.get(req.AccountID, req.Region)
 	if err != nil {
-		return &protocol.Response{Success: false, Error: err.Error()}
+		return errorResponse(err)
 	}
-	return marshalResponse(protocol.ListTagsResponse{Tags: state.Tags})
+
+	tags := state.Tags
+	if req.Service != "" {
+		// Filter by service
+		tags = make(map[staging.Service]map[string]staging.TagEntry)
+		if svcTags, ok := state.Tags[req.Service]; ok {
+			tags[req.Service] = svcTags
+		}
+	}
+	return marshalResponse(protocol.ListTagsResponse{Tags: tags})
 }
 
 // handleLoad handles the Load method.
@@ -80,7 +113,7 @@ func (d *Daemon) handleLoad(req *protocol.Request) *protocol.Response {
 func (d *Daemon) handleStageEntry(req *protocol.Request) *protocol.Response {
 	state, err := d.state.get(req.AccountID, req.Region)
 	if err != nil {
-		return &protocol.Response{Success: false, Error: err.Error()}
+		return errorResponse(err)
 	}
 
 	if state.Entries[req.Service] == nil {
@@ -89,16 +122,16 @@ func (d *Daemon) handleStageEntry(req *protocol.Request) *protocol.Response {
 	state.Entries[req.Service][req.Name] = *req.Entry
 
 	if err := d.state.set(req.AccountID, req.Region, state); err != nil {
-		return &protocol.Response{Success: false, Error: err.Error()}
+		return errorResponse(err)
 	}
-	return &protocol.Response{Success: true}
+	return successResponse()
 }
 
 // handleStageTag handles the StageTag method.
 func (d *Daemon) handleStageTag(req *protocol.Request) *protocol.Response {
 	state, err := d.state.get(req.AccountID, req.Region)
 	if err != nil {
-		return &protocol.Response{Success: false, Error: err.Error()}
+		return errorResponse(err)
 	}
 
 	if state.Tags[req.Service] == nil {
@@ -107,54 +140,54 @@ func (d *Daemon) handleStageTag(req *protocol.Request) *protocol.Response {
 	state.Tags[req.Service][req.Name] = *req.TagEntry
 
 	if err := d.state.set(req.AccountID, req.Region, state); err != nil {
-		return &protocol.Response{Success: false, Error: err.Error()}
+		return errorResponse(err)
 	}
-	return &protocol.Response{Success: true}
+	return successResponse()
 }
 
 // handleUnstageEntry handles the UnstageEntry method.
 func (d *Daemon) handleUnstageEntry(req *protocol.Request) *protocol.Response {
 	state, err := d.state.get(req.AccountID, req.Region)
 	if err != nil {
-		return &protocol.Response{Success: false, Error: err.Error()}
+		return errorResponse(err)
 	}
 
 	if entries, ok := state.Entries[req.Service]; ok {
 		if _, ok := entries[req.Name]; ok {
 			delete(entries, req.Name)
 			if err := d.state.set(req.AccountID, req.Region, state); err != nil {
-				return &protocol.Response{Success: false, Error: err.Error()}
+				return errorResponse(err)
 			}
-			return &protocol.Response{Success: true}
+			return successResponse()
 		}
 	}
-	return &protocol.Response{Success: false, Error: staging.ErrNotStaged.Error()}
+	return errorResponse(staging.ErrNotStaged)
 }
 
 // handleUnstageTag handles the UnstageTag method.
 func (d *Daemon) handleUnstageTag(req *protocol.Request) *protocol.Response {
 	state, err := d.state.get(req.AccountID, req.Region)
 	if err != nil {
-		return &protocol.Response{Success: false, Error: err.Error()}
+		return errorResponse(err)
 	}
 
 	if tags, ok := state.Tags[req.Service]; ok {
 		if _, ok := tags[req.Name]; ok {
 			delete(tags, req.Name)
 			if err := d.state.set(req.AccountID, req.Region, state); err != nil {
-				return &protocol.Response{Success: false, Error: err.Error()}
+				return errorResponse(err)
 			}
-			return &protocol.Response{Success: true}
+			return successResponse()
 		}
 	}
-	return &protocol.Response{Success: false, Error: staging.ErrNotStaged.Error()}
+	return errorResponse(staging.ErrNotStaged)
 }
 
 // handleUnstageAll handles the UnstageAll method.
 func (d *Daemon) handleUnstageAll(req *protocol.Request) *protocol.Response {
 	state, err := d.state.get(req.AccountID, req.Region)
 	if err != nil {
-		return &protocol.Response{Success: false, Error: err.Error()}
+		return errorResponse(err)
 	}
 
 	// Clear all entries and tags for all services if req.Service is empty
@@ -174,16 +207,16 @@ func (d *Daemon) handleUnstageAll(req *protocol.Request) *protocol.Response {
 	}
 
 	if err := d.state.set(req.AccountID, req.Region, state); err != nil {
-		return &protocol.Response{Success: false, Error: err.Error()}
+		return errorResponse(err)
 	}
-	return &protocol.Response{Success: true}
+	return successResponse()
 }
 
 // handleGetState handles the GetState method (for persist).
 func (d *Daemon) handleGetState(req *protocol.Request) *protocol.Response {
 	state, err := d.state.get(req.AccountID, req.Region)
 	if err != nil {
-		return &protocol.Response{Success: false, Error: err.Error()}
+		return errorResponse(err)
 	}
 	return marshalResponse(protocol.StateResponse{State: state})
 }
@@ -191,13 +224,13 @@ func (d *Daemon) handleGetState(req *protocol.Request) *protocol.Response {
 // handleSetState handles the SetState method (for drain).
 func (d *Daemon) handleSetState(req *protocol.Request) *protocol.Response {
 	if req.State == nil {
-		return &protocol.Response{Success: false, Error: "state is required"}
+		return errorMessageResponse("state is required")
 	}
 
 	if err := d.state.set(req.AccountID, req.Region, req.State); err != nil {
-		return &protocol.Response{Success: false, Error: err.Error()}
+		return errorResponse(err)
 	}
-	return &protocol.Response{Success: true}
+	return successResponse()
 }
 
 // handleIsEmpty handles the IsEmpty method.

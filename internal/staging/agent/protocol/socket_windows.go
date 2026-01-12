@@ -10,12 +10,12 @@ import (
 // SocketPath returns the path for the daemon socket on Windows.
 func SocketPath() string {
 	if localAppData := os.Getenv("LOCALAPPDATA"); localAppData != "" {
-		return filepath.Join(localAppData, "suve", "agent.sock")
+		return filepath.Join(localAppData, socketDirName, socketFileName)
 	}
 	// Fallback to user's home directory
 	if home, err := os.UserHomeDir(); err == nil {
-		return filepath.Join(home, ".suve", "agent.sock")
+		return filepath.Join(home, "."+socketDirName, socketFileName)
 	}
 	// Last resort: use temp directory
-	return filepath.Join(os.TempDir(), "suve", "agent.sock")
+	return filepath.Join(os.TempDir(), socketDirName, socketFileName)
 }

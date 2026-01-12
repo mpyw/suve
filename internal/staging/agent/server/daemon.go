@@ -19,6 +19,11 @@ import (
 	"github.com/mpyw/suve/internal/staging/agent/server/security"
 )
 
+const (
+	// connectionTimeout is the deadline for reading/writing on a connection.
+	connectionTimeout = 5 * time.Second
+)
+
 // DaemonOption configures a Daemon.
 type DaemonOption func(*Daemon)
 
@@ -138,7 +143,7 @@ func (d *Daemon) handleConnection(conn net.Conn) {
 	defer func() { _ = conn.Close() }()
 
 	// Set read deadline
-	_ = conn.SetDeadline(time.Now().Add(5 * time.Second))
+	_ = conn.SetDeadline(time.Now().Add(connectionTimeout))
 
 	// Verify peer credentials
 	if err := security.VerifyPeerCredentials(conn); err != nil {
@@ -160,7 +165,7 @@ func (d *Daemon) handleConnection(conn net.Conn) {
 	resp := d.handleRequest(&req)
 
 	// Send response
-	_ = conn.SetDeadline(time.Now().Add(5 * time.Second))
+	_ = conn.SetDeadline(time.Now().Add(connectionTimeout))
 	encoder := json.NewEncoder(conn)
 	_ = encoder.Encode(resp)
 
@@ -180,7 +185,7 @@ func (d *Daemon) handleRequest(req *protocol.Request) *protocol.Response {
 		return d.handlePing()
 	case protocol.MethodShutdown:
 		go d.Shutdown()
-		return &protocol.Response{Success: true}
+		return successResponse()
 	case protocol.MethodGetEntry:
 		return d.handleGetEntry(req)
 	case protocol.MethodGetTag:
@@ -208,7 +213,7 @@ func (d *Daemon) handleRequest(req *protocol.Request) *protocol.Response {
 	case protocol.MethodIsEmpty:
 		return d.handleIsEmpty()
 	default:
-		return &protocol.Response{Success: false, Error: fmt.Sprintf("unknown method: %s", req.Method)}
+		return errorMessageResponse(fmt.Sprintf("unknown method: %s", req.Method))
 	}
 }
 

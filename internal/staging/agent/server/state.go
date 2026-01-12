@@ -35,7 +35,7 @@ func (s *secureState) get(accountID, region string) (*staging.State, error) {
 	key := stateKey{AccountID: accountID, Region: region}
 	buf, ok := s.states[key]
 	if !ok || buf.IsEmpty() {
-		return newEmptyState(), nil
+		return staging.NewEmptyState(), nil
 	}
 
 	data, err := buf.Bytes()
@@ -94,21 +94,6 @@ func (s *secureState) destroy() {
 		buf.Destroy()
 	}
 	s.states = make(map[stateKey]*security.Buffer)
-}
-
-// newEmptyState creates a new empty staging state.
-func newEmptyState() *staging.State {
-	return &staging.State{
-		Version: 1,
-		Entries: map[staging.Service]map[string]staging.Entry{
-			staging.ServiceParam:  {},
-			staging.ServiceSecret: {},
-		},
-		Tags: map[staging.Service]map[string]staging.TagEntry{
-			staging.ServiceParam:  {},
-			staging.ServiceSecret: {},
-		},
-	}
 }
 
 // zeroBytes securely zeros a byte slice.

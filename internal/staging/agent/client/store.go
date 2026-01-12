@@ -48,54 +48,12 @@ func (s *Store) GetTag(ctx context.Context, service staging.Service, name string
 
 // ListEntries returns all staged entries for a service.
 func (s *Store) ListEntries(ctx context.Context, service staging.Service) (map[staging.Service]map[string]staging.Entry, error) {
-	entries, err := s.client.ListEntries(ctx, s.accountID, s.region, service)
-	if err != nil {
-		return nil, err
-	}
-
-	// Filter by service if specified
-	if service != "" {
-		result := make(map[staging.Service]map[string]staging.Entry)
-		if svcEntries, ok := entries[service]; ok && len(svcEntries) > 0 {
-			result[service] = svcEntries
-		}
-		return result, nil
-	}
-
-	// Remove empty service maps
-	result := make(map[staging.Service]map[string]staging.Entry)
-	for svc, svcEntries := range entries {
-		if len(svcEntries) > 0 {
-			result[svc] = svcEntries
-		}
-	}
-	return result, nil
+	return s.client.ListEntries(ctx, s.accountID, s.region, service)
 }
 
 // ListTags returns all staged tag changes for a service.
 func (s *Store) ListTags(ctx context.Context, service staging.Service) (map[staging.Service]map[string]staging.TagEntry, error) {
-	tags, err := s.client.ListTags(ctx, s.accountID, s.region, service)
-	if err != nil {
-		return nil, err
-	}
-
-	// Filter by service if specified
-	if service != "" {
-		result := make(map[staging.Service]map[string]staging.TagEntry)
-		if svcTags, ok := tags[service]; ok && len(svcTags) > 0 {
-			result[service] = svcTags
-		}
-		return result, nil
-	}
-
-	// Remove empty service maps
-	result := make(map[staging.Service]map[string]staging.TagEntry)
-	for svc, svcTags := range tags {
-		if len(svcTags) > 0 {
-			result[svc] = svcTags
-		}
-	}
-	return result, nil
+	return s.client.ListTags(ctx, s.accountID, s.region, service)
 }
 
 // Load loads the current staging state.

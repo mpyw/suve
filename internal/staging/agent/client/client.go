@@ -188,10 +188,7 @@ func (c *Client) Load(ctx context.Context, accountID, region string) (*staging.S
 
 // StageEntry adds or updates a staged entry in the daemon.
 func (c *Client) StageEntry(ctx context.Context, accountID, region string, service staging.Service, name string, entry staging.Entry) error {
-	if err := c.ensureDaemon(ctx); err != nil {
-		return err
-	}
-	return c.doSimpleRequest(ctx, &protocol.Request{
+	return c.doSimpleRequestEnsuringDaemon(ctx, &protocol.Request{
 		Method:    protocol.MethodStageEntry,
 		AccountID: accountID,
 		Region:    region,
@@ -203,10 +200,7 @@ func (c *Client) StageEntry(ctx context.Context, accountID, region string, servi
 
 // StageTag adds or updates staged tag changes in the daemon.
 func (c *Client) StageTag(ctx context.Context, accountID, region string, service staging.Service, name string, tagEntry staging.TagEntry) error {
-	if err := c.ensureDaemon(ctx); err != nil {
-		return err
-	}
-	return c.doSimpleRequest(ctx, &protocol.Request{
+	return c.doSimpleRequestEnsuringDaemon(ctx, &protocol.Request{
 		Method:    protocol.MethodStageTag,
 		AccountID: accountID,
 		Region:    region,
@@ -218,10 +212,7 @@ func (c *Client) StageTag(ctx context.Context, accountID, region string, service
 
 // UnstageEntry removes a staged entry from the daemon.
 func (c *Client) UnstageEntry(ctx context.Context, accountID, region string, service staging.Service, name string) error {
-	if err := c.ensureDaemon(ctx); err != nil {
-		return err
-	}
-	return c.doSimpleRequest(ctx, &protocol.Request{
+	return c.doSimpleRequestEnsuringDaemon(ctx, &protocol.Request{
 		Method:    protocol.MethodUnstageEntry,
 		AccountID: accountID,
 		Region:    region,
@@ -232,10 +223,7 @@ func (c *Client) UnstageEntry(ctx context.Context, accountID, region string, ser
 
 // UnstageTag removes staged tag changes from the daemon.
 func (c *Client) UnstageTag(ctx context.Context, accountID, region string, service staging.Service, name string) error {
-	if err := c.ensureDaemon(ctx); err != nil {
-		return err
-	}
-	return c.doSimpleRequest(ctx, &protocol.Request{
+	return c.doSimpleRequestEnsuringDaemon(ctx, &protocol.Request{
 		Method:    protocol.MethodUnstageTag,
 		AccountID: accountID,
 		Region:    region,
@@ -246,10 +234,7 @@ func (c *Client) UnstageTag(ctx context.Context, accountID, region string, servi
 
 // UnstageAll removes all staged changes from the daemon.
 func (c *Client) UnstageAll(ctx context.Context, accountID, region string, service staging.Service) error {
-	if err := c.ensureDaemon(ctx); err != nil {
-		return err
-	}
-	return c.doSimpleRequest(ctx, &protocol.Request{
+	return c.doSimpleRequestEnsuringDaemon(ctx, &protocol.Request{
 		Method:    protocol.MethodUnstageAll,
 		AccountID: accountID,
 		Region:    region,
@@ -268,20 +253,12 @@ func (c *Client) GetState(ctx context.Context, accountID, region string) (*stagi
 
 // SetState sets the full state for drain operations.
 func (c *Client) SetState(ctx context.Context, accountID, region string, state *staging.State) error {
-	if err := c.ensureDaemon(ctx); err != nil {
-		return err
-	}
-
-	resp, err := c.sendRequest(ctx, &protocol.Request{
+	return c.doSimpleRequestEnsuringDaemon(ctx, &protocol.Request{
 		Method:    protocol.MethodSetState,
 		AccountID: accountID,
 		Region:    region,
 		State:     state,
 	})
-	if err != nil {
-		return err
-	}
-	return resp.Err()
 }
 
 // doRequestWithResult sends a request to the daemon and unmarshals the response.
@@ -366,4 +343,12 @@ func (c *Client) doSimpleRequest(ctx context.Context, req *protocol.Request) err
 		return err
 	}
 	return resp.Err()
+}
+
+// doSimpleRequestEnsuringDaemon ensures the daemon is running, then sends a simple request.
+func (c *Client) doSimpleRequestEnsuringDaemon(ctx context.Context, req *protocol.Request) error {
+	if err := c.ensureDaemon(ctx); err != nil {
+		return err
+	}
+	return c.doSimpleRequest(ctx, req)
 }
