@@ -1,19 +1,26 @@
-//go:build !linux
+//go:build !linux && !darwin
 
 package agent
 
 import (
+	"fmt"
 	"net"
+	"os"
+	"path/filepath"
 )
 
-// setupProcessSecurity is a no-op on non-Linux platforms.
-// macOS and Windows rely on socket/file permissions for security.
+// getSocketPath returns the path for the daemon socket on other platforms.
+func getSocketPath() string {
+	// Fallback to /tmp/suve-$UID/
+	return filepath.Join(fmt.Sprintf("/tmp/suve-%d", os.Getuid()), "agent.sock")
+}
+
+// setupProcessSecurity is a no-op on unsupported platforms.
 func (d *Daemon) setupProcessSecurity() error {
 	return nil
 }
 
-// verifyPeerCredentials is a no-op on non-Linux platforms.
-// SO_PEERCRED is Linux-specific; macOS and Windows rely on socket permissions.
+// verifyPeerCredentials is a no-op on unsupported platforms.
 func (d *Daemon) verifyPeerCredentials(_ net.Conn) error {
 	return nil
 }

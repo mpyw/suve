@@ -6,9 +6,20 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"path/filepath"
 
 	"golang.org/x/sys/unix"
 )
+
+// getSocketPath returns the path for the daemon socket on Linux.
+func getSocketPath() string {
+	// Use XDG_RUNTIME_DIR (Linux standard)
+	if xdgRuntime := os.Getenv("XDG_RUNTIME_DIR"); xdgRuntime != "" {
+		return filepath.Join(xdgRuntime, "suve", "agent.sock")
+	}
+	// Fallback to /tmp/suve-$UID/
+	return filepath.Join(fmt.Sprintf("/tmp/suve-%d", os.Getuid()), "agent.sock")
+}
 
 // setupProcessSecurity configures Linux-specific security measures.
 func (d *Daemon) setupProcessSecurity() error {
