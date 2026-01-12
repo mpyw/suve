@@ -13,7 +13,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/mpyw/suve/internal/staging"
 	"github.com/mpyw/suve/internal/staging/agent/protocol"
 )
 
@@ -36,7 +35,8 @@ func WithAutoStartDisabled() ClientOption {
 	}
 }
 
-// Client provides communication with the staging agent daemon.
+// Client provides low-level communication with the staging agent daemon.
+// For data operations, use Store which wraps Client with account/region binding.
 type Client struct {
 	socketPath        string
 	autoStartDisabled bool
@@ -132,171 +132,19 @@ func (c *Client) Shutdown(ctx context.Context) error {
 
 // IsEmpty checks if the daemon state is empty.
 func (c *Client) IsEmpty(ctx context.Context) (bool, error) {
-	return doRequestWithResult(c, ctx, &protocol.Request{Method: protocol.MethodIsEmpty}, func(r *protocol.IsEmptyResponse) bool { return r.Empty })
-}
-
-// GetEntry retrieves a staged entry from the daemon.
-func (c *Client) GetEntry(ctx context.Context, accountID, region string, service staging.Service, name string) (*staging.Entry, error) {
-	return doRequestWithResultEnsuringDaemon(c, ctx, &protocol.Request{
-		Method:    protocol.MethodGetEntry,
-		AccountID: accountID,
-		Region:    region,
-		Service:   service,
-		Name:      name,
-	}, func(r *protocol.EntryResponse) *staging.Entry { return r.Entry })
-}
-
-// GetTag retrieves staged tag changes from the daemon.
-func (c *Client) GetTag(ctx context.Context, accountID, region string, service staging.Service, name string) (*staging.TagEntry, error) {
-	return doRequestWithResultEnsuringDaemon(c, ctx, &protocol.Request{
-		Method:    protocol.MethodGetTag,
-		AccountID: accountID,
-		Region:    region,
-		Service:   service,
-		Name:      name,
-	}, func(r *protocol.TagResponse) *staging.TagEntry { return r.TagEntry })
-}
-
-// ListEntries returns all staged entries from the daemon.
-func (c *Client) ListEntries(ctx context.Context, accountID, region string, service staging.Service) (map[staging.Service]map[string]staging.Entry, error) {
-	return doRequestWithResultEnsuringDaemon(c, ctx, &protocol.Request{
-		Method:    protocol.MethodListEntries,
-		AccountID: accountID,
-		Region:    region,
-		Service:   service,
-	}, func(r *protocol.ListEntriesResponse) map[staging.Service]map[string]staging.Entry { return r.Entries })
-}
-
-// ListTags returns all staged tag changes from the daemon.
-func (c *Client) ListTags(ctx context.Context, accountID, region string, service staging.Service) (map[staging.Service]map[string]staging.TagEntry, error) {
-	return doRequestWithResultEnsuringDaemon(c, ctx, &protocol.Request{
-		Method:    protocol.MethodListTags,
-		AccountID: accountID,
-		Region:    region,
-		Service:   service,
-	}, func(r *protocol.ListTagsResponse) map[staging.Service]map[string]staging.TagEntry { return r.Tags })
-}
-
-// Load loads the full state from the daemon.
-func (c *Client) Load(ctx context.Context, accountID, region string) (*staging.State, error) {
-	return doRequestWithResultEnsuringDaemon(c, ctx, &protocol.Request{
-		Method:    protocol.MethodLoad,
-		AccountID: accountID,
-		Region:    region,
-	}, func(r *protocol.StateResponse) *staging.State { return r.State })
-}
-
-// StageEntry adds or updates a staged entry in the daemon.
-func (c *Client) StageEntry(ctx context.Context, accountID, region string, service staging.Service, name string, entry staging.Entry) error {
-	return c.doSimpleRequestEnsuringDaemon(ctx, &protocol.Request{
-		Method:    protocol.MethodStageEntry,
-		AccountID: accountID,
-		Region:    region,
-		Service:   service,
-		Name:      name,
-		Entry:     &entry,
-	})
-}
-
-// StageTag adds or updates staged tag changes in the daemon.
-func (c *Client) StageTag(ctx context.Context, accountID, region string, service staging.Service, name string, tagEntry staging.TagEntry) error {
-	return c.doSimpleRequestEnsuringDaemon(ctx, &protocol.Request{
-		Method:    protocol.MethodStageTag,
-		AccountID: accountID,
-		Region:    region,
-		Service:   service,
-		Name:      name,
-		TagEntry:  &tagEntry,
-	})
-}
-
-// UnstageEntry removes a staged entry from the daemon.
-func (c *Client) UnstageEntry(ctx context.Context, accountID, region string, service staging.Service, name string) error {
-	return c.doSimpleRequestEnsuringDaemon(ctx, &protocol.Request{
-		Method:    protocol.MethodUnstageEntry,
-		AccountID: accountID,
-		Region:    region,
-		Service:   service,
-		Name:      name,
-	})
-}
-
-// UnstageTag removes staged tag changes from the daemon.
-func (c *Client) UnstageTag(ctx context.Context, accountID, region string, service staging.Service, name string) error {
-	return c.doSimpleRequestEnsuringDaemon(ctx, &protocol.Request{
-		Method:    protocol.MethodUnstageTag,
-		AccountID: accountID,
-		Region:    region,
-		Service:   service,
-		Name:      name,
-	})
-}
-
-// UnstageAll removes all staged changes from the daemon.
-func (c *Client) UnstageAll(ctx context.Context, accountID, region string, service staging.Service) error {
-	return c.doSimpleRequestEnsuringDaemon(ctx, &protocol.Request{
-		Method:    protocol.MethodUnstageAll,
-		AccountID: accountID,
-		Region:    region,
-		Service:   service,
-	})
-}
-
-// GetState retrieves the full state for persist operations.
-func (c *Client) GetState(ctx context.Context, accountID, region string) (*staging.State, error) {
-	return doRequestWithResult(c, ctx, &protocol.Request{
-		Method:    protocol.MethodGetState,
-		AccountID: accountID,
-		Region:    region,
-	}, func(r *protocol.StateResponse) *staging.State { return r.State })
-}
-
-// SetState sets the full state for drain operations.
-func (c *Client) SetState(ctx context.Context, accountID, region string, state *staging.State) error {
-	return c.doSimpleRequestEnsuringDaemon(ctx, &protocol.Request{
-		Method:    protocol.MethodSetState,
-		AccountID: accountID,
-		Region:    region,
-		State:     state,
-	})
-}
-
-// doRequestWithResult sends a request to the daemon and unmarshals the response.
-func doRequestWithResult[Resp any, Result any](
-	c *Client,
-	ctx context.Context,
-	req *protocol.Request,
-	extract func(*Resp) Result,
-) (Result, error) {
-	var zero Result
-
-	resp, err := c.sendRequest(ctx, req)
+	resp, err := c.sendRequest(ctx, &protocol.Request{Method: protocol.MethodIsEmpty})
 	if err != nil {
-		return zero, err
+		return false, err
 	}
 	if err := resp.Err(); err != nil {
-		return zero, err
+		return false, err
 	}
 
-	var result Resp
+	var result protocol.IsEmptyResponse
 	if err := json.Unmarshal(resp.Data, &result); err != nil {
-		return zero, fmt.Errorf("failed to unmarshal response: %w", err)
+		return false, fmt.Errorf("failed to unmarshal response: %w", err)
 	}
-	return extract(&result), nil
-}
-
-// doRequestWithResultEnsuringDaemon ensures the daemon is running, then sends a request and unmarshals the response.
-func doRequestWithResultEnsuringDaemon[Resp any, Result any](
-	c *Client,
-	ctx context.Context,
-	req *protocol.Request,
-	extract func(*Resp) Result,
-) (Result, error) {
-	var zero Result
-	if err := c.ensureDaemon(ctx); err != nil {
-		return zero, err
-	}
-	return doRequestWithResult(c, ctx, req, extract)
+	return result.Empty, nil
 }
 
 // sendRequest sends a request to the daemon and returns the response.
@@ -343,12 +191,4 @@ func (c *Client) doSimpleRequest(ctx context.Context, req *protocol.Request) err
 		return err
 	}
 	return resp.Err()
-}
-
-// doSimpleRequestEnsuringDaemon ensures the daemon is running, then sends a simple request.
-func (c *Client) doSimpleRequestEnsuringDaemon(ctx context.Context, req *protocol.Request) error {
-	if err := c.ensureDaemon(ctx); err != nil {
-		return err
-	}
-	return c.doSimpleRequest(ctx, req)
 }

@@ -114,7 +114,7 @@ EXAMPLES:
 				return errors.New("no staged changes in file to drain")
 			}
 
-			agentStore := client.NewStore(identity.AccountID, identity.Region)
+			agentStore := client.NewStore(identity.AccountID, identity.Region, agent.ClientOptions()...)
 			force := cmd.Bool("force")
 			merge := cmd.Bool("merge")
 			keep := cmd.Bool("keep")
@@ -141,8 +141,7 @@ EXAMPLES:
 			}
 
 			// Set state in agent
-			c := client.NewClient(agent.ClientOptions()...)
-			if err := c.SetState(ctx, identity.AccountID, identity.Region, finalState); err != nil {
+			if err := agentStore.SetState(ctx, finalState); err != nil {
 				return fmt.Errorf("failed to set state in agent: %w", err)
 			}
 
