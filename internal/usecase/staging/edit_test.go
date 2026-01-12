@@ -259,8 +259,8 @@ func TestEditUseCase_Execute_ZeroLastModified(t *testing.T) {
 func TestEditUseCase_Execute_StageError(t *testing.T) {
 	t.Parallel()
 
-	store := newMockStore()
-	store.stageErr = errors.New("stage error")
+	store := testutil.NewMockStore()
+	store.StageEntryErr = errors.New("stage error")
 
 	uc := &usecasestaging.EditUseCase{
 		Strategy: newMockEditStrategy(),
@@ -278,8 +278,8 @@ func TestEditUseCase_Execute_StageError(t *testing.T) {
 func TestEditUseCase_Execute_GetErrorForBaseModified(t *testing.T) {
 	t.Parallel()
 
-	store := newMockStore()
-	store.getErr = errors.New("get error")
+	store := testutil.NewMockStore()
+	store.GetEntryErr = errors.New("get error")
 
 	uc := &usecasestaging.EditUseCase{
 		Strategy: newMockEditStrategy(),
@@ -296,8 +296,8 @@ func TestEditUseCase_Execute_GetErrorForBaseModified(t *testing.T) {
 func TestEditUseCase_Baseline_GetError(t *testing.T) {
 	t.Parallel()
 
-	store := newMockStore()
-	store.getErr = errors.New("get error")
+	store := testutil.NewMockStore()
+	store.GetEntryErr = errors.New("get error")
 
 	uc := &usecasestaging.EditUseCase{
 		Strategy: newMockEditStrategy(),

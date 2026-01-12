@@ -148,8 +148,8 @@ func TestStatusUseCase_Execute_SecretWithDeleteOptions(t *testing.T) {
 func TestStatusUseCase_Execute_GetError(t *testing.T) {
 	t.Parallel()
 
-	store := newMockStore()
-	store.getErr = errors.New("store error")
+	store := testutil.NewMockStore()
+	store.GetEntryErr = errors.New("store error")
 
 	uc := &usecasestaging.StatusUseCase{
 		Strategy: newParamStrategy(),
@@ -164,8 +164,8 @@ func TestStatusUseCase_Execute_GetError(t *testing.T) {
 func TestStatusUseCase_Execute_ListError(t *testing.T) {
 	t.Parallel()
 
-	store := newMockStore()
-	store.listErr = errors.New("list error")
+	store := testutil.NewMockStore()
+	store.ListEntriesErr = errors.New("list error")
 
 	uc := &usecasestaging.StatusUseCase{
 		Strategy: newParamStrategy(),
@@ -280,8 +280,8 @@ func TestStatusUseCase_Execute_FilterByName_BothEntryAndTag(t *testing.T) {
 func TestStatusUseCase_Execute_GetTagError(t *testing.T) {
 	t.Parallel()
 
-	store := newMockStore()
-	store.getTagErr = errors.New("get tag error")
+	store := testutil.NewMockStore()
+	store.GetTagErr = errors.New("get tag error")
 
 	uc := &usecasestaging.StatusUseCase{
 		Strategy: newParamStrategy(),
@@ -296,8 +296,8 @@ func TestStatusUseCase_Execute_GetTagError(t *testing.T) {
 func TestStatusUseCase_Execute_ListTagsError(t *testing.T) {
 	t.Parallel()
 
-	store := newMockStore()
-	store.listTagsErr = errors.New("list tags error")
+	store := testutil.NewMockStore()
+	store.ListTagsErr = errors.New("list tags error")
 
 	uc := &usecasestaging.StatusUseCase{
 		Strategy: newParamStrategy(),

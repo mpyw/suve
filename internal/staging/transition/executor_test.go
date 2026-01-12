@@ -1,7 +1,6 @@
 package transition
 
 import (
-	"context"
 	"errors"
 	"testing"
 	"time"
@@ -12,157 +11,11 @@ import (
 
 	"github.com/mpyw/suve/internal/maputil"
 	"github.com/mpyw/suve/internal/staging"
+	"github.com/mpyw/suve/internal/staging/testutil"
 )
 
-// mockStore implements staging.StoreReadWriteOperator for testing.
-// It stores state in memory and can be configured to return errors.
-type mockStore struct {
-	entries map[staging.Service]map[string]staging.Entry
-	tags    map[staging.Service]map[string]staging.TagEntry
-
-	// Error injection for testing error paths
-	getEntryErr     error
-	getTagErr       error
-	stageEntryErr   error
-	stageTagErr     error
-	unstageTagErr   error
-	unstageEntryErr error
-}
-
-func newMockStore() *mockStore {
-	return &mockStore{
-		entries: map[staging.Service]map[string]staging.Entry{
-			staging.ServiceParam:  make(map[string]staging.Entry),
-			staging.ServiceSecret: make(map[string]staging.Entry),
-		},
-		tags: map[staging.Service]map[string]staging.TagEntry{
-			staging.ServiceParam:  make(map[string]staging.TagEntry),
-			staging.ServiceSecret: make(map[string]staging.TagEntry),
-		},
-	}
-}
-
-func (m *mockStore) GetEntry(_ context.Context, service staging.Service, name string) (*staging.Entry, error) {
-	if m.getEntryErr != nil {
-		return nil, m.getEntryErr
-	}
-	if entry, ok := m.entries[service][name]; ok {
-		return &entry, nil
-	}
-	return nil, staging.ErrNotStaged
-}
-
-func (m *mockStore) GetTag(_ context.Context, service staging.Service, name string) (*staging.TagEntry, error) {
-	if m.getTagErr != nil {
-		return nil, m.getTagErr
-	}
-	if tag, ok := m.tags[service][name]; ok {
-		return &tag, nil
-	}
-	return nil, staging.ErrNotStaged
-}
-
-func (m *mockStore) StageEntry(_ context.Context, service staging.Service, name string, entry staging.Entry) error {
-	if m.stageEntryErr != nil {
-		return m.stageEntryErr
-	}
-	m.entries[service][name] = entry
-	return nil
-}
-
-func (m *mockStore) StageTag(_ context.Context, service staging.Service, name string, tag staging.TagEntry) error {
-	if m.stageTagErr != nil {
-		return m.stageTagErr
-	}
-	m.tags[service][name] = tag
-	return nil
-}
-
-func (m *mockStore) UnstageEntry(_ context.Context, service staging.Service, name string) error {
-	if m.unstageEntryErr != nil {
-		return m.unstageEntryErr
-	}
-	if _, ok := m.entries[service][name]; !ok {
-		return staging.ErrNotStaged
-	}
-	delete(m.entries[service], name)
-	return nil
-}
-
-func (m *mockStore) UnstageTag(_ context.Context, service staging.Service, name string) error {
-	if m.unstageTagErr != nil {
-		return m.unstageTagErr
-	}
-	if _, ok := m.tags[service][name]; !ok {
-		return staging.ErrNotStaged
-	}
-	delete(m.tags[service], name)
-	return nil
-}
-
-func (m *mockStore) UnstageAll(_ context.Context, service staging.Service) error {
-	switch service {
-	case staging.ServiceParam:
-		m.entries[staging.ServiceParam] = make(map[string]staging.Entry)
-		m.tags[staging.ServiceParam] = make(map[string]staging.TagEntry)
-	case staging.ServiceSecret:
-		m.entries[staging.ServiceSecret] = make(map[string]staging.Entry)
-		m.tags[staging.ServiceSecret] = make(map[string]staging.TagEntry)
-	case "":
-		m.entries[staging.ServiceParam] = make(map[string]staging.Entry)
-		m.entries[staging.ServiceSecret] = make(map[string]staging.Entry)
-		m.tags[staging.ServiceParam] = make(map[string]staging.TagEntry)
-		m.tags[staging.ServiceSecret] = make(map[string]staging.TagEntry)
-	}
-	return nil
-}
-
-func (m *mockStore) ListEntries(_ context.Context, service staging.Service) (map[staging.Service]map[string]staging.Entry, error) {
-	result := make(map[staging.Service]map[string]staging.Entry)
-	switch service {
-	case staging.ServiceParam:
-		if len(m.entries[staging.ServiceParam]) > 0 {
-			result[staging.ServiceParam] = m.entries[staging.ServiceParam]
-		}
-	case staging.ServiceSecret:
-		if len(m.entries[staging.ServiceSecret]) > 0 {
-			result[staging.ServiceSecret] = m.entries[staging.ServiceSecret]
-		}
-	case "":
-		if len(m.entries[staging.ServiceParam]) > 0 {
-			result[staging.ServiceParam] = m.entries[staging.ServiceParam]
-		}
-		if len(m.entries[staging.ServiceSecret]) > 0 {
-			result[staging.ServiceSecret] = m.entries[staging.ServiceSecret]
-		}
-	}
-	return result, nil
-}
-
-func (m *mockStore) ListTags(_ context.Context, service staging.Service) (map[staging.Service]map[string]staging.TagEntry, error) {
-	result := make(map[staging.Service]map[string]staging.TagEntry)
-	switch service {
-	case staging.ServiceParam:
-		if len(m.tags[staging.ServiceParam]) > 0 {
-			result[staging.ServiceParam] = m.tags[staging.ServiceParam]
-		}
-	case staging.ServiceSecret:
-		if len(m.tags[staging.ServiceSecret]) > 0 {
-			result[staging.ServiceSecret] = m.tags[staging.ServiceSecret]
-		}
-	case "":
-		if len(m.tags[staging.ServiceParam]) > 0 {
-			result[staging.ServiceParam] = m.tags[staging.ServiceParam]
-		}
-		if len(m.tags[staging.ServiceSecret]) > 0 {
-			result[staging.ServiceSecret] = m.tags[staging.ServiceSecret]
-		}
-	}
-	return result, nil
-}
-
 func TestNewExecutor(t *testing.T) {
-	store := newMockStore()
+	store := testutil.NewMockStore()
 	executor := NewExecutor(store)
 	assert.NotNil(t, executor)
 	assert.Equal(t, store, executor.Store)
@@ -171,7 +24,7 @@ func TestNewExecutor(t *testing.T) {
 func TestExecuteEntry_Add(t *testing.T) {
 	t.Parallel()
 
-	store := newMockStore()
+	store := testutil.NewMockStore()
 	executor := NewExecutor(store)
 
 	state := EntryState{
@@ -196,7 +49,7 @@ func TestExecuteEntry_Add(t *testing.T) {
 func TestExecuteEntry_AddWithDescription(t *testing.T) {
 	t.Parallel()
 
-	store := newMockStore()
+	store := testutil.NewMockStore()
 	executor := NewExecutor(store)
 
 	state := EntryState{
@@ -222,7 +75,7 @@ func TestExecuteEntry_AddWithDescription(t *testing.T) {
 func TestExecuteEntry_Edit(t *testing.T) {
 	t.Parallel()
 
-	store := newMockStore()
+	store := testutil.NewMockStore()
 	executor := NewExecutor(store)
 
 	currentValue := "current"
@@ -247,7 +100,7 @@ func TestExecuteEntry_Edit(t *testing.T) {
 func TestExecuteEntry_EditWithMetadata(t *testing.T) {
 	t.Parallel()
 
-	store := newMockStore()
+	store := testutil.NewMockStore()
 	executor := NewExecutor(store)
 
 	currentValue := "current"
@@ -280,7 +133,7 @@ func TestExecuteEntry_EditWithMetadata(t *testing.T) {
 func TestExecuteEntry_Delete(t *testing.T) {
 	t.Parallel()
 
-	store := newMockStore()
+	store := testutil.NewMockStore()
 	executor := NewExecutor(store)
 
 	currentValue := "current"
@@ -305,7 +158,7 @@ func TestExecuteEntry_Delete(t *testing.T) {
 func TestExecuteEntry_DeleteWithMetadata(t *testing.T) {
 	t.Parallel()
 
-	store := newMockStore()
+	store := testutil.NewMockStore()
 	executor := NewExecutor(store)
 
 	currentValue := "current"
@@ -335,7 +188,7 @@ func TestExecuteEntry_DeleteWithMetadata(t *testing.T) {
 func TestExecuteEntry_DeleteCreate_UnstagesTags(t *testing.T) {
 	t.Parallel()
 
-	store := newMockStore()
+	store := testutil.NewMockStore()
 
 	// Pre-stage CREATE and tags
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/new", staging.Entry{
@@ -373,7 +226,7 @@ func TestExecuteEntry_DeleteCreate_UnstagesTags(t *testing.T) {
 func TestExecuteEntry_DeleteCreate_NoTags(t *testing.T) {
 	t.Parallel()
 
-	store := newMockStore()
+	store := testutil.NewMockStore()
 
 	// Pre-stage CREATE but no tags
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/new", staging.Entry{
@@ -404,7 +257,7 @@ func TestExecuteEntry_DeleteCreate_NoTags(t *testing.T) {
 func TestExecuteEntry_Reset(t *testing.T) {
 	t.Parallel()
 
-	store := newMockStore()
+	store := testutil.NewMockStore()
 
 	// Pre-stage an entry
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
@@ -435,7 +288,7 @@ func TestExecuteEntry_Reset(t *testing.T) {
 func TestExecuteEntry_Error(t *testing.T) {
 	t.Parallel()
 
-	store := newMockStore()
+	store := testutil.NewMockStore()
 	executor := NewExecutor(store)
 
 	state := EntryState{
@@ -452,7 +305,7 @@ func TestExecuteEntry_Error(t *testing.T) {
 func TestExecuteEntry_ResetNotStaged(t *testing.T) {
 	t.Parallel()
 
-	store := newMockStore()
+	store := testutil.NewMockStore()
 	executor := NewExecutor(store)
 
 	state := EntryState{
@@ -471,7 +324,7 @@ func TestExecuteEntry_ResetNotStaged(t *testing.T) {
 func TestExecuteTag_Add(t *testing.T) {
 	t.Parallel()
 
-	store := newMockStore()
+	store := testutil.NewMockStore()
 	executor := NewExecutor(store)
 
 	baseTime := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
@@ -497,7 +350,7 @@ func TestExecuteTag_Add(t *testing.T) {
 func TestExecuteTag_Remove(t *testing.T) {
 	t.Parallel()
 
-	store := newMockStore()
+	store := testutil.NewMockStore()
 	executor := NewExecutor(store)
 
 	action := TagActionUntag{
@@ -521,7 +374,7 @@ func TestExecuteTag_Remove(t *testing.T) {
 func TestExecuteTag_Error(t *testing.T) {
 	t.Parallel()
 
-	store := newMockStore()
+	store := testutil.NewMockStore()
 	executor := NewExecutor(store)
 
 	action := TagActionTag{
@@ -539,7 +392,7 @@ func TestExecuteTag_Error(t *testing.T) {
 func TestExecuteTag_UnstageWhenEmpty(t *testing.T) {
 	t.Parallel()
 
-	store := newMockStore()
+	store := testutil.NewMockStore()
 
 	// Pre-stage tags
 	require.NoError(t, store.StageTag(t.Context(), staging.ServiceParam, "/app/config", staging.TagEntry{
@@ -576,7 +429,7 @@ func TestExecuteTag_UnstageWhenEmpty(t *testing.T) {
 func TestExecuteTag_UnstageWhenCompletelyEmpty(t *testing.T) {
 	t.Parallel()
 
-	store := newMockStore()
+	store := testutil.NewMockStore()
 
 	// Pre-stage tags to add "env": "prod"
 	require.NoError(t, store.StageTag(t.Context(), staging.ServiceParam, "/app/config", staging.TagEntry{
@@ -614,7 +467,7 @@ func TestExecuteTag_UnstageWhenCompletelyEmpty(t *testing.T) {
 func TestExecuteTag_UnstageWhenAlreadyNotStaged(t *testing.T) {
 	t.Parallel()
 
-	store := newMockStore()
+	store := testutil.NewMockStore()
 	executor := NewExecutor(store)
 
 	// No pre-staged tags, and action with auto-skip results in empty tags
@@ -638,7 +491,7 @@ func TestLoadEntryState(t *testing.T) {
 
 	t.Run("not staged", func(t *testing.T) {
 		t.Parallel()
-		store := newMockStore()
+		store := testutil.NewMockStore()
 
 		currentValue := "aws-value"
 		state, err := LoadEntryState(t.Context(), store, staging.ServiceParam, "/app/config", &currentValue)
@@ -651,7 +504,7 @@ func TestLoadEntryState(t *testing.T) {
 
 	t.Run("staged create", func(t *testing.T) {
 		t.Parallel()
-		store := newMockStore()
+		store := testutil.NewMockStore()
 		require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/new", staging.Entry{
 			Operation: staging.OperationCreate,
 			Value:     lo.ToPtr("draft"),
@@ -668,7 +521,7 @@ func TestLoadEntryState(t *testing.T) {
 
 	t.Run("staged update", func(t *testing.T) {
 		t.Parallel()
-		store := newMockStore()
+		store := testutil.NewMockStore()
 		require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("updated"),
@@ -686,7 +539,7 @@ func TestLoadEntryState(t *testing.T) {
 
 	t.Run("staged delete", func(t *testing.T) {
 		t.Parallel()
-		store := newMockStore()
+		store := testutil.NewMockStore()
 		require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
 			Operation: staging.OperationDelete,
 			StagedAt:  time.Now(),
@@ -705,7 +558,7 @@ func TestLoadStagedTags(t *testing.T) {
 
 	t.Run("not staged", func(t *testing.T) {
 		t.Parallel()
-		store := newMockStore()
+		store := testutil.NewMockStore()
 
 		tags, baseModifiedAt, err := LoadStagedTags(t.Context(), store, staging.ServiceParam, "/app/config")
 		require.NoError(t, err)
@@ -716,7 +569,7 @@ func TestLoadStagedTags(t *testing.T) {
 
 	t.Run("staged", func(t *testing.T) {
 		t.Parallel()
-		store := newMockStore()
+		store := testutil.NewMockStore()
 		baseTime := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
 		require.NoError(t, store.StageTag(t.Context(), staging.ServiceParam, "/app/config", staging.TagEntry{
 			Add:            map[string]string{"env": "prod"},
@@ -741,7 +594,8 @@ var errMock = errors.New("mock error")
 func TestExecuteEntry_PersistError(t *testing.T) {
 	t.Parallel()
 
-	store := &mockStore{stageEntryErr: errMock}
+	store := testutil.NewMockStore()
+	store.StageEntryErr = errMock
 	executor := NewExecutor(store)
 
 	state := EntryState{
@@ -757,8 +611,8 @@ func TestExecuteEntry_PersistError(t *testing.T) {
 func TestExecuteEntry_UnstageTagError(t *testing.T) {
 	t.Parallel()
 
-	store := newMockStore()
-	store.unstageTagErr = errMock
+	store := testutil.NewMockStore()
+	store.UnstageTagErr = errMock
 
 	// Pre-stage entry so UnstageEntry succeeds
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/new", staging.Entry{
@@ -782,7 +636,8 @@ func TestExecuteEntry_UnstageTagError(t *testing.T) {
 func TestExecuteTag_PersistError(t *testing.T) {
 	t.Parallel()
 
-	store := &mockStore{stageTagErr: errMock}
+	store := testutil.NewMockStore()
+	store.StageTagErr = errMock
 	executor := NewExecutor(store)
 
 	action := TagActionTag{
@@ -800,7 +655,8 @@ func TestExecuteTag_PersistError(t *testing.T) {
 func TestLoadEntryState_Error(t *testing.T) {
 	t.Parallel()
 
-	store := &mockStore{getEntryErr: errMock}
+	store := testutil.NewMockStore()
+	store.GetEntryErr = errMock
 
 	_, err := LoadEntryState(t.Context(), store, staging.ServiceParam, "/app/config", nil)
 	assert.ErrorIs(t, err, errMock)
@@ -809,7 +665,8 @@ func TestLoadEntryState_Error(t *testing.T) {
 func TestLoadStagedTags_Error(t *testing.T) {
 	t.Parallel()
 
-	store := &mockStore{getTagErr: errMock}
+	store := testutil.NewMockStore()
+	store.GetTagErr = errMock
 
 	_, _, err := LoadStagedTags(t.Context(), store, staging.ServiceParam, "/app/config")
 	assert.ErrorIs(t, err, errMock)

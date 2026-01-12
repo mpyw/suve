@@ -255,8 +255,8 @@ func (m *mockParserWithParseSpecErr) ParseSpec(_ string) (string, bool, error) {
 func TestResetUseCase_Execute_ListError(t *testing.T) {
 	t.Parallel()
 
-	store := newMockStore()
-	store.listErr = errors.New("list error")
+	store := testutil.NewMockStore()
+	store.ListEntriesErr = errors.New("list error")
 
 	uc := &usecasestaging.ResetUseCase{
 		Parser: newMockParser(),
@@ -271,11 +271,11 @@ func TestResetUseCase_Execute_ListError(t *testing.T) {
 func TestResetUseCase_Execute_UnstageAllError(t *testing.T) {
 	t.Parallel()
 
-	store := newMockStore()
-	store.addEntry(staging.ServiceParam, "/app/config", staging.Entry{
+	store := testutil.NewMockStore()
+	store.AddEntry(staging.ServiceParam, "/app/config", staging.Entry{
 		Operation: staging.OperationUpdate,
 	})
-	store.unstageAllErr = errors.New("unstage all error")
+	store.UnstageAllErr = errors.New("unstage all error")
 
 	uc := &usecasestaging.ResetUseCase{
 		Parser: newMockParser(),
@@ -290,8 +290,8 @@ func TestResetUseCase_Execute_UnstageAllError(t *testing.T) {
 func TestResetUseCase_Execute_GetError(t *testing.T) {
 	t.Parallel()
 
-	store := newMockStore()
-	store.getErr = errors.New("get error")
+	store := testutil.NewMockStore()
+	store.GetEntryErr = errors.New("get error")
 
 	uc := &usecasestaging.ResetUseCase{
 		Parser: newMockParser(),
@@ -306,11 +306,11 @@ func TestResetUseCase_Execute_GetError(t *testing.T) {
 func TestResetUseCase_Execute_UnstageError(t *testing.T) {
 	t.Parallel()
 
-	store := newMockStore()
-	store.addEntry(staging.ServiceParam, "/app/config", staging.Entry{
+	store := testutil.NewMockStore()
+	store.AddEntry(staging.ServiceParam, "/app/config", staging.Entry{
 		Operation: staging.OperationUpdate,
 	})
-	store.unstageErr = errors.New("unstage error")
+	store.UnstageEntryErr = errors.New("unstage error")
 
 	uc := &usecasestaging.ResetUseCase{
 		Parser: newMockParser(),
@@ -325,8 +325,8 @@ func TestResetUseCase_Execute_UnstageError(t *testing.T) {
 func TestResetUseCase_Execute_RestoreStageError(t *testing.T) {
 	t.Parallel()
 
-	store := newMockStore()
-	store.stageErr = errors.New("stage error")
+	store := testutil.NewMockStore()
+	store.StageEntryErr = errors.New("stage error")
 
 	parser := &mockParserWithVersion{
 		mockParser: newMockParser(),

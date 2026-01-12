@@ -172,8 +172,8 @@ func TestTagUseCase_Tag_FetchError(t *testing.T) {
 func TestTagUseCase_Tag_StageError(t *testing.T) {
 	t.Parallel()
 
-	store := newMockStore()
-	store.stageTagErr = errors.New("stage error")
+	store := testutil.NewMockStore()
+	store.StageTagErr = errors.New("stage error")
 
 	uc := &usecasestaging.TagUseCase{
 		Strategy: newMockTagStrategy(),
@@ -191,8 +191,8 @@ func TestTagUseCase_Tag_StageError(t *testing.T) {
 func TestTagUseCase_Tag_GetError(t *testing.T) {
 	t.Parallel()
 
-	store := newMockStore()
-	store.getTagErr = errors.New("get error")
+	store := testutil.NewMockStore()
+	store.GetTagErr = errors.New("get error")
 
 	uc := &usecasestaging.TagUseCase{
 		Strategy: newMockTagStrategy(),
@@ -314,8 +314,8 @@ func TestTagUseCase_Tag_BlockedOnDelete(t *testing.T) {
 func TestTagUseCase_Tag_GetEntryError(t *testing.T) {
 	t.Parallel()
 
-	store := newMockStore()
-	store.getErr = errors.New("get entry error")
+	store := testutil.NewMockStore()
+	store.GetEntryErr = errors.New("get entry error")
 
 	uc := &usecasestaging.TagUseCase{
 		Strategy: newMockTagStrategy(),
@@ -440,8 +440,8 @@ func TestTagUseCase_Untag_ParseError(t *testing.T) {
 func TestTagUseCase_Untag_GetEntryError(t *testing.T) {
 	t.Parallel()
 
-	store := newMockStore()
-	store.getErr = errors.New("get entry error")
+	store := testutil.NewMockStore()
+	store.GetEntryErr = errors.New("get entry error")
 
 	uc := &usecasestaging.TagUseCase{
 		Strategy: newMockTagStrategy(),
@@ -459,8 +459,8 @@ func TestTagUseCase_Untag_GetEntryError(t *testing.T) {
 func TestTagUseCase_Untag_GetTagError(t *testing.T) {
 	t.Parallel()
 
-	store := newMockStore()
-	store.getTagErr = errors.New("get tag error")
+	store := testutil.NewMockStore()
+	store.GetTagErr = errors.New("get tag error")
 
 	uc := &usecasestaging.TagUseCase{
 		Strategy: newMockTagStrategy(),
@@ -617,8 +617,8 @@ func TestTagUseCase_Untag_EmptyTagKeys(t *testing.T) {
 func TestTagUseCase_Untag_StageError(t *testing.T) {
 	t.Parallel()
 
-	store := newMockStore()
-	store.stageTagErr = errors.New("stage error")
+	store := testutil.NewMockStore()
+	store.StageTagErr = errors.New("stage error")
 
 	uc := &usecasestaging.TagUseCase{
 		Strategy: newMockTagStrategy(),

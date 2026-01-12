@@ -284,8 +284,8 @@ func TestDiffUseCase_Execute_AutoUnstage_UpdateNoLongerExists(t *testing.T) {
 func TestDiffUseCase_Execute_ListError(t *testing.T) {
 	t.Parallel()
 
-	store := newMockStore()
-	store.listErr = errors.New("list error")
+	store := testutil.NewMockStore()
+	store.ListEntriesErr = errors.New("list error")
 
 	uc := &usecasestaging.DiffUseCase{
 		Strategy: newMockDiffStrategy(),
@@ -300,8 +300,8 @@ func TestDiffUseCase_Execute_ListError(t *testing.T) {
 func TestDiffUseCase_Execute_GetError(t *testing.T) {
 	t.Parallel()
 
-	store := newMockStore()
-	store.getErr = errors.New("get error")
+	store := testutil.NewMockStore()
+	store.GetEntryErr = errors.New("get error")
 
 	uc := &usecasestaging.DiffUseCase{
 		Strategy: newMockDiffStrategy(),
@@ -316,8 +316,8 @@ func TestDiffUseCase_Execute_GetError(t *testing.T) {
 func TestDiffUseCase_Execute_GetTagError(t *testing.T) {
 	t.Parallel()
 
-	store := newMockStore()
-	store.getTagErr = errors.New("get tag error")
+	store := testutil.NewMockStore()
+	store.GetTagErr = errors.New("get tag error")
 
 	uc := &usecasestaging.DiffUseCase{
 		Strategy: newMockDiffStrategy(),
@@ -332,8 +332,8 @@ func TestDiffUseCase_Execute_GetTagError(t *testing.T) {
 func TestDiffUseCase_Execute_ListTagsError(t *testing.T) {
 	t.Parallel()
 
-	store := newMockStore()
-	store.listTagsErr = errors.New("list tags error")
+	store := testutil.NewMockStore()
+	store.ListTagsErr = errors.New("list tags error")
 
 	uc := &usecasestaging.DiffUseCase{
 		Strategy: newMockDiffStrategy(),

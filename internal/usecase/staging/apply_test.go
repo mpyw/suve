@@ -254,8 +254,8 @@ func TestApplyUseCase_Execute_ConflictDetection(t *testing.T) {
 func TestApplyUseCase_Execute_ListError(t *testing.T) {
 	t.Parallel()
 
-	store := newMockStore()
-	store.listErr = errors.New("list error")
+	store := testutil.NewMockStore()
+	store.ListEntriesErr = errors.New("list error")
 
 	uc := &usecasestaging.ApplyUseCase{
 		Strategy: newMockApplyStrategy(),
@@ -493,8 +493,8 @@ func TestApplyUseCase_Execute_FilterByName_TagOnly(t *testing.T) {
 func TestApplyUseCase_Execute_ListTagsError(t *testing.T) {
 	t.Parallel()
 
-	store := newMockStore()
-	store.listTagsErr = errors.New("list tags error")
+	store := testutil.NewMockStore()
+	store.ListTagsErr = errors.New("list tags error")
 
 	uc := &usecasestaging.ApplyUseCase{
 		Strategy: newMockApplyTagStrategy(),

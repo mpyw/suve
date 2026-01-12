@@ -176,5 +176,15 @@ func (m *MockStore) ListTags(_ context.Context, service staging.Service) (map[st
 	return result, nil
 }
 
+// AddEntry is a helper to add entries directly for testing.
+func (m *MockStore) AddEntry(service staging.Service, name string, entry staging.Entry) {
+	m.entries[service][name] = entry
+}
+
+// AddTag is a helper to add tag entries directly for testing.
+func (m *MockStore) AddTag(service staging.Service, name string, tag staging.TagEntry) {
+	m.tags[service][name] = tag
+}
+
 // Compile-time check that MockStore implements StoreReadWriteOperator.
 var _ staging.StoreReadWriteOperator = (*MockStore)(nil)

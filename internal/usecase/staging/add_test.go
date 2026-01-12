@@ -201,8 +201,8 @@ func TestAddUseCase_Draft_ParseError(t *testing.T) {
 func TestAddUseCase_Execute_StageError(t *testing.T) {
 	t.Parallel()
 
-	store := newMockStore()
-	store.stageErr = errors.New("stage error")
+	store := testutil.NewMockStore()
+	store.StageEntryErr = errors.New("stage error")
 
 	uc := &usecasestaging.AddUseCase{
 		Strategy: newMockEditStrategyNotFound(),
@@ -220,8 +220,8 @@ func TestAddUseCase_Execute_StageError(t *testing.T) {
 func TestAddUseCase_Draft_GetError(t *testing.T) {
 	t.Parallel()
 
-	store := newMockStore()
-	store.getErr = errors.New("get error")
+	store := testutil.NewMockStore()
+	store.GetEntryErr = errors.New("get error")
 
 	uc := &usecasestaging.AddUseCase{
 		Strategy: newMockEditStrategyNotFound(),
@@ -236,8 +236,8 @@ func TestAddUseCase_Draft_GetError(t *testing.T) {
 func TestAddUseCase_Execute_GetError(t *testing.T) {
 	t.Parallel()
 
-	store := newMockStore()
-	store.getErr = errors.New("store get error")
+	store := testutil.NewMockStore()
+	store.GetEntryErr = errors.New("store get error")
 
 	uc := &usecasestaging.AddUseCase{
 		Strategy: newMockEditStrategyNotFound(),

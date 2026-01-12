@@ -210,8 +210,8 @@ func TestDeleteUseCase_Execute_ZeroLastModified_StagedCreate(t *testing.T) {
 func TestDeleteUseCase_Execute_StageError(t *testing.T) {
 	t.Parallel()
 
-	store := newMockStore()
-	store.stageErr = errors.New("stage error")
+	store := testutil.NewMockStore()
+	store.StageEntryErr = errors.New("stage error")
 
 	uc := &usecasestaging.DeleteUseCase{
 		Strategy: newMockDeleteStrategy(false),
@@ -228,8 +228,8 @@ func TestDeleteUseCase_Execute_StageError(t *testing.T) {
 func TestDeleteUseCase_Execute_GetError(t *testing.T) {
 	t.Parallel()
 
-	store := newMockStore()
-	store.getErr = errors.New("store get error")
+	store := testutil.NewMockStore()
+	store.GetEntryErr = errors.New("store get error")
 
 	uc := &usecasestaging.DeleteUseCase{
 		Strategy: newMockDeleteStrategy(false),
@@ -246,13 +246,13 @@ func TestDeleteUseCase_Execute_GetError(t *testing.T) {
 func TestDeleteUseCase_Execute_UnstageError(t *testing.T) {
 	t.Parallel()
 
-	store := newMockStore()
+	store := testutil.NewMockStore()
 	// Simulate existing CREATE entry by staging it
-	store.entries[staging.ServiceParam]["/app/new"] = staging.Entry{
+	store.AddEntry(staging.ServiceParam, "/app/new", staging.Entry{
 		Operation: staging.OperationCreate,
 		Value:     lo.ToPtr("value"),
-	}
-	store.unstageErr = errors.New("unstage error")
+	})
+	store.UnstageEntryErr = errors.New("unstage error")
 
 	uc := &usecasestaging.DeleteUseCase{
 		Strategy: newMockDeleteStrategy(false),
