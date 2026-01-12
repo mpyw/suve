@@ -14,7 +14,7 @@ import (
 	"github.com/mpyw/suve/internal/staging"
 )
 
-// mockStore implements staging.StoreReadWriter for testing.
+// mockStore implements staging.StoreReadWriteOperator for testing.
 // It stores state in memory and can be configured to return errors.
 type mockStore struct {
 	entries map[staging.Service]map[string]staging.Entry

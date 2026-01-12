@@ -47,7 +47,7 @@ type StatusOutput struct {
 // StatusUseCase executes status operations.
 type StatusUseCase struct {
 	Strategy staging.ServiceStrategy
-	Store    staging.StoreReader
+	Store    staging.StoreReadOperator
 }
 
 // Execute runs the status use case.

@@ -6,7 +6,7 @@ import (
 	"github.com/mpyw/suve/internal/staging"
 )
 
-// mockStore implements staging.StoreReadWriter for testing.
+// mockStore implements staging.StoreReadWriteOperator for testing.
 type mockStore struct {
 	entries       map[staging.Service]map[string]staging.Entry
 	tags          map[staging.Service]map[string]staging.TagEntry

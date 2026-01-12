@@ -55,7 +55,7 @@ type DiffOutput struct {
 // DiffUseCase executes diff operations.
 type DiffUseCase struct {
 	Strategy staging.DiffStrategy
-	Store    staging.StoreReadWriter
+	Store    staging.StoreReadWriteOperator
 }
 
 // Execute runs the diff use case.

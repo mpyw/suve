@@ -35,7 +35,7 @@ type UntagOutput struct {
 // TagUseCase executes tag staging operations.
 type TagUseCase struct {
 	Strategy staging.EditStrategy
-	Store    staging.StoreReadWriter
+	Store    staging.StoreReadWriteOperator
 }
 
 // tagContext holds common context for tag operations.

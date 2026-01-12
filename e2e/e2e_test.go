@@ -68,8 +68,6 @@ func setupEnv(t *testing.T) {
 	t.Setenv("AWS_ACCESS_KEY_ID", "test")
 	t.Setenv("AWS_SECRET_ACCESS_KEY", "test")
 	t.Setenv("AWS_DEFAULT_REGION", "us-east-1")
-	// Use file storage for E2E tests (agent requires daemon process)
-	t.Setenv("SUVE_STORAGE", "file")
 }
 
 // setupTempHome sets up a temporary HOME directory for isolated staging tests.

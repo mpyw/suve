@@ -40,7 +40,7 @@ type ResetOutput struct {
 type ResetUseCase struct {
 	Parser  staging.Parser
 	Fetcher staging.ResetStrategy
-	Store   staging.StoreReadWriter
+	Store   staging.StoreReadWriteOperator
 }
 
 // Execute runs the reset use case.

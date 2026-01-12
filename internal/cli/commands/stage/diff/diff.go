@@ -41,7 +41,7 @@ type SecretClient interface {
 type Runner struct {
 	ParamClient  ParamClient
 	SecretClient SecretClient
-	Store        staging.StoreReadWriter
+	Store        staging.StoreReadWriteOperator
 	Stdout       io.Writer
 	Stderr       io.Writer
 }

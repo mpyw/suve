@@ -29,7 +29,7 @@ type DeleteOutput struct {
 // DeleteUseCase executes delete staging operations.
 type DeleteUseCase struct {
 	Strategy staging.DeleteStrategy
-	Store    staging.StoreReadWriter
+	Store    staging.StoreReadWriteOperator
 }
 
 // Execute runs the delete use case.

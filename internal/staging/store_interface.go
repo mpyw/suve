@@ -53,11 +53,3 @@ type StateIO interface {
 	StateDrainer
 	StatePersister
 }
-
-// Deprecated aliases for backward compatibility.
-// TODO: Remove these after updating all references.
-type (
-	StoreReader     = StoreReadOperator
-	StoreWriter     = StoreWriteOperator
-	StoreReadWriter = StoreReadWriteOperator
-)

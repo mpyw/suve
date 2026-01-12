@@ -59,7 +59,7 @@ type ApplyOutput struct {
 // ApplyUseCase executes apply operations.
 type ApplyUseCase struct {
 	Strategy staging.ApplyStrategy
-	Store    staging.StoreReadWriter
+	Store    staging.StoreReadWriteOperator
 }
 
 // Execute runs the apply use case.

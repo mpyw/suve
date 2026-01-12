@@ -6,7 +6,7 @@ import (
 	"github.com/mpyw/suve/internal/staging"
 )
 
-// AgentStore implements staging.StoreReadWriter using the daemon.
+// AgentStore implements staging.StoreReadWriteOperator using the daemon.
 type AgentStore struct {
 	client    *Client
 	accountID string
