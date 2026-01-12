@@ -19,28 +19,43 @@ import (
 	"github.com/mpyw/suve/internal/staging/agent/server/security"
 )
 
+// DaemonOption configures a Daemon.
+type DaemonOption func(*Daemon)
+
+// WithAutoShutdownDisabled disables automatic shutdown when state becomes empty.
+func WithAutoShutdownDisabled() DaemonOption {
+	return func(d *Daemon) {
+		d.autoShutdownDisabled = true
+	}
+}
+
 // Daemon represents the staging agent daemon.
 type Daemon struct {
-	listener   net.Listener
-	state      *secureState
-	wg         sync.WaitGroup
-	ctx        context.Context
-	cancel     context.CancelFunc
-	shutdownCh chan struct{}
+	listener             net.Listener
+	state                *secureState
+	wg                   sync.WaitGroup
+	ctx                  context.Context
+	cancel               context.CancelFunc
+	shutdownCh           chan struct{}
+	autoShutdownDisabled bool
 }
 
 // NewDaemon creates a new daemon instance.
 // Uses context.Background() intentionally: the daemon runs independently of the
 // CLI command that started it and manages its own lifecycle via OS signals
 // (SIGTERM/SIGINT) rather than parent context cancellation.
-func NewDaemon() *Daemon {
+func NewDaemon(opts ...DaemonOption) *Daemon {
 	ctx, cancel := context.WithCancel(context.Background())
-	return &Daemon{
+	d := &Daemon{
 		state:      newSecureState(),
 		ctx:        ctx,
 		cancel:     cancel,
 		shutdownCh: make(chan struct{}),
 	}
+	for _, opt := range opts {
+		opt(d)
+	}
+	return d
 }
 
 // Run starts the daemon and blocks until shutdown.
@@ -150,7 +165,7 @@ func (d *Daemon) handleConnection(conn net.Conn) {
 	_ = encoder.Encode(resp)
 
 	// Check for auto-shutdown after UnstageEntry, UnstageTag, or UnstageAll
-	if resp.Success && (req.Method == protocol.MethodUnstageEntry || req.Method == protocol.MethodUnstageTag || req.Method == protocol.MethodUnstageAll) {
+	if !d.autoShutdownDisabled && resp.Success && (req.Method == protocol.MethodUnstageEntry || req.Method == protocol.MethodUnstageTag || req.Method == protocol.MethodUnstageAll) {
 		if d.state.isEmpty() {
 			// Schedule shutdown
 			go d.Shutdown()
