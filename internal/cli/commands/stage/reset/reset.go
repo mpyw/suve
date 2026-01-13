@@ -93,7 +93,12 @@ func (r *Runner) Run(ctx context.Context) error {
 
 	// Always call UnstageAll to trigger daemon auto-shutdown check
 	// Empty service ("") clears both SSM Parameter Store and Secrets Manager
-	if err := r.Store.UnstageAll(ctx, ""); err != nil {
+	// Use hint for context-aware shutdown message
+	if hinted, ok := r.Store.(store.HintedUnstager); ok {
+		if err := hinted.UnstageAllWithHint(ctx, "", store.HintReset); err != nil {
+			return err
+		}
+	} else if err := r.Store.UnstageAll(ctx, ""); err != nil {
 		return err
 	}
 

@@ -29,16 +29,18 @@ const (
 
 // Hint values for context-aware shutdown messages.
 const (
-	HintApply = "apply" // Unstage triggered by apply (changes were applied to AWS)
-	HintReset = "reset" // Unstage triggered by reset (changes were discarded)
+	HintApply   = "apply"   // Unstage triggered by apply (changes were applied to AWS)
+	HintReset   = "reset"   // Unstage triggered by reset (changes were discarded)
+	HintPersist = "persist" // Unstage triggered by persist (state saved to file)
 )
 
 // ShutdownReason values for client-side message formatting.
 const (
-	ShutdownReasonApplied  = "applied"  // All changes were applied to AWS
-	ShutdownReasonUnstaged = "unstaged" // All changes were unstaged/discarded
-	ShutdownReasonCleared  = "cleared"  // State was cleared (SetState with empty)
-	ShutdownReasonEmpty    = "empty"    // Generic: no staged changes remain
+	ShutdownReasonApplied   = "applied"   // All changes were applied to AWS
+	ShutdownReasonUnstaged  = "unstaged"  // All changes were unstaged/discarded
+	ShutdownReasonPersisted = "persisted" // State was saved to file
+	ShutdownReasonCleared   = "cleared"   // State was cleared (SetState with empty)
+	ShutdownReasonEmpty     = "empty"     // Generic: no staged changes remain
 )
 
 // Request represents a JSON-RPC request to the daemon.
@@ -51,7 +53,7 @@ type Request struct {
 	Entry     *staging.Entry    `json:"entry,omitempty"`
 	TagEntry  *staging.TagEntry `json:"tag_entry,omitempty"`
 	State     *staging.State    `json:"state,omitempty"`
-	Hint      string            `json:"hint,omitempty"` // Optional context hint for shutdown messages (HintApply, HintReset)
+	Hint      string            `json:"hint,omitempty"` // Optional context hint for shutdown messages (HintApply, HintReset, HintPersist)
 }
 
 // Response represents a JSON-RPC response from the daemon.

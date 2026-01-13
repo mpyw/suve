@@ -302,6 +302,8 @@ func printShutdownMessage(reason string) {
 		msg = "all changes applied"
 	case protocol.ShutdownReasonUnstaged:
 		msg = "all changes unstaged"
+	case protocol.ShutdownReasonPersisted:
+		msg = "state saved to file"
 	case protocol.ShutdownReasonCleared:
 		msg = "state cleared"
 	default:

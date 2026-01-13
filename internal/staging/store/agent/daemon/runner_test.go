@@ -128,6 +128,18 @@ func TestRunner_checkAutoShutdown_ShutdownReasons(t *testing.T) {
 		assert.Equal(t, protocol.ShutdownReasonUnstaged, resp.ShutdownReason)
 	})
 
+	t.Run("UnstageEntry with persist hint returns persisted reason", func(t *testing.T) {
+		t.Parallel()
+		r := NewRunner(testRunnerAccountID, testRunnerRegion)
+
+		req := &protocol.Request{Method: protocol.MethodUnstageEntry, Hint: protocol.HintPersist}
+		resp := &protocol.Response{Success: true}
+
+		r.checkAutoShutdown(req, resp)
+		assert.True(t, resp.WillShutdown)
+		assert.Equal(t, protocol.ShutdownReasonPersisted, resp.ShutdownReason)
+	})
+
 	// UnstageTag tests
 	t.Run("UnstageTag with no hint returns empty reason", func(t *testing.T) {
 		t.Parallel()
@@ -165,6 +177,18 @@ func TestRunner_checkAutoShutdown_ShutdownReasons(t *testing.T) {
 		assert.Equal(t, protocol.ShutdownReasonUnstaged, resp.ShutdownReason)
 	})
 
+	t.Run("UnstageTag with persist hint returns persisted reason", func(t *testing.T) {
+		t.Parallel()
+		r := NewRunner(testRunnerAccountID, testRunnerRegion)
+
+		req := &protocol.Request{Method: protocol.MethodUnstageTag, Hint: protocol.HintPersist}
+		resp := &protocol.Response{Success: true}
+
+		r.checkAutoShutdown(req, resp)
+		assert.True(t, resp.WillShutdown)
+		assert.Equal(t, protocol.ShutdownReasonPersisted, resp.ShutdownReason)
+	})
+
 	// UnstageAll tests
 	t.Run("UnstageAll with no hint returns unstaged reason", func(t *testing.T) {
 		t.Parallel()
@@ -200,6 +224,18 @@ func TestRunner_checkAutoShutdown_ShutdownReasons(t *testing.T) {
 		r.checkAutoShutdown(req, resp)
 		assert.True(t, resp.WillShutdown)
 		assert.Equal(t, protocol.ShutdownReasonUnstaged, resp.ShutdownReason)
+	})
+
+	t.Run("UnstageAll with persist hint returns persisted reason", func(t *testing.T) {
+		t.Parallel()
+		r := NewRunner(testRunnerAccountID, testRunnerRegion)
+
+		req := &protocol.Request{Method: protocol.MethodUnstageAll, Hint: protocol.HintPersist}
+		resp := &protocol.Response{Success: true}
+
+		r.checkAutoShutdown(req, resp)
+		assert.True(t, resp.WillShutdown)
+		assert.Equal(t, protocol.ShutdownReasonPersisted, resp.ShutdownReason)
 	})
 
 	// SetState tests

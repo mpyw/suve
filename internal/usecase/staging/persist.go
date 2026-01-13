@@ -105,8 +105,12 @@ func (u *PersistUseCase) Execute(ctx context.Context, input PersistInput) (*Pers
 				return output, &PersistError{Op: "clear", Err: err, NonFatal: true}
 			}
 		} else {
-			// Drain with keep=false to clear all memory
-			if _, err := u.AgentStore.Drain(ctx, "", false); err != nil {
+			// Clear all memory with persist hint for proper shutdown message
+			if hinted, ok := u.AgentStore.(store.HintedUnstager); ok {
+				if err := hinted.UnstageAllWithHint(ctx, "", store.HintPersist); err != nil {
+					return output, &PersistError{Op: "clear", Err: err, NonFatal: true}
+				}
+			} else if err := u.AgentStore.UnstageAll(ctx, ""); err != nil {
 				return output, &PersistError{Op: "clear", Err: err, NonFatal: true}
 			}
 		}

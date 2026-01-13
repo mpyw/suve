@@ -84,6 +84,8 @@ func (r *Runner) checkAutoShutdown(req *protocol.Request, resp *protocol.Respons
 					resp.ShutdownReason = protocol.ShutdownReasonApplied
 				case protocol.HintReset:
 					resp.ShutdownReason = protocol.ShutdownReasonUnstaged
+				case protocol.HintPersist:
+					resp.ShutdownReason = protocol.ShutdownReasonPersisted
 				default:
 					resp.ShutdownReason = protocol.ShutdownReasonEmpty
 				}
@@ -91,10 +93,12 @@ func (r *Runner) checkAutoShutdown(req *protocol.Request, resp *protocol.Respons
 		case protocol.MethodUnstageAll:
 			if r.handler.IsEmpty() {
 				resp.WillShutdown = true
-				// UnstageAll is typically from reset, use hint or default to "unstaged"
+				// UnstageAll is typically from reset or persist, use hint
 				switch req.Hint {
 				case protocol.HintApply:
 					resp.ShutdownReason = protocol.ShutdownReasonApplied
+				case protocol.HintPersist:
+					resp.ShutdownReason = protocol.ShutdownReasonPersisted
 				default:
 					resp.ShutdownReason = protocol.ShutdownReasonUnstaged
 				}

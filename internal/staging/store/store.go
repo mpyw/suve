@@ -9,8 +9,9 @@ import (
 
 // Hint values for context-aware shutdown messages.
 const (
-	HintApply = "apply" // Unstage triggered by apply (changes were applied to AWS)
-	HintReset = "reset" // Unstage triggered by reset (changes were discarded)
+	HintApply   = "apply"   // Unstage triggered by apply (changes were applied to AWS)
+	HintReset   = "reset"   // Unstage triggered by reset (changes were discarded)
+	HintPersist = "persist" // Unstage triggered by persist (state saved to file)
 )
 
 // ReadOperator provides read-only access to individual staging entries.
