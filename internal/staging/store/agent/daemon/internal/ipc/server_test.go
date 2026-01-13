@@ -13,6 +13,11 @@ import (
 	"github.com/mpyw/suve/internal/staging/store/agent/internal/protocol"
 )
 
+const (
+	testAccountID = "123456789012"
+	testRegion    = "us-east-1"
+)
+
 func TestNewServer(t *testing.T) {
 	t.Parallel()
 
@@ -21,8 +26,10 @@ func TestNewServer(t *testing.T) {
 	}
 	callback := func(req *protocol.Request, resp *protocol.Response) {}
 
-	s := NewServer(handler, callback)
+	s := NewServer(testAccountID, testRegion, handler, callback)
 	require.NotNil(t, s)
+	assert.Equal(t, testAccountID, s.accountID)
+	assert.Equal(t, testRegion, s.region)
 	assert.NotNil(t, s.handler)
 	assert.NotNil(t, s.onResponse)
 	assert.NotNil(t, s.ctx)
@@ -36,7 +43,7 @@ func TestServer_Done(t *testing.T) {
 		return &protocol.Response{Success: true}
 	}
 
-	s := NewServer(handler, nil)
+	s := NewServer(testAccountID, testRegion, handler, nil)
 
 	// Channel should not be closed initially
 	select {
@@ -67,7 +74,7 @@ func TestServer_Shutdown(t *testing.T) {
 			return &protocol.Response{Success: true}
 		}
 
-		s := NewServer(handler, nil)
+		s := NewServer(testAccountID, testRegion, handler, nil)
 		// Shutdown should work even without a listener
 		s.Shutdown()
 
@@ -86,7 +93,7 @@ func TestServer_Shutdown(t *testing.T) {
 			return &protocol.Response{Success: true}
 		}
 
-		s := NewServer(handler, nil)
+		s := NewServer(testAccountID, testRegion, handler, nil)
 
 		// Create a temporary listener using TCP for easier testing
 		// (Unix socket paths have length limits on some platforms)
@@ -109,7 +116,7 @@ func TestServer_sendError(t *testing.T) {
 	handler := func(req *protocol.Request) *protocol.Response {
 		return &protocol.Response{Success: true}
 	}
-	s := NewServer(handler, nil)
+	s := NewServer(testAccountID, testRegion, handler, nil)
 
 	// Use a pipe to capture the response
 	client, server := net.Pipe()
@@ -146,7 +153,7 @@ func TestServer_sendError_withMockConn(t *testing.T) {
 	handler := func(req *protocol.Request) *protocol.Response {
 		return &protocol.Response{Success: true}
 	}
-	s := NewServer(handler, nil)
+	s := NewServer(testAccountID, testRegion, handler, nil)
 
 	buf := &bytes.Buffer{}
 	conn := &mockConn{Buffer: buf}

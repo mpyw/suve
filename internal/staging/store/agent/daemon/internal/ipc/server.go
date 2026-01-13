@@ -28,6 +28,8 @@ type ResponseCallback func(*protocol.Request, *protocol.Response)
 
 // Server provides low-level IPC server functionality.
 type Server struct {
+	accountID  string
+	region     string
 	listener   net.Listener
 	handler    RequestHandler
 	onResponse ResponseCallback
@@ -36,10 +38,12 @@ type Server struct {
 	cancel     context.CancelFunc
 }
 
-// NewServer creates a new IPC server.
-func NewServer(handler RequestHandler, onResponse ResponseCallback) *Server {
+// NewServer creates a new IPC server for a specific AWS account and region.
+func NewServer(accountID, region string, handler RequestHandler, onResponse ResponseCallback) *Server {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &Server{
+		accountID:  accountID,
+		region:     region,
 		handler:    handler,
 		onResponse: onResponse,
 		ctx:        ctx,
@@ -53,7 +57,7 @@ func (s *Server) Start() error {
 		return fmt.Errorf("failed to setup process security: %w", err)
 	}
 
-	socketPath := protocol.SocketPath()
+	socketPath := protocol.SocketPathForAccount(s.accountID, s.region)
 
 	if err := s.createSocketDir(socketPath); err != nil {
 		return err

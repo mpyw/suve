@@ -3,10 +3,12 @@ package agent
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/urfave/cli/v3"
 
 	"github.com/mpyw/suve/internal/cli/output"
+	"github.com/mpyw/suve/internal/infra"
 	agentcfg "github.com/mpyw/suve/internal/staging/store/agent"
 	"github.com/mpyw/suve/internal/staging/store/agent/daemon"
 )
@@ -47,8 +49,31 @@ This command is usually called automatically when staging operations are perform
 The daemon will automatically shut down when all staged changes are cleared.
 
 Set ` + agentcfg.EnvDaemonManualMode + `=1 to enable manual mode (disables auto-start and auto-shutdown).`,
-		Action: func(_ context.Context, _ *cli.Command) error {
-			runner := daemon.NewRunner(agentcfg.DaemonOptions()...)
+		Flags: []cli.Flag{
+			&cli.StringFlag{
+				Name:  "account",
+				Usage: "AWS account ID (required, usually passed automatically)",
+			},
+			&cli.StringFlag{
+				Name:  "region",
+				Usage: "AWS region (required, usually passed automatically)",
+			},
+		},
+		Action: func(ctx context.Context, cmd *cli.Command) error {
+			accountID := cmd.String("account")
+			region := cmd.String("region")
+
+			// If not passed via flags, get from AWS identity
+			if accountID == "" || region == "" {
+				identity, err := infra.GetAWSIdentity(ctx)
+				if err != nil {
+					return fmt.Errorf("failed to get AWS identity: %w", err)
+				}
+				accountID = identity.AccountID
+				region = identity.Region
+			}
+
+			runner := daemon.NewRunner(accountID, region, agentcfg.DaemonOptions()...)
 			return runner.Run()
 		},
 	}
@@ -62,8 +87,13 @@ func stopCommand() *cli.Command {
 
 This command sends a shutdown signal to the running daemon.
 Note: Any staged changes in memory will be lost unless persisted first.`,
-		Action: func(_ context.Context, cmd *cli.Command) error {
-			launcher := daemon.NewLauncher()
+		Action: func(ctx context.Context, cmd *cli.Command) error {
+			identity, err := infra.GetAWSIdentity(ctx)
+			if err != nil {
+				return fmt.Errorf("failed to get AWS identity: %w", err)
+			}
+
+			launcher := daemon.NewLauncher(identity.AccountID, identity.Region)
 			if err := launcher.Shutdown(); err != nil {
 				output.Printf(cmd.Root().ErrWriter, "Warning: %v\n", err)
 				return nil

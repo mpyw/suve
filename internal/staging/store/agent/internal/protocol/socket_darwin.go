@@ -7,10 +7,10 @@ import (
 	"path/filepath"
 )
 
-// SocketPath returns the path for the daemon socket on macOS.
-func SocketPath() string {
+// socketPathForAccount returns the path for the daemon socket on macOS for a specific account/region.
+func socketPathForAccount(accountID, region string) string {
 	if tmpdir := os.Getenv("TMPDIR"); tmpdir != "" {
-		return filepath.Join(tmpdir, socketDirName, socketFileName)
+		return filepath.Join(tmpdir, socketDirName, accountID, region, socketFileName)
 	}
-	return socketPathFallback()
+	return socketPathFallback(accountID, region)
 }

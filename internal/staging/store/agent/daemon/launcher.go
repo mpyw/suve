@@ -28,14 +28,18 @@ func WithAutoStartDisabled() LauncherOption {
 
 // Launcher manages daemon startup and connectivity.
 type Launcher struct {
+	accountID         string
+	region            string
 	client            *ipc.Client
 	autoStartDisabled bool
 }
 
-// NewLauncher creates a new daemon launcher.
-func NewLauncher(opts ...LauncherOption) *Launcher {
+// NewLauncher creates a new daemon launcher for a specific AWS account and region.
+func NewLauncher(accountID, region string, opts ...LauncherOption) *Launcher {
 	l := &Launcher{
-		client: ipc.NewClient(),
+		accountID: accountID,
+		region:    region,
+		client:    ipc.NewClient(accountID, region),
 	}
 	for _, opt := range opts {
 		opt(l)
@@ -92,7 +96,7 @@ func (l *Launcher) Shutdown() error {
 // startProcess starts a new daemon process.
 func (l *Launcher) startProcess() error {
 	if l.autoStartDisabled {
-		return fmt.Errorf("daemon not running and auto-start is disabled; run 'suve stage agent start' manually")
+		return fmt.Errorf("daemon not running and auto-start is disabled; run 'suve stage agent start --account %s --region %s' manually", l.accountID, l.region)
 	}
 
 	executable, err := os.Executable()
@@ -100,7 +104,7 @@ func (l *Launcher) startProcess() error {
 		return fmt.Errorf("failed to get executable path: %w", err)
 	}
 
-	cmd := exec.Command(executable, "stage", "agent", "start")
+	cmd := exec.Command(executable, "stage", "agent", "start", "--account", l.accountID, "--region", l.region)
 	cmd.Stdout = nil
 	cmd.Stderr = nil
 	cmd.Stdin = nil

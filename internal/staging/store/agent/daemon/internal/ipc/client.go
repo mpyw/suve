@@ -27,10 +27,10 @@ type Client struct {
 	mu         sync.Mutex
 }
 
-// NewClient creates a new IPC client.
-func NewClient() *Client {
+// NewClient creates a new IPC client for a specific AWS account and region.
+func NewClient(accountID, region string) *Client {
 	return &Client{
-		socketPath: protocol.SocketPath(),
+		socketPath: protocol.SocketPathForAccount(accountID, region),
 	}
 }
 

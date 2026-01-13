@@ -22,20 +22,24 @@ func WithAutoShutdownDisabled() RunnerOption {
 
 // Runner represents the staging agent daemon process.
 type Runner struct {
+	accountID            string
+	region               string
 	server               *ipc.Server
 	handler              *server.Handler
 	autoShutdownDisabled bool
 }
 
-// NewRunner creates a new daemon runner.
-func NewRunner(opts ...RunnerOption) *Runner {
+// NewRunner creates a new daemon runner for a specific AWS account and region.
+func NewRunner(accountID, region string, opts ...RunnerOption) *Runner {
 	r := &Runner{
-		handler: server.NewHandler(),
+		accountID: accountID,
+		region:    region,
+		handler:   server.NewHandler(),
 	}
 	for _, opt := range opts {
 		opt(r)
 	}
-	r.server = ipc.NewServer(r.handler.HandleRequest, r.handleAutoShutdown)
+	r.server = ipc.NewServer(accountID, region, r.handler.HandleRequest, r.handleAutoShutdown)
 	return r
 }
 

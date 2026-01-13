@@ -45,7 +45,7 @@ func NewStore(accountID, region string, opts ...StoreOption) *Store {
 	if s.autoStartDisabled {
 		launcherOpts = append(launcherOpts, daemon.WithAutoStartDisabled())
 	}
-	s.launcher = daemon.NewLauncher(launcherOpts...)
+	s.launcher = daemon.NewLauncher(accountID, region, launcherOpts...)
 
 	return s
 }
