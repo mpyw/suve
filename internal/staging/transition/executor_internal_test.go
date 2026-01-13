@@ -1,4 +1,4 @@
-package transition //nolint:testpackage // Internal tests sharing test fixtures with reducer_test.go
+package transition
 
 import (
 	"errors"

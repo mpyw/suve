@@ -1,4 +1,3 @@
-//nolint:testpackage // Integration tests require access to internal types and unexported functions
 package daemon
 
 import (

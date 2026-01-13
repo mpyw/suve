@@ -1,4 +1,3 @@
-//nolint:testpackage // Internal tests for unexported Runner behavior (checkAutoShutdown)
 package daemon
 
 import (

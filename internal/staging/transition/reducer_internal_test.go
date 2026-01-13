@@ -1,4 +1,4 @@
-package transition //nolint:testpackage // Internal tests sharing test fixtures with executor_test.go
+package transition
 
 import (
 	"testing"

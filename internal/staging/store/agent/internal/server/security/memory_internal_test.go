@@ -1,4 +1,3 @@
-//nolint:testpackage // Tests for unexported Buffer internals
 package security
 
 import (

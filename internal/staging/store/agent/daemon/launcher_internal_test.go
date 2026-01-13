@@ -1,4 +1,3 @@
-//nolint:testpackage // Internal tests for unexported functions (startProcess, mockSpawner)
 package daemon
 
 import (
