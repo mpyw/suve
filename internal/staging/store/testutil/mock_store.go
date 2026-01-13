@@ -24,6 +24,8 @@ type MockStore struct {
 	UnstageAllErr   error
 	ListEntriesErr  error
 	ListTagsErr     error
+	DrainErr        error
+	WriteStateErr   error
 }
 
 // NewMockStore creates a new MockStore with initialized maps.
@@ -187,5 +189,76 @@ func (m *MockStore) AddTag(service staging.Service, name string, tag staging.Tag
 	m.tags[service][name] = tag
 }
 
-// Compile-time check that MockStore implements ReadWriteOperator.
+// Drain retrieves the entire state from storage.
+// If keep is false, the source storage is cleared after reading.
+func (m *MockStore) Drain(_ context.Context, keep bool) (*staging.State, error) {
+	if m.DrainErr != nil {
+		return nil, m.DrainErr
+	}
+
+	// Copy current state
+	state := staging.NewEmptyState()
+	for service, entries := range m.entries {
+		for name, entry := range entries {
+			state.Entries[service][name] = entry
+		}
+	}
+	for service, tags := range m.tags {
+		for name, tag := range tags {
+			state.Tags[service][name] = tag
+		}
+	}
+
+	// Clear storage if not keeping
+	if !keep {
+		m.entries = map[staging.Service]map[string]staging.Entry{
+			staging.ServiceParam:  make(map[string]staging.Entry),
+			staging.ServiceSecret: make(map[string]staging.Entry),
+		}
+		m.tags = map[staging.Service]map[string]staging.TagEntry{
+			staging.ServiceParam:  make(map[string]staging.TagEntry),
+			staging.ServiceSecret: make(map[string]staging.TagEntry),
+		}
+	}
+
+	return state, nil
+}
+
+// WriteState writes the entire state to storage.
+func (m *MockStore) WriteState(_ context.Context, state *staging.State) error {
+	if m.WriteStateErr != nil {
+		return m.WriteStateErr
+	}
+
+	// Replace all entries and tags
+	m.entries = map[staging.Service]map[string]staging.Entry{
+		staging.ServiceParam:  make(map[string]staging.Entry),
+		staging.ServiceSecret: make(map[string]staging.Entry),
+	}
+	m.tags = map[staging.Service]map[string]staging.TagEntry{
+		staging.ServiceParam:  make(map[string]staging.TagEntry),
+		staging.ServiceSecret: make(map[string]staging.TagEntry),
+	}
+
+	if state == nil {
+		return nil
+	}
+
+	for service, entries := range state.Entries {
+		for name, entry := range entries {
+			m.entries[service][name] = entry
+		}
+	}
+	for service, tags := range state.Tags {
+		for name, tag := range tags {
+			m.tags[service][name] = tag
+		}
+	}
+
+	return nil
+}
+
+// Compile-time checks that MockStore implements interfaces.
 var _ store.ReadWriteOperator = (*MockStore)(nil)
+var _ store.FileStore = (*MockStore)(nil)
+var _ store.AgentStore = (*MockStore)(nil)
