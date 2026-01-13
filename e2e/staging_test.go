@@ -24,8 +24,10 @@ import (
 	globalreset "github.com/mpyw/suve/internal/cli/commands/stage/reset"
 	secretstage "github.com/mpyw/suve/internal/cli/commands/stage/secret"
 	globalstatus "github.com/mpyw/suve/internal/cli/commands/stage/status"
+	"github.com/mpyw/suve/internal/maputil"
 	"github.com/mpyw/suve/internal/staging"
 	stgcli "github.com/mpyw/suve/internal/staging/cli"
+	"github.com/mpyw/suve/internal/staging/store/agent/daemon"
 )
 
 // =============================================================================
@@ -595,5 +597,506 @@ func TestMixed_ServiceSpecificDrainPersist(t *testing.T) {
 		secretStatus, _, err := runSubCommand(t, secretstage.Command(), "status")
 		require.NoError(t, err)
 		assert.Contains(t, secretStatus, secretName)
+	})
+}
+
+// =============================================================================
+// Agent Store Direct Tests (for IPC coverage)
+// =============================================================================
+
+// TestAgentStore_DirectMethods tests agent store methods directly to improve IPC coverage.
+func TestAgentStore_DirectMethods(t *testing.T) {
+	setupEnv(t)
+	setupTempHome(t)
+
+	store := newStore()
+	paramName := "/suve-e2e-direct/test-param"
+
+	// Clean up first
+	_ = store.UnstageAll(t.Context(), staging.ServiceParam)
+	t.Cleanup(func() {
+		_ = store.UnstageAll(t.Context(), staging.ServiceParam)
+	})
+
+	// Test StageEntry and GetEntry
+	t.Run("stage-and-get-entry", func(t *testing.T) {
+		entry := staging.Entry{
+			Operation: staging.OperationCreate,
+			Value:     lo.ToPtr("direct-test-value"),
+			StagedAt:  time.Now(),
+		}
+		err := store.StageEntry(t.Context(), staging.ServiceParam, paramName, entry)
+		require.NoError(t, err)
+
+		retrieved, err := store.GetEntry(t.Context(), staging.ServiceParam, paramName)
+		require.NoError(t, err)
+		assert.Equal(t, staging.OperationCreate, retrieved.Operation)
+		assert.Equal(t, "direct-test-value", lo.FromPtr(retrieved.Value))
+	})
+
+	// Test ListEntries
+	t.Run("list-entries", func(t *testing.T) {
+		entries, err := store.ListEntries(t.Context(), staging.ServiceParam)
+		require.NoError(t, err)
+		assert.Contains(t, entries[staging.ServiceParam], paramName)
+	})
+
+	// Test UnstageEntry
+	t.Run("unstage-entry", func(t *testing.T) {
+		err := store.UnstageEntry(t.Context(), staging.ServiceParam, paramName)
+		require.NoError(t, err)
+
+		_, err = store.GetEntry(t.Context(), staging.ServiceParam, paramName)
+		assert.ErrorIs(t, err, staging.ErrNotStaged)
+	})
+
+	// Test GetEntry for non-existent entry
+	t.Run("get-nonexistent-entry", func(t *testing.T) {
+		_, err := store.GetEntry(t.Context(), staging.ServiceParam, "/nonexistent/param")
+		assert.ErrorIs(t, err, staging.ErrNotStaged)
+	})
+}
+
+// TestAgentStore_TagMethods tests tag-related methods on the agent store.
+func TestAgentStore_TagMethods(t *testing.T) {
+	setupEnv(t)
+	setupTempHome(t)
+
+	store := newStore()
+	paramName := "/suve-e2e-direct/tag-test"
+
+	// Clean up first
+	_ = store.UnstageAll(t.Context(), staging.ServiceParam)
+	t.Cleanup(func() {
+		_ = store.UnstageAll(t.Context(), staging.ServiceParam)
+	})
+
+	// Test StageTag and GetTag
+	t.Run("stage-and-get-tag", func(t *testing.T) {
+		tagEntry := staging.TagEntry{
+			Add:      map[string]string{"env": "test", "team": "e2e"},
+			Remove:   maputil.NewSet("old-tag"),
+			StagedAt: time.Now(),
+		}
+		err := store.StageTag(t.Context(), staging.ServiceParam, paramName, tagEntry)
+		require.NoError(t, err)
+
+		retrieved, err := store.GetTag(t.Context(), staging.ServiceParam, paramName)
+		require.NoError(t, err)
+		assert.Equal(t, "test", retrieved.Add["env"])
+		assert.Equal(t, "e2e", retrieved.Add["team"])
+		assert.True(t, retrieved.Remove.Contains("old-tag"))
+	})
+
+	// Test ListTags
+	t.Run("list-tags", func(t *testing.T) {
+		tags, err := store.ListTags(t.Context(), staging.ServiceParam)
+		require.NoError(t, err)
+		assert.Contains(t, tags[staging.ServiceParam], paramName)
+	})
+
+	// Test UnstageTag
+	t.Run("unstage-tag", func(t *testing.T) {
+		err := store.UnstageTag(t.Context(), staging.ServiceParam, paramName)
+		require.NoError(t, err)
+
+		_, err = store.GetTag(t.Context(), staging.ServiceParam, paramName)
+		assert.ErrorIs(t, err, staging.ErrNotStaged)
+	})
+
+	// Test GetTag for non-existent tag
+	t.Run("get-nonexistent-tag", func(t *testing.T) {
+		_, err := store.GetTag(t.Context(), staging.ServiceParam, "/nonexistent/param")
+		assert.ErrorIs(t, err, staging.ErrNotStaged)
+	})
+}
+
+// TestAgentStore_LoadAndWriteState tests Load and WriteState methods.
+func TestAgentStore_LoadAndWriteState(t *testing.T) {
+	setupEnv(t)
+	setupTempHome(t)
+
+	store := newStore()
+
+	// Clean up first
+	_ = store.UnstageAll(t.Context(), "")
+	t.Cleanup(func() {
+		_ = store.UnstageAll(t.Context(), "")
+	})
+
+	// Test Load with empty state
+	t.Run("load-empty-state", func(t *testing.T) {
+		state, err := store.Drain(t.Context(), true)
+		require.NoError(t, err)
+		assert.True(t, state.IsEmpty())
+	})
+
+	// Test WriteState
+	t.Run("write-state", func(t *testing.T) {
+		state := &staging.State{
+			Entries: map[staging.Service]map[string]staging.Entry{
+				staging.ServiceParam: {
+					"/suve-e2e-direct/write-state": {
+						Operation: staging.OperationUpdate,
+						Value:     lo.ToPtr("written-value"),
+						StagedAt:  time.Now(),
+					},
+				},
+			},
+			Tags: map[staging.Service]map[string]staging.TagEntry{},
+		}
+		err := store.WriteState(t.Context(), state)
+		require.NoError(t, err)
+
+		// Verify state was written
+		loaded, err := store.Drain(t.Context(), true)
+		require.NoError(t, err)
+		assert.NotNil(t, loaded.Entries[staging.ServiceParam]["/suve-e2e-direct/write-state"])
+	})
+
+	// Test Load with data
+	t.Run("load-with-data", func(t *testing.T) {
+		state, err := store.Drain(t.Context(), true)
+		require.NoError(t, err)
+		assert.False(t, state.IsEmpty())
+		entry := state.Entries[staging.ServiceParam]["/suve-e2e-direct/write-state"]
+		assert.Equal(t, "written-value", lo.FromPtr(entry.Value))
+	})
+}
+
+// TestAgentStore_DrainMethod tests the Drain method.
+func TestAgentStore_DrainMethod(t *testing.T) {
+	setupEnv(t)
+	setupTempHome(t)
+
+	store := newStore()
+	paramName := "/suve-e2e-direct/drain-test"
+
+	// Clean up first
+	_ = store.UnstageAll(t.Context(), "")
+	t.Cleanup(func() {
+		_ = store.UnstageAll(t.Context(), "")
+	})
+
+	// Stage some data first
+	err := store.StageEntry(t.Context(), staging.ServiceParam, paramName, staging.Entry{
+		Operation: staging.OperationUpdate,
+		Value:     lo.ToPtr("drain-value"),
+		StagedAt:  time.Now(),
+	})
+	require.NoError(t, err)
+
+	// Test Drain with keep=true
+	t.Run("drain-with-keep", func(t *testing.T) {
+		state, err := store.Drain(t.Context(), true)
+		require.NoError(t, err)
+		assert.NotNil(t, state.Entries[staging.ServiceParam][paramName])
+
+		// Data should still be there after drain with keep
+		entry, err := store.GetEntry(t.Context(), staging.ServiceParam, paramName)
+		require.NoError(t, err)
+		assert.Equal(t, "drain-value", lo.FromPtr(entry.Value))
+	})
+
+	// Test Drain with keep=false (clears memory)
+	t.Run("drain-without-keep", func(t *testing.T) {
+		state, err := store.Drain(t.Context(), false)
+		require.NoError(t, err)
+		assert.NotNil(t, state.Entries[staging.ServiceParam][paramName])
+
+		// Data should be gone after drain without keep
+		_, err = store.GetEntry(t.Context(), staging.ServiceParam, paramName)
+		assert.ErrorIs(t, err, staging.ErrNotStaged)
+	})
+
+	// Test Drain on empty state
+	t.Run("drain-empty", func(t *testing.T) {
+		state, err := store.Drain(t.Context(), false)
+		require.NoError(t, err)
+		assert.True(t, state.IsEmpty())
+	})
+}
+
+// TestAgentStore_UnstageAll tests UnstageAll with different service filters.
+func TestAgentStore_UnstageAll(t *testing.T) {
+	setupEnv(t)
+	setupTempHome(t)
+
+	store := newStore()
+
+	// Clean up first
+	_ = store.UnstageAll(t.Context(), "")
+	t.Cleanup(func() {
+		_ = store.UnstageAll(t.Context(), "")
+	})
+
+	// Stage entries for both services
+	_ = store.StageEntry(t.Context(), staging.ServiceParam, "/suve-e2e/unstage-all/param", staging.Entry{
+		Operation: staging.OperationUpdate,
+		Value:     lo.ToPtr("param-value"),
+		StagedAt:  time.Now(),
+	})
+	_ = store.StageEntry(t.Context(), staging.ServiceSecret, "suve-e2e/unstage-all/secret", staging.Entry{
+		Operation: staging.OperationUpdate,
+		Value:     lo.ToPtr("secret-value"),
+		StagedAt:  time.Now(),
+	})
+
+	// Test UnstageAll for specific service
+	t.Run("unstage-all-param", func(t *testing.T) {
+		err := store.UnstageAll(t.Context(), staging.ServiceParam)
+		require.NoError(t, err)
+
+		// Param should be gone
+		_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/suve-e2e/unstage-all/param")
+		assert.ErrorIs(t, err, staging.ErrNotStaged)
+
+		// Secret should still be there
+		entry, err := store.GetEntry(t.Context(), staging.ServiceSecret, "suve-e2e/unstage-all/secret")
+		require.NoError(t, err)
+		assert.Equal(t, "secret-value", lo.FromPtr(entry.Value))
+	})
+
+	// Test UnstageAll for all services
+	t.Run("unstage-all-services", func(t *testing.T) {
+		// Re-add param
+		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/suve-e2e/unstage-all/param", staging.Entry{
+			Operation: staging.OperationUpdate,
+			Value:     lo.ToPtr("param-value"),
+			StagedAt:  time.Now(),
+		})
+
+		// Unstage all services (empty string)
+		err := store.UnstageAll(t.Context(), "")
+		require.NoError(t, err)
+
+		// Both should be gone
+		_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/suve-e2e/unstage-all/param")
+		assert.ErrorIs(t, err, staging.ErrNotStaged)
+		_, err = store.GetEntry(t.Context(), staging.ServiceSecret, "suve-e2e/unstage-all/secret")
+		assert.ErrorIs(t, err, staging.ErrNotStaged)
+	})
+}
+
+// TestAgentStore_ListMethods tests ListEntries and ListTags with various states.
+func TestAgentStore_ListMethods(t *testing.T) {
+	setupEnv(t)
+	setupTempHome(t)
+
+	store := newStore()
+
+	// Clean up first
+	_ = store.UnstageAll(t.Context(), "")
+	t.Cleanup(func() {
+		_ = store.UnstageAll(t.Context(), "")
+	})
+
+	// Test ListEntries on empty state
+	t.Run("list-entries-empty", func(t *testing.T) {
+		entries, err := store.ListEntries(t.Context(), staging.ServiceParam)
+		require.NoError(t, err)
+		// Should return empty or nil map
+		assert.Empty(t, entries[staging.ServiceParam])
+	})
+
+	// Test ListTags on empty state
+	t.Run("list-tags-empty", func(t *testing.T) {
+		tags, err := store.ListTags(t.Context(), staging.ServiceParam)
+		require.NoError(t, err)
+		assert.Empty(t, tags[staging.ServiceParam])
+	})
+
+	// Stage multiple entries and tags
+	_ = store.StageEntry(t.Context(), staging.ServiceParam, "/suve-e2e/list/param1", staging.Entry{
+		Operation: staging.OperationCreate,
+		Value:     lo.ToPtr("value1"),
+		StagedAt:  time.Now(),
+	})
+	_ = store.StageEntry(t.Context(), staging.ServiceParam, "/suve-e2e/list/param2", staging.Entry{
+		Operation: staging.OperationUpdate,
+		Value:     lo.ToPtr("value2"),
+		StagedAt:  time.Now(),
+	})
+	_ = store.StageTag(t.Context(), staging.ServiceParam, "/suve-e2e/list/param1", staging.TagEntry{
+		Add:      map[string]string{"key": "value"},
+		StagedAt: time.Now(),
+	})
+
+	// Test ListEntries with multiple entries
+	t.Run("list-multiple-entries", func(t *testing.T) {
+		entries, err := store.ListEntries(t.Context(), staging.ServiceParam)
+		require.NoError(t, err)
+		assert.Len(t, entries[staging.ServiceParam], 2)
+		assert.Contains(t, entries[staging.ServiceParam], "/suve-e2e/list/param1")
+		assert.Contains(t, entries[staging.ServiceParam], "/suve-e2e/list/param2")
+	})
+
+	// Test ListTags
+	t.Run("list-tags-with-data", func(t *testing.T) {
+		tags, err := store.ListTags(t.Context(), staging.ServiceParam)
+		require.NoError(t, err)
+		assert.Contains(t, tags[staging.ServiceParam], "/suve-e2e/list/param1")
+	})
+
+	// Test ListEntries for all services (empty string)
+	t.Run("list-entries-all-services", func(t *testing.T) {
+		// Add a secret entry too
+		_ = store.StageEntry(t.Context(), staging.ServiceSecret, "suve-e2e/list/secret1", staging.Entry{
+			Operation: staging.OperationCreate,
+			Value:     lo.ToPtr("secret-value"),
+			StagedAt:  time.Now(),
+		})
+
+		entries, err := store.ListEntries(t.Context(), "")
+		require.NoError(t, err)
+		assert.NotEmpty(t, entries[staging.ServiceParam])
+		assert.NotEmpty(t, entries[staging.ServiceSecret])
+	})
+}
+
+// =============================================================================
+// Daemon Launcher Tests (for IPC coverage)
+// =============================================================================
+
+// TestDaemonLauncher_Ping tests the launcher Ping method directly.
+func TestDaemonLauncher_Ping(t *testing.T) {
+	setupEnv(t)
+	setupTempHome(t)
+
+	// Create launcher for the running test daemon
+	launcher := daemon.NewLauncher("000000000000", "us-east-1", daemon.WithAutoStartDisabled())
+
+	// Test Ping
+	t.Run("ping-success", func(t *testing.T) {
+		err := launcher.Ping()
+		require.NoError(t, err)
+	})
+
+	// Test multiple pings (concurrent access)
+	t.Run("ping-concurrent", func(t *testing.T) {
+		done := make(chan error, 10)
+		for i := 0; i < 10; i++ {
+			go func() {
+				done <- launcher.Ping()
+			}()
+		}
+		for i := 0; i < 10; i++ {
+			err := <-done
+			assert.NoError(t, err)
+		}
+	})
+}
+
+// TestDaemonLauncher_EnsureRunning tests the EnsureRunning method.
+func TestDaemonLauncher_EnsureRunning(t *testing.T) {
+	setupEnv(t)
+	setupTempHome(t)
+
+	// Create launcher for the running test daemon
+	launcher := daemon.NewLauncher("000000000000", "us-east-1", daemon.WithAutoStartDisabled())
+
+	// Test EnsureRunning (daemon is already running from TestMain)
+	t.Run("ensure-running-when-running", func(t *testing.T) {
+		err := launcher.EnsureRunning()
+		require.NoError(t, err)
+	})
+}
+
+// TestDaemonLauncher_ViaStore tests launcher IPC indirectly through store operations.
+// This exercises the SendRequest method via the store's methods.
+func TestDaemonLauncher_ViaStore(t *testing.T) {
+	setupEnv(t)
+	setupTempHome(t)
+
+	store := newStore()
+
+	// Clean up first
+	_ = store.UnstageAll(t.Context(), "")
+	t.Cleanup(func() {
+		_ = store.UnstageAll(t.Context(), "")
+	})
+
+	// Multiple sequential operations test IPC reliability
+	t.Run("multiple-sequential-ipc-calls", func(t *testing.T) {
+		for i := 0; i < 5; i++ {
+			err := store.StageEntry(t.Context(), staging.ServiceParam, "/suve-e2e/ipc-test", staging.Entry{
+				Operation: staging.OperationUpdate,
+				Value:     lo.ToPtr("test-value"),
+				StagedAt:  time.Now(),
+			})
+			require.NoError(t, err)
+
+			_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/suve-e2e/ipc-test")
+			require.NoError(t, err)
+
+			err = store.UnstageEntry(t.Context(), staging.ServiceParam, "/suve-e2e/ipc-test")
+			require.NoError(t, err)
+		}
+	})
+
+	// Load/WriteState tests additional protocol methods
+	t.Run("load-and-write-state-ipc", func(t *testing.T) {
+		state, err := store.Drain(t.Context(), true)
+		require.NoError(t, err)
+		assert.True(t, state.IsEmpty())
+
+		state.Entries = map[staging.Service]map[string]staging.Entry{
+			staging.ServiceParam: {
+				"/suve-e2e/ipc-write": {
+					Operation: staging.OperationCreate,
+					Value:     lo.ToPtr("ipc-value"),
+					StagedAt:  time.Now(),
+				},
+			},
+		}
+		err = store.WriteState(t.Context(), state)
+		require.NoError(t, err)
+
+		loaded, err := store.Drain(t.Context(), true)
+		require.NoError(t, err)
+		assert.NotNil(t, loaded.Entries[staging.ServiceParam]["/suve-e2e/ipc-write"])
+	})
+}
+
+// TestDaemonLauncher_NotRunning tests launcher behavior when daemon is not running.
+func TestDaemonLauncher_NotRunning(t *testing.T) {
+	setupEnv(t)
+	setupTempHome(t)
+
+	// Create launcher for a different account where no daemon is running
+	launcher := daemon.NewLauncher("999999999999", "ap-northeast-1", daemon.WithAutoStartDisabled())
+
+	// Test Ping fails when daemon not running
+	t.Run("ping-not-running", func(t *testing.T) {
+		err := launcher.Ping()
+		assert.Error(t, err)
+	})
+
+	// Test EnsureRunning fails when auto-start is disabled
+	t.Run("ensure-running-fails", func(t *testing.T) {
+		err := launcher.EnsureRunning()
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "auto-start is disabled")
+	})
+}
+
+// TestAgentStore_NotRunning tests store behavior when daemon is not running.
+func TestAgentStore_NotRunning(t *testing.T) {
+	setupEnv(t)
+	setupTempHome(t)
+
+	// Create store for a different account where no daemon is running
+	store := newStoreForAccount("999999999999", "ap-northeast-1")
+
+	// Test GetEntry fails when daemon not running
+	t.Run("get-entry-not-running", func(t *testing.T) {
+		_, err := store.GetEntry(t.Context(), staging.ServiceParam, "/test")
+		assert.Error(t, err)
+	})
+
+	// Test ListEntries fails when daemon not running
+	t.Run("list-entries-not-running", func(t *testing.T) {
+		_, err := store.ListEntries(t.Context(), staging.ServiceParam)
+		assert.Error(t, err)
 	})
 }

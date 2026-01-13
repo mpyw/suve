@@ -34,7 +34,9 @@ var testDaemon *daemon.Runner
 // TestMain sets up the staging agent daemon before running tests.
 func TestMain(m *testing.M) {
 	// Create isolated temp directory for socket path
-	tmpDir, err := os.MkdirTemp("", "suve-e2e-*")
+	// Use /tmp directly to avoid socket path length limit issues on macOS
+	// (macOS has a 104-byte limit for Unix socket paths)
+	tmpDir, err := os.MkdirTemp("/tmp", "suve-e2e-")
 	if err != nil {
 		output.Printf(os.Stderr, "failed to create temp dir: %v\n", err)
 		os.Exit(1)
@@ -137,6 +139,12 @@ func setupTempHome(t *testing.T) string {
 // localstack uses account ID "000000000000" and region "us-east-1".
 func newStore() store.AgentStore {
 	return agent.NewStore("000000000000", "us-east-1")
+}
+
+// newStoreForAccount creates a staging store for a specific account and region.
+// Used for testing error cases when daemon is not running for that account.
+func newStoreForAccount(accountID, region string) store.AgentStore {
+	return agent.NewStore(accountID, region)
 }
 
 // runCommand executes a CLI command and returns stdout, stderr, and error.
