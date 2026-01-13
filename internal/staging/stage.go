@@ -126,6 +126,50 @@ func NewEmptyState() *State {
 	}
 }
 
+// ExtractService returns a new state containing only entries for the specified service.
+// If service is empty, returns a clone of the entire state.
+func (s *State) ExtractService(service Service) *State {
+	if s == nil {
+		return NewEmptyState()
+	}
+	if service == "" {
+		// Clone entire state
+		result := NewEmptyState()
+		result.Merge(s)
+		return result
+	}
+	result := NewEmptyState()
+	if entries, ok := s.Entries[service]; ok {
+		maps.Copy(result.Entries[service], entries)
+	}
+	if tags, ok := s.Tags[service]; ok {
+		maps.Copy(result.Tags[service], tags)
+	}
+	return result
+}
+
+// RemoveService removes all entries for the specified service from this state.
+// If service is empty, clears all entries.
+func (s *State) RemoveService(service Service) {
+	if s == nil {
+		return
+	}
+	if service == "" {
+		// Clear all
+		s.Entries = map[Service]map[string]Entry{
+			ServiceParam:  make(map[string]Entry),
+			ServiceSecret: make(map[string]Entry),
+		}
+		s.Tags = map[Service]map[string]TagEntry{
+			ServiceParam:  make(map[string]TagEntry),
+			ServiceSecret: make(map[string]TagEntry),
+		}
+		return
+	}
+	s.Entries[service] = make(map[string]Entry)
+	s.Tags[service] = make(map[string]TagEntry)
+}
+
 // Service represents which AWS service the staged change belongs to.
 type Service string
 

@@ -69,6 +69,18 @@ func (s *Store) SetPassphrase(passphrase string) {
 	s.passphrase = passphrase
 }
 
+// Exists checks if the state file exists.
+func (s *Store) Exists() (bool, error) {
+	_, err := os.Stat(s.stateFilePath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return false, nil
+		}
+		return false, fmt.Errorf("failed to check state file: %w", err)
+	}
+	return true, nil
+}
+
 // IsEncrypted checks if the stored file is encrypted.
 func (s *Store) IsEncrypted() (bool, error) {
 	data, err := os.ReadFile(s.stateFilePath)

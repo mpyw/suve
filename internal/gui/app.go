@@ -114,9 +114,18 @@ func (a *App) getStagingStore() (store.ReadWriteOperator, error) {
 		return nil, err
 	}
 
-	store := agent.NewStore(identity.AccountID, identity.Region)
-	a.stagingStore = store
-	return store, nil
+	s := agent.NewStore(identity.AccountID, identity.Region)
+	a.stagingStore = s
+	return s, nil
+}
+
+func (a *App) getAgentStore() (store.AgentStore, error) {
+	identity, err := infra.GetAWSIdentity(a.ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return agent.NewStore(identity.AccountID, identity.Region), nil
 }
 
 func (a *App) getService(service string) (staging.Service, error) {

@@ -8,12 +8,13 @@ import (
 
 	"github.com/urfave/cli/v3"
 
-	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/cli/passphrase"
 	"github.com/mpyw/suve/internal/cli/terminal"
 	"github.com/mpyw/suve/internal/infra"
+	stgcli "github.com/mpyw/suve/internal/staging/cli"
 	"github.com/mpyw/suve/internal/staging/store/agent"
 	"github.com/mpyw/suve/internal/staging/store/file"
+	stagingusecase "github.com/mpyw/suve/internal/usecase/staging"
 )
 
 // Command returns the stage persist command.
@@ -50,18 +51,6 @@ EXAMPLES:
 			}
 
 			agentStore := agent.NewStore(identity.AccountID, identity.Region)
-			keep := cmd.Bool("keep")
-
-			// Drain state from agent (keep for now, will clear after successful file write if needed)
-			state, err := agentStore.Drain(ctx, true)
-			if err != nil {
-				return fmt.Errorf("failed to get state from agent: %w", err)
-			}
-
-			// Check if there's anything to persist
-			if state.IsEmpty() {
-				return errors.New("no staged changes to persist")
-			}
 
 			// Get passphrase
 			prompter := &passphrase.Prompter{
@@ -95,36 +84,18 @@ EXAMPLES:
 				return fmt.Errorf("failed to create file store: %w", err)
 			}
 
-			if err := fileStore.WriteState(ctx, state); err != nil {
-				return fmt.Errorf("failed to save state to file: %w", err)
+			r := &stgcli.PersistRunner{
+				UseCase: &stagingusecase.PersistUseCase{
+					AgentStore: agentStore,
+					FileStore:  fileStore,
+				},
+				Stdout:    cmd.Root().Writer,
+				Stderr:    cmd.Root().ErrWriter,
+				Encrypted: pass != "",
 			}
-
-			// Clear agent memory unless --keep is specified
-			encrypted := pass != ""
-			if !keep {
-				// Drain with keep=false to clear memory
-				if _, err := agentStore.Drain(ctx, false); err != nil {
-					return fmt.Errorf("failed to clear agent memory: %w", err)
-				}
-				if encrypted {
-					output.Println(cmd.Root().Writer, "Staged changes persisted to file (encrypted) and cleared from memory")
-				} else {
-					output.Println(cmd.Root().Writer, "Staged changes persisted to file and cleared from memory")
-				}
-			} else {
-				if encrypted {
-					output.Println(cmd.Root().Writer, "Staged changes persisted to file (encrypted, kept in memory)")
-				} else {
-					output.Println(cmd.Root().Writer, "Staged changes persisted to file (kept in memory)")
-				}
-			}
-
-			// Display warning about plain-text storage only if not encrypted
-			if !encrypted {
-				output.Warn(cmd.Root().ErrWriter, "Note: secrets are stored as plain text.")
-			}
-
-			return nil
+			return r.Run(ctx, stgcli.PersistOptions{
+				Keep: cmd.Bool("keep"),
+			})
 		},
 	}
 }

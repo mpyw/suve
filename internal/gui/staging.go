@@ -3,8 +3,10 @@
 package gui
 
 import (
+	"github.com/mpyw/suve/internal/infra"
 	"github.com/mpyw/suve/internal/maputil"
 	"github.com/mpyw/suve/internal/staging"
+	"github.com/mpyw/suve/internal/staging/store/file"
 	stagingusecase "github.com/mpyw/suve/internal/usecase/staging"
 )
 
@@ -646,5 +648,155 @@ func (a *App) StagingDiff(service string, name string) (*StagingDiffResult, erro
 		ItemName:   result.ItemName,
 		Entries:    entries,
 		TagEntries: tagEntries,
+	}, nil
+}
+
+// =============================================================================
+// Drain/Persist Types
+// =============================================================================
+
+// StagingDrainResult represents the result of draining from file to agent.
+type StagingDrainResult struct {
+	Merged     bool `json:"merged"`
+	EntryCount int  `json:"entryCount"`
+	TagCount   int  `json:"tagCount"`
+}
+
+// StagingPersistResult represents the result of persisting from agent to file.
+type StagingPersistResult struct {
+	EntryCount int `json:"entryCount"`
+	TagCount   int `json:"tagCount"`
+}
+
+// StagingFileStatusResult represents the status of the staging file.
+type StagingFileStatusResult struct {
+	Exists    bool `json:"exists"`
+	Encrypted bool `json:"encrypted"`
+}
+
+// =============================================================================
+// Drain/Persist Methods
+// =============================================================================
+
+// StagingFileStatus checks if the staging file exists and whether it's encrypted.
+func (a *App) StagingFileStatus() (*StagingFileStatusResult, error) {
+	identity, err := infra.GetAWSIdentity(a.ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	fileStore, err := file.NewStore(identity.AccountID, identity.Region)
+	if err != nil {
+		return nil, err
+	}
+
+	exists, err := fileStore.Exists()
+	if err != nil {
+		return nil, err
+	}
+
+	result := &StagingFileStatusResult{
+		Exists: exists,
+	}
+
+	if exists {
+		encrypted, err := fileStore.IsEncrypted()
+		if err != nil {
+			return nil, err
+		}
+		result.Encrypted = encrypted
+	}
+
+	return result, nil
+}
+
+// StagingDrain loads staged changes from file into agent memory.
+// If the file is encrypted, passphrase must be provided.
+func (a *App) StagingDrain(service string, passphrase string, keep bool, force bool, merge bool) (*StagingDrainResult, error) {
+	identity, err := infra.GetAWSIdentity(a.ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	fileStore, err := file.NewStoreWithPassphrase(identity.AccountID, identity.Region, passphrase)
+	if err != nil {
+		return nil, err
+	}
+
+	agentStore, err := a.getAgentStore()
+	if err != nil {
+		return nil, err
+	}
+
+	var svc staging.Service
+	if service != "" {
+		svc, err = a.getService(service)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	uc := &stagingusecase.DrainUseCase{
+		FileStore:  fileStore,
+		AgentStore: agentStore,
+	}
+	result, err := uc.Execute(a.ctx, stagingusecase.DrainInput{
+		Service: svc,
+		Keep:    keep,
+		Force:   force,
+		Merge:   merge,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return &StagingDrainResult{
+		Merged:     result.Merged,
+		EntryCount: result.EntryCount,
+		TagCount:   result.TagCount,
+	}, nil
+}
+
+// StagingPersist saves staged changes from agent memory to file.
+// If passphrase is provided, the file will be encrypted.
+func (a *App) StagingPersist(service string, passphrase string, keep bool) (*StagingPersistResult, error) {
+	identity, err := infra.GetAWSIdentity(a.ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	fileStore, err := file.NewStoreWithPassphrase(identity.AccountID, identity.Region, passphrase)
+	if err != nil {
+		return nil, err
+	}
+
+	agentStore, err := a.getAgentStore()
+	if err != nil {
+		return nil, err
+	}
+
+	var svc staging.Service
+	if service != "" {
+		svc, err = a.getService(service)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	uc := &stagingusecase.PersistUseCase{
+		AgentStore: agentStore,
+		FileStore:  fileStore,
+	}
+	result, err := uc.Execute(a.ctx, stagingusecase.PersistInput{
+		Service: svc,
+		Keep:    keep,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return &StagingPersistResult{
+		EntryCount: result.EntryCount,
+		TagCount:   result.TagCount,
 	}, nil
 }

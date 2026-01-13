@@ -8,13 +8,13 @@ import (
 
 	"github.com/urfave/cli/v3"
 
-	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/cli/passphrase"
 	"github.com/mpyw/suve/internal/cli/terminal"
 	"github.com/mpyw/suve/internal/infra"
-	"github.com/mpyw/suve/internal/staging"
+	stgcli "github.com/mpyw/suve/internal/staging/cli"
 	"github.com/mpyw/suve/internal/staging/store/agent"
 	"github.com/mpyw/suve/internal/staging/store/file"
+	stagingusecase "github.com/mpyw/suve/internal/usecase/staging"
 )
 
 // Command returns the stage drain command.
@@ -103,60 +103,21 @@ EXAMPLES:
 				return fmt.Errorf("failed to create file store: %w", err)
 			}
 
-			// Drain from file (keep file for now, we'll delete after successful agent write)
-			fileState, err := fileStore.Drain(ctx, true)
-			if err != nil {
-				return fmt.Errorf("failed to load state from file: %w", err)
-			}
-
-			// Check if there's anything to drain
-			if fileState.IsEmpty() {
-				return errors.New("no staged changes in file to drain")
-			}
-
 			agentStore := agent.NewStore(identity.AccountID, identity.Region)
-			force := cmd.Bool("force")
-			merge := cmd.Bool("merge")
-			keep := cmd.Bool("keep")
 
-			// Check if agent already has staged changes
-			agentState, err := agentStore.Drain(ctx, true) // keep=true to not clear yet
-			if err != nil {
-				// Agent might not be running, which is fine - treat as empty
-				agentState = staging.NewEmptyState()
+			r := &stgcli.DrainRunner{
+				UseCase: &stagingusecase.DrainUseCase{
+					FileStore:  fileStore,
+					AgentStore: agentStore,
+				},
+				Stdout: cmd.Root().Writer,
+				Stderr: cmd.Root().ErrWriter,
 			}
-
-			if !agentState.IsEmpty() && !force && !merge {
-				return errors.New("agent already has staged changes; use --force to overwrite or --merge to combine")
-			}
-
-			var finalState *staging.State
-			if merge && !agentState.IsEmpty() {
-				// Merge states: start with agent state, merge file state (file takes precedence)
-				finalState = agentState
-				finalState.Merge(fileState)
-			} else {
-				// Use file state directly
-				finalState = fileState
-			}
-
-			// Set state in agent
-			if err := agentStore.WriteState(ctx, finalState); err != nil {
-				return fmt.Errorf("failed to set state in agent: %w", err)
-			}
-
-			// Delete file unless --keep is specified
-			if !keep {
-				// Drain again with keep=false to delete the file
-				if _, err := fileStore.Drain(ctx, false); err != nil {
-					output.Printf(cmd.Root().ErrWriter, "Warning: failed to delete file: %v\n", err)
-				}
-				output.Println(cmd.Root().Writer, "Staged changes loaded from file and file deleted")
-			} else {
-				output.Println(cmd.Root().Writer, "Staged changes loaded from file (file kept)")
-			}
-
-			return nil
+			return r.Run(ctx, stgcli.DrainOptions{
+				Keep:  cmd.Bool("keep"),
+				Force: cmd.Bool("force"),
+				Merge: cmd.Bool("merge"),
+			})
 		},
 	}
 }
