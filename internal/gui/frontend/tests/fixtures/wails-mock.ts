@@ -640,7 +640,7 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
         paramTags: state.stagedParamTags,
         secretTags: state.stagedSecretTags,
       }),
-      StagingDiff: async (service: string) => {
+      StagingDiff: async (service: string, _passphrase?: string) => {
         const staged = service === 'param' ? state.stagedParam : state.stagedSecret;
         const tagStaged = service === 'param' ? state.stagedParamTags : state.stagedSecretTags;
         return {
@@ -713,7 +713,7 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
         }
         return { name };
       },
-      StagingDelete: async (service: string, name: string) => {
+      StagingDelete: async (service: string, name: string, _keepCurrentValue?: boolean, _currentVersion?: number) => {
         const staged = service === 'param' ? state.stagedParam : state.stagedSecret;
         staged.push({ name, operation: 'delete' });
         return { name };
@@ -763,6 +763,15 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
           entry.removeTags = entry.removeTags.filter((k: string) => k !== key);
         }
         return { name };
+      },
+      StagingFileStatus: async () => {
+        return { exists: false, encrypted: false };
+      },
+      StagingPersist: async (_service: string, _passphrase: string, _keep: boolean) => {
+        return { filePath: '/tmp/staging.json', entryCount: 0, tagCount: 0, encrypted: false };
+      },
+      StagingDrain: async (_service: string, _passphrase: string, _keep: boolean, _force: boolean, _merge: boolean) => {
+        return { entryCount: 0, tagCount: 0, merged: false };
       },
       StagingCheckStatus: async (service: string, name: string) => {
         const staged = service === 'param' ? state.stagedParam : state.stagedSecret;
