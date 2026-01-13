@@ -288,3 +288,32 @@ func TestIndent(t *testing.T) {
 		})
 	}
 }
+
+func TestWarn(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
+	Warn(&buf, "warning %s", "message")
+	assert.Contains(t, buf.String(), "!")
+	assert.Contains(t, buf.String(), "warning message")
+}
+
+func TestPrint(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
+	Print(&buf, "hello")
+	assert.Equal(t, "hello", buf.String())
+}
+
+func TestPrintln(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
+	Println(&buf, "hello")
+	assert.Equal(t, "hello\n", buf.String())
+}
+
+func TestPrintf(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
+	Printf(&buf, "hello %s %d", "world", 42)
+	assert.Equal(t, "hello world 42", buf.String())
+}
