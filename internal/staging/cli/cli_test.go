@@ -2201,10 +2201,10 @@ func TestResetRunner_Skipped(t *testing.T) {
 }
 
 // =============================================================================
-// DrainRunner Tests
+// StashPopRunner Tests
 // =============================================================================
 
-func TestDrainRunner_Run(t *testing.T) {
+func TestStashPopRunner_Run(t *testing.T) {
 	t.Parallel()
 
 	t.Run("drain success - file to agent", func(t *testing.T) {
@@ -2221,7 +2221,7 @@ func TestDrainRunner_Run(t *testing.T) {
 		})
 
 		var stdout, stderr bytes.Buffer
-		r := &cli.DrainRunner{
+		r := &cli.StashPopRunner{
 			UseCase: &stagingusecase.DrainUseCase{
 				FileStore:  fileStore,
 				AgentStore: agentStore,
@@ -2230,9 +2230,9 @@ func TestDrainRunner_Run(t *testing.T) {
 			Stderr: &stderr,
 		}
 
-		err := r.Run(t.Context(), cli.DrainOptions{})
+		err := r.Run(t.Context(), cli.StashPopOptions{})
 		require.NoError(t, err)
-		assert.Contains(t, stdout.String(), "Staged changes loaded from file and file deleted")
+		assert.Contains(t, stdout.String(), "Stashed changes restored and file deleted")
 
 		// Verify entry was moved to agent
 		entry, err := agentStore.GetEntry(t.Context(), staging.ServiceParam, "/app/config")
@@ -2257,7 +2257,7 @@ func TestDrainRunner_Run(t *testing.T) {
 		})
 
 		var stdout, stderr bytes.Buffer
-		r := &cli.DrainRunner{
+		r := &cli.StashPopRunner{
 			UseCase: &stagingusecase.DrainUseCase{
 				FileStore:  fileStore,
 				AgentStore: agentStore,
@@ -2266,7 +2266,7 @@ func TestDrainRunner_Run(t *testing.T) {
 			Stderr: &stderr,
 		}
 
-		err := r.Run(t.Context(), cli.DrainOptions{Keep: true})
+		err := r.Run(t.Context(), cli.StashPopOptions{Keep: true})
 		require.NoError(t, err)
 		assert.Contains(t, stdout.String(), "file kept")
 
@@ -2298,7 +2298,7 @@ func TestDrainRunner_Run(t *testing.T) {
 		})
 
 		var stdout, stderr bytes.Buffer
-		r := &cli.DrainRunner{
+		r := &cli.StashPopRunner{
 			UseCase: &stagingusecase.DrainUseCase{
 				FileStore:  fileStore,
 				AgentStore: agentStore,
@@ -2307,7 +2307,7 @@ func TestDrainRunner_Run(t *testing.T) {
 			Stderr: &stderr,
 		}
 
-		err := r.Run(t.Context(), cli.DrainOptions{Merge: true})
+		err := r.Run(t.Context(), cli.StashPopOptions{Merge: true})
 		require.NoError(t, err)
 		assert.Contains(t, stdout.String(), "merged")
 
@@ -2339,7 +2339,7 @@ func TestDrainRunner_Run(t *testing.T) {
 		})
 
 		var stdout, stderr bytes.Buffer
-		r := &cli.DrainRunner{
+		r := &cli.StashPopRunner{
 			UseCase: &stagingusecase.DrainUseCase{
 				FileStore:  fileStore,
 				AgentStore: agentStore,
@@ -2348,7 +2348,7 @@ func TestDrainRunner_Run(t *testing.T) {
 			Stderr: &stderr,
 		}
 
-		err := r.Run(t.Context(), cli.DrainOptions{Merge: true, Keep: true})
+		err := r.Run(t.Context(), cli.StashPopOptions{Merge: true, Keep: true})
 		require.NoError(t, err)
 		assert.Contains(t, stdout.String(), "merged")
 		assert.Contains(t, stdout.String(), "file kept")
@@ -2371,7 +2371,7 @@ func TestDrainRunner_Run(t *testing.T) {
 		agentStore := testutil.NewMockStore()
 
 		var stdout, stderr bytes.Buffer
-		r := &cli.DrainRunner{
+		r := &cli.StashPopRunner{
 			UseCase: &stagingusecase.DrainUseCase{
 				FileStore:  fileStore,
 				AgentStore: agentStore,
@@ -2380,7 +2380,7 @@ func TestDrainRunner_Run(t *testing.T) {
 			Stderr: &stderr,
 		}
 
-		err := r.Run(t.Context(), cli.DrainOptions{})
+		err := r.Run(t.Context(), cli.StashPopOptions{})
 		assert.Error(t, err)
 		assert.ErrorIs(t, err, stagingusecase.ErrNothingToDrain)
 	})
@@ -2406,7 +2406,7 @@ func TestDrainRunner_Run(t *testing.T) {
 		})
 
 		var stdout, stderr bytes.Buffer
-		r := &cli.DrainRunner{
+		r := &cli.StashPopRunner{
 			UseCase: &stagingusecase.DrainUseCase{
 				FileStore:  fileStore,
 				AgentStore: agentStore,
@@ -2415,7 +2415,7 @@ func TestDrainRunner_Run(t *testing.T) {
 			Stderr: &stderr,
 		}
 
-		err := r.Run(t.Context(), cli.DrainOptions{})
+		err := r.Run(t.Context(), cli.StashPopOptions{})
 		assert.Error(t, err)
 		assert.ErrorIs(t, err, stagingusecase.ErrAgentHasChanges)
 	})
@@ -2441,7 +2441,7 @@ func TestDrainRunner_Run(t *testing.T) {
 		})
 
 		var stdout, stderr bytes.Buffer
-		r := &cli.DrainRunner{
+		r := &cli.StashPopRunner{
 			UseCase: &stagingusecase.DrainUseCase{
 				FileStore:  fileStore,
 				AgentStore: agentStore,
@@ -2450,7 +2450,7 @@ func TestDrainRunner_Run(t *testing.T) {
 			Stderr: &stderr,
 		}
 
-		err := r.Run(t.Context(), cli.DrainOptions{Force: true})
+		err := r.Run(t.Context(), cli.StashPopOptions{Force: true})
 		require.NoError(t, err)
 
 		// With force, file content replaces agent content
@@ -2477,7 +2477,7 @@ func TestDrainRunner_Run(t *testing.T) {
 		})
 
 		var stdout, stderr bytes.Buffer
-		r := &cli.DrainRunner{
+		r := &cli.StashPopRunner{
 			UseCase: &stagingusecase.DrainUseCase{
 				FileStore:  fileStore,
 				AgentStore: agentStore,
@@ -2487,7 +2487,7 @@ func TestDrainRunner_Run(t *testing.T) {
 		}
 
 		// Only drain param service
-		err := r.Run(t.Context(), cli.DrainOptions{Service: staging.ServiceParam})
+		err := r.Run(t.Context(), cli.StashPopOptions{Service: staging.ServiceParam})
 		require.NoError(t, err)
 
 		// Param should be in agent
@@ -2512,7 +2512,7 @@ func TestDrainRunner_Run(t *testing.T) {
 		})
 
 		var stdout, stderr bytes.Buffer
-		r := &cli.DrainRunner{
+		r := &cli.StashPopRunner{
 			UseCase: &stagingusecase.DrainUseCase{
 				FileStore:  fileStore,
 				AgentStore: agentStore,
@@ -2525,17 +2525,17 @@ func TestDrainRunner_Run(t *testing.T) {
 		// First drain succeeds (loads state), but second drain (to delete) will fail
 		// We need to trigger the non-fatal path by making the final Drain fail
 
-		err := r.Run(t.Context(), cli.DrainOptions{Keep: true})
+		err := r.Run(t.Context(), cli.StashPopOptions{Keep: true})
 		require.NoError(t, err)
 		// Just verify the normal path works - the non-fatal error path requires more complex mocking
 	})
 }
 
 // =============================================================================
-// PersistRunner Tests
+// StashPushRunner Tests
 // =============================================================================
 
-func TestPersistRunner_Run(t *testing.T) {
+func TestStashPushRunner_Run(t *testing.T) {
 	t.Parallel()
 
 	t.Run("persist success - agent to file", func(t *testing.T) {
@@ -2552,7 +2552,7 @@ func TestPersistRunner_Run(t *testing.T) {
 		})
 
 		var stdout, stderr bytes.Buffer
-		r := &cli.PersistRunner{
+		r := &cli.StashPushRunner{
 			UseCase: &stagingusecase.PersistUseCase{
 				AgentStore: agentStore,
 				FileStore:  fileStore,
@@ -2561,9 +2561,9 @@ func TestPersistRunner_Run(t *testing.T) {
 			Stderr: &stderr,
 		}
 
-		err := r.Run(t.Context(), cli.PersistOptions{})
+		err := r.Run(t.Context(), cli.StashPushOptions{})
 		require.NoError(t, err)
-		assert.Contains(t, stdout.String(), "Staged changes persisted to file and cleared from memory")
+		assert.Contains(t, stdout.String(), "Staged changes stashed to file and cleared from memory")
 		assert.Contains(t, stderr.String(), "plain text") // Warning about plain text storage
 
 		// Verify entry was moved to file
@@ -2589,7 +2589,7 @@ func TestPersistRunner_Run(t *testing.T) {
 		})
 
 		var stdout, stderr bytes.Buffer
-		r := &cli.PersistRunner{
+		r := &cli.StashPushRunner{
 			UseCase: &stagingusecase.PersistUseCase{
 				AgentStore: agentStore,
 				FileStore:  fileStore,
@@ -2598,7 +2598,7 @@ func TestPersistRunner_Run(t *testing.T) {
 			Stderr: &stderr,
 		}
 
-		err := r.Run(t.Context(), cli.PersistOptions{Keep: true})
+		err := r.Run(t.Context(), cli.StashPushOptions{Keep: true})
 		require.NoError(t, err)
 		assert.Contains(t, stdout.String(), "kept in memory")
 
@@ -2622,7 +2622,7 @@ func TestPersistRunner_Run(t *testing.T) {
 		})
 
 		var stdout, stderr bytes.Buffer
-		r := &cli.PersistRunner{
+		r := &cli.StashPushRunner{
 			UseCase: &stagingusecase.PersistUseCase{
 				AgentStore: agentStore,
 				FileStore:  fileStore,
@@ -2632,7 +2632,7 @@ func TestPersistRunner_Run(t *testing.T) {
 			Encrypted: true,
 		}
 
-		err := r.Run(t.Context(), cli.PersistOptions{})
+		err := r.Run(t.Context(), cli.StashPushOptions{})
 		require.NoError(t, err)
 		assert.Contains(t, stdout.String(), "encrypted")
 		assert.NotContains(t, stderr.String(), "plain text") // No warning when encrypted
@@ -2645,7 +2645,7 @@ func TestPersistRunner_Run(t *testing.T) {
 		fileStore := testutil.NewMockStore()
 
 		var stdout, stderr bytes.Buffer
-		r := &cli.PersistRunner{
+		r := &cli.StashPushRunner{
 			UseCase: &stagingusecase.PersistUseCase{
 				AgentStore: agentStore,
 				FileStore:  fileStore,
@@ -2654,7 +2654,7 @@ func TestPersistRunner_Run(t *testing.T) {
 			Stderr: &stderr,
 		}
 
-		err := r.Run(t.Context(), cli.PersistOptions{})
+		err := r.Run(t.Context(), cli.StashPushOptions{})
 		assert.Error(t, err)
 		assert.ErrorIs(t, err, stagingusecase.ErrNothingToPersist)
 	})
@@ -2678,7 +2678,7 @@ func TestPersistRunner_Run(t *testing.T) {
 		})
 
 		var stdout, stderr bytes.Buffer
-		r := &cli.PersistRunner{
+		r := &cli.StashPushRunner{
 			UseCase: &stagingusecase.PersistUseCase{
 				AgentStore: agentStore,
 				FileStore:  fileStore,
@@ -2688,7 +2688,7 @@ func TestPersistRunner_Run(t *testing.T) {
 		}
 
 		// Only persist param service
-		err := r.Run(t.Context(), cli.PersistOptions{Service: staging.ServiceParam})
+		err := r.Run(t.Context(), cli.StashPushOptions{Service: staging.ServiceParam})
 		require.NoError(t, err)
 
 		// Param should be in file
@@ -2713,7 +2713,7 @@ func TestPersistRunner_Run(t *testing.T) {
 		})
 
 		var stdout, stderr bytes.Buffer
-		r := &cli.PersistRunner{
+		r := &cli.StashPushRunner{
 			UseCase: &stagingusecase.PersistUseCase{
 				AgentStore: agentStore,
 				FileStore:  fileStore,
@@ -2723,7 +2723,7 @@ func TestPersistRunner_Run(t *testing.T) {
 			Encrypted: true,
 		}
 
-		err := r.Run(t.Context(), cli.PersistOptions{Keep: true})
+		err := r.Run(t.Context(), cli.StashPushOptions{Keep: true})
 		require.NoError(t, err)
 		assert.Contains(t, stdout.String(), "encrypted, kept in memory")
 	})

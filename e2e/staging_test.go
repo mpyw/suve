@@ -726,7 +726,7 @@ func TestAgentStore_LoadAndWriteState(t *testing.T) {
 
 	// Test Load with empty state
 	t.Run("load-empty-state", func(t *testing.T) {
-		state, err := store.Drain(t.Context(), true)
+		state, err := store.Drain(t.Context(), "", true)
 		require.NoError(t, err)
 		assert.True(t, state.IsEmpty())
 	})
@@ -745,18 +745,18 @@ func TestAgentStore_LoadAndWriteState(t *testing.T) {
 			},
 			Tags: map[staging.Service]map[string]staging.TagEntry{},
 		}
-		err := store.WriteState(t.Context(), state)
+		err := store.WriteState(t.Context(), "", state)
 		require.NoError(t, err)
 
 		// Verify state was written
-		loaded, err := store.Drain(t.Context(), true)
+		loaded, err := store.Drain(t.Context(), "", true)
 		require.NoError(t, err)
 		assert.NotNil(t, loaded.Entries[staging.ServiceParam]["/suve-e2e-direct/write-state"])
 	})
 
 	// Test Load with data
 	t.Run("load-with-data", func(t *testing.T) {
-		state, err := store.Drain(t.Context(), true)
+		state, err := store.Drain(t.Context(), "", true)
 		require.NoError(t, err)
 		assert.False(t, state.IsEmpty())
 		entry := state.Entries[staging.ServiceParam]["/suve-e2e-direct/write-state"]
@@ -788,7 +788,7 @@ func TestAgentStore_DrainMethod(t *testing.T) {
 
 	// Test Drain with keep=true
 	t.Run("drain-with-keep", func(t *testing.T) {
-		state, err := store.Drain(t.Context(), true)
+		state, err := store.Drain(t.Context(), "", true)
 		require.NoError(t, err)
 		assert.NotNil(t, state.Entries[staging.ServiceParam][paramName])
 
@@ -800,7 +800,7 @@ func TestAgentStore_DrainMethod(t *testing.T) {
 
 	// Test Drain with keep=false (clears memory)
 	t.Run("drain-without-keep", func(t *testing.T) {
-		state, err := store.Drain(t.Context(), false)
+		state, err := store.Drain(t.Context(), "", false)
 		require.NoError(t, err)
 		assert.NotNil(t, state.Entries[staging.ServiceParam][paramName])
 
@@ -811,7 +811,7 @@ func TestAgentStore_DrainMethod(t *testing.T) {
 
 	// Test Drain on empty state
 	t.Run("drain-empty", func(t *testing.T) {
-		state, err := store.Drain(t.Context(), false)
+		state, err := store.Drain(t.Context(), "", false)
 		require.NoError(t, err)
 		assert.True(t, state.IsEmpty())
 	})
@@ -1036,7 +1036,7 @@ func TestDaemonLauncher_ViaStore(t *testing.T) {
 
 	// Load/WriteState tests additional protocol methods
 	t.Run("load-and-write-state-ipc", func(t *testing.T) {
-		state, err := store.Drain(t.Context(), true)
+		state, err := store.Drain(t.Context(), "", true)
 		require.NoError(t, err)
 		assert.True(t, state.IsEmpty())
 
@@ -1049,10 +1049,10 @@ func TestDaemonLauncher_ViaStore(t *testing.T) {
 				},
 			},
 		}
-		err = store.WriteState(t.Context(), state)
+		err = store.WriteState(t.Context(), "", state)
 		require.NoError(t, err)
 
-		loaded, err := store.Drain(t.Context(), true)
+		loaded, err := store.Drain(t.Context(), "", true)
 		require.NoError(t, err)
 		assert.NotNil(t, loaded.Entries[staging.ServiceParam]["/suve-e2e/ipc-write"])
 	})

@@ -122,7 +122,7 @@ func TestStore_Drain(t *testing.T) {
 		path := filepath.Join(tmpDir, "stage.json")
 		store := file.NewStoreWithPath(path)
 
-		state, err := store.Drain(t.Context(), true)
+		state, err := store.Drain(t.Context(), "", true)
 		require.NoError(t, err)
 		assert.True(t, state.IsEmpty())
 	})
@@ -148,7 +148,7 @@ func TestStore_Drain(t *testing.T) {
 		require.NoError(t, err)
 
 		store := file.NewStoreWithPath(path)
-		state, err := store.Drain(t.Context(), true)
+		state, err := store.Drain(t.Context(), "", true)
 		require.NoError(t, err)
 
 		assert.Equal(t, 2, state.Version)
@@ -172,7 +172,7 @@ func TestStore_Drain(t *testing.T) {
 		require.NoError(t, err)
 
 		store := file.NewStoreWithPath(path)
-		_, err = store.Drain(t.Context(), false)
+		_, err = store.Drain(t.Context(), "", false)
 		require.NoError(t, err)
 
 		// File should be deleted
@@ -197,7 +197,7 @@ func TestStore_Drain(t *testing.T) {
 		store := file.NewStoreWithPath(path)
 		store.SetPassphrase("mypassword")
 
-		state, err := store.Drain(t.Context(), true)
+		state, err := store.Drain(t.Context(), "", true)
 		require.NoError(t, err)
 		assert.Equal(t, "secret", lo.FromPtr(state.Entries[staging.ServiceParam]["/test"].Value))
 	})
@@ -215,7 +215,7 @@ func TestStore_Drain(t *testing.T) {
 		require.NoError(t, err)
 
 		store := file.NewStoreWithPath(path)
-		_, err = store.Drain(t.Context(), true)
+		_, err = store.Drain(t.Context(), "", true)
 		assert.ErrorIs(t, err, crypt.ErrDecryptionFailed)
 	})
 }
@@ -236,7 +236,7 @@ func TestStore_Persist(t *testing.T) {
 			Value:     lo.ToPtr("test-value"),
 		}
 
-		err := store.WriteState(t.Context(), state)
+		err := store.WriteState(t.Context(), "", state)
 		require.NoError(t, err)
 
 		// File should exist
@@ -244,7 +244,7 @@ func TestStore_Persist(t *testing.T) {
 		assert.NoError(t, err)
 
 		// Read back and verify
-		readState, err := store.Drain(t.Context(), true)
+		readState, err := store.Drain(t.Context(), "", true)
 		require.NoError(t, err)
 		assert.Equal(t, "test-value", lo.FromPtr(readState.Entries[staging.ServiceParam]["/app/config"].Value))
 	})
@@ -262,12 +262,12 @@ func TestStore_Persist(t *testing.T) {
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("test"),
 		}
-		err := store.WriteState(t.Context(), state)
+		err := store.WriteState(t.Context(), "", state)
 		require.NoError(t, err)
 
 		// Then persist empty state
 		emptyState := staging.NewEmptyState()
-		err = store.WriteState(t.Context(), emptyState)
+		err = store.WriteState(t.Context(), "", emptyState)
 		require.NoError(t, err)
 
 		// File should be removed
@@ -289,7 +289,7 @@ func TestStore_Persist(t *testing.T) {
 			Value:     lo.ToPtr("encrypted-value"),
 		}
 
-		err := store.WriteState(t.Context(), state)
+		err := store.WriteState(t.Context(), "", state)
 		require.NoError(t, err)
 
 		// File should be encrypted
@@ -298,7 +298,7 @@ func TestStore_Persist(t *testing.T) {
 		assert.True(t, isEnc)
 
 		// Should be able to drain with same passphrase
-		readState, err := store.Drain(t.Context(), true)
+		readState, err := store.Drain(t.Context(), "", true)
 		require.NoError(t, err)
 		assert.Equal(t, "encrypted-value", lo.FromPtr(readState.Entries[staging.ServiceParam]["/app/secret"].Value))
 	})

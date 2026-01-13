@@ -8,12 +8,24 @@ import (
 	"github.com/mpyw/suve/internal/staging/store"
 )
 
+// PersistMode determines how to handle existing stash file.
+type PersistMode int
+
+const (
+	// PersistModeOverwrite replaces the existing stash file.
+	PersistModeOverwrite PersistMode = iota
+	// PersistModeMerge merges with the existing stash file.
+	PersistModeMerge
+)
+
 // PersistInput holds input for the persist use case.
 type PersistInput struct {
 	// Service filters the persist to a specific service. Empty means all services.
 	Service staging.Service
 	// Keep preserves the agent memory after persisting.
 	Keep bool
+	// Mode determines how to handle existing stash file.
+	Mode PersistMode
 }
 
 // PersistOutput holds the result of the persist use case.
@@ -33,7 +45,7 @@ type PersistUseCase struct {
 // Execute runs the persist use case.
 func (u *PersistUseCase) Execute(ctx context.Context, input PersistInput) (*PersistOutput, error) {
 	// Drain state from agent (keep for now, will clear after successful file write if needed)
-	agentState, err := u.AgentStore.Drain(ctx, true)
+	agentState, err := u.AgentStore.Drain(ctx, "", true)
 	if err != nil {
 		return nil, &PersistError{Op: "load", Err: err}
 	}
@@ -46,17 +58,19 @@ func (u *PersistUseCase) Execute(ctx context.Context, input PersistInput) (*Pers
 		return nil, ErrNothingToPersist
 	}
 
-	// Load existing file state to merge with (for service-specific persist)
+	// Load existing file state to merge with (for merge mode or service-specific persist)
 	var finalState *staging.State
-	if input.Service != "" {
-		// Service-specific: merge with existing file state for other services
-		fileState, err := u.FileStore.Drain(ctx, true)
+	if input.Mode == PersistModeMerge || input.Service != "" {
+		// Merge mode or service-specific: merge with existing file state
+		fileState, err := u.FileStore.Drain(ctx, "", true)
 		if err != nil {
 			// File might not exist, which is fine - start fresh
 			fileState = staging.NewEmptyState()
 		}
 		finalState = fileState
-		finalState.RemoveService(input.Service) // Clear the target service
+		if input.Service != "" {
+			finalState.RemoveService(input.Service) // Clear the target service only
+		}
 		finalState.Merge(persistState)
 	} else {
 		// Replace all: use agent state directly
@@ -64,7 +78,7 @@ func (u *PersistUseCase) Execute(ctx context.Context, input PersistInput) (*Pers
 	}
 
 	// Write to file
-	if err := u.FileStore.WriteState(ctx, finalState); err != nil {
+	if err := u.FileStore.WriteState(ctx, "", finalState); err != nil {
 		return nil, &PersistError{Op: "write", Err: err}
 	}
 
@@ -87,12 +101,12 @@ func (u *PersistUseCase) Execute(ctx context.Context, input PersistInput) (*Pers
 		if input.Service != "" {
 			// Remove only the persisted service from agent, keep the rest
 			agentState.RemoveService(input.Service)
-			if err := u.AgentStore.WriteState(ctx, agentState); err != nil {
+			if err := u.AgentStore.WriteState(ctx, "", agentState); err != nil {
 				return output, &PersistError{Op: "clear", Err: err, NonFatal: true}
 			}
 		} else {
 			// Drain with keep=false to clear all memory
-			if _, err := u.AgentStore.Drain(ctx, false); err != nil {
+			if _, err := u.AgentStore.Drain(ctx, "", false); err != nil {
 				return output, &PersistError{Op: "clear", Err: err, NonFatal: true}
 			}
 		}

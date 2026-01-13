@@ -15,10 +15,10 @@ import (
 	stagingusecase "github.com/mpyw/suve/internal/usecase/staging"
 )
 
-func TestDrainRunner_Run(t *testing.T) {
+func TestStashPopRunner_Run(t *testing.T) {
 	t.Parallel()
 
-	t.Run("success - basic drain", func(t *testing.T) {
+	t.Run("success - basic stash pop", func(t *testing.T) {
 		t.Parallel()
 
 		fileStore := testutil.NewMockStore()
@@ -33,7 +33,7 @@ func TestDrainRunner_Run(t *testing.T) {
 		stdout := &bytes.Buffer{}
 		stderr := &bytes.Buffer{}
 
-		runner := &DrainRunner{
+		runner := &StashPopRunner{
 			UseCase: &stagingusecase.DrainUseCase{
 				FileStore:  fileStore,
 				AgentStore: agentStore,
@@ -42,13 +42,13 @@ func TestDrainRunner_Run(t *testing.T) {
 			Stderr: stderr,
 		}
 
-		err := runner.Run(t.Context(), DrainOptions{})
+		err := runner.Run(t.Context(), StashPopOptions{})
 		require.NoError(t, err)
-		assert.Contains(t, stdout.String(), "Staged changes loaded from file")
+		assert.Contains(t, stdout.String(), "Stashed changes restored")
 		assert.Contains(t, stdout.String(), "file deleted")
 	})
 
-	t.Run("success - drain with keep", func(t *testing.T) {
+	t.Run("success - stash pop with keep", func(t *testing.T) {
 		t.Parallel()
 
 		fileStore := testutil.NewMockStore()
@@ -63,7 +63,7 @@ func TestDrainRunner_Run(t *testing.T) {
 		stdout := &bytes.Buffer{}
 		stderr := &bytes.Buffer{}
 
-		runner := &DrainRunner{
+		runner := &StashPopRunner{
 			UseCase: &stagingusecase.DrainUseCase{
 				FileStore:  fileStore,
 				AgentStore: agentStore,
@@ -72,12 +72,12 @@ func TestDrainRunner_Run(t *testing.T) {
 			Stderr: stderr,
 		}
 
-		err := runner.Run(t.Context(), DrainOptions{Keep: true})
+		err := runner.Run(t.Context(), StashPopOptions{Keep: true})
 		require.NoError(t, err)
 		assert.Contains(t, stdout.String(), "file kept")
 	})
 
-	t.Run("success - drain with merge", func(t *testing.T) {
+	t.Run("success - stash pop with merge", func(t *testing.T) {
 		t.Parallel()
 
 		fileStore := testutil.NewMockStore()
@@ -97,7 +97,7 @@ func TestDrainRunner_Run(t *testing.T) {
 		stdout := &bytes.Buffer{}
 		stderr := &bytes.Buffer{}
 
-		runner := &DrainRunner{
+		runner := &StashPopRunner{
 			UseCase: &stagingusecase.DrainUseCase{
 				FileStore:  fileStore,
 				AgentStore: agentStore,
@@ -106,12 +106,12 @@ func TestDrainRunner_Run(t *testing.T) {
 			Stderr: stderr,
 		}
 
-		err := runner.Run(t.Context(), DrainOptions{Merge: true})
+		err := runner.Run(t.Context(), StashPopOptions{Merge: true})
 		require.NoError(t, err)
 		assert.Contains(t, stdout.String(), "merged")
 	})
 
-	t.Run("error - nothing to drain", func(t *testing.T) {
+	t.Run("error - nothing to pop", func(t *testing.T) {
 		t.Parallel()
 
 		fileStore := testutil.NewMockStore()
@@ -120,7 +120,7 @@ func TestDrainRunner_Run(t *testing.T) {
 		stdout := &bytes.Buffer{}
 		stderr := &bytes.Buffer{}
 
-		runner := &DrainRunner{
+		runner := &StashPopRunner{
 			UseCase: &stagingusecase.DrainUseCase{
 				FileStore:  fileStore,
 				AgentStore: agentStore,
@@ -129,7 +129,7 @@ func TestDrainRunner_Run(t *testing.T) {
 			Stderr: stderr,
 		}
 
-		err := runner.Run(t.Context(), DrainOptions{})
+		err := runner.Run(t.Context(), StashPopOptions{})
 		assert.ErrorIs(t, err, stagingusecase.ErrNothingToDrain)
 	})
 
@@ -153,7 +153,7 @@ func TestDrainRunner_Run(t *testing.T) {
 		stdout := &bytes.Buffer{}
 		stderr := &bytes.Buffer{}
 
-		runner := &DrainRunner{
+		runner := &StashPopRunner{
 			UseCase: &stagingusecase.DrainUseCase{
 				FileStore:  fileStore,
 				AgentStore: agentStore,
@@ -162,7 +162,7 @@ func TestDrainRunner_Run(t *testing.T) {
 			Stderr: stderr,
 		}
 
-		err := runner.Run(t.Context(), DrainOptions{})
+		err := runner.Run(t.Context(), StashPopOptions{})
 		assert.ErrorIs(t, err, stagingusecase.ErrAgentHasChanges)
 	})
 
@@ -181,9 +181,7 @@ func TestDrainRunner_Run(t *testing.T) {
 		stdout := &bytes.Buffer{}
 		stderr := &bytes.Buffer{}
 
-		// Create a mock usecase that returns a non-fatal error
-		// We'll simulate this by using a real usecase but checking the warning output
-		runner := &DrainRunner{
+		runner := &StashPopRunner{
 			UseCase: &stagingusecase.DrainUseCase{
 				FileStore:  fileStore,
 				AgentStore: agentStore,
@@ -192,17 +190,16 @@ func TestDrainRunner_Run(t *testing.T) {
 			Stderr: stderr,
 		}
 
-		// This test just verifies the runner handles success case
-		// Non-fatal error testing would require mocking the usecase
-		err := runner.Run(t.Context(), DrainOptions{Keep: true})
+		// This test verifies the runner handles success case
+		err := runner.Run(t.Context(), StashPopOptions{Keep: true})
 		require.NoError(t, err)
 	})
 }
 
-func TestDrainFlags(t *testing.T) {
+func TestStashPopFlags(t *testing.T) {
 	t.Parallel()
 
-	flags := drainFlags()
+	flags := stashPopFlags()
 	assert.Len(t, flags, 4)
 
 	flagNames := make([]string, len(flags))
@@ -216,33 +213,18 @@ func TestDrainFlags(t *testing.T) {
 	assert.Contains(t, flagNames, "passphrase-stdin")
 }
 
-func TestNewGlobalDrainCommand(t *testing.T) {
-	t.Parallel()
-
-	cmd := NewGlobalDrainCommand()
-	require.NotNil(t, cmd)
-	assert.Equal(t, "drain", cmd.Name)
-	assert.NotEmpty(t, cmd.Usage)
-	assert.NotEmpty(t, cmd.Description)
-	assert.NotNil(t, cmd.Action)
-	assert.Len(t, cmd.Flags, 4)
-}
-
-func TestDrainRunner_NonFatalError(t *testing.T) {
+func TestStashPopRunner_NonFatalError(t *testing.T) {
 	t.Parallel()
 
 	stdout := &bytes.Buffer{}
 	stderr := &bytes.Buffer{}
 
-	// Create a mock that simulates non-fatal error by using a custom error type
 	nonFatalErr := &stagingusecase.DrainError{
 		Op:       "delete",
 		Err:      errors.New("file deletion failed"),
 		NonFatal: true,
 	}
 
-	// We can't easily mock the usecase, but we can test the error handling logic
-	// by checking that non-fatal errors are warnings
 	assert.True(t, nonFatalErr.NonFatal)
 	assert.Contains(t, nonFatalErr.Error(), "failed to delete file")
 

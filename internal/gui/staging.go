@@ -3,6 +3,8 @@
 package gui
 
 import (
+	"errors"
+
 	"github.com/mpyw/suve/internal/infra"
 	"github.com/mpyw/suve/internal/maputil"
 	"github.com/mpyw/suve/internal/staging"
@@ -759,7 +761,8 @@ func (a *App) StagingDrain(service string, passphrase string, keep bool, force b
 
 // StagingPersist saves staged changes from agent memory to file.
 // If passphrase is provided, the file will be encrypted.
-func (a *App) StagingPersist(service string, passphrase string, keep bool) (*StagingPersistResult, error) {
+// mode: "overwrite" or "merge"
+func (a *App) StagingPersist(service string, passphrase string, keep bool, mode string) (*StagingPersistResult, error) {
 	identity, err := infra.GetAWSIdentity(a.ctx)
 	if err != nil {
 		return nil, err
@@ -783,6 +786,11 @@ func (a *App) StagingPersist(service string, passphrase string, keep bool) (*Sta
 		}
 	}
 
+	persistMode := stagingusecase.PersistModeOverwrite
+	if mode == "merge" {
+		persistMode = stagingusecase.PersistModeMerge
+	}
+
 	uc := &stagingusecase.PersistUseCase{
 		AgentStore: agentStore,
 		FileStore:  fileStore,
@@ -790,6 +798,7 @@ func (a *App) StagingPersist(service string, passphrase string, keep bool) (*Sta
 	result, err := uc.Execute(a.ctx, stagingusecase.PersistInput{
 		Service: svc,
 		Keep:    keep,
+		Mode:    persistMode,
 	})
 	if err != nil {
 		return nil, err
@@ -798,5 +807,41 @@ func (a *App) StagingPersist(service string, passphrase string, keep bool) (*Sta
 	return &StagingPersistResult{
 		EntryCount: result.EntryCount,
 		TagCount:   result.TagCount,
+	}, nil
+}
+
+// StagingDropResult represents the result of dropping the stash file.
+type StagingDropResult struct {
+	Dropped bool `json:"dropped"`
+}
+
+// StagingDrop deletes the staging file without loading it into memory.
+func (a *App) StagingDrop() (*StagingDropResult, error) {
+	identity, err := infra.GetAWSIdentity(a.ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	fileStore, err := file.NewStore(identity.AccountID, identity.Region)
+	if err != nil {
+		return nil, err
+	}
+
+	exists, err := fileStore.Exists()
+	if err != nil {
+		return nil, err
+	}
+	if !exists {
+		return nil, errors.New("no stashed changes to drop")
+	}
+
+	// Drain with keep=false to delete the file (we discard the result)
+	_, err = fileStore.Drain(a.ctx, "", false)
+	if err != nil {
+		return nil, err
+	}
+
+	return &StagingDropResult{
+		Dropped: true,
 	}, nil
 }

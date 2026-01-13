@@ -6,24 +6,66 @@ run:
   modules-download-mode: readonly
 
 linters:
-  default: standard
+  default: all
+  disable:
+    # Struct/interface style - too verbose or not idiomatic
+    - exhaustruct      # Requires all struct fields
+    - ireturn          # Interface returns are idiomatic Go
+    - varnamelen       # Short names in small scopes are fine
+    - inamedparam      # Interface named params not always needed
+    - nonamedreturns   # Named returns useful for documentation
+    # Wrapping/formatting - handled by other tools or not useful
+    - wrapcheck        # Internal packages don't need wrapping
+    - nlreturn         # Pure style preference
+    - wsl              # Pure style preference (wsl_v5 included)
+    - lll              # Line length - use editor settings
+    - tagliatelle      # JSON tag naming style preference
+    # Test style - not all patterns are useful
+    - paralleltest     # Not all tests benefit from parallel
+    - testpackage      # Internal tests are common and useful
+    # Code organization - too opinionated
+    - gochecknoglobals # Package-level vars are intentional (errors, configs)
+    - gochecknoinits   # init() is sometimes needed
+    - funcorder        # Function order is contextual
+    - godox            # TODO/FIXME comments are fine during development
+    # Performance micro-optimizations - premature
+    - prealloc         # Premature optimization
+    - mnd              # Magic numbers are often contextually clear
+    # i18n - not needed for this CLI tool
+    - gosmopolitan     # No i18n requirements
+    # Duplicate detection - handled by fzdupl instead
+    - dupl             # fzdupl is more precise
+    # We configure depguard ourselves
+    - depguard
   enable:
     - depguard
-    - forbidigo
   exclusions:
     rules:
       # Allow fmt.Fprint* in output/output.go (implements the wrapper functions)
       - path: "internal/cli/output/output\\.go"
         linters:
           - forbidigo
-      # Allow fmt.Fprint* in test files
-      - path: "_test\\.go$"
-        linters:
-          - forbidigo
+        text: "fmt\\.Fprint"
       # Allow fmt.Fprint* in e2e tests
       - path: "e2e/"
         linters:
           - forbidigo
+        text: "fmt\\.Fprint"
+      # Allow context.Background() in entry points
+      - path: "cmd/suve/main\\.go"
+        linters:
+          - forbidigo
+        text: "context\\.Background"
+      # Allow context.Background() in daemon server (creates root context)
+      - path: "internal/staging/store/agent/daemon/internal/ipc/server\\.go"
+        linters:
+          - forbidigo
+        text: "context\\.Background"
+      # Allow context.Background() in e2e tests (top-level test setup)
+      - path: "e2e/e2e_test\\.go"
+        linters:
+          - forbidigo
+        text: "context\\.Background"
   settings:
     cyclop:
       max-complexity: 30
@@ -53,6 +95,10 @@ linters:
       forbid:
         - pattern: 'fmt\.Fprint(ln|f)?'
           msg: "Use output package functions instead of fmt.Fprint*"
+        - pattern: 'context\.Background\(\)'
+          msg: "Use context from caller or t.Context() in tests. Only allowed in main.go and daemon entry points."
+        - pattern: 'context\.TODO\(\)'
+          msg: "Use context from caller or t.Context() in tests"
       exclude-godoc-examples: true
       analyze-types: true
 

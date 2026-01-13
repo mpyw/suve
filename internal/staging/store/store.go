@@ -48,14 +48,16 @@ type ReadWriteOperator interface {
 // Drainer provides bulk read access to staging state (for drain command).
 type Drainer interface {
 	// Drain retrieves the entire state from storage.
+	// If service is empty, returns all services; otherwise filters to the specified service.
 	// If keep is false, the source storage is cleared after reading.
-	Drain(ctx context.Context, keep bool) (*staging.State, error)
+	Drain(ctx context.Context, service staging.Service, keep bool) (*staging.State, error)
 }
 
 // Writer provides bulk write access to staging state.
 type Writer interface {
 	// WriteState writes the entire state to storage.
-	WriteState(ctx context.Context, state *staging.State) error
+	// If service is empty, writes all services; otherwise writes only the specified service.
+	WriteState(ctx context.Context, service staging.Service, state *staging.State) error
 }
 
 // FileStore combines drain and write operations for file storage.

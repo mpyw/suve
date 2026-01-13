@@ -192,7 +192,8 @@ func (s *Store) UnstageAllWithHint(ctx context.Context, service staging.Service,
 }
 
 // Drain retrieves the state from the daemon, optionally clearing memory.
-func (s *Store) Drain(ctx context.Context, keep bool) (*staging.State, error) {
+// If service is empty, returns all services; otherwise filters to the specified service.
+func (s *Store) Drain(ctx context.Context, service staging.Service, keep bool) (*staging.State, error) {
 	state, err := doRequestWithResult(s, ctx, &protocol.Request{
 		Method:    protocol.MethodGetState,
 		AccountID: s.accountID,
@@ -216,11 +217,22 @@ func (s *Store) Drain(ctx context.Context, keep bool) (*staging.State, error) {
 		}
 	}
 
+	// Filter by service if specified
+	if service != "" {
+		return state.ExtractService(service), nil
+	}
+
 	return state, nil
 }
 
 // WriteState sets the full state for drain operations.
-func (s *Store) WriteState(ctx context.Context, state *staging.State) error {
+// If service is empty, writes all services; otherwise writes only the specified service.
+func (s *Store) WriteState(ctx context.Context, service staging.Service, state *staging.State) error {
+	// Filter by service if specified
+	if service != "" {
+		state = state.ExtractService(service)
+	}
+
 	return s.doSimpleRequestEnsuringDaemon(ctx, &protocol.Request{
 		Method:    protocol.MethodSetState,
 		AccountID: s.accountID,

@@ -190,22 +190,23 @@ func (m *MockStore) AddTag(service staging.Service, name string, tag staging.Tag
 }
 
 // Drain retrieves the entire state from storage.
+// If service is empty, returns all services; otherwise filters to the specified service.
 // If keep is false, the source storage is cleared after reading.
-func (m *MockStore) Drain(_ context.Context, keep bool) (*staging.State, error) {
+func (m *MockStore) Drain(_ context.Context, service staging.Service, keep bool) (*staging.State, error) {
 	if m.DrainErr != nil {
 		return nil, m.DrainErr
 	}
 
 	// Copy current state
 	state := staging.NewEmptyState()
-	for service, entries := range m.entries {
+	for svc, entries := range m.entries {
 		for name, entry := range entries {
-			state.Entries[service][name] = entry
+			state.Entries[svc][name] = entry
 		}
 	}
-	for service, tags := range m.tags {
+	for svc, tags := range m.tags {
 		for name, tag := range tags {
-			state.Tags[service][name] = tag
+			state.Tags[svc][name] = tag
 		}
 	}
 
@@ -221,13 +222,24 @@ func (m *MockStore) Drain(_ context.Context, keep bool) (*staging.State, error) 
 		}
 	}
 
+	// Filter by service if specified
+	if service != "" {
+		return state.ExtractService(service), nil
+	}
+
 	return state, nil
 }
 
 // WriteState writes the entire state to storage.
-func (m *MockStore) WriteState(_ context.Context, state *staging.State) error {
+// If service is empty, writes all services; otherwise writes only the specified service.
+func (m *MockStore) WriteState(_ context.Context, service staging.Service, state *staging.State) error {
 	if m.WriteStateErr != nil {
 		return m.WriteStateErr
+	}
+
+	// Filter by service if specified
+	if service != "" {
+		state = state.ExtractService(service)
 	}
 
 	// Replace all entries and tags
@@ -244,14 +256,14 @@ func (m *MockStore) WriteState(_ context.Context, state *staging.State) error {
 		return nil
 	}
 
-	for service, entries := range state.Entries {
+	for svc, entries := range state.Entries {
 		for name, entry := range entries {
-			m.entries[service][name] = entry
+			m.entries[svc][name] = entry
 		}
 	}
-	for service, tags := range state.Tags {
+	for svc, tags := range state.Tags {
 		for name, tag := range tags {
-			m.tags[service][name] = tag
+			m.tags[svc][name] = tag
 		}
 	}
 

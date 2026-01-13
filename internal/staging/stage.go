@@ -84,6 +84,38 @@ func (s *State) IsEmpty() bool {
 	return true
 }
 
+// TotalCount returns the total number of entries and tags in the state.
+func (s *State) TotalCount() int {
+	if s == nil {
+		return 0
+	}
+	return s.EntryCount() + s.TagCount()
+}
+
+// EntryCount returns the total number of entries in the state.
+func (s *State) EntryCount() int {
+	if s == nil {
+		return 0
+	}
+	count := 0
+	for _, entries := range s.Entries {
+		count += len(entries)
+	}
+	return count
+}
+
+// TagCount returns the total number of tag entries in the state.
+func (s *State) TagCount() int {
+	if s == nil {
+		return 0
+	}
+	count := 0
+	for _, tags := range s.Tags {
+		count += len(tags)
+	}
+	return count
+}
+
 // Merge merges another state into this state.
 // The other state takes precedence for conflicting entries.
 func (s *State) Merge(other *State) {

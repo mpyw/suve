@@ -367,6 +367,125 @@ func TestPrompter_ConfirmDelete(t *testing.T) {
 	})
 }
 
+func TestPrompter_ConfirmChoice(t *testing.T) {
+	t.Parallel()
+
+	choices := []confirm.Choice{
+		{Label: "Merge", Description: "Merge with existing"},
+		{Label: "Overwrite", Description: "Replace existing"},
+		{Label: "Cancel", Description: "Abort operation"},
+	}
+
+	t.Run("default choice (enter)", func(t *testing.T) {
+		t.Parallel()
+		var stderr bytes.Buffer
+		p := &confirm.Prompter{
+			Stdin:  strings.NewReader("\n"),
+			Stdout: io.Discard,
+			Stderr: &stderr,
+		}
+
+		result, err := p.ConfirmChoice("How do you want to proceed?", choices)
+		require.NoError(t, err)
+		assert.Equal(t, confirm.ChoiceResult(0), result)
+		assert.Contains(t, stderr.String(), "How do you want to proceed?")
+		assert.Contains(t, stderr.String(), "1. Merge (Merge with existing)")
+		assert.Contains(t, stderr.String(), "2. Overwrite (Replace existing)")
+		assert.Contains(t, stderr.String(), "3. Cancel (Abort operation)")
+	})
+
+	t.Run("select first choice", func(t *testing.T) {
+		t.Parallel()
+		p := &confirm.Prompter{
+			Stdin:  strings.NewReader("1\n"),
+			Stdout: io.Discard,
+			Stderr: io.Discard,
+		}
+
+		result, err := p.ConfirmChoice("Choose:", choices)
+		require.NoError(t, err)
+		assert.Equal(t, confirm.ChoiceResult(0), result)
+	})
+
+	t.Run("select second choice", func(t *testing.T) {
+		t.Parallel()
+		p := &confirm.Prompter{
+			Stdin:  strings.NewReader("2\n"),
+			Stdout: io.Discard,
+			Stderr: io.Discard,
+		}
+
+		result, err := p.ConfirmChoice("Choose:", choices)
+		require.NoError(t, err)
+		assert.Equal(t, confirm.ChoiceResult(1), result)
+	})
+
+	t.Run("select third choice", func(t *testing.T) {
+		t.Parallel()
+		p := &confirm.Prompter{
+			Stdin:  strings.NewReader("3\n"),
+			Stdout: io.Discard,
+			Stderr: io.Discard,
+		}
+
+		result, err := p.ConfirmChoice("Choose:", choices)
+		require.NoError(t, err)
+		assert.Equal(t, confirm.ChoiceResult(2), result)
+	})
+
+	t.Run("invalid input - returns cancelled", func(t *testing.T) {
+		t.Parallel()
+		p := &confirm.Prompter{
+			Stdin:  strings.NewReader("abc\n"),
+			Stdout: io.Discard,
+			Stderr: io.Discard,
+		}
+
+		result, err := p.ConfirmChoice("Choose:", choices)
+		require.NoError(t, err)
+		assert.Equal(t, confirm.ChoiceCancelled, result)
+	})
+
+	t.Run("out of range - returns cancelled", func(t *testing.T) {
+		t.Parallel()
+		p := &confirm.Prompter{
+			Stdin:  strings.NewReader("5\n"),
+			Stdout: io.Discard,
+			Stderr: io.Discard,
+		}
+
+		result, err := p.ConfirmChoice("Choose:", choices)
+		require.NoError(t, err)
+		assert.Equal(t, confirm.ChoiceCancelled, result)
+	})
+
+	t.Run("zero - returns cancelled", func(t *testing.T) {
+		t.Parallel()
+		p := &confirm.Prompter{
+			Stdin:  strings.NewReader("0\n"),
+			Stdout: io.Discard,
+			Stderr: io.Discard,
+		}
+
+		result, err := p.ConfirmChoice("Choose:", choices)
+		require.NoError(t, err)
+		assert.Equal(t, confirm.ChoiceCancelled, result)
+	})
+
+	t.Run("read error", func(t *testing.T) {
+		t.Parallel()
+		p := &confirm.Prompter{
+			Stdin:  &errorReader{},
+			Stdout: io.Discard,
+			Stderr: io.Discard,
+		}
+
+		_, err := p.ConfirmChoice("Choose:", choices)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to read response")
+	})
+}
+
 // errorReader is a reader that always returns an error.
 type errorReader struct{}
 

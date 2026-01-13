@@ -534,7 +534,7 @@ func TestFileDrainPersist(t *testing.T) {
 		}
 
 		// Write state (persist)
-		err := fileStore.WriteState(context.Background(), state)
+		err := fileStore.WriteState(context.Background(), "", state)
 		require.NoError(t, err)
 
 		// Verify file exists
@@ -548,7 +548,7 @@ func TestFileDrainPersist(t *testing.T) {
 		assert.False(t, isEnc)
 
 		// Drain (read back)
-		drainedState, err := fileStore.Drain(context.Background(), true)
+		drainedState, err := fileStore.Drain(context.Background(), "", true)
 		require.NoError(t, err)
 		assert.Equal(t, "test-value", lo.FromPtr(drainedState.Entries[staging.ServiceParam]["/app/config"].Value))
 	})
@@ -571,7 +571,7 @@ func TestFileDrainPersist(t *testing.T) {
 		}
 
 		// Write encrypted state
-		err := fileStore.WriteState(context.Background(), state)
+		err := fileStore.WriteState(context.Background(), "", state)
 		require.NoError(t, err)
 
 		// Verify encrypted
@@ -580,7 +580,7 @@ func TestFileDrainPersist(t *testing.T) {
 		assert.True(t, isEnc)
 
 		// Drain with correct passphrase
-		drainedState, err := fileStore.Drain(context.Background(), true)
+		drainedState, err := fileStore.Drain(context.Background(), "", true)
 		require.NoError(t, err)
 		assert.Equal(t, "secret-value", lo.FromPtr(drainedState.Entries[staging.ServiceSecret]["my-secret"].Value))
 
@@ -606,11 +606,11 @@ func TestFileDrainPersist(t *testing.T) {
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("value"),
 		}
-		err := fileStore.WriteState(context.Background(), state)
+		err := fileStore.WriteState(context.Background(), "", state)
 		require.NoError(t, err)
 
 		// Drain with keep=false
-		_, err = fileStore.Drain(context.Background(), false)
+		_, err = fileStore.Drain(context.Background(), "", false)
 		require.NoError(t, err)
 
 		// File should be removed
@@ -636,11 +636,11 @@ func TestFileDrainPersist(t *testing.T) {
 			Remove: maputil.NewSet("deprecated"),
 		}
 
-		err := fileStore.WriteState(context.Background(), state)
+		err := fileStore.WriteState(context.Background(), "", state)
 		require.NoError(t, err)
 
 		// Drain and verify
-		drainedState, err := fileStore.Drain(context.Background(), true)
+		drainedState, err := fileStore.Drain(context.Background(), "", true)
 		require.NoError(t, err)
 		assert.Equal(t, "prod", drainedState.Tags[staging.ServiceParam]["/app/config"].Add["env"])
 		assert.True(t, drainedState.Tags[staging.ServiceParam]["/app/config"].Remove.Contains("deprecated"))
@@ -665,11 +665,11 @@ func TestFileDrainPersist(t *testing.T) {
 			Value:     lo.ToPtr("secret-value"),
 		}
 
-		err := fileStore.WriteState(context.Background(), state)
+		err := fileStore.WriteState(context.Background(), "", state)
 		require.NoError(t, err)
 
 		// Drain and verify both services
-		drainedState, err := fileStore.Drain(context.Background(), true)
+		drainedState, err := fileStore.Drain(context.Background(), "", true)
 		require.NoError(t, err)
 		assert.Equal(t, "param-value", lo.FromPtr(drainedState.Entries[staging.ServiceParam]["/app/config"].Value))
 		assert.Equal(t, "secret-value", lo.FromPtr(drainedState.Entries[staging.ServiceSecret]["my-secret"].Value))
@@ -688,7 +688,7 @@ func TestFileDrainPersist(t *testing.T) {
 		assert.False(t, exists)
 
 		// Draining nonexistent file returns empty state (not an error)
-		state, err := fileStore.Drain(context.Background(), true)
+		state, err := fileStore.Drain(context.Background(), "", true)
 		require.NoError(t, err)
 		assert.Empty(t, state.Entries[staging.ServiceParam])
 		assert.Empty(t, state.Entries[staging.ServiceSecret])
@@ -708,7 +708,7 @@ func TestFileDrainPersist(t *testing.T) {
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("first-value"),
 		}
-		err := fileStore.WriteState(context.Background(), state1)
+		err := fileStore.WriteState(context.Background(), "", state1)
 		require.NoError(t, err)
 
 		// Overwrite with second state
@@ -717,11 +717,11 @@ func TestFileDrainPersist(t *testing.T) {
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("second-value"),
 		}
-		err = fileStore.WriteState(context.Background(), state2)
+		err = fileStore.WriteState(context.Background(), "", state2)
 		require.NoError(t, err)
 
 		// Drain should only have second state
-		drainedState, err := fileStore.Drain(context.Background(), true)
+		drainedState, err := fileStore.Drain(context.Background(), "", true)
 		require.NoError(t, err)
 		assert.NotContains(t, drainedState.Entries[staging.ServiceParam], "/first")
 		assert.Contains(t, drainedState.Entries[staging.ServiceParam], "/second")

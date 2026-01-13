@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { StagingDiff, StagingApply, StagingReset, StagingEdit, StagingUnstage, StagingAddTag, StagingCancelAddTag, StagingCancelRemoveTag, StagingFileStatus, StagingDrain, StagingPersist } from '../../wailsjs/go/gui/App';
+  import { StagingDiff, StagingApply, StagingReset, StagingEdit, StagingUnstage, StagingAddTag, StagingCancelAddTag, StagingCancelRemoveTag, StagingFileStatus, StagingDrain, StagingPersist, StagingDrop } from '../../wailsjs/go/gui/App';
   import type { gui } from '../../wailsjs/go/models';
   import Modal from './Modal.svelte';
   import PassphraseModal from './PassphraseModal.svelte';
@@ -64,6 +64,16 @@
   let drainKeep = $state(false);
   let drainForce = $state(false);
   let drainMerge = $state(false);
+
+  // Push options modal (when file exists)
+  let showPushOptionsModal = $state(false);
+  let pushPassphrase = $state('');
+  let pushMode: 'overwrite' | 'merge' = $state('overwrite');
+
+  // Drop confirmation modal
+  let showDropModal = $state(false);
+  let dropLoading = $state(false);
+  let dropError = $state('');
 
   async function loadStatus() {
     loading = true;
@@ -267,17 +277,33 @@
   }
 
   // Persist modal handlers
-  function openPersistModal() {
+  async function openPersistModal() {
     persistError = '';
     persistResult = null;
-    showPersistModal = true;
+    pushPassphrase = '';
+    pushMode = 'overwrite';
+
+    try {
+      // Check if file exists first
+      fileStatus = await StagingFileStatus();
+      if (fileStatus?.exists) {
+        // File exists, show options modal for merge/overwrite
+        showPushOptionsModal = true;
+      } else {
+        // No existing file, go straight to passphrase modal
+        showPersistModal = true;
+      }
+    } catch (e) {
+      // If can't check, just show passphrase modal
+      showPersistModal = true;
+    }
   }
 
   async function handlePersist(passphrase: string) {
     persistLoading = true;
     persistError = '';
     try {
-      const result = await StagingPersist('', passphrase, false); // service='', keep=false
+      const result = await StagingPersist('', passphrase, false, pushMode); // service='', keep=false
       persistResult = result;
       showPersistModal = false;
       await loadStatus();
@@ -288,8 +314,24 @@
     }
   }
 
+  async function handlePersistWithOptions() {
+    persistLoading = true;
+    persistError = '';
+    try {
+      const result = await StagingPersist('', pushPassphrase, false, pushMode);
+      persistResult = result;
+      showPushOptionsModal = false;
+      await loadStatus();
+    } catch (e) {
+      persistError = parseError(e);
+    } finally {
+      persistLoading = false;
+    }
+  }
+
   function closePersistModal() {
     showPersistModal = false;
+    showPushOptionsModal = false;
     persistResult = null;
   }
 
@@ -357,6 +399,30 @@
     drainResult = null;
   }
 
+  // Drop modal handlers
+  function openDropModal() {
+    dropError = '';
+    showDropModal = true;
+  }
+
+  async function handleDrop() {
+    dropLoading = true;
+    dropError = '';
+    try {
+      await StagingDrop();
+      showDropModal = false;
+      await loadStatus();
+    } catch (e) {
+      dropError = parseError(e);
+    } finally {
+      dropLoading = false;
+    }
+  }
+
+  function closeDropModal() {
+    showDropModal = false;
+  }
+
   // Computed helpers for entry display logic
   function hasValueChange(entry: gui.StagingDiffEntry): boolean {
     return entry.stagedValue !== undefined && entry.stagedValue !== '';
@@ -398,11 +464,14 @@
         </button>
       </div>
       <div class="file-actions">
-        <button class="btn-file btn-persist" onclick={openPersistModal} disabled={loading || (paramEntries.length === 0 && secretEntries.length === 0)} title="Save staged changes to file">
-          Persist
+        <button class="btn-file btn-push" onclick={openPersistModal} disabled={loading || (paramEntries.length === 0 && secretEntries.length === 0)} title="Save staged changes to file">
+          Push
         </button>
-        <button class="btn-file btn-drain" onclick={openDrainModal} disabled={loading || !fileStatus?.exists} title="Load staged changes from file">
-          Drain
+        <button class="btn-file btn-pop" onclick={openDrainModal} disabled={loading || !fileStatus?.exists} title="Load staged changes from file">
+          Pop
+        </button>
+        <button class="btn-file btn-drop" onclick={openDropModal} disabled={loading || !fileStatus?.exists} title="Delete stash file">
+          Drop
         </button>
       </div>
       <button class="btn-primary" onclick={loadStatus} disabled={loading}>
@@ -880,7 +949,7 @@
 
 <!-- Persist Result Modal -->
 {#if persistResult}
-<Modal title="Persist Complete" show={true} onclose={() => persistResult = null}>
+<Modal title="Push Complete" show={true} onclose={() => persistResult = null}>
   <div class="persist-result">
     <div class="result-icon success">✓</div>
     <h4>Successfully saved to file</h4>
@@ -894,6 +963,65 @@
   </div>
 </Modal>
 {/if}
+
+<!-- Push Options Modal (when stash file already exists) -->
+<Modal title="Stash File Exists" show={showPushOptionsModal} onclose={closePersistModal}>
+  <div class="push-options">
+    {#if persistError}
+      <div class="modal-error">{persistError}</div>
+    {/if}
+
+    <p>A stash file already exists. How do you want to proceed?</p>
+
+    <div class="options-group">
+      <label class="radio-label">
+        <input type="radio" name="pushMode" value="overwrite" bind:group={pushMode} />
+        <span>Overwrite</span>
+        <span class="option-desc">Replace existing stash file</span>
+      </label>
+      <label class="radio-label">
+        <input type="radio" name="pushMode" value="merge" bind:group={pushMode} />
+        <span>Merge</span>
+        <span class="option-desc">Merge with existing stash file</span>
+      </label>
+    </div>
+
+    <div class="form-group">
+      <label for="push-passphrase">Passphrase (optional, for encryption)</label>
+      <input
+        id="push-passphrase"
+        type="password"
+        class="form-input"
+        bind:value={pushPassphrase}
+        placeholder="Leave empty for no encryption"
+      />
+    </div>
+
+    <div class="form-actions">
+      <button type="button" class="btn-secondary" onclick={closePersistModal}>Cancel</button>
+      <button type="button" class="btn-push-action" onclick={handlePersistWithOptions} disabled={persistLoading}>
+        {persistLoading ? 'Pushing...' : 'Push'}
+      </button>
+    </div>
+  </div>
+</Modal>
+
+<!-- Drop Confirmation Modal -->
+<Modal title="Drop Stash" show={showDropModal} onclose={closeDropModal}>
+  <div class="modal-confirm">
+    {#if dropError}
+      <div class="modal-error">{dropError}</div>
+    {/if}
+    <p>Delete the stash file without loading?</p>
+    <p class="warning">This will permanently delete the stash file. This action cannot be undone.</p>
+    <div class="form-actions">
+      <button type="button" class="btn-secondary" onclick={closeDropModal}>Cancel</button>
+      <button type="button" class="btn-danger" onclick={handleDrop} disabled={dropLoading}>
+        {dropLoading ? 'Dropping...' : 'Drop'}
+      </button>
+    </div>
+  </div>
+</Modal>
 
 <style>
   .header {
@@ -1534,22 +1662,81 @@
     cursor: not-allowed;
   }
 
-  .btn-persist {
+  .btn-push {
     background: #2196f3;
     color: #fff;
   }
 
-  .btn-persist:hover:not(:disabled) {
+  .btn-push:hover:not(:disabled) {
     background: #1976d2;
   }
 
-  .btn-drain {
+  .btn-pop {
     background: #9c27b0;
     color: #fff;
   }
 
-  .btn-drain:hover:not(:disabled) {
+  .btn-pop:hover:not(:disabled) {
     background: #7b1fa2;
+  }
+
+  .btn-drop {
+    background: #f44336;
+    color: #fff;
+  }
+
+  .btn-drop:hover:not(:disabled) {
+    background: #d32f2f;
+  }
+
+  .btn-push-action {
+    padding: 8px 16px;
+    background: #2196f3;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+  }
+
+  .btn-push-action:hover:not(:disabled) {
+    background: #1976d2;
+  }
+
+  .btn-push-action:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  /* Push options modal styles */
+  .push-options {
+    text-align: center;
+  }
+
+  .push-options p {
+    color: #ccc;
+    margin: 0 0 12px 0;
+  }
+
+  .radio-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #ccc;
+    cursor: pointer;
+    padding: 8px;
+    border-radius: 4px;
+    transition: background 0.2s;
+  }
+
+  .radio-label:hover {
+    background: rgba(255, 255, 255, 0.05);
+  }
+
+  .option-desc {
+    font-size: 12px;
+    color: #888;
+    margin-left: auto;
   }
 
   /* Drain options modal styles */

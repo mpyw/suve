@@ -39,7 +39,7 @@ type DrainUseCase struct {
 // Execute runs the drain use case.
 func (u *DrainUseCase) Execute(ctx context.Context, input DrainInput) (*DrainOutput, error) {
 	// Drain from file (keep file for now, we'll delete after successful agent write)
-	fileState, err := u.FileStore.Drain(ctx, true)
+	fileState, err := u.FileStore.Drain(ctx, "", true)
 	if err != nil {
 		return nil, &DrainError{Op: "load", Err: err}
 	}
@@ -53,7 +53,7 @@ func (u *DrainUseCase) Execute(ctx context.Context, input DrainInput) (*DrainOut
 	}
 
 	// Check if agent already has staged changes
-	agentState, err := u.AgentStore.Drain(ctx, true) // keep=true to not clear yet
+	agentState, err := u.AgentStore.Drain(ctx, "", true) // keep=true to not clear yet
 	if err != nil {
 		// Agent might not be running, which is fine - treat as empty
 		agentState = staging.NewEmptyState()
@@ -84,7 +84,7 @@ func (u *DrainUseCase) Execute(ctx context.Context, input DrainInput) (*DrainOut
 	}
 
 	// Set state in agent
-	if err := u.AgentStore.WriteState(ctx, finalState); err != nil {
+	if err := u.AgentStore.WriteState(ctx, "", finalState); err != nil {
 		return nil, &DrainError{Op: "write", Err: err}
 	}
 
@@ -110,19 +110,19 @@ func (u *DrainUseCase) Execute(ctx context.Context, input DrainInput) (*DrainOut
 			fileState.RemoveService(input.Service)
 			if fileState.IsEmpty() {
 				// Delete the file entirely
-				if _, err := u.FileStore.Drain(ctx, false); err != nil {
+				if _, err := u.FileStore.Drain(ctx, "", false); err != nil {
 					// Non-fatal: state is already in agent
 					return output, &DrainError{Op: "delete", Err: err, NonFatal: true}
 				}
 			} else {
 				// Write back the remaining state
-				if err := u.FileStore.WriteState(ctx, fileState); err != nil {
+				if err := u.FileStore.WriteState(ctx, "", fileState); err != nil {
 					return output, &DrainError{Op: "delete", Err: err, NonFatal: true}
 				}
 			}
 		} else {
 			// Drain again with keep=false to delete the file
-			if _, err := u.FileStore.Drain(ctx, false); err != nil {
+			if _, err := u.FileStore.Drain(ctx, "", false); err != nil {
 				return output, &DrainError{Op: "delete", Err: err, NonFatal: true}
 			}
 		}

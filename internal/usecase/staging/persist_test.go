@@ -190,6 +190,312 @@ func TestPersistUseCase_Execute(t *testing.T) {
 	})
 }
 
+func TestPersistUseCase_PersistMode(t *testing.T) {
+	t.Parallel()
+
+	t.Run("overwrite mode replaces entire file", func(t *testing.T) {
+		t.Parallel()
+
+		agentStore := testutil.NewMockStore()
+		fileStore := testutil.NewMockStore()
+
+		// Existing file has both param and secret
+		_ = fileStore.StageEntry(t.Context(), staging.ServiceParam, "/existing/param", staging.Entry{
+			Operation: staging.OperationUpdate,
+			Value:     lo.ToPtr("existing-param"),
+			StagedAt:  time.Now(),
+		})
+		_ = fileStore.StageEntry(t.Context(), staging.ServiceSecret, "existing-secret", staging.Entry{
+			Operation: staging.OperationUpdate,
+			Value:     lo.ToPtr("existing-secret"),
+			StagedAt:  time.Now(),
+		})
+
+		// Agent has new param
+		_ = agentStore.StageEntry(t.Context(), staging.ServiceParam, "/new/param", staging.Entry{
+			Operation: staging.OperationUpdate,
+			Value:     lo.ToPtr("new-param"),
+			StagedAt:  time.Now(),
+		})
+
+		usecase := &stagingusecase.PersistUseCase{
+			AgentStore: agentStore,
+			FileStore:  fileStore,
+		}
+
+		_, err := usecase.Execute(t.Context(), stagingusecase.PersistInput{
+			Mode: stagingusecase.PersistModeOverwrite,
+		})
+		require.NoError(t, err)
+
+		// New param should exist
+		_, err = fileStore.GetEntry(t.Context(), staging.ServiceParam, "/new/param")
+		require.NoError(t, err)
+
+		// Existing param should be gone (overwritten)
+		_, err = fileStore.GetEntry(t.Context(), staging.ServiceParam, "/existing/param")
+		assert.ErrorIs(t, err, staging.ErrNotStaged)
+
+		// Existing secret should also be gone (overwritten)
+		_, err = fileStore.GetEntry(t.Context(), staging.ServiceSecret, "existing-secret")
+		assert.ErrorIs(t, err, staging.ErrNotStaged)
+	})
+
+	t.Run("merge mode combines with existing file", func(t *testing.T) {
+		t.Parallel()
+
+		agentStore := testutil.NewMockStore()
+		fileStore := testutil.NewMockStore()
+
+		// Existing file has both param and secret
+		_ = fileStore.StageEntry(t.Context(), staging.ServiceParam, "/existing/param", staging.Entry{
+			Operation: staging.OperationUpdate,
+			Value:     lo.ToPtr("existing-param"),
+			StagedAt:  time.Now(),
+		})
+		_ = fileStore.StageEntry(t.Context(), staging.ServiceSecret, "existing-secret", staging.Entry{
+			Operation: staging.OperationUpdate,
+			Value:     lo.ToPtr("existing-secret"),
+			StagedAt:  time.Now(),
+		})
+
+		// Agent has new param
+		_ = agentStore.StageEntry(t.Context(), staging.ServiceParam, "/new/param", staging.Entry{
+			Operation: staging.OperationUpdate,
+			Value:     lo.ToPtr("new-param"),
+			StagedAt:  time.Now(),
+		})
+
+		usecase := &stagingusecase.PersistUseCase{
+			AgentStore: agentStore,
+			FileStore:  fileStore,
+		}
+
+		_, err := usecase.Execute(t.Context(), stagingusecase.PersistInput{
+			Mode: stagingusecase.PersistModeMerge,
+		})
+		require.NoError(t, err)
+
+		// All entries should exist
+		_, err = fileStore.GetEntry(t.Context(), staging.ServiceParam, "/new/param")
+		require.NoError(t, err)
+		_, err = fileStore.GetEntry(t.Context(), staging.ServiceParam, "/existing/param")
+		require.NoError(t, err)
+		_, err = fileStore.GetEntry(t.Context(), staging.ServiceSecret, "existing-secret")
+		require.NoError(t, err)
+	})
+
+	t.Run("merge mode with conflicting keys - agent wins", func(t *testing.T) {
+		t.Parallel()
+
+		agentStore := testutil.NewMockStore()
+		fileStore := testutil.NewMockStore()
+
+		// Existing file has param
+		_ = fileStore.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
+			Operation: staging.OperationUpdate,
+			Value:     lo.ToPtr("old-value"),
+			StagedAt:  time.Now(),
+		})
+
+		// Agent has same param with different value
+		_ = agentStore.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
+			Operation: staging.OperationUpdate,
+			Value:     lo.ToPtr("new-value"),
+			StagedAt:  time.Now(),
+		})
+
+		usecase := &stagingusecase.PersistUseCase{
+			AgentStore: agentStore,
+			FileStore:  fileStore,
+		}
+
+		_, err := usecase.Execute(t.Context(), stagingusecase.PersistInput{
+			Mode: stagingusecase.PersistModeMerge,
+		})
+		require.NoError(t, err)
+
+		// Agent value should win
+		entry, err := fileStore.GetEntry(t.Context(), staging.ServiceParam, "/app/config")
+		require.NoError(t, err)
+		assert.Equal(t, "new-value", lo.FromPtr(entry.Value))
+	})
+}
+
+func TestPersistUseCase_ServiceSpecific_EdgeCases(t *testing.T) {
+	t.Parallel()
+
+	t.Run("push param only when secret stash exists - preserves secrets", func(t *testing.T) {
+		t.Parallel()
+
+		agentStore := testutil.NewMockStore()
+		fileStore := testutil.NewMockStore()
+
+		// Existing file has only secrets
+		_ = fileStore.StageEntry(t.Context(), staging.ServiceSecret, "existing-secret", staging.Entry{
+			Operation: staging.OperationUpdate,
+			Value:     lo.ToPtr("secret-value"),
+			StagedAt:  time.Now(),
+		})
+
+		// Agent has params
+		_ = agentStore.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
+			Operation: staging.OperationUpdate,
+			Value:     lo.ToPtr("param-value"),
+			StagedAt:  time.Now(),
+		})
+
+		usecase := &stagingusecase.PersistUseCase{
+			AgentStore: agentStore,
+			FileStore:  fileStore,
+		}
+
+		// Push param only
+		_, err := usecase.Execute(t.Context(), stagingusecase.PersistInput{
+			Service: staging.ServiceParam,
+		})
+		require.NoError(t, err)
+
+		// Param should exist in file
+		_, err = fileStore.GetEntry(t.Context(), staging.ServiceParam, "/app/config")
+		require.NoError(t, err)
+
+		// Secret should still exist in file (preserved)
+		_, err = fileStore.GetEntry(t.Context(), staging.ServiceSecret, "existing-secret")
+		require.NoError(t, err)
+	})
+
+	t.Run("push secret only when param stash exists - preserves params", func(t *testing.T) {
+		t.Parallel()
+
+		agentStore := testutil.NewMockStore()
+		fileStore := testutil.NewMockStore()
+
+		// Existing file has only params
+		_ = fileStore.StageEntry(t.Context(), staging.ServiceParam, "/existing/param", staging.Entry{
+			Operation: staging.OperationUpdate,
+			Value:     lo.ToPtr("param-value"),
+			StagedAt:  time.Now(),
+		})
+
+		// Agent has secrets
+		_ = agentStore.StageEntry(t.Context(), staging.ServiceSecret, "my-secret", staging.Entry{
+			Operation: staging.OperationUpdate,
+			Value:     lo.ToPtr("secret-value"),
+			StagedAt:  time.Now(),
+		})
+
+		usecase := &stagingusecase.PersistUseCase{
+			AgentStore: agentStore,
+			FileStore:  fileStore,
+		}
+
+		// Push secret only
+		_, err := usecase.Execute(t.Context(), stagingusecase.PersistInput{
+			Service: staging.ServiceSecret,
+		})
+		require.NoError(t, err)
+
+		// Secret should exist in file
+		_, err = fileStore.GetEntry(t.Context(), staging.ServiceSecret, "my-secret")
+		require.NoError(t, err)
+
+		// Param should still exist in file (preserved)
+		_, err = fileStore.GetEntry(t.Context(), staging.ServiceParam, "/existing/param")
+		require.NoError(t, err)
+	})
+
+	t.Run("push param when both services stash exists - replaces only param", func(t *testing.T) {
+		t.Parallel()
+
+		agentStore := testutil.NewMockStore()
+		fileStore := testutil.NewMockStore()
+
+		// Existing file has both param and secret
+		_ = fileStore.StageEntry(t.Context(), staging.ServiceParam, "/old/param", staging.Entry{
+			Operation: staging.OperationUpdate,
+			Value:     lo.ToPtr("old-param"),
+			StagedAt:  time.Now(),
+		})
+		_ = fileStore.StageEntry(t.Context(), staging.ServiceSecret, "existing-secret", staging.Entry{
+			Operation: staging.OperationUpdate,
+			Value:     lo.ToPtr("secret-value"),
+			StagedAt:  time.Now(),
+		})
+
+		// Agent has new param
+		_ = agentStore.StageEntry(t.Context(), staging.ServiceParam, "/new/param", staging.Entry{
+			Operation: staging.OperationUpdate,
+			Value:     lo.ToPtr("new-param"),
+			StagedAt:  time.Now(),
+		})
+
+		usecase := &stagingusecase.PersistUseCase{
+			AgentStore: agentStore,
+			FileStore:  fileStore,
+		}
+
+		// Push param only
+		_, err := usecase.Execute(t.Context(), stagingusecase.PersistInput{
+			Service: staging.ServiceParam,
+		})
+		require.NoError(t, err)
+
+		// New param should exist
+		_, err = fileStore.GetEntry(t.Context(), staging.ServiceParam, "/new/param")
+		require.NoError(t, err)
+
+		// Old param should be gone (replaced)
+		_, err = fileStore.GetEntry(t.Context(), staging.ServiceParam, "/old/param")
+		assert.ErrorIs(t, err, staging.ErrNotStaged)
+
+		// Secret should still exist (preserved)
+		_, err = fileStore.GetEntry(t.Context(), staging.ServiceSecret, "existing-secret")
+		require.NoError(t, err)
+	})
+
+	t.Run("service-specific push ignores Mode flag - always merges at service level", func(t *testing.T) {
+		t.Parallel()
+
+		agentStore := testutil.NewMockStore()
+		fileStore := testutil.NewMockStore()
+
+		// Existing file has secret
+		_ = fileStore.StageEntry(t.Context(), staging.ServiceSecret, "existing-secret", staging.Entry{
+			Operation: staging.OperationUpdate,
+			Value:     lo.ToPtr("secret-value"),
+			StagedAt:  time.Now(),
+		})
+
+		// Agent has param
+		_ = agentStore.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
+			Operation: staging.OperationUpdate,
+			Value:     lo.ToPtr("param-value"),
+			StagedAt:  time.Now(),
+		})
+
+		usecase := &stagingusecase.PersistUseCase{
+			AgentStore: agentStore,
+			FileStore:  fileStore,
+		}
+
+		// Even with Overwrite mode, service-specific push preserves other services
+		_, err := usecase.Execute(t.Context(), stagingusecase.PersistInput{
+			Service: staging.ServiceParam,
+			Mode:    stagingusecase.PersistModeOverwrite, // This is ignored for service-specific
+		})
+		require.NoError(t, err)
+
+		// Param should exist
+		_, err = fileStore.GetEntry(t.Context(), staging.ServiceParam, "/app/config")
+		require.NoError(t, err)
+
+		// Secret should still exist (service filter forces merge behavior)
+		_, err = fileStore.GetEntry(t.Context(), staging.ServiceSecret, "existing-secret")
+		require.NoError(t, err)
+	})
+}
+
 func TestPersistUseCase_Execute_Errors(t *testing.T) {
 	t.Parallel()
 

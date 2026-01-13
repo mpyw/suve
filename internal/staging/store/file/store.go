@@ -95,8 +95,9 @@ func (s *Store) IsEncrypted() (bool, error) {
 
 // Drain reads the state from file, optionally deleting the file.
 // This implements StateDrainer for file-based storage.
+// If service is empty, returns all services; otherwise filters to the specified service.
 // If keep is false, the file is deleted after reading.
-func (s *Store) Drain(_ context.Context, keep bool) (*staging.State, error) {
+func (s *Store) Drain(_ context.Context, service staging.Service, keep bool) (*staging.State, error) {
 	fileMu.Lock()
 	defer fileMu.Unlock()
 
@@ -134,14 +135,25 @@ func (s *Store) Drain(_ context.Context, keep bool) (*staging.State, error) {
 		}
 	}
 
+	// Filter by service if specified
+	if service != "" {
+		return state.ExtractService(service), nil
+	}
+
 	return &state, nil
 }
 
 // WriteState saves the state to file.
 // This implements StateWriter for file-based storage.
-func (s *Store) WriteState(_ context.Context, state *staging.State) error {
+// If service is empty, writes all services; otherwise writes only the specified service.
+func (s *Store) WriteState(_ context.Context, service staging.Service, state *staging.State) error {
 	fileMu.Lock()
 	defer fileMu.Unlock()
+
+	// Filter by service if specified
+	if service != "" {
+		state = state.ExtractService(service)
+	}
 
 	// Ensure directory exists
 	dir := filepath.Dir(s.stateFilePath)

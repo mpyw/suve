@@ -74,3 +74,61 @@ func (p *Prompter) ConfirmDelete(target string, skipConfirm bool) (bool, error) 
 	output.Printf(p.Stderr, "%s Continue? [y/N]: ", colors.Warning("?"))
 	return p.readYesNo()
 }
+
+// Choice represents an option in a multiple choice prompt.
+type Choice struct {
+	Label       string
+	Description string
+}
+
+// ChoiceResult represents the result of a choice prompt.
+type ChoiceResult int
+
+const (
+	// ChoiceCancelled indicates the user cancelled the prompt.
+	ChoiceCancelled ChoiceResult = -1
+)
+
+// ConfirmChoice displays a multiple choice prompt and returns the selected index.
+// Returns ChoiceCancelled (-1) if the user cancels or selects cancel option.
+// The first choice (index 0) is the default when user just presses Enter.
+func (p *Prompter) ConfirmChoice(message string, choices []Choice) (ChoiceResult, error) {
+	p.printTargetInfo()
+	output.Printf(p.Stderr, "%s %s\n", colors.Warning("?"), message)
+
+	for i, choice := range choices {
+		if choice.Description != "" {
+			output.Printf(p.Stderr, "  %d. %s (%s)\n", i+1, choice.Label, choice.Description)
+		} else {
+			output.Printf(p.Stderr, "  %d. %s\n", i+1, choice.Label)
+		}
+	}
+
+	output.Printf(p.Stderr, "Enter choice [1]: ")
+
+	reader := bufio.NewReader(p.Stdin)
+	response, err := reader.ReadString('\n')
+	if err != nil {
+		return ChoiceCancelled, fmt.Errorf("failed to read response: %w", err)
+	}
+
+	response = strings.TrimSpace(response)
+
+	// Default to first choice if empty
+	if response == "" {
+		return 0, nil
+	}
+
+	// Parse as number
+	var choice int
+	if _, err := fmt.Sscanf(response, "%d", &choice); err != nil {
+		return ChoiceCancelled, nil // Invalid input treated as cancel
+	}
+
+	// Validate range
+	if choice < 1 || choice > len(choices) {
+		return ChoiceCancelled, nil // Out of range treated as cancel
+	}
+
+	return ChoiceResult(choice - 1), nil
+}
