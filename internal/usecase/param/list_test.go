@@ -2,7 +2,6 @@ package param_test
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"testing"
 
@@ -28,15 +27,20 @@ func (m *mockListClient) DescribeParameters(_ context.Context, _ *paramapi.Descr
 	if m.describeErr != nil {
 		return nil, m.describeErr
 	}
+
 	// Support paginated results for testing
 	if len(m.describeResults) > 0 {
 		idx := m.describeCallCount
+
 		m.describeCallCount++
+
 		if idx < len(m.describeResults) {
 			return m.describeResults[idx], nil
 		}
+
 		return &paramapi.DescribeParametersOutput{}, nil
 	}
+
 	return m.describeResult, nil
 }
 
@@ -46,9 +50,11 @@ func (m *mockListClient) GetParameters(_ context.Context, input *paramapi.GetPar
 	}
 
 	var params []paramapi.Parameter
+
 	var invalidParams []string
 
 	invalidSet := make(map[string]bool)
+
 	for _, name := range m.invalidParameters {
 		invalidSet[name] = true
 	}
@@ -56,8 +62,10 @@ func (m *mockListClient) GetParameters(_ context.Context, input *paramapi.GetPar
 	for _, name := range input.Names {
 		if invalidSet[name] {
 			invalidParams = append(invalidParams, name)
+
 			continue
 		}
+
 		if m.getParameterValue != nil {
 			if value, ok := m.getParameterValue[name]; ok {
 				params = append(params, paramapi.Parameter{
@@ -167,7 +175,7 @@ func TestListUseCase_Execute_InvalidFilter(t *testing.T) {
 	_, err := uc.Execute(t.Context(), param.ListInput{
 		Filter: "[invalid",
 	})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "invalid filter regex")
 }
 
@@ -175,13 +183,13 @@ func TestListUseCase_Execute_DescribeError(t *testing.T) {
 	t.Parallel()
 
 	client := &mockListClient{
-		describeErr: errors.New("aws error"),
+		describeErr: errAWS,
 	}
 
 	uc := &param.ListUseCase{Client: client}
 
 	_, err := uc.Execute(t.Context(), param.ListInput{})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to describe parameters")
 }
 
@@ -211,11 +219,13 @@ func TestListUseCase_Execute_WithValue(t *testing.T) {
 
 	// Verify actual values are returned correctly
 	valueMap := make(map[string]string)
+
 	for _, entry := range output.Entries {
 		require.NotNil(t, entry.Value, "entry %s should have value", entry.Name)
-		assert.Nil(t, entry.Error, "entry %s should not have error", entry.Name)
+		require.NoError(t, entry.Error, "entry %s should not have error", entry.Name)
 		valueMap[entry.Name] = *entry.Value
 	}
+
 	assert.Equal(t, "config-value", valueMap["/app/config"])
 	assert.Equal(t, "secret-value", valueMap["/app/secret"])
 }
@@ -250,10 +260,10 @@ func TestListUseCase_Execute_WithValue_PartialError(t *testing.T) {
 		case "/app/config":
 			require.NotNil(t, entry.Value)
 			assert.Equal(t, "config-value", *entry.Value)
-			assert.Nil(t, entry.Error)
+			require.NoError(t, entry.Error)
 		case "/app/invalid":
 			assert.Nil(t, entry.Value)
-			require.NotNil(t, entry.Error)
+			require.Error(t, entry.Error)
 			assert.Contains(t, entry.Error.Error(), "parameter not found")
 		default:
 			t.Errorf("unexpected entry: %s", entry.Name)
@@ -345,6 +355,7 @@ func TestListUseCase_Execute_WithPagination_FilterApplied(t *testing.T) {
 	})
 	require.NoError(t, err)
 	assert.Len(t, output.Entries, 2)
+
 	for _, entry := range output.Entries {
 		assert.Contains(t, entry.Name, "config")
 	}
@@ -354,7 +365,7 @@ func TestListUseCase_Execute_WithPagination_Error(t *testing.T) {
 	t.Parallel()
 
 	client := &mockListClient{
-		describeErr: errors.New("aws error"),
+		describeErr: errAWS,
 	}
 
 	uc := &param.ListUseCase{Client: client}
@@ -362,7 +373,7 @@ func TestListUseCase_Execute_WithPagination_Error(t *testing.T) {
 	_, err := uc.Execute(t.Context(), param.ListInput{
 		MaxResults: 10,
 	})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to describe parameters")
 }
 
@@ -405,7 +416,7 @@ func TestListUseCase_Execute_WithValue_GetParametersError(t *testing.T) {
 				{Name: lo.ToPtr("/app/param2")},
 			},
 		},
-		getParametersErr: errors.New("access denied"),
+		getParametersErr: errAccessDenied,
 	}
 
 	uc := &param.ListUseCase{Client: client}
@@ -419,7 +430,7 @@ func TestListUseCase_Execute_WithValue_GetParametersError(t *testing.T) {
 	// All entries should have errors since GetParameters failed
 	for _, entry := range output.Entries {
 		assert.Nil(t, entry.Value)
-		assert.NotNil(t, entry.Error)
+		require.Error(t, entry.Error)
 		assert.Contains(t, entry.Error.Error(), "access denied")
 	}
 }
@@ -429,8 +440,11 @@ func TestListUseCase_Execute_WithValue_LargeBatch(t *testing.T) {
 
 	// Create 15 parameters to test batching (should split into 10 + 5)
 	const numParams = 15
+
 	metadata := make([]paramapi.ParameterMetadata, numParams)
+
 	expectedValues := make(map[string]string, numParams)
+
 	for i := range numParams {
 		name := fmt.Sprintf("/app/param%d", i)
 		metadata[i] = paramapi.ParameterMetadata{Name: lo.ToPtr(name)}
@@ -455,7 +469,7 @@ func TestListUseCase_Execute_WithValue_LargeBatch(t *testing.T) {
 	// Verify all entries have correct values (ensures batching works correctly)
 	for _, entry := range output.Entries {
 		require.NotNil(t, entry.Value, "entry %s should have value", entry.Name)
-		assert.Nil(t, entry.Error, "entry %s should not have error", entry.Name)
+		require.NoError(t, entry.Error, "entry %s should not have error", entry.Name)
 		assert.Equal(t, expectedValues[entry.Name], *entry.Value, "entry %s should have correct value", entry.Name)
 	}
 }

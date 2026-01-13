@@ -2,7 +2,6 @@ package param_test
 
 import (
 	"context"
-	"errors"
 	"testing"
 
 	"github.com/samber/lo"
@@ -22,6 +21,7 @@ func (m *mockCreateClient) PutParameter(_ context.Context, _ *paramapi.PutParame
 	if m.putParameterErr != nil {
 		return nil, m.putParameterErr
 	}
+
 	return m.putParameterResult, nil
 }
 
@@ -78,7 +78,7 @@ func TestCreateUseCase_Execute_AlreadyExists(t *testing.T) {
 		Value: "value",
 		Type:  paramapi.ParameterTypeString,
 	})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to create parameter")
 }
 
@@ -86,7 +86,7 @@ func TestCreateUseCase_Execute_PutError(t *testing.T) {
 	t.Parallel()
 
 	client := &mockCreateClient{
-		putParameterErr: errors.New("aws error"),
+		putParameterErr: errAWS,
 	}
 
 	uc := &param.CreateUseCase{Client: client}
@@ -96,6 +96,6 @@ func TestCreateUseCase_Execute_PutError(t *testing.T) {
 		Value: "value",
 		Type:  paramapi.ParameterTypeString,
 	})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to create parameter")
 }

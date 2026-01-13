@@ -2728,3 +2728,247 @@ func TestStashPushRunner_Run(t *testing.T) {
 		assert.Contains(t, stdout.String(), "encrypted, kept in memory")
 	})
 }
+
+// =============================================================================
+// DiffRunner Tag Entry Tests
+// =============================================================================
+
+func TestDiffRunner_TagEntries(t *testing.T) {
+	t.Parallel()
+
+	t.Run("diff tag entry with add and remove", func(t *testing.T) {
+		t.Parallel()
+
+		store := testutil.NewMockStore()
+		removeKeys := map[string]struct{}{"deprecated": {}, "old": {}}
+		_ = store.StageTag(t.Context(), staging.ServiceParam, "/app/config", staging.TagEntry{
+			Add:      map[string]string{"env": "prod", "team": "platform"},
+			Remove:   removeKeys,
+			StagedAt: time.Now(),
+		})
+
+		var stdout, stderr bytes.Buffer
+		r := &cli.DiffRunner{
+			UseCase: &stagingusecase.DiffUseCase{
+				Strategy: &fullMockStrategy{service: staging.ServiceParam},
+				Store:    store,
+			},
+			Stdout: &stdout,
+			Stderr: &stderr,
+		}
+
+		err := r.Run(t.Context(), cli.DiffOptions{Name: "/app/config"})
+		require.NoError(t, err)
+		output := stdout.String()
+		assert.Contains(t, output, "Tags:")
+		assert.Contains(t, output, "+")
+		assert.Contains(t, output, "-")
+	})
+
+	t.Run("diff tag entry with add only", func(t *testing.T) {
+		t.Parallel()
+
+		store := testutil.NewMockStore()
+		_ = store.StageTag(t.Context(), staging.ServiceParam, "/app/config", staging.TagEntry{
+			Add:      map[string]string{"env": "prod"},
+			StagedAt: time.Now(),
+		})
+
+		var stdout, stderr bytes.Buffer
+		r := &cli.DiffRunner{
+			UseCase: &stagingusecase.DiffUseCase{
+				Strategy: &fullMockStrategy{service: staging.ServiceParam},
+				Store:    store,
+			},
+			Stdout: &stdout,
+			Stderr: &stderr,
+		}
+
+		err := r.Run(t.Context(), cli.DiffOptions{Name: "/app/config"})
+		require.NoError(t, err)
+		output := stdout.String()
+		assert.Contains(t, output, "Tags:")
+		assert.Contains(t, output, "env=prod")
+	})
+
+	t.Run("diff tag entry with remove only", func(t *testing.T) {
+		t.Parallel()
+
+		store := testutil.NewMockStore()
+		removeKeys := map[string]struct{}{"deprecated": {}}
+		_ = store.StageTag(t.Context(), staging.ServiceParam, "/app/config", staging.TagEntry{
+			Remove:   removeKeys,
+			StagedAt: time.Now(),
+		})
+
+		var stdout, stderr bytes.Buffer
+		r := &cli.DiffRunner{
+			UseCase: &stagingusecase.DiffUseCase{
+				Strategy: &fullMockStrategy{service: staging.ServiceParam},
+				Store:    store,
+			},
+			Stdout: &stdout,
+			Stderr: &stderr,
+		}
+
+		err := r.Run(t.Context(), cli.DiffOptions{Name: "/app/config"})
+		require.NoError(t, err)
+		output := stdout.String()
+		assert.Contains(t, output, "Tags:")
+		assert.Contains(t, output, "-")
+		assert.Contains(t, output, "deprecated")
+	})
+
+	t.Run("diff multiple tag entries", func(t *testing.T) {
+		t.Parallel()
+
+		store := testutil.NewMockStore()
+		_ = store.StageTag(t.Context(), staging.ServiceParam, "/app/config1", staging.TagEntry{
+			Add:      map[string]string{"env": "prod"},
+			StagedAt: time.Now(),
+		})
+		_ = store.StageTag(t.Context(), staging.ServiceParam, "/app/config2", staging.TagEntry{
+			Add:      map[string]string{"env": "dev"},
+			StagedAt: time.Now(),
+		})
+
+		var stdout, stderr bytes.Buffer
+		r := &cli.DiffRunner{
+			UseCase: &stagingusecase.DiffUseCase{
+				Strategy: &fullMockStrategy{service: staging.ServiceParam},
+				Store:    store,
+			},
+			Stdout: &stdout,
+			Stderr: &stderr,
+		}
+
+		err := r.Run(t.Context(), cli.DiffOptions{})
+		require.NoError(t, err)
+		output := stdout.String()
+		assert.Contains(t, output, "/app/config1")
+		assert.Contains(t, output, "/app/config2")
+	})
+}
+
+// =============================================================================
+// Status Runner Remove-Only Tag Tests
+// =============================================================================
+
+func TestStatusRunner_RemoveOnlyTag(t *testing.T) {
+	t.Parallel()
+
+	t.Run("show single - tag entry with remove only", func(t *testing.T) {
+		t.Parallel()
+
+		store := testutil.NewMockStore()
+		removeKeys := map[string]struct{}{"deprecated": {}, "old": {}}
+		_ = store.StageTag(t.Context(), staging.ServiceParam, "/app/config", staging.TagEntry{
+			Remove:   removeKeys,
+			StagedAt: time.Now(),
+		})
+
+		var stdout, stderr bytes.Buffer
+		r := &cli.StatusRunner{
+			UseCase: &stagingusecase.StatusUseCase{
+				Strategy: &fullMockStrategy{service: staging.ServiceParam},
+				Store:    store,
+			},
+			Stdout: &stdout,
+			Stderr: &stderr,
+		}
+
+		err := r.Run(t.Context(), cli.StatusOptions{Name: "/app/config"})
+		require.NoError(t, err)
+		output := stdout.String()
+		assert.Contains(t, output, "T") // Tag indicator
+		assert.Contains(t, output, "-2 tag(s)")
+	})
+
+	t.Run("show single - tag entry with verbose remove only", func(t *testing.T) {
+		t.Parallel()
+
+		store := testutil.NewMockStore()
+		removeKeys := map[string]struct{}{"deprecated": {}, "old": {}}
+		_ = store.StageTag(t.Context(), staging.ServiceParam, "/app/config", staging.TagEntry{
+			Remove:   removeKeys,
+			StagedAt: time.Now(),
+		})
+
+		var stdout, stderr bytes.Buffer
+		r := &cli.StatusRunner{
+			UseCase: &stagingusecase.StatusUseCase{
+				Strategy: &fullMockStrategy{service: staging.ServiceParam},
+				Store:    store,
+			},
+			Stdout: &stdout,
+			Stderr: &stderr,
+		}
+
+		err := r.Run(t.Context(), cli.StatusOptions{Name: "/app/config", Verbose: true})
+		require.NoError(t, err)
+		output := stdout.String()
+		assert.Contains(t, output, "- deprecated")
+		assert.Contains(t, output, "- old")
+	})
+}
+
+// =============================================================================
+// Apply formatTagApplySummary Edge Cases
+// =============================================================================
+
+func TestApplyRunner_TagSummaryEdgeCases(t *testing.T) {
+	t.Parallel()
+
+	t.Run("apply with add tags only summary", func(t *testing.T) {
+		t.Parallel()
+
+		store := testutil.NewMockStore()
+		_ = store.StageTag(t.Context(), staging.ServiceParam, "/app/config", staging.TagEntry{
+			Add:      map[string]string{"env": "prod", "team": "backend"},
+			StagedAt: time.Now(),
+		})
+
+		var stdout, stderr bytes.Buffer
+		r := &cli.ApplyRunner{
+			UseCase: &stagingusecase.ApplyUseCase{
+				Strategy: &fullMockStrategy{service: staging.ServiceParam},
+				Store:    store,
+			},
+			Stdout: &stdout,
+			Stderr: &stderr,
+		}
+
+		err := r.Run(t.Context(), cli.ApplyOptions{})
+		require.NoError(t, err)
+		output := stdout.String()
+		assert.Contains(t, output, "Tagged")
+		assert.Contains(t, output, "+2")
+	})
+
+	t.Run("apply with remove tags only summary", func(t *testing.T) {
+		t.Parallel()
+
+		store := testutil.NewMockStore()
+		removeKeys := map[string]struct{}{"deprecated": {}, "old": {}, "obsolete": {}}
+		_ = store.StageTag(t.Context(), staging.ServiceParam, "/app/config", staging.TagEntry{
+			Remove:   removeKeys,
+			StagedAt: time.Now(),
+		})
+
+		var stdout, stderr bytes.Buffer
+		r := &cli.ApplyRunner{
+			UseCase: &stagingusecase.ApplyUseCase{
+				Strategy: &fullMockStrategy{service: staging.ServiceParam},
+				Store:    store,
+			},
+			Stdout: &stdout,
+			Stderr: &stderr,
+		}
+
+		err := r.Run(t.Context(), cli.ApplyOptions{})
+		require.NoError(t, err)
+		output := stdout.String()
+		assert.Contains(t, output, "Tagged")
+		assert.Contains(t, output, "-3")
+	})
+}

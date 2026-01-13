@@ -17,6 +17,37 @@ const (
 	retryDelay     = 100 * time.Millisecond
 )
 
+// processSpawner is an interface for spawning daemon processes.
+// This allows mocking in tests.
+type processSpawner interface {
+	Spawn(accountID, region string) error
+}
+
+// defaultProcessSpawner spawns daemon processes using exec.Command.
+type defaultProcessSpawner struct{}
+
+func (s *defaultProcessSpawner) Spawn(accountID, region string) error {
+	executable, err := os.Executable()
+	if err != nil {
+		return fmt.Errorf("failed to get executable path: %w", err)
+	}
+
+	cmd := exec.Command(executable, "stage", "agent", "start", "--account", accountID, "--region", region)
+	cmd.Stdout = nil
+	cmd.Stderr = nil
+	cmd.Stdin = nil
+
+	if err := cmd.Start(); err != nil {
+		return fmt.Errorf("failed to start daemon process: %w", err)
+	}
+
+	if err := cmd.Process.Release(); err != nil {
+		return fmt.Errorf("failed to release daemon process: %w", err)
+	}
+
+	return nil
+}
+
 // LauncherOption configures a Launcher.
 type LauncherOption func(*Launcher)
 
@@ -27,11 +58,19 @@ func WithAutoStartDisabled() LauncherOption {
 	}
 }
 
+// withSpawner is an internal option to set a custom process spawner (for testing).
+func withSpawner(spawner processSpawner) LauncherOption {
+	return func(l *Launcher) {
+		l.spawner = spawner
+	}
+}
+
 // Launcher manages daemon startup and connectivity.
 type Launcher struct {
 	accountID         string
 	region            string
 	client            *ipc.Client
+	spawner           processSpawner
 	autoStartDisabled bool
 }
 
@@ -41,6 +80,7 @@ func NewLauncher(accountID, region string, opts ...LauncherOption) *Launcher {
 		accountID: accountID,
 		region:    region,
 		client:    ipc.NewClient(accountID, region),
+		spawner:   &defaultProcessSpawner{},
 	}
 	for _, opt := range opts {
 		opt(l)
@@ -101,23 +141,5 @@ func (l *Launcher) startProcess() error {
 		return fmt.Errorf("daemon not running and auto-start is disabled; run 'suve stage agent start --account %s --region %s' manually", l.accountID, l.region)
 	}
 
-	executable, err := os.Executable()
-	if err != nil {
-		return fmt.Errorf("failed to get executable path: %w", err)
-	}
-
-	cmd := exec.Command(executable, "stage", "agent", "start", "--account", l.accountID, "--region", l.region)
-	cmd.Stdout = nil
-	cmd.Stderr = nil
-	cmd.Stdin = nil
-
-	if err := cmd.Start(); err != nil {
-		return fmt.Errorf("failed to start daemon process: %w", err)
-	}
-
-	if err := cmd.Process.Release(); err != nil {
-		return fmt.Errorf("failed to release daemon process: %w", err)
-	}
-
-	return nil
+	return l.spawner.Spawn(l.accountID, l.region)
 }

@@ -69,12 +69,12 @@ func (u *ShowUseCase) Execute(ctx context.Context, input ShowInput) (*ShowOutput
 		ResourceId:   param.Name,
 	})
 	if err == nil && tagsOutput != nil {
-		for _, tag := range tagsOutput.TagList {
-			output.Tags = append(output.Tags, ShowTag{
+		output.Tags = lo.Map(tagsOutput.TagList, func(tag paramapi.Tag, _ int) ShowTag {
+			return ShowTag{
 				Key:   lo.FromPtr(tag.Key),
 				Value: lo.FromPtr(tag.Value),
-			})
-		}
+			}
+		})
 	}
 
 	return output, nil

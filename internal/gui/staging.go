@@ -738,11 +738,11 @@ func (a *App) StagingDrain(service string, passphrase string, keep bool, force b
 		}
 	}
 
-	uc := &stagingusecase.DrainUseCase{
+	uc := &stagingusecase.StashPopUseCase{
 		FileStore:  fileStore,
 		AgentStore: agentStore,
 	}
-	result, err := uc.Execute(a.ctx, stagingusecase.DrainInput{
+	result, err := uc.Execute(a.ctx, stagingusecase.StashPopInput{
 		Service: svc,
 		Keep:    keep,
 		Force:   force,
@@ -786,16 +786,16 @@ func (a *App) StagingPersist(service string, passphrase string, keep bool, mode 
 		}
 	}
 
-	persistMode := stagingusecase.PersistModeOverwrite
+	persistMode := stagingusecase.StashPushModeOverwrite
 	if mode == "merge" {
-		persistMode = stagingusecase.PersistModeMerge
+		persistMode = stagingusecase.StashPushModeMerge
 	}
 
-	uc := &stagingusecase.PersistUseCase{
+	uc := &stagingusecase.StashPushUseCase{
 		AgentStore: agentStore,
 		FileStore:  fileStore,
 	}
-	result, err := uc.Execute(a.ctx, stagingusecase.PersistInput{
+	result, err := uc.Execute(a.ctx, stagingusecase.StashPushInput{
 		Service: svc,
 		Keep:    keep,
 		Mode:    persistMode,

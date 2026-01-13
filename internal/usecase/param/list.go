@@ -60,8 +60,10 @@ type ListUseCase struct {
 func (u *ListUseCase) Execute(ctx context.Context, input ListInput) (*ListOutput, error) {
 	// Compile regex filter if specified
 	var filterRegex *regexp.Regexp
+
 	if input.Filter != "" {
 		var err error
+
 		filterRegex, err = regexp.Compile(input.Filter)
 		if err != nil {
 			return nil, fmt.Errorf("invalid filter regex: %w", err)
@@ -103,6 +105,7 @@ type paramInfo struct {
 // executeAll fetches all pages (original behavior).
 func (u *ListUseCase) executeAll(ctx context.Context, input ListInput, apiInput *paramapi.DescribeParametersInput, filterRegex *regexp.Regexp) (*ListOutput, error) {
 	var params []paramInfo
+
 	paginator := paramapi.NewDescribeParametersPaginator(u.Client, apiInput)
 	for paginator.HasMorePages() {
 		page, err := paginator.NextPage(ctx)
@@ -112,9 +115,11 @@ func (u *ListUseCase) executeAll(ctx context.Context, input ListInput, apiInput 
 
 		for _, param := range page.Parameters {
 			name := lo.FromPtr(param.Name)
+
 			if filterRegex != nil && !filterRegex.MatchString(name) {
 				continue
 			}
+
 			params = append(params, paramInfo{
 				Name: name,
 				Type: string(param.Type),
@@ -128,6 +133,7 @@ func (u *ListUseCase) executeAll(ctx context.Context, input ListInput, apiInput 
 // executeWithPagination fetches pages until MaxResults is reached or no more pages.
 func (u *ListUseCase) executeWithPagination(ctx context.Context, input ListInput, apiInput *paramapi.DescribeParametersInput, filterRegex *regexp.Regexp) (*ListOutput, error) {
 	var params []paramInfo
+
 	nextToken := input.NextToken
 
 	for {
@@ -146,9 +152,11 @@ func (u *ListUseCase) executeWithPagination(ctx context.Context, input ListInput
 
 		for _, param := range page.Parameters {
 			name := lo.FromPtr(param.Name)
+
 			if filterRegex != nil && !filterRegex.MatchString(name) {
 				continue
 			}
+
 			params = append(params, paramInfo{
 				Name: name,
 				Type: string(param.Type),
@@ -166,6 +174,7 @@ func (u *ListUseCase) executeWithPagination(ctx context.Context, input ListInput
 
 	// Trim to MaxResults if we got more
 	outputNextToken := nextToken
+
 	if len(params) > input.MaxResults {
 		params = params[:input.MaxResults]
 		// Keep the nextToken so caller can fetch more
@@ -183,6 +192,7 @@ func (u *ListUseCase) buildOutput(ctx context.Context, withValue bool, params []
 		for _, p := range params {
 			output.Entries = append(output.Entries, ListEntry{Name: p.Name, Type: p.Type})
 		}
+
 		return output, nil
 	}
 
@@ -192,11 +202,13 @@ func (u *ListUseCase) buildOutput(ctx context.Context, withValue bool, params []
 	// Collect results in order
 	for _, p := range params {
 		entry := ListEntry{Name: p.Name, Type: p.Type}
+
 		if err, hasErr := errs[p.Name]; hasErr {
 			entry.Error = err
 		} else if val, hasVal := values[p.Name]; hasVal {
 			entry.Value = lo.ToPtr(val)
 		}
+
 		output.Entries = append(output.Entries, entry)
 	}
 
@@ -237,6 +249,7 @@ func (u *ListUseCase) fetchValuesBatched(ctx context.Context, params []paramInfo
 			for _, name := range batchMap[batchIdx] {
 				errs[name] = fmt.Errorf("failed to get parameter: %w", result.Err)
 			}
+
 			continue
 		}
 
@@ -247,7 +260,7 @@ func (u *ListUseCase) fetchValuesBatched(ctx context.Context, params []paramInfo
 
 		// Map invalid parameters (not found)
 		for _, name := range result.Value.InvalidParameters {
-			errs[name] = fmt.Errorf("parameter not found: %s", name)
+			errs[name] = fmt.Errorf("%w: %s", ErrParameterNotFound, name)
 		}
 	}
 

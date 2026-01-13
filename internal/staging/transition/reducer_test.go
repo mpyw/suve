@@ -593,3 +593,118 @@ func TestStagedTags_IsEmpty(t *testing.T) {
 		})
 	}
 }
+
+func TestStagedTags_Clone(t *testing.T) {
+	tests := []struct {
+		name        string
+		stagedTags  StagedTags
+		wantToSet   map[string]string
+		wantToUnset []string
+	}{
+		{
+			name:        "Empty with nil maps",
+			stagedTags:  StagedTags{},
+			wantToSet:   map[string]string{},
+			wantToUnset: []string{},
+		},
+		{
+			name: "With values",
+			stagedTags: StagedTags{
+				ToSet:   map[string]string{"env": "prod"},
+				ToUnset: maputil.NewSet("deprecated"),
+			},
+			wantToSet:   map[string]string{"env": "prod"},
+			wantToUnset: []string{"deprecated"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cloned := tt.stagedTags.Clone()
+			assert.Equal(t, tt.wantToSet, cloned.ToSet)
+			assert.ElementsMatch(t, tt.wantToUnset, cloned.ToUnset.Values())
+
+			// Ensure maps are initialized (not nil)
+			assert.NotNil(t, cloned.ToSet)
+			assert.NotNil(t, cloned.ToUnset)
+
+			// Ensure it's a deep copy by modifying cloned and checking original is unchanged
+			cloned.ToSet["new"] = "value"
+			cloned.ToUnset.Add("new-key")
+			assert.NotContains(t, tt.stagedTags.ToSet, "new")
+		})
+	}
+}
+
+func TestReduceEntry_Delete_NotFound(t *testing.T) {
+	// Test case: CurrentValue=nil + NotStaged -> ERROR (resource not found)
+	state := EntryState{
+		CurrentValue: nil,
+		StagedState:  EntryStagedStateNotStaged{},
+	}
+	result := ReduceEntry(state, EntryActionDelete{})
+	assert.Equal(t, ErrCannotDeleteNotFound, result.Error)
+	assert.Equal(t, EntryStagedStateNotStaged{}, result.NewState.StagedState)
+}
+
+func TestReduceEntry_Delete_InconsistentState(t *testing.T) {
+	// Test edge case: CurrentValue=nil + Delete -> Delete (no-op)
+	// This is an inconsistent state in practice, but the reducer handles it gracefully
+	state := EntryState{
+		CurrentValue: nil,                      // Resource doesn't exist on AWS
+		StagedState:  EntryStagedStateDelete{}, // But staged for delete
+	}
+	result := ReduceEntry(state, EntryActionDelete{})
+	// This should still return error since the resource doesn't exist
+	assert.Equal(t, ErrCannotDeleteNotFound, result.Error)
+	assert.Equal(t, EntryStagedStateDelete{}, result.NewState.StagedState)
+}
+
+// Test interface marker methods for coverage.
+func TestEntryAction_Marker(t *testing.T) {
+	t.Parallel()
+	// These tests exist to cover the sealed interface marker methods
+	var _ EntryAction = EntryActionAdd{}
+
+	var _ EntryAction = EntryActionEdit{}
+
+	var _ EntryAction = EntryActionDelete{}
+
+	var _ EntryAction = EntryActionReset{}
+
+	// Call the marker methods directly
+	EntryActionAdd{Value: "test"}.isEntryAction()
+	EntryActionEdit{Value: "test"}.isEntryAction()
+	EntryActionDelete{}.isEntryAction()
+	EntryActionReset{}.isEntryAction()
+}
+
+func TestTagAction_Marker(t *testing.T) {
+	t.Parallel()
+	// These tests exist to cover the sealed interface marker methods
+	var _ TagAction = TagActionTag{}
+
+	var _ TagAction = TagActionUntag{}
+
+	// Call the marker methods directly
+	TagActionTag{Tags: map[string]string{}}.isTagAction()
+	TagActionUntag{Keys: maputil.NewSet[string]()}.isTagAction()
+}
+
+func TestEntryStagedState_Marker(t *testing.T) {
+	t.Parallel()
+	// These tests exist to cover the sealed interface marker methods
+	var _ EntryStagedState = EntryStagedStateNotStaged{}
+
+	var _ EntryStagedState = EntryStagedStateCreate{}
+
+	var _ EntryStagedState = EntryStagedStateUpdate{}
+
+	var _ EntryStagedState = EntryStagedStateDelete{}
+
+	// Call the marker methods directly
+	EntryStagedStateNotStaged{}.isEntryStagedState()
+	EntryStagedStateCreate{DraftValue: "test"}.isEntryStagedState()
+	EntryStagedStateUpdate{DraftValue: "test"}.isEntryStagedState()
+	EntryStagedStateDelete{}.isEntryStagedState()
+}

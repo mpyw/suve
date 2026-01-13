@@ -323,3 +323,198 @@ func TestDrainError(t *testing.T) {
 		assert.ErrorIs(t, err, innerErr)
 	})
 }
+
+// =============================================================================
+// Service-Specific File Deletion Tests
+// =============================================================================
+
+func TestDrainUseCase_ServiceSpecific_FileDeleteErrors(t *testing.T) {
+	t.Parallel()
+
+	t.Run("write back error for service-specific drain when file has other services", func(t *testing.T) {
+		t.Parallel()
+
+		fileStore := testutil.NewMockStore()
+		agentStore := testutil.NewMockStore()
+
+		// File has both param and secret entries
+		_ = fileStore.StageEntry(t.Context(), staging.ServiceParam, "/app/param", staging.Entry{
+			Operation: staging.OperationUpdate,
+			Value:     lo.ToPtr("param-value"),
+			StagedAt:  time.Now(),
+		})
+		_ = fileStore.StageEntry(t.Context(), staging.ServiceSecret, "my-secret", staging.Entry{
+			Operation: staging.OperationUpdate,
+			Value:     lo.ToPtr("secret-value"),
+			StagedAt:  time.Now(),
+		})
+
+		usecase := &stagingusecase.StashPopUseCase{
+			FileStore:  fileStore,
+			AgentStore: agentStore,
+		}
+
+		// Make WriteState fail (for writing back remaining state)
+		fileStore.WriteStateErr = errors.New("write back error")
+
+		// Execute should return output but with non-fatal error
+		output, err := usecase.Execute(t.Context(), stagingusecase.StashPopInput{
+			Service: staging.ServiceParam,
+		})
+		assert.NotNil(t, output)
+		assert.Equal(t, 1, output.EntryCount)
+
+		var drainErr *stagingusecase.StashPopError
+		require.ErrorAs(t, err, &drainErr)
+		assert.Equal(t, "delete", drainErr.Op)
+		assert.True(t, drainErr.NonFatal)
+
+		// Agent should still have the param entry (operation succeeded before cleanup)
+		_, err = agentStore.GetEntry(t.Context(), staging.ServiceParam, "/app/param")
+		require.NoError(t, err)
+	})
+}
+
+func TestDrainUseCase_ServiceSpecific_MergeWithAgentState(t *testing.T) {
+	t.Parallel()
+
+	t.Run("service-specific drain merges with existing agent state for other services", func(t *testing.T) {
+		t.Parallel()
+
+		fileStore := testutil.NewMockStore()
+		agentStore := testutil.NewMockStore()
+
+		// Agent already has secret entries
+		_ = agentStore.StageEntry(t.Context(), staging.ServiceSecret, "existing-secret", staging.Entry{
+			Operation: staging.OperationUpdate,
+			Value:     lo.ToPtr("agent-secret"),
+			StagedAt:  time.Now(),
+		})
+
+		// File has param entries
+		_ = fileStore.StageEntry(t.Context(), staging.ServiceParam, "/app/param", staging.Entry{
+			Operation: staging.OperationUpdate,
+			Value:     lo.ToPtr("file-param"),
+			StagedAt:  time.Now(),
+		})
+
+		usecase := &stagingusecase.StashPopUseCase{
+			FileStore:  fileStore,
+			AgentStore: agentStore,
+		}
+
+		_, err := usecase.Execute(t.Context(), stagingusecase.StashPopInput{
+			Service: staging.ServiceParam,
+		})
+		require.NoError(t, err)
+
+		// Both services should be in agent
+		_, err = agentStore.GetEntry(t.Context(), staging.ServiceParam, "/app/param")
+		require.NoError(t, err)
+		_, err = agentStore.GetEntry(t.Context(), staging.ServiceSecret, "existing-secret")
+		require.NoError(t, err)
+	})
+}
+
+func TestDrainUseCase_AgentDrainError_TreatedAsEmpty(t *testing.T) {
+	t.Parallel()
+
+	fileStore := testutil.NewMockStore()
+	agentStore := testutil.NewMockStore()
+
+	// File has param entries
+	_ = fileStore.StageEntry(t.Context(), staging.ServiceParam, "/app/param", staging.Entry{
+		Operation: staging.OperationUpdate,
+		Value:     lo.ToPtr("file-param"),
+		StagedAt:  time.Now(),
+	})
+
+	// Make agent drain fail (simulates agent not running)
+	agentStore.DrainErr = errors.New("agent not available")
+
+	usecase := &stagingusecase.StashPopUseCase{
+		FileStore:  fileStore,
+		AgentStore: agentStore,
+	}
+
+	// Should succeed because agent drain error is treated as empty state
+	output, err := usecase.Execute(t.Context(), stagingusecase.StashPopInput{})
+	require.NoError(t, err)
+	assert.Equal(t, 1, output.EntryCount)
+
+	// Verify entry is in agent (write should succeed even though drain failed)
+	_, err = agentStore.GetEntry(t.Context(), staging.ServiceParam, "/app/param")
+	require.NoError(t, err)
+}
+
+func TestDrainUseCase_ServiceSpecific_FileDeleteDrainError(t *testing.T) {
+	t.Parallel()
+
+	t.Run("drain error when deleting file after service removal - file becomes empty", func(t *testing.T) {
+		t.Parallel()
+
+		fileStore := testutil.NewMockStore()
+		agentStore := testutil.NewMockStore()
+
+		// File has only param entries (will be empty after draining param service)
+		_ = fileStore.StageEntry(t.Context(), staging.ServiceParam, "/app/param", staging.Entry{
+			Operation: staging.OperationUpdate,
+			Value:     lo.ToPtr("param-value"),
+			StagedAt:  time.Now(),
+		})
+
+		// Set DrainErr to fail on 2nd call (the delete call after successful initial drain)
+		fileStore.DrainErr = errors.New("delete file error")
+		fileStore.DrainErrOnCall = 2 // Fail on second Drain call only
+
+		usecase := &stagingusecase.StashPopUseCase{
+			FileStore:  fileStore,
+			AgentStore: agentStore,
+		}
+
+		// Execute should succeed with non-fatal error (state already transferred)
+		output, err := usecase.Execute(t.Context(), stagingusecase.StashPopInput{
+			Service: staging.ServiceParam,
+		})
+		require.NotNil(t, output)
+		assert.Equal(t, 1, output.EntryCount)
+
+		var drainErr *stagingusecase.StashPopError
+		require.ErrorAs(t, err, &drainErr)
+		assert.Equal(t, "delete", drainErr.Op)
+		assert.True(t, drainErr.NonFatal)
+	})
+
+	t.Run("drain error when deleting file for full drain", func(t *testing.T) {
+		t.Parallel()
+
+		fileStore := testutil.NewMockStore()
+		agentStore := testutil.NewMockStore()
+
+		// File has entries
+		_ = fileStore.StageEntry(t.Context(), staging.ServiceParam, "/app/param", staging.Entry{
+			Operation: staging.OperationUpdate,
+			Value:     lo.ToPtr("param-value"),
+			StagedAt:  time.Now(),
+		})
+
+		// Set DrainErr to fail on 2nd call (the delete call after successful initial drain)
+		fileStore.DrainErr = errors.New("delete file error")
+		fileStore.DrainErrOnCall = 2 // Fail on second Drain call only
+
+		usecase := &stagingusecase.StashPopUseCase{
+			FileStore:  fileStore,
+			AgentStore: agentStore,
+		}
+
+		// Execute should succeed with non-fatal error (state already transferred)
+		output, err := usecase.Execute(t.Context(), stagingusecase.StashPopInput{})
+		require.NotNil(t, output)
+		assert.Equal(t, 1, output.EntryCount)
+
+		var drainErr *stagingusecase.StashPopError
+		require.ErrorAs(t, err, &drainErr)
+		assert.Equal(t, "delete", drainErr.Op)
+		assert.True(t, drainErr.NonFatal)
+	})
+}

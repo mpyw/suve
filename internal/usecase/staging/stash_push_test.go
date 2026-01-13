@@ -578,3 +578,224 @@ func TestPersistError(t *testing.T) {
 		assert.ErrorIs(t, err, innerErr)
 	})
 }
+
+// =============================================================================
+// HintedUnstager Tests
+// =============================================================================
+
+func TestPersistUseCase_WithHintedUnstager(t *testing.T) {
+	t.Parallel()
+
+	t.Run("uses persist hint for UnstageAll", func(t *testing.T) {
+		t.Parallel()
+
+		agentStore := testutil.NewHintedMockStore()
+		fileStore := testutil.NewMockStore()
+
+		_ = agentStore.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
+			Operation: staging.OperationUpdate,
+			Value:     lo.ToPtr("agent-value"),
+			StagedAt:  time.Now(),
+		})
+
+		usecase := &stagingusecase.StashPushUseCase{
+			AgentStore: agentStore,
+			FileStore:  fileStore,
+		}
+
+		output, err := usecase.Execute(t.Context(), stagingusecase.StashPushInput{})
+		require.NoError(t, err)
+		assert.Equal(t, 1, output.EntryCount)
+
+		// Verify persist hint was used
+		assert.Equal(t, "persist", agentStore.LastHint)
+
+		// Verify agent is cleared
+		_, err = agentStore.GetEntry(t.Context(), staging.ServiceParam, "/app/config")
+		assert.ErrorIs(t, err, staging.ErrNotStaged)
+	})
+
+	t.Run("hinted unstage error is non-fatal", func(t *testing.T) {
+		t.Parallel()
+
+		agentStore := testutil.NewHintedMockStore()
+		fileStore := testutil.NewMockStore()
+
+		_ = agentStore.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
+			Operation: staging.OperationUpdate,
+			Value:     lo.ToPtr("agent-value"),
+			StagedAt:  time.Now(),
+		})
+		agentStore.UnstageAllWithHintErr = errors.New("hinted unstage error")
+
+		usecase := &stagingusecase.StashPushUseCase{
+			AgentStore: agentStore,
+			FileStore:  fileStore,
+		}
+
+		output, err := usecase.Execute(t.Context(), stagingusecase.StashPushInput{})
+		// Should return output even on error since it's non-fatal
+		assert.NotNil(t, output)
+		assert.Equal(t, 1, output.EntryCount)
+
+		// Error should be returned but as non-fatal
+		var persistErr *stagingusecase.StashPushError
+		require.ErrorAs(t, err, &persistErr)
+		assert.Equal(t, "clear", persistErr.Op)
+		assert.True(t, persistErr.NonFatal)
+
+		// File should still have the entry (write succeeded)
+		_, err = fileStore.GetEntry(t.Context(), staging.ServiceParam, "/app/config")
+		require.NoError(t, err)
+	})
+
+	t.Run("non-hinted agent UnstageAll error is non-fatal", func(t *testing.T) {
+		t.Parallel()
+
+		agentStore := testutil.NewMockStore()
+		fileStore := testutil.NewMockStore()
+
+		_ = agentStore.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
+			Operation: staging.OperationUpdate,
+			Value:     lo.ToPtr("agent-value"),
+			StagedAt:  time.Now(),
+		})
+		agentStore.UnstageAllErr = errors.New("unstage all error")
+
+		usecase := &stagingusecase.StashPushUseCase{
+			AgentStore: agentStore,
+			FileStore:  fileStore,
+		}
+
+		output, err := usecase.Execute(t.Context(), stagingusecase.StashPushInput{})
+		// Should return output even on error since it's non-fatal
+		assert.NotNil(t, output)
+		assert.Equal(t, 1, output.EntryCount)
+
+		// Error should be returned but as non-fatal
+		var persistErr *stagingusecase.StashPushError
+		require.ErrorAs(t, err, &persistErr)
+		assert.Equal(t, "clear", persistErr.Op)
+		assert.True(t, persistErr.NonFatal)
+	})
+}
+
+func TestPersistUseCase_ServiceSpecific_ClearError(t *testing.T) {
+	t.Parallel()
+
+	t.Run("service-specific WriteState error is non-fatal", func(t *testing.T) {
+		t.Parallel()
+
+		agentStore := testutil.NewMockStore()
+		fileStore := testutil.NewMockStore()
+
+		// Agent has entries for both services
+		_ = agentStore.StageEntry(t.Context(), staging.ServiceParam, "/app/param", staging.Entry{
+			Operation: staging.OperationUpdate,
+			Value:     lo.ToPtr("param-value"),
+			StagedAt:  time.Now(),
+		})
+		_ = agentStore.StageEntry(t.Context(), staging.ServiceSecret, "my-secret", staging.Entry{
+			Operation: staging.OperationUpdate,
+			Value:     lo.ToPtr("secret-value"),
+			StagedAt:  time.Now(),
+		})
+
+		usecase := &stagingusecase.StashPushUseCase{
+			AgentStore: agentStore,
+			FileStore:  fileStore,
+		}
+
+		// First push succeeds
+		_, err := usecase.Execute(t.Context(), stagingusecase.StashPushInput{Service: staging.ServiceParam})
+		require.NoError(t, err)
+
+		// Now make WriteState fail for the clearing step
+		agentStore.WriteStateErr = errors.New("write state error")
+
+		// Push secret service (param should already be cleared from previous push)
+		// Re-add param to agent store since it was cleared
+		_ = agentStore.StageEntry(t.Context(), staging.ServiceParam, "/app/param2", staging.Entry{
+			Operation: staging.OperationUpdate,
+			Value:     lo.ToPtr("param-value2"),
+			StagedAt:  time.Now(),
+		})
+
+		output, err := usecase.Execute(t.Context(), stagingusecase.StashPushInput{Service: staging.ServiceParam})
+		// Should return output even on error since it's non-fatal
+		assert.NotNil(t, output)
+		assert.Equal(t, 1, output.EntryCount)
+
+		// Error should be returned but as non-fatal
+		var persistErr *stagingusecase.StashPushError
+		require.ErrorAs(t, err, &persistErr)
+		assert.Equal(t, "clear", persistErr.Op)
+		assert.True(t, persistErr.NonFatal)
+	})
+}
+
+func TestPersistUseCase_FileDrainError_TreatedAsFresh(t *testing.T) {
+	t.Parallel()
+
+	t.Run("merge mode with file drain error starts fresh", func(t *testing.T) {
+		t.Parallel()
+
+		agentStore := testutil.NewMockStore()
+		fileStore := testutil.NewMockStore()
+
+		// Agent has entries
+		_ = agentStore.StageEntry(t.Context(), staging.ServiceParam, "/app/param", staging.Entry{
+			Operation: staging.OperationUpdate,
+			Value:     lo.ToPtr("agent-value"),
+			StagedAt:  time.Now(),
+		})
+
+		// Make file drain fail (simulates file doesn't exist)
+		fileStore.DrainErr = errors.New("file not found")
+
+		usecase := &stagingusecase.StashPushUseCase{
+			AgentStore: agentStore,
+			FileStore:  fileStore,
+		}
+
+		// Should succeed because file drain error is treated as empty state (start fresh)
+		output, err := usecase.Execute(t.Context(), stagingusecase.StashPushInput{Mode: stagingusecase.StashPushModeMerge})
+		require.NoError(t, err)
+		assert.Equal(t, 1, output.EntryCount)
+
+		// Verify entry is in file
+		_, err = fileStore.GetEntry(t.Context(), staging.ServiceParam, "/app/param")
+		require.NoError(t, err)
+	})
+
+	t.Run("service-specific push with file drain error starts fresh", func(t *testing.T) {
+		t.Parallel()
+
+		agentStore := testutil.NewMockStore()
+		fileStore := testutil.NewMockStore()
+
+		// Agent has entries
+		_ = agentStore.StageEntry(t.Context(), staging.ServiceParam, "/app/param", staging.Entry{
+			Operation: staging.OperationUpdate,
+			Value:     lo.ToPtr("agent-value"),
+			StagedAt:  time.Now(),
+		})
+
+		// Make file drain fail (simulates file doesn't exist)
+		fileStore.DrainErr = errors.New("file not found")
+
+		usecase := &stagingusecase.StashPushUseCase{
+			AgentStore: agentStore,
+			FileStore:  fileStore,
+		}
+
+		// Should succeed because file drain error is treated as empty state (start fresh)
+		output, err := usecase.Execute(t.Context(), stagingusecase.StashPushInput{Service: staging.ServiceParam})
+		require.NoError(t, err)
+		assert.Equal(t, 1, output.EntryCount)
+
+		// Verify entry is in file
+		_, err = fileStore.GetEntry(t.Context(), staging.ServiceParam, "/app/param")
+		require.NoError(t, err)
+	})
+}

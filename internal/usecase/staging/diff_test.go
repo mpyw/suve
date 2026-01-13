@@ -370,3 +370,76 @@ func TestDiffUseCase_Execute_UnknownOperation(t *testing.T) {
 	assert.Equal(t, usecasestaging.DiffEntryWarning, output.Entries[0].Type)
 	assert.Contains(t, output.Entries[0].Warning, "fetch error")
 }
+
+func TestDiffUseCase_Execute_FilterByName_EntryExistsTagNil(t *testing.T) {
+	t.Parallel()
+
+	store := testutil.NewMockStore()
+	// Stage only an entry, no tag
+	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/entry-only", staging.Entry{
+		Operation: staging.OperationUpdate,
+		Value:     lo.ToPtr("value"),
+		StagedAt:  time.Now(),
+	}))
+
+	uc := &usecasestaging.DiffUseCase{
+		Strategy: newMockDiffStrategy(),
+		Store:    store,
+	}
+
+	output, err := uc.Execute(t.Context(), usecasestaging.DiffInput{Name: "/app/entry-only"})
+	require.NoError(t, err)
+	require.Len(t, output.Entries, 1)
+	assert.Equal(t, "/app/entry-only", output.Entries[0].Name)
+	assert.Empty(t, output.TagEntries) // No tag entries
+}
+
+func TestDiffUseCase_Execute_FilterByName_TagExistsEntryNil(t *testing.T) {
+	t.Parallel()
+
+	store := testutil.NewMockStore()
+	// Stage only a tag, no entry
+	require.NoError(t, store.StageTag(t.Context(), staging.ServiceParam, "/app/tag-only", staging.TagEntry{
+		Add:      map[string]string{"env": "prod"},
+		StagedAt: time.Now(),
+	}))
+
+	uc := &usecasestaging.DiffUseCase{
+		Strategy: newMockDiffStrategy(),
+		Store:    store,
+	}
+
+	output, err := uc.Execute(t.Context(), usecasestaging.DiffInput{Name: "/app/tag-only"})
+	require.NoError(t, err)
+	assert.Empty(t, output.Entries) // No entries
+	require.Len(t, output.TagEntries, 1)
+	assert.Equal(t, "/app/tag-only", output.TagEntries[0].Name)
+	assert.Equal(t, "prod", output.TagEntries[0].Add["env"])
+}
+
+func TestDiffUseCase_Execute_WithTagEntriesProcessing(t *testing.T) {
+	t.Parallel()
+
+	store := testutil.NewMockStore()
+	removeKeys := map[string]struct{}{"old-key": {}}
+	require.NoError(t, store.StageTag(t.Context(), staging.ServiceParam, "/app/config", staging.TagEntry{
+		Add:      map[string]string{"env": "prod", "team": "backend"},
+		Remove:   removeKeys,
+		StagedAt: time.Now(),
+	}))
+
+	uc := &usecasestaging.DiffUseCase{
+		Strategy: newMockDiffStrategy(),
+		Store:    store,
+	}
+
+	output, err := uc.Execute(t.Context(), usecasestaging.DiffInput{})
+	require.NoError(t, err)
+	require.Len(t, output.TagEntries, 1)
+
+	tagEntry := output.TagEntries[0]
+	assert.Equal(t, "/app/config", tagEntry.Name)
+	assert.Equal(t, "prod", tagEntry.Add["env"])
+	assert.Equal(t, "backend", tagEntry.Add["team"])
+	assert.True(t, tagEntry.Remove.Contains("old-key"))
+}

@@ -998,3 +998,112 @@ func TestRun_ApplyTagsOnlyRemovals(t *testing.T) {
 	assert.Contains(t, buf.String(), "[-2]")
 	assert.NotContains(t, buf.String(), "+")
 }
+
+func TestRun_WithHintedStore(t *testing.T) {
+	t.Parallel()
+
+	store := testutil.NewHintedMockStore()
+
+	// Stage SSM Parameter Store parameter
+	_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
+		Operation: staging.OperationUpdate,
+		Value:     lo.ToPtr("param-value"),
+		StagedAt:  time.Now(),
+	})
+
+	paramMock := newParamStrategy()
+
+	var buf bytes.Buffer
+	r := &apply.Runner{
+		ParamStrategy: paramMock,
+		Store:         store,
+		Stdout:        &buf,
+		Stderr:        &bytes.Buffer{},
+	}
+
+	err := r.Run(t.Context())
+	require.NoError(t, err)
+	assert.Contains(t, buf.String(), "SSM Parameter Store: Updated /app/config")
+	assert.Equal(t, "apply", store.LastHint)
+}
+
+func TestRun_WithHintedStoreTagApply(t *testing.T) {
+	t.Parallel()
+
+	store := testutil.NewHintedMockStore()
+
+	// Stage tag changes
+	_ = store.StageTag(t.Context(), staging.ServiceParam, "/app/config", staging.TagEntry{
+		Add:      map[string]string{"env": "prod"},
+		StagedAt: time.Now(),
+	})
+
+	paramMock := newParamStrategy()
+
+	var buf bytes.Buffer
+	r := &apply.Runner{
+		ParamStrategy: paramMock,
+		Store:         store,
+		Stdout:        &buf,
+		Stderr:        &bytes.Buffer{},
+	}
+
+	err := r.Run(t.Context())
+	require.NoError(t, err)
+	assert.Contains(t, buf.String(), "SSM Parameter Store: Tagged /app/config")
+	assert.Equal(t, "apply", store.LastHint)
+}
+
+func TestRun_FormatTagApplySummaryEmpty(t *testing.T) {
+	t.Parallel()
+
+	store := testutil.NewMockStore()
+
+	// Stage tag changes with both empty add and remove
+	_ = store.StageTag(t.Context(), staging.ServiceParam, "/app/config", staging.TagEntry{
+		StagedAt: time.Now(),
+	})
+
+	paramMock := newParamStrategy()
+
+	var buf bytes.Buffer
+	r := &apply.Runner{
+		ParamStrategy: paramMock,
+		Store:         store,
+		Stdout:        &buf,
+		Stderr:        &bytes.Buffer{},
+	}
+
+	err := r.Run(t.Context())
+	require.NoError(t, err)
+	// Should not have [+N] or [-N] suffix when no changes
+	assert.Contains(t, buf.String(), "SSM Parameter Store: Tagged /app/config")
+	assert.NotContains(t, buf.String(), "[+")
+	assert.NotContains(t, buf.String(), "[-")
+}
+
+func TestRun_ListTagsError(t *testing.T) {
+	t.Parallel()
+
+	store := testutil.NewMockStore()
+	store.ListTagsErr = errors.New("mock list tags error")
+
+	// Stage some entries so we get past the first ListEntries call
+	_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
+		Operation: staging.OperationUpdate,
+		Value:     lo.ToPtr("param-value"),
+		StagedAt:  time.Now(),
+	})
+
+	var buf bytes.Buffer
+	r := &apply.Runner{
+		ParamStrategy: newParamStrategy(),
+		Store:         store,
+		Stdout:        &buf,
+		Stderr:        &bytes.Buffer{},
+	}
+
+	err := r.Run(t.Context())
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "mock list tags error")
+}

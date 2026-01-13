@@ -2,7 +2,6 @@ package param_test
 
 import (
 	"context"
-	"errors"
 	"testing"
 	"time"
 
@@ -23,6 +22,7 @@ func (m *mockLogClient) GetParameterHistory(_ context.Context, _ *paramapi.GetPa
 	if m.getHistoryErr != nil {
 		return nil, m.getHistoryErr
 	}
+
 	return m.getHistoryResult, nil
 }
 
@@ -83,7 +83,7 @@ func TestLogUseCase_Execute_Error(t *testing.T) {
 	t.Parallel()
 
 	client := &mockLogClient{
-		getHistoryErr: errors.New("aws error"),
+		getHistoryErr: errAWS,
 	}
 
 	uc := &param.LogUseCase{Client: client}
@@ -91,7 +91,7 @@ func TestLogUseCase_Execute_Error(t *testing.T) {
 	_, err := uc.Execute(t.Context(), param.LogInput{
 		Name: "/app/config",
 	})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to get parameter history")
 }
 

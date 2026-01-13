@@ -505,3 +505,62 @@ func TestApplyUseCase_Execute_ListTagsError(t *testing.T) {
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "list tags error")
 }
+
+// =============================================================================
+// HintedUnstager Tests
+// =============================================================================
+
+func TestApplyUseCase_Execute_WithHintedUnstager_Entry(t *testing.T) {
+	t.Parallel()
+
+	store := testutil.NewHintedMockStore()
+	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
+		Operation: staging.OperationUpdate,
+		Value:     lo.ToPtr("new-value"),
+		StagedAt:  time.Now(),
+	}))
+
+	uc := &usecasestaging.ApplyUseCase{
+		Strategy: newMockApplyStrategy(),
+		Store:    store,
+	}
+
+	output, err := uc.Execute(t.Context(), usecasestaging.ApplyInput{
+		IgnoreConflicts: true,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, 1, output.EntrySucceeded)
+
+	// Verify hint was used
+	assert.Equal(t, "apply", store.LastHint)
+
+	// Verify unstaged
+	_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/config")
+	assert.ErrorIs(t, err, staging.ErrNotStaged)
+}
+
+func TestApplyUseCase_Execute_WithHintedUnstager_Tag(t *testing.T) {
+	t.Parallel()
+
+	store := testutil.NewHintedMockStore()
+	require.NoError(t, store.StageTag(t.Context(), staging.ServiceParam, "/app/config", staging.TagEntry{
+		Add:      map[string]string{"env": "prod"},
+		StagedAt: time.Now(),
+	}))
+
+	uc := &usecasestaging.ApplyUseCase{
+		Strategy: newMockApplyTagStrategy(),
+		Store:    store,
+	}
+
+	output, err := uc.Execute(t.Context(), usecasestaging.ApplyInput{})
+	require.NoError(t, err)
+	assert.Equal(t, 1, output.TagSucceeded)
+
+	// Verify hint was used
+	assert.Equal(t, "apply", store.LastHint)
+
+	// Verify unstaged
+	_, err = store.GetTag(t.Context(), staging.ServiceParam, "/app/config")
+	assert.ErrorIs(t, err, staging.ErrNotStaged)
+}

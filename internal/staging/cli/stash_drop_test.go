@@ -331,3 +331,32 @@ func TestState_TotalCount(t *testing.T) {
 		assert.Equal(t, 3, s.TotalCount())
 	})
 }
+
+func TestStashDropFlags(t *testing.T) {
+	t.Parallel()
+
+	flags := stashDropFlags()
+	assert.Len(t, flags, 1) // force
+
+	flagNames := make([]string, len(flags))
+	for i, f := range flags {
+		flagNames[i] = f.Names()[0]
+	}
+
+	assert.Contains(t, flagNames, "force")
+}
+
+func TestStashShowFlags(t *testing.T) {
+	t.Parallel()
+
+	flags := stashShowFlags()
+	assert.Len(t, flags, 2) // verbose, passphrase-stdin
+
+	flagNames := make([]string, len(flags))
+	for i, f := range flags {
+		flagNames[i] = f.Names()[0]
+	}
+
+	assert.Contains(t, flagNames, "verbose")
+	assert.Contains(t, flagNames, "passphrase-stdin")
+}

@@ -2,7 +2,6 @@ package param_test
 
 import (
 	"context"
-	"errors"
 	"testing"
 	"time"
 
@@ -28,6 +27,7 @@ func (m *mockShowClient) GetParameter(_ context.Context, _ *paramapi.GetParamete
 	if m.getParameterErr != nil {
 		return nil, m.getParameterErr
 	}
+
 	return m.getParameterResult, nil
 }
 
@@ -35,9 +35,11 @@ func (m *mockShowClient) GetParameterHistory(_ context.Context, _ *paramapi.GetP
 	if m.getHistoryErr != nil {
 		return nil, m.getHistoryErr
 	}
+
 	if m.getHistoryResult == nil {
 		return &paramapi.GetParameterHistoryOutput{}, nil
 	}
+
 	return m.getHistoryResult, nil
 }
 
@@ -45,9 +47,11 @@ func (m *mockShowClient) ListTagsForResource(_ context.Context, _ *paramapi.List
 	if m.listTagsErr != nil {
 		return nil, m.listTagsErr
 	}
+
 	if m.listTagsResult != nil {
 		return m.listTagsResult, nil
 	}
+
 	return &paramapi.ListTagsForResourceOutput{}, nil
 }
 
@@ -144,7 +148,7 @@ func TestShowUseCase_Execute_Error(t *testing.T) {
 	t.Parallel()
 
 	client := &mockShowClient{
-		getParameterErr: errors.New("aws error"),
+		getParameterErr: errAWS,
 	}
 
 	uc := &param.ShowUseCase{Client: client}
@@ -155,7 +159,7 @@ func TestShowUseCase_Execute_Error(t *testing.T) {
 	_, err = uc.Execute(t.Context(), param.ShowInput{
 		Spec: spec,
 	})
-	assert.Error(t, err)
+	require.Error(t, err)
 }
 
 func TestShowUseCase_Execute_NoLastModified(t *testing.T) {

@@ -1,0 +1,379 @@
+package ipc
+
+import (
+	"encoding/json"
+	"errors"
+	"net"
+	"os"
+	"path/filepath"
+	"testing"
+	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/mpyw/suve/internal/staging/store/agent/internal/protocol"
+)
+
+func TestNewClient(t *testing.T) {
+	t.Parallel()
+
+	c := NewClient(testAccountID, testRegion)
+	require.NotNil(t, c)
+	assert.NotEmpty(t, c.socketPath)
+	assert.Contains(t, c.socketPath, testAccountID)
+	assert.Contains(t, c.socketPath, testRegion)
+}
+
+func TestClient_SendRequest_NotConnected(t *testing.T) {
+	t.Parallel()
+
+	c := NewClient("nonexistent", "nonexistent")
+	resp, err := c.SendRequest(&protocol.Request{Method: protocol.MethodPing})
+
+	require.Error(t, err)
+	assert.Nil(t, resp)
+	assert.True(t, errors.Is(err, ErrNotConnected))
+}
+
+func TestClient_Ping_NotConnected(t *testing.T) {
+	t.Parallel()
+
+	c := NewClient("nonexistent", "nonexistent")
+	err := c.Ping()
+
+	require.Error(t, err)
+	assert.True(t, errors.Is(err, ErrNotConnected))
+}
+
+func TestClient_SendRequest_Success(t *testing.T) {
+	// Create temp directory for socket
+	tmpDir, err := os.MkdirTemp("/tmp", "suve-client-test-*")
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = os.RemoveAll(tmpDir) })
+
+	socketPath := filepath.Join(tmpDir, "test.sock")
+
+	// Start a mock server
+	listener, err := net.Listen("unix", socketPath)
+	require.NoError(t, err)
+	defer func() { _ = listener.Close() }()
+
+	go func() {
+		conn, err := listener.Accept()
+		if err != nil {
+			return
+		}
+		defer func() { _ = conn.Close() }()
+
+		// Read request
+		var req protocol.Request
+		decoder := json.NewDecoder(conn)
+		if err := decoder.Decode(&req); err != nil {
+			return
+		}
+
+		// Send response
+		resp := protocol.Response{Success: true}
+		encoder := json.NewEncoder(conn)
+		_ = encoder.Encode(&resp)
+	}()
+
+	// Create client with custom socket path
+	c := &Client{socketPath: socketPath}
+
+	resp, err := c.SendRequest(&protocol.Request{Method: protocol.MethodPing})
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+	assert.True(t, resp.Success)
+}
+
+func TestClient_SendRequest_ErrorResponse(t *testing.T) {
+	// Create temp directory for socket
+	tmpDir, err := os.MkdirTemp("/tmp", "suve-client-err-*")
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = os.RemoveAll(tmpDir) })
+
+	socketPath := filepath.Join(tmpDir, "test.sock")
+
+	// Start a mock server that returns an error
+	listener, err := net.Listen("unix", socketPath)
+	require.NoError(t, err)
+	defer func() { _ = listener.Close() }()
+
+	go func() {
+		conn, err := listener.Accept()
+		if err != nil {
+			return
+		}
+		defer func() { _ = conn.Close() }()
+
+		// Read request
+		var req protocol.Request
+		decoder := json.NewDecoder(conn)
+		if err := decoder.Decode(&req); err != nil {
+			return
+		}
+
+		// Send error response
+		resp := protocol.Response{Success: false, Error: "test error"}
+		encoder := json.NewEncoder(conn)
+		_ = encoder.Encode(&resp)
+	}()
+
+	c := &Client{socketPath: socketPath}
+
+	resp, err := c.SendRequest(&protocol.Request{Method: protocol.MethodPing})
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+	assert.False(t, resp.Success)
+	assert.Equal(t, "test error", resp.Error)
+}
+
+func TestClient_SendRequest_ServerClosesConnection(t *testing.T) {
+	// Create temp directory for socket
+	tmpDir, err := os.MkdirTemp("/tmp", "suve-client-close-*")
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = os.RemoveAll(tmpDir) })
+
+	socketPath := filepath.Join(tmpDir, "test.sock")
+
+	// Start a mock server that closes connection without response
+	listener, err := net.Listen("unix", socketPath)
+	require.NoError(t, err)
+	defer func() { _ = listener.Close() }()
+
+	go func() {
+		conn, err := listener.Accept()
+		if err != nil {
+			return
+		}
+		// Close immediately without reading or writing
+		_ = conn.Close()
+	}()
+
+	c := &Client{socketPath: socketPath}
+
+	resp, err := c.SendRequest(&protocol.Request{Method: protocol.MethodPing})
+	require.Error(t, err)
+	assert.Nil(t, resp)
+	assert.Contains(t, err.Error(), "daemon closed connection unexpectedly")
+}
+
+func TestClient_Ping_Success(t *testing.T) {
+	// Create temp directory for socket
+	tmpDir, err := os.MkdirTemp("/tmp", "suve-client-ping-*")
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = os.RemoveAll(tmpDir) })
+
+	socketPath := filepath.Join(tmpDir, "test.sock")
+
+	// Start a mock server
+	listener, err := net.Listen("unix", socketPath)
+	require.NoError(t, err)
+	defer func() { _ = listener.Close() }()
+
+	go func() {
+		conn, err := listener.Accept()
+		if err != nil {
+			return
+		}
+		defer func() { _ = conn.Close() }()
+
+		// Read request
+		var req protocol.Request
+		decoder := json.NewDecoder(conn)
+		if err := decoder.Decode(&req); err != nil {
+			return
+		}
+
+		// Verify it's a ping request
+		if req.Method != protocol.MethodPing {
+			return
+		}
+
+		// Send success response
+		resp := protocol.Response{Success: true}
+		encoder := json.NewEncoder(conn)
+		_ = encoder.Encode(&resp)
+	}()
+
+	c := &Client{socketPath: socketPath}
+
+	err = c.Ping()
+	require.NoError(t, err)
+}
+
+func TestClient_Ping_ServerError(t *testing.T) {
+	// Create temp directory for socket
+	tmpDir, err := os.MkdirTemp("/tmp", "suve-client-ping-err-*")
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = os.RemoveAll(tmpDir) })
+
+	socketPath := filepath.Join(tmpDir, "test.sock")
+
+	// Start a mock server that returns error
+	listener, err := net.Listen("unix", socketPath)
+	require.NoError(t, err)
+	defer func() { _ = listener.Close() }()
+
+	go func() {
+		conn, err := listener.Accept()
+		if err != nil {
+			return
+		}
+		defer func() { _ = conn.Close() }()
+
+		// Read request
+		var req protocol.Request
+		decoder := json.NewDecoder(conn)
+		if err := decoder.Decode(&req); err != nil {
+			return
+		}
+
+		// Send error response
+		resp := protocol.Response{Success: false, Error: "ping failed"}
+		encoder := json.NewEncoder(conn)
+		_ = encoder.Encode(&resp)
+	}()
+
+	c := &Client{socketPath: socketPath}
+
+	err = c.Ping()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "ping failed")
+}
+
+func TestClient_ConcurrentSendRequest(t *testing.T) {
+	// Create temp directory for socket
+	tmpDir, err := os.MkdirTemp("/tmp", "suve-client-concurrent-*")
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = os.RemoveAll(tmpDir) })
+
+	socketPath := filepath.Join(tmpDir, "test.sock")
+
+	// Start a mock server that handles multiple connections
+	listener, err := net.Listen("unix", socketPath)
+	require.NoError(t, err)
+	defer func() { _ = listener.Close() }()
+
+	go func() {
+		for {
+			conn, err := listener.Accept()
+			if err != nil {
+				return
+			}
+			go func(c net.Conn) {
+				defer func() { _ = c.Close() }()
+
+				// Read request
+				var req protocol.Request
+				decoder := json.NewDecoder(c)
+				if err := decoder.Decode(&req); err != nil {
+					return
+				}
+
+				// Simulate some processing time
+				time.Sleep(10 * time.Millisecond)
+
+				// Send response
+				resp := protocol.Response{Success: true}
+				encoder := json.NewEncoder(c)
+				_ = encoder.Encode(&resp)
+			}(conn)
+		}
+	}()
+
+	c := &Client{socketPath: socketPath}
+
+	// Send multiple concurrent requests
+	const numRequests = 10
+	done := make(chan error, numRequests)
+
+	for i := 0; i < numRequests; i++ {
+		go func() {
+			_, err := c.SendRequest(&protocol.Request{Method: protocol.MethodPing})
+			done <- err
+		}()
+	}
+
+	// Wait for all requests to complete
+	for i := 0; i < numRequests; i++ {
+		select {
+		case err := <-done:
+			assert.NoError(t, err)
+		case <-time.After(5 * time.Second):
+			t.Fatal("concurrent requests timed out")
+		}
+	}
+}
+
+func TestClient_SendRequest_DecodeNonEOFError(t *testing.T) {
+	// Create temp directory for socket
+	tmpDir, err := os.MkdirTemp("/tmp", "suve-client-decode-err-*")
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = os.RemoveAll(tmpDir) })
+
+	socketPath := filepath.Join(tmpDir, "test.sock")
+
+	// Start a mock server that returns invalid JSON
+	listener, err := net.Listen("unix", socketPath)
+	require.NoError(t, err)
+	defer func() { _ = listener.Close() }()
+
+	go func() {
+		conn, err := listener.Accept()
+		if err != nil {
+			return
+		}
+		defer func() { _ = conn.Close() }()
+
+		// Read request
+		var req protocol.Request
+		decoder := json.NewDecoder(conn)
+		if err := decoder.Decode(&req); err != nil {
+			return
+		}
+
+		// Send invalid JSON response (not EOF, just malformed)
+		_, _ = conn.Write([]byte("{invalid json}\n"))
+	}()
+
+	c := &Client{socketPath: socketPath}
+
+	resp, err := c.SendRequest(&protocol.Request{Method: protocol.MethodPing})
+	require.Error(t, err)
+	assert.Nil(t, resp)
+	assert.Contains(t, err.Error(), "failed to read response")
+}
+
+func TestClient_SendRequest_EncodeError(t *testing.T) {
+	// Create temp directory for socket
+	tmpDir, err := os.MkdirTemp("/tmp", "suve-client-encode-err-*")
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = os.RemoveAll(tmpDir) })
+
+	socketPath := filepath.Join(tmpDir, "test.sock")
+
+	// Start a mock server that immediately closes write direction
+	listener, err := net.Listen("unix", socketPath)
+	require.NoError(t, err)
+	defer func() { _ = listener.Close() }()
+
+	go func() {
+		conn, err := listener.Accept()
+		if err != nil {
+			return
+		}
+		// Close immediately to cause encode failure
+		_ = conn.Close()
+	}()
+
+	c := &Client{socketPath: socketPath}
+
+	// This should fail when trying to encode the request because connection is closed
+	resp, err := c.SendRequest(&protocol.Request{Method: protocol.MethodPing})
+	require.Error(t, err)
+	assert.Nil(t, resp)
+	// The error should be either "failed to send request" or EOF-related
+}

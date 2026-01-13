@@ -587,7 +587,7 @@ func TestFileDrainPersist(t *testing.T) {
 		// Drain with wrong passphrase should fail
 		wrongStore := file.NewStoreWithPath(localFilePath)
 		wrongStore.SetPassphrase("wrong-passphrase")
-		_, err = wrongStore.Drain(context.Background(), true)
+		_, err = wrongStore.Drain(context.Background(), "", true)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "decryption")
 	})
@@ -725,5 +725,392 @@ func TestFileDrainPersist(t *testing.T) {
 		require.NoError(t, err)
 		assert.NotContains(t, drainedState.Entries[staging.ServiceParam], "/first")
 		assert.Contains(t, drainedState.Entries[staging.ServiceParam], "/second")
+	})
+}
+
+// =============================================================================
+// Error Path Tests
+// =============================================================================
+
+func TestApp_StagingStatus_ErrorPaths(t *testing.T) {
+	t.Parallel()
+
+	t.Run("list entries error for param", func(t *testing.T) {
+		t.Parallel()
+		app := setupTestApp(t)
+		mockStore := app.stagingStore.(*testutil.MockStore) //nolint:forcetypeassert // test helper
+		mockStore.ListEntriesErr = staging.ErrNotStaged
+
+		_, err := app.StagingStatus()
+		assert.Error(t, err)
+	})
+
+	t.Run("list tags error for param", func(t *testing.T) {
+		t.Parallel()
+		app := setupTestApp(t)
+		mockStore := app.stagingStore.(*testutil.MockStore) //nolint:forcetypeassert // test helper
+		mockStore.ListTagsErr = staging.ErrNotStaged
+
+		_, err := app.StagingStatus()
+		assert.Error(t, err)
+	})
+}
+
+func TestApp_StagingUnstage_ErrorPaths(t *testing.T) {
+	t.Parallel()
+
+	t.Run("invalid service", func(t *testing.T) {
+		t.Parallel()
+		app := setupTestApp(t)
+
+		_, err := app.StagingUnstage("invalid", "/test")
+		assert.ErrorIs(t, err, errInvalidService)
+	})
+
+	t.Run("unstage entry error (not ErrNotStaged)", func(t *testing.T) {
+		t.Parallel()
+		app := setupTestApp(t)
+		mockStore := app.stagingStore.(*testutil.MockStore) //nolint:forcetypeassert // test helper
+
+		// Stage an entry first
+		err := app.stagingStore.StageEntry(app.ctx, staging.ServiceParam, "/test", staging.Entry{
+			Operation: staging.OperationUpdate,
+			Value:     lo.ToPtr("value"),
+		})
+		require.NoError(t, err)
+
+		// Inject error
+		mockStore.UnstageEntryErr = context.DeadlineExceeded
+
+		_, err = app.StagingUnstage("param", "/test")
+		require.Error(t, err)
+		assert.ErrorIs(t, err, context.DeadlineExceeded)
+	})
+
+	t.Run("unstage tag error (not ErrNotStaged)", func(t *testing.T) {
+		t.Parallel()
+		app := setupTestApp(t)
+		mockStore := app.stagingStore.(*testutil.MockStore) //nolint:forcetypeassert // test helper
+
+		// Stage a tag first
+		err := app.stagingStore.StageTag(app.ctx, staging.ServiceParam, "/test", staging.TagEntry{
+			Add: map[string]string{"key": "value"},
+		})
+		require.NoError(t, err)
+
+		// Inject error
+		mockStore.UnstageTagErr = context.DeadlineExceeded
+
+		_, err = app.StagingUnstage("param", "/test")
+		require.Error(t, err)
+		assert.ErrorIs(t, err, context.DeadlineExceeded)
+	})
+}
+
+func TestApp_StagingCancelAddTag_ErrorPaths(t *testing.T) {
+	t.Parallel()
+
+	t.Run("invalid service", func(t *testing.T) {
+		t.Parallel()
+		app := setupTestApp(t)
+
+		_, err := app.StagingCancelAddTag("invalid", "/test", "key")
+		assert.ErrorIs(t, err, errInvalidService)
+	})
+
+	t.Run("tag not staged", func(t *testing.T) {
+		t.Parallel()
+		app := setupTestApp(t)
+
+		_, err := app.StagingCancelAddTag("param", "/nonexistent", "key")
+		assert.ErrorIs(t, err, staging.ErrNotStaged)
+	})
+
+	t.Run("stage tag error when updating", func(t *testing.T) {
+		t.Parallel()
+		app := setupTestApp(t)
+		mockStore := app.stagingStore.(*testutil.MockStore) //nolint:forcetypeassert // test helper
+
+		// Stage multiple add tags
+		err := app.stagingStore.StageTag(app.ctx, staging.ServiceParam, "/test", staging.TagEntry{
+			Add: map[string]string{"key1": "val1", "key2": "val2"},
+		})
+		require.NoError(t, err)
+
+		// Inject error for restaging
+		mockStore.StageTagErr = context.DeadlineExceeded
+
+		// Cancel one tag (should fail when restaging)
+		_, err = app.StagingCancelAddTag("param", "/test", "key1")
+		require.Error(t, err)
+		assert.ErrorIs(t, err, context.DeadlineExceeded)
+	})
+
+	t.Run("unstage tag error when clearing last tag", func(t *testing.T) {
+		t.Parallel()
+		app := setupTestApp(t)
+		mockStore := app.stagingStore.(*testutil.MockStore) //nolint:forcetypeassert // test helper
+
+		// Stage single add tag
+		err := app.stagingStore.StageTag(app.ctx, staging.ServiceParam, "/test", staging.TagEntry{
+			Add: map[string]string{"key": "value"},
+		})
+		require.NoError(t, err)
+
+		// Inject error for unstaging
+		mockStore.UnstageTagErr = context.DeadlineExceeded
+
+		// Cancel the only tag (should fail when trying to unstage)
+		_, err = app.StagingCancelAddTag("param", "/test", "key")
+		require.Error(t, err)
+		assert.ErrorIs(t, err, context.DeadlineExceeded)
+	})
+}
+
+func TestApp_StagingCancelRemoveTag_ErrorPaths(t *testing.T) {
+	t.Parallel()
+
+	t.Run("invalid service", func(t *testing.T) {
+		t.Parallel()
+		app := setupTestApp(t)
+
+		_, err := app.StagingCancelRemoveTag("invalid", "/test", "key")
+		assert.ErrorIs(t, err, errInvalidService)
+	})
+
+	t.Run("tag not staged", func(t *testing.T) {
+		t.Parallel()
+		app := setupTestApp(t)
+
+		_, err := app.StagingCancelRemoveTag("param", "/nonexistent", "key")
+		assert.ErrorIs(t, err, staging.ErrNotStaged)
+	})
+
+	t.Run("stage tag error when updating", func(t *testing.T) {
+		t.Parallel()
+		app := setupTestApp(t)
+		mockStore := app.stagingStore.(*testutil.MockStore) //nolint:forcetypeassert // test helper
+
+		// Stage multiple remove tags
+		err := app.stagingStore.StageTag(app.ctx, staging.ServiceParam, "/test", staging.TagEntry{
+			Remove: maputil.NewSet("key1", "key2"),
+		})
+		require.NoError(t, err)
+
+		// Inject error for restaging
+		mockStore.StageTagErr = context.DeadlineExceeded
+
+		// Cancel one tag (should fail when restaging)
+		_, err = app.StagingCancelRemoveTag("param", "/test", "key1")
+		require.Error(t, err)
+		assert.ErrorIs(t, err, context.DeadlineExceeded)
+	})
+
+	t.Run("unstage tag error when clearing last remove tag", func(t *testing.T) {
+		t.Parallel()
+		app := setupTestApp(t)
+		mockStore := app.stagingStore.(*testutil.MockStore) //nolint:forcetypeassert // test helper
+
+		// Stage single remove tag
+		err := app.stagingStore.StageTag(app.ctx, staging.ServiceParam, "/test", staging.TagEntry{
+			Remove: maputil.NewSet("key"),
+		})
+		require.NoError(t, err)
+
+		// Inject error for unstaging
+		mockStore.UnstageTagErr = context.DeadlineExceeded
+
+		// Cancel the only tag (should fail when trying to unstage)
+		_, err = app.StagingCancelRemoveTag("param", "/test", "key")
+		require.Error(t, err)
+		assert.ErrorIs(t, err, context.DeadlineExceeded)
+	})
+}
+
+func TestApp_StagingCheckStatus_ErrorPaths(t *testing.T) {
+	t.Parallel()
+
+	t.Run("invalid service", func(t *testing.T) {
+		t.Parallel()
+		app := setupTestApp(t)
+
+		_, err := app.StagingCheckStatus("invalid", "/test")
+		assert.ErrorIs(t, err, errInvalidService)
+	})
+}
+
+func TestApp_StagingReset_ErrorPaths(t *testing.T) {
+	t.Parallel()
+
+	t.Run("unstage all error", func(t *testing.T) {
+		t.Parallel()
+		app := setupTestApp(t)
+		mockStore := app.stagingStore.(*testutil.MockStore) //nolint:forcetypeassert // test helper
+
+		// Stage an entry
+		err := app.stagingStore.StageEntry(app.ctx, staging.ServiceParam, "/test", staging.Entry{
+			Operation: staging.OperationUpdate,
+			Value:     lo.ToPtr("value"),
+		})
+		require.NoError(t, err)
+
+		// Inject error
+		mockStore.UnstageAllErr = context.DeadlineExceeded
+
+		_, err = app.StagingReset("param")
+		require.Error(t, err)
+		assert.ErrorIs(t, err, context.DeadlineExceeded)
+	})
+}
+
+// =============================================================================
+// Edge Cases
+// =============================================================================
+
+func TestApp_StagingStatus_AllOperations(t *testing.T) {
+	t.Parallel()
+
+	t.Run("all operations covered", func(t *testing.T) {
+		t.Parallel()
+		app := setupTestApp(t)
+
+		// Create operation
+		err := app.stagingStore.StageEntry(app.ctx, staging.ServiceParam, "/create", staging.Entry{
+			Operation: staging.OperationCreate,
+			Value:     lo.ToPtr("new-value"),
+		})
+		require.NoError(t, err)
+
+		// Update operation
+		err = app.stagingStore.StageEntry(app.ctx, staging.ServiceParam, "/update", staging.Entry{
+			Operation: staging.OperationUpdate,
+			Value:     lo.ToPtr("updated-value"),
+		})
+		require.NoError(t, err)
+
+		// Delete operation
+		err = app.stagingStore.StageEntry(app.ctx, staging.ServiceParam, "/delete", staging.Entry{
+			Operation: staging.OperationDelete,
+		})
+		require.NoError(t, err)
+
+		result, err := app.StagingStatus()
+		require.NoError(t, err)
+		assert.Len(t, result.Param, 3)
+
+		// Verify operations are correctly mapped
+		operations := make(map[string]string)
+		for _, entry := range result.Param {
+			operations[entry.Name] = entry.Operation
+		}
+		assert.Equal(t, "create", operations["/create"])
+		assert.Equal(t, "update", operations["/update"])
+		assert.Equal(t, "delete", operations["/delete"])
+	})
+}
+
+func TestApp_StagingCheckStatus_BothEntryAndTags(t *testing.T) {
+	t.Parallel()
+
+	t.Run("handles get entry error gracefully", func(t *testing.T) {
+		t.Parallel()
+		app := setupTestApp(t)
+		mockStore := app.stagingStore.(*testutil.MockStore) //nolint:forcetypeassert // test helper
+
+		// Stage a tag (no entry)
+		err := app.stagingStore.StageTag(app.ctx, staging.ServiceParam, "/test", staging.TagEntry{
+			Add: map[string]string{"key": "value"},
+		})
+		require.NoError(t, err)
+
+		// GetEntryErr is not staging.ErrNotStaged, but GetEntry returns error for non-existent
+		// The behavior depends on the mock - let's verify the positive case
+		result, err := app.StagingCheckStatus("param", "/test")
+		require.NoError(t, err)
+		assert.False(t, result.HasEntry)
+		assert.True(t, result.HasTags)
+
+		// Now set error and verify handling
+		mockStore.GetEntryErr = context.DeadlineExceeded
+		result, err = app.StagingCheckStatus("param", "/test")
+		require.NoError(t, err) // GetEntry error is swallowed, HasEntry is just false
+		assert.False(t, result.HasEntry)
+	})
+}
+
+func TestApp_StagingUnstage_BothEntryAndTag(t *testing.T) {
+	t.Parallel()
+
+	t.Run("unstage both entry and tag", func(t *testing.T) {
+		t.Parallel()
+		app := setupTestApp(t)
+
+		// Stage both entry and tag for the same item
+		err := app.stagingStore.StageEntry(app.ctx, staging.ServiceParam, "/app/config", staging.Entry{
+			Operation: staging.OperationUpdate,
+			Value:     lo.ToPtr("value"),
+		})
+		require.NoError(t, err)
+
+		err = app.stagingStore.StageTag(app.ctx, staging.ServiceParam, "/app/config", staging.TagEntry{
+			Add: map[string]string{"env": "prod"},
+		})
+		require.NoError(t, err)
+
+		// Verify both are staged
+		status, err := app.StagingCheckStatus("param", "/app/config")
+		require.NoError(t, err)
+		assert.True(t, status.HasEntry)
+		assert.True(t, status.HasTags)
+
+		// Unstage both
+		result, err := app.StagingUnstage("param", "/app/config")
+		require.NoError(t, err)
+		assert.Equal(t, "/app/config", result.Name)
+
+		// Verify both are unstaged
+		status, err = app.StagingCheckStatus("param", "/app/config")
+		require.NoError(t, err)
+		assert.False(t, status.HasEntry)
+		assert.False(t, status.HasTags)
+	})
+}
+
+func TestApp_StagingReset_ResetBothEntriesAndTags(t *testing.T) {
+	t.Parallel()
+
+	t.Run("reset clears both entries and tags", func(t *testing.T) {
+		t.Parallel()
+		app := setupTestApp(t)
+
+		// Stage entries
+		err := app.stagingStore.StageEntry(app.ctx, staging.ServiceParam, "/entry1", staging.Entry{
+			Operation: staging.OperationUpdate,
+			Value:     lo.ToPtr("value1"),
+		})
+		require.NoError(t, err)
+
+		// Stage tags
+		err = app.stagingStore.StageTag(app.ctx, staging.ServiceParam, "/tag1", staging.TagEntry{
+			Add: map[string]string{"key": "value"},
+		})
+		require.NoError(t, err)
+
+		// Verify staged
+		status, err := app.StagingStatus()
+		require.NoError(t, err)
+		assert.Len(t, status.Param, 1)
+		assert.Len(t, status.ParamTags, 1)
+
+		// Reset
+		result, err := app.StagingReset("param")
+		require.NoError(t, err)
+		assert.Equal(t, "unstagedAll", result.Type)
+
+		// Verify cleared
+		status, err = app.StagingStatus()
+		require.NoError(t, err)
+		assert.Empty(t, status.Param)
+		assert.Empty(t, status.ParamTags)
 	})
 }

@@ -38,11 +38,14 @@ func (u *DeleteUseCase) GetCurrentValue(ctx context.Context, name string) (strin
 		WithDecryption: lo.ToPtr(true),
 	})
 	if err != nil {
-		if pnf := (*paramapi.ParameterNotFound)(nil); errors.As(err, &pnf) {
+		pnf := (*paramapi.ParameterNotFound)(nil)
+		if errors.As(err, &pnf) {
 			return "", nil
 		}
+
 		return "", err
 	}
+
 	return lo.FromPtr(out.Parameter.Value), nil
 }
 

@@ -31,13 +31,13 @@ type TagUseCase struct {
 func (u *TagUseCase) Execute(ctx context.Context, input TagInput) error {
 	// Add tags
 	if len(input.Add) > 0 {
-		tags := make([]paramapi.Tag, 0, len(input.Add))
-		for k, v := range input.Add {
-			tags = append(tags, paramapi.Tag{
+		tags := lo.MapToSlice(input.Add, func(k, v string) paramapi.Tag {
+			return paramapi.Tag{
 				Key:   lo.ToPtr(k),
 				Value: lo.ToPtr(v),
-			})
-		}
+			}
+		})
+
 		_, err := u.Client.AddTagsToResource(ctx, &paramapi.AddTagsToResourceInput{
 			ResourceId:   lo.ToPtr(input.Name),
 			ResourceType: paramapi.ResourceTypeForTaggingParameter,

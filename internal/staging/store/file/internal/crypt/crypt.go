@@ -7,9 +7,41 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
+	"io"
 
 	"golang.org/x/crypto/argon2"
 )
+
+// Hooks for testing - these allow tests to inject errors.
+var (
+	randReader    io.Reader                                      = rand.Reader
+	newCipherFunc func(key []byte) (cipher.Block, error)         = aes.NewCipher
+	newGCMFunc    func(cipher cipher.Block) (cipher.AEAD, error) = cipher.NewGCM
+)
+
+// SetRandReader sets the random reader for testing purposes.
+// This should only be used in tests.
+func SetRandReader(r io.Reader) {
+	randReader = r
+}
+
+// ResetRandReader resets the random reader to the default.
+func ResetRandReader() {
+	randReader = rand.Reader
+}
+
+// SetCipherFuncs sets the cipher creation functions for testing.
+// This should only be used in tests.
+func SetCipherFuncs(newCipher func(key []byte) (cipher.Block, error), newGCM func(cipher cipher.Block) (cipher.AEAD, error)) {
+	newCipherFunc = newCipher
+	newGCMFunc = newGCM
+}
+
+// ResetCipherFuncs resets the cipher functions to defaults.
+func ResetCipherFuncs() {
+	newCipherFunc = aes.NewCipher
+	newGCMFunc = cipher.NewGCM
+}
 
 const (
 	// MagicHeader identifies encrypted files.
@@ -44,7 +76,7 @@ const headerLen = len(MagicHeader) + 1
 func Encrypt(data []byte, passphrase string) ([]byte, error) {
 	// Generate random salt
 	salt := make([]byte, saltLen)
-	if _, err := rand.Read(salt); err != nil {
+	if _, err := io.ReadFull(randReader, salt); err != nil {
 		return nil, fmt.Errorf("failed to generate salt: %w", err)
 	}
 
@@ -52,20 +84,20 @@ func Encrypt(data []byte, passphrase string) ([]byte, error) {
 	key := argon2.IDKey([]byte(passphrase), salt, argonTime, argonMemory, argonThreads, argonKeyLen)
 
 	// Create AES cipher
-	block, err := aes.NewCipher(key)
+	block, err := newCipherFunc(key)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create cipher: %w", err)
 	}
 
 	// Create GCM mode
-	gcm, err := cipher.NewGCM(block)
+	gcm, err := newGCMFunc(block)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create GCM: %w", err)
 	}
 
 	// Generate random nonce
 	nonce := make([]byte, nonceLen)
-	if _, err := rand.Read(nonce); err != nil {
+	if _, err := io.ReadFull(randReader, nonce); err != nil {
 		return nil, fmt.Errorf("failed to generate nonce: %w", err)
 	}
 
@@ -114,13 +146,13 @@ func Decrypt(data []byte, passphrase string) ([]byte, error) {
 	key := argon2.IDKey([]byte(passphrase), salt, argonTime, argonMemory, argonThreads, argonKeyLen)
 
 	// Create AES cipher
-	block, err := aes.NewCipher(key)
+	block, err := newCipherFunc(key)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create cipher: %w", err)
 	}
 
 	// Create GCM mode
-	gcm, err := cipher.NewGCM(block)
+	gcm, err := newGCMFunc(block)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create GCM: %w", err)
 	}

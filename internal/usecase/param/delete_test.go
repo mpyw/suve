@@ -2,7 +2,6 @@ package param_test
 
 import (
 	"context"
-	"errors"
 	"testing"
 
 	"github.com/samber/lo"
@@ -24,6 +23,7 @@ func (m *mockDeleteClient) GetParameter(_ context.Context, _ *paramapi.GetParame
 	if m.getParameterErr != nil {
 		return nil, m.getParameterErr
 	}
+
 	return m.getParameterResult, nil
 }
 
@@ -31,6 +31,7 @@ func (m *mockDeleteClient) DeleteParameter(_ context.Context, _ *paramapi.Delete
 	if m.deleteParameterErr != nil {
 		return nil, m.deleteParameterErr
 	}
+
 	return m.deleteParameterResult, nil
 }
 
@@ -70,13 +71,13 @@ func TestDeleteUseCase_GetCurrentValue_Error(t *testing.T) {
 	t.Parallel()
 
 	client := &mockDeleteClient{
-		getParameterErr: errors.New("aws error"),
+		getParameterErr: errAWS,
 	}
 
 	uc := &param.DeleteUseCase{Client: client}
 
 	_, err := uc.GetCurrentValue(t.Context(), "/app/config")
-	assert.Error(t, err)
+	require.Error(t, err)
 }
 
 func TestDeleteUseCase_Execute(t *testing.T) {
@@ -99,7 +100,7 @@ func TestDeleteUseCase_Execute_Error(t *testing.T) {
 	t.Parallel()
 
 	client := &mockDeleteClient{
-		deleteParameterErr: errors.New("delete failed"),
+		deleteParameterErr: errDeleteFailed,
 	}
 
 	uc := &param.DeleteUseCase{Client: client}
@@ -107,6 +108,6 @@ func TestDeleteUseCase_Execute_Error(t *testing.T) {
 	_, err := uc.Execute(t.Context(), param.DeleteInput{
 		Name: "/app/config",
 	})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to delete parameter")
 }

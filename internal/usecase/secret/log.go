@@ -12,10 +12,7 @@ import (
 )
 
 // LogClient is the interface for the log use case.
-type LogClient interface {
-	secretapi.ListSecretVersionIdsAPI
-	secretapi.GetSecretValueAPI
-}
+type LogClient = VersionResolverClient
 
 // LogInput holds input for the log use case.
 type LogInput struct {

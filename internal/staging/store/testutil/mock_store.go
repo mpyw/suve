@@ -26,6 +26,12 @@ type MockStore struct {
 	ListTagsErr     error
 	DrainErr        error
 	WriteStateErr   error
+
+	// DrainCallCount tracks the number of Drain calls
+	DrainCallCount int
+	// DrainErrOnCall specifies which call number (1-indexed) should return DrainErr
+	// If 0, DrainErr applies to all calls. If >0, DrainErr only applies to that call number.
+	DrainErrOnCall int
 }
 
 // NewMockStore creates a new MockStore with initialized maps.
@@ -193,8 +199,12 @@ func (m *MockStore) AddTag(service staging.Service, name string, tag staging.Tag
 // If service is empty, returns all services; otherwise filters to the specified service.
 // If keep is false, the source storage is cleared after reading.
 func (m *MockStore) Drain(_ context.Context, service staging.Service, keep bool) (*staging.State, error) {
+	m.DrainCallCount++
 	if m.DrainErr != nil {
-		return nil, m.DrainErr
+		// If DrainErrOnCall is specified, only return error on that specific call
+		if m.DrainErrOnCall == 0 || m.DrainErrOnCall == m.DrainCallCount {
+			return nil, m.DrainErr
+		}
 	}
 
 	// Copy current state
@@ -270,7 +280,51 @@ func (m *MockStore) WriteState(_ context.Context, service staging.Service, state
 	return nil
 }
 
+// HintedMockStore extends MockStore with HintedUnstager support.
+type HintedMockStore struct {
+	*MockStore
+	UnstageEntryWithHintErr error
+	UnstageTagWithHintErr   error
+	UnstageAllWithHintErr   error
+	LastHint                string // Records the last hint used
+}
+
+// NewHintedMockStore creates a new HintedMockStore with initialized maps.
+func NewHintedMockStore() *HintedMockStore {
+	return &HintedMockStore{
+		MockStore: NewMockStore(),
+	}
+}
+
+// UnstageEntryWithHint removes a staged entry with an operation hint.
+func (m *HintedMockStore) UnstageEntryWithHint(ctx context.Context, service staging.Service, name string, hint string) error {
+	m.LastHint = hint
+	if m.UnstageEntryWithHintErr != nil {
+		return m.UnstageEntryWithHintErr
+	}
+	return m.MockStore.UnstageEntry(ctx, service, name)
+}
+
+// UnstageTagWithHint removes staged tag changes with an operation hint.
+func (m *HintedMockStore) UnstageTagWithHint(ctx context.Context, service staging.Service, name string, hint string) error {
+	m.LastHint = hint
+	if m.UnstageTagWithHintErr != nil {
+		return m.UnstageTagWithHintErr
+	}
+	return m.MockStore.UnstageTag(ctx, service, name)
+}
+
+// UnstageAllWithHint removes all staged changes with an operation hint.
+func (m *HintedMockStore) UnstageAllWithHint(ctx context.Context, service staging.Service, hint string) error {
+	m.LastHint = hint
+	if m.UnstageAllWithHintErr != nil {
+		return m.UnstageAllWithHintErr
+	}
+	return m.MockStore.UnstageAll(ctx, service)
+}
+
 // Compile-time checks that MockStore implements interfaces.
 var _ store.ReadWriteOperator = (*MockStore)(nil)
 var _ store.FileStore = (*MockStore)(nil)
 var _ store.AgentStore = (*MockStore)(nil)
+var _ store.HintedUnstager = (*HintedMockStore)(nil)

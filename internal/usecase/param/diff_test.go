@@ -2,7 +2,6 @@ package param_test
 
 import (
 	"context"
-	"errors"
 	"testing"
 
 	"github.com/samber/lo"
@@ -30,19 +29,23 @@ func (m *mockDiffClient) GetParameter(_ context.Context, _ *paramapi.GetParamete
 	if idx < len(m.getParameterErrs) && m.getParameterErrs[idx] != nil {
 		return nil, m.getParameterErrs[idx]
 	}
+
 	if idx < len(m.getParameterResults) {
 		return m.getParameterResults[idx], nil
 	}
-	return nil, errors.New("unexpected GetParameter call")
+
+	return nil, errUnexpectedCall
 }
 
 func (m *mockDiffClient) GetParameterHistory(_ context.Context, _ *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
 	if m.getHistoryErr != nil {
 		return nil, m.getHistoryErr
 	}
+
 	// Return a fresh copy to avoid in-place mutations affecting subsequent calls
 	params := make([]paramapi.ParameterHistory, len(m.historyParams))
 	copy(params, m.historyParams)
+
 	return &paramapi.GetParameterHistoryOutput{Parameters: params}, nil
 }
 
@@ -79,7 +82,7 @@ func TestDiffUseCase_Execute_Spec1Error(t *testing.T) {
 	t.Parallel()
 
 	client := &mockDiffClient{
-		getParameterErrs: []error{errors.New("get parameter error")},
+		getParameterErrs: []error{errGetParameter},
 	}
 
 	uc := &param.DiffUseCase{Client: client}
@@ -101,7 +104,7 @@ func TestDiffUseCase_Execute_Spec2Error(t *testing.T) {
 		getParameterResults: []*paramapi.GetParameterOutput{
 			{Parameter: &paramapi.Parameter{Name: lo.ToPtr("/app/config"), Value: lo.ToPtr("old-value"), Version: 1}},
 		},
-		getParameterErrs: []error{nil, errors.New("second get parameter error")},
+		getParameterErrs: []error{nil, errGetParameter},
 	}
 
 	uc := &param.DiffUseCase{Client: client}
@@ -173,7 +176,7 @@ func TestDiffUseCase_Execute_WithShift_Error(t *testing.T) {
 	t.Parallel()
 
 	client := &mockDiffClient{
-		getHistoryErr: errors.New("history error"),
+		getHistoryErr: errHistoryFailed,
 	}
 
 	uc := &param.DiffUseCase{Client: client}

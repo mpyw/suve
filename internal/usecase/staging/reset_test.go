@@ -435,3 +435,133 @@ func TestResetUseCase_Execute_RestoreFetchCurrentError(t *testing.T) {
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "aws error")
 }
+
+// =============================================================================
+// HintedUnstager Tests
+// =============================================================================
+
+func TestResetUseCase_Execute_UnstageAll_WithHintedUnstager(t *testing.T) {
+	t.Parallel()
+
+	store := testutil.NewHintedMockStore()
+	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/one", staging.Entry{
+		Operation: staging.OperationUpdate,
+		Value:     lo.ToPtr("one"),
+		StagedAt:  time.Now(),
+	}))
+	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/two", staging.Entry{
+		Operation: staging.OperationCreate,
+		Value:     lo.ToPtr("two"),
+		StagedAt:  time.Now(),
+	}))
+
+	uc := &usecasestaging.ResetUseCase{
+		Parser: newMockParser(),
+		Store:  store,
+	}
+
+	output, err := uc.Execute(t.Context(), usecasestaging.ResetInput{
+		All: true,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, usecasestaging.ResetResultUnstagedAll, output.Type)
+	assert.Equal(t, 2, output.Count)
+
+	// Verify hint was used
+	assert.Equal(t, "reset", store.LastHint)
+
+	// Verify all unstaged
+	entries, err := store.ListEntries(t.Context(), staging.ServiceParam)
+	require.NoError(t, err)
+	assert.Empty(t, entries[staging.ServiceParam])
+}
+
+func TestResetUseCase_Execute_UnstageAll_WithHintedUnstager_Error(t *testing.T) {
+	t.Parallel()
+
+	store := testutil.NewHintedMockStore()
+	store.AddEntry(staging.ServiceParam, "/app/config", staging.Entry{
+		Operation: staging.OperationUpdate,
+	})
+	store.UnstageAllWithHintErr = errors.New("hinted unstage error")
+
+	uc := &usecasestaging.ResetUseCase{
+		Parser: newMockParser(),
+		Store:  store,
+	}
+
+	_, err := uc.Execute(t.Context(), usecasestaging.ResetInput{All: true})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "hinted unstage error")
+}
+
+func TestResetUseCase_Execute_UnstageAll_Empty_WithHintedUnstager(t *testing.T) {
+	t.Parallel()
+
+	store := testutil.NewHintedMockStore()
+	uc := &usecasestaging.ResetUseCase{
+		Parser: newMockParser(),
+		Store:  store,
+	}
+
+	output, err := uc.Execute(t.Context(), usecasestaging.ResetInput{
+		All: true,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, usecasestaging.ResetResultNothingStaged, output.Type)
+
+	// Verify hint was still used even for empty unstage
+	assert.Equal(t, "reset", store.LastHint)
+}
+
+func TestResetUseCase_Execute_UnstageAll_WithTags(t *testing.T) {
+	t.Parallel()
+
+	store := testutil.NewMockStore()
+	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
+		Operation: staging.OperationUpdate,
+		Value:     lo.ToPtr("value"),
+		StagedAt:  time.Now(),
+	}))
+	require.NoError(t, store.StageTag(t.Context(), staging.ServiceParam, "/app/config", staging.TagEntry{
+		Add:      map[string]string{"env": "prod"},
+		StagedAt: time.Now(),
+	}))
+
+	uc := &usecasestaging.ResetUseCase{
+		Parser: newMockParser(),
+		Store:  store,
+	}
+
+	output, err := uc.Execute(t.Context(), usecasestaging.ResetInput{
+		All: true,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, usecasestaging.ResetResultUnstagedAll, output.Type)
+	assert.Equal(t, 2, output.Count) // 1 entry + 1 tag
+
+	// Verify all unstaged
+	entries, err := store.ListEntries(t.Context(), staging.ServiceParam)
+	require.NoError(t, err)
+	assert.Empty(t, entries[staging.ServiceParam])
+
+	tags, err := store.ListTags(t.Context(), staging.ServiceParam)
+	require.NoError(t, err)
+	assert.Empty(t, tags[staging.ServiceParam])
+}
+
+func TestResetUseCase_Execute_ListTagsError(t *testing.T) {
+	t.Parallel()
+
+	store := testutil.NewMockStore()
+	store.ListTagsErr = errors.New("list tags error")
+
+	uc := &usecasestaging.ResetUseCase{
+		Parser: newMockParser(),
+		Store:  store,
+	}
+
+	_, err := uc.Execute(t.Context(), usecasestaging.ResetInput{All: true})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "list tags error")
+}

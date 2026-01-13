@@ -23,6 +23,11 @@ const (
 // fileMu protects concurrent access to the state file within a process.
 var fileMu sync.Mutex
 
+// Hooks for testing - these allow tests to inject errors.
+var (
+	userHomeDirFunc = os.UserHomeDir
+)
+
 // Store manages the staging state using the filesystem.
 // It implements StateIO interface for drain/persist operations.
 type Store struct {
@@ -34,7 +39,7 @@ type Store struct {
 // The state file is stored under ~/.suve/{accountID}/{region}/stage.json
 // to isolate staging state per AWS account and region.
 func NewStore(accountID, region string) (*Store, error) {
-	homeDir, err := os.UserHomeDir()
+	homeDir, err := userHomeDirFunc()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get home directory: %w", err)
 	}

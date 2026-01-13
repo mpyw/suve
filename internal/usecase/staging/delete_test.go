@@ -321,3 +321,31 @@ func TestDeleteUseCase_Execute_DeleteOnUpdate(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, staging.OperationDelete, entry.Operation)
 }
+
+func TestDeleteUseCase_Execute_UnstageTagError(t *testing.T) {
+	t.Parallel()
+
+	store := testutil.NewMockStore()
+	// Simulate existing CREATE entry
+	store.AddEntry(staging.ServiceParam, "/app/new", staging.Entry{
+		Operation: staging.OperationCreate,
+		Value:     lo.ToPtr("value"),
+	})
+	// Simulate existing tag entry
+	store.AddTag(staging.ServiceParam, "/app/new", staging.TagEntry{
+		Add: map[string]string{"env": "prod"},
+	})
+	// Make UnstageTag fail
+	store.UnstageTagErr = errors.New("unstage tag error")
+
+	uc := &usecasestaging.DeleteUseCase{
+		Strategy: newMockDeleteStrategy(false),
+		Store:    store,
+	}
+
+	_, err := uc.Execute(t.Context(), usecasestaging.DeleteInput{
+		Name: "/app/new",
+	})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "unstage tag error")
+}

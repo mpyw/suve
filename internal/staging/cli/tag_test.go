@@ -144,3 +144,56 @@ func TestUntagRunner_Run(t *testing.T) {
 		require.Error(t, err)
 	})
 }
+
+func TestTagRunner_EmptyTags(t *testing.T) {
+	t.Parallel()
+
+	t.Run("empty tags slice returns error", func(t *testing.T) {
+		t.Parallel()
+
+		store := testutil.NewMockStore()
+
+		var stdout, stderr bytes.Buffer
+		r := &cli.TagRunner{
+			UseCase: &stagingusecase.TagUseCase{
+				Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentVal: "existing"},
+				Store:    store,
+			},
+			Stdout: &stdout,
+			Stderr: &stderr,
+		}
+
+		err := r.Run(t.Context(), cli.TagOptions{
+			Name: "/app/config",
+			Tags: []string{}, // Empty tags
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "no tags specified")
+	})
+
+	t.Run("tag with equals in value", func(t *testing.T) {
+		t.Parallel()
+
+		store := testutil.NewMockStore()
+
+		var stdout, stderr bytes.Buffer
+		r := &cli.TagRunner{
+			UseCase: &stagingusecase.TagUseCase{
+				Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentVal: "existing"},
+				Store:    store,
+			},
+			Stdout: &stdout,
+			Stderr: &stderr,
+		}
+
+		err := r.Run(t.Context(), cli.TagOptions{
+			Name: "/app/config",
+			Tags: []string{"url=https://example.com?foo=bar"}, // Value contains equals
+		})
+		require.NoError(t, err)
+
+		tagEntry, err := store.GetTag(t.Context(), staging.ServiceParam, "/app/config")
+		require.NoError(t, err)
+		assert.Equal(t, "https://example.com?foo=bar", tagEntry.Add["url"])
+	})
+}

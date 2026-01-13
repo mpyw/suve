@@ -186,3 +186,14 @@ func TestEncrypt_ProducesDifferentOutput(t *testing.T) {
 
 	assert.Equal(t, decrypted1, decrypted2)
 }
+
+func TestDecrypt_UnsupportedVersion(t *testing.T) {
+	// Create data with valid header but unsupported version
+	data := make([]byte, headerLen+saltLen+nonceLen+20)
+	copy(data, []byte(MagicHeader))
+	data[len(MagicHeader)] = 99 // Unsupported version
+
+	_, err := Decrypt(data, "any-passphrase")
+	assert.ErrorIs(t, err, ErrInvalidFormat)
+	assert.Contains(t, err.Error(), "unsupported version 99")
+}
