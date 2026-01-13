@@ -10,6 +10,7 @@ import (
 	"github.com/mpyw/suve/internal/version/paramversion"
 )
 
+//nolint:funlen // Table-driven test with many cases
 func TestParse(t *testing.T) {
 	t.Parallel()
 	tests := []struct {

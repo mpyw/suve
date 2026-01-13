@@ -76,6 +76,7 @@ func TestClient_SendRequest_Success(t *testing.T) {
 		// Send response
 		resp := protocol.Response{Success: true}
 		encoder := json.NewEncoder(conn)
+		//nolint:errchkjson // Test code: Response struct is safe for JSON encoding
 		_ = encoder.Encode(&resp)
 	}()
 
@@ -118,6 +119,7 @@ func TestClient_SendRequest_ErrorResponse(t *testing.T) {
 		// Send error response
 		resp := protocol.Response{Success: false, Error: "test error"}
 		encoder := json.NewEncoder(conn)
+		//nolint:errchkjson // Test code: Response struct is safe for JSON encoding
 		_ = encoder.Encode(&resp)
 	}()
 
@@ -138,7 +140,7 @@ func TestClient_SendRequest_ServerClosesConnection(t *testing.T) {
 
 	socketPath := filepath.Join(tmpDir, "test.sock")
 
-	// Start a mock server that closes connection without response
+	// Start a mock server that reads request but closes without response
 	listener, err := net.Listen("unix", socketPath)
 	require.NoError(t, err)
 	defer func() { _ = listener.Close() }()
@@ -148,7 +150,11 @@ func TestClient_SendRequest_ServerClosesConnection(t *testing.T) {
 		if err != nil {
 			return
 		}
-		// Close immediately without reading or writing
+		// Read the request to allow client to complete write
+		var req protocol.Request
+		decoder := json.NewDecoder(conn)
+		_ = decoder.Decode(&req)
+		// Close without responding - client should get EOF on read
 		_ = conn.Close()
 	}()
 
@@ -195,6 +201,7 @@ func TestClient_Ping_Success(t *testing.T) {
 		// Send success response
 		resp := protocol.Response{Success: true}
 		encoder := json.NewEncoder(conn)
+		//nolint:errchkjson // Test code: Response struct is safe for JSON encoding
 		_ = encoder.Encode(&resp)
 	}()
 
@@ -234,6 +241,7 @@ func TestClient_Ping_ServerError(t *testing.T) {
 		// Send error response
 		resp := protocol.Response{Success: false, Error: "ping failed"}
 		encoder := json.NewEncoder(conn)
+		//nolint:errchkjson // Test code: Response struct is safe for JSON encoding
 		_ = encoder.Encode(&resp)
 	}()
 
@@ -279,6 +287,7 @@ func TestClient_ConcurrentSendRequest(t *testing.T) {
 				// Send response
 				resp := protocol.Response{Success: true}
 				encoder := json.NewEncoder(c)
+				//nolint:errchkjson // Test code: Response struct is safe for JSON encoding
 				_ = encoder.Encode(&resp)
 			}(conn)
 		}

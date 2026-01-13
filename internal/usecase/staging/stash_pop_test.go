@@ -14,6 +14,7 @@ import (
 	stagingusecase "github.com/mpyw/suve/internal/usecase/staging"
 )
 
+//nolint:funlen // Table-driven test with many cases
 func TestDrainUseCase_Execute(t *testing.T) {
 	t.Parallel()
 

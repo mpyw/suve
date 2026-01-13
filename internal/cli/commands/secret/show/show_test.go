@@ -60,6 +60,7 @@ func (m *mockClient) DescribeSecret(ctx context.Context, params *secretapi.Descr
 	return &secretapi.DescribeSecretOutput{}, nil
 }
 
+//nolint:funlen // Table-driven test with many cases
 func TestRun(t *testing.T) {
 	t.Parallel()
 	now := time.Now()

@@ -54,7 +54,7 @@ func TestServer_ServeClosesListenerOnCancel(t *testing.T) {
 	require.NoError(t, err)
 	s.listener = listener
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 
 	// Start Serve in background
 	done := make(chan struct{})
@@ -136,7 +136,11 @@ func TestServer_sendError_withMockConn(t *testing.T) {
 }
 
 func TestServer_handleConnection_validRequest(t *testing.T) {
-	t.Parallel()
+	// Create temp directory for socket
+	tmpDir, err := os.MkdirTemp("/tmp", "suve-server-handleconn-valid-*")
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = os.RemoveAll(tmpDir) })
+	t.Setenv("TMPDIR", tmpDir)
 
 	handlerCalled := false
 	handler := func(req *protocol.Request) *protocol.Response {
@@ -150,68 +154,102 @@ func TestServer_handleConnection_validRequest(t *testing.T) {
 		callbackCalled = true
 	}
 
-	s := NewServer(testAccountID, testRegion, handler, callback, nil)
+	accountID := "hc-valid"
+	region := "r1"
 
-	// Create a pipe
-	client, server := net.Pipe()
-	defer func() { _ = client.Close() }()
+	s := NewServer(accountID, region, handler, callback, nil)
 
-	// Send request in goroutine
-	go func() {
-		defer func() { _ = server.Close() }()
-		s.handleConnection(server)
-	}()
+	err = s.Start()
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	go s.Serve(ctx)
+
+	socketPath := protocol.SocketPathForAccount(accountID, region)
+
+	// Connect and send a request
+	conn, err := net.DialTimeout("unix", socketPath, time.Second)
+	require.NoError(t, err)
+	defer func() { _ = conn.Close() }()
 
 	// Write request
 	req := protocol.Request{Method: protocol.MethodPing}
-	encoder := json.NewEncoder(client)
-	err := encoder.Encode(&req)
+	encoder := json.NewEncoder(conn)
+	err = encoder.Encode(&req)
 	require.NoError(t, err)
 
 	// Read response
 	var resp protocol.Response
-	decoder := json.NewDecoder(client)
+	decoder := json.NewDecoder(conn)
 	err = decoder.Decode(&resp)
 	require.NoError(t, err)
 
 	assert.True(t, resp.Success)
 	assert.True(t, handlerCalled)
 	assert.True(t, callbackCalled)
+
+	cancel()
 }
 
 func TestServer_handleConnection_invalidJSON(t *testing.T) {
-	t.Parallel()
+	// Create temp directory for socket
+	tmpDir, err := os.MkdirTemp("/tmp", "suve-server-handleconn-invalidjson-*")
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = os.RemoveAll(tmpDir) })
+	t.Setenv("TMPDIR", tmpDir)
 
 	handler := func(req *protocol.Request) *protocol.Response {
 		t.Fatal("handler should not be called for invalid JSON")
 		return nil
 	}
 
-	s := NewServer(testAccountID, testRegion, handler, nil, nil)
+	accountID := "hc-invalidjson"
+	region := "r1"
 
-	client, server := net.Pipe()
-	defer func() { _ = client.Close() }()
+	s := NewServer(accountID, region, handler, nil, nil)
 
-	go func() {
-		defer func() { _ = server.Close() }()
-		s.handleConnection(server)
-	}()
+	err = s.Start()
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	go s.Serve(ctx)
+
+	socketPath := protocol.SocketPathForAccount(accountID, region)
+
+	// Connect and send invalid JSON
+	conn, err := net.DialTimeout("unix", socketPath, time.Second)
+	require.NoError(t, err)
+	defer func() { _ = conn.Close() }()
 
 	// Write invalid JSON
-	_, err := client.Write([]byte("not valid json{"))
+	_, err = conn.Write([]byte("not valid json{"))
 	require.NoError(t, err)
-	_ = client.Close()
+
+	// Close write side to signal end of request
+	if unixConn, ok := conn.(*net.UnixConn); ok {
+		_ = unixConn.CloseWrite()
+	}
 
 	// Read error response
 	var resp protocol.Response
-	decoder := json.NewDecoder(client)
-	_ = decoder.Decode(&resp)
-	// Should fail because connection was closed after error or we get an error response
-	// Either way the handler was not called
+	decoder := json.NewDecoder(conn)
+	err = decoder.Decode(&resp)
+	// We might get an error response or EOF - either is acceptable
+	// The important thing is the handler was not called
+
+	cancel()
 }
 
 func TestServer_handleConnection_shutdownCallback(t *testing.T) {
-	t.Parallel()
+	// Create temp directory for socket
+	tmpDir, err := os.MkdirTemp("/tmp", "suve-server-handleconn-shutdown-*")
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = os.RemoveAll(tmpDir) })
+	t.Setenv("TMPDIR", tmpDir)
 
 	handler := func(req *protocol.Request) *protocol.Response {
 		return &protocol.Response{Success: true}
@@ -227,25 +265,35 @@ func TestServer_handleConnection_shutdownCallback(t *testing.T) {
 		close(shutdownCalled)
 	}
 
-	s := NewServer(testAccountID, testRegion, handler, callback, shutdownCb)
+	accountID := "hc-shutdown"
+	region := "r1"
 
-	client, server := net.Pipe()
-	defer func() { _ = client.Close() }()
+	s := NewServer(accountID, region, handler, callback, shutdownCb)
 
-	go func() {
-		defer func() { _ = server.Close() }()
-		s.handleConnection(server)
-	}()
+	err = s.Start()
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	go s.Serve(ctx)
+
+	socketPath := protocol.SocketPathForAccount(accountID, region)
+
+	// Connect and send a request
+	conn, err := net.DialTimeout("unix", socketPath, time.Second)
+	require.NoError(t, err)
+	defer func() { _ = conn.Close() }()
 
 	// Write request
 	req := protocol.Request{Method: protocol.MethodPing}
-	encoder := json.NewEncoder(client)
-	err := encoder.Encode(&req)
+	encoder := json.NewEncoder(conn)
+	err = encoder.Encode(&req)
 	require.NoError(t, err)
 
 	// Read response
 	var resp protocol.Response
-	decoder := json.NewDecoder(client)
+	decoder := json.NewDecoder(conn)
 	err = decoder.Decode(&resp)
 	require.NoError(t, err)
 
@@ -259,39 +307,57 @@ func TestServer_handleConnection_shutdownCallback(t *testing.T) {
 	case <-time.After(time.Second):
 		t.Fatal("shutdown callback should have been called")
 	}
+
+	cancel()
 }
 
 func TestServer_handleConnection_nilCallbacks(t *testing.T) {
-	t.Parallel()
+	// Create temp directory for socket
+	tmpDir, err := os.MkdirTemp("/tmp", "suve-server-handleconn-nil-*")
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = os.RemoveAll(tmpDir) })
+	t.Setenv("TMPDIR", tmpDir)
 
 	handler := func(req *protocol.Request) *protocol.Response {
 		return &protocol.Response{Success: true}
 	}
 
+	accountID := "hc-nil"
+	region := "r1"
+
 	// Create server with nil callbacks
-	s := NewServer(testAccountID, testRegion, handler, nil, nil)
+	s := NewServer(accountID, region, handler, nil, nil)
 
-	client, server := net.Pipe()
-	defer func() { _ = client.Close() }()
+	err = s.Start()
+	require.NoError(t, err)
 
-	go func() {
-		defer func() { _ = server.Close() }()
-		s.handleConnection(server)
-	}()
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	go s.Serve(ctx)
+
+	socketPath := protocol.SocketPathForAccount(accountID, region)
+
+	// Connect and send a request
+	conn, err := net.DialTimeout("unix", socketPath, time.Second)
+	require.NoError(t, err)
+	defer func() { _ = conn.Close() }()
 
 	// Write request
 	req := protocol.Request{Method: protocol.MethodPing}
-	encoder := json.NewEncoder(client)
-	err := encoder.Encode(&req)
+	encoder := json.NewEncoder(conn)
+	err = encoder.Encode(&req)
 	require.NoError(t, err)
 
 	// Read response
 	var resp protocol.Response
-	decoder := json.NewDecoder(client)
+	decoder := json.NewDecoder(conn)
 	err = decoder.Decode(&resp)
 	require.NoError(t, err)
 
 	assert.True(t, resp.Success)
+
+	cancel()
 }
 
 func TestServer_handleConnection_EOF(t *testing.T) {
@@ -406,7 +472,7 @@ func TestServer_Serve(t *testing.T) {
 	err = s.Start()
 	require.NoError(t, err)
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
 	// Run Serve in background
@@ -457,7 +523,7 @@ func TestServer_Serve_MultipleConnections(t *testing.T) {
 	err = s.Start()
 	require.NoError(t, err)
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
 	go s.Serve(ctx)
@@ -610,7 +676,7 @@ func TestServer_Serve_AcceptError(t *testing.T) {
 	require.NoError(t, err)
 	s.listener = listener
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 
 	// Start Serve in background
 	done := make(chan struct{})
@@ -720,7 +786,9 @@ func TestServer_setSocketPermissions_Error(t *testing.T) {
 
 // TestServer_Start_CreateSocketDirError tests Start when createSocketDir fails.
 func TestServer_Start_CreateSocketDirError(t *testing.T) {
-	t.Setenv("TMPDIR", "/dev/null")
+	// Use a path that will definitely fail on Linux
+	// /proc/1/root is only accessible by root, and creating directories there will fail
+	t.Setenv("TMPDIR", "/proc/1/root/nonexistent-suve-test")
 
 	handler := func(req *protocol.Request) *protocol.Response {
 		return &protocol.Response{Success: true}
@@ -732,8 +800,9 @@ func TestServer_Start_CreateSocketDirError(t *testing.T) {
 	s := NewServer(accountID, region, handler, nil, nil)
 
 	err := s.Start()
+	// On Linux with /proc/1/root, this should fail with permission denied or path error
+	// On macOS, it might fail differently, but should still fail
 	require.Error(t, err)
-	// Error could be from createSocketDir or listen
 }
 
 // TestServer_Start_ListenError tests Start when listen fails.
@@ -756,7 +825,7 @@ func TestServer_Start_ListenError(t *testing.T) {
 	err = s1.Start()
 	require.NoError(t, err)
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
 	// Start serving in background so socket stays locked
@@ -815,36 +884,52 @@ func TestServer_Start_ListenErrorLongPath(t *testing.T) {
 
 // TestServer_handleConnection_WillShutdownWithNilCallback tests shutdown callback is not called when nil.
 func TestServer_handleConnection_WillShutdownWithNilCallback(t *testing.T) {
-	t.Parallel()
+	// Create temp directory for socket
+	tmpDir, err := os.MkdirTemp("/tmp", "suve-server-handleconn-willshutdown-*")
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = os.RemoveAll(tmpDir) })
+	t.Setenv("TMPDIR", tmpDir)
 
 	handler := func(req *protocol.Request) *protocol.Response {
 		return &protocol.Response{Success: true, WillShutdown: true}
 	}
 
+	accountID := "hc-willshutdown"
+	region := "r1"
+
 	// Create server with nil shutdown callback but non-nil response callback
-	s := NewServer(testAccountID, testRegion, handler, nil, nil)
+	s := NewServer(accountID, region, handler, nil, nil)
 
-	client, server := net.Pipe()
-	defer func() { _ = client.Close() }()
+	err = s.Start()
+	require.NoError(t, err)
 
-	go func() {
-		defer func() { _ = server.Close() }()
-		s.handleConnection(server)
-	}()
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	go s.Serve(ctx)
+
+	socketPath := protocol.SocketPathForAccount(accountID, region)
+
+	// Connect and send a request
+	conn, err := net.DialTimeout("unix", socketPath, time.Second)
+	require.NoError(t, err)
+	defer func() { _ = conn.Close() }()
 
 	// Write request
 	req := protocol.Request{Method: protocol.MethodPing}
-	encoder := json.NewEncoder(client)
-	err := encoder.Encode(&req)
+	encoder := json.NewEncoder(conn)
+	err = encoder.Encode(&req)
 	require.NoError(t, err)
 
 	// Read response
 	var resp protocol.Response
-	decoder := json.NewDecoder(client)
+	decoder := json.NewDecoder(conn)
 	err = decoder.Decode(&resp)
 	require.NoError(t, err)
 
 	assert.True(t, resp.Success)
 	assert.True(t, resp.WillShutdown)
 	// No panic or error should occur even with nil shutdown callback
+
+	cancel()
 }

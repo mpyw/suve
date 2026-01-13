@@ -19,7 +19,11 @@ func TryFormat(value string) (string, bool) {
 	if err := json.Unmarshal([]byte(value), &data); err != nil {
 		return value, false
 	}
-	formatted, _ := json.MarshalIndent(data, "", "  ")
+	formatted, err := json.MarshalIndent(data, "", "  ")
+	if err != nil {
+		// This should not happen if Unmarshal succeeded, but handle it gracefully
+		return value, false
+	}
 	return string(formatted), true
 }
 

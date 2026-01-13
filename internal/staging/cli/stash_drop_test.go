@@ -17,6 +17,7 @@ import (
 	"github.com/mpyw/suve/internal/staging/store/file"
 )
 
+//nolint:funlen // Table-driven test with many cases
 func TestStashDropRunner_Run(t *testing.T) {
 	t.Parallel()
 

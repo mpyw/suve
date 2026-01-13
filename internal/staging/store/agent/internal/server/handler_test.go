@@ -14,6 +14,7 @@ import (
 	"github.com/mpyw/suve/internal/staging/store/agent/internal/server"
 )
 
+//nolint:funlen // Table-driven test with many cases
 func TestHandler_HandleRequest(t *testing.T) {
 	t.Parallel()
 

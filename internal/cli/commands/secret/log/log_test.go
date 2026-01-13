@@ -18,6 +18,11 @@ import (
 	"github.com/mpyw/suve/internal/usecase/secret"
 )
 
+const (
+	testVersionID1 = "version-id-1"
+	testVersionID2 = "version-id-2"
+)
+
 func TestCommand_Validation(t *testing.T) {
 	t.Parallel()
 
@@ -102,6 +107,7 @@ func (m *mockClient) GetSecretValue(ctx context.Context, params *secretapi.GetSe
 	return nil, fmt.Errorf("GetSecretValue not mocked")
 }
 
+//nolint:funlen // Table-driven test with many cases
 func TestRun(t *testing.T) {
 	t.Parallel()
 	now := time.Now()
@@ -139,23 +145,23 @@ func TestRun(t *testing.T) {
 				listSecretVersionIdsFunc: func(_ context.Context, _ *secretapi.ListSecretVersionIdsInput, _ ...func(*secretapi.Options)) (*secretapi.ListSecretVersionIdsOutput, error) {
 					return &secretapi.ListSecretVersionIdsOutput{
 						Versions: []secretapi.SecretVersionsListEntry{
-							{VersionId: lo.ToPtr("version-id-1"), CreatedDate: lo.ToPtr(now.Add(-time.Hour)), VersionStages: []string{"AWSPREVIOUS"}},
-							{VersionId: lo.ToPtr("version-id-2"), CreatedDate: &now, VersionStages: []string{"AWSCURRENT"}},
+							{VersionId: lo.ToPtr(testVersionID1), CreatedDate: lo.ToPtr(now.Add(-time.Hour)), VersionStages: []string{"AWSPREVIOUS"}},
+							{VersionId: lo.ToPtr(testVersionID2), CreatedDate: &now, VersionStages: []string{"AWSCURRENT"}},
 						},
 					}, nil
 				},
 				getSecretValueFunc: func(_ context.Context, params *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) {
 					versionID := lo.FromPtr(params.VersionId)
 					switch versionID {
-					case "version-id-1":
+					case testVersionID1:
 						return &secretapi.GetSecretValueOutput{
 							SecretString: lo.ToPtr("old-value"),
-							VersionId:    lo.ToPtr("version-id-1"),
+							VersionId:    lo.ToPtr(testVersionID1),
 						}, nil
-					case "version-id-2":
+					case testVersionID2:
 						return &secretapi.GetSecretValueOutput{
 							SecretString: lo.ToPtr("new-value"),
-							VersionId:    lo.ToPtr("version-id-2"),
+							VersionId:    lo.ToPtr(testVersionID2),
 						}, nil
 					}
 					return nil, fmt.Errorf("unknown version")
@@ -298,23 +304,23 @@ func TestRun(t *testing.T) {
 				listSecretVersionIdsFunc: func(_ context.Context, _ *secretapi.ListSecretVersionIdsInput, _ ...func(*secretapi.Options)) (*secretapi.ListSecretVersionIdsOutput, error) {
 					return &secretapi.ListSecretVersionIdsOutput{
 						Versions: []secretapi.SecretVersionsListEntry{
-							{VersionId: lo.ToPtr("version-id-1"), CreatedDate: lo.ToPtr(now.Add(-time.Hour))},
-							{VersionId: lo.ToPtr("version-id-2"), CreatedDate: &now},
+							{VersionId: lo.ToPtr(testVersionID1), CreatedDate: lo.ToPtr(now.Add(-time.Hour))},
+							{VersionId: lo.ToPtr(testVersionID2), CreatedDate: &now},
 						},
 					}, nil
 				},
 				getSecretValueFunc: func(_ context.Context, params *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) {
 					versionID := lo.FromPtr(params.VersionId)
 					switch versionID {
-					case "version-id-1":
+					case testVersionID1:
 						return &secretapi.GetSecretValueOutput{
 							SecretString: lo.ToPtr("old-value"),
-							VersionId:    lo.ToPtr("version-id-1"),
+							VersionId:    lo.ToPtr(testVersionID1),
 						}, nil
-					case "version-id-2":
+					case testVersionID2:
 						return &secretapi.GetSecretValueOutput{
 							SecretString: lo.ToPtr("new-value"),
-							VersionId:    lo.ToPtr("version-id-2"),
+							VersionId:    lo.ToPtr(testVersionID2),
 						}, nil
 					}
 					return nil, fmt.Errorf("unknown version")
@@ -332,23 +338,23 @@ func TestRun(t *testing.T) {
 				listSecretVersionIdsFunc: func(_ context.Context, _ *secretapi.ListSecretVersionIdsInput, _ ...func(*secretapi.Options)) (*secretapi.ListSecretVersionIdsOutput, error) {
 					return &secretapi.ListSecretVersionIdsOutput{
 						Versions: []secretapi.SecretVersionsListEntry{
-							{VersionId: lo.ToPtr("version-id-1"), CreatedDate: lo.ToPtr(now.Add(-time.Hour))},
-							{VersionId: lo.ToPtr("version-id-2"), CreatedDate: &now},
+							{VersionId: lo.ToPtr(testVersionID1), CreatedDate: lo.ToPtr(now.Add(-time.Hour))},
+							{VersionId: lo.ToPtr(testVersionID2), CreatedDate: &now},
 						},
 					}, nil
 				},
 				getSecretValueFunc: func(_ context.Context, params *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) {
 					versionID := lo.FromPtr(params.VersionId)
 					switch versionID {
-					case "version-id-1":
+					case testVersionID1:
 						return &secretapi.GetSecretValueOutput{
 							SecretString: lo.ToPtr(`{"key":"old"}`),
-							VersionId:    lo.ToPtr("version-id-1"),
+							VersionId:    lo.ToPtr(testVersionID1),
 						}, nil
-					case "version-id-2":
+					case testVersionID2:
 						return &secretapi.GetSecretValueOutput{
 							SecretString: lo.ToPtr(`{"key":"new"}`),
-							VersionId:    lo.ToPtr("version-id-2"),
+							VersionId:    lo.ToPtr(testVersionID2),
 						}, nil
 					}
 					return nil, fmt.Errorf("unknown version")
@@ -366,23 +372,23 @@ func TestRun(t *testing.T) {
 				listSecretVersionIdsFunc: func(_ context.Context, _ *secretapi.ListSecretVersionIdsInput, _ ...func(*secretapi.Options)) (*secretapi.ListSecretVersionIdsOutput, error) {
 					return &secretapi.ListSecretVersionIdsOutput{
 						Versions: []secretapi.SecretVersionsListEntry{
-							{VersionId: lo.ToPtr("version-id-1"), CreatedDate: lo.ToPtr(now.Add(-time.Hour))},
-							{VersionId: lo.ToPtr("version-id-2"), CreatedDate: &now},
+							{VersionId: lo.ToPtr(testVersionID1), CreatedDate: lo.ToPtr(now.Add(-time.Hour))},
+							{VersionId: lo.ToPtr(testVersionID2), CreatedDate: &now},
 						},
 					}, nil
 				},
 				getSecretValueFunc: func(_ context.Context, params *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) {
 					versionID := lo.FromPtr(params.VersionId)
 					switch versionID {
-					case "version-id-1":
+					case testVersionID1:
 						return &secretapi.GetSecretValueOutput{
 							SecretString: lo.ToPtr("not json"),
-							VersionId:    lo.ToPtr("version-id-1"),
+							VersionId:    lo.ToPtr(testVersionID1),
 						}, nil
-					case "version-id-2":
+					case testVersionID2:
 						return &secretapi.GetSecretValueOutput{
 							SecretString: lo.ToPtr("also not json"),
-							VersionId:    lo.ToPtr("version-id-2"),
+							VersionId:    lo.ToPtr(testVersionID2),
 						}, nil
 					}
 					return nil, fmt.Errorf("unknown version")
@@ -400,8 +406,8 @@ func TestRun(t *testing.T) {
 				listSecretVersionIdsFunc: func(_ context.Context, _ *secretapi.ListSecretVersionIdsInput, _ ...func(*secretapi.Options)) (*secretapi.ListSecretVersionIdsOutput, error) {
 					return &secretapi.ListSecretVersionIdsOutput{
 						Versions: []secretapi.SecretVersionsListEntry{
-							{VersionId: lo.ToPtr("version-id-1"), CreatedDate: lo.ToPtr(now.Add(-time.Hour)), VersionStages: []string{"AWSPREVIOUS"}},
-							{VersionId: lo.ToPtr("version-id-2"), CreatedDate: &now, VersionStages: []string{"AWSCURRENT"}},
+							{VersionId: lo.ToPtr(testVersionID1), CreatedDate: lo.ToPtr(now.Add(-time.Hour)), VersionStages: []string{"AWSPREVIOUS"}},
+							{VersionId: lo.ToPtr(testVersionID2), CreatedDate: &now, VersionStages: []string{"AWSCURRENT"}},
 						},
 					}, nil
 				},
@@ -421,8 +427,8 @@ func TestRun(t *testing.T) {
 				listSecretVersionIdsFunc: func(_ context.Context, _ *secretapi.ListSecretVersionIdsInput, _ ...func(*secretapi.Options)) (*secretapi.ListSecretVersionIdsOutput, error) {
 					return &secretapi.ListSecretVersionIdsOutput{
 						Versions: []secretapi.SecretVersionsListEntry{
-							{VersionId: lo.ToPtr("version-id-1"), CreatedDate: nil, VersionStages: nil},
-							{VersionId: lo.ToPtr("version-id-2"), CreatedDate: &now, VersionStages: []string{"AWSCURRENT"}},
+							{VersionId: lo.ToPtr(testVersionID1), CreatedDate: nil, VersionStages: nil},
+							{VersionId: lo.ToPtr(testVersionID2), CreatedDate: &now, VersionStages: []string{"AWSCURRENT"}},
 						},
 					}, nil
 				},
@@ -534,23 +540,23 @@ func TestRun(t *testing.T) {
 				listSecretVersionIdsFunc: func(_ context.Context, _ *secretapi.ListSecretVersionIdsInput, _ ...func(*secretapi.Options)) (*secretapi.ListSecretVersionIdsOutput, error) {
 					return &secretapi.ListSecretVersionIdsOutput{
 						Versions: []secretapi.SecretVersionsListEntry{
-							{VersionId: lo.ToPtr("version-id-1"), CreatedDate: lo.ToPtr(now.Add(-time.Hour)), VersionStages: []string{"AWSPREVIOUS"}},
-							{VersionId: lo.ToPtr("version-id-2"), CreatedDate: &now, VersionStages: []string{"AWSCURRENT"}},
+							{VersionId: lo.ToPtr(testVersionID1), CreatedDate: lo.ToPtr(now.Add(-time.Hour)), VersionStages: []string{"AWSPREVIOUS"}},
+							{VersionId: lo.ToPtr(testVersionID2), CreatedDate: &now, VersionStages: []string{"AWSCURRENT"}},
 						},
 					}, nil
 				},
 				getSecretValueFunc: func(_ context.Context, params *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) {
 					versionID := lo.FromPtr(params.VersionId)
 					switch versionID {
-					case "version-id-1":
+					case testVersionID1:
 						return &secretapi.GetSecretValueOutput{
 							SecretString: lo.ToPtr("old-value"),
-							VersionId:    lo.ToPtr("version-id-1"),
+							VersionId:    lo.ToPtr(testVersionID1),
 						}, nil
-					case "version-id-2":
+					case testVersionID2:
 						return &secretapi.GetSecretValueOutput{
 							SecretString: lo.ToPtr("new-value"),
-							VersionId:    lo.ToPtr("version-id-2"),
+							VersionId:    lo.ToPtr(testVersionID2),
 						}, nil
 					}
 					return nil, fmt.Errorf("unknown version")
@@ -570,7 +576,7 @@ func TestRun(t *testing.T) {
 				listSecretVersionIdsFunc: func(_ context.Context, _ *secretapi.ListSecretVersionIdsInput, _ ...func(*secretapi.Options)) (*secretapi.ListSecretVersionIdsOutput, error) {
 					return &secretapi.ListSecretVersionIdsOutput{
 						Versions: []secretapi.SecretVersionsListEntry{
-							{VersionId: lo.ToPtr("version-id-1"), CreatedDate: &now, VersionStages: []string{"AWSCURRENT"}},
+							{VersionId: lo.ToPtr(testVersionID1), CreatedDate: &now, VersionStages: []string{"AWSCURRENT"}},
 						},
 					}, nil
 				},
@@ -590,14 +596,14 @@ func TestRun(t *testing.T) {
 				listSecretVersionIdsFunc: func(_ context.Context, _ *secretapi.ListSecretVersionIdsInput, _ ...func(*secretapi.Options)) (*secretapi.ListSecretVersionIdsOutput, error) {
 					return &secretapi.ListSecretVersionIdsOutput{
 						Versions: []secretapi.SecretVersionsListEntry{
-							{VersionId: lo.ToPtr("version-id-1"), CreatedDate: nil, VersionStages: nil},
+							{VersionId: lo.ToPtr(testVersionID1), CreatedDate: nil, VersionStages: nil},
 						},
 					}, nil
 				},
 				getSecretValueFunc: func(_ context.Context, _ *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) {
 					return &secretapi.GetSecretValueOutput{
 						SecretString: lo.ToPtr("secret-value"),
-						VersionId:    lo.ToPtr("version-id-1"),
+						VersionId:    lo.ToPtr(testVersionID1),
 					}, nil
 				},
 			},

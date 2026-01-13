@@ -2069,13 +2069,13 @@ func TestParam_ListJSON(t *testing.T) {
 }
 
 // =============================================================================
-// Service-Specific Drain and Persist Tests
+// Service-Specific Stash Tests
 // =============================================================================
 
-// TestParam_DrainAndPersist tests service-specific drain and persist for parameters.
-func TestParam_DrainAndPersist(t *testing.T) {
+// TestParam_StashPushAndPop tests service-specific stash push and pop for parameters.
+func TestParam_StashPushAndPop(t *testing.T) {
 	setupEnv(t)
-	paramName := "/suve-e2e-param-drain-persist/test"
+	paramName := "/suve-e2e-param-stash-push-pop/test"
 
 	// Cleanup
 	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
@@ -2092,12 +2092,12 @@ func TestParam_DrainAndPersist(t *testing.T) {
 		t.Logf("stage add output: %s", stdout)
 	})
 
-	// Persist only param service to file
-	t.Run("persist-param-only", func(t *testing.T) {
-		stdout, _, err := runSubCommand(t, paramstage.Command(), "persist")
+	// Stash push only param service to file
+	t.Run("stash-push-param-only", func(t *testing.T) {
+		stdout, _, err := runSubCommand(t, paramstage.Command(), "stash", "push")
 		require.NoError(t, err)
-		t.Logf("persist output: %s", stdout)
-		assert.Contains(t, stdout, "persisted to file")
+		t.Logf("stash push output: %s", stdout)
+		assert.Contains(t, stdout, "stashed to file")
 	})
 
 	// Agent should be empty for param
@@ -2108,12 +2108,12 @@ func TestParam_DrainAndPersist(t *testing.T) {
 		assert.NotContains(t, stdout, paramName)
 	})
 
-	// Drain param service back from file
-	t.Run("drain-param-only", func(t *testing.T) {
-		stdout, _, err := runSubCommand(t, paramstage.Command(), "drain")
+	// Stash pop param service back from file
+	t.Run("stash-pop-param-only", func(t *testing.T) {
+		stdout, _, err := runSubCommand(t, paramstage.Command(), "stash", "pop")
 		require.NoError(t, err)
-		t.Logf("drain output: %s", stdout)
-		assert.Contains(t, stdout, "loaded from file")
+		t.Logf("stash pop output: %s", stdout)
+		assert.Contains(t, stdout, "restored")
 	})
 
 	// Param should be back in agent
@@ -2137,10 +2137,10 @@ func TestParam_DrainAndPersist(t *testing.T) {
 	})
 }
 
-// TestParam_PersistWithKeep tests param persist with --keep flag.
-func TestParam_PersistWithKeep(t *testing.T) {
+// TestParam_StashPushWithKeep tests param stash push with --keep flag.
+func TestParam_StashPushWithKeep(t *testing.T) {
 	setupEnv(t)
-	paramName := "/suve-e2e-param-persist-keep/test"
+	paramName := "/suve-e2e-param-stash-push-keep/test"
 
 	// Cleanup
 	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
@@ -2154,11 +2154,11 @@ func TestParam_PersistWithKeep(t *testing.T) {
 	_, _, err := runSubCommand(t, paramstage.Command(), "add", paramName, "test-value")
 	require.NoError(t, err)
 
-	// Persist with --keep (should keep in agent memory)
-	t.Run("persist-with-keep", func(t *testing.T) {
-		stdout, _, err := runSubCommand(t, paramstage.Command(), "persist", "--keep")
+	// Stash push with --keep (should keep in agent memory)
+	t.Run("stash-push-with-keep", func(t *testing.T) {
+		stdout, _, err := runSubCommand(t, paramstage.Command(), "stash", "push", "--keep")
 		require.NoError(t, err)
-		t.Logf("persist --keep output: %s", stdout)
+		t.Logf("stash push --keep output: %s", stdout)
 		assert.Contains(t, stdout, "kept in memory")
 	})
 
@@ -2170,11 +2170,11 @@ func TestParam_PersistWithKeep(t *testing.T) {
 	})
 }
 
-// TestParam_DrainWithMerge tests param drain with --merge flag.
-func TestParam_DrainWithMerge(t *testing.T) {
+// TestParam_StashPopWithMerge tests param stash pop with --merge flag.
+func TestParam_StashPopWithMerge(t *testing.T) {
 	setupEnv(t)
-	paramName1 := "/suve-e2e-param-drain-merge/param1"
-	paramName2 := "/suve-e2e-param-drain-merge/param2"
+	paramName1 := "/suve-e2e-param-stash-pop-merge/param1"
+	paramName2 := "/suve-e2e-param-stash-pop-merge/param2"
 
 	// Cleanup
 	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName1)
@@ -2186,21 +2186,21 @@ func TestParam_DrainWithMerge(t *testing.T) {
 		_, _, _ = runCommand(t, globalreset.Command(), "--yes")
 	})
 
-	// Stage param1 and persist to file
+	// Stage param1 and stash push to file
 	_, _, err := runSubCommand(t, paramstage.Command(), "add", paramName1, "value1")
 	require.NoError(t, err)
-	_, _, err = runSubCommand(t, paramstage.Command(), "persist")
+	_, _, err = runSubCommand(t, paramstage.Command(), "stash", "push")
 	require.NoError(t, err)
 
 	// Stage param2 in agent
 	_, _, err = runSubCommand(t, paramstage.Command(), "add", paramName2, "value2")
 	require.NoError(t, err)
 
-	// Drain with --merge (should combine both)
-	t.Run("drain-with-merge", func(t *testing.T) {
-		stdout, _, err := runSubCommand(t, paramstage.Command(), "drain", "--merge")
+	// Stash pop with --merge (should combine both)
+	t.Run("stash-pop-with-merge", func(t *testing.T) {
+		stdout, _, err := runSubCommand(t, paramstage.Command(), "stash", "pop", "--merge")
 		require.NoError(t, err)
-		t.Logf("drain --merge output: %s", stdout)
+		t.Logf("stash pop --merge output: %s", stdout)
 		assert.Contains(t, stdout, "merged")
 	})
 

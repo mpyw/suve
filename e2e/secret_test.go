@@ -785,10 +785,10 @@ func TestSecret_ListJSON(t *testing.T) {
 	assert.True(t, strings.HasPrefix(strings.TrimSpace(stdout), "[") || strings.HasPrefix(strings.TrimSpace(stdout), "{"))
 }
 
-// TestSecret_DrainAndPersist tests service-specific drain and persist for secrets.
-func TestSecret_DrainAndPersist(t *testing.T) {
+// TestSecret_StashPushAndPop tests service-specific stash push and pop for secrets.
+func TestSecret_StashPushAndPop(t *testing.T) {
 	setupEnv(t)
-	secretName := "suve-e2e-secret-drain-persist/test"
+	secretName := "suve-e2e-secret-stash-push-pop/test"
 
 	// Cleanup
 	_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
@@ -805,12 +805,12 @@ func TestSecret_DrainAndPersist(t *testing.T) {
 		t.Logf("stage add output: %s", stdout)
 	})
 
-	// Persist only secret service to file
-	t.Run("persist-secret-only", func(t *testing.T) {
-		stdout, _, err := runSubCommand(t, secretstage.Command(), "persist")
+	// Stash push only secret service to file
+	t.Run("stash-push-secret-only", func(t *testing.T) {
+		stdout, _, err := runSubCommand(t, secretstage.Command(), "stash", "push")
 		require.NoError(t, err)
-		t.Logf("persist output: %s", stdout)
-		assert.Contains(t, stdout, "persisted to file")
+		t.Logf("stash push output: %s", stdout)
+		assert.Contains(t, stdout, "stashed to file")
 	})
 
 	// Agent should be empty for secret
@@ -820,12 +820,12 @@ func TestSecret_DrainAndPersist(t *testing.T) {
 		assert.NotContains(t, stdout, secretName)
 	})
 
-	// Drain secret service back from file
-	t.Run("drain-secret-only", func(t *testing.T) {
-		stdout, _, err := runSubCommand(t, secretstage.Command(), "drain")
+	// Stash pop secret service back from file
+	t.Run("stash-pop-secret-only", func(t *testing.T) {
+		stdout, _, err := runSubCommand(t, secretstage.Command(), "stash", "pop")
 		require.NoError(t, err)
-		t.Logf("drain output: %s", stdout)
-		assert.Contains(t, stdout, "loaded from file")
+		t.Logf("stash pop output: %s", stdout)
+		assert.Contains(t, stdout, "restored")
 	})
 
 	// Secret should be back in agent

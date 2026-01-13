@@ -14,6 +14,11 @@ import (
 	"github.com/mpyw/suve/internal/staging/store/testutil"
 )
 
+const (
+	testCurrentValue  = "current"
+	testExistingValue = "existing-value"
+)
+
 func TestNewExecutor(t *testing.T) {
 	store := testutil.NewMockStore()
 	executor := NewExecutor(store)
@@ -78,7 +83,7 @@ func TestExecuteEntry_Edit(t *testing.T) {
 	store := testutil.NewMockStore()
 	executor := NewExecutor(store)
 
-	currentValue := "current"
+	currentValue := testCurrentValue
 	state := EntryState{
 		CurrentValue: &currentValue,
 		StagedState:  EntryStagedStateNotStaged{},
@@ -103,7 +108,7 @@ func TestExecuteEntry_EditWithMetadata(t *testing.T) {
 	store := testutil.NewMockStore()
 	executor := NewExecutor(store)
 
-	currentValue := "current"
+	currentValue := testCurrentValue
 	state := EntryState{
 		CurrentValue: &currentValue,
 		StagedState:  EntryStagedStateNotStaged{},
@@ -136,7 +141,7 @@ func TestExecuteEntry_Delete(t *testing.T) {
 	store := testutil.NewMockStore()
 	executor := NewExecutor(store)
 
-	currentValue := "current"
+	currentValue := testCurrentValue
 	state := EntryState{
 		CurrentValue: &currentValue,
 		StagedState:  EntryStagedStateNotStaged{},
@@ -161,7 +166,7 @@ func TestExecuteEntry_DeleteWithMetadata(t *testing.T) {
 	store := testutil.NewMockStore()
 	executor := NewExecutor(store)
 
-	currentValue := "current"
+	currentValue := testCurrentValue
 	state := EntryState{
 		CurrentValue: &currentValue,
 		StagedState:  EntryStagedStateNotStaged{},
@@ -269,7 +274,7 @@ func TestExecuteEntry_Reset(t *testing.T) {
 	executor := NewExecutor(store)
 
 	state := EntryState{
-		CurrentValue: lo.ToPtr("current"),
+		CurrentValue: lo.ToPtr(testCurrentValue),
 		StagedState:  EntryStagedStateUpdate{DraftValue: "updated"},
 	}
 
@@ -292,7 +297,7 @@ func TestExecuteEntry_Error(t *testing.T) {
 	executor := NewExecutor(store)
 
 	state := EntryState{
-		CurrentValue: lo.ToPtr("current"),
+		CurrentValue: lo.ToPtr(testCurrentValue),
 		StagedState:  EntryStagedStateDelete{},
 	}
 
@@ -332,7 +337,7 @@ func TestExecuteTag_Add(t *testing.T) {
 		Tags:           map[string]string{"env": "prod"},
 		CurrentAWSTags: nil, // nil disables auto-skip
 	}
-	existingValue := "existing-value"
+	existingValue := testExistingValue
 	entryState := EntryState{CurrentValue: &existingValue, StagedState: EntryStagedStateNotStaged{}}
 
 	result, err := executor.ExecuteTag(t.Context(), staging.ServiceParam, "/app/config", entryState, StagedTags{}, action, &baseTime)
@@ -357,7 +362,7 @@ func TestExecuteTag_Remove(t *testing.T) {
 		Keys:              maputil.NewSet("deprecated"),
 		CurrentAWSTagKeys: nil, // nil disables auto-skip
 	}
-	existingValue := "existing-value"
+	existingValue := testExistingValue
 	entryState := EntryState{CurrentValue: &existingValue, StagedState: EntryStagedStateNotStaged{}}
 
 	result, err := executor.ExecuteTag(t.Context(), staging.ServiceParam, "/app/config", entryState, StagedTags{}, action, nil)
@@ -380,7 +385,7 @@ func TestExecuteTag_Error(t *testing.T) {
 	action := TagActionTag{
 		Tags: map[string]string{"env": "prod"},
 	}
-	existingValue := "existing-value"
+	existingValue := testExistingValue
 	entryState := EntryState{CurrentValue: &existingValue, StagedState: EntryStagedStateDelete{}}
 
 	// Tag on DELETE should error
@@ -410,7 +415,7 @@ func TestExecuteTag_UnstageWhenEmpty(t *testing.T) {
 		Keys:              maputil.NewSet("env"),
 		CurrentAWSTagKeys: maputil.NewSet("env"),
 	}
-	existingValue := "existing-value"
+	existingValue := testExistingValue
 	entryState := EntryState{CurrentValue: &existingValue, StagedState: EntryStagedStateNotStaged{}}
 
 	result, err := executor.ExecuteTag(t.Context(), staging.ServiceParam, "/app/config", entryState, existingTags, action, nil)
@@ -448,7 +453,7 @@ func TestExecuteTag_UnstageWhenCompletelyEmpty(t *testing.T) {
 		Tags:           map[string]string{"env": "prod"},
 		CurrentAWSTags: map[string]string{"env": "prod"}, // Same value on AWS - auto-skip
 	}
-	existingValue := "existing-value"
+	existingValue := testExistingValue
 	entryState := EntryState{CurrentValue: &existingValue, StagedState: EntryStagedStateNotStaged{}}
 
 	result, err := executor.ExecuteTag(t.Context(), staging.ServiceParam, "/app/config", entryState, existingTags, action, nil)
@@ -476,7 +481,7 @@ func TestExecuteTag_UnstageWhenAlreadyNotStaged(t *testing.T) {
 		Tags:           map[string]string{"env": "prod"},
 		CurrentAWSTags: map[string]string{"env": "prod"}, // Same value on AWS - auto-skip
 	}
-	existingValue := "existing-value"
+	existingValue := testExistingValue
 	entryState := EntryState{CurrentValue: &existingValue, StagedState: EntryStagedStateNotStaged{}}
 
 	result, err := executor.ExecuteTag(t.Context(), staging.ServiceParam, "/app/config", entryState, existingTags, action, nil)
@@ -528,7 +533,7 @@ func TestLoadEntryState(t *testing.T) {
 			StagedAt:  time.Now(),
 		}))
 
-		currentValue := "current"
+		currentValue := testCurrentValue
 		state, err := LoadEntryState(t.Context(), store, staging.ServiceParam, "/app/config", &currentValue)
 		require.NoError(t, err)
 
@@ -644,7 +649,7 @@ func TestExecuteTag_PersistError(t *testing.T) {
 		Tags:           map[string]string{"env": "prod"},
 		CurrentAWSTags: nil, // nil disables auto-skip
 	}
-	existingValue := "existing-value"
+	existingValue := testExistingValue
 	entryState := EntryState{CurrentValue: &existingValue, StagedState: EntryStagedStateNotStaged{}}
 
 	// Tag should fail due to StageTag error

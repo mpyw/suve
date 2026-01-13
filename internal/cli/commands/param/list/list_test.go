@@ -49,6 +49,7 @@ func (m *mockClient) GetParameters(ctx context.Context, params *paramapi.GetPara
 	return nil, fmt.Errorf("GetParameters not mocked")
 }
 
+//nolint:funlen // Table-driven test with many cases
 func TestRun(t *testing.T) {
 	t.Parallel()
 	tests := []struct {

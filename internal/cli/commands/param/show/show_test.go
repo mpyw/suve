@@ -60,6 +60,7 @@ func (m *mockClient) ListTagsForResource(ctx context.Context, params *paramapi.L
 	return &paramapi.ListTagsForResourceOutput{}, nil
 }
 
+//nolint:funlen // Table-driven test with many cases
 func TestRun(t *testing.T) {
 	t.Parallel()
 	now := time.Now()

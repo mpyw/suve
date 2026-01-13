@@ -355,13 +355,13 @@ func TestGlobal_ResetWithTags(t *testing.T) {
 }
 
 // =============================================================================
-// Drain and Persist Tests
+// Stash Push and Pop Tests
 // =============================================================================
 
-// TestGlobal_DrainAndPersist tests the drain and persist workflow.
-func TestGlobal_DrainAndPersist(t *testing.T) {
+// TestGlobal_StashPushAndPop tests the stash push and pop workflow.
+func TestGlobal_StashPushAndPop(t *testing.T) {
 	setupEnv(t)
-	paramName := "/suve-e2e-drain-persist/test-param"
+	paramName := "/suve-e2e-stash-push-pop/test-param"
 
 	// Cleanup
 	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
@@ -385,31 +385,31 @@ func TestGlobal_DrainAndPersist(t *testing.T) {
 		assert.Contains(t, stdout, paramName)
 	})
 
-	// Persist agent memory to file
-	t.Run("persist-to-file", func(t *testing.T) {
+	// Stash push agent memory to file
+	t.Run("stash-push-to-file", func(t *testing.T) {
 		stdout, _, err := runSubCommand(t, stgcli.NewGlobalStashCommand(), "push")
 		require.NoError(t, err)
-		t.Logf("persist output: %s", stdout)
+		t.Logf("stash push output: %s", stdout)
 		assert.Contains(t, stdout, "Staged changes stashed to file")
 	})
 
 	// Agent should now be empty
-	t.Run("verify-agent-empty-after-persist", func(t *testing.T) {
+	t.Run("verify-agent-empty-after-stash-push", func(t *testing.T) {
 		stdout, _, err := runCommand(t, globalstatus.Command())
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "No changes staged")
 	})
 
-	// Drain file back to agent
-	t.Run("drain-from-file", func(t *testing.T) {
+	// Stash pop file back to agent
+	t.Run("stash-pop-from-file", func(t *testing.T) {
 		stdout, _, err := runSubCommand(t, stgcli.NewGlobalStashCommand(), "pop")
 		require.NoError(t, err)
-		t.Logf("drain output: %s", stdout)
+		t.Logf("stash pop output: %s", stdout)
 		assert.Contains(t, stdout, "Stashed changes restored")
 	})
 
 	// Agent should have the staged changes again
-	t.Run("verify-agent-has-changes-after-drain", func(t *testing.T) {
+	t.Run("verify-agent-has-changes-after-stash-pop", func(t *testing.T) {
 		stdout, _, err := runCommand(t, globalstatus.Command())
 		require.NoError(t, err)
 		assert.Contains(t, stdout, paramName)
@@ -429,10 +429,10 @@ func TestGlobal_DrainAndPersist(t *testing.T) {
 	})
 }
 
-// TestGlobal_PersistWithKeep tests persist with --keep flag.
-func TestGlobal_PersistWithKeep(t *testing.T) {
+// TestGlobal_StashPushWithKeep tests stash push with --keep flag.
+func TestGlobal_StashPushWithKeep(t *testing.T) {
 	setupEnv(t)
-	paramName := "/suve-e2e-persist-keep/test-param"
+	paramName := "/suve-e2e-stash-push-keep/test-param"
 
 	// Cleanup
 	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
@@ -446,11 +446,11 @@ func TestGlobal_PersistWithKeep(t *testing.T) {
 	_, _, err := runCommand(t, paramstage.Command(), "add", paramName, "test-value")
 	require.NoError(t, err)
 
-	// Persist with --keep flag (should keep agent memory)
-	t.Run("persist-with-keep", func(t *testing.T) {
+	// Stash push with --keep flag (should keep agent memory)
+	t.Run("stash-push-with-keep", func(t *testing.T) {
 		stdout, _, err := runSubCommand(t, stgcli.NewGlobalStashCommand(), "push", "--keep")
 		require.NoError(t, err)
-		t.Logf("persist --keep output: %s", stdout)
+		t.Logf("stash push --keep output: %s", stdout)
 	})
 
 	// Agent should still have the changes
@@ -461,11 +461,11 @@ func TestGlobal_PersistWithKeep(t *testing.T) {
 	})
 }
 
-// TestGlobal_DrainWithMerge tests drain with --merge flag.
-func TestGlobal_DrainWithMerge(t *testing.T) {
+// TestGlobal_StashPopWithMerge tests stash pop with --merge flag.
+func TestGlobal_StashPopWithMerge(t *testing.T) {
 	setupEnv(t)
-	paramName1 := "/suve-e2e-drain-merge/param1"
-	paramName2 := "/suve-e2e-drain-merge/param2"
+	paramName1 := "/suve-e2e-stash-pop-merge/param1"
+	paramName2 := "/suve-e2e-stash-pop-merge/param2"
 
 	// Cleanup
 	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName1)
@@ -477,7 +477,7 @@ func TestGlobal_DrainWithMerge(t *testing.T) {
 		_, _, _ = runCommand(t, globalreset.Command(), "--yes")
 	})
 
-	// Stage param1 and persist to file
+	// Stage param1 and stash push to file
 	_, _, err := runCommand(t, paramstage.Command(), "add", paramName1, "value1")
 	require.NoError(t, err)
 	_, _, err = runSubCommand(t, stgcli.NewGlobalStashCommand(), "push")
@@ -487,11 +487,11 @@ func TestGlobal_DrainWithMerge(t *testing.T) {
 	_, _, err = runCommand(t, paramstage.Command(), "add", paramName2, "value2")
 	require.NoError(t, err)
 
-	// Drain with merge (should combine both)
-	t.Run("drain-with-merge", func(t *testing.T) {
+	// Stash pop with merge (should combine both)
+	t.Run("stash-pop-with-merge", func(t *testing.T) {
 		stdout, _, err := runSubCommand(t, stgcli.NewGlobalStashCommand(), "pop", "--merge")
 		require.NoError(t, err)
-		t.Logf("drain --merge output: %s", stdout)
+		t.Logf("stash pop --merge output: %s", stdout)
 	})
 
 	// Both parameters should be staged
@@ -503,22 +503,22 @@ func TestGlobal_DrainWithMerge(t *testing.T) {
 	})
 }
 
-// TestGlobal_DrainEmpty tests drain when file is empty.
-func TestGlobal_DrainEmpty(t *testing.T) {
+// TestGlobal_StashPopEmpty tests stash pop when file is empty.
+func TestGlobal_StashPopEmpty(t *testing.T) {
 	setupEnv(t)
 
 	// Reset to ensure clean state
 	_, _, _ = runCommand(t, globalreset.Command(), "--yes")
 
-	// Drain should fail or indicate nothing to drain
-	t.Run("drain-empty", func(t *testing.T) {
+	// Stash pop should fail or indicate nothing to pop
+	t.Run("stash-pop-empty", func(t *testing.T) {
 		_, _, err := runSubCommand(t, stgcli.NewGlobalStashCommand(), "pop")
 		assert.Error(t, err)
 	})
 }
 
-// TestGlobal_PersistEmpty tests persist when agent is empty.
-func TestGlobal_PersistEmpty(t *testing.T) {
+// TestGlobal_StashPushEmpty tests stash push when agent is empty.
+func TestGlobal_StashPushEmpty(t *testing.T) {
 	setupEnv(t)
 
 	// Reset to ensure clean state (run twice to be safe)
@@ -527,27 +527,27 @@ func TestGlobal_PersistEmpty(t *testing.T) {
 
 	// Verify agent is actually empty
 	stdout, _, _ := runCommand(t, globalstatus.Command())
-	t.Logf("status before persist: %s", stdout)
+	t.Logf("status before stash push: %s", stdout)
 
-	// Persist should fail when agent is empty (no staged changes)
-	t.Run("persist-empty", func(t *testing.T) {
+	// Stash push should fail when agent is empty (no staged changes)
+	t.Run("stash-push-empty", func(t *testing.T) {
 		_, stderr, err := runSubCommand(t, stgcli.NewGlobalStashCommand(), "push")
-		// Either returns error or prints "nothing to persist"
+		// Either returns error or prints "nothing to stash"
 		if err == nil {
-			// If no error, check output - might indicate nothing was persisted
-			t.Logf("persist succeeded with no error - stderr: %s", stderr)
+			// If no error, check output - might indicate nothing was stashed
+			t.Logf("stash push succeeded with no error - stderr: %s", stderr)
 		} else {
-			// Expected: error when nothing to persist
-			t.Logf("persist returned error as expected: %v", err)
+			// Expected: error when nothing to stash
+			t.Logf("stash push returned error as expected: %v", err)
 		}
 	})
 }
 
-// TestMixed_ServiceSpecificDrainPersist tests drain/persist with mixed services.
-func TestMixed_ServiceSpecificDrainPersist(t *testing.T) {
+// TestMixed_ServiceSpecificStashPushPop tests stash push/pop with mixed services.
+func TestMixed_ServiceSpecificStashPushPop(t *testing.T) {
 	setupEnv(t)
-	paramName := "/suve-e2e-mixed-drain/param"
-	secretName := "suve-e2e-mixed-drain/secret"
+	paramName := "/suve-e2e-mixed-stash/param"
+	secretName := "suve-e2e-mixed-stash/secret"
 
 	// Cleanup
 	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
@@ -565,8 +565,8 @@ func TestMixed_ServiceSpecificDrainPersist(t *testing.T) {
 	_, _, err = runSubCommand(t, secretstage.Command(), "add", secretName, "secret-value")
 	require.NoError(t, err)
 
-	// Persist only params (secrets should remain in agent)
-	t.Run("persist-param-only", func(t *testing.T) {
+	// Stash push only params (secrets should remain in agent)
+	t.Run("stash-push-param-only", func(t *testing.T) {
 		_, _, err := runSubCommand(t, paramstage.Command(), "stash", "push")
 		require.NoError(t, err)
 	})
@@ -582,8 +582,8 @@ func TestMixed_ServiceSpecificDrainPersist(t *testing.T) {
 		assert.Contains(t, secretStatus, secretName)
 	})
 
-	// Drain params back (secret should be unaffected)
-	t.Run("drain-param-back", func(t *testing.T) {
+	// Stash pop params back (secret should be unaffected)
+	t.Run("stash-pop-param-back", func(t *testing.T) {
 		_, _, err := runSubCommand(t, paramstage.Command(), "stash", "pop")
 		require.NoError(t, err)
 	})

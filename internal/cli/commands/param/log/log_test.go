@@ -103,6 +103,7 @@ func (m *mockClient) GetParameterHistory(ctx context.Context, params *paramapi.G
 	return nil, fmt.Errorf("GetParameterHistory not mocked")
 }
 
+//nolint:funlen // Table-driven test with many cases
 func TestRun(t *testing.T) {
 	t.Parallel()
 	now := time.Now()

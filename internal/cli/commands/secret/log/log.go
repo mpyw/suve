@@ -202,6 +202,8 @@ func action(ctx context.Context, cmd *cli.Command) error {
 }
 
 // Run executes the log command.
+//
+//nolint:gocognit // Log output has multiple format branches that are clearer inline than extracted
 func (r *Runner) Run(ctx context.Context, opts Options) error {
 	result, err := r.UseCase.Execute(ctx, secret.LogInput{
 		Name:       opts.Name,

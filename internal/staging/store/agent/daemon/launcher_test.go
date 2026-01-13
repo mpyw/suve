@@ -164,6 +164,7 @@ func TestLauncher_EnsureRunning_AlreadyRunning(t *testing.T) {
 				}
 				resp := protocol.Response{Success: true}
 				encoder := json.NewEncoder(c)
+				//nolint:errchkjson // Test code: Response struct is safe for JSON encoding
 				_ = encoder.Encode(&resp)
 			}(conn)
 		}
@@ -222,6 +223,7 @@ func TestLauncher_PingWithRunningDaemon(t *testing.T) {
 				}
 				resp := protocol.Response{Success: true}
 				encoder := json.NewEncoder(c)
+				//nolint:errchkjson // Test code: Response struct is safe for JSON encoding
 				_ = encoder.Encode(&resp)
 			}(conn)
 		}
@@ -268,6 +270,7 @@ func TestLauncher_ShutdownWithRunningDaemon(t *testing.T) {
 				}
 				resp := protocol.Response{Success: true}
 				encoder := json.NewEncoder(c)
+				//nolint:errchkjson // Test code: Response struct is safe for JSON encoding
 				_ = encoder.Encode(&resp)
 			}(conn)
 		}
@@ -314,6 +317,7 @@ func TestLauncher_ShutdownWithServerError(t *testing.T) {
 				}
 				resp := protocol.Response{Success: false, Error: "shutdown failed"}
 				encoder := json.NewEncoder(c)
+				//nolint:errchkjson // Test code: Response struct is safe for JSON encoding
 				_ = encoder.Encode(&resp)
 			}(conn)
 		}
@@ -408,6 +412,7 @@ func TestLauncher_EnsureRunning_WithMockSpawner(t *testing.T) {
 					}
 					resp := protocol.Response{Success: true}
 					encoder := json.NewEncoder(c)
+					//nolint:errchkjson // Test code: Response struct is safe for JSON encoding
 					_ = encoder.Encode(&resp)
 				}(conn)
 			}

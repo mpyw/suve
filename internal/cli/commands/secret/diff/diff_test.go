@@ -18,6 +18,8 @@ import (
 	"github.com/mpyw/suve/internal/version/secretversion"
 )
 
+const testStageLabelPrevious = "AWSPREVIOUS"
+
 func TestCommand_Validation(t *testing.T) {
 	t.Parallel()
 
@@ -54,6 +56,7 @@ func TestCommand_Validation(t *testing.T) {
 	})
 }
 
+//nolint:funlen // Table-driven test with many cases
 func TestParseArgs(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
@@ -426,7 +429,7 @@ func TestRunnerRun(t *testing.T) {
 			mock: &mockClient{
 				getSecretValueFunc: func(_ context.Context, params *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) {
 					stage := lo.FromPtr(params.VersionStage)
-					if stage == "AWSPREVIOUS" {
+					if stage == testStageLabelPrevious {
 						return &secretapi.GetSecretValueOutput{
 							Name:         lo.ToPtr("my-secret"),
 							VersionId:    lo.ToPtr("prev-version-id-long"),
@@ -454,7 +457,7 @@ func TestRunnerRun(t *testing.T) {
 			mock: &mockClient{
 				getSecretValueFunc: func(_ context.Context, params *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) {
 					stage := lo.FromPtr(params.VersionStage)
-					if stage == "AWSPREVIOUS" {
+					if stage == testStageLabelPrevious {
 						return &secretapi.GetSecretValueOutput{
 							Name:         lo.ToPtr("my-secret"),
 							VersionId:    lo.ToPtr("v1"),
@@ -481,7 +484,7 @@ func TestRunnerRun(t *testing.T) {
 			},
 			mock: &mockClient{
 				getSecretValueFunc: func(_ context.Context, params *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) {
-					if lo.FromPtr(params.VersionStage) == "AWSPREVIOUS" {
+					if lo.FromPtr(params.VersionStage) == testStageLabelPrevious {
 						return nil, fmt.Errorf("version not found")
 					}
 					return &secretapi.GetSecretValueOutput{
@@ -523,7 +526,7 @@ func TestRunnerRun(t *testing.T) {
 			mock: &mockClient{
 				getSecretValueFunc: func(_ context.Context, params *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) {
 					stage := lo.FromPtr(params.VersionStage)
-					if stage == "AWSPREVIOUS" {
+					if stage == testStageLabelPrevious {
 						return &secretapi.GetSecretValueOutput{
 							Name:         lo.ToPtr("my-secret"),
 							VersionId:    lo.ToPtr("v1-longer-id"),
@@ -552,7 +555,7 @@ func TestRunnerRun(t *testing.T) {
 			mock: &mockClient{
 				getSecretValueFunc: func(_ context.Context, params *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) {
 					stage := lo.FromPtr(params.VersionStage)
-					if stage == "AWSPREVIOUS" {
+					if stage == testStageLabelPrevious {
 						return &secretapi.GetSecretValueOutput{
 							Name:         lo.ToPtr("my-secret"),
 							VersionId:    lo.ToPtr("v1-longer-id"),

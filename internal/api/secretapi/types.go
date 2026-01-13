@@ -53,6 +53,8 @@ const (
 )
 
 // Re-exported Secrets Manager error types.
+//
+//nolint:errname // This is a type alias to AWS SDK type, preserving original name for consistency
 type (
 	ResourceNotFoundException = types.ResourceNotFoundException
 )

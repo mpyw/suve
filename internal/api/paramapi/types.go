@@ -54,6 +54,8 @@ const (
 )
 
 // Re-exported SSM error types.
+//
+//nolint:errname // These are type aliases to AWS SDK types, preserving original names for consistency
 type (
 	ParameterNotFound      = types.ParameterNotFound
 	ParameterAlreadyExists = types.ParameterAlreadyExists

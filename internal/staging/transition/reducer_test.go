@@ -9,6 +9,8 @@ import (
 	"github.com/mpyw/suve/internal/maputil"
 )
 
+// testExistingValue is declared in executor_test.go
+
 func TestReduceEntry_Add(t *testing.T) {
 	tests := []struct {
 		name            string
@@ -266,7 +268,7 @@ func TestReduceEntry_Reset(t *testing.T) {
 }
 
 func TestReduceTag_Tag(t *testing.T) {
-	existingValue := "existing-value"
+	existingValue := testExistingValue
 	tests := []struct {
 		name          string
 		entryState    EntryState
@@ -420,7 +422,7 @@ func TestReduceTag_Tag(t *testing.T) {
 }
 
 func TestReduceTag_Untag(t *testing.T) {
-	existingValue := "existing-value"
+	existingValue := testExistingValue
 	tests := []struct {
 		name          string
 		entryState    EntryState

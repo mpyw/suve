@@ -15,6 +15,8 @@ import (
 	usecasestaging "github.com/mpyw/suve/internal/usecase/staging"
 )
 
+const testCurrentValue = "current-value"
+
 type mockResetStrategy struct {
 	*mockParser
 
@@ -44,7 +46,7 @@ func newMockResetStrategy() *mockResetStrategy {
 		mockParser:   newMockParser(),
 		fetchValue:   "version-value",
 		versionLabel: "#3",
-		currentValue: "current-value",
+		currentValue: testCurrentValue,
 	}
 }
 
@@ -358,8 +360,8 @@ func TestResetUseCase_Execute_RestoreSkipped_SameAsAWS(t *testing.T) {
 
 	// Fetcher returns value that matches current AWS
 	fetcher := newMockResetStrategy()
-	fetcher.fetchValue = "current-value"
-	fetcher.currentValue = "current-value" // Same as fetched version
+	fetcher.fetchValue = testCurrentValue
+	fetcher.currentValue = testCurrentValue // Same as fetched version
 	fetcher.versionLabel = "#3"
 
 	uc := &usecasestaging.ResetUseCase{
@@ -392,7 +394,7 @@ func TestResetUseCase_Execute_RestoreNotSkipped_DifferentFromAWS(t *testing.T) {
 	// Fetcher returns value different from current AWS
 	fetcher := newMockResetStrategy()
 	fetcher.fetchValue = "old-version-value"
-	fetcher.currentValue = "current-value" // Different from fetched version
+	fetcher.currentValue = testCurrentValue // Different from fetched version
 	fetcher.versionLabel = "#3"
 
 	uc := &usecasestaging.ResetUseCase{

@@ -19,6 +19,8 @@ import (
 	"github.com/mpyw/suve/internal/version/paramversion"
 )
 
+const testParamVersion1 = "/app/param:1"
+
 func TestCommand_Validation(t *testing.T) {
 	t.Parallel()
 
@@ -47,6 +49,7 @@ func TestCommand_Validation(t *testing.T) {
 	})
 }
 
+//nolint:funlen // Table-driven test with many cases
 func TestParseArgs(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
@@ -387,6 +390,7 @@ func (m *mockClient) GetParameterHistory(ctx context.Context, params *paramapi.G
 	return nil, fmt.Errorf("GetParameterHistory not mocked")
 }
 
+//nolint:funlen // Table-driven test with many cases
 func TestRun(t *testing.T) {
 	t.Parallel()
 	now := time.Now()
@@ -407,7 +411,7 @@ func TestRun(t *testing.T) {
 			mock: &mockClient{
 				getParameterFunc: func(_ context.Context, params *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
 					name := lo.FromPtr(params.Name)
-					if name == "/app/param:1" {
+					if name == testParamVersion1 {
 						return &paramapi.GetParameterOutput{
 							Parameter: &paramapi.Parameter{
 								Name:             lo.ToPtr("/app/param"),
@@ -465,7 +469,7 @@ func TestRun(t *testing.T) {
 			},
 			mock: &mockClient{
 				getParameterFunc: func(_ context.Context, params *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
-					if lo.FromPtr(params.Name) == "/app/param:1" {
+					if lo.FromPtr(params.Name) == testParamVersion1 {
 						return nil, fmt.Errorf("version not found")
 					}
 					return &paramapi.GetParameterOutput{
@@ -511,7 +515,7 @@ func TestRun(t *testing.T) {
 			mock: &mockClient{
 				getParameterFunc: func(_ context.Context, params *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
 					name := lo.FromPtr(params.Name)
-					if name == "/app/param:1" {
+					if name == testParamVersion1 {
 						return &paramapi.GetParameterOutput{
 							Parameter: &paramapi.Parameter{
 								Name:    lo.ToPtr("/app/param"),
@@ -546,7 +550,7 @@ func TestRun(t *testing.T) {
 			mock: &mockClient{
 				getParameterFunc: func(_ context.Context, params *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
 					name := lo.FromPtr(params.Name)
-					if name == "/app/param:1" {
+					if name == testParamVersion1 {
 						return &paramapi.GetParameterOutput{
 							Parameter: &paramapi.Parameter{
 								Name:    lo.ToPtr("/app/param"),

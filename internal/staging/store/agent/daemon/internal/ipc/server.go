@@ -141,6 +141,7 @@ func (s *Server) handleConnection(conn net.Conn) {
 
 	_ = conn.SetDeadline(time.Now().Add(connectionTimeout))
 	encoder := json.NewEncoder(conn)
+	//nolint:errchkjson // Response struct is safe for JSON encoding
 	_ = encoder.Encode(resp)
 
 	// Trigger shutdown callback AFTER response is sent
@@ -153,6 +154,7 @@ func (s *Server) handleConnection(conn net.Conn) {
 func (s *Server) sendError(conn net.Conn, msg string) {
 	resp := protocol.Response{Success: false, Error: msg}
 	encoder := json.NewEncoder(conn)
+	//nolint:errchkjson // Response struct is safe for JSON encoding
 	_ = encoder.Encode(resp)
 }
 

@@ -258,6 +258,7 @@ func TestStatusRunner_Run(t *testing.T) {
 // DiffRunner Tests
 // =============================================================================
 
+//nolint:funlen // Table-driven test with many cases
 func TestDiffRunner_Run(t *testing.T) {
 	t.Parallel()
 
@@ -822,6 +823,7 @@ func TestEditRunner_Run(t *testing.T) {
 // PushRunner Tests
 // =============================================================================
 
+//nolint:funlen // Table-driven test with many cases
 func TestApplyRunner_Run(t *testing.T) {
 	t.Parallel()
 
@@ -1147,6 +1149,7 @@ func TestApplyRunner_Run(t *testing.T) {
 // ResetRunner Tests
 // =============================================================================
 
+//nolint:funlen // Table-driven test with many cases
 func TestResetRunner_Run(t *testing.T) {
 	t.Parallel()
 
@@ -2204,6 +2207,7 @@ func TestResetRunner_Skipped(t *testing.T) {
 // StashPopRunner Tests
 // =============================================================================
 
+//nolint:funlen // Table-driven test with many cases
 func TestStashPopRunner_Run(t *testing.T) {
 	t.Parallel()
 

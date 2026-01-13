@@ -12,8 +12,10 @@ import (
 	"github.com/mpyw/suve/internal/cli/editor"
 )
 
+const goosWindows = "windows"
+
 func TestOpen_ModifiesContent(t *testing.T) {
-	if runtime.GOOS == "windows" {
+	if runtime.GOOS == goosWindows {
 		t.Skip("Skipping on Windows - requires Unix shell")
 	}
 
@@ -36,7 +38,7 @@ printf '%s-modified' "$content" > "$1"
 }
 
 func TestOpen_ReturnsUnmodifiedContent(t *testing.T) {
-	if runtime.GOOS == "windows" {
+	if runtime.GOOS == goosWindows {
 		t.Skip("Skipping on Windows - requires Unix shell")
 	}
 
@@ -50,7 +52,7 @@ func TestOpen_ReturnsUnmodifiedContent(t *testing.T) {
 }
 
 func TestOpen_TrimsTrailingNewline(t *testing.T) {
-	if runtime.GOOS == "windows" {
+	if runtime.GOOS == goosWindows {
 		t.Skip("Skipping on Windows - requires Unix shell")
 	}
 
@@ -71,7 +73,7 @@ echo "with-newline" > "$1"
 }
 
 func TestOpen_TrimsCRLF(t *testing.T) {
-	if runtime.GOOS == "windows" {
+	if runtime.GOOS == goosWindows {
 		t.Skip("Skipping on Windows - requires Unix shell")
 	}
 
@@ -92,7 +94,7 @@ printf "with-crlf\r\n" > "$1"
 }
 
 func TestOpen_UsesVISUALOverEDITOR(t *testing.T) {
-	if runtime.GOOS == "windows" {
+	if runtime.GOOS == goosWindows {
 		t.Skip("Skipping on Windows - requires Unix shell")
 	}
 
@@ -119,7 +121,7 @@ printf 'editor' > "$1"
 }
 
 func TestOpen_EditorError(t *testing.T) {
-	if runtime.GOOS == "windows" {
+	if runtime.GOOS == goosWindows {
 		t.Skip("Skipping on Windows - requires Unix shell")
 	}
 
