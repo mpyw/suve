@@ -694,16 +694,28 @@ export namespace gui {
 	    merged: boolean;
 	    entryCount: number;
 	    tagCount: number;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new StagingDrainResult(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.merged = source["merged"];
 	        this.entryCount = source["entryCount"];
 	        this.tagCount = source["tagCount"];
+	    }
+	}
+	export class StagingDropResult {
+	    dropped: boolean;
+
+	    static createFrom(source: any = {}) {
+	        return new StagingDropResult(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.dropped = source["dropped"];
 	    }
 	}
 	export class StagingEditResult {

@@ -42,7 +42,7 @@ func (c *Client) SendRequest(req *protocol.Request) (*protocol.Response, error) 
 	dialer := net.Dialer{Timeout: dialTimeout}
 	conn, err := dialer.Dial("unix", c.socketPath)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrNotConnected, err)
+		return nil, fmt.Errorf("%w: %w", ErrNotConnected, err)
 	}
 	defer func() { _ = conn.Close() }()
 

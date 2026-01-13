@@ -303,7 +303,7 @@ func (m *HintedMockStore) UnstageEntryWithHint(ctx context.Context, service stag
 	if m.UnstageEntryWithHintErr != nil {
 		return m.UnstageEntryWithHintErr
 	}
-	return m.MockStore.UnstageEntry(ctx, service, name)
+	return m.UnstageEntry(ctx, service, name)
 }
 
 // UnstageTagWithHint removes staged tag changes with an operation hint.
@@ -312,7 +312,7 @@ func (m *HintedMockStore) UnstageTagWithHint(ctx context.Context, service stagin
 	if m.UnstageTagWithHintErr != nil {
 		return m.UnstageTagWithHintErr
 	}
-	return m.MockStore.UnstageTag(ctx, service, name)
+	return m.UnstageTag(ctx, service, name)
 }
 
 // UnstageAllWithHint removes all staged changes with an operation hint.
@@ -321,7 +321,7 @@ func (m *HintedMockStore) UnstageAllWithHint(ctx context.Context, service stagin
 	if m.UnstageAllWithHintErr != nil {
 		return m.UnstageAllWithHintErr
 	}
-	return m.MockStore.UnstageAll(ctx, service)
+	return m.UnstageAll(ctx, service)
 }
 
 // Compile-time checks that MockStore implements interfaces.

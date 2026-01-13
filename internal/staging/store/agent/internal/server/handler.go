@@ -65,7 +65,7 @@ func (h *Handler) HandleRequest(req *protocol.Request) *protocol.Response {
 	case protocol.MethodIsEmpty:
 		return h.handleIsEmpty()
 	default:
-		return errorMessageResponse("unknown method: " + string(req.Method))
+		return errorMessageResponse("unknown method: " + req.Method)
 	}
 }
 

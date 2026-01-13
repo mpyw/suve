@@ -387,7 +387,7 @@ func TestGlobal_DrainAndPersist(t *testing.T) {
 
 	// Persist agent memory to file
 	t.Run("persist-to-file", func(t *testing.T) {
-		stdout, _, err := runCommand(t, stgcli.NewGlobalPersistCommand())
+		stdout, _, err := runSubCommand(t, stgcli.NewGlobalStashCommand(), "push")
 		require.NoError(t, err)
 		t.Logf("persist output: %s", stdout)
 		assert.Contains(t, stdout, "persisted to file")
@@ -402,7 +402,7 @@ func TestGlobal_DrainAndPersist(t *testing.T) {
 
 	// Drain file back to agent
 	t.Run("drain-from-file", func(t *testing.T) {
-		stdout, _, err := runCommand(t, stgcli.NewGlobalDrainCommand())
+		stdout, _, err := runSubCommand(t, stgcli.NewGlobalStashCommand(), "pop")
 		require.NoError(t, err)
 		t.Logf("drain output: %s", stdout)
 		assert.Contains(t, stdout, "loaded from file")
@@ -448,7 +448,7 @@ func TestGlobal_PersistWithKeep(t *testing.T) {
 
 	// Persist with --keep flag (should keep agent memory)
 	t.Run("persist-with-keep", func(t *testing.T) {
-		stdout, _, err := runCommand(t, stgcli.NewGlobalPersistCommand(), "--keep")
+		stdout, _, err := runSubCommand(t, stgcli.NewGlobalStashCommand(), "push", "--keep")
 		require.NoError(t, err)
 		t.Logf("persist --keep output: %s", stdout)
 	})
@@ -480,7 +480,7 @@ func TestGlobal_DrainWithMerge(t *testing.T) {
 	// Stage param1 and persist to file
 	_, _, err := runCommand(t, paramstage.Command(), "add", paramName1, "value1")
 	require.NoError(t, err)
-	_, _, err = runCommand(t, stgcli.NewGlobalPersistCommand())
+	_, _, err = runSubCommand(t, stgcli.NewGlobalStashCommand(), "push")
 	require.NoError(t, err)
 
 	// Stage param2 in agent
@@ -489,7 +489,7 @@ func TestGlobal_DrainWithMerge(t *testing.T) {
 
 	// Drain with merge (should combine both)
 	t.Run("drain-with-merge", func(t *testing.T) {
-		stdout, _, err := runCommand(t, stgcli.NewGlobalDrainCommand(), "--merge")
+		stdout, _, err := runSubCommand(t, stgcli.NewGlobalStashCommand(), "pop", "--merge")
 		require.NoError(t, err)
 		t.Logf("drain --merge output: %s", stdout)
 	})
@@ -512,7 +512,7 @@ func TestGlobal_DrainEmpty(t *testing.T) {
 
 	// Drain should fail or indicate nothing to drain
 	t.Run("drain-empty", func(t *testing.T) {
-		_, _, err := runCommand(t, stgcli.NewGlobalDrainCommand())
+		_, _, err := runSubCommand(t, stgcli.NewGlobalStashCommand(), "pop")
 		assert.Error(t, err)
 	})
 }
@@ -531,7 +531,7 @@ func TestGlobal_PersistEmpty(t *testing.T) {
 
 	// Persist should fail when agent is empty (no staged changes)
 	t.Run("persist-empty", func(t *testing.T) {
-		_, stderr, err := runCommand(t, stgcli.NewGlobalPersistCommand())
+		_, stderr, err := runSubCommand(t, stgcli.NewGlobalStashCommand(), "push")
 		// Either returns error or prints "nothing to persist"
 		if err == nil {
 			// If no error, check output - might indicate nothing was persisted

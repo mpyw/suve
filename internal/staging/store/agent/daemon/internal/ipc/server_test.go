@@ -205,7 +205,7 @@ func TestServer_handleConnection_invalidJSON(t *testing.T) {
 	// Read error response
 	var resp protocol.Response
 	decoder := json.NewDecoder(client)
-	err = decoder.Decode(&resp)
+	_ = decoder.Decode(&resp)
 	// Should fail because connection was closed after error or we get an error response
 	// Either way the handler was not called
 }

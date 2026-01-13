@@ -114,6 +114,10 @@ export function StagingDrain(arg1, arg2, arg3, arg4, arg5) {
   return window['go']['gui']['App']['StagingDrain'](arg1, arg2, arg3, arg4, arg5);
 }
 
+export function StagingDrop() {
+  return window['go']['gui']['App']['StagingDrop']();
+}
+
 export function StagingEdit(arg1, arg2, arg3) {
   return window['go']['gui']['App']['StagingEdit'](arg1, arg2, arg3);
 }
@@ -122,8 +126,8 @@ export function StagingFileStatus() {
   return window['go']['gui']['App']['StagingFileStatus']();
 }
 
-export function StagingPersist(arg1, arg2, arg3) {
-  return window['go']['gui']['App']['StagingPersist'](arg1, arg2, arg3);
+export function StagingPersist(arg1, arg2, arg3, arg4) {
+  return window['go']['gui']['App']['StagingPersist'](arg1, arg2, arg3, arg4);
 }
 
 export function StagingRemoveTag(arg1, arg2, arg3) {

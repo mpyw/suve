@@ -66,6 +66,9 @@ func (r *ApplyRunner) Run(ctx context.Context, opts ApplyOptions) error {
 					output.Success(r.Stdout, "Updated %s", name)
 				case stagingusecase.ApplyResultDeleted:
 					output.Success(r.Stdout, "Deleted %s", name)
+				case stagingusecase.ApplyResultFailed:
+					// Unreachable: when Status is Failed, entry.Error is always non-nil,
+					// so the outer if-branch handles this case.
 				}
 			}
 			break
