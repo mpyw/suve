@@ -5,7 +5,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 
+	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/staging"
 	"github.com/mpyw/suve/internal/staging/store"
 	"github.com/mpyw/suve/internal/staging/store/agent/daemon"
@@ -141,33 +143,51 @@ func (s *Store) StageTag(ctx context.Context, service staging.Service, name stri
 
 // UnstageEntry removes a staged entry.
 func (s *Store) UnstageEntry(ctx context.Context, service staging.Service, name string) error {
+	return s.UnstageEntryWithHint(ctx, service, name, "")
+}
+
+// UnstageEntryWithHint removes a staged entry with an operation hint for shutdown messages.
+func (s *Store) UnstageEntryWithHint(ctx context.Context, service staging.Service, name string, hint string) error {
 	return s.doSimpleRequestEnsuringDaemon(ctx, &protocol.Request{
 		Method:    protocol.MethodUnstageEntry,
 		AccountID: s.accountID,
 		Region:    s.region,
 		Service:   service,
 		Name:      name,
+		Hint:      hint,
 	})
 }
 
 // UnstageTag removes staged tag changes.
 func (s *Store) UnstageTag(ctx context.Context, service staging.Service, name string) error {
+	return s.UnstageTagWithHint(ctx, service, name, "")
+}
+
+// UnstageTagWithHint removes staged tag changes with an operation hint for shutdown messages.
+func (s *Store) UnstageTagWithHint(ctx context.Context, service staging.Service, name string, hint string) error {
 	return s.doSimpleRequestEnsuringDaemon(ctx, &protocol.Request{
 		Method:    protocol.MethodUnstageTag,
 		AccountID: s.accountID,
 		Region:    s.region,
 		Service:   service,
 		Name:      name,
+		Hint:      hint,
 	})
 }
 
 // UnstageAll removes all staged changes for a service.
 func (s *Store) UnstageAll(ctx context.Context, service staging.Service) error {
+	return s.UnstageAllWithHint(ctx, service, "")
+}
+
+// UnstageAllWithHint removes all staged changes for a service with an operation hint for shutdown messages.
+func (s *Store) UnstageAllWithHint(ctx context.Context, service staging.Service, hint string) error {
 	return s.doSimpleRequestEnsuringDaemon(ctx, &protocol.Request{
 		Method:    protocol.MethodUnstageAll,
 		AccountID: s.accountID,
 		Region:    s.region,
 		Service:   service,
+		Hint:      hint,
 	})
 }
 
@@ -256,7 +276,26 @@ func (s *Store) doSimpleRequestEnsuringDaemon(_ context.Context, req *protocol.R
 	if err != nil {
 		return err
 	}
+	if resp.WillShutdown {
+		printShutdownMessage(resp.ShutdownReason)
+	}
 	return resp.Err()
+}
+
+// printShutdownMessage prints the appropriate shutdown message based on reason.
+func printShutdownMessage(reason string) {
+	var msg string
+	switch reason {
+	case protocol.ShutdownReasonApplied:
+		msg = "all changes applied"
+	case protocol.ShutdownReasonUnstaged:
+		msg = "all changes unstaged"
+	case protocol.ShutdownReasonCleared:
+		msg = "state cleared"
+	default:
+		msg = "no staged changes"
+	}
+	output.Printf(os.Stderr, "info: staging agent stopped (%s)\n", msg)
 }
 
 // Compile-time checks.
@@ -264,4 +303,5 @@ var (
 	_ store.ReadWriteOperator = (*Store)(nil)
 	_ store.Drainer           = (*Store)(nil)
 	_ store.Writer            = (*Store)(nil)
+	_ store.HintedUnstager    = (*Store)(nil)
 )

@@ -5,7 +5,6 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/staging/store/agent/daemon/internal/ipc"
 	"github.com/mpyw/suve/internal/staging/store/agent/internal/protocol"
 	"github.com/mpyw/suve/internal/staging/store/agent/internal/server"
@@ -40,7 +39,7 @@ func NewRunner(accountID, region string, opts ...RunnerOption) *Runner {
 	for _, opt := range opts {
 		opt(r)
 	}
-	r.server = ipc.NewServer(accountID, region, r.handler.HandleRequest, r.handleAutoShutdown)
+	r.server = ipc.NewServer(accountID, region, r.handler.HandleRequest, r.checkAutoShutdown, r.Shutdown)
 	return r
 }
 
@@ -71,14 +70,39 @@ func (r *Runner) Shutdown() {
 	r.handler.Destroy()
 }
 
-// handleAutoShutdown checks if the daemon should shut down after unstage operations.
-func (r *Runner) handleAutoShutdown(req *protocol.Request, resp *protocol.Response) {
+// checkAutoShutdown sets WillShutdown flag if the daemon should shut down after this response.
+// The actual shutdown is triggered by the IPC server after the response is sent.
+func (r *Runner) checkAutoShutdown(req *protocol.Request, resp *protocol.Response) {
 	if !r.autoShutdownDisabled && resp.Success {
 		switch req.Method {
-		case protocol.MethodUnstageEntry, protocol.MethodUnstageTag, protocol.MethodUnstageAll:
+		case protocol.MethodUnstageEntry, protocol.MethodUnstageTag:
 			if r.handler.IsEmpty() {
-				output.Printf(os.Stderr, "info: staging agent stopped (no staged changes)\n")
-				go r.Shutdown()
+				resp.WillShutdown = true
+				// Use hint to determine reason, default to "empty"
+				switch req.Hint {
+				case protocol.HintApply:
+					resp.ShutdownReason = protocol.ShutdownReasonApplied
+				case protocol.HintReset:
+					resp.ShutdownReason = protocol.ShutdownReasonUnstaged
+				default:
+					resp.ShutdownReason = protocol.ShutdownReasonEmpty
+				}
+			}
+		case protocol.MethodUnstageAll:
+			if r.handler.IsEmpty() {
+				resp.WillShutdown = true
+				// UnstageAll is typically from reset, use hint or default to "unstaged"
+				switch req.Hint {
+				case protocol.HintApply:
+					resp.ShutdownReason = protocol.ShutdownReasonApplied
+				default:
+					resp.ShutdownReason = protocol.ShutdownReasonUnstaged
+				}
+			}
+		case protocol.MethodSetState:
+			if r.handler.IsEmpty() {
+				resp.WillShutdown = true
+				resp.ShutdownReason = protocol.ShutdownReasonCleared
 			}
 		}
 	}

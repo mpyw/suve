@@ -312,6 +312,245 @@ func TestDaemonLifecycle_ManualModeDisablesAutoShutdown(t *testing.T) {
 	}
 }
 
+// TestDaemonLifecycle_AutoShutdown_UnstageAll tests automatic shutdown after UnstageAll.
+// Note: This test cannot run in parallel because it modifies TMPDIR.
+func TestDaemonLifecycle_AutoShutdown_UnstageAll(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("/tmp", "suve-unstageall-*")
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = os.RemoveAll(tmpDir) })
+	t.Setenv("TMPDIR", tmpDir)
+
+	accountID := "a5"
+	region := "r5"
+
+	runner := NewRunner(accountID, region)
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- runner.Run()
+	}()
+
+	launcher := NewLauncher(accountID, region, WithAutoStartDisabled())
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		if err := launcher.Ping(); err == nil {
+			break
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+
+	// Stage entries for both services
+	for _, svc := range []staging.Service{staging.ServiceParam, staging.ServiceSecret} {
+		stageReq := &protocol.Request{
+			Method:    protocol.MethodStageEntry,
+			AccountID: accountID,
+			Region:    region,
+			Service:   svc,
+			Name:      "/test/param",
+			Entry: &staging.Entry{
+				Value:     lo.ToPtr("test-value"),
+				Operation: staging.OperationCreate,
+			},
+		}
+		resp, err := launcher.SendRequest(stageReq)
+		require.NoError(t, err)
+		require.True(t, resp.Success)
+	}
+
+	// UnstageAll with empty service clears both services and triggers auto-shutdown
+	unstageReq := &protocol.Request{
+		Method:    protocol.MethodUnstageAll,
+		AccountID: accountID,
+		Region:    region,
+		Service:   "", // Empty clears all services
+	}
+	resp, err := launcher.SendRequest(unstageReq)
+	require.NoError(t, err)
+	require.True(t, resp.Success)
+
+	// Daemon should auto-shutdown
+	select {
+	case err := <-errCh:
+		assert.NoError(t, err)
+	case <-time.After(5 * time.Second):
+		runner.Shutdown()
+		t.Fatal("daemon did not auto-shutdown after UnstageAll")
+	}
+}
+
+// TestDaemonLifecycle_AutoShutdown_UnstageTag tests automatic shutdown after UnstageTag empties state.
+// Note: This test cannot run in parallel because it modifies TMPDIR.
+func TestDaemonLifecycle_AutoShutdown_UnstageTag(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("/tmp", "suve-unstagetag-*")
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = os.RemoveAll(tmpDir) })
+	t.Setenv("TMPDIR", tmpDir)
+
+	accountID := "a6"
+	region := "r6"
+
+	runner := NewRunner(accountID, region)
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- runner.Run()
+	}()
+
+	launcher := NewLauncher(accountID, region, WithAutoStartDisabled())
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		if err := launcher.Ping(); err == nil {
+			break
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+
+	// Stage only a tag (no entry)
+	stageReq := &protocol.Request{
+		Method:    protocol.MethodStageTag,
+		AccountID: accountID,
+		Region:    region,
+		Service:   staging.ServiceParam,
+		Name:      "/test/param",
+		TagEntry: &staging.TagEntry{
+			Add: map[string]string{"key": "value"},
+		},
+	}
+	resp, err := launcher.SendRequest(stageReq)
+	require.NoError(t, err)
+	require.True(t, resp.Success)
+
+	// UnstageTag should trigger auto-shutdown when state becomes empty
+	unstageReq := &protocol.Request{
+		Method:    protocol.MethodUnstageTag,
+		AccountID: accountID,
+		Region:    region,
+		Service:   staging.ServiceParam,
+		Name:      "/test/param",
+	}
+	resp, err = launcher.SendRequest(unstageReq)
+	require.NoError(t, err)
+	require.True(t, resp.Success)
+
+	// Daemon should auto-shutdown
+	select {
+	case err := <-errCh:
+		assert.NoError(t, err)
+	case <-time.After(5 * time.Second):
+		runner.Shutdown()
+		t.Fatal("daemon did not auto-shutdown after UnstageTag")
+	}
+}
+
+// TestDaemonLifecycle_AutoShutdown_SetState tests automatic shutdown after SetState with empty state.
+// Note: This test cannot run in parallel because it modifies TMPDIR.
+func TestDaemonLifecycle_AutoShutdown_SetState(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("/tmp", "suve-setstate-*")
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = os.RemoveAll(tmpDir) })
+	t.Setenv("TMPDIR", tmpDir)
+
+	accountID := "a7"
+	region := "r7"
+
+	runner := NewRunner(accountID, region)
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- runner.Run()
+	}()
+
+	launcher := NewLauncher(accountID, region, WithAutoStartDisabled())
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		if err := launcher.Ping(); err == nil {
+			break
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+
+	// Stage an entry
+	stageReq := &protocol.Request{
+		Method:    protocol.MethodStageEntry,
+		AccountID: accountID,
+		Region:    region,
+		Service:   staging.ServiceParam,
+		Name:      "/test/param",
+		Entry: &staging.Entry{
+			Value:     lo.ToPtr("test-value"),
+			Operation: staging.OperationCreate,
+		},
+	}
+	resp, err := launcher.SendRequest(stageReq)
+	require.NoError(t, err)
+	require.True(t, resp.Success)
+
+	// SetState with empty state should trigger auto-shutdown
+	setStateReq := &protocol.Request{
+		Method:    protocol.MethodSetState,
+		AccountID: accountID,
+		Region:    region,
+		State:     staging.NewEmptyState(),
+	}
+	resp, err = launcher.SendRequest(setStateReq)
+	require.NoError(t, err)
+	require.True(t, resp.Success)
+
+	// Daemon should auto-shutdown
+	select {
+	case err := <-errCh:
+		assert.NoError(t, err)
+	case <-time.After(5 * time.Second):
+		runner.Shutdown()
+		t.Fatal("daemon did not auto-shutdown after SetState with empty state")
+	}
+}
+
+// TestDaemonLifecycle_AutoShutdown_UnstageAllEmpty tests automatic shutdown when UnstageAll is called on empty state.
+// Note: This test cannot run in parallel because it modifies TMPDIR.
+func TestDaemonLifecycle_AutoShutdown_UnstageAllEmpty(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("/tmp", "suve-empty-*")
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = os.RemoveAll(tmpDir) })
+	t.Setenv("TMPDIR", tmpDir)
+
+	accountID := "a8"
+	region := "r8"
+
+	runner := NewRunner(accountID, region)
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- runner.Run()
+	}()
+
+	launcher := NewLauncher(accountID, region, WithAutoStartDisabled())
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		if err := launcher.Ping(); err == nil {
+			break
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+
+	// Don't stage anything - state is already empty
+	// UnstageAll on empty state should still trigger auto-shutdown check
+	unstageReq := &protocol.Request{
+		Method:    protocol.MethodUnstageAll,
+		AccountID: accountID,
+		Region:    region,
+		Service:   "", // Empty clears all services
+	}
+	resp, err := launcher.SendRequest(unstageReq)
+	require.NoError(t, err)
+	require.True(t, resp.Success)
+
+	// Daemon should auto-shutdown (state was already empty)
+	select {
+	case err := <-errCh:
+		assert.NoError(t, err)
+	case <-time.After(5 * time.Second):
+		runner.Shutdown()
+		t.Fatal("daemon did not auto-shutdown after UnstageAll on empty state")
+	}
+}
+
 // TestDaemonLifecycle_SocketPathStructure tests the socket path structure includes account and region.
 func TestDaemonLifecycle_SocketPathStructure(t *testing.T) {
 	t.Parallel()

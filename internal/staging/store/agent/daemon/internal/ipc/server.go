@@ -23,8 +23,12 @@ const (
 // RequestHandler handles incoming requests and returns responses.
 type RequestHandler func(*protocol.Request) *protocol.Response
 
-// ResponseCallback is called after a response is sent.
+// ResponseCallback is called before a response is sent.
+// It can modify the response (e.g., set WillShutdown flag).
 type ResponseCallback func(*protocol.Request, *protocol.Response)
+
+// ShutdownCallback is called after a response with WillShutdown=true is sent.
+type ShutdownCallback func()
 
 // Server provides low-level IPC server functionality.
 type Server struct {
@@ -33,19 +37,21 @@ type Server struct {
 	listener   net.Listener
 	handler    RequestHandler
 	onResponse ResponseCallback
+	onShutdown ShutdownCallback
 	wg         sync.WaitGroup
 	ctx        context.Context
 	cancel     context.CancelFunc
 }
 
 // NewServer creates a new IPC server for a specific AWS account and region.
-func NewServer(accountID, region string, handler RequestHandler, onResponse ResponseCallback) *Server {
+func NewServer(accountID, region string, handler RequestHandler, onResponse ResponseCallback, onShutdown ShutdownCallback) *Server {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &Server{
 		accountID:  accountID,
 		region:     region,
 		handler:    handler,
 		onResponse: onResponse,
+		onShutdown: onShutdown,
 		ctx:        ctx,
 		cancel:     cancel,
 	}
@@ -138,12 +144,18 @@ func (s *Server) handleConnection(conn net.Conn) {
 
 	resp := s.handler(&req)
 
+	// Call onResponse BEFORE encoding to allow setting WillShutdown flag
+	if s.onResponse != nil {
+		s.onResponse(&req, resp)
+	}
+
 	_ = conn.SetDeadline(time.Now().Add(connectionTimeout))
 	encoder := json.NewEncoder(conn)
 	_ = encoder.Encode(resp)
 
-	if s.onResponse != nil {
-		s.onResponse(&req, resp)
+	// Trigger shutdown callback AFTER response is sent
+	if resp.WillShutdown && s.onShutdown != nil {
+		go s.onShutdown()
 	}
 }
 

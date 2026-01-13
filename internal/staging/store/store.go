@@ -7,6 +7,12 @@ import (
 	"github.com/mpyw/suve/internal/staging"
 )
 
+// Hint values for context-aware shutdown messages.
+const (
+	HintApply = "apply" // Unstage triggered by apply (changes were applied to AWS)
+	HintReset = "reset" // Unstage triggered by reset (changes were discarded)
+)
+
 // ReadOperator provides read-only access to individual staging entries.
 type ReadOperator interface {
 	// GetEntry retrieves a staged entry.
@@ -63,4 +69,15 @@ type AgentStore interface {
 	ReadWriteOperator
 	Drainer
 	Writer
+}
+
+// HintedUnstager provides unstage operations with hints for context-aware shutdown messages.
+// This interface is optional and only implemented by agent stores.
+type HintedUnstager interface {
+	// UnstageEntryWithHint removes a staged entry with an operation hint.
+	UnstageEntryWithHint(ctx context.Context, service staging.Service, name string, hint string) error
+	// UnstageTagWithHint removes staged tag changes with an operation hint.
+	UnstageTagWithHint(ctx context.Context, service staging.Service, name string, hint string) error
+	// UnstageAllWithHint removes all staged changes with an operation hint.
+	UnstageAllWithHint(ctx context.Context, service staging.Service, hint string) error
 }

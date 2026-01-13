@@ -168,8 +168,8 @@ func (u *ApplyUseCase) applyEntries(ctx context.Context, service staging.Service
 			case staging.OperationDelete:
 				resultEntry.Status = ApplyResultDeleted
 			}
-			// Unstage successful operations
-			_ = u.Store.UnstageEntry(ctx, service, name)
+			// Unstage successful operations with apply hint
+			u.unstageEntry(ctx, service, name)
 			output.EntrySucceeded++
 		}
 		output.EntryResults = append(output.EntryResults, resultEntry)
@@ -196,10 +196,28 @@ func (u *ApplyUseCase) applyTags(ctx context.Context, service staging.Service, t
 			resultTag.Error = result.Err
 			output.TagFailed++
 		} else {
-			// Unstage successful operations
-			_ = u.Store.UnstageTag(ctx, service, name)
+			// Unstage successful operations with apply hint
+			u.unstageTag(ctx, service, name)
 			output.TagSucceeded++
 		}
 		output.TagResults = append(output.TagResults, resultTag)
+	}
+}
+
+// unstageEntry removes a staged entry with the apply hint if supported.
+func (u *ApplyUseCase) unstageEntry(ctx context.Context, service staging.Service, name string) {
+	if hinted, ok := u.Store.(store.HintedUnstager); ok {
+		_ = hinted.UnstageEntryWithHint(ctx, service, name, store.HintApply)
+	} else {
+		_ = u.Store.UnstageEntry(ctx, service, name)
+	}
+}
+
+// unstageTag removes staged tag changes with the apply hint if supported.
+func (u *ApplyUseCase) unstageTag(ctx context.Context, service staging.Service, name string) {
+	if hinted, ok := u.Store.(store.HintedUnstager); ok {
+		_ = hinted.UnstageTagWithHint(ctx, service, name, store.HintApply)
+	} else {
+		_ = u.Store.UnstageTag(ctx, service, name)
 	}
 }

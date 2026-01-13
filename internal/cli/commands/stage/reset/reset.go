@@ -91,23 +91,15 @@ func (r *Runner) Run(ctx context.Context) error {
 
 	totalCount := paramCount + secretCount
 
+	// Always call UnstageAll to trigger daemon auto-shutdown check
+	// Empty service ("") clears both SSM Parameter Store and Secrets Manager
+	if err := r.Store.UnstageAll(ctx, ""); err != nil {
+		return err
+	}
+
 	if totalCount == 0 {
 		output.Info(r.Stdout, "No changes staged.")
 		return nil
-	}
-
-	// Unstage all SSM Parameter Store (UnstageAll clears both entries and tags)
-	if paramCount > 0 {
-		if err := r.Store.UnstageAll(ctx, staging.ServiceParam); err != nil {
-			return err
-		}
-	}
-
-	// Unstage all Secrets Manager (UnstageAll clears both entries and tags)
-	if secretCount > 0 {
-		if err := r.Store.UnstageAll(ctx, staging.ServiceSecret); err != nil {
-			return err
-		}
 	}
 
 	output.Success(r.Stdout, "Unstaged all changes (%d SSM Parameter Store, %d Secrets Manager)", paramCount, secretCount)

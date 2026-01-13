@@ -27,6 +27,20 @@ const (
 	MethodIsEmpty      = "IsEmpty"
 )
 
+// Hint values for context-aware shutdown messages.
+const (
+	HintApply = "apply" // Unstage triggered by apply (changes were applied to AWS)
+	HintReset = "reset" // Unstage triggered by reset (changes were discarded)
+)
+
+// ShutdownReason values for client-side message formatting.
+const (
+	ShutdownReasonApplied  = "applied"  // All changes were applied to AWS
+	ShutdownReasonUnstaged = "unstaged" // All changes were unstaged/discarded
+	ShutdownReasonCleared  = "cleared"  // State was cleared (SetState with empty)
+	ShutdownReasonEmpty    = "empty"    // Generic: no staged changes remain
+)
+
 // Request represents a JSON-RPC request to the daemon.
 type Request struct {
 	Method    string            `json:"method"`
@@ -37,13 +51,16 @@ type Request struct {
 	Entry     *staging.Entry    `json:"entry,omitempty"`
 	TagEntry  *staging.TagEntry `json:"tag_entry,omitempty"`
 	State     *staging.State    `json:"state,omitempty"`
+	Hint      string            `json:"hint,omitempty"` // Optional context hint for shutdown messages (HintApply, HintReset)
 }
 
 // Response represents a JSON-RPC response from the daemon.
 type Response struct {
-	Success bool            `json:"success"`
-	Error   string          `json:"error,omitempty"`
-	Data    json.RawMessage `json:"data,omitempty"`
+	Success        bool            `json:"success"`
+	Error          string          `json:"error,omitempty"`
+	Data           json.RawMessage `json:"data,omitempty"`
+	WillShutdown   bool            `json:"will_shutdown,omitempty"`   // Set when daemon will auto-shutdown after this response
+	ShutdownReason string          `json:"shutdown_reason,omitempty"` // Reason for shutdown (ShutdownReason* constants)
 }
 
 // Err returns the error from the response, converting known error messages.
