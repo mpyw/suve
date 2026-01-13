@@ -107,6 +107,67 @@ func TestState_Merge(t *testing.T) {
 
 		assert.Len(t, state1.Tags[staging.ServiceParam], 2)
 	})
+
+	t.Run("merge nil state does nothing", func(t *testing.T) {
+		t.Parallel()
+		state := staging.NewEmptyState()
+		state.Entries[staging.ServiceParam]["/app/config"] = staging.Entry{
+			Operation: staging.OperationUpdate,
+			Value:     lo.ToPtr("value"),
+			StagedAt:  time.Now(),
+		}
+
+		state.Merge(nil)
+
+		assert.Len(t, state.Entries[staging.ServiceParam], 1)
+		assert.Equal(t, "value", lo.FromPtr(state.Entries[staging.ServiceParam]["/app/config"].Value))
+	})
+
+	t.Run("merge into nil maps initializes them", func(t *testing.T) {
+		t.Parallel()
+		state1 := &staging.State{
+			Entries: nil,
+			Tags:    nil,
+		}
+
+		state2 := staging.NewEmptyState()
+		state2.Entries[staging.ServiceParam]["/app/config"] = staging.Entry{
+			Operation: staging.OperationCreate,
+			Value:     lo.ToPtr("new-value"),
+			StagedAt:  time.Now(),
+		}
+		state2.Tags[staging.ServiceSecret]["my-secret"] = staging.TagEntry{
+			Add:      map[string]string{"env": "prod"},
+			StagedAt: time.Now(),
+		}
+
+		state1.Merge(state2)
+
+		assert.NotNil(t, state1.Entries)
+		assert.NotNil(t, state1.Tags)
+		assert.Equal(t, "new-value", lo.FromPtr(state1.Entries[staging.ServiceParam]["/app/config"].Value))
+		assert.Equal(t, "prod", state1.Tags[staging.ServiceSecret]["my-secret"].Add["env"])
+	})
+
+	t.Run("merge into nil service maps", func(t *testing.T) {
+		t.Parallel()
+		state1 := &staging.State{
+			Entries: make(map[staging.Service]map[string]staging.Entry),
+			Tags:    make(map[staging.Service]map[string]staging.TagEntry),
+		}
+
+		state2 := staging.NewEmptyState()
+		state2.Entries[staging.ServiceParam]["/app/config"] = staging.Entry{
+			Operation: staging.OperationCreate,
+			Value:     lo.ToPtr("value"),
+			StagedAt:  time.Now(),
+		}
+
+		state1.Merge(state2)
+
+		assert.NotNil(t, state1.Entries[staging.ServiceParam])
+		assert.Len(t, state1.Entries[staging.ServiceParam], 1)
+	})
 }
 
 func TestState_ExtractService(t *testing.T) {
