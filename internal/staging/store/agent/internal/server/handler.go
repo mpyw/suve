@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 
 	"github.com/mpyw/suve/internal/staging"
-	"github.com/mpyw/suve/internal/staging/agent/protocol"
+	"github.com/mpyw/suve/internal/staging/store/agent/internal/protocol"
 )
 
 // Handler handles staging agent requests.

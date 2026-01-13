@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"github.com/mpyw/suve/internal/staging"
+	"github.com/mpyw/suve/internal/staging/store"
 	"github.com/mpyw/suve/internal/staging/transition"
 )
 
@@ -40,7 +41,7 @@ type ResetOutput struct {
 type ResetUseCase struct {
 	Parser  staging.Parser
 	Fetcher staging.ResetStrategy
-	Store   staging.StoreReadWriteOperator
+	Store   store.ReadWriteOperator
 }
 
 // Execute runs the reset use case.

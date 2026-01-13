@@ -7,8 +7,9 @@ import (
 	"fmt"
 
 	"github.com/mpyw/suve/internal/staging"
-	"github.com/mpyw/suve/internal/staging/agent/daemon"
-	"github.com/mpyw/suve/internal/staging/agent/protocol"
+	"github.com/mpyw/suve/internal/staging/store"
+	"github.com/mpyw/suve/internal/staging/store/agent/daemon"
+	"github.com/mpyw/suve/internal/staging/store/agent/internal/protocol"
 )
 
 // StoreOption configures a Store.
@@ -21,7 +22,7 @@ func WithAutoStartDisabled() StoreOption {
 	}
 }
 
-// Store implements staging.StoreReadWriteOperator using the daemon.
+// Store implements store.ReadWriteOperator using the daemon.
 type Store struct {
 	launcher          *daemon.Launcher
 	accountID         string
@@ -198,8 +199,8 @@ func (s *Store) Drain(ctx context.Context, keep bool) (*staging.State, error) {
 	return state, nil
 }
 
-// SetState sets the full state for drain operations.
-func (s *Store) SetState(ctx context.Context, state *staging.State) error {
+// WriteState sets the full state for drain operations.
+func (s *Store) WriteState(ctx context.Context, state *staging.State) error {
 	return s.doSimpleRequestEnsuringDaemon(ctx, &protocol.Request{
 		Method:    protocol.MethodSetState,
 		AccountID: s.accountID,
@@ -217,7 +218,7 @@ func doRequestWithResult[Resp any, Result any](
 ) (Result, error) {
 	var zero Result
 
-	resp, err := s.launcher.Client().SendRequest(req)
+	resp, err := s.launcher.SendRequest(req)
 	if err != nil {
 		return zero, err
 	}
@@ -251,7 +252,7 @@ func (s *Store) doSimpleRequestEnsuringDaemon(_ context.Context, req *protocol.R
 	if err := s.launcher.EnsureRunning(); err != nil {
 		return err
 	}
-	resp, err := s.launcher.Client().SendRequest(req)
+	resp, err := s.launcher.SendRequest(req)
 	if err != nil {
 		return err
 	}
@@ -260,6 +261,7 @@ func (s *Store) doSimpleRequestEnsuringDaemon(_ context.Context, req *protocol.R
 
 // Compile-time checks.
 var (
-	_ staging.StoreReadWriteOperator = (*Store)(nil)
-	_ staging.StateDrainer           = (*Store)(nil)
+	_ store.ReadWriteOperator = (*Store)(nil)
+	_ store.Drainer           = (*Store)(nil)
+	_ store.Writer            = (*Store)(nil)
 )

@@ -12,8 +12,8 @@ import (
 	"github.com/mpyw/suve/internal/cli/passphrase"
 	"github.com/mpyw/suve/internal/cli/terminal"
 	"github.com/mpyw/suve/internal/infra"
-	"github.com/mpyw/suve/internal/staging/agent/client"
-	"github.com/mpyw/suve/internal/staging/file"
+	"github.com/mpyw/suve/internal/staging/store/agent"
+	"github.com/mpyw/suve/internal/staging/store/file"
 )
 
 // Command returns the stage persist command.
@@ -49,7 +49,7 @@ EXAMPLES:
 				return fmt.Errorf("failed to get AWS identity: %w", err)
 			}
 
-			agentStore := client.NewStore(identity.AccountID, identity.Region)
+			agentStore := agent.NewStore(identity.AccountID, identity.Region)
 			keep := cmd.Bool("keep")
 
 			// Drain state from agent (keep for now, will clear after successful file write if needed)
@@ -95,7 +95,7 @@ EXAMPLES:
 				return fmt.Errorf("failed to create file store: %w", err)
 			}
 
-			if err := fileStore.Persist(ctx, state); err != nil {
+			if err := fileStore.WriteState(ctx, state); err != nil {
 				return fmt.Errorf("failed to save state to file: %w", err)
 			}
 

@@ -13,9 +13,8 @@ import (
 	"github.com/mpyw/suve/internal/cli/terminal"
 	"github.com/mpyw/suve/internal/infra"
 	"github.com/mpyw/suve/internal/staging"
-	"github.com/mpyw/suve/internal/staging/agent"
-	"github.com/mpyw/suve/internal/staging/agent/client"
-	"github.com/mpyw/suve/internal/staging/file"
+	"github.com/mpyw/suve/internal/staging/store/agent"
+	"github.com/mpyw/suve/internal/staging/store/file"
 )
 
 // Command returns the stage drain command.
@@ -115,7 +114,7 @@ EXAMPLES:
 				return errors.New("no staged changes in file to drain")
 			}
 
-			agentStore := client.NewStore(identity.AccountID, identity.Region, agent.ClientOptions()...)
+			agentStore := agent.NewStore(identity.AccountID, identity.Region)
 			force := cmd.Bool("force")
 			merge := cmd.Bool("merge")
 			keep := cmd.Bool("keep")
@@ -142,7 +141,7 @@ EXAMPLES:
 			}
 
 			// Set state in agent
-			if err := agentStore.SetState(ctx, finalState); err != nil {
+			if err := agentStore.WriteState(ctx, finalState); err != nil {
 				return fmt.Errorf("failed to set state in agent: %w", err)
 			}
 

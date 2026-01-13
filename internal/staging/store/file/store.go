@@ -11,7 +11,8 @@ import (
 	"sync"
 
 	"github.com/mpyw/suve/internal/staging"
-	"github.com/mpyw/suve/internal/staging/crypt"
+	"github.com/mpyw/suve/internal/staging/store"
+	"github.com/mpyw/suve/internal/staging/store/file/internal/crypt"
 )
 
 const (
@@ -124,9 +125,9 @@ func (s *Store) Drain(_ context.Context, keep bool) (*staging.State, error) {
 	return &state, nil
 }
 
-// Persist saves the state to file.
-// This implements StatePersister for file-based storage.
-func (s *Store) Persist(_ context.Context, state *staging.State) error {
+// WriteState saves the state to file.
+// This implements StateWriter for file-based storage.
+func (s *Store) WriteState(_ context.Context, state *staging.State) error {
 	fileMu.Lock()
 	defer fileMu.Unlock()
 
@@ -187,5 +188,5 @@ func initializeStateMaps(state *staging.State) {
 	}
 }
 
-// Compile-time check that Store implements StateIO.
-var _ staging.StateIO = (*Store)(nil)
+// Compile-time check that Store implements FileStore.
+var _ store.FileStore = (*Store)(nil)

@@ -20,7 +20,8 @@ import (
 	"github.com/mpyw/suve/internal/maputil"
 	"github.com/mpyw/suve/internal/parallel"
 	"github.com/mpyw/suve/internal/staging"
-	"github.com/mpyw/suve/internal/staging/agent"
+	"github.com/mpyw/suve/internal/staging/store"
+	"github.com/mpyw/suve/internal/staging/store/agent"
 	"github.com/mpyw/suve/internal/version/paramversion"
 	"github.com/mpyw/suve/internal/version/secretversion"
 )
@@ -41,7 +42,7 @@ type SecretClient interface {
 type Runner struct {
 	ParamClient  ParamClient
 	SecretClient SecretClient
-	Store        staging.StoreReadWriteOperator
+	Store        store.ReadWriteOperator
 	Stdout       io.Writer
 	Stderr       io.Writer
 }

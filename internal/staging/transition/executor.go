@@ -8,15 +8,16 @@ import (
 	"github.com/samber/lo"
 
 	"github.com/mpyw/suve/internal/staging"
+	"github.com/mpyw/suve/internal/staging/store"
 )
 
 // Executor executes state transitions and persists results to the store.
 type Executor struct {
-	Store staging.StoreReadWriteOperator
+	Store store.ReadWriteOperator
 }
 
 // NewExecutor creates a new Executor.
-func NewExecutor(store staging.StoreReadWriteOperator) *Executor {
+func NewExecutor(store store.ReadWriteOperator) *Executor {
 	return &Executor{Store: store}
 }
 
@@ -135,14 +136,14 @@ func (e *Executor) persistTagState(ctx context.Context, service staging.Service,
 }
 
 // LoadEntryState loads the current entry state from the store and AWS info.
-func LoadEntryState(ctx context.Context, store staging.StoreReadOperator, service staging.Service, name string, currentAWSValue *string) (EntryState, error) {
+func LoadEntryState(ctx context.Context, store store.ReadOperator, service staging.Service, name string, currentAWSValue *string) (EntryState, error) {
 	state, _, err := LoadEntryStateWithMetadata(ctx, store, service, name, currentAWSValue)
 	return state, err
 }
 
 // LoadEntryStateWithMetadata loads the current entry state and returns BaseModifiedAt metadata.
 // BaseModifiedAt is used for conflict detection when applying changes.
-func LoadEntryStateWithMetadata(ctx context.Context, store staging.StoreReadOperator, service staging.Service, name string, currentAWSValue *string) (EntryState, *time.Time, error) {
+func LoadEntryStateWithMetadata(ctx context.Context, store store.ReadOperator, service staging.Service, name string, currentAWSValue *string) (EntryState, *time.Time, error) {
 	stagedEntry, err := store.GetEntry(ctx, service, name)
 	if err != nil && !errors.Is(err, staging.ErrNotStaged) {
 		return EntryState{}, nil, err
@@ -174,7 +175,7 @@ func LoadEntryStateWithMetadata(ctx context.Context, store staging.StoreReadOper
 }
 
 // LoadStagedTags loads the current staged tags from the store.
-func LoadStagedTags(ctx context.Context, store staging.StoreReadOperator, service staging.Service, name string) (StagedTags, *time.Time, error) {
+func LoadStagedTags(ctx context.Context, store store.ReadOperator, service staging.Service, name string) (StagedTags, *time.Time, error) {
 	tagEntry, err := store.GetTag(ctx, service, name)
 	if err != nil {
 		if errors.Is(err, staging.ErrNotStaged) {

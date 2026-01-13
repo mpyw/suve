@@ -7,8 +7,8 @@ import (
 	"os/exec"
 	"time"
 
-	"github.com/mpyw/suve/internal/staging/agent/ipc"
-	"github.com/mpyw/suve/internal/staging/agent/protocol"
+	"github.com/mpyw/suve/internal/staging/store/agent/daemon/internal/ipc"
+	"github.com/mpyw/suve/internal/staging/store/agent/internal/protocol"
 )
 
 const (
@@ -43,9 +43,14 @@ func NewLauncher(opts ...LauncherOption) *Launcher {
 	return l
 }
 
-// Client returns the underlying IPC client.
-func (l *Launcher) Client() *ipc.Client {
-	return l.client
+// SendRequest sends a request to the daemon.
+func (l *Launcher) SendRequest(req *protocol.Request) (*protocol.Response, error) {
+	return l.client.SendRequest(req)
+}
+
+// Ping checks if the daemon is reachable.
+func (l *Launcher) Ping() error {
+	return l.client.Ping()
 }
 
 // EnsureRunning ensures the daemon is running, starting it if necessary.

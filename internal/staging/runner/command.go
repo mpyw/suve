@@ -14,7 +14,7 @@ import (
 	"github.com/mpyw/suve/internal/cli/pager"
 	"github.com/mpyw/suve/internal/infra"
 	"github.com/mpyw/suve/internal/staging"
-	"github.com/mpyw/suve/internal/staging/agent"
+	"github.com/mpyw/suve/internal/staging/store/agent"
 	stagingusecase "github.com/mpyw/suve/internal/usecase/staging"
 )
 

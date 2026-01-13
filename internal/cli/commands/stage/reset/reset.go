@@ -11,12 +11,13 @@ import (
 	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/infra"
 	"github.com/mpyw/suve/internal/staging"
-	"github.com/mpyw/suve/internal/staging/agent"
+	"github.com/mpyw/suve/internal/staging/store"
+	"github.com/mpyw/suve/internal/staging/store/agent"
 )
 
 // Runner executes the reset command.
 type Runner struct {
-	Store  staging.StoreReadWriteOperator
+	Store  store.ReadWriteOperator
 	Stdout io.Writer
 	Stderr io.Writer
 }

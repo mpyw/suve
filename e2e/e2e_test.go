@@ -48,9 +48,9 @@ import (
 	secretstage "github.com/mpyw/suve/internal/cli/commands/stage/secret"
 	globalstatus "github.com/mpyw/suve/internal/cli/commands/stage/status"
 	"github.com/mpyw/suve/internal/staging"
-	"github.com/mpyw/suve/internal/staging/agent"
-	"github.com/mpyw/suve/internal/staging/agent/daemon"
-	"github.com/mpyw/suve/internal/staging/agent/ipc"
+	"github.com/mpyw/suve/internal/staging/store"
+	"github.com/mpyw/suve/internal/staging/store/agent"
+	"github.com/mpyw/suve/internal/staging/store/agent/daemon"
 )
 
 // testDaemon is the shared staging agent daemon for all E2E tests.
@@ -98,7 +98,7 @@ func TestMain(m *testing.M) {
 
 // waitForDaemon waits for the daemon to be ready by polling with ping.
 func waitForDaemon(timeout time.Duration, daemonErrCh <-chan error) error {
-	c := ipc.NewClient()
+	launcher := daemon.NewLauncher(daemon.WithAutoStartDisabled())
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
@@ -115,7 +115,7 @@ func waitForDaemon(timeout time.Duration, daemonErrCh <-chan error) error {
 			return fmt.Errorf("daemon did not become ready within %v (last error: %v)", timeout, lastErr)
 		case <-ticker.C:
 			// Try to ping daemon (any successful request means it's ready)
-			if err := c.Ping(); err == nil {
+			if err := launcher.Ping(); err == nil {
 				return nil
 			} else {
 				lastErr = err
@@ -153,7 +153,7 @@ func setupTempHome(t *testing.T) string {
 
 // newStore creates a new staging store for E2E tests.
 // localstack uses account ID "000000000000" and region "us-east-1".
-func newStore() staging.StoreReadWriteOperator {
+func newStore() store.AgentStore {
 	return agent.NewStore("000000000000", "us-east-1")
 }
 

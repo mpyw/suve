@@ -9,6 +9,7 @@ import (
 	"github.com/mpyw/suve/internal/maputil"
 	"github.com/mpyw/suve/internal/parallel"
 	"github.com/mpyw/suve/internal/staging"
+	"github.com/mpyw/suve/internal/staging/store"
 )
 
 // DiffInput holds input for the diff use case.
@@ -55,7 +56,7 @@ type DiffOutput struct {
 // DiffUseCase executes diff operations.
 type DiffUseCase struct {
 	Strategy staging.DiffStrategy
-	Store    staging.StoreReadWriteOperator
+	Store    store.ReadWriteOperator
 }
 
 // Execute runs the diff use case.

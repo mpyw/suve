@@ -5,9 +5,9 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/mpyw/suve/internal/staging/agent/ipc"
-	"github.com/mpyw/suve/internal/staging/agent/protocol"
-	"github.com/mpyw/suve/internal/staging/agent/server"
+	"github.com/mpyw/suve/internal/staging/store/agent/daemon/internal/ipc"
+	"github.com/mpyw/suve/internal/staging/store/agent/internal/protocol"
+	"github.com/mpyw/suve/internal/staging/store/agent/internal/server"
 )
 
 // RunnerOption configures a Runner.

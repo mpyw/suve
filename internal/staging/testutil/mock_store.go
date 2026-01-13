@@ -5,9 +5,10 @@ import (
 	"context"
 
 	"github.com/mpyw/suve/internal/staging"
+	"github.com/mpyw/suve/internal/staging/store"
 )
 
-// MockStore implements staging.StoreReadWriteOperator for testing.
+// MockStore implements store.ReadWriteOperator for testing.
 // It stores state in memory and can be configured to return errors.
 type MockStore struct {
 	entries map[staging.Service]map[string]staging.Entry
@@ -186,5 +187,5 @@ func (m *MockStore) AddTag(service staging.Service, name string, tag staging.Tag
 	m.tags[service][name] = tag
 }
 
-// Compile-time check that MockStore implements StoreReadWriteOperator.
-var _ staging.StoreReadWriteOperator = (*MockStore)(nil)
+// Compile-time check that MockStore implements ReadWriteOperator.
+var _ store.ReadWriteOperator = (*MockStore)(nil)

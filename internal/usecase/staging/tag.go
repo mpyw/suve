@@ -7,6 +7,7 @@ import (
 
 	"github.com/mpyw/suve/internal/maputil"
 	"github.com/mpyw/suve/internal/staging"
+	"github.com/mpyw/suve/internal/staging/store"
 	"github.com/mpyw/suve/internal/staging/transition"
 )
 
@@ -35,7 +36,7 @@ type UntagOutput struct {
 // TagUseCase executes tag staging operations.
 type TagUseCase struct {
 	Strategy staging.EditStrategy
-	Store    staging.StoreReadWriteOperator
+	Store    store.ReadWriteOperator
 }
 
 // tagContext holds common context for tag operations.

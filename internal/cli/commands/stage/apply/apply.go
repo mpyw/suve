@@ -16,7 +16,8 @@ import (
 	"github.com/mpyw/suve/internal/maputil"
 	"github.com/mpyw/suve/internal/parallel"
 	"github.com/mpyw/suve/internal/staging"
-	"github.com/mpyw/suve/internal/staging/agent"
+	"github.com/mpyw/suve/internal/staging/store"
+	"github.com/mpyw/suve/internal/staging/store/agent"
 )
 
 // serviceConflictCheck holds entries and strategy for a single service's conflict checking.
@@ -29,7 +30,7 @@ type serviceConflictCheck struct {
 type Runner struct {
 	ParamStrategy   staging.ApplyStrategy
 	SecretStrategy  staging.ApplyStrategy
-	Store           staging.StoreReadWriteOperator
+	Store           store.ReadWriteOperator
 	Stdout          io.Writer
 	Stderr          io.Writer
 	IgnoreConflicts bool

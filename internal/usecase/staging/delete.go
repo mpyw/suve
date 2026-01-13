@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/mpyw/suve/internal/staging"
+	"github.com/mpyw/suve/internal/staging/store"
 	"github.com/mpyw/suve/internal/staging/transition"
 )
 
@@ -29,7 +30,7 @@ type DeleteOutput struct {
 // DeleteUseCase executes delete staging operations.
 type DeleteUseCase struct {
 	Strategy staging.DeleteStrategy
-	Store    staging.StoreReadWriteOperator
+	Store    store.ReadWriteOperator
 }
 
 // Execute runs the delete use case.

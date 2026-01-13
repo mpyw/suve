@@ -9,6 +9,7 @@ import (
 
 	"github.com/mpyw/suve/internal/maputil"
 	"github.com/mpyw/suve/internal/staging"
+	"github.com/mpyw/suve/internal/staging/store"
 )
 
 // StatusInput holds input for the status use case.
@@ -47,7 +48,7 @@ type StatusOutput struct {
 // StatusUseCase executes status operations.
 type StatusUseCase struct {
 	Strategy staging.ServiceStrategy
-	Store    staging.StoreReadOperator
+	Store    store.ReadOperator
 }
 
 // Execute runs the status use case.

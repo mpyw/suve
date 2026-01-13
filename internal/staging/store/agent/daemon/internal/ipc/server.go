@@ -12,8 +12,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/mpyw/suve/internal/staging/agent/protocol"
-	"github.com/mpyw/suve/internal/staging/agent/server/security"
+	"github.com/mpyw/suve/internal/staging/store/agent/internal/protocol"
+	"github.com/mpyw/suve/internal/staging/store/agent/internal/server/security"
 )
 
 const (

@@ -5,8 +5,8 @@ package agent
 import (
 	"os"
 
-	"github.com/mpyw/suve/internal/staging/agent/client"
-	"github.com/mpyw/suve/internal/staging/agent/daemon"
+	"github.com/mpyw/suve/internal/staging/store/agent/daemon"
+	"github.com/mpyw/suve/internal/staging/store/agent/internal/client"
 )
 
 // Environment variable names for agent configuration.

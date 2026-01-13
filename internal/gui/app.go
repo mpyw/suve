@@ -9,7 +9,8 @@ import (
 	"github.com/mpyw/suve/internal/api/secretapi"
 	"github.com/mpyw/suve/internal/infra"
 	"github.com/mpyw/suve/internal/staging"
-	"github.com/mpyw/suve/internal/staging/agent"
+	"github.com/mpyw/suve/internal/staging/store"
+	"github.com/mpyw/suve/internal/staging/store/agent"
 )
 
 // =============================================================================
@@ -49,7 +50,7 @@ type App struct {
 	secretClient SecretClient
 
 	// Staging store
-	stagingStore staging.StoreReadWriteOperator
+	stagingStore store.ReadWriteOperator
 }
 
 // NewApp creates a new App application struct.
@@ -103,7 +104,7 @@ func (a *App) getSecretClient() (SecretClient, error) {
 	return client, nil
 }
 
-func (a *App) getStagingStore() (staging.StoreReadWriteOperator, error) {
+func (a *App) getStagingStore() (store.ReadWriteOperator, error) {
 	if a.stagingStore != nil {
 		return a.stagingStore, nil
 	}

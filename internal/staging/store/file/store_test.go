@@ -10,8 +10,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/mpyw/suve/internal/staging"
-	"github.com/mpyw/suve/internal/staging/crypt"
-	"github.com/mpyw/suve/internal/staging/file"
+	"github.com/mpyw/suve/internal/staging/store/file"
+	"github.com/mpyw/suve/internal/staging/store/file/internal/crypt"
 )
 
 func TestNewStore(t *testing.T) {
@@ -204,7 +204,7 @@ func TestStore_Persist(t *testing.T) {
 			Value:     lo.ToPtr("test-value"),
 		}
 
-		err := store.Persist(t.Context(), state)
+		err := store.WriteState(t.Context(), state)
 		require.NoError(t, err)
 
 		// File should exist
@@ -230,12 +230,12 @@ func TestStore_Persist(t *testing.T) {
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("test"),
 		}
-		err := store.Persist(t.Context(), state)
+		err := store.WriteState(t.Context(), state)
 		require.NoError(t, err)
 
 		// Then persist empty state
 		emptyState := staging.NewEmptyState()
-		err = store.Persist(t.Context(), emptyState)
+		err = store.WriteState(t.Context(), emptyState)
 		require.NoError(t, err)
 
 		// File should be removed
@@ -257,7 +257,7 @@ func TestStore_Persist(t *testing.T) {
 			Value:     lo.ToPtr("encrypted-value"),
 		}
 
-		err := store.Persist(t.Context(), state)
+		err := store.WriteState(t.Context(), state)
 		require.NoError(t, err)
 
 		// File should be encrypted

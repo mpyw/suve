@@ -7,6 +7,7 @@ import (
 	"github.com/mpyw/suve/internal/maputil"
 	"github.com/mpyw/suve/internal/parallel"
 	"github.com/mpyw/suve/internal/staging"
+	"github.com/mpyw/suve/internal/staging/store"
 )
 
 // ApplyInput holds input for the apply use case.
@@ -59,7 +60,7 @@ type ApplyOutput struct {
 // ApplyUseCase executes apply operations.
 type ApplyUseCase struct {
 	Strategy staging.ApplyStrategy
-	Store    staging.StoreReadWriteOperator
+	Store    store.ReadWriteOperator
 }
 
 // Execute runs the apply use case.
