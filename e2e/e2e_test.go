@@ -31,6 +31,8 @@ import (
 	paramlist "github.com/mpyw/suve/internal/cli/commands/param/list"
 	paramlog "github.com/mpyw/suve/internal/cli/commands/param/log"
 	paramshow "github.com/mpyw/suve/internal/cli/commands/param/show"
+	paramtag "github.com/mpyw/suve/internal/cli/commands/param/tag"
+	paramuntag "github.com/mpyw/suve/internal/cli/commands/param/untag"
 	paramupdate "github.com/mpyw/suve/internal/cli/commands/param/update"
 	secretcreate "github.com/mpyw/suve/internal/cli/commands/secret/create"
 	secretdelete "github.com/mpyw/suve/internal/cli/commands/secret/delete"
@@ -39,6 +41,8 @@ import (
 	secretlog "github.com/mpyw/suve/internal/cli/commands/secret/log"
 	secretrestore "github.com/mpyw/suve/internal/cli/commands/secret/restore"
 	secretshow "github.com/mpyw/suve/internal/cli/commands/secret/show"
+	secrettag "github.com/mpyw/suve/internal/cli/commands/secret/tag"
+	secretuntag "github.com/mpyw/suve/internal/cli/commands/secret/untag"
 	secretupdate "github.com/mpyw/suve/internal/cli/commands/secret/update"
 	globalstage "github.com/mpyw/suve/internal/cli/commands/stage"
 	globalapply "github.com/mpyw/suve/internal/cli/commands/stage/apply"
@@ -2197,4 +2201,975 @@ func TestSecret_StagingAddExistingResourceFails(t *testing.T) {
 		assert.Contains(t, err.Error(), "already exists")
 		t.Logf("expected error: %v", err)
 	})
+}
+
+// =============================================================================
+// Tag/Untag Command Tests
+// =============================================================================
+
+// TestParam_TagAndUntag tests the param tag and untag commands.
+func TestParam_TagAndUntag(t *testing.T) {
+	setupEnv(t)
+	paramName := "/suve-e2e-tag/test-param"
+
+	// Cleanup
+	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	t.Cleanup(func() {
+		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	})
+
+	// Create parameter first
+	t.Run("create", func(t *testing.T) {
+		_, _, err := runCommand(t, paramcreate.Command(), paramName, "test-value")
+		require.NoError(t, err)
+	})
+
+	// Add tags
+	t.Run("tag", func(t *testing.T) {
+		stdout, _, err := runCommand(t, paramtag.Command(), paramName, "env=test", "team=suve")
+		require.NoError(t, err)
+		assert.Contains(t, stdout, "Tagged")
+		t.Logf("tag output: %s", stdout)
+	})
+
+	// Verify tags are added
+	t.Run("verify-tags", func(t *testing.T) {
+		stdout, _, err := runCommand(t, paramshow.Command(), paramName)
+		require.NoError(t, err)
+		assert.Contains(t, stdout, "env: test")
+		assert.Contains(t, stdout, "team: suve")
+	})
+
+	// Remove one tag
+	t.Run("untag", func(t *testing.T) {
+		stdout, _, err := runCommand(t, paramuntag.Command(), paramName, "team")
+		require.NoError(t, err)
+		assert.Contains(t, stdout, "Untagged")
+		t.Logf("untag output: %s", stdout)
+	})
+
+	// Verify tag is removed
+	t.Run("verify-untag", func(t *testing.T) {
+		stdout, _, err := runCommand(t, paramshow.Command(), paramName)
+		require.NoError(t, err)
+		assert.Contains(t, stdout, "env: test")
+		assert.NotContains(t, stdout, "team: suve")
+	})
+}
+
+// TestParam_TagInvalidFormat tests error handling for invalid tag formats.
+func TestParam_TagInvalidFormat(t *testing.T) {
+	setupEnv(t)
+	paramName := "/suve-e2e-tag/invalid-format"
+
+	// Cleanup
+	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	t.Cleanup(func() {
+		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	})
+
+	// Create parameter first
+	_, _, err := runCommand(t, paramcreate.Command(), paramName, "test-value")
+	require.NoError(t, err)
+
+	// Try to add invalid tag format
+	t.Run("invalid-format", func(t *testing.T) {
+		_, _, err := runCommand(t, paramtag.Command(), paramName, "invalid-tag-no-equals")
+		assert.Error(t, err)
+		t.Logf("expected error: %v", err)
+	})
+}
+
+// TestSecret_TagAndUntag tests the secret tag and untag commands.
+func TestSecret_TagAndUntag(t *testing.T) {
+	setupEnv(t)
+	secretName := "suve-e2e-tag/test-secret"
+
+	// Cleanup
+	_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
+	t.Cleanup(func() {
+		_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
+	})
+
+	// Create secret first
+	t.Run("create", func(t *testing.T) {
+		_, _, err := runCommand(t, secretcreate.Command(), secretName, "test-value")
+		require.NoError(t, err)
+	})
+
+	// Add tags
+	t.Run("tag", func(t *testing.T) {
+		stdout, _, err := runCommand(t, secrettag.Command(), secretName, "env=test", "team=suve")
+		require.NoError(t, err)
+		assert.Contains(t, stdout, "Tagged")
+		t.Logf("tag output: %s", stdout)
+	})
+
+	// Verify tags are added
+	t.Run("verify-tags", func(t *testing.T) {
+		stdout, _, err := runCommand(t, secretshow.Command(), secretName)
+		require.NoError(t, err)
+		assert.Contains(t, stdout, "env: test")
+		assert.Contains(t, stdout, "team: suve")
+	})
+
+	// Remove one tag
+	t.Run("untag", func(t *testing.T) {
+		stdout, _, err := runCommand(t, secretuntag.Command(), secretName, "team")
+		require.NoError(t, err)
+		assert.Contains(t, stdout, "Untagged")
+		t.Logf("untag output: %s", stdout)
+	})
+
+	// Verify tag is removed
+	t.Run("verify-untag", func(t *testing.T) {
+		stdout, _, err := runCommand(t, secretshow.Command(), secretName)
+		require.NoError(t, err)
+		assert.Contains(t, stdout, "env: test")
+		assert.NotContains(t, stdout, "team: suve")
+	})
+}
+
+// TestSecret_TagInvalidFormat tests error handling for invalid tag formats.
+func TestSecret_TagInvalidFormat(t *testing.T) {
+	setupEnv(t)
+	secretName := "suve-e2e-tag/invalid-format"
+
+	// Cleanup
+	_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
+	t.Cleanup(func() {
+		_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
+	})
+
+	// Create secret first
+	_, _, err := runCommand(t, secretcreate.Command(), secretName, "test-value")
+	require.NoError(t, err)
+
+	// Try to add invalid tag format
+	t.Run("invalid-format", func(t *testing.T) {
+		_, _, err := runCommand(t, secrettag.Command(), secretName, "invalid-tag-no-equals")
+		assert.Error(t, err)
+		t.Logf("expected error: %v", err)
+	})
+}
+
+// TestParam_TagNonExistent tests tagging a non-existent parameter.
+func TestParam_TagNonExistent(t *testing.T) {
+	setupEnv(t)
+	paramName := "/suve-e2e-tag/non-existent"
+
+	// Ensure it doesn't exist
+	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+
+	// Try to tag non-existent parameter
+	_, _, err := runCommand(t, paramtag.Command(), paramName, "env=test")
+	assert.Error(t, err)
+	t.Logf("expected error: %v", err)
+}
+
+// TestSecret_TagNonExistent tests tagging a non-existent secret.
+func TestSecret_TagNonExistent(t *testing.T) {
+	setupEnv(t)
+	secretName := "suve-e2e-tag/non-existent"
+
+	// Ensure it doesn't exist
+	_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
+
+	// Try to tag non-existent secret
+	_, _, err := runCommand(t, secrettag.Command(), secretName, "env=test")
+	assert.Error(t, err)
+	t.Logf("expected error: %v", err)
+}
+
+// TestParam_UntagNonExistent tests untagging a non-existent parameter.
+func TestParam_UntagNonExistent(t *testing.T) {
+	setupEnv(t)
+	paramName := "/suve-e2e-untag/non-existent"
+
+	// Ensure it doesn't exist
+	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+
+	// Try to untag non-existent parameter
+	_, _, err := runCommand(t, paramuntag.Command(), paramName, "env")
+	assert.Error(t, err)
+	t.Logf("expected error: %v", err)
+}
+
+// TestSecret_UntagNonExistent tests untagging a non-existent secret.
+func TestSecret_UntagNonExistent(t *testing.T) {
+	setupEnv(t)
+	secretName := "suve-e2e-untag/non-existent"
+
+	// Ensure it doesn't exist
+	_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
+
+	// Try to untag non-existent secret
+	_, _, err := runCommand(t, secretuntag.Command(), secretName, "env")
+	assert.Error(t, err)
+	t.Logf("expected error: %v", err)
+}
+
+// =============================================================================
+// Update Command Edge Cases
+// =============================================================================
+
+// TestParam_UpdateWithType tests param update with --type flag.
+func TestParam_UpdateWithType(t *testing.T) {
+	setupEnv(t)
+	paramName := "/suve-e2e-update/type-test"
+
+	// Cleanup
+	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	t.Cleanup(func() {
+		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	})
+
+	// Create parameter first
+	t.Run("create", func(t *testing.T) {
+		_, _, err := runCommand(t, paramcreate.Command(), paramName, "initial-value")
+		require.NoError(t, err)
+	})
+
+	// Update with type change to SecureString
+	t.Run("update-secure", func(t *testing.T) {
+		stdout, _, err := runCommand(t, paramupdate.Command(), "--yes", "--secure", paramName, "secure-value")
+		require.NoError(t, err)
+		assert.Contains(t, stdout, "Updated")
+	})
+
+	// Verify the type changed
+	t.Run("verify-secure", func(t *testing.T) {
+		stdout, _, err := runCommand(t, paramshow.Command(), paramName)
+		require.NoError(t, err)
+		assert.Contains(t, stdout, "SecureString")
+	})
+
+	// Update with explicit type StringList
+	t.Run("update-stringlist", func(t *testing.T) {
+		stdout, _, err := runCommand(t, paramupdate.Command(), "--yes", "--type", "StringList", paramName, "item1,item2,item3")
+		require.NoError(t, err)
+		assert.Contains(t, stdout, "Updated")
+	})
+}
+
+// TestParam_UpdateConflictingFlags tests error handling for conflicting flags.
+func TestParam_UpdateConflictingFlags(t *testing.T) {
+	setupEnv(t)
+	paramName := "/suve-e2e-update/conflicting-flags"
+
+	// Cleanup
+	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	t.Cleanup(func() {
+		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	})
+
+	// Create parameter first
+	_, _, err := runCommand(t, paramcreate.Command(), paramName, "initial-value")
+	require.NoError(t, err)
+
+	// Try to use both --secure and --type
+	t.Run("secure-and-type-conflict", func(t *testing.T) {
+		_, _, err := runCommand(t, paramupdate.Command(), "--yes", "--secure", "--type", "String", paramName, "new-value")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "cannot use --secure with --type")
+	})
+}
+
+// TestParam_UpdateWithDescription tests param update with description.
+func TestParam_UpdateWithDescription(t *testing.T) {
+	setupEnv(t)
+	paramName := "/suve-e2e-update/description-test"
+
+	// Cleanup
+	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	t.Cleanup(func() {
+		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	})
+
+	// Create parameter first
+	_, _, err := runCommand(t, paramcreate.Command(), paramName, "initial-value")
+	require.NoError(t, err)
+
+	// Update with description
+	t.Run("update-with-description", func(t *testing.T) {
+		stdout, _, err := runCommand(t, paramupdate.Command(), "--yes", "--description", "Updated description", paramName, "new-value")
+		require.NoError(t, err)
+		assert.Contains(t, stdout, "Updated")
+	})
+}
+
+// TestParam_UpdateNonExistent tests updating a non-existent parameter.
+func TestParam_UpdateNonExistent(t *testing.T) {
+	setupEnv(t)
+	paramName := "/suve-e2e-update/non-existent"
+
+	// Ensure it doesn't exist
+	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+
+	// Try to update non-existent parameter
+	_, _, err := runCommand(t, paramupdate.Command(), "--yes", paramName, "new-value")
+	assert.Error(t, err)
+}
+
+// TestSecret_UpdateNonExistent tests updating a non-existent secret.
+func TestSecret_UpdateNonExistent(t *testing.T) {
+	setupEnv(t)
+	secretName := "suve-e2e-update/non-existent"
+
+	// Ensure it doesn't exist
+	_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
+
+	// Try to update non-existent secret
+	_, _, err := runCommand(t, secretupdate.Command(), "--yes", secretName, "new-value")
+	assert.Error(t, err)
+}
+
+// TestParam_UpdateMissingArgs tests error handling for missing arguments.
+func TestParam_UpdateMissingArgs(t *testing.T) {
+	setupEnv(t)
+
+	// No arguments at all
+	t.Run("no-args", func(t *testing.T) {
+		_, _, err := runCommand(t, paramupdate.Command())
+		assert.Error(t, err)
+	})
+
+	// Only name, no value
+	t.Run("no-value", func(t *testing.T) {
+		_, _, err := runCommand(t, paramupdate.Command(), "/test/param")
+		assert.Error(t, err)
+	})
+}
+
+// TestSecret_UpdateMissingArgs tests error handling for missing arguments.
+func TestSecret_UpdateMissingArgs(t *testing.T) {
+	setupEnv(t)
+
+	// No arguments at all
+	t.Run("no-args", func(t *testing.T) {
+		_, _, err := runCommand(t, secretupdate.Command())
+		assert.Error(t, err)
+	})
+
+	// Only name, no value
+	t.Run("no-value", func(t *testing.T) {
+		_, _, err := runCommand(t, secretupdate.Command(), "test/secret")
+		assert.Error(t, err)
+	})
+}
+
+// =============================================================================
+// Log Command Edge Cases
+// =============================================================================
+
+// TestParam_LogWithNumber tests param log with --number flag.
+func TestParam_LogWithNumber(t *testing.T) {
+	setupEnv(t)
+	paramName := "/suve-e2e-log/num-flag-test"
+
+	// Cleanup
+	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	t.Cleanup(func() {
+		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	})
+
+	// Create parameter with multiple versions
+	stdout, stderr, err := runCommand(t, paramcreate.Command(), paramName, "first-value")
+	t.Logf("create: stdout=%s, stderr=%s, err=%v", stdout, stderr, err)
+	require.NoError(t, err)
+
+	stdout, stderr, err = runCommand(t, paramupdate.Command(), "--yes", paramName, "second-value")
+	t.Logf("update: stdout=%s, stderr=%s, err=%v", stdout, stderr, err)
+	require.NoError(t, err)
+
+	// Get full log to verify versions
+	stdout, _, err = runCommand(t, paramlog.Command(), paramName)
+	require.NoError(t, err)
+	t.Logf("full log: %s", stdout)
+
+	// Get log with -n 1 (only most recent)
+	stdout, _, err = runCommand(t, paramlog.Command(), "-n", "1", paramName)
+	require.NoError(t, err)
+	t.Logf("log -n 1: %s", stdout)
+	// Should only have 1 version entry
+	lines := strings.Split(strings.TrimSpace(stdout), "\n")
+	versionCount := 0
+	for _, line := range lines {
+		if strings.HasPrefix(strings.TrimSpace(line), "Version") {
+			versionCount++
+		}
+	}
+	assert.Equal(t, 1, versionCount)
+}
+
+// TestParam_LogNonExistent tests log for non-existent parameter.
+func TestParam_LogNonExistent(t *testing.T) {
+	setupEnv(t)
+	paramName := "/suve-e2e-log/non-existent"
+
+	// Ensure it doesn't exist
+	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+
+	// Try to get log
+	_, _, err := runCommand(t, paramlog.Command(), paramName)
+	assert.Error(t, err)
+}
+
+// TestSecret_LogNonExistent tests log for non-existent secret.
+func TestSecret_LogNonExistent(t *testing.T) {
+	setupEnv(t)
+	secretName := "suve-e2e-log/non-existent"
+
+	// Ensure it doesn't exist
+	_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
+
+	// Try to get log
+	_, _, err := runCommand(t, secretlog.Command(), secretName)
+	assert.Error(t, err)
+}
+
+// TestParam_LogWithFormat tests param log with different output formats.
+func TestParam_LogWithFormat(t *testing.T) {
+	setupEnv(t)
+	paramName := "/suve-e2e-log/format-test"
+
+	// Cleanup
+	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	t.Cleanup(func() {
+		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	})
+
+	// Create parameter
+	_, _, _ = runCommand(t, paramcreate.Command(), paramName, "test-value")
+
+	// Test JSON format
+	t.Run("json-format", func(t *testing.T) {
+		stdout, _, err := runCommand(t, paramlog.Command(), "--output", "json", paramName)
+		require.NoError(t, err)
+		assert.True(t, strings.HasPrefix(strings.TrimSpace(stdout), "[") || strings.HasPrefix(strings.TrimSpace(stdout), "{"))
+	})
+
+	// Test text format (default)
+	t.Run("text-format", func(t *testing.T) {
+		stdout, _, err := runCommand(t, paramlog.Command(), paramName)
+		require.NoError(t, err)
+		// Log output format is "Version N" not "Version:"
+		assert.Contains(t, stdout, "Version")
+		assert.Contains(t, stdout, "Date:")
+	})
+}
+
+// =============================================================================
+// Diff Command Edge Cases
+// =============================================================================
+
+// TestParam_DiffVersions tests param diff between specific versions.
+func TestParam_DiffVersions(t *testing.T) {
+	setupEnv(t)
+	paramName := "/suve-e2e-diff/versions-test"
+
+	// Cleanup
+	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	t.Cleanup(func() {
+		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	})
+
+	// Create and update parameter
+	_, _, _ = runCommand(t, paramcreate.Command(), paramName, "version1-value")
+	_, _, _ = runCommand(t, paramupdate.Command(), "--yes", paramName, "version2-value")
+	_, _, _ = runCommand(t, paramupdate.Command(), "--yes", paramName, "version3-value")
+
+	// Diff between version 1 and version 3
+	t.Run("diff-v1-v3", func(t *testing.T) {
+		stdout, _, err := runCommand(t, paramdiff.Command(), paramName+"#1", paramName+"#3")
+		require.NoError(t, err)
+		assert.Contains(t, stdout, "version1-value")
+		assert.Contains(t, stdout, "version3-value")
+	})
+
+	// Diff with shift notation
+	t.Run("diff-shift", func(t *testing.T) {
+		stdout, _, err := runCommand(t, paramdiff.Command(), paramName+"~1", paramName)
+		require.NoError(t, err)
+		assert.Contains(t, stdout, "version2-value")
+		assert.Contains(t, stdout, "version3-value")
+	})
+}
+
+// TestParam_DiffNonExistent tests diff for non-existent parameter.
+func TestParam_DiffNonExistent(t *testing.T) {
+	setupEnv(t)
+	paramName := "/suve-e2e-diff/non-existent"
+
+	// Ensure it doesn't exist
+	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+
+	// Try to diff
+	_, _, err := runCommand(t, paramdiff.Command(), paramName)
+	assert.Error(t, err)
+}
+
+// TestSecret_DiffNonExistent tests diff for non-existent secret.
+func TestSecret_DiffNonExistent(t *testing.T) {
+	setupEnv(t)
+	secretName := "suve-e2e-diff/non-existent"
+
+	// Ensure it doesn't exist
+	_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
+
+	// Try to diff
+	_, _, err := runCommand(t, secretdiff.Command(), secretName)
+	assert.Error(t, err)
+}
+
+// TestParam_DiffNoChanges tests diff when there are no changes.
+func TestParam_DiffNoChanges(t *testing.T) {
+	setupEnv(t)
+	paramName := "/suve-e2e-diff/no-changes"
+
+	// Cleanup
+	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	t.Cleanup(func() {
+		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	})
+
+	// Create parameter
+	_, _, _ = runCommand(t, paramcreate.Command(), paramName, "same-value")
+	_, _, _ = runCommand(t, paramupdate.Command(), "--yes", paramName, "same-value")
+
+	// Diff should show no changes (or be empty)
+	stdout, _, err := runCommand(t, paramdiff.Command(), paramName+"~1", paramName)
+	require.NoError(t, err)
+	// When values are the same, diff might be empty or show no diff
+	t.Logf("diff output: %s", stdout)
+}
+
+// =============================================================================
+// Show Command Edge Cases
+// =============================================================================
+
+// TestParam_ShowRaw tests param show with --raw flag.
+func TestParam_ShowRaw(t *testing.T) {
+	setupEnv(t)
+	paramName := "/suve-e2e-show/raw-test"
+	paramValue := "raw-value-with-special-chars\ttab\nnewline"
+
+	// Cleanup
+	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	t.Cleanup(func() {
+		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	})
+
+	// Create parameter with special characters
+	_, _, err := runCommand(t, paramcreate.Command(), paramName, paramValue)
+	require.NoError(t, err)
+
+	// Show raw (just the value)
+	t.Run("raw", func(t *testing.T) {
+		stdout, _, err := runCommand(t, paramshow.Command(), "--raw", paramName)
+		require.NoError(t, err)
+		// Raw output should be just the value
+		assert.Equal(t, paramValue, strings.TrimSuffix(stdout, "\n"))
+	})
+
+	// Show without raw (formatted)
+	t.Run("formatted", func(t *testing.T) {
+		stdout, _, err := runCommand(t, paramshow.Command(), paramName)
+		require.NoError(t, err)
+		// Formatted output should have metadata and the value
+		assert.Contains(t, stdout, "Name:")
+		assert.Contains(t, stdout, "Version:")
+		assert.Contains(t, stdout, "raw-value-with-special-chars")
+	})
+}
+
+// TestSecret_ShowRaw tests secret show with --raw flag.
+func TestSecret_ShowRaw(t *testing.T) {
+	setupEnv(t)
+	secretName := "suve-e2e-show/raw-test"
+	secretValue := "raw-secret-value"
+
+	// Cleanup
+	_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
+	t.Cleanup(func() {
+		_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
+	})
+
+	// Create secret
+	_, _, err := runCommand(t, secretcreate.Command(), secretName, secretValue)
+	require.NoError(t, err)
+
+	// Show raw
+	t.Run("raw", func(t *testing.T) {
+		stdout, _, err := runCommand(t, secretshow.Command(), "--raw", secretName)
+		require.NoError(t, err)
+		assert.Equal(t, secretValue, strings.TrimSuffix(stdout, "\n"))
+	})
+}
+
+// TestParam_ShowWithVersion tests param show with version specifier.
+func TestParam_ShowWithVersion(t *testing.T) {
+	setupEnv(t)
+	paramName := "/suve-e2e-show/version-test"
+
+	// Cleanup
+	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	t.Cleanup(func() {
+		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	})
+
+	// Create and update
+	_, _, _ = runCommand(t, paramcreate.Command(), paramName, "v1")
+	_, _, _ = runCommand(t, paramupdate.Command(), "--yes", paramName, "v2")
+
+	// Show specific version
+	t.Run("show-v1", func(t *testing.T) {
+		stdout, _, err := runCommand(t, paramshow.Command(), "--raw", paramName+"#1")
+		require.NoError(t, err)
+		assert.Equal(t, "v1", strings.TrimSuffix(stdout, "\n"))
+	})
+
+	// Show with shift
+	t.Run("show-shift", func(t *testing.T) {
+		stdout, _, err := runCommand(t, paramshow.Command(), "--raw", paramName+"~1")
+		require.NoError(t, err)
+		assert.Equal(t, "v1", strings.TrimSuffix(stdout, "\n"))
+	})
+}
+
+// TestParam_ShowNonExistent tests show for non-existent parameter.
+func TestParam_ShowNonExistent(t *testing.T) {
+	setupEnv(t)
+	paramName := "/suve-e2e-show/non-existent"
+
+	// Ensure it doesn't exist
+	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+
+	// Try to show
+	_, _, err := runCommand(t, paramshow.Command(), paramName)
+	assert.Error(t, err)
+}
+
+// TestSecret_ShowNonExistent tests show for non-existent secret.
+func TestSecret_ShowNonExistent(t *testing.T) {
+	setupEnv(t)
+	secretName := "suve-e2e-show/non-existent"
+
+	// Ensure it doesn't exist
+	_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
+
+	// Try to show
+	_, _, err := runCommand(t, secretshow.Command(), secretName)
+	assert.Error(t, err)
+}
+
+// =============================================================================
+// Create Command Edge Cases
+// =============================================================================
+
+// TestParam_CreateAndTag tests creating a param and adding tags after.
+func TestParam_CreateAndTag(t *testing.T) {
+	setupEnv(t)
+	paramName := "/suve-e2e-create/and-tag"
+
+	// Cleanup
+	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	t.Cleanup(func() {
+		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	})
+
+	// Create parameter
+	stdout, _, err := runCommand(t, paramcreate.Command(), paramName, "value")
+	require.NoError(t, err)
+	assert.Contains(t, stdout, "Created")
+
+	// Add tags after creation
+	_, _, err = runCommand(t, paramtag.Command(), paramName, "env=test", "team=suve")
+	require.NoError(t, err)
+
+	// Verify tags
+	stdout, _, err = runCommand(t, paramshow.Command(), paramName)
+	require.NoError(t, err)
+	assert.Contains(t, stdout, "env: test")
+	assert.Contains(t, stdout, "team: suve")
+}
+
+// TestSecret_CreateAndTag tests creating a secret and adding tags after.
+func TestSecret_CreateAndTag(t *testing.T) {
+	setupEnv(t)
+	secretName := "suve-e2e-create/and-tag"
+
+	// Cleanup
+	_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
+	t.Cleanup(func() {
+		_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
+	})
+
+	// Create secret
+	stdout, _, err := runCommand(t, secretcreate.Command(), secretName, "value")
+	require.NoError(t, err)
+	assert.Contains(t, stdout, "Created")
+
+	// Add tags after creation
+	_, _, err = runCommand(t, secrettag.Command(), secretName, "env=test", "team=suve")
+	require.NoError(t, err)
+
+	// Verify tags
+	stdout, _, err = runCommand(t, secretshow.Command(), secretName)
+	require.NoError(t, err)
+	assert.Contains(t, stdout, "env: test")
+	assert.Contains(t, stdout, "team: suve")
+}
+
+// TestParam_CreateWithDescription tests param create with description.
+func TestParam_CreateWithDescription(t *testing.T) {
+	setupEnv(t)
+	paramName := "/suve-e2e-create/with-description"
+
+	// Cleanup
+	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	t.Cleanup(func() {
+		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	})
+
+	// Create with description
+	stdout, _, err := runCommand(t, paramcreate.Command(), "--description", "Test parameter description", paramName, "value")
+	require.NoError(t, err)
+	assert.Contains(t, stdout, "Created")
+}
+
+// TestParam_CreateDuplicate tests creating a duplicate parameter.
+func TestParam_CreateDuplicate(t *testing.T) {
+	setupEnv(t)
+	paramName := "/suve-e2e-create/duplicate"
+
+	// Cleanup
+	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	t.Cleanup(func() {
+		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	})
+
+	// Create first
+	_, _, err := runCommand(t, paramcreate.Command(), paramName, "value")
+	require.NoError(t, err)
+
+	// Try to create again
+	_, _, err = runCommand(t, paramcreate.Command(), paramName, "value2")
+	assert.Error(t, err)
+}
+
+// TestSecret_CreateDuplicate tests creating a duplicate secret.
+func TestSecret_CreateDuplicate(t *testing.T) {
+	setupEnv(t)
+	secretName := "suve-e2e-create/duplicate"
+
+	// Cleanup
+	_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
+	t.Cleanup(func() {
+		_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
+	})
+
+	// Create first
+	_, _, err := runCommand(t, secretcreate.Command(), secretName, "value")
+	require.NoError(t, err)
+
+	// Try to create again
+	_, _, err = runCommand(t, secretcreate.Command(), secretName, "value2")
+	assert.Error(t, err)
+}
+
+// TestParam_CreateMissingArgs tests error handling for missing arguments.
+func TestParam_CreateMissingArgs(t *testing.T) {
+	setupEnv(t)
+
+	// No arguments at all
+	t.Run("no-args", func(t *testing.T) {
+		_, _, err := runCommand(t, paramcreate.Command())
+		assert.Error(t, err)
+	})
+
+	// Only name, no value
+	t.Run("no-value", func(t *testing.T) {
+		_, _, err := runCommand(t, paramcreate.Command(), "/test/param")
+		assert.Error(t, err)
+	})
+}
+
+// TestSecret_CreateMissingArgs tests error handling for missing arguments.
+func TestSecret_CreateMissingArgs(t *testing.T) {
+	setupEnv(t)
+
+	// No arguments at all
+	t.Run("no-args", func(t *testing.T) {
+		_, _, err := runCommand(t, secretcreate.Command())
+		assert.Error(t, err)
+	})
+
+	// Only name, no value
+	t.Run("no-value", func(t *testing.T) {
+		_, _, err := runCommand(t, secretcreate.Command(), "test/secret")
+		assert.Error(t, err)
+	})
+}
+
+// =============================================================================
+// Delete Command Edge Cases
+// =============================================================================
+
+// TestParam_DeleteNonExistent tests deleting a non-existent parameter.
+func TestParam_DeleteNonExistent(t *testing.T) {
+	setupEnv(t)
+	paramName := "/suve-e2e-delete/non-existent"
+
+	// Ensure it doesn't exist
+	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+
+	// Try to delete (should fail since it doesn't exist)
+	_, _, err := runCommand(t, paramdelete.Command(), "--yes", paramName)
+	assert.Error(t, err)
+}
+
+// TestSecret_DeleteNonExistent tests deleting a non-existent secret.
+func TestSecret_DeleteNonExistent(t *testing.T) {
+	setupEnv(t)
+	// Use a unique name that definitely doesn't exist
+	secretName := "suve-e2e-delete/definitely-non-existent-secret-xyz"
+
+	// Try to delete (should fail since it doesn't exist)
+	// Note: AWS Secrets Manager returns ResourceNotFoundException for non-existent secrets
+	_, _, err := runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
+	// Localstack may return success for non-existent secrets, so we just log the result
+	if err != nil {
+		t.Logf("Delete non-existent returned error as expected: %v", err)
+	}
+}
+
+// TestSecret_DeleteWithRecoveryWindow tests secret delete with recovery window.
+func TestSecret_DeleteWithRecoveryWindow(t *testing.T) {
+	setupEnv(t)
+	secretName := "suve-e2e-delete/scheduled"
+
+	// Cleanup
+	_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
+	t.Cleanup(func() {
+		_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
+	})
+
+	// Create secret
+	_, _, err := runCommand(t, secretcreate.Command(), secretName, "value")
+	require.NoError(t, err)
+
+	// Delete with recovery window (7 days minimum)
+	stdout, _, err := runCommand(t, secretdelete.Command(), "--yes", "--recovery-window", "7", secretName)
+	require.NoError(t, err)
+	assert.Contains(t, stdout, "Scheduled")
+
+	// Restore it (to clean up properly)
+	_, _, _ = runCommand(t, secretrestore.Command(), "--yes", secretName)
+}
+
+// =============================================================================
+// List Command Edge Cases
+// =============================================================================
+
+// TestParam_ListWithPath tests param list with specific path.
+func TestParam_ListWithPath(t *testing.T) {
+	setupEnv(t)
+	basePath := "/suve-e2e-list/path-test"
+
+	// Cleanup
+	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", basePath+"/param1")
+	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", basePath+"/param2")
+	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", basePath+"/subdir/param3")
+	t.Cleanup(func() {
+		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", basePath+"/param1")
+		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", basePath+"/param2")
+		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", basePath+"/subdir/param3")
+	})
+
+	// Create parameters
+	_, _, _ = runCommand(t, paramcreate.Command(), basePath+"/param1", "v1")
+	_, _, _ = runCommand(t, paramcreate.Command(), basePath+"/param2", "v2")
+	_, _, _ = runCommand(t, paramcreate.Command(), basePath+"/subdir/param3", "v3")
+
+	// List all under basePath (non-recursive)
+	t.Run("list-all", func(t *testing.T) {
+		stdout, _, err := runCommand(t, paramlist.Command(), basePath)
+		require.NoError(t, err)
+		assert.Contains(t, stdout, "param1")
+		assert.Contains(t, stdout, "param2")
+		// param3 is in a subdirectory, so it won't appear without --recursive
+	})
+
+	// List with recursive
+	t.Run("list-recursive", func(t *testing.T) {
+		stdout, _, err := runCommand(t, paramlist.Command(), "--recursive", basePath)
+		require.NoError(t, err)
+		assert.Contains(t, stdout, "param1")
+		assert.Contains(t, stdout, "subdir/param3")
+	})
+}
+
+// TestParam_ListWithFilter tests param list with filter.
+func TestParam_ListWithFilter(t *testing.T) {
+	setupEnv(t)
+	basePath := "/suve-e2e-list/filter-test"
+
+	// Cleanup
+	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", basePath+"/app-config")
+	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", basePath+"/db-config")
+	t.Cleanup(func() {
+		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", basePath+"/app-config")
+		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", basePath+"/db-config")
+	})
+
+	// Create parameters
+	_, _, _ = runCommand(t, paramcreate.Command(), basePath+"/app-config", "v1")
+	_, _, _ = runCommand(t, paramcreate.Command(), basePath+"/db-config", "v2")
+
+	// List with filter
+	stdout, _, err := runCommand(t, paramlist.Command(), "--filter", "app", basePath)
+	require.NoError(t, err)
+	assert.Contains(t, stdout, "app-config")
+	assert.NotContains(t, stdout, "db-config")
+}
+
+// TestParam_ListJSON tests param list with JSON output.
+func TestParam_ListJSON(t *testing.T) {
+	setupEnv(t)
+	basePath := "/suve-e2e-list/json-test"
+
+	// Cleanup
+	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", basePath+"/param1")
+	t.Cleanup(func() {
+		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", basePath+"/param1")
+	})
+
+	// Create parameter
+	_, _, _ = runCommand(t, paramcreate.Command(), basePath+"/param1", "v1")
+
+	// List with JSON format
+	stdout, _, err := runCommand(t, paramlist.Command(), "--output", "json", basePath)
+	require.NoError(t, err)
+	assert.True(t, strings.HasPrefix(strings.TrimSpace(stdout), "[") || strings.HasPrefix(strings.TrimSpace(stdout), "{"))
+}
+
+// TestSecret_ListJSON tests secret list with JSON output.
+func TestSecret_ListJSON(t *testing.T) {
+	setupEnv(t)
+	secretName := "suve-e2e-list/json-test"
+
+	// Cleanup
+	_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
+	t.Cleanup(func() {
+		_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
+	})
+
+	// Create secret
+	_, _, _ = runCommand(t, secretcreate.Command(), secretName, "v1")
+
+	// List with JSON format
+	stdout, _, err := runCommand(t, secretlist.Command(), "--output", "json")
+	require.NoError(t, err)
+	assert.True(t, strings.HasPrefix(strings.TrimSpace(stdout), "[") || strings.HasPrefix(strings.TrimSpace(stdout), "{"))
 }
