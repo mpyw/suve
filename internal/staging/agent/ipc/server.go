@@ -37,18 +37,14 @@ type Server struct {
 }
 
 // NewServer creates a new IPC server.
-func NewServer(handler RequestHandler) *Server {
+func NewServer(handler RequestHandler, onResponse ResponseCallback) *Server {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &Server{
-		handler: handler,
-		ctx:     ctx,
-		cancel:  cancel,
+		handler:    handler,
+		onResponse: onResponse,
+		ctx:        ctx,
+		cancel:     cancel,
 	}
-}
-
-// SetResponseCallback sets a callback to be called after each response.
-func (s *Server) SetResponseCallback(cb ResponseCallback) {
-	s.onResponse = cb
 }
 
 // Start starts listening on the Unix socket.

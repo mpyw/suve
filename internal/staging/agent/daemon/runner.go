@@ -35,8 +35,7 @@ func NewRunner(opts ...RunnerOption) *Runner {
 	for _, opt := range opts {
 		opt(r)
 	}
-	r.server = ipc.NewServer(r.handler.HandleRequest)
-	r.server.SetResponseCallback(r.handleAutoShutdown)
+	r.server = ipc.NewServer(r.handler.HandleRequest, r.handleAutoShutdown)
 	return r
 }
 
