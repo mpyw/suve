@@ -34,7 +34,7 @@ func TestStashPushRunner_Run(t *testing.T) {
 		stderr := &bytes.Buffer{}
 
 		runner := &StashPushRunner{
-			UseCase: &stagingusecase.PersistUseCase{
+			UseCase: &stagingusecase.StashPushUseCase{
 				AgentStore: agentStore,
 				FileStore:  fileStore,
 			},
@@ -67,7 +67,7 @@ func TestStashPushRunner_Run(t *testing.T) {
 		stderr := &bytes.Buffer{}
 
 		runner := &StashPushRunner{
-			UseCase: &stagingusecase.PersistUseCase{
+			UseCase: &stagingusecase.StashPushUseCase{
 				AgentStore: agentStore,
 				FileStore:  fileStore,
 			},
@@ -99,7 +99,7 @@ func TestStashPushRunner_Run(t *testing.T) {
 		stderr := &bytes.Buffer{}
 
 		runner := &StashPushRunner{
-			UseCase: &stagingusecase.PersistUseCase{
+			UseCase: &stagingusecase.StashPushUseCase{
 				AgentStore: agentStore,
 				FileStore:  fileStore,
 			},
@@ -129,7 +129,7 @@ func TestStashPushRunner_Run(t *testing.T) {
 		stderr := &bytes.Buffer{}
 
 		runner := &StashPushRunner{
-			UseCase: &stagingusecase.PersistUseCase{
+			UseCase: &stagingusecase.StashPushUseCase{
 				AgentStore: agentStore,
 				FileStore:  fileStore,
 			},
@@ -154,7 +154,7 @@ func TestStashPushRunner_Run(t *testing.T) {
 		stderr := &bytes.Buffer{}
 
 		runner := &StashPushRunner{
-			UseCase: &stagingusecase.PersistUseCase{
+			UseCase: &stagingusecase.StashPushUseCase{
 				AgentStore: agentStore,
 				FileStore:  fileStore,
 			},
@@ -164,7 +164,7 @@ func TestStashPushRunner_Run(t *testing.T) {
 		}
 
 		err := runner.Run(t.Context(), StashPushOptions{})
-		assert.ErrorIs(t, err, stagingusecase.ErrNothingToPersist)
+		assert.ErrorIs(t, err, stagingusecase.ErrNothingToStashPush)
 	})
 
 	t.Run("success - stash push with service filter", func(t *testing.T) {
@@ -188,7 +188,7 @@ func TestStashPushRunner_Run(t *testing.T) {
 		stderr := &bytes.Buffer{}
 
 		runner := &StashPushRunner{
-			UseCase: &stagingusecase.PersistUseCase{
+			UseCase: &stagingusecase.StashPushUseCase{
 				AgentStore: agentStore,
 				FileStore:  fileStore,
 			},
@@ -243,7 +243,7 @@ func TestStashPushRunner_NonFatalError(t *testing.T) {
 	t.Parallel()
 
 	// Test that non-fatal errors are properly identified
-	nonFatalErr := &stagingusecase.PersistError{
+	nonFatalErr := &stagingusecase.StashPushError{
 		Op:       "clear",
 		Err:      errors.New("agent clear failed"),
 		NonFatal: true,
@@ -279,7 +279,7 @@ func TestStashPushRunner_Run_NonFatalErrorContinues(t *testing.T) {
 	stderr := &bytes.Buffer{}
 
 	runner := &StashPushRunner{
-		UseCase: &stagingusecase.PersistUseCase{
+		UseCase: &stagingusecase.StashPushUseCase{
 			AgentStore: agentStore,
 			FileStore:  fileStore,
 		},
@@ -327,7 +327,7 @@ func TestStashPushRunner_Run_WithModes(t *testing.T) {
 		stderr := &bytes.Buffer{}
 
 		runner := &StashPushRunner{
-			UseCase: &stagingusecase.PersistUseCase{
+			UseCase: &stagingusecase.StashPushUseCase{
 				AgentStore: agentStore,
 				FileStore:  fileStore,
 			},
@@ -336,7 +336,7 @@ func TestStashPushRunner_Run_WithModes(t *testing.T) {
 			Encrypted: false,
 		}
 
-		err := runner.Run(t.Context(), StashPushOptions{Mode: stagingusecase.PersistModeOverwrite})
+		err := runner.Run(t.Context(), StashPushOptions{Mode: stagingusecase.StashPushModeOverwrite})
 		require.NoError(t, err)
 
 		// New data should be in file
@@ -372,7 +372,7 @@ func TestStashPushRunner_Run_WithModes(t *testing.T) {
 		stderr := &bytes.Buffer{}
 
 		runner := &StashPushRunner{
-			UseCase: &stagingusecase.PersistUseCase{
+			UseCase: &stagingusecase.StashPushUseCase{
 				AgentStore: agentStore,
 				FileStore:  fileStore,
 			},
@@ -381,7 +381,7 @@ func TestStashPushRunner_Run_WithModes(t *testing.T) {
 			Encrypted: false,
 		}
 
-		err := runner.Run(t.Context(), StashPushOptions{Mode: stagingusecase.PersistModeMerge})
+		err := runner.Run(t.Context(), StashPushOptions{Mode: stagingusecase.StashPushModeMerge})
 		require.NoError(t, err)
 
 		// New data should be in file

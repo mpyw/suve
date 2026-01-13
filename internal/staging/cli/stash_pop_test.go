@@ -34,7 +34,7 @@ func TestStashPopRunner_Run(t *testing.T) {
 		stderr := &bytes.Buffer{}
 
 		runner := &StashPopRunner{
-			UseCase: &stagingusecase.DrainUseCase{
+			UseCase: &stagingusecase.StashPopUseCase{
 				FileStore:  fileStore,
 				AgentStore: agentStore,
 			},
@@ -64,7 +64,7 @@ func TestStashPopRunner_Run(t *testing.T) {
 		stderr := &bytes.Buffer{}
 
 		runner := &StashPopRunner{
-			UseCase: &stagingusecase.DrainUseCase{
+			UseCase: &stagingusecase.StashPopUseCase{
 				FileStore:  fileStore,
 				AgentStore: agentStore,
 			},
@@ -98,7 +98,7 @@ func TestStashPopRunner_Run(t *testing.T) {
 		stderr := &bytes.Buffer{}
 
 		runner := &StashPopRunner{
-			UseCase: &stagingusecase.DrainUseCase{
+			UseCase: &stagingusecase.StashPopUseCase{
 				FileStore:  fileStore,
 				AgentStore: agentStore,
 			},
@@ -121,7 +121,7 @@ func TestStashPopRunner_Run(t *testing.T) {
 		stderr := &bytes.Buffer{}
 
 		runner := &StashPopRunner{
-			UseCase: &stagingusecase.DrainUseCase{
+			UseCase: &stagingusecase.StashPopUseCase{
 				FileStore:  fileStore,
 				AgentStore: agentStore,
 			},
@@ -130,7 +130,7 @@ func TestStashPopRunner_Run(t *testing.T) {
 		}
 
 		err := runner.Run(t.Context(), StashPopOptions{})
-		assert.ErrorIs(t, err, stagingusecase.ErrNothingToDrain)
+		assert.ErrorIs(t, err, stagingusecase.ErrNothingToStashPop)
 	})
 
 	t.Run("error - agent has changes without force/merge", func(t *testing.T) {
@@ -154,7 +154,7 @@ func TestStashPopRunner_Run(t *testing.T) {
 		stderr := &bytes.Buffer{}
 
 		runner := &StashPopRunner{
-			UseCase: &stagingusecase.DrainUseCase{
+			UseCase: &stagingusecase.StashPopUseCase{
 				FileStore:  fileStore,
 				AgentStore: agentStore,
 			},
@@ -182,7 +182,7 @@ func TestStashPopRunner_Run(t *testing.T) {
 		stderr := &bytes.Buffer{}
 
 		runner := &StashPopRunner{
-			UseCase: &stagingusecase.DrainUseCase{
+			UseCase: &stagingusecase.StashPopUseCase{
 				FileStore:  fileStore,
 				AgentStore: agentStore,
 			},
@@ -219,7 +219,7 @@ func TestStashPopRunner_NonFatalError(t *testing.T) {
 	stdout := &bytes.Buffer{}
 	stderr := &bytes.Buffer{}
 
-	nonFatalErr := &stagingusecase.DrainError{
+	nonFatalErr := &stagingusecase.StashPopError{
 		Op:       "delete",
 		Err:      errors.New("file deletion failed"),
 		NonFatal: true,

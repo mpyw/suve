@@ -22,7 +22,7 @@ import (
 
 // StashPushRunner executes stash push operations using a usecase.
 type StashPushRunner struct {
-	UseCase   *stagingusecase.PersistUseCase
+	UseCase   *stagingusecase.StashPushUseCase
 	Stdout    io.Writer
 	Stderr    io.Writer
 	Encrypted bool // Whether the file is encrypted (for output messages)
@@ -35,19 +35,19 @@ type StashPushOptions struct {
 	// Keep preserves the agent memory after pushing to file.
 	Keep bool
 	// Mode determines how to handle existing stash file.
-	Mode stagingusecase.PersistMode
+	Mode stagingusecase.StashPushMode
 }
 
 // Run executes the stash push command.
 func (r *StashPushRunner) Run(ctx context.Context, opts StashPushOptions) error {
-	_, err := r.UseCase.Execute(ctx, stagingusecase.PersistInput{
+	_, err := r.UseCase.Execute(ctx, stagingusecase.StashPushInput{
 		Service: opts.Service,
 		Keep:    opts.Keep,
 		Mode:    opts.Mode,
 	})
 	if err != nil {
 		// Check for non-fatal error (state was written but agent cleanup failed)
-		var persistErr *stagingusecase.PersistError
+		var persistErr *stagingusecase.StashPushError
 		if errors.As(err, &persistErr) && persistErr.NonFatal {
 			output.Warn(r.Stderr, "Warning: %v", err)
 			// Continue with success message since state was written
@@ -118,14 +118,14 @@ func stashPushAction(service staging.Service) func(context.Context, *cli.Command
 		}
 
 		// Determine mode based on flags and file existence
-		mode := stagingusecase.PersistModeMerge // Default to merge (safer)
+		mode := stagingusecase.StashPushModeMerge // Default to merge (safer)
 		forceFlag := cmd.Bool("force")
 		mergeFlag := cmd.Bool("merge")
 
 		if forceFlag {
-			mode = stagingusecase.PersistModeOverwrite
+			mode = stagingusecase.StashPushModeOverwrite
 		} else if mergeFlag {
-			mode = stagingusecase.PersistModeMerge
+			mode = stagingusecase.StashPushModeMerge
 		} else {
 			// Check if we need to prompt
 			exists, err := basicFileStore.Exists()
@@ -163,9 +163,9 @@ func stashPushAction(service staging.Service) func(context.Context, *cli.Command
 
 				switch choice {
 				case 0: // Merge
-					mode = stagingusecase.PersistModeMerge
+					mode = stagingusecase.StashPushModeMerge
 				case 1: // Overwrite
-					mode = stagingusecase.PersistModeOverwrite
+					mode = stagingusecase.StashPushModeOverwrite
 				default: // Cancel or error
 					output.Printf(cmd.Root().Writer, "Operation cancelled.\n")
 					return nil
@@ -206,7 +206,7 @@ func stashPushAction(service staging.Service) func(context.Context, *cli.Command
 		}
 
 		r := &StashPushRunner{
-			UseCase: &stagingusecase.PersistUseCase{
+			UseCase: &stagingusecase.StashPushUseCase{
 				AgentStore: agentStore,
 				FileStore:  fileStore,
 			},

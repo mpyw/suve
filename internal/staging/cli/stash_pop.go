@@ -18,7 +18,7 @@ import (
 
 // StashPopRunner executes stash pop operations using a usecase.
 type StashPopRunner struct {
-	UseCase *stagingusecase.DrainUseCase
+	UseCase *stagingusecase.StashPopUseCase
 	Stdout  io.Writer
 	Stderr  io.Writer
 }
@@ -37,7 +37,7 @@ type StashPopOptions struct {
 
 // Run executes the stash pop command.
 func (r *StashPopRunner) Run(ctx context.Context, opts StashPopOptions) error {
-	result, err := r.UseCase.Execute(ctx, stagingusecase.DrainInput{
+	result, err := r.UseCase.Execute(ctx, stagingusecase.StashPopInput{
 		Service: opts.Service,
 		Keep:    opts.Keep,
 		Force:   opts.Force,
@@ -45,7 +45,7 @@ func (r *StashPopRunner) Run(ctx context.Context, opts StashPopOptions) error {
 	})
 	if err != nil {
 		// Check for non-fatal error (state was written but file cleanup failed)
-		var drainErr *stagingusecase.DrainError
+		var drainErr *stagingusecase.StashPopError
 		if errors.As(err, &drainErr) && drainErr.NonFatal {
 			output.Warn(r.Stderr, "Warning: %v", err)
 			// Continue with success message since state was written
@@ -110,7 +110,7 @@ func stashPopAction(service staging.Service) func(context.Context, *cli.Command)
 		agentStore := agent.NewStore(identity.AccountID, identity.Region)
 
 		r := &StashPopRunner{
-			UseCase: &stagingusecase.DrainUseCase{
+			UseCase: &stagingusecase.StashPopUseCase{
 				FileStore:  fileStore,
 				AgentStore: agentStore,
 			},

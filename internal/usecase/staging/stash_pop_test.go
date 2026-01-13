@@ -29,12 +29,12 @@ func TestDrainUseCase_Execute(t *testing.T) {
 			StagedAt:  time.Now(),
 		})
 
-		usecase := &stagingusecase.DrainUseCase{
+		usecase := &stagingusecase.StashPopUseCase{
 			FileStore:  fileStore,
 			AgentStore: agentStore,
 		}
 
-		output, err := usecase.Execute(t.Context(), stagingusecase.DrainInput{})
+		output, err := usecase.Execute(t.Context(), stagingusecase.StashPopInput{})
 		require.NoError(t, err)
 		assert.Equal(t, 1, output.EntryCount)
 		assert.False(t, output.Merged)
@@ -61,12 +61,12 @@ func TestDrainUseCase_Execute(t *testing.T) {
 			StagedAt:  time.Now(),
 		})
 
-		usecase := &stagingusecase.DrainUseCase{
+		usecase := &stagingusecase.StashPopUseCase{
 			FileStore:  fileStore,
 			AgentStore: agentStore,
 		}
 
-		_, err := usecase.Execute(t.Context(), stagingusecase.DrainInput{Keep: true})
+		_, err := usecase.Execute(t.Context(), stagingusecase.StashPopInput{Keep: true})
 		require.NoError(t, err)
 
 		// Verify entry exists in both
@@ -93,12 +93,12 @@ func TestDrainUseCase_Execute(t *testing.T) {
 			StagedAt:  time.Now(),
 		})
 
-		usecase := &stagingusecase.DrainUseCase{
+		usecase := &stagingusecase.StashPopUseCase{
 			FileStore:  fileStore,
 			AgentStore: agentStore,
 		}
 
-		output, err := usecase.Execute(t.Context(), stagingusecase.DrainInput{Merge: true})
+		output, err := usecase.Execute(t.Context(), stagingusecase.StashPopInput{Merge: true})
 		require.NoError(t, err)
 		assert.True(t, output.Merged)
 
@@ -126,12 +126,12 @@ func TestDrainUseCase_Execute(t *testing.T) {
 			StagedAt:  time.Now(),
 		})
 
-		usecase := &stagingusecase.DrainUseCase{
+		usecase := &stagingusecase.StashPopUseCase{
 			FileStore:  fileStore,
 			AgentStore: agentStore,
 		}
 
-		_, err := usecase.Execute(t.Context(), stagingusecase.DrainInput{Force: true})
+		_, err := usecase.Execute(t.Context(), stagingusecase.StashPopInput{Force: true})
 		require.NoError(t, err)
 
 		// With force, agent should have file content
@@ -145,13 +145,13 @@ func TestDrainUseCase_Execute(t *testing.T) {
 		fileStore := testutil.NewMockStore()
 		agentStore := testutil.NewMockStore()
 
-		usecase := &stagingusecase.DrainUseCase{
+		usecase := &stagingusecase.StashPopUseCase{
 			FileStore:  fileStore,
 			AgentStore: agentStore,
 		}
 
-		_, err := usecase.Execute(t.Context(), stagingusecase.DrainInput{})
-		assert.ErrorIs(t, err, stagingusecase.ErrNothingToDrain)
+		_, err := usecase.Execute(t.Context(), stagingusecase.StashPopInput{})
+		assert.ErrorIs(t, err, stagingusecase.ErrNothingToStashPop)
 	})
 
 	t.Run("drain error - agent has changes", func(t *testing.T) {
@@ -171,12 +171,12 @@ func TestDrainUseCase_Execute(t *testing.T) {
 			StagedAt:  time.Now(),
 		})
 
-		usecase := &stagingusecase.DrainUseCase{
+		usecase := &stagingusecase.StashPopUseCase{
 			FileStore:  fileStore,
 			AgentStore: agentStore,
 		}
 
-		_, err := usecase.Execute(t.Context(), stagingusecase.DrainInput{})
+		_, err := usecase.Execute(t.Context(), stagingusecase.StashPopInput{})
 		assert.ErrorIs(t, err, stagingusecase.ErrAgentHasChanges)
 	})
 
@@ -197,12 +197,12 @@ func TestDrainUseCase_Execute(t *testing.T) {
 			StagedAt:  time.Now(),
 		})
 
-		usecase := &stagingusecase.DrainUseCase{
+		usecase := &stagingusecase.StashPopUseCase{
 			FileStore:  fileStore,
 			AgentStore: agentStore,
 		}
 
-		_, err := usecase.Execute(t.Context(), stagingusecase.DrainInput{Service: staging.ServiceParam})
+		_, err := usecase.Execute(t.Context(), stagingusecase.StashPopInput{Service: staging.ServiceParam})
 		require.NoError(t, err)
 
 		// Param should be in agent
@@ -225,12 +225,12 @@ func TestDrainUseCase_Execute(t *testing.T) {
 			StagedAt: time.Now(),
 		})
 
-		usecase := &stagingusecase.DrainUseCase{
+		usecase := &stagingusecase.StashPopUseCase{
 			FileStore:  fileStore,
 			AgentStore: agentStore,
 		}
 
-		output, err := usecase.Execute(t.Context(), stagingusecase.DrainInput{})
+		output, err := usecase.Execute(t.Context(), stagingusecase.StashPopInput{})
 		require.NoError(t, err)
 		assert.Equal(t, 1, output.TagCount)
 
@@ -251,13 +251,13 @@ func TestDrainUseCase_Execute_Errors(t *testing.T) {
 		fileStore.DrainErr = errors.New("read error")
 		agentStore := testutil.NewMockStore()
 
-		usecase := &stagingusecase.DrainUseCase{
+		usecase := &stagingusecase.StashPopUseCase{
 			FileStore:  fileStore,
 			AgentStore: agentStore,
 		}
 
-		_, err := usecase.Execute(t.Context(), stagingusecase.DrainInput{})
-		var drainErr *stagingusecase.DrainError
+		_, err := usecase.Execute(t.Context(), stagingusecase.StashPopInput{})
+		var drainErr *stagingusecase.StashPopError
 		require.ErrorAs(t, err, &drainErr)
 		assert.Equal(t, "load", drainErr.Op)
 	})
@@ -275,13 +275,13 @@ func TestDrainUseCase_Execute_Errors(t *testing.T) {
 		})
 		agentStore.WriteStateErr = errors.New("write error")
 
-		usecase := &stagingusecase.DrainUseCase{
+		usecase := &stagingusecase.StashPopUseCase{
 			FileStore:  fileStore,
 			AgentStore: agentStore,
 		}
 
-		_, err := usecase.Execute(t.Context(), stagingusecase.DrainInput{})
-		var drainErr *stagingusecase.DrainError
+		_, err := usecase.Execute(t.Context(), stagingusecase.StashPopInput{})
+		var drainErr *stagingusecase.StashPopError
 		require.ErrorAs(t, err, &drainErr)
 		assert.Equal(t, "write", drainErr.Op)
 	})
@@ -292,34 +292,34 @@ func TestDrainError(t *testing.T) {
 
 	t.Run("error message - load", func(t *testing.T) {
 		t.Parallel()
-		err := &stagingusecase.DrainError{Op: "load", Err: errors.New("connection failed")}
+		err := &stagingusecase.StashPopError{Op: "load", Err: errors.New("connection failed")}
 		assert.Contains(t, err.Error(), "failed to load state from file")
 		assert.Contains(t, err.Error(), "connection failed")
 	})
 
 	t.Run("error message - write", func(t *testing.T) {
 		t.Parallel()
-		err := &stagingusecase.DrainError{Op: "write", Err: errors.New("write failed")}
+		err := &stagingusecase.StashPopError{Op: "write", Err: errors.New("write failed")}
 		assert.Contains(t, err.Error(), "failed to set state in agent")
 	})
 
 	t.Run("error message - delete", func(t *testing.T) {
 		t.Parallel()
-		err := &stagingusecase.DrainError{Op: "delete", Err: errors.New("delete failed")}
+		err := &stagingusecase.StashPopError{Op: "delete", Err: errors.New("delete failed")}
 		assert.Contains(t, err.Error(), "failed to delete file")
 	})
 
 	t.Run("error message - unknown op", func(t *testing.T) {
 		t.Parallel()
 		innerErr := errors.New("something went wrong")
-		err := &stagingusecase.DrainError{Op: "unknown", Err: innerErr}
+		err := &stagingusecase.StashPopError{Op: "unknown", Err: innerErr}
 		assert.Equal(t, "something went wrong", err.Error())
 	})
 
 	t.Run("unwrap", func(t *testing.T) {
 		t.Parallel()
 		innerErr := errors.New("inner error")
-		err := &stagingusecase.DrainError{Op: "load", Err: innerErr}
+		err := &stagingusecase.StashPopError{Op: "load", Err: innerErr}
 		assert.ErrorIs(t, err, innerErr)
 	})
 }

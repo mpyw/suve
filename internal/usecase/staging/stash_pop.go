@@ -8,8 +8,8 @@ import (
 	"github.com/mpyw/suve/internal/staging/store"
 )
 
-// DrainInput holds input for the drain use case.
-type DrainInput struct {
+// StashPopInput holds input for the drain use case.
+type StashPopInput struct {
 	// Service filters the drain to a specific service. Empty means all services.
 	Service staging.Service
 	// Keep preserves the file after draining.
@@ -20,8 +20,8 @@ type DrainInput struct {
 	Merge bool
 }
 
-// DrainOutput holds the result of the drain use case.
-type DrainOutput struct {
+// StashPopOutput holds the result of the drain use case.
+type StashPopOutput struct {
 	// Merged indicates whether the state was merged with existing agent state.
 	Merged bool
 	// EntryCount is the number of entries in the final state.
@@ -30,18 +30,18 @@ type DrainOutput struct {
 	TagCount int
 }
 
-// DrainUseCase executes drain operations (file -> agent).
-type DrainUseCase struct {
+// StashPopUseCase executes drain operations (file -> agent).
+type StashPopUseCase struct {
 	FileStore  store.FileStore
 	AgentStore store.AgentStore
 }
 
 // Execute runs the drain use case.
-func (u *DrainUseCase) Execute(ctx context.Context, input DrainInput) (*DrainOutput, error) {
+func (u *StashPopUseCase) Execute(ctx context.Context, input StashPopInput) (*StashPopOutput, error) {
 	// Drain from file (keep file for now, we'll delete after successful agent write)
 	fileState, err := u.FileStore.Drain(ctx, "", true)
 	if err != nil {
-		return nil, &DrainError{Op: "load", Err: err}
+		return nil, &StashPopError{Op: "load", Err: err}
 	}
 
 	// Extract service-specific state if filtered
@@ -49,7 +49,7 @@ func (u *DrainUseCase) Execute(ctx context.Context, input DrainInput) (*DrainOut
 
 	// Check if there's anything to drain
 	if drainState.IsEmpty() {
-		return nil, ErrNothingToDrain
+		return nil, ErrNothingToStashPop
 	}
 
 	// Check if agent already has staged changes
@@ -85,7 +85,7 @@ func (u *DrainUseCase) Execute(ctx context.Context, input DrainInput) (*DrainOut
 
 	// Set state in agent
 	if err := u.AgentStore.WriteState(ctx, "", finalState); err != nil {
-		return nil, &DrainError{Op: "write", Err: err}
+		return nil, &StashPopError{Op: "write", Err: err}
 	}
 
 	// Prepare output (before cleanup, so we can return it even on non-fatal errors)
@@ -97,7 +97,7 @@ func (u *DrainUseCase) Execute(ctx context.Context, input DrainInput) (*DrainOut
 	for _, tags := range finalState.Tags {
 		tagCount += len(tags)
 	}
-	output := &DrainOutput{
+	output := &StashPopOutput{
 		Merged:     merged,
 		EntryCount: entryCount,
 		TagCount:   tagCount,
@@ -112,18 +112,18 @@ func (u *DrainUseCase) Execute(ctx context.Context, input DrainInput) (*DrainOut
 				// Delete the file entirely
 				if _, err := u.FileStore.Drain(ctx, "", false); err != nil {
 					// Non-fatal: state is already in agent
-					return output, &DrainError{Op: "delete", Err: err, NonFatal: true}
+					return output, &StashPopError{Op: "delete", Err: err, NonFatal: true}
 				}
 			} else {
 				// Write back the remaining state
 				if err := u.FileStore.WriteState(ctx, "", fileState); err != nil {
-					return output, &DrainError{Op: "delete", Err: err, NonFatal: true}
+					return output, &StashPopError{Op: "delete", Err: err, NonFatal: true}
 				}
 			}
 		} else {
 			// Drain again with keep=false to delete the file
 			if _, err := u.FileStore.Drain(ctx, "", false); err != nil {
-				return output, &DrainError{Op: "delete", Err: err, NonFatal: true}
+				return output, &StashPopError{Op: "delete", Err: err, NonFatal: true}
 			}
 		}
 	}
@@ -132,20 +132,20 @@ func (u *DrainUseCase) Execute(ctx context.Context, input DrainInput) (*DrainOut
 }
 
 var (
-	// ErrNothingToDrain is returned when there are no staged changes in file to drain.
-	ErrNothingToDrain = errors.New("no staged changes in file to drain")
+	// ErrNothingToStashPop is returned when there are no staged changes in file to drain.
+	ErrNothingToStashPop = errors.New("no staged changes in file to drain")
 	// ErrAgentHasChanges is returned when agent has staged changes and neither force nor merge is specified.
 	ErrAgentHasChanges = errors.New("agent already has staged changes; use --force to overwrite or --merge to combine")
 )
 
-// DrainError represents an error during drain operation.
-type DrainError struct {
+// StashPopError represents an error during drain operation.
+type StashPopError struct {
 	Op       string // "load", "write", "delete"
 	Err      error
 	NonFatal bool // If true, the error is non-fatal (state was already written)
 }
 
-func (e *DrainError) Error() string {
+func (e *StashPopError) Error() string {
 	switch e.Op {
 	case "load":
 		return "failed to load state from file: " + e.Err.Error()
@@ -158,6 +158,6 @@ func (e *DrainError) Error() string {
 	}
 }
 
-func (e *DrainError) Unwrap() error {
+func (e *StashPopError) Unwrap() error {
 	return e.Err
 }

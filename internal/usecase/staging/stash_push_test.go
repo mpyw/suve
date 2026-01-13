@@ -29,12 +29,12 @@ func TestPersistUseCase_Execute(t *testing.T) {
 			StagedAt:  time.Now(),
 		})
 
-		usecase := &stagingusecase.PersistUseCase{
+		usecase := &stagingusecase.StashPushUseCase{
 			AgentStore: agentStore,
 			FileStore:  fileStore,
 		}
 
-		output, err := usecase.Execute(t.Context(), stagingusecase.PersistInput{})
+		output, err := usecase.Execute(t.Context(), stagingusecase.StashPushInput{})
 		require.NoError(t, err)
 		assert.Equal(t, 1, output.EntryCount)
 
@@ -60,12 +60,12 @@ func TestPersistUseCase_Execute(t *testing.T) {
 			StagedAt:  time.Now(),
 		})
 
-		usecase := &stagingusecase.PersistUseCase{
+		usecase := &stagingusecase.StashPushUseCase{
 			AgentStore: agentStore,
 			FileStore:  fileStore,
 		}
 
-		_, err := usecase.Execute(t.Context(), stagingusecase.PersistInput{Keep: true})
+		_, err := usecase.Execute(t.Context(), stagingusecase.StashPushInput{Keep: true})
 		require.NoError(t, err)
 
 		// Verify entry exists in both
@@ -81,13 +81,13 @@ func TestPersistUseCase_Execute(t *testing.T) {
 		agentStore := testutil.NewMockStore()
 		fileStore := testutil.NewMockStore()
 
-		usecase := &stagingusecase.PersistUseCase{
+		usecase := &stagingusecase.StashPushUseCase{
 			AgentStore: agentStore,
 			FileStore:  fileStore,
 		}
 
-		_, err := usecase.Execute(t.Context(), stagingusecase.PersistInput{})
-		assert.ErrorIs(t, err, stagingusecase.ErrNothingToPersist)
+		_, err := usecase.Execute(t.Context(), stagingusecase.StashPushInput{})
+		assert.ErrorIs(t, err, stagingusecase.ErrNothingToStashPush)
 	})
 
 	t.Run("persist with service filter", func(t *testing.T) {
@@ -107,12 +107,12 @@ func TestPersistUseCase_Execute(t *testing.T) {
 			StagedAt:  time.Now(),
 		})
 
-		usecase := &stagingusecase.PersistUseCase{
+		usecase := &stagingusecase.StashPushUseCase{
 			AgentStore: agentStore,
 			FileStore:  fileStore,
 		}
 
-		_, err := usecase.Execute(t.Context(), stagingusecase.PersistInput{Service: staging.ServiceParam})
+		_, err := usecase.Execute(t.Context(), stagingusecase.StashPushInput{Service: staging.ServiceParam})
 		require.NoError(t, err)
 
 		// Param should be in file
@@ -139,12 +139,12 @@ func TestPersistUseCase_Execute(t *testing.T) {
 			StagedAt: time.Now(),
 		})
 
-		usecase := &stagingusecase.PersistUseCase{
+		usecase := &stagingusecase.StashPushUseCase{
 			AgentStore: agentStore,
 			FileStore:  fileStore,
 		}
 
-		output, err := usecase.Execute(t.Context(), stagingusecase.PersistInput{})
+		output, err := usecase.Execute(t.Context(), stagingusecase.StashPushInput{})
 		require.NoError(t, err)
 		assert.Equal(t, 1, output.TagCount)
 
@@ -174,12 +174,12 @@ func TestPersistUseCase_Execute(t *testing.T) {
 			StagedAt:  time.Now(),
 		})
 
-		usecase := &stagingusecase.PersistUseCase{
+		usecase := &stagingusecase.StashPushUseCase{
 			AgentStore: agentStore,
 			FileStore:  fileStore,
 		}
 
-		_, err := usecase.Execute(t.Context(), stagingusecase.PersistInput{Service: staging.ServiceParam})
+		_, err := usecase.Execute(t.Context(), stagingusecase.StashPushInput{Service: staging.ServiceParam})
 		require.NoError(t, err)
 
 		// Both should exist in file
@@ -218,13 +218,13 @@ func TestPersistUseCase_PersistMode(t *testing.T) {
 			StagedAt:  time.Now(),
 		})
 
-		usecase := &stagingusecase.PersistUseCase{
+		usecase := &stagingusecase.StashPushUseCase{
 			AgentStore: agentStore,
 			FileStore:  fileStore,
 		}
 
-		_, err := usecase.Execute(t.Context(), stagingusecase.PersistInput{
-			Mode: stagingusecase.PersistModeOverwrite,
+		_, err := usecase.Execute(t.Context(), stagingusecase.StashPushInput{
+			Mode: stagingusecase.StashPushModeOverwrite,
 		})
 		require.NoError(t, err)
 
@@ -266,13 +266,13 @@ func TestPersistUseCase_PersistMode(t *testing.T) {
 			StagedAt:  time.Now(),
 		})
 
-		usecase := &stagingusecase.PersistUseCase{
+		usecase := &stagingusecase.StashPushUseCase{
 			AgentStore: agentStore,
 			FileStore:  fileStore,
 		}
 
-		_, err := usecase.Execute(t.Context(), stagingusecase.PersistInput{
-			Mode: stagingusecase.PersistModeMerge,
+		_, err := usecase.Execute(t.Context(), stagingusecase.StashPushInput{
+			Mode: stagingusecase.StashPushModeMerge,
 		})
 		require.NoError(t, err)
 
@@ -305,13 +305,13 @@ func TestPersistUseCase_PersistMode(t *testing.T) {
 			StagedAt:  time.Now(),
 		})
 
-		usecase := &stagingusecase.PersistUseCase{
+		usecase := &stagingusecase.StashPushUseCase{
 			AgentStore: agentStore,
 			FileStore:  fileStore,
 		}
 
-		_, err := usecase.Execute(t.Context(), stagingusecase.PersistInput{
-			Mode: stagingusecase.PersistModeMerge,
+		_, err := usecase.Execute(t.Context(), stagingusecase.StashPushInput{
+			Mode: stagingusecase.StashPushModeMerge,
 		})
 		require.NoError(t, err)
 
@@ -345,13 +345,13 @@ func TestPersistUseCase_ServiceSpecific_EdgeCases(t *testing.T) {
 			StagedAt:  time.Now(),
 		})
 
-		usecase := &stagingusecase.PersistUseCase{
+		usecase := &stagingusecase.StashPushUseCase{
 			AgentStore: agentStore,
 			FileStore:  fileStore,
 		}
 
 		// Push param only
-		_, err := usecase.Execute(t.Context(), stagingusecase.PersistInput{
+		_, err := usecase.Execute(t.Context(), stagingusecase.StashPushInput{
 			Service: staging.ServiceParam,
 		})
 		require.NoError(t, err)
@@ -385,13 +385,13 @@ func TestPersistUseCase_ServiceSpecific_EdgeCases(t *testing.T) {
 			StagedAt:  time.Now(),
 		})
 
-		usecase := &stagingusecase.PersistUseCase{
+		usecase := &stagingusecase.StashPushUseCase{
 			AgentStore: agentStore,
 			FileStore:  fileStore,
 		}
 
 		// Push secret only
-		_, err := usecase.Execute(t.Context(), stagingusecase.PersistInput{
+		_, err := usecase.Execute(t.Context(), stagingusecase.StashPushInput{
 			Service: staging.ServiceSecret,
 		})
 		require.NoError(t, err)
@@ -430,13 +430,13 @@ func TestPersistUseCase_ServiceSpecific_EdgeCases(t *testing.T) {
 			StagedAt:  time.Now(),
 		})
 
-		usecase := &stagingusecase.PersistUseCase{
+		usecase := &stagingusecase.StashPushUseCase{
 			AgentStore: agentStore,
 			FileStore:  fileStore,
 		}
 
 		// Push param only
-		_, err := usecase.Execute(t.Context(), stagingusecase.PersistInput{
+		_, err := usecase.Execute(t.Context(), stagingusecase.StashPushInput{
 			Service: staging.ServiceParam,
 		})
 		require.NoError(t, err)
@@ -474,15 +474,15 @@ func TestPersistUseCase_ServiceSpecific_EdgeCases(t *testing.T) {
 			StagedAt:  time.Now(),
 		})
 
-		usecase := &stagingusecase.PersistUseCase{
+		usecase := &stagingusecase.StashPushUseCase{
 			AgentStore: agentStore,
 			FileStore:  fileStore,
 		}
 
 		// Even with Overwrite mode, service-specific push preserves other services
-		_, err := usecase.Execute(t.Context(), stagingusecase.PersistInput{
+		_, err := usecase.Execute(t.Context(), stagingusecase.StashPushInput{
 			Service: staging.ServiceParam,
-			Mode:    stagingusecase.PersistModeOverwrite, // This is ignored for service-specific
+			Mode:    stagingusecase.StashPushModeOverwrite, // This is ignored for service-specific
 		})
 		require.NoError(t, err)
 
@@ -506,13 +506,13 @@ func TestPersistUseCase_Execute_Errors(t *testing.T) {
 		agentStore.DrainErr = errors.New("read error")
 		fileStore := testutil.NewMockStore()
 
-		usecase := &stagingusecase.PersistUseCase{
+		usecase := &stagingusecase.StashPushUseCase{
 			AgentStore: agentStore,
 			FileStore:  fileStore,
 		}
 
-		_, err := usecase.Execute(t.Context(), stagingusecase.PersistInput{})
-		var persistErr *stagingusecase.PersistError
+		_, err := usecase.Execute(t.Context(), stagingusecase.StashPushInput{})
+		var persistErr *stagingusecase.StashPushError
 		require.ErrorAs(t, err, &persistErr)
 		assert.Equal(t, "load", persistErr.Op)
 	})
@@ -530,13 +530,13 @@ func TestPersistUseCase_Execute_Errors(t *testing.T) {
 		})
 		fileStore.WriteStateErr = errors.New("write error")
 
-		usecase := &stagingusecase.PersistUseCase{
+		usecase := &stagingusecase.StashPushUseCase{
 			AgentStore: agentStore,
 			FileStore:  fileStore,
 		}
 
-		_, err := usecase.Execute(t.Context(), stagingusecase.PersistInput{})
-		var persistErr *stagingusecase.PersistError
+		_, err := usecase.Execute(t.Context(), stagingusecase.StashPushInput{})
+		var persistErr *stagingusecase.StashPushError
 		require.ErrorAs(t, err, &persistErr)
 		assert.Equal(t, "write", persistErr.Op)
 	})
@@ -547,34 +547,34 @@ func TestPersistError(t *testing.T) {
 
 	t.Run("error message - load", func(t *testing.T) {
 		t.Parallel()
-		err := &stagingusecase.PersistError{Op: "load", Err: errors.New("connection failed")}
+		err := &stagingusecase.StashPushError{Op: "load", Err: errors.New("connection failed")}
 		assert.Contains(t, err.Error(), "failed to get state from agent")
 		assert.Contains(t, err.Error(), "connection failed")
 	})
 
 	t.Run("error message - write", func(t *testing.T) {
 		t.Parallel()
-		err := &stagingusecase.PersistError{Op: "write", Err: errors.New("write failed")}
+		err := &stagingusecase.StashPushError{Op: "write", Err: errors.New("write failed")}
 		assert.Contains(t, err.Error(), "failed to save state to file")
 	})
 
 	t.Run("error message - clear", func(t *testing.T) {
 		t.Parallel()
-		err := &stagingusecase.PersistError{Op: "clear", Err: errors.New("clear failed")}
+		err := &stagingusecase.StashPushError{Op: "clear", Err: errors.New("clear failed")}
 		assert.Contains(t, err.Error(), "failed to clear agent memory")
 	})
 
 	t.Run("error message - unknown op", func(t *testing.T) {
 		t.Parallel()
 		innerErr := errors.New("something went wrong")
-		err := &stagingusecase.PersistError{Op: "unknown", Err: innerErr}
+		err := &stagingusecase.StashPushError{Op: "unknown", Err: innerErr}
 		assert.Equal(t, "something went wrong", err.Error())
 	})
 
 	t.Run("unwrap", func(t *testing.T) {
 		t.Parallel()
 		innerErr := errors.New("inner error")
-		err := &stagingusecase.PersistError{Op: "load", Err: innerErr}
+		err := &stagingusecase.StashPushError{Op: "load", Err: innerErr}
 		assert.ErrorIs(t, err, innerErr)
 	})
 }

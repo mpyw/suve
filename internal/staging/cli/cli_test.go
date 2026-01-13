@@ -2222,7 +2222,7 @@ func TestStashPopRunner_Run(t *testing.T) {
 
 		var stdout, stderr bytes.Buffer
 		r := &cli.StashPopRunner{
-			UseCase: &stagingusecase.DrainUseCase{
+			UseCase: &stagingusecase.StashPopUseCase{
 				FileStore:  fileStore,
 				AgentStore: agentStore,
 			},
@@ -2258,7 +2258,7 @@ func TestStashPopRunner_Run(t *testing.T) {
 
 		var stdout, stderr bytes.Buffer
 		r := &cli.StashPopRunner{
-			UseCase: &stagingusecase.DrainUseCase{
+			UseCase: &stagingusecase.StashPopUseCase{
 				FileStore:  fileStore,
 				AgentStore: agentStore,
 			},
@@ -2299,7 +2299,7 @@ func TestStashPopRunner_Run(t *testing.T) {
 
 		var stdout, stderr bytes.Buffer
 		r := &cli.StashPopRunner{
-			UseCase: &stagingusecase.DrainUseCase{
+			UseCase: &stagingusecase.StashPopUseCase{
 				FileStore:  fileStore,
 				AgentStore: agentStore,
 			},
@@ -2340,7 +2340,7 @@ func TestStashPopRunner_Run(t *testing.T) {
 
 		var stdout, stderr bytes.Buffer
 		r := &cli.StashPopRunner{
-			UseCase: &stagingusecase.DrainUseCase{
+			UseCase: &stagingusecase.StashPopUseCase{
 				FileStore:  fileStore,
 				AgentStore: agentStore,
 			},
@@ -2372,7 +2372,7 @@ func TestStashPopRunner_Run(t *testing.T) {
 
 		var stdout, stderr bytes.Buffer
 		r := &cli.StashPopRunner{
-			UseCase: &stagingusecase.DrainUseCase{
+			UseCase: &stagingusecase.StashPopUseCase{
 				FileStore:  fileStore,
 				AgentStore: agentStore,
 			},
@@ -2382,7 +2382,7 @@ func TestStashPopRunner_Run(t *testing.T) {
 
 		err := r.Run(t.Context(), cli.StashPopOptions{})
 		assert.Error(t, err)
-		assert.ErrorIs(t, err, stagingusecase.ErrNothingToDrain)
+		assert.ErrorIs(t, err, stagingusecase.ErrNothingToStashPop)
 	})
 
 	t.Run("drain error - agent has changes without force/merge", func(t *testing.T) {
@@ -2407,7 +2407,7 @@ func TestStashPopRunner_Run(t *testing.T) {
 
 		var stdout, stderr bytes.Buffer
 		r := &cli.StashPopRunner{
-			UseCase: &stagingusecase.DrainUseCase{
+			UseCase: &stagingusecase.StashPopUseCase{
 				FileStore:  fileStore,
 				AgentStore: agentStore,
 			},
@@ -2442,7 +2442,7 @@ func TestStashPopRunner_Run(t *testing.T) {
 
 		var stdout, stderr bytes.Buffer
 		r := &cli.StashPopRunner{
-			UseCase: &stagingusecase.DrainUseCase{
+			UseCase: &stagingusecase.StashPopUseCase{
 				FileStore:  fileStore,
 				AgentStore: agentStore,
 			},
@@ -2478,7 +2478,7 @@ func TestStashPopRunner_Run(t *testing.T) {
 
 		var stdout, stderr bytes.Buffer
 		r := &cli.StashPopRunner{
-			UseCase: &stagingusecase.DrainUseCase{
+			UseCase: &stagingusecase.StashPopUseCase{
 				FileStore:  fileStore,
 				AgentStore: agentStore,
 			},
@@ -2513,7 +2513,7 @@ func TestStashPopRunner_Run(t *testing.T) {
 
 		var stdout, stderr bytes.Buffer
 		r := &cli.StashPopRunner{
-			UseCase: &stagingusecase.DrainUseCase{
+			UseCase: &stagingusecase.StashPopUseCase{
 				FileStore:  fileStore,
 				AgentStore: agentStore,
 			},
@@ -2553,7 +2553,7 @@ func TestStashPushRunner_Run(t *testing.T) {
 
 		var stdout, stderr bytes.Buffer
 		r := &cli.StashPushRunner{
-			UseCase: &stagingusecase.PersistUseCase{
+			UseCase: &stagingusecase.StashPushUseCase{
 				AgentStore: agentStore,
 				FileStore:  fileStore,
 			},
@@ -2590,7 +2590,7 @@ func TestStashPushRunner_Run(t *testing.T) {
 
 		var stdout, stderr bytes.Buffer
 		r := &cli.StashPushRunner{
-			UseCase: &stagingusecase.PersistUseCase{
+			UseCase: &stagingusecase.StashPushUseCase{
 				AgentStore: agentStore,
 				FileStore:  fileStore,
 			},
@@ -2623,7 +2623,7 @@ func TestStashPushRunner_Run(t *testing.T) {
 
 		var stdout, stderr bytes.Buffer
 		r := &cli.StashPushRunner{
-			UseCase: &stagingusecase.PersistUseCase{
+			UseCase: &stagingusecase.StashPushUseCase{
 				AgentStore: agentStore,
 				FileStore:  fileStore,
 			},
@@ -2646,7 +2646,7 @@ func TestStashPushRunner_Run(t *testing.T) {
 
 		var stdout, stderr bytes.Buffer
 		r := &cli.StashPushRunner{
-			UseCase: &stagingusecase.PersistUseCase{
+			UseCase: &stagingusecase.StashPushUseCase{
 				AgentStore: agentStore,
 				FileStore:  fileStore,
 			},
@@ -2656,7 +2656,7 @@ func TestStashPushRunner_Run(t *testing.T) {
 
 		err := r.Run(t.Context(), cli.StashPushOptions{})
 		assert.Error(t, err)
-		assert.ErrorIs(t, err, stagingusecase.ErrNothingToPersist)
+		assert.ErrorIs(t, err, stagingusecase.ErrNothingToStashPush)
 	})
 
 	t.Run("persist with service filter", func(t *testing.T) {
@@ -2679,7 +2679,7 @@ func TestStashPushRunner_Run(t *testing.T) {
 
 		var stdout, stderr bytes.Buffer
 		r := &cli.StashPushRunner{
-			UseCase: &stagingusecase.PersistUseCase{
+			UseCase: &stagingusecase.StashPushUseCase{
 				AgentStore: agentStore,
 				FileStore:  fileStore,
 			},
@@ -2714,7 +2714,7 @@ func TestStashPushRunner_Run(t *testing.T) {
 
 		var stdout, stderr bytes.Buffer
 		r := &cli.StashPushRunner{
-			UseCase: &stagingusecase.PersistUseCase{
+			UseCase: &stagingusecase.StashPushUseCase{
 				AgentStore: agentStore,
 				FileStore:  fileStore,
 			},
