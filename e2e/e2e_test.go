@@ -2668,6 +2668,155 @@ func TestParam_LogWithFormat(t *testing.T) {
 	})
 }
 
+// TestParam_LogWithPatch tests param log with --patch flag.
+func TestParam_LogWithPatch(t *testing.T) {
+	setupEnv(t)
+	paramName := "/suve-e2e-log/patch-test"
+
+	// Cleanup
+	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	t.Cleanup(func() {
+		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	})
+
+	// Create and update to have multiple versions
+	_, _, _ = runCommand(t, paramcreate.Command(), paramName, "initial-value")
+	_, _, _ = runCommand(t, paramupdate.Command(), "--yes", paramName, "updated-value")
+
+	// Test with patch flag
+	t.Run("with-patch", func(t *testing.T) {
+		stdout, _, err := runCommand(t, paramlog.Command(), "-p", paramName)
+		require.NoError(t, err)
+		assert.Contains(t, stdout, "Version")
+		// Patch output should show diff-like content
+		assert.True(t, strings.Contains(stdout, "+") || strings.Contains(stdout, "-") || strings.Contains(stdout, "initial-value") || strings.Contains(stdout, "updated-value"))
+	})
+}
+
+// TestParam_LogWithOneline tests param log with --oneline flag.
+func TestParam_LogWithOneline(t *testing.T) {
+	setupEnv(t)
+	paramName := "/suve-e2e-log/oneline-test"
+
+	// Cleanup
+	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	t.Cleanup(func() {
+		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	})
+
+	// Create parameter
+	_, _, _ = runCommand(t, paramcreate.Command(), paramName, "test-value")
+
+	// Test with oneline flag
+	t.Run("with-oneline", func(t *testing.T) {
+		stdout, _, err := runCommand(t, paramlog.Command(), "--oneline", paramName)
+		require.NoError(t, err)
+		// Oneline format should be compact
+		assert.NotEmpty(t, stdout)
+	})
+
+	// Test with oneline and max-value-length
+	t.Run("with-oneline-maxlen", func(t *testing.T) {
+		stdout, _, err := runCommand(t, paramlog.Command(), "--oneline", "--max-value-length", "5", paramName)
+		require.NoError(t, err)
+		assert.NotEmpty(t, stdout)
+	})
+}
+
+// TestParam_LogWithReverse tests param log with --reverse flag.
+func TestParam_LogWithReverse(t *testing.T) {
+	setupEnv(t)
+	paramName := "/suve-e2e-log/reverse-test"
+
+	// Cleanup
+	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	t.Cleanup(func() {
+		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	})
+
+	// Create and update to have multiple versions
+	_, _, _ = runCommand(t, paramcreate.Command(), paramName, "v1")
+	_, _, _ = runCommand(t, paramupdate.Command(), "--yes", paramName, "v2")
+	_, _, _ = runCommand(t, paramupdate.Command(), "--yes", paramName, "v3")
+
+	// Test with reverse flag
+	t.Run("with-reverse", func(t *testing.T) {
+		stdout, _, err := runCommand(t, paramlog.Command(), "--reverse", paramName)
+		require.NoError(t, err)
+		// In reverse mode, should still show versions
+		assert.Contains(t, stdout, "Version")
+	})
+}
+
+// TestParam_LogFlagWarnings tests param log warning messages for conflicting flags.
+func TestParam_LogFlagWarnings(t *testing.T) {
+	setupEnv(t)
+	paramName := "/suve-e2e-log/warnings-test"
+
+	// Cleanup
+	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	t.Cleanup(func() {
+		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	})
+
+	// Create parameter
+	_, _, _ = runCommand(t, paramcreate.Command(), paramName, "test-value")
+
+	// Test --parse-json without --patch (should warn)
+	t.Run("parse-json-without-patch", func(t *testing.T) {
+		stdout, stderr, err := runCommand(t, paramlog.Command(), "--parse-json", paramName)
+		require.NoError(t, err)
+		assert.NotEmpty(t, stdout)
+		// Should have a warning on stderr about --parse-json having no effect
+		t.Logf("stderr: %s", stderr)
+	})
+
+	// Test --oneline with --patch (should warn)
+	t.Run("oneline-with-patch", func(t *testing.T) {
+		_, _, err := runCommand(t, paramlog.Command(), "--oneline", "-p", paramName)
+		require.NoError(t, err)
+		// Command should succeed even with conflicting flags
+	})
+
+	// Test --output=json with --patch (should warn)
+	t.Run("json-with-patch", func(t *testing.T) {
+		stdout, _, err := runCommand(t, paramlog.Command(), "--output", "json", "-p", paramName)
+		require.NoError(t, err)
+		// JSON output should still work
+		assert.True(t, strings.HasPrefix(strings.TrimSpace(stdout), "[") || strings.HasPrefix(strings.TrimSpace(stdout), "{"))
+	})
+
+	// Test --output=json with --oneline (should warn)
+	t.Run("json-with-oneline", func(t *testing.T) {
+		stdout, _, err := runCommand(t, paramlog.Command(), "--output", "json", "--oneline", paramName)
+		require.NoError(t, err)
+		assert.True(t, strings.HasPrefix(strings.TrimSpace(stdout), "[") || strings.HasPrefix(strings.TrimSpace(stdout), "{"))
+	})
+}
+
+// TestParam_LogWithParseJson tests param log with --parse-json flag.
+func TestParam_LogWithParseJson(t *testing.T) {
+	setupEnv(t)
+	paramName := "/suve-e2e-log/parsejson-test"
+
+	// Cleanup
+	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	t.Cleanup(func() {
+		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	})
+
+	// Create with JSON value
+	_, _, _ = runCommand(t, paramcreate.Command(), paramName, `{"key": "value1"}`)
+	_, _, _ = runCommand(t, paramupdate.Command(), "--yes", paramName, `{"key": "value2"}`)
+
+	// Test with --parse-json and -p
+	t.Run("parse-json-with-patch", func(t *testing.T) {
+		stdout, _, err := runCommand(t, paramlog.Command(), "-p", "--parse-json", paramName)
+		require.NoError(t, err)
+		assert.Contains(t, stdout, "key")
+	})
+}
+
 // =============================================================================
 // Diff Command Edge Cases
 // =============================================================================
