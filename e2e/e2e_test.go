@@ -51,6 +51,7 @@ import (
 	globalreset "github.com/mpyw/suve/internal/cli/commands/stage/reset"
 	secretstage "github.com/mpyw/suve/internal/cli/commands/stage/secret"
 	globalstatus "github.com/mpyw/suve/internal/cli/commands/stage/status"
+	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/staging"
 	"github.com/mpyw/suve/internal/staging/store"
 	"github.com/mpyw/suve/internal/staging/store/agent"
@@ -65,16 +66,22 @@ func TestMain(m *testing.M) {
 	// Create isolated temp directory for socket path
 	tmpDir, err := os.MkdirTemp("", "suve-e2e-*")
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "failed to create temp dir: %v\n", err)
+		output.Printf(os.Stderr, "failed to create temp dir: %v\n", err)
 		os.Exit(1)
 	}
 
 	// Set TMPDIR so protocol.SocketPath() uses our isolated directory
-	os.Setenv("TMPDIR", tmpDir)
+	if err := os.Setenv("TMPDIR", tmpDir); err != nil {
+		output.Printf(os.Stderr, "failed to set TMPDIR: %v\n", err)
+		os.Exit(1)
+	}
 
 	// Enable manual mode to prevent fork bomb from test binary
 	// This disables both auto-start and auto-shutdown
-	os.Setenv(agent.EnvDaemonManualMode, "1")
+	if err := os.Setenv(agent.EnvDaemonManualMode, "1"); err != nil {
+		output.Printf(os.Stderr, "failed to set manual mode: %v\n", err)
+		os.Exit(1)
+	}
 
 	// Start daemon with error channel
 	testDaemon = daemon.NewRunner(agent.DaemonOptions()...)
@@ -85,7 +92,7 @@ func TestMain(m *testing.M) {
 
 	// Wait for daemon to be ready by polling with ping
 	if err := waitForDaemon(5*time.Second, daemonErrCh); err != nil {
-		fmt.Fprintf(os.Stderr, "failed to start daemon: %v\n", err)
+		output.Printf(os.Stderr, "failed to start daemon: %v\n", err)
 		testDaemon.Shutdown()
 		_ = os.RemoveAll(tmpDir)
 		os.Exit(1)
