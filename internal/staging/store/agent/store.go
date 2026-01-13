@@ -8,9 +8,6 @@ import (
 // StoreOption configures a Store.
 type StoreOption = client.StoreOption
 
-// WithAutoStartDisabled disables automatic daemon startup.
-var WithAutoStartDisabled = client.WithAutoStartDisabled
-
 // NewStore creates an AgentStore using the agent daemon.
 // The agent daemon is started automatically if not running, unless
 // manual mode is enabled (see [EnvDaemonAutoStart]).
