@@ -4,10 +4,18 @@ package cli
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 
+	"github.com/urfave/cli/v3"
+
 	"github.com/mpyw/suve/internal/cli/output"
+	"github.com/mpyw/suve/internal/cli/passphrase"
+	"github.com/mpyw/suve/internal/cli/terminal"
+	"github.com/mpyw/suve/internal/infra"
 	"github.com/mpyw/suve/internal/staging"
+	"github.com/mpyw/suve/internal/staging/store/agent"
+	"github.com/mpyw/suve/internal/staging/store/file"
 	stagingusecase "github.com/mpyw/suve/internal/usecase/staging"
 )
 
@@ -66,4 +74,96 @@ func (r *PersistRunner) Run(ctx context.Context, opts PersistOptions) error {
 	}
 
 	return nil
+}
+
+// NewPersistCommand creates a service-specific persist command with the given config.
+func NewPersistCommand(cfg CommandConfig) *cli.Command {
+	parser := cfg.ParserFactory()
+	service := parser.Service()
+
+	return &cli.Command{
+		Name:  "persist",
+		Usage: fmt.Sprintf("Save staged %s changes from memory to file", cfg.ItemName),
+		Description: fmt.Sprintf(`Save staged %s changes from the in-memory agent to a file.
+
+This command saves the staging state for %ss from the agent daemon
+to the persistent file storage (~/.suve/{accountID}/{region}/stage.json).
+
+By default, the %s entries are cleared from agent memory after persisting.
+Use --keep to retain them in memory.
+
+EXAMPLES:
+   suve stage %s persist                            Save to file and clear agent memory
+   suve stage %s persist --keep                     Save to file and keep agent memory
+   echo "secret" | suve stage %s persist --passphrase-stdin   Use passphrase from stdin`,
+			cfg.ItemName,
+			cfg.ItemName,
+			cfg.ItemName,
+			cfg.CommandName,
+			cfg.CommandName,
+			cfg.CommandName),
+		Flags: []cli.Flag{
+			&cli.BoolFlag{
+				Name:  "keep",
+				Usage: "Keep staged changes in agent memory after persisting",
+			},
+			&cli.BoolFlag{
+				Name:  "passphrase-stdin",
+				Usage: "Read passphrase from stdin (for scripts/automation)",
+			},
+		},
+		Action: func(ctx context.Context, cmd *cli.Command) error {
+			identity, err := infra.GetAWSIdentity(ctx)
+			if err != nil {
+				return fmt.Errorf("failed to get AWS identity: %w", err)
+			}
+
+			agentStore := agent.NewStore(identity.AccountID, identity.Region)
+
+			// Get passphrase
+			prompter := &passphrase.Prompter{
+				Stdin:  cmd.Root().Reader,
+				Stdout: cmd.Root().Writer,
+				Stderr: cmd.Root().ErrWriter,
+			}
+
+			var pass string
+			if cmd.Bool("passphrase-stdin") {
+				pass, err = prompter.ReadFromStdin()
+				if err != nil {
+					return fmt.Errorf("failed to read passphrase from stdin: %w", err)
+				}
+			} else if terminal.IsTerminalWriter(cmd.Root().ErrWriter) {
+				pass, err = prompter.PromptForEncrypt()
+				if err != nil {
+					if errors.Is(err, passphrase.ErrCancelled) {
+						return nil
+					}
+					return fmt.Errorf("failed to get passphrase: %w", err)
+				}
+			} else {
+				prompter.WarnNonTTY()
+				// pass remains empty = plain text
+			}
+
+			fileStore, err := file.NewStoreWithPassphrase(identity.AccountID, identity.Region, pass)
+			if err != nil {
+				return fmt.Errorf("failed to create file store: %w", err)
+			}
+
+			r := &PersistRunner{
+				UseCase: &stagingusecase.PersistUseCase{
+					AgentStore: agentStore,
+					FileStore:  fileStore,
+				},
+				Stdout:    cmd.Root().Writer,
+				Stderr:    cmd.Root().ErrWriter,
+				Encrypted: pass != "",
+			}
+			return r.Run(ctx, PersistOptions{
+				Service: service,
+				Keep:    cmd.Bool("keep"),
+			})
+		},
+	}
 }

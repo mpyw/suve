@@ -41,6 +41,8 @@ Use 'suve stage param reset' to unstage or restore from a version.`,
 			stgcli.NewResetCommand(config),
 			stgcli.NewTagCommand(config),
 			stgcli.NewUntagCommand(config),
+			stgcli.NewDrainCommand(config),
+			stgcli.NewPersistCommand(config),
 		},
 		CommandNotFound: cliinternal.CommandNotFound,
 	}

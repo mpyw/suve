@@ -3371,3 +3371,256 @@ func TestGlobal_PersistEmpty(t *testing.T) {
 		}
 	})
 }
+
+// =============================================================================
+// Service-Specific Drain and Persist Tests
+// =============================================================================
+
+// TestParam_DrainAndPersist tests service-specific drain and persist for parameters.
+func TestParam_DrainAndPersist(t *testing.T) {
+	setupEnv(t)
+	paramName := "/suve-e2e-param-drain-persist/test"
+
+	// Cleanup
+	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+	t.Cleanup(func() {
+		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+		_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+	})
+
+	// Stage a parameter
+	t.Run("stage-param", func(t *testing.T) {
+		stdout, _, err := runSubCommand(t, paramstage.Command(), "add", paramName, "test-value")
+		require.NoError(t, err)
+		t.Logf("stage add output: %s", stdout)
+	})
+
+	// Persist only param service to file
+	t.Run("persist-param-only", func(t *testing.T) {
+		stdout, _, err := runSubCommand(t, paramstage.Command(), "persist")
+		require.NoError(t, err)
+		t.Logf("persist output: %s", stdout)
+		assert.Contains(t, stdout, "persisted to file")
+	})
+
+	// Agent should be empty for param
+	t.Run("verify-agent-empty", func(t *testing.T) {
+		stdout, _, err := runSubCommand(t, paramstage.Command(), "status")
+		require.NoError(t, err)
+		// Should show no param changes
+		assert.NotContains(t, stdout, paramName)
+	})
+
+	// Drain param service back from file
+	t.Run("drain-param-only", func(t *testing.T) {
+		stdout, _, err := runSubCommand(t, paramstage.Command(), "drain")
+		require.NoError(t, err)
+		t.Logf("drain output: %s", stdout)
+		assert.Contains(t, stdout, "loaded from file")
+	})
+
+	// Param should be back in agent
+	t.Run("verify-param-restored", func(t *testing.T) {
+		stdout, _, err := runSubCommand(t, paramstage.Command(), "status")
+		require.NoError(t, err)
+		assert.Contains(t, stdout, paramName)
+	})
+
+	// Apply to verify workflow works end-to-end
+	t.Run("apply-changes", func(t *testing.T) {
+		_, _, err := runSubCommand(t, paramstage.Command(), "apply", "--yes")
+		require.NoError(t, err)
+	})
+
+	// Verify created
+	t.Run("verify-created", func(t *testing.T) {
+		stdout, _, err := runCommand(t, paramshow.Command(), "--raw", paramName)
+		require.NoError(t, err)
+		assert.Equal(t, "test-value", strings.TrimSpace(stdout))
+	})
+}
+
+// TestParam_PersistWithKeep tests param persist with --keep flag.
+func TestParam_PersistWithKeep(t *testing.T) {
+	setupEnv(t)
+	paramName := "/suve-e2e-param-persist-keep/test"
+
+	// Cleanup
+	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+	t.Cleanup(func() {
+		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+		_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+	})
+
+	// Stage a parameter
+	_, _, err := runSubCommand(t, paramstage.Command(), "add", paramName, "test-value")
+	require.NoError(t, err)
+
+	// Persist with --keep (should keep in agent memory)
+	t.Run("persist-with-keep", func(t *testing.T) {
+		stdout, _, err := runSubCommand(t, paramstage.Command(), "persist", "--keep")
+		require.NoError(t, err)
+		t.Logf("persist --keep output: %s", stdout)
+		assert.Contains(t, stdout, "kept in memory")
+	})
+
+	// Param should still be in agent
+	t.Run("verify-still-in-agent", func(t *testing.T) {
+		stdout, _, err := runSubCommand(t, paramstage.Command(), "status")
+		require.NoError(t, err)
+		assert.Contains(t, stdout, paramName)
+	})
+}
+
+// TestParam_DrainWithMerge tests param drain with --merge flag.
+func TestParam_DrainWithMerge(t *testing.T) {
+	setupEnv(t)
+	paramName1 := "/suve-e2e-param-drain-merge/param1"
+	paramName2 := "/suve-e2e-param-drain-merge/param2"
+
+	// Cleanup
+	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName1)
+	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName2)
+	_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+	t.Cleanup(func() {
+		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName1)
+		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName2)
+		_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+	})
+
+	// Stage param1 and persist to file
+	_, _, err := runSubCommand(t, paramstage.Command(), "add", paramName1, "value1")
+	require.NoError(t, err)
+	_, _, err = runSubCommand(t, paramstage.Command(), "persist")
+	require.NoError(t, err)
+
+	// Stage param2 in agent
+	_, _, err = runSubCommand(t, paramstage.Command(), "add", paramName2, "value2")
+	require.NoError(t, err)
+
+	// Drain with --merge (should combine both)
+	t.Run("drain-with-merge", func(t *testing.T) {
+		stdout, _, err := runSubCommand(t, paramstage.Command(), "drain", "--merge")
+		require.NoError(t, err)
+		t.Logf("drain --merge output: %s", stdout)
+		assert.Contains(t, stdout, "merged")
+	})
+
+	// Both should be in agent
+	t.Run("verify-both-staged", func(t *testing.T) {
+		stdout, _, err := runSubCommand(t, paramstage.Command(), "status")
+		require.NoError(t, err)
+		assert.Contains(t, stdout, paramName1)
+		assert.Contains(t, stdout, paramName2)
+	})
+}
+
+// TestSecret_DrainAndPersist tests service-specific drain and persist for secrets.
+func TestSecret_DrainAndPersist(t *testing.T) {
+	setupEnv(t)
+	secretName := "suve-e2e-secret-drain-persist/test"
+
+	// Cleanup
+	_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
+	_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+	t.Cleanup(func() {
+		_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
+		_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+	})
+
+	// Stage a secret
+	t.Run("stage-secret", func(t *testing.T) {
+		stdout, _, err := runSubCommand(t, secretstage.Command(), "add", secretName, "secret-value")
+		require.NoError(t, err)
+		t.Logf("stage add output: %s", stdout)
+	})
+
+	// Persist only secret service to file
+	t.Run("persist-secret-only", func(t *testing.T) {
+		stdout, _, err := runSubCommand(t, secretstage.Command(), "persist")
+		require.NoError(t, err)
+		t.Logf("persist output: %s", stdout)
+		assert.Contains(t, stdout, "persisted to file")
+	})
+
+	// Agent should be empty for secret
+	t.Run("verify-agent-empty", func(t *testing.T) {
+		stdout, _, err := runSubCommand(t, secretstage.Command(), "status")
+		require.NoError(t, err)
+		assert.NotContains(t, stdout, secretName)
+	})
+
+	// Drain secret service back from file
+	t.Run("drain-secret-only", func(t *testing.T) {
+		stdout, _, err := runSubCommand(t, secretstage.Command(), "drain")
+		require.NoError(t, err)
+		t.Logf("drain output: %s", stdout)
+		assert.Contains(t, stdout, "loaded from file")
+	})
+
+	// Secret should be back in agent
+	t.Run("verify-secret-restored", func(t *testing.T) {
+		stdout, _, err := runSubCommand(t, secretstage.Command(), "status")
+		require.NoError(t, err)
+		assert.Contains(t, stdout, secretName)
+	})
+}
+
+// TestMixed_ServiceSpecificDrainPersist tests drain/persist with mixed services.
+func TestMixed_ServiceSpecificDrainPersist(t *testing.T) {
+	setupEnv(t)
+	paramName := "/suve-e2e-mixed-drain/param"
+	secretName := "suve-e2e-mixed-drain/secret"
+
+	// Cleanup
+	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
+	_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+	t.Cleanup(func() {
+		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+		_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
+		_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+	})
+
+	// Stage both param and secret
+	_, _, err := runSubCommand(t, paramstage.Command(), "add", paramName, "param-value")
+	require.NoError(t, err)
+	_, _, err = runSubCommand(t, secretstage.Command(), "add", secretName, "secret-value")
+	require.NoError(t, err)
+
+	// Persist only params (secrets should remain in agent)
+	t.Run("persist-param-only", func(t *testing.T) {
+		_, _, err := runSubCommand(t, paramstage.Command(), "persist")
+		require.NoError(t, err)
+	})
+
+	// Param should be gone from agent, secret should remain
+	t.Run("verify-param-gone-secret-remains", func(t *testing.T) {
+		paramStatus, _, err := runSubCommand(t, paramstage.Command(), "status")
+		require.NoError(t, err)
+		assert.NotContains(t, paramStatus, paramName)
+
+		secretStatus, _, err := runSubCommand(t, secretstage.Command(), "status")
+		require.NoError(t, err)
+		assert.Contains(t, secretStatus, secretName)
+	})
+
+	// Drain params back (secret should be unaffected)
+	t.Run("drain-param-back", func(t *testing.T) {
+		_, _, err := runSubCommand(t, paramstage.Command(), "drain")
+		require.NoError(t, err)
+	})
+
+	// Both should now be in agent
+	t.Run("verify-both-in-agent", func(t *testing.T) {
+		paramStatus, _, err := runSubCommand(t, paramstage.Command(), "status")
+		require.NoError(t, err)
+		assert.Contains(t, paramStatus, paramName)
+
+		secretStatus, _, err := runSubCommand(t, secretstage.Command(), "status")
+		require.NoError(t, err)
+		assert.Contains(t, secretStatus, secretName)
+	})
+}
