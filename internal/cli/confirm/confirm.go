@@ -122,7 +122,7 @@ func (p *Prompter) ConfirmChoice(message string, choices []Choice) (ChoiceResult
 	// Parse as number
 	var choice int
 	if _, err := fmt.Sscanf(response, "%d", &choice); err != nil {
-		return ChoiceCancelled, nil // Invalid input treated as cancel
+		return ChoiceCancelled, nil //nolint:nilerr // Invalid input is intentionally treated as cancel, not error
 	}
 
 	// Validate range

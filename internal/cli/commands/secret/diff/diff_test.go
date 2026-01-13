@@ -444,6 +444,7 @@ func TestRunnerRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
+				t.Helper()
 				assert.Contains(t, output, "-old-secret")
 				assert.Contains(t, output, "+new-secret")
 			},
@@ -472,6 +473,7 @@ func TestRunnerRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
+				t.Helper()
 				assert.Contains(t, output, "-old")
 				assert.Contains(t, output, "+new")
 			},
@@ -541,6 +543,7 @@ func TestRunnerRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
+				t.Helper()
 				assert.Contains(t, output, "-")
 				assert.Contains(t, output, "+")
 			},

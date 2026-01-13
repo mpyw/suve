@@ -3,6 +3,7 @@ package testutil
 
 import (
 	"context"
+	"maps"
 
 	"github.com/mpyw/suve/internal/staging"
 	"github.com/mpyw/suve/internal/staging/store"
@@ -210,14 +211,10 @@ func (m *MockStore) Drain(_ context.Context, service staging.Service, keep bool)
 	// Copy current state
 	state := staging.NewEmptyState()
 	for svc, entries := range m.entries {
-		for name, entry := range entries {
-			state.Entries[svc][name] = entry
-		}
+		maps.Copy(state.Entries[svc], entries)
 	}
 	for svc, tags := range m.tags {
-		for name, tag := range tags {
-			state.Tags[svc][name] = tag
-		}
+		maps.Copy(state.Tags[svc], tags)
 	}
 
 	// Clear storage if not keeping
@@ -267,14 +264,10 @@ func (m *MockStore) WriteState(_ context.Context, service staging.Service, state
 	}
 
 	for svc, entries := range state.Entries {
-		for name, entry := range entries {
-			m.entries[svc][name] = entry
-		}
+		maps.Copy(m.entries[svc], entries)
 	}
 	for svc, tags := range state.Tags {
-		for name, tag := range tags {
-			m.tags[svc][name] = tag
-		}
+		maps.Copy(m.tags[svc], tags)
 	}
 
 	return nil

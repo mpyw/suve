@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -239,12 +240,13 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
-				v1Pos := bytes.Index([]byte(output), []byte("Version 1"))
-				v2Pos := bytes.Index([]byte(output), []byte("Version 2"))
+				t.Helper()
+				v1Pos := strings.Index(output, "Version 1")
+				v2Pos := strings.Index(output, "Version 2")
 				require.NotEqual(t, -1, v1Pos, "expected Version 1 in output")
 				require.NotEqual(t, -1, v2Pos, "expected Version 2 in output")
 				assert.Less(t, v1Pos, v2Pos, "expected Version 1 before Version 2 in reverse mode")
-				currentPos := bytes.Index([]byte(output), []byte("(current)"))
+				currentPos := strings.Index(output, "(current)")
 				assert.Greater(t, currentPos, v2Pos, "expected (current) label after Version 2 in reverse mode")
 			},
 		},

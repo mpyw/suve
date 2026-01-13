@@ -73,10 +73,10 @@ func (r *UntagRunner) Run(ctx context.Context, opts UntagOptions) error {
 
 // parseTags parses key=value pairs into a map.
 func parseTags(tagSlice []string) (map[string]string, error) {
-	if len(tagSlice) == 0 {
-		return nil, nil
-	}
 	tags := make(map[string]string)
+	if len(tagSlice) == 0 {
+		return tags, nil
+	}
 	for _, t := range tagSlice {
 		parts := strings.SplitN(t, "=", 2)
 		if len(parts) != 2 {

@@ -62,8 +62,7 @@ func (o *Writer) Separator() {
 
 // Value prints a value with proper indentation.
 func (o *Writer) Value(value string) {
-	lines := strings.Split(value, "\n")
-	for _, line := range lines {
+	for line := range strings.SplitSeq(value, "\n") {
 		_, _ = fmt.Fprintf(o.w, "  %s\n", line)
 	}
 }
