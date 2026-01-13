@@ -47,14 +47,13 @@ import (
 	globalstage "github.com/mpyw/suve/internal/cli/commands/stage"
 	globalapply "github.com/mpyw/suve/internal/cli/commands/stage/apply"
 	globaldiff "github.com/mpyw/suve/internal/cli/commands/stage/diff"
-	globaldrain "github.com/mpyw/suve/internal/cli/commands/stage/drain"
 	paramstage "github.com/mpyw/suve/internal/cli/commands/stage/param"
-	globalpersist "github.com/mpyw/suve/internal/cli/commands/stage/persist"
 	globalreset "github.com/mpyw/suve/internal/cli/commands/stage/reset"
 	secretstage "github.com/mpyw/suve/internal/cli/commands/stage/secret"
 	globalstatus "github.com/mpyw/suve/internal/cli/commands/stage/status"
 	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/staging"
+	stgcli "github.com/mpyw/suve/internal/staging/cli"
 	"github.com/mpyw/suve/internal/staging/store"
 	"github.com/mpyw/suve/internal/staging/store/agent"
 	"github.com/mpyw/suve/internal/staging/store/agent/daemon"
@@ -3365,7 +3364,7 @@ func TestGlobal_DrainAndPersist(t *testing.T) {
 
 	// Persist agent memory to file
 	t.Run("persist-to-file", func(t *testing.T) {
-		stdout, _, err := runCommand(t, globalpersist.Command())
+		stdout, _, err := runCommand(t, stgcli.NewGlobalPersistCommand())
 		require.NoError(t, err)
 		t.Logf("persist output: %s", stdout)
 		assert.Contains(t, stdout, "persisted to file")
@@ -3380,7 +3379,7 @@ func TestGlobal_DrainAndPersist(t *testing.T) {
 
 	// Drain file back to agent
 	t.Run("drain-from-file", func(t *testing.T) {
-		stdout, _, err := runCommand(t, globaldrain.Command())
+		stdout, _, err := runCommand(t, stgcli.NewGlobalDrainCommand())
 		require.NoError(t, err)
 		t.Logf("drain output: %s", stdout)
 		assert.Contains(t, stdout, "loaded from file")
@@ -3426,7 +3425,7 @@ func TestGlobal_PersistWithKeep(t *testing.T) {
 
 	// Persist with --keep flag (should keep agent memory)
 	t.Run("persist-with-keep", func(t *testing.T) {
-		stdout, _, err := runCommand(t, globalpersist.Command(), "--keep")
+		stdout, _, err := runCommand(t, stgcli.NewGlobalPersistCommand(), "--keep")
 		require.NoError(t, err)
 		t.Logf("persist --keep output: %s", stdout)
 	})
@@ -3458,7 +3457,7 @@ func TestGlobal_DrainWithMerge(t *testing.T) {
 	// Stage param1 and persist to file
 	_, _, err := runCommand(t, paramstage.Command(), "add", paramName1, "value1")
 	require.NoError(t, err)
-	_, _, err = runCommand(t, globalpersist.Command())
+	_, _, err = runCommand(t, stgcli.NewGlobalPersistCommand())
 	require.NoError(t, err)
 
 	// Stage param2 in agent
@@ -3467,7 +3466,7 @@ func TestGlobal_DrainWithMerge(t *testing.T) {
 
 	// Drain with merge (should combine both)
 	t.Run("drain-with-merge", func(t *testing.T) {
-		stdout, _, err := runCommand(t, globaldrain.Command(), "--merge")
+		stdout, _, err := runCommand(t, stgcli.NewGlobalDrainCommand(), "--merge")
 		require.NoError(t, err)
 		t.Logf("drain --merge output: %s", stdout)
 	})
@@ -3490,7 +3489,7 @@ func TestGlobal_DrainEmpty(t *testing.T) {
 
 	// Drain should fail or indicate nothing to drain
 	t.Run("drain-empty", func(t *testing.T) {
-		_, _, err := runCommand(t, globaldrain.Command())
+		_, _, err := runCommand(t, stgcli.NewGlobalDrainCommand())
 		assert.Error(t, err)
 	})
 }
@@ -3509,7 +3508,7 @@ func TestGlobal_PersistEmpty(t *testing.T) {
 
 	// Persist should fail when agent is empty (no staged changes)
 	t.Run("persist-empty", func(t *testing.T) {
-		_, stderr, err := runCommand(t, globalpersist.Command())
+		_, stderr, err := runCommand(t, stgcli.NewGlobalPersistCommand())
 		// Either returns error or prints "nothing to persist"
 		if err == nil {
 			// If no error, check output - might indicate nothing was persisted
