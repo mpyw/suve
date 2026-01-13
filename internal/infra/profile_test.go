@@ -139,7 +139,7 @@ sso_account_id = 123456789012
 
 		profile := findProfileByAccountID("999999999999")
 
-		assert.Equal(t, "", profile)
+		assert.Empty(t, profile)
 	})
 
 	t.Run("prefers AWS_PROFILE when it matches", func(t *testing.T) {
@@ -226,7 +226,7 @@ sso_account_id = 123456789012
 
 		profile := findProfileByAccountID("123456789012")
 
-		assert.Equal(t, "", profile)
+		assert.Empty(t, profile)
 	})
 }
 

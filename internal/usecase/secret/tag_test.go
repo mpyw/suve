@@ -159,6 +159,6 @@ func TestTagUseCase_Execute_RemoveTagsError(t *testing.T) {
 		Name:   "my-secret",
 		Remove: []string{"old-tag"},
 	})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to remove tags")
 }

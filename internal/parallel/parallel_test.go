@@ -30,11 +30,11 @@ func TestExecuteMap(t *testing.T) {
 
 		require.Len(t, results, 3)
 		assert.Equal(t, 2, results["a"].Value)
-		assert.Nil(t, results["a"].Err)
+		assert.NoError(t, results["a"].Err)
 		assert.Equal(t, 4, results["b"].Value)
-		assert.Nil(t, results["b"].Err)
+		assert.NoError(t, results["b"].Err)
 		assert.Equal(t, 6, results["c"].Value)
-		assert.Nil(t, results["c"].Err)
+		assert.NoError(t, results["c"].Err)
 	})
 
 	t.Run("with errors", func(t *testing.T) {

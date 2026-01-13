@@ -447,7 +447,7 @@ func TestServer_Start_RemovesExistingSocket(t *testing.T) {
 	// The stale file should be removed and replaced with a real socket
 	info, err := os.Stat(socketPath)
 	require.NoError(t, err)
-	assert.True(t, info.Mode()&os.ModeSocket != 0, "file should be a socket")
+	assert.NotEqual(t, os.FileMode(0), info.Mode()&os.ModeSocket, "file should be a socket")
 }
 
 // TestServer_Serve tests the server accept loop.

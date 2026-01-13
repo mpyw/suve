@@ -2,7 +2,6 @@ package ipc
 
 import (
 	"encoding/json"
-	"errors"
 	"net"
 	"os"
 	"path/filepath"
@@ -33,7 +32,7 @@ func TestClient_SendRequest_NotConnected(t *testing.T) {
 
 	require.Error(t, err)
 	assert.Nil(t, resp)
-	assert.True(t, errors.Is(err, ErrNotConnected))
+	assert.ErrorIs(t, err, ErrNotConnected)
 }
 
 func TestClient_Ping_NotConnected(t *testing.T) {
@@ -43,7 +42,7 @@ func TestClient_Ping_NotConnected(t *testing.T) {
 	err := c.Ping()
 
 	require.Error(t, err)
-	assert.True(t, errors.Is(err, ErrNotConnected))
+	assert.ErrorIs(t, err, ErrNotConnected)
 }
 
 func TestClient_SendRequest_Success(t *testing.T) {

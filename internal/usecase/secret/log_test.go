@@ -108,7 +108,7 @@ func TestLogUseCase_Execute_Error(t *testing.T) {
 	_, err := uc.Execute(t.Context(), secret.LogInput{
 		Name: "my-secret",
 	})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to list secret versions")
 }
 

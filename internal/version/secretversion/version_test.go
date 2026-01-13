@@ -396,6 +396,6 @@ func TestTruncateVersionID(t *testing.T) {
 	t.Run("empty string", func(t *testing.T) {
 		t.Parallel()
 		result := secretversion.TruncateVersionID("")
-		assert.Equal(t, "", result)
+		assert.Empty(t, result)
 	})
 }

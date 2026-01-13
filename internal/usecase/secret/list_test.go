@@ -189,7 +189,7 @@ func TestListUseCase_Execute_WithValue(t *testing.T) {
 
 	for _, entry := range output.Entries {
 		assert.NotNil(t, entry.Value)
-		assert.Nil(t, entry.Error)
+		assert.NoError(t, entry.Error)
 	}
 }
 

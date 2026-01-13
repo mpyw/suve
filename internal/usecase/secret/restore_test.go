@@ -57,6 +57,6 @@ func TestRestoreUseCase_Execute_Error(t *testing.T) {
 	_, err := uc.Execute(t.Context(), secret.RestoreInput{
 		Name: "my-secret",
 	})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to restore secret")
 }
