@@ -6,10 +6,9 @@ package jsonutil
 
 import (
 	"encoding/json"
-	"fmt"
 	"io"
 
-	"github.com/mpyw/suve/internal/cli/colors"
+	"github.com/mpyw/suve/internal/cli/output"
 )
 
 // TryFormat attempts to format a JSON string with indentation.
@@ -52,5 +51,5 @@ func warn(w io.Writer, name, reason string) {
 		msg += " for " + name
 	}
 	msg += ": " + reason
-	_, _ = fmt.Fprintln(w, colors.Warning("Warning: "+msg))
+	output.Warning(w, "%s", msg)
 }

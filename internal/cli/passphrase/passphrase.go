@@ -11,6 +11,7 @@ import (
 	"golang.org/x/term"
 
 	"github.com/mpyw/suve/internal/cli/colors"
+	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/cli/terminal"
 )
 
@@ -81,7 +82,7 @@ func (p *Prompter) PromptForDecrypt() (string, error) {
 
 // WarnNonTTY prints warning for non-TTY environment.
 func (p *Prompter) WarnNonTTY() {
-	_, _ = fmt.Fprintf(p.Stderr, "%s Non-interactive mode. Storing secrets as plain text.\n", colors.Warning("!"))
+	output.Warn(p.Stderr, "Non-interactive mode. Storing secrets as plain text.")
 }
 
 // ReadFromStdin reads a single line from stdin without prompting.
@@ -99,7 +100,7 @@ func (p *Prompter) ReadFromStdin() (string, error) {
 
 // confirmPlainText asks user to confirm storing as plain text.
 func (p *Prompter) confirmPlainText() bool {
-	_, _ = fmt.Fprintf(p.Stderr, "%s Storing secrets as plain text on disk.\n", colors.Warning("!"))
+	output.Warn(p.Stderr, "Storing secrets as plain text on disk.")
 	_, _ = fmt.Fprintf(p.Stderr, "%s Continue without encryption? [y/N]: ", colors.Warning("?"))
 
 	// Use buffered reader to preserve stream position

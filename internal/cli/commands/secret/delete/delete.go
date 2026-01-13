@@ -9,7 +9,6 @@ import (
 
 	"github.com/urfave/cli/v3"
 
-	"github.com/mpyw/suve/internal/cli/colors"
 	"github.com/mpyw/suve/internal/cli/confirm"
 	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/infra"
@@ -99,7 +98,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	if !skipConfirm {
 		currentValue, _ := uc.GetCurrentValue(ctx, name)
 		if currentValue != "" {
-			_, _ = fmt.Fprintf(cmd.Root().ErrWriter, "%s Current value of %s:\n", colors.Warning("!"), name)
+			output.Warn(cmd.Root().ErrWriter, "Current value of %s:", name)
 			_, _ = fmt.Fprintln(cmd.Root().ErrWriter)
 			_, _ = fmt.Fprintln(cmd.Root().ErrWriter, output.Indent(currentValue, "  "))
 			_, _ = fmt.Fprintln(cmd.Root().ErrWriter)
@@ -149,13 +148,9 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 	}
 
 	if opts.Force {
-		_, _ = fmt.Fprintf(r.Stdout, "%s Permanently deleted secret %s\n",
-			colors.Warning("!"),
-			result.Name,
-		)
+		output.Warn(r.Stdout, "Permanently deleted secret %s", result.Name)
 	} else {
-		_, _ = fmt.Fprintf(r.Stdout, "%s Scheduled deletion of secret %s (deletion date: %s)\n",
-			colors.Warning("!"),
+		output.Warn(r.Stdout, "Scheduled deletion of secret %s (deletion date: %s)",
 			result.Name,
 			result.DeletionDate.Format("2006-01-02"),
 		)

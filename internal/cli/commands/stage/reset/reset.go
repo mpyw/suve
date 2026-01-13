@@ -8,7 +8,7 @@ import (
 
 	"github.com/urfave/cli/v3"
 
-	"github.com/mpyw/suve/internal/cli/colors"
+	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/infra"
 	"github.com/mpyw/suve/internal/staging"
 	"github.com/mpyw/suve/internal/staging/agent"
@@ -47,8 +47,8 @@ EXAMPLES:
 func action(ctx context.Context, cmd *cli.Command) error {
 	// Require --all flag for safety
 	if !cmd.Bool("all") {
-		_, _ = fmt.Fprintln(cmd.Root().ErrWriter, colors.Warning("Warning: no effect without --all flag"))
-		_, _ = fmt.Fprintln(cmd.Root().ErrWriter, "Hint: Use 'suve stage reset --all' to unstage all changes")
+		output.Warning(cmd.Root().ErrWriter, "no effect without --all flag")
+		output.Hint(cmd.Root().ErrWriter, "Use 'suve stage reset --all' to unstage all changes")
 		return nil
 	}
 
@@ -91,7 +91,7 @@ func (r *Runner) Run(ctx context.Context) error {
 	totalCount := paramCount + secretCount
 
 	if totalCount == 0 {
-		_, _ = fmt.Fprintln(r.Stdout, colors.Warning("No changes staged."))
+		output.Info(r.Stdout, "No changes staged.")
 		return nil
 	}
 
@@ -109,7 +109,6 @@ func (r *Runner) Run(ctx context.Context) error {
 		}
 	}
 
-	_, _ = fmt.Fprintf(r.Stdout, "%s Unstaged all changes (%d SSM Parameter Store, %d Secrets Manager)\n",
-		colors.Success("✓"), paramCount, secretCount)
+	output.Success(r.Stdout, "Unstaged all changes (%d SSM Parameter Store, %d Secrets Manager)", paramCount, secretCount)
 	return nil
 }

@@ -78,7 +78,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	if !skipConfirm {
 		currentValue, _ := useCase.GetCurrentValue(ctx, name)
 		if currentValue != "" {
-			_, _ = fmt.Fprintf(cmd.Root().ErrWriter, "%s Current value of %s:\n", colors.Warning("!"), name)
+			output.Warn(cmd.Root().ErrWriter, "Current value of %s:", name)
 			_, _ = fmt.Fprintln(cmd.Root().ErrWriter)
 			_, _ = fmt.Fprintln(cmd.Root().ErrWriter, output.Indent(currentValue, "  "))
 			_, _ = fmt.Fprintln(cmd.Root().ErrWriter)

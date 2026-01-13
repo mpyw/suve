@@ -112,6 +112,13 @@ func Info(w io.Writer, format string, args ...any) {
 	_, _ = fmt.Fprintln(w, colors.Warning(msg))
 }
 
+// Warn prints a warning message with yellow "!" prefix.
+// Example: "! Skipped /app/config (same as AWS)"
+func Warn(w io.Writer, format string, args ...any) {
+	msg := fmt.Sprintf(format, args...)
+	_, _ = fmt.Fprintf(w, "%s %s\n", colors.Warning("!"), msg)
+}
+
 // Diff generates a unified diff between two strings with ANSI colors.
 func Diff(oldName, newName, oldContent, newContent string) string {
 	edits := udiff.Strings(oldContent, newContent)

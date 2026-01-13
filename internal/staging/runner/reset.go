@@ -3,10 +3,9 @@ package runner
 
 import (
 	"context"
-	"fmt"
 	"io"
 
-	"github.com/mpyw/suve/internal/cli/colors"
+	"github.com/mpyw/suve/internal/cli/output"
 	stagingusecase "github.com/mpyw/suve/internal/usecase/staging"
 )
 
@@ -35,19 +34,17 @@ func (r *ResetRunner) Run(ctx context.Context, opts ResetOptions) error {
 
 	switch result.Type {
 	case stagingusecase.ResetResultNothingStaged:
-		_, _ = fmt.Fprintf(r.Stdout, "%s\n", colors.Warning(fmt.Sprintf("No %s changes staged.", result.ServiceName)))
+		output.Info(r.Stdout, "No %s changes staged.", result.ServiceName)
 	case stagingusecase.ResetResultUnstagedAll:
-		_, _ = fmt.Fprintf(r.Stdout, "%s Unstaged all %s %ss (%d)\n", colors.Success("✓"), result.ServiceName, result.ItemName, result.Count)
+		output.Success(r.Stdout, "Unstaged all %s %ss (%d)", result.ServiceName, result.ItemName, result.Count)
 	case stagingusecase.ResetResultNotStaged:
-		_, _ = fmt.Fprintf(r.Stdout, "%s %s is not staged\n", colors.Warning("!"), result.Name)
+		output.Warn(r.Stdout, "%s is not staged", result.Name)
 	case stagingusecase.ResetResultUnstaged:
-		_, _ = fmt.Fprintf(r.Stdout, "%s Unstaged %s\n", colors.Success("✓"), result.Name)
+		output.Success(r.Stdout, "Unstaged %s", result.Name)
 	case stagingusecase.ResetResultRestored:
-		_, _ = fmt.Fprintf(r.Stdout, "%s Restored %s (staged from version %s)\n",
-			colors.Success("✓"), result.Name, result.VersionLabel)
+		output.Success(r.Stdout, "Restored %s (staged from version %s)", result.Name, result.VersionLabel)
 	case stagingusecase.ResetResultSkipped:
-		_, _ = fmt.Fprintf(r.Stdout, "%s Skipped %s (version %s matches current value)\n",
-			colors.Warning("!"), result.Name, result.VersionLabel)
+		output.Warn(r.Stdout, "Skipped %s (version %s matches current value)", result.Name, result.VersionLabel)
 	}
 
 	return nil

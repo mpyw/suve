@@ -3,10 +3,9 @@ package runner
 
 import (
 	"context"
-	"fmt"
 	"io"
 
-	"github.com/mpyw/suve/internal/cli/colors"
+	"github.com/mpyw/suve/internal/cli/output"
 	stagingusecase "github.com/mpyw/suve/internal/usecase/staging"
 )
 
@@ -37,18 +36,18 @@ func (r *DeleteRunner) Run(ctx context.Context, opts DeleteOptions) error {
 
 	// Handle CREATE -> NotStaged (unstage instead of delete)
 	if result.Unstaged {
-		_, _ = fmt.Fprintf(r.Stdout, "%s Unstaged creation: %s\n", colors.Success("✓"), result.Name)
+		output.Success(r.Stdout, "Unstaged creation: %s", result.Name)
 		return nil
 	}
 
 	if result.ShowDeleteOptions {
 		if result.Force {
-			_, _ = fmt.Fprintf(r.Stdout, "%s Staged for immediate deletion: %s\n", colors.Success("✓"), result.Name)
+			output.Success(r.Stdout, "Staged for immediate deletion: %s", result.Name)
 		} else {
-			_, _ = fmt.Fprintf(r.Stdout, "%s Staged for deletion (%d-day recovery): %s\n", colors.Success("✓"), result.RecoveryWindow, result.Name)
+			output.Success(r.Stdout, "Staged for deletion (%d-day recovery): %s", result.RecoveryWindow, result.Name)
 		}
 	} else {
-		_, _ = fmt.Fprintf(r.Stdout, "%s Staged for deletion: %s\n", colors.Success("✓"), result.Name)
+		output.Success(r.Stdout, "Staged for deletion: %s", result.Name)
 	}
 	return nil
 }

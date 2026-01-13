@@ -9,8 +9,8 @@ import (
 
 	"github.com/urfave/cli/v3"
 
-	"github.com/mpyw/suve/internal/cli/colors"
 	"github.com/mpyw/suve/internal/cli/confirm"
+	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/cli/pager"
 	"github.com/mpyw/suve/internal/infra"
 	"github.com/mpyw/suve/internal/staging"
@@ -373,7 +373,7 @@ EXAMPLES:
 
 			serviceEntries := entries[service]
 			if len(serviceEntries) == 0 {
-				_, _ = fmt.Fprintf(cmd.Root().Writer, "%s No %s changes staged.\n", colors.Warning("!"), parser.ServiceName())
+				output.Warn(cmd.Root().Writer, "No %s changes staged.", parser.ServiceName())
 				return nil
 			}
 

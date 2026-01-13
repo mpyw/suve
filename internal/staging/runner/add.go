@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/mpyw/suve/internal/cli/colors"
 	"github.com/mpyw/suve/internal/cli/editor"
+	"github.com/mpyw/suve/internal/cli/output"
 	stagingusecase "github.com/mpyw/suve/internal/usecase/staging"
 )
 
@@ -51,13 +51,13 @@ func (r *AddRunner) Run(ctx context.Context, opts AddOptions) error {
 
 		// Check if value is empty (canceled)
 		if newValue == "" {
-			_, _ = fmt.Fprintln(r.Stdout, colors.Warning("Empty value, not staged."))
+			output.Info(r.Stdout, "Empty value, not staged.")
 			return nil
 		}
 
 		// Check if unchanged from staged value
 		if draft.IsStaged && newValue == draft.Value {
-			_, _ = fmt.Fprintln(r.Stdout, colors.Warning("No changes made."))
+			output.Info(r.Stdout, "No changes made.")
 			return nil
 		}
 	}
@@ -72,6 +72,6 @@ func (r *AddRunner) Run(ctx context.Context, opts AddOptions) error {
 		return err
 	}
 
-	_, _ = fmt.Fprintf(r.Stdout, "%s Staged for creation: %s\n", colors.Success("✓"), result.Name)
+	output.Success(r.Stdout, "Staged for creation: %s", result.Name)
 	return nil
 }

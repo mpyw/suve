@@ -8,7 +8,7 @@ import (
 
 	"github.com/urfave/cli/v3"
 
-	"github.com/mpyw/suve/internal/cli/colors"
+	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/cli/passphrase"
 	"github.com/mpyw/suve/internal/cli/terminal"
 	"github.com/mpyw/suve/internal/infra"
@@ -121,7 +121,7 @@ EXAMPLES:
 
 			// Display warning about plain-text storage only if not encrypted
 			if !encrypted {
-				_, _ = fmt.Fprintf(cmd.Root().ErrWriter, "%s Note: secrets are stored as plain text.\n", colors.Warning("!"))
+				output.Warn(cmd.Root().ErrWriter, "Note: secrets are stored as plain text.")
 			}
 
 			return nil

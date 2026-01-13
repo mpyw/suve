@@ -7,7 +7,7 @@ import (
 	"io"
 	"strings"
 
-	"github.com/mpyw/suve/internal/cli/colors"
+	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/maputil"
 	stagingusecase "github.com/mpyw/suve/internal/usecase/staging"
 )
@@ -40,7 +40,7 @@ func (r *TagRunner) Run(ctx context.Context, opts TagOptions) error {
 		return err
 	}
 
-	_, _ = fmt.Fprintf(r.Stdout, "%s Staged tags for: %s\n", colors.Success("✓"), result.Name)
+	output.Success(r.Stdout, "Staged tags for: %s", result.Name)
 	return nil
 }
 
@@ -67,7 +67,7 @@ func (r *UntagRunner) Run(ctx context.Context, opts UntagOptions) error {
 		return err
 	}
 
-	_, _ = fmt.Fprintf(r.Stdout, "%s Staged tag removal for: %s\n", colors.Success("✓"), result.Name)
+	output.Success(r.Stdout, "Staged tag removal for: %s", result.Name)
 	return nil
 }
 

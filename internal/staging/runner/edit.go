@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/mpyw/suve/internal/cli/colors"
 	"github.com/mpyw/suve/internal/cli/editor"
+	"github.com/mpyw/suve/internal/cli/output"
 	stagingusecase "github.com/mpyw/suve/internal/usecase/staging"
 )
 
@@ -51,7 +51,7 @@ func (r *EditRunner) Run(ctx context.Context, opts EditOptions) error {
 
 		// Check if changed
 		if newValue == baseline.Value {
-			_, _ = fmt.Fprintln(r.Stdout, colors.Warning("No changes made."))
+			output.Info(r.Stdout, "No changes made.")
 			return nil
 		}
 	}
@@ -68,11 +68,11 @@ func (r *EditRunner) Run(ctx context.Context, opts EditOptions) error {
 
 	switch {
 	case result.Skipped:
-		_, _ = fmt.Fprintf(r.Stdout, "%s Skipped %s (same as AWS)\n", colors.Warning("!"), result.Name)
+		output.Warn(r.Stdout, "Skipped %s (same as AWS)", result.Name)
 	case result.Unstaged:
-		_, _ = fmt.Fprintf(r.Stdout, "%s Unstaged %s (reverted to AWS)\n", colors.Success("✓"), result.Name)
+		output.Success(r.Stdout, "Unstaged %s (reverted to AWS)", result.Name)
 	default:
-		_, _ = fmt.Fprintf(r.Stdout, "%s Staged: %s\n", colors.Success("✓"), result.Name)
+		output.Success(r.Stdout, "Staged: %s", result.Name)
 	}
 	return nil
 }
