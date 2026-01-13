@@ -36,7 +36,7 @@ func NewRunner(opts ...RunnerOption) *Runner {
 		opt(r)
 	}
 	r.server = ipc.NewServer(r.handler.HandleRequest)
-	r.server.SetResponseCallback(r.onResponse)
+	r.server.SetResponseCallback(r.handleAutoShutdown)
 	return r
 }
 
@@ -67,9 +67,8 @@ func (r *Runner) Shutdown() {
 	r.handler.Destroy()
 }
 
-// onResponse is called after each response to check for auto-shutdown.
-func (r *Runner) onResponse(req *protocol.Request, resp *protocol.Response) {
-	// Check for auto-shutdown after UnstageEntry, UnstageTag, or UnstageAll
+// handleAutoShutdown checks if the daemon should shut down after unstage operations.
+func (r *Runner) handleAutoShutdown(req *protocol.Request, resp *protocol.Response) {
 	if !r.autoShutdownDisabled && resp.Success {
 		switch req.Method {
 		case protocol.MethodUnstageEntry, protocol.MethodUnstageTag, protocol.MethodUnstageAll:
