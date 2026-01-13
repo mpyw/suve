@@ -56,7 +56,13 @@ export function StagingDelete(arg1:string,arg2:string,arg3:boolean,arg4:number):
 
 export function StagingDiff(arg1:string,arg2:string):Promise<gui.StagingDiffResult>;
 
+export function StagingDrain(arg1:string,arg2:string,arg3:boolean,arg4:boolean,arg5:boolean):Promise<gui.StagingDrainResult>;
+
 export function StagingEdit(arg1:string,arg2:string,arg3:string):Promise<gui.StagingEditResult>;
+
+export function StagingFileStatus():Promise<gui.StagingFileStatusResult>;
+
+export function StagingPersist(arg1:string,arg2:string,arg3:boolean):Promise<gui.StagingPersistResult>;
 
 export function StagingRemoveTag(arg1:string,arg2:string,arg3:string):Promise<gui.StagingRemoveTagResult>;
 
