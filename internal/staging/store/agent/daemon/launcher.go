@@ -32,7 +32,7 @@ func (s *defaultProcessSpawner) Spawn(accountID, region string) error {
 		return fmt.Errorf("failed to get executable path: %w", err)
 	}
 
-	//nolint:gosec // G204: executable is from os.Executable(), not user input
+	//nolint:gosec,noctx // G204: executable is from os.Executable(), not user input; noctx: intentionally no context for background daemon
 	cmd := exec.Command(executable, "stage", "agent", "start", "--account", accountID, "--region", region)
 	cmd.Stdout = nil
 	cmd.Stderr = nil

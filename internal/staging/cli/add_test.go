@@ -32,7 +32,7 @@ func TestAddRunner_Run(t *testing.T) {
 			},
 			Stdout:     &buf,
 			Stderr:     &bytes.Buffer{},
-			OpenEditor: func(_ string) (string, error) { return "new-value", nil },
+			OpenEditor: func(_ context.Context, _ string) (string, error) { return "new-value", nil },
 		}
 
 		err := r.Run(t.Context(), cli.AddOptions{Name: "/app/config"})
@@ -66,7 +66,7 @@ func TestAddRunner_Run(t *testing.T) {
 			},
 			Stdout: &buf,
 			Stderr: &bytes.Buffer{},
-			OpenEditor: func(current string) (string, error) {
+			OpenEditor: func(_ context.Context, current string) (string, error) {
 				assert.Equal(t, "original-value", current)
 				return "updated-value", nil
 			},
@@ -96,7 +96,7 @@ func TestAddRunner_Run(t *testing.T) {
 			},
 			Stdout:     &buf,
 			Stderr:     &bytes.Buffer{},
-			OpenEditor: func(_ string) (string, error) { return "", nil },
+			OpenEditor: func(_ context.Context, _ string) (string, error) { return "", nil },
 		}
 
 		err := r.Run(t.Context(), cli.AddOptions{Name: "/app/config"})
@@ -127,7 +127,7 @@ func TestAddRunner_Run(t *testing.T) {
 			},
 			Stdout: &buf,
 			Stderr: &bytes.Buffer{},
-			OpenEditor: func(_ string) (string, error) {
+			OpenEditor: func(_ context.Context, _ string) (string, error) {
 				return "same-value", nil
 			},
 		}
@@ -150,7 +150,7 @@ func TestAddRunner_Run(t *testing.T) {
 			},
 			Stdout:     &buf,
 			Stderr:     &bytes.Buffer{},
-			OpenEditor: func(_ string) (string, error) { return "secret-value", nil },
+			OpenEditor: func(_ context.Context, _ string) (string, error) { return "secret-value", nil },
 		}
 
 		err := r.Run(t.Context(), cli.AddOptions{Name: "my-secret"})
@@ -225,7 +225,7 @@ func TestAddRunner_ErrorCases(t *testing.T) {
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
-			OpenEditor: func(_ string) (string, error) {
+			OpenEditor: func(_ context.Context, _ string) (string, error) {
 				return "", errors.New("editor crashed")
 			},
 		}

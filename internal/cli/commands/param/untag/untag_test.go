@@ -80,6 +80,7 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
+				t.Helper()
 				assert.Contains(t, output, "Untagged")
 				assert.Contains(t, output, "/app/param")
 			},
@@ -97,6 +98,7 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
+				t.Helper()
 				assert.Contains(t, output, "2 key(s)")
 			},
 		},

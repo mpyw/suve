@@ -130,6 +130,7 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
+				t.Helper()
 				assert.Contains(t, output, "Version 2")
 				assert.Contains(t, output, "Version 1")
 				assert.Contains(t, output, "(current)")
@@ -149,6 +150,7 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
+				t.Helper()
 				// Normal mode shows full value without truncation
 				assert.Contains(t, output, "should NOT be truncated in normal mode")
 				assert.NotContains(t, output, "...")
@@ -168,6 +170,7 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
+				t.Helper()
 				assert.Contains(t, output, "...")
 				// Full value should not appear
 				assert.NotContains(t, output, "should be truncated")
@@ -187,6 +190,7 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
+				t.Helper()
 				assert.Contains(t, output, "-old-value")
 				assert.Contains(t, output, "+new-value")
 				assert.Contains(t, output, "/app/param#1")
@@ -206,6 +210,7 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
+				t.Helper()
 				assert.Contains(t, output, "Version 1")
 				assert.NotContains(t, output, "---")
 			},

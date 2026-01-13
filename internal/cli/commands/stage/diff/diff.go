@@ -181,6 +181,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 	first := true
 
 	// Process SSM Parameter Store entries in sorted order
+	//nolint:dupl // Similar to secret loop below but calls different service-specific methods
 	for _, name := range maputil.SortedKeys(paramEntries) {
 		entry := paramEntries[name]
 		result := paramResults[name]

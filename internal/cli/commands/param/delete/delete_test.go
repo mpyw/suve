@@ -64,6 +64,7 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
+				t.Helper()
 				assert.Contains(t, output, "Deleted")
 				assert.Contains(t, output, "/app/param")
 			},

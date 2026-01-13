@@ -673,7 +673,7 @@ func TestEditRunner_Run(t *testing.T) {
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
-			OpenEditor: func(current string) (string, error) {
+			OpenEditor: func(_ context.Context, current string) (string, error) {
 				assert.Equal(t, "aws-value", current)
 				return "edited-value", nil
 			},
@@ -707,7 +707,7 @@ func TestEditRunner_Run(t *testing.T) {
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
-			OpenEditor: func(current string) (string, error) {
+			OpenEditor: func(_ context.Context, current string) (string, error) {
 				assert.Equal(t, "staged-value", current) // Should use staged, not AWS
 				return "new-value", nil
 			},
@@ -739,7 +739,7 @@ func TestEditRunner_Run(t *testing.T) {
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
-			OpenEditor: func(current string) (string, error) {
+			OpenEditor: func(_ context.Context, current string) (string, error) {
 				assert.Equal(t, "create-value", current)
 				return "edited-create-value", nil
 			},
@@ -762,7 +762,7 @@ func TestEditRunner_Run(t *testing.T) {
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
-			OpenEditor: func(current string) (string, error) {
+			OpenEditor: func(_ context.Context, current string) (string, error) {
 				return current, nil // Return unchanged
 			},
 		}
@@ -785,7 +785,7 @@ func TestEditRunner_Run(t *testing.T) {
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
-			OpenEditor: func(_ string) (string, error) {
+			OpenEditor: func(_ context.Context, _ string) (string, error) {
 				return "", errors.New("editor crashed")
 			},
 		}
@@ -808,7 +808,7 @@ func TestEditRunner_Run(t *testing.T) {
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
-			OpenEditor: func(_ string) (string, error) {
+			OpenEditor: func(_ context.Context, _ string) (string, error) {
 				return "value", nil
 			},
 		}
@@ -1634,7 +1634,7 @@ func TestEditRunner_WithMetadata(t *testing.T) {
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
-			OpenEditor: func(current string) (string, error) {
+			OpenEditor: func(_ context.Context, _ string) (string, error) {
 				t.Fatal("OpenEditor should not be called when delete is staged")
 				return "", nil
 			},

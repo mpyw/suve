@@ -33,7 +33,7 @@ printf '%s-modified' "$content" > "$1"
 	t.Setenv("EDITOR", scriptPath)
 	t.Setenv("VISUAL", "")
 
-	result, err := editor.Open("original")
+	result, err := editor.Open(t.Context(), "original")
 	require.NoError(t, err)
 	assert.Equal(t, "original-modified", result)
 }
@@ -47,7 +47,7 @@ func TestOpen_ReturnsUnmodifiedContent(t *testing.T) {
 	t.Setenv("EDITOR", "true")
 	t.Setenv("VISUAL", "")
 
-	result, err := editor.Open("unchanged content")
+	result, err := editor.Open(t.Context(), "unchanged content")
 	require.NoError(t, err)
 	assert.Equal(t, "unchanged content", result)
 }
@@ -69,7 +69,7 @@ echo "with-newline" > "$1"
 	t.Setenv("EDITOR", scriptPath)
 	t.Setenv("VISUAL", "")
 
-	result, err := editor.Open("original")
+	result, err := editor.Open(t.Context(), "original")
 	require.NoError(t, err)
 	assert.Equal(t, "with-newline", result)
 }
@@ -91,7 +91,7 @@ printf "with-crlf\r\n" > "$1"
 	t.Setenv("EDITOR", scriptPath)
 	t.Setenv("VISUAL", "")
 
-	result, err := editor.Open("original")
+	result, err := editor.Open(t.Context(), "original")
 	require.NoError(t, err)
 	assert.Equal(t, "with-crlf", result)
 }
@@ -120,7 +120,7 @@ printf 'editor' > "$1"
 	t.Setenv("VISUAL", visualScript)
 	t.Setenv("EDITOR", editorScript)
 
-	result, err := editor.Open("original")
+	result, err := editor.Open(t.Context(), "original")
 	require.NoError(t, err)
 	assert.Equal(t, "visual", result)
 }
@@ -134,6 +134,6 @@ func TestOpen_EditorError(t *testing.T) {
 	t.Setenv("EDITOR", "false")
 	t.Setenv("VISUAL", "")
 
-	_, err := editor.Open("content")
+	_, err := editor.Open(t.Context(), "content")
 	require.Error(t, err)
 }

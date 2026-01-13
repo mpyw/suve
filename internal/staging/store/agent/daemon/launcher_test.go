@@ -145,7 +145,7 @@ func TestLauncher_EnsureRunning_AlreadyRunning(t *testing.T) {
 	require.NoError(t, err)
 
 	// Start a mock server
-	listener, err := net.Listen("unix", socketPath)
+	listener, err := (&net.ListenConfig{}).Listen(t.Context(), "unix", socketPath)
 	require.NoError(t, err)
 	defer func() { _ = listener.Close() }()
 
@@ -204,7 +204,7 @@ func TestLauncher_PingWithRunningDaemon(t *testing.T) {
 	require.NoError(t, err)
 
 	// Start a mock server
-	listener, err := net.Listen("unix", socketPath)
+	listener, err := (&net.ListenConfig{}).Listen(t.Context(), "unix", socketPath)
 	require.NoError(t, err)
 	defer func() { _ = listener.Close() }()
 
@@ -251,7 +251,7 @@ func TestLauncher_ShutdownWithRunningDaemon(t *testing.T) {
 	require.NoError(t, err)
 
 	// Start a mock server
-	listener, err := net.Listen("unix", socketPath)
+	listener, err := (&net.ListenConfig{}).Listen(t.Context(), "unix", socketPath)
 	require.NoError(t, err)
 	defer func() { _ = listener.Close() }()
 
@@ -298,7 +298,7 @@ func TestLauncher_ShutdownWithServerError(t *testing.T) {
 	require.NoError(t, err)
 
 	// Start a mock server that returns an error
-	listener, err := net.Listen("unix", socketPath)
+	listener, err := (&net.ListenConfig{}).Listen(t.Context(), "unix", socketPath)
 	require.NoError(t, err)
 	defer func() { _ = listener.Close() }()
 
@@ -392,7 +392,7 @@ func TestLauncher_EnsureRunning_WithMockSpawner(t *testing.T) {
 
 		// Start mock server
 		var err error
-		listener, err = net.Listen("unix", socketPath)
+		listener, err = (&net.ListenConfig{}).Listen(t.Context(), "unix", socketPath)
 		if err != nil {
 			return err
 		}

@@ -26,7 +26,7 @@ func (r *errorReader) Read(p []byte) (n int, err error) {
 		toRead = r.bytesToRead - r.bytesRead
 	}
 	// Fill with zeros
-	for i := 0; i < toRead; i++ {
+	for i := range toRead {
 		p[i] = 0
 	}
 	r.bytesRead += toRead

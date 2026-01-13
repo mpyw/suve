@@ -299,7 +299,7 @@ func TestClient_ConcurrentSendRequest(t *testing.T) {
 	const numRequests = 10
 	done := make(chan error, numRequests)
 
-	for i := 0; i < numRequests; i++ {
+	for range numRequests {
 		go func() {
 			_, err := c.SendRequest(&protocol.Request{Method: protocol.MethodPing})
 			done <- err
@@ -307,7 +307,7 @@ func TestClient_ConcurrentSendRequest(t *testing.T) {
 	}
 
 	// Wait for all requests to complete
-	for i := 0; i < numRequests; i++ {
+	for range numRequests {
 		select {
 		case err := <-done:
 			assert.NoError(t, err)

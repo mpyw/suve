@@ -74,6 +74,7 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
+				t.Helper()
 				assert.Contains(t, output, "Scheduled deletion")
 				assert.Contains(t, output, "my-secret")
 			},

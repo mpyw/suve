@@ -434,6 +434,7 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
+				t.Helper()
 				assert.Contains(t, output, "-old-value")
 				assert.Contains(t, output, "+new-value")
 			},
@@ -457,6 +458,7 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
+				t.Helper()
 				// No diff lines expected for identical content
 				assert.NotContains(t, output, "-same-value")
 			},
@@ -536,6 +538,7 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
+				t.Helper()
 				assert.Contains(t, output, "-")
 				assert.Contains(t, output, "+")
 			},
@@ -571,6 +574,7 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
+				t.Helper()
 				assert.Contains(t, output, "-not json")
 				assert.Contains(t, output, "+also not json")
 			},

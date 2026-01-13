@@ -18,59 +18,23 @@ linters:
     - err113           # Dynamic errors are acceptable in CLI tools
     # Wrapping/formatting - handled by other tools or not useful
     - wrapcheck        # Internal packages don't need wrapping
-    - nlreturn         # Pure style preference
-    - wsl              # Pure style preference (wsl_v5 included)
-    - lll              # Line length - use editor settings
-    - tagliatelle      # JSON tag naming style preference
-    # Test style - not all patterns are useful
-    - paralleltest     # Not all tests benefit from parallel
-    - testpackage      # Internal tests are common and useful
+    - wsl              # Whitespace - pure style preference
     # Code organization - too opinionated
-    - gochecknoglobals # Package-level vars are intentional (errors, configs)
     - gochecknoinits   # init() is sometimes needed
     - funcorder        # Function order is contextual
     - godox            # TODO/FIXME comments are fine during development
-    # Performance micro-optimizations - premature
-    - prealloc         # Premature optimization
-    - mnd              # Magic numbers are often contextually clear
     # i18n - not needed for this CLI tool
     - gosmopolitan     # No i18n requirements
-    # Duplicate detection - handled by fzdupl instead
-    - dupl             # fzdupl is more precise
     # We configure depguard ourselves
     - depguard
-    # Style preferences - too strict for this codebase
-    - gocritic         # ifElseChain style is acceptable
-    - godoclint        # Multiple package comments are acceptable
-    - godot            # Comment punctuation is not critical
-    - goprintffuncname # printf naming convention not always useful
-    - maintidx         # Test functions are naturally large
-    - intrange         # Go 1.22+ range syntax not required
-    # Modernization suggestions - would require significant refactoring
+    # Nesting complexity - sometimes necessary for clarity
     - nestif           # Complex nesting is sometimes necessary for clarity
-    - modernize        # Go 1.22+ modernizations (rangeint, mapsloop, etc.)
-    - mirror           # bytes.Index allocation warnings are premature optimization
-    # Whitespace and style - pure stylistic preferences
-    - wsl              # Whitespace linter - pure style preference
-    - wsl_v5           # Whitespace linter v5 - pure style preference (already excluded)
-    - revive           # Many style-based rules that are too strict
-    # Context requirements - would require significant API changes
-    - noctx            # Context in net/exec calls - major refactoring
-    # Error handling style - valid patterns in this codebase
+    # Error handling style - inline errors are idiomatic
     - noinlineerr      # Inline error handling is idiomatic
-    - nilerr           # Sometimes returning nil error with logged message is intentional
-    - nilnil           # Sometimes returning nil, nil is valid (no result, no error)
-    # Test patterns - not all patterns apply
-    - usetesting       # t.TempDir vs os.MkdirTemp - both valid
-    - testifylint      # Testify assertion style preferences
-    - thelper          # Not all helper functions need t.Helper()
-    - tparallel        # Not all tests benefit from parallel
-    # Too strict performance optimizations
+    # Performance optimizations - often less readable
     - perfsprint       # fmt.Sprintf -> string concat is often less readable
     # Package/variable naming - too strict
     - predeclared      # Package names like 'delete' are intentional
-    # Parameter usage - sometimes unused params are needed for interface compliance
-    - unparam          # Unused params are sometimes intentional for API consistency
   enable:
     - depguard
   exclusions:
@@ -90,7 +54,20 @@ linters:
         linters:
           - forbidigo
         text: "context\\.Background"
+      # Exclude maintidx, mnd, and dupl from test files
+      - path: "_test\\.go$"
+        linters:
+          - maintidx
+          - mnd
+          - dupl
+      # Exclude tparallel from e2e tests (integration tests need sequential execution)
+      - path: "e2e/"
+        linters:
+          - tparallel
   settings:
+    usetesting:
+      # Allow os.MkdirTemp - needed for daemon tests with socket paths (~104-108 byte limit)
+      os-mkdir-temp: false
     cyclop:
       max-complexity: 30
     funlen:
@@ -100,6 +77,8 @@ linters:
       min-complexity: 60
     exhaustive:
       default-signifies-exhaustive: true
+    lll:
+      line-length: 150
     depguard:
       rules:
         aws-sdk:

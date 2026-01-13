@@ -170,7 +170,7 @@ func TestServer_handleConnection_validRequest(t *testing.T) {
 	socketPath := protocol.SocketPathForAccount(accountID, region)
 
 	// Connect and send a request
-	conn, err := net.DialTimeout("unix", socketPath, time.Second)
+	conn, err := (&net.Dialer{Timeout: time.Second}).DialContext(t.Context(), "unix", socketPath)
 	require.NoError(t, err)
 	defer func() { _ = conn.Close() }()
 
@@ -221,7 +221,7 @@ func TestServer_handleConnection_invalidJSON(t *testing.T) {
 	socketPath := protocol.SocketPathForAccount(accountID, region)
 
 	// Connect and send invalid JSON
-	conn, err := net.DialTimeout("unix", socketPath, time.Second)
+	conn, err := (&net.Dialer{Timeout: time.Second}).DialContext(t.Context(), "unix", socketPath)
 	require.NoError(t, err)
 	defer func() { _ = conn.Close() }()
 
@@ -281,7 +281,7 @@ func TestServer_handleConnection_shutdownCallback(t *testing.T) {
 	socketPath := protocol.SocketPathForAccount(accountID, region)
 
 	// Connect and send a request
-	conn, err := net.DialTimeout("unix", socketPath, time.Second)
+	conn, err := (&net.Dialer{Timeout: time.Second}).DialContext(t.Context(), "unix", socketPath)
 	require.NoError(t, err)
 	defer func() { _ = conn.Close() }()
 
@@ -339,7 +339,7 @@ func TestServer_handleConnection_nilCallbacks(t *testing.T) {
 	socketPath := protocol.SocketPathForAccount(accountID, region)
 
 	// Connect and send a request
-	conn, err := net.DialTimeout("unix", socketPath, time.Second)
+	conn, err := (&net.Dialer{Timeout: time.Second}).DialContext(t.Context(), "unix", socketPath)
 	require.NoError(t, err)
 	defer func() { _ = conn.Close() }()
 
@@ -481,7 +481,7 @@ func TestServer_Serve(t *testing.T) {
 	socketPath := protocol.SocketPathForAccount(accountID, region)
 
 	// Connect and send a request
-	conn, err := net.DialTimeout("unix", socketPath, time.Second)
+	conn, err := (&net.Dialer{Timeout: time.Second}).DialContext(t.Context(), "unix", socketPath)
 	require.NoError(t, err)
 
 	req := protocol.Request{Method: protocol.MethodPing}
@@ -534,9 +534,9 @@ func TestServer_Serve_MultipleConnections(t *testing.T) {
 	const numRequests = 5
 	done := make(chan error, numRequests)
 
-	for i := 0; i < numRequests; i++ {
+	for range numRequests {
 		go func() {
-			conn, err := net.DialTimeout("unix", socketPath, time.Second)
+			conn, err := (&net.Dialer{Timeout: time.Second}).DialContext(t.Context(), "unix", socketPath)
 			if err != nil {
 				done <- err
 				return
@@ -566,7 +566,7 @@ func TestServer_Serve_MultipleConnections(t *testing.T) {
 	}
 
 	// Wait for all requests
-	for i := 0; i < numRequests; i++ {
+	for range numRequests {
 		select {
 		case err := <-done:
 			assert.NoError(t, err)
@@ -789,9 +789,14 @@ func TestServer_setSocketPermissions_Error(t *testing.T) {
 
 // TestServer_Start_CreateSocketDirError tests Start when createSocketDir fails.
 func TestServer_Start_CreateSocketDirError(t *testing.T) {
-	// Use a path that will definitely fail on Linux
+	// Use a path that will definitely fail
 	// /proc/1/root is only accessible by root, and creating directories there will fail
-	t.Setenv("TMPDIR", "/proc/1/root/nonexistent-suve-test")
+	invalidPath := "/proc/1/root/nonexistent-suve-test"
+
+	// On Linux, socketPathForAccount uses XDG_RUNTIME_DIR first, then fallback to /tmp
+	// Set both to ensure the invalid path is used regardless of platform
+	t.Setenv("XDG_RUNTIME_DIR", invalidPath)
+	t.Setenv("TMPDIR", invalidPath)
 
 	handler := func(req *protocol.Request) *protocol.Response {
 		return &protocol.Response{Success: true}
@@ -810,10 +815,12 @@ func TestServer_Start_CreateSocketDirError(t *testing.T) {
 
 // TestServer_Start_ListenError tests Start when listen fails.
 func TestServer_Start_ListenError(t *testing.T) {
-	// Create temp directory for socket
-	tmpDir, err := os.MkdirTemp("/tmp", "suve-server-listen-err-*")
+	// Create temp directory for socket using /tmp to keep paths short (Unix socket path limit ~104-108 bytes)
+	tmpDir, err := os.MkdirTemp("/tmp", "suve-listen-*")
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = os.RemoveAll(tmpDir) })
+	// On Linux, socketPathForAccount uses XDG_RUNTIME_DIR first
+	t.Setenv("XDG_RUNTIME_DIR", tmpDir)
 	t.Setenv("TMPDIR", tmpDir)
 
 	accountID := "start-listen-err"
@@ -845,9 +852,7 @@ func TestServer_Start_ListenError(t *testing.T) {
 // TestServer_Start_ListenErrorLongPath tests Start when listen fails due to path length.
 func TestServer_Start_ListenErrorLongPath(t *testing.T) {
 	// Create temp directory for socket
-	tmpDir, err := os.MkdirTemp("/tmp", "suve-server-long-path-*")
-	require.NoError(t, err)
-	t.Cleanup(func() { _ = os.RemoveAll(tmpDir) })
+	tmpDir := t.TempDir()
 
 	handler := func(req *protocol.Request) *protocol.Response {
 		return &protocol.Response{Success: true}
@@ -856,12 +861,14 @@ func TestServer_Start_ListenErrorLongPath(t *testing.T) {
 	// Use a very long account ID to make the socket path too long (Unix sockets have ~104-108 byte limit)
 	// Create nested directories to make the path very long
 	longPath := tmpDir
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		longPath = filepath.Join(longPath, "abcdefghij")
 	}
 	//nolint:gosec // G302: standard directory permissions for test
-	err = os.MkdirAll(longPath, 0o755)
+	err := os.MkdirAll(longPath, 0o755)
 	require.NoError(t, err)
+	// On Linux, socketPathForAccount uses XDG_RUNTIME_DIR first
+	t.Setenv("XDG_RUNTIME_DIR", longPath)
 	t.Setenv("TMPDIR", longPath)
 
 	accountID := "very-long-account-id-that-makes-path-too-long"
@@ -915,7 +922,7 @@ func TestServer_handleConnection_WillShutdownWithNilCallback(t *testing.T) {
 	socketPath := protocol.SocketPathForAccount(accountID, region)
 
 	// Connect and send a request
-	conn, err := net.DialTimeout("unix", socketPath, time.Second)
+	conn, err := (&net.Dialer{Timeout: time.Second}).DialContext(t.Context(), "unix", socketPath)
 	require.NoError(t, err)
 	defer func() { _ = conn.Close() }()
 

@@ -105,6 +105,7 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
+				t.Helper()
 				assert.Contains(t, output, "Tagged")
 				assert.Contains(t, output, "my-secret")
 			},
@@ -122,6 +123,7 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
+				t.Helper()
 				assert.Contains(t, output, "2 tag(s)")
 			},
 		},

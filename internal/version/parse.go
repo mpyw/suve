@@ -153,7 +153,7 @@ func Parse[A any](input string, parser AbsoluteParser[A]) (*Spec[A], error) {
 //   - '~' followed by a letter (ambiguous: could be part of the name or a shift typo)
 //   - PrefixChar at end or followed by invalid char, when Error is set
 func findNameEnd[A any](input string, parsers []SpecifierParser[A]) (int, error) {
-	for i := 0; i < len(input); i++ {
+	for i := range len(input) {
 		// Check for shift specifier (~)
 		if input[i] == '~' {
 			if isShiftStart(input, i) {

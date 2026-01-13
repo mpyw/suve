@@ -1,7 +1,6 @@
 package timeutil
 
 import (
-	"os"
 	"testing"
 	"time"
 
@@ -89,14 +88,8 @@ func TestFormatRFC3339_EmptyTZ(t *testing.T) {
 	utcTime := time.Date(2024, 1, 15, 12, 30, 45, 0, time.UTC)
 
 	// Unset TZ to test local time behavior
-	// Note: We need to save and restore since t.Setenv doesn't support unsetting
-	originalTZ, hadTZ := os.LookupEnv("TZ")
-	require.NoError(t, os.Unsetenv("TZ"))
-	t.Cleanup(func() {
-		if hadTZ {
-			_ = os.Setenv("TZ", originalTZ)
-		}
-	})
+	// Note: Setting TZ="" effectively unsets it (uses local time)
+	t.Setenv("TZ", "")
 
 	result := FormatRFC3339(utcTime)
 
@@ -186,15 +179,8 @@ func TestLoadLocation_DirectCalls(t *testing.T) {
 	})
 
 	t.Run("empty TZ uses local", func(t *testing.T) {
-		// Unset TZ
-		originalTZ, hadTZ := os.LookupEnv("TZ")
-		require.NoError(t, os.Unsetenv("TZ"))
-		t.Cleanup(func() {
-			if hadTZ {
-				_ = os.Setenv("TZ", originalTZ)
-			}
-		})
-
+		// Unset TZ - setting TZ="" effectively unsets it (uses local time)
+		t.Setenv("TZ", "")
 		loc := loadLocation()
 		assert.Equal(t, time.Local, loc)
 	})

@@ -195,7 +195,7 @@ sso_account_id = 123456789012
 		t.Setenv("AWS_DEFAULT_PROFILE", "")
 
 		// Should always return "alpha" (first alphabetically)
-		for i := 0; i < 10; i++ {
+		for range 10 {
 			profile := findProfileByAccountID("123456789012")
 			assert.Equal(t, "alpha", profile)
 		}

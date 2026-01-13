@@ -44,7 +44,7 @@ func (r *AddRunner) Run(ctx context.Context, opts AddOptions) error {
 		if editorFn == nil {
 			editorFn = editor.Open
 		}
-		newValue, err = editorFn(draft.Value)
+		newValue, err = editorFn(ctx, draft.Value)
 		if err != nil {
 			return fmt.Errorf("failed to edit: %w", err)
 		}
