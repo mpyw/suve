@@ -5,8 +5,8 @@ package agent
 import (
 	"os"
 
-	"github.com/mpyw/suve/internal/staging/agent/server"
-	"github.com/mpyw/suve/internal/staging/agent/transport"
+	"github.com/mpyw/suve/internal/staging/agent/client"
+	"github.com/mpyw/suve/internal/staging/agent/daemon"
 )
 
 // Environment variable names for agent configuration.
@@ -23,17 +23,17 @@ func isManualMode() bool {
 }
 
 // ClientOptions returns client options based on the current mode.
-func ClientOptions() []transport.ClientOption {
+func ClientOptions() []client.StoreOption {
 	if isManualMode() {
-		return []transport.ClientOption{transport.WithAutoStartDisabled()}
+		return []client.StoreOption{client.WithAutoStartDisabled()}
 	}
 	return nil
 }
 
 // DaemonOptions returns daemon options based on the current mode.
-func DaemonOptions() []server.DaemonOption {
+func DaemonOptions() []daemon.RunnerOption {
 	if isManualMode() {
-		return []server.DaemonOption{server.WithAutoShutdownDisabled()}
+		return []daemon.RunnerOption{daemon.WithAutoShutdownDisabled()}
 	}
 	return nil
 }

@@ -8,8 +8,7 @@ import (
 
 	"github.com/mpyw/suve/internal/cli/output"
 	agentcfg "github.com/mpyw/suve/internal/staging/agent"
-	"github.com/mpyw/suve/internal/staging/agent/server"
-	"github.com/mpyw/suve/internal/staging/agent/transport"
+	"github.com/mpyw/suve/internal/staging/agent/daemon"
 )
 
 // Command returns the stage agent command.
@@ -49,8 +48,8 @@ The daemon will automatically shut down when all staged changes are cleared.
 
 Set ` + agentcfg.EnvDaemonAutoStart + `=0 to enable manual mode (disables auto-start and auto-shutdown).`,
 		Action: func(_ context.Context, _ *cli.Command) error {
-			daemon := server.NewDaemon(agentcfg.DaemonOptions()...)
-			return daemon.Run()
+			runner := daemon.NewRunner(agentcfg.DaemonOptions()...)
+			return runner.Run()
 		},
 	}
 }
@@ -63,9 +62,9 @@ func stopCommand() *cli.Command {
 
 This command sends a shutdown signal to the running daemon.
 Note: Any staged changes in memory will be lost unless persisted first.`,
-		Action: func(ctx context.Context, cmd *cli.Command) error {
-			c := transport.NewClient(agentcfg.ClientOptions()...)
-			if err := c.Shutdown(ctx); err != nil {
+		Action: func(_ context.Context, cmd *cli.Command) error {
+			launcher := daemon.NewLauncher()
+			if err := launcher.Shutdown(); err != nil {
 				output.Printf(cmd.Root().ErrWriter, "Warning: %v\n", err)
 				return nil
 			}

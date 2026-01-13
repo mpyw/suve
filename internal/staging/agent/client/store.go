@@ -7,24 +7,46 @@ import (
 	"fmt"
 
 	"github.com/mpyw/suve/internal/staging"
+	"github.com/mpyw/suve/internal/staging/agent/daemon"
 	"github.com/mpyw/suve/internal/staging/agent/protocol"
-	"github.com/mpyw/suve/internal/staging/agent/transport"
 )
+
+// StoreOption configures a Store.
+type StoreOption func(*Store)
+
+// WithAutoStartDisabled disables automatic daemon startup.
+func WithAutoStartDisabled() StoreOption {
+	return func(s *Store) {
+		s.autoStartDisabled = true
+	}
+}
 
 // Store implements staging.StoreReadWriteOperator using the daemon.
 type Store struct {
-	client    *transport.Client
-	accountID string
-	region    string
+	launcher          *daemon.Launcher
+	accountID         string
+	region            string
+	autoStartDisabled bool
 }
 
 // NewStore creates a new Store.
-func NewStore(accountID, region string, opts ...transport.ClientOption) *Store {
-	return &Store{
-		client:    transport.NewClient(opts...),
+func NewStore(accountID, region string, opts ...StoreOption) *Store {
+	s := &Store{
 		accountID: accountID,
 		region:    region,
 	}
+	for _, opt := range opts {
+		opt(s)
+	}
+
+	// Build launcher options based on store options
+	var launcherOpts []daemon.LauncherOption
+	if s.autoStartDisabled {
+		launcherOpts = append(launcherOpts, daemon.WithAutoStartDisabled())
+	}
+	s.launcher = daemon.NewLauncher(launcherOpts...)
+
+	return s
 }
 
 // GetEntry retrieves a staged entry.
@@ -189,13 +211,13 @@ func (s *Store) SetState(ctx context.Context, state *staging.State) error {
 // doRequestWithResult sends a request and unmarshals the response.
 func doRequestWithResult[Resp any, Result any](
 	s *Store,
-	ctx context.Context,
+	_ context.Context,
 	req *protocol.Request,
 	extract func(*Resp) Result,
 ) (Result, error) {
 	var zero Result
 
-	resp, err := s.client.SendRequest(ctx, req)
+	resp, err := s.launcher.Client().SendRequest(req)
 	if err != nil {
 		return zero, err
 	}
@@ -218,18 +240,22 @@ func doRequestWithResultEnsuringDaemon[Resp any, Result any](
 	extract func(*Resp) Result,
 ) (Result, error) {
 	var zero Result
-	if err := s.client.EnsureDaemon(ctx); err != nil {
+	if err := s.launcher.EnsureRunning(); err != nil {
 		return zero, err
 	}
 	return doRequestWithResult(s, ctx, req, extract)
 }
 
 // doSimpleRequestEnsuringDaemon ensures daemon is running, then sends simple request.
-func (s *Store) doSimpleRequestEnsuringDaemon(ctx context.Context, req *protocol.Request) error {
-	if err := s.client.EnsureDaemon(ctx); err != nil {
+func (s *Store) doSimpleRequestEnsuringDaemon(_ context.Context, req *protocol.Request) error {
+	if err := s.launcher.EnsureRunning(); err != nil {
 		return err
 	}
-	return s.client.DoSimpleRequest(ctx, req)
+	resp, err := s.launcher.Client().SendRequest(req)
+	if err != nil {
+		return err
+	}
+	return resp.Err()
 }
 
 // Compile-time checks.

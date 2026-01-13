@@ -49,12 +49,12 @@ import (
 	globalstatus "github.com/mpyw/suve/internal/cli/commands/stage/status"
 	"github.com/mpyw/suve/internal/staging"
 	"github.com/mpyw/suve/internal/staging/agent"
-	"github.com/mpyw/suve/internal/staging/agent/server"
-	"github.com/mpyw/suve/internal/staging/agent/transport"
+	"github.com/mpyw/suve/internal/staging/agent/daemon"
+	"github.com/mpyw/suve/internal/staging/agent/ipc"
 )
 
 // testDaemon is the shared staging agent daemon for all E2E tests.
-var testDaemon *server.Daemon
+var testDaemon *daemon.Runner
 
 // TestMain sets up the staging agent daemon before running tests.
 func TestMain(m *testing.M) {
@@ -73,7 +73,7 @@ func TestMain(m *testing.M) {
 	os.Setenv(agent.EnvDaemonAutoStart, "0")
 
 	// Start daemon with error channel
-	testDaemon = server.NewDaemon(agent.DaemonOptions()...)
+	testDaemon = daemon.NewRunner(agent.DaemonOptions()...)
 	daemonErrCh := make(chan error, 1)
 	go func() {
 		daemonErrCh <- testDaemon.Run()
@@ -98,7 +98,7 @@ func TestMain(m *testing.M) {
 
 // waitForDaemon waits for the daemon to be ready by polling with ping.
 func waitForDaemon(timeout time.Duration, daemonErrCh <-chan error) error {
-	c := transport.NewClient(agent.ClientOptions()...)
+	c := ipc.NewClient()
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
@@ -114,8 +114,8 @@ func waitForDaemon(timeout time.Duration, daemonErrCh <-chan error) error {
 		case <-ctx.Done():
 			return fmt.Errorf("daemon did not become ready within %v (last error: %v)", timeout, lastErr)
 		case <-ticker.C:
-			// Try to check if daemon is empty (any successful request means it's ready)
-			if _, err := c.IsEmpty(ctx); err == nil {
+			// Try to ping daemon (any successful request means it's ready)
+			if err := c.Ping(); err == nil {
 				return nil
 			} else {
 				lastErr = err

@@ -1,4 +1,4 @@
-package transport
+package ipc
 
 import (
 	"context"
@@ -23,19 +23,20 @@ const (
 // RequestHandler handles incoming requests and returns responses.
 type RequestHandler func(*protocol.Request) *protocol.Response
 
+// ResponseCallback is called after a response is sent.
+type ResponseCallback func(*protocol.Request, *protocol.Response)
+
 // Server provides low-level IPC server functionality.
 type Server struct {
-	listener net.Listener
-	handler  RequestHandler
-	wg       sync.WaitGroup
-	ctx      context.Context
-	cancel   context.CancelFunc
-
-	// OnResponse is called after a response is sent, allowing post-processing.
-	OnResponse func(*protocol.Request, *protocol.Response)
+	listener   net.Listener
+	handler    RequestHandler
+	onResponse ResponseCallback
+	wg         sync.WaitGroup
+	ctx        context.Context
+	cancel     context.CancelFunc
 }
 
-// NewServer creates a new transport server.
+// NewServer creates a new IPC server.
 func NewServer(handler RequestHandler) *Server {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &Server{
@@ -43,6 +44,11 @@ func NewServer(handler RequestHandler) *Server {
 		ctx:     ctx,
 		cancel:  cancel,
 	}
+}
+
+// SetResponseCallback sets a callback to be called after each response.
+func (s *Server) SetResponseCallback(cb ResponseCallback) {
+	s.onResponse = cb
 }
 
 // Start starts listening on the Unix socket.
@@ -136,8 +142,8 @@ func (s *Server) handleConnection(conn net.Conn) {
 	encoder := json.NewEncoder(conn)
 	_ = encoder.Encode(resp)
 
-	if s.OnResponse != nil {
-		s.OnResponse(&req, resp)
+	if s.onResponse != nil {
+		s.onResponse(&req, resp)
 	}
 }
 
