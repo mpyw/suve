@@ -14,6 +14,8 @@ linters:
     - varnamelen       # Short names in small scopes are fine
     - inamedparam      # Interface named params not always needed
     - nonamedreturns   # Named returns useful for documentation
+    # Error handling style - too strict
+    - err113           # Dynamic errors are acceptable in CLI tools
     # Wrapping/formatting - handled by other tools or not useful
     - wrapcheck        # Internal packages don't need wrapping
     - nlreturn         # Pure style preference

@@ -390,7 +390,7 @@ func TestGlobal_DrainAndPersist(t *testing.T) {
 		stdout, _, err := runSubCommand(t, stgcli.NewGlobalStashCommand(), "push")
 		require.NoError(t, err)
 		t.Logf("persist output: %s", stdout)
-		assert.Contains(t, stdout, "persisted to file")
+		assert.Contains(t, stdout, "Staged changes stashed to file")
 	})
 
 	// Agent should now be empty
@@ -405,7 +405,7 @@ func TestGlobal_DrainAndPersist(t *testing.T) {
 		stdout, _, err := runSubCommand(t, stgcli.NewGlobalStashCommand(), "pop")
 		require.NoError(t, err)
 		t.Logf("drain output: %s", stdout)
-		assert.Contains(t, stdout, "loaded from file")
+		assert.Contains(t, stdout, "Stashed changes restored")
 	})
 
 	// Agent should have the staged changes again
@@ -567,7 +567,7 @@ func TestMixed_ServiceSpecificDrainPersist(t *testing.T) {
 
 	// Persist only params (secrets should remain in agent)
 	t.Run("persist-param-only", func(t *testing.T) {
-		_, _, err := runSubCommand(t, paramstage.Command(), "persist")
+		_, _, err := runSubCommand(t, paramstage.Command(), "stash", "push")
 		require.NoError(t, err)
 	})
 
@@ -584,7 +584,7 @@ func TestMixed_ServiceSpecificDrainPersist(t *testing.T) {
 
 	// Drain params back (secret should be unaffected)
 	t.Run("drain-param-back", func(t *testing.T) {
-		_, _, err := runSubCommand(t, paramstage.Command(), "drain")
+		_, _, err := runSubCommand(t, paramstage.Command(), "stash", "pop")
 		require.NoError(t, err)
 	})
 
