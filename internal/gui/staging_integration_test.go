@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/mpyw/suve/internal/maputil"
 	"github.com/mpyw/suve/internal/staging"
 	"github.com/mpyw/suve/internal/staging/store/file"
 	"github.com/mpyw/suve/internal/staging/store/testutil"
@@ -252,6 +253,235 @@ func TestApp_getService(t *testing.T) {
 	})
 }
 
+func TestApp_StagingCancelRemoveTag(t *testing.T) {
+	t.Parallel()
+
+	t.Run("cancel single remove tag", func(t *testing.T) {
+		t.Parallel()
+		app := setupTestApp(t)
+
+		// Stage multiple remove tags
+		err := app.stagingStore.StageTag(app.ctx, staging.ServiceParam, "/app/config", staging.TagEntry{
+			Remove: maputil.NewSet("env", "team"),
+		})
+		require.NoError(t, err)
+
+		// Cancel one tag removal
+		result, err := app.StagingCancelRemoveTag("param", "/app/config", "env")
+		require.NoError(t, err)
+		assert.Equal(t, "/app/config", result.Name)
+
+		// Verify only team remains in remove list
+		tagEntry, err := app.stagingStore.GetTag(app.ctx, staging.ServiceParam, "/app/config")
+		require.NoError(t, err)
+		assert.False(t, tagEntry.Remove.Contains("env"))
+		assert.True(t, tagEntry.Remove.Contains("team"))
+	})
+
+	t.Run("cancel last remove tag removes entry", func(t *testing.T) {
+		t.Parallel()
+		app := setupTestApp(t)
+
+		// Stage single remove tag
+		err := app.stagingStore.StageTag(app.ctx, staging.ServiceParam, "/app/config", staging.TagEntry{
+			Remove: maputil.NewSet("env"),
+		})
+		require.NoError(t, err)
+
+		// Cancel the only tag
+		_, err = app.StagingCancelRemoveTag("param", "/app/config", "env")
+		require.NoError(t, err)
+
+		// Verify tag entry is removed
+		_, err = app.stagingStore.GetTag(app.ctx, staging.ServiceParam, "/app/config")
+		assert.ErrorIs(t, err, staging.ErrNotStaged)
+	})
+
+	t.Run("cancel with both add and remove - preserves add", func(t *testing.T) {
+		t.Parallel()
+		app := setupTestApp(t)
+
+		// Stage both add and remove
+		err := app.stagingStore.StageTag(app.ctx, staging.ServiceParam, "/app/config", staging.TagEntry{
+			Add:    map[string]string{"env": "prod"},
+			Remove: maputil.NewSet("team"),
+		})
+		require.NoError(t, err)
+
+		// Cancel the remove tag
+		_, err = app.StagingCancelRemoveTag("param", "/app/config", "team")
+		require.NoError(t, err)
+
+		// Verify add tags are preserved
+		tagEntry, err := app.stagingStore.GetTag(app.ctx, staging.ServiceParam, "/app/config")
+		require.NoError(t, err)
+		assert.Empty(t, tagEntry.Remove)
+		assert.Equal(t, "prod", tagEntry.Add["env"])
+	})
+}
+
+func TestApp_StagingStatus_EdgeCases(t *testing.T) {
+	t.Parallel()
+
+	t.Run("mixed services entries and tags", func(t *testing.T) {
+		t.Parallel()
+		app := setupTestApp(t)
+
+		// Stage param entry
+		err := app.stagingStore.StageEntry(app.ctx, staging.ServiceParam, "/app/config", staging.Entry{
+			Operation: staging.OperationUpdate,
+			Value:     lo.ToPtr("value1"),
+		})
+		require.NoError(t, err)
+
+		// Stage secret entry
+		err = app.stagingStore.StageEntry(app.ctx, staging.ServiceSecret, "my-secret", staging.Entry{
+			Operation: staging.OperationCreate,
+			Value:     lo.ToPtr("secret-value"),
+		})
+		require.NoError(t, err)
+
+		// Stage param tag
+		err = app.stagingStore.StageTag(app.ctx, staging.ServiceParam, "/app/other", staging.TagEntry{
+			Add: map[string]string{"env": "prod"},
+		})
+		require.NoError(t, err)
+
+		// Stage secret tag
+		err = app.stagingStore.StageTag(app.ctx, staging.ServiceSecret, "other-secret", staging.TagEntry{
+			Remove: maputil.NewSet("deprecated"),
+		})
+		require.NoError(t, err)
+
+		result, err := app.StagingStatus()
+		require.NoError(t, err)
+		assert.Len(t, result.Param, 1)
+		assert.Len(t, result.Secret, 1)
+		assert.Len(t, result.ParamTags, 1)
+		assert.Len(t, result.SecretTags, 1)
+	})
+
+	t.Run("delete operation", func(t *testing.T) {
+		t.Parallel()
+		app := setupTestApp(t)
+
+		err := app.stagingStore.StageEntry(app.ctx, staging.ServiceParam, "/to-delete", staging.Entry{
+			Operation: staging.OperationDelete,
+		})
+		require.NoError(t, err)
+
+		result, err := app.StagingStatus()
+		require.NoError(t, err)
+		assert.Len(t, result.Param, 1)
+		assert.Equal(t, "delete", result.Param[0].Operation)
+		assert.Nil(t, result.Param[0].Value)
+	})
+
+	t.Run("tag with add and remove", func(t *testing.T) {
+		t.Parallel()
+		app := setupTestApp(t)
+
+		err := app.stagingStore.StageTag(app.ctx, staging.ServiceParam, "/app/config", staging.TagEntry{
+			Add:    map[string]string{"env": "prod", "team": "backend"},
+			Remove: maputil.NewSet("deprecated", "old"),
+		})
+		require.NoError(t, err)
+
+		result, err := app.StagingStatus()
+		require.NoError(t, err)
+		assert.Len(t, result.ParamTags, 1)
+		assert.Equal(t, "prod", result.ParamTags[0].AddTags["env"])
+		assert.Equal(t, "backend", result.ParamTags[0].AddTags["team"])
+		assert.Contains(t, result.ParamTags[0].RemoveTags, "deprecated")
+		assert.Contains(t, result.ParamTags[0].RemoveTags, "old")
+	})
+}
+
+func TestApp_StagingReset(t *testing.T) {
+	t.Parallel()
+
+	t.Run("reset param service", func(t *testing.T) {
+		t.Parallel()
+		app := setupTestApp(t)
+
+		// Stage entries in both services
+		_ = app.stagingStore.StageEntry(app.ctx, staging.ServiceParam, "/app/config", staging.Entry{
+			Operation: staging.OperationUpdate,
+			Value:     lo.ToPtr("value"),
+		})
+		_ = app.stagingStore.StageEntry(app.ctx, staging.ServiceSecret, "my-secret", staging.Entry{
+			Operation: staging.OperationCreate,
+			Value:     lo.ToPtr("secret"),
+		})
+
+		// Reset param only
+		result, err := app.StagingReset("param")
+		require.NoError(t, err)
+		assert.NotNil(t, result)
+		assert.Equal(t, "unstagedAll", result.Type)
+
+		// Verify param cleared, secret remains
+		status, err := app.StagingStatus()
+		require.NoError(t, err)
+		assert.Empty(t, status.Param)
+		assert.Len(t, status.Secret, 1)
+	})
+
+	t.Run("reset secret service", func(t *testing.T) {
+		t.Parallel()
+		app := setupTestApp(t)
+
+		// Stage entries in both services
+		_ = app.stagingStore.StageEntry(app.ctx, staging.ServiceParam, "/app/config", staging.Entry{
+			Operation: staging.OperationUpdate,
+			Value:     lo.ToPtr("value"),
+		})
+		_ = app.stagingStore.StageEntry(app.ctx, staging.ServiceSecret, "my-secret", staging.Entry{
+			Operation: staging.OperationCreate,
+			Value:     lo.ToPtr("secret"),
+		})
+
+		// Reset secret only
+		result, err := app.StagingReset("secret")
+		require.NoError(t, err)
+		assert.NotNil(t, result)
+		assert.Equal(t, "unstagedAll", result.Type)
+
+		// Verify secret cleared, param remains
+		status, err := app.StagingStatus()
+		require.NoError(t, err)
+		assert.Len(t, status.Param, 1)
+		assert.Empty(t, status.Secret)
+	})
+
+	t.Run("reset nothing staged", func(t *testing.T) {
+		t.Parallel()
+		app := setupTestApp(t)
+
+		// Reset when nothing staged
+		result, err := app.StagingReset("param")
+		require.NoError(t, err)
+		assert.NotNil(t, result)
+		assert.Equal(t, "nothingStaged", result.Type)
+	})
+
+	t.Run("reset invalid service", func(t *testing.T) {
+		t.Parallel()
+		app := setupTestApp(t)
+
+		_, err := app.StagingReset("invalid")
+		assert.ErrorIs(t, err, errInvalidService)
+	})
+
+	t.Run("reset empty service", func(t *testing.T) {
+		t.Parallel()
+		app := setupTestApp(t)
+
+		_, err := app.StagingReset("")
+		assert.ErrorIs(t, err, errInvalidService)
+	})
+}
+
 // =============================================================================
 // File-based Integration Tests for Drain/Persist
 // =============================================================================
@@ -390,4 +620,110 @@ func TestFileDrainPersist(t *testing.T) {
 	})
 
 	_ = filePath // suppress unused variable warning
+
+	t.Run("persist with tags only", func(t *testing.T) {
+		t.Parallel()
+
+		localTmpDir := t.TempDir()
+		localFilePath := filepath.Join(localTmpDir, "stage.json")
+
+		fileStore := file.NewStoreWithPath(localFilePath)
+
+		// Create state with tags only (no entries)
+		state := staging.NewEmptyState()
+		state.Tags[staging.ServiceParam]["/app/config"] = staging.TagEntry{
+			Add:    map[string]string{"env": "prod"},
+			Remove: maputil.NewSet("deprecated"),
+		}
+
+		err := fileStore.WriteState(context.Background(), state)
+		require.NoError(t, err)
+
+		// Drain and verify
+		drainedState, err := fileStore.Drain(context.Background(), true)
+		require.NoError(t, err)
+		assert.Equal(t, "prod", drainedState.Tags[staging.ServiceParam]["/app/config"].Add["env"])
+		assert.True(t, drainedState.Tags[staging.ServiceParam]["/app/config"].Remove.Contains("deprecated"))
+	})
+
+	t.Run("persist multiple services", func(t *testing.T) {
+		t.Parallel()
+
+		localTmpDir := t.TempDir()
+		localFilePath := filepath.Join(localTmpDir, "stage.json")
+
+		fileStore := file.NewStoreWithPath(localFilePath)
+
+		// Create state with both services
+		state := staging.NewEmptyState()
+		state.Entries[staging.ServiceParam]["/app/config"] = staging.Entry{
+			Operation: staging.OperationUpdate,
+			Value:     lo.ToPtr("param-value"),
+		}
+		state.Entries[staging.ServiceSecret]["my-secret"] = staging.Entry{
+			Operation: staging.OperationCreate,
+			Value:     lo.ToPtr("secret-value"),
+		}
+
+		err := fileStore.WriteState(context.Background(), state)
+		require.NoError(t, err)
+
+		// Drain and verify both services
+		drainedState, err := fileStore.Drain(context.Background(), true)
+		require.NoError(t, err)
+		assert.Equal(t, "param-value", lo.FromPtr(drainedState.Entries[staging.ServiceParam]["/app/config"].Value))
+		assert.Equal(t, "secret-value", lo.FromPtr(drainedState.Entries[staging.ServiceSecret]["my-secret"].Value))
+	})
+
+	t.Run("drain nonexistent file returns empty state", func(t *testing.T) {
+		t.Parallel()
+
+		localTmpDir := t.TempDir()
+		localFilePath := filepath.Join(localTmpDir, "nonexistent.json")
+
+		fileStore := file.NewStoreWithPath(localFilePath)
+
+		exists, err := fileStore.Exists()
+		require.NoError(t, err)
+		assert.False(t, exists)
+
+		// Draining nonexistent file returns empty state (not an error)
+		state, err := fileStore.Drain(context.Background(), true)
+		require.NoError(t, err)
+		assert.Empty(t, state.Entries[staging.ServiceParam])
+		assert.Empty(t, state.Entries[staging.ServiceSecret])
+	})
+
+	t.Run("overwrite existing file on persist", func(t *testing.T) {
+		t.Parallel()
+
+		localTmpDir := t.TempDir()
+		localFilePath := filepath.Join(localTmpDir, "stage.json")
+
+		fileStore := file.NewStoreWithPath(localFilePath)
+
+		// Write first state
+		state1 := staging.NewEmptyState()
+		state1.Entries[staging.ServiceParam]["/first"] = staging.Entry{
+			Operation: staging.OperationUpdate,
+			Value:     lo.ToPtr("first-value"),
+		}
+		err := fileStore.WriteState(context.Background(), state1)
+		require.NoError(t, err)
+
+		// Overwrite with second state
+		state2 := staging.NewEmptyState()
+		state2.Entries[staging.ServiceParam]["/second"] = staging.Entry{
+			Operation: staging.OperationUpdate,
+			Value:     lo.ToPtr("second-value"),
+		}
+		err = fileStore.WriteState(context.Background(), state2)
+		require.NoError(t, err)
+
+		// Drain should only have second state
+		drainedState, err := fileStore.Drain(context.Background(), true)
+		require.NoError(t, err)
+		assert.NotContains(t, drainedState.Entries[staging.ServiceParam], "/first")
+		assert.Contains(t, drainedState.Entries[staging.ServiceParam], "/second")
+	})
 }
