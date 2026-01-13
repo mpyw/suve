@@ -14,6 +14,12 @@ import (
 func TestState_IsEmpty(t *testing.T) {
 	t.Parallel()
 
+	t.Run("nil state is empty", func(t *testing.T) {
+		t.Parallel()
+		var state *staging.State
+		assert.True(t, state.IsEmpty())
+	})
+
 	t.Run("empty state is empty", func(t *testing.T) {
 		t.Parallel()
 		state := staging.NewEmptyState()
@@ -173,6 +179,14 @@ func TestState_Merge(t *testing.T) {
 func TestState_ExtractService(t *testing.T) {
 	t.Parallel()
 
+	t.Run("extract from nil state returns empty state", func(t *testing.T) {
+		t.Parallel()
+		var state *staging.State
+		extracted := state.ExtractService(staging.ServiceParam)
+		assert.NotNil(t, extracted)
+		assert.True(t, extracted.IsEmpty())
+	})
+
 	t.Run("extract specific service", func(t *testing.T) {
 		t.Parallel()
 		state := staging.NewEmptyState()
@@ -210,6 +224,39 @@ func TestState_ExtractService(t *testing.T) {
 
 func TestState_RemoveService(t *testing.T) {
 	t.Parallel()
+
+	t.Run("remove from nil state does nothing", func(t *testing.T) {
+		t.Parallel()
+		var state *staging.State
+		// Should not panic
+		state.RemoveService(staging.ServiceParam)
+	})
+
+	t.Run("remove empty service clears all", func(t *testing.T) {
+		t.Parallel()
+		state := staging.NewEmptyState()
+		state.Entries[staging.ServiceParam]["/app/param"] = staging.Entry{
+			Operation: staging.OperationUpdate,
+			Value:     lo.ToPtr("param-value"),
+			StagedAt:  time.Now(),
+		}
+		state.Entries[staging.ServiceSecret]["my-secret"] = staging.Entry{
+			Operation: staging.OperationUpdate,
+			Value:     lo.ToPtr("secret-value"),
+			StagedAt:  time.Now(),
+		}
+		state.Tags[staging.ServiceParam]["/app/param"] = staging.TagEntry{
+			Add:      map[string]string{"env": "prod"},
+			StagedAt: time.Now(),
+		}
+
+		state.RemoveService("")
+
+		assert.Empty(t, state.Entries[staging.ServiceParam])
+		assert.Empty(t, state.Entries[staging.ServiceSecret])
+		assert.Empty(t, state.Tags[staging.ServiceParam])
+		assert.Empty(t, state.Tags[staging.ServiceSecret])
+	})
 
 	t.Run("remove specific service", func(t *testing.T) {
 		t.Parallel()

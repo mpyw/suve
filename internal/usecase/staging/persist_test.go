@@ -190,6 +190,52 @@ func TestPersistUseCase_Execute(t *testing.T) {
 	})
 }
 
+func TestPersistUseCase_Execute_Errors(t *testing.T) {
+	t.Parallel()
+
+	t.Run("error on agent load", func(t *testing.T) {
+		t.Parallel()
+
+		agentStore := testutil.NewMockStore()
+		agentStore.DrainErr = errors.New("read error")
+		fileStore := testutil.NewMockStore()
+
+		usecase := &stagingusecase.PersistUseCase{
+			AgentStore: agentStore,
+			FileStore:  fileStore,
+		}
+
+		_, err := usecase.Execute(t.Context(), stagingusecase.PersistInput{})
+		var persistErr *stagingusecase.PersistError
+		require.ErrorAs(t, err, &persistErr)
+		assert.Equal(t, "load", persistErr.Op)
+	})
+
+	t.Run("error on file write", func(t *testing.T) {
+		t.Parallel()
+
+		agentStore := testutil.NewMockStore()
+		fileStore := testutil.NewMockStore()
+
+		_ = agentStore.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
+			Operation: staging.OperationUpdate,
+			Value:     lo.ToPtr("value"),
+			StagedAt:  time.Now(),
+		})
+		fileStore.WriteStateErr = errors.New("write error")
+
+		usecase := &stagingusecase.PersistUseCase{
+			AgentStore: agentStore,
+			FileStore:  fileStore,
+		}
+
+		_, err := usecase.Execute(t.Context(), stagingusecase.PersistInput{})
+		var persistErr *stagingusecase.PersistError
+		require.ErrorAs(t, err, &persistErr)
+		assert.Equal(t, "write", persistErr.Op)
+	})
+}
+
 func TestPersistError(t *testing.T) {
 	t.Parallel()
 

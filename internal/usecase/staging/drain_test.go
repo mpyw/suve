@@ -241,6 +241,52 @@ func TestDrainUseCase_Execute(t *testing.T) {
 	})
 }
 
+func TestDrainUseCase_Execute_Errors(t *testing.T) {
+	t.Parallel()
+
+	t.Run("error on file load", func(t *testing.T) {
+		t.Parallel()
+
+		fileStore := testutil.NewMockStore()
+		fileStore.DrainErr = errors.New("read error")
+		agentStore := testutil.NewMockStore()
+
+		usecase := &stagingusecase.DrainUseCase{
+			FileStore:  fileStore,
+			AgentStore: agentStore,
+		}
+
+		_, err := usecase.Execute(t.Context(), stagingusecase.DrainInput{})
+		var drainErr *stagingusecase.DrainError
+		require.ErrorAs(t, err, &drainErr)
+		assert.Equal(t, "load", drainErr.Op)
+	})
+
+	t.Run("error on agent write", func(t *testing.T) {
+		t.Parallel()
+
+		fileStore := testutil.NewMockStore()
+		agentStore := testutil.NewMockStore()
+
+		_ = fileStore.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
+			Operation: staging.OperationUpdate,
+			Value:     lo.ToPtr("value"),
+			StagedAt:  time.Now(),
+		})
+		agentStore.WriteStateErr = errors.New("write error")
+
+		usecase := &stagingusecase.DrainUseCase{
+			FileStore:  fileStore,
+			AgentStore: agentStore,
+		}
+
+		_, err := usecase.Execute(t.Context(), stagingusecase.DrainInput{})
+		var drainErr *stagingusecase.DrainError
+		require.ErrorAs(t, err, &drainErr)
+		assert.Equal(t, "write", drainErr.Op)
+	})
+}
+
 func TestDrainError(t *testing.T) {
 	t.Parallel()
 
