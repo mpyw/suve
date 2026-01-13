@@ -7,6 +7,8 @@
 //
 // Colors are automatically disabled when output is not a TTY, ensuring
 // clean output when piped or redirected.
+//
+//nolint:forbidigo // This package wraps fmt.Fprint* functions
 package output
 
 import (
@@ -159,6 +161,21 @@ func colorDiff(diff string) string {
 	}
 
 	return result.String()
+}
+
+// Print writes a message to the writer without a newline.
+func Print(w io.Writer, msg string) {
+	_, _ = fmt.Fprint(w, msg)
+}
+
+// Println writes a message to the writer with a newline.
+func Println(w io.Writer, msg string) {
+	_, _ = fmt.Fprintln(w, msg)
+}
+
+// Printf writes a formatted message to the writer.
+func Printf(w io.Writer, format string, args ...any) {
+	_, _ = fmt.Fprintf(w, format, args...)
 }
 
 // Indent adds a prefix to each line of the input string.

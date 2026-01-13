@@ -9,7 +9,7 @@ import (
 	"github.com/urfave/cli/v3"
 
 	"github.com/mpyw/suve/internal/api/paramapi"
-	"github.com/mpyw/suve/internal/cli/colors"
+	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/infra"
 	"github.com/mpyw/suve/internal/usecase/param"
 )
@@ -120,11 +120,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 		return err
 	}
 
-	_, _ = fmt.Fprintf(r.Stdout, "%s Created parameter %s (version: %d)\n",
-		colors.Success("✓"),
-		result.Name,
-		result.Version,
-	)
+	output.Success(r.Stdout, "Created parameter %s (version: %d)", result.Name, result.Version)
 
 	return nil
 }

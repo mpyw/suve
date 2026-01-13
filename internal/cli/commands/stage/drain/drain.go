@@ -8,6 +8,7 @@ import (
 
 	"github.com/urfave/cli/v3"
 
+	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/cli/passphrase"
 	"github.com/mpyw/suve/internal/cli/terminal"
 	"github.com/mpyw/suve/internal/infra"
@@ -149,11 +150,11 @@ EXAMPLES:
 			if !keep {
 				// Drain again with keep=false to delete the file
 				if _, err := fileStore.Drain(ctx, false); err != nil {
-					_, _ = fmt.Fprintf(cmd.Root().ErrWriter, "Warning: failed to delete file: %v\n", err)
+					output.Printf(cmd.Root().ErrWriter, "Warning: failed to delete file: %v\n", err)
 				}
-				_, _ = fmt.Fprintln(cmd.Root().Writer, "Staged changes loaded from file and file deleted")
+				output.Println(cmd.Root().Writer, "Staged changes loaded from file and file deleted")
 			} else {
-				_, _ = fmt.Fprintln(cmd.Root().Writer, "Staged changes loaded from file (file kept)")
+				output.Println(cmd.Root().Writer, "Staged changes loaded from file (file kept)")
 			}
 
 			return nil

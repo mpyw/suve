@@ -9,7 +9,6 @@ import (
 
 	"github.com/urfave/cli/v3"
 
-	"github.com/mpyw/suve/internal/cli/colors"
 	"github.com/mpyw/suve/internal/cli/confirm"
 	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/infra"
@@ -84,7 +83,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		if currentValue != "" {
 			diff := output.Diff(name+" (AWS)", name+" (new)", currentValue, newValue)
 			if diff != "" {
-				_, _ = fmt.Fprintln(cmd.Root().ErrWriter, diff)
+				output.Println(cmd.Root().ErrWriter, diff)
 			}
 		}
 
@@ -131,11 +130,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 		return err
 	}
 
-	_, _ = fmt.Fprintf(r.Stdout, "%s Updated secret %s (version: %s)\n",
-		colors.Success("✓"),
-		result.Name,
-		result.VersionID,
-	)
+	output.Success(r.Stdout, "Updated secret %s (version: %s)", result.Name, result.VersionID)
 
 	return nil
 }

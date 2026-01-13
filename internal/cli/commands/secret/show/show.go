@@ -154,7 +154,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 
 	// Raw mode: output value only without trailing newline
 	if opts.Raw {
-		_, _ = fmt.Fprint(r.Stdout, value)
+		output.Print(r.Stdout, value)
 		return nil
 	}
 

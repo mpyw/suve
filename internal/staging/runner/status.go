@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/mpyw/suve/internal/cli/colors"
+	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/maputil"
 	"github.com/mpyw/suve/internal/staging"
 	stagingusecase "github.com/mpyw/suve/internal/usecase/staging"
@@ -37,7 +38,7 @@ func (r *StatusRunner) Run(ctx context.Context, opts StatusOptions) error {
 
 	totalCount := len(result.Entries) + len(result.TagEntries)
 	if totalCount == 0 {
-		_, _ = fmt.Fprintf(r.Stdout, "No %s changes staged.\n", result.ServiceName)
+		output.Printf(r.Stdout, "No %s changes staged.\n", result.ServiceName)
 		return nil
 	}
 
@@ -54,7 +55,7 @@ func (r *StatusRunner) Run(ctx context.Context, opts StatusOptions) error {
 	}
 
 	// For all items, show header and entries
-	_, _ = fmt.Fprintf(r.Stdout, "%s (%d):\n", colors.Warning(fmt.Sprintf("Staged %s changes", result.ServiceName)), totalCount)
+	output.Printf(r.Stdout, "%s (%d):\n", colors.Warning(fmt.Sprintf("Staged %s changes", result.ServiceName)), totalCount)
 
 	printer := &staging.EntryPrinter{Writer: r.Stdout}
 	for _, name := range maputil.SortedNames(result.Entries, func(e stagingusecase.StatusEntry) string { return e.Name }) {
@@ -88,14 +89,14 @@ func (r *StatusRunner) printTagEntry(e stagingusecase.StatusTagEntry, verbose bo
 		parts = append(parts, fmt.Sprintf("-%d tag(s)", e.Remove.Len()))
 	}
 	summary := strings.Join(parts, ", ")
-	_, _ = fmt.Fprintf(r.Stdout, "  %s %s [%s]\n", colors.Info("T"), e.Name, summary)
+	output.Printf(r.Stdout, "  %s %s [%s]\n", colors.Info("T"), e.Name, summary)
 
 	if verbose {
 		for key, value := range e.Add {
-			_, _ = fmt.Fprintf(r.Stdout, "      + %s=%s\n", key, value)
+			output.Printf(r.Stdout, "      + %s=%s\n", key, value)
 		}
 		for key := range e.Remove {
-			_, _ = fmt.Fprintf(r.Stdout, "      - %s\n", key)
+			output.Printf(r.Stdout, "      - %s\n", key)
 		}
 	}
 }

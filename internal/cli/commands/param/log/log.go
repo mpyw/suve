@@ -275,7 +275,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 			if entry.IsCurrent {
 				currentMark = colors.Current(" (current)")
 			}
-			_, _ = fmt.Fprintf(r.Stdout, "%s%d%s  %s  %s\n",
+			output.Printf(r.Stdout, "%s%d%s  %s  %s\n",
 				colors.Version(""),
 				entry.Version,
 				currentMark,
@@ -289,9 +289,9 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 		if entry.IsCurrent {
 			versionLabel += " " + colors.Current("(current)")
 		}
-		_, _ = fmt.Fprintln(r.Stdout, colors.Version(versionLabel))
+		output.Println(r.Stdout, colors.Version(versionLabel))
 		if entry.LastModified != nil {
-			_, _ = fmt.Fprintf(r.Stdout, "%s %s\n", colors.FieldLabel("Date:"), timeutil.FormatRFC3339(*entry.LastModified))
+			output.Printf(r.Stdout, "%s %s\n", colors.FieldLabel("Date:"), timeutil.FormatRFC3339(*entry.LastModified))
 		}
 
 		if opts.ShowPatch {
@@ -318,8 +318,8 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 				newName := fmt.Sprintf("%s#%d", result.Name, newEntry.Version)
 				diff := output.Diff(oldName, newName, oldValue, newValue)
 				if diff != "" {
-					_, _ = fmt.Fprintln(r.Stdout)
-					_, _ = fmt.Fprint(r.Stdout, diff)
+					output.Println(r.Stdout, "")
+					output.Print(r.Stdout, diff)
 				}
 			}
 		} else {
@@ -328,11 +328,11 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 			if opts.MaxValueLength > 0 && len(value) > opts.MaxValueLength {
 				value = value[:opts.MaxValueLength] + "..."
 			}
-			_, _ = fmt.Fprintf(r.Stdout, "%s\n", value)
+			output.Printf(r.Stdout, "%s\n", value)
 		}
 
 		if i < len(entries)-1 {
-			_, _ = fmt.Fprintln(r.Stdout)
+			output.Println(r.Stdout, "")
 		}
 	}
 

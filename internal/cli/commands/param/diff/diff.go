@@ -176,7 +176,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 		value1,
 		value2,
 	)
-	_, _ = fmt.Fprint(r.Stdout, diff)
+	output.Print(r.Stdout, diff)
 
 	return nil
 }

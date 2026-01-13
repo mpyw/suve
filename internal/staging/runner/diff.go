@@ -60,13 +60,13 @@ func (r *DiffRunner) Run(ctx context.Context, opts DiffOptions) error {
 				output.Warning(r.Stderr, "unstaged %s: %s", entry.Name, entry.Warning)
 			case stagingusecase.DiffEntryCreate:
 				if !first {
-					_, _ = fmt.Fprintln(r.Stdout)
+					output.Println(r.Stdout, "")
 				}
 				first = false
 				r.outputDiffCreate(opts, entry)
 			case stagingusecase.DiffEntryNormal:
 				if !first {
-					_, _ = fmt.Fprintln(r.Stdout)
+					output.Println(r.Stdout, "")
 				}
 				first = false
 				r.outputDiff(opts, entry)
@@ -82,7 +82,7 @@ func (r *DiffRunner) Run(ctx context.Context, opts DiffOptions) error {
 				continue
 			}
 			if !first {
-				_, _ = fmt.Fprintln(r.Stdout)
+				output.Println(r.Stdout, "")
 			}
 			first = false
 			r.outputTagEntry(tagEntry)
@@ -110,7 +110,7 @@ func (r *DiffRunner) outputDiff(opts DiffOptions, entry stagingusecase.DiffEntry
 	), entry.Name)
 
 	diff := output.Diff(label1, label2, awsValue, stagedValue)
-	_, _ = fmt.Fprint(r.Stdout, diff)
+	output.Print(r.Stdout, diff)
 
 	// Show staged metadata
 	r.outputMetadata(entry)
@@ -130,7 +130,7 @@ func (r *DiffRunner) outputDiffCreate(opts DiffOptions, entry stagingusecase.Dif
 	label2 := fmt.Sprintf("%s (staged for creation)", entry.Name)
 
 	diff := output.Diff(label1, label2, "", stagedValue)
-	_, _ = fmt.Fprint(r.Stdout, diff)
+	output.Print(r.Stdout, diff)
 
 	// Show staged metadata
 	r.outputMetadata(entry)
@@ -138,22 +138,22 @@ func (r *DiffRunner) outputDiffCreate(opts DiffOptions, entry stagingusecase.Dif
 
 func (r *DiffRunner) outputMetadata(entry stagingusecase.DiffEntry) {
 	if desc := lo.FromPtr(entry.Description); desc != "" {
-		_, _ = fmt.Fprintf(r.Stdout, "%s %s\n", colors.FieldLabel("Description:"), desc)
+		output.Printf(r.Stdout, "%s %s\n", colors.FieldLabel("Description:"), desc)
 	}
 }
 
 func (r *DiffRunner) outputTagEntry(tagEntry stagingusecase.DiffTagEntry) {
-	_, _ = fmt.Fprintf(r.Stdout, "%s %s (staged tag changes)\n", colors.Info("Tags:"), tagEntry.Name)
+	output.Printf(r.Stdout, "%s %s (staged tag changes)\n", colors.Info("Tags:"), tagEntry.Name)
 
 	if len(tagEntry.Add) > 0 {
 		var tagPairs []string
 		for _, k := range maputil.SortedKeys(tagEntry.Add) {
 			tagPairs = append(tagPairs, fmt.Sprintf("%s=%s", k, tagEntry.Add[k]))
 		}
-		_, _ = fmt.Fprintf(r.Stdout, "  %s %s\n", colors.OpAdd("+"), strings.Join(tagPairs, ", "))
+		output.Printf(r.Stdout, "  %s %s\n", colors.OpAdd("+"), strings.Join(tagPairs, ", "))
 	}
 
 	if tagEntry.Remove.Len() > 0 {
-		_, _ = fmt.Fprintf(r.Stdout, "  %s %s\n", colors.OpDelete("-"), strings.Join(tagEntry.Remove.Values(), ", "))
+		output.Printf(r.Stdout, "  %s %s\n", colors.OpDelete("-"), strings.Join(tagEntry.Remove.Values(), ", "))
 	}
 }

@@ -1,12 +1,12 @@
 package staging
 
 import (
-	"fmt"
 	"io"
 
 	"github.com/samber/lo"
 
 	"github.com/mpyw/suve/internal/cli/colors"
+	"github.com/mpyw/suve/internal/cli/output"
 )
 
 // EntryPrinter prints staged entries to the given writer.
@@ -29,12 +29,12 @@ func (p *EntryPrinter) PrintEntry(name string, entry Entry, verbose, showDeleteO
 	}
 
 	if !verbose {
-		_, _ = fmt.Fprintf(p.Writer, "  %s %s\n", opColor, name)
+		output.Printf(p.Writer, "  %s %s\n", opColor, name)
 		return
 	}
 
-	_, _ = fmt.Fprintf(p.Writer, "\n%s %s\n", opColor, name)
-	_, _ = fmt.Fprintf(p.Writer, "  %s %s\n", colors.FieldLabel("Staged:"), entry.StagedAt.Format("2006-01-02 15:04:05"))
+	output.Printf(p.Writer, "\n%s %s\n", opColor, name)
+	output.Printf(p.Writer, "  %s %s\n", colors.FieldLabel("Staged:"), entry.StagedAt.Format("2006-01-02 15:04:05"))
 
 	switch entry.Operation {
 	case OperationCreate, OperationUpdate:
@@ -43,15 +43,15 @@ func (p *EntryPrinter) PrintEntry(name string, entry Entry, verbose, showDeleteO
 			if len(value) > 100 {
 				value = value[:100] + "..."
 			}
-			_, _ = fmt.Fprintf(p.Writer, "  %s %s\n", colors.FieldLabel("Value:"), value)
+			output.Printf(p.Writer, "  %s %s\n", colors.FieldLabel("Value:"), value)
 		}
 	case OperationDelete:
 		if showDeleteOptions && entry.DeleteOptions != nil {
 			switch {
 			case entry.DeleteOptions.Force:
-				_, _ = fmt.Fprintf(p.Writer, "  %s force (immediate, no recovery)\n", colors.FieldLabel("Delete:"))
+				output.Printf(p.Writer, "  %s force (immediate, no recovery)\n", colors.FieldLabel("Delete:"))
 			case entry.DeleteOptions.RecoveryWindow > 0:
-				_, _ = fmt.Fprintf(p.Writer, "  %s %d days recovery window\n", colors.FieldLabel("Delete:"), entry.DeleteOptions.RecoveryWindow)
+				output.Printf(p.Writer, "  %s %d days recovery window\n", colors.FieldLabel("Delete:"), entry.DeleteOptions.RecoveryWindow)
 			}
 		}
 	}

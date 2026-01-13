@@ -9,7 +9,7 @@ import (
 
 	"github.com/urfave/cli/v3"
 
-	"github.com/mpyw/suve/internal/cli/colors"
+	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/infra"
 	"github.com/mpyw/suve/internal/usecase/param"
 )
@@ -81,11 +81,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 		return err
 	}
 
-	_, _ = fmt.Fprintf(r.Stdout, "%s Tagged parameter %s (%d tag(s))\n",
-		colors.Success("✓"),
-		opts.Name,
-		len(opts.Tags),
-	)
+	output.Success(r.Stdout, "Tagged parameter %s (%d tag(s))", opts.Name, len(opts.Tags))
 
 	return nil
 }

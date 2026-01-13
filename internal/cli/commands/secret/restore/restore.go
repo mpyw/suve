@@ -8,7 +8,7 @@ import (
 
 	"github.com/urfave/cli/v3"
 
-	"github.com/mpyw/suve/internal/cli/colors"
+	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/infra"
 	"github.com/mpyw/suve/internal/usecase/secret"
 )
@@ -72,10 +72,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 		return err
 	}
 
-	_, _ = fmt.Fprintf(r.Stdout, "%s Restored secret %s\n",
-		colors.Success("✓"),
-		result.Name,
-	)
+	output.Success(r.Stdout, "Restored secret %s", result.Name)
 
 	return nil
 }

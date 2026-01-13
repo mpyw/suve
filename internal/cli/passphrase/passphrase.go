@@ -4,7 +4,6 @@ package passphrase
 import (
 	"bufio"
 	"errors"
-	"fmt"
 	"io"
 	"strings"
 
@@ -36,13 +35,13 @@ type Prompter struct {
 // Returns empty string if user chooses to continue without encryption after warning.
 // Returns ErrCancelled if user declines to continue without encryption.
 func (p *Prompter) PromptForEncrypt() (string, error) {
-	_, _ = fmt.Fprintf(p.Stderr, "Enter passphrase (empty for plain text): ")
+	output.Print(p.Stderr, "Enter passphrase (empty for plain text): ")
 
 	pass, err := p.readPassword()
 	if err != nil {
-		return "", fmt.Errorf("failed to read passphrase: %w", err)
+		return "", errors.New("failed to read passphrase: " + err.Error())
 	}
-	_, _ = fmt.Fprintln(p.Stderr) // newline after password input
+	output.Println(p.Stderr, "") // newline after password input
 
 	// If empty, warn and confirm
 	if pass == "" {
@@ -53,12 +52,12 @@ func (p *Prompter) PromptForEncrypt() (string, error) {
 	}
 
 	// Confirm passphrase
-	_, _ = fmt.Fprintf(p.Stderr, "Confirm passphrase: ")
+	output.Print(p.Stderr, "Confirm passphrase: ")
 	confirm, err := p.readPassword()
 	if err != nil {
-		return "", fmt.Errorf("failed to read confirmation: %w", err)
+		return "", errors.New("failed to read confirmation: " + err.Error())
 	}
-	_, _ = fmt.Fprintln(p.Stderr) // newline after password input
+	output.Println(p.Stderr, "") // newline after password input
 
 	if pass != confirm {
 		return "", ErrPassphraseMismatch
@@ -69,13 +68,13 @@ func (p *Prompter) PromptForEncrypt() (string, error) {
 
 // PromptForDecrypt prompts for passphrase for decryption (no confirmation).
 func (p *Prompter) PromptForDecrypt() (string, error) {
-	_, _ = fmt.Fprintf(p.Stderr, "Enter passphrase: ")
+	output.Print(p.Stderr, "Enter passphrase: ")
 
 	pass, err := p.readPassword()
 	if err != nil {
-		return "", fmt.Errorf("failed to read passphrase: %w", err)
+		return "", errors.New("failed to read passphrase: " + err.Error())
 	}
-	_, _ = fmt.Fprintln(p.Stderr) // newline after password input
+	output.Println(p.Stderr, "") // newline after password input
 
 	return pass, nil
 }
@@ -101,7 +100,7 @@ func (p *Prompter) ReadFromStdin() (string, error) {
 // confirmPlainText asks user to confirm storing as plain text.
 func (p *Prompter) confirmPlainText() bool {
 	output.Warn(p.Stderr, "Storing secrets as plain text on disk.")
-	_, _ = fmt.Fprintf(p.Stderr, "%s Continue without encryption? [y/N]: ", colors.Warning("?"))
+	output.Printf(p.Stderr, "%s Continue without encryption? [y/N]: ", colors.Warning("?"))
 
 	// Use buffered reader to preserve stream position
 	if p.bufReader == nil {

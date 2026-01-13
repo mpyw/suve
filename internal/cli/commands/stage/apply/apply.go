@@ -203,7 +203,7 @@ func (r *Runner) Run(ctx context.Context) error {
 
 	// Apply SSM Parameter Store changes
 	if len(paramStaged) > 0 {
-		_, _ = fmt.Fprintln(r.Stdout, "Applying SSM Parameter Store parameters...")
+		output.Println(r.Stdout, "Applying SSM Parameter Store parameters...")
 		succeeded, failed := r.applyService(ctx, r.ParamStrategy, paramStaged)
 		totalSucceeded += succeeded
 		totalFailed += failed
@@ -211,7 +211,7 @@ func (r *Runner) Run(ctx context.Context) error {
 
 	// Apply Secrets Manager changes
 	if len(secretStaged) > 0 {
-		_, _ = fmt.Fprintln(r.Stdout, "Applying Secrets Manager secrets...")
+		output.Println(r.Stdout, "Applying Secrets Manager secrets...")
 		succeeded, failed := r.applyService(ctx, r.SecretStrategy, secretStaged)
 		totalSucceeded += succeeded
 		totalFailed += failed
@@ -219,7 +219,7 @@ func (r *Runner) Run(ctx context.Context) error {
 
 	// Apply SSM Parameter Store tag changes
 	if len(paramTagStaged) > 0 {
-		_, _ = fmt.Fprintln(r.Stdout, "Applying SSM Parameter Store tags...")
+		output.Println(r.Stdout, "Applying SSM Parameter Store tags...")
 		succeeded, failed := r.applyTagService(ctx, r.ParamStrategy, paramTagStaged)
 		totalSucceeded += succeeded
 		totalFailed += failed
@@ -227,7 +227,7 @@ func (r *Runner) Run(ctx context.Context) error {
 
 	// Apply Secrets Manager tag changes
 	if len(secretTagStaged) > 0 {
-		_, _ = fmt.Fprintln(r.Stdout, "Applying Secrets Manager tags...")
+		output.Println(r.Stdout, "Applying Secrets Manager tags...")
 		succeeded, failed := r.applyTagService(ctx, r.SecretStrategy, secretTagStaged)
 		totalSucceeded += succeeded
 		totalFailed += failed

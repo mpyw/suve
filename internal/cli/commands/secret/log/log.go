@@ -265,7 +265,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 			if len(entry.VersionStage) > 0 {
 				labelsStr = colors.Current(fmt.Sprintf(" %v", entry.VersionStage))
 			}
-			_, _ = fmt.Fprintf(r.Stdout, "%s%s  %s%s\n",
+			output.Printf(r.Stdout, "%s%s  %s%s\n",
 				colors.Version(secretversion.TruncateVersionID(versionID)),
 				labelsStr,
 				colors.FieldLabel(dateStr),
@@ -278,9 +278,9 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 		if len(entry.VersionStage) > 0 {
 			versionLabel += " " + colors.Current(fmt.Sprintf("%v", entry.VersionStage))
 		}
-		_, _ = fmt.Fprintln(r.Stdout, colors.Version(versionLabel))
+		output.Println(r.Stdout, colors.Version(versionLabel))
 		if entry.CreatedDate != nil {
-			_, _ = fmt.Fprintf(r.Stdout, "%s %s\n", colors.FieldLabel("Date:"), timeutil.FormatRFC3339(*entry.CreatedDate))
+			output.Printf(r.Stdout, "%s %s\n", colors.FieldLabel("Date:"), timeutil.FormatRFC3339(*entry.CreatedDate))
 		}
 
 		if opts.ShowPatch {
@@ -317,15 +317,15 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 					newName := fmt.Sprintf("%s#%s", opts.Name, secretversion.TruncateVersionID(newVersionID))
 					diff := output.Diff(oldName, newName, oldValue, newValue)
 					if diff != "" {
-						_, _ = fmt.Fprintln(r.Stdout)
-						_, _ = fmt.Fprint(r.Stdout, diff)
+						output.Println(r.Stdout, "")
+						output.Print(r.Stdout, diff)
 					}
 				}
 			}
 		}
 
 		if i < len(entries)-1 {
-			_, _ = fmt.Fprintln(r.Stdout)
+			output.Println(r.Stdout, "")
 		}
 	}
 

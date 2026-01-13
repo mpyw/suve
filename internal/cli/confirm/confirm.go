@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/mpyw/suve/internal/cli/colors"
+	"github.com/mpyw/suve/internal/cli/output"
 )
 
 // Prompter handles confirmation prompts.
@@ -26,9 +27,9 @@ func (p *Prompter) printTargetInfo() {
 		return
 	}
 	if p.Profile != "" {
-		_, _ = fmt.Fprintf(p.Stderr, "%s Target: %s (%s / %s)\n", colors.Info("i"), p.Profile, p.AccountID, p.Region)
+		output.Printf(p.Stderr, "%s Target: %s (%s / %s)\n", colors.Info("i"), p.Profile, p.AccountID, p.Region)
 	} else {
-		_, _ = fmt.Fprintf(p.Stderr, "%s Target: %s / %s\n", colors.Info("i"), p.AccountID, p.Region)
+		output.Printf(p.Stderr, "%s Target: %s / %s\n", colors.Info("i"), p.AccountID, p.Region)
 	}
 }
 
@@ -52,7 +53,7 @@ func (p *Prompter) Confirm(message string, skipConfirm bool) (bool, error) {
 	}
 
 	p.printTargetInfo()
-	_, _ = fmt.Fprintf(p.Stderr, "%s %s [y/N]: ", colors.Warning("?"), message)
+	output.Printf(p.Stderr, "%s %s [y/N]: ", colors.Warning("?"), message)
 	return p.readYesNo()
 }
 
@@ -69,7 +70,7 @@ func (p *Prompter) ConfirmDelete(target string, skipConfirm bool) (bool, error) 
 	}
 
 	p.printTargetInfo()
-	_, _ = fmt.Fprintf(p.Stderr, "%s This will permanently delete: %s\n", colors.Error("!"), target)
-	_, _ = fmt.Fprintf(p.Stderr, "%s Continue? [y/N]: ", colors.Warning("?"))
+	output.Printf(p.Stderr, "%s This will permanently delete: %s\n", colors.Error("!"), target)
+	output.Printf(p.Stderr, "%s Continue? [y/N]: ", colors.Warning("?"))
 	return p.readYesNo()
 }

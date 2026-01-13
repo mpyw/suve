@@ -107,15 +107,15 @@ EXAMPLES:
 					return fmt.Errorf("failed to clear agent memory: %w", err)
 				}
 				if encrypted {
-					_, _ = fmt.Fprintln(cmd.Root().Writer, "Staged changes persisted to file (encrypted) and cleared from memory")
+					output.Println(cmd.Root().Writer, "Staged changes persisted to file (encrypted) and cleared from memory")
 				} else {
-					_, _ = fmt.Fprintln(cmd.Root().Writer, "Staged changes persisted to file and cleared from memory")
+					output.Println(cmd.Root().Writer, "Staged changes persisted to file and cleared from memory")
 				}
 			} else {
 				if encrypted {
-					_, _ = fmt.Fprintln(cmd.Root().Writer, "Staged changes persisted to file (encrypted, kept in memory)")
+					output.Println(cmd.Root().Writer, "Staged changes persisted to file (encrypted, kept in memory)")
 				} else {
-					_, _ = fmt.Fprintln(cmd.Root().Writer, "Staged changes persisted to file (kept in memory)")
+					output.Println(cmd.Root().Writer, "Staged changes persisted to file (kept in memory)")
 				}
 			}
 

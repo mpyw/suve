@@ -130,7 +130,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 	// If --show is not specified and not JSON output, just print names
 	if !opts.Show && opts.Output != output.FormatJSON {
 		for _, entry := range result.Entries {
-			_, _ = fmt.Fprintln(r.Stdout, entry.Name)
+			output.Println(r.Stdout, entry.Name)
 		}
 		return nil
 	}
@@ -164,9 +164,9 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 	// Text output with values
 	for _, entry := range result.Entries {
 		if entry.Error != nil {
-			_, _ = fmt.Fprintf(r.Stdout, "%s\t<error: %v>\n", entry.Name, entry.Error)
+			output.Printf(r.Stdout, "%s\t<error: %v>\n", entry.Name, entry.Error)
 		} else {
-			_, _ = fmt.Fprintf(r.Stdout, "%s\t%s\n", entry.Name, lo.FromPtr(entry.Value))
+			output.Printf(r.Stdout, "%s\t%s\n", entry.Name, lo.FromPtr(entry.Value))
 		}
 	}
 

@@ -198,7 +198,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 			case staging.OperationCreate:
 				// Item doesn't exist in AWS - this is expected for create operations
 				if !first {
-					_, _ = fmt.Fprintln(r.Stdout)
+					output.Println(r.Stdout, "")
 				}
 				first = false
 				if err := r.outputDiffCreate(opts, name, entry); err != nil {
@@ -217,7 +217,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 		}
 
 		if !first {
-			_, _ = fmt.Fprintln(r.Stdout)
+			output.Println(r.Stdout, "")
 		}
 		first = false
 
@@ -245,7 +245,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 			case staging.OperationCreate:
 				// Item doesn't exist in AWS - this is expected for create operations
 				if !first {
-					_, _ = fmt.Fprintln(r.Stdout)
+					output.Println(r.Stdout, "")
 				}
 				first = false
 				if err := r.outputDiffCreate(opts, name, entry); err != nil {
@@ -264,7 +264,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 		}
 
 		if !first {
-			_, _ = fmt.Fprintln(r.Stdout)
+			output.Println(r.Stdout, "")
 		}
 		first = false
 
@@ -277,7 +277,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 	for _, name := range maputil.SortedKeys(paramTagEntries) {
 		tagEntry := paramTagEntries[name]
 		if !first {
-			_, _ = fmt.Fprintln(r.Stdout)
+			output.Println(r.Stdout, "")
 		}
 		first = false
 		r.outputTagDiff(name, tagEntry)
@@ -287,7 +287,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 	for _, name := range maputil.SortedKeys(secretTagEntries) {
 		tagEntry := secretTagEntries[name]
 		if !first {
-			_, _ = fmt.Fprintln(r.Stdout)
+			output.Println(r.Stdout, "")
 		}
 		first = false
 		r.outputTagDiff(name, tagEntry)
@@ -327,7 +327,7 @@ func (r *Runner) outputParamDiff(ctx context.Context, opts Options, name string,
 	), name)
 
 	diff := output.Diff(label1, label2, awsValue, stagedValue)
-	_, _ = fmt.Fprint(r.Stdout, diff)
+	output.Print(r.Stdout, diff)
 
 	// Show staged metadata
 	r.outputMetadata(entry)
@@ -367,7 +367,7 @@ func (r *Runner) outputSecretDiff(ctx context.Context, opts Options, name string
 	), name)
 
 	diff := output.Diff(label1, label2, awsValue, stagedValue)
-	_, _ = fmt.Fprint(r.Stdout, diff)
+	output.Print(r.Stdout, diff)
 
 	// Show staged metadata
 	r.outputMetadata(entry)
@@ -389,7 +389,7 @@ func (r *Runner) outputDiffCreate(opts Options, name string, entry staging.Entry
 	label2 := fmt.Sprintf("%s (staged for creation)", name)
 
 	diff := output.Diff(label1, label2, "", stagedValue)
-	_, _ = fmt.Fprint(r.Stdout, diff)
+	output.Print(r.Stdout, diff)
 
 	// Show staged metadata
 	r.outputMetadata(entry)
@@ -399,22 +399,22 @@ func (r *Runner) outputDiffCreate(opts Options, name string, entry staging.Entry
 
 func (r *Runner) outputMetadata(entry staging.Entry) {
 	if desc := lo.FromPtr(entry.Description); desc != "" {
-		_, _ = fmt.Fprintf(r.Stdout, "%s %s\n", colors.FieldLabel("Description:"), desc)
+		output.Printf(r.Stdout, "%s %s\n", colors.FieldLabel("Description:"), desc)
 	}
 }
 
 func (r *Runner) outputTagDiff(name string, tagEntry staging.TagEntry) {
-	_, _ = fmt.Fprintf(r.Stdout, "%s %s (staged tag changes)\n", colors.Info("Tags:"), name)
+	output.Printf(r.Stdout, "%s %s (staged tag changes)\n", colors.Info("Tags:"), name)
 
 	if len(tagEntry.Add) > 0 {
 		var tagPairs []string
 		for _, k := range maputil.SortedKeys(tagEntry.Add) {
 			tagPairs = append(tagPairs, fmt.Sprintf("%s=%s", k, tagEntry.Add[k]))
 		}
-		_, _ = fmt.Fprintf(r.Stdout, "  %s %s\n", colors.OpAdd("+"), strings.Join(tagPairs, ", "))
+		output.Printf(r.Stdout, "  %s %s\n", colors.OpAdd("+"), strings.Join(tagPairs, ", "))
 	}
 
 	if tagEntry.Remove.Len() > 0 {
-		_, _ = fmt.Fprintf(r.Stdout, "  %s %s\n", colors.OpDelete("-"), strings.Join(tagEntry.Remove.Values(), ", "))
+		output.Printf(r.Stdout, "  %s %s\n", colors.OpDelete("-"), strings.Join(tagEntry.Remove.Values(), ", "))
 	}
 }

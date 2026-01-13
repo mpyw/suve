@@ -10,6 +10,7 @@ import (
 	"github.com/urfave/cli/v3"
 
 	"github.com/mpyw/suve/internal/cli/colors"
+	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/infra"
 	"github.com/mpyw/suve/internal/maputil"
 	"github.com/mpyw/suve/internal/staging"
@@ -101,7 +102,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 	}
 
 	if !hasChanges {
-		_, _ = fmt.Fprintln(r.Stdout, "No changes staged.")
+		output.Println(r.Stdout, "No changes staged.")
 		return nil
 	}
 
@@ -112,7 +113,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 	paramTagEntries := tagEntries[staging.ServiceParam]
 	paramTotal := len(paramEntries) + len(paramTagEntries)
 	if paramTotal > 0 {
-		_, _ = fmt.Fprintf(r.Stdout, "%s (%d):\n", colors.Warning("Staged SSM Parameter Store changes"), paramTotal)
+		output.Printf(r.Stdout, "%s (%d):\n", colors.Warning("Staged SSM Parameter Store changes"), paramTotal)
 		printEntries(printer, paramEntries, opts.Verbose, false)
 		printTagEntries(r.Stdout, paramTagEntries, opts.Verbose)
 	}
@@ -124,9 +125,9 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 	if secretTotal > 0 {
 		// Add spacing if we printed SSM Parameter Store entries
 		if paramTotal > 0 {
-			_, _ = fmt.Fprintln(r.Stdout)
+			output.Println(r.Stdout, "")
 		}
-		_, _ = fmt.Fprintf(r.Stdout, "%s (%d):\n", colors.Warning("Staged Secrets Manager changes"), secretTotal)
+		output.Printf(r.Stdout, "%s (%d):\n", colors.Warning("Staged Secrets Manager changes"), secretTotal)
 		printEntries(printer, secretEntries, opts.Verbose, true)
 		printTagEntries(r.Stdout, secretTagEntries, opts.Verbose)
 	}
@@ -152,14 +153,14 @@ func printTagEntries(w io.Writer, tagEntries map[string]staging.TagEntry, verbos
 			parts = append(parts, fmt.Sprintf("-%d tag(s)", entry.Remove.Len()))
 		}
 		summary := strings.Join(parts, ", ")
-		_, _ = fmt.Fprintf(w, "  %s %s [%s]\n", colors.Info("T"), name, summary)
+		output.Printf(w, "  %s %s [%s]\n", colors.Info("T"), name, summary)
 
 		if verbose {
 			for key, value := range entry.Add {
-				_, _ = fmt.Fprintf(w, "      + %s=%s\n", key, value)
+				output.Printf(w, "      + %s=%s\n", key, value)
 			}
 			for key := range entry.Remove {
-				_, _ = fmt.Fprintf(w, "      - %s\n", key)
+				output.Printf(w, "      - %s\n", key)
 			}
 		}
 	}

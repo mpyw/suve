@@ -79,9 +79,9 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		currentValue, _ := useCase.GetCurrentValue(ctx, name)
 		if currentValue != "" {
 			output.Warn(cmd.Root().ErrWriter, "Current value of %s:", name)
-			_, _ = fmt.Fprintln(cmd.Root().ErrWriter)
-			_, _ = fmt.Fprintln(cmd.Root().ErrWriter, output.Indent(currentValue, "  "))
-			_, _ = fmt.Fprintln(cmd.Root().ErrWriter)
+			output.Println(cmd.Root().ErrWriter, "")
+			output.Println(cmd.Root().ErrWriter, output.Indent(currentValue, "  "))
+			output.Println(cmd.Root().ErrWriter, "")
 		}
 	}
 
@@ -123,7 +123,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 		return err
 	}
 
-	_, _ = fmt.Fprintf(r.Stdout, "%s %s\n", colors.OpDelete("Deleted"), result.Name)
+	output.Printf(r.Stdout, "%s %s\n", colors.OpDelete("Deleted"), result.Name)
 
 	return nil
 }

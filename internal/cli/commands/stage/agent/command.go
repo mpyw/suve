@@ -3,10 +3,10 @@ package agent
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/urfave/cli/v3"
 
+	"github.com/mpyw/suve/internal/cli/output"
 	agentcfg "github.com/mpyw/suve/internal/staging/agent"
 	"github.com/mpyw/suve/internal/staging/agent/server"
 	"github.com/mpyw/suve/internal/staging/agent/transport"
@@ -66,10 +66,10 @@ Note: Any staged changes in memory will be lost unless persisted first.`,
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			c := transport.NewClient(agentcfg.ClientOptions()...)
 			if err := c.Shutdown(ctx); err != nil {
-				_, _ = fmt.Fprintf(cmd.Root().ErrWriter, "Warning: %v\n", err)
+				output.Printf(cmd.Root().ErrWriter, "Warning: %v\n", err)
 				return nil
 			}
-			_, _ = fmt.Fprintln(cmd.Root().Writer, "Agent stopped")
+			output.Println(cmd.Root().Writer, "Agent stopped")
 			return nil
 		},
 	}

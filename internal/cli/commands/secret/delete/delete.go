@@ -99,9 +99,9 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		currentValue, _ := uc.GetCurrentValue(ctx, name)
 		if currentValue != "" {
 			output.Warn(cmd.Root().ErrWriter, "Current value of %s:", name)
-			_, _ = fmt.Fprintln(cmd.Root().ErrWriter)
-			_, _ = fmt.Fprintln(cmd.Root().ErrWriter, output.Indent(currentValue, "  "))
-			_, _ = fmt.Fprintln(cmd.Root().ErrWriter)
+			output.Println(cmd.Root().ErrWriter, "")
+			output.Println(cmd.Root().ErrWriter, output.Indent(currentValue, "  "))
+			output.Println(cmd.Root().ErrWriter, "")
 		}
 	}
 
