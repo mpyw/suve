@@ -22,6 +22,38 @@ func TestNewStore(t *testing.T) {
 	assert.NotNil(t, store)
 }
 
+func TestStore_Exists(t *testing.T) {
+	t.Parallel()
+
+	t.Run("file exists", func(t *testing.T) {
+		t.Parallel()
+
+		tmpDir := t.TempDir()
+		path := filepath.Join(tmpDir, "stage.json")
+		store := file.NewStoreWithPath(path)
+
+		// Create the file
+		err := os.WriteFile(path, []byte(`{}`), 0o600)
+		require.NoError(t, err)
+
+		exists, err := store.Exists()
+		require.NoError(t, err)
+		assert.True(t, exists)
+	})
+
+	t.Run("file does not exist", func(t *testing.T) {
+		t.Parallel()
+
+		tmpDir := t.TempDir()
+		path := filepath.Join(tmpDir, "nonexistent.json")
+		store := file.NewStoreWithPath(path)
+
+		exists, err := store.Exists()
+		require.NoError(t, err)
+		assert.False(t, exists)
+	})
+}
+
 func TestNewStoreWithPassphrase(t *testing.T) {
 	t.Parallel()
 
