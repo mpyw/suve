@@ -3,7 +3,6 @@ package terminal
 
 import (
 	"io"
-	"os"
 
 	"github.com/mattn/go-isatty"
 	"golang.org/x/term"
@@ -25,12 +24,6 @@ var GetSize = term.GetSize
 // This is a variable to allow mocking in tests.
 var IsTTY = isatty.IsTerminal
 
-// GetWidth returns the terminal width for stdout.
-// Returns DefaultWidth if detection fails or stdout is not a terminal.
-func GetWidth() int {
-	return GetWidthFromWriter(os.Stdout)
-}
-
 // GetWidthFromWriter returns the terminal width for the given writer.
 // Returns DefaultWidth if detection fails or writer is not a terminal.
 func GetWidthFromWriter(w io.Writer) int {
@@ -44,11 +37,6 @@ func GetWidthFromWriter(w io.Writer) int {
 		return DefaultWidth
 	}
 	return width
-}
-
-// IsTerminal returns true if stdout is a terminal.
-func IsTerminal() bool {
-	return IsTerminalWriter(os.Stdout)
 }
 
 // IsTerminalWriter returns true if the given writer is a terminal.
