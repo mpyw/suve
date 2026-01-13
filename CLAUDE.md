@@ -317,8 +317,6 @@ Optional free-form section for:
 ## References
 
 ```yaml
-memories:
-  - relevant-memory-file.md
 related_docs:
   - ../sibling/CLAUDE.md
 external:
