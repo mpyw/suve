@@ -1,8 +1,8 @@
 package daemon
 
 import (
+	"context"
 	"os"
-	"syscall"
 	"testing"
 	"time"
 
@@ -346,10 +346,12 @@ func TestRunner_checkAutoShutdown_NonEmptyState(t *testing.T) {
 	})
 }
 
-// TestRunner_Run_SignalHandling tests that the runner handles signals correctly.
-func TestRunner_Run_SignalHandling(t *testing.T) {
+// TestRunner_Run_ContextCancellation tests that the runner handles context cancellation correctly.
+// Note: Signal handling (SIGTERM) is tested indirectly via e2e tests and real usage.
+// Sending SIGTERM to the test process would kill the entire test run.
+func TestRunner_Run_ContextCancellation(t *testing.T) {
 	// Create temp directory for socket
-	tmpDir, err := os.MkdirTemp("/tmp", "suve-runner-signal-*")
+	tmpDir, err := os.MkdirTemp("/tmp", "suve-runner-ctx-*")
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = os.RemoveAll(tmpDir) })
 	t.Setenv("TMPDIR", tmpDir)
@@ -359,9 +361,12 @@ func TestRunner_Run_SignalHandling(t *testing.T) {
 
 	runner := NewRunner(accountID, region, WithAutoShutdownDisabled())
 
+	// Create a cancellable context
+	ctx, cancel := context.WithCancel(t.Context())
+
 	errCh := make(chan error, 1)
 	go func() {
-		errCh <- runner.Run(t.Context())
+		errCh <- runner.Run(ctx)
 	}()
 
 	// Wait for daemon to be ready
@@ -375,18 +380,15 @@ func TestRunner_Run_SignalHandling(t *testing.T) {
 	}
 	require.NoError(t, launcher.Ping(), "daemon should be ready")
 
-	// Send SIGTERM to trigger shutdown
-	process, err := os.FindProcess(os.Getpid())
-	require.NoError(t, err)
-	err = process.Signal(syscall.SIGTERM)
-	require.NoError(t, err)
+	// Cancel the context to trigger shutdown
+	cancel()
 
 	// Wait for daemon to exit
 	select {
 	case err := <-errCh:
 		assert.NoError(t, err)
 	case <-time.After(5 * time.Second):
-		t.Fatal("daemon did not shut down within timeout after SIGTERM")
+		t.Fatal("daemon did not shut down within timeout after context cancellation")
 	}
 }
 
