@@ -1,4 +1,4 @@
-package runner_test
+package cli_test
 
 import (
 	"bytes"
@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/mpyw/suve/internal/staging"
-	"github.com/mpyw/suve/internal/staging/runner"
+	"github.com/mpyw/suve/internal/staging/cli"
 	"github.com/mpyw/suve/internal/staging/testutil"
 	stagingusecase "github.com/mpyw/suve/internal/usecase/staging"
 )
@@ -22,7 +22,7 @@ func TestTagRunner_Run(t *testing.T) {
 		store := testutil.NewMockStore()
 
 		var stdout, stderr bytes.Buffer
-		r := &runner.TagRunner{
+		r := &cli.TagRunner{
 			UseCase: &stagingusecase.TagUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentVal: "existing"},
 				Store:    store,
@@ -31,7 +31,7 @@ func TestTagRunner_Run(t *testing.T) {
 			Stderr: &stderr,
 		}
 
-		err := r.Run(t.Context(), runner.TagOptions{
+		err := r.Run(t.Context(), cli.TagOptions{
 			Name: "/app/config",
 			Tags: []string{"env=prod", "team=platform"},
 		})
@@ -50,7 +50,7 @@ func TestTagRunner_Run(t *testing.T) {
 		store := testutil.NewMockStore()
 
 		var stdout, stderr bytes.Buffer
-		r := &runner.TagRunner{
+		r := &cli.TagRunner{
 			UseCase: &stagingusecase.TagUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentVal: "existing"},
 				Store:    store,
@@ -59,7 +59,7 @@ func TestTagRunner_Run(t *testing.T) {
 			Stderr: &stderr,
 		}
 
-		err := r.Run(t.Context(), runner.TagOptions{
+		err := r.Run(t.Context(), cli.TagOptions{
 			Name: "/app/config",
 			Tags: []string{"invalid-tag-without-equals"},
 		})
@@ -73,7 +73,7 @@ func TestTagRunner_Run(t *testing.T) {
 		store := testutil.NewMockStore()
 
 		var stdout, stderr bytes.Buffer
-		r := &runner.TagRunner{
+		r := &cli.TagRunner{
 			UseCase: &stagingusecase.TagUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentErr: assert.AnError},
 				Store:    store,
@@ -82,7 +82,7 @@ func TestTagRunner_Run(t *testing.T) {
 			Stderr: &stderr,
 		}
 
-		err := r.Run(t.Context(), runner.TagOptions{
+		err := r.Run(t.Context(), cli.TagOptions{
 			Name: "/app/config",
 			Tags: []string{"env=prod"},
 		})
@@ -99,7 +99,7 @@ func TestUntagRunner_Run(t *testing.T) {
 		store := testutil.NewMockStore()
 
 		var stdout, stderr bytes.Buffer
-		r := &runner.UntagRunner{
+		r := &cli.UntagRunner{
 			UseCase: &stagingusecase.TagUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentVal: "existing"},
 				Store:    store,
@@ -108,7 +108,7 @@ func TestUntagRunner_Run(t *testing.T) {
 			Stderr: &stderr,
 		}
 
-		err := r.Run(t.Context(), runner.UntagOptions{
+		err := r.Run(t.Context(), cli.UntagOptions{
 			Name: "/app/config",
 			Keys: []string{"deprecated", "old-tag"},
 		})
@@ -128,7 +128,7 @@ func TestUntagRunner_Run(t *testing.T) {
 		store := testutil.NewMockStore()
 
 		var stdout, stderr bytes.Buffer
-		r := &runner.UntagRunner{
+		r := &cli.UntagRunner{
 			UseCase: &stagingusecase.TagUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentErr: assert.AnError},
 				Store:    store,
@@ -137,7 +137,7 @@ func TestUntagRunner_Run(t *testing.T) {
 			Stderr: &stderr,
 		}
 
-		err := r.Run(t.Context(), runner.UntagOptions{
+		err := r.Run(t.Context(), cli.UntagOptions{
 			Name: "/app/config",
 			Keys: []string{"deprecated"},
 		})

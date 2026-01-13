@@ -1,5 +1,5 @@
-// Package runner provides shared runners and command builders for stage commands.
-package runner
+// Package cli provides shared runners and command builders for stage commands.
+package cli
 
 import (
 	"context"

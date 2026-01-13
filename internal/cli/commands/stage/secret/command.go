@@ -6,10 +6,10 @@ import (
 
 	cliinternal "github.com/mpyw/suve/internal/cli/commands/internal"
 	"github.com/mpyw/suve/internal/staging"
-	"github.com/mpyw/suve/internal/staging/runner"
+	stgcli "github.com/mpyw/suve/internal/staging/cli"
 )
 
-var config = runner.CommandConfig{
+var config = stgcli.CommandConfig{
 	CommandName:   "secret",
 	ItemName:      "secret",
 	Factory:       staging.SecretFactory,
@@ -32,15 +32,15 @@ Use 'suve stage secret diff' to see differences between staged and AWS values.
 Use 'suve stage secret apply' to apply staged secret changes to AWS.
 Use 'suve stage secret reset' to unstage or restore from a version.`,
 		Commands: []*cli.Command{
-			runner.NewAddCommand(config),
-			runner.NewEditCommand(config),
-			runner.NewDeleteCommand(config),
-			runner.NewStatusCommand(config),
-			runner.NewDiffCommand(config),
-			runner.NewApplyCommand(config),
-			runner.NewResetCommand(config),
-			runner.NewTagCommand(config),
-			runner.NewUntagCommand(config),
+			stgcli.NewAddCommand(config),
+			stgcli.NewEditCommand(config),
+			stgcli.NewDeleteCommand(config),
+			stgcli.NewStatusCommand(config),
+			stgcli.NewDiffCommand(config),
+			stgcli.NewApplyCommand(config),
+			stgcli.NewResetCommand(config),
+			stgcli.NewTagCommand(config),
+			stgcli.NewUntagCommand(config),
 		},
 		CommandNotFound: cliinternal.CommandNotFound,
 	}

@@ -1,4 +1,4 @@
-package runner_test
+package cli_test
 
 import (
 	"bytes"
@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/mpyw/suve/internal/staging"
-	"github.com/mpyw/suve/internal/staging/runner"
+	"github.com/mpyw/suve/internal/staging/cli"
 	"github.com/mpyw/suve/internal/staging/testutil"
 	stagingusecase "github.com/mpyw/suve/internal/usecase/staging"
 )
@@ -25,7 +25,7 @@ func TestAddRunner_Run(t *testing.T) {
 		store := testutil.NewMockStore()
 
 		var buf bytes.Buffer
-		r := &runner.AddRunner{
+		r := &cli.AddRunner{
 			UseCase: &stagingusecase.AddUseCase{
 				Strategy: &mockStrategy{service: staging.ServiceParam},
 				Store:    store,
@@ -35,7 +35,7 @@ func TestAddRunner_Run(t *testing.T) {
 			OpenEditor: func(_ string) (string, error) { return "new-value", nil },
 		}
 
-		err := r.Run(t.Context(), runner.AddOptions{Name: "/app/config"})
+		err := r.Run(t.Context(), cli.AddOptions{Name: "/app/config"})
 		require.NoError(t, err)
 		assert.Contains(t, buf.String(), "Staged for creation")
 		assert.Contains(t, buf.String(), "/app/config")
@@ -59,7 +59,7 @@ func TestAddRunner_Run(t *testing.T) {
 		})
 
 		var buf bytes.Buffer
-		r := &runner.AddRunner{
+		r := &cli.AddRunner{
 			UseCase: &stagingusecase.AddUseCase{
 				Strategy: &mockStrategy{service: staging.ServiceParam},
 				Store:    store,
@@ -72,7 +72,7 @@ func TestAddRunner_Run(t *testing.T) {
 			},
 		}
 
-		err := r.Run(t.Context(), runner.AddOptions{Name: "/app/config"})
+		err := r.Run(t.Context(), cli.AddOptions{Name: "/app/config"})
 		require.NoError(t, err)
 		assert.Contains(t, buf.String(), "Staged for creation")
 
@@ -89,7 +89,7 @@ func TestAddRunner_Run(t *testing.T) {
 		store := testutil.NewMockStore()
 
 		var buf bytes.Buffer
-		r := &runner.AddRunner{
+		r := &cli.AddRunner{
 			UseCase: &stagingusecase.AddUseCase{
 				Strategy: &mockStrategy{service: staging.ServiceParam},
 				Store:    store,
@@ -99,7 +99,7 @@ func TestAddRunner_Run(t *testing.T) {
 			OpenEditor: func(_ string) (string, error) { return "", nil },
 		}
 
-		err := r.Run(t.Context(), runner.AddOptions{Name: "/app/config"})
+		err := r.Run(t.Context(), cli.AddOptions{Name: "/app/config"})
 		require.NoError(t, err)
 		assert.Contains(t, buf.String(), "Empty value")
 
@@ -120,7 +120,7 @@ func TestAddRunner_Run(t *testing.T) {
 		})
 
 		var buf bytes.Buffer
-		r := &runner.AddRunner{
+		r := &cli.AddRunner{
 			UseCase: &stagingusecase.AddUseCase{
 				Strategy: &mockStrategy{service: staging.ServiceParam},
 				Store:    store,
@@ -132,7 +132,7 @@ func TestAddRunner_Run(t *testing.T) {
 			},
 		}
 
-		err := r.Run(t.Context(), runner.AddOptions{Name: "/app/config"})
+		err := r.Run(t.Context(), cli.AddOptions{Name: "/app/config"})
 		require.NoError(t, err)
 		assert.Contains(t, buf.String(), "No changes made")
 	})
@@ -143,7 +143,7 @@ func TestAddRunner_Run(t *testing.T) {
 		store := testutil.NewMockStore()
 
 		var buf bytes.Buffer
-		r := &runner.AddRunner{
+		r := &cli.AddRunner{
 			UseCase: &stagingusecase.AddUseCase{
 				Strategy: &mockStrategy{service: staging.ServiceSecret},
 				Store:    store,
@@ -153,7 +153,7 @@ func TestAddRunner_Run(t *testing.T) {
 			OpenEditor: func(_ string) (string, error) { return "secret-value", nil },
 		}
 
-		err := r.Run(t.Context(), runner.AddOptions{Name: "my-secret"})
+		err := r.Run(t.Context(), cli.AddOptions{Name: "my-secret"})
 		require.NoError(t, err)
 
 		// Verify staged with correct service
@@ -198,7 +198,7 @@ func TestAddRunner_ErrorCases(t *testing.T) {
 		store := testutil.NewMockStore()
 
 		var stdout, stderr bytes.Buffer
-		r := &runner.AddRunner{
+		r := &cli.AddRunner{
 			UseCase: &stagingusecase.AddUseCase{
 				Strategy: &mockStrategy{service: staging.ServiceParam, parseNameErr: errors.New("invalid name")},
 				Store:    store,
@@ -207,7 +207,7 @@ func TestAddRunner_ErrorCases(t *testing.T) {
 			Stderr: &stderr,
 		}
 
-		err := r.Run(t.Context(), runner.AddOptions{Name: "invalid"})
+		err := r.Run(t.Context(), cli.AddOptions{Name: "invalid"})
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid name")
 	})
@@ -218,7 +218,7 @@ func TestAddRunner_ErrorCases(t *testing.T) {
 		store := testutil.NewMockStore()
 
 		var stdout, stderr bytes.Buffer
-		r := &runner.AddRunner{
+		r := &cli.AddRunner{
 			UseCase: &stagingusecase.AddUseCase{
 				Strategy: &mockStrategy{service: staging.ServiceParam},
 				Store:    store,
@@ -230,7 +230,7 @@ func TestAddRunner_ErrorCases(t *testing.T) {
 			},
 		}
 
-		err := r.Run(t.Context(), runner.AddOptions{Name: "/app/config"})
+		err := r.Run(t.Context(), cli.AddOptions{Name: "/app/config"})
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to edit")
 	})
@@ -245,7 +245,7 @@ func TestAddRunner_WithOptions(t *testing.T) {
 		store := testutil.NewMockStore()
 
 		var stdout, stderr bytes.Buffer
-		r := &runner.AddRunner{
+		r := &cli.AddRunner{
 			UseCase: &stagingusecase.AddUseCase{
 				Strategy: &mockStrategy{service: staging.ServiceParam},
 				Store:    store,
@@ -255,7 +255,7 @@ func TestAddRunner_WithOptions(t *testing.T) {
 			// No OpenEditor set - with Value provided, editor should not be called
 		}
 
-		err := r.Run(t.Context(), runner.AddOptions{
+		err := r.Run(t.Context(), cli.AddOptions{
 			Name:  "/app/new-config",
 			Value: "direct-value",
 		})
@@ -274,7 +274,7 @@ func TestAddRunner_WithOptions(t *testing.T) {
 		store := testutil.NewMockStore()
 
 		var stdout, stderr bytes.Buffer
-		r := &runner.AddRunner{
+		r := &cli.AddRunner{
 			UseCase: &stagingusecase.AddUseCase{
 				Strategy: &mockStrategy{service: staging.ServiceParam},
 				Store:    store,
@@ -283,7 +283,7 @@ func TestAddRunner_WithOptions(t *testing.T) {
 			Stderr: &stderr,
 		}
 
-		err := r.Run(t.Context(), runner.AddOptions{
+		err := r.Run(t.Context(), cli.AddOptions{
 			Name:        "/app/new-config",
 			Value:       "test-value",
 			Description: "Test description",
