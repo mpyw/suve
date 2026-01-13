@@ -2318,6 +2318,52 @@ func TestDrainRunner_Run(t *testing.T) {
 		require.NoError(t, err)
 	})
 
+	t.Run("drain success - with merge and keep", func(t *testing.T) {
+		t.Parallel()
+
+		fileStore := testutil.NewMockStore()
+		agentStore := testutil.NewMockStore()
+
+		// Agent already has an entry
+		_ = agentStore.StageEntry(t.Context(), staging.ServiceParam, "/app/existing", staging.Entry{
+			Operation: staging.OperationUpdate,
+			Value:     lo.ToPtr("agent-value"),
+			StagedAt:  time.Now(),
+		})
+
+		// File has another entry
+		_ = fileStore.StageEntry(t.Context(), staging.ServiceParam, "/app/new", staging.Entry{
+			Operation: staging.OperationUpdate,
+			Value:     lo.ToPtr("file-value"),
+			StagedAt:  time.Now(),
+		})
+
+		var stdout, stderr bytes.Buffer
+		r := &cli.DrainRunner{
+			UseCase: &stagingusecase.DrainUseCase{
+				FileStore:  fileStore,
+				AgentStore: agentStore,
+			},
+			Stdout: &stdout,
+			Stderr: &stderr,
+		}
+
+		err := r.Run(t.Context(), cli.DrainOptions{Merge: true, Keep: true})
+		require.NoError(t, err)
+		assert.Contains(t, stdout.String(), "merged")
+		assert.Contains(t, stdout.String(), "file kept")
+
+		// Verify both entries exist in agent
+		_, err = agentStore.GetEntry(t.Context(), staging.ServiceParam, "/app/existing")
+		require.NoError(t, err)
+		_, err = agentStore.GetEntry(t.Context(), staging.ServiceParam, "/app/new")
+		require.NoError(t, err)
+
+		// Verify file store still has the entry (kept)
+		_, err = fileStore.GetEntry(t.Context(), staging.ServiceParam, "/app/new")
+		require.NoError(t, err)
+	})
+
 	t.Run("drain error - nothing to drain", func(t *testing.T) {
 		t.Parallel()
 
