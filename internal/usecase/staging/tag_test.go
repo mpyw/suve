@@ -18,6 +18,7 @@ import (
 
 type mockTagStrategy struct {
 	*mockParser
+
 	fetchResult *staging.EditFetchResult
 	fetchErr    error
 }

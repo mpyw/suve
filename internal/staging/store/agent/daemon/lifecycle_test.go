@@ -66,7 +66,7 @@ func TestDaemonLifecycle_StartupAndShutdown(t *testing.T) {
 	// Start in background
 	errCh := make(chan error, 1)
 	go func() {
-		errCh <- runner.Run()
+		errCh <- runner.Run(t.Context())
 	}()
 
 	// Wait for daemon to be ready
@@ -118,14 +118,14 @@ func TestDaemonLifecycle_MultipleAccountsSimultaneous(t *testing.T) {
 	runner1 := NewRunner(account1, region, WithAutoShutdownDisabled())
 	errCh1 := make(chan error, 1)
 	go func() {
-		errCh1 <- runner1.Run()
+		errCh1 <- runner1.Run(t.Context())
 	}()
 
 	// Start daemon for account2
 	runner2 := NewRunner(account2, region, WithAutoShutdownDisabled())
 	errCh2 := make(chan error, 1)
 	go func() {
-		errCh2 <- runner2.Run()
+		errCh2 <- runner2.Run(t.Context())
 	}()
 
 	// Wait for both daemons to be ready
@@ -181,7 +181,7 @@ func TestDaemonLifecycle_AutoShutdown(t *testing.T) {
 	// Start in background
 	errCh := make(chan error, 1)
 	go func() {
-		errCh <- runner.Run()
+		errCh <- runner.Run(t.Context())
 	}()
 
 	// Wait for daemon to be ready
@@ -252,7 +252,7 @@ func TestDaemonLifecycle_ManualModeDisablesAutoShutdown(t *testing.T) {
 	// Start in background
 	errCh := make(chan error, 1)
 	go func() {
-		errCh <- runner.Run()
+		errCh <- runner.Run(t.Context())
 	}()
 
 	// Wait for daemon to be ready
@@ -326,7 +326,7 @@ func TestDaemonLifecycle_AutoShutdown_UnstageAll(t *testing.T) {
 	runner := NewRunner(accountID, region)
 	errCh := make(chan error, 1)
 	go func() {
-		errCh <- runner.Run()
+		errCh <- runner.Run(t.Context())
 	}()
 
 	launcher := NewLauncher(accountID, region, WithAutoStartDisabled())
@@ -391,7 +391,7 @@ func TestDaemonLifecycle_AutoShutdown_UnstageTag(t *testing.T) {
 	runner := NewRunner(accountID, region)
 	errCh := make(chan error, 1)
 	go func() {
-		errCh <- runner.Run()
+		errCh <- runner.Run(t.Context())
 	}()
 
 	launcher := NewLauncher(accountID, region, WithAutoStartDisabled())
@@ -454,7 +454,7 @@ func TestDaemonLifecycle_AutoShutdown_SetState(t *testing.T) {
 	runner := NewRunner(accountID, region)
 	errCh := make(chan error, 1)
 	go func() {
-		errCh <- runner.Run()
+		errCh <- runner.Run(t.Context())
 	}()
 
 	launcher := NewLauncher(accountID, region, WithAutoStartDisabled())
@@ -517,7 +517,7 @@ func TestDaemonLifecycle_AutoShutdown_UnstageAllEmpty(t *testing.T) {
 	runner := NewRunner(accountID, region)
 	errCh := make(chan error, 1)
 	go func() {
-		errCh <- runner.Run()
+		errCh <- runner.Run(t.Context())
 	}()
 
 	launcher := NewLauncher(accountID, region, WithAutoStartDisabled())

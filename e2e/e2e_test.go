@@ -59,7 +59,7 @@ func TestMain(m *testing.M) {
 	testDaemon = daemon.NewRunner("000000000000", "us-east-1", agent.DaemonOptions()...)
 	daemonErrCh := make(chan error, 1)
 	go func() {
-		daemonErrCh <- testDaemon.Run()
+		daemonErrCh <- testDaemon.Run(context.Background()) //nolint:forbidigo // TestMain has no t.Context()
 	}()
 
 	// Wait for daemon to be ready by polling with ping
@@ -83,7 +83,7 @@ func TestMain(m *testing.M) {
 func waitForDaemon(timeout time.Duration, daemonErrCh <-chan error) error {
 	// Use same account/region as the daemon
 	launcher := daemon.NewLauncher("000000000000", "us-east-1", daemon.WithAutoStartDisabled())
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	ctx, cancel := context.WithTimeout(context.Background(), timeout) //nolint:forbidigo // called from TestMain
 	defer cancel()
 
 	ticker := time.NewTicker(50 * time.Millisecond)

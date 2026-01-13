@@ -17,6 +17,7 @@ import (
 
 type mockParser struct {
 	*mockServiceStrategy
+
 	parsedName string
 	parseErr   error
 }

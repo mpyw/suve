@@ -1,6 +1,7 @@
 package daemon
 
 import (
+	"context"
 	"os"
 	"os/signal"
 	"syscall"
@@ -27,6 +28,7 @@ type Runner struct {
 	server               *ipc.Server
 	handler              *server.Handler
 	autoShutdownDisabled bool
+	cancel               context.CancelFunc
 }
 
 // NewRunner creates a new daemon runner for a specific AWS account and region.
@@ -44,10 +46,15 @@ func NewRunner(accountID, region string, opts ...RunnerOption) *Runner {
 }
 
 // Run starts the daemon and blocks until shutdown.
-func (r *Runner) Run() error {
+// The provided context is used for graceful shutdown - when cancelled, the daemon will stop.
+// Additionally, SIGTERM and SIGINT signals will trigger shutdown.
+func (r *Runner) Run(ctx context.Context) error {
 	if err := r.server.Start(); err != nil {
 		return err
 	}
+
+	ctx, cancel := context.WithCancel(ctx)
+	r.cancel = cancel
 
 	// Handle signals
 	sigCh := make(chan os.Signal, 1)
@@ -56,17 +63,20 @@ func (r *Runner) Run() error {
 		select {
 		case <-sigCh:
 			r.Shutdown()
-		case <-r.server.Done():
+		case <-ctx.Done():
+			// Context cancelled, no need to do anything
 		}
 	}()
 
-	r.server.Serve()
+	r.server.Serve(ctx)
 	return nil
 }
 
 // Shutdown gracefully shuts down the daemon.
 func (r *Runner) Shutdown() {
-	r.server.Shutdown()
+	if r.cancel != nil {
+		r.cancel()
+	}
 	r.handler.Destroy()
 }
 

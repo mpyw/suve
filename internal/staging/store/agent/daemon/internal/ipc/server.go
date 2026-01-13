@@ -39,21 +39,16 @@ type Server struct {
 	onResponse ResponseCallback
 	onShutdown ShutdownCallback
 	wg         sync.WaitGroup
-	ctx        context.Context
-	cancel     context.CancelFunc
 }
 
 // NewServer creates a new IPC server for a specific AWS account and region.
 func NewServer(accountID, region string, handler RequestHandler, onResponse ResponseCallback, onShutdown ShutdownCallback) *Server {
-	ctx, cancel := context.WithCancel(context.Background())
 	return &Server{
 		accountID:  accountID,
 		region:     region,
 		handler:    handler,
 		onResponse: onResponse,
 		onShutdown: onShutdown,
-		ctx:        ctx,
-		cancel:     cancel,
 	}
 }
 
@@ -87,13 +82,21 @@ func (s *Server) Start() error {
 	return nil
 }
 
-// Serve accepts and handles connections until shutdown.
-func (s *Server) Serve() {
+// Serve accepts and handles connections until the context is cancelled.
+func (s *Server) Serve(ctx context.Context) {
+	go func() {
+		<-ctx.Done()
+		if s.listener != nil {
+			_ = s.listener.Close()
+		}
+	}()
+
 	for {
 		conn, err := s.listener.Accept()
 		if err != nil {
 			select {
-			case <-s.ctx.Done():
+			case <-ctx.Done():
+				s.wg.Wait()
 				return
 			default:
 				continue
@@ -101,25 +104,12 @@ func (s *Server) Serve() {
 		}
 
 		s.wg.Add(1)
+		//goroutinectx:ignore goroutine // handleConnection uses connection timeout, not context cancellation
 		go func() {
 			defer s.wg.Done()
 			s.handleConnection(conn)
 		}()
 	}
-}
-
-// Shutdown gracefully shuts down the server.
-func (s *Server) Shutdown() {
-	s.cancel()
-	if s.listener != nil {
-		_ = s.listener.Close()
-	}
-	s.wg.Wait()
-}
-
-// Done returns a channel that's closed when the server is shutting down.
-func (s *Server) Done() <-chan struct{} {
-	return s.ctx.Done()
 }
 
 // handleConnection handles a single client connection.

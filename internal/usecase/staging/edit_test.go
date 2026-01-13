@@ -17,6 +17,7 @@ import (
 
 type mockEditStrategy struct {
 	*mockParser
+
 	fetchResult *staging.EditFetchResult
 	fetchErr    error
 }

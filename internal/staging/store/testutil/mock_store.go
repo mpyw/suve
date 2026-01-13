@@ -283,6 +283,7 @@ func (m *MockStore) WriteState(_ context.Context, service staging.Service, state
 // HintedMockStore extends MockStore with HintedUnstager support.
 type HintedMockStore struct {
 	*MockStore
+
 	UnstageEntryWithHintErr error
 	UnstageTagWithHintErr   error
 	UnstageAllWithHintErr   error

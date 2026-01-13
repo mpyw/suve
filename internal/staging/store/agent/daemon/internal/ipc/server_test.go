@@ -2,6 +2,7 @@ package ipc
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net"
 	"os"
@@ -36,11 +37,9 @@ func TestNewServer(t *testing.T) {
 	assert.NotNil(t, s.handler)
 	assert.NotNil(t, s.onResponse)
 	assert.NotNil(t, s.onShutdown)
-	assert.NotNil(t, s.ctx)
-	assert.NotNil(t, s.cancel)
 }
 
-func TestServer_Done(t *testing.T) {
+func TestServer_ServeClosesListenerOnCancel(t *testing.T) {
 	t.Parallel()
 
 	handler := func(req *protocol.Request) *protocol.Response {
@@ -49,69 +48,34 @@ func TestServer_Done(t *testing.T) {
 
 	s := NewServer(testAccountID, testRegion, handler, nil, nil)
 
-	// Channel should not be closed initially
-	select {
-	case <-s.Done():
-		t.Fatal("done channel should not be closed initially")
-	default:
-		// Expected
-	}
+	// Create a temporary listener using TCP for easier testing
+	// (Unix socket paths have length limits on some platforms)
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	s.listener = listener
 
-	// After shutdown, channel should be closed
-	s.Shutdown()
+	ctx, cancel := context.WithCancel(context.Background())
+
+	// Start Serve in background
+	done := make(chan struct{})
+	go func() {
+		s.Serve(ctx)
+		close(done)
+	}()
+
+	// Cancel context should close the listener
+	cancel()
 
 	select {
-	case <-s.Done():
-		// Expected
+	case <-done:
+		// Expected - Serve returned after context cancellation
 	case <-time.After(time.Second):
-		t.Fatal("done channel should be closed after shutdown")
+		t.Fatal("Serve should return after context cancellation")
 	}
-}
 
-func TestServer_Shutdown(t *testing.T) {
-	t.Parallel()
-
-	t.Run("shutdown without listener", func(t *testing.T) {
-		t.Parallel()
-
-		handler := func(req *protocol.Request) *protocol.Response {
-			return &protocol.Response{Success: true}
-		}
-
-		s := NewServer(testAccountID, testRegion, handler, nil, nil)
-		// Shutdown should work even without a listener
-		s.Shutdown()
-
-		select {
-		case <-s.Done():
-			// Expected - context should be cancelled
-		case <-time.After(time.Second):
-			t.Fatal("context should be cancelled after shutdown")
-		}
-	})
-
-	t.Run("shutdown with listener", func(t *testing.T) {
-		t.Parallel()
-
-		handler := func(req *protocol.Request) *protocol.Response {
-			return &protocol.Response{Success: true}
-		}
-
-		s := NewServer(testAccountID, testRegion, handler, nil, nil)
-
-		// Create a temporary listener using TCP for easier testing
-		// (Unix socket paths have length limits on some platforms)
-		listener, err := net.Listen("tcp", "127.0.0.1:0")
-		require.NoError(t, err)
-		s.listener = listener
-
-		// Shutdown should close the listener
-		s.Shutdown()
-
-		// Verify listener is closed
-		_, err = listener.Accept()
-		assert.Error(t, err)
-	})
+	// Verify listener is closed
+	_, err = listener.Accept()
+	assert.Error(t, err)
 }
 
 func TestServer_sendError(t *testing.T) {
@@ -373,7 +337,7 @@ func TestServer_Start(t *testing.T) {
 
 	err = s.Start()
 	require.NoError(t, err)
-	defer s.Shutdown()
+	defer func() { _ = s.listener.Close() }()
 
 	// Verify socket file exists
 	socketPath := protocol.SocketPathForAccount(accountID, region)
@@ -412,7 +376,7 @@ func TestServer_Start_RemovesExistingSocket(t *testing.T) {
 
 	err = s.Start()
 	require.NoError(t, err)
-	defer s.Shutdown()
+	defer func() { _ = s.listener.Close() }()
 
 	// The stale file should be removed and replaced with a real socket
 	info, err := os.Stat(socketPath)
@@ -442,8 +406,11 @@ func TestServer_Serve(t *testing.T) {
 	err = s.Start()
 	require.NoError(t, err)
 
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	// Run Serve in background
-	go s.Serve()
+	go s.Serve(ctx)
 
 	socketPath := protocol.SocketPathForAccount(accountID, region)
 
@@ -463,8 +430,8 @@ func TestServer_Serve(t *testing.T) {
 	assert.True(t, resp.Success)
 	_ = conn.Close()
 
-	// Shutdown
-	s.Shutdown()
+	// Shutdown via context cancellation
+	cancel()
 
 	// Verify request was handled
 	assert.Equal(t, 1, requestsHandled)
@@ -490,7 +457,10 @@ func TestServer_Serve_MultipleConnections(t *testing.T) {
 	err = s.Start()
 	require.NoError(t, err)
 
-	go s.Serve()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	go s.Serve(ctx)
 
 	socketPath := protocol.SocketPathForAccount(accountID, region)
 
@@ -539,7 +509,7 @@ func TestServer_Serve_MultipleConnections(t *testing.T) {
 		}
 	}
 
-	s.Shutdown()
+	cancel()
 }
 
 // TestServer_createSocketDir tests socket directory creation.
@@ -640,10 +610,12 @@ func TestServer_Serve_AcceptError(t *testing.T) {
 	require.NoError(t, err)
 	s.listener = listener
 
+	ctx, cancel := context.WithCancel(context.Background())
+
 	// Start Serve in background
 	done := make(chan struct{})
 	go func() {
-		s.Serve()
+		s.Serve(ctx)
 		close(done)
 	}()
 
@@ -653,8 +625,8 @@ func TestServer_Serve_AcceptError(t *testing.T) {
 	// Close the listener to cause accept errors
 	_ = listener.Close()
 
-	// Shutdown to exit the serve loop
-	s.Shutdown()
+	// Cancel context to exit the serve loop
+	cancel()
 
 	// Wait for Serve to exit
 	select {
@@ -784,11 +756,14 @@ func TestServer_Start_ListenError(t *testing.T) {
 	err = s1.Start()
 	require.NoError(t, err)
 
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	// Start serving in background so socket stays locked
-	go s1.Serve()
+	go s1.Serve(ctx)
 
 	// Clean up
-	s1.Shutdown()
+	cancel()
 }
 
 // TestServer_Start_RemoveExistingSocketError tests removeExistingSocket error handling.
@@ -825,7 +800,7 @@ func TestServer_Start_ListenErrorLongPath(t *testing.T) {
 	if err != nil {
 		assert.Contains(t, err.Error(), "failed to listen on socket")
 	} else {
-		s.Shutdown()
+		_ = s.listener.Close()
 	}
 }
 

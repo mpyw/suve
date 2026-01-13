@@ -17,6 +17,7 @@ import (
 
 type mockResetStrategy struct {
 	*mockParser
+
 	fetchValue        string
 	versionLabel      string
 	fetchErr          error
@@ -216,6 +217,7 @@ func TestResetUseCase_Execute_Restore_FetchError(t *testing.T) {
 
 type mockParserWithVersion struct {
 	*mockParser
+
 	hasVersion bool
 }
 
@@ -245,6 +247,7 @@ func TestResetUseCase_Execute_ParseError(t *testing.T) {
 
 type mockParserWithParseSpecErr struct {
 	*mockParser
+
 	parseErr error
 }
 

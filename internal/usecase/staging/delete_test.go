@@ -17,6 +17,7 @@ import (
 
 type mockDeleteStrategy struct {
 	*mockServiceStrategy
+
 	lastModified time.Time
 	fetchErr     error
 }

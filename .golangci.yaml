@@ -51,18 +51,8 @@ linters:
         linters:
           - forbidigo
         text: "fmt\\.Fprint"
-      # Allow context.Background() in entry points
+      # Allow context.Background() in entry points (main.go is the root)
       - path: "cmd/suve/main\\.go"
-        linters:
-          - forbidigo
-        text: "context\\.Background"
-      # Allow context.Background() in daemon server (creates root context)
-      - path: "internal/staging/store/agent/daemon/internal/ipc/server\\.go"
-        linters:
-          - forbidigo
-        text: "context\\.Background"
-      # Allow context.Background() in e2e tests (top-level test setup)
-      - path: "e2e/e2e_test\\.go"
         linters:
           - forbidigo
         text: "context\\.Background"

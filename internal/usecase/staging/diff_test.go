@@ -17,6 +17,7 @@ import (
 
 type mockDiffStrategy struct {
 	*mockServiceStrategy
+
 	fetchResults map[string]*staging.FetchResult
 	fetchErrors  map[string]error
 }

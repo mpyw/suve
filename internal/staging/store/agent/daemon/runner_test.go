@@ -361,7 +361,7 @@ func TestRunner_Run_SignalHandling(t *testing.T) {
 
 	errCh := make(chan error, 1)
 	go func() {
-		errCh <- runner.Run()
+		errCh <- runner.Run(t.Context())
 	}()
 
 	// Wait for daemon to be ready
@@ -444,7 +444,7 @@ func TestRunner_Run_StartError(t *testing.T) {
 
 	runner := NewRunner(accountID, region)
 
-	err := runner.Run()
+	err := runner.Run(t.Context())
 	require.Error(t, err)
 	// Error should be from Start() failing to create socket directory
 }

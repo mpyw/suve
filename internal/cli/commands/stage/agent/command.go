@@ -74,7 +74,7 @@ Set ` + agentcfg.EnvDaemonManualMode + `=1 to enable manual mode (disables auto-
 			}
 
 			runner := daemon.NewRunner(accountID, region, agentcfg.DaemonOptions()...)
-			return runner.Run()
+			return runner.Run(ctx)
 		},
 	}
 }

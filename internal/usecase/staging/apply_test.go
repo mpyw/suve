@@ -17,6 +17,7 @@ import (
 
 type mockApplyStrategy struct {
 	*mockServiceStrategy
+
 	applyErrors      map[string]error
 	lastModified     map[string]time.Time
 	fetchModifiedErr error
@@ -296,6 +297,7 @@ func TestApplyUseCase_Execute_DeleteSuccess(t *testing.T) {
 
 type mockApplyTagStrategy struct {
 	*mockApplyStrategy
+
 	applyTagsErrors map[string]error
 }
 
