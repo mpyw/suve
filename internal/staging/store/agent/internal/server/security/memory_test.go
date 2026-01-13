@@ -48,29 +48,6 @@ func TestBuffer_Bytes_Empty(t *testing.T) {
 	assert.Nil(t, result)
 }
 
-func TestBuffer_Open(t *testing.T) {
-	original := []byte("secret data")
-	data := make([]byte, len(original))
-	copy(data, original)
-
-	buf := NewBuffer(data)
-
-	lb, err := buf.Open()
-	require.NoError(t, err)
-	require.NotNil(t, lb)
-	defer lb.Destroy()
-
-	assert.Equal(t, original, lb.Bytes())
-}
-
-func TestBuffer_Open_Empty(t *testing.T) {
-	buf := NewBuffer(nil)
-
-	lb, err := buf.Open()
-	require.NoError(t, err)
-	assert.Nil(t, lb)
-}
-
 func TestBuffer_IsEmpty(t *testing.T) {
 	emptyBuf := NewBuffer(nil)
 	assert.True(t, emptyBuf.IsEmpty())

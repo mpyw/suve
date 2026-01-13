@@ -26,18 +26,7 @@ func NewBuffer(data []byte) *Buffer {
 	return &Buffer{enclave: enclave}
 }
 
-// Open decrypts and returns the data in a locked buffer.
-// The caller must call Destroy() on the returned LockedBuffer when done.
-// Returns nil if the buffer is empty.
-func (b *Buffer) Open() (*memguard.LockedBuffer, error) {
-	if b.enclave == nil {
-		return nil, nil
-	}
-	return b.enclave.Open()
-}
-
 // Bytes returns a copy of the decrypted data.
-// This is less secure than Open() but more convenient.
 // The caller should zero the returned slice when done.
 func (b *Buffer) Bytes() ([]byte, error) {
 	if b.enclave == nil {
