@@ -5,6 +5,7 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/staging/store/agent/daemon/internal/ipc"
 	"github.com/mpyw/suve/internal/staging/store/agent/internal/protocol"
 	"github.com/mpyw/suve/internal/staging/store/agent/internal/server"
@@ -76,6 +77,7 @@ func (r *Runner) handleAutoShutdown(req *protocol.Request, resp *protocol.Respon
 		switch req.Method {
 		case protocol.MethodUnstageEntry, protocol.MethodUnstageTag, protocol.MethodUnstageAll:
 			if r.handler.IsEmpty() {
+				output.Printf(os.Stderr, "info: staging agent stopped (no staged changes)\n")
 				go r.Shutdown()
 			}
 		}

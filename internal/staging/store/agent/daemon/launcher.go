@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"time"
 
+	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/staging/store/agent/daemon/internal/ipc"
 	"github.com/mpyw/suve/internal/staging/store/agent/internal/protocol"
 )
@@ -76,6 +77,7 @@ func (l *Launcher) EnsureRunning() error {
 	deadline := time.Now().Add(connectTimeout)
 	for time.Now().Before(deadline) {
 		if err := l.client.Ping(); err == nil {
+			output.Printf(os.Stderr, "info: staging agent started for account %s (%s)\n", l.accountID, l.region)
 			return nil
 		}
 		<-ticker.C
