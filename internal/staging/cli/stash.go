@@ -1,4 +1,3 @@
-// Package cli provides shared runners and command builders for stage commands.
 package cli
 
 import (
@@ -118,17 +117,19 @@ func fileStoreForReading(cmd *cli.Command, accountID, region string, checkExists
 			Stdout: cmd.Root().Writer,
 			Stderr: cmd.Root().ErrWriter,
 		}
-		if cmd.Bool("passphrase-stdin") {
+
+		switch {
+		case cmd.Bool("passphrase-stdin"):
 			pass, err = prompter.ReadFromStdin()
 			if err != nil {
 				return nil, fmt.Errorf("failed to read passphrase from stdin: %w", err)
 			}
-		} else if terminal.IsTerminalWriter(cmd.Root().ErrWriter) {
+		case terminal.IsTerminalWriter(cmd.Root().ErrWriter):
 			pass, err = prompter.PromptForDecrypt()
 			if err != nil {
 				return nil, fmt.Errorf("failed to get passphrase: %w", err)
 			}
-		} else {
+		default:
 			return nil, errors.New("encrypted file cannot be decrypted in non-TTY environment; use --passphrase-stdin")
 		}
 	}

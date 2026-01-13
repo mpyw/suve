@@ -13,6 +13,8 @@ import (
 )
 
 // Hooks for testing - these allow tests to inject errors.
+//
+//nolint:gochecknoglobals // Testing hooks to inject errors into crypto operations.
 var (
 	randReader    io.Reader                                      = rand.Reader
 	newCipherFunc func(key []byte) (cipher.Block, error)         = aes.NewCipher
@@ -49,7 +51,7 @@ const (
 	// Version is the current encryption format version.
 	Version = byte(1)
 
-	// Argon2 parameters (OWASP recommended for sensitive data)
+	// Argon2 parameters (OWASP recommended for sensitive data).
 	argonTime    = 3
 	argonMemory  = 64 * 1024 // 64 MB
 	argonThreads = 4
@@ -68,8 +70,11 @@ var (
 	ErrNotEncrypted = errors.New("data is not encrypted")
 )
 
-// headerLen is the total header length: magic (8) + version (1)
+// headerLen is the total header length: magic (8) + version (1).
 const headerLen = len(MagicHeader) + 1
+
+// gcmAuthTagLen is the minimum GCM authentication tag length in bytes.
+const gcmAuthTagLen = 16
 
 // Encrypt encrypts data with the given passphrase using AES-256-GCM with Argon2id key derivation.
 // Returns encrypted data in format: magic header + version + salt + nonce + ciphertext.
@@ -123,7 +128,7 @@ func Decrypt(data []byte, passphrase string) ([]byte, error) {
 		return nil, ErrNotEncrypted
 	}
 
-	minLen := headerLen + saltLen + nonceLen + 16 // 16 is minimum GCM auth tag
+	minLen := headerLen + saltLen + nonceLen + gcmAuthTagLen
 	if len(data) < minLen {
 		return nil, ErrInvalidFormat
 	}
@@ -171,5 +176,6 @@ func IsEncrypted(data []byte) bool {
 	if len(data) < headerLen {
 		return false
 	}
+
 	return string(data[:len(MagicHeader)]) == MagicHeader
 }

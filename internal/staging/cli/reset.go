@@ -1,4 +1,3 @@
-// Package cli provides shared runners and command builders for stage commands.
 package cli
 
 import (

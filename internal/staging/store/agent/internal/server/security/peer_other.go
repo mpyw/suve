@@ -5,4 +5,6 @@ package security
 import "net"
 
 // VerifyPeerCredentials is a no-op on unsupported platforms.
-func VerifyPeerCredentials(_ net.Conn) error { return nil }
+func VerifyPeerCredentials(_ net.Conn) error {
+	return nil
+}

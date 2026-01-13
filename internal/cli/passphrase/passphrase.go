@@ -41,6 +41,7 @@ func (p *Prompter) PromptForEncrypt() (string, error) {
 	if err != nil {
 		return "", errors.New("failed to read passphrase: " + err.Error())
 	}
+
 	output.Println(p.Stderr, "") // newline after password input
 
 	// If empty, warn and confirm
@@ -48,15 +49,18 @@ func (p *Prompter) PromptForEncrypt() (string, error) {
 		if !p.confirmPlainText() {
 			return "", ErrCancelled
 		}
+
 		return "", nil
 	}
 
 	// Confirm passphrase
 	output.Print(p.Stderr, "Confirm passphrase: ")
+
 	confirm, err := p.readPassword()
 	if err != nil {
 		return "", errors.New("failed to read confirmation: " + err.Error())
 	}
+
 	output.Println(p.Stderr, "") // newline after password input
 
 	if pass != confirm {
@@ -74,6 +78,7 @@ func (p *Prompter) PromptForDecrypt() (string, error) {
 	if err != nil {
 		return "", errors.New("failed to read passphrase: " + err.Error())
 	}
+
 	output.Println(p.Stderr, "") // newline after password input
 
 	return pass, nil
@@ -90,10 +95,12 @@ func (p *Prompter) ReadFromStdin() (string, error) {
 	if p.bufReader == nil {
 		p.bufReader = bufio.NewReader(p.Stdin)
 	}
+
 	line, err := p.bufReader.ReadString('\n')
 	if err != nil && err != io.EOF {
 		return "", err
 	}
+
 	return strings.TrimSuffix(strings.TrimSuffix(line, "\n"), "\r"), nil
 }
 
@@ -106,12 +113,14 @@ func (p *Prompter) confirmPlainText() bool {
 	if p.bufReader == nil {
 		p.bufReader = bufio.NewReader(p.Stdin)
 	}
+
 	response, err := p.bufReader.ReadString('\n')
 	if err != nil {
 		return false
 	}
 
 	response = strings.TrimSpace(strings.ToLower(response))
+
 	return response == "y" || response == "yes"
 }
 
@@ -124,6 +133,7 @@ func (p *Prompter) readPassword() (string, error) {
 		if err != nil {
 			return "", err
 		}
+
 		return string(pass), nil
 	}
 
@@ -132,9 +142,11 @@ func (p *Prompter) readPassword() (string, error) {
 	if p.bufReader == nil {
 		p.bufReader = bufio.NewReader(p.Stdin)
 	}
+
 	line, err := p.bufReader.ReadString('\n')
 	if err != nil && err != io.EOF {
 		return "", err
 	}
+
 	return strings.TrimSuffix(line, "\n"), nil
 }

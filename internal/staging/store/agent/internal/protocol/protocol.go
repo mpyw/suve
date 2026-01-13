@@ -44,6 +44,8 @@ const (
 )
 
 // Request represents a JSON-RPC request to the daemon.
+//
+//nolint:tagliatelle // JSON field names use snake_case for consistency with IPC protocol
 type Request struct {
 	Method    string            `json:"method"`
 	AccountID string            `json:"account_id"`
@@ -57,6 +59,8 @@ type Request struct {
 }
 
 // Response represents a JSON-RPC response from the daemon.
+//
+//nolint:tagliatelle // JSON field names use snake_case for consistency with IPC protocol
 type Response struct {
 	Success        bool            `json:"success"`
 	Error          string          `json:"error,omitempty"`
@@ -70,9 +74,11 @@ func (r *Response) Err() error {
 	if r.Success {
 		return nil
 	}
+
 	if r.Error == staging.ErrNotStaged.Error() {
 		return staging.ErrNotStaged
 	}
+
 	return errors.New(r.Error)
 }
 
@@ -82,6 +88,8 @@ type EntryResponse struct {
 }
 
 // TagResponse is the response data for GetTag.
+//
+//nolint:tagliatelle // JSON field names use snake_case for consistency with IPC protocol
 type TagResponse struct {
 	TagEntry *staging.TagEntry `json:"tag_entry,omitempty"`
 }

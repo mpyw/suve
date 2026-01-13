@@ -1,4 +1,4 @@
-package transition
+package transition //nolint:testpackage // Internal tests sharing test fixtures with reducer_test.go
 
 import (
 	"errors"
@@ -20,6 +20,8 @@ const (
 )
 
 func TestNewExecutor(t *testing.T) {
+	t.Parallel()
+
 	store := testutil.NewMockStore()
 	executor := NewExecutor(store)
 	assert.NotNil(t, executor)
@@ -221,11 +223,11 @@ func TestExecuteEntry_DeleteCreate_UnstagesTags(t *testing.T) {
 
 	// Check entry unstaged
 	_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/new")
-	assert.ErrorIs(t, err, staging.ErrNotStaged)
+	require.ErrorIs(t, err, staging.ErrNotStaged)
 
 	// Check tags unstaged
 	_, err = store.GetTag(t.Context(), staging.ServiceParam, "/app/new")
-	assert.ErrorIs(t, err, staging.ErrNotStaged)
+	require.ErrorIs(t, err, staging.ErrNotStaged)
 }
 
 func TestExecuteEntry_DeleteCreate_NoTags(t *testing.T) {
@@ -303,7 +305,7 @@ func TestExecuteEntry_Error(t *testing.T) {
 
 	// Edit on DELETE should error
 	result, err := executor.ExecuteEntry(t.Context(), staging.ServiceParam, "/app/config", state, EntryActionEdit{Value: "new"}, nil)
-	assert.ErrorIs(t, err, ErrCannotEditDelete)
+	require.ErrorIs(t, err, ErrCannotEditDelete)
 	assert.Equal(t, ErrCannotEditDelete, result.Error)
 }
 
@@ -390,7 +392,7 @@ func TestExecuteTag_Error(t *testing.T) {
 
 	// Tag on DELETE should error
 	result, err := executor.ExecuteTag(t.Context(), staging.ServiceParam, "/app/config", entryState, StagedTags{}, action, nil)
-	assert.ErrorIs(t, err, ErrCannotTagDelete)
+	require.ErrorIs(t, err, ErrCannotTagDelete)
 	assert.Equal(t, ErrCannotTagDelete, result.Error)
 }
 
@@ -496,6 +498,7 @@ func TestLoadEntryState(t *testing.T) {
 
 	t.Run("not staged", func(t *testing.T) {
 		t.Parallel()
+
 		store := testutil.NewMockStore()
 
 		currentValue := "aws-value"
@@ -509,6 +512,7 @@ func TestLoadEntryState(t *testing.T) {
 
 	t.Run("staged create", func(t *testing.T) {
 		t.Parallel()
+
 		store := testutil.NewMockStore()
 		require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/new", staging.Entry{
 			Operation: staging.OperationCreate,
@@ -526,6 +530,7 @@ func TestLoadEntryState(t *testing.T) {
 
 	t.Run("staged update", func(t *testing.T) {
 		t.Parallel()
+
 		store := testutil.NewMockStore()
 		require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
 			Operation: staging.OperationUpdate,
@@ -544,6 +549,7 @@ func TestLoadEntryState(t *testing.T) {
 
 	t.Run("staged delete", func(t *testing.T) {
 		t.Parallel()
+
 		store := testutil.NewMockStore()
 		require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
 			Operation: staging.OperationDelete,
@@ -563,6 +569,7 @@ func TestLoadStagedTags(t *testing.T) {
 
 	t.Run("not staged", func(t *testing.T) {
 		t.Parallel()
+
 		store := testutil.NewMockStore()
 
 		tags, baseModifiedAt, err := LoadStagedTags(t.Context(), store, staging.ServiceParam, "/app/config")
@@ -574,6 +581,7 @@ func TestLoadStagedTags(t *testing.T) {
 
 	t.Run("staged", func(t *testing.T) {
 		t.Parallel()
+
 		store := testutil.NewMockStore()
 		baseTime := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
 		require.NoError(t, store.StageTag(t.Context(), staging.ServiceParam, "/app/config", staging.TagEntry{

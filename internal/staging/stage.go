@@ -9,6 +9,9 @@ import (
 	"github.com/mpyw/suve/internal/maputil"
 )
 
+// stateVersion is the current version of the staging state format.
+const stateVersion = 2
+
 // Operation represents the type of staged change.
 type Operation string
 
@@ -27,13 +30,16 @@ type Entry struct {
 	Operation   Operation `json:"operation"`
 	Value       *string   `json:"value,omitempty"` // nil for delete, pointer to distinguish from empty string
 	Description *string   `json:"description,omitempty"`
-	StagedAt    time.Time `json:"staged_at"`
+	//nolint:tagliatelle // JSON uses snake_case for consistency with file storage format
+	StagedAt time.Time `json:"staged_at"`
 	// BaseModifiedAt records the AWS LastModified time when the value was fetched.
 	// Used for conflict detection: if AWS was modified after this time, it's a conflict.
 	// Only set for update/delete operations (nil for create since there's no base).
+	//nolint:tagliatelle // JSON uses snake_case for consistency with file storage format
 	BaseModifiedAt *time.Time `json:"base_modified_at,omitempty"`
 	// DeleteOptions holds Secrets Manager-specific delete options.
 	// Only used when Operation is OperationDelete and service is Secrets Manager.
+	//nolint:tagliatelle // JSON uses snake_case for consistency with file storage format
 	DeleteOptions *DeleteOptions `json:"delete_options,omitempty"`
 }
 
@@ -43,9 +49,11 @@ type TagEntry struct {
 	Add    map[string]string   `json:"add,omitempty"`    // Tags to add or update
 	Remove maputil.Set[string] `json:"remove,omitempty"` // Tag keys to remove
 	// StagedAt records when the tag change was staged.
+	//nolint:tagliatelle // JSON uses snake_case for consistency with file storage format
 	StagedAt time.Time `json:"staged_at"`
 	// BaseModifiedAt records the AWS LastModified time when tags were fetched.
 	// Used for conflict detection.
+	//nolint:tagliatelle // JSON uses snake_case for consistency with file storage format
 	BaseModifiedAt *time.Time `json:"base_modified_at,omitempty"`
 }
 
@@ -55,6 +63,7 @@ type DeleteOptions struct {
 	Force bool `json:"force,omitempty"`
 	// RecoveryWindow is the number of days before permanent deletion (7-30).
 	// Only used when Force is false. 0 means default (30 days).
+	//nolint:tagliatelle // JSON uses snake_case for consistency with file storage format
 	RecoveryWindow int `json:"recovery_window,omitempty"`
 }
 
@@ -71,11 +80,13 @@ func (s *State) IsEmpty() bool {
 	if s == nil {
 		return true
 	}
+
 	for _, entries := range s.Entries {
 		if len(entries) > 0 {
 			return false
 		}
 	}
+
 	for _, tags := range s.Tags {
 		if len(tags) > 0 {
 			return false
@@ -97,10 +108,13 @@ func (s *State) EntryCount() int {
 	if s == nil {
 		return 0
 	}
+
 	count := 0
+
 	for _, entries := range s.Entries {
 		count += len(entries)
 	}
+
 	return count
 }
 
@@ -109,10 +123,13 @@ func (s *State) TagCount() int {
 	if s == nil {
 		return 0
 	}
+
 	count := 0
+
 	for _, tags := range s.Tags {
 		count += len(tags)
 	}
+
 	return count
 }
 
@@ -122,9 +139,11 @@ func (s *State) Merge(other *State) {
 	if other == nil {
 		return
 	}
+
 	if s.Entries == nil {
 		s.Entries = make(map[Service]map[string]Entry)
 	}
+
 	if s.Tags == nil {
 		s.Tags = make(map[Service]map[string]TagEntry)
 	}
@@ -133,12 +152,15 @@ func (s *State) Merge(other *State) {
 		if s.Entries[svc] == nil {
 			s.Entries[svc] = make(map[string]Entry)
 		}
+
 		maps.Copy(s.Entries[svc], entries)
 	}
+
 	for svc, tags := range other.Tags {
 		if s.Tags[svc] == nil {
 			s.Tags[svc] = make(map[string]TagEntry)
 		}
+
 		maps.Copy(s.Tags[svc], tags)
 	}
 }
@@ -146,7 +168,7 @@ func (s *State) Merge(other *State) {
 // NewEmptyState creates a new empty state with initialized maps.
 func NewEmptyState() *State {
 	return &State{
-		Version: 2,
+		Version: stateVersion,
 		Entries: map[Service]map[string]Entry{
 			ServiceParam:  make(map[string]Entry),
 			ServiceSecret: make(map[string]Entry),
@@ -164,19 +186,25 @@ func (s *State) ExtractService(service Service) *State {
 	if s == nil {
 		return NewEmptyState()
 	}
+
 	if service == "" {
 		// Clone entire state
 		result := NewEmptyState()
 		result.Merge(s)
+
 		return result
 	}
+
 	result := NewEmptyState()
+
 	if entries, ok := s.Entries[service]; ok {
 		maps.Copy(result.Entries[service], entries)
 	}
+
 	if tags, ok := s.Tags[service]; ok {
 		maps.Copy(result.Tags[service], tags)
 	}
+
 	return result
 }
 
@@ -186,6 +214,7 @@ func (s *State) RemoveService(service Service) {
 	if s == nil {
 		return
 	}
+
 	if service == "" {
 		// Clear all
 		s.Entries = map[Service]map[string]Entry{
@@ -196,8 +225,10 @@ func (s *State) RemoveService(service Service) {
 			ServiceParam:  make(map[string]TagEntry),
 			ServiceSecret: make(map[string]TagEntry),
 		}
+
 		return
 	}
+
 	s.Entries[service] = make(map[string]Entry)
 	s.Tags[service] = make(map[string]TagEntry)
 }

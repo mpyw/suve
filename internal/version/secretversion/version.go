@@ -16,7 +16,7 @@ import (
 // Client is the interface for GetSecretWithVersion.
 type Client interface {
 	secretapi.GetSecretValueAPI
-	secretapi.ListSecretVersionIdsAPI
+	secretapi.ListSecretVersionIDsAPI
 }
 
 // GetSecretWithVersion retrieves a secret with version/shift/label support.
@@ -51,7 +51,7 @@ func TruncateVersionID(id string) string {
 }
 
 func getSecretWithShift(ctx context.Context, client Client, spec *Spec) (*secretapi.GetSecretValueOutput, error) {
-	versions, err := client.ListSecretVersionIds(ctx, &secretapi.ListSecretVersionIdsInput{
+	versions, err := client.ListSecretVersionIds(ctx, &secretapi.ListSecretVersionIDsInput{
 		SecretId: lo.ToPtr(spec.Name),
 	})
 	if err != nil {

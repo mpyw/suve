@@ -1,4 +1,3 @@
-// Package cli provides shared runners and command builders for stage commands.
 package cli
 
 import (
@@ -77,11 +76,13 @@ func parseTags(tagSlice []string) (map[string]string, error) {
 	if len(tagSlice) == 0 {
 		return tags, nil
 	}
+
 	for _, t := range tagSlice {
-		parts := strings.SplitN(t, "=", 2)
-		if len(parts) != 2 {
+		parts := strings.SplitN(t, "=", 2) //nolint:mnd // 2 parts: key=value
+		if len(parts) != 2 {                 //nolint:mnd // 2 parts expected
 			return nil, fmt.Errorf("invalid tag format %q: expected key=value", t)
 		}
+
 		tags[parts[0]] = parts[1]
 	}
 	return tags, nil

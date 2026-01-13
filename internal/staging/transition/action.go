@@ -1,3 +1,6 @@
+// Package transition implements state machine logic for staging operations.
+// It provides reducers (pure functions) that compute new states from current states
+// and actions, separating state computation logic from side effects for testability.
 package transition
 
 import "github.com/mpyw/suve/internal/maputil"

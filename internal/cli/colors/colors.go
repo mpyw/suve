@@ -3,6 +3,7 @@ package colors
 
 import "github.com/fatih/color"
 
+//nolint:gochecknoglobals // Immutable color definitions initialized at package load
 var (
 	// Warning formats text in yellow for warning messages.
 	Warning = color.New(color.FgYellow).SprintFunc()

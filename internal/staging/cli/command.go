@@ -66,6 +66,7 @@ EXAMPLES:
 			if err != nil {
 				return fmt.Errorf("failed to get AWS identity: %w", err)
 			}
+
 			store := agent.NewStore(identity.AccountID, identity.Region)
 
 			r := &StatusRunner{
@@ -121,15 +122,19 @@ EXAMPLES:
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			var name string
+
 			if cmd.Args().Len() > 1 {
 				return fmt.Errorf("usage: suve stage %s diff [name]", cfg.CommandName)
 			}
+
 			if cmd.Args().Len() == 1 {
 				parser := cfg.ParserFactory()
+
 				parsedName, err := parser.ParseName(cmd.Args().First())
 				if err != nil {
 					return err
 				}
+
 				name = parsedName
 			}
 
@@ -137,6 +142,7 @@ EXAMPLES:
 			if err != nil {
 				return fmt.Errorf("failed to get AWS identity: %w", err)
 			}
+
 			store := agent.NewStore(identity.AccountID, identity.Region)
 
 			strategy, err := cfg.Factory(ctx)
@@ -159,6 +165,7 @@ EXAMPLES:
 					Stdout: w,
 					Stderr: cmd.Root().ErrWriter,
 				}
+
 				return r.Run(ctx, opts)
 			})
 		},
@@ -204,6 +211,7 @@ EXAMPLES:
 			}
 
 			name := cmd.Args().First()
+
 			var value string
 			if cmd.Args().Len() >= 2 {
 				value = cmd.Args().Get(1)
@@ -213,6 +221,7 @@ EXAMPLES:
 			if err != nil {
 				return fmt.Errorf("failed to get AWS identity: %w", err)
 			}
+
 			store := agent.NewStore(identity.AccountID, identity.Region)
 
 			strategy, err := cfg.Factory(ctx)
@@ -228,6 +237,7 @@ EXAMPLES:
 				Stdout: cmd.Root().Writer,
 				Stderr: cmd.Root().ErrWriter,
 			}
+
 			return r.Run(ctx, AddOptions{
 				Name:        name,
 				Value:       value,
@@ -278,6 +288,7 @@ EXAMPLES:
 			}
 
 			name := cmd.Args().First()
+
 			var value string
 			if cmd.Args().Len() >= 2 {
 				value = cmd.Args().Get(1)
@@ -287,6 +298,7 @@ EXAMPLES:
 			if err != nil {
 				return fmt.Errorf("failed to get AWS identity: %w", err)
 			}
+
 			store := agent.NewStore(identity.AccountID, identity.Region)
 
 			strategy, err := cfg.Factory(ctx)
@@ -302,6 +314,7 @@ EXAMPLES:
 				Stdout: cmd.Root().Writer,
 				Stderr: cmd.Root().ErrWriter,
 			}
+
 			return r.Run(ctx, EditOptions{
 				Name:        name,
 				Value:       value,
@@ -361,11 +374,13 @@ EXAMPLES:
 			if err != nil {
 				return fmt.Errorf("failed to get AWS identity: %w", err)
 			}
+
 			store := agent.NewStore(identity.AccountID, identity.Region)
 
 			// Get entries to show what will be applied
 			parser := cfg.ParserFactory()
 			service := parser.Service()
+
 			entries, err := store.ListEntries(ctx, service)
 			if err != nil {
 				return err
@@ -374,6 +389,7 @@ EXAMPLES:
 			serviceEntries := entries[service]
 			if len(serviceEntries) == 0 {
 				output.Warn(cmd.Root().Writer, "No %s changes staged.", parser.ServiceName())
+
 				return nil
 			}
 
@@ -407,6 +423,7 @@ EXAMPLES:
 			if err != nil {
 				return err
 			}
+
 			if !confirmed {
 				return nil
 			}
@@ -478,11 +495,13 @@ EXAMPLES:
 			if err != nil {
 				return fmt.Errorf("failed to get AWS identity: %w", err)
 			}
+
 			store := agent.NewStore(identity.AccountID, identity.Region)
 
 			opts := ResetOptions{
 				All: resetAll,
 			}
+
 			if !resetAll {
 				opts.Spec = cmd.Args().First()
 			}
@@ -491,16 +510,19 @@ EXAMPLES:
 
 			// Check if version spec is provided (need AWS client for FetchVersion)
 			var fetcher staging.ResetStrategy
+
 			if !resetAll && opts.Spec != "" {
 				_, hasVersion, err := parser.ParseSpec(opts.Spec)
 				if err != nil {
 					return err
 				}
+
 				if hasVersion {
 					strategy, err := cfg.Factory(ctx)
 					if err != nil {
 						return err
 					}
+
 					fetcher = strategy
 				}
 			}
@@ -526,6 +548,7 @@ func NewDeleteCommand(cfg CommandConfig) *cli.Command {
 	hasDeleteOptions := parser.HasDeleteOptions()
 
 	var flags []cli.Flag
+
 	var description string
 
 	if hasDeleteOptions {
@@ -601,6 +624,7 @@ EXAMPLES:
 			if err != nil {
 				return fmt.Errorf("failed to get AWS identity: %w", err)
 			}
+
 			store := agent.NewStore(identity.AccountID, identity.Region)
 
 			strategy, err := cfg.Factory(ctx)
@@ -629,8 +653,64 @@ EXAMPLES:
 	}
 }
 
+// tagCommandRunner is a function that runs a tag or untag command.
+type tagCommandRunner func(
+	ctx context.Context,
+	useCase *stagingusecase.TagUseCase,
+	stdout, stderr io.Writer,
+	name string,
+	args []string,
+) error
+
+// tagAction creates a common action handler for tag/untag commands.
+func tagAction(cfg CommandConfig, usageMsg string, runner tagCommandRunner) func(context.Context, *cli.Command) error {
+	return func(ctx context.Context, cmd *cli.Command) error {
+		if cmd.Args().Len() < 2 {
+			return fmt.Errorf("usage: suve stage %s %s", cfg.CommandName, usageMsg)
+		}
+
+		name := cmd.Args().First()
+		args := cmd.Args().Slice()[1:]
+
+		identity, err := infra.GetAWSIdentity(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to get AWS identity: %w", err)
+		}
+
+		store := agent.NewStore(identity.AccountID, identity.Region)
+
+		strategy, err := cfg.Factory(ctx)
+		if err != nil {
+			return err
+		}
+
+		useCase := &stagingusecase.TagUseCase{
+			Strategy: strategy,
+			Store:    store,
+		}
+
+		return runner(ctx, useCase, cmd.Root().Writer, cmd.Root().ErrWriter, name, args)
+	}
+}
+
 // NewTagCommand creates a tag command with the given config.
 func NewTagCommand(cfg CommandConfig) *cli.Command {
+	runner := func(
+		ctx context.Context,
+		useCase *stagingusecase.TagUseCase,
+		stdout, stderr io.Writer,
+		name string,
+		tags []string,
+	) error {
+		r := &TagRunner{
+			UseCase: useCase,
+			Stdout:  stdout,
+			Stderr:  stderr,
+		}
+
+		return r.Run(ctx, TagOptions{Name: name, Tags: tags})
+	}
+
 	return &cli.Command{
 		Name:      "tag",
 		Usage:     fmt.Sprintf("Stage tags for a %s", cfg.ItemName),
@@ -653,43 +733,28 @@ EXAMPLES:
 			cfg.CommandName,
 			cfg.CommandName,
 			cfg.CommandName),
-		Action: func(ctx context.Context, cmd *cli.Command) error {
-			if cmd.Args().Len() < 2 {
-				return fmt.Errorf("usage: suve stage %s tag <name> <key>=<value>", cfg.CommandName)
-			}
-
-			name := cmd.Args().First()
-			tags := cmd.Args().Slice()[1:]
-
-			identity, err := infra.GetAWSIdentity(ctx)
-			if err != nil {
-				return fmt.Errorf("failed to get AWS identity: %w", err)
-			}
-			store := agent.NewStore(identity.AccountID, identity.Region)
-
-			strategy, err := cfg.Factory(ctx)
-			if err != nil {
-				return err
-			}
-
-			r := &TagRunner{
-				UseCase: &stagingusecase.TagUseCase{
-					Strategy: strategy,
-					Store:    store,
-				},
-				Stdout: cmd.Root().Writer,
-				Stderr: cmd.Root().ErrWriter,
-			}
-			return r.Run(ctx, TagOptions{
-				Name: name,
-				Tags: tags,
-			})
-		},
+		Action: tagAction(cfg, "tag <name> <key>=<value>", runner),
 	}
 }
 
 // NewUntagCommand creates an untag command with the given config.
 func NewUntagCommand(cfg CommandConfig) *cli.Command {
+	runner := func(
+		ctx context.Context,
+		useCase *stagingusecase.TagUseCase,
+		stdout, stderr io.Writer,
+		name string,
+		keys []string,
+	) error {
+		r := &UntagRunner{
+			UseCase: useCase,
+			Stdout:  stdout,
+			Stderr:  stderr,
+		}
+
+		return r.Run(ctx, UntagOptions{Name: name, Keys: keys})
+	}
+
 	return &cli.Command{
 		Name:      "untag",
 		Usage:     fmt.Sprintf("Stage tag removal for a %s", cfg.ItemName),
@@ -712,37 +777,6 @@ EXAMPLES:
 			cfg.CommandName,
 			cfg.CommandName,
 			cfg.CommandName),
-		Action: func(ctx context.Context, cmd *cli.Command) error {
-			if cmd.Args().Len() < 2 {
-				return fmt.Errorf("usage: suve stage %s untag <name> <key>", cfg.CommandName)
-			}
-
-			name := cmd.Args().First()
-			keys := cmd.Args().Slice()[1:]
-
-			identity, err := infra.GetAWSIdentity(ctx)
-			if err != nil {
-				return fmt.Errorf("failed to get AWS identity: %w", err)
-			}
-			store := agent.NewStore(identity.AccountID, identity.Region)
-
-			strategy, err := cfg.Factory(ctx)
-			if err != nil {
-				return err
-			}
-
-			r := &UntagRunner{
-				UseCase: &stagingusecase.TagUseCase{
-					Strategy: strategy,
-					Store:    store,
-				},
-				Stdout: cmd.Root().Writer,
-				Stderr: cmd.Root().ErrWriter,
-			}
-			return r.Run(ctx, UntagOptions{
-				Name: name,
-				Keys: keys,
-			})
-		},
+		Action: tagAction(cfg, "untag <name> <key>", runner),
 	}
 }

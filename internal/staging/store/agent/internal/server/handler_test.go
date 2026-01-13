@@ -20,6 +20,7 @@ func TestHandler_HandleRequest(t *testing.T) {
 
 	t.Run("ping", func(t *testing.T) {
 		t.Parallel()
+
 		h := server.NewHandler()
 		defer h.Destroy()
 
@@ -29,6 +30,7 @@ func TestHandler_HandleRequest(t *testing.T) {
 
 	t.Run("shutdown", func(t *testing.T) {
 		t.Parallel()
+
 		h := server.NewHandler()
 		defer h.Destroy()
 
@@ -79,6 +81,7 @@ func TestHandler_HandleRequest(t *testing.T) {
 		assert.True(t, resp.Success)
 
 		var result protocol.EntryResponse
+
 		err := json.Unmarshal(resp.Data, &result)
 		require.NoError(t, err)
 		require.NotNil(t, result.Entry)
@@ -100,6 +103,7 @@ func TestHandler_HandleRequest(t *testing.T) {
 		assert.True(t, resp.Success)
 
 		var result protocol.EntryResponse
+
 		err := json.Unmarshal(resp.Data, &result)
 		require.NoError(t, err)
 		assert.Nil(t, result.Entry)
@@ -137,6 +141,7 @@ func TestHandler_HandleRequest(t *testing.T) {
 		assert.True(t, resp.Success)
 
 		var result protocol.TagResponse
+
 		err := json.Unmarshal(resp.Data, &result)
 		require.NoError(t, err)
 		require.NotNil(t, result.TagEntry)
@@ -145,6 +150,7 @@ func TestHandler_HandleRequest(t *testing.T) {
 
 	t.Run("get tag - not found", func(t *testing.T) {
 		t.Parallel()
+
 		h := server.NewHandler()
 		defer h.Destroy()
 
@@ -165,6 +171,7 @@ func TestHandler_HandleRequest(t *testing.T) {
 
 	t.Run("list entries", func(t *testing.T) {
 		t.Parallel()
+
 		h := server.NewHandler()
 		defer h.Destroy()
 
@@ -195,6 +202,7 @@ func TestHandler_HandleRequest(t *testing.T) {
 		assert.True(t, resp.Success)
 
 		var result protocol.ListEntriesResponse
+
 		err := json.Unmarshal(resp.Data, &result)
 		require.NoError(t, err)
 		assert.Len(t, result.Entries[staging.ServiceParam], 2)
@@ -233,6 +241,7 @@ func TestHandler_HandleRequest(t *testing.T) {
 		assert.True(t, resp.Success)
 
 		var result protocol.ListEntriesResponse
+
 		err := json.Unmarshal(resp.Data, &result)
 		require.NoError(t, err)
 		assert.Len(t, result.Entries, 1)
@@ -241,6 +250,7 @@ func TestHandler_HandleRequest(t *testing.T) {
 
 	t.Run("list tags", func(t *testing.T) {
 		t.Parallel()
+
 		h := server.NewHandler()
 		defer h.Destroy()
 
@@ -263,6 +273,7 @@ func TestHandler_HandleRequest(t *testing.T) {
 		assert.True(t, resp.Success)
 
 		var result protocol.ListTagsResponse
+
 		err := json.Unmarshal(resp.Data, &result)
 		require.NoError(t, err)
 		assert.Len(t, result.Tags[staging.ServiceParam], 1)
@@ -270,6 +281,7 @@ func TestHandler_HandleRequest(t *testing.T) {
 
 	t.Run("list tags - filter by service", func(t *testing.T) {
 		t.Parallel()
+
 		h := server.NewHandler()
 		defer h.Destroy()
 
@@ -301,6 +313,7 @@ func TestHandler_HandleRequest(t *testing.T) {
 		assert.True(t, resp.Success)
 
 		var result protocol.ListTagsResponse
+
 		err := json.Unmarshal(resp.Data, &result)
 		require.NoError(t, err)
 		assert.Len(t, result.Tags, 1)
@@ -309,6 +322,7 @@ func TestHandler_HandleRequest(t *testing.T) {
 
 	t.Run("unstage entry", func(t *testing.T) {
 		t.Parallel()
+
 		h := server.NewHandler()
 		defer h.Destroy()
 
@@ -340,6 +354,7 @@ func TestHandler_HandleRequest(t *testing.T) {
 			Service:   staging.ServiceParam,
 			Name:      "/app/config",
 		})
+
 		var result protocol.EntryResponse
 		_ = json.Unmarshal(resp.Data, &result)
 		assert.Nil(t, result.Entry)
@@ -347,6 +362,7 @@ func TestHandler_HandleRequest(t *testing.T) {
 
 	t.Run("unstage entry - not staged", func(t *testing.T) {
 		t.Parallel()
+
 		h := server.NewHandler()
 		defer h.Destroy()
 
@@ -363,6 +379,7 @@ func TestHandler_HandleRequest(t *testing.T) {
 
 	t.Run("unstage tag", func(t *testing.T) {
 		t.Parallel()
+
 		h := server.NewHandler()
 		defer h.Destroy()
 
@@ -394,13 +411,16 @@ func TestHandler_HandleRequest(t *testing.T) {
 			Service:   staging.ServiceParam,
 			Name:      "/app/config",
 		})
+
 		var result protocol.TagResponse
+
 		_ = json.Unmarshal(resp.Data, &result)
 		assert.Nil(t, result.TagEntry)
 	})
 
 	t.Run("unstage tag - not staged", func(t *testing.T) {
 		t.Parallel()
+
 		h := server.NewHandler()
 		defer h.Destroy()
 
@@ -417,6 +437,7 @@ func TestHandler_HandleRequest(t *testing.T) {
 
 	t.Run("unstage all - all services", func(t *testing.T) {
 		t.Parallel()
+
 		h := server.NewHandler()
 		defer h.Destroy()
 
@@ -453,7 +474,9 @@ func TestHandler_HandleRequest(t *testing.T) {
 			AccountID: "123456789012",
 			Region:    "us-east-1",
 		})
+
 		var result protocol.ListEntriesResponse
+
 		_ = json.Unmarshal(resp.Data, &result)
 		assert.Empty(t, result.Entries[staging.ServiceParam])
 		assert.Empty(t, result.Entries[staging.ServiceSecret])
@@ -497,7 +520,9 @@ func TestHandler_HandleRequest(t *testing.T) {
 			AccountID: "123456789012",
 			Region:    "us-east-1",
 		})
+
 		var result protocol.ListEntriesResponse
+
 		_ = json.Unmarshal(resp.Data, &result)
 		assert.Empty(t, result.Entries[staging.ServiceParam])
 		assert.Len(t, result.Entries[staging.ServiceSecret], 1)
@@ -505,6 +530,7 @@ func TestHandler_HandleRequest(t *testing.T) {
 
 	t.Run("get state and set state", func(t *testing.T) {
 		t.Parallel()
+
 		h := server.NewHandler()
 		defer h.Destroy()
 
@@ -595,6 +621,7 @@ func TestHandler_HandleRequest(t *testing.T) {
 		assert.True(t, resp.Success)
 
 		var result protocol.IsEmptyResponse
+
 		err := json.Unmarshal(resp.Data, &result)
 		require.NoError(t, err)
 		assert.True(t, result.Empty)
@@ -602,6 +629,7 @@ func TestHandler_HandleRequest(t *testing.T) {
 
 	t.Run("is empty - not empty after staging", func(t *testing.T) {
 		t.Parallel()
+
 		h := server.NewHandler()
 		defer h.Destroy()
 
@@ -618,7 +646,9 @@ func TestHandler_HandleRequest(t *testing.T) {
 		assert.False(t, h.IsEmpty())
 
 		resp := h.HandleRequest(&protocol.Request{Method: protocol.MethodIsEmpty})
+
 		var result protocol.IsEmptyResponse
+
 		_ = json.Unmarshal(resp.Data, &result)
 		assert.False(t, result.Empty)
 	})
@@ -656,7 +686,9 @@ func TestHandler_HandleRequest(t *testing.T) {
 			Service:   staging.ServiceParam,
 			Name:      "/app/config",
 		})
+
 		var result1 protocol.EntryResponse
+
 		_ = json.Unmarshal(resp.Data, &result1)
 		assert.Equal(t, "account1-value", lo.FromPtr(result1.Entry.Value))
 
@@ -668,7 +700,9 @@ func TestHandler_HandleRequest(t *testing.T) {
 			Service:   staging.ServiceParam,
 			Name:      "/app/config",
 		})
+
 		var result2 protocol.EntryResponse
+
 		_ = json.Unmarshal(resp.Data, &result2)
 		assert.Equal(t, "account2-value", lo.FromPtr(result2.Entry.Value))
 	})

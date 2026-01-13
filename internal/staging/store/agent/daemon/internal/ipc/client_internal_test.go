@@ -45,6 +45,7 @@ func TestClient_Ping_NotConnected(t *testing.T) {
 	assert.ErrorIs(t, err, ErrNotConnected)
 }
 
+//nolint:paralleltest // Uses t.Context() which cannot be used with t.Parallel().
 func TestClient_SendRequest_Success(t *testing.T) {
 	// Create temp directory for socket
 	tmpDir, err := os.MkdirTemp("/tmp", "suve-client-test-*")
@@ -56,6 +57,7 @@ func TestClient_SendRequest_Success(t *testing.T) {
 	// Start a mock server
 	listener, err := (&net.ListenConfig{}).Listen(t.Context(), "unix", socketPath)
 	require.NoError(t, err)
+
 	defer func() { _ = listener.Close() }()
 
 	go func() {
@@ -63,10 +65,12 @@ func TestClient_SendRequest_Success(t *testing.T) {
 		if err != nil {
 			return
 		}
+
 		defer func() { _ = conn.Close() }()
 
 		// Read request
 		var req protocol.Request
+
 		decoder := json.NewDecoder(conn)
 		if err := decoder.Decode(&req); err != nil {
 			return
@@ -88,6 +92,7 @@ func TestClient_SendRequest_Success(t *testing.T) {
 	assert.True(t, resp.Success)
 }
 
+//nolint:paralleltest // Uses t.Context() which cannot be used with t.Parallel().
 func TestClient_SendRequest_ErrorResponse(t *testing.T) {
 	// Create temp directory for socket
 	tmpDir, err := os.MkdirTemp("/tmp", "suve-client-err-*")
@@ -99,6 +104,7 @@ func TestClient_SendRequest_ErrorResponse(t *testing.T) {
 	// Start a mock server that returns an error
 	listener, err := (&net.ListenConfig{}).Listen(t.Context(), "unix", socketPath)
 	require.NoError(t, err)
+
 	defer func() { _ = listener.Close() }()
 
 	go func() {
@@ -106,10 +112,12 @@ func TestClient_SendRequest_ErrorResponse(t *testing.T) {
 		if err != nil {
 			return
 		}
+
 		defer func() { _ = conn.Close() }()
 
 		// Read request
 		var req protocol.Request
+
 		decoder := json.NewDecoder(conn)
 		if err := decoder.Decode(&req); err != nil {
 			return
@@ -131,6 +139,7 @@ func TestClient_SendRequest_ErrorResponse(t *testing.T) {
 	assert.Equal(t, "test error", resp.Error)
 }
 
+//nolint:paralleltest // Uses t.Context() which cannot be used with t.Parallel().
 func TestClient_SendRequest_ServerClosesConnection(t *testing.T) {
 	// Create temp directory for socket
 	tmpDir, err := os.MkdirTemp("/tmp", "suve-client-close-*")
@@ -142,6 +151,7 @@ func TestClient_SendRequest_ServerClosesConnection(t *testing.T) {
 	// Start a mock server that reads request but closes without response
 	listener, err := (&net.ListenConfig{}).Listen(t.Context(), "unix", socketPath)
 	require.NoError(t, err)
+
 	defer func() { _ = listener.Close() }()
 
 	go func() {
@@ -151,6 +161,7 @@ func TestClient_SendRequest_ServerClosesConnection(t *testing.T) {
 		}
 		// Read the request to allow client to complete write
 		var req protocol.Request
+
 		decoder := json.NewDecoder(conn)
 		_ = decoder.Decode(&req)
 		// Close without responding - client should get EOF on read
@@ -165,6 +176,7 @@ func TestClient_SendRequest_ServerClosesConnection(t *testing.T) {
 	assert.Contains(t, err.Error(), "daemon closed connection unexpectedly")
 }
 
+//nolint:paralleltest // Uses t.Context() which cannot be used with t.Parallel().
 func TestClient_Ping_Success(t *testing.T) {
 	// Create temp directory for socket
 	tmpDir, err := os.MkdirTemp("/tmp", "suve-client-ping-*")
@@ -176,6 +188,7 @@ func TestClient_Ping_Success(t *testing.T) {
 	// Start a mock server
 	listener, err := (&net.ListenConfig{}).Listen(t.Context(), "unix", socketPath)
 	require.NoError(t, err)
+
 	defer func() { _ = listener.Close() }()
 
 	go func() {
@@ -183,10 +196,12 @@ func TestClient_Ping_Success(t *testing.T) {
 		if err != nil {
 			return
 		}
+
 		defer func() { _ = conn.Close() }()
 
 		// Read request
 		var req protocol.Request
+
 		decoder := json.NewDecoder(conn)
 		if err := decoder.Decode(&req); err != nil {
 			return
@@ -210,6 +225,7 @@ func TestClient_Ping_Success(t *testing.T) {
 	require.NoError(t, err)
 }
 
+//nolint:paralleltest // Uses t.Context() which cannot be used with t.Parallel().
 func TestClient_Ping_ServerError(t *testing.T) {
 	// Create temp directory for socket
 	tmpDir, err := os.MkdirTemp("/tmp", "suve-client-ping-err-*")
@@ -221,6 +237,7 @@ func TestClient_Ping_ServerError(t *testing.T) {
 	// Start a mock server that returns error
 	listener, err := (&net.ListenConfig{}).Listen(t.Context(), "unix", socketPath)
 	require.NoError(t, err)
+
 	defer func() { _ = listener.Close() }()
 
 	go func() {
@@ -228,10 +245,12 @@ func TestClient_Ping_ServerError(t *testing.T) {
 		if err != nil {
 			return
 		}
+
 		defer func() { _ = conn.Close() }()
 
 		// Read request
 		var req protocol.Request
+
 		decoder := json.NewDecoder(conn)
 		if err := decoder.Decode(&req); err != nil {
 			return
@@ -251,6 +270,7 @@ func TestClient_Ping_ServerError(t *testing.T) {
 	assert.Contains(t, err.Error(), "ping failed")
 }
 
+//nolint:paralleltest // Uses t.Context() which cannot be used with t.Parallel().
 func TestClient_ConcurrentSendRequest(t *testing.T) {
 	// Create temp directory for socket
 	tmpDir, err := os.MkdirTemp("/tmp", "suve-client-concurrent-*")
@@ -262,6 +282,7 @@ func TestClient_ConcurrentSendRequest(t *testing.T) {
 	// Start a mock server that handles multiple connections
 	listener, err := (&net.ListenConfig{}).Listen(t.Context(), "unix", socketPath)
 	require.NoError(t, err)
+
 	defer func() { _ = listener.Close() }()
 
 	go func() {
@@ -270,11 +291,13 @@ func TestClient_ConcurrentSendRequest(t *testing.T) {
 			if err != nil {
 				return
 			}
+
 			go func(c net.Conn) {
 				defer func() { _ = c.Close() }()
 
 				// Read request
 				var req protocol.Request
+
 				decoder := json.NewDecoder(c)
 				if err := decoder.Decode(&req); err != nil {
 					return
@@ -296,6 +319,7 @@ func TestClient_ConcurrentSendRequest(t *testing.T) {
 
 	// Send multiple concurrent requests
 	const numRequests = 10
+
 	done := make(chan error, numRequests)
 
 	for range numRequests {
@@ -309,13 +333,14 @@ func TestClient_ConcurrentSendRequest(t *testing.T) {
 	for range numRequests {
 		select {
 		case err := <-done:
-			assert.NoError(t, err)
+			require.NoError(t, err)
 		case <-time.After(5 * time.Second):
 			t.Fatal("concurrent requests timed out")
 		}
 	}
 }
 
+//nolint:paralleltest // Uses t.Context() which cannot be used with t.Parallel().
 func TestClient_SendRequest_DecodeNonEOFError(t *testing.T) {
 	// Create temp directory for socket
 	tmpDir, err := os.MkdirTemp("/tmp", "suve-client-decode-err-*")
@@ -327,6 +352,7 @@ func TestClient_SendRequest_DecodeNonEOFError(t *testing.T) {
 	// Start a mock server that returns invalid JSON
 	listener, err := (&net.ListenConfig{}).Listen(t.Context(), "unix", socketPath)
 	require.NoError(t, err)
+
 	defer func() { _ = listener.Close() }()
 
 	go func() {
@@ -334,10 +360,12 @@ func TestClient_SendRequest_DecodeNonEOFError(t *testing.T) {
 		if err != nil {
 			return
 		}
+
 		defer func() { _ = conn.Close() }()
 
 		// Read request
 		var req protocol.Request
+
 		decoder := json.NewDecoder(conn)
 		if err := decoder.Decode(&req); err != nil {
 			return
@@ -355,6 +383,7 @@ func TestClient_SendRequest_DecodeNonEOFError(t *testing.T) {
 	assert.Contains(t, err.Error(), "failed to read response")
 }
 
+//nolint:paralleltest // Uses t.Context() which cannot be used with t.Parallel().
 func TestClient_SendRequest_EncodeError(t *testing.T) {
 	// Create temp directory for socket
 	tmpDir, err := os.MkdirTemp("/tmp", "suve-client-encode-err-*")
@@ -366,6 +395,7 @@ func TestClient_SendRequest_EncodeError(t *testing.T) {
 	// Start a mock server that immediately closes write direction
 	listener, err := (&net.ListenConfig{}).Listen(t.Context(), "unix", socketPath)
 	require.NoError(t, err)
+
 	defer func() { _ = listener.Close() }()
 
 	go func() {

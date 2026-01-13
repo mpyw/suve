@@ -12,5 +12,6 @@ func socketPathForAccount(accountID, region string) string {
 	if tmpdir := os.Getenv("TMPDIR"); tmpdir != "" {
 		return filepath.Join(tmpdir, socketDirName, accountID, region, socketFileName)
 	}
+
 	return socketPathFallback(accountID, region)
 }

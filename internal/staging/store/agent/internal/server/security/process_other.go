@@ -3,4 +3,6 @@
 package security
 
 // SetupProcess is a no-op on unsupported platforms.
-func SetupProcess() error { return nil }
+func SetupProcess() error {
+	return nil
+}

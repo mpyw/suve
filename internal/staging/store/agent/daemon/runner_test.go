@@ -1,3 +1,4 @@
+//nolint:testpackage // Internal tests for unexported Runner behavior (checkAutoShutdown)
 package daemon
 
 import (
@@ -24,6 +25,7 @@ func TestNewRunner(t *testing.T) {
 
 	t.Run("default options", func(t *testing.T) {
 		t.Parallel()
+
 		r := NewRunner(testRunnerAccountID, testRunnerRegion)
 		require.NotNil(t, r)
 		assert.NotNil(t, r.server)
@@ -35,6 +37,7 @@ func TestNewRunner(t *testing.T) {
 
 	t.Run("with auto shutdown disabled", func(t *testing.T) {
 		t.Parallel()
+
 		r := NewRunner(testRunnerAccountID, testRunnerRegion, WithAutoShutdownDisabled())
 		require.NotNil(t, r)
 		assert.True(t, r.autoShutdownDisabled)
@@ -46,6 +49,7 @@ func TestRunner_Shutdown(t *testing.T) {
 
 	t.Run("shutdown without running server", func(t *testing.T) {
 		t.Parallel()
+
 		r := NewRunner(testRunnerAccountID, testRunnerRegion)
 		// This should not panic
 		r.Shutdown()
@@ -57,6 +61,7 @@ func TestRunner_checkAutoShutdown(t *testing.T) {
 
 	t.Run("does not set WillShutdown when auto shutdown disabled", func(t *testing.T) {
 		t.Parallel()
+
 		r := NewRunner(testRunnerAccountID, testRunnerRegion, WithAutoShutdownDisabled())
 
 		req := &protocol.Request{Method: protocol.MethodUnstageAll}
@@ -111,6 +116,7 @@ func TestRunner_checkAutoShutdown_ShutdownReasons(t *testing.T) {
 
 	t.Run("UnstageEntry with apply hint returns applied reason", func(t *testing.T) {
 		t.Parallel()
+
 		r := NewRunner(testRunnerAccountID, testRunnerRegion)
 
 		req := &protocol.Request{Method: protocol.MethodUnstageEntry, Hint: protocol.HintApply}
@@ -135,6 +141,7 @@ func TestRunner_checkAutoShutdown_ShutdownReasons(t *testing.T) {
 
 	t.Run("UnstageEntry with persist hint returns persisted reason", func(t *testing.T) {
 		t.Parallel()
+
 		r := NewRunner(testRunnerAccountID, testRunnerRegion)
 
 		req := &protocol.Request{Method: protocol.MethodUnstageEntry, Hint: protocol.HintPersist}
@@ -160,6 +167,7 @@ func TestRunner_checkAutoShutdown_ShutdownReasons(t *testing.T) {
 
 	t.Run("UnstageTag with apply hint returns applied reason", func(t *testing.T) {
 		t.Parallel()
+
 		r := NewRunner(testRunnerAccountID, testRunnerRegion)
 
 		req := &protocol.Request{Method: protocol.MethodUnstageTag, Hint: protocol.HintApply}
@@ -172,6 +180,7 @@ func TestRunner_checkAutoShutdown_ShutdownReasons(t *testing.T) {
 
 	t.Run("UnstageTag with reset hint returns unstaged reason", func(t *testing.T) {
 		t.Parallel()
+
 		r := NewRunner(testRunnerAccountID, testRunnerRegion)
 
 		req := &protocol.Request{Method: protocol.MethodUnstageTag, Hint: protocol.HintReset}
@@ -197,6 +206,7 @@ func TestRunner_checkAutoShutdown_ShutdownReasons(t *testing.T) {
 	// UnstageAll tests
 	t.Run("UnstageAll with no hint returns unstaged reason", func(t *testing.T) {
 		t.Parallel()
+
 		r := NewRunner(testRunnerAccountID, testRunnerRegion)
 
 		req := &protocol.Request{Method: protocol.MethodUnstageAll}
@@ -221,6 +231,7 @@ func TestRunner_checkAutoShutdown_ShutdownReasons(t *testing.T) {
 
 	t.Run("UnstageAll with reset hint returns unstaged reason", func(t *testing.T) {
 		t.Parallel()
+
 		r := NewRunner(testRunnerAccountID, testRunnerRegion)
 
 		req := &protocol.Request{Method: protocol.MethodUnstageAll, Hint: protocol.HintReset}
@@ -246,6 +257,7 @@ func TestRunner_checkAutoShutdown_ShutdownReasons(t *testing.T) {
 	// SetState tests
 	t.Run("SetState returns cleared reason", func(t *testing.T) {
 		t.Parallel()
+
 		r := NewRunner(testRunnerAccountID, testRunnerRegion)
 
 		req := &protocol.Request{Method: protocol.MethodSetState}
@@ -264,6 +276,7 @@ func TestRunner_checkAutoShutdown_NonEmptyState(t *testing.T) {
 
 	t.Run("UnstageEntry does not shutdown when state not empty", func(t *testing.T) {
 		t.Parallel()
+
 		r := NewRunner(testRunnerAccountID, testRunnerRegion)
 
 		// Stage an entry to make state non-empty
@@ -365,19 +378,23 @@ func TestRunner_Run_ContextCancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 
 	errCh := make(chan error, 1)
+
 	go func() {
 		errCh <- runner.Run(ctx)
 	}()
 
 	// Wait for daemon to be ready
 	launcher := NewLauncher(accountID, region, WithAutoStartDisabled())
+
 	deadline := time.Now().Add(5 * time.Second)
 	for time.Now().Before(deadline) {
 		if err := launcher.Ping(); err == nil {
 			break
 		}
+
 		time.Sleep(50 * time.Millisecond)
 	}
+
 	require.NoError(t, launcher.Ping(), "daemon should be ready")
 
 	// Cancel the context to trigger shutdown
@@ -386,7 +403,7 @@ func TestRunner_Run_ContextCancellation(t *testing.T) {
 	// Wait for daemon to exit
 	select {
 	case err := <-errCh:
-		assert.NoError(t, err)
+		require.NoError(t, err)
 	case <-time.After(5 * time.Second):
 		t.Fatal("daemon did not shut down within timeout after context cancellation")
 	}

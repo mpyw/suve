@@ -6,4 +6,6 @@ package security
 // from capturing sensitive data in memory.
 
 // SetupProcess is a no-op on Windows (not yet implemented).
-func SetupProcess() error { return nil }
+func SetupProcess() error {
+	return nil
+}

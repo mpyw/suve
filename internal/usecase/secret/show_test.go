@@ -18,7 +18,7 @@ import (
 type mockShowClient struct {
 	getSecretValueResult *secretapi.GetSecretValueOutput
 	getSecretValueErr    error
-	listVersionsResult   *secretapi.ListSecretVersionIdsOutput
+	listVersionsResult   *secretapi.ListSecretVersionIDsOutput
 	listVersionsErr      error
 	describeSecretResult *secretapi.DescribeSecretOutput
 	describeSecretErr    error
@@ -31,7 +31,7 @@ func (m *mockShowClient) GetSecretValue(_ context.Context, _ *secretapi.GetSecre
 	return m.getSecretValueResult, nil
 }
 
-func (m *mockShowClient) ListSecretVersionIds(_ context.Context, _ *secretapi.ListSecretVersionIdsInput, _ ...func(*secretapi.Options)) (*secretapi.ListSecretVersionIdsOutput, error) {
+func (m *mockShowClient) ListSecretVersionIds(_ context.Context, _ *secretapi.ListSecretVersionIDsInput, _ ...func(*secretapi.Options)) (*secretapi.ListSecretVersionIDsOutput, error) {
 	if m.listVersionsErr != nil {
 		return nil, m.listVersionsErr
 	}
@@ -174,7 +174,7 @@ func TestShowUseCase_Execute_WithShift(t *testing.T) {
 
 	now := time.Now()
 	client := &mockShowClient{
-		listVersionsResult: &secretapi.ListSecretVersionIdsOutput{
+		listVersionsResult: &secretapi.ListSecretVersionIDsOutput{
 			Versions: []secretapi.SecretVersionsListEntry{
 				{VersionId: lo.ToPtr("v1-id"), CreatedDate: lo.ToPtr(now.Add(-2 * time.Hour))},
 				{VersionId: lo.ToPtr("v2-id"), CreatedDate: lo.ToPtr(now.Add(-1 * time.Hour))},

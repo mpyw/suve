@@ -9,4 +9,6 @@ import "net"
 // Consider using named pipes with security descriptors instead.
 
 // VerifyPeerCredentials is a no-op on Windows (not yet implemented).
-func VerifyPeerCredentials(_ net.Conn) error { return nil }
+func VerifyPeerCredentials(_ net.Conn) error {
+	return nil
+}

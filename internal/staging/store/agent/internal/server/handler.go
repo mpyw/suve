@@ -90,6 +90,7 @@ func marshalResponse(v any) *protocol.Response {
 	if err != nil {
 		return errorResponse(err)
 	}
+
 	return &protocol.Response{Success: true, Data: data}
 }
 
@@ -106,11 +107,13 @@ func (h *Handler) handleGetEntry(req *protocol.Request) *protocol.Response {
 	}
 
 	var entry *staging.Entry
+
 	if entries, ok := state.Entries[req.Service]; ok {
 		if e, ok := entries[req.Name]; ok {
 			entry = &e
 		}
 	}
+
 	return marshalResponse(protocol.EntryResponse{Entry: entry})
 }
 
@@ -122,11 +125,13 @@ func (h *Handler) handleGetTag(req *protocol.Request) *protocol.Response {
 	}
 
 	var tagEntry *staging.TagEntry
+
 	if tags, ok := state.Tags[req.Service]; ok {
 		if t, ok := tags[req.Name]; ok {
 			tagEntry = &t
 		}
 	}
+
 	return marshalResponse(protocol.TagResponse{TagEntry: tagEntry})
 }
 
@@ -141,10 +146,12 @@ func (h *Handler) handleListEntries(req *protocol.Request) *protocol.Response {
 	if req.Service != "" {
 		// Filter by service
 		entries = make(map[staging.Service]map[string]staging.Entry)
+
 		if svcEntries, ok := state.Entries[req.Service]; ok {
 			entries[req.Service] = svcEntries
 		}
 	}
+
 	return marshalResponse(protocol.ListEntriesResponse{Entries: entries})
 }
 
@@ -159,10 +166,12 @@ func (h *Handler) handleListTags(req *protocol.Request) *protocol.Response {
 	if req.Service != "" {
 		// Filter by service
 		tags = make(map[staging.Service]map[string]staging.TagEntry)
+
 		if svcTags, ok := state.Tags[req.Service]; ok {
 			tags[req.Service] = svcTags
 		}
 	}
+
 	return marshalResponse(protocol.ListTagsResponse{Tags: tags})
 }
 
@@ -181,11 +190,13 @@ func (h *Handler) handleStageEntry(req *protocol.Request) *protocol.Response {
 	if state.Entries[req.Service] == nil {
 		state.Entries[req.Service] = make(map[string]staging.Entry)
 	}
+
 	state.Entries[req.Service][req.Name] = *req.Entry
 
 	if err := h.state.set(req.AccountID, req.Region, state); err != nil {
 		return errorResponse(err)
 	}
+
 	return successResponse()
 }
 
@@ -199,11 +210,13 @@ func (h *Handler) handleStageTag(req *protocol.Request) *protocol.Response {
 	if state.Tags[req.Service] == nil {
 		state.Tags[req.Service] = make(map[string]staging.TagEntry)
 	}
+
 	state.Tags[req.Service][req.Name] = *req.TagEntry
 
 	if err := h.state.set(req.AccountID, req.Region, state); err != nil {
 		return errorResponse(err)
 	}
+
 	return successResponse()
 }
 
@@ -217,12 +230,15 @@ func (h *Handler) handleUnstageEntry(req *protocol.Request) *protocol.Response {
 	if entries, ok := state.Entries[req.Service]; ok {
 		if _, ok := entries[req.Name]; ok {
 			delete(entries, req.Name)
+
 			if err := h.state.set(req.AccountID, req.Region, state); err != nil {
 				return errorResponse(err)
 			}
+
 			return successResponse()
 		}
 	}
+
 	return errorResponse(staging.ErrNotStaged)
 }
 
@@ -236,12 +252,15 @@ func (h *Handler) handleUnstageTag(req *protocol.Request) *protocol.Response {
 	if tags, ok := state.Tags[req.Service]; ok {
 		if _, ok := tags[req.Name]; ok {
 			delete(tags, req.Name)
+
 			if err := h.state.set(req.AccountID, req.Region, state); err != nil {
 				return errorResponse(err)
 			}
+
 			return successResponse()
 		}
 	}
+
 	return errorResponse(staging.ErrNotStaged)
 }
 
@@ -271,6 +290,7 @@ func (h *Handler) handleUnstageAll(req *protocol.Request) *protocol.Response {
 	if err := h.state.set(req.AccountID, req.Region, state); err != nil {
 		return errorResponse(err)
 	}
+
 	return successResponse()
 }
 
@@ -280,6 +300,7 @@ func (h *Handler) handleGetState(req *protocol.Request) *protocol.Response {
 	if err != nil {
 		return errorResponse(err)
 	}
+
 	return marshalResponse(protocol.StateResponse{State: state})
 }
 
@@ -292,6 +313,7 @@ func (h *Handler) handleSetState(req *protocol.Request) *protocol.Response {
 	if err := h.state.set(req.AccountID, req.Region, req.State); err != nil {
 		return errorResponse(err)
 	}
+
 	return successResponse()
 }
 

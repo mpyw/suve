@@ -24,10 +24,10 @@ const (
 func TestNewServer(t *testing.T) {
 	t.Parallel()
 
-	handler := func(req *protocol.Request) *protocol.Response {
+	handler := func(_ *protocol.Request) *protocol.Response {
 		return &protocol.Response{Success: true}
 	}
-	callback := func(req *protocol.Request, resp *protocol.Response) {}
+	callback := func(_ *protocol.Request, _ *protocol.Response) {}
 	shutdownCb := func() {}
 
 	s := NewServer(testAccountID, testRegion, handler, callback, shutdownCb)
@@ -42,7 +42,7 @@ func TestNewServer(t *testing.T) {
 func TestServer_ServeClosesListenerOnCancel(t *testing.T) {
 	t.Parallel()
 
-	handler := func(req *protocol.Request) *protocol.Response {
+	handler := func(_ *protocol.Request) *protocol.Response {
 		return &protocol.Response{Success: true}
 	}
 
@@ -52,12 +52,14 @@ func TestServer_ServeClosesListenerOnCancel(t *testing.T) {
 	// (Unix socket paths have length limits on some platforms)
 	listener, err := (&net.ListenConfig{}).Listen(t.Context(), "tcp", "127.0.0.1:0")
 	require.NoError(t, err)
+
 	s.listener = listener
 
 	ctx, cancel := context.WithCancel(t.Context())
 
 	// Start Serve in background
 	done := make(chan struct{})
+
 	go func() {
 		s.Serve(ctx)
 		close(done)
@@ -81,20 +83,23 @@ func TestServer_ServeClosesListenerOnCancel(t *testing.T) {
 func TestServer_sendError(t *testing.T) {
 	t.Parallel()
 
-	handler := func(req *protocol.Request) *protocol.Response {
+	handler := func(_ *protocol.Request) *protocol.Response {
 		return &protocol.Response{Success: true}
 	}
 	s := NewServer(testAccountID, testRegion, handler, nil, nil)
 
 	// Use a pipe to capture the response
 	client, server := net.Pipe()
+
 	defer func() { _ = client.Close() }()
 	defer func() { _ = server.Close() }()
 
 	errMsg := "test error message"
+
 	go s.sendError(server, errMsg)
 
 	var resp protocol.Response
+
 	decoder := json.NewDecoder(client)
 	err := decoder.Decode(&resp)
 	require.NoError(t, err)
@@ -118,7 +123,7 @@ func (m *mockConn) SetWriteDeadline(time.Time) error { return nil }
 func TestServer_sendError_withMockConn(t *testing.T) {
 	t.Parallel()
 
-	handler := func(req *protocol.Request) *protocol.Response {
+	handler := func(_ *protocol.Request) *protocol.Response {
 		return &protocol.Response{Success: true}
 	}
 	s := NewServer(testAccountID, testRegion, handler, nil, nil)
@@ -129,6 +134,7 @@ func TestServer_sendError_withMockConn(t *testing.T) {
 	s.sendError(conn, "error from mock")
 
 	var resp protocol.Response
+
 	err := json.Unmarshal(buf.Bytes(), &resp)
 	require.NoError(t, err)
 	assert.False(t, resp.Success)
@@ -145,12 +151,14 @@ func TestServer_handleConnection_validRequest(t *testing.T) {
 	handlerCalled := false
 	handler := func(req *protocol.Request) *protocol.Response {
 		handlerCalled = true
+
 		assert.Equal(t, protocol.MethodPing, req.Method)
+
 		return &protocol.Response{Success: true}
 	}
 
 	callbackCalled := false
-	callback := func(req *protocol.Request, resp *protocol.Response) {
+	callback := func(_ *protocol.Request, _ *protocol.Response) {
 		callbackCalled = true
 	}
 
@@ -172,6 +180,7 @@ func TestServer_handleConnection_validRequest(t *testing.T) {
 	// Connect and send a request
 	conn, err := (&net.Dialer{Timeout: time.Second}).DialContext(t.Context(), "unix", socketPath)
 	require.NoError(t, err)
+
 	defer func() { _ = conn.Close() }()
 
 	// Write request
@@ -181,7 +190,9 @@ func TestServer_handleConnection_validRequest(t *testing.T) {
 	require.NoError(t, err)
 
 	// Read response
+
 	var resp protocol.Response
+
 	decoder := json.NewDecoder(conn)
 	err = decoder.Decode(&resp)
 	require.NoError(t, err)
@@ -200,8 +211,9 @@ func TestServer_handleConnection_invalidJSON(t *testing.T) {
 	t.Cleanup(func() { _ = os.RemoveAll(tmpDir) })
 	t.Setenv("TMPDIR", tmpDir)
 
-	handler := func(req *protocol.Request) *protocol.Response {
+	handler := func(_ *protocol.Request) *protocol.Response {
 		t.Fatal("handler should not be called for invalid JSON")
+
 		return nil
 	}
 
@@ -223,6 +235,7 @@ func TestServer_handleConnection_invalidJSON(t *testing.T) {
 	// Connect and send invalid JSON
 	conn, err := (&net.Dialer{Timeout: time.Second}).DialContext(t.Context(), "unix", socketPath)
 	require.NoError(t, err)
+
 	defer func() { _ = conn.Close() }()
 
 	// Write invalid JSON
@@ -236,6 +249,7 @@ func TestServer_handleConnection_invalidJSON(t *testing.T) {
 
 	// Read error response
 	var resp protocol.Response
+
 	decoder := json.NewDecoder(conn)
 	_ = decoder.Decode(&resp)
 	// We might get an error response or EOF - either is acceptable
@@ -251,12 +265,12 @@ func TestServer_handleConnection_shutdownCallback(t *testing.T) {
 	t.Cleanup(func() { _ = os.RemoveAll(tmpDir) })
 	t.Setenv("TMPDIR", tmpDir)
 
-	handler := func(req *protocol.Request) *protocol.Response {
+	handler := func(_ *protocol.Request) *protocol.Response {
 		return &protocol.Response{Success: true}
 	}
 
 	// Use callback to set WillShutdown
-	callback := func(req *protocol.Request, resp *protocol.Response) {
+	callback := func(_ *protocol.Request, resp *protocol.Response) {
 		resp.WillShutdown = true
 	}
 
@@ -283,6 +297,7 @@ func TestServer_handleConnection_shutdownCallback(t *testing.T) {
 	// Connect and send a request
 	conn, err := (&net.Dialer{Timeout: time.Second}).DialContext(t.Context(), "unix", socketPath)
 	require.NoError(t, err)
+
 	defer func() { _ = conn.Close() }()
 
 	// Write request
@@ -293,6 +308,7 @@ func TestServer_handleConnection_shutdownCallback(t *testing.T) {
 
 	// Read response
 	var resp protocol.Response
+
 	decoder := json.NewDecoder(conn)
 	err = decoder.Decode(&resp)
 	require.NoError(t, err)
@@ -318,7 +334,7 @@ func TestServer_handleConnection_nilCallbacks(t *testing.T) {
 	t.Cleanup(func() { _ = os.RemoveAll(tmpDir) })
 	t.Setenv("TMPDIR", tmpDir)
 
-	handler := func(req *protocol.Request) *protocol.Response {
+	handler := func(_ *protocol.Request) *protocol.Response {
 		return &protocol.Response{Success: true}
 	}
 
@@ -341,6 +357,7 @@ func TestServer_handleConnection_nilCallbacks(t *testing.T) {
 	// Connect and send a request
 	conn, err := (&net.Dialer{Timeout: time.Second}).DialContext(t.Context(), "unix", socketPath)
 	require.NoError(t, err)
+
 	defer func() { _ = conn.Close() }()
 
 	// Write request
@@ -350,7 +367,9 @@ func TestServer_handleConnection_nilCallbacks(t *testing.T) {
 	require.NoError(t, err)
 
 	// Read response
+
 	var resp protocol.Response
+
 	decoder := json.NewDecoder(conn)
 	err = decoder.Decode(&resp)
 	require.NoError(t, err)
@@ -363,8 +382,9 @@ func TestServer_handleConnection_nilCallbacks(t *testing.T) {
 func TestServer_handleConnection_EOF(t *testing.T) {
 	t.Parallel()
 
-	handler := func(req *protocol.Request) *protocol.Response {
+	handler := func(_ *protocol.Request) *protocol.Response {
 		t.Fatal("handler should not be called on EOF")
+
 		return nil
 	}
 
@@ -374,6 +394,7 @@ func TestServer_handleConnection_EOF(t *testing.T) {
 
 	go func() {
 		defer func() { _ = server.Close() }()
+
 		s.handleConnection(server)
 	}()
 
@@ -395,7 +416,7 @@ func TestServer_Start(t *testing.T) {
 	accountID := "s1"
 	region := "r1"
 
-	handler := func(req *protocol.Request) *protocol.Response {
+	handler := func(_ *protocol.Request) *protocol.Response {
 		return &protocol.Response{Success: true}
 	}
 
@@ -403,6 +424,7 @@ func TestServer_Start(t *testing.T) {
 
 	err = s.Start(t.Context())
 	require.NoError(t, err)
+
 	defer func() { _ = s.listener.Close() }()
 
 	// Verify socket file exists
@@ -434,7 +456,7 @@ func TestServer_Start_RemovesExistingSocket(t *testing.T) {
 	err = os.WriteFile(socketPath, []byte("stale"), 0o600)
 	require.NoError(t, err)
 
-	handler := func(req *protocol.Request) *protocol.Response {
+	handler := func(_ *protocol.Request) *protocol.Response {
 		return &protocol.Response{Success: true}
 	}
 
@@ -442,6 +464,7 @@ func TestServer_Start_RemovesExistingSocket(t *testing.T) {
 
 	err = s.Start(t.Context())
 	require.NoError(t, err)
+
 	defer func() { _ = s.listener.Close() }()
 
 	// The stale file should be removed and replaced with a real socket
@@ -462,8 +485,9 @@ func TestServer_Serve(t *testing.T) {
 	region := "r3"
 
 	requestsHandled := 0
-	handler := func(req *protocol.Request) *protocol.Response {
+	handler := func(_ *protocol.Request) *protocol.Response {
 		requestsHandled++
+
 		return &protocol.Response{Success: true}
 	}
 
@@ -485,15 +509,18 @@ func TestServer_Serve(t *testing.T) {
 	require.NoError(t, err)
 
 	req := protocol.Request{Method: protocol.MethodPing}
+
 	encoder := json.NewEncoder(conn)
 	err = encoder.Encode(&req)
 	require.NoError(t, err)
 
 	var resp protocol.Response
+
 	decoder := json.NewDecoder(conn)
 	err = decoder.Decode(&resp)
 	require.NoError(t, err)
 	assert.True(t, resp.Success)
+
 	_ = conn.Close()
 
 	// Shutdown via context cancellation
@@ -514,7 +541,7 @@ func TestServer_Serve_MultipleConnections(t *testing.T) {
 	accountID := "s4"
 	region := "r4"
 
-	handler := func(req *protocol.Request) *protocol.Response {
+	handler := func(_ *protocol.Request) *protocol.Response {
 		return &protocol.Response{Success: true}
 	}
 
@@ -532,6 +559,7 @@ func TestServer_Serve_MultipleConnections(t *testing.T) {
 
 	// Send multiple concurrent requests
 	const numRequests = 5
+
 	done := make(chan error, numRequests)
 
 	for range numRequests {
@@ -539,28 +567,36 @@ func TestServer_Serve_MultipleConnections(t *testing.T) {
 			conn, err := (&net.Dialer{Timeout: time.Second}).DialContext(t.Context(), "unix", socketPath)
 			if err != nil {
 				done <- err
+
 				return
 			}
+
 			defer func() { _ = conn.Close() }()
 
 			req := protocol.Request{Method: protocol.MethodPing}
+
 			encoder := json.NewEncoder(conn)
 			if err := encoder.Encode(&req); err != nil {
 				done <- err
+
 				return
 			}
 
 			var resp protocol.Response
+
 			decoder := json.NewDecoder(conn)
 			if err := decoder.Decode(&resp); err != nil {
 				done <- err
+
 				return
 			}
 
 			if !resp.Success {
 				done <- err
+
 				return
 			}
+
 			done <- nil
 		}()
 	}
@@ -569,7 +605,7 @@ func TestServer_Serve_MultipleConnections(t *testing.T) {
 	for range numRequests {
 		select {
 		case err := <-done:
-			assert.NoError(t, err)
+			require.NoError(t, err)
 		case <-time.After(5 * time.Second):
 			t.Fatal("requests timed out")
 		}
@@ -580,12 +616,14 @@ func TestServer_Serve_MultipleConnections(t *testing.T) {
 
 // TestServer_createSocketDir tests socket directory creation.
 func TestServer_createSocketDir(t *testing.T) {
+	t.Parallel()
+
 	// Create temp directory
 	tmpDir, err := os.MkdirTemp("/tmp", "suve-server-mkdir-*")
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = os.RemoveAll(tmpDir) })
 
-	handler := func(req *protocol.Request) *protocol.Response {
+	handler := func(_ *protocol.Request) *protocol.Response {
 		return &protocol.Response{Success: true}
 	}
 
@@ -607,18 +645,22 @@ func TestServer_createSocketDir(t *testing.T) {
 
 // TestServer_removeExistingSocket tests socket file removal.
 func TestServer_removeExistingSocket(t *testing.T) {
+	t.Parallel()
+
 	// Create temp directory
 	tmpDir, err := os.MkdirTemp("/tmp", "suve-server-rm-*")
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = os.RemoveAll(tmpDir) })
 
-	handler := func(req *protocol.Request) *protocol.Response {
+	handler := func(_ *protocol.Request) *protocol.Response {
 		return &protocol.Response{Success: true}
 	}
 
 	s := NewServer(testAccountID, testRegion, handler, nil, nil)
 
 	t.Run("removes existing file", func(t *testing.T) {
+		t.Parallel()
+
 		socketPath := filepath.Join(tmpDir, "existing.sock")
 		err := os.WriteFile(socketPath, []byte("test"), 0o600)
 		require.NoError(t, err)
@@ -631,6 +673,8 @@ func TestServer_removeExistingSocket(t *testing.T) {
 	})
 
 	t.Run("no error for non-existent file", func(t *testing.T) {
+		t.Parallel()
+
 		socketPath := filepath.Join(tmpDir, "nonexistent.sock")
 		err := s.removeExistingSocket(socketPath)
 		require.NoError(t, err)
@@ -639,12 +683,14 @@ func TestServer_removeExistingSocket(t *testing.T) {
 
 // TestServer_setSocketPermissions tests socket permission setting.
 func TestServer_setSocketPermissions(t *testing.T) {
+	t.Parallel()
+
 	// Create temp directory
 	tmpDir, err := os.MkdirTemp("/tmp", "suve-server-perm-*")
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = os.RemoveAll(tmpDir) })
 
-	handler := func(req *protocol.Request) *protocol.Response {
+	handler := func(_ *protocol.Request) *protocol.Response {
 		return &protocol.Response{Success: true}
 	}
 
@@ -665,8 +711,10 @@ func TestServer_setSocketPermissions(t *testing.T) {
 }
 
 // TestServer_Serve_AcceptError tests that Serve handles accept errors gracefully.
+//
+//nolint:paralleltest // Uses t.Context() which is not compatible with t.Parallel().
 func TestServer_Serve_AcceptError(t *testing.T) {
-	handler := func(req *protocol.Request) *protocol.Response {
+	handler := func(_ *protocol.Request) *protocol.Response {
 		return &protocol.Response{Success: true}
 	}
 
@@ -675,12 +723,14 @@ func TestServer_Serve_AcceptError(t *testing.T) {
 	// Create a TCP listener for testing
 	listener, err := (&net.ListenConfig{}).Listen(t.Context(), "tcp", "127.0.0.1:0")
 	require.NoError(t, err)
+
 	s.listener = listener
 
 	ctx, cancel := context.WithCancel(t.Context())
 
 	// Start Serve in background
 	done := make(chan struct{})
+
 	go func() {
 		s.Serve(ctx)
 		close(done)
@@ -708,9 +758,10 @@ func TestServer_Serve_AcceptError(t *testing.T) {
 func TestServer_createSocketDir_Error(t *testing.T) {
 	t.Parallel()
 
-	handler := func(req *protocol.Request) *protocol.Response {
+	handler := func(_ *protocol.Request) *protocol.Response {
 		return &protocol.Response{Success: true}
 	}
+
 	s := NewServer(testAccountID, testRegion, handler, nil, nil)
 
 	t.Run("mkdir fails on invalid path", func(t *testing.T) {
@@ -723,6 +774,8 @@ func TestServer_createSocketDir_Error(t *testing.T) {
 	})
 
 	t.Run("chmod fails on non-existent directory", func(t *testing.T) {
+		t.Parallel()
+
 		// Create temp directory
 		tmpDir, err := os.MkdirTemp("/tmp", "suve-server-chmod-fail-*")
 		require.NoError(t, err)
@@ -731,6 +784,7 @@ func TestServer_createSocketDir_Error(t *testing.T) {
 		// We need to test the chmod error path. This is tricky because MkdirAll creates the dir.
 		// One way is to make directory read-only on parent, but this test verifies createSocketDir works.
 		socketPath := filepath.Join(tmpDir, "test.sock")
+
 		err = s.createSocketDir(socketPath)
 		require.NoError(t, err)
 	})
@@ -738,12 +792,16 @@ func TestServer_createSocketDir_Error(t *testing.T) {
 
 // TestServer_removeExistingSocket_Error tests error handling in removeExistingSocket.
 func TestServer_removeExistingSocket_Error(t *testing.T) {
-	handler := func(req *protocol.Request) *protocol.Response {
+	t.Parallel()
+
+	handler := func(_ *protocol.Request) *protocol.Response {
 		return &protocol.Response{Success: true}
 	}
 	s := NewServer(testAccountID, testRegion, handler, nil, nil)
 
 	t.Run("remove fails on read-only directory", func(t *testing.T) {
+		t.Parallel()
+
 		// Create temp directory
 		tmpDir, err := os.MkdirTemp("/tmp", "suve-server-rm-fail-*")
 		require.NoError(t, err)
@@ -773,13 +831,15 @@ func TestServer_removeExistingSocket_Error(t *testing.T) {
 func TestServer_setSocketPermissions_Error(t *testing.T) {
 	t.Parallel()
 
-	handler := func(req *protocol.Request) *protocol.Response {
+	handler := func(_ *protocol.Request) *protocol.Response {
 		return &protocol.Response{Success: true}
 	}
+
 	s := NewServer(testAccountID, testRegion, handler, nil, nil)
 
 	t.Run("chmod fails on non-existent file", func(t *testing.T) {
 		t.Parallel()
+
 		socketPath := "/nonexistent/path/socket.sock"
 		err := s.setSocketPermissions(socketPath)
 		require.Error(t, err)
@@ -798,7 +858,7 @@ func TestServer_Start_CreateSocketDirError(t *testing.T) {
 	t.Setenv("XDG_RUNTIME_DIR", invalidPath)
 	t.Setenv("TMPDIR", invalidPath)
 
-	handler := func(req *protocol.Request) *protocol.Response {
+	handler := func(_ *protocol.Request) *protocol.Response {
 		return &protocol.Response{Success: true}
 	}
 
@@ -826,7 +886,7 @@ func TestServer_Start_ListenError(t *testing.T) {
 	accountID := "start-listen-err"
 	region := "r1"
 
-	handler := func(req *protocol.Request) *protocol.Response {
+	handler := func(_ *protocol.Request) *protocol.Response {
 		return &protocol.Response{Success: true}
 	}
 
@@ -854,7 +914,7 @@ func TestServer_Start_ListenErrorLongPath(t *testing.T) {
 	// Create temp directory for socket
 	tmpDir := t.TempDir()
 
-	handler := func(req *protocol.Request) *protocol.Response {
+	handler := func(_ *protocol.Request) *protocol.Response {
 		return &protocol.Response{Success: true}
 	}
 
@@ -901,7 +961,7 @@ func TestServer_handleConnection_WillShutdownWithNilCallback(t *testing.T) {
 	t.Cleanup(func() { _ = os.RemoveAll(tmpDir) })
 	t.Setenv("TMPDIR", tmpDir)
 
-	handler := func(req *protocol.Request) *protocol.Response {
+	handler := func(_ *protocol.Request) *protocol.Response {
 		return &protocol.Response{Success: true, WillShutdown: true}
 	}
 
@@ -924,6 +984,7 @@ func TestServer_handleConnection_WillShutdownWithNilCallback(t *testing.T) {
 	// Connect and send a request
 	conn, err := (&net.Dialer{Timeout: time.Second}).DialContext(t.Context(), "unix", socketPath)
 	require.NoError(t, err)
+
 	defer func() { _ = conn.Close() }()
 
 	// Write request
@@ -933,7 +994,9 @@ func TestServer_handleConnection_WillShutdownWithNilCallback(t *testing.T) {
 	require.NoError(t, err)
 
 	// Read response
+
 	var resp protocol.Response
+
 	decoder := json.NewDecoder(conn)
 	err = decoder.Decode(&resp)
 	require.NoError(t, err)

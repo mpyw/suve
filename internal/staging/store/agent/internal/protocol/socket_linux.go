@@ -12,5 +12,6 @@ func socketPathForAccount(accountID, region string) string {
 	if xdgRuntime := os.Getenv("XDG_RUNTIME_DIR"); xdgRuntime != "" {
 		return filepath.Join(xdgRuntime, socketDirName, accountID, region, socketFileName)
 	}
+
 	return socketPathFallback(accountID, region)
 }

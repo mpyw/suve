@@ -1,4 +1,3 @@
-// Package cli provides shared runners and command builders for stage commands.
 package cli
 
 import (
@@ -122,11 +121,12 @@ func stashPushAction(service staging.Service) func(context.Context, *cli.Command
 		forceFlag := cmd.Bool("force")
 		mergeFlag := cmd.Bool("merge")
 
-		if forceFlag {
+		switch {
+		case forceFlag:
 			mode = stagingusecase.StashPushModeOverwrite
-		} else if mergeFlag {
+		case mergeFlag:
 			mode = stagingusecase.StashPushModeMerge
-		} else {
+		default:
 			// Check if we need to prompt
 			exists, err := basicFileStore.Exists()
 			if err != nil {
@@ -168,6 +168,7 @@ func stashPushAction(service staging.Service) func(context.Context, *cli.Command
 					mode = stagingusecase.StashPushModeOverwrite
 				default: // Cancel or error
 					output.Printf(cmd.Root().Writer, "Operation cancelled.\n")
+
 					return nil
 				}
 			}
@@ -181,12 +182,14 @@ func stashPushAction(service staging.Service) func(context.Context, *cli.Command
 		}
 
 		var pass string
-		if cmd.Bool("passphrase-stdin") {
+
+		switch {
+		case cmd.Bool("passphrase-stdin"):
 			pass, err = prompter.ReadFromStdin()
 			if err != nil {
 				return fmt.Errorf("failed to read passphrase from stdin: %w", err)
 			}
-		} else if terminal.IsTerminalWriter(cmd.Root().ErrWriter) {
+		case terminal.IsTerminalWriter(cmd.Root().ErrWriter):
 			pass, err = prompter.PromptForEncrypt()
 			if err != nil {
 				if errors.Is(err, passphrase.ErrCancelled) {
@@ -195,7 +198,7 @@ func stashPushAction(service staging.Service) func(context.Context, *cli.Command
 
 				return fmt.Errorf("failed to get passphrase: %w", err)
 			}
-		} else {
+		default:
 			prompter.WarnNonTTY()
 			// pass remains empty = plain text
 		}

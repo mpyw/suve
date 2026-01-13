@@ -1,3 +1,4 @@
+//nolint:testpackage // Internal tests for unexported functions (startProcess, mockSpawner)
 package daemon
 
 import (
@@ -30,9 +31,11 @@ type mockSpawner struct {
 
 func (m *mockSpawner) Spawn(accountID, region string) error {
 	m.spawnCount.Add(1)
+
 	if m.spawnFunc != nil {
 		return m.spawnFunc(accountID, region)
 	}
+
 	return nil
 }
 
@@ -41,6 +44,7 @@ func TestNewLauncher(t *testing.T) {
 
 	t.Run("default options", func(t *testing.T) {
 		t.Parallel()
+
 		l := NewLauncher(testAccountID, testRegion)
 		require.NotNil(t, l)
 		assert.NotNil(t, l.client)
@@ -51,6 +55,7 @@ func TestNewLauncher(t *testing.T) {
 
 	t.Run("with auto start disabled", func(t *testing.T) {
 		t.Parallel()
+
 		l := NewLauncher(testAccountID, testRegion, WithAutoStartDisabled())
 		require.NotNil(t, l)
 		assert.True(t, l.autoStartDisabled)
@@ -62,6 +67,7 @@ func TestLauncher_startProcess(t *testing.T) {
 
 	t.Run("auto start disabled returns error", func(t *testing.T) {
 		t.Parallel()
+
 		l := NewLauncher(testAccountID, testRegion, WithAutoStartDisabled())
 
 		err := l.startProcess()
@@ -78,6 +84,7 @@ func TestLauncher_EnsureRunning(t *testing.T) {
 
 	t.Run("daemon not running and auto start disabled", func(t *testing.T) {
 		t.Parallel()
+
 		l := NewLauncher(testAccountID, testRegion, WithAutoStartDisabled())
 
 		// EnsureRunning should fail because daemon is not running
@@ -93,6 +100,7 @@ func TestLauncher_Ping(t *testing.T) {
 
 	t.Run("daemon not running", func(t *testing.T) {
 		t.Parallel()
+
 		l := NewLauncher(testAccountID, testRegion, WithAutoStartDisabled())
 
 		err := l.Ping()
@@ -107,6 +115,7 @@ func TestLauncher_Shutdown(t *testing.T) {
 
 	t.Run("daemon not running", func(t *testing.T) {
 		t.Parallel()
+
 		l := NewLauncher(testAccountID, testRegion, WithAutoStartDisabled())
 
 		err := l.Shutdown()
@@ -120,6 +129,7 @@ func TestLauncher_SendRequest(t *testing.T) {
 
 	t.Run("daemon not running", func(t *testing.T) {
 		t.Parallel()
+
 		l := NewLauncher(testAccountID, testRegion, WithAutoStartDisabled())
 
 		resp, err := l.SendRequest(&protocol.Request{Method: protocol.MethodPing})
@@ -147,6 +157,7 @@ func TestLauncher_EnsureRunning_AlreadyRunning(t *testing.T) {
 	// Start a mock server
 	listener, err := (&net.ListenConfig{}).Listen(t.Context(), "unix", socketPath)
 	require.NoError(t, err)
+
 	defer func() { _ = listener.Close() }()
 
 	go func() {
@@ -155,13 +166,18 @@ func TestLauncher_EnsureRunning_AlreadyRunning(t *testing.T) {
 			if err != nil {
 				return
 			}
+
 			go func(c net.Conn) {
 				defer func() { _ = c.Close() }()
+
 				var req protocol.Request
+
 				decoder := json.NewDecoder(c)
+
 				if err := decoder.Decode(&req); err != nil {
 					return
 				}
+
 				resp := protocol.Response{Success: true}
 				encoder := json.NewEncoder(c)
 				//nolint:errchkjson // Test code: Response struct is safe for JSON encoding
@@ -206,6 +222,7 @@ func TestLauncher_PingWithRunningDaemon(t *testing.T) {
 	// Start a mock server
 	listener, err := (&net.ListenConfig{}).Listen(t.Context(), "unix", socketPath)
 	require.NoError(t, err)
+
 	defer func() { _ = listener.Close() }()
 
 	go func() {
@@ -214,13 +231,18 @@ func TestLauncher_PingWithRunningDaemon(t *testing.T) {
 			if err != nil {
 				return
 			}
+
 			go func(c net.Conn) {
 				defer func() { _ = c.Close() }()
+
 				var req protocol.Request
+
 				decoder := json.NewDecoder(c)
+
 				if err := decoder.Decode(&req); err != nil {
 					return
 				}
+
 				resp := protocol.Response{Success: true}
 				encoder := json.NewEncoder(c)
 				//nolint:errchkjson // Test code: Response struct is safe for JSON encoding
@@ -253,6 +275,7 @@ func TestLauncher_ShutdownWithRunningDaemon(t *testing.T) {
 	// Start a mock server
 	listener, err := (&net.ListenConfig{}).Listen(t.Context(), "unix", socketPath)
 	require.NoError(t, err)
+
 	defer func() { _ = listener.Close() }()
 
 	go func() {
@@ -261,13 +284,18 @@ func TestLauncher_ShutdownWithRunningDaemon(t *testing.T) {
 			if err != nil {
 				return
 			}
+
 			go func(c net.Conn) {
 				defer func() { _ = c.Close() }()
+
 				var req protocol.Request
+
 				decoder := json.NewDecoder(c)
+
 				if err := decoder.Decode(&req); err != nil {
 					return
 				}
+
 				resp := protocol.Response{Success: true}
 				encoder := json.NewEncoder(c)
 				//nolint:errchkjson // Test code: Response struct is safe for JSON encoding
@@ -300,6 +328,7 @@ func TestLauncher_ShutdownWithServerError(t *testing.T) {
 	// Start a mock server that returns an error
 	listener, err := (&net.ListenConfig{}).Listen(t.Context(), "unix", socketPath)
 	require.NoError(t, err)
+
 	defer func() { _ = listener.Close() }()
 
 	go func() {
@@ -308,13 +337,18 @@ func TestLauncher_ShutdownWithServerError(t *testing.T) {
 			if err != nil {
 				return
 			}
+
 			go func(c net.Conn) {
 				defer func() { _ = c.Close() }()
+
 				var req protocol.Request
+
 				decoder := json.NewDecoder(c)
+
 				if err := decoder.Decode(&req); err != nil {
 					return
 				}
+
 				resp := protocol.Response{Success: false, Error: "shutdown failed"}
 				encoder := json.NewEncoder(c)
 				//nolint:errchkjson // Test code: Response struct is safe for JSON encoding
@@ -354,7 +388,7 @@ func TestLauncher_EnsureRunning_Timeout(t *testing.T) {
 	assert.Less(t, elapsed, 1*time.Second)
 }
 
-// Test to verify that the IPC client is properly constructed
+// TestLauncher_ClientIntegration verifies that the IPC client is properly constructed.
 func TestLauncher_ClientIntegration(t *testing.T) {
 	t.Parallel()
 
@@ -384,7 +418,9 @@ func TestLauncher_EnsureRunning_WithMockSpawner(t *testing.T) {
 
 	// Create mock spawner that starts a mock server when called
 	spawner := &mockSpawner{}
+
 	var listener net.Listener
+
 	spawner.spawnFunc = func(aid, reg string) error {
 		// Verify correct parameters
 		assert.Equal(t, accountID, aid)
@@ -392,6 +428,7 @@ func TestLauncher_EnsureRunning_WithMockSpawner(t *testing.T) {
 
 		// Start mock server
 		var err error
+
 		listener, err = (&net.ListenConfig{}).Listen(t.Context(), "unix", socketPath)
 		if err != nil {
 			return err
@@ -403,13 +440,18 @@ func TestLauncher_EnsureRunning_WithMockSpawner(t *testing.T) {
 				if err != nil {
 					return
 				}
+
 				go func(c net.Conn) {
 					defer func() { _ = c.Close() }()
+
 					var req protocol.Request
+
 					decoder := json.NewDecoder(c)
+
 					if err := decoder.Decode(&req); err != nil {
 						return
 					}
+
 					resp := protocol.Response{Success: true}
 					encoder := json.NewEncoder(c)
 					//nolint:errchkjson // Test code: Response struct is safe for JSON encoding
@@ -417,8 +459,10 @@ func TestLauncher_EnsureRunning_WithMockSpawner(t *testing.T) {
 				}(conn)
 			}
 		}()
+
 		return nil
 	}
+
 	defer func() {
 		if listener != nil {
 			_ = listener.Close()
@@ -447,7 +491,7 @@ func TestLauncher_EnsureRunning_SpawnError(t *testing.T) {
 	region := "r2"
 
 	spawner := &mockSpawner{
-		spawnFunc: func(aid, reg string) error {
+		spawnFunc: func(_, _ string) error {
 			return errors.New("spawn failed")
 		},
 	}
@@ -473,7 +517,7 @@ func TestLauncher_EnsureRunning_TimeoutWithMockSpawner(t *testing.T) {
 
 	// Spawner that succeeds but doesn't start a server
 	spawner := &mockSpawner{
-		spawnFunc: func(aid, reg string) error {
+		spawnFunc: func(_, _ string) error {
 			// Don't actually start anything - simulate daemon failing to start
 			return nil
 		},
@@ -493,6 +537,7 @@ func TestLauncher_startProcess_WithMockSpawner(t *testing.T) {
 
 	t.Run("success", func(t *testing.T) {
 		t.Parallel()
+
 		spawner := &mockSpawner{}
 		l := NewLauncher(testAccountID, testRegion, withSpawner(spawner))
 
@@ -503,8 +548,9 @@ func TestLauncher_startProcess_WithMockSpawner(t *testing.T) {
 
 	t.Run("error", func(t *testing.T) {
 		t.Parallel()
+
 		spawner := &mockSpawner{
-			spawnFunc: func(aid, reg string) error {
+			spawnFunc: func(_, _ string) error {
 				return errors.New("failed to spawn")
 			},
 		}
@@ -531,6 +577,7 @@ func TestDefaultProcessSpawner_Spawn(t *testing.T) {
 
 	t.Run("launcher uses default spawner", func(t *testing.T) {
 		t.Parallel()
+
 		l := NewLauncher(testAccountID, testRegion)
 		require.NotNil(t, l.spawner)
 		// Verify it's the default spawner type

@@ -87,11 +87,13 @@ func TestCheckConflicts(t *testing.T) {
 
 	t.Run("create no conflict - resource does not exist", func(t *testing.T) {
 		t.Parallel()
+
 		strategy := &mockApplyStrategy{
 			fetchLastModifiedFunc: func(_ context.Context, _ string) (time.Time, error) {
 				return time.Time{}, nil // Resource doesn't exist (zero time)
 			},
 		}
+
 		entries := map[string]staging.Entry{
 			"new-item": {Operation: staging.OperationCreate, Value: lo.ToPtr("value")},
 		}

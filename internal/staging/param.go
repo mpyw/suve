@@ -104,6 +104,7 @@ func (s *ParamStrategy) applyUpdate(ctx context.Context, name string, entry Entr
 		if pnf := (*paramapi.ParameterNotFound)(nil); errors.As(err, &pnf) {
 			return fmt.Errorf("parameter not found: %s", name)
 		}
+
 		return fmt.Errorf("failed to get existing parameter: %w", err)
 	}
 
@@ -142,6 +143,7 @@ func (s *ParamStrategy) ApplyTags(ctx context.Context, name string, tagEntry Tag
 			return err
 		}
 	}
+
 	return nil
 }
 
@@ -154,8 +156,10 @@ func (s *ParamStrategy) applyDelete(ctx context.Context, name string) error {
 		if pnf := (*paramapi.ParameterNotFound)(nil); errors.As(err, &pnf) {
 			return nil
 		}
+
 		return fmt.Errorf("failed to delete parameter: %w", err)
 	}
+
 	return nil
 }
 
@@ -169,21 +173,26 @@ func (s *ParamStrategy) FetchLastModified(ctx context.Context, name string) (tim
 		if pnf := (*paramapi.ParameterNotFound)(nil); errors.As(err, &pnf) {
 			return time.Time{}, nil
 		}
+
 		return time.Time{}, fmt.Errorf("failed to get parameter: %w", err)
 	}
+
 	if result.Parameter != nil && result.Parameter.LastModifiedDate != nil {
 		return *result.Parameter.LastModifiedDate, nil
 	}
+
 	return time.Time{}, nil
 }
 
 // FetchCurrent fetches the current value from AWS SSM Parameter Store for diffing.
 func (s *ParamStrategy) FetchCurrent(ctx context.Context, name string) (*FetchResult, error) {
 	spec := &paramversion.Spec{Name: name}
+
 	param, err := paramversion.GetParameterWithVersion(ctx, s.Client, spec)
 	if err != nil {
 		return nil, err
 	}
+
 	return &FetchResult{
 		Value:      lo.FromPtr(param.Value),
 		Identifier: fmt.Sprintf("#%d", param.Version),
@@ -196,9 +205,11 @@ func (s *ParamStrategy) ParseName(input string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+
 	if spec.Absolute.Version != nil || spec.Shift > 0 {
 		return "", fmt.Errorf("stage diff requires a parameter name without version specifier")
 	}
+
 	return spec.Name, nil
 }
 
@@ -206,19 +217,24 @@ func (s *ParamStrategy) ParseName(input string) (string, error) {
 // Returns *ResourceNotFoundError if the parameter doesn't exist.
 func (s *ParamStrategy) FetchCurrentValue(ctx context.Context, name string) (*EditFetchResult, error) {
 	spec := &paramversion.Spec{Name: name}
+
 	param, err := paramversion.GetParameterWithVersion(ctx, s.Client, spec)
 	if err != nil {
 		if pnf := (*paramapi.ParameterNotFound)(nil); errors.As(err, &pnf) {
 			return nil, &ResourceNotFoundError{Err: err}
 		}
+
 		return nil, err
 	}
+
 	result := &EditFetchResult{
 		Value: lo.FromPtr(param.Value),
 	}
+
 	if param.LastModifiedDate != nil {
 		result.LastModified = *param.LastModifiedDate
 	}
+
 	return result, nil
 }
 
@@ -228,7 +244,9 @@ func (s *ParamStrategy) ParseSpec(input string) (name string, hasVersion bool, e
 	if err != nil {
 		return "", false, err
 	}
+
 	hasVersion = spec.Absolute.Version != nil || spec.Shift > 0
+
 	return spec.Name, hasVersion, nil
 }
 
@@ -238,10 +256,12 @@ func (s *ParamStrategy) FetchVersion(ctx context.Context, input string) (value s
 	if err != nil {
 		return "", "", err
 	}
+
 	param, err := paramversion.GetParameterWithVersion(ctx, s.Client, spec)
 	if err != nil {
 		return "", "", err
 	}
+
 	return lo.FromPtr(param.Value), fmt.Sprintf("#%d", param.Version), nil
 }
 
@@ -251,6 +271,7 @@ func ParamFactory(ctx context.Context) (FullStrategy, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize AWS client: %w", err)
 	}
+
 	return NewParamStrategy(client), nil
 }
 

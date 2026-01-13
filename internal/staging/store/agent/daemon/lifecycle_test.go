@@ -1,3 +1,4 @@
+//nolint:testpackage // Integration tests require access to internal types and unexported functions
 package daemon
 
 import (
@@ -65,6 +66,7 @@ func TestDaemonLifecycle_StartupAndShutdown(t *testing.T) {
 
 	// Start in background
 	errCh := make(chan error, 1)
+
 	go func() {
 		errCh <- runner.Run(t.Context())
 	}()
@@ -72,14 +74,19 @@ func TestDaemonLifecycle_StartupAndShutdown(t *testing.T) {
 	// Wait for daemon to be ready
 	launcher := NewLauncher(accountID, region, WithAutoStartDisabled())
 	deadline := time.Now().Add(5 * time.Second)
+
 	var ready bool
+
 	for time.Now().Before(deadline) {
 		if err := launcher.Ping(); err == nil {
 			ready = true
+
 			break
 		}
+
 		time.Sleep(50 * time.Millisecond)
 	}
+
 	require.True(t, ready, "daemon should be ready within timeout")
 
 	// Verify socket file exists
@@ -94,7 +101,7 @@ func TestDaemonLifecycle_StartupAndShutdown(t *testing.T) {
 	select {
 	case err := <-errCh:
 		// Should exit without error
-		assert.NoError(t, err)
+		require.NoError(t, err)
 	case <-time.After(5 * time.Second):
 		t.Fatal("daemon did not shut down within timeout")
 	}
@@ -117,6 +124,7 @@ func TestDaemonLifecycle_MultipleAccountsSimultaneous(t *testing.T) {
 	// Start daemon for account1
 	runner1 := NewRunner(account1, region, WithAutoShutdownDisabled())
 	errCh1 := make(chan error, 1)
+
 	go func() {
 		errCh1 <- runner1.Run(t.Context())
 	}()
@@ -124,6 +132,7 @@ func TestDaemonLifecycle_MultipleAccountsSimultaneous(t *testing.T) {
 	// Start daemon for account2
 	runner2 := NewRunner(account2, region, WithAutoShutdownDisabled())
 	errCh2 := make(chan error, 1)
+
 	go func() {
 		errCh2 <- runner2.Run(t.Context())
 	}()
@@ -133,16 +142,21 @@ func TestDaemonLifecycle_MultipleAccountsSimultaneous(t *testing.T) {
 	launcher2 := NewLauncher(account2, region, WithAutoStartDisabled())
 
 	deadline := time.Now().Add(5 * time.Second)
+
 	var ready1, ready2 bool
+
 	for time.Now().Before(deadline) && (!ready1 || !ready2) {
 		if !ready1 && launcher1.Ping() == nil {
 			ready1 = true
 		}
+
 		if !ready2 && launcher2.Ping() == nil {
 			ready2 = true
 		}
+
 		time.Sleep(50 * time.Millisecond)
 	}
+
 	require.True(t, ready1, "daemon for account1 should be ready")
 	require.True(t, ready2, "daemon for account2 should be ready")
 
@@ -153,10 +167,12 @@ func TestDaemonLifecycle_MultipleAccountsSimultaneous(t *testing.T) {
 	// Cleanup
 	runner1.Shutdown()
 	runner2.Shutdown()
+
 	select {
 	case <-errCh1:
 	case <-time.After(5 * time.Second):
 	}
+
 	select {
 	case <-errCh2:
 	case <-time.After(5 * time.Second):
@@ -180,17 +196,20 @@ func TestDaemonLifecycle_AutoShutdown(t *testing.T) {
 
 	// Start in background
 	errCh := make(chan error, 1)
+
 	go func() {
 		errCh <- runner.Run(t.Context())
 	}()
 
 	// Wait for daemon to be ready
 	launcher := NewLauncher(accountID, region, WithAutoStartDisabled())
+
 	deadline := time.Now().Add(5 * time.Second)
 	for time.Now().Before(deadline) {
 		if err := launcher.Ping(); err == nil {
 			break
 		}
+
 		time.Sleep(50 * time.Millisecond)
 	}
 
@@ -226,7 +245,7 @@ func TestDaemonLifecycle_AutoShutdown(t *testing.T) {
 	select {
 	case err := <-errCh:
 		// Should exit without error
-		assert.NoError(t, err)
+		require.NoError(t, err)
 	case <-time.After(5 * time.Second):
 		// Force shutdown if auto-shutdown didn't work
 		runner.Shutdown()
@@ -251,17 +270,20 @@ func TestDaemonLifecycle_ManualModeDisablesAutoShutdown(t *testing.T) {
 
 	// Start in background
 	errCh := make(chan error, 1)
+
 	go func() {
 		errCh <- runner.Run(t.Context())
 	}()
 
 	// Wait for daemon to be ready
 	launcher := NewLauncher(accountID, region, WithAutoStartDisabled())
+
 	deadline := time.Now().Add(5 * time.Second)
 	for time.Now().Before(deadline) {
 		if err := launcher.Ping(); err == nil {
 			break
 		}
+
 		time.Sleep(50 * time.Millisecond)
 	}
 
@@ -306,6 +328,7 @@ func TestDaemonLifecycle_ManualModeDisablesAutoShutdown(t *testing.T) {
 
 	// Manual shutdown
 	runner.Shutdown()
+
 	select {
 	case <-errCh:
 	case <-time.After(5 * time.Second):
@@ -325,16 +348,19 @@ func TestDaemonLifecycle_AutoShutdown_UnstageAll(t *testing.T) {
 
 	runner := NewRunner(accountID, region)
 	errCh := make(chan error, 1)
+
 	go func() {
 		errCh <- runner.Run(t.Context())
 	}()
 
 	launcher := NewLauncher(accountID, region, WithAutoStartDisabled())
+
 	deadline := time.Now().Add(5 * time.Second)
 	for time.Now().Before(deadline) {
 		if err := launcher.Ping(); err == nil {
 			break
 		}
+
 		time.Sleep(50 * time.Millisecond)
 	}
 
@@ -370,7 +396,7 @@ func TestDaemonLifecycle_AutoShutdown_UnstageAll(t *testing.T) {
 	// Daemon should auto-shutdown
 	select {
 	case err := <-errCh:
-		assert.NoError(t, err)
+		require.NoError(t, err)
 	case <-time.After(5 * time.Second):
 		runner.Shutdown()
 		t.Fatal("daemon did not auto-shutdown after UnstageAll")
@@ -390,16 +416,19 @@ func TestDaemonLifecycle_AutoShutdown_UnstageTag(t *testing.T) {
 
 	runner := NewRunner(accountID, region)
 	errCh := make(chan error, 1)
+
 	go func() {
 		errCh <- runner.Run(t.Context())
 	}()
 
 	launcher := NewLauncher(accountID, region, WithAutoStartDisabled())
+
 	deadline := time.Now().Add(5 * time.Second)
 	for time.Now().Before(deadline) {
 		if err := launcher.Ping(); err == nil {
 			break
 		}
+
 		time.Sleep(50 * time.Millisecond)
 	}
 
@@ -433,7 +462,7 @@ func TestDaemonLifecycle_AutoShutdown_UnstageTag(t *testing.T) {
 	// Daemon should auto-shutdown
 	select {
 	case err := <-errCh:
-		assert.NoError(t, err)
+		require.NoError(t, err)
 	case <-time.After(5 * time.Second):
 		runner.Shutdown()
 		t.Fatal("daemon did not auto-shutdown after UnstageTag")
@@ -453,16 +482,19 @@ func TestDaemonLifecycle_AutoShutdown_SetState(t *testing.T) {
 
 	runner := NewRunner(accountID, region)
 	errCh := make(chan error, 1)
+
 	go func() {
 		errCh <- runner.Run(t.Context())
 	}()
 
 	launcher := NewLauncher(accountID, region, WithAutoStartDisabled())
+
 	deadline := time.Now().Add(5 * time.Second)
 	for time.Now().Before(deadline) {
 		if err := launcher.Ping(); err == nil {
 			break
 		}
+
 		time.Sleep(50 * time.Millisecond)
 	}
 
@@ -496,7 +528,7 @@ func TestDaemonLifecycle_AutoShutdown_SetState(t *testing.T) {
 	// Daemon should auto-shutdown
 	select {
 	case err := <-errCh:
-		assert.NoError(t, err)
+		require.NoError(t, err)
 	case <-time.After(5 * time.Second):
 		runner.Shutdown()
 		t.Fatal("daemon did not auto-shutdown after SetState with empty state")
@@ -516,16 +548,19 @@ func TestDaemonLifecycle_AutoShutdown_UnstageAllEmpty(t *testing.T) {
 
 	runner := NewRunner(accountID, region)
 	errCh := make(chan error, 1)
+
 	go func() {
 		errCh <- runner.Run(t.Context())
 	}()
 
 	launcher := NewLauncher(accountID, region, WithAutoStartDisabled())
+
 	deadline := time.Now().Add(5 * time.Second)
 	for time.Now().Before(deadline) {
 		if err := launcher.Ping(); err == nil {
 			break
 		}
+
 		time.Sleep(50 * time.Millisecond)
 	}
 
@@ -544,7 +579,7 @@ func TestDaemonLifecycle_AutoShutdown_UnstageAllEmpty(t *testing.T) {
 	// Daemon should auto-shutdown (state was already empty)
 	select {
 	case err := <-errCh:
-		assert.NoError(t, err)
+		require.NoError(t, err)
 	case <-time.After(5 * time.Second):
 		runner.Shutdown()
 		t.Fatal("daemon did not auto-shutdown after UnstageAll on empty state")

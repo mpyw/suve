@@ -6,5 +6,5 @@ import "github.com/mpyw/suve/internal/api/secretapi"
 // secret version resolution (listing versions and fetching values).
 type VersionResolverClient interface {
 	secretapi.GetSecretValueAPI
-	secretapi.ListSecretVersionIdsAPI
+	secretapi.ListSecretVersionIDsAPI
 }

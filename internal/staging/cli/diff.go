@@ -1,4 +1,3 @@
-// Package cli provides shared runners and command builders for stage commands.
 package cli
 
 import (
@@ -47,6 +46,7 @@ func (r *DiffRunner) Run(ctx context.Context, opts DiffOptions) error {
 
 	// Output results in sorted order
 	first := true
+
 	for _, name := range maputil.SortedNames(result.Entries, func(e stagingusecase.DiffEntry) string { return e.Name }) {
 		for _, entry := range result.Entries {
 			if entry.Name != name {
@@ -62,15 +62,20 @@ func (r *DiffRunner) Run(ctx context.Context, opts DiffOptions) error {
 				if !first {
 					output.Println(r.Stdout, "")
 				}
+
 				first = false
-				r.outputDiffCreate(opts, entry)
+
+				r.OutputDiffCreate(opts, entry)
 			case stagingusecase.DiffEntryNormal:
 				if !first {
 					output.Println(r.Stdout, "")
 				}
+
 				first = false
-				r.outputDiff(opts, entry)
+
+				r.OutputDiff(opts, entry)
 			}
+
 			break
 		}
 	}
@@ -81,11 +86,15 @@ func (r *DiffRunner) Run(ctx context.Context, opts DiffOptions) error {
 			if tagEntry.Name != name {
 				continue
 			}
+
 			if !first {
 				output.Println(r.Stdout, "")
 			}
+
 			first = false
-			r.outputTagEntry(tagEntry)
+
+			r.OutputTagEntry(tagEntry)
+
 			break
 		}
 	}
@@ -93,7 +102,8 @@ func (r *DiffRunner) Run(ctx context.Context, opts DiffOptions) error {
 	return nil
 }
 
-func (r *DiffRunner) outputDiff(opts DiffOptions, entry stagingusecase.DiffEntry) {
+// OutputDiff outputs a diff entry for an existing resource.
+func (r *DiffRunner) OutputDiff(opts DiffOptions, entry stagingusecase.DiffEntry) {
 	awsValue := entry.AWSValue
 	stagedValue := entry.StagedValue
 
@@ -113,10 +123,11 @@ func (r *DiffRunner) outputDiff(opts DiffOptions, entry stagingusecase.DiffEntry
 	output.Print(r.Stdout, diff)
 
 	// Show staged metadata
-	r.outputMetadata(entry)
+	r.OutputMetadata(entry)
 }
 
-func (r *DiffRunner) outputDiffCreate(opts DiffOptions, entry stagingusecase.DiffEntry) {
+// OutputDiffCreate outputs a diff entry for a newly created resource.
+func (r *DiffRunner) OutputDiffCreate(opts DiffOptions, entry stagingusecase.DiffEntry) {
 	stagedValue := entry.StagedValue
 
 	// Format as JSON if enabled
@@ -133,16 +144,18 @@ func (r *DiffRunner) outputDiffCreate(opts DiffOptions, entry stagingusecase.Dif
 	output.Print(r.Stdout, diff)
 
 	// Show staged metadata
-	r.outputMetadata(entry)
+	r.OutputMetadata(entry)
 }
 
-func (r *DiffRunner) outputMetadata(entry stagingusecase.DiffEntry) {
+// OutputMetadata outputs metadata for a diff entry.
+func (r *DiffRunner) OutputMetadata(entry stagingusecase.DiffEntry) {
 	if desc := lo.FromPtr(entry.Description); desc != "" {
 		output.Printf(r.Stdout, "%s %s\n", colors.FieldLabel("Description:"), desc)
 	}
 }
 
-func (r *DiffRunner) outputTagEntry(tagEntry stagingusecase.DiffTagEntry) {
+// OutputTagEntry outputs a tag entry.
+func (r *DiffRunner) OutputTagEntry(tagEntry stagingusecase.DiffTagEntry) {
 	output.Printf(r.Stdout, "%s %s (staged tag changes)\n", colors.Info("Tags:"), tagEntry.Name)
 
 	if len(tagEntry.Add) > 0 {
@@ -150,6 +163,7 @@ func (r *DiffRunner) outputTagEntry(tagEntry stagingusecase.DiffTagEntry) {
 		for _, k := range maputil.SortedKeys(tagEntry.Add) {
 			tagPairs = append(tagPairs, fmt.Sprintf("%s=%s", k, tagEntry.Add[k]))
 		}
+
 		output.Printf(r.Stdout, "  %s %s\n", colors.OpAdd("+"), strings.Join(tagPairs, ", "))
 	}
 

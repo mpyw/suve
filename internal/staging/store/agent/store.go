@@ -13,5 +13,6 @@ type StoreOption = client.StoreOption
 // manual mode is enabled (see [EnvDaemonManualMode]).
 func NewStore(accountID, region string, opts ...StoreOption) store.AgentStore {
 	opts = append(ClientOptions(), opts...)
+
 	return client.NewStore(accountID, region, opts...)
 }

@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/mpyw/suve/internal/cli/pager"
 )
@@ -16,12 +17,14 @@ func TestWithPagerWriter_NoPagerTrue(t *testing.T) {
 	t.Parallel()
 
 	var buf bytes.Buffer
+
 	err := pager.WithPagerWriter(&buf, true, func(w io.Writer) error {
 		_, err := w.Write([]byte("test output"))
+
 		return err
 	})
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "test output", buf.String())
 }
 
@@ -30,12 +33,14 @@ func TestWithPagerWriter_NoPagerFalse_NonTTY(t *testing.T) {
 
 	// When stdout is not a TTY (like in tests), output goes directly to stdout
 	var buf bytes.Buffer
+
 	err := pager.WithPagerWriter(&buf, false, func(w io.Writer) error {
 		_, err := w.Write([]byte("test output"))
+
 		return err
 	})
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "test output", buf.String())
 }
 
@@ -43,8 +48,10 @@ func TestWithPagerWriter_ErrorPropagation(t *testing.T) {
 	t.Parallel()
 
 	expectedErr := errors.New("test error")
+
 	var buf bytes.Buffer
-	err := pager.WithPagerWriter(&buf, true, func(w io.Writer) error {
+
+	err := pager.WithPagerWriter(&buf, true, func(_ io.Writer) error {
 		return expectedErr
 	})
 
@@ -55,12 +62,13 @@ func TestWithPagerWriter_EmptyOutput(t *testing.T) {
 	t.Parallel()
 
 	var buf bytes.Buffer
-	err := pager.WithPagerWriter(&buf, true, func(w io.Writer) error {
+
+	err := pager.WithPagerWriter(&buf, true, func(_ io.Writer) error {
 		// Write nothing
 		return nil
 	})
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Empty(t, buf.String())
 }
 
@@ -72,6 +80,7 @@ func TestWithPagerWriter_WithFdNonTTY(t *testing.T) {
 	if err != nil {
 		t.Skip("cannot open /dev/null")
 	}
+
 	defer func() { _ = devNull.Close() }()
 
 	var output []byte
@@ -79,9 +88,10 @@ func TestWithPagerWriter_WithFdNonTTY(t *testing.T) {
 	err = pager.WithPagerWriter(devNull, false, func(w io.Writer) error {
 		output = []byte("test output")
 		_, err := w.Write(output)
+
 		return err
 	})
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "test output", string(output))
 }

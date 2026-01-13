@@ -40,10 +40,12 @@ func (c *Client) SendRequest(req *protocol.Request) (*protocol.Response, error) 
 	defer c.mu.Unlock()
 
 	dialer := net.Dialer{Timeout: dialTimeout}
+
 	conn, err := dialer.Dial("unix", c.socketPath)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrNotConnected, err)
 	}
+
 	defer func() { _ = conn.Close() }()
 
 	if err := conn.SetDeadline(time.Now().Add(requestTimeout)); err != nil {
@@ -56,11 +58,13 @@ func (c *Client) SendRequest(req *protocol.Request) (*protocol.Response, error) 
 	}
 
 	decoder := json.NewDecoder(conn)
+
 	var resp protocol.Response
 	if err := decoder.Decode(&resp); err != nil {
 		if errors.Is(err, io.EOF) {
 			return nil, fmt.Errorf("daemon closed connection unexpectedly")
 		}
+
 		return nil, fmt.Errorf("failed to read response: %w", err)
 	}
 
@@ -73,5 +77,6 @@ func (c *Client) Ping() error {
 	if err != nil {
 		return err
 	}
+
 	return resp.Err()
 }

@@ -47,7 +47,7 @@ type LogUseCase struct {
 // Execute runs the log use case.
 func (u *LogUseCase) Execute(ctx context.Context, input LogInput) (*LogOutput, error) {
 	// List all versions
-	result, err := u.Client.ListSecretVersionIds(ctx, &secretapi.ListSecretVersionIdsInput{
+	result, err := u.Client.ListSecretVersionIds(ctx, &secretapi.ListSecretVersionIDsInput{
 		SecretId:   lo.ToPtr(input.Name),
 		MaxResults: lo.ToPtr(input.MaxResults),
 	})

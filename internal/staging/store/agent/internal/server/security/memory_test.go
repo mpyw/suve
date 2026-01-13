@@ -1,3 +1,4 @@
+//nolint:testpackage // Tests for unexported Buffer internals
 package security
 
 import (
@@ -9,6 +10,8 @@ import (
 )
 
 func TestNewBuffer_EmptyData(t *testing.T) {
+	t.Parallel()
+
 	buf := NewBuffer(nil)
 	assert.True(t, buf.IsEmpty())
 
@@ -17,6 +20,8 @@ func TestNewBuffer_EmptyData(t *testing.T) {
 }
 
 func TestNewBuffer_WithData(t *testing.T) {
+	t.Parallel()
+
 	data := []byte("secret data")
 	original := make([]byte, len(data))
 	copy(original, data)
@@ -29,6 +34,8 @@ func TestNewBuffer_WithData(t *testing.T) {
 }
 
 func TestBuffer_Bytes(t *testing.T) {
+	t.Parallel()
+
 	original := []byte("secret data")
 	data := make([]byte, len(original))
 	copy(data, original)
@@ -41,6 +48,8 @@ func TestBuffer_Bytes(t *testing.T) {
 }
 
 func TestBuffer_Bytes_Empty(t *testing.T) {
+	t.Parallel()
+
 	buf := NewBuffer(nil)
 
 	result, err := buf.Bytes()
@@ -49,6 +58,8 @@ func TestBuffer_Bytes_Empty(t *testing.T) {
 }
 
 func TestBuffer_IsEmpty(t *testing.T) {
+	t.Parallel()
+
 	emptyBuf := NewBuffer(nil)
 	assert.True(t, emptyBuf.IsEmpty())
 
@@ -57,6 +68,8 @@ func TestBuffer_IsEmpty(t *testing.T) {
 }
 
 func TestBuffer_Destroy(t *testing.T) {
+	t.Parallel()
+
 	buf := NewBuffer([]byte("secret"))
 	assert.False(t, buf.IsEmpty())
 
@@ -69,6 +82,8 @@ func TestBuffer_Destroy(t *testing.T) {
 }
 
 func TestBuffer_MultipleBytesCall(t *testing.T) {
+	t.Parallel()
+
 	original := []byte("secret data")
 	data := make([]byte, len(original))
 	copy(data, original)

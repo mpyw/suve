@@ -1,4 +1,4 @@
-package cli
+package cli_test
 
 import (
 	"bytes"
@@ -14,6 +14,7 @@ import (
 
 	"github.com/mpyw/suve/internal/maputil"
 	"github.com/mpyw/suve/internal/staging"
+	"github.com/mpyw/suve/internal/staging/cli"
 	"github.com/mpyw/suve/internal/staging/store/file"
 )
 
@@ -47,13 +48,13 @@ func TestStashShowRunner_Run(t *testing.T) {
 		stdout := &bytes.Buffer{}
 		stderr := &bytes.Buffer{}
 
-		runner := &StashShowRunner{
+		runner := &cli.StashShowRunner{
 			FileStore: fileStore,
 			Stdout:    stdout,
 			Stderr:    stderr,
 		}
 
-		err = runner.Run(t.Context(), StashShowOptions{})
+		err = runner.Run(t.Context(), cli.StashShowOptions{})
 		require.NoError(t, err)
 		assert.Contains(t, stdout.String(), "/app/config")
 		assert.Contains(t, stdout.String(), "my-secret")
@@ -86,13 +87,13 @@ func TestStashShowRunner_Run(t *testing.T) {
 		stdout := &bytes.Buffer{}
 		stderr := &bytes.Buffer{}
 
-		runner := &StashShowRunner{
+		runner := &cli.StashShowRunner{
 			FileStore: fileStore,
 			Stdout:    stdout,
 			Stderr:    stderr,
 		}
 
-		err = runner.Run(t.Context(), StashShowOptions{Service: staging.ServiceParam})
+		err = runner.Run(t.Context(), cli.StashShowOptions{Service: staging.ServiceParam})
 		require.NoError(t, err)
 		assert.Contains(t, stdout.String(), "/app/config")
 		assert.NotContains(t, stdout.String(), "my-secret")
@@ -119,13 +120,13 @@ func TestStashShowRunner_Run(t *testing.T) {
 		stdout := &bytes.Buffer{}
 		stderr := &bytes.Buffer{}
 
-		runner := &StashShowRunner{
+		runner := &cli.StashShowRunner{
 			FileStore: fileStore,
 			Stdout:    stdout,
 			Stderr:    stderr,
 		}
 
-		err = runner.Run(t.Context(), StashShowOptions{})
+		err = runner.Run(t.Context(), cli.StashShowOptions{})
 		require.NoError(t, err)
 		assert.Contains(t, stdout.String(), "/app/config")
 		assert.Contains(t, stdout.String(), "+1 tags")
@@ -143,13 +144,13 @@ func TestStashShowRunner_Run(t *testing.T) {
 		stdout := &bytes.Buffer{}
 		stderr := &bytes.Buffer{}
 
-		runner := &StashShowRunner{
+		runner := &cli.StashShowRunner{
 			FileStore: fileStore,
 			Stdout:    stdout,
 			Stderr:    stderr,
 		}
 
-		err := runner.Run(t.Context(), StashShowOptions{})
+		err := runner.Run(t.Context(), cli.StashShowOptions{})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "no stashed changes")
 	})
@@ -175,14 +176,14 @@ func TestStashShowRunner_Run(t *testing.T) {
 		stdout := &bytes.Buffer{}
 		stderr := &bytes.Buffer{}
 
-		runner := &StashShowRunner{
+		runner := &cli.StashShowRunner{
 			FileStore: fileStore,
 			Stdout:    stdout,
 			Stderr:    stderr,
 		}
 
 		// Try to show secret service which has no entries
-		err = runner.Run(t.Context(), StashShowOptions{Service: staging.ServiceSecret})
+		err = runner.Run(t.Context(), cli.StashShowOptions{Service: staging.ServiceSecret})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "no stashed changes for secret")
 	})
@@ -208,13 +209,13 @@ func TestStashShowRunner_Run(t *testing.T) {
 		stdout := &bytes.Buffer{}
 		stderr := &bytes.Buffer{}
 
-		runner := &StashShowRunner{
+		runner := &cli.StashShowRunner{
 			FileStore: fileStore,
 			Stdout:    stdout,
 			Stderr:    stderr,
 		}
 
-		err = runner.Run(t.Context(), StashShowOptions{Verbose: true})
+		err = runner.Run(t.Context(), cli.StashShowOptions{Verbose: true})
 		require.NoError(t, err)
 		assert.Contains(t, stdout.String(), "/app/config")
 		// Verbose output includes the value
@@ -242,13 +243,13 @@ func TestStashShowRunner_Run(t *testing.T) {
 		stdout := &bytes.Buffer{}
 		stderr := &bytes.Buffer{}
 
-		runner := &StashShowRunner{
+		runner := &cli.StashShowRunner{
 			FileStore: fileStore,
 			Stdout:    stdout,
 			Stderr:    stderr,
 		}
 
-		err = runner.Run(t.Context(), StashShowOptions{})
+		err = runner.Run(t.Context(), cli.StashShowOptions{})
 		require.NoError(t, err)
 
 		// File should still exist
@@ -257,48 +258,3 @@ func TestStashShowRunner_Run(t *testing.T) {
 	})
 }
 
-func TestPrintTagSummary(t *testing.T) {
-	t.Parallel()
-
-	t.Run("add only", func(t *testing.T) {
-		t.Parallel()
-
-		stdout := &bytes.Buffer{}
-		printTagSummary(stdout, "/app/config", staging.TagEntry{
-			Add: map[string]string{"env": "prod", "team": "backend"},
-		})
-		assert.Contains(t, stdout.String(), "+2 tags")
-		assert.NotContains(t, stdout.String(), "-")
-	})
-
-	t.Run("remove only", func(t *testing.T) {
-		t.Parallel()
-
-		stdout := &bytes.Buffer{}
-		printTagSummary(stdout, "/app/config", staging.TagEntry{
-			Remove: maputil.NewSet("old-tag", "deprecated"),
-		})
-		assert.Contains(t, stdout.String(), "-2 tags")
-		assert.NotContains(t, stdout.String(), "+")
-	})
-
-	t.Run("add and remove", func(t *testing.T) {
-		t.Parallel()
-
-		stdout := &bytes.Buffer{}
-		printTagSummary(stdout, "/app/config", staging.TagEntry{
-			Add:    map[string]string{"env": "prod"},
-			Remove: maputil.NewSet("old-tag", "deprecated"),
-		})
-		assert.Contains(t, stdout.String(), "+1 tags")
-		assert.Contains(t, stdout.String(), "-2 tags")
-	})
-
-	t.Run("empty entry", func(t *testing.T) {
-		t.Parallel()
-
-		stdout := &bytes.Buffer{}
-		printTagSummary(stdout, "/app/config", staging.TagEntry{})
-		assert.Empty(t, stdout.String())
-	})
-}

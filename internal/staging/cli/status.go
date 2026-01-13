@@ -1,4 +1,3 @@
-// Package cli provides shared runners and command builders for stage commands.
 package cli
 
 import (
@@ -48,6 +47,7 @@ func (r *StatusRunner) Run(ctx context.Context, opts StatusOptions) error {
 		for _, entry := range result.Entries {
 			printer.PrintEntry(entry.Name, toStagingEntry(entry), opts.Verbose, entry.ShowDeleteOptions)
 		}
+
 		for _, tagEntry := range result.TagEntries {
 			r.printTagEntry(tagEntry, opts.Verbose)
 		}
@@ -58,10 +58,12 @@ func (r *StatusRunner) Run(ctx context.Context, opts StatusOptions) error {
 	output.Printf(r.Stdout, "%s (%d):\n", colors.Warning(fmt.Sprintf("Staged %s changes", result.ServiceName)), totalCount)
 
 	printer := &staging.EntryPrinter{Writer: r.Stdout}
+
 	for _, name := range maputil.SortedNames(result.Entries, func(e stagingusecase.StatusEntry) string { return e.Name }) {
 		for _, entry := range result.Entries {
 			if entry.Name == name {
 				printer.PrintEntry(entry.Name, toStagingEntry(entry), opts.Verbose, entry.ShowDeleteOptions)
+
 				break
 			}
 		}
@@ -72,6 +74,7 @@ func (r *StatusRunner) Run(ctx context.Context, opts StatusOptions) error {
 		for _, tagEntry := range result.TagEntries {
 			if tagEntry.Name == name {
 				r.printTagEntry(tagEntry, opts.Verbose)
+
 				break
 			}
 		}
@@ -85,9 +88,11 @@ func (r *StatusRunner) printTagEntry(e stagingusecase.StatusTagEntry, verbose bo
 	if len(e.Add) > 0 {
 		parts = append(parts, fmt.Sprintf("+%d tag(s)", len(e.Add)))
 	}
+
 	if e.Remove.Len() > 0 {
 		parts = append(parts, fmt.Sprintf("-%d tag(s)", e.Remove.Len()))
 	}
+
 	summary := strings.Join(parts, ", ")
 	output.Printf(r.Stdout, "  %s %s [%s]\n", colors.Info("T"), e.Name, summary)
 
@@ -95,6 +100,7 @@ func (r *StatusRunner) printTagEntry(e stagingusecase.StatusTagEntry, verbose bo
 		for key, value := range e.Add {
 			output.Printf(r.Stdout, "      + %s=%s\n", key, value)
 		}
+
 		for key := range e.Remove {
 			output.Printf(r.Stdout, "      - %s\n", key)
 		}

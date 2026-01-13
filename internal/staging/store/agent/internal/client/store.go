@@ -47,6 +47,7 @@ func NewStore(accountID, region string, opts ...StoreOption) *Store {
 	if s.autoStartDisabled {
 		launcherOpts = append(launcherOpts, daemon.WithAutoStartDisabled())
 	}
+
 	s.launcher = daemon.NewLauncher(accountID, region, launcherOpts...)
 
 	return s
@@ -64,9 +65,11 @@ func (s *Store) GetEntry(ctx context.Context, service staging.Service, name stri
 	if err != nil {
 		return nil, err
 	}
+
 	if entry == nil {
 		return nil, staging.ErrNotStaged
 	}
+
 	return entry, nil
 }
 
@@ -82,9 +85,11 @@ func (s *Store) GetTag(ctx context.Context, service staging.Service, name string
 	if err != nil {
 		return nil, err
 	}
+
 	if tagEntry == nil {
 		return nil, staging.ErrNotStaged
 	}
+
 	return tagEntry, nil
 }
 
@@ -202,6 +207,7 @@ func (s *Store) Drain(ctx context.Context, service staging.Service, keep bool) (
 	if err != nil {
 		return nil, err
 	}
+
 	if state == nil {
 		state = staging.NewEmptyState()
 	}
@@ -242,6 +248,8 @@ func (s *Store) WriteState(ctx context.Context, service staging.Service, state *
 }
 
 // doRequestWithResult sends a request and unmarshals the response.
+//
+//nolint:revive // context comes after Store to support generic type inference
 func doRequestWithResult[Resp any, Result any](
 	s *Store,
 	_ context.Context,
@@ -254,6 +262,7 @@ func doRequestWithResult[Resp any, Result any](
 	if err != nil {
 		return zero, err
 	}
+
 	if err := resp.Err(); err != nil {
 		return zero, err
 	}
@@ -262,10 +271,13 @@ func doRequestWithResult[Resp any, Result any](
 	if err := json.Unmarshal(resp.Data, &result); err != nil {
 		return zero, fmt.Errorf("failed to unmarshal response: %w", err)
 	}
+
 	return extract(&result), nil
 }
 
 // doRequestWithResultEnsuringDaemon ensures daemon is running, then sends request.
+//
+//nolint:revive // context comes after Store to support generic type inference
 func doRequestWithResultEnsuringDaemon[Resp any, Result any](
 	s *Store,
 	ctx context.Context,
@@ -276,6 +288,7 @@ func doRequestWithResultEnsuringDaemon[Resp any, Result any](
 	if err := s.launcher.EnsureRunning(); err != nil {
 		return zero, err
 	}
+
 	return doRequestWithResult(s, ctx, req, extract)
 }
 
@@ -284,19 +297,23 @@ func (s *Store) doSimpleRequestEnsuringDaemon(_ context.Context, req *protocol.R
 	if err := s.launcher.EnsureRunning(); err != nil {
 		return err
 	}
+
 	resp, err := s.launcher.SendRequest(req)
 	if err != nil {
 		return err
 	}
+
 	if resp.WillShutdown {
 		printShutdownMessage(resp.ShutdownReason)
 	}
+
 	return resp.Err()
 }
 
 // printShutdownMessage prints the appropriate shutdown message based on reason.
 func printShutdownMessage(reason string) {
 	var msg string
+
 	switch reason {
 	case protocol.ShutdownReasonApplied:
 		msg = "all changes applied"
@@ -309,6 +326,7 @@ func printShutdownMessage(reason string) {
 	default:
 		msg = "no staged changes"
 	}
+
 	output.Printf(os.Stderr, "info: staging agent stopped (%s)\n", msg)
 }
 

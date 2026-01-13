@@ -184,7 +184,7 @@ func (m *mockStrategy) ParseSpec(input string) (string, bool, error) {
 	return input, false, nil
 }
 
-// FetchCurrentValue returns not-found for add scenarios (new resource)
+// FetchCurrentValue returns not-found for add scenarios (new resource).
 func (m *mockStrategy) FetchCurrentValue(_ context.Context, _ string) (*staging.EditFetchResult, error) {
 	return nil, &staging.ResourceNotFoundError{Err: errors.New("resource not found")}
 }
@@ -198,6 +198,7 @@ func TestAddRunner_ErrorCases(t *testing.T) {
 		store := testutil.NewMockStore()
 
 		var stdout, stderr bytes.Buffer
+
 		r := &cli.AddRunner{
 			UseCase: &stagingusecase.AddUseCase{
 				Strategy: &mockStrategy{service: staging.ServiceParam, parseNameErr: errors.New("invalid name")},
@@ -208,7 +209,7 @@ func TestAddRunner_ErrorCases(t *testing.T) {
 		}
 
 		err := r.Run(t.Context(), cli.AddOptions{Name: "invalid"})
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid name")
 	})
 
@@ -218,6 +219,7 @@ func TestAddRunner_ErrorCases(t *testing.T) {
 		store := testutil.NewMockStore()
 
 		var stdout, stderr bytes.Buffer
+
 		r := &cli.AddRunner{
 			UseCase: &stagingusecase.AddUseCase{
 				Strategy: &mockStrategy{service: staging.ServiceParam},
@@ -231,7 +233,7 @@ func TestAddRunner_ErrorCases(t *testing.T) {
 		}
 
 		err := r.Run(t.Context(), cli.AddOptions{Name: "/app/config"})
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to edit")
 	})
 }

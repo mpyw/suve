@@ -145,15 +145,18 @@ func TestEntryPrinter_PrintEntry(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
+
 			var buf bytes.Buffer
 			printer := &staging.EntryPrinter{Writer: &buf}
 
 			printer.PrintEntry(tt.entryName, tt.entry, tt.verbose, tt.showDeleteOptions)
 
 			output := buf.String()
+
 			for _, want := range tt.wantContains {
 				assert.Contains(t, output, want)
 			}
+
 			for _, notWant := range tt.wantNotContains {
 				assert.NotContains(t, output, notWant)
 			}

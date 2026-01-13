@@ -1,4 +1,3 @@
-// Package cli provides shared runners and command builders for stage commands.
 package cli
 
 import (
@@ -49,5 +48,6 @@ func (r *DeleteRunner) Run(ctx context.Context, opts DeleteOptions) error {
 	} else {
 		output.Success(r.Stdout, "Staged for deletion: %s", result.Name)
 	}
+
 	return nil
 }

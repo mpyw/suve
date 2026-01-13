@@ -27,6 +27,7 @@ func ClientOptions() []client.StoreOption {
 	if isManualMode() {
 		return []client.StoreOption{client.WithAutoStartDisabled()}
 	}
+
 	return nil
 }
 
@@ -35,5 +36,6 @@ func DaemonOptions() []daemon.RunnerOption {
 	if isManualMode() {
 		return []daemon.RunnerOption{daemon.WithAutoShutdownDisabled()}
 	}
+
 	return nil
 }

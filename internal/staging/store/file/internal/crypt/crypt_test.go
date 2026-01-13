@@ -1,4 +1,4 @@
-package crypt
+package crypt_test
 
 import (
 	"bytes"
@@ -6,9 +6,13 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/mpyw/suve/internal/staging/store/file/internal/crypt"
 )
 
 func TestEncryptDecrypt(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name       string
 		data       []byte
@@ -48,12 +52,14 @@ func TestEncryptDecrypt(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			// Encrypt
-			encrypted, err := Encrypt(tt.data, tt.passphrase)
+			encrypted, err := crypt.Encrypt(tt.data, tt.passphrase)
 			require.NoError(t, err)
 
 			// Verify it's marked as encrypted
-			assert.True(t, IsEncrypted(encrypted))
+			assert.True(t, crypt.IsEncrypted(encrypted))
 
 			// Verify encrypted data is different from original (unless empty)
 			if len(tt.data) > 0 {
@@ -61,14 +67,12 @@ func TestEncryptDecrypt(t *testing.T) {
 			}
 
 			// Decrypt
-			decrypted, err := Decrypt(encrypted, tt.passphrase)
+			decrypted, err := crypt.Decrypt(encrypted, tt.passphrase)
 			require.NoError(t, err)
 
 			// Verify decrypted matches original
 			// Use bytes.Equal for proper nil/empty comparison
-			if len(tt.data) == 0 && len(decrypted) == 0 {
-				// Both empty, that's fine
-			} else {
+			if len(tt.data) != 0 || len(decrypted) != 0 {
 				assert.Equal(t, tt.data, decrypted)
 			}
 		})
@@ -76,53 +80,65 @@ func TestEncryptDecrypt(t *testing.T) {
 }
 
 func TestDecrypt_WrongPassphrase(t *testing.T) {
+	t.Parallel()
+
 	data := []byte("secret data")
 	passphrase := "correct-password"
 
-	encrypted, err := Encrypt(data, passphrase)
+	encrypted, err := crypt.Encrypt(data, passphrase)
 	require.NoError(t, err)
 
-	_, err = Decrypt(encrypted, "wrong-password")
-	assert.ErrorIs(t, err, ErrDecryptionFailed)
+	_, err = crypt.Decrypt(encrypted, "wrong-password")
+	assert.ErrorIs(t, err, crypt.ErrDecryptionFailed)
 }
 
 func TestDecrypt_NotEncrypted(t *testing.T) {
+	t.Parallel()
+
 	plainData := []byte(`{"version":2,"entries":{}}`)
 
-	_, err := Decrypt(plainData, "any-passphrase")
-	assert.ErrorIs(t, err, ErrNotEncrypted)
+	_, err := crypt.Decrypt(plainData, "any-passphrase")
+	assert.ErrorIs(t, err, crypt.ErrNotEncrypted)
 }
 
 func TestDecrypt_CorruptedData(t *testing.T) {
+	t.Parallel()
+
 	data := []byte("secret data")
 	passphrase := "secret"
 
-	encrypted, err := Encrypt(data, passphrase)
+	encrypted, err := crypt.Encrypt(data, passphrase)
 	require.NoError(t, err)
 
 	// Corrupt the ciphertext (last few bytes)
 	encrypted[len(encrypted)-1] ^= 0xff
 	encrypted[len(encrypted)-2] ^= 0xff
 
-	_, err = Decrypt(encrypted, passphrase)
-	assert.ErrorIs(t, err, ErrDecryptionFailed)
+	_, err = crypt.Decrypt(encrypted, passphrase)
+	assert.ErrorIs(t, err, crypt.ErrDecryptionFailed)
 }
 
 func TestDecrypt_TruncatedData(t *testing.T) {
+	t.Parallel()
+
 	data := []byte("secret data")
 	passphrase := "secret"
 
-	encrypted, err := Encrypt(data, passphrase)
+	encrypted, err := crypt.Encrypt(data, passphrase)
 	require.NoError(t, err)
 
-	// Truncate data
-	truncated := encrypted[:headerLen+saltLen+nonceLen+5] // Less than minimum
+	// Truncate data - minimum length is header(9) + salt(32) + nonce(12) + authTag(16) = 69
+	// Use a length less than this to trigger ErrInvalidFormat
+	minLen := len(crypt.MagicHeader) + 1 + 32 + 12 + 16 // header + salt + nonce + tag = 69
+	truncated := encrypted[:minLen-10]                  // Less than minimum
 
-	_, err = Decrypt(truncated, passphrase)
-	assert.ErrorIs(t, err, ErrInvalidFormat)
+	_, err = crypt.Decrypt(truncated, passphrase)
+	assert.ErrorIs(t, err, crypt.ErrInvalidFormat)
 }
 
 func TestIsEncrypted(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name     string
 		data     []byte
@@ -130,7 +146,7 @@ func TestIsEncrypted(t *testing.T) {
 	}{
 		{
 			name:     "encrypted data",
-			data:     append([]byte(MagicHeader), Version),
+			data:     append([]byte(crypt.MagicHeader), crypt.Version),
 			expected: true,
 		},
 		{
@@ -157,43 +173,50 @@ func TestIsEncrypted(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := IsEncrypted(tt.data)
+			t.Parallel()
+
+			result := crypt.IsEncrypted(tt.data)
 			assert.Equal(t, tt.expected, result)
 		})
 	}
 }
 
 func TestEncrypt_ProducesDifferentOutput(t *testing.T) {
+	t.Parallel()
+
 	data := []byte("same data")
 	passphrase := "same passphrase"
 
 	// Encrypt twice
-	encrypted1, err := Encrypt(data, passphrase)
+	encrypted1, err := crypt.Encrypt(data, passphrase)
 	require.NoError(t, err)
 
-	encrypted2, err := Encrypt(data, passphrase)
+	encrypted2, err := crypt.Encrypt(data, passphrase)
 	require.NoError(t, err)
 
 	// Should produce different ciphertext due to random salt and nonce
 	assert.NotEqual(t, encrypted1, encrypted2)
 
 	// But both should decrypt to same data
-	decrypted1, err := Decrypt(encrypted1, passphrase)
+	decrypted1, err := crypt.Decrypt(encrypted1, passphrase)
 	require.NoError(t, err)
 
-	decrypted2, err := Decrypt(encrypted2, passphrase)
+	decrypted2, err := crypt.Decrypt(encrypted2, passphrase)
 	require.NoError(t, err)
 
 	assert.Equal(t, decrypted1, decrypted2)
 }
 
 func TestDecrypt_UnsupportedVersion(t *testing.T) {
-	// Create data with valid header but unsupported version
-	data := make([]byte, headerLen+saltLen+nonceLen+20)
-	copy(data, []byte(MagicHeader))
-	data[len(MagicHeader)] = 99 // Unsupported version
+	t.Parallel()
 
-	_, err := Decrypt(data, "any-passphrase")
-	assert.ErrorIs(t, err, ErrInvalidFormat)
+	// Create data with valid header but unsupported version
+	// header(9) + salt(32) + nonce(12) + some data(20) = 73 bytes
+	data := make([]byte, len(crypt.MagicHeader)+1+32+12+20)
+	copy(data, []byte(crypt.MagicHeader))
+	data[len(crypt.MagicHeader)] = 99 // Unsupported version
+
+	_, err := crypt.Decrypt(data, "any-passphrase")
+	require.ErrorIs(t, err, crypt.ErrInvalidFormat)
 	assert.Contains(t, err.Error(), "unsupported version 99")
 }

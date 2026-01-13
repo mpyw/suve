@@ -1,4 +1,3 @@
-// Package cli provides shared runners and command builders for stage commands.
 package cli
 
 import (
@@ -44,6 +43,7 @@ func (r *AddRunner) Run(ctx context.Context, opts AddOptions) error {
 		if editorFn == nil {
 			editorFn = editor.Open
 		}
+
 		newValue, err = editorFn(ctx, draft.Value)
 		if err != nil {
 			return fmt.Errorf("failed to edit: %w", err)
@@ -52,12 +52,14 @@ func (r *AddRunner) Run(ctx context.Context, opts AddOptions) error {
 		// Check if value is empty (canceled)
 		if newValue == "" {
 			output.Info(r.Stdout, "Empty value, not staged.")
+
 			return nil
 		}
 
 		// Check if unchanged from staged value
 		if draft.IsStaged && newValue == draft.Value {
 			output.Info(r.Stdout, "No changes made.")
+
 			return nil
 		}
 	}
@@ -73,5 +75,6 @@ func (r *AddRunner) Run(ctx context.Context, opts AddOptions) error {
 	}
 
 	output.Success(r.Stdout, "Staged for creation: %s", result.Name)
+
 	return nil
 }

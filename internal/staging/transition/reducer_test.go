@@ -1,4 +1,4 @@
-package transition
+package transition //nolint:testpackage // Internal tests sharing test fixtures with executor_test.go
 
 import (
 	"testing"
@@ -12,6 +12,8 @@ import (
 // testExistingValue is declared in executor_test.go
 
 func TestReduceEntry_Add(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name            string
 		state           EntryState
@@ -72,6 +74,8 @@ func TestReduceEntry_Add(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			result := ReduceEntry(tt.state, tt.action)
 			assert.Equal(t, tt.wantState, result.NewState.StagedState)
 			assert.Equal(t, tt.wantDiscardTags, result.DiscardTags)
@@ -81,6 +85,8 @@ func TestReduceEntry_Add(t *testing.T) {
 }
 
 func TestReduceEntry_Edit(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name            string
 		state           EntryState
@@ -157,6 +163,8 @@ func TestReduceEntry_Edit(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			result := ReduceEntry(tt.state, tt.action)
 			assert.Equal(t, tt.wantState, result.NewState.StagedState)
 			assert.Equal(t, tt.wantDiscardTags, result.DiscardTags)
@@ -166,6 +174,8 @@ func TestReduceEntry_Edit(t *testing.T) {
 }
 
 func TestReduceEntry_Delete(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name            string
 		state           EntryState
@@ -209,6 +219,8 @@ func TestReduceEntry_Delete(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			result := ReduceEntry(tt.state, EntryActionDelete{})
 			assert.Equal(t, tt.wantState, result.NewState.StagedState)
 			assert.Equal(t, tt.wantDiscardTags, result.DiscardTags)
@@ -218,6 +230,8 @@ func TestReduceEntry_Delete(t *testing.T) {
 }
 
 func TestReduceEntry_Reset(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name      string
 		state     EntryState
@@ -259,6 +273,8 @@ func TestReduceEntry_Reset(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			result := ReduceEntry(tt.state, EntryActionReset{})
 			assert.Equal(t, tt.wantState, result.NewState.StagedState)
 			assert.False(t, result.DiscardTags)
@@ -268,6 +284,8 @@ func TestReduceEntry_Reset(t *testing.T) {
 }
 
 func TestReduceTag_Tag(t *testing.T) {
+	t.Parallel()
+
 	existingValue := testExistingValue
 	tests := []struct {
 		name          string
@@ -413,6 +431,8 @@ func TestReduceTag_Tag(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			result := ReduceTag(tt.entryState, tt.stagedTags, tt.action)
 			assert.Equal(t, tt.wantStagedTag.ToSet, result.NewStagedTags.ToSet)
 			assert.Equal(t, tt.wantStagedTag.ToUnset.Values(), result.NewStagedTags.ToUnset.Values())
@@ -422,6 +442,8 @@ func TestReduceTag_Tag(t *testing.T) {
 }
 
 func TestReduceTag_Untag(t *testing.T) {
+	t.Parallel()
+
 	existingValue := testExistingValue
 	tests := []struct {
 		name          string
@@ -544,6 +566,8 @@ func TestReduceTag_Untag(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			result := ReduceTag(tt.entryState, tt.stagedTags, tt.action)
 			assert.Equal(t, tt.wantStagedTag.ToSet, result.NewStagedTags.ToSet)
 			assert.Equal(t, tt.wantStagedTag.ToUnset.Values(), result.NewStagedTags.ToUnset.Values())
@@ -553,6 +577,8 @@ func TestReduceTag_Untag(t *testing.T) {
 }
 
 func TestStagedTags_IsEmpty(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name       string
 		stagedTags StagedTags
@@ -591,12 +617,16 @@ func TestStagedTags_IsEmpty(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			assert.Equal(t, tt.want, tt.stagedTags.IsEmpty())
 		})
 	}
 }
 
 func TestStagedTags_Clone(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name        string
 		stagedTags  StagedTags
@@ -622,6 +652,8 @@ func TestStagedTags_Clone(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			cloned := tt.stagedTags.Clone()
 			assert.Equal(t, tt.wantToSet, cloned.ToSet)
 			assert.ElementsMatch(t, tt.wantToUnset, cloned.ToUnset.Values())
@@ -639,6 +671,8 @@ func TestStagedTags_Clone(t *testing.T) {
 }
 
 func TestReduceEntry_Delete_NotFound(t *testing.T) {
+	t.Parallel()
+
 	// Test case: CurrentValue=nil + NotStaged -> ERROR (resource not found)
 	state := EntryState{
 		CurrentValue: nil,
@@ -650,6 +684,8 @@ func TestReduceEntry_Delete_NotFound(t *testing.T) {
 }
 
 func TestReduceEntry_Delete_InconsistentState(t *testing.T) {
+	t.Parallel()
+
 	// Test edge case: CurrentValue=nil + Delete -> Delete (no-op)
 	// This is an inconsistent state in practice, but the reducer handles it gracefully
 	state := EntryState{

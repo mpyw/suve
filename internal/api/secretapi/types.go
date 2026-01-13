@@ -1,4 +1,3 @@
-// Package secretapi provides interfaces and types for AWS Secrets Manager.
 package secretapi
 
 import (
@@ -6,61 +5,109 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager/types"
 )
 
-// Re-exported Secrets Manager client and options types.
-type (
-	Client  = secretsmanager.Client
-	Options = secretsmanager.Options
-)
+// Client is a re-exported Secrets Manager client type for dependency injection.
+type Client = secretsmanager.Client
 
-// Re-exported Secrets Manager input/output types.
-type (
-	GetSecretValueInput        = secretsmanager.GetSecretValueInput
-	GetSecretValueOutput       = secretsmanager.GetSecretValueOutput
-	ListSecretVersionIdsInput  = secretsmanager.ListSecretVersionIdsInput
-	ListSecretVersionIdsOutput = secretsmanager.ListSecretVersionIdsOutput
-	ListSecretsInput           = secretsmanager.ListSecretsInput
-	ListSecretsOutput          = secretsmanager.ListSecretsOutput
-	CreateSecretInput          = secretsmanager.CreateSecretInput
-	CreateSecretOutput         = secretsmanager.CreateSecretOutput
-	PutSecretValueInput        = secretsmanager.PutSecretValueInput
-	PutSecretValueOutput       = secretsmanager.PutSecretValueOutput
-	DeleteSecretInput          = secretsmanager.DeleteSecretInput
-	DeleteSecretOutput         = secretsmanager.DeleteSecretOutput
-	RestoreSecretInput         = secretsmanager.RestoreSecretInput
-	RestoreSecretOutput        = secretsmanager.RestoreSecretOutput
-	UpdateSecretInput          = secretsmanager.UpdateSecretInput
-	UpdateSecretOutput         = secretsmanager.UpdateSecretOutput
-	TagResourceInput           = secretsmanager.TagResourceInput
-	TagResourceOutput          = secretsmanager.TagResourceOutput
-	UntagResourceInput         = secretsmanager.UntagResourceInput
-	UntagResourceOutput        = secretsmanager.UntagResourceOutput
-	DescribeSecretInput        = secretsmanager.DescribeSecretInput
-	DescribeSecretOutput       = secretsmanager.DescribeSecretOutput
-)
+// Options is a re-exported Secrets Manager options type.
+type Options = secretsmanager.Options
 
-// Re-exported Secrets Manager model types.
-type (
-	SecretVersionsListEntry = types.SecretVersionsListEntry
-	SecretListEntry         = types.SecretListEntry
-	Tag                     = types.Tag
-	Filter                  = types.Filter
-	FilterNameStringType    = types.FilterNameStringType
-)
+// GetSecretValueInput is a re-exported Secrets Manager input type.
+type GetSecretValueInput = secretsmanager.GetSecretValueInput
+
+// GetSecretValueOutput is a re-exported Secrets Manager output type.
+type GetSecretValueOutput = secretsmanager.GetSecretValueOutput
+
+// ListSecretVersionIDsInput is a re-exported Secrets Manager input type.
+type ListSecretVersionIDsInput = secretsmanager.ListSecretVersionIdsInput
+
+// ListSecretVersionIDsOutput is a re-exported Secrets Manager output type.
+type ListSecretVersionIDsOutput = secretsmanager.ListSecretVersionIdsOutput
+
+// ListSecretsInput is a re-exported Secrets Manager input type.
+type ListSecretsInput = secretsmanager.ListSecretsInput
+
+// ListSecretsOutput is a re-exported Secrets Manager output type.
+type ListSecretsOutput = secretsmanager.ListSecretsOutput
+
+// CreateSecretInput is a re-exported Secrets Manager input type.
+type CreateSecretInput = secretsmanager.CreateSecretInput
+
+// CreateSecretOutput is a re-exported Secrets Manager output type.
+type CreateSecretOutput = secretsmanager.CreateSecretOutput
+
+// PutSecretValueInput is a re-exported Secrets Manager input type.
+type PutSecretValueInput = secretsmanager.PutSecretValueInput
+
+// PutSecretValueOutput is a re-exported Secrets Manager output type.
+type PutSecretValueOutput = secretsmanager.PutSecretValueOutput
+
+// DeleteSecretInput is a re-exported Secrets Manager input type.
+type DeleteSecretInput = secretsmanager.DeleteSecretInput
+
+// DeleteSecretOutput is a re-exported Secrets Manager output type.
+type DeleteSecretOutput = secretsmanager.DeleteSecretOutput
+
+// RestoreSecretInput is a re-exported Secrets Manager input type.
+type RestoreSecretInput = secretsmanager.RestoreSecretInput
+
+// RestoreSecretOutput is a re-exported Secrets Manager output type.
+type RestoreSecretOutput = secretsmanager.RestoreSecretOutput
+
+// UpdateSecretInput is a re-exported Secrets Manager input type.
+type UpdateSecretInput = secretsmanager.UpdateSecretInput
+
+// UpdateSecretOutput is a re-exported Secrets Manager output type.
+type UpdateSecretOutput = secretsmanager.UpdateSecretOutput
+
+// TagResourceInput is a re-exported Secrets Manager input type.
+type TagResourceInput = secretsmanager.TagResourceInput
+
+// TagResourceOutput is a re-exported Secrets Manager output type.
+type TagResourceOutput = secretsmanager.TagResourceOutput
+
+// UntagResourceInput is a re-exported Secrets Manager input type.
+type UntagResourceInput = secretsmanager.UntagResourceInput
+
+// UntagResourceOutput is a re-exported Secrets Manager output type.
+type UntagResourceOutput = secretsmanager.UntagResourceOutput
+
+// DescribeSecretInput is a re-exported Secrets Manager input type.
+type DescribeSecretInput = secretsmanager.DescribeSecretInput
+
+// DescribeSecretOutput is a re-exported Secrets Manager output type.
+type DescribeSecretOutput = secretsmanager.DescribeSecretOutput
+
+// SecretVersionsListEntry is a re-exported Secrets Manager model type.
+type SecretVersionsListEntry = types.SecretVersionsListEntry
+
+// SecretListEntry is a re-exported Secrets Manager model type.
+type SecretListEntry = types.SecretListEntry
+
+// Tag is a re-exported Secrets Manager model type.
+type Tag = types.Tag
+
+// Filter is a re-exported Secrets Manager model type.
+type Filter = types.Filter
+
+// FilterNameStringType is a re-exported Secrets Manager model type.
+type FilterNameStringType = types.FilterNameStringType
 
 // Re-exported Secrets Manager constants.
 const (
 	FilterNameStringTypeName = types.FilterNameStringTypeName
 )
 
-// Re-exported Secrets Manager error types.
+// ResourceNotFoundException is a re-exported Secrets Manager error type.
 //
-//nolint:errname // This is a type alias to AWS SDK type, preserving original name for consistency
-type (
-	ResourceNotFoundException = types.ResourceNotFoundException
-)
+//nolint:errname // Type alias to AWS SDK type, preserving original name for consistency
+type ResourceNotFoundException = types.ResourceNotFoundException
 
-// Re-exported Secrets Manager functions.
-var (
-	NewFromConfig           = secretsmanager.NewFromConfig
-	NewListSecretsPaginator = secretsmanager.NewListSecretsPaginator
-)
+// NewFromConfig is a re-exported Secrets Manager factory function for dependency injection.
+//
+//nolint:gochecknoglobals // Re-export of AWS SDK factory function for dependency injection
+var NewFromConfig = secretsmanager.NewFromConfig
+
+// NewListSecretsPaginator is a re-exported Secrets Manager factory function for dependency injection.
+//
+//nolint:gochecknoglobals // Re-export of AWS SDK factory function for dependency injection
+var NewListSecretsPaginator = secretsmanager.NewListSecretsPaginator

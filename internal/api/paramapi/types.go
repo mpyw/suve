@@ -1,4 +1,3 @@
-// Package paramapi provides interfaces and types for AWS Systems Manager Parameter Store.
 package paramapi
 
 import (
@@ -6,44 +5,86 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ssm/types"
 )
 
-// Re-exported SSM client and options types.
-type (
-	Client  = ssm.Client
-	Options = ssm.Options
-)
+// Client is a re-exported SSM client type for dependency injection.
+type Client = ssm.Client
 
-// Re-exported SSM input/output types.
-type (
-	GetParameterInput            = ssm.GetParameterInput
-	GetParameterOutput           = ssm.GetParameterOutput
-	GetParametersInput           = ssm.GetParametersInput
-	GetParametersOutput          = ssm.GetParametersOutput
-	GetParameterHistoryInput     = ssm.GetParameterHistoryInput
-	GetParameterHistoryOutput    = ssm.GetParameterHistoryOutput
-	PutParameterInput            = ssm.PutParameterInput
-	PutParameterOutput           = ssm.PutParameterOutput
-	DeleteParameterInput         = ssm.DeleteParameterInput
-	DeleteParameterOutput        = ssm.DeleteParameterOutput
-	DescribeParametersInput      = ssm.DescribeParametersInput
-	DescribeParametersOutput     = ssm.DescribeParametersOutput
-	AddTagsToResourceInput       = ssm.AddTagsToResourceInput
-	AddTagsToResourceOutput      = ssm.AddTagsToResourceOutput
-	RemoveTagsFromResourceInput  = ssm.RemoveTagsFromResourceInput
-	RemoveTagsFromResourceOutput = ssm.RemoveTagsFromResourceOutput
-	ListTagsForResourceInput     = ssm.ListTagsForResourceInput
-	ListTagsForResourceOutput    = ssm.ListTagsForResourceOutput
-)
+// Options is a re-exported SSM options type.
+type Options = ssm.Options
 
-// Re-exported SSM model types.
-type (
-	Parameter              = types.Parameter
-	ParameterHistory       = types.ParameterHistory
-	ParameterMetadata      = types.ParameterMetadata
-	ParameterType          = types.ParameterType
-	ParameterStringFilter  = types.ParameterStringFilter
-	Tag                    = types.Tag
-	ResourceTypeForTagging = types.ResourceTypeForTagging
-)
+// GetParameterInput is a re-exported SSM input type.
+type GetParameterInput = ssm.GetParameterInput
+
+// GetParameterOutput is a re-exported SSM output type.
+type GetParameterOutput = ssm.GetParameterOutput
+
+// GetParametersInput is a re-exported SSM input type.
+type GetParametersInput = ssm.GetParametersInput
+
+// GetParametersOutput is a re-exported SSM output type.
+type GetParametersOutput = ssm.GetParametersOutput
+
+// GetParameterHistoryInput is a re-exported SSM input type.
+type GetParameterHistoryInput = ssm.GetParameterHistoryInput
+
+// GetParameterHistoryOutput is a re-exported SSM output type.
+type GetParameterHistoryOutput = ssm.GetParameterHistoryOutput
+
+// PutParameterInput is a re-exported SSM input type.
+type PutParameterInput = ssm.PutParameterInput
+
+// PutParameterOutput is a re-exported SSM output type.
+type PutParameterOutput = ssm.PutParameterOutput
+
+// DeleteParameterInput is a re-exported SSM input type.
+type DeleteParameterInput = ssm.DeleteParameterInput
+
+// DeleteParameterOutput is a re-exported SSM output type.
+type DeleteParameterOutput = ssm.DeleteParameterOutput
+
+// DescribeParametersInput is a re-exported SSM input type.
+type DescribeParametersInput = ssm.DescribeParametersInput
+
+// DescribeParametersOutput is a re-exported SSM output type.
+type DescribeParametersOutput = ssm.DescribeParametersOutput
+
+// AddTagsToResourceInput is a re-exported SSM input type.
+type AddTagsToResourceInput = ssm.AddTagsToResourceInput
+
+// AddTagsToResourceOutput is a re-exported SSM output type.
+type AddTagsToResourceOutput = ssm.AddTagsToResourceOutput
+
+// RemoveTagsFromResourceInput is a re-exported SSM input type.
+type RemoveTagsFromResourceInput = ssm.RemoveTagsFromResourceInput
+
+// RemoveTagsFromResourceOutput is a re-exported SSM output type.
+type RemoveTagsFromResourceOutput = ssm.RemoveTagsFromResourceOutput
+
+// ListTagsForResourceInput is a re-exported SSM input type.
+type ListTagsForResourceInput = ssm.ListTagsForResourceInput
+
+// ListTagsForResourceOutput is a re-exported SSM output type.
+type ListTagsForResourceOutput = ssm.ListTagsForResourceOutput
+
+// Parameter is a re-exported SSM model type.
+type Parameter = types.Parameter
+
+// ParameterHistory is a re-exported SSM model type.
+type ParameterHistory = types.ParameterHistory
+
+// ParameterMetadata is a re-exported SSM model type.
+type ParameterMetadata = types.ParameterMetadata
+
+// ParameterType is a re-exported SSM model type.
+type ParameterType = types.ParameterType
+
+// ParameterStringFilter is a re-exported SSM model type.
+type ParameterStringFilter = types.ParameterStringFilter
+
+// Tag is a re-exported SSM model type.
+type Tag = types.Tag
+
+// ResourceTypeForTagging is a re-exported SSM model type.
+type ResourceTypeForTagging = types.ResourceTypeForTagging
 
 // Re-exported SSM constants.
 const (
@@ -53,19 +94,25 @@ const (
 	ResourceTypeForTaggingParameter = types.ResourceTypeForTaggingParameter
 )
 
-// Re-exported SSM error types.
+// ParameterNotFound is a re-exported SSM error type.
 //
-//nolint:errname // These are type aliases to AWS SDK types, preserving original names for consistency
-type (
-	ParameterNotFound      = types.ParameterNotFound
-	ParameterAlreadyExists = types.ParameterAlreadyExists
-)
+//nolint:errname // Type alias to AWS SDK type, preserving original name for consistency
+type ParameterNotFound = types.ParameterNotFound
 
-// Re-exported SSM functions.
-var (
-	NewFromConfig                  = ssm.NewFromConfig
-	NewDescribeParametersPaginator = ssm.NewDescribeParametersPaginator
-)
+// ParameterAlreadyExists is a re-exported SSM error type.
+//
+//nolint:errname // Type alias to AWS SDK type, preserving original name for consistency
+type ParameterAlreadyExists = types.ParameterAlreadyExists
+
+// NewFromConfig is a re-exported SSM factory function for dependency injection.
+//
+//nolint:gochecknoglobals // Re-export of AWS SDK factory function for dependency injection
+var NewFromConfig = ssm.NewFromConfig
+
+// NewDescribeParametersPaginator is a re-exported SSM factory function for dependency injection.
+//
+//nolint:gochecknoglobals // Re-export of AWS SDK factory function for dependency injection
+var NewDescribeParametersPaginator = ssm.NewDescribeParametersPaginator
 
 // Re-exported filter types.
 const (

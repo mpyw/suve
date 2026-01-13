@@ -6,4 +6,6 @@ package security
 // to disable core dumps and prevent secrets from being dumped to disk.
 
 // SetupProcess is a no-op on macOS (not yet implemented).
-func SetupProcess() error { return nil }
+func SetupProcess() error {
+	return nil
+}

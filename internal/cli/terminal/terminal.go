@@ -18,10 +18,14 @@ type Fder interface {
 
 // GetSize returns the terminal width and height for the given file descriptor.
 // This is a variable to allow mocking in tests.
+//
+//nolint:gochecknoglobals // Required for test mocking
 var GetSize = term.GetSize
 
 // IsTTY checks if the file descriptor is a TTY.
 // This is a variable to allow mocking in tests.
+//
+//nolint:gochecknoglobals // Required for test mocking
 var IsTTY = isatty.IsTerminal
 
 // GetWidthFromWriter returns the terminal width for the given writer.
@@ -36,6 +40,7 @@ func GetWidthFromWriter(w io.Writer) int {
 	if err != nil || width <= 0 {
 		return DefaultWidth
 	}
+
 	return width
 }
 
@@ -45,5 +50,6 @@ func IsTerminalWriter(w io.Writer) bool {
 	if !ok {
 		return false
 	}
+
 	return IsTTY(f.Fd())
 }

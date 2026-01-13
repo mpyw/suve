@@ -86,6 +86,7 @@ func NewLauncher(accountID, region string, opts ...LauncherOption) *Launcher {
 	for _, opt := range opts {
 		opt(l)
 	}
+
 	return l
 }
 
@@ -119,8 +120,10 @@ func (l *Launcher) EnsureRunning() error {
 	for time.Now().Before(deadline) {
 		if err := l.client.Ping(); err == nil {
 			output.Printf(os.Stderr, "info: staging agent started for account %s (%s)\n", l.accountID, l.region)
+
 			return nil
 		}
+
 		<-ticker.C
 	}
 
@@ -133,13 +136,18 @@ func (l *Launcher) Shutdown() error {
 	if err != nil {
 		return err
 	}
+
 	return resp.Err()
 }
 
 // startProcess starts a new daemon process.
 func (l *Launcher) startProcess() error {
 	if l.autoStartDisabled {
-		return fmt.Errorf("daemon not running and auto-start is disabled; run 'suve stage agent start --account %s --region %s' manually", l.accountID, l.region)
+		return fmt.Errorf(
+			"daemon not running and auto-start is disabled; "+
+				"run 'suve stage agent start --account %s --region %s' manually",
+			l.accountID, l.region,
+		)
 	}
 
 	return l.spawner.Spawn(l.accountID, l.region)

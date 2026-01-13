@@ -17,7 +17,7 @@ import (
 // SecretClient is the combined interface for Secrets Manager stage operations.
 type SecretClient interface {
 	secretapi.GetSecretValueAPI
-	secretapi.ListSecretVersionIdsAPI
+	secretapi.ListSecretVersionIDsAPI
 	secretapi.CreateSecretAPI
 	secretapi.PutSecretValueAPI
 	secretapi.DeleteSecretAPI
@@ -83,6 +83,7 @@ func (s *SecretStrategy) applyCreate(ctx context.Context, name string, entry Ent
 	if err != nil {
 		return fmt.Errorf("failed to create secret: %w", err)
 	}
+
 	return nil
 }
 
@@ -123,6 +124,7 @@ func (s *SecretStrategy) ApplyTags(ctx context.Context, name string, tagEntry Ta
 			return err
 		}
 	}
+
 	return nil
 }
 
@@ -163,6 +165,7 @@ func (s *SecretStrategy) FetchLastModified(ctx context.Context, name string) (ti
 		}
 		return time.Time{}, fmt.Errorf("failed to get secret: %w", err)
 	}
+
 	if result.CreatedDate != nil {
 		return *result.CreatedDate, nil
 	}
@@ -172,11 +175,14 @@ func (s *SecretStrategy) FetchLastModified(ctx context.Context, name string) (ti
 // FetchCurrent fetches the current value from AWS Secrets Manager for diffing.
 func (s *SecretStrategy) FetchCurrent(ctx context.Context, name string) (*FetchResult, error) {
 	spec := &secretversion.Spec{Name: name}
+
 	secret, err := secretversion.GetSecretWithVersion(ctx, s.Client, spec)
 	if err != nil {
 		return nil, err
 	}
+
 	versionID := secretversion.TruncateVersionID(lo.FromPtr(secret.VersionId))
+
 	return &FetchResult{
 		Value:      lo.FromPtr(secret.SecretString),
 		Identifier: "#" + versionID,
@@ -189,6 +195,7 @@ func (s *SecretStrategy) ParseName(input string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+
 	if spec.Absolute.ID != nil || spec.Absolute.Label != nil || spec.Shift > 0 {
 		return "", fmt.Errorf("stage diff requires a secret name without version specifier")
 	}
@@ -199,13 +206,16 @@ func (s *SecretStrategy) ParseName(input string) (string, error) {
 // Returns *ResourceNotFoundError if the secret doesn't exist.
 func (s *SecretStrategy) FetchCurrentValue(ctx context.Context, name string) (*EditFetchResult, error) {
 	spec := &secretversion.Spec{Name: name}
+
 	secret, err := secretversion.GetSecretWithVersion(ctx, s.Client, spec)
 	if err != nil {
 		if rnf := (*secretapi.ResourceNotFoundException)(nil); errors.As(err, &rnf) {
 			return nil, &ResourceNotFoundError{Err: err}
 		}
+
 		return nil, err
 	}
+
 	result := &EditFetchResult{
 		Value: lo.FromPtr(secret.SecretString),
 	}
@@ -221,7 +231,9 @@ func (s *SecretStrategy) ParseSpec(input string) (name string, hasVersion bool, 
 	if err != nil {
 		return "", false, err
 	}
+
 	hasVersion = spec.Absolute.ID != nil || spec.Absolute.Label != nil || spec.Shift > 0
+
 	return spec.Name, hasVersion, nil
 }
 
@@ -231,11 +243,14 @@ func (s *SecretStrategy) FetchVersion(ctx context.Context, input string) (value 
 	if err != nil {
 		return "", "", err
 	}
+
 	secret, err := secretversion.GetSecretWithVersion(ctx, s.Client, spec)
 	if err != nil {
 		return "", "", err
 	}
+
 	versionID := secretversion.TruncateVersionID(lo.FromPtr(secret.VersionId))
+
 	return lo.FromPtr(secret.SecretString), "#" + versionID, nil
 }
 

@@ -16,6 +16,7 @@ func TestState_IsEmpty(t *testing.T) {
 
 	t.Run("nil state is empty", func(t *testing.T) {
 		t.Parallel()
+
 		var state *staging.State
 		assert.True(t, state.IsEmpty())
 	})
@@ -181,6 +182,7 @@ func TestState_ExtractService(t *testing.T) {
 
 	t.Run("extract from nil state returns empty state", func(t *testing.T) {
 		t.Parallel()
+
 		var state *staging.State
 		extracted := state.ExtractService(staging.ServiceParam)
 		assert.NotNil(t, extracted)
@@ -227,6 +229,7 @@ func TestState_RemoveService(t *testing.T) {
 
 	t.Run("remove from nil state does nothing", func(t *testing.T) {
 		t.Parallel()
+
 		var state *staging.State
 		// Should not panic
 		state.RemoveService(staging.ServiceParam)

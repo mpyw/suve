@@ -33,6 +33,7 @@ func (s *secureState) get(accountID, region string) (*staging.State, error) {
 	defer s.mu.RUnlock()
 
 	key := stateKey{AccountID: accountID, Region: region}
+
 	buf, ok := s.states[key]
 	if !ok || buf.IsEmpty() {
 		return staging.NewEmptyState(), nil
@@ -48,6 +49,7 @@ func (s *secureState) get(accountID, region string) (*staging.State, error) {
 	if err := json.Unmarshal(data, &state); err != nil {
 		return nil, err
 	}
+
 	return &state, nil
 }
 
@@ -66,6 +68,7 @@ func (s *secureState) set(accountID, region string, state *staging.State) error 
 	// Check if state is empty
 	if state.IsEmpty() {
 		delete(s.states, key)
+
 		return nil
 	}
 
@@ -75,6 +78,7 @@ func (s *secureState) set(accountID, region string, state *staging.State) error 
 	}
 	// NewBuffer zeros the input data
 	s.states[key] = security.NewBuffer(data)
+
 	return nil
 }
 
@@ -82,6 +86,7 @@ func (s *secureState) set(accountID, region string, state *staging.State) error 
 func (s *secureState) isEmpty() bool {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
+
 	return len(s.states) == 0
 }
 
@@ -93,6 +98,7 @@ func (s *secureState) destroy() {
 	for _, buf := range s.states {
 		buf.Destroy()
 	}
+
 	s.states = make(map[stateKey]*security.Buffer)
 }
 

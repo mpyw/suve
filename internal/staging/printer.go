@@ -9,6 +9,9 @@ import (
 	"github.com/mpyw/suve/internal/cli/output"
 )
 
+// maxValueDisplayLength is the maximum length of a value shown in status output.
+const maxValueDisplayLength = 100
+
 // EntryPrinter prints staged entries to the given writer.
 type EntryPrinter struct {
 	Writer io.Writer
@@ -19,6 +22,7 @@ type EntryPrinter struct {
 // If showDeleteOptions is true, shows delete options (Force/RecoveryWindow) for delete operations.
 func (p *EntryPrinter) PrintEntry(name string, entry Entry, verbose, showDeleteOptions bool) {
 	var opColor string
+
 	switch entry.Operation {
 	case OperationCreate:
 		opColor = colors.OpAdd("A")
@@ -30,6 +34,7 @@ func (p *EntryPrinter) PrintEntry(name string, entry Entry, verbose, showDeleteO
 
 	if !verbose {
 		output.Printf(p.Writer, "  %s %s\n", opColor, name)
+
 		return
 	}
 
@@ -40,9 +45,10 @@ func (p *EntryPrinter) PrintEntry(name string, entry Entry, verbose, showDeleteO
 	case OperationCreate, OperationUpdate:
 		if entry.Value != nil {
 			value := lo.FromPtr(entry.Value)
-			if len(value) > 100 {
-				value = value[:100] + "..."
+			if len(value) > maxValueDisplayLength {
+				value = value[:maxValueDisplayLength] + "..."
 			}
+
 			output.Printf(p.Writer, "  %s %s\n", colors.FieldLabel("Value:"), value)
 		}
 	case OperationDelete:

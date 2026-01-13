@@ -18,11 +18,14 @@ func NewBuffer(data []byte) *Buffer {
 	if len(data) == 0 {
 		return &Buffer{}
 	}
+
 	enclave := memguard.NewEnclave(data)
+
 	// Zero the original data
 	for i := range data {
 		data[i] = 0
 	}
+
 	return &Buffer{enclave: enclave}
 }
 
@@ -32,14 +35,18 @@ func (b *Buffer) Bytes() ([]byte, error) {
 	if b.enclave == nil {
 		return nil, nil
 	}
+
 	lb, err := b.enclave.Open()
 	if err != nil {
 		return nil, err
 	}
+
 	defer lb.Destroy()
+
 	// Make a copy
 	data := make([]byte, lb.Size())
 	copy(data, lb.Bytes())
+
 	return data, nil
 }
 

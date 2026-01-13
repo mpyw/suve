@@ -1,4 +1,3 @@
-// Package cli provides shared runners and command builders for stage commands.
 package cli
 
 import (
@@ -47,6 +46,7 @@ func (r *ApplyRunner) Run(ctx context.Context, opts ApplyOptions) error {
 	// Handle "nothing staged" case
 	if len(result.EntryResults) == 0 && len(result.TagResults) == 0 && err == nil {
 		output.Info(r.Stdout, "No %s changes staged.", result.ServiceName)
+
 		return nil
 	}
 
@@ -56,6 +56,7 @@ func (r *ApplyRunner) Run(ctx context.Context, opts ApplyOptions) error {
 			if entry.Name != name {
 				continue
 			}
+
 			if entry.Error != nil {
 				output.Failed(r.Stderr, name, entry.Error)
 			} else {
@@ -71,6 +72,7 @@ func (r *ApplyRunner) Run(ctx context.Context, opts ApplyOptions) error {
 					// so the outer if-branch handles this case.
 				}
 			}
+
 			break
 		}
 	}
@@ -81,11 +83,13 @@ func (r *ApplyRunner) Run(ctx context.Context, opts ApplyOptions) error {
 			if tag.Name != name {
 				continue
 			}
+
 			if tag.Error != nil {
 				output.Failed(r.Stderr, name+" (tags)", tag.Error)
 			} else {
-				output.Success(r.Stdout, "Tagged %s%s", name, formatTagApplySummary(tag))
+				output.Success(r.Stdout, "Tagged %s%s", name, FormatTagApplySummary(tag))
 			}
+
 			break
 		}
 	}
@@ -94,18 +98,22 @@ func (r *ApplyRunner) Run(ctx context.Context, opts ApplyOptions) error {
 	return err
 }
 
-func formatTagApplySummary(tag stagingusecase.ApplyTagResult) string {
+// FormatTagApplySummary formats a tag apply result as a summary string.
+func FormatTagApplySummary(tag stagingusecase.ApplyTagResult) string {
 	var parts []string
 	if len(tag.AddTags) > 0 {
 		parts = append(parts, fmt.Sprintf("+%d", len(tag.AddTags)))
 	}
+
 	if tag.RemoveTag.Len() > 0 {
 		parts = append(parts, fmt.Sprintf("-%d", tag.RemoveTag.Len()))
 	}
+
 	if len(parts) == 0 {
 		// Unreachable: TagEntry with empty Add and Remove is unstaged by persistTagState,
 		// so ApplyTagResult should always have at least one non-empty field.
 		return ""
 	}
+
 	return " [" + strings.Join(parts, ", ") + "]"
 }

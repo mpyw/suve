@@ -41,7 +41,9 @@ func NewRunner(accountID, region string, opts ...RunnerOption) *Runner {
 	for _, opt := range opts {
 		opt(r)
 	}
+
 	r.server = ipc.NewServer(accountID, region, r.handler.HandleRequest, r.checkAutoShutdown, r.Shutdown)
+
 	return r
 }
 
@@ -59,6 +61,7 @@ func (r *Runner) Run(ctx context.Context) error {
 	// Handle signals
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGTERM, syscall.SIGINT)
+
 	go func() {
 		select {
 		case <-sigCh:
@@ -69,6 +72,7 @@ func (r *Runner) Run(ctx context.Context) error {
 	}()
 
 	r.server.Serve(ctx)
+
 	return nil
 }
 
@@ -77,6 +81,7 @@ func (r *Runner) Shutdown() {
 	if r.cancel != nil {
 		r.cancel()
 	}
+
 	r.handler.Destroy()
 }
 

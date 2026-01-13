@@ -41,7 +41,7 @@ func TestCommand_Validation(t *testing.T) {
 
 type mockClient struct {
 	getSecretValueFunc       func(ctx context.Context, params *secretapi.GetSecretValueInput, optFns ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error)
-	listSecretVersionIdsFunc func(ctx context.Context, params *secretapi.ListSecretVersionIdsInput, optFns ...func(*secretapi.Options)) (*secretapi.ListSecretVersionIdsOutput, error)
+	listSecretVersionIdsFunc func(ctx context.Context, params *secretapi.ListSecretVersionIDsInput, optFns ...func(*secretapi.Options)) (*secretapi.ListSecretVersionIDsOutput, error)
 	describeSecretFunc       func(ctx context.Context, params *secretapi.DescribeSecretInput, optFns ...func(*secretapi.Options)) (*secretapi.DescribeSecretOutput, error)
 }
 
@@ -49,7 +49,7 @@ func (m *mockClient) GetSecretValue(ctx context.Context, params *secretapi.GetSe
 	return m.getSecretValueFunc(ctx, params, optFns...)
 }
 
-func (m *mockClient) ListSecretVersionIds(ctx context.Context, params *secretapi.ListSecretVersionIdsInput, optFns ...func(*secretapi.Options)) (*secretapi.ListSecretVersionIdsOutput, error) {
+func (m *mockClient) ListSecretVersionIds(ctx context.Context, params *secretapi.ListSecretVersionIDsInput, optFns ...func(*secretapi.Options)) (*secretapi.ListSecretVersionIDsOutput, error) {
 	return m.listSecretVersionIdsFunc(ctx, params, optFns...)
 }
 
@@ -96,8 +96,8 @@ func TestRun(t *testing.T) {
 			name: "show with shift",
 			opts: show.Options{Spec: &secretversion.Spec{Name: "my-secret", Shift: 1}},
 			mock: &mockClient{
-				listSecretVersionIdsFunc: func(_ context.Context, _ *secretapi.ListSecretVersionIdsInput, _ ...func(*secretapi.Options)) (*secretapi.ListSecretVersionIdsOutput, error) {
-					return &secretapi.ListSecretVersionIdsOutput{
+				listSecretVersionIdsFunc: func(_ context.Context, _ *secretapi.ListSecretVersionIDsInput, _ ...func(*secretapi.Options)) (*secretapi.ListSecretVersionIDsOutput, error) {
+					return &secretapi.ListSecretVersionIDsOutput{
 						Versions: []secretapi.SecretVersionsListEntry{
 							{VersionId: lo.ToPtr("v1"), CreatedDate: lo.ToPtr(now.Add(-2 * time.Hour))},
 							{VersionId: lo.ToPtr("v2"), CreatedDate: lo.ToPtr(now.Add(-time.Hour))},
@@ -204,8 +204,8 @@ func TestRun(t *testing.T) {
 			name: "raw mode with shift",
 			opts: show.Options{Spec: &secretversion.Spec{Name: "my-secret", Shift: 1}, Raw: true},
 			mock: &mockClient{
-				listSecretVersionIdsFunc: func(_ context.Context, _ *secretapi.ListSecretVersionIdsInput, _ ...func(*secretapi.Options)) (*secretapi.ListSecretVersionIdsOutput, error) {
-					return &secretapi.ListSecretVersionIdsOutput{
+				listSecretVersionIdsFunc: func(_ context.Context, _ *secretapi.ListSecretVersionIDsInput, _ ...func(*secretapi.Options)) (*secretapi.ListSecretVersionIDsOutput, error) {
+					return &secretapi.ListSecretVersionIDsOutput{
 						Versions: []secretapi.SecretVersionsListEntry{
 							{VersionId: lo.ToPtr("v1"), CreatedDate: lo.ToPtr(now.Add(-time.Hour))},
 							{VersionId: lo.ToPtr("v2"), CreatedDate: &now},

@@ -14,7 +14,7 @@ import (
 // ShowClient is the interface for the show use case.
 type ShowClient interface {
 	secretapi.GetSecretValueAPI
-	secretapi.ListSecretVersionIdsAPI
+	secretapi.ListSecretVersionIDsAPI
 	secretapi.DescribeSecretAPI
 }
 

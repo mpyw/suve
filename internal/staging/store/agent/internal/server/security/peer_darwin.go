@@ -8,4 +8,6 @@ import "net"
 // via getsockopt to verify the connecting process belongs to the same user.
 
 // VerifyPeerCredentials is a no-op on macOS (not yet implemented).
-func VerifyPeerCredentials(_ net.Conn) error { return nil }
+func VerifyPeerCredentials(_ net.Conn) error {
+	return nil
+}

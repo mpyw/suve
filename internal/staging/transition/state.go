@@ -61,10 +61,12 @@ func (t StagedTags) Clone() StagedTags {
 	if toSet == nil {
 		toSet = make(map[string]string)
 	}
+
 	toUnset := maps.Clone(t.ToUnset)
 	if toUnset == nil {
 		toUnset = maputil.NewSet[string]()
 	}
+
 	return StagedTags{
 		ToSet:   toSet,
 		ToUnset: toUnset,

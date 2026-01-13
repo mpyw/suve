@@ -54,7 +54,7 @@ func (m *fullMockStrategy) ParseSpec(input string) (string, bool, error) {
 	}
 	return input, m.parseSpecVersion, nil
 }
-func (m *fullMockStrategy) FetchCurrent(_ context.Context, name string) (*staging.FetchResult, error) {
+func (m *fullMockStrategy) FetchCurrent(_ context.Context, _ string) (*staging.FetchResult, error) {
 	if m.fetchCurrentErr != nil {
 		return nil, m.fetchCurrentErr
 	}
@@ -140,7 +140,7 @@ func TestStatusRunner_Run(t *testing.T) {
 		}
 
 		err := r.Run(t.Context(), cli.StatusOptions{Name: "/app/config"})
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "not staged")
 	})
 
@@ -791,7 +791,7 @@ func TestEditRunner_Run(t *testing.T) {
 		}
 
 		err := r.Run(t.Context(), cli.EditOptions{Name: "/app/config"})
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to edit")
 	})
 
@@ -814,7 +814,7 @@ func TestEditRunner_Run(t *testing.T) {
 		}
 
 		err := r.Run(t.Context(), cli.EditOptions{Name: "/app/config"})
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "not found")
 	})
 }
@@ -865,11 +865,11 @@ func TestApplyRunner_Run(t *testing.T) {
 
 		// Verify all unstaged
 		_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/config1")
-		assert.ErrorIs(t, err, staging.ErrNotStaged)
+		require.ErrorIs(t, err, staging.ErrNotStaged)
 		_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/config2")
-		assert.ErrorIs(t, err, staging.ErrNotStaged)
+		require.ErrorIs(t, err, staging.ErrNotStaged)
 		_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/config3")
-		assert.ErrorIs(t, err, staging.ErrNotStaged)
+		require.ErrorIs(t, err, staging.ErrNotStaged)
 	})
 
 	t.Run("apply single - success", func(t *testing.T) {
@@ -902,9 +902,9 @@ func TestApplyRunner_Run(t *testing.T) {
 
 		// Only config1 should be unstaged
 		_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/config1")
-		assert.ErrorIs(t, err, staging.ErrNotStaged)
+		require.ErrorIs(t, err, staging.ErrNotStaged)
 		_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/config2")
-		assert.NoError(t, err) // Still staged
+		require.NoError(t, err) // Still staged
 	})
 
 	t.Run("apply single - not staged", func(t *testing.T) {
@@ -929,7 +929,7 @@ func TestApplyRunner_Run(t *testing.T) {
 		}
 
 		err := r.Run(t.Context(), cli.ApplyOptions{Name: "/app/config"})
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "not staged")
 	})
 
@@ -974,7 +974,7 @@ func TestApplyRunner_Run(t *testing.T) {
 		}
 
 		err := r.Run(t.Context(), cli.ApplyOptions{})
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed 1")
 		assert.Contains(t, stderr.String(), "apply failed")
 	})
@@ -1002,7 +1002,7 @@ func TestApplyRunner_Run(t *testing.T) {
 		}
 
 		err := r.Run(t.Context(), cli.ApplyOptions{})
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "conflict")
 		assert.Contains(t, stderr.String(), "conflict detected")
 	})
@@ -1031,7 +1031,7 @@ func TestApplyRunner_Run(t *testing.T) {
 		}
 
 		err := r.Run(t.Context(), cli.ApplyOptions{})
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "conflict")
 		assert.Contains(t, stderr.String(), "conflict detected")
 	})
@@ -1058,7 +1058,7 @@ func TestApplyRunner_Run(t *testing.T) {
 		}
 
 		err := r.Run(t.Context(), cli.ApplyOptions{})
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "conflict")
 	})
 
@@ -1305,7 +1305,7 @@ func TestResetRunner_Run(t *testing.T) {
 		}
 
 		err := r.Run(t.Context(), cli.ResetOptions{Spec: "/app/config#1"})
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "reset strategy required")
 	})
 
@@ -1331,7 +1331,7 @@ func TestResetRunner_Run(t *testing.T) {
 		}
 
 		err := r.Run(t.Context(), cli.ResetOptions{Spec: "/app/config#999"})
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "version not found")
 	})
 
@@ -1354,7 +1354,7 @@ func TestResetRunner_Run(t *testing.T) {
 		}
 
 		err := r.Run(t.Context(), cli.ResetOptions{Spec: "invalid"})
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid spec")
 	})
 }
@@ -2385,7 +2385,7 @@ func TestStashPopRunner_Run(t *testing.T) {
 		}
 
 		err := r.Run(t.Context(), cli.StashPopOptions{})
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.ErrorIs(t, err, stagingusecase.ErrNothingToStashPop)
 	})
 
@@ -2420,7 +2420,7 @@ func TestStashPopRunner_Run(t *testing.T) {
 		}
 
 		err := r.Run(t.Context(), cli.StashPopOptions{})
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.ErrorIs(t, err, stagingusecase.ErrAgentHasChanges)
 	})
 
@@ -2659,7 +2659,7 @@ func TestStashPushRunner_Run(t *testing.T) {
 		}
 
 		err := r.Run(t.Context(), cli.StashPushOptions{})
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.ErrorIs(t, err, stagingusecase.ErrNothingToStashPush)
 	})
 

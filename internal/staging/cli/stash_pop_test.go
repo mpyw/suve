@@ -1,4 +1,4 @@
-package cli
+package cli_test
 
 import (
 	"bytes"
@@ -11,11 +11,12 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/mpyw/suve/internal/staging"
+	"github.com/mpyw/suve/internal/staging/cli"
 	"github.com/mpyw/suve/internal/staging/store/testutil"
 	stagingusecase "github.com/mpyw/suve/internal/usecase/staging"
 )
 
-func TestStashPopRunner_Run(t *testing.T) {
+func TestStashPopRunner_RunBasic(t *testing.T) {
 	t.Parallel()
 
 	t.Run("success - basic stash pop", func(t *testing.T) {
@@ -33,7 +34,7 @@ func TestStashPopRunner_Run(t *testing.T) {
 		stdout := &bytes.Buffer{}
 		stderr := &bytes.Buffer{}
 
-		runner := &StashPopRunner{
+		runner := &cli.StashPopRunner{
 			UseCase: &stagingusecase.StashPopUseCase{
 				FileStore:  fileStore,
 				AgentStore: agentStore,
@@ -42,7 +43,7 @@ func TestStashPopRunner_Run(t *testing.T) {
 			Stderr: stderr,
 		}
 
-		err := runner.Run(t.Context(), StashPopOptions{})
+		err := runner.Run(t.Context(), cli.StashPopOptions{})
 		require.NoError(t, err)
 		assert.Contains(t, stdout.String(), "Stashed changes restored")
 		assert.Contains(t, stdout.String(), "file deleted")
@@ -63,7 +64,7 @@ func TestStashPopRunner_Run(t *testing.T) {
 		stdout := &bytes.Buffer{}
 		stderr := &bytes.Buffer{}
 
-		runner := &StashPopRunner{
+		runner := &cli.StashPopRunner{
 			UseCase: &stagingusecase.StashPopUseCase{
 				FileStore:  fileStore,
 				AgentStore: agentStore,
@@ -72,7 +73,7 @@ func TestStashPopRunner_Run(t *testing.T) {
 			Stderr: stderr,
 		}
 
-		err := runner.Run(t.Context(), StashPopOptions{Keep: true})
+		err := runner.Run(t.Context(), cli.StashPopOptions{Keep: true})
 		require.NoError(t, err)
 		assert.Contains(t, stdout.String(), "file kept")
 	})
@@ -97,7 +98,7 @@ func TestStashPopRunner_Run(t *testing.T) {
 		stdout := &bytes.Buffer{}
 		stderr := &bytes.Buffer{}
 
-		runner := &StashPopRunner{
+		runner := &cli.StashPopRunner{
 			UseCase: &stagingusecase.StashPopUseCase{
 				FileStore:  fileStore,
 				AgentStore: agentStore,
@@ -106,7 +107,7 @@ func TestStashPopRunner_Run(t *testing.T) {
 			Stderr: stderr,
 		}
 
-		err := runner.Run(t.Context(), StashPopOptions{Merge: true})
+		err := runner.Run(t.Context(), cli.StashPopOptions{Merge: true})
 		require.NoError(t, err)
 		assert.Contains(t, stdout.String(), "merged")
 	})
@@ -120,7 +121,7 @@ func TestStashPopRunner_Run(t *testing.T) {
 		stdout := &bytes.Buffer{}
 		stderr := &bytes.Buffer{}
 
-		runner := &StashPopRunner{
+		runner := &cli.StashPopRunner{
 			UseCase: &stagingusecase.StashPopUseCase{
 				FileStore:  fileStore,
 				AgentStore: agentStore,
@@ -129,7 +130,7 @@ func TestStashPopRunner_Run(t *testing.T) {
 			Stderr: stderr,
 		}
 
-		err := runner.Run(t.Context(), StashPopOptions{})
+		err := runner.Run(t.Context(), cli.StashPopOptions{})
 		assert.ErrorIs(t, err, stagingusecase.ErrNothingToStashPop)
 	})
 
@@ -153,7 +154,7 @@ func TestStashPopRunner_Run(t *testing.T) {
 		stdout := &bytes.Buffer{}
 		stderr := &bytes.Buffer{}
 
-		runner := &StashPopRunner{
+		runner := &cli.StashPopRunner{
 			UseCase: &stagingusecase.StashPopUseCase{
 				FileStore:  fileStore,
 				AgentStore: agentStore,
@@ -162,7 +163,7 @@ func TestStashPopRunner_Run(t *testing.T) {
 			Stderr: stderr,
 		}
 
-		err := runner.Run(t.Context(), StashPopOptions{})
+		err := runner.Run(t.Context(), cli.StashPopOptions{})
 		assert.ErrorIs(t, err, stagingusecase.ErrAgentHasChanges)
 	})
 
@@ -181,7 +182,7 @@ func TestStashPopRunner_Run(t *testing.T) {
 		stdout := &bytes.Buffer{}
 		stderr := &bytes.Buffer{}
 
-		runner := &StashPopRunner{
+		runner := &cli.StashPopRunner{
 			UseCase: &stagingusecase.StashPopUseCase{
 				FileStore:  fileStore,
 				AgentStore: agentStore,
@@ -191,26 +192,9 @@ func TestStashPopRunner_Run(t *testing.T) {
 		}
 
 		// This test verifies the runner handles success case
-		err := runner.Run(t.Context(), StashPopOptions{Keep: true})
+		err := runner.Run(t.Context(), cli.StashPopOptions{Keep: true})
 		require.NoError(t, err)
 	})
-}
-
-func TestStashPopFlags(t *testing.T) {
-	t.Parallel()
-
-	flags := stashPopFlags()
-	assert.Len(t, flags, 4)
-
-	flagNames := make([]string, len(flags))
-	for i, f := range flags {
-		flagNames[i] = f.Names()[0]
-	}
-
-	assert.Contains(t, flagNames, "keep")
-	assert.Contains(t, flagNames, "force")
-	assert.Contains(t, flagNames, "merge")
-	assert.Contains(t, flagNames, "passphrase-stdin")
 }
 
 func TestStashPopRunner_NonFatalError(t *testing.T) {

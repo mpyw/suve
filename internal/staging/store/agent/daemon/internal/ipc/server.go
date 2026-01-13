@@ -18,6 +18,11 @@ import (
 
 const (
 	connectionTimeout = 5 * time.Second
+
+	// socketDirPerm is the permission for the socket directory (owner rwx only).
+	socketDirPerm = 0o700
+	// socketFilePerm is the permission for the socket file (owner rw only).
+	socketFilePerm = 0o600
 )
 
 // RequestHandler handles incoming requests and returns responses.
@@ -72,10 +77,12 @@ func (s *Server) Start(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to listen on socket: %w", err)
 	}
+
 	s.listener = listener
 
 	if err := s.setSocketPermissions(socketPath); err != nil {
 		_ = listener.Close()
+
 		return err
 	}
 
@@ -86,6 +93,7 @@ func (s *Server) Start(ctx context.Context) error {
 func (s *Server) Serve(ctx context.Context) {
 	go func() {
 		<-ctx.Done()
+
 		if s.listener != nil {
 			_ = s.listener.Close()
 		}
@@ -97,6 +105,7 @@ func (s *Server) Serve(ctx context.Context) {
 			select {
 			case <-ctx.Done():
 				s.wg.Wait()
+
 				return
 			default:
 				continue
@@ -107,6 +116,7 @@ func (s *Server) Serve(ctx context.Context) {
 		//goroutinectx:ignore goroutine // handleConnection uses connection timeout, not context cancellation
 		go func() {
 			defer s.wg.Done()
+
 			s.handleConnection(conn)
 		}()
 	}
@@ -120,15 +130,18 @@ func (s *Server) handleConnection(conn net.Conn) {
 
 	if err := security.VerifyPeerCredentials(conn); err != nil {
 		s.sendError(conn, err.Error())
+
 		return
 	}
 
 	decoder := json.NewDecoder(conn)
+
 	var req protocol.Request
 	if err := decoder.Decode(&req); err != nil {
 		if !errors.Is(err, io.EOF) {
 			s.sendError(conn, fmt.Sprintf("failed to decode request: %v", err))
 		}
+
 		return
 	}
 
@@ -161,13 +174,14 @@ func (s *Server) sendError(conn net.Conn, msg string) {
 // createSocketDir creates the socket directory with secure permissions.
 func (s *Server) createSocketDir(socketPath string) error {
 	dir := filepath.Dir(socketPath)
-	if err := os.MkdirAll(dir, 0o700); err != nil {
+	if err := os.MkdirAll(dir, socketDirPerm); err != nil {
 		return fmt.Errorf("failed to create socket directory: %w", err)
 	}
-	//nolint:gosec // G302: 0o700 is appropriate for directories (owner rwx only)
-	if err := os.Chmod(dir, 0o700); err != nil {
+
+	if err := os.Chmod(dir, socketDirPerm); err != nil {
 		return fmt.Errorf("failed to set socket directory permissions: %w", err)
 	}
+
 	return nil
 }
 
@@ -176,13 +190,15 @@ func (s *Server) removeExistingSocket(socketPath string) error {
 	if err := os.Remove(socketPath); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("failed to remove existing socket: %w", err)
 	}
+
 	return nil
 }
 
 // setSocketPermissions sets secure permissions on the socket file.
 func (s *Server) setSocketPermissions(socketPath string) error {
-	if err := os.Chmod(socketPath, 0o600); err != nil {
+	if err := os.Chmod(socketPath, socketFilePerm); err != nil {
 		return fmt.Errorf("failed to set socket permissions: %w", err)
 	}
+
 	return nil
 }

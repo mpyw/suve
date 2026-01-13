@@ -1,4 +1,3 @@
-// Package cli provides shared runners and command builders for stage commands.
 package cli
 
 import (
@@ -44,6 +43,7 @@ func (r *EditRunner) Run(ctx context.Context, opts EditOptions) error {
 		if editorFn == nil {
 			editorFn = editor.Open
 		}
+
 		newValue, err = editorFn(ctx, baseline.Value)
 		if err != nil {
 			return fmt.Errorf("failed to edit: %w", err)

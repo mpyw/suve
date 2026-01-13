@@ -19,7 +19,7 @@ type mockDiffClient struct {
 	getSecretValueResults []*secretapi.GetSecretValueOutput
 	getSecretValueErrs    []error
 	getSecretValueCalls   int
-	listVersionsResult    *secretapi.ListSecretVersionIdsOutput
+	listVersionsResult    *secretapi.ListSecretVersionIDsOutput
 	listVersionsErr       error
 }
 
@@ -36,7 +36,7 @@ func (m *mockDiffClient) GetSecretValue(_ context.Context, _ *secretapi.GetSecre
 	return nil, errors.New("unexpected GetSecretValue call")
 }
 
-func (m *mockDiffClient) ListSecretVersionIds(_ context.Context, _ *secretapi.ListSecretVersionIdsInput, _ ...func(*secretapi.Options)) (*secretapi.ListSecretVersionIdsOutput, error) {
+func (m *mockDiffClient) ListSecretVersionIds(_ context.Context, _ *secretapi.ListSecretVersionIDsInput, _ ...func(*secretapi.Options)) (*secretapi.ListSecretVersionIDsOutput, error) {
 	if m.listVersionsErr != nil {
 		return nil, m.listVersionsErr
 	}
@@ -144,7 +144,7 @@ func TestDiffUseCase_Execute_WithShift(t *testing.T) {
 	now := time.Now()
 	// Specs with shift use ListSecretVersionIds + GetSecretValue
 	client := &mockDiffClient{
-		listVersionsResult: &secretapi.ListSecretVersionIdsOutput{
+		listVersionsResult: &secretapi.ListSecretVersionIDsOutput{
 			Versions: []secretapi.SecretVersionsListEntry{
 				{VersionId: lo.ToPtr("v1-id"), CreatedDate: lo.ToPtr(now.Add(-2 * time.Hour))},
 				{VersionId: lo.ToPtr("v2-id"), CreatedDate: lo.ToPtr(now.Add(-1 * time.Hour))},
