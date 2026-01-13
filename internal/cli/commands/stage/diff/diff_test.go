@@ -17,7 +17,7 @@ import (
 	stagediff "github.com/mpyw/suve/internal/cli/commands/stage/diff"
 	"github.com/mpyw/suve/internal/maputil"
 	"github.com/mpyw/suve/internal/staging"
-	"github.com/mpyw/suve/internal/staging/testutil"
+	"github.com/mpyw/suve/internal/staging/store/testutil"
 )
 
 type mockParamClient struct {

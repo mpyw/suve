@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/mpyw/suve/internal/staging"
-	"github.com/mpyw/suve/internal/staging/testutil"
+	"github.com/mpyw/suve/internal/staging/store/testutil"
 	"github.com/mpyw/suve/internal/staging/transition"
 	usecasestaging "github.com/mpyw/suve/internal/usecase/staging"
 )

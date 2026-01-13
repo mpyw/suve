@@ -70,7 +70,7 @@ func TestMain(m *testing.M) {
 
 	// Enable manual mode to prevent fork bomb from test binary
 	// This disables both auto-start and auto-shutdown
-	os.Setenv(agent.EnvDaemonAutoStart, "0")
+	os.Setenv(agent.EnvDaemonManualMode, "1")
 
 	// Start daemon with error channel
 	testDaemon = daemon.NewRunner(agent.DaemonOptions()...)

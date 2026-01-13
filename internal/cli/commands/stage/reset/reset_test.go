@@ -14,7 +14,7 @@ import (
 	"github.com/mpyw/suve/internal/cli/commands/stage/reset"
 	"github.com/mpyw/suve/internal/maputil"
 	"github.com/mpyw/suve/internal/staging"
-	"github.com/mpyw/suve/internal/staging/testutil"
+	"github.com/mpyw/suve/internal/staging/store/testutil"
 )
 
 func TestCommand_Validation(t *testing.T) {

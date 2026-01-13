@@ -11,15 +11,15 @@ import (
 
 // Environment variable names for agent configuration.
 const (
-	// EnvDaemonAutoStart controls automatic daemon startup and shutdown.
-	// Set to "0" to disable both auto-start and auto-shutdown (manual mode).
-	EnvDaemonAutoStart = "SUVE_DAEMON_AUTO_START"
+	// EnvDaemonManualMode controls manual daemon management.
+	// Set to "1" to enable manual mode (disables both auto-start and auto-shutdown).
+	EnvDaemonManualMode = "SUVE_DAEMON_MANUAL_MODE"
 )
 
 // isManualMode returns true if the daemon should be managed manually.
 // When true, both auto-start and auto-shutdown are disabled.
 func isManualMode() bool {
-	return os.Getenv(EnvDaemonAutoStart) == "0"
+	return os.Getenv(EnvDaemonManualMode) == "1"
 }
 
 // ClientOptions returns client options based on the current mode.

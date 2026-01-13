@@ -13,7 +13,7 @@ import (
 
 	"github.com/mpyw/suve/internal/staging"
 	"github.com/mpyw/suve/internal/staging/cli"
-	"github.com/mpyw/suve/internal/staging/testutil"
+	"github.com/mpyw/suve/internal/staging/store/testutil"
 	stagingusecase "github.com/mpyw/suve/internal/usecase/staging"
 )
 

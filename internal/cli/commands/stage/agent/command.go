@@ -46,7 +46,7 @@ This command is usually called automatically when staging operations are perform
 
 The daemon will automatically shut down when all staged changes are cleared.
 
-Set ` + agentcfg.EnvDaemonAutoStart + `=0 to enable manual mode (disables auto-start and auto-shutdown).`,
+Set ` + agentcfg.EnvDaemonManualMode + `=1 to enable manual mode (disables auto-start and auto-shutdown).`,
 		Action: func(_ context.Context, _ *cli.Command) error {
 			runner := daemon.NewRunner(agentcfg.DaemonOptions()...)
 			return runner.Run()
