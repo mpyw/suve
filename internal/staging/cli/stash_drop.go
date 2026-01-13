@@ -62,7 +62,10 @@ func (r *StashDropRunner) Run(ctx context.Context, opts StashDropOptions) error 
 
 		// If state is now empty, delete the file entirely; otherwise write back remaining state
 		updateErr := lo.
-			IfF(state.IsEmpty(), func() error { _, err := r.FileStore.Drain(ctx, "", false); return err }).
+			IfF(state.IsEmpty(), func() error {
+				_, err := r.FileStore.Drain(ctx, "", false)
+				return err
+			}).
 			ElseF(func() error { return r.FileStore.WriteState(ctx, "", state) })
 		if updateErr != nil {
 			return fmt.Errorf("failed to update stash file: %w", updateErr)
@@ -153,6 +156,7 @@ func stashDropAction(service staging.Service) func(context.Context, *cli.Command
 
 			if !confirmed {
 				output.Printf(cmd.Root().Writer, "Operation cancelled.\n")
+
 				return nil
 			}
 		}

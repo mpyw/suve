@@ -87,6 +87,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	if secure && cmd.IsSet("type") {
 		return errors.New("cannot use --secure with --type; use one or the other")
 	}
+
 	if secure {
 		paramType = "SecureString"
 	}
@@ -101,6 +102,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		Stdout:  cmd.Root().Writer,
 		Stderr:  cmd.Root().ErrWriter,
 	}
+
 	return r.Run(ctx, Options{
 		Name:        cmd.Args().Get(0),
 		Value:       cmd.Args().Get(1),

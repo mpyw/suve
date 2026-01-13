@@ -92,6 +92,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	if secure && cmd.IsSet("type") {
 		return fmt.Errorf("cannot use --secure with --type; use one or the other")
 	}
+
 	if secure {
 		paramType = "SecureString"
 	}
@@ -128,10 +129,12 @@ func action(ctx context.Context, cmd *cli.Command) error {
 			prompter.Region = identity.Region
 			prompter.Profile = identity.Profile
 		}
+
 		confirmed, err := prompter.ConfirmAction("Update parameter", name, false)
 		if err != nil {
 			return err
 		}
+
 		if !confirmed {
 			return nil
 		}
@@ -142,6 +145,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		Stdout:  cmd.Root().Writer,
 		Stderr:  cmd.Root().ErrWriter,
 	}
+
 	return r.Run(ctx, Options{
 		Name:        name,
 		Value:       newValue,
@@ -177,8 +181,10 @@ func getCurrentValue(ctx context.Context, client paramapi.GetParameterAPI, name 
 	if err != nil {
 		return "", false
 	}
+
 	if result.Parameter == nil || result.Parameter.Value == nil {
 		return "", false
 	}
+
 	return *result.Parameter.Value, true
 }

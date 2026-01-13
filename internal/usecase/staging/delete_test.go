@@ -26,6 +26,7 @@ func (m *mockDeleteStrategy) FetchLastModified(_ context.Context, _ string) (tim
 	if m.fetchErr != nil {
 		return time.Time{}, m.fetchErr
 	}
+
 	return m.lastModified, nil
 }
 
@@ -35,6 +36,7 @@ func newMockDeleteStrategy(hasDeleteOptions bool) *mockDeleteStrategy {
 		lastModified:        time.Now(),
 	}
 	strategy.hasDeleteOptions = hasDeleteOptions
+
 	return strategy
 }
 

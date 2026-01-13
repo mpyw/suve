@@ -120,12 +120,14 @@ func TestParseFlags(t *testing.T) {
 			if tt.wantErr != "" {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tt.wantErr)
+
 				return
 			}
 
 			require.NoError(t, err)
 			assert.Equal(t, tt.wantAdd, result.Change.Add)
 			assert.ElementsMatch(t, tt.wantRemove.Values(), result.Change.Remove.Values())
+
 			if tt.wantWarnings == nil {
 				assert.Empty(t, result.Warnings)
 			} else {
@@ -170,7 +172,7 @@ func TestChange_IsEmpty(t *testing.T) {
 	}
 }
 
-// Mock Secrets Manager client for testing
+// Mock Secrets Manager client for testing.
 type mockSecretClient struct {
 	tagResourceFunc   func(ctx context.Context, params *secretapi.TagResourceInput, optFns ...func(*secretapi.Options)) (*secretapi.TagResourceOutput, error)
 	untagResourceFunc func(ctx context.Context, params *secretapi.UntagResourceInput, optFns ...func(*secretapi.Options)) (*secretapi.UntagResourceOutput, error)
@@ -180,6 +182,7 @@ func (m *mockSecretClient) TagResource(ctx context.Context, params *secretapi.Ta
 	if m.tagResourceFunc != nil {
 		return m.tagResourceFunc(ctx, params, optFns...)
 	}
+
 	return &secretapi.TagResourceOutput{}, nil
 }
 
@@ -187,11 +190,13 @@ func (m *mockSecretClient) UntagResource(ctx context.Context, params *secretapi.
 	if m.untagResourceFunc != nil {
 		return m.untagResourceFunc(ctx, params, optFns...)
 	}
+
 	return &secretapi.UntagResourceOutput{}, nil
 }
 
 func TestApplySecret(t *testing.T) {
 	t.Parallel()
+
 	tests := []struct {
 		name     string
 		secretID string
@@ -213,12 +218,15 @@ func TestApplySecret(t *testing.T) {
 				tagResourceFunc: func(_ context.Context, params *secretapi.TagResourceInput, _ ...func(*secretapi.Options)) (*secretapi.TagResourceOutput, error) {
 					assert.Equal(t, "my-secret", lo.FromPtr(params.SecretId))
 					assert.Len(t, params.Tags, 2)
+
 					tagMap := make(map[string]string)
 					for _, tag := range params.Tags {
 						tagMap[lo.FromPtr(tag.Key)] = lo.FromPtr(tag.Value)
 					}
+
 					assert.Equal(t, "prod", tagMap["env"])
 					assert.Equal(t, "platform", tagMap["team"])
+
 					return &secretapi.TagResourceOutput{}, nil
 				},
 			},
@@ -231,6 +239,7 @@ func TestApplySecret(t *testing.T) {
 				untagResourceFunc: func(_ context.Context, params *secretapi.UntagResourceInput, _ ...func(*secretapi.Options)) (*secretapi.UntagResourceOutput, error) {
 					assert.Equal(t, "my-secret", lo.FromPtr(params.SecretId))
 					assert.ElementsMatch(t, []string{"deprecated", "old"}, params.TagKeys)
+
 					return &secretapi.UntagResourceOutput{}, nil
 				},
 			},
@@ -245,11 +254,13 @@ func TestApplySecret(t *testing.T) {
 					assert.Len(t, params.Tags, 1)
 					assert.Equal(t, "env", lo.FromPtr(params.Tags[0].Key))
 					assert.Equal(t, "prod", lo.FromPtr(params.Tags[0].Value))
+
 					return &secretapi.TagResourceOutput{}, nil
 				},
 				untagResourceFunc: func(_ context.Context, params *secretapi.UntagResourceInput, _ ...func(*secretapi.Options)) (*secretapi.UntagResourceOutput, error) {
 					assert.Equal(t, "my-secret", lo.FromPtr(params.SecretId))
 					assert.Equal(t, []string{"deprecated"}, params.TagKeys)
+
 					return &secretapi.UntagResourceOutput{}, nil
 				},
 			},
@@ -286,6 +297,7 @@ func TestApplySecret(t *testing.T) {
 			if tt.wantErr != "" {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tt.wantErr)
+
 				return
 			}
 
@@ -294,7 +306,7 @@ func TestApplySecret(t *testing.T) {
 	}
 }
 
-// Mock SSM Parameter Store client for testing
+// Mock SSM Parameter Store client for testing.
 type mockParamClient struct {
 	addTagsToResourceFunc      func(ctx context.Context, params *paramapi.AddTagsToResourceInput, optFns ...func(*paramapi.Options)) (*paramapi.AddTagsToResourceOutput, error)
 	removeTagsFromResourceFunc func(ctx context.Context, params *paramapi.RemoveTagsFromResourceInput, optFns ...func(*paramapi.Options)) (*paramapi.RemoveTagsFromResourceOutput, error)
@@ -304,6 +316,7 @@ func (m *mockParamClient) AddTagsToResource(ctx context.Context, params *paramap
 	if m.addTagsToResourceFunc != nil {
 		return m.addTagsToResourceFunc(ctx, params, optFns...)
 	}
+
 	return &paramapi.AddTagsToResourceOutput{}, nil
 }
 
@@ -311,11 +324,13 @@ func (m *mockParamClient) RemoveTagsFromResource(ctx context.Context, params *pa
 	if m.removeTagsFromResourceFunc != nil {
 		return m.removeTagsFromResourceFunc(ctx, params, optFns...)
 	}
+
 	return &paramapi.RemoveTagsFromResourceOutput{}, nil
 }
 
 func TestApplyParam(t *testing.T) {
 	t.Parallel()
+
 	tests := []struct {
 		name       string
 		resourceID string
@@ -338,12 +353,15 @@ func TestApplyParam(t *testing.T) {
 					assert.Equal(t, paramapi.ResourceTypeForTaggingParameter, params.ResourceType)
 					assert.Equal(t, "/my/param", lo.FromPtr(params.ResourceId))
 					assert.Len(t, params.Tags, 2)
+
 					tagMap := make(map[string]string)
 					for _, tag := range params.Tags {
 						tagMap[lo.FromPtr(tag.Key)] = lo.FromPtr(tag.Value)
 					}
+
 					assert.Equal(t, "prod", tagMap["env"])
 					assert.Equal(t, "platform", tagMap["team"])
+
 					return &paramapi.AddTagsToResourceOutput{}, nil
 				},
 			},
@@ -357,6 +375,7 @@ func TestApplyParam(t *testing.T) {
 					assert.Equal(t, paramapi.ResourceTypeForTaggingParameter, params.ResourceType)
 					assert.Equal(t, "/my/param", lo.FromPtr(params.ResourceId))
 					assert.ElementsMatch(t, []string{"deprecated", "old"}, params.TagKeys)
+
 					return &paramapi.RemoveTagsFromResourceOutput{}, nil
 				},
 			},
@@ -372,12 +391,14 @@ func TestApplyParam(t *testing.T) {
 					assert.Len(t, params.Tags, 1)
 					assert.Equal(t, "env", lo.FromPtr(params.Tags[0].Key))
 					assert.Equal(t, "prod", lo.FromPtr(params.Tags[0].Value))
+
 					return &paramapi.AddTagsToResourceOutput{}, nil
 				},
 				removeTagsFromResourceFunc: func(_ context.Context, params *paramapi.RemoveTagsFromResourceInput, _ ...func(*paramapi.Options)) (*paramapi.RemoveTagsFromResourceOutput, error) {
 					assert.Equal(t, paramapi.ResourceTypeForTaggingParameter, params.ResourceType)
 					assert.Equal(t, "/my/param", lo.FromPtr(params.ResourceId))
 					assert.Equal(t, []string{"deprecated"}, params.TagKeys)
+
 					return &paramapi.RemoveTagsFromResourceOutput{}, nil
 				},
 			},
@@ -414,6 +435,7 @@ func TestApplyParam(t *testing.T) {
 			if tt.wantErr != "" {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tt.wantErr)
+
 				return
 			}
 
@@ -422,8 +444,8 @@ func TestApplyParam(t *testing.T) {
 	}
 }
 
-// Verify secretapi.Tag is used correctly (compile-time check)
+// Verify secretapi.Tag is used correctly (compile-time check).
 var _ secretapi.Tag = secretapi.Tag{}
 
-// Verify paramapi.Tag is used correctly (compile-time check)
+// Verify paramapi.Tag is used correctly (compile-time check).
 var _ paramapi.Tag = paramapi.Tag{}

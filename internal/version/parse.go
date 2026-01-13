@@ -183,6 +183,7 @@ func findNameEnd[A any](input string, parsers []SpecifierParser[A]) (int, error)
 			// No error set - treat as part of name
 		}
 	}
+
 	return len(input), nil // No specifier found
 }
 
@@ -222,6 +223,7 @@ func parseAbsolute[A any](s string, parsers []SpecifierParser[A], abs A) (A, str
 
 		s = s[end:] // Advance past this specifier
 	}
+
 	return abs, s, nil
 }
 
@@ -233,5 +235,6 @@ func matchParser[A any](ch byte, parsers []SpecifierParser[A]) (SpecifierParser[
 			return p, true
 		}
 	}
+
 	return SpecifierParser[A]{}, false
 }

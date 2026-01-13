@@ -512,6 +512,7 @@ func TestPersistUseCase_Execute_Errors(t *testing.T) {
 		}
 
 		_, err := usecase.Execute(t.Context(), stagingusecase.StashPushInput{})
+
 		var persistErr *stagingusecase.StashPushError
 		require.ErrorAs(t, err, &persistErr)
 		assert.Equal(t, "load", persistErr.Op)
@@ -536,6 +537,7 @@ func TestPersistUseCase_Execute_Errors(t *testing.T) {
 		}
 
 		_, err := usecase.Execute(t.Context(), stagingusecase.StashPushInput{})
+
 		var persistErr *stagingusecase.StashPushError
 		require.ErrorAs(t, err, &persistErr)
 		assert.Equal(t, "write", persistErr.Op)
@@ -547,6 +549,7 @@ func TestPersistError(t *testing.T) {
 
 	t.Run("error message - load", func(t *testing.T) {
 		t.Parallel()
+
 		err := &stagingusecase.StashPushError{Op: "load", Err: errors.New("connection failed")}
 		assert.Contains(t, err.Error(), "failed to get state from agent")
 		assert.Contains(t, err.Error(), "connection failed")
@@ -554,18 +557,21 @@ func TestPersistError(t *testing.T) {
 
 	t.Run("error message - write", func(t *testing.T) {
 		t.Parallel()
+
 		err := &stagingusecase.StashPushError{Op: "write", Err: errors.New("write failed")}
 		assert.Contains(t, err.Error(), "failed to save state to file")
 	})
 
 	t.Run("error message - clear", func(t *testing.T) {
 		t.Parallel()
+
 		err := &stagingusecase.StashPushError{Op: "clear", Err: errors.New("clear failed")}
 		assert.Contains(t, err.Error(), "failed to clear agent memory")
 	})
 
 	t.Run("error message - unknown op", func(t *testing.T) {
 		t.Parallel()
+
 		innerErr := errors.New("something went wrong")
 		err := &stagingusecase.StashPushError{Op: "unknown", Err: innerErr}
 		assert.Equal(t, "something went wrong", err.Error())
@@ -573,6 +579,7 @@ func TestPersistError(t *testing.T) {
 
 	t.Run("unwrap", func(t *testing.T) {
 		t.Parallel()
+
 		innerErr := errors.New("inner error")
 		err := &stagingusecase.StashPushError{Op: "load", Err: innerErr}
 		assert.ErrorIs(t, err, innerErr)

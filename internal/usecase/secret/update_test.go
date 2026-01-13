@@ -26,6 +26,7 @@ func (m *mockUpdateClient) GetSecretValue(_ context.Context, _ *secretapi.GetSec
 	if m.getSecretValueErr != nil {
 		return nil, m.getSecretValueErr
 	}
+
 	return m.getSecretValueResult, nil
 }
 
@@ -33,6 +34,7 @@ func (m *mockUpdateClient) UpdateSecret(_ context.Context, _ *secretapi.UpdateSe
 	if m.updateSecretErr != nil {
 		return nil, m.updateSecretErr
 	}
+
 	return m.updateSecretResult, nil
 }
 
@@ -40,6 +42,7 @@ func (m *mockUpdateClient) PutSecretValue(_ context.Context, _ *secretapi.PutSec
 	if m.putSecretValueErr != nil {
 		return nil, m.putSecretValueErr
 	}
+
 	return m.putSecretValueResult, nil
 }
 

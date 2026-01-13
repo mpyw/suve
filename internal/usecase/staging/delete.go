@@ -82,6 +82,7 @@ func (u *DeleteUseCase) Execute(ctx context.Context, input DeleteInput) (*Delete
 		if err := u.Store.UnstageTag(ctx, service, input.Name); err != nil && !errors.Is(err, staging.ErrNotStaged) {
 			return nil, err
 		}
+
 		return &DeleteOutput{
 			Name:     input.Name,
 			Unstaged: true,

@@ -26,6 +26,7 @@ func (p *Prompter) printTargetInfo() {
 	if p.AccountID == "" || p.Region == "" {
 		return
 	}
+
 	if p.Profile != "" {
 		output.Printf(p.Stderr, "%s Target: %s (%s / %s)\n", colors.Info("i"), p.Profile, p.AccountID, p.Region)
 	} else {
@@ -36,12 +37,14 @@ func (p *Prompter) printTargetInfo() {
 // readYesNo reads a yes/no response from stdin.
 func (p *Prompter) readYesNo() (bool, error) {
 	reader := bufio.NewReader(p.Stdin)
+
 	response, err := reader.ReadString('\n')
 	if err != nil {
 		return false, fmt.Errorf("failed to read response: %w", err)
 	}
 
 	response = strings.TrimSpace(strings.ToLower(response))
+
 	return response == "y" || response == "yes", nil
 }
 
@@ -54,12 +57,14 @@ func (p *Prompter) Confirm(message string, skipConfirm bool) (bool, error) {
 
 	p.printTargetInfo()
 	output.Printf(p.Stderr, "%s %s [y/N]: ", colors.Warning("?"), message)
+
 	return p.readYesNo()
 }
 
 // ConfirmAction is a convenience function for confirming an action.
 func (p *Prompter) ConfirmAction(action, target string, skipConfirm bool) (bool, error) {
 	message := fmt.Sprintf("%s %s?", action, target)
+
 	return p.Confirm(message, skipConfirm)
 }
 
@@ -72,6 +77,7 @@ func (p *Prompter) ConfirmDelete(target string, skipConfirm bool) (bool, error) 
 	p.printTargetInfo()
 	output.Printf(p.Stderr, "%s This will permanently delete: %s\n", colors.Error("!"), target)
 	output.Printf(p.Stderr, "%s Continue? [y/N]: ", colors.Warning("?"))
+
 	return p.readYesNo()
 }
 
@@ -107,6 +113,7 @@ func (p *Prompter) ConfirmChoice(message string, choices []Choice) (ChoiceResult
 	output.Printf(p.Stderr, "Enter choice [1]: ")
 
 	reader := bufio.NewReader(p.Stdin)
+
 	response, err := reader.ReadString('\n')
 	if err != nil {
 		return ChoiceCancelled, fmt.Errorf("failed to read response: %w", err)

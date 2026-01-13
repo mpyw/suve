@@ -28,6 +28,7 @@ func loadLocation() *time.Location {
 		// TZ is invalid: fall back to UTC for safety
 		return time.UTC
 	}
+
 	return loc
 }
 
@@ -37,6 +38,7 @@ func GetLocation() *time.Location {
 	locationOnce.Do(func() {
 		locationCache = loadLocation()
 	})
+
 	return locationCache
 }
 

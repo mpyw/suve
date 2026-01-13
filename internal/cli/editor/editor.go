@@ -29,11 +29,13 @@ func Open(ctx context.Context, content string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+
 	defer func() { _ = os.Remove(tmpFile.Name()) }()
 
 	if _, err := tmpFile.WriteString(content); err != nil {
 		return "", errors.Join(err, tmpFile.Close())
 	}
+
 	if err := tmpFile.Close(); err != nil {
 		return "", err
 	}

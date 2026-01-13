@@ -97,10 +97,12 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		prompter.Region = identity.Region
 		prompter.Profile = identity.Profile
 	}
+
 	confirmed, err := prompter.ConfirmDelete(name, skipConfirm)
 	if err != nil {
 		return err
 	}
+
 	if !confirmed {
 		return nil
 	}
@@ -110,6 +112,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		Stdout:  cmd.Root().Writer,
 		Stderr:  cmd.Root().ErrWriter,
 	}
+
 	return r.Run(ctx, Options{
 		Name: name,
 	})

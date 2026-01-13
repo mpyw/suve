@@ -25,6 +25,7 @@ func (m *mockDeleteClient) GetSecretValue(_ context.Context, _ *secretapi.GetSec
 	if m.getSecretValueErr != nil {
 		return nil, m.getSecretValueErr
 	}
+
 	return m.getSecretValueResult, nil
 }
 
@@ -32,6 +33,7 @@ func (m *mockDeleteClient) DeleteSecret(_ context.Context, _ *secretapi.DeleteSe
 	if m.deleteSecretErr != nil {
 		return nil, m.deleteSecretErr
 	}
+
 	return m.deleteSecretResult, nil
 }
 

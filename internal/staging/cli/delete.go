@@ -36,6 +36,7 @@ func (r *DeleteRunner) Run(ctx context.Context, opts DeleteOptions) error {
 	// Handle CREATE -> NotStaged (unstage instead of delete)
 	if result.Unstaged {
 		output.Success(r.Stdout, "Unstaged creation: %s", result.Name)
+
 		return nil
 	}
 

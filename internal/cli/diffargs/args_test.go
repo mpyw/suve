@@ -199,11 +199,13 @@ func TestParseArgs_Param(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
+
 			spec1, spec2, err := diffargs.ParseArgs(tt.args, parse, hasAbsolute, prefixes, usage)
 
 			if tt.wantErrMsg != "" {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tt.wantErrMsg)
+
 				return
 			}
 
@@ -288,11 +290,13 @@ func TestParseArgs_Secret(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
+
 			spec1, spec2, err := diffargs.ParseArgs(tt.args, parse, hasAbsolute, prefixes, usage)
 
 			if tt.wantErrMsg != "" {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tt.wantErrMsg)
+
 				return
 			}
 

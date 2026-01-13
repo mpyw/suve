@@ -36,6 +36,7 @@ func ExecuteMapWithLimit[K comparable, V any, R any](
 	fn func(ctx context.Context, key K, value V) (R, error),
 ) map[K]*Result[R] {
 	results := make(map[K]*Result[R], len(entries))
+
 	var mu sync.Mutex
 
 	g, gctx := errgroup.WithContext(ctx)
@@ -44,13 +45,18 @@ func ExecuteMapWithLimit[K comparable, V any, R any](
 	for key, value := range entries {
 		g.Go(func() error {
 			result, err := fn(gctx, key, value)
+
 			mu.Lock()
+
 			results[key] = &Result[R]{Value: result, Err: err}
+
 			mu.Unlock()
+
 			return nil // Don't fail the group on individual errors
 		})
 	}
 
 	_ = g.Wait()
+
 	return results
 }

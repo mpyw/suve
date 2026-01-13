@@ -22,6 +22,7 @@ func (m *mockRestoreClient) RestoreSecret(_ context.Context, _ *secretapi.Restor
 	if m.restoreErr != nil {
 		return nil, m.restoreErr
 	}
+
 	return m.restoreResult, nil
 }
 

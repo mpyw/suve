@@ -20,6 +20,7 @@ func parseShift(s string) (int, error) {
 			// Unexpected character (not a shift start)
 			return 0, fmt.Errorf("unexpected characters: %s", s[i:])
 		}
+
 		i++
 		// After ~, expect: end of string, digit, or another ~
 		if i < len(s) && !internal.IsDigit(s[i]) && s[i] != '~' {
@@ -30,6 +31,7 @@ func parseShift(s string) (int, error) {
 		for i < len(s) && internal.IsDigit(s[i]) {
 			i++
 		}
+
 		if numStart == i {
 			// Bare ~ means ~1
 			total++
@@ -38,6 +40,7 @@ func parseShift(s string) (int, error) {
 			if err != nil {
 				return 0, fmt.Errorf("shift number too large: %s", s[numStart:i])
 			}
+
 			total += n
 		}
 	}

@@ -48,8 +48,10 @@ type ListUseCase struct {
 func (u *ListUseCase) Execute(ctx context.Context, input ListInput) (*ListOutput, error) {
 	// Compile regex filter if specified
 	var filterRegex *regexp.Regexp
+
 	if input.Filter != "" {
 		var err error
+
 		filterRegex, err = regexp.Compile(input.Filter)
 		if err != nil {
 			return nil, fmt.Errorf("invalid filter regex: %w", err)
@@ -79,6 +81,7 @@ func (u *ListUseCase) Execute(ctx context.Context, input ListInput) (*ListOutput
 // executeAll fetches all pages (original behavior).
 func (u *ListUseCase) executeAll(ctx context.Context, input ListInput, listInput *secretapi.ListSecretsInput, filterRegex *regexp.Regexp) (*ListOutput, error) {
 	var names []string
+
 	paginator := secretapi.NewListSecretsPaginator(u.Client, listInput)
 	for paginator.HasMorePages() {
 		page, err := paginator.NextPage(ctx)
@@ -91,6 +94,7 @@ func (u *ListUseCase) executeAll(ctx context.Context, input ListInput, listInput
 			if filterRegex != nil && !filterRegex.MatchString(name) {
 				continue
 			}
+
 			names = append(names, name)
 		}
 	}
@@ -101,6 +105,7 @@ func (u *ListUseCase) executeAll(ctx context.Context, input ListInput, listInput
 // executeWithPagination fetches pages until MaxResults is reached or no more pages.
 func (u *ListUseCase) executeWithPagination(ctx context.Context, input ListInput, listInput *secretapi.ListSecretsInput, filterRegex *regexp.Regexp) (*ListOutput, error) {
 	var names []string
+
 	nextToken := input.NextToken
 
 	// AWS ListSecrets max is 100, request more to account for filtering
@@ -125,6 +130,7 @@ func (u *ListUseCase) executeWithPagination(ctx context.Context, input ListInput
 			if filterRegex != nil && !filterRegex.MatchString(name) {
 				continue
 			}
+
 			names = append(names, name)
 		}
 
@@ -139,6 +145,7 @@ func (u *ListUseCase) executeWithPagination(ctx context.Context, input ListInput
 
 	// Trim to MaxResults if we got more
 	outputNextToken := nextToken
+
 	if len(names) > input.MaxResults {
 		names = names[:input.MaxResults]
 		// Keep the nextToken so caller can fetch more
@@ -156,6 +163,7 @@ func (u *ListUseCase) buildOutput(ctx context.Context, withValue bool, names []s
 		for _, name := range names {
 			output.Entries = append(output.Entries, ListEntry{Name: name})
 		}
+
 		return output, nil
 	}
 
@@ -172,18 +180,21 @@ func (u *ListUseCase) buildOutput(ctx context.Context, withValue bool, names []s
 		if err != nil {
 			return "", err
 		}
+
 		return lo.FromPtr(out.SecretString), nil
 	})
 
 	// Collect results in order
 	for _, name := range names {
 		result := results[name]
+
 		entry := ListEntry{Name: name}
 		if result.Err != nil {
 			entry.Error = result.Err
 		} else {
 			entry.Value = lo.ToPtr(result.Value)
 		}
+
 		output.Entries = append(output.Entries, entry)
 	}
 

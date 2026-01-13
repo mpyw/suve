@@ -11,7 +11,6 @@ import (
 
 func TestParseAWSConfigProfiles(t *testing.T) {
 	// Cannot use t.Parallel() because subtests use t.Setenv
-
 	t.Run("parses sso_account_id", func(t *testing.T) {
 		configContent := `
 [default]
@@ -108,7 +107,6 @@ sso_account_id = 999999999999
 
 func TestFindProfileByAccountID(t *testing.T) {
 	// Cannot use t.Parallel() because subtests use t.Setenv
-
 	t.Run("finds matching profile", func(t *testing.T) {
 		configContent := `
 [profile production]
@@ -232,7 +230,6 @@ sso_account_id = 123456789012
 
 func TestGetAWSConfigPath(t *testing.T) {
 	// Cannot use t.Parallel() because subtests use t.Setenv
-
 	t.Run("uses AWS_CONFIG_FILE if set", func(t *testing.T) {
 		t.Setenv("AWS_CONFIG_FILE", "/custom/path/config")
 
@@ -259,5 +256,6 @@ func createTempConfig(t *testing.T, content string) string {
 	configPath := filepath.Join(tmpDir, "config")
 	err := os.WriteFile(configPath, []byte(content), 0o600)
 	require.NoError(t, err)
+
 	return configPath
 }

@@ -23,6 +23,7 @@ func (m *mockClient) GetParameter(ctx context.Context, params *paramapi.GetParam
 	if m.getParameterFunc != nil {
 		return m.getParameterFunc(ctx, params, optFns...)
 	}
+
 	return nil, fmt.Errorf("GetParameter not mocked")
 }
 
@@ -30,15 +31,18 @@ func (m *mockClient) GetParameterHistory(ctx context.Context, params *paramapi.G
 	if m.getParameterHistoryFunc != nil {
 		return m.getParameterHistoryFunc(ctx, params, optFns...)
 	}
+
 	return nil, fmt.Errorf("GetParameterHistory not mocked")
 }
 
 func TestGetParameterWithVersion_Latest(t *testing.T) {
 	t.Parallel()
+
 	now := time.Now()
 	mock := &mockClient{
 		getParameterFunc: func(_ context.Context, params *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
 			assert.Equal(t, "/my/param", lo.FromPtr(params.Name))
+
 			return &paramapi.GetParameterOutput{
 				Parameter: &paramapi.Parameter{
 					Name:             lo.ToPtr("/my/param"),
@@ -62,9 +66,11 @@ func TestGetParameterWithVersion_Latest(t *testing.T) {
 
 func TestGetParameterWithVersion_SpecificVersion(t *testing.T) {
 	t.Parallel()
+
 	mock := &mockClient{
 		getParameterFunc: func(_ context.Context, params *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
 			assert.Equal(t, "/my/param:2", lo.FromPtr(params.Name))
+
 			return &paramapi.GetParameterOutput{
 				Parameter: &paramapi.Parameter{
 					Name:    lo.ToPtr("/my/param"),
@@ -87,6 +93,7 @@ func TestGetParameterWithVersion_SpecificVersion(t *testing.T) {
 
 func TestGetParameterWithVersion_Shift(t *testing.T) {
 	t.Parallel()
+
 	now := time.Now()
 	mock := &mockClient{
 		getParameterHistoryFunc: func(_ context.Context, params *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
@@ -113,6 +120,7 @@ func TestGetParameterWithVersion_Shift(t *testing.T) {
 
 func TestGetParameterWithVersion_ShiftFromSpecificVersion(t *testing.T) {
 	t.Parallel()
+
 	now := time.Now()
 	mock := &mockClient{
 		getParameterHistoryFunc: func(_ context.Context, _ *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
@@ -137,6 +145,7 @@ func TestGetParameterWithVersion_ShiftFromSpecificVersion(t *testing.T) {
 
 func TestGetParameterWithVersion_ShiftOutOfRange(t *testing.T) {
 	t.Parallel()
+
 	now := time.Now()
 	mock := &mockClient{
 		getParameterHistoryFunc: func(_ context.Context, _ *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
@@ -157,6 +166,7 @@ func TestGetParameterWithVersion_ShiftOutOfRange(t *testing.T) {
 
 func TestGetParameterWithVersion_VersionNotFound(t *testing.T) {
 	t.Parallel()
+
 	now := time.Now()
 	mock := &mockClient{
 		getParameterHistoryFunc: func(_ context.Context, _ *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
@@ -178,6 +188,7 @@ func TestGetParameterWithVersion_VersionNotFound(t *testing.T) {
 
 func TestGetParameterWithVersion_EmptyHistory(t *testing.T) {
 	t.Parallel()
+
 	mock := &mockClient{
 		getParameterHistoryFunc: func(_ context.Context, _ *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
 			return &paramapi.GetParameterHistoryOutput{
@@ -195,6 +206,7 @@ func TestGetParameterWithVersion_EmptyHistory(t *testing.T) {
 
 func TestGetParameterWithVersion_GetParameterError(t *testing.T) {
 	t.Parallel()
+
 	mock := &mockClient{
 		getParameterFunc: func(_ context.Context, _ *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
 			return nil, fmt.Errorf("AWS error")
@@ -210,6 +222,7 @@ func TestGetParameterWithVersion_GetParameterError(t *testing.T) {
 
 func TestGetParameterWithVersion_GetParameterHistoryError(t *testing.T) {
 	t.Parallel()
+
 	mock := &mockClient{
 		getParameterHistoryFunc: func(_ context.Context, _ *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
 			return nil, fmt.Errorf("AWS error")
@@ -225,10 +238,12 @@ func TestGetParameterWithVersion_GetParameterHistoryError(t *testing.T) {
 
 func TestGetParameterWithVersion_AlwaysDecrypts(t *testing.T) {
 	t.Parallel()
+
 	mock := &mockClient{
 		getParameterFunc: func(_ context.Context, params *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
 			// Verify that WithDecryption is always true
 			assert.True(t, lo.FromPtr(params.WithDecryption))
+
 			return &paramapi.GetParameterOutput{
 				Parameter: &paramapi.Parameter{
 					Name:    lo.ToPtr("/my/param"),

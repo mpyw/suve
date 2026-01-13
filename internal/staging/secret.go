@@ -148,8 +148,10 @@ func (s *SecretStrategy) applyDelete(ctx context.Context, name string, entry Ent
 		if rnf := (*secretapi.ResourceNotFoundException)(nil); errors.As(err, &rnf) {
 			return nil
 		}
+
 		return fmt.Errorf("failed to delete secret: %w", err)
 	}
+
 	return nil
 }
 
@@ -163,12 +165,14 @@ func (s *SecretStrategy) FetchLastModified(ctx context.Context, name string) (ti
 		if rnf := (*secretapi.ResourceNotFoundException)(nil); errors.As(err, &rnf) {
 			return time.Time{}, nil
 		}
+
 		return time.Time{}, fmt.Errorf("failed to get secret: %w", err)
 	}
 
 	if result.CreatedDate != nil {
 		return *result.CreatedDate, nil
 	}
+
 	return time.Time{}, nil
 }
 
@@ -199,6 +203,7 @@ func (s *SecretStrategy) ParseName(input string) (string, error) {
 	if spec.Absolute.ID != nil || spec.Absolute.Label != nil || spec.Shift > 0 {
 		return "", fmt.Errorf("stage diff requires a secret name without version specifier")
 	}
+
 	return spec.Name, nil
 }
 
@@ -222,6 +227,7 @@ func (s *SecretStrategy) FetchCurrentValue(ctx context.Context, name string) (*E
 	if secret.CreatedDate != nil {
 		result.LastModified = *secret.CreatedDate
 	}
+
 	return result, nil
 }
 
@@ -260,6 +266,7 @@ func SecretFactory(ctx context.Context) (FullStrategy, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize AWS client: %w", err)
 	}
+
 	return NewSecretStrategy(client), nil
 }
 

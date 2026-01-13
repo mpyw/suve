@@ -73,6 +73,7 @@ func TestRunner_checkAutoShutdown(t *testing.T) {
 
 	t.Run("does not set WillShutdown on non-unstage methods", func(t *testing.T) {
 		t.Parallel()
+
 		r := NewRunner(testRunnerAccountID, testRunnerRegion)
 
 		req := &protocol.Request{Method: protocol.MethodPing}
@@ -85,6 +86,7 @@ func TestRunner_checkAutoShutdown(t *testing.T) {
 
 	t.Run("does not set WillShutdown on failed response", func(t *testing.T) {
 		t.Parallel()
+
 		r := NewRunner(testRunnerAccountID, testRunnerRegion)
 
 		req := &protocol.Request{Method: protocol.MethodUnstageAll}
@@ -103,6 +105,7 @@ func TestRunner_checkAutoShutdown_ShutdownReasons(t *testing.T) {
 	// UnstageEntry tests
 	t.Run("UnstageEntry with no hint returns empty reason", func(t *testing.T) {
 		t.Parallel()
+
 		r := NewRunner(testRunnerAccountID, testRunnerRegion)
 
 		req := &protocol.Request{Method: protocol.MethodUnstageEntry}
@@ -128,6 +131,7 @@ func TestRunner_checkAutoShutdown_ShutdownReasons(t *testing.T) {
 
 	t.Run("UnstageEntry with reset hint returns unstaged reason", func(t *testing.T) {
 		t.Parallel()
+
 		r := NewRunner(testRunnerAccountID, testRunnerRegion)
 
 		req := &protocol.Request{Method: protocol.MethodUnstageEntry, Hint: protocol.HintReset}
@@ -154,6 +158,7 @@ func TestRunner_checkAutoShutdown_ShutdownReasons(t *testing.T) {
 	// UnstageTag tests
 	t.Run("UnstageTag with no hint returns empty reason", func(t *testing.T) {
 		t.Parallel()
+
 		r := NewRunner(testRunnerAccountID, testRunnerRegion)
 
 		req := &protocol.Request{Method: protocol.MethodUnstageTag}
@@ -192,6 +197,7 @@ func TestRunner_checkAutoShutdown_ShutdownReasons(t *testing.T) {
 
 	t.Run("UnstageTag with persist hint returns persisted reason", func(t *testing.T) {
 		t.Parallel()
+
 		r := NewRunner(testRunnerAccountID, testRunnerRegion)
 
 		req := &protocol.Request{Method: protocol.MethodUnstageTag, Hint: protocol.HintPersist}
@@ -218,6 +224,7 @@ func TestRunner_checkAutoShutdown_ShutdownReasons(t *testing.T) {
 
 	t.Run("UnstageAll with apply hint returns applied reason", func(t *testing.T) {
 		t.Parallel()
+
 		r := NewRunner(testRunnerAccountID, testRunnerRegion)
 
 		req := &protocol.Request{Method: protocol.MethodUnstageAll, Hint: protocol.HintApply}
@@ -243,6 +250,7 @@ func TestRunner_checkAutoShutdown_ShutdownReasons(t *testing.T) {
 
 	t.Run("UnstageAll with persist hint returns persisted reason", func(t *testing.T) {
 		t.Parallel()
+
 		r := NewRunner(testRunnerAccountID, testRunnerRegion)
 
 		req := &protocol.Request{Method: protocol.MethodUnstageAll, Hint: protocol.HintPersist}
@@ -327,6 +335,7 @@ func TestRunner_checkAutoShutdown_NonEmptyState(t *testing.T) {
 
 	t.Run("UnstageTag does not shutdown when state not empty", func(t *testing.T) {
 		t.Parallel()
+
 		r := NewRunner(testRunnerAccountID, testRunnerRegion)
 
 		// Stage an entry
@@ -440,6 +449,7 @@ func TestRunner_checkAutoShutdown_AllMethods(t *testing.T) {
 	for _, method := range nonTriggeringMethods {
 		t.Run(method, func(t *testing.T) {
 			t.Parallel()
+
 			r := NewRunner(testRunnerAccountID, testRunnerRegion)
 
 			req := &protocol.Request{Method: method}

@@ -25,6 +25,7 @@ func TestAddRunner_Run(t *testing.T) {
 		store := testutil.NewMockStore()
 
 		var buf bytes.Buffer
+
 		r := &cli.AddRunner{
 			UseCase: &stagingusecase.AddUseCase{
 				Strategy: &mockStrategy{service: staging.ServiceParam},
@@ -59,6 +60,7 @@ func TestAddRunner_Run(t *testing.T) {
 		})
 
 		var buf bytes.Buffer
+
 		r := &cli.AddRunner{
 			UseCase: &stagingusecase.AddUseCase{
 				Strategy: &mockStrategy{service: staging.ServiceParam},
@@ -68,6 +70,7 @@ func TestAddRunner_Run(t *testing.T) {
 			Stderr: &bytes.Buffer{},
 			OpenEditor: func(_ context.Context, current string) (string, error) {
 				assert.Equal(t, "original-value", current)
+
 				return "updated-value", nil
 			},
 		}
@@ -89,6 +92,7 @@ func TestAddRunner_Run(t *testing.T) {
 		store := testutil.NewMockStore()
 
 		var buf bytes.Buffer
+
 		r := &cli.AddRunner{
 			UseCase: &stagingusecase.AddUseCase{
 				Strategy: &mockStrategy{service: staging.ServiceParam},
@@ -120,6 +124,7 @@ func TestAddRunner_Run(t *testing.T) {
 		})
 
 		var buf bytes.Buffer
+
 		r := &cli.AddRunner{
 			UseCase: &stagingusecase.AddUseCase{
 				Strategy: &mockStrategy{service: staging.ServiceParam},
@@ -143,6 +148,7 @@ func TestAddRunner_Run(t *testing.T) {
 		store := testutil.NewMockStore()
 
 		var buf bytes.Buffer
+
 		r := &cli.AddRunner{
 			UseCase: &stagingusecase.AddUseCase{
 				Strategy: &mockStrategy{service: staging.ServiceSecret},
@@ -178,6 +184,7 @@ func (m *mockStrategy) ParseName(input string) (string, error) {
 	if m.parseNameErr != nil {
 		return "", m.parseNameErr
 	}
+
 	return input, nil
 }
 func (m *mockStrategy) ParseSpec(input string) (string, bool, error) {
@@ -247,6 +254,7 @@ func TestAddRunner_WithOptions(t *testing.T) {
 		store := testutil.NewMockStore()
 
 		var stdout, stderr bytes.Buffer
+
 		r := &cli.AddRunner{
 			UseCase: &stagingusecase.AddUseCase{
 				Strategy: &mockStrategy{service: staging.ServiceParam},
@@ -276,6 +284,7 @@ func TestAddRunner_WithOptions(t *testing.T) {
 		store := testutil.NewMockStore()
 
 		var stdout, stderr bytes.Buffer
+
 		r := &cli.AddRunner{
 			UseCase: &stagingusecase.AddUseCase{
 				Strategy: &mockStrategy{service: staging.ServiceParam},

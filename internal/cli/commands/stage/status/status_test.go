@@ -23,6 +23,7 @@ func TestCommand_NoStagedChanges(t *testing.T) {
 	store := testutil.NewMockStore()
 
 	var buf bytes.Buffer
+
 	r := &status.Runner{
 		Store:  store,
 		Stdout: &buf,
@@ -47,6 +48,7 @@ func TestCommand_ShowParamChangesOnly(t *testing.T) {
 	})
 
 	var buf bytes.Buffer
+
 	r := &status.Runner{
 		Store:  store,
 		Stdout: &buf,
@@ -75,6 +77,7 @@ func TestCommand_ShowSecretChangesOnly(t *testing.T) {
 	})
 
 	var buf bytes.Buffer
+
 	r := &status.Runner{
 		Store:  store,
 		Stdout: &buf,
@@ -107,6 +110,7 @@ func TestCommand_ShowBothParamAndSecretChanges(t *testing.T) {
 	})
 
 	var buf bytes.Buffer
+
 	r := &status.Runner{
 		Store:  store,
 		Stdout: &buf,
@@ -143,6 +147,7 @@ func TestCommand_VerboseOutput(t *testing.T) {
 	})
 
 	var buf bytes.Buffer
+
 	r := &status.Runner{
 		Store:  store,
 		Stdout: &buf,
@@ -171,6 +176,7 @@ func TestCommand_VerboseWithDelete(t *testing.T) {
 	})
 
 	var buf bytes.Buffer
+
 	r := &status.Runner{
 		Store:  store,
 		Stdout: &buf,
@@ -200,6 +206,7 @@ func TestCommand_VerboseTruncatesLongValue(t *testing.T) {
 	})
 
 	var buf bytes.Buffer
+
 	r := &status.Runner{
 		Store:  store,
 		Stdout: &buf,
@@ -218,7 +225,9 @@ func TestCommand_Validation(t *testing.T) {
 	t.Parallel()
 
 	app := appcli.MakeApp()
+
 	var buf bytes.Buffer
+
 	app.Writer = &buf
 
 	// Test that the command exists and works
@@ -234,6 +243,7 @@ func TestCommand_StoreError(t *testing.T) {
 	store.ListEntriesErr = errors.New("mock store error")
 
 	var buf bytes.Buffer
+
 	r := &status.Runner{
 		Store:  store,
 		Stdout: &buf,
@@ -257,6 +267,7 @@ func TestCommand_ShowParamTagChangesOnly(t *testing.T) {
 	})
 
 	var buf bytes.Buffer
+
 	r := &status.Runner{
 		Store:  store,
 		Stdout: &buf,
@@ -287,6 +298,7 @@ func TestCommand_ShowSecretTagChangesOnly(t *testing.T) {
 	})
 
 	var buf bytes.Buffer
+
 	r := &status.Runner{
 		Store:  store,
 		Stdout: &buf,
@@ -324,6 +336,7 @@ func TestCommand_ShowMixedEntryAndTagChanges(t *testing.T) {
 	})
 
 	var buf bytes.Buffer
+
 	r := &status.Runner{
 		Store:  store,
 		Stdout: &buf,
@@ -354,6 +367,7 @@ func TestCommand_TagChangesVerbose(t *testing.T) {
 	})
 
 	var buf bytes.Buffer
+
 	r := &status.Runner{
 		Store:  store,
 		Stdout: &buf,
@@ -390,6 +404,7 @@ func TestCommand_TagOnlyChangesNoEntries(t *testing.T) {
 	})
 
 	var buf bytes.Buffer
+
 	r := &status.Runner{
 		Store:  store,
 		Stdout: &buf,

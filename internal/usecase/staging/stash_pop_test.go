@@ -258,6 +258,7 @@ func TestDrainUseCase_Execute_Errors(t *testing.T) {
 		}
 
 		_, err := usecase.Execute(t.Context(), stagingusecase.StashPopInput{})
+
 		var drainErr *stagingusecase.StashPopError
 		require.ErrorAs(t, err, &drainErr)
 		assert.Equal(t, "load", drainErr.Op)
@@ -282,6 +283,7 @@ func TestDrainUseCase_Execute_Errors(t *testing.T) {
 		}
 
 		_, err := usecase.Execute(t.Context(), stagingusecase.StashPopInput{})
+
 		var drainErr *stagingusecase.StashPopError
 		require.ErrorAs(t, err, &drainErr)
 		assert.Equal(t, "write", drainErr.Op)
@@ -293,6 +295,7 @@ func TestDrainError(t *testing.T) {
 
 	t.Run("error message - load", func(t *testing.T) {
 		t.Parallel()
+
 		err := &stagingusecase.StashPopError{Op: "load", Err: errors.New("connection failed")}
 		assert.Contains(t, err.Error(), "failed to load state from file")
 		assert.Contains(t, err.Error(), "connection failed")
@@ -300,18 +303,21 @@ func TestDrainError(t *testing.T) {
 
 	t.Run("error message - write", func(t *testing.T) {
 		t.Parallel()
+
 		err := &stagingusecase.StashPopError{Op: "write", Err: errors.New("write failed")}
 		assert.Contains(t, err.Error(), "failed to set state in agent")
 	})
 
 	t.Run("error message - delete", func(t *testing.T) {
 		t.Parallel()
+
 		err := &stagingusecase.StashPopError{Op: "delete", Err: errors.New("delete failed")}
 		assert.Contains(t, err.Error(), "failed to delete file")
 	})
 
 	t.Run("error message - unknown op", func(t *testing.T) {
 		t.Parallel()
+
 		innerErr := errors.New("something went wrong")
 		err := &stagingusecase.StashPopError{Op: "unknown", Err: innerErr}
 		assert.Equal(t, "something went wrong", err.Error())
@@ -319,6 +325,7 @@ func TestDrainError(t *testing.T) {
 
 	t.Run("unwrap", func(t *testing.T) {
 		t.Parallel()
+
 		innerErr := errors.New("inner error")
 		err := &stagingusecase.StashPopError{Op: "load", Err: innerErr}
 		assert.ErrorIs(t, err, innerErr)

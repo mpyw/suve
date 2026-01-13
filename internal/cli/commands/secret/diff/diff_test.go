@@ -25,6 +25,7 @@ func TestCommand_Validation(t *testing.T) {
 
 	t.Run("missing arguments", func(t *testing.T) {
 		t.Parallel()
+
 		app := appcli.MakeApp()
 		err := app.Run(t.Context(), []string{"suve", "secret", "diff"})
 		require.Error(t, err)
@@ -33,6 +34,7 @@ func TestCommand_Validation(t *testing.T) {
 
 	t.Run("invalid version spec", func(t *testing.T) {
 		t.Parallel()
+
 		app := appcli.MakeApp()
 		err := app.Run(t.Context(), []string{"suve", "secret", "diff", "my-secret#"})
 		require.Error(t, err)
@@ -41,6 +43,7 @@ func TestCommand_Validation(t *testing.T) {
 
 	t.Run("invalid label spec", func(t *testing.T) {
 		t.Parallel()
+
 		app := appcli.MakeApp()
 		err := app.Run(t.Context(), []string{"suve", "secret", "diff", "my-secret:"})
 		require.Error(t, err)
@@ -49,6 +52,7 @@ func TestCommand_Validation(t *testing.T) {
 
 	t.Run("too many arguments", func(t *testing.T) {
 		t.Parallel()
+
 		app := appcli.MakeApp()
 		err := app.Run(t.Context(), []string{"suve", "secret", "diff", "my-secret", ":AWSPREVIOUS", ":AWSCURRENT", ":extra"})
 		require.Error(t, err)
@@ -59,6 +63,7 @@ func TestCommand_Validation(t *testing.T) {
 //nolint:funlen // Table-driven test with many cases
 func TestParseArgs(t *testing.T) {
 	t.Parallel()
+
 	tests := []struct {
 		name       string
 		args       []string
@@ -356,6 +361,7 @@ func TestParseArgs(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
+
 			spec1, spec2, err := diffargs.ParseArgs(
 				tt.args,
 				secretversion.Parse,
@@ -367,6 +373,7 @@ func TestParseArgs(t *testing.T) {
 			if tt.wantErrMsg != "" {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tt.wantErrMsg)
+
 				return
 			}
 
@@ -401,6 +408,7 @@ func (m *mockClient) GetSecretValue(ctx context.Context, params *secretapi.GetSe
 	if m.getSecretValueFunc != nil {
 		return m.getSecretValueFunc(ctx, params, optFns...)
 	}
+
 	return nil, fmt.Errorf("GetSecretValue not mocked")
 }
 
@@ -408,6 +416,7 @@ func (m *mockClient) ListSecretVersionIds(ctx context.Context, params *secretapi
 	if m.listSecretVersionIdsFunc != nil {
 		return m.listSecretVersionIdsFunc(ctx, params, optFns...)
 	}
+
 	return nil, fmt.Errorf("ListSecretVersionIds not mocked")
 }
 
@@ -436,6 +445,7 @@ func TestRunnerRun(t *testing.T) {
 							SecretString: lo.ToPtr("old-secret"),
 						}, nil
 					}
+
 					return &secretapi.GetSecretValueOutput{
 						Name:         lo.ToPtr("my-secret"),
 						VersionId:    lo.ToPtr("curr-version-id-long"),
@@ -465,6 +475,7 @@ func TestRunnerRun(t *testing.T) {
 							SecretString: lo.ToPtr("old"),
 						}, nil
 					}
+
 					return &secretapi.GetSecretValueOutput{
 						Name:         lo.ToPtr("my-secret"),
 						VersionId:    lo.ToPtr("v2"),
@@ -489,6 +500,7 @@ func TestRunnerRun(t *testing.T) {
 					if lo.FromPtr(params.VersionStage) == testStageLabelPrevious {
 						return nil, fmt.Errorf("version not found")
 					}
+
 					return &secretapi.GetSecretValueOutput{
 						Name:         lo.ToPtr("my-secret"),
 						VersionId:    lo.ToPtr("v1"),
@@ -509,6 +521,7 @@ func TestRunnerRun(t *testing.T) {
 					if lo.FromPtr(params.VersionStage) == "AWSCURRENT" {
 						return nil, fmt.Errorf("version not found")
 					}
+
 					return &secretapi.GetSecretValueOutput{
 						Name:         lo.ToPtr("my-secret"),
 						VersionId:    lo.ToPtr("v1"),
@@ -535,6 +548,7 @@ func TestRunnerRun(t *testing.T) {
 							SecretString: lo.ToPtr(`{"key":"old"}`),
 						}, nil
 					}
+
 					return &secretapi.GetSecretValueOutput{
 						Name:         lo.ToPtr("my-secret"),
 						VersionId:    lo.ToPtr("v2-longer-id"),
@@ -565,6 +579,7 @@ func TestRunnerRun(t *testing.T) {
 							SecretString: lo.ToPtr("not json"),
 						}, nil
 					}
+
 					return &secretapi.GetSecretValueOutput{
 						Name:         lo.ToPtr("my-secret"),
 						VersionId:    lo.ToPtr("v2-longer-id"),
@@ -582,7 +597,9 @@ func TestRunnerRun(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
+
 			var stdout, stderr bytes.Buffer
+
 			r := &secretdiff.Runner{
 				UseCase: &secret.DiffUseCase{Client: tt.mock},
 				Stdout:  &stdout,
@@ -592,10 +609,12 @@ func TestRunnerRun(t *testing.T) {
 
 			if tt.wantErr {
 				assert.Error(t, err)
+
 				return
 			}
 
 			require.NoError(t, err)
+
 			if tt.check != nil {
 				tt.check(t, stdout.String())
 			}
@@ -605,6 +624,7 @@ func TestRunnerRun(t *testing.T) {
 
 func TestRun_IdenticalWarning(t *testing.T) {
 	t.Parallel()
+
 	mock := &mockClient{
 		getSecretValueFunc: func(_ context.Context, _ *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) {
 			return &secretapi.GetSecretValueOutput{
@@ -616,6 +636,7 @@ func TestRun_IdenticalWarning(t *testing.T) {
 	}
 
 	var stdout, stderr bytes.Buffer
+
 	r := &secretdiff.Runner{
 		UseCase: &secret.DiffUseCase{Client: mock},
 		Stdout:  &stdout,

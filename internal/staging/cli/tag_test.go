@@ -22,6 +22,7 @@ func TestTagRunner_Run(t *testing.T) {
 		store := testutil.NewMockStore()
 
 		var stdout, stderr bytes.Buffer
+
 		r := &cli.TagRunner{
 			UseCase: &stagingusecase.TagUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentVal: "existing"},
@@ -50,6 +51,7 @@ func TestTagRunner_Run(t *testing.T) {
 		store := testutil.NewMockStore()
 
 		var stdout, stderr bytes.Buffer
+
 		r := &cli.TagRunner{
 			UseCase: &stagingusecase.TagUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentVal: "existing"},
@@ -73,6 +75,7 @@ func TestTagRunner_Run(t *testing.T) {
 		store := testutil.NewMockStore()
 
 		var stdout, stderr bytes.Buffer
+
 		r := &cli.TagRunner{
 			UseCase: &stagingusecase.TagUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentErr: assert.AnError},
@@ -99,6 +102,7 @@ func TestUntagRunner_Run(t *testing.T) {
 		store := testutil.NewMockStore()
 
 		var stdout, stderr bytes.Buffer
+
 		r := &cli.UntagRunner{
 			UseCase: &stagingusecase.TagUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentVal: "existing"},
@@ -128,6 +132,7 @@ func TestUntagRunner_Run(t *testing.T) {
 		store := testutil.NewMockStore()
 
 		var stdout, stderr bytes.Buffer
+
 		r := &cli.UntagRunner{
 			UseCase: &stagingusecase.TagUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentErr: assert.AnError},
@@ -154,6 +159,7 @@ func TestTagRunner_EmptyTags(t *testing.T) {
 		store := testutil.NewMockStore()
 
 		var stdout, stderr bytes.Buffer
+
 		r := &cli.TagRunner{
 			UseCase: &stagingusecase.TagUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentVal: "existing"},
@@ -177,6 +183,7 @@ func TestTagRunner_EmptyTags(t *testing.T) {
 		store := testutil.NewMockStore()
 
 		var stdout, stderr bytes.Buffer
+
 		r := &cli.TagRunner{
 			UseCase: &stagingusecase.TagUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentVal: "existing"},

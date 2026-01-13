@@ -46,18 +46,21 @@ func (m *fullMockStrategy) ParseName(input string) (string, error) {
 	if m.parseNameErr != nil {
 		return "", m.parseNameErr
 	}
+
 	return input, nil
 }
 func (m *fullMockStrategy) ParseSpec(input string) (string, bool, error) {
 	if m.parseSpecErr != nil {
 		return "", false, m.parseSpecErr
 	}
+
 	return input, m.parseSpecVersion, nil
 }
 func (m *fullMockStrategy) FetchCurrent(_ context.Context, _ string) (*staging.FetchResult, error) {
 	if m.fetchCurrentErr != nil {
 		return nil, m.fetchCurrentErr
 	}
+
 	return &staging.FetchResult{
 		Value:      m.fetchCurrentVal,
 		Identifier: "#1",
@@ -67,6 +70,7 @@ func (m *fullMockStrategy) FetchCurrentValue(_ context.Context, _ string) (*stag
 	if m.fetchCurrentErr != nil {
 		return nil, m.fetchCurrentErr
 	}
+
 	return &staging.EditFetchResult{
 		Value:        m.fetchCurrentVal,
 		LastModified: m.fetchLastModifiedVal,
@@ -76,6 +80,7 @@ func (m *fullMockStrategy) FetchVersion(_ context.Context, _ string) (string, st
 	if m.fetchVersionErr != nil {
 		return "", "", m.fetchVersionErr
 	}
+
 	return m.fetchVersionVal, m.fetchVersionLbl, nil
 }
 func (m *fullMockStrategy) Apply(_ context.Context, _ string, _ staging.Entry) error {
@@ -88,6 +93,7 @@ func (m *fullMockStrategy) FetchLastModified(_ context.Context, _ string) (time.
 	if m.fetchLastModifiedErr != nil {
 		return time.Time{}, m.fetchLastModifiedErr
 	}
+
 	return m.fetchLastModifiedVal, nil
 }
 
@@ -109,6 +115,7 @@ func TestStatusRunner_Run(t *testing.T) {
 		})
 
 		var stdout, stderr bytes.Buffer
+
 		r := &cli.StatusRunner{
 			UseCase: &stagingusecase.StatusUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam},
@@ -130,6 +137,7 @@ func TestStatusRunner_Run(t *testing.T) {
 		store := testutil.NewMockStore()
 
 		var stdout, stderr bytes.Buffer
+
 		r := &cli.StatusRunner{
 			UseCase: &stagingusecase.StatusUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam},
@@ -155,6 +163,7 @@ func TestStatusRunner_Run(t *testing.T) {
 		})
 
 		var stdout, stderr bytes.Buffer
+
 		r := &cli.StatusRunner{
 			UseCase: &stagingusecase.StatusUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam},
@@ -175,6 +184,7 @@ func TestStatusRunner_Run(t *testing.T) {
 		store := testutil.NewMockStore()
 
 		var stdout, stderr bytes.Buffer
+
 		r := &cli.StatusRunner{
 			UseCase: &stagingusecase.StatusUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam},
@@ -209,6 +219,7 @@ func TestStatusRunner_Run(t *testing.T) {
 		})
 
 		var stdout, stderr bytes.Buffer
+
 		r := &cli.StatusRunner{
 			UseCase: &stagingusecase.StatusUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam},
@@ -220,6 +231,7 @@ func TestStatusRunner_Run(t *testing.T) {
 
 		err := r.Run(t.Context(), cli.StatusOptions{})
 		require.NoError(t, err)
+
 		output := stdout.String()
 		assert.Contains(t, output, "Staged")
 		assert.Contains(t, output, "(3)")
@@ -239,6 +251,7 @@ func TestStatusRunner_Run(t *testing.T) {
 		})
 
 		var stdout, stderr bytes.Buffer
+
 		r := &cli.StatusRunner{
 			UseCase: &stagingusecase.StatusUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceSecret, hasDeleteOptions: true},
@@ -273,6 +286,7 @@ func TestDiffRunner_Run(t *testing.T) {
 		})
 
 		var stdout, stderr bytes.Buffer
+
 		r := &cli.DiffRunner{
 			UseCase: &stagingusecase.DiffUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentVal: "old-value"},
@@ -284,6 +298,7 @@ func TestDiffRunner_Run(t *testing.T) {
 
 		err := r.Run(t.Context(), cli.DiffOptions{Name: "/app/config"})
 		require.NoError(t, err)
+
 		output := stdout.String()
 		assert.Contains(t, output, "-old-value")
 		assert.Contains(t, output, "+new-value")
@@ -305,6 +320,7 @@ func TestDiffRunner_Run(t *testing.T) {
 		})
 
 		var stdout, stderr bytes.Buffer
+
 		r := &cli.DiffRunner{
 			UseCase: &stagingusecase.DiffUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentVal: "old"},
@@ -316,6 +332,7 @@ func TestDiffRunner_Run(t *testing.T) {
 
 		err := r.Run(t.Context(), cli.DiffOptions{})
 		require.NoError(t, err)
+
 		output := stdout.String()
 		assert.Contains(t, output, "/app/config1")
 		assert.Contains(t, output, "/app/config2")
@@ -327,6 +344,7 @@ func TestDiffRunner_Run(t *testing.T) {
 		store := testutil.NewMockStore()
 
 		var stdout, stderr bytes.Buffer
+
 		r := &cli.DiffRunner{
 			UseCase: &stagingusecase.DiffUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam},
@@ -347,6 +365,7 @@ func TestDiffRunner_Run(t *testing.T) {
 		store := testutil.NewMockStore()
 
 		var stdout, stderr bytes.Buffer
+
 		r := &cli.DiffRunner{
 			UseCase: &stagingusecase.DiffUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam},
@@ -372,6 +391,7 @@ func TestDiffRunner_Run(t *testing.T) {
 		})
 
 		var stdout, stderr bytes.Buffer
+
 		r := &cli.DiffRunner{
 			UseCase: &stagingusecase.DiffUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentVal: `{"a":1}`},
@@ -383,6 +403,7 @@ func TestDiffRunner_Run(t *testing.T) {
 
 		err := r.Run(t.Context(), cli.DiffOptions{Name: "/app/config", ParseJSON: true})
 		require.NoError(t, err)
+
 		output := stdout.String()
 		// JSON should be formatted with sorted keys
 		assert.Contains(t, output, `"a"`)
@@ -399,6 +420,7 @@ func TestDiffRunner_Run(t *testing.T) {
 		})
 
 		var stdout, stderr bytes.Buffer
+
 		r := &cli.DiffRunner{
 			UseCase: &stagingusecase.DiffUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentVal: `{"valid": "json"}`},
@@ -424,6 +446,7 @@ func TestDiffRunner_Run(t *testing.T) {
 		})
 
 		var stdout, stderr bytes.Buffer
+
 		r := &cli.DiffRunner{
 			UseCase: &stagingusecase.DiffUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentVal: "same-value"},
@@ -453,6 +476,7 @@ func TestDiffRunner_Run(t *testing.T) {
 		})
 
 		var stdout, stderr bytes.Buffer
+
 		r := &cli.DiffRunner{
 			UseCase: &stagingusecase.DiffUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentVal: "current-value"},
@@ -464,6 +488,7 @@ func TestDiffRunner_Run(t *testing.T) {
 
 		err := r.Run(t.Context(), cli.DiffOptions{Name: "/app/config"})
 		require.NoError(t, err)
+
 		output := stdout.String()
 		assert.Contains(t, output, "-current-value")
 		assert.Contains(t, output, "staged for deletion")
@@ -480,6 +505,7 @@ func TestDiffRunner_Run(t *testing.T) {
 		})
 
 		var stdout, stderr bytes.Buffer
+
 		r := &cli.DiffRunner{
 			UseCase: &stagingusecase.DiffUseCase{
 				// FetchCurrent returns error because item was deleted from AWS
@@ -511,6 +537,7 @@ func TestDiffRunner_Run(t *testing.T) {
 		})
 
 		var stdout, stderr bytes.Buffer
+
 		r := &cli.DiffRunner{
 			UseCase: &stagingusecase.DiffUseCase{
 				// FetchCurrent returns error because item doesn't exist yet
@@ -546,6 +573,7 @@ func TestDiffRunner_Run(t *testing.T) {
 		})
 
 		var stdout, stderr bytes.Buffer
+
 		r := &cli.DiffRunner{
 			UseCase: &stagingusecase.DiffUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentErr: errors.New("parameter not found")},
@@ -557,6 +585,7 @@ func TestDiffRunner_Run(t *testing.T) {
 
 		err := r.Run(t.Context(), cli.DiffOptions{Name: "/app/new-json", ParseJSON: true})
 		require.NoError(t, err)
+
 		output := stdout.String()
 		// JSON should be formatted
 		assert.Contains(t, output, `"a"`)
@@ -574,6 +603,7 @@ func TestDiffRunner_Run(t *testing.T) {
 		})
 
 		var stdout, stderr bytes.Buffer
+
 		r := &cli.DiffRunner{
 			UseCase: &stagingusecase.DiffUseCase{
 				// Item already exists in AWS with same value
@@ -605,6 +635,7 @@ func TestDiffRunner_Run(t *testing.T) {
 		})
 
 		var stdout, stderr bytes.Buffer
+
 		r := &cli.DiffRunner{
 			UseCase: &stagingusecase.DiffUseCase{
 				// Item already exists in AWS with different value
@@ -617,6 +648,7 @@ func TestDiffRunner_Run(t *testing.T) {
 
 		err := r.Run(t.Context(), cli.DiffOptions{Name: "/app/param"})
 		require.NoError(t, err)
+
 		output := stdout.String()
 		assert.Contains(t, output, "-old-value")
 		assert.Contains(t, output, "+new-value")
@@ -632,6 +664,7 @@ func TestDiffRunner_Run(t *testing.T) {
 		})
 
 		var stdout, stderr bytes.Buffer
+
 		r := &cli.DiffRunner{
 			UseCase: &stagingusecase.DiffUseCase{
 				// FetchCurrent returns error because item doesn't exist in AWS anymore
@@ -666,6 +699,7 @@ func TestEditRunner_Run(t *testing.T) {
 		store := testutil.NewMockStore()
 
 		var stdout, stderr bytes.Buffer
+
 		r := &cli.EditRunner{
 			UseCase: &stagingusecase.EditUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentVal: "aws-value"},
@@ -675,6 +709,7 @@ func TestEditRunner_Run(t *testing.T) {
 			Stderr: &stderr,
 			OpenEditor: func(_ context.Context, current string) (string, error) {
 				assert.Equal(t, "aws-value", current)
+
 				return "edited-value", nil
 			},
 		}
@@ -700,6 +735,7 @@ func TestEditRunner_Run(t *testing.T) {
 		})
 
 		var stdout, stderr bytes.Buffer
+
 		r := &cli.EditRunner{
 			UseCase: &stagingusecase.EditUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentVal: "aws-value"},
@@ -709,6 +745,7 @@ func TestEditRunner_Run(t *testing.T) {
 			Stderr: &stderr,
 			OpenEditor: func(_ context.Context, current string) (string, error) {
 				assert.Equal(t, "staged-value", current) // Should use staged, not AWS
+
 				return "new-value", nil
 			},
 		}
@@ -732,6 +769,7 @@ func TestEditRunner_Run(t *testing.T) {
 		})
 
 		var stdout, stderr bytes.Buffer
+
 		r := &cli.EditRunner{
 			UseCase: &stagingusecase.EditUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam},
@@ -741,6 +779,7 @@ func TestEditRunner_Run(t *testing.T) {
 			Stderr: &stderr,
 			OpenEditor: func(_ context.Context, current string) (string, error) {
 				assert.Equal(t, "create-value", current)
+
 				return "edited-create-value", nil
 			},
 		}
@@ -755,6 +794,7 @@ func TestEditRunner_Run(t *testing.T) {
 		store := testutil.NewMockStore()
 
 		var stdout, stderr bytes.Buffer
+
 		r := &cli.EditRunner{
 			UseCase: &stagingusecase.EditUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentVal: "same-value"},
@@ -778,6 +818,7 @@ func TestEditRunner_Run(t *testing.T) {
 		store := testutil.NewMockStore()
 
 		var stdout, stderr bytes.Buffer
+
 		r := &cli.EditRunner{
 			UseCase: &stagingusecase.EditUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentVal: "value"},
@@ -801,6 +842,7 @@ func TestEditRunner_Run(t *testing.T) {
 		store := testutil.NewMockStore()
 
 		var stdout, stderr bytes.Buffer
+
 		r := &cli.EditRunner{
 			UseCase: &stagingusecase.EditUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentErr: errors.New("not found")},
@@ -847,6 +889,7 @@ func TestApplyRunner_Run(t *testing.T) {
 		})
 
 		var stdout, stderr bytes.Buffer
+
 		r := &cli.ApplyRunner{
 			UseCase: &stagingusecase.ApplyUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam},
@@ -858,6 +901,7 @@ func TestApplyRunner_Run(t *testing.T) {
 
 		err := r.Run(t.Context(), cli.ApplyOptions{})
 		require.NoError(t, err)
+
 		output := stdout.String()
 		assert.Contains(t, output, "Created")
 		assert.Contains(t, output, "Updated")
@@ -888,6 +932,7 @@ func TestApplyRunner_Run(t *testing.T) {
 		})
 
 		var stdout, stderr bytes.Buffer
+
 		r := &cli.ApplyRunner{
 			UseCase: &stagingusecase.ApplyUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam},
@@ -919,6 +964,7 @@ func TestApplyRunner_Run(t *testing.T) {
 		})
 
 		var stdout, stderr bytes.Buffer
+
 		r := &cli.ApplyRunner{
 			UseCase: &stagingusecase.ApplyUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam},
@@ -939,6 +985,7 @@ func TestApplyRunner_Run(t *testing.T) {
 		store := testutil.NewMockStore()
 
 		var stdout, stderr bytes.Buffer
+
 		r := &cli.ApplyRunner{
 			UseCase: &stagingusecase.ApplyUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam},
@@ -964,6 +1011,7 @@ func TestApplyRunner_Run(t *testing.T) {
 		})
 
 		var stdout, stderr bytes.Buffer
+
 		r := &cli.ApplyRunner{
 			UseCase: &stagingusecase.ApplyUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam, applyErr: errors.New("apply failed")},
@@ -991,6 +1039,7 @@ func TestApplyRunner_Run(t *testing.T) {
 		})
 
 		var stdout, stderr bytes.Buffer
+
 		r := &cli.ApplyRunner{
 			UseCase: &stagingusecase.ApplyUseCase{
 				// FetchLastModified returns non-zero time = resource exists now
@@ -1020,6 +1069,7 @@ func TestApplyRunner_Run(t *testing.T) {
 		})
 
 		var stdout, stderr bytes.Buffer
+
 		r := &cli.ApplyRunner{
 			UseCase: &stagingusecase.ApplyUseCase{
 				// FetchLastModified returns time AFTER BaseModifiedAt = conflict
@@ -1048,6 +1098,7 @@ func TestApplyRunner_Run(t *testing.T) {
 		})
 
 		var stdout, stderr bytes.Buffer
+
 		r := &cli.ApplyRunner{
 			UseCase: &stagingusecase.ApplyUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchLastModifiedVal: time.Now()},
@@ -1075,6 +1126,7 @@ func TestApplyRunner_Run(t *testing.T) {
 		})
 
 		var stdout, stderr bytes.Buffer
+
 		r := &cli.ApplyRunner{
 			UseCase: &stagingusecase.ApplyUseCase{
 				// FetchLastModified returns same time as BaseModifiedAt = no conflict
@@ -1103,6 +1155,7 @@ func TestApplyRunner_Run(t *testing.T) {
 		})
 
 		var stdout, stderr bytes.Buffer
+
 		r := &cli.ApplyRunner{
 			UseCase: &stagingusecase.ApplyUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchLastModifiedVal: time.Now()},
@@ -1129,6 +1182,7 @@ func TestApplyRunner_Run(t *testing.T) {
 		})
 
 		var stdout, stderr bytes.Buffer
+
 		r := &cli.ApplyRunner{
 			UseCase: &stagingusecase.ApplyUseCase{
 				// FetchLastModified returns zero time = resource doesn't exist = no conflict
@@ -1169,6 +1223,7 @@ func TestResetRunner_Run(t *testing.T) {
 		})
 
 		var stdout, stderr bytes.Buffer
+
 		r := &cli.ResetRunner{
 			UseCase: &stagingusecase.ResetUseCase{
 				Parser: &fullMockStrategy{service: staging.ServiceParam},
@@ -1194,6 +1249,7 @@ func TestResetRunner_Run(t *testing.T) {
 		store := testutil.NewMockStore()
 
 		var stdout, stderr bytes.Buffer
+
 		r := &cli.ResetRunner{
 			UseCase: &stagingusecase.ResetUseCase{
 				Parser: &fullMockStrategy{service: staging.ServiceParam},
@@ -1219,6 +1275,7 @@ func TestResetRunner_Run(t *testing.T) {
 		})
 
 		var stdout, stderr bytes.Buffer
+
 		r := &cli.ResetRunner{
 			UseCase: &stagingusecase.ResetUseCase{
 				Parser: &fullMockStrategy{service: staging.ServiceParam},
@@ -1242,6 +1299,7 @@ func TestResetRunner_Run(t *testing.T) {
 		store := testutil.NewMockStore()
 
 		var stdout, stderr bytes.Buffer
+
 		r := &cli.ResetRunner{
 			UseCase: &stagingusecase.ResetUseCase{
 				Parser: &fullMockStrategy{service: staging.ServiceParam},
@@ -1262,6 +1320,7 @@ func TestResetRunner_Run(t *testing.T) {
 		store := testutil.NewMockStore()
 
 		var stdout, stderr bytes.Buffer
+
 		fetcher := &fullMockStrategy{
 			service:          staging.ServiceParam,
 			parseSpecVersion: true,
@@ -1294,6 +1353,7 @@ func TestResetRunner_Run(t *testing.T) {
 		store := testutil.NewMockStore()
 
 		var stdout, stderr bytes.Buffer
+
 		r := &cli.ResetRunner{
 			UseCase: &stagingusecase.ResetUseCase{
 				Parser:  &fullMockStrategy{service: staging.ServiceParam, parseSpecVersion: true},
@@ -1315,6 +1375,7 @@ func TestResetRunner_Run(t *testing.T) {
 		store := testutil.NewMockStore()
 
 		var stdout, stderr bytes.Buffer
+
 		fetcher := &fullMockStrategy{
 			service:          staging.ServiceParam,
 			parseSpecVersion: true,
@@ -1341,6 +1402,7 @@ func TestResetRunner_Run(t *testing.T) {
 		store := testutil.NewMockStore()
 
 		var stdout, stderr bytes.Buffer
+
 		r := &cli.ResetRunner{
 			UseCase: &stagingusecase.ResetUseCase{
 				Parser: &fullMockStrategy{
@@ -1377,6 +1439,7 @@ func TestRunners_SecretService(t *testing.T) {
 		})
 
 		var stdout, stderr bytes.Buffer
+
 		r := &cli.StatusRunner{
 			UseCase: &stagingusecase.StatusUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceSecret},
@@ -1402,6 +1465,7 @@ func TestRunners_SecretService(t *testing.T) {
 		})
 
 		var stdout, stderr bytes.Buffer
+
 		r := &cli.ApplyRunner{
 			UseCase: &stagingusecase.ApplyUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceSecret},
@@ -1431,6 +1495,7 @@ func TestRunners_DeleteOptions(t *testing.T) {
 		})
 
 		var stdout, stderr bytes.Buffer
+
 		r := &cli.StatusRunner{
 			UseCase: &stagingusecase.StatusUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceSecret, hasDeleteOptions: true},
@@ -1464,6 +1529,7 @@ func TestDiffRunner_OutputMetadata(t *testing.T) {
 		})
 
 		var stdout, stderr bytes.Buffer
+
 		r := &cli.DiffRunner{
 			UseCase: &stagingusecase.DiffUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentVal: "old-value"},
@@ -1475,6 +1541,7 @@ func TestDiffRunner_OutputMetadata(t *testing.T) {
 
 		err := r.Run(t.Context(), cli.DiffOptions{Name: "/app/config"})
 		require.NoError(t, err)
+
 		output := stdout.String()
 		assert.Contains(t, output, "Description:")
 		assert.Contains(t, output, "Updated config description")
@@ -1495,6 +1562,7 @@ func TestDiffRunner_OutputMetadata(t *testing.T) {
 		})
 
 		var stdout, stderr bytes.Buffer
+
 		r := &cli.DiffRunner{
 			UseCase: &stagingusecase.DiffUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentVal: "old-value"},
@@ -1506,6 +1574,7 @@ func TestDiffRunner_OutputMetadata(t *testing.T) {
 
 		err := r.Run(t.Context(), cli.DiffOptions{Name: "/app/config"})
 		require.NoError(t, err)
+
 		output := stdout.String()
 		assert.Contains(t, output, "Tags:")
 		assert.Contains(t, output, "env=prod")
@@ -1529,6 +1598,7 @@ func TestDiffRunner_OutputMetadata(t *testing.T) {
 		})
 
 		var stdout, stderr bytes.Buffer
+
 		r := &cli.DiffRunner{
 			UseCase: &stagingusecase.DiffUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentErr: errors.New("not found")},
@@ -1540,6 +1610,7 @@ func TestDiffRunner_OutputMetadata(t *testing.T) {
 
 		err := r.Run(t.Context(), cli.DiffOptions{Name: "/app/new-param"})
 		require.NoError(t, err)
+
 		output := stdout.String()
 		assert.Contains(t, output, "+brand-new")
 		assert.Contains(t, output, "staged for creation")
@@ -1563,6 +1634,7 @@ func TestEditRunner_WithMetadata(t *testing.T) {
 		store := testutil.NewMockStore()
 
 		var stdout, stderr bytes.Buffer
+
 		r := &cli.EditRunner{
 			UseCase: &stagingusecase.EditUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentVal: "current"},
@@ -1591,6 +1663,7 @@ func TestEditRunner_WithMetadata(t *testing.T) {
 		awsTime := time.Now().Add(-time.Hour).Truncate(time.Second)
 
 		var stdout, stderr bytes.Buffer
+
 		r := &cli.EditRunner{
 			UseCase: &stagingusecase.EditUseCase{
 				Strategy: &fullMockStrategy{
@@ -1627,6 +1700,7 @@ func TestEditRunner_WithMetadata(t *testing.T) {
 		})
 
 		var stdout, stderr bytes.Buffer
+
 		r := &cli.EditRunner{
 			UseCase: &stagingusecase.EditUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentVal: "aws-value"},
@@ -1636,6 +1710,7 @@ func TestEditRunner_WithMetadata(t *testing.T) {
 			Stderr: &stderr,
 			OpenEditor: func(_ context.Context, _ string) (string, error) {
 				t.Fatal("OpenEditor should not be called when delete is staged")
+
 				return "", nil
 			},
 		}
@@ -1664,6 +1739,7 @@ func TestApplyRunner_WithTags(t *testing.T) {
 		})
 
 		var stdout, stderr bytes.Buffer
+
 		r := &cli.ApplyRunner{
 			UseCase: &stagingusecase.ApplyUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam},
@@ -1675,6 +1751,7 @@ func TestApplyRunner_WithTags(t *testing.T) {
 
 		err := r.Run(t.Context(), cli.ApplyOptions{})
 		require.NoError(t, err)
+
 		output := stdout.String()
 		assert.Contains(t, output, "Tagged")
 		assert.Contains(t, output, "+2")
@@ -1693,6 +1770,7 @@ func TestApplyRunner_WithTags(t *testing.T) {
 		})
 
 		var stdout, stderr bytes.Buffer
+
 		r := &cli.ApplyRunner{
 			UseCase: &stagingusecase.ApplyUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam},
@@ -1704,6 +1782,7 @@ func TestApplyRunner_WithTags(t *testing.T) {
 
 		err := r.Run(t.Context(), cli.ApplyOptions{})
 		require.NoError(t, err)
+
 		output := stdout.String()
 		assert.Contains(t, output, "Tagged")
 		assert.Contains(t, output, "-2")
@@ -1727,6 +1806,7 @@ func TestApplyRunner_WithTags(t *testing.T) {
 		})
 
 		var stdout, stderr bytes.Buffer
+
 		r := &cli.ApplyRunner{
 			UseCase: &stagingusecase.ApplyUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam},
@@ -1738,6 +1818,7 @@ func TestApplyRunner_WithTags(t *testing.T) {
 
 		err := r.Run(t.Context(), cli.ApplyOptions{})
 		require.NoError(t, err)
+
 		output := stdout.String()
 		assert.Contains(t, output, "Updated")
 		assert.Contains(t, output, "Tagged")
@@ -1763,6 +1844,7 @@ func TestStatusRunner_WithTagEntries(t *testing.T) {
 		})
 
 		var stdout, stderr bytes.Buffer
+
 		r := &cli.StatusRunner{
 			UseCase: &stagingusecase.StatusUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam},
@@ -1774,6 +1856,7 @@ func TestStatusRunner_WithTagEntries(t *testing.T) {
 
 		err := r.Run(t.Context(), cli.StatusOptions{Name: "/app/config"})
 		require.NoError(t, err)
+
 		output := stdout.String()
 		assert.Contains(t, output, "/app/config")
 		assert.Contains(t, output, "T") // Tag indicator
@@ -1792,6 +1875,7 @@ func TestStatusRunner_WithTagEntries(t *testing.T) {
 		})
 
 		var stdout, stderr bytes.Buffer
+
 		r := &cli.StatusRunner{
 			UseCase: &stagingusecase.StatusUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam},
@@ -1803,6 +1887,7 @@ func TestStatusRunner_WithTagEntries(t *testing.T) {
 
 		err := r.Run(t.Context(), cli.StatusOptions{Name: "/app/config"})
 		require.NoError(t, err)
+
 		output := stdout.String()
 		assert.Contains(t, output, "+1 tag(s)")
 		assert.Contains(t, output, "-2 tag(s)")
@@ -1820,6 +1905,7 @@ func TestStatusRunner_WithTagEntries(t *testing.T) {
 		})
 
 		var stdout, stderr bytes.Buffer
+
 		r := &cli.StatusRunner{
 			UseCase: &stagingusecase.StatusUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam},
@@ -1831,6 +1917,7 @@ func TestStatusRunner_WithTagEntries(t *testing.T) {
 
 		err := r.Run(t.Context(), cli.StatusOptions{Name: "/app/config", Verbose: true})
 		require.NoError(t, err)
+
 		output := stdout.String()
 		assert.Contains(t, output, "+ env=prod")
 		assert.Contains(t, output, "- deprecated")
@@ -1850,6 +1937,7 @@ func TestStatusRunner_WithTagEntries(t *testing.T) {
 		})
 
 		var stdout, stderr bytes.Buffer
+
 		r := &cli.StatusRunner{
 			UseCase: &stagingusecase.StatusUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam},
@@ -1861,6 +1949,7 @@ func TestStatusRunner_WithTagEntries(t *testing.T) {
 
 		err := r.Run(t.Context(), cli.StatusOptions{})
 		require.NoError(t, err)
+
 		output := stdout.String()
 		assert.Contains(t, output, "Staged")
 		assert.Contains(t, output, "(2)")
@@ -1883,6 +1972,7 @@ func TestStatusRunner_WithTagEntries(t *testing.T) {
 		})
 
 		var stdout, stderr bytes.Buffer
+
 		r := &cli.StatusRunner{
 			UseCase: &stagingusecase.StatusUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam},
@@ -1894,6 +1984,7 @@ func TestStatusRunner_WithTagEntries(t *testing.T) {
 
 		err := r.Run(t.Context(), cli.StatusOptions{})
 		require.NoError(t, err)
+
 		output := stdout.String()
 		assert.Contains(t, output, "(2)") // 1 entry + 1 tag
 		assert.Contains(t, output, "/app/value")
@@ -1912,6 +2003,7 @@ func TestStatusRunner_WithTagEntries(t *testing.T) {
 		})
 
 		var stdout, stderr bytes.Buffer
+
 		r := &cli.StatusRunner{
 			UseCase: &stagingusecase.StatusUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam},
@@ -1923,6 +2015,7 @@ func TestStatusRunner_WithTagEntries(t *testing.T) {
 
 		err := r.Run(t.Context(), cli.StatusOptions{Verbose: true})
 		require.NoError(t, err)
+
 		output := stdout.String()
 		assert.Contains(t, output, "+ env=prod")
 		assert.Contains(t, output, "- old")
@@ -1938,6 +2031,7 @@ func TestDeleteRunner_Run(t *testing.T) {
 		store := testutil.NewMockStore()
 
 		var stdout, stderr bytes.Buffer
+
 		r := &cli.DeleteRunner{
 			UseCase: &stagingusecase.DeleteUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchLastModifiedVal: time.Now()},
@@ -1963,6 +2057,7 @@ func TestDeleteRunner_Run(t *testing.T) {
 		store := testutil.NewMockStore()
 
 		var stdout, stderr bytes.Buffer
+
 		r := &cli.DeleteRunner{
 			UseCase: &stagingusecase.DeleteUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceSecret, hasDeleteOptions: true, fetchLastModifiedVal: time.Now()},
@@ -1993,6 +2088,7 @@ func TestDeleteRunner_Run(t *testing.T) {
 		store := testutil.NewMockStore()
 
 		var stdout, stderr bytes.Buffer
+
 		r := &cli.DeleteRunner{
 			UseCase: &stagingusecase.DeleteUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceSecret, hasDeleteOptions: true, fetchLastModifiedVal: time.Now()},
@@ -2022,6 +2118,7 @@ func TestDeleteRunner_Run(t *testing.T) {
 		store := testutil.NewMockStore()
 
 		var stdout, stderr bytes.Buffer
+
 		r := &cli.DeleteRunner{
 			UseCase: &stagingusecase.DeleteUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchLastModifiedErr: errors.New("not found")},
@@ -2042,6 +2139,7 @@ func TestDeleteRunner_Run(t *testing.T) {
 		store := testutil.NewMockStore()
 
 		var stdout, stderr bytes.Buffer
+
 		r := &cli.DeleteRunner{
 			UseCase: &stagingusecase.DeleteUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceSecret, hasDeleteOptions: true, fetchLastModifiedVal: time.Now()},
@@ -2072,6 +2170,7 @@ func TestDeleteRunner_Run(t *testing.T) {
 		})
 
 		var stdout, stderr bytes.Buffer
+
 		r := &cli.DeleteRunner{
 			UseCase: &stagingusecase.DeleteUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam},
@@ -2104,6 +2203,7 @@ func TestEditRunner_Skipped_Unstaged(t *testing.T) {
 		store := testutil.NewMockStore()
 
 		var stdout, stderr bytes.Buffer
+
 		r := &cli.EditRunner{
 			UseCase: &stagingusecase.EditUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentVal: "aws-value"},
@@ -2139,6 +2239,7 @@ func TestEditRunner_Skipped_Unstaged(t *testing.T) {
 		})
 
 		var stdout, stderr bytes.Buffer
+
 		r := &cli.EditRunner{
 			UseCase: &stagingusecase.EditUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentVal: "aws-value"},
@@ -2225,6 +2326,7 @@ func TestStashPopRunner_Run(t *testing.T) {
 		})
 
 		var stdout, stderr bytes.Buffer
+
 		r := &cli.StashPopRunner{
 			UseCase: &stagingusecase.StashPopUseCase{
 				FileStore:  fileStore,
@@ -2261,6 +2363,7 @@ func TestStashPopRunner_Run(t *testing.T) {
 		})
 
 		var stdout, stderr bytes.Buffer
+
 		r := &cli.StashPopRunner{
 			UseCase: &stagingusecase.StashPopUseCase{
 				FileStore:  fileStore,
@@ -2302,6 +2405,7 @@ func TestStashPopRunner_Run(t *testing.T) {
 		})
 
 		var stdout, stderr bytes.Buffer
+
 		r := &cli.StashPopRunner{
 			UseCase: &stagingusecase.StashPopUseCase{
 				FileStore:  fileStore,
@@ -2343,6 +2447,7 @@ func TestStashPopRunner_Run(t *testing.T) {
 		})
 
 		var stdout, stderr bytes.Buffer
+
 		r := &cli.StashPopRunner{
 			UseCase: &stagingusecase.StashPopUseCase{
 				FileStore:  fileStore,
@@ -2375,6 +2480,7 @@ func TestStashPopRunner_Run(t *testing.T) {
 		agentStore := testutil.NewMockStore()
 
 		var stdout, stderr bytes.Buffer
+
 		r := &cli.StashPopRunner{
 			UseCase: &stagingusecase.StashPopUseCase{
 				FileStore:  fileStore,
@@ -2410,6 +2516,7 @@ func TestStashPopRunner_Run(t *testing.T) {
 		})
 
 		var stdout, stderr bytes.Buffer
+
 		r := &cli.StashPopRunner{
 			UseCase: &stagingusecase.StashPopUseCase{
 				FileStore:  fileStore,
@@ -2445,6 +2552,7 @@ func TestStashPopRunner_Run(t *testing.T) {
 		})
 
 		var stdout, stderr bytes.Buffer
+
 		r := &cli.StashPopRunner{
 			UseCase: &stagingusecase.StashPopUseCase{
 				FileStore:  fileStore,
@@ -2481,6 +2589,7 @@ func TestStashPopRunner_Run(t *testing.T) {
 		})
 
 		var stdout, stderr bytes.Buffer
+
 		r := &cli.StashPopRunner{
 			UseCase: &stagingusecase.StashPopUseCase{
 				FileStore:  fileStore,
@@ -2516,6 +2625,7 @@ func TestStashPopRunner_Run(t *testing.T) {
 		})
 
 		var stdout, stderr bytes.Buffer
+
 		r := &cli.StashPopRunner{
 			UseCase: &stagingusecase.StashPopUseCase{
 				FileStore:  fileStore,
@@ -2556,6 +2666,7 @@ func TestStashPushRunner_Run(t *testing.T) {
 		})
 
 		var stdout, stderr bytes.Buffer
+
 		r := &cli.StashPushRunner{
 			UseCase: &stagingusecase.StashPushUseCase{
 				AgentStore: agentStore,
@@ -2593,6 +2704,7 @@ func TestStashPushRunner_Run(t *testing.T) {
 		})
 
 		var stdout, stderr bytes.Buffer
+
 		r := &cli.StashPushRunner{
 			UseCase: &stagingusecase.StashPushUseCase{
 				AgentStore: agentStore,
@@ -2626,6 +2738,7 @@ func TestStashPushRunner_Run(t *testing.T) {
 		})
 
 		var stdout, stderr bytes.Buffer
+
 		r := &cli.StashPushRunner{
 			UseCase: &stagingusecase.StashPushUseCase{
 				AgentStore: agentStore,
@@ -2649,6 +2762,7 @@ func TestStashPushRunner_Run(t *testing.T) {
 		fileStore := testutil.NewMockStore()
 
 		var stdout, stderr bytes.Buffer
+
 		r := &cli.StashPushRunner{
 			UseCase: &stagingusecase.StashPushUseCase{
 				AgentStore: agentStore,
@@ -2682,6 +2796,7 @@ func TestStashPushRunner_Run(t *testing.T) {
 		})
 
 		var stdout, stderr bytes.Buffer
+
 		r := &cli.StashPushRunner{
 			UseCase: &stagingusecase.StashPushUseCase{
 				AgentStore: agentStore,
@@ -2717,6 +2832,7 @@ func TestStashPushRunner_Run(t *testing.T) {
 		})
 
 		var stdout, stderr bytes.Buffer
+
 		r := &cli.StashPushRunner{
 			UseCase: &stagingusecase.StashPushUseCase{
 				AgentStore: agentStore,
@@ -2752,6 +2868,7 @@ func TestDiffRunner_TagEntries(t *testing.T) {
 		})
 
 		var stdout, stderr bytes.Buffer
+
 		r := &cli.DiffRunner{
 			UseCase: &stagingusecase.DiffUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam},
@@ -2763,6 +2880,7 @@ func TestDiffRunner_TagEntries(t *testing.T) {
 
 		err := r.Run(t.Context(), cli.DiffOptions{Name: "/app/config"})
 		require.NoError(t, err)
+
 		output := stdout.String()
 		assert.Contains(t, output, "Tags:")
 		assert.Contains(t, output, "+")
@@ -2779,6 +2897,7 @@ func TestDiffRunner_TagEntries(t *testing.T) {
 		})
 
 		var stdout, stderr bytes.Buffer
+
 		r := &cli.DiffRunner{
 			UseCase: &stagingusecase.DiffUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam},
@@ -2790,6 +2909,7 @@ func TestDiffRunner_TagEntries(t *testing.T) {
 
 		err := r.Run(t.Context(), cli.DiffOptions{Name: "/app/config"})
 		require.NoError(t, err)
+
 		output := stdout.String()
 		assert.Contains(t, output, "Tags:")
 		assert.Contains(t, output, "env=prod")
@@ -2806,6 +2926,7 @@ func TestDiffRunner_TagEntries(t *testing.T) {
 		})
 
 		var stdout, stderr bytes.Buffer
+
 		r := &cli.DiffRunner{
 			UseCase: &stagingusecase.DiffUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam},
@@ -2817,6 +2938,7 @@ func TestDiffRunner_TagEntries(t *testing.T) {
 
 		err := r.Run(t.Context(), cli.DiffOptions{Name: "/app/config"})
 		require.NoError(t, err)
+
 		output := stdout.String()
 		assert.Contains(t, output, "Tags:")
 		assert.Contains(t, output, "-")
@@ -2837,6 +2959,7 @@ func TestDiffRunner_TagEntries(t *testing.T) {
 		})
 
 		var stdout, stderr bytes.Buffer
+
 		r := &cli.DiffRunner{
 			UseCase: &stagingusecase.DiffUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam},
@@ -2848,6 +2971,7 @@ func TestDiffRunner_TagEntries(t *testing.T) {
 
 		err := r.Run(t.Context(), cli.DiffOptions{})
 		require.NoError(t, err)
+
 		output := stdout.String()
 		assert.Contains(t, output, "/app/config1")
 		assert.Contains(t, output, "/app/config2")
@@ -2872,6 +2996,7 @@ func TestStatusRunner_RemoveOnlyTag(t *testing.T) {
 		})
 
 		var stdout, stderr bytes.Buffer
+
 		r := &cli.StatusRunner{
 			UseCase: &stagingusecase.StatusUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam},
@@ -2883,6 +3008,7 @@ func TestStatusRunner_RemoveOnlyTag(t *testing.T) {
 
 		err := r.Run(t.Context(), cli.StatusOptions{Name: "/app/config"})
 		require.NoError(t, err)
+
 		output := stdout.String()
 		assert.Contains(t, output, "T") // Tag indicator
 		assert.Contains(t, output, "-2 tag(s)")
@@ -2899,6 +3025,7 @@ func TestStatusRunner_RemoveOnlyTag(t *testing.T) {
 		})
 
 		var stdout, stderr bytes.Buffer
+
 		r := &cli.StatusRunner{
 			UseCase: &stagingusecase.StatusUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam},
@@ -2910,6 +3037,7 @@ func TestStatusRunner_RemoveOnlyTag(t *testing.T) {
 
 		err := r.Run(t.Context(), cli.StatusOptions{Name: "/app/config", Verbose: true})
 		require.NoError(t, err)
+
 		output := stdout.String()
 		assert.Contains(t, output, "- deprecated")
 		assert.Contains(t, output, "- old")
@@ -2933,6 +3061,7 @@ func TestApplyRunner_TagSummaryEdgeCases(t *testing.T) {
 		})
 
 		var stdout, stderr bytes.Buffer
+
 		r := &cli.ApplyRunner{
 			UseCase: &stagingusecase.ApplyUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam},
@@ -2944,6 +3073,7 @@ func TestApplyRunner_TagSummaryEdgeCases(t *testing.T) {
 
 		err := r.Run(t.Context(), cli.ApplyOptions{})
 		require.NoError(t, err)
+
 		output := stdout.String()
 		assert.Contains(t, output, "Tagged")
 		assert.Contains(t, output, "+2")
@@ -2960,6 +3090,7 @@ func TestApplyRunner_TagSummaryEdgeCases(t *testing.T) {
 		})
 
 		var stdout, stderr bytes.Buffer
+
 		r := &cli.ApplyRunner{
 			UseCase: &stagingusecase.ApplyUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam},
@@ -2971,6 +3102,7 @@ func TestApplyRunner_TagSummaryEdgeCases(t *testing.T) {
 
 		err := r.Run(t.Context(), cli.ApplyOptions{})
 		require.NoError(t, err)
+
 		output := stdout.String()
 		assert.Contains(t, output, "Tagged")
 		assert.Contains(t, output, "-3")

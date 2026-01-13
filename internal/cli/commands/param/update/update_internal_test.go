@@ -19,6 +19,7 @@ func (m *mockGetParameterClient) GetParameter(_ context.Context, _ *paramapi.Get
 	if m.err != nil {
 		return nil, m.err
 	}
+
 	return m.output, nil
 }
 
@@ -27,6 +28,7 @@ func TestGetCurrentValue(t *testing.T) {
 
 	t.Run("returns value when parameter exists", func(t *testing.T) {
 		t.Parallel()
+
 		client := &mockGetParameterClient{
 			output: &paramapi.GetParameterOutput{
 				Parameter: &paramapi.Parameter{
@@ -43,17 +45,19 @@ func TestGetCurrentValue(t *testing.T) {
 
 	t.Run("returns false when error occurs", func(t *testing.T) {
 		t.Parallel()
+
 		client := &mockGetParameterClient{
 			err: &paramapi.ParameterNotFound{Message: lo.ToPtr("not found")},
 		}
 
 		value, ok := getCurrentValue(context.Background(), client, "/app/missing")
 		assert.False(t, ok)
-		assert.Equal(t, "", value)
+		assert.Empty(t, value)
 	})
 
 	t.Run("returns false when parameter is nil", func(t *testing.T) {
 		t.Parallel()
+
 		client := &mockGetParameterClient{
 			output: &paramapi.GetParameterOutput{
 				Parameter: nil,
@@ -62,11 +66,12 @@ func TestGetCurrentValue(t *testing.T) {
 
 		value, ok := getCurrentValue(context.Background(), client, "/app/config")
 		assert.False(t, ok)
-		assert.Equal(t, "", value)
+		assert.Empty(t, value)
 	})
 
 	t.Run("returns false when value is nil", func(t *testing.T) {
 		t.Parallel()
+
 		client := &mockGetParameterClient{
 			output: &paramapi.GetParameterOutput{
 				Parameter: &paramapi.Parameter{
@@ -78,6 +83,6 @@ func TestGetCurrentValue(t *testing.T) {
 
 		value, ok := getCurrentValue(context.Background(), client, "/app/config")
 		assert.False(t, ok)
-		assert.Equal(t, "", value)
+		assert.Empty(t, value)
 	})
 }

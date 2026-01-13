@@ -21,6 +21,7 @@ func TestCommand_Validation(t *testing.T) {
 
 	t.Run("missing arguments", func(t *testing.T) {
 		t.Parallel()
+
 		app := appcli.MakeApp()
 		err := app.Run(t.Context(), []string{"suve", "param", "tag"})
 		require.Error(t, err)
@@ -29,6 +30,7 @@ func TestCommand_Validation(t *testing.T) {
 
 	t.Run("missing tag argument", func(t *testing.T) {
 		t.Parallel()
+
 		app := appcli.MakeApp()
 		err := app.Run(t.Context(), []string{"suve", "param", "tag", "/app/param"})
 		require.Error(t, err)
@@ -37,6 +39,7 @@ func TestCommand_Validation(t *testing.T) {
 
 	t.Run("invalid tag format", func(t *testing.T) {
 		t.Parallel()
+
 		app := appcli.MakeApp()
 		err := app.Run(t.Context(), []string{"suve", "param", "tag", "/app/param", "invalid"})
 		require.Error(t, err)
@@ -45,6 +48,7 @@ func TestCommand_Validation(t *testing.T) {
 
 	t.Run("empty key", func(t *testing.T) {
 		t.Parallel()
+
 		app := appcli.MakeApp()
 		err := app.Run(t.Context(), []string{"suve", "param", "tag", "/app/param", "=value"})
 		require.Error(t, err)
@@ -61,6 +65,7 @@ func (m *mockClient) AddTagsToResource(ctx context.Context, params *paramapi.Add
 	if m.addTagsFunc != nil {
 		return m.addTagsFunc(ctx, params, optFns...)
 	}
+
 	return &paramapi.AddTagsToResourceOutput{}, nil
 }
 
@@ -68,6 +73,7 @@ func (m *mockClient) RemoveTagsFromResource(ctx context.Context, params *paramap
 	if m.removeTagsFunc != nil {
 		return m.removeTagsFunc(ctx, params, optFns...)
 	}
+
 	return &paramapi.RemoveTagsFromResourceOutput{}, nil
 }
 
@@ -92,6 +98,7 @@ func TestRun(t *testing.T) {
 					assert.Equal(t, "/app/param", lo.FromPtr(params.ResourceId))
 					assert.Equal(t, paramapi.ResourceTypeForTaggingParameter, params.ResourceType)
 					assert.Len(t, params.Tags, 1)
+
 					return &paramapi.AddTagsToResourceOutput{}, nil
 				},
 			},
@@ -110,6 +117,7 @@ func TestRun(t *testing.T) {
 			mock: &mockClient{
 				addTagsFunc: func(_ context.Context, params *paramapi.AddTagsToResourceInput, _ ...func(*paramapi.Options)) (*paramapi.AddTagsToResourceOutput, error) {
 					assert.Len(t, params.Tags, 2)
+
 					return &paramapi.AddTagsToResourceOutput{}, nil
 				},
 			},
@@ -136,7 +144,9 @@ func TestRun(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
+
 			var buf bytes.Buffer
+
 			r := &tag.Runner{
 				UseCase: &param.TagUseCase{Client: tt.mock},
 				Stdout:  &buf,
@@ -146,10 +156,12 @@ func TestRun(t *testing.T) {
 			if tt.wantErr != "" {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tt.wantErr)
+
 				return
 			}
 
 			require.NoError(t, err)
+
 			if tt.check != nil {
 				tt.check(t, buf.String())
 			}

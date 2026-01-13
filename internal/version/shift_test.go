@@ -9,6 +9,7 @@ import (
 
 func TestParseShift(t *testing.T) {
 	t.Parallel()
+
 	tests := []struct {
 		name      string
 		input     string
@@ -58,11 +59,14 @@ func TestParseShift(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
+
 			gotShift, err := parseShift(tt.input)
 			if tt.wantErr {
 				assert.Error(t, err)
+
 				return
 			}
+
 			require.NoError(t, err)
 			assert.Equal(t, tt.wantShift, gotShift)
 		})
@@ -71,6 +75,7 @@ func TestParseShift(t *testing.T) {
 
 func TestIsShiftStart(t *testing.T) {
 	t.Parallel()
+
 	tests := []struct {
 		name string
 		s    string
@@ -117,6 +122,7 @@ func TestIsShiftStart(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
+
 			got := isShiftStart(tt.s, tt.i)
 			assert.Equal(t, tt.want, got)
 		})

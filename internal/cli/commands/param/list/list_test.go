@@ -19,8 +19,11 @@ import (
 
 func TestCommand_Help(t *testing.T) {
 	t.Parallel()
+
 	app := appcli.MakeApp()
+
 	var buf bytes.Buffer
+
 	app.Writer = &buf
 	err := app.Run(t.Context(), []string{"suve", "param", "list", "--help"})
 	require.NoError(t, err)
@@ -39,6 +42,7 @@ func (m *mockClient) DescribeParameters(ctx context.Context, params *paramapi.De
 	if m.describeParametersFunc != nil {
 		return m.describeParametersFunc(ctx, params, optFns...)
 	}
+
 	return nil, fmt.Errorf("DescribeParameters not mocked")
 }
 
@@ -46,6 +50,7 @@ func (m *mockClient) GetParameters(ctx context.Context, params *paramapi.GetPara
 	if m.getParametersFunc != nil {
 		return m.getParametersFunc(ctx, params, optFns...)
 	}
+
 	return nil, fmt.Errorf("GetParameters not mocked")
 }
 
@@ -84,6 +89,7 @@ func TestRun(t *testing.T) {
 			mock: &mockClient{
 				describeParametersFunc: func(_ context.Context, params *paramapi.DescribeParametersInput, _ ...func(*paramapi.Options)) (*paramapi.DescribeParametersOutput, error) {
 					require.NotEmpty(t, params.ParameterFilters, "expected filter to be set")
+
 					return &paramapi.DescribeParametersOutput{
 						Parameters: []paramapi.ParameterMetadata{
 							{Name: lo.ToPtr("/app/param1")},
@@ -103,6 +109,7 @@ func TestRun(t *testing.T) {
 				describeParametersFunc: func(_ context.Context, params *paramapi.DescribeParametersInput, _ ...func(*paramapi.Options)) (*paramapi.DescribeParametersOutput, error) {
 					require.NotEmpty(t, params.ParameterFilters, "expected filter to be set")
 					assert.Equal(t, "Recursive", lo.FromPtr(params.ParameterFilters[0].Option))
+
 					return &paramapi.DescribeParametersOutput{
 						Parameters: []paramapi.ParameterMetadata{
 							{Name: lo.ToPtr("/app/sub/param")},
@@ -172,7 +179,9 @@ func TestRun(t *testing.T) {
 						"/app/param1": "value1",
 						"/app/param2": "value2",
 					}
+
 					var result []paramapi.Parameter
+
 					for _, name := range params.Names {
 						if val, ok := values[name]; ok {
 							result = append(result, paramapi.Parameter{
@@ -181,6 +190,7 @@ func TestRun(t *testing.T) {
 							})
 						}
 					}
+
 					return &paramapi.GetParametersOutput{
 						Parameters: result,
 					}, nil
@@ -229,6 +239,7 @@ func TestRun(t *testing.T) {
 							Value: lo.ToPtr("secret-value"),
 						})
 					}
+
 					return &paramapi.GetParametersOutput{
 						Parameters: result,
 					}, nil
@@ -290,7 +301,9 @@ func TestRun(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
+
 			var buf, errBuf bytes.Buffer
+
 			r := &list.Runner{
 				UseCase: &param.ListUseCase{Client: tt.mock},
 				Stdout:  &buf,
@@ -300,10 +313,12 @@ func TestRun(t *testing.T) {
 
 			if tt.wantErr {
 				assert.Error(t, err)
+
 				return
 			}
 
 			require.NoError(t, err)
+
 			if tt.check != nil {
 				tt.check(t, buf.String())
 			}

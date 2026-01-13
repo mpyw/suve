@@ -69,11 +69,13 @@ Set ` + agentcfg.EnvDaemonManualMode + `=1 to enable manual mode (disables auto-
 				if err != nil {
 					return fmt.Errorf("failed to get AWS identity: %w", err)
 				}
+
 				accountID = identity.AccountID
 				region = identity.Region
 			}
 
 			runner := daemon.NewRunner(accountID, region, agentcfg.DaemonOptions()...)
+
 			return runner.Run(ctx)
 		},
 	}
@@ -96,9 +98,12 @@ Note: Any staged changes in memory will be lost unless persisted first.`,
 			launcher := daemon.NewLauncher(identity.AccountID, identity.Region)
 			if err := launcher.Shutdown(); err != nil {
 				output.Printf(cmd.Root().ErrWriter, "Warning: %v\n", err)
+
 				return nil
 			}
+
 			output.Println(cmd.Root().Writer, "Agent stopped")
+
 			return nil
 		},
 	}

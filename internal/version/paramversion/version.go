@@ -23,6 +23,7 @@ func GetParameterWithVersion(ctx context.Context, client Client, spec *Spec) (*p
 	if spec.HasShift() {
 		return getParameterWithShift(ctx, client, spec)
 	}
+
 	return getParameterDirect(ctx, client, spec)
 }
 
@@ -44,8 +45,10 @@ func getParameterWithShift(ctx context.Context, client paramapi.GetParameterHist
 	slices.Reverse(params)
 
 	baseIdx := 0
+
 	if spec.Absolute.Version != nil {
 		var found bool
+
 		_, baseIdx, found = lo.FindIndexOf(params, func(p paramapi.ParameterHistory) bool {
 			return p.Version == *spec.Absolute.Version
 		})
@@ -79,6 +82,7 @@ func getParameterDirect(ctx context.Context, client paramapi.GetParameterAPI, sp
 	}
 
 	param := result.Parameter
+
 	return &paramapi.ParameterHistory{
 		Name:             param.Name,
 		Value:            param.Value,

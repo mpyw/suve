@@ -21,6 +21,7 @@ func TestCommand_Validation(t *testing.T) {
 
 	t.Run("missing arguments", func(t *testing.T) {
 		t.Parallel()
+
 		app := appcli.MakeApp()
 		err := app.Run(t.Context(), []string{"suve", "secret", "untag"})
 		require.Error(t, err)
@@ -29,6 +30,7 @@ func TestCommand_Validation(t *testing.T) {
 
 	t.Run("missing key argument", func(t *testing.T) {
 		t.Parallel()
+
 		app := appcli.MakeApp()
 		err := app.Run(t.Context(), []string{"suve", "secret", "untag", "my-secret"})
 		require.Error(t, err)
@@ -46,6 +48,7 @@ func (m *mockClient) DescribeSecret(ctx context.Context, params *secretapi.Descr
 	if m.describeSecretFunc != nil {
 		return m.describeSecretFunc(ctx, params, optFns...)
 	}
+
 	return &secretapi.DescribeSecretOutput{
 		ARN: lo.ToPtr("arn:aws:secretsmanager:us-east-1:123456789012:secret:my-secret"),
 	}, nil
@@ -55,6 +58,7 @@ func (m *mockClient) TagResource(ctx context.Context, params *secretapi.TagResou
 	if m.tagResourceFunc != nil {
 		return m.tagResourceFunc(ctx, params, optFns...)
 	}
+
 	return &secretapi.TagResourceOutput{}, nil
 }
 
@@ -62,6 +66,7 @@ func (m *mockClient) UntagResource(ctx context.Context, params *secretapi.UntagR
 	if m.untagResourceFunc != nil {
 		return m.untagResourceFunc(ctx, params, optFns...)
 	}
+
 	return &secretapi.UntagResourceOutput{}, nil
 }
 
@@ -85,6 +90,7 @@ func TestRun(t *testing.T) {
 				untagResourceFunc: func(_ context.Context, params *secretapi.UntagResourceInput, _ ...func(*secretapi.Options)) (*secretapi.UntagResourceOutput, error) {
 					assert.Contains(t, lo.FromPtr(params.SecretId), "arn:aws:secretsmanager")
 					assert.Equal(t, []string{"env"}, params.TagKeys)
+
 					return &secretapi.UntagResourceOutput{}, nil
 				},
 			},
@@ -102,6 +108,7 @@ func TestRun(t *testing.T) {
 			mock: &mockClient{
 				untagResourceFunc: func(_ context.Context, params *secretapi.UntagResourceInput, _ ...func(*secretapi.Options)) (*secretapi.UntagResourceOutput, error) {
 					assert.Len(t, params.TagKeys, 2)
+
 					return &secretapi.UntagResourceOutput{}, nil
 				},
 			},
@@ -140,7 +147,9 @@ func TestRun(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
+
 			var buf bytes.Buffer
+
 			r := &untag.Runner{
 				UseCase: &secret.TagUseCase{Client: tt.mock},
 				Stdout:  &buf,
@@ -150,10 +159,12 @@ func TestRun(t *testing.T) {
 			if tt.wantErr != "" {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tt.wantErr)
+
 				return
 			}
 
 			require.NoError(t, err)
+
 			if tt.check != nil {
 				tt.check(t, buf.String())
 			}

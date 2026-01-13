@@ -164,6 +164,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		if err != nil {
 			return fmt.Errorf("invalid --since value: must be RFC3339 format (e.g., '2024-01-01T00:00:00Z')")
 		}
+
 		opts.Since = &since
 	}
 
@@ -173,6 +174,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		if err != nil {
 			return fmt.Errorf("invalid --until value: must be RFC3339 format (e.g., '2024-12-31T23:59:59Z')")
 		}
+
 		opts.Until = &until
 	}
 
@@ -191,6 +193,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		if opts.ShowPatch {
 			output.Warning(cmd.Root().ErrWriter, "-p/--patch has no effect with --output=json")
 		}
+
 		if opts.Oneline {
 			output.Warning(cmd.Root().ErrWriter, "--oneline has no effect with --output=json")
 		}
@@ -210,6 +213,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 			Stdout:  w,
 			Stderr:  cmd.Root().ErrWriter,
 		}
+
 		return r.Run(ctx, opts)
 	})
 }
@@ -245,8 +249,10 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 				items[i].Modified = timeutil.FormatRFC3339(*entry.LastModified)
 			}
 		}
+
 		enc := json.NewEncoder(r.Stdout)
 		enc.SetIndent("", "  ")
+
 		return enc.Encode(items)
 	}
 
@@ -257,6 +263,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 			if entry.LastModified != nil {
 				dateStr = entry.LastModified.Format("2006-01-02")
 			}
+
 			value := entry.Value
 			// Determine max length for oneline mode
 			maxLen := opts.MaxValueLength
@@ -264,18 +271,19 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 				// Auto: use terminal width minus overhead for metadata
 				// Reserve ~30 chars for: version (6) + current mark (10) + date (10) + separators (4)
 				termWidth := terminal.GetWidthFromWriter(r.Stdout)
-				maxLen = termWidth - 30
-				if maxLen < 10 {
-					maxLen = 10
-				}
+
+				maxLen = max(termWidth-30, 10)
 			}
+
 			if maxLen > 0 && len(value) > maxLen {
 				value = value[:maxLen] + "..."
 			}
+
 			currentMark := ""
 			if entry.IsCurrent {
 				currentMark = colors.Current(" (current)")
 			}
+
 			output.Printf(r.Stdout, "%s%d%s  %s  %s\n",
 				colors.Version(""),
 				entry.Version,
@@ -283,6 +291,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 				colors.FieldLabel(dateStr),
 				value,
 			)
+
 			continue
 		}
 
@@ -290,7 +299,9 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 		if entry.IsCurrent {
 			versionLabel += " " + colors.Current("(current)")
 		}
+
 		output.Println(r.Stdout, colors.Version(versionLabel))
+
 		if entry.LastModified != nil {
 			output.Printf(r.Stdout, "%s %s\n", colors.FieldLabel("Date:"), timeutil.FormatRFC3339(*entry.LastModified))
 		}
@@ -311,12 +322,15 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 				}
 
 				oldValue := oldEntry.Value
+
 				newValue := newEntry.Value
 				if opts.ParseJSON {
 					oldValue, newValue = jsonutil.TryFormatOrWarn2(oldValue, newValue, r.Stderr, "")
 				}
+
 				oldName := fmt.Sprintf("%s#%d", result.Name, oldEntry.Version)
 				newName := fmt.Sprintf("%s#%d", result.Name, newEntry.Version)
+
 				diff := output.Diff(oldName, newName, oldValue, newValue)
 				if diff != "" {
 					output.Println(r.Stdout, "")
@@ -329,6 +343,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 			if opts.MaxValueLength > 0 && len(value) > opts.MaxValueLength {
 				value = value[:opts.MaxValueLength] + "..."
 			}
+
 			output.Printf(r.Stdout, "%s\n", value)
 		}
 

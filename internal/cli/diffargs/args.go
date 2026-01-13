@@ -156,6 +156,7 @@ func parseOneArg[A any](
 	// For SSM Parameter Store: latest version
 	// For Secrets Manager: AWSCURRENT label
 	var zero A
+
 	spec2 := &version.Spec[A]{Name: spec.Name, Absolute: zero, Shift: 0}
 
 	return spec, spec2, nil
@@ -225,6 +226,7 @@ func parseTwoArgs[A any](
 		// "/app/config" "#3" → compare #3 with latest
 		// This makes the specified version the "from" and default the "to"
 		var zero A
+
 		return spec2, &version.Spec[A]{Name: spec1.Name, Absolute: zero, Shift: 0}, nil
 	}
 

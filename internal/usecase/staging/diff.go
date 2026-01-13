@@ -73,6 +73,7 @@ func (u *DiffUseCase) Execute(ctx context.Context, input DiffInput) (*DiffOutput
 	if err != nil {
 		return nil, err
 	}
+
 	entries := allEntries[service]
 
 	// Get all staged tag entries for the service
@@ -80,6 +81,7 @@ func (u *DiffUseCase) Execute(ctx context.Context, input DiffInput) (*DiffOutput
 	if err != nil {
 		return nil, err
 	}
+
 	tagEntries := allTagEntries[service]
 
 	// Filter by name if specified
@@ -103,6 +105,7 @@ func (u *DiffUseCase) Execute(ctx context.Context, input DiffInput) (*DiffOutput
 				Type:    DiffEntryWarning,
 				Warning: "not staged",
 			})
+
 			return output, nil
 		}
 
@@ -165,6 +168,7 @@ func (u *DiffUseCase) processDiffResult(ctx context.Context, name string, entry 
 	// Check if identical and auto-unstage
 	if awsValue == stagedValue {
 		_ = u.Store.UnstageEntry(ctx, service, name)
+
 		return DiffEntry{
 			Name:    name,
 			Type:    DiffEntryAutoUnstaged,
@@ -189,6 +193,7 @@ func (u *DiffUseCase) handleFetchError(ctx context.Context, name string, entry s
 	switch entry.Operation {
 	case staging.OperationDelete:
 		_ = u.Store.UnstageEntry(ctx, service, name)
+
 		return DiffEntry{
 			Name:    name,
 			Type:    DiffEntryAutoUnstaged,
@@ -206,6 +211,7 @@ func (u *DiffUseCase) handleFetchError(ctx context.Context, name string, entry s
 
 	case staging.OperationUpdate:
 		_ = u.Store.UnstageEntry(ctx, service, name)
+
 		return DiffEntry{
 			Name:    name,
 			Type:    DiffEntryAutoUnstaged,

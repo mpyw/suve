@@ -134,6 +134,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 			Stdout:  w,
 			Stderr:  cmd.Root().ErrWriter,
 		}
+
 		return r.Run(ctx, opts)
 	})
 }
@@ -167,6 +168,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 	// Raw mode: output value only without trailing newline
 	if opts.Raw {
 		output.Print(r.Stdout, value)
+
 		return nil
 	}
 
@@ -182,15 +184,19 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 		if jsonParsed {
 			jsonOut.JsonParsed = lo.ToPtr(true)
 		}
+
 		if result.LastModified != nil {
 			jsonOut.Modified = timeutil.FormatRFC3339(*result.LastModified)
 		}
+
 		jsonOut.Tags = make(map[string]string)
 		for _, tag := range result.Tags {
 			jsonOut.Tags[tag.Key] = tag.Value
 		}
+
 		enc := json.NewEncoder(r.Stdout)
 		enc.SetIndent("", "  ")
+
 		return enc.Encode(jsonOut)
 	}
 
@@ -203,15 +209,19 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 	if jsonParsed {
 		out.Field("JsonParsed", "true")
 	}
+
 	if result.LastModified != nil {
 		out.Field("Modified", timeutil.FormatRFC3339(*result.LastModified))
 	}
+
 	if len(result.Tags) > 0 {
 		out.Field("Tags", fmt.Sprintf("%d tag(s)", len(result.Tags)))
+
 		for _, tag := range result.Tags {
 			out.Field("  "+tag.Key, tag.Value)
 		}
 	}
+
 	out.Separator()
 	out.Value(value)
 

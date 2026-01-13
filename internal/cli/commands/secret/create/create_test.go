@@ -21,6 +21,7 @@ func TestCommand_Validation(t *testing.T) {
 
 	t.Run("missing arguments", func(t *testing.T) {
 		t.Parallel()
+
 		app := appcli.MakeApp()
 		err := app.Run(t.Context(), []string{"suve", "secret", "create"})
 		require.Error(t, err)
@@ -29,6 +30,7 @@ func TestCommand_Validation(t *testing.T) {
 
 	t.Run("missing value argument", func(t *testing.T) {
 		t.Parallel()
+
 		app := appcli.MakeApp()
 		err := app.Run(t.Context(), []string{"suve", "secret", "create", "my-secret"})
 		require.Error(t, err)
@@ -44,6 +46,7 @@ func (m *mockClient) CreateSecret(ctx context.Context, params *secretapi.CreateS
 	if m.createSecretFunc != nil {
 		return m.createSecretFunc(ctx, params, optFns...)
 	}
+
 	return nil, fmt.Errorf("CreateSecret not mocked")
 }
 
@@ -63,6 +66,7 @@ func TestRun(t *testing.T) {
 				createSecretFunc: func(_ context.Context, params *secretapi.CreateSecretInput, _ ...func(*secretapi.Options)) (*secretapi.CreateSecretOutput, error) {
 					assert.Equal(t, "my-secret", lo.FromPtr(params.Name))
 					assert.Equal(t, "secret-value", lo.FromPtr(params.SecretString))
+
 					return &secretapi.CreateSecretOutput{
 						Name:      lo.ToPtr("my-secret"),
 						VersionId: lo.ToPtr("abc123"),
@@ -81,6 +85,7 @@ func TestRun(t *testing.T) {
 			mock: &mockClient{
 				createSecretFunc: func(_ context.Context, params *secretapi.CreateSecretInput, _ ...func(*secretapi.Options)) (*secretapi.CreateSecretOutput, error) {
 					assert.Equal(t, "Test description", lo.FromPtr(params.Description))
+
 					return &secretapi.CreateSecretOutput{
 						Name:      lo.ToPtr("my-secret"),
 						VersionId: lo.ToPtr("abc123"),
@@ -103,7 +108,9 @@ func TestRun(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
+
 			var buf, errBuf bytes.Buffer
+
 			r := &create.Runner{
 				UseCase: &secret.CreateUseCase{Client: tt.mock},
 				Stdout:  &buf,
@@ -114,10 +121,12 @@ func TestRun(t *testing.T) {
 			if tt.wantErr != "" {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tt.wantErr)
+
 				return
 			}
 
 			require.NoError(t, err)
+
 			if tt.check != nil {
 				tt.check(t, buf.String())
 			}

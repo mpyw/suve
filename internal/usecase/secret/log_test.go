@@ -25,6 +25,7 @@ func (m *mockLogClient) ListSecretVersionIds(_ context.Context, _ *secretapi.Lis
 	if m.listVersionsErr != nil {
 		return nil, m.listVersionsErr
 	}
+
 	return m.listVersionsResult, nil
 }
 
@@ -35,11 +36,13 @@ func (m *mockLogClient) GetSecretValue(_ context.Context, input *secretapi.GetSe
 			return nil, err
 		}
 	}
+
 	if m.getSecretValueValue != nil {
 		if value, ok := m.getSecretValueValue[versionID]; ok {
 			return &secretapi.GetSecretValueOutput{SecretString: lo.ToPtr(value)}, nil
 		}
 	}
+
 	return nil, &secretapi.ResourceNotFoundException{Message: lo.ToPtr("not found")}
 }
 

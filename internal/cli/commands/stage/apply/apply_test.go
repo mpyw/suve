@@ -39,6 +39,7 @@ func (m *mockStrategy) Apply(ctx context.Context, name string, entry staging.Ent
 	if m.applyFunc != nil {
 		return m.applyFunc(ctx, name, entry)
 	}
+
 	return nil
 }
 
@@ -50,6 +51,7 @@ func (m *mockStrategy) ApplyTags(ctx context.Context, name string, tagEntry stag
 	if m.applyTagsFunc != nil {
 		return m.applyTagsFunc(ctx, name, tagEntry)
 	}
+
 	return nil
 }
 
@@ -76,8 +78,11 @@ func TestCommand_Validation(t *testing.T) {
 
 	t.Run("help", func(t *testing.T) {
 		t.Parallel()
+
 		app := appcli.MakeApp()
+
 		var buf bytes.Buffer
+
 		app.Writer = &buf
 		err := app.Run(t.Context(), []string{"suve", "stage", "push", "--help"})
 		require.NoError(t, err)
@@ -91,6 +96,7 @@ func TestRun_NoChanges(t *testing.T) {
 	store := testutil.NewMockStore()
 
 	var buf bytes.Buffer
+
 	r := &apply.Runner{
 		ParamStrategy:  newParamStrategy(),
 		SecretStrategy: newSecretStrategy(),
@@ -131,18 +137,23 @@ func TestRun_ApplyBothServices(t *testing.T) {
 	paramMock := newParamStrategy()
 	paramMock.applyFunc = func(_ context.Context, name string, _ staging.Entry) error {
 		paramPutCalled = true
+
 		assert.Equal(t, "/app/config", name)
+
 		return nil
 	}
 
 	secretMock := newSecretStrategy()
 	secretMock.applyFunc = func(_ context.Context, name string, _ staging.Entry) error {
 		secretPutCalled = true
+
 		assert.Equal(t, "my-secret", name)
+
 		return nil
 	}
 
 	var buf bytes.Buffer
+
 	r := &apply.Runner{
 		ParamStrategy:  paramMock,
 		SecretStrategy: secretMock,
@@ -183,10 +194,12 @@ func TestRun_ApplyParamOnly(t *testing.T) {
 	paramMock := newParamStrategy()
 	paramMock.applyFunc = func(_ context.Context, _ string, _ staging.Entry) error {
 		paramPutCalled = true
+
 		return nil
 	}
 
 	var buf bytes.Buffer
+
 	r := &apply.Runner{
 		ParamStrategy:  paramMock,
 		SecretStrategy: nil, // Should not be needed
@@ -218,10 +231,12 @@ func TestRun_ApplySecretOnly(t *testing.T) {
 	secretMock := newSecretStrategy()
 	secretMock.applyFunc = func(_ context.Context, _ string, _ staging.Entry) error {
 		secretPutCalled = true
+
 		return nil
 	}
 
 	var buf bytes.Buffer
+
 	r := &apply.Runner{
 		ParamStrategy:  nil, // Should not be needed
 		SecretStrategy: secretMock,
@@ -258,16 +273,19 @@ func TestRun_ApplyDelete(t *testing.T) {
 	paramMock := newParamStrategy()
 	paramMock.applyFunc = func(_ context.Context, _ string, _ staging.Entry) error {
 		paramDeleteCalled = true
+
 		return nil
 	}
 
 	secretMock := newSecretStrategy()
 	secretMock.applyFunc = func(_ context.Context, _ string, _ staging.Entry) error {
 		secretDeleteCalled = true
+
 		return nil
 	}
 
 	var buf bytes.Buffer
+
 	r := &apply.Runner{
 		ParamStrategy:  paramMock,
 		SecretStrategy: secretMock,
@@ -312,6 +330,7 @@ func TestRun_PartialFailure(t *testing.T) {
 	}
 
 	var buf, errBuf bytes.Buffer
+
 	r := &apply.Runner{
 		ParamStrategy:  paramMock,
 		SecretStrategy: secretMock,
@@ -341,6 +360,7 @@ func TestRun_StoreError(t *testing.T) {
 	store.ListEntriesErr = errors.New("mock store error")
 
 	var buf bytes.Buffer
+
 	r := &apply.Runner{
 		ParamStrategy:  newParamStrategy(),
 		SecretStrategy: newSecretStrategy(),
@@ -369,13 +389,16 @@ func TestRun_SecretDeleteWithForce(t *testing.T) {
 	})
 
 	var capturedEntry staging.Entry
+
 	secretMock := newSecretStrategy()
 	secretMock.applyFunc = func(_ context.Context, _ string, entry staging.Entry) error {
 		capturedEntry = entry
+
 		return nil
 	}
 
 	var buf bytes.Buffer
+
 	r := &apply.Runner{
 		SecretStrategy: secretMock,
 		Store:          store,
@@ -404,13 +427,16 @@ func TestRun_SecretDeleteWithRecoveryWindow(t *testing.T) {
 	})
 
 	var capturedEntry staging.Entry
+
 	secretMock := newSecretStrategy()
 	secretMock.applyFunc = func(_ context.Context, _ string, entry staging.Entry) error {
 		capturedEntry = entry
+
 		return nil
 	}
 
 	var buf bytes.Buffer
+
 	r := &apply.Runner{
 		SecretStrategy: secretMock,
 		Store:          store,
@@ -440,6 +466,7 @@ func TestRun_ParamDeleteError(t *testing.T) {
 	}
 
 	var buf, errBuf bytes.Buffer
+
 	r := &apply.Runner{
 		ParamStrategy: paramMock,
 		Store:         store,
@@ -469,6 +496,7 @@ func TestRun_SecretSetError(t *testing.T) {
 	}
 
 	var buf, errBuf bytes.Buffer
+
 	r := &apply.Runner{
 		SecretStrategy: secretMock,
 		Store:          store,
@@ -497,6 +525,7 @@ func TestRun_SecretDeleteError(t *testing.T) {
 	}
 
 	var buf, errBuf bytes.Buffer
+
 	r := &apply.Runner{
 		SecretStrategy: secretMock,
 		Store:          store,
@@ -526,6 +555,7 @@ func TestRun_ParamSetError(t *testing.T) {
 	}
 
 	var buf, errBuf bytes.Buffer
+
 	r := &apply.Runner{
 		ParamStrategy: paramMock,
 		Store:         store,
@@ -555,6 +585,7 @@ func TestRun_ConflictDetection_CreateConflict(t *testing.T) {
 	paramMock.fetchLastModifiedVal = time.Now()
 
 	var buf, errBuf bytes.Buffer
+
 	r := &apply.Runner{
 		ParamStrategy:   paramMock,
 		Store:           store,
@@ -587,6 +618,7 @@ func TestRun_ConflictDetection_UpdateConflict(t *testing.T) {
 	paramMock.fetchLastModifiedVal = time.Now()
 
 	var buf, errBuf bytes.Buffer
+
 	r := &apply.Runner{
 		ParamStrategy:   paramMock,
 		Store:           store,
@@ -618,6 +650,7 @@ func TestRun_ConflictDetection_DeleteConflict(t *testing.T) {
 	secretMock.fetchLastModifiedVal = time.Now()
 
 	var buf, errBuf bytes.Buffer
+
 	r := &apply.Runner{
 		SecretStrategy:  secretMock,
 		Store:           store,
@@ -651,10 +684,12 @@ func TestRun_ConflictDetection_IgnoreConflicts(t *testing.T) {
 	paramMock.fetchLastModifiedVal = time.Now()
 	paramMock.applyFunc = func(_ context.Context, _ string, _ staging.Entry) error {
 		applyCalled = true
+
 		return nil
 	}
 
 	var buf, errBuf bytes.Buffer
+
 	r := &apply.Runner{
 		ParamStrategy:   paramMock,
 		Store:           store,
@@ -687,10 +722,12 @@ func TestRun_ConflictDetection_NoConflict(t *testing.T) {
 	paramMock.fetchLastModifiedVal = baseTime.Add(-1 * time.Hour)
 	paramMock.applyFunc = func(_ context.Context, _ string, _ staging.Entry) error {
 		applyCalled = true
+
 		return nil
 	}
 
 	var buf bytes.Buffer
+
 	r := &apply.Runner{
 		ParamStrategy:   paramMock,
 		Store:           store,
@@ -734,6 +771,7 @@ func TestRun_ConflictDetection_BothServices(t *testing.T) {
 	secretMock.fetchLastModifiedVal = time.Now() // conflict
 
 	var buf, errBuf bytes.Buffer
+
 	r := &apply.Runner{
 		ParamStrategy:   paramMock,
 		SecretStrategy:  secretMock,
@@ -768,6 +806,7 @@ func TestRun_ApplyCreate(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
+
 	r := &apply.Runner{
 		ParamStrategy: paramMock,
 		Store:         store,
@@ -796,13 +835,16 @@ func TestRun_ApplyTagsSuccess(t *testing.T) {
 	paramMock := newParamStrategy()
 	paramMock.applyTagsFunc = func(_ context.Context, name string, tagEntry staging.TagEntry) error {
 		applyTagsCalled = true
+
 		assert.Equal(t, "/app/config", name)
 		assert.Equal(t, map[string]string{"env": "prod", "team": "api"}, tagEntry.Add)
 		assert.True(t, tagEntry.Remove.Contains("deprecated"))
+
 		return nil
 	}
 
 	var buf bytes.Buffer
+
 	r := &apply.Runner{
 		ParamStrategy: paramMock,
 		Store:         store,
@@ -840,6 +882,7 @@ func TestRun_ApplyTagsError(t *testing.T) {
 	}
 
 	var buf, errBuf bytes.Buffer
+
 	r := &apply.Runner{
 		ParamStrategy: paramMock,
 		Store:         store,
@@ -873,11 +916,14 @@ func TestRun_ApplyTagsSecretService(t *testing.T) {
 	secretMock := newSecretStrategy()
 	secretMock.applyTagsFunc = func(_ context.Context, name string, _ staging.TagEntry) error {
 		applyTagsCalled = true
+
 		assert.Equal(t, "my-secret", name)
+
 		return nil
 	}
 
 	var buf bytes.Buffer
+
 	r := &apply.Runner{
 		SecretStrategy: secretMock,
 		Store:          store,
@@ -916,14 +962,17 @@ func TestRun_ApplyBothEntriesAndTags(t *testing.T) {
 	paramMock := newParamStrategy()
 	paramMock.applyFunc = func(_ context.Context, _ string, _ staging.Entry) error {
 		entryCalled = true
+
 		return nil
 	}
 	paramMock.applyTagsFunc = func(_ context.Context, _ string, _ staging.TagEntry) error {
 		tagCalled = true
+
 		return nil
 	}
 
 	var buf bytes.Buffer
+
 	r := &apply.Runner{
 		ParamStrategy: paramMock,
 		Store:         store,
@@ -956,6 +1005,7 @@ func TestRun_ApplyTagsOnlyAdditions(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
+
 	r := &apply.Runner{
 		ParamStrategy: paramMock,
 		Store:         store,
@@ -986,6 +1036,7 @@ func TestRun_ApplyTagsOnlyRemovals(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
+
 	r := &apply.Runner{
 		ParamStrategy: paramMock,
 		Store:         store,
@@ -1014,6 +1065,7 @@ func TestRun_WithHintedStore(t *testing.T) {
 	paramMock := newParamStrategy()
 
 	var buf bytes.Buffer
+
 	r := &apply.Runner{
 		ParamStrategy: paramMock,
 		Store:         store,
@@ -1041,6 +1093,7 @@ func TestRun_WithHintedStoreTagApply(t *testing.T) {
 	paramMock := newParamStrategy()
 
 	var buf bytes.Buffer
+
 	r := &apply.Runner{
 		ParamStrategy: paramMock,
 		Store:         store,
@@ -1067,6 +1120,7 @@ func TestRun_FormatTagApplySummaryEmpty(t *testing.T) {
 	paramMock := newParamStrategy()
 
 	var buf bytes.Buffer
+
 	r := &apply.Runner{
 		ParamStrategy: paramMock,
 		Store:         store,
@@ -1096,6 +1150,7 @@ func TestRun_ListTagsError(t *testing.T) {
 	})
 
 	var buf bytes.Buffer
+
 	r := &apply.Runner{
 		ParamStrategy: newParamStrategy(),
 		Store:         store,

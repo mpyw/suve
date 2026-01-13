@@ -99,6 +99,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		Stdout:  cmd.Root().Writer,
 		Stderr:  cmd.Root().ErrWriter,
 	}
+
 	return r.Run(ctx, Options{
 		Prefix: cmd.Args().First(),
 		Filter: cmd.String("filter"),
@@ -125,6 +126,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 		for _, entry := range entries {
 			output.Println(r.Stdout, entry.Name)
 		}
+
 		return nil
 	}
 
@@ -134,8 +136,10 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 		for i, entry := range entries {
 			items[i] = JSONOutputItem{Name: entry.Name}
 		}
+
 		enc := json.NewEncoder(r.Stdout)
 		enc.SetIndent("", "  ")
+
 		return enc.Encode(items)
 	}
 
@@ -149,8 +153,10 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 				items = append(items, JSONOutputItem{Name: entry.Name, Value: entry.Value})
 			}
 		}
+
 		enc := json.NewEncoder(r.Stdout)
 		enc.SetIndent("", "  ")
+
 		return enc.Encode(items)
 	}
 

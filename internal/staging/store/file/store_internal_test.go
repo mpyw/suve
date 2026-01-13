@@ -91,6 +91,7 @@ func TestInitializeStateMaps(t *testing.T) {
 func TestNewStore_UserHomeDirError(t *testing.T) {
 	// Save the original function and restore it after the test
 	originalFunc := userHomeDirFunc
+
 	defer func() { userHomeDirFunc = originalFunc }()
 
 	// Inject error
@@ -107,6 +108,7 @@ func TestNewStore_UserHomeDirError(t *testing.T) {
 func TestNewStoreWithPassphrase_UserHomeDirError(t *testing.T) {
 	// Save the original function and restore it after the test
 	originalFunc := userHomeDirFunc
+
 	defer func() { userHomeDirFunc = originalFunc }()
 
 	// Inject error
@@ -123,7 +125,6 @@ func TestNewStoreWithPassphrase_UserHomeDirError(t *testing.T) {
 func TestDrain_RemoveFileError(t *testing.T) {
 	// This test validates the error path when os.Remove fails in Drain
 	// We can trigger this by making the file unremovable
-
 	tmpDir := t.TempDir()
 	dirPath := tmpDir + "/subdir"
 	err := os.MkdirAll(dirPath, 0o750)
@@ -177,6 +178,7 @@ func TestWriteState_RemoveEmptyStateError(t *testing.T) {
 func TestWriteState_EncryptionError(t *testing.T) {
 	// Inject error into crypt's random reader
 	crypt.SetRandReader(&errorReader{err: errors.New("random source unavailable")})
+
 	defer crypt.ResetRandReader()
 
 	tmpDir := t.TempDir()

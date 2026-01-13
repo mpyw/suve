@@ -21,6 +21,7 @@ func TestCommand_Validation(t *testing.T) {
 
 	t.Run("missing secret name", func(t *testing.T) {
 		t.Parallel()
+
 		app := appcli.MakeApp()
 		err := app.Run(t.Context(), []string{"suve", "secret", "restore"})
 		require.Error(t, err)
@@ -36,6 +37,7 @@ func (m *mockClient) RestoreSecret(ctx context.Context, params *secretapi.Restor
 	if m.restoreSecretFunc != nil {
 		return m.restoreSecretFunc(ctx, params, optFns...)
 	}
+
 	return nil, fmt.Errorf("RestoreSecret not mocked")
 }
 
@@ -54,6 +56,7 @@ func TestRun(t *testing.T) {
 			mock: &mockClient{
 				restoreSecretFunc: func(_ context.Context, params *secretapi.RestoreSecretInput, _ ...func(*secretapi.Options)) (*secretapi.RestoreSecretOutput, error) {
 					assert.Equal(t, "my-secret", lo.FromPtr(params.SecretId))
+
 					return &secretapi.RestoreSecretOutput{
 						Name: lo.ToPtr("my-secret"),
 					}, nil
@@ -80,7 +83,9 @@ func TestRun(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
+
 			var buf, errBuf bytes.Buffer
+
 			r := &restore.Runner{
 				UseCase: &secret.RestoreUseCase{Client: tt.mock},
 				Stdout:  &buf,
@@ -90,10 +95,12 @@ func TestRun(t *testing.T) {
 
 			if tt.wantErr {
 				assert.Error(t, err)
+
 				return
 			}
 
 			require.NoError(t, err)
+
 			if tt.check != nil {
 				tt.check(t, buf.String())
 			}

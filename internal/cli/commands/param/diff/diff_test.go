@@ -26,6 +26,7 @@ func TestCommand_Validation(t *testing.T) {
 
 	t.Run("missing arguments", func(t *testing.T) {
 		t.Parallel()
+
 		app := appcli.MakeApp()
 		err := app.Run(t.Context(), []string{"suve", "param", "diff"})
 		require.Error(t, err)
@@ -34,6 +35,7 @@ func TestCommand_Validation(t *testing.T) {
 
 	t.Run("invalid version spec", func(t *testing.T) {
 		t.Parallel()
+
 		app := appcli.MakeApp()
 		err := app.Run(t.Context(), []string{"suve", "param", "diff", "/app/param#"})
 		require.Error(t, err)
@@ -42,6 +44,7 @@ func TestCommand_Validation(t *testing.T) {
 
 	t.Run("too many arguments", func(t *testing.T) {
 		t.Parallel()
+
 		app := appcli.MakeApp()
 		err := app.Run(t.Context(), []string{"suve", "param", "diff", "/a", "#1", "#2", "#3"})
 		require.Error(t, err)
@@ -52,6 +55,7 @@ func TestCommand_Validation(t *testing.T) {
 //nolint:funlen // Table-driven test with many cases
 func TestParseArgs(t *testing.T) {
 	t.Parallel()
+
 	tests := []struct {
 		name       string
 		args       []string
@@ -337,6 +341,7 @@ func TestParseArgs(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
+
 			spec1, spec2, err := diffargs.ParseArgs(
 				tt.args,
 				paramversion.Parse,
@@ -348,6 +353,7 @@ func TestParseArgs(t *testing.T) {
 			if tt.wantErrMsg != "" {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tt.wantErrMsg)
+
 				return
 			}
 
@@ -380,6 +386,7 @@ func (m *mockClient) GetParameter(ctx context.Context, params *paramapi.GetParam
 	if m.getParameterFunc != nil {
 		return m.getParameterFunc(ctx, params, optFns...)
 	}
+
 	return nil, fmt.Errorf("GetParameter not mocked")
 }
 
@@ -387,12 +394,14 @@ func (m *mockClient) GetParameterHistory(ctx context.Context, params *paramapi.G
 	if m.getParameterHistoryFunc != nil {
 		return m.getParameterHistoryFunc(ctx, params, optFns...)
 	}
+
 	return nil, fmt.Errorf("GetParameterHistory not mocked")
 }
 
 //nolint:funlen // Table-driven test with many cases
 func TestRun(t *testing.T) {
 	t.Parallel()
+
 	now := time.Now()
 
 	tests := []struct {
@@ -422,6 +431,7 @@ func TestRun(t *testing.T) {
 							},
 						}, nil
 					}
+
 					return &paramapi.GetParameterOutput{
 						Parameter: &paramapi.Parameter{
 							Name:             lo.ToPtr("/app/param"),
@@ -474,6 +484,7 @@ func TestRun(t *testing.T) {
 					if lo.FromPtr(params.Name) == testParamVersion1 {
 						return nil, fmt.Errorf("version not found")
 					}
+
 					return &paramapi.GetParameterOutput{
 						Parameter: &paramapi.Parameter{
 							Name:    lo.ToPtr("/app/param"),
@@ -496,6 +507,7 @@ func TestRun(t *testing.T) {
 					if lo.FromPtr(params.Name) == "/app/param:2" {
 						return nil, fmt.Errorf("version not found")
 					}
+
 					return &paramapi.GetParameterOutput{
 						Parameter: &paramapi.Parameter{
 							Name:    lo.ToPtr("/app/param"),
@@ -527,6 +539,7 @@ func TestRun(t *testing.T) {
 							},
 						}, nil
 					}
+
 					return &paramapi.GetParameterOutput{
 						Parameter: &paramapi.Parameter{
 							Name:    lo.ToPtr("/app/param"),
@@ -563,6 +576,7 @@ func TestRun(t *testing.T) {
 							},
 						}, nil
 					}
+
 					return &paramapi.GetParameterOutput{
 						Parameter: &paramapi.Parameter{
 							Name:    lo.ToPtr("/app/param"),
@@ -584,7 +598,9 @@ func TestRun(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
+
 			var buf, errBuf bytes.Buffer
+
 			r := &paramdiff.Runner{
 				UseCase: &param.DiffUseCase{Client: tt.mock},
 				Stdout:  &buf,
@@ -594,10 +610,12 @@ func TestRun(t *testing.T) {
 
 			if tt.wantErr {
 				assert.Error(t, err)
+
 				return
 			}
 
 			require.NoError(t, err)
+
 			if tt.check != nil {
 				tt.check(t, buf.String())
 			}
@@ -607,6 +625,7 @@ func TestRun(t *testing.T) {
 
 func TestRun_IdenticalWarning(t *testing.T) {
 	t.Parallel()
+
 	mock := &mockClient{
 		getParameterFunc: func(_ context.Context, _ *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
 			return &paramapi.GetParameterOutput{
@@ -621,6 +640,7 @@ func TestRun_IdenticalWarning(t *testing.T) {
 	}
 
 	var stdout, stderr bytes.Buffer
+
 	r := &paramdiff.Runner{
 		UseCase: &param.DiffUseCase{Client: mock},
 		Stdout:  &stdout,

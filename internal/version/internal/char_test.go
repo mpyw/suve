@@ -10,6 +10,7 @@ import (
 
 func TestIsDigit(t *testing.T) {
 	t.Parallel()
+
 	tests := []struct {
 		c    byte
 		want bool
@@ -29,6 +30,7 @@ func TestIsDigit(t *testing.T) {
 
 func TestIsLetter(t *testing.T) {
 	t.Parallel()
+
 	tests := []struct {
 		c    byte
 		want bool

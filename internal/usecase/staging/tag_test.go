@@ -27,6 +27,7 @@ func (m *mockTagStrategy) FetchCurrentValue(_ context.Context, _ string) (*stagi
 	if m.fetchErr != nil {
 		return nil, m.fetchErr
 	}
+
 	return m.fetchResult, nil
 }
 

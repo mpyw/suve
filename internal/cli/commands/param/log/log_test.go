@@ -24,6 +24,7 @@ func TestCommand_Validation(t *testing.T) {
 
 	t.Run("missing parameter name", func(t *testing.T) {
 		t.Parallel()
+
 		app := appcli.MakeApp()
 		err := app.Run(t.Context(), []string{"suve", "param", "log"})
 		require.Error(t, err)
@@ -32,6 +33,7 @@ func TestCommand_Validation(t *testing.T) {
 
 	t.Run("invalid since timestamp", func(t *testing.T) {
 		t.Parallel()
+
 		app := appcli.MakeApp()
 		err := app.Run(t.Context(), []string{"suve", "param", "log", "--since", "invalid", "/app/param"})
 		require.Error(t, err)
@@ -40,6 +42,7 @@ func TestCommand_Validation(t *testing.T) {
 
 	t.Run("invalid until timestamp", func(t *testing.T) {
 		t.Parallel()
+
 		app := appcli.MakeApp()
 		err := app.Run(t.Context(), []string{"suve", "param", "log", "--until", "invalid", "/app/param"})
 		require.Error(t, err)
@@ -48,8 +51,11 @@ func TestCommand_Validation(t *testing.T) {
 
 	t.Run("help", func(t *testing.T) {
 		t.Parallel()
+
 		app := appcli.MakeApp()
+
 		var buf bytes.Buffer
+
 		app.Writer = &buf
 		err := app.Run(t.Context(), []string{"suve", "param", "log", "--help"})
 		require.NoError(t, err)
@@ -58,7 +64,9 @@ func TestCommand_Validation(t *testing.T) {
 
 	t.Run("json without patch warns", func(t *testing.T) {
 		t.Parallel()
+
 		var errBuf bytes.Buffer
+
 		app := appcli.MakeApp()
 		app.ErrWriter = &errBuf
 		_ = app.Run(t.Context(), []string{"suve", "param", "log", "--parse-json", "/app/param"})
@@ -67,7 +75,9 @@ func TestCommand_Validation(t *testing.T) {
 
 	t.Run("oneline with patch warns", func(t *testing.T) {
 		t.Parallel()
+
 		var errBuf bytes.Buffer
+
 		app := appcli.MakeApp()
 		app.ErrWriter = &errBuf
 		_ = app.Run(t.Context(), []string{"suve", "param", "log", "--oneline", "--patch", "/app/param"})
@@ -76,7 +86,9 @@ func TestCommand_Validation(t *testing.T) {
 
 	t.Run("output json with patch warns", func(t *testing.T) {
 		t.Parallel()
+
 		var errBuf bytes.Buffer
+
 		app := appcli.MakeApp()
 		app.ErrWriter = &errBuf
 		_ = app.Run(t.Context(), []string{"suve", "param", "log", "--output=json", "--patch", "/app/param"})
@@ -85,7 +97,9 @@ func TestCommand_Validation(t *testing.T) {
 
 	t.Run("output json with oneline warns", func(t *testing.T) {
 		t.Parallel()
+
 		var errBuf bytes.Buffer
+
 		app := appcli.MakeApp()
 		app.ErrWriter = &errBuf
 		_ = app.Run(t.Context(), []string{"suve", "param", "log", "--output=json", "--oneline", "/app/param"})
@@ -101,12 +115,14 @@ func (m *mockClient) GetParameterHistory(ctx context.Context, params *paramapi.G
 	if m.getParameterHistoryFunc != nil {
 		return m.getParameterHistoryFunc(ctx, params, optFns...)
 	}
+
 	return nil, fmt.Errorf("GetParameterHistory not mocked")
 }
 
 //nolint:funlen // Table-driven test with many cases
 func TestRun(t *testing.T) {
 	t.Parallel()
+
 	now := time.Now()
 
 	tests := []struct {
@@ -122,6 +138,7 @@ func TestRun(t *testing.T) {
 			mock: &mockClient{
 				getParameterHistoryFunc: func(_ context.Context, params *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
 					assert.Equal(t, "/app/param", lo.FromPtr(params.Name))
+
 					return &paramapi.GetParameterHistoryOutput{
 						Parameters: []paramapi.ParameterHistory{
 							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr("v1"), Version: 1, LastModifiedDate: lo.ToPtr(now.Add(-time.Hour))},
@@ -143,6 +160,7 @@ func TestRun(t *testing.T) {
 			mock: &mockClient{
 				getParameterHistoryFunc: func(_ context.Context, _ *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
 					longValue := "this is a very long value that should NOT be truncated in normal mode"
+
 					return &paramapi.GetParameterHistoryOutput{
 						Parameters: []paramapi.ParameterHistory{
 							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr(longValue), Version: 1, LastModifiedDate: &now},
@@ -163,6 +181,7 @@ func TestRun(t *testing.T) {
 			mock: &mockClient{
 				getParameterHistoryFunc: func(_ context.Context, _ *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
 					longValue := "this is a very long value that should be truncated"
+
 					return &paramapi.GetParameterHistoryOutput{
 						Parameters: []paramapi.ParameterHistory{
 							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr(longValue), Version: 1, LastModifiedDate: &now},
@@ -241,11 +260,14 @@ func TestRun(t *testing.T) {
 			},
 			check: func(t *testing.T, output string) {
 				t.Helper()
+
 				v1Pos := strings.Index(output, "Version 1")
 				v2Pos := strings.Index(output, "Version 2")
+
 				require.NotEqual(t, -1, v1Pos, "expected Version 1 in output")
 				require.NotEqual(t, -1, v2Pos, "expected Version 2 in output")
 				assert.Less(t, v1Pos, v2Pos, "expected Version 1 before Version 2 in reverse mode")
+
 				currentPos := strings.Index(output, "(current)")
 				assert.Greater(t, currentPos, v2Pos, "expected (current) label after Version 2 in reverse mode")
 			},
@@ -312,6 +334,7 @@ func TestRun(t *testing.T) {
 			mock: &mockClient{
 				getParameterHistoryFunc: func(_ context.Context, _ *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
 					longValue := "this is a very long value that exceeds forty characters"
+
 					return &paramapi.GetParameterHistoryOutput{
 						Parameters: []paramapi.ParameterHistory{
 							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr(longValue), Version: 1, LastModifiedDate: &now},
@@ -533,7 +556,9 @@ func TestRun(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
+
 			var buf, errBuf bytes.Buffer
+
 			r := &log.Runner{
 				UseCase: &param.LogUseCase{Client: tt.mock},
 				Stdout:  &buf,
@@ -543,10 +568,12 @@ func TestRun(t *testing.T) {
 
 			if tt.wantErr {
 				assert.Error(t, err)
+
 				return
 			}
 
 			require.NoError(t, err)
+
 			if tt.check != nil {
 				tt.check(t, buf.String())
 			}

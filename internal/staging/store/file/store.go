@@ -43,7 +43,9 @@ func NewStore(accountID, region string) (*Store, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to get home directory: %w", err)
 	}
+
 	stateDir := filepath.Join(homeDir, stateDirName, accountID, region)
+
 	return &Store{
 		stateFilePath: filepath.Join(stateDir, stateFileName),
 	}, nil
@@ -64,7 +66,9 @@ func NewStoreWithPassphrase(accountID, region, passphrase string) (*Store, error
 	if err != nil {
 		return nil, err
 	}
+
 	store.passphrase = passphrase
+
 	return store, nil
 }
 
@@ -81,8 +85,10 @@ func (s *Store) Exists() (bool, error) {
 		if os.IsNotExist(err) {
 			return false, nil
 		}
+
 		return false, fmt.Errorf("failed to check state file: %w", err)
 	}
+
 	return true, nil
 }
 
@@ -93,8 +99,10 @@ func (s *Store) IsEncrypted() (bool, error) {
 		if os.IsNotExist(err) {
 			return false, nil
 		}
+
 		return false, fmt.Errorf("failed to read state file: %w", err)
 	}
+
 	return crypt.IsEncrypted(data), nil
 }
 
@@ -111,6 +119,7 @@ func (s *Store) Drain(_ context.Context, service staging.Service, keep bool) (*s
 		if os.IsNotExist(err) {
 			return staging.NewEmptyState(), nil
 		}
+
 		return nil, fmt.Errorf("failed to read state file: %w", err)
 	}
 
@@ -119,6 +128,7 @@ func (s *Store) Drain(_ context.Context, service staging.Service, keep bool) (*s
 		if s.passphrase == "" {
 			return nil, crypt.ErrDecryptionFailed
 		}
+
 		data, err = crypt.Decrypt(data, s.passphrase)
 		if err != nil {
 			return nil, err
@@ -172,6 +182,7 @@ func (s *Store) WriteState(_ context.Context, service staging.Service, state *st
 		if err := os.Remove(s.stateFilePath); err != nil && !os.IsNotExist(err) {
 			return fmt.Errorf("failed to remove empty state file: %w", err)
 		}
+
 		return nil
 	}
 
@@ -200,18 +211,23 @@ func initializeStateMaps(state *staging.State) {
 	if state.Entries == nil {
 		state.Entries = make(map[staging.Service]map[string]staging.Entry)
 	}
+
 	if state.Entries[staging.ServiceParam] == nil {
 		state.Entries[staging.ServiceParam] = make(map[string]staging.Entry)
 	}
+
 	if state.Entries[staging.ServiceSecret] == nil {
 		state.Entries[staging.ServiceSecret] = make(map[string]staging.Entry)
 	}
+
 	if state.Tags == nil {
 		state.Tags = make(map[staging.Service]map[string]staging.TagEntry)
 	}
+
 	if state.Tags[staging.ServiceParam] == nil {
 		state.Tags[staging.ServiceParam] = make(map[string]staging.TagEntry)
 	}
+
 	if state.Tags[staging.ServiceSecret] == nil {
 		state.Tags[staging.ServiceSecret] = make(map[string]staging.TagEntry)
 	}

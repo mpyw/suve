@@ -174,6 +174,7 @@ func TestGetLocation_Caching(t *testing.T) {
 func TestLoadLocation_DirectCalls(t *testing.T) {
 	t.Run("valid timezone", func(t *testing.T) {
 		t.Setenv("TZ", "Europe/Berlin")
+
 		loc := loadLocation()
 		assert.Equal(t, "Europe/Berlin", loc.String())
 	})
@@ -181,12 +182,14 @@ func TestLoadLocation_DirectCalls(t *testing.T) {
 	t.Run("empty TZ uses local", func(t *testing.T) {
 		// Unset TZ - setting TZ="" effectively unsets it (uses local time)
 		t.Setenv("TZ", "")
+
 		loc := loadLocation()
 		assert.Equal(t, time.Local, loc)
 	})
 
 	t.Run("invalid TZ falls back to UTC", func(t *testing.T) {
 		t.Setenv("TZ", "Not/A/Real/Timezone")
+
 		loc := loadLocation()
 		assert.Equal(t, time.UTC, loc)
 	})

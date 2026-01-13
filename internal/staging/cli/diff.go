@@ -41,6 +41,7 @@ func (r *DiffRunner) Run(ctx context.Context, opts DiffOptions) error {
 
 	if len(result.Entries) == 0 && len(result.TagEntries) == 0 {
 		output.Warning(r.Stderr, "no %ss staged", result.ItemName)
+
 		return nil
 	}
 

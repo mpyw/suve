@@ -644,6 +644,7 @@ EXAMPLES:
 				Stdout: cmd.Root().Writer,
 				Stderr: cmd.Root().ErrWriter,
 			}
+
 			return r.Run(ctx, DeleteOptions{
 				Name:           name,
 				Force:          force,

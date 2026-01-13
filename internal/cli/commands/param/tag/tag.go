@@ -51,6 +51,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	}
 
 	name := cmd.Args().Get(0)
+
 	tags, err := parseTags(cmd.Args().Slice()[1:])
 	if err != nil {
 		return err
@@ -65,6 +66,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		UseCase: &param.TagUseCase{Client: client},
 		Stdout:  cmd.Root().Writer,
 	}
+
 	return r.Run(ctx, Options{
 		Name: name,
 		Tags: tags,
@@ -88,16 +90,20 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 
 func parseTags(args []string) (map[string]string, error) {
 	tags := make(map[string]string)
+
 	for _, arg := range args {
 		parts := strings.SplitN(arg, "=", 2)
 		if len(parts) != 2 {
 			return nil, fmt.Errorf("invalid tag format %q: expected key=value", arg)
 		}
+
 		key, value := parts[0], parts[1]
 		if key == "" {
 			return nil, fmt.Errorf("invalid tag format %q: key cannot be empty", arg)
 		}
+
 		tags[key] = value
 	}
+
 	return tags, nil
 }

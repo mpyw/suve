@@ -29,12 +29,15 @@ func (m *mockListClient) ListSecrets(_ context.Context, _ *secretapi.ListSecrets
 	// Support paginated results for testing
 	if len(m.listSecretsResults) > 0 {
 		idx := m.listSecretsCallCount
+
 		m.listSecretsCallCount++
 		if idx < len(m.listSecretsResults) {
 			return m.listSecretsResults[idx], nil
 		}
+
 		return &secretapi.ListSecretsOutput{}, nil
 	}
+
 	return m.listSecretsResult, nil
 }
 
@@ -45,11 +48,13 @@ func (m *mockListClient) GetSecretValue(_ context.Context, input *secretapi.GetS
 			return nil, err
 		}
 	}
+
 	if m.getSecretValueValue != nil {
 		if value, ok := m.getSecretValueValue[name]; ok {
 			return &secretapi.GetSecretValueOutput{SecretString: lo.ToPtr(value)}, nil
 		}
 	}
+
 	return nil, &secretapi.ResourceNotFoundException{Message: lo.ToPtr("not found")}
 }
 
@@ -220,14 +225,17 @@ func TestListUseCase_Execute_WithValue_PartialError(t *testing.T) {
 	assert.Len(t, output.Entries, 2)
 
 	var hasValue, hasError bool
+
 	for _, entry := range output.Entries {
 		if entry.Value != nil {
 			hasValue = true
 		}
+
 		if entry.Error != nil {
 			hasError = true
 		}
 	}
+
 	assert.True(t, hasValue)
 	assert.True(t, hasError)
 }
@@ -316,6 +324,7 @@ func TestListUseCase_Execute_WithPagination_FilterApplied(t *testing.T) {
 	})
 	require.NoError(t, err)
 	assert.Len(t, output.Entries, 2)
+
 	for _, entry := range output.Entries {
 		assert.Contains(t, entry.Name, "config")
 	}

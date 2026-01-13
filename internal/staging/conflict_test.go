@@ -20,6 +20,7 @@ func (m *mockApplyStrategy) FetchLastModified(ctx context.Context, name string) 
 	if m.fetchLastModifiedFunc != nil {
 		return m.fetchLastModifiedFunc(ctx, name)
 	}
+
 	return time.Time{}, nil
 }
 
@@ -55,6 +56,7 @@ func TestCheckConflicts(t *testing.T) {
 
 	t.Run("empty entries returns empty conflicts", func(t *testing.T) {
 		t.Parallel()
+
 		strategy := &mockApplyStrategy{}
 		conflicts := staging.CheckConflicts(t.Context(), strategy, map[string]staging.Entry{})
 		assert.Empty(t, conflicts)
@@ -62,6 +64,7 @@ func TestCheckConflicts(t *testing.T) {
 
 	t.Run("entries without create or base time return empty", func(t *testing.T) {
 		t.Parallel()
+
 		strategy := &mockApplyStrategy{}
 		entries := map[string]staging.Entry{
 			"item1": {Operation: staging.OperationUpdate},
@@ -73,6 +76,7 @@ func TestCheckConflicts(t *testing.T) {
 
 	t.Run("create conflict - resource now exists", func(t *testing.T) {
 		t.Parallel()
+
 		strategy := &mockApplyStrategy{
 			fetchLastModifiedFunc: func(_ context.Context, _ string) (time.Time, error) {
 				return baseTime, nil // Resource exists (non-zero time)
@@ -103,6 +107,7 @@ func TestCheckConflicts(t *testing.T) {
 
 	t.Run("create fetch error - no conflict assumed", func(t *testing.T) {
 		t.Parallel()
+
 		strategy := &mockApplyStrategy{
 			fetchLastModifiedFunc: func(_ context.Context, _ string) (time.Time, error) {
 				return time.Time{}, errors.New("access denied")
@@ -117,6 +122,7 @@ func TestCheckConflicts(t *testing.T) {
 
 	t.Run("update conflict - AWS modified after base", func(t *testing.T) {
 		t.Parallel()
+
 		strategy := &mockApplyStrategy{
 			fetchLastModifiedFunc: func(_ context.Context, _ string) (time.Time, error) {
 				return laterTime, nil
@@ -135,6 +141,7 @@ func TestCheckConflicts(t *testing.T) {
 
 	t.Run("update no conflict - AWS not modified after base", func(t *testing.T) {
 		t.Parallel()
+
 		strategy := &mockApplyStrategy{
 			fetchLastModifiedFunc: func(_ context.Context, _ string) (time.Time, error) {
 				return baseTime, nil // Same time as base
@@ -153,6 +160,7 @@ func TestCheckConflicts(t *testing.T) {
 
 	t.Run("update fetch error - no conflict assumed", func(t *testing.T) {
 		t.Parallel()
+
 		strategy := &mockApplyStrategy{
 			fetchLastModifiedFunc: func(_ context.Context, _ string) (time.Time, error) {
 				return time.Time{}, errors.New("access denied")
@@ -171,6 +179,7 @@ func TestCheckConflicts(t *testing.T) {
 
 	t.Run("delete conflict - resource was modified after base", func(t *testing.T) {
 		t.Parallel()
+
 		strategy := &mockApplyStrategy{
 			fetchLastModifiedFunc: func(_ context.Context, _ string) (time.Time, error) {
 				return laterTime, nil
@@ -188,6 +197,7 @@ func TestCheckConflicts(t *testing.T) {
 
 	t.Run("delete no conflict - resource already deleted", func(t *testing.T) {
 		t.Parallel()
+
 		strategy := &mockApplyStrategy{
 			fetchLastModifiedFunc: func(_ context.Context, _ string) (time.Time, error) {
 				return time.Time{}, nil // Resource doesn't exist
@@ -205,6 +215,7 @@ func TestCheckConflicts(t *testing.T) {
 
 	t.Run("mixed entries - multiple conflicts", func(t *testing.T) {
 		t.Parallel()
+
 		strategy := &mockApplyStrategy{
 			fetchLastModifiedFunc: func(_ context.Context, name string) (time.Time, error) {
 				switch name {

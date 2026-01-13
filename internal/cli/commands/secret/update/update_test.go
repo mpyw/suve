@@ -21,6 +21,7 @@ func TestCommand_Validation(t *testing.T) {
 
 	t.Run("missing arguments", func(t *testing.T) {
 		t.Parallel()
+
 		app := appcli.MakeApp()
 		err := app.Run(t.Context(), []string{"suve", "secret", "update"})
 		require.Error(t, err)
@@ -29,6 +30,7 @@ func TestCommand_Validation(t *testing.T) {
 
 	t.Run("missing value argument", func(t *testing.T) {
 		t.Parallel()
+
 		app := appcli.MakeApp()
 		err := app.Run(t.Context(), []string{"suve", "secret", "update", "my-secret"})
 		require.Error(t, err)
@@ -46,6 +48,7 @@ func (m *mockClient) GetSecretValue(ctx context.Context, params *secretapi.GetSe
 	if m.getSecretValueFunc != nil {
 		return m.getSecretValueFunc(ctx, params, optFns...)
 	}
+
 	return &secretapi.GetSecretValueOutput{
 		ARN: lo.ToPtr("arn:aws:secretsmanager:us-east-1:123456789012:secret:my-secret"),
 	}, nil
@@ -55,6 +58,7 @@ func (m *mockClient) PutSecretValue(ctx context.Context, params *secretapi.PutSe
 	if m.putSecretValueFunc != nil {
 		return m.putSecretValueFunc(ctx, params, optFns...)
 	}
+
 	return nil, fmt.Errorf("PutSecretValue not mocked")
 }
 
@@ -62,6 +66,7 @@ func (m *mockClient) UpdateSecret(ctx context.Context, params *secretapi.UpdateS
 	if m.updateSecretFunc != nil {
 		return m.updateSecretFunc(ctx, params, optFns...)
 	}
+
 	return &secretapi.UpdateSecretOutput{}, nil
 }
 
@@ -81,6 +86,7 @@ func TestRun(t *testing.T) {
 				putSecretValueFunc: func(_ context.Context, params *secretapi.PutSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.PutSecretValueOutput, error) {
 					assert.Equal(t, "my-secret", lo.FromPtr(params.SecretId))
 					assert.Equal(t, "new-value", lo.FromPtr(params.SecretString))
+
 					return &secretapi.PutSecretValueOutput{
 						Name:      lo.ToPtr("my-secret"),
 						VersionId: lo.ToPtr("new-version-id"),
@@ -108,6 +114,7 @@ func TestRun(t *testing.T) {
 				updateSecretFunc: func(_ context.Context, params *secretapi.UpdateSecretInput, _ ...func(*secretapi.Options)) (*secretapi.UpdateSecretOutput, error) {
 					assert.Equal(t, "my-secret", lo.FromPtr(params.SecretId))
 					assert.Equal(t, "updated description", lo.FromPtr(params.Description))
+
 					return &secretapi.UpdateSecretOutput{
 						ARN: lo.ToPtr("arn:aws:secretsmanager:us-east-1:123456789012:secret:my-secret"),
 					}, nil
@@ -149,7 +156,9 @@ func TestRun(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
+
 			var buf, errBuf bytes.Buffer
+
 			r := &update.Runner{
 				UseCase: &secret.UpdateUseCase{Client: tt.mock},
 				Stdout:  &buf,
@@ -160,10 +169,12 @@ func TestRun(t *testing.T) {
 			if tt.wantErr != "" {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tt.wantErr)
+
 				return
 			}
 
 			require.NoError(t, err)
+
 			if tt.check != nil {
 				tt.check(t, buf.String())
 			}

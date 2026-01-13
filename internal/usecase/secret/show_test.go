@@ -28,6 +28,7 @@ func (m *mockShowClient) GetSecretValue(_ context.Context, _ *secretapi.GetSecre
 	if m.getSecretValueErr != nil {
 		return nil, m.getSecretValueErr
 	}
+
 	return m.getSecretValueResult, nil
 }
 
@@ -35,6 +36,7 @@ func (m *mockShowClient) ListSecretVersionIds(_ context.Context, _ *secretapi.Li
 	if m.listVersionsErr != nil {
 		return nil, m.listVersionsErr
 	}
+
 	return m.listVersionsResult, nil
 }
 
@@ -42,9 +44,11 @@ func (m *mockShowClient) DescribeSecret(_ context.Context, _ *secretapi.Describe
 	if m.describeSecretErr != nil {
 		return nil, m.describeSecretErr
 	}
+
 	if m.describeSecretResult != nil {
 		return m.describeSecretResult, nil
 	}
+
 	return &secretapi.DescribeSecretOutput{}, nil
 }
 

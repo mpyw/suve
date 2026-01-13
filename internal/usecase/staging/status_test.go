@@ -204,10 +204,12 @@ func TestStatusUseCase_Execute_WithTagEntries(t *testing.T) {
 
 	// Find the specific entries
 	var configEntry, secretEntry *usecasestaging.StatusTagEntry
+
 	for i := range output.TagEntries {
 		if output.TagEntries[i].Name == "/app/config" {
 			configEntry = &output.TagEntries[i]
 		}
+
 		if output.TagEntries[i].Name == "/app/secret" {
 			secretEntry = &output.TagEntries[i]
 		}

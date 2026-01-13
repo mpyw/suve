@@ -125,6 +125,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 			Stdout:  w,
 			Stderr:  cmd.Root().ErrWriter,
 		}
+
 		return r.Run(ctx, opts)
 	})
 }
@@ -170,8 +171,10 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 				value2,
 			)
 		}
+
 		enc := json.NewEncoder(r.Stdout)
 		enc.SetIndent("", "  ")
+
 		return enc.Encode(jsonOut)
 	}
 
@@ -179,6 +182,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 		output.Warning(r.Stderr, "comparing identical versions")
 		output.Hint(r.Stderr, "To compare with previous version, use: suve secret diff %s~1", result.OldName)
 		output.Hint(r.Stderr, "or: suve secret diff %s:AWSPREVIOUS", result.OldName)
+
 		return nil
 	}
 

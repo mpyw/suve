@@ -31,6 +31,7 @@ func ApplyParam(ctx context.Context, client ParamClient, resourceID string, chan
 				Value: lo.ToPtr(v),
 			})
 		}
+
 		_, err := client.AddTagsToResource(ctx, &paramapi.AddTagsToResourceInput{
 			ResourceType: paramapi.ResourceTypeForTaggingParameter,
 			ResourceId:   lo.ToPtr(resourceID),

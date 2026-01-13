@@ -54,9 +54,11 @@ func (m *MockStore) GetEntry(_ context.Context, service staging.Service, name st
 	if m.GetEntryErr != nil {
 		return nil, m.GetEntryErr
 	}
+
 	if entry, ok := m.entries[service][name]; ok {
 		return &entry, nil
 	}
+
 	return nil, staging.ErrNotStaged
 }
 
@@ -65,9 +67,11 @@ func (m *MockStore) GetTag(_ context.Context, service staging.Service, name stri
 	if m.GetTagErr != nil {
 		return nil, m.GetTagErr
 	}
+
 	if tag, ok := m.tags[service][name]; ok {
 		return &tag, nil
 	}
+
 	return nil, staging.ErrNotStaged
 }
 
@@ -76,7 +80,9 @@ func (m *MockStore) StageEntry(_ context.Context, service staging.Service, name 
 	if m.StageEntryErr != nil {
 		return m.StageEntryErr
 	}
+
 	m.entries[service][name] = entry
+
 	return nil
 }
 
@@ -85,7 +91,9 @@ func (m *MockStore) StageTag(_ context.Context, service staging.Service, name st
 	if m.StageTagErr != nil {
 		return m.StageTagErr
 	}
+
 	m.tags[service][name] = tag
+
 	return nil
 }
 
@@ -94,10 +102,13 @@ func (m *MockStore) UnstageEntry(_ context.Context, service staging.Service, nam
 	if m.UnstageEntryErr != nil {
 		return m.UnstageEntryErr
 	}
+
 	if _, ok := m.entries[service][name]; !ok {
 		return staging.ErrNotStaged
 	}
+
 	delete(m.entries[service], name)
+
 	return nil
 }
 
@@ -106,10 +117,13 @@ func (m *MockStore) UnstageTag(_ context.Context, service staging.Service, name 
 	if m.UnstageTagErr != nil {
 		return m.UnstageTagErr
 	}
+
 	if _, ok := m.tags[service][name]; !ok {
 		return staging.ErrNotStaged
 	}
+
 	delete(m.tags[service], name)
+
 	return nil
 }
 
@@ -118,6 +132,7 @@ func (m *MockStore) UnstageAll(_ context.Context, service staging.Service) error
 	if m.UnstageAllErr != nil {
 		return m.UnstageAllErr
 	}
+
 	switch service {
 	case staging.ServiceParam:
 		m.entries[staging.ServiceParam] = make(map[string]staging.Entry)
@@ -131,6 +146,7 @@ func (m *MockStore) UnstageAll(_ context.Context, service staging.Service) error
 		m.tags[staging.ServiceParam] = make(map[string]staging.TagEntry)
 		m.tags[staging.ServiceSecret] = make(map[string]staging.TagEntry)
 	}
+
 	return nil
 }
 
@@ -139,7 +155,9 @@ func (m *MockStore) ListEntries(_ context.Context, service staging.Service) (map
 	if m.ListEntriesErr != nil {
 		return nil, m.ListEntriesErr
 	}
+
 	result := make(map[staging.Service]map[string]staging.Entry)
+
 	switch service {
 	case staging.ServiceParam:
 		if len(m.entries[staging.ServiceParam]) > 0 {
@@ -153,10 +171,12 @@ func (m *MockStore) ListEntries(_ context.Context, service staging.Service) (map
 		if len(m.entries[staging.ServiceParam]) > 0 {
 			result[staging.ServiceParam] = m.entries[staging.ServiceParam]
 		}
+
 		if len(m.entries[staging.ServiceSecret]) > 0 {
 			result[staging.ServiceSecret] = m.entries[staging.ServiceSecret]
 		}
 	}
+
 	return result, nil
 }
 
@@ -165,7 +185,9 @@ func (m *MockStore) ListTags(_ context.Context, service staging.Service) (map[st
 	if m.ListTagsErr != nil {
 		return nil, m.ListTagsErr
 	}
+
 	result := make(map[staging.Service]map[string]staging.TagEntry)
+
 	switch service {
 	case staging.ServiceParam:
 		if len(m.tags[staging.ServiceParam]) > 0 {
@@ -179,10 +201,12 @@ func (m *MockStore) ListTags(_ context.Context, service staging.Service) (map[st
 		if len(m.tags[staging.ServiceParam]) > 0 {
 			result[staging.ServiceParam] = m.tags[staging.ServiceParam]
 		}
+
 		if len(m.tags[staging.ServiceSecret]) > 0 {
 			result[staging.ServiceSecret] = m.tags[staging.ServiceSecret]
 		}
 	}
+
 	return result, nil
 }
 
@@ -213,6 +237,7 @@ func (m *MockStore) Drain(_ context.Context, service staging.Service, keep bool)
 	for svc, entries := range m.entries {
 		maps.Copy(state.Entries[svc], entries)
 	}
+
 	for svc, tags := range m.tags {
 		maps.Copy(state.Tags[svc], tags)
 	}
@@ -266,6 +291,7 @@ func (m *MockStore) WriteState(_ context.Context, service staging.Service, state
 	for svc, entries := range state.Entries {
 		maps.Copy(m.entries[svc], entries)
 	}
+
 	for svc, tags := range state.Tags {
 		maps.Copy(m.tags[svc], tags)
 	}
@@ -296,6 +322,7 @@ func (m *HintedMockStore) UnstageEntryWithHint(ctx context.Context, service stag
 	if m.UnstageEntryWithHintErr != nil {
 		return m.UnstageEntryWithHintErr
 	}
+
 	return m.UnstageEntry(ctx, service, name)
 }
 
@@ -305,6 +332,7 @@ func (m *HintedMockStore) UnstageTagWithHint(ctx context.Context, service stagin
 	if m.UnstageTagWithHintErr != nil {
 		return m.UnstageTagWithHintErr
 	}
+
 	return m.UnstageTag(ctx, service, name)
 }
 
@@ -314,6 +342,7 @@ func (m *HintedMockStore) UnstageAllWithHint(ctx context.Context, service stagin
 	if m.UnstageAllWithHintErr != nil {
 		return m.UnstageAllWithHintErr
 	}
+
 	return m.UnstageAll(ctx, service)
 }
 

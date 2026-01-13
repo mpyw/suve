@@ -147,6 +147,7 @@ func TestEntryPrinter_PrintEntry(t *testing.T) {
 			t.Parallel()
 
 			var buf bytes.Buffer
+
 			printer := &staging.EntryPrinter{Writer: &buf}
 
 			printer.PrintEntry(tt.entryName, tt.entry, tt.verbose, tt.showDeleteOptions)

@@ -40,6 +40,7 @@ func TestHandler_HandleRequest(t *testing.T) {
 
 	t.Run("unknown method", func(t *testing.T) {
 		t.Parallel()
+
 		h := server.NewHandler()
 		defer h.Destroy()
 
@@ -50,6 +51,7 @@ func TestHandler_HandleRequest(t *testing.T) {
 
 	t.Run("stage and get entry", func(t *testing.T) {
 		t.Parallel()
+
 		h := server.NewHandler()
 		defer h.Destroy()
 
@@ -90,6 +92,7 @@ func TestHandler_HandleRequest(t *testing.T) {
 
 	t.Run("get entry - not found", func(t *testing.T) {
 		t.Parallel()
+
 		h := server.NewHandler()
 		defer h.Destroy()
 
@@ -111,6 +114,7 @@ func TestHandler_HandleRequest(t *testing.T) {
 
 	t.Run("stage and get tag", func(t *testing.T) {
 		t.Parallel()
+
 		h := server.NewHandler()
 		defer h.Destroy()
 
@@ -164,6 +168,7 @@ func TestHandler_HandleRequest(t *testing.T) {
 		assert.True(t, resp.Success)
 
 		var result protocol.TagResponse
+
 		err := json.Unmarshal(resp.Data, &result)
 		require.NoError(t, err)
 		assert.Nil(t, result.TagEntry)
@@ -210,6 +215,7 @@ func TestHandler_HandleRequest(t *testing.T) {
 
 	t.Run("list entries - filter by service", func(t *testing.T) {
 		t.Parallel()
+
 		h := server.NewHandler()
 		defer h.Destroy()
 
@@ -356,6 +362,7 @@ func TestHandler_HandleRequest(t *testing.T) {
 		})
 
 		var result protocol.EntryResponse
+
 		_ = json.Unmarshal(resp.Data, &result)
 		assert.Nil(t, result.Entry)
 	})
@@ -484,6 +491,7 @@ func TestHandler_HandleRequest(t *testing.T) {
 
 	t.Run("unstage all - specific service", func(t *testing.T) {
 		t.Parallel()
+
 		h := server.NewHandler()
 		defer h.Destroy()
 
@@ -559,6 +567,7 @@ func TestHandler_HandleRequest(t *testing.T) {
 		assert.True(t, resp.Success)
 
 		var result protocol.StateResponse
+
 		err := json.Unmarshal(resp.Data, &result)
 		require.NoError(t, err)
 		require.NotNil(t, result.State)
@@ -567,6 +576,7 @@ func TestHandler_HandleRequest(t *testing.T) {
 
 	t.Run("set state - nil state error", func(t *testing.T) {
 		t.Parallel()
+
 		h := server.NewHandler()
 		defer h.Destroy()
 
@@ -582,6 +592,7 @@ func TestHandler_HandleRequest(t *testing.T) {
 
 	t.Run("load - same as get state", func(t *testing.T) {
 		t.Parallel()
+
 		h := server.NewHandler()
 		defer h.Destroy()
 
@@ -604,6 +615,7 @@ func TestHandler_HandleRequest(t *testing.T) {
 		assert.True(t, resp.Success)
 
 		var result protocol.StateResponse
+
 		err := json.Unmarshal(resp.Data, &result)
 		require.NoError(t, err)
 		require.NotNil(t, result.State)
@@ -612,6 +624,7 @@ func TestHandler_HandleRequest(t *testing.T) {
 
 	t.Run("is empty - initially empty", func(t *testing.T) {
 		t.Parallel()
+
 		h := server.NewHandler()
 		defer h.Destroy()
 
@@ -655,6 +668,7 @@ func TestHandler_HandleRequest(t *testing.T) {
 
 	t.Run("multi-account/region isolation", func(t *testing.T) {
 		t.Parallel()
+
 		h := server.NewHandler()
 		defer h.Destroy()
 

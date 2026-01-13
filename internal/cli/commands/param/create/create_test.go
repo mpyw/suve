@@ -21,6 +21,7 @@ func TestCommand_Validation(t *testing.T) {
 
 	t.Run("missing arguments", func(t *testing.T) {
 		t.Parallel()
+
 		app := appcli.MakeApp()
 		err := app.Run(t.Context(), []string{"suve", "param", "create"})
 		require.Error(t, err)
@@ -29,6 +30,7 @@ func TestCommand_Validation(t *testing.T) {
 
 	t.Run("missing value argument", func(t *testing.T) {
 		t.Parallel()
+
 		app := appcli.MakeApp()
 		err := app.Run(t.Context(), []string{"suve", "param", "create", "/app/param"})
 		require.Error(t, err)
@@ -37,6 +39,7 @@ func TestCommand_Validation(t *testing.T) {
 
 	t.Run("conflicting secure and type flags", func(t *testing.T) {
 		t.Parallel()
+
 		app := appcli.MakeApp()
 		err := app.Run(t.Context(), []string{"suve", "param", "create", "--secure", "--type", "String", "/app/param", "value"})
 		require.Error(t, err)
@@ -52,6 +55,7 @@ func (m *mockClient) PutParameter(ctx context.Context, params *paramapi.PutParam
 	if m.putParameterFunc != nil {
 		return m.putParameterFunc(ctx, params, optFns...)
 	}
+
 	return nil, fmt.Errorf("PutParameter not mocked")
 }
 
@@ -78,6 +82,7 @@ func TestRun(t *testing.T) {
 					assert.Equal(t, "test-value", lo.FromPtr(params.Value))
 					assert.Equal(t, paramapi.ParameterTypeSecureString, params.Type)
 					assert.False(t, lo.FromPtr(params.Overwrite))
+
 					return &paramapi.PutParameterOutput{
 						Version: 1,
 					}, nil
@@ -102,6 +107,7 @@ func TestRun(t *testing.T) {
 				putParameterFunc: func(_ context.Context, params *paramapi.PutParameterInput, _ ...func(*paramapi.Options)) (*paramapi.PutParameterOutput, error) {
 					assert.Equal(t, "Test description", lo.FromPtr(params.Description))
 					assert.False(t, lo.FromPtr(params.Overwrite))
+
 					return &paramapi.PutParameterOutput{
 						Version: 1,
 					}, nil
@@ -133,7 +139,9 @@ func TestRun(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
+
 			var buf, errBuf bytes.Buffer
+
 			r := &create.Runner{
 				UseCase: &param.CreateUseCase{Client: tt.mock},
 				Stdout:  &buf,
@@ -144,10 +152,12 @@ func TestRun(t *testing.T) {
 			if tt.wantErr != "" {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tt.wantErr)
+
 				return
 			}
 
 			require.NoError(t, err)
+
 			if tt.check != nil {
 				tt.check(t, buf.String())
 			}

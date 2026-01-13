@@ -170,6 +170,7 @@ func (u *ResetUseCase) restore(ctx context.Context, spec, name string) (*ResetOu
 
 	// Execute the edit transition with the restored value
 	executor := transition.NewExecutor(u.Store)
+
 	result, err := executor.ExecuteEntry(ctx, service, name, entryState, transition.EntryActionEdit{Value: value}, nil)
 	if err != nil {
 		return nil, err

@@ -20,6 +20,7 @@ func TestCommand_Validation(t *testing.T) {
 
 	t.Run("missing parameter name", func(t *testing.T) {
 		t.Parallel()
+
 		app := appcli.MakeApp()
 		err := app.Run(t.Context(), []string{"suve", "param", "delete"})
 		require.Error(t, err)
@@ -36,6 +37,7 @@ func (m *mockClient) DeleteParameter(ctx context.Context, params *paramapi.Delet
 	if m.deleteParameterFunc != nil {
 		return m.deleteParameterFunc(ctx, params, optFns...)
 	}
+
 	return nil, fmt.Errorf("DeleteParameter not mocked")
 }
 
@@ -43,6 +45,7 @@ func (m *mockClient) GetParameter(ctx context.Context, params *paramapi.GetParam
 	if m.getParameterFunc != nil {
 		return m.getParameterFunc(ctx, params, optFns...)
 	}
+
 	return nil, &paramapi.ParameterNotFound{}
 }
 
@@ -84,7 +87,9 @@ func TestRun(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
+
 			var buf, errBuf bytes.Buffer
+
 			r := &delete.Runner{
 				UseCase: &param.DeleteUseCase{Client: tt.mock},
 				Stdout:  &buf,
@@ -94,10 +99,12 @@ func TestRun(t *testing.T) {
 
 			if tt.wantErr {
 				assert.Error(t, err)
+
 				return
 			}
 
 			require.NoError(t, err)
+
 			if tt.check != nil {
 				tt.check(t, buf.String())
 			}

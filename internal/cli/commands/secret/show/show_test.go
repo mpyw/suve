@@ -24,6 +24,7 @@ func TestCommand_Validation(t *testing.T) {
 
 	t.Run("missing secret name", func(t *testing.T) {
 		t.Parallel()
+
 		app := appcli.MakeApp()
 		err := app.Run(t.Context(), []string{"suve", "secret", "show"})
 		require.Error(t, err)
@@ -32,6 +33,7 @@ func TestCommand_Validation(t *testing.T) {
 
 	t.Run("invalid version spec", func(t *testing.T) {
 		t.Parallel()
+
 		app := appcli.MakeApp()
 		err := app.Run(t.Context(), []string{"suve", "secret", "show", "my-secret#"})
 		require.Error(t, err)
@@ -57,12 +59,14 @@ func (m *mockClient) DescribeSecret(ctx context.Context, params *secretapi.Descr
 	if m.describeSecretFunc != nil {
 		return m.describeSecretFunc(ctx, params, optFns...)
 	}
+
 	return &secretapi.DescribeSecretOutput{}, nil
 }
 
 //nolint:funlen // Table-driven test with many cases
 func TestRun(t *testing.T) {
 	t.Parallel()
+
 	now := time.Now()
 
 	tests := []struct {
@@ -135,6 +139,7 @@ func TestRun(t *testing.T) {
 			check: func(t *testing.T, output string) {
 				appleIdx := bytes.Index([]byte(output), []byte("apple"))
 				zebraIdx := bytes.Index([]byte(output), []byte("zebra"))
+
 				require.NotEqual(t, -1, appleIdx, "expected apple in output")
 				require.NotEqual(t, -1, zebraIdx, "expected zebra in output")
 				assert.Less(t, appleIdx, zebraIdx, "expected keys to be sorted (apple before zebra)")
@@ -237,6 +242,7 @@ func TestRun(t *testing.T) {
 			check: func(t *testing.T, output string) {
 				appleIdx := bytes.Index([]byte(output), []byte("apple"))
 				zebraIdx := bytes.Index([]byte(output), []byte("zebra"))
+
 				require.NotEqual(t, -1, appleIdx, "expected apple in output")
 				require.NotEqual(t, -1, zebraIdx, "expected zebra in output")
 				assert.Less(t, appleIdx, zebraIdx, "expected keys to be sorted (apple before zebra)")
@@ -326,7 +332,9 @@ func TestRun(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
+
 			var buf, errBuf bytes.Buffer
+
 			r := &show.Runner{
 				UseCase: &secret.ShowUseCase{Client: tt.mock},
 				Stdout:  &buf,
@@ -336,10 +344,12 @@ func TestRun(t *testing.T) {
 
 			if tt.wantErr {
 				assert.Error(t, err)
+
 				return
 			}
 
 			require.NoError(t, err)
+
 			if tt.check != nil {
 				tt.check(t, buf.String())
 			}

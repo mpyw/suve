@@ -27,6 +27,7 @@ func (m *mockApplyStrategy) Apply(_ context.Context, name string, _ staging.Entr
 	if err, ok := m.applyErrors[name]; ok {
 		return err
 	}
+
 	return nil
 }
 
@@ -38,9 +39,11 @@ func (m *mockApplyStrategy) FetchLastModified(_ context.Context, name string) (t
 	if m.fetchModifiedErr != nil {
 		return time.Time{}, m.fetchModifiedErr
 	}
+
 	if t, ok := m.lastModified[name]; ok {
 		return t, nil
 	}
+
 	return time.Now(), nil
 }
 
@@ -305,6 +308,7 @@ func (m *mockApplyTagStrategy) ApplyTags(_ context.Context, name string, _ stagi
 	if err, ok := m.applyTagsErrors[name]; ok {
 		return err
 	}
+
 	return nil
 }
 

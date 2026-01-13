@@ -52,6 +52,7 @@ func (r *EditRunner) Run(ctx context.Context, opts EditOptions) error {
 		// Check if changed
 		if newValue == baseline.Value {
 			output.Info(r.Stdout, "No changes made.")
+
 			return nil
 		}
 	}
@@ -74,5 +75,6 @@ func (r *EditRunner) Run(ctx context.Context, opts EditOptions) error {
 	default:
 		output.Success(r.Stdout, "Staged: %s", result.Name)
 	}
+
 	return nil
 }

@@ -65,12 +65,15 @@ func (u *LogUseCase) Execute(ctx context.Context, input LogInput) (*LogOutput, e
 		if a.CreatedDate == nil || b.CreatedDate == nil {
 			return 0
 		}
+
 		if a.CreatedDate.After(*b.CreatedDate) {
 			return -1
 		}
+
 		if a.CreatedDate.Before(*b.CreatedDate) {
 			return 1
 		}
+
 		return 0
 	})
 
@@ -81,23 +84,29 @@ func (u *LogUseCase) Execute(ctx context.Context, input LogInput) (*LogOutput, e
 
 	// Build entries
 	var entries []LogEntry
+
 	for _, v := range versions {
 		// Apply date filters (skip entries without CreatedDate when filters are applied)
 		if input.Since != nil || input.Until != nil {
 			if v.CreatedDate == nil {
 				continue
 			}
+
 			if input.Since != nil && v.CreatedDate.Before(*input.Since) {
 				continue
 			}
+
 			if input.Until != nil && v.CreatedDate.After(*input.Until) {
 				continue
 			}
 		}
 
 		// Fetch the value for this version
-		var value string
-		var fetchErr error
+		var (
+			value    string
+			fetchErr error
+		)
+
 		if v.VersionId != nil {
 			secretOut, err := u.Client.GetSecretValue(ctx, &secretapi.GetSecretValueInput{
 				SecretId:  lo.ToPtr(input.Name),

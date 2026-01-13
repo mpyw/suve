@@ -20,6 +20,7 @@ func TestOutputDiff(t *testing.T) {
 		t.Parallel()
 
 		var stdout, stderr bytes.Buffer
+
 		r := &cli.DiffRunner{
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -34,6 +35,7 @@ func TestOutputDiff(t *testing.T) {
 		}
 
 		r.OutputDiff(cli.DiffOptions{}, entry)
+
 		output := stdout.String()
 		assert.Contains(t, output, "staged for deletion")
 	})
@@ -42,6 +44,7 @@ func TestOutputDiff(t *testing.T) {
 		t.Parallel()
 
 		var stdout, stderr bytes.Buffer
+
 		r := &cli.DiffRunner{
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -56,6 +59,7 @@ func TestOutputDiff(t *testing.T) {
 		}
 
 		r.OutputDiff(cli.DiffOptions{ParseJSON: true}, entry)
+
 		output := stdout.String()
 		assert.Contains(t, output, "a")
 		assert.Contains(t, output, "b")
@@ -69,6 +73,7 @@ func TestOutputDiffCreate(t *testing.T) {
 		t.Parallel()
 
 		var stdout, stderr bytes.Buffer
+
 		r := &cli.DiffRunner{
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -81,6 +86,7 @@ func TestOutputDiffCreate(t *testing.T) {
 		}
 
 		r.OutputDiffCreate(cli.DiffOptions{ParseJSON: true}, entry)
+
 		output := stdout.String()
 		assert.Contains(t, output, "staged for creation")
 		assert.Contains(t, output, "key")
@@ -90,6 +96,7 @@ func TestOutputDiffCreate(t *testing.T) {
 		t.Parallel()
 
 		var stdout, stderr bytes.Buffer
+
 		r := &cli.DiffRunner{
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -102,6 +109,7 @@ func TestOutputDiffCreate(t *testing.T) {
 		}
 
 		r.OutputDiffCreate(cli.DiffOptions{ParseJSON: true}, entry)
+
 		output := stdout.String()
 		assert.Contains(t, output, "plain-text-value")
 	})
@@ -114,6 +122,7 @@ func TestOutputMetadata(t *testing.T) {
 		t.Parallel()
 
 		var stdout, stderr bytes.Buffer
+
 		r := &cli.DiffRunner{
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -124,6 +133,7 @@ func TestOutputMetadata(t *testing.T) {
 		}
 
 		r.OutputMetadata(entry)
+
 		output := stdout.String()
 		assert.Contains(t, output, "Description:")
 		assert.Contains(t, output, "Test description")
@@ -133,6 +143,7 @@ func TestOutputMetadata(t *testing.T) {
 		t.Parallel()
 
 		var stdout, stderr bytes.Buffer
+
 		r := &cli.DiffRunner{
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -150,6 +161,7 @@ func TestOutputMetadata(t *testing.T) {
 		t.Parallel()
 
 		var stdout, stderr bytes.Buffer
+
 		r := &cli.DiffRunner{
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -171,6 +183,7 @@ func TestOutputTagEntry(t *testing.T) {
 		t.Parallel()
 
 		var stdout, stderr bytes.Buffer
+
 		r := &cli.DiffRunner{
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -183,6 +196,7 @@ func TestOutputTagEntry(t *testing.T) {
 		}
 
 		r.OutputTagEntry(tagEntry)
+
 		output := stdout.String()
 		assert.Contains(t, output, "staged tag changes")
 		assert.Contains(t, output, "+")
@@ -193,6 +207,7 @@ func TestOutputTagEntry(t *testing.T) {
 		t.Parallel()
 
 		var stdout, stderr bytes.Buffer
+
 		r := &cli.DiffRunner{
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -205,6 +220,7 @@ func TestOutputTagEntry(t *testing.T) {
 		}
 
 		r.OutputTagEntry(tagEntry)
+
 		output := stdout.String()
 		assert.Contains(t, output, "-")
 		assert.Contains(t, output, "deprecated")
@@ -215,6 +231,7 @@ func TestOutputTagEntry(t *testing.T) {
 		t.Parallel()
 
 		var stdout, stderr bytes.Buffer
+
 		r := &cli.DiffRunner{
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -227,6 +244,7 @@ func TestOutputTagEntry(t *testing.T) {
 		}
 
 		r.OutputTagEntry(tagEntry)
+
 		output := stdout.String()
 		assert.Contains(t, output, "+")
 		assert.Contains(t, output, "-")

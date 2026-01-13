@@ -21,6 +21,7 @@ func TestCommand_Validation(t *testing.T) {
 
 	t.Run("missing arguments", func(t *testing.T) {
 		t.Parallel()
+
 		app := appcli.MakeApp()
 		err := app.Run(t.Context(), []string{"suve", "secret", "tag"})
 		require.Error(t, err)
@@ -29,6 +30,7 @@ func TestCommand_Validation(t *testing.T) {
 
 	t.Run("missing tag argument", func(t *testing.T) {
 		t.Parallel()
+
 		app := appcli.MakeApp()
 		err := app.Run(t.Context(), []string{"suve", "secret", "tag", "my-secret"})
 		require.Error(t, err)
@@ -37,6 +39,7 @@ func TestCommand_Validation(t *testing.T) {
 
 	t.Run("invalid tag format", func(t *testing.T) {
 		t.Parallel()
+
 		app := appcli.MakeApp()
 		err := app.Run(t.Context(), []string{"suve", "secret", "tag", "my-secret", "invalid"})
 		require.Error(t, err)
@@ -45,6 +48,7 @@ func TestCommand_Validation(t *testing.T) {
 
 	t.Run("empty key", func(t *testing.T) {
 		t.Parallel()
+
 		app := appcli.MakeApp()
 		err := app.Run(t.Context(), []string{"suve", "secret", "tag", "my-secret", "=value"})
 		require.Error(t, err)
@@ -62,6 +66,7 @@ func (m *mockClient) DescribeSecret(ctx context.Context, params *secretapi.Descr
 	if m.describeSecretFunc != nil {
 		return m.describeSecretFunc(ctx, params, optFns...)
 	}
+
 	return &secretapi.DescribeSecretOutput{
 		ARN: lo.ToPtr("arn:aws:secretsmanager:us-east-1:123456789012:secret:my-secret"),
 	}, nil
@@ -71,6 +76,7 @@ func (m *mockClient) TagResource(ctx context.Context, params *secretapi.TagResou
 	if m.tagResourceFunc != nil {
 		return m.tagResourceFunc(ctx, params, optFns...)
 	}
+
 	return &secretapi.TagResourceOutput{}, nil
 }
 
@@ -78,6 +84,7 @@ func (m *mockClient) UntagResource(ctx context.Context, params *secretapi.UntagR
 	if m.untagResourceFunc != nil {
 		return m.untagResourceFunc(ctx, params, optFns...)
 	}
+
 	return &secretapi.UntagResourceOutput{}, nil
 }
 
@@ -101,6 +108,7 @@ func TestRun(t *testing.T) {
 				tagResourceFunc: func(_ context.Context, params *secretapi.TagResourceInput, _ ...func(*secretapi.Options)) (*secretapi.TagResourceOutput, error) {
 					assert.Contains(t, lo.FromPtr(params.SecretId), "arn:aws:secretsmanager")
 					assert.Len(t, params.Tags, 1)
+
 					return &secretapi.TagResourceOutput{}, nil
 				},
 			},
@@ -119,6 +127,7 @@ func TestRun(t *testing.T) {
 			mock: &mockClient{
 				tagResourceFunc: func(_ context.Context, params *secretapi.TagResourceInput, _ ...func(*secretapi.Options)) (*secretapi.TagResourceOutput, error) {
 					assert.Len(t, params.Tags, 2)
+
 					return &secretapi.TagResourceOutput{}, nil
 				},
 			},
@@ -158,7 +167,9 @@ func TestRun(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
+
 			var buf bytes.Buffer
+
 			r := &tag.Runner{
 				UseCase: &secret.TagUseCase{Client: tt.mock},
 				Stdout:  &buf,
@@ -168,10 +179,12 @@ func TestRun(t *testing.T) {
 			if tt.wantErr != "" {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tt.wantErr)
+
 				return
 			}
 
 			require.NoError(t, err)
+
 			if tt.check != nil {
 				tt.check(t, buf.String())
 			}

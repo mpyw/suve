@@ -92,6 +92,7 @@ func (s *State) IsEmpty() bool {
 			return false
 		}
 	}
+
 	return true
 }
 
@@ -100,6 +101,7 @@ func (s *State) TotalCount() int {
 	if s == nil {
 		return 0
 	}
+
 	return s.EntryCount() + s.TagCount()
 }
 

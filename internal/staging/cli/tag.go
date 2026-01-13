@@ -40,6 +40,7 @@ func (r *TagRunner) Run(ctx context.Context, opts TagOptions) error {
 	}
 
 	output.Success(r.Stdout, "Staged tags for: %s", result.Name)
+
 	return nil
 }
 
@@ -67,6 +68,7 @@ func (r *UntagRunner) Run(ctx context.Context, opts UntagOptions) error {
 	}
 
 	output.Success(r.Stdout, "Staged tag removal for: %s", result.Name)
+
 	return nil
 }
 
@@ -85,5 +87,6 @@ func parseTags(tagSlice []string) (map[string]string, error) {
 
 		tags[parts[0]] = parts[1]
 	}
+
 	return tags, nil
 }

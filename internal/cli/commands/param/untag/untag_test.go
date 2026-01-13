@@ -21,6 +21,7 @@ func TestCommand_Validation(t *testing.T) {
 
 	t.Run("missing arguments", func(t *testing.T) {
 		t.Parallel()
+
 		app := appcli.MakeApp()
 		err := app.Run(t.Context(), []string{"suve", "param", "untag"})
 		require.Error(t, err)
@@ -29,6 +30,7 @@ func TestCommand_Validation(t *testing.T) {
 
 	t.Run("missing key argument", func(t *testing.T) {
 		t.Parallel()
+
 		app := appcli.MakeApp()
 		err := app.Run(t.Context(), []string{"suve", "param", "untag", "/app/param"})
 		require.Error(t, err)
@@ -45,6 +47,7 @@ func (m *mockClient) AddTagsToResource(ctx context.Context, params *paramapi.Add
 	if m.addTagsFunc != nil {
 		return m.addTagsFunc(ctx, params, optFns...)
 	}
+
 	return &paramapi.AddTagsToResourceOutput{}, nil
 }
 
@@ -52,6 +55,7 @@ func (m *mockClient) RemoveTagsFromResource(ctx context.Context, params *paramap
 	if m.removeTagsFunc != nil {
 		return m.removeTagsFunc(ctx, params, optFns...)
 	}
+
 	return &paramapi.RemoveTagsFromResourceOutput{}, nil
 }
 
@@ -76,6 +80,7 @@ func TestRun(t *testing.T) {
 					assert.Equal(t, "/app/param", lo.FromPtr(params.ResourceId))
 					assert.Equal(t, paramapi.ResourceTypeForTaggingParameter, params.ResourceType)
 					assert.Equal(t, []string{"env"}, params.TagKeys)
+
 					return &paramapi.RemoveTagsFromResourceOutput{}, nil
 				},
 			},
@@ -94,6 +99,7 @@ func TestRun(t *testing.T) {
 			mock: &mockClient{
 				removeTagsFunc: func(_ context.Context, params *paramapi.RemoveTagsFromResourceInput, _ ...func(*paramapi.Options)) (*paramapi.RemoveTagsFromResourceOutput, error) {
 					assert.Len(t, params.TagKeys, 2)
+
 					return &paramapi.RemoveTagsFromResourceOutput{}, nil
 				},
 			},
@@ -120,7 +126,9 @@ func TestRun(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
+
 			var buf bytes.Buffer
+
 			r := &untag.Runner{
 				UseCase: &param.TagUseCase{Client: tt.mock},
 				Stdout:  &buf,
@@ -130,10 +138,12 @@ func TestRun(t *testing.T) {
 			if tt.wantErr != "" {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tt.wantErr)
+
 				return
 			}
 
 			require.NoError(t, err)
+
 			if tt.check != nil {
 				tt.check(t, buf.String())
 			}

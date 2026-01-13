@@ -9,7 +9,9 @@ import (
 
 func TestWriter_Field(t *testing.T) {
 	t.Parallel()
+
 	var buf bytes.Buffer
+
 	w := New(&buf)
 
 	w.Field("Name", "test-value")
@@ -21,7 +23,9 @@ func TestWriter_Field(t *testing.T) {
 
 func TestWriter_Separator(t *testing.T) {
 	t.Parallel()
+
 	var buf bytes.Buffer
+
 	w := New(&buf)
 
 	w.Separator()
@@ -31,6 +35,7 @@ func TestWriter_Separator(t *testing.T) {
 
 func TestWriter_Value(t *testing.T) {
 	t.Parallel()
+
 	tests := []struct {
 		name     string
 		value    string
@@ -56,7 +61,9 @@ func TestWriter_Value(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
+
 			var buf bytes.Buffer
+
 			w := New(&buf)
 
 			w.Value(tt.value)
@@ -71,6 +78,7 @@ func TestWriter_Value(t *testing.T) {
 
 func TestDiff(t *testing.T) {
 	t.Parallel()
+
 	tests := []struct {
 		name       string
 		oldName    string
@@ -125,6 +133,7 @@ func TestDiff(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
+
 			result := Diff(tt.oldName, tt.newName, tt.oldContent, tt.newContent)
 
 			for _, expected := range tt.contains {
@@ -140,12 +149,14 @@ func TestDiff(t *testing.T) {
 
 func TestDiff_EmptyInputs(t *testing.T) {
 	t.Parallel()
+
 	result := Diff("old", "new", "", "")
 	assert.Empty(t, result)
 }
 
 func TestColorDiff(t *testing.T) {
 	t.Parallel()
+
 	diff := "--- old\n+++ new\n@@ -1 +1 @@\n-removed\n+added\n context"
 
 	result := colorDiff(diff)
@@ -157,12 +168,14 @@ func TestColorDiff(t *testing.T) {
 
 func TestColorDiff_EmptyInput(t *testing.T) {
 	t.Parallel()
+
 	result := colorDiff("")
 	assert.Empty(t, result)
 }
 
 func TestWarning(t *testing.T) {
 	t.Parallel()
+
 	var buf bytes.Buffer
 	Warning(&buf, "test %s", "message")
 	assert.Contains(t, buf.String(), "Warning:")
@@ -171,6 +184,7 @@ func TestWarning(t *testing.T) {
 
 func TestHint(t *testing.T) {
 	t.Parallel()
+
 	var buf bytes.Buffer
 	Hint(&buf, "try %s", "this")
 	assert.Contains(t, buf.String(), "Hint:")
@@ -179,6 +193,7 @@ func TestHint(t *testing.T) {
 
 func TestError(t *testing.T) {
 	t.Parallel()
+
 	var buf bytes.Buffer
 	Error(&buf, "error %d", 42)
 	assert.Contains(t, buf.String(), "Error:")
@@ -187,6 +202,7 @@ func TestError(t *testing.T) {
 
 func TestSuccess(t *testing.T) {
 	t.Parallel()
+
 	var buf bytes.Buffer
 	Success(&buf, "Created parameter %s", "/app/config")
 	assert.Contains(t, buf.String(), "✓")
@@ -195,6 +211,7 @@ func TestSuccess(t *testing.T) {
 
 func TestFailed(t *testing.T) {
 	t.Parallel()
+
 	var buf bytes.Buffer
 	Failed(&buf, "/app/config", assert.AnError)
 	assert.Contains(t, buf.String(), "Failed")
@@ -204,6 +221,7 @@ func TestFailed(t *testing.T) {
 
 func TestInfo(t *testing.T) {
 	t.Parallel()
+
 	var buf bytes.Buffer
 	Info(&buf, "No changes %s", "staged")
 	assert.Contains(t, buf.String(), "No changes staged")
@@ -211,6 +229,7 @@ func TestInfo(t *testing.T) {
 
 func TestParseFormat(t *testing.T) {
 	t.Parallel()
+
 	tests := []struct {
 		input    string
 		expected Format
@@ -225,6 +244,7 @@ func TestParseFormat(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
 			t.Parallel()
+
 			result := ParseFormat(tt.input)
 			assert.Equal(t, tt.expected, result)
 		})
@@ -233,6 +253,7 @@ func TestParseFormat(t *testing.T) {
 
 func TestDiffRaw(t *testing.T) {
 	t.Parallel()
+
 	result := DiffRaw("old", "new", "old-value", "new-value")
 	assert.Contains(t, result, "--- old")
 	assert.Contains(t, result, "+++ new")
@@ -242,12 +263,14 @@ func TestDiffRaw(t *testing.T) {
 
 func TestDiffRaw_EmptyInputs(t *testing.T) {
 	t.Parallel()
+
 	result := DiffRaw("old", "new", "", "")
 	assert.Empty(t, result)
 }
 
 func TestIndent(t *testing.T) {
 	t.Parallel()
+
 	tests := []struct {
 		name     string
 		input    string
@@ -283,6 +306,7 @@ func TestIndent(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
+
 			result := Indent(tt.input, tt.prefix)
 			assert.Equal(t, tt.expected, result)
 		})
@@ -291,6 +315,7 @@ func TestIndent(t *testing.T) {
 
 func TestWarn(t *testing.T) {
 	t.Parallel()
+
 	var buf bytes.Buffer
 	Warn(&buf, "warning %s", "message")
 	assert.Contains(t, buf.String(), "!")
@@ -299,6 +324,7 @@ func TestWarn(t *testing.T) {
 
 func TestPrint(t *testing.T) {
 	t.Parallel()
+
 	var buf bytes.Buffer
 	Print(&buf, "hello")
 	assert.Equal(t, "hello", buf.String())
@@ -306,6 +332,7 @@ func TestPrint(t *testing.T) {
 
 func TestPrintln(t *testing.T) {
 	t.Parallel()
+
 	var buf bytes.Buffer
 	Println(&buf, "hello")
 	assert.Equal(t, "hello\n", buf.String())
@@ -313,6 +340,7 @@ func TestPrintln(t *testing.T) {
 
 func TestPrintf(t *testing.T) {
 	t.Parallel()
+
 	var buf bytes.Buffer
 	Printf(&buf, "hello %s %d", "world", 42)
 	assert.Equal(t, "hello world 42", buf.String())

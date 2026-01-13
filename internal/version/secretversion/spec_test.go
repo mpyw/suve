@@ -13,6 +13,7 @@ import (
 //nolint:funlen // Table-driven test with many cases
 func TestParse(t *testing.T) {
 	t.Parallel()
+
 	tests := []struct {
 		name      string
 		input     string
@@ -390,10 +391,12 @@ func TestParse(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
+
 			spec, err := secretversion.Parse(tt.input)
 
 			if tt.wantErr {
 				assert.Error(t, err)
+
 				return
 			}
 
@@ -408,6 +411,7 @@ func TestParse(t *testing.T) {
 
 func TestSpec_HasShift(t *testing.T) {
 	t.Parallel()
+
 	tests := []struct {
 		name string
 		spec *secretversion.Spec
@@ -498,11 +502,13 @@ func TestParseDiffArgs(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
+
 			spec1, spec2, err := secretversion.ParseDiffArgs(tt.args)
 
 			if tt.wantErrMsg != "" {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tt.wantErrMsg)
+
 				return
 			}
 

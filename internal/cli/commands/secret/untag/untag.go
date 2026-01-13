@@ -59,6 +59,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		UseCase: &secret.TagUseCase{Client: client},
 		Stdout:  cmd.Root().Writer,
 	}
+
 	return r.Run(ctx, Options{
 		Name: name,
 		Keys: keys,

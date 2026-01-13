@@ -152,6 +152,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		if err != nil {
 			return fmt.Errorf("invalid --since value: must be RFC3339 format (e.g., '2024-01-01T00:00:00Z')")
 		}
+
 		opts.Since = &since
 	}
 
@@ -161,6 +162,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		if err != nil {
 			return fmt.Errorf("invalid --until value: must be RFC3339 format (e.g., '2024-12-31T23:59:59Z')")
 		}
+
 		opts.Until = &until
 	}
 
@@ -179,6 +181,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		if opts.ShowPatch {
 			output.Warning(cmd.Root().ErrWriter, "-p/--patch has no effect with --output=json")
 		}
+
 		if opts.Oneline {
 			output.Warning(cmd.Root().ErrWriter, "--oneline has no effect with --output=json")
 		}
@@ -198,6 +201,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 			Stdout:  w,
 			Stderr:  cmd.Root().ErrWriter,
 		}
+
 		return r.Run(ctx, opts)
 	})
 }
@@ -232,23 +236,29 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 			if len(entry.VersionStage) > 0 {
 				item.Stages = entry.VersionStage
 			}
+
 			if entry.CreatedDate != nil {
 				item.Created = timeutil.FormatRFC3339(*entry.CreatedDate)
 			}
+
 			if entry.Error != nil {
 				item.Error = entry.Error.Error()
 			} else {
 				item.Value = &entry.Value
 			}
+
 			items = append(items, item)
 		}
+
 		enc := json.NewEncoder(r.Stdout)
 		enc.SetIndent("", "  ")
+
 		return enc.Encode(items)
 	}
 
 	// Build secret values map for patch mode
 	secretValues := make(map[string]string)
+
 	for _, entry := range entries {
 		if entry.Error == nil {
 			secretValues[entry.VersionID] = entry.Value
@@ -264,16 +274,19 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 			if entry.CreatedDate != nil {
 				dateStr = entry.CreatedDate.Format("2006-01-02")
 			}
+
 			labelsStr := ""
 			if len(entry.VersionStage) > 0 {
 				labelsStr = colors.Current(fmt.Sprintf(" %v", entry.VersionStage))
 			}
+
 			output.Printf(r.Stdout, "%s%s  %s%s\n",
 				colors.Version(secretversion.TruncateVersionID(versionID)),
 				labelsStr,
 				colors.FieldLabel(dateStr),
 				"",
 			)
+
 			continue
 		}
 
@@ -281,7 +294,9 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 		if len(entry.VersionStage) > 0 {
 			versionLabel += " " + colors.Current(fmt.Sprintf("%v", entry.VersionStage))
 		}
+
 		output.Println(r.Stdout, colors.Version(versionLabel))
+
 		if entry.CreatedDate != nil {
 			output.Printf(r.Stdout, "%s %s\n", colors.FieldLabel("Date:"), timeutil.FormatRFC3339(*entry.CreatedDate))
 		}
@@ -289,6 +304,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 		if opts.ShowPatch {
 			// Determine old/new indices based on order
 			var oldIdx, newIdx int
+
 			if opts.Reverse {
 				// In reverse mode: comparing with next version (newer)
 				if i < len(entries)-1 {
@@ -311,13 +327,16 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 				oldVersionID := entries[oldIdx].VersionID
 				newVersionID := entries[newIdx].VersionID
 				oldValue, oldOk := secretValues[oldVersionID]
+
 				newValue, newOk := secretValues[newVersionID]
 				if oldOk && newOk {
 					if opts.ParseJSON {
 						oldValue, newValue = jsonutil.TryFormatOrWarn2(oldValue, newValue, r.Stderr, "")
 					}
+
 					oldName := fmt.Sprintf("%s#%s", opts.Name, secretversion.TruncateVersionID(oldVersionID))
 					newName := fmt.Sprintf("%s#%s", opts.Name, secretversion.TruncateVersionID(newVersionID))
+
 					diff := output.Diff(oldName, newName, oldValue, newValue)
 					if diff != "" {
 						output.Println(r.Stdout, "")

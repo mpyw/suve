@@ -22,6 +22,7 @@ func TestCommand_Validation(t *testing.T) {
 
 	t.Run("missing secret name", func(t *testing.T) {
 		t.Parallel()
+
 		app := appcli.MakeApp()
 		err := app.Run(t.Context(), []string{"suve", "secret", "delete"})
 		require.Error(t, err)
@@ -38,6 +39,7 @@ func (m *mockClient) GetSecretValue(ctx context.Context, params *secretapi.GetSe
 	if m.getSecretValueFunc != nil {
 		return m.getSecretValueFunc(ctx, params, optFns...)
 	}
+
 	return nil, &secretapi.ResourceNotFoundException{Message: lo.ToPtr("not found")}
 }
 
@@ -45,11 +47,13 @@ func (m *mockClient) DeleteSecret(ctx context.Context, params *secretapi.DeleteS
 	if m.deleteSecretFunc != nil {
 		return m.deleteSecretFunc(ctx, params, optFns...)
 	}
+
 	return nil, fmt.Errorf("DeleteSecret not mocked")
 }
 
 func TestRun(t *testing.T) {
 	t.Parallel()
+
 	now := time.Now()
 	deletionDate := now.Add(30 * 24 * time.Hour)
 
@@ -67,6 +71,7 @@ func TestRun(t *testing.T) {
 				deleteSecretFunc: func(_ context.Context, params *secretapi.DeleteSecretInput, _ ...func(*secretapi.Options)) (*secretapi.DeleteSecretOutput, error) {
 					assert.False(t, lo.FromPtr(params.ForceDeleteWithoutRecovery), "expected ForceDeleteWithoutRecovery to be false")
 					assert.Equal(t, int64(30), lo.FromPtr(params.RecoveryWindowInDays))
+
 					return &secretapi.DeleteSecretOutput{
 						Name:         lo.ToPtr("my-secret"),
 						DeletionDate: &deletionDate,
@@ -85,6 +90,7 @@ func TestRun(t *testing.T) {
 			mock: &mockClient{
 				deleteSecretFunc: func(_ context.Context, params *secretapi.DeleteSecretInput, _ ...func(*secretapi.Options)) (*secretapi.DeleteSecretOutput, error) {
 					assert.True(t, lo.FromPtr(params.ForceDeleteWithoutRecovery), "expected ForceDeleteWithoutRecovery to be true")
+
 					return &secretapi.DeleteSecretOutput{
 						Name: lo.ToPtr("my-secret"),
 					}, nil
@@ -109,7 +115,9 @@ func TestRun(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
+
 			var buf, errBuf bytes.Buffer
+
 			r := &delete.Runner{
 				UseCase: &secret.DeleteUseCase{Client: tt.mock},
 				Stdout:  &buf,
@@ -119,10 +127,12 @@ func TestRun(t *testing.T) {
 
 			if tt.wantErr {
 				assert.Error(t, err)
+
 				return
 			}
 
 			require.NoError(t, err)
+
 			if tt.check != nil {
 				tt.check(t, buf.String())
 			}

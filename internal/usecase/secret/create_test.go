@@ -22,6 +22,7 @@ func (m *mockCreateClient) CreateSecret(_ context.Context, _ *secretapi.CreateSe
 	if m.createErr != nil {
 		return nil, m.createErr
 	}
+
 	return m.createResult, nil
 }
 

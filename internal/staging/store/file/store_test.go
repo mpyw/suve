@@ -287,7 +287,7 @@ func TestStore_Drain(t *testing.T) {
 
 		// Should only have param entries
 		assert.Len(t, state.Entries[staging.ServiceParam], 1)
-		assert.Len(t, state.Entries[staging.ServiceSecret], 0)
+		assert.Empty(t, state.Entries[staging.ServiceSecret])
 		assert.Equal(t, "param-val", lo.FromPtr(state.Entries[staging.ServiceParam]["/app/config"].Value))
 	})
 
@@ -451,7 +451,7 @@ func TestStore_Persist(t *testing.T) {
 		readState, err := store.Drain(t.Context(), "", true)
 		require.NoError(t, err)
 		assert.Len(t, readState.Entries[staging.ServiceParam], 1)
-		assert.Len(t, readState.Entries[staging.ServiceSecret], 0)
+		assert.Empty(t, readState.Entries[staging.ServiceSecret])
 	})
 
 	t.Run("persist creates directory if not exists", func(t *testing.T) {

@@ -60,6 +60,7 @@ func TestStartCommand_HasExpectedFlags(t *testing.T) {
 		if len(names) > 0 {
 			return names[0]
 		}
+
 		return ""
 	})
 

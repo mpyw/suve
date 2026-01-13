@@ -37,6 +37,7 @@ func (u *TagUseCase) Execute(ctx context.Context, input TagInput) error {
 	if err != nil {
 		return fmt.Errorf("failed to describe secret: %w", err)
 	}
+
 	arn := lo.FromPtr(desc.ARN)
 
 	// Add tags
@@ -48,6 +49,7 @@ func (u *TagUseCase) Execute(ctx context.Context, input TagInput) error {
 				Value: lo.ToPtr(v),
 			})
 		}
+
 		_, err := u.Client.TagResource(ctx, &secretapi.TagResourceInput{
 			SecretId: lo.ToPtr(arn),
 			Tags:     tags,

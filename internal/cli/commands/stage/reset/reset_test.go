@@ -22,8 +22,11 @@ func TestCommand_Validation(t *testing.T) {
 
 	t.Run("help", func(t *testing.T) {
 		t.Parallel()
+
 		app := appcli.MakeApp()
+
 		var buf bytes.Buffer
+
 		app.Writer = &buf
 		err := app.Run(t.Context(), []string{"suve", "stage", "reset", "--help"})
 		require.NoError(t, err)
@@ -37,6 +40,7 @@ func TestRun_NoChanges(t *testing.T) {
 	store := testutil.NewMockStore()
 
 	var buf bytes.Buffer
+
 	r := &reset.Runner{
 		Store:  store,
 		Stdout: &buf,
@@ -73,6 +77,7 @@ func TestRun_UnstageAll(t *testing.T) {
 	})
 
 	var buf bytes.Buffer
+
 	r := &reset.Runner{
 		Store:  store,
 		Stdout: &buf,
@@ -105,6 +110,7 @@ func TestRun_UnstageParamOnly(t *testing.T) {
 	})
 
 	var buf bytes.Buffer
+
 	r := &reset.Runner{
 		Store:  store,
 		Stdout: &buf,
@@ -129,6 +135,7 @@ func TestRun_UnstageSecretOnly(t *testing.T) {
 	})
 
 	var buf bytes.Buffer
+
 	r := &reset.Runner{
 		Store:  store,
 		Stdout: &buf,
@@ -147,6 +154,7 @@ func TestRun_StoreError(t *testing.T) {
 	store.ListEntriesErr = errors.New("mock store error")
 
 	var buf bytes.Buffer
+
 	r := &reset.Runner{
 		Store:  store,
 		Stdout: &buf,
@@ -174,6 +182,7 @@ func TestRun_UnstageTagsOnly(t *testing.T) {
 	})
 
 	var buf bytes.Buffer
+
 	r := &reset.Runner{
 		Store:  store,
 		Stdout: &buf,
@@ -223,6 +232,7 @@ func TestRun_UnstageEntriesAndTags(t *testing.T) {
 	})
 
 	var buf bytes.Buffer
+
 	r := &reset.Runner{
 		Store:  store,
 		Stdout: &buf,
@@ -258,6 +268,7 @@ func TestRun_WithHintedStore(t *testing.T) {
 	})
 
 	var buf bytes.Buffer
+
 	r := &reset.Runner{
 		Store:  store,
 		Stdout: &buf,
@@ -284,6 +295,7 @@ func TestRun_ListTagsError(t *testing.T) {
 	})
 
 	var buf bytes.Buffer
+
 	r := &reset.Runner{
 		Store:  store,
 		Stdout: &buf,
@@ -309,6 +321,7 @@ func TestRun_UnstageAllError(t *testing.T) {
 	})
 
 	var buf bytes.Buffer
+
 	r := &reset.Runner{
 		Store:  store,
 		Stdout: &buf,
@@ -334,6 +347,7 @@ func TestRun_WithHintedStoreError(t *testing.T) {
 	})
 
 	var buf bytes.Buffer
+
 	r := &reset.Runner{
 		Store:  store,
 		Stdout: &buf,

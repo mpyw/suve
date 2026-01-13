@@ -36,7 +36,9 @@ func testParser() version.AbsoluteParser[TestAbsoluteSpec] {
 					for _, c := range value {
 						n = n*10 + int(c-'0')
 					}
+
 					abs.Number = &n
+
 					return abs, nil
 				},
 			},
@@ -49,6 +51,7 @@ func testParser() version.AbsoluteParser[TestAbsoluteSpec] {
 				},
 				Apply: func(value string, abs TestAbsoluteSpec) (TestAbsoluteSpec, error) {
 					abs.Label = value
+
 					return abs, nil
 				},
 			},
@@ -64,6 +67,7 @@ func TestSpec_HasShift(t *testing.T) {
 
 	t.Run("no shift", func(t *testing.T) {
 		t.Parallel()
+
 		spec := &version.Spec[TestAbsoluteSpec]{
 			Name:  "test",
 			Shift: 0,
@@ -73,6 +77,7 @@ func TestSpec_HasShift(t *testing.T) {
 
 	t.Run("with shift", func(t *testing.T) {
 		t.Parallel()
+
 		spec := &version.Spec[TestAbsoluteSpec]{
 			Name:  "test",
 			Shift: 1,
@@ -82,6 +87,7 @@ func TestSpec_HasShift(t *testing.T) {
 
 	t.Run("negative shift treated as no shift", func(t *testing.T) {
 		t.Parallel()
+
 		spec := &version.Spec[TestAbsoluteSpec]{
 			Name:  "test",
 			Shift: -1,
@@ -92,10 +98,12 @@ func TestSpec_HasShift(t *testing.T) {
 
 func TestParse(t *testing.T) {
 	t.Parallel()
+
 	parser := testParser()
 
 	t.Run("name only", func(t *testing.T) {
 		t.Parallel()
+
 		spec, err := version.Parse("/my/param", parser)
 		require.NoError(t, err)
 		assert.Equal(t, "/my/param", spec.Name)
@@ -106,30 +114,35 @@ func TestParse(t *testing.T) {
 
 	t.Run("empty input", func(t *testing.T) {
 		t.Parallel()
+
 		_, err := version.Parse("", parser)
 		assert.ErrorIs(t, err, version.ErrEmptySpec)
 	})
 
 	t.Run("whitespace only", func(t *testing.T) {
 		t.Parallel()
+
 		_, err := version.Parse("   ", parser)
 		assert.ErrorIs(t, err, version.ErrEmptySpec)
 	})
 
 	t.Run("empty name with specifier", func(t *testing.T) {
 		t.Parallel()
+
 		_, err := version.Parse("#1", parser)
 		assert.ErrorIs(t, err, version.ErrEmptyName)
 	})
 
 	t.Run("empty name with shift", func(t *testing.T) {
 		t.Parallel()
+
 		_, err := version.Parse("~1", parser)
 		assert.ErrorIs(t, err, version.ErrEmptyName)
 	})
 
 	t.Run("with number specifier", func(t *testing.T) {
 		t.Parallel()
+
 		spec, err := version.Parse("/my/param#123", parser)
 		require.NoError(t, err)
 		assert.Equal(t, "/my/param", spec.Name)
@@ -139,6 +152,7 @@ func TestParse(t *testing.T) {
 
 	t.Run("with label specifier", func(t *testing.T) {
 		t.Parallel()
+
 		spec, err := version.Parse("secret:CURRENT", parser)
 		require.NoError(t, err)
 		assert.Equal(t, "secret", spec.Name)
@@ -147,6 +161,7 @@ func TestParse(t *testing.T) {
 
 	t.Run("with shift only", func(t *testing.T) {
 		t.Parallel()
+
 		spec, err := version.Parse("/my/param~2", parser)
 		require.NoError(t, err)
 		assert.Equal(t, "/my/param", spec.Name)
@@ -155,6 +170,7 @@ func TestParse(t *testing.T) {
 
 	t.Run("with number and shift", func(t *testing.T) {
 		t.Parallel()
+
 		spec, err := version.Parse("/my/param#5~2", parser)
 		require.NoError(t, err)
 		assert.Equal(t, "/my/param", spec.Name)
@@ -165,6 +181,7 @@ func TestParse(t *testing.T) {
 
 	t.Run("with label and shift", func(t *testing.T) {
 		t.Parallel()
+
 		spec, err := version.Parse("secret:CURRENT~1", parser)
 		require.NoError(t, err)
 		assert.Equal(t, "secret", spec.Name)
@@ -174,6 +191,7 @@ func TestParse(t *testing.T) {
 
 	t.Run("shift without number", func(t *testing.T) {
 		t.Parallel()
+
 		spec, err := version.Parse("/my/param~", parser)
 		require.NoError(t, err)
 		assert.Equal(t, 1, spec.Shift) // ~ alone = ~1
@@ -181,6 +199,7 @@ func TestParse(t *testing.T) {
 
 	t.Run("multiple shifts", func(t *testing.T) {
 		t.Parallel()
+
 		spec, err := version.Parse("/my/param~~", parser)
 		require.NoError(t, err)
 		assert.Equal(t, 2, spec.Shift) // ~~ = ~1~1 = 2
@@ -188,6 +207,7 @@ func TestParse(t *testing.T) {
 
 	t.Run("cumulative shifts", func(t *testing.T) {
 		t.Parallel()
+
 		spec, err := version.Parse("/my/param~1~2", parser)
 		require.NoError(t, err)
 		assert.Equal(t, 3, spec.Shift) // ~1~2 = 3
@@ -195,12 +215,14 @@ func TestParse(t *testing.T) {
 
 	t.Run("ambiguous tilde", func(t *testing.T) {
 		t.Parallel()
+
 		_, err := version.Parse("/my/param~backup", parser)
 		assert.ErrorIs(t, err, version.ErrAmbiguousTilde)
 	})
 
 	t.Run("invalid specifier - # at end", func(t *testing.T) {
 		t.Parallel()
+
 		_, err := version.Parse("/my/param#", parser)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "# must be followed")
@@ -208,12 +230,14 @@ func TestParse(t *testing.T) {
 
 	t.Run("# followed by non-digit", func(t *testing.T) {
 		t.Parallel()
+
 		_, err := version.Parse("/my/param#abc", parser)
 		assert.Error(t, err)
 	})
 
 	t.Run("multiple absolute specifiers", func(t *testing.T) {
 		t.Parallel()
+
 		_, err := version.Parse("/my/param#1#2", parser)
 		assert.ErrorIs(t, err, version.ErrMultipleAbsoluteSpec)
 	})
@@ -237,6 +261,7 @@ func TestParse(t *testing.T) {
 
 	t.Run("whitespace trimmed", func(t *testing.T) {
 		t.Parallel()
+
 		spec, err := version.Parse("  /my/param  ", parser)
 		require.NoError(t, err)
 		assert.Equal(t, "/my/param", spec.Name)
@@ -286,7 +311,9 @@ func TestParse_NoDuplicatedCheck(t *testing.T) {
 					for _, c := range value {
 						n = n*10 + int(c-'0')
 					}
+
 					abs.Number = &n
+
 					return abs, nil
 				},
 			},
@@ -305,6 +332,7 @@ func TestParse_NoDuplicatedCheck(t *testing.T) {
 
 func TestParse_InvalidShiftAfterAbsolute(t *testing.T) {
 	t.Parallel()
+
 	parser := testParser()
 
 	// Test case where parseShift returns an error after a valid absolute specifier
@@ -332,7 +360,9 @@ func TestParse_UnknownCharAfterAbsolute(t *testing.T) {
 					for _, c := range value {
 						n = n*10 + int(c-'0')
 					}
+
 					abs.Number = &n
+
 					return abs, nil
 				},
 			},
@@ -385,7 +415,9 @@ func TestParse_MatchParserNoMatch(t *testing.T) {
 					for _, c := range value {
 						n = n*10 + int(c-'0')
 					}
+
 					abs.Number = &n
+
 					return abs, nil
 				},
 			},

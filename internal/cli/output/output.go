@@ -69,7 +69,7 @@ func (o *Writer) Value(value string) {
 
 // Warning prints a warning message in yellow.
 // Used to alert users about non-critical issues that don't prevent command execution.
-// Example: "Warning: comparing identical versions"
+// Example: "Warning: comparing identical versions".
 func Warning(w io.Writer, format string, args ...any) {
 	msg := fmt.Sprintf(format, args...)
 	_, _ = fmt.Fprintln(w, colors.Warning("Warning: "+msg))
@@ -77,7 +77,7 @@ func Warning(w io.Writer, format string, args ...any) {
 
 // Hint prints a hint message in cyan.
 // Used to provide helpful suggestions to the user, typically following a warning.
-// Example: "Hint: To compare with previous version, use: suve param diff /param~1"
+// Example: "Hint: To compare with previous version, use: suve param diff /param~1".
 func Hint(w io.Writer, format string, args ...any) {
 	msg := fmt.Sprintf(format, args...)
 	_, _ = fmt.Fprintln(w, colors.Info("Hint: "+msg))
@@ -92,27 +92,27 @@ func Error(w io.Writer, format string, args ...any) {
 }
 
 // Success prints a success message with green checkmark.
-// Example: "✓ Created parameter /app/config"
+// Example: "✓ Created parameter /app/config".
 func Success(w io.Writer, format string, args ...any) {
 	msg := fmt.Sprintf(format, args...)
 	_, _ = fmt.Fprintf(w, "%s %s\n", colors.Success("✓"), msg)
 }
 
 // Failed prints a failure message in red.
-// Example: "Failed /app/config: error message"
+// Example: "Failed /app/config: error message".
 func Failed(w io.Writer, name string, err error) {
 	_, _ = fmt.Fprintf(w, "%s %s: %v\n", colors.Failed("Failed"), name, err)
 }
 
 // Info prints an informational message in yellow (without "Warning:" prefix).
-// Example: "No changes staged."
+// Example: "No changes staged.".
 func Info(w io.Writer, format string, args ...any) {
 	msg := fmt.Sprintf(format, args...)
 	_, _ = fmt.Fprintln(w, colors.Warning(msg))
 }
 
 // Warn prints a warning message with yellow "!" prefix.
-// Example: "! Skipped /app/config (same as AWS)"
+// Example: "! Skipped /app/config (same as AWS)".
 func Warn(w io.Writer, format string, args ...any) {
 	msg := fmt.Sprintf(format, args...)
 	_, _ = fmt.Fprintf(w, "%s %s\n", colors.Warning("!"), msg)
@@ -122,6 +122,7 @@ func Warn(w io.Writer, format string, args ...any) {
 func Diff(oldName, newName, oldContent, newContent string) string {
 	edits := udiff.Strings(oldContent, newContent)
 	unified, _ := udiff.ToUnifiedDiff(oldName, newName, oldContent, edits, udiff.DefaultContextLines)
+
 	return colorDiff(unified.String())
 }
 
@@ -129,6 +130,7 @@ func Diff(oldName, newName, oldContent, newContent string) string {
 func DiffRaw(oldName, newName, oldContent, newContent string) string {
 	edits := udiff.Strings(oldContent, newContent)
 	unified, _ := udiff.ToUnifiedDiff(oldName, newName, oldContent, edits, udiff.DefaultContextLines)
+
 	return unified.String()
 }
 
@@ -139,6 +141,7 @@ func colorDiff(diff string) string {
 	}
 
 	lines := strings.Split(diff, "\n")
+
 	var result strings.Builder
 
 	for _, line := range lines {
@@ -154,6 +157,7 @@ func colorDiff(diff string) string {
 		default:
 			result.WriteString(line)
 		}
+
 		result.WriteString("\n")
 	}
 
@@ -180,11 +184,13 @@ func Indent(s, prefix string) string {
 	if s == "" {
 		return ""
 	}
+
 	lines := strings.Split(s, "\n")
 	for i, line := range lines {
 		if line != "" {
 			lines[i] = prefix + line
 		}
 	}
+
 	return strings.Join(lines, "\n")
 }

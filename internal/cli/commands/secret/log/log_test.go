@@ -28,6 +28,7 @@ func TestCommand_Validation(t *testing.T) {
 
 	t.Run("missing secret name", func(t *testing.T) {
 		t.Parallel()
+
 		app := appcli.MakeApp()
 		err := app.Run(t.Context(), []string{"suve", "secret", "log"})
 		require.Error(t, err)
@@ -38,6 +39,7 @@ func TestCommand_Validation(t *testing.T) {
 		t.Parallel()
 		// This will fail due to AWS client init, but we test the warning path
 		var errBuf bytes.Buffer
+
 		app := appcli.MakeApp()
 		app.ErrWriter = &errBuf
 		_ = app.Run(t.Context(), []string{"suve", "secret", "log", "--parse-json", "my-secret"})
@@ -46,6 +48,7 @@ func TestCommand_Validation(t *testing.T) {
 
 	t.Run("invalid since timestamp", func(t *testing.T) {
 		t.Parallel()
+
 		app := appcli.MakeApp()
 		err := app.Run(t.Context(), []string{"suve", "secret", "log", "--since", "invalid", "my-secret"})
 		require.Error(t, err)
@@ -54,6 +57,7 @@ func TestCommand_Validation(t *testing.T) {
 
 	t.Run("invalid until timestamp", func(t *testing.T) {
 		t.Parallel()
+
 		app := appcli.MakeApp()
 		err := app.Run(t.Context(), []string{"suve", "secret", "log", "--until", "not-a-date", "my-secret"})
 		require.Error(t, err)
@@ -62,7 +66,9 @@ func TestCommand_Validation(t *testing.T) {
 
 	t.Run("oneline with patch warns", func(t *testing.T) {
 		t.Parallel()
+
 		var errBuf bytes.Buffer
+
 		app := appcli.MakeApp()
 		app.ErrWriter = &errBuf
 		_ = app.Run(t.Context(), []string{"suve", "secret", "log", "--oneline", "--patch", "my-secret"})
@@ -71,7 +77,9 @@ func TestCommand_Validation(t *testing.T) {
 
 	t.Run("output json with patch warns", func(t *testing.T) {
 		t.Parallel()
+
 		var errBuf bytes.Buffer
+
 		app := appcli.MakeApp()
 		app.ErrWriter = &errBuf
 		_ = app.Run(t.Context(), []string{"suve", "secret", "log", "--output=json", "--patch", "my-secret"})
@@ -80,7 +88,9 @@ func TestCommand_Validation(t *testing.T) {
 
 	t.Run("output json with oneline warns", func(t *testing.T) {
 		t.Parallel()
+
 		var errBuf bytes.Buffer
+
 		app := appcli.MakeApp()
 		app.ErrWriter = &errBuf
 		_ = app.Run(t.Context(), []string{"suve", "secret", "log", "--output=json", "--oneline", "my-secret"})
@@ -97,6 +107,7 @@ func (m *mockClient) ListSecretVersionIds(ctx context.Context, params *secretapi
 	if m.listSecretVersionIdsFunc != nil {
 		return m.listSecretVersionIdsFunc(ctx, params, optFns...)
 	}
+
 	return nil, fmt.Errorf("ListSecretVersionIds not mocked")
 }
 
@@ -104,12 +115,14 @@ func (m *mockClient) GetSecretValue(ctx context.Context, params *secretapi.GetSe
 	if m.getSecretValueFunc != nil {
 		return m.getSecretValueFunc(ctx, params, optFns...)
 	}
+
 	return nil, fmt.Errorf("GetSecretValue not mocked")
 }
 
 //nolint:funlen // Table-driven test with many cases
 func TestRun(t *testing.T) {
 	t.Parallel()
+
 	now := time.Now()
 
 	tests := []struct {
@@ -125,6 +138,7 @@ func TestRun(t *testing.T) {
 			mock: &mockClient{
 				listSecretVersionIdsFunc: func(_ context.Context, params *secretapi.ListSecretVersionIDsInput, _ ...func(*secretapi.Options)) (*secretapi.ListSecretVersionIDsOutput, error) {
 					assert.Equal(t, "my-secret", lo.FromPtr(params.SecretId))
+
 					return &secretapi.ListSecretVersionIDsOutput{
 						Versions: []secretapi.SecretVersionsListEntry{
 							{VersionId: lo.ToPtr("v1"), CreatedDate: lo.ToPtr(now.Add(-time.Hour)), VersionStages: []string{"AWSPREVIOUS"}},
@@ -164,6 +178,7 @@ func TestRun(t *testing.T) {
 							VersionId:    lo.ToPtr(testVersionID2),
 						}, nil
 					}
+
 					return nil, fmt.Errorf("unknown version")
 				},
 			},
@@ -222,6 +237,7 @@ func TestRun(t *testing.T) {
 			check: func(t *testing.T, output string) {
 				prevPos := bytes.Index([]byte(output), []byte("AWSPREVIOUS"))
 				currPos := bytes.Index([]byte(output), []byte("AWSCURRENT"))
+
 				require.NotEqual(t, -1, prevPos, "expected AWSPREVIOUS in output")
 				require.NotEqual(t, -1, currPos, "expected AWSCURRENT in output")
 				assert.Less(t, prevPos, currPos, "expected AWSPREVIOUS before AWSCURRENT in reverse mode")
@@ -323,6 +339,7 @@ func TestRun(t *testing.T) {
 							VersionId:    lo.ToPtr(testVersionID2),
 						}, nil
 					}
+
 					return nil, fmt.Errorf("unknown version")
 				},
 			},
@@ -357,6 +374,7 @@ func TestRun(t *testing.T) {
 							VersionId:    lo.ToPtr(testVersionID2),
 						}, nil
 					}
+
 					return nil, fmt.Errorf("unknown version")
 				},
 			},
@@ -391,6 +409,7 @@ func TestRun(t *testing.T) {
 							VersionId:    lo.ToPtr(testVersionID2),
 						}, nil
 					}
+
 					return nil, fmt.Errorf("unknown version")
 				},
 			},
@@ -559,6 +578,7 @@ func TestRun(t *testing.T) {
 							VersionId:    lo.ToPtr(testVersionID2),
 						}, nil
 					}
+
 					return nil, fmt.Errorf("unknown version")
 				},
 			},
@@ -618,7 +638,9 @@ func TestRun(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
+
 			var buf, errBuf bytes.Buffer
+
 			r := &log.Runner{
 				UseCase: &secret.LogUseCase{Client: tt.mock},
 				Stdout:  &buf,
@@ -628,10 +650,12 @@ func TestRun(t *testing.T) {
 
 			if tt.wantErr {
 				assert.Error(t, err)
+
 				return
 			}
 
 			require.NoError(t, err)
+
 			if tt.check != nil {
 				tt.check(t, buf.String())
 			}

@@ -23,12 +23,14 @@ func TestState_IsEmpty(t *testing.T) {
 
 	t.Run("empty state is empty", func(t *testing.T) {
 		t.Parallel()
+
 		state := staging.NewEmptyState()
 		assert.True(t, state.IsEmpty())
 	})
 
 	t.Run("state with entry is not empty", func(t *testing.T) {
 		t.Parallel()
+
 		state := staging.NewEmptyState()
 		state.Entries[staging.ServiceParam]["/app/config"] = staging.Entry{
 			Operation: staging.OperationUpdate,
@@ -40,6 +42,7 @@ func TestState_IsEmpty(t *testing.T) {
 
 	t.Run("state with tag is not empty", func(t *testing.T) {
 		t.Parallel()
+
 		state := staging.NewEmptyState()
 		state.Tags[staging.ServiceParam]["/app/config"] = staging.TagEntry{
 			Add:      map[string]string{"env": "prod"},
@@ -54,6 +57,7 @@ func TestState_Merge(t *testing.T) {
 
 	t.Run("merge entries", func(t *testing.T) {
 		t.Parallel()
+
 		state1 := staging.NewEmptyState()
 		state1.Entries[staging.ServiceParam]["/app/config1"] = staging.Entry{
 			Operation: staging.OperationUpdate,
@@ -77,6 +81,7 @@ func TestState_Merge(t *testing.T) {
 
 	t.Run("merge overwrites existing entries", func(t *testing.T) {
 		t.Parallel()
+
 		state1 := staging.NewEmptyState()
 		state1.Entries[staging.ServiceParam]["/app/config"] = staging.Entry{
 			Operation: staging.OperationUpdate,
@@ -98,6 +103,7 @@ func TestState_Merge(t *testing.T) {
 
 	t.Run("merge tags", func(t *testing.T) {
 		t.Parallel()
+
 		state1 := staging.NewEmptyState()
 		state1.Tags[staging.ServiceParam]["/app/config1"] = staging.TagEntry{
 			Add:      map[string]string{"env": "prod"},
@@ -117,6 +123,7 @@ func TestState_Merge(t *testing.T) {
 
 	t.Run("merge nil state does nothing", func(t *testing.T) {
 		t.Parallel()
+
 		state := staging.NewEmptyState()
 		state.Entries[staging.ServiceParam]["/app/config"] = staging.Entry{
 			Operation: staging.OperationUpdate,
@@ -132,6 +139,7 @@ func TestState_Merge(t *testing.T) {
 
 	t.Run("merge into nil maps initializes them", func(t *testing.T) {
 		t.Parallel()
+
 		state1 := &staging.State{
 			Entries: nil,
 			Tags:    nil,
@@ -158,6 +166,7 @@ func TestState_Merge(t *testing.T) {
 
 	t.Run("merge into nil service maps", func(t *testing.T) {
 		t.Parallel()
+
 		state1 := &staging.State{
 			Entries: make(map[staging.Service]map[string]staging.Entry),
 			Tags:    make(map[staging.Service]map[string]staging.TagEntry),
@@ -184,6 +193,7 @@ func TestState_ExtractService(t *testing.T) {
 		t.Parallel()
 
 		var state *staging.State
+
 		extracted := state.ExtractService(staging.ServiceParam)
 		assert.NotNil(t, extracted)
 		assert.True(t, extracted.IsEmpty())
@@ -191,6 +201,7 @@ func TestState_ExtractService(t *testing.T) {
 
 	t.Run("extract specific service", func(t *testing.T) {
 		t.Parallel()
+
 		state := staging.NewEmptyState()
 		state.Entries[staging.ServiceParam]["/app/param"] = staging.Entry{
 			Operation: staging.OperationUpdate,
@@ -211,6 +222,7 @@ func TestState_ExtractService(t *testing.T) {
 
 	t.Run("extract empty service returns copy", func(t *testing.T) {
 		t.Parallel()
+
 		state := staging.NewEmptyState()
 		state.Entries[staging.ServiceParam]["/app/param"] = staging.Entry{
 			Operation: staging.OperationUpdate,
@@ -237,6 +249,7 @@ func TestState_RemoveService(t *testing.T) {
 
 	t.Run("remove empty service clears all", func(t *testing.T) {
 		t.Parallel()
+
 		state := staging.NewEmptyState()
 		state.Entries[staging.ServiceParam]["/app/param"] = staging.Entry{
 			Operation: staging.OperationUpdate,
@@ -263,6 +276,7 @@ func TestState_RemoveService(t *testing.T) {
 
 	t.Run("remove specific service", func(t *testing.T) {
 		t.Parallel()
+
 		state := staging.NewEmptyState()
 		state.Entries[staging.ServiceParam]["/app/param"] = staging.Entry{
 			Operation: staging.OperationUpdate,
@@ -292,6 +306,7 @@ func TestNewEmptyState(t *testing.T) {
 
 	t.Run("creates initialized empty state", func(t *testing.T) {
 		t.Parallel()
+
 		state := staging.NewEmptyState()
 
 		require.NotNil(t, state)
@@ -309,6 +324,7 @@ func TestResourceNotFoundError(t *testing.T) {
 
 	t.Run("error message with inner error", func(t *testing.T) {
 		t.Parallel()
+
 		err := &staging.ResourceNotFoundError{
 			Err: staging.ErrNotStaged,
 		}
@@ -317,12 +333,14 @@ func TestResourceNotFoundError(t *testing.T) {
 
 	t.Run("error message without inner error", func(t *testing.T) {
 		t.Parallel()
+
 		err := &staging.ResourceNotFoundError{}
 		assert.Equal(t, "resource not found", err.Error())
 	})
 
 	t.Run("unwrap", func(t *testing.T) {
 		t.Parallel()
+
 		err := &staging.ResourceNotFoundError{
 			Err: staging.ErrNotStaged,
 		}

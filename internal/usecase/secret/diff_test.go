@@ -30,9 +30,11 @@ func (m *mockDiffClient) GetSecretValue(_ context.Context, _ *secretapi.GetSecre
 	if idx < len(m.getSecretValueErrs) && m.getSecretValueErrs[idx] != nil {
 		return nil, m.getSecretValueErrs[idx]
 	}
+
 	if idx < len(m.getSecretValueResults) {
 		return m.getSecretValueResults[idx], nil
 	}
+
 	return nil, errors.New("unexpected GetSecretValue call")
 }
 
@@ -40,6 +42,7 @@ func (m *mockDiffClient) ListSecretVersionIds(_ context.Context, _ *secretapi.Li
 	if m.listVersionsErr != nil {
 		return nil, m.listVersionsErr
 	}
+
 	return m.listVersionsResult, nil
 }
 

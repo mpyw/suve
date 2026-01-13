@@ -29,7 +29,7 @@ type AbsoluteSpec struct {
 //   - :<label> optional staging label (0 or 1, mutually exclusive with #VERSION)
 //   - <shift>  ~ or ~<N>, repeatable (0 or more, cumulative)
 //
-// Examples: my-secret, my-secret#abc123, my-secret:AWSCURRENT, my-secret~1
+// Examples: my-secret, my-secret#abc123, my-secret:AWSCURRENT, my-secret~1.
 type Spec = version.Spec[AbsoluteSpec]
 
 // hasAbsoluteSpec returns true if either ID or Label is already set.
@@ -47,6 +47,7 @@ var parser = version.AbsoluteParser[AbsoluteSpec]{
 			Duplicated: hasAbsoluteSpec,
 			Apply: func(value string, abs AbsoluteSpec) (AbsoluteSpec, error) {
 				abs.ID = lo.ToPtr(value)
+
 				return abs, nil
 			},
 		},
@@ -57,6 +58,7 @@ var parser = version.AbsoluteParser[AbsoluteSpec]{
 			Duplicated: hasAbsoluteSpec,
 			Apply: func(value string, abs AbsoluteSpec) (AbsoluteSpec, error) {
 				abs.Label = lo.ToPtr(value)
+
 				return abs, nil
 			},
 		},

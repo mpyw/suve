@@ -132,6 +132,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 			Stdout:  w,
 			Stderr:  cmd.Root().ErrWriter,
 		}
+
 		return r.Run(ctx, opts)
 	})
 }
@@ -155,6 +156,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 	// Raw mode: output value only without trailing newline
 	if opts.Raw {
 		output.Print(r.Stdout, value)
+
 		return nil
 	}
 
@@ -168,18 +170,23 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 		if result.VersionID != "" {
 			jsonOut.VersionID = result.VersionID
 		}
+
 		if len(result.VersionStage) > 0 {
 			jsonOut.Stages = result.VersionStage
 		}
+
 		if result.CreatedDate != nil {
 			jsonOut.Created = timeutil.FormatRFC3339(*result.CreatedDate)
 		}
+
 		jsonOut.Tags = make(map[string]string)
 		for _, tag := range result.Tags {
 			jsonOut.Tags[tag.Key] = tag.Value
 		}
+
 		enc := json.NewEncoder(r.Stdout)
 		enc.SetIndent("", "  ")
+
 		return enc.Encode(jsonOut)
 	}
 
@@ -187,21 +194,27 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 	out := output.New(r.Stdout)
 	out.Field("Name", result.Name)
 	out.Field("ARN", result.ARN)
+
 	if result.VersionID != "" {
 		out.Field("VersionId", result.VersionID)
 	}
+
 	if len(result.VersionStage) > 0 {
 		out.Field("Stages", fmt.Sprintf("%v", result.VersionStage))
 	}
+
 	if result.CreatedDate != nil {
 		out.Field("Created", timeutil.FormatRFC3339(*result.CreatedDate))
 	}
+
 	if len(result.Tags) > 0 {
 		out.Field("Tags", fmt.Sprintf("%d tag(s)", len(result.Tags)))
+
 		for _, tag := range result.Tags {
 			out.Field("  "+tag.Key, tag.Value)
 		}
 	}
+
 	out.Separator()
 	out.Value(value)
 

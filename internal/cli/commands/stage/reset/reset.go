@@ -50,6 +50,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	if !cmd.Bool("all") {
 		output.Warning(cmd.Root().ErrWriter, "no effect without --all flag")
 		output.Hint(cmd.Root().ErrWriter, "Use 'suve stage reset --all' to unstage all changes")
+
 		return nil
 	}
 
@@ -57,6 +58,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	if err != nil {
 		return fmt.Errorf("failed to get AWS identity: %w", err)
 	}
+
 	store := agent.NewStore(identity.AccountID, identity.Region)
 
 	r := &Runner{
@@ -104,9 +106,11 @@ func (r *Runner) Run(ctx context.Context) error {
 
 	if totalCount == 0 {
 		output.Info(r.Stdout, "No changes staged.")
+
 		return nil
 	}
 
 	output.Success(r.Stdout, "Unstaged all changes (%d SSM Parameter Store, %d Secrets Manager)", paramCount, secretCount)
+
 	return nil
 }

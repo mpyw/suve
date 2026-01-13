@@ -67,11 +67,14 @@ func (u *StashPopUseCase) Execute(ctx context.Context, input StashPopInput) (*St
 
 	// Prepare final state
 	var finalState *staging.State
+
 	merged := false
+
 	if input.Merge && !agentState.IsEmpty() {
 		// Merge states: start with agent state, merge drain state (drain takes precedence)
 		finalState = agentState
 		finalState.Merge(drainState)
+
 		merged = true
 	} else if input.Service != "" {
 		// Service-specific: merge with existing agent state for other services
@@ -93,10 +96,12 @@ func (u *StashPopUseCase) Execute(ctx context.Context, input StashPopInput) (*St
 	for _, entries := range finalState.Entries {
 		entryCount += len(entries)
 	}
+
 	tagCount := 0
 	for _, tags := range finalState.Tags {
 		tagCount += len(tags)
 	}
+
 	output := &StashPopOutput{
 		Merged:     merged,
 		EntryCount: entryCount,
@@ -108,6 +113,7 @@ func (u *StashPopUseCase) Execute(ctx context.Context, input StashPopInput) (*St
 		if input.Service != "" {
 			// Remove only the drained service from file, keep the rest
 			fileState.RemoveService(input.Service)
+
 			if fileState.IsEmpty() {
 				// Delete the file entirely
 				if _, err := u.FileStore.Drain(ctx, "", false); err != nil {

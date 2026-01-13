@@ -11,6 +11,7 @@ import (
 
 func TestTryFormat(t *testing.T) {
 	t.Parallel()
+
 	tests := []struct {
 		name     string
 		input    string
@@ -46,6 +47,7 @@ func TestTryFormat(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
+
 			gotStr, gotBool := jsonutil.TryFormat(tt.input)
 			assert.Equal(t, tt.wantStr, gotStr)
 			assert.Equal(t, tt.wantBool, gotBool)
@@ -55,6 +57,7 @@ func TestTryFormat(t *testing.T) {
 
 func TestTryFormatOrWarn(t *testing.T) {
 	t.Parallel()
+
 	tests := []struct {
 		name        string
 		value       string
@@ -82,15 +85,19 @@ func TestTryFormatOrWarn(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
+
 			var errBuf bytes.Buffer
+
 			result := jsonutil.TryFormatOrWarn(tt.value, &errBuf, tt.itemName)
 
 			if tt.wantWarning {
 				assert.Contains(t, errBuf.String(), "Warning:")
 				assert.Contains(t, errBuf.String(), "--parse-json has no effect")
+
 				if tt.itemName != "" {
 					assert.Contains(t, errBuf.String(), tt.itemName)
 				}
+
 				assert.Equal(t, tt.value, result)
 			} else {
 				assert.Empty(t, errBuf.String())
@@ -101,6 +108,7 @@ func TestTryFormatOrWarn(t *testing.T) {
 
 func TestTryFormatOrWarn2(t *testing.T) {
 	t.Parallel()
+
 	tests := []struct {
 		name        string
 		v1          string
@@ -138,15 +146,19 @@ func TestTryFormatOrWarn2(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
+
 			var errBuf bytes.Buffer
+
 			r1, r2 := jsonutil.TryFormatOrWarn2(tt.v1, tt.v2, &errBuf, tt.itemName)
 
 			if tt.wantWarning {
 				assert.Contains(t, errBuf.String(), "Warning:")
 				assert.Contains(t, errBuf.String(), "--parse-json has no effect")
+
 				if tt.itemName != "" {
 					assert.Contains(t, errBuf.String(), tt.itemName)
 				}
+
 				assert.Equal(t, tt.v1, r1)
 				assert.Equal(t, tt.v2, r2)
 			} else {

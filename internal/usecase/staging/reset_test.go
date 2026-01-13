@@ -31,6 +31,7 @@ func (m *mockResetStrategy) FetchVersion(_ context.Context, _ string) (string, s
 	if m.fetchErr != nil {
 		return "", "", m.fetchErr
 	}
+
 	return m.fetchValue, m.versionLabel, nil
 }
 
@@ -38,6 +39,7 @@ func (m *mockResetStrategy) FetchCurrentValue(_ context.Context, _ string) (*sta
 	if m.fetchCurrentError != nil {
 		return nil, m.fetchCurrentError
 	}
+
 	return &staging.EditFetchResult{Value: m.currentValue}, nil
 }
 

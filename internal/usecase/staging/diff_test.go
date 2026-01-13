@@ -26,9 +26,11 @@ func (m *mockDiffStrategy) FetchCurrent(_ context.Context, name string) (*stagin
 	if err, ok := m.fetchErrors[name]; ok {
 		return nil, err
 	}
+
 	if result, ok := m.fetchResults[name]; ok {
 		return result, nil
 	}
+
 	return &staging.FetchResult{Value: "aws-value", Identifier: "#1"}, nil
 }
 

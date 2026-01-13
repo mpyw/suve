@@ -26,6 +26,7 @@ func (m *mockEditStrategy) FetchCurrentValue(_ context.Context, _ string) (*stag
 	if m.fetchErr != nil {
 		return nil, m.fetchErr
 	}
+
 	return m.fetchResult, nil
 }
 

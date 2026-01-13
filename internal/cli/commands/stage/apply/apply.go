@@ -78,6 +78,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	if err != nil {
 		return fmt.Errorf("failed to get AWS identity: %w", err)
 	}
+
 	store := agent.NewStore(identity.AccountID, identity.Region)
 
 	// Check if there are any staged changes
@@ -85,14 +86,17 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	if err != nil {
 		return err
 	}
+
 	secretStaged, err := store.ListEntries(ctx, staging.ServiceSecret)
 	if err != nil {
 		return err
 	}
+
 	paramTagStaged, err := store.ListTags(ctx, staging.ServiceParam)
 	if err != nil {
 		return err
 	}
+
 	secretTagStaged, err := store.ListTags(ctx, staging.ServiceSecret)
 	if err != nil {
 		return err
@@ -103,6 +107,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 
 	if !hasParam && !hasSecret {
 		output.Info(cmd.Root().Writer, "No changes staged.")
+
 		return nil
 	}
 
@@ -122,10 +127,12 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	prompter.Profile = identity.Profile
 
 	message := fmt.Sprintf("Apply %d staged change(s) to AWS?", totalStaged)
+
 	confirmed, err := prompter.Confirm(message, skipConfirm)
 	if err != nil {
 		return err
 	}
+
 	if !confirmed {
 		return nil
 	}
@@ -143,6 +150,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		if err != nil {
 			return err
 		}
+
 		r.ParamStrategy = strategy
 	}
 
@@ -151,6 +159,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		if err != nil {
 			return err
 		}
+
 		r.SecretStrategy = strategy
 	}
 
@@ -184,6 +193,7 @@ func (r *Runner) Run(ctx context.Context) error {
 				strategy: r.ParamStrategy,
 			})
 		}
+
 		if len(secretStaged) > 0 && r.SecretStrategy != nil {
 			checks = append(checks, serviceConflictCheck{
 				entries:  secretStaged,
@@ -196,6 +206,7 @@ func (r *Runner) Run(ctx context.Context) error {
 			for _, name := range maputil.SortedKeys(allConflicts) {
 				output.Warning(r.Stderr, "conflict detected for %s: AWS was modified after staging", name)
 			}
+
 			return fmt.Errorf("apply rejected: %d conflict(s) detected (use --ignore-conflicts to force)", len(allConflicts))
 		}
 	}
@@ -248,6 +259,7 @@ func (r *Runner) applyService(ctx context.Context, strategy staging.ApplyStrateg
 
 	results := parallel.ExecuteMap(ctx, staged, func(ctx context.Context, name string, entry staging.Entry) (staging.Operation, error) {
 		err := strategy.Apply(ctx, name, entry)
+
 		return entry.Operation, err
 	})
 
@@ -255,6 +267,7 @@ func (r *Runner) applyService(ctx context.Context, strategy staging.ApplyStrateg
 		result := results[name]
 		if result.Err != nil {
 			output.Failed(r.Stderr, serviceName+": "+name, result.Err)
+
 			failed++
 		} else {
 			switch result.Value {
@@ -273,6 +286,7 @@ func (r *Runner) applyService(ctx context.Context, strategy staging.ApplyStrateg
 			} else if err := r.Store.UnstageEntry(ctx, service, name); err != nil {
 				output.Warning(r.Stderr, "failed to clear staging for %s: %v", name, err)
 			}
+
 			succeeded++
 		}
 	}
@@ -286,14 +300,17 @@ func (r *Runner) applyTagService(ctx context.Context, strategy staging.ApplyStra
 
 	results := parallel.ExecuteMap(ctx, staged, func(ctx context.Context, name string, tagEntry staging.TagEntry) (struct{}, error) {
 		err := strategy.ApplyTags(ctx, name, tagEntry)
+
 		return struct{}{}, err
 	})
 
 	for _, name := range maputil.SortedKeys(staged) {
 		tagEntry := staged[name]
+
 		result := results[name]
 		if result.Err != nil {
 			output.Failed(r.Stderr, serviceName+": "+name+" (tags)", result.Err)
+
 			failed++
 		} else {
 			output.Success(r.Stdout, "%s: Tagged %s%s", serviceName, name, formatTagApplySummary(tagEntry))
@@ -305,6 +322,7 @@ func (r *Runner) applyTagService(ctx context.Context, strategy staging.ApplyStra
 			} else if err := r.Store.UnstageTag(ctx, service, name); err != nil {
 				output.Warning(r.Stderr, "failed to clear staging for %s tags: %v", name, err)
 			}
+
 			succeeded++
 		}
 	}
@@ -317,12 +335,15 @@ func formatTagApplySummary(tagEntry staging.TagEntry) string {
 	if len(tagEntry.Add) > 0 {
 		parts = append(parts, fmt.Sprintf("+%d", len(tagEntry.Add)))
 	}
+
 	if tagEntry.Remove.Len() > 0 {
 		parts = append(parts, fmt.Sprintf("-%d", tagEntry.Remove.Len()))
 	}
+
 	if len(parts) == 0 {
 		return ""
 	}
+
 	return " [" + strings.Join(parts, ", ") + "]"
 }
 

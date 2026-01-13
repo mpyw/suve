@@ -60,6 +60,7 @@ func (u *StashPushUseCase) Execute(ctx context.Context, input StashPushInput) (*
 
 	// Load existing file state to merge with (for merge mode or service-specific persist)
 	var finalState *staging.State
+
 	if input.Mode == StashPushModeMerge || input.Service != "" {
 		// Merge mode or service-specific: merge with existing file state
 		fileState, err := u.FileStore.Drain(ctx, "", true)
@@ -67,10 +68,12 @@ func (u *StashPushUseCase) Execute(ctx context.Context, input StashPushInput) (*
 			// File might not exist, which is fine - start fresh
 			fileState = staging.NewEmptyState()
 		}
+
 		finalState = fileState
 		if input.Service != "" {
 			finalState.RemoveService(input.Service) // Clear the target service only
 		}
+
 		finalState.Merge(persistState)
 	} else {
 		// Replace all: use agent state directly
@@ -87,10 +90,12 @@ func (u *StashPushUseCase) Execute(ctx context.Context, input StashPushInput) (*
 	for _, entries := range persistState.Entries {
 		entryCount += len(entries)
 	}
+
 	tagCount := 0
 	for _, tags := range persistState.Tags {
 		tagCount += len(tags)
 	}
+
 	output := &StashPushOutput{
 		EntryCount: entryCount,
 		TagCount:   tagCount,
@@ -101,6 +106,7 @@ func (u *StashPushUseCase) Execute(ctx context.Context, input StashPushInput) (*
 		if input.Service != "" {
 			// Remove only the persisted service from agent, keep the rest
 			agentState.RemoveService(input.Service)
+
 			if err := u.AgentStore.WriteState(ctx, "", agentState); err != nil {
 				return output, &StashPushError{Op: "clear", Err: err, NonFatal: true}
 			}

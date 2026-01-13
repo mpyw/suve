@@ -155,6 +155,7 @@ func TestSecretStrategy_Apply(t *testing.T) {
 
 	t.Run("create operation", func(t *testing.T) {
 		t.Parallel()
+
 		mock := &secretMockClient{
 			createSecretFunc: func(
 				_ context.Context, params *secretapi.CreateSecretInput, _ ...func(*secretapi.Options),
@@ -176,6 +177,7 @@ func TestSecretStrategy_Apply(t *testing.T) {
 
 	t.Run("create operation error", func(t *testing.T) {
 		t.Parallel()
+
 		mock := &secretMockClient{
 			createSecretFunc: func(
 				_ context.Context, _ *secretapi.CreateSecretInput, _ ...func(*secretapi.Options),
@@ -195,6 +197,7 @@ func TestSecretStrategy_Apply(t *testing.T) {
 
 	t.Run("update operation", func(t *testing.T) {
 		t.Parallel()
+
 		mock := &secretMockClient{
 			putSecretValueFunc: func(
 				_ context.Context, params *secretapi.PutSecretValueInput, _ ...func(*secretapi.Options),
@@ -216,6 +219,7 @@ func TestSecretStrategy_Apply(t *testing.T) {
 
 	t.Run("update operation error", func(t *testing.T) {
 		t.Parallel()
+
 		mock := &secretMockClient{
 			putSecretValueFunc: func(
 				_ context.Context, _ *secretapi.PutSecretValueInput, _ ...func(*secretapi.Options),
@@ -235,6 +239,7 @@ func TestSecretStrategy_Apply(t *testing.T) {
 
 	t.Run("delete operation - basic", func(t *testing.T) {
 		t.Parallel()
+
 		mock := &secretMockClient{
 			deleteSecretFunc: func(
 				_ context.Context, params *secretapi.DeleteSecretInput, _ ...func(*secretapi.Options),
@@ -242,6 +247,7 @@ func TestSecretStrategy_Apply(t *testing.T) {
 				assert.Equal(t, "my-secret", lo.FromPtr(params.SecretId))
 				assert.Nil(t, params.ForceDeleteWithoutRecovery)
 				assert.Nil(t, params.RecoveryWindowInDays)
+
 				return &secretapi.DeleteSecretOutput{}, nil
 			},
 		}
@@ -255,11 +261,13 @@ func TestSecretStrategy_Apply(t *testing.T) {
 
 	t.Run("delete operation - with force", func(t *testing.T) {
 		t.Parallel()
+
 		mock := &secretMockClient{
 			deleteSecretFunc: func(
 				_ context.Context, params *secretapi.DeleteSecretInput, _ ...func(*secretapi.Options),
 			) (*secretapi.DeleteSecretOutput, error) {
 				assert.True(t, lo.FromPtr(params.ForceDeleteWithoutRecovery))
+
 				return &secretapi.DeleteSecretOutput{}, nil
 			},
 		}
@@ -276,12 +284,14 @@ func TestSecretStrategy_Apply(t *testing.T) {
 
 	t.Run("delete operation - with recovery window", func(t *testing.T) {
 		t.Parallel()
+
 		mock := &secretMockClient{
 			deleteSecretFunc: func(
 				_ context.Context, params *secretapi.DeleteSecretInput, _ ...func(*secretapi.Options),
 			) (*secretapi.DeleteSecretOutput, error) {
 				assert.Nil(t, params.ForceDeleteWithoutRecovery)
 				assert.Equal(t, int64(14), lo.FromPtr(params.RecoveryWindowInDays))
+
 				return &secretapi.DeleteSecretOutput{}, nil
 			},
 		}
@@ -298,6 +308,7 @@ func TestSecretStrategy_Apply(t *testing.T) {
 
 	t.Run("delete operation error", func(t *testing.T) {
 		t.Parallel()
+
 		mock := &secretMockClient{
 			deleteSecretFunc: func(
 				_ context.Context, _ *secretapi.DeleteSecretInput, _ ...func(*secretapi.Options),
@@ -316,6 +327,7 @@ func TestSecretStrategy_Apply(t *testing.T) {
 
 	t.Run("unknown operation", func(t *testing.T) {
 		t.Parallel()
+
 		s := staging.NewSecretStrategy(&secretMockClient{})
 		err := s.Apply(t.Context(), "my-secret", staging.Entry{
 			Operation: staging.Operation("unknown"),
@@ -330,6 +342,7 @@ func TestSecretStrategy_FetchCurrent(t *testing.T) {
 
 	t.Run("success", func(t *testing.T) {
 		t.Parallel()
+
 		mock := &secretMockClient{
 			getSecretValueFunc: func(
 				_ context.Context, _ *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options),
@@ -350,6 +363,7 @@ func TestSecretStrategy_FetchCurrent(t *testing.T) {
 
 	t.Run("error", func(t *testing.T) {
 		t.Parallel()
+
 		mock := &secretMockClient{
 			getSecretValueFunc: func(
 				_ context.Context, _ *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options),
@@ -371,6 +385,7 @@ func TestSecretStrategy_ParseName(t *testing.T) {
 
 	t.Run("valid name", func(t *testing.T) {
 		t.Parallel()
+
 		name, err := s.ParseName("my-secret")
 		require.NoError(t, err)
 		assert.Equal(t, "my-secret", name)
@@ -378,6 +393,7 @@ func TestSecretStrategy_ParseName(t *testing.T) {
 
 	t.Run("name with version ID", func(t *testing.T) {
 		t.Parallel()
+
 		_, err := s.ParseName("my-secret#abc123")
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "without version specifier")
@@ -385,6 +401,7 @@ func TestSecretStrategy_ParseName(t *testing.T) {
 
 	t.Run("name with label", func(t *testing.T) {
 		t.Parallel()
+
 		_, err := s.ParseName("my-secret:AWSCURRENT")
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "without version specifier")
@@ -392,6 +409,7 @@ func TestSecretStrategy_ParseName(t *testing.T) {
 
 	t.Run("name with shift", func(t *testing.T) {
 		t.Parallel()
+
 		_, err := s.ParseName("my-secret~1")
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "without version specifier")
@@ -399,12 +417,14 @@ func TestSecretStrategy_ParseName(t *testing.T) {
 
 	t.Run("parse error - empty version ID", func(t *testing.T) {
 		t.Parallel()
+
 		_, err := s.ParseName("my-secret#")
 		require.Error(t, err)
 	})
 
 	t.Run("parse error - empty label", func(t *testing.T) {
 		t.Parallel()
+
 		_, err := s.ParseName("my-secret:")
 		require.Error(t, err)
 	})
@@ -417,6 +437,7 @@ func TestSecretStrategy_FetchCurrentValue(t *testing.T) {
 
 	t.Run("success", func(t *testing.T) {
 		t.Parallel()
+
 		mock := &secretMockClient{
 			getSecretValueFunc: func(
 				_ context.Context, _ *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options),
@@ -437,6 +458,7 @@ func TestSecretStrategy_FetchCurrentValue(t *testing.T) {
 
 	t.Run("error", func(t *testing.T) {
 		t.Parallel()
+
 		mock := &secretMockClient{
 			getSecretValueFunc: func(
 				_ context.Context, _ *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options),
@@ -458,6 +480,7 @@ func TestSecretStrategy_ParseSpec(t *testing.T) {
 
 	t.Run("name only", func(t *testing.T) {
 		t.Parallel()
+
 		name, hasVersion, err := s.ParseSpec("my-secret")
 		require.NoError(t, err)
 		assert.Equal(t, "my-secret", name)
@@ -466,6 +489,7 @@ func TestSecretStrategy_ParseSpec(t *testing.T) {
 
 	t.Run("with version ID", func(t *testing.T) {
 		t.Parallel()
+
 		name, hasVersion, err := s.ParseSpec("my-secret#abc123")
 		require.NoError(t, err)
 		assert.Equal(t, "my-secret", name)
@@ -474,6 +498,7 @@ func TestSecretStrategy_ParseSpec(t *testing.T) {
 
 	t.Run("with label", func(t *testing.T) {
 		t.Parallel()
+
 		name, hasVersion, err := s.ParseSpec("my-secret:AWSPREVIOUS")
 		require.NoError(t, err)
 		assert.Equal(t, "my-secret", name)
@@ -482,6 +507,7 @@ func TestSecretStrategy_ParseSpec(t *testing.T) {
 
 	t.Run("with shift", func(t *testing.T) {
 		t.Parallel()
+
 		name, hasVersion, err := s.ParseSpec("my-secret~1")
 		require.NoError(t, err)
 		assert.Equal(t, "my-secret", name)
@@ -490,12 +516,14 @@ func TestSecretStrategy_ParseSpec(t *testing.T) {
 
 	t.Run("parse error - empty version ID", func(t *testing.T) {
 		t.Parallel()
+
 		_, _, err := s.ParseSpec("my-secret#")
 		require.Error(t, err)
 	})
 
 	t.Run("parse error - empty label", func(t *testing.T) {
 		t.Parallel()
+
 		_, _, err := s.ParseSpec("my-secret:")
 		require.Error(t, err)
 	})
@@ -506,11 +534,13 @@ func TestSecretStrategy_FetchVersion(t *testing.T) {
 
 	t.Run("success with label", func(t *testing.T) {
 		t.Parallel()
+
 		mock := &secretMockClient{
 			getSecretValueFunc: func(
 				_ context.Context, params *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options),
 			) (*secretapi.GetSecretValueOutput, error) {
 				assert.Equal(t, "AWSPREVIOUS", lo.FromPtr(params.VersionStage))
+
 				return &secretapi.GetSecretValueOutput{
 					SecretString: lo.ToPtr("previous-value"),
 					VersionId:    lo.ToPtr("12345678-abcd-efgh-ijkl-mnopqrstuvwx"),
@@ -527,6 +557,7 @@ func TestSecretStrategy_FetchVersion(t *testing.T) {
 
 	t.Run("success with shift", func(t *testing.T) {
 		t.Parallel()
+
 		mock := &secretMockClient{
 			getSecretValueFunc: func(
 				_ context.Context, params *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options),
@@ -537,6 +568,7 @@ func TestSecretStrategy_FetchVersion(t *testing.T) {
 						VersionId:    lo.ToPtr("version-current"),
 					}, nil
 				}
+
 				return &secretapi.GetSecretValueOutput{
 					SecretString: lo.ToPtr("shifted-value"),
 					VersionId:    lo.ToPtr("version-shifted"),
@@ -563,6 +595,7 @@ func TestSecretStrategy_FetchVersion(t *testing.T) {
 
 	t.Run("parse error", func(t *testing.T) {
 		t.Parallel()
+
 		s := staging.NewSecretStrategy(&secretMockClient{})
 		_, _, err := s.FetchVersion(t.Context(), "")
 		require.Error(t, err)
@@ -570,6 +603,7 @@ func TestSecretStrategy_FetchVersion(t *testing.T) {
 
 	t.Run("fetch error", func(t *testing.T) {
 		t.Parallel()
+
 		mock := &secretMockClient{
 			getSecretValueFunc: func(
 				_ context.Context, _ *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options),
@@ -599,6 +633,7 @@ func TestSecretStrategy_FetchLastModified(t *testing.T) {
 
 	t.Run("success - returns created date", func(t *testing.T) {
 		t.Parallel()
+
 		mock := &secretMockClient{
 			getSecretValueFunc: func(
 				_ context.Context, _ *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options),
@@ -618,6 +653,7 @@ func TestSecretStrategy_FetchLastModified(t *testing.T) {
 
 	t.Run("not found - returns zero time", func(t *testing.T) {
 		t.Parallel()
+
 		mock := &secretMockClient{
 			getSecretValueFunc: func(
 				_ context.Context, _ *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options),
@@ -634,6 +670,7 @@ func TestSecretStrategy_FetchLastModified(t *testing.T) {
 
 	t.Run("other error - returns error", func(t *testing.T) {
 		t.Parallel()
+
 		mock := &secretMockClient{
 			getSecretValueFunc: func(
 				_ context.Context, _ *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options),
@@ -650,6 +687,7 @@ func TestSecretStrategy_FetchLastModified(t *testing.T) {
 
 	t.Run("nil CreatedDate - returns zero time", func(t *testing.T) {
 		t.Parallel()
+
 		mock := &secretMockClient{
 			getSecretValueFunc: func(
 				_ context.Context, _ *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options),
@@ -673,11 +711,13 @@ func TestSecretStrategy_Apply_WithOptions(t *testing.T) {
 
 	t.Run("create with description", func(t *testing.T) {
 		t.Parallel()
+
 		mock := &secretMockClient{
 			createSecretFunc: func(
 				_ context.Context, params *secretapi.CreateSecretInput, _ ...func(*secretapi.Options),
 			) (*secretapi.CreateSecretOutput, error) {
 				assert.Equal(t, "Test description", lo.FromPtr(params.Description))
+
 				return &secretapi.CreateSecretOutput{}, nil
 			},
 		}
@@ -693,6 +733,7 @@ func TestSecretStrategy_Apply_WithOptions(t *testing.T) {
 
 	t.Run("update with description", func(t *testing.T) {
 		t.Parallel()
+
 		updateSecretCalled := false
 		mock := &secretMockClient{
 			putSecretValueFunc: func(
@@ -723,6 +764,7 @@ func TestSecretStrategy_Apply_WithOptions(t *testing.T) {
 
 	t.Run("update with description error", func(t *testing.T) {
 		t.Parallel()
+
 		mock := &secretMockClient{
 			putSecretValueFunc: func(
 				_ context.Context, _ *secretapi.PutSecretValueInput, _ ...func(*secretapi.Options),
@@ -748,6 +790,7 @@ func TestSecretStrategy_Apply_WithOptions(t *testing.T) {
 
 	t.Run("delete already deleted", func(t *testing.T) {
 		t.Parallel()
+
 		mock := &secretMockClient{
 			deleteSecretFunc: func(
 				_ context.Context, _ *secretapi.DeleteSecretInput, _ ...func(*secretapi.Options),
@@ -790,14 +833,17 @@ func TestSecretStrategy_ApplyTags(t *testing.T) {
 
 	t.Run("add tags", func(t *testing.T) {
 		t.Parallel()
+
 		tagResourceCalled := false
 		mock := &secretMockClient{
 			tagResourceFunc: func(
 				_ context.Context, params *secretapi.TagResourceInput, _ ...func(*secretapi.Options),
 			) (*secretapi.TagResourceOutput, error) {
 				tagResourceCalled = true
+
 				assert.Equal(t, "my-secret", lo.FromPtr(params.SecretId))
 				assert.Len(t, params.Tags, 1)
+
 				return &secretapi.TagResourceOutput{}, nil
 			},
 		}
@@ -812,6 +858,7 @@ func TestSecretStrategy_ApplyTags(t *testing.T) {
 
 	t.Run("remove tags", func(t *testing.T) {
 		t.Parallel()
+
 		untagResourceCalled := false
 		mock := &secretMockClient{
 			untagResourceFunc: func(
@@ -837,6 +884,7 @@ func TestSecretStrategy_ApplyTags(t *testing.T) {
 
 	t.Run("add and remove tags", func(t *testing.T) {
 		t.Parallel()
+
 		tagResourceCalled := false
 		untagResourceCalled := false
 		mock := &secretMockClient{
@@ -873,6 +921,7 @@ func TestSecretStrategy_ApplyTags(t *testing.T) {
 
 	t.Run("add tags error", func(t *testing.T) {
 		t.Parallel()
+
 		mock := &secretMockClient{
 			tagResourceFunc: func(
 				_ context.Context, _ *secretapi.TagResourceInput, _ ...func(*secretapi.Options),
@@ -890,6 +939,7 @@ func TestSecretStrategy_ApplyTags(t *testing.T) {
 
 	t.Run("remove tags error", func(t *testing.T) {
 		t.Parallel()
+
 		mock := &secretMockClient{
 			untagResourceFunc: func(
 				_ context.Context, _ *secretapi.UntagResourceInput, _ ...func(*secretapi.Options),

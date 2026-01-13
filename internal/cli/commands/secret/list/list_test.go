@@ -20,8 +20,11 @@ import (
 
 func TestCommand_Help(t *testing.T) {
 	t.Parallel()
+
 	app := appcli.MakeApp()
+
 	var buf bytes.Buffer
+
 	app.Writer = &buf
 	err := app.Run(t.Context(), []string{"suve", "secret", "list", "--help"})
 	require.NoError(t, err)
@@ -39,6 +42,7 @@ func (m *mockClient) ListSecrets(ctx context.Context, params *secretapi.ListSecr
 	if m.listSecretsFunc != nil {
 		return m.listSecretsFunc(ctx, params, optFns...)
 	}
+
 	return nil, fmt.Errorf("ListSecrets not mocked")
 }
 
@@ -46,6 +50,7 @@ func (m *mockClient) GetSecretValue(ctx context.Context, params *secretapi.GetSe
 	if m.getSecretValueFunc != nil {
 		return m.getSecretValueFunc(ctx, params, optFns...)
 	}
+
 	return nil, fmt.Errorf("GetSecretValue not mocked")
 }
 
@@ -84,6 +89,7 @@ func TestRun(t *testing.T) {
 			mock: &mockClient{
 				listSecretsFunc: func(_ context.Context, params *secretapi.ListSecretsInput, _ ...func(*secretapi.Options)) (*secretapi.ListSecretsOutput, error) {
 					require.NotEmpty(t, params.Filters, "expected filter to be set")
+
 					return &secretapi.ListSecretsOutput{
 						SecretList: []secretapi.SecretListEntry{
 							{Name: lo.ToPtr("app/secret1")},
@@ -155,6 +161,7 @@ func TestRun(t *testing.T) {
 						"secret1": "value1",
 						"secret2": "value2",
 					}
+
 					return &secretapi.GetSecretValueOutput{
 						Name:         params.SecretId,
 						SecretString: lo.ToPtr(values[name]),
@@ -253,7 +260,9 @@ func TestRun(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
+
 			var buf, errBuf bytes.Buffer
+
 			r := &list.Runner{
 				UseCase: &secret.ListUseCase{Client: tt.mock},
 				Stdout:  &buf,
@@ -263,10 +272,12 @@ func TestRun(t *testing.T) {
 
 			if tt.wantErr {
 				assert.Error(t, err)
+
 				return
 			}
 
 			require.NoError(t, err)
+
 			if tt.check != nil {
 				tt.check(t, buf.String())
 			}

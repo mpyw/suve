@@ -24,6 +24,7 @@ func (m *mockTagClient) DescribeSecret(_ context.Context, _ *secretapi.DescribeS
 	if m.describeErr != nil {
 		return nil, m.describeErr
 	}
+
 	return m.describeResult, nil
 }
 
@@ -31,6 +32,7 @@ func (m *mockTagClient) TagResource(_ context.Context, _ *secretapi.TagResourceI
 	if m.tagErr != nil {
 		return nil, m.tagErr
 	}
+
 	return &secretapi.TagResourceOutput{}, nil
 }
 
@@ -38,6 +40,7 @@ func (m *mockTagClient) UntagResource(_ context.Context, _ *secretapi.UntagResou
 	if m.untagErr != nil {
 		return nil, m.untagErr
 	}
+
 	return &secretapi.UntagResourceOutput{}, nil
 }
 

@@ -14,6 +14,7 @@ func (e *ResourceNotFoundError) Error() string {
 	if e.Err != nil {
 		return e.Err.Error()
 	}
+
 	return "resource not found"
 }
 

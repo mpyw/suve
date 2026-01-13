@@ -26,9 +26,11 @@ func (m *mockParser) ParseName(input string) (string, error) {
 	if m.parseErr != nil {
 		return "", m.parseErr
 	}
+
 	if m.parsedName != "" {
 		return m.parsedName, nil
 	}
+
 	return input, nil
 }
 
