@@ -73,6 +73,7 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
+				t.Helper()
 				assert.Contains(t, output, "/app/param1")
 				assert.Contains(t, output, "/app/param2")
 			},
@@ -91,6 +92,7 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
+				t.Helper()
 				assert.Contains(t, output, "/app/param1")
 			},
 		},
@@ -109,6 +111,7 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
+				t.Helper()
 				assert.Contains(t, output, "/app/sub/param")
 			},
 		},

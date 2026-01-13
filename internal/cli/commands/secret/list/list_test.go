@@ -73,6 +73,7 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
+				t.Helper()
 				assert.Contains(t, output, "secret1")
 				assert.Contains(t, output, "secret2")
 			},
@@ -91,6 +92,7 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
+				t.Helper()
 				assert.Contains(t, output, "app/secret1")
 			},
 		},
@@ -119,6 +121,7 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
+				t.Helper()
 				assert.Contains(t, output, "app/prod/secret1")
 				assert.NotContains(t, output, "app/dev/secret2")
 				assert.Contains(t, output, "app/prod/secret3")

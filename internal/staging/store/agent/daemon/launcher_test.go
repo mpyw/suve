@@ -518,7 +518,9 @@ func TestLauncher_startProcess_WithMockSpawner(t *testing.T) {
 
 // TestDefaultProcessSpawner_Spawn tests the default spawner.
 func TestDefaultProcessSpawner_Spawn(t *testing.T) {
+	t.Parallel()
 	t.Run("spawns process successfully", func(t *testing.T) {
+		t.Parallel()
 		// The default spawner will call os.Executable() which returns the test binary.
 		// Since the test binary doesn't have "stage agent start" command, it will exit
 		// quickly, but the Spawn itself should succeed (process starts and releases).

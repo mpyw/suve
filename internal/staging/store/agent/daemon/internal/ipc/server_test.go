@@ -50,7 +50,7 @@ func TestServer_ServeClosesListenerOnCancel(t *testing.T) {
 
 	// Create a temporary listener using TCP for easier testing
 	// (Unix socket paths have length limits on some platforms)
-	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	listener, err := (&net.ListenConfig{}).Listen(t.Context(), "tcp", "127.0.0.1:0")
 	require.NoError(t, err)
 	s.listener = listener
 
@@ -159,7 +159,7 @@ func TestServer_handleConnection_validRequest(t *testing.T) {
 
 	s := NewServer(accountID, region, handler, callback, nil)
 
-	err = s.Start()
+	err = s.Start(t.Context())
 	require.NoError(t, err)
 
 	ctx, cancel := context.WithCancel(t.Context())
@@ -210,7 +210,7 @@ func TestServer_handleConnection_invalidJSON(t *testing.T) {
 
 	s := NewServer(accountID, region, handler, nil, nil)
 
-	err = s.Start()
+	err = s.Start(t.Context())
 	require.NoError(t, err)
 
 	ctx, cancel := context.WithCancel(t.Context())
@@ -270,7 +270,7 @@ func TestServer_handleConnection_shutdownCallback(t *testing.T) {
 
 	s := NewServer(accountID, region, handler, callback, shutdownCb)
 
-	err = s.Start()
+	err = s.Start(t.Context())
 	require.NoError(t, err)
 
 	ctx, cancel := context.WithCancel(t.Context())
@@ -328,7 +328,7 @@ func TestServer_handleConnection_nilCallbacks(t *testing.T) {
 	// Create server with nil callbacks
 	s := NewServer(accountID, region, handler, nil, nil)
 
-	err = s.Start()
+	err = s.Start(t.Context())
 	require.NoError(t, err)
 
 	ctx, cancel := context.WithCancel(t.Context())
@@ -401,7 +401,7 @@ func TestServer_Start(t *testing.T) {
 
 	s := NewServer(accountID, region, handler, nil, nil)
 
-	err = s.Start()
+	err = s.Start(t.Context())
 	require.NoError(t, err)
 	defer func() { _ = s.listener.Close() }()
 
@@ -440,7 +440,7 @@ func TestServer_Start_RemovesExistingSocket(t *testing.T) {
 
 	s := NewServer(accountID, region, handler, nil, nil)
 
-	err = s.Start()
+	err = s.Start(t.Context())
 	require.NoError(t, err)
 	defer func() { _ = s.listener.Close() }()
 
@@ -469,7 +469,7 @@ func TestServer_Serve(t *testing.T) {
 
 	s := NewServer(accountID, region, handler, nil, nil)
 
-	err = s.Start()
+	err = s.Start(t.Context())
 	require.NoError(t, err)
 
 	ctx, cancel := context.WithCancel(t.Context())
@@ -520,7 +520,7 @@ func TestServer_Serve_MultipleConnections(t *testing.T) {
 
 	s := NewServer(accountID, region, handler, nil, nil)
 
-	err = s.Start()
+	err = s.Start(t.Context())
 	require.NoError(t, err)
 
 	ctx, cancel := context.WithCancel(t.Context())
@@ -673,7 +673,7 @@ func TestServer_Serve_AcceptError(t *testing.T) {
 	s := NewServer(testAccountID, testRegion, handler, nil, nil)
 
 	// Create a TCP listener for testing
-	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	listener, err := (&net.ListenConfig{}).Listen(t.Context(), "tcp", "127.0.0.1:0")
 	require.NoError(t, err)
 	s.listener = listener
 
@@ -807,7 +807,7 @@ func TestServer_Start_CreateSocketDirError(t *testing.T) {
 
 	s := NewServer(accountID, region, handler, nil, nil)
 
-	err := s.Start()
+	err := s.Start(t.Context())
 	// On Linux with /proc/1/root, this should fail with permission denied or path error
 	// On macOS, it might fail differently, but should still fail
 	require.Error(t, err)
@@ -832,7 +832,7 @@ func TestServer_Start_ListenError(t *testing.T) {
 
 	// First start a server on the socket
 	s1 := NewServer(accountID, region, handler, nil, nil)
-	err = s1.Start()
+	err = s1.Start(t.Context())
 	require.NoError(t, err)
 
 	ctx, cancel := context.WithCancel(t.Context())
@@ -875,7 +875,7 @@ func TestServer_Start_ListenErrorLongPath(t *testing.T) {
 	region := "very-long-region-name-for-testing"
 
 	s := NewServer(accountID, region, handler, nil, nil)
-	err = s.Start()
+	err = s.Start(t.Context())
 	// Either succeed (if path fits) or fail with listen error
 	if err != nil {
 		assert.Contains(t, err.Error(), "failed to listen on socket")
@@ -911,7 +911,7 @@ func TestServer_handleConnection_WillShutdownWithNilCallback(t *testing.T) {
 	// Create server with nil shutdown callback but non-nil response callback
 	s := NewServer(accountID, region, handler, nil, nil)
 
-	err = s.Start()
+	err = s.Start(t.Context())
 	require.NoError(t, err)
 
 	ctx, cancel := context.WithCancel(t.Context())

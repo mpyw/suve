@@ -49,7 +49,7 @@ func NewRunner(accountID, region string, opts ...RunnerOption) *Runner {
 // The provided context is used for graceful shutdown - when cancelled, the daemon will stop.
 // Additionally, SIGTERM and SIGINT signals will trigger shutdown.
 func (r *Runner) Run(ctx context.Context) error {
-	if err := r.server.Start(); err != nil {
+	if err := r.server.Start(ctx); err != nil {
 		return err
 	}
 

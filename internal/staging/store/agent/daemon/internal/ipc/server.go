@@ -53,7 +53,7 @@ func NewServer(accountID, region string, handler RequestHandler, onResponse Resp
 }
 
 // Start starts listening on the Unix socket.
-func (s *Server) Start() error {
+func (s *Server) Start(ctx context.Context) error {
 	if err := security.SetupProcess(); err != nil {
 		return fmt.Errorf("failed to setup process security: %w", err)
 	}
@@ -68,7 +68,7 @@ func (s *Server) Start() error {
 		return err
 	}
 
-	listener, err := net.Listen("unix", socketPath)
+	listener, err := (&net.ListenConfig{}).Listen(ctx, "unix", socketPath)
 	if err != nil {
 		return fmt.Errorf("failed to listen on socket: %w", err)
 	}

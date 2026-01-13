@@ -55,7 +55,7 @@ func TestClient_SendRequest_Success(t *testing.T) {
 	socketPath := filepath.Join(tmpDir, "test.sock")
 
 	// Start a mock server
-	listener, err := net.Listen("unix", socketPath)
+	listener, err := (&net.ListenConfig{}).Listen(t.Context(), "unix", socketPath)
 	require.NoError(t, err)
 	defer func() { _ = listener.Close() }()
 
@@ -98,7 +98,7 @@ func TestClient_SendRequest_ErrorResponse(t *testing.T) {
 	socketPath := filepath.Join(tmpDir, "test.sock")
 
 	// Start a mock server that returns an error
-	listener, err := net.Listen("unix", socketPath)
+	listener, err := (&net.ListenConfig{}).Listen(t.Context(), "unix", socketPath)
 	require.NoError(t, err)
 	defer func() { _ = listener.Close() }()
 
@@ -141,7 +141,7 @@ func TestClient_SendRequest_ServerClosesConnection(t *testing.T) {
 	socketPath := filepath.Join(tmpDir, "test.sock")
 
 	// Start a mock server that reads request but closes without response
-	listener, err := net.Listen("unix", socketPath)
+	listener, err := (&net.ListenConfig{}).Listen(t.Context(), "unix", socketPath)
 	require.NoError(t, err)
 	defer func() { _ = listener.Close() }()
 
@@ -175,7 +175,7 @@ func TestClient_Ping_Success(t *testing.T) {
 	socketPath := filepath.Join(tmpDir, "test.sock")
 
 	// Start a mock server
-	listener, err := net.Listen("unix", socketPath)
+	listener, err := (&net.ListenConfig{}).Listen(t.Context(), "unix", socketPath)
 	require.NoError(t, err)
 	defer func() { _ = listener.Close() }()
 
@@ -220,7 +220,7 @@ func TestClient_Ping_ServerError(t *testing.T) {
 	socketPath := filepath.Join(tmpDir, "test.sock")
 
 	// Start a mock server that returns error
-	listener, err := net.Listen("unix", socketPath)
+	listener, err := (&net.ListenConfig{}).Listen(t.Context(), "unix", socketPath)
 	require.NoError(t, err)
 	defer func() { _ = listener.Close() }()
 
@@ -261,7 +261,7 @@ func TestClient_ConcurrentSendRequest(t *testing.T) {
 	socketPath := filepath.Join(tmpDir, "test.sock")
 
 	// Start a mock server that handles multiple connections
-	listener, err := net.Listen("unix", socketPath)
+	listener, err := (&net.ListenConfig{}).Listen(t.Context(), "unix", socketPath)
 	require.NoError(t, err)
 	defer func() { _ = listener.Close() }()
 
@@ -326,7 +326,7 @@ func TestClient_SendRequest_DecodeNonEOFError(t *testing.T) {
 	socketPath := filepath.Join(tmpDir, "test.sock")
 
 	// Start a mock server that returns invalid JSON
-	listener, err := net.Listen("unix", socketPath)
+	listener, err := (&net.ListenConfig{}).Listen(t.Context(), "unix", socketPath)
 	require.NoError(t, err)
 	defer func() { _ = listener.Close() }()
 
@@ -365,7 +365,7 @@ func TestClient_SendRequest_EncodeError(t *testing.T) {
 	socketPath := filepath.Join(tmpDir, "test.sock")
 
 	// Start a mock server that immediately closes write direction
-	listener, err := net.Listen("unix", socketPath)
+	listener, err := (&net.ListenConfig{}).Listen(t.Context(), "unix", socketPath)
 	require.NoError(t, err)
 	defer func() { _ = listener.Close() }()
 
