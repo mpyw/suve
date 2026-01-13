@@ -265,7 +265,12 @@ func (r *Runner) applyService(ctx context.Context, strat staging.ApplyStrategy, 
 			case staging.OperationDelete:
 				output.Success(r.Stdout, "%s: Deleted %s", serviceName, name)
 			}
-			if err := r.Store.UnstageEntry(ctx, service, name); err != nil {
+			// Use hint for context-aware shutdown message
+			if hinted, ok := r.Store.(store.HintedUnstager); ok {
+				if err := hinted.UnstageEntryWithHint(ctx, service, name, store.HintApply); err != nil {
+					output.Warning(r.Stderr, "failed to clear staging for %s: %v", name, err)
+				}
+			} else if err := r.Store.UnstageEntry(ctx, service, name); err != nil {
 				output.Warning(r.Stderr, "failed to clear staging for %s: %v", name, err)
 			}
 			succeeded++
@@ -292,7 +297,12 @@ func (r *Runner) applyTagService(ctx context.Context, strat staging.ApplyStrateg
 			failed++
 		} else {
 			output.Success(r.Stdout, "%s: Tagged %s%s", serviceName, name, formatTagApplySummary(tagEntry))
-			if err := r.Store.UnstageTag(ctx, service, name); err != nil {
+			// Use hint for context-aware shutdown message
+			if hinted, ok := r.Store.(store.HintedUnstager); ok {
+				if err := hinted.UnstageTagWithHint(ctx, service, name, store.HintApply); err != nil {
+					output.Warning(r.Stderr, "failed to clear staging for %s tags: %v", name, err)
+				}
+			} else if err := r.Store.UnstageTag(ctx, service, name); err != nil {
 				output.Warning(r.Stderr, "failed to clear staging for %s tags: %v", name, err)
 			}
 			succeeded++
