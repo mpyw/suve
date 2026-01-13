@@ -79,7 +79,7 @@ func parseTags(tagSlice []string) (map[string]string, error) {
 
 	for _, t := range tagSlice {
 		parts := strings.SplitN(t, "=", 2) //nolint:mnd // 2 parts: key=value
-		if len(parts) != 2 {                 //nolint:mnd // 2 parts expected
+		if len(parts) != 2 {               //nolint:mnd // 2 parts expected
 			return nil, fmt.Errorf("invalid tag format %q: expected key=value", t)
 		}
 

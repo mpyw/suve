@@ -257,4 +257,3 @@ func TestStashShowRunner_Run(t *testing.T) {
 		assert.NoError(t, err)
 	})
 }
-

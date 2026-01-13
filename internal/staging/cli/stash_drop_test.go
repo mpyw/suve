@@ -334,4 +334,3 @@ func TestState_TotalCount(t *testing.T) {
 		assert.Equal(t, 3, s.TotalCount())
 	})
 }
-
