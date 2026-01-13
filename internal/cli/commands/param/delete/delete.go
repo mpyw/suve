@@ -3,6 +3,7 @@ package delete
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -55,7 +56,7 @@ EXAMPLES:
 
 func action(ctx context.Context, cmd *cli.Command) error {
 	if cmd.Args().Len() < 1 {
-		return fmt.Errorf("usage: suve param delete <name>")
+		return errors.New("usage: suve param delete <name>")
 	}
 
 	name := cmd.Args().First()

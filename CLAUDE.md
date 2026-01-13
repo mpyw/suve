@@ -28,7 +28,7 @@ This file provides guidance to Claude Code when working with code in this reposi
 3. **Stash Commands**: Save/restore staging state to file
    - `stage stash push` - Save staged changes to encrypted file
    - `stage stash pop` - Restore staged changes from file (deletes file)
-   - `stage stash apply` - Restore staged changes (keeps file)
+   - `stage stash pop --keep` - Restore staged changes (keeps file)
    - `stage stash show` - Preview stashed changes
    - `stage stash drop` - Delete stash file
 

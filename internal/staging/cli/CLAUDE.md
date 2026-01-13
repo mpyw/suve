@@ -90,7 +90,7 @@ cmd := cli.NewAddCommand(cfg)
 - `stash` (default action = push)
 - `stash push` - agent memory -> file
 - `stash pop` - file -> agent memory (deletes file)
-- `stash apply` - file -> agent memory (keeps file)
+- `stash pop --keep` - file -> agent memory (keeps file)
 - `stash show` - preview file contents
 - `stash drop` - delete file
 

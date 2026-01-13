@@ -146,7 +146,8 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	name := cmd.Args().First()
 
 	opts := Options{
-		Name:           name,
+		Name: name,
+		//nolint:gosec // G115: CLI flag is bounded, overflow not possible in practice
 		MaxResults:     int32(cmd.Int("number")),
 		ShowPatch:      cmd.Bool("patch"),
 		ParseJSON:      cmd.Bool("parse-json"),
@@ -154,7 +155,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		NoPager:        cmd.Bool("no-pager"),
 		Oneline:        cmd.Bool("oneline"),
 		Output:         output.ParseFormat(cmd.String("output")),
-		MaxValueLength: int(cmd.Int("max-value-length")),
+		MaxValueLength: cmd.Int("max-value-length"),
 	}
 
 	// Parse --since timestamp

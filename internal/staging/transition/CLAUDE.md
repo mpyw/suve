@@ -10,36 +10,49 @@ parent: ../CLAUDE.md
 
 ## Overview
 
-State machine for staging operations. Defines valid state transitions and provides helper functions for determining next states based on current state and requested operation.
+State machine for staging operations. Provides reducers (pure functions) that compute new states from current states and actions. Separates state computation logic from side effects for testability.
 
 ## Architecture
 
 ```yaml
 key_types:
-  - name: State
-    role: Enum representing staging states
-  - name: Transition
-    role: Valid state transition definition
+  - name: EntryState
+    role: Current state of a staged entry (value + staged state)
+  - name: EntryStagedState
+    role: Interface for entry staged states (NotStaged, Create, Update, Delete)
+  - name: StagedTags
+    role: Staged tag changes (ToSet, ToUnset)
+  - name: EntryTransitionResult
+    role: Result of entry state transition (next state, discard tags flag)
+  - name: TagTransitionResult
+    role: Result of tag state transition (next tags)
+  - name: Executor
+    role: Applies transitions to store with error handling
 
-states:
-  - Empty      # No staged changes
-  - Staged     # Has staged changes (not yet applied)
-  - Applying   # Currently applying changes
-  - Applied    # Changes successfully applied
-  - Failed     # Apply failed (partial or complete)
+entry_staged_states:
+  - EntryStagedStateNotStaged  # Entry has no staged changes
+  - EntryStagedStateCreate     # Entry staged for creation (with DraftValue)
+  - EntryStagedStateUpdate     # Entry staged for update (with DraftValue)
+  - EntryStagedStateDelete     # Entry staged for deletion
 
-transitions:
-  Empty   -> Staged   (add/edit/delete)
-  Staged  -> Staged   (add/edit/delete more)
-  Staged  -> Empty    (reset)
-  Staged  -> Applying (apply start)
-  Applying -> Applied (apply success)
-  Applying -> Failed  (apply error)
-  Failed  -> Staged   (retry)
-  Failed  -> Empty    (reset)
+actions:
+  - EntryActionAdd     # Stage new entry creation
+  - EntryActionEdit    # Stage entry modification
+  - EntryActionDelete  # Stage entry deletion
+  - EntryActionReset   # Unstage entry
+  - TagActionTag       # Stage tag addition
+  - TagActionUntag     # Stage tag removal
+  - TagActionReset     # Unstage tags
+
+files:
+  - state.go    # EntryState, EntryStagedState types, StagedTags
+  - action.go   # Action types
+  - reducer.go  # ReduceEntry(), ReduceTag() pure functions
+  - executor.go # Executor applies transitions with store operations
 
 dependencies:
-  internal: []
+  internal:
+    - internal/staging/store  # Store interface for Executor
   external: []
 ```
 
@@ -48,24 +61,51 @@ dependencies:
 ```yaml
 coverage_target: 95%
 mock_strategy: |
-  - Pure unit tests, no external dependencies
+  - Pure unit tests for reducers (no mocks needed)
+  - MockStore for Executor tests
 focus_areas:
-  - All valid transitions
-  - Invalid transition rejection
-  - Edge case state combinations
+  - All valid state transitions
+  - Error cases (invalid transitions)
+  - Edge cases in state combinations
 skip_areas: []
 ```
 
 ## Notes
 
-### Usage Pattern
+### Reducer Pattern
 
 ```go
-currentState := transition.Staged
-if transition.CanTransition(currentState, transition.Applying) {
-    // Start apply operation
-}
+// Pure function: takes current state + action, returns new state
+result := transition.ReduceEntry(currentState, action)
+newState := result.NextState
+shouldDiscardTags := result.DiscardTags
+
+// Tags reducer
+tagResult := transition.ReduceTag(currentTags, tagAction)
+newTags := tagResult.NextTags
 ```
+
+### State Transitions
+
+```
+Entry transitions:
+  NotStaged + Add    -> Create
+  NotStaged + Edit   -> Update (if current value exists)
+  NotStaged + Delete -> Delete (if current value exists)
+  Create + Edit      -> Create (updated draft)
+  Create + Reset     -> NotStaged
+  Update + Edit      -> Update (updated draft)
+  Update + Reset     -> NotStaged
+  Delete + Reset     -> NotStaged
+```
+
+### Executor
+
+Executor wraps reducers with store operations:
+- Loads current state from store
+- Applies reducer
+- Saves new state to store
+- Returns error if transition is invalid
 
 ## References
 

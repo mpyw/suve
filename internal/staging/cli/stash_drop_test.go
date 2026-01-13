@@ -276,6 +276,7 @@ func TestStashDropRunner_Run(t *testing.T) {
 		assert.NoError(t, err)
 
 		// Read and verify remaining data
+		//nolint:gosec // G304: path is from t.TempDir(), safe for test
 		remainingData, err := os.ReadFile(path)
 		require.NoError(t, err)
 

@@ -134,9 +134,11 @@ func TestDrain_RemoveFileError(t *testing.T) {
 	require.NoError(t, err)
 
 	// Make directory read-only so file can't be removed
+	//nolint:gosec // G302: intentionally restrictive permissions for test
 	err = os.Chmod(dirPath, 0o555)
 	require.NoError(t, err)
-	defer func() { _ = os.Chmod(dirPath, 0o755) }() // Restore for cleanup
+	//nolint:gosec // G302: restore permissions for cleanup
+	defer func() { _ = os.Chmod(dirPath, 0o755) }()
 
 	store := NewStoreWithPath(path)
 
@@ -157,9 +159,11 @@ func TestWriteState_RemoveEmptyStateError(t *testing.T) {
 	require.NoError(t, err)
 
 	// Make directory read-only so file can't be removed
+	//nolint:gosec // G302: intentionally restrictive permissions for test
 	err = os.Chmod(dirPath, 0o555)
 	require.NoError(t, err)
-	defer func() { _ = os.Chmod(dirPath, 0o755) }() // Restore for cleanup
+	//nolint:gosec // G302: restore permissions for cleanup
+	defer func() { _ = os.Chmod(dirPath, 0o755) }()
 
 	store := NewStoreWithPath(path)
 

@@ -99,4 +99,5 @@ Shutdown message indicates the reason (applied/unstaged/persisted/cleared).
 related_docs:
   - ../CLAUDE.md
   - daemon/CLAUDE.md
+  - ../../../../docs/staging-agent.md  # User-facing documentation
 ```

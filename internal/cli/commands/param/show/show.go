@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"strconv"
 
 	"github.com/samber/lo"
 	"github.com/urfave/cli/v3"
@@ -196,7 +197,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 	// Normal mode: show metadata + value
 	out := output.New(r.Stdout)
 	out.Field("Name", result.Name)
-	out.Field("Version", fmt.Sprintf("%d", result.Version))
+	out.Field("Version", strconv.FormatInt(result.Version, 10))
 	out.Field("Type", string(result.Type))
 	// Show json_parsed only when --parse-json was used and succeeded
 	if jsonParsed {

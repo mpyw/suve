@@ -135,7 +135,8 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	}
 
 	opts := Options{
-		Name:       cmd.Args().First(),
+		Name: cmd.Args().First(),
+		//nolint:gosec // G115: CLI flag is bounded, overflow not possible in practice
 		MaxResults: int32(cmd.Int("number")),
 		ShowPatch:  cmd.Bool("patch"),
 		ParseJSON:  cmd.Bool("parse-json"),

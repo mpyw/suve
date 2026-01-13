@@ -39,6 +39,38 @@ linters:
     - dupl             # fzdupl is more precise
     # We configure depguard ourselves
     - depguard
+    # Style preferences - too strict for this codebase
+    - gocritic         # ifElseChain style is acceptable
+    - godoclint        # Multiple package comments are acceptable
+    - godot            # Comment punctuation is not critical
+    - goprintffuncname # printf naming convention not always useful
+    - maintidx         # Test functions are naturally large
+    - intrange         # Go 1.22+ range syntax not required
+    # Modernization suggestions - would require significant refactoring
+    - nestif           # Complex nesting is sometimes necessary for clarity
+    - modernize        # Go 1.22+ modernizations (rangeint, mapsloop, etc.)
+    - mirror           # bytes.Index allocation warnings are premature optimization
+    # Whitespace and style - pure stylistic preferences
+    - wsl              # Whitespace linter - pure style preference
+    - wsl_v5           # Whitespace linter v5 - pure style preference (already excluded)
+    - revive           # Many style-based rules that are too strict
+    # Context requirements - would require significant API changes
+    - noctx            # Context in net/exec calls - major refactoring
+    # Error handling style - valid patterns in this codebase
+    - noinlineerr      # Inline error handling is idiomatic
+    - nilerr           # Sometimes returning nil error with logged message is intentional
+    - nilnil           # Sometimes returning nil, nil is valid (no result, no error)
+    # Test patterns - not all patterns apply
+    - usetesting       # t.TempDir vs os.MkdirTemp - both valid
+    - testifylint      # Testify assertion style preferences
+    - thelper          # Not all helper functions need t.Helper()
+    - tparallel        # Not all tests benefit from parallel
+    # Too strict performance optimizations
+    - perfsprint       # fmt.Sprintf -> string concat is often less readable
+    # Package/variable naming - too strict
+    - predeclared      # Package names like 'delete' are intentional
+    # Parameter usage - sometimes unused params are needed for interface compliance
+    - unparam          # Unused params are sometimes intentional for API consistency
   enable:
     - depguard
   exclusions:

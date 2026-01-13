@@ -323,6 +323,8 @@ func (a *App) StagingReset(service string) (*StagingResetResult, error) {
 		output.Type = "notStaged"
 	case stagingusecase.ResetResultNothingStaged:
 		output.Type = "nothingStaged"
+	case stagingusecase.ResetResultSkipped:
+		output.Type = "skipped"
 	}
 
 	return output, nil
@@ -423,12 +425,12 @@ func (a *App) StagingUnstage(service, name string) (*StagingUnstageResult, error
 	}
 
 	// Unstage entry (ignore ErrNotStaged)
-	if err := store.UnstageEntry(a.ctx, svc, name); err != nil && err != staging.ErrNotStaged {
+	if err := store.UnstageEntry(a.ctx, svc, name); err != nil && !errors.Is(err, staging.ErrNotStaged) {
 		return nil, err
 	}
 
 	// Unstage tags (ignore ErrNotStaged)
-	if err := store.UnstageTag(a.ctx, svc, name); err != nil && err != staging.ErrNotStaged {
+	if err := store.UnstageTag(a.ctx, svc, name); err != nil && !errors.Is(err, staging.ErrNotStaged) {
 		return nil, err
 	}
 

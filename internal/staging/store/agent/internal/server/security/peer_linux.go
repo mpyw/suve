@@ -28,6 +28,7 @@ func VerifyPeerCredentials(conn net.Conn) error {
 		return fmt.Errorf("failed to get peer credentials: %w", err)
 	}
 
+	//nolint:gosec // G115: UID is always non-negative and fits in uint32
 	if cred.Uid != uint32(os.Getuid()) {
 		return fmt.Errorf("permission denied: peer UID %d does not match %d", cred.Uid, os.Getuid())
 	}

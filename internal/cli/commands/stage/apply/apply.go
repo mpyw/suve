@@ -139,19 +139,19 @@ func action(ctx context.Context, cmd *cli.Command) error {
 
 	// Initialize strategies only if needed
 	if hasParam {
-		strat, err := staging.ParamFactory(ctx)
+		strategy, err := staging.ParamFactory(ctx)
 		if err != nil {
 			return err
 		}
-		r.ParamStrategy = strat
+		r.ParamStrategy = strategy
 	}
 
 	if hasSecret {
-		strat, err := staging.SecretFactory(ctx)
+		strategy, err := staging.SecretFactory(ctx)
 		if err != nil {
 			return err
 		}
-		r.SecretStrategy = strat
+		r.SecretStrategy = strategy
 	}
 
 	return r.Run(ctx)
@@ -242,12 +242,12 @@ func (r *Runner) Run(ctx context.Context) error {
 	return nil
 }
 
-func (r *Runner) applyService(ctx context.Context, strat staging.ApplyStrategy, staged map[string]staging.Entry) (succeeded, failed int) {
-	service := strat.Service()
-	serviceName := strat.ServiceName()
+func (r *Runner) applyService(ctx context.Context, strategy staging.ApplyStrategy, staged map[string]staging.Entry) (succeeded, failed int) {
+	service := strategy.Service()
+	serviceName := strategy.ServiceName()
 
 	results := parallel.ExecuteMap(ctx, staged, func(ctx context.Context, name string, entry staging.Entry) (staging.Operation, error) {
-		err := strat.Apply(ctx, name, entry)
+		err := strategy.Apply(ctx, name, entry)
 		return entry.Operation, err
 	})
 
@@ -280,12 +280,12 @@ func (r *Runner) applyService(ctx context.Context, strat staging.ApplyStrategy, 
 	return succeeded, failed
 }
 
-func (r *Runner) applyTagService(ctx context.Context, strat staging.ApplyStrategy, staged map[string]staging.TagEntry) (succeeded, failed int) {
-	service := strat.Service()
-	serviceName := strat.ServiceName()
+func (r *Runner) applyTagService(ctx context.Context, strategy staging.ApplyStrategy, staged map[string]staging.TagEntry) (succeeded, failed int) {
+	service := strategy.Service()
+	serviceName := strategy.ServiceName()
 
 	results := parallel.ExecuteMap(ctx, staged, func(ctx context.Context, name string, tagEntry staging.TagEntry) (struct{}, error) {
-		err := strat.ApplyTags(ctx, name, tagEntry)
+		err := strategy.ApplyTags(ctx, name, tagEntry)
 		return struct{}{}, err
 	})
 

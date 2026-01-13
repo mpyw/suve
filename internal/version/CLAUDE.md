@@ -21,12 +21,18 @@ packages:
   secretversion/:  # Secrets Manager version parser
 
 key_types:
-  - name: paramversion.Parser
-    role: Parse param version specs (#N, ~N)
-  - name: secretversion.Parser
-    role: Parse secret version specs (#ID, :LABEL, ~N)
   - name: Spec
-    role: Parsed version specification (Name, Version/Label, Shifts)
+    role: Type alias for parsed version spec (includes Name, AbsoluteSpec, Shifts)
+  - name: AbsoluteSpec
+    role: Parsed absolute version (param: version int, secret: version ID or label)
+
+public_api:
+  paramversion:
+    - Parse(spec string) -> Spec  # Parse version spec string
+    - ParseDiffArgs(args []string) -> (name, spec1, spec2)
+  secretversion:
+    - Parse(spec string) -> Spec  # Parse version spec string
+    - ParseDiffArgs(args []string) -> (name, spec1, spec2)
 
 version_syntax:
   param: "<name>[#VERSION][~SHIFT]*"
@@ -67,12 +73,14 @@ skip_areas:
 Shifts are cumulative: `~1~2` = `~3`
 Bare `~` equals `~1`
 
-### Parser.Resolve()
+### Version Resolution Flow
 
-Takes API client to resolve shifts to actual version:
-1. Parse name and modifiers
-2. List versions from AWS
-3. Apply shifts to find target version
+When using `Parse()` with shifts (~N):
+1. Parse name and modifiers into Spec
+2. Caller lists versions from AWS API
+3. Caller applies shifts to find target version
+
+Note: The `Spec.Shifts` field accumulates shift count (e.g., `~1~2` = 3 shifts)
 
 ## References
 

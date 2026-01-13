@@ -84,15 +84,7 @@ skip_areas:
 **StashPop (file -> agent):**
 - Conflict handling: Force (overwrite) or Merge (combine)
 - Service filter: Pop only param or secret entries
-- `--keep`: Don't delete file after pop
-
-### Type Aliases
-
-For backward compatibility during rename:
-```go
-type PersistUseCase = StashPushUseCase
-type DrainUseCase = StashPopUseCase
-```
+- `--keep`: Don't delete file after pop (same as `stash apply`)
 
 ## References
 

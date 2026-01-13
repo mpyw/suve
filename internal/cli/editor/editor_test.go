@@ -26,6 +26,7 @@ func TestOpen_ModifiesContent(t *testing.T) {
 content=$(cat "$1")
 printf '%s-modified' "$content" > "$1"
 `
+	//nolint:gosec // G306: executable permission required for test shell script
 	require.NoError(t, os.WriteFile(scriptPath, []byte(script), 0o755))
 
 	// Set EDITOR to our test script
@@ -62,6 +63,7 @@ func TestOpen_TrimsTrailingNewline(t *testing.T) {
 	script := `#!/bin/sh
 echo "with-newline" > "$1"
 `
+	//nolint:gosec // G306: executable permission required for test shell script
 	require.NoError(t, os.WriteFile(scriptPath, []byte(script), 0o755))
 
 	t.Setenv("EDITOR", scriptPath)
@@ -83,6 +85,7 @@ func TestOpen_TrimsCRLF(t *testing.T) {
 	script := `#!/bin/sh
 printf "with-crlf\r\n" > "$1"
 `
+	//nolint:gosec // G306: executable permission required for test shell script
 	require.NoError(t, os.WriteFile(scriptPath, []byte(script), 0o755))
 
 	t.Setenv("EDITOR", scriptPath)
@@ -103,10 +106,12 @@ func TestOpen_UsesVISUALOverEDITOR(t *testing.T) {
 	visualScript := filepath.Join(tmpDir, "visual.sh")
 	editorScript := filepath.Join(tmpDir, "editor.sh")
 
+	//nolint:gosec // G306: executable permission required for test shell script
 	require.NoError(t, os.WriteFile(visualScript, []byte(`#!/bin/sh
 printf 'visual' > "$1"
 `), 0o755))
 
+	//nolint:gosec // G306: executable permission required for test shell script
 	require.NoError(t, os.WriteFile(editorScript, []byte(`#!/bin/sh
 printf 'editor' > "$1"
 `), 0o755))

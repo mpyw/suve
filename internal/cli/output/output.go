@@ -7,8 +7,6 @@
 //
 // Colors are automatically disabled when output is not a TTY, ensuring
 // clean output when piped or redirected.
-//
-//nolint:forbidigo // This package wraps fmt.Fprint* functions
 package output
 
 import (

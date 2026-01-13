@@ -125,8 +125,8 @@ EXAMPLES:
 				return fmt.Errorf("usage: suve stage %s diff [name]", cfg.CommandName)
 			}
 			if cmd.Args().Len() == 1 {
-				strat := cfg.ParserFactory()
-				parsedName, err := strat.ParseName(cmd.Args().First())
+				parser := cfg.ParserFactory()
+				parsedName, err := parser.ParseName(cmd.Args().First())
 				if err != nil {
 					return err
 				}
@@ -139,7 +139,7 @@ EXAMPLES:
 			}
 			store := agent.NewStore(identity.AccountID, identity.Region)
 
-			strat, err := cfg.Factory(ctx)
+			strategy, err := cfg.Factory(ctx)
 			if err != nil {
 				return err
 			}
@@ -153,7 +153,7 @@ EXAMPLES:
 			return pager.WithPagerWriter(cmd.Root().Writer, opts.NoPager, func(w io.Writer) error {
 				r := &DiffRunner{
 					UseCase: &stagingusecase.DiffUseCase{
-						Strategy: strat,
+						Strategy: strategy,
 						Store:    store,
 					},
 					Stdout: w,
@@ -215,14 +215,14 @@ EXAMPLES:
 			}
 			store := agent.NewStore(identity.AccountID, identity.Region)
 
-			strat, err := cfg.Factory(ctx)
+			strategy, err := cfg.Factory(ctx)
 			if err != nil {
 				return fmt.Errorf("failed to initialize strategy: %w", err)
 			}
 
 			r := &AddRunner{
 				UseCase: &stagingusecase.AddUseCase{
-					Strategy: strat,
+					Strategy: strategy,
 					Store:    store,
 				},
 				Stdout: cmd.Root().Writer,
@@ -289,14 +289,14 @@ EXAMPLES:
 			}
 			store := agent.NewStore(identity.AccountID, identity.Region)
 
-			strat, err := cfg.Factory(ctx)
+			strategy, err := cfg.Factory(ctx)
 			if err != nil {
 				return err
 			}
 
 			r := &EditRunner{
 				UseCase: &stagingusecase.EditUseCase{
-					Strategy: strat,
+					Strategy: strategy,
 					Store:    store,
 				},
 				Stdout: cmd.Root().Writer,
@@ -411,14 +411,14 @@ EXAMPLES:
 				return nil
 			}
 
-			strat, err := cfg.Factory(ctx)
+			strategy, err := cfg.Factory(ctx)
 			if err != nil {
 				return err
 			}
 
 			r := &ApplyRunner{
 				UseCase: &stagingusecase.ApplyUseCase{
-					Strategy: strat,
+					Strategy: strategy,
 					Store:    store,
 				},
 				Stdout: cmd.Root().Writer,
@@ -497,11 +497,11 @@ EXAMPLES:
 					return err
 				}
 				if hasVersion {
-					strat, err := cfg.Factory(ctx)
+					strategy, err := cfg.Factory(ctx)
 					if err != nil {
 						return err
 					}
-					fetcher = strat
+					fetcher = strategy
 				}
 			}
 
@@ -522,8 +522,8 @@ EXAMPLES:
 
 // NewDeleteCommand creates a delete command with the given config.
 func NewDeleteCommand(cfg CommandConfig) *cli.Command {
-	strat := cfg.ParserFactory()
-	hasDeleteOptions := strat.HasDeleteOptions()
+	parser := cfg.ParserFactory()
+	hasDeleteOptions := parser.HasDeleteOptions()
 
 	var flags []cli.Flag
 	var description string
@@ -603,7 +603,7 @@ EXAMPLES:
 			}
 			store := agent.NewStore(identity.AccountID, identity.Region)
 
-			strat, err := cfg.Factory(ctx)
+			strategy, err := cfg.Factory(ctx)
 			if err != nil {
 				return err
 			}
@@ -614,7 +614,7 @@ EXAMPLES:
 
 			r := &DeleteRunner{
 				UseCase: &stagingusecase.DeleteUseCase{
-					Strategy: strat,
+					Strategy: strategy,
 					Store:    store,
 				},
 				Stdout: cmd.Root().Writer,
@@ -667,14 +667,14 @@ EXAMPLES:
 			}
 			store := agent.NewStore(identity.AccountID, identity.Region)
 
-			strat, err := cfg.Factory(ctx)
+			strategy, err := cfg.Factory(ctx)
 			if err != nil {
 				return err
 			}
 
 			r := &TagRunner{
 				UseCase: &stagingusecase.TagUseCase{
-					Strategy: strat,
+					Strategy: strategy,
 					Store:    store,
 				},
 				Stdout: cmd.Root().Writer,
@@ -726,14 +726,14 @@ EXAMPLES:
 			}
 			store := agent.NewStore(identity.AccountID, identity.Region)
 
-			strat, err := cfg.Factory(ctx)
+			strategy, err := cfg.Factory(ctx)
 			if err != nil {
 				return err
 			}
 
 			r := &UntagRunner{
 				UseCase: &stagingusecase.TagUseCase{
-					Strategy: strat,
+					Strategy: strategy,
 					Store:    store,
 				},
 				Stdout: cmd.Root().Writer,

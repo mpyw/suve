@@ -74,11 +74,13 @@ suve
     ├── add, edit, delete
     ├── status, diff
     ├── apply, reset
-    ├── stash (push, pop, apply, show, drop)
+    ├── stash (push, pop, show, drop)
     ├── agent (start, stop)
-    ├── param (add, edit, delete, status, diff, apply, reset, stash)
-    └── secret (add, edit, delete, status, diff, apply, reset, stash)
+    ├── param (add, edit, delete, status, diff, apply, reset, stash, tag, untag)
+    └── secret (add, edit, delete, status, diff, apply, reset, stash, tag, untag)
 ```
+
+> Note: `stash pop --keep` functions as "stash apply" (restore without deleting file).
 
 ## References
 

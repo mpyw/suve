@@ -8,10 +8,10 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestErrorString_Error(t *testing.T) {
+func TestStringError_Error(t *testing.T) {
 	t.Parallel()
 
-	err := errorString("test error message")
+	err := stringError("test error message")
 	assert.Equal(t, "test error message", err.Error())
 }
 

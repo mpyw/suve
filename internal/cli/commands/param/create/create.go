@@ -3,6 +3,7 @@ package create
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 
@@ -76,7 +77,7 @@ EXAMPLES:
 
 func action(ctx context.Context, cmd *cli.Command) error {
 	if cmd.Args().Len() < 2 {
-		return fmt.Errorf("usage: suve param create <name> <value>")
+		return errors.New("usage: suve param create <name> <value>")
 	}
 
 	secure := cmd.Bool("secure")
@@ -84,7 +85,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 
 	// Check for conflicting flags
 	if secure && cmd.IsSet("type") {
-		return fmt.Errorf("cannot use --secure with --type; use one or the other")
+		return errors.New("cannot use --secure with --type; use one or the other")
 	}
 	if secure {
 		paramType = "SecureString"

@@ -42,6 +42,8 @@ type SecretClient interface {
 // =============================================================================
 
 // App struct holds application state and dependencies.
+//
+//nolint:containedctx // Wails apps require storing context from Startup
 type App struct {
 	ctx context.Context
 
@@ -68,11 +70,11 @@ func (a *App) Startup(ctx context.Context) {
 // =============================================================================
 
 // errInvalidService is returned when an invalid service is specified.
-var errInvalidService = errorString("invalid service: must be 'param' or 'secret'")
+var errInvalidService = stringError("invalid service: must be 'param' or 'secret'")
 
-type errorString string
+type stringError string
 
-func (e errorString) Error() string { return string(e) }
+func (e stringError) Error() string { return string(e) }
 
 // =============================================================================
 // Helper Methods

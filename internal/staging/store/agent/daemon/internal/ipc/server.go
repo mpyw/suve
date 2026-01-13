@@ -164,6 +164,7 @@ func (s *Server) createSocketDir(socketPath string) error {
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return fmt.Errorf("failed to create socket directory: %w", err)
 	}
+	//nolint:gosec // G302: 0o700 is appropriate for directories (owner rwx only)
 	if err := os.Chmod(dir, 0o700); err != nil {
 		return fmt.Errorf("failed to set socket directory permissions: %w", err)
 	}

@@ -237,7 +237,7 @@ func TestServer_handleConnection_invalidJSON(t *testing.T) {
 	// Read error response
 	var resp protocol.Response
 	decoder := json.NewDecoder(conn)
-	err = decoder.Decode(&resp)
+	_ = decoder.Decode(&resp)
 	// We might get an error response or EOF - either is acceptable
 	// The important thing is the handler was not called
 
@@ -652,6 +652,7 @@ func TestServer_setSocketPermissions(t *testing.T) {
 
 	// Create a test file with loose permissions
 	socketPath := filepath.Join(tmpDir, "test.sock")
+	//nolint:gosec // G302: intentionally loose permissions to test setSocketPermissions
 	err = os.WriteFile(socketPath, []byte("test"), 0o777)
 	require.NoError(t, err)
 
@@ -747,7 +748,8 @@ func TestServer_removeExistingSocket_Error(t *testing.T) {
 		tmpDir, err := os.MkdirTemp("/tmp", "suve-server-rm-fail-*")
 		require.NoError(t, err)
 		t.Cleanup(func() {
-			_ = os.Chmod(tmpDir, 0o755) // restore permissions for cleanup
+			//nolint:gosec // G302: restore permissions for cleanup
+			_ = os.Chmod(tmpDir, 0o755)
 			_ = os.RemoveAll(tmpDir)
 		})
 
@@ -757,6 +759,7 @@ func TestServer_removeExistingSocket_Error(t *testing.T) {
 		require.NoError(t, err)
 
 		// Make directory read-only to cause remove to fail
+		//nolint:gosec // G302: intentionally restrictive for test
 		err = os.Chmod(tmpDir, 0o555)
 		require.NoError(t, err)
 
@@ -856,6 +859,7 @@ func TestServer_Start_ListenErrorLongPath(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		longPath = filepath.Join(longPath, "abcdefghij")
 	}
+	//nolint:gosec // G302: standard directory permissions for test
 	err = os.MkdirAll(longPath, 0o755)
 	require.NoError(t, err)
 	t.Setenv("TMPDIR", longPath)
