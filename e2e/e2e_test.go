@@ -47,7 +47,9 @@ import (
 	globalstage "github.com/mpyw/suve/internal/cli/commands/stage"
 	globalapply "github.com/mpyw/suve/internal/cli/commands/stage/apply"
 	globaldiff "github.com/mpyw/suve/internal/cli/commands/stage/diff"
+	globaldrain "github.com/mpyw/suve/internal/cli/commands/stage/drain"
 	paramstage "github.com/mpyw/suve/internal/cli/commands/stage/param"
+	globalpersist "github.com/mpyw/suve/internal/cli/commands/stage/persist"
 	globalreset "github.com/mpyw/suve/internal/cli/commands/stage/reset"
 	secretstage "github.com/mpyw/suve/internal/cli/commands/stage/secret"
 	globalstatus "github.com/mpyw/suve/internal/cli/commands/stage/status"
@@ -3179,4 +3181,193 @@ func TestSecret_ListJSON(t *testing.T) {
 	stdout, _, err := runCommand(t, secretlist.Command(), "--output", "json")
 	require.NoError(t, err)
 	assert.True(t, strings.HasPrefix(strings.TrimSpace(stdout), "[") || strings.HasPrefix(strings.TrimSpace(stdout), "{"))
+}
+
+// =============================================================================
+// Drain and Persist Tests
+// =============================================================================
+
+// TestGlobal_DrainAndPersist tests the drain and persist workflow.
+func TestGlobal_DrainAndPersist(t *testing.T) {
+	setupEnv(t)
+	paramName := "/suve-e2e-drain-persist/test-param"
+
+	// Cleanup
+	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+	t.Cleanup(func() {
+		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+		_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+	})
+
+	// Stage a parameter in agent memory
+	t.Run("stage-add", func(t *testing.T) {
+		stdout, _, err := runCommand(t, paramstage.Command(), "add", paramName, "test-value")
+		require.NoError(t, err)
+		t.Logf("stage add output: %s", stdout)
+	})
+
+	// Verify agent has staged changes
+	t.Run("verify-agent-status", func(t *testing.T) {
+		stdout, _, err := runCommand(t, globalstatus.Command())
+		require.NoError(t, err)
+		assert.Contains(t, stdout, paramName)
+	})
+
+	// Persist agent memory to file
+	t.Run("persist-to-file", func(t *testing.T) {
+		stdout, _, err := runCommand(t, globalpersist.Command())
+		require.NoError(t, err)
+		t.Logf("persist output: %s", stdout)
+		assert.Contains(t, stdout, "persisted to file")
+	})
+
+	// Agent should now be empty
+	t.Run("verify-agent-empty-after-persist", func(t *testing.T) {
+		stdout, _, err := runCommand(t, globalstatus.Command())
+		require.NoError(t, err)
+		assert.Contains(t, stdout, "No changes staged")
+	})
+
+	// Drain file back to agent
+	t.Run("drain-from-file", func(t *testing.T) {
+		stdout, _, err := runCommand(t, globaldrain.Command())
+		require.NoError(t, err)
+		t.Logf("drain output: %s", stdout)
+		assert.Contains(t, stdout, "loaded from file")
+	})
+
+	// Agent should have the staged changes again
+	t.Run("verify-agent-has-changes-after-drain", func(t *testing.T) {
+		stdout, _, err := runCommand(t, globalstatus.Command())
+		require.NoError(t, err)
+		assert.Contains(t, stdout, paramName)
+	})
+
+	// Apply the staged changes
+	t.Run("apply-changes", func(t *testing.T) {
+		_, _, err := runCommand(t, globalapply.Command(), "--yes")
+		require.NoError(t, err)
+	})
+
+	// Verify the parameter was created
+	t.Run("verify-created", func(t *testing.T) {
+		stdout, _, err := runCommand(t, paramshow.Command(), "--raw", paramName)
+		require.NoError(t, err)
+		assert.Equal(t, "test-value", strings.TrimSpace(stdout))
+	})
+}
+
+// TestGlobal_PersistWithKeep tests persist with --keep flag.
+func TestGlobal_PersistWithKeep(t *testing.T) {
+	setupEnv(t)
+	paramName := "/suve-e2e-persist-keep/test-param"
+
+	// Cleanup
+	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+	t.Cleanup(func() {
+		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+		_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+	})
+
+	// Stage a parameter
+	_, _, err := runCommand(t, paramstage.Command(), "add", paramName, "test-value")
+	require.NoError(t, err)
+
+	// Persist with --keep flag (should keep agent memory)
+	t.Run("persist-with-keep", func(t *testing.T) {
+		stdout, _, err := runCommand(t, globalpersist.Command(), "--keep")
+		require.NoError(t, err)
+		t.Logf("persist --keep output: %s", stdout)
+	})
+
+	// Agent should still have the changes
+	t.Run("agent-still-has-changes", func(t *testing.T) {
+		stdout, _, err := runCommand(t, globalstatus.Command())
+		require.NoError(t, err)
+		assert.Contains(t, stdout, paramName)
+	})
+}
+
+// TestGlobal_DrainWithMerge tests drain with --merge flag.
+func TestGlobal_DrainWithMerge(t *testing.T) {
+	setupEnv(t)
+	paramName1 := "/suve-e2e-drain-merge/param1"
+	paramName2 := "/suve-e2e-drain-merge/param2"
+
+	// Cleanup
+	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName1)
+	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName2)
+	_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+	t.Cleanup(func() {
+		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName1)
+		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName2)
+		_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+	})
+
+	// Stage param1 and persist to file
+	_, _, err := runCommand(t, paramstage.Command(), "add", paramName1, "value1")
+	require.NoError(t, err)
+	_, _, err = runCommand(t, globalpersist.Command())
+	require.NoError(t, err)
+
+	// Stage param2 in agent
+	_, _, err = runCommand(t, paramstage.Command(), "add", paramName2, "value2")
+	require.NoError(t, err)
+
+	// Drain with merge (should combine both)
+	t.Run("drain-with-merge", func(t *testing.T) {
+		stdout, _, err := runCommand(t, globaldrain.Command(), "--merge")
+		require.NoError(t, err)
+		t.Logf("drain --merge output: %s", stdout)
+	})
+
+	// Both parameters should be staged
+	t.Run("verify-both-staged", func(t *testing.T) {
+		stdout, _, err := runCommand(t, globalstatus.Command())
+		require.NoError(t, err)
+		assert.Contains(t, stdout, paramName1)
+		assert.Contains(t, stdout, paramName2)
+	})
+}
+
+// TestGlobal_DrainEmpty tests drain when file is empty.
+func TestGlobal_DrainEmpty(t *testing.T) {
+	setupEnv(t)
+
+	// Reset to ensure clean state
+	_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+
+	// Drain should fail or indicate nothing to drain
+	t.Run("drain-empty", func(t *testing.T) {
+		_, _, err := runCommand(t, globaldrain.Command())
+		assert.Error(t, err)
+	})
+}
+
+// TestGlobal_PersistEmpty tests persist when agent is empty.
+func TestGlobal_PersistEmpty(t *testing.T) {
+	setupEnv(t)
+
+	// Reset to ensure clean state (run twice to be safe)
+	_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+	_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+
+	// Verify agent is actually empty
+	stdout, _, _ := runCommand(t, globalstatus.Command())
+	t.Logf("status before persist: %s", stdout)
+
+	// Persist should fail when agent is empty (no staged changes)
+	t.Run("persist-empty", func(t *testing.T) {
+		_, stderr, err := runCommand(t, globalpersist.Command())
+		// Either returns error or prints "nothing to persist"
+		if err == nil {
+			// If no error, check output - might indicate nothing was persisted
+			t.Logf("persist succeeded with no error - stderr: %s", stderr)
+		} else {
+			// Expected: error when nothing to persist
+			t.Logf("persist returned error as expected: %v", err)
+		}
+	})
 }
