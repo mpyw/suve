@@ -103,6 +103,8 @@ func stashPushFlags() []cli.Flag {
 }
 
 // stashPushAction creates the action function for stash push commands.
+//
+//nolint:gocognit,cyclop // Complex but readable as a single flow.
 func stashPushAction(service staging.Service) func(context.Context, *cli.Command) error {
 	return func(ctx context.Context, cmd *cli.Command) error {
 		identity, err := infra.GetAWSIdentity(ctx)
