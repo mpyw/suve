@@ -64,9 +64,7 @@ func (r *StashDropRunner) Run(ctx context.Context, opts StashDropOptions) error 
 		// If state is now empty, delete the file entirely; otherwise write back remaining state
 		updateErr := lo.
 			IfF(state.IsEmpty(), func() error {
-				_, err := r.FileStore.Drain(ctx, "", false)
-
-				return err
+				return r.FileStore.Delete()
 			}).
 			ElseF(func() error { return r.FileStore.WriteState(ctx, "", state) })
 		if updateErr != nil {
@@ -78,9 +76,8 @@ func (r *StashDropRunner) Run(ctx context.Context, opts StashDropOptions) error 
 		return nil
 	}
 
-	// Global drop - delete entire file
-	_, err = r.FileStore.Drain(ctx, "", false)
-	if err != nil {
+	// Global drop - delete entire file (no decryption needed)
+	if err := r.FileStore.Delete(); err != nil {
 		return fmt.Errorf("failed to delete stash file: %w", err)
 	}
 
@@ -126,20 +123,36 @@ func stashDropAction(service staging.Service) func(context.Context, *cli.Command
 			// Confirm unless --force
 			forceFlag := cmd.Bool("force")
 			if !forceFlag && terminal.IsTerminalWriter(cmd.Root().ErrWriter) {
-				// Count items for the message
+				// Try to count items for the message
+				var target string
+
 				state, err := fileStore.Drain(ctx, "", true)
-				if err != nil {
+				switch {
+				case errors.Is(err, file.ErrDecryptionFailed):
+					// File is encrypted without passphrase
+					if service != "" {
+						// Service-specific drop requires reading the file to preserve other services
+						return struct{}{}, errors.New("stash file is encrypted; use --force to delete without decryption, or use global drop")
+					}
+					// Global drop can proceed without decryption
+					target = "encrypted stash file"
+				case err != nil:
 					return struct{}{}, fmt.Errorf("failed to read stash file: %w", err)
-				}
+				default:
+					// Successfully read file, count items
+					itemCount := lo.
+						If(service != "", len(state.Entries[service])+len(state.Tags[service])).
+						Else(state.TotalCount())
 
-				itemCount := lo.
-					If(service != "", len(state.Entries[service])+len(state.Tags[service])).
-					Else(state.TotalCount())
+					if itemCount == 0 {
+						return struct{}{}, lo.
+							IfF(service != "", func() error { return fmt.Errorf("no stashed changes for %s", service) }).
+							ElseF(func() error { return errors.New("no stashed changes to drop") })
+					}
 
-				if itemCount == 0 {
-					return struct{}{}, lo.
-						IfF(service != "", func() error { return fmt.Errorf("no stashed changes for %s", service) }).
-						ElseF(func() error { return errors.New("no stashed changes to drop") })
+					target = lo.
+						If(service != "", fmt.Sprintf("%d stashed %s item(s)", itemCount, service)).
+						Else(fmt.Sprintf("%d stashed item(s)", itemCount))
 				}
 
 				confirmPrompter := &confirm.Prompter{
@@ -147,10 +160,6 @@ func stashDropAction(service staging.Service) func(context.Context, *cli.Command
 					Stdout: cmd.Root().Writer,
 					Stderr: cmd.Root().ErrWriter,
 				}
-
-				target := lo.
-					If(service != "", fmt.Sprintf("%d stashed %s item(s)", itemCount, service)).
-					Else(fmt.Sprintf("%d stashed item(s)", itemCount))
 
 				confirmed, err := confirmPrompter.ConfirmDelete(target, false)
 				if err != nil {

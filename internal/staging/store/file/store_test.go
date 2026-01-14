@@ -150,6 +150,68 @@ func TestStore_IsEncrypted(t *testing.T) {
 	})
 }
 
+func TestStore_Delete(t *testing.T) {
+	t.Parallel()
+
+	t.Run("delete existing file", func(t *testing.T) {
+		t.Parallel()
+
+		tmpDir := t.TempDir()
+		path := filepath.Join(tmpDir, "stage.json")
+		store := file.NewStoreWithPath(path)
+
+		// Create a file
+		err := os.WriteFile(path, []byte(`{"version":2}`), 0o600)
+		require.NoError(t, err)
+
+		// Verify file exists
+		_, err = os.Stat(path)
+		require.NoError(t, err)
+
+		// Delete the file
+		err = store.Delete()
+		require.NoError(t, err)
+
+		// Verify file is deleted
+		_, err = os.Stat(path)
+		assert.True(t, os.IsNotExist(err))
+	})
+
+	t.Run("delete encrypted file without passphrase", func(t *testing.T) {
+		t.Parallel()
+
+		tmpDir := t.TempDir()
+		path := filepath.Join(tmpDir, "stage.json")
+		store := file.NewStoreWithPath(path)
+
+		// Create encrypted file
+		encrypted, err := crypt.Encrypt([]byte(`{"version":2}`), "secret")
+		require.NoError(t, err)
+		err = os.WriteFile(path, encrypted, 0o600)
+		require.NoError(t, err)
+
+		// Delete should work without needing passphrase
+		err = store.Delete()
+		require.NoError(t, err)
+
+		// Verify file is deleted
+		_, err = os.Stat(path)
+		assert.True(t, os.IsNotExist(err))
+	})
+
+	t.Run("delete non-existent file", func(t *testing.T) {
+		t.Parallel()
+
+		tmpDir := t.TempDir()
+		path := filepath.Join(tmpDir, "nonexistent.json")
+		store := file.NewStoreWithPath(path)
+
+		// Delete should succeed even if file doesn't exist
+		err := store.Delete()
+		require.NoError(t, err)
+	})
+}
+
 func TestStore_Drain(t *testing.T) {
 	t.Parallel()
 

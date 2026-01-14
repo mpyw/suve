@@ -20,6 +20,10 @@ const (
 	stateDirName  = ".suve"
 )
 
+// ErrDecryptionFailed is returned when attempting to read an encrypted file without a passphrase,
+// or when the passphrase is incorrect.
+var ErrDecryptionFailed = crypt.ErrDecryptionFailed
+
 // fileMu protects concurrent access to the state file within a process.
 //
 //nolint:gochecknoglobals // process-wide mutex for file access synchronization
@@ -106,6 +110,19 @@ func (s *Store) IsEncrypted() (bool, error) {
 	}
 
 	return crypt.IsEncrypted(data), nil
+}
+
+// Delete removes the state file without reading it.
+// This is useful for drop operations that don't need to decrypt the file.
+func (s *Store) Delete() error {
+	fileMu.Lock()
+	defer fileMu.Unlock()
+
+	if err := os.Remove(s.stateFilePath); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("failed to delete stash file: %w", err)
+	}
+
+	return nil
 }
 
 // Drain reads the state from file, optionally deleting the file.

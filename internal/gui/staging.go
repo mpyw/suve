@@ -853,9 +853,8 @@ func (a *App) StagingDrop() (*StagingDropResult, error) {
 		return nil, errors.New("no stashed changes to drop")
 	}
 
-	// Drain with keep=false to delete the file (we discard the result)
-	_, err = fileStore.Drain(a.ctx, "", false)
-	if err != nil {
+	// Delete the file directly (no decryption needed for drop)
+	if err := fileStore.Delete(); err != nil {
 		return nil, err
 	}
 
