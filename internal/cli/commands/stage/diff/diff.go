@@ -454,8 +454,7 @@ func (r *Runner) outputTagDiff(name string, tagEntry staging.TagEntry) {
 	output.Printf(r.Stdout, "%s %s (staged tag changes)\n", colors.Info("Tags:"), name)
 
 	if len(tagEntry.Add) > 0 {
-		var tagPairs []string
-
+		tagPairs := make([]string, 0, len(tagEntry.Add))
 		for _, k := range maputil.SortedKeys(tagEntry.Add) {
 			tagPairs = append(tagPairs, fmt.Sprintf("%s=%s", k, tagEntry.Add[k]))
 		}

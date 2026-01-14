@@ -249,7 +249,7 @@ func TestRun(t *testing.T) {
 				},
 				//nolint:lll // mock function signature
 				getParametersFunc: func(_ context.Context, params *paramapi.GetParametersInput, _ ...func(*paramapi.Options)) (*paramapi.GetParametersOutput, error) {
-					var result []paramapi.Parameter
+					result := make([]paramapi.Parameter, 0, len(params.Names))
 					for _, name := range params.Names {
 						result = append(result, paramapi.Parameter{
 							Name:  lo.ToPtr(name),

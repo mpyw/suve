@@ -21,6 +21,7 @@ func VerifyPeerCredentials(conn net.Conn) error {
 	if err != nil {
 		return fmt.Errorf("failed to get socket file descriptor: %w", err)
 	}
+
 	defer func() { _ = file.Close() }()
 
 	cred, err := unix.GetsockoptUcred(int(file.Fd()), unix.SOL_SOCKET, unix.SO_PEERCRED)
