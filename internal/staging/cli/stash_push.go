@@ -150,7 +150,7 @@ func stashPushAction(service staging.Service) func(context.Context, *cli.Command
 					Stderr: cmd.Root().ErrWriter,
 				}
 
-				output.Printf(cmd.Root().ErrWriter, "Stash file already exists with %d item(s).\n", itemCount)
+				output.Warning(cmd.Root().ErrWriter, "Stash file already exists with %d item(s).", itemCount)
 
 				choice, err := confirmPrompter.ConfirmChoice("How do you want to proceed?", []confirm.Choice{
 					{Label: "Merge", Description: "combine with existing stash"},
@@ -167,7 +167,7 @@ func stashPushAction(service staging.Service) func(context.Context, *cli.Command
 				case 1: // Overwrite
 					mode = stagingusecase.StashPushModeOverwrite
 				default: // Cancel or error
-					output.Printf(cmd.Root().Writer, "Operation cancelled.\n")
+					output.Info(cmd.Root().Writer, "Operation cancelled.")
 
 					return nil
 				}

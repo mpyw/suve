@@ -15,5 +15,6 @@ import (
 func CommandNotFound(_ context.Context, cmd *cli.Command, command string) {
 	_ = cli.ShowSubcommandHelp(cmd)
 	w := lo.CoalesceOrEmpty(cmd.Root().ErrWriter, cmd.Root().Writer)
-	output.Printf(w, "\nUnknown command: %s\n", command)
+	output.Println(w, "")
+	output.Warning(w, "Unknown command: %s", command)
 }

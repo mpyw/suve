@@ -32,7 +32,8 @@ func MakeApp() *cli.Command {
 		CommandNotFound: func(_ context.Context, cmd *cli.Command, command string) {
 			_ = cli.ShowAppHelp(cmd)
 			w := lo.CoalesceOrEmpty(cmd.Root().ErrWriter, cmd.Root().Writer)
-			output.Printf(w, "\nCommand not found: %s\n", command)
+			output.Println(w, "")
+			output.Warning(w, "Command not found: %s", command)
 		},
 	}
 }

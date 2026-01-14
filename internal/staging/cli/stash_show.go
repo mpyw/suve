@@ -82,9 +82,9 @@ func (r *StashShowRunner) Run(ctx context.Context, opts StashShowOptions) error 
 	}
 
 	if totalCount == 0 {
-		output.Printf(r.Stdout, "No stashed changes\n")
+		output.Info(r.Stdout, "No stashed changes")
 	} else {
-		output.Printf(r.Stdout, "\nTotal: %d stashed item(s)\n", totalCount)
+		output.Info(r.Stdout, "\nTotal: %d stashed item(s)", totalCount)
 	}
 
 	return nil

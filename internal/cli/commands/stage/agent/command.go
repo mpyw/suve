@@ -92,7 +92,7 @@ Set ` + agentcfg.EnvDaemonManualMode + `=1 to enable manual mode (disables auto-
 
 			// Check if already running
 			if err := launcher.Ping(ctx); err == nil {
-				output.Println(cmd.Root().Writer, "Agent is already running")
+				output.Info(cmd.Root().Writer, "Agent is already running")
 
 				return nil
 			}
@@ -102,7 +102,7 @@ Set ` + agentcfg.EnvDaemonManualMode + `=1 to enable manual mode (disables auto-
 				return err
 			}
 
-			output.Println(cmd.Root().Writer, "Agent started")
+			output.Info(cmd.Root().Writer, "Agent started")
 
 			return nil
 		},
@@ -125,12 +125,12 @@ Note: Any staged changes in memory will be lost unless persisted first.`,
 
 			launcher := daemon.NewLauncher(identity.AccountID, identity.Region)
 			if err := launcher.Shutdown(ctx); err != nil {
-				output.Printf(cmd.Root().ErrWriter, "Warning: %v\n", err)
+				output.Warning(cmd.Root().ErrWriter, "%v", err)
 
 				return nil
 			}
 
-			output.Println(cmd.Root().Writer, "Agent stopped")
+			output.Info(cmd.Root().Writer, "Agent stopped")
 
 			return nil
 		},

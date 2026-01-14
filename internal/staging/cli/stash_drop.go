@@ -156,7 +156,7 @@ func stashDropAction(service staging.Service) func(context.Context, *cli.Command
 			}
 
 			if !confirmed {
-				output.Printf(cmd.Root().Writer, "Operation cancelled.\n")
+				output.Info(cmd.Root().Writer, "Operation cancelled.")
 
 				return nil
 			}

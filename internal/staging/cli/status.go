@@ -37,7 +37,7 @@ func (r *StatusRunner) Run(ctx context.Context, opts StatusOptions) error {
 
 	totalCount := len(result.Entries) + len(result.TagEntries)
 	if totalCount == 0 {
-		output.Printf(r.Stdout, "No %s changes staged.\n", result.ServiceName)
+		output.Info(r.Stdout, "No %s changes staged.", result.ServiceName)
 
 		return nil
 	}

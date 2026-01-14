@@ -108,7 +108,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 	}
 
 	if !hasChanges {
-		output.Println(r.Stdout, "No changes staged.")
+		output.Info(r.Stdout, "No changes staged.")
 
 		return nil
 	}

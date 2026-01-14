@@ -323,7 +323,7 @@ func printShutdownMessage(reason string) {
 		msg = "no staged changes"
 	}
 
-	output.Printf(os.Stderr, "info: staging agent stopped (%s)\n", msg)
+	output.Info(os.Stderr, "staging agent stopped (%s)", msg)
 }
 
 // Compile-time checks.
