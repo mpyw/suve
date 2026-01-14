@@ -605,6 +605,171 @@ func TestMixed_ServiceSpecificStashPushPop(t *testing.T) {
 	})
 }
 
+// TestGlobal_StashDrop tests the global stash drop command.
+func TestGlobal_StashDrop(t *testing.T) {
+	setupEnv(t)
+	setupTempHome(t)
+
+	paramName := "/suve-e2e-stash-drop/test-param"
+
+	// Cleanup
+	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+	t.Cleanup(func() {
+		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+		_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+	})
+
+	// Stage a parameter and stash push
+	_, _, err := runCommand(t, paramstage.Command(), "add", paramName, "test-value")
+	require.NoError(t, err)
+
+	_, _, err = runSubCommand(t, stgcli.NewGlobalStashCommand(), "push")
+	require.NoError(t, err)
+
+	// Verify stash file exists via stash show
+	stdout, _, err := runSubCommand(t, stgcli.NewGlobalStashCommand(), "show")
+	require.NoError(t, err)
+	assert.Contains(t, stdout, paramName)
+
+	// Drop the stash
+	t.Run("drop-global-stash", func(t *testing.T) {
+		stdout, _, err := runSubCommand(t, stgcli.NewGlobalStashCommand(), "drop", "--yes")
+		require.NoError(t, err)
+		t.Logf("stash drop output: %s", stdout)
+		assert.Contains(t, stdout, "All stashed changes dropped")
+	})
+
+	// Verify stash is gone
+	t.Run("verify-stash-gone", func(t *testing.T) {
+		_, _, err := runSubCommand(t, stgcli.NewGlobalStashCommand(), "show")
+		assert.Error(t, err)
+	})
+}
+
+// TestGlobal_StashDropEmpty tests stash drop when no stash exists.
+func TestGlobal_StashDropEmpty(t *testing.T) {
+	setupEnv(t)
+	setupTempHome(t)
+
+	// Cleanup to ensure no stash file
+	_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+
+	// Try to drop when no stash exists
+	t.Run("drop-empty-stash", func(t *testing.T) {
+		_, _, err := runSubCommand(t, stgcli.NewGlobalStashCommand(), "drop", "--yes")
+		assert.Error(t, err)
+	})
+}
+
+// TestGlobal_StashDropEncrypted tests stash drop on encrypted stash files.
+func TestGlobal_StashDropEncrypted(t *testing.T) {
+	setupEnv(t)
+	setupTempHome(t)
+
+	paramName := "/suve-e2e-stash-drop-enc/test-param"
+
+	// Cleanup
+	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+	t.Cleanup(func() {
+		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+		_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+	})
+
+	// Stage a parameter
+	_, _, err := runCommand(t, paramstage.Command(), "add", paramName, "secret-value")
+	require.NoError(t, err)
+
+	// Stash push with passphrase (using passphrase-stdin)
+	cmd := stgcli.NewGlobalStashCommand()
+	stdin := strings.NewReader("testpassphrase\ntestpassphrase\n")
+	stdout, stderr, err := runSubCommandWithStdin(t, cmd, stdin, "push")
+	require.NoError(t, err, "stash push failed: stdout=%s stderr=%s", stdout, stderr)
+
+	// Verify stash file is encrypted by trying to show without passphrase
+	_, _, err = runSubCommand(t, stgcli.NewGlobalStashCommand(), "show")
+	require.Error(t, err, "show should fail on encrypted file without passphrase")
+
+	// Drop the encrypted stash without passphrase - should succeed for global drop
+	t.Run("drop-encrypted-stash", func(t *testing.T) {
+		stdout, _, err := runSubCommand(t, stgcli.NewGlobalStashCommand(), "drop", "--yes")
+		require.NoError(t, err)
+		t.Logf("stash drop output: %s", stdout)
+		assert.Contains(t, stdout, "All stashed changes dropped")
+	})
+
+	// Verify stash is gone
+	t.Run("verify-stash-gone", func(t *testing.T) {
+		_, _, err := runSubCommand(t, stgcli.NewGlobalStashCommand(), "show")
+		assert.Error(t, err)
+	})
+}
+
+// TestService_StashDrop tests service-specific stash drop.
+func TestService_StashDrop(t *testing.T) {
+	setupEnv(t)
+	setupTempHome(t)
+
+	paramName := "/suve-e2e-service-drop/param"
+	secretName := "suve-e2e-service-drop/secret"
+
+	// Cleanup
+	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
+	_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+	t.Cleanup(func() {
+		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+		_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
+		_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+	})
+
+	// Stage both param and secret
+	_, _, err := runSubCommand(t, paramstage.Command(), "add", paramName, "param-value")
+	require.NoError(t, err)
+	_, _, err = runSubCommand(t, secretstage.Command(), "add", secretName, "secret-value")
+	require.NoError(t, err)
+
+	// Stash push both
+	_, _, err = runSubCommand(t, stgcli.NewGlobalStashCommand(), "push")
+	require.NoError(t, err)
+
+	// Verify both services are in stash
+	stdout, _, err := runSubCommand(t, stgcli.NewGlobalStashCommand(), "show")
+	require.NoError(t, err)
+	assert.Contains(t, stdout, paramName)
+	assert.Contains(t, stdout, secretName)
+
+	// Drop only param service
+	t.Run("drop-param-only", func(t *testing.T) {
+		stdout, _, err := runSubCommand(t, paramstage.Command(), "stash", "drop", "--yes")
+		require.NoError(t, err)
+		t.Logf("param stash drop output: %s", stdout)
+		assert.Contains(t, stdout, "Stashed param changes dropped")
+	})
+
+	// Verify param is gone but secret remains
+	t.Run("verify-secret-remains", func(t *testing.T) {
+		stdout, _, err := runSubCommand(t, stgcli.NewGlobalStashCommand(), "show")
+		require.NoError(t, err)
+		assert.NotContains(t, stdout, paramName)
+		assert.Contains(t, stdout, secretName)
+	})
+
+	// Drop secret service
+	t.Run("drop-secret", func(t *testing.T) {
+		stdout, _, err := runSubCommand(t, secretstage.Command(), "stash", "drop", "--yes")
+		require.NoError(t, err)
+		assert.Contains(t, stdout, "Stashed secret changes dropped")
+	})
+
+	// Verify stash is now empty (file should be deleted)
+	t.Run("verify-stash-empty", func(t *testing.T) {
+		_, _, err := runSubCommand(t, stgcli.NewGlobalStashCommand(), "show")
+		assert.Error(t, err)
+	})
+}
+
 // =============================================================================
 // Agent Store Direct Tests (for IPC coverage)
 // =============================================================================

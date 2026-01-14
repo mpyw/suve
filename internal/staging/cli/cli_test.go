@@ -2565,10 +2565,10 @@ func TestStashPopRunner_Run(t *testing.T) {
 			Stderr: &stderr,
 		}
 
-		err := r.Run(t.Context(), cli.StashPopOptions{Force: true})
+		err := r.Run(t.Context(), cli.StashPopOptions{Overwrite: true})
 		require.NoError(t, err)
 
-		// With force, file content replaces agent content
+		// With overwrite, file content replaces agent content
 		_, err = agentStore.GetEntry(t.Context(), staging.ServiceParam, "/app/new")
 		require.NoError(t, err)
 	})

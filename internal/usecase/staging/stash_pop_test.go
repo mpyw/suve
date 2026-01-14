@@ -132,10 +132,10 @@ func TestDrainUseCase_Execute(t *testing.T) {
 			AgentStore: agentStore,
 		}
 
-		_, err := usecase.Execute(t.Context(), stagingusecase.StashPopInput{Force: true})
+		_, err := usecase.Execute(t.Context(), stagingusecase.StashPopInput{Overwrite: true})
 		require.NoError(t, err)
 
-		// With force, agent should have file content
+		// With overwrite, agent should have file content
 		_, err = agentStore.GetEntry(t.Context(), staging.ServiceParam, "/app/config")
 		require.NoError(t, err)
 	})

@@ -235,5 +235,18 @@ func initializeStateMaps(state *staging.State) {
 	}
 }
 
+// Delete removes the state file without reading its contents.
+// This is useful for dropping stash when decryption is not needed.
+func (s *Store) Delete() error {
+	fileMu.Lock()
+	defer fileMu.Unlock()
+
+	if err := os.Remove(s.stateFilePath); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("failed to remove state file: %w", err)
+	}
+
+	return nil
+}
+
 // Compile-time check that Store implements FileStore.
 var _ store.FileStore = (*Store)(nil)

@@ -29,8 +29,8 @@ type StashPopOptions struct {
 	Service staging.Service
 	// Keep preserves the file after popping.
 	Keep bool
-	// Force overwrites agent memory without checking for conflicts.
-	Force bool
+	// Overwrite overwrites agent memory without checking for conflicts.
+	Overwrite bool
 	// Merge combines file changes with existing agent memory.
 	Merge bool
 }
@@ -38,10 +38,10 @@ type StashPopOptions struct {
 // Run executes the stash pop command.
 func (r *StashPopRunner) Run(ctx context.Context, opts StashPopOptions) error {
 	result, err := r.UseCase.Execute(ctx, stagingusecase.StashPopInput{
-		Service: opts.Service,
-		Keep:    opts.Keep,
-		Force:   opts.Force,
-		Merge:   opts.Merge,
+		Service:   opts.Service,
+		Keep:      opts.Keep,
+		Overwrite: opts.Overwrite,
+		Merge:     opts.Merge,
 	})
 	if err != nil {
 		// Check for non-fatal error (state was written but file cleanup failed)
@@ -80,12 +80,12 @@ func stashPopFlags() []cli.Flag {
 			Usage: "Keep the file after restoring into memory",
 		},
 		&cli.BoolFlag{
-			Name:  "force",
-			Usage: "Overwrite agent memory without prompt",
+			Name:  "yes",
+			Usage: "Skip confirmation prompt (uses merge mode by default)",
 		},
 		&cli.BoolFlag{
-			Name:  "merge",
-			Usage: "Merge file changes with existing memory",
+			Name:  "overwrite",
+			Usage: "Overwrite agent memory instead of merging",
 		},
 		&cli.BoolFlag{
 			Name:  "passphrase-stdin",
@@ -120,10 +120,10 @@ func stashPopAction(service staging.Service) func(context.Context, *cli.Command)
 			}
 
 			return r.Run(ctx, StashPopOptions{
-				Service: service,
-				Keep:    cmd.Bool("keep"),
-				Force:   cmd.Bool("force"),
-				Merge:   cmd.Bool("merge"),
+				Service:   service,
+				Keep:      cmd.Bool("keep"),
+				Overwrite: cmd.Bool("overwrite"),
+				Merge:     cmd.Bool("merge") || cmd.Bool("yes"),
 			})
 		})
 
@@ -145,14 +145,14 @@ By default, the file is deleted after restoring.
 Use --keep to retain the file after popping (same as 'stash apply').
 
 If the agent already has staged changes, you'll be prompted to confirm
-the action. Use --force to skip the prompt and overwrite, or --merge
-to merge the file changes with existing memory changes.
+the action. Use --yes to skip the prompt and merge, or --overwrite
+to replace the existing memory changes.
 
 EXAMPLES:
    suve stage stash pop                            Restore from file and delete file
    suve stage stash pop --keep                     Restore from file and keep file
-   suve stage stash pop --force                    Overwrite agent memory without prompt
-   suve stage stash pop --merge                    Merge file with existing memory
+   suve stage stash pop --yes                      Merge with agent memory without prompt
+   suve stage stash pop --overwrite                Overwrite agent memory
    echo "secret" | suve stage stash pop --passphrase-stdin   Decrypt with passphrase from stdin`,
 		Flags:  stashPopFlags(),
 		Action: stashPopAction(""), // Empty service = all services
@@ -176,14 +176,14 @@ By default, the %s entries are removed from the file after restoring.
 Use --keep to retain them in the file.
 
 If the agent already has staged %s changes, you'll be prompted to confirm
-the action. Use --force to skip the prompt and overwrite, or --merge
-to merge the file changes with existing memory changes.
+the action. Use --yes to skip the prompt and merge, or --overwrite
+to replace the existing memory changes.
 
 EXAMPLES:
    suve stage %s stash pop                            Restore from file
    suve stage %s stash pop --keep                     Restore from file and keep in file
-   suve stage %s stash pop --force                    Overwrite agent memory without prompt
-   suve stage %s stash pop --merge                    Merge file with existing memory
+   suve stage %s stash pop --yes                      Merge with agent memory without prompt
+   suve stage %s stash pop --overwrite                Overwrite agent memory
    echo "secret" | suve stage %s stash pop --passphrase-stdin   Decrypt with passphrase from stdin`,
 			cfg.ItemName,
 			cfg.ItemName,

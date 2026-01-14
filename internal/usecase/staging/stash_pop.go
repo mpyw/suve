@@ -14,8 +14,8 @@ type StashPopInput struct {
 	Service staging.Service
 	// Keep preserves the file after draining.
 	Keep bool
-	// Force overwrites agent memory without checking for conflicts.
-	Force bool
+	// Overwrite overwrites agent memory without checking for conflicts.
+	Overwrite bool
 	// Merge combines file changes with existing agent memory.
 	Merge bool
 }
@@ -61,7 +61,7 @@ func (u *StashPopUseCase) Execute(ctx context.Context, input StashPopInput) (*St
 
 	// Check for conflicts
 	agentServiceState := agentState.ExtractService(input.Service)
-	if !agentServiceState.IsEmpty() && !input.Force && !input.Merge {
+	if !agentServiceState.IsEmpty() && !input.Overwrite && !input.Merge {
 		return nil, ErrAgentHasChanges
 	}
 
@@ -141,8 +141,8 @@ func (u *StashPopUseCase) Execute(ctx context.Context, input StashPopInput) (*St
 var (
 	// ErrNothingToStashPop is returned when there are no staged changes in file to drain.
 	ErrNothingToStashPop = errors.New("no staged changes in file to drain")
-	// ErrAgentHasChanges is returned when agent has staged changes and neither force nor merge is specified.
-	ErrAgentHasChanges = errors.New("agent already has staged changes; use --force to overwrite or --merge to combine")
+	// ErrAgentHasChanges is returned when agent has staged changes and neither overwrite nor merge is specified.
+	ErrAgentHasChanges = errors.New("agent already has staged changes; use --overwrite to replace or --yes to merge")
 )
 
 // StashPopError represents an error during drain operation.

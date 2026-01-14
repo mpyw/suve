@@ -87,12 +87,12 @@ func stashPushFlags() []cli.Flag {
 			Usage: "Keep staged changes in agent memory after stashing",
 		},
 		&cli.BoolFlag{
-			Name:  "force",
-			Usage: "Overwrite existing stash without prompt",
+			Name:  "yes",
+			Usage: "Skip confirmation prompt (uses merge mode by default)",
 		},
 		&cli.BoolFlag{
-			Name:  "merge",
-			Usage: "Merge with existing stash without prompt",
+			Name:  "overwrite",
+			Usage: "Overwrite existing stash instead of merging",
 		},
 		&cli.BoolFlag{
 			Name:  "passphrase-stdin",
@@ -102,6 +102,8 @@ func stashPushFlags() []cli.Flag {
 }
 
 // stashPushAction creates the action function for stash push commands.
+//
+//nolint:gocognit // Action function with multiple branching paths for flags and file existence
 func stashPushAction(service staging.Service) func(context.Context, *cli.Command) error {
 	return func(ctx context.Context, cmd *cli.Command) error {
 		identity, err := infra.GetAWSIdentity(ctx)
@@ -120,15 +122,14 @@ func stashPushAction(service staging.Service) func(context.Context, *cli.Command
 
 			// Determine mode based on flags and file existence
 			mode := usestaging.StashPushModeMerge // Default to merge (safer)
-			forceFlag := cmd.Bool("force")
-			mergeFlag := cmd.Bool("merge")
+			skipConfirm := cmd.Bool("yes")
+			overwriteFlag := cmd.Bool("overwrite")
 
-			switch {
-			case forceFlag:
+			if overwriteFlag {
 				mode = usestaging.StashPushModeOverwrite
-			case mergeFlag:
-				mode = usestaging.StashPushModeMerge
-			default:
+			}
+
+			if !skipConfirm && !overwriteFlag {
 				// Check if we need to prompt
 				exists, err := basicFileStore.Exists()
 				if err != nil {
