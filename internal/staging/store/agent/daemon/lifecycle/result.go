@@ -10,3 +10,10 @@ type Result[T any] struct {
 	// When true, Value should be ignored.
 	NothingStaged bool
 }
+
+// Result0 is like Result but without a value.
+// Used by ExecuteRead0 for actions that don't return a value.
+type Result0 struct {
+	// NothingStaged indicates that the agent was not running, meaning no changes are staged.
+	NothingStaged bool
+}

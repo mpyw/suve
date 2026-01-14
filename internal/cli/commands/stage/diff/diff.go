@@ -98,26 +98,26 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		NoPager:   cmd.Bool("no-pager"),
 	}
 
-	result, err := lifecycle.ExecuteRead(ctx, store, lifecycle.CmdDiff, func() (struct{}, error) {
+	result, err := lifecycle.ExecuteRead0(ctx, store, lifecycle.CmdDiff, func() error {
 		// Check if there are any staged changes before creating clients
 		paramStaged, err := store.ListEntries(ctx, staging.ServiceParam)
 		if err != nil {
-			return struct{}{}, err
+			return err
 		}
 
 		secretStaged, err := store.ListEntries(ctx, staging.ServiceSecret)
 		if err != nil {
-			return struct{}{}, err
+			return err
 		}
 
 		paramTagStaged, err := store.ListTags(ctx, staging.ServiceParam)
 		if err != nil {
-			return struct{}{}, err
+			return err
 		}
 
 		secretTagStaged, err := store.ListTags(ctx, staging.ServiceSecret)
 		if err != nil {
-			return struct{}{}, err
+			return err
 		}
 
 		hasParam := len(paramStaged[staging.ServiceParam]) > 0 || len(paramTagStaged[staging.ServiceParam]) > 0
@@ -126,7 +126,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		if !hasParam && !hasSecret {
 			output.Warning(cmd.Root().ErrWriter, "nothing staged")
 
-			return struct{}{}, nil
+			return nil
 		}
 
 		r := &Runner{
@@ -138,7 +138,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		if hasParam {
 			paramClient, err := infra.NewParamClient(ctx)
 			if err != nil {
-				return struct{}{}, fmt.Errorf("failed to initialize SSM Parameter Store client: %w", err)
+				return fmt.Errorf("failed to initialize SSM Parameter Store client: %w", err)
 			}
 
 			r.ParamClient = paramClient
@@ -147,13 +147,13 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		if hasSecret {
 			secretClient, err := infra.NewSecretClient(ctx)
 			if err != nil {
-				return struct{}{}, fmt.Errorf("failed to initialize Secrets Manager client: %w", err)
+				return fmt.Errorf("failed to initialize Secrets Manager client: %w", err)
 			}
 
 			r.SecretClient = secretClient
 		}
 
-		return struct{}{}, pager.WithPagerWriter(cmd.Root().Writer, opts.NoPager, func(w io.Writer) error {
+		return pager.WithPagerWriter(cmd.Root().Writer, opts.NoPager, func(w io.Writer) error {
 			r.Stdout = w
 
 			return r.Run(ctx, opts)

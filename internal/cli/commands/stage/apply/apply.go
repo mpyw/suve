@@ -82,26 +82,26 @@ func action(ctx context.Context, cmd *cli.Command) error {
 
 	store := agent.NewStore(identity.AccountID, identity.Region)
 
-	result, err := lifecycle.ExecuteRead(ctx, store, lifecycle.CmdApply, func() (struct{}, error) {
+	result, err := lifecycle.ExecuteRead0(ctx, store, lifecycle.CmdApply, func() error {
 		// Check if there are any staged changes
 		paramStaged, err := store.ListEntries(ctx, staging.ServiceParam)
 		if err != nil {
-			return struct{}{}, err
+			return err
 		}
 
 		secretStaged, err := store.ListEntries(ctx, staging.ServiceSecret)
 		if err != nil {
-			return struct{}{}, err
+			return err
 		}
 
 		paramTagStaged, err := store.ListTags(ctx, staging.ServiceParam)
 		if err != nil {
-			return struct{}{}, err
+			return err
 		}
 
 		secretTagStaged, err := store.ListTags(ctx, staging.ServiceSecret)
 		if err != nil {
-			return struct{}{}, err
+			return err
 		}
 
 		hasParam := len(paramStaged[staging.ServiceParam]) > 0 || len(paramTagStaged[staging.ServiceParam]) > 0
@@ -110,7 +110,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		if !hasParam && !hasSecret {
 			output.Info(cmd.Root().Writer, "No changes staged.")
 
-			return struct{}{}, nil
+			return nil
 		}
 
 		// Count total staged changes
@@ -132,11 +132,11 @@ func action(ctx context.Context, cmd *cli.Command) error {
 
 		confirmed, err := prompter.Confirm(message, skipConfirm)
 		if err != nil {
-			return struct{}{}, err
+			return err
 		}
 
 		if !confirmed {
-			return struct{}{}, nil
+			return nil
 		}
 
 		r := &Runner{
@@ -150,7 +150,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		if hasParam {
 			strategy, err := staging.ParamFactory(ctx)
 			if err != nil {
-				return struct{}{}, err
+				return err
 			}
 
 			r.ParamStrategy = strategy
@@ -159,13 +159,13 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		if hasSecret {
 			strategy, err := staging.SecretFactory(ctx)
 			if err != nil {
-				return struct{}{}, err
+				return err
 			}
 
 			r.SecretStrategy = strategy
 		}
 
-		return struct{}{}, r.Run(ctx)
+		return r.Run(ctx)
 	})
 	if err != nil {
 		return err

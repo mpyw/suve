@@ -129,10 +129,10 @@ func stashShowAction(service staging.Service) func(context.Context, *cli.Command
 			return fmt.Errorf("failed to get AWS identity: %w", err)
 		}
 
-		_, err = lifecycle.ExecuteFile(ctx, lifecycle.CmdStashShow, func() (struct{}, error) {
+		err = lifecycle.ExecuteFile0(ctx, lifecycle.CmdStashShow, func() error {
 			fileStore, err := fileStoreForReading(cmd, identity.AccountID, identity.Region, true)
 			if err != nil {
-				return struct{}{}, err
+				return err
 			}
 
 			r := &StashShowRunner{
@@ -141,7 +141,7 @@ func stashShowAction(service staging.Service) func(context.Context, *cli.Command
 				Stderr:    cmd.Root().ErrWriter,
 			}
 
-			return struct{}{}, r.Run(ctx, StashShowOptions{
+			return r.Run(ctx, StashShowOptions{
 				Service: service,
 				Verbose: cmd.Bool("verbose"),
 			})

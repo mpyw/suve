@@ -77,7 +77,7 @@ EXAMPLES:
 				opts.Name = cmd.Args().First()
 			}
 
-			result, err := lifecycle.ExecuteRead(ctx, store, lifecycle.CmdStatus, func() (struct{}, error) {
+			result, err := lifecycle.ExecuteRead0(ctx, store, lifecycle.CmdStatus, func() error {
 				r := &StatusRunner{
 					UseCase: &stagingusecase.StatusUseCase{
 						Strategy: cfg.ParserFactory(),
@@ -87,7 +87,7 @@ EXAMPLES:
 					Stderr: cmd.Root().ErrWriter,
 				}
 
-				return struct{}{}, r.Run(ctx, opts)
+				return r.Run(ctx, opts)
 			})
 			if err != nil {
 				return err
@@ -163,13 +163,13 @@ EXAMPLES:
 				NoPager:   cmd.Bool("no-pager"),
 			}
 
-			result, err := lifecycle.ExecuteRead(ctx, store, lifecycle.CmdDiff, func() (struct{}, error) {
+			result, err := lifecycle.ExecuteRead0(ctx, store, lifecycle.CmdDiff, func() error {
 				strategy, err := cfg.Factory(ctx)
 				if err != nil {
-					return struct{}{}, err
+					return err
 				}
 
-				return struct{}{}, pager.WithPagerWriter(cmd.Root().Writer, opts.NoPager, func(w io.Writer) error {
+				return pager.WithPagerWriter(cmd.Root().Writer, opts.NoPager, func(w io.Writer) error {
 					r := &DiffRunner{
 						UseCase: &stagingusecase.DiffUseCase{
 							Strategy: strategy,
@@ -401,20 +401,20 @@ EXAMPLES:
 			store := agent.NewStore(identity.AccountID, identity.Region)
 			parser := cfg.ParserFactory()
 
-			result, err := lifecycle.ExecuteRead(ctx, store, lifecycle.CmdApply, func() (struct{}, error) {
+			result, err := lifecycle.ExecuteRead0(ctx, store, lifecycle.CmdApply, func() error {
 				// Get entries to show what will be applied
 				service := parser.Service()
 
 				entries, err := store.ListEntries(ctx, service)
 				if err != nil {
-					return struct{}{}, err
+					return err
 				}
 
 				serviceEntries := entries[service]
 				if len(serviceEntries) == 0 {
 					output.Info(cmd.Root().Writer, "No %s changes staged.", parser.ServiceName())
 
-					return struct{}{}, nil
+					return nil
 				}
 
 				// Filter by name if specified
@@ -424,7 +424,7 @@ EXAMPLES:
 				if cmd.Args().Len() > 0 {
 					opts.Name = cmd.Args().First()
 					if _, ok := serviceEntries[opts.Name]; !ok {
-						return struct{}{}, fmt.Errorf("%s is not staged", opts.Name)
+						return fmt.Errorf("%s is not staged", opts.Name)
 					}
 				}
 
@@ -445,16 +445,16 @@ EXAMPLES:
 
 				confirmed, err := prompter.Confirm(message, skipConfirm)
 				if err != nil {
-					return struct{}{}, err
+					return err
 				}
 
 				if !confirmed {
-					return struct{}{}, nil
+					return nil
 				}
 
 				strategy, err := cfg.Factory(ctx)
 				if err != nil {
-					return struct{}{}, err
+					return err
 				}
 
 				r := &ApplyRunner{
@@ -466,7 +466,7 @@ EXAMPLES:
 					Stderr: cmd.Root().ErrWriter,
 				}
 
-				return struct{}{}, r.Run(ctx, opts)
+				return r.Run(ctx, opts)
 			})
 			if err != nil {
 				return err
@@ -557,10 +557,10 @@ EXAMPLES:
 
 			if hasVersion {
 				// Reset with version spec - write operation, auto-start the agent
-				_, err := lifecycle.ExecuteWrite(ctx, store, lifecycle.CmdResetVersion, func() (struct{}, error) {
+				err := lifecycle.ExecuteWrite0(ctx, store, lifecycle.CmdResetVersion, func() error {
 					strategy, err := cfg.Factory(ctx)
 					if err != nil {
-						return struct{}{}, err
+						return err
 					}
 
 					r := &ResetRunner{
@@ -573,14 +573,14 @@ EXAMPLES:
 						Stderr: cmd.Root().ErrWriter,
 					}
 
-					return struct{}{}, r.Run(ctx, opts)
+					return r.Run(ctx, opts)
 				})
 
 				return err
 			}
 
 			// Reset without version spec - read operation, check if agent is running
-			result, err := lifecycle.ExecuteRead(ctx, store, lifecycle.CmdReset, func() (struct{}, error) {
+			result, err := lifecycle.ExecuteRead0(ctx, store, lifecycle.CmdReset, func() error {
 				r := &ResetRunner{
 					UseCase: &stagingusecase.ResetUseCase{
 						Parser:  parser,
@@ -591,7 +591,7 @@ EXAMPLES:
 					Stderr: cmd.Root().ErrWriter,
 				}
 
-				return struct{}{}, r.Run(ctx, opts)
+				return r.Run(ctx, opts)
 			})
 			if err != nil {
 				return err

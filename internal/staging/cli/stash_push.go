@@ -111,11 +111,11 @@ func stashPushAction(service staging.Service) func(context.Context, *cli.Command
 
 		agentStore := agent.NewStore(identity.AccountID, identity.Region)
 
-		result, err := lifecycle.ExecuteRead(ctx, agentStore, lifecycle.CmdStashPush, func() (struct{}, error) {
+		result, err := lifecycle.ExecuteRead0(ctx, agentStore, lifecycle.CmdStashPush, func() error {
 			// Check if stash file already exists
 			basicFileStore, err := file.NewStore(identity.AccountID, identity.Region)
 			if err != nil {
-				return struct{}{}, fmt.Errorf("failed to create file store: %w", err)
+				return fmt.Errorf("failed to create file store: %w", err)
 			}
 
 			// Determine mode based on flags and file existence
@@ -132,7 +132,7 @@ func stashPushAction(service staging.Service) func(context.Context, *cli.Command
 				// Check if we need to prompt
 				exists, err := basicFileStore.Exists()
 				if err != nil {
-					return struct{}{}, fmt.Errorf("failed to check stash file: %w", err)
+					return fmt.Errorf("failed to check stash file: %w", err)
 				}
 
 				// Only prompt for global push when file exists
@@ -141,7 +141,7 @@ func stashPushAction(service staging.Service) func(context.Context, *cli.Command
 					// Count existing items for the prompt message
 					existingState, err := basicFileStore.Drain(ctx, "", true)
 					if err != nil {
-						return struct{}{}, fmt.Errorf("failed to read stash file: %w", err)
+						return fmt.Errorf("failed to read stash file: %w", err)
 					}
 
 					itemCount := existingState.TotalCount()
@@ -160,7 +160,7 @@ func stashPushAction(service staging.Service) func(context.Context, *cli.Command
 						{Label: "Cancel", Description: "abort operation"},
 					})
 					if err != nil {
-						return struct{}{}, fmt.Errorf("failed to get confirmation: %w", err)
+						return fmt.Errorf("failed to get confirmation: %w", err)
 					}
 
 					switch choice {
@@ -171,7 +171,7 @@ func stashPushAction(service staging.Service) func(context.Context, *cli.Command
 					default: // Cancel or error
 						output.Info(cmd.Root().Writer, "Operation cancelled.")
 
-						return struct{}{}, nil
+						return nil
 					}
 				}
 			}
@@ -189,16 +189,16 @@ func stashPushAction(service staging.Service) func(context.Context, *cli.Command
 			case cmd.Bool("passphrase-stdin"):
 				pass, err = prompter.ReadFromStdin()
 				if err != nil {
-					return struct{}{}, fmt.Errorf("failed to read passphrase from stdin: %w", err)
+					return fmt.Errorf("failed to read passphrase from stdin: %w", err)
 				}
 			case terminal.IsTerminalWriter(cmd.Root().ErrWriter):
 				pass, err = prompter.PromptForEncrypt()
 				if err != nil {
 					if errors.Is(err, passphrase.ErrCancelled) {
-						return struct{}{}, nil
+						return nil
 					}
 
-					return struct{}{}, fmt.Errorf("failed to get passphrase: %w", err)
+					return fmt.Errorf("failed to get passphrase: %w", err)
 				}
 			default:
 				prompter.WarnNonTTY()
@@ -207,7 +207,7 @@ func stashPushAction(service staging.Service) func(context.Context, *cli.Command
 
 			fileStore, err := file.NewStoreWithPassphrase(identity.AccountID, identity.Region, pass)
 			if err != nil {
-				return struct{}{}, fmt.Errorf("failed to create file store: %w", err)
+				return fmt.Errorf("failed to create file store: %w", err)
 			}
 
 			r := &StashPushRunner{
@@ -220,7 +220,7 @@ func stashPushAction(service staging.Service) func(context.Context, *cli.Command
 				Encrypted: pass != "",
 			}
 
-			return struct{}{}, r.Run(ctx, StashPushOptions{
+			return r.Run(ctx, StashPushOptions{
 				Service: service,
 				Keep:    cmd.Bool("keep"),
 				Mode:    mode,

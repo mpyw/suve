@@ -107,20 +107,20 @@ func stashDropAction(service staging.Service) func(context.Context, *cli.Command
 			return fmt.Errorf("failed to get AWS identity: %w", err)
 		}
 
-		_, err = lifecycle.ExecuteFile(ctx, lifecycle.CmdStashDrop, func() (struct{}, error) {
+		err = lifecycle.ExecuteFile0(ctx, lifecycle.CmdStashDrop, func() error {
 			fileStore, err := file.NewStore(identity.AccountID, identity.Region)
 			if err != nil {
-				return struct{}{}, fmt.Errorf("failed to create file store: %w", err)
+				return fmt.Errorf("failed to create file store: %w", err)
 			}
 
 			// Check if file exists
 			exists, err := fileStore.Exists()
 			if err != nil {
-				return struct{}{}, fmt.Errorf("failed to check stash file: %w", err)
+				return fmt.Errorf("failed to check stash file: %w", err)
 			}
 
 			if !exists {
-				return struct{}{}, errors.New("no stashed changes to drop")
+				return errors.New("no stashed changes to drop")
 			}
 
 			// Confirm unless --force
@@ -129,7 +129,7 @@ func stashDropAction(service staging.Service) func(context.Context, *cli.Command
 				// Count items for the message
 				state, err := fileStore.Drain(ctx, "", true)
 				if err != nil {
-					return struct{}{}, fmt.Errorf("failed to read stash file: %w", err)
+					return fmt.Errorf("failed to read stash file: %w", err)
 				}
 
 				itemCount := lo.
@@ -137,7 +137,7 @@ func stashDropAction(service staging.Service) func(context.Context, *cli.Command
 					Else(state.TotalCount())
 
 				if itemCount == 0 {
-					return struct{}{}, lo.
+					return lo.
 						IfF(service != "", func() error { return fmt.Errorf("no stashed changes for %s", service) }).
 						ElseF(func() error { return errors.New("no stashed changes to drop") })
 				}
@@ -154,13 +154,13 @@ func stashDropAction(service staging.Service) func(context.Context, *cli.Command
 
 				confirmed, err := confirmPrompter.ConfirmDelete(target, false)
 				if err != nil {
-					return struct{}{}, fmt.Errorf("failed to get confirmation: %w", err)
+					return fmt.Errorf("failed to get confirmation: %w", err)
 				}
 
 				if !confirmed {
 					output.Info(cmd.Root().Writer, "Operation cancelled.")
 
-					return struct{}{}, nil
+					return nil
 				}
 			}
 
@@ -170,7 +170,7 @@ func stashDropAction(service staging.Service) func(context.Context, *cli.Command
 				Stderr:    cmd.Root().ErrWriter,
 			}
 
-			return struct{}{}, r.Run(ctx, StashDropOptions{
+			return r.Run(ctx, StashDropOptions{
 				Service: service,
 				Force:   forceFlag,
 			})
