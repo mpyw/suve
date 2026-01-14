@@ -15,6 +15,23 @@ PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 FRONTEND_DIR="$PROJECT_DIR/internal/gui/frontend"
 GUI_DIR="$PROJECT_DIR/gui"
 
+# Cleanup function for trap
+WAILS_PID=""
+AGENT_PID=""
+cleanup() {
+    echo ""
+    echo "Cleaning up..."
+    if [[ -n "$WAILS_PID" ]]; then
+        echo "Stopping wails dev..."
+        kill "$WAILS_PID" 2>/dev/null || true
+    fi
+    if [[ -n "$AGENT_PID" ]]; then
+        echo "Stopping staging agent..."
+        kill "$AGENT_PID" 2>/dev/null || true
+    fi
+}
+trap cleanup EXIT
+
 cd "$PROJECT_DIR"
 
 # LocalStack configuration
@@ -63,6 +80,19 @@ echo "=== Starting wails dev ==="
 # Clean up previous test artifacts
 rm -rf "$FRONTEND_DIR/test-results-recording" 2>/dev/null || true
 
+# Start daemon manually before wails dev to prevent hot-reload loop
+# SUVE_DAEMON_MANUAL_MODE=1 prevents auto-start/stop which causes
+# file changes that trigger wails hot-reload in an infinite loop
+export SUVE_DAEMON_MANUAL_MODE=1
+echo "Starting staging agent manually..."
+# Stop any existing daemon first (from previous runs)
+"$PROJECT_DIR/bin/suve" stage agent stop 2>/dev/null || true
+# Run daemon in background (agent start is a foreground/blocking command)
+"$PROJECT_DIR/bin/suve" stage agent start &
+AGENT_PID=$!
+# Wait for daemon to be ready
+sleep 1
+
 # Start wails dev in background (same as make gui-dev)
 cd "$GUI_DIR"
 wails dev -skipbindings -tags dev &
@@ -80,7 +110,6 @@ while ! curl -s "http://localhost:$WAILS_PORT" > /dev/null 2>&1; do
     RETRY_COUNT=$((RETRY_COUNT + 1))
     if [ $RETRY_COUNT -ge $MAX_RETRIES ]; then
         echo "Error: wails dev did not start within ${MAX_RETRIES} seconds"
-        kill $WAILS_PID 2>/dev/null || true
         exit 1
     fi
     sleep 1
@@ -109,11 +138,7 @@ NODE_PATH="$FRONTEND_DIR/node_modules" VITE_PORT="$WAILS_PORT" npx playwright te
     --project=chromium \
     --reporter=list
 
-# Stop wails dev
-echo "Stopping wails dev..."
-kill $WAILS_PID 2>/dev/null || true
-
-# Find the recorded video
+# Find the recorded video (cleanup handled by trap)
 VIDEO_FILE=$(find ./test-results-recording -name "*.webm" -type f 2>/dev/null | head -1)
 
 if [[ -n "$VIDEO_FILE" ]]; then
@@ -151,7 +176,6 @@ if [[ -n "$VIDEO_FILE" ]]; then
     rm -rf ./test-results-recording
 else
     echo "Error: No video file found"
-    # Stop wails dev on error
-    kill $WAILS_PID 2>/dev/null || true
+    # Cleanup handled by trap
     exit 1
 fi
