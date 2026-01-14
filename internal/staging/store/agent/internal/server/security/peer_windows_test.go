@@ -34,10 +34,7 @@ func TestVerifyPeerCredentials_Windows_DocumentedBehavior(t *testing.T) {
 
 	// Verify that the function accepts any connection type without error,
 	// since security on Windows relies on socket file ACLs instead.
-	var connections []net.Conn
-
-	connections = append(connections, nil)
-	connections = append(connections, &mockConn{})
+	connections := []net.Conn{nil, &mockConn{}}
 
 	for _, conn := range connections {
 		err := security.VerifyPeerCredentials(conn)
