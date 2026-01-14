@@ -84,6 +84,10 @@ func stashPopFlags() []cli.Flag {
 			Usage: "Skip confirmation prompt (uses merge mode by default)",
 		},
 		&cli.BoolFlag{
+			Name:  "merge",
+			Usage: "Merge with existing agent memory (same as --yes, explicit mode)",
+		},
+		&cli.BoolFlag{
 			Name:  "overwrite",
 			Usage: "Overwrite agent memory instead of merging",
 		},
