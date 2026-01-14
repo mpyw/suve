@@ -642,7 +642,7 @@ export namespace gui {
 	export class StagingDiffTagEntry {
 	    name: string;
 	    addTags?: Record<string, string>;
-	    removeTags?: string[];
+	    removeTags?: Record<string, string>;
 	
 	    static createFrom(source: any = {}) {
 	        return new StagingDiffTagEntry(source);
@@ -694,11 +694,11 @@ export namespace gui {
 	    merged: boolean;
 	    entryCount: number;
 	    tagCount: number;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new StagingDrainResult(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.merged = source["merged"];
@@ -708,11 +708,11 @@ export namespace gui {
 	}
 	export class StagingDropResult {
 	    dropped: boolean;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new StagingDropResult(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.dropped = source["dropped"];

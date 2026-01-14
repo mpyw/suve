@@ -31,7 +31,7 @@ export interface StagedEntry {
 export interface StagedTagEntry {
   name: string;
   addTags: Record<string, string>;
-  removeTags: string[];
+  removeTags: Record<string, string>;
 }
 
 export interface ParamLogEntry {
@@ -119,7 +119,7 @@ export function createStagedValue(
 export function createStagedTags(
   name: string,
   addTags: Record<string, string> = {},
-  removeTags: string[] = []
+  removeTags: Record<string, string> = {}
 ): StagedTagEntry {
   return { name, addTags, removeTags };
 }
@@ -732,7 +732,7 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
         const tagStaged = service === 'param' ? state.stagedParamTags : state.stagedSecretTags;
         let entry = tagStaged.find((t: any) => t.name === name);
         if (!entry) {
-          entry = { name, addTags: {}, removeTags: [] };
+          entry = { name, addTags: {}, removeTags: {} };
           tagStaged.push(entry);
         }
         entry.addTags[key] = value;
@@ -742,10 +742,10 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
         const tagStaged = service === 'param' ? state.stagedParamTags : state.stagedSecretTags;
         let entry = tagStaged.find((t: any) => t.name === name);
         if (!entry) {
-          entry = { name, addTags: {}, removeTags: [] };
+          entry = { name, addTags: {}, removeTags: {} };
           tagStaged.push(entry);
         }
-        entry.removeTags.push(key);
+        entry.removeTags[key] = ''; // Value will be fetched from AWS in real implementation
         return { name };
       },
       StagingCancelAddTag: async (service: string, name: string, key: string) => {
@@ -760,7 +760,7 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
         const tagStaged = service === 'param' ? state.stagedParamTags : state.stagedSecretTags;
         const entry = tagStaged.find((t: any) => t.name === name);
         if (entry) {
-          entry.removeTags = entry.removeTags.filter((k: string) => k !== key);
+          delete entry.removeTags[key];
         }
         return { name };
       },

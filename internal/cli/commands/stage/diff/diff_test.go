@@ -3,6 +3,7 @@ package diff_test
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"testing"
 	"time"
@@ -31,6 +32,11 @@ type mockParamClient struct {
 		params *paramapi.GetParameterHistoryInput,
 		optFns ...func(*paramapi.Options),
 	) (*paramapi.GetParameterHistoryOutput, error)
+	listTagsForResourceFunc func(
+		ctx context.Context,
+		params *paramapi.ListTagsForResourceInput,
+		optFns ...func(*paramapi.Options),
+	) (*paramapi.ListTagsForResourceOutput, error)
 }
 
 func (m *mockParamClient) GetParameter(
@@ -57,6 +63,18 @@ func (m *mockParamClient) GetParameterHistory(
 	return nil, fmt.Errorf("GetParameterHistory not mocked")
 }
 
+func (m *mockParamClient) ListTagsForResource(
+	ctx context.Context,
+	params *paramapi.ListTagsForResourceInput,
+	optFns ...func(*paramapi.Options),
+) (*paramapi.ListTagsForResourceOutput, error) {
+	if m.listTagsForResourceFunc != nil {
+		return m.listTagsForResourceFunc(ctx, params, optFns...)
+	}
+
+	return &paramapi.ListTagsForResourceOutput{}, nil
+}
+
 type mockSecretClient struct {
 	getSecretValueFunc func(
 		ctx context.Context,
@@ -69,6 +87,11 @@ type mockSecretClient struct {
 		params *secretapi.ListSecretVersionIDsInput,
 		optFns ...func(*secretapi.Options),
 	) (*secretapi.ListSecretVersionIDsOutput, error)
+	describeSecretFunc func(
+		ctx context.Context,
+		params *secretapi.DescribeSecretInput,
+		optFns ...func(*secretapi.Options),
+	) (*secretapi.DescribeSecretOutput, error)
 }
 
 func (m *mockSecretClient) GetSecretValue(
@@ -94,6 +117,18 @@ func (m *mockSecretClient) ListSecretVersionIds(
 	}
 
 	return nil, fmt.Errorf("ListSecretVersionIds not mocked")
+}
+
+func (m *mockSecretClient) DescribeSecret(
+	ctx context.Context,
+	params *secretapi.DescribeSecretInput,
+	optFns ...func(*secretapi.Options),
+) (*secretapi.DescribeSecretOutput, error) {
+	if m.describeSecretFunc != nil {
+		return m.describeSecretFunc(ctx, params, optFns...)
+	}
+
+	return &secretapi.DescribeSecretOutput{}, nil
 }
 
 func TestCommand_Validation(t *testing.T) {
@@ -1114,4 +1149,216 @@ func TestRun_BothEntriesAndTags(t *testing.T) {
 	// Tag diff
 	assert.Contains(t, output, "Tags:")
 	assert.Contains(t, output, "/app/other")
+}
+
+func TestRun_ParamTagDiffWithValues(t *testing.T) {
+	t.Parallel()
+
+	store := testutil.NewMockStore()
+
+	// Stage param tag removals
+	err := store.StageTag(t.Context(), staging.ServiceParam, "/app/config", staging.TagEntry{
+		Remove:   maputil.NewSet("deprecated", "old-tag"),
+		StagedAt: time.Now(),
+	})
+	require.NoError(t, err)
+
+	// Mock ListTagsForResource to return current tag values
+	paramMock := &mockParamClient{
+		listTagsForResourceFunc: func(
+			_ context.Context, _ *paramapi.ListTagsForResourceInput, _ ...func(*paramapi.Options),
+		) (*paramapi.ListTagsForResourceOutput, error) {
+			return &paramapi.ListTagsForResourceOutput{
+				TagList: []paramapi.Tag{
+					{Key: lo.ToPtr("deprecated"), Value: lo.ToPtr("true")},
+					{Key: lo.ToPtr("old-tag"), Value: lo.ToPtr("legacy-value")},
+					{Key: lo.ToPtr("other"), Value: lo.ToPtr("not-staged")},
+				},
+			}, nil
+		},
+	}
+
+	var stdout, stderr bytes.Buffer
+
+	r := &stagediff.Runner{
+		ParamClient: paramMock,
+		Store:       store,
+		Stdout:      &stdout,
+		Stderr:      &stderr,
+	}
+
+	err = r.Run(t.Context(), stagediff.Options{})
+	require.NoError(t, err)
+
+	output := stdout.String()
+	assert.Contains(t, output, "Tags:")
+	assert.Contains(t, output, "/app/config")
+	assert.Contains(t, output, "deprecated=true")
+	assert.Contains(t, output, "old-tag=legacy-value")
+}
+
+func TestRun_SecretTagDiffWithValues(t *testing.T) {
+	t.Parallel()
+
+	store := testutil.NewMockStore()
+
+	// Stage secret tag removals
+	err := store.StageTag(t.Context(), staging.ServiceSecret, "my-secret", staging.TagEntry{
+		Remove:   maputil.NewSet("deprecated"),
+		StagedAt: time.Now(),
+	})
+	require.NoError(t, err)
+
+	// Mock DescribeSecret to return current tag values
+	secretMock := &mockSecretClient{
+		describeSecretFunc: func(
+			_ context.Context, _ *secretapi.DescribeSecretInput, _ ...func(*secretapi.Options),
+		) (*secretapi.DescribeSecretOutput, error) {
+			return &secretapi.DescribeSecretOutput{
+				Tags: []secretapi.Tag{
+					{Key: lo.ToPtr("deprecated"), Value: lo.ToPtr("yes")},
+				},
+			}, nil
+		},
+	}
+
+	var stdout, stderr bytes.Buffer
+
+	r := &stagediff.Runner{
+		SecretClient: secretMock,
+		Store:        store,
+		Stdout:       &stdout,
+		Stderr:       &stderr,
+	}
+
+	err = r.Run(t.Context(), stagediff.Options{})
+	require.NoError(t, err)
+
+	output := stdout.String()
+	assert.Contains(t, output, "Tags:")
+	assert.Contains(t, output, "my-secret")
+	assert.Contains(t, output, "deprecated=yes")
+}
+
+func TestRun_ParamTagDiffAPIError(t *testing.T) {
+	t.Parallel()
+
+	store := testutil.NewMockStore()
+
+	// Stage param tag removals
+	err := store.StageTag(t.Context(), staging.ServiceParam, "/app/config", staging.TagEntry{
+		Remove:   maputil.NewSet("deprecated"),
+		StagedAt: time.Now(),
+	})
+	require.NoError(t, err)
+
+	// Mock ListTagsForResource to return error
+	paramMock := &mockParamClient{
+		listTagsForResourceFunc: func(
+			_ context.Context, _ *paramapi.ListTagsForResourceInput, _ ...func(*paramapi.Options),
+		) (*paramapi.ListTagsForResourceOutput, error) {
+			return nil, errors.New("API error")
+		},
+	}
+
+	var stdout, stderr bytes.Buffer
+
+	r := &stagediff.Runner{
+		ParamClient: paramMock,
+		Store:       store,
+		Stdout:      &stdout,
+		Stderr:      &stderr,
+	}
+
+	err = r.Run(t.Context(), stagediff.Options{})
+	require.NoError(t, err)
+
+	output := stdout.String()
+	// Should still show the tag key, just without value
+	assert.Contains(t, output, "Tags:")
+	assert.Contains(t, output, "deprecated")
+}
+
+func TestRun_SecretTagDiffAPIError(t *testing.T) {
+	t.Parallel()
+
+	store := testutil.NewMockStore()
+
+	// Stage secret tag removals
+	err := store.StageTag(t.Context(), staging.ServiceSecret, "my-secret", staging.TagEntry{
+		Remove:   maputil.NewSet("old-tag"),
+		StagedAt: time.Now(),
+	})
+	require.NoError(t, err)
+
+	// Mock DescribeSecret to return error
+	secretMock := &mockSecretClient{
+		describeSecretFunc: func(
+			_ context.Context, _ *secretapi.DescribeSecretInput, _ ...func(*secretapi.Options),
+		) (*secretapi.DescribeSecretOutput, error) {
+			return nil, errors.New("API error")
+		},
+	}
+
+	var stdout, stderr bytes.Buffer
+
+	r := &stagediff.Runner{
+		SecretClient: secretMock,
+		Store:        store,
+		Stdout:       &stdout,
+		Stderr:       &stderr,
+	}
+
+	err = r.Run(t.Context(), stagediff.Options{})
+	require.NoError(t, err)
+
+	output := stdout.String()
+	// Should still show the tag key, just without value
+	assert.Contains(t, output, "Tags:")
+	assert.Contains(t, output, "old-tag")
+}
+
+func TestRun_TagDiffWithMissingValue(t *testing.T) {
+	t.Parallel()
+
+	store := testutil.NewMockStore()
+
+	// Stage param tag removals
+	err := store.StageTag(t.Context(), staging.ServiceParam, "/app/config", staging.TagEntry{
+		Remove:   maputil.NewSet("has-value", "no-value"),
+		StagedAt: time.Now(),
+	})
+	require.NoError(t, err)
+
+	// Mock ListTagsForResource to return only some tags
+	paramMock := &mockParamClient{
+		listTagsForResourceFunc: func(
+			_ context.Context, _ *paramapi.ListTagsForResourceInput, _ ...func(*paramapi.Options),
+		) (*paramapi.ListTagsForResourceOutput, error) {
+			return &paramapi.ListTagsForResourceOutput{
+				TagList: []paramapi.Tag{
+					{Key: lo.ToPtr("has-value"), Value: lo.ToPtr("found")},
+					// no-value tag not in AWS (already deleted?)
+				},
+			}, nil
+		},
+	}
+
+	var stdout, stderr bytes.Buffer
+
+	r := &stagediff.Runner{
+		ParamClient: paramMock,
+		Store:       store,
+		Stdout:      &stdout,
+		Stderr:      &stderr,
+	}
+
+	err = r.Run(t.Context(), stagediff.Options{})
+	require.NoError(t, err)
+
+	output := stdout.String()
+	assert.Contains(t, output, "has-value=found")
+	// no-value should appear without value since it's not in AWS
+	assert.Contains(t, output, "no-value")
+	assert.NotContains(t, output, "no-value=")
 }

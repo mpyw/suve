@@ -138,7 +138,7 @@ type StagingDiffEntry struct {
 type StagingDiffTagEntry struct {
 	Name       string            `json:"name"`
 	AddTags    map[string]string `json:"addTags,omitempty"`
-	RemoveTags []string          `json:"removeTags,omitempty"`
+	RemoveTags map[string]string `json:"removeTags,omitempty"` // key=current value from AWS
 }
 
 // =============================================================================
@@ -656,7 +656,7 @@ func (a *App) StagingDiff(service string, name string) (*StagingDiffResult, erro
 		tagEntries[i] = StagingDiffTagEntry{
 			Name:       t.Name,
 			AddTags:    t.Add,
-			RemoveTags: t.Remove.Values(),
+			RemoveTags: t.Remove,
 		}
 	}
 

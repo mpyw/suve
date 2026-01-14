@@ -41,6 +41,9 @@ type secretMockClient struct {
 	untagResourceFunc func(
 		ctx context.Context, params *secretapi.UntagResourceInput, optFns ...func(*secretapi.Options),
 	) (*secretapi.UntagResourceOutput, error)
+	describeSecretFunc func(
+		ctx context.Context, params *secretapi.DescribeSecretInput, optFns ...func(*secretapi.Options),
+	) (*secretapi.DescribeSecretOutput, error)
 }
 
 func (m *secretMockClient) GetSecretValue(
@@ -122,6 +125,16 @@ func (m *secretMockClient) UntagResource(
 	}
 
 	return &secretapi.UntagResourceOutput{}, nil
+}
+
+func (m *secretMockClient) DescribeSecret(
+	ctx context.Context, params *secretapi.DescribeSecretInput, optFns ...func(*secretapi.Options),
+) (*secretapi.DescribeSecretOutput, error) {
+	if m.describeSecretFunc != nil {
+		return m.describeSecretFunc(ctx, params, optFns...)
+	}
+
+	return &secretapi.DescribeSecretOutput{}, nil
 }
 
 func TestSecretStrategy_BasicMethods(t *testing.T) {
@@ -953,5 +966,127 @@ func TestSecretStrategy_ApplyTags(t *testing.T) {
 			Remove: maputil.NewSet("old-tag"),
 		})
 		require.Error(t, err)
+	})
+}
+
+func TestSecretStrategy_FetchCurrentTags(t *testing.T) {
+	t.Parallel()
+
+	t.Run("returns tags successfully", func(t *testing.T) {
+		t.Parallel()
+
+		mock := &secretMockClient{
+			describeSecretFunc: func(
+				_ context.Context, params *secretapi.DescribeSecretInput, _ ...func(*secretapi.Options),
+			) (*secretapi.DescribeSecretOutput, error) {
+				assert.Equal(t, "my-secret", *params.SecretId)
+
+				return &secretapi.DescribeSecretOutput{
+					Tags: []secretapi.Tag{
+						{Key: lo.ToPtr("env"), Value: lo.ToPtr("prod")},
+						{Key: lo.ToPtr("team"), Value: lo.ToPtr("backend")},
+					},
+				}, nil
+			},
+		}
+
+		s := staging.NewSecretStrategy(mock)
+		tags, err := s.FetchCurrentTags(t.Context(), "my-secret")
+		require.NoError(t, err)
+		assert.Equal(t, map[string]string{"env": "prod", "team": "backend"}, tags)
+	})
+
+	t.Run("returns nil when secret not found", func(t *testing.T) {
+		t.Parallel()
+
+		mock := &secretMockClient{
+			describeSecretFunc: func(
+				_ context.Context, _ *secretapi.DescribeSecretInput, _ ...func(*secretapi.Options),
+			) (*secretapi.DescribeSecretOutput, error) {
+				return nil, &secretapi.ResourceNotFoundException{}
+			},
+		}
+
+		s := staging.NewSecretStrategy(mock)
+		tags, err := s.FetchCurrentTags(t.Context(), "nonexistent-secret")
+		require.NoError(t, err)
+		assert.Nil(t, tags)
+	})
+
+	t.Run("returns error for other API errors", func(t *testing.T) {
+		t.Parallel()
+
+		mock := &secretMockClient{
+			describeSecretFunc: func(
+				_ context.Context, _ *secretapi.DescribeSecretInput, _ ...func(*secretapi.Options),
+			) (*secretapi.DescribeSecretOutput, error) {
+				return nil, errors.New("API error")
+			},
+		}
+
+		s := staging.NewSecretStrategy(mock)
+		tags, err := s.FetchCurrentTags(t.Context(), "my-secret")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to describe secret")
+		assert.Nil(t, tags)
+	})
+
+	t.Run("returns nil when no tags exist", func(t *testing.T) {
+		t.Parallel()
+
+		mock := &secretMockClient{
+			describeSecretFunc: func(
+				_ context.Context, _ *secretapi.DescribeSecretInput, _ ...func(*secretapi.Options),
+			) (*secretapi.DescribeSecretOutput, error) {
+				return &secretapi.DescribeSecretOutput{
+					Tags: []secretapi.Tag{},
+				}, nil
+			},
+		}
+
+		s := staging.NewSecretStrategy(mock)
+		tags, err := s.FetchCurrentTags(t.Context(), "my-secret")
+		require.NoError(t, err)
+		assert.Nil(t, tags)
+	})
+
+	t.Run("returns nil when result is nil", func(t *testing.T) {
+		t.Parallel()
+
+		mock := &secretMockClient{
+			describeSecretFunc: func(
+				_ context.Context, _ *secretapi.DescribeSecretInput, _ ...func(*secretapi.Options),
+			) (*secretapi.DescribeSecretOutput, error) {
+				return nil, nil //nolint:nilnil // testing nil result
+			},
+		}
+
+		s := staging.NewSecretStrategy(mock)
+		tags, err := s.FetchCurrentTags(t.Context(), "my-secret")
+		require.NoError(t, err)
+		assert.Nil(t, tags)
+	})
+
+	t.Run("skips tags with nil key or value", func(t *testing.T) {
+		t.Parallel()
+
+		mock := &secretMockClient{
+			describeSecretFunc: func(
+				_ context.Context, _ *secretapi.DescribeSecretInput, _ ...func(*secretapi.Options),
+			) (*secretapi.DescribeSecretOutput, error) {
+				return &secretapi.DescribeSecretOutput{
+					Tags: []secretapi.Tag{
+						{Key: lo.ToPtr("valid"), Value: lo.ToPtr("tag")},
+						{Key: nil, Value: lo.ToPtr("no-key")},
+						{Key: lo.ToPtr("no-value"), Value: nil},
+					},
+				}, nil
+			},
+		}
+
+		s := staging.NewSecretStrategy(mock)
+		tags, err := s.FetchCurrentTags(t.Context(), "my-secret")
+		require.NoError(t, err)
+		assert.Equal(t, map[string]string{"valid": "tag"}, tags)
 	})
 }

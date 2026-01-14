@@ -312,7 +312,7 @@ test.describe('Operation Type Display', () => {
 test.describe('Tag Staging Display', () => {
   test('should display tag-only changes', async ({ page }) => {
     const tagOnly = createTagOnlyStagedState(
-      [createStagedTags('/app/config', { 'new-tag': 'value' }, [])],
+      [createStagedTags('/app/config', { 'new-tag': 'value' }, {})],
       []
     );
     await setupWailsMocks(page, tagOnly);
@@ -324,7 +324,7 @@ test.describe('Tag Staging Display', () => {
 
   test('should display add tag changes', async ({ page }) => {
     const addTags = createTagOnlyStagedState(
-      [createStagedTags('/app/config', { 'env': 'staging', 'team': 'backend' }, [])],
+      [createStagedTags('/app/config', { 'env': 'staging', 'team': 'backend' }, {})],
       []
     );
     await setupWailsMocks(page, addTags);
@@ -335,7 +335,7 @@ test.describe('Tag Staging Display', () => {
 
   test('should display remove tag changes', async ({ page }) => {
     const removeTags = createTagOnlyStagedState(
-      [createStagedTags('/app/config', {}, ['old-tag', 'deprecated'])],
+      [createStagedTags('/app/config', {}, { 'old-tag': 'old-value', 'deprecated': 'true' })],
       []
     );
     await setupWailsMocks(page, removeTags);
@@ -346,7 +346,7 @@ test.describe('Tag Staging Display', () => {
 
   test('should display both add and remove tag changes', async ({ page }) => {
     const mixedTags = createTagOnlyStagedState(
-      [createStagedTags('/app/config', { 'new': 'value' }, ['old'])],
+      [createStagedTags('/app/config', { 'new': 'value' }, { 'old': 'old-value' })],
       []
     );
     await setupWailsMocks(page, mixedTags);
@@ -358,7 +358,7 @@ test.describe('Tag Staging Display', () => {
   test('should display value change with tag changes', async ({ page }) => {
     const valueAndTags: Partial<MockState> = {
       stagedParam: [createStagedValue('/app/config', 'update', 'new-value')],
-      stagedParamTags: [createStagedTags('/app/config', { 'version': '2' }, [])],
+      stagedParamTags: [createStagedTags('/app/config', { 'version': '2' }, {})],
       stagedSecret: [],
       stagedSecretTags: [],
     };

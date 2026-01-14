@@ -22,6 +22,7 @@ type ParamClient interface {
 	paramapi.DeleteParameterAPI
 	paramapi.AddTagsToResourceAPI
 	paramapi.RemoveTagsFromResourceAPI
+	paramapi.ListTagsForResourceAPI
 }
 
 // ParamStrategy implements ServiceStrategy for SSM Parameter Store.
@@ -197,6 +198,35 @@ func (s *ParamStrategy) FetchCurrent(ctx context.Context, name string) (*FetchRe
 		Value:      lo.FromPtr(param.Value),
 		Identifier: fmt.Sprintf("#%d", param.Version),
 	}, nil
+}
+
+// FetchCurrentTags fetches the current tags from AWS SSM Parameter Store.
+func (s *ParamStrategy) FetchCurrentTags(ctx context.Context, name string) (map[string]string, error) {
+	result, err := s.Client.ListTagsForResource(ctx, &paramapi.ListTagsForResourceInput{
+		ResourceType: paramapi.ResourceTypeForTaggingParameter,
+		ResourceId:   lo.ToPtr(name),
+	})
+	if err != nil {
+		// Parameter not found - return nil (no tags available)
+		if pnf := (*paramapi.ParameterNotFound)(nil); errors.As(err, &pnf) {
+			return nil, nil //nolint:nilnil // intentional: no tags for non-existent resource
+		}
+
+		return nil, fmt.Errorf("failed to get tags: %w", err)
+	}
+
+	if result == nil || len(result.TagList) == 0 {
+		return nil, nil //nolint:nilnil // intentional: resource exists but has no tags
+	}
+
+	tags := make(map[string]string, len(result.TagList))
+	for _, tag := range result.TagList {
+		if tag.Key != nil && tag.Value != nil {
+			tags[*tag.Key] = *tag.Value
+		}
+	}
+
+	return tags, nil
 }
 
 // ParseName parses and validates a name for editing.

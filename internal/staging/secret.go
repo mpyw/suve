@@ -24,6 +24,7 @@ type SecretClient interface {
 	secretapi.UpdateSecretAPI
 	secretapi.TagResourceAPI
 	secretapi.UntagResourceAPI
+	secretapi.DescribeSecretAPI
 }
 
 // SecretStrategy implements ServiceStrategy for Secrets Manager.
@@ -191,6 +192,34 @@ func (s *SecretStrategy) FetchCurrent(ctx context.Context, name string) (*FetchR
 		Value:      lo.FromPtr(secret.SecretString),
 		Identifier: "#" + versionID,
 	}, nil
+}
+
+// FetchCurrentTags fetches the current tags from AWS Secrets Manager.
+func (s *SecretStrategy) FetchCurrentTags(ctx context.Context, name string) (map[string]string, error) {
+	result, err := s.Client.DescribeSecret(ctx, &secretapi.DescribeSecretInput{
+		SecretId: lo.ToPtr(name),
+	})
+	if err != nil {
+		// Secret not found - return nil (no tags available)
+		if rnf := (*secretapi.ResourceNotFoundException)(nil); errors.As(err, &rnf) {
+			return nil, nil //nolint:nilnil // intentional: no tags for non-existent resource
+		}
+
+		return nil, fmt.Errorf("failed to describe secret: %w", err)
+	}
+
+	if result == nil || len(result.Tags) == 0 {
+		return nil, nil //nolint:nilnil // intentional: resource exists but has no tags
+	}
+
+	tags := make(map[string]string, len(result.Tags))
+	for _, tag := range result.Tags {
+		if tag.Key != nil && tag.Value != nil {
+			tags[*tag.Key] = *tag.Value
+		}
+	}
+
+	return tags, nil
 }
 
 // ParseName parses and validates a name for editing.
