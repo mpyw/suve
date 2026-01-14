@@ -99,9 +99,10 @@ cmd := cli.NewAddCommand(cfg)
 Both `stash push` and `stash pop` support mutually exclusive mode flags:
 - `--merge` - Combine source data with existing destination data (default)
 - `--overwrite` - Replace destination data with source data
-- `--yes` - Confirm without prompt (implies merge mode)
 
 These flags use urfave/cli v3's `MutuallyExclusiveFlags` to ensure only one can be specified.
+
+Additionally, `--yes` flag skips confirmation prompts (can be combined with either mode).
 
 ## References
 

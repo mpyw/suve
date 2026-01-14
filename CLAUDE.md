@@ -34,7 +34,7 @@ This file provides guidance to Claude Code when working with code in this reposi
    - Mode flags (mutually exclusive):
      - `--merge` - Combine with existing data (default)
      - `--overwrite` - Replace existing data
-     - `--yes` - Confirm without prompt (implies merge)
+   - `--yes` - Confirm without prompt
 
 4. **Version Specification**: Git-like revision syntax
    ```
