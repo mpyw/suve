@@ -118,12 +118,12 @@ func TestStashShowRunner_Run(t *testing.T) {
 			staging.ServiceParam:  file.NewStoreWithPath(paramPath, staging.ServiceParam),
 			staging.ServiceSecret: file.NewStoreWithPath(secretPath, staging.ServiceSecret),
 		}
-		fileStore := file.NewCompositeStore(stores)
+		factory := file.NewFactoryFromStores(stores)
 		stdout := &bytes.Buffer{}
 		stderr := &bytes.Buffer{}
 
 		runner := &cli.StashShowRunner{
-			FileStore: fileStore,
+			FileStore: factory.Global(),
 			Stdout:    stdout,
 			Stderr:    stderr,
 		}
@@ -146,12 +146,15 @@ func TestStashShowRunner_Run(t *testing.T) {
 			"/app/config": {Operation: staging.OperationUpdate, Value: lo.ToPtr("test-value"), StagedAt: time.Now()},
 		}, nil)
 
-		fileStore := file.NewStoreWithPath(paramPath, staging.ServiceParam)
+		stores := map[staging.Service]*file.Store{
+			staging.ServiceParam: file.NewStoreWithPath(paramPath, staging.ServiceParam),
+		}
+		factory := file.NewFactoryFromStores(stores)
 		stdout := &bytes.Buffer{}
 		stderr := &bytes.Buffer{}
 
 		runner := &cli.StashShowRunner{
-			FileStore: fileStore,
+			FileStore: factory.Service(staging.ServiceParam),
 			Stdout:    stdout,
 			Stderr:    stderr,
 		}
@@ -173,12 +176,15 @@ func TestStashShowRunner_Run(t *testing.T) {
 			"/app/config": {Add: map[string]string{"env": "prod"}, Remove: maputil.NewSet("old-tag")},
 		})
 
-		fileStore := file.NewStoreWithPath(paramPath, staging.ServiceParam)
+		stores := map[staging.Service]*file.Store{
+			staging.ServiceParam: file.NewStoreWithPath(paramPath, staging.ServiceParam),
+		}
+		factory := file.NewFactoryFromStores(stores)
 		stdout := &bytes.Buffer{}
 		stderr := &bytes.Buffer{}
 
 		runner := &cli.StashShowRunner{
-			FileStore: fileStore,
+			FileStore: factory.Service(staging.ServiceParam),
 			Stdout:    stdout,
 			Stderr:    stderr,
 		}
@@ -201,12 +207,15 @@ func TestStashShowRunner_Run(t *testing.T) {
 			"/app/config": {Add: map[string]string{"env": "prod", "team": "backend"}, Remove: maputil.NewSet[string]()},
 		})
 
-		fileStore := file.NewStoreWithPath(paramPath, staging.ServiceParam)
+		stores := map[staging.Service]*file.Store{
+			staging.ServiceParam: file.NewStoreWithPath(paramPath, staging.ServiceParam),
+		}
+		factory := file.NewFactoryFromStores(stores)
 		stdout := &bytes.Buffer{}
 		stderr := &bytes.Buffer{}
 
 		runner := &cli.StashShowRunner{
-			FileStore: fileStore,
+			FileStore: factory.Service(staging.ServiceParam),
 			Stdout:    stdout,
 			Stderr:    stderr,
 		}
@@ -229,12 +238,15 @@ func TestStashShowRunner_Run(t *testing.T) {
 			"/app/config": {Add: map[string]string{}, Remove: maputil.NewSet("deprecated", "obsolete")},
 		})
 
-		fileStore := file.NewStoreWithPath(paramPath, staging.ServiceParam)
+		stores := map[staging.Service]*file.Store{
+			staging.ServiceParam: file.NewStoreWithPath(paramPath, staging.ServiceParam),
+		}
+		factory := file.NewFactoryFromStores(stores)
 		stdout := &bytes.Buffer{}
 		stderr := &bytes.Buffer{}
 
 		runner := &cli.StashShowRunner{
-			FileStore: fileStore,
+			FileStore: factory.Service(staging.ServiceParam),
 			Stdout:    stdout,
 			Stderr:    stderr,
 		}
@@ -253,12 +265,15 @@ func TestStashShowRunner_Run(t *testing.T) {
 		paramPath := filepath.Join(tmpDir, "param.json")
 		// Don't create the file
 
-		fileStore := file.NewStoreWithPath(paramPath, staging.ServiceParam)
+		stores := map[staging.Service]*file.Store{
+			staging.ServiceParam: file.NewStoreWithPath(paramPath, staging.ServiceParam),
+		}
+		factory := file.NewFactoryFromStores(stores)
 		stdout := &bytes.Buffer{}
 		stderr := &bytes.Buffer{}
 
 		runner := &cli.StashShowRunner{
-			FileStore: fileStore,
+			FileStore: factory.Service(staging.ServiceParam),
 			Stdout:    stdout,
 			Stderr:    stderr,
 		}
@@ -284,12 +299,12 @@ func TestStashShowRunner_Run(t *testing.T) {
 			staging.ServiceParam:  file.NewStoreWithPath(paramPath, staging.ServiceParam),
 			staging.ServiceSecret: file.NewStoreWithPath(secretPath, staging.ServiceSecret),
 		}
-		fileStore := file.NewCompositeStore(stores)
+		factory := file.NewFactoryFromStores(stores)
 		stdout := &bytes.Buffer{}
 		stderr := &bytes.Buffer{}
 
 		runner := &cli.StashShowRunner{
-			FileStore: fileStore,
+			FileStore: factory.Service(staging.ServiceSecret),
 			Stdout:    stdout,
 			Stderr:    stderr,
 		}
@@ -311,12 +326,15 @@ func TestStashShowRunner_Run(t *testing.T) {
 			"/app/config": {Operation: staging.OperationUpdate, Value: lo.ToPtr("test-value"), StagedAt: time.Now()},
 		}, nil)
 
-		fileStore := file.NewStoreWithPath(paramPath, staging.ServiceParam)
+		stores := map[staging.Service]*file.Store{
+			staging.ServiceParam: file.NewStoreWithPath(paramPath, staging.ServiceParam),
+		}
+		factory := file.NewFactoryFromStores(stores)
 		stdout := &bytes.Buffer{}
 		stderr := &bytes.Buffer{}
 
 		runner := &cli.StashShowRunner{
-			FileStore: fileStore,
+			FileStore: factory.Service(staging.ServiceParam),
 			Stdout:    stdout,
 			Stderr:    stderr,
 		}
@@ -339,12 +357,15 @@ func TestStashShowRunner_Run(t *testing.T) {
 			"/app/config": {Operation: staging.OperationUpdate, Value: lo.ToPtr("test-value"), StagedAt: time.Now()},
 		}, nil)
 
-		fileStore := file.NewStoreWithPath(paramPath, staging.ServiceParam)
+		stores := map[staging.Service]*file.Store{
+			staging.ServiceParam: file.NewStoreWithPath(paramPath, staging.ServiceParam),
+		}
+		factory := file.NewFactoryFromStores(stores)
 		stdout := &bytes.Buffer{}
 		stderr := &bytes.Buffer{}
 
 		runner := &cli.StashShowRunner{
-			FileStore: fileStore,
+			FileStore: factory.Service(staging.ServiceParam),
 			Stdout:    stdout,
 			Stderr:    stderr,
 		}

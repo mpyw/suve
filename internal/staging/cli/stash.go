@@ -85,59 +85,6 @@ EXAMPLES:
 	}
 }
 
-// fileStoreForReading creates a file store for reading operations (service-specific).
-// It handles passphrase prompting if the file is encrypted.
-// If checkExists is true, returns an error if the file doesn't exist.
-func fileStoreForReading(cmd *cli.Command, accountID, region string, service staging.Service, checkExists bool) (*file.Store, error) {
-	basicFileStore, err := file.NewStore(accountID, region, service)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create file store: %w", err)
-	}
-
-	if checkExists {
-		exists, err := basicFileStore.Exists()
-		if err != nil {
-			return nil, fmt.Errorf("failed to check stash file: %w", err)
-		}
-
-		if !exists {
-			return nil, errors.New("no stashed changes")
-		}
-	}
-
-	isEnc, err := basicFileStore.IsEncrypted()
-	if err != nil {
-		return nil, fmt.Errorf("failed to check file encryption: %w", err)
-	}
-
-	var pass string
-
-	if isEnc {
-		prompter := &passphrase.Prompter{
-			Stdin:  cmd.Root().Reader,
-			Stdout: cmd.Root().Writer,
-			Stderr: cmd.Root().ErrWriter,
-		}
-
-		switch {
-		case cmd.Bool("passphrase-stdin"):
-			pass, err = prompter.ReadFromStdin()
-			if err != nil {
-				return nil, fmt.Errorf("failed to read passphrase from stdin: %w", err)
-			}
-		case terminal.IsTerminalWriter(cmd.Root().ErrWriter):
-			pass, err = prompter.PromptForDecrypt()
-			if err != nil {
-				return nil, fmt.Errorf("failed to get passphrase: %w", err)
-			}
-		default:
-			return nil, errors.New("encrypted file cannot be decrypted in non-TTY environment; use --passphrase-stdin")
-		}
-	}
-
-	return file.NewStoreWithPassphrase(accountID, region, service, pass)
-}
-
 // fileStoresForReading creates file stores for all services for reading operations (global).
 // It handles passphrase prompting if any file is encrypted.
 // If checkExists is true, returns an error if no files exist.

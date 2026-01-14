@@ -18,7 +18,7 @@ import (
 
 // StashShowRunner executes stash show operations.
 type StashShowRunner struct {
-	FileStore store.FileStore //nolint:staticcheck // using legacy interface during migration
+	FileStore store.Drainer
 	Stdout    io.Writer
 	Stderr    io.Writer
 }
@@ -35,7 +35,7 @@ type StashShowOptions struct {
 // Note: Existence check should be done before calling this method.
 func (r *StashShowRunner) Run(ctx context.Context, opts StashShowOptions) error {
 	// Read state (keep=true to preserve file)
-	state, err := r.FileStore.Drain(ctx, opts.Service, true)
+	state, err := r.FileStore.Drain(ctx, true)
 	if err != nil {
 		return fmt.Errorf("failed to read stash file: %w", err)
 	}
@@ -117,25 +117,24 @@ func stashShowAction(service staging.Service) func(context.Context, *cli.Command
 		}
 
 		_, err = lifecycle.ExecuteFile(ctx, lifecycle.CmdStashShow, func() (struct{}, error) {
-			// V3: Use service-specific store or composite store for global operations
-			var fileStore store.FileStore //nolint:staticcheck // using legacy interface during migration
-			if service != "" {
-				fileStore, err = fileStoreForReading(cmd, identity.AccountID, identity.Region, service, true)
-			} else {
-				var stores map[staging.Service]*file.Store
-
-				stores, err = fileStoresForReading(cmd, identity.AccountID, identity.Region, true)
-				if err == nil {
-					fileStore = file.NewCompositeStore(stores)
-				}
-			}
-
+			// Get all stores with passphrase handling
+			stores, err := fileStoresForReading(cmd, identity.AccountID, identity.Region, true)
 			if err != nil {
 				return struct{}{}, err
 			}
 
+			// Use factory to get service-scoped or global drainer
+			factory := file.NewFactoryFromStores(stores)
+
+			var drainer store.Drainer
+			if service != "" {
+				drainer = factory.Service(service)
+			} else {
+				drainer = factory.Global()
+			}
+
 			r := &StashShowRunner{
-				FileStore: fileStore,
+				FileStore: drainer,
 				Stdout:    cmd.Root().Writer,
 				Stderr:    cmd.Root().ErrWriter,
 			}

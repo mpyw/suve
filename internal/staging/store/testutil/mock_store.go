@@ -528,8 +528,19 @@ type HintedMockGlobalStore struct {
 	hintedParent *HintedMockStore
 }
 
+// Service creates a service-scoped store with hint support (implements AgentStoreFactory).
+func (m *HintedMockStore) Service(service staging.Service) store.ServiceStore {
+	return &HintedMockServiceStore{
+		MockServiceStore: &MockServiceStore{
+			parent:  m.MockStore,
+			service: service,
+		},
+		hintedParent: m,
+	}
+}
+
 // Global creates a HintedMockGlobalStore that implements store.GlobalStore and HintedGlobalUnstager.
-func (m *HintedMockStore) Global() *HintedMockGlobalStore {
+func (m *HintedMockStore) Global() store.GlobalStore {
 	return &HintedMockGlobalStore{
 		MockGlobalStore: &MockGlobalStore{parent: m.MockStore},
 		hintedParent:    m,
@@ -549,6 +560,7 @@ var (
 	_ store.FileStore             = (*MockStore)(nil)
 	_ store.AgentStore            = (*MockStore)(nil)
 	_ store.AgentStoreFactory     = (*MockStore)(nil)
+	_ store.AgentStoreFactory     = (*HintedMockStore)(nil)
 	_ store.HintedUnstager        = (*HintedMockStore)(nil)
 	_ store.ServiceStore          = (*MockServiceStore)(nil)
 	_ store.ServiceReadWriter     = (*MockServiceStore)(nil)

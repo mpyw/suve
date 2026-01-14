@@ -18,7 +18,7 @@ import (
 
 // Runner executes the reset command.
 type Runner struct {
-	Store  store.ReadWriteOperator //nolint:staticcheck // using legacy interface during migration
+	Store  store.AgentStoreFactory
 	Stdout io.Writer
 	Stderr io.Writer
 }
@@ -60,11 +60,11 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		return fmt.Errorf("failed to get AWS identity: %w", err)
 	}
 
-	store := agent.NewStore(identity.AccountID, identity.Region)
+	factory := agent.NewFactory(identity.AccountID, identity.Region)
 
-	result, err := lifecycle.ExecuteRead(ctx, store, lifecycle.CmdReset, func() (struct{}, error) {
+	result, err := lifecycle.ExecuteRead(ctx, factory, lifecycle.CmdReset, func() (struct{}, error) {
 		r := &Runner{
-			Store:  store,
+			Store:  factory,
 			Stdout: cmd.Root().Writer,
 			Stderr: cmd.Root().ErrWriter,
 		}
@@ -84,13 +84,15 @@ func action(ctx context.Context, cmd *cli.Command) error {
 
 // Run executes the reset command.
 func (r *Runner) Run(ctx context.Context) error {
+	globalStore := r.Store.Global()
+
 	// Get counts before reset
-	staged, err := r.Store.ListEntries(ctx, "")
+	staged, err := globalStore.ListEntries(ctx)
 	if err != nil {
 		return err
 	}
 
-	tagStaged, err := r.Store.ListTags(ctx, "")
+	tagStaged, err := globalStore.ListTags(ctx)
 	if err != nil {
 		return err
 	}
@@ -106,13 +108,12 @@ func (r *Runner) Run(ctx context.Context) error {
 	totalCount := paramCount + secretCount
 
 	// Always call UnstageAll to trigger daemon auto-shutdown check
-	// Empty service ("") clears both SSM Parameter Store and Secrets Manager
 	// Use hint for context-aware shutdown message
-	if hinted, ok := r.Store.(store.HintedUnstager); ok { //nolint:staticcheck // using legacy interface
-		if err := hinted.UnstageAllWithHint(ctx, "", store.HintReset); err != nil {
+	if hinted, ok := globalStore.(store.HintedGlobalUnstager); ok {
+		if err := hinted.UnstageAllWithHint(ctx, store.HintReset); err != nil {
 			return err
 		}
-	} else if err := r.Store.UnstageAll(ctx, ""); err != nil {
+	} else if err := globalStore.UnstageAll(ctx); err != nil {
 		return err
 	}
 

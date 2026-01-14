@@ -43,7 +43,7 @@ type SecretClient interface {
 type Runner struct {
 	ParamClient  ParamClient
 	SecretClient SecretClient
-	Store        store.ReadWriteOperator //nolint:staticcheck // using legacy interface during migration
+	Store        store.AgentStoreFactory
 	Stdout       io.Writer
 	Stderr       io.Writer
 }
@@ -91,37 +91,34 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		return fmt.Errorf("failed to get AWS identity: %w", err)
 	}
 
-	store := agent.NewStore(identity.AccountID, identity.Region)
+	factory := agent.NewFactory(identity.AccountID, identity.Region)
 
 	opts := Options{
 		ParseJSON: cmd.Bool("parse-json"),
 		NoPager:   cmd.Bool("no-pager"),
 	}
 
-	result, err := lifecycle.ExecuteRead(ctx, store, lifecycle.CmdDiff, func() (struct{}, error) {
+	result, err := lifecycle.ExecuteRead(ctx, factory, lifecycle.CmdDiff, func() (struct{}, error) {
+		globalStore := factory.Global()
+
 		// Check if there are any staged changes before creating clients
-		paramStaged, err := store.ListEntries(ctx, staging.ServiceParam)
+		allStaged, err := globalStore.ListEntries(ctx)
 		if err != nil {
 			return struct{}{}, err
 		}
 
-		secretStaged, err := store.ListEntries(ctx, staging.ServiceSecret)
+		allTagStaged, err := globalStore.ListTags(ctx)
 		if err != nil {
 			return struct{}{}, err
 		}
 
-		paramTagStaged, err := store.ListTags(ctx, staging.ServiceParam)
-		if err != nil {
-			return struct{}{}, err
-		}
+		paramStaged := allStaged[staging.ServiceParam]
+		secretStaged := allStaged[staging.ServiceSecret]
+		paramTagStaged := allTagStaged[staging.ServiceParam]
+		secretTagStaged := allTagStaged[staging.ServiceSecret]
 
-		secretTagStaged, err := store.ListTags(ctx, staging.ServiceSecret)
-		if err != nil {
-			return struct{}{}, err
-		}
-
-		hasParam := len(paramStaged[staging.ServiceParam]) > 0 || len(paramTagStaged[staging.ServiceParam]) > 0
-		hasSecret := len(secretStaged[staging.ServiceSecret]) > 0 || len(secretTagStaged[staging.ServiceSecret]) > 0
+		hasParam := len(paramStaged) > 0 || len(paramTagStaged) > 0
+		hasSecret := len(secretStaged) > 0 || len(secretTagStaged) > 0
 
 		if !hasParam && !hasSecret {
 			output.Warning(cmd.Root().ErrWriter, "nothing staged")
@@ -130,7 +127,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		}
 
 		r := &Runner{
-			Store:  store,
+			Store:  factory,
 			Stderr: cmd.Root().ErrWriter,
 		}
 
@@ -172,12 +169,14 @@ func action(ctx context.Context, cmd *cli.Command) error {
 
 // Run executes the diff command.
 func (r *Runner) Run(ctx context.Context, opts Options) error {
-	allEntries, err := r.Store.ListEntries(ctx, "")
+	globalStore := r.Store.Global()
+
+	allEntries, err := globalStore.ListEntries(ctx)
 	if err != nil {
 		return err
 	}
 
-	allTagEntries, err := r.Store.ListTags(ctx, "")
+	allTagEntries, err := globalStore.ListTags(ctx)
 	if err != nil {
 		return err
 	}
@@ -186,6 +185,8 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 	secretEntries := allEntries[staging.ServiceSecret]
 	paramTagEntries := allTagEntries[staging.ServiceParam]
 	secretTagEntries := allTagEntries[staging.ServiceSecret]
+	paramStore := r.Store.Service(staging.ServiceParam)
+	secretStore := r.Store.Service(staging.ServiceSecret)
 
 	// Fetch all values in parallel
 	paramResults := parallel.ExecuteMap(
@@ -221,7 +222,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 			switch entry.Operation {
 			case staging.OperationDelete:
 				// Item doesn't exist in AWS anymore - deletion already applied
-				if err := r.Store.UnstageEntry(ctx, staging.ServiceParam, name); err != nil {
+				if err := paramStore.UnstageEntry(ctx, name); err != nil {
 					return fmt.Errorf("failed to unstage %s: %w", name, err)
 				}
 
@@ -245,7 +246,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 
 			case staging.OperationUpdate:
 				// Item doesn't exist in AWS anymore - staged update is invalid
-				if err := r.Store.UnstageEntry(ctx, staging.ServiceParam, name); err != nil {
+				if err := paramStore.UnstageEntry(ctx, name); err != nil {
 					return fmt.Errorf("failed to unstage %s: %w", name, err)
 				}
 
@@ -261,7 +262,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 
 		first = false
 
-		if err := r.outputParamDiff(ctx, opts, name, entry, result.Value); err != nil {
+		if err := r.outputParamDiff(ctx, opts, paramStore, name, entry, result.Value); err != nil {
 			return err
 		}
 	}
@@ -277,7 +278,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 			switch entry.Operation {
 			case staging.OperationDelete:
 				// Item doesn't exist in AWS anymore - deletion already applied
-				if err := r.Store.UnstageEntry(ctx, staging.ServiceSecret, name); err != nil {
+				if err := secretStore.UnstageEntry(ctx, name); err != nil {
 					return fmt.Errorf("failed to unstage %s: %w", name, err)
 				}
 
@@ -301,7 +302,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 
 			case staging.OperationUpdate:
 				// Item doesn't exist in AWS anymore - staged update is invalid
-				if err := r.Store.UnstageEntry(ctx, staging.ServiceSecret, name); err != nil {
+				if err := secretStore.UnstageEntry(ctx, name); err != nil {
 					return fmt.Errorf("failed to unstage %s: %w", name, err)
 				}
 
@@ -317,7 +318,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 
 		first = false
 
-		if err := r.outputSecretDiff(ctx, opts, name, entry, result.Value); err != nil {
+		if err := r.outputSecretDiff(ctx, opts, secretStore, name, entry, result.Value); err != nil {
 			return err
 		}
 	}
@@ -351,7 +352,10 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 	return nil
 }
 
-func (r *Runner) outputParamDiff(ctx context.Context, opts Options, name string, entry staging.Entry, param *paramapi.ParameterHistory) error {
+func (r *Runner) outputParamDiff(
+	ctx context.Context, opts Options, serviceStore store.ServiceStore,
+	name string, entry staging.Entry, param *paramapi.ParameterHistory,
+) error {
 	awsValue := lo.FromPtr(param.Value)
 	stagedValue := lo.FromPtr(entry.Value)
 
@@ -367,7 +371,7 @@ func (r *Runner) outputParamDiff(ctx context.Context, opts Options, name string,
 
 	if awsValue == stagedValue {
 		// Auto-unstage since there's no difference
-		if err := r.Store.UnstageEntry(ctx, staging.ServiceParam, name); err != nil {
+		if err := serviceStore.UnstageEntry(ctx, name); err != nil {
 			return fmt.Errorf("failed to unstage %s: %w", name, err)
 		}
 
@@ -392,7 +396,10 @@ func (r *Runner) outputParamDiff(ctx context.Context, opts Options, name string,
 	return nil
 }
 
-func (r *Runner) outputSecretDiff(ctx context.Context, opts Options, name string, entry staging.Entry, secret *secretapi.GetSecretValueOutput) error {
+func (r *Runner) outputSecretDiff(
+	ctx context.Context, opts Options, serviceStore store.ServiceStore,
+	name string, entry staging.Entry, secret *secretapi.GetSecretValueOutput,
+) error {
 	awsValue := lo.FromPtr(secret.SecretString)
 	stagedValue := lo.FromPtr(entry.Value)
 
@@ -408,7 +415,7 @@ func (r *Runner) outputSecretDiff(ctx context.Context, opts Options, name string
 
 	if awsValue == stagedValue {
 		// Auto-unstage since there's no difference
-		if err := r.Store.UnstageEntry(ctx, staging.ServiceSecret, name); err != nil {
+		if err := serviceStore.UnstageEntry(ctx, name); err != nil {
 			return fmt.Errorf("failed to unstage %s: %w", name, err)
 		}
 

@@ -21,7 +21,7 @@ import (
 
 // Runner executes the status command.
 type Runner struct {
-	Store  store.ReadWriteOperator //nolint:staticcheck // using legacy interface during migration
+	Store  store.GlobalLister
 	Stdout io.Writer
 	Stderr io.Writer
 }
@@ -60,15 +60,15 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		return fmt.Errorf("failed to get AWS identity: %w", err)
 	}
 
-	store := agent.NewStore(identity.AccountID, identity.Region)
+	factory := agent.NewFactory(identity.AccountID, identity.Region)
 
 	opts := Options{
 		Verbose: cmd.Bool("verbose"),
 	}
 
-	result, err := lifecycle.ExecuteRead(ctx, store, lifecycle.CmdStatus, func() (struct{}, error) {
+	result, err := lifecycle.ExecuteRead(ctx, factory, lifecycle.CmdStatus, func() (struct{}, error) {
 		r := &Runner{
-			Store:  store,
+			Store:  factory.Global(),
 			Stdout: cmd.Root().Writer,
 			Stderr: cmd.Root().ErrWriter,
 		}
@@ -88,12 +88,12 @@ func action(ctx context.Context, cmd *cli.Command) error {
 
 // Run executes the status command.
 func (r *Runner) Run(ctx context.Context, opts Options) error {
-	entries, err := r.Store.ListEntries(ctx, "")
+	entries, err := r.Store.ListEntries(ctx)
 	if err != nil {
 		return err
 	}
 
-	tagEntries, err := r.Store.ListTags(ctx, "")
+	tagEntries, err := r.Store.ListTags(ctx)
 	if err != nil {
 		return err
 	}

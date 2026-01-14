@@ -31,7 +31,7 @@ type serviceConflictCheck struct {
 type Runner struct {
 	ParamStrategy   staging.ApplyStrategy
 	SecretStrategy  staging.ApplyStrategy
-	Store           store.ReadWriteOperator //nolint:staticcheck // using legacy interface during migration
+	Store           store.AgentStoreFactory
 	Stdout          io.Writer
 	Stderr          io.Writer
 	IgnoreConflicts bool
@@ -80,32 +80,29 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		return fmt.Errorf("failed to get AWS identity: %w", err)
 	}
 
-	store := agent.NewStore(identity.AccountID, identity.Region)
+	factory := agent.NewFactory(identity.AccountID, identity.Region)
 
-	result, err := lifecycle.ExecuteRead(ctx, store, lifecycle.CmdApply, func() (struct{}, error) {
+	result, err := lifecycle.ExecuteRead(ctx, factory, lifecycle.CmdApply, func() (struct{}, error) {
+		globalStore := factory.Global()
+
 		// Check if there are any staged changes
-		paramStaged, err := store.ListEntries(ctx, staging.ServiceParam)
+		allStaged, err := globalStore.ListEntries(ctx)
 		if err != nil {
 			return struct{}{}, err
 		}
 
-		secretStaged, err := store.ListEntries(ctx, staging.ServiceSecret)
+		allTagStaged, err := globalStore.ListTags(ctx)
 		if err != nil {
 			return struct{}{}, err
 		}
 
-		paramTagStaged, err := store.ListTags(ctx, staging.ServiceParam)
-		if err != nil {
-			return struct{}{}, err
-		}
+		paramStaged := allStaged[staging.ServiceParam]
+		secretStaged := allStaged[staging.ServiceSecret]
+		paramTagStaged := allTagStaged[staging.ServiceParam]
+		secretTagStaged := allTagStaged[staging.ServiceSecret]
 
-		secretTagStaged, err := store.ListTags(ctx, staging.ServiceSecret)
-		if err != nil {
-			return struct{}{}, err
-		}
-
-		hasParam := len(paramStaged[staging.ServiceParam]) > 0 || len(paramTagStaged[staging.ServiceParam]) > 0
-		hasSecret := len(secretStaged[staging.ServiceSecret]) > 0 || len(secretTagStaged[staging.ServiceSecret]) > 0
+		hasParam := len(paramStaged) > 0 || len(paramTagStaged) > 0
+		hasSecret := len(secretStaged) > 0 || len(secretTagStaged) > 0
 
 		if !hasParam && !hasSecret {
 			output.Info(cmd.Root().Writer, "No changes staged.")
@@ -114,8 +111,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		}
 
 		// Count total staged changes
-		totalStaged := len(paramStaged[staging.ServiceParam]) + len(secretStaged[staging.ServiceSecret]) +
-			len(paramTagStaged[staging.ServiceParam]) + len(secretTagStaged[staging.ServiceSecret])
+		totalStaged := len(paramStaged) + len(secretStaged) + len(paramTagStaged) + len(secretTagStaged)
 
 		// Confirm apply
 		skipConfirm := cmd.Bool("yes")
@@ -140,7 +136,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		}
 
 		r := &Runner{
-			Store:           store,
+			Store:           factory,
 			Stdout:          cmd.Root().Writer,
 			Stderr:          cmd.Root().ErrWriter,
 			IgnoreConflicts: cmd.Bool("ignore-conflicts"),
@@ -180,13 +176,15 @@ func action(ctx context.Context, cmd *cli.Command) error {
 
 // Run executes the apply command.
 func (r *Runner) Run(ctx context.Context) error {
-	// Get all staged changes (empty string means all services)
-	allStaged, err := r.Store.ListEntries(ctx, "")
+	globalStore := r.Store.Global()
+
+	// Get all staged changes
+	allStaged, err := globalStore.ListEntries(ctx)
 	if err != nil {
 		return err
 	}
 
-	allTagStaged, err := r.Store.ListTags(ctx, "")
+	allTagStaged, err := globalStore.ListTags(ctx)
 	if err != nil {
 		return err
 	}
@@ -268,6 +266,7 @@ func (r *Runner) Run(ctx context.Context) error {
 func (r *Runner) applyService(ctx context.Context, strategy staging.ApplyStrategy, staged map[string]staging.Entry) (succeeded, failed int) {
 	service := strategy.Service()
 	serviceName := strategy.ServiceName()
+	serviceStore := r.Store.Service(service)
 
 	results := parallel.ExecuteMap(ctx, staged, func(ctx context.Context, name string, entry staging.Entry) (staging.Operation, error) {
 		err := strategy.Apply(ctx, name, entry)
@@ -291,11 +290,11 @@ func (r *Runner) applyService(ctx context.Context, strategy staging.ApplyStrateg
 				output.Success(r.Stdout, "%s: Deleted %s", serviceName, name)
 			}
 			// Use hint for context-aware shutdown message
-			if hinted, ok := r.Store.(store.HintedUnstager); ok { //nolint:staticcheck // using legacy interface
-				if err := hinted.UnstageEntryWithHint(ctx, service, name, store.HintApply); err != nil {
+			if hinted, ok := serviceStore.(store.HintedServiceUnstager); ok {
+				if err := hinted.UnstageEntryWithHint(ctx, name, store.HintApply); err != nil {
 					output.Warning(r.Stderr, "failed to clear staging for %s: %v", name, err)
 				}
-			} else if err := r.Store.UnstageEntry(ctx, service, name); err != nil {
+			} else if err := serviceStore.UnstageEntry(ctx, name); err != nil {
 				output.Warning(r.Stderr, "failed to clear staging for %s: %v", name, err)
 			}
 
@@ -309,6 +308,7 @@ func (r *Runner) applyService(ctx context.Context, strategy staging.ApplyStrateg
 func (r *Runner) applyTagService(ctx context.Context, strategy staging.ApplyStrategy, staged map[string]staging.TagEntry) (succeeded, failed int) {
 	service := strategy.Service()
 	serviceName := strategy.ServiceName()
+	serviceStore := r.Store.Service(service)
 
 	results := parallel.ExecuteMap(ctx, staged, func(ctx context.Context, name string, tagEntry staging.TagEntry) (struct{}, error) {
 		err := strategy.ApplyTags(ctx, name, tagEntry)
@@ -327,11 +327,11 @@ func (r *Runner) applyTagService(ctx context.Context, strategy staging.ApplyStra
 		} else {
 			output.Success(r.Stdout, "%s: Tagged %s%s", serviceName, name, formatTagApplySummary(tagEntry))
 			// Use hint for context-aware shutdown message
-			if hinted, ok := r.Store.(store.HintedUnstager); ok { //nolint:staticcheck // using legacy interface
-				if err := hinted.UnstageTagWithHint(ctx, service, name, store.HintApply); err != nil {
+			if hinted, ok := serviceStore.(store.HintedServiceUnstager); ok {
+				if err := hinted.UnstageTagWithHint(ctx, name, store.HintApply); err != nil {
 					output.Warning(r.Stderr, "failed to clear staging for %s tags: %v", name, err)
 				}
-			} else if err := r.Store.UnstageTag(ctx, service, name); err != nil {
+			} else if err := serviceStore.UnstageTag(ctx, name); err != nil {
 				output.Warning(r.Stderr, "failed to clear staging for %s tags: %v", name, err)
 			}
 
