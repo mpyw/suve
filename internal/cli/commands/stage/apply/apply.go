@@ -18,6 +18,7 @@ import (
 	"github.com/mpyw/suve/internal/staging"
 	"github.com/mpyw/suve/internal/staging/store"
 	"github.com/mpyw/suve/internal/staging/store/agent"
+	"github.com/mpyw/suve/internal/staging/store/agent/daemon/lifecycle"
 )
 
 // serviceConflictCheck holds entries and strategy for a single service's conflict checking.
@@ -81,96 +82,100 @@ func action(ctx context.Context, cmd *cli.Command) error {
 
 	store := agent.NewStore(identity.AccountID, identity.Region)
 
-	// If agent is not running, there's nothing to apply
-	if err := store.Ping(ctx); err != nil {
-		output.Info(cmd.Root().Writer, "No changes staged.")
-
-		return nil
-	}
-
-	// Check if there are any staged changes
-	paramStaged, err := store.ListEntries(ctx, staging.ServiceParam)
-	if err != nil {
-		return err
-	}
-
-	secretStaged, err := store.ListEntries(ctx, staging.ServiceSecret)
-	if err != nil {
-		return err
-	}
-
-	paramTagStaged, err := store.ListTags(ctx, staging.ServiceParam)
-	if err != nil {
-		return err
-	}
-
-	secretTagStaged, err := store.ListTags(ctx, staging.ServiceSecret)
-	if err != nil {
-		return err
-	}
-
-	hasParam := len(paramStaged[staging.ServiceParam]) > 0 || len(paramTagStaged[staging.ServiceParam]) > 0
-	hasSecret := len(secretStaged[staging.ServiceSecret]) > 0 || len(secretTagStaged[staging.ServiceSecret]) > 0
-
-	if !hasParam && !hasSecret {
-		output.Info(cmd.Root().Writer, "No changes staged.")
-
-		return nil
-	}
-
-	// Count total staged changes
-	totalStaged := len(paramStaged[staging.ServiceParam]) + len(secretStaged[staging.ServiceSecret]) +
-		len(paramTagStaged[staging.ServiceParam]) + len(secretTagStaged[staging.ServiceSecret])
-
-	// Confirm apply
-	skipConfirm := cmd.Bool("yes")
-	prompter := &confirm.Prompter{
-		Stdin:  os.Stdin,
-		Stdout: cmd.Root().Writer,
-		Stderr: cmd.Root().ErrWriter,
-	}
-	prompter.AccountID = identity.AccountID
-	prompter.Region = identity.Region
-	prompter.Profile = identity.Profile
-
-	message := fmt.Sprintf("Apply %d staged change(s) to AWS?", totalStaged)
-
-	confirmed, err := prompter.Confirm(message, skipConfirm)
-	if err != nil {
-		return err
-	}
-
-	if !confirmed {
-		return nil
-	}
-
-	r := &Runner{
-		Store:           store,
-		Stdout:          cmd.Root().Writer,
-		Stderr:          cmd.Root().ErrWriter,
-		IgnoreConflicts: cmd.Bool("ignore-conflicts"),
-	}
-
-	// Initialize strategies only if needed
-	if hasParam {
-		strategy, err := staging.ParamFactory(ctx)
+	result, err := lifecycle.ExecuteRead(ctx, store, lifecycle.CmdApply, func() (struct{}, error) {
+		// Check if there are any staged changes
+		paramStaged, err := store.ListEntries(ctx, staging.ServiceParam)
 		if err != nil {
-			return err
+			return struct{}{}, err
 		}
 
-		r.ParamStrategy = strategy
-	}
-
-	if hasSecret {
-		strategy, err := staging.SecretFactory(ctx)
+		secretStaged, err := store.ListEntries(ctx, staging.ServiceSecret)
 		if err != nil {
-			return err
+			return struct{}{}, err
 		}
 
-		r.SecretStrategy = strategy
+		paramTagStaged, err := store.ListTags(ctx, staging.ServiceParam)
+		if err != nil {
+			return struct{}{}, err
+		}
+
+		secretTagStaged, err := store.ListTags(ctx, staging.ServiceSecret)
+		if err != nil {
+			return struct{}{}, err
+		}
+
+		hasParam := len(paramStaged[staging.ServiceParam]) > 0 || len(paramTagStaged[staging.ServiceParam]) > 0
+		hasSecret := len(secretStaged[staging.ServiceSecret]) > 0 || len(secretTagStaged[staging.ServiceSecret]) > 0
+
+		if !hasParam && !hasSecret {
+			output.Info(cmd.Root().Writer, "No changes staged.")
+
+			return struct{}{}, nil
+		}
+
+		// Count total staged changes
+		totalStaged := len(paramStaged[staging.ServiceParam]) + len(secretStaged[staging.ServiceSecret]) +
+			len(paramTagStaged[staging.ServiceParam]) + len(secretTagStaged[staging.ServiceSecret])
+
+		// Confirm apply
+		skipConfirm := cmd.Bool("yes")
+		prompter := &confirm.Prompter{
+			Stdin:  os.Stdin,
+			Stdout: cmd.Root().Writer,
+			Stderr: cmd.Root().ErrWriter,
+		}
+		prompter.AccountID = identity.AccountID
+		prompter.Region = identity.Region
+		prompter.Profile = identity.Profile
+
+		message := fmt.Sprintf("Apply %d staged change(s) to AWS?", totalStaged)
+
+		confirmed, err := prompter.Confirm(message, skipConfirm)
+		if err != nil {
+			return struct{}{}, err
+		}
+
+		if !confirmed {
+			return struct{}{}, nil
+		}
+
+		r := &Runner{
+			Store:           store,
+			Stdout:          cmd.Root().Writer,
+			Stderr:          cmd.Root().ErrWriter,
+			IgnoreConflicts: cmd.Bool("ignore-conflicts"),
+		}
+
+		// Initialize strategies only if needed
+		if hasParam {
+			strategy, err := staging.ParamFactory(ctx)
+			if err != nil {
+				return struct{}{}, err
+			}
+
+			r.ParamStrategy = strategy
+		}
+
+		if hasSecret {
+			strategy, err := staging.SecretFactory(ctx)
+			if err != nil {
+				return struct{}{}, err
+			}
+
+			r.SecretStrategy = strategy
+		}
+
+		return struct{}{}, r.Run(ctx)
+	})
+	if err != nil {
+		return err
 	}
 
-	return r.Run(ctx)
+	if result.NothingStaged {
+		output.Info(cmd.Root().Writer, "No changes staged.")
+	}
+
+	return nil
 }
 
 // Run executes the apply command.

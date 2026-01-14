@@ -14,6 +14,7 @@ import (
 	"github.com/mpyw/suve/internal/cli/terminal"
 	"github.com/mpyw/suve/internal/infra"
 	"github.com/mpyw/suve/internal/staging"
+	"github.com/mpyw/suve/internal/staging/store/agent/daemon/lifecycle"
 	"github.com/mpyw/suve/internal/staging/store/file"
 )
 
@@ -106,72 +107,76 @@ func stashDropAction(service staging.Service) func(context.Context, *cli.Command
 			return fmt.Errorf("failed to get AWS identity: %w", err)
 		}
 
-		fileStore, err := file.NewStore(identity.AccountID, identity.Region)
-		if err != nil {
-			return fmt.Errorf("failed to create file store: %w", err)
-		}
-
-		// Check if file exists
-		exists, err := fileStore.Exists()
-		if err != nil {
-			return fmt.Errorf("failed to check stash file: %w", err)
-		}
-
-		if !exists {
-			return errors.New("no stashed changes to drop")
-		}
-
-		// Confirm unless --force
-		forceFlag := cmd.Bool("force")
-		if !forceFlag && terminal.IsTerminalWriter(cmd.Root().ErrWriter) {
-			// Count items for the message
-			state, err := fileStore.Drain(ctx, "", true)
+		_, err = lifecycle.ExecuteFile(ctx, lifecycle.CmdStashDrop, func() (struct{}, error) {
+			fileStore, err := file.NewStore(identity.AccountID, identity.Region)
 			if err != nil {
-				return fmt.Errorf("failed to read stash file: %w", err)
+				return struct{}{}, fmt.Errorf("failed to create file store: %w", err)
 			}
 
-			itemCount := lo.
-				If(service != "", len(state.Entries[service])+len(state.Tags[service])).
-				Else(state.TotalCount())
-
-			if itemCount == 0 {
-				return lo.
-					IfF(service != "", func() error { return fmt.Errorf("no stashed changes for %s", service) }).
-					ElseF(func() error { return errors.New("no stashed changes to drop") })
-			}
-
-			confirmPrompter := &confirm.Prompter{
-				Stdin:  cmd.Root().Reader,
-				Stdout: cmd.Root().Writer,
-				Stderr: cmd.Root().ErrWriter,
-			}
-
-			target := lo.
-				If(service != "", fmt.Sprintf("%d stashed %s item(s)", itemCount, service)).
-				Else(fmt.Sprintf("%d stashed item(s)", itemCount))
-
-			confirmed, err := confirmPrompter.ConfirmDelete(target, false)
+			// Check if file exists
+			exists, err := fileStore.Exists()
 			if err != nil {
-				return fmt.Errorf("failed to get confirmation: %w", err)
+				return struct{}{}, fmt.Errorf("failed to check stash file: %w", err)
 			}
 
-			if !confirmed {
-				output.Info(cmd.Root().Writer, "Operation cancelled.")
-
-				return nil
+			if !exists {
+				return struct{}{}, errors.New("no stashed changes to drop")
 			}
-		}
 
-		r := &StashDropRunner{
-			FileStore: fileStore,
-			Stdout:    cmd.Root().Writer,
-			Stderr:    cmd.Root().ErrWriter,
-		}
+			// Confirm unless --force
+			forceFlag := cmd.Bool("force")
+			if !forceFlag && terminal.IsTerminalWriter(cmd.Root().ErrWriter) {
+				// Count items for the message
+				state, err := fileStore.Drain(ctx, "", true)
+				if err != nil {
+					return struct{}{}, fmt.Errorf("failed to read stash file: %w", err)
+				}
 
-		return r.Run(ctx, StashDropOptions{
-			Service: service,
-			Force:   forceFlag,
+				itemCount := lo.
+					If(service != "", len(state.Entries[service])+len(state.Tags[service])).
+					Else(state.TotalCount())
+
+				if itemCount == 0 {
+					return struct{}{}, lo.
+						IfF(service != "", func() error { return fmt.Errorf("no stashed changes for %s", service) }).
+						ElseF(func() error { return errors.New("no stashed changes to drop") })
+				}
+
+				confirmPrompter := &confirm.Prompter{
+					Stdin:  cmd.Root().Reader,
+					Stdout: cmd.Root().Writer,
+					Stderr: cmd.Root().ErrWriter,
+				}
+
+				target := lo.
+					If(service != "", fmt.Sprintf("%d stashed %s item(s)", itemCount, service)).
+					Else(fmt.Sprintf("%d stashed item(s)", itemCount))
+
+				confirmed, err := confirmPrompter.ConfirmDelete(target, false)
+				if err != nil {
+					return struct{}{}, fmt.Errorf("failed to get confirmation: %w", err)
+				}
+
+				if !confirmed {
+					output.Info(cmd.Root().Writer, "Operation cancelled.")
+
+					return struct{}{}, nil
+				}
+			}
+
+			r := &StashDropRunner{
+				FileStore: fileStore,
+				Stdout:    cmd.Root().Writer,
+				Stderr:    cmd.Root().ErrWriter,
+			}
+
+			return struct{}{}, r.Run(ctx, StashDropOptions{
+				Service: service,
+				Force:   forceFlag,
+			})
 		})
+
+		return err
 	}
 }
 

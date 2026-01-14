@@ -28,6 +28,7 @@ type MockStore struct {
 	DrainErr        error
 	WriteStateErr   error
 	PingErr         error
+	StartErr        error
 
 	// DrainCallCount tracks the number of Drain calls
 	DrainCallCount int
@@ -307,6 +308,11 @@ func (m *MockStore) WriteState(_ context.Context, service staging.Service, state
 // Ping checks if the agent daemon is running.
 func (m *MockStore) Ping(_ context.Context) error {
 	return m.PingErr
+}
+
+// Start ensures the agent daemon is running, starting it if necessary.
+func (m *MockStore) Start(_ context.Context) error {
+	return m.StartErr
 }
 
 // HintedMockStore extends MockStore with HintedUnstager support.

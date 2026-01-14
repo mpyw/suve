@@ -14,8 +14,8 @@ import (
 	"github.com/mpyw/suve/internal/staging/store/agent/internal/protocol"
 )
 
-// TestDaemonLifecycle_AccountIsolation tests that daemons for different accounts are isolated.
-func TestDaemonLifecycle_AccountIsolation(t *testing.T) {
+// TestDaemonProcess_AccountIsolation tests that daemons for different accounts are isolated.
+func TestDaemonProcess_AccountIsolation(t *testing.T) {
 	t.Parallel()
 
 	account1 := "111111111111"
@@ -31,8 +31,8 @@ func TestDaemonLifecycle_AccountIsolation(t *testing.T) {
 	assert.Contains(t, path2, account2)
 }
 
-// TestDaemonLifecycle_RegionIsolation tests that daemons for different regions are isolated.
-func TestDaemonLifecycle_RegionIsolation(t *testing.T) {
+// TestDaemonProcess_RegionIsolation tests that daemons for different regions are isolated.
+func TestDaemonProcess_RegionIsolation(t *testing.T) {
 	t.Parallel()
 
 	account := "123456789012"
@@ -45,12 +45,13 @@ func TestDaemonLifecycle_RegionIsolation(t *testing.T) {
 
 	assert.NotEqual(t, path1, path2, "different regions should have different socket paths")
 	assert.Contains(t, path1, region1)
+	assert.Contains(t, path1, region1)
 	assert.Contains(t, path2, region2)
 }
 
-// TestDaemonLifecycle_StartupAndShutdown tests daemon startup and shutdown.
+// TestDaemonProcess_StartupAndShutdown tests daemon startup and shutdown.
 // Note: This test cannot run in parallel because it modifies TMPDIR.
-func TestDaemonLifecycle_StartupAndShutdown(t *testing.T) {
+func TestDaemonProcess_StartupAndShutdown(t *testing.T) {
 	// Create temp directory for socket (use /tmp to keep path short on macOS)
 	tmpDir, err := os.MkdirTemp("/tmp", "suve-test-*")
 	require.NoError(t, err)
@@ -106,9 +107,9 @@ func TestDaemonLifecycle_StartupAndShutdown(t *testing.T) {
 	}
 }
 
-// TestDaemonLifecycle_MultipleAccountsSimultaneous tests running daemons for different accounts simultaneously.
+// TestDaemonProcess_MultipleAccountsSimultaneous tests running daemons for different accounts simultaneously.
 // Note: This test cannot run in parallel because it modifies TMPDIR.
-func TestDaemonLifecycle_MultipleAccountsSimultaneous(t *testing.T) {
+func TestDaemonProcess_MultipleAccountsSimultaneous(t *testing.T) {
 	// Create temp directory for socket (use /tmp to keep path short on macOS)
 	tmpDir, err := os.MkdirTemp("/tmp", "suve-multi-*")
 	require.NoError(t, err)
@@ -178,9 +179,9 @@ func TestDaemonLifecycle_MultipleAccountsSimultaneous(t *testing.T) {
 	}
 }
 
-// TestDaemonLifecycle_AutoShutdown tests automatic shutdown when state becomes empty.
+// TestDaemonProcess_AutoShutdown tests automatic shutdown when state becomes empty.
 // Note: This test cannot run in parallel because it modifies TMPDIR.
-func TestDaemonLifecycle_AutoShutdown(t *testing.T) {
+func TestDaemonProcess_AutoShutdown(t *testing.T) {
 	// Create temp directory for socket (use /tmp to keep path short on macOS)
 	tmpDir, err := os.MkdirTemp("/tmp", "suve-auto-*")
 	require.NoError(t, err)
@@ -252,9 +253,9 @@ func TestDaemonLifecycle_AutoShutdown(t *testing.T) {
 	}
 }
 
-// TestDaemonLifecycle_ManualModeDisablesAutoShutdown tests that manual mode prevents auto-shutdown.
+// TestDaemonProcess_ManualModeDisablesAutoShutdown tests that manual mode prevents auto-shutdown.
 // Note: This test cannot run in parallel because it modifies TMPDIR.
-func TestDaemonLifecycle_ManualModeDisablesAutoShutdown(t *testing.T) {
+func TestDaemonProcess_ManualModeDisablesAutoShutdown(t *testing.T) {
 	// Create temp directory for socket (use /tmp to keep path short on macOS)
 	tmpDir, err := os.MkdirTemp("/tmp", "suve-man-*")
 	require.NoError(t, err)
@@ -334,9 +335,9 @@ func TestDaemonLifecycle_ManualModeDisablesAutoShutdown(t *testing.T) {
 	}
 }
 
-// TestDaemonLifecycle_AutoShutdown_UnstageAll tests automatic shutdown after UnstageAll.
+// TestDaemonProcess_AutoShutdown_UnstageAll tests automatic shutdown after UnstageAll.
 // Note: This test cannot run in parallel because it modifies TMPDIR.
-func TestDaemonLifecycle_AutoShutdown_UnstageAll(t *testing.T) {
+func TestDaemonProcess_AutoShutdown_UnstageAll(t *testing.T) {
 	tmpDir, err := os.MkdirTemp("/tmp", "suve-unstageall-*")
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = os.RemoveAll(tmpDir) })
@@ -402,9 +403,9 @@ func TestDaemonLifecycle_AutoShutdown_UnstageAll(t *testing.T) {
 	}
 }
 
-// TestDaemonLifecycle_AutoShutdown_UnstageTag tests automatic shutdown after UnstageTag empties state.
+// TestDaemonProcess_AutoShutdown_UnstageTag tests automatic shutdown after UnstageTag empties state.
 // Note: This test cannot run in parallel because it modifies TMPDIR.
-func TestDaemonLifecycle_AutoShutdown_UnstageTag(t *testing.T) {
+func TestDaemonProcess_AutoShutdown_UnstageTag(t *testing.T) {
 	tmpDir, err := os.MkdirTemp("/tmp", "suve-unstagetag-*")
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = os.RemoveAll(tmpDir) })
@@ -468,9 +469,9 @@ func TestDaemonLifecycle_AutoShutdown_UnstageTag(t *testing.T) {
 	}
 }
 
-// TestDaemonLifecycle_AutoShutdown_SetState tests automatic shutdown after SetState with empty state.
+// TestDaemonProcess_AutoShutdown_SetState tests automatic shutdown after SetState with empty state.
 // Note: This test cannot run in parallel because it modifies TMPDIR.
-func TestDaemonLifecycle_AutoShutdown_SetState(t *testing.T) {
+func TestDaemonProcess_AutoShutdown_SetState(t *testing.T) {
 	tmpDir, err := os.MkdirTemp("/tmp", "suve-setstate-*")
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = os.RemoveAll(tmpDir) })
@@ -534,9 +535,9 @@ func TestDaemonLifecycle_AutoShutdown_SetState(t *testing.T) {
 	}
 }
 
-// TestDaemonLifecycle_AutoShutdown_UnstageAllEmpty tests automatic shutdown when UnstageAll is called on empty state.
+// TestDaemonProcess_AutoShutdown_UnstageAllEmpty tests automatic shutdown when UnstageAll is called on empty state.
 // Note: This test cannot run in parallel because it modifies TMPDIR.
-func TestDaemonLifecycle_AutoShutdown_UnstageAllEmpty(t *testing.T) {
+func TestDaemonProcess_AutoShutdown_UnstageAllEmpty(t *testing.T) {
 	tmpDir, err := os.MkdirTemp("/tmp", "suve-empty-*")
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = os.RemoveAll(tmpDir) })
@@ -585,8 +586,8 @@ func TestDaemonLifecycle_AutoShutdown_UnstageAllEmpty(t *testing.T) {
 	}
 }
 
-// TestDaemonLifecycle_SocketPathStructure tests the socket path structure includes account and region.
-func TestDaemonLifecycle_SocketPathStructure(t *testing.T) {
+// TestDaemonProcess_SocketPathStructure tests the socket path structure includes account and region.
+func TestDaemonProcess_SocketPathStructure(t *testing.T) {
 	t.Parallel()
 
 	accountID := "123456789012"

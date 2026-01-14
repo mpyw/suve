@@ -4,8 +4,10 @@
 
 ```yaml
 path: internal/staging/store/agent/daemon
-type: package
+type: integration
 parent: ../CLAUDE.md
+children:
+  - lifecycle/CLAUDE.md
 ```
 
 ## Overview

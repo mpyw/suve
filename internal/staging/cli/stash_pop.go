@@ -12,6 +12,7 @@ import (
 	"github.com/mpyw/suve/internal/infra"
 	"github.com/mpyw/suve/internal/staging"
 	"github.com/mpyw/suve/internal/staging/store/agent"
+	"github.com/mpyw/suve/internal/staging/store/agent/daemon/lifecycle"
 	stagingusecase "github.com/mpyw/suve/internal/usecase/staging"
 )
 
@@ -108,21 +109,25 @@ func stashPopAction(service staging.Service) func(context.Context, *cli.Command)
 
 		agentStore := agent.NewStore(identity.AccountID, identity.Region)
 
-		r := &StashPopRunner{
-			UseCase: &stagingusecase.StashPopUseCase{
-				FileStore:  fileStore,
-				AgentStore: agentStore,
-			},
-			Stdout: cmd.Root().Writer,
-			Stderr: cmd.Root().ErrWriter,
-		}
+		_, err = lifecycle.ExecuteWrite(ctx, agentStore, lifecycle.CmdStashPop, func() (struct{}, error) {
+			r := &StashPopRunner{
+				UseCase: &stagingusecase.StashPopUseCase{
+					FileStore:  fileStore,
+					AgentStore: agentStore,
+				},
+				Stdout: cmd.Root().Writer,
+				Stderr: cmd.Root().ErrWriter,
+			}
 
-		return r.Run(ctx, StashPopOptions{
-			Service: service,
-			Keep:    cmd.Bool("keep"),
-			Force:   cmd.Bool("force"),
-			Merge:   cmd.Bool("merge"),
+			return struct{}{}, r.Run(ctx, StashPopOptions{
+				Service: service,
+				Keep:    cmd.Bool("keep"),
+				Force:   cmd.Bool("force"),
+				Merge:   cmd.Bool("merge"),
+			})
 		})
+
+		return err
 	}
 }
 

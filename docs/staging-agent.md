@@ -40,9 +40,39 @@ suve uses an in-memory daemon process to store staged changes. This provides:
 
 ### Daemon Lifecycle
 
-1. **Auto-Start**: When you run a staging command (e.g., `suve stage param edit`), the daemon starts automatically if not running
+1. **Auto-Start**: When you run a write command (e.g., `suve stage param add`), the daemon starts automatically if not running
 2. **Active**: Daemon stores staged changes in memory, responds to CLI requests
 3. **Auto-Shutdown**: When all staged changes are cleared (via `apply`, `reset`, or `stash push`), the daemon shuts down automatically
+
+#### Command Behavior Summary
+
+**Write commands** (auto-start daemon):
+- `add`, `edit`, `delete` - Stage changes for creation/modification/deletion
+- `tag`, `untag` - Stage tag changes
+- `reset <name>#version` - Stage a historical version (fetches from AWS)
+- `stash pop` - Restore changes from file to agent
+
+**Read commands** (no auto-start, returns "nothing staged" if daemon not running):
+- `status` - Show staged changes
+- `diff` - Show diff between staged and AWS
+- `apply` - Apply staged changes to AWS (read first, then write to AWS)
+- `reset --all` - Unstage all changes
+- `reset <name>` - Unstage specific entry (no version = just remove from staging)
+- `stash push` - Save staged changes to file
+
+**File-only commands** (no daemon interaction):
+- `stash show` - Preview stashed file contents
+- `stash drop` - Delete stash file
+
+#### Auto-Shutdown Triggers
+
+The daemon shuts down automatically when the staging area becomes empty:
+
+| Action | Shutdown Message |
+|--------|------------------|
+| `apply` completes | "All changes applied" |
+| `reset --all` completes | "All changes unstaged" |
+| `stash push` completes | "State saved to file" |
 
 ### Socket Paths
 

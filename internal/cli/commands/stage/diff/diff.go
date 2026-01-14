@@ -22,6 +22,7 @@ import (
 	"github.com/mpyw/suve/internal/staging"
 	"github.com/mpyw/suve/internal/staging/store"
 	"github.com/mpyw/suve/internal/staging/store/agent"
+	"github.com/mpyw/suve/internal/staging/store/agent/daemon/lifecycle"
 	"github.com/mpyw/suve/internal/version/paramversion"
 	"github.com/mpyw/suve/internal/version/secretversion"
 )
@@ -92,77 +93,81 @@ func action(ctx context.Context, cmd *cli.Command) error {
 
 	store := agent.NewStore(identity.AccountID, identity.Region)
 
-	// If agent is not running, there's nothing staged
-	if err := store.Ping(ctx); err != nil {
-		output.Warning(cmd.Root().ErrWriter, "nothing staged")
-
-		return nil
-	}
-
-	// Check if there are any staged changes before creating clients
-	paramStaged, err := store.ListEntries(ctx, staging.ServiceParam)
-	if err != nil {
-		return err
-	}
-
-	secretStaged, err := store.ListEntries(ctx, staging.ServiceSecret)
-	if err != nil {
-		return err
-	}
-
-	paramTagStaged, err := store.ListTags(ctx, staging.ServiceParam)
-	if err != nil {
-		return err
-	}
-
-	secretTagStaged, err := store.ListTags(ctx, staging.ServiceSecret)
-	if err != nil {
-		return err
-	}
-
-	hasParam := len(paramStaged[staging.ServiceParam]) > 0 || len(paramTagStaged[staging.ServiceParam]) > 0
-	hasSecret := len(secretStaged[staging.ServiceSecret]) > 0 || len(secretTagStaged[staging.ServiceSecret]) > 0
-
-	if !hasParam && !hasSecret {
-		output.Warning(cmd.Root().ErrWriter, "nothing staged")
-
-		return nil
-	}
-
-	r := &Runner{
-		Store:  store,
-		Stderr: cmd.Root().ErrWriter,
-	}
-
-	// Initialize clients only if needed
-	if hasParam {
-		paramClient, err := infra.NewParamClient(ctx)
-		if err != nil {
-			return fmt.Errorf("failed to initialize SSM Parameter Store client: %w", err)
-		}
-
-		r.ParamClient = paramClient
-	}
-
-	if hasSecret {
-		secretClient, err := infra.NewSecretClient(ctx)
-		if err != nil {
-			return fmt.Errorf("failed to initialize Secrets Manager client: %w", err)
-		}
-
-		r.SecretClient = secretClient
-	}
-
 	opts := Options{
 		ParseJSON: cmd.Bool("parse-json"),
 		NoPager:   cmd.Bool("no-pager"),
 	}
 
-	return pager.WithPagerWriter(cmd.Root().Writer, opts.NoPager, func(w io.Writer) error {
-		r.Stdout = w
+	result, err := lifecycle.ExecuteRead(ctx, store, lifecycle.CmdDiff, func() (struct{}, error) {
+		// Check if there are any staged changes before creating clients
+		paramStaged, err := store.ListEntries(ctx, staging.ServiceParam)
+		if err != nil {
+			return struct{}{}, err
+		}
 
-		return r.Run(ctx, opts)
+		secretStaged, err := store.ListEntries(ctx, staging.ServiceSecret)
+		if err != nil {
+			return struct{}{}, err
+		}
+
+		paramTagStaged, err := store.ListTags(ctx, staging.ServiceParam)
+		if err != nil {
+			return struct{}{}, err
+		}
+
+		secretTagStaged, err := store.ListTags(ctx, staging.ServiceSecret)
+		if err != nil {
+			return struct{}{}, err
+		}
+
+		hasParam := len(paramStaged[staging.ServiceParam]) > 0 || len(paramTagStaged[staging.ServiceParam]) > 0
+		hasSecret := len(secretStaged[staging.ServiceSecret]) > 0 || len(secretTagStaged[staging.ServiceSecret]) > 0
+
+		if !hasParam && !hasSecret {
+			output.Warning(cmd.Root().ErrWriter, "nothing staged")
+
+			return struct{}{}, nil
+		}
+
+		r := &Runner{
+			Store:  store,
+			Stderr: cmd.Root().ErrWriter,
+		}
+
+		// Initialize clients only if needed
+		if hasParam {
+			paramClient, err := infra.NewParamClient(ctx)
+			if err != nil {
+				return struct{}{}, fmt.Errorf("failed to initialize SSM Parameter Store client: %w", err)
+			}
+
+			r.ParamClient = paramClient
+		}
+
+		if hasSecret {
+			secretClient, err := infra.NewSecretClient(ctx)
+			if err != nil {
+				return struct{}{}, fmt.Errorf("failed to initialize Secrets Manager client: %w", err)
+			}
+
+			r.SecretClient = secretClient
+		}
+
+		return struct{}{}, pager.WithPagerWriter(cmd.Root().Writer, opts.NoPager, func(w io.Writer) error {
+			r.Stdout = w
+
+			return r.Run(ctx, opts)
+		})
 	})
+	if err != nil {
+		return err
+	}
+
+	if result.NothingStaged {
+		output.Warning(cmd.Root().ErrWriter, "nothing staged")
+	}
+
+	return nil
 }
 
 // Run executes the diff command.

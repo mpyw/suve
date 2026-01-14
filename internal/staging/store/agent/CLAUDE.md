@@ -80,6 +80,74 @@ skip_areas:
                                          └─────────────────┘
 ```
 
+### Agent Lifecycle Rules
+
+The agent daemon follows specific rules for auto-start and auto-shutdown based on command type.
+
+**For detailed command classification and executor functions, see `daemon/lifecycle/CLAUDE.md`.**
+
+#### Auto-Start Rules (Summary)
+
+| Category | Should Auto-Start | Rationale |
+|----------|-------------------|-----------|
+| **WriteCommand** | ✅ Yes | Need agent to store changes |
+| **ReadCommand** | ❌ No (Ping check) | If agent not running, nothing is staged |
+| **FileCommand** | ❌ No | Only access file store, not agent |
+
+#### Auto-Shutdown Rules
+
+| Trigger | Shutdown? | Reason Code |
+|---------|-----------|-------------|
+| `apply` empties state | ✅ Yes | `applied` |
+| `reset --all` empties state | ✅ Yes | `unstaged` |
+| `reset <name>` empties state | ✅ Yes | `unstaged` |
+| `stash push` empties state | ✅ Yes | `persisted` |
+| `stash pop --keep` empties agent | ✅ Yes | `cleared` |
+
+#### Implementation Pattern (Lifecycle Package)
+
+Commands should use the `daemon/lifecycle` package executor functions:
+
+```go
+import "github.com/mpyw/suve/internal/staging/store/agent/daemon/lifecycle"
+
+// Write command - auto-starts agent
+result, err := lifecycle.ExecuteWrite(ctx, launcher, lifecycle.CmdAdd, func() (*Output, error) {
+    return usecase.Execute(ctx, input)
+})
+
+// Read command - checks if agent running first
+result, err := lifecycle.ExecuteRead(ctx, store, lifecycle.CmdStatus, func() (*Output, error) {
+    return usecase.Execute(ctx, input)
+})
+if result.NothingStaged {
+    // Handle "nothing staged" case
+}
+
+// File command - no agent needed
+result, err := lifecycle.ExecuteFile(ctx, lifecycle.CmdStashShow, func() (*Output, error) {
+    return usecase.Execute(ctx, input)
+})
+```
+
+#### Store Method Auto-Start Behavior
+
+| Method | Auto-Starts | Used By |
+|--------|-------------|---------|
+| `Ping()` | ❌ No | Lifecycle checks |
+| `StageEntry()` | ✅ Yes | add, edit, delete |
+| `StageTag()` | ✅ Yes | tag, untag |
+| `UnstageEntry()` | ✅ Yes | reset (specific) |
+| `UnstageTag()` | ✅ Yes | reset (specific) |
+| `UnstageAll()` | ✅ Yes | reset --all, apply |
+| `ListEntries()` | ✅ Yes | status, diff, apply |
+| `ListTags()` | ✅ Yes | status, diff, apply |
+| `GetEntry()` | ✅ Yes | diff |
+| `Drain()` | ❌ No | stash push |
+| `WriteState()` | ✅ Yes | stash pop |
+
+**Important**: Even though `UnstageAll` and `ListEntries` auto-start, commands using them should do a Ping check first to provide better UX when nothing is staged.
+
 ### Auto-Shutdown
 
 Daemon automatically shuts down when:
