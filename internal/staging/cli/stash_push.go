@@ -15,13 +15,14 @@ import (
 	"github.com/mpyw/suve/internal/infra"
 	"github.com/mpyw/suve/internal/staging"
 	"github.com/mpyw/suve/internal/staging/store/agent"
+	"github.com/mpyw/suve/internal/staging/store/agent/daemon/lifecycle"
 	"github.com/mpyw/suve/internal/staging/store/file"
-	stagingusecase "github.com/mpyw/suve/internal/usecase/staging"
+	usestaging "github.com/mpyw/suve/internal/usecase/staging"
 )
 
 // StashPushRunner executes stash push operations using a usecase.
 type StashPushRunner struct {
-	UseCase   *stagingusecase.StashPushUseCase
+	UseCase   *usestaging.StashPushUseCase
 	Stdout    io.Writer
 	Stderr    io.Writer
 	Encrypted bool // Whether the file is encrypted (for output messages)
@@ -34,19 +35,19 @@ type StashPushOptions struct {
 	// Keep preserves the agent memory after pushing to file.
 	Keep bool
 	// Mode determines how to handle existing stash file.
-	Mode stagingusecase.StashPushMode
+	Mode usestaging.StashPushMode
 }
 
 // Run executes the stash push command.
 func (r *StashPushRunner) Run(ctx context.Context, opts StashPushOptions) error {
-	_, err := r.UseCase.Execute(ctx, stagingusecase.StashPushInput{
+	_, err := r.UseCase.Execute(ctx, usestaging.StashPushInput{
 		Service: opts.Service,
 		Keep:    opts.Keep,
 		Mode:    opts.Mode,
 	})
 	if err != nil {
 		// Check for non-fatal error (state was written but agent cleanup failed)
-		var persistErr *stagingusecase.StashPushError
+		var persistErr *usestaging.StashPushError
 		if errors.As(err, &persistErr) && persistErr.NonFatal {
 			output.Warning(r.Stderr, "%v", err)
 			// Continue with success message since state was written
@@ -110,119 +111,137 @@ func stashPushAction(service staging.Service) func(context.Context, *cli.Command
 
 		agentStore := agent.NewStore(identity.AccountID, identity.Region)
 
-		// Check if stash file already exists
-		basicFileStore, err := file.NewStore(identity.AccountID, identity.Region)
-		if err != nil {
-			return fmt.Errorf("failed to create file store: %w", err)
-		}
-
-		// Determine mode based on flags and file existence
-		mode := stagingusecase.StashPushModeMerge // Default to merge (safer)
-		forceFlag := cmd.Bool("force")
-		mergeFlag := cmd.Bool("merge")
-
-		switch {
-		case forceFlag:
-			mode = stagingusecase.StashPushModeOverwrite
-		case mergeFlag:
-			mode = stagingusecase.StashPushModeMerge
-		default:
-			// Check if we need to prompt
-			exists, err := basicFileStore.Exists()
+		result, err := lifecycle.ExecuteRead(ctx, agentStore, lifecycle.CmdStashPush, func() (struct{}, error) {
+			// Check if stash file already exists
+			basicFileStore, err := file.NewStore(identity.AccountID, identity.Region)
 			if err != nil {
-				return fmt.Errorf("failed to check stash file: %w", err)
+				return struct{}{}, fmt.Errorf("failed to create file store: %w", err)
 			}
 
-			// Only prompt for global push when file exists
-			// Service-specific push always merges (preserves other services)
-			if exists && service == "" && terminal.IsTerminalWriter(cmd.Root().ErrWriter) {
-				// Count existing items for the prompt message
-				existingState, err := basicFileStore.Drain(ctx, "", true)
+			// Determine mode based on flags and file existence
+			mode := usestaging.StashPushModeMerge // Default to merge (safer)
+			forceFlag := cmd.Bool("force")
+			mergeFlag := cmd.Bool("merge")
+
+			switch {
+			case forceFlag:
+				mode = usestaging.StashPushModeOverwrite
+			case mergeFlag:
+				mode = usestaging.StashPushModeMerge
+			default:
+				// Check if we need to prompt
+				exists, err := basicFileStore.Exists()
 				if err != nil {
-					return fmt.Errorf("failed to read stash file: %w", err)
+					return struct{}{}, fmt.Errorf("failed to check stash file: %w", err)
 				}
 
-				itemCount := existingState.TotalCount()
+				// Only prompt for global push when file exists
+				// Service-specific push always merges (preserves other services)
+				if exists && service == "" && terminal.IsTerminalWriter(cmd.Root().ErrWriter) {
+					// Count existing items for the prompt message
+					existingState, err := basicFileStore.Drain(ctx, "", true)
+					if err != nil {
+						return struct{}{}, fmt.Errorf("failed to read stash file: %w", err)
+					}
 
-				confirmPrompter := &confirm.Prompter{
-					Stdin:  cmd.Root().Reader,
-					Stdout: cmd.Root().Writer,
-					Stderr: cmd.Root().ErrWriter,
+					itemCount := existingState.TotalCount()
+
+					confirmPrompter := &confirm.Prompter{
+						Stdin:  cmd.Root().Reader,
+						Stdout: cmd.Root().Writer,
+						Stderr: cmd.Root().ErrWriter,
+					}
+
+					output.Warning(cmd.Root().ErrWriter, "Stash file already exists with %d item(s).", itemCount)
+
+					choice, err := confirmPrompter.ConfirmChoice("How do you want to proceed?", []confirm.Choice{
+						{Label: "Merge", Description: "combine with existing stash"},
+						{Label: "Overwrite", Description: "replace existing stash"},
+						{Label: "Cancel", Description: "abort operation"},
+					})
+					if err != nil {
+						return struct{}{}, fmt.Errorf("failed to get confirmation: %w", err)
+					}
+
+					switch choice {
+					case 0: // Merge
+						mode = usestaging.StashPushModeMerge
+					case 1: // Overwrite
+						mode = usestaging.StashPushModeOverwrite
+					default: // Cancel or error
+						output.Info(cmd.Root().Writer, "Operation cancelled.")
+
+						return struct{}{}, nil
+					}
 				}
+			}
 
-				output.Warning(cmd.Root().ErrWriter, "Stash file already exists with %d item(s).", itemCount)
+			// Get passphrase
+			prompter := &passphrase.Prompter{
+				Stdin:  cmd.Root().Reader,
+				Stdout: cmd.Root().Writer,
+				Stderr: cmd.Root().ErrWriter,
+			}
 
-				choice, err := confirmPrompter.ConfirmChoice("How do you want to proceed?", []confirm.Choice{
-					{Label: "Merge", Description: "combine with existing stash"},
-					{Label: "Overwrite", Description: "replace existing stash"},
-					{Label: "Cancel", Description: "abort operation"},
-				})
+			var pass string
+
+			switch {
+			case cmd.Bool("passphrase-stdin"):
+				pass, err = prompter.ReadFromStdin()
 				if err != nil {
-					return fmt.Errorf("failed to get confirmation: %w", err)
+					return struct{}{}, fmt.Errorf("failed to read passphrase from stdin: %w", err)
 				}
+			case terminal.IsTerminalWriter(cmd.Root().ErrWriter):
+				pass, err = prompter.PromptForEncrypt()
+				if err != nil {
+					if errors.Is(err, passphrase.ErrCancelled) {
+						return struct{}{}, nil
+					}
 
-				switch choice {
-				case 0: // Merge
-					mode = stagingusecase.StashPushModeMerge
-				case 1: // Overwrite
-					mode = stagingusecase.StashPushModeOverwrite
-				default: // Cancel or error
-					output.Info(cmd.Root().Writer, "Operation cancelled.")
-
-					return nil
+					return struct{}{}, fmt.Errorf("failed to get passphrase: %w", err)
 				}
+			default:
+				prompter.WarnNonTTY()
+				// pass remains empty = plain text
 			}
-		}
 
-		// Get passphrase
-		prompter := &passphrase.Prompter{
-			Stdin:  cmd.Root().Reader,
-			Stdout: cmd.Root().Writer,
-			Stderr: cmd.Root().ErrWriter,
-		}
-
-		var pass string
-
-		switch {
-		case cmd.Bool("passphrase-stdin"):
-			pass, err = prompter.ReadFromStdin()
+			fileStore, err := file.NewStoreWithPassphrase(identity.AccountID, identity.Region, pass)
 			if err != nil {
-				return fmt.Errorf("failed to read passphrase from stdin: %w", err)
+				return struct{}{}, fmt.Errorf("failed to create file store: %w", err)
 			}
-		case terminal.IsTerminalWriter(cmd.Root().ErrWriter):
-			pass, err = prompter.PromptForEncrypt()
-			if err != nil {
-				if errors.Is(err, passphrase.ErrCancelled) {
-					return nil
-				}
 
-				return fmt.Errorf("failed to get passphrase: %w", err)
+			r := &StashPushRunner{
+				UseCase: &usestaging.StashPushUseCase{
+					AgentStore: agentStore,
+					FileStore:  fileStore,
+				},
+				Stdout:    cmd.Root().Writer,
+				Stderr:    cmd.Root().ErrWriter,
+				Encrypted: pass != "",
 			}
-		default:
-			prompter.WarnNonTTY()
-			// pass remains empty = plain text
-		}
 
-		fileStore, err := file.NewStoreWithPassphrase(identity.AccountID, identity.Region, pass)
-		if err != nil {
-			return fmt.Errorf("failed to create file store: %w", err)
-		}
-
-		r := &StashPushRunner{
-			UseCase: &stagingusecase.StashPushUseCase{
-				AgentStore: agentStore,
-				FileStore:  fileStore,
-			},
-			Stdout:    cmd.Root().Writer,
-			Stderr:    cmd.Root().ErrWriter,
-			Encrypted: pass != "",
-		}
-
-		return r.Run(ctx, StashPushOptions{
-			Service: service,
-			Keep:    cmd.Bool("keep"),
-			Mode:    mode,
+			return struct{}{}, r.Run(ctx, StashPushOptions{
+				Service: service,
+				Keep:    cmd.Bool("keep"),
+				Mode:    mode,
+			})
 		})
+		if err != nil {
+			// Handle "nothing to stash" gracefully (agent running but empty)
+			if errors.Is(err, usestaging.ErrNothingToStashPush) {
+				output.Info(cmd.Root().Writer, "No staged changes to persist.")
+
+				return nil
+			}
+
+			return err
+		}
+
+		if result.NothingStaged {
+			output.Info(cmd.Root().Writer, "No staged changes to persist.")
+		}
+
+		return nil
 	}
 }
 

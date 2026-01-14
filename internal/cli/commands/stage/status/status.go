@@ -16,6 +16,7 @@ import (
 	"github.com/mpyw/suve/internal/staging"
 	"github.com/mpyw/suve/internal/staging/store"
 	"github.com/mpyw/suve/internal/staging/store/agent"
+	"github.com/mpyw/suve/internal/staging/store/agent/daemon/lifecycle"
 )
 
 // Runner executes the status command.
@@ -61,17 +62,28 @@ func action(ctx context.Context, cmd *cli.Command) error {
 
 	store := agent.NewStore(identity.AccountID, identity.Region)
 
-	r := &Runner{
-		Store:  store,
-		Stdout: cmd.Root().Writer,
-		Stderr: cmd.Root().ErrWriter,
-	}
-
 	opts := Options{
 		Verbose: cmd.Bool("verbose"),
 	}
 
-	return r.Run(ctx, opts)
+	result, err := lifecycle.ExecuteRead(ctx, store, lifecycle.CmdStatus, func() (struct{}, error) {
+		r := &Runner{
+			Store:  store,
+			Stdout: cmd.Root().Writer,
+			Stderr: cmd.Root().ErrWriter,
+		}
+
+		return struct{}{}, r.Run(ctx, opts)
+	})
+	if err != nil {
+		return err
+	}
+
+	if result.NothingStaged {
+		output.Info(cmd.Root().Writer, "No changes staged.")
+	}
+
+	return nil
 }
 
 // Run executes the status command.

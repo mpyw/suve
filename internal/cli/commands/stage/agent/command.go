@@ -124,8 +124,17 @@ Note: Any staged changes in memory will be lost unless persisted first.`,
 			}
 
 			launcher := daemon.NewLauncher(identity.AccountID, identity.Region)
+
+			// Check if agent is running first
+			if err := launcher.Ping(ctx); err != nil {
+				// Agent not running is not an error for stop command
+				output.Info(cmd.Root().Writer, "Agent is not running.")
+
+				return nil //nolint:nilerr
+			}
+
 			if err := launcher.Shutdown(ctx); err != nil {
-				output.Warning(cmd.Root().ErrWriter, "%v", err)
+				output.Warning(cmd.Root().ErrWriter, "failed to stop agent: %v", err)
 
 				return nil
 			}

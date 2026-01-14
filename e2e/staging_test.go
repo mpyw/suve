@@ -1108,3 +1108,145 @@ func TestAgentStore_NotRunning(t *testing.T) {
 		assert.Error(t, err)
 	})
 }
+
+// =============================================================================
+// Agent Lifecycle Tests - Commands should NOT start agent when nothing staged
+// =============================================================================
+
+// TestAgentLifecycle_StatusDoesNotStartAgent verifies that status command
+// returns "No changes staged" without starting the agent when nothing is staged.
+func TestAgentLifecycle_StatusDoesNotStartAgent(t *testing.T) {
+	setupEnv(t)
+	setupTempHome(t)
+
+	store := newStore()
+
+	// Ensure staging is empty
+	_ = store.UnstageAll(t.Context(), "")
+
+	// Global status should return "No changes staged" without error
+	t.Run("global-status-empty", func(t *testing.T) {
+		stdout, _, err := runCommand(t, globalstatus.Command())
+		require.NoError(t, err)
+		assert.Contains(t, stdout, "No changes staged")
+	})
+
+	// Service-specific status should return appropriate message
+	t.Run("param-status-empty", func(t *testing.T) {
+		stdout, _, err := runSubCommand(t, paramstage.Command(), "status")
+		require.NoError(t, err)
+		assert.Contains(t, stdout, "No")
+	})
+
+	t.Run("secret-status-empty", func(t *testing.T) {
+		stdout, _, err := runSubCommand(t, secretstage.Command(), "status")
+		require.NoError(t, err)
+		assert.Contains(t, stdout, "No")
+	})
+}
+
+// TestAgentLifecycle_DiffDoesNotStartAgent verifies that diff command
+// returns warning without starting the agent when nothing is staged.
+func TestAgentLifecycle_DiffDoesNotStartAgent(t *testing.T) {
+	setupEnv(t)
+	setupTempHome(t)
+
+	store := newStore()
+
+	// Ensure staging is empty
+	_ = store.UnstageAll(t.Context(), "")
+
+	// Global diff should show warning without error
+	t.Run("global-diff-empty", func(t *testing.T) {
+		_, stderr, err := runCommand(t, globaldiff.Command())
+		require.NoError(t, err)
+		assert.Contains(t, stderr, "nothing staged")
+	})
+
+	// Service-specific diff should show warning
+	// Message is either "nothing staged" (lifecycle) or "no parameters staged" (runner)
+	t.Run("param-diff-empty", func(t *testing.T) {
+		_, stderr, err := runSubCommand(t, paramstage.Command(), "diff")
+		require.NoError(t, err)
+		assert.True(t, strings.Contains(stderr, "nothing staged") || strings.Contains(stderr, "no parameters staged"),
+			"expected 'nothing staged' or 'no parameters staged', got: %s", stderr)
+	})
+}
+
+// TestAgentLifecycle_ApplyDoesNotStartAgent verifies that apply command
+// returns "No changes staged" without starting the agent when nothing is staged.
+func TestAgentLifecycle_ApplyDoesNotStartAgent(t *testing.T) {
+	setupEnv(t)
+	setupTempHome(t)
+
+	store := newStore()
+
+	// Ensure staging is empty
+	_ = store.UnstageAll(t.Context(), "")
+
+	// Global apply should return info message without error
+	t.Run("global-apply-empty", func(t *testing.T) {
+		stdout, _, err := runCommand(t, globalapply.Command(), "--yes")
+		require.NoError(t, err)
+		assert.Contains(t, stdout, "No changes staged")
+	})
+
+	// Service-specific apply should return appropriate message
+	t.Run("param-apply-empty", func(t *testing.T) {
+		stdout, _, err := runSubCommand(t, paramstage.Command(), "apply", "--yes")
+		require.NoError(t, err)
+		assert.Contains(t, stdout, "No")
+	})
+}
+
+// TestAgentLifecycle_ResetDoesNotStartAgent verifies that reset command
+// returns "No changes staged" without starting the agent when nothing is staged.
+func TestAgentLifecycle_ResetDoesNotStartAgent(t *testing.T) {
+	setupEnv(t)
+	setupTempHome(t)
+
+	store := newStore()
+
+	// Ensure staging is empty
+	_ = store.UnstageAll(t.Context(), "")
+
+	// Global reset --all should return info message without error
+	t.Run("global-reset-all-empty", func(t *testing.T) {
+		stdout, _, err := runCommand(t, globalreset.Command(), "--all")
+		require.NoError(t, err)
+		assert.Contains(t, stdout, "No changes staged")
+	})
+
+	// Service-specific reset should return appropriate message
+	t.Run("param-reset-all-empty", func(t *testing.T) {
+		stdout, _, err := runSubCommand(t, paramstage.Command(), "reset", "--all")
+		require.NoError(t, err)
+		assert.Contains(t, stdout, "No")
+	})
+}
+
+// TestAgentLifecycle_StashPushDoesNotStartAgent verifies that stash push command
+// returns "No staged changes to persist" without starting the agent when nothing is staged.
+func TestAgentLifecycle_StashPushDoesNotStartAgent(t *testing.T) {
+	setupEnv(t)
+	setupTempHome(t)
+
+	store := newStore()
+
+	// Ensure staging is empty
+	_ = store.UnstageAll(t.Context(), "")
+
+	// Global stash push should return info message without error
+	t.Run("global-stash-push-empty", func(t *testing.T) {
+		stdout, _, err := runSubCommand(t, stgcli.NewGlobalStashCommand(), "push")
+		require.NoError(t, err)
+		assert.Contains(t, stdout, "No staged changes")
+	})
+
+	// Service-specific stash push should return appropriate message
+	t.Run("param-stash-push-empty", func(t *testing.T) {
+		stdout, _, err := runSubCommand(t, paramstage.Command(), "stash", "push")
+		require.NoError(t, err)
+		assert.Contains(t, stdout, "No staged changes")
+	})
+}

@@ -11,6 +11,7 @@ import (
 	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/infra"
 	"github.com/mpyw/suve/internal/staging"
+	"github.com/mpyw/suve/internal/staging/store/agent/daemon/lifecycle"
 	"github.com/mpyw/suve/internal/staging/store/file"
 )
 
@@ -128,21 +129,25 @@ func stashShowAction(service staging.Service) func(context.Context, *cli.Command
 			return fmt.Errorf("failed to get AWS identity: %w", err)
 		}
 
-		fileStore, err := fileStoreForReading(cmd, identity.AccountID, identity.Region, true)
-		if err != nil {
-			return err
-		}
+		_, err = lifecycle.ExecuteFile(ctx, lifecycle.CmdStashShow, func() (struct{}, error) {
+			fileStore, err := fileStoreForReading(cmd, identity.AccountID, identity.Region, true)
+			if err != nil {
+				return struct{}{}, err
+			}
 
-		r := &StashShowRunner{
-			FileStore: fileStore,
-			Stdout:    cmd.Root().Writer,
-			Stderr:    cmd.Root().ErrWriter,
-		}
+			r := &StashShowRunner{
+				FileStore: fileStore,
+				Stdout:    cmd.Root().Writer,
+				Stderr:    cmd.Root().ErrWriter,
+			}
 
-		return r.Run(ctx, StashShowOptions{
-			Service: service,
-			Verbose: cmd.Bool("verbose"),
+			return struct{}{}, r.Run(ctx, StashShowOptions{
+				Service: service,
+				Verbose: cmd.Bool("verbose"),
+			})
 		})
+
+		return err
 	}
 }
 

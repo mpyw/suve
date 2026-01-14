@@ -13,6 +13,7 @@ import (
 	"github.com/mpyw/suve/internal/staging"
 	"github.com/mpyw/suve/internal/staging/store"
 	"github.com/mpyw/suve/internal/staging/store/agent"
+	"github.com/mpyw/suve/internal/staging/store/agent/daemon/lifecycle"
 )
 
 // Runner executes the reset command.
@@ -61,13 +62,24 @@ func action(ctx context.Context, cmd *cli.Command) error {
 
 	store := agent.NewStore(identity.AccountID, identity.Region)
 
-	r := &Runner{
-		Store:  store,
-		Stdout: cmd.Root().Writer,
-		Stderr: cmd.Root().ErrWriter,
+	result, err := lifecycle.ExecuteRead(ctx, store, lifecycle.CmdReset, func() (struct{}, error) {
+		r := &Runner{
+			Store:  store,
+			Stdout: cmd.Root().Writer,
+			Stderr: cmd.Root().ErrWriter,
+		}
+
+		return struct{}{}, r.Run(ctx)
+	})
+	if err != nil {
+		return err
 	}
 
-	return r.Run(ctx)
+	if result.NothingStaged {
+		output.Info(cmd.Root().Writer, "No changes staged.")
+	}
+
+	return nil
 }
 
 // Run executes the reset command.

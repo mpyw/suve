@@ -100,7 +100,7 @@ func TestStashShowRunner_Run(t *testing.T) {
 		assert.Contains(t, stdout.String(), "Total: 1 stashed item(s)")
 	})
 
-	t.Run("success - show with tags", func(t *testing.T) {
+	t.Run("success - show with tags (add and remove)", func(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
@@ -131,6 +131,72 @@ func TestStashShowRunner_Run(t *testing.T) {
 		assert.Contains(t, stdout.String(), "/app/config")
 		assert.Contains(t, stdout.String(), "+1 tags")
 		assert.Contains(t, stdout.String(), "-1 tags")
+	})
+
+	t.Run("success - show with tags (add only)", func(t *testing.T) {
+		t.Parallel()
+
+		tmpDir := t.TempDir()
+		path := filepath.Join(tmpDir, "stage.json")
+
+		// Write test data with tags (add only)
+		state := staging.NewEmptyState()
+		state.Tags[staging.ServiceParam]["/app/config"] = staging.TagEntry{
+			Add:    map[string]string{"env": "prod", "team": "backend"},
+			Remove: maputil.NewSet[string](),
+		}
+		data, err := json.MarshalIndent(state, "", "  ")
+		require.NoError(t, err)
+		require.NoError(t, os.WriteFile(path, data, 0o600))
+
+		fileStore := file.NewStoreWithPath(path)
+		stdout := &bytes.Buffer{}
+		stderr := &bytes.Buffer{}
+
+		runner := &cli.StashShowRunner{
+			FileStore: fileStore,
+			Stdout:    stdout,
+			Stderr:    stderr,
+		}
+
+		err = runner.Run(t.Context(), cli.StashShowOptions{})
+		require.NoError(t, err)
+		assert.Contains(t, stdout.String(), "/app/config")
+		assert.Contains(t, stdout.String(), "+2 tags")
+		assert.NotContains(t, stdout.String(), "-")
+	})
+
+	t.Run("success - show with tags (remove only)", func(t *testing.T) {
+		t.Parallel()
+
+		tmpDir := t.TempDir()
+		path := filepath.Join(tmpDir, "stage.json")
+
+		// Write test data with tags (remove only)
+		state := staging.NewEmptyState()
+		state.Tags[staging.ServiceParam]["/app/config"] = staging.TagEntry{
+			Add:    map[string]string{},
+			Remove: maputil.NewSet("deprecated", "obsolete"),
+		}
+		data, err := json.MarshalIndent(state, "", "  ")
+		require.NoError(t, err)
+		require.NoError(t, os.WriteFile(path, data, 0o600))
+
+		fileStore := file.NewStoreWithPath(path)
+		stdout := &bytes.Buffer{}
+		stderr := &bytes.Buffer{}
+
+		runner := &cli.StashShowRunner{
+			FileStore: fileStore,
+			Stdout:    stdout,
+			Stderr:    stderr,
+		}
+
+		err = runner.Run(t.Context(), cli.StashShowOptions{})
+		require.NoError(t, err)
+		assert.Contains(t, stdout.String(), "/app/config")
+		assert.Contains(t, stdout.String(), "-2 tags")
+		assert.NotContains(t, stdout.String(), "+")
 	})
 
 	t.Run("error - no stashed changes", func(t *testing.T) {

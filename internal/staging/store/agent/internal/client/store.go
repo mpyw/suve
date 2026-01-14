@@ -11,6 +11,7 @@ import (
 	"github.com/mpyw/suve/internal/staging"
 	"github.com/mpyw/suve/internal/staging/store"
 	"github.com/mpyw/suve/internal/staging/store/agent/daemon"
+	"github.com/mpyw/suve/internal/staging/store/agent/daemon/lifecycle"
 	"github.com/mpyw/suve/internal/staging/store/agent/internal/protocol"
 )
 
@@ -326,10 +327,24 @@ func printShutdownMessage(reason string) {
 	output.Info(os.Stderr, "Staging agent stopped (%s)", msg)
 }
 
+// Ping checks if the agent daemon is running.
+// Returns nil if the daemon is reachable, or an error if not.
+func (s *Store) Ping(ctx context.Context) error {
+	return s.launcher.Ping(ctx)
+}
+
+// Start ensures the agent daemon is running, starting it if necessary.
+// This implements the lifecycle.Starter interface.
+func (s *Store) Start(ctx context.Context) error {
+	return s.launcher.EnsureRunning(ctx)
+}
+
 // Compile-time checks.
 var (
 	_ store.ReadWriteOperator = (*Store)(nil)
 	_ store.Drainer           = (*Store)(nil)
 	_ store.Writer            = (*Store)(nil)
 	_ store.HintedUnstager    = (*Store)(nil)
+	_ lifecycle.Pinger        = (*Store)(nil)
+	_ lifecycle.Starter       = (*Store)(nil)
 )
