@@ -66,14 +66,14 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		Verbose: cmd.Bool("verbose"),
 	}
 
-	result, err := lifecycle.ExecuteRead(ctx, store, lifecycle.CmdStatus, func() (struct{}, error) {
+	result, err := lifecycle.ExecuteRead0(ctx, store, lifecycle.CmdStatus, func() error {
 		r := &Runner{
 			Store:  store,
 			Stdout: cmd.Root().Writer,
 			Stderr: cmd.Root().ErrWriter,
 		}
 
-		return struct{}{}, r.Run(ctx, opts)
+		return r.Run(ctx, opts)
 	})
 	if err != nil {
 		return err

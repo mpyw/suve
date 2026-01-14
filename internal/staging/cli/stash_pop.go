@@ -109,7 +109,7 @@ func stashPopAction(service staging.Service) func(context.Context, *cli.Command)
 
 		agentStore := agent.NewStore(identity.AccountID, identity.Region)
 
-		_, err = lifecycle.ExecuteWrite(ctx, agentStore, lifecycle.CmdStashPop, func() (struct{}, error) {
+		err = lifecycle.ExecuteWrite0(ctx, agentStore, lifecycle.CmdStashPop, func() error {
 			r := &StashPopRunner{
 				UseCase: &stagingusecase.StashPopUseCase{
 					FileStore:  fileStore,
@@ -119,7 +119,7 @@ func stashPopAction(service staging.Service) func(context.Context, *cli.Command)
 				Stderr: cmd.Root().ErrWriter,
 			}
 
-			return struct{}{}, r.Run(ctx, StashPopOptions{
+			return r.Run(ctx, StashPopOptions{
 				Service: service,
 				Keep:    cmd.Bool("keep"),
 				Force:   cmd.Bool("force"),
