@@ -2,6 +2,7 @@
 package daemon
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -91,19 +92,19 @@ func NewLauncher(accountID, region string, opts ...LauncherOption) *Launcher {
 }
 
 // SendRequest sends a request to the daemon.
-func (l *Launcher) SendRequest(req *protocol.Request) (*protocol.Response, error) {
-	return l.client.SendRequest(req)
+func (l *Launcher) SendRequest(ctx context.Context, req *protocol.Request) (*protocol.Response, error) {
+	return l.client.SendRequest(ctx, req)
 }
 
 // Ping checks if the daemon is reachable.
-func (l *Launcher) Ping() error {
-	return l.client.Ping()
+func (l *Launcher) Ping(ctx context.Context) error {
+	return l.client.Ping(ctx)
 }
 
 // EnsureRunning ensures the daemon is running, starting it if necessary.
-func (l *Launcher) EnsureRunning() error {
+func (l *Launcher) EnsureRunning(ctx context.Context) error {
 	// Try to ping first
-	if err := l.client.Ping(); err == nil {
+	if err := l.client.Ping(ctx); err == nil {
 		return nil
 	}
 
@@ -118,7 +119,7 @@ func (l *Launcher) EnsureRunning() error {
 
 	deadline := time.Now().Add(connectTimeout)
 	for time.Now().Before(deadline) {
-		if err := l.client.Ping(); err == nil {
+		if err := l.client.Ping(ctx); err == nil {
 			output.Printf(os.Stderr, "info: staging agent started for account %s (%s)\n", l.accountID, l.region)
 
 			return nil
@@ -131,8 +132,8 @@ func (l *Launcher) EnsureRunning() error {
 }
 
 // Shutdown sends a shutdown request to the daemon.
-func (l *Launcher) Shutdown() error {
-	resp, err := l.client.SendRequest(&protocol.Request{Method: protocol.MethodShutdown})
+func (l *Launcher) Shutdown(ctx context.Context) error {
+	resp, err := l.client.SendRequest(ctx, &protocol.Request{Method: protocol.MethodShutdown})
 	if err != nil {
 		return err
 	}

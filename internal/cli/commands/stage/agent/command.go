@@ -96,7 +96,7 @@ Note: Any staged changes in memory will be lost unless persisted first.`,
 			}
 
 			launcher := daemon.NewLauncher(identity.AccountID, identity.Region)
-			if err := launcher.Shutdown(); err != nil {
+			if err := launcher.Shutdown(ctx); err != nil {
 				output.Printf(cmd.Root().ErrWriter, "Warning: %v\n", err)
 
 				return nil

@@ -28,7 +28,7 @@ func TestClient_SendRequest_NotConnected(t *testing.T) {
 	t.Parallel()
 
 	c := NewClient("nonexistent", "nonexistent")
-	resp, err := c.SendRequest(&protocol.Request{Method: protocol.MethodPing})
+	resp, err := c.SendRequest(t.Context(), &protocol.Request{Method: protocol.MethodPing})
 
 	require.Error(t, err)
 	assert.Nil(t, resp)
@@ -39,7 +39,7 @@ func TestClient_Ping_NotConnected(t *testing.T) {
 	t.Parallel()
 
 	c := NewClient("nonexistent", "nonexistent")
-	err := c.Ping()
+	err := c.Ping(t.Context())
 
 	require.Error(t, err)
 	assert.ErrorIs(t, err, ErrNotConnected)
@@ -86,7 +86,7 @@ func TestClient_SendRequest_Success(t *testing.T) {
 	// Create client with custom socket path
 	c := &Client{socketPath: socketPath}
 
-	resp, err := c.SendRequest(&protocol.Request{Method: protocol.MethodPing})
+	resp, err := c.SendRequest(t.Context(), &protocol.Request{Method: protocol.MethodPing})
 	require.NoError(t, err)
 	require.NotNil(t, resp)
 	assert.True(t, resp.Success)
@@ -132,7 +132,7 @@ func TestClient_SendRequest_ErrorResponse(t *testing.T) {
 
 	c := &Client{socketPath: socketPath}
 
-	resp, err := c.SendRequest(&protocol.Request{Method: protocol.MethodPing})
+	resp, err := c.SendRequest(t.Context(), &protocol.Request{Method: protocol.MethodPing})
 	require.NoError(t, err)
 	require.NotNil(t, resp)
 	assert.False(t, resp.Success)
@@ -170,7 +170,7 @@ func TestClient_SendRequest_ServerClosesConnection(t *testing.T) {
 
 	c := &Client{socketPath: socketPath}
 
-	resp, err := c.SendRequest(&protocol.Request{Method: protocol.MethodPing})
+	resp, err := c.SendRequest(t.Context(), &protocol.Request{Method: protocol.MethodPing})
 	require.Error(t, err)
 	assert.Nil(t, resp)
 	assert.Contains(t, err.Error(), "daemon closed connection unexpectedly")
@@ -221,7 +221,7 @@ func TestClient_Ping_Success(t *testing.T) {
 
 	c := &Client{socketPath: socketPath}
 
-	err = c.Ping()
+	err = c.Ping(t.Context())
 	require.NoError(t, err)
 }
 
@@ -265,7 +265,7 @@ func TestClient_Ping_ServerError(t *testing.T) {
 
 	c := &Client{socketPath: socketPath}
 
-	err = c.Ping()
+	err = c.Ping(t.Context())
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "ping failed")
 }
@@ -324,7 +324,7 @@ func TestClient_ConcurrentSendRequest(t *testing.T) {
 
 	for range numRequests {
 		go func() {
-			_, err := c.SendRequest(&protocol.Request{Method: protocol.MethodPing})
+			_, err := c.SendRequest(t.Context(), &protocol.Request{Method: protocol.MethodPing})
 			done <- err
 		}()
 	}
@@ -377,7 +377,7 @@ func TestClient_SendRequest_DecodeNonEOFError(t *testing.T) {
 
 	c := &Client{socketPath: socketPath}
 
-	resp, err := c.SendRequest(&protocol.Request{Method: protocol.MethodPing})
+	resp, err := c.SendRequest(t.Context(), &protocol.Request{Method: protocol.MethodPing})
 	require.Error(t, err)
 	assert.Nil(t, resp)
 	assert.Contains(t, err.Error(), "failed to read response")
@@ -410,7 +410,7 @@ func TestClient_SendRequest_EncodeError(t *testing.T) {
 	c := &Client{socketPath: socketPath}
 
 	// This should fail when trying to encode the request because connection is closed
-	resp, err := c.SendRequest(&protocol.Request{Method: protocol.MethodPing})
+	resp, err := c.SendRequest(t.Context(), &protocol.Request{Method: protocol.MethodPing})
 	require.Error(t, err)
 	assert.Nil(t, resp)
 	// The error should be either "failed to send request" or EOF-related

@@ -396,14 +396,14 @@ func TestRunner_Run_ContextCancellation(t *testing.T) {
 
 	deadline := time.Now().Add(5 * time.Second)
 	for time.Now().Before(deadline) {
-		if err := launcher.Ping(); err == nil {
+		if err := launcher.Ping(t.Context()); err == nil {
 			break
 		}
 
 		time.Sleep(50 * time.Millisecond)
 	}
 
-	require.NoError(t, launcher.Ping(), "daemon should be ready")
+	require.NoError(t, launcher.Ping(t.Context()), "daemon should be ready")
 
 	// Cancel the context to trigger shutdown
 	cancel()

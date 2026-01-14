@@ -2,6 +2,7 @@
 package ipc
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -35,20 +36,31 @@ func NewClient(accountID, region string) *Client {
 }
 
 // SendRequest sends a request to the daemon and returns the response.
-func (c *Client) SendRequest(req *protocol.Request) (*protocol.Response, error) {
+// The context is used for connection establishment and request timeout.
+func (c *Client) SendRequest(ctx context.Context, req *protocol.Request) (*protocol.Response, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	dialer := net.Dialer{Timeout: dialTimeout}
+	// Use context deadline if set, otherwise use default timeout.
+	dialCtx, cancel := context.WithTimeout(ctx, dialTimeout)
+	defer cancel()
 
-	conn, err := dialer.Dial("unix", c.socketPath)
+	dialer := net.Dialer{}
+
+	conn, err := dialer.DialContext(dialCtx, "unix", c.socketPath)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrNotConnected, err)
 	}
 
 	defer func() { _ = conn.Close() }()
 
-	if err := conn.SetDeadline(time.Now().Add(requestTimeout)); err != nil {
+	// Set request deadline based on context or default timeout.
+	deadline := time.Now().Add(requestTimeout)
+	if ctxDeadline, ok := ctx.Deadline(); ok && ctxDeadline.Before(deadline) {
+		deadline = ctxDeadline
+	}
+
+	if err := conn.SetDeadline(deadline); err != nil {
 		return nil, fmt.Errorf("failed to set deadline: %w", err)
 	}
 
@@ -72,8 +84,8 @@ func (c *Client) SendRequest(req *protocol.Request) (*protocol.Response, error) 
 }
 
 // Ping checks if the daemon is reachable.
-func (c *Client) Ping() error {
-	resp, err := c.SendRequest(&protocol.Request{Method: protocol.MethodPing})
+func (c *Client) Ping(ctx context.Context) error {
+	resp, err := c.SendRequest(ctx, &protocol.Request{Method: protocol.MethodPing})
 	if err != nil {
 		return err
 	}

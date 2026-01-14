@@ -77,7 +77,7 @@ func TestDaemonLifecycle_StartupAndShutdown(t *testing.T) {
 	var ready bool
 
 	for time.Now().Before(deadline) {
-		if err := launcher.Ping(); err == nil {
+		if err := launcher.Ping(t.Context()); err == nil {
 			ready = true
 
 			break
@@ -145,11 +145,11 @@ func TestDaemonLifecycle_MultipleAccountsSimultaneous(t *testing.T) {
 	var ready1, ready2 bool
 
 	for time.Now().Before(deadline) && (!ready1 || !ready2) {
-		if !ready1 && launcher1.Ping() == nil {
+		if !ready1 && launcher1.Ping(t.Context()) == nil {
 			ready1 = true
 		}
 
-		if !ready2 && launcher2.Ping() == nil {
+		if !ready2 && launcher2.Ping(t.Context()) == nil {
 			ready2 = true
 		}
 
@@ -160,8 +160,8 @@ func TestDaemonLifecycle_MultipleAccountsSimultaneous(t *testing.T) {
 	require.True(t, ready2, "daemon for account2 should be ready")
 
 	// Both should respond independently
-	require.NoError(t, launcher1.Ping())
-	require.NoError(t, launcher2.Ping())
+	require.NoError(t, launcher1.Ping(t.Context()))
+	require.NoError(t, launcher2.Ping(t.Context()))
 
 	// Cleanup
 	runner1.Shutdown()
@@ -205,7 +205,7 @@ func TestDaemonLifecycle_AutoShutdown(t *testing.T) {
 
 	deadline := time.Now().Add(5 * time.Second)
 	for time.Now().Before(deadline) {
-		if err := launcher.Ping(); err == nil {
+		if err := launcher.Ping(t.Context()); err == nil {
 			break
 		}
 
@@ -224,7 +224,7 @@ func TestDaemonLifecycle_AutoShutdown(t *testing.T) {
 			Operation: staging.OperationCreate,
 		},
 	}
-	resp, err := launcher.SendRequest(stageReq)
+	resp, err := launcher.SendRequest(t.Context(), stageReq)
 	require.NoError(t, err)
 	require.True(t, resp.Success)
 
@@ -236,7 +236,7 @@ func TestDaemonLifecycle_AutoShutdown(t *testing.T) {
 		Service:   staging.ServiceParam,
 		Name:      "/test/param",
 	}
-	resp, err = launcher.SendRequest(unstageReq)
+	resp, err = launcher.SendRequest(t.Context(), unstageReq)
 	require.NoError(t, err)
 	require.True(t, resp.Success)
 
@@ -279,7 +279,7 @@ func TestDaemonLifecycle_ManualModeDisablesAutoShutdown(t *testing.T) {
 
 	deadline := time.Now().Add(5 * time.Second)
 	for time.Now().Before(deadline) {
-		if err := launcher.Ping(); err == nil {
+		if err := launcher.Ping(t.Context()); err == nil {
 			break
 		}
 
@@ -298,7 +298,7 @@ func TestDaemonLifecycle_ManualModeDisablesAutoShutdown(t *testing.T) {
 			Operation: staging.OperationCreate,
 		},
 	}
-	resp, err := launcher.SendRequest(stageReq)
+	resp, err := launcher.SendRequest(t.Context(), stageReq)
 	require.NoError(t, err)
 	require.True(t, resp.Success)
 
@@ -309,7 +309,7 @@ func TestDaemonLifecycle_ManualModeDisablesAutoShutdown(t *testing.T) {
 		Service:   staging.ServiceParam,
 		Name:      "/test/param",
 	}
-	resp, err = launcher.SendRequest(unstageReq)
+	resp, err = launcher.SendRequest(t.Context(), unstageReq)
 	require.NoError(t, err)
 	require.True(t, resp.Success)
 
@@ -323,7 +323,7 @@ func TestDaemonLifecycle_ManualModeDisablesAutoShutdown(t *testing.T) {
 	}
 
 	// Should still be able to ping
-	require.NoError(t, launcher.Ping())
+	require.NoError(t, launcher.Ping(t.Context()))
 
 	// Manual shutdown
 	runner.Shutdown()
@@ -356,7 +356,7 @@ func TestDaemonLifecycle_AutoShutdown_UnstageAll(t *testing.T) {
 
 	deadline := time.Now().Add(5 * time.Second)
 	for time.Now().Before(deadline) {
-		if err := launcher.Ping(); err == nil {
+		if err := launcher.Ping(t.Context()); err == nil {
 			break
 		}
 
@@ -376,7 +376,7 @@ func TestDaemonLifecycle_AutoShutdown_UnstageAll(t *testing.T) {
 				Operation: staging.OperationCreate,
 			},
 		}
-		resp, err := launcher.SendRequest(stageReq)
+		resp, err := launcher.SendRequest(t.Context(), stageReq)
 		require.NoError(t, err)
 		require.True(t, resp.Success)
 	}
@@ -388,7 +388,7 @@ func TestDaemonLifecycle_AutoShutdown_UnstageAll(t *testing.T) {
 		Region:    region,
 		Service:   "", // Empty clears all services
 	}
-	resp, err := launcher.SendRequest(unstageReq)
+	resp, err := launcher.SendRequest(t.Context(), unstageReq)
 	require.NoError(t, err)
 	require.True(t, resp.Success)
 
@@ -424,7 +424,7 @@ func TestDaemonLifecycle_AutoShutdown_UnstageTag(t *testing.T) {
 
 	deadline := time.Now().Add(5 * time.Second)
 	for time.Now().Before(deadline) {
-		if err := launcher.Ping(); err == nil {
+		if err := launcher.Ping(t.Context()); err == nil {
 			break
 		}
 
@@ -442,7 +442,7 @@ func TestDaemonLifecycle_AutoShutdown_UnstageTag(t *testing.T) {
 			Add: map[string]string{"key": "value"},
 		},
 	}
-	resp, err := launcher.SendRequest(stageReq)
+	resp, err := launcher.SendRequest(t.Context(), stageReq)
 	require.NoError(t, err)
 	require.True(t, resp.Success)
 
@@ -454,7 +454,7 @@ func TestDaemonLifecycle_AutoShutdown_UnstageTag(t *testing.T) {
 		Service:   staging.ServiceParam,
 		Name:      "/test/param",
 	}
-	resp, err = launcher.SendRequest(unstageReq)
+	resp, err = launcher.SendRequest(t.Context(), unstageReq)
 	require.NoError(t, err)
 	require.True(t, resp.Success)
 
@@ -490,7 +490,7 @@ func TestDaemonLifecycle_AutoShutdown_SetState(t *testing.T) {
 
 	deadline := time.Now().Add(5 * time.Second)
 	for time.Now().Before(deadline) {
-		if err := launcher.Ping(); err == nil {
+		if err := launcher.Ping(t.Context()); err == nil {
 			break
 		}
 
@@ -509,7 +509,7 @@ func TestDaemonLifecycle_AutoShutdown_SetState(t *testing.T) {
 			Operation: staging.OperationCreate,
 		},
 	}
-	resp, err := launcher.SendRequest(stageReq)
+	resp, err := launcher.SendRequest(t.Context(), stageReq)
 	require.NoError(t, err)
 	require.True(t, resp.Success)
 
@@ -520,7 +520,7 @@ func TestDaemonLifecycle_AutoShutdown_SetState(t *testing.T) {
 		Region:    region,
 		State:     staging.NewEmptyState(),
 	}
-	resp, err = launcher.SendRequest(setStateReq)
+	resp, err = launcher.SendRequest(t.Context(), setStateReq)
 	require.NoError(t, err)
 	require.True(t, resp.Success)
 
@@ -556,7 +556,7 @@ func TestDaemonLifecycle_AutoShutdown_UnstageAllEmpty(t *testing.T) {
 
 	deadline := time.Now().Add(5 * time.Second)
 	for time.Now().Before(deadline) {
-		if err := launcher.Ping(); err == nil {
+		if err := launcher.Ping(t.Context()); err == nil {
 			break
 		}
 
@@ -571,7 +571,7 @@ func TestDaemonLifecycle_AutoShutdown_UnstageAllEmpty(t *testing.T) {
 		Region:    region,
 		Service:   "", // Empty clears all services
 	}
-	resp, err := launcher.SendRequest(unstageReq)
+	resp, err := launcher.SendRequest(t.Context(), unstageReq)
 	require.NoError(t, err)
 	require.True(t, resp.Success)
 

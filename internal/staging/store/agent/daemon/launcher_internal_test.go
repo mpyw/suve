@@ -88,7 +88,7 @@ func TestLauncher_EnsureRunning(t *testing.T) {
 
 		// EnsureRunning should fail because daemon is not running
 		// and auto-start is disabled
-		err := l.EnsureRunning()
+		err := l.EnsureRunning(t.Context())
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to start daemon")
 	})
@@ -102,7 +102,7 @@ func TestLauncher_Ping(t *testing.T) {
 
 		l := NewLauncher(testAccountID, testRegion, WithAutoStartDisabled())
 
-		err := l.Ping()
+		err := l.Ping(t.Context())
 		require.Error(t, err)
 		// Should contain "not connected" from the IPC client
 		assert.Contains(t, err.Error(), "not connected")
@@ -117,7 +117,7 @@ func TestLauncher_Shutdown(t *testing.T) {
 
 		l := NewLauncher(testAccountID, testRegion, WithAutoStartDisabled())
 
-		err := l.Shutdown()
+		err := l.Shutdown(t.Context())
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "not connected")
 	})
@@ -131,7 +131,7 @@ func TestLauncher_SendRequest(t *testing.T) {
 
 		l := NewLauncher(testAccountID, testRegion, WithAutoStartDisabled())
 
-		resp, err := l.SendRequest(&protocol.Request{Method: protocol.MethodPing})
+		resp, err := l.SendRequest(t.Context(), &protocol.Request{Method: protocol.MethodPing})
 		require.Error(t, err)
 		assert.Nil(t, resp)
 	})
@@ -187,7 +187,7 @@ func TestLauncher_EnsureRunning_AlreadyRunning(t *testing.T) {
 
 	// EnsureRunning should succeed immediately (daemon already running)
 	l := NewLauncher(accountID, region, WithAutoStartDisabled())
-	err = l.EnsureRunning()
+	err = l.EnsureRunning(t.Context())
 	require.NoError(t, err)
 }
 
@@ -251,7 +251,7 @@ func TestLauncher_PingWithRunningDaemon(t *testing.T) {
 	}()
 
 	l := NewLauncher(accountID, region, WithAutoStartDisabled())
-	err = l.Ping()
+	err = l.Ping(t.Context())
 	require.NoError(t, err)
 }
 
@@ -304,7 +304,7 @@ func TestLauncher_ShutdownWithRunningDaemon(t *testing.T) {
 	}()
 
 	l := NewLauncher(accountID, region, WithAutoStartDisabled())
-	err = l.Shutdown()
+	err = l.Shutdown(t.Context())
 	require.NoError(t, err)
 }
 
@@ -357,7 +357,7 @@ func TestLauncher_ShutdownWithServerError(t *testing.T) {
 	}()
 
 	l := NewLauncher(accountID, region, WithAutoStartDisabled())
-	err = l.Shutdown()
+	err = l.Shutdown(t.Context())
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "shutdown failed")
 }
@@ -377,7 +377,7 @@ func TestLauncher_EnsureRunning_Timeout(t *testing.T) {
 
 	// This should fail because daemon is not running and auto-start is disabled
 	start := time.Now()
-	err = l.EnsureRunning()
+	err = l.EnsureRunning(t.Context())
 	elapsed := time.Since(start)
 
 	require.Error(t, err)
@@ -471,7 +471,7 @@ func TestLauncher_EnsureRunning_WithMockSpawner(t *testing.T) {
 	l := NewLauncher(accountID, region, withSpawner(spawner))
 
 	// EnsureRunning should start the daemon via spawner and then ping successfully
-	err = l.EnsureRunning()
+	err = l.EnsureRunning(t.Context())
 	require.NoError(t, err)
 
 	// Verify spawner was called
@@ -497,7 +497,7 @@ func TestLauncher_EnsureRunning_SpawnError(t *testing.T) {
 
 	l := NewLauncher(accountID, region, withSpawner(spawner))
 
-	err = l.EnsureRunning()
+	err = l.EnsureRunning(t.Context())
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to start daemon")
 	assert.Contains(t, err.Error(), "spawn failed")
@@ -525,7 +525,7 @@ func TestLauncher_EnsureRunning_TimeoutWithMockSpawner(t *testing.T) {
 	l := NewLauncher(accountID, region, withSpawner(spawner))
 
 	// Should timeout since no daemon is listening
-	err = l.EnsureRunning()
+	err = l.EnsureRunning(t.Context())
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "daemon did not start within timeout")
 }

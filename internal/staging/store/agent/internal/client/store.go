@@ -252,13 +252,13 @@ func (s *Store) WriteState(ctx context.Context, service staging.Service, state *
 //nolint:revive // context comes after Store to support generic type inference
 func doRequestWithResult[Resp any, Result any](
 	s *Store,
-	_ context.Context,
+	ctx context.Context,
 	req *protocol.Request,
 	extract func(*Resp) Result,
 ) (Result, error) {
 	var zero Result
 
-	resp, err := s.launcher.SendRequest(req)
+	resp, err := s.launcher.SendRequest(ctx, req)
 	if err != nil {
 		return zero, err
 	}
@@ -285,7 +285,7 @@ func doRequestWithResultEnsuringDaemon[Resp any, Result any](
 	extract func(*Resp) Result,
 ) (Result, error) {
 	var zero Result
-	if err := s.launcher.EnsureRunning(); err != nil {
+	if err := s.launcher.EnsureRunning(ctx); err != nil {
 		return zero, err
 	}
 
@@ -293,12 +293,12 @@ func doRequestWithResultEnsuringDaemon[Resp any, Result any](
 }
 
 // doSimpleRequestEnsuringDaemon ensures daemon is running, then sends simple request.
-func (s *Store) doSimpleRequestEnsuringDaemon(_ context.Context, req *protocol.Request) error {
-	if err := s.launcher.EnsureRunning(); err != nil {
+func (s *Store) doSimpleRequestEnsuringDaemon(ctx context.Context, req *protocol.Request) error {
+	if err := s.launcher.EnsureRunning(ctx); err != nil {
 		return err
 	}
 
-	resp, err := s.launcher.SendRequest(req)
+	resp, err := s.launcher.SendRequest(ctx, req)
 	if err != nil {
 		return err
 	}
