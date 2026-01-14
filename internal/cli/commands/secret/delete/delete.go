@@ -98,7 +98,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	if !skipConfirm {
 		currentValue, _ := uc.GetCurrentValue(ctx, name)
 		if currentValue != "" {
-			output.Warn(cmd.Root().ErrWriter, "Current value of %s:", name)
+			output.Info(cmd.Root().ErrWriter, "Current value of %s:", name)
 			output.Println(cmd.Root().ErrWriter, "")
 			output.Println(cmd.Root().ErrWriter, output.Indent(currentValue, "  "))
 			output.Println(cmd.Root().ErrWriter, "")
@@ -151,9 +151,9 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 	}
 
 	if opts.Force {
-		output.Warn(r.Stdout, "Permanently deleted secret %s", result.Name)
+		output.Success(r.Stdout, "Permanently deleted secret %s", result.Name)
 	} else {
-		output.Warn(r.Stdout, "Scheduled deletion of secret %s (deletion date: %s)",
+		output.Success(r.Stdout, "Scheduled deletion of secret %s (deletion date: %s)",
 			result.Name,
 			result.DeletionDate.Format("2006-01-02"),
 		)

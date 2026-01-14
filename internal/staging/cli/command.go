@@ -388,7 +388,7 @@ EXAMPLES:
 
 			serviceEntries := entries[service]
 			if len(serviceEntries) == 0 {
-				output.Warn(cmd.Root().Writer, "No %s changes staged.", parser.ServiceName())
+				output.Info(cmd.Root().Writer, "No %s changes staged.", parser.ServiceName())
 
 				return nil
 			}

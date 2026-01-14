@@ -46,7 +46,7 @@ func (r *StashPopRunner) Run(ctx context.Context, opts StashPopOptions) error {
 		// Check for non-fatal error (state was written but file cleanup failed)
 		var drainErr *stagingusecase.StashPopError
 		if errors.As(err, &drainErr) && drainErr.NonFatal {
-			output.Warn(r.Stderr, "Warning: %v", err)
+			output.Warning(r.Stderr, "%v", err)
 			// Continue with success message since state was written
 		} else {
 			return err

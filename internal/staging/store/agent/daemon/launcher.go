@@ -120,7 +120,7 @@ func (l *Launcher) EnsureRunning(ctx context.Context) error {
 	deadline := time.Now().Add(connectTimeout)
 	for time.Now().Before(deadline) {
 		if err := l.client.Ping(ctx); err == nil {
-			output.Info(os.Stderr, "staging agent started for account %s (%s)", l.accountID, l.region)
+			output.Info(os.Stderr, "Staging agent started for account %s (%s)", l.accountID, l.region)
 
 			return nil
 		}

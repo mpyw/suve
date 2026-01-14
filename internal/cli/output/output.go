@@ -112,13 +112,14 @@ func Failed(w io.Writer, name string, err error) {
 	_, _ = fmt.Fprintf(w, "%s %s: %v\n", colors.Failed("Failed"), name, err)
 }
 
-// Info prints an informational message in yellow (without "Warning:" prefix).
-// Example: "No changes staged.".
+// Info prints an informational message in cyan.
+// Used for status updates, progress messages, and neutral information.
+// Example: "No changes staged.", "Agent started".
 //
 //nolint:goprintffuncname // intentionally named without 'f' suffix for cleaner API
 func Info(w io.Writer, format string, args ...any) {
 	msg := fmt.Sprintf(format, args...)
-	_, _ = fmt.Fprintln(w, colors.Warning(msg))
+	_, _ = fmt.Fprintln(w, colors.Info(msg))
 }
 
 // Warn prints a warning message with yellow "!" prefix.

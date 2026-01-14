@@ -48,7 +48,7 @@ func (r *StashPushRunner) Run(ctx context.Context, opts StashPushOptions) error 
 		// Check for non-fatal error (state was written but agent cleanup failed)
 		var persistErr *stagingusecase.StashPushError
 		if errors.As(err, &persistErr) && persistErr.NonFatal {
-			output.Warn(r.Stderr, "Warning: %v", err)
+			output.Warning(r.Stderr, "%v", err)
 			// Continue with success message since state was written
 		} else {
 			return err
@@ -72,7 +72,7 @@ func (r *StashPushRunner) Run(ctx context.Context, opts StashPushOptions) error 
 
 	// Display warning about plain-text storage only if not encrypted
 	if !r.Encrypted {
-		output.Warn(r.Stderr, "Note: secrets are stored as plain text.")
+		output.Warn(r.Stderr, "Secrets are stored as plain text.")
 	}
 
 	return nil

@@ -10,7 +10,6 @@ import (
 
 	"github.com/urfave/cli/v3"
 
-	"github.com/mpyw/suve/internal/cli/colors"
 	"github.com/mpyw/suve/internal/cli/confirm"
 	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/infra"
@@ -79,7 +78,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	if !skipConfirm {
 		currentValue, _ := useCase.GetCurrentValue(ctx, name)
 		if currentValue != "" {
-			output.Warn(cmd.Root().ErrWriter, "Current value of %s:", name)
+			output.Info(cmd.Root().ErrWriter, "Current value of %s:", name)
 			output.Println(cmd.Root().ErrWriter, "")
 			output.Println(cmd.Root().ErrWriter, output.Indent(currentValue, "  "))
 			output.Println(cmd.Root().ErrWriter, "")
@@ -127,7 +126,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 		return err
 	}
 
-	output.Printf(r.Stdout, "%s %s\n", colors.OpDelete("Deleted"), result.Name)
+	output.Success(r.Stdout, "Deleted %s", result.Name)
 
 	return nil
 }
