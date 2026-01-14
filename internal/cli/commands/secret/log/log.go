@@ -83,7 +83,7 @@ EXAMPLES:
    suve secret log --since 2024-01-01T00:00:00Z my-secret  Show versions since date
    suve secret log --output=json my-secret               Output as JSON`,
 		Flags: []cli.Flag{
-			&cli.IntFlag{
+			&cli.Int32Flag{
 				Name:    "number",
 				Aliases: []string{"n"},
 				Value:   10, //nolint:mnd // default number of versions to display
@@ -135,9 +135,8 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	}
 
 	opts := Options{
-		Name: cmd.Args().First(),
-		//nolint:gosec // G115: CLI flag is bounded, overflow not possible in practice
-		MaxResults: int32(cmd.Int("number")),
+		Name:       cmd.Args().First(),
+		MaxResults: cmd.Int32("number"),
 		ShowPatch:  cmd.Bool("patch"),
 		ParseJSON:  cmd.Bool("parse-json"),
 		Reverse:    cmd.Bool("reverse"),

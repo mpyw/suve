@@ -153,6 +153,7 @@ func TestGetParameterWithVersion_ShiftOutOfRange(t *testing.T) {
 
 	now := time.Now()
 	mock := &mockClient{
+		//nolint:lll // mock function signature
 		getParameterHistoryFunc: func(_ context.Context, _ *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
 			return &paramapi.GetParameterHistoryOutput{
 				Parameters: []paramapi.ParameterHistory{
@@ -174,6 +175,7 @@ func TestGetParameterWithVersion_VersionNotFound(t *testing.T) {
 
 	now := time.Now()
 	mock := &mockClient{
+		//nolint:lll // mock function signature
 		getParameterHistoryFunc: func(_ context.Context, _ *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
 			return &paramapi.GetParameterHistoryOutput{
 				Parameters: []paramapi.ParameterHistory{
@@ -195,6 +197,7 @@ func TestGetParameterWithVersion_EmptyHistory(t *testing.T) {
 	t.Parallel()
 
 	mock := &mockClient{
+		//nolint:lll // mock function signature
 		getParameterHistoryFunc: func(_ context.Context, _ *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
 			return &paramapi.GetParameterHistoryOutput{
 				Parameters: []paramapi.ParameterHistory{},
@@ -229,6 +232,7 @@ func TestGetParameterWithVersion_GetParameterHistoryError(t *testing.T) {
 	t.Parallel()
 
 	mock := &mockClient{
+		//nolint:lll // mock function signature
 		getParameterHistoryFunc: func(_ context.Context, _ *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
 			return nil, fmt.Errorf("AWS error")
 		},

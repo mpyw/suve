@@ -87,7 +87,7 @@ EXAMPLES:
    suve param log --since 2024-01-01T00:00:00Z /app/config  Show versions since date
    suve param log --output=json /app/config               Output as JSON`,
 		Flags: []cli.Flag{
-			&cli.IntFlag{
+			&cli.Int32Flag{
 				Name:    "number",
 				Aliases: []string{"n"},
 				Value:   10, //nolint:mnd // default number of versions to display
@@ -128,7 +128,7 @@ EXAMPLES:
 				Name:  "output",
 				Usage: "Output format: text (default) or json",
 			},
-			&cli.IntFlag{
+			&cli.Int32Flag{
 				Name:  "max-value-length",
 				Value: 0,
 				Usage: "Maximum value preview length (0 = auto: unlimited for normal, terminal width for oneline)",
@@ -146,9 +146,8 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	name := cmd.Args().First()
 
 	opts := Options{
-		Name: name,
-		//nolint:gosec // G115: CLI flag is bounded, overflow not possible in practice
-		MaxResults:     int32(cmd.Int("number")),
+		Name:           name,
+		MaxResults:     cmd.Int32("number"),
 		ShowPatch:      cmd.Bool("patch"),
 		ParseJSON:      cmd.Bool("parse-json"),
 		Reverse:        cmd.Bool("reverse"),

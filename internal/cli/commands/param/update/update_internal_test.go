@@ -15,6 +15,7 @@ type mockGetParameterClient struct {
 	err    error
 }
 
+//nolint:lll // mock function signature
 func (m *mockGetParameterClient) GetParameter(_ context.Context, _ *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
 	if m.err != nil {
 		return nil, m.err

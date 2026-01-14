@@ -42,6 +42,7 @@ func (m *mockShowClient) ListSecretVersionIds(_ context.Context, _ *secretapi.Li
 	return m.listVersionsResult, nil
 }
 
+//nolint:lll // mock function signature
 func (m *mockShowClient) DescribeSecret(_ context.Context, _ *secretapi.DescribeSecretInput, _ ...func(*secretapi.Options)) (*secretapi.DescribeSecretOutput, error) {
 	if m.describeSecretErr != nil {
 		return nil, m.describeSecretErr

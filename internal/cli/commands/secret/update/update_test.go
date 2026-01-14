@@ -39,11 +39,15 @@ func TestCommand_Validation(t *testing.T) {
 }
 
 type mockClient struct {
+	//nolint:lll // mock function signature
 	getSecretValueFunc func(ctx context.Context, params *secretapi.GetSecretValueInput, optFns ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error)
+	//nolint:lll // mock function signature
 	putSecretValueFunc func(ctx context.Context, params *secretapi.PutSecretValueInput, optFns ...func(*secretapi.Options)) (*secretapi.PutSecretValueOutput, error)
+	//nolint:lll // mock function signature
 	updateSecretFunc   func(ctx context.Context, params *secretapi.UpdateSecretInput, optFns ...func(*secretapi.Options)) (*secretapi.UpdateSecretOutput, error)
 }
 
+//nolint:lll // mock function signature
 func (m *mockClient) GetSecretValue(ctx context.Context, params *secretapi.GetSecretValueInput, optFns ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) {
 	if m.getSecretValueFunc != nil {
 		return m.getSecretValueFunc(ctx, params, optFns...)
@@ -54,6 +58,7 @@ func (m *mockClient) GetSecretValue(ctx context.Context, params *secretapi.GetSe
 	}, nil
 }
 
+//nolint:lll // mock function signature
 func (m *mockClient) PutSecretValue(ctx context.Context, params *secretapi.PutSecretValueInput, optFns ...func(*secretapi.Options)) (*secretapi.PutSecretValueOutput, error) {
 	if m.putSecretValueFunc != nil {
 		return m.putSecretValueFunc(ctx, params, optFns...)
@@ -62,6 +67,7 @@ func (m *mockClient) PutSecretValue(ctx context.Context, params *secretapi.PutSe
 	return nil, fmt.Errorf("PutSecretValue not mocked")
 }
 
+//nolint:lll // mock function signature
 func (m *mockClient) UpdateSecret(ctx context.Context, params *secretapi.UpdateSecretInput, optFns ...func(*secretapi.Options)) (*secretapi.UpdateSecretOutput, error) {
 	if m.updateSecretFunc != nil {
 		return m.updateSecretFunc(ctx, params, optFns...)
@@ -83,6 +89,7 @@ func TestRun(t *testing.T) {
 			name: "update secret",
 			opts: update.Options{Name: "my-secret", Value: "new-value"},
 			mock: &mockClient{
+				//nolint:lll // mock function signature
 				putSecretValueFunc: func(_ context.Context, params *secretapi.PutSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.PutSecretValueOutput, error) {
 					assert.Equal(t, "my-secret", lo.FromPtr(params.SecretId))
 					assert.Equal(t, "new-value", lo.FromPtr(params.SecretString))
@@ -111,6 +118,7 @@ func TestRun(t *testing.T) {
 						ARN:       lo.ToPtr("arn:aws:secretsmanager:us-east-1:123456789012:secret:my-secret"),
 					}, nil
 				},
+				//nolint:lll // mock function signature
 				updateSecretFunc: func(_ context.Context, params *secretapi.UpdateSecretInput, _ ...func(*secretapi.Options)) (*secretapi.UpdateSecretOutput, error) {
 					assert.Equal(t, "my-secret", lo.FromPtr(params.SecretId))
 					assert.Equal(t, "updated description", lo.FromPtr(params.Description))
@@ -129,6 +137,7 @@ func TestRun(t *testing.T) {
 			opts:    update.Options{Name: "my-secret", Value: "new-value"},
 			wantErr: "failed to update secret value",
 			mock: &mockClient{
+				//nolint:lll // mock function signature
 				putSecretValueFunc: func(_ context.Context, _ *secretapi.PutSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.PutSecretValueOutput, error) {
 					return nil, fmt.Errorf("AWS error")
 				},
@@ -139,6 +148,7 @@ func TestRun(t *testing.T) {
 			opts:    update.Options{Name: "my-secret", Value: "new-value", Description: "desc"},
 			wantErr: "failed to update secret description",
 			mock: &mockClient{
+				//nolint:lll // mock function signature
 				putSecretValueFunc: func(_ context.Context, _ *secretapi.PutSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.PutSecretValueOutput, error) {
 					return &secretapi.PutSecretValueOutput{
 						Name:      lo.ToPtr("my-secret"),

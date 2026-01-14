@@ -28,6 +28,7 @@ func (m *mockUpdateClient) GetParameter(_ context.Context, _ *paramapi.GetParame
 	return m.getParameterResult, nil
 }
 
+//nolint:lll // mock function signature
 func (m *mockUpdateClient) PutParameter(_ context.Context, _ *paramapi.PutParameterInput, _ ...func(*paramapi.Options)) (*paramapi.PutParameterOutput, error) {
 	if m.putParameterErr != nil {
 		return nil, m.putParameterErr

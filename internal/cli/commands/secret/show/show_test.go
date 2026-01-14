@@ -42,21 +42,27 @@ func TestCommand_Validation(t *testing.T) {
 }
 
 type mockClient struct {
+	//nolint:lll // mock function signature
 	getSecretValueFunc func(ctx context.Context, params *secretapi.GetSecretValueInput, optFns ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error)
 	//nolint:revive,stylecheck // Field name matches AWS SDK method name
+	//nolint:lll // mock function signature
 	listSecretVersionIdsFunc func(ctx context.Context, params *secretapi.ListSecretVersionIDsInput, optFns ...func(*secretapi.Options)) (*secretapi.ListSecretVersionIDsOutput, error)
+	//nolint:lll // mock function signature
 	describeSecretFunc       func(ctx context.Context, params *secretapi.DescribeSecretInput, optFns ...func(*secretapi.Options)) (*secretapi.DescribeSecretOutput, error)
 }
 
+//nolint:lll // mock function signature
 func (m *mockClient) GetSecretValue(ctx context.Context, params *secretapi.GetSecretValueInput, optFns ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) {
 	return m.getSecretValueFunc(ctx, params, optFns...)
 }
 
 //nolint:revive,stylecheck // Method name must match AWS SDK interface
+//nolint:lll // mock function signature
 func (m *mockClient) ListSecretVersionIds(ctx context.Context, params *secretapi.ListSecretVersionIDsInput, optFns ...func(*secretapi.Options)) (*secretapi.ListSecretVersionIDsOutput, error) {
 	return m.listSecretVersionIdsFunc(ctx, params, optFns...)
 }
 
+//nolint:lll // mock function signature
 func (m *mockClient) DescribeSecret(ctx context.Context, params *secretapi.DescribeSecretInput, optFns ...func(*secretapi.Options)) (*secretapi.DescribeSecretOutput, error) {
 	if m.describeSecretFunc != nil {
 		return m.describeSecretFunc(ctx, params, optFns...)
@@ -82,6 +88,7 @@ func TestRun(t *testing.T) {
 			name: "show latest version",
 			opts: show.Options{Spec: &secretversion.Spec{Name: "my-secret"}},
 			mock: &mockClient{
+				//nolint:lll // mock function signature
 				getSecretValueFunc: func(_ context.Context, _ *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) {
 					return &secretapi.GetSecretValueOutput{
 						Name:          lo.ToPtr("my-secret"),
@@ -102,6 +109,7 @@ func TestRun(t *testing.T) {
 			name: "show with shift",
 			opts: show.Options{Spec: &secretversion.Spec{Name: "my-secret", Shift: 1}},
 			mock: &mockClient{
+				//nolint:lll // mock function signature
 				listSecretVersionIdsFunc: func(_ context.Context, _ *secretapi.ListSecretVersionIDsInput, _ ...func(*secretapi.Options)) (*secretapi.ListSecretVersionIDsOutput, error) {
 					return &secretapi.ListSecretVersionIDsOutput{
 						Versions: []secretapi.SecretVersionsListEntry{
@@ -111,6 +119,7 @@ func TestRun(t *testing.T) {
 						},
 					}, nil
 				},
+				//nolint:lll // mock function signature
 				getSecretValueFunc: func(_ context.Context, _ *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) {
 					return &secretapi.GetSecretValueOutput{
 						Name:         lo.ToPtr("my-secret"),
@@ -127,6 +136,7 @@ func TestRun(t *testing.T) {
 			name: "show JSON formatted with sorted keys",
 			opts: show.Options{Spec: &secretversion.Spec{Name: "my-secret"}, ParseJSON: true},
 			mock: &mockClient{
+				//nolint:lll // mock function signature
 				getSecretValueFunc: func(_ context.Context, _ *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) {
 					return &secretapi.GetSecretValueOutput{
 						Name:          lo.ToPtr("my-secret"),
@@ -151,6 +161,7 @@ func TestRun(t *testing.T) {
 			name: "error from AWS",
 			opts: show.Options{Spec: &secretversion.Spec{Name: "my-secret"}},
 			mock: &mockClient{
+				//nolint:lll // mock function signature
 				getSecretValueFunc: func(_ context.Context, _ *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) {
 					return nil, fmt.Errorf("AWS error")
 				},
@@ -161,6 +172,7 @@ func TestRun(t *testing.T) {
 			name: "show without optional fields",
 			opts: show.Options{Spec: &secretversion.Spec{Name: "my-secret"}},
 			mock: &mockClient{
+				//nolint:lll // mock function signature
 				getSecretValueFunc: func(_ context.Context, _ *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) {
 					return &secretapi.GetSecretValueOutput{
 						Name:         lo.ToPtr("my-secret"),
@@ -180,6 +192,7 @@ func TestRun(t *testing.T) {
 			name: "json flag with non-JSON value warns",
 			opts: show.Options{Spec: &secretversion.Spec{Name: "my-secret"}, ParseJSON: true},
 			mock: &mockClient{
+				//nolint:lll // mock function signature
 				getSecretValueFunc: func(_ context.Context, _ *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) {
 					return &secretapi.GetSecretValueOutput{
 						Name:         lo.ToPtr("my-secret"),
@@ -196,6 +209,7 @@ func TestRun(t *testing.T) {
 			name: "raw mode outputs only value",
 			opts: show.Options{Spec: &secretversion.Spec{Name: "my-secret"}, Raw: true},
 			mock: &mockClient{
+				//nolint:lll // mock function signature
 				getSecretValueFunc: func(_ context.Context, _ *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) {
 					return &secretapi.GetSecretValueOutput{
 						Name:         lo.ToPtr("my-secret"),
@@ -211,6 +225,7 @@ func TestRun(t *testing.T) {
 			name: "raw mode with shift",
 			opts: show.Options{Spec: &secretversion.Spec{Name: "my-secret", Shift: 1}, Raw: true},
 			mock: &mockClient{
+				//nolint:lll // mock function signature
 				listSecretVersionIdsFunc: func(_ context.Context, _ *secretapi.ListSecretVersionIDsInput, _ ...func(*secretapi.Options)) (*secretapi.ListSecretVersionIDsOutput, error) {
 					return &secretapi.ListSecretVersionIDsOutput{
 						Versions: []secretapi.SecretVersionsListEntry{

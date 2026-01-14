@@ -533,6 +533,7 @@ func TestRun(t *testing.T) {
 				ParseJSON: true,
 			},
 			mock: &mockClient{
+				//nolint:lll // mock function signature
 				getParameterFunc: func(_ context.Context, params *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
 					name := lo.FromPtr(params.Name)
 					if name == testParamVersion1 {
@@ -570,6 +571,7 @@ func TestRun(t *testing.T) {
 				ParseJSON: true,
 			},
 			mock: &mockClient{
+				//nolint:lll // mock function signature
 				getParameterFunc: func(_ context.Context, params *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
 					name := lo.FromPtr(params.Name)
 					if name == testParamVersion1 {

@@ -15,11 +15,14 @@ import (
 )
 
 type mockClient struct {
+	//nolint:lll // mock function signature
 	getSecretValueFunc func(ctx context.Context, params *secretapi.GetSecretValueInput, optFns ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error)
 	//nolint:revive,stylecheck // Field name matches AWS SDK method name
+	//nolint:lll // mock function signature
 	listSecretVersionIdsFunc func(ctx context.Context, params *secretapi.ListSecretVersionIDsInput, optFns ...func(*secretapi.Options)) (*secretapi.ListSecretVersionIDsOutput, error)
 }
 
+//nolint:lll // mock function signature
 func (m *mockClient) GetSecretValue(ctx context.Context, params *secretapi.GetSecretValueInput, optFns ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) {
 	if m.getSecretValueFunc != nil {
 		return m.getSecretValueFunc(ctx, params, optFns...)
@@ -29,6 +32,7 @@ func (m *mockClient) GetSecretValue(ctx context.Context, params *secretapi.GetSe
 }
 
 //nolint:revive,stylecheck // Method name must match AWS SDK interface
+//nolint:lll // mock function signature
 func (m *mockClient) ListSecretVersionIds(ctx context.Context, params *secretapi.ListSecretVersionIDsInput, optFns ...func(*secretapi.Options)) (*secretapi.ListSecretVersionIDsOutput, error) {
 	if m.listSecretVersionIdsFunc != nil {
 		return m.listSecretVersionIdsFunc(ctx, params, optFns...)
@@ -42,6 +46,7 @@ func TestGetSecretWithVersion_Latest(t *testing.T) {
 
 	now := time.Now()
 	mock := &mockClient{
+		//nolint:lll // mock function signature
 		getSecretValueFunc: func(_ context.Context, params *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) {
 			assert.Equal(t, "my-secret", lo.FromPtr(params.SecretId))
 
@@ -68,6 +73,7 @@ func TestGetSecretWithVersion_WithLabel(t *testing.T) {
 	t.Parallel()
 
 	mock := &mockClient{
+		//nolint:lll // mock function signature
 		getSecretValueFunc: func(_ context.Context, params *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) {
 			assert.Equal(t, "AWSPREVIOUS", lo.FromPtr(params.VersionStage))
 
@@ -93,6 +99,7 @@ func TestGetSecretWithVersion_Shift(t *testing.T) {
 
 	now := time.Now()
 	mock := &mockClient{
+		//nolint:lll // mock function signature
 		listSecretVersionIdsFunc: func(_ context.Context, params *secretapi.ListSecretVersionIDsInput, _ ...func(*secretapi.Options)) (*secretapi.ListSecretVersionIDsOutput, error) {
 			assert.Equal(t, "my-secret", lo.FromPtr(params.SecretId))
 
@@ -104,6 +111,7 @@ func TestGetSecretWithVersion_Shift(t *testing.T) {
 				},
 			}, nil
 		},
+		//nolint:lll // mock function signature
 		getSecretValueFunc: func(_ context.Context, params *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) {
 			// After sorting by date descending, shift 1 should give v2
 			assert.Equal(t, "v2", lo.FromPtr(params.VersionId))
@@ -128,6 +136,7 @@ func TestGetSecretWithVersion_ShiftOutOfRange(t *testing.T) {
 
 	now := time.Now()
 	mock := &mockClient{
+		//nolint:lll // mock function signature
 		listSecretVersionIdsFunc: func(_ context.Context, _ *secretapi.ListSecretVersionIDsInput, _ ...func(*secretapi.Options)) (*secretapi.ListSecretVersionIDsOutput, error) {
 			return &secretapi.ListSecretVersionIDsOutput{
 				Versions: []secretapi.SecretVersionsListEntry{
@@ -148,6 +157,7 @@ func TestGetSecretWithVersion_ListVersionsError(t *testing.T) {
 	t.Parallel()
 
 	mock := &mockClient{
+		//nolint:lll // mock function signature
 		listSecretVersionIdsFunc: func(_ context.Context, _ *secretapi.ListSecretVersionIDsInput, _ ...func(*secretapi.Options)) (*secretapi.ListSecretVersionIDsOutput, error) {
 			return nil, fmt.Errorf("AWS error")
 		},
@@ -164,6 +174,7 @@ func TestGetSecretWithVersion_GetSecretError(t *testing.T) {
 	t.Parallel()
 
 	mock := &mockClient{
+		//nolint:lll // mock function signature
 		getSecretValueFunc: func(_ context.Context, _ *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) {
 			return nil, fmt.Errorf("AWS error")
 		},
@@ -180,6 +191,7 @@ func TestGetSecretWithVersion_EmptyVersionList(t *testing.T) {
 	t.Parallel()
 
 	mock := &mockClient{
+		//nolint:lll // mock function signature
 		listSecretVersionIdsFunc: func(_ context.Context, _ *secretapi.ListSecretVersionIDsInput, _ ...func(*secretapi.Options)) (*secretapi.ListSecretVersionIDsOutput, error) {
 			return &secretapi.ListSecretVersionIDsOutput{
 				Versions: []secretapi.SecretVersionsListEntry{},
@@ -199,6 +211,7 @@ func TestGetSecretWithVersion_SortByCreatedDate(t *testing.T) {
 
 	now := time.Now()
 	mock := &mockClient{
+		//nolint:lll // mock function signature
 		listSecretVersionIdsFunc: func(_ context.Context, _ *secretapi.ListSecretVersionIDsInput, _ ...func(*secretapi.Options)) (*secretapi.ListSecretVersionIDsOutput, error) {
 			// Return in random order to verify sorting
 			return &secretapi.ListSecretVersionIDsOutput{
@@ -209,6 +222,7 @@ func TestGetSecretWithVersion_SortByCreatedDate(t *testing.T) {
 				},
 			}, nil
 		},
+		//nolint:lll // mock function signature
 		getSecretValueFunc: func(_ context.Context, params *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) {
 			// Shift 2 should be the oldest (v1) after sorting by date descending
 			assert.Equal(t, "v1", lo.FromPtr(params.VersionId))
@@ -233,6 +247,7 @@ func TestGetSecretWithVersion_NilCreatedDate(t *testing.T) {
 
 	now := time.Now()
 	mock := &mockClient{
+		//nolint:lll // mock function signature
 		listSecretVersionIdsFunc: func(_ context.Context, _ *secretapi.ListSecretVersionIDsInput, _ ...func(*secretapi.Options)) (*secretapi.ListSecretVersionIDsOutput, error) {
 			// Multiple nil dates to ensure both branches of the nil check are covered
 			return &secretapi.ListSecretVersionIDsOutput{
@@ -243,6 +258,7 @@ func TestGetSecretWithVersion_NilCreatedDate(t *testing.T) {
 				},
 			}, nil
 		},
+		//nolint:lll // mock function signature
 		getSecretValueFunc: func(_ context.Context, params *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) {
 			// v2 has a date, v1/v3 don't, so after sorting v2 should be first (index 0)
 			// Versions with nil dates are sorted to the end
@@ -265,6 +281,7 @@ func TestGetSecretWithVersion_WithID(t *testing.T) {
 	t.Parallel()
 
 	mock := &mockClient{
+		//nolint:lll // mock function signature
 		getSecretValueFunc: func(_ context.Context, params *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) {
 			assert.Equal(t, "abc123", lo.FromPtr(params.VersionId))
 
@@ -289,6 +306,7 @@ func TestGetSecretWithVersion_IDWithShift(t *testing.T) {
 
 	now := time.Now()
 	mock := &mockClient{
+		//nolint:lll // mock function signature
 		listSecretVersionIdsFunc: func(_ context.Context, _ *secretapi.ListSecretVersionIDsInput, _ ...func(*secretapi.Options)) (*secretapi.ListSecretVersionIDsOutput, error) {
 			// Versions sorted by date descending after sort: v3(newest), v2, v1(oldest)
 			return &secretapi.ListSecretVersionIDsOutput{
@@ -299,6 +317,7 @@ func TestGetSecretWithVersion_IDWithShift(t *testing.T) {
 				},
 			}, nil
 		},
+		//nolint:lll // mock function signature
 		getSecretValueFunc: func(_ context.Context, params *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) {
 			// ID=v2 is at index 1 after sorting, shift 1 should give v1 (index 2)
 			assert.Equal(t, "v1", lo.FromPtr(params.VersionId))
@@ -324,6 +343,7 @@ func TestGetSecretWithVersion_LabelWithShift(t *testing.T) {
 
 	now := time.Now()
 	mock := &mockClient{
+		//nolint:lll // mock function signature
 		listSecretVersionIdsFunc: func(_ context.Context, _ *secretapi.ListSecretVersionIDsInput, _ ...func(*secretapi.Options)) (*secretapi.ListSecretVersionIDsOutput, error) {
 			// v3 has AWSCURRENT, v2 has AWSPREVIOUS
 			return &secretapi.ListSecretVersionIDsOutput{
@@ -334,6 +354,7 @@ func TestGetSecretWithVersion_LabelWithShift(t *testing.T) {
 				},
 			}, nil
 		},
+		//nolint:lll // mock function signature
 		getSecretValueFunc: func(_ context.Context, params *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) {
 			// AWSCURRENT=v3 is at index 0 after sorting, shift 1 should give v2 (index 1)
 			assert.Equal(t, "v2", lo.FromPtr(params.VersionId))
@@ -359,6 +380,7 @@ func TestGetSecretWithVersion_IDNotFound(t *testing.T) {
 
 	now := time.Now()
 	mock := &mockClient{
+		//nolint:lll // mock function signature
 		listSecretVersionIdsFunc: func(_ context.Context, _ *secretapi.ListSecretVersionIDsInput, _ ...func(*secretapi.Options)) (*secretapi.ListSecretVersionIDsOutput, error) {
 			return &secretapi.ListSecretVersionIDsOutput{
 				Versions: []secretapi.SecretVersionsListEntry{
@@ -381,6 +403,7 @@ func TestGetSecretWithVersion_LabelNotFound(t *testing.T) {
 
 	now := time.Now()
 	mock := &mockClient{
+		//nolint:lll // mock function signature
 		listSecretVersionIdsFunc: func(_ context.Context, _ *secretapi.ListSecretVersionIDsInput, _ ...func(*secretapi.Options)) (*secretapi.ListSecretVersionIDsOutput, error) {
 			return &secretapi.ListSecretVersionIDsOutput{
 				Versions: []secretapi.SecretVersionsListEntry{

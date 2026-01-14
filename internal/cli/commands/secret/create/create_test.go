@@ -39,9 +39,11 @@ func TestCommand_Validation(t *testing.T) {
 }
 
 type mockClient struct {
+	//nolint:lll // mock function signature
 	createSecretFunc func(ctx context.Context, params *secretapi.CreateSecretInput, optFns ...func(*secretapi.Options)) (*secretapi.CreateSecretOutput, error)
 }
 
+//nolint:lll // mock function signature
 func (m *mockClient) CreateSecret(ctx context.Context, params *secretapi.CreateSecretInput, optFns ...func(*secretapi.Options)) (*secretapi.CreateSecretOutput, error) {
 	if m.createSecretFunc != nil {
 		return m.createSecretFunc(ctx, params, optFns...)
@@ -63,6 +65,7 @@ func TestRun(t *testing.T) {
 			name: "create secret",
 			opts: create.Options{Name: "my-secret", Value: "secret-value"},
 			mock: &mockClient{
+				//nolint:lll // mock function signature
 				createSecretFunc: func(_ context.Context, params *secretapi.CreateSecretInput, _ ...func(*secretapi.Options)) (*secretapi.CreateSecretOutput, error) {
 					assert.Equal(t, "my-secret", lo.FromPtr(params.Name))
 					assert.Equal(t, "secret-value", lo.FromPtr(params.SecretString))
@@ -83,6 +86,7 @@ func TestRun(t *testing.T) {
 			name: "create with description",
 			opts: create.Options{Name: "my-secret", Value: "secret-value", Description: "Test description"},
 			mock: &mockClient{
+				//nolint:lll // mock function signature
 				createSecretFunc: func(_ context.Context, params *secretapi.CreateSecretInput, _ ...func(*secretapi.Options)) (*secretapi.CreateSecretOutput, error) {
 					assert.Equal(t, "Test description", lo.FromPtr(params.Description))
 

@@ -31,10 +31,13 @@ func TestCommand_Validation(t *testing.T) {
 }
 
 type mockClient struct {
+	//nolint:lll // mock function signature
 	getSecretValueFunc func(ctx context.Context, params *secretapi.GetSecretValueInput, optFns ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error)
+	//nolint:lll // mock function signature
 	deleteSecretFunc   func(ctx context.Context, params *secretapi.DeleteSecretInput, optFns ...func(*secretapi.Options)) (*secretapi.DeleteSecretOutput, error)
 }
 
+//nolint:lll // mock function signature
 func (m *mockClient) GetSecretValue(ctx context.Context, params *secretapi.GetSecretValueInput, optFns ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) {
 	if m.getSecretValueFunc != nil {
 		return m.getSecretValueFunc(ctx, params, optFns...)
@@ -43,6 +46,7 @@ func (m *mockClient) GetSecretValue(ctx context.Context, params *secretapi.GetSe
 	return nil, &secretapi.ResourceNotFoundException{Message: lo.ToPtr("not found")}
 }
 
+//nolint:lll // mock function signature
 func (m *mockClient) DeleteSecret(ctx context.Context, params *secretapi.DeleteSecretInput, optFns ...func(*secretapi.Options)) (*secretapi.DeleteSecretOutput, error) {
 	if m.deleteSecretFunc != nil {
 		return m.deleteSecretFunc(ctx, params, optFns...)
@@ -68,6 +72,7 @@ func TestRun(t *testing.T) {
 			name: "delete with recovery window",
 			opts: delete.Options{Name: "my-secret", Force: false, RecoveryWindow: 30},
 			mock: &mockClient{
+				//nolint:lll // mock function signature
 				deleteSecretFunc: func(_ context.Context, params *secretapi.DeleteSecretInput, _ ...func(*secretapi.Options)) (*secretapi.DeleteSecretOutput, error) {
 					assert.False(t, lo.FromPtr(params.ForceDeleteWithoutRecovery), "expected ForceDeleteWithoutRecovery to be false")
 					assert.Equal(t, int64(30), lo.FromPtr(params.RecoveryWindowInDays))
@@ -88,6 +93,7 @@ func TestRun(t *testing.T) {
 			name: "force delete",
 			opts: delete.Options{Name: "my-secret", Force: true},
 			mock: &mockClient{
+				//nolint:lll // mock function signature
 				deleteSecretFunc: func(_ context.Context, params *secretapi.DeleteSecretInput, _ ...func(*secretapi.Options)) (*secretapi.DeleteSecretOutput, error) {
 					assert.True(t, lo.FromPtr(params.ForceDeleteWithoutRecovery), "expected ForceDeleteWithoutRecovery to be true")
 

@@ -165,6 +165,7 @@ func TestRun(t *testing.T) {
 			name: "invalid regex filter",
 			opts: list.Options{Filter: "[invalid"},
 			mock: &mockClient{
+				//nolint:lll // mock function signature
 				describeParametersFunc: func(_ context.Context, _ *paramapi.DescribeParametersInput, _ ...func(*paramapi.Options)) (*paramapi.DescribeParametersOutput, error) {
 					return &paramapi.DescribeParametersOutput{}, nil
 				},
@@ -184,6 +185,7 @@ func TestRun(t *testing.T) {
 						},
 					}, nil
 				},
+				//nolint:lll // mock function signature
 				getParametersFunc: func(_ context.Context, params *paramapi.GetParametersInput, _ ...func(*paramapi.Options)) (*paramapi.GetParametersOutput, error) {
 					values := map[string]string{
 						"/app/param1": "value1",
@@ -216,6 +218,7 @@ func TestRun(t *testing.T) {
 			name: "JSON output without show",
 			opts: list.Options{Output: output.FormatJSON},
 			mock: &mockClient{
+				//nolint:lll // mock function signature
 				describeParametersFunc: func(_ context.Context, _ *paramapi.DescribeParametersInput, _ ...func(*paramapi.Options)) (*paramapi.DescribeParametersOutput, error) {
 					return &paramapi.DescribeParametersOutput{
 						Parameters: []paramapi.ParameterMetadata{
@@ -236,6 +239,7 @@ func TestRun(t *testing.T) {
 			name: "JSON output with show",
 			opts: list.Options{Output: output.FormatJSON, Show: true},
 			mock: &mockClient{
+				//nolint:lll // mock function signature
 				describeParametersFunc: func(_ context.Context, _ *paramapi.DescribeParametersInput, _ ...func(*paramapi.Options)) (*paramapi.DescribeParametersOutput, error) {
 					return &paramapi.DescribeParametersOutput{
 						Parameters: []paramapi.ParameterMetadata{
@@ -243,6 +247,7 @@ func TestRun(t *testing.T) {
 						},
 					}, nil
 				},
+				//nolint:lll // mock function signature
 				getParametersFunc: func(_ context.Context, params *paramapi.GetParametersInput, _ ...func(*paramapi.Options)) (*paramapi.GetParametersOutput, error) {
 					var result []paramapi.Parameter
 					for _, name := range params.Names {
@@ -267,6 +272,7 @@ func TestRun(t *testing.T) {
 			name: "JSON output with show and error",
 			opts: list.Options{Output: output.FormatJSON, Show: true},
 			mock: &mockClient{
+				//nolint:lll // mock function signature
 				describeParametersFunc: func(_ context.Context, _ *paramapi.DescribeParametersInput, _ ...func(*paramapi.Options)) (*paramapi.DescribeParametersOutput, error) {
 					return &paramapi.DescribeParametersOutput{
 						Parameters: []paramapi.ParameterMetadata{
@@ -274,6 +280,7 @@ func TestRun(t *testing.T) {
 						},
 					}, nil
 				},
+				//nolint:lll // mock function signature
 				getParametersFunc: func(_ context.Context, params *paramapi.GetParametersInput, _ ...func(*paramapi.Options)) (*paramapi.GetParametersOutput, error) {
 					// Return all requested parameters as invalid (simulates not found)
 					return &paramapi.GetParametersOutput{
@@ -291,6 +298,7 @@ func TestRun(t *testing.T) {
 			name: "text output with error",
 			opts: list.Options{Show: true},
 			mock: &mockClient{
+				//nolint:lll // mock function signature
 				describeParametersFunc: func(_ context.Context, _ *paramapi.DescribeParametersInput, _ ...func(*paramapi.Options)) (*paramapi.DescribeParametersOutput, error) {
 					return &paramapi.DescribeParametersOutput{
 						Parameters: []paramapi.ParameterMetadata{
@@ -298,6 +306,7 @@ func TestRun(t *testing.T) {
 						},
 					}, nil
 				},
+				//nolint:lll // mock function signature
 				getParametersFunc: func(_ context.Context, params *paramapi.GetParametersInput, _ ...func(*paramapi.Options)) (*paramapi.GetParametersOutput, error) {
 					// Return all requested parameters as invalid (simulates not found)
 					return &paramapi.GetParametersOutput{

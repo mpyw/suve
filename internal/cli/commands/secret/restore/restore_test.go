@@ -30,9 +30,11 @@ func TestCommand_Validation(t *testing.T) {
 }
 
 type mockClient struct {
+	//nolint:lll // mock function signature
 	restoreSecretFunc func(ctx context.Context, params *secretapi.RestoreSecretInput, optFns ...func(*secretapi.Options)) (*secretapi.RestoreSecretOutput, error)
 }
 
+//nolint:lll // mock function signature
 func (m *mockClient) RestoreSecret(ctx context.Context, params *secretapi.RestoreSecretInput, optFns ...func(*secretapi.Options)) (*secretapi.RestoreSecretOutput, error) {
 	if m.restoreSecretFunc != nil {
 		return m.restoreSecretFunc(ctx, params, optFns...)
@@ -54,6 +56,7 @@ func TestRun(t *testing.T) {
 			name: "restore secret",
 			opts: restore.Options{Name: "my-secret"},
 			mock: &mockClient{
+				//nolint:lll // mock function signature
 				restoreSecretFunc: func(_ context.Context, params *secretapi.RestoreSecretInput, _ ...func(*secretapi.Options)) (*secretapi.RestoreSecretOutput, error) {
 					assert.Equal(t, "my-secret", lo.FromPtr(params.SecretId))
 
@@ -72,6 +75,7 @@ func TestRun(t *testing.T) {
 			name: "error from AWS",
 			opts: restore.Options{Name: "my-secret"},
 			mock: &mockClient{
+				//nolint:lll // mock function signature
 				restoreSecretFunc: func(_ context.Context, _ *secretapi.RestoreSecretInput, _ ...func(*secretapi.Options)) (*secretapi.RestoreSecretOutput, error) {
 					return nil, fmt.Errorf("AWS error")
 				},

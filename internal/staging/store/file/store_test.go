@@ -225,6 +225,7 @@ func TestStore_Drain(t *testing.T) {
 		path := filepath.Join(tmpDir, "stage.json")
 
 		// Write encrypted data
+		//nolint:lll // mock function signature
 		testData := `{"version": 2, "entries": {"param": {"/test": {"operation": "create", "value": "secret"}}, "secret": {}}, "tags": {"param": {}, "secret": {}}}`
 		encrypted, err := crypt.Encrypt([]byte(testData), "mypassword")
 		require.NoError(t, err)

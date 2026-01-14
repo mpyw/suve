@@ -400,11 +400,14 @@ func assertSpec(t *testing.T, label string, got *secretversion.Spec, want *wantS
 }
 
 type mockClient struct {
+	//nolint:lll // mock function signature
 	getSecretValueFunc func(ctx context.Context, params *secretapi.GetSecretValueInput, optFns ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error)
 	//nolint:revive,stylecheck // Field name matches AWS SDK method name
+	//nolint:lll // mock function signature
 	listSecretVersionIdsFunc func(ctx context.Context, params *secretapi.ListSecretVersionIDsInput, optFns ...func(*secretapi.Options)) (*secretapi.ListSecretVersionIDsOutput, error)
 }
 
+//nolint:lll // mock function signature
 func (m *mockClient) GetSecretValue(ctx context.Context, params *secretapi.GetSecretValueInput, optFns ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) {
 	if m.getSecretValueFunc != nil {
 		return m.getSecretValueFunc(ctx, params, optFns...)
@@ -414,6 +417,7 @@ func (m *mockClient) GetSecretValue(ctx context.Context, params *secretapi.GetSe
 }
 
 //nolint:revive,stylecheck // Method name must match AWS SDK interface
+//nolint:lll // mock function signature
 func (m *mockClient) ListSecretVersionIds(ctx context.Context, params *secretapi.ListSecretVersionIDsInput, optFns ...func(*secretapi.Options)) (*secretapi.ListSecretVersionIDsOutput, error) {
 	if m.listSecretVersionIdsFunc != nil {
 		return m.listSecretVersionIdsFunc(ctx, params, optFns...)
@@ -438,6 +442,7 @@ func TestRunnerRun(t *testing.T) {
 				Spec2: &secretversion.Spec{Name: "my-secret", Absolute: secretversion.AbsoluteSpec{Label: lo.ToPtr("AWSCURRENT")}},
 			},
 			mock: &mockClient{
+				//nolint:lll // mock function signature
 				getSecretValueFunc: func(_ context.Context, params *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) {
 					stage := lo.FromPtr(params.VersionStage)
 					if stage == testStageLabelPrevious {
@@ -468,6 +473,7 @@ func TestRunnerRun(t *testing.T) {
 				Spec2: &secretversion.Spec{Name: "my-secret", Absolute: secretversion.AbsoluteSpec{Label: lo.ToPtr("AWSCURRENT")}},
 			},
 			mock: &mockClient{
+				//nolint:lll // mock function signature
 				getSecretValueFunc: func(_ context.Context, params *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) {
 					stage := lo.FromPtr(params.VersionStage)
 					if stage == testStageLabelPrevious {
@@ -498,6 +504,7 @@ func TestRunnerRun(t *testing.T) {
 				Spec2: &secretversion.Spec{Name: "my-secret", Absolute: secretversion.AbsoluteSpec{Label: lo.ToPtr("AWSCURRENT")}},
 			},
 			mock: &mockClient{
+				//nolint:lll // mock function signature
 				getSecretValueFunc: func(_ context.Context, params *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) {
 					if lo.FromPtr(params.VersionStage) == testStageLabelPrevious {
 						return nil, fmt.Errorf("version not found")
@@ -519,6 +526,7 @@ func TestRunnerRun(t *testing.T) {
 				Spec2: &secretversion.Spec{Name: "my-secret", Absolute: secretversion.AbsoluteSpec{Label: lo.ToPtr("AWSCURRENT")}},
 			},
 			mock: &mockClient{
+				//nolint:lll // mock function signature
 				getSecretValueFunc: func(_ context.Context, params *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) {
 					if lo.FromPtr(params.VersionStage) == "AWSCURRENT" {
 						return nil, fmt.Errorf("version not found")
@@ -541,6 +549,7 @@ func TestRunnerRun(t *testing.T) {
 				ParseJSON: true,
 			},
 			mock: &mockClient{
+				//nolint:lll // mock function signature
 				getSecretValueFunc: func(_ context.Context, params *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) {
 					stage := lo.FromPtr(params.VersionStage)
 					if stage == testStageLabelPrevious {
@@ -572,6 +581,7 @@ func TestRunnerRun(t *testing.T) {
 				ParseJSON: true,
 			},
 			mock: &mockClient{
+				//nolint:lll // mock function signature
 				getSecretValueFunc: func(_ context.Context, params *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) {
 					stage := lo.FromPtr(params.VersionStage)
 					if stage == testStageLabelPrevious {
@@ -628,6 +638,7 @@ func TestRun_IdenticalWarning(t *testing.T) {
 	t.Parallel()
 
 	mock := &mockClient{
+		//nolint:lll // mock function signature
 		getSecretValueFunc: func(_ context.Context, _ *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) {
 			return &secretapi.GetSecretValueOutput{
 				Name:         lo.ToPtr("my-secret"),

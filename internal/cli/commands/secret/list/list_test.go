@@ -34,10 +34,13 @@ func TestCommand_Help(t *testing.T) {
 }
 
 type mockClient struct {
+	//nolint:lll // mock function signature
 	listSecretsFunc    func(ctx context.Context, params *secretapi.ListSecretsInput, optFns ...func(*secretapi.Options)) (*secretapi.ListSecretsOutput, error)
+	//nolint:lll // mock function signature
 	getSecretValueFunc func(ctx context.Context, params *secretapi.GetSecretValueInput, optFns ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error)
 }
 
+//nolint:lll // mock function signature
 func (m *mockClient) ListSecrets(ctx context.Context, params *secretapi.ListSecretsInput, optFns ...func(*secretapi.Options)) (*secretapi.ListSecretsOutput, error) {
 	if m.listSecretsFunc != nil {
 		return m.listSecretsFunc(ctx, params, optFns...)
@@ -46,6 +49,7 @@ func (m *mockClient) ListSecrets(ctx context.Context, params *secretapi.ListSecr
 	return nil, fmt.Errorf("ListSecrets not mocked")
 }
 
+//nolint:lll // mock function signature
 func (m *mockClient) GetSecretValue(ctx context.Context, params *secretapi.GetSecretValueInput, optFns ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) {
 	if m.getSecretValueFunc != nil {
 		return m.getSecretValueFunc(ctx, params, optFns...)
@@ -87,6 +91,7 @@ func TestRun(t *testing.T) {
 			name: "list with prefix filter",
 			opts: list.Options{Prefix: "app/"},
 			mock: &mockClient{
+				//nolint:lll // mock function signature
 				listSecretsFunc: func(_ context.Context, params *secretapi.ListSecretsInput, _ ...func(*secretapi.Options)) (*secretapi.ListSecretsOutput, error) {
 					require.NotEmpty(t, params.Filters, "expected filter to be set")
 
@@ -155,6 +160,7 @@ func TestRun(t *testing.T) {
 						},
 					}, nil
 				},
+				//nolint:lll // mock function signature
 				getSecretValueFunc: func(_ context.Context, params *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) {
 					name := lo.FromPtr(params.SecretId)
 					values := map[string]string{
@@ -203,6 +209,7 @@ func TestRun(t *testing.T) {
 						},
 					}, nil
 				},
+				//nolint:lll // mock function signature
 				getSecretValueFunc: func(_ context.Context, params *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) {
 					return &secretapi.GetSecretValueOutput{
 						Name:         params.SecretId,

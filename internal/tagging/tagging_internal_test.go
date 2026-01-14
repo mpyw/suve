@@ -370,6 +370,7 @@ func TestApplyParam(t *testing.T) {
 			resourceID: "/my/param",
 			change:     &Change{Add: map[string]string{"env": "prod", "team": "platform"}, Remove: maputil.NewSet[string]()},
 			mock: &mockParamClient{
+				//nolint:lll // mock function signature
 				addTagsToResourceFunc: func(_ context.Context, params *paramapi.AddTagsToResourceInput, _ ...func(*paramapi.Options)) (*paramapi.AddTagsToResourceOutput, error) {
 					assert.Equal(t, paramapi.ResourceTypeForTaggingParameter, params.ResourceType)
 					assert.Equal(t, "/my/param", lo.FromPtr(params.ResourceId))
@@ -392,6 +393,7 @@ func TestApplyParam(t *testing.T) {
 			resourceID: "/my/param",
 			change:     &Change{Add: map[string]string{}, Remove: maputil.NewSet("deprecated", "old")},
 			mock: &mockParamClient{
+				//nolint:lll // mock function signature
 				removeTagsFromResourceFunc: func(_ context.Context, params *paramapi.RemoveTagsFromResourceInput, _ ...func(*paramapi.Options)) (*paramapi.RemoveTagsFromResourceOutput, error) {
 					assert.Equal(t, paramapi.ResourceTypeForTaggingParameter, params.ResourceType)
 					assert.Equal(t, "/my/param", lo.FromPtr(params.ResourceId))
@@ -406,6 +408,7 @@ func TestApplyParam(t *testing.T) {
 			resourceID: "/my/param",
 			change:     &Change{Add: map[string]string{"env": "prod"}, Remove: maputil.NewSet("deprecated")},
 			mock: &mockParamClient{
+				//nolint:lll // mock function signature
 				addTagsToResourceFunc: func(_ context.Context, params *paramapi.AddTagsToResourceInput, _ ...func(*paramapi.Options)) (*paramapi.AddTagsToResourceOutput, error) {
 					assert.Equal(t, paramapi.ResourceTypeForTaggingParameter, params.ResourceType)
 					assert.Equal(t, "/my/param", lo.FromPtr(params.ResourceId))
@@ -415,6 +418,7 @@ func TestApplyParam(t *testing.T) {
 
 					return &paramapi.AddTagsToResourceOutput{}, nil
 				},
+				//nolint:lll // mock function signature
 				removeTagsFromResourceFunc: func(_ context.Context, params *paramapi.RemoveTagsFromResourceInput, _ ...func(*paramapi.Options)) (*paramapi.RemoveTagsFromResourceOutput, error) {
 					assert.Equal(t, paramapi.ResourceTypeForTaggingParameter, params.ResourceType)
 					assert.Equal(t, "/my/param", lo.FromPtr(params.ResourceId))
@@ -429,6 +433,7 @@ func TestApplyParam(t *testing.T) {
 			resourceID: "/my/param",
 			change:     &Change{Add: map[string]string{"env": "prod"}, Remove: maputil.NewSet[string]()},
 			mock: &mockParamClient{
+				//nolint:lll // mock function signature
 				addTagsToResourceFunc: func(_ context.Context, _ *paramapi.AddTagsToResourceInput, _ ...func(*paramapi.Options)) (*paramapi.AddTagsToResourceOutput, error) {
 					return nil, fmt.Errorf("access denied")
 				},
@@ -440,6 +445,7 @@ func TestApplyParam(t *testing.T) {
 			resourceID: "/my/param",
 			change:     &Change{Add: map[string]string{}, Remove: maputil.NewSet("deprecated")},
 			mock: &mockParamClient{
+				//nolint:lll // mock function signature
 				removeTagsFromResourceFunc: func(_ context.Context, _ *paramapi.RemoveTagsFromResourceInput, _ ...func(*paramapi.Options)) (*paramapi.RemoveTagsFromResourceOutput, error) {
 					return nil, fmt.Errorf("access denied")
 				},

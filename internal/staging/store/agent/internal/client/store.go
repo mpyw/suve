@@ -55,7 +55,7 @@ func NewStore(accountID, region string, opts ...StoreOption) *Store {
 
 // GetEntry retrieves a staged entry.
 func (s *Store) GetEntry(ctx context.Context, service staging.Service, name string) (*staging.Entry, error) {
-	entry, err := doRequestWithResultEnsuringDaemon(s, ctx, &protocol.Request{
+	entry, err := doRequestWithResultEnsuringDaemon(ctx, s, &protocol.Request{
 		Method:    protocol.MethodGetEntry,
 		AccountID: s.accountID,
 		Region:    s.region,
@@ -75,7 +75,7 @@ func (s *Store) GetEntry(ctx context.Context, service staging.Service, name stri
 
 // GetTag retrieves staged tag changes.
 func (s *Store) GetTag(ctx context.Context, service staging.Service, name string) (*staging.TagEntry, error) {
-	tagEntry, err := doRequestWithResultEnsuringDaemon(s, ctx, &protocol.Request{
+	tagEntry, err := doRequestWithResultEnsuringDaemon(ctx, s, &protocol.Request{
 		Method:    protocol.MethodGetTag,
 		AccountID: s.accountID,
 		Region:    s.region,
@@ -95,7 +95,7 @@ func (s *Store) GetTag(ctx context.Context, service staging.Service, name string
 
 // ListEntries returns all staged entries for a service.
 func (s *Store) ListEntries(ctx context.Context, service staging.Service) (map[staging.Service]map[string]staging.Entry, error) {
-	return doRequestWithResultEnsuringDaemon(s, ctx, &protocol.Request{
+	return doRequestWithResultEnsuringDaemon(ctx, s, &protocol.Request{
 		Method:    protocol.MethodListEntries,
 		AccountID: s.accountID,
 		Region:    s.region,
@@ -105,7 +105,7 @@ func (s *Store) ListEntries(ctx context.Context, service staging.Service) (map[s
 
 // ListTags returns all staged tag changes for a service.
 func (s *Store) ListTags(ctx context.Context, service staging.Service) (map[staging.Service]map[string]staging.TagEntry, error) {
-	return doRequestWithResultEnsuringDaemon(s, ctx, &protocol.Request{
+	return doRequestWithResultEnsuringDaemon(ctx, s, &protocol.Request{
 		Method:    protocol.MethodListTags,
 		AccountID: s.accountID,
 		Region:    s.region,
@@ -115,7 +115,7 @@ func (s *Store) ListTags(ctx context.Context, service staging.Service) (map[stag
 
 // Load loads the current staging state.
 func (s *Store) Load(ctx context.Context) (*staging.State, error) {
-	return doRequestWithResultEnsuringDaemon(s, ctx, &protocol.Request{
+	return doRequestWithResultEnsuringDaemon(ctx, s, &protocol.Request{
 		Method:    protocol.MethodLoad,
 		AccountID: s.accountID,
 		Region:    s.region,
@@ -199,7 +199,7 @@ func (s *Store) UnstageAllWithHint(ctx context.Context, service staging.Service,
 // Drain retrieves the state from the daemon, optionally clearing memory.
 // If service is empty, returns all services; otherwise filters to the specified service.
 func (s *Store) Drain(ctx context.Context, service staging.Service, keep bool) (*staging.State, error) {
-	state, err := doRequestWithResult(s, ctx, &protocol.Request{
+	state, err := doRequestWithResult(ctx, s, &protocol.Request{
 		Method:    protocol.MethodGetState,
 		AccountID: s.accountID,
 		Region:    s.region,
@@ -248,11 +248,9 @@ func (s *Store) WriteState(ctx context.Context, service staging.Service, state *
 }
 
 // doRequestWithResult sends a request and unmarshals the response.
-//
-//nolint:revive // context comes after Store to support generic type inference
 func doRequestWithResult[Resp any, Result any](
-	s *Store,
 	ctx context.Context,
+	s *Store,
 	req *protocol.Request,
 	extract func(*Resp) Result,
 ) (Result, error) {
@@ -276,11 +274,9 @@ func doRequestWithResult[Resp any, Result any](
 }
 
 // doRequestWithResultEnsuringDaemon ensures daemon is running, then sends request.
-//
-//nolint:revive // context comes after Store to support generic type inference
 func doRequestWithResultEnsuringDaemon[Resp any, Result any](
-	s *Store,
 	ctx context.Context,
+	s *Store,
 	req *protocol.Request,
 	extract func(*Resp) Result,
 ) (Result, error) {
@@ -289,7 +285,7 @@ func doRequestWithResultEnsuringDaemon[Resp any, Result any](
 		return zero, err
 	}
 
-	return doRequestWithResult(s, ctx, req, extract)
+	return doRequestWithResult(ctx, s, req, extract)
 }
 
 // doSimpleRequestEnsuringDaemon ensures daemon is running, then sends simple request.
