@@ -671,7 +671,7 @@
   </div>
 
   <div class="actions">
-    <div class="actions-left">
+    <div class="actions-center">
       <button
         class="btn-action btn-apply"
         onclick={() => openApplyModal(paramEntries.length > 0 ? 'param' : 'secret')}
@@ -711,18 +711,14 @@
             onclick={() => { showStashDropdown = false; openPersistModal(); }}
             disabled={loading || (paramEntries.length === 0 && secretEntries.length === 0)}
           >
-            <span class="dropdown-icon">📤</span>
-            Push to File
-            <span class="dropdown-hint">Save staged changes</span>
+            Push <span class="dropdown-desc">(Export)</span>
           </button>
           <button
             class="dropdown-item"
             onclick={() => { showStashDropdown = false; openDrainModal(); }}
             disabled={loading || !fileStatus?.exists}
           >
-            <span class="dropdown-icon">📥</span>
-            Pop from File
-            <span class="dropdown-hint">Load and delete file</span>
+            Pop <span class="dropdown-desc">(Import)</span>
           </button>
           <div class="dropdown-divider"></div>
           <button
@@ -730,9 +726,7 @@
             onclick={() => { showStashDropdown = false; openDropModal(); }}
             disabled={loading || !fileStatus?.exists}
           >
-            <span class="dropdown-icon">🗑️</span>
-            Drop File
-            <span class="dropdown-hint">Delete without loading</span>
+            Drop <span class="dropdown-desc">(Trash)</span>
           </button>
         </div>
       {/if}
@@ -1282,22 +1276,23 @@
   }
 
   .actions {
+    position: relative;
     display: flex;
-    justify-content: space-between;
+    justify-content: center;
     align-items: center;
-    gap: 12px;
     padding: 16px;
     background: #1a1a2e;
     border-top: 1px solid #2d2d44;
   }
 
-  .actions-left {
+  .actions-center {
     display: flex;
     gap: 12px;
   }
 
   .btn-action {
-    padding: 10px 20px;
+    min-width: 120px;
+    padding: 10px 24px;
     border: none;
     border-radius: 4px;
     font-size: 14px;
@@ -1331,7 +1326,10 @@
 
   /* Stash dropdown */
   .stash-dropdown {
-    position: relative;
+    position: absolute;
+    right: 16px;
+    top: 50%;
+    transform: translateY(-50%);
   }
 
   .btn-stash {
@@ -1392,15 +1390,17 @@
   .dropdown-item {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
     width: 100%;
-    padding: 12px 16px;
+    padding: 10px 16px;
     background: transparent;
     border: none;
     color: #fff;
     font-size: 14px;
+    font-weight: 500;
     cursor: pointer;
     text-align: left;
+    white-space: nowrap;
     transition: background 0.2s;
   }
 
@@ -1417,14 +1417,10 @@
     background: rgba(244, 67, 54, 0.2);
   }
 
-  .dropdown-icon {
-    font-size: 16px;
-  }
-
-  .dropdown-hint {
-    margin-left: auto;
-    font-size: 11px;
-    color: #666;
+  .dropdown-desc {
+    font-size: 12px;
+    font-weight: 400;
+    color: #888;
   }
 
   .dropdown-divider {
