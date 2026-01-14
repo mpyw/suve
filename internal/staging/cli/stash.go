@@ -8,6 +8,7 @@ import (
 
 	"github.com/mpyw/suve/internal/cli/passphrase"
 	"github.com/mpyw/suve/internal/cli/terminal"
+	"github.com/mpyw/suve/internal/staging"
 	"github.com/mpyw/suve/internal/staging/store/file"
 )
 
@@ -84,11 +85,11 @@ EXAMPLES:
 	}
 }
 
-// fileStoreForReading creates a file store for reading operations.
+// fileStoreForReading creates a file store for reading operations (service-specific).
 // It handles passphrase prompting if the file is encrypted.
 // If checkExists is true, returns an error if the file doesn't exist.
-func fileStoreForReading(cmd *cli.Command, accountID, region string, checkExists bool) (*file.Store, error) {
-	basicFileStore, err := file.NewStore(accountID, region)
+func fileStoreForReading(cmd *cli.Command, accountID, region string, service staging.Service, checkExists bool) (*file.Store, error) {
+	basicFileStore, err := file.NewStore(accountID, region, service)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create file store: %w", err)
 	}
@@ -134,5 +135,58 @@ func fileStoreForReading(cmd *cli.Command, accountID, region string, checkExists
 		}
 	}
 
-	return file.NewStoreWithPassphrase(accountID, region, pass)
+	return file.NewStoreWithPassphrase(accountID, region, service, pass)
+}
+
+// fileStoresForReading creates file stores for all services for reading operations (global).
+// It handles passphrase prompting if any file is encrypted.
+// If checkExists is true, returns an error if no files exist.
+func fileStoresForReading(cmd *cli.Command, accountID, region string, checkExists bool) (map[staging.Service]*file.Store, error) {
+	basicStores, err := file.NewStoresForAllServices(accountID, region)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create file stores: %w", err)
+	}
+
+	if checkExists {
+		anyExists, err := file.AnyExists(basicStores)
+		if err != nil {
+			return nil, fmt.Errorf("failed to check stash files: %w", err)
+		}
+
+		if !anyExists {
+			return nil, errors.New("no stashed changes")
+		}
+	}
+
+	anyEnc, err := file.AnyEncrypted(basicStores)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check file encryption: %w", err)
+	}
+
+	var pass string
+
+	if anyEnc {
+		prompter := &passphrase.Prompter{
+			Stdin:  cmd.Root().Reader,
+			Stdout: cmd.Root().Writer,
+			Stderr: cmd.Root().ErrWriter,
+		}
+
+		switch {
+		case cmd.Bool("passphrase-stdin"):
+			pass, err = prompter.ReadFromStdin()
+			if err != nil {
+				return nil, fmt.Errorf("failed to read passphrase from stdin: %w", err)
+			}
+		case terminal.IsTerminalWriter(cmd.Root().ErrWriter):
+			pass, err = prompter.PromptForDecrypt()
+			if err != nil {
+				return nil, fmt.Errorf("failed to get passphrase: %w", err)
+			}
+		default:
+			return nil, errors.New("encrypted file cannot be decrypted in non-TTY environment; use --passphrase-stdin")
+		}
+	}
+
+	return file.NewStoresWithPassphrase(accountID, region, pass)
 }

@@ -106,7 +106,7 @@ Stash commands allow you to save staged changes to a file for later restoration,
 
 ```
                     stash push
-   Agent Memory ──────────────────► File (~/.suve/.../stage.json)
+   Agent Memory ──────────────────► Files (~/.suve/.../{param,secret}.json)
        ▲                                     │
        │                                     │
        │               stash pop             │
@@ -183,11 +183,13 @@ When using service-specific stash:
 
 ### Stash File Format
 
-The stash file is stored at `~/.suve/{accountID}/{region}/stage.json`:
+Stash files are stored separately per service:
+- `~/.suve/{accountID}/{region}/param.json` - Parameter Store changes
+- `~/.suve/{accountID}/{region}/secret.json` - Secrets Manager changes
 
 **Unencrypted:**
 ```json
-{"version":1,"entries":{...},"tags":{...}}
+{"version":3,"service":"param","entries":{...},"tags":{...}}
 ```
 
 **Encrypted:** Binary format with `SUVE_ENC` header, salt, and AES-GCM ciphertext.
@@ -317,7 +319,8 @@ suve stage agent stop
 
 | Item | Path |
 |------|------|
-| Stash file | `~/.suve/{accountID}/{region}/stage.json` |
+| Param stash file | `~/.suve/{accountID}/{region}/param.json` |
+| Secret stash file | `~/.suve/{accountID}/{region}/secret.json` |
 | Socket | Platform-specific (see [Socket Paths](#socket-paths)) |
 
 ## Troubleshooting

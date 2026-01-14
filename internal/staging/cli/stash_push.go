@@ -14,6 +14,7 @@ import (
 	"github.com/mpyw/suve/internal/cli/terminal"
 	"github.com/mpyw/suve/internal/infra"
 	"github.com/mpyw/suve/internal/staging"
+	"github.com/mpyw/suve/internal/staging/store"
 	"github.com/mpyw/suve/internal/staging/store/agent"
 	"github.com/mpyw/suve/internal/staging/store/agent/daemon/lifecycle"
 	"github.com/mpyw/suve/internal/staging/store/file"
@@ -112,10 +113,48 @@ func stashPushAction(service staging.Service) func(context.Context, *cli.Command
 		agentStore := agent.NewStore(identity.AccountID, identity.Region)
 
 		result, err := lifecycle.ExecuteRead(ctx, agentStore, lifecycle.CmdStashPush, func() (struct{}, error) {
-			// Check if stash file already exists
-			basicFileStore, err := file.NewStore(identity.AccountID, identity.Region)
-			if err != nil {
-				return struct{}{}, fmt.Errorf("failed to create file store: %w", err)
+			// V3: Check if stash file(s) already exist
+			var (
+				anyExists      bool
+				totalItemCount int
+			)
+
+			if service != "" {
+				// Service-specific: check single file
+				basicStore, err := file.NewStore(identity.AccountID, identity.Region, service)
+				if err != nil {
+					return struct{}{}, fmt.Errorf("failed to create file store: %w", err)
+				}
+
+				anyExists, err = basicStore.Exists()
+				if err != nil {
+					return struct{}{}, fmt.Errorf("failed to check stash file: %w", err)
+				}
+
+				if anyExists {
+					existingState, err := basicStore.Drain(ctx, "", true)
+					if err == nil {
+						totalItemCount = existingState.TotalCount()
+					}
+				}
+			} else {
+				// Global: check all files
+				basicStores, err := file.NewStoresForAllServices(identity.AccountID, identity.Region)
+				if err != nil {
+					return struct{}{}, fmt.Errorf("failed to create file stores: %w", err)
+				}
+
+				anyExists, err = file.AnyExists(basicStores)
+				if err != nil {
+					return struct{}{}, fmt.Errorf("failed to check stash files: %w", err)
+				}
+
+				if anyExists {
+					existingState, err := file.DrainAll(ctx, basicStores, true)
+					if err == nil {
+						totalItemCount = existingState.TotalCount()
+					}
+				}
 			}
 
 			// Determine mode based on flags and file existence
@@ -129,30 +168,16 @@ func stashPushAction(service staging.Service) func(context.Context, *cli.Command
 			case mergeFlag:
 				mode = usestaging.StashPushModeMerge
 			default:
-				// Check if we need to prompt
-				exists, err := basicFileStore.Exists()
-				if err != nil {
-					return struct{}{}, fmt.Errorf("failed to check stash file: %w", err)
-				}
-
 				// Only prompt for global push when file exists
 				// Service-specific push always merges (preserves other services)
-				if exists && service == "" && terminal.IsTerminalWriter(cmd.Root().ErrWriter) {
-					// Count existing items for the prompt message
-					existingState, err := basicFileStore.Drain(ctx, "", true)
-					if err != nil {
-						return struct{}{}, fmt.Errorf("failed to read stash file: %w", err)
-					}
-
-					itemCount := existingState.TotalCount()
-
+				if anyExists && service == "" && terminal.IsTerminalWriter(cmd.Root().ErrWriter) {
 					confirmPrompter := &confirm.Prompter{
 						Stdin:  cmd.Root().Reader,
 						Stdout: cmd.Root().Writer,
 						Stderr: cmd.Root().ErrWriter,
 					}
 
-					output.Warning(cmd.Root().ErrWriter, "Stash file already exists with %d item(s).", itemCount)
+					output.Warning(cmd.Root().ErrWriter, "Stash file(s) already exist with %d item(s).", totalItemCount)
 
 					choice, err := confirmPrompter.ConfirmChoice("How do you want to proceed?", []confirm.Choice{
 						{Label: "Merge", Description: "combine with existing stash"},
@@ -205,7 +230,19 @@ func stashPushAction(service staging.Service) func(context.Context, *cli.Command
 				// pass remains empty = plain text
 			}
 
-			fileStore, err := file.NewStoreWithPassphrase(identity.AccountID, identity.Region, pass)
+			// V3: Create service-specific store or composite store
+			var fileStore store.FileStore
+			if service != "" {
+				fileStore, err = file.NewStoreWithPassphrase(identity.AccountID, identity.Region, service, pass)
+			} else {
+				var stores map[staging.Service]*file.Store
+
+				stores, err = file.NewStoresWithPassphrase(identity.AccountID, identity.Region, pass)
+				if err == nil {
+					fileStore = file.NewCompositeStore(stores)
+				}
+			}
+
 			if err != nil {
 				return struct{}{}, fmt.Errorf("failed to create file store: %w", err)
 			}
@@ -253,7 +290,7 @@ func newGlobalStashPushCommand() *cli.Command {
 		Description: `Save staged changes from the in-memory agent to a file.
 
 This command saves the current staging state from the agent daemon
-to the persistent file storage (~/.suve/{accountID}/{region}/stage.json).
+to the persistent file storage (~/.suve/{accountID}/{region}/{param,secret}.json).
 
 By default, the agent's memory is cleared after stashing.
 Use --keep to retain the staged changes in memory.
@@ -278,7 +315,7 @@ func newStashPushCommand(cfg CommandConfig) *cli.Command {
 		Description: fmt.Sprintf(`Save staged %s changes from the in-memory agent to a file.
 
 This command saves the staging state for %ss from the agent daemon
-to the persistent file storage (~/.suve/{accountID}/{region}/stage.json).
+to the persistent file storage (~/.suve/{accountID}/{region}/%s.json).
 
 By default, the %s entries are cleared from agent memory after stashing.
 Use --keep to retain them in memory.
@@ -289,6 +326,7 @@ EXAMPLES:
    echo "secret" | suve stage %s stash push --passphrase-stdin   Use passphrase from stdin`,
 			cfg.ItemName,
 			cfg.ItemName,
+			cfg.CommandName,
 			cfg.ItemName,
 			cfg.CommandName,
 			cfg.CommandName,

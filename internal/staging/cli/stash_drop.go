@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/samber/lo"
 	"github.com/urfave/cli/v3"
 
 	"github.com/mpyw/suve/internal/cli/confirm"
@@ -18,23 +17,15 @@ import (
 	"github.com/mpyw/suve/internal/staging/store/file"
 )
 
-// StashDropRunner executes stash drop operations.
+// StashDropRunner executes stash drop operations for a single service.
 type StashDropRunner struct {
 	FileStore *file.Store
 	Stdout    io.Writer
 	Stderr    io.Writer
 }
 
-// StashDropOptions holds options for the stash drop command.
-type StashDropOptions struct {
-	// Service filters the operation to a specific service. Empty means all services.
-	Service staging.Service
-	// Force skips the confirmation prompt.
-	Force bool
-}
-
-// Run executes the stash drop command.
-func (r *StashDropRunner) Run(ctx context.Context, opts StashDropOptions) error {
+// Run executes the stash drop command for a single service.
+func (r *StashDropRunner) Run(_ context.Context) error {
 	// Check if file exists
 	exists, err := r.FileStore.Exists()
 	if err != nil {
@@ -45,43 +36,38 @@ func (r *StashDropRunner) Run(ctx context.Context, opts StashDropOptions) error 
 		return errors.New("no stashed changes to drop")
 	}
 
-	// For service-specific drop, we need to read, remove service, and write back
-	if opts.Service != "" {
-		state, err := r.FileStore.Drain(ctx, "", true)
-		if err != nil {
-			return fmt.Errorf("failed to read stash file: %w", err)
-		}
-
-		// Check if the service has any entries
-		hasEntries := len(state.Entries[opts.Service]) > 0 || len(state.Tags[opts.Service]) > 0
-		if !hasEntries {
-			return fmt.Errorf("no stashed changes for %s", opts.Service)
-		}
-
-		// Remove the service
-		state.RemoveService(opts.Service)
-
-		// If state is now empty, delete the file entirely; otherwise write back remaining state
-		updateErr := lo.
-			IfF(state.IsEmpty(), func() error {
-				_, err := r.FileStore.Drain(ctx, "", false)
-
-				return err
-			}).
-			ElseF(func() error { return r.FileStore.WriteState(ctx, "", state) })
-		if updateErr != nil {
-			return fmt.Errorf("failed to update stash file: %w", updateErr)
-		}
-
-		output.Success(r.Stdout, "Stashed %s changes dropped", opts.Service)
-
-		return nil
+	// V3: Just delete the file (no need to preserve other services)
+	if err := r.FileStore.Delete(); err != nil {
+		return fmt.Errorf("failed to delete stash file: %w", err)
 	}
 
-	// Global drop - delete entire file
-	_, err = r.FileStore.Drain(ctx, "", false)
+	output.Success(r.Stdout, "Stashed %s changes dropped", r.FileStore.Service())
+
+	return nil
+}
+
+// GlobalStashDropRunner executes stash drop operations for all services.
+type GlobalStashDropRunner struct {
+	FileStores map[staging.Service]*file.Store
+	Stdout     io.Writer
+	Stderr     io.Writer
+}
+
+// Run executes the global stash drop command.
+func (r *GlobalStashDropRunner) Run(_ context.Context) error {
+	// Check if any file exists
+	anyExists, err := file.AnyExists(r.FileStores)
 	if err != nil {
-		return fmt.Errorf("failed to delete stash file: %w", err)
+		return fmt.Errorf("failed to check stash files: %w", err)
+	}
+
+	if !anyExists {
+		return errors.New("no stashed changes to drop")
+	}
+
+	// V3: Delete all files
+	if err := file.DeleteAll(r.FileStores); err != nil {
+		return fmt.Errorf("failed to delete stash files: %w", err)
 	}
 
 	output.Success(r.Stdout, "All stashed changes dropped")
@@ -108,76 +94,172 @@ func stashDropAction(service staging.Service) func(context.Context, *cli.Command
 		}
 
 		_, err = lifecycle.ExecuteFile(ctx, lifecycle.CmdStashDrop, func() (struct{}, error) {
-			fileStore, err := file.NewStore(identity.AccountID, identity.Region)
-			if err != nil {
-				return struct{}{}, fmt.Errorf("failed to create file store: %w", err)
-			}
-
-			// Check if file exists
-			exists, err := fileStore.Exists()
-			if err != nil {
-				return struct{}{}, fmt.Errorf("failed to check stash file: %w", err)
-			}
-
-			if !exists {
-				return struct{}{}, errors.New("no stashed changes to drop")
-			}
-
-			// Confirm unless --force
 			forceFlag := cmd.Bool("force")
-			if !forceFlag && terminal.IsTerminalWriter(cmd.Root().ErrWriter) {
-				// Count items for the message
-				state, err := fileStore.Drain(ctx, "", true)
-				if err != nil {
-					return struct{}{}, fmt.Errorf("failed to read stash file: %w", err)
-				}
 
-				itemCount := lo.
-					If(service != "", len(state.Entries[service])+len(state.Tags[service])).
-					Else(state.TotalCount())
-
-				if itemCount == 0 {
-					return struct{}{}, lo.
-						IfF(service != "", func() error { return fmt.Errorf("no stashed changes for %s", service) }).
-						ElseF(func() error { return errors.New("no stashed changes to drop") })
-				}
-
-				confirmPrompter := &confirm.Prompter{
-					Stdin:  cmd.Root().Reader,
-					Stdout: cmd.Root().Writer,
-					Stderr: cmd.Root().ErrWriter,
-				}
-
-				target := lo.
-					If(service != "", fmt.Sprintf("%d stashed %s item(s)", itemCount, service)).
-					Else(fmt.Sprintf("%d stashed item(s)", itemCount))
-
-				confirmed, err := confirmPrompter.ConfirmDelete(target, false)
-				if err != nil {
-					return struct{}{}, fmt.Errorf("failed to get confirmation: %w", err)
-				}
-
-				if !confirmed {
-					output.Info(cmd.Root().Writer, "Operation cancelled.")
-
-					return struct{}{}, nil
-				}
+			if service != "" {
+				// Service-specific drop
+				return struct{}{}, runServiceSpecificDrop(ctx, cmd, identity.AccountID, identity.Region, service, forceFlag)
 			}
 
-			r := &StashDropRunner{
-				FileStore: fileStore,
-				Stdout:    cmd.Root().Writer,
-				Stderr:    cmd.Root().ErrWriter,
-			}
-
-			return struct{}{}, r.Run(ctx, StashDropOptions{
-				Service: service,
-				Force:   forceFlag,
-			})
+			// Global drop
+			return struct{}{}, runGlobalDrop(ctx, cmd, identity.AccountID, identity.Region, forceFlag)
 		})
 
 		return err
 	}
+}
+
+func runServiceSpecificDrop(ctx context.Context, cmd *cli.Command, accountID, region string, service staging.Service, force bool) error {
+	fileStore, err := file.NewStore(accountID, region, service)
+	if err != nil {
+		return fmt.Errorf("failed to create file store: %w", err)
+	}
+
+	// Check if file exists
+	exists, err := fileStore.Exists()
+	if err != nil {
+		return fmt.Errorf("failed to check stash file: %w", err)
+	}
+
+	if !exists {
+		return fmt.Errorf("no stashed changes for %s", service)
+	}
+
+	// Confirm unless --force
+	if !force && terminal.IsTerminalWriter(cmd.Root().ErrWriter) {
+		// Try to count items for confirmation message
+		// If encrypted, we can still drop without passphrase
+		var target string
+
+		state, err := fileStore.Drain(ctx, "", true)
+
+		switch {
+		case errors.Is(err, file.ErrDecryptionFailed):
+			// File is encrypted, but we can still drop it
+			target = fmt.Sprintf("encrypted %s stash file", service)
+		case err != nil:
+			return fmt.Errorf("failed to read stash file: %w", err)
+		default:
+			itemCount := len(state.Entries[service]) + len(state.Tags[service])
+			if itemCount == 0 {
+				return fmt.Errorf("no stashed changes for %s", service)
+			}
+
+			target = fmt.Sprintf("%d stashed %s item(s)", itemCount, service)
+		}
+
+		confirmPrompter := &confirm.Prompter{
+			Stdin:  cmd.Root().Reader,
+			Stdout: cmd.Root().Writer,
+			Stderr: cmd.Root().ErrWriter,
+		}
+
+		confirmed, err := confirmPrompter.ConfirmDelete(target, false)
+		if err != nil {
+			return fmt.Errorf("failed to get confirmation: %w", err)
+		}
+
+		if !confirmed {
+			output.Info(cmd.Root().Writer, "Operation cancelled.")
+
+			return nil
+		}
+	}
+
+	r := &StashDropRunner{
+		FileStore: fileStore,
+		Stdout:    cmd.Root().Writer,
+		Stderr:    cmd.Root().ErrWriter,
+	}
+
+	return r.Run(ctx)
+}
+
+func runGlobalDrop(ctx context.Context, cmd *cli.Command, accountID, region string, force bool) error {
+	fileStores, err := file.NewStoresForAllServices(accountID, region)
+	if err != nil {
+		return fmt.Errorf("failed to create file stores: %w", err)
+	}
+
+	// Check if any file exists
+	anyExists, err := file.AnyExists(fileStores)
+	if err != nil {
+		return fmt.Errorf("failed to check stash files: %w", err)
+	}
+
+	if !anyExists {
+		return errors.New("no stashed changes to drop")
+	}
+
+	// Confirm unless --force
+	if !force && terminal.IsTerminalWriter(cmd.Root().ErrWriter) {
+		// Try to count items for confirmation message
+		var (
+			target       string
+			totalCount   int
+			hasEncrypted bool
+		)
+
+		for _, svc := range file.AllServices {
+			store := fileStores[svc]
+
+			exists, err := store.Exists()
+			if err != nil {
+				return fmt.Errorf("failed to check stash file: %w", err)
+			}
+
+			if !exists {
+				continue
+			}
+
+			state, err := store.Drain(ctx, "", true)
+			if errors.Is(err, file.ErrDecryptionFailed) {
+				hasEncrypted = true
+
+				continue
+			} else if err != nil {
+				return fmt.Errorf("failed to read stash file: %w", err)
+			}
+
+			totalCount += state.TotalCount()
+		}
+
+		switch {
+		case hasEncrypted && totalCount > 0:
+			target = fmt.Sprintf("%d stashed item(s) and encrypted file(s)", totalCount)
+		case hasEncrypted:
+			target = "encrypted stash file(s)"
+		case totalCount > 0:
+			target = fmt.Sprintf("%d stashed item(s)", totalCount)
+		default:
+			return errors.New("no stashed changes to drop")
+		}
+
+		confirmPrompter := &confirm.Prompter{
+			Stdin:  cmd.Root().Reader,
+			Stdout: cmd.Root().Writer,
+			Stderr: cmd.Root().ErrWriter,
+		}
+
+		confirmed, err := confirmPrompter.ConfirmDelete(target, false)
+		if err != nil {
+			return fmt.Errorf("failed to get confirmation: %w", err)
+		}
+
+		if !confirmed {
+			output.Info(cmd.Root().Writer, "Operation cancelled.")
+
+			return nil
+		}
+	}
+
+	r := &GlobalStashDropRunner{
+		FileStores: fileStores,
+		Stdout:     cmd.Root().Writer,
+		Stderr:     cmd.Root().ErrWriter,
+	}
+
+	return r.Run(ctx)
 }
 
 // newGlobalStashDropCommand creates a global stash drop command that operates on all services.
@@ -208,9 +290,8 @@ func newStashDropCommand(cfg CommandConfig) *cli.Command {
 		Usage: fmt.Sprintf("Delete stashed %s changes without restoring", cfg.ItemName),
 		Description: fmt.Sprintf(`Delete stashed %s changes from the file without loading them into memory.
 
-This command permanently removes the stashed %s changes. Other services'
-stashed changes are preserved. You will be prompted to confirm unless
---force is specified.
+This command permanently removes the stashed %s changes.
+You will be prompted to confirm unless --force is specified.
 
 EXAMPLES:
    suve stage %s stash drop                            Delete stashed %s changes

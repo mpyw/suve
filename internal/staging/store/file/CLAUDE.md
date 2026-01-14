@@ -10,16 +10,20 @@ parent: ../CLAUDE.md
 
 ## Overview
 
-File-based staging storage with optional encryption. Stores staging state as JSON in `~/.suve/{accountID}/{region}/stage.json`. Supports Argon2id key derivation with AES-256-GCM encryption for secure stash persistence.
+File-based staging storage with optional encryption. Stores staging state as separate JSON files per service:
+- `~/.suve/{accountID}/{region}/param.json` for Parameter Store changes
+- `~/.suve/{accountID}/{region}/secret.json` for Secrets Manager changes
+
+Supports Argon2id key derivation with AES-256-GCM encryption for secure stash persistence.
 
 ## Architecture
 
 ```yaml
 key_types:
   - name: Store
-    role: FileStore implementation with encryption support
-  - name: StoreOption
-    role: Functional options for Store configuration
+    role: Service-specific FileStore implementation with encryption support
+  - name: CompositeStore
+    role: Wrapper for multiple service stores for global operations
 
 files:
   - store.go           # Store struct, NewStore, NewStoreWithPassphrase
@@ -52,9 +56,11 @@ skip_areas:
 
 ### File Format
 
+Each service file is self-describing with the V3 format:
+
 Unencrypted:
 ```json
-{"version":1,"entries":{...},"tags":{...}}
+{"version":3,"service":"param","entries":{...},"tags":{...}}
 ```
 
 Encrypted: Binary format with salt prefix + AES-GCM ciphertext

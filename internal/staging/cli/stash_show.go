@@ -11,13 +11,14 @@ import (
 	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/infra"
 	"github.com/mpyw/suve/internal/staging"
+	"github.com/mpyw/suve/internal/staging/store"
 	"github.com/mpyw/suve/internal/staging/store/agent/daemon/lifecycle"
 	"github.com/mpyw/suve/internal/staging/store/file"
 )
 
 // StashShowRunner executes stash show operations.
 type StashShowRunner struct {
-	FileStore *file.Store
+	FileStore store.FileStore
 	Stdout    io.Writer
 	Stderr    io.Writer
 }
@@ -31,26 +32,12 @@ type StashShowOptions struct {
 }
 
 // Run executes the stash show command.
+// Note: Existence check should be done before calling this method.
 func (r *StashShowRunner) Run(ctx context.Context, opts StashShowOptions) error {
-	// Check if file exists
-	exists, err := r.FileStore.Exists()
-	if err != nil {
-		return fmt.Errorf("failed to check stash file: %w", err)
-	}
-
-	if !exists {
-		return errors.New("no stashed changes")
-	}
-
 	// Read state (keep=true to preserve file)
-	state, err := r.FileStore.Drain(ctx, "", true)
+	state, err := r.FileStore.Drain(ctx, opts.Service, true)
 	if err != nil {
 		return fmt.Errorf("failed to read stash file: %w", err)
-	}
-
-	// Filter by service if specified
-	if opts.Service != "" {
-		state = state.ExtractService(opts.Service)
 	}
 
 	// Check if there's anything to show
@@ -130,7 +117,19 @@ func stashShowAction(service staging.Service) func(context.Context, *cli.Command
 		}
 
 		_, err = lifecycle.ExecuteFile(ctx, lifecycle.CmdStashShow, func() (struct{}, error) {
-			fileStore, err := fileStoreForReading(cmd, identity.AccountID, identity.Region, true)
+			// V3: Use service-specific store or composite store for global operations
+			var fileStore store.FileStore
+			if service != "" {
+				fileStore, err = fileStoreForReading(cmd, identity.AccountID, identity.Region, service, true)
+			} else {
+				var stores map[staging.Service]*file.Store
+
+				stores, err = fileStoresForReading(cmd, identity.AccountID, identity.Region, true)
+				if err == nil {
+					fileStore = file.NewCompositeStore(stores)
+				}
+			}
+
 			if err != nil {
 				return struct{}{}, err
 			}

@@ -701,12 +701,12 @@ func (a *App) StagingFileStatus() (*StagingFileStatusResult, error) {
 		return nil, err
 	}
 
-	fileStore, err := file.NewStore(identity.AccountID, identity.Region)
+	stores, err := file.NewStoresForAllServices(identity.AccountID, identity.Region)
 	if err != nil {
 		return nil, err
 	}
 
-	exists, err := fileStore.Exists()
+	exists, err := file.AnyExists(stores)
 	if err != nil {
 		return nil, err
 	}
@@ -716,7 +716,7 @@ func (a *App) StagingFileStatus() (*StagingFileStatusResult, error) {
 	}
 
 	if exists {
-		encrypted, err := fileStore.IsEncrypted()
+		encrypted, err := file.AnyEncrypted(stores)
 		if err != nil {
 			return nil, err
 		}
@@ -735,10 +735,12 @@ func (a *App) StagingDrain(service string, passphrase string, keep bool, force b
 		return nil, err
 	}
 
-	fileStore, err := file.NewStoreWithPassphrase(identity.AccountID, identity.Region, passphrase)
+	stores, err := file.NewStoresWithPassphrase(identity.AccountID, identity.Region, passphrase)
 	if err != nil {
 		return nil, err
 	}
+
+	fileStore := file.NewCompositeStore(stores)
 
 	agentStore, err := a.getAgentStore()
 	if err != nil {
@@ -784,10 +786,12 @@ func (a *App) StagingPersist(service string, passphrase string, keep bool, mode 
 		return nil, err
 	}
 
-	fileStore, err := file.NewStoreWithPassphrase(identity.AccountID, identity.Region, passphrase)
+	stores, err := file.NewStoresWithPassphrase(identity.AccountID, identity.Region, passphrase)
 	if err != nil {
 		return nil, err
 	}
+
+	fileStore := file.NewCompositeStore(stores)
 
 	agentStore, err := a.getAgentStore()
 	if err != nil {
@@ -839,12 +843,12 @@ func (a *App) StagingDrop() (*StagingDropResult, error) {
 		return nil, err
 	}
 
-	fileStore, err := file.NewStore(identity.AccountID, identity.Region)
+	stores, err := file.NewStoresForAllServices(identity.AccountID, identity.Region)
 	if err != nil {
 		return nil, err
 	}
 
-	exists, err := fileStore.Exists()
+	exists, err := file.AnyExists(stores)
 	if err != nil {
 		return nil, err
 	}
@@ -853,9 +857,8 @@ func (a *App) StagingDrop() (*StagingDropResult, error) {
 		return nil, errors.New("no stashed changes to drop")
 	}
 
-	// Drain with keep=false to delete the file (we discard the result)
-	_, err = fileStore.Drain(a.ctx, "", false)
-	if err != nil {
+	// Delete all stash files
+	if err := file.DeleteAll(stores); err != nil {
 		return nil, err
 	}
 

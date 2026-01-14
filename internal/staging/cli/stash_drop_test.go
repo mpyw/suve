@@ -2,49 +2,32 @@ package cli_test
 
 import (
 	"bytes"
-	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
-	"time"
 
-	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/mpyw/suve/internal/maputil"
 	"github.com/mpyw/suve/internal/staging"
 	"github.com/mpyw/suve/internal/staging/cli"
 	"github.com/mpyw/suve/internal/staging/store/file"
 )
 
-//nolint:funlen // Table-driven test with many cases
 func TestStashDropRunner_Run(t *testing.T) {
 	t.Parallel()
 
-	t.Run("success - drop all services", func(t *testing.T) {
+	t.Run("success - drop service file", func(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
-		path := filepath.Join(tmpDir, "stage.json")
+		path := filepath.Join(tmpDir, "param.json")
 
-		// Write test data
-		state := staging.NewEmptyState()
-		state.Entries[staging.ServiceParam]["/app/config"] = staging.Entry{
-			Operation: staging.OperationUpdate,
-			Value:     lo.ToPtr("test-value"),
-			StagedAt:  time.Now(),
-		}
-		state.Entries[staging.ServiceSecret]["my-secret"] = staging.Entry{
-			Operation: staging.OperationCreate,
-			Value:     lo.ToPtr("secret-value"),
-			StagedAt:  time.Now(),
-		}
-		data, err := json.MarshalIndent(state, "", "  ")
-		require.NoError(t, err)
-		require.NoError(t, os.WriteFile(path, data, 0o600))
+		// Write V3 format test data
+		testData := `{"version":3,"service":"param","entries":{"/app/config":{"operation":"update","value":"test-value"}}}`
+		require.NoError(t, os.WriteFile(path, []byte(testData), 0o600))
 
-		fileStore := file.NewStoreWithPath(path)
+		fileStore := file.NewStoreWithPath(path, staging.ServiceParam)
 		stdout := &bytes.Buffer{}
 		stderr := &bytes.Buffer{}
 
@@ -54,94 +37,11 @@ func TestStashDropRunner_Run(t *testing.T) {
 			Stderr:    stderr,
 		}
 
-		err = runner.Run(t.Context(), cli.StashDropOptions{})
+		err := runner.Run(t.Context())
 		require.NoError(t, err)
-		assert.Contains(t, stdout.String(), "All stashed changes dropped")
+		assert.Contains(t, stdout.String(), "Stashed param changes dropped")
 
 		// File should be deleted
-		_, err = os.Stat(path)
-		assert.True(t, os.IsNotExist(err))
-	})
-
-	t.Run("success - drop specific service", func(t *testing.T) {
-		t.Parallel()
-
-		tmpDir := t.TempDir()
-		path := filepath.Join(tmpDir, "stage.json")
-
-		// Write test data with both services
-		state := staging.NewEmptyState()
-		state.Entries[staging.ServiceParam]["/app/config"] = staging.Entry{
-			Operation: staging.OperationUpdate,
-			Value:     lo.ToPtr("param-value"),
-			StagedAt:  time.Now(),
-		}
-		state.Entries[staging.ServiceSecret]["my-secret"] = staging.Entry{
-			Operation: staging.OperationCreate,
-			Value:     lo.ToPtr("secret-value"),
-			StagedAt:  time.Now(),
-		}
-		data, err := json.MarshalIndent(state, "", "  ")
-		require.NoError(t, err)
-		require.NoError(t, os.WriteFile(path, data, 0o600))
-
-		fileStore := file.NewStoreWithPath(path)
-		stdout := &bytes.Buffer{}
-		stderr := &bytes.Buffer{}
-
-		runner := &cli.StashDropRunner{
-			FileStore: fileStore,
-			Stdout:    stdout,
-			Stderr:    stderr,
-		}
-
-		// Drop only param service
-		err = runner.Run(t.Context(), cli.StashDropOptions{Service: staging.ServiceParam})
-		require.NoError(t, err)
-		assert.Contains(t, stdout.String(), "Stashed param changes dropped")
-
-		// File should still exist with secret service
-		_, err = os.Stat(path)
-		require.NoError(t, err)
-
-		// Verify secret service is preserved
-		remainingState, err := fileStore.Drain(t.Context(), "", true)
-		require.NoError(t, err)
-		assert.Empty(t, remainingState.Entries[staging.ServiceParam])
-		assert.Len(t, remainingState.Entries[staging.ServiceSecret], 1)
-	})
-
-	t.Run("success - drop service with tags only", func(t *testing.T) {
-		t.Parallel()
-
-		tmpDir := t.TempDir()
-		path := filepath.Join(tmpDir, "stage.json")
-
-		// Write test data with tags
-		state := staging.NewEmptyState()
-		state.Tags[staging.ServiceParam]["/app/config"] = staging.TagEntry{
-			Add:    map[string]string{"env": "prod"},
-			Remove: maputil.NewSet("old-tag"),
-		}
-		data, err := json.MarshalIndent(state, "", "  ")
-		require.NoError(t, err)
-		require.NoError(t, os.WriteFile(path, data, 0o600))
-
-		fileStore := file.NewStoreWithPath(path)
-		stdout := &bytes.Buffer{}
-		stderr := &bytes.Buffer{}
-
-		runner := &cli.StashDropRunner{
-			FileStore: fileStore,
-			Stdout:    stdout,
-			Stderr:    stderr,
-		}
-
-		err = runner.Run(t.Context(), cli.StashDropOptions{Service: staging.ServiceParam})
-		require.NoError(t, err)
-		assert.Contains(t, stdout.String(), "Stashed param changes dropped")
-
-		// File should be deleted (empty state)
 		_, err = os.Stat(path)
 		assert.True(t, os.IsNotExist(err))
 	})
@@ -150,10 +50,10 @@ func TestStashDropRunner_Run(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
-		path := filepath.Join(tmpDir, "stage.json")
+		path := filepath.Join(tmpDir, "param.json")
 		// Don't create the file
 
-		fileStore := file.NewStoreWithPath(path)
+		fileStore := file.NewStoreWithPath(path, staging.ServiceParam)
 		stdout := &bytes.Buffer{}
 		stderr := &bytes.Buffer{}
 
@@ -163,128 +63,111 @@ func TestStashDropRunner_Run(t *testing.T) {
 			Stderr:    stderr,
 		}
 
-		err := runner.Run(t.Context(), cli.StashDropOptions{})
+		err := runner.Run(t.Context())
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "no stashed changes to drop")
 	})
+}
 
-	t.Run("error - no stashed changes for specific service", func(t *testing.T) {
+func TestGlobalStashDropRunner_Run(t *testing.T) {
+	t.Parallel()
+
+	t.Run("success - drop all services", func(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
-		path := filepath.Join(tmpDir, "stage.json")
+		paramPath := filepath.Join(tmpDir, "param.json")
+		secretPath := filepath.Join(tmpDir, "secret.json")
 
-		// Write test data with only param service
-		state := staging.NewEmptyState()
-		state.Entries[staging.ServiceParam]["/app/config"] = staging.Entry{
-			Operation: staging.OperationUpdate,
-			Value:     lo.ToPtr("test-value"),
-			StagedAt:  time.Now(),
+		// Write V3 format test data for both services
+		paramData := `{"version":3,"service":"param","entries":{"/app/config":{"operation":"update","value":"param-value"}}}`
+		//nolint:gosec // G101: test data, not actual credentials
+		secretData := `{"version":3,"service":"secret","entries":{"my-secret":{"operation":"create","value":"secret-value"}}}`
+
+		require.NoError(t, os.WriteFile(paramPath, []byte(paramData), 0o600))
+		require.NoError(t, os.WriteFile(secretPath, []byte(secretData), 0o600))
+
+		fileStores := map[staging.Service]*file.Store{
+			staging.ServiceParam:  file.NewStoreWithPath(paramPath, staging.ServiceParam),
+			staging.ServiceSecret: file.NewStoreWithPath(secretPath, staging.ServiceSecret),
 		}
-		data, err := json.MarshalIndent(state, "", "  ")
-		require.NoError(t, err)
-		require.NoError(t, os.WriteFile(path, data, 0o600))
-
-		fileStore := file.NewStoreWithPath(path)
 		stdout := &bytes.Buffer{}
 		stderr := &bytes.Buffer{}
 
-		runner := &cli.StashDropRunner{
-			FileStore: fileStore,
-			Stdout:    stdout,
-			Stderr:    stderr,
+		runner := &cli.GlobalStashDropRunner{
+			FileStores: fileStores,
+			Stdout:     stdout,
+			Stderr:     stderr,
 		}
 
-		// Try to drop secret service which has no entries
-		err = runner.Run(t.Context(), cli.StashDropOptions{Service: staging.ServiceSecret})
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "no stashed changes for secret")
-	})
-
-	t.Run("success - drop last service deletes file", func(t *testing.T) {
-		t.Parallel()
-
-		tmpDir := t.TempDir()
-		path := filepath.Join(tmpDir, "stage.json")
-
-		// Write test data with only one service
-		state := staging.NewEmptyState()
-		state.Entries[staging.ServiceParam]["/app/config"] = staging.Entry{
-			Operation: staging.OperationUpdate,
-			Value:     lo.ToPtr("test-value"),
-			StagedAt:  time.Now(),
-		}
-		data, err := json.MarshalIndent(state, "", "  ")
+		err := runner.Run(t.Context())
 		require.NoError(t, err)
-		require.NoError(t, os.WriteFile(path, data, 0o600))
+		assert.Contains(t, stdout.String(), "All stashed changes dropped")
 
-		fileStore := file.NewStoreWithPath(path)
-		stdout := &bytes.Buffer{}
-		stderr := &bytes.Buffer{}
-
-		runner := &cli.StashDropRunner{
-			FileStore: fileStore,
-			Stdout:    stdout,
-			Stderr:    stderr,
-		}
-
-		// Drop the only service
-		err = runner.Run(t.Context(), cli.StashDropOptions{Service: staging.ServiceParam})
-		require.NoError(t, err)
-
-		// File should be deleted because state is now empty
-		_, err = os.Stat(path)
+		// Both files should be deleted
+		_, err = os.Stat(paramPath)
+		assert.True(t, os.IsNotExist(err))
+		_, err = os.Stat(secretPath)
 		assert.True(t, os.IsNotExist(err))
 	})
 
-	t.Run("file preserved after drop specific service", func(t *testing.T) {
+	t.Run("success - drop with only one service file", func(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
-		path := filepath.Join(tmpDir, "stage.json")
+		paramPath := filepath.Join(tmpDir, "param.json")
+		secretPath := filepath.Join(tmpDir, "secret.json")
 
-		// Write test data with both services
-		state := staging.NewEmptyState()
-		state.Entries[staging.ServiceParam]["/app/config"] = staging.Entry{
-			Operation: staging.OperationUpdate,
-			Value:     lo.ToPtr("param-value"),
-			StagedAt:  time.Now(),
-		}
-		state.Entries[staging.ServiceSecret]["my-secret"] = staging.Entry{
-			Operation: staging.OperationCreate,
-			Value:     lo.ToPtr("secret-value"),
-			StagedAt:  time.Now(),
-		}
-		data, err := json.MarshalIndent(state, "", "  ")
-		require.NoError(t, err)
-		require.NoError(t, os.WriteFile(path, data, 0o600))
+		// Only create param file
+		paramData := `{"version":3,"service":"param","entries":{"/app/config":{"operation":"update","value":"param-value"}}}`
+		require.NoError(t, os.WriteFile(paramPath, []byte(paramData), 0o600))
 
-		fileStore := file.NewStoreWithPath(path)
+		fileStores := map[staging.Service]*file.Store{
+			staging.ServiceParam:  file.NewStoreWithPath(paramPath, staging.ServiceParam),
+			staging.ServiceSecret: file.NewStoreWithPath(secretPath, staging.ServiceSecret),
+		}
 		stdout := &bytes.Buffer{}
 		stderr := &bytes.Buffer{}
 
-		runner := &cli.StashDropRunner{
-			FileStore: fileStore,
-			Stdout:    stdout,
-			Stderr:    stderr,
+		runner := &cli.GlobalStashDropRunner{
+			FileStores: fileStores,
+			Stdout:     stdout,
+			Stderr:     stderr,
 		}
 
-		err = runner.Run(t.Context(), cli.StashDropOptions{Service: staging.ServiceParam})
+		err := runner.Run(t.Context())
 		require.NoError(t, err)
+		assert.Contains(t, stdout.String(), "All stashed changes dropped")
 
-		// File should still exist
-		_, err = os.Stat(path)
-		require.NoError(t, err)
+		// Param file should be deleted
+		_, err = os.Stat(paramPath)
+		assert.True(t, os.IsNotExist(err))
+	})
 
-		// Read and verify remaining data
-		//nolint:gosec // G304: path is from t.TempDir(), safe for test
-		remainingData, err := os.ReadFile(path)
-		require.NoError(t, err)
+	t.Run("error - no stashed changes to drop", func(t *testing.T) {
+		t.Parallel()
 
-		var remainingState staging.State
-		require.NoError(t, json.Unmarshal(remainingData, &remainingState))
-		assert.Empty(t, remainingState.Entries[staging.ServiceParam])
-		assert.Len(t, remainingState.Entries[staging.ServiceSecret], 1)
+		tmpDir := t.TempDir()
+		paramPath := filepath.Join(tmpDir, "param.json")
+		secretPath := filepath.Join(tmpDir, "secret.json")
+		// Don't create any files
+
+		fileStores := map[staging.Service]*file.Store{
+			staging.ServiceParam:  file.NewStoreWithPath(paramPath, staging.ServiceParam),
+			staging.ServiceSecret: file.NewStoreWithPath(secretPath, staging.ServiceSecret),
+		}
+		stdout := &bytes.Buffer{}
+		stderr := &bytes.Buffer{}
+
+		runner := &cli.GlobalStashDropRunner{
+			FileStores: fileStores,
+			Stdout:     stdout,
+			Stderr:     stderr,
+		}
+
+		err := runner.Run(t.Context())
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "no stashed changes to drop")
 	})
 }
 

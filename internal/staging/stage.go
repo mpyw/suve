@@ -10,7 +10,8 @@ import (
 )
 
 // stateVersion is the current version of the staging state format.
-const stateVersion = 2
+// V3: Separate files per service (param.json, secret.json).
+const stateVersion = 3
 
 // Operation represents the type of staged change.
 type Operation string

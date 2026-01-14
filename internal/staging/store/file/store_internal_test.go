@@ -13,81 +13,6 @@ import (
 	"github.com/mpyw/suve/internal/staging/store/file/internal/crypt"
 )
 
-func TestInitializeStateMaps(t *testing.T) {
-	t.Parallel()
-
-	t.Run("nil entries", func(t *testing.T) {
-		t.Parallel()
-
-		state := &staging.State{
-			Entries: nil,
-			Tags:    nil,
-		}
-
-		initializeStateMaps(state)
-
-		assert.NotNil(t, state.Entries)
-		assert.NotNil(t, state.Entries[staging.ServiceParam])
-		assert.NotNil(t, state.Entries[staging.ServiceSecret])
-		assert.NotNil(t, state.Tags)
-		assert.NotNil(t, state.Tags[staging.ServiceParam])
-		assert.NotNil(t, state.Tags[staging.ServiceSecret])
-	})
-
-	t.Run("empty entries map", func(t *testing.T) {
-		t.Parallel()
-
-		state := &staging.State{
-			Entries: make(map[staging.Service]map[string]staging.Entry),
-			Tags:    make(map[staging.Service]map[string]staging.TagEntry),
-		}
-
-		initializeStateMaps(state)
-
-		assert.NotNil(t, state.Entries[staging.ServiceParam])
-		assert.NotNil(t, state.Entries[staging.ServiceSecret])
-		assert.NotNil(t, state.Tags[staging.ServiceParam])
-		assert.NotNil(t, state.Tags[staging.ServiceSecret])
-	})
-
-	t.Run("partial entries map", func(t *testing.T) {
-		t.Parallel()
-
-		state := &staging.State{
-			Entries: map[staging.Service]map[string]staging.Entry{
-				staging.ServiceParam: {"key": staging.Entry{}},
-			},
-			Tags: map[staging.Service]map[string]staging.TagEntry{
-				staging.ServiceSecret: {"key": staging.TagEntry{}},
-			},
-		}
-
-		initializeStateMaps(state)
-
-		// Should preserve existing data
-		assert.Len(t, state.Entries[staging.ServiceParam], 1)
-		assert.Len(t, state.Tags[staging.ServiceSecret], 1)
-
-		// Should initialize missing maps
-		assert.NotNil(t, state.Entries[staging.ServiceSecret])
-		assert.NotNil(t, state.Tags[staging.ServiceParam])
-	})
-
-	t.Run("already initialized", func(t *testing.T) {
-		t.Parallel()
-
-		state := staging.NewEmptyState()
-		state.Entries[staging.ServiceParam]["key"] = staging.Entry{}
-		state.Tags[staging.ServiceSecret]["key"] = staging.TagEntry{}
-
-		initializeStateMaps(state)
-
-		// Should preserve all existing data
-		assert.Len(t, state.Entries[staging.ServiceParam], 1)
-		assert.Len(t, state.Tags[staging.ServiceSecret], 1)
-	})
-}
-
 // Note: This test cannot use t.Parallel() because it modifies the global userHomeDirFunc variable.
 //
 //nolint:paralleltest // Modifies package-level variable userHomeDirFunc.
@@ -102,7 +27,7 @@ func TestNewStore_UserHomeDirError(t *testing.T) {
 		return "", errors.New("home directory not available")
 	}
 
-	store, err := NewStore("123456789012", "ap-northeast-1")
+	store, err := NewStore("123456789012", "ap-northeast-1", staging.ServiceParam)
 	assert.Nil(t, store)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to get home directory")
@@ -122,7 +47,7 @@ func TestNewStoreWithPassphrase_UserHomeDirError(t *testing.T) {
 		return "", errors.New("home directory not available")
 	}
 
-	store, err := NewStoreWithPassphrase("123456789012", "ap-northeast-1", "secret")
+	store, err := NewStoreWithPassphrase("123456789012", "ap-northeast-1", staging.ServiceParam, "secret")
 	assert.Nil(t, store)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to get home directory")
@@ -138,8 +63,8 @@ func TestDrain_RemoveFileError(t *testing.T) {
 	err := os.MkdirAll(dirPath, 0o750)
 	require.NoError(t, err)
 
-	path := dirPath + "/stage.json"
-	err = os.WriteFile(path, []byte(`{"version":2,"entries":{"param":{},"secret":{}},"tags":{"param":{},"secret":{}}}`), 0o600)
+	path := dirPath + "/param.json"
+	err = os.WriteFile(path, []byte(`{"version":3,"entries":{"param":{}},"tags":{"param":{}}}`), 0o600)
 	require.NoError(t, err)
 
 	// Make directory read-only so file can't be removed
@@ -149,7 +74,7 @@ func TestDrain_RemoveFileError(t *testing.T) {
 	//nolint:gosec // G302: restore permissions for cleanup
 	defer func() { _ = os.Chmod(dirPath, 0o755) }()
 
-	store := NewStoreWithPath(path)
+	store := NewStoreWithPath(path, staging.ServiceParam)
 
 	_, err = store.Drain(t.Context(), "", false) // keep=false triggers remove
 	require.Error(t, err)
@@ -165,8 +90,8 @@ func TestWriteState_RemoveEmptyStateError(t *testing.T) {
 	err := os.MkdirAll(dirPath, 0o750)
 	require.NoError(t, err)
 
-	path := dirPath + "/stage.json"
-	err = os.WriteFile(path, []byte(`{}`), 0o600)
+	path := dirPath + "/param.json"
+	err = os.WriteFile(path, []byte(`{"version":3,"entries":{"param":{}},"tags":{"param":{}}}`), 0o600)
 	require.NoError(t, err)
 
 	// Make directory read-only so file can't be removed
@@ -176,7 +101,7 @@ func TestWriteState_RemoveEmptyStateError(t *testing.T) {
 	//nolint:gosec // G302: restore permissions for cleanup
 	defer func() { _ = os.Chmod(dirPath, 0o755) }()
 
-	store := NewStoreWithPath(path)
+	store := NewStoreWithPath(path, staging.ServiceParam)
 
 	// Empty state should trigger file removal, which should fail
 	emptyState := staging.NewEmptyState()
@@ -195,8 +120,8 @@ func TestWriteState_EncryptionError(t *testing.T) {
 	defer crypt.ResetRandReader()
 
 	tmpDir := t.TempDir()
-	path := tmpDir + "/stage.json"
-	store := NewStoreWithPath(path)
+	path := tmpDir + "/param.json"
+	store := NewStoreWithPath(path, staging.ServiceParam)
 	store.SetPassphrase("secret") // Enable encryption
 
 	state := staging.NewEmptyState()

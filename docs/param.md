@@ -624,7 +624,7 @@ The staging workflow allows you to prepare changes locally before applying them 
 > [!IMPORTANT]
 > The staging workflow lets you prepare changes locally, review them, and apply when ready--just like `git add` -> `git diff --staged` -> `git commit`.
 
-The stage file is stored at `~/.suve/<ACCOUNT_ID>/<REGION>/stage.json`.
+The stage file is stored at `~/.suve/<ACCOUNT_ID>/<REGION>/param.json`.
 
 ### Workflow Overview
 

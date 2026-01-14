@@ -11,8 +11,10 @@ import (
 	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/infra"
 	"github.com/mpyw/suve/internal/staging"
+	"github.com/mpyw/suve/internal/staging/store"
 	"github.com/mpyw/suve/internal/staging/store/agent"
 	"github.com/mpyw/suve/internal/staging/store/agent/daemon/lifecycle"
+	"github.com/mpyw/suve/internal/staging/store/file"
 	stagingusecase "github.com/mpyw/suve/internal/usecase/staging"
 )
 
@@ -102,7 +104,19 @@ func stashPopAction(service staging.Service) func(context.Context, *cli.Command)
 			return fmt.Errorf("failed to get AWS identity: %w", err)
 		}
 
-		fileStore, err := fileStoreForReading(cmd, identity.AccountID, identity.Region, false)
+		// V3: Use service-specific store or composite store for global operations
+		var fileStore store.FileStore
+		if service != "" {
+			fileStore, err = fileStoreForReading(cmd, identity.AccountID, identity.Region, service, false)
+		} else {
+			var stores map[staging.Service]*file.Store
+
+			stores, err = fileStoresForReading(cmd, identity.AccountID, identity.Region, false)
+			if err == nil {
+				fileStore = file.NewCompositeStore(stores)
+			}
+		}
+
 		if err != nil {
 			return err
 		}
@@ -139,9 +153,9 @@ func newGlobalStashPopCommand() *cli.Command {
 		Description: `Restore staged changes from file into the in-memory agent.
 
 This command loads the staging state from the persistent file storage
-(~/.suve/{accountID}/{region}/stage.json) into the agent daemon.
+(~/.suve/{accountID}/{region}/{param,secret}.json) into the agent daemon.
 
-By default, the file is deleted after restoring.
+By default, the files are deleted after restoring.
 Use --keep to retain the file after popping (same as 'stash apply').
 
 If the agent already has staged changes, you'll be prompted to confirm
@@ -170,9 +184,9 @@ func newStashPopCommand(cfg CommandConfig) *cli.Command {
 		Description: fmt.Sprintf(`Restore staged %s changes from file into the in-memory agent.
 
 This command loads the staging state for %ss from the persistent file storage
-(~/.suve/{accountID}/{region}/stage.json) into the agent daemon.
+(~/.suve/{accountID}/{region}/%s.json) into the agent daemon.
 
-By default, the %s entries are removed from the file after restoring.
+By default, the file is deleted after restoring.
 Use --keep to retain them in the file.
 
 If the agent already has staged %s changes, you'll be prompted to confirm
@@ -187,7 +201,7 @@ EXAMPLES:
    echo "secret" | suve stage %s stash pop --passphrase-stdin   Decrypt with passphrase from stdin`,
 			cfg.ItemName,
 			cfg.ItemName,
-			cfg.ItemName,
+			cfg.CommandName,
 			cfg.ItemName,
 			cfg.CommandName,
 			cfg.CommandName,
