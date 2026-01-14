@@ -38,6 +38,8 @@ func hasAbsoluteSpec(abs AbsoluteSpec) bool {
 }
 
 // parser defines the Secrets Manager-specific parsing logic.
+//
+//nolint:gochecknoglobals // stateless parser configuration
 var parser = version.AbsoluteParser[AbsoluteSpec]{
 	Parsers: []version.SpecifierParser[AbsoluteSpec]{
 		{

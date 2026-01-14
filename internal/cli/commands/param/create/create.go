@@ -76,7 +76,7 @@ EXAMPLES:
 }
 
 func action(ctx context.Context, cmd *cli.Command) error {
-	if cmd.Args().Len() < 2 {
+	if cmd.Args().Len() < 2 { //nolint:mnd // minimum required args: name and value
 		return errors.New("usage: suve param create <name> <value>")
 	}
 

@@ -16,6 +16,7 @@ type mockTagClient struct {
 	removeTagsErr error
 }
 
+//nolint:lll // mock function signature must match AWS SDK interface
 func (m *mockTagClient) AddTagsToResource(_ context.Context, _ *paramapi.AddTagsToResourceInput, _ ...func(*paramapi.Options)) (*paramapi.AddTagsToResourceOutput, error) {
 	if m.addTagsErr != nil {
 		return nil, m.addTagsErr
@@ -24,6 +25,7 @@ func (m *mockTagClient) AddTagsToResource(_ context.Context, _ *paramapi.AddTags
 	return &paramapi.AddTagsToResourceOutput{}, nil
 }
 
+//nolint:lll // mock function signature must match AWS SDK interface
 func (m *mockTagClient) RemoveTagsFromResource(_ context.Context, _ *paramapi.RemoveTagsFromResourceInput, _ ...func(*paramapi.Options)) (*paramapi.RemoveTagsFromResourceOutput, error) {
 	if m.removeTagsErr != nil {
 		return nil, m.removeTagsErr

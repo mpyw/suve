@@ -86,7 +86,7 @@ EXAMPLES:
 			&cli.IntFlag{
 				Name:    "number",
 				Aliases: []string{"n"},
-				Value:   10,
+				Value:   10, //nolint:mnd // default number of versions to display
 				Usage:   "Number of versions to show",
 			},
 			&cli.BoolFlag{

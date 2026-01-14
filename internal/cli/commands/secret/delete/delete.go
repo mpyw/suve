@@ -62,7 +62,7 @@ EXAMPLES:
 			&cli.IntFlag{
 				Name:  "recovery-window",
 				Usage: "Number of days before permanent deletion (7-30)",
-				Value: 30,
+				Value: 30, //nolint:mnd // AWS Secrets Manager default recovery window
 			},
 			&cli.BoolFlag{
 				Name:  "yes",

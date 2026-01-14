@@ -18,6 +18,7 @@ type ResetInput struct {
 // ResetResultType represents the type of reset result.
 type ResetResultType int
 
+// ResetResultType constants representing the outcome of a reset operation.
 const (
 	ResetResultUnstaged ResetResultType = iota
 	ResetResultUnstagedAll
@@ -110,7 +111,7 @@ func (u *ResetUseCase) unstageAll(ctx context.Context, serviceName, itemName str
 	}, nil
 }
 
-func (u *ResetUseCase) unstage(ctx context.Context, name, serviceName, itemName string) (*ResetOutput, error) {
+func (u *ResetUseCase) unstage(ctx context.Context, name, _, _ string) (*ResetOutput, error) {
 	service := u.Parser.Service()
 
 	// Load current state (nil CurrentValue since we don't care about AWS state for reset)

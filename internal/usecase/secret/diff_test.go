@@ -38,6 +38,7 @@ func (m *mockDiffClient) GetSecretValue(_ context.Context, _ *secretapi.GetSecre
 	return nil, errors.New("unexpected GetSecretValue call")
 }
 
+//nolint:revive,stylecheck // Method name must match AWS SDK interface
 func (m *mockDiffClient) ListSecretVersionIds(_ context.Context, _ *secretapi.ListSecretVersionIDsInput, _ ...func(*secretapi.Options)) (*secretapi.ListSecretVersionIDsOutput, error) {
 	if m.listVersionsErr != nil {
 		return nil, m.listVersionsErr

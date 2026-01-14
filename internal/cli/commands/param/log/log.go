@@ -90,7 +90,7 @@ EXAMPLES:
 			&cli.IntFlag{
 				Name:    "number",
 				Aliases: []string{"n"},
-				Value:   10,
+				Value:   10, //nolint:mnd // default number of versions to display
 				Usage:   "Maximum number of versions to show",
 			},
 			&cli.BoolFlag{
@@ -271,8 +271,9 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 				// Auto: use terminal width minus overhead for metadata
 				// Reserve ~30 chars for: version (6) + current mark (10) + date (10) + separators (4)
 				termWidth := terminal.GetWidthFromWriter(r.Stdout)
-
-				maxLen = max(termWidth-30, 10)
+				const metadataOverhead = 30 // version + current mark + date + separators
+				const minValueLength = 10
+				maxLen = max(termWidth-metadataOverhead, minValueLength)
 			}
 
 			if maxLen > 0 && len(value) > maxLen {

@@ -95,11 +95,12 @@ func printTagSummary(w io.Writer, name string, entry staging.TagEntry) {
 	addCount := len(entry.Add)
 	removeCount := len(entry.Remove)
 
-	if addCount > 0 && removeCount > 0 {
+	switch {
+	case addCount > 0 && removeCount > 0:
 		output.Printf(w, "  T %s [+%d tags, -%d tags]\n", name, addCount, removeCount)
-	} else if addCount > 0 {
+	case addCount > 0:
 		output.Printf(w, "  T %s [+%d tags]\n", name, addCount)
-	} else if removeCount > 0 {
+	case removeCount > 0:
 		output.Printf(w, "  T %s [-%d tags]\n", name, removeCount)
 	}
 }

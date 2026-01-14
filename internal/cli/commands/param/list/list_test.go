@@ -147,6 +147,7 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
+				t.Helper()
 				assert.Contains(t, output, "/app/prod/param1")
 				assert.NotContains(t, output, "/app/dev/param2")
 				assert.Contains(t, output, "/app/prod/param3")
@@ -197,6 +198,7 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
+				t.Helper()
 				assert.Contains(t, output, "/app/param1\tvalue1")
 				assert.Contains(t, output, "/app/param2\tvalue2")
 			},
@@ -215,6 +217,7 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, out string) {
+				t.Helper()
 				assert.Contains(t, out, `"name": "/app/param1"`)
 				assert.Contains(t, out, `"name": "/app/param2"`)
 				assert.NotContains(t, out, `"value"`)
@@ -246,6 +249,7 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, out string) {
+				t.Helper()
 				assert.Contains(t, out, `"name": "/app/param1"`)
 				assert.Contains(t, out, `"value": "secret-value"`)
 			},
@@ -269,6 +273,7 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, out string) {
+				t.Helper()
 				assert.Contains(t, out, `"name": "/app/error-param"`)
 				assert.Contains(t, out, `"error":`)
 			},
@@ -292,6 +297,7 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, out string) {
+				t.Helper()
 				assert.Contains(t, out, "/app/error-param")
 				assert.Contains(t, out, "<error:")
 			},

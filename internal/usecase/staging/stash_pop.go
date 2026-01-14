@@ -70,18 +70,19 @@ func (u *StashPopUseCase) Execute(ctx context.Context, input StashPopInput) (*St
 
 	merged := false
 
-	if input.Merge && !agentState.IsEmpty() {
+	switch {
+	case input.Merge && !agentState.IsEmpty():
 		// Merge states: start with agent state, merge drain state (drain takes precedence)
 		finalState = agentState
 		finalState.Merge(drainState)
 
 		merged = true
-	} else if input.Service != "" {
+	case input.Service != "":
 		// Service-specific: merge with existing agent state for other services
 		finalState = agentState
 		finalState.RemoveService(input.Service) // Clear the target service
 		finalState.Merge(drainState)
-	} else {
+	default:
 		// Replace all: use file state directly
 		finalState = drainState
 	}

@@ -7,6 +7,7 @@ import (
 	"time"
 )
 
+//nolint:gochecknoglobals // cached timezone location for performance
 var (
 	// locationCache caches the loaded timezone location.
 	locationCache *time.Location

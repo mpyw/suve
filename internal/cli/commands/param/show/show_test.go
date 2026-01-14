@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -139,8 +140,8 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
-				appleIdx := bytes.Index([]byte(output), []byte("apple"))
-				zebraIdx := bytes.Index([]byte(output), []byte("zebra"))
+				appleIdx := strings.Index(output, "apple")
+				zebraIdx := strings.Index(output, "zebra")
 
 				require.NotEqual(t, -1, appleIdx, "expected apple in output")
 				require.NotEqual(t, -1, zebraIdx, "expected zebra in output")
@@ -309,8 +310,8 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
-				appleIdx := bytes.Index([]byte(output), []byte("apple"))
-				zebraIdx := bytes.Index([]byte(output), []byte("zebra"))
+				appleIdx := strings.Index(output, "apple")
+				zebraIdx := strings.Index(output, "zebra")
 
 				require.NotEqual(t, -1, appleIdx, "expected apple in output")
 				require.NotEqual(t, -1, zebraIdx, "expected zebra in output")

@@ -17,6 +17,7 @@ type mockCreateClient struct {
 	putParameterErr    error
 }
 
+//nolint:lll // mock function signature must match AWS SDK interface
 func (m *mockCreateClient) PutParameter(_ context.Context, _ *paramapi.PutParameterInput, _ ...func(*paramapi.Options)) (*paramapi.PutParameterOutput, error) {
 	if m.putParameterErr != nil {
 		return nil, m.putParameterErr

@@ -21,12 +21,14 @@ const (
 )
 
 // fileMu protects concurrent access to the state file within a process.
+//
+//nolint:gochecknoglobals // process-wide mutex for file access synchronization
 var fileMu sync.Mutex
 
 // Hooks for testing - these allow tests to inject errors.
-var (
-	userHomeDirFunc = os.UserHomeDir
-)
+//
+//nolint:gochecknoglobals // test hook for dependency injection
+var userHomeDirFunc = os.UserHomeDir
 
 // Store manages the staging state using the filesystem.
 // It implements StateIO interface for drain/persist operations.
@@ -172,7 +174,7 @@ func (s *Store) WriteState(_ context.Context, service staging.Service, state *st
 
 	// Ensure directory exists
 	dir := filepath.Dir(s.stateFilePath)
-	if err := os.MkdirAll(dir, 0o700); err != nil {
+	if err := os.MkdirAll(dir, 0o700); err != nil { //nolint:mnd // owner-only directory permissions
 		return fmt.Errorf("failed to create state directory: %w", err)
 	}
 
@@ -199,7 +201,7 @@ func (s *Store) WriteState(_ context.Context, service staging.Service, state *st
 		}
 	}
 
-	if err := os.WriteFile(s.stateFilePath, data, 0o600); err != nil {
+	if err := os.WriteFile(s.stateFilePath, data, 0o600); err != nil { //nolint:mnd // owner-only file permissions
 		return fmt.Errorf("failed to write state file: %w", err)
 	}
 

@@ -107,6 +107,8 @@ func (u *DeleteUseCase) Execute(ctx context.Context, input DeleteInput) (*Delete
 }
 
 // stageDeleteWithOptions stages a delete entry with optional delete options.
+//
+//nolint:lll // function parameters are descriptive for clarity
 func (u *DeleteUseCase) stageDeleteWithOptions(ctx context.Context, service staging.Service, name string, lastModified time.Time, hasDeleteOptions, force bool, recoveryWindow int) error {
 	entry := staging.Entry{
 		Operation: staging.OperationDelete,

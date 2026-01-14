@@ -121,7 +121,7 @@ func ParseArgs[A any](
 	switch len(args) {
 	case 1:
 		return parseOneArg(args[0], parse)
-	case 2:
+	case 2: //nolint:mnd // two-arg case for version comparison
 		return parseTwoArgs(args[0], args[1], parse, hasAbsolute, prefixes)
 	default: // case 3
 		return parseThreeArgs(args[0], args[1], args[2], parse)

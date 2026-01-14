@@ -20,6 +20,7 @@ type DiffInput struct {
 // DiffEntryType represents the type of diff entry.
 type DiffEntryType int
 
+// DiffEntryType constants representing the type of diff result.
 const (
 	DiffEntryNormal DiffEntryType = iota
 	DiffEntryCreate
@@ -149,6 +150,7 @@ func (u *DiffUseCase) Execute(ctx context.Context, input DiffInput) (*DiffOutput
 	return output, nil
 }
 
+//nolint:lll // function parameters are descriptive for clarity
 func (u *DiffUseCase) processDiffResult(ctx context.Context, name string, entry staging.Entry, result *parallel.Result[*staging.FetchResult]) DiffEntry {
 	service := u.Strategy.Service()
 

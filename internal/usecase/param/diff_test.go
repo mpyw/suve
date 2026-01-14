@@ -22,6 +22,7 @@ type mockDiffClient struct {
 	getHistoryErr error
 }
 
+//nolint:lll // mock function signature must match AWS SDK interface
 func (m *mockDiffClient) GetParameter(_ context.Context, _ *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
 	idx := m.getParameterCalls
 	m.getParameterCalls++
@@ -37,6 +38,7 @@ func (m *mockDiffClient) GetParameter(_ context.Context, _ *paramapi.GetParamete
 	return nil, errUnexpectedCall
 }
 
+//nolint:lll // mock function signature must match AWS SDK interface
 func (m *mockDiffClient) GetParameterHistory(_ context.Context, _ *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
 	if m.getHistoryErr != nil {
 		return nil, m.getHistoryErr

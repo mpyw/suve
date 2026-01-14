@@ -43,7 +43,7 @@ EXAMPLES:
 }
 
 func action(ctx context.Context, cmd *cli.Command) error {
-	if cmd.Args().Len() < 2 {
+	if cmd.Args().Len() < 2 { //nolint:mnd // minimum required args: name and key
 		return fmt.Errorf("usage: suve secret untag <name> <key> [key]")
 	}
 

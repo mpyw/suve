@@ -46,7 +46,7 @@ EXAMPLES:
 }
 
 func action(ctx context.Context, cmd *cli.Command) error {
-	if cmd.Args().Len() < 2 {
+	if cmd.Args().Len() < 2 { //nolint:mnd // minimum required args: name and key=value
 		return fmt.Errorf("usage: suve secret tag <name> <key=value> [key=value]")
 	}
 
@@ -92,8 +92,8 @@ func parseTags(args []string) (map[string]string, error) {
 	tags := make(map[string]string)
 
 	for _, arg := range args {
-		parts := strings.SplitN(arg, "=", 2)
-		if len(parts) != 2 {
+		parts := strings.SplitN(arg, "=", 2) //nolint:mnd // split into key=value pair
+		if len(parts) != 2 {                 //nolint:mnd // expect exactly key and value
 			return nil, fmt.Errorf("invalid tag format %q: expected key=value", arg)
 		}
 

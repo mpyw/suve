@@ -56,11 +56,13 @@ func TestCommand_Validation(t *testing.T) {
 	})
 }
 
+//nolint:lll // mock struct fields match AWS SDK interface signatures
 type mockClient struct {
 	addTagsFunc    func(ctx context.Context, params *paramapi.AddTagsToResourceInput, optFns ...func(*paramapi.Options)) (*paramapi.AddTagsToResourceOutput, error)
 	removeTagsFunc func(ctx context.Context, params *paramapi.RemoveTagsFromResourceInput, optFns ...func(*paramapi.Options)) (*paramapi.RemoveTagsFromResourceOutput, error)
 }
 
+//nolint:lll // mock function signature must match AWS SDK interface
 func (m *mockClient) AddTagsToResource(ctx context.Context, params *paramapi.AddTagsToResourceInput, optFns ...func(*paramapi.Options)) (*paramapi.AddTagsToResourceOutput, error) {
 	if m.addTagsFunc != nil {
 		return m.addTagsFunc(ctx, params, optFns...)
@@ -69,6 +71,7 @@ func (m *mockClient) AddTagsToResource(ctx context.Context, params *paramapi.Add
 	return &paramapi.AddTagsToResourceOutput{}, nil
 }
 
+//nolint:lll // mock function signature must match AWS SDK interface
 func (m *mockClient) RemoveTagsFromResource(ctx context.Context, params *paramapi.RemoveTagsFromResourceInput, optFns ...func(*paramapi.Options)) (*paramapi.RemoveTagsFromResourceOutput, error) {
 	if m.removeTagsFunc != nil {
 		return m.removeTagsFunc(ctx, params, optFns...)
@@ -94,6 +97,7 @@ func TestRun(t *testing.T) {
 				Tags: map[string]string{"env": "prod"},
 			},
 			mock: &mockClient{
+				//nolint:lll // inline mock
 				addTagsFunc: func(_ context.Context, params *paramapi.AddTagsToResourceInput, _ ...func(*paramapi.Options)) (*paramapi.AddTagsToResourceOutput, error) {
 					assert.Equal(t, "/app/param", lo.FromPtr(params.ResourceId))
 					assert.Equal(t, paramapi.ResourceTypeForTaggingParameter, params.ResourceType)
@@ -115,6 +119,7 @@ func TestRun(t *testing.T) {
 				Tags: map[string]string{"env": "prod", "team": "backend"},
 			},
 			mock: &mockClient{
+				//nolint:lll // inline mock
 				addTagsFunc: func(_ context.Context, params *paramapi.AddTagsToResourceInput, _ ...func(*paramapi.Options)) (*paramapi.AddTagsToResourceOutput, error) {
 					assert.Len(t, params.Tags, 2)
 

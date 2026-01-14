@@ -197,7 +197,7 @@ func TestPrompter_Confirm(t *testing.T) {
 		}
 
 		_, err := p.Confirm("test message", false)
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to read response")
 	})
 }
@@ -396,7 +396,7 @@ func TestPrompter_ConfirmDelete(t *testing.T) {
 		}
 
 		_, err := p.ConfirmDelete("/my/param", false)
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to read response")
 	})
 }
@@ -524,7 +524,7 @@ func TestPrompter_ConfirmChoice(t *testing.T) {
 		}
 
 		_, err := p.ConfirmChoice("Choose:", choices)
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to read response")
 	})
 }

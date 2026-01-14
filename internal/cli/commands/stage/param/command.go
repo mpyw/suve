@@ -9,6 +9,7 @@ import (
 	stgcli "github.com/mpyw/suve/internal/staging/cli"
 )
 
+//nolint:gochecknoglobals // package-level config for command factory
 var config = stgcli.CommandConfig{
 	CommandName:   "param",
 	ItemName:      "parameter",

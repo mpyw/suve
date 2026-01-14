@@ -29,6 +29,8 @@ type AbsoluteSpec struct {
 type Spec = version.Spec[AbsoluteSpec]
 
 // parser defines the SSM Parameter Store-specific parsing logic.
+//
+//nolint:gochecknoglobals // stateless parser configuration
 var parser = version.AbsoluteParser[AbsoluteSpec]{
 	Parsers: []version.SpecifierParser[AbsoluteSpec]{
 		{

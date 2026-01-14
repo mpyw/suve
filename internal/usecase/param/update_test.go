@@ -19,6 +19,7 @@ type mockUpdateClient struct {
 	putParameterErr    error
 }
 
+//nolint:lll // mock function signature must match AWS SDK interface
 func (m *mockUpdateClient) GetParameter(_ context.Context, _ *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
 	if m.getParameterErr != nil {
 		return nil, m.getParameterErr

@@ -213,7 +213,7 @@ EXAMPLES:
 			name := cmd.Args().First()
 
 			var value string
-			if cmd.Args().Len() >= 2 {
+			if cmd.Args().Len() >= 2 { //nolint:mnd // check for optional value argument
 				value = cmd.Args().Get(1)
 			}
 
@@ -290,7 +290,7 @@ EXAMPLES:
 			name := cmd.Args().First()
 
 			var value string
-			if cmd.Args().Len() >= 2 {
+			if cmd.Args().Len() >= 2 { //nolint:mnd // check for optional value argument
 				value = cmd.Args().Get(1)
 			}
 
@@ -561,7 +561,7 @@ func NewDeleteCommand(cfg CommandConfig) *cli.Command {
 			&cli.IntFlag{
 				Name:  "recovery-window",
 				Usage: "Number of days before permanent deletion (7-30)",
-				Value: 30,
+				Value: 30, //nolint:mnd // AWS Secrets Manager default recovery window
 			},
 		}
 		description = fmt.Sprintf(`Stage a %s for deletion.
@@ -666,7 +666,7 @@ type tagCommandRunner func(
 // tagAction creates a common action handler for tag/untag commands.
 func tagAction(cfg CommandConfig, usageMsg string, runner tagCommandRunner) func(context.Context, *cli.Command) error {
 	return func(ctx context.Context, cmd *cli.Command) error {
-		if cmd.Args().Len() < 2 {
+		if cmd.Args().Len() < 2 { //nolint:mnd // minimum required args: name and key/value
 			return fmt.Errorf("usage: suve stage %s %s", cfg.CommandName, usageMsg)
 		}
 

@@ -14,6 +14,8 @@ import (
 )
 
 // Version is set by goreleaser via ldflags.
+//
+//nolint:gochecknoglobals // build-time variable set by ldflags
 var Version = "dev"
 
 // MakeApp creates a new CLI application instance.
@@ -36,4 +38,6 @@ func MakeApp() *cli.Command {
 }
 
 // App is the main CLI application.
+//
+//nolint:gochecknoglobals // singleton CLI app instance
 var App = MakeApp()

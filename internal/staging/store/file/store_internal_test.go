@@ -89,6 +89,8 @@ func TestInitializeStateMaps(t *testing.T) {
 }
 
 func TestNewStore_UserHomeDirError(t *testing.T) {
+	t.Parallel()
+
 	// Save the original function and restore it after the test
 	originalFunc := userHomeDirFunc
 
@@ -106,6 +108,8 @@ func TestNewStore_UserHomeDirError(t *testing.T) {
 }
 
 func TestNewStoreWithPassphrase_UserHomeDirError(t *testing.T) {
+	t.Parallel()
+
 	// Save the original function and restore it after the test
 	originalFunc := userHomeDirFunc
 
@@ -123,6 +127,8 @@ func TestNewStoreWithPassphrase_UserHomeDirError(t *testing.T) {
 }
 
 func TestDrain_RemoveFileError(t *testing.T) {
+	t.Parallel()
+
 	// This test validates the error path when os.Remove fails in Drain
 	// We can trigger this by making the file unremovable
 	tmpDir := t.TempDir()
@@ -149,6 +155,8 @@ func TestDrain_RemoveFileError(t *testing.T) {
 }
 
 func TestWriteState_RemoveEmptyStateError(t *testing.T) {
+	t.Parallel()
+
 	// Create a directory structure where we can't remove the file
 	tmpDir := t.TempDir()
 	dirPath := tmpDir + "/subdir"
@@ -176,6 +184,8 @@ func TestWriteState_RemoveEmptyStateError(t *testing.T) {
 }
 
 func TestWriteState_EncryptionError(t *testing.T) {
+	t.Parallel()
+
 	// Inject error into crypt's random reader
 	crypt.SetRandReader(&errorReader{err: errors.New("random source unavailable")})
 

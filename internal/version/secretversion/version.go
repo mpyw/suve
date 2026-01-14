@@ -44,9 +44,12 @@ func GetSecretWithVersion(ctx context.Context, client Client, spec *Spec) (*secr
 // TruncateVersionID truncates a version ID to 8 characters for display.
 // Secrets Manager version IDs are UUIDs which are long; this provides
 // a readable short form similar to git commit hashes.
+// versionIDDisplayLength is the number of characters to display for version IDs.
+const versionIDDisplayLength = 8
+
 func TruncateVersionID(id string) string {
-	if len(id) > 8 {
-		return id[:8]
+	if len(id) > versionIDDisplayLength {
+		return id[:versionIDDisplayLength]
 	}
 
 	return id

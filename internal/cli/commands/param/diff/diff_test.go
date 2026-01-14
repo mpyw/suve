@@ -377,11 +377,13 @@ func assertSpec(t *testing.T, label string, got *paramversion.Spec, want *wantSp
 	assert.Equal(t, want.shift, got.Shift, "%s.Shift", label)
 }
 
+//nolint:lll // mock struct fields match AWS SDK interface signatures
 type mockClient struct {
 	getParameterFunc        func(ctx context.Context, params *paramapi.GetParameterInput, optFns ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error)
 	getParameterHistoryFunc func(ctx context.Context, params *paramapi.GetParameterHistoryInput, optFns ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error)
 }
 
+//nolint:lll // mock function signature must match AWS SDK interface
 func (m *mockClient) GetParameter(ctx context.Context, params *paramapi.GetParameterInput, optFns ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
 	if m.getParameterFunc != nil {
 		return m.getParameterFunc(ctx, params, optFns...)
@@ -390,6 +392,7 @@ func (m *mockClient) GetParameter(ctx context.Context, params *paramapi.GetParam
 	return nil, fmt.Errorf("GetParameter not mocked")
 }
 
+//nolint:lll // mock function signature must match AWS SDK interface
 func (m *mockClient) GetParameterHistory(ctx context.Context, params *paramapi.GetParameterHistoryInput, optFns ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
 	if m.getParameterHistoryFunc != nil {
 		return m.getParameterHistoryFunc(ctx, params, optFns...)
@@ -418,6 +421,7 @@ func TestRun(t *testing.T) {
 				Spec2: &paramversion.Spec{Name: "/app/param", Absolute: paramversion.AbsoluteSpec{Version: lo.ToPtr(int64(2))}},
 			},
 			mock: &mockClient{
+				//nolint:lll // inline mock function in test table
 				getParameterFunc: func(_ context.Context, params *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
 					name := lo.FromPtr(params.Name)
 					if name == testParamVersion1 {
@@ -456,6 +460,7 @@ func TestRun(t *testing.T) {
 				Spec2: &paramversion.Spec{Name: "/app/param", Absolute: paramversion.AbsoluteSpec{Version: lo.ToPtr(int64(2))}},
 			},
 			mock: &mockClient{
+				//nolint:lll // inline mock function in test table
 				getParameterFunc: func(_ context.Context, _ *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
 					return &paramapi.GetParameterOutput{
 						Parameter: &paramapi.Parameter{
@@ -480,6 +485,7 @@ func TestRun(t *testing.T) {
 				Spec2: &paramversion.Spec{Name: "/app/param", Absolute: paramversion.AbsoluteSpec{Version: lo.ToPtr(int64(2))}},
 			},
 			mock: &mockClient{
+				//nolint:lll // inline mock function in test table
 				getParameterFunc: func(_ context.Context, params *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
 					if lo.FromPtr(params.Name) == testParamVersion1 {
 						return nil, fmt.Errorf("version not found")
@@ -503,6 +509,7 @@ func TestRun(t *testing.T) {
 				Spec2: &paramversion.Spec{Name: "/app/param", Absolute: paramversion.AbsoluteSpec{Version: lo.ToPtr(int64(2))}},
 			},
 			mock: &mockClient{
+				//nolint:lll // inline mock function in test table
 				getParameterFunc: func(_ context.Context, params *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
 					if lo.FromPtr(params.Name) == "/app/param:2" {
 						return nil, fmt.Errorf("version not found")

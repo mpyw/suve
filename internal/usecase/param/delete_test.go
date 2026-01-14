@@ -19,6 +19,7 @@ type mockDeleteClient struct {
 	deleteParameterErr    error
 }
 
+//nolint:lll // mock function signature must match AWS SDK interface
 func (m *mockDeleteClient) GetParameter(_ context.Context, _ *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
 	if m.getParameterErr != nil {
 		return nil, m.getParameterErr
@@ -27,6 +28,7 @@ func (m *mockDeleteClient) GetParameter(_ context.Context, _ *paramapi.GetParame
 	return m.getParameterResult, nil
 }
 
+//nolint:lll // mock function signature must match AWS SDK interface
 func (m *mockDeleteClient) DeleteParameter(_ context.Context, _ *paramapi.DeleteParameterInput, _ ...func(*paramapi.Options)) (*paramapi.DeleteParameterOutput, error) {
 	if m.deleteParameterErr != nil {
 		return nil, m.deleteParameterErr

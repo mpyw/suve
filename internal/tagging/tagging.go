@@ -47,14 +47,14 @@ func ParseFlags(tags []string, untags []string) (*ParseResult, error) {
 		index int
 	}
 
-	var ops []operation
+	ops := make([]operation, 0, len(tags)+len(untags))
 
 	idx := 0
 
 	// Parse --tag flags
 	for _, tag := range tags {
-		parts := strings.SplitN(tag, "=", 2)
-		if len(parts) != 2 {
+		parts := strings.SplitN(tag, "=", 2) //nolint:mnd // split into key=value pair
+		if len(parts) != 2 {                 //nolint:mnd // expect exactly key and value
 			return nil, fmt.Errorf("invalid tag format %q: expected key=value", tag)
 		}
 

@@ -23,6 +23,7 @@ type mockShowClient struct {
 	listTagsErr        error
 }
 
+//nolint:lll // mock function signature must match AWS SDK interface
 func (m *mockShowClient) GetParameter(_ context.Context, _ *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
 	if m.getParameterErr != nil {
 		return nil, m.getParameterErr
@@ -31,6 +32,7 @@ func (m *mockShowClient) GetParameter(_ context.Context, _ *paramapi.GetParamete
 	return m.getParameterResult, nil
 }
 
+//nolint:lll // mock function signature must match AWS SDK interface
 func (m *mockShowClient) GetParameterHistory(_ context.Context, _ *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
 	if m.getHistoryErr != nil {
 		return nil, m.getHistoryErr
@@ -43,6 +45,7 @@ func (m *mockShowClient) GetParameterHistory(_ context.Context, _ *paramapi.GetP
 	return m.getHistoryResult, nil
 }
 
+//nolint:lll // mock function signature must match AWS SDK interface
 func (m *mockShowClient) ListTagsForResource(_ context.Context, _ *paramapi.ListTagsForResourceInput, _ ...func(*paramapi.Options)) (*paramapi.ListTagsForResourceOutput, error) {
 	if m.listTagsErr != nil {
 		return nil, m.listTagsErr

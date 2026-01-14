@@ -70,6 +70,8 @@ func (o *Writer) Value(value string) {
 // Warning prints a warning message in yellow.
 // Used to alert users about non-critical issues that don't prevent command execution.
 // Example: "Warning: comparing identical versions".
+//
+//nolint:goprintffuncname // intentionally named without 'f' suffix for cleaner API
 func Warning(w io.Writer, format string, args ...any) {
 	msg := fmt.Sprintf(format, args...)
 	_, _ = fmt.Fprintln(w, colors.Warning("Warning: "+msg))
@@ -78,6 +80,8 @@ func Warning(w io.Writer, format string, args ...any) {
 // Hint prints a hint message in cyan.
 // Used to provide helpful suggestions to the user, typically following a warning.
 // Example: "Hint: To compare with previous version, use: suve param diff /param~1".
+//
+//nolint:goprintffuncname // intentionally named without 'f' suffix for cleaner API
 func Hint(w io.Writer, format string, args ...any) {
 	msg := fmt.Sprintf(format, args...)
 	_, _ = fmt.Fprintln(w, colors.Info("Hint: "+msg))
@@ -86,6 +90,8 @@ func Hint(w io.Writer, format string, args ...any) {
 // Error prints an error message in red.
 // Used for user-facing error messages that are not Go errors.
 // For Go errors, use the standard error return pattern instead.
+//
+//nolint:goprintffuncname // intentionally named without 'f' suffix for cleaner API
 func Error(w io.Writer, format string, args ...any) {
 	msg := fmt.Sprintf(format, args...)
 	_, _ = fmt.Fprintln(w, colors.Error("Error: "+msg))
@@ -93,6 +99,8 @@ func Error(w io.Writer, format string, args ...any) {
 
 // Success prints a success message with green checkmark.
 // Example: "✓ Created parameter /app/config".
+//
+//nolint:goprintffuncname // intentionally named without 'f' suffix for cleaner API
 func Success(w io.Writer, format string, args ...any) {
 	msg := fmt.Sprintf(format, args...)
 	_, _ = fmt.Fprintf(w, "%s %s\n", colors.Success("✓"), msg)
@@ -106,6 +114,8 @@ func Failed(w io.Writer, name string, err error) {
 
 // Info prints an informational message in yellow (without "Warning:" prefix).
 // Example: "No changes staged.".
+//
+//nolint:goprintffuncname // intentionally named without 'f' suffix for cleaner API
 func Info(w io.Writer, format string, args ...any) {
 	msg := fmt.Sprintf(format, args...)
 	_, _ = fmt.Fprintln(w, colors.Warning(msg))
@@ -113,6 +123,8 @@ func Info(w io.Writer, format string, args ...any) {
 
 // Warn prints a warning message with yellow "!" prefix.
 // Example: "! Skipped /app/config (same as AWS)".
+//
+//nolint:goprintffuncname // intentionally named without 'f' suffix for cleaner API
 func Warn(w io.Writer, format string, args ...any) {
 	msg := fmt.Sprintf(format, args...)
 	_, _ = fmt.Fprintf(w, "%s %s\n", colors.Warning("!"), msg)

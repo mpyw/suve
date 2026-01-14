@@ -83,7 +83,7 @@ func (u *LogUseCase) Execute(ctx context.Context, input LogInput) (*LogOutput, e
 	}
 
 	// Build entries
-	var entries []LogEntry
+	entries := make([]LogEntry, 0, len(versions))
 
 	for _, v := range versions {
 		// Apply date filters (skip entries without CreatedDate when filters are applied)

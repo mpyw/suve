@@ -23,6 +23,7 @@ type mockListClient struct {
 	getParametersErr  error    // Error to return from GetParameters
 }
 
+//nolint:lll // mock function signature must match AWS SDK interface
 func (m *mockListClient) DescribeParameters(_ context.Context, _ *paramapi.DescribeParametersInput, _ ...func(*paramapi.Options)) (*paramapi.DescribeParametersOutput, error) {
 	if m.describeErr != nil {
 		return nil, m.describeErr
@@ -44,6 +45,7 @@ func (m *mockListClient) DescribeParameters(_ context.Context, _ *paramapi.Descr
 	return m.describeResult, nil
 }
 
+//nolint:lll // mock function signature must match AWS SDK interface
 func (m *mockListClient) GetParameters(_ context.Context, input *paramapi.GetParametersInput, _ ...func(*paramapi.Options)) (*paramapi.GetParametersOutput, error) {
 	if m.getParametersErr != nil {
 		return nil, m.getParametersErr

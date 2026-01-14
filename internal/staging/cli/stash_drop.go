@@ -64,6 +64,7 @@ func (r *StashDropRunner) Run(ctx context.Context, opts StashDropOptions) error 
 		updateErr := lo.
 			IfF(state.IsEmpty(), func() error {
 				_, err := r.FileStore.Drain(ctx, "", false)
+
 				return err
 			}).
 			ElseF(func() error { return r.FileStore.WriteState(ctx, "", state) })

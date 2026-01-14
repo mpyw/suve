@@ -25,7 +25,7 @@ func TestExecuteMap(t *testing.T) {
 			"c": 3,
 		}
 
-		results := parallel.ExecuteMap(t.Context(), entries, func(_ context.Context, key string, value int) (int, error) {
+		results := parallel.ExecuteMap(t.Context(), entries, func(_ context.Context, _ string, value int) (int, error) {
 			return value * 2, nil
 		})
 
@@ -89,10 +89,10 @@ func TestExecuteMap(t *testing.T) {
 
 		results := parallel.ExecuteMap(t.Context(), entries, func(_ context.Context, _ int, _ string) (bool, error) {
 			current := atomic.AddInt32(&running, 1)
-			// Update max if current is higher
+			// Update maxConcurrent if current is higher
 			for {
-				max := atomic.LoadInt32(&maxConcurrent)
-				if current <= max || atomic.CompareAndSwapInt32(&maxConcurrent, max, current) {
+				oldMax := atomic.LoadInt32(&maxConcurrent)
+				if current <= oldMax || atomic.CompareAndSwapInt32(&maxConcurrent, oldMax, current) {
 					break
 				}
 			}
@@ -132,8 +132,8 @@ func TestExecuteMapWithLimit(t *testing.T) {
 			current := atomic.AddInt32(&running, 1)
 
 			for {
-				max := atomic.LoadInt32(&maxConcurrent)
-				if current <= max || atomic.CompareAndSwapInt32(&maxConcurrent, max, current) {
+				oldMax := atomic.LoadInt32(&maxConcurrent)
+				if current <= oldMax || atomic.CompareAndSwapInt32(&maxConcurrent, oldMax, current) {
 					break
 				}
 			}
@@ -167,8 +167,8 @@ func TestExecuteMapWithLimit(t *testing.T) {
 			current := atomic.AddInt32(&running, 1)
 
 			for {
-				max := atomic.LoadInt32(&maxConcurrent)
-				if current <= max || atomic.CompareAndSwapInt32(&maxConcurrent, max, current) {
+				oldMax := atomic.LoadInt32(&maxConcurrent)
+				if current <= oldMax || atomic.CompareAndSwapInt32(&maxConcurrent, oldMax, current) {
 					break
 				}
 			}

@@ -149,7 +149,7 @@ func parseAWSConfigProfiles() map[string]string {
 
 		// Try role_arn (extract account ID from ARN)
 		if key, err := section.GetKey("role_arn"); err == nil {
-			if matches := arnAccountIDRegex.FindStringSubmatch(key.String()); len(matches) == 2 {
+			if matches := arnAccountIDRegex.FindStringSubmatch(key.String()); len(matches) == 2 { //nolint:mnd // regex capture groups
 				profiles[profileName] = matches[1]
 			}
 		}

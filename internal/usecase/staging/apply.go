@@ -19,6 +19,7 @@ type ApplyInput struct {
 // ApplyResultStatus represents the status of an apply operation.
 type ApplyResultStatus int
 
+// ApplyResultStatus constants representing the outcome of applying a staged entry.
 const (
 	ApplyResultCreated ApplyResultStatus = iota
 	ApplyResultUpdated

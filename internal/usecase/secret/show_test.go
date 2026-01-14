@@ -32,6 +32,7 @@ func (m *mockShowClient) GetSecretValue(_ context.Context, _ *secretapi.GetSecre
 	return m.getSecretValueResult, nil
 }
 
+//nolint:revive,stylecheck // Method name must match AWS SDK interface
 func (m *mockShowClient) ListSecretVersionIds(_ context.Context, _ *secretapi.ListSecretVersionIDsInput, _ ...func(*secretapi.Options)) (*secretapi.ListSecretVersionIDsOutput, error) {
 	if m.listVersionsErr != nil {
 		return nil, m.listVersionsErr
