@@ -14,13 +14,7 @@ func SetupProcess() error {
 	// SEM_FAILCRITICALERRORS: Don't display critical error dialogs
 	// SEM_NOGPFAULTERRORBOX: Don't display GP fault error box (prevents WER)
 	// SEM_NOOPENFILEERRORBOX: Don't display file error dialogs
-	const (
-		SEM_FAILCRITICALERRORS     = 0x0001
-		SEM_NOGPFAULTERRORBOX      = 0x0002
-		SEM_NOOPENFILEERRORBOX     = 0x8000
-	)
-
-	windows.SetErrorMode(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX | SEM_NOOPENFILEERRORBOX)
+	windows.SetErrorMode(windows.SEM_FAILCRITICALERRORS | windows.SEM_NOGPFAULTERRORBOX | windows.SEM_NOOPENFILEERRORBOX)
 
 	return nil
 }

@@ -3,7 +3,6 @@
 package security_test
 
 import (
-	"context"
 	"net"
 	"os"
 	"path/filepath"
@@ -27,10 +26,10 @@ func TestVerifyPeerCredentials_ValidConnection(t *testing.T) {
 
 	socketPath := filepath.Join(tmpDir, "test.sock")
 
-	// Start listener
+	// Start listener with test context (auto-cancelled on test end)
 	var lc net.ListenConfig
 
-	listener, err := lc.Listen(context.Background(), "unix", socketPath)
+	listener, err := lc.Listen(t.Context(), "unix", socketPath)
 	require.NoError(t, err)
 
 	defer func() { _ = listener.Close() }()
@@ -53,7 +52,7 @@ func TestVerifyPeerCredentials_ValidConnection(t *testing.T) {
 	// Connect as client
 	dialer := &net.Dialer{Timeout: time.Second}
 
-	clientConn, err := dialer.DialContext(context.Background(), "unix", socketPath)
+	clientConn, err := dialer.DialContext(t.Context(), "unix", socketPath)
 	require.NoError(t, err)
 
 	defer func() { _ = clientConn.Close() }()
@@ -68,8 +67,8 @@ func TestVerifyPeerCredentials_ValidConnection(t *testing.T) {
 		require.NoError(t, err)
 	case err := <-errCh:
 		t.Fatalf("Accept failed: %v", err)
-	case <-time.After(2 * time.Second):
-		t.Fatal("Timeout waiting for connection")
+	case <-t.Context().Done():
+		t.Fatal("Test context cancelled")
 	}
 }
 
