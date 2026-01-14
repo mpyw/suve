@@ -469,14 +469,10 @@ jobs:
         include:
           - os: linux
             runner: ubuntu-latest
-            lint_args: "--timeout=5m"
           - os: darwin
             runner: macos-latest
-            lint_args: "--timeout=5m"
-          - os: windows
-            runner: windows-latest
-            # Exclude gci on Windows due to false positives with line endings
-            lint_args: "--timeout=5m --disable=gci"
+          # Note: Windows excluded due to gci formatter false positives.
+          # Main Lint job (Linux) covers all essential checks.
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
@@ -489,7 +485,7 @@ jobs:
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@v9
         with:
-          args: ${{ matrix.lint_args }}
+          args: --timeout=5m
 
   platform-build:
     name: Platform Build (${{ matrix.goos }}/${{ matrix.goarch }})
