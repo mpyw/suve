@@ -102,180 +102,6 @@ func stashPushFlags() []cli.Flag {
 	}
 }
 
-// stashPushExistenceResult holds the result of checking stash file existence.
-type stashPushExistenceResult struct {
-	exists    bool
-	itemCount int
-}
-
-// checkStashExistence checks if stash file(s) already exist and counts items.
-func checkStashExistence(ctx context.Context, identity *infra.AWSIdentity, service staging.Service) (*stashPushExistenceResult, error) {
-	if service != "" {
-		return checkServiceStashExistence(ctx, identity, service)
-	}
-
-	return checkGlobalStashExistence(ctx, identity)
-}
-
-func checkServiceStashExistence(ctx context.Context, identity *infra.AWSIdentity, service staging.Service) (*stashPushExistenceResult, error) {
-	basicStore, err := file.NewStore(identity.AccountID, identity.Region, service)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create file store: %w", err)
-	}
-
-	exists, err := basicStore.Exists()
-	if err != nil {
-		return nil, fmt.Errorf("failed to check stash file: %w", err)
-	}
-
-	result := &stashPushExistenceResult{exists: exists}
-
-	if exists {
-		existingState, err := basicStore.Drain(ctx, "", true)
-		if err == nil {
-			result.itemCount = existingState.TotalCount()
-		}
-	}
-
-	return result, nil
-}
-
-func checkGlobalStashExistence(ctx context.Context, identity *infra.AWSIdentity) (*stashPushExistenceResult, error) {
-	basicStores, err := file.NewStoresForAllServices(identity.AccountID, identity.Region)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create file stores: %w", err)
-	}
-
-	exists, err := file.AnyExists(basicStores)
-	if err != nil {
-		return nil, fmt.Errorf("failed to check stash files: %w", err)
-	}
-
-	result := &stashPushExistenceResult{exists: exists}
-
-	if exists {
-		existingState, err := file.DrainAll(ctx, basicStores, true)
-		if err == nil {
-			result.itemCount = existingState.TotalCount()
-		}
-	}
-
-	return result, nil
-}
-
-// stashPushModeResult holds the result of determining push mode.
-type stashPushModeResult struct {
-	mode      usestaging.StashPushMode
-	cancelled bool
-}
-
-// determineStashPushMode determines the push mode based on flags and user prompt.
-func determineStashPushMode(cmd *cli.Command, service staging.Service, existence *stashPushExistenceResult) (*stashPushModeResult, error) {
-	forceFlag := cmd.Bool("force")
-	mergeFlag := cmd.Bool("merge")
-
-	switch {
-	case forceFlag:
-		return &stashPushModeResult{mode: usestaging.StashPushModeOverwrite}, nil
-	case mergeFlag:
-		return &stashPushModeResult{mode: usestaging.StashPushModeMerge}, nil
-	default:
-		return promptStashPushMode(cmd, service, existence)
-	}
-}
-
-func promptStashPushMode(cmd *cli.Command, service staging.Service, existence *stashPushExistenceResult) (*stashPushModeResult, error) {
-	// Only prompt for global push when file exists
-	// Service-specific push always merges (preserves other services)
-	if !existence.exists || service != "" || !terminal.IsTerminalWriter(cmd.Root().ErrWriter) {
-		return &stashPushModeResult{mode: usestaging.StashPushModeMerge}, nil
-	}
-
-	confirmPrompter := &confirm.Prompter{
-		Stdin:  cmd.Root().Reader,
-		Stdout: cmd.Root().Writer,
-		Stderr: cmd.Root().ErrWriter,
-	}
-
-	output.Warning(cmd.Root().ErrWriter, "Stash file(s) already exist with %d item(s).", existence.itemCount)
-
-	choice, err := confirmPrompter.ConfirmChoice("How do you want to proceed?", []confirm.Choice{
-		{Label: "Merge", Description: "combine with existing stash"},
-		{Label: "Overwrite", Description: "replace existing stash"},
-		{Label: "Cancel", Description: "abort operation"},
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to get confirmation: %w", err)
-	}
-
-	switch choice {
-	case 0: // Merge
-		return &stashPushModeResult{mode: usestaging.StashPushModeMerge}, nil
-	case 1: // Overwrite
-		return &stashPushModeResult{mode: usestaging.StashPushModeOverwrite}, nil
-	default: // Cancel
-		output.Info(cmd.Root().Writer, "Operation cancelled.")
-
-		return &stashPushModeResult{cancelled: true}, nil
-	}
-}
-
-// stashPushPassphraseResult holds the result of getting passphrase.
-type stashPushPassphraseResult struct {
-	passphrase string
-	cancelled  bool
-}
-
-// getStashPushPassphrase gets the passphrase from stdin or prompt.
-func getStashPushPassphrase(cmd *cli.Command) (*stashPushPassphraseResult, error) {
-	prompter := &passphrase.Prompter{
-		Stdin:  cmd.Root().Reader,
-		Stdout: cmd.Root().Writer,
-		Stderr: cmd.Root().ErrWriter,
-	}
-
-	switch {
-	case cmd.Bool("passphrase-stdin"):
-		pass, err := prompter.ReadFromStdin()
-		if err != nil {
-			return nil, fmt.Errorf("failed to read passphrase from stdin: %w", err)
-		}
-
-		return &stashPushPassphraseResult{passphrase: pass}, nil
-
-	case terminal.IsTerminalWriter(cmd.Root().ErrWriter):
-		pass, err := prompter.PromptForEncrypt()
-		if err != nil {
-			if errors.Is(err, passphrase.ErrCancelled) {
-				return &stashPushPassphraseResult{cancelled: true}, nil
-			}
-
-			return nil, fmt.Errorf("failed to get passphrase: %w", err)
-		}
-
-		return &stashPushPassphraseResult{passphrase: pass}, nil
-
-	default:
-		prompter.WarnNonTTY()
-
-		return &stashPushPassphraseResult{}, nil // Empty passphrase = plain text
-	}
-}
-
-// createStashPushFileStore creates a file store for stash push operation.
-func createStashPushFileStore(identity *infra.AWSIdentity, service staging.Service, pass string) (store.FileStore, error) {
-	if service != "" {
-		return file.NewStoreWithPassphrase(identity.AccountID, identity.Region, service, pass)
-	}
-
-	stores, err := file.NewStoresWithPassphrase(identity.AccountID, identity.Region, pass)
-	if err != nil {
-		return nil, err
-	}
-
-	return file.NewCompositeStore(stores), nil
-}
-
 // stashPushAction creates the action function for stash push commands.
 func stashPushAction(service staging.Service) func(context.Context, *cli.Command) error {
 	return func(ctx context.Context, cmd *cli.Command) error {
@@ -287,9 +113,158 @@ func stashPushAction(service staging.Service) func(context.Context, *cli.Command
 		agentStore := agent.NewStore(identity.AccountID, identity.Region)
 
 		result, err := lifecycle.ExecuteRead(ctx, agentStore, lifecycle.CmdStashPush, func() (struct{}, error) {
-			return executeStashPush(ctx, cmd, identity, agentStore, service)
+			// V3: Check if stash file(s) already exist
+			var (
+				anyExists      bool
+				totalItemCount int
+			)
+
+			if service != "" {
+				// Service-specific: check single file
+				basicStore, err := file.NewStore(identity.AccountID, identity.Region, service)
+				if err != nil {
+					return struct{}{}, fmt.Errorf("failed to create file store: %w", err)
+				}
+
+				anyExists, err = basicStore.Exists()
+				if err != nil {
+					return struct{}{}, fmt.Errorf("failed to check stash file: %w", err)
+				}
+
+				if anyExists {
+					existingState, err := basicStore.Drain(ctx, "", true)
+					if err == nil {
+						totalItemCount = existingState.TotalCount()
+					}
+				}
+			} else {
+				// Global: check all files
+				basicStores, err := file.NewStoresForAllServices(identity.AccountID, identity.Region)
+				if err != nil {
+					return struct{}{}, fmt.Errorf("failed to create file stores: %w", err)
+				}
+
+				anyExists, err = file.AnyExists(basicStores)
+				if err != nil {
+					return struct{}{}, fmt.Errorf("failed to check stash files: %w", err)
+				}
+
+				if anyExists {
+					existingState, err := file.DrainAll(ctx, basicStores, true)
+					if err == nil {
+						totalItemCount = existingState.TotalCount()
+					}
+				}
+			}
+
+			// Determine mode based on flags and file existence
+			mode := usestaging.StashPushModeMerge // Default to merge (safer)
+			forceFlag := cmd.Bool("force")
+			mergeFlag := cmd.Bool("merge")
+
+			switch {
+			case forceFlag:
+				mode = usestaging.StashPushModeOverwrite
+			case mergeFlag:
+				mode = usestaging.StashPushModeMerge
+			default:
+				// Only prompt for global push when file exists
+				// Service-specific push always merges (preserves other services)
+				if anyExists && service == "" && terminal.IsTerminalWriter(cmd.Root().ErrWriter) {
+					confirmPrompter := &confirm.Prompter{
+						Stdin:  cmd.Root().Reader,
+						Stdout: cmd.Root().Writer,
+						Stderr: cmd.Root().ErrWriter,
+					}
+
+					output.Warning(cmd.Root().ErrWriter, "Stash file(s) already exist with %d item(s).", totalItemCount)
+
+					choice, err := confirmPrompter.ConfirmChoice("How do you want to proceed?", []confirm.Choice{
+						{Label: "Merge", Description: "combine with existing stash"},
+						{Label: "Overwrite", Description: "replace existing stash"},
+						{Label: "Cancel", Description: "abort operation"},
+					})
+					if err != nil {
+						return struct{}{}, fmt.Errorf("failed to get confirmation: %w", err)
+					}
+
+					switch choice {
+					case 0: // Merge
+						mode = usestaging.StashPushModeMerge
+					case 1: // Overwrite
+						mode = usestaging.StashPushModeOverwrite
+					default: // Cancel or error
+						output.Info(cmd.Root().Writer, "Operation cancelled.")
+
+						return struct{}{}, nil
+					}
+				}
+			}
+
+			// Get passphrase
+			prompter := &passphrase.Prompter{
+				Stdin:  cmd.Root().Reader,
+				Stdout: cmd.Root().Writer,
+				Stderr: cmd.Root().ErrWriter,
+			}
+
+			var pass string
+
+			switch {
+			case cmd.Bool("passphrase-stdin"):
+				pass, err = prompter.ReadFromStdin()
+				if err != nil {
+					return struct{}{}, fmt.Errorf("failed to read passphrase from stdin: %w", err)
+				}
+			case terminal.IsTerminalWriter(cmd.Root().ErrWriter):
+				pass, err = prompter.PromptForEncrypt()
+				if err != nil {
+					if errors.Is(err, passphrase.ErrCancelled) {
+						return struct{}{}, nil
+					}
+
+					return struct{}{}, fmt.Errorf("failed to get passphrase: %w", err)
+				}
+			default:
+				prompter.WarnNonTTY()
+				// pass remains empty = plain text
+			}
+
+			// V3: Create service-specific store or composite store
+			var fileStore store.FileStore
+			if service != "" {
+				fileStore, err = file.NewStoreWithPassphrase(identity.AccountID, identity.Region, service, pass)
+			} else {
+				var stores map[staging.Service]*file.Store
+
+				stores, err = file.NewStoresWithPassphrase(identity.AccountID, identity.Region, pass)
+				if err == nil {
+					fileStore = file.NewCompositeStore(stores)
+				}
+			}
+
+			if err != nil {
+				return struct{}{}, fmt.Errorf("failed to create file store: %w", err)
+			}
+
+			r := &StashPushRunner{
+				UseCase: &usestaging.StashPushUseCase{
+					AgentStore: agentStore,
+					FileStore:  fileStore,
+				},
+				Stdout:    cmd.Root().Writer,
+				Stderr:    cmd.Root().ErrWriter,
+				Encrypted: pass != "",
+			}
+
+			return struct{}{}, r.Run(ctx, StashPushOptions{
+				Service: service,
+				Keep:    cmd.Bool("keep"),
+				Mode:    mode,
+			})
 		})
 		if err != nil {
+			// Handle "nothing to stash" gracefully (agent running but empty)
 			if errors.Is(err, usestaging.ErrNothingToStashPush) {
 				output.Info(cmd.Root().Writer, "No staged changes to persist.")
 
@@ -305,58 +280,6 @@ func stashPushAction(service staging.Service) func(context.Context, *cli.Command
 
 		return nil
 	}
-}
-
-func executeStashPush(
-	ctx context.Context,
-	cmd *cli.Command,
-	identity *infra.AWSIdentity,
-	agentStore store.AgentStore,
-	service staging.Service,
-) (struct{}, error) {
-	existence, err := checkStashExistence(ctx, identity, service)
-	if err != nil {
-		return struct{}{}, err
-	}
-
-	modeResult, err := determineStashPushMode(cmd, service, existence)
-	if err != nil {
-		return struct{}{}, err
-	}
-
-	if modeResult.cancelled {
-		return struct{}{}, nil
-	}
-
-	passResult, err := getStashPushPassphrase(cmd)
-	if err != nil {
-		return struct{}{}, err
-	}
-
-	if passResult.cancelled {
-		return struct{}{}, nil
-	}
-
-	fileStore, err := createStashPushFileStore(identity, service, passResult.passphrase)
-	if err != nil {
-		return struct{}{}, fmt.Errorf("failed to create file store: %w", err)
-	}
-
-	r := &StashPushRunner{
-		UseCase: &usestaging.StashPushUseCase{
-			AgentStore: agentStore,
-			FileStore:  fileStore,
-		},
-		Stdout:    cmd.Root().Writer,
-		Stderr:    cmd.Root().ErrWriter,
-		Encrypted: passResult.passphrase != "",
-	}
-
-	return struct{}{}, r.Run(ctx, StashPushOptions{
-		Service: service,
-		Keep:    cmd.Bool("keep"),
-		Mode:    modeResult.mode,
-	})
 }
 
 // newGlobalStashPushCommand creates a global stash push command that operates on all services.
