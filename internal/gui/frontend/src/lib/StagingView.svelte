@@ -1279,10 +1279,11 @@
   }
 
   .actions {
-    position: relative;
     display: flex;
+    flex-wrap: wrap;
     justify-content: center;
     align-items: center;
+    gap: 12px 24px;
     padding: 16px;
     background: #1a1a2e;
     border-top: 1px solid #2d2d44;
@@ -1329,10 +1330,7 @@
 
   /* Stash dropdown */
   .stash-dropdown {
-    position: absolute;
-    right: 16px;
-    top: 50%;
-    transform: translateY(-50%);
+    position: relative;
   }
 
   .btn-stash {
