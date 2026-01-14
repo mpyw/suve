@@ -1279,21 +1279,21 @@
   }
 
   .actions {
+    position: relative;
     display: flex;
     flex-wrap: wrap;
+    justify-content: center;
     align-items: center;
-    gap: 12px 24px;
+    gap: 12px;
     padding: 16px;
     background: #1a1a2e;
     border-top: 1px solid #2d2d44;
   }
 
   .actions-center {
-    flex: 1;
     display: flex;
     justify-content: center;
     gap: 12px;
-    min-width: 420px;
   }
 
   .btn-action {
@@ -1332,7 +1332,24 @@
 
   /* Stash dropdown */
   .stash-dropdown {
-    position: relative;
+    position: absolute;
+    right: 16px;
+    top: 50%;
+    transform: translateY(-50%);
+  }
+
+  /* Narrow viewport: Stash wraps below and aligns right */
+  @media (max-width: 600px) {
+    .actions {
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .stash-dropdown {
+      position: static;
+      transform: none;
+      align-self: flex-end;
+    }
   }
 
   .btn-stash {
