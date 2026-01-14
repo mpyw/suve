@@ -711,6 +711,7 @@
             onclick={() => { showStashDropdown = false; openPersistModal(); }}
             disabled={loading || (paramEntries.length === 0 && secretEntries.length === 0)}
           >
+            <span class="dropdown-icon">📤</span>
             Push <span class="dropdown-desc">(Export)</span>
           </button>
           <button
@@ -718,6 +719,7 @@
             onclick={() => { showStashDropdown = false; openDrainModal(); }}
             disabled={loading || !fileStatus?.exists}
           >
+            <span class="dropdown-icon">📥</span>
             Pop <span class="dropdown-desc">(Import)</span>
           </button>
           <div class="dropdown-divider"></div>
@@ -726,6 +728,7 @@
             onclick={() => { showStashDropdown = false; openDropModal(); }}
             disabled={loading || !fileStatus?.exists}
           >
+            <span class="dropdown-icon">🗑️</span>
             Drop <span class="dropdown-desc">(Trash)</span>
           </button>
         </div>
@@ -1291,8 +1294,8 @@
   }
 
   .btn-action {
-    min-width: 120px;
-    padding: 10px 24px;
+    min-width: 160px;
+    padding: 12px 32px;
     border: none;
     border-radius: 4px;
     font-size: 14px;
@@ -1415,6 +1418,10 @@
 
   .dropdown-item-danger:hover:not(:disabled) {
     background: rgba(244, 67, 54, 0.2);
+  }
+
+  .dropdown-icon {
+    font-size: 16px;
   }
 
   .dropdown-desc {
