@@ -75,6 +75,9 @@
   let dropLoading = $state(false);
   let dropError = $state('');
 
+  // Stash dropdown state
+  let showStashDropdown = $state(false);
+
   async function loadStatus() {
     loading = true;
     error = '';
@@ -463,17 +466,6 @@
           Value
         </button>
       </div>
-      <div class="file-actions">
-        <button class="btn-file btn-push" onclick={openPersistModal} disabled={loading || (paramEntries.length === 0 && secretEntries.length === 0)} title="Save staged changes to file">
-          Push
-        </button>
-        <button class="btn-file btn-pop" onclick={openDrainModal} disabled={loading || !fileStatus?.exists} title="Load staged changes from file">
-          Pop
-        </button>
-        <button class="btn-file btn-drop" onclick={openDropModal} disabled={loading || !fileStatus?.exists} title="Delete stash file">
-          Drop
-        </button>
-      </div>
       <button class="btn-primary" onclick={loadStatus} disabled={loading}>
         {loading ? 'Loading...' : 'Refresh'}
       </button>
@@ -678,13 +670,14 @@
     </div>
   </div>
 
-  {#if paramEntries.length > 0 || secretEntries.length > 0}
-    <div class="actions">
+  <div class="actions">
+    <div class="actions-left">
       <button
         class="btn-action btn-apply"
         onclick={() => openApplyModal(paramEntries.length > 0 ? 'param' : 'secret')}
+        disabled={paramEntries.length === 0 && secretEntries.length === 0}
       >
-        Apply All Changes
+        Apply All
       </button>
       <button
         class="btn-action btn-reset"
@@ -692,11 +685,59 @@
           if (paramEntries.length > 0) openResetModal('param');
           if (secretEntries.length > 0) openResetModal('secret');
         }}
+        disabled={paramEntries.length === 0 && secretEntries.length === 0}
       >
         Reset All
       </button>
     </div>
-  {/if}
+    <div class="stash-dropdown">
+      <button
+        class="btn-stash"
+        class:has-file={fileStatus?.exists}
+        onclick={() => showStashDropdown = !showStashDropdown}
+      >
+        Stash
+        {#if fileStatus?.exists}
+          <span class="stash-indicator">●</span>
+        {/if}
+        <span class="dropdown-arrow">▾</span>
+      </button>
+      {#if showStashDropdown}
+        <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+        <div class="dropdown-backdrop" onclick={() => showStashDropdown = false}></div>
+        <div class="dropdown-menu">
+          <button
+            class="dropdown-item"
+            onclick={() => { showStashDropdown = false; openPersistModal(); }}
+            disabled={loading || (paramEntries.length === 0 && secretEntries.length === 0)}
+          >
+            <span class="dropdown-icon">📤</span>
+            Push to File
+            <span class="dropdown-hint">Save staged changes</span>
+          </button>
+          <button
+            class="dropdown-item"
+            onclick={() => { showStashDropdown = false; openDrainModal(); }}
+            disabled={loading || !fileStatus?.exists}
+          >
+            <span class="dropdown-icon">📥</span>
+            Pop from File
+            <span class="dropdown-hint">Load and delete file</span>
+          </button>
+          <div class="dropdown-divider"></div>
+          <button
+            class="dropdown-item dropdown-item-danger"
+            onclick={() => { showStashDropdown = false; openDropModal(); }}
+            disabled={loading || !fileStatus?.exists}
+          >
+            <span class="dropdown-icon">🗑️</span>
+            Drop File
+            <span class="dropdown-hint">Delete without loading</span>
+          </button>
+        </div>
+      {/if}
+    </div>
+  </div>
 </div>
 
 <!-- Apply Modal -->
@@ -1242,15 +1283,21 @@
 
   .actions {
     display: flex;
+    justify-content: space-between;
+    align-items: center;
     gap: 12px;
     padding: 16px;
     background: #1a1a2e;
     border-top: 1px solid #2d2d44;
   }
 
+  .actions-left {
+    display: flex;
+    gap: 12px;
+  }
+
   .btn-action {
-    flex: 1;
-    padding: 12px;
+    padding: 10px 20px;
     border: none;
     border-radius: 4px;
     font-size: 14px;
@@ -1280,6 +1327,110 @@
     background: #444;
     color: #888;
     cursor: not-allowed;
+  }
+
+  /* Stash dropdown */
+  .stash-dropdown {
+    position: relative;
+  }
+
+  .btn-stash {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 16px;
+    background: #2d2d44;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    font-size: 14px;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+
+  .btn-stash:hover {
+    background: #3d3d54;
+  }
+
+  .btn-stash.has-file {
+    background: #3d3d54;
+  }
+
+  .stash-indicator {
+    color: #4fc3f7;
+    font-size: 10px;
+  }
+
+  .dropdown-arrow {
+    font-size: 10px;
+    color: #888;
+  }
+
+  .dropdown-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 99;
+  }
+
+  .dropdown-menu {
+    position: absolute;
+    bottom: 100%;
+    right: 0;
+    margin-bottom: 8px;
+    background: #1a1a2e;
+    border: 1px solid #2d2d44;
+    border-radius: 8px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+    min-width: 200px;
+    z-index: 100;
+    overflow: hidden;
+  }
+
+  .dropdown-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 12px 16px;
+    background: transparent;
+    border: none;
+    color: #fff;
+    font-size: 14px;
+    cursor: pointer;
+    text-align: left;
+    transition: background 0.2s;
+  }
+
+  .dropdown-item:hover:not(:disabled) {
+    background: #2d2d44;
+  }
+
+  .dropdown-item:disabled {
+    color: #666;
+    cursor: not-allowed;
+  }
+
+  .dropdown-item-danger:hover:not(:disabled) {
+    background: rgba(244, 67, 54, 0.2);
+  }
+
+  .dropdown-icon {
+    font-size: 16px;
+  }
+
+  .dropdown-hint {
+    margin-left: auto;
+    font-size: 11px;
+    color: #666;
+  }
+
+  .dropdown-divider {
+    height: 1px;
+    background: #2d2d44;
+    margin: 4px 0;
   }
 
   /* Modal styles */
@@ -1642,53 +1793,7 @@
     border-style: solid;
   }
 
-  /* File actions (Persist/Drain) styles */
-  .file-actions {
-    display: flex;
-    gap: 8px;
-  }
-
-  .btn-file {
-    padding: 6px 12px;
-    border: none;
-    border-radius: 4px;
-    font-size: 12px;
-    cursor: pointer;
-    transition: all 0.2s;
-  }
-
-  .btn-file:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-
-  .btn-push {
-    background: #2196f3;
-    color: #fff;
-  }
-
-  .btn-push:hover:not(:disabled) {
-    background: #1976d2;
-  }
-
-  .btn-pop {
-    background: #9c27b0;
-    color: #fff;
-  }
-
-  .btn-pop:hover:not(:disabled) {
-    background: #7b1fa2;
-  }
-
-  .btn-drop {
-    background: #f44336;
-    color: #fff;
-  }
-
-  .btn-drop:hover:not(:disabled) {
-    background: #d32f2f;
-  }
-
+  /* Modal action buttons */
   .btn-push-action {
     padding: 8px 16px;
     background: #2196f3;
