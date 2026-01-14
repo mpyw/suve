@@ -3,7 +3,6 @@ package terminal
 
 import (
 	"io"
-	"os"
 
 	"github.com/mattn/go-isatty"
 	"golang.org/x/term"
@@ -19,17 +18,15 @@ type Fder interface {
 
 // GetSize returns the terminal width and height for the given file descriptor.
 // This is a variable to allow mocking in tests.
+//
+//nolint:gochecknoglobals // Required for test mocking
 var GetSize = term.GetSize
 
 // IsTTY checks if the file descriptor is a TTY.
 // This is a variable to allow mocking in tests.
+//
+//nolint:gochecknoglobals // Required for test mocking
 var IsTTY = isatty.IsTerminal
-
-// GetWidth returns the terminal width for stdout.
-// Returns DefaultWidth if detection fails or stdout is not a terminal.
-func GetWidth() int {
-	return GetWidthFromWriter(os.Stdout)
-}
 
 // GetWidthFromWriter returns the terminal width for the given writer.
 // Returns DefaultWidth if detection fails or writer is not a terminal.
@@ -43,12 +40,8 @@ func GetWidthFromWriter(w io.Writer) int {
 	if err != nil || width <= 0 {
 		return DefaultWidth
 	}
-	return width
-}
 
-// IsTerminal returns true if stdout is a terminal.
-func IsTerminal() bool {
-	return IsTerminalWriter(os.Stdout)
+	return width
 }
 
 // IsTerminalWriter returns true if the given writer is a terminal.
@@ -57,5 +50,6 @@ func IsTerminalWriter(w io.Writer) bool {
 	if !ok {
 		return false
 	}
+
 	return IsTTY(f.Fd())
 }

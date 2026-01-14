@@ -16,53 +16,83 @@ import (
 )
 
 type paramMockClient struct {
-	getParameterFunc           func(ctx context.Context, params *paramapi.GetParameterInput, optFns ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error)
-	getParameterHistoryFunc    func(ctx context.Context, params *paramapi.GetParameterHistoryInput, optFns ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error)
-	putParameterFunc           func(ctx context.Context, params *paramapi.PutParameterInput, optFns ...func(*paramapi.Options)) (*paramapi.PutParameterOutput, error)
-	deleteParameterFunc        func(ctx context.Context, params *paramapi.DeleteParameterInput, optFns ...func(*paramapi.Options)) (*paramapi.DeleteParameterOutput, error)
-	addTagsToResourceFunc      func(ctx context.Context, params *paramapi.AddTagsToResourceInput, optFns ...func(*paramapi.Options)) (*paramapi.AddTagsToResourceOutput, error)
-	removeTagsFromResourceFunc func(ctx context.Context, params *paramapi.RemoveTagsFromResourceInput, optFns ...func(*paramapi.Options)) (*paramapi.RemoveTagsFromResourceOutput, error)
+	getParameterFunc func(
+		ctx context.Context, params *paramapi.GetParameterInput, optFns ...func(*paramapi.Options),
+	) (*paramapi.GetParameterOutput, error)
+	getParameterHistoryFunc func(
+		ctx context.Context, params *paramapi.GetParameterHistoryInput, optFns ...func(*paramapi.Options),
+	) (*paramapi.GetParameterHistoryOutput, error)
+	putParameterFunc func(
+		ctx context.Context, params *paramapi.PutParameterInput, optFns ...func(*paramapi.Options),
+	) (*paramapi.PutParameterOutput, error)
+	deleteParameterFunc func(
+		ctx context.Context, params *paramapi.DeleteParameterInput, optFns ...func(*paramapi.Options),
+	) (*paramapi.DeleteParameterOutput, error)
+	addTagsToResourceFunc func(
+		ctx context.Context, params *paramapi.AddTagsToResourceInput, optFns ...func(*paramapi.Options),
+	) (*paramapi.AddTagsToResourceOutput, error)
+	removeTagsFromResourceFunc func(
+		ctx context.Context, params *paramapi.RemoveTagsFromResourceInput, optFns ...func(*paramapi.Options),
+	) (*paramapi.RemoveTagsFromResourceOutput, error)
 }
 
-func (m *paramMockClient) GetParameter(ctx context.Context, params *paramapi.GetParameterInput, optFns ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
+func (m *paramMockClient) GetParameter(
+	ctx context.Context, params *paramapi.GetParameterInput, optFns ...func(*paramapi.Options),
+) (*paramapi.GetParameterOutput, error) {
 	if m.getParameterFunc != nil {
 		return m.getParameterFunc(ctx, params, optFns...)
 	}
+
 	return nil, errors.New("GetParameter not mocked")
 }
 
-func (m *paramMockClient) GetParameterHistory(ctx context.Context, params *paramapi.GetParameterHistoryInput, optFns ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
+func (m *paramMockClient) GetParameterHistory(
+	ctx context.Context, params *paramapi.GetParameterHistoryInput, optFns ...func(*paramapi.Options),
+) (*paramapi.GetParameterHistoryOutput, error) {
 	if m.getParameterHistoryFunc != nil {
 		return m.getParameterHistoryFunc(ctx, params, optFns...)
 	}
+
 	return nil, errors.New("GetParameterHistory not mocked")
 }
 
-func (m *paramMockClient) PutParameter(ctx context.Context, params *paramapi.PutParameterInput, optFns ...func(*paramapi.Options)) (*paramapi.PutParameterOutput, error) {
+func (m *paramMockClient) PutParameter(
+	ctx context.Context, params *paramapi.PutParameterInput, optFns ...func(*paramapi.Options),
+) (*paramapi.PutParameterOutput, error) {
 	if m.putParameterFunc != nil {
 		return m.putParameterFunc(ctx, params, optFns...)
 	}
+
 	return nil, errors.New("PutParameter not mocked")
 }
 
-func (m *paramMockClient) DeleteParameter(ctx context.Context, params *paramapi.DeleteParameterInput, optFns ...func(*paramapi.Options)) (*paramapi.DeleteParameterOutput, error) {
+func (m *paramMockClient) DeleteParameter(
+	ctx context.Context, params *paramapi.DeleteParameterInput, optFns ...func(*paramapi.Options),
+) (*paramapi.DeleteParameterOutput, error) {
 	if m.deleteParameterFunc != nil {
 		return m.deleteParameterFunc(ctx, params, optFns...)
 	}
+
 	return nil, errors.New("DeleteParameter not mocked")
 }
 
-func (m *paramMockClient) AddTagsToResource(ctx context.Context, params *paramapi.AddTagsToResourceInput, optFns ...func(*paramapi.Options)) (*paramapi.AddTagsToResourceOutput, error) {
+func (m *paramMockClient) AddTagsToResource(
+	ctx context.Context, params *paramapi.AddTagsToResourceInput, optFns ...func(*paramapi.Options),
+) (*paramapi.AddTagsToResourceOutput, error) {
 	if m.addTagsToResourceFunc != nil {
 		return m.addTagsToResourceFunc(ctx, params, optFns...)
 	}
+
 	return &paramapi.AddTagsToResourceOutput{}, nil
 }
 
-func (m *paramMockClient) RemoveTagsFromResource(ctx context.Context, params *paramapi.RemoveTagsFromResourceInput, optFns ...func(*paramapi.Options)) (*paramapi.RemoveTagsFromResourceOutput, error) {
+func (m *paramMockClient) RemoveTagsFromResource(
+	ctx context.Context, params *paramapi.RemoveTagsFromResourceInput, optFns ...func(*paramapi.Options),
+) (*paramapi.RemoveTagsFromResourceOutput, error) {
 	if m.removeTagsFromResourceFunc != nil {
 		return m.removeTagsFromResourceFunc(ctx, params, optFns...)
 	}
+
 	return &paramapi.RemoveTagsFromResourceOutput{}, nil
 }
 
@@ -97,12 +127,14 @@ func TestParamStrategy_Apply(t *testing.T) {
 
 	t.Run("create operation - new parameter", func(t *testing.T) {
 		t.Parallel()
+
 		mock := &paramMockClient{
 			putParameterFunc: func(_ context.Context, params *paramapi.PutParameterInput, _ ...func(*paramapi.Options)) (*paramapi.PutParameterOutput, error) {
 				assert.Equal(t, "/app/param", lo.FromPtr(params.Name))
 				assert.Equal(t, "new-value", lo.FromPtr(params.Value))
 				assert.Equal(t, paramapi.ParameterTypeString, params.Type)
 				assert.False(t, lo.FromPtr(params.Overwrite)) // Create uses Overwrite=false
+
 				return &paramapi.PutParameterOutput{Version: 1}, nil
 			},
 		}
@@ -117,6 +149,7 @@ func TestParamStrategy_Apply(t *testing.T) {
 
 	t.Run("update operation - preserves type", func(t *testing.T) {
 		t.Parallel()
+
 		mock := &paramMockClient{
 			getParameterFunc: func(_ context.Context, _ *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
 				return &paramapi.GetParameterOutput{
@@ -130,6 +163,7 @@ func TestParamStrategy_Apply(t *testing.T) {
 			putParameterFunc: func(_ context.Context, params *paramapi.PutParameterInput, _ ...func(*paramapi.Options)) (*paramapi.PutParameterOutput, error) {
 				assert.Equal(t, paramapi.ParameterTypeSecureString, params.Type)
 				assert.True(t, lo.FromPtr(params.Overwrite)) // Update uses Overwrite=true
+
 				return &paramapi.PutParameterOutput{Version: 2}, nil
 			},
 		}
@@ -144,9 +178,13 @@ func TestParamStrategy_Apply(t *testing.T) {
 
 	t.Run("delete operation", func(t *testing.T) {
 		t.Parallel()
+
 		mock := &paramMockClient{
-			deleteParameterFunc: func(_ context.Context, params *paramapi.DeleteParameterInput, _ ...func(*paramapi.Options)) (*paramapi.DeleteParameterOutput, error) {
+			deleteParameterFunc: func(
+				_ context.Context, params *paramapi.DeleteParameterInput, _ ...func(*paramapi.Options),
+			) (*paramapi.DeleteParameterOutput, error) {
 				assert.Equal(t, "/app/param", lo.FromPtr(params.Name))
+
 				return &paramapi.DeleteParameterOutput{}, nil
 			},
 		}
@@ -160,6 +198,7 @@ func TestParamStrategy_Apply(t *testing.T) {
 
 	t.Run("unknown operation", func(t *testing.T) {
 		t.Parallel()
+
 		s := staging.NewParamStrategy(&paramMockClient{})
 		err := s.Apply(t.Context(), "/app/param", staging.Entry{
 			Operation: staging.Operation("unknown"),
@@ -170,6 +209,7 @@ func TestParamStrategy_Apply(t *testing.T) {
 
 	t.Run("update get parameter error (not ParameterNotFound)", func(t *testing.T) {
 		t.Parallel()
+
 		mock := &paramMockClient{
 			getParameterFunc: func(_ context.Context, _ *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
 				return nil, errors.New("access denied")
@@ -187,6 +227,7 @@ func TestParamStrategy_Apply(t *testing.T) {
 
 	t.Run("update parameter not found error", func(t *testing.T) {
 		t.Parallel()
+
 		mock := &paramMockClient{
 			getParameterFunc: func(_ context.Context, _ *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
 				return nil, &paramapi.ParameterNotFound{}
@@ -204,6 +245,7 @@ func TestParamStrategy_Apply(t *testing.T) {
 
 	t.Run("create put parameter error", func(t *testing.T) {
 		t.Parallel()
+
 		mock := &paramMockClient{
 			putParameterFunc: func(_ context.Context, _ *paramapi.PutParameterInput, _ ...func(*paramapi.Options)) (*paramapi.PutParameterOutput, error) {
 				return nil, errors.New("put failed")
@@ -221,6 +263,7 @@ func TestParamStrategy_Apply(t *testing.T) {
 
 	t.Run("update put parameter error", func(t *testing.T) {
 		t.Parallel()
+
 		mock := &paramMockClient{
 			getParameterFunc: func(_ context.Context, _ *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
 				return &paramapi.GetParameterOutput{
@@ -246,8 +289,11 @@ func TestParamStrategy_Apply(t *testing.T) {
 
 	t.Run("delete parameter error", func(t *testing.T) {
 		t.Parallel()
+
 		mock := &paramMockClient{
-			deleteParameterFunc: func(_ context.Context, _ *paramapi.DeleteParameterInput, _ ...func(*paramapi.Options)) (*paramapi.DeleteParameterOutput, error) {
+			deleteParameterFunc: func(
+				_ context.Context, _ *paramapi.DeleteParameterInput, _ ...func(*paramapi.Options),
+			) (*paramapi.DeleteParameterOutput, error) {
 				return nil, errors.New("delete failed")
 			},
 		}
@@ -266,6 +312,7 @@ func TestParamStrategy_FetchCurrent(t *testing.T) {
 
 	t.Run("success", func(t *testing.T) {
 		t.Parallel()
+
 		mock := &paramMockClient{
 			getParameterFunc: func(_ context.Context, _ *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
 				return &paramapi.GetParameterOutput{
@@ -287,6 +334,7 @@ func TestParamStrategy_FetchCurrent(t *testing.T) {
 
 	t.Run("error", func(t *testing.T) {
 		t.Parallel()
+
 		mock := &paramMockClient{
 			getParameterFunc: func(_ context.Context, _ *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
 				return nil, errors.New("not found")
@@ -306,6 +354,7 @@ func TestParamStrategy_ParseName(t *testing.T) {
 
 	t.Run("valid name", func(t *testing.T) {
 		t.Parallel()
+
 		name, err := s.ParseName("/app/param")
 		require.NoError(t, err)
 		assert.Equal(t, "/app/param", name)
@@ -313,6 +362,7 @@ func TestParamStrategy_ParseName(t *testing.T) {
 
 	t.Run("name with version", func(t *testing.T) {
 		t.Parallel()
+
 		_, err := s.ParseName("/app/param#5")
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "without version specifier")
@@ -320,6 +370,7 @@ func TestParamStrategy_ParseName(t *testing.T) {
 
 	t.Run("name with shift", func(t *testing.T) {
 		t.Parallel()
+
 		_, err := s.ParseName("/app/param~1")
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "without version specifier")
@@ -327,6 +378,7 @@ func TestParamStrategy_ParseName(t *testing.T) {
 
 	t.Run("name is valid even without slash prefix", func(t *testing.T) {
 		t.Parallel()
+
 		name, err := s.ParseName("myParam")
 		require.NoError(t, err)
 		assert.Equal(t, "myParam", name)
@@ -334,6 +386,7 @@ func TestParamStrategy_ParseName(t *testing.T) {
 
 	t.Run("parse error - invalid version format", func(t *testing.T) {
 		t.Parallel()
+
 		_, err := s.ParseName("/app/param#abc")
 		require.Error(t, err)
 	})
@@ -346,6 +399,7 @@ func TestParamStrategy_FetchCurrentValue(t *testing.T) {
 
 	t.Run("success", func(t *testing.T) {
 		t.Parallel()
+
 		mock := &paramMockClient{
 			getParameterFunc: func(_ context.Context, _ *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
 				return &paramapi.GetParameterOutput{
@@ -366,6 +420,7 @@ func TestParamStrategy_FetchCurrentValue(t *testing.T) {
 
 	t.Run("error", func(t *testing.T) {
 		t.Parallel()
+
 		mock := &paramMockClient{
 			getParameterFunc: func(_ context.Context, _ *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
 				return nil, errors.New("fetch error")
@@ -385,6 +440,7 @@ func TestParamStrategy_ParseSpec(t *testing.T) {
 
 	t.Run("name only", func(t *testing.T) {
 		t.Parallel()
+
 		name, hasVersion, err := s.ParseSpec("/app/param")
 		require.NoError(t, err)
 		assert.Equal(t, "/app/param", name)
@@ -393,6 +449,7 @@ func TestParamStrategy_ParseSpec(t *testing.T) {
 
 	t.Run("with version", func(t *testing.T) {
 		t.Parallel()
+
 		name, hasVersion, err := s.ParseSpec("/app/param#5")
 		require.NoError(t, err)
 		assert.Equal(t, "/app/param", name)
@@ -401,6 +458,7 @@ func TestParamStrategy_ParseSpec(t *testing.T) {
 
 	t.Run("with shift", func(t *testing.T) {
 		t.Parallel()
+
 		name, hasVersion, err := s.ParseSpec("/app/param~1")
 		require.NoError(t, err)
 		assert.Equal(t, "/app/param", name)
@@ -409,6 +467,7 @@ func TestParamStrategy_ParseSpec(t *testing.T) {
 
 	t.Run("invalid spec - bad version", func(t *testing.T) {
 		t.Parallel()
+
 		_, _, err := s.ParseSpec("/app/param#abc")
 		require.Error(t, err)
 	})
@@ -419,6 +478,7 @@ func TestParamStrategy_FetchVersion(t *testing.T) {
 
 	t.Run("success with version", func(t *testing.T) {
 		t.Parallel()
+
 		mock := &paramMockClient{
 			getParameterFunc: func(_ context.Context, params *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
 				// Version selector uses GetParameter with name:version format
@@ -441,8 +501,11 @@ func TestParamStrategy_FetchVersion(t *testing.T) {
 
 	t.Run("success with shift", func(t *testing.T) {
 		t.Parallel()
+
 		mock := &paramMockClient{
-			getParameterHistoryFunc: func(_ context.Context, _ *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
+			getParameterHistoryFunc: func(
+				_ context.Context, _ *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options),
+			) (*paramapi.GetParameterHistoryOutput, error) {
 				return &paramapi.GetParameterHistoryOutput{
 					Parameters: []paramapi.ParameterHistory{
 						{Version: 1, Value: lo.ToPtr("v1")},
@@ -462,6 +525,7 @@ func TestParamStrategy_FetchVersion(t *testing.T) {
 
 	t.Run("parse error - invalid version format", func(t *testing.T) {
 		t.Parallel()
+
 		s := staging.NewParamStrategy(&paramMockClient{})
 		_, _, err := s.FetchVersion(t.Context(), "/app/param#abc")
 		require.Error(t, err)
@@ -469,8 +533,11 @@ func TestParamStrategy_FetchVersion(t *testing.T) {
 
 	t.Run("fetch error", func(t *testing.T) {
 		t.Parallel()
+
 		mock := &paramMockClient{
-			getParameterHistoryFunc: func(_ context.Context, _ *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
+			getParameterHistoryFunc: func(
+				_ context.Context, _ *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options),
+			) (*paramapi.GetParameterHistoryOutput, error) {
 				return nil, errors.New("fetch error")
 			},
 		}
@@ -496,6 +563,7 @@ func TestParamStrategy_FetchLastModified(t *testing.T) {
 
 	t.Run("success - returns last modified time", func(t *testing.T) {
 		t.Parallel()
+
 		mock := &paramMockClient{
 			getParameterFunc: func(_ context.Context, _ *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
 				return &paramapi.GetParameterOutput{
@@ -515,6 +583,7 @@ func TestParamStrategy_FetchLastModified(t *testing.T) {
 
 	t.Run("not found - returns zero time", func(t *testing.T) {
 		t.Parallel()
+
 		mock := &paramMockClient{
 			getParameterFunc: func(_ context.Context, _ *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
 				return nil, &paramapi.ParameterNotFound{}
@@ -529,6 +598,7 @@ func TestParamStrategy_FetchLastModified(t *testing.T) {
 
 	t.Run("other error - returns error", func(t *testing.T) {
 		t.Parallel()
+
 		mock := &paramMockClient{
 			getParameterFunc: func(_ context.Context, _ *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
 				return nil, errors.New("access denied")
@@ -543,6 +613,7 @@ func TestParamStrategy_FetchLastModified(t *testing.T) {
 
 	t.Run("nil LastModifiedDate - returns zero time", func(t *testing.T) {
 		t.Parallel()
+
 		mock := &paramMockClient{
 			getParameterFunc: func(_ context.Context, _ *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
 				return &paramapi.GetParameterOutput{
@@ -562,6 +633,7 @@ func TestParamStrategy_FetchLastModified(t *testing.T) {
 
 	t.Run("nil Parameter - returns zero time", func(t *testing.T) {
 		t.Parallel()
+
 		mock := &paramMockClient{
 			getParameterFunc: func(_ context.Context, _ *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
 				return &paramapi.GetParameterOutput{Parameter: nil}, nil
@@ -580,10 +652,12 @@ func TestParamStrategy_Apply_WithDescription(t *testing.T) {
 
 	t.Run("create with description", func(t *testing.T) {
 		t.Parallel()
+
 		mock := &paramMockClient{
 			putParameterFunc: func(_ context.Context, params *paramapi.PutParameterInput, _ ...func(*paramapi.Options)) (*paramapi.PutParameterOutput, error) {
 				assert.Equal(t, "Test description", lo.FromPtr(params.Description))
 				assert.False(t, lo.FromPtr(params.Overwrite))
+
 				return &paramapi.PutParameterOutput{Version: 1}, nil
 			},
 		}
@@ -599,6 +673,7 @@ func TestParamStrategy_Apply_WithDescription(t *testing.T) {
 
 	t.Run("update with description", func(t *testing.T) {
 		t.Parallel()
+
 		mock := &paramMockClient{
 			getParameterFunc: func(_ context.Context, _ *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
 				return &paramapi.GetParameterOutput{
@@ -611,6 +686,7 @@ func TestParamStrategy_Apply_WithDescription(t *testing.T) {
 			putParameterFunc: func(_ context.Context, params *paramapi.PutParameterInput, _ ...func(*paramapi.Options)) (*paramapi.PutParameterOutput, error) {
 				assert.Equal(t, "Test description", lo.FromPtr(params.Description))
 				assert.True(t, lo.FromPtr(params.Overwrite))
+
 				return &paramapi.PutParameterOutput{Version: 2}, nil
 			},
 		}
@@ -629,7 +705,9 @@ func TestParamStrategy_Apply_DeleteAlreadyDeleted(t *testing.T) {
 	t.Parallel()
 
 	mock := &paramMockClient{
-		deleteParameterFunc: func(_ context.Context, _ *paramapi.DeleteParameterInput, _ ...func(*paramapi.Options)) (*paramapi.DeleteParameterOutput, error) {
+		deleteParameterFunc: func(
+			_ context.Context, _ *paramapi.DeleteParameterInput, _ ...func(*paramapi.Options),
+		) (*paramapi.DeleteParameterOutput, error) {
 			return nil, &paramapi.ParameterNotFound{}
 		},
 	}
@@ -646,11 +724,16 @@ func TestParamStrategy_ApplyTags(t *testing.T) {
 
 	t.Run("add tags", func(t *testing.T) {
 		t.Parallel()
+
 		addTagsCalled := false
 		mock := &paramMockClient{
-			addTagsToResourceFunc: func(_ context.Context, params *paramapi.AddTagsToResourceInput, _ ...func(*paramapi.Options)) (*paramapi.AddTagsToResourceOutput, error) {
+			addTagsToResourceFunc: func(
+				_ context.Context, params *paramapi.AddTagsToResourceInput, _ ...func(*paramapi.Options),
+			) (*paramapi.AddTagsToResourceOutput, error) {
 				addTagsCalled = true
+
 				assert.Len(t, params.Tags, 1)
+
 				return &paramapi.AddTagsToResourceOutput{}, nil
 			},
 		}
@@ -665,11 +748,16 @@ func TestParamStrategy_ApplyTags(t *testing.T) {
 
 	t.Run("remove tags", func(t *testing.T) {
 		t.Parallel()
+
 		removeTagsCalled := false
 		mock := &paramMockClient{
-			removeTagsFromResourceFunc: func(_ context.Context, params *paramapi.RemoveTagsFromResourceInput, _ ...func(*paramapi.Options)) (*paramapi.RemoveTagsFromResourceOutput, error) {
+			removeTagsFromResourceFunc: func(
+				_ context.Context, params *paramapi.RemoveTagsFromResourceInput, _ ...func(*paramapi.Options),
+			) (*paramapi.RemoveTagsFromResourceOutput, error) {
 				removeTagsCalled = true
+
 				assert.Contains(t, params.TagKeys, "old-tag")
+
 				return &paramapi.RemoveTagsFromResourceOutput{}, nil
 			},
 		}
@@ -684,17 +772,26 @@ func TestParamStrategy_ApplyTags(t *testing.T) {
 
 	t.Run("add and remove tags", func(t *testing.T) {
 		t.Parallel()
+
 		addTagsCalled := false
 		removeTagsCalled := false
 		mock := &paramMockClient{
-			addTagsToResourceFunc: func(_ context.Context, params *paramapi.AddTagsToResourceInput, _ ...func(*paramapi.Options)) (*paramapi.AddTagsToResourceOutput, error) {
+			addTagsToResourceFunc: func(
+				_ context.Context, params *paramapi.AddTagsToResourceInput, _ ...func(*paramapi.Options),
+			) (*paramapi.AddTagsToResourceOutput, error) {
 				addTagsCalled = true
+
 				assert.Len(t, params.Tags, 1)
+
 				return &paramapi.AddTagsToResourceOutput{}, nil
 			},
-			removeTagsFromResourceFunc: func(_ context.Context, params *paramapi.RemoveTagsFromResourceInput, _ ...func(*paramapi.Options)) (*paramapi.RemoveTagsFromResourceOutput, error) {
+			removeTagsFromResourceFunc: func(
+				_ context.Context, params *paramapi.RemoveTagsFromResourceInput, _ ...func(*paramapi.Options),
+			) (*paramapi.RemoveTagsFromResourceOutput, error) {
 				removeTagsCalled = true
+
 				assert.Contains(t, params.TagKeys, "deprecated")
+
 				return &paramapi.RemoveTagsFromResourceOutput{}, nil
 			},
 		}
@@ -711,8 +808,11 @@ func TestParamStrategy_ApplyTags(t *testing.T) {
 
 	t.Run("add tags error", func(t *testing.T) {
 		t.Parallel()
+
 		mock := &paramMockClient{
-			addTagsToResourceFunc: func(_ context.Context, _ *paramapi.AddTagsToResourceInput, _ ...func(*paramapi.Options)) (*paramapi.AddTagsToResourceOutput, error) {
+			addTagsToResourceFunc: func(
+				_ context.Context, _ *paramapi.AddTagsToResourceInput, _ ...func(*paramapi.Options),
+			) (*paramapi.AddTagsToResourceOutput, error) {
 				return nil, errors.New("tagging failed")
 			},
 		}
@@ -726,8 +826,11 @@ func TestParamStrategy_ApplyTags(t *testing.T) {
 
 	t.Run("remove tags error", func(t *testing.T) {
 		t.Parallel()
+
 		mock := &paramMockClient{
-			removeTagsFromResourceFunc: func(_ context.Context, _ *paramapi.RemoveTagsFromResourceInput, _ ...func(*paramapi.Options)) (*paramapi.RemoveTagsFromResourceOutput, error) {
+			removeTagsFromResourceFunc: func(
+				_ context.Context, _ *paramapi.RemoveTagsFromResourceInput, _ ...func(*paramapi.Options),
+			) (*paramapi.RemoveTagsFromResourceOutput, error) {
 				return nil, errors.New("untagging failed")
 			},
 		}

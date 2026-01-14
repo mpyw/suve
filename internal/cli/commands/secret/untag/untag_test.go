@@ -21,6 +21,7 @@ func TestCommand_Validation(t *testing.T) {
 
 	t.Run("missing arguments", func(t *testing.T) {
 		t.Parallel()
+
 		app := appcli.MakeApp()
 		err := app.Run(t.Context(), []string{"suve", "secret", "untag"})
 		require.Error(t, err)
@@ -29,6 +30,7 @@ func TestCommand_Validation(t *testing.T) {
 
 	t.Run("missing key argument", func(t *testing.T) {
 		t.Parallel()
+
 		app := appcli.MakeApp()
 		err := app.Run(t.Context(), []string{"suve", "secret", "untag", "my-secret"})
 		require.Error(t, err)
@@ -37,31 +39,40 @@ func TestCommand_Validation(t *testing.T) {
 }
 
 type mockClient struct {
+	//nolint:lll // mock function signature
 	describeSecretFunc func(ctx context.Context, params *secretapi.DescribeSecretInput, optFns ...func(*secretapi.Options)) (*secretapi.DescribeSecretOutput, error)
-	tagResourceFunc    func(ctx context.Context, params *secretapi.TagResourceInput, optFns ...func(*secretapi.Options)) (*secretapi.TagResourceOutput, error)
-	untagResourceFunc  func(ctx context.Context, params *secretapi.UntagResourceInput, optFns ...func(*secretapi.Options)) (*secretapi.UntagResourceOutput, error)
+	//nolint:lll // mock function signature
+	tagResourceFunc func(ctx context.Context, params *secretapi.TagResourceInput, optFns ...func(*secretapi.Options)) (*secretapi.TagResourceOutput, error)
+	//nolint:lll // mock function signature
+	untagResourceFunc func(ctx context.Context, params *secretapi.UntagResourceInput, optFns ...func(*secretapi.Options)) (*secretapi.UntagResourceOutput, error)
 }
 
+//nolint:lll // mock function signature
 func (m *mockClient) DescribeSecret(ctx context.Context, params *secretapi.DescribeSecretInput, optFns ...func(*secretapi.Options)) (*secretapi.DescribeSecretOutput, error) {
 	if m.describeSecretFunc != nil {
 		return m.describeSecretFunc(ctx, params, optFns...)
 	}
+
 	return &secretapi.DescribeSecretOutput{
 		ARN: lo.ToPtr("arn:aws:secretsmanager:us-east-1:123456789012:secret:my-secret"),
 	}, nil
 }
 
+//nolint:lll // mock function signature
 func (m *mockClient) TagResource(ctx context.Context, params *secretapi.TagResourceInput, optFns ...func(*secretapi.Options)) (*secretapi.TagResourceOutput, error) {
 	if m.tagResourceFunc != nil {
 		return m.tagResourceFunc(ctx, params, optFns...)
 	}
+
 	return &secretapi.TagResourceOutput{}, nil
 }
 
+//nolint:lll // mock function signature
 func (m *mockClient) UntagResource(ctx context.Context, params *secretapi.UntagResourceInput, optFns ...func(*secretapi.Options)) (*secretapi.UntagResourceOutput, error) {
 	if m.untagResourceFunc != nil {
 		return m.untagResourceFunc(ctx, params, optFns...)
 	}
+
 	return &secretapi.UntagResourceOutput{}, nil
 }
 
@@ -82,13 +93,16 @@ func TestRun(t *testing.T) {
 				Keys: []string{"env"},
 			},
 			mock: &mockClient{
+				//nolint:lll // mock function signature
 				untagResourceFunc: func(_ context.Context, params *secretapi.UntagResourceInput, _ ...func(*secretapi.Options)) (*secretapi.UntagResourceOutput, error) {
 					assert.Contains(t, lo.FromPtr(params.SecretId), "arn:aws:secretsmanager")
 					assert.Equal(t, []string{"env"}, params.TagKeys)
+
 					return &secretapi.UntagResourceOutput{}, nil
 				},
 			},
 			check: func(t *testing.T, output string) {
+				t.Helper()
 				assert.Contains(t, output, "Untagged")
 				assert.Contains(t, output, "my-secret")
 			},
@@ -100,12 +114,15 @@ func TestRun(t *testing.T) {
 				Keys: []string{"env", "team"},
 			},
 			mock: &mockClient{
+				//nolint:lll // mock function signature
 				untagResourceFunc: func(_ context.Context, params *secretapi.UntagResourceInput, _ ...func(*secretapi.Options)) (*secretapi.UntagResourceOutput, error) {
 					assert.Len(t, params.TagKeys, 2)
+
 					return &secretapi.UntagResourceOutput{}, nil
 				},
 			},
 			check: func(t *testing.T, output string) {
+				t.Helper()
 				assert.Contains(t, output, "2 key(s)")
 			},
 		},
@@ -116,6 +133,7 @@ func TestRun(t *testing.T) {
 				Keys: []string{"env"},
 			},
 			mock: &mockClient{
+				//nolint:lll // mock function signature
 				describeSecretFunc: func(_ context.Context, _ *secretapi.DescribeSecretInput, _ ...func(*secretapi.Options)) (*secretapi.DescribeSecretOutput, error) {
 					return nil, fmt.Errorf("AWS error")
 				},
@@ -129,6 +147,7 @@ func TestRun(t *testing.T) {
 				Keys: []string{"env"},
 			},
 			mock: &mockClient{
+				//nolint:lll // mock function signature
 				untagResourceFunc: func(_ context.Context, _ *secretapi.UntagResourceInput, _ ...func(*secretapi.Options)) (*secretapi.UntagResourceOutput, error) {
 					return nil, fmt.Errorf("AWS error")
 				},
@@ -140,7 +159,9 @@ func TestRun(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
+
 			var buf bytes.Buffer
+
 			r := &untag.Runner{
 				UseCase: &secret.TagUseCase{Client: tt.mock},
 				Stdout:  &buf,
@@ -150,10 +171,12 @@ func TestRun(t *testing.T) {
 			if tt.wantErr != "" {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tt.wantErr)
+
 				return
 			}
 
 			require.NoError(t, err)
+
 			if tt.check != nil {
 				tt.check(t, buf.String())
 			}

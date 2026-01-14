@@ -14,31 +14,38 @@ import (
 	"github.com/mpyw/suve/internal/version/paramversion"
 )
 
+//nolint:lll // mock struct fields match AWS SDK interface signatures
 type mockClient struct {
 	getParameterFunc        func(ctx context.Context, params *paramapi.GetParameterInput, optFns ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error)
 	getParameterHistoryFunc func(ctx context.Context, params *paramapi.GetParameterHistoryInput, optFns ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error)
 }
 
+//nolint:lll // mock function signature must match AWS SDK interface
 func (m *mockClient) GetParameter(ctx context.Context, params *paramapi.GetParameterInput, optFns ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
 	if m.getParameterFunc != nil {
 		return m.getParameterFunc(ctx, params, optFns...)
 	}
+
 	return nil, fmt.Errorf("GetParameter not mocked")
 }
 
+//nolint:lll // mock function signature must match AWS SDK interface
 func (m *mockClient) GetParameterHistory(ctx context.Context, params *paramapi.GetParameterHistoryInput, optFns ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
 	if m.getParameterHistoryFunc != nil {
 		return m.getParameterHistoryFunc(ctx, params, optFns...)
 	}
+
 	return nil, fmt.Errorf("GetParameterHistory not mocked")
 }
 
 func TestGetParameterWithVersion_Latest(t *testing.T) {
 	t.Parallel()
+
 	now := time.Now()
 	mock := &mockClient{
 		getParameterFunc: func(_ context.Context, params *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
 			assert.Equal(t, "/my/param", lo.FromPtr(params.Name))
+
 			return &paramapi.GetParameterOutput{
 				Parameter: &paramapi.Parameter{
 					Name:             lo.ToPtr("/my/param"),
@@ -62,9 +69,11 @@ func TestGetParameterWithVersion_Latest(t *testing.T) {
 
 func TestGetParameterWithVersion_SpecificVersion(t *testing.T) {
 	t.Parallel()
+
 	mock := &mockClient{
 		getParameterFunc: func(_ context.Context, params *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
 			assert.Equal(t, "/my/param:2", lo.FromPtr(params.Name))
+
 			return &paramapi.GetParameterOutput{
 				Parameter: &paramapi.Parameter{
 					Name:    lo.ToPtr("/my/param"),
@@ -87,8 +96,10 @@ func TestGetParameterWithVersion_SpecificVersion(t *testing.T) {
 
 func TestGetParameterWithVersion_Shift(t *testing.T) {
 	t.Parallel()
+
 	now := time.Now()
 	mock := &mockClient{
+		//nolint:lll // inline mock function
 		getParameterHistoryFunc: func(_ context.Context, params *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
 			assert.Equal(t, "/my/param", lo.FromPtr(params.Name))
 			// History is returned oldest first by AWS
@@ -113,8 +124,10 @@ func TestGetParameterWithVersion_Shift(t *testing.T) {
 
 func TestGetParameterWithVersion_ShiftFromSpecificVersion(t *testing.T) {
 	t.Parallel()
+
 	now := time.Now()
 	mock := &mockClient{
+		//nolint:lll // inline mock function
 		getParameterHistoryFunc: func(_ context.Context, _ *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
 			return &paramapi.GetParameterHistoryOutput{
 				Parameters: []paramapi.ParameterHistory{
@@ -137,8 +150,10 @@ func TestGetParameterWithVersion_ShiftFromSpecificVersion(t *testing.T) {
 
 func TestGetParameterWithVersion_ShiftOutOfRange(t *testing.T) {
 	t.Parallel()
+
 	now := time.Now()
 	mock := &mockClient{
+		//nolint:lll // mock function signature
 		getParameterHistoryFunc: func(_ context.Context, _ *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
 			return &paramapi.GetParameterHistoryOutput{
 				Parameters: []paramapi.ParameterHistory{
@@ -157,8 +172,10 @@ func TestGetParameterWithVersion_ShiftOutOfRange(t *testing.T) {
 
 func TestGetParameterWithVersion_VersionNotFound(t *testing.T) {
 	t.Parallel()
+
 	now := time.Now()
 	mock := &mockClient{
+		//nolint:lll // mock function signature
 		getParameterHistoryFunc: func(_ context.Context, _ *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
 			return &paramapi.GetParameterHistoryOutput{
 				Parameters: []paramapi.ParameterHistory{
@@ -178,7 +195,9 @@ func TestGetParameterWithVersion_VersionNotFound(t *testing.T) {
 
 func TestGetParameterWithVersion_EmptyHistory(t *testing.T) {
 	t.Parallel()
+
 	mock := &mockClient{
+		//nolint:lll // mock function signature
 		getParameterHistoryFunc: func(_ context.Context, _ *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
 			return &paramapi.GetParameterHistoryOutput{
 				Parameters: []paramapi.ParameterHistory{},
@@ -195,6 +214,7 @@ func TestGetParameterWithVersion_EmptyHistory(t *testing.T) {
 
 func TestGetParameterWithVersion_GetParameterError(t *testing.T) {
 	t.Parallel()
+
 	mock := &mockClient{
 		getParameterFunc: func(_ context.Context, _ *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
 			return nil, fmt.Errorf("AWS error")
@@ -210,7 +230,9 @@ func TestGetParameterWithVersion_GetParameterError(t *testing.T) {
 
 func TestGetParameterWithVersion_GetParameterHistoryError(t *testing.T) {
 	t.Parallel()
+
 	mock := &mockClient{
+		//nolint:lll // mock function signature
 		getParameterHistoryFunc: func(_ context.Context, _ *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
 			return nil, fmt.Errorf("AWS error")
 		},
@@ -225,10 +247,12 @@ func TestGetParameterWithVersion_GetParameterHistoryError(t *testing.T) {
 
 func TestGetParameterWithVersion_AlwaysDecrypts(t *testing.T) {
 	t.Parallel()
+
 	mock := &mockClient{
 		getParameterFunc: func(_ context.Context, params *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
 			// Verify that WithDecryption is always true
 			assert.True(t, lo.FromPtr(params.WithDecryption))
+
 			return &paramapi.GetParameterOutput{
 				Parameter: &paramapi.Parameter{
 					Name:    lo.ToPtr("/my/param"),

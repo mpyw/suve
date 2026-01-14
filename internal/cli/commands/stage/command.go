@@ -5,12 +5,14 @@ import (
 	"github.com/urfave/cli/v3"
 
 	cliinternal "github.com/mpyw/suve/internal/cli/commands/internal"
+	"github.com/mpyw/suve/internal/cli/commands/stage/agent"
 	"github.com/mpyw/suve/internal/cli/commands/stage/apply"
 	"github.com/mpyw/suve/internal/cli/commands/stage/diff"
 	"github.com/mpyw/suve/internal/cli/commands/stage/param"
 	"github.com/mpyw/suve/internal/cli/commands/stage/reset"
 	"github.com/mpyw/suve/internal/cli/commands/stage/secret"
 	"github.com/mpyw/suve/internal/cli/commands/stage/status"
+	stgcli "github.com/mpyw/suve/internal/staging/cli"
 )
 
 // Command returns the global stage command with subcommands.
@@ -28,12 +30,15 @@ Global commands operate on all staged changes:
    diff      Show diff of all staged changes vs AWS
    apply     Apply all staged changes to AWS
    reset     Unstage all changes
+   stash     Save/restore staged changes to/from file
 
 EXAMPLES:
    suve stage param add /my/param       Stage a new SSM Parameter Store parameter
    suve stage secret edit my-secret     Edit and stage a secret
    suve stage status                    View all staged changes
-   suve stage apply                     Apply all staged changes`,
+   suve stage apply                     Apply all staged changes
+   suve stage stash                     Save staged changes to file
+   suve stage stash pop                 Restore staged changes from file`,
 		Commands: []*cli.Command{
 			param.Command(),
 			secret.Command(),
@@ -41,6 +46,8 @@ EXAMPLES:
 			diff.Command(),
 			apply.Command(),
 			reset.Command(),
+			stgcli.NewGlobalStashCommand(),
+			agent.Command(),
 		},
 		CommandNotFound: cliinternal.CommandNotFound,
 	}

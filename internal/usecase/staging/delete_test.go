@@ -3,7 +3,6 @@ package staging_test
 import (
 	"context"
 	"errors"
-	"path/filepath"
 	"testing"
 	"time"
 
@@ -12,12 +11,13 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/mpyw/suve/internal/staging"
-	"github.com/mpyw/suve/internal/staging/file"
+	"github.com/mpyw/suve/internal/staging/store/testutil"
 	usecasestaging "github.com/mpyw/suve/internal/usecase/staging"
 )
 
 type mockDeleteStrategy struct {
 	*mockServiceStrategy
+
 	lastModified time.Time
 	fetchErr     error
 }
@@ -26,6 +26,7 @@ func (m *mockDeleteStrategy) FetchLastModified(_ context.Context, _ string) (tim
 	if m.fetchErr != nil {
 		return time.Time{}, m.fetchErr
 	}
+
 	return m.lastModified, nil
 }
 
@@ -35,13 +36,14 @@ func newMockDeleteStrategy(hasDeleteOptions bool) *mockDeleteStrategy {
 		lastModified:        time.Now(),
 	}
 	strategy.hasDeleteOptions = hasDeleteOptions
+
 	return strategy
 }
 
 func TestDeleteUseCase_Execute_Param(t *testing.T) {
 	t.Parallel()
 
-	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := testutil.NewMockStore()
 	uc := &usecasestaging.DeleteUseCase{
 		Strategy: newMockDeleteStrategy(false),
 		Store:    store,
@@ -64,7 +66,7 @@ func TestDeleteUseCase_Execute_Param(t *testing.T) {
 func TestDeleteUseCase_Execute_SecretWithRecoveryWindow(t *testing.T) {
 	t.Parallel()
 
-	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := testutil.NewMockStore()
 	strategy := newMockDeleteStrategy(true)
 	strategy.mockServiceStrategy = newSecretStrategy()
 
@@ -91,7 +93,7 @@ func TestDeleteUseCase_Execute_SecretWithRecoveryWindow(t *testing.T) {
 func TestDeleteUseCase_Execute_SecretForceDelete(t *testing.T) {
 	t.Parallel()
 
-	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := testutil.NewMockStore()
 	strategy := newMockDeleteStrategy(true)
 	strategy.mockServiceStrategy = newSecretStrategy()
 
@@ -111,7 +113,7 @@ func TestDeleteUseCase_Execute_SecretForceDelete(t *testing.T) {
 func TestDeleteUseCase_Execute_InvalidRecoveryWindow(t *testing.T) {
 	t.Parallel()
 
-	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := testutil.NewMockStore()
 	strategy := newMockDeleteStrategy(true)
 	strategy.mockServiceStrategy = newSecretStrategy()
 
@@ -125,7 +127,7 @@ func TestDeleteUseCase_Execute_InvalidRecoveryWindow(t *testing.T) {
 		Name:           "my-secret",
 		RecoveryWindow: 5,
 	})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "recovery window")
 
 	// Too long
@@ -139,7 +141,7 @@ func TestDeleteUseCase_Execute_InvalidRecoveryWindow(t *testing.T) {
 func TestDeleteUseCase_Execute_FetchError(t *testing.T) {
 	t.Parallel()
 
-	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := testutil.NewMockStore()
 	strategy := newMockDeleteStrategy(false)
 	strategy.fetchErr = errors.New("not found")
 
@@ -151,14 +153,14 @@ func TestDeleteUseCase_Execute_FetchError(t *testing.T) {
 	_, err := uc.Execute(t.Context(), usecasestaging.DeleteInput{
 		Name: "/app/not-exists",
 	})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to fetch")
 }
 
 func TestDeleteUseCase_Execute_ZeroLastModified_ResourceNotFound(t *testing.T) {
 	t.Parallel()
 
-	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := testutil.NewMockStore()
 	strategy := newMockDeleteStrategy(false)
 	strategy.lastModified = time.Time{} // Zero time means resource doesn't exist
 
@@ -178,7 +180,7 @@ func TestDeleteUseCase_Execute_ZeroLastModified_ResourceNotFound(t *testing.T) {
 func TestDeleteUseCase_Execute_ZeroLastModified_StagedCreate(t *testing.T) {
 	t.Parallel()
 
-	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := testutil.NewMockStore()
 
 	// Pre-stage a CREATE operation
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/new-param", staging.Entry{
@@ -211,8 +213,8 @@ func TestDeleteUseCase_Execute_ZeroLastModified_StagedCreate(t *testing.T) {
 func TestDeleteUseCase_Execute_StageError(t *testing.T) {
 	t.Parallel()
 
-	store := newMockStore()
-	store.stageErr = errors.New("stage error")
+	store := testutil.NewMockStore()
+	store.StageEntryErr = errors.New("stage error")
 
 	uc := &usecasestaging.DeleteUseCase{
 		Strategy: newMockDeleteStrategy(false),
@@ -222,15 +224,15 @@ func TestDeleteUseCase_Execute_StageError(t *testing.T) {
 	_, err := uc.Execute(t.Context(), usecasestaging.DeleteInput{
 		Name: "/app/config",
 	})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "stage error")
 }
 
 func TestDeleteUseCase_Execute_GetError(t *testing.T) {
 	t.Parallel()
 
-	store := newMockStore()
-	store.getErr = errors.New("store get error")
+	store := testutil.NewMockStore()
+	store.GetEntryErr = errors.New("store get error")
 
 	uc := &usecasestaging.DeleteUseCase{
 		Strategy: newMockDeleteStrategy(false),
@@ -240,20 +242,20 @@ func TestDeleteUseCase_Execute_GetError(t *testing.T) {
 	_, err := uc.Execute(t.Context(), usecasestaging.DeleteInput{
 		Name: "/app/config",
 	})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "store get error")
 }
 
 func TestDeleteUseCase_Execute_UnstageError(t *testing.T) {
 	t.Parallel()
 
-	store := newMockStore()
+	store := testutil.NewMockStore()
 	// Simulate existing CREATE entry by staging it
-	store.entries[staging.ServiceParam]["/app/new"] = staging.Entry{
+	store.AddEntry(staging.ServiceParam, "/app/new", staging.Entry{
 		Operation: staging.OperationCreate,
 		Value:     lo.ToPtr("value"),
-	}
-	store.unstageErr = errors.New("unstage error")
+	})
+	store.UnstageEntryErr = errors.New("unstage error")
 
 	uc := &usecasestaging.DeleteUseCase{
 		Strategy: newMockDeleteStrategy(false),
@@ -263,14 +265,14 @@ func TestDeleteUseCase_Execute_UnstageError(t *testing.T) {
 	_, err := uc.Execute(t.Context(), usecasestaging.DeleteInput{
 		Name: "/app/new",
 	})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "unstage error")
 }
 
 func TestDeleteUseCase_Execute_UnstagesCreate(t *testing.T) {
 	t.Parallel()
 
-	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := testutil.NewMockStore()
 	// Pre-stage a CREATE operation
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/new", staging.Entry{
 		Operation: staging.OperationCreate,
@@ -298,7 +300,7 @@ func TestDeleteUseCase_Execute_UnstagesCreate(t *testing.T) {
 func TestDeleteUseCase_Execute_DeleteOnUpdate(t *testing.T) {
 	t.Parallel()
 
-	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := testutil.NewMockStore()
 	// Pre-stage an UPDATE operation
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/existing", staging.Entry{
 		Operation: staging.OperationUpdate,
@@ -321,4 +323,32 @@ func TestDeleteUseCase_Execute_DeleteOnUpdate(t *testing.T) {
 	entry, err := store.GetEntry(t.Context(), staging.ServiceParam, "/app/existing")
 	require.NoError(t, err)
 	assert.Equal(t, staging.OperationDelete, entry.Operation)
+}
+
+func TestDeleteUseCase_Execute_UnstageTagError(t *testing.T) {
+	t.Parallel()
+
+	store := testutil.NewMockStore()
+	// Simulate existing CREATE entry
+	store.AddEntry(staging.ServiceParam, "/app/new", staging.Entry{
+		Operation: staging.OperationCreate,
+		Value:     lo.ToPtr("value"),
+	})
+	// Simulate existing tag entry
+	store.AddTag(staging.ServiceParam, "/app/new", staging.TagEntry{
+		Add: map[string]string{"env": "prod"},
+	})
+	// Make UnstageTag fail
+	store.UnstageTagErr = errors.New("unstage tag error")
+
+	uc := &usecasestaging.DeleteUseCase{
+		Strategy: newMockDeleteStrategy(false),
+		Store:    store,
+	}
+
+	_, err := uc.Execute(t.Context(), usecasestaging.DeleteInput{
+		Name: "/app/new",
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "unstage tag error")
 }

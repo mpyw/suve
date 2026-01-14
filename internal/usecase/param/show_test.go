@@ -2,7 +2,6 @@ package param_test
 
 import (
 	"context"
-	"errors"
 	"testing"
 	"time"
 
@@ -24,30 +23,38 @@ type mockShowClient struct {
 	listTagsErr        error
 }
 
+//nolint:lll // mock function signature must match AWS SDK interface
 func (m *mockShowClient) GetParameter(_ context.Context, _ *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
 	if m.getParameterErr != nil {
 		return nil, m.getParameterErr
 	}
+
 	return m.getParameterResult, nil
 }
 
+//nolint:lll // mock function signature must match AWS SDK interface
 func (m *mockShowClient) GetParameterHistory(_ context.Context, _ *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
 	if m.getHistoryErr != nil {
 		return nil, m.getHistoryErr
 	}
+
 	if m.getHistoryResult == nil {
 		return &paramapi.GetParameterHistoryOutput{}, nil
 	}
+
 	return m.getHistoryResult, nil
 }
 
+//nolint:lll // mock function signature must match AWS SDK interface
 func (m *mockShowClient) ListTagsForResource(_ context.Context, _ *paramapi.ListTagsForResourceInput, _ ...func(*paramapi.Options)) (*paramapi.ListTagsForResourceOutput, error) {
 	if m.listTagsErr != nil {
 		return nil, m.listTagsErr
 	}
+
 	if m.listTagsResult != nil {
 		return m.listTagsResult, nil
 	}
+
 	return &paramapi.ListTagsForResourceOutput{}, nil
 }
 
@@ -144,7 +151,7 @@ func TestShowUseCase_Execute_Error(t *testing.T) {
 	t.Parallel()
 
 	client := &mockShowClient{
-		getParameterErr: errors.New("aws error"),
+		getParameterErr: errAWS,
 	}
 
 	uc := &param.ShowUseCase{Client: client}
@@ -155,7 +162,7 @@ func TestShowUseCase_Execute_Error(t *testing.T) {
 	_, err = uc.Execute(t.Context(), param.ShowInput{
 		Spec: spec,
 	})
-	assert.Error(t, err)
+	require.Error(t, err)
 }
 
 func TestShowUseCase_Execute_NoLastModified(t *testing.T) {

@@ -28,7 +28,7 @@ jobs:
       - name: Run tests with coverage
         run: |
           PACKAGES=$(go list ./... | grep -v internal/gui | grep -v /cmd/)
-          COVERPKG=$(go list ./... | grep -v internal/gui | grep -v /cmd/ | tr '\n' ',')
+          COVERPKG=$(go list ./... | grep -v testutil | grep -v /e2e | grep -v internal/gui | grep -v /cmd/ | tr '\n' ',')
           go test -v -race -coverprofile=coverage.txt -covermode=atomic -coverpkg=$COVERPKG $PACKAGES
 
       - name: Upload coverage to Codecov
@@ -40,6 +40,30 @@ jobs:
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
         continue-on-error: true
+
+  gui-go-test:
+    name: GUI Go Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
+      - name: Install Wails dependencies (CGO)
+        run: |
+          for i in {1..5}; do sudo apt-get update && break || sleep $((i * 5)); done
+          for i in {1..5}; do sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev build-essential pkg-config && break || sleep $((i * 5)); done
+
+      - name: Create dummy frontend dist
+        run: mkdir -p internal/gui/frontend/dist && touch internal/gui/frontend/dist/index.html
+
+      - name: Run GUI Go tests
+        run: |
+          CGO_ENABLED=1 go test -v -race -tags=production,webkit2_41 ./internal/gui/...
 
   e2e:
     name: E2E Test
@@ -71,7 +95,9 @@ jobs:
           timeout 60 bash -c 'until curl -sf http://localhost:4566/_localstack/health; do sleep 2; done'
 
       - name: Run e2e tests with coverage
-        run: go test -v -race -tags e2e -coverprofile=coverage-e2e.txt -covermode=atomic -coverpkg=./... ./e2e/...
+        run: |
+          COVERPKG=$(go list ./... | grep -v testutil | grep -v /e2e | grep -v internal/gui | grep -v /cmd/ | tr '\n' ',')
+          go test -v -race -tags e2e -coverprofile=coverage-e2e.txt -covermode=atomic -coverpkg=$COVERPKG ./e2e/...
         env:
           SUVE_LOCALSTACK_EXTERNAL_PORT: 4566
 
@@ -114,6 +140,9 @@ jobs:
         uses: golangci/golangci-lint-action@v9
         with:
           args: --timeout=5m --build-tags=production,webkit2_41
+
+      - name: Run goroutinectx
+        run: go run github.com/mpyw/goroutinectx/cmd/goroutinectx@v0.7.5 ./...
 
   gui-test:
     name: GUI Test (Playwright)

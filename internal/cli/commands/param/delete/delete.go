@@ -3,13 +3,13 @@ package delete
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 
 	"github.com/urfave/cli/v3"
 
-	"github.com/mpyw/suve/internal/cli/colors"
 	"github.com/mpyw/suve/internal/cli/confirm"
 	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/infra"
@@ -55,7 +55,7 @@ EXAMPLES:
 
 func action(ctx context.Context, cmd *cli.Command) error {
 	if cmd.Args().Len() < 1 {
-		return fmt.Errorf("usage: suve param delete <name>")
+		return errors.New("usage: suve param delete <name>")
 	}
 
 	name := cmd.Args().First()
@@ -78,10 +78,10 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	if !skipConfirm {
 		currentValue, _ := useCase.GetCurrentValue(ctx, name)
 		if currentValue != "" {
-			_, _ = fmt.Fprintf(cmd.Root().ErrWriter, "%s Current value of %s:\n", colors.Warning("!"), name)
-			_, _ = fmt.Fprintln(cmd.Root().ErrWriter)
-			_, _ = fmt.Fprintln(cmd.Root().ErrWriter, output.Indent(currentValue, "  "))
-			_, _ = fmt.Fprintln(cmd.Root().ErrWriter)
+			output.Info(cmd.Root().ErrWriter, "Current value of %s:", name)
+			output.Println(cmd.Root().ErrWriter, "")
+			output.Println(cmd.Root().ErrWriter, output.Indent(currentValue, "  "))
+			output.Println(cmd.Root().ErrWriter, "")
 		}
 	}
 
@@ -96,10 +96,12 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		prompter.Region = identity.Region
 		prompter.Profile = identity.Profile
 	}
+
 	confirmed, err := prompter.ConfirmDelete(name, skipConfirm)
 	if err != nil {
 		return err
 	}
+
 	if !confirmed {
 		return nil
 	}
@@ -109,6 +111,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		Stdout:  cmd.Root().Writer,
 		Stderr:  cmd.Root().ErrWriter,
 	}
+
 	return r.Run(ctx, Options{
 		Name: name,
 	})
@@ -123,7 +126,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 		return err
 	}
 
-	_, _ = fmt.Fprintf(r.Stdout, "%s %s\n", colors.OpDelete("Deleted"), result.Name)
+	output.Success(r.Stdout, "Deleted %s", result.Name)
 
 	return nil
 }

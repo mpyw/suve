@@ -690,6 +690,34 @@ export namespace gui {
 		}
 	}
 	
+	export class StagingDrainResult {
+	    merged: boolean;
+	    entryCount: number;
+	    tagCount: number;
+
+	    static createFrom(source: any = {}) {
+	        return new StagingDrainResult(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.merged = source["merged"];
+	        this.entryCount = source["entryCount"];
+	        this.tagCount = source["tagCount"];
+	    }
+	}
+	export class StagingDropResult {
+	    dropped: boolean;
+
+	    static createFrom(source: any = {}) {
+	        return new StagingDropResult(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.dropped = source["dropped"];
+	    }
+	}
 	export class StagingEditResult {
 	    name: string;
 	
@@ -718,6 +746,34 @@ export namespace gui {
 	        this.operation = source["operation"];
 	        this.value = source["value"];
 	        this.stagedAt = source["stagedAt"];
+	    }
+	}
+	export class StagingFileStatusResult {
+	    exists: boolean;
+	    encrypted: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new StagingFileStatusResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.exists = source["exists"];
+	        this.encrypted = source["encrypted"];
+	    }
+	}
+	export class StagingPersistResult {
+	    entryCount: number;
+	    tagCount: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new StagingPersistResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.entryCount = source["entryCount"];
+	        this.tagCount = source["tagCount"];
 	    }
 	}
 	export class StagingRemoveTagResult {

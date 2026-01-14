@@ -31,6 +31,7 @@ type TagTransitionResult struct {
 // ReduceEntry applies an entry action to produce a new state.
 func ReduceEntry(state EntryState, action EntryAction) EntryTransitionResult {
 	var result EntryTransitionResult
+
 	switch a := action.(type) {
 	case EntryActionAdd:
 		result = reduceAdd(state, a)
@@ -41,18 +42,21 @@ func ReduceEntry(state EntryState, action EntryAction) EntryTransitionResult {
 	case EntryActionReset:
 		result = reduceReset(state)
 	}
+
 	return result
 }
 
 // ReduceTag applies a tag action to produce new staged tags.
 func ReduceTag(entryState EntryState, stagedTags StagedTags, action TagAction) TagTransitionResult {
 	var result TagTransitionResult
+
 	switch a := action.(type) {
 	case TagActionTag:
 		result = reduceTag(entryState, stagedTags, a)
 	case TagActionUntag:
 		result = reduceUntag(entryState, stagedTags, a)
 	}
+
 	return result
 }
 
@@ -66,10 +70,12 @@ func ReduceTag(entryState EntryState, stagedTags StagedTags, action TagAction) T
 //   - CurrentValue=nil + Delete    → ERROR      (cannot add to delete)
 func reduceAdd(state EntryState, action EntryActionAdd) EntryTransitionResult {
 	var err error
+
 	// Check if resource already exists on AWS
 	if state.CurrentValue != nil {
 		return EntryTransitionResult{NewState: state, Error: ErrCannotAddToExisting}
 	}
+
 	switch state.StagedState.(type) {
 	case EntryStagedStateNotStaged, EntryStagedStateCreate:
 		state.StagedState = EntryStagedStateCreate{DraftValue: action.Value}
@@ -78,6 +84,7 @@ func reduceAdd(state EntryState, action EntryActionAdd) EntryTransitionResult {
 	case EntryStagedStateDelete:
 		err = ErrCannotAddToDelete
 	}
+
 	return EntryTransitionResult{NewState: state, Error: err}
 }
 
@@ -92,6 +99,7 @@ func reduceAdd(state EntryState, action EntryActionAdd) EntryTransitionResult {
 //   - Delete    → ERROR      (must reset first to edit)
 func reduceEdit(state EntryState, action EntryActionEdit) EntryTransitionResult {
 	var err error
+
 	switch state.StagedState.(type) {
 	case EntryStagedStateNotStaged:
 		// Auto-skip if value matches AWS current value
@@ -110,6 +118,7 @@ func reduceEdit(state EntryState, action EntryActionEdit) EntryTransitionResult 
 	case EntryStagedStateDelete:
 		err = ErrCannotEditDelete
 	}
+
 	return EntryTransitionResult{NewState: state, Error: err}
 }
 
@@ -143,6 +152,7 @@ func reduceDelete(state EntryState) EntryTransitionResult {
 	case EntryStagedStateDelete:
 		// no-op
 	}
+
 	return EntryTransitionResult{NewState: state, DiscardTags: discardTags}
 }
 
@@ -152,6 +162,7 @@ func reduceDelete(state EntryState) EntryTransitionResult {
 //   - Any → NotStaged  (unstage entry only, tags preserved)
 func reduceReset(state EntryState) EntryTransitionResult {
 	state.StagedState = EntryStagedStateNotStaged{}
+
 	return EntryTransitionResult{NewState: state}
 }
 
@@ -192,9 +203,11 @@ func reduceTag(entryState EntryState, stagedTags StagedTags, action TagActionTag
 		if action.CurrentAWSTags != nil {
 			if awsValue, exists := action.CurrentAWSTags[key]; exists && awsValue == value {
 				delete(cloned.ToSet, key)
+
 				continue
 			}
 		}
+
 		cloned.ToSet[key] = value
 	}
 
@@ -237,8 +250,10 @@ func reduceUntag(entryState EntryState, stagedTags StagedTags, action TagActionU
 		// Auto-skip if tag doesn't exist on AWS (unless CurrentAWSTagKeys is nil)
 		if action.CurrentAWSTagKeys != nil && !action.CurrentAWSTagKeys.Contains(key) {
 			cloned.ToUnset.Remove(key)
+
 			continue
 		}
+
 		cloned.ToUnset.Add(key)
 	}
 

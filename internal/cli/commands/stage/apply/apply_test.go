@@ -3,9 +3,8 @@ package apply_test
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
-	"os"
-	"path/filepath"
 	"testing"
 	"time"
 
@@ -17,7 +16,7 @@ import (
 	"github.com/mpyw/suve/internal/cli/commands/stage/apply"
 	"github.com/mpyw/suve/internal/maputil"
 	"github.com/mpyw/suve/internal/staging"
-	"github.com/mpyw/suve/internal/staging/file"
+	"github.com/mpyw/suve/internal/staging/store/testutil"
 )
 
 // mockStrategy implements staging.ApplyStrategy for testing.
@@ -40,6 +39,7 @@ func (m *mockStrategy) Apply(ctx context.Context, name string, entry staging.Ent
 	if m.applyFunc != nil {
 		return m.applyFunc(ctx, name, entry)
 	}
+
 	return nil
 }
 
@@ -51,6 +51,7 @@ func (m *mockStrategy) ApplyTags(ctx context.Context, name string, tagEntry stag
 	if m.applyTagsFunc != nil {
 		return m.applyTagsFunc(ctx, name, tagEntry)
 	}
+
 	return nil
 }
 
@@ -77,8 +78,11 @@ func TestCommand_Validation(t *testing.T) {
 
 	t.Run("help", func(t *testing.T) {
 		t.Parallel()
+
 		app := appcli.MakeApp()
+
 		var buf bytes.Buffer
+
 		app.Writer = &buf
 		err := app.Run(t.Context(), []string{"suve", "stage", "push", "--help"})
 		require.NoError(t, err)
@@ -89,10 +93,10 @@ func TestCommand_Validation(t *testing.T) {
 func TestRun_NoChanges(t *testing.T) {
 	t.Parallel()
 
-	tmpDir := t.TempDir()
-	store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := testutil.NewMockStore()
 
 	var buf bytes.Buffer
+
 	r := &apply.Runner{
 		ParamStrategy:  newParamStrategy(),
 		SecretStrategy: newSecretStrategy(),
@@ -111,8 +115,7 @@ func TestRun_NoChanges(t *testing.T) {
 func TestRun_ApplyBothServices(t *testing.T) {
 	t.Parallel()
 
-	tmpDir := t.TempDir()
-	store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := testutil.NewMockStore()
 
 	// Stage SSM Parameter Store parameter
 	_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
@@ -134,18 +137,23 @@ func TestRun_ApplyBothServices(t *testing.T) {
 	paramMock := newParamStrategy()
 	paramMock.applyFunc = func(_ context.Context, name string, _ staging.Entry) error {
 		paramPutCalled = true
+
 		assert.Equal(t, "/app/config", name)
+
 		return nil
 	}
 
 	secretMock := newSecretStrategy()
 	secretMock.applyFunc = func(_ context.Context, name string, _ staging.Entry) error {
 		secretPutCalled = true
+
 		assert.Equal(t, "my-secret", name)
+
 		return nil
 	}
 
 	var buf bytes.Buffer
+
 	r := &apply.Runner{
 		ParamStrategy:  paramMock,
 		SecretStrategy: secretMock,
@@ -173,8 +181,7 @@ func TestRun_ApplyBothServices(t *testing.T) {
 func TestRun_ApplyParamOnly(t *testing.T) {
 	t.Parallel()
 
-	tmpDir := t.TempDir()
-	store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := testutil.NewMockStore()
 
 	// Stage only SSM Parameter Store parameter
 	_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
@@ -187,10 +194,12 @@ func TestRun_ApplyParamOnly(t *testing.T) {
 	paramMock := newParamStrategy()
 	paramMock.applyFunc = func(_ context.Context, _ string, _ staging.Entry) error {
 		paramPutCalled = true
+
 		return nil
 	}
 
 	var buf bytes.Buffer
+
 	r := &apply.Runner{
 		ParamStrategy:  paramMock,
 		SecretStrategy: nil, // Should not be needed
@@ -209,8 +218,7 @@ func TestRun_ApplyParamOnly(t *testing.T) {
 func TestRun_ApplySecretOnly(t *testing.T) {
 	t.Parallel()
 
-	tmpDir := t.TempDir()
-	store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := testutil.NewMockStore()
 
 	// Stage only Secrets Manager secret
 	_ = store.StageEntry(t.Context(), staging.ServiceSecret, "my-secret", staging.Entry{
@@ -223,10 +231,12 @@ func TestRun_ApplySecretOnly(t *testing.T) {
 	secretMock := newSecretStrategy()
 	secretMock.applyFunc = func(_ context.Context, _ string, _ staging.Entry) error {
 		secretPutCalled = true
+
 		return nil
 	}
 
 	var buf bytes.Buffer
+
 	r := &apply.Runner{
 		ParamStrategy:  nil, // Should not be needed
 		SecretStrategy: secretMock,
@@ -245,8 +255,7 @@ func TestRun_ApplySecretOnly(t *testing.T) {
 func TestRun_ApplyDelete(t *testing.T) {
 	t.Parallel()
 
-	tmpDir := t.TempDir()
-	store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := testutil.NewMockStore()
 
 	// Stage deletes
 	_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/old", staging.Entry{
@@ -264,16 +273,19 @@ func TestRun_ApplyDelete(t *testing.T) {
 	paramMock := newParamStrategy()
 	paramMock.applyFunc = func(_ context.Context, _ string, _ staging.Entry) error {
 		paramDeleteCalled = true
+
 		return nil
 	}
 
 	secretMock := newSecretStrategy()
 	secretMock.applyFunc = func(_ context.Context, _ string, _ staging.Entry) error {
 		secretDeleteCalled = true
+
 		return nil
 	}
 
 	var buf bytes.Buffer
+
 	r := &apply.Runner{
 		ParamStrategy:  paramMock,
 		SecretStrategy: secretMock,
@@ -293,8 +305,7 @@ func TestRun_ApplyDelete(t *testing.T) {
 func TestRun_PartialFailure(t *testing.T) {
 	t.Parallel()
 
-	tmpDir := t.TempDir()
-	store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := testutil.NewMockStore()
 
 	// Stage both
 	_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
@@ -319,6 +330,7 @@ func TestRun_PartialFailure(t *testing.T) {
 	}
 
 	var buf, errBuf bytes.Buffer
+
 	r := &apply.Runner{
 		ParamStrategy:  paramMock,
 		SecretStrategy: secretMock,
@@ -344,15 +356,11 @@ func TestRun_PartialFailure(t *testing.T) {
 func TestRun_StoreError(t *testing.T) {
 	t.Parallel()
 
-	tmpDir := t.TempDir()
-	path := filepath.Join(tmpDir, "stage.json")
-
-	// Create invalid JSON
-	require.NoError(t, os.WriteFile(path, []byte("invalid json"), 0o644))
-
-	store := file.NewStoreWithPath(path)
+	store := testutil.NewMockStore()
+	store.ListEntriesErr = errors.New("mock store error")
 
 	var buf bytes.Buffer
+
 	r := &apply.Runner{
 		ParamStrategy:  newParamStrategy(),
 		SecretStrategy: newSecretStrategy(),
@@ -363,14 +371,13 @@ func TestRun_StoreError(t *testing.T) {
 
 	err := r.Run(t.Context())
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to parse")
+	assert.Contains(t, err.Error(), "mock store error")
 }
 
 func TestRun_SecretDeleteWithForce(t *testing.T) {
 	t.Parallel()
 
-	tmpDir := t.TempDir()
-	store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := testutil.NewMockStore()
 
 	// Stage Secrets Manager delete with force option
 	_ = store.StageEntry(t.Context(), staging.ServiceSecret, "my-secret", staging.Entry{
@@ -382,13 +389,16 @@ func TestRun_SecretDeleteWithForce(t *testing.T) {
 	})
 
 	var capturedEntry staging.Entry
+
 	secretMock := newSecretStrategy()
 	secretMock.applyFunc = func(_ context.Context, _ string, entry staging.Entry) error {
 		capturedEntry = entry
+
 		return nil
 	}
 
 	var buf bytes.Buffer
+
 	r := &apply.Runner{
 		SecretStrategy: secretMock,
 		Store:          store,
@@ -405,8 +415,7 @@ func TestRun_SecretDeleteWithForce(t *testing.T) {
 func TestRun_SecretDeleteWithRecoveryWindow(t *testing.T) {
 	t.Parallel()
 
-	tmpDir := t.TempDir()
-	store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := testutil.NewMockStore()
 
 	// Stage Secrets Manager delete with custom recovery window
 	_ = store.StageEntry(t.Context(), staging.ServiceSecret, "my-secret", staging.Entry{
@@ -418,13 +427,16 @@ func TestRun_SecretDeleteWithRecoveryWindow(t *testing.T) {
 	})
 
 	var capturedEntry staging.Entry
+
 	secretMock := newSecretStrategy()
 	secretMock.applyFunc = func(_ context.Context, _ string, entry staging.Entry) error {
 		capturedEntry = entry
+
 		return nil
 	}
 
 	var buf bytes.Buffer
+
 	r := &apply.Runner{
 		SecretStrategy: secretMock,
 		Store:          store,
@@ -441,8 +453,7 @@ func TestRun_SecretDeleteWithRecoveryWindow(t *testing.T) {
 func TestRun_ParamDeleteError(t *testing.T) {
 	t.Parallel()
 
-	tmpDir := t.TempDir()
-	store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := testutil.NewMockStore()
 
 	_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
 		Operation: staging.OperationDelete,
@@ -455,6 +466,7 @@ func TestRun_ParamDeleteError(t *testing.T) {
 	}
 
 	var buf, errBuf bytes.Buffer
+
 	r := &apply.Runner{
 		ParamStrategy: paramMock,
 		Store:         store,
@@ -470,8 +482,7 @@ func TestRun_ParamDeleteError(t *testing.T) {
 func TestRun_SecretSetError(t *testing.T) {
 	t.Parallel()
 
-	tmpDir := t.TempDir()
-	store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := testutil.NewMockStore()
 
 	_ = store.StageEntry(t.Context(), staging.ServiceSecret, "my-secret", staging.Entry{
 		Operation: staging.OperationUpdate,
@@ -485,6 +496,7 @@ func TestRun_SecretSetError(t *testing.T) {
 	}
 
 	var buf, errBuf bytes.Buffer
+
 	r := &apply.Runner{
 		SecretStrategy: secretMock,
 		Store:          store,
@@ -500,8 +512,7 @@ func TestRun_SecretSetError(t *testing.T) {
 func TestRun_SecretDeleteError(t *testing.T) {
 	t.Parallel()
 
-	tmpDir := t.TempDir()
-	store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := testutil.NewMockStore()
 
 	_ = store.StageEntry(t.Context(), staging.ServiceSecret, "my-secret", staging.Entry{
 		Operation: staging.OperationDelete,
@@ -514,6 +525,7 @@ func TestRun_SecretDeleteError(t *testing.T) {
 	}
 
 	var buf, errBuf bytes.Buffer
+
 	r := &apply.Runner{
 		SecretStrategy: secretMock,
 		Store:          store,
@@ -529,8 +541,7 @@ func TestRun_SecretDeleteError(t *testing.T) {
 func TestRun_ParamSetError(t *testing.T) {
 	t.Parallel()
 
-	tmpDir := t.TempDir()
-	store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := testutil.NewMockStore()
 
 	_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
 		Operation: staging.OperationUpdate,
@@ -544,6 +555,7 @@ func TestRun_ParamSetError(t *testing.T) {
 	}
 
 	var buf, errBuf bytes.Buffer
+
 	r := &apply.Runner{
 		ParamStrategy: paramMock,
 		Store:         store,
@@ -559,8 +571,7 @@ func TestRun_ParamSetError(t *testing.T) {
 func TestRun_ConflictDetection_CreateConflict(t *testing.T) {
 	t.Parallel()
 
-	tmpDir := t.TempDir()
-	store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := testutil.NewMockStore()
 
 	// Stage a create operation
 	_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/new-param", staging.Entry{
@@ -574,6 +585,7 @@ func TestRun_ConflictDetection_CreateConflict(t *testing.T) {
 	paramMock.fetchLastModifiedVal = time.Now()
 
 	var buf, errBuf bytes.Buffer
+
 	r := &apply.Runner{
 		ParamStrategy:   paramMock,
 		Store:           store,
@@ -591,8 +603,7 @@ func TestRun_ConflictDetection_CreateConflict(t *testing.T) {
 func TestRun_ConflictDetection_UpdateConflict(t *testing.T) {
 	t.Parallel()
 
-	tmpDir := t.TempDir()
-	store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := testutil.NewMockStore()
 
 	baseTime := time.Now().Add(-1 * time.Hour)
 	_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
@@ -607,6 +618,7 @@ func TestRun_ConflictDetection_UpdateConflict(t *testing.T) {
 	paramMock.fetchLastModifiedVal = time.Now()
 
 	var buf, errBuf bytes.Buffer
+
 	r := &apply.Runner{
 		ParamStrategy:   paramMock,
 		Store:           store,
@@ -624,8 +636,7 @@ func TestRun_ConflictDetection_UpdateConflict(t *testing.T) {
 func TestRun_ConflictDetection_DeleteConflict(t *testing.T) {
 	t.Parallel()
 
-	tmpDir := t.TempDir()
-	store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := testutil.NewMockStore()
 
 	baseTime := time.Now().Add(-1 * time.Hour)
 	_ = store.StageEntry(t.Context(), staging.ServiceSecret, "my-secret", staging.Entry{
@@ -639,6 +650,7 @@ func TestRun_ConflictDetection_DeleteConflict(t *testing.T) {
 	secretMock.fetchLastModifiedVal = time.Now()
 
 	var buf, errBuf bytes.Buffer
+
 	r := &apply.Runner{
 		SecretStrategy:  secretMock,
 		Store:           store,
@@ -656,8 +668,7 @@ func TestRun_ConflictDetection_DeleteConflict(t *testing.T) {
 func TestRun_ConflictDetection_IgnoreConflicts(t *testing.T) {
 	t.Parallel()
 
-	tmpDir := t.TempDir()
-	store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := testutil.NewMockStore()
 
 	baseTime := time.Now().Add(-1 * time.Hour)
 	_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
@@ -673,10 +684,12 @@ func TestRun_ConflictDetection_IgnoreConflicts(t *testing.T) {
 	paramMock.fetchLastModifiedVal = time.Now()
 	paramMock.applyFunc = func(_ context.Context, _ string, _ staging.Entry) error {
 		applyCalled = true
+
 		return nil
 	}
 
 	var buf, errBuf bytes.Buffer
+
 	r := &apply.Runner{
 		ParamStrategy:   paramMock,
 		Store:           store,
@@ -693,8 +706,7 @@ func TestRun_ConflictDetection_IgnoreConflicts(t *testing.T) {
 func TestRun_ConflictDetection_NoConflict(t *testing.T) {
 	t.Parallel()
 
-	tmpDir := t.TempDir()
-	store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := testutil.NewMockStore()
 
 	baseTime := time.Now()
 	_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
@@ -710,10 +722,12 @@ func TestRun_ConflictDetection_NoConflict(t *testing.T) {
 	paramMock.fetchLastModifiedVal = baseTime.Add(-1 * time.Hour)
 	paramMock.applyFunc = func(_ context.Context, _ string, _ staging.Entry) error {
 		applyCalled = true
+
 		return nil
 	}
 
 	var buf bytes.Buffer
+
 	r := &apply.Runner{
 		ParamStrategy:   paramMock,
 		Store:           store,
@@ -730,8 +744,7 @@ func TestRun_ConflictDetection_NoConflict(t *testing.T) {
 func TestRun_ConflictDetection_BothServices(t *testing.T) {
 	t.Parallel()
 
-	tmpDir := t.TempDir()
-	store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := testutil.NewMockStore()
 
 	baseTime := time.Now().Add(-1 * time.Hour)
 
@@ -758,6 +771,7 @@ func TestRun_ConflictDetection_BothServices(t *testing.T) {
 	secretMock.fetchLastModifiedVal = time.Now() // conflict
 
 	var buf, errBuf bytes.Buffer
+
 	r := &apply.Runner{
 		ParamStrategy:   paramMock,
 		SecretStrategy:  secretMock,
@@ -777,8 +791,7 @@ func TestRun_ConflictDetection_BothServices(t *testing.T) {
 func TestRun_ApplyCreate(t *testing.T) {
 	t.Parallel()
 
-	tmpDir := t.TempDir()
-	store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := testutil.NewMockStore()
 
 	// Stage create operation
 	_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/new-param", staging.Entry{
@@ -793,6 +806,7 @@ func TestRun_ApplyCreate(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
+
 	r := &apply.Runner{
 		ParamStrategy: paramMock,
 		Store:         store,
@@ -808,8 +822,7 @@ func TestRun_ApplyCreate(t *testing.T) {
 func TestRun_ApplyTagsSuccess(t *testing.T) {
 	t.Parallel()
 
-	tmpDir := t.TempDir()
-	store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := testutil.NewMockStore()
 
 	// Stage tag changes
 	_ = store.StageTag(t.Context(), staging.ServiceParam, "/app/config", staging.TagEntry{
@@ -822,13 +835,16 @@ func TestRun_ApplyTagsSuccess(t *testing.T) {
 	paramMock := newParamStrategy()
 	paramMock.applyTagsFunc = func(_ context.Context, name string, tagEntry staging.TagEntry) error {
 		applyTagsCalled = true
+
 		assert.Equal(t, "/app/config", name)
 		assert.Equal(t, map[string]string{"env": "prod", "team": "api"}, tagEntry.Add)
 		assert.True(t, tagEntry.Remove.Contains("deprecated"))
+
 		return nil
 	}
 
 	var buf bytes.Buffer
+
 	r := &apply.Runner{
 		ParamStrategy: paramMock,
 		Store:         store,
@@ -852,8 +868,7 @@ func TestRun_ApplyTagsSuccess(t *testing.T) {
 func TestRun_ApplyTagsError(t *testing.T) {
 	t.Parallel()
 
-	tmpDir := t.TempDir()
-	store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := testutil.NewMockStore()
 
 	// Stage tag changes
 	_ = store.StageTag(t.Context(), staging.ServiceParam, "/app/config", staging.TagEntry{
@@ -867,6 +882,7 @@ func TestRun_ApplyTagsError(t *testing.T) {
 	}
 
 	var buf, errBuf bytes.Buffer
+
 	r := &apply.Runner{
 		ParamStrategy: paramMock,
 		Store:         store,
@@ -888,8 +904,7 @@ func TestRun_ApplyTagsError(t *testing.T) {
 func TestRun_ApplyTagsSecretService(t *testing.T) {
 	t.Parallel()
 
-	tmpDir := t.TempDir()
-	store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := testutil.NewMockStore()
 
 	// Stage secret tag changes
 	_ = store.StageTag(t.Context(), staging.ServiceSecret, "my-secret", staging.TagEntry{
@@ -901,11 +916,14 @@ func TestRun_ApplyTagsSecretService(t *testing.T) {
 	secretMock := newSecretStrategy()
 	secretMock.applyTagsFunc = func(_ context.Context, name string, _ staging.TagEntry) error {
 		applyTagsCalled = true
+
 		assert.Equal(t, "my-secret", name)
+
 		return nil
 	}
 
 	var buf bytes.Buffer
+
 	r := &apply.Runner{
 		SecretStrategy: secretMock,
 		Store:          store,
@@ -923,8 +941,7 @@ func TestRun_ApplyTagsSecretService(t *testing.T) {
 func TestRun_ApplyBothEntriesAndTags(t *testing.T) {
 	t.Parallel()
 
-	tmpDir := t.TempDir()
-	store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := testutil.NewMockStore()
 
 	// Stage entry change
 	_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
@@ -945,14 +962,17 @@ func TestRun_ApplyBothEntriesAndTags(t *testing.T) {
 	paramMock := newParamStrategy()
 	paramMock.applyFunc = func(_ context.Context, _ string, _ staging.Entry) error {
 		entryCalled = true
+
 		return nil
 	}
 	paramMock.applyTagsFunc = func(_ context.Context, _ string, _ staging.TagEntry) error {
 		tagCalled = true
+
 		return nil
 	}
 
 	var buf bytes.Buffer
+
 	r := &apply.Runner{
 		ParamStrategy: paramMock,
 		Store:         store,
@@ -971,8 +991,7 @@ func TestRun_ApplyBothEntriesAndTags(t *testing.T) {
 func TestRun_ApplyTagsOnlyAdditions(t *testing.T) {
 	t.Parallel()
 
-	tmpDir := t.TempDir()
-	store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := testutil.NewMockStore()
 
 	// Stage tag changes with only additions
 	_ = store.StageTag(t.Context(), staging.ServiceParam, "/app/config", staging.TagEntry{
@@ -986,6 +1005,7 @@ func TestRun_ApplyTagsOnlyAdditions(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
+
 	r := &apply.Runner{
 		ParamStrategy: paramMock,
 		Store:         store,
@@ -1002,8 +1022,7 @@ func TestRun_ApplyTagsOnlyAdditions(t *testing.T) {
 func TestRun_ApplyTagsOnlyRemovals(t *testing.T) {
 	t.Parallel()
 
-	tmpDir := t.TempDir()
-	store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := testutil.NewMockStore()
 
 	// Stage tag changes with only removals
 	_ = store.StageTag(t.Context(), staging.ServiceParam, "/app/config", staging.TagEntry{
@@ -1017,6 +1036,7 @@ func TestRun_ApplyTagsOnlyRemovals(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
+
 	r := &apply.Runner{
 		ParamStrategy: paramMock,
 		Store:         store,
@@ -1028,4 +1048,117 @@ func TestRun_ApplyTagsOnlyRemovals(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, buf.String(), "[-2]")
 	assert.NotContains(t, buf.String(), "+")
+}
+
+func TestRun_WithHintedStore(t *testing.T) {
+	t.Parallel()
+
+	store := testutil.NewHintedMockStore()
+
+	// Stage SSM Parameter Store parameter
+	_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
+		Operation: staging.OperationUpdate,
+		Value:     lo.ToPtr("param-value"),
+		StagedAt:  time.Now(),
+	})
+
+	paramMock := newParamStrategy()
+
+	var buf bytes.Buffer
+
+	r := &apply.Runner{
+		ParamStrategy: paramMock,
+		Store:         store,
+		Stdout:        &buf,
+		Stderr:        &bytes.Buffer{},
+	}
+
+	err := r.Run(t.Context())
+	require.NoError(t, err)
+	assert.Contains(t, buf.String(), "SSM Parameter Store: Updated /app/config")
+	assert.Equal(t, "apply", store.LastHint)
+}
+
+func TestRun_WithHintedStoreTagApply(t *testing.T) {
+	t.Parallel()
+
+	store := testutil.NewHintedMockStore()
+
+	// Stage tag changes
+	_ = store.StageTag(t.Context(), staging.ServiceParam, "/app/config", staging.TagEntry{
+		Add:      map[string]string{"env": "prod"},
+		StagedAt: time.Now(),
+	})
+
+	paramMock := newParamStrategy()
+
+	var buf bytes.Buffer
+
+	r := &apply.Runner{
+		ParamStrategy: paramMock,
+		Store:         store,
+		Stdout:        &buf,
+		Stderr:        &bytes.Buffer{},
+	}
+
+	err := r.Run(t.Context())
+	require.NoError(t, err)
+	assert.Contains(t, buf.String(), "SSM Parameter Store: Tagged /app/config")
+	assert.Equal(t, "apply", store.LastHint)
+}
+
+func TestRun_FormatTagApplySummaryEmpty(t *testing.T) {
+	t.Parallel()
+
+	store := testutil.NewMockStore()
+
+	// Stage tag changes with both empty add and remove
+	_ = store.StageTag(t.Context(), staging.ServiceParam, "/app/config", staging.TagEntry{
+		StagedAt: time.Now(),
+	})
+
+	paramMock := newParamStrategy()
+
+	var buf bytes.Buffer
+
+	r := &apply.Runner{
+		ParamStrategy: paramMock,
+		Store:         store,
+		Stdout:        &buf,
+		Stderr:        &bytes.Buffer{},
+	}
+
+	err := r.Run(t.Context())
+	require.NoError(t, err)
+	// Should not have [+N] or [-N] suffix when no changes
+	assert.Contains(t, buf.String(), "SSM Parameter Store: Tagged /app/config")
+	assert.NotContains(t, buf.String(), "[+")
+	assert.NotContains(t, buf.String(), "[-")
+}
+
+func TestRun_ListTagsError(t *testing.T) {
+	t.Parallel()
+
+	store := testutil.NewMockStore()
+	store.ListTagsErr = errors.New("mock list tags error")
+
+	// Stage some entries so we get past the first ListEntries call
+	_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
+		Operation: staging.OperationUpdate,
+		Value:     lo.ToPtr("param-value"),
+		StagedAt:  time.Now(),
+	})
+
+	var buf bytes.Buffer
+
+	r := &apply.Runner{
+		ParamStrategy: newParamStrategy(),
+		Store:         store,
+		Stdout:        &buf,
+		Stderr:        &bytes.Buffer{},
+	}
+
+	err := r.Run(t.Context())
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "mock list tags error")
 }

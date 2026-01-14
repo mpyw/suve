@@ -2,6 +2,7 @@
 package editor
 
 import (
+	"context"
 	"errors"
 	"os"
 	"os/exec"
@@ -12,12 +13,12 @@ import (
 )
 
 // OpenFunc is the type for editor functions.
-type OpenFunc func(content string) (string, error)
+type OpenFunc func(ctx context.Context, content string) (string, error)
 
 // Open opens the content in an external editor and returns the edited result.
 // It uses the VISUAL or EDITOR environment variable to determine the editor.
 // Falls back to notepad on Windows or vi on other platforms.
-func Open(content string) (string, error) {
+func Open(ctx context.Context, content string) (string, error) {
 	editor := lo.CoalesceOrEmpty(
 		os.Getenv("VISUAL"),
 		os.Getenv("EDITOR"),
@@ -28,11 +29,13 @@ func Open(content string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+
 	defer func() { _ = os.Remove(tmpFile.Name()) }()
 
 	if _, err := tmpFile.WriteString(content); err != nil {
 		return "", errors.Join(err, tmpFile.Close())
 	}
+
 	if err := tmpFile.Close(); err != nil {
 		return "", err
 	}
@@ -40,7 +43,7 @@ func Open(content string) (string, error) {
 	// Split editor command to support multi-argument editors like "code --wait"
 	args := strings.Fields(editor)
 	args = append(args, tmpFile.Name())
-	cmd := exec.Command(args[0], args[1:]...) //nolint:gosec // Editor command from user environment
+	cmd := exec.CommandContext(ctx, args[0], args[1:]...) //nolint:gosec // Editor command from user environment
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr

@@ -20,8 +20,11 @@ import (
 
 func TestCommand_Help(t *testing.T) {
 	t.Parallel()
+
 	app := appcli.MakeApp()
+
 	var buf bytes.Buffer
+
 	app.Writer = &buf
 	err := app.Run(t.Context(), []string{"suve", "secret", "list", "--help"})
 	require.NoError(t, err)
@@ -31,24 +34,31 @@ func TestCommand_Help(t *testing.T) {
 }
 
 type mockClient struct {
-	listSecretsFunc    func(ctx context.Context, params *secretapi.ListSecretsInput, optFns ...func(*secretapi.Options)) (*secretapi.ListSecretsOutput, error)
+	//nolint:lll // mock function signature
+	listSecretsFunc func(ctx context.Context, params *secretapi.ListSecretsInput, optFns ...func(*secretapi.Options)) (*secretapi.ListSecretsOutput, error)
+	//nolint:lll // mock function signature
 	getSecretValueFunc func(ctx context.Context, params *secretapi.GetSecretValueInput, optFns ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error)
 }
 
+//nolint:lll // mock function signature
 func (m *mockClient) ListSecrets(ctx context.Context, params *secretapi.ListSecretsInput, optFns ...func(*secretapi.Options)) (*secretapi.ListSecretsOutput, error) {
 	if m.listSecretsFunc != nil {
 		return m.listSecretsFunc(ctx, params, optFns...)
 	}
+
 	return nil, fmt.Errorf("ListSecrets not mocked")
 }
 
+//nolint:lll // mock function signature
 func (m *mockClient) GetSecretValue(ctx context.Context, params *secretapi.GetSecretValueInput, optFns ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) {
 	if m.getSecretValueFunc != nil {
 		return m.getSecretValueFunc(ctx, params, optFns...)
 	}
+
 	return nil, fmt.Errorf("GetSecretValue not mocked")
 }
 
+//nolint:funlen // Table-driven test with many cases
 func TestRun(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
@@ -72,6 +82,7 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
+				t.Helper()
 				assert.Contains(t, output, "secret1")
 				assert.Contains(t, output, "secret2")
 			},
@@ -80,8 +91,10 @@ func TestRun(t *testing.T) {
 			name: "list with prefix filter",
 			opts: list.Options{Prefix: "app/"},
 			mock: &mockClient{
+				//nolint:lll // mock function signature
 				listSecretsFunc: func(_ context.Context, params *secretapi.ListSecretsInput, _ ...func(*secretapi.Options)) (*secretapi.ListSecretsOutput, error) {
 					require.NotEmpty(t, params.Filters, "expected filter to be set")
+
 					return &secretapi.ListSecretsOutput{
 						SecretList: []secretapi.SecretListEntry{
 							{Name: lo.ToPtr("app/secret1")},
@@ -90,6 +103,7 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
+				t.Helper()
 				assert.Contains(t, output, "app/secret1")
 			},
 		},
@@ -118,6 +132,7 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
+				t.Helper()
 				assert.Contains(t, output, "app/prod/secret1")
 				assert.NotContains(t, output, "app/dev/secret2")
 				assert.Contains(t, output, "app/prod/secret3")
@@ -145,12 +160,14 @@ func TestRun(t *testing.T) {
 						},
 					}, nil
 				},
+				//nolint:lll // mock function signature
 				getSecretValueFunc: func(_ context.Context, params *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) {
 					name := lo.FromPtr(params.SecretId)
 					values := map[string]string{
 						"secret1": "value1",
 						"secret2": "value2",
 					}
+
 					return &secretapi.GetSecretValueOutput{
 						Name:         params.SecretId,
 						SecretString: lo.ToPtr(values[name]),
@@ -158,6 +175,7 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, out string) {
+				t.Helper()
 				assert.Contains(t, out, "secret1\tvalue1")
 				assert.Contains(t, out, "secret2\tvalue2")
 			},
@@ -176,6 +194,7 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, out string) {
+				t.Helper()
 				assert.Contains(t, out, `"name": "secret1"`)
 				assert.Contains(t, out, `"name": "secret2"`)
 				assert.NotContains(t, out, `"value"`)
@@ -192,6 +211,7 @@ func TestRun(t *testing.T) {
 						},
 					}, nil
 				},
+				//nolint:lll // mock function signature
 				getSecretValueFunc: func(_ context.Context, params *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) {
 					return &secretapi.GetSecretValueOutput{
 						Name:         params.SecretId,
@@ -200,6 +220,7 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, out string) {
+				t.Helper()
 				assert.Contains(t, out, `"name": "secret1"`)
 				assert.Contains(t, out, `"value": "secret-value"`)
 			},
@@ -215,11 +236,12 @@ func TestRun(t *testing.T) {
 						},
 					}, nil
 				},
-				getSecretValueFunc: func(_ context.Context, _ *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) {
+				getSecretValueFunc: func(_ context.Context, _ *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) { //nolint:lll
 					return nil, errors.New("access denied")
 				},
 			},
 			check: func(t *testing.T, out string) {
+				t.Helper()
 				assert.Contains(t, out, `"name": "error-secret"`)
 				assert.Contains(t, out, `"error": "access denied"`)
 			},
@@ -235,11 +257,12 @@ func TestRun(t *testing.T) {
 						},
 					}, nil
 				},
-				getSecretValueFunc: func(_ context.Context, _ *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) {
+				getSecretValueFunc: func(_ context.Context, _ *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) { //nolint:lll
 					return nil, errors.New("fetch error")
 				},
 			},
 			check: func(t *testing.T, out string) {
+				t.Helper()
 				assert.Contains(t, out, "error-secret")
 				assert.Contains(t, out, "<error:")
 			},
@@ -249,7 +272,9 @@ func TestRun(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
+
 			var buf, errBuf bytes.Buffer
+
 			r := &list.Runner{
 				UseCase: &secret.ListUseCase{Client: tt.mock},
 				Stdout:  &buf,
@@ -259,10 +284,12 @@ func TestRun(t *testing.T) {
 
 			if tt.wantErr {
 				assert.Error(t, err)
+
 				return
 			}
 
 			require.NoError(t, err)
+
 			if tt.check != nil {
 				tt.check(t, buf.String())
 			}

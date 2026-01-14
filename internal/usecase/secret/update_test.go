@@ -22,24 +22,30 @@ type mockUpdateClient struct {
 	putSecretValueErr    error
 }
 
+//nolint:lll // mock function signature must match AWS SDK interface
 func (m *mockUpdateClient) GetSecretValue(_ context.Context, _ *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) {
 	if m.getSecretValueErr != nil {
 		return nil, m.getSecretValueErr
 	}
+
 	return m.getSecretValueResult, nil
 }
 
+//nolint:lll // mock function signature must match AWS SDK interface
 func (m *mockUpdateClient) UpdateSecret(_ context.Context, _ *secretapi.UpdateSecretInput, _ ...func(*secretapi.Options)) (*secretapi.UpdateSecretOutput, error) {
 	if m.updateSecretErr != nil {
 		return nil, m.updateSecretErr
 	}
+
 	return m.updateSecretResult, nil
 }
 
+//nolint:lll // mock function signature must match AWS SDK interface
 func (m *mockUpdateClient) PutSecretValue(_ context.Context, _ *secretapi.PutSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.PutSecretValueOutput, error) {
 	if m.putSecretValueErr != nil {
 		return nil, m.putSecretValueErr
 	}
+
 	return m.putSecretValueResult, nil
 }
 
@@ -153,7 +159,7 @@ func TestUpdateUseCase_Execute_PutValueError(t *testing.T) {
 		Name:  "my-secret",
 		Value: "new-value",
 	})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to update secret value")
 }
 
@@ -170,6 +176,6 @@ func TestUpdateUseCase_Execute_UpdateDescriptionError(t *testing.T) {
 		Name:        "my-secret",
 		Description: "new description",
 	})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to update secret description")
 }

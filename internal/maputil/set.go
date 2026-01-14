@@ -11,6 +11,7 @@ func NewSet[T comparable](values ...T) Set[T] {
 	for _, v := range values {
 		s[v] = struct{}{}
 	}
+
 	return s
 }
 
@@ -27,6 +28,7 @@ func (s Set[T]) Remove(value T) {
 // Contains returns true if the value is in the set.
 func (s Set[T]) Contains(value T) bool {
 	_, ok := s[value]
+
 	return ok
 }
 
@@ -41,6 +43,7 @@ func (s Set[T]) Values() []T {
 	for v := range s {
 		values = append(values, v)
 	}
+
 	return values
 }
 
@@ -55,6 +58,8 @@ func (s *Set[T]) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &values); err != nil {
 		return err
 	}
+
 	*s = NewSet(values...)
+
 	return nil
 }

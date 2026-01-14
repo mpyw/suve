@@ -9,7 +9,7 @@ import (
 
 	"github.com/urfave/cli/v3"
 
-	"github.com/mpyw/suve/internal/cli/colors"
+	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/infra"
 	"github.com/mpyw/suve/internal/usecase/secret"
 )
@@ -46,11 +46,12 @@ EXAMPLES:
 }
 
 func action(ctx context.Context, cmd *cli.Command) error {
-	if cmd.Args().Len() < 2 {
+	if cmd.Args().Len() < 2 { //nolint:mnd // minimum required args: name and key=value
 		return fmt.Errorf("usage: suve secret tag <name> <key=value> [key=value]")
 	}
 
 	name := cmd.Args().Get(0)
+
 	tags, err := parseTags(cmd.Args().Slice()[1:])
 	if err != nil {
 		return err
@@ -65,6 +66,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		UseCase: &secret.TagUseCase{Client: client},
 		Stdout:  cmd.Root().Writer,
 	}
+
 	return r.Run(ctx, Options{
 		Name: name,
 		Tags: tags,
@@ -81,27 +83,27 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 		return err
 	}
 
-	_, _ = fmt.Fprintf(r.Stdout, "%s Tagged secret %s (%d tag(s))\n",
-		colors.Success("✓"),
-		opts.Name,
-		len(opts.Tags),
-	)
+	output.Success(r.Stdout, "Tagged secret %s (%d tag(s))", opts.Name, len(opts.Tags))
 
 	return nil
 }
 
 func parseTags(args []string) (map[string]string, error) {
 	tags := make(map[string]string)
+
 	for _, arg := range args {
-		parts := strings.SplitN(arg, "=", 2)
-		if len(parts) != 2 {
+		parts := strings.SplitN(arg, "=", 2) //nolint:mnd // split into key=value pair
+		if len(parts) != 2 {                 //nolint:mnd // expect exactly key and value
 			return nil, fmt.Errorf("invalid tag format %q: expected key=value", arg)
 		}
+
 		key, value := parts[0], parts[1]
 		if key == "" {
 			return nil, fmt.Errorf("invalid tag format %q: key cannot be empty", arg)
 		}
+
 		tags[key] = value
 	}
+
 	return tags, nil
 }

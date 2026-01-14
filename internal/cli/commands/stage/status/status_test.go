@@ -2,8 +2,7 @@ package status_test
 
 import (
 	"bytes"
-	"os"
-	"path/filepath"
+	"errors"
 	"testing"
 	"time"
 
@@ -15,16 +14,16 @@ import (
 	"github.com/mpyw/suve/internal/cli/commands/stage/status"
 	"github.com/mpyw/suve/internal/maputil"
 	"github.com/mpyw/suve/internal/staging"
-	"github.com/mpyw/suve/internal/staging/file"
+	"github.com/mpyw/suve/internal/staging/store/testutil"
 )
 
 func TestCommand_NoStagedChanges(t *testing.T) {
 	t.Parallel()
 
-	tmpDir := t.TempDir()
-	store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := testutil.NewMockStore()
 
 	var buf bytes.Buffer
+
 	r := &status.Runner{
 		Store:  store,
 		Stdout: &buf,
@@ -39,8 +38,7 @@ func TestCommand_NoStagedChanges(t *testing.T) {
 func TestCommand_ShowParamChangesOnly(t *testing.T) {
 	t.Parallel()
 
-	tmpDir := t.TempDir()
-	store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := testutil.NewMockStore()
 
 	now := time.Now()
 	_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
@@ -50,6 +48,7 @@ func TestCommand_ShowParamChangesOnly(t *testing.T) {
 	})
 
 	var buf bytes.Buffer
+
 	r := &status.Runner{
 		Store:  store,
 		Stdout: &buf,
@@ -68,8 +67,7 @@ func TestCommand_ShowParamChangesOnly(t *testing.T) {
 func TestCommand_ShowSecretChangesOnly(t *testing.T) {
 	t.Parallel()
 
-	tmpDir := t.TempDir()
-	store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := testutil.NewMockStore()
 
 	now := time.Now()
 	_ = store.StageEntry(t.Context(), staging.ServiceSecret, "my-secret", staging.Entry{
@@ -79,6 +77,7 @@ func TestCommand_ShowSecretChangesOnly(t *testing.T) {
 	})
 
 	var buf bytes.Buffer
+
 	r := &status.Runner{
 		Store:  store,
 		Stdout: &buf,
@@ -97,8 +96,7 @@ func TestCommand_ShowSecretChangesOnly(t *testing.T) {
 func TestCommand_ShowBothParamAndSecretChanges(t *testing.T) {
 	t.Parallel()
 
-	tmpDir := t.TempDir()
-	store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := testutil.NewMockStore()
 
 	now := time.Now()
 	_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
@@ -112,6 +110,7 @@ func TestCommand_ShowBothParamAndSecretChanges(t *testing.T) {
 	})
 
 	var buf bytes.Buffer
+
 	r := &status.Runner{
 		Store:  store,
 		Stdout: &buf,
@@ -133,8 +132,7 @@ func TestCommand_ShowBothParamAndSecretChanges(t *testing.T) {
 func TestCommand_VerboseOutput(t *testing.T) {
 	t.Parallel()
 
-	tmpDir := t.TempDir()
-	store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := testutil.NewMockStore()
 
 	now := time.Now()
 	_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
@@ -149,6 +147,7 @@ func TestCommand_VerboseOutput(t *testing.T) {
 	})
 
 	var buf bytes.Buffer
+
 	r := &status.Runner{
 		Store:  store,
 		Stdout: &buf,
@@ -168,8 +167,7 @@ func TestCommand_VerboseOutput(t *testing.T) {
 func TestCommand_VerboseWithDelete(t *testing.T) {
 	t.Parallel()
 
-	tmpDir := t.TempDir()
-	store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := testutil.NewMockStore()
 
 	now := time.Now()
 	_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
@@ -178,6 +176,7 @@ func TestCommand_VerboseWithDelete(t *testing.T) {
 	})
 
 	var buf bytes.Buffer
+
 	r := &status.Runner{
 		Store:  store,
 		Stdout: &buf,
@@ -196,8 +195,7 @@ func TestCommand_VerboseWithDelete(t *testing.T) {
 func TestCommand_VerboseTruncatesLongValue(t *testing.T) {
 	t.Parallel()
 
-	tmpDir := t.TempDir()
-	store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := testutil.NewMockStore()
 
 	now := time.Now()
 	longValue := "this is a very long value that exceeds one hundred characters and should be truncated in verbose mode output display"
@@ -208,6 +206,7 @@ func TestCommand_VerboseTruncatesLongValue(t *testing.T) {
 	})
 
 	var buf bytes.Buffer
+
 	r := &status.Runner{
 		Store:  store,
 		Stdout: &buf,
@@ -226,7 +225,9 @@ func TestCommand_Validation(t *testing.T) {
 	t.Parallel()
 
 	app := appcli.MakeApp()
+
 	var buf bytes.Buffer
+
 	app.Writer = &buf
 
 	// Test that the command exists and works
@@ -238,32 +239,26 @@ func TestCommand_Validation(t *testing.T) {
 func TestCommand_StoreError(t *testing.T) {
 	t.Parallel()
 
-	tmpDir := t.TempDir()
-	path := filepath.Join(tmpDir, "stage.json")
-
-	// Create invalid JSON
-	err := os.WriteFile(path, []byte("invalid json"), 0o600)
-	require.NoError(t, err)
-
-	store := file.NewStoreWithPath(path)
+	store := testutil.NewMockStore()
+	store.ListEntriesErr = errors.New("mock store error")
 
 	var buf bytes.Buffer
+
 	r := &status.Runner{
 		Store:  store,
 		Stdout: &buf,
 		Stderr: &bytes.Buffer{},
 	}
 
-	err = r.Run(t.Context(), status.Options{})
+	err := r.Run(t.Context(), status.Options{})
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to parse")
+	assert.Contains(t, err.Error(), "mock store error")
 }
 
 func TestCommand_ShowParamTagChangesOnly(t *testing.T) {
 	t.Parallel()
 
-	tmpDir := t.TempDir()
-	store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := testutil.NewMockStore()
 
 	now := time.Now()
 	_ = store.StageTag(t.Context(), staging.ServiceParam, "/app/config", staging.TagEntry{
@@ -272,6 +267,7 @@ func TestCommand_ShowParamTagChangesOnly(t *testing.T) {
 	})
 
 	var buf bytes.Buffer
+
 	r := &status.Runner{
 		Store:  store,
 		Stdout: &buf,
@@ -292,8 +288,7 @@ func TestCommand_ShowParamTagChangesOnly(t *testing.T) {
 func TestCommand_ShowSecretTagChangesOnly(t *testing.T) {
 	t.Parallel()
 
-	tmpDir := t.TempDir()
-	store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := testutil.NewMockStore()
 
 	now := time.Now()
 	_ = store.StageTag(t.Context(), staging.ServiceSecret, "my-secret", staging.TagEntry{
@@ -303,6 +298,7 @@ func TestCommand_ShowSecretTagChangesOnly(t *testing.T) {
 	})
 
 	var buf bytes.Buffer
+
 	r := &status.Runner{
 		Store:  store,
 		Stdout: &buf,
@@ -324,8 +320,7 @@ func TestCommand_ShowSecretTagChangesOnly(t *testing.T) {
 func TestCommand_ShowMixedEntryAndTagChanges(t *testing.T) {
 	t.Parallel()
 
-	tmpDir := t.TempDir()
-	store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := testutil.NewMockStore()
 
 	now := time.Now()
 	// Entry change
@@ -341,6 +336,7 @@ func TestCommand_ShowMixedEntryAndTagChanges(t *testing.T) {
 	})
 
 	var buf bytes.Buffer
+
 	r := &status.Runner{
 		Store:  store,
 		Stdout: &buf,
@@ -361,8 +357,7 @@ func TestCommand_ShowMixedEntryAndTagChanges(t *testing.T) {
 func TestCommand_TagChangesVerbose(t *testing.T) {
 	t.Parallel()
 
-	tmpDir := t.TempDir()
-	store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := testutil.NewMockStore()
 
 	now := time.Now()
 	_ = store.StageTag(t.Context(), staging.ServiceParam, "/app/config", staging.TagEntry{
@@ -372,6 +367,7 @@ func TestCommand_TagChangesVerbose(t *testing.T) {
 	})
 
 	var buf bytes.Buffer
+
 	r := &status.Runner{
 		Store:  store,
 		Stdout: &buf,
@@ -394,8 +390,7 @@ func TestCommand_TagChangesVerbose(t *testing.T) {
 func TestCommand_TagOnlyChangesNoEntries(t *testing.T) {
 	t.Parallel()
 
-	tmpDir := t.TempDir()
-	store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := testutil.NewMockStore()
 
 	now := time.Now()
 	// Only tag changes, no entry changes
@@ -409,6 +404,7 @@ func TestCommand_TagOnlyChangesNoEntries(t *testing.T) {
 	})
 
 	var buf bytes.Buffer
+
 	r := &status.Runner{
 		Store:  store,
 		Stdout: &buf,

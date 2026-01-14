@@ -7,6 +7,7 @@ import (
 	"github.com/samber/lo"
 
 	"github.com/mpyw/suve/internal/staging"
+	"github.com/mpyw/suve/internal/staging/store"
 	"github.com/mpyw/suve/internal/staging/transition"
 )
 
@@ -25,7 +26,7 @@ type AddOutput struct {
 // AddUseCase executes add operations.
 type AddUseCase struct {
 	Strategy staging.EditStrategy
-	Store    staging.StoreReadWriter
+	Store    store.ReadWriteOperator
 }
 
 // Execute runs the add use case.
@@ -40,6 +41,7 @@ func (u *AddUseCase) Execute(ctx context.Context, input AddInput) (*AddOutput, e
 
 	// Check if resource already exists on AWS
 	var currentValue *string
+
 	result, err := u.Strategy.FetchCurrentValue(ctx, name)
 	if err != nil {
 		// ResourceNotFoundError means resource doesn't exist - that's expected for add
@@ -60,10 +62,12 @@ func (u *AddUseCase) Execute(ctx context.Context, input AddInput) (*AddOutput, e
 
 	// Execute the transition
 	executor := transition.NewExecutor(u.Store)
+
 	opts := &transition.EntryExecuteOptions{}
 	if input.Description != "" {
 		opts.Description = &input.Description
 	}
+
 	_, err = executor.ExecuteEntry(ctx, service, name, entryState, transition.EntryActionAdd{Value: input.Value}, opts)
 	if err != nil {
 		return nil, err
@@ -98,6 +102,7 @@ func (u *AddUseCase) Draft(ctx context.Context, input DraftInput) (*DraftOutput,
 		if errors.Is(err, staging.ErrNotStaged) {
 			return &DraftOutput{IsStaged: false}, nil
 		}
+
 		return nil, err
 	}
 

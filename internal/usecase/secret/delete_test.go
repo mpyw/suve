@@ -21,17 +21,21 @@ type mockDeleteClient struct {
 	deleteSecretErr      error
 }
 
+//nolint:lll // mock function signature must match AWS SDK interface
 func (m *mockDeleteClient) GetSecretValue(_ context.Context, _ *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) {
 	if m.getSecretValueErr != nil {
 		return nil, m.getSecretValueErr
 	}
+
 	return m.getSecretValueResult, nil
 }
 
+//nolint:lll // mock function signature must match AWS SDK interface
 func (m *mockDeleteClient) DeleteSecret(_ context.Context, _ *secretapi.DeleteSecretInput, _ ...func(*secretapi.Options)) (*secretapi.DeleteSecretOutput, error) {
 	if m.deleteSecretErr != nil {
 		return nil, m.deleteSecretErr
 	}
+
 	return m.deleteSecretResult, nil
 }
 
@@ -155,6 +159,6 @@ func TestDeleteUseCase_Execute_Error(t *testing.T) {
 	_, err := uc.Execute(t.Context(), secret.DeleteInput{
 		Name: "my-secret",
 	})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to delete secret")
 }

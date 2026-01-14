@@ -121,7 +121,7 @@ func ParseArgs[A any](
 	switch len(args) {
 	case 1:
 		return parseOneArg(args[0], parse)
-	case 2:
+	case 2: //nolint:mnd // two-arg case for version comparison
 		return parseTwoArgs(args[0], args[1], parse, hasAbsolute, prefixes)
 	default: // case 3
 		return parseThreeArgs(args[0], args[1], args[2], parse)
@@ -156,6 +156,7 @@ func parseOneArg[A any](
 	// For SSM Parameter Store: latest version
 	// For Secrets Manager: AWSCURRENT label
 	var zero A
+
 	spec2 := &version.Spec[A]{Name: spec.Name, Absolute: zero, Shift: 0}
 
 	return spec, spec2, nil
@@ -225,6 +226,7 @@ func parseTwoArgs[A any](
 		// "/app/config" "#3" → compare #3 with latest
 		// This makes the specified version the "from" and default the "to"
 		var zero A
+
 		return spec2, &version.Spec[A]{Name: spec1.Name, Absolute: zero, Shift: 0}, nil
 	}
 

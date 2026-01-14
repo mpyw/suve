@@ -19,8 +19,11 @@ import (
 
 func TestCommand_Help(t *testing.T) {
 	t.Parallel()
+
 	app := appcli.MakeApp()
+
 	var buf bytes.Buffer
+
 	app.Writer = &buf
 	err := app.Run(t.Context(), []string{"suve", "param", "list", "--help"})
 	require.NoError(t, err)
@@ -30,25 +33,31 @@ func TestCommand_Help(t *testing.T) {
 	assert.Contains(t, buf.String(), "--show")
 }
 
+//nolint:lll // mock struct fields match AWS SDK interface signatures
 type mockClient struct {
 	describeParametersFunc func(ctx context.Context, params *paramapi.DescribeParametersInput, optFns ...func(*paramapi.Options)) (*paramapi.DescribeParametersOutput, error)
 	getParametersFunc      func(ctx context.Context, params *paramapi.GetParametersInput, optFns ...func(*paramapi.Options)) (*paramapi.GetParametersOutput, error)
 }
 
+//nolint:lll // mock function signature must match AWS SDK interface
 func (m *mockClient) DescribeParameters(ctx context.Context, params *paramapi.DescribeParametersInput, optFns ...func(*paramapi.Options)) (*paramapi.DescribeParametersOutput, error) {
 	if m.describeParametersFunc != nil {
 		return m.describeParametersFunc(ctx, params, optFns...)
 	}
+
 	return nil, fmt.Errorf("DescribeParameters not mocked")
 }
 
+//nolint:lll // mock function signature must match AWS SDK interface
 func (m *mockClient) GetParameters(ctx context.Context, params *paramapi.GetParametersInput, optFns ...func(*paramapi.Options)) (*paramapi.GetParametersOutput, error) {
 	if m.getParametersFunc != nil {
 		return m.getParametersFunc(ctx, params, optFns...)
 	}
+
 	return nil, fmt.Errorf("GetParameters not mocked")
 }
 
+//nolint:funlen // Table-driven test with many cases
 func TestRun(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
@@ -62,6 +71,7 @@ func TestRun(t *testing.T) {
 			name: "list all parameters",
 			opts: list.Options{},
 			mock: &mockClient{
+				//nolint:lll // inline mock function in test table
 				describeParametersFunc: func(_ context.Context, _ *paramapi.DescribeParametersInput, _ ...func(*paramapi.Options)) (*paramapi.DescribeParametersOutput, error) {
 					return &paramapi.DescribeParametersOutput{
 						Parameters: []paramapi.ParameterMetadata{
@@ -72,6 +82,7 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
+				t.Helper()
 				assert.Contains(t, output, "/app/param1")
 				assert.Contains(t, output, "/app/param2")
 			},
@@ -80,8 +91,10 @@ func TestRun(t *testing.T) {
 			name: "list with prefix",
 			opts: list.Options{Prefix: "/app/"},
 			mock: &mockClient{
+				//nolint:lll // inline mock function in test table
 				describeParametersFunc: func(_ context.Context, params *paramapi.DescribeParametersInput, _ ...func(*paramapi.Options)) (*paramapi.DescribeParametersOutput, error) {
 					require.NotEmpty(t, params.ParameterFilters, "expected filter to be set")
+
 					return &paramapi.DescribeParametersOutput{
 						Parameters: []paramapi.ParameterMetadata{
 							{Name: lo.ToPtr("/app/param1")},
@@ -90,6 +103,7 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
+				t.Helper()
 				assert.Contains(t, output, "/app/param1")
 			},
 		},
@@ -97,9 +111,11 @@ func TestRun(t *testing.T) {
 			name: "recursive listing",
 			opts: list.Options{Prefix: "/app/", Recursive: true},
 			mock: &mockClient{
+				//nolint:lll // inline mock function in test table
 				describeParametersFunc: func(_ context.Context, params *paramapi.DescribeParametersInput, _ ...func(*paramapi.Options)) (*paramapi.DescribeParametersOutput, error) {
 					require.NotEmpty(t, params.ParameterFilters, "expected filter to be set")
 					assert.Equal(t, "Recursive", lo.FromPtr(params.ParameterFilters[0].Option))
+
 					return &paramapi.DescribeParametersOutput{
 						Parameters: []paramapi.ParameterMetadata{
 							{Name: lo.ToPtr("/app/sub/param")},
@@ -108,6 +124,7 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
+				t.Helper()
 				assert.Contains(t, output, "/app/sub/param")
 			},
 		},
@@ -115,6 +132,7 @@ func TestRun(t *testing.T) {
 			name: "error from AWS",
 			opts: list.Options{},
 			mock: &mockClient{
+				//nolint:lll // inline mock function in test table
 				describeParametersFunc: func(_ context.Context, _ *paramapi.DescribeParametersInput, _ ...func(*paramapi.Options)) (*paramapi.DescribeParametersOutput, error) {
 					return nil, fmt.Errorf("AWS error")
 				},
@@ -125,6 +143,7 @@ func TestRun(t *testing.T) {
 			name: "filter by regex",
 			opts: list.Options{Filter: "prod"},
 			mock: &mockClient{
+				//nolint:lll // inline mock function in test table
 				describeParametersFunc: func(_ context.Context, _ *paramapi.DescribeParametersInput, _ ...func(*paramapi.Options)) (*paramapi.DescribeParametersOutput, error) {
 					return &paramapi.DescribeParametersOutput{
 						Parameters: []paramapi.ParameterMetadata{
@@ -136,6 +155,7 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
+				t.Helper()
 				assert.Contains(t, output, "/app/prod/param1")
 				assert.NotContains(t, output, "/app/dev/param2")
 				assert.Contains(t, output, "/app/prod/param3")
@@ -145,6 +165,7 @@ func TestRun(t *testing.T) {
 			name: "invalid regex filter",
 			opts: list.Options{Filter: "[invalid"},
 			mock: &mockClient{
+				//nolint:lll // mock function signature
 				describeParametersFunc: func(_ context.Context, _ *paramapi.DescribeParametersInput, _ ...func(*paramapi.Options)) (*paramapi.DescribeParametersOutput, error) {
 					return &paramapi.DescribeParametersOutput{}, nil
 				},
@@ -155,6 +176,7 @@ func TestRun(t *testing.T) {
 			name: "show parameter values",
 			opts: list.Options{Show: true},
 			mock: &mockClient{
+				//nolint:lll // inline mock function in test table
 				describeParametersFunc: func(_ context.Context, _ *paramapi.DescribeParametersInput, _ ...func(*paramapi.Options)) (*paramapi.DescribeParametersOutput, error) {
 					return &paramapi.DescribeParametersOutput{
 						Parameters: []paramapi.ParameterMetadata{
@@ -163,12 +185,15 @@ func TestRun(t *testing.T) {
 						},
 					}, nil
 				},
+				//nolint:lll // mock function signature
 				getParametersFunc: func(_ context.Context, params *paramapi.GetParametersInput, _ ...func(*paramapi.Options)) (*paramapi.GetParametersOutput, error) {
 					values := map[string]string{
 						"/app/param1": "value1",
 						"/app/param2": "value2",
 					}
+
 					var result []paramapi.Parameter
+
 					for _, name := range params.Names {
 						if val, ok := values[name]; ok {
 							result = append(result, paramapi.Parameter{
@@ -177,12 +202,14 @@ func TestRun(t *testing.T) {
 							})
 						}
 					}
+
 					return &paramapi.GetParametersOutput{
 						Parameters: result,
 					}, nil
 				},
 			},
 			check: func(t *testing.T, output string) {
+				t.Helper()
 				assert.Contains(t, output, "/app/param1\tvalue1")
 				assert.Contains(t, output, "/app/param2\tvalue2")
 			},
@@ -191,6 +218,7 @@ func TestRun(t *testing.T) {
 			name: "JSON output without show",
 			opts: list.Options{Output: output.FormatJSON},
 			mock: &mockClient{
+				//nolint:lll // mock function signature
 				describeParametersFunc: func(_ context.Context, _ *paramapi.DescribeParametersInput, _ ...func(*paramapi.Options)) (*paramapi.DescribeParametersOutput, error) {
 					return &paramapi.DescribeParametersOutput{
 						Parameters: []paramapi.ParameterMetadata{
@@ -201,6 +229,7 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, out string) {
+				t.Helper()
 				assert.Contains(t, out, `"name": "/app/param1"`)
 				assert.Contains(t, out, `"name": "/app/param2"`)
 				assert.NotContains(t, out, `"value"`)
@@ -210,6 +239,7 @@ func TestRun(t *testing.T) {
 			name: "JSON output with show",
 			opts: list.Options{Output: output.FormatJSON, Show: true},
 			mock: &mockClient{
+				//nolint:lll // mock function signature
 				describeParametersFunc: func(_ context.Context, _ *paramapi.DescribeParametersInput, _ ...func(*paramapi.Options)) (*paramapi.DescribeParametersOutput, error) {
 					return &paramapi.DescribeParametersOutput{
 						Parameters: []paramapi.ParameterMetadata{
@@ -217,20 +247,23 @@ func TestRun(t *testing.T) {
 						},
 					}, nil
 				},
+				//nolint:lll // mock function signature
 				getParametersFunc: func(_ context.Context, params *paramapi.GetParametersInput, _ ...func(*paramapi.Options)) (*paramapi.GetParametersOutput, error) {
-					var result []paramapi.Parameter
+					result := make([]paramapi.Parameter, 0, len(params.Names))
 					for _, name := range params.Names {
 						result = append(result, paramapi.Parameter{
 							Name:  lo.ToPtr(name),
 							Value: lo.ToPtr("secret-value"),
 						})
 					}
+
 					return &paramapi.GetParametersOutput{
 						Parameters: result,
 					}, nil
 				},
 			},
 			check: func(t *testing.T, out string) {
+				t.Helper()
 				assert.Contains(t, out, `"name": "/app/param1"`)
 				assert.Contains(t, out, `"value": "secret-value"`)
 			},
@@ -239,6 +272,7 @@ func TestRun(t *testing.T) {
 			name: "JSON output with show and error",
 			opts: list.Options{Output: output.FormatJSON, Show: true},
 			mock: &mockClient{
+				//nolint:lll // mock function signature
 				describeParametersFunc: func(_ context.Context, _ *paramapi.DescribeParametersInput, _ ...func(*paramapi.Options)) (*paramapi.DescribeParametersOutput, error) {
 					return &paramapi.DescribeParametersOutput{
 						Parameters: []paramapi.ParameterMetadata{
@@ -246,6 +280,7 @@ func TestRun(t *testing.T) {
 						},
 					}, nil
 				},
+				//nolint:lll // mock function signature
 				getParametersFunc: func(_ context.Context, params *paramapi.GetParametersInput, _ ...func(*paramapi.Options)) (*paramapi.GetParametersOutput, error) {
 					// Return all requested parameters as invalid (simulates not found)
 					return &paramapi.GetParametersOutput{
@@ -254,6 +289,7 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, out string) {
+				t.Helper()
 				assert.Contains(t, out, `"name": "/app/error-param"`)
 				assert.Contains(t, out, `"error":`)
 			},
@@ -262,6 +298,7 @@ func TestRun(t *testing.T) {
 			name: "text output with error",
 			opts: list.Options{Show: true},
 			mock: &mockClient{
+				//nolint:lll // mock function signature
 				describeParametersFunc: func(_ context.Context, _ *paramapi.DescribeParametersInput, _ ...func(*paramapi.Options)) (*paramapi.DescribeParametersOutput, error) {
 					return &paramapi.DescribeParametersOutput{
 						Parameters: []paramapi.ParameterMetadata{
@@ -269,6 +306,7 @@ func TestRun(t *testing.T) {
 						},
 					}, nil
 				},
+				//nolint:lll // mock function signature
 				getParametersFunc: func(_ context.Context, params *paramapi.GetParametersInput, _ ...func(*paramapi.Options)) (*paramapi.GetParametersOutput, error) {
 					// Return all requested parameters as invalid (simulates not found)
 					return &paramapi.GetParametersOutput{
@@ -277,6 +315,7 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, out string) {
+				t.Helper()
 				assert.Contains(t, out, "/app/error-param")
 				assert.Contains(t, out, "<error:")
 			},
@@ -286,7 +325,9 @@ func TestRun(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
+
 			var buf, errBuf bytes.Buffer
+
 			r := &list.Runner{
 				UseCase: &param.ListUseCase{Client: tt.mock},
 				Stdout:  &buf,
@@ -296,10 +337,12 @@ func TestRun(t *testing.T) {
 
 			if tt.wantErr {
 				assert.Error(t, err)
+
 				return
 			}
 
 			require.NoError(t, err)
+
 			if tt.check != nil {
 				tt.check(t, buf.String())
 			}

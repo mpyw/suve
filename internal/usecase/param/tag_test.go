@@ -2,7 +2,6 @@ package param_test
 
 import (
 	"context"
-	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -17,17 +16,21 @@ type mockTagClient struct {
 	removeTagsErr error
 }
 
+//nolint:lll // mock function signature must match AWS SDK interface
 func (m *mockTagClient) AddTagsToResource(_ context.Context, _ *paramapi.AddTagsToResourceInput, _ ...func(*paramapi.Options)) (*paramapi.AddTagsToResourceOutput, error) {
 	if m.addTagsErr != nil {
 		return nil, m.addTagsErr
 	}
+
 	return &paramapi.AddTagsToResourceOutput{}, nil
 }
 
+//nolint:lll // mock function signature must match AWS SDK interface
 func (m *mockTagClient) RemoveTagsFromResource(_ context.Context, _ *paramapi.RemoveTagsFromResourceInput, _ ...func(*paramapi.Options)) (*paramapi.RemoveTagsFromResourceOutput, error) {
 	if m.removeTagsErr != nil {
 		return nil, m.removeTagsErr
 	}
+
 	return &paramapi.RemoveTagsFromResourceOutput{}, nil
 }
 
@@ -87,7 +90,7 @@ func TestTagUseCase_Execute_AddTagsError(t *testing.T) {
 	t.Parallel()
 
 	client := &mockTagClient{
-		addTagsErr: errors.New("add tags failed"),
+		addTagsErr: errAddTagsFailed,
 	}
 	uc := &param.TagUseCase{Client: client}
 
@@ -95,7 +98,7 @@ func TestTagUseCase_Execute_AddTagsError(t *testing.T) {
 		Name: "/app/config",
 		Add:  map[string]string{"env": "prod"},
 	})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to add tags")
 }
 
@@ -103,7 +106,7 @@ func TestTagUseCase_Execute_RemoveTagsError(t *testing.T) {
 	t.Parallel()
 
 	client := &mockTagClient{
-		removeTagsErr: errors.New("remove tags failed"),
+		removeTagsErr: errRemoveTagsFailed,
 	}
 	uc := &param.TagUseCase{Client: client}
 
@@ -111,6 +114,6 @@ func TestTagUseCase_Execute_RemoveTagsError(t *testing.T) {
 		Name:   "/app/config",
 		Remove: []string{"old-tag"},
 	})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to remove tags")
 }

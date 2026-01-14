@@ -3,10 +3,11 @@ package internal
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/samber/lo"
 	"github.com/urfave/cli/v3"
+
+	"github.com/mpyw/suve/internal/cli/output"
 )
 
 // CommandNotFound is a shared handler for unknown subcommands.
@@ -14,5 +15,6 @@ import (
 func CommandNotFound(_ context.Context, cmd *cli.Command, command string) {
 	_ = cli.ShowSubcommandHelp(cmd)
 	w := lo.CoalesceOrEmpty(cmd.Root().ErrWriter, cmd.Root().Writer)
-	_, _ = fmt.Fprintf(w, "\nUnknown command: %s\n", command)
+	output.Println(w, "")
+	output.Warning(w, "Unknown command: %s", command)
 }

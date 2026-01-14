@@ -99,6 +99,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		Stdout:  cmd.Root().Writer,
 		Stderr:  cmd.Root().ErrWriter,
 	}
+
 	return r.Run(ctx, Options{
 		Prefix: cmd.Args().First(),
 		Filter: cmd.String("filter"),
@@ -123,8 +124,9 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 	// If --show is not specified and not JSON output, just print names
 	if !opts.Show && opts.Output != output.FormatJSON {
 		for _, entry := range entries {
-			_, _ = fmt.Fprintln(r.Stdout, entry.Name)
+			output.Println(r.Stdout, entry.Name)
 		}
+
 		return nil
 	}
 
@@ -134,8 +136,10 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 		for i, entry := range entries {
 			items[i] = JSONOutputItem{Name: entry.Name}
 		}
+
 		enc := json.NewEncoder(r.Stdout)
 		enc.SetIndent("", "  ")
+
 		return enc.Encode(items)
 	}
 
@@ -149,17 +153,19 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 				items = append(items, JSONOutputItem{Name: entry.Name, Value: entry.Value})
 			}
 		}
+
 		enc := json.NewEncoder(r.Stdout)
 		enc.SetIndent("", "  ")
+
 		return enc.Encode(items)
 	}
 
 	// Text output with values
 	for _, entry := range entries {
 		if entry.Error != nil {
-			_, _ = fmt.Fprintf(r.Stdout, "%s\t<error: %v>\n", entry.Name, entry.Error)
+			output.Printf(r.Stdout, "%s\t<error: %v>\n", entry.Name, entry.Error)
 		} else {
-			_, _ = fmt.Fprintf(r.Stdout, "%s\t%s\n", entry.Name, lo.FromPtr(entry.Value))
+			output.Printf(r.Stdout, "%s\t%s\n", entry.Name, lo.FromPtr(entry.Value))
 		}
 	}
 

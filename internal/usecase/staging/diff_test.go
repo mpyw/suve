@@ -3,7 +3,6 @@ package staging_test
 import (
 	"context"
 	"errors"
-	"path/filepath"
 	"testing"
 	"time"
 
@@ -12,12 +11,13 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/mpyw/suve/internal/staging"
-	"github.com/mpyw/suve/internal/staging/file"
+	"github.com/mpyw/suve/internal/staging/store/testutil"
 	usecasestaging "github.com/mpyw/suve/internal/usecase/staging"
 )
 
 type mockDiffStrategy struct {
 	*mockServiceStrategy
+
 	fetchResults map[string]*staging.FetchResult
 	fetchErrors  map[string]error
 }
@@ -26,9 +26,11 @@ func (m *mockDiffStrategy) FetchCurrent(_ context.Context, name string) (*stagin
 	if err, ok := m.fetchErrors[name]; ok {
 		return nil, err
 	}
+
 	if result, ok := m.fetchResults[name]; ok {
 		return result, nil
 	}
+
 	return &staging.FetchResult{Value: "aws-value", Identifier: "#1"}, nil
 }
 
@@ -43,7 +45,7 @@ func newMockDiffStrategy() *mockDiffStrategy {
 func TestDiffUseCase_Execute_Empty(t *testing.T) {
 	t.Parallel()
 
-	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := testutil.NewMockStore()
 	uc := &usecasestaging.DiffUseCase{
 		Strategy: newMockDiffStrategy(),
 		Store:    store,
@@ -58,7 +60,7 @@ func TestDiffUseCase_Execute_Empty(t *testing.T) {
 func TestDiffUseCase_Execute_UpdateDiff(t *testing.T) {
 	t.Parallel()
 
-	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := testutil.NewMockStore()
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("new-value"),
@@ -91,7 +93,7 @@ func TestDiffUseCase_Execute_UpdateDiff(t *testing.T) {
 func TestDiffUseCase_Execute_CreateDiff(t *testing.T) {
 	t.Parallel()
 
-	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := testutil.NewMockStore()
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/new", staging.Entry{
 		Operation:   staging.OperationCreate,
 		Value:       lo.ToPtr("new-value"),
@@ -120,7 +122,7 @@ func TestDiffUseCase_Execute_CreateDiff(t *testing.T) {
 func TestDiffUseCase_Execute_DeleteDiff(t *testing.T) {
 	t.Parallel()
 
-	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := testutil.NewMockStore()
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/delete", staging.Entry{
 		Operation: staging.OperationDelete,
 		StagedAt:  time.Now(),
@@ -151,7 +153,7 @@ func TestDiffUseCase_Execute_DeleteDiff(t *testing.T) {
 func TestDiffUseCase_Execute_AutoUnstage_Identical(t *testing.T) {
 	t.Parallel()
 
-	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := testutil.NewMockStore()
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/same", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("same-value"),
@@ -185,7 +187,7 @@ func TestDiffUseCase_Execute_AutoUnstage_Identical(t *testing.T) {
 func TestDiffUseCase_Execute_AutoUnstage_AlreadyDeleted(t *testing.T) {
 	t.Parallel()
 
-	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := testutil.NewMockStore()
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/gone", staging.Entry{
 		Operation: staging.OperationDelete,
 		StagedAt:  time.Now(),
@@ -211,7 +213,7 @@ func TestDiffUseCase_Execute_AutoUnstage_AlreadyDeleted(t *testing.T) {
 func TestDiffUseCase_Execute_FilterByName(t *testing.T) {
 	t.Parallel()
 
-	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := testutil.NewMockStore()
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/one", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("one"),
@@ -237,7 +239,7 @@ func TestDiffUseCase_Execute_FilterByName(t *testing.T) {
 func TestDiffUseCase_Execute_FilterByName_NotStaged(t *testing.T) {
 	t.Parallel()
 
-	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := testutil.NewMockStore()
 	uc := &usecasestaging.DiffUseCase{
 		Strategy: newMockDiffStrategy(),
 		Store:    store,
@@ -253,7 +255,7 @@ func TestDiffUseCase_Execute_FilterByName_NotStaged(t *testing.T) {
 func TestDiffUseCase_Execute_AutoUnstage_UpdateNoLongerExists(t *testing.T) {
 	t.Parallel()
 
-	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := testutil.NewMockStore()
 	// Stage an update for something that no longer exists
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/gone", staging.Entry{
 		Operation: staging.OperationUpdate,
@@ -285,8 +287,8 @@ func TestDiffUseCase_Execute_AutoUnstage_UpdateNoLongerExists(t *testing.T) {
 func TestDiffUseCase_Execute_ListError(t *testing.T) {
 	t.Parallel()
 
-	store := newMockStore()
-	store.listErr = errors.New("list error")
+	store := testutil.NewMockStore()
+	store.ListEntriesErr = errors.New("list error")
 
 	uc := &usecasestaging.DiffUseCase{
 		Strategy: newMockDiffStrategy(),
@@ -294,15 +296,15 @@ func TestDiffUseCase_Execute_ListError(t *testing.T) {
 	}
 
 	_, err := uc.Execute(t.Context(), usecasestaging.DiffInput{})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "list error")
 }
 
 func TestDiffUseCase_Execute_GetError(t *testing.T) {
 	t.Parallel()
 
-	store := newMockStore()
-	store.getErr = errors.New("get error")
+	store := testutil.NewMockStore()
+	store.GetEntryErr = errors.New("get error")
 
 	uc := &usecasestaging.DiffUseCase{
 		Strategy: newMockDiffStrategy(),
@@ -310,15 +312,15 @@ func TestDiffUseCase_Execute_GetError(t *testing.T) {
 	}
 
 	_, err := uc.Execute(t.Context(), usecasestaging.DiffInput{Name: "/app/config"})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "get error")
 }
 
 func TestDiffUseCase_Execute_GetTagError(t *testing.T) {
 	t.Parallel()
 
-	store := newMockStore()
-	store.getTagErr = errors.New("get tag error")
+	store := testutil.NewMockStore()
+	store.GetTagErr = errors.New("get tag error")
 
 	uc := &usecasestaging.DiffUseCase{
 		Strategy: newMockDiffStrategy(),
@@ -326,15 +328,15 @@ func TestDiffUseCase_Execute_GetTagError(t *testing.T) {
 	}
 
 	_, err := uc.Execute(t.Context(), usecasestaging.DiffInput{Name: "/app/config"})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "get tag error")
 }
 
 func TestDiffUseCase_Execute_ListTagsError(t *testing.T) {
 	t.Parallel()
 
-	store := newMockStore()
-	store.listTagsErr = errors.New("list tags error")
+	store := testutil.NewMockStore()
+	store.ListTagsErr = errors.New("list tags error")
 
 	uc := &usecasestaging.DiffUseCase{
 		Strategy: newMockDiffStrategy(),
@@ -342,14 +344,14 @@ func TestDiffUseCase_Execute_ListTagsError(t *testing.T) {
 	}
 
 	_, err := uc.Execute(t.Context(), usecasestaging.DiffInput{})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "list tags error")
 }
 
 func TestDiffUseCase_Execute_UnknownOperation(t *testing.T) {
 	t.Parallel()
 
-	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := testutil.NewMockStore()
 	// Stage an entry with an unknown operation (edge case)
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/unknown", staging.Entry{
 		Operation: staging.Operation("unknown"), // Invalid operation
@@ -370,4 +372,77 @@ func TestDiffUseCase_Execute_UnknownOperation(t *testing.T) {
 	require.Len(t, output.Entries, 1)
 	assert.Equal(t, usecasestaging.DiffEntryWarning, output.Entries[0].Type)
 	assert.Contains(t, output.Entries[0].Warning, "fetch error")
+}
+
+func TestDiffUseCase_Execute_FilterByName_EntryExistsTagNil(t *testing.T) {
+	t.Parallel()
+
+	store := testutil.NewMockStore()
+	// Stage only an entry, no tag
+	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/entry-only", staging.Entry{
+		Operation: staging.OperationUpdate,
+		Value:     lo.ToPtr("value"),
+		StagedAt:  time.Now(),
+	}))
+
+	uc := &usecasestaging.DiffUseCase{
+		Strategy: newMockDiffStrategy(),
+		Store:    store,
+	}
+
+	output, err := uc.Execute(t.Context(), usecasestaging.DiffInput{Name: "/app/entry-only"})
+	require.NoError(t, err)
+	require.Len(t, output.Entries, 1)
+	assert.Equal(t, "/app/entry-only", output.Entries[0].Name)
+	assert.Empty(t, output.TagEntries) // No tag entries
+}
+
+func TestDiffUseCase_Execute_FilterByName_TagExistsEntryNil(t *testing.T) {
+	t.Parallel()
+
+	store := testutil.NewMockStore()
+	// Stage only a tag, no entry
+	require.NoError(t, store.StageTag(t.Context(), staging.ServiceParam, "/app/tag-only", staging.TagEntry{
+		Add:      map[string]string{"env": "prod"},
+		StagedAt: time.Now(),
+	}))
+
+	uc := &usecasestaging.DiffUseCase{
+		Strategy: newMockDiffStrategy(),
+		Store:    store,
+	}
+
+	output, err := uc.Execute(t.Context(), usecasestaging.DiffInput{Name: "/app/tag-only"})
+	require.NoError(t, err)
+	assert.Empty(t, output.Entries) // No entries
+	require.Len(t, output.TagEntries, 1)
+	assert.Equal(t, "/app/tag-only", output.TagEntries[0].Name)
+	assert.Equal(t, "prod", output.TagEntries[0].Add["env"])
+}
+
+func TestDiffUseCase_Execute_WithTagEntriesProcessing(t *testing.T) {
+	t.Parallel()
+
+	store := testutil.NewMockStore()
+	removeKeys := map[string]struct{}{"old-key": {}}
+	require.NoError(t, store.StageTag(t.Context(), staging.ServiceParam, "/app/config", staging.TagEntry{
+		Add:      map[string]string{"env": "prod", "team": "backend"},
+		Remove:   removeKeys,
+		StagedAt: time.Now(),
+	}))
+
+	uc := &usecasestaging.DiffUseCase{
+		Strategy: newMockDiffStrategy(),
+		Store:    store,
+	}
+
+	output, err := uc.Execute(t.Context(), usecasestaging.DiffInput{})
+	require.NoError(t, err)
+	require.Len(t, output.TagEntries, 1)
+
+	tagEntry := output.TagEntries[0]
+	assert.Equal(t, "/app/config", tagEntry.Name)
+	assert.Equal(t, "prod", tagEntry.Add["env"])
+	assert.Equal(t, "backend", tagEntry.Add["team"])
+	assert.True(t, tagEntry.Remove.Contains("old-key"))
 }

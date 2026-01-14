@@ -105,6 +105,7 @@ func (a *App) SecretList(prefix string, withValue bool, filter string, maxResult
 	}
 
 	uc := &secret.ListUseCase{Client: client}
+
 	result, err := uc.Execute(a.ctx, secret.ListInput{
 		Prefix:     prefix,
 		WithValue:  withValue,
@@ -140,6 +141,7 @@ func (a *App) SecretShow(specStr string) (*SecretShowResult, error) {
 	}
 
 	uc := &secret.ShowUseCase{Client: client}
+
 	result, err := uc.Execute(a.ctx, secret.ShowInput{Spec: spec})
 	if err != nil {
 		return nil, err
@@ -157,12 +159,14 @@ func (a *App) SecretShow(specStr string) (*SecretShowResult, error) {
 	if result.CreatedDate != nil {
 		r.CreatedDate = result.CreatedDate.Format("2006-01-02T15:04:05Z07:00")
 	}
+
 	for _, tag := range result.Tags {
 		r.Tags = append(r.Tags, SecretShowTag{
 			Key:   tag.Key,
 			Value: tag.Value,
 		})
 	}
+
 	return r, nil
 }
 
@@ -174,6 +178,7 @@ func (a *App) SecretLog(name string, maxResults int32) (*SecretLogResult, error)
 	}
 
 	uc := &secret.LogUseCase{Client: client}
+
 	result, err := uc.Execute(a.ctx, secret.LogInput{
 		Name:       name,
 		MaxResults: maxResults,
@@ -193,6 +198,7 @@ func (a *App) SecretLog(name string, maxResults int32) (*SecretLogResult, error)
 		if e.CreatedDate != nil {
 			entry.Created = e.CreatedDate.Format("2006-01-02T15:04:05Z07:00")
 		}
+
 		entries[i] = entry
 	}
 
@@ -207,6 +213,7 @@ func (a *App) SecretCreate(name, value string) (*SecretCreateResult, error) {
 	}
 
 	uc := &secret.CreateUseCase{Client: client}
+
 	result, err := uc.Execute(a.ctx, secret.CreateInput{
 		Name:  name,
 		Value: value,
@@ -230,6 +237,7 @@ func (a *App) SecretUpdate(name, value string) (*SecretUpdateResult, error) {
 	}
 
 	uc := &secret.UpdateUseCase{Client: client}
+
 	result, err := uc.Execute(a.ctx, secret.UpdateInput{
 		Name:  name,
 		Value: value,
@@ -253,6 +261,7 @@ func (a *App) SecretDelete(name string, force bool) (*SecretDeleteResult, error)
 	}
 
 	uc := &secret.DeleteUseCase{Client: client}
+
 	result, err := uc.Execute(a.ctx, secret.DeleteInput{
 		Name:  name,
 		Force: force,
@@ -268,6 +277,7 @@ func (a *App) SecretDelete(name string, force bool) (*SecretDeleteResult, error)
 	if result.DeletionDate != nil {
 		r.DeletionDate = result.DeletionDate.Format("2006-01-02T15:04:05Z07:00")
 	}
+
 	return r, nil
 }
 
@@ -279,6 +289,7 @@ func (a *App) SecretAddTag(name, key, value string) error {
 	}
 
 	uc := &secret.TagUseCase{Client: client}
+
 	return uc.Execute(a.ctx, secret.TagInput{
 		Name: name,
 		Add:  map[string]string{key: value},
@@ -293,6 +304,7 @@ func (a *App) SecretRemoveTag(name, key string) error {
 	}
 
 	uc := &secret.TagUseCase{Client: client}
+
 	return uc.Execute(a.ctx, secret.TagInput{
 		Name:   name,
 		Remove: []string{key},
@@ -305,6 +317,7 @@ func (a *App) SecretDiff(spec1Str, spec2Str string) (*SecretDiffResult, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	spec2, err := secretversion.Parse(spec2Str)
 	if err != nil {
 		return nil, err
@@ -316,6 +329,7 @@ func (a *App) SecretDiff(spec1Str, spec2Str string) (*SecretDiffResult, error) {
 	}
 
 	uc := &secret.DiffUseCase{Client: client}
+
 	result, err := uc.Execute(a.ctx, secret.DiffInput{
 		Spec1: spec1,
 		Spec2: spec2,
@@ -342,6 +356,7 @@ func (a *App) SecretRestore(name string) (*SecretRestoreResult, error) {
 	}
 
 	uc := &secret.RestoreUseCase{Client: client}
+
 	result, err := uc.Execute(a.ctx, secret.RestoreInput{Name: name})
 	if err != nil {
 		return nil, err

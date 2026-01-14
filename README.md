@@ -301,10 +301,10 @@ Output will look like:
 
 > [!NOTE]
 > The staging workflow lets you prepare changes locally, review them, and apply when ready—just like `git add` → `git diff --staged` → `git commit`.
-> For detailed state transition rules, see [Staging State Transitions](docs/staging-state-transitions.md).
+> For detailed documentation, see [Staging State Transitions](docs/staging-state-transitions.md) and [Staging Agent/Daemon](docs/staging-agent.md).
 
-> [!CAUTION]
-> Staged values are stored in plain text at `~/.suve/<ACCOUNT_ID>/<REGION>/stage.json`. If you no longer need pending changes, run `suve stage reset --all` to clear them.
+> [!TIP]
+> Staged values are stored in secure memory (daemon process). Use `suve stage stash` to save changes to an encrypted file for later restoration.
 
 **1. Stage changes** (opens editor or accepts value directly):
 
@@ -376,6 +376,25 @@ suve stage reset --all
 
 > [!TIP]
 > `suve stage apply` prompts for confirmation before applying. Use `--yes` to skip the prompt.
+
+**Save changes for later** (stash):
+
+```bash
+# Save staged changes to file (prompts for passphrase)
+suve stage stash
+
+# Restore from file
+suve stage stash pop
+
+# Preview stashed changes
+suve stage stash show
+
+# Delete stash without restoring
+suve stage stash drop
+```
+
+> [!NOTE]
+> See [Staging Agent/Daemon](docs/staging-agent.md) for detailed stash command documentation.
 
 ## Version Specification
 
@@ -497,6 +516,26 @@ where ~SHIFT = ~ | ~N  (repeatable, cumulative)
 | `suve stage diff` | `--parse-json` (`-j`)<br>`--no-pager` | Compare all staged vs AWS |
 | `suve stage apply` | `--yes`<br>`--ignore-conflicts` | Apply all staged changes |
 | `suve stage reset` | `--all` | Unstage all changes |
+
+### Stash Commands
+
+| Command | Options | Description |
+|---------|---------|-------------|
+| `suve stage stash` | | Save staged changes to file (alias for `push`) |
+| `suve stage stash push` | `--keep`<br>`--force`<br>`--merge`<br>`--passphrase-stdin` | Save staged changes from memory to file |
+| `suve stage stash pop` | `--keep`<br>`--force`<br>`--merge`<br>`--passphrase-stdin` | Restore staged changes from file |
+| `suve stage stash show` | `--verbose` (`-v`)<br>`--passphrase-stdin` | Preview stashed changes |
+| `suve stage stash drop` | `--force`<br>`--passphrase-stdin` | Delete stash file |
+
+### Agent Commands
+
+| Command | Description |
+|---------|-------------|
+| `suve stage agent start` | Start the staging daemon manually |
+| `suve stage agent stop` | Stop the staging daemon |
+
+> [!NOTE]
+> See [Staging Agent/Daemon](docs/staging-agent.md) for detailed documentation on daemon architecture and stash commands.
 
 ## Environment Variables
 

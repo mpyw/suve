@@ -43,6 +43,7 @@ func (u *UpdateUseCase) GetCurrentValue(ctx context.Context, name string) (strin
 	if err != nil {
 		return "", err
 	}
+
 	return lo.FromPtr(out.SecretString), nil
 }
 
@@ -59,6 +60,7 @@ func (u *UpdateUseCase) Execute(ctx context.Context, input UpdateInput) (*Update
 		if err != nil {
 			return nil, fmt.Errorf("failed to update secret value: %w", err)
 		}
+
 		versionID = lo.FromPtr(result.VersionId)
 		arn = lo.FromPtr(result.ARN)
 	}
@@ -72,9 +74,11 @@ func (u *UpdateUseCase) Execute(ctx context.Context, input UpdateInput) (*Update
 		if err != nil {
 			return nil, fmt.Errorf("failed to update secret description: %w", err)
 		}
+
 		if versionID == "" {
 			versionID = lo.FromPtr(result.VersionId)
 		}
+
 		arn = lo.FromPtr(result.ARN)
 	}
 

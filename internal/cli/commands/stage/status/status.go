@@ -10,15 +10,17 @@ import (
 	"github.com/urfave/cli/v3"
 
 	"github.com/mpyw/suve/internal/cli/colors"
+	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/infra"
 	"github.com/mpyw/suve/internal/maputil"
 	"github.com/mpyw/suve/internal/staging"
-	"github.com/mpyw/suve/internal/staging/file"
+	"github.com/mpyw/suve/internal/staging/store"
+	"github.com/mpyw/suve/internal/staging/store/agent"
 )
 
 // Runner executes the status command.
 type Runner struct {
-	Store  *file.Store
+	Store  store.ReadWriteOperator
 	Stdout io.Writer
 	Stderr io.Writer
 }
@@ -56,10 +58,8 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	if err != nil {
 		return fmt.Errorf("failed to get AWS identity: %w", err)
 	}
-	store, err := file.NewStore(identity.AccountID, identity.Region)
-	if err != nil {
-		return fmt.Errorf("failed to initialize stage store: %w", err)
-	}
+
+	store := agent.NewStore(identity.AccountID, identity.Region)
 
 	r := &Runner{
 		Store:  store,
@@ -88,23 +88,28 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 
 	// Check if there are any changes
 	hasChanges := false
+
 	for _, serviceEntries := range entries {
 		if len(serviceEntries) > 0 {
 			hasChanges = true
+
 			break
 		}
 	}
+
 	if !hasChanges {
 		for _, serviceTags := range tagEntries {
 			if len(serviceTags) > 0 {
 				hasChanges = true
+
 				break
 			}
 		}
 	}
 
 	if !hasChanges {
-		_, _ = fmt.Fprintln(r.Stdout, "No changes staged.")
+		output.Info(r.Stdout, "No changes staged.")
+
 		return nil
 	}
 
@@ -113,9 +118,10 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 	// Show SSM Parameter Store changes (no DeleteOptions for SSM Parameter Store)
 	paramEntries := entries[staging.ServiceParam]
 	paramTagEntries := tagEntries[staging.ServiceParam]
+
 	paramTotal := len(paramEntries) + len(paramTagEntries)
 	if paramTotal > 0 {
-		_, _ = fmt.Fprintf(r.Stdout, "%s (%d):\n", colors.Warning("Staged SSM Parameter Store changes"), paramTotal)
+		output.Printf(r.Stdout, "%s (%d):\n", colors.Warning("Staged SSM Parameter Store changes"), paramTotal)
 		printEntries(printer, paramEntries, opts.Verbose, false)
 		printTagEntries(r.Stdout, paramTagEntries, opts.Verbose)
 	}
@@ -123,13 +129,15 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 	// Show Secrets Manager changes (with DeleteOptions)
 	secretEntries := entries[staging.ServiceSecret]
 	secretTagEntries := tagEntries[staging.ServiceSecret]
+
 	secretTotal := len(secretEntries) + len(secretTagEntries)
 	if secretTotal > 0 {
 		// Add spacing if we printed SSM Parameter Store entries
 		if paramTotal > 0 {
-			_, _ = fmt.Fprintln(r.Stdout)
+			output.Println(r.Stdout, "")
 		}
-		_, _ = fmt.Fprintf(r.Stdout, "%s (%d):\n", colors.Warning("Staged Secrets Manager changes"), secretTotal)
+
+		output.Printf(r.Stdout, "%s (%d):\n", colors.Warning("Staged Secrets Manager changes"), secretTotal)
 		printEntries(printer, secretEntries, opts.Verbose, true)
 		printTagEntries(r.Stdout, secretTagEntries, opts.Verbose)
 	}
@@ -147,22 +155,26 @@ func printEntries(printer *staging.EntryPrinter, entries map[string]staging.Entr
 func printTagEntries(w io.Writer, tagEntries map[string]staging.TagEntry, verbose bool) {
 	for _, name := range maputil.SortedKeys(tagEntries) {
 		entry := tagEntries[name]
+
 		parts := []string{}
 		if len(entry.Add) > 0 {
 			parts = append(parts, fmt.Sprintf("+%d tag(s)", len(entry.Add)))
 		}
+
 		if entry.Remove.Len() > 0 {
 			parts = append(parts, fmt.Sprintf("-%d tag(s)", entry.Remove.Len()))
 		}
+
 		summary := strings.Join(parts, ", ")
-		_, _ = fmt.Fprintf(w, "  %s %s [%s]\n", colors.Info("T"), name, summary)
+		output.Printf(w, "  %s %s [%s]\n", colors.Info("T"), name, summary)
 
 		if verbose {
 			for key, value := range entry.Add {
-				_, _ = fmt.Fprintf(w, "      + %s=%s\n", key, value)
+				output.Printf(w, "      + %s=%s\n", key, value)
 			}
+
 			for key := range entry.Remove {
-				_, _ = fmt.Fprintf(w, "      - %s\n", key)
+				output.Printf(w, "      - %s\n", key)
 			}
 		}
 	}

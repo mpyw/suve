@@ -18,33 +18,40 @@ import (
 type mockShowClient struct {
 	getSecretValueResult *secretapi.GetSecretValueOutput
 	getSecretValueErr    error
-	listVersionsResult   *secretapi.ListSecretVersionIdsOutput
+	listVersionsResult   *secretapi.ListSecretVersionIDsOutput
 	listVersionsErr      error
 	describeSecretResult *secretapi.DescribeSecretOutput
 	describeSecretErr    error
 }
 
+//nolint:lll // mock function signature must match AWS SDK interface
 func (m *mockShowClient) GetSecretValue(_ context.Context, _ *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) {
 	if m.getSecretValueErr != nil {
 		return nil, m.getSecretValueErr
 	}
+
 	return m.getSecretValueResult, nil
 }
 
-func (m *mockShowClient) ListSecretVersionIds(_ context.Context, _ *secretapi.ListSecretVersionIdsInput, _ ...func(*secretapi.Options)) (*secretapi.ListSecretVersionIdsOutput, error) {
+//nolint:revive,stylecheck,lll // Method name must match AWS SDK interface
+func (m *mockShowClient) ListSecretVersionIds(_ context.Context, _ *secretapi.ListSecretVersionIDsInput, _ ...func(*secretapi.Options)) (*secretapi.ListSecretVersionIDsOutput, error) {
 	if m.listVersionsErr != nil {
 		return nil, m.listVersionsErr
 	}
+
 	return m.listVersionsResult, nil
 }
 
+//nolint:lll // mock function signature
 func (m *mockShowClient) DescribeSecret(_ context.Context, _ *secretapi.DescribeSecretInput, _ ...func(*secretapi.Options)) (*secretapi.DescribeSecretOutput, error) {
 	if m.describeSecretErr != nil {
 		return nil, m.describeSecretErr
 	}
+
 	if m.describeSecretResult != nil {
 		return m.describeSecretResult, nil
 	}
+
 	return &secretapi.DescribeSecretOutput{}, nil
 }
 
@@ -174,7 +181,7 @@ func TestShowUseCase_Execute_WithShift(t *testing.T) {
 
 	now := time.Now()
 	client := &mockShowClient{
-		listVersionsResult: &secretapi.ListSecretVersionIdsOutput{
+		listVersionsResult: &secretapi.ListSecretVersionIDsOutput{
 			Versions: []secretapi.SecretVersionsListEntry{
 				{VersionId: lo.ToPtr("v1-id"), CreatedDate: lo.ToPtr(now.Add(-2 * time.Hour))},
 				{VersionId: lo.ToPtr("v2-id"), CreatedDate: lo.ToPtr(now.Add(-1 * time.Hour))},

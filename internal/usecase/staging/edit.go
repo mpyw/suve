@@ -8,6 +8,7 @@ import (
 	"github.com/samber/lo"
 
 	"github.com/mpyw/suve/internal/staging"
+	"github.com/mpyw/suve/internal/staging/store"
 	"github.com/mpyw/suve/internal/staging/transition"
 )
 
@@ -28,7 +29,7 @@ type EditOutput struct {
 // EditUseCase executes edit operations.
 type EditUseCase struct {
 	Strategy staging.EditStrategy
-	Store    staging.StoreReadWriter
+	Store    store.ReadWriteOperator
 }
 
 // Execute runs the edit use case.

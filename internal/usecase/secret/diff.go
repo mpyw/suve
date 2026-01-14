@@ -5,15 +5,11 @@ import (
 
 	"github.com/samber/lo"
 
-	"github.com/mpyw/suve/internal/api/secretapi"
 	"github.com/mpyw/suve/internal/version/secretversion"
 )
 
 // DiffClient is the interface for the diff use case.
-type DiffClient interface {
-	secretapi.GetSecretValueAPI
-	secretapi.ListSecretVersionIdsAPI
-}
+type DiffClient = VersionResolverClient
 
 // DiffInput holds input for the diff use case.
 type DiffInput struct {

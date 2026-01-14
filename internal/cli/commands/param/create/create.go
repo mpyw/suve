@@ -3,13 +3,14 @@ package create
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 
 	"github.com/urfave/cli/v3"
 
 	"github.com/mpyw/suve/internal/api/paramapi"
-	"github.com/mpyw/suve/internal/cli/colors"
+	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/infra"
 	"github.com/mpyw/suve/internal/usecase/param"
 )
@@ -75,8 +76,8 @@ EXAMPLES:
 }
 
 func action(ctx context.Context, cmd *cli.Command) error {
-	if cmd.Args().Len() < 2 {
-		return fmt.Errorf("usage: suve param create <name> <value>")
+	if cmd.Args().Len() < 2 { //nolint:mnd // minimum required args: name and value
+		return errors.New("usage: suve param create <name> <value>")
 	}
 
 	secure := cmd.Bool("secure")
@@ -84,8 +85,9 @@ func action(ctx context.Context, cmd *cli.Command) error {
 
 	// Check for conflicting flags
 	if secure && cmd.IsSet("type") {
-		return fmt.Errorf("cannot use --secure with --type; use one or the other")
+		return errors.New("cannot use --secure with --type; use one or the other")
 	}
+
 	if secure {
 		paramType = "SecureString"
 	}
@@ -100,6 +102,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		Stdout:  cmd.Root().Writer,
 		Stderr:  cmd.Root().ErrWriter,
 	}
+
 	return r.Run(ctx, Options{
 		Name:        cmd.Args().Get(0),
 		Value:       cmd.Args().Get(1),
@@ -120,11 +123,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 		return err
 	}
 
-	_, _ = fmt.Fprintf(r.Stdout, "%s Created parameter %s (version: %d)\n",
-		colors.Success("✓"),
-		result.Name,
-		result.Version,
-	)
+	output.Success(r.Stdout, "Created parameter %s (version: %d)", result.Name, result.Version)
 
 	return nil
 }

@@ -8,7 +8,7 @@ import (
 
 	"github.com/urfave/cli/v3"
 
-	"github.com/mpyw/suve/internal/cli/colors"
+	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/infra"
 	"github.com/mpyw/suve/internal/usecase/secret"
 )
@@ -58,7 +58,7 @@ EXAMPLES:
 }
 
 func action(ctx context.Context, cmd *cli.Command) error {
-	if cmd.Args().Len() < 2 {
+	if cmd.Args().Len() < 2 { //nolint:mnd // minimum required args: name and value
 		return fmt.Errorf("usage: suve secret create <name> <value>")
 	}
 
@@ -72,6 +72,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		Stdout:  cmd.Root().Writer,
 		Stderr:  cmd.Root().ErrWriter,
 	}
+
 	return r.Run(ctx, Options{
 		Name:        cmd.Args().Get(0),
 		Value:       cmd.Args().Get(1),
@@ -90,11 +91,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 		return err
 	}
 
-	_, _ = fmt.Fprintf(r.Stdout, "%s Created secret %s (version: %s)\n",
-		colors.Success("✓"),
-		result.Name,
-		result.VersionID,
-	)
+	output.Success(r.Stdout, "Created secret %s (version: %s)", result.Name, result.VersionID)
 
 	return nil
 }

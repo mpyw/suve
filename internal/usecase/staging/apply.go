@@ -7,6 +7,7 @@ import (
 	"github.com/mpyw/suve/internal/maputil"
 	"github.com/mpyw/suve/internal/parallel"
 	"github.com/mpyw/suve/internal/staging"
+	"github.com/mpyw/suve/internal/staging/store"
 )
 
 // ApplyInput holds input for the apply use case.
@@ -18,6 +19,7 @@ type ApplyInput struct {
 // ApplyResultStatus represents the status of an apply operation.
 type ApplyResultStatus int
 
+// ApplyResultStatus constants representing the outcome of applying a staged entry.
 const (
 	ApplyResultCreated ApplyResultStatus = iota
 	ApplyResultUpdated
@@ -59,7 +61,7 @@ type ApplyOutput struct {
 // ApplyUseCase executes apply operations.
 type ApplyUseCase struct {
 	Strategy staging.ApplyStrategy
-	Store    staging.StoreReadWriter
+	Store    store.ReadWriteOperator
 }
 
 // Execute runs the apply use case.
@@ -78,6 +80,7 @@ func (u *ApplyUseCase) Execute(ctx context.Context, input ApplyInput) (*ApplyOut
 	if err != nil {
 		return nil, err
 	}
+
 	stagedTags, err := u.Store.ListTags(ctx, service)
 	if err != nil {
 		return nil, err
@@ -94,6 +97,7 @@ func (u *ApplyUseCase) Execute(ctx context.Context, input ApplyInput) (*ApplyOut
 		if entry, exists := entries[input.Name]; exists {
 			filteredEntries[input.Name] = entry
 		}
+
 		if tagEntry, exists := tags[input.Name]; exists {
 			filteredTags[input.Name] = tagEntry
 		}
@@ -101,6 +105,7 @@ func (u *ApplyUseCase) Execute(ctx context.Context, input ApplyInput) (*ApplyOut
 		if len(filteredEntries) == 0 && len(filteredTags) == 0 {
 			return nil, fmt.Errorf("%s %s is not staged", itemName, input.Name)
 		}
+
 		entries = filteredEntries
 		tags = filteredTags
 	}
@@ -116,6 +121,7 @@ func (u *ApplyUseCase) Execute(ctx context.Context, input ApplyInput) (*ApplyOut
 			for name := range conflicts {
 				output.Conflicts = append(output.Conflicts, name)
 			}
+
 			return output, fmt.Errorf("apply rejected: %d conflict(s) detected", len(conflicts))
 		}
 	}
@@ -144,6 +150,7 @@ func (u *ApplyUseCase) applyEntries(ctx context.Context, service staging.Service
 	// Execute apply operations in parallel
 	results := parallel.ExecuteMap(ctx, entries, func(ctx context.Context, name string, entry staging.Entry) (staging.Operation, error) {
 		err := u.Strategy.Apply(ctx, name, entry)
+
 		return entry.Operation, err
 	})
 
@@ -167,10 +174,12 @@ func (u *ApplyUseCase) applyEntries(ctx context.Context, service staging.Service
 			case staging.OperationDelete:
 				resultEntry.Status = ApplyResultDeleted
 			}
-			// Unstage successful operations
-			_ = u.Store.UnstageEntry(ctx, service, name)
+			// Unstage successful operations with apply hint
+			u.unstageEntry(ctx, service, name)
+
 			output.EntrySucceeded++
 		}
+
 		output.EntryResults = append(output.EntryResults, resultEntry)
 	}
 }
@@ -179,6 +188,7 @@ func (u *ApplyUseCase) applyTags(ctx context.Context, service staging.Service, t
 	// Execute tag apply operations in parallel
 	results := parallel.ExecuteMap(ctx, tags, func(ctx context.Context, name string, tagEntry staging.TagEntry) (struct{}, error) {
 		err := u.Strategy.ApplyTags(ctx, name, tagEntry)
+
 		return struct{}{}, err
 	})
 
@@ -195,10 +205,30 @@ func (u *ApplyUseCase) applyTags(ctx context.Context, service staging.Service, t
 			resultTag.Error = result.Err
 			output.TagFailed++
 		} else {
-			// Unstage successful operations
-			_ = u.Store.UnstageTag(ctx, service, name)
+			// Unstage successful operations with apply hint
+			u.unstageTag(ctx, service, name)
+
 			output.TagSucceeded++
 		}
+
 		output.TagResults = append(output.TagResults, resultTag)
+	}
+}
+
+// unstageEntry removes a staged entry with the apply hint if supported.
+func (u *ApplyUseCase) unstageEntry(ctx context.Context, service staging.Service, name string) {
+	if hinted, ok := u.Store.(store.HintedUnstager); ok {
+		_ = hinted.UnstageEntryWithHint(ctx, service, name, store.HintApply)
+	} else {
+		_ = u.Store.UnstageEntry(ctx, service, name)
+	}
+}
+
+// unstageTag removes staged tag changes with the apply hint if supported.
+func (u *ApplyUseCase) unstageTag(ctx context.Context, service staging.Service, name string) {
+	if hinted, ok := u.Store.(store.HintedUnstager); ok {
+		_ = hinted.UnstageTagWithHint(ctx, service, name, store.HintApply)
+	} else {
+		_ = u.Store.UnstageTag(ctx, service, name)
 	}
 }

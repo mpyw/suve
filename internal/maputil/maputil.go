@@ -12,6 +12,7 @@ import (
 func SortedKeys[K cmp.Ordered, V any](m map[K]V) []K {
 	keys := lo.Keys(m)
 	slices.Sort(keys)
+
 	return keys
 }
 
@@ -22,5 +23,6 @@ func SortedNames[T any](items []T, getName func(T) string) []string {
 	for _, item := range items {
 		names[getName(item)] = struct{}{}
 	}
+
 	return SortedKeys(names)
 }

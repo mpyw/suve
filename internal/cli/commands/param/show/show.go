@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"strconv"
 
 	"github.com/samber/lo"
 	"github.com/urfave/cli/v3"
@@ -41,7 +42,7 @@ type JSONOutput struct {
 	Name       string            `json:"name"`
 	Version    int64             `json:"version"`
 	Type       string            `json:"type"`
-	JsonParsed *bool             `json:"json_parsed,omitempty"` // Only when --parse-json is used
+	JSONParsed *bool             `json:"json_parsed,omitempty"` //nolint:tagliatelle // snake_case for backwards compatibility
 	Modified   string            `json:"modified,omitempty"`
 	Tags       map[string]string `json:"tags"`
 	Value      string            `json:"value"`
@@ -133,6 +134,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 			Stdout:  w,
 			Stderr:  cmd.Root().ErrWriter,
 		}
+
 		return r.Run(ctx, opts)
 	})
 }
@@ -165,7 +167,8 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 
 	// Raw mode: output value only without trailing newline
 	if opts.Raw {
-		_, _ = fmt.Fprint(r.Stdout, value)
+		output.Print(r.Stdout, value)
+
 		return nil
 	}
 
@@ -179,38 +182,46 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 		}
 		// Show json_parsed only when --parse-json was used and succeeded
 		if jsonParsed {
-			jsonOut.JsonParsed = lo.ToPtr(true)
+			jsonOut.JSONParsed = lo.ToPtr(true)
 		}
+
 		if result.LastModified != nil {
 			jsonOut.Modified = timeutil.FormatRFC3339(*result.LastModified)
 		}
+
 		jsonOut.Tags = make(map[string]string)
 		for _, tag := range result.Tags {
 			jsonOut.Tags[tag.Key] = tag.Value
 		}
+
 		enc := json.NewEncoder(r.Stdout)
 		enc.SetIndent("", "  ")
+
 		return enc.Encode(jsonOut)
 	}
 
 	// Normal mode: show metadata + value
 	out := output.New(r.Stdout)
 	out.Field("Name", result.Name)
-	out.Field("Version", fmt.Sprintf("%d", result.Version))
+	out.Field("Version", strconv.FormatInt(result.Version, 10))
 	out.Field("Type", string(result.Type))
 	// Show json_parsed only when --parse-json was used and succeeded
 	if jsonParsed {
 		out.Field("JsonParsed", "true")
 	}
+
 	if result.LastModified != nil {
 		out.Field("Modified", timeutil.FormatRFC3339(*result.LastModified))
 	}
+
 	if len(result.Tags) > 0 {
 		out.Field("Tags", fmt.Sprintf("%d tag(s)", len(result.Tags)))
+
 		for _, tag := range result.Tags {
 			out.Field("  "+tag.Key, tag.Value)
 		}
 	}
+
 	out.Separator()
 	out.Value(value)
 

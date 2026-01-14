@@ -29,7 +29,7 @@ type ParseResult struct {
 // Returns warnings if the same key appears in both (later wins).
 //
 // Tag format: "key=value"
-// Untag format: "key"
+// Untag format: "key".
 func ParseFlags(tags []string, untags []string) (*ParseResult, error) {
 	result := &ParseResult{
 		Change: &Change{
@@ -46,19 +46,23 @@ func ParseFlags(tags []string, untags []string) (*ParseResult, error) {
 		value string // only for add
 		index int
 	}
-	var ops []operation
+
+	ops := make([]operation, 0, len(tags)+len(untags))
+
 	idx := 0
 
 	// Parse --tag flags
 	for _, tag := range tags {
-		parts := strings.SplitN(tag, "=", 2)
-		if len(parts) != 2 {
+		parts := strings.SplitN(tag, "=", 2) //nolint:mnd // split into key=value pair
+		if len(parts) != 2 {                 //nolint:mnd // expect exactly key and value
 			return nil, fmt.Errorf("invalid tag format %q: expected key=value", tag)
 		}
+
 		key, value := parts[0], parts[1]
 		if key == "" {
 			return nil, fmt.Errorf("invalid tag format %q: key cannot be empty", tag)
 		}
+
 		ops = append(ops, operation{isAdd: true, key: key, value: value, index: idx})
 		idx++
 	}
@@ -68,6 +72,7 @@ func ParseFlags(tags []string, untags []string) (*ParseResult, error) {
 		if key == "" {
 			return nil, fmt.Errorf("invalid untag: key cannot be empty")
 		}
+
 		ops = append(ops, operation{isAdd: false, key: key, index: idx})
 		idx++
 	}
@@ -83,14 +88,17 @@ func ParseFlags(tags []string, untags []string) (*ParseResult, error) {
 			} else {
 				prevAction = fmt.Sprintf("--untag %s", prev.key)
 			}
+
 			if op.isAdd {
 				newAction = fmt.Sprintf("--tag %s=%s", op.key, op.value)
 			} else {
 				newAction = fmt.Sprintf("--untag %s", op.key)
 			}
+
 			result.Warnings = append(result.Warnings,
 				fmt.Sprintf("tag %q: %s overrides %s", op.key, newAction, prevAction))
 		}
+
 		seen[op.key] = op
 	}
 

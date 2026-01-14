@@ -3,6 +3,7 @@ package param
 import (
 	"context"
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/samber/lo"
@@ -60,45 +61,45 @@ func (u *LogUseCase) Execute(ctx context.Context, input LogInput) (*LogOutput, e
 		return &LogOutput{Name: input.Name}, nil
 	}
 
-	// Find max version
-	var maxVersion int64
-	for _, p := range params {
-		if p.Version > maxVersion {
-			maxVersion = p.Version
-		}
-	}
+	// Find max version using lo.MaxBy
+	maxVersion := lo.MaxBy(params, func(a, b paramapi.ParameterHistory) bool {
+		return a.Version > b.Version
+	}).Version
 
-	// Convert to entries and apply date filters
-	var entries []LogEntry
-	for _, history := range params {
-		// Apply date filters (skip entries without LastModifiedDate when filters are applied)
+	// Apply date filters using lo.Filter
+	filtered := lo.Filter(params, func(h paramapi.ParameterHistory, _ int) bool {
+		// Skip entries without LastModifiedDate when date filters are applied
 		if input.Since != nil || input.Until != nil {
-			if history.LastModifiedDate == nil {
-				continue
+			if h.LastModifiedDate == nil {
+				return false
 			}
-			if input.Since != nil && history.LastModifiedDate.Before(*input.Since) {
-				continue
+
+			if input.Since != nil && h.LastModifiedDate.Before(*input.Since) {
+				return false
 			}
-			if input.Until != nil && history.LastModifiedDate.After(*input.Until) {
-				continue
+
+			if input.Until != nil && h.LastModifiedDate.After(*input.Until) {
+				return false
 			}
 		}
 
-		entry := LogEntry{
-			Version:      history.Version,
-			Type:         history.Type,
-			Value:        lo.FromPtr(history.Value),
-			LastModified: history.LastModifiedDate,
-			IsCurrent:    history.Version == maxVersion,
+		return true
+	})
+
+	// Convert to entries using lo.Map
+	entries := lo.Map(filtered, func(h paramapi.ParameterHistory, _ int) LogEntry {
+		return LogEntry{
+			Version:      h.Version,
+			Type:         h.Type,
+			Value:        lo.FromPtr(h.Value),
+			LastModified: h.LastModifiedDate,
+			IsCurrent:    h.Version == maxVersion,
 		}
-		entries = append(entries, entry)
-	}
+	})
 
 	// AWS returns oldest first; reverse to show newest first (unless --reverse)
 	if !input.Reverse {
-		for i, j := 0, len(entries)-1; i < j; i, j = i+1, j-1 {
-			entries[i], entries[j] = entries[j], entries[i]
-		}
+		slices.Reverse(entries)
 	}
 
 	return &LogOutput{

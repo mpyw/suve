@@ -8,15 +8,16 @@ import (
 	"github.com/samber/lo"
 
 	"github.com/mpyw/suve/internal/staging"
+	"github.com/mpyw/suve/internal/staging/store"
 )
 
 // Executor executes state transitions and persists results to the store.
 type Executor struct {
-	Store staging.StoreReadWriter
+	Store store.ReadWriteOperator
 }
 
 // NewExecutor creates a new Executor.
-func NewExecutor(store staging.StoreReadWriter) *Executor {
+func NewExecutor(store store.ReadWriteOperator) *Executor {
 	return &Executor{Store: store}
 }
 
@@ -27,7 +28,14 @@ type EntryExecuteOptions struct {
 }
 
 // ExecuteEntry executes an entry action and persists the result.
-func (e *Executor) ExecuteEntry(ctx context.Context, service staging.Service, name string, state EntryState, action EntryAction, opts *EntryExecuteOptions) (EntryTransitionResult, error) {
+func (e *Executor) ExecuteEntry(
+	ctx context.Context,
+	service staging.Service,
+	name string,
+	state EntryState,
+	action EntryAction,
+	opts *EntryExecuteOptions,
+) (EntryTransitionResult, error) {
 	result := ReduceEntry(state, action)
 	if result.Error != nil {
 		return result, result.Error
@@ -52,7 +60,15 @@ func (e *Executor) ExecuteEntry(ctx context.Context, service staging.Service, na
 }
 
 // ExecuteTag executes a tag action and persists the result.
-func (e *Executor) ExecuteTag(ctx context.Context, service staging.Service, name string, entryState EntryState, stagedTags StagedTags, action TagAction, baseModifiedAt *time.Time) (TagTransitionResult, error) {
+func (e *Executor) ExecuteTag(
+	ctx context.Context,
+	service staging.Service,
+	name string,
+	entryState EntryState,
+	stagedTags StagedTags,
+	action TagAction,
+	baseModifiedAt *time.Time,
+) (TagTransitionResult, error) {
 	result := ReduceTag(entryState, stagedTags, action)
 	if result.Error != nil {
 		return result, result.Error
@@ -67,8 +83,16 @@ func (e *Executor) ExecuteTag(ctx context.Context, service staging.Service, name
 }
 
 // persistEntryState saves the entry state to the store.
-func (e *Executor) persistEntryState(ctx context.Context, service staging.Service, name string, oldState EntryState, result EntryTransitionResult, opts *EntryExecuteOptions) error {
+func (e *Executor) persistEntryState(
+	ctx context.Context,
+	service staging.Service,
+	name string,
+	oldState EntryState,
+	result EntryTransitionResult,
+	opts *EntryExecuteOptions,
+) error {
 	var err error
+
 	switch s := result.NewState.StagedState.(type) {
 	case EntryStagedStateNotStaged:
 		// Unstage if was previously staged
@@ -85,6 +109,7 @@ func (e *Executor) persistEntryState(ctx context.Context, service staging.Servic
 		if opts != nil && opts.Description != nil {
 			entry.Description = opts.Description
 		}
+
 		err = e.Store.StageEntry(ctx, service, name, entry)
 
 	case EntryStagedStateUpdate:
@@ -99,6 +124,7 @@ func (e *Executor) persistEntryState(ctx context.Context, service staging.Servic
 				entry.Description = opts.Description
 			}
 		}
+
 		err = e.Store.StageEntry(ctx, service, name, entry)
 
 	case EntryStagedStateDelete:
@@ -109,19 +135,28 @@ func (e *Executor) persistEntryState(ctx context.Context, service staging.Servic
 		if opts != nil {
 			entry.BaseModifiedAt = opts.BaseModifiedAt
 		}
+
 		err = e.Store.StageEntry(ctx, service, name, entry)
 	}
+
 	return err
 }
 
 // persistTagState saves the tag state to the store.
-func (e *Executor) persistTagState(ctx context.Context, service staging.Service, name string, stagedTags StagedTags, baseModifiedAt *time.Time) error {
+func (e *Executor) persistTagState(
+	ctx context.Context,
+	service staging.Service,
+	name string,
+	stagedTags StagedTags,
+	baseModifiedAt *time.Time,
+) error {
 	// If no tags to stage, unstage
 	if stagedTags.IsEmpty() {
 		err := e.Store.UnstageTag(ctx, service, name)
 		if errors.Is(err, staging.ErrNotStaged) {
 			return nil // Already not staged, that's fine
 		}
+
 		return err
 	}
 
@@ -135,14 +170,27 @@ func (e *Executor) persistTagState(ctx context.Context, service staging.Service,
 }
 
 // LoadEntryState loads the current entry state from the store and AWS info.
-func LoadEntryState(ctx context.Context, store staging.StoreReader, service staging.Service, name string, currentAWSValue *string) (EntryState, error) {
+func LoadEntryState(
+	ctx context.Context,
+	store store.ReadOperator,
+	service staging.Service,
+	name string,
+	currentAWSValue *string,
+) (EntryState, error) {
 	state, _, err := LoadEntryStateWithMetadata(ctx, store, service, name, currentAWSValue)
+
 	return state, err
 }
 
 // LoadEntryStateWithMetadata loads the current entry state and returns BaseModifiedAt metadata.
 // BaseModifiedAt is used for conflict detection when applying changes.
-func LoadEntryStateWithMetadata(ctx context.Context, store staging.StoreReader, service staging.Service, name string, currentAWSValue *string) (EntryState, *time.Time, error) {
+func LoadEntryStateWithMetadata(
+	ctx context.Context,
+	store store.ReadOperator,
+	service staging.Service,
+	name string,
+	currentAWSValue *string,
+) (EntryState, *time.Time, error) {
 	stagedEntry, err := store.GetEntry(ctx, service, name)
 	if err != nil && !errors.Is(err, staging.ErrNotStaged) {
 		return EntryState{}, nil, err
@@ -174,12 +222,13 @@ func LoadEntryStateWithMetadata(ctx context.Context, store staging.StoreReader, 
 }
 
 // LoadStagedTags loads the current staged tags from the store.
-func LoadStagedTags(ctx context.Context, store staging.StoreReader, service staging.Service, name string) (StagedTags, *time.Time, error) {
+func LoadStagedTags(ctx context.Context, store store.ReadOperator, service staging.Service, name string) (StagedTags, *time.Time, error) {
 	tagEntry, err := store.GetTag(ctx, service, name)
 	if err != nil {
 		if errors.Is(err, staging.ErrNotStaged) {
 			return StagedTags{}, nil, nil
 		}
+
 		return StagedTags{}, nil, err
 	}
 

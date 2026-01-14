@@ -7,6 +7,7 @@ import (
 	"time"
 )
 
+//nolint:gochecknoglobals // cached timezone location for performance
 var (
 	// locationCache caches the loaded timezone location.
 	locationCache *time.Location
@@ -28,6 +29,7 @@ func loadLocation() *time.Location {
 		// TZ is invalid: fall back to UTC for safety
 		return time.UTC
 	}
+
 	return loc
 }
 
@@ -37,6 +39,7 @@ func GetLocation() *time.Location {
 	locationOnce.Do(func() {
 		locationCache = loadLocation()
 	})
+
 	return locationCache
 }
 

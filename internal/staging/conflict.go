@@ -2,6 +2,7 @@ package staging
 
 import (
 	"context"
+	"maps"
 	"time"
 
 	"github.com/mpyw/suve/internal/parallel"
@@ -36,12 +37,9 @@ func CheckConflicts(ctx context.Context, strategy ApplyStrategy, entries map[str
 
 	// Combine all entries for parallel fetch
 	allToCheck := make(map[string]Entry)
-	for name, entry := range toCheckCreate {
-		allToCheck[name] = entry
-	}
-	for name, entry := range toCheckModified {
-		allToCheck[name] = entry
-	}
+
+	maps.Copy(allToCheck, toCheckCreate)
+	maps.Copy(allToCheck, toCheckModified)
 
 	// Fetch last modified times in parallel
 	results := parallel.ExecuteMap(ctx, allToCheck, func(ctx context.Context, name string, _ Entry) (time.Time, error) {

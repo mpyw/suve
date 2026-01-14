@@ -9,6 +9,7 @@ import (
 	"github.com/mpyw/suve/internal/maputil"
 	"github.com/mpyw/suve/internal/parallel"
 	"github.com/mpyw/suve/internal/staging"
+	"github.com/mpyw/suve/internal/staging/store"
 )
 
 // DiffInput holds input for the diff use case.
@@ -19,6 +20,7 @@ type DiffInput struct {
 // DiffEntryType represents the type of diff entry.
 type DiffEntryType int
 
+// DiffEntryType constants representing the type of diff result.
 const (
 	DiffEntryNormal DiffEntryType = iota
 	DiffEntryCreate
@@ -55,7 +57,7 @@ type DiffOutput struct {
 // DiffUseCase executes diff operations.
 type DiffUseCase struct {
 	Strategy staging.DiffStrategy
-	Store    staging.StoreReadWriter
+	Store    store.ReadWriteOperator
 }
 
 // Execute runs the diff use case.
@@ -72,6 +74,7 @@ func (u *DiffUseCase) Execute(ctx context.Context, input DiffInput) (*DiffOutput
 	if err != nil {
 		return nil, err
 	}
+
 	entries := allEntries[service]
 
 	// Get all staged tag entries for the service
@@ -79,6 +82,7 @@ func (u *DiffUseCase) Execute(ctx context.Context, input DiffInput) (*DiffOutput
 	if err != nil {
 		return nil, err
 	}
+
 	tagEntries := allTagEntries[service]
 
 	// Filter by name if specified
@@ -102,6 +106,7 @@ func (u *DiffUseCase) Execute(ctx context.Context, input DiffInput) (*DiffOutput
 				Type:    DiffEntryWarning,
 				Warning: "not staged",
 			})
+
 			return output, nil
 		}
 
@@ -145,6 +150,7 @@ func (u *DiffUseCase) Execute(ctx context.Context, input DiffInput) (*DiffOutput
 	return output, nil
 }
 
+//nolint:lll // function parameters are descriptive for clarity
 func (u *DiffUseCase) processDiffResult(ctx context.Context, name string, entry staging.Entry, result *parallel.Result[*staging.FetchResult]) DiffEntry {
 	service := u.Strategy.Service()
 
@@ -164,6 +170,7 @@ func (u *DiffUseCase) processDiffResult(ctx context.Context, name string, entry 
 	// Check if identical and auto-unstage
 	if awsValue == stagedValue {
 		_ = u.Store.UnstageEntry(ctx, service, name)
+
 		return DiffEntry{
 			Name:    name,
 			Type:    DiffEntryAutoUnstaged,
@@ -188,6 +195,7 @@ func (u *DiffUseCase) handleFetchError(ctx context.Context, name string, entry s
 	switch entry.Operation {
 	case staging.OperationDelete:
 		_ = u.Store.UnstageEntry(ctx, service, name)
+
 		return DiffEntry{
 			Name:    name,
 			Type:    DiffEntryAutoUnstaged,
@@ -205,6 +213,7 @@ func (u *DiffUseCase) handleFetchError(ctx context.Context, name string, entry s
 
 	case staging.OperationUpdate:
 		_ = u.Store.UnstageEntry(ctx, service, name)
+
 		return DiffEntry{
 			Name:    name,
 			Type:    DiffEntryAutoUnstaged,

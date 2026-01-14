@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/mpyw/suve/internal/staging"
+	"github.com/mpyw/suve/internal/staging/store"
 	"github.com/mpyw/suve/internal/staging/transition"
 )
 
@@ -29,7 +30,7 @@ type DeleteOutput struct {
 // DeleteUseCase executes delete staging operations.
 type DeleteUseCase struct {
 	Strategy staging.DeleteStrategy
-	Store    staging.StoreReadWriter
+	Store    store.ReadWriteOperator
 }
 
 // Execute runs the delete use case.
@@ -81,6 +82,7 @@ func (u *DeleteUseCase) Execute(ctx context.Context, input DeleteInput) (*Delete
 		if err := u.Store.UnstageTag(ctx, service, input.Name); err != nil && !errors.Is(err, staging.ErrNotStaged) {
 			return nil, err
 		}
+
 		return &DeleteOutput{
 			Name:     input.Name,
 			Unstaged: true,
@@ -105,6 +107,8 @@ func (u *DeleteUseCase) Execute(ctx context.Context, input DeleteInput) (*Delete
 }
 
 // stageDeleteWithOptions stages a delete entry with optional delete options.
+//
+//nolint:lll // function parameters are descriptive for clarity
 func (u *DeleteUseCase) stageDeleteWithOptions(ctx context.Context, service staging.Service, name string, lastModified time.Time, hasDeleteOptions, force bool, recoveryWindow int) error {
 	entry := staging.Entry{
 		Operation: staging.OperationDelete,

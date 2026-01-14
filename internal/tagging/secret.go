@@ -31,6 +31,7 @@ func ApplySecret(ctx context.Context, client SecretClient, secretID string, chan
 				Value: lo.ToPtr(v),
 			})
 		}
+
 		_, err := client.TagResource(ctx, &secretapi.TagResourceInput{
 			SecretId: lo.ToPtr(secretID),
 			Tags:     tags,

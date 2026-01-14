@@ -15,19 +15,22 @@ import (
 )
 
 type mockLogClient struct {
-	listVersionsResult  *secretapi.ListSecretVersionIdsOutput
+	listVersionsResult  *secretapi.ListSecretVersionIDsOutput
 	listVersionsErr     error
 	getSecretValueValue map[string]string
 	getSecretValueErr   map[string]error
 }
 
-func (m *mockLogClient) ListSecretVersionIds(_ context.Context, _ *secretapi.ListSecretVersionIdsInput, _ ...func(*secretapi.Options)) (*secretapi.ListSecretVersionIdsOutput, error) {
+//nolint:revive,stylecheck,lll // Method name must match AWS SDK interface
+func (m *mockLogClient) ListSecretVersionIds(_ context.Context, _ *secretapi.ListSecretVersionIDsInput, _ ...func(*secretapi.Options)) (*secretapi.ListSecretVersionIDsOutput, error) {
 	if m.listVersionsErr != nil {
 		return nil, m.listVersionsErr
 	}
+
 	return m.listVersionsResult, nil
 }
 
+//nolint:lll // mock function signature must match AWS SDK interface
 func (m *mockLogClient) GetSecretValue(_ context.Context, input *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) {
 	versionID := lo.FromPtr(input.VersionId)
 	if m.getSecretValueErr != nil {
@@ -35,11 +38,13 @@ func (m *mockLogClient) GetSecretValue(_ context.Context, input *secretapi.GetSe
 			return nil, err
 		}
 	}
+
 	if m.getSecretValueValue != nil {
 		if value, ok := m.getSecretValueValue[versionID]; ok {
 			return &secretapi.GetSecretValueOutput{SecretString: lo.ToPtr(value)}, nil
 		}
 	}
+
 	return nil, &secretapi.ResourceNotFoundException{Message: lo.ToPtr("not found")}
 }
 
@@ -48,7 +53,7 @@ func TestLogUseCase_Execute(t *testing.T) {
 
 	now := time.Now()
 	client := &mockLogClient{
-		listVersionsResult: &secretapi.ListSecretVersionIdsOutput{
+		listVersionsResult: &secretapi.ListSecretVersionIDsOutput{
 			Versions: []secretapi.SecretVersionsListEntry{
 				{VersionId: lo.ToPtr("v1-id"), CreatedDate: lo.ToPtr(now.Add(-2 * time.Hour)), VersionStages: []string{}},
 				{VersionId: lo.ToPtr("v2-id"), CreatedDate: lo.ToPtr(now.Add(-1 * time.Hour)), VersionStages: []string{}},
@@ -82,7 +87,7 @@ func TestLogUseCase_Execute_Empty(t *testing.T) {
 	t.Parallel()
 
 	client := &mockLogClient{
-		listVersionsResult: &secretapi.ListSecretVersionIdsOutput{
+		listVersionsResult: &secretapi.ListSecretVersionIDsOutput{
 			Versions: []secretapi.SecretVersionsListEntry{},
 		},
 	}
@@ -108,7 +113,7 @@ func TestLogUseCase_Execute_Error(t *testing.T) {
 	_, err := uc.Execute(t.Context(), secret.LogInput{
 		Name: "my-secret",
 	})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to list secret versions")
 }
 
@@ -117,7 +122,7 @@ func TestLogUseCase_Execute_Reverse(t *testing.T) {
 
 	now := time.Now()
 	client := &mockLogClient{
-		listVersionsResult: &secretapi.ListSecretVersionIdsOutput{
+		listVersionsResult: &secretapi.ListSecretVersionIDsOutput{
 			Versions: []secretapi.SecretVersionsListEntry{
 				{VersionId: lo.ToPtr("v1-id"), CreatedDate: lo.ToPtr(now.Add(-2 * time.Hour))},
 				{VersionId: lo.ToPtr("v2-id"), CreatedDate: lo.ToPtr(now.Add(-1 * time.Hour))},
@@ -150,7 +155,7 @@ func TestLogUseCase_Execute_SinceFilter(t *testing.T) {
 
 	now := time.Now()
 	client := &mockLogClient{
-		listVersionsResult: &secretapi.ListSecretVersionIdsOutput{
+		listVersionsResult: &secretapi.ListSecretVersionIDsOutput{
 			Versions: []secretapi.SecretVersionsListEntry{
 				{VersionId: lo.ToPtr("v1-id"), CreatedDate: lo.ToPtr(now.Add(-3 * time.Hour))},
 				{VersionId: lo.ToPtr("v2-id"), CreatedDate: lo.ToPtr(now.Add(-1 * time.Hour))},
@@ -181,7 +186,7 @@ func TestLogUseCase_Execute_UntilFilter(t *testing.T) {
 
 	now := time.Now()
 	client := &mockLogClient{
-		listVersionsResult: &secretapi.ListSecretVersionIdsOutput{
+		listVersionsResult: &secretapi.ListSecretVersionIDsOutput{
 			Versions: []secretapi.SecretVersionsListEntry{
 				{VersionId: lo.ToPtr("v1-id"), CreatedDate: lo.ToPtr(now.Add(-3 * time.Hour))},
 				{VersionId: lo.ToPtr("v2-id"), CreatedDate: lo.ToPtr(now.Add(-1 * time.Hour))},
@@ -212,7 +217,7 @@ func TestLogUseCase_Execute_GetValueError(t *testing.T) {
 
 	now := time.Now()
 	client := &mockLogClient{
-		listVersionsResult: &secretapi.ListSecretVersionIdsOutput{
+		listVersionsResult: &secretapi.ListSecretVersionIDsOutput{
 			Versions: []secretapi.SecretVersionsListEntry{
 				{VersionId: lo.ToPtr("v1-id"), CreatedDate: lo.ToPtr(now)},
 			},
@@ -237,7 +242,7 @@ func TestLogUseCase_Execute_NilCreatedDate(t *testing.T) {
 	t.Parallel()
 
 	client := &mockLogClient{
-		listVersionsResult: &secretapi.ListSecretVersionIdsOutput{
+		listVersionsResult: &secretapi.ListSecretVersionIDsOutput{
 			Versions: []secretapi.SecretVersionsListEntry{
 				{VersionId: lo.ToPtr("v1-id"), CreatedDate: nil},
 			},
@@ -262,7 +267,7 @@ func TestLogUseCase_Execute_NilVersionId(t *testing.T) {
 
 	now := time.Now()
 	client := &mockLogClient{
-		listVersionsResult: &secretapi.ListSecretVersionIdsOutput{
+		listVersionsResult: &secretapi.ListSecretVersionIDsOutput{
 			Versions: []secretapi.SecretVersionsListEntry{
 				{VersionId: nil, CreatedDate: lo.ToPtr(now)},
 			},
@@ -286,7 +291,7 @@ func TestLogUseCase_Execute_SortWithNilCreatedDate(t *testing.T) {
 	now := time.Now()
 	// Test sorting when some entries have nil CreatedDate
 	client := &mockLogClient{
-		listVersionsResult: &secretapi.ListSecretVersionIdsOutput{
+		listVersionsResult: &secretapi.ListSecretVersionIDsOutput{
 			Versions: []secretapi.SecretVersionsListEntry{
 				{VersionId: lo.ToPtr("v1-id"), CreatedDate: nil},
 				{VersionId: lo.ToPtr("v2-id"), CreatedDate: lo.ToPtr(now)},
@@ -315,7 +320,7 @@ func TestLogUseCase_Execute_SortWithEqualDates(t *testing.T) {
 	now := time.Now()
 	// Test sorting when entries have the same CreatedDate
 	client := &mockLogClient{
-		listVersionsResult: &secretapi.ListSecretVersionIdsOutput{
+		listVersionsResult: &secretapi.ListSecretVersionIDsOutput{
 			Versions: []secretapi.SecretVersionsListEntry{
 				{VersionId: lo.ToPtr("v1-id"), CreatedDate: lo.ToPtr(now)},
 				{VersionId: lo.ToPtr("v2-id"), CreatedDate: lo.ToPtr(now)},
@@ -343,7 +348,7 @@ func TestLogUseCase_Execute_SortUnsortedInput(t *testing.T) {
 	// Test sorting when input is in unsorted order (oldest first)
 	// This ensures the sorting "a.Before(b)" branch is covered
 	client := &mockLogClient{
-		listVersionsResult: &secretapi.ListSecretVersionIdsOutput{
+		listVersionsResult: &secretapi.ListSecretVersionIDsOutput{
 			Versions: []secretapi.SecretVersionsListEntry{
 				// Oldest first in input
 				{VersionId: lo.ToPtr("v1-id"), CreatedDate: lo.ToPtr(now.Add(-2 * time.Hour))},
@@ -380,7 +385,7 @@ func TestLogUseCase_Execute_FilterWithNilCreatedDate(t *testing.T) {
 	now := time.Now()
 	// Test date filtering when entry has nil CreatedDate (should be filtered out when date filter is applied)
 	client := &mockLogClient{
-		listVersionsResult: &secretapi.ListSecretVersionIdsOutput{
+		listVersionsResult: &secretapi.ListSecretVersionIDsOutput{
 			Versions: []secretapi.SecretVersionsListEntry{
 				{VersionId: lo.ToPtr("v1-id"), CreatedDate: nil},
 				{VersionId: lo.ToPtr("v2-id"), CreatedDate: lo.ToPtr(now)},

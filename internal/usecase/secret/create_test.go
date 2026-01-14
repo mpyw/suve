@@ -18,10 +18,12 @@ type mockCreateClient struct {
 	createErr    error
 }
 
+//nolint:lll // mock function signature must match AWS SDK interface
 func (m *mockCreateClient) CreateSecret(_ context.Context, _ *secretapi.CreateSecretInput, _ ...func(*secretapi.Options)) (*secretapi.CreateSecretOutput, error) {
 	if m.createErr != nil {
 		return nil, m.createErr
 	}
+
 	return m.createResult, nil
 }
 
@@ -83,6 +85,6 @@ func TestCreateUseCase_Execute_Error(t *testing.T) {
 		Name:  "my-secret",
 		Value: "secret-value",
 	})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to create secret")
 }

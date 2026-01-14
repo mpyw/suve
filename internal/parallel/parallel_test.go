@@ -18,27 +18,29 @@ func TestExecuteMap(t *testing.T) {
 
 	t.Run("success", func(t *testing.T) {
 		t.Parallel()
+
 		entries := map[string]int{
 			"a": 1,
 			"b": 2,
 			"c": 3,
 		}
 
-		results := parallel.ExecuteMap(t.Context(), entries, func(_ context.Context, key string, value int) (int, error) {
+		results := parallel.ExecuteMap(t.Context(), entries, func(_ context.Context, _ string, value int) (int, error) {
 			return value * 2, nil
 		})
 
 		require.Len(t, results, 3)
 		assert.Equal(t, 2, results["a"].Value)
-		assert.Nil(t, results["a"].Err)
+		require.NoError(t, results["a"].Err)
 		assert.Equal(t, 4, results["b"].Value)
-		assert.Nil(t, results["b"].Err)
+		require.NoError(t, results["b"].Err)
 		assert.Equal(t, 6, results["c"].Value)
-		assert.Nil(t, results["c"].Err)
+		assert.NoError(t, results["c"].Err)
 	})
 
 	t.Run("with errors", func(t *testing.T) {
 		t.Parallel()
+
 		entries := map[string]int{
 			"a": 1,
 			"b": 2,
@@ -48,18 +50,20 @@ func TestExecuteMap(t *testing.T) {
 			if key == "b" {
 				return 0, errors.New("error for b")
 			}
+
 			return 42, nil
 		})
 
 		require.Len(t, results, 2)
 		assert.Equal(t, 42, results["a"].Value)
-		assert.Nil(t, results["a"].Err)
+		require.NoError(t, results["a"].Err)
 		assert.Equal(t, 0, results["b"].Value)
 		assert.EqualError(t, results["b"].Err, "error for b")
 	})
 
 	t.Run("empty map", func(t *testing.T) {
 		t.Parallel()
+
 		entries := map[string]int{}
 
 		results := parallel.ExecuteMap(t.Context(), entries, func(_ context.Context, _ string, value int) (int, error) {
@@ -71,26 +75,31 @@ func TestExecuteMap(t *testing.T) {
 
 	t.Run("actually parallel", func(t *testing.T) {
 		t.Parallel()
+
 		entries := map[int]string{
 			1: "a",
 			2: "b",
 			3: "c",
 		}
 
-		var running int32
-		var maxConcurrent int32
+		var (
+			running       int32
+			maxConcurrent int32
+		)
 
 		results := parallel.ExecuteMap(t.Context(), entries, func(_ context.Context, _ int, _ string) (bool, error) {
 			current := atomic.AddInt32(&running, 1)
-			// Update max if current is higher
+			// Update maxConcurrent if current is higher
 			for {
-				max := atomic.LoadInt32(&maxConcurrent)
-				if current <= max || atomic.CompareAndSwapInt32(&maxConcurrent, max, current) {
+				oldMax := atomic.LoadInt32(&maxConcurrent)
+				if current <= oldMax || atomic.CompareAndSwapInt32(&maxConcurrent, oldMax, current) {
 					break
 				}
 			}
+
 			time.Sleep(10 * time.Millisecond)
 			atomic.AddInt32(&running, -1)
+
 			return true, nil
 		})
 
@@ -105,6 +114,7 @@ func TestExecuteMapWithLimit(t *testing.T) {
 
 	t.Run("respects limit", func(t *testing.T) {
 		t.Parallel()
+
 		entries := map[int]string{
 			1: "a",
 			2: "b",
@@ -113,19 +123,24 @@ func TestExecuteMapWithLimit(t *testing.T) {
 			5: "e",
 		}
 
-		var maxConcurrent int32
-		var running int32
+		var (
+			maxConcurrent int32
+			running       int32
+		)
 
 		results := parallel.ExecuteMapWithLimit(t.Context(), entries, 2, func(_ context.Context, _ int, _ string) (bool, error) {
 			current := atomic.AddInt32(&running, 1)
+
 			for {
-				max := atomic.LoadInt32(&maxConcurrent)
-				if current <= max || atomic.CompareAndSwapInt32(&maxConcurrent, max, current) {
+				oldMax := atomic.LoadInt32(&maxConcurrent)
+				if current <= oldMax || atomic.CompareAndSwapInt32(&maxConcurrent, oldMax, current) {
 					break
 				}
 			}
+
 			time.Sleep(20 * time.Millisecond)
 			atomic.AddInt32(&running, -1)
+
 			return true, nil
 		})
 
@@ -136,25 +151,31 @@ func TestExecuteMapWithLimit(t *testing.T) {
 
 	t.Run("limit of 1 is sequential", func(t *testing.T) {
 		t.Parallel()
+
 		entries := map[int]string{
 			1: "a",
 			2: "b",
 			3: "c",
 		}
 
-		var maxConcurrent int32
-		var running int32
+		var (
+			maxConcurrent int32
+			running       int32
+		)
 
 		results := parallel.ExecuteMapWithLimit(t.Context(), entries, 1, func(_ context.Context, _ int, _ string) (bool, error) {
 			current := atomic.AddInt32(&running, 1)
+
 			for {
-				max := atomic.LoadInt32(&maxConcurrent)
-				if current <= max || atomic.CompareAndSwapInt32(&maxConcurrent, max, current) {
+				oldMax := atomic.LoadInt32(&maxConcurrent)
+				if current <= oldMax || atomic.CompareAndSwapInt32(&maxConcurrent, oldMax, current) {
 					break
 				}
 			}
+
 			time.Sleep(5 * time.Millisecond)
 			atomic.AddInt32(&running, -1)
+
 			return true, nil
 		})
 

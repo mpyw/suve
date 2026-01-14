@@ -9,6 +9,7 @@ import (
 
 	"github.com/mpyw/suve/internal/maputil"
 	"github.com/mpyw/suve/internal/staging"
+	"github.com/mpyw/suve/internal/staging/store"
 )
 
 // StatusInput holds input for the status use case.
@@ -47,7 +48,7 @@ type StatusOutput struct {
 // StatusUseCase executes status operations.
 type StatusUseCase struct {
 	Strategy staging.ServiceStrategy
-	Store    staging.StoreReader
+	Store    store.ReadOperator
 }
 
 // Execute runs the status use case.
@@ -69,6 +70,7 @@ func (u *StatusUseCase) Execute(ctx context.Context, input StatusInput) (*Status
 		if entryErr != nil && !errors.Is(entryErr, staging.ErrNotStaged) {
 			return nil, entryErr
 		}
+
 		if entry != nil {
 			output.Entries = []StatusEntry{toStatusEntry(input.Name, *entry, showDeleteOptions)}
 		}
@@ -78,6 +80,7 @@ func (u *StatusUseCase) Execute(ctx context.Context, input StatusInput) (*Status
 		if tagErr != nil && !errors.Is(tagErr, staging.ErrNotStaged) {
 			return nil, tagErr
 		}
+
 		if tagEntry != nil {
 			output.TagEntries = []StatusTagEntry{toStatusTagEntry(input.Name, *tagEntry)}
 		}
@@ -95,6 +98,7 @@ func (u *StatusUseCase) Execute(ctx context.Context, input StatusInput) (*Status
 	if err != nil {
 		return nil, err
 	}
+
 	serviceEntries := entries[service]
 	for name, entry := range serviceEntries {
 		output.Entries = append(output.Entries, toStatusEntry(name, entry, showDeleteOptions))
@@ -105,6 +109,7 @@ func (u *StatusUseCase) Execute(ctx context.Context, input StatusInput) (*Status
 	if err != nil {
 		return nil, err
 	}
+
 	serviceTagEntries := tagEntries[service]
 	for name, tagEntry := range serviceTagEntries {
 		output.TagEntries = append(output.TagEntries, toStatusTagEntry(name, tagEntry))

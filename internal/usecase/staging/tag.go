@@ -7,6 +7,7 @@ import (
 
 	"github.com/mpyw/suve/internal/maputil"
 	"github.com/mpyw/suve/internal/staging"
+	"github.com/mpyw/suve/internal/staging/store"
 	"github.com/mpyw/suve/internal/staging/transition"
 )
 
@@ -35,7 +36,7 @@ type UntagOutput struct {
 // TagUseCase executes tag staging operations.
 type TagUseCase struct {
 	Strategy staging.EditStrategy
-	Store    staging.StoreReadWriter
+	Store    store.ReadWriteOperator
 }
 
 // tagContext holds common context for tag operations.
@@ -98,6 +99,7 @@ func (u *TagUseCase) fetchAWSCurrentValue(ctx context.Context, name string) (*st
 		if notFoundErr := (*staging.ResourceNotFoundError)(nil); errors.As(err, &notFoundErr) {
 			return nil, nil, nil
 		}
+
 		return nil, nil, err
 	}
 
@@ -105,6 +107,7 @@ func (u *TagUseCase) fetchAWSCurrentValue(ctx context.Context, name string) (*st
 	if !result.LastModified.IsZero() {
 		baseModifiedAt = &result.LastModified
 	}
+
 	return &result.Value, baseModifiedAt, nil
 }
 
@@ -129,6 +132,7 @@ func (u *TagUseCase) Tag(ctx context.Context, input TagInput) (*TagOutput, error
 
 	// Execute the transition
 	executor := transition.NewExecutor(u.Store)
+
 	_, err = executor.ExecuteTag(ctx, tc.service, tc.name, tc.entryState, tc.stagedTags, action, tc.baseModifiedAt)
 	if err != nil {
 		return nil, err
@@ -163,6 +167,7 @@ func (u *TagUseCase) Untag(ctx context.Context, input UntagInput) (*UntagOutput,
 
 	// Execute the transition
 	executor := transition.NewExecutor(u.Store)
+
 	_, err = executor.ExecuteTag(ctx, tc.service, tc.name, tc.entryState, tc.stagedTags, action, tc.baseModifiedAt)
 	if err != nil {
 		return nil, err

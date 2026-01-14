@@ -17,6 +17,7 @@ func TestPrompter_Confirm(t *testing.T) {
 
 	t.Run("skip confirm", func(t *testing.T) {
 		t.Parallel()
+
 		p := &confirm.Prompter{
 			Stdin:  strings.NewReader(""),
 			Stdout: io.Discard,
@@ -30,7 +31,9 @@ func TestPrompter_Confirm(t *testing.T) {
 
 	t.Run("confirm with y", func(t *testing.T) {
 		t.Parallel()
+
 		var stderr bytes.Buffer
+
 		p := &confirm.Prompter{
 			Stdin:  strings.NewReader("y\n"),
 			Stdout: io.Discard,
@@ -46,7 +49,9 @@ func TestPrompter_Confirm(t *testing.T) {
 
 	t.Run("confirm with identity displays target info", func(t *testing.T) {
 		t.Parallel()
+
 		var stderr bytes.Buffer
+
 		p := &confirm.Prompter{
 			Stdin:     strings.NewReader("y\n"),
 			Stdout:    io.Discard,
@@ -63,7 +68,9 @@ func TestPrompter_Confirm(t *testing.T) {
 
 	t.Run("confirm with profile displays profile in target info", func(t *testing.T) {
 		t.Parallel()
+
 		var stderr bytes.Buffer
+
 		p := &confirm.Prompter{
 			Stdin:     strings.NewReader("y\n"),
 			Stdout:    io.Discard,
@@ -81,7 +88,9 @@ func TestPrompter_Confirm(t *testing.T) {
 
 	t.Run("confirm without identity does not display target info", func(t *testing.T) {
 		t.Parallel()
+
 		var stderr bytes.Buffer
+
 		p := &confirm.Prompter{
 			Stdin:  strings.NewReader("y\n"),
 			Stdout: io.Discard,
@@ -96,6 +105,7 @@ func TestPrompter_Confirm(t *testing.T) {
 
 	t.Run("confirm with yes", func(t *testing.T) {
 		t.Parallel()
+
 		p := &confirm.Prompter{
 			Stdin:  strings.NewReader("yes\n"),
 			Stdout: io.Discard,
@@ -109,6 +119,7 @@ func TestPrompter_Confirm(t *testing.T) {
 
 	t.Run("confirm with YES (case insensitive)", func(t *testing.T) {
 		t.Parallel()
+
 		p := &confirm.Prompter{
 			Stdin:  strings.NewReader("YES\n"),
 			Stdout: io.Discard,
@@ -122,6 +133,7 @@ func TestPrompter_Confirm(t *testing.T) {
 
 	t.Run("decline with n", func(t *testing.T) {
 		t.Parallel()
+
 		p := &confirm.Prompter{
 			Stdin:  strings.NewReader("n\n"),
 			Stdout: io.Discard,
@@ -135,6 +147,7 @@ func TestPrompter_Confirm(t *testing.T) {
 
 	t.Run("decline with no", func(t *testing.T) {
 		t.Parallel()
+
 		p := &confirm.Prompter{
 			Stdin:  strings.NewReader("no\n"),
 			Stdout: io.Discard,
@@ -148,6 +161,7 @@ func TestPrompter_Confirm(t *testing.T) {
 
 	t.Run("decline with empty (default no)", func(t *testing.T) {
 		t.Parallel()
+
 		p := &confirm.Prompter{
 			Stdin:  strings.NewReader("\n"),
 			Stdout: io.Discard,
@@ -161,6 +175,7 @@ func TestPrompter_Confirm(t *testing.T) {
 
 	t.Run("decline with random input", func(t *testing.T) {
 		t.Parallel()
+
 		p := &confirm.Prompter{
 			Stdin:  strings.NewReader("maybe\n"),
 			Stdout: io.Discard,
@@ -174,6 +189,7 @@ func TestPrompter_Confirm(t *testing.T) {
 
 	t.Run("read error", func(t *testing.T) {
 		t.Parallel()
+
 		p := &confirm.Prompter{
 			Stdin:  &errorReader{},
 			Stdout: io.Discard,
@@ -181,7 +197,7 @@ func TestPrompter_Confirm(t *testing.T) {
 		}
 
 		_, err := p.Confirm("test message", false)
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to read response")
 	})
 }
@@ -191,7 +207,9 @@ func TestPrompter_ConfirmAction(t *testing.T) {
 
 	t.Run("formats message correctly", func(t *testing.T) {
 		t.Parallel()
+
 		var stderr bytes.Buffer
+
 		p := &confirm.Prompter{
 			Stdin:  strings.NewReader("y\n"),
 			Stdout: io.Discard,
@@ -206,6 +224,7 @@ func TestPrompter_ConfirmAction(t *testing.T) {
 
 	t.Run("skip confirm", func(t *testing.T) {
 		t.Parallel()
+
 		p := &confirm.Prompter{
 			Stdin:  strings.NewReader(""),
 			Stdout: io.Discard,
@@ -219,7 +238,9 @@ func TestPrompter_ConfirmAction(t *testing.T) {
 
 	t.Run("confirm action with identity displays target info", func(t *testing.T) {
 		t.Parallel()
+
 		var stderr bytes.Buffer
+
 		p := &confirm.Prompter{
 			Stdin:     strings.NewReader("y\n"),
 			Stdout:    io.Discard,
@@ -241,7 +262,9 @@ func TestPrompter_PartialIdentity(t *testing.T) {
 
 	t.Run("account only does not display target info", func(t *testing.T) {
 		t.Parallel()
+
 		var stderr bytes.Buffer
+
 		p := &confirm.Prompter{
 			Stdin:     strings.NewReader("y\n"),
 			Stdout:    io.Discard,
@@ -256,7 +279,9 @@ func TestPrompter_PartialIdentity(t *testing.T) {
 
 	t.Run("region only does not display target info", func(t *testing.T) {
 		t.Parallel()
+
 		var stderr bytes.Buffer
+
 		p := &confirm.Prompter{
 			Stdin:  strings.NewReader("y\n"),
 			Stdout: io.Discard,
@@ -275,6 +300,7 @@ func TestPrompter_ConfirmDelete(t *testing.T) {
 
 	t.Run("skip confirm", func(t *testing.T) {
 		t.Parallel()
+
 		p := &confirm.Prompter{
 			Stdin:  strings.NewReader(""),
 			Stdout: io.Discard,
@@ -288,7 +314,9 @@ func TestPrompter_ConfirmDelete(t *testing.T) {
 
 	t.Run("confirm with warning", func(t *testing.T) {
 		t.Parallel()
+
 		var stderr bytes.Buffer
+
 		p := &confirm.Prompter{
 			Stdin:  strings.NewReader("y\n"),
 			Stdout: io.Discard,
@@ -305,7 +333,9 @@ func TestPrompter_ConfirmDelete(t *testing.T) {
 
 	t.Run("confirm delete with identity displays target info", func(t *testing.T) {
 		t.Parallel()
+
 		var stderr bytes.Buffer
+
 		p := &confirm.Prompter{
 			Stdin:     strings.NewReader("y\n"),
 			Stdout:    io.Discard,
@@ -323,7 +353,9 @@ func TestPrompter_ConfirmDelete(t *testing.T) {
 
 	t.Run("confirm delete with profile displays profile in target info", func(t *testing.T) {
 		t.Parallel()
+
 		var stderr bytes.Buffer
+
 		p := &confirm.Prompter{
 			Stdin:     strings.NewReader("y\n"),
 			Stdout:    io.Discard,
@@ -342,6 +374,7 @@ func TestPrompter_ConfirmDelete(t *testing.T) {
 
 	t.Run("decline delete", func(t *testing.T) {
 		t.Parallel()
+
 		p := &confirm.Prompter{
 			Stdin:  strings.NewReader("n\n"),
 			Stdout: io.Discard,
@@ -355,6 +388,7 @@ func TestPrompter_ConfirmDelete(t *testing.T) {
 
 	t.Run("read error", func(t *testing.T) {
 		t.Parallel()
+
 		p := &confirm.Prompter{
 			Stdin:  &errorReader{},
 			Stdout: io.Discard,
@@ -362,7 +396,135 @@ func TestPrompter_ConfirmDelete(t *testing.T) {
 		}
 
 		_, err := p.ConfirmDelete("/my/param", false)
-		assert.Error(t, err)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to read response")
+	})
+}
+
+func TestPrompter_ConfirmChoice(t *testing.T) {
+	t.Parallel()
+
+	choices := []confirm.Choice{
+		{Label: "Merge", Description: "Merge with existing"},
+		{Label: "Overwrite", Description: "Replace existing"},
+		{Label: "Cancel", Description: "Abort operation"},
+	}
+
+	t.Run("default choice (enter)", func(t *testing.T) {
+		t.Parallel()
+
+		var stderr bytes.Buffer
+
+		p := &confirm.Prompter{
+			Stdin:  strings.NewReader("\n"),
+			Stdout: io.Discard,
+			Stderr: &stderr,
+		}
+
+		result, err := p.ConfirmChoice("How do you want to proceed?", choices)
+		require.NoError(t, err)
+		assert.Equal(t, confirm.ChoiceResult(0), result)
+		assert.Contains(t, stderr.String(), "How do you want to proceed?")
+		assert.Contains(t, stderr.String(), "1. Merge (Merge with existing)")
+		assert.Contains(t, stderr.String(), "2. Overwrite (Replace existing)")
+		assert.Contains(t, stderr.String(), "3. Cancel (Abort operation)")
+	})
+
+	t.Run("select first choice", func(t *testing.T) {
+		t.Parallel()
+
+		p := &confirm.Prompter{
+			Stdin:  strings.NewReader("1\n"),
+			Stdout: io.Discard,
+			Stderr: io.Discard,
+		}
+
+		result, err := p.ConfirmChoice("Choose:", choices)
+		require.NoError(t, err)
+		assert.Equal(t, confirm.ChoiceResult(0), result)
+	})
+
+	t.Run("select second choice", func(t *testing.T) {
+		t.Parallel()
+
+		p := &confirm.Prompter{
+			Stdin:  strings.NewReader("2\n"),
+			Stdout: io.Discard,
+			Stderr: io.Discard,
+		}
+
+		result, err := p.ConfirmChoice("Choose:", choices)
+		require.NoError(t, err)
+		assert.Equal(t, confirm.ChoiceResult(1), result)
+	})
+
+	t.Run("select third choice", func(t *testing.T) {
+		t.Parallel()
+
+		p := &confirm.Prompter{
+			Stdin:  strings.NewReader("3\n"),
+			Stdout: io.Discard,
+			Stderr: io.Discard,
+		}
+
+		result, err := p.ConfirmChoice("Choose:", choices)
+		require.NoError(t, err)
+		assert.Equal(t, confirm.ChoiceResult(2), result)
+	})
+
+	t.Run("invalid input - returns cancelled", func(t *testing.T) {
+		t.Parallel()
+
+		p := &confirm.Prompter{
+			Stdin:  strings.NewReader("abc\n"),
+			Stdout: io.Discard,
+			Stderr: io.Discard,
+		}
+
+		result, err := p.ConfirmChoice("Choose:", choices)
+		require.NoError(t, err)
+		assert.Equal(t, confirm.ChoiceCancelled, result)
+	})
+
+	t.Run("out of range - returns cancelled", func(t *testing.T) {
+		t.Parallel()
+
+		p := &confirm.Prompter{
+			Stdin:  strings.NewReader("5\n"),
+			Stdout: io.Discard,
+			Stderr: io.Discard,
+		}
+
+		result, err := p.ConfirmChoice("Choose:", choices)
+		require.NoError(t, err)
+		assert.Equal(t, confirm.ChoiceCancelled, result)
+	})
+
+	t.Run("zero - returns cancelled", func(t *testing.T) {
+		t.Parallel()
+
+		p := &confirm.Prompter{
+			Stdin:  strings.NewReader("0\n"),
+			Stdout: io.Discard,
+			Stderr: io.Discard,
+		}
+
+		result, err := p.ConfirmChoice("Choose:", choices)
+		require.NoError(t, err)
+		assert.Equal(t, confirm.ChoiceCancelled, result)
+	})
+
+	t.Run("read error", func(t *testing.T) {
+		t.Parallel()
+
+		p := &confirm.Prompter{
+			Stdin:  &errorReader{},
+			Stdout: io.Discard,
+			Stderr: io.Discard,
+		}
+
+		_, err := p.ConfirmChoice("Choose:", choices)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to read response")
 	})
 }

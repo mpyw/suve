@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -24,6 +25,7 @@ func TestCommand_Validation(t *testing.T) {
 
 	t.Run("missing parameter name", func(t *testing.T) {
 		t.Parallel()
+
 		app := appcli.MakeApp()
 		err := app.Run(t.Context(), []string{"suve", "param", "show"})
 		require.Error(t, err)
@@ -32,6 +34,7 @@ func TestCommand_Validation(t *testing.T) {
 
 	t.Run("invalid version spec", func(t *testing.T) {
 		t.Parallel()
+
 		app := appcli.MakeApp()
 		err := app.Run(t.Context(), []string{"suve", "param", "show", "/app/param#"})
 		require.Error(t, err)
@@ -39,29 +42,36 @@ func TestCommand_Validation(t *testing.T) {
 	})
 }
 
+//nolint:lll // mock struct fields match AWS SDK interface signatures
 type mockClient struct {
 	getParameterFunc        func(ctx context.Context, params *paramapi.GetParameterInput, optFns ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error)
 	getParameterHistoryFunc func(ctx context.Context, params *paramapi.GetParameterHistoryInput, optFns ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error)
 	listTagsForResourceFunc func(ctx context.Context, params *paramapi.ListTagsForResourceInput, optFns ...func(*paramapi.Options)) (*paramapi.ListTagsForResourceOutput, error)
 }
 
+//nolint:lll // mock function signature must match AWS SDK interface
 func (m *mockClient) GetParameter(ctx context.Context, params *paramapi.GetParameterInput, optFns ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
 	return m.getParameterFunc(ctx, params, optFns...)
 }
 
+//nolint:lll // mock function signature must match AWS SDK interface
 func (m *mockClient) GetParameterHistory(ctx context.Context, params *paramapi.GetParameterHistoryInput, optFns ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
 	return m.getParameterHistoryFunc(ctx, params, optFns...)
 }
 
+//nolint:lll // mock function signature must match AWS SDK interface
 func (m *mockClient) ListTagsForResource(ctx context.Context, params *paramapi.ListTagsForResourceInput, optFns ...func(*paramapi.Options)) (*paramapi.ListTagsForResourceOutput, error) {
 	if m.listTagsForResourceFunc != nil {
 		return m.listTagsForResourceFunc(ctx, params, optFns...)
 	}
+
 	return &paramapi.ListTagsForResourceOutput{}, nil
 }
 
+//nolint:funlen // Table-driven test with many cases
 func TestRun(t *testing.T) {
 	t.Parallel()
+
 	now := time.Now()
 
 	tests := []struct {
@@ -90,6 +100,7 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
+				t.Helper()
 				assert.Contains(t, output, "/my/param")
 				assert.Contains(t, output, "test-value")
 			},
@@ -100,6 +111,7 @@ func TestRun(t *testing.T) {
 				Spec: &paramversion.Spec{Name: "/my/param", Shift: 1},
 			},
 			mock: &mockClient{
+				//nolint:lll // inline mock function in test table
 				getParameterHistoryFunc: func(_ context.Context, _ *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
 					return &paramapi.GetParameterHistoryOutput{
 						Parameters: []paramapi.ParameterHistory{
@@ -111,6 +123,7 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
+				t.Helper()
 				assert.Contains(t, output, "v2")
 			},
 		},
@@ -134,8 +147,11 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
-				appleIdx := bytes.Index([]byte(output), []byte("apple"))
-				zebraIdx := bytes.Index([]byte(output), []byte("zebra"))
+				t.Helper()
+
+				appleIdx := strings.Index(output, "apple")
+				zebraIdx := strings.Index(output, "zebra")
+
 				require.NotEqual(t, -1, appleIdx, "expected apple in output")
 				require.NotEqual(t, -1, zebraIdx, "expected zebra in output")
 				assert.Less(t, appleIdx, zebraIdx, "expected keys to be sorted (apple before zebra)")
@@ -168,6 +184,7 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
+				t.Helper()
 				assert.Contains(t, output, "/my/param")
 				assert.NotContains(t, output, "Modified")
 			},
@@ -191,6 +208,7 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
+				t.Helper()
 				assert.Contains(t, output, "a,b,c")
 			},
 		},
@@ -213,6 +231,8 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
+				t.Helper()
+
 				assert.Contains(t, output, "encrypted-blob")
 			},
 		},
@@ -235,6 +255,8 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
+				t.Helper()
+
 				assert.Contains(t, output, "not json")
 				assert.NotContains(t, output, "JsonParsed")
 			},
@@ -259,6 +281,8 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
+				t.Helper()
+
 				assert.Equal(t, "raw-value", output)
 			},
 		},
@@ -269,6 +293,7 @@ func TestRun(t *testing.T) {
 				Raw:  true,
 			},
 			mock: &mockClient{
+				//nolint:lll // inline mock function in test table
 				getParameterHistoryFunc: func(_ context.Context, _ *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
 					return &paramapi.GetParameterHistoryOutput{
 						Parameters: []paramapi.ParameterHistory{
@@ -279,6 +304,8 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
+				t.Helper()
+
 				assert.Equal(t, "v1", output)
 			},
 		},
@@ -303,8 +330,11 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
-				appleIdx := bytes.Index([]byte(output), []byte("apple"))
-				zebraIdx := bytes.Index([]byte(output), []byte("zebra"))
+				t.Helper()
+
+				appleIdx := strings.Index(output, "apple")
+				zebraIdx := strings.Index(output, "zebra")
+
 				require.NotEqual(t, -1, appleIdx, "expected apple in output")
 				require.NotEqual(t, -1, zebraIdx, "expected zebra in output")
 				assert.Less(t, appleIdx, zebraIdx, "expected keys to be sorted (apple before zebra)")
@@ -327,6 +357,7 @@ func TestRun(t *testing.T) {
 						},
 					}, nil
 				},
+				//nolint:lll // inline mock function in test table
 				listTagsForResourceFunc: func(_ context.Context, _ *paramapi.ListTagsForResourceInput, _ ...func(*paramapi.Options)) (*paramapi.ListTagsForResourceOutput, error) {
 					return &paramapi.ListTagsForResourceOutput{
 						TagList: []paramapi.Tag{
@@ -337,6 +368,8 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
+				t.Helper()
+
 				assert.Contains(t, output, "Tags")
 				assert.Contains(t, output, "2 tag(s)")
 				assert.Contains(t, output, "Environment")
@@ -363,6 +396,7 @@ func TestRun(t *testing.T) {
 						},
 					}, nil
 				},
+				//nolint:lll // inline mock function in test table
 				listTagsForResourceFunc: func(_ context.Context, _ *paramapi.ListTagsForResourceInput, _ ...func(*paramapi.Options)) (*paramapi.ListTagsForResourceOutput, error) {
 					return &paramapi.ListTagsForResourceOutput{
 						TagList: []paramapi.Tag{
@@ -373,6 +407,8 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
+				t.Helper()
+
 				assert.Contains(t, output, `"tags"`)
 				assert.Contains(t, output, `"Environment"`)
 				assert.Contains(t, output, `"production"`)
@@ -399,6 +435,8 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
+				t.Helper()
+
 				assert.Contains(t, output, `"tags": {}`)
 			},
 		},
@@ -407,7 +445,9 @@ func TestRun(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
+
 			var buf, errBuf bytes.Buffer
+
 			r := &show.Runner{
 				UseCase: &param.ShowUseCase{Client: tt.mock},
 				Stdout:  &buf,
@@ -417,10 +457,12 @@ func TestRun(t *testing.T) {
 
 			if tt.wantErr {
 				assert.Error(t, err)
+
 				return
 			}
 
 			require.NoError(t, err)
+
 			if tt.check != nil {
 				tt.check(t, buf.String())
 			}

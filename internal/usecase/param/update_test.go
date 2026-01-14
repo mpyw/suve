@@ -2,7 +2,6 @@ package param_test
 
 import (
 	"context"
-	"errors"
 	"testing"
 
 	"github.com/samber/lo"
@@ -20,17 +19,21 @@ type mockUpdateClient struct {
 	putParameterErr    error
 }
 
+//nolint:lll // mock function signature must match AWS SDK interface
 func (m *mockUpdateClient) GetParameter(_ context.Context, _ *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
 	if m.getParameterErr != nil {
 		return nil, m.getParameterErr
 	}
+
 	return m.getParameterResult, nil
 }
 
+//nolint:lll // mock function signature
 func (m *mockUpdateClient) PutParameter(_ context.Context, _ *paramapi.PutParameterInput, _ ...func(*paramapi.Options)) (*paramapi.PutParameterOutput, error) {
 	if m.putParameterErr != nil {
 		return nil, m.putParameterErr
 	}
+
 	return m.putParameterResult, nil
 }
 
@@ -68,13 +71,13 @@ func TestUpdateUseCase_Exists_Error(t *testing.T) {
 	t.Parallel()
 
 	client := &mockUpdateClient{
-		getParameterErr: errors.New("aws error"),
+		getParameterErr: errAWS,
 	}
 
 	uc := &param.UpdateUseCase{Client: client}
 
 	_, err := uc.Exists(t.Context(), "/app/config")
-	assert.Error(t, err)
+	require.Error(t, err)
 }
 
 func TestUpdateUseCase_Execute(t *testing.T) {
@@ -114,7 +117,7 @@ func TestUpdateUseCase_Execute_NotFound(t *testing.T) {
 		Value: "value",
 		Type:  paramapi.ParameterTypeString,
 	})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "parameter not found")
 }
 
@@ -122,7 +125,7 @@ func TestUpdateUseCase_Execute_ExistsError(t *testing.T) {
 	t.Parallel()
 
 	client := &mockUpdateClient{
-		getParameterErr: errors.New("aws error"),
+		getParameterErr: errAWS,
 	}
 
 	uc := &param.UpdateUseCase{Client: client}
@@ -132,7 +135,7 @@ func TestUpdateUseCase_Execute_ExistsError(t *testing.T) {
 		Value: "value",
 		Type:  paramapi.ParameterTypeString,
 	})
-	assert.Error(t, err)
+	require.Error(t, err)
 }
 
 func TestUpdateUseCase_Execute_PutError(t *testing.T) {
@@ -142,7 +145,7 @@ func TestUpdateUseCase_Execute_PutError(t *testing.T) {
 		getParameterResult: &paramapi.GetParameterOutput{
 			Parameter: &paramapi.Parameter{Name: lo.ToPtr("/app/config")},
 		},
-		putParameterErr: errors.New("put failed"),
+		putParameterErr: errPutFailed,
 	}
 
 	uc := &param.UpdateUseCase{Client: client}
@@ -152,6 +155,6 @@ func TestUpdateUseCase_Execute_PutError(t *testing.T) {
 		Value: "value",
 		Type:  paramapi.ParameterTypeString,
 	})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to update parameter")
 }

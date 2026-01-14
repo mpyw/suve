@@ -18,10 +18,12 @@ type mockRestoreClient struct {
 	restoreErr    error
 }
 
+//nolint:lll // mock function signature must match AWS SDK interface
 func (m *mockRestoreClient) RestoreSecret(_ context.Context, _ *secretapi.RestoreSecretInput, _ ...func(*secretapi.Options)) (*secretapi.RestoreSecretOutput, error) {
 	if m.restoreErr != nil {
 		return nil, m.restoreErr
 	}
+
 	return m.restoreResult, nil
 }
 
@@ -57,6 +59,6 @@ func TestRestoreUseCase_Execute_Error(t *testing.T) {
 	_, err := uc.Execute(t.Context(), secret.RestoreInput{
 		Name: "my-secret",
 	})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to restore secret")
 }

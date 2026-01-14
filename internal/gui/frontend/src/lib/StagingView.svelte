@@ -1,8 +1,9 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { StagingDiff, StagingApply, StagingReset, StagingEdit, StagingUnstage, StagingAddTag, StagingCancelAddTag, StagingCancelRemoveTag } from '../../wailsjs/go/gui/App';
+  import { StagingDiff, StagingApply, StagingReset, StagingEdit, StagingUnstage, StagingAddTag, StagingCancelAddTag, StagingCancelRemoveTag, StagingFileStatus, StagingDrain, StagingPersist, StagingDrop } from '../../wailsjs/go/gui/App';
   import type { gui } from '../../wailsjs/go/models';
   import Modal from './Modal.svelte';
+  import PassphraseModal from './PassphraseModal.svelte';
   import DiffDisplay from './DiffDisplay.svelte';
   import { formatDate, parseError } from './viewUtils';
   import './common.css';
@@ -47,19 +48,51 @@
   let tagEditValue = $state('');
   let tagEditIsNew = $state(false);
 
+  // Persist/Drain modal states
+  let showPersistModal = $state(false);
+  let showDrainModal = $state(false);
+  let showDrainOptionsModal = $state(false);
+  let persistLoading = $state(false);
+  let drainLoading = $state(false);
+  let persistError = $state('');
+  let drainError = $state('');
+  let persistResult: gui.StagingPersistResult | null = $state(null);
+  let drainResult: gui.StagingDrainResult | null = $state(null);
+  let fileStatus: gui.StagingFileStatusResult | null = $state(null);
+
+  // Drain options
+  let drainKeep = $state(false);
+  let drainForce = $state(false);
+  let drainMerge = $state(false);
+
+  // Push options modal (when file exists)
+  let showPushOptionsModal = $state(false);
+  let pushPassphrase = $state('');
+  let pushMode: 'overwrite' | 'merge' = $state('overwrite');
+
+  // Drop confirmation modal
+  let showDropModal = $state(false);
+  let dropLoading = $state(false);
+  let dropError = $state('');
+
+  // Stash dropdown state
+  let showStashDropdown = $state(false);
+
   async function loadStatus() {
     loading = true;
     error = '';
     try {
-      // Load diff data which includes AWS values
-      const [ssmResult, smResult] = await Promise.all([
+      // Load diff data and file status in parallel
+      const [ssmResult, smResult, fileStatusResult] = await Promise.all([
         StagingDiff('param', ''),
-        StagingDiff('secret', '')
+        StagingDiff('secret', ''),
+        StagingFileStatus().catch(() => null) // Don't fail if file status check fails
       ]);
       paramEntries = ssmResult?.entries?.filter(e => e.type !== 'autoUnstaged') || [];
       secretEntries = smResult?.entries?.filter(e => e.type !== 'autoUnstaged') || [];
       paramTagEntries = ssmResult?.tagEntries || [];
       secretTagEntries = smResult?.tagEntries || [];
+      fileStatus = fileStatusResult;
       // Emit count change for sidebar badge
       const totalCount = paramEntries.length + secretEntries.length + paramTagEntries.length + secretTagEntries.length;
       oncountchange?.(totalCount);
@@ -69,6 +102,7 @@
       secretEntries = [];
       paramTagEntries = [];
       secretTagEntries = [];
+      fileStatus = null;
       oncountchange?.(0);
     } finally {
       loading = false;
@@ -243,6 +277,153 @@
     } catch (e) {
       error = parseError(e);
     }
+  }
+
+  // Persist modal handlers
+  async function openPersistModal() {
+    persistError = '';
+    persistResult = null;
+    pushPassphrase = '';
+    pushMode = 'overwrite';
+
+    try {
+      // Check if file exists first
+      fileStatus = await StagingFileStatus();
+      if (fileStatus?.exists) {
+        // File exists, show options modal for merge/overwrite
+        showPushOptionsModal = true;
+      } else {
+        // No existing file, go straight to passphrase modal
+        showPersistModal = true;
+      }
+    } catch (e) {
+      // If can't check, just show passphrase modal
+      showPersistModal = true;
+    }
+  }
+
+  async function handlePersist(passphrase: string) {
+    persistLoading = true;
+    persistError = '';
+    try {
+      const result = await StagingPersist('', passphrase, false, pushMode); // service='', keep=false
+      persistResult = result;
+      showPersistModal = false;
+      await loadStatus();
+    } catch (e) {
+      persistError = parseError(e);
+    } finally {
+      persistLoading = false;
+    }
+  }
+
+  async function handlePersistWithOptions() {
+    persistLoading = true;
+    persistError = '';
+    try {
+      const result = await StagingPersist('', pushPassphrase, false, pushMode);
+      persistResult = result;
+      showPushOptionsModal = false;
+      await loadStatus();
+    } catch (e) {
+      persistError = parseError(e);
+    } finally {
+      persistLoading = false;
+    }
+  }
+
+  function closePersistModal() {
+    showPersistModal = false;
+    showPushOptionsModal = false;
+    persistResult = null;
+  }
+
+  // Drain modal handlers
+  async function openDrainModal() {
+    drainError = '';
+    drainResult = null;
+    drainKeep = false;
+    drainForce = false;
+    drainMerge = false;
+
+    try {
+      // Check file status first
+      fileStatus = await StagingFileStatus();
+      if (!fileStatus.exists) {
+        error = 'No staging file found. Nothing to drain.';
+        return;
+      }
+
+      if (fileStatus.encrypted) {
+        // File is encrypted, show passphrase modal
+        showDrainModal = true;
+      } else {
+        // File is not encrypted, show options modal directly
+        showDrainOptionsModal = true;
+      }
+    } catch (e) {
+      error = parseError(e);
+    }
+  }
+
+  async function handleDrainWithPassphrase(passphrase: string) {
+    drainLoading = true;
+    drainError = '';
+    try {
+      const result = await StagingDrain('', passphrase, drainKeep, drainForce, drainMerge);
+      drainResult = result;
+      showDrainModal = false;
+      await loadStatus();
+    } catch (e) {
+      drainError = parseError(e);
+    } finally {
+      drainLoading = false;
+    }
+  }
+
+  async function handleDrainWithOptions() {
+    drainLoading = true;
+    drainError = '';
+    try {
+      const result = await StagingDrain('', '', drainKeep, drainForce, drainMerge);
+      drainResult = result;
+      showDrainOptionsModal = false;
+      await loadStatus();
+    } catch (e) {
+      drainError = parseError(e);
+    } finally {
+      drainLoading = false;
+    }
+  }
+
+  function closeDrainModal() {
+    showDrainModal = false;
+    showDrainOptionsModal = false;
+    drainResult = null;
+  }
+
+  // Drop modal handlers
+  function openDropModal() {
+    dropError = '';
+    showDropModal = true;
+  }
+
+  async function handleDrop() {
+    dropLoading = true;
+    dropError = '';
+    try {
+      await StagingDrop();
+      showDropModal = false;
+      await loadStatus();
+    } catch (e) {
+      dropError = parseError(e);
+    } finally {
+      dropLoading = false;
+    }
+  }
+
+  function closeDropModal() {
+    showDropModal = false;
   }
 
   // Computed helpers for entry display logic
@@ -489,13 +670,14 @@
     </div>
   </div>
 
-  {#if paramEntries.length > 0 || secretEntries.length > 0}
-    <div class="actions">
+  <div class="actions">
+    <div class="actions-center">
       <button
         class="btn-action btn-apply"
         onclick={() => openApplyModal(paramEntries.length > 0 ? 'param' : 'secret')}
+        disabled={paramEntries.length === 0 && secretEntries.length === 0}
       >
-        Apply All Changes
+        Apply All
       </button>
       <button
         class="btn-action btn-reset"
@@ -503,11 +685,56 @@
           if (paramEntries.length > 0) openResetModal('param');
           if (secretEntries.length > 0) openResetModal('secret');
         }}
+        disabled={paramEntries.length === 0 && secretEntries.length === 0}
       >
         Reset All
       </button>
     </div>
-  {/if}
+    <div class="stash-dropdown">
+      <button
+        class="btn-stash"
+        class:has-file={fileStatus?.exists}
+        onclick={() => showStashDropdown = !showStashDropdown}
+      >
+        Stash
+        {#if fileStatus?.exists}
+          <span class="stash-indicator">●</span>
+        {/if}
+        <span class="dropdown-arrow">▾</span>
+      </button>
+      {#if showStashDropdown}
+        <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+        <div class="dropdown-backdrop" onclick={() => showStashDropdown = false}></div>
+        <div class="dropdown-menu">
+          <button
+            class="dropdown-item"
+            onclick={() => { showStashDropdown = false; openPersistModal(); }}
+            disabled={loading || (paramEntries.length === 0 && secretEntries.length === 0)}
+          >
+            <span class="dropdown-icon">⏏️</span>
+            Push <span class="dropdown-desc">(Persist)</span>
+          </button>
+          <button
+            class="dropdown-item"
+            onclick={() => { showStashDropdown = false; openDrainModal(); }}
+            disabled={loading || !fileStatus?.exists}
+          >
+            <span class="dropdown-icon">▶️</span>
+            Pop <span class="dropdown-desc">(Drain)</span>
+          </button>
+          <div class="dropdown-divider"></div>
+          <button
+            class="dropdown-item dropdown-item-danger"
+            onclick={() => { showStashDropdown = false; openDropModal(); }}
+            disabled={loading || !fileStatus?.exists}
+          >
+            <span class="dropdown-icon">🗑️</span>
+            Drop <span class="dropdown-desc">(Trash)</span>
+          </button>
+        </div>
+      {/if}
+    </div>
+  </div>
 </div>
 
 <!-- Apply Modal -->
@@ -683,6 +910,155 @@
       </button>
     </div>
   </form>
+</Modal>
+
+<!-- Persist Modal (uses PassphraseModal for encryption) -->
+<PassphraseModal
+  show={showPersistModal}
+  mode="encrypt"
+  title="Persist to File"
+  onsubmit={handlePersist}
+  oncancel={closePersistModal}
+  loading={persistLoading}
+  error={persistError}
+/>
+
+<!-- Drain Modal (uses PassphraseModal for decryption when encrypted) -->
+<PassphraseModal
+  show={showDrainModal}
+  mode="decrypt"
+  title="Drain from File"
+  onsubmit={handleDrainWithPassphrase}
+  oncancel={closeDrainModal}
+  loading={drainLoading}
+  error={drainError}
+/>
+
+<!-- Drain Options Modal (for unencrypted files) -->
+<Modal title="Drain from File" show={showDrainOptionsModal} onclose={closeDrainModal}>
+  <div class="drain-options">
+    {#if drainError}
+      <div class="modal-error">{drainError}</div>
+    {/if}
+
+    {#if drainResult}
+      <div class="drain-result">
+        <div class="result-icon success">✓</div>
+        <h4>Successfully loaded from file</h4>
+        <div class="result-stats">
+          <span class="stat">{drainResult.entryCount} entries</span>
+          <span class="stat">{drainResult.tagCount} tag changes</span>
+          {#if drainResult.merged}
+            <span class="stat merged">(merged)</span>
+          {/if}
+        </div>
+        <div class="form-actions">
+          <button type="button" class="btn-primary" onclick={closeDrainModal}>Close</button>
+        </div>
+      </div>
+    {:else}
+      <p>Load staged changes from file into memory?</p>
+      <p class="info">This will load changes from the staging file ({fileStatus?.encrypted ? 'encrypted' : 'plain text'}).</p>
+
+      <div class="options-group">
+        <label class="checkbox-label">
+          <input type="checkbox" bind:checked={drainKeep} />
+          <span>Keep file after loading</span>
+        </label>
+        <label class="checkbox-label">
+          <input type="checkbox" bind:checked={drainMerge} />
+          <span>Merge with existing changes</span>
+        </label>
+        <label class="checkbox-label">
+          <input type="checkbox" bind:checked={drainForce} />
+          <span>Force overwrite existing changes</span>
+        </label>
+      </div>
+
+      <div class="form-actions">
+        <button type="button" class="btn-secondary" onclick={closeDrainModal}>Cancel</button>
+        <button type="button" class="btn-drain-action" onclick={handleDrainWithOptions} disabled={drainLoading}>
+          {drainLoading ? 'Loading...' : 'Load from File'}
+        </button>
+      </div>
+    {/if}
+  </div>
+</Modal>
+
+<!-- Persist Result Modal -->
+{#if persistResult}
+<Modal title="Push Complete" show={true} onclose={() => persistResult = null}>
+  <div class="persist-result">
+    <div class="result-icon success">✓</div>
+    <h4>Successfully saved to file</h4>
+    <div class="result-stats">
+      <span class="stat">{persistResult.entryCount} entries</span>
+      <span class="stat">{persistResult.tagCount} tag changes</span>
+    </div>
+    <div class="form-actions">
+      <button type="button" class="btn-primary" onclick={() => persistResult = null}>Close</button>
+    </div>
+  </div>
+</Modal>
+{/if}
+
+<!-- Push Options Modal (when stash file already exists) -->
+<Modal title="Stash File Exists" show={showPushOptionsModal} onclose={closePersistModal}>
+  <div class="push-options">
+    {#if persistError}
+      <div class="modal-error">{persistError}</div>
+    {/if}
+
+    <p>A stash file already exists. How do you want to proceed?</p>
+
+    <div class="options-group">
+      <label class="radio-label">
+        <input type="radio" name="pushMode" value="overwrite" bind:group={pushMode} />
+        <span>Overwrite</span>
+        <span class="option-desc">Replace existing stash file</span>
+      </label>
+      <label class="radio-label">
+        <input type="radio" name="pushMode" value="merge" bind:group={pushMode} />
+        <span>Merge</span>
+        <span class="option-desc">Merge with existing stash file</span>
+      </label>
+    </div>
+
+    <div class="form-group">
+      <label for="push-passphrase">Passphrase (optional, for encryption)</label>
+      <input
+        id="push-passphrase"
+        type="password"
+        class="form-input"
+        bind:value={pushPassphrase}
+        placeholder="Leave empty for no encryption"
+      />
+    </div>
+
+    <div class="form-actions">
+      <button type="button" class="btn-secondary" onclick={closePersistModal}>Cancel</button>
+      <button type="button" class="btn-push-action" onclick={handlePersistWithOptions} disabled={persistLoading}>
+        {persistLoading ? 'Pushing...' : 'Push'}
+      </button>
+    </div>
+  </div>
+</Modal>
+
+<!-- Drop Confirmation Modal -->
+<Modal title="Drop Stash" show={showDropModal} onclose={closeDropModal}>
+  <div class="modal-confirm">
+    {#if dropError}
+      <div class="modal-error">{dropError}</div>
+    {/if}
+    <p>Delete the stash file without loading?</p>
+    <p class="warning">This will permanently delete the stash file. This action cannot be undone.</p>
+    <div class="form-actions">
+      <button type="button" class="btn-secondary" onclick={closeDropModal}>Cancel</button>
+      <button type="button" class="btn-danger" onclick={handleDrop} disabled={dropLoading}>
+        {dropLoading ? 'Dropping...' : 'Drop'}
+      </button>
+    </div>
+  </div>
 </Modal>
 
 <style>
@@ -903,16 +1279,26 @@
   }
 
   .actions {
+    position: relative;
     display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
     gap: 12px;
     padding: 16px;
     background: #1a1a2e;
     border-top: 1px solid #2d2d44;
   }
 
+  .actions-center {
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+  }
+
   .btn-action {
-    flex: 1;
-    padding: 12px;
+    min-width: 200px;
+    padding: 12px 40px;
     border: none;
     border-radius: 4px;
     font-size: 14px;
@@ -942,6 +1328,129 @@
     background: #444;
     color: #888;
     cursor: not-allowed;
+  }
+
+  /* Stash dropdown */
+  .stash-dropdown {
+    position: absolute;
+    right: 16px;
+    top: 50%;
+    transform: translateY(-50%);
+  }
+
+  /* Narrow viewport: Stash wraps below and aligns right */
+  @media (max-width: 800px) {
+    .actions {
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .stash-dropdown {
+      position: static;
+      transform: none;
+      align-self: flex-end;
+    }
+  }
+
+  .btn-stash {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 16px;
+    background: #2d2d44;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    font-size: 14px;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+
+  .btn-stash:hover {
+    background: #3d3d54;
+  }
+
+  .btn-stash.has-file {
+    background: #3d3d54;
+  }
+
+  .stash-indicator {
+    color: #4fc3f7;
+    font-size: 10px;
+  }
+
+  .dropdown-arrow {
+    font-size: 10px;
+    color: #888;
+  }
+
+  .dropdown-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 99;
+  }
+
+  .dropdown-menu {
+    position: absolute;
+    bottom: 100%;
+    right: 0;
+    margin-bottom: 8px;
+    background: #1a1a2e;
+    border: 1px solid #2d2d44;
+    border-radius: 8px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+    min-width: 200px;
+    z-index: 100;
+    overflow: hidden;
+  }
+
+  .dropdown-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 10px 16px;
+    background: transparent;
+    border: none;
+    color: #fff;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    text-align: left;
+    white-space: nowrap;
+    transition: background 0.2s;
+  }
+
+  .dropdown-item:hover:not(:disabled) {
+    background: #2d2d44;
+  }
+
+  .dropdown-item:disabled {
+    color: #666;
+    cursor: not-allowed;
+  }
+
+  .dropdown-item-danger:hover:not(:disabled) {
+    background: rgba(244, 67, 54, 0.2);
+  }
+
+  .dropdown-icon {
+    font-size: 16px;
+  }
+
+  .dropdown-desc {
+    font-size: 12px;
+    font-weight: 400;
+    color: #888;
+  }
+
+  .dropdown-divider {
+    height: 1px;
+    background: #2d2d44;
+    margin: 4px 0;
   }
 
   /* Modal styles */
@@ -1302,5 +1811,143 @@
   .btn-add-tag:hover {
     background: rgba(76, 175, 80, 0.1);
     border-style: solid;
+  }
+
+  /* Modal action buttons */
+  .btn-push-action {
+    padding: 8px 16px;
+    background: #2196f3;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+  }
+
+  .btn-push-action:hover:not(:disabled) {
+    background: #1976d2;
+  }
+
+  .btn-push-action:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  /* Push options modal styles */
+  .push-options {
+    text-align: center;
+  }
+
+  .push-options p {
+    color: #ccc;
+    margin: 0 0 12px 0;
+  }
+
+  .radio-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #ccc;
+    cursor: pointer;
+    padding: 8px;
+    border-radius: 4px;
+    transition: background 0.2s;
+  }
+
+  .radio-label:hover {
+    background: rgba(255, 255, 255, 0.05);
+  }
+
+  .option-desc {
+    font-size: 12px;
+    color: #888;
+    margin-left: auto;
+  }
+
+  /* Drain options modal styles */
+  .drain-options {
+    text-align: center;
+  }
+
+  .drain-options p {
+    color: #ccc;
+    margin: 0 0 12px 0;
+  }
+
+  .options-group {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin: 20px 0;
+    text-align: left;
+    background: #0f0f1a;
+    padding: 16px;
+    border-radius: 4px;
+  }
+
+  .btn-drain-action {
+    padding: 8px 16px;
+    background: #9c27b0;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+  }
+
+  .btn-drain-action:hover:not(:disabled) {
+    background: #7b1fa2;
+  }
+
+  .btn-drain-action:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  /* Result modal styles */
+  .drain-result,
+  .persist-result {
+    text-align: center;
+    padding: 16px 0;
+  }
+
+  .result-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 16px;
+    font-size: 24px;
+  }
+
+  .result-icon.success {
+    background: rgba(76, 175, 80, 0.2);
+    border: 2px solid #4caf50;
+    color: #4caf50;
+  }
+
+  .drain-result h4,
+  .persist-result h4 {
+    margin: 0 0 12px;
+    color: #fff;
+    font-size: 16px;
+  }
+
+  .result-stats {
+    display: flex;
+    gap: 16px;
+    justify-content: center;
+    margin-bottom: 20px;
+  }
+
+  .result-stats .stat {
+    font-size: 13px;
+    color: #888;
+  }
+
+  .result-stats .stat.merged {
+    color: #ff9800;
   }
 </style>

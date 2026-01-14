@@ -25,10 +25,12 @@ type AbsoluteSpec struct {
 //   - #<N>     optional version number (0 or 1)
 //   - <shift>  ~ or ~<N>, repeatable (0 or more, cumulative)
 //
-// Examples: /my/param, /my/param#3, /my/param~1, /my/param#5~2, /my/param~~
+// Examples: /my/param, /my/param#3, /my/param~1, /my/param#5~2, /my/param~~.
 type Spec = version.Spec[AbsoluteSpec]
 
 // parser defines the SSM Parameter Store-specific parsing logic.
+//
+//nolint:gochecknoglobals // stateless parser configuration
 var parser = version.AbsoluteParser[AbsoluteSpec]{
 	Parsers: []version.SpecifierParser[AbsoluteSpec]{
 		{
@@ -44,6 +46,7 @@ var parser = version.AbsoluteParser[AbsoluteSpec]{
 					return abs, err
 				}
 				abs.Version = lo.ToPtr(v)
+
 				return abs, nil
 			},
 		},

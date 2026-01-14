@@ -2,8 +2,7 @@ package reset_test
 
 import (
 	"bytes"
-	"os"
-	"path/filepath"
+	"errors"
 	"testing"
 	"time"
 
@@ -15,7 +14,7 @@ import (
 	"github.com/mpyw/suve/internal/cli/commands/stage/reset"
 	"github.com/mpyw/suve/internal/maputil"
 	"github.com/mpyw/suve/internal/staging"
-	"github.com/mpyw/suve/internal/staging/file"
+	"github.com/mpyw/suve/internal/staging/store/testutil"
 )
 
 func TestCommand_Validation(t *testing.T) {
@@ -23,8 +22,11 @@ func TestCommand_Validation(t *testing.T) {
 
 	t.Run("help", func(t *testing.T) {
 		t.Parallel()
+
 		app := appcli.MakeApp()
+
 		var buf bytes.Buffer
+
 		app.Writer = &buf
 		err := app.Run(t.Context(), []string{"suve", "stage", "reset", "--help"})
 		require.NoError(t, err)
@@ -35,10 +37,10 @@ func TestCommand_Validation(t *testing.T) {
 func TestRun_NoChanges(t *testing.T) {
 	t.Parallel()
 
-	tmpDir := t.TempDir()
-	store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := testutil.NewMockStore()
 
 	var buf bytes.Buffer
+
 	r := &reset.Runner{
 		Store:  store,
 		Stdout: &buf,
@@ -53,8 +55,7 @@ func TestRun_NoChanges(t *testing.T) {
 func TestRun_UnstageAll(t *testing.T) {
 	t.Parallel()
 
-	tmpDir := t.TempDir()
-	store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := testutil.NewMockStore()
 
 	// Stage SSM Parameter Store parameters
 	_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config1", staging.Entry{
@@ -76,6 +77,7 @@ func TestRun_UnstageAll(t *testing.T) {
 	})
 
 	var buf bytes.Buffer
+
 	r := &reset.Runner{
 		Store:  store,
 		Stdout: &buf,
@@ -98,8 +100,7 @@ func TestRun_UnstageAll(t *testing.T) {
 func TestRun_UnstageParamOnly(t *testing.T) {
 	t.Parallel()
 
-	tmpDir := t.TempDir()
-	store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := testutil.NewMockStore()
 
 	// Stage only SSM Parameter Store parameters
 	_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
@@ -109,6 +110,7 @@ func TestRun_UnstageParamOnly(t *testing.T) {
 	})
 
 	var buf bytes.Buffer
+
 	r := &reset.Runner{
 		Store:  store,
 		Stdout: &buf,
@@ -123,8 +125,7 @@ func TestRun_UnstageParamOnly(t *testing.T) {
 func TestRun_UnstageSecretOnly(t *testing.T) {
 	t.Parallel()
 
-	tmpDir := t.TempDir()
-	store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := testutil.NewMockStore()
 
 	// Stage only Secrets Manager secrets
 	_ = store.StageEntry(t.Context(), staging.ServiceSecret, "my-secret", staging.Entry{
@@ -134,6 +135,7 @@ func TestRun_UnstageSecretOnly(t *testing.T) {
 	})
 
 	var buf bytes.Buffer
+
 	r := &reset.Runner{
 		Store:  store,
 		Stdout: &buf,
@@ -148,15 +150,11 @@ func TestRun_UnstageSecretOnly(t *testing.T) {
 func TestRun_StoreError(t *testing.T) {
 	t.Parallel()
 
-	tmpDir := t.TempDir()
-	path := filepath.Join(tmpDir, "stage.json")
-
-	// Create invalid JSON
-	require.NoError(t, os.WriteFile(path, []byte("invalid json"), 0o644))
-
-	store := file.NewStoreWithPath(path)
+	store := testutil.NewMockStore()
+	store.ListEntriesErr = errors.New("mock store error")
 
 	var buf bytes.Buffer
+
 	r := &reset.Runner{
 		Store:  store,
 		Stdout: &buf,
@@ -165,14 +163,13 @@ func TestRun_StoreError(t *testing.T) {
 
 	err := r.Run(t.Context())
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to parse")
+	assert.Contains(t, err.Error(), "mock store error")
 }
 
 func TestRun_UnstageTagsOnly(t *testing.T) {
 	t.Parallel()
 
-	tmpDir := t.TempDir()
-	store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := testutil.NewMockStore()
 
 	// Stage only tag changes (no entry changes)
 	_ = store.StageTag(t.Context(), staging.ServiceParam, "/app/config", staging.TagEntry{
@@ -185,6 +182,7 @@ func TestRun_UnstageTagsOnly(t *testing.T) {
 	})
 
 	var buf bytes.Buffer
+
 	r := &reset.Runner{
 		Store:  store,
 		Stdout: &buf,
@@ -205,8 +203,7 @@ func TestRun_UnstageTagsOnly(t *testing.T) {
 func TestRun_UnstageEntriesAndTags(t *testing.T) {
 	t.Parallel()
 
-	tmpDir := t.TempDir()
-	store := file.NewStoreWithPath(filepath.Join(tmpDir, "stage.json"))
+	store := testutil.NewMockStore()
 
 	// Stage entry change
 	_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
@@ -235,6 +232,7 @@ func TestRun_UnstageEntriesAndTags(t *testing.T) {
 	})
 
 	var buf bytes.Buffer
+
 	r := &reset.Runner{
 		Store:  store,
 		Stdout: &buf,
@@ -255,4 +253,108 @@ func TestRun_UnstageEntriesAndTags(t *testing.T) {
 	assert.Equal(t, staging.ErrNotStaged, err)
 	_, err = store.GetTag(t.Context(), staging.ServiceSecret, "other-secret")
 	assert.Equal(t, staging.ErrNotStaged, err)
+}
+
+func TestRun_WithHintedStore(t *testing.T) {
+	t.Parallel()
+
+	store := testutil.NewHintedMockStore()
+
+	// Stage an entry
+	_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
+		Operation: staging.OperationUpdate,
+		Value:     lo.ToPtr("param-value"),
+		StagedAt:  time.Now(),
+	})
+
+	var buf bytes.Buffer
+
+	r := &reset.Runner{
+		Store:  store,
+		Stdout: &buf,
+		Stderr: &bytes.Buffer{},
+	}
+
+	err := r.Run(t.Context())
+	require.NoError(t, err)
+	assert.Contains(t, buf.String(), "Unstaged all changes")
+	assert.Equal(t, "reset", store.LastHint)
+}
+
+func TestRun_ListTagsError(t *testing.T) {
+	t.Parallel()
+
+	store := testutil.NewMockStore()
+	store.ListTagsErr = errors.New("mock list tags error")
+
+	// Stage an entry so we get past the entry listing
+	_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
+		Operation: staging.OperationUpdate,
+		Value:     lo.ToPtr("param-value"),
+		StagedAt:  time.Now(),
+	})
+
+	var buf bytes.Buffer
+
+	r := &reset.Runner{
+		Store:  store,
+		Stdout: &buf,
+		Stderr: &bytes.Buffer{},
+	}
+
+	err := r.Run(t.Context())
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "mock list tags error")
+}
+
+func TestRun_UnstageAllError(t *testing.T) {
+	t.Parallel()
+
+	store := testutil.NewMockStore()
+	store.UnstageAllErr = errors.New("mock unstage all error")
+
+	// Stage an entry
+	_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
+		Operation: staging.OperationUpdate,
+		Value:     lo.ToPtr("param-value"),
+		StagedAt:  time.Now(),
+	})
+
+	var buf bytes.Buffer
+
+	r := &reset.Runner{
+		Store:  store,
+		Stdout: &buf,
+		Stderr: &bytes.Buffer{},
+	}
+
+	err := r.Run(t.Context())
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "mock unstage all error")
+}
+
+func TestRun_WithHintedStoreError(t *testing.T) {
+	t.Parallel()
+
+	store := testutil.NewHintedMockStore()
+	store.UnstageAllWithHintErr = errors.New("mock hinted unstage all error")
+
+	// Stage an entry
+	_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
+		Operation: staging.OperationUpdate,
+		Value:     lo.ToPtr("param-value"),
+		StagedAt:  time.Now(),
+	})
+
+	var buf bytes.Buffer
+
+	r := &reset.Runner{
+		Store:  store,
+		Stdout: &buf,
+		Stderr: &bytes.Buffer{},
+	}
+
+	err := r.Run(t.Context())
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "mock hinted unstage all error")
 }

@@ -2,7 +2,6 @@ package staging_test
 
 import (
 	"errors"
-	"path/filepath"
 	"testing"
 	"time"
 
@@ -11,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/mpyw/suve/internal/staging"
-	"github.com/mpyw/suve/internal/staging/file"
+	"github.com/mpyw/suve/internal/staging/store/testutil"
 	usecasestaging "github.com/mpyw/suve/internal/usecase/staging"
 )
 
@@ -48,7 +47,7 @@ func newSecretStrategy() *mockServiceStrategy {
 func TestStatusUseCase_Execute_Empty(t *testing.T) {
 	t.Parallel()
 
-	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := testutil.NewMockStore()
 	uc := &usecasestaging.StatusUseCase{
 		Strategy: newParamStrategy(),
 		Store:    store,
@@ -65,7 +64,7 @@ func TestStatusUseCase_Execute_Empty(t *testing.T) {
 func TestStatusUseCase_Execute_WithEntries(t *testing.T) {
 	t.Parallel()
 
-	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := testutil.NewMockStore()
 	now := time.Now().Truncate(time.Second)
 
 	// Stage some entries
@@ -92,7 +91,7 @@ func TestStatusUseCase_Execute_WithEntries(t *testing.T) {
 func TestStatusUseCase_Execute_FilterByName(t *testing.T) {
 	t.Parallel()
 
-	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := testutil.NewMockStore()
 	now := time.Now()
 
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
@@ -114,14 +113,14 @@ func TestStatusUseCase_Execute_FilterByName(t *testing.T) {
 
 	// Non-existent entry
 	_, err = uc.Execute(t.Context(), usecasestaging.StatusInput{Name: "/app/other"})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "not staged")
 }
 
 func TestStatusUseCase_Execute_SecretWithDeleteOptions(t *testing.T) {
 	t.Parallel()
 
-	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := testutil.NewMockStore()
 	now := time.Now()
 
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceSecret, "my-secret", staging.Entry{
@@ -149,8 +148,8 @@ func TestStatusUseCase_Execute_SecretWithDeleteOptions(t *testing.T) {
 func TestStatusUseCase_Execute_GetError(t *testing.T) {
 	t.Parallel()
 
-	store := newMockStore()
-	store.getErr = errors.New("store error")
+	store := testutil.NewMockStore()
+	store.GetEntryErr = errors.New("store error")
 
 	uc := &usecasestaging.StatusUseCase{
 		Strategy: newParamStrategy(),
@@ -158,15 +157,15 @@ func TestStatusUseCase_Execute_GetError(t *testing.T) {
 	}
 
 	_, err := uc.Execute(t.Context(), usecasestaging.StatusInput{Name: "/app/config"})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "store error")
 }
 
 func TestStatusUseCase_Execute_ListError(t *testing.T) {
 	t.Parallel()
 
-	store := newMockStore()
-	store.listErr = errors.New("list error")
+	store := testutil.NewMockStore()
+	store.ListEntriesErr = errors.New("list error")
 
 	uc := &usecasestaging.StatusUseCase{
 		Strategy: newParamStrategy(),
@@ -174,14 +173,14 @@ func TestStatusUseCase_Execute_ListError(t *testing.T) {
 	}
 
 	_, err := uc.Execute(t.Context(), usecasestaging.StatusInput{})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "list error")
 }
 
 func TestStatusUseCase_Execute_WithTagEntries(t *testing.T) {
 	t.Parallel()
 
-	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := testutil.NewMockStore()
 	now := time.Now().Truncate(time.Second)
 
 	// Stage tag entries
@@ -205,10 +204,12 @@ func TestStatusUseCase_Execute_WithTagEntries(t *testing.T) {
 
 	// Find the specific entries
 	var configEntry, secretEntry *usecasestaging.StatusTagEntry
+
 	for i := range output.TagEntries {
 		if output.TagEntries[i].Name == "/app/config" {
 			configEntry = &output.TagEntries[i]
 		}
+
 		if output.TagEntries[i].Name == "/app/secret" {
 			secretEntry = &output.TagEntries[i]
 		}
@@ -225,7 +226,7 @@ func TestStatusUseCase_Execute_WithTagEntries(t *testing.T) {
 func TestStatusUseCase_Execute_FilterByName_TagEntry(t *testing.T) {
 	t.Parallel()
 
-	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := testutil.NewMockStore()
 	now := time.Now()
 
 	// Stage only tag entry (no regular entry)
@@ -251,7 +252,7 @@ func TestStatusUseCase_Execute_FilterByName_TagEntry(t *testing.T) {
 func TestStatusUseCase_Execute_FilterByName_BothEntryAndTag(t *testing.T) {
 	t.Parallel()
 
-	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := testutil.NewMockStore()
 	now := time.Now()
 
 	// Stage both regular entry and tag entry
@@ -281,8 +282,8 @@ func TestStatusUseCase_Execute_FilterByName_BothEntryAndTag(t *testing.T) {
 func TestStatusUseCase_Execute_GetTagError(t *testing.T) {
 	t.Parallel()
 
-	store := newMockStore()
-	store.getTagErr = errors.New("get tag error")
+	store := testutil.NewMockStore()
+	store.GetTagErr = errors.New("get tag error")
 
 	uc := &usecasestaging.StatusUseCase{
 		Strategy: newParamStrategy(),
@@ -290,15 +291,15 @@ func TestStatusUseCase_Execute_GetTagError(t *testing.T) {
 	}
 
 	_, err := uc.Execute(t.Context(), usecasestaging.StatusInput{Name: "/app/config"})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "get tag error")
 }
 
 func TestStatusUseCase_Execute_ListTagsError(t *testing.T) {
 	t.Parallel()
 
-	store := newMockStore()
-	store.listTagsErr = errors.New("list tags error")
+	store := testutil.NewMockStore()
+	store.ListTagsErr = errors.New("list tags error")
 
 	uc := &usecasestaging.StatusUseCase{
 		Strategy: newParamStrategy(),
@@ -306,6 +307,6 @@ func TestStatusUseCase_Execute_ListTagsError(t *testing.T) {
 	}
 
 	_, err := uc.Execute(t.Context(), usecasestaging.StatusInput{})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "list tags error")
 }

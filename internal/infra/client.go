@@ -33,6 +33,7 @@ func NewParamClient(ctx context.Context) (*ssm.Client, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	return ssm.NewFromConfig(cfg), nil
 }
 
@@ -42,6 +43,7 @@ func NewSecretClient(ctx context.Context) (*secretsmanager.Client, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	return secretsmanager.NewFromConfig(cfg), nil
 }
 
@@ -60,12 +62,14 @@ func GetAWSIdentity(ctx context.Context) (*AWSIdentity, error) {
 	}
 
 	stsClient := sts.NewFromConfig(cfg)
+
 	output, err := stsClient.GetCallerIdentity(ctx, &sts.GetCallerIdentityInput{})
 	if err != nil {
 		return nil, err
 	}
 
 	accountID := lo.FromPtr(output.Account)
+
 	return &AWSIdentity{
 		AccountID: accountID,
 		Region:    cfg.Region,
@@ -80,7 +84,7 @@ func GetAWSIdentity(ctx context.Context) (*AWSIdentity, error) {
 // Logic:
 // 1. Parse ~/.aws/config to build a map of profile -> account ID
 // 2. If AWS_PROFILE is set and its account matches, use it
-// 3. Otherwise, return the first profile that matches the account ID
+// 3. Otherwise, return the first profile that matches the account ID.
 func findProfileByAccountID(accountID string) string {
 	profileAccounts := parseAWSConfigProfiles()
 	if len(profileAccounts) == 0 {
@@ -93,6 +97,7 @@ func findProfileByAccountID(accountID string) string {
 			return envProfile
 		}
 	}
+
 	if envProfile := os.Getenv("AWS_DEFAULT_PROFILE"); envProfile != "" {
 		if profileAccounts[envProfile] == accountID {
 			return envProfile
@@ -113,6 +118,7 @@ func findProfileByAccountID(accountID string) string {
 // Account ID is extracted from sso_account_id or role_arn.
 func parseAWSConfigProfiles() map[string]string {
 	configPath := getAWSConfigPath()
+
 	cfg, err := ini.Load(configPath)
 	if err != nil {
 		return nil
@@ -137,12 +143,13 @@ func parseAWSConfigProfiles() map[string]string {
 		// Try sso_account_id first
 		if key, err := section.GetKey("sso_account_id"); err == nil {
 			profiles[profileName] = key.String()
+
 			continue
 		}
 
 		// Try role_arn (extract account ID from ARN)
 		if key, err := section.GetKey("role_arn"); err == nil {
-			if matches := arnAccountIDRegex.FindStringSubmatch(key.String()); len(matches) == 2 {
+			if matches := arnAccountIDRegex.FindStringSubmatch(key.String()); len(matches) == 2 { //nolint:mnd // regex capture groups
 				profiles[profileName] = matches[1]
 			}
 		}
@@ -156,9 +163,11 @@ func getAWSConfigPath() string {
 	if configFile := os.Getenv("AWS_CONFIG_FILE"); configFile != "" {
 		return configFile
 	}
+
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return ""
 	}
+
 	return filepath.Join(home, ".aws", "config")
 }

@@ -40,6 +40,7 @@ func WithPagerWriter(stdout io.Writer, noPager bool, fn func(w io.Writer) error)
 	// Check if output fits in terminal
 	if fitsInTerminal(int(f.Fd()), buf.String()) {
 		_, err := stdout.Write(buf.Bytes())
+
 		return err
 	}
 

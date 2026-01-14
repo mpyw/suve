@@ -22,6 +22,7 @@ type mockListClient struct {
 	getSecretValueErr    map[string]error
 }
 
+//nolint:lll // mock function signature must match AWS SDK interface
 func (m *mockListClient) ListSecrets(_ context.Context, _ *secretapi.ListSecretsInput, _ ...func(*secretapi.Options)) (*secretapi.ListSecretsOutput, error) {
 	if m.listSecretsErr != nil {
 		return nil, m.listSecretsErr
@@ -29,15 +30,19 @@ func (m *mockListClient) ListSecrets(_ context.Context, _ *secretapi.ListSecrets
 	// Support paginated results for testing
 	if len(m.listSecretsResults) > 0 {
 		idx := m.listSecretsCallCount
+
 		m.listSecretsCallCount++
 		if idx < len(m.listSecretsResults) {
 			return m.listSecretsResults[idx], nil
 		}
+
 		return &secretapi.ListSecretsOutput{}, nil
 	}
+
 	return m.listSecretsResult, nil
 }
 
+//nolint:lll // mock function signature must match AWS SDK interface
 func (m *mockListClient) GetSecretValue(_ context.Context, input *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) {
 	name := lo.FromPtr(input.SecretId)
 	if m.getSecretValueErr != nil {
@@ -45,11 +50,13 @@ func (m *mockListClient) GetSecretValue(_ context.Context, input *secretapi.GetS
 			return nil, err
 		}
 	}
+
 	if m.getSecretValueValue != nil {
 		if value, ok := m.getSecretValueValue[name]; ok {
 			return &secretapi.GetSecretValueOutput{SecretString: lo.ToPtr(value)}, nil
 		}
 	}
+
 	return nil, &secretapi.ResourceNotFoundException{Message: lo.ToPtr("not found")}
 }
 
@@ -145,7 +152,7 @@ func TestListUseCase_Execute_InvalidFilter(t *testing.T) {
 	_, err := uc.Execute(t.Context(), secret.ListInput{
 		Filter: "[invalid",
 	})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "invalid filter regex")
 }
 
@@ -159,7 +166,7 @@ func TestListUseCase_Execute_ListError(t *testing.T) {
 	uc := &secret.ListUseCase{Client: client}
 
 	_, err := uc.Execute(t.Context(), secret.ListInput{})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to list secrets")
 }
 
@@ -189,7 +196,7 @@ func TestListUseCase_Execute_WithValue(t *testing.T) {
 
 	for _, entry := range output.Entries {
 		assert.NotNil(t, entry.Value)
-		assert.Nil(t, entry.Error)
+		assert.NoError(t, entry.Error)
 	}
 }
 
@@ -220,14 +227,17 @@ func TestListUseCase_Execute_WithValue_PartialError(t *testing.T) {
 	assert.Len(t, output.Entries, 2)
 
 	var hasValue, hasError bool
+
 	for _, entry := range output.Entries {
 		if entry.Value != nil {
 			hasValue = true
 		}
+
 		if entry.Error != nil {
 			hasError = true
 		}
 	}
+
 	assert.True(t, hasValue)
 	assert.True(t, hasError)
 }
@@ -316,6 +326,7 @@ func TestListUseCase_Execute_WithPagination_FilterApplied(t *testing.T) {
 	})
 	require.NoError(t, err)
 	assert.Len(t, output.Entries, 2)
+
 	for _, entry := range output.Entries {
 		assert.Contains(t, entry.Name, "config")
 	}
@@ -333,7 +344,7 @@ func TestListUseCase_Execute_WithPagination_Error(t *testing.T) {
 	_, err := uc.Execute(t.Context(), secret.ListInput{
 		MaxResults: 10,
 	})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to list secrets")
 }
 

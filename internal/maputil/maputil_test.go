@@ -13,6 +13,7 @@ func TestSortedKeys(t *testing.T) {
 
 	t.Run("string keys", func(t *testing.T) {
 		t.Parallel()
+
 		m := map[string]int{
 			"c": 3,
 			"a": 1,
@@ -24,6 +25,7 @@ func TestSortedKeys(t *testing.T) {
 
 	t.Run("int keys", func(t *testing.T) {
 		t.Parallel()
+
 		m := map[int]string{
 			3: "c",
 			1: "a",
@@ -35,6 +37,7 @@ func TestSortedKeys(t *testing.T) {
 
 	t.Run("empty map", func(t *testing.T) {
 		t.Parallel()
+
 		m := map[string]int{}
 		keys := maputil.SortedKeys(m)
 		assert.Empty(t, keys)
@@ -42,6 +45,7 @@ func TestSortedKeys(t *testing.T) {
 
 	t.Run("single element", func(t *testing.T) {
 		t.Parallel()
+
 		m := map[string]int{"only": 1}
 		keys := maputil.SortedKeys(m)
 		assert.Equal(t, []string{"only"}, keys)
@@ -58,6 +62,7 @@ func TestSortedNames(t *testing.T) {
 
 	t.Run("multiple items", func(t *testing.T) {
 		t.Parallel()
+
 		items := []item{
 			{Name: "charlie", Value: 3},
 			{Name: "alice", Value: 1},
@@ -69,6 +74,7 @@ func TestSortedNames(t *testing.T) {
 
 	t.Run("duplicate names", func(t *testing.T) {
 		t.Parallel()
+
 		items := []item{
 			{Name: "alice", Value: 1},
 			{Name: "alice", Value: 2},
@@ -80,6 +86,7 @@ func TestSortedNames(t *testing.T) {
 
 	t.Run("empty slice", func(t *testing.T) {
 		t.Parallel()
+
 		items := []item{}
 		names := maputil.SortedNames(items, func(i item) string { return i.Name })
 		assert.Empty(t, names)

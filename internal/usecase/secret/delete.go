@@ -45,8 +45,10 @@ func (u *DeleteUseCase) GetCurrentValue(ctx context.Context, name string) (strin
 		if rnf := (*secretapi.ResourceNotFoundException)(nil); errors.As(err, &rnf) {
 			return "", nil
 		}
+
 		return "", err
 	}
+
 	return lo.FromPtr(out.SecretString), nil
 }
 

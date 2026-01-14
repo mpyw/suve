@@ -21,6 +21,7 @@ func TestCommand_Validation(t *testing.T) {
 
 	t.Run("missing arguments", func(t *testing.T) {
 		t.Parallel()
+
 		app := appcli.MakeApp()
 		err := app.Run(t.Context(), []string{"suve", "param", "untag"})
 		require.Error(t, err)
@@ -29,6 +30,7 @@ func TestCommand_Validation(t *testing.T) {
 
 	t.Run("missing key argument", func(t *testing.T) {
 		t.Parallel()
+
 		app := appcli.MakeApp()
 		err := app.Run(t.Context(), []string{"suve", "param", "untag", "/app/param"})
 		require.Error(t, err)
@@ -36,22 +38,27 @@ func TestCommand_Validation(t *testing.T) {
 	})
 }
 
+//nolint:lll // mock struct fields match AWS SDK interface signatures
 type mockClient struct {
 	addTagsFunc    func(ctx context.Context, params *paramapi.AddTagsToResourceInput, optFns ...func(*paramapi.Options)) (*paramapi.AddTagsToResourceOutput, error)
 	removeTagsFunc func(ctx context.Context, params *paramapi.RemoveTagsFromResourceInput, optFns ...func(*paramapi.Options)) (*paramapi.RemoveTagsFromResourceOutput, error)
 }
 
+//nolint:lll // mock function signature must match AWS SDK interface
 func (m *mockClient) AddTagsToResource(ctx context.Context, params *paramapi.AddTagsToResourceInput, optFns ...func(*paramapi.Options)) (*paramapi.AddTagsToResourceOutput, error) {
 	if m.addTagsFunc != nil {
 		return m.addTagsFunc(ctx, params, optFns...)
 	}
+
 	return &paramapi.AddTagsToResourceOutput{}, nil
 }
 
+//nolint:lll // mock function signature must match AWS SDK interface
 func (m *mockClient) RemoveTagsFromResource(ctx context.Context, params *paramapi.RemoveTagsFromResourceInput, optFns ...func(*paramapi.Options)) (*paramapi.RemoveTagsFromResourceOutput, error) {
 	if m.removeTagsFunc != nil {
 		return m.removeTagsFunc(ctx, params, optFns...)
 	}
+
 	return &paramapi.RemoveTagsFromResourceOutput{}, nil
 }
 
@@ -72,14 +79,17 @@ func TestRun(t *testing.T) {
 				Keys: []string{"env"},
 			},
 			mock: &mockClient{
+				//nolint:lll // inline mock function in test table
 				removeTagsFunc: func(_ context.Context, params *paramapi.RemoveTagsFromResourceInput, _ ...func(*paramapi.Options)) (*paramapi.RemoveTagsFromResourceOutput, error) {
 					assert.Equal(t, "/app/param", lo.FromPtr(params.ResourceId))
 					assert.Equal(t, paramapi.ResourceTypeForTaggingParameter, params.ResourceType)
 					assert.Equal(t, []string{"env"}, params.TagKeys)
+
 					return &paramapi.RemoveTagsFromResourceOutput{}, nil
 				},
 			},
 			check: func(t *testing.T, output string) {
+				t.Helper()
 				assert.Contains(t, output, "Untagged")
 				assert.Contains(t, output, "/app/param")
 			},
@@ -91,12 +101,15 @@ func TestRun(t *testing.T) {
 				Keys: []string{"env", "team"},
 			},
 			mock: &mockClient{
+				//nolint:lll // inline mock function in test table
 				removeTagsFunc: func(_ context.Context, params *paramapi.RemoveTagsFromResourceInput, _ ...func(*paramapi.Options)) (*paramapi.RemoveTagsFromResourceOutput, error) {
 					assert.Len(t, params.TagKeys, 2)
+
 					return &paramapi.RemoveTagsFromResourceOutput{}, nil
 				},
 			},
 			check: func(t *testing.T, output string) {
+				t.Helper()
 				assert.Contains(t, output, "2 key(s)")
 			},
 		},
@@ -107,6 +120,7 @@ func TestRun(t *testing.T) {
 				Keys: []string{"env"},
 			},
 			mock: &mockClient{
+				//nolint:lll // inline mock function in test table
 				removeTagsFunc: func(_ context.Context, _ *paramapi.RemoveTagsFromResourceInput, _ ...func(*paramapi.Options)) (*paramapi.RemoveTagsFromResourceOutput, error) {
 					return nil, fmt.Errorf("AWS error")
 				},
@@ -118,7 +132,9 @@ func TestRun(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
+
 			var buf bytes.Buffer
+
 			r := &untag.Runner{
 				UseCase: &param.TagUseCase{Client: tt.mock},
 				Stdout:  &buf,
@@ -128,10 +144,12 @@ func TestRun(t *testing.T) {
 			if tt.wantErr != "" {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tt.wantErr)
+
 				return
 			}
 
 			require.NoError(t, err)
+
 			if tt.check != nil {
 				tt.check(t, buf.String())
 			}

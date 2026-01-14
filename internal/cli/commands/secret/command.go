@@ -1,3 +1,4 @@
+// Package secret provides CLI commands for AWS Secrets Manager.
 package secret
 
 import (

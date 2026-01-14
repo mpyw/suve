@@ -3,7 +3,6 @@ package staging_test
 import (
 	"context"
 	"errors"
-	"path/filepath"
 	"testing"
 	"time"
 
@@ -12,12 +11,15 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/mpyw/suve/internal/staging"
-	"github.com/mpyw/suve/internal/staging/file"
+	"github.com/mpyw/suve/internal/staging/store/testutil"
 	usecasestaging "github.com/mpyw/suve/internal/usecase/staging"
 )
 
+const testCurrentValue = "current-value"
+
 type mockResetStrategy struct {
 	*mockParser
+
 	fetchValue        string
 	versionLabel      string
 	fetchErr          error
@@ -29,6 +31,7 @@ func (m *mockResetStrategy) FetchVersion(_ context.Context, _ string) (string, s
 	if m.fetchErr != nil {
 		return "", "", m.fetchErr
 	}
+
 	return m.fetchValue, m.versionLabel, nil
 }
 
@@ -36,6 +39,7 @@ func (m *mockResetStrategy) FetchCurrentValue(_ context.Context, _ string) (*sta
 	if m.fetchCurrentError != nil {
 		return nil, m.fetchCurrentError
 	}
+
 	return &staging.EditFetchResult{Value: m.currentValue}, nil
 }
 
@@ -44,14 +48,14 @@ func newMockResetStrategy() *mockResetStrategy {
 		mockParser:   newMockParser(),
 		fetchValue:   "version-value",
 		versionLabel: "#3",
-		currentValue: "current-value",
+		currentValue: testCurrentValue,
 	}
 }
 
 func TestResetUseCase_Execute_Unstage(t *testing.T) {
 	t.Parallel()
 
-	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := testutil.NewMockStore()
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("value"),
@@ -78,7 +82,7 @@ func TestResetUseCase_Execute_Unstage(t *testing.T) {
 func TestResetUseCase_Execute_NotStaged(t *testing.T) {
 	t.Parallel()
 
-	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := testutil.NewMockStore()
 	uc := &usecasestaging.ResetUseCase{
 		Parser: newMockParser(),
 		Store:  store,
@@ -94,7 +98,7 @@ func TestResetUseCase_Execute_NotStaged(t *testing.T) {
 func TestResetUseCase_Execute_UnstageAll(t *testing.T) {
 	t.Parallel()
 
-	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := testutil.NewMockStore()
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/one", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("one"),
@@ -127,7 +131,7 @@ func TestResetUseCase_Execute_UnstageAll(t *testing.T) {
 func TestResetUseCase_Execute_UnstageAll_Empty(t *testing.T) {
 	t.Parallel()
 
-	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := testutil.NewMockStore()
 	uc := &usecasestaging.ResetUseCase{
 		Parser: newMockParser(),
 		Store:  store,
@@ -143,7 +147,7 @@ func TestResetUseCase_Execute_UnstageAll_Empty(t *testing.T) {
 func TestResetUseCase_Execute_Restore(t *testing.T) {
 	t.Parallel()
 
-	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := testutil.NewMockStore()
 	parser := &mockParserWithVersion{
 		mockParser: newMockParser(),
 		hasVersion: true,
@@ -172,7 +176,7 @@ func TestResetUseCase_Execute_Restore(t *testing.T) {
 func TestResetUseCase_Execute_Restore_NoFetcher(t *testing.T) {
 	t.Parallel()
 
-	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := testutil.NewMockStore()
 	parser := &mockParserWithVersion{
 		mockParser: newMockParser(),
 		hasVersion: true,
@@ -187,14 +191,14 @@ func TestResetUseCase_Execute_Restore_NoFetcher(t *testing.T) {
 	_, err := uc.Execute(t.Context(), usecasestaging.ResetInput{
 		Spec: "/app/config#3",
 	})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "reset strategy required")
 }
 
 func TestResetUseCase_Execute_Restore_FetchError(t *testing.T) {
 	t.Parallel()
 
-	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := testutil.NewMockStore()
 	parser := &mockParserWithVersion{
 		mockParser: newMockParser(),
 		hasVersion: true,
@@ -211,12 +215,13 @@ func TestResetUseCase_Execute_Restore_FetchError(t *testing.T) {
 	_, err := uc.Execute(t.Context(), usecasestaging.ResetInput{
 		Spec: "/app/config#999",
 	})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "version not found")
 }
 
 type mockParserWithVersion struct {
 	*mockParser
+
 	hasVersion bool
 }
 
@@ -227,7 +232,7 @@ func (m *mockParserWithVersion) ParseSpec(input string) (string, bool, error) {
 func TestResetUseCase_Execute_ParseError(t *testing.T) {
 	t.Parallel()
 
-	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := testutil.NewMockStore()
 	parser := &mockParserWithParseSpecErr{
 		mockParser: newMockParser(),
 		parseErr:   errors.New("parse error"),
@@ -246,6 +251,7 @@ func TestResetUseCase_Execute_ParseError(t *testing.T) {
 
 type mockParserWithParseSpecErr struct {
 	*mockParser
+
 	parseErr error
 }
 
@@ -256,8 +262,8 @@ func (m *mockParserWithParseSpecErr) ParseSpec(_ string) (string, bool, error) {
 func TestResetUseCase_Execute_ListError(t *testing.T) {
 	t.Parallel()
 
-	store := newMockStore()
-	store.listErr = errors.New("list error")
+	store := testutil.NewMockStore()
+	store.ListEntriesErr = errors.New("list error")
 
 	uc := &usecasestaging.ResetUseCase{
 		Parser: newMockParser(),
@@ -265,18 +271,18 @@ func TestResetUseCase_Execute_ListError(t *testing.T) {
 	}
 
 	_, err := uc.Execute(t.Context(), usecasestaging.ResetInput{All: true})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "list error")
 }
 
 func TestResetUseCase_Execute_UnstageAllError(t *testing.T) {
 	t.Parallel()
 
-	store := newMockStore()
-	store.addEntry(staging.ServiceParam, "/app/config", staging.Entry{
+	store := testutil.NewMockStore()
+	store.AddEntry(staging.ServiceParam, "/app/config", staging.Entry{
 		Operation: staging.OperationUpdate,
 	})
-	store.unstageAllErr = errors.New("unstage all error")
+	store.UnstageAllErr = errors.New("unstage all error")
 
 	uc := &usecasestaging.ResetUseCase{
 		Parser: newMockParser(),
@@ -284,15 +290,15 @@ func TestResetUseCase_Execute_UnstageAllError(t *testing.T) {
 	}
 
 	_, err := uc.Execute(t.Context(), usecasestaging.ResetInput{All: true})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "unstage all error")
 }
 
 func TestResetUseCase_Execute_GetError(t *testing.T) {
 	t.Parallel()
 
-	store := newMockStore()
-	store.getErr = errors.New("get error")
+	store := testutil.NewMockStore()
+	store.GetEntryErr = errors.New("get error")
 
 	uc := &usecasestaging.ResetUseCase{
 		Parser: newMockParser(),
@@ -300,18 +306,18 @@ func TestResetUseCase_Execute_GetError(t *testing.T) {
 	}
 
 	_, err := uc.Execute(t.Context(), usecasestaging.ResetInput{Spec: "/app/config"})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "get error")
 }
 
 func TestResetUseCase_Execute_UnstageError(t *testing.T) {
 	t.Parallel()
 
-	store := newMockStore()
-	store.addEntry(staging.ServiceParam, "/app/config", staging.Entry{
+	store := testutil.NewMockStore()
+	store.AddEntry(staging.ServiceParam, "/app/config", staging.Entry{
 		Operation: staging.OperationUpdate,
 	})
-	store.unstageErr = errors.New("unstage error")
+	store.UnstageEntryErr = errors.New("unstage error")
 
 	uc := &usecasestaging.ResetUseCase{
 		Parser: newMockParser(),
@@ -319,15 +325,15 @@ func TestResetUseCase_Execute_UnstageError(t *testing.T) {
 	}
 
 	_, err := uc.Execute(t.Context(), usecasestaging.ResetInput{Spec: "/app/config"})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "unstage error")
 }
 
 func TestResetUseCase_Execute_RestoreStageError(t *testing.T) {
 	t.Parallel()
 
-	store := newMockStore()
-	store.stageErr = errors.New("stage error")
+	store := testutil.NewMockStore()
+	store.StageEntryErr = errors.New("stage error")
 
 	parser := &mockParserWithVersion{
 		mockParser: newMockParser(),
@@ -341,14 +347,14 @@ func TestResetUseCase_Execute_RestoreStageError(t *testing.T) {
 	}
 
 	_, err := uc.Execute(t.Context(), usecasestaging.ResetInput{Spec: "/app/config#3"})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "stage error")
 }
 
 func TestResetUseCase_Execute_RestoreSkipped_SameAsAWS(t *testing.T) {
 	t.Parallel()
 
-	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := testutil.NewMockStore()
 	parser := &mockParserWithVersion{
 		mockParser: newMockParser(),
 		hasVersion: true,
@@ -356,8 +362,8 @@ func TestResetUseCase_Execute_RestoreSkipped_SameAsAWS(t *testing.T) {
 
 	// Fetcher returns value that matches current AWS
 	fetcher := newMockResetStrategy()
-	fetcher.fetchValue = "current-value"
-	fetcher.currentValue = "current-value" // Same as fetched version
+	fetcher.fetchValue = testCurrentValue
+	fetcher.currentValue = testCurrentValue // Same as fetched version
 	fetcher.versionLabel = "#3"
 
 	uc := &usecasestaging.ResetUseCase{
@@ -381,7 +387,7 @@ func TestResetUseCase_Execute_RestoreSkipped_SameAsAWS(t *testing.T) {
 func TestResetUseCase_Execute_RestoreNotSkipped_DifferentFromAWS(t *testing.T) {
 	t.Parallel()
 
-	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := testutil.NewMockStore()
 	parser := &mockParserWithVersion{
 		mockParser: newMockParser(),
 		hasVersion: true,
@@ -390,7 +396,7 @@ func TestResetUseCase_Execute_RestoreNotSkipped_DifferentFromAWS(t *testing.T) {
 	// Fetcher returns value different from current AWS
 	fetcher := newMockResetStrategy()
 	fetcher.fetchValue = "old-version-value"
-	fetcher.currentValue = "current-value" // Different from fetched version
+	fetcher.currentValue = testCurrentValue // Different from fetched version
 	fetcher.versionLabel = "#3"
 
 	uc := &usecasestaging.ResetUseCase{
@@ -415,7 +421,7 @@ func TestResetUseCase_Execute_RestoreNotSkipped_DifferentFromAWS(t *testing.T) {
 func TestResetUseCase_Execute_RestoreFetchCurrentError(t *testing.T) {
 	t.Parallel()
 
-	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := testutil.NewMockStore()
 	parser := &mockParserWithVersion{
 		mockParser: newMockParser(),
 		hasVersion: true,
@@ -433,6 +439,136 @@ func TestResetUseCase_Execute_RestoreFetchCurrentError(t *testing.T) {
 	_, err := uc.Execute(t.Context(), usecasestaging.ResetInput{
 		Spec: "/app/config#3",
 	})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "aws error")
+}
+
+// =============================================================================
+// HintedUnstager Tests
+// =============================================================================
+
+func TestResetUseCase_Execute_UnstageAll_WithHintedUnstager(t *testing.T) {
+	t.Parallel()
+
+	store := testutil.NewHintedMockStore()
+	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/one", staging.Entry{
+		Operation: staging.OperationUpdate,
+		Value:     lo.ToPtr("one"),
+		StagedAt:  time.Now(),
+	}))
+	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/two", staging.Entry{
+		Operation: staging.OperationCreate,
+		Value:     lo.ToPtr("two"),
+		StagedAt:  time.Now(),
+	}))
+
+	uc := &usecasestaging.ResetUseCase{
+		Parser: newMockParser(),
+		Store:  store,
+	}
+
+	output, err := uc.Execute(t.Context(), usecasestaging.ResetInput{
+		All: true,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, usecasestaging.ResetResultUnstagedAll, output.Type)
+	assert.Equal(t, 2, output.Count)
+
+	// Verify hint was used
+	assert.Equal(t, "reset", store.LastHint)
+
+	// Verify all unstaged
+	entries, err := store.ListEntries(t.Context(), staging.ServiceParam)
+	require.NoError(t, err)
+	assert.Empty(t, entries[staging.ServiceParam])
+}
+
+func TestResetUseCase_Execute_UnstageAll_WithHintedUnstager_Error(t *testing.T) {
+	t.Parallel()
+
+	store := testutil.NewHintedMockStore()
+	store.AddEntry(staging.ServiceParam, "/app/config", staging.Entry{
+		Operation: staging.OperationUpdate,
+	})
+	store.UnstageAllWithHintErr = errors.New("hinted unstage error")
+
+	uc := &usecasestaging.ResetUseCase{
+		Parser: newMockParser(),
+		Store:  store,
+	}
+
+	_, err := uc.Execute(t.Context(), usecasestaging.ResetInput{All: true})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "hinted unstage error")
+}
+
+func TestResetUseCase_Execute_UnstageAll_Empty_WithHintedUnstager(t *testing.T) {
+	t.Parallel()
+
+	store := testutil.NewHintedMockStore()
+	uc := &usecasestaging.ResetUseCase{
+		Parser: newMockParser(),
+		Store:  store,
+	}
+
+	output, err := uc.Execute(t.Context(), usecasestaging.ResetInput{
+		All: true,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, usecasestaging.ResetResultNothingStaged, output.Type)
+
+	// Verify hint was still used even for empty unstage
+	assert.Equal(t, "reset", store.LastHint)
+}
+
+func TestResetUseCase_Execute_UnstageAll_WithTags(t *testing.T) {
+	t.Parallel()
+
+	store := testutil.NewMockStore()
+	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
+		Operation: staging.OperationUpdate,
+		Value:     lo.ToPtr("value"),
+		StagedAt:  time.Now(),
+	}))
+	require.NoError(t, store.StageTag(t.Context(), staging.ServiceParam, "/app/config", staging.TagEntry{
+		Add:      map[string]string{"env": "prod"},
+		StagedAt: time.Now(),
+	}))
+
+	uc := &usecasestaging.ResetUseCase{
+		Parser: newMockParser(),
+		Store:  store,
+	}
+
+	output, err := uc.Execute(t.Context(), usecasestaging.ResetInput{
+		All: true,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, usecasestaging.ResetResultUnstagedAll, output.Type)
+	assert.Equal(t, 2, output.Count) // 1 entry + 1 tag
+
+	// Verify all unstaged
+	entries, err := store.ListEntries(t.Context(), staging.ServiceParam)
+	require.NoError(t, err)
+	assert.Empty(t, entries[staging.ServiceParam])
+
+	tags, err := store.ListTags(t.Context(), staging.ServiceParam)
+	require.NoError(t, err)
+	assert.Empty(t, tags[staging.ServiceParam])
+}
+
+func TestResetUseCase_Execute_ListTagsError(t *testing.T) {
+	t.Parallel()
+
+	store := testutil.NewMockStore()
+	store.ListTagsErr = errors.New("list tags error")
+
+	uc := &usecasestaging.ResetUseCase{
+		Parser: newMockParser(),
+		Store:  store,
+	}
+
+	_, err := uc.Execute(t.Context(), usecasestaging.ResetInput{All: true})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "list tags error")
 }

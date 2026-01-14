@@ -8,15 +8,16 @@ import (
 
 	"github.com/urfave/cli/v3"
 
-	"github.com/mpyw/suve/internal/cli/colors"
+	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/infra"
 	"github.com/mpyw/suve/internal/staging"
-	"github.com/mpyw/suve/internal/staging/file"
+	"github.com/mpyw/suve/internal/staging/store"
+	"github.com/mpyw/suve/internal/staging/store/agent"
 )
 
 // Runner executes the reset command.
 type Runner struct {
-	Store  *file.Store
+	Store  store.ReadWriteOperator
 	Stdout io.Writer
 	Stderr io.Writer
 }
@@ -47,8 +48,9 @@ EXAMPLES:
 func action(ctx context.Context, cmd *cli.Command) error {
 	// Require --all flag for safety
 	if !cmd.Bool("all") {
-		_, _ = fmt.Fprintln(cmd.Root().ErrWriter, colors.Warning("Warning: no effect without --all flag"))
-		_, _ = fmt.Fprintln(cmd.Root().ErrWriter, "Hint: Use 'suve stage reset --all' to unstage all changes")
+		output.Warning(cmd.Root().ErrWriter, "no effect without --all flag")
+		output.Hint(cmd.Root().ErrWriter, "Use 'suve stage reset --all' to unstage all changes")
+
 		return nil
 	}
 
@@ -56,10 +58,8 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	if err != nil {
 		return fmt.Errorf("failed to get AWS identity: %w", err)
 	}
-	store, err := file.NewStore(identity.AccountID, identity.Region)
-	if err != nil {
-		return fmt.Errorf("failed to initialize stage store: %w", err)
-	}
+
+	store := agent.NewStore(identity.AccountID, identity.Region)
 
 	r := &Runner{
 		Store:  store,
@@ -93,26 +93,24 @@ func (r *Runner) Run(ctx context.Context) error {
 
 	totalCount := paramCount + secretCount
 
+	// Always call UnstageAll to trigger daemon auto-shutdown check
+	// Empty service ("") clears both SSM Parameter Store and Secrets Manager
+	// Use hint for context-aware shutdown message
+	if hinted, ok := r.Store.(store.HintedUnstager); ok {
+		if err := hinted.UnstageAllWithHint(ctx, "", store.HintReset); err != nil {
+			return err
+		}
+	} else if err := r.Store.UnstageAll(ctx, ""); err != nil {
+		return err
+	}
+
 	if totalCount == 0 {
-		_, _ = fmt.Fprintln(r.Stdout, colors.Warning("No changes staged."))
+		output.Info(r.Stdout, "No changes staged.")
+
 		return nil
 	}
 
-	// Unstage all SSM Parameter Store (UnstageAll clears both entries and tags)
-	if paramCount > 0 {
-		if err := r.Store.UnstageAll(ctx, staging.ServiceParam); err != nil {
-			return err
-		}
-	}
+	output.Success(r.Stdout, "Unstaged all changes (%d SSM Parameter Store, %d Secrets Manager)", paramCount, secretCount)
 
-	// Unstage all Secrets Manager (UnstageAll clears both entries and tags)
-	if secretCount > 0 {
-		if err := r.Store.UnstageAll(ctx, staging.ServiceSecret); err != nil {
-			return err
-		}
-	}
-
-	_, _ = fmt.Fprintf(r.Stdout, "%s Unstaged all changes (%d SSM Parameter Store, %d Secrets Manager)\n",
-		colors.Success("✓"), paramCount, secretCount)
 	return nil
 }

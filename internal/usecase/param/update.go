@@ -41,11 +41,14 @@ func (u *UpdateUseCase) Exists(ctx context.Context, name string) (bool, error) {
 		Name: lo.ToPtr(name),
 	})
 	if err != nil {
-		if pnf := (*paramapi.ParameterNotFound)(nil); errors.As(err, &pnf) {
+		pnf := (*paramapi.ParameterNotFound)(nil)
+		if errors.As(err, &pnf) {
 			return false, nil
 		}
+
 		return false, err
 	}
+
 	return true, nil
 }
 
@@ -57,8 +60,9 @@ func (u *UpdateUseCase) Execute(ctx context.Context, input UpdateInput) (*Update
 	if err != nil {
 		return nil, err
 	}
+
 	if !exists {
-		return nil, fmt.Errorf("parameter not found: %s", input.Name)
+		return nil, fmt.Errorf("%w: %s", ErrParameterNotFound, input.Name)
 	}
 
 	// Update parameter

@@ -3,7 +3,6 @@ package staging_test
 import (
 	"context"
 	"errors"
-	"path/filepath"
 	"testing"
 	"time"
 
@@ -13,12 +12,13 @@ import (
 
 	"github.com/mpyw/suve/internal/maputil"
 	"github.com/mpyw/suve/internal/staging"
-	"github.com/mpyw/suve/internal/staging/file"
+	"github.com/mpyw/suve/internal/staging/store/testutil"
 	usecasestaging "github.com/mpyw/suve/internal/usecase/staging"
 )
 
 type mockTagStrategy struct {
 	*mockParser
+
 	fetchResult *staging.EditFetchResult
 	fetchErr    error
 }
@@ -27,6 +27,7 @@ func (m *mockTagStrategy) FetchCurrentValue(_ context.Context, _ string) (*stagi
 	if m.fetchErr != nil {
 		return nil, m.fetchErr
 	}
+
 	return m.fetchResult, nil
 }
 
@@ -47,7 +48,7 @@ func newMockTagStrategy() *mockTagStrategy {
 func TestTagUseCase_Tag_NewTagEntry(t *testing.T) {
 	t.Parallel()
 
-	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := testutil.NewMockStore()
 	uc := &usecasestaging.TagUseCase{
 		Strategy: newMockTagStrategy(),
 		Store:    store,
@@ -71,7 +72,7 @@ func TestTagUseCase_Tag_NewTagEntry(t *testing.T) {
 func TestTagUseCase_Tag_MergeWithExisting(t *testing.T) {
 	t.Parallel()
 
-	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := testutil.NewMockStore()
 	baseTime := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
 
 	// Pre-stage a tag entry
@@ -103,7 +104,7 @@ func TestTagUseCase_Tag_MergeWithExisting(t *testing.T) {
 func TestTagUseCase_Tag_AddTagRemovesFromUntagList(t *testing.T) {
 	t.Parallel()
 
-	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := testutil.NewMockStore()
 
 	// Pre-stage with remove tags
 	require.NoError(t, store.StageTag(t.Context(), staging.ServiceParam, "/app/config", staging.TagEntry{
@@ -133,7 +134,7 @@ func TestTagUseCase_Tag_AddTagRemovesFromUntagList(t *testing.T) {
 func TestTagUseCase_Tag_ParseError(t *testing.T) {
 	t.Parallel()
 
-	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := testutil.NewMockStore()
 	strategy := newMockTagStrategy()
 	strategy.parseErr = errors.New("invalid name")
 
@@ -146,14 +147,14 @@ func TestTagUseCase_Tag_ParseError(t *testing.T) {
 		Name: "invalid",
 		Tags: map[string]string{"env": "prod"},
 	})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "invalid name")
 }
 
 func TestTagUseCase_Tag_FetchError(t *testing.T) {
 	t.Parallel()
 
-	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := testutil.NewMockStore()
 	strategy := newMockTagStrategy()
 	strategy.fetchErr = errors.New("aws error")
 
@@ -166,15 +167,15 @@ func TestTagUseCase_Tag_FetchError(t *testing.T) {
 		Name: "/app/config",
 		Tags: map[string]string{"env": "prod"},
 	})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "aws error")
 }
 
 func TestTagUseCase_Tag_StageError(t *testing.T) {
 	t.Parallel()
 
-	store := newMockStore()
-	store.stageTagErr = errors.New("stage error")
+	store := testutil.NewMockStore()
+	store.StageTagErr = errors.New("stage error")
 
 	uc := &usecasestaging.TagUseCase{
 		Strategy: newMockTagStrategy(),
@@ -185,15 +186,15 @@ func TestTagUseCase_Tag_StageError(t *testing.T) {
 		Name: "/app/config",
 		Tags: map[string]string{"env": "prod"},
 	})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "stage error")
 }
 
 func TestTagUseCase_Tag_GetError(t *testing.T) {
 	t.Parallel()
 
-	store := newMockStore()
-	store.getTagErr = errors.New("get error")
+	store := testutil.NewMockStore()
+	store.GetTagErr = errors.New("get error")
 
 	uc := &usecasestaging.TagUseCase{
 		Strategy: newMockTagStrategy(),
@@ -204,14 +205,14 @@ func TestTagUseCase_Tag_GetError(t *testing.T) {
 		Name: "/app/config",
 		Tags: map[string]string{"env": "prod"},
 	})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "get error")
 }
 
 func TestTagUseCase_Tag_ZeroLastModified(t *testing.T) {
 	t.Parallel()
 
-	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := testutil.NewMockStore()
 	strategy := newMockTagStrategy()
 	strategy.fetchResult = &staging.EditFetchResult{
 		Value:        "aws-value",
@@ -237,7 +238,7 @@ func TestTagUseCase_Tag_ZeroLastModified(t *testing.T) {
 func TestTagUseCase_Tag_StagedForCreate_ResourceNotFound(t *testing.T) {
 	t.Parallel()
 
-	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := testutil.NewMockStore()
 
 	// First, stage an entry for CREATE (new resource that doesn't exist in AWS)
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/new-param", staging.Entry{
@@ -272,7 +273,7 @@ func TestTagUseCase_Tag_StagedForCreate_ResourceNotFound(t *testing.T) {
 func TestTagUseCase_Tag_EmptyTags(t *testing.T) {
 	t.Parallel()
 
-	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := testutil.NewMockStore()
 	uc := &usecasestaging.TagUseCase{
 		Strategy: newMockTagStrategy(),
 		Store:    store,
@@ -290,7 +291,7 @@ func TestTagUseCase_Tag_EmptyTags(t *testing.T) {
 func TestTagUseCase_Tag_BlockedOnDelete(t *testing.T) {
 	t.Parallel()
 
-	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := testutil.NewMockStore()
 
 	// Pre-stage DELETE operation
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
@@ -315,8 +316,8 @@ func TestTagUseCase_Tag_BlockedOnDelete(t *testing.T) {
 func TestTagUseCase_Tag_GetEntryError(t *testing.T) {
 	t.Parallel()
 
-	store := newMockStore()
-	store.getErr = errors.New("get entry error")
+	store := testutil.NewMockStore()
+	store.GetEntryErr = errors.New("get entry error")
 
 	uc := &usecasestaging.TagUseCase{
 		Strategy: newMockTagStrategy(),
@@ -327,7 +328,7 @@ func TestTagUseCase_Tag_GetEntryError(t *testing.T) {
 		Name: "/app/config",
 		Tags: map[string]string{"env": "prod"},
 	})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "get entry error")
 }
 
@@ -338,7 +339,7 @@ func TestTagUseCase_Tag_GetEntryError(t *testing.T) {
 func TestTagUseCase_Untag_Success(t *testing.T) {
 	t.Parallel()
 
-	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := testutil.NewMockStore()
 	uc := &usecasestaging.TagUseCase{
 		Strategy: newMockTagStrategy(),
 		Store:    store,
@@ -361,7 +362,7 @@ func TestTagUseCase_Untag_Success(t *testing.T) {
 func TestTagUseCase_Untag_RemoveTagDeletesFromAddList(t *testing.T) {
 	t.Parallel()
 
-	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := testutil.NewMockStore()
 
 	// Pre-stage with tags to add
 	require.NoError(t, store.StageTag(t.Context(), staging.ServiceParam, "/app/config", staging.TagEntry{
@@ -391,7 +392,7 @@ func TestTagUseCase_Untag_RemoveTagDeletesFromAddList(t *testing.T) {
 func TestTagUseCase_Untag_DuplicateRemoveKeys(t *testing.T) {
 	t.Parallel()
 
-	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := testutil.NewMockStore()
 
 	// Pre-stage with remove key
 	require.NoError(t, store.StageTag(t.Context(), staging.ServiceParam, "/app/config", staging.TagEntry{
@@ -421,7 +422,7 @@ func TestTagUseCase_Untag_DuplicateRemoveKeys(t *testing.T) {
 func TestTagUseCase_Untag_ParseError(t *testing.T) {
 	t.Parallel()
 
-	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := testutil.NewMockStore()
 	strategy := newMockTagStrategy()
 	strategy.parseErr = errors.New("invalid name")
 
@@ -434,15 +435,15 @@ func TestTagUseCase_Untag_ParseError(t *testing.T) {
 		Name:    "invalid",
 		TagKeys: maputil.NewSet("env"),
 	})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "invalid name")
 }
 
 func TestTagUseCase_Untag_GetEntryError(t *testing.T) {
 	t.Parallel()
 
-	store := newMockStore()
-	store.getErr = errors.New("get entry error")
+	store := testutil.NewMockStore()
+	store.GetEntryErr = errors.New("get entry error")
 
 	uc := &usecasestaging.TagUseCase{
 		Strategy: newMockTagStrategy(),
@@ -453,15 +454,15 @@ func TestTagUseCase_Untag_GetEntryError(t *testing.T) {
 		Name:    "/app/config",
 		TagKeys: maputil.NewSet("env"),
 	})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "get entry error")
 }
 
 func TestTagUseCase_Untag_GetTagError(t *testing.T) {
 	t.Parallel()
 
-	store := newMockStore()
-	store.getTagErr = errors.New("get tag error")
+	store := testutil.NewMockStore()
+	store.GetTagErr = errors.New("get tag error")
 
 	uc := &usecasestaging.TagUseCase{
 		Strategy: newMockTagStrategy(),
@@ -472,14 +473,14 @@ func TestTagUseCase_Untag_GetTagError(t *testing.T) {
 		Name:    "/app/config",
 		TagKeys: maputil.NewSet("env"),
 	})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "get tag error")
 }
 
 func TestTagUseCase_Untag_FetchError(t *testing.T) {
 	t.Parallel()
 
-	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := testutil.NewMockStore()
 	strategy := newMockTagStrategy()
 	strategy.fetchErr = errors.New("aws error")
 
@@ -492,14 +493,14 @@ func TestTagUseCase_Untag_FetchError(t *testing.T) {
 		Name:    "/app/config",
 		TagKeys: maputil.NewSet("env"),
 	})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "aws error")
 }
 
 func TestTagUseCase_Untag_BlockedOnDelete(t *testing.T) {
 	t.Parallel()
 
-	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := testutil.NewMockStore()
 
 	// Pre-stage DELETE operation
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
@@ -524,7 +525,7 @@ func TestTagUseCase_Untag_BlockedOnDelete(t *testing.T) {
 func TestTagUseCase_Untag_StagedForCreate_WithExistingTags(t *testing.T) {
 	t.Parallel()
 
-	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := testutil.NewMockStore()
 
 	// Stage an entry for CREATE
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/new-param", staging.Entry{
@@ -567,7 +568,7 @@ func TestTagUseCase_Untag_StagedForCreate_WithExistingTags(t *testing.T) {
 func TestTagUseCase_Untag_StagedForCreate_AutoSkip(t *testing.T) {
 	t.Parallel()
 
-	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := testutil.NewMockStore()
 
 	// Stage an entry for CREATE without any pre-staged tags
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/new-param", staging.Entry{
@@ -600,7 +601,7 @@ func TestTagUseCase_Untag_StagedForCreate_AutoSkip(t *testing.T) {
 func TestTagUseCase_Untag_EmptyTagKeys(t *testing.T) {
 	t.Parallel()
 
-	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := testutil.NewMockStore()
 	uc := &usecasestaging.TagUseCase{
 		Strategy: newMockTagStrategy(),
 		Store:    store,
@@ -618,8 +619,8 @@ func TestTagUseCase_Untag_EmptyTagKeys(t *testing.T) {
 func TestTagUseCase_Untag_StageError(t *testing.T) {
 	t.Parallel()
 
-	store := newMockStore()
-	store.stageTagErr = errors.New("stage error")
+	store := testutil.NewMockStore()
+	store.StageTagErr = errors.New("stage error")
 
 	uc := &usecasestaging.TagUseCase{
 		Strategy: newMockTagStrategy(),
@@ -630,14 +631,14 @@ func TestTagUseCase_Untag_StageError(t *testing.T) {
 		Name:    "/app/config",
 		TagKeys: maputil.NewSet("env"),
 	})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "stage error")
 }
 
 func TestTagUseCase_Untag_PreservesBaseModifiedAt(t *testing.T) {
 	t.Parallel()
 
-	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := testutil.NewMockStore()
 	baseTime := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
 
 	// Pre-stage a tag entry with BaseModifiedAt
@@ -666,7 +667,7 @@ func TestTagUseCase_Untag_PreservesBaseModifiedAt(t *testing.T) {
 func TestTagUseCase_Untag_ZeroLastModified(t *testing.T) {
 	t.Parallel()
 
-	store := file.NewStoreWithPath(filepath.Join(t.TempDir(), "staging.json"))
+	store := testutil.NewMockStore()
 	strategy := newMockTagStrategy()
 	strategy.fetchResult = &staging.EditFetchResult{
 		Value:        "aws-value",

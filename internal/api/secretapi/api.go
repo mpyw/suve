@@ -10,9 +10,9 @@ type GetSecretValueAPI interface {
 	GetSecretValue(ctx context.Context, params *GetSecretValueInput, optFns ...func(*Options)) (*GetSecretValueOutput, error)
 }
 
-// ListSecretVersionIdsAPI is the interface for listing secret versions.
-type ListSecretVersionIdsAPI interface {
-	ListSecretVersionIds(ctx context.Context, params *ListSecretVersionIdsInput, optFns ...func(*Options)) (*ListSecretVersionIdsOutput, error)
+// ListSecretVersionIDsAPI is the interface for listing secret versions.
+type ListSecretVersionIDsAPI interface {
+	ListSecretVersionIds(ctx context.Context, params *ListSecretVersionIDsInput, optFns ...func(*Options)) (*ListSecretVersionIDsOutput, error)
 }
 
 // ListSecretsAPI is the interface for listing secrets.

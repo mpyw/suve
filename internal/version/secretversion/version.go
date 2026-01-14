@@ -16,7 +16,7 @@ import (
 // Client is the interface for GetSecretWithVersion.
 type Client interface {
 	secretapi.GetSecretValueAPI
-	secretapi.ListSecretVersionIdsAPI
+	secretapi.ListSecretVersionIDsAPI
 }
 
 // GetSecretWithVersion retrieves a secret with version/shift/label support.
@@ -33,6 +33,7 @@ func GetSecretWithVersion(ctx context.Context, client Client, spec *Spec) (*secr
 	if spec.Absolute.ID != nil {
 		input.VersionId = spec.Absolute.ID
 	}
+
 	if spec.Absolute.Label != nil {
 		input.VersionStage = spec.Absolute.Label
 	}
@@ -43,15 +44,20 @@ func GetSecretWithVersion(ctx context.Context, client Client, spec *Spec) (*secr
 // TruncateVersionID truncates a version ID to 8 characters for display.
 // Secrets Manager version IDs are UUIDs which are long; this provides
 // a readable short form similar to git commit hashes.
+// versionIDDisplayLength is the number of characters to display for version IDs.
+const versionIDDisplayLength = 8
+
+// TruncateVersionID truncates a version ID to a readable short form.
 func TruncateVersionID(id string) string {
-	if len(id) > 8 {
-		return id[:8]
+	if len(id) > versionIDDisplayLength {
+		return id[:versionIDDisplayLength]
 	}
+
 	return id
 }
 
 func getSecretWithShift(ctx context.Context, client Client, spec *Spec) (*secretapi.GetSecretValueOutput, error) {
-	versions, err := client.ListSecretVersionIds(ctx, &secretapi.ListSecretVersionIdsInput{
+	versions, err := client.ListSecretVersionIds(ctx, &secretapi.ListSecretVersionIDsInput{
 		SecretId: lo.ToPtr(spec.Name),
 	})
 	if err != nil {
@@ -67,19 +73,23 @@ func getSecretWithShift(ctx context.Context, client Client, spec *Spec) (*secret
 		if versionList[i].CreatedDate == nil {
 			return false
 		}
+
 		if versionList[j].CreatedDate == nil {
 			return true
 		}
+
 		return versionList[i].CreatedDate.After(*versionList[j].CreatedDate)
 	})
 
 	// Find base index
 	baseIdx := 0
+
 	var (
 		predicate func(secretapi.SecretVersionsListEntry) bool
 		errMsg    string
 		found     bool
 	)
+
 	switch {
 	case spec.Absolute.ID != nil:
 		predicate = func(v secretapi.SecretVersionsListEntry) bool {
@@ -92,6 +102,7 @@ func getSecretWithShift(ctx context.Context, client Client, spec *Spec) (*secret
 		}
 		errMsg = fmt.Sprintf("version label not found: %s", *spec.Absolute.Label)
 	}
+
 	if predicate != nil {
 		_, baseIdx, found = lo.FindIndexOf(versionList, predicate)
 		if !found {
@@ -105,6 +116,7 @@ func getSecretWithShift(ctx context.Context, client Client, spec *Spec) (*secret
 	}
 
 	targetVersion := versionList[targetIdx]
+
 	return client.GetSecretValue(ctx, &secretapi.GetSecretValueInput{
 		SecretId:  lo.ToPtr(spec.Name),
 		VersionId: targetVersion.VersionId,

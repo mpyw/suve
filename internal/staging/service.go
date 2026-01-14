@@ -1,4 +1,3 @@
-// Package staging provides staging functionality for AWS parameter and secret changes.
 package staging
 
 import (
@@ -15,6 +14,7 @@ func (e *ResourceNotFoundError) Error() string {
 	if e.Err != nil {
 		return e.Err.Error()
 	}
+
 	return "resource not found"
 }
 

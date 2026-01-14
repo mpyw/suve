@@ -10,6 +10,8 @@ import (
 )
 
 // ParamClient is the interface for SSM Parameter Store tag operations.
+//
+//nolint:lll // interface method signatures must match AWS SDK
 type ParamClient interface {
 	AddTagsToResource(ctx context.Context, params *paramapi.AddTagsToResourceInput, optFns ...func(*paramapi.Options)) (*paramapi.AddTagsToResourceOutput, error)
 	RemoveTagsFromResource(ctx context.Context, params *paramapi.RemoveTagsFromResourceInput, optFns ...func(*paramapi.Options)) (*paramapi.RemoveTagsFromResourceOutput, error)
@@ -31,6 +33,7 @@ func ApplyParam(ctx context.Context, client ParamClient, resourceID string, chan
 				Value: lo.ToPtr(v),
 			})
 		}
+
 		_, err := client.AddTagsToResource(ctx, &paramapi.AddTagsToResourceInput{
 			ResourceType: paramapi.ResourceTypeForTaggingParameter,
 			ResourceId:   lo.ToPtr(resourceID),

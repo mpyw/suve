@@ -12,8 +12,10 @@ import (
 	"github.com/mpyw/suve/internal/cli/editor"
 )
 
+const goosWindows = "windows"
+
 func TestOpen_ModifiesContent(t *testing.T) {
-	if runtime.GOOS == "windows" {
+	if runtime.GOOS == goosWindows {
 		t.Skip("Skipping on Windows - requires Unix shell")
 	}
 
@@ -24,19 +26,20 @@ func TestOpen_ModifiesContent(t *testing.T) {
 content=$(cat "$1")
 printf '%s-modified' "$content" > "$1"
 `
+	//nolint:gosec // G306: executable permission required for test shell script
 	require.NoError(t, os.WriteFile(scriptPath, []byte(script), 0o755))
 
 	// Set EDITOR to our test script
 	t.Setenv("EDITOR", scriptPath)
 	t.Setenv("VISUAL", "")
 
-	result, err := editor.Open("original")
+	result, err := editor.Open(t.Context(), "original")
 	require.NoError(t, err)
 	assert.Equal(t, "original-modified", result)
 }
 
 func TestOpen_ReturnsUnmodifiedContent(t *testing.T) {
-	if runtime.GOOS == "windows" {
+	if runtime.GOOS == goosWindows {
 		t.Skip("Skipping on Windows - requires Unix shell")
 	}
 
@@ -44,13 +47,13 @@ func TestOpen_ReturnsUnmodifiedContent(t *testing.T) {
 	t.Setenv("EDITOR", "true")
 	t.Setenv("VISUAL", "")
 
-	result, err := editor.Open("unchanged content")
+	result, err := editor.Open(t.Context(), "unchanged content")
 	require.NoError(t, err)
 	assert.Equal(t, "unchanged content", result)
 }
 
 func TestOpen_TrimsTrailingNewline(t *testing.T) {
-	if runtime.GOOS == "windows" {
+	if runtime.GOOS == goosWindows {
 		t.Skip("Skipping on Windows - requires Unix shell")
 	}
 
@@ -60,18 +63,19 @@ func TestOpen_TrimsTrailingNewline(t *testing.T) {
 	script := `#!/bin/sh
 echo "with-newline" > "$1"
 `
+	//nolint:gosec // G306: executable permission required for test shell script
 	require.NoError(t, os.WriteFile(scriptPath, []byte(script), 0o755))
 
 	t.Setenv("EDITOR", scriptPath)
 	t.Setenv("VISUAL", "")
 
-	result, err := editor.Open("original")
+	result, err := editor.Open(t.Context(), "original")
 	require.NoError(t, err)
 	assert.Equal(t, "with-newline", result)
 }
 
 func TestOpen_TrimsCRLF(t *testing.T) {
-	if runtime.GOOS == "windows" {
+	if runtime.GOOS == goosWindows {
 		t.Skip("Skipping on Windows - requires Unix shell")
 	}
 
@@ -81,18 +85,19 @@ func TestOpen_TrimsCRLF(t *testing.T) {
 	script := `#!/bin/sh
 printf "with-crlf\r\n" > "$1"
 `
+	//nolint:gosec // G306: executable permission required for test shell script
 	require.NoError(t, os.WriteFile(scriptPath, []byte(script), 0o755))
 
 	t.Setenv("EDITOR", scriptPath)
 	t.Setenv("VISUAL", "")
 
-	result, err := editor.Open("original")
+	result, err := editor.Open(t.Context(), "original")
 	require.NoError(t, err)
 	assert.Equal(t, "with-crlf", result)
 }
 
 func TestOpen_UsesVISUALOverEDITOR(t *testing.T) {
-	if runtime.GOOS == "windows" {
+	if runtime.GOOS == goosWindows {
 		t.Skip("Skipping on Windows - requires Unix shell")
 	}
 
@@ -101,10 +106,12 @@ func TestOpen_UsesVISUALOverEDITOR(t *testing.T) {
 	visualScript := filepath.Join(tmpDir, "visual.sh")
 	editorScript := filepath.Join(tmpDir, "editor.sh")
 
+	//nolint:gosec // G306: executable permission required for test shell script
 	require.NoError(t, os.WriteFile(visualScript, []byte(`#!/bin/sh
 printf 'visual' > "$1"
 `), 0o755))
 
+	//nolint:gosec // G306: executable permission required for test shell script
 	require.NoError(t, os.WriteFile(editorScript, []byte(`#!/bin/sh
 printf 'editor' > "$1"
 `), 0o755))
@@ -113,13 +120,13 @@ printf 'editor' > "$1"
 	t.Setenv("VISUAL", visualScript)
 	t.Setenv("EDITOR", editorScript)
 
-	result, err := editor.Open("original")
+	result, err := editor.Open(t.Context(), "original")
 	require.NoError(t, err)
 	assert.Equal(t, "visual", result)
 }
 
 func TestOpen_EditorError(t *testing.T) {
-	if runtime.GOOS == "windows" {
+	if runtime.GOOS == goosWindows {
 		t.Skip("Skipping on Windows - requires Unix shell")
 	}
 
@@ -127,6 +134,6 @@ func TestOpen_EditorError(t *testing.T) {
 	t.Setenv("EDITOR", "false")
 	t.Setenv("VISUAL", "")
 
-	_, err := editor.Open("content")
+	_, err := editor.Open(t.Context(), "content")
 	require.Error(t, err)
 }

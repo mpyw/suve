@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"github.com/mpyw/suve/internal/staging"
+	"github.com/mpyw/suve/internal/staging/store"
 	"github.com/mpyw/suve/internal/staging/transition"
 )
 
@@ -17,6 +18,7 @@ type ResetInput struct {
 // ResetResultType represents the type of reset result.
 type ResetResultType int
 
+// ResetResultType constants representing the outcome of a reset operation.
 const (
 	ResetResultUnstaged ResetResultType = iota
 	ResetResultUnstagedAll
@@ -40,7 +42,7 @@ type ResetOutput struct {
 type ResetUseCase struct {
 	Parser  staging.Parser
 	Fetcher staging.ResetStrategy
-	Store   staging.StoreReadWriter
+	Store   store.ReadWriteOperator
 }
 
 // Execute runs the reset use case.
@@ -72,27 +74,44 @@ func (u *ResetUseCase) unstageAll(ctx context.Context, serviceName, itemName str
 		return nil, err
 	}
 
+	stagedTags, err := u.Store.ListTags(ctx, service)
+	if err != nil {
+		return nil, err
+	}
+
 	serviceStaged := staged[service]
-	if len(serviceStaged) == 0 {
+	serviceStagedTags := stagedTags[service]
+	totalCount := len(serviceStaged) + len(serviceStagedTags)
+
+	// Always call UnstageAll to trigger daemon auto-shutdown check
+	// even if there's nothing staged for this service
+	// Use hint for context-aware shutdown message
+	if hinted, ok := u.Store.(store.HintedUnstager); ok {
+		if err := hinted.UnstageAllWithHint(ctx, service, store.HintReset); err != nil {
+			return nil, err
+		}
+	} else {
+		if err := u.Store.UnstageAll(ctx, service); err != nil {
+			return nil, err
+		}
+	}
+
+	if totalCount == 0 {
 		return &ResetOutput{
 			Type:        ResetResultNothingStaged,
 			ServiceName: serviceName,
 		}, nil
 	}
 
-	if err := u.Store.UnstageAll(ctx, service); err != nil {
-		return nil, err
-	}
-
 	return &ResetOutput{
 		Type:        ResetResultUnstagedAll,
-		Count:       len(serviceStaged),
+		Count:       totalCount,
 		ServiceName: serviceName,
 		ItemName:    itemName,
 	}, nil
 }
 
-func (u *ResetUseCase) unstage(ctx context.Context, name, serviceName, itemName string) (*ResetOutput, error) {
+func (u *ResetUseCase) unstage(ctx context.Context, name, _, _ string) (*ResetOutput, error) {
 	service := u.Parser.Service()
 
 	// Load current state (nil CurrentValue since we don't care about AWS state for reset)
@@ -152,6 +171,7 @@ func (u *ResetUseCase) restore(ctx context.Context, spec, name string) (*ResetOu
 
 	// Execute the edit transition with the restored value
 	executor := transition.NewExecutor(u.Store)
+
 	result, err := executor.ExecuteEntry(ctx, service, name, entryState, transition.EntryActionEdit{Value: value}, nil)
 	if err != nil {
 		return nil, err

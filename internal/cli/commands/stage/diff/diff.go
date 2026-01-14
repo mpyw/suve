@@ -20,7 +20,8 @@ import (
 	"github.com/mpyw/suve/internal/maputil"
 	"github.com/mpyw/suve/internal/parallel"
 	"github.com/mpyw/suve/internal/staging"
-	"github.com/mpyw/suve/internal/staging/file"
+	"github.com/mpyw/suve/internal/staging/store"
+	"github.com/mpyw/suve/internal/staging/store/agent"
 	"github.com/mpyw/suve/internal/version/paramversion"
 	"github.com/mpyw/suve/internal/version/secretversion"
 )
@@ -34,14 +35,14 @@ type ParamClient interface {
 // SecretClient is the interface for Secrets Manager operations.
 type SecretClient interface {
 	secretapi.GetSecretValueAPI
-	secretapi.ListSecretVersionIdsAPI
+	secretapi.ListSecretVersionIDsAPI
 }
 
 // Runner executes the diff command.
 type Runner struct {
 	ParamClient  ParamClient
 	SecretClient SecretClient
-	Store        *file.Store
+	Store        store.ReadWriteOperator
 	Stdout       io.Writer
 	Stderr       io.Writer
 }
@@ -88,24 +89,25 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	if err != nil {
 		return fmt.Errorf("failed to get AWS identity: %w", err)
 	}
-	store, err := file.NewStore(identity.AccountID, identity.Region)
-	if err != nil {
-		return fmt.Errorf("failed to initialize stage store: %w", err)
-	}
+
+	store := agent.NewStore(identity.AccountID, identity.Region)
 
 	// Check if there are any staged changes before creating clients
 	paramStaged, err := store.ListEntries(ctx, staging.ServiceParam)
 	if err != nil {
 		return err
 	}
+
 	secretStaged, err := store.ListEntries(ctx, staging.ServiceSecret)
 	if err != nil {
 		return err
 	}
+
 	paramTagStaged, err := store.ListTags(ctx, staging.ServiceParam)
 	if err != nil {
 		return err
 	}
+
 	secretTagStaged, err := store.ListTags(ctx, staging.ServiceSecret)
 	if err != nil {
 		return err
@@ -116,6 +118,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 
 	if !hasParam && !hasSecret {
 		output.Warning(cmd.Root().ErrWriter, "nothing staged")
+
 		return nil
 	}
 
@@ -130,6 +133,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		if err != nil {
 			return fmt.Errorf("failed to initialize SSM Parameter Store client: %w", err)
 		}
+
 		r.ParamClient = paramClient
 	}
 
@@ -138,6 +142,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		if err != nil {
 			return fmt.Errorf("failed to initialize Secrets Manager client: %w", err)
 		}
+
 		r.SecretClient = secretClient
 	}
 
@@ -148,6 +153,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 
 	return pager.WithPagerWriter(cmd.Root().Writer, opts.NoPager, func(w io.Writer) error {
 		r.Stdout = w
+
 		return r.Run(ctx, opts)
 	})
 }
@@ -170,19 +176,30 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 	secretTagEntries := allTagEntries[staging.ServiceSecret]
 
 	// Fetch all values in parallel
-	paramResults := parallel.ExecuteMap(ctx, paramEntries, func(ctx context.Context, name string, _ staging.Entry) (*paramapi.ParameterHistory, error) {
-		spec := &paramversion.Spec{Name: name}
-		return paramversion.GetParameterWithVersion(ctx, r.ParamClient, spec)
-	})
+	paramResults := parallel.ExecuteMap(
+		ctx,
+		paramEntries,
+		func(ctx context.Context, name string, _ staging.Entry) (*paramapi.ParameterHistory, error) {
+			spec := &paramversion.Spec{Name: name}
 
-	secretResults := parallel.ExecuteMap(ctx, secretEntries, func(ctx context.Context, name string, _ staging.Entry) (*secretapi.GetSecretValueOutput, error) {
-		spec := &secretversion.Spec{Name: name}
-		return secretversion.GetSecretWithVersion(ctx, r.SecretClient, spec)
-	})
+			return paramversion.GetParameterWithVersion(ctx, r.ParamClient, spec)
+		},
+	)
+
+	secretResults := parallel.ExecuteMap(
+		ctx,
+		secretEntries,
+		func(ctx context.Context, name string, _ staging.Entry) (*secretapi.GetSecretValueOutput, error) {
+			spec := &secretversion.Spec{Name: name}
+
+			return secretversion.GetSecretWithVersion(ctx, r.SecretClient, spec)
+		},
+	)
 
 	first := true
 
 	// Process SSM Parameter Store entries in sorted order
+	//nolint:dupl // Similar to secret loop below but calls different service-specific methods
 	for _, name := range maputil.SortedKeys(paramEntries) {
 		entry := paramEntries[name]
 		result := paramResults[name]
@@ -195,18 +212,23 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 				if err := r.Store.UnstageEntry(ctx, staging.ServiceParam, name); err != nil {
 					return fmt.Errorf("failed to unstage %s: %w", name, err)
 				}
+
 				output.Warning(r.Stderr, "unstaged %s: already deleted in AWS", name)
+
 				continue
 
 			case staging.OperationCreate:
 				// Item doesn't exist in AWS - this is expected for create operations
 				if !first {
-					_, _ = fmt.Fprintln(r.Stdout)
+					output.Println(r.Stdout, "")
 				}
+
 				first = false
-				if err := r.outputParamDiffCreate(opts, name, entry); err != nil {
+
+				if err := r.outputDiffCreate(opts, name, entry); err != nil {
 					return err
 				}
+
 				continue
 
 			case staging.OperationUpdate:
@@ -214,14 +236,17 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 				if err := r.Store.UnstageEntry(ctx, staging.ServiceParam, name); err != nil {
 					return fmt.Errorf("failed to unstage %s: %w", name, err)
 				}
+
 				output.Warning(r.Stderr, "unstaged %s: item no longer exists in AWS", name)
+
 				continue
 			}
 		}
 
 		if !first {
-			_, _ = fmt.Fprintln(r.Stdout)
+			output.Println(r.Stdout, "")
 		}
+
 		first = false
 
 		if err := r.outputParamDiff(ctx, opts, name, entry, result.Value); err != nil {
@@ -230,6 +255,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 	}
 
 	// Process Secrets Manager entries in sorted order
+	//nolint:dupl // Similar to param loop above but calls different service-specific methods
 	for _, name := range maputil.SortedKeys(secretEntries) {
 		entry := secretEntries[name]
 		result := secretResults[name]
@@ -242,18 +268,23 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 				if err := r.Store.UnstageEntry(ctx, staging.ServiceSecret, name); err != nil {
 					return fmt.Errorf("failed to unstage %s: %w", name, err)
 				}
+
 				output.Warning(r.Stderr, "unstaged %s: already deleted in AWS", name)
+
 				continue
 
 			case staging.OperationCreate:
 				// Item doesn't exist in AWS - this is expected for create operations
 				if !first {
-					_, _ = fmt.Fprintln(r.Stdout)
+					output.Println(r.Stdout, "")
 				}
+
 				first = false
-				if err := r.outputSecretDiffCreate(opts, name, entry); err != nil {
+
+				if err := r.outputDiffCreate(opts, name, entry); err != nil {
 					return err
 				}
+
 				continue
 
 			case staging.OperationUpdate:
@@ -261,14 +292,17 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 				if err := r.Store.UnstageEntry(ctx, staging.ServiceSecret, name); err != nil {
 					return fmt.Errorf("failed to unstage %s: %w", name, err)
 				}
+
 				output.Warning(r.Stderr, "unstaged %s: item no longer exists in AWS", name)
+
 				continue
 			}
 		}
 
 		if !first {
-			_, _ = fmt.Fprintln(r.Stdout)
+			output.Println(r.Stdout, "")
 		}
+
 		first = false
 
 		if err := r.outputSecretDiff(ctx, opts, name, entry, result.Value); err != nil {
@@ -279,20 +313,26 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 	// Process SSM Parameter Store tag entries
 	for _, name := range maputil.SortedKeys(paramTagEntries) {
 		tagEntry := paramTagEntries[name]
+
 		if !first {
-			_, _ = fmt.Fprintln(r.Stdout)
+			output.Println(r.Stdout, "")
 		}
+
 		first = false
+
 		r.outputTagDiff(name, tagEntry)
 	}
 
 	// Process Secrets Manager tag entries
 	for _, name := range maputil.SortedKeys(secretTagEntries) {
 		tagEntry := secretTagEntries[name]
+
 		if !first {
-			_, _ = fmt.Fprintln(r.Stdout)
+			output.Println(r.Stdout, "")
 		}
+
 		first = false
+
 		r.outputTagDiff(name, tagEntry)
 	}
 
@@ -318,7 +358,9 @@ func (r *Runner) outputParamDiff(ctx context.Context, opts Options, name string,
 		if err := r.Store.UnstageEntry(ctx, staging.ServiceParam, name); err != nil {
 			return fmt.Errorf("failed to unstage %s: %w", name, err)
 		}
+
 		output.Warning(r.Stderr, "unstaged %s: identical to AWS current", name)
+
 		return nil
 	}
 
@@ -330,7 +372,7 @@ func (r *Runner) outputParamDiff(ctx context.Context, opts Options, name string,
 	), name)
 
 	diff := output.Diff(label1, label2, awsValue, stagedValue)
-	_, _ = fmt.Fprint(r.Stdout, diff)
+	output.Print(r.Stdout, diff)
 
 	// Show staged metadata
 	r.outputMetadata(entry)
@@ -357,7 +399,9 @@ func (r *Runner) outputSecretDiff(ctx context.Context, opts Options, name string
 		if err := r.Store.UnstageEntry(ctx, staging.ServiceSecret, name); err != nil {
 			return fmt.Errorf("failed to unstage %s: %w", name, err)
 		}
+
 		output.Warning(r.Stderr, "unstaged %s: identical to AWS current", name)
+
 		return nil
 	}
 
@@ -370,7 +414,7 @@ func (r *Runner) outputSecretDiff(ctx context.Context, opts Options, name string
 	), name)
 
 	diff := output.Diff(label1, label2, awsValue, stagedValue)
-	_, _ = fmt.Fprint(r.Stdout, diff)
+	output.Print(r.Stdout, diff)
 
 	// Show staged metadata
 	r.outputMetadata(entry)
@@ -378,7 +422,7 @@ func (r *Runner) outputSecretDiff(ctx context.Context, opts Options, name string
 	return nil
 }
 
-func (r *Runner) outputParamDiffCreate(opts Options, name string, entry staging.Entry) error {
+func (r *Runner) outputDiffCreate(opts Options, name string, entry staging.Entry) error {
 	stagedValue := lo.FromPtr(entry.Value)
 
 	// Format as JSON if enabled
@@ -392,29 +436,7 @@ func (r *Runner) outputParamDiffCreate(opts Options, name string, entry staging.
 	label2 := fmt.Sprintf("%s (staged for creation)", name)
 
 	diff := output.Diff(label1, label2, "", stagedValue)
-	_, _ = fmt.Fprint(r.Stdout, diff)
-
-	// Show staged metadata
-	r.outputMetadata(entry)
-
-	return nil
-}
-
-func (r *Runner) outputSecretDiffCreate(opts Options, name string, entry staging.Entry) error {
-	stagedValue := lo.FromPtr(entry.Value)
-
-	// Format as JSON if enabled
-	if opts.ParseJSON {
-		if formatted, ok := jsonutil.TryFormat(stagedValue); ok {
-			stagedValue = formatted
-		}
-	}
-
-	label1 := fmt.Sprintf("%s (not in AWS)", name)
-	label2 := fmt.Sprintf("%s (staged for creation)", name)
-
-	diff := output.Diff(label1, label2, "", stagedValue)
-	_, _ = fmt.Fprint(r.Stdout, diff)
+	output.Print(r.Stdout, diff)
 
 	// Show staged metadata
 	r.outputMetadata(entry)
@@ -424,22 +446,23 @@ func (r *Runner) outputSecretDiffCreate(opts Options, name string, entry staging
 
 func (r *Runner) outputMetadata(entry staging.Entry) {
 	if desc := lo.FromPtr(entry.Description); desc != "" {
-		_, _ = fmt.Fprintf(r.Stdout, "%s %s\n", colors.FieldLabel("Description:"), desc)
+		output.Printf(r.Stdout, "%s %s\n", colors.FieldLabel("Description:"), desc)
 	}
 }
 
 func (r *Runner) outputTagDiff(name string, tagEntry staging.TagEntry) {
-	_, _ = fmt.Fprintf(r.Stdout, "%s %s (staged tag changes)\n", colors.Info("Tags:"), name)
+	output.Printf(r.Stdout, "%s %s (staged tag changes)\n", colors.Info("Tags:"), name)
 
 	if len(tagEntry.Add) > 0 {
-		var tagPairs []string
+		tagPairs := make([]string, 0, len(tagEntry.Add))
 		for _, k := range maputil.SortedKeys(tagEntry.Add) {
 			tagPairs = append(tagPairs, fmt.Sprintf("%s=%s", k, tagEntry.Add[k]))
 		}
-		_, _ = fmt.Fprintf(r.Stdout, "  %s %s\n", colors.OpAdd("+"), strings.Join(tagPairs, ", "))
+
+		output.Printf(r.Stdout, "  %s %s\n", colors.OpAdd("+"), strings.Join(tagPairs, ", "))
 	}
 
 	if tagEntry.Remove.Len() > 0 {
-		_, _ = fmt.Fprintf(r.Stdout, "  %s %s\n", colors.OpDelete("-"), strings.Join(tagEntry.Remove.Values(), ", "))
+		output.Printf(r.Stdout, "  %s %s\n", colors.OpDelete("-"), strings.Join(tagEntry.Remove.Values(), ", "))
 	}
 }

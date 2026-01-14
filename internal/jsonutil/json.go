@@ -6,10 +6,9 @@ package jsonutil
 
 import (
 	"encoding/json"
-	"fmt"
 	"io"
 
-	"github.com/mpyw/suve/internal/cli/colors"
+	"github.com/mpyw/suve/internal/cli/output"
 )
 
 // TryFormat attempts to format a JSON string with indentation.
@@ -20,7 +19,13 @@ func TryFormat(value string) (string, bool) {
 	if err := json.Unmarshal([]byte(value), &data); err != nil {
 		return value, false
 	}
-	formatted, _ := json.MarshalIndent(data, "", "  ")
+
+	formatted, err := json.MarshalIndent(data, "", "  ")
+	if err != nil {
+		// This should not happen if Unmarshal succeeded, but handle it gracefully
+		return value, false
+	}
+
 	return string(formatted), true
 }
 
@@ -30,7 +35,9 @@ func TryFormatOrWarn(value string, errW io.Writer, name string) string {
 	if formatted, ok := TryFormat(value); ok {
 		return formatted
 	}
+
 	warn(errW, name, "value is not valid JSON")
+
 	return value
 }
 
@@ -38,11 +45,14 @@ func TryFormatOrWarn(value string, errW io.Writer, name string) string {
 // If name is non-empty, includes it in the warning message.
 func TryFormatOrWarn2(v1, v2 string, errW io.Writer, name string) (string, string) {
 	f1, ok1 := TryFormat(v1)
+
 	f2, ok2 := TryFormat(v2)
 	if ok1 && ok2 {
 		return f1, f2
 	}
+
 	warn(errW, name, "some values are not valid JSON")
+
 	return v1, v2
 }
 
@@ -51,6 +61,7 @@ func warn(w io.Writer, name, reason string) {
 	if name != "" {
 		msg += " for " + name
 	}
+
 	msg += ": " + reason
-	_, _ = fmt.Fprintln(w, colors.Warning("Warning: "+msg))
+	output.Warning(w, "%s", msg)
 }

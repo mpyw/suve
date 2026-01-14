@@ -20,24 +20,30 @@ type mockTagClient struct {
 	untagErr       error
 }
 
+//nolint:lll // mock function signature must match AWS SDK interface
 func (m *mockTagClient) DescribeSecret(_ context.Context, _ *secretapi.DescribeSecretInput, _ ...func(*secretapi.Options)) (*secretapi.DescribeSecretOutput, error) {
 	if m.describeErr != nil {
 		return nil, m.describeErr
 	}
+
 	return m.describeResult, nil
 }
 
+//nolint:lll // mock function signature must match AWS SDK interface
 func (m *mockTagClient) TagResource(_ context.Context, _ *secretapi.TagResourceInput, _ ...func(*secretapi.Options)) (*secretapi.TagResourceOutput, error) {
 	if m.tagErr != nil {
 		return nil, m.tagErr
 	}
+
 	return &secretapi.TagResourceOutput{}, nil
 }
 
+//nolint:lll // mock function signature must match AWS SDK interface
 func (m *mockTagClient) UntagResource(_ context.Context, _ *secretapi.UntagResourceInput, _ ...func(*secretapi.Options)) (*secretapi.UntagResourceOutput, error) {
 	if m.untagErr != nil {
 		return nil, m.untagErr
 	}
+
 	return &secretapi.UntagResourceOutput{}, nil
 }
 
@@ -121,7 +127,7 @@ func TestTagUseCase_Execute_DescribeError(t *testing.T) {
 		Name: "my-secret",
 		Add:  map[string]string{"env": "prod"},
 	})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to describe secret")
 }
 
@@ -140,7 +146,7 @@ func TestTagUseCase_Execute_AddTagsError(t *testing.T) {
 		Name: "my-secret",
 		Add:  map[string]string{"env": "prod"},
 	})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to add tags")
 }
 
@@ -159,6 +165,6 @@ func TestTagUseCase_Execute_RemoveTagsError(t *testing.T) {
 		Name:   "my-secret",
 		Remove: []string{"old-tag"},
 	})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to remove tags")
 }

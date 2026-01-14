@@ -21,17 +21,18 @@ func (m *mockFdWriter) Fd() uintptr {
 	return m.fd
 }
 
+//nolint:paralleltest // Test modifies package globals (IsTTY, GetSize)
 func TestGetWidthFromWriter_TTY(t *testing.T) {
-	// Not parallel because we override globals
 	origIsTTY := IsTTY
 	origGetSize := GetSize
+
 	defer func() {
 		IsTTY = origIsTTY
 		GetSize = origGetSize
 	}()
 
-	IsTTY = func(fd uintptr) bool { return true }
-	GetSize = func(fd int) (width, height int, err error) {
+	IsTTY = func(_ uintptr) bool { return true }
+	GetSize = func(_ int) (width, height int, err error) {
 		return 120, 40, nil
 	}
 
@@ -40,29 +41,31 @@ func TestGetWidthFromWriter_TTY(t *testing.T) {
 	assert.Equal(t, 120, width)
 }
 
+//nolint:paralleltest // Test modifies package globals (IsTTY)
 func TestGetWidthFromWriter_NonTTY(t *testing.T) {
-	// Not parallel because we override globals
 	origIsTTY := IsTTY
+
 	defer func() { IsTTY = origIsTTY }()
 
-	IsTTY = func(fd uintptr) bool { return false }
+	IsTTY = func(_ uintptr) bool { return false }
 
 	w := &mockFdWriter{fd: 1}
 	width := GetWidthFromWriter(w)
 	assert.Equal(t, DefaultWidth, width)
 }
 
+//nolint:paralleltest // Test modifies package globals (IsTTY, GetSize)
 func TestGetWidthFromWriter_GetSizeError(t *testing.T) {
-	// Not parallel because we override globals
 	origIsTTY := IsTTY
 	origGetSize := GetSize
+
 	defer func() {
 		IsTTY = origIsTTY
 		GetSize = origGetSize
 	}()
 
-	IsTTY = func(fd uintptr) bool { return true }
-	GetSize = func(fd int) (width, height int, err error) {
+	IsTTY = func(_ uintptr) bool { return true }
+	GetSize = func(_ int) (width, height int, err error) {
 		return 0, 0, assert.AnError
 	}
 
@@ -71,17 +74,18 @@ func TestGetWidthFromWriter_GetSizeError(t *testing.T) {
 	assert.Equal(t, DefaultWidth, width)
 }
 
+//nolint:paralleltest // Test modifies package globals (IsTTY, GetSize)
 func TestGetWidthFromWriter_ZeroWidth(t *testing.T) {
-	// Not parallel because we override globals
 	origIsTTY := IsTTY
 	origGetSize := GetSize
+
 	defer func() {
 		IsTTY = origIsTTY
 		GetSize = origGetSize
 	}()
 
-	IsTTY = func(fd uintptr) bool { return true }
-	GetSize = func(fd int) (width, height int, err error) {
+	IsTTY = func(_ uintptr) bool { return true }
+	GetSize = func(_ int) (width, height int, err error) {
 		return 0, 40, nil
 	}
 
@@ -90,24 +94,26 @@ func TestGetWidthFromWriter_ZeroWidth(t *testing.T) {
 	assert.Equal(t, DefaultWidth, width)
 }
 
+//nolint:paralleltest // Test modifies package globals (IsTTY)
 func TestIsTerminalWriter_TTY(t *testing.T) {
-	// Not parallel because we override globals
 	origIsTTY := IsTTY
+
 	defer func() { IsTTY = origIsTTY }()
 
-	IsTTY = func(fd uintptr) bool { return true }
+	IsTTY = func(_ uintptr) bool { return true }
 
 	w := &mockFdWriter{fd: 1}
 	result := IsTerminalWriter(w)
 	assert.True(t, result)
 }
 
+//nolint:paralleltest // Test modifies package globals (IsTTY)
 func TestIsTerminalWriter_NonTTY(t *testing.T) {
-	// Not parallel because we override globals
 	origIsTTY := IsTTY
+
 	defer func() { IsTTY = origIsTTY }()
 
-	IsTTY = func(fd uintptr) bool { return false }
+	IsTTY = func(_ uintptr) bool { return false }
 
 	w := &mockFdWriter{fd: 1}
 	result := IsTerminalWriter(w)

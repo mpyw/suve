@@ -11,7 +11,6 @@ import (
 	"github.com/urfave/cli/v3"
 
 	"github.com/mpyw/suve/internal/api/paramapi"
-	"github.com/mpyw/suve/internal/cli/colors"
 	"github.com/mpyw/suve/internal/cli/confirm"
 	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/infra"
@@ -82,7 +81,7 @@ EXAMPLES:
 }
 
 func action(ctx context.Context, cmd *cli.Command) error {
-	if cmd.Args().Len() < 2 {
+	if cmd.Args().Len() < 2 { //nolint:mnd // minimum required args: name and value
 		return fmt.Errorf("usage: suve param update <name> <value>")
 	}
 
@@ -93,6 +92,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	if secure && cmd.IsSet("type") {
 		return fmt.Errorf("cannot use --secure with --type; use one or the other")
 	}
+
 	if secure {
 		paramType = "SecureString"
 	}
@@ -114,7 +114,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		if currentValue != "" {
 			diff := output.Diff(name+" (AWS)", name+" (new)", currentValue, newValue)
 			if diff != "" {
-				_, _ = fmt.Fprintln(cmd.Root().ErrWriter, diff)
+				output.Println(cmd.Root().ErrWriter, diff)
 			}
 		}
 
@@ -129,10 +129,12 @@ func action(ctx context.Context, cmd *cli.Command) error {
 			prompter.Region = identity.Region
 			prompter.Profile = identity.Profile
 		}
+
 		confirmed, err := prompter.ConfirmAction("Update parameter", name, false)
 		if err != nil {
 			return err
 		}
+
 		if !confirmed {
 			return nil
 		}
@@ -143,6 +145,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		Stdout:  cmd.Root().Writer,
 		Stderr:  cmd.Root().ErrWriter,
 	}
+
 	return r.Run(ctx, Options{
 		Name:        name,
 		Value:       newValue,
@@ -163,11 +166,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 		return err
 	}
 
-	_, _ = fmt.Fprintf(r.Stdout, "%s Updated parameter %s (version: %d)\n",
-		colors.Success("✓"),
-		result.Name,
-		result.Version,
-	)
+	output.Success(r.Stdout, "Updated parameter %s (version: %d)", result.Name, result.Version)
 
 	return nil
 }
@@ -182,8 +181,10 @@ func getCurrentValue(ctx context.Context, client paramapi.GetParameterAPI, name 
 	if err != nil {
 		return "", false
 	}
+
 	if result.Parameter == nil || result.Parameter.Value == nil {
 		return "", false
 	}
+
 	return *result.Parameter.Value, true
 }

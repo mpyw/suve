@@ -62,15 +62,16 @@ func (o *Writer) Separator() {
 
 // Value prints a value with proper indentation.
 func (o *Writer) Value(value string) {
-	lines := strings.Split(value, "\n")
-	for _, line := range lines {
+	for line := range strings.SplitSeq(value, "\n") {
 		_, _ = fmt.Fprintf(o.w, "  %s\n", line)
 	}
 }
 
 // Warning prints a warning message in yellow.
 // Used to alert users about non-critical issues that don't prevent command execution.
-// Example: "Warning: comparing identical versions"
+// Example: "Warning: comparing identical versions".
+//
+//nolint:goprintffuncname // intentionally named without 'f' suffix for cleaner API
 func Warning(w io.Writer, format string, args ...any) {
 	msg := fmt.Sprintf(format, args...)
 	_, _ = fmt.Fprintln(w, colors.Warning("Warning: "+msg))
@@ -78,7 +79,9 @@ func Warning(w io.Writer, format string, args ...any) {
 
 // Hint prints a hint message in cyan.
 // Used to provide helpful suggestions to the user, typically following a warning.
-// Example: "Hint: To compare with previous version, use: suve param diff /param~1"
+// Example: "Hint: To compare with previous version, use: suve param diff /param~1".
+//
+//nolint:goprintffuncname // intentionally named without 'f' suffix for cleaner API
 func Hint(w io.Writer, format string, args ...any) {
 	msg := fmt.Sprintf(format, args...)
 	_, _ = fmt.Fprintln(w, colors.Info("Hint: "+msg))
@@ -87,35 +90,52 @@ func Hint(w io.Writer, format string, args ...any) {
 // Error prints an error message in red.
 // Used for user-facing error messages that are not Go errors.
 // For Go errors, use the standard error return pattern instead.
+//
+//nolint:goprintffuncname // intentionally named without 'f' suffix for cleaner API
 func Error(w io.Writer, format string, args ...any) {
 	msg := fmt.Sprintf(format, args...)
 	_, _ = fmt.Fprintln(w, colors.Error("Error: "+msg))
 }
 
 // Success prints a success message with green checkmark.
-// Example: "✓ Created parameter /app/config"
+// Example: "✓ Created parameter /app/config".
+//
+//nolint:goprintffuncname // intentionally named without 'f' suffix for cleaner API
 func Success(w io.Writer, format string, args ...any) {
 	msg := fmt.Sprintf(format, args...)
 	_, _ = fmt.Fprintf(w, "%s %s\n", colors.Success("✓"), msg)
 }
 
 // Failed prints a failure message in red.
-// Example: "Failed /app/config: error message"
+// Example: "Failed /app/config: error message".
 func Failed(w io.Writer, name string, err error) {
 	_, _ = fmt.Fprintf(w, "%s %s: %v\n", colors.Failed("Failed"), name, err)
 }
 
-// Info prints an informational message in yellow (without "Warning:" prefix).
-// Example: "No changes staged."
+// Info prints an informational message in cyan.
+// Used for status updates, progress messages, and neutral information.
+// Example: "No changes staged.", "Agent started".
+//
+//nolint:goprintffuncname // intentionally named without 'f' suffix for cleaner API
 func Info(w io.Writer, format string, args ...any) {
 	msg := fmt.Sprintf(format, args...)
-	_, _ = fmt.Fprintln(w, colors.Warning(msg))
+	_, _ = fmt.Fprintln(w, colors.Info(msg))
+}
+
+// Warn prints a warning message with yellow "!" prefix.
+// Example: "! Skipped /app/config (same as AWS)".
+//
+//nolint:goprintffuncname // intentionally named without 'f' suffix for cleaner API
+func Warn(w io.Writer, format string, args ...any) {
+	msg := fmt.Sprintf(format, args...)
+	_, _ = fmt.Fprintf(w, "%s %s\n", colors.Warning("!"), msg)
 }
 
 // Diff generates a unified diff between two strings with ANSI colors.
 func Diff(oldName, newName, oldContent, newContent string) string {
 	edits := udiff.Strings(oldContent, newContent)
 	unified, _ := udiff.ToUnifiedDiff(oldName, newName, oldContent, edits, udiff.DefaultContextLines)
+
 	return colorDiff(unified.String())
 }
 
@@ -123,6 +143,7 @@ func Diff(oldName, newName, oldContent, newContent string) string {
 func DiffRaw(oldName, newName, oldContent, newContent string) string {
 	edits := udiff.Strings(oldContent, newContent)
 	unified, _ := udiff.ToUnifiedDiff(oldName, newName, oldContent, edits, udiff.DefaultContextLines)
+
 	return unified.String()
 }
 
@@ -133,6 +154,7 @@ func colorDiff(diff string) string {
 	}
 
 	lines := strings.Split(diff, "\n")
+
 	var result strings.Builder
 
 	for _, line := range lines {
@@ -148,10 +170,26 @@ func colorDiff(diff string) string {
 		default:
 			result.WriteString(line)
 		}
+
 		result.WriteString("\n")
 	}
 
 	return result.String()
+}
+
+// Print writes a message to the writer without a newline.
+func Print(w io.Writer, msg string) {
+	_, _ = fmt.Fprint(w, msg)
+}
+
+// Println writes a message to the writer with a newline.
+func Println(w io.Writer, msg string) {
+	_, _ = fmt.Fprintln(w, msg)
+}
+
+// Printf writes a formatted message to the writer.
+func Printf(w io.Writer, format string, args ...any) {
+	_, _ = fmt.Fprintf(w, format, args...)
 }
 
 // Indent adds a prefix to each line of the input string.
@@ -159,11 +197,13 @@ func Indent(s, prefix string) string {
 	if s == "" {
 		return ""
 	}
+
 	lines := strings.Split(s, "\n")
 	for i, line := range lines {
 		if line != "" {
 			lines[i] = prefix + line
 		}
 	}
+
 	return strings.Join(lines, "\n")
 }

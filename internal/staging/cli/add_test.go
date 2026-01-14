@@ -1,0 +1,308 @@
+package cli_test
+
+import (
+	"bytes"
+	"context"
+	"errors"
+	"testing"
+
+	"github.com/samber/lo"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/mpyw/suve/internal/staging"
+	"github.com/mpyw/suve/internal/staging/cli"
+	"github.com/mpyw/suve/internal/staging/store/testutil"
+	stagingusecase "github.com/mpyw/suve/internal/usecase/staging"
+)
+
+func TestAddRunner_Run(t *testing.T) {
+	t.Parallel()
+
+	t.Run("create new item", func(t *testing.T) {
+		t.Parallel()
+
+		store := testutil.NewMockStore()
+
+		var buf bytes.Buffer
+
+		r := &cli.AddRunner{
+			UseCase: &stagingusecase.AddUseCase{
+				Strategy: &mockStrategy{service: staging.ServiceParam},
+				Store:    store,
+			},
+			Stdout:     &buf,
+			Stderr:     &bytes.Buffer{},
+			OpenEditor: func(_ context.Context, _ string) (string, error) { return "new-value", nil },
+		}
+
+		err := r.Run(t.Context(), cli.AddOptions{Name: "/app/config"})
+		require.NoError(t, err)
+		assert.Contains(t, buf.String(), "Staged for creation")
+		assert.Contains(t, buf.String(), "/app/config")
+
+		// Verify staged with OperationCreate
+		entry, err := store.GetEntry(t.Context(), staging.ServiceParam, "/app/config")
+		require.NoError(t, err)
+		assert.Equal(t, staging.OperationCreate, entry.Operation)
+		assert.Equal(t, "new-value", lo.FromPtr(entry.Value))
+	})
+
+	t.Run("edit already staged create", func(t *testing.T) {
+		t.Parallel()
+
+		store := testutil.NewMockStore()
+
+		// Pre-stage as create
+		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
+			Operation: staging.OperationCreate,
+			Value:     lo.ToPtr("original-value"),
+		})
+
+		var buf bytes.Buffer
+
+		r := &cli.AddRunner{
+			UseCase: &stagingusecase.AddUseCase{
+				Strategy: &mockStrategy{service: staging.ServiceParam},
+				Store:    store,
+			},
+			Stdout: &buf,
+			Stderr: &bytes.Buffer{},
+			OpenEditor: func(_ context.Context, current string) (string, error) {
+				assert.Equal(t, "original-value", current)
+
+				return "updated-value", nil
+			},
+		}
+
+		err := r.Run(t.Context(), cli.AddOptions{Name: "/app/config"})
+		require.NoError(t, err)
+		assert.Contains(t, buf.String(), "Staged for creation")
+
+		// Verify updated
+		entry, err := store.GetEntry(t.Context(), staging.ServiceParam, "/app/config")
+		require.NoError(t, err)
+		assert.Equal(t, staging.OperationCreate, entry.Operation)
+		assert.Equal(t, "updated-value", lo.FromPtr(entry.Value))
+	})
+
+	t.Run("empty value not staged", func(t *testing.T) {
+		t.Parallel()
+
+		store := testutil.NewMockStore()
+
+		var buf bytes.Buffer
+
+		r := &cli.AddRunner{
+			UseCase: &stagingusecase.AddUseCase{
+				Strategy: &mockStrategy{service: staging.ServiceParam},
+				Store:    store,
+			},
+			Stdout:     &buf,
+			Stderr:     &bytes.Buffer{},
+			OpenEditor: func(_ context.Context, _ string) (string, error) { return "", nil },
+		}
+
+		err := r.Run(t.Context(), cli.AddOptions{Name: "/app/config"})
+		require.NoError(t, err)
+		assert.Contains(t, buf.String(), "Empty value")
+
+		// Verify not staged
+		_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/config")
+		assert.Equal(t, staging.ErrNotStaged, err)
+	})
+
+	t.Run("no changes made", func(t *testing.T) {
+		t.Parallel()
+
+		store := testutil.NewMockStore()
+
+		// Pre-stage as create
+		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
+			Operation: staging.OperationCreate,
+			Value:     lo.ToPtr("same-value"),
+		})
+
+		var buf bytes.Buffer
+
+		r := &cli.AddRunner{
+			UseCase: &stagingusecase.AddUseCase{
+				Strategy: &mockStrategy{service: staging.ServiceParam},
+				Store:    store,
+			},
+			Stdout: &buf,
+			Stderr: &bytes.Buffer{},
+			OpenEditor: func(_ context.Context, _ string) (string, error) {
+				return "same-value", nil
+			},
+		}
+
+		err := r.Run(t.Context(), cli.AddOptions{Name: "/app/config"})
+		require.NoError(t, err)
+		assert.Contains(t, buf.String(), "No changes made")
+	})
+
+	t.Run("Secrets Manager service", func(t *testing.T) {
+		t.Parallel()
+
+		store := testutil.NewMockStore()
+
+		var buf bytes.Buffer
+
+		r := &cli.AddRunner{
+			UseCase: &stagingusecase.AddUseCase{
+				Strategy: &mockStrategy{service: staging.ServiceSecret},
+				Store:    store,
+			},
+			Stdout:     &buf,
+			Stderr:     &bytes.Buffer{},
+			OpenEditor: func(_ context.Context, _ string) (string, error) { return "secret-value", nil },
+		}
+
+		err := r.Run(t.Context(), cli.AddOptions{Name: "my-secret"})
+		require.NoError(t, err)
+
+		// Verify staged with correct service
+		entry, err := store.GetEntry(t.Context(), staging.ServiceSecret, "my-secret")
+		require.NoError(t, err)
+		assert.Equal(t, staging.OperationCreate, entry.Operation)
+		assert.Equal(t, "secret-value", lo.FromPtr(entry.Value))
+	})
+}
+
+// mockStrategy implements staging.EditStrategy for testing.
+type mockStrategy struct {
+	service      staging.Service
+	parseNameErr error
+}
+
+func (m *mockStrategy) Service() staging.Service { return m.service }
+func (m *mockStrategy) ServiceName() string      { return string(m.service) }
+func (m *mockStrategy) ItemName() string         { return "item" }
+func (m *mockStrategy) HasDeleteOptions() bool   { return false }
+func (m *mockStrategy) ParseName(input string) (string, error) {
+	if m.parseNameErr != nil {
+		return "", m.parseNameErr
+	}
+
+	return input, nil
+}
+func (m *mockStrategy) ParseSpec(input string) (string, bool, error) {
+	return input, false, nil
+}
+
+// FetchCurrentValue returns not-found for add scenarios (new resource).
+func (m *mockStrategy) FetchCurrentValue(_ context.Context, _ string) (*staging.EditFetchResult, error) {
+	return nil, &staging.ResourceNotFoundError{Err: errors.New("resource not found")}
+}
+
+func TestAddRunner_ErrorCases(t *testing.T) {
+	t.Parallel()
+
+	t.Run("parse name error", func(t *testing.T) {
+		t.Parallel()
+
+		store := testutil.NewMockStore()
+
+		var stdout, stderr bytes.Buffer
+
+		r := &cli.AddRunner{
+			UseCase: &stagingusecase.AddUseCase{
+				Strategy: &mockStrategy{service: staging.ServiceParam, parseNameErr: errors.New("invalid name")},
+				Store:    store,
+			},
+			Stdout: &stdout,
+			Stderr: &stderr,
+		}
+
+		err := r.Run(t.Context(), cli.AddOptions{Name: "invalid"})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid name")
+	})
+
+	t.Run("editor error", func(t *testing.T) {
+		t.Parallel()
+
+		store := testutil.NewMockStore()
+
+		var stdout, stderr bytes.Buffer
+
+		r := &cli.AddRunner{
+			UseCase: &stagingusecase.AddUseCase{
+				Strategy: &mockStrategy{service: staging.ServiceParam},
+				Store:    store,
+			},
+			Stdout: &stdout,
+			Stderr: &stderr,
+			OpenEditor: func(_ context.Context, _ string) (string, error) {
+				return "", errors.New("editor crashed")
+			},
+		}
+
+		err := r.Run(t.Context(), cli.AddOptions{Name: "/app/config"})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to edit")
+	})
+}
+
+func TestAddRunner_WithOptions(t *testing.T) {
+	t.Parallel()
+
+	t.Run("with provided value (skip editor)", func(t *testing.T) {
+		t.Parallel()
+
+		store := testutil.NewMockStore()
+
+		var stdout, stderr bytes.Buffer
+
+		r := &cli.AddRunner{
+			UseCase: &stagingusecase.AddUseCase{
+				Strategy: &mockStrategy{service: staging.ServiceParam},
+				Store:    store,
+			},
+			Stdout: &stdout,
+			Stderr: &stderr,
+			// No OpenEditor set - with Value provided, editor should not be called
+		}
+
+		err := r.Run(t.Context(), cli.AddOptions{
+			Name:  "/app/new-config",
+			Value: "direct-value",
+		})
+		require.NoError(t, err)
+		assert.Contains(t, stdout.String(), "Staged for creation")
+
+		entry, err := store.GetEntry(t.Context(), staging.ServiceParam, "/app/new-config")
+		require.NoError(t, err)
+		assert.Equal(t, staging.OperationCreate, entry.Operation)
+		assert.Equal(t, "direct-value", lo.FromPtr(entry.Value))
+	})
+
+	t.Run("with description", func(t *testing.T) {
+		t.Parallel()
+
+		store := testutil.NewMockStore()
+
+		var stdout, stderr bytes.Buffer
+
+		r := &cli.AddRunner{
+			UseCase: &stagingusecase.AddUseCase{
+				Strategy: &mockStrategy{service: staging.ServiceParam},
+				Store:    store,
+			},
+			Stdout: &stdout,
+			Stderr: &stderr,
+		}
+
+		err := r.Run(t.Context(), cli.AddOptions{
+			Name:        "/app/new-config",
+			Value:       "test-value",
+			Description: "Test description",
+		})
+		require.NoError(t, err)
+
+		entry, err := store.GetEntry(t.Context(), staging.ServiceParam, "/app/new-config")
+		require.NoError(t, err)
+		assert.Equal(t, "Test description", lo.FromPtr(entry.Description))
+	})
+}

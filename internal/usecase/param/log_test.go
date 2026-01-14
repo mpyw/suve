@@ -2,7 +2,6 @@ package param_test
 
 import (
 	"context"
-	"errors"
 	"testing"
 	"time"
 
@@ -19,10 +18,12 @@ type mockLogClient struct {
 	getHistoryErr    error
 }
 
+//nolint:lll // mock function signature must match AWS SDK interface
 func (m *mockLogClient) GetParameterHistory(_ context.Context, _ *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
 	if m.getHistoryErr != nil {
 		return nil, m.getHistoryErr
 	}
+
 	return m.getHistoryResult, nil
 }
 
@@ -33,9 +34,18 @@ func TestLogUseCase_Execute(t *testing.T) {
 	client := &mockLogClient{
 		getHistoryResult: &paramapi.GetParameterHistoryOutput{
 			Parameters: []paramapi.ParameterHistory{
-				{Name: lo.ToPtr("/app/config"), Value: lo.ToPtr("v1"), Version: 1, Type: paramapi.ParameterTypeString, LastModifiedDate: lo.ToPtr(now.Add(-2 * time.Hour))},
-				{Name: lo.ToPtr("/app/config"), Value: lo.ToPtr("v2"), Version: 2, Type: paramapi.ParameterTypeString, LastModifiedDate: lo.ToPtr(now.Add(-1 * time.Hour))},
-				{Name: lo.ToPtr("/app/config"), Value: lo.ToPtr("v3"), Version: 3, Type: paramapi.ParameterTypeString, LastModifiedDate: lo.ToPtr(now)},
+				{
+					Name: lo.ToPtr("/app/config"), Value: lo.ToPtr("v1"), Version: 1,
+					Type: paramapi.ParameterTypeString, LastModifiedDate: lo.ToPtr(now.Add(-2 * time.Hour)),
+				},
+				{
+					Name: lo.ToPtr("/app/config"), Value: lo.ToPtr("v2"), Version: 2,
+					Type: paramapi.ParameterTypeString, LastModifiedDate: lo.ToPtr(now.Add(-1 * time.Hour)),
+				},
+				{
+					Name: lo.ToPtr("/app/config"), Value: lo.ToPtr("v3"), Version: 3,
+					Type: paramapi.ParameterTypeString, LastModifiedDate: lo.ToPtr(now),
+				},
 			},
 		},
 	}
@@ -83,7 +93,7 @@ func TestLogUseCase_Execute_Error(t *testing.T) {
 	t.Parallel()
 
 	client := &mockLogClient{
-		getHistoryErr: errors.New("aws error"),
+		getHistoryErr: errAWS,
 	}
 
 	uc := &param.LogUseCase{Client: client}
@@ -91,7 +101,7 @@ func TestLogUseCase_Execute_Error(t *testing.T) {
 	_, err := uc.Execute(t.Context(), param.LogInput{
 		Name: "/app/config",
 	})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to get parameter history")
 }
 

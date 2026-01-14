@@ -5,8 +5,10 @@ package gui
 import (
 	"errors"
 
+	"github.com/mpyw/suve/internal/infra"
 	"github.com/mpyw/suve/internal/maputil"
 	"github.com/mpyw/suve/internal/staging"
+	"github.com/mpyw/suve/internal/staging/store/file"
 	stagingusecase "github.com/mpyw/suve/internal/usecase/staging"
 )
 
@@ -158,6 +160,7 @@ func (a *App) StagingStatus() (*StagingStatusResult, error) {
 		Strategy: paramParser,
 		Store:    store,
 	}
+
 	paramResult, err := paramUC.Execute(a.ctx, stagingusecase.StatusInput{})
 	if err != nil {
 		return nil, err
@@ -168,6 +171,7 @@ func (a *App) StagingStatus() (*StagingStatusResult, error) {
 		Strategy: secretParser,
 		Store:    store,
 	}
+
 	secretResult, err := secretUC.Execute(a.ctx, stagingusecase.StatusInput{})
 	if err != nil {
 		return nil, err
@@ -265,6 +269,7 @@ func (a *App) StagingApply(service string, ignoreConflicts bool) (*StagingApplyR
 				entry.Error = r.Error.Error()
 			}
 		}
+
 		output.EntryResults = append(output.EntryResults, entry)
 	}
 
@@ -277,6 +282,7 @@ func (a *App) StagingApply(service string, ignoreConflicts bool) (*StagingApplyR
 		if r.Error != nil {
 			tagResult.Error = r.Error.Error()
 		}
+
 		output.TagResults = append(output.TagResults, tagResult)
 	}
 
@@ -299,6 +305,7 @@ func (a *App) StagingReset(service string) (*StagingResetResult, error) {
 		Parser: parser,
 		Store:  store,
 	}
+
 	result, err := uc.Execute(a.ctx, stagingusecase.ResetInput{All: true})
 	if err != nil {
 		return nil, err
@@ -321,6 +328,8 @@ func (a *App) StagingReset(service string) (*StagingResetResult, error) {
 		output.Type = "notStaged"
 	case stagingusecase.ResetResultNothingStaged:
 		output.Type = "nothingStaged"
+	case stagingusecase.ResetResultSkipped:
+		output.Type = "skipped"
 	}
 
 	return output, nil
@@ -342,6 +351,7 @@ func (a *App) StagingAdd(service, name, value string) (*StagingAddResult, error)
 		Strategy: strategy,
 		Store:    store,
 	}
+
 	result, err := uc.Execute(a.ctx, stagingusecase.AddInput{
 		Name:  name,
 		Value: value,
@@ -369,6 +379,7 @@ func (a *App) StagingEdit(service, name, value string) (*StagingEditResult, erro
 		Strategy: strategy,
 		Store:    store,
 	}
+
 	result, err := uc.Execute(a.ctx, stagingusecase.EditInput{
 		Name:  name,
 		Value: value,
@@ -396,6 +407,7 @@ func (a *App) StagingDelete(service, name string, force bool, recoveryWindow int
 		Strategy: strategy,
 		Store:    store,
 	}
+
 	result, err := uc.Execute(a.ctx, stagingusecase.DeleteInput{
 		Name:           name,
 		Force:          force,
@@ -449,6 +461,7 @@ func (a *App) StagingAddTag(service, name, key, value string) (*StagingAddTagRes
 		Strategy: strategy,
 		Store:    store,
 	}
+
 	result, err := uc.Tag(a.ctx, stagingusecase.TagInput{
 		Name: name,
 		Tags: map[string]string{key: value},
@@ -476,6 +489,7 @@ func (a *App) StagingRemoveTag(service, name, key string) (*StagingRemoveTagResu
 		Strategy: strategy,
 		Store:    store,
 	}
+
 	result, err := uc.Untag(a.ctx, stagingusecase.UntagInput{
 		Name:    name,
 		TagKeys: maputil.NewSet(key),
@@ -557,7 +571,7 @@ func (a *App) StagingCancelRemoveTag(service, name, key string) (*StagingCancelR
 	return &StagingCancelRemoveTagResult{Name: name}, nil
 }
 
-// StagingCheckStatus checks if a specific item has staged changes.
+// StagingCheckStatusResult holds the result of checking staged status for an item.
 type StagingCheckStatusResult struct {
 	HasEntry bool `json:"hasEntry"`
 	HasTags  bool `json:"hasTags"`
@@ -606,6 +620,7 @@ func (a *App) StagingDiff(service string, name string) (*StagingDiffResult, erro
 		Strategy: strategy,
 		Store:    store,
 	}
+
 	result, err := uc.Execute(a.ctx, stagingusecase.DiffInput{Name: name})
 	if err != nil {
 		return nil, err
@@ -632,6 +647,7 @@ func (a *App) StagingDiff(service string, name string) (*StagingDiffResult, erro
 		case stagingusecase.DiffEntryWarning:
 			entry.Type = "warning"
 		}
+
 		entries[i] = entry
 	}
 
@@ -648,5 +664,202 @@ func (a *App) StagingDiff(service string, name string) (*StagingDiffResult, erro
 		ItemName:   result.ItemName,
 		Entries:    entries,
 		TagEntries: tagEntries,
+	}, nil
+}
+
+// =============================================================================
+// Drain/Persist Types
+// =============================================================================
+
+// StagingDrainResult represents the result of draining from file to agent.
+type StagingDrainResult struct {
+	Merged     bool `json:"merged"`
+	EntryCount int  `json:"entryCount"`
+	TagCount   int  `json:"tagCount"`
+}
+
+// StagingPersistResult represents the result of persisting from agent to file.
+type StagingPersistResult struct {
+	EntryCount int `json:"entryCount"`
+	TagCount   int `json:"tagCount"`
+}
+
+// StagingFileStatusResult represents the status of the staging file.
+type StagingFileStatusResult struct {
+	Exists    bool `json:"exists"`
+	Encrypted bool `json:"encrypted"`
+}
+
+// =============================================================================
+// Drain/Persist Methods
+// =============================================================================
+
+// StagingFileStatus checks if the staging file exists and whether it's encrypted.
+func (a *App) StagingFileStatus() (*StagingFileStatusResult, error) {
+	identity, err := infra.GetAWSIdentity(a.ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	fileStore, err := file.NewStore(identity.AccountID, identity.Region)
+	if err != nil {
+		return nil, err
+	}
+
+	exists, err := fileStore.Exists()
+	if err != nil {
+		return nil, err
+	}
+
+	result := &StagingFileStatusResult{
+		Exists: exists,
+	}
+
+	if exists {
+		encrypted, err := fileStore.IsEncrypted()
+		if err != nil {
+			return nil, err
+		}
+
+		result.Encrypted = encrypted
+	}
+
+	return result, nil
+}
+
+// StagingDrain loads staged changes from file into agent memory.
+// If the file is encrypted, passphrase must be provided.
+func (a *App) StagingDrain(service string, passphrase string, keep bool, force bool, merge bool) (*StagingDrainResult, error) {
+	identity, err := infra.GetAWSIdentity(a.ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	fileStore, err := file.NewStoreWithPassphrase(identity.AccountID, identity.Region, passphrase)
+	if err != nil {
+		return nil, err
+	}
+
+	agentStore, err := a.getAgentStore()
+	if err != nil {
+		return nil, err
+	}
+
+	var svc staging.Service
+	if service != "" {
+		svc, err = a.getService(service)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	uc := &stagingusecase.StashPopUseCase{
+		FileStore:  fileStore,
+		AgentStore: agentStore,
+	}
+
+	result, err := uc.Execute(a.ctx, stagingusecase.StashPopInput{
+		Service: svc,
+		Keep:    keep,
+		Force:   force,
+		Merge:   merge,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return &StagingDrainResult{
+		Merged:     result.Merged,
+		EntryCount: result.EntryCount,
+		TagCount:   result.TagCount,
+	}, nil
+}
+
+// StagingPersist saves staged changes from agent memory to file.
+// If passphrase is provided, the file will be encrypted.
+// mode: "overwrite" or "merge"
+func (a *App) StagingPersist(service string, passphrase string, keep bool, mode string) (*StagingPersistResult, error) {
+	identity, err := infra.GetAWSIdentity(a.ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	fileStore, err := file.NewStoreWithPassphrase(identity.AccountID, identity.Region, passphrase)
+	if err != nil {
+		return nil, err
+	}
+
+	agentStore, err := a.getAgentStore()
+	if err != nil {
+		return nil, err
+	}
+
+	var svc staging.Service
+	if service != "" {
+		svc, err = a.getService(service)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	persistMode := stagingusecase.StashPushModeOverwrite
+	if mode == "merge" {
+		persistMode = stagingusecase.StashPushModeMerge
+	}
+
+	uc := &stagingusecase.StashPushUseCase{
+		AgentStore: agentStore,
+		FileStore:  fileStore,
+	}
+
+	result, err := uc.Execute(a.ctx, stagingusecase.StashPushInput{
+		Service: svc,
+		Keep:    keep,
+		Mode:    persistMode,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return &StagingPersistResult{
+		EntryCount: result.EntryCount,
+		TagCount:   result.TagCount,
+	}, nil
+}
+
+// StagingDropResult represents the result of dropping the stash file.
+type StagingDropResult struct {
+	Dropped bool `json:"dropped"`
+}
+
+// StagingDrop deletes the staging file without loading it into memory.
+func (a *App) StagingDrop() (*StagingDropResult, error) {
+	identity, err := infra.GetAWSIdentity(a.ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	fileStore, err := file.NewStore(identity.AccountID, identity.Region)
+	if err != nil {
+		return nil, err
+	}
+
+	exists, err := fileStore.Exists()
+	if err != nil {
+		return nil, err
+	}
+
+	if !exists {
+		return nil, errors.New("no stashed changes to drop")
+	}
+
+	// Drain with keep=false to delete the file (we discard the result)
+	_, err = fileStore.Drain(a.ctx, "", false)
+	if err != nil {
+		return nil, err
+	}
+
+	return &StagingDropResult{
+		Dropped: true,
 	}, nil
 }

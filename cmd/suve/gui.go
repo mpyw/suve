@@ -1,5 +1,6 @@
 //go:build production || dev
 
+// Package main provides the suve CLI entry point.
 package main
 
 import (
@@ -23,8 +24,10 @@ func registerGUIFlag() {
 			if err := gui.Run(); err != nil {
 				return ctx, err
 			}
+
 			os.Exit(0)
 		}
+
 		return ctx, nil
 	}
 }
