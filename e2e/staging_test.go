@@ -1,6 +1,7 @@
 //go:build e2e
 
-package e2e
+//nolint:paralleltest,dogsled,gosec // E2E tests: sequential execution, cleanup, G101 false positive
+package e2e_test
 
 import (
 	"strings"
@@ -186,7 +187,7 @@ func TestGlobal_StageResetAll(t *testing.T) {
 // TestGlobal_StageCommand tests the global stage parent command structure.
 func TestGlobal_StageCommand(t *testing.T) {
 	setupEnv(t)
-	_ = setupTempHome(t)
+	setupTempHome(t)
 
 	// Test that global stage command has correct subcommands
 	t.Run("has-subcommands", func(t *testing.T) {
@@ -208,7 +209,7 @@ func TestGlobal_StageCommand(t *testing.T) {
 // TestStaging_ErrorCases tests staging error scenarios.
 func TestStaging_ErrorCases(t *testing.T) {
 	setupEnv(t)
-	_ = setupTempHome(t)
+	setupTempHome(t)
 
 	// Push when nothing staged - warning goes to stdout
 	t.Run("apply-nothing-staged", func(t *testing.T) {
@@ -361,6 +362,7 @@ func TestGlobal_ResetWithTags(t *testing.T) {
 // TestGlobal_StashPushAndPop tests the stash push and pop workflow.
 func TestGlobal_StashPushAndPop(t *testing.T) {
 	setupEnv(t)
+
 	paramName := "/suve-e2e-stash-push-pop/test-param"
 
 	// Cleanup
@@ -432,6 +434,7 @@ func TestGlobal_StashPushAndPop(t *testing.T) {
 // TestGlobal_StashPushWithKeep tests stash push with --keep flag.
 func TestGlobal_StashPushWithKeep(t *testing.T) {
 	setupEnv(t)
+
 	paramName := "/suve-e2e-stash-push-keep/test-param"
 
 	// Cleanup
@@ -464,6 +467,7 @@ func TestGlobal_StashPushWithKeep(t *testing.T) {
 // TestGlobal_StashPopWithMerge tests stash pop with --merge flag.
 func TestGlobal_StashPopWithMerge(t *testing.T) {
 	setupEnv(t)
+
 	paramName1 := "/suve-e2e-stash-pop-merge/param1"
 	paramName2 := "/suve-e2e-stash-pop-merge/param2"
 
@@ -546,6 +550,7 @@ func TestGlobal_StashPushEmpty(t *testing.T) {
 // TestMixed_ServiceSpecificStashPushPop tests stash push/pop with mixed services.
 func TestMixed_ServiceSpecificStashPushPop(t *testing.T) {
 	setupEnv(t)
+
 	paramName := "/suve-e2e-mixed-stash/param"
 	secretName := "suve-e2e-mixed-stash/secret"
 
@@ -849,7 +854,7 @@ func TestAgentStore_UnstageAll(t *testing.T) {
 
 		// Param should be gone
 		_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/suve-e2e/unstage-all/param")
-		assert.ErrorIs(t, err, staging.ErrNotStaged)
+		require.ErrorIs(t, err, staging.ErrNotStaged)
 
 		// Secret should still be there
 		entry, err := store.GetEntry(t.Context(), staging.ServiceSecret, "suve-e2e/unstage-all/secret")
@@ -872,9 +877,9 @@ func TestAgentStore_UnstageAll(t *testing.T) {
 
 		// Both should be gone
 		_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/suve-e2e/unstage-all/param")
-		assert.ErrorIs(t, err, staging.ErrNotStaged)
+		require.ErrorIs(t, err, staging.ErrNotStaged)
 		_, err = store.GetEntry(t.Context(), staging.ServiceSecret, "suve-e2e/unstage-all/secret")
-		assert.ErrorIs(t, err, staging.ErrNotStaged)
+		require.ErrorIs(t, err, staging.ErrNotStaged)
 	})
 }
 
@@ -976,12 +981,14 @@ func TestDaemonLauncher_Ping(t *testing.T) {
 	t.Run("ping-concurrent", func(t *testing.T) {
 		ctx := t.Context()
 		done := make(chan error, 10)
-		for i := 0; i < 10; i++ {
+
+		for range 10 {
 			go func() {
 				done <- launcher.Ping(ctx)
 			}()
 		}
-		for i := 0; i < 10; i++ {
+
+		for range 10 {
 			err := <-done
 			assert.NoError(t, err)
 		}
@@ -1019,7 +1026,7 @@ func TestDaemonLauncher_ViaStore(t *testing.T) {
 
 	// Multiple sequential operations test IPC reliability
 	t.Run("multiple-sequential-ipc-calls", func(t *testing.T) {
-		for i := 0; i < 5; i++ {
+		for range 5 {
 			err := store.StageEntry(t.Context(), staging.ServiceParam, "/suve-e2e/ipc-test", staging.Entry{
 				Operation: staging.OperationUpdate,
 				Value:     lo.ToPtr("test-value"),
@@ -1076,7 +1083,7 @@ func TestDaemonLauncher_NotRunning(t *testing.T) {
 	// Test EnsureRunning fails when auto-start is disabled
 	t.Run("ensure-running-fails", func(t *testing.T) {
 		err := launcher.EnsureRunning(t.Context())
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "auto-start is disabled")
 	})
 }

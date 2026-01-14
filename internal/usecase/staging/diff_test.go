@@ -296,7 +296,7 @@ func TestDiffUseCase_Execute_ListError(t *testing.T) {
 	}
 
 	_, err := uc.Execute(t.Context(), usecasestaging.DiffInput{})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "list error")
 }
 
@@ -312,7 +312,7 @@ func TestDiffUseCase_Execute_GetError(t *testing.T) {
 	}
 
 	_, err := uc.Execute(t.Context(), usecasestaging.DiffInput{Name: "/app/config"})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "get error")
 }
 
@@ -328,7 +328,7 @@ func TestDiffUseCase_Execute_GetTagError(t *testing.T) {
 	}
 
 	_, err := uc.Execute(t.Context(), usecasestaging.DiffInput{Name: "/app/config"})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "get tag error")
 }
 
@@ -344,7 +344,7 @@ func TestDiffUseCase_Execute_ListTagsError(t *testing.T) {
 	}
 
 	_, err := uc.Execute(t.Context(), usecasestaging.DiffInput{})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "list tags error")
 }
 

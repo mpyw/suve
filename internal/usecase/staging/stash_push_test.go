@@ -234,11 +234,11 @@ func TestPersistUseCase_PersistMode(t *testing.T) {
 
 		// Existing param should be gone (overwritten)
 		_, err = fileStore.GetEntry(t.Context(), staging.ServiceParam, "/existing/param")
-		assert.ErrorIs(t, err, staging.ErrNotStaged)
+		require.ErrorIs(t, err, staging.ErrNotStaged)
 
 		// Existing secret should also be gone (overwritten)
 		_, err = fileStore.GetEntry(t.Context(), staging.ServiceSecret, "existing-secret")
-		assert.ErrorIs(t, err, staging.ErrNotStaged)
+		require.ErrorIs(t, err, staging.ErrNotStaged)
 	})
 
 	t.Run("merge mode combines with existing file", func(t *testing.T) {
@@ -447,7 +447,7 @@ func TestPersistUseCase_ServiceSpecific_EdgeCases(t *testing.T) {
 
 		// Old param should be gone (replaced)
 		_, err = fileStore.GetEntry(t.Context(), staging.ServiceParam, "/old/param")
-		assert.ErrorIs(t, err, staging.ErrNotStaged)
+		require.ErrorIs(t, err, staging.ErrNotStaged)
 
 		// Secret should still exist (preserved)
 		_, err = fileStore.GetEntry(t.Context(), staging.ServiceSecret, "existing-secret")

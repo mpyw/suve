@@ -466,6 +466,7 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
+				t.Helper()
 				assert.Contains(t, output, "Version 2")
 				assert.NotContains(t, output, "Version 1")
 			},
@@ -485,6 +486,7 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
+				t.Helper()
 				assert.Contains(t, output, `"version"`)
 				assert.Contains(t, output, `"value"`)
 				assert.Contains(t, output, `"type"`)
@@ -505,6 +507,7 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
+				t.Helper()
 				assert.Contains(t, output, `"version"`)
 				assert.NotContains(t, output, `"modified"`)
 			},
@@ -524,6 +527,7 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
+				t.Helper()
 				assert.Contains(t, output, "Version")
 			},
 		},
@@ -541,6 +545,7 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
+				t.Helper()
 				assert.Contains(t, output, "Version 1")
 				assert.NotContains(t, output, "Date:")
 			},
@@ -559,6 +564,7 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
+				t.Helper()
 				assert.Contains(t, output, "1")
 			},
 		},
@@ -577,6 +583,8 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
+				t.Helper()
+
 				assert.Contains(t, output, "Version")
 				// No diff should be shown since values are identical
 				assert.NotContains(t, output, "-same-value")

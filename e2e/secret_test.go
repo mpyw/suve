@@ -1,6 +1,7 @@
 //go:build e2e
 
-package e2e
+//nolint:paralleltest,dogsled,gosec // E2E tests: sequential execution, cleanup, G101 false positive
+package e2e_test
 
 import (
 	"strings"
@@ -33,6 +34,7 @@ import (
 // TestSecret_FullWorkflow tests the complete Secrets Manager workflow.
 func TestSecret_FullWorkflow(t *testing.T) {
 	setupEnv(t)
+
 	secretName := "suve-e2e-test/basic/secret"
 
 	// Cleanup: force delete secret if it exists
@@ -165,6 +167,7 @@ func TestSecret_FullWorkflow(t *testing.T) {
 // TestSecret_VersionSpecifiers tests Secrets Manager version specifier syntax.
 func TestSecret_VersionSpecifiers(t *testing.T) {
 	setupEnv(t)
+
 	secretName := "suve-e2e-test/version/secret"
 
 	// Cleanup
@@ -199,6 +202,7 @@ func TestSecret_VersionSpecifiers(t *testing.T) {
 		stdout, _, err := runCommand(t, secretshow.Command(), "--raw", secretName+"~1")
 		// Localstack may not support shift properly, skip strict assertion
 		t.Logf("shift ~1 stdout: %s, err: %v", stdout, err)
+
 		if err == nil {
 			// If it works, value should be one of the previous versions
 			assert.True(t, stdout == "v1" || stdout == "v2" || stdout == "v3",
@@ -402,7 +406,7 @@ func TestSecret_SpecialCharactersInName(t *testing.T) {
 // TestSecret_StagingAddViaCLI tests the Secrets Manager stage add command via CLI.
 func TestSecret_StagingAddViaCLI(t *testing.T) {
 	setupEnv(t)
-	_ = setupTempHome(t)
+	setupTempHome(t)
 
 	secretName := "suve-e2e-staging/add-cli/secret"
 
@@ -445,7 +449,7 @@ func TestSecret_StagingAddViaCLI(t *testing.T) {
 // TestSecret_StagingAddExistingResourceFails tests that adding an existing secret fails.
 func TestSecret_StagingAddExistingResourceFails(t *testing.T) {
 	setupEnv(t)
-	_ = setupTempHome(t)
+	setupTempHome(t)
 
 	secretName := "suve-e2e-staging/add-existing/secret"
 
@@ -462,7 +466,7 @@ func TestSecret_StagingAddExistingResourceFails(t *testing.T) {
 	// Try to stage add - should fail because resource already exists
 	t.Run("add-existing-fails", func(t *testing.T) {
 		_, _, err := runSubCommand(t, secretstage.Command(), "add", secretName, "new-value")
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "already exists")
 		t.Logf("expected error: %v", err)
 	})
@@ -471,6 +475,7 @@ func TestSecret_StagingAddExistingResourceFails(t *testing.T) {
 // TestSecret_TagAndUntag tests the secret tag and untag commands.
 func TestSecret_TagAndUntag(t *testing.T) {
 	setupEnv(t)
+
 	secretName := "suve-e2e-tag/test-secret"
 
 	// Cleanup
@@ -521,6 +526,7 @@ func TestSecret_TagAndUntag(t *testing.T) {
 // TestSecret_TagInvalidFormat tests error handling for invalid tag formats.
 func TestSecret_TagInvalidFormat(t *testing.T) {
 	setupEnv(t)
+
 	secretName := "suve-e2e-tag/invalid-format"
 
 	// Cleanup
@@ -536,7 +542,7 @@ func TestSecret_TagInvalidFormat(t *testing.T) {
 	// Try to add invalid tag format
 	t.Run("invalid-format", func(t *testing.T) {
 		_, _, err := runCommand(t, secrettag.Command(), secretName, "invalid-tag-no-equals")
-		assert.Error(t, err)
+		require.Error(t, err)
 		t.Logf("expected error: %v", err)
 	})
 }
@@ -544,6 +550,7 @@ func TestSecret_TagInvalidFormat(t *testing.T) {
 // TestSecret_TagNonExistent tests tagging a non-existent secret.
 func TestSecret_TagNonExistent(t *testing.T) {
 	setupEnv(t)
+
 	secretName := "suve-e2e-tag/non-existent"
 
 	// Ensure it doesn't exist
@@ -551,13 +558,14 @@ func TestSecret_TagNonExistent(t *testing.T) {
 
 	// Try to tag non-existent secret
 	_, _, err := runCommand(t, secrettag.Command(), secretName, "env=test")
-	assert.Error(t, err)
+	require.Error(t, err)
 	t.Logf("expected error: %v", err)
 }
 
 // TestSecret_UntagNonExistent tests untagging a non-existent secret.
 func TestSecret_UntagNonExistent(t *testing.T) {
 	setupEnv(t)
+
 	secretName := "suve-e2e-untag/non-existent"
 
 	// Ensure it doesn't exist
@@ -565,13 +573,14 @@ func TestSecret_UntagNonExistent(t *testing.T) {
 
 	// Try to untag non-existent secret
 	_, _, err := runCommand(t, secretuntag.Command(), secretName, "env")
-	assert.Error(t, err)
+	require.Error(t, err)
 	t.Logf("expected error: %v", err)
 }
 
 // TestSecret_UpdateNonExistent tests updating a non-existent secret.
 func TestSecret_UpdateNonExistent(t *testing.T) {
 	setupEnv(t)
+
 	secretName := "suve-e2e-update/non-existent"
 
 	// Ensure it doesn't exist
@@ -602,6 +611,7 @@ func TestSecret_UpdateMissingArgs(t *testing.T) {
 // TestSecret_LogNonExistent tests log for non-existent secret.
 func TestSecret_LogNonExistent(t *testing.T) {
 	setupEnv(t)
+
 	secretName := "suve-e2e-log/non-existent"
 
 	// Ensure it doesn't exist
@@ -615,6 +625,7 @@ func TestSecret_LogNonExistent(t *testing.T) {
 // TestSecret_DiffNonExistent tests diff for non-existent secret.
 func TestSecret_DiffNonExistent(t *testing.T) {
 	setupEnv(t)
+
 	secretName := "suve-e2e-diff/non-existent"
 
 	// Ensure it doesn't exist
@@ -628,6 +639,7 @@ func TestSecret_DiffNonExistent(t *testing.T) {
 // TestSecret_ShowRaw tests secret show with --raw flag.
 func TestSecret_ShowRaw(t *testing.T) {
 	setupEnv(t)
+
 	secretName := "suve-e2e-show/raw-test"
 	secretValue := "raw-secret-value"
 
@@ -652,6 +664,7 @@ func TestSecret_ShowRaw(t *testing.T) {
 // TestSecret_ShowNonExistent tests show for non-existent secret.
 func TestSecret_ShowNonExistent(t *testing.T) {
 	setupEnv(t)
+
 	secretName := "suve-e2e-show/non-existent"
 
 	// Ensure it doesn't exist
@@ -665,6 +678,7 @@ func TestSecret_ShowNonExistent(t *testing.T) {
 // TestSecret_CreateAndTag tests creating a secret and adding tags after.
 func TestSecret_CreateAndTag(t *testing.T) {
 	setupEnv(t)
+
 	secretName := "suve-e2e-create/and-tag"
 
 	// Cleanup
@@ -692,6 +706,7 @@ func TestSecret_CreateAndTag(t *testing.T) {
 // TestSecret_CreateDuplicate tests creating a duplicate secret.
 func TestSecret_CreateDuplicate(t *testing.T) {
 	setupEnv(t)
+
 	secretName := "suve-e2e-create/duplicate"
 
 	// Cleanup
@@ -744,6 +759,7 @@ func TestSecret_DeleteNonExistent(t *testing.T) {
 // TestSecret_DeleteWithRecoveryWindow tests secret delete with recovery window.
 func TestSecret_DeleteWithRecoveryWindow(t *testing.T) {
 	setupEnv(t)
+
 	secretName := "suve-e2e-delete/scheduled"
 
 	// Cleanup
@@ -768,6 +784,7 @@ func TestSecret_DeleteWithRecoveryWindow(t *testing.T) {
 // TestSecret_ListJSON tests secret list with JSON output.
 func TestSecret_ListJSON(t *testing.T) {
 	setupEnv(t)
+
 	secretName := "suve-e2e-list/json-test"
 
 	// Cleanup
@@ -788,6 +805,7 @@ func TestSecret_ListJSON(t *testing.T) {
 // TestSecret_StashPushAndPop tests service-specific stash push and pop for secrets.
 func TestSecret_StashPushAndPop(t *testing.T) {
 	setupEnv(t)
+
 	secretName := "suve-e2e-secret-stash-push-pop/test"
 
 	// Cleanup

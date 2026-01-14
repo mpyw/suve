@@ -153,7 +153,7 @@ func TestDeleteUseCase_Execute_FetchError(t *testing.T) {
 	_, err := uc.Execute(t.Context(), usecasestaging.DeleteInput{
 		Name: "/app/not-exists",
 	})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to fetch")
 }
 
@@ -224,7 +224,7 @@ func TestDeleteUseCase_Execute_StageError(t *testing.T) {
 	_, err := uc.Execute(t.Context(), usecasestaging.DeleteInput{
 		Name: "/app/config",
 	})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "stage error")
 }
 
@@ -242,7 +242,7 @@ func TestDeleteUseCase_Execute_GetError(t *testing.T) {
 	_, err := uc.Execute(t.Context(), usecasestaging.DeleteInput{
 		Name: "/app/config",
 	})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "store get error")
 }
 
@@ -265,7 +265,7 @@ func TestDeleteUseCase_Execute_UnstageError(t *testing.T) {
 	_, err := uc.Execute(t.Context(), usecasestaging.DeleteInput{
 		Name: "/app/new",
 	})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "unstage error")
 }
 

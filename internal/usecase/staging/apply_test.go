@@ -180,7 +180,7 @@ func TestApplyUseCase_Execute_FilterByName_NotStaged(t *testing.T) {
 	_, err := uc.Execute(t.Context(), usecasestaging.ApplyInput{
 		Name: "/app/not-staged",
 	})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "not staged")
 }
 
@@ -210,7 +210,7 @@ func TestApplyUseCase_Execute_PartialFailure(t *testing.T) {
 	output, err := uc.Execute(t.Context(), usecasestaging.ApplyInput{
 		IgnoreConflicts: true,
 	})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "applied 1 entries")
 	assert.Equal(t, 1, output.EntrySucceeded)
 	assert.Equal(t, 1, output.EntryFailed)
@@ -249,7 +249,7 @@ func TestApplyUseCase_Execute_ConflictDetection(t *testing.T) {
 	output, err := uc.Execute(t.Context(), usecasestaging.ApplyInput{
 		IgnoreConflicts: false,
 	})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "conflict")
 	assert.Len(t, output.Conflicts, 1)
 	assert.Equal(t, "/app/conflict", output.Conflicts[0])
@@ -417,12 +417,12 @@ func TestApplyUseCase_Execute_TagFailure(t *testing.T) {
 	}
 
 	output, err := uc.Execute(t.Context(), usecasestaging.ApplyInput{})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed 0 entries, 1 tags")
 	assert.Equal(t, 0, output.TagSucceeded)
 	assert.Equal(t, 1, output.TagFailed)
 	require.Len(t, output.TagResults, 1)
-	assert.Error(t, output.TagResults[0].Error)
+	require.Error(t, output.TagResults[0].Error)
 
 	// Failed tag should still be staged
 	_, err = store.GetTag(t.Context(), staging.ServiceParam, "/app/config")
@@ -451,14 +451,14 @@ func TestApplyUseCase_Execute_PartialTagFailure(t *testing.T) {
 	}
 
 	output, err := uc.Execute(t.Context(), usecasestaging.ApplyInput{})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed 0 entries, 1 tags")
 	assert.Equal(t, 1, output.TagSucceeded)
 	assert.Equal(t, 1, output.TagFailed)
 
 	// Success should be unstaged
 	_, err = store.GetTag(t.Context(), staging.ServiceParam, "/app/success")
-	assert.ErrorIs(t, err, staging.ErrNotStaged)
+	require.ErrorIs(t, err, staging.ErrNotStaged)
 
 	// Failure should still be staged
 	_, err = store.GetTag(t.Context(), staging.ServiceParam, "/app/fail")
@@ -508,7 +508,7 @@ func TestApplyUseCase_Execute_ListTagsError(t *testing.T) {
 	}
 
 	_, err := uc.Execute(t.Context(), usecasestaging.ApplyInput{})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "list tags error")
 }
 

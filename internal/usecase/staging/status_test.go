@@ -113,7 +113,7 @@ func TestStatusUseCase_Execute_FilterByName(t *testing.T) {
 
 	// Non-existent entry
 	_, err = uc.Execute(t.Context(), usecasestaging.StatusInput{Name: "/app/other"})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "not staged")
 }
 
@@ -157,7 +157,7 @@ func TestStatusUseCase_Execute_GetError(t *testing.T) {
 	}
 
 	_, err := uc.Execute(t.Context(), usecasestaging.StatusInput{Name: "/app/config"})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "store error")
 }
 
@@ -291,7 +291,7 @@ func TestStatusUseCase_Execute_GetTagError(t *testing.T) {
 	}
 
 	_, err := uc.Execute(t.Context(), usecasestaging.StatusInput{Name: "/app/config"})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "get tag error")
 }
 

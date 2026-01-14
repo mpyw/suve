@@ -9,7 +9,7 @@
 //
 // Environment variables:
 //   - SUVE_LOCALSTACK_EXTERNAL_PORT: Custom localstack port (default: 4566)
-package e2e
+package e2e_test
 
 import (
 	"bytes"
@@ -28,7 +28,7 @@ import (
 	"github.com/mpyw/suve/internal/staging/store/agent/daemon"
 )
 
-// testDaemon is the shared staging agent daemon for all E2E tests.
+//nolint:gochecknoglobals // E2E test requires shared daemon instance across all tests
 var testDaemon *daemon.Runner
 
 // TestMain sets up the staging agent daemon before running tests.
@@ -58,15 +58,18 @@ func TestMain(m *testing.M) {
 	// Start daemon with error channel (localstack uses account "000000000000" and region "us-east-1")
 	testDaemon = daemon.NewRunner("000000000000", "us-east-1", agent.DaemonOptions()...)
 	daemonErrCh := make(chan error, 1)
+
 	go func() {
-		daemonErrCh <- testDaemon.Run(context.Background()) //nolint:forbidigo // TestMain has no t.Context()
+		daemonErrCh <- testDaemon.Run(context.Background())
 	}()
 
 	// Wait for daemon to be ready by polling with ping
 	if err := waitForDaemon(5*time.Second, daemonErrCh); err != nil {
 		output.Printf(os.Stderr, "failed to start daemon: %v\n", err)
 		testDaemon.Shutdown()
+
 		_ = os.RemoveAll(tmpDir)
+
 		os.Exit(1)
 	}
 
@@ -75,7 +78,9 @@ func TestMain(m *testing.M) {
 
 	// Cleanup
 	testDaemon.Shutdown()
+
 	_ = os.RemoveAll(tmpDir)
+
 	os.Exit(code)
 }
 
@@ -83,20 +88,22 @@ func TestMain(m *testing.M) {
 func waitForDaemon(timeout time.Duration, daemonErrCh <-chan error) error {
 	// Use same account/region as the daemon
 	launcher := daemon.NewLauncher("000000000000", "us-east-1", daemon.WithAutoStartDisabled())
-	ctx, cancel := context.WithTimeout(context.Background(), timeout) //nolint:forbidigo // called from TestMain
+
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
 	ticker := time.NewTicker(50 * time.Millisecond)
 	defer ticker.Stop()
 
 	var lastErr error
+
 	for {
 		select {
 		case err := <-daemonErrCh:
 			// Daemon exited with error
 			return fmt.Errorf("daemon exited: %w", err)
 		case <-ctx.Done():
-			return fmt.Errorf("daemon did not become ready within %v (last error: %v)", timeout, lastErr)
+			return fmt.Errorf("daemon did not become ready within %v (last error: %w)", timeout, lastErr)
 		case <-ticker.C:
 			// Try to ping daemon (any successful request means it's ready)
 			if err := launcher.Ping(ctx); err == nil {
@@ -118,6 +125,7 @@ func getEndpoint() string {
 // setupEnv sets up environment variables for localstack and returns a cleanup function.
 func setupEnv(t *testing.T) {
 	t.Helper()
+
 	endpoint := getEndpoint()
 
 	// Set AWS environment variables for localstack
@@ -128,11 +136,9 @@ func setupEnv(t *testing.T) {
 }
 
 // setupTempHome sets up a temporary HOME directory for isolated staging tests.
-func setupTempHome(t *testing.T) string {
+func setupTempHome(t *testing.T) {
 	t.Helper()
-	tmpHome := t.TempDir()
-	t.Setenv("HOME", tmpHome)
-	return tmpHome
+	t.Setenv("HOME", t.TempDir())
 }
 
 // newStore creates a new staging store for E2E tests.
@@ -152,6 +158,7 @@ func runCommand(t *testing.T, cmd *cli.Command, args ...string) (stdout, stderr 
 	t.Helper()
 
 	var outBuf, errBuf bytes.Buffer
+
 	app := &cli.Command{
 		Name:      "suve",
 		Writer:    &outBuf,
@@ -171,6 +178,7 @@ func runSubCommand(t *testing.T, parentCmd *cli.Command, subCmdName string, args
 	t.Helper()
 
 	var outBuf, errBuf bytes.Buffer
+
 	app := &cli.Command{
 		Name:      "suve",
 		Writer:    &outBuf,

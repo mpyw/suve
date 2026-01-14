@@ -147,7 +147,7 @@ func TestTagUseCase_Tag_ParseError(t *testing.T) {
 		Name: "invalid",
 		Tags: map[string]string{"env": "prod"},
 	})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "invalid name")
 }
 
@@ -186,7 +186,7 @@ func TestTagUseCase_Tag_StageError(t *testing.T) {
 		Name: "/app/config",
 		Tags: map[string]string{"env": "prod"},
 	})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "stage error")
 }
 
@@ -205,7 +205,7 @@ func TestTagUseCase_Tag_GetError(t *testing.T) {
 		Name: "/app/config",
 		Tags: map[string]string{"env": "prod"},
 	})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "get error")
 }
 
@@ -328,7 +328,7 @@ func TestTagUseCase_Tag_GetEntryError(t *testing.T) {
 		Name: "/app/config",
 		Tags: map[string]string{"env": "prod"},
 	})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "get entry error")
 }
 
@@ -454,7 +454,7 @@ func TestTagUseCase_Untag_GetEntryError(t *testing.T) {
 		Name:    "/app/config",
 		TagKeys: maputil.NewSet("env"),
 	})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "get entry error")
 }
 
@@ -473,7 +473,7 @@ func TestTagUseCase_Untag_GetTagError(t *testing.T) {
 		Name:    "/app/config",
 		TagKeys: maputil.NewSet("env"),
 	})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "get tag error")
 }
 
@@ -493,7 +493,7 @@ func TestTagUseCase_Untag_FetchError(t *testing.T) {
 		Name:    "/app/config",
 		TagKeys: maputil.NewSet("env"),
 	})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "aws error")
 }
 
@@ -631,7 +631,7 @@ func TestTagUseCase_Untag_StageError(t *testing.T) {
 		Name:    "/app/config",
 		TagKeys: maputil.NewSet("env"),
 	})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "stage error")
 }
 

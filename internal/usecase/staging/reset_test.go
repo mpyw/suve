@@ -191,7 +191,7 @@ func TestResetUseCase_Execute_Restore_NoFetcher(t *testing.T) {
 	_, err := uc.Execute(t.Context(), usecasestaging.ResetInput{
 		Spec: "/app/config#3",
 	})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "reset strategy required")
 }
 
@@ -215,7 +215,7 @@ func TestResetUseCase_Execute_Restore_FetchError(t *testing.T) {
 	_, err := uc.Execute(t.Context(), usecasestaging.ResetInput{
 		Spec: "/app/config#999",
 	})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "version not found")
 }
 
@@ -439,7 +439,7 @@ func TestResetUseCase_Execute_RestoreFetchCurrentError(t *testing.T) {
 	_, err := uc.Execute(t.Context(), usecasestaging.ResetInput{
 		Spec: "/app/config#3",
 	})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "aws error")
 }
 
@@ -498,7 +498,7 @@ func TestResetUseCase_Execute_UnstageAll_WithHintedUnstager_Error(t *testing.T) 
 	}
 
 	_, err := uc.Execute(t.Context(), usecasestaging.ResetInput{All: true})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "hinted unstage error")
 }
 
@@ -569,6 +569,6 @@ func TestResetUseCase_Execute_ListTagsError(t *testing.T) {
 	}
 
 	_, err := uc.Execute(t.Context(), usecasestaging.ResetInput{All: true})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "list tags error")
 }

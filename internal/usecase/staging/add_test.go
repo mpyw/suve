@@ -181,7 +181,7 @@ func TestAddUseCase_Execute_ParseError(t *testing.T) {
 		Name:  "invalid",
 		Value: "value",
 	})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "invalid name")
 }
 
@@ -216,7 +216,7 @@ func TestAddUseCase_Execute_StageError(t *testing.T) {
 		Name:  "/app/config",
 		Value: "value",
 	})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "stage error")
 }
 
@@ -232,7 +232,7 @@ func TestAddUseCase_Draft_GetError(t *testing.T) {
 	}
 
 	_, err := uc.Draft(t.Context(), usecasestaging.DraftInput{Name: "/app/config"})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "get error")
 }
 
@@ -251,7 +251,7 @@ func TestAddUseCase_Execute_GetError(t *testing.T) {
 		Name:  "/app/config",
 		Value: "value",
 	})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "store get error")
 }
 
@@ -298,7 +298,7 @@ func TestAddUseCase_Execute_RejectsWhenDeleteStaged(t *testing.T) {
 		Name:  "/app/deleted",
 		Value: "new-value",
 	})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "already staged for deletion")
 }
 
@@ -349,6 +349,6 @@ func TestAddUseCase_Execute_FetchError(t *testing.T) {
 		Name:  "/app/config",
 		Value: "value",
 	})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "AWS connection error")
 }

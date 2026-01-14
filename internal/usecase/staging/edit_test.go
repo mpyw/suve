@@ -180,7 +180,7 @@ func TestEditUseCase_Execute_FetchError(t *testing.T) {
 		Name:  "/app/config",
 		Value: "new-value",
 	})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "aws error")
 }
 

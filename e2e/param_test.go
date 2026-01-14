@@ -1,6 +1,7 @@
 //go:build e2e
 
-package e2e
+//nolint:paralleltest,dogsled // E2E tests: sequential execution, ignored cleanup output
+package e2e_test
 
 import (
 	"strings"
@@ -32,9 +33,10 @@ import (
 // =============================================================================
 
 // TestParam_FullWorkflow tests the complete SSM Parameter Store workflow:
-// create → show → show --raw → update → log → diff → list → delete → verify deletion
+// create → show → show --raw → update → log → diff → list → delete → verify deletion.
 func TestParam_FullWorkflow(t *testing.T) {
 	setupEnv(t)
+
 	paramName := "/suve-e2e-test/basic/param"
 
 	// Cleanup: delete parameter if it exists (ignore errors)
@@ -101,7 +103,7 @@ func TestParam_FullWorkflow(t *testing.T) {
 		require.NoError(t, err)
 		// First entry should be Version 1 when reversed
 		lines := strings.Split(strings.TrimSpace(stdout), "\n")
-		assert.True(t, strings.Contains(lines[0], "1"))
+		assert.Contains(t, lines[0], "1")
 		t.Logf("log --reverse output: %s", stdout)
 
 		// -p (patch)
@@ -145,6 +147,7 @@ func TestParam_FullWorkflow(t *testing.T) {
 		if stdout != "" {
 			assert.Contains(t, stdout, paramName)
 		}
+
 		t.Logf("list output: %s", stdout)
 	})
 
@@ -164,6 +167,7 @@ func TestParam_FullWorkflow(t *testing.T) {
 // TestParam_VersionSpecifiers tests SSM Parameter Store version specifier syntax.
 func TestParam_VersionSpecifiers(t *testing.T) {
 	setupEnv(t)
+
 	paramName := "/suve-e2e-test/version/param"
 
 	// Cleanup
@@ -226,6 +230,7 @@ func TestParam_VersionSpecifiers(t *testing.T) {
 // TestParam_ParseJSONFlag tests the --parse-json/-j flag for formatting.
 func TestParam_ParseJSONFlag(t *testing.T) {
 	setupEnv(t)
+
 	paramName := "/suve-e2e-test/json/param"
 
 	// Cleanup
@@ -642,6 +647,7 @@ func TestParam_ErrorCases(t *testing.T) {
 // TestParam_SpecialCharactersInValue tests values with special characters.
 func TestParam_SpecialCharactersInValue(t *testing.T) {
 	setupEnv(t)
+
 	paramName := "/suve-e2e-test/special/param"
 
 	// Cleanup
@@ -679,6 +685,7 @@ func TestParam_SpecialCharactersInValue(t *testing.T) {
 // TestParam_LongValue tests handling of long parameter values.
 func TestParam_LongValue(t *testing.T) {
 	setupEnv(t)
+
 	paramName := "/suve-e2e-test/long/param"
 
 	// Cleanup
@@ -705,7 +712,7 @@ func TestParam_LongValue(t *testing.T) {
 // TestParam_StagingAddViaCLI tests the stage add command via CLI (with value argument).
 func TestParam_StagingAddViaCLI(t *testing.T) {
 	setupEnv(t)
-	_ = setupTempHome(t)
+	setupTempHome(t)
 
 	paramName := "/suve-e2e-staging/add-cli/param"
 
@@ -828,7 +835,7 @@ func TestParam_StagingAddWithOptions(t *testing.T) {
 // TestParam_StagingEditViaCLI tests re-adding (editing) a staged value via CLI.
 func TestParam_StagingEditViaCLI(t *testing.T) {
 	setupEnv(t)
-	_ = setupTempHome(t)
+	setupTempHome(t)
 
 	paramName := "/suve-e2e-staging/edit-cli/param"
 
@@ -866,7 +873,7 @@ func TestParam_StagingEditViaCLI(t *testing.T) {
 // TestParam_StagingDiffViaCLI tests the stage diff command via CLI for various operations.
 func TestParam_StagingDiffViaCLI(t *testing.T) {
 	setupEnv(t)
-	_ = setupTempHome(t)
+	setupTempHome(t)
 
 	paramName := "/suve-e2e-staging/diff-cli/param"
 
@@ -942,6 +949,7 @@ func TestParam_GlobalDiffWithJSON(t *testing.T) {
 // TestParam_OutputOption tests --output=json option on various commands.
 func TestParam_OutputOption(t *testing.T) {
 	setupEnv(t)
+
 	paramName := "/suve-e2e-output/param"
 
 	// Cleanup
@@ -1006,6 +1014,7 @@ func TestParam_OutputOption(t *testing.T) {
 // TestParam_FilterOption tests --filter option on list command.
 func TestParam_FilterOption(t *testing.T) {
 	setupEnv(t)
+
 	prefix := "/suve-e2e-filter"
 
 	// Cleanup
@@ -1047,6 +1056,7 @@ func TestParam_FilterOption(t *testing.T) {
 // TestParam_ShowOption tests --show option on list command.
 func TestParam_ShowOption(t *testing.T) {
 	setupEnv(t)
+
 	prefix := "/suve-e2e-show"
 
 	// Cleanup
@@ -1092,7 +1102,7 @@ func TestParam_ShowOption(t *testing.T) {
 // TestParam_StagingAddExistingResourceFails tests that adding an existing resource fails.
 func TestParam_StagingAddExistingResourceFails(t *testing.T) {
 	setupEnv(t)
-	_ = setupTempHome(t)
+	setupTempHome(t)
 
 	paramName := "/suve-e2e-staging/add-existing/param"
 
@@ -1109,7 +1119,7 @@ func TestParam_StagingAddExistingResourceFails(t *testing.T) {
 	// Try to stage add - should fail because resource already exists
 	t.Run("add-existing-fails", func(t *testing.T) {
 		_, _, err := runSubCommand(t, paramstage.Command(), "add", paramName, "new-value")
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "already exists")
 		t.Logf("expected error: %v", err)
 	})
@@ -1118,7 +1128,7 @@ func TestParam_StagingAddExistingResourceFails(t *testing.T) {
 // TestParam_StagingDeleteNonExistingResourceFails tests that deleting a non-existing resource fails.
 func TestParam_StagingDeleteNonExistingResourceFails(t *testing.T) {
 	setupEnv(t)
-	_ = setupTempHome(t)
+	setupTempHome(t)
 
 	paramName := "/suve-e2e-staging/delete-nonexisting/param-does-not-exist"
 
@@ -1128,7 +1138,7 @@ func TestParam_StagingDeleteNonExistingResourceFails(t *testing.T) {
 	// Try to stage delete - should fail because resource doesn't exist
 	t.Run("delete-nonexisting-fails", func(t *testing.T) {
 		_, _, err := runSubCommand(t, paramstage.Command(), "delete", paramName)
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "not found")
 		t.Logf("expected error: %v", err)
 	})
@@ -1137,7 +1147,7 @@ func TestParam_StagingDeleteNonExistingResourceFails(t *testing.T) {
 // TestParam_StagingTagNonExistingResourceFails tests that tagging a non-existing resource fails.
 func TestParam_StagingTagNonExistingResourceFails(t *testing.T) {
 	setupEnv(t)
-	_ = setupTempHome(t)
+	setupTempHome(t)
 
 	paramName := "/suve-e2e-staging/tag-nonexisting/param-does-not-exist"
 
@@ -1147,7 +1157,7 @@ func TestParam_StagingTagNonExistingResourceFails(t *testing.T) {
 	// Try to stage tag - should fail because resource doesn't exist
 	t.Run("tag-nonexisting-fails", func(t *testing.T) {
 		_, _, err := runSubCommand(t, paramstage.Command(), "tag", paramName, "env=test")
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "not found")
 		t.Logf("expected error: %v", err)
 	})
@@ -1156,7 +1166,7 @@ func TestParam_StagingTagNonExistingResourceFails(t *testing.T) {
 // TestParam_StagingUntagNonExistingResourceFails tests that untagging a non-existing resource fails.
 func TestParam_StagingUntagNonExistingResourceFails(t *testing.T) {
 	setupEnv(t)
-	_ = setupTempHome(t)
+	setupTempHome(t)
 
 	paramName := "/suve-e2e-staging/untag-nonexisting/param-does-not-exist"
 
@@ -1166,7 +1176,7 @@ func TestParam_StagingUntagNonExistingResourceFails(t *testing.T) {
 	// Try to stage untag - should fail because resource doesn't exist
 	t.Run("untag-nonexisting-fails", func(t *testing.T) {
 		_, _, err := runSubCommand(t, paramstage.Command(), "untag", paramName, "env")
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "not found")
 		t.Logf("expected error: %v", err)
 	})
@@ -1175,7 +1185,7 @@ func TestParam_StagingUntagNonExistingResourceFails(t *testing.T) {
 // TestParam_StagingDeleteStagedCreateSucceeds tests that deleting a staged CREATE unstages it.
 func TestParam_StagingDeleteStagedCreateSucceeds(t *testing.T) {
 	setupEnv(t)
-	_ = setupTempHome(t)
+	setupTempHome(t)
 
 	paramName := "/suve-e2e-staging/delete-staged-create/param"
 
@@ -1219,7 +1229,7 @@ func TestParam_StagingDeleteStagedCreateSucceeds(t *testing.T) {
 // TestParam_StagingTagStagedCreateSucceeds tests that tagging a staged CREATE succeeds.
 func TestParam_StagingTagStagedCreateSucceeds(t *testing.T) {
 	setupEnv(t)
-	_ = setupTempHome(t)
+	setupTempHome(t)
 
 	paramName := "/suve-e2e-staging/tag-staged-create/param"
 
@@ -1272,6 +1282,7 @@ func TestParam_StagingTagStagedCreateSucceeds(t *testing.T) {
 // TestParam_TagAndUntag tests the param tag and untag commands.
 func TestParam_TagAndUntag(t *testing.T) {
 	setupEnv(t)
+
 	paramName := "/suve-e2e-tag/test-param"
 
 	// Cleanup
@@ -1322,6 +1333,7 @@ func TestParam_TagAndUntag(t *testing.T) {
 // TestParam_TagInvalidFormat tests error handling for invalid tag formats.
 func TestParam_TagInvalidFormat(t *testing.T) {
 	setupEnv(t)
+
 	paramName := "/suve-e2e-tag/invalid-format"
 
 	// Cleanup
@@ -1337,7 +1349,7 @@ func TestParam_TagInvalidFormat(t *testing.T) {
 	// Try to add invalid tag format
 	t.Run("invalid-format", func(t *testing.T) {
 		_, _, err := runCommand(t, paramtag.Command(), paramName, "invalid-tag-no-equals")
-		assert.Error(t, err)
+		require.Error(t, err)
 		t.Logf("expected error: %v", err)
 	})
 }
@@ -1345,6 +1357,7 @@ func TestParam_TagInvalidFormat(t *testing.T) {
 // TestParam_TagNonExistent tests tagging a non-existent parameter.
 func TestParam_TagNonExistent(t *testing.T) {
 	setupEnv(t)
+
 	paramName := "/suve-e2e-tag/non-existent"
 
 	// Ensure it doesn't exist
@@ -1352,13 +1365,14 @@ func TestParam_TagNonExistent(t *testing.T) {
 
 	// Try to tag non-existent parameter
 	_, _, err := runCommand(t, paramtag.Command(), paramName, "env=test")
-	assert.Error(t, err)
+	require.Error(t, err)
 	t.Logf("expected error: %v", err)
 }
 
 // TestParam_UntagNonExistent tests untagging a non-existent parameter.
 func TestParam_UntagNonExistent(t *testing.T) {
 	setupEnv(t)
+
 	paramName := "/suve-e2e-untag/non-existent"
 
 	// Ensure it doesn't exist
@@ -1366,7 +1380,7 @@ func TestParam_UntagNonExistent(t *testing.T) {
 
 	// Try to untag non-existent parameter
 	_, _, err := runCommand(t, paramuntag.Command(), paramName, "env")
-	assert.Error(t, err)
+	require.Error(t, err)
 	t.Logf("expected error: %v", err)
 }
 
@@ -1377,6 +1391,7 @@ func TestParam_UntagNonExistent(t *testing.T) {
 // TestParam_UpdateWithType tests param update with --type flag.
 func TestParam_UpdateWithType(t *testing.T) {
 	setupEnv(t)
+
 	paramName := "/suve-e2e-update/type-test"
 
 	// Cleanup
@@ -1416,6 +1431,7 @@ func TestParam_UpdateWithType(t *testing.T) {
 // TestParam_UpdateConflictingFlags tests error handling for conflicting flags.
 func TestParam_UpdateConflictingFlags(t *testing.T) {
 	setupEnv(t)
+
 	paramName := "/suve-e2e-update/conflicting-flags"
 
 	// Cleanup
@@ -1431,7 +1447,7 @@ func TestParam_UpdateConflictingFlags(t *testing.T) {
 	// Try to use both --secure and --type
 	t.Run("secure-and-type-conflict", func(t *testing.T) {
 		_, _, err := runCommand(t, paramupdate.Command(), "--yes", "--secure", "--type", "String", paramName, "new-value")
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "cannot use --secure with --type")
 	})
 }
@@ -1439,6 +1455,7 @@ func TestParam_UpdateConflictingFlags(t *testing.T) {
 // TestParam_UpdateWithDescription tests param update with description.
 func TestParam_UpdateWithDescription(t *testing.T) {
 	setupEnv(t)
+
 	paramName := "/suve-e2e-update/description-test"
 
 	// Cleanup
@@ -1462,6 +1479,7 @@ func TestParam_UpdateWithDescription(t *testing.T) {
 // TestParam_UpdateNonExistent tests updating a non-existent parameter.
 func TestParam_UpdateNonExistent(t *testing.T) {
 	setupEnv(t)
+
 	paramName := "/suve-e2e-update/non-existent"
 
 	// Ensure it doesn't exist
@@ -1496,6 +1514,7 @@ func TestParam_UpdateMissingArgs(t *testing.T) {
 // TestParam_LogWithNumber tests param log with --number flag.
 func TestParam_LogWithNumber(t *testing.T) {
 	setupEnv(t)
+
 	paramName := "/suve-e2e-log/num-flag-test"
 
 	// Cleanup
@@ -1525,17 +1544,20 @@ func TestParam_LogWithNumber(t *testing.T) {
 	// Should only have 1 version entry
 	lines := strings.Split(strings.TrimSpace(stdout), "\n")
 	versionCount := 0
+
 	for _, line := range lines {
 		if strings.HasPrefix(strings.TrimSpace(line), "Version") {
 			versionCount++
 		}
 	}
+
 	assert.Equal(t, 1, versionCount)
 }
 
 // TestParam_LogNonExistent tests log for non-existent parameter.
 func TestParam_LogNonExistent(t *testing.T) {
 	setupEnv(t)
+
 	paramName := "/suve-e2e-log/non-existent"
 
 	// Ensure it doesn't exist
@@ -1549,6 +1571,7 @@ func TestParam_LogNonExistent(t *testing.T) {
 // TestParam_LogWithFormat tests param log with different output formats.
 func TestParam_LogWithFormat(t *testing.T) {
 	setupEnv(t)
+
 	paramName := "/suve-e2e-log/format-test"
 
 	// Cleanup
@@ -1580,6 +1603,7 @@ func TestParam_LogWithFormat(t *testing.T) {
 // TestParam_LogWithPatch tests param log with --patch flag.
 func TestParam_LogWithPatch(t *testing.T) {
 	setupEnv(t)
+
 	paramName := "/suve-e2e-log/patch-test"
 
 	// Cleanup
@@ -1598,13 +1622,18 @@ func TestParam_LogWithPatch(t *testing.T) {
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "Version")
 		// Patch output should show diff-like content
-		assert.True(t, strings.Contains(stdout, "+") || strings.Contains(stdout, "-") || strings.Contains(stdout, "initial-value") || strings.Contains(stdout, "updated-value"))
+		hasDiffContent := strings.Contains(stdout, "+") ||
+			strings.Contains(stdout, "-") ||
+			strings.Contains(stdout, "initial-value") ||
+			strings.Contains(stdout, "updated-value")
+		assert.True(t, hasDiffContent)
 	})
 }
 
 // TestParam_LogWithOneline tests param log with --oneline flag.
 func TestParam_LogWithOneline(t *testing.T) {
 	setupEnv(t)
+
 	paramName := "/suve-e2e-log/oneline-test"
 
 	// Cleanup
@@ -1635,6 +1664,7 @@ func TestParam_LogWithOneline(t *testing.T) {
 // TestParam_LogWithReverse tests param log with --reverse flag.
 func TestParam_LogWithReverse(t *testing.T) {
 	setupEnv(t)
+
 	paramName := "/suve-e2e-log/reverse-test"
 
 	// Cleanup
@@ -1660,6 +1690,7 @@ func TestParam_LogWithReverse(t *testing.T) {
 // TestParam_LogFlagWarnings tests param log warning messages for conflicting flags.
 func TestParam_LogFlagWarnings(t *testing.T) {
 	setupEnv(t)
+
 	paramName := "/suve-e2e-log/warnings-test"
 
 	// Cleanup
@@ -1706,6 +1737,7 @@ func TestParam_LogFlagWarnings(t *testing.T) {
 // TestParam_LogWithParseJson tests param log with --parse-json flag.
 func TestParam_LogWithParseJson(t *testing.T) {
 	setupEnv(t)
+
 	paramName := "/suve-e2e-log/parsejson-test"
 
 	// Cleanup
@@ -1733,6 +1765,7 @@ func TestParam_LogWithParseJson(t *testing.T) {
 // TestParam_DiffVersions tests param diff between specific versions.
 func TestParam_DiffVersions(t *testing.T) {
 	setupEnv(t)
+
 	paramName := "/suve-e2e-diff/versions-test"
 
 	// Cleanup
@@ -1766,6 +1799,7 @@ func TestParam_DiffVersions(t *testing.T) {
 // TestParam_DiffNonExistent tests diff for non-existent parameter.
 func TestParam_DiffNonExistent(t *testing.T) {
 	setupEnv(t)
+
 	paramName := "/suve-e2e-diff/non-existent"
 
 	// Ensure it doesn't exist
@@ -1779,6 +1813,7 @@ func TestParam_DiffNonExistent(t *testing.T) {
 // TestParam_DiffNoChanges tests diff when there are no changes.
 func TestParam_DiffNoChanges(t *testing.T) {
 	setupEnv(t)
+
 	paramName := "/suve-e2e-diff/no-changes"
 
 	// Cleanup
@@ -1805,6 +1840,7 @@ func TestParam_DiffNoChanges(t *testing.T) {
 // TestParam_ShowRaw tests param show with --raw flag.
 func TestParam_ShowRaw(t *testing.T) {
 	setupEnv(t)
+
 	paramName := "/suve-e2e-show/raw-test"
 	paramValue := "raw-value-with-special-chars\ttab\nnewline"
 
@@ -1840,6 +1876,7 @@ func TestParam_ShowRaw(t *testing.T) {
 // TestParam_ShowWithVersion tests param show with version specifier.
 func TestParam_ShowWithVersion(t *testing.T) {
 	setupEnv(t)
+
 	paramName := "/suve-e2e-show/version-test"
 
 	// Cleanup
@@ -1870,6 +1907,7 @@ func TestParam_ShowWithVersion(t *testing.T) {
 // TestParam_ShowNonExistent tests show for non-existent parameter.
 func TestParam_ShowNonExistent(t *testing.T) {
 	setupEnv(t)
+
 	paramName := "/suve-e2e-show/non-existent"
 
 	// Ensure it doesn't exist
@@ -1887,6 +1925,7 @@ func TestParam_ShowNonExistent(t *testing.T) {
 // TestParam_CreateAndTag tests creating a param and adding tags after.
 func TestParam_CreateAndTag(t *testing.T) {
 	setupEnv(t)
+
 	paramName := "/suve-e2e-create/and-tag"
 
 	// Cleanup
@@ -1914,6 +1953,7 @@ func TestParam_CreateAndTag(t *testing.T) {
 // TestParam_CreateWithDescription tests param create with description.
 func TestParam_CreateWithDescription(t *testing.T) {
 	setupEnv(t)
+
 	paramName := "/suve-e2e-create/with-description"
 
 	// Cleanup
@@ -1931,6 +1971,7 @@ func TestParam_CreateWithDescription(t *testing.T) {
 // TestParam_CreateDuplicate tests creating a duplicate parameter.
 func TestParam_CreateDuplicate(t *testing.T) {
 	setupEnv(t)
+
 	paramName := "/suve-e2e-create/duplicate"
 
 	// Cleanup
@@ -1972,6 +2013,7 @@ func TestParam_CreateMissingArgs(t *testing.T) {
 // TestParam_DeleteNonExistent tests deleting a non-existent parameter.
 func TestParam_DeleteNonExistent(t *testing.T) {
 	setupEnv(t)
+
 	paramName := "/suve-e2e-delete/non-existent"
 
 	// Ensure it doesn't exist
@@ -1989,6 +2031,7 @@ func TestParam_DeleteNonExistent(t *testing.T) {
 // TestParam_ListWithPath tests param list with specific path.
 func TestParam_ListWithPath(t *testing.T) {
 	setupEnv(t)
+
 	basePath := "/suve-e2e-list/path-test"
 
 	// Cleanup
@@ -2027,6 +2070,7 @@ func TestParam_ListWithPath(t *testing.T) {
 // TestParam_ListWithFilter tests param list with filter.
 func TestParam_ListWithFilter(t *testing.T) {
 	setupEnv(t)
+
 	basePath := "/suve-e2e-list/filter-test"
 
 	// Cleanup
@@ -2051,6 +2095,7 @@ func TestParam_ListWithFilter(t *testing.T) {
 // TestParam_ListJSON tests param list with JSON output.
 func TestParam_ListJSON(t *testing.T) {
 	setupEnv(t)
+
 	basePath := "/suve-e2e-list/json-test"
 
 	// Cleanup
@@ -2075,6 +2120,7 @@ func TestParam_ListJSON(t *testing.T) {
 // TestParam_StashPushAndPop tests service-specific stash push and pop for parameters.
 func TestParam_StashPushAndPop(t *testing.T) {
 	setupEnv(t)
+
 	paramName := "/suve-e2e-param-stash-push-pop/test"
 
 	// Cleanup
@@ -2140,6 +2186,7 @@ func TestParam_StashPushAndPop(t *testing.T) {
 // TestParam_StashPushWithKeep tests param stash push with --keep flag.
 func TestParam_StashPushWithKeep(t *testing.T) {
 	setupEnv(t)
+
 	paramName := "/suve-e2e-param-stash-push-keep/test"
 
 	// Cleanup
@@ -2173,6 +2220,7 @@ func TestParam_StashPushWithKeep(t *testing.T) {
 // TestParam_StashPopWithMerge tests param stash pop with --merge flag.
 func TestParam_StashPopWithMerge(t *testing.T) {
 	setupEnv(t)
+
 	paramName1 := "/suve-e2e-param-stash-pop-merge/param1"
 	paramName2 := "/suve-e2e-param-stash-pop-merge/param2"
 

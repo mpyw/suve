@@ -154,6 +154,8 @@ func TestRun(t *testing.T) {
 			},
 			check: func(t *testing.T, output string) {
 				t.Helper()
+
+				t.Helper()
 				assert.Contains(t, output, "Version")
 				assert.Contains(t, output, "AWSCURRENT")
 			},
@@ -192,6 +194,8 @@ func TestRun(t *testing.T) {
 			},
 			check: func(t *testing.T, output string) {
 				t.Helper()
+
+				t.Helper()
 				assert.Contains(t, output, "-old-value")
 				assert.Contains(t, output, "+new-value")
 				assert.Contains(t, output, "my-secret#version-")
@@ -218,6 +222,8 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
+				t.Helper()
+
 				t.Helper()
 				assert.Contains(t, output, "Version")
 				assert.NotContains(t, output, "---")
@@ -251,6 +257,8 @@ func TestRun(t *testing.T) {
 			check: func(t *testing.T, output string) {
 				t.Helper()
 
+				t.Helper()
+
 				prevPos := strings.Index(output, "AWSPREVIOUS")
 				currPos := strings.Index(output, "AWSCURRENT")
 
@@ -272,6 +280,8 @@ func TestRun(t *testing.T) {
 			},
 			check: func(t *testing.T, output string) {
 				t.Helper()
+
+				t.Helper()
 				assert.Empty(t, output)
 			},
 		},
@@ -290,6 +300,10 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
+				t.Helper()
+
+				t.Helper()
+
 				assert.Contains(t, output, "Version")
 			},
 		},
@@ -308,6 +322,10 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
+				t.Helper()
+
+				t.Helper()
+
 				assert.Contains(t, output, "Version")
 			},
 		},
@@ -330,6 +348,10 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
+				t.Helper()
+
+				t.Helper()
+
 				// Should still show version info but no diff
 				assert.Contains(t, output, "Version")
 				assert.NotContains(t, output, "---")
@@ -368,6 +390,10 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
+				t.Helper()
+
+				t.Helper()
+
 				// In reverse mode, first version (oldest) shows diff to next (newer)
 				assert.Contains(t, output, "Version")
 			},
@@ -405,6 +431,8 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
+				t.Helper()
+
 				// Check that diff is shown with formatted JSON
 				assert.Contains(t, output, "Version")
 			},
@@ -442,6 +470,10 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
+				t.Helper()
+
+				t.Helper()
+
 				assert.Contains(t, output, "-not json")
 				assert.Contains(t, output, "+also not json")
 			},
@@ -461,6 +493,8 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
+				t.Helper()
+
 				// Oneline format should be compact
 				assert.Contains(t, output, "version-")
 				assert.Contains(t, output, "AWSCURRENT")
@@ -483,6 +517,10 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
+				t.Helper()
+
+				t.Helper()
+
 				assert.Contains(t, output, "version-")
 			},
 		},
@@ -501,6 +539,8 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
+				t.Helper()
+
 				// Only new version should be shown (old is before since)
 				assert.Contains(t, output, "new-vers")
 				assert.NotContains(t, output, "old-vers")
@@ -521,6 +561,8 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
+				t.Helper()
+
 				// Only old version should be shown (new is after until)
 				assert.Contains(t, output, "old-vers")
 				assert.NotContains(t, output, "new-vers")
@@ -541,6 +583,8 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
+				t.Helper()
+
 				// Only middle version should be shown
 				assert.Contains(t, output, "middle-v")
 				assert.NotContains(t, output, "oldest-v")
@@ -561,6 +605,8 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
+				t.Helper()
+
 				// All versions are before since, so output is empty
 				assert.Empty(t, output)
 			},
@@ -579,6 +625,8 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
+				t.Helper()
+
 				// Version without CreatedDate is skipped in filter
 				assert.Contains(t, output, "new-vers")
 				assert.NotContains(t, output, "no-date")
@@ -616,6 +664,10 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
+				t.Helper()
+
+				t.Helper()
+
 				assert.Contains(t, output, `"versionId"`)
 				assert.Contains(t, output, `"value"`)
 				assert.Contains(t, output, `"stages"`)
@@ -639,6 +691,10 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
+				t.Helper()
+
+				t.Helper()
+
 				assert.Contains(t, output, `"error"`)
 				assert.Contains(t, output, "access denied")
 			},
@@ -662,6 +718,10 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
+				t.Helper()
+
+				t.Helper()
+
 				assert.Contains(t, output, `"versionId"`)
 				assert.NotContains(t, output, `"created"`)
 				assert.NotContains(t, output, `"stages"`)

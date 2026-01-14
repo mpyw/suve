@@ -231,6 +231,8 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
+				t.Helper()
+
 				assert.Contains(t, output, "encrypted-blob")
 			},
 		},
@@ -253,6 +255,8 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
+				t.Helper()
+
 				assert.Contains(t, output, "not json")
 				assert.NotContains(t, output, "JsonParsed")
 			},
@@ -277,6 +281,8 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
+				t.Helper()
+
 				assert.Equal(t, "raw-value", output)
 			},
 		},
@@ -298,6 +304,8 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
+				t.Helper()
+
 				assert.Equal(t, "v1", output)
 			},
 		},
@@ -322,6 +330,8 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
+				t.Helper()
+
 				appleIdx := strings.Index(output, "apple")
 				zebraIdx := strings.Index(output, "zebra")
 
@@ -358,6 +368,8 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
+				t.Helper()
+
 				assert.Contains(t, output, "Tags")
 				assert.Contains(t, output, "2 tag(s)")
 				assert.Contains(t, output, "Environment")
@@ -395,6 +407,8 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
+				t.Helper()
+
 				assert.Contains(t, output, `"tags"`)
 				assert.Contains(t, output, `"Environment"`)
 				assert.Contains(t, output, `"production"`)
@@ -421,6 +435,8 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
+				t.Helper()
+
 				assert.Contains(t, output, `"tags": {}`)
 			},
 		},
