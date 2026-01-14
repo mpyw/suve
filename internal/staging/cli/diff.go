@@ -168,7 +168,16 @@ func (r *DiffRunner) OutputTagEntry(tagEntry stagingusecase.DiffTagEntry) {
 		output.Printf(r.Stdout, "  %s %s\n", colors.OpAdd("+"), strings.Join(tagPairs, ", "))
 	}
 
-	if tagEntry.Remove.Len() > 0 {
-		output.Printf(r.Stdout, "  %s %s\n", colors.OpDelete("-"), strings.Join(tagEntry.Remove.Values(), ", "))
+	if len(tagEntry.Remove) > 0 {
+		tagPairs := make([]string, 0, len(tagEntry.Remove))
+		for _, k := range maputil.SortedKeys(tagEntry.Remove) {
+			if v := tagEntry.Remove[k]; v != "" {
+				tagPairs = append(tagPairs, fmt.Sprintf("%s=%s", k, v))
+			} else {
+				tagPairs = append(tagPairs, k)
+			}
+		}
+
+		output.Printf(r.Stdout, "  %s %s\n", colors.OpDelete("-"), strings.Join(tagPairs, ", "))
 	}
 }

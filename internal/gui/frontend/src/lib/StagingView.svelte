@@ -523,12 +523,12 @@
                     {/each}
                   </div>
                 {/if}
-                {#if tagEntry?.removeTags && tagEntry.removeTags.length > 0}
+                {#if tagEntry?.removeTags && Object.keys(tagEntry.removeTags).length > 0}
                   <div class="tag-changes tag-remove">
                     <span class="tag-label">- Tags:</span>
-                    {#each tagEntry.removeTags as key}
+                    {#each Object.entries(tagEntry.removeTags) as [key, value]}
                       <span class="tag-item">
-                        {key}
+                        {value ? `${key}=${value}` : key}
                         <button class="tag-cancel-btn" onclick={() => handleCancelUntag('param', entry.name, key)} title="Cancel untag">↩</button>
                       </span>
                     {/each}
@@ -619,12 +619,12 @@
                     {/each}
                   </div>
                 {/if}
-                {#if tagEntry?.removeTags && tagEntry.removeTags.length > 0}
+                {#if tagEntry?.removeTags && Object.keys(tagEntry.removeTags).length > 0}
                   <div class="tag-changes tag-remove">
                     <span class="tag-label">- Tags:</span>
-                    {#each tagEntry.removeTags as key}
+                    {#each Object.entries(tagEntry.removeTags) as [key, value]}
                       <span class="tag-item">
-                        {key}
+                        {value ? `${key}=${value}` : key}
                         <button class="tag-cancel-btn" onclick={() => handleCancelUntag('secret', entry.name, key)} title="Cancel untag">↩</button>
                       </span>
                     {/each}

@@ -6,7 +6,6 @@ import (
 
 	"github.com/samber/lo"
 
-	"github.com/mpyw/suve/internal/maputil"
 	"github.com/mpyw/suve/internal/parallel"
 	"github.com/mpyw/suve/internal/staging"
 	"github.com/mpyw/suve/internal/staging/store"
@@ -43,8 +42,8 @@ type DiffEntry struct {
 // DiffTagEntry represents a single diff result for tag changes.
 type DiffTagEntry struct {
 	Name   string
-	Add    map[string]string   // Tags to add or update
-	Remove maputil.Set[string] // Tag keys to remove
+	Add    map[string]string // Tags to add or update
+	Remove map[string]string // Tags to remove (key=current value from AWS)
 }
 
 // DiffOutput holds the result of the diff use case.
@@ -138,13 +137,35 @@ func (u *DiffUseCase) Execute(ctx context.Context, input DiffInput) (*DiffOutput
 		}
 	}
 
-	// Process tag entries (just list them, no comparison needed)
+	// Process tag entries - fetch current values for removed tags
 	for name, tagEntry := range tagEntries {
-		output.TagEntries = append(output.TagEntries, DiffTagEntry{
-			Name:   name,
-			Add:    tagEntry.Add,
-			Remove: tagEntry.Remove,
-		})
+		diffTagEntry := DiffTagEntry{
+			Name: name,
+			Add:  tagEntry.Add,
+		}
+
+		// Fetch current tag values for removed tags
+		if tagEntry.Remove.Len() > 0 {
+			currentTags, err := u.Strategy.FetchCurrentTags(ctx, name)
+			if err != nil {
+				// If fetch fails, use keys only (fallback to old behavior)
+				diffTagEntry.Remove = make(map[string]string, tagEntry.Remove.Len())
+				for key := range tagEntry.Remove {
+					diffTagEntry.Remove[key] = ""
+				}
+			} else {
+				diffTagEntry.Remove = make(map[string]string, tagEntry.Remove.Len())
+				for key := range tagEntry.Remove {
+					if currentTags != nil {
+						diffTagEntry.Remove[key] = currentTags[key]
+					} else {
+						diffTagEntry.Remove[key] = ""
+					}
+				}
+			}
+		}
+
+		output.TagEntries = append(output.TagEntries, diffTagEntry)
 	}
 
 	return output, nil

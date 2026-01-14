@@ -96,6 +96,9 @@ func (m *fullMockStrategy) FetchLastModified(_ context.Context, _ string) (time.
 
 	return m.fetchLastModifiedVal, nil
 }
+func (m *fullMockStrategy) FetchCurrentTags(_ context.Context, _ string) (map[string]string, error) {
+	return nil, nil //nolint:nilnil // mock implementation
+}
 
 // =============================================================================
 // StatusRunner Tests

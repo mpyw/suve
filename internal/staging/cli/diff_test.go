@@ -7,7 +7,6 @@ import (
 	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/mpyw/suve/internal/maputil"
 	"github.com/mpyw/suve/internal/staging"
 	"github.com/mpyw/suve/internal/staging/cli"
 	stagingusecase "github.com/mpyw/suve/internal/usecase/staging"
@@ -192,7 +191,7 @@ func TestOutputTagEntry(t *testing.T) {
 		tagEntry := stagingusecase.DiffTagEntry{
 			Name:   "/app/config",
 			Add:    map[string]string{"env": "prod"},
-			Remove: maputil.NewSet[string](),
+			Remove: map[string]string{},
 		}
 
 		r.OutputTagEntry(tagEntry)
@@ -216,15 +215,15 @@ func TestOutputTagEntry(t *testing.T) {
 		tagEntry := stagingusecase.DiffTagEntry{
 			Name:   "/app/config",
 			Add:    map[string]string{},
-			Remove: maputil.NewSet("deprecated", "old"),
+			Remove: map[string]string{"deprecated": "true", "old": "legacy"},
 		}
 
 		r.OutputTagEntry(tagEntry)
 
 		output := stdout.String()
 		assert.Contains(t, output, "-")
-		assert.Contains(t, output, "deprecated")
-		assert.Contains(t, output, "old")
+		assert.Contains(t, output, "deprecated=true")
+		assert.Contains(t, output, "old=legacy")
 	})
 
 	t.Run("both add and remove tags", func(t *testing.T) {
@@ -240,7 +239,7 @@ func TestOutputTagEntry(t *testing.T) {
 		tagEntry := stagingusecase.DiffTagEntry{
 			Name:   "/app/config",
 			Add:    map[string]string{"env": "prod"},
-			Remove: maputil.NewSet("deprecated"),
+			Remove: map[string]string{"deprecated": "old-value"},
 		}
 
 		r.OutputTagEntry(tagEntry)

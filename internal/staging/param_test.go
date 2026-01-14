@@ -34,6 +34,9 @@ type paramMockClient struct {
 	removeTagsFromResourceFunc func(
 		ctx context.Context, params *paramapi.RemoveTagsFromResourceInput, optFns ...func(*paramapi.Options),
 	) (*paramapi.RemoveTagsFromResourceOutput, error)
+	listTagsForResourceFunc func(
+		ctx context.Context, params *paramapi.ListTagsForResourceInput, optFns ...func(*paramapi.Options),
+	) (*paramapi.ListTagsForResourceOutput, error)
 }
 
 func (m *paramMockClient) GetParameter(
@@ -94,6 +97,16 @@ func (m *paramMockClient) RemoveTagsFromResource(
 	}
 
 	return &paramapi.RemoveTagsFromResourceOutput{}, nil
+}
+
+func (m *paramMockClient) ListTagsForResource(
+	ctx context.Context, params *paramapi.ListTagsForResourceInput, optFns ...func(*paramapi.Options),
+) (*paramapi.ListTagsForResourceOutput, error) {
+	if m.listTagsForResourceFunc != nil {
+		return m.listTagsForResourceFunc(ctx, params, optFns...)
+	}
+
+	return &paramapi.ListTagsForResourceOutput{}, nil
 }
 
 func TestParamStrategy_BasicMethods(t *testing.T) {
@@ -862,4 +875,127 @@ func TestParamStrategy_FetchCurrentValue_NoLastModified(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "value", result.Value)
 	assert.True(t, result.LastModified.IsZero())
+}
+
+func TestParamStrategy_FetchCurrentTags(t *testing.T) {
+	t.Parallel()
+
+	t.Run("returns tags successfully", func(t *testing.T) {
+		t.Parallel()
+
+		mock := &paramMockClient{
+			listTagsForResourceFunc: func(
+				_ context.Context, params *paramapi.ListTagsForResourceInput, _ ...func(*paramapi.Options),
+			) (*paramapi.ListTagsForResourceOutput, error) {
+				assert.Equal(t, "/app/param", *params.ResourceId)
+				assert.Equal(t, paramapi.ResourceTypeForTaggingParameter, params.ResourceType)
+
+				return &paramapi.ListTagsForResourceOutput{
+					TagList: []paramapi.Tag{
+						{Key: lo.ToPtr("env"), Value: lo.ToPtr("prod")},
+						{Key: lo.ToPtr("team"), Value: lo.ToPtr("backend")},
+					},
+				}, nil
+			},
+		}
+
+		s := staging.NewParamStrategy(mock)
+		tags, err := s.FetchCurrentTags(t.Context(), "/app/param")
+		require.NoError(t, err)
+		assert.Equal(t, map[string]string{"env": "prod", "team": "backend"}, tags)
+	})
+
+	t.Run("returns nil when parameter not found", func(t *testing.T) {
+		t.Parallel()
+
+		mock := &paramMockClient{
+			listTagsForResourceFunc: func(
+				_ context.Context, _ *paramapi.ListTagsForResourceInput, _ ...func(*paramapi.Options),
+			) (*paramapi.ListTagsForResourceOutput, error) {
+				return nil, &paramapi.ParameterNotFound{}
+			},
+		}
+
+		s := staging.NewParamStrategy(mock)
+		tags, err := s.FetchCurrentTags(t.Context(), "/app/nonexistent")
+		require.NoError(t, err)
+		assert.Nil(t, tags)
+	})
+
+	t.Run("returns error for other API errors", func(t *testing.T) {
+		t.Parallel()
+
+		mock := &paramMockClient{
+			listTagsForResourceFunc: func(
+				_ context.Context, _ *paramapi.ListTagsForResourceInput, _ ...func(*paramapi.Options),
+			) (*paramapi.ListTagsForResourceOutput, error) {
+				return nil, errors.New("API error")
+			},
+		}
+
+		s := staging.NewParamStrategy(mock)
+		tags, err := s.FetchCurrentTags(t.Context(), "/app/param")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to get tags")
+		assert.Nil(t, tags)
+	})
+
+	t.Run("returns nil when no tags exist", func(t *testing.T) {
+		t.Parallel()
+
+		mock := &paramMockClient{
+			listTagsForResourceFunc: func(
+				_ context.Context, _ *paramapi.ListTagsForResourceInput, _ ...func(*paramapi.Options),
+			) (*paramapi.ListTagsForResourceOutput, error) {
+				return &paramapi.ListTagsForResourceOutput{
+					TagList: []paramapi.Tag{},
+				}, nil
+			},
+		}
+
+		s := staging.NewParamStrategy(mock)
+		tags, err := s.FetchCurrentTags(t.Context(), "/app/param")
+		require.NoError(t, err)
+		assert.Nil(t, tags)
+	})
+
+	t.Run("returns nil when result is nil", func(t *testing.T) {
+		t.Parallel()
+
+		mock := &paramMockClient{
+			listTagsForResourceFunc: func(
+				_ context.Context, _ *paramapi.ListTagsForResourceInput, _ ...func(*paramapi.Options),
+			) (*paramapi.ListTagsForResourceOutput, error) {
+				return nil, nil //nolint:nilnil // testing nil result
+			},
+		}
+
+		s := staging.NewParamStrategy(mock)
+		tags, err := s.FetchCurrentTags(t.Context(), "/app/param")
+		require.NoError(t, err)
+		assert.Nil(t, tags)
+	})
+
+	t.Run("skips tags with nil key or value", func(t *testing.T) {
+		t.Parallel()
+
+		mock := &paramMockClient{
+			listTagsForResourceFunc: func(
+				_ context.Context, _ *paramapi.ListTagsForResourceInput, _ ...func(*paramapi.Options),
+			) (*paramapi.ListTagsForResourceOutput, error) {
+				return &paramapi.ListTagsForResourceOutput{
+					TagList: []paramapi.Tag{
+						{Key: lo.ToPtr("valid"), Value: lo.ToPtr("tag")},
+						{Key: nil, Value: lo.ToPtr("no-key")},
+						{Key: lo.ToPtr("no-value"), Value: nil},
+					},
+				}, nil
+			},
+		}
+
+		s := staging.NewParamStrategy(mock)
+		tags, err := s.FetchCurrentTags(t.Context(), "/app/param")
+		require.NoError(t, err)
+		assert.Equal(t, map[string]string{"valid": "tag"}, tags)
+	})
 }

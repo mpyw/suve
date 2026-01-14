@@ -18,8 +18,9 @@ import (
 type mockDiffStrategy struct {
 	*mockServiceStrategy
 
-	fetchResults map[string]*staging.FetchResult
-	fetchErrors  map[string]error
+	fetchResults    map[string]*staging.FetchResult
+	fetchErrors     map[string]error
+	fetchTagResults map[string]map[string]string
 }
 
 func (m *mockDiffStrategy) FetchCurrent(_ context.Context, name string) (*staging.FetchResult, error) {
@@ -34,11 +35,20 @@ func (m *mockDiffStrategy) FetchCurrent(_ context.Context, name string) (*stagin
 	return &staging.FetchResult{Value: "aws-value", Identifier: "#1"}, nil
 }
 
+func (m *mockDiffStrategy) FetchCurrentTags(_ context.Context, name string) (map[string]string, error) {
+	if result, ok := m.fetchTagResults[name]; ok {
+		return result, nil
+	}
+
+	return nil, nil //nolint:nilnil // mock implementation
+}
+
 func newMockDiffStrategy() *mockDiffStrategy {
 	return &mockDiffStrategy{
 		mockServiceStrategy: newParamStrategy(),
 		fetchResults:        make(map[string]*staging.FetchResult),
 		fetchErrors:         make(map[string]error),
+		fetchTagResults:     make(map[string]map[string]string),
 	}
 }
 
@@ -444,5 +454,6 @@ func TestDiffUseCase_Execute_WithTagEntriesProcessing(t *testing.T) {
 	assert.Equal(t, "/app/config", tagEntry.Name)
 	assert.Equal(t, "prod", tagEntry.Add["env"])
 	assert.Equal(t, "backend", tagEntry.Add["team"])
-	assert.True(t, tagEntry.Remove.Contains("old-key"))
+	_, hasOldKey := tagEntry.Remove["old-key"]
+	assert.True(t, hasOldKey)
 }

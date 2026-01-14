@@ -94,6 +94,10 @@ type DiffStrategy interface {
 
 	// FetchCurrent fetches the current value from AWS for diffing.
 	FetchCurrent(ctx context.Context, name string) (*FetchResult, error)
+
+	// FetchCurrentTags fetches the current tags from AWS for showing in diff output.
+	// Returns nil map if the resource doesn't exist or has no tags.
+	FetchCurrentTags(ctx context.Context, name string) (map[string]string, error)
 }
 
 // EditStrategy defines service-specific edit operations.

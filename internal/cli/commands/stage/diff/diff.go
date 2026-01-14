@@ -31,12 +31,14 @@ import (
 type ParamClient interface {
 	paramapi.GetParameterAPI
 	paramapi.GetParameterHistoryAPI
+	paramapi.ListTagsForResourceAPI
 }
 
 // SecretClient is the interface for Secrets Manager operations.
 type SecretClient interface {
 	secretapi.GetSecretValueAPI
 	secretapi.ListSecretVersionIDsAPI
+	secretapi.DescribeSecretAPI
 }
 
 // Runner executes the diff command.
@@ -332,7 +334,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 
 		first = false
 
-		r.outputTagDiff(name, tagEntry)
+		r.outputParamTagDiff(ctx, name, tagEntry)
 	}
 
 	// Process Secrets Manager tag entries
@@ -345,7 +347,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 
 		first = false
 
-		r.outputTagDiff(name, tagEntry)
+		r.outputSecretTagDiff(ctx, name, tagEntry)
 	}
 
 	return nil
@@ -462,7 +464,7 @@ func (r *Runner) outputMetadata(entry staging.Entry) {
 	}
 }
 
-func (r *Runner) outputTagDiff(name string, tagEntry staging.TagEntry) {
+func (r *Runner) outputParamTagDiff(ctx context.Context, name string, tagEntry staging.TagEntry) {
 	output.Printf(r.Stdout, "%s %s (staged tag changes)\n", colors.Info("Tags:"), name)
 
 	if len(tagEntry.Add) > 0 {
@@ -475,6 +477,89 @@ func (r *Runner) outputTagDiff(name string, tagEntry staging.TagEntry) {
 	}
 
 	if tagEntry.Remove.Len() > 0 {
-		output.Printf(r.Stdout, "  %s %s\n", colors.OpDelete("-"), strings.Join(tagEntry.Remove.Values(), ", "))
+		// Fetch current tag values from AWS
+		currentTags := r.fetchParamTags(ctx, name)
+		r.outputRemovedTags(tagEntry.Remove, currentTags)
 	}
+}
+
+func (r *Runner) outputSecretTagDiff(ctx context.Context, name string, tagEntry staging.TagEntry) {
+	output.Printf(r.Stdout, "%s %s (staged tag changes)\n", colors.Info("Tags:"), name)
+
+	if len(tagEntry.Add) > 0 {
+		tagPairs := make([]string, 0, len(tagEntry.Add))
+		for _, k := range maputil.SortedKeys(tagEntry.Add) {
+			tagPairs = append(tagPairs, fmt.Sprintf("%s=%s", k, tagEntry.Add[k]))
+		}
+
+		output.Printf(r.Stdout, "  %s %s\n", colors.OpAdd("+"), strings.Join(tagPairs, ", "))
+	}
+
+	if tagEntry.Remove.Len() > 0 {
+		// Fetch current tag values from AWS
+		currentTags := r.fetchSecretTags(ctx, name)
+		r.outputRemovedTags(tagEntry.Remove, currentTags)
+	}
+}
+
+func (r *Runner) fetchParamTags(ctx context.Context, name string) map[string]string {
+	if r.ParamClient == nil {
+		return nil
+	}
+
+	result, err := r.ParamClient.ListTagsForResource(ctx, &paramapi.ListTagsForResourceInput{
+		ResourceType: paramapi.ResourceTypeForTaggingParameter,
+		ResourceId:   lo.ToPtr(name),
+	})
+	if err != nil || result == nil {
+		return nil
+	}
+
+	tags := make(map[string]string, len(result.TagList))
+	for _, tag := range result.TagList {
+		if tag.Key != nil && tag.Value != nil {
+			tags[*tag.Key] = *tag.Value
+		}
+	}
+
+	return tags
+}
+
+func (r *Runner) fetchSecretTags(ctx context.Context, name string) map[string]string {
+	if r.SecretClient == nil {
+		return nil
+	}
+
+	result, err := r.SecretClient.DescribeSecret(ctx, &secretapi.DescribeSecretInput{
+		SecretId: lo.ToPtr(name),
+	})
+	if err != nil || result == nil {
+		return nil
+	}
+
+	tags := make(map[string]string, len(result.Tags))
+	for _, tag := range result.Tags {
+		if tag.Key != nil && tag.Value != nil {
+			tags[*tag.Key] = *tag.Value
+		}
+	}
+
+	return tags
+}
+
+func (r *Runner) outputRemovedTags(remove maputil.Set[string], currentTags map[string]string) {
+	tagPairs := make([]string, 0, remove.Len())
+	for _, k := range maputil.SortedKeys(remove) {
+		if currentTags != nil {
+			if v := currentTags[k]; v != "" {
+				tagPairs = append(tagPairs, fmt.Sprintf("%s=%s", k, v))
+			} else {
+				tagPairs = append(tagPairs, k)
+			}
+		} else {
+			tagPairs = append(tagPairs, k)
+		}
+	}
+
+	output.Printf(r.Stdout, "  %s %s\n", colors.OpDelete("-"), strings.Join(tagPairs, ", "))
 }
