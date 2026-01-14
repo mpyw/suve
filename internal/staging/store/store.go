@@ -72,6 +72,9 @@ type AgentStore interface {
 	ReadWriteOperator
 	Drainer
 	Writer
+	// Ping checks if the agent daemon is running.
+	// Returns nil if reachable, error if not.
+	Ping(ctx context.Context) error
 }
 
 // HintedUnstager provides unstage operations with hints for context-aware shutdown messages.

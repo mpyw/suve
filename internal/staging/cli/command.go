@@ -69,6 +69,13 @@ EXAMPLES:
 
 			store := agent.NewStore(identity.AccountID, identity.Region)
 
+			// If agent is not running, there's nothing staged
+			if err := store.Ping(ctx); err != nil {
+				output.Info(cmd.Root().Writer, "No %s changes staged.", cfg.ItemName)
+
+				return nil
+			}
+
 			r := &StatusRunner{
 				UseCase: &stagingusecase.StatusUseCase{
 					Strategy: cfg.ParserFactory(),
@@ -144,6 +151,13 @@ EXAMPLES:
 			}
 
 			store := agent.NewStore(identity.AccountID, identity.Region)
+
+			// If agent is not running, there's nothing staged
+			if err := store.Ping(ctx); err != nil {
+				output.Warning(cmd.Root().ErrWriter, "nothing staged")
+
+				return nil
+			}
 
 			strategy, err := cfg.Factory(ctx)
 			if err != nil {
@@ -377,8 +391,15 @@ EXAMPLES:
 
 			store := agent.NewStore(identity.AccountID, identity.Region)
 
-			// Get entries to show what will be applied
+			// If agent is not running, there's nothing to apply
 			parser := cfg.ParserFactory()
+			if err := store.Ping(ctx); err != nil {
+				output.Info(cmd.Root().Writer, "No %s changes staged.", parser.ServiceName())
+
+				return nil
+			}
+
+			// Get entries to show what will be applied
 			service := parser.Service()
 
 			entries, err := store.ListEntries(ctx, service)
@@ -497,6 +518,13 @@ EXAMPLES:
 			}
 
 			store := agent.NewStore(identity.AccountID, identity.Region)
+
+			// If agent is not running, there's nothing to reset
+			if err := store.Ping(ctx); err != nil {
+				output.Info(cmd.Root().Writer, "No %s changes staged.", cfg.ItemName)
+
+				return nil
+			}
 
 			opts := ResetOptions{
 				All: resetAll,

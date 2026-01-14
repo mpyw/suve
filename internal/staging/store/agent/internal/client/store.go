@@ -326,6 +326,12 @@ func printShutdownMessage(reason string) {
 	output.Info(os.Stderr, "Staging agent stopped (%s)", msg)
 }
 
+// Ping checks if the agent daemon is running.
+// Returns nil if the daemon is reachable, or an error if not.
+func (s *Store) Ping(ctx context.Context) error {
+	return s.launcher.Ping(ctx)
+}
+
 // Compile-time checks.
 var (
 	_ store.ReadWriteOperator = (*Store)(nil)

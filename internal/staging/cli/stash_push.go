@@ -110,6 +110,13 @@ func stashPushAction(service staging.Service) func(context.Context, *cli.Command
 
 		agentStore := agent.NewStore(identity.AccountID, identity.Region)
 
+		// If agent is not running, there's nothing to push
+		if err := agentStore.Ping(ctx); err != nil {
+			output.Info(cmd.Root().Writer, "No staged changes to persist.")
+
+			return nil
+		}
+
 		// Check if stash file already exists
 		basicFileStore, err := file.NewStore(identity.AccountID, identity.Region)
 		if err != nil {

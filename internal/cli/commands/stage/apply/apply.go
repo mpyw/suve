@@ -81,6 +81,13 @@ func action(ctx context.Context, cmd *cli.Command) error {
 
 	store := agent.NewStore(identity.AccountID, identity.Region)
 
+	// If agent is not running, there's nothing to apply
+	if err := store.Ping(ctx); err != nil {
+		output.Info(cmd.Root().Writer, "No changes staged.")
+
+		return nil
+	}
+
 	// Check if there are any staged changes
 	paramStaged, err := store.ListEntries(ctx, staging.ServiceParam)
 	if err != nil {
