@@ -88,9 +88,10 @@ func TestInitializeStateMaps(t *testing.T) {
 	})
 }
 
+// Note: This test cannot use t.Parallel() because it modifies the global userHomeDirFunc variable.
+//
+//nolint:paralleltest // Modifies package-level variable userHomeDirFunc.
 func TestNewStore_UserHomeDirError(t *testing.T) {
-	t.Parallel()
-
 	// Save the original function and restore it after the test
 	originalFunc := userHomeDirFunc
 
@@ -107,9 +108,10 @@ func TestNewStore_UserHomeDirError(t *testing.T) {
 	assert.Contains(t, err.Error(), "failed to get home directory")
 }
 
+// Note: This test cannot use t.Parallel() because it modifies the global userHomeDirFunc variable.
+//
+//nolint:paralleltest // Modifies package-level variable userHomeDirFunc.
 func TestNewStoreWithPassphrase_UserHomeDirError(t *testing.T) {
-	t.Parallel()
-
 	// Save the original function and restore it after the test
 	originalFunc := userHomeDirFunc
 
@@ -183,9 +185,10 @@ func TestWriteState_RemoveEmptyStateError(t *testing.T) {
 	assert.Contains(t, err.Error(), "failed to remove empty state file")
 }
 
+// Note: This test cannot use t.Parallel() because it modifies the global randReader variable in crypt package.
+//
+//nolint:paralleltest // Modifies package-level variable via crypt.SetRandReader.
 func TestWriteState_EncryptionError(t *testing.T) {
-	t.Parallel()
-
 	// Inject error into crypt's random reader
 	crypt.SetRandReader(&errorReader{err: errors.New("random source unavailable")})
 
