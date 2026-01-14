@@ -1294,8 +1294,8 @@
   }
 
   .btn-action {
-    min-width: 160px;
-    padding: 12px 32px;
+    min-width: 200px;
+    padding: 12px 40px;
     border: none;
     border-radius: 4px;
     font-size: 14px;
