@@ -35,7 +35,7 @@ type StashPushOptions struct {
 	// Keep preserves the agent memory after pushing to file.
 	Keep bool
 	// Mode determines how to handle existing stash file.
-	Mode usestaging.StashPushMode
+	Mode usestaging.StashMode
 }
 
 // Run executes the stash push command.
@@ -88,11 +88,15 @@ func stashPushFlags() []cli.Flag {
 		},
 		&cli.BoolFlag{
 			Name:  "yes",
-			Usage: "Skip confirmation prompt (uses merge mode by default)",
+			Usage: "Skip confirmation prompt",
+		},
+		&cli.BoolFlag{
+			Name:  "merge",
+			Usage: "Merge with existing stash (default)",
 		},
 		&cli.BoolFlag{
 			Name:  "overwrite",
-			Usage: "Overwrite existing stash instead of merging",
+			Usage: "Overwrite existing stash",
 		},
 		&cli.BoolFlag{
 			Name:  "passphrase-stdin",
@@ -101,9 +105,19 @@ func stashPushFlags() []cli.Flag {
 	}
 }
 
+// stashPushMutuallyExclusiveFlags returns the mutually exclusive flags constraint.
+func stashPushMutuallyExclusiveFlags() []cli.MutuallyExclusiveFlags {
+	return []cli.MutuallyExclusiveFlags{
+		{
+			Flags: [][]cli.Flag{
+				{&cli.BoolFlag{Name: "merge"}},
+				{&cli.BoolFlag{Name: "overwrite"}},
+			},
+		},
+	}
+}
+
 // stashPushAction creates the action function for stash push commands.
-//
-//nolint:gocognit // Action function with multiple branching paths for flags and file existence
 func stashPushAction(service staging.Service) func(context.Context, *cli.Command) error {
 	return func(ctx context.Context, cmd *cli.Command) error {
 		identity, err := infra.GetAWSIdentity(ctx)
@@ -120,24 +134,28 @@ func stashPushAction(service staging.Service) func(context.Context, *cli.Command
 				return fmt.Errorf("failed to create file store: %w", err)
 			}
 
-			// Determine mode based on flags and file existence
-			mode := usestaging.StashPushModeMerge // Default to merge (safer)
-			skipConfirm := cmd.Bool("yes")
+			// Determine mode based on flags
+			mergeFlag := cmd.Bool("merge")
 			overwriteFlag := cmd.Bool("overwrite")
+			skipConfirm := cmd.Bool("yes")
 
-			if overwriteFlag {
-				mode = usestaging.StashPushModeOverwrite
-			}
+			var mode usestaging.StashMode
 
-			if !skipConfirm && !overwriteFlag {
-				// Check if we need to prompt
+			switch {
+			case overwriteFlag:
+				mode = usestaging.StashModeOverwrite
+			case mergeFlag || skipConfirm:
+				// --merge or --yes (without explicit mode) defaults to merge
+				mode = usestaging.StashModeMerge
+			default:
+				// No flag specified - check if we need to prompt
 				exists, err := basicFileStore.Exists()
 				if err != nil {
 					return fmt.Errorf("failed to check stash file: %w", err)
 				}
 
-				// Only prompt for global push when file exists
-				// Service-specific push always merges (preserves other services)
+				// Only prompt for global push when file exists and TTY available
+				// Service-specific push defaults to merge (preserves other services)
 				if exists && service == "" && terminal.IsTerminalWriter(cmd.Root().ErrWriter) {
 					// Count existing items for the prompt message
 					existingState, err := basicFileStore.Drain(ctx, "", true)
@@ -166,14 +184,17 @@ func stashPushAction(service staging.Service) func(context.Context, *cli.Command
 
 					switch choice {
 					case 0: // Merge
-						mode = usestaging.StashPushModeMerge
+						mode = usestaging.StashModeMerge
 					case 1: // Overwrite
-						mode = usestaging.StashPushModeOverwrite
+						mode = usestaging.StashModeOverwrite
 					default: // Cancel or error
 						output.Info(cmd.Root().Writer, "Operation cancelled.")
 
 						return nil
 					}
+				} else {
+					// Default to merge when no TTY or service-specific
+					mode = usestaging.StashModeMerge
 				}
 			}
 
@@ -263,8 +284,9 @@ EXAMPLES:
    suve stage stash push                            Save to file and clear agent memory
    suve stage stash push --keep                     Save to file and keep agent memory
    echo "secret" | suve stage stash push --passphrase-stdin   Use passphrase from stdin`,
-		Flags:  stashPushFlags(),
-		Action: stashPushAction(""), // Empty service = all services
+		Flags:                  stashPushFlags(),
+		MutuallyExclusiveFlags: stashPushMutuallyExclusiveFlags(),
+		Action:                 stashPushAction(""), // Empty service = all services
 	}
 }
 
@@ -294,7 +316,8 @@ EXAMPLES:
 			cfg.CommandName,
 			cfg.CommandName,
 			cfg.CommandName),
-		Flags:  stashPushFlags(),
-		Action: stashPushAction(service),
+		Flags:                  stashPushFlags(),
+		MutuallyExclusiveFlags: stashPushMutuallyExclusiveFlags(),
+		Action:                 stashPushAction(service),
 	}
 }

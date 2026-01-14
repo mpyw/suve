@@ -308,7 +308,7 @@ func TestStashPushRunner_Run_WithModes(t *testing.T) {
 			Encrypted: false,
 		}
 
-		err := runner.Run(t.Context(), cli.StashPushOptions{Mode: stagingusecase.StashPushModeOverwrite})
+		err := runner.Run(t.Context(), cli.StashPushOptions{Mode: stagingusecase.StashModeOverwrite})
 		require.NoError(t, err)
 
 		// New data should be in file
@@ -353,7 +353,7 @@ func TestStashPushRunner_Run_WithModes(t *testing.T) {
 			Encrypted: false,
 		}
 
-		err := runner.Run(t.Context(), cli.StashPushOptions{Mode: stagingusecase.StashPushModeMerge})
+		err := runner.Run(t.Context(), cli.StashPushOptions{Mode: stagingusecase.StashModeMerge})
 		require.NoError(t, err)
 
 		// New data should be in file

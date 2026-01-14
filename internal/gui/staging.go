@@ -729,7 +729,8 @@ func (a *App) StagingFileStatus() (*StagingFileStatusResult, error) {
 
 // StagingDrain loads staged changes from file into agent memory.
 // If the file is encrypted, passphrase must be provided.
-func (a *App) StagingDrain(service string, passphrase string, keep bool, overwrite bool, merge bool) (*StagingDrainResult, error) {
+// mode: "overwrite" or "merge" (default)
+func (a *App) StagingDrain(service string, passphrase string, keep bool, mode string) (*StagingDrainResult, error) {
 	identity, err := infra.GetAWSIdentity(a.ctx)
 	if err != nil {
 		return nil, err
@@ -753,16 +754,20 @@ func (a *App) StagingDrain(service string, passphrase string, keep bool, overwri
 		}
 	}
 
+	drainMode := stagingusecase.StashModeMerge
+	if mode == "overwrite" {
+		drainMode = stagingusecase.StashModeOverwrite
+	}
+
 	uc := &stagingusecase.StashPopUseCase{
 		FileStore:  fileStore,
 		AgentStore: agentStore,
 	}
 
 	result, err := uc.Execute(a.ctx, stagingusecase.StashPopInput{
-		Service:   svc,
-		Keep:      keep,
-		Overwrite: overwrite,
-		Merge:     merge,
+		Service: svc,
+		Keep:    keep,
+		Mode:    drainMode,
 	})
 	if err != nil {
 		return nil, err
@@ -802,9 +807,9 @@ func (a *App) StagingPersist(service string, passphrase string, keep bool, mode 
 		}
 	}
 
-	persistMode := stagingusecase.StashPushModeOverwrite
+	persistMode := stagingusecase.StashModeOverwrite
 	if mode == "merge" {
-		persistMode = stagingusecase.StashPushModeMerge
+		persistMode = stagingusecase.StashModeMerge
 	}
 
 	uc := &stagingusecase.StashPushUseCase{

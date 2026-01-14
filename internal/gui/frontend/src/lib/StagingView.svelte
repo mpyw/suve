@@ -62,8 +62,7 @@
 
   // Drain options
   let drainKeep = $state(false);
-  let drainForce = $state(false);
-  let drainMerge = $state(false);
+  let drainMode: 'merge' | 'overwrite' = $state('merge');
 
   // Push options modal (when file exists)
   let showPushOptionsModal = $state(false);
@@ -343,8 +342,7 @@
     drainError = '';
     drainResult = null;
     drainKeep = false;
-    drainForce = false;
-    drainMerge = false;
+    drainMode = 'merge';
 
     try {
       // Check file status first
@@ -370,7 +368,7 @@
     drainLoading = true;
     drainError = '';
     try {
-      const result = await StagingDrain('', passphrase, drainKeep, drainForce, drainMerge);
+      const result = await StagingDrain('', passphrase, drainKeep, drainMode);
       drainResult = result;
       showDrainModal = false;
       await loadStatus();
@@ -385,7 +383,7 @@
     drainLoading = true;
     drainError = '';
     try {
-      const result = await StagingDrain('', '', drainKeep, drainForce, drainMerge);
+      const result = await StagingDrain('', '', drainKeep, drainMode);
       drainResult = result;
       showDrainOptionsModal = false;
       await loadStatus();
@@ -965,13 +963,16 @@
           <input type="checkbox" bind:checked={drainKeep} />
           <span>Keep file after loading</span>
         </label>
-        <label class="checkbox-label">
-          <input type="checkbox" bind:checked={drainMerge} />
+      </div>
+      <div class="options-group">
+        <span class="options-label">Mode:</span>
+        <label class="radio-label">
+          <input type="radio" name="drainMode" value="merge" bind:group={drainMode} />
           <span>Merge with existing changes</span>
         </label>
-        <label class="checkbox-label">
-          <input type="checkbox" bind:checked={drainForce} />
-          <span>Force overwrite existing changes</span>
+        <label class="radio-label">
+          <input type="radio" name="drainMode" value="overwrite" bind:group={drainMode} />
+          <span>Overwrite existing changes</span>
         </label>
       </div>
 

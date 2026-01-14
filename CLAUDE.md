@@ -31,6 +31,10 @@ This file provides guidance to Claude Code when working with code in this reposi
    - `stage stash pop --keep` - Restore staged changes (keeps file)
    - `stage stash show` - Preview stashed changes
    - `stage stash drop` - Delete stash file
+   - Mode flags (mutually exclusive):
+     - `--merge` - Combine with existing data (default)
+     - `--overwrite` - Replace existing data
+     - `--yes` - Confirm without prompt (implies merge)
 
 4. **Version Specification**: Git-like revision syntax
    ```

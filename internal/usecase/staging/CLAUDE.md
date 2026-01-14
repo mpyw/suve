@@ -36,6 +36,8 @@ key_types:
     role: Load file to agent memory (drain)
   - name: TagUseCase
     role: Stage tag add/remove operations
+  - name: StashMode
+    role: Enum for stash conflict handling (Merge, Overwrite)
 
 files:
   staging_ops:
@@ -44,6 +46,7 @@ files:
     - apply.go, reset.go
     - tag.go
   stash_ops:
+    - stash_mode.go   # StashMode enum (Merge, Overwrite)
     - stash_push.go   # Agent -> File
     - stash_pop.go    # File -> Agent
 
@@ -74,15 +77,24 @@ skip_areas:
 
 ## Notes
 
+### StashMode
+
+Both `StashPush` and `StashPop` use a unified `StashMode` enum:
+- `StashModeMerge` (default): Combines data from source with existing data at destination
+- `StashModeOverwrite`: Replaces destination data with source data
+
+CLI flags `--merge` and `--overwrite` are mutually exclusive (using urfave/cli v3's `MutuallyExclusiveFlags`).
+Default behavior is `Merge` for safer operation.
+
 ### Stash Operations
 
 **StashPush (agent -> file):**
-- Modes: Overwrite (replace file) or Merge (combine with existing)
+- Uses StashMode for conflict handling with existing file
 - Service filter: Push only param or secret entries
 - `--keep`: Don't clear agent memory after push
 
 **StashPop (file -> agent):**
-- Conflict handling: Force (overwrite) or Merge (combine)
+- Uses StashMode for conflict handling with existing agent memory
 - Service filter: Pop only param or secret entries
 - `--keep`: Don't delete file after pop (same as `stash apply`)
 

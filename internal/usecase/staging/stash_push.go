@@ -8,16 +8,6 @@ import (
 	"github.com/mpyw/suve/internal/staging/store"
 )
 
-// StashPushMode determines how to handle existing stash file.
-type StashPushMode int
-
-const (
-	// StashPushModeOverwrite replaces the existing stash file.
-	StashPushModeOverwrite StashPushMode = iota
-	// StashPushModeMerge merges with the existing stash file.
-	StashPushModeMerge
-)
-
 // StashPushInput holds input for the persist use case.
 type StashPushInput struct {
 	// Service filters the persist to a specific service. Empty means all services.
@@ -25,7 +15,9 @@ type StashPushInput struct {
 	// Keep preserves the agent memory after persisting.
 	Keep bool
 	// Mode determines how to handle existing stash file.
-	Mode StashPushMode
+	// StashModeMerge combines agent data with existing file data.
+	// StashModeOverwrite replaces existing file data.
+	Mode StashMode
 }
 
 // StashPushOutput holds the result of the persist use case.
@@ -58,11 +50,12 @@ func (u *StashPushUseCase) Execute(ctx context.Context, input StashPushInput) (*
 		return nil, ErrNothingToStashPush
 	}
 
-	// Load existing file state to merge with (for merge mode or service-specific persist)
+	// Determine final state based on strategy and scope
 	var finalState *staging.State
 
-	if input.Mode == StashPushModeMerge || input.Service != "" {
-		// Merge mode or service-specific: merge with existing file state
+	switch {
+	case input.Service != "":
+		// Service-specific: always preserve other services from file
 		fileState, err := u.FileStore.Drain(ctx, "", true)
 		if err != nil {
 			// File might not exist, which is fine - start fresh
@@ -70,13 +63,26 @@ func (u *StashPushUseCase) Execute(ctx context.Context, input StashPushInput) (*
 		}
 
 		finalState = fileState
-		if input.Service != "" {
-			finalState.RemoveService(input.Service) // Clear the target service only
+		if input.Mode == StashModeOverwrite {
+			// Overwrite: clear target service, then add agent's data
+			finalState.RemoveService(input.Service)
+			finalState.Merge(persistState)
+		} else {
+			// Merge: combine file's target service with agent's target service
+			finalState.Merge(persistState)
+		}
+	case input.Mode == StashModeMerge:
+		// Global merge: combine file state with agent state
+		fileState, err := u.FileStore.Drain(ctx, "", true)
+		if err != nil {
+			// File might not exist, which is fine - start fresh
+			fileState = staging.NewEmptyState()
 		}
 
+		finalState = fileState
 		finalState.Merge(persistState)
-	} else {
-		// Replace all: use agent state directly
+	default:
+		// Global overwrite: replace entire file with agent state
 		finalState = persistState
 	}
 
