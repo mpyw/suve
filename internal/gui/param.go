@@ -91,6 +91,7 @@ func (a *App) ParamList(prefix string, recursive bool, withValue bool, filter st
 	}
 
 	uc := &param.ListUseCase{Client: client}
+
 	result, err := uc.Execute(a.ctx, param.ListInput{
 		Prefix:     prefix,
 		Recursive:  recursive,
@@ -128,6 +129,7 @@ func (a *App) ParamShow(specStr string) (*ParamShowResult, error) {
 	}
 
 	uc := &param.ShowUseCase{Client: client}
+
 	result, err := uc.Execute(a.ctx, param.ShowInput{Spec: spec})
 	if err != nil {
 		return nil, err
@@ -144,12 +146,14 @@ func (a *App) ParamShow(specStr string) (*ParamShowResult, error) {
 	if result.LastModified != nil {
 		r.LastModified = result.LastModified.Format("2006-01-02T15:04:05Z07:00")
 	}
+
 	for _, tag := range result.Tags {
 		r.Tags = append(r.Tags, ParamShowTag{
 			Key:   tag.Key,
 			Value: tag.Value,
 		})
 	}
+
 	return r, nil
 }
 
@@ -161,6 +165,7 @@ func (a *App) ParamLog(name string, maxResults int32) (*ParamLogResult, error) {
 	}
 
 	uc := &param.LogUseCase{Client: client}
+
 	result, err := uc.Execute(a.ctx, param.LogInput{
 		Name:       name,
 		MaxResults: maxResults,
@@ -180,6 +185,7 @@ func (a *App) ParamLog(name string, maxResults int32) (*ParamLogResult, error) {
 		if e.LastModified != nil {
 			entry.LastModified = e.LastModified.Format("2006-01-02T15:04:05Z07:00")
 		}
+
 		entries[i] = entry
 	}
 
@@ -192,6 +198,7 @@ func (a *App) ParamDiff(spec1Str, spec2Str string) (*ParamDiffResult, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	spec2, err := paramversion.Parse(spec2Str)
 	if err != nil {
 		return nil, err
@@ -203,6 +210,7 @@ func (a *App) ParamDiff(spec1Str, spec2Str string) (*ParamDiffResult, error) {
 	}
 
 	uc := &param.DiffUseCase{Client: client}
+
 	result, err := uc.Execute(a.ctx, param.DiffInput{
 		Spec1: spec1,
 		Spec2: spec2,
@@ -229,6 +237,7 @@ func (a *App) ParamSet(name, value, paramType string) (*ParamSetResult, error) {
 
 	// Try to create first
 	createUC := &param.CreateUseCase{Client: client}
+
 	createResult, err := createUC.Execute(a.ctx, param.CreateInput{
 		Name:  name,
 		Value: value,
@@ -245,6 +254,7 @@ func (a *App) ParamSet(name, value, paramType string) (*ParamSetResult, error) {
 	// If parameter already exists, update it
 	if pae := (*paramapi.ParameterAlreadyExists)(nil); errors.As(err, &pae) {
 		updateUC := &param.UpdateUseCase{Client: client}
+
 		updateResult, err := updateUC.Execute(a.ctx, param.UpdateInput{
 			Name:  name,
 			Value: value,
@@ -253,6 +263,7 @@ func (a *App) ParamSet(name, value, paramType string) (*ParamSetResult, error) {
 		if err != nil {
 			return nil, err
 		}
+
 		return &ParamSetResult{
 			Name:      updateResult.Name,
 			Version:   updateResult.Version,
@@ -271,6 +282,7 @@ func (a *App) ParamDelete(name string) (*ParamDeleteResult, error) {
 	}
 
 	uc := &param.DeleteUseCase{Client: client}
+
 	result, err := uc.Execute(a.ctx, param.DeleteInput{Name: name})
 	if err != nil {
 		return nil, err
@@ -287,6 +299,7 @@ func (a *App) ParamAddTag(name, key, value string) error {
 	}
 
 	uc := &param.TagUseCase{Client: client}
+
 	return uc.Execute(a.ctx, param.TagInput{
 		Name: name,
 		Add:  map[string]string{key: value},
@@ -301,6 +314,7 @@ func (a *App) ParamRemoveTag(name, key string) error {
 	}
 
 	uc := &param.TagUseCase{Client: client}
+
 	return uc.Execute(a.ctx, param.TagInput{
 		Name:   name,
 		Remove: []string{key},

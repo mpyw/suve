@@ -173,7 +173,7 @@ func TestStatusUseCase_Execute_ListError(t *testing.T) {
 	}
 
 	_, err := uc.Execute(t.Context(), usecasestaging.StatusInput{})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "list error")
 }
 
@@ -307,6 +307,6 @@ func TestStatusUseCase_Execute_ListTagsError(t *testing.T) {
 	}
 
 	_, err := uc.Execute(t.Context(), usecasestaging.StatusInput{})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "list tags error")
 }

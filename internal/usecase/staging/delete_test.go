@@ -127,7 +127,7 @@ func TestDeleteUseCase_Execute_InvalidRecoveryWindow(t *testing.T) {
 		Name:           "my-secret",
 		RecoveryWindow: 5,
 	})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "recovery window")
 
 	// Too long
@@ -349,6 +349,6 @@ func TestDeleteUseCase_Execute_UnstageTagError(t *testing.T) {
 	_, err := uc.Execute(t.Context(), usecasestaging.DeleteInput{
 		Name: "/app/new",
 	})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "unstage tag error")
 }

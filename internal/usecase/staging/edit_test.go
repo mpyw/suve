@@ -273,7 +273,7 @@ func TestEditUseCase_Execute_StageError(t *testing.T) {
 		Name:  "/app/config",
 		Value: "value",
 	})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "stage error")
 }
 

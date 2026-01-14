@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestStringError_Error(t *testing.T) {
@@ -70,6 +71,7 @@ func TestApp_getService_EdgeCases(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
+
 			app := &App{}
 
 			_, err := app.getService(tt.service)
@@ -113,14 +115,15 @@ func TestApp_getParser(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
+
 			app := &App{}
 
 			parser, err := app.getParser(tt.service)
 			if tt.expectError {
-				assert.ErrorIs(t, err, errInvalidService)
+				require.ErrorIs(t, err, errInvalidService)
 				assert.Nil(t, parser)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.NotNil(t, parser)
 			}
 		})

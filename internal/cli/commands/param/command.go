@@ -1,3 +1,4 @@
+// Package param provides CLI commands for AWS SSM Parameter Store.
 package param
 
 import (

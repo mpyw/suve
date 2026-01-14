@@ -35,7 +35,7 @@ func TestCommand_Help(t *testing.T) {
 
 type mockClient struct {
 	//nolint:lll // mock function signature
-	listSecretsFunc    func(ctx context.Context, params *secretapi.ListSecretsInput, optFns ...func(*secretapi.Options)) (*secretapi.ListSecretsOutput, error)
+	listSecretsFunc func(ctx context.Context, params *secretapi.ListSecretsInput, optFns ...func(*secretapi.Options)) (*secretapi.ListSecretsOutput, error)
 	//nolint:lll // mock function signature
 	getSecretValueFunc func(ctx context.Context, params *secretapi.GetSecretValueInput, optFns ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error)
 }
@@ -175,6 +175,7 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, out string) {
+				t.Helper()
 				assert.Contains(t, out, "secret1\tvalue1")
 				assert.Contains(t, out, "secret2\tvalue2")
 			},
@@ -193,6 +194,7 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, out string) {
+				t.Helper()
 				assert.Contains(t, out, `"name": "secret1"`)
 				assert.Contains(t, out, `"name": "secret2"`)
 				assert.NotContains(t, out, `"value"`)
@@ -218,6 +220,7 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, out string) {
+				t.Helper()
 				assert.Contains(t, out, `"name": "secret1"`)
 				assert.Contains(t, out, `"value": "secret-value"`)
 			},
@@ -233,11 +236,12 @@ func TestRun(t *testing.T) {
 						},
 					}, nil
 				},
-				getSecretValueFunc: func(_ context.Context, _ *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) {
+				getSecretValueFunc: func(_ context.Context, _ *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) { //nolint:lll
 					return nil, errors.New("access denied")
 				},
 			},
 			check: func(t *testing.T, out string) {
+				t.Helper()
 				assert.Contains(t, out, `"name": "error-secret"`)
 				assert.Contains(t, out, `"error": "access denied"`)
 			},
@@ -253,11 +257,12 @@ func TestRun(t *testing.T) {
 						},
 					}, nil
 				},
-				getSecretValueFunc: func(_ context.Context, _ *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) {
+				getSecretValueFunc: func(_ context.Context, _ *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) { //nolint:lll
 					return nil, errors.New("fetch error")
 				},
 			},
 			check: func(t *testing.T, out string) {
+				t.Helper()
 				assert.Contains(t, out, "error-secret")
 				assert.Contains(t, out, "<error:")
 			},

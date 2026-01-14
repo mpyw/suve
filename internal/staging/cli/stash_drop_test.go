@@ -274,7 +274,7 @@ func TestStashDropRunner_Run(t *testing.T) {
 
 		// File should still exist
 		_, err = os.Stat(path)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		// Read and verify remaining data
 		//nolint:gosec // G304: path is from t.TempDir(), safe for test

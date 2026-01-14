@@ -152,7 +152,7 @@ func TestListUseCase_Execute_InvalidFilter(t *testing.T) {
 	_, err := uc.Execute(t.Context(), secret.ListInput{
 		Filter: "[invalid",
 	})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "invalid filter regex")
 }
 
@@ -166,7 +166,7 @@ func TestListUseCase_Execute_ListError(t *testing.T) {
 	uc := &secret.ListUseCase{Client: client}
 
 	_, err := uc.Execute(t.Context(), secret.ListInput{})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to list secrets")
 }
 
@@ -344,7 +344,7 @@ func TestListUseCase_Execute_WithPagination_Error(t *testing.T) {
 	_, err := uc.Execute(t.Context(), secret.ListInput{
 		MaxResults: 10,
 	})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to list secrets")
 }
 

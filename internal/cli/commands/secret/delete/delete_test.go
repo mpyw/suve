@@ -34,7 +34,7 @@ type mockClient struct {
 	//nolint:lll // mock function signature
 	getSecretValueFunc func(ctx context.Context, params *secretapi.GetSecretValueInput, optFns ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error)
 	//nolint:lll // mock function signature
-	deleteSecretFunc   func(ctx context.Context, params *secretapi.DeleteSecretInput, optFns ...func(*secretapi.Options)) (*secretapi.DeleteSecretOutput, error)
+	deleteSecretFunc func(ctx context.Context, params *secretapi.DeleteSecretInput, optFns ...func(*secretapi.Options)) (*secretapi.DeleteSecretOutput, error)
 }
 
 //nolint:lll // mock function signature
@@ -103,6 +103,7 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
+				t.Helper()
 				assert.Contains(t, output, "Permanently deleted")
 			},
 		},

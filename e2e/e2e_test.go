@@ -99,7 +99,7 @@ func waitForDaemon(timeout time.Duration, daemonErrCh <-chan error) error {
 			return fmt.Errorf("daemon did not become ready within %v (last error: %v)", timeout, lastErr)
 		case <-ticker.C:
 			// Try to ping daemon (any successful request means it's ready)
-			if err := launcher.Ping(); err == nil {
+			if err := launcher.Ping(ctx); err == nil {
 				return nil
 			} else {
 				lastErr = err

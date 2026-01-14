@@ -159,7 +159,7 @@ func TestUpdateUseCase_Execute_PutValueError(t *testing.T) {
 		Name:  "my-secret",
 		Value: "new-value",
 	})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to update secret value")
 }
 
@@ -176,6 +176,6 @@ func TestUpdateUseCase_Execute_UpdateDescriptionError(t *testing.T) {
 		Name:        "my-secret",
 		Description: "new description",
 	})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to update secret description")
 }

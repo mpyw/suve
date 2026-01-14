@@ -270,8 +270,11 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 				// Auto: use terminal width minus overhead for metadata
 				// Reserve ~30 chars for: version (6) + current mark (10) + date (10) + separators (4)
 				termWidth := terminal.GetWidthFromWriter(r.Stdout)
+
 				const metadataOverhead = 30 // version + current mark + date + separators
+
 				const minValueLength = 10
+
 				maxLen = max(termWidth-metadataOverhead, minValueLength)
 			}
 

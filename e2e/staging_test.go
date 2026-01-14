@@ -968,16 +968,17 @@ func TestDaemonLauncher_Ping(t *testing.T) {
 
 	// Test Ping
 	t.Run("ping-success", func(t *testing.T) {
-		err := launcher.Ping()
+		err := launcher.Ping(t.Context())
 		require.NoError(t, err)
 	})
 
 	// Test multiple pings (concurrent access)
 	t.Run("ping-concurrent", func(t *testing.T) {
+		ctx := t.Context()
 		done := make(chan error, 10)
 		for i := 0; i < 10; i++ {
 			go func() {
-				done <- launcher.Ping()
+				done <- launcher.Ping(ctx)
 			}()
 		}
 		for i := 0; i < 10; i++ {
@@ -997,7 +998,7 @@ func TestDaemonLauncher_EnsureRunning(t *testing.T) {
 
 	// Test EnsureRunning (daemon is already running from TestMain)
 	t.Run("ensure-running-when-running", func(t *testing.T) {
-		err := launcher.EnsureRunning()
+		err := launcher.EnsureRunning(t.Context())
 		require.NoError(t, err)
 	})
 }
@@ -1068,13 +1069,13 @@ func TestDaemonLauncher_NotRunning(t *testing.T) {
 
 	// Test Ping fails when daemon not running
 	t.Run("ping-not-running", func(t *testing.T) {
-		err := launcher.Ping()
+		err := launcher.Ping(t.Context())
 		assert.Error(t, err)
 	})
 
 	// Test EnsureRunning fails when auto-start is disabled
 	t.Run("ensure-running-fails", func(t *testing.T) {
-		err := launcher.EnsureRunning()
+		err := launcher.EnsureRunning(t.Context())
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "auto-start is disabled")
 	})

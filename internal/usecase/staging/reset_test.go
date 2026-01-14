@@ -271,7 +271,7 @@ func TestResetUseCase_Execute_ListError(t *testing.T) {
 	}
 
 	_, err := uc.Execute(t.Context(), usecasestaging.ResetInput{All: true})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "list error")
 }
 
@@ -290,7 +290,7 @@ func TestResetUseCase_Execute_UnstageAllError(t *testing.T) {
 	}
 
 	_, err := uc.Execute(t.Context(), usecasestaging.ResetInput{All: true})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "unstage all error")
 }
 
@@ -306,7 +306,7 @@ func TestResetUseCase_Execute_GetError(t *testing.T) {
 	}
 
 	_, err := uc.Execute(t.Context(), usecasestaging.ResetInput{Spec: "/app/config"})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "get error")
 }
 
@@ -325,7 +325,7 @@ func TestResetUseCase_Execute_UnstageError(t *testing.T) {
 	}
 
 	_, err := uc.Execute(t.Context(), usecasestaging.ResetInput{Spec: "/app/config"})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "unstage error")
 }
 
@@ -347,7 +347,7 @@ func TestResetUseCase_Execute_RestoreStageError(t *testing.T) {
 	}
 
 	_, err := uc.Execute(t.Context(), usecasestaging.ResetInput{Spec: "/app/config#3"})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "stage error")
 }
 

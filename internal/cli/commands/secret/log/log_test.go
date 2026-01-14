@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -100,15 +101,12 @@ func TestCommand_Validation(t *testing.T) {
 
 type mockClient struct {
 	//nolint:revive,stylecheck // Field name matches AWS SDK method name
-	//nolint:lll // mock function signature
-	listSecretVersionIdsFunc func(ctx context.Context, params *secretapi.ListSecretVersionIDsInput, optFns ...func(*secretapi.Options)) (*secretapi.ListSecretVersionIDsOutput, error)
-	//nolint:lll // mock function signature
-	getSecretValueFunc       func(ctx context.Context, params *secretapi.GetSecretValueInput, optFns ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error)
+	listSecretVersionIdsFunc func(ctx context.Context, params *secretapi.ListSecretVersionIDsInput, optFns ...func(*secretapi.Options)) (*secretapi.ListSecretVersionIDsOutput, error) //nolint:lll
+	getSecretValueFunc       func(ctx context.Context, params *secretapi.GetSecretValueInput, optFns ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error)             //nolint:lll
 }
 
 //nolint:revive,stylecheck // Method name must match AWS SDK interface
-//nolint:lll // mock function signature
-func (m *mockClient) ListSecretVersionIds(ctx context.Context, params *secretapi.ListSecretVersionIDsInput, optFns ...func(*secretapi.Options)) (*secretapi.ListSecretVersionIDsOutput, error) {
+func (m *mockClient) ListSecretVersionIds(ctx context.Context, params *secretapi.ListSecretVersionIDsInput, optFns ...func(*secretapi.Options)) (*secretapi.ListSecretVersionIDsOutput, error) { //nolint:lll
 	if m.listSecretVersionIdsFunc != nil {
 		return m.listSecretVersionIdsFunc(ctx, params, optFns...)
 	}
@@ -155,6 +153,7 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
+				t.Helper()
 				assert.Contains(t, output, "Version")
 				assert.Contains(t, output, "AWSCURRENT")
 			},
@@ -192,6 +191,7 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
+				t.Helper()
 				assert.Contains(t, output, "-old-value")
 				assert.Contains(t, output, "+new-value")
 				assert.Contains(t, output, "my-secret#version-")
@@ -218,6 +218,7 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
+				t.Helper()
 				assert.Contains(t, output, "Version")
 				assert.NotContains(t, output, "---")
 			},
@@ -248,8 +249,10 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
-				prevPos := bytes.Index([]byte(output), []byte("AWSPREVIOUS"))
-				currPos := bytes.Index([]byte(output), []byte("AWSCURRENT"))
+				t.Helper()
+
+				prevPos := strings.Index(output, "AWSPREVIOUS")
+				currPos := strings.Index(output, "AWSCURRENT")
 
 				require.NotEqual(t, -1, prevPos, "expected AWSPREVIOUS in output")
 				require.NotEqual(t, -1, currPos, "expected AWSCURRENT in output")
@@ -268,6 +271,7 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
+				t.Helper()
 				assert.Empty(t, output)
 			},
 		},
@@ -526,7 +530,7 @@ func TestRun(t *testing.T) {
 			name: "filter by since and until date",
 			opts: log.Options{Name: "my-secret", MaxResults: 10, Since: lo.ToPtr(now.Add(-90 * time.Minute)), Until: lo.ToPtr(now.Add(-30 * time.Minute))},
 			mock: &mockClient{
-				listSecretVersionIdsFunc: func(_ context.Context, _ *secretapi.ListSecretVersionIDsInput, _ ...func(*secretapi.Options)) (*secretapi.ListSecretVersionIDsOutput, error) {
+				listSecretVersionIdsFunc: func(_ context.Context, _ *secretapi.ListSecretVersionIDsInput, _ ...func(*secretapi.Options)) (*secretapi.ListSecretVersionIDsOutput, error) { //nolint:lll
 					return &secretapi.ListSecretVersionIDsOutput{
 						Versions: []secretapi.SecretVersionsListEntry{
 							{VersionId: lo.ToPtr("oldest-ver"), CreatedDate: lo.ToPtr(now.Add(-3 * time.Hour))},
@@ -547,7 +551,7 @@ func TestRun(t *testing.T) {
 			name: "filter excludes all versions",
 			opts: log.Options{Name: "my-secret", MaxResults: 10, Since: lo.ToPtr(now.Add(time.Hour))},
 			mock: &mockClient{
-				listSecretVersionIdsFunc: func(_ context.Context, _ *secretapi.ListSecretVersionIDsInput, _ ...func(*secretapi.Options)) (*secretapi.ListSecretVersionIDsOutput, error) {
+				listSecretVersionIdsFunc: func(_ context.Context, _ *secretapi.ListSecretVersionIDsInput, _ ...func(*secretapi.Options)) (*secretapi.ListSecretVersionIDsOutput, error) { //nolint:lll
 					return &secretapi.ListSecretVersionIDsOutput{
 						Versions: []secretapi.SecretVersionsListEntry{
 							{VersionId: lo.ToPtr("v1"), CreatedDate: lo.ToPtr(now.Add(-time.Hour))},
@@ -565,7 +569,7 @@ func TestRun(t *testing.T) {
 			name: "filter skips versions without CreatedDate",
 			opts: log.Options{Name: "my-secret", MaxResults: 10, Since: lo.ToPtr(now.Add(-30 * time.Minute))},
 			mock: &mockClient{
-				listSecretVersionIdsFunc: func(_ context.Context, _ *secretapi.ListSecretVersionIDsInput, _ ...func(*secretapi.Options)) (*secretapi.ListSecretVersionIDsOutput, error) {
+				listSecretVersionIdsFunc: func(_ context.Context, _ *secretapi.ListSecretVersionIDsInput, _ ...func(*secretapi.Options)) (*secretapi.ListSecretVersionIDsOutput, error) { //nolint:lll
 					return &secretapi.ListSecretVersionIDsOutput{
 						Versions: []secretapi.SecretVersionsListEntry{
 							{VersionId: lo.ToPtr("no-date-ver"), CreatedDate: nil},
@@ -584,7 +588,7 @@ func TestRun(t *testing.T) {
 			name: "JSON output format",
 			opts: log.Options{Name: "my-secret", MaxResults: 10, Output: output.FormatJSON},
 			mock: &mockClient{
-				listSecretVersionIdsFunc: func(_ context.Context, _ *secretapi.ListSecretVersionIDsInput, _ ...func(*secretapi.Options)) (*secretapi.ListSecretVersionIDsOutput, error) {
+				listSecretVersionIdsFunc: func(_ context.Context, _ *secretapi.ListSecretVersionIDsInput, _ ...func(*secretapi.Options)) (*secretapi.ListSecretVersionIDsOutput, error) { //nolint:lll
 					return &secretapi.ListSecretVersionIDsOutput{
 						Versions: []secretapi.SecretVersionsListEntry{
 							{VersionId: lo.ToPtr(testVersionID1), CreatedDate: lo.ToPtr(now.Add(-time.Hour)), VersionStages: []string{"AWSPREVIOUS"}},
@@ -622,7 +626,7 @@ func TestRun(t *testing.T) {
 			name: "JSON output with GetSecretValue error",
 			opts: log.Options{Name: "my-secret", MaxResults: 10, Output: output.FormatJSON},
 			mock: &mockClient{
-				listSecretVersionIdsFunc: func(_ context.Context, _ *secretapi.ListSecretVersionIDsInput, _ ...func(*secretapi.Options)) (*secretapi.ListSecretVersionIDsOutput, error) {
+				listSecretVersionIdsFunc: func(_ context.Context, _ *secretapi.ListSecretVersionIDsInput, _ ...func(*secretapi.Options)) (*secretapi.ListSecretVersionIDsOutput, error) { //nolint:lll
 					return &secretapi.ListSecretVersionIDsOutput{
 						Versions: []secretapi.SecretVersionsListEntry{
 							{VersionId: lo.ToPtr(testVersionID1), CreatedDate: &now, VersionStages: []string{"AWSCURRENT"}},
@@ -643,14 +647,14 @@ func TestRun(t *testing.T) {
 			name: "JSON output without CreatedDate",
 			opts: log.Options{Name: "my-secret", MaxResults: 10, Output: output.FormatJSON},
 			mock: &mockClient{
-				listSecretVersionIdsFunc: func(_ context.Context, _ *secretapi.ListSecretVersionIDsInput, _ ...func(*secretapi.Options)) (*secretapi.ListSecretVersionIDsOutput, error) {
+				listSecretVersionIdsFunc: func(_ context.Context, _ *secretapi.ListSecretVersionIDsInput, _ ...func(*secretapi.Options)) (*secretapi.ListSecretVersionIDsOutput, error) { //nolint:lll
 					return &secretapi.ListSecretVersionIDsOutput{
 						Versions: []secretapi.SecretVersionsListEntry{
 							{VersionId: lo.ToPtr(testVersionID1), CreatedDate: nil, VersionStages: nil},
 						},
 					}, nil
 				},
-				getSecretValueFunc: func(_ context.Context, _ *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) {
+				getSecretValueFunc: func(_ context.Context, _ *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) { //nolint:lll
 					return &secretapi.GetSecretValueOutput{
 						SecretString: lo.ToPtr("secret-value"),
 						VersionId:    lo.ToPtr(testVersionID1),

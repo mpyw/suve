@@ -42,7 +42,7 @@ type JSONOutput struct {
 	Name       string            `json:"name"`
 	Version    int64             `json:"version"`
 	Type       string            `json:"type"`
-	JsonParsed *bool             `json:"json_parsed,omitempty"` // Only when --parse-json is used
+	JSONParsed *bool             `json:"json_parsed,omitempty"` //nolint:tagliatelle // snake_case for backwards compatibility
 	Modified   string            `json:"modified,omitempty"`
 	Tags       map[string]string `json:"tags"`
 	Value      string            `json:"value"`
@@ -182,7 +182,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 		}
 		// Show json_parsed only when --parse-json was used and succeeded
 		if jsonParsed {
-			jsonOut.JsonParsed = lo.ToPtr(true)
+			jsonOut.JSONParsed = lo.ToPtr(true)
 		}
 
 		if result.LastModified != nil {

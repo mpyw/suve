@@ -167,7 +167,7 @@ func TestTagUseCase_Tag_FetchError(t *testing.T) {
 		Name: "/app/config",
 		Tags: map[string]string{"env": "prod"},
 	})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "aws error")
 }
 
@@ -435,7 +435,7 @@ func TestTagUseCase_Untag_ParseError(t *testing.T) {
 		Name:    "invalid",
 		TagKeys: maputil.NewSet("env"),
 	})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "invalid name")
 }
 

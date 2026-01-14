@@ -44,7 +44,7 @@ type mockClient struct {
 	//nolint:lll // mock function signature
 	putSecretValueFunc func(ctx context.Context, params *secretapi.PutSecretValueInput, optFns ...func(*secretapi.Options)) (*secretapi.PutSecretValueOutput, error)
 	//nolint:lll // mock function signature
-	updateSecretFunc   func(ctx context.Context, params *secretapi.UpdateSecretInput, optFns ...func(*secretapi.Options)) (*secretapi.UpdateSecretOutput, error)
+	updateSecretFunc func(ctx context.Context, params *secretapi.UpdateSecretInput, optFns ...func(*secretapi.Options)) (*secretapi.UpdateSecretOutput, error)
 }
 
 //nolint:lll // mock function signature
@@ -111,7 +111,7 @@ func TestRun(t *testing.T) {
 			name: "update secret with description",
 			opts: update.Options{Name: "my-secret", Value: "new-value", Description: "updated description"},
 			mock: &mockClient{
-				putSecretValueFunc: func(_ context.Context, params *secretapi.PutSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.PutSecretValueOutput, error) {
+				putSecretValueFunc: func(_ context.Context, _ *secretapi.PutSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.PutSecretValueOutput, error) { //nolint:lll
 					return &secretapi.PutSecretValueOutput{
 						Name:      lo.ToPtr("my-secret"),
 						VersionId: lo.ToPtr("new-version-id"),
@@ -129,6 +129,7 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
+				t.Helper()
 				assert.Contains(t, output, "Updated secret")
 			},
 		},

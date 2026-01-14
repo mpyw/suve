@@ -1,5 +1,6 @@
 //go:build production || dev
 
+// Package gui provides the Wails-based GUI application.
 package gui
 
 import (
@@ -89,7 +90,9 @@ func (a *App) getParamClient() (ParamClient, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	a.paramClient = client
+
 	return client, nil
 }
 
@@ -102,7 +105,9 @@ func (a *App) getSecretClient() (SecretClient, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	a.secretClient = client
+
 	return client, nil
 }
 
@@ -118,6 +123,7 @@ func (a *App) getStagingStore() (store.ReadWriteOperator, error) {
 
 	s := agent.NewStore(identity.AccountID, identity.Region)
 	a.stagingStore = s
+
 	return s, nil
 }
 
@@ -159,12 +165,14 @@ func (a *App) getEditStrategy(service string) (staging.EditStrategy, error) {
 		if err != nil {
 			return nil, err
 		}
+
 		return staging.NewParamStrategy(client), nil
 	case string(staging.ServiceSecret):
 		client, err := a.getSecretClient()
 		if err != nil {
 			return nil, err
 		}
+
 		return staging.NewSecretStrategy(client), nil
 	default:
 		return nil, errInvalidService
@@ -178,12 +186,14 @@ func (a *App) getDeleteStrategy(service string) (staging.DeleteStrategy, error) 
 		if err != nil {
 			return nil, err
 		}
+
 		return staging.NewParamStrategy(client), nil
 	case string(staging.ServiceSecret):
 		client, err := a.getSecretClient()
 		if err != nil {
 			return nil, err
 		}
+
 		return staging.NewSecretStrategy(client), nil
 	default:
 		return nil, errInvalidService
@@ -197,12 +207,14 @@ func (a *App) getApplyStrategy(service string) (staging.ApplyStrategy, error) {
 		if err != nil {
 			return nil, err
 		}
+
 		return staging.NewParamStrategy(client), nil
 	case string(staging.ServiceSecret):
 		client, err := a.getSecretClient()
 		if err != nil {
 			return nil, err
 		}
+
 		return staging.NewSecretStrategy(client), nil
 	default:
 		return nil, errInvalidService
@@ -216,12 +228,14 @@ func (a *App) getDiffStrategy(service string) (staging.DiffStrategy, error) {
 		if err != nil {
 			return nil, err
 		}
+
 		return staging.NewParamStrategy(client), nil
 	case string(staging.ServiceSecret):
 		client, err := a.getSecretClient()
 		if err != nil {
 			return nil, err
 		}
+
 		return staging.NewSecretStrategy(client), nil
 	default:
 		return nil, errInvalidService
@@ -245,6 +259,7 @@ func (a *App) GetAWSIdentity() (*AWSIdentityResult, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	return &AWSIdentityResult{
 		AccountID: identity.AccountID,
 		Region:    identity.Region,

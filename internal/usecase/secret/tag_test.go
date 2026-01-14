@@ -127,7 +127,7 @@ func TestTagUseCase_Execute_DescribeError(t *testing.T) {
 		Name: "my-secret",
 		Add:  map[string]string{"env": "prod"},
 	})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to describe secret")
 }
 
@@ -146,7 +146,7 @@ func TestTagUseCase_Execute_AddTagsError(t *testing.T) {
 		Name: "my-secret",
 		Add:  map[string]string{"env": "prod"},
 	})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to add tags")
 }
 

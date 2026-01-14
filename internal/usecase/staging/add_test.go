@@ -83,7 +83,7 @@ func TestAddUseCase_Execute_RejectsWhenResourceExists(t *testing.T) {
 		Name:  "/app/existing",
 		Value: "new-value",
 	})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.ErrorIs(t, err, transition.ErrCannotAddToExisting)
 }
 
@@ -275,7 +275,7 @@ func TestAddUseCase_Execute_RejectsWhenUpdateStaged(t *testing.T) {
 		Name:  "/app/existing",
 		Value: "new-value",
 	})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "already staged for update")
 }
 

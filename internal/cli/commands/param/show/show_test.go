@@ -100,6 +100,7 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
+				t.Helper()
 				assert.Contains(t, output, "/my/param")
 				assert.Contains(t, output, "test-value")
 			},
@@ -122,6 +123,7 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
+				t.Helper()
 				assert.Contains(t, output, "v2")
 			},
 		},
@@ -145,6 +147,8 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
+				t.Helper()
+
 				appleIdx := strings.Index(output, "apple")
 				zebraIdx := strings.Index(output, "zebra")
 
@@ -180,6 +184,7 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
+				t.Helper()
 				assert.Contains(t, output, "/my/param")
 				assert.NotContains(t, output, "Modified")
 			},
@@ -203,6 +208,7 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
+				t.Helper()
 				assert.Contains(t, output, "a,b,c")
 			},
 		},

@@ -234,6 +234,7 @@ func TestApp_getService(t *testing.T) {
 
 	t.Run("param", func(t *testing.T) {
 		t.Parallel()
+
 		svc, err := app.getService("param")
 		require.NoError(t, err)
 		assert.Equal(t, staging.ServiceParam, svc)
@@ -241,6 +242,7 @@ func TestApp_getService(t *testing.T) {
 
 	t.Run("secret", func(t *testing.T) {
 		t.Parallel()
+
 		svc, err := app.getService("secret")
 		require.NoError(t, err)
 		assert.Equal(t, staging.ServiceSecret, svc)
@@ -248,6 +250,7 @@ func TestApp_getService(t *testing.T) {
 
 	t.Run("invalid", func(t *testing.T) {
 		t.Parallel()
+
 		_, err := app.getService("invalid")
 		assert.ErrorIs(t, err, errInvalidService)
 	})
@@ -588,7 +591,7 @@ func TestFileDrainPersist(t *testing.T) {
 		wrongStore := file.NewStoreWithPath(localFilePath)
 		wrongStore.SetPassphrase("wrong-passphrase")
 		_, err = wrongStore.Drain(context.Background(), "", true)
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "decryption")
 	})
 
@@ -1003,6 +1006,7 @@ func TestApp_StagingStatus_AllOperations(t *testing.T) {
 		for _, entry := range result.Param {
 			operations[entry.Name] = entry.Operation
 		}
+
 		assert.Equal(t, "create", operations["/create"])
 		assert.Equal(t, "update", operations["/update"])
 		assert.Equal(t, "delete", operations["/delete"])

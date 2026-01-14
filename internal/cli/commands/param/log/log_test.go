@@ -296,6 +296,7 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
+				t.Helper()
 				assert.Contains(t, output, "-old-value")
 				assert.Contains(t, output, "+new-value")
 				assert.Contains(t, output, "--- /app/param#1")
@@ -314,6 +315,7 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
+				t.Helper()
 				assert.Empty(t, output)
 			},
 		},
@@ -332,6 +334,7 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
+				t.Helper()
 				// Oneline format should be compact
 				assert.Contains(t, output, "2")
 				assert.Contains(t, output, "(current)")
@@ -356,6 +359,7 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
+				t.Helper()
 				assert.Contains(t, output, "...")
 				// Full value should not appear
 				assert.NotContains(t, output, "exceeds forty characters")
@@ -377,6 +381,7 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
+				t.Helper()
 				assert.Contains(t, output, "Version 2")
 				assert.Contains(t, output, "Version 3")
 				assert.NotContains(t, output, "Version 1")
@@ -398,6 +403,7 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
+				t.Helper()
 				assert.Contains(t, output, "Version 1")
 				assert.Contains(t, output, "Version 2")
 				assert.NotContains(t, output, "Version 3")
@@ -420,6 +426,7 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
+				t.Helper()
 				assert.NotContains(t, output, "Version 1")
 				assert.Contains(t, output, "Version 2")
 				assert.Contains(t, output, "Version 3")
@@ -440,6 +447,7 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
+				t.Helper()
 				assert.Empty(t, output)
 			},
 		},

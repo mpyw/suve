@@ -85,6 +85,6 @@ func TestCreateUseCase_Execute_Error(t *testing.T) {
 		Name:  "my-secret",
 		Value: "secret-value",
 	})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to create secret")
 }

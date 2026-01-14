@@ -159,6 +159,6 @@ func TestDeleteUseCase_Execute_Error(t *testing.T) {
 	_, err := uc.Execute(t.Context(), secret.DeleteInput{
 		Name: "my-secret",
 	})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to delete secret")
 }

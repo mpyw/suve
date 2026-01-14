@@ -68,7 +68,7 @@ func TestStore_Exists(t *testing.T) {
 		store := file.NewStoreWithPath(invalidPath)
 
 		exists, err := store.Exists()
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.False(t, exists)
 		assert.Contains(t, err.Error(), "failed to check state file")
 	})
@@ -144,7 +144,7 @@ func TestStore_IsEncrypted(t *testing.T) {
 		store := file.NewStoreWithPath(invalidPath)
 
 		isEnc, err := store.IsEncrypted()
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.False(t, isEnc)
 		assert.Contains(t, err.Error(), "failed to read state file")
 	})
@@ -304,7 +304,7 @@ func TestStore_Drain(t *testing.T) {
 		store := file.NewStoreWithPath(invalidPath)
 
 		_, err = store.Drain(t.Context(), "", true)
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to read state file")
 	})
 
@@ -320,7 +320,7 @@ func TestStore_Drain(t *testing.T) {
 
 		store := file.NewStoreWithPath(path)
 		_, err = store.Drain(t.Context(), "", true)
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to parse state file")
 	})
 
@@ -365,7 +365,7 @@ func TestStore_Persist(t *testing.T) {
 
 		// File should exist
 		_, err = os.Stat(path)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		// Read back and verify
 		readState, err := store.Drain(t.Context(), "", true)
@@ -496,7 +496,7 @@ func TestStore_Persist(t *testing.T) {
 		}
 
 		err = store.WriteState(t.Context(), "", state)
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to create state directory")
 	})
 
@@ -533,7 +533,7 @@ func TestStore_Persist(t *testing.T) {
 		}
 
 		err = store.WriteState(t.Context(), "", state)
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to write state file")
 	})
 }

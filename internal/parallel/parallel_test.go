@@ -31,9 +31,9 @@ func TestExecuteMap(t *testing.T) {
 
 		require.Len(t, results, 3)
 		assert.Equal(t, 2, results["a"].Value)
-		assert.NoError(t, results["a"].Err)
+		require.NoError(t, results["a"].Err)
 		assert.Equal(t, 4, results["b"].Value)
-		assert.NoError(t, results["b"].Err)
+		require.NoError(t, results["b"].Err)
 		assert.Equal(t, 6, results["c"].Value)
 		assert.NoError(t, results["c"].Err)
 	})
@@ -56,7 +56,7 @@ func TestExecuteMap(t *testing.T) {
 
 		require.Len(t, results, 2)
 		assert.Equal(t, 42, results["a"].Value)
-		assert.NoError(t, results["a"].Err)
+		require.NoError(t, results["a"].Err)
 		assert.Equal(t, 0, results["b"].Value)
 		assert.EqualError(t, results["b"].Err, "error for b")
 	})

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -42,28 +43,22 @@ func TestCommand_Validation(t *testing.T) {
 }
 
 type mockClient struct {
-	//nolint:lll // mock function signature
-	getSecretValueFunc func(ctx context.Context, params *secretapi.GetSecretValueInput, optFns ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error)
+	getSecretValueFunc func(ctx context.Context, params *secretapi.GetSecretValueInput, optFns ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) //nolint:lll
 	//nolint:revive,stylecheck // Field name matches AWS SDK method name
-	//nolint:lll // mock function signature
-	listSecretVersionIdsFunc func(ctx context.Context, params *secretapi.ListSecretVersionIDsInput, optFns ...func(*secretapi.Options)) (*secretapi.ListSecretVersionIDsOutput, error)
-	//nolint:lll // mock function signature
-	describeSecretFunc       func(ctx context.Context, params *secretapi.DescribeSecretInput, optFns ...func(*secretapi.Options)) (*secretapi.DescribeSecretOutput, error)
+	listSecretVersionIdsFunc func(ctx context.Context, params *secretapi.ListSecretVersionIDsInput, optFns ...func(*secretapi.Options)) (*secretapi.ListSecretVersionIDsOutput, error) //nolint:lll
+	describeSecretFunc       func(ctx context.Context, params *secretapi.DescribeSecretInput, optFns ...func(*secretapi.Options)) (*secretapi.DescribeSecretOutput, error)             //nolint:lll
 }
 
-//nolint:lll // mock function signature
-func (m *mockClient) GetSecretValue(ctx context.Context, params *secretapi.GetSecretValueInput, optFns ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) {
+func (m *mockClient) GetSecretValue(ctx context.Context, params *secretapi.GetSecretValueInput, optFns ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) { //nolint:lll
 	return m.getSecretValueFunc(ctx, params, optFns...)
 }
 
 //nolint:revive,stylecheck // Method name must match AWS SDK interface
-//nolint:lll // mock function signature
-func (m *mockClient) ListSecretVersionIds(ctx context.Context, params *secretapi.ListSecretVersionIDsInput, optFns ...func(*secretapi.Options)) (*secretapi.ListSecretVersionIDsOutput, error) {
+func (m *mockClient) ListSecretVersionIds(ctx context.Context, params *secretapi.ListSecretVersionIDsInput, optFns ...func(*secretapi.Options)) (*secretapi.ListSecretVersionIDsOutput, error) { //nolint:lll
 	return m.listSecretVersionIdsFunc(ctx, params, optFns...)
 }
 
-//nolint:lll // mock function signature
-func (m *mockClient) DescribeSecret(ctx context.Context, params *secretapi.DescribeSecretInput, optFns ...func(*secretapi.Options)) (*secretapi.DescribeSecretOutput, error) {
+func (m *mockClient) DescribeSecret(ctx context.Context, params *secretapi.DescribeSecretInput, optFns ...func(*secretapi.Options)) (*secretapi.DescribeSecretOutput, error) { //nolint:lll
 	if m.describeSecretFunc != nil {
 		return m.describeSecretFunc(ctx, params, optFns...)
 	}
@@ -101,6 +96,7 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
+				t.Helper()
 				assert.Contains(t, output, "my-secret")
 				assert.Contains(t, output, "secret-value")
 			},
@@ -129,6 +125,7 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
+				t.Helper()
 				assert.Contains(t, output, "previous-value")
 			},
 		},
@@ -149,8 +146,10 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
-				appleIdx := bytes.Index([]byte(output), []byte("apple"))
-				zebraIdx := bytes.Index([]byte(output), []byte("zebra"))
+				t.Helper()
+
+				appleIdx := strings.Index(output, "apple")
+				zebraIdx := strings.Index(output, "zebra")
 
 				require.NotEqual(t, -1, appleIdx, "expected apple in output")
 				require.NotEqual(t, -1, zebraIdx, "expected zebra in output")
@@ -182,6 +181,7 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
+				t.Helper()
 				assert.Contains(t, output, "my-secret")
 				assert.NotContains(t, output, "VersionId")
 				assert.NotContains(t, output, "Stages")
@@ -202,6 +202,7 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
+				t.Helper()
 				assert.Contains(t, output, "not json")
 			},
 		},
@@ -218,6 +219,7 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
+				t.Helper()
 				assert.Equal(t, "raw-secret-value", output)
 			},
 		},
@@ -234,7 +236,7 @@ func TestRun(t *testing.T) {
 						},
 					}, nil
 				},
-				getSecretValueFunc: func(_ context.Context, _ *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) {
+				getSecretValueFunc: func(_ context.Context, _ *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) { //nolint:lll
 					return &secretapi.GetSecretValueOutput{
 						Name:         lo.ToPtr("my-secret"),
 						SecretString: lo.ToPtr("previous-value"),
@@ -249,7 +251,7 @@ func TestRun(t *testing.T) {
 			name: "raw mode with JSON formatting",
 			opts: show.Options{Spec: &secretversion.Spec{Name: "my-secret"}, ParseJSON: true, Raw: true},
 			mock: &mockClient{
-				getSecretValueFunc: func(_ context.Context, _ *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) {
+				getSecretValueFunc: func(_ context.Context, _ *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) { //nolint:lll
 					return &secretapi.GetSecretValueOutput{
 						Name:         lo.ToPtr("my-secret"),
 						SecretString: lo.ToPtr(`{"zebra":"last","apple":"first"}`),
@@ -257,8 +259,8 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
-				appleIdx := bytes.Index([]byte(output), []byte("apple"))
-				zebraIdx := bytes.Index([]byte(output), []byte("zebra"))
+				appleIdx := strings.Index(output, "apple")
+				zebraIdx := strings.Index(output, "zebra")
 
 				require.NotEqual(t, -1, appleIdx, "expected apple in output")
 				require.NotEqual(t, -1, zebraIdx, "expected zebra in output")
@@ -269,7 +271,7 @@ func TestRun(t *testing.T) {
 			name: "show with tags",
 			opts: show.Options{Spec: &secretversion.Spec{Name: "my-secret"}},
 			mock: &mockClient{
-				getSecretValueFunc: func(_ context.Context, _ *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) {
+				getSecretValueFunc: func(_ context.Context, _ *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) { //nolint:lll
 					return &secretapi.GetSecretValueOutput{
 						Name:          lo.ToPtr("my-secret"),
 						ARN:           lo.ToPtr("arn:aws:secretsmanager:us-east-1:123456789012:secret:my-secret-AbCdEf"),
@@ -279,7 +281,7 @@ func TestRun(t *testing.T) {
 						CreatedDate:   &now,
 					}, nil
 				},
-				describeSecretFunc: func(_ context.Context, _ *secretapi.DescribeSecretInput, _ ...func(*secretapi.Options)) (*secretapi.DescribeSecretOutput, error) {
+				describeSecretFunc: func(_ context.Context, _ *secretapi.DescribeSecretInput, _ ...func(*secretapi.Options)) (*secretapi.DescribeSecretOutput, error) { //nolint:lll
 					return &secretapi.DescribeSecretOutput{
 						Tags: []secretapi.Tag{
 							{Key: lo.ToPtr("Environment"), Value: lo.ToPtr("production")},
@@ -301,7 +303,7 @@ func TestRun(t *testing.T) {
 			name: "show with tags in JSON output",
 			opts: show.Options{Spec: &secretversion.Spec{Name: "my-secret"}, Output: output.FormatJSON},
 			mock: &mockClient{
-				getSecretValueFunc: func(_ context.Context, _ *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) {
+				getSecretValueFunc: func(_ context.Context, _ *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) { //nolint:lll
 					return &secretapi.GetSecretValueOutput{
 						Name:          lo.ToPtr("my-secret"),
 						ARN:           lo.ToPtr("arn:aws:secretsmanager:us-east-1:123456789012:secret:my-secret-AbCdEf"),
@@ -311,7 +313,7 @@ func TestRun(t *testing.T) {
 						CreatedDate:   &now,
 					}, nil
 				},
-				describeSecretFunc: func(_ context.Context, _ *secretapi.DescribeSecretInput, _ ...func(*secretapi.Options)) (*secretapi.DescribeSecretOutput, error) {
+				describeSecretFunc: func(_ context.Context, _ *secretapi.DescribeSecretInput, _ ...func(*secretapi.Options)) (*secretapi.DescribeSecretOutput, error) { //nolint:lll
 					return &secretapi.DescribeSecretOutput{
 						Tags: []secretapi.Tag{
 							{Key: lo.ToPtr("Environment"), Value: lo.ToPtr("production")},
@@ -332,7 +334,7 @@ func TestRun(t *testing.T) {
 			name: "JSON output with empty tags shows empty object",
 			opts: show.Options{Spec: &secretversion.Spec{Name: "my-secret"}, Output: output.FormatJSON},
 			mock: &mockClient{
-				getSecretValueFunc: func(_ context.Context, _ *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) {
+				getSecretValueFunc: func(_ context.Context, _ *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) { //nolint:lll
 					return &secretapi.GetSecretValueOutput{
 						Name:         lo.ToPtr("my-secret"),
 						ARN:          lo.ToPtr("arn:aws:secretsmanager:us-east-1:123456789012:secret:my-secret-AbCdEf"),

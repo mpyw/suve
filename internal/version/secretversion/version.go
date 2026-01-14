@@ -47,6 +47,7 @@ func GetSecretWithVersion(ctx context.Context, client Client, spec *Spec) (*secr
 // versionIDDisplayLength is the number of characters to display for version IDs.
 const versionIDDisplayLength = 8
 
+// TruncateVersionID truncates a version ID to a readable short form.
 func TruncateVersionID(id string) string {
 	if len(id) > versionIDDisplayLength {
 		return id[:versionIDDisplayLength]

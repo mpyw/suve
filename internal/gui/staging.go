@@ -160,6 +160,7 @@ func (a *App) StagingStatus() (*StagingStatusResult, error) {
 		Strategy: paramParser,
 		Store:    store,
 	}
+
 	paramResult, err := paramUC.Execute(a.ctx, stagingusecase.StatusInput{})
 	if err != nil {
 		return nil, err
@@ -170,6 +171,7 @@ func (a *App) StagingStatus() (*StagingStatusResult, error) {
 		Strategy: secretParser,
 		Store:    store,
 	}
+
 	secretResult, err := secretUC.Execute(a.ctx, stagingusecase.StatusInput{})
 	if err != nil {
 		return nil, err
@@ -267,6 +269,7 @@ func (a *App) StagingApply(service string, ignoreConflicts bool) (*StagingApplyR
 				entry.Error = r.Error.Error()
 			}
 		}
+
 		output.EntryResults = append(output.EntryResults, entry)
 	}
 
@@ -279,6 +282,7 @@ func (a *App) StagingApply(service string, ignoreConflicts bool) (*StagingApplyR
 		if r.Error != nil {
 			tagResult.Error = r.Error.Error()
 		}
+
 		output.TagResults = append(output.TagResults, tagResult)
 	}
 
@@ -301,6 +305,7 @@ func (a *App) StagingReset(service string) (*StagingResetResult, error) {
 		Parser: parser,
 		Store:  store,
 	}
+
 	result, err := uc.Execute(a.ctx, stagingusecase.ResetInput{All: true})
 	if err != nil {
 		return nil, err
@@ -346,6 +351,7 @@ func (a *App) StagingAdd(service, name, value string) (*StagingAddResult, error)
 		Strategy: strategy,
 		Store:    store,
 	}
+
 	result, err := uc.Execute(a.ctx, stagingusecase.AddInput{
 		Name:  name,
 		Value: value,
@@ -373,6 +379,7 @@ func (a *App) StagingEdit(service, name, value string) (*StagingEditResult, erro
 		Strategy: strategy,
 		Store:    store,
 	}
+
 	result, err := uc.Execute(a.ctx, stagingusecase.EditInput{
 		Name:  name,
 		Value: value,
@@ -400,6 +407,7 @@ func (a *App) StagingDelete(service, name string, force bool, recoveryWindow int
 		Strategy: strategy,
 		Store:    store,
 	}
+
 	result, err := uc.Execute(a.ctx, stagingusecase.DeleteInput{
 		Name:           name,
 		Force:          force,
@@ -453,6 +461,7 @@ func (a *App) StagingAddTag(service, name, key, value string) (*StagingAddTagRes
 		Strategy: strategy,
 		Store:    store,
 	}
+
 	result, err := uc.Tag(a.ctx, stagingusecase.TagInput{
 		Name: name,
 		Tags: map[string]string{key: value},
@@ -480,6 +489,7 @@ func (a *App) StagingRemoveTag(service, name, key string) (*StagingRemoveTagResu
 		Strategy: strategy,
 		Store:    store,
 	}
+
 	result, err := uc.Untag(a.ctx, stagingusecase.UntagInput{
 		Name:    name,
 		TagKeys: maputil.NewSet(key),
@@ -561,7 +571,7 @@ func (a *App) StagingCancelRemoveTag(service, name, key string) (*StagingCancelR
 	return &StagingCancelRemoveTagResult{Name: name}, nil
 }
 
-// StagingCheckStatus checks if a specific item has staged changes.
+// StagingCheckStatusResult holds the result of checking staged status for an item.
 type StagingCheckStatusResult struct {
 	HasEntry bool `json:"hasEntry"`
 	HasTags  bool `json:"hasTags"`
@@ -610,6 +620,7 @@ func (a *App) StagingDiff(service string, name string) (*StagingDiffResult, erro
 		Strategy: strategy,
 		Store:    store,
 	}
+
 	result, err := uc.Execute(a.ctx, stagingusecase.DiffInput{Name: name})
 	if err != nil {
 		return nil, err
@@ -636,6 +647,7 @@ func (a *App) StagingDiff(service string, name string) (*StagingDiffResult, erro
 		case stagingusecase.DiffEntryWarning:
 			entry.Type = "warning"
 		}
+
 		entries[i] = entry
 	}
 
@@ -708,6 +720,7 @@ func (a *App) StagingFileStatus() (*StagingFileStatusResult, error) {
 		if err != nil {
 			return nil, err
 		}
+
 		result.Encrypted = encrypted
 	}
 
@@ -744,6 +757,7 @@ func (a *App) StagingDrain(service string, passphrase string, keep bool, force b
 		FileStore:  fileStore,
 		AgentStore: agentStore,
 	}
+
 	result, err := uc.Execute(a.ctx, stagingusecase.StashPopInput{
 		Service: svc,
 		Keep:    keep,
@@ -797,6 +811,7 @@ func (a *App) StagingPersist(service string, passphrase string, keep bool, mode 
 		AgentStore: agentStore,
 		FileStore:  fileStore,
 	}
+
 	result, err := uc.Execute(a.ctx, stagingusecase.StashPushInput{
 		Service: svc,
 		Keep:    keep,
@@ -833,6 +848,7 @@ func (a *App) StagingDrop() (*StagingDropResult, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	if !exists {
 		return nil, errors.New("no stashed changes to drop")
 	}

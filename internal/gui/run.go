@@ -14,12 +14,12 @@ func Run() error {
 
 	opts := &options.App{
 		Title:  "suve",
-		Width:  1024,
-		Height: 768,
+		Width:  1024, //nolint:mnd
+		Height: 768,  //nolint:mnd
 		AssetServer: &assetserver.Options{
 			Assets: Assets,
 		},
-		BackgroundColour: &options.RGBA{R: 27, G: 38, B: 54, A: 1},
+		BackgroundColour: &options.RGBA{R: 27, G: 38, B: 54, A: 1}, //nolint:mnd
 		OnStartup:        app.Startup,
 		Bind: []any{
 			app,

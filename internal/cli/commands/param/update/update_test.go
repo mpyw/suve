@@ -113,6 +113,7 @@ func TestRun(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, output string) {
+				t.Helper()
 				assert.Contains(t, output, "Updated parameter")
 				assert.Contains(t, output, "/app/param")
 				assert.Contains(t, output, "version: 2")

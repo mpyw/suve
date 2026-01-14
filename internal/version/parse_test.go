@@ -224,7 +224,7 @@ func TestParse(t *testing.T) {
 		t.Parallel()
 
 		_, err := version.Parse("/my/param#", parser)
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "# must be followed")
 	})
 
