@@ -17,7 +17,6 @@ GUI_DIR="$PROJECT_DIR/gui"
 
 # Cleanup function for trap
 WAILS_PID=""
-AGENT_PID=""
 cleanup() {
     echo ""
     echo "Cleaning up..."
@@ -25,10 +24,8 @@ cleanup() {
         echo "Stopping wails dev..."
         kill "$WAILS_PID" 2>/dev/null || true
     fi
-    if [[ -n "$AGENT_PID" ]]; then
-        echo "Stopping staging agent..."
-        kill "$AGENT_PID" 2>/dev/null || true
-    fi
+    echo "Stopping staging agent..."
+    "$PROJECT_DIR/bin/suve" stage agent stop 2>/dev/null || true
 }
 trap cleanup EXIT
 
@@ -87,11 +84,8 @@ export SUVE_DAEMON_MANUAL_MODE=1
 echo "Starting staging agent manually..."
 # Stop any existing daemon first (from previous runs)
 "$PROJECT_DIR/bin/suve" stage agent stop 2>/dev/null || true
-# Run daemon in background (agent start is a foreground/blocking command)
-"$PROJECT_DIR/bin/suve" stage agent start &
-AGENT_PID=$!
-# Wait for daemon to be ready
-sleep 1
+# Start daemon (auto-backgrounds via launcher)
+"$PROJECT_DIR/bin/suve" stage agent start
 
 # Start wails dev in background (same as make gui-dev)
 cd "$GUI_DIR"

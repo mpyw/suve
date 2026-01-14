@@ -58,10 +58,16 @@ Set ` + agentcfg.EnvDaemonManualMode + `=1 to enable manual mode (disables auto-
 				Name:  "region",
 				Usage: "AWS region (required, usually passed automatically)",
 			},
+			&cli.BoolFlag{
+				Name:   "foreground",
+				Usage:  "Run daemon in foreground (used internally by spawner)",
+				Hidden: true,
+			},
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			accountID := cmd.String("account")
 			region := cmd.String("region")
+			foreground := cmd.Bool("foreground")
 
 			// If not passed via flags, get from AWS identity
 			if accountID == "" || region == "" {
@@ -74,9 +80,31 @@ Set ` + agentcfg.EnvDaemonManualMode + `=1 to enable manual mode (disables auto-
 				region = identity.Region
 			}
 
-			runner := daemon.NewRunner(accountID, region, agentcfg.DaemonOptions()...)
+			// Foreground mode: run daemon directly (used by spawner)
+			if foreground {
+				runner := daemon.NewRunner(accountID, region, agentcfg.DaemonOptions()...)
 
-			return runner.Run(ctx)
+				return runner.Run(ctx)
+			}
+
+			// Background mode: spawn daemon via launcher
+			launcher := daemon.NewLauncher(accountID, region)
+
+			// Check if already running
+			if err := launcher.Ping(ctx); err == nil {
+				output.Println(cmd.Root().Writer, "Agent is already running")
+
+				return nil
+			}
+
+			// Start daemon in background
+			if err := launcher.EnsureRunning(ctx); err != nil {
+				return err
+			}
+
+			output.Println(cmd.Root().Writer, "Agent started")
+
+			return nil
 		},
 	}
 }

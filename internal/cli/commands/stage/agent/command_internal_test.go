@@ -66,6 +66,27 @@ func TestStartCommand_HasExpectedFlags(t *testing.T) {
 
 	assert.Contains(t, flagNames, "account")
 	assert.Contains(t, flagNames, "region")
+	assert.Contains(t, flagNames, "foreground")
+}
+
+func TestStartCommand_ForegroundFlagIsHidden(t *testing.T) {
+	t.Parallel()
+
+	cmd := startCommand()
+	require.NotNil(t, cmd)
+
+	// Find foreground flag and verify it's hidden
+	for _, f := range cmd.Flags {
+		if lo.Contains(f.Names(), "foreground") {
+			bf, ok := f.(*cli.BoolFlag)
+			require.True(t, ok, "foreground should be a BoolFlag")
+			assert.True(t, bf.Hidden, "foreground flag should be hidden")
+
+			return
+		}
+	}
+
+	t.Fatal("foreground flag not found")
 }
 
 func TestStopCommand(t *testing.T) {

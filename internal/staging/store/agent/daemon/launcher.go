@@ -34,7 +34,7 @@ func (s *defaultProcessSpawner) Spawn(accountID, region string) error {
 	}
 
 	//nolint:gosec,noctx // G204: executable is from os.Executable(), not user input; noctx: intentionally no context for background daemon
-	cmd := exec.Command(executable, "stage", "agent", "start", "--account", accountID, "--region", region)
+	cmd := exec.Command(executable, "stage", "agent", "start", "--foreground", "--account", accountID, "--region", region)
 	cmd.Stdout = nil
 	cmd.Stderr = nil
 	cmd.Stdin = nil
