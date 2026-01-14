@@ -14,9 +14,12 @@ import (
 )
 
 const (
-	localPeerCred    = 0x001 // LOCAL_PEERCRED
-	xucredSize       = 76    // sizeof(struct xucred) on Darwin
-	xucredUIDEndByte = 8     // End of cr_uid field in xucred structure
+	localPeerCred       = 0x001 // LOCAL_PEERCRED
+	xucredSize          = 76    // sizeof(struct xucred) on Darwin
+	xucredVersionOffset = 0     // Offset of cr_version field
+	xucredUIDOffset     = 4     // Offset of cr_uid field
+	xucredUIDEnd        = 8     // End of cr_uid field
+	xucredVersion       = 0     // Expected XUCRED_VERSION value
 )
 
 // VerifyPeerCredentials checks peer credentials on macOS using LOCAL_PEERCRED.
@@ -65,14 +68,22 @@ func VerifyPeerCredentials(conn net.Conn) error {
 			return
 		}
 
-		if bufLen < xucredUIDEndByte {
-			credErr = fmt.Errorf("invalid peer credentials: buffer too small")
+		if bufLen < xucredUIDEnd {
+			credErr = fmt.Errorf("invalid peer credentials: buffer too small (%d bytes)", bufLen)
 
 			return
 		}
 
-		// Extract UID from bytes 4-8 (little-endian on all Apple platforms)
-		peerUID = binary.LittleEndian.Uint32(buf[4:xucredUIDEndByte])
+		// Verify xucred structure version for forward compatibility
+		version := binary.LittleEndian.Uint32(buf[xucredVersionOffset:xucredUIDOffset])
+		if version != xucredVersion {
+			credErr = fmt.Errorf("unsupported xucred version: %d", version)
+
+			return
+		}
+
+		// Extract UID (little-endian on all Apple platforms)
+		peerUID = binary.LittleEndian.Uint32(buf[xucredUIDOffset:xucredUIDEnd])
 	})
 	if controlErr != nil {
 		return fmt.Errorf("failed to access socket: %w", controlErr)
