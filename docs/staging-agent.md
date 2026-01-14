@@ -182,13 +182,16 @@ When using `--merge`:
 
 The daemon verifies that connecting clients are running as the same user:
 
-| Platform | Mechanism |
-|----------|-----------|
-| Linux | `SO_PEERCRED` socket option |
-| macOS | `LOCAL_PEERPID` / peer credentials |
-| Windows | Named pipe security |
+| Platform | Mechanism | Description |
+|----------|-----------|-------------|
+| Linux | `SO_PEERCRED` | Socket option returns peer UID via `GetsockoptUcred` |
+| macOS | `LOCAL_PEERCRED` | `GetsockoptXucred` returns peer UID from `xucred` structure |
+| Windows | Socket ACLs | No peer credentials available; relies on socket file permissions |
 
 This prevents unauthorized processes from accessing your staged secrets.
+
+> **Note (Windows)**: Windows AF_UNIX sockets do not support peer credential verification.
+> Security relies on socket file ACLs and directory permissions (`0700`).
 
 ### Memory Protection
 
@@ -196,7 +199,19 @@ Sensitive data in daemon memory is protected using the [memguard](https://github
 
 - **mlock**: Prevents memory from being swapped to disk
 - **Guard pages**: Detects buffer overflows/underflows
-- **Secure destruction**: Overwrites memory on cleanup
+- **Secure destruction**: Uses `memguard.WipeBytes()` for cryptographically secure memory zeroing
+
+### Core Dump Prevention
+
+The daemon prevents sensitive data from leaking via crash dumps:
+
+| Platform | Mechanism | Description |
+|----------|-----------|-------------|
+| Linux | `prctl(PR_SET_DUMPABLE, 0)` | Disables core dump generation |
+| macOS | `setrlimit(RLIMIT_CORE, 0)` | Sets core dump size limit to zero |
+| Windows | `SetErrorMode(SEM_*)` | Disables Windows Error Reporting and minidump generation |
+
+This ensures that even if the daemon crashes, no sensitive data is written to disk.
 
 ### File Encryption
 
