@@ -21,10 +21,8 @@ func NewBuffer(data []byte) *Buffer {
 
 	enclave := memguard.NewEnclave(data)
 
-	// Zero the original data
-	for i := range data {
-		data[i] = 0
-	}
+	// Securely zero the original data (prevents compiler optimization from skipping)
+	memguard.WipeBytes(data)
 
 	return &Buffer{enclave: enclave}
 }

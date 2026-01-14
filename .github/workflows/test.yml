@@ -398,3 +398,143 @@ jobs:
           name: playwright-report-windows-latest
           path: internal/gui/frontend/playwright-report/
           retention-days: 30
+
+  platform-test:
+    name: Platform Test (${{ matrix.os }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: linux
+            runner: ubuntu-latest
+          - os: darwin
+            runner: macos-latest
+          - os: windows
+            runner: windows-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
+      - name: Find platform-specific packages
+        id: packages
+        shell: bash
+        run: |
+          # Find packages with platform-specific build tags (excluding gui and test files)
+          PACKAGES=$(grep -rl "//go:build" --include="*.go" . \
+            | grep -v "_test.go" \
+            | grep -v "/gui/" \
+            | grep -v "vendor" \
+            | xargs -I{} dirname {} \
+            | sort -u \
+            | sed 's|^\./|./|' \
+            | tr '\n' ' ')
+          echo "packages=$PACKAGES"
+          echo "packages=$PACKAGES" >> "$GITHUB_OUTPUT"
+
+      - name: Run platform-specific tests with coverage
+        shell: bash
+        run: |
+          COVERPKG=""
+          for pkg in ${{ steps.packages.outputs.packages }}; do
+            if [ -n "$COVERPKG" ]; then
+              COVERPKG="$COVERPKG,"
+            fi
+            COVERPKG="$COVERPKG$pkg/..."
+          done
+          echo "Coverage packages: $COVERPKG"
+          go test -v -race -coverprofile=coverage-platform-${{ matrix.os }}.txt -covermode=atomic -coverpkg="$COVERPKG" ${{ steps.packages.outputs.packages }}
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          files: ./coverage-platform-${{ matrix.os }}.txt
+          flags: platform-${{ matrix.os }}
+          name: codecov-suve-platform-${{ matrix.os }}
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+        continue-on-error: true
+
+  platform-lint:
+    name: Platform Lint (${{ matrix.os }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: linux
+            runner: ubuntu-latest
+          - os: darwin
+            runner: macos-latest
+          # Note: Windows excluded due to gci formatter false positives.
+          # Main Lint job (Linux) covers all essential checks.
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: '1.24'
+
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v9
+        with:
+          args: --timeout=5m
+
+  platform-build:
+    name: Platform Build (${{ matrix.goos }}/${{ matrix.goarch }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - goos: freebsd
+            goarch: amd64
+          - goos: freebsd
+            goarch: arm64
+          - goos: openbsd
+            goarch: amd64
+          - goos: netbsd
+            goarch: amd64
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
+      - name: Find platform-specific packages
+        id: packages
+        run: |
+          # Find packages with platform-specific build tags (excluding gui and test files)
+          PACKAGES=$(grep -rl "//go:build" --include="*.go" . \
+            | grep -v "_test.go" \
+            | grep -v "/gui/" \
+            | grep -v "vendor" \
+            | xargs -I{} dirname {} \
+            | sort -u \
+            | sed 's|^\./|./|' \
+            | tr '\n' ' ')
+          echo "packages=$PACKAGES"
+          echo "packages=$PACKAGES" >> "$GITHUB_OUTPUT"
+
+      - name: Build for ${{ matrix.goos }}/${{ matrix.goarch }}
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: "0"
+        run: |
+          echo "Building for $GOOS/$GOARCH..."
+          for pkg in ${{ steps.packages.outputs.packages }}; do
+            echo "Building $pkg..."
+            go build -v "$pkg/..."
+          done
+          echo "Build successful for $GOOS/$GOARCH"
