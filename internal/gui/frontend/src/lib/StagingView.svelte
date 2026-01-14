@@ -352,13 +352,8 @@
         return;
       }
 
-      if (fileStatus.encrypted) {
-        // File is encrypted, show passphrase modal
-        showDrainModal = true;
-      } else {
-        // File is not encrypted, show options modal directly
-        showDrainOptionsModal = true;
-      }
+      // Always show options modal first (for both encrypted and unencrypted)
+      showDrainOptionsModal = true;
     } catch (e) {
       error = parseError(e);
     }
@@ -380,6 +375,14 @@
   }
 
   async function handleDrainWithOptions() {
+    // If encrypted, we need to get passphrase first
+    if (fileStatus?.encrypted) {
+      showDrainOptionsModal = false;
+      showDrainModal = true;
+      return;
+    }
+
+    // Unencrypted file - proceed directly
     drainLoading = true;
     drainError = '';
     try {
@@ -965,21 +968,22 @@
         </label>
       </div>
       <div class="options-group">
-        <span class="options-label">Mode:</span>
         <label class="radio-label">
           <input type="radio" name="drainMode" value="merge" bind:group={drainMode} />
-          <span>Merge with existing changes</span>
+          <span>Merge</span>
+          <span class="option-desc">Combine with existing staged changes</span>
         </label>
         <label class="radio-label">
           <input type="radio" name="drainMode" value="overwrite" bind:group={drainMode} />
-          <span>Overwrite existing changes</span>
+          <span>Overwrite</span>
+          <span class="option-desc">Replace existing staged changes</span>
         </label>
       </div>
 
       <div class="form-actions">
         <button type="button" class="btn-secondary" onclick={closeDrainModal}>Cancel</button>
         <button type="button" class="btn-drain-action" onclick={handleDrainWithOptions} disabled={drainLoading}>
-          {drainLoading ? 'Loading...' : 'Load from File'}
+          {drainLoading ? 'Loading...' : (fileStatus?.encrypted ? 'Next (Enter Passphrase)' : 'Load from File')}
         </button>
       </div>
     {/if}
