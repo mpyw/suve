@@ -18,7 +18,7 @@ import (
 
 // Runner executes the reset command.
 type Runner struct {
-	Store  store.ReadWriteOperator
+	Store  store.ReadWriteOperator //nolint:staticcheck // using legacy interface during migration
 	Stdout io.Writer
 	Stderr io.Writer
 }
@@ -108,7 +108,7 @@ func (r *Runner) Run(ctx context.Context) error {
 	// Always call UnstageAll to trigger daemon auto-shutdown check
 	// Empty service ("") clears both SSM Parameter Store and Secrets Manager
 	// Use hint for context-aware shutdown message
-	if hinted, ok := r.Store.(store.HintedUnstager); ok {
+	if hinted, ok := r.Store.(store.HintedUnstager); ok { //nolint:staticcheck // using legacy interface
 		if err := hinted.UnstageAllWithHint(ctx, "", store.HintReset); err != nil {
 			return err
 		}

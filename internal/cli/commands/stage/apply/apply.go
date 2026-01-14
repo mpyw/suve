@@ -31,7 +31,7 @@ type serviceConflictCheck struct {
 type Runner struct {
 	ParamStrategy   staging.ApplyStrategy
 	SecretStrategy  staging.ApplyStrategy
-	Store           store.ReadWriteOperator
+	Store           store.ReadWriteOperator //nolint:staticcheck // using legacy interface during migration
 	Stdout          io.Writer
 	Stderr          io.Writer
 	IgnoreConflicts bool
@@ -291,7 +291,7 @@ func (r *Runner) applyService(ctx context.Context, strategy staging.ApplyStrateg
 				output.Success(r.Stdout, "%s: Deleted %s", serviceName, name)
 			}
 			// Use hint for context-aware shutdown message
-			if hinted, ok := r.Store.(store.HintedUnstager); ok {
+			if hinted, ok := r.Store.(store.HintedUnstager); ok { //nolint:staticcheck // using legacy interface
 				if err := hinted.UnstageEntryWithHint(ctx, service, name, store.HintApply); err != nil {
 					output.Warning(r.Stderr, "failed to clear staging for %s: %v", name, err)
 				}
@@ -327,7 +327,7 @@ func (r *Runner) applyTagService(ctx context.Context, strategy staging.ApplyStra
 		} else {
 			output.Success(r.Stdout, "%s: Tagged %s%s", serviceName, name, formatTagApplySummary(tagEntry))
 			// Use hint for context-aware shutdown message
-			if hinted, ok := r.Store.(store.HintedUnstager); ok {
+			if hinted, ok := r.Store.(store.HintedUnstager); ok { //nolint:staticcheck // using legacy interface
 				if err := hinted.UnstageTagWithHint(ctx, service, name, store.HintApply); err != nil {
 					output.Warning(r.Stderr, "failed to clear staging for %s tags: %v", name, err)
 				}

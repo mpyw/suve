@@ -64,7 +64,7 @@ func TestResetUseCase_Execute_Unstage(t *testing.T) {
 
 	uc := &usecasestaging.ResetUseCase{
 		Parser: newMockParser(),
-		Store:  store,
+		Store:  store.ForService(staging.ServiceParam),
 	}
 
 	output, err := uc.Execute(t.Context(), usecasestaging.ResetInput{
@@ -85,7 +85,7 @@ func TestResetUseCase_Execute_NotStaged(t *testing.T) {
 	store := testutil.NewMockStore()
 	uc := &usecasestaging.ResetUseCase{
 		Parser: newMockParser(),
-		Store:  store,
+		Store:  store.ForService(staging.ServiceParam),
 	}
 
 	output, err := uc.Execute(t.Context(), usecasestaging.ResetInput{
@@ -112,7 +112,7 @@ func TestResetUseCase_Execute_UnstageAll(t *testing.T) {
 
 	uc := &usecasestaging.ResetUseCase{
 		Parser: newMockParser(),
-		Store:  store,
+		Store:  store.ForService(staging.ServiceParam),
 	}
 
 	output, err := uc.Execute(t.Context(), usecasestaging.ResetInput{
@@ -134,7 +134,7 @@ func TestResetUseCase_Execute_UnstageAll_Empty(t *testing.T) {
 	store := testutil.NewMockStore()
 	uc := &usecasestaging.ResetUseCase{
 		Parser: newMockParser(),
-		Store:  store,
+		Store:  store.ForService(staging.ServiceParam),
 	}
 
 	output, err := uc.Execute(t.Context(), usecasestaging.ResetInput{
@@ -156,7 +156,7 @@ func TestResetUseCase_Execute_Restore(t *testing.T) {
 	uc := &usecasestaging.ResetUseCase{
 		Parser:  parser,
 		Fetcher: newMockResetStrategy(),
-		Store:   store,
+		Store:   store.ForService(staging.ServiceParam),
 	}
 
 	output, err := uc.Execute(t.Context(), usecasestaging.ResetInput{
@@ -184,7 +184,7 @@ func TestResetUseCase_Execute_Restore_NoFetcher(t *testing.T) {
 
 	uc := &usecasestaging.ResetUseCase{
 		Parser: parser,
-		Store:  store,
+		Store:  store.ForService(staging.ServiceParam),
 		// No Fetcher
 	}
 
@@ -209,7 +209,7 @@ func TestResetUseCase_Execute_Restore_FetchError(t *testing.T) {
 	uc := &usecasestaging.ResetUseCase{
 		Parser:  parser,
 		Fetcher: fetcher,
-		Store:   store,
+		Store:   store.ForService(staging.ServiceParam),
 	}
 
 	_, err := uc.Execute(t.Context(), usecasestaging.ResetInput{
@@ -240,7 +240,7 @@ func TestResetUseCase_Execute_ParseError(t *testing.T) {
 
 	uc := &usecasestaging.ResetUseCase{
 		Parser: parser,
-		Store:  store,
+		Store:  store.ForService(staging.ServiceParam),
 	}
 
 	_, err := uc.Execute(t.Context(), usecasestaging.ResetInput{
@@ -267,7 +267,7 @@ func TestResetUseCase_Execute_ListError(t *testing.T) {
 
 	uc := &usecasestaging.ResetUseCase{
 		Parser: newMockParser(),
-		Store:  store,
+		Store:  store.ForService(staging.ServiceParam),
 	}
 
 	_, err := uc.Execute(t.Context(), usecasestaging.ResetInput{All: true})
@@ -286,7 +286,7 @@ func TestResetUseCase_Execute_UnstageAllError(t *testing.T) {
 
 	uc := &usecasestaging.ResetUseCase{
 		Parser: newMockParser(),
-		Store:  store,
+		Store:  store.ForService(staging.ServiceParam),
 	}
 
 	_, err := uc.Execute(t.Context(), usecasestaging.ResetInput{All: true})
@@ -302,7 +302,7 @@ func TestResetUseCase_Execute_GetError(t *testing.T) {
 
 	uc := &usecasestaging.ResetUseCase{
 		Parser: newMockParser(),
-		Store:  store,
+		Store:  store.ForService(staging.ServiceParam),
 	}
 
 	_, err := uc.Execute(t.Context(), usecasestaging.ResetInput{Spec: "/app/config"})
@@ -321,7 +321,7 @@ func TestResetUseCase_Execute_UnstageError(t *testing.T) {
 
 	uc := &usecasestaging.ResetUseCase{
 		Parser: newMockParser(),
-		Store:  store,
+		Store:  store.ForService(staging.ServiceParam),
 	}
 
 	_, err := uc.Execute(t.Context(), usecasestaging.ResetInput{Spec: "/app/config"})
@@ -343,7 +343,7 @@ func TestResetUseCase_Execute_RestoreStageError(t *testing.T) {
 	uc := &usecasestaging.ResetUseCase{
 		Parser:  parser,
 		Fetcher: newMockResetStrategy(),
-		Store:   store,
+		Store:   store.ForService(staging.ServiceParam),
 	}
 
 	_, err := uc.Execute(t.Context(), usecasestaging.ResetInput{Spec: "/app/config#3"})
@@ -369,7 +369,7 @@ func TestResetUseCase_Execute_RestoreSkipped_SameAsAWS(t *testing.T) {
 	uc := &usecasestaging.ResetUseCase{
 		Parser:  parser,
 		Fetcher: fetcher,
-		Store:   store,
+		Store:   store.ForService(staging.ServiceParam),
 	}
 
 	output, err := uc.Execute(t.Context(), usecasestaging.ResetInput{
@@ -402,7 +402,7 @@ func TestResetUseCase_Execute_RestoreNotSkipped_DifferentFromAWS(t *testing.T) {
 	uc := &usecasestaging.ResetUseCase{
 		Parser:  parser,
 		Fetcher: fetcher,
-		Store:   store,
+		Store:   store.ForService(staging.ServiceParam),
 	}
 
 	output, err := uc.Execute(t.Context(), usecasestaging.ResetInput{
@@ -433,7 +433,7 @@ func TestResetUseCase_Execute_RestoreFetchCurrentError(t *testing.T) {
 	uc := &usecasestaging.ResetUseCase{
 		Parser:  parser,
 		Fetcher: fetcher,
-		Store:   store,
+		Store:   store.ForService(staging.ServiceParam),
 	}
 
 	_, err := uc.Execute(t.Context(), usecasestaging.ResetInput{
@@ -464,7 +464,7 @@ func TestResetUseCase_Execute_UnstageAll_WithHintedUnstager(t *testing.T) {
 
 	uc := &usecasestaging.ResetUseCase{
 		Parser: newMockParser(),
-		Store:  store,
+		Store:  store.ForService(staging.ServiceParam),
 	}
 
 	output, err := uc.Execute(t.Context(), usecasestaging.ResetInput{
@@ -494,7 +494,7 @@ func TestResetUseCase_Execute_UnstageAll_WithHintedUnstager_Error(t *testing.T) 
 
 	uc := &usecasestaging.ResetUseCase{
 		Parser: newMockParser(),
-		Store:  store,
+		Store:  store.ForService(staging.ServiceParam),
 	}
 
 	_, err := uc.Execute(t.Context(), usecasestaging.ResetInput{All: true})
@@ -508,7 +508,7 @@ func TestResetUseCase_Execute_UnstageAll_Empty_WithHintedUnstager(t *testing.T) 
 	store := testutil.NewHintedMockStore()
 	uc := &usecasestaging.ResetUseCase{
 		Parser: newMockParser(),
-		Store:  store,
+		Store:  store.ForService(staging.ServiceParam),
 	}
 
 	output, err := uc.Execute(t.Context(), usecasestaging.ResetInput{
@@ -537,7 +537,7 @@ func TestResetUseCase_Execute_UnstageAll_WithTags(t *testing.T) {
 
 	uc := &usecasestaging.ResetUseCase{
 		Parser: newMockParser(),
-		Store:  store,
+		Store:  store.ForService(staging.ServiceParam),
 	}
 
 	output, err := uc.Execute(t.Context(), usecasestaging.ResetInput{
@@ -565,7 +565,7 @@ func TestResetUseCase_Execute_ListTagsError(t *testing.T) {
 
 	uc := &usecasestaging.ResetUseCase{
 		Parser: newMockParser(),
-		Store:  store,
+		Store:  store.ForService(staging.ServiceParam),
 	}
 
 	_, err := uc.Execute(t.Context(), usecasestaging.ResetInput{All: true})

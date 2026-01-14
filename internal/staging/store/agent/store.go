@@ -11,6 +11,8 @@ type StoreOption = client.StoreOption
 // NewStore creates an AgentStore using the agent daemon.
 // The agent daemon is started automatically if not running, unless
 // manual mode is enabled (see [EnvDaemonManualMode]).
+//
+//nolint:staticcheck // returns legacy interface for backward compatibility
 func NewStore(accountID, region string, opts ...StoreOption) store.AgentStore {
 	opts = append(ClientOptions(), opts...)
 

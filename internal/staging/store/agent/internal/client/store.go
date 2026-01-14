@@ -340,11 +340,13 @@ func (s *Store) Start(ctx context.Context) error {
 }
 
 // Compile-time checks.
+//
+//nolint:staticcheck // intentionally using legacy interfaces during migration
 var (
-	_ store.ReadWriteOperator = (*Store)(nil)
-	_ store.Drainer           = (*Store)(nil)
-	_ store.Writer            = (*Store)(nil)
-	_ store.HintedUnstager    = (*Store)(nil)
-	_ lifecycle.Pinger        = (*Store)(nil)
-	_ lifecycle.Starter       = (*Store)(nil)
+	_ store.LegacyReadWriteOperator = (*Store)(nil)
+	_ store.LegacyDrainer           = (*Store)(nil)
+	_ store.LegacyWriter            = (*Store)(nil)
+	_ store.LegacyHintedUnstager    = (*Store)(nil)
+	_ lifecycle.Pinger              = (*Store)(nil)
+	_ lifecycle.Starter             = (*Store)(nil)
 )

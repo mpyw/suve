@@ -24,6 +24,8 @@ key_types:
     role: Commands that only access file storage (stash show, stash drop)
   - name: Result[T]
     role: Generic result type for read commands with NothingStaged flag
+  - name: ReadResult
+    role: Non-generic result type for error-only read commands
   - name: Pinger
     role: Interface for checking agent status without starting
   - name: Starter
@@ -31,8 +33,8 @@ key_types:
 
 files:
   - command.go   # Command type definitions (WriteCommand, ReadCommand, FileCommand)
-  - result.go    # Result[T] generic type
-  - executor.go  # ExecuteWrite, ExecuteRead, ExecuteFile functions
+  - result.go    # Result[T], ReadResult types
+  - executor.go  # ExecuteWrite, ExecuteRead, ExecuteFile + error-only variants
 
 dependencies:
   internal: []
@@ -140,6 +142,44 @@ func ExecuteFile[T any](
 
 - Simply executes the action and returns result
 - No agent interaction
+
+## Error-Only Variants
+
+For actions that only return an error (no value), use these variants to avoid the `struct{}{}` pattern:
+
+### ExecuteWriteErr
+
+```go
+func ExecuteWriteErr(
+    ctx context.Context,
+    starter Starter,
+    _ WriteCommand,
+    action func() error,
+) error
+```
+
+### ExecuteReadErr
+
+```go
+func ExecuteReadErr(
+    ctx context.Context,
+    pinger Pinger,
+    _ ReadCommand,
+    action func() error,
+) (ReadResult, error)
+```
+
+Returns `ReadResult` instead of `Result[T]` to indicate whether nothing was staged.
+
+### ExecuteFileErr
+
+```go
+func ExecuteFileErr(
+    _ context.Context,
+    _ FileCommand,
+    action func() error,
+) error
+```
 
 ## Usage Example
 

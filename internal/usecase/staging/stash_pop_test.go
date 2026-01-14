@@ -31,8 +31,8 @@ func TestDrainUseCase_Execute(t *testing.T) {
 		})
 
 		usecase := &stagingusecase.StashPopUseCase{
-			FileStore:  fileStore,
-			AgentStore: agentStore,
+			FileStore:  fileStore.Global(),
+			AgentStore: agentStore.Global(),
 		}
 
 		output, err := usecase.Execute(t.Context(), stagingusecase.StashPopInput{})
@@ -63,8 +63,8 @@ func TestDrainUseCase_Execute(t *testing.T) {
 		})
 
 		usecase := &stagingusecase.StashPopUseCase{
-			FileStore:  fileStore,
-			AgentStore: agentStore,
+			FileStore:  fileStore.Global(),
+			AgentStore: agentStore.Global(),
 		}
 
 		_, err := usecase.Execute(t.Context(), stagingusecase.StashPopInput{Keep: true})
@@ -95,8 +95,8 @@ func TestDrainUseCase_Execute(t *testing.T) {
 		})
 
 		usecase := &stagingusecase.StashPopUseCase{
-			FileStore:  fileStore,
-			AgentStore: agentStore,
+			FileStore:  fileStore.Global(),
+			AgentStore: agentStore.Global(),
 		}
 
 		output, err := usecase.Execute(t.Context(), stagingusecase.StashPopInput{Merge: true})
@@ -128,8 +128,8 @@ func TestDrainUseCase_Execute(t *testing.T) {
 		})
 
 		usecase := &stagingusecase.StashPopUseCase{
-			FileStore:  fileStore,
-			AgentStore: agentStore,
+			FileStore:  fileStore.Global(),
+			AgentStore: agentStore.Global(),
 		}
 
 		_, err := usecase.Execute(t.Context(), stagingusecase.StashPopInput{Force: true})
@@ -147,8 +147,8 @@ func TestDrainUseCase_Execute(t *testing.T) {
 		agentStore := testutil.NewMockStore()
 
 		usecase := &stagingusecase.StashPopUseCase{
-			FileStore:  fileStore,
-			AgentStore: agentStore,
+			FileStore:  fileStore.Global(),
+			AgentStore: agentStore.Global(),
 		}
 
 		_, err := usecase.Execute(t.Context(), stagingusecase.StashPopInput{})
@@ -173,8 +173,8 @@ func TestDrainUseCase_Execute(t *testing.T) {
 		})
 
 		usecase := &stagingusecase.StashPopUseCase{
-			FileStore:  fileStore,
-			AgentStore: agentStore,
+			FileStore:  fileStore.Global(),
+			AgentStore: agentStore.Global(),
 		}
 
 		_, err := usecase.Execute(t.Context(), stagingusecase.StashPopInput{})
@@ -199,8 +199,8 @@ func TestDrainUseCase_Execute(t *testing.T) {
 		})
 
 		usecase := &stagingusecase.StashPopUseCase{
-			FileStore:  fileStore,
-			AgentStore: agentStore,
+			FileStore:  fileStore.Global(),
+			AgentStore: agentStore.Global(),
 		}
 
 		_, err := usecase.Execute(t.Context(), stagingusecase.StashPopInput{Service: staging.ServiceParam})
@@ -227,8 +227,8 @@ func TestDrainUseCase_Execute(t *testing.T) {
 		})
 
 		usecase := &stagingusecase.StashPopUseCase{
-			FileStore:  fileStore,
-			AgentStore: agentStore,
+			FileStore:  fileStore.Global(),
+			AgentStore: agentStore.Global(),
 		}
 
 		output, err := usecase.Execute(t.Context(), stagingusecase.StashPopInput{})
@@ -253,8 +253,8 @@ func TestDrainUseCase_Execute_Errors(t *testing.T) {
 		agentStore := testutil.NewMockStore()
 
 		usecase := &stagingusecase.StashPopUseCase{
-			FileStore:  fileStore,
-			AgentStore: agentStore,
+			FileStore:  fileStore.Global(),
+			AgentStore: agentStore.Global(),
 		}
 
 		_, err := usecase.Execute(t.Context(), stagingusecase.StashPopInput{})
@@ -278,8 +278,8 @@ func TestDrainUseCase_Execute_Errors(t *testing.T) {
 		agentStore.WriteStateErr = errors.New("write error")
 
 		usecase := &stagingusecase.StashPopUseCase{
-			FileStore:  fileStore,
-			AgentStore: agentStore,
+			FileStore:  fileStore.Global(),
+			AgentStore: agentStore.Global(),
 		}
 
 		_, err := usecase.Execute(t.Context(), stagingusecase.StashPopInput{})
@@ -358,8 +358,8 @@ func TestDrainUseCase_ServiceSpecific_FileDeleteErrors(t *testing.T) {
 		})
 
 		usecase := &stagingusecase.StashPopUseCase{
-			FileStore:  fileStore,
-			AgentStore: agentStore,
+			FileStore:  fileStore.Global(),
+			AgentStore: agentStore.Global(),
 		}
 
 		// Make WriteState fail (for writing back remaining state)
@@ -407,8 +407,8 @@ func TestDrainUseCase_ServiceSpecific_MergeWithAgentState(t *testing.T) {
 		})
 
 		usecase := &stagingusecase.StashPopUseCase{
-			FileStore:  fileStore,
-			AgentStore: agentStore,
+			FileStore:  fileStore.Global(),
+			AgentStore: agentStore.Global(),
 		}
 
 		_, err := usecase.Execute(t.Context(), stagingusecase.StashPopInput{
@@ -441,8 +441,8 @@ func TestDrainUseCase_AgentDrainError_TreatedAsEmpty(t *testing.T) {
 	agentStore.DrainErr = errors.New("agent not available")
 
 	usecase := &stagingusecase.StashPopUseCase{
-		FileStore:  fileStore,
-		AgentStore: agentStore,
+		FileStore:  fileStore.Global(),
+		AgentStore: agentStore.Global(),
 	}
 
 	// Should succeed because agent drain error is treated as empty state
@@ -476,8 +476,8 @@ func TestDrainUseCase_ServiceSpecific_FileDeleteDrainError(t *testing.T) {
 		fileStore.DrainErrOnCall = 2 // Fail on second Drain call only
 
 		usecase := &stagingusecase.StashPopUseCase{
-			FileStore:  fileStore,
-			AgentStore: agentStore,
+			FileStore:  fileStore.Global(),
+			AgentStore: agentStore.Global(),
 		}
 
 		// Execute should succeed with non-fatal error (state already transferred)
@@ -511,8 +511,8 @@ func TestDrainUseCase_ServiceSpecific_FileDeleteDrainError(t *testing.T) {
 		fileStore.DrainErrOnCall = 2 // Fail on second Drain call only
 
 		usecase := &stagingusecase.StashPopUseCase{
-			FileStore:  fileStore,
-			AgentStore: agentStore,
+			FileStore:  fileStore.Global(),
+			AgentStore: agentStore.Global(),
 		}
 
 		// Execute should succeed with non-fatal error (state already transferred)

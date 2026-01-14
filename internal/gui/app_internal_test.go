@@ -30,7 +30,7 @@ func TestNewApp(t *testing.T) {
 	// Verify fields are nil (lazy initialization)
 	assert.Nil(t, app.paramClient)
 	assert.Nil(t, app.secretClient)
-	assert.Nil(t, app.stagingStore)
+	assert.Nil(t, app.stagingFactory)
 }
 
 func TestApp_Startup(t *testing.T) {

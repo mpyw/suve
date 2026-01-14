@@ -18,7 +18,7 @@ import (
 
 // StashShowRunner executes stash show operations.
 type StashShowRunner struct {
-	FileStore store.FileStore
+	FileStore store.FileStore //nolint:staticcheck // using legacy interface during migration
 	Stdout    io.Writer
 	Stderr    io.Writer
 }
@@ -118,7 +118,7 @@ func stashShowAction(service staging.Service) func(context.Context, *cli.Command
 
 		_, err = lifecycle.ExecuteFile(ctx, lifecycle.CmdStashShow, func() (struct{}, error) {
 			// V3: Use service-specific store or composite store for global operations
-			var fileStore store.FileStore
+			var fileStore store.FileStore //nolint:staticcheck // using legacy interface during migration
 			if service != "" {
 				fileStore, err = fileStoreForReading(cmd, identity.AccountID, identity.Region, service, true)
 			} else {

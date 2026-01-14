@@ -190,3 +190,14 @@ func fileStoresForReading(cmd *cli.Command, accountID, region string, checkExist
 
 	return file.NewStoresWithPassphrase(accountID, region, pass)
 }
+
+// fileFactoryForReading creates a file factory for reading with passphrase handling.
+// If checkExists is true, returns an error if no stash files exist.
+func fileFactoryForReading(cmd *cli.Command, accountID, region string, checkExists bool) (*file.Factory, error) {
+	stores, err := fileStoresForReading(cmd, accountID, region, checkExists)
+	if err != nil {
+		return nil, err
+	}
+
+	return file.NewFactoryFromStores(stores), nil
+}

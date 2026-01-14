@@ -14,7 +14,6 @@ import (
 	"github.com/mpyw/suve/internal/cli/terminal"
 	"github.com/mpyw/suve/internal/infra"
 	"github.com/mpyw/suve/internal/staging"
-	"github.com/mpyw/suve/internal/staging/store"
 	"github.com/mpyw/suve/internal/staging/store/agent"
 	"github.com/mpyw/suve/internal/staging/store/agent/daemon/lifecycle"
 	"github.com/mpyw/suve/internal/staging/store/file"
@@ -112,9 +111,9 @@ func stashPushAction(service staging.Service) func(context.Context, *cli.Command
 			return fmt.Errorf("failed to get AWS identity: %w", err)
 		}
 
-		agentStore := agent.NewStore(identity.AccountID, identity.Region)
+		agentFactory := agent.NewFactory(identity.AccountID, identity.Region)
 
-		result, err := lifecycle.ExecuteRead(ctx, agentStore, lifecycle.CmdStashPush, func() (struct{}, error) {
+		result, err := lifecycle.ExecuteRead(ctx, agentFactory, lifecycle.CmdStashPush, func() (struct{}, error) {
 			// V3: Check if stash file(s) already exist
 			var (
 				anyExists      bool
@@ -232,27 +231,18 @@ func stashPushAction(service staging.Service) func(context.Context, *cli.Command
 				// pass remains empty = plain text
 			}
 
-			// V3: Create service-specific store or composite store
-			var fileStore store.FileStore
-			if service != "" {
-				fileStore, err = file.NewStoreWithPassphrase(identity.AccountID, identity.Region, service, pass)
-			} else {
-				var stores map[staging.Service]*file.Store
-
-				stores, err = file.NewStoresWithPassphrase(identity.AccountID, identity.Region, pass)
-				if err == nil {
-					fileStore = file.NewCompositeStore(stores)
-				}
-			}
-
+			// Create file stores with passphrase and wrap in factory
+			stores, err := file.NewStoresWithPassphrase(identity.AccountID, identity.Region, pass)
 			if err != nil {
 				return struct{}{}, fmt.Errorf("failed to create file store: %w", err)
 			}
 
+			fileFactory := file.NewFactoryFromStores(stores)
+
 			r := &StashPushRunner{
 				UseCase: &usestaging.StashPushUseCase{
-					AgentStore: agentStore,
-					FileStore:  fileStore,
+					AgentStore: agentFactory.Global(),
+					FileStore:  fileFactory.Global(),
 				},
 				Stdout:    cmd.Root().Writer,
 				Stderr:    cmd.Root().ErrWriter,

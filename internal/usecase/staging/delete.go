@@ -30,12 +30,11 @@ type DeleteOutput struct {
 // DeleteUseCase executes delete staging operations.
 type DeleteUseCase struct {
 	Strategy staging.DeleteStrategy
-	Store    store.ReadWriteOperator
+	Store    store.ServiceReadWriter
 }
 
 // Execute runs the delete use case.
 func (u *DeleteUseCase) Execute(ctx context.Context, input DeleteInput) (*DeleteOutput, error) {
-	service := u.Strategy.Service()
 	itemName := u.Strategy.ItemName()
 	hasDeleteOptions := u.Strategy.HasDeleteOptions()
 
@@ -61,7 +60,7 @@ func (u *DeleteUseCase) Execute(ctx context.Context, input DeleteInput) (*Delete
 	}
 
 	// Load current state with CurrentValue for existence check
-	entryState, err := transition.LoadEntryState(ctx, u.Store, service, input.Name, currentValue)
+	entryState, err := transition.LoadEntryState(ctx, u.Store, input.Name, currentValue)
 	if err != nil {
 		return nil, err
 	}
@@ -75,11 +74,11 @@ func (u *DeleteUseCase) Execute(ctx context.Context, input DeleteInput) (*Delete
 	// Check if we should unstage a CREATE
 	if result.DiscardTags {
 		// CREATE -> NotStaged: unstage entry and tags
-		if err := u.Store.UnstageEntry(ctx, service, input.Name); err != nil {
+		if err := u.Store.UnstageEntry(ctx, input.Name); err != nil {
 			return nil, err
 		}
 		// Unstage tags too (ignore ErrNotStaged)
-		if err := u.Store.UnstageTag(ctx, service, input.Name); err != nil && !errors.Is(err, staging.ErrNotStaged) {
+		if err := u.Store.UnstageTag(ctx, input.Name); err != nil && !errors.Is(err, staging.ErrNotStaged) {
 			return nil, err
 		}
 
@@ -90,7 +89,7 @@ func (u *DeleteUseCase) Execute(ctx context.Context, input DeleteInput) (*Delete
 	}
 
 	// Stage delete with options (single persist)
-	if err := u.stageDeleteWithOptions(ctx, service, input.Name, lastModified, hasDeleteOptions, input.Force, input.RecoveryWindow); err != nil {
+	if err := u.stageDeleteWithOptions(ctx, input.Name, lastModified, hasDeleteOptions, input.Force, input.RecoveryWindow); err != nil {
 		return nil, err
 	}
 
@@ -109,7 +108,7 @@ func (u *DeleteUseCase) Execute(ctx context.Context, input DeleteInput) (*Delete
 // stageDeleteWithOptions stages a delete entry with optional delete options.
 //
 //nolint:lll // function parameters are descriptive for clarity
-func (u *DeleteUseCase) stageDeleteWithOptions(ctx context.Context, service staging.Service, name string, lastModified time.Time, hasDeleteOptions, force bool, recoveryWindow int) error {
+func (u *DeleteUseCase) stageDeleteWithOptions(ctx context.Context, name string, lastModified time.Time, hasDeleteOptions, force bool, recoveryWindow int) error {
 	entry := staging.Entry{
 		Operation: staging.OperationDelete,
 		StagedAt:  time.Now(),
@@ -125,5 +124,5 @@ func (u *DeleteUseCase) stageDeleteWithOptions(ctx context.Context, service stag
 		}
 	}
 
-	return u.Store.StageEntry(ctx, service, name, entry)
+	return u.Store.StageEntry(ctx, name, entry)
 }

@@ -38,14 +38,14 @@ type StashPushOutput struct {
 
 // StashPushUseCase executes persist operations (agent -> file).
 type StashPushUseCase struct {
-	AgentStore store.AgentStore
-	FileStore  store.FileStore
+	AgentStore store.GlobalStore
+	FileStore  store.DrainWriter
 }
 
 // Execute runs the persist use case.
 func (u *StashPushUseCase) Execute(ctx context.Context, input StashPushInput) (*StashPushOutput, error) {
 	// Drain state from agent (keep for now, will clear after successful file write if needed)
-	agentState, err := u.AgentStore.Drain(ctx, "", true)
+	agentState, err := u.AgentStore.Drain(ctx, true)
 	if err != nil {
 		return nil, &StashPushError{Op: "load", Err: err}
 	}
@@ -63,7 +63,7 @@ func (u *StashPushUseCase) Execute(ctx context.Context, input StashPushInput) (*
 
 	if input.Mode == StashPushModeMerge || input.Service != "" {
 		// Merge mode or service-specific: merge with existing file state
-		fileState, err := u.FileStore.Drain(ctx, "", true)
+		fileState, err := u.FileStore.Drain(ctx, true)
 		if err != nil {
 			// File might not exist, which is fine - start fresh
 			fileState = staging.NewEmptyState()
@@ -81,7 +81,7 @@ func (u *StashPushUseCase) Execute(ctx context.Context, input StashPushInput) (*
 	}
 
 	// Write to file
-	if err := u.FileStore.WriteState(ctx, "", finalState); err != nil {
+	if err := u.FileStore.WriteState(ctx, finalState); err != nil {
 		return nil, &StashPushError{Op: "write", Err: err}
 	}
 
@@ -107,16 +107,16 @@ func (u *StashPushUseCase) Execute(ctx context.Context, input StashPushInput) (*
 			// Remove only the persisted service from agent, keep the rest
 			agentState.RemoveService(input.Service)
 
-			if err := u.AgentStore.WriteState(ctx, "", agentState); err != nil {
+			if err := u.AgentStore.WriteState(ctx, agentState); err != nil {
 				return output, &StashPushError{Op: "clear", Err: err, NonFatal: true}
 			}
 		} else {
 			// Clear all memory with persist hint for proper shutdown message
-			if hinted, ok := u.AgentStore.(store.HintedUnstager); ok {
-				if err := hinted.UnstageAllWithHint(ctx, "", store.HintPersist); err != nil {
+			if hinted, ok := u.AgentStore.(store.HintedGlobalUnstager); ok {
+				if err := hinted.UnstageAllWithHint(ctx, store.HintPersist); err != nil {
 					return output, &StashPushError{Op: "clear", Err: err, NonFatal: true}
 				}
-			} else if err := u.AgentStore.UnstageAll(ctx, ""); err != nil {
+			} else if err := u.AgentStore.UnstageAll(ctx); err != nil {
 				return output, &StashPushError{Op: "clear", Err: err, NonFatal: true}
 			}
 		}

@@ -147,18 +147,18 @@ type StagingDiffTagEntry struct {
 
 // StagingStatus gets the current staging status.
 func (a *App) StagingStatus() (*StagingStatusResult, error) {
-	store, err := a.getStagingStore()
-	if err != nil {
-		return nil, err
-	}
-
 	paramParser, _ := a.getParser(string(staging.ServiceParam))
 	secretParser, _ := a.getParser(string(staging.ServiceSecret))
 
 	// SSM Parameter Store status
+	paramStore, err := a.getStagingStoreForService(staging.ServiceParam)
+	if err != nil {
+		return nil, err
+	}
+
 	paramUC := &stagingusecase.StatusUseCase{
 		Strategy: paramParser,
-		Store:    store,
+		Store:    paramStore,
 	}
 
 	paramResult, err := paramUC.Execute(a.ctx, stagingusecase.StatusInput{})
@@ -167,9 +167,14 @@ func (a *App) StagingStatus() (*StagingStatusResult, error) {
 	}
 
 	// Secrets Manager status
+	secretStore, err := a.getStagingStoreForService(staging.ServiceSecret)
+	if err != nil {
+		return nil, err
+	}
+
 	secretUC := &stagingusecase.StatusUseCase{
 		Strategy: secretParser,
-		Store:    store,
+		Store:    secretStore,
 	}
 
 	secretResult, err := secretUC.Execute(a.ctx, stagingusecase.StatusInput{})
@@ -225,7 +230,12 @@ func (a *App) StagingStatus() (*StagingStatusResult, error) {
 
 // StagingApply applies staged changes for a service.
 func (a *App) StagingApply(service string, ignoreConflicts bool) (*StagingApplyResult, error) {
-	store, err := a.getStagingStore()
+	serviceEnum, err := a.getService(service)
+	if err != nil {
+		return nil, err
+	}
+
+	store, err := a.getStagingStoreForService(serviceEnum)
 	if err != nil {
 		return nil, err
 	}
@@ -291,7 +301,12 @@ func (a *App) StagingApply(service string, ignoreConflicts bool) (*StagingApplyR
 
 // StagingReset resets (unstages) all staged changes for a service.
 func (a *App) StagingReset(service string) (*StagingResetResult, error) {
-	store, err := a.getStagingStore()
+	serviceEnum, err := a.getService(service)
+	if err != nil {
+		return nil, err
+	}
+
+	store, err := a.getStagingStoreForService(serviceEnum)
 	if err != nil {
 		return nil, err
 	}
@@ -337,7 +352,12 @@ func (a *App) StagingReset(service string) (*StagingResetResult, error) {
 
 // StagingAdd stages a create operation for a new item.
 func (a *App) StagingAdd(service, name, value string) (*StagingAddResult, error) {
-	store, err := a.getStagingStore()
+	serviceEnum, err := a.getService(service)
+	if err != nil {
+		return nil, err
+	}
+
+	store, err := a.getStagingStoreForService(serviceEnum)
 	if err != nil {
 		return nil, err
 	}
@@ -365,7 +385,12 @@ func (a *App) StagingAdd(service, name, value string) (*StagingAddResult, error)
 
 // StagingEdit stages an update operation for an existing item.
 func (a *App) StagingEdit(service, name, value string) (*StagingEditResult, error) {
-	store, err := a.getStagingStore()
+	serviceEnum, err := a.getService(service)
+	if err != nil {
+		return nil, err
+	}
+
+	store, err := a.getStagingStoreForService(serviceEnum)
 	if err != nil {
 		return nil, err
 	}
@@ -393,7 +418,12 @@ func (a *App) StagingEdit(service, name, value string) (*StagingEditResult, erro
 
 // StagingDelete stages a delete operation for an existing item.
 func (a *App) StagingDelete(service, name string, force bool, recoveryWindow int) (*StagingDeleteResult, error) {
-	store, err := a.getStagingStore()
+	serviceEnum, err := a.getService(service)
+	if err != nil {
+		return nil, err
+	}
+
+	store, err := a.getStagingStoreForService(serviceEnum)
 	if err != nil {
 		return nil, err
 	}
@@ -422,23 +452,23 @@ func (a *App) StagingDelete(service, name string, force bool, recoveryWindow int
 
 // StagingUnstage removes an item from staging (both entry and tags).
 func (a *App) StagingUnstage(service, name string) (*StagingUnstageResult, error) {
-	store, err := a.getStagingStore()
+	serviceEnum, err := a.getService(service)
 	if err != nil {
 		return nil, err
 	}
 
-	svc, err := a.getService(service)
+	store, err := a.getStagingStoreForService(serviceEnum)
 	if err != nil {
 		return nil, err
 	}
 
 	// Unstage entry (ignore ErrNotStaged)
-	if err := store.UnstageEntry(a.ctx, svc, name); err != nil && !errors.Is(err, staging.ErrNotStaged) {
+	if err := store.UnstageEntry(a.ctx, name); err != nil && !errors.Is(err, staging.ErrNotStaged) {
 		return nil, err
 	}
 
 	// Unstage tags (ignore ErrNotStaged)
-	if err := store.UnstageTag(a.ctx, svc, name); err != nil && !errors.Is(err, staging.ErrNotStaged) {
+	if err := store.UnstageTag(a.ctx, name); err != nil && !errors.Is(err, staging.ErrNotStaged) {
 		return nil, err
 	}
 
@@ -447,7 +477,12 @@ func (a *App) StagingUnstage(service, name string) (*StagingUnstageResult, error
 
 // StagingAddTag stages adding a tag to an item.
 func (a *App) StagingAddTag(service, name, key, value string) (*StagingAddTagResult, error) {
-	store, err := a.getStagingStore()
+	serviceEnum, err := a.getService(service)
+	if err != nil {
+		return nil, err
+	}
+
+	store, err := a.getStagingStoreForService(serviceEnum)
 	if err != nil {
 		return nil, err
 	}
@@ -475,7 +510,12 @@ func (a *App) StagingAddTag(service, name, key, value string) (*StagingAddTagRes
 
 // StagingRemoveTag stages removing a tag from an item.
 func (a *App) StagingRemoveTag(service, name, key string) (*StagingRemoveTagResult, error) {
-	store, err := a.getStagingStore()
+	serviceEnum, err := a.getService(service)
+	if err != nil {
+		return nil, err
+	}
+
+	store, err := a.getStagingStoreForService(serviceEnum)
 	if err != nil {
 		return nil, err
 	}
@@ -503,18 +543,18 @@ func (a *App) StagingRemoveTag(service, name, key string) (*StagingRemoveTagResu
 
 // StagingCancelAddTag cancels a staged tag addition (removes from Add only).
 func (a *App) StagingCancelAddTag(service, name, key string) (*StagingCancelAddTagResult, error) {
-	store, err := a.getStagingStore()
+	serviceEnum, err := a.getService(service)
 	if err != nil {
 		return nil, err
 	}
 
-	svc, err := a.getService(service)
+	store, err := a.getStagingStoreForService(serviceEnum)
 	if err != nil {
 		return nil, err
 	}
 
 	// Get existing tag entry
-	tagEntry, err := store.GetTag(a.ctx, svc, name)
+	tagEntry, err := store.GetTag(a.ctx, name)
 	if err != nil {
 		return nil, err
 	}
@@ -524,11 +564,11 @@ func (a *App) StagingCancelAddTag(service, name, key string) (*StagingCancelAddT
 
 	// If tag entry has no meaningful content, unstage it
 	if len(tagEntry.Add) == 0 && tagEntry.Remove.Len() == 0 {
-		if err := store.UnstageTag(a.ctx, svc, name); err != nil {
+		if err := store.UnstageTag(a.ctx, name); err != nil {
 			return nil, err
 		}
 	} else {
-		if err := store.StageTag(a.ctx, svc, name, *tagEntry); err != nil {
+		if err := store.StageTag(a.ctx, name, *tagEntry); err != nil {
 			return nil, err
 		}
 	}
@@ -538,18 +578,18 @@ func (a *App) StagingCancelAddTag(service, name, key string) (*StagingCancelAddT
 
 // StagingCancelRemoveTag cancels a staged tag removal (removes from Remove only).
 func (a *App) StagingCancelRemoveTag(service, name, key string) (*StagingCancelRemoveTagResult, error) {
-	store, err := a.getStagingStore()
+	serviceEnum, err := a.getService(service)
 	if err != nil {
 		return nil, err
 	}
 
-	svc, err := a.getService(service)
+	store, err := a.getStagingStoreForService(serviceEnum)
 	if err != nil {
 		return nil, err
 	}
 
 	// Get existing tag entry
-	tagEntry, err := store.GetTag(a.ctx, svc, name)
+	tagEntry, err := store.GetTag(a.ctx, name)
 	if err != nil {
 		return nil, err
 	}
@@ -559,11 +599,11 @@ func (a *App) StagingCancelRemoveTag(service, name, key string) (*StagingCancelR
 
 	// If tag entry has no meaningful content, unstage it
 	if len(tagEntry.Add) == 0 && tagEntry.Remove.Len() == 0 {
-		if err := store.UnstageTag(a.ctx, svc, name); err != nil {
+		if err := store.UnstageTag(a.ctx, name); err != nil {
 			return nil, err
 		}
 	} else {
-		if err := store.StageTag(a.ctx, svc, name, *tagEntry); err != nil {
+		if err := store.StageTag(a.ctx, name, *tagEntry); err != nil {
 			return nil, err
 		}
 	}
@@ -579,12 +619,12 @@ type StagingCheckStatusResult struct {
 
 // StagingCheckStatus checks if a specific item has staged entry or tag changes.
 func (a *App) StagingCheckStatus(service, name string) (*StagingCheckStatusResult, error) {
-	store, err := a.getStagingStore()
+	serviceEnum, err := a.getService(service)
 	if err != nil {
 		return nil, err
 	}
 
-	svc, err := a.getService(service)
+	store, err := a.getStagingStoreForService(serviceEnum)
 	if err != nil {
 		return nil, err
 	}
@@ -592,12 +632,12 @@ func (a *App) StagingCheckStatus(service, name string) (*StagingCheckStatusResul
 	result := &StagingCheckStatusResult{}
 
 	// Check for staged entry
-	if _, err := store.GetEntry(a.ctx, svc, name); err == nil {
+	if _, err := store.GetEntry(a.ctx, name); err == nil {
 		result.HasEntry = true
 	}
 
 	// Check for staged tags
-	if _, err := store.GetTag(a.ctx, svc, name); err == nil {
+	if _, err := store.GetTag(a.ctx, name); err == nil {
 		result.HasTags = true
 	}
 
@@ -606,7 +646,12 @@ func (a *App) StagingCheckStatus(service, name string) (*StagingCheckStatusResul
 
 // StagingDiff shows diff between staged changes and AWS.
 func (a *App) StagingDiff(service string, name string) (*StagingDiffResult, error) {
-	store, err := a.getStagingStore()
+	serviceEnum, err := a.getService(service)
+	if err != nil {
+		return nil, err
+	}
+
+	store, err := a.getStagingStoreForService(serviceEnum)
 	if err != nil {
 		return nil, err
 	}
@@ -740,9 +785,9 @@ func (a *App) StagingDrain(service string, passphrase string, keep bool, force b
 		return nil, err
 	}
 
-	fileStore := file.NewCompositeStore(stores)
+	fileFactory := file.NewFactoryFromStores(stores)
 
-	agentStore, err := a.getAgentStore()
+	agentFactory, err := a.getAgentFactory()
 	if err != nil {
 		return nil, err
 	}
@@ -756,8 +801,8 @@ func (a *App) StagingDrain(service string, passphrase string, keep bool, force b
 	}
 
 	uc := &stagingusecase.StashPopUseCase{
-		FileStore:  fileStore,
-		AgentStore: agentStore,
+		FileStore:  fileFactory.Global(),
+		AgentStore: agentFactory.Global(),
 	}
 
 	result, err := uc.Execute(a.ctx, stagingusecase.StashPopInput{
@@ -791,9 +836,9 @@ func (a *App) StagingPersist(service string, passphrase string, keep bool, mode 
 		return nil, err
 	}
 
-	fileStore := file.NewCompositeStore(stores)
+	fileFactory := file.NewFactoryFromStores(stores)
 
-	agentStore, err := a.getAgentStore()
+	agentFactory, err := a.getAgentFactory()
 	if err != nil {
 		return nil, err
 	}
@@ -812,8 +857,8 @@ func (a *App) StagingPersist(service string, passphrase string, keep bool, mode 
 	}
 
 	uc := &stagingusecase.StashPushUseCase{
-		AgentStore: agentStore,
-		FileStore:  fileStore,
+		AgentStore: agentFactory.Global(),
+		FileStore:  fileFactory.Global(),
 	}
 
 	result, err := uc.Execute(a.ctx, stagingusecase.StashPushInput{

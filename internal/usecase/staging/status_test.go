@@ -50,7 +50,7 @@ func TestStatusUseCase_Execute_Empty(t *testing.T) {
 	store := testutil.NewMockStore()
 	uc := &usecasestaging.StatusUseCase{
 		Strategy: newParamStrategy(),
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	output, err := uc.Execute(t.Context(), usecasestaging.StatusInput{})
@@ -80,7 +80,7 @@ func TestStatusUseCase_Execute_WithEntries(t *testing.T) {
 
 	uc := &usecasestaging.StatusUseCase{
 		Strategy: newParamStrategy(),
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	output, err := uc.Execute(t.Context(), usecasestaging.StatusInput{})
@@ -102,7 +102,7 @@ func TestStatusUseCase_Execute_FilterByName(t *testing.T) {
 
 	uc := &usecasestaging.StatusUseCase{
 		Strategy: newParamStrategy(),
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	// Existing entry
@@ -134,7 +134,7 @@ func TestStatusUseCase_Execute_SecretWithDeleteOptions(t *testing.T) {
 
 	uc := &usecasestaging.StatusUseCase{
 		Strategy: newSecretStrategy(),
-		Store:    store,
+		Store:    store.ForService(staging.ServiceSecret),
 	}
 
 	output, err := uc.Execute(t.Context(), usecasestaging.StatusInput{})
@@ -145,20 +145,20 @@ func TestStatusUseCase_Execute_SecretWithDeleteOptions(t *testing.T) {
 	assert.Equal(t, 14, output.Entries[0].DeleteOptions.RecoveryWindow)
 }
 
-func TestStatusUseCase_Execute_GetError(t *testing.T) {
+func TestStatusUseCase_Execute_ListEntriesError_WithName(t *testing.T) {
 	t.Parallel()
 
 	store := testutil.NewMockStore()
-	store.GetEntryErr = errors.New("store error")
+	store.ListEntriesErr = errors.New("list entries error")
 
 	uc := &usecasestaging.StatusUseCase{
 		Strategy: newParamStrategy(),
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	_, err := uc.Execute(t.Context(), usecasestaging.StatusInput{Name: "/app/config"})
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "store error")
+	assert.Contains(t, err.Error(), "list entries error")
 }
 
 func TestStatusUseCase_Execute_ListError(t *testing.T) {
@@ -169,7 +169,7 @@ func TestStatusUseCase_Execute_ListError(t *testing.T) {
 
 	uc := &usecasestaging.StatusUseCase{
 		Strategy: newParamStrategy(),
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	_, err := uc.Execute(t.Context(), usecasestaging.StatusInput{})
@@ -195,7 +195,7 @@ func TestStatusUseCase_Execute_WithTagEntries(t *testing.T) {
 
 	uc := &usecasestaging.StatusUseCase{
 		Strategy: newParamStrategy(),
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	output, err := uc.Execute(t.Context(), usecasestaging.StatusInput{})
@@ -237,7 +237,7 @@ func TestStatusUseCase_Execute_FilterByName_TagEntry(t *testing.T) {
 
 	uc := &usecasestaging.StatusUseCase{
 		Strategy: newParamStrategy(),
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	// Existing tag entry
@@ -268,7 +268,7 @@ func TestStatusUseCase_Execute_FilterByName_BothEntryAndTag(t *testing.T) {
 
 	uc := &usecasestaging.StatusUseCase{
 		Strategy: newParamStrategy(),
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	output, err := uc.Execute(t.Context(), usecasestaging.StatusInput{Name: "/app/config"})
@@ -279,20 +279,20 @@ func TestStatusUseCase_Execute_FilterByName_BothEntryAndTag(t *testing.T) {
 	assert.Equal(t, "/app/config", output.TagEntries[0].Name)
 }
 
-func TestStatusUseCase_Execute_GetTagError(t *testing.T) {
+func TestStatusUseCase_Execute_ListTagsError_WithName(t *testing.T) {
 	t.Parallel()
 
 	store := testutil.NewMockStore()
-	store.GetTagErr = errors.New("get tag error")
+	store.ListTagsErr = errors.New("list tags error")
 
 	uc := &usecasestaging.StatusUseCase{
 		Strategy: newParamStrategy(),
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	_, err := uc.Execute(t.Context(), usecasestaging.StatusInput{Name: "/app/config"})
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "get tag error")
+	assert.Contains(t, err.Error(), "list tags error")
 }
 
 func TestStatusUseCase_Execute_ListTagsError(t *testing.T) {
@@ -303,7 +303,7 @@ func TestStatusUseCase_Execute_ListTagsError(t *testing.T) {
 
 	uc := &usecasestaging.StatusUseCase{
 		Strategy: newParamStrategy(),
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	_, err := uc.Execute(t.Context(), usecasestaging.StatusInput{})

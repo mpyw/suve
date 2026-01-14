@@ -26,13 +26,11 @@ type AddOutput struct {
 // AddUseCase executes add operations.
 type AddUseCase struct {
 	Strategy staging.EditStrategy
-	Store    store.ReadWriteOperator
+	Store    store.ServiceReadWriter
 }
 
 // Execute runs the add use case.
 func (u *AddUseCase) Execute(ctx context.Context, input AddInput) (*AddOutput, error) {
-	service := u.Strategy.Service()
-
 	// Parse and validate name
 	name, err := u.Strategy.ParseName(input.Name)
 	if err != nil {
@@ -55,7 +53,7 @@ func (u *AddUseCase) Execute(ctx context.Context, input AddInput) (*AddOutput, e
 	}
 
 	// Load current state with AWS existence check
-	entryState, err := transition.LoadEntryState(ctx, u.Store, service, name, currentValue)
+	entryState, err := transition.LoadEntryState(ctx, u.Store, name, currentValue)
 	if err != nil {
 		return nil, err
 	}
@@ -68,7 +66,7 @@ func (u *AddUseCase) Execute(ctx context.Context, input AddInput) (*AddOutput, e
 		opts.Description = &input.Description
 	}
 
-	_, err = executor.ExecuteEntry(ctx, service, name, entryState, transition.EntryActionAdd{Value: input.Value}, opts)
+	_, err = executor.ExecuteEntry(ctx, name, entryState, transition.EntryActionAdd{Value: input.Value}, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -89,15 +87,13 @@ type DraftOutput struct {
 
 // Draft returns the currently staged create value (draft) for re-editing.
 func (u *AddUseCase) Draft(ctx context.Context, input DraftInput) (*DraftOutput, error) {
-	service := u.Strategy.Service()
-
 	// Parse and validate name
 	name, err := u.Strategy.ParseName(input.Name)
 	if err != nil {
 		return nil, err
 	}
 
-	stagedEntry, err := u.Store.GetEntry(ctx, service, name)
+	stagedEntry, err := u.Store.GetEntry(ctx, name)
 	if err != nil {
 		if errors.Is(err, staging.ErrNotStaged) {
 			return &DraftOutput{IsStaged: false}, nil

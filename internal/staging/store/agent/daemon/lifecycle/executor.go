@@ -62,3 +62,50 @@ func ExecuteFile[T any](
 ) (T, error) {
 	return action()
 }
+
+// ExecuteWriteErr is like ExecuteWrite but for actions that only return an error.
+// Use this to avoid the struct{}{} pattern when no return value is needed.
+func ExecuteWriteErr(
+	ctx context.Context,
+	starter Starter,
+	_ WriteCommand,
+	action func() error,
+) error {
+	if err := starter.Start(ctx); err != nil {
+		return err
+	}
+
+	return action()
+}
+
+// ExecuteReadErr is like ExecuteRead but for actions that only return an error.
+// Use this to avoid the struct{}{} pattern when no return value is needed.
+// Returns ReadResult to indicate whether nothing was staged.
+func ExecuteReadErr(
+	ctx context.Context,
+	pinger Pinger,
+	_ ReadCommand,
+	action func() error,
+) (ReadResult, error) {
+	if err := pinger.Ping(ctx); err != nil {
+		// Ping failure means agent not running = nothing staged.
+		// This is not an error condition, so return nil error.
+		return ReadResult{NothingStaged: true}, nil //nolint:nilerr
+	}
+
+	if err := action(); err != nil {
+		return ReadResult{}, err
+	}
+
+	return ReadResult{}, nil
+}
+
+// ExecuteFileErr is like ExecuteFile but for actions that only return an error.
+// Use this to avoid the struct{}{} pattern when no return value is needed.
+func ExecuteFileErr(
+	_ context.Context,
+	_ FileCommand,
+	action func() error,
+) error {
+	return action()
+}

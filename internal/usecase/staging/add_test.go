@@ -50,7 +50,7 @@ func TestAddUseCase_Execute(t *testing.T) {
 	store := testutil.NewMockStore()
 	uc := &usecasestaging.AddUseCase{
 		Strategy: newMockEditStrategyNotFound(), // Resource doesn't exist - expected for add
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	output, err := uc.Execute(t.Context(), usecasestaging.AddInput{
@@ -76,7 +76,7 @@ func TestAddUseCase_Execute_RejectsWhenResourceExists(t *testing.T) {
 	// Resource exists on AWS
 	uc := &usecasestaging.AddUseCase{
 		Strategy: newMockEditStrategy(), // Returns existing value
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	_, err := uc.Execute(t.Context(), usecasestaging.AddInput{
@@ -93,7 +93,7 @@ func TestAddUseCase_Execute_MinimalInput(t *testing.T) {
 	store := testutil.NewMockStore()
 	uc := &usecasestaging.AddUseCase{
 		Strategy: newMockEditStrategyNotFound(),
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	output, err := uc.Execute(t.Context(), usecasestaging.AddInput{
@@ -114,7 +114,7 @@ func TestAddUseCase_Draft_NotStaged(t *testing.T) {
 	store := testutil.NewMockStore()
 	uc := &usecasestaging.AddUseCase{
 		Strategy: newMockEditStrategyNotFound(),
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	output, err := uc.Draft(t.Context(), usecasestaging.DraftInput{Name: "/app/not-exists"})
@@ -135,7 +135,7 @@ func TestAddUseCase_Draft_StagedCreate(t *testing.T) {
 
 	uc := &usecasestaging.AddUseCase{
 		Strategy: newMockEditStrategyNotFound(),
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	output, err := uc.Draft(t.Context(), usecasestaging.DraftInput{Name: "/app/draft"})
@@ -157,7 +157,7 @@ func TestAddUseCase_Draft_StagedUpdate(t *testing.T) {
 
 	uc := &usecasestaging.AddUseCase{
 		Strategy: newMockEditStrategyNotFound(),
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	output, err := uc.Draft(t.Context(), usecasestaging.DraftInput{Name: "/app/update"})
@@ -174,7 +174,7 @@ func TestAddUseCase_Execute_ParseError(t *testing.T) {
 
 	uc := &usecasestaging.AddUseCase{
 		Strategy: strategy,
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	_, err := uc.Execute(t.Context(), usecasestaging.AddInput{
@@ -194,7 +194,7 @@ func TestAddUseCase_Draft_ParseError(t *testing.T) {
 
 	uc := &usecasestaging.AddUseCase{
 		Strategy: strategy,
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	_, err := uc.Draft(t.Context(), usecasestaging.DraftInput{Name: "invalid"})
@@ -209,7 +209,7 @@ func TestAddUseCase_Execute_StageError(t *testing.T) {
 
 	uc := &usecasestaging.AddUseCase{
 		Strategy: newMockEditStrategyNotFound(),
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	_, err := uc.Execute(t.Context(), usecasestaging.AddInput{
@@ -228,7 +228,7 @@ func TestAddUseCase_Draft_GetError(t *testing.T) {
 
 	uc := &usecasestaging.AddUseCase{
 		Strategy: newMockEditStrategyNotFound(),
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	_, err := uc.Draft(t.Context(), usecasestaging.DraftInput{Name: "/app/config"})
@@ -244,7 +244,7 @@ func TestAddUseCase_Execute_GetError(t *testing.T) {
 
 	uc := &usecasestaging.AddUseCase{
 		Strategy: newMockEditStrategyNotFound(),
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	_, err := uc.Execute(t.Context(), usecasestaging.AddInput{
@@ -268,7 +268,7 @@ func TestAddUseCase_Execute_RejectsWhenUpdateStaged(t *testing.T) {
 
 	uc := &usecasestaging.AddUseCase{
 		Strategy: newMockEditStrategyNotFound(),
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	_, err := uc.Execute(t.Context(), usecasestaging.AddInput{
@@ -291,7 +291,7 @@ func TestAddUseCase_Execute_RejectsWhenDeleteStaged(t *testing.T) {
 
 	uc := &usecasestaging.AddUseCase{
 		Strategy: newMockEditStrategyNotFound(),
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	_, err := uc.Execute(t.Context(), usecasestaging.AddInput{
@@ -315,7 +315,7 @@ func TestAddUseCase_Execute_AllowsReEditOfCreate(t *testing.T) {
 
 	uc := &usecasestaging.AddUseCase{
 		Strategy: newMockEditStrategyNotFound(),
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	// Should allow updating the value
@@ -342,7 +342,7 @@ func TestAddUseCase_Execute_FetchError(t *testing.T) {
 
 	uc := &usecasestaging.AddUseCase{
 		Strategy: strategy,
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	_, err := uc.Execute(t.Context(), usecasestaging.AddInput{

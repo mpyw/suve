@@ -26,7 +26,7 @@ func TestTagRunner_Run(t *testing.T) {
 		r := &cli.TagRunner{
 			UseCase: &stagingusecase.TagUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentVal: "existing"},
-				Store:    store,
+				Store:    store.ForService(staging.ServiceParam),
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -55,7 +55,7 @@ func TestTagRunner_Run(t *testing.T) {
 		r := &cli.TagRunner{
 			UseCase: &stagingusecase.TagUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentVal: "existing"},
-				Store:    store,
+				Store:    store.ForService(staging.ServiceParam),
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -79,7 +79,7 @@ func TestTagRunner_Run(t *testing.T) {
 		r := &cli.TagRunner{
 			UseCase: &stagingusecase.TagUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentErr: assert.AnError},
-				Store:    store,
+				Store:    store.ForService(staging.ServiceParam),
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -106,7 +106,7 @@ func TestUntagRunner_Run(t *testing.T) {
 		r := &cli.UntagRunner{
 			UseCase: &stagingusecase.TagUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentVal: "existing"},
-				Store:    store,
+				Store:    store.ForService(staging.ServiceParam),
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -136,7 +136,7 @@ func TestUntagRunner_Run(t *testing.T) {
 		r := &cli.UntagRunner{
 			UseCase: &stagingusecase.TagUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentErr: assert.AnError},
-				Store:    store,
+				Store:    store.ForService(staging.ServiceParam),
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -163,7 +163,7 @@ func TestTagRunner_EmptyTags(t *testing.T) {
 		r := &cli.TagRunner{
 			UseCase: &stagingusecase.TagUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentVal: "existing"},
-				Store:    store,
+				Store:    store.ForService(staging.ServiceParam),
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -187,7 +187,7 @@ func TestTagRunner_EmptyTags(t *testing.T) {
 		r := &cli.TagRunner{
 			UseCase: &stagingusecase.TagUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentVal: "existing"},
-				Store:    store,
+				Store:    store.ForService(staging.ServiceParam),
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,

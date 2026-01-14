@@ -119,7 +119,7 @@ func TestStatusRunner_Run(t *testing.T) {
 		r := &cli.StatusRunner{
 			UseCase: &stagingusecase.StatusUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam},
-				Store:    store,
+				Store:    store.ForService(staging.ServiceParam),
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -141,7 +141,7 @@ func TestStatusRunner_Run(t *testing.T) {
 		r := &cli.StatusRunner{
 			UseCase: &stagingusecase.StatusUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam},
-				Store:    store,
+				Store:    store.ForService(staging.ServiceParam),
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -167,7 +167,7 @@ func TestStatusRunner_Run(t *testing.T) {
 		r := &cli.StatusRunner{
 			UseCase: &stagingusecase.StatusUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam},
-				Store:    store,
+				Store:    store.ForService(staging.ServiceParam),
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -188,7 +188,7 @@ func TestStatusRunner_Run(t *testing.T) {
 		r := &cli.StatusRunner{
 			UseCase: &stagingusecase.StatusUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam},
-				Store:    store,
+				Store:    store.ForService(staging.ServiceParam),
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -223,7 +223,7 @@ func TestStatusRunner_Run(t *testing.T) {
 		r := &cli.StatusRunner{
 			UseCase: &stagingusecase.StatusUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam},
-				Store:    store,
+				Store:    store.ForService(staging.ServiceParam),
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -255,7 +255,7 @@ func TestStatusRunner_Run(t *testing.T) {
 		r := &cli.StatusRunner{
 			UseCase: &stagingusecase.StatusUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceSecret, hasDeleteOptions: true},
-				Store:    store,
+				Store:    store.ForService(staging.ServiceSecret),
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -290,7 +290,7 @@ func TestDiffRunner_Run(t *testing.T) {
 		r := &cli.DiffRunner{
 			UseCase: &stagingusecase.DiffUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentVal: "old-value"},
-				Store:    store,
+				Store:    store.ForService(staging.ServiceParam),
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -324,7 +324,7 @@ func TestDiffRunner_Run(t *testing.T) {
 		r := &cli.DiffRunner{
 			UseCase: &stagingusecase.DiffUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentVal: "old"},
-				Store:    store,
+				Store:    store.ForService(staging.ServiceParam),
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -348,7 +348,7 @@ func TestDiffRunner_Run(t *testing.T) {
 		r := &cli.DiffRunner{
 			UseCase: &stagingusecase.DiffUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam},
-				Store:    store,
+				Store:    store.ForService(staging.ServiceParam),
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -369,7 +369,7 @@ func TestDiffRunner_Run(t *testing.T) {
 		r := &cli.DiffRunner{
 			UseCase: &stagingusecase.DiffUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam},
-				Store:    store,
+				Store:    store.ForService(staging.ServiceParam),
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -395,7 +395,7 @@ func TestDiffRunner_Run(t *testing.T) {
 		r := &cli.DiffRunner{
 			UseCase: &stagingusecase.DiffUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentVal: `{"a":1}`},
-				Store:    store,
+				Store:    store.ForService(staging.ServiceParam),
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -424,7 +424,7 @@ func TestDiffRunner_Run(t *testing.T) {
 		r := &cli.DiffRunner{
 			UseCase: &stagingusecase.DiffUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentVal: `{"valid": "json"}`},
-				Store:    store,
+				Store:    store.ForService(staging.ServiceParam),
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -450,7 +450,7 @@ func TestDiffRunner_Run(t *testing.T) {
 		r := &cli.DiffRunner{
 			UseCase: &stagingusecase.DiffUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentVal: "same-value"},
-				Store:    store,
+				Store:    store.ForService(staging.ServiceParam),
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -480,7 +480,7 @@ func TestDiffRunner_Run(t *testing.T) {
 		r := &cli.DiffRunner{
 			UseCase: &stagingusecase.DiffUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentVal: "current-value"},
-				Store:    store,
+				Store:    store.ForService(staging.ServiceParam),
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -510,7 +510,7 @@ func TestDiffRunner_Run(t *testing.T) {
 			UseCase: &stagingusecase.DiffUseCase{
 				// FetchCurrent returns error because item was deleted from AWS
 				Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentErr: errors.New("parameter not found")},
-				Store:    store,
+				Store:    store.ForService(staging.ServiceParam),
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -542,7 +542,7 @@ func TestDiffRunner_Run(t *testing.T) {
 			UseCase: &stagingusecase.DiffUseCase{
 				// FetchCurrent returns error because item doesn't exist yet
 				Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentErr: errors.New("parameter not found")},
-				Store:    store,
+				Store:    store.ForService(staging.ServiceParam),
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -577,7 +577,7 @@ func TestDiffRunner_Run(t *testing.T) {
 		r := &cli.DiffRunner{
 			UseCase: &stagingusecase.DiffUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentErr: errors.New("parameter not found")},
-				Store:    store,
+				Store:    store.ForService(staging.ServiceParam),
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -608,7 +608,7 @@ func TestDiffRunner_Run(t *testing.T) {
 			UseCase: &stagingusecase.DiffUseCase{
 				// Item already exists in AWS with same value
 				Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentVal: "same-value"},
-				Store:    store,
+				Store:    store.ForService(staging.ServiceParam),
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -640,7 +640,7 @@ func TestDiffRunner_Run(t *testing.T) {
 			UseCase: &stagingusecase.DiffUseCase{
 				// Item already exists in AWS with different value
 				Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentVal: "old-value"},
-				Store:    store,
+				Store:    store.ForService(staging.ServiceParam),
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -669,7 +669,7 @@ func TestDiffRunner_Run(t *testing.T) {
 			UseCase: &stagingusecase.DiffUseCase{
 				// FetchCurrent returns error because item doesn't exist in AWS anymore
 				Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentErr: errors.New("parameter not found")},
-				Store:    store,
+				Store:    store.ForService(staging.ServiceParam),
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -703,7 +703,7 @@ func TestEditRunner_Run(t *testing.T) {
 		r := &cli.EditRunner{
 			UseCase: &stagingusecase.EditUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentVal: "aws-value"},
-				Store:    store,
+				Store:    store.ForService(staging.ServiceParam),
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -739,7 +739,7 @@ func TestEditRunner_Run(t *testing.T) {
 		r := &cli.EditRunner{
 			UseCase: &stagingusecase.EditUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentVal: "aws-value"},
-				Store:    store,
+				Store:    store.ForService(staging.ServiceParam),
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -773,7 +773,7 @@ func TestEditRunner_Run(t *testing.T) {
 		r := &cli.EditRunner{
 			UseCase: &stagingusecase.EditUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam},
-				Store:    store,
+				Store:    store.ForService(staging.ServiceParam),
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -798,7 +798,7 @@ func TestEditRunner_Run(t *testing.T) {
 		r := &cli.EditRunner{
 			UseCase: &stagingusecase.EditUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentVal: "same-value"},
-				Store:    store,
+				Store:    store.ForService(staging.ServiceParam),
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -822,7 +822,7 @@ func TestEditRunner_Run(t *testing.T) {
 		r := &cli.EditRunner{
 			UseCase: &stagingusecase.EditUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentVal: "value"},
-				Store:    store,
+				Store:    store.ForService(staging.ServiceParam),
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -846,7 +846,7 @@ func TestEditRunner_Run(t *testing.T) {
 		r := &cli.EditRunner{
 			UseCase: &stagingusecase.EditUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentErr: errors.New("not found")},
-				Store:    store,
+				Store:    store.ForService(staging.ServiceParam),
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -893,7 +893,7 @@ func TestApplyRunner_Run(t *testing.T) {
 		r := &cli.ApplyRunner{
 			UseCase: &stagingusecase.ApplyUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam},
-				Store:    store,
+				Store:    store.ForService(staging.ServiceParam),
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -936,7 +936,7 @@ func TestApplyRunner_Run(t *testing.T) {
 		r := &cli.ApplyRunner{
 			UseCase: &stagingusecase.ApplyUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam},
-				Store:    store,
+				Store:    store.ForService(staging.ServiceParam),
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -968,7 +968,7 @@ func TestApplyRunner_Run(t *testing.T) {
 		r := &cli.ApplyRunner{
 			UseCase: &stagingusecase.ApplyUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam},
-				Store:    store,
+				Store:    store.ForService(staging.ServiceParam),
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -989,7 +989,7 @@ func TestApplyRunner_Run(t *testing.T) {
 		r := &cli.ApplyRunner{
 			UseCase: &stagingusecase.ApplyUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam},
-				Store:    store,
+				Store:    store.ForService(staging.ServiceParam),
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -1015,7 +1015,7 @@ func TestApplyRunner_Run(t *testing.T) {
 		r := &cli.ApplyRunner{
 			UseCase: &stagingusecase.ApplyUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam, applyErr: errors.New("apply failed")},
-				Store:    store,
+				Store:    store.ForService(staging.ServiceParam),
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -1044,7 +1044,7 @@ func TestApplyRunner_Run(t *testing.T) {
 			UseCase: &stagingusecase.ApplyUseCase{
 				// FetchLastModified returns non-zero time = resource exists now
 				Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchLastModifiedVal: time.Now()},
-				Store:    store,
+				Store:    store.ForService(staging.ServiceParam),
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -1074,7 +1074,7 @@ func TestApplyRunner_Run(t *testing.T) {
 			UseCase: &stagingusecase.ApplyUseCase{
 				// FetchLastModified returns time AFTER BaseModifiedAt = conflict
 				Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchLastModifiedVal: time.Now()},
-				Store:    store,
+				Store:    store.ForService(staging.ServiceParam),
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -1102,7 +1102,7 @@ func TestApplyRunner_Run(t *testing.T) {
 		r := &cli.ApplyRunner{
 			UseCase: &stagingusecase.ApplyUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchLastModifiedVal: time.Now()},
-				Store:    store,
+				Store:    store.ForService(staging.ServiceParam),
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -1131,7 +1131,7 @@ func TestApplyRunner_Run(t *testing.T) {
 			UseCase: &stagingusecase.ApplyUseCase{
 				// FetchLastModified returns same time as BaseModifiedAt = no conflict
 				Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchLastModifiedVal: baseTime},
-				Store:    store,
+				Store:    store.ForService(staging.ServiceParam),
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -1159,7 +1159,7 @@ func TestApplyRunner_Run(t *testing.T) {
 		r := &cli.ApplyRunner{
 			UseCase: &stagingusecase.ApplyUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchLastModifiedVal: time.Now()},
-				Store:    store,
+				Store:    store.ForService(staging.ServiceParam),
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -1187,7 +1187,7 @@ func TestApplyRunner_Run(t *testing.T) {
 			UseCase: &stagingusecase.ApplyUseCase{
 				// FetchLastModified returns zero time = resource doesn't exist = no conflict
 				Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchLastModifiedVal: time.Time{}},
-				Store:    store,
+				Store:    store.ForService(staging.ServiceParam),
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -1227,7 +1227,7 @@ func TestResetRunner_Run(t *testing.T) {
 		r := &cli.ResetRunner{
 			UseCase: &stagingusecase.ResetUseCase{
 				Parser: &fullMockStrategy{service: staging.ServiceParam},
-				Store:  store,
+				Store:  store.ForService(staging.ServiceParam),
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -1253,7 +1253,7 @@ func TestResetRunner_Run(t *testing.T) {
 		r := &cli.ResetRunner{
 			UseCase: &stagingusecase.ResetUseCase{
 				Parser: &fullMockStrategy{service: staging.ServiceParam},
-				Store:  store,
+				Store:  store.ForService(staging.ServiceParam),
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -1279,7 +1279,7 @@ func TestResetRunner_Run(t *testing.T) {
 		r := &cli.ResetRunner{
 			UseCase: &stagingusecase.ResetUseCase{
 				Parser: &fullMockStrategy{service: staging.ServiceParam},
-				Store:  store,
+				Store:  store.ForService(staging.ServiceParam),
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -1303,7 +1303,7 @@ func TestResetRunner_Run(t *testing.T) {
 		r := &cli.ResetRunner{
 			UseCase: &stagingusecase.ResetUseCase{
 				Parser: &fullMockStrategy{service: staging.ServiceParam},
-				Store:  store,
+				Store:  store.ForService(staging.ServiceParam),
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -1331,7 +1331,7 @@ func TestResetRunner_Run(t *testing.T) {
 			UseCase: &stagingusecase.ResetUseCase{
 				Parser:  fetcher,
 				Fetcher: fetcher,
-				Store:   store,
+				Store:   store.ForService(staging.ServiceParam),
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -1358,7 +1358,7 @@ func TestResetRunner_Run(t *testing.T) {
 			UseCase: &stagingusecase.ResetUseCase{
 				Parser:  &fullMockStrategy{service: staging.ServiceParam, parseSpecVersion: true},
 				Fetcher: nil, // No fetcher
-				Store:   store,
+				Store:   store.ForService(staging.ServiceParam),
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -1385,7 +1385,7 @@ func TestResetRunner_Run(t *testing.T) {
 			UseCase: &stagingusecase.ResetUseCase{
 				Parser:  fetcher,
 				Fetcher: fetcher,
-				Store:   store,
+				Store:   store.ForService(staging.ServiceParam),
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -1409,7 +1409,7 @@ func TestResetRunner_Run(t *testing.T) {
 					service:      staging.ServiceParam,
 					parseSpecErr: errors.New("invalid spec"),
 				},
-				Store: store,
+				Store: store.ForService(staging.ServiceParam),
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -1443,7 +1443,7 @@ func TestRunners_SecretService(t *testing.T) {
 		r := &cli.StatusRunner{
 			UseCase: &stagingusecase.StatusUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceSecret},
-				Store:    store,
+				Store:    store.ForService(staging.ServiceSecret),
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -1469,7 +1469,7 @@ func TestRunners_SecretService(t *testing.T) {
 		r := &cli.ApplyRunner{
 			UseCase: &stagingusecase.ApplyUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceSecret},
-				Store:    store,
+				Store:    store.ForService(staging.ServiceSecret),
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -1499,7 +1499,7 @@ func TestRunners_DeleteOptions(t *testing.T) {
 		r := &cli.StatusRunner{
 			UseCase: &stagingusecase.StatusUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceSecret, hasDeleteOptions: true},
-				Store:    store,
+				Store:    store.ForService(staging.ServiceSecret),
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -1533,7 +1533,7 @@ func TestDiffRunner_OutputMetadata(t *testing.T) {
 		r := &cli.DiffRunner{
 			UseCase: &stagingusecase.DiffUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentVal: "old-value"},
-				Store:    store,
+				Store:    store.ForService(staging.ServiceParam),
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -1566,7 +1566,7 @@ func TestDiffRunner_OutputMetadata(t *testing.T) {
 		r := &cli.DiffRunner{
 			UseCase: &stagingusecase.DiffUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentVal: "old-value"},
-				Store:    store,
+				Store:    store.ForService(staging.ServiceParam),
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -1602,7 +1602,7 @@ func TestDiffRunner_OutputMetadata(t *testing.T) {
 		r := &cli.DiffRunner{
 			UseCase: &stagingusecase.DiffUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentErr: errors.New("not found")},
-				Store:    store,
+				Store:    store.ForService(staging.ServiceParam),
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -1638,7 +1638,7 @@ func TestEditRunner_WithMetadata(t *testing.T) {
 		r := &cli.EditRunner{
 			UseCase: &stagingusecase.EditUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentVal: "current"},
-				Store:    store,
+				Store:    store.ForService(staging.ServiceParam),
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -1671,7 +1671,7 @@ func TestEditRunner_WithMetadata(t *testing.T) {
 					fetchCurrentVal:      "current",
 					fetchLastModifiedVal: awsTime,
 				},
-				Store: store,
+				Store: store.ForService(staging.ServiceParam),
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -1704,7 +1704,7 @@ func TestEditRunner_WithMetadata(t *testing.T) {
 		r := &cli.EditRunner{
 			UseCase: &stagingusecase.EditUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentVal: "aws-value"},
-				Store:    store,
+				Store:    store.ForService(staging.ServiceParam),
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -1743,7 +1743,7 @@ func TestApplyRunner_WithTags(t *testing.T) {
 		r := &cli.ApplyRunner{
 			UseCase: &stagingusecase.ApplyUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam},
-				Store:    store,
+				Store:    store.ForService(staging.ServiceParam),
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -1774,7 +1774,7 @@ func TestApplyRunner_WithTags(t *testing.T) {
 		r := &cli.ApplyRunner{
 			UseCase: &stagingusecase.ApplyUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam},
-				Store:    store,
+				Store:    store.ForService(staging.ServiceParam),
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -1810,7 +1810,7 @@ func TestApplyRunner_WithTags(t *testing.T) {
 		r := &cli.ApplyRunner{
 			UseCase: &stagingusecase.ApplyUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam},
-				Store:    store,
+				Store:    store.ForService(staging.ServiceParam),
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -1848,7 +1848,7 @@ func TestStatusRunner_WithTagEntries(t *testing.T) {
 		r := &cli.StatusRunner{
 			UseCase: &stagingusecase.StatusUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam},
-				Store:    store,
+				Store:    store.ForService(staging.ServiceParam),
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -1879,7 +1879,7 @@ func TestStatusRunner_WithTagEntries(t *testing.T) {
 		r := &cli.StatusRunner{
 			UseCase: &stagingusecase.StatusUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam},
-				Store:    store,
+				Store:    store.ForService(staging.ServiceParam),
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -1909,7 +1909,7 @@ func TestStatusRunner_WithTagEntries(t *testing.T) {
 		r := &cli.StatusRunner{
 			UseCase: &stagingusecase.StatusUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam},
-				Store:    store,
+				Store:    store.ForService(staging.ServiceParam),
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -1941,7 +1941,7 @@ func TestStatusRunner_WithTagEntries(t *testing.T) {
 		r := &cli.StatusRunner{
 			UseCase: &stagingusecase.StatusUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam},
-				Store:    store,
+				Store:    store.ForService(staging.ServiceParam),
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -1976,7 +1976,7 @@ func TestStatusRunner_WithTagEntries(t *testing.T) {
 		r := &cli.StatusRunner{
 			UseCase: &stagingusecase.StatusUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam},
-				Store:    store,
+				Store:    store.ForService(staging.ServiceParam),
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -2007,7 +2007,7 @@ func TestStatusRunner_WithTagEntries(t *testing.T) {
 		r := &cli.StatusRunner{
 			UseCase: &stagingusecase.StatusUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam},
-				Store:    store,
+				Store:    store.ForService(staging.ServiceParam),
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -2035,7 +2035,7 @@ func TestDeleteRunner_Run(t *testing.T) {
 		r := &cli.DeleteRunner{
 			UseCase: &stagingusecase.DeleteUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchLastModifiedVal: time.Now()},
-				Store:    store,
+				Store:    store.ForService(staging.ServiceParam),
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -2061,7 +2061,7 @@ func TestDeleteRunner_Run(t *testing.T) {
 		r := &cli.DeleteRunner{
 			UseCase: &stagingusecase.DeleteUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceSecret, hasDeleteOptions: true, fetchLastModifiedVal: time.Now()},
-				Store:    store,
+				Store:    store.ForService(staging.ServiceSecret),
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -2092,7 +2092,7 @@ func TestDeleteRunner_Run(t *testing.T) {
 		r := &cli.DeleteRunner{
 			UseCase: &stagingusecase.DeleteUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceSecret, hasDeleteOptions: true, fetchLastModifiedVal: time.Now()},
-				Store:    store,
+				Store:    store.ForService(staging.ServiceSecret),
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -2122,7 +2122,7 @@ func TestDeleteRunner_Run(t *testing.T) {
 		r := &cli.DeleteRunner{
 			UseCase: &stagingusecase.DeleteUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchLastModifiedErr: errors.New("not found")},
-				Store:    store,
+				Store:    store.ForService(staging.ServiceParam),
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -2143,7 +2143,7 @@ func TestDeleteRunner_Run(t *testing.T) {
 		r := &cli.DeleteRunner{
 			UseCase: &stagingusecase.DeleteUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceSecret, hasDeleteOptions: true, fetchLastModifiedVal: time.Now()},
-				Store:    store,
+				Store:    store.ForService(staging.ServiceParam),
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -2174,7 +2174,7 @@ func TestDeleteRunner_Run(t *testing.T) {
 		r := &cli.DeleteRunner{
 			UseCase: &stagingusecase.DeleteUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam},
-				Store:    store,
+				Store:    store.ForService(staging.ServiceParam),
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -2207,7 +2207,7 @@ func TestEditRunner_Skipped_Unstaged(t *testing.T) {
 		r := &cli.EditRunner{
 			UseCase: &stagingusecase.EditUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentVal: "aws-value"},
-				Store:    store,
+				Store:    store.ForService(staging.ServiceParam),
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -2243,7 +2243,7 @@ func TestEditRunner_Skipped_Unstaged(t *testing.T) {
 		r := &cli.EditRunner{
 			UseCase: &stagingusecase.EditUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentVal: "aws-value"},
-				Store:    store,
+				Store:    store.ForService(staging.ServiceParam),
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -2288,7 +2288,7 @@ func TestResetRunner_Skipped(t *testing.T) {
 			UseCase: &stagingusecase.ResetUseCase{
 				Parser:  fetcher,
 				Fetcher: fetcher,
-				Store:   store,
+				Store:   store.ForService(staging.ServiceParam),
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -2329,8 +2329,8 @@ func TestStashPopRunner_Run(t *testing.T) {
 
 		r := &cli.StashPopRunner{
 			UseCase: &stagingusecase.StashPopUseCase{
-				FileStore:  fileStore,
-				AgentStore: agentStore,
+				FileStore:  fileStore.Global(),
+				AgentStore: agentStore.Global(),
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -2366,8 +2366,8 @@ func TestStashPopRunner_Run(t *testing.T) {
 
 		r := &cli.StashPopRunner{
 			UseCase: &stagingusecase.StashPopUseCase{
-				FileStore:  fileStore,
-				AgentStore: agentStore,
+				FileStore:  fileStore.Global(),
+				AgentStore: agentStore.Global(),
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -2408,8 +2408,8 @@ func TestStashPopRunner_Run(t *testing.T) {
 
 		r := &cli.StashPopRunner{
 			UseCase: &stagingusecase.StashPopUseCase{
-				FileStore:  fileStore,
-				AgentStore: agentStore,
+				FileStore:  fileStore.Global(),
+				AgentStore: agentStore.Global(),
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -2450,8 +2450,8 @@ func TestStashPopRunner_Run(t *testing.T) {
 
 		r := &cli.StashPopRunner{
 			UseCase: &stagingusecase.StashPopUseCase{
-				FileStore:  fileStore,
-				AgentStore: agentStore,
+				FileStore:  fileStore.Global(),
+				AgentStore: agentStore.Global(),
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -2483,8 +2483,8 @@ func TestStashPopRunner_Run(t *testing.T) {
 
 		r := &cli.StashPopRunner{
 			UseCase: &stagingusecase.StashPopUseCase{
-				FileStore:  fileStore,
-				AgentStore: agentStore,
+				FileStore:  fileStore.Global(),
+				AgentStore: agentStore.Global(),
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -2519,8 +2519,8 @@ func TestStashPopRunner_Run(t *testing.T) {
 
 		r := &cli.StashPopRunner{
 			UseCase: &stagingusecase.StashPopUseCase{
-				FileStore:  fileStore,
-				AgentStore: agentStore,
+				FileStore:  fileStore.Global(),
+				AgentStore: agentStore.Global(),
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -2555,8 +2555,8 @@ func TestStashPopRunner_Run(t *testing.T) {
 
 		r := &cli.StashPopRunner{
 			UseCase: &stagingusecase.StashPopUseCase{
-				FileStore:  fileStore,
-				AgentStore: agentStore,
+				FileStore:  fileStore.Global(),
+				AgentStore: agentStore.Global(),
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -2592,8 +2592,8 @@ func TestStashPopRunner_Run(t *testing.T) {
 
 		r := &cli.StashPopRunner{
 			UseCase: &stagingusecase.StashPopUseCase{
-				FileStore:  fileStore,
-				AgentStore: agentStore,
+				FileStore:  fileStore.Global(),
+				AgentStore: agentStore.Global(),
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -2628,8 +2628,8 @@ func TestStashPopRunner_Run(t *testing.T) {
 
 		r := &cli.StashPopRunner{
 			UseCase: &stagingusecase.StashPopUseCase{
-				FileStore:  fileStore,
-				AgentStore: agentStore,
+				FileStore:  fileStore.Global(),
+				AgentStore: agentStore.Global(),
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -2669,8 +2669,8 @@ func TestStashPushRunner_Run(t *testing.T) {
 
 		r := &cli.StashPushRunner{
 			UseCase: &stagingusecase.StashPushUseCase{
-				AgentStore: agentStore,
-				FileStore:  fileStore,
+				AgentStore: agentStore.Global(),
+				FileStore:  fileStore.Global(),
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -2707,8 +2707,8 @@ func TestStashPushRunner_Run(t *testing.T) {
 
 		r := &cli.StashPushRunner{
 			UseCase: &stagingusecase.StashPushUseCase{
-				AgentStore: agentStore,
-				FileStore:  fileStore,
+				AgentStore: agentStore.Global(),
+				FileStore:  fileStore.Global(),
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -2741,8 +2741,8 @@ func TestStashPushRunner_Run(t *testing.T) {
 
 		r := &cli.StashPushRunner{
 			UseCase: &stagingusecase.StashPushUseCase{
-				AgentStore: agentStore,
-				FileStore:  fileStore,
+				AgentStore: agentStore.Global(),
+				FileStore:  fileStore.Global(),
 			},
 			Stdout:    &stdout,
 			Stderr:    &stderr,
@@ -2765,8 +2765,8 @@ func TestStashPushRunner_Run(t *testing.T) {
 
 		r := &cli.StashPushRunner{
 			UseCase: &stagingusecase.StashPushUseCase{
-				AgentStore: agentStore,
-				FileStore:  fileStore,
+				AgentStore: agentStore.Global(),
+				FileStore:  fileStore.Global(),
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -2799,8 +2799,8 @@ func TestStashPushRunner_Run(t *testing.T) {
 
 		r := &cli.StashPushRunner{
 			UseCase: &stagingusecase.StashPushUseCase{
-				AgentStore: agentStore,
-				FileStore:  fileStore,
+				AgentStore: agentStore.Global(),
+				FileStore:  fileStore.Global(),
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -2835,8 +2835,8 @@ func TestStashPushRunner_Run(t *testing.T) {
 
 		r := &cli.StashPushRunner{
 			UseCase: &stagingusecase.StashPushUseCase{
-				AgentStore: agentStore,
-				FileStore:  fileStore,
+				AgentStore: agentStore.Global(),
+				FileStore:  fileStore.Global(),
 			},
 			Stdout:    &stdout,
 			Stderr:    &stderr,
@@ -2872,7 +2872,7 @@ func TestDiffRunner_TagEntries(t *testing.T) {
 		r := &cli.DiffRunner{
 			UseCase: &stagingusecase.DiffUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam},
-				Store:    store,
+				Store:    store.ForService(staging.ServiceParam),
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -2901,7 +2901,7 @@ func TestDiffRunner_TagEntries(t *testing.T) {
 		r := &cli.DiffRunner{
 			UseCase: &stagingusecase.DiffUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam},
-				Store:    store,
+				Store:    store.ForService(staging.ServiceParam),
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -2930,7 +2930,7 @@ func TestDiffRunner_TagEntries(t *testing.T) {
 		r := &cli.DiffRunner{
 			UseCase: &stagingusecase.DiffUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam},
-				Store:    store,
+				Store:    store.ForService(staging.ServiceParam),
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -2963,7 +2963,7 @@ func TestDiffRunner_TagEntries(t *testing.T) {
 		r := &cli.DiffRunner{
 			UseCase: &stagingusecase.DiffUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam},
-				Store:    store,
+				Store:    store.ForService(staging.ServiceParam),
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -3000,7 +3000,7 @@ func TestStatusRunner_RemoveOnlyTag(t *testing.T) {
 		r := &cli.StatusRunner{
 			UseCase: &stagingusecase.StatusUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam},
-				Store:    store,
+				Store:    store.ForService(staging.ServiceParam),
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -3029,7 +3029,7 @@ func TestStatusRunner_RemoveOnlyTag(t *testing.T) {
 		r := &cli.StatusRunner{
 			UseCase: &stagingusecase.StatusUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam},
-				Store:    store,
+				Store:    store.ForService(staging.ServiceParam),
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -3065,7 +3065,7 @@ func TestApplyRunner_TagSummaryEdgeCases(t *testing.T) {
 		r := &cli.ApplyRunner{
 			UseCase: &stagingusecase.ApplyUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam},
-				Store:    store,
+				Store:    store.ForService(staging.ServiceParam),
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -3094,7 +3094,7 @@ func TestApplyRunner_TagSummaryEdgeCases(t *testing.T) {
 		r := &cli.ApplyRunner{
 			UseCase: &stagingusecase.ApplyUseCase{
 				Strategy: &fullMockStrategy{service: staging.ServiceParam},
-				Store:    store,
+				Store:    store.ForService(staging.ServiceParam),
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,

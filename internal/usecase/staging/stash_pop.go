@@ -32,14 +32,14 @@ type StashPopOutput struct {
 
 // StashPopUseCase executes drain operations (file -> agent).
 type StashPopUseCase struct {
-	FileStore  store.FileStore
-	AgentStore store.AgentStore
+	FileStore  store.DrainWriter
+	AgentStore store.GlobalStore
 }
 
 // Execute runs the drain use case.
 func (u *StashPopUseCase) Execute(ctx context.Context, input StashPopInput) (*StashPopOutput, error) {
 	// Drain from file (keep file for now, we'll delete after successful agent write)
-	fileState, err := u.FileStore.Drain(ctx, "", true)
+	fileState, err := u.FileStore.Drain(ctx, true)
 	if err != nil {
 		return nil, &StashPopError{Op: "load", Err: err}
 	}
@@ -53,7 +53,7 @@ func (u *StashPopUseCase) Execute(ctx context.Context, input StashPopInput) (*St
 	}
 
 	// Check if agent already has staged changes
-	agentState, err := u.AgentStore.Drain(ctx, "", true) // keep=true to not clear yet
+	agentState, err := u.AgentStore.Drain(ctx, true) // keep=true to not clear yet
 	if err != nil {
 		// Agent might not be running, which is fine - treat as empty
 		agentState = staging.NewEmptyState()
@@ -88,7 +88,7 @@ func (u *StashPopUseCase) Execute(ctx context.Context, input StashPopInput) (*St
 	}
 
 	// Set state in agent
-	if err := u.AgentStore.WriteState(ctx, "", finalState); err != nil {
+	if err := u.AgentStore.WriteState(ctx, finalState); err != nil {
 		return nil, &StashPopError{Op: "write", Err: err}
 	}
 
@@ -117,19 +117,19 @@ func (u *StashPopUseCase) Execute(ctx context.Context, input StashPopInput) (*St
 
 			if fileState.IsEmpty() {
 				// Delete the file entirely
-				if _, err := u.FileStore.Drain(ctx, "", false); err != nil {
+				if _, err := u.FileStore.Drain(ctx, false); err != nil {
 					// Non-fatal: state is already in agent
 					return output, &StashPopError{Op: "delete", Err: err, NonFatal: true}
 				}
 			} else {
 				// Write back the remaining state
-				if err := u.FileStore.WriteState(ctx, "", fileState); err != nil {
+				if err := u.FileStore.WriteState(ctx, fileState); err != nil {
 					return output, &StashPopError{Op: "delete", Err: err, NonFatal: true}
 				}
 			}
 		} else {
 			// Drain again with keep=false to delete the file
-			if _, err := u.FileStore.Drain(ctx, "", false); err != nil {
+			if _, err := u.FileStore.Drain(ctx, false); err != nil {
 				return output, &StashPopError{Op: "delete", Err: err, NonFatal: true}
 			}
 		}

@@ -46,7 +46,7 @@ func TestDeleteUseCase_Execute_Param(t *testing.T) {
 	store := testutil.NewMockStore()
 	uc := &usecasestaging.DeleteUseCase{
 		Strategy: newMockDeleteStrategy(false),
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	output, err := uc.Execute(t.Context(), usecasestaging.DeleteInput{
@@ -72,7 +72,7 @@ func TestDeleteUseCase_Execute_SecretWithRecoveryWindow(t *testing.T) {
 
 	uc := &usecasestaging.DeleteUseCase{
 		Strategy: strategy,
-		Store:    store,
+		Store:    store.ForService(staging.ServiceSecret),
 	}
 
 	output, err := uc.Execute(t.Context(), usecasestaging.DeleteInput{
@@ -99,7 +99,7 @@ func TestDeleteUseCase_Execute_SecretForceDelete(t *testing.T) {
 
 	uc := &usecasestaging.DeleteUseCase{
 		Strategy: strategy,
-		Store:    store,
+		Store:    store.ForService(staging.ServiceSecret),
 	}
 
 	output, err := uc.Execute(t.Context(), usecasestaging.DeleteInput{
@@ -119,7 +119,7 @@ func TestDeleteUseCase_Execute_InvalidRecoveryWindow(t *testing.T) {
 
 	uc := &usecasestaging.DeleteUseCase{
 		Strategy: strategy,
-		Store:    store,
+		Store:    store.ForService(staging.ServiceSecret),
 	}
 
 	// Too short
@@ -147,7 +147,7 @@ func TestDeleteUseCase_Execute_FetchError(t *testing.T) {
 
 	uc := &usecasestaging.DeleteUseCase{
 		Strategy: strategy,
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	_, err := uc.Execute(t.Context(), usecasestaging.DeleteInput{
@@ -166,7 +166,7 @@ func TestDeleteUseCase_Execute_ZeroLastModified_ResourceNotFound(t *testing.T) {
 
 	uc := &usecasestaging.DeleteUseCase{
 		Strategy: strategy,
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	// Delete should fail when resource doesn't exist on AWS and not staged
@@ -194,7 +194,7 @@ func TestDeleteUseCase_Execute_ZeroLastModified_StagedCreate(t *testing.T) {
 
 	uc := &usecasestaging.DeleteUseCase{
 		Strategy: strategy,
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	// Delete should succeed by unstaging the CREATE
@@ -218,7 +218,7 @@ func TestDeleteUseCase_Execute_StageError(t *testing.T) {
 
 	uc := &usecasestaging.DeleteUseCase{
 		Strategy: newMockDeleteStrategy(false),
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	_, err := uc.Execute(t.Context(), usecasestaging.DeleteInput{
@@ -236,7 +236,7 @@ func TestDeleteUseCase_Execute_GetError(t *testing.T) {
 
 	uc := &usecasestaging.DeleteUseCase{
 		Strategy: newMockDeleteStrategy(false),
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	_, err := uc.Execute(t.Context(), usecasestaging.DeleteInput{
@@ -259,7 +259,7 @@ func TestDeleteUseCase_Execute_UnstageError(t *testing.T) {
 
 	uc := &usecasestaging.DeleteUseCase{
 		Strategy: newMockDeleteStrategy(false),
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	_, err := uc.Execute(t.Context(), usecasestaging.DeleteInput{
@@ -282,7 +282,7 @@ func TestDeleteUseCase_Execute_UnstagesCreate(t *testing.T) {
 
 	uc := &usecasestaging.DeleteUseCase{
 		Strategy: newMockDeleteStrategy(false),
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	output, err := uc.Execute(t.Context(), usecasestaging.DeleteInput{
@@ -310,7 +310,7 @@ func TestDeleteUseCase_Execute_DeleteOnUpdate(t *testing.T) {
 
 	uc := &usecasestaging.DeleteUseCase{
 		Strategy: newMockDeleteStrategy(false),
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	output, err := uc.Execute(t.Context(), usecasestaging.DeleteInput{
@@ -343,7 +343,7 @@ func TestDeleteUseCase_Execute_UnstageTagError(t *testing.T) {
 
 	uc := &usecasestaging.DeleteUseCase{
 		Strategy: newMockDeleteStrategy(false),
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	_, err := uc.Execute(t.Context(), usecasestaging.DeleteInput{

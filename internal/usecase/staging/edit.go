@@ -29,13 +29,11 @@ type EditOutput struct {
 // EditUseCase executes edit operations.
 type EditUseCase struct {
 	Strategy staging.EditStrategy
-	Store    store.ReadWriteOperator
+	Store    store.ServiceReadWriter
 }
 
 // Execute runs the edit use case.
 func (u *EditUseCase) Execute(ctx context.Context, input EditInput) (*EditOutput, error) {
-	service := u.Strategy.Service()
-
 	// Load current state from AWS
 	currentValue, awsBaseModifiedAt, err := u.fetchCurrentState(ctx, input.Name)
 	if err != nil {
@@ -43,7 +41,7 @@ func (u *EditUseCase) Execute(ctx context.Context, input EditInput) (*EditOutput
 	}
 
 	// Load staged entry state with metadata
-	entryState, existingBaseModifiedAt, err := transition.LoadEntryStateWithMetadata(ctx, u.Store, service, input.Name, currentValue)
+	entryState, existingBaseModifiedAt, err := transition.LoadEntryStateWithMetadata(ctx, u.Store, input.Name, currentValue)
 	if err != nil {
 		return nil, err
 	}
@@ -66,7 +64,7 @@ func (u *EditUseCase) Execute(ctx context.Context, input EditInput) (*EditOutput
 	executor := transition.NewExecutor(u.Store)
 	_, wasNotStaged := entryState.StagedState.(transition.EntryStagedStateNotStaged)
 
-	result, err := executor.ExecuteEntry(ctx, service, input.Name, entryState, transition.EntryActionEdit{Value: input.Value}, opts)
+	result, err := executor.ExecuteEntry(ctx, input.Name, entryState, transition.EntryActionEdit{Value: input.Value}, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -115,10 +113,8 @@ type BaselineOutput struct {
 
 // Baseline returns the baseline value for editing (staged value if exists, otherwise from AWS).
 func (u *EditUseCase) Baseline(ctx context.Context, input BaselineInput) (*BaselineOutput, error) {
-	service := u.Strategy.Service()
-
 	// Check if already staged
-	stagedEntry, err := u.Store.GetEntry(ctx, service, input.Name)
+	stagedEntry, err := u.Store.GetEntry(ctx, input.Name)
 	if err != nil && !errors.Is(err, staging.ErrNotStaged) {
 		return nil, err
 	}

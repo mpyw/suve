@@ -36,8 +36,8 @@ func TestStashPushRunner_RunBasic(t *testing.T) {
 
 		runner := &cli.StashPushRunner{
 			UseCase: &stagingusecase.StashPushUseCase{
-				AgentStore: agentStore,
-				FileStore:  fileStore,
+				AgentStore: agentStore.Global(),
+				FileStore:  fileStore.Global(),
 			},
 			Stdout:    stdout,
 			Stderr:    stderr,
@@ -69,8 +69,8 @@ func TestStashPushRunner_RunBasic(t *testing.T) {
 
 		runner := &cli.StashPushRunner{
 			UseCase: &stagingusecase.StashPushUseCase{
-				AgentStore: agentStore,
-				FileStore:  fileStore,
+				AgentStore: agentStore.Global(),
+				FileStore:  fileStore.Global(),
 			},
 			Stdout:    stdout,
 			Stderr:    stderr,
@@ -101,8 +101,8 @@ func TestStashPushRunner_RunBasic(t *testing.T) {
 
 		runner := &cli.StashPushRunner{
 			UseCase: &stagingusecase.StashPushUseCase{
-				AgentStore: agentStore,
-				FileStore:  fileStore,
+				AgentStore: agentStore.Global(),
+				FileStore:  fileStore.Global(),
 			},
 			Stdout:    stdout,
 			Stderr:    stderr,
@@ -131,8 +131,8 @@ func TestStashPushRunner_RunBasic(t *testing.T) {
 
 		runner := &cli.StashPushRunner{
 			UseCase: &stagingusecase.StashPushUseCase{
-				AgentStore: agentStore,
-				FileStore:  fileStore,
+				AgentStore: agentStore.Global(),
+				FileStore:  fileStore.Global(),
 			},
 			Stdout:    stdout,
 			Stderr:    stderr,
@@ -156,8 +156,8 @@ func TestStashPushRunner_RunBasic(t *testing.T) {
 
 		runner := &cli.StashPushRunner{
 			UseCase: &stagingusecase.StashPushUseCase{
-				AgentStore: agentStore,
-				FileStore:  fileStore,
+				AgentStore: agentStore.Global(),
+				FileStore:  fileStore.Global(),
 			},
 			Stdout:    stdout,
 			Stderr:    stderr,
@@ -190,8 +190,8 @@ func TestStashPushRunner_RunBasic(t *testing.T) {
 
 		runner := &cli.StashPushRunner{
 			UseCase: &stagingusecase.StashPushUseCase{
-				AgentStore: agentStore,
-				FileStore:  fileStore,
+				AgentStore: agentStore.Global(),
+				FileStore:  fileStore.Global(),
 			},
 			Stdout:    stdout,
 			Stderr:    stderr,
@@ -252,8 +252,8 @@ func TestStashPushRunner_Run_NonFatalErrorContinues(t *testing.T) {
 
 	runner := &cli.StashPushRunner{
 		UseCase: &stagingusecase.StashPushUseCase{
-			AgentStore: agentStore,
-			FileStore:  fileStore,
+			AgentStore: agentStore.Global(),
+			FileStore:  fileStore.Global(),
 		},
 		Stdout:    stdout,
 		Stderr:    stderr,
@@ -300,8 +300,8 @@ func TestStashPushRunner_Run_WithModes(t *testing.T) {
 
 		runner := &cli.StashPushRunner{
 			UseCase: &stagingusecase.StashPushUseCase{
-				AgentStore: agentStore,
-				FileStore:  fileStore,
+				AgentStore: agentStore.Global(),
+				FileStore:  fileStore.Global(),
 			},
 			Stdout:    stdout,
 			Stderr:    stderr,
@@ -345,8 +345,8 @@ func TestStashPushRunner_Run_WithModes(t *testing.T) {
 
 		runner := &cli.StashPushRunner{
 			UseCase: &stagingusecase.StashPushUseCase{
-				AgentStore: agentStore,
-				FileStore:  fileStore,
+				AgentStore: agentStore.Global(),
+				FileStore:  fileStore.Global(),
 			},
 			Stdout:    stdout,
 			Stderr:    stderr,

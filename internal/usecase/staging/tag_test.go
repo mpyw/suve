@@ -51,7 +51,7 @@ func TestTagUseCase_Tag_NewTagEntry(t *testing.T) {
 	store := testutil.NewMockStore()
 	uc := &usecasestaging.TagUseCase{
 		Strategy: newMockTagStrategy(),
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	output, err := uc.Tag(t.Context(), usecasestaging.TagInput{
@@ -84,7 +84,7 @@ func TestTagUseCase_Tag_MergeWithExisting(t *testing.T) {
 
 	uc := &usecasestaging.TagUseCase{
 		Strategy: newMockTagStrategy(),
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	_, err := uc.Tag(t.Context(), usecasestaging.TagInput{
@@ -114,7 +114,7 @@ func TestTagUseCase_Tag_AddTagRemovesFromUntagList(t *testing.T) {
 
 	uc := &usecasestaging.TagUseCase{
 		Strategy: newMockTagStrategy(),
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	// Add a tag that was previously in remove list
@@ -140,7 +140,7 @@ func TestTagUseCase_Tag_ParseError(t *testing.T) {
 
 	uc := &usecasestaging.TagUseCase{
 		Strategy: strategy,
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	_, err := uc.Tag(t.Context(), usecasestaging.TagInput{
@@ -160,7 +160,7 @@ func TestTagUseCase_Tag_FetchError(t *testing.T) {
 
 	uc := &usecasestaging.TagUseCase{
 		Strategy: strategy,
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	_, err := uc.Tag(t.Context(), usecasestaging.TagInput{
@@ -179,7 +179,7 @@ func TestTagUseCase_Tag_StageError(t *testing.T) {
 
 	uc := &usecasestaging.TagUseCase{
 		Strategy: newMockTagStrategy(),
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	_, err := uc.Tag(t.Context(), usecasestaging.TagInput{
@@ -198,7 +198,7 @@ func TestTagUseCase_Tag_GetError(t *testing.T) {
 
 	uc := &usecasestaging.TagUseCase{
 		Strategy: newMockTagStrategy(),
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	_, err := uc.Tag(t.Context(), usecasestaging.TagInput{
@@ -221,7 +221,7 @@ func TestTagUseCase_Tag_ZeroLastModified(t *testing.T) {
 
 	uc := &usecasestaging.TagUseCase{
 		Strategy: strategy,
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	_, err := uc.Tag(t.Context(), usecasestaging.TagInput{
@@ -253,7 +253,7 @@ func TestTagUseCase_Tag_StagedForCreate_ResourceNotFound(t *testing.T) {
 
 	uc := &usecasestaging.TagUseCase{
 		Strategy: strategy,
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	// Tag the staged CREATE entry - should succeed despite resource not existing on AWS
@@ -276,7 +276,7 @@ func TestTagUseCase_Tag_EmptyTags(t *testing.T) {
 	store := testutil.NewMockStore()
 	uc := &usecasestaging.TagUseCase{
 		Strategy: newMockTagStrategy(),
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	// Execute with empty tags - should error
@@ -301,7 +301,7 @@ func TestTagUseCase_Tag_BlockedOnDelete(t *testing.T) {
 
 	uc := &usecasestaging.TagUseCase{
 		Strategy: newMockTagStrategy(),
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	// Attempting to tag a DELETE should fail
@@ -321,7 +321,7 @@ func TestTagUseCase_Tag_GetEntryError(t *testing.T) {
 
 	uc := &usecasestaging.TagUseCase{
 		Strategy: newMockTagStrategy(),
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	_, err := uc.Tag(t.Context(), usecasestaging.TagInput{
@@ -342,7 +342,7 @@ func TestTagUseCase_Untag_Success(t *testing.T) {
 	store := testutil.NewMockStore()
 	uc := &usecasestaging.TagUseCase{
 		Strategy: newMockTagStrategy(),
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	output, err := uc.Untag(t.Context(), usecasestaging.UntagInput{
@@ -372,7 +372,7 @@ func TestTagUseCase_Untag_RemoveTagDeletesFromAddList(t *testing.T) {
 
 	uc := &usecasestaging.TagUseCase{
 		Strategy: newMockTagStrategy(),
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	// Remove a tag that was previously in add list
@@ -402,7 +402,7 @@ func TestTagUseCase_Untag_DuplicateRemoveKeys(t *testing.T) {
 
 	uc := &usecasestaging.TagUseCase{
 		Strategy: newMockTagStrategy(),
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	// Try to remove the same key again
@@ -428,7 +428,7 @@ func TestTagUseCase_Untag_ParseError(t *testing.T) {
 
 	uc := &usecasestaging.TagUseCase{
 		Strategy: strategy,
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	_, err := uc.Untag(t.Context(), usecasestaging.UntagInput{
@@ -447,7 +447,7 @@ func TestTagUseCase_Untag_GetEntryError(t *testing.T) {
 
 	uc := &usecasestaging.TagUseCase{
 		Strategy: newMockTagStrategy(),
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	_, err := uc.Untag(t.Context(), usecasestaging.UntagInput{
@@ -466,7 +466,7 @@ func TestTagUseCase_Untag_GetTagError(t *testing.T) {
 
 	uc := &usecasestaging.TagUseCase{
 		Strategy: newMockTagStrategy(),
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	_, err := uc.Untag(t.Context(), usecasestaging.UntagInput{
@@ -486,7 +486,7 @@ func TestTagUseCase_Untag_FetchError(t *testing.T) {
 
 	uc := &usecasestaging.TagUseCase{
 		Strategy: strategy,
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	_, err := uc.Untag(t.Context(), usecasestaging.UntagInput{
@@ -510,7 +510,7 @@ func TestTagUseCase_Untag_BlockedOnDelete(t *testing.T) {
 
 	uc := &usecasestaging.TagUseCase{
 		Strategy: newMockTagStrategy(),
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	// Attempting to untag a DELETE should fail
@@ -546,7 +546,7 @@ func TestTagUseCase_Untag_StagedForCreate_WithExistingTags(t *testing.T) {
 
 	uc := &usecasestaging.TagUseCase{
 		Strategy: strategy,
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	// Untag "env" from the staged CREATE entry - should succeed despite resource not existing
@@ -583,7 +583,7 @@ func TestTagUseCase_Untag_StagedForCreate_AutoSkip(t *testing.T) {
 
 	uc := &usecasestaging.TagUseCase{
 		Strategy: strategy,
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	// Untag "env" - auto-skipped since tag doesn't exist
@@ -604,7 +604,7 @@ func TestTagUseCase_Untag_EmptyTagKeys(t *testing.T) {
 	store := testutil.NewMockStore()
 	uc := &usecasestaging.TagUseCase{
 		Strategy: newMockTagStrategy(),
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	// Execute with empty tag keys - should error
@@ -624,7 +624,7 @@ func TestTagUseCase_Untag_StageError(t *testing.T) {
 
 	uc := &usecasestaging.TagUseCase{
 		Strategy: newMockTagStrategy(),
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	_, err := uc.Untag(t.Context(), usecasestaging.UntagInput{
@@ -650,7 +650,7 @@ func TestTagUseCase_Untag_PreservesBaseModifiedAt(t *testing.T) {
 
 	uc := &usecasestaging.TagUseCase{
 		Strategy: newMockTagStrategy(),
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	_, err := uc.Untag(t.Context(), usecasestaging.UntagInput{
@@ -676,7 +676,7 @@ func TestTagUseCase_Untag_ZeroLastModified(t *testing.T) {
 
 	uc := &usecasestaging.TagUseCase{
 		Strategy: strategy,
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	_, err := uc.Untag(t.Context(), usecasestaging.UntagInput{

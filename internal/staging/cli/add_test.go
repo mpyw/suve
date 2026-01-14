@@ -29,7 +29,7 @@ func TestAddRunner_Run(t *testing.T) {
 		r := &cli.AddRunner{
 			UseCase: &stagingusecase.AddUseCase{
 				Strategy: &mockStrategy{service: staging.ServiceParam},
-				Store:    store,
+				Store:    store.ForService(staging.ServiceParam),
 			},
 			Stdout:     &buf,
 			Stderr:     &bytes.Buffer{},
@@ -64,7 +64,7 @@ func TestAddRunner_Run(t *testing.T) {
 		r := &cli.AddRunner{
 			UseCase: &stagingusecase.AddUseCase{
 				Strategy: &mockStrategy{service: staging.ServiceParam},
-				Store:    store,
+				Store:    store.ForService(staging.ServiceParam),
 			},
 			Stdout: &buf,
 			Stderr: &bytes.Buffer{},
@@ -96,7 +96,7 @@ func TestAddRunner_Run(t *testing.T) {
 		r := &cli.AddRunner{
 			UseCase: &stagingusecase.AddUseCase{
 				Strategy: &mockStrategy{service: staging.ServiceParam},
-				Store:    store,
+				Store:    store.ForService(staging.ServiceParam),
 			},
 			Stdout:     &buf,
 			Stderr:     &bytes.Buffer{},
@@ -128,7 +128,7 @@ func TestAddRunner_Run(t *testing.T) {
 		r := &cli.AddRunner{
 			UseCase: &stagingusecase.AddUseCase{
 				Strategy: &mockStrategy{service: staging.ServiceParam},
-				Store:    store,
+				Store:    store.ForService(staging.ServiceParam),
 			},
 			Stdout: &buf,
 			Stderr: &bytes.Buffer{},
@@ -152,7 +152,7 @@ func TestAddRunner_Run(t *testing.T) {
 		r := &cli.AddRunner{
 			UseCase: &stagingusecase.AddUseCase{
 				Strategy: &mockStrategy{service: staging.ServiceSecret},
-				Store:    store,
+				Store:    store.ForService(staging.ServiceSecret),
 			},
 			Stdout:     &buf,
 			Stderr:     &bytes.Buffer{},
@@ -209,7 +209,7 @@ func TestAddRunner_ErrorCases(t *testing.T) {
 		r := &cli.AddRunner{
 			UseCase: &stagingusecase.AddUseCase{
 				Strategy: &mockStrategy{service: staging.ServiceParam, parseNameErr: errors.New("invalid name")},
-				Store:    store,
+				Store:    store.ForService(staging.ServiceParam),
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -230,7 +230,7 @@ func TestAddRunner_ErrorCases(t *testing.T) {
 		r := &cli.AddRunner{
 			UseCase: &stagingusecase.AddUseCase{
 				Strategy: &mockStrategy{service: staging.ServiceParam},
-				Store:    store,
+				Store:    store.ForService(staging.ServiceParam),
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -258,7 +258,7 @@ func TestAddRunner_WithOptions(t *testing.T) {
 		r := &cli.AddRunner{
 			UseCase: &stagingusecase.AddUseCase{
 				Strategy: &mockStrategy{service: staging.ServiceParam},
-				Store:    store,
+				Store:    store.ForService(staging.ServiceParam),
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -288,7 +288,7 @@ func TestAddRunner_WithOptions(t *testing.T) {
 		r := &cli.AddRunner{
 			UseCase: &stagingusecase.AddUseCase{
 				Strategy: &mockStrategy{service: staging.ServiceParam},
-				Store:    store,
+				Store:    store.ForService(staging.ServiceParam),
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,

@@ -61,7 +61,7 @@ func TestApplyUseCase_Execute_Empty(t *testing.T) {
 	store := testutil.NewMockStore()
 	uc := &usecasestaging.ApplyUseCase{
 		Strategy: newMockApplyStrategy(),
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	output, err := uc.Execute(t.Context(), usecasestaging.ApplyInput{})
@@ -85,7 +85,7 @@ func TestApplyUseCase_Execute_SingleCreate(t *testing.T) {
 
 	uc := &usecasestaging.ApplyUseCase{
 		Strategy: newMockApplyStrategy(),
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	output, err := uc.Execute(t.Context(), usecasestaging.ApplyInput{
@@ -123,7 +123,7 @@ func TestApplyUseCase_Execute_MultipleOperations(t *testing.T) {
 
 	uc := &usecasestaging.ApplyUseCase{
 		Strategy: newMockApplyStrategy(),
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	output, err := uc.Execute(t.Context(), usecasestaging.ApplyInput{
@@ -151,7 +151,7 @@ func TestApplyUseCase_Execute_FilterByName(t *testing.T) {
 
 	uc := &usecasestaging.ApplyUseCase{
 		Strategy: newMockApplyStrategy(),
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	output, err := uc.Execute(t.Context(), usecasestaging.ApplyInput{
@@ -174,7 +174,7 @@ func TestApplyUseCase_Execute_FilterByName_NotStaged(t *testing.T) {
 	store := testutil.NewMockStore()
 	uc := &usecasestaging.ApplyUseCase{
 		Strategy: newMockApplyStrategy(),
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	_, err := uc.Execute(t.Context(), usecasestaging.ApplyInput{
@@ -204,7 +204,7 @@ func TestApplyUseCase_Execute_PartialFailure(t *testing.T) {
 
 	uc := &usecasestaging.ApplyUseCase{
 		Strategy: strategy,
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	output, err := uc.Execute(t.Context(), usecasestaging.ApplyInput{
@@ -243,7 +243,7 @@ func TestApplyUseCase_Execute_ConflictDetection(t *testing.T) {
 
 	uc := &usecasestaging.ApplyUseCase{
 		Strategy: strategy,
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	output, err := uc.Execute(t.Context(), usecasestaging.ApplyInput{
@@ -263,7 +263,7 @@ func TestApplyUseCase_Execute_ListError(t *testing.T) {
 
 	uc := &usecasestaging.ApplyUseCase{
 		Strategy: newMockApplyStrategy(),
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	_, err := uc.Execute(t.Context(), usecasestaging.ApplyInput{})
@@ -282,7 +282,7 @@ func TestApplyUseCase_Execute_DeleteSuccess(t *testing.T) {
 
 	uc := &usecasestaging.ApplyUseCase{
 		Strategy: newMockApplyStrategy(),
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	output, err := uc.Execute(t.Context(), usecasestaging.ApplyInput{
@@ -330,7 +330,7 @@ func TestApplyUseCase_Execute_TagsOnly(t *testing.T) {
 
 	uc := &usecasestaging.ApplyUseCase{
 		Strategy: newMockApplyTagStrategy(),
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	output, err := uc.Execute(t.Context(), usecasestaging.ApplyInput{})
@@ -361,7 +361,7 @@ func TestApplyUseCase_Execute_TagsWithRemove(t *testing.T) {
 
 	uc := &usecasestaging.ApplyUseCase{
 		Strategy: newMockApplyTagStrategy(),
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	output, err := uc.Execute(t.Context(), usecasestaging.ApplyInput{})
@@ -388,7 +388,7 @@ func TestApplyUseCase_Execute_EntriesAndTags(t *testing.T) {
 
 	uc := &usecasestaging.ApplyUseCase{
 		Strategy: newMockApplyTagStrategy(),
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	output, err := uc.Execute(t.Context(), usecasestaging.ApplyInput{
@@ -413,7 +413,7 @@ func TestApplyUseCase_Execute_TagFailure(t *testing.T) {
 
 	uc := &usecasestaging.ApplyUseCase{
 		Strategy: strategy,
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	output, err := uc.Execute(t.Context(), usecasestaging.ApplyInput{})
@@ -447,7 +447,7 @@ func TestApplyUseCase_Execute_PartialTagFailure(t *testing.T) {
 
 	uc := &usecasestaging.ApplyUseCase{
 		Strategy: strategy,
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	output, err := uc.Execute(t.Context(), usecasestaging.ApplyInput{})
@@ -480,7 +480,7 @@ func TestApplyUseCase_Execute_FilterByName_TagOnly(t *testing.T) {
 
 	uc := &usecasestaging.ApplyUseCase{
 		Strategy: newMockApplyTagStrategy(),
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	output, err := uc.Execute(t.Context(), usecasestaging.ApplyInput{
@@ -504,7 +504,7 @@ func TestApplyUseCase_Execute_ListTagsError(t *testing.T) {
 
 	uc := &usecasestaging.ApplyUseCase{
 		Strategy: newMockApplyTagStrategy(),
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	_, err := uc.Execute(t.Context(), usecasestaging.ApplyInput{})
@@ -528,7 +528,7 @@ func TestApplyUseCase_Execute_WithHintedUnstager_Entry(t *testing.T) {
 
 	uc := &usecasestaging.ApplyUseCase{
 		Strategy: newMockApplyStrategy(),
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	output, err := uc.Execute(t.Context(), usecasestaging.ApplyInput{
@@ -556,7 +556,7 @@ func TestApplyUseCase_Execute_WithHintedUnstager_Tag(t *testing.T) {
 
 	uc := &usecasestaging.ApplyUseCase{
 		Strategy: newMockApplyTagStrategy(),
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	output, err := uc.Execute(t.Context(), usecasestaging.ApplyInput{})

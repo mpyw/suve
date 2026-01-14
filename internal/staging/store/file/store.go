@@ -463,8 +463,10 @@ func (c *CompositeStore) WriteState(ctx context.Context, service staging.Service
 	return WriteAll(ctx, c.stores, state)
 }
 
-// Compile-time check that Store implements FileStore.
-var _ store.FileStore = (*Store)(nil)
-
-// Compile-time check that CompositeStore implements FileStore.
-var _ store.FileStore = (*CompositeStore)(nil)
+// Compile-time checks.
+//
+//nolint:staticcheck // intentionally using legacy interfaces during migration
+var (
+	_ store.LegacyFileStore = (*Store)(nil)
+	_ store.LegacyFileStore = (*CompositeStore)(nil)
+)

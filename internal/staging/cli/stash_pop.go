@@ -11,10 +11,8 @@ import (
 	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/infra"
 	"github.com/mpyw/suve/internal/staging"
-	"github.com/mpyw/suve/internal/staging/store"
 	"github.com/mpyw/suve/internal/staging/store/agent"
 	"github.com/mpyw/suve/internal/staging/store/agent/daemon/lifecycle"
-	"github.com/mpyw/suve/internal/staging/store/file"
 	stagingusecase "github.com/mpyw/suve/internal/usecase/staging"
 )
 
@@ -104,30 +102,19 @@ func stashPopAction(service staging.Service) func(context.Context, *cli.Command)
 			return fmt.Errorf("failed to get AWS identity: %w", err)
 		}
 
-		// V3: Use service-specific store or composite store for global operations
-		var fileStore store.FileStore
-		if service != "" {
-			fileStore, err = fileStoreForReading(cmd, identity.AccountID, identity.Region, service, false)
-		} else {
-			var stores map[staging.Service]*file.Store
-
-			stores, err = fileStoresForReading(cmd, identity.AccountID, identity.Region, false)
-			if err == nil {
-				fileStore = file.NewCompositeStore(stores)
-			}
-		}
-
+		// Use factory pattern for file and agent stores
+		fileFactory, err := fileFactoryForReading(cmd, identity.AccountID, identity.Region, false)
 		if err != nil {
 			return err
 		}
 
-		agentStore := agent.NewStore(identity.AccountID, identity.Region)
+		agentFactory := agent.NewFactory(identity.AccountID, identity.Region)
 
-		_, err = lifecycle.ExecuteWrite(ctx, agentStore, lifecycle.CmdStashPop, func() (struct{}, error) {
+		_, err = lifecycle.ExecuteWrite(ctx, agentFactory, lifecycle.CmdStashPop, func() (struct{}, error) {
 			r := &StashPopRunner{
 				UseCase: &stagingusecase.StashPopUseCase{
-					FileStore:  fileStore,
-					AgentStore: agentStore,
+					FileStore:  fileFactory.Global(),
+					AgentStore: agentFactory.Global(),
 				},
 				Stdout: cmd.Root().Writer,
 				Stderr: cmd.Root().ErrWriter,

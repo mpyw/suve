@@ -143,12 +143,16 @@ func setupTempHome(t *testing.T) {
 
 // newStore creates a new staging store for E2E tests.
 // localstack uses account ID "000000000000" and region "us-east-1".
+//
+//nolint:staticcheck // returns legacy interface for E2E test compatibility
 func newStore() store.AgentStore {
 	return agent.NewStore("000000000000", "us-east-1")
 }
 
 // newStoreForAccount creates a staging store for a specific account and region.
 // Used for testing error cases when daemon is not running for that account.
+//
+//nolint:staticcheck // returns legacy interface for E2E test compatibility
 func newStoreForAccount(accountID, region string) store.AgentStore {
 	return agent.NewStore(accountID, region)
 }

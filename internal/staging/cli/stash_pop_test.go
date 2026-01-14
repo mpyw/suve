@@ -36,8 +36,8 @@ func TestStashPopRunner_RunBasic(t *testing.T) {
 
 		runner := &cli.StashPopRunner{
 			UseCase: &stagingusecase.StashPopUseCase{
-				FileStore:  fileStore,
-				AgentStore: agentStore,
+				FileStore:  fileStore.Global(),
+				AgentStore: agentStore.Global(),
 			},
 			Stdout: stdout,
 			Stderr: stderr,
@@ -66,8 +66,8 @@ func TestStashPopRunner_RunBasic(t *testing.T) {
 
 		runner := &cli.StashPopRunner{
 			UseCase: &stagingusecase.StashPopUseCase{
-				FileStore:  fileStore,
-				AgentStore: agentStore,
+				FileStore:  fileStore.Global(),
+				AgentStore: agentStore.Global(),
 			},
 			Stdout: stdout,
 			Stderr: stderr,
@@ -100,8 +100,8 @@ func TestStashPopRunner_RunBasic(t *testing.T) {
 
 		runner := &cli.StashPopRunner{
 			UseCase: &stagingusecase.StashPopUseCase{
-				FileStore:  fileStore,
-				AgentStore: agentStore,
+				FileStore:  fileStore.Global(),
+				AgentStore: agentStore.Global(),
 			},
 			Stdout: stdout,
 			Stderr: stderr,
@@ -123,8 +123,8 @@ func TestStashPopRunner_RunBasic(t *testing.T) {
 
 		runner := &cli.StashPopRunner{
 			UseCase: &stagingusecase.StashPopUseCase{
-				FileStore:  fileStore,
-				AgentStore: agentStore,
+				FileStore:  fileStore.Global(),
+				AgentStore: agentStore.Global(),
 			},
 			Stdout: stdout,
 			Stderr: stderr,
@@ -156,8 +156,8 @@ func TestStashPopRunner_RunBasic(t *testing.T) {
 
 		runner := &cli.StashPopRunner{
 			UseCase: &stagingusecase.StashPopUseCase{
-				FileStore:  fileStore,
-				AgentStore: agentStore,
+				FileStore:  fileStore.Global(),
+				AgentStore: agentStore.Global(),
 			},
 			Stdout: stdout,
 			Stderr: stderr,
@@ -184,8 +184,8 @@ func TestStashPopRunner_RunBasic(t *testing.T) {
 
 		runner := &cli.StashPopRunner{
 			UseCase: &stagingusecase.StashPopUseCase{
-				FileStore:  fileStore,
-				AgentStore: agentStore,
+				FileStore:  fileStore.Global(),
+				AgentStore: agentStore.Global(),
 			},
 			Stdout: stdout,
 			Stderr: stderr,

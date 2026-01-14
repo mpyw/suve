@@ -3,7 +3,6 @@ package staging
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
@@ -48,7 +47,7 @@ type StatusOutput struct {
 // StatusUseCase executes status operations.
 type StatusUseCase struct {
 	Strategy staging.ServiceStrategy
-	Store    store.ReadOperator
+	Store    store.ServiceLister
 }
 
 // Execute runs the status use case.
@@ -65,28 +64,28 @@ func (u *StatusUseCase) Execute(ctx context.Context, input StatusInput) (*Status
 	}
 
 	if input.Name != "" {
-		// Get specific entry
-		entry, entryErr := u.Store.GetEntry(ctx, service, input.Name)
-		if entryErr != nil && !errors.Is(entryErr, staging.ErrNotStaged) {
-			return nil, entryErr
+		// Get specific entry by scanning the list (ServiceLister doesn't have GetEntry)
+		entries, err := u.Store.ListEntries(ctx)
+		if err != nil {
+			return nil, err
 		}
 
-		if entry != nil {
-			output.Entries = []StatusEntry{toStatusEntry(input.Name, *entry, showDeleteOptions)}
+		if entry, exists := entries[input.Name]; exists {
+			output.Entries = []StatusEntry{toStatusEntry(input.Name, entry, showDeleteOptions)}
 		}
 
-		// Get specific tag entry
-		tagEntry, tagErr := u.Store.GetTag(ctx, service, input.Name)
-		if tagErr != nil && !errors.Is(tagErr, staging.ErrNotStaged) {
-			return nil, tagErr
+		// Get specific tag entry by scanning the list
+		tagEntries, err := u.Store.ListTags(ctx)
+		if err != nil {
+			return nil, err
 		}
 
-		if tagEntry != nil {
-			output.TagEntries = []StatusTagEntry{toStatusTagEntry(input.Name, *tagEntry)}
+		if tagEntry, exists := tagEntries[input.Name]; exists {
+			output.TagEntries = []StatusTagEntry{toStatusTagEntry(input.Name, tagEntry)}
 		}
 
 		// If neither exists, return error
-		if entry == nil && tagEntry == nil {
+		if len(output.Entries) == 0 && len(output.TagEntries) == 0 {
 			return nil, fmt.Errorf("%s %s is not staged", itemName, input.Name)
 		}
 
@@ -94,24 +93,22 @@ func (u *StatusUseCase) Execute(ctx context.Context, input StatusInput) (*Status
 	}
 
 	// Get all entries
-	entries, err := u.Store.ListEntries(ctx, service)
+	entries, err := u.Store.ListEntries(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	serviceEntries := entries[service]
-	for name, entry := range serviceEntries {
+	for name, entry := range entries {
 		output.Entries = append(output.Entries, toStatusEntry(name, entry, showDeleteOptions))
 	}
 
 	// Get all tag entries
-	tagEntries, err := u.Store.ListTags(ctx, service)
+	tagEntries, err := u.Store.ListTags(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	serviceTagEntries := tagEntries[service]
-	for name, tagEntry := range serviceTagEntries {
+	for name, tagEntry := range tagEntries {
 		output.TagEntries = append(output.TagEntries, toStatusTagEntry(name, tagEntry))
 	}
 

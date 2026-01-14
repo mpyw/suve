@@ -68,7 +68,9 @@ EXAMPLES:
 				return fmt.Errorf("failed to get AWS identity: %w", err)
 			}
 
-			store := agent.NewStore(identity.AccountID, identity.Region)
+			factory := agent.NewFactory(identity.AccountID, identity.Region)
+			parser := cfg.ParserFactory()
+			serviceStore := factory.Service(parser.Service())
 
 			opts := StatusOptions{
 				Verbose: cmd.Bool("verbose"),
@@ -77,11 +79,11 @@ EXAMPLES:
 				opts.Name = cmd.Args().First()
 			}
 
-			result, err := lifecycle.ExecuteRead(ctx, store, lifecycle.CmdStatus, func() (struct{}, error) {
+			result, err := lifecycle.ExecuteRead(ctx, factory, lifecycle.CmdStatus, func() (struct{}, error) {
 				r := &StatusRunner{
 					UseCase: &stagingusecase.StatusUseCase{
-						Strategy: cfg.ParserFactory(),
-						Store:    store,
+						Strategy: parser,
+						Store:    serviceStore,
 					},
 					Stdout: cmd.Root().Writer,
 					Stderr: cmd.Root().ErrWriter,
@@ -155,7 +157,9 @@ EXAMPLES:
 				return fmt.Errorf("failed to get AWS identity: %w", err)
 			}
 
-			store := agent.NewStore(identity.AccountID, identity.Region)
+			factory := agent.NewFactory(identity.AccountID, identity.Region)
+			parser := cfg.ParserFactory()
+			serviceStore := factory.Service(parser.Service())
 
 			opts := DiffOptions{
 				Name:      name,
@@ -163,7 +167,7 @@ EXAMPLES:
 				NoPager:   cmd.Bool("no-pager"),
 			}
 
-			result, err := lifecycle.ExecuteRead(ctx, store, lifecycle.CmdDiff, func() (struct{}, error) {
+			result, err := lifecycle.ExecuteRead(ctx, factory, lifecycle.CmdDiff, func() (struct{}, error) {
 				strategy, err := cfg.Factory(ctx)
 				if err != nil {
 					return struct{}{}, err
@@ -173,7 +177,7 @@ EXAMPLES:
 					r := &DiffRunner{
 						UseCase: &stagingusecase.DiffUseCase{
 							Strategy: strategy,
-							Store:    store,
+							Store:    serviceStore,
 						},
 						Stdout: w,
 						Stderr: cmd.Root().ErrWriter,
@@ -245,17 +249,18 @@ EXAMPLES:
 				return fmt.Errorf("failed to get AWS identity: %w", err)
 			}
 
-			store := agent.NewStore(identity.AccountID, identity.Region)
-
 			strategy, err := cfg.Factory(ctx)
 			if err != nil {
 				return fmt.Errorf("failed to initialize strategy: %w", err)
 			}
 
+			factory := agent.NewFactory(identity.AccountID, identity.Region)
+			serviceStore := factory.Service(strategy.Service())
+
 			r := &AddRunner{
 				UseCase: &stagingusecase.AddUseCase{
 					Strategy: strategy,
-					Store:    store,
+					Store:    serviceStore,
 				},
 				Stdout: cmd.Root().Writer,
 				Stderr: cmd.Root().ErrWriter,
@@ -322,17 +327,18 @@ EXAMPLES:
 				return fmt.Errorf("failed to get AWS identity: %w", err)
 			}
 
-			store := agent.NewStore(identity.AccountID, identity.Region)
-
 			strategy, err := cfg.Factory(ctx)
 			if err != nil {
 				return err
 			}
 
+			factory := agent.NewFactory(identity.AccountID, identity.Region)
+			serviceStore := factory.Service(strategy.Service())
+
 			r := &EditRunner{
 				UseCase: &stagingusecase.EditUseCase{
 					Strategy: strategy,
-					Store:    store,
+					Store:    serviceStore,
 				},
 				Stdout: cmd.Root().Writer,
 				Stderr: cmd.Root().ErrWriter,
@@ -398,20 +404,18 @@ EXAMPLES:
 				return fmt.Errorf("failed to get AWS identity: %w", err)
 			}
 
-			store := agent.NewStore(identity.AccountID, identity.Region)
+			factory := agent.NewFactory(identity.AccountID, identity.Region)
 			parser := cfg.ParserFactory()
+			serviceStore := factory.Service(parser.Service())
 
-			result, err := lifecycle.ExecuteRead(ctx, store, lifecycle.CmdApply, func() (struct{}, error) {
+			result, err := lifecycle.ExecuteRead(ctx, factory, lifecycle.CmdApply, func() (struct{}, error) {
 				// Get entries to show what will be applied
-				service := parser.Service()
-
-				entries, err := store.ListEntries(ctx, service)
+				entries, err := serviceStore.ListEntries(ctx)
 				if err != nil {
 					return struct{}{}, err
 				}
 
-				serviceEntries := entries[service]
-				if len(serviceEntries) == 0 {
+				if len(entries) == 0 {
 					output.Info(cmd.Root().Writer, "No %s changes staged.", parser.ServiceName())
 
 					return struct{}{}, nil
@@ -423,7 +427,7 @@ EXAMPLES:
 				}
 				if cmd.Args().Len() > 0 {
 					opts.Name = cmd.Args().First()
-					if _, ok := serviceEntries[opts.Name]; !ok {
+					if _, ok := entries[opts.Name]; !ok {
 						return struct{}{}, fmt.Errorf("%s is not staged", opts.Name)
 					}
 				}
@@ -440,7 +444,7 @@ EXAMPLES:
 				if opts.Name != "" {
 					message = fmt.Sprintf("Apply staged changes for %s to AWS?", opts.Name)
 				} else {
-					message = fmt.Sprintf("Apply %d staged %s change(s) to AWS?", len(serviceEntries), parser.ServiceName())
+					message = fmt.Sprintf("Apply %d staged %s change(s) to AWS?", len(entries), parser.ServiceName())
 				}
 
 				confirmed, err := prompter.Confirm(message, skipConfirm)
@@ -460,7 +464,7 @@ EXAMPLES:
 				r := &ApplyRunner{
 					UseCase: &stagingusecase.ApplyUseCase{
 						Strategy: strategy,
-						Store:    store,
+						Store:    serviceStore,
 					},
 					Stdout: cmd.Root().Writer,
 					Stderr: cmd.Root().ErrWriter,
@@ -553,11 +557,12 @@ EXAMPLES:
 				return fmt.Errorf("failed to get AWS identity: %w", err)
 			}
 
-			store := agent.NewStore(identity.AccountID, identity.Region)
+			factory := agent.NewFactory(identity.AccountID, identity.Region)
+			serviceStore := factory.Service(parser.Service())
 
 			if hasVersion {
 				// Reset with version spec - write operation, auto-start the agent
-				_, err := lifecycle.ExecuteWrite(ctx, store, lifecycle.CmdResetVersion, func() (struct{}, error) {
+				_, err := lifecycle.ExecuteWrite(ctx, factory, lifecycle.CmdResetVersion, func() (struct{}, error) {
 					strategy, err := cfg.Factory(ctx)
 					if err != nil {
 						return struct{}{}, err
@@ -567,7 +572,7 @@ EXAMPLES:
 						UseCase: &stagingusecase.ResetUseCase{
 							Parser:  parser,
 							Fetcher: strategy,
-							Store:   store,
+							Store:   serviceStore,
 						},
 						Stdout: cmd.Root().Writer,
 						Stderr: cmd.Root().ErrWriter,
@@ -580,12 +585,12 @@ EXAMPLES:
 			}
 
 			// Reset without version spec - read operation, check if agent is running
-			result, err := lifecycle.ExecuteRead(ctx, store, lifecycle.CmdReset, func() (struct{}, error) {
+			result, err := lifecycle.ExecuteRead(ctx, factory, lifecycle.CmdReset, func() (struct{}, error) {
 				r := &ResetRunner{
 					UseCase: &stagingusecase.ResetUseCase{
 						Parser:  parser,
 						Fetcher: nil,
-						Store:   store,
+						Store:   serviceStore,
 					},
 					Stdout: cmd.Root().Writer,
 					Stderr: cmd.Root().ErrWriter,
@@ -689,12 +694,13 @@ EXAMPLES:
 				return fmt.Errorf("failed to get AWS identity: %w", err)
 			}
 
-			store := agent.NewStore(identity.AccountID, identity.Region)
-
 			strategy, err := cfg.Factory(ctx)
 			if err != nil {
 				return err
 			}
+
+			factory := agent.NewFactory(identity.AccountID, identity.Region)
+			serviceStore := factory.Service(strategy.Service())
 
 			name := cmd.Args().First()
 			force := cmd.Bool("force")
@@ -703,7 +709,7 @@ EXAMPLES:
 			r := &DeleteRunner{
 				UseCase: &stagingusecase.DeleteUseCase{
 					Strategy: strategy,
-					Store:    store,
+					Store:    serviceStore,
 				},
 				Stdout: cmd.Root().Writer,
 				Stderr: cmd.Root().ErrWriter,
@@ -742,16 +748,17 @@ func tagAction(cfg CommandConfig, usageMsg string, runner tagCommandRunner) func
 			return fmt.Errorf("failed to get AWS identity: %w", err)
 		}
 
-		store := agent.NewStore(identity.AccountID, identity.Region)
-
 		strategy, err := cfg.Factory(ctx)
 		if err != nil {
 			return err
 		}
 
+		factory := agent.NewFactory(identity.AccountID, identity.Region)
+		serviceStore := factory.Service(strategy.Service())
+
 		useCase := &stagingusecase.TagUseCase{
 			Strategy: strategy,
-			Store:    store,
+			Store:    serviceStore,
 		}
 
 		return runner(ctx, useCase, cmd.Root().Writer, cmd.Root().ErrWriter, name, args)

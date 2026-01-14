@@ -48,7 +48,7 @@ func TestDiffUseCase_Execute_Empty(t *testing.T) {
 	store := testutil.NewMockStore()
 	uc := &usecasestaging.DiffUseCase{
 		Strategy: newMockDiffStrategy(),
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	output, err := uc.Execute(t.Context(), usecasestaging.DiffInput{})
@@ -75,7 +75,7 @@ func TestDiffUseCase_Execute_UpdateDiff(t *testing.T) {
 
 	uc := &usecasestaging.DiffUseCase{
 		Strategy: strategy,
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	output, err := uc.Execute(t.Context(), usecasestaging.DiffInput{})
@@ -106,7 +106,7 @@ func TestDiffUseCase_Execute_CreateDiff(t *testing.T) {
 
 	uc := &usecasestaging.DiffUseCase{
 		Strategy: strategy,
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	output, err := uc.Execute(t.Context(), usecasestaging.DiffInput{})
@@ -136,7 +136,7 @@ func TestDiffUseCase_Execute_DeleteDiff(t *testing.T) {
 
 	uc := &usecasestaging.DiffUseCase{
 		Strategy: strategy,
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	output, err := uc.Execute(t.Context(), usecasestaging.DiffInput{})
@@ -168,7 +168,7 @@ func TestDiffUseCase_Execute_AutoUnstage_Identical(t *testing.T) {
 
 	uc := &usecasestaging.DiffUseCase{
 		Strategy: strategy,
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	output, err := uc.Execute(t.Context(), usecasestaging.DiffInput{})
@@ -198,7 +198,7 @@ func TestDiffUseCase_Execute_AutoUnstage_AlreadyDeleted(t *testing.T) {
 
 	uc := &usecasestaging.DiffUseCase{
 		Strategy: strategy,
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	output, err := uc.Execute(t.Context(), usecasestaging.DiffInput{})
@@ -227,7 +227,7 @@ func TestDiffUseCase_Execute_FilterByName(t *testing.T) {
 
 	uc := &usecasestaging.DiffUseCase{
 		Strategy: newMockDiffStrategy(),
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	output, err := uc.Execute(t.Context(), usecasestaging.DiffInput{Name: "/app/one"})
@@ -242,7 +242,7 @@ func TestDiffUseCase_Execute_FilterByName_NotStaged(t *testing.T) {
 	store := testutil.NewMockStore()
 	uc := &usecasestaging.DiffUseCase{
 		Strategy: newMockDiffStrategy(),
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	output, err := uc.Execute(t.Context(), usecasestaging.DiffInput{Name: "/app/not-staged"})
@@ -268,7 +268,7 @@ func TestDiffUseCase_Execute_AutoUnstage_UpdateNoLongerExists(t *testing.T) {
 
 	uc := &usecasestaging.DiffUseCase{
 		Strategy: strategy,
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	output, err := uc.Execute(t.Context(), usecasestaging.DiffInput{})
@@ -292,7 +292,7 @@ func TestDiffUseCase_Execute_ListError(t *testing.T) {
 
 	uc := &usecasestaging.DiffUseCase{
 		Strategy: newMockDiffStrategy(),
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	_, err := uc.Execute(t.Context(), usecasestaging.DiffInput{})
@@ -308,7 +308,7 @@ func TestDiffUseCase_Execute_GetError(t *testing.T) {
 
 	uc := &usecasestaging.DiffUseCase{
 		Strategy: newMockDiffStrategy(),
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	_, err := uc.Execute(t.Context(), usecasestaging.DiffInput{Name: "/app/config"})
@@ -324,7 +324,7 @@ func TestDiffUseCase_Execute_GetTagError(t *testing.T) {
 
 	uc := &usecasestaging.DiffUseCase{
 		Strategy: newMockDiffStrategy(),
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	_, err := uc.Execute(t.Context(), usecasestaging.DiffInput{Name: "/app/config"})
@@ -340,7 +340,7 @@ func TestDiffUseCase_Execute_ListTagsError(t *testing.T) {
 
 	uc := &usecasestaging.DiffUseCase{
 		Strategy: newMockDiffStrategy(),
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	_, err := uc.Execute(t.Context(), usecasestaging.DiffInput{})
@@ -364,7 +364,7 @@ func TestDiffUseCase_Execute_UnknownOperation(t *testing.T) {
 
 	uc := &usecasestaging.DiffUseCase{
 		Strategy: strategy,
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	output, err := uc.Execute(t.Context(), usecasestaging.DiffInput{})
@@ -387,7 +387,7 @@ func TestDiffUseCase_Execute_FilterByName_EntryExistsTagNil(t *testing.T) {
 
 	uc := &usecasestaging.DiffUseCase{
 		Strategy: newMockDiffStrategy(),
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	output, err := uc.Execute(t.Context(), usecasestaging.DiffInput{Name: "/app/entry-only"})
@@ -409,7 +409,7 @@ func TestDiffUseCase_Execute_FilterByName_TagExistsEntryNil(t *testing.T) {
 
 	uc := &usecasestaging.DiffUseCase{
 		Strategy: newMockDiffStrategy(),
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	output, err := uc.Execute(t.Context(), usecasestaging.DiffInput{Name: "/app/tag-only"})
@@ -433,7 +433,7 @@ func TestDiffUseCase_Execute_WithTagEntriesProcessing(t *testing.T) {
 
 	uc := &usecasestaging.DiffUseCase{
 		Strategy: newMockDiffStrategy(),
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	output, err := uc.Execute(t.Context(), usecasestaging.DiffInput{})

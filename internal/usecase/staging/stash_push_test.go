@@ -30,8 +30,8 @@ func TestPersistUseCase_Execute(t *testing.T) {
 		})
 
 		usecase := &stagingusecase.StashPushUseCase{
-			AgentStore: agentStore,
-			FileStore:  fileStore,
+			AgentStore: agentStore.Global(),
+			FileStore:  fileStore.Global(),
 		}
 
 		output, err := usecase.Execute(t.Context(), stagingusecase.StashPushInput{})
@@ -61,8 +61,8 @@ func TestPersistUseCase_Execute(t *testing.T) {
 		})
 
 		usecase := &stagingusecase.StashPushUseCase{
-			AgentStore: agentStore,
-			FileStore:  fileStore,
+			AgentStore: agentStore.Global(),
+			FileStore:  fileStore.Global(),
 		}
 
 		_, err := usecase.Execute(t.Context(), stagingusecase.StashPushInput{Keep: true})
@@ -82,8 +82,8 @@ func TestPersistUseCase_Execute(t *testing.T) {
 		fileStore := testutil.NewMockStore()
 
 		usecase := &stagingusecase.StashPushUseCase{
-			AgentStore: agentStore,
-			FileStore:  fileStore,
+			AgentStore: agentStore.Global(),
+			FileStore:  fileStore.Global(),
 		}
 
 		_, err := usecase.Execute(t.Context(), stagingusecase.StashPushInput{})
@@ -108,8 +108,8 @@ func TestPersistUseCase_Execute(t *testing.T) {
 		})
 
 		usecase := &stagingusecase.StashPushUseCase{
-			AgentStore: agentStore,
-			FileStore:  fileStore,
+			AgentStore: agentStore.Global(),
+			FileStore:  fileStore.Global(),
 		}
 
 		_, err := usecase.Execute(t.Context(), stagingusecase.StashPushInput{Service: staging.ServiceParam})
@@ -140,8 +140,8 @@ func TestPersistUseCase_Execute(t *testing.T) {
 		})
 
 		usecase := &stagingusecase.StashPushUseCase{
-			AgentStore: agentStore,
-			FileStore:  fileStore,
+			AgentStore: agentStore.Global(),
+			FileStore:  fileStore.Global(),
 		}
 
 		output, err := usecase.Execute(t.Context(), stagingusecase.StashPushInput{})
@@ -175,8 +175,8 @@ func TestPersistUseCase_Execute(t *testing.T) {
 		})
 
 		usecase := &stagingusecase.StashPushUseCase{
-			AgentStore: agentStore,
-			FileStore:  fileStore,
+			AgentStore: agentStore.Global(),
+			FileStore:  fileStore.Global(),
 		}
 
 		_, err := usecase.Execute(t.Context(), stagingusecase.StashPushInput{Service: staging.ServiceParam})
@@ -219,8 +219,8 @@ func TestPersistUseCase_PersistMode(t *testing.T) {
 		})
 
 		usecase := &stagingusecase.StashPushUseCase{
-			AgentStore: agentStore,
-			FileStore:  fileStore,
+			AgentStore: agentStore.Global(),
+			FileStore:  fileStore.Global(),
 		}
 
 		_, err := usecase.Execute(t.Context(), stagingusecase.StashPushInput{
@@ -267,8 +267,8 @@ func TestPersistUseCase_PersistMode(t *testing.T) {
 		})
 
 		usecase := &stagingusecase.StashPushUseCase{
-			AgentStore: agentStore,
-			FileStore:  fileStore,
+			AgentStore: agentStore.Global(),
+			FileStore:  fileStore.Global(),
 		}
 
 		_, err := usecase.Execute(t.Context(), stagingusecase.StashPushInput{
@@ -306,8 +306,8 @@ func TestPersistUseCase_PersistMode(t *testing.T) {
 		})
 
 		usecase := &stagingusecase.StashPushUseCase{
-			AgentStore: agentStore,
-			FileStore:  fileStore,
+			AgentStore: agentStore.Global(),
+			FileStore:  fileStore.Global(),
 		}
 
 		_, err := usecase.Execute(t.Context(), stagingusecase.StashPushInput{
@@ -346,8 +346,8 @@ func TestPersistUseCase_ServiceSpecific_EdgeCases(t *testing.T) {
 		})
 
 		usecase := &stagingusecase.StashPushUseCase{
-			AgentStore: agentStore,
-			FileStore:  fileStore,
+			AgentStore: agentStore.Global(),
+			FileStore:  fileStore.Global(),
 		}
 
 		// Push param only
@@ -386,8 +386,8 @@ func TestPersistUseCase_ServiceSpecific_EdgeCases(t *testing.T) {
 		})
 
 		usecase := &stagingusecase.StashPushUseCase{
-			AgentStore: agentStore,
-			FileStore:  fileStore,
+			AgentStore: agentStore.Global(),
+			FileStore:  fileStore.Global(),
 		}
 
 		// Push secret only
@@ -431,8 +431,8 @@ func TestPersistUseCase_ServiceSpecific_EdgeCases(t *testing.T) {
 		})
 
 		usecase := &stagingusecase.StashPushUseCase{
-			AgentStore: agentStore,
-			FileStore:  fileStore,
+			AgentStore: agentStore.Global(),
+			FileStore:  fileStore.Global(),
 		}
 
 		// Push param only
@@ -475,8 +475,8 @@ func TestPersistUseCase_ServiceSpecific_EdgeCases(t *testing.T) {
 		})
 
 		usecase := &stagingusecase.StashPushUseCase{
-			AgentStore: agentStore,
-			FileStore:  fileStore,
+			AgentStore: agentStore.Global(),
+			FileStore:  fileStore.Global(),
 		}
 
 		// Even with Overwrite mode, service-specific push preserves other services
@@ -507,8 +507,8 @@ func TestPersistUseCase_Execute_Errors(t *testing.T) {
 		fileStore := testutil.NewMockStore()
 
 		usecase := &stagingusecase.StashPushUseCase{
-			AgentStore: agentStore,
-			FileStore:  fileStore,
+			AgentStore: agentStore.Global(),
+			FileStore:  fileStore.Global(),
 		}
 
 		_, err := usecase.Execute(t.Context(), stagingusecase.StashPushInput{})
@@ -532,8 +532,8 @@ func TestPersistUseCase_Execute_Errors(t *testing.T) {
 		fileStore.WriteStateErr = errors.New("write error")
 
 		usecase := &stagingusecase.StashPushUseCase{
-			AgentStore: agentStore,
-			FileStore:  fileStore,
+			AgentStore: agentStore.Global(),
+			FileStore:  fileStore.Global(),
 		}
 
 		_, err := usecase.Execute(t.Context(), stagingusecase.StashPushInput{})
@@ -606,8 +606,8 @@ func TestPersistUseCase_WithHintedUnstager(t *testing.T) {
 		})
 
 		usecase := &stagingusecase.StashPushUseCase{
-			AgentStore: agentStore,
-			FileStore:  fileStore,
+			AgentStore: agentStore.Global(),
+			FileStore:  fileStore.Global(),
 		}
 
 		output, err := usecase.Execute(t.Context(), stagingusecase.StashPushInput{})
@@ -636,8 +636,8 @@ func TestPersistUseCase_WithHintedUnstager(t *testing.T) {
 		agentStore.UnstageAllWithHintErr = errors.New("hinted unstage error")
 
 		usecase := &stagingusecase.StashPushUseCase{
-			AgentStore: agentStore,
-			FileStore:  fileStore,
+			AgentStore: agentStore.Global(),
+			FileStore:  fileStore.Global(),
 		}
 
 		output, err := usecase.Execute(t.Context(), stagingusecase.StashPushInput{})
@@ -670,8 +670,8 @@ func TestPersistUseCase_WithHintedUnstager(t *testing.T) {
 		agentStore.UnstageAllErr = errors.New("unstage all error")
 
 		usecase := &stagingusecase.StashPushUseCase{
-			AgentStore: agentStore,
-			FileStore:  fileStore,
+			AgentStore: agentStore.Global(),
+			FileStore:  fileStore.Global(),
 		}
 
 		output, err := usecase.Execute(t.Context(), stagingusecase.StashPushInput{})
@@ -709,8 +709,8 @@ func TestPersistUseCase_ServiceSpecific_ClearError(t *testing.T) {
 		})
 
 		usecase := &stagingusecase.StashPushUseCase{
-			AgentStore: agentStore,
-			FileStore:  fileStore,
+			AgentStore: agentStore.Global(),
+			FileStore:  fileStore.Global(),
 		}
 
 		// First push succeeds
@@ -761,8 +761,8 @@ func TestPersistUseCase_FileDrainError_TreatedAsFresh(t *testing.T) {
 		fileStore.DrainErr = errors.New("file not found")
 
 		usecase := &stagingusecase.StashPushUseCase{
-			AgentStore: agentStore,
-			FileStore:  fileStore,
+			AgentStore: agentStore.Global(),
+			FileStore:  fileStore.Global(),
 		}
 
 		// Should succeed because file drain error is treated as empty state (start fresh)
@@ -792,8 +792,8 @@ func TestPersistUseCase_FileDrainError_TreatedAsFresh(t *testing.T) {
 		fileStore.DrainErr = errors.New("file not found")
 
 		usecase := &stagingusecase.StashPushUseCase{
-			AgentStore: agentStore,
-			FileStore:  fileStore,
+			AgentStore: agentStore.Global(),
+			FileStore:  fileStore.Global(),
 		}
 
 		// Should succeed because file drain error is treated as empty state (start fresh)

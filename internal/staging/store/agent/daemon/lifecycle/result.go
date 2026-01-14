@@ -10,3 +10,10 @@ type Result[T any] struct {
 	// When true, Value should be ignored.
 	NothingStaged bool
 }
+
+// ReadResult is a non-generic result type for read commands that don't return a value.
+// Use this with ExecuteReadErr when you only need to check if nothing was staged.
+type ReadResult struct {
+	// NothingStaged indicates that the agent was not running, meaning no changes are staged.
+	NothingStaged bool
+}

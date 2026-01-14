@@ -54,7 +54,7 @@ func TestEditUseCase_Execute(t *testing.T) {
 	store := testutil.NewMockStore()
 	uc := &usecasestaging.EditUseCase{
 		Strategy: newMockEditStrategy(),
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	output, err := uc.Execute(t.Context(), usecasestaging.EditInput{
@@ -89,7 +89,7 @@ func TestEditUseCase_Execute_PreservesBaseModifiedAt(t *testing.T) {
 
 	uc := &usecasestaging.EditUseCase{
 		Strategy: newMockEditStrategy(),
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	// Re-edit should preserve original BaseModifiedAt
@@ -116,7 +116,7 @@ func TestEditUseCase_Baseline_FromAWS(t *testing.T) {
 
 	uc := &usecasestaging.EditUseCase{
 		Strategy: strategy,
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	output, err := uc.Baseline(t.Context(), usecasestaging.BaselineInput{Name: "/app/config"})
@@ -136,7 +136,7 @@ func TestEditUseCase_Baseline_FromStaging(t *testing.T) {
 
 	uc := &usecasestaging.EditUseCase{
 		Strategy: newMockEditStrategy(),
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	output, err := uc.Baseline(t.Context(), usecasestaging.BaselineInput{Name: "/app/config"})
@@ -156,7 +156,7 @@ func TestEditUseCase_Baseline_FromStagingCreate(t *testing.T) {
 
 	uc := &usecasestaging.EditUseCase{
 		Strategy: newMockEditStrategy(),
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	output, err := uc.Baseline(t.Context(), usecasestaging.BaselineInput{Name: "/app/new"})
@@ -173,7 +173,7 @@ func TestEditUseCase_Execute_FetchError(t *testing.T) {
 
 	uc := &usecasestaging.EditUseCase{
 		Strategy: strategy,
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	_, err := uc.Execute(t.Context(), usecasestaging.EditInput{
@@ -193,7 +193,7 @@ func TestEditUseCase_Baseline_FetchError(t *testing.T) {
 
 	uc := &usecasestaging.EditUseCase{
 		Strategy: strategy,
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	_, err := uc.Baseline(t.Context(), usecasestaging.BaselineInput{Name: "/app/config"})
@@ -213,7 +213,7 @@ func TestEditUseCase_Execute_WithStagedCreate(t *testing.T) {
 
 	uc := &usecasestaging.EditUseCase{
 		Strategy: newMockEditStrategy(),
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	_, err := uc.Execute(t.Context(), usecasestaging.EditInput{
@@ -244,7 +244,7 @@ func TestEditUseCase_Execute_ZeroLastModified(t *testing.T) {
 
 	uc := &usecasestaging.EditUseCase{
 		Strategy: strategy,
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	_, err := uc.Execute(t.Context(), usecasestaging.EditInput{
@@ -266,7 +266,7 @@ func TestEditUseCase_Execute_StageError(t *testing.T) {
 
 	uc := &usecasestaging.EditUseCase{
 		Strategy: newMockEditStrategy(),
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	_, err := uc.Execute(t.Context(), usecasestaging.EditInput{
@@ -285,7 +285,7 @@ func TestEditUseCase_Execute_GetErrorForBaseModified(t *testing.T) {
 
 	uc := &usecasestaging.EditUseCase{
 		Strategy: newMockEditStrategy(),
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	_, err := uc.Execute(t.Context(), usecasestaging.EditInput{
@@ -303,7 +303,7 @@ func TestEditUseCase_Baseline_GetError(t *testing.T) {
 
 	uc := &usecasestaging.EditUseCase{
 		Strategy: newMockEditStrategy(),
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	_, err := uc.Baseline(t.Context(), usecasestaging.BaselineInput{Name: "/app/config"})
@@ -322,7 +322,7 @@ func TestEditUseCase_Execute_BlocksEditOnDelete(t *testing.T) {
 
 	uc := &usecasestaging.EditUseCase{
 		Strategy: newMockEditStrategy(),
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	// Editing a staged DELETE should be blocked
@@ -357,7 +357,7 @@ func TestEditUseCase_Baseline_BlocksWhenDeleteStaged(t *testing.T) {
 
 	uc := &usecasestaging.EditUseCase{
 		Strategy: strategy,
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	// When DELETE is staged, Baseline should return an error
@@ -382,7 +382,7 @@ func TestEditUseCase_Execute_PreservesUpdateOperation(t *testing.T) {
 
 	uc := &usecasestaging.EditUseCase{
 		Strategy: newMockEditStrategy(),
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	// Re-edit should preserve UPDATE operation
@@ -411,7 +411,7 @@ func TestEditUseCase_Execute_Skipped_SameAsAWS(t *testing.T) {
 
 	uc := &usecasestaging.EditUseCase{
 		Strategy: strategy,
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	// Edit with same value as AWS - should be skipped
@@ -448,7 +448,7 @@ func TestEditUseCase_Execute_Unstaged_RevertedToAWS(t *testing.T) {
 
 	uc := &usecasestaging.EditUseCase{
 		Strategy: strategy,
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	// Edit back to AWS value - should auto-unstage
@@ -477,7 +477,7 @@ func TestEditUseCase_Execute_NotSkipped_DifferentFromAWS(t *testing.T) {
 
 	uc := &usecasestaging.EditUseCase{
 		Strategy: strategy,
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	// Edit with different value - should be staged
@@ -511,7 +511,7 @@ func TestEditUseCase_Execute_EmptyStringValue_AutoSkip(t *testing.T) {
 
 	uc := &usecasestaging.EditUseCase{
 		Strategy: strategy,
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	// Edit with empty string (same as AWS) - should auto-skip
@@ -542,7 +542,7 @@ func TestEditUseCase_Execute_EmptyStringValue_Stage(t *testing.T) {
 
 	uc := &usecasestaging.EditUseCase{
 		Strategy: strategy,
-		Store:    store,
+		Store:    store.ForService(staging.ServiceParam),
 	}
 
 	// Edit to non-empty value - should stage

@@ -21,7 +21,7 @@ import (
 
 // Runner executes the status command.
 type Runner struct {
-	Store  store.ReadWriteOperator
+	Store  store.ReadWriteOperator //nolint:staticcheck // using legacy interface during migration
 	Stdout io.Writer
 	Stderr io.Writer
 }

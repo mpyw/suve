@@ -43,7 +43,7 @@ type SecretClient interface {
 type Runner struct {
 	ParamClient  ParamClient
 	SecretClient SecretClient
-	Store        store.ReadWriteOperator
+	Store        store.ReadWriteOperator //nolint:staticcheck // using legacy interface during migration
 	Stdout       io.Writer
 	Stderr       io.Writer
 }

@@ -319,3 +319,137 @@ func TestExecuteFile_ComplexType(t *testing.T) {
 	require.NotNil(t, result)
 	assert.Equal(t, []byte{1, 2, 3}, result.Data)
 }
+
+// Tests for error-only variants.
+
+func TestExecuteWriteErr_StartSucceeds_ActionSucceeds(t *testing.T) {
+	t.Parallel()
+
+	starter := &mockStarter{err: nil}
+	ctx := context.Background()
+
+	err := lifecycle.ExecuteWriteErr(ctx, starter, lifecycle.CmdAdd, func() error {
+		return nil
+	})
+
+	require.NoError(t, err)
+}
+
+func TestExecuteWriteErr_StartSucceeds_ActionFails(t *testing.T) {
+	t.Parallel()
+
+	starter := &mockStarter{err: nil}
+	ctx := context.Background()
+	actionErr := errors.New("action failed")
+
+	err := lifecycle.ExecuteWriteErr(ctx, starter, lifecycle.CmdEdit, func() error {
+		return actionErr
+	})
+
+	require.ErrorIs(t, err, actionErr)
+}
+
+func TestExecuteWriteErr_StartFails(t *testing.T) {
+	t.Parallel()
+
+	startErr := errors.New("start failed")
+	starter := &mockStarter{err: startErr}
+	ctx := context.Background()
+
+	err := lifecycle.ExecuteWriteErr(ctx, starter, lifecycle.CmdDelete, func() error {
+		t.Fatal("action should not be called when Start fails")
+
+		return nil
+	})
+
+	require.ErrorIs(t, err, startErr)
+}
+
+func TestExecuteReadErr_PingFails_ReturnsNothingStaged(t *testing.T) {
+	t.Parallel()
+
+	pinger := &mockPinger{err: errors.New("agent not running")}
+	ctx := context.Background()
+
+	result, err := lifecycle.ExecuteReadErr(ctx, pinger, lifecycle.CmdStatus, func() error {
+		t.Fatal("action should not be called when Ping fails")
+
+		return nil
+	})
+
+	require.NoError(t, err)
+	assert.True(t, result.NothingStaged)
+}
+
+func TestExecuteReadErr_PingSucceeds_ActionSucceeds(t *testing.T) {
+	t.Parallel()
+
+	pinger := &mockPinger{err: nil}
+	ctx := context.Background()
+
+	result, err := lifecycle.ExecuteReadErr(ctx, pinger, lifecycle.CmdDiff, func() error {
+		return nil
+	})
+
+	require.NoError(t, err)
+	assert.False(t, result.NothingStaged)
+}
+
+func TestExecuteReadErr_PingSucceeds_ActionFails(t *testing.T) {
+	t.Parallel()
+
+	pinger := &mockPinger{err: nil}
+	ctx := context.Background()
+	actionErr := errors.New("action failed")
+
+	result, err := lifecycle.ExecuteReadErr(ctx, pinger, lifecycle.CmdApply, func() error {
+		return actionErr
+	})
+
+	require.ErrorIs(t, err, actionErr)
+	assert.False(t, result.NothingStaged)
+}
+
+func TestExecuteFileErr_ActionSucceeds(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+
+	err := lifecycle.ExecuteFileErr(ctx, lifecycle.CmdStashDrop, func() error {
+		return nil
+	})
+
+	require.NoError(t, err)
+}
+
+func TestExecuteFileErr_ActionFails(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	actionErr := errors.New("file delete failed")
+
+	err := lifecycle.ExecuteFileErr(ctx, lifecycle.CmdStashDrop, func() error {
+		return actionErr
+	})
+
+	require.ErrorIs(t, err, actionErr)
+}
+
+func TestReadResult_ZeroValue(t *testing.T) {
+	t.Parallel()
+
+	// Test that zero value of ReadResult has expected defaults
+	var result lifecycle.ReadResult
+
+	assert.False(t, result.NothingStaged)
+}
+
+func TestReadResult_NothingStaged(t *testing.T) {
+	t.Parallel()
+
+	result := lifecycle.ReadResult{
+		NothingStaged: true,
+	}
+
+	assert.True(t, result.NothingStaged)
+}

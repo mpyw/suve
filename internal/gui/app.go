@@ -53,9 +53,9 @@ type App struct {
 	paramClient  ParamClient
 	secretClient SecretClient
 
-	// Staging store (AgentStore includes ReadWriteOperator)
-	stagingStore   store.AgentStore
-	stagingStoreMu sync.Mutex // protects stagingStore initialization
+	// Staging store factory
+	stagingFactory   store.AgentStoreFactory
+	stagingFactoryMu sync.Mutex // protects stagingFactory initialization
 }
 
 // NewApp creates a new App application struct.
@@ -113,21 +113,21 @@ func (a *App) getSecretClient() (SecretClient, error) {
 	return client, nil
 }
 
-func (a *App) getStagingStore() (store.ReadWriteOperator, error) {
-	s, err := a.getAgentStore()
+func (a *App) getStagingStoreForService(service staging.Service) (store.ServiceStore, error) {
+	factory, err := a.getAgentFactory()
 	if err != nil {
 		return nil, err
 	}
 
-	return s, nil
+	return factory.Service(service), nil
 }
 
-func (a *App) getAgentStore() (store.AgentStore, error) {
-	a.stagingStoreMu.Lock()
-	defer a.stagingStoreMu.Unlock()
+func (a *App) getAgentFactory() (store.AgentStoreFactory, error) {
+	a.stagingFactoryMu.Lock()
+	defer a.stagingFactoryMu.Unlock()
 
-	if a.stagingStore != nil {
-		return a.stagingStore, nil
+	if a.stagingFactory != nil {
+		return a.stagingFactory, nil
 	}
 
 	identity, err := infra.GetAWSIdentity(a.ctx)
@@ -135,10 +135,10 @@ func (a *App) getAgentStore() (store.AgentStore, error) {
 		return nil, err
 	}
 
-	s := agent.NewStore(identity.AccountID, identity.Region)
-	a.stagingStore = s
+	f := agent.NewFactory(identity.AccountID, identity.Region)
+	a.stagingFactory = f
 
-	return s, nil
+	return f, nil
 }
 
 func (a *App) getService(service string) (staging.Service, error) {
