@@ -1339,7 +1339,7 @@
   }
 
   /* Narrow viewport: Stash wraps below and aligns right */
-  @media (max-width: 600px) {
+  @media (max-width: 800px) {
     .actions {
       flex-direction: column;
       gap: 12px;
