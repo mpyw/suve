@@ -681,10 +681,10 @@ func TestGlobal_StashDropEncrypted(t *testing.T) {
 	_, _, err := runCommand(t, paramstage.Command(), "add", paramName, "secret-value")
 	require.NoError(t, err)
 
-	// Stash push with passphrase (using passphrase-stdin)
+	// Stash push with passphrase (using passphrase-stdin flag)
 	cmd := stgcli.NewGlobalStashCommand()
-	stdin := strings.NewReader("testpassphrase\ntestpassphrase\n")
-	stdout, stderr, err := runSubCommandWithStdin(t, cmd, stdin, "push")
+	stdin := strings.NewReader("testpassphrase\n")
+	stdout, stderr, err := runSubCommandWithStdin(t, cmd, stdin, "push", "--passphrase-stdin")
 	require.NoError(t, err, "stash push failed: stdout=%s stderr=%s", stdout, stderr)
 
 	// Verify stash file is encrypted by trying to show without passphrase
