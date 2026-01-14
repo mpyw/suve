@@ -2,6 +2,18 @@
 
 .DEFAULT_GOAL := help
 
+# Detect host OS for linting
+UNAME_S := $(shell uname -s)
+ifeq ($(UNAME_S),Darwin)
+    HOST_GOOS := darwin
+else ifeq ($(UNAME_S),Linux)
+    HOST_GOOS := linux
+else ifeq ($(UNAME_S),FreeBSD)
+    HOST_GOOS := freebsd
+else
+    HOST_GOOS := windows
+endif
+
 SUVE_LOCALSTACK_EXTERNAL_PORT ?= 4566
 COVERPKG = $(shell go list ./... | grep -v testutil | grep -v /e2e | grep -v internal/gui | grep -v /cmd/ | tr '\n' ',')
 
@@ -20,11 +32,8 @@ build: ## Build CLI binary
 test: ## Run unit tests
 	go test $(shell go list ./... | grep -v internal/gui | grep -v /cmd/)
 
-lint: ## Run linter (all build tags + cross-platform)
-	GOOS=darwin golangci-lint run --build-tags=e2e,production ./...
-	GOOS=linux golangci-lint run --build-tags=e2e,production ./...
-	GOOS=windows golangci-lint run --build-tags=e2e,production ./...
-	GOOS=freebsd golangci-lint run --build-tags=e2e,production ./...
+lint: ## Run linter (host OS only, with all build tags)
+	GOOS=$(HOST_GOOS) golangci-lint run --build-tags=e2e,production ./...
 
 up: ## Start localstack container
 	SUVE_LOCALSTACK_EXTERNAL_PORT=$(SUVE_LOCALSTACK_EXTERNAL_PORT) docker compose up -d
