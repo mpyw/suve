@@ -21,7 +21,7 @@ type mockLogClient struct {
 	getSecretValueErr   map[string]error
 }
 
-//nolint:revive,stylecheck // Method name must match AWS SDK interface
+//nolint:revive,stylecheck,lll // Method name must match AWS SDK interface
 func (m *mockLogClient) ListSecretVersionIds(_ context.Context, _ *secretapi.ListSecretVersionIDsInput, _ ...func(*secretapi.Options)) (*secretapi.ListSecretVersionIDsOutput, error) {
 	if m.listVersionsErr != nil {
 		return nil, m.listVersionsErr
@@ -30,6 +30,7 @@ func (m *mockLogClient) ListSecretVersionIds(_ context.Context, _ *secretapi.Lis
 	return m.listVersionsResult, nil
 }
 
+//nolint:lll // mock function signature must match AWS SDK interface
 func (m *mockLogClient) GetSecretValue(_ context.Context, input *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) {
 	versionID := lo.FromPtr(input.VersionId)
 	if m.getSecretValueErr != nil {

@@ -460,7 +460,6 @@ func TestRun(t *testing.T) {
 				Spec2: &paramversion.Spec{Name: "/app/param", Absolute: paramversion.AbsoluteSpec{Version: lo.ToPtr(int64(2))}},
 			},
 			mock: &mockClient{
-				//nolint:lll // inline mock function in test table
 				getParameterFunc: func(_ context.Context, _ *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
 					return &paramapi.GetParameterOutput{
 						Parameter: &paramapi.Parameter{

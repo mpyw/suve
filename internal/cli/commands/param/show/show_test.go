@@ -42,20 +42,24 @@ func TestCommand_Validation(t *testing.T) {
 	})
 }
 
+//nolint:lll // mock struct fields match AWS SDK interface signatures
 type mockClient struct {
 	getParameterFunc        func(ctx context.Context, params *paramapi.GetParameterInput, optFns ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error)
 	getParameterHistoryFunc func(ctx context.Context, params *paramapi.GetParameterHistoryInput, optFns ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error)
 	listTagsForResourceFunc func(ctx context.Context, params *paramapi.ListTagsForResourceInput, optFns ...func(*paramapi.Options)) (*paramapi.ListTagsForResourceOutput, error)
 }
 
+//nolint:lll // mock function signature must match AWS SDK interface
 func (m *mockClient) GetParameter(ctx context.Context, params *paramapi.GetParameterInput, optFns ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
 	return m.getParameterFunc(ctx, params, optFns...)
 }
 
+//nolint:lll // mock function signature must match AWS SDK interface
 func (m *mockClient) GetParameterHistory(ctx context.Context, params *paramapi.GetParameterHistoryInput, optFns ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
 	return m.getParameterHistoryFunc(ctx, params, optFns...)
 }
 
+//nolint:lll // mock function signature must match AWS SDK interface
 func (m *mockClient) ListTagsForResource(ctx context.Context, params *paramapi.ListTagsForResourceInput, optFns ...func(*paramapi.Options)) (*paramapi.ListTagsForResourceOutput, error) {
 	if m.listTagsForResourceFunc != nil {
 		return m.listTagsForResourceFunc(ctx, params, optFns...)
@@ -106,6 +110,7 @@ func TestRun(t *testing.T) {
 				Spec: &paramversion.Spec{Name: "/my/param", Shift: 1},
 			},
 			mock: &mockClient{
+				//nolint:lll // inline mock function in test table
 				getParameterHistoryFunc: func(_ context.Context, _ *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
 					return &paramapi.GetParameterHistoryOutput{
 						Parameters: []paramapi.ParameterHistory{
@@ -276,6 +281,7 @@ func TestRun(t *testing.T) {
 				Raw:  true,
 			},
 			mock: &mockClient{
+				//nolint:lll // inline mock function in test table
 				getParameterHistoryFunc: func(_ context.Context, _ *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
 					return &paramapi.GetParameterHistoryOutput{
 						Parameters: []paramapi.ParameterHistory{
@@ -335,6 +341,7 @@ func TestRun(t *testing.T) {
 						},
 					}, nil
 				},
+				//nolint:lll // inline mock function in test table
 				listTagsForResourceFunc: func(_ context.Context, _ *paramapi.ListTagsForResourceInput, _ ...func(*paramapi.Options)) (*paramapi.ListTagsForResourceOutput, error) {
 					return &paramapi.ListTagsForResourceOutput{
 						TagList: []paramapi.Tag{
@@ -371,6 +378,7 @@ func TestRun(t *testing.T) {
 						},
 					}, nil
 				},
+				//nolint:lll // inline mock function in test table
 				listTagsForResourceFunc: func(_ context.Context, _ *paramapi.ListTagsForResourceInput, _ ...func(*paramapi.Options)) (*paramapi.ListTagsForResourceOutput, error) {
 					return &paramapi.ListTagsForResourceOutput{
 						TagList: []paramapi.Tag{

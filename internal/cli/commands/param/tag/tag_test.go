@@ -138,6 +138,7 @@ func TestRun(t *testing.T) {
 				Tags: map[string]string{"env": "prod"},
 			},
 			mock: &mockClient{
+				//nolint:lll // inline mock function in test table
 				addTagsFunc: func(_ context.Context, _ *paramapi.AddTagsToResourceInput, _ ...func(*paramapi.Options)) (*paramapi.AddTagsToResourceOutput, error) {
 					return nil, fmt.Errorf("AWS error")
 				},

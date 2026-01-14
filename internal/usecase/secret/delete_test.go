@@ -21,6 +21,7 @@ type mockDeleteClient struct {
 	deleteSecretErr      error
 }
 
+//nolint:lll // mock function signature must match AWS SDK interface
 func (m *mockDeleteClient) GetSecretValue(_ context.Context, _ *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) {
 	if m.getSecretValueErr != nil {
 		return nil, m.getSecretValueErr
@@ -29,6 +30,7 @@ func (m *mockDeleteClient) GetSecretValue(_ context.Context, _ *secretapi.GetSec
 	return m.getSecretValueResult, nil
 }
 
+//nolint:lll // mock function signature must match AWS SDK interface
 func (m *mockDeleteClient) DeleteSecret(_ context.Context, _ *secretapi.DeleteSecretInput, _ ...func(*secretapi.Options)) (*secretapi.DeleteSecretOutput, error) {
 	if m.deleteSecretErr != nil {
 		return nil, m.deleteSecretErr

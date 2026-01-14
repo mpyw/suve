@@ -47,10 +47,12 @@ func TestCommand_Validation(t *testing.T) {
 	})
 }
 
+//nolint:lll // mock struct fields match AWS SDK interface signatures
 type mockClient struct {
 	putParameterFunc func(ctx context.Context, params *paramapi.PutParameterInput, optFns ...func(*paramapi.Options)) (*paramapi.PutParameterOutput, error)
 }
 
+//nolint:lll // mock function signature must match AWS SDK interface
 func (m *mockClient) PutParameter(ctx context.Context, params *paramapi.PutParameterInput, optFns ...func(*paramapi.Options)) (*paramapi.PutParameterOutput, error) {
 	if m.putParameterFunc != nil {
 		return m.putParameterFunc(ctx, params, optFns...)
@@ -77,6 +79,7 @@ func TestRun(t *testing.T) {
 				Type:  "SecureString",
 			},
 			mock: &mockClient{
+				//nolint:lll // inline mock function in test table
 				putParameterFunc: func(_ context.Context, params *paramapi.PutParameterInput, _ ...func(*paramapi.Options)) (*paramapi.PutParameterOutput, error) {
 					assert.Equal(t, "/app/param", lo.FromPtr(params.Name))
 					assert.Equal(t, "test-value", lo.FromPtr(params.Value))
@@ -104,6 +107,7 @@ func TestRun(t *testing.T) {
 				Description: "Test description",
 			},
 			mock: &mockClient{
+				//nolint:lll // inline mock function in test table
 				putParameterFunc: func(_ context.Context, params *paramapi.PutParameterInput, _ ...func(*paramapi.Options)) (*paramapi.PutParameterOutput, error) {
 					assert.Equal(t, "Test description", lo.FromPtr(params.Description))
 					assert.False(t, lo.FromPtr(params.Overwrite))

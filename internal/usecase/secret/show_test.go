@@ -24,6 +24,7 @@ type mockShowClient struct {
 	describeSecretErr    error
 }
 
+//nolint:lll // mock function signature must match AWS SDK interface
 func (m *mockShowClient) GetSecretValue(_ context.Context, _ *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) {
 	if m.getSecretValueErr != nil {
 		return nil, m.getSecretValueErr
@@ -32,7 +33,7 @@ func (m *mockShowClient) GetSecretValue(_ context.Context, _ *secretapi.GetSecre
 	return m.getSecretValueResult, nil
 }
 
-//nolint:revive,stylecheck // Method name must match AWS SDK interface
+//nolint:revive,stylecheck,lll // Method name must match AWS SDK interface
 func (m *mockShowClient) ListSecretVersionIds(_ context.Context, _ *secretapi.ListSecretVersionIDsInput, _ ...func(*secretapi.Options)) (*secretapi.ListSecretVersionIDsOutput, error) {
 	if m.listVersionsErr != nil {
 		return nil, m.listVersionsErr

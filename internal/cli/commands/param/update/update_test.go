@@ -47,11 +47,13 @@ func TestCommand_Validation(t *testing.T) {
 	})
 }
 
+//nolint:lll // mock struct fields match AWS SDK interface signatures
 type mockClient struct {
 	getParameterFunc func(ctx context.Context, params *paramapi.GetParameterInput, optFns ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error)
 	putParameterFunc func(ctx context.Context, params *paramapi.PutParameterInput, optFns ...func(*paramapi.Options)) (*paramapi.PutParameterOutput, error)
 }
 
+//nolint:lll // mock function signature must match AWS SDK interface
 func (m *mockClient) GetParameter(ctx context.Context, params *paramapi.GetParameterInput, optFns ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
 	if m.getParameterFunc != nil {
 		return m.getParameterFunc(ctx, params, optFns...)
@@ -60,6 +62,7 @@ func (m *mockClient) GetParameter(ctx context.Context, params *paramapi.GetParam
 	return nil, fmt.Errorf("GetParameter not mocked")
 }
 
+//nolint:lll // mock function signature must match AWS SDK interface
 func (m *mockClient) PutParameter(ctx context.Context, params *paramapi.PutParameterInput, optFns ...func(*paramapi.Options)) (*paramapi.PutParameterOutput, error) {
 	if m.putParameterFunc != nil {
 		return m.putParameterFunc(ctx, params, optFns...)
@@ -97,6 +100,7 @@ func TestRun(t *testing.T) {
 			},
 			mock: &mockClient{
 				getParameterFunc: defaultGetParameter,
+				//nolint:lll // inline mock function in test table
 				putParameterFunc: func(_ context.Context, params *paramapi.PutParameterInput, _ ...func(*paramapi.Options)) (*paramapi.PutParameterOutput, error) {
 					assert.Equal(t, "/app/param", lo.FromPtr(params.Name))
 					assert.Equal(t, "test-value", lo.FromPtr(params.Value))
@@ -124,6 +128,7 @@ func TestRun(t *testing.T) {
 			},
 			mock: &mockClient{
 				getParameterFunc: defaultGetParameter,
+				//nolint:lll // inline mock function in test table
 				putParameterFunc: func(_ context.Context, params *paramapi.PutParameterInput, _ ...func(*paramapi.Options)) (*paramapi.PutParameterOutput, error) {
 					assert.Equal(t, "Test description", lo.FromPtr(params.Description))
 					assert.True(t, lo.FromPtr(params.Overwrite))

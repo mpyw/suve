@@ -14,11 +14,13 @@ import (
 	"github.com/mpyw/suve/internal/version/paramversion"
 )
 
+//nolint:lll // mock struct fields match AWS SDK interface signatures
 type mockClient struct {
 	getParameterFunc        func(ctx context.Context, params *paramapi.GetParameterInput, optFns ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error)
 	getParameterHistoryFunc func(ctx context.Context, params *paramapi.GetParameterHistoryInput, optFns ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error)
 }
 
+//nolint:lll // mock function signature must match AWS SDK interface
 func (m *mockClient) GetParameter(ctx context.Context, params *paramapi.GetParameterInput, optFns ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
 	if m.getParameterFunc != nil {
 		return m.getParameterFunc(ctx, params, optFns...)
@@ -27,6 +29,7 @@ func (m *mockClient) GetParameter(ctx context.Context, params *paramapi.GetParam
 	return nil, fmt.Errorf("GetParameter not mocked")
 }
 
+//nolint:lll // mock function signature must match AWS SDK interface
 func (m *mockClient) GetParameterHistory(ctx context.Context, params *paramapi.GetParameterHistoryInput, optFns ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
 	if m.getParameterHistoryFunc != nil {
 		return m.getParameterHistoryFunc(ctx, params, optFns...)
@@ -96,6 +99,7 @@ func TestGetParameterWithVersion_Shift(t *testing.T) {
 
 	now := time.Now()
 	mock := &mockClient{
+		//nolint:lll // inline mock function
 		getParameterHistoryFunc: func(_ context.Context, params *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
 			assert.Equal(t, "/my/param", lo.FromPtr(params.Name))
 			// History is returned oldest first by AWS
@@ -123,6 +127,7 @@ func TestGetParameterWithVersion_ShiftFromSpecificVersion(t *testing.T) {
 
 	now := time.Now()
 	mock := &mockClient{
+		//nolint:lll // inline mock function
 		getParameterHistoryFunc: func(_ context.Context, _ *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
 			return &paramapi.GetParameterHistoryOutput{
 				Parameters: []paramapi.ParameterHistory{

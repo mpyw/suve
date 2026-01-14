@@ -33,11 +33,13 @@ func TestCommand_Help(t *testing.T) {
 	assert.Contains(t, buf.String(), "--show")
 }
 
+//nolint:lll // mock struct fields match AWS SDK interface signatures
 type mockClient struct {
 	describeParametersFunc func(ctx context.Context, params *paramapi.DescribeParametersInput, optFns ...func(*paramapi.Options)) (*paramapi.DescribeParametersOutput, error)
 	getParametersFunc      func(ctx context.Context, params *paramapi.GetParametersInput, optFns ...func(*paramapi.Options)) (*paramapi.GetParametersOutput, error)
 }
 
+//nolint:lll // mock function signature must match AWS SDK interface
 func (m *mockClient) DescribeParameters(ctx context.Context, params *paramapi.DescribeParametersInput, optFns ...func(*paramapi.Options)) (*paramapi.DescribeParametersOutput, error) {
 	if m.describeParametersFunc != nil {
 		return m.describeParametersFunc(ctx, params, optFns...)
@@ -46,6 +48,7 @@ func (m *mockClient) DescribeParameters(ctx context.Context, params *paramapi.De
 	return nil, fmt.Errorf("DescribeParameters not mocked")
 }
 
+//nolint:lll // mock function signature must match AWS SDK interface
 func (m *mockClient) GetParameters(ctx context.Context, params *paramapi.GetParametersInput, optFns ...func(*paramapi.Options)) (*paramapi.GetParametersOutput, error) {
 	if m.getParametersFunc != nil {
 		return m.getParametersFunc(ctx, params, optFns...)
@@ -68,6 +71,7 @@ func TestRun(t *testing.T) {
 			name: "list all parameters",
 			opts: list.Options{},
 			mock: &mockClient{
+				//nolint:lll // inline mock function in test table
 				describeParametersFunc: func(_ context.Context, _ *paramapi.DescribeParametersInput, _ ...func(*paramapi.Options)) (*paramapi.DescribeParametersOutput, error) {
 					return &paramapi.DescribeParametersOutput{
 						Parameters: []paramapi.ParameterMetadata{
@@ -87,6 +91,7 @@ func TestRun(t *testing.T) {
 			name: "list with prefix",
 			opts: list.Options{Prefix: "/app/"},
 			mock: &mockClient{
+				//nolint:lll // inline mock function in test table
 				describeParametersFunc: func(_ context.Context, params *paramapi.DescribeParametersInput, _ ...func(*paramapi.Options)) (*paramapi.DescribeParametersOutput, error) {
 					require.NotEmpty(t, params.ParameterFilters, "expected filter to be set")
 
@@ -106,6 +111,7 @@ func TestRun(t *testing.T) {
 			name: "recursive listing",
 			opts: list.Options{Prefix: "/app/", Recursive: true},
 			mock: &mockClient{
+				//nolint:lll // inline mock function in test table
 				describeParametersFunc: func(_ context.Context, params *paramapi.DescribeParametersInput, _ ...func(*paramapi.Options)) (*paramapi.DescribeParametersOutput, error) {
 					require.NotEmpty(t, params.ParameterFilters, "expected filter to be set")
 					assert.Equal(t, "Recursive", lo.FromPtr(params.ParameterFilters[0].Option))
@@ -126,6 +132,7 @@ func TestRun(t *testing.T) {
 			name: "error from AWS",
 			opts: list.Options{},
 			mock: &mockClient{
+				//nolint:lll // inline mock function in test table
 				describeParametersFunc: func(_ context.Context, _ *paramapi.DescribeParametersInput, _ ...func(*paramapi.Options)) (*paramapi.DescribeParametersOutput, error) {
 					return nil, fmt.Errorf("AWS error")
 				},
@@ -136,6 +143,7 @@ func TestRun(t *testing.T) {
 			name: "filter by regex",
 			opts: list.Options{Filter: "prod"},
 			mock: &mockClient{
+				//nolint:lll // inline mock function in test table
 				describeParametersFunc: func(_ context.Context, _ *paramapi.DescribeParametersInput, _ ...func(*paramapi.Options)) (*paramapi.DescribeParametersOutput, error) {
 					return &paramapi.DescribeParametersOutput{
 						Parameters: []paramapi.ParameterMetadata{
@@ -167,6 +175,7 @@ func TestRun(t *testing.T) {
 			name: "show parameter values",
 			opts: list.Options{Show: true},
 			mock: &mockClient{
+				//nolint:lll // inline mock function in test table
 				describeParametersFunc: func(_ context.Context, _ *paramapi.DescribeParametersInput, _ ...func(*paramapi.Options)) (*paramapi.DescribeParametersOutput, error) {
 					return &paramapi.DescribeParametersOutput{
 						Parameters: []paramapi.ParameterMetadata{

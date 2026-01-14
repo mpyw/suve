@@ -22,6 +22,7 @@ type mockListClient struct {
 	getSecretValueErr    map[string]error
 }
 
+//nolint:lll // mock function signature must match AWS SDK interface
 func (m *mockListClient) ListSecrets(_ context.Context, _ *secretapi.ListSecretsInput, _ ...func(*secretapi.Options)) (*secretapi.ListSecretsOutput, error) {
 	if m.listSecretsErr != nil {
 		return nil, m.listSecretsErr
@@ -41,6 +42,7 @@ func (m *mockListClient) ListSecrets(_ context.Context, _ *secretapi.ListSecrets
 	return m.listSecretsResult, nil
 }
 
+//nolint:lll // mock function signature must match AWS SDK interface
 func (m *mockListClient) GetSecretValue(_ context.Context, input *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) {
 	name := lo.FromPtr(input.SecretId)
 	if m.getSecretValueErr != nil {

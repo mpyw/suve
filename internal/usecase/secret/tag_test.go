@@ -20,6 +20,7 @@ type mockTagClient struct {
 	untagErr       error
 }
 
+//nolint:lll // mock function signature must match AWS SDK interface
 func (m *mockTagClient) DescribeSecret(_ context.Context, _ *secretapi.DescribeSecretInput, _ ...func(*secretapi.Options)) (*secretapi.DescribeSecretOutput, error) {
 	if m.describeErr != nil {
 		return nil, m.describeErr
@@ -28,6 +29,7 @@ func (m *mockTagClient) DescribeSecret(_ context.Context, _ *secretapi.DescribeS
 	return m.describeResult, nil
 }
 
+//nolint:lll // mock function signature must match AWS SDK interface
 func (m *mockTagClient) TagResource(_ context.Context, _ *secretapi.TagResourceInput, _ ...func(*secretapi.Options)) (*secretapi.TagResourceOutput, error) {
 	if m.tagErr != nil {
 		return nil, m.tagErr
@@ -36,6 +38,7 @@ func (m *mockTagClient) TagResource(_ context.Context, _ *secretapi.TagResourceI
 	return &secretapi.TagResourceOutput{}, nil
 }
 
+//nolint:lll // mock function signature must match AWS SDK interface
 func (m *mockTagClient) UntagResource(_ context.Context, _ *secretapi.UntagResourceInput, _ ...func(*secretapi.Options)) (*secretapi.UntagResourceOutput, error) {
 	if m.untagErr != nil {
 		return nil, m.untagErr

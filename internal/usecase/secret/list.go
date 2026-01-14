@@ -79,7 +79,9 @@ func (u *ListUseCase) Execute(ctx context.Context, input ListInput) (*ListOutput
 }
 
 // executeAll fetches all pages (original behavior).
-func (u *ListUseCase) executeAll(ctx context.Context, input ListInput, listInput *secretapi.ListSecretsInput, filterRegex *regexp.Regexp) (*ListOutput, error) {
+func (u *ListUseCase) executeAll(
+	ctx context.Context, input ListInput, listInput *secretapi.ListSecretsInput, filterRegex *regexp.Regexp,
+) (*ListOutput, error) {
 	var names []string
 
 	paginator := secretapi.NewListSecretsPaginator(u.Client, listInput)
@@ -103,7 +105,9 @@ func (u *ListUseCase) executeAll(ctx context.Context, input ListInput, listInput
 }
 
 // executeWithPagination fetches pages until MaxResults is reached or no more pages.
-func (u *ListUseCase) executeWithPagination(ctx context.Context, input ListInput, listInput *secretapi.ListSecretsInput, filterRegex *regexp.Regexp) (*ListOutput, error) {
+func (u *ListUseCase) executeWithPagination(
+	ctx context.Context, input ListInput, listInput *secretapi.ListSecretsInput, filterRegex *regexp.Regexp,
+) (*ListOutput, error) {
 	var names []string
 
 	nextToken := input.NextToken

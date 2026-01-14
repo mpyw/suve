@@ -181,11 +181,14 @@ func TestChange_IsEmpty(t *testing.T) {
 }
 
 // Mock Secrets Manager client for testing.
+//
+//nolint:lll // mock struct fields match AWS SDK interface signatures
 type mockSecretClient struct {
 	tagResourceFunc   func(ctx context.Context, params *secretapi.TagResourceInput, optFns ...func(*secretapi.Options)) (*secretapi.TagResourceOutput, error)
 	untagResourceFunc func(ctx context.Context, params *secretapi.UntagResourceInput, optFns ...func(*secretapi.Options)) (*secretapi.UntagResourceOutput, error)
 }
 
+//nolint:lll // mock function signature must match AWS SDK interface
 func (m *mockSecretClient) TagResource(ctx context.Context, params *secretapi.TagResourceInput, optFns ...func(*secretapi.Options)) (*secretapi.TagResourceOutput, error) {
 	if m.tagResourceFunc != nil {
 		return m.tagResourceFunc(ctx, params, optFns...)
@@ -194,6 +197,7 @@ func (m *mockSecretClient) TagResource(ctx context.Context, params *secretapi.Ta
 	return &secretapi.TagResourceOutput{}, nil
 }
 
+//nolint:lll // mock function signature must match AWS SDK interface
 func (m *mockSecretClient) UntagResource(ctx context.Context, params *secretapi.UntagResourceInput, optFns ...func(*secretapi.Options)) (*secretapi.UntagResourceOutput, error) {
 	if m.untagResourceFunc != nil {
 		return m.untagResourceFunc(ctx, params, optFns...)
@@ -223,6 +227,7 @@ func TestApplySecret(t *testing.T) {
 			secretID: "my-secret",
 			change:   &Change{Add: map[string]string{"env": "prod", "team": "platform"}, Remove: maputil.NewSet[string]()},
 			mock: &mockSecretClient{
+				//nolint:lll // inline mock function in test table
 				tagResourceFunc: func(_ context.Context, params *secretapi.TagResourceInput, _ ...func(*secretapi.Options)) (*secretapi.TagResourceOutput, error) {
 					assert.Equal(t, "my-secret", lo.FromPtr(params.SecretId))
 					assert.Len(t, params.Tags, 2)
@@ -244,6 +249,7 @@ func TestApplySecret(t *testing.T) {
 			secretID: "my-secret",
 			change:   &Change{Add: map[string]string{}, Remove: maputil.NewSet("deprecated", "old")},
 			mock: &mockSecretClient{
+				//nolint:lll // inline mock function in test table
 				untagResourceFunc: func(_ context.Context, params *secretapi.UntagResourceInput, _ ...func(*secretapi.Options)) (*secretapi.UntagResourceOutput, error) {
 					assert.Equal(t, "my-secret", lo.FromPtr(params.SecretId))
 					assert.ElementsMatch(t, []string{"deprecated", "old"}, params.TagKeys)
@@ -257,6 +263,7 @@ func TestApplySecret(t *testing.T) {
 			secretID: "my-secret",
 			change:   &Change{Add: map[string]string{"env": "prod"}, Remove: maputil.NewSet("deprecated")},
 			mock: &mockSecretClient{
+				//nolint:lll // inline mock function in test table
 				tagResourceFunc: func(_ context.Context, params *secretapi.TagResourceInput, _ ...func(*secretapi.Options)) (*secretapi.TagResourceOutput, error) {
 					assert.Equal(t, "my-secret", lo.FromPtr(params.SecretId))
 					assert.Len(t, params.Tags, 1)
@@ -265,6 +272,7 @@ func TestApplySecret(t *testing.T) {
 
 					return &secretapi.TagResourceOutput{}, nil
 				},
+				//nolint:lll // inline mock function in test table
 				untagResourceFunc: func(_ context.Context, params *secretapi.UntagResourceInput, _ ...func(*secretapi.Options)) (*secretapi.UntagResourceOutput, error) {
 					assert.Equal(t, "my-secret", lo.FromPtr(params.SecretId))
 					assert.Equal(t, []string{"deprecated"}, params.TagKeys)
@@ -289,6 +297,7 @@ func TestApplySecret(t *testing.T) {
 			secretID: "my-secret",
 			change:   &Change{Add: map[string]string{}, Remove: maputil.NewSet("deprecated")},
 			mock: &mockSecretClient{
+				//nolint:lll // inline mock function in test table
 				untagResourceFunc: func(_ context.Context, _ *secretapi.UntagResourceInput, _ ...func(*secretapi.Options)) (*secretapi.UntagResourceOutput, error) {
 					return nil, fmt.Errorf("access denied")
 				},
@@ -315,11 +324,14 @@ func TestApplySecret(t *testing.T) {
 }
 
 // Mock SSM Parameter Store client for testing.
+//
+//nolint:lll // mock struct fields match AWS SDK interface signatures
 type mockParamClient struct {
 	addTagsToResourceFunc      func(ctx context.Context, params *paramapi.AddTagsToResourceInput, optFns ...func(*paramapi.Options)) (*paramapi.AddTagsToResourceOutput, error)
 	removeTagsFromResourceFunc func(ctx context.Context, params *paramapi.RemoveTagsFromResourceInput, optFns ...func(*paramapi.Options)) (*paramapi.RemoveTagsFromResourceOutput, error)
 }
 
+//nolint:lll // mock function signature must match AWS SDK interface
 func (m *mockParamClient) AddTagsToResource(ctx context.Context, params *paramapi.AddTagsToResourceInput, optFns ...func(*paramapi.Options)) (*paramapi.AddTagsToResourceOutput, error) {
 	if m.addTagsToResourceFunc != nil {
 		return m.addTagsToResourceFunc(ctx, params, optFns...)
@@ -328,6 +340,7 @@ func (m *mockParamClient) AddTagsToResource(ctx context.Context, params *paramap
 	return &paramapi.AddTagsToResourceOutput{}, nil
 }
 
+//nolint:lll // mock function signature must match AWS SDK interface
 func (m *mockParamClient) RemoveTagsFromResource(ctx context.Context, params *paramapi.RemoveTagsFromResourceInput, optFns ...func(*paramapi.Options)) (*paramapi.RemoveTagsFromResourceOutput, error) {
 	if m.removeTagsFromResourceFunc != nil {
 		return m.removeTagsFromResourceFunc(ctx, params, optFns...)

@@ -22,6 +22,7 @@ type mockUpdateClient struct {
 	putSecretValueErr    error
 }
 
+//nolint:lll // mock function signature must match AWS SDK interface
 func (m *mockUpdateClient) GetSecretValue(_ context.Context, _ *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) {
 	if m.getSecretValueErr != nil {
 		return nil, m.getSecretValueErr
@@ -30,6 +31,7 @@ func (m *mockUpdateClient) GetSecretValue(_ context.Context, _ *secretapi.GetSec
 	return m.getSecretValueResult, nil
 }
 
+//nolint:lll // mock function signature must match AWS SDK interface
 func (m *mockUpdateClient) UpdateSecret(_ context.Context, _ *secretapi.UpdateSecretInput, _ ...func(*secretapi.Options)) (*secretapi.UpdateSecretOutput, error) {
 	if m.updateSecretErr != nil {
 		return nil, m.updateSecretErr
@@ -38,6 +40,7 @@ func (m *mockUpdateClient) UpdateSecret(_ context.Context, _ *secretapi.UpdateSe
 	return m.updateSecretResult, nil
 }
 
+//nolint:lll // mock function signature must match AWS SDK interface
 func (m *mockUpdateClient) PutSecretValue(_ context.Context, _ *secretapi.PutSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.PutSecretValueOutput, error) {
 	if m.putSecretValueErr != nil {
 		return nil, m.putSecretValueErr

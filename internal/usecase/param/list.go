@@ -103,7 +103,9 @@ type paramInfo struct {
 }
 
 // executeAll fetches all pages (original behavior).
-func (u *ListUseCase) executeAll(ctx context.Context, input ListInput, apiInput *paramapi.DescribeParametersInput, filterRegex *regexp.Regexp) (*ListOutput, error) {
+func (u *ListUseCase) executeAll(
+	ctx context.Context, input ListInput, apiInput *paramapi.DescribeParametersInput, filterRegex *regexp.Regexp,
+) (*ListOutput, error) {
 	var params []paramInfo
 
 	paginator := paramapi.NewDescribeParametersPaginator(u.Client, apiInput)
@@ -131,7 +133,9 @@ func (u *ListUseCase) executeAll(ctx context.Context, input ListInput, apiInput 
 }
 
 // executeWithPagination fetches pages until MaxResults is reached or no more pages.
-func (u *ListUseCase) executeWithPagination(ctx context.Context, input ListInput, apiInput *paramapi.DescribeParametersInput, filterRegex *regexp.Regexp) (*ListOutput, error) {
+func (u *ListUseCase) executeWithPagination(
+	ctx context.Context, input ListInput, apiInput *paramapi.DescribeParametersInput, filterRegex *regexp.Regexp,
+) (*ListOutput, error) {
 	var params []paramInfo
 
 	nextToken := input.NextToken
