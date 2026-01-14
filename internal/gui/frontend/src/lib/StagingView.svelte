@@ -1281,7 +1281,6 @@
   .actions {
     display: flex;
     flex-wrap: wrap;
-    justify-content: center;
     align-items: center;
     gap: 12px 24px;
     padding: 16px;
@@ -1290,8 +1289,11 @@
   }
 
   .actions-center {
+    flex: 1;
     display: flex;
+    justify-content: center;
     gap: 12px;
+    min-width: 420px;
   }
 
   .btn-action {
