@@ -712,7 +712,7 @@
             disabled={loading || (paramEntries.length === 0 && secretEntries.length === 0)}
           >
             <span class="dropdown-icon">📤</span>
-            Push <span class="dropdown-desc">(Export)</span>
+            Push <span class="dropdown-desc">(Persist)</span>
           </button>
           <button
             class="dropdown-item"
@@ -720,7 +720,7 @@
             disabled={loading || !fileStatus?.exists}
           >
             <span class="dropdown-icon">📥</span>
-            Pop <span class="dropdown-desc">(Import)</span>
+            Pop <span class="dropdown-desc">(Drain)</span>
           </button>
           <div class="dropdown-divider"></div>
           <button
