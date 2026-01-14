@@ -512,20 +512,6 @@ EXAMPLES:
 				return fmt.Errorf("usage: suve stage %s reset <spec> or suve stage %s reset --all", cfg.CommandName, cfg.CommandName)
 			}
 
-			identity, err := infra.GetAWSIdentity(ctx)
-			if err != nil {
-				return fmt.Errorf("failed to get AWS identity: %w", err)
-			}
-
-			store := agent.NewStore(identity.AccountID, identity.Region)
-
-			// If agent is not running, there's nothing to reset
-			if err := store.Ping(ctx); err != nil {
-				output.Info(cmd.Root().Writer, "No %s changes staged.", cfg.ItemName)
-
-				return nil
-			}
-
 			opts := ResetOptions{
 				All: resetAll,
 			}
@@ -536,23 +522,47 @@ EXAMPLES:
 
 			parser := cfg.ParserFactory()
 
-			// Check if version spec is provided (need AWS client for FetchVersion)
-			var fetcher staging.ResetStrategy
+			// Check if version spec is provided before Ping check
+			// If version spec exists, this is a write operation that should auto-start the agent
+			var hasVersion bool
 
 			if !resetAll && opts.Spec != "" {
-				_, hasVersion, err := parser.ParseSpec(opts.Spec)
+				var err error
+
+				_, hasVersion, err = parser.ParseSpec(opts.Spec)
+				if err != nil {
+					return err
+				}
+			}
+
+			identity, err := infra.GetAWSIdentity(ctx)
+			if err != nil {
+				return fmt.Errorf("failed to get AWS identity: %w", err)
+			}
+
+			store := agent.NewStore(identity.AccountID, identity.Region)
+
+			// If agent is not running and no version spec provided, there's nothing to reset
+			// (simple unstage or reset --all with nothing staged)
+			// But if version spec is provided, we need to auto-start and stage the historical version
+			if !hasVersion {
+				if err := store.Ping(ctx); err != nil {
+					output.Info(cmd.Root().Writer, "No %s changes staged.", cfg.ItemName)
+
+					return nil
+				}
+			}
+
+			// Fetch strategy for version spec
+			var fetcher staging.ResetStrategy
+
+			if hasVersion {
+				strategy, err := cfg.Factory(ctx)
 				if err != nil {
 					return err
 				}
 
-				if hasVersion {
-					strategy, err := cfg.Factory(ctx)
-					if err != nil {
-						return err
-					}
-
-					fetcher = strategy
-				}
+				fetcher = strategy
 			}
 
 			r := &ResetRunner{
