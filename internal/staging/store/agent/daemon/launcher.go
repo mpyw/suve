@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"sync"
 	"time"
 
 	"github.com/mpyw/suve/internal/cli/output"
@@ -74,6 +75,7 @@ type Launcher struct {
 	client            *ipc.Client
 	spawner           processSpawner
 	autoStartDisabled bool
+	mu                sync.Mutex // protects EnsureRunning from concurrent calls
 }
 
 // NewLauncher creates a new daemon launcher for a specific AWS account and region.
@@ -103,6 +105,9 @@ func (l *Launcher) Ping(ctx context.Context) error {
 
 // EnsureRunning ensures the daemon is running, starting it if necessary.
 func (l *Launcher) EnsureRunning(ctx context.Context) error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
 	// Try to ping first
 	if err := l.client.Ping(ctx); err == nil {
 		return nil

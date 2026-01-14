@@ -5,6 +5,7 @@ package gui
 
 import (
 	"context"
+	"sync"
 
 	"github.com/mpyw/suve/internal/api/paramapi"
 	"github.com/mpyw/suve/internal/api/secretapi"
@@ -52,8 +53,9 @@ type App struct {
 	paramClient  ParamClient
 	secretClient SecretClient
 
-	// Staging store
-	stagingStore store.ReadWriteOperator
+	// Staging store (AgentStore includes ReadWriteOperator)
+	stagingStore   store.AgentStore
+	stagingStoreMu sync.Mutex // protects stagingStore initialization
 }
 
 // NewApp creates a new App application struct.
@@ -112,6 +114,18 @@ func (a *App) getSecretClient() (SecretClient, error) {
 }
 
 func (a *App) getStagingStore() (store.ReadWriteOperator, error) {
+	s, err := a.getAgentStore()
+	if err != nil {
+		return nil, err
+	}
+
+	return s, nil
+}
+
+func (a *App) getAgentStore() (store.AgentStore, error) {
+	a.stagingStoreMu.Lock()
+	defer a.stagingStoreMu.Unlock()
+
 	if a.stagingStore != nil {
 		return a.stagingStore, nil
 	}
@@ -125,15 +139,6 @@ func (a *App) getStagingStore() (store.ReadWriteOperator, error) {
 	a.stagingStore = s
 
 	return s, nil
-}
-
-func (a *App) getAgentStore() (store.AgentStore, error) {
-	identity, err := infra.GetAWSIdentity(a.ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	return agent.NewStore(identity.AccountID, identity.Region), nil
 }
 
 func (a *App) getService(service string) (staging.Service, error) {
