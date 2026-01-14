@@ -1164,10 +1164,12 @@ func TestAgentLifecycle_DiffDoesNotStartAgent(t *testing.T) {
 	})
 
 	// Service-specific diff should show warning
+	// Message is either "nothing staged" (lifecycle) or "no parameters staged" (runner)
 	t.Run("param-diff-empty", func(t *testing.T) {
 		_, stderr, err := runSubCommand(t, paramstage.Command(), "diff")
 		require.NoError(t, err)
-		assert.Contains(t, stderr, "nothing staged")
+		assert.True(t, strings.Contains(stderr, "nothing staged") || strings.Contains(stderr, "no parameters staged"),
+			"expected 'nothing staged' or 'no parameters staged', got: %s", stderr)
 	})
 }
 

@@ -17,12 +17,12 @@ import (
 	"github.com/mpyw/suve/internal/staging/store/agent"
 	"github.com/mpyw/suve/internal/staging/store/agent/daemon/lifecycle"
 	"github.com/mpyw/suve/internal/staging/store/file"
-	stagingusecase "github.com/mpyw/suve/internal/usecase/staging"
+	usestaging "github.com/mpyw/suve/internal/usecase/staging"
 )
 
 // StashPushRunner executes stash push operations using a usecase.
 type StashPushRunner struct {
-	UseCase   *stagingusecase.StashPushUseCase
+	UseCase   *usestaging.StashPushUseCase
 	Stdout    io.Writer
 	Stderr    io.Writer
 	Encrypted bool // Whether the file is encrypted (for output messages)
@@ -35,19 +35,19 @@ type StashPushOptions struct {
 	// Keep preserves the agent memory after pushing to file.
 	Keep bool
 	// Mode determines how to handle existing stash file.
-	Mode stagingusecase.StashPushMode
+	Mode usestaging.StashPushMode
 }
 
 // Run executes the stash push command.
 func (r *StashPushRunner) Run(ctx context.Context, opts StashPushOptions) error {
-	_, err := r.UseCase.Execute(ctx, stagingusecase.StashPushInput{
+	_, err := r.UseCase.Execute(ctx, usestaging.StashPushInput{
 		Service: opts.Service,
 		Keep:    opts.Keep,
 		Mode:    opts.Mode,
 	})
 	if err != nil {
 		// Check for non-fatal error (state was written but agent cleanup failed)
-		var persistErr *stagingusecase.StashPushError
+		var persistErr *usestaging.StashPushError
 		if errors.As(err, &persistErr) && persistErr.NonFatal {
 			output.Warning(r.Stderr, "%v", err)
 			// Continue with success message since state was written
@@ -119,15 +119,15 @@ func stashPushAction(service staging.Service) func(context.Context, *cli.Command
 			}
 
 			// Determine mode based on flags and file existence
-			mode := stagingusecase.StashPushModeMerge // Default to merge (safer)
+			mode := usestaging.StashPushModeMerge // Default to merge (safer)
 			forceFlag := cmd.Bool("force")
 			mergeFlag := cmd.Bool("merge")
 
 			switch {
 			case forceFlag:
-				mode = stagingusecase.StashPushModeOverwrite
+				mode = usestaging.StashPushModeOverwrite
 			case mergeFlag:
-				mode = stagingusecase.StashPushModeMerge
+				mode = usestaging.StashPushModeMerge
 			default:
 				// Check if we need to prompt
 				exists, err := basicFileStore.Exists()
@@ -165,9 +165,9 @@ func stashPushAction(service staging.Service) func(context.Context, *cli.Command
 
 					switch choice {
 					case 0: // Merge
-						mode = stagingusecase.StashPushModeMerge
+						mode = usestaging.StashPushModeMerge
 					case 1: // Overwrite
-						mode = stagingusecase.StashPushModeOverwrite
+						mode = usestaging.StashPushModeOverwrite
 					default: // Cancel or error
 						output.Info(cmd.Root().Writer, "Operation cancelled.")
 
@@ -211,7 +211,7 @@ func stashPushAction(service staging.Service) func(context.Context, *cli.Command
 			}
 
 			r := &StashPushRunner{
-				UseCase: &stagingusecase.StashPushUseCase{
+				UseCase: &usestaging.StashPushUseCase{
 					AgentStore: agentStore,
 					FileStore:  fileStore,
 				},
@@ -227,6 +227,13 @@ func stashPushAction(service staging.Service) func(context.Context, *cli.Command
 			})
 		})
 		if err != nil {
+			// Handle "nothing to stash" gracefully (agent running but empty)
+			if errors.Is(err, usestaging.ErrNothingToStashPush) {
+				output.Info(cmd.Root().Writer, "No staged changes to persist.")
+
+				return nil
+			}
+
 			return err
 		}
 
