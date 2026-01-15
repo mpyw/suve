@@ -65,6 +65,7 @@ func (u *EditUseCase) Execute(ctx context.Context, input EditInput) (*EditOutput
 
 	// Determine if we need to fetch from AWS
 	var currentValue *string
+
 	var awsBaseModifiedAt *time.Time
 
 	if stagedEntry != nil && stagedEntry.Operation == staging.OperationCreate {

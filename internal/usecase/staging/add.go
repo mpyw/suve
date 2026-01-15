@@ -103,8 +103,8 @@ func (u *AddUseCase) Draft(ctx context.Context, input DraftInput) (*DraftOutput,
 	// - Not Pinger (e.g., FileStore) → proceed to GetEntry directly
 	if pinger, ok := u.Store.(store.Pinger); ok {
 		if pinger.Ping(ctx) != nil {
-			// Daemon not running → no draft
-			return &DraftOutput{IsStaged: false}, nil
+			// Daemon not running → no draft (intentionally ignoring ping error)
+			return &DraftOutput{IsStaged: false}, nil //nolint:nilerr
 		}
 	}
 
