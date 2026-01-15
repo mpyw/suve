@@ -1811,7 +1811,7 @@ func TestStash_EncryptedWithServiceFilter(t *testing.T) {
 	t.Run("encrypted-param-pop", func(t *testing.T) {
 		cmd := paramstage.Command()
 		stdin := strings.NewReader("testpass123\n")
-		stdout, stderr, err := runSubCommandWithNestedStdin(t, cmd, stdin, "stash", "pop", "--passphrase-stdin")
+		stdout, stderr, err := runStashSubCommandWithStdin(t, cmd, stdin, "pop", "--passphrase-stdin")
 		require.NoError(t, err, "stdout=%s stderr=%s", stdout, stderr)
 		t.Logf("encrypted param pop output: %s", stdout)
 
@@ -2006,5 +2006,627 @@ func TestStash_PushKeepWithModes(t *testing.T) {
 		stdout, _, err = runCommand(t, globalstatus.Command())
 		require.NoError(t, err)
 		assert.Contains(t, stdout, paramName)
+	})
+}
+
+// =============================================================================
+// Service-Specific Stash Mode Tests
+// =============================================================================
+
+// TestStash_ParamServiceModes tests param-specific stash push/pop with modes.
+func TestStash_ParamServiceModes(t *testing.T) {
+	setupEnv(t)
+	setupTempHome(t)
+
+	paramName1 := "/suve-e2e-param-svc-modes/param1"
+	paramName2 := "/suve-e2e-param-svc-modes/param2"
+
+	// Cleanup
+	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName1)
+	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName2)
+	_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+	t.Cleanup(func() {
+		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName1)
+		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName2)
+		_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+	})
+
+	// Stage param1 and push to file via param-specific command
+	_, _, err := runSubCommand(t, paramstage.Command(), "add", paramName1, "value1")
+	require.NoError(t, err)
+	_, _, err = runSubCommand(t, paramstage.Command(), "stash", "push")
+	require.NoError(t, err)
+
+	// Stage param2
+	_, _, err = runSubCommand(t, paramstage.Command(), "add", paramName2, "value2")
+	require.NoError(t, err)
+
+	// Test param push with merge mode
+	t.Run("param-push-merge", func(t *testing.T) {
+		stdout, _, err := runSubCommand(t, paramstage.Command(), "stash", "push", "--merge")
+		require.NoError(t, err)
+		t.Logf("param push --merge output: %s", stdout)
+
+		// Verify file has both params
+		stdout, _, err = runSubCommand(t, stgcli.NewGlobalStashCommand(), "show")
+		require.NoError(t, err)
+		assert.Contains(t, stdout, paramName1)
+		assert.Contains(t, stdout, paramName2)
+	})
+
+	// Stage param1 again and test overwrite
+	_, _, err = runSubCommand(t, paramstage.Command(), "add", paramName1, "value1-new")
+	require.NoError(t, err)
+
+	t.Run("param-push-overwrite", func(t *testing.T) {
+		stdout, _, err := runSubCommand(t, paramstage.Command(), "stash", "push", "--overwrite")
+		require.NoError(t, err)
+		t.Logf("param push --overwrite output: %s", stdout)
+
+		// Verify file has only param1 (overwritten)
+		stdout, _, err = runSubCommand(t, stgcli.NewGlobalStashCommand(), "show")
+		require.NoError(t, err)
+		assert.Contains(t, stdout, paramName1)
+		assert.NotContains(t, stdout, paramName2)
+	})
+
+	// Setup for pop tests
+	_, _, _ = runCommand(t, globalreset.Command(), "--all")
+	_, _, err = runSubCommand(t, paramstage.Command(), "add", paramName1, "value1")
+	require.NoError(t, err)
+	_, _, err = runSubCommand(t, paramstage.Command(), "stash", "push")
+	require.NoError(t, err)
+	_, _, err = runSubCommand(t, paramstage.Command(), "add", paramName2, "value2")
+	require.NoError(t, err)
+
+	t.Run("param-pop-merge", func(t *testing.T) {
+		stdout, _, err := runSubCommand(t, paramstage.Command(), "stash", "pop", "--merge")
+		require.NoError(t, err)
+		t.Logf("param pop --merge output: %s", stdout)
+
+		// Verify agent has both params
+		stdout, _, err = runSubCommand(t, paramstage.Command(), "status")
+		require.NoError(t, err)
+		assert.Contains(t, stdout, paramName1)
+		assert.Contains(t, stdout, paramName2)
+	})
+
+	// Setup for overwrite test
+	_, _, _ = runCommand(t, globalreset.Command(), "--all")
+	_, _, err = runSubCommand(t, paramstage.Command(), "add", paramName1, "value1")
+	require.NoError(t, err)
+	_, _, err = runSubCommand(t, paramstage.Command(), "stash", "push")
+	require.NoError(t, err)
+	_, _, err = runSubCommand(t, paramstage.Command(), "add", paramName2, "value2")
+	require.NoError(t, err)
+
+	t.Run("param-pop-overwrite", func(t *testing.T) {
+		stdout, _, err := runSubCommand(t, paramstage.Command(), "stash", "pop", "--overwrite")
+		require.NoError(t, err)
+		t.Logf("param pop --overwrite output: %s", stdout)
+
+		// Verify agent has only param1 (param2 overwritten)
+		stdout, _, err = runSubCommand(t, paramstage.Command(), "status")
+		require.NoError(t, err)
+		assert.Contains(t, stdout, paramName1)
+		assert.NotContains(t, stdout, paramName2)
+	})
+}
+
+// TestStash_SecretServiceModes tests secret-specific stash push/pop with modes.
+func TestStash_SecretServiceModes(t *testing.T) {
+	setupEnv(t)
+	setupTempHome(t)
+
+	secretName1 := "suve-e2e-secret-svc-modes/secret1"
+	secretName2 := "suve-e2e-secret-svc-modes/secret2"
+
+	// Cleanup
+	_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName1)
+	_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName2)
+	_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+	t.Cleanup(func() {
+		_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName1)
+		_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName2)
+		_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+	})
+
+	// Stage secret1 and push
+	_, _, err := runSubCommand(t, secretstage.Command(), "add", secretName1, "secret-value1")
+	require.NoError(t, err)
+	_, _, err = runSubCommand(t, secretstage.Command(), "stash", "push")
+	require.NoError(t, err)
+
+	// Stage secret2
+	_, _, err = runSubCommand(t, secretstage.Command(), "add", secretName2, "secret-value2")
+	require.NoError(t, err)
+
+	// Test secret push with merge
+	t.Run("secret-push-merge", func(t *testing.T) {
+		stdout, _, err := runSubCommand(t, secretstage.Command(), "stash", "push", "--merge")
+		require.NoError(t, err)
+		t.Logf("secret push --merge output: %s", stdout)
+
+		// Verify file has both secrets
+		stdout, _, err = runSubCommand(t, stgcli.NewGlobalStashCommand(), "show")
+		require.NoError(t, err)
+		assert.Contains(t, stdout, secretName1)
+		assert.Contains(t, stdout, secretName2)
+	})
+
+	// Setup for pop test
+	_, _, _ = runCommand(t, globalreset.Command(), "--all")
+	_, _, err = runSubCommand(t, secretstage.Command(), "add", secretName1, "secret-value1")
+	require.NoError(t, err)
+	_, _, err = runSubCommand(t, secretstage.Command(), "stash", "push")
+	require.NoError(t, err)
+	_, _, err = runSubCommand(t, secretstage.Command(), "add", secretName2, "secret-value2")
+	require.NoError(t, err)
+
+	t.Run("secret-pop-merge", func(t *testing.T) {
+		stdout, _, err := runSubCommand(t, secretstage.Command(), "stash", "pop", "--merge")
+		require.NoError(t, err)
+		t.Logf("secret pop --merge output: %s", stdout)
+
+		// Verify agent has both secrets
+		stdout, _, err = runSubCommand(t, secretstage.Command(), "status")
+		require.NoError(t, err)
+		assert.Contains(t, stdout, secretName1)
+		assert.Contains(t, stdout, secretName2)
+	})
+}
+
+// =============================================================================
+// Service-Specific Keep Flag Tests
+// =============================================================================
+
+// TestStash_ParamServiceKeep tests param-specific stash push/pop with --keep flag.
+func TestStash_ParamServiceKeep(t *testing.T) {
+	setupEnv(t)
+	setupTempHome(t)
+
+	paramName := "/suve-e2e-param-svc-keep/param"
+
+	// Cleanup
+	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+	t.Cleanup(func() {
+		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+		_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+	})
+
+	// Stage and push with --keep
+	_, _, err := runSubCommand(t, paramstage.Command(), "add", paramName, "test-value")
+	require.NoError(t, err)
+
+	t.Run("param-push-keep", func(t *testing.T) {
+		stdout, _, err := runSubCommand(t, paramstage.Command(), "stash", "push", "--keep")
+		require.NoError(t, err)
+		t.Logf("param push --keep output: %s", stdout)
+
+		// Agent should still have param
+		stdout, _, err = runSubCommand(t, paramstage.Command(), "status")
+		require.NoError(t, err)
+		assert.Contains(t, stdout, paramName)
+
+		// File should also have param
+		stdout, _, err = runSubCommand(t, stgcli.NewGlobalStashCommand(), "show")
+		require.NoError(t, err)
+		assert.Contains(t, stdout, paramName)
+	})
+
+	// Reset and setup for pop --keep test
+	_, _, _ = runCommand(t, globalreset.Command(), "--all")
+
+	t.Run("param-pop-keep", func(t *testing.T) {
+		stdout, _, err := runSubCommand(t, paramstage.Command(), "stash", "pop", "--keep")
+		require.NoError(t, err)
+		t.Logf("param pop --keep output: %s", stdout)
+
+		// Agent should have param
+		stdout, _, err = runSubCommand(t, paramstage.Command(), "status")
+		require.NoError(t, err)
+		assert.Contains(t, stdout, paramName)
+
+		// File should still exist
+		stdout, _, err = runSubCommand(t, stgcli.NewGlobalStashCommand(), "show")
+		require.NoError(t, err)
+		assert.Contains(t, stdout, paramName)
+	})
+}
+
+// TestStash_SecretServiceKeep tests secret-specific stash push/pop with --keep flag.
+func TestStash_SecretServiceKeep(t *testing.T) {
+	setupEnv(t)
+	setupTempHome(t)
+
+	secretName := "suve-e2e-secret-svc-keep/secret"
+
+	// Cleanup
+	_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
+	_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+	t.Cleanup(func() {
+		_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
+		_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+	})
+
+	// Stage and push with --keep
+	_, _, err := runSubCommand(t, secretstage.Command(), "add", secretName, "secret-value")
+	require.NoError(t, err)
+
+	t.Run("secret-push-keep", func(t *testing.T) {
+		stdout, _, err := runSubCommand(t, secretstage.Command(), "stash", "push", "--keep")
+		require.NoError(t, err)
+		t.Logf("secret push --keep output: %s", stdout)
+
+		// Agent should still have secret
+		stdout, _, err = runSubCommand(t, secretstage.Command(), "status")
+		require.NoError(t, err)
+		assert.Contains(t, stdout, secretName)
+
+		// File should also have secret
+		stdout, _, err = runSubCommand(t, stgcli.NewGlobalStashCommand(), "show")
+		require.NoError(t, err)
+		assert.Contains(t, stdout, secretName)
+	})
+
+	// Reset and setup for pop --keep test
+	_, _, _ = runCommand(t, globalreset.Command(), "--all")
+
+	t.Run("secret-pop-keep", func(t *testing.T) {
+		stdout, _, err := runSubCommand(t, secretstage.Command(), "stash", "pop", "--keep")
+		require.NoError(t, err)
+		t.Logf("secret pop --keep output: %s", stdout)
+
+		// Agent should have secret
+		stdout, _, err = runSubCommand(t, secretstage.Command(), "status")
+		require.NoError(t, err)
+		assert.Contains(t, stdout, secretName)
+
+		// File should still exist
+		stdout, _, err = runSubCommand(t, stgcli.NewGlobalStashCommand(), "show")
+		require.NoError(t, err)
+		assert.Contains(t, stdout, secretName)
+	})
+}
+
+// =============================================================================
+// Service-Specific Encryption Tests
+// =============================================================================
+
+// TestStash_ParamServiceEncrypted tests param-specific stash with encryption.
+func TestStash_ParamServiceEncrypted(t *testing.T) {
+	setupEnv(t)
+	setupTempHome(t)
+
+	paramName := "/suve-e2e-param-svc-enc/param"
+
+	// Cleanup
+	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+	t.Cleanup(func() {
+		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+		_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+	})
+
+	// Stage param
+	_, _, err := runSubCommand(t, paramstage.Command(), "add", paramName, "secret-param-value")
+	require.NoError(t, err)
+
+	// Push with encryption via param-specific command
+	t.Run("param-push-encrypted", func(t *testing.T) {
+		cmd := paramstage.Command()
+		stdin := strings.NewReader("param-passphrase\n")
+		stdout, stderr, err := runStashSubCommandWithStdin(t, cmd, stdin, "push", "--passphrase-stdin")
+		require.NoError(t, err, "stdout=%s stderr=%s", stdout, stderr)
+		t.Logf("param push encrypted output: %s", stdout)
+		assert.Contains(t, stdout, "encrypted")
+	})
+
+	// Verify file is encrypted (show without passphrase fails)
+	t.Run("show-encrypted-fails", func(t *testing.T) {
+		_, _, err := runSubCommand(t, stgcli.NewGlobalStashCommand(), "show")
+		assert.Error(t, err)
+	})
+
+	// Pop with passphrase via param-specific command
+	t.Run("param-pop-encrypted", func(t *testing.T) {
+		cmd := paramstage.Command()
+		stdin := strings.NewReader("param-passphrase\n")
+		stdout, stderr, err := runStashSubCommandWithStdin(t, cmd, stdin, "pop", "--passphrase-stdin")
+		require.NoError(t, err, "stdout=%s stderr=%s", stdout, stderr)
+		t.Logf("param pop encrypted output: %s", stdout)
+
+		// Verify param is in agent
+		stdout, _, err = runSubCommand(t, paramstage.Command(), "status")
+		require.NoError(t, err)
+		assert.Contains(t, stdout, paramName)
+	})
+}
+
+// TestStash_SecretServiceEncrypted tests secret-specific stash with encryption.
+func TestStash_SecretServiceEncrypted(t *testing.T) {
+	setupEnv(t)
+	setupTempHome(t)
+
+	secretName := "suve-e2e-secret-svc-enc/secret"
+
+	// Cleanup
+	_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
+	_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+	t.Cleanup(func() {
+		_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
+		_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+	})
+
+	// Stage secret
+	_, _, err := runSubCommand(t, secretstage.Command(), "add", secretName, "encrypted-secret-value")
+	require.NoError(t, err)
+
+	// Push with encryption via secret-specific command
+	t.Run("secret-push-encrypted", func(t *testing.T) {
+		cmd := secretstage.Command()
+		stdin := strings.NewReader("secret-passphrase\n")
+		stdout, stderr, err := runStashSubCommandWithStdin(t, cmd, stdin, "push", "--passphrase-stdin")
+		require.NoError(t, err, "stdout=%s stderr=%s", stdout, stderr)
+		t.Logf("secret push encrypted output: %s", stdout)
+		assert.Contains(t, stdout, "encrypted")
+	})
+
+	// Pop with passphrase via secret-specific command
+	t.Run("secret-pop-encrypted", func(t *testing.T) {
+		cmd := secretstage.Command()
+		stdin := strings.NewReader("secret-passphrase\n")
+		stdout, stderr, err := runStashSubCommandWithStdin(t, cmd, stdin, "pop", "--passphrase-stdin")
+		require.NoError(t, err, "stdout=%s stderr=%s", stdout, stderr)
+		t.Logf("secret pop encrypted output: %s", stdout)
+
+		// Verify secret is in agent
+		stdout, _, err = runSubCommand(t, secretstage.Command(), "status")
+		require.NoError(t, err)
+		assert.Contains(t, stdout, secretName)
+	})
+}
+
+// TestStash_ServiceDropEncrypted tests service-specific drop on encrypted files.
+func TestStash_ServiceDropEncrypted(t *testing.T) {
+	setupEnv(t)
+	setupTempHome(t)
+
+	paramName := "/suve-e2e-svc-drop-enc/param"
+	secretName := "suve-e2e-svc-drop-enc/secret"
+
+	// Cleanup
+	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
+	_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+	t.Cleanup(func() {
+		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+		_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
+		_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+	})
+
+	// Stage both and push encrypted globally
+	_, _, err := runSubCommand(t, paramstage.Command(), "add", paramName, "param-value")
+	require.NoError(t, err)
+	_, _, err = runSubCommand(t, secretstage.Command(), "add", secretName, "secret-value")
+	require.NoError(t, err)
+
+	cmd := stgcli.NewGlobalStashCommand()
+	stdin := strings.NewReader("drop-enc-pass\n")
+	_, _, err = runSubCommandWithStdin(t, cmd, stdin, "push", "--passphrase-stdin")
+	require.NoError(t, err)
+
+	// Drop param from encrypted file (needs passphrase to read/filter/re-encrypt)
+	t.Run("param-drop-encrypted", func(t *testing.T) {
+		stdin := strings.NewReader("drop-enc-pass\n")
+		stdout, stderr, err := runStashSubCommandWithStdin(t, paramstage.Command(), stdin, "drop", "--yes", "--passphrase-stdin")
+		require.NoError(t, err, "stdout=%s stderr=%s", stdout, stderr)
+		t.Logf("param drop encrypted output: %s", stdout)
+		assert.Contains(t, stdout, "Stashed param changes dropped")
+	})
+
+	// Verify secret still in file (but file is still encrypted)
+	// Global show should fail without passphrase
+	t.Run("verify-file-still-encrypted", func(t *testing.T) {
+		_, _, err := runSubCommand(t, stgcli.NewGlobalStashCommand(), "show")
+		assert.Error(t, err)
+	})
+
+	// Drop secret from encrypted file (needs passphrase to read/filter/re-encrypt)
+	t.Run("secret-drop-encrypted", func(t *testing.T) {
+		stdin := strings.NewReader("drop-enc-pass\n")
+		stdout, stderr, err := runStashSubCommandWithStdin(t, secretstage.Command(), stdin, "drop", "--yes", "--passphrase-stdin")
+		require.NoError(t, err, "stdout=%s stderr=%s", stdout, stderr)
+		t.Logf("secret drop encrypted output: %s", stdout)
+		assert.Contains(t, stdout, "Stashed secret changes dropped")
+	})
+
+	// File should be deleted now
+	t.Run("verify-file-deleted", func(t *testing.T) {
+		_, _, err := runSubCommand(t, stgcli.NewGlobalStashCommand(), "show")
+		assert.Error(t, err)
+	})
+}
+
+// =============================================================================
+// Cross-Service Encrypted Tests
+// =============================================================================
+
+// TestStash_CrossServiceEncrypted tests cross-service operations with encrypted files.
+func TestStash_CrossServiceEncrypted(t *testing.T) {
+	setupEnv(t)
+	setupTempHome(t)
+
+	paramName := "/suve-e2e-cross-enc/param"
+	secretName := "suve-e2e-cross-enc/secret"
+
+	// Cleanup
+	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
+	_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+	t.Cleanup(func() {
+		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+		_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
+		_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+	})
+
+	// Stage param and push encrypted via param command
+	_, _, err := runSubCommand(t, paramstage.Command(), "add", paramName, "param-value")
+	require.NoError(t, err)
+
+	cmd := paramstage.Command()
+	stdin := strings.NewReader("cross-enc-pass\n")
+	_, _, err = runStashSubCommandWithStdin(t, cmd, stdin, "push", "--passphrase-stdin")
+	require.NoError(t, err)
+
+	// Stage secret in agent (file has encrypted param, agent has secret)
+	_, _, err = runSubCommand(t, secretstage.Command(), "add", secretName, "secret-value")
+	require.NoError(t, err)
+
+	// Global pop with merge - should combine encrypted param from file with secret in agent
+	t.Run("global-pop-cross-service-encrypted", func(t *testing.T) {
+		cmd := stgcli.NewGlobalStashCommand()
+		stdin := strings.NewReader("cross-enc-pass\n")
+		stdout, stderr, err := runSubCommandWithStdin(t, cmd, stdin, "pop", "--merge", "--passphrase-stdin")
+		require.NoError(t, err, "stdout=%s stderr=%s", stdout, stderr)
+		t.Logf("global pop cross-service encrypted output: %s", stdout)
+
+		// Verify both param and secret in agent
+		stdout, _, err = runCommand(t, globalstatus.Command())
+		require.NoError(t, err)
+		assert.Contains(t, stdout, paramName)
+		assert.Contains(t, stdout, secretName)
+	})
+}
+
+// TestStash_EncryptedMergeToPlain tests pushing encrypted content to merge with existing plain file.
+func TestStash_EncryptedMergeToPlain(t *testing.T) {
+	setupEnv(t)
+	setupTempHome(t)
+
+	paramName1 := "/suve-e2e-enc-merge-plain/param1"
+	paramName2 := "/suve-e2e-enc-merge-plain/param2"
+
+	// Cleanup
+	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName1)
+	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName2)
+	_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+	t.Cleanup(func() {
+		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName1)
+		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName2)
+		_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+	})
+
+	// Stage param1 and push plain (no passphrase)
+	_, _, err := runSubCommand(t, paramstage.Command(), "add", paramName1, "value1")
+	require.NoError(t, err)
+	_, _, err = runSubCommand(t, stgcli.NewGlobalStashCommand(), "push")
+	require.NoError(t, err)
+
+	// Stage param2 and push encrypted with merge
+	_, _, err = runSubCommand(t, paramstage.Command(), "add", paramName2, "value2")
+	require.NoError(t, err)
+
+	t.Run("encrypted-merge-to-plain", func(t *testing.T) {
+		cmd := stgcli.NewGlobalStashCommand()
+		stdin := strings.NewReader("enc-merge-pass\n")
+		stdout, stderr, err := runSubCommandWithStdin(t, cmd, stdin, "push", "--merge", "--passphrase-stdin")
+		require.NoError(t, err, "stdout=%s stderr=%s", stdout, stderr)
+		t.Logf("encrypted merge to plain output: %s", stdout)
+		// File should now be encrypted with both params
+		assert.Contains(t, stdout, "encrypted")
+	})
+
+	// Verify file is encrypted
+	t.Run("verify-file-encrypted", func(t *testing.T) {
+		_, _, err := runSubCommand(t, stgcli.NewGlobalStashCommand(), "show")
+		assert.Error(t, err) // Should fail without passphrase
+	})
+
+	// Pop and verify both params
+	t.Run("pop-merged-encrypted", func(t *testing.T) {
+		cmd := stgcli.NewGlobalStashCommand()
+		stdin := strings.NewReader("enc-merge-pass\n")
+		stdout, stderr, err := runSubCommandWithStdin(t, cmd, stdin, "pop", "--passphrase-stdin")
+		require.NoError(t, err, "stdout=%s stderr=%s", stdout, stderr)
+
+		// Verify both params in agent
+		stdout, _, err = runSubCommand(t, paramstage.Command(), "status")
+		require.NoError(t, err)
+		assert.Contains(t, stdout, paramName1)
+		assert.Contains(t, stdout, paramName2)
+	})
+}
+
+// TestStash_ServiceFilteredEncryptedMerge tests service-filtered merge with encrypted file.
+func TestStash_ServiceFilteredEncryptedMerge(t *testing.T) {
+	setupEnv(t)
+	setupTempHome(t)
+
+	paramName := "/suve-e2e-svc-enc-merge/param"
+	secretName := "suve-e2e-svc-enc-merge/secret"
+
+	// Cleanup
+	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
+	_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+	t.Cleanup(func() {
+		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+		_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
+		_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+	})
+
+	// Stage param and push encrypted
+	_, _, err := runSubCommand(t, paramstage.Command(), "add", paramName, "param-value")
+	require.NoError(t, err)
+
+	cmd := stgcli.NewGlobalStashCommand()
+	stdin := strings.NewReader("svc-enc-merge-pass\n")
+	_, _, err = runSubCommandWithStdin(t, cmd, stdin, "push", "--passphrase-stdin")
+	require.NoError(t, err)
+
+	// Stage secret and push via secret command (should merge with encrypted param)
+	_, _, err = runSubCommand(t, secretstage.Command(), "add", secretName, "secret-value")
+	require.NoError(t, err)
+
+	t.Run("secret-merge-to-encrypted-param", func(t *testing.T) {
+		cmd := secretstage.Command()
+		stdin := strings.NewReader("svc-enc-merge-pass\n")
+		stdout, stderr, err := runStashSubCommandWithStdin(t, cmd, stdin, "push", "--merge", "--passphrase-stdin")
+		require.NoError(t, err, "stdout=%s stderr=%s", stdout, stderr)
+		t.Logf("secret merge to encrypted param output: %s", stdout)
+	})
+
+	// Pop only param with passphrase
+	t.Run("pop-param-from-mixed-encrypted", func(t *testing.T) {
+		cmd := paramstage.Command()
+		stdin := strings.NewReader("svc-enc-merge-pass\n")
+		stdout, stderr, err := runStashSubCommandWithStdin(t, cmd, stdin, "pop", "--passphrase-stdin")
+		require.NoError(t, err, "stdout=%s stderr=%s", stdout, stderr)
+		t.Logf("pop param from mixed encrypted output: %s", stdout)
+
+		// Verify param in agent
+		stdout, _, err = runSubCommand(t, paramstage.Command(), "status")
+		require.NoError(t, err)
+		assert.Contains(t, stdout, paramName)
+
+		// Verify secret NOT in agent
+		stdout, _, err = runSubCommand(t, secretstage.Command(), "status")
+		require.NoError(t, err)
+		assert.NotContains(t, stdout, secretName)
+	})
+
+	// Pop secret
+	t.Run("pop-secret-from-encrypted", func(t *testing.T) {
+		cmd := secretstage.Command()
+		stdin := strings.NewReader("svc-enc-merge-pass\n")
+		stdout, stderr, err := runStashSubCommandWithStdin(t, cmd, stdin, "pop", "--passphrase-stdin")
+		require.NoError(t, err, "stdout=%s stderr=%s", stdout, stderr)
+
+		// Verify secret in agent
+		stdout, _, err = runSubCommand(t, secretstage.Command(), "status")
+		require.NoError(t, err)
+		assert.Contains(t, stdout, secretName)
 	})
 }
