@@ -216,3 +216,26 @@ func runSubCommandWithStdin(
 
 	return outBuf.String(), errBuf.String(), err
 }
+
+// runSubCommandWithNestedStdin executes a nested subcommand (e.g., "param stash pop") with custom stdin.
+func runSubCommandWithNestedStdin(
+	t *testing.T, parentCmd *cli.Command, stdin io.Reader, subCmdName string, nestedSubCmdName string, args ...string,
+) (stdout, stderr string, err error) {
+	t.Helper()
+
+	var outBuf, errBuf bytes.Buffer
+
+	app := &cli.Command{
+		Name:      "suve",
+		Reader:    stdin,
+		Writer:    &outBuf,
+		ErrWriter: &errBuf,
+		Commands:  []*cli.Command{parentCmd},
+	}
+
+	// Build full args: ["suve", "parent-name", "sub-name", "nested-sub-name", ...args]
+	fullArgs := append([]string{"suve", parentCmd.Name, subCmdName, nestedSubCmdName}, args...)
+	err = app.Run(t.Context(), fullArgs)
+
+	return outBuf.String(), errBuf.String(), err
+}

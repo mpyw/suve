@@ -1415,3 +1415,596 @@ func TestAgentLifecycle_StashPushDoesNotStartAgent(t *testing.T) {
 		assert.Contains(t, stdout, "No staged changes")
 	})
 }
+
+// =============================================================================
+// Comprehensive Stash State Combination Tests
+// =============================================================================
+
+// TestStash_PushModes tests stash push with merge and overwrite modes.
+func TestStash_PushModes(t *testing.T) {
+	setupEnv(t)
+	setupTempHome(t)
+
+	paramName1 := "/suve-e2e-push-modes/param1"
+	paramName2 := "/suve-e2e-push-modes/param2"
+
+	// Cleanup
+	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName1)
+	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName2)
+	_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+	t.Cleanup(func() {
+		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName1)
+		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName2)
+		_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+	})
+
+	// Stage param1 and push to file
+	_, _, err := runCommand(t, paramstage.Command(), "add", paramName1, "value1")
+	require.NoError(t, err)
+	_, _, err = runSubCommand(t, stgcli.NewGlobalStashCommand(), "push")
+	require.NoError(t, err)
+
+	// Stage param2 in agent
+	_, _, err = runCommand(t, paramstage.Command(), "add", paramName2, "value2")
+	require.NoError(t, err)
+
+	// Test push with merge mode (default) - should add param2 to existing param1 in file
+	t.Run("push-merge-mode", func(t *testing.T) {
+		stdout, _, err := runSubCommand(t, stgcli.NewGlobalStashCommand(), "push", "--merge")
+		require.NoError(t, err)
+		t.Logf("push --merge output: %s", stdout)
+
+		// Verify file has both params
+		stdout, _, err = runSubCommand(t, stgcli.NewGlobalStashCommand(), "show")
+		require.NoError(t, err)
+		assert.Contains(t, stdout, paramName1)
+		assert.Contains(t, stdout, paramName2)
+	})
+
+	// Stage param1 again with different value
+	_, _, err = runCommand(t, paramstage.Command(), "add", paramName1, "value1-updated")
+	require.NoError(t, err)
+
+	// Test push with overwrite mode - should replace entire file
+	t.Run("push-overwrite-mode", func(t *testing.T) {
+		stdout, _, err := runSubCommand(t, stgcli.NewGlobalStashCommand(), "push", "--overwrite")
+		require.NoError(t, err)
+		t.Logf("push --overwrite output: %s", stdout)
+
+		// Verify file has only param1 (param2 was overwritten)
+		stdout, _, err = runSubCommand(t, stgcli.NewGlobalStashCommand(), "show")
+		require.NoError(t, err)
+		assert.Contains(t, stdout, paramName1)
+		assert.NotContains(t, stdout, paramName2)
+	})
+}
+
+// TestStash_PopModes tests stash pop with merge and overwrite modes.
+func TestStash_PopModes(t *testing.T) {
+	setupEnv(t)
+	setupTempHome(t)
+
+	paramName1 := "/suve-e2e-pop-modes/param1"
+	paramName2 := "/suve-e2e-pop-modes/param2"
+
+	// Cleanup
+	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName1)
+	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName2)
+	_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+	t.Cleanup(func() {
+		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName1)
+		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName2)
+		_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+	})
+
+	// Stage param1 and push to file
+	_, _, err := runCommand(t, paramstage.Command(), "add", paramName1, "value1")
+	require.NoError(t, err)
+	_, _, err = runSubCommand(t, stgcli.NewGlobalStashCommand(), "push")
+	require.NoError(t, err)
+
+	// Stage param2 in agent (so agent has param2, file has param1)
+	_, _, err = runCommand(t, paramstage.Command(), "add", paramName2, "value2")
+	require.NoError(t, err)
+
+	// Test pop with merge mode (default) - should combine agent and file
+	t.Run("pop-merge-mode", func(t *testing.T) {
+		stdout, _, err := runSubCommand(t, stgcli.NewGlobalStashCommand(), "pop", "--merge")
+		require.NoError(t, err)
+		t.Logf("pop --merge output: %s", stdout)
+
+		// Verify agent has both params
+		stdout, _, err = runCommand(t, globalstatus.Command())
+		require.NoError(t, err)
+		assert.Contains(t, stdout, paramName1)
+		assert.Contains(t, stdout, paramName2)
+	})
+
+	// Clear agent and repopulate for overwrite test
+	_, _, _ = runCommand(t, globalreset.Command(), "--all")
+
+	// Stage param1 and push to file again
+	_, _, err = runCommand(t, paramstage.Command(), "add", paramName1, "value1")
+	require.NoError(t, err)
+	_, _, err = runSubCommand(t, stgcli.NewGlobalStashCommand(), "push")
+	require.NoError(t, err)
+
+	// Stage param2 in agent
+	_, _, err = runCommand(t, paramstage.Command(), "add", paramName2, "value2")
+	require.NoError(t, err)
+
+	// Test pop with overwrite mode - should replace agent with file
+	t.Run("pop-overwrite-mode", func(t *testing.T) {
+		stdout, _, err := runSubCommand(t, stgcli.NewGlobalStashCommand(), "pop", "--overwrite")
+		require.NoError(t, err)
+		t.Logf("pop --overwrite output: %s", stdout)
+
+		// Verify agent has only param1 from file (param2 was overwritten)
+		stdout, _, err = runCommand(t, globalstatus.Command())
+		require.NoError(t, err)
+		assert.Contains(t, stdout, paramName1)
+		assert.NotContains(t, stdout, paramName2)
+	})
+}
+
+// TestStash_PopKeepFlag tests stash pop with --keep flag.
+func TestStash_PopKeepFlag(t *testing.T) {
+	setupEnv(t)
+	setupTempHome(t)
+
+	paramName := "/suve-e2e-pop-keep/param"
+
+	// Cleanup
+	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+	t.Cleanup(func() {
+		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+		_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+	})
+
+	// Stage and push to file
+	_, _, err := runCommand(t, paramstage.Command(), "add", paramName, "test-value")
+	require.NoError(t, err)
+	_, _, err = runSubCommand(t, stgcli.NewGlobalStashCommand(), "push")
+	require.NoError(t, err)
+
+	// Pop with --keep flag - file should remain
+	t.Run("pop-with-keep", func(t *testing.T) {
+		stdout, _, err := runSubCommand(t, stgcli.NewGlobalStashCommand(), "pop", "--keep")
+		require.NoError(t, err)
+		t.Logf("pop --keep output: %s", stdout)
+
+		// Verify agent has the param
+		stdout, _, err = runCommand(t, globalstatus.Command())
+		require.NoError(t, err)
+		assert.Contains(t, stdout, paramName)
+
+		// Verify file still exists (show should work)
+		stdout, _, err = runSubCommand(t, stgcli.NewGlobalStashCommand(), "show")
+		require.NoError(t, err)
+		assert.Contains(t, stdout, paramName)
+	})
+
+	// Pop again without --keep - file should be deleted
+	t.Run("pop-without-keep", func(t *testing.T) {
+		// Reset agent first
+		_, _, _ = runCommand(t, globalreset.Command(), "--all")
+
+		_, _, err := runSubCommand(t, stgcli.NewGlobalStashCommand(), "pop")
+		require.NoError(t, err)
+
+		// Verify file is gone
+		_, _, err = runSubCommand(t, stgcli.NewGlobalStashCommand(), "show")
+		assert.Error(t, err) // File should not exist
+	})
+}
+
+// TestStash_ServiceFilteredPush tests service-specific stash push operations.
+func TestStash_ServiceFilteredPush(t *testing.T) {
+	setupEnv(t)
+	setupTempHome(t)
+
+	paramName := "/suve-e2e-filtered-push/param"
+	secretName := "suve-e2e-filtered-push/secret"
+
+	// Cleanup
+	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
+	_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+	t.Cleanup(func() {
+		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+		_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
+		_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+	})
+
+	// Stage both param and secret
+	_, _, err := runSubCommand(t, paramstage.Command(), "add", paramName, "param-value")
+	require.NoError(t, err)
+	_, _, err = runSubCommand(t, secretstage.Command(), "add", secretName, "secret-value")
+	require.NoError(t, err)
+
+	// Push only param service to file
+	t.Run("push-param-only", func(t *testing.T) {
+		stdout, _, err := runSubCommand(t, paramstage.Command(), "stash", "push")
+		require.NoError(t, err)
+		t.Logf("param stash push output: %s", stdout)
+
+		// Verify param is gone from agent
+		stdout, _, err = runSubCommand(t, paramstage.Command(), "status")
+		require.NoError(t, err)
+		assert.NotContains(t, stdout, paramName)
+
+		// Verify secret still in agent
+		stdout, _, err = runSubCommand(t, secretstage.Command(), "status")
+		require.NoError(t, err)
+		assert.Contains(t, stdout, secretName)
+
+		// Verify file has only param
+		stdout, _, err = runSubCommand(t, stgcli.NewGlobalStashCommand(), "show")
+		require.NoError(t, err)
+		assert.Contains(t, stdout, paramName)
+		assert.NotContains(t, stdout, secretName)
+	})
+
+	// Push secret to file (merges with existing param)
+	t.Run("push-secret-merges", func(t *testing.T) {
+		stdout, _, err := runSubCommand(t, secretstage.Command(), "stash", "push")
+		require.NoError(t, err)
+		t.Logf("secret stash push output: %s", stdout)
+
+		// Verify both in file
+		stdout, _, err = runSubCommand(t, stgcli.NewGlobalStashCommand(), "show")
+		require.NoError(t, err)
+		assert.Contains(t, stdout, paramName)
+		assert.Contains(t, stdout, secretName)
+	})
+}
+
+// TestStash_ServiceFilteredPop tests service-specific stash pop operations.
+func TestStash_ServiceFilteredPop(t *testing.T) {
+	setupEnv(t)
+	setupTempHome(t)
+
+	paramName := "/suve-e2e-filtered-pop/param"
+	secretName := "suve-e2e-filtered-pop/secret"
+
+	// Cleanup
+	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
+	_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+	t.Cleanup(func() {
+		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+		_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
+		_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+	})
+
+	// Stage both and push globally to file
+	_, _, err := runSubCommand(t, paramstage.Command(), "add", paramName, "param-value")
+	require.NoError(t, err)
+	_, _, err = runSubCommand(t, secretstage.Command(), "add", secretName, "secret-value")
+	require.NoError(t, err)
+	_, _, err = runSubCommand(t, stgcli.NewGlobalStashCommand(), "push")
+	require.NoError(t, err)
+
+	// Pop only param service from file
+	t.Run("pop-param-only", func(t *testing.T) {
+		stdout, _, err := runSubCommand(t, paramstage.Command(), "stash", "pop")
+		require.NoError(t, err)
+		t.Logf("param stash pop output: %s", stdout)
+
+		// Verify param is in agent
+		stdout, _, err = runSubCommand(t, paramstage.Command(), "status")
+		require.NoError(t, err)
+		assert.Contains(t, stdout, paramName)
+
+		// Verify secret NOT in agent (still only in file)
+		stdout, _, err = runSubCommand(t, secretstage.Command(), "status")
+		require.NoError(t, err)
+		assert.NotContains(t, stdout, secretName)
+
+		// Verify file still has secret (param was removed from file)
+		stdout, _, err = runSubCommand(t, stgcli.NewGlobalStashCommand(), "show")
+		require.NoError(t, err)
+		assert.NotContains(t, stdout, paramName)
+		assert.Contains(t, stdout, secretName)
+	})
+
+	// Pop secret service from file
+	t.Run("pop-secret", func(t *testing.T) {
+		stdout, _, err := runSubCommand(t, secretstage.Command(), "stash", "pop")
+		require.NoError(t, err)
+		t.Logf("secret stash pop output: %s", stdout)
+
+		// Verify secret is now in agent
+		stdout, _, err = runSubCommand(t, secretstage.Command(), "status")
+		require.NoError(t, err)
+		assert.Contains(t, stdout, secretName)
+
+		// Verify file is now empty (deleted)
+		_, _, err = runSubCommand(t, stgcli.NewGlobalStashCommand(), "show")
+		assert.Error(t, err) // File should not exist
+	})
+}
+
+// TestStash_CrossServiceMerge tests merging param stash with secret in agent and vice versa.
+func TestStash_CrossServiceMerge(t *testing.T) {
+	setupEnv(t)
+	setupTempHome(t)
+
+	paramName := "/suve-e2e-cross-merge/param"
+	secretName := "suve-e2e-cross-merge/secret"
+
+	// Cleanup
+	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
+	_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+	t.Cleanup(func() {
+		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+		_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
+		_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+	})
+
+	// Stage param and push to file
+	_, _, err := runSubCommand(t, paramstage.Command(), "add", paramName, "param-value")
+	require.NoError(t, err)
+	_, _, err = runSubCommand(t, paramstage.Command(), "stash", "push")
+	require.NoError(t, err)
+
+	// Stage secret in agent (file has param, agent has secret)
+	_, _, err = runSubCommand(t, secretstage.Command(), "add", secretName, "secret-value")
+	require.NoError(t, err)
+
+	// Global pop with merge - should combine param from file with secret in agent
+	t.Run("global-pop-merges-cross-service", func(t *testing.T) {
+		stdout, _, err := runSubCommand(t, stgcli.NewGlobalStashCommand(), "pop", "--merge")
+		require.NoError(t, err)
+		t.Logf("global pop --merge output: %s", stdout)
+
+		// Verify both param and secret in agent
+		stdout, _, err = runCommand(t, globalstatus.Command())
+		require.NoError(t, err)
+		assert.Contains(t, stdout, paramName)
+		assert.Contains(t, stdout, secretName)
+	})
+}
+
+// TestStash_EncryptedWithServiceFilter tests encrypted stash with service filtering.
+func TestStash_EncryptedWithServiceFilter(t *testing.T) {
+	setupEnv(t)
+	setupTempHome(t)
+
+	paramName := "/suve-e2e-enc-filter/param"
+	secretName := "suve-e2e-enc-filter/secret"
+
+	// Cleanup
+	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
+	_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+	t.Cleanup(func() {
+		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+		_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
+		_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+	})
+
+	// Stage both
+	_, _, err := runSubCommand(t, paramstage.Command(), "add", paramName, "param-value")
+	require.NoError(t, err)
+	_, _, err = runSubCommand(t, secretstage.Command(), "add", secretName, "secret-value")
+	require.NoError(t, err)
+
+	// Push globally with encryption
+	t.Run("encrypted-global-push", func(t *testing.T) {
+		cmd := stgcli.NewGlobalStashCommand()
+		stdin := strings.NewReader("testpass123\n")
+		stdout, stderr, err := runSubCommandWithStdin(t, cmd, stdin, "push", "--passphrase-stdin")
+		require.NoError(t, err, "stdout=%s stderr=%s", stdout, stderr)
+		t.Logf("encrypted push output: %s", stdout)
+	})
+
+	// Verify show fails without passphrase (file is encrypted)
+	t.Run("show-fails-without-passphrase", func(t *testing.T) {
+		_, _, err := runSubCommand(t, stgcli.NewGlobalStashCommand(), "show")
+		assert.Error(t, err)
+	})
+
+	// Pop param-only with passphrase
+	t.Run("encrypted-param-pop", func(t *testing.T) {
+		cmd := paramstage.Command()
+		stdin := strings.NewReader("testpass123\n")
+		stdout, stderr, err := runSubCommandWithNestedStdin(t, cmd, stdin, "stash", "pop", "--passphrase-stdin")
+		require.NoError(t, err, "stdout=%s stderr=%s", stdout, stderr)
+		t.Logf("encrypted param pop output: %s", stdout)
+
+		// Verify param in agent
+		stdout, _, err = runSubCommand(t, paramstage.Command(), "status")
+		require.NoError(t, err)
+		assert.Contains(t, stdout, paramName)
+
+		// Verify secret NOT in agent
+		stdout, _, err = runSubCommand(t, secretstage.Command(), "status")
+		require.NoError(t, err)
+		assert.NotContains(t, stdout, secretName)
+	})
+
+	// Drop the remaining encrypted file (should not need passphrase)
+	t.Run("encrypted-drop-no-passphrase", func(t *testing.T) {
+		stdout, _, err := runSubCommand(t, stgcli.NewGlobalStashCommand(), "drop", "--yes")
+		require.NoError(t, err)
+		assert.Contains(t, stdout, "All stashed changes dropped")
+	})
+}
+
+// TestStash_PopModesWithKeep tests pop with both mode and keep flags.
+func TestStash_PopModesWithKeep(t *testing.T) {
+	setupEnv(t)
+	setupTempHome(t)
+
+	paramName1 := "/suve-e2e-pop-mode-keep/param1"
+	paramName2 := "/suve-e2e-pop-mode-keep/param2"
+
+	// Cleanup
+	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName1)
+	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName2)
+	_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+	t.Cleanup(func() {
+		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName1)
+		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName2)
+		_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+	})
+
+	// Stage param1 and push to file
+	_, _, err := runCommand(t, paramstage.Command(), "add", paramName1, "value1")
+	require.NoError(t, err)
+	_, _, err = runSubCommand(t, stgcli.NewGlobalStashCommand(), "push")
+	require.NoError(t, err)
+
+	// Stage param2 in agent
+	_, _, err = runCommand(t, paramstage.Command(), "add", paramName2, "value2")
+	require.NoError(t, err)
+
+	// Pop with merge mode and keep flag
+	t.Run("pop-merge-keep", func(t *testing.T) {
+		stdout, _, err := runSubCommand(t, stgcli.NewGlobalStashCommand(), "pop", "--merge", "--keep")
+		require.NoError(t, err)
+		t.Logf("pop --merge --keep output: %s", stdout)
+
+		// Verify agent has both
+		stdout, _, err = runCommand(t, globalstatus.Command())
+		require.NoError(t, err)
+		assert.Contains(t, stdout, paramName1)
+		assert.Contains(t, stdout, paramName2)
+
+		// Verify file still exists
+		stdout, _, err = runSubCommand(t, stgcli.NewGlobalStashCommand(), "show")
+		require.NoError(t, err)
+		assert.Contains(t, stdout, paramName1)
+	})
+
+	// Reset and test overwrite with keep
+	_, _, _ = runCommand(t, globalreset.Command(), "--all")
+	_, _, err = runCommand(t, paramstage.Command(), "add", paramName2, "value2")
+	require.NoError(t, err)
+
+	t.Run("pop-overwrite-keep", func(t *testing.T) {
+		stdout, _, err := runSubCommand(t, stgcli.NewGlobalStashCommand(), "pop", "--overwrite", "--keep")
+		require.NoError(t, err)
+		t.Logf("pop --overwrite --keep output: %s", stdout)
+
+		// Verify agent has only param1 from file (param2 was overwritten)
+		stdout, _, err = runCommand(t, globalstatus.Command())
+		require.NoError(t, err)
+		assert.Contains(t, stdout, paramName1)
+		assert.NotContains(t, stdout, paramName2)
+
+		// Verify file still exists
+		stdout, _, err = runSubCommand(t, stgcli.NewGlobalStashCommand(), "show")
+		require.NoError(t, err)
+		assert.Contains(t, stdout, paramName1)
+	})
+}
+
+// TestStash_ServiceDropWithMixedContent tests service-specific drop with mixed content.
+func TestStash_ServiceDropWithMixedContent(t *testing.T) {
+	setupEnv(t)
+	setupTempHome(t)
+
+	paramName := "/suve-e2e-svc-drop-mixed/param"
+	secretName := "suve-e2e-svc-drop-mixed/secret"
+
+	// Cleanup
+	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
+	_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+	t.Cleanup(func() {
+		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+		_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
+		_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+	})
+
+	// Stage both and push globally
+	_, _, err := runSubCommand(t, paramstage.Command(), "add", paramName, "param-value")
+	require.NoError(t, err)
+	_, _, err = runSubCommand(t, secretstage.Command(), "add", secretName, "secret-value")
+	require.NoError(t, err)
+	_, _, err = runSubCommand(t, stgcli.NewGlobalStashCommand(), "push")
+	require.NoError(t, err)
+
+	// Drop only param from file
+	t.Run("drop-param-only", func(t *testing.T) {
+		stdout, _, err := runSubCommand(t, paramstage.Command(), "stash", "drop", "--yes")
+		require.NoError(t, err)
+		t.Logf("param stash drop output: %s", stdout)
+		assert.Contains(t, stdout, "Stashed param changes dropped")
+
+		// Verify file now has only secret
+		stdout, _, err = runSubCommand(t, stgcli.NewGlobalStashCommand(), "show")
+		require.NoError(t, err)
+		assert.NotContains(t, stdout, paramName)
+		assert.Contains(t, stdout, secretName)
+	})
+
+	// Drop secret - file should be deleted
+	t.Run("drop-secret-deletes-file", func(t *testing.T) {
+		stdout, _, err := runSubCommand(t, secretstage.Command(), "stash", "drop", "--yes")
+		require.NoError(t, err)
+		assert.Contains(t, stdout, "Stashed secret changes dropped")
+
+		// Verify file is gone
+		_, _, err = runSubCommand(t, stgcli.NewGlobalStashCommand(), "show")
+		assert.Error(t, err)
+	})
+}
+
+// TestStash_PushKeepWithModes tests push with --keep flag and modes.
+func TestStash_PushKeepWithModes(t *testing.T) {
+	setupEnv(t)
+	setupTempHome(t)
+
+	paramName := "/suve-e2e-push-keep-modes/param"
+
+	// Cleanup
+	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+	t.Cleanup(func() {
+		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+		_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+	})
+
+	// Stage param
+	_, _, err := runCommand(t, paramstage.Command(), "add", paramName, "initial-value")
+	require.NoError(t, err)
+
+	// Push with keep flag
+	t.Run("push-keep", func(t *testing.T) {
+		stdout, _, err := runSubCommand(t, stgcli.NewGlobalStashCommand(), "push", "--keep")
+		require.NoError(t, err)
+		t.Logf("push --keep output: %s", stdout)
+
+		// Verify agent still has the param
+		stdout, _, err = runCommand(t, globalstatus.Command())
+		require.NoError(t, err)
+		assert.Contains(t, stdout, paramName)
+
+		// Verify file also has the param
+		stdout, _, err = runSubCommand(t, stgcli.NewGlobalStashCommand(), "show")
+		require.NoError(t, err)
+		assert.Contains(t, stdout, paramName)
+	})
+
+	// Update param value and push with keep + merge
+	_, _, err = runCommand(t, globalreset.Command(), "--all")
+	require.NoError(t, err)
+	_, _, err = runCommand(t, paramstage.Command(), "add", paramName, "updated-value")
+	require.NoError(t, err)
+
+	t.Run("push-keep-merge", func(t *testing.T) {
+		stdout, _, err := runSubCommand(t, stgcli.NewGlobalStashCommand(), "push", "--keep", "--merge")
+		require.NoError(t, err)
+		t.Logf("push --keep --merge output: %s", stdout)
+
+		// Agent should still have the param
+		stdout, _, err = runCommand(t, globalstatus.Command())
+		require.NoError(t, err)
+		assert.Contains(t, stdout, paramName)
+	})
+}
