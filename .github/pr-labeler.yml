@@ -1,0 +1,61 @@
+# PR labeler configuration for actions/labeler
+# Labels are applied based on changed file paths
+
+cli:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "internal/cli/**"
+          - "cmd/suve/**"
+
+gui:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "internal/gui/**"
+
+staging:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "internal/staging/**"
+          - "internal/usecase/staging/**"
+
+param:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "internal/api/paramapi/**"
+          - "internal/cli/commands/param/**"
+          - "internal/usecase/param/**"
+          - "internal/version/paramversion/**"
+
+secret:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "internal/api/secretapi/**"
+          - "internal/cli/commands/secret/**"
+          - "internal/usecase/secret/**"
+          - "internal/version/secretversion/**"
+
+documentation:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "**/*.md"
+          - "docs/**"
+
+github_actions:
+  - changed-files:
+      - any-glob-to-any-file:
+          - ".github/workflows/**"
+          - ".github/*.yml"
+
+go:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "**/*.go"
+          - "go.mod"
+          - "go.sum"
+
+javascript:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "internal/gui/frontend/**/*.ts"
+          - "internal/gui/frontend/**/*.svelte"
+          - "internal/gui/frontend/package*.json"

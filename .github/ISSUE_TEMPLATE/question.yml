@@ -1,0 +1,42 @@
+name: Question
+description: Ask a question about suve
+labels: ["question"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Have a question? We're here to help!
+
+        Before asking, please check:
+        - [README](https://github.com/mpyw/suve#readme)
+        - [Existing issues](https://github.com/mpyw/suve/issues?q=is%3Aissue)
+
+  - type: textarea
+    id: question
+    attributes:
+      label: Question
+      description: What would you like to know?
+    validations:
+      required: true
+
+  - type: dropdown
+    id: topic
+    attributes:
+      label: Topic
+      description: What is this question about?
+      options:
+        - Usage / How-to
+        - Configuration
+        - AWS Integration
+        - Installation
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: Any relevant context that might help answer your question
+    validations:
+      required: false
