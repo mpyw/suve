@@ -144,6 +144,29 @@ jobs:
       - name: Run goroutinectx
         run: go run github.com/mpyw/goroutinectx/cmd/goroutinectx@v0.7.5 ./...
 
+  frontend-lint:
+    name: Frontend Lint
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: internal/gui/frontend
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: internal/gui/frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run Biome and svelte-check
+        run: npm run ci
+
   gui-test:
     name: GUI Test (Playwright)
     runs-on: ${{ matrix.os }}
