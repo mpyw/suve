@@ -475,3 +475,45 @@ func TestAddUseCase_Draft_NonPingerStore(t *testing.T) {
 	assert.True(t, output.IsStaged)
 	assert.Equal(t, "draft-value", output.Value)
 }
+
+func TestAddUseCase_Draft_NonPingerStore_NotStaged(t *testing.T) {
+	t.Parallel()
+
+	// When store doesn't implement Pinger and nothing is staged,
+	// should return IsStaged=false
+	mockStore := testutil.NewMockStore()
+
+	// Wrap to hide Pinger interface
+	wrappedStore := &nonPingerStoreWrapper{mockStore}
+
+	uc := &usecasestaging.AddUseCase{
+		Strategy: newMockEditStrategyNotFound(),
+		Store:    wrappedStore,
+	}
+
+	output, err := uc.Draft(t.Context(), usecasestaging.DraftInput{Name: "/app/not-exists"})
+	require.NoError(t, err)
+	assert.False(t, output.IsStaged)
+	assert.Empty(t, output.Value)
+}
+
+func TestAddUseCase_Draft_NonPingerStore_GetEntryError(t *testing.T) {
+	t.Parallel()
+
+	// When store doesn't implement Pinger and GetEntry fails,
+	// error should propagate
+	mockStore := testutil.NewMockStore()
+	mockStore.GetEntryErr = errors.New("storage unavailable")
+
+	// Wrap to hide Pinger interface
+	wrappedStore := &nonPingerStoreWrapper{mockStore}
+
+	uc := &usecasestaging.AddUseCase{
+		Strategy: newMockEditStrategyNotFound(),
+		Store:    wrappedStore,
+	}
+
+	_, err := uc.Draft(t.Context(), usecasestaging.DraftInput{Name: "/app/config"})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "storage unavailable")
+}

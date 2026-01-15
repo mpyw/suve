@@ -916,3 +916,114 @@ func TestEditUseCase_Baseline_NonPingerStore(t *testing.T) {
 	assert.Equal(t, "staged-value", output.Value)
 	assert.True(t, output.IsStagedEdit)
 }
+
+func TestEditUseCase_Execute_NonPingerStore_NotStaged(t *testing.T) {
+	t.Parallel()
+
+	// When store doesn't implement Pinger and nothing is staged,
+	// should fetch from AWS and stage the edit
+	mockStore := testutil.NewMockStore()
+
+	// Wrap to hide Pinger interface
+	wrappedStore := &nonPingerStoreWrapper{mockStore}
+
+	strategy := newMockEditStrategy()
+	strategy.fetchResult = &staging.EditFetchResult{
+		Value:        "aws-value",
+		LastModified: time.Now(),
+	}
+
+	uc := &usecasestaging.EditUseCase{
+		Strategy: strategy,
+		Store:    wrappedStore,
+	}
+
+	output, err := uc.Execute(t.Context(), usecasestaging.EditInput{
+		Name:  "/app/config",
+		Value: "new-value",
+	})
+	require.NoError(t, err)
+	assert.False(t, output.Skipped)
+
+	// Verify entry was staged
+	entry, err := mockStore.GetEntry(t.Context(), staging.ServiceParam, "/app/config")
+	require.NoError(t, err)
+	assert.Equal(t, staging.OperationUpdate, entry.Operation)
+	assert.Equal(t, "new-value", lo.FromPtr(entry.Value))
+}
+
+func TestEditUseCase_Execute_NonPingerStore_GetEntryError(t *testing.T) {
+	t.Parallel()
+
+	// When store doesn't implement Pinger and GetEntry fails,
+	// error should propagate
+	mockStore := testutil.NewMockStore()
+	mockStore.GetEntryErr = errors.New("storage unavailable")
+
+	// Wrap to hide Pinger interface
+	wrappedStore := &nonPingerStoreWrapper{mockStore}
+
+	strategy := newMockEditStrategy()
+
+	uc := &usecasestaging.EditUseCase{
+		Strategy: strategy,
+		Store:    wrappedStore,
+	}
+
+	_, err := uc.Execute(t.Context(), usecasestaging.EditInput{
+		Name:  "/app/config",
+		Value: "new-value",
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "storage unavailable")
+}
+
+func TestEditUseCase_Baseline_NonPingerStore_NotStaged(t *testing.T) {
+	t.Parallel()
+
+	// When store doesn't implement Pinger and nothing is staged,
+	// should fetch from AWS
+	mockStore := testutil.NewMockStore()
+
+	// Wrap to hide Pinger interface
+	wrappedStore := &nonPingerStoreWrapper{mockStore}
+
+	strategy := newMockEditStrategy()
+	strategy.fetchResult = &staging.EditFetchResult{
+		Value:        "aws-value",
+		LastModified: time.Now(),
+	}
+
+	uc := &usecasestaging.EditUseCase{
+		Strategy: strategy,
+		Store:    wrappedStore,
+	}
+
+	output, err := uc.Baseline(t.Context(), usecasestaging.BaselineInput{Name: "/app/config"})
+	require.NoError(t, err)
+	assert.Equal(t, "aws-value", output.Value)
+	assert.False(t, output.IsStagedEdit)
+}
+
+func TestEditUseCase_Baseline_NonPingerStore_GetEntryError(t *testing.T) {
+	t.Parallel()
+
+	// When store doesn't implement Pinger and GetEntry fails,
+	// error should propagate
+	mockStore := testutil.NewMockStore()
+	mockStore.GetEntryErr = errors.New("storage unavailable")
+
+	// Wrap to hide Pinger interface
+	wrappedStore := &nonPingerStoreWrapper{mockStore}
+
+	strategy := newMockEditStrategy()
+
+	uc := &usecasestaging.EditUseCase{
+		Strategy: strategy,
+		Store:    wrappedStore,
+	}
+
+	_, err := uc.Baseline(t.Context(), usecasestaging.BaselineInput{Name: "/app/config"})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "storage unavailable")
+}
