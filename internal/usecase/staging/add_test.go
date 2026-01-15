@@ -352,3 +352,168 @@ func TestAddUseCase_Execute_FetchError(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "AWS connection error")
 }
+
+// Ping-first pattern tests
+
+func TestAddUseCase_Draft_PingFirst_DaemonNotRunning(t *testing.T) {
+	t.Parallel()
+
+	// When daemon is not running (Ping fails), should return "not staged" without checking store
+	store := testutil.NewMockStore()
+	store.PingErr = errors.New("daemon not running")
+
+	// Pre-stage a CREATE operation (should not be found if Ping fails)
+	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/draft", staging.Entry{
+		Operation: staging.OperationCreate,
+		Value:     lo.ToPtr("draft-value"),
+		StagedAt:  time.Now(),
+	}))
+
+	uc := &usecasestaging.AddUseCase{
+		Strategy: newMockEditStrategyNotFound(),
+		Store:    store,
+	}
+
+	output, err := uc.Draft(t.Context(), usecasestaging.DraftInput{Name: "/app/draft"})
+	require.NoError(t, err)
+	// Should return "not staged" since daemon isn't running
+	assert.False(t, output.IsStaged)
+	assert.Empty(t, output.Value)
+}
+
+func TestAddUseCase_Draft_PingFirst_DaemonRunning(t *testing.T) {
+	t.Parallel()
+
+	// When daemon is running (Ping succeeds), should find staged draft
+	store := testutil.NewMockStore()
+	store.PingErr = nil // Daemon running
+
+	// Pre-stage a CREATE operation
+	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/draft", staging.Entry{
+		Operation: staging.OperationCreate,
+		Value:     lo.ToPtr("draft-value"),
+		StagedAt:  time.Now(),
+	}))
+
+	uc := &usecasestaging.AddUseCase{
+		Strategy: newMockEditStrategyNotFound(),
+		Store:    store,
+	}
+
+	output, err := uc.Draft(t.Context(), usecasestaging.DraftInput{Name: "/app/draft"})
+	require.NoError(t, err)
+	// Should find the staged draft
+	assert.True(t, output.IsStaged)
+	assert.Equal(t, "draft-value", output.Value)
+}
+
+func TestAddUseCase_Draft_PingFirst_DaemonRunning_NotStaged(t *testing.T) {
+	t.Parallel()
+
+	// When daemon is running but nothing is staged
+	store := testutil.NewMockStore()
+	store.PingErr = nil // Daemon running
+
+	uc := &usecasestaging.AddUseCase{
+		Strategy: newMockEditStrategyNotFound(),
+		Store:    store,
+	}
+
+	output, err := uc.Draft(t.Context(), usecasestaging.DraftInput{Name: "/app/not-exists"})
+	require.NoError(t, err)
+	assert.False(t, output.IsStaged)
+	assert.Empty(t, output.Value)
+}
+
+func TestAddUseCase_Draft_PingFirst_DaemonRunning_GetEntryError(t *testing.T) {
+	t.Parallel()
+
+	// When Ping succeeds but GetEntry fails (not ErrNotStaged), error should propagate
+	store := testutil.NewMockStore()
+	store.PingErr = nil // Daemon running
+	store.GetEntryErr = errors.New("storage unavailable")
+
+	uc := &usecasestaging.AddUseCase{
+		Strategy: newMockEditStrategyNotFound(),
+		Store:    store,
+	}
+
+	_, err := uc.Draft(t.Context(), usecasestaging.DraftInput{Name: "/app/config"})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "storage unavailable")
+}
+
+// nonPingerStoreWrapper is defined in edit_test.go (same package).
+// It wraps a store but doesn't implement Pinger interface,
+// simulating FileStore behavior where Ping check is not available.
+
+func TestAddUseCase_Draft_NonPingerStore(t *testing.T) {
+	t.Parallel()
+
+	// When store doesn't implement Pinger (like FileStore),
+	// should proceed directly to GetEntry without Ping check
+	mockStore := testutil.NewMockStore()
+
+	// Pre-stage a CREATE operation
+	require.NoError(t, mockStore.StageEntry(t.Context(), staging.ServiceParam, "/app/draft", staging.Entry{
+		Operation: staging.OperationCreate,
+		Value:     lo.ToPtr("draft-value"),
+		StagedAt:  time.Now(),
+	}))
+
+	// Wrap to hide Pinger interface
+	wrappedStore := &nonPingerStoreWrapper{mockStore}
+
+	uc := &usecasestaging.AddUseCase{
+		Strategy: newMockEditStrategyNotFound(),
+		Store:    wrappedStore,
+	}
+
+	// Should check staged state directly and return draft
+	output, err := uc.Draft(t.Context(), usecasestaging.DraftInput{Name: "/app/draft"})
+	require.NoError(t, err)
+	assert.True(t, output.IsStaged)
+	assert.Equal(t, "draft-value", output.Value)
+}
+
+func TestAddUseCase_Draft_NonPingerStore_NotStaged(t *testing.T) {
+	t.Parallel()
+
+	// When store doesn't implement Pinger and nothing is staged,
+	// should return IsStaged=false
+	mockStore := testutil.NewMockStore()
+
+	// Wrap to hide Pinger interface
+	wrappedStore := &nonPingerStoreWrapper{mockStore}
+
+	uc := &usecasestaging.AddUseCase{
+		Strategy: newMockEditStrategyNotFound(),
+		Store:    wrappedStore,
+	}
+
+	output, err := uc.Draft(t.Context(), usecasestaging.DraftInput{Name: "/app/not-exists"})
+	require.NoError(t, err)
+	assert.False(t, output.IsStaged)
+	assert.Empty(t, output.Value)
+}
+
+func TestAddUseCase_Draft_NonPingerStore_GetEntryError(t *testing.T) {
+	t.Parallel()
+
+	// When store doesn't implement Pinger and GetEntry fails,
+	// error should propagate
+	mockStore := testutil.NewMockStore()
+	mockStore.GetEntryErr = errors.New("storage unavailable")
+
+	// Wrap to hide Pinger interface
+	wrappedStore := &nonPingerStoreWrapper{mockStore}
+
+	uc := &usecasestaging.AddUseCase{
+		Strategy: newMockEditStrategyNotFound(),
+		Store:    wrappedStore,
+	}
+
+	_, err := uc.Draft(t.Context(), usecasestaging.DraftInput{Name: "/app/config"})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "storage unavailable")
+}

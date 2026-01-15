@@ -24,10 +24,6 @@ key_types:
     role: Commands that only access file storage (stash show, stash drop)
   - name: Result[T]
     role: Generic result type for read commands with NothingStaged flag
-  - name: Pinger
-    role: Interface for checking agent status without starting
-  - name: Starter
-    role: Interface for ensuring agent is running
 
 files:
   - command.go   # Command type definitions (WriteCommand, ReadCommand, FileCommand)
@@ -35,7 +31,8 @@ files:
   - executor.go  # ExecuteWrite, ExecuteRead, ExecuteFile functions
 
 dependencies:
-  internal: []
+  internal:
+    - internal/staging/store  # store.Pinger, store.Starter interfaces
   external: []
 ```
 
@@ -101,7 +98,7 @@ Commands that only interact with file storage, bypassing the agent entirely.
 ```go
 func ExecuteWrite[T any](
     ctx context.Context,
-    starter Starter,
+    starter store.Starter,  // from internal/staging/store
     _ WriteCommand,
     action func() (T, error),
 ) (T, error)
@@ -116,7 +113,7 @@ func ExecuteWrite[T any](
 ```go
 func ExecuteRead[T any](
     ctx context.Context,
-    pinger Pinger,
+    pinger store.Pinger,  // from internal/staging/store
     _ ReadCommand,
     action func() (T, error),
 ) (Result[T], error)
@@ -176,6 +173,19 @@ For read commands, "nothing staged" is not an error - it's a valid state. The `R
 - `Result{NothingStaged: true}` + `nil error` = Agent not running, nothing staged
 - `Result{Value: v}` + `nil error` = Action succeeded
 - `Result{}` + `error` = Action failed
+
+### Edit Command Special Case
+
+The `edit` command is classified as WriteCommand but doesn't use the lifecycle wrapper.
+Instead, it implements a "Ping-first" pattern directly in `EditUseCase`:
+- Checks Pinger before accessing staged state
+- If daemon not running, skips staged check and fetches from AWS directly
+- If daemon running, checks staged state first
+
+This avoids unnecessary daemon auto-start when editing unstaged resources while still
+allowing the StageEntry call to auto-start when actually staging the edit.
+
+See `internal/usecase/staging/CLAUDE.md` for details on the Ping-first pattern.
 
 ## References
 

@@ -29,10 +29,14 @@ key_types:
     role: Interface for bulk state retrieval
   - name: Writer
     role: Interface for bulk state writing
+  - name: Pinger
+    role: Interface for checking if daemon is running (without starting)
+  - name: Starter
+    role: Interface for ensuring daemon is running (auto-start if needed)
   - name: FileStore
     role: Drainer + Writer for file backend
   - name: AgentStore
-    role: Full interface for agent backend
+    role: Full interface for agent backend (embeds Pinger/Starter)
   - name: HintedUnstager
     role: Unstage with operation hints for shutdown messages
 
@@ -71,11 +75,27 @@ ReadOperator ─┐
 WriteOperator ┘                      │
                                      ├─> AgentStore
 Drainer ─────────────────────────────┤
-Writer ──────────────────────────────┘
+Writer ──────────────────────────────┤
+Pinger ──────────────────────────────┤
+Starter ─────────────────────────────┘
 
 Drainer ─┬─> FileStore
 Writer ──┘
 ```
+
+### Pinger/Starter Pattern
+
+The `Pinger` and `Starter` interfaces enable efficient daemon lifecycle management:
+
+- **Pinger**: Checks if daemon is running without starting it. Used by read operations
+  to determine if staged state exists without triggering unnecessary daemon auto-start.
+- **Starter**: Ensures daemon is running, starting it if needed. Used by write operations
+  that must persist changes to daemon memory.
+
+This pattern is used by:
+- `lifecycle.ExecuteRead`: Uses Pinger to check before read operations
+- `lifecycle.ExecuteWrite`: Uses Starter to ensure daemon for write operations
+- UseCase "Ping-first" pattern: Edit/Add use cases check Pinger before accessing staged state
 
 ### Hints for Shutdown Messages
 

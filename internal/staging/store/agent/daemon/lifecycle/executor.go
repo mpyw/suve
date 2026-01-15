@@ -1,23 +1,17 @@
 package lifecycle
 
-import "context"
+import (
+	"context"
 
-// Pinger checks if the agent is running without starting it.
-type Pinger interface {
-	Ping(ctx context.Context) error
-}
-
-// Starter ensures the agent is running, starting it if necessary.
-type Starter interface {
-	Start(ctx context.Context) error
-}
+	"github.com/mpyw/suve/internal/staging/store"
+)
 
 // ExecuteWrite executes a write command that requires the agent to be running.
 // It ensures the agent is started before executing the action.
 // The cmd parameter is used for type safety to ensure only write commands are passed.
 func ExecuteWrite[T any](
 	ctx context.Context,
-	starter Starter,
+	starter store.Starter,
 	_ WriteCommand,
 	action func() (T, error),
 ) (T, error) {
@@ -35,7 +29,7 @@ func ExecuteWrite[T any](
 // The cmd parameter is used for type safety to ensure only read commands are passed.
 func ExecuteRead[T any](
 	ctx context.Context,
-	pinger Pinger,
+	pinger store.Pinger,
 	_ ReadCommand,
 	action func() (T, error),
 ) (Result[T], error) {
@@ -66,7 +60,7 @@ func ExecuteFile[T any](
 // ExecuteWrite0 is like ExecuteWrite but for actions that don't return a value.
 func ExecuteWrite0(
 	ctx context.Context,
-	starter Starter,
+	starter store.Starter,
 	cmd WriteCommand,
 	action func() error,
 ) error {
@@ -80,7 +74,7 @@ func ExecuteWrite0(
 // ExecuteRead0 is like ExecuteRead but for actions that don't return a value.
 func ExecuteRead0(
 	ctx context.Context,
-	pinger Pinger,
+	pinger store.Pinger,
 	cmd ReadCommand,
 	action func() error,
 ) (Result0, error) {

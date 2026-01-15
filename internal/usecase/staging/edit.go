@@ -36,17 +36,54 @@ type EditUseCase struct {
 func (u *EditUseCase) Execute(ctx context.Context, input EditInput) (*EditOutput, error) {
 	service := u.Strategy.Service()
 
-	// Load current state from AWS
-	currentValue, awsBaseModifiedAt, err := u.fetchCurrentState(ctx, input.Name)
-	if err != nil {
-		return nil, err
+	// Check staged state first to avoid unnecessary AWS fetch
+	// Only ping-check if Store implements Pinger
+	var stagedEntry *staging.Entry
+
+	if pinger, ok := u.Store.(store.Pinger); ok {
+		if pinger.Ping(ctx) != nil {
+			// Daemon not running → nothing staged, will fetch from AWS below
+			stagedEntry = nil
+		} else {
+			// Daemon running → check staged state
+			entry, err := u.Store.GetEntry(ctx, service, input.Name)
+			if err != nil && !errors.Is(err, staging.ErrNotStaged) {
+				return nil, err
+			}
+
+			stagedEntry = entry
+		}
+	} else {
+		// Not Pinger (e.g., FileStore) → check staged state directly
+		entry, err := u.Store.GetEntry(ctx, service, input.Name)
+		if err != nil && !errors.Is(err, staging.ErrNotStaged) {
+			return nil, err
+		}
+
+		stagedEntry = entry
 	}
 
-	// Load staged entry state with metadata
-	entryState, existingBaseModifiedAt, err := transition.LoadEntryStateWithMetadata(ctx, u.Store, service, input.Name, currentValue)
-	if err != nil {
-		return nil, err
+	// Determine if we need to fetch from AWS
+	var currentValue *string
+
+	var awsBaseModifiedAt *time.Time
+
+	if stagedEntry != nil && stagedEntry.Operation == staging.OperationCreate {
+		// Staged as Create → resource doesn't exist in AWS, skip fetch
+		currentValue = nil
+		awsBaseModifiedAt = nil
+	} else {
+		// Not staged or staged as Update/Delete → fetch from AWS
+		var err error
+
+		currentValue, awsBaseModifiedAt, err = u.fetchCurrentState(ctx, input.Name)
+		if err != nil {
+			return nil, err
+		}
 	}
+
+	// Build entry state from already-fetched data (avoid redundant GetEntry call)
+	entryState, existingBaseModifiedAt := u.buildEntryState(stagedEntry, currentValue)
 
 	// Use existing BaseModifiedAt if available, otherwise use AWS
 	baseModifiedAt := existingBaseModifiedAt
@@ -84,6 +121,35 @@ func (u *EditUseCase) Execute(ctx context.Context, input EditInput) (*EditOutput
 	return output, nil
 }
 
+// buildEntryState constructs EntryState from already-fetched staged entry and AWS value.
+func (u *EditUseCase) buildEntryState(stagedEntry *staging.Entry, currentAWSValue *string) (transition.EntryState, *time.Time) {
+	state := transition.EntryState{
+		CurrentValue: currentAWSValue,
+		StagedState:  transition.EntryStagedStateNotStaged{},
+	}
+
+	var baseModifiedAt *time.Time
+
+	if stagedEntry != nil {
+		baseModifiedAt = stagedEntry.BaseModifiedAt
+
+		switch stagedEntry.Operation {
+		case staging.OperationCreate:
+			state.StagedState = transition.EntryStagedStateCreate{
+				DraftValue: lo.FromPtr(stagedEntry.Value),
+			}
+		case staging.OperationUpdate:
+			state.StagedState = transition.EntryStagedStateUpdate{
+				DraftValue: lo.FromPtr(stagedEntry.Value),
+			}
+		case staging.OperationDelete:
+			state.StagedState = transition.EntryStagedStateDelete{}
+		}
+	}
+
+	return state, baseModifiedAt
+}
+
 // fetchCurrentState fetches the current AWS value and last modified time.
 func (u *EditUseCase) fetchCurrentState(ctx context.Context, name string) (*string, *time.Time, error) {
 	result, err := u.Strategy.FetchCurrentValue(ctx, name)
@@ -117,6 +183,17 @@ type BaselineOutput struct {
 func (u *EditUseCase) Baseline(ctx context.Context, input BaselineInput) (*BaselineOutput, error) {
 	service := u.Strategy.Service()
 
+	// Only ping-check if Store implements Pinger
+	// - Pinger + ping fails → daemon not running, skip staged check
+	// - Pinger + ping succeeds → daemon running, check staged
+	// - Not Pinger (e.g., FileStore) → proceed to GetEntry directly
+	if pinger, ok := u.Store.(store.Pinger); ok {
+		if pinger.Ping(ctx) != nil {
+			// Daemon not running → skip staged check, go to AWS
+			return u.fetchBaselineFromAWS(ctx, input.Name)
+		}
+	}
+
 	// Check if already staged
 	stagedEntry, err := u.Store.GetEntry(ctx, service, input.Name)
 	if err != nil && !errors.Is(err, staging.ErrNotStaged) {
@@ -136,8 +213,13 @@ func (u *EditUseCase) Baseline(ctx context.Context, input BaselineInput) (*Basel
 		}
 	}
 
-	// Fetch from AWS
-	result, err := u.Strategy.FetchCurrentValue(ctx, input.Name)
+	// Not staged → fetch from AWS
+	return u.fetchBaselineFromAWS(ctx, input.Name)
+}
+
+// fetchBaselineFromAWS fetches the baseline value from AWS.
+func (u *EditUseCase) fetchBaselineFromAWS(ctx context.Context, name string) (*BaselineOutput, error) {
+	result, err := u.Strategy.FetchCurrentValue(ctx, name)
 	if err != nil {
 		return nil, err
 	}

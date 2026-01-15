@@ -67,16 +67,23 @@ type FileStore interface {
 	Writer
 }
 
+// Pinger checks if the agent daemon is running without starting it.
+type Pinger interface {
+	Ping(ctx context.Context) error
+}
+
+// Starter ensures the agent daemon is running, starting it if necessary.
+type Starter interface {
+	Start(ctx context.Context) error
+}
+
 // AgentStore provides full access to agent storage including drain/write operations.
 type AgentStore interface {
 	ReadWriteOperator
 	Drainer
 	Writer
-	// Ping checks if the agent daemon is running.
-	// Returns nil if reachable, error if not.
-	Ping(ctx context.Context) error
-	// Start ensures the agent daemon is running, starting it if necessary.
-	Start(ctx context.Context) error
+	Pinger
+	Starter
 }
 
 // HintedUnstager provides unstage operations with hints for context-aware shutdown messages.
