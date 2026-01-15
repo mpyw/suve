@@ -558,3 +558,163 @@ func TestEditUseCase_Execute_EmptyStringValue_Stage(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "new-value", lo.FromPtr(entry.Value))
 }
+
+// Ping-first pattern tests
+
+func TestEditUseCase_Baseline_PingFirst_DaemonNotRunning(t *testing.T) {
+	t.Parallel()
+
+	// When daemon is not running (Ping fails), should skip staged check and fetch from AWS
+	store := testutil.NewMockStore()
+	store.PingErr = errors.New("daemon not running")
+
+	strategy := newMockEditStrategy()
+	strategy.fetchResult = &staging.EditFetchResult{
+		Value:        "aws-value",
+		LastModified: time.Now(),
+	}
+
+	uc := &usecasestaging.EditUseCase{
+		Strategy: strategy,
+		Store:    store,
+	}
+
+	output, err := uc.Baseline(t.Context(), usecasestaging.BaselineInput{Name: "/app/config"})
+	require.NoError(t, err)
+	assert.Equal(t, "aws-value", output.Value)
+	assert.False(t, output.IsStagedEdit)
+}
+
+func TestEditUseCase_Baseline_PingFirst_DaemonRunning(t *testing.T) {
+	t.Parallel()
+
+	// When daemon is running (Ping succeeds), should check staged state
+	store := testutil.NewMockStore()
+	store.PingErr = nil // Daemon running
+
+	// Pre-stage an UPDATE operation
+	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
+		Operation: staging.OperationUpdate,
+		Value:     lo.ToPtr("staged-value"),
+		StagedAt:  time.Now(),
+	}))
+
+	strategy := newMockEditStrategy()
+	strategy.fetchResult = &staging.EditFetchResult{
+		Value:        "aws-value",
+		LastModified: time.Now(),
+	}
+
+	uc := &usecasestaging.EditUseCase{
+		Strategy: strategy,
+		Store:    store,
+	}
+
+	output, err := uc.Baseline(t.Context(), usecasestaging.BaselineInput{Name: "/app/config"})
+	require.NoError(t, err)
+	assert.Equal(t, "staged-value", output.Value)
+	assert.True(t, output.IsStagedEdit)
+}
+
+func TestEditUseCase_Execute_PingFirst_DaemonNotRunning(t *testing.T) {
+	t.Parallel()
+
+	// When daemon is not running (Ping fails), should skip staged check and fetch from AWS
+	store := testutil.NewMockStore()
+	store.PingErr = errors.New("daemon not running")
+
+	strategy := newMockEditStrategy()
+	strategy.fetchResult = &staging.EditFetchResult{
+		Value:        "aws-value",
+		LastModified: time.Now(),
+	}
+
+	uc := &usecasestaging.EditUseCase{
+		Strategy: strategy,
+		Store:    store,
+	}
+
+	output, err := uc.Execute(t.Context(), usecasestaging.EditInput{
+		Name:  "/app/config",
+		Value: "new-value",
+	})
+	require.NoError(t, err)
+	assert.False(t, output.Skipped)
+	assert.False(t, output.Unstaged)
+
+	// Verify entry was staged (this triggers daemon auto-start via StageEntry)
+	entry, err := store.GetEntry(t.Context(), staging.ServiceParam, "/app/config")
+	require.NoError(t, err)
+	assert.Equal(t, staging.OperationUpdate, entry.Operation)
+	assert.Equal(t, "new-value", lo.FromPtr(entry.Value))
+}
+
+func TestEditUseCase_Execute_PingFirst_DaemonNotRunning_SameAsAWS(t *testing.T) {
+	t.Parallel()
+
+	// When daemon is not running and value matches AWS, should be skipped (no staging)
+	store := testutil.NewMockStore()
+	store.PingErr = errors.New("daemon not running")
+
+	strategy := newMockEditStrategy()
+	strategy.fetchResult = &staging.EditFetchResult{
+		Value:        "aws-value",
+		LastModified: time.Now(),
+	}
+
+	uc := &usecasestaging.EditUseCase{
+		Strategy: strategy,
+		Store:    store,
+	}
+
+	output, err := uc.Execute(t.Context(), usecasestaging.EditInput{
+		Name:  "/app/config",
+		Value: "aws-value", // Same as AWS
+	})
+	require.NoError(t, err)
+	assert.True(t, output.Skipped)
+	assert.False(t, output.Unstaged)
+
+	// Verify nothing was staged
+	_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/config")
+	assert.ErrorIs(t, err, staging.ErrNotStaged)
+}
+
+func TestEditUseCase_Execute_PingFirst_StagedCreate_SkipsAWSFetch(t *testing.T) {
+	t.Parallel()
+
+	// When staged as Create, should NOT fetch from AWS (resource doesn't exist)
+	store := testutil.NewMockStore()
+	store.PingErr = nil // Daemon running
+
+	// Pre-stage a CREATE operation
+	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/new", staging.Entry{
+		Operation: staging.OperationCreate,
+		Value:     lo.ToPtr("initial-value"),
+		StagedAt:  time.Now(),
+	}))
+
+	// Strategy that would fail if called
+	strategy := newMockEditStrategy()
+	strategy.fetchErr = errors.New("should not be called for staged create")
+
+	uc := &usecasestaging.EditUseCase{
+		Strategy: strategy,
+		Store:    store,
+	}
+
+	// This should succeed without calling FetchCurrentValue
+	output, err := uc.Execute(t.Context(), usecasestaging.EditInput{
+		Name:  "/app/new",
+		Value: "updated-value",
+	})
+	require.NoError(t, err)
+	assert.False(t, output.Skipped)
+	assert.False(t, output.Unstaged)
+
+	// Verify entry was updated
+	entry, err := store.GetEntry(t.Context(), staging.ServiceParam, "/app/new")
+	require.NoError(t, err)
+	assert.Equal(t, staging.OperationCreate, entry.Operation)
+	assert.Equal(t, "updated-value", lo.FromPtr(entry.Value))
+}

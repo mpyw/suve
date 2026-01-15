@@ -352,3 +352,75 @@ func TestAddUseCase_Execute_FetchError(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "AWS connection error")
 }
+
+// Ping-first pattern tests
+
+func TestAddUseCase_Draft_PingFirst_DaemonNotRunning(t *testing.T) {
+	t.Parallel()
+
+	// When daemon is not running (Ping fails), should return "not staged" without checking store
+	store := testutil.NewMockStore()
+	store.PingErr = errors.New("daemon not running")
+
+	// Pre-stage a CREATE operation (should not be found if Ping fails)
+	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/draft", staging.Entry{
+		Operation: staging.OperationCreate,
+		Value:     lo.ToPtr("draft-value"),
+		StagedAt:  time.Now(),
+	}))
+
+	uc := &usecasestaging.AddUseCase{
+		Strategy: newMockEditStrategyNotFound(),
+		Store:    store,
+	}
+
+	output, err := uc.Draft(t.Context(), usecasestaging.DraftInput{Name: "/app/draft"})
+	require.NoError(t, err)
+	// Should return "not staged" since daemon isn't running
+	assert.False(t, output.IsStaged)
+	assert.Empty(t, output.Value)
+}
+
+func TestAddUseCase_Draft_PingFirst_DaemonRunning(t *testing.T) {
+	t.Parallel()
+
+	// When daemon is running (Ping succeeds), should find staged draft
+	store := testutil.NewMockStore()
+	store.PingErr = nil // Daemon running
+
+	// Pre-stage a CREATE operation
+	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/draft", staging.Entry{
+		Operation: staging.OperationCreate,
+		Value:     lo.ToPtr("draft-value"),
+		StagedAt:  time.Now(),
+	}))
+
+	uc := &usecasestaging.AddUseCase{
+		Strategy: newMockEditStrategyNotFound(),
+		Store:    store,
+	}
+
+	output, err := uc.Draft(t.Context(), usecasestaging.DraftInput{Name: "/app/draft"})
+	require.NoError(t, err)
+	// Should find the staged draft
+	assert.True(t, output.IsStaged)
+	assert.Equal(t, "draft-value", output.Value)
+}
+
+func TestAddUseCase_Draft_PingFirst_DaemonRunning_NotStaged(t *testing.T) {
+	t.Parallel()
+
+	// When daemon is running but nothing is staged
+	store := testutil.NewMockStore()
+	store.PingErr = nil // Daemon running
+
+	uc := &usecasestaging.AddUseCase{
+		Strategy: newMockEditStrategyNotFound(),
+		Store:    store,
+	}
+
+	output, err := uc.Draft(t.Context(), usecasestaging.DraftInput{Name: "/app/not-exists"})
+	require.NoError(t, err)
+	assert.False(t, output.IsStaged)
+	assert.Empty(t, output.Value)
+}

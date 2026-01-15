@@ -62,20 +62,47 @@ dependencies:
 ## Testing Strategy
 
 ```yaml
-coverage_target: 85%
+coverage_target: 90%
 mock_strategy: |
   - testutil.MockStore for store interfaces
   - Direct struct manipulation for State testing
+  - MockStore.PingErr for Ping-first pattern tests
 focus_areas:
   - Add/Edit with conflict detection
   - Apply with rollback on partial failure
   - Stash merge/overwrite modes
   - Service-specific filtering
+  - Ping-first pattern (daemon lifecycle)
 skip_areas:
   - AWS API behavior
 ```
 
 ## Notes
+
+### Ping-First Pattern
+
+The `EditUseCase` and `AddUseCase` implement a "Ping-first" pattern to avoid unnecessary
+daemon auto-start and AWS requests:
+
+```go
+// Before accessing staged state, check if daemon is running
+if pinger, ok := u.Store.(store.Pinger); ok {
+    if pinger.Ping(ctx) != nil {
+        // Daemon not running → nothing staged → skip to AWS/default
+    }
+}
+// Proceed to GetEntry only if daemon is running
+```
+
+This pattern applies to:
+- `EditUseCase.Baseline()`: Returns AWS value if daemon not running
+- `EditUseCase.Execute()`: Skips staged check if daemon not running, fetches from AWS directly
+- `AddUseCase.Draft()`: Returns "not staged" if daemon not running
+
+Benefits:
+- Avoids daemon auto-start for pure read operations
+- Reduces unnecessary AWS requests when editing staged CREATE entries
+- Maintains correct behavior for FileStore (which doesn't implement Pinger)
 
 ### StashMode
 

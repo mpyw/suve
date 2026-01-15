@@ -97,6 +97,17 @@ func (u *AddUseCase) Draft(ctx context.Context, input DraftInput) (*DraftOutput,
 		return nil, err
 	}
 
+	// Only ping-check if Store implements Pinger
+	// - Pinger + ping fails → daemon not running, no draft
+	// - Pinger + ping succeeds → daemon running, check staged
+	// - Not Pinger (e.g., FileStore) → proceed to GetEntry directly
+	if pinger, ok := u.Store.(store.Pinger); ok {
+		if pinger.Ping(ctx) != nil {
+			// Daemon not running → no draft
+			return &DraftOutput{IsStaged: false}, nil
+		}
+	}
+
 	stagedEntry, err := u.Store.GetEntry(ctx, service, name)
 	if err != nil {
 		if errors.Is(err, staging.ErrNotStaged) {

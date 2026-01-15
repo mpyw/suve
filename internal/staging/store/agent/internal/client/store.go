@@ -11,7 +11,6 @@ import (
 	"github.com/mpyw/suve/internal/staging"
 	"github.com/mpyw/suve/internal/staging/store"
 	"github.com/mpyw/suve/internal/staging/store/agent/daemon"
-	"github.com/mpyw/suve/internal/staging/store/agent/daemon/lifecycle"
 	"github.com/mpyw/suve/internal/staging/store/agent/internal/protocol"
 )
 
@@ -334,7 +333,7 @@ func (s *Store) Ping(ctx context.Context) error {
 }
 
 // Start ensures the agent daemon is running, starting it if necessary.
-// This implements the lifecycle.Starter interface.
+// This implements the store.Starter interface.
 func (s *Store) Start(ctx context.Context) error {
 	return s.launcher.EnsureRunning(ctx)
 }
@@ -345,6 +344,6 @@ var (
 	_ store.Drainer           = (*Store)(nil)
 	_ store.Writer            = (*Store)(nil)
 	_ store.HintedUnstager    = (*Store)(nil)
-	_ lifecycle.Pinger        = (*Store)(nil)
-	_ lifecycle.Starter       = (*Store)(nil)
+	_ store.Pinger            = (*Store)(nil)
+	_ store.Starter           = (*Store)(nil)
 )
