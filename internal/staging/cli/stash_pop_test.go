@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/mpyw/suve/internal/cli/confirm"
 	"github.com/mpyw/suve/internal/staging"
 	"github.com/mpyw/suve/internal/staging/cli"
 	"github.com/mpyw/suve/internal/staging/store/testutil"
@@ -222,4 +223,192 @@ func TestStashPopRunner_NonFatalError(t *testing.T) {
 
 	_ = stdout
 	_ = stderr
+}
+
+func TestStashPopModeChooser_ChooseMode(t *testing.T) {
+	t.Parallel()
+
+	t.Run("overwrite flag takes precedence", func(t *testing.T) {
+		t.Parallel()
+
+		chooser := &cli.StashPopModeChooser{
+			Stderr: &bytes.Buffer{},
+			Stdout: &bytes.Buffer{},
+		}
+
+		result, err := chooser.ChooseMode(cli.StashPopModeInput{
+			OverwriteFlag: true,
+			MergeFlag:     true, // Should be ignored
+			HasChanges:    true,
+			IsTTY:         true,
+		})
+
+		require.NoError(t, err)
+		assert.False(t, result.Cancelled)
+		assert.Equal(t, stagingusecase.StashModeOverwrite, result.Mode)
+	})
+
+	t.Run("merge flag takes precedence over prompt", func(t *testing.T) {
+		t.Parallel()
+
+		chooser := &cli.StashPopModeChooser{
+			Stderr: &bytes.Buffer{},
+			Stdout: &bytes.Buffer{},
+		}
+
+		result, err := chooser.ChooseMode(cli.StashPopModeInput{
+			MergeFlag:  true,
+			HasChanges: true,
+			IsTTY:      true,
+		})
+
+		require.NoError(t, err)
+		assert.False(t, result.Cancelled)
+		assert.Equal(t, stagingusecase.StashModeMerge, result.Mode)
+	})
+
+	t.Run("defaults to merge when no changes", func(t *testing.T) {
+		t.Parallel()
+
+		chooser := &cli.StashPopModeChooser{
+			Stderr: &bytes.Buffer{},
+			Stdout: &bytes.Buffer{},
+		}
+
+		result, err := chooser.ChooseMode(cli.StashPopModeInput{
+			HasChanges: false,
+			IsTTY:      true,
+		})
+
+		require.NoError(t, err)
+		assert.False(t, result.Cancelled)
+		assert.Equal(t, stagingusecase.StashModeMerge, result.Mode)
+	})
+
+	t.Run("defaults to merge when non-TTY", func(t *testing.T) {
+		t.Parallel()
+
+		chooser := &cli.StashPopModeChooser{
+			Stderr: &bytes.Buffer{},
+			Stdout: &bytes.Buffer{},
+		}
+
+		result, err := chooser.ChooseMode(cli.StashPopModeInput{
+			HasChanges: true,
+			ItemCount:  5,
+			IsTTY:      false, // Non-TTY environment
+		})
+
+		require.NoError(t, err)
+		assert.False(t, result.Cancelled)
+		assert.Equal(t, stagingusecase.StashModeMerge, result.Mode)
+	})
+
+	t.Run("prompts when TTY and has changes - user selects merge", func(t *testing.T) {
+		t.Parallel()
+
+		stdin := bytes.NewBufferString("1\n") // Select "Merge"
+		stderr := &bytes.Buffer{}
+
+		chooser := &cli.StashPopModeChooser{
+			Prompter: &confirm.Prompter{
+				Stdin:  stdin,
+				Stdout: &bytes.Buffer{},
+				Stderr: stderr,
+			},
+			Stderr: stderr,
+			Stdout: &bytes.Buffer{},
+		}
+
+		result, err := chooser.ChooseMode(cli.StashPopModeInput{
+			HasChanges: true,
+			ItemCount:  3,
+			IsTTY:      true,
+		})
+
+		require.NoError(t, err)
+		assert.False(t, result.Cancelled)
+		assert.Equal(t, stagingusecase.StashModeMerge, result.Mode)
+		assert.Contains(t, stderr.String(), "3 staged change(s)")
+	})
+
+	t.Run("prompts when TTY and has changes - user selects overwrite", func(t *testing.T) {
+		t.Parallel()
+
+		stdin := bytes.NewBufferString("2\n") // Select "Overwrite"
+		stderr := &bytes.Buffer{}
+
+		chooser := &cli.StashPopModeChooser{
+			Prompter: &confirm.Prompter{
+				Stdin:  stdin,
+				Stdout: &bytes.Buffer{},
+				Stderr: stderr,
+			},
+			Stderr: stderr,
+			Stdout: &bytes.Buffer{},
+		}
+
+		result, err := chooser.ChooseMode(cli.StashPopModeInput{
+			HasChanges: true,
+			ItemCount:  3,
+			IsTTY:      true,
+		})
+
+		require.NoError(t, err)
+		assert.False(t, result.Cancelled)
+		assert.Equal(t, stagingusecase.StashModeOverwrite, result.Mode)
+	})
+
+	t.Run("prompts when TTY and has changes - user selects cancel", func(t *testing.T) {
+		t.Parallel()
+
+		stdin := bytes.NewBufferString("3\n") // Select "Cancel"
+		stderr := &bytes.Buffer{}
+
+		chooser := &cli.StashPopModeChooser{
+			Prompter: &confirm.Prompter{
+				Stdin:  stdin,
+				Stdout: &bytes.Buffer{},
+				Stderr: stderr,
+			},
+			Stderr: stderr,
+			Stdout: &bytes.Buffer{},
+		}
+
+		result, err := chooser.ChooseMode(cli.StashPopModeInput{
+			HasChanges: true,
+			ItemCount:  3,
+			IsTTY:      true,
+		})
+
+		require.NoError(t, err)
+		assert.True(t, result.Cancelled)
+	})
+
+	t.Run("prompts when TTY and has changes - user enters default (merge)", func(t *testing.T) {
+		t.Parallel()
+
+		stdin := bytes.NewBufferString("\n") // Just press Enter (default)
+		stderr := &bytes.Buffer{}
+
+		chooser := &cli.StashPopModeChooser{
+			Prompter: &confirm.Prompter{
+				Stdin:  stdin,
+				Stdout: &bytes.Buffer{},
+				Stderr: stderr,
+			},
+			Stderr: stderr,
+			Stdout: &bytes.Buffer{},
+		}
+
+		result, err := chooser.ChooseMode(cli.StashPopModeInput{
+			HasChanges: true,
+			ItemCount:  3,
+			IsTTY:      true,
+		})
+
+		require.NoError(t, err)
+		assert.False(t, result.Cancelled)
+		assert.Equal(t, stagingusecase.StashModeMerge, result.Mode)
+	})
 }
