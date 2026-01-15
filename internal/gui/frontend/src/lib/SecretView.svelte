@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { SecretList, SecretShow, SecretLog, SecretCreate, SecretUpdate, SecretDelete, SecretDiff, SecretRestore, SecretAddTag, SecretRemoveTag, StagingAdd, StagingEdit, StagingDelete, StagingAddTag, StagingRemoveTag, StagingCheckStatus } from '../../wailsjs/go/gui/App';
   import type { gui } from '../../wailsjs/go/models';
+  import { withRetry } from './retry';
   import CloseIcon from './icons/CloseIcon.svelte';
   import EyeIcon from './icons/EyeIcon.svelte';
   import EyeOffIcon from './icons/EyeOffIcon.svelte';
@@ -167,7 +168,7 @@
       const [detail, log, staging] = await Promise.all([
         SecretShow(name),
         SecretLog(name, 10),
-        StagingCheckStatus('secret', name)
+        withRetry(() => StagingCheckStatus('secret', name))
       ]);
       secretDetail = detail;
       secretLog = log?.entries || [];

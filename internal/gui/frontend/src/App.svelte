@@ -5,6 +5,7 @@
   import SecretView from './lib/SecretView.svelte';
   import StagingView from './lib/StagingView.svelte';
   import { GetAWSIdentity, StagingStatus } from '../wailsjs/go/gui/App';
+  import { withRetry } from './lib/retry';
 
   let activeView: 'param' | 'secret' | 'staging' = $state('param');
   let stagingCount = $state(0);
@@ -22,7 +23,7 @@
 
   async function loadStagingCount() {
     try {
-      const status = await StagingStatus();
+      const status = await withRetry(() => StagingStatus());
       stagingCount = (status?.param?.length || 0) + (status?.secret?.length || 0);
     } catch (e) {
       stagingCount = 0;
