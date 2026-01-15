@@ -34,10 +34,14 @@ export function formatJsonValue(value: string): string {
  */
 export function getOperationColor(operation: string): string {
   switch (operation) {
-    case 'create': return 'op-create';
-    case 'update': return 'op-update';
-    case 'delete': return 'op-delete';
-    default: return '';
+    case 'create':
+      return 'op-create';
+    case 'update':
+      return 'op-update';
+    case 'delete':
+      return 'op-delete';
+    default:
+      return '';
   }
 }
 
