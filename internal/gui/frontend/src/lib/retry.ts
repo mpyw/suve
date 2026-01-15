@@ -7,7 +7,7 @@ export async function withRetry<T>(fn: () => Promise<T>): Promise<T> {
   // First attempt
   try {
     return await fn();
-  } catch (error) {
+  } catch {
     // Fall through to retry loop
   }
 
@@ -16,7 +16,7 @@ export async function withRetry<T>(fn: () => Promise<T>): Promise<T> {
     await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY));
     try {
       return await fn();
-    } catch (error) {
+    } catch {
       // Continue retrying
     }
   }

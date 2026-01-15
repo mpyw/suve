@@ -1,7 +1,7 @@
 <script lang="ts">
-  import Modal from './Modal.svelte';
   import EyeIcon from './icons/EyeIcon.svelte';
   import EyeOffIcon from './icons/EyeOffIcon.svelte';
+  import Modal from './Modal.svelte';
   import './common.css';
 
   interface Props {

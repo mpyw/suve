@@ -1,11 +1,11 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { StagingDiff, StagingApply, StagingReset, StagingEdit, StagingUnstage, StagingAddTag, StagingCancelAddTag, StagingCancelRemoveTag, StagingFileStatus, StagingDrain, StagingPersist, StagingDrop } from '../../wailsjs/go/gui/App';
+  import { StagingAddTag, StagingApply, StagingCancelAddTag, StagingCancelRemoveTag, StagingDiff, StagingDrain, StagingDrop, StagingEdit, StagingFileStatus, StagingPersist, StagingReset, StagingUnstage } from '../../wailsjs/go/gui/App';
   import type { gui } from '../../wailsjs/go/models';
-  import { withRetry } from './retry';
+  import DiffDisplay from './DiffDisplay.svelte';
   import Modal from './Modal.svelte';
   import PassphraseModal from './PassphraseModal.svelte';
-  import DiffDisplay from './DiffDisplay.svelte';
+  import { withRetry } from './retry';
   import { formatDate, parseError } from './viewUtils';
   import './common.css';
 

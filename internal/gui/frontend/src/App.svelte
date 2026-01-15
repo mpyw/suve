@@ -1,11 +1,11 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import Sidebar from './lib/Sidebar.svelte';
-  import ParamView from './lib/ParamView.svelte';
-  import SecretView from './lib/SecretView.svelte';
-  import StagingView from './lib/StagingView.svelte';
   import { GetAWSIdentity, StagingStatus } from '../wailsjs/go/gui/App';
+  import ParamView from './lib/ParamView.svelte';
   import { withRetry } from './lib/retry';
+  import SecretView from './lib/SecretView.svelte';
+  import Sidebar from './lib/Sidebar.svelte';
+  import StagingView from './lib/StagingView.svelte';
 
   let activeView: 'param' | 'secret' | 'staging' = $state('param');
   let stagingCount = $state(0);

@@ -9,7 +9,10 @@ export interface DiffSegment {
  * Compute inline diff between two strings using word-level comparison.
  * Returns segments for rendering with highlighting.
  */
-export function computeInlineDiff(oldText: string, newText: string): { oldSegments: DiffSegment[]; newSegments: DiffSegment[] } {
+export function computeInlineDiff(
+  oldText: string,
+  newText: string
+): { oldSegments: DiffSegment[]; newSegments: DiffSegment[] } {
   const oldLines = oldText.split('\n');
   const newLines = newText.split('\n');
 
@@ -41,10 +44,17 @@ export function computeInlineDiff(oldText: string, newText: string): { oldSegmen
   return { oldSegments, newSegments };
 }
 
-function diffLine(oldLine: string, newLine: string): { oldSegs: DiffSegment[]; newSegs: DiffSegment[] } {
+function diffLine(
+  oldLine: string,
+  newLine: string
+): { oldSegs: DiffSegment[]; newSegs: DiffSegment[] } {
   // Find common prefix
   let prefixLen = 0;
-  while (prefixLen < oldLine.length && prefixLen < newLine.length && oldLine[prefixLen] === newLine[prefixLen]) {
+  while (
+    prefixLen < oldLine.length &&
+    prefixLen < newLine.length &&
+    oldLine[prefixLen] === newLine[prefixLen]
+  ) {
     prefixLen++;
   }
 

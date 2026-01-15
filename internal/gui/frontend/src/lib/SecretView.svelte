@@ -1,15 +1,15 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { SecretList, SecretShow, SecretLog, SecretCreate, SecretUpdate, SecretDelete, SecretDiff, SecretRestore, SecretAddTag, SecretRemoveTag, StagingAdd, StagingEdit, StagingDelete, StagingAddTag, StagingRemoveTag, StagingCheckStatus } from '../../wailsjs/go/gui/App';
+  import { SecretAddTag, SecretCreate, SecretDelete, SecretDiff, SecretList, SecretLog, SecretRemoveTag, SecretRestore, SecretShow, SecretUpdate, StagingAdd, StagingAddTag, StagingCheckStatus, StagingDelete, StagingEdit, StagingRemoveTag } from '../../wailsjs/go/gui/App';
   import type { gui } from '../../wailsjs/go/models';
-  import { withRetry } from './retry';
+  import DiffDisplay from './DiffDisplay.svelte';
   import CloseIcon from './icons/CloseIcon.svelte';
   import EyeIcon from './icons/EyeIcon.svelte';
   import EyeOffIcon from './icons/EyeOffIcon.svelte';
   import Modal from './Modal.svelte';
-  import DiffDisplay from './DiffDisplay.svelte';
-  import { maskValue, formatDate, formatJsonValue, parseError, createDebouncer } from './viewUtils';
+  import { withRetry } from './retry';
   import { createDiffMode } from './useDiffMode.svelte';
+  import { createDebouncer, formatDate, formatJsonValue, maskValue, parseError } from './viewUtils';
   import './common.css';
 
   interface Props {
@@ -138,7 +138,7 @@
 
     observer = new IntersectionObserver(
       (observedEntries) => {
-        if (observedEntries[0].isIntersecting && nextToken && !loadingMore && !loading) {
+        if (observedEntries[0]?.isIntersecting && nextToken && !loadingMore && !loading) {
           loadMore({ prefix, filter, withValue });
         }
       },
