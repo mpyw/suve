@@ -4,7 +4,7 @@ This file provides guidance to Claude Code when working with code in this reposi
 
 ## Project Overview
 
-**suve** (**S**ecret **U**nified **V**ersioning **E**xplorer) is a Git-like CLI for AWS Parameter Store and Secrets Manager. It provides familiar Git-style commands (`show`, `log`, `diff`, `list`, `create`, `update`, `delete`) with version specification syntax (`#VERSION`, `~SHIFT`, `:LABEL`).
+**suve** (**S**ecret **U**nified **V**ersioning **E**xplorer) is a Git-like CLI for AWS Parameter Store and Secrets Manager. It provides familiar Git-style commands (`show`, `log`, `diff`, `list`, `tag`, `stash`) with version specification syntax (`#VERSION`, `~SHIFT`, `:LABEL`).
 
 ### Core Concepts
 
@@ -62,6 +62,7 @@ This file provides guidance to Claude Code when working with code in this reposi
 5. **Two Services**:
    - `param` (aliases: `ssm`, `ps`) - AWS Systems Manager Parameter Store
    - `secret` (aliases: `sm`) - AWS Secrets Manager
+   - `stage` (alias: `stg`) - Staging operations
 
 ## Architecture
 

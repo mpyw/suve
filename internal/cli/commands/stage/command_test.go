@@ -18,6 +18,7 @@ func TestCommand(t *testing.T) {
 
 	require.NotNil(t, cmd)
 	assert.Equal(t, "stage", cmd.Name)
+	assert.Contains(t, cmd.Aliases, "stg")
 	assert.NotEmpty(t, cmd.Usage)
 	assert.NotEmpty(t, cmd.Description)
 	assert.NotNil(t, cmd.CommandNotFound)
