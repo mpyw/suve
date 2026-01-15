@@ -466,6 +466,42 @@ func TestEditUseCase_Execute_Unstaged_RevertedToAWS(t *testing.T) {
 	assert.ErrorIs(t, err, staging.ErrNotStaged)
 }
 
+func TestEditUseCase_Execute_UnstageError(t *testing.T) {
+	t.Parallel()
+
+	// When auto-unstage fails (revert to AWS value), error should propagate
+	store := testutil.NewMockStore()
+
+	// Pre-stage an UPDATE operation
+	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
+		Operation: staging.OperationUpdate,
+		Value:     lo.ToPtr("staged-value"),
+		StagedAt:  time.Now(),
+	}))
+
+	// Set UnstageEntryErr to simulate failure during auto-unstage
+	store.UnstageEntryErr = errors.New("unstage failed")
+
+	strategy := newMockEditStrategy()
+	strategy.fetchResult = &staging.EditFetchResult{
+		Value:        "aws-value",
+		LastModified: time.Now(),
+	}
+
+	uc := &usecasestaging.EditUseCase{
+		Strategy: strategy,
+		Store:    store,
+	}
+
+	// Edit back to AWS value - should trigger auto-unstage which fails
+	_, err := uc.Execute(t.Context(), usecasestaging.EditInput{
+		Name:  "/app/config",
+		Value: "aws-value", // Reverted to AWS value
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "unstage failed")
+}
+
 func TestEditUseCase_Execute_NotSkipped_DifferentFromAWS(t *testing.T) {
 	t.Parallel()
 
@@ -835,6 +871,71 @@ func TestEditUseCase_Baseline_PingFirst_DaemonNotRunning_IgnoresStagedEntry(t *t
 	require.NoError(t, err)
 	assert.Equal(t, "aws-value", output.Value)
 	assert.False(t, output.IsStagedEdit)
+}
+
+func TestEditUseCase_Execute_PingFirst_DaemonNotRunning_StagedCreateIgnored(t *testing.T) {
+	t.Parallel()
+
+	// Edge case: Ping fails but store has staged CREATE
+	// Staged CREATE is ignored, AWS fetch is attempted
+	// Resource doesn't exist on AWS → error
+	store := testutil.NewMockStore()
+	store.PingErr = errors.New("daemon not running")
+
+	// Pre-stage a CREATE operation (would be ignored due to Ping failure)
+	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/new", staging.Entry{
+		Operation: staging.OperationCreate,
+		Value:     lo.ToPtr("new-value"),
+		StagedAt:  time.Now(),
+	}))
+
+	// Resource doesn't exist on AWS
+	strategy := newMockEditStrategyNotFound()
+
+	uc := &usecasestaging.EditUseCase{
+		Strategy: strategy,
+		Store:    store,
+	}
+
+	// Should fail because Ping failed (staged CREATE ignored) and AWS resource not found
+	_, err := uc.Execute(t.Context(), usecasestaging.EditInput{
+		Name:  "/app/new",
+		Value: "updated-value",
+	})
+	require.Error(t, err)
+	// ResourceNotFoundError is expected
+	assert.Contains(t, err.Error(), "not found")
+}
+
+func TestEditUseCase_Baseline_PingFirst_DaemonNotRunning_StagedCreateIgnored(t *testing.T) {
+	t.Parallel()
+
+	// Edge case: Ping fails but store has staged CREATE
+	// Staged CREATE is ignored, AWS fetch is attempted
+	// Resource doesn't exist on AWS → error
+	store := testutil.NewMockStore()
+	store.PingErr = errors.New("daemon not running")
+
+	// Pre-stage a CREATE operation (would be ignored due to Ping failure)
+	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/new", staging.Entry{
+		Operation: staging.OperationCreate,
+		Value:     lo.ToPtr("new-value"),
+		StagedAt:  time.Now(),
+	}))
+
+	// Resource doesn't exist on AWS
+	strategy := newMockEditStrategyNotFound()
+
+	uc := &usecasestaging.EditUseCase{
+		Strategy: strategy,
+		Store:    store,
+	}
+
+	// Should fail because Ping failed (staged CREATE ignored) and AWS resource not found
+	_, err := uc.Baseline(t.Context(), usecasestaging.BaselineInput{Name: "/app/new"})
+	require.Error(t, err)
+	// ResourceNotFoundError is expected
+	assert.Contains(t, err.Error(), "not found")
 }
 
 // nonPingerStoreWrapper wraps a store but doesn't implement Pinger interface.
