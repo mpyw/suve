@@ -8,7 +8,9 @@ import (
 
 	"github.com/urfave/cli/v3"
 
+	"github.com/mpyw/suve/internal/cli/confirm"
 	"github.com/mpyw/suve/internal/cli/output"
+	"github.com/mpyw/suve/internal/cli/terminal"
 	"github.com/mpyw/suve/internal/infra"
 	"github.com/mpyw/suve/internal/staging"
 	"github.com/mpyw/suve/internal/staging/store/agent"
@@ -122,24 +124,67 @@ func stashPopAction(service staging.Service) func(context.Context, *cli.Command)
 
 		agentStore := agent.NewStore(identity.AccountID, identity.Region)
 
-		// Determine mode based on flags
-		mergeFlag := cmd.Bool("merge")
-		overwriteFlag := cmd.Bool("overwrite")
-		yesFlag := cmd.Bool("yes")
-
-		var mode stagingusecase.StashMode
-
-		switch {
-		case overwriteFlag:
-			mode = stagingusecase.StashModeOverwrite
-		default:
-			// --merge, --yes, or no flag defaults to merge
-			_ = mergeFlag // explicitly acknowledge merge flag
-			_ = yesFlag   // --yes also defaults to merge
-			mode = stagingusecase.StashModeMerge
-		}
-
 		err = lifecycle.ExecuteWrite0(ctx, agentStore, lifecycle.CmdStashPop, func() error {
+			// Determine mode based on flags or interactive prompt
+			mergeFlag := cmd.Bool("merge")
+			overwriteFlag := cmd.Bool("overwrite")
+
+			var mode stagingusecase.StashMode
+
+			switch {
+			case overwriteFlag:
+				mode = stagingusecase.StashModeOverwrite
+			case mergeFlag:
+				mode = stagingusecase.StashModeMerge
+			default:
+				// No explicit flag - check if we need to prompt
+				// Check if agent has existing changes
+				existingState, err := agentStore.Drain(ctx, service, true) // keep=true to peek
+				if err != nil {
+					return fmt.Errorf("failed to check agent state: %w", err)
+				}
+
+				hasChanges := !existingState.IsEmpty()
+
+				// Only prompt if agent has changes and TTY available
+				if hasChanges && terminal.IsTerminalWriter(cmd.Root().ErrWriter) {
+					itemCount := existingState.TotalCount()
+
+					confirmPrompter := &confirm.Prompter{
+						Stdin:     cmd.Root().Reader,
+						Stdout:    cmd.Root().Writer,
+						Stderr:    cmd.Root().ErrWriter,
+						AccountID: identity.AccountID,
+						Region:    identity.Region,
+					}
+
+					output.Warning(cmd.Root().ErrWriter, "Agent already has %d staged change(s).", itemCount)
+
+					choice, err := confirmPrompter.ConfirmChoice("How do you want to proceed?", []confirm.Choice{
+						{Label: "Merge", Description: "combine stashed changes with existing"},
+						{Label: "Overwrite", Description: "replace existing with stashed changes"},
+						{Label: "Cancel", Description: "abort operation"},
+					})
+					if err != nil {
+						return fmt.Errorf("failed to get confirmation: %w", err)
+					}
+
+					switch choice {
+					case 0: // Merge
+						mode = stagingusecase.StashModeMerge
+					case 1: // Overwrite
+						mode = stagingusecase.StashModeOverwrite
+					default: // Cancel or error
+						output.Info(cmd.Root().Writer, "Operation cancelled.")
+
+						return nil
+					}
+				} else {
+					// Default to merge when no prompt needed
+					mode = stagingusecase.StashModeMerge
+				}
+			}
+
 			r := &StashPopRunner{
 				UseCase: &stagingusecase.StashPopUseCase{
 					FileStore:  fileStore,
