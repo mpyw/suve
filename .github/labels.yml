@@ -1,0 +1,84 @@
+# Label definitions managed by crazy-max/ghaction-github-labeler
+# Changes here will be synced to GitHub on push to main
+
+# Type labels
+- name: bug
+  color: "d73a4a"
+  description: Something isn't working
+
+- name: enhancement
+  color: "a2eeef"
+  description: New feature or request
+
+- name: documentation
+  color: "0075ca"
+  description: Improvements or additions to documentation
+
+- name: question
+  color: "d876e3"
+  description: Further information is requested
+
+# Status labels
+- name: duplicate
+  color: "cfd3d7"
+  description: This issue or pull request already exists
+
+- name: invalid
+  color: "e4e669"
+  description: This doesn't seem right
+
+- name: wontfix
+  color: "ffffff"
+  description: This will not be worked on
+
+# Component labels
+- name: cli
+  color: "1d76db"
+  description: CLI functionality
+
+- name: gui
+  color: "0e8a16"
+  description: GUI functionality
+
+- name: staging
+  color: "5319e7"
+  description: Staging workflow functionality
+
+# Service labels
+- name: param
+  color: "f9a825"
+  description: AWS Parameter Store related
+
+- name: secret
+  color: "e65100"
+  description: AWS Secrets Manager related
+
+# Impact labels
+- name: security
+  color: "b60205"
+  description: Security related issue or fix
+
+- name: performance
+  color: "fbca04"
+  description: Performance improvement
+
+- name: breaking-change
+  color: "b60205"
+  description: Breaking change that requires attention
+
+# Dependabot labels
+- name: dependencies
+  color: "0366d6"
+  description: Pull requests that update a dependency file
+
+- name: go
+  color: "16e2e2"
+  description: Pull requests that update Go code
+
+- name: github_actions
+  color: "000000"
+  description: Pull requests that update GitHub Actions code
+
+- name: javascript
+  color: "168700"
+  description: Pull requests that update JavaScript code

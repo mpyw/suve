@@ -1,0 +1,19 @@
+name: Issue Labeler
+
+on:
+  issues:
+    types: [opened, edited]
+
+jobs:
+  labeler:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: Label issue based on content
+        uses: github/issue-labeler@v3.4
+        with:
+          configuration-path: .github/issue-labeler.yml
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          include-title: 1

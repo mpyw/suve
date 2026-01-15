@@ -1,0 +1,27 @@
+# Issue labeler configuration for github/issue-labeler
+# Labels are applied based on issue title/body content (regex patterns)
+
+cli:
+  - '\b(cli|command|flag|option|terminal|shell)\b'
+  - '\bsuve (param|secret) '
+
+gui:
+  - '\b(gui|ui|frontend|wails|svelte|window|dialog)\b'
+
+staging:
+  - '\b(stag(e|ing)|stash|daemon|apply|reset)\b'
+
+param:
+  - '\b(param(eter)?|ssm|parameter.?store)\b'
+
+secret:
+  - '\b(secret|sm|secrets?.?manager)\b'
+
+security:
+  - '\b(security|vulnerab|cve|exploit|auth|credential|encrypt|decrypt)\b'
+
+performance:
+  - '\b(performance|slow|fast|speed|latency|memory|cpu|optimization)\b'
+
+documentation:
+  - '\b(doc(s|umentation)?|readme|example|tutorial)\b'
