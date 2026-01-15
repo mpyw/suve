@@ -15,6 +15,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"testing"
 	"time"
@@ -188,6 +189,52 @@ func runSubCommand(t *testing.T, parentCmd *cli.Command, subCmdName string, args
 
 	// Build full args: ["suve", "parent-name", "sub-name", ...args]
 	fullArgs := append([]string{"suve", parentCmd.Name, subCmdName}, args...)
+	err = app.Run(t.Context(), fullArgs)
+
+	return outBuf.String(), errBuf.String(), err
+}
+
+// runSubCommandWithStdin executes a subcommand with custom stdin for passphrase input.
+func runSubCommandWithStdin(
+	t *testing.T, parentCmd *cli.Command, stdin io.Reader, subCmdName string, args ...string,
+) (stdout, stderr string, err error) {
+	t.Helper()
+
+	var outBuf, errBuf bytes.Buffer
+
+	app := &cli.Command{
+		Name:      "suve",
+		Reader:    stdin,
+		Writer:    &outBuf,
+		ErrWriter: &errBuf,
+		Commands:  []*cli.Command{parentCmd},
+	}
+
+	// Build full args: ["suve", "parent-name", "sub-name", ...args]
+	fullArgs := append([]string{"suve", parentCmd.Name, subCmdName}, args...)
+	err = app.Run(t.Context(), fullArgs)
+
+	return outBuf.String(), errBuf.String(), err
+}
+
+// runStashSubCommandWithStdin executes a stash subcommand (e.g., "param stash pop") with custom stdin.
+func runStashSubCommandWithStdin(
+	t *testing.T, parentCmd *cli.Command, stdin io.Reader, stashSubCmd string, args ...string,
+) (stdout, stderr string, err error) {
+	t.Helper()
+
+	var outBuf, errBuf bytes.Buffer
+
+	app := &cli.Command{
+		Name:      "suve",
+		Reader:    stdin,
+		Writer:    &outBuf,
+		ErrWriter: &errBuf,
+		Commands:  []*cli.Command{parentCmd},
+	}
+
+	// Build full args: ["suve", "parent-name", "stash", "stash-sub-cmd", ...args]
+	fullArgs := append([]string{"suve", parentCmd.Name, "stash", stashSubCmd}, args...)
 	err = app.Run(t.Context(), fullArgs)
 
 	return outBuf.String(), errBuf.String(), err

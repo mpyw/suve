@@ -62,13 +62,12 @@
 
   // Drain options
   let drainKeep = $state(false);
-  let drainForce = $state(false);
-  let drainMerge = $state(false);
+  let drainMode: 'merge' | 'overwrite' = $state('merge');
 
   // Push options modal (when file exists)
   let showPushOptionsModal = $state(false);
   let pushPassphrase = $state('');
-  let pushMode: 'overwrite' | 'merge' = $state('overwrite');
+  let pushMode: 'overwrite' | 'merge' = $state('merge');
 
   // Drop confirmation modal
   let showDropModal = $state(false);
@@ -284,7 +283,7 @@
     persistError = '';
     persistResult = null;
     pushPassphrase = '';
-    pushMode = 'overwrite';
+    pushMode = 'merge';
 
     try {
       // Check if file exists first
@@ -343,8 +342,7 @@
     drainError = '';
     drainResult = null;
     drainKeep = false;
-    drainForce = false;
-    drainMerge = false;
+    drainMode = 'merge';
 
     try {
       // Check file status first
@@ -354,13 +352,8 @@
         return;
       }
 
-      if (fileStatus.encrypted) {
-        // File is encrypted, show passphrase modal
-        showDrainModal = true;
-      } else {
-        // File is not encrypted, show options modal directly
-        showDrainOptionsModal = true;
-      }
+      // Always show options modal first (for both encrypted and unencrypted)
+      showDrainOptionsModal = true;
     } catch (e) {
       error = parseError(e);
     }
@@ -370,7 +363,7 @@
     drainLoading = true;
     drainError = '';
     try {
-      const result = await StagingDrain('', passphrase, drainKeep, drainForce, drainMerge);
+      const result = await StagingDrain('', passphrase, drainKeep, drainMode);
       drainResult = result;
       showDrainModal = false;
       await loadStatus();
@@ -382,10 +375,18 @@
   }
 
   async function handleDrainWithOptions() {
+    // If encrypted, we need to get passphrase first
+    if (fileStatus?.encrypted) {
+      showDrainOptionsModal = false;
+      showDrainModal = true;
+      return;
+    }
+
+    // Unencrypted file - proceed directly
     drainLoading = true;
     drainError = '';
     try {
-      const result = await StagingDrain('', '', drainKeep, drainForce, drainMerge);
+      const result = await StagingDrain('', '', drainKeep, drainMode);
       drainResult = result;
       showDrainOptionsModal = false;
       await loadStatus();
@@ -965,20 +966,24 @@
           <input type="checkbox" bind:checked={drainKeep} />
           <span>Keep file after loading</span>
         </label>
-        <label class="checkbox-label">
-          <input type="checkbox" bind:checked={drainMerge} />
-          <span>Merge with existing changes</span>
+      </div>
+      <div class="options-group">
+        <label class="radio-label">
+          <input type="radio" name="drainMode" value="merge" bind:group={drainMode} />
+          <span>Merge</span>
+          <span class="option-desc">Combine with existing staged changes</span>
         </label>
-        <label class="checkbox-label">
-          <input type="checkbox" bind:checked={drainForce} />
-          <span>Force overwrite existing changes</span>
+        <label class="radio-label">
+          <input type="radio" name="drainMode" value="overwrite" bind:group={drainMode} />
+          <span>Overwrite</span>
+          <span class="option-desc">Replace existing staged changes</span>
         </label>
       </div>
 
       <div class="form-actions">
         <button type="button" class="btn-secondary" onclick={closeDrainModal}>Cancel</button>
         <button type="button" class="btn-drain-action" onclick={handleDrainWithOptions} disabled={drainLoading}>
-          {drainLoading ? 'Loading...' : 'Load from File'}
+          {drainLoading ? 'Loading...' : (fileStatus?.encrypted ? 'Next (Enter Passphrase)' : 'Load from File')}
         </button>
       </div>
     {/if}
@@ -1013,14 +1018,14 @@
 
     <div class="options-group">
       <label class="radio-label">
+        <input type="radio" name="pushMode" value="merge" bind:group={pushMode} />
+        <span>Merge</span>
+        <span class="option-desc">Combine with existing stash file</span>
+      </label>
+      <label class="radio-label">
         <input type="radio" name="pushMode" value="overwrite" bind:group={pushMode} />
         <span>Overwrite</span>
         <span class="option-desc">Replace existing stash file</span>
-      </label>
-      <label class="radio-label">
-        <input type="radio" name="pushMode" value="merge" bind:group={pushMode} />
-        <span>Merge</span>
-        <span class="option-desc">Merge with existing stash file</span>
       </label>
     </div>
 

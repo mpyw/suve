@@ -729,7 +729,8 @@ func (a *App) StagingFileStatus() (*StagingFileStatusResult, error) {
 
 // StagingDrain loads staged changes from file into agent memory.
 // If the file is encrypted, passphrase must be provided.
-func (a *App) StagingDrain(service string, passphrase string, keep bool, force bool, merge bool) (*StagingDrainResult, error) {
+// mode: "overwrite" or "merge" (default)
+func (a *App) StagingDrain(service string, passphrase string, keep bool, mode string) (*StagingDrainResult, error) {
 	identity, err := infra.GetAWSIdentity(a.ctx)
 	if err != nil {
 		return nil, err
@@ -753,6 +754,11 @@ func (a *App) StagingDrain(service string, passphrase string, keep bool, force b
 		}
 	}
 
+	drainMode := stagingusecase.StashModeMerge
+	if mode == "overwrite" {
+		drainMode = stagingusecase.StashModeOverwrite
+	}
+
 	uc := &stagingusecase.StashPopUseCase{
 		FileStore:  fileStore,
 		AgentStore: agentStore,
@@ -761,8 +767,7 @@ func (a *App) StagingDrain(service string, passphrase string, keep bool, force b
 	result, err := uc.Execute(a.ctx, stagingusecase.StashPopInput{
 		Service: svc,
 		Keep:    keep,
-		Force:   force,
-		Merge:   merge,
+		Mode:    drainMode,
 	})
 	if err != nil {
 		return nil, err
@@ -802,9 +807,9 @@ func (a *App) StagingPersist(service string, passphrase string, keep bool, mode 
 		}
 	}
 
-	persistMode := stagingusecase.StashPushModeOverwrite
+	persistMode := stagingusecase.StashModeOverwrite
 	if mode == "merge" {
-		persistMode = stagingusecase.StashPushModeMerge
+		persistMode = stagingusecase.StashModeMerge
 	}
 
 	uc := &stagingusecase.StashPushUseCase{
@@ -833,6 +838,7 @@ type StagingDropResult struct {
 }
 
 // StagingDrop deletes the staging file without loading it into memory.
+// This works even for encrypted files since it just deletes the file directly.
 func (a *App) StagingDrop() (*StagingDropResult, error) {
 	identity, err := infra.GetAWSIdentity(a.ctx)
 	if err != nil {
@@ -853,9 +859,9 @@ func (a *App) StagingDrop() (*StagingDropResult, error) {
 		return nil, errors.New("no stashed changes to drop")
 	}
 
-	// Drain with keep=false to delete the file (we discard the result)
-	_, err = fileStore.Drain(a.ctx, "", false)
-	if err != nil {
+	// Delete the file directly without reading its contents
+	// This allows dropping encrypted files without passphrase
+	if err := fileStore.Delete(); err != nil {
 		return nil, err
 	}
 

@@ -18,8 +18,7 @@ import (
 	"github.com/mpyw/suve/internal/staging/store/file"
 )
 
-//nolint:funlen // Table-driven test with many cases
-func TestStashDropRunner_Run(t *testing.T) {
+func TestGlobalDropRunner_Run(t *testing.T) {
 	t.Parallel()
 
 	t.Run("success - drop all services", func(t *testing.T) {
@@ -46,15 +45,13 @@ func TestStashDropRunner_Run(t *testing.T) {
 
 		fileStore := file.NewStoreWithPath(path)
 		stdout := &bytes.Buffer{}
-		stderr := &bytes.Buffer{}
 
-		runner := &cli.StashDropRunner{
+		runner := &cli.GlobalDropRunner{
 			FileStore: fileStore,
 			Stdout:    stdout,
-			Stderr:    stderr,
 		}
 
-		err = runner.Run(t.Context(), cli.StashDropOptions{})
+		err = runner.Run()
 		require.NoError(t, err)
 		assert.Contains(t, stdout.String(), "All stashed changes dropped")
 
@@ -62,6 +59,31 @@ func TestStashDropRunner_Run(t *testing.T) {
 		_, err = os.Stat(path)
 		assert.True(t, os.IsNotExist(err))
 	})
+
+	t.Run("success - drop non-existent file (no error)", func(t *testing.T) {
+		t.Parallel()
+
+		tmpDir := t.TempDir()
+		path := filepath.Join(tmpDir, "stage.json")
+		// Don't create the file
+
+		fileStore := file.NewStoreWithPath(path)
+		stdout := &bytes.Buffer{}
+
+		runner := &cli.GlobalDropRunner{
+			FileStore: fileStore,
+			Stdout:    stdout,
+		}
+
+		// GlobalDropRunner.Run does not check existence, it just deletes
+		err := runner.Run()
+		require.NoError(t, err)
+		assert.Contains(t, stdout.String(), "All stashed changes dropped")
+	})
+}
+
+func TestServiceDropRunner_Run(t *testing.T) {
+	t.Parallel()
 
 	t.Run("success - drop specific service", func(t *testing.T) {
 		t.Parallel()
@@ -87,16 +109,15 @@ func TestStashDropRunner_Run(t *testing.T) {
 
 		fileStore := file.NewStoreWithPath(path)
 		stdout := &bytes.Buffer{}
-		stderr := &bytes.Buffer{}
 
-		runner := &cli.StashDropRunner{
+		runner := &cli.ServiceDropRunner{
 			FileStore: fileStore,
+			Service:   staging.ServiceParam,
 			Stdout:    stdout,
-			Stderr:    stderr,
 		}
 
 		// Drop only param service
-		err = runner.Run(t.Context(), cli.StashDropOptions{Service: staging.ServiceParam})
+		err = runner.Run(t.Context())
 		require.NoError(t, err)
 		assert.Contains(t, stdout.String(), "Stashed param changes dropped")
 
@@ -129,43 +150,20 @@ func TestStashDropRunner_Run(t *testing.T) {
 
 		fileStore := file.NewStoreWithPath(path)
 		stdout := &bytes.Buffer{}
-		stderr := &bytes.Buffer{}
 
-		runner := &cli.StashDropRunner{
+		runner := &cli.ServiceDropRunner{
 			FileStore: fileStore,
+			Service:   staging.ServiceParam,
 			Stdout:    stdout,
-			Stderr:    stderr,
 		}
 
-		err = runner.Run(t.Context(), cli.StashDropOptions{Service: staging.ServiceParam})
+		err = runner.Run(t.Context())
 		require.NoError(t, err)
 		assert.Contains(t, stdout.String(), "Stashed param changes dropped")
 
 		// File should be deleted (empty state)
 		_, err = os.Stat(path)
 		assert.True(t, os.IsNotExist(err))
-	})
-
-	t.Run("error - no stashed changes to drop", func(t *testing.T) {
-		t.Parallel()
-
-		tmpDir := t.TempDir()
-		path := filepath.Join(tmpDir, "stage.json")
-		// Don't create the file
-
-		fileStore := file.NewStoreWithPath(path)
-		stdout := &bytes.Buffer{}
-		stderr := &bytes.Buffer{}
-
-		runner := &cli.StashDropRunner{
-			FileStore: fileStore,
-			Stdout:    stdout,
-			Stderr:    stderr,
-		}
-
-		err := runner.Run(t.Context(), cli.StashDropOptions{})
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "no stashed changes to drop")
 	})
 
 	t.Run("error - no stashed changes for specific service", func(t *testing.T) {
@@ -187,16 +185,15 @@ func TestStashDropRunner_Run(t *testing.T) {
 
 		fileStore := file.NewStoreWithPath(path)
 		stdout := &bytes.Buffer{}
-		stderr := &bytes.Buffer{}
 
-		runner := &cli.StashDropRunner{
+		runner := &cli.ServiceDropRunner{
 			FileStore: fileStore,
+			Service:   staging.ServiceSecret,
 			Stdout:    stdout,
-			Stderr:    stderr,
 		}
 
 		// Try to drop secret service which has no entries
-		err = runner.Run(t.Context(), cli.StashDropOptions{Service: staging.ServiceSecret})
+		err = runner.Run(t.Context())
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "no stashed changes for secret")
 	})
@@ -220,16 +217,15 @@ func TestStashDropRunner_Run(t *testing.T) {
 
 		fileStore := file.NewStoreWithPath(path)
 		stdout := &bytes.Buffer{}
-		stderr := &bytes.Buffer{}
 
-		runner := &cli.StashDropRunner{
+		runner := &cli.ServiceDropRunner{
 			FileStore: fileStore,
+			Service:   staging.ServiceParam,
 			Stdout:    stdout,
-			Stderr:    stderr,
 		}
 
 		// Drop the only service
-		err = runner.Run(t.Context(), cli.StashDropOptions{Service: staging.ServiceParam})
+		err = runner.Run(t.Context())
 		require.NoError(t, err)
 
 		// File should be deleted because state is now empty
@@ -261,15 +257,14 @@ func TestStashDropRunner_Run(t *testing.T) {
 
 		fileStore := file.NewStoreWithPath(path)
 		stdout := &bytes.Buffer{}
-		stderr := &bytes.Buffer{}
 
-		runner := &cli.StashDropRunner{
+		runner := &cli.ServiceDropRunner{
 			FileStore: fileStore,
+			Service:   staging.ServiceParam,
 			Stdout:    stdout,
-			Stderr:    stderr,
 		}
 
-		err = runner.Run(t.Context(), cli.StashDropOptions{Service: staging.ServiceParam})
+		err = runner.Run(t.Context())
 		require.NoError(t, err)
 
 		// File should still exist

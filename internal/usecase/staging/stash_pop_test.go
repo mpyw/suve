@@ -99,7 +99,7 @@ func TestDrainUseCase_Execute(t *testing.T) {
 			AgentStore: agentStore,
 		}
 
-		output, err := usecase.Execute(t.Context(), stagingusecase.StashPopInput{Merge: true})
+		output, err := usecase.Execute(t.Context(), stagingusecase.StashPopInput{Mode: stagingusecase.StashModeMerge})
 		require.NoError(t, err)
 		assert.True(t, output.Merged)
 
@@ -132,10 +132,10 @@ func TestDrainUseCase_Execute(t *testing.T) {
 			AgentStore: agentStore,
 		}
 
-		_, err := usecase.Execute(t.Context(), stagingusecase.StashPopInput{Force: true})
+		_, err := usecase.Execute(t.Context(), stagingusecase.StashPopInput{Mode: stagingusecase.StashModeOverwrite})
 		require.NoError(t, err)
 
-		// With force, agent should have file content
+		// With overwrite, agent should have file content
 		_, err = agentStore.GetEntry(t.Context(), staging.ServiceParam, "/app/config")
 		require.NoError(t, err)
 	})
@@ -155,7 +155,7 @@ func TestDrainUseCase_Execute(t *testing.T) {
 		assert.ErrorIs(t, err, stagingusecase.ErrNothingToStashPop)
 	})
 
-	t.Run("drain error - agent has changes", func(t *testing.T) {
+	t.Run("drain defaults to merge when agent has changes", func(t *testing.T) {
 		t.Parallel()
 
 		fileStore := testutil.NewMockStore()
@@ -177,8 +177,16 @@ func TestDrainUseCase_Execute(t *testing.T) {
 			AgentStore: agentStore,
 		}
 
-		_, err := usecase.Execute(t.Context(), stagingusecase.StashPopInput{})
-		assert.ErrorIs(t, err, stagingusecase.ErrAgentHasChanges)
+		// Default mode (StashModeMerge) should merge instead of erroring
+		output, err := usecase.Execute(t.Context(), stagingusecase.StashPopInput{})
+		require.NoError(t, err)
+		assert.True(t, output.Merged)
+
+		// Both entries should exist
+		_, err = agentStore.GetEntry(t.Context(), staging.ServiceParam, "/app/existing")
+		require.NoError(t, err)
+		_, err = agentStore.GetEntry(t.Context(), staging.ServiceParam, "/app/config")
+		require.NoError(t, err)
 	})
 
 	t.Run("drain with service filter", func(t *testing.T) {

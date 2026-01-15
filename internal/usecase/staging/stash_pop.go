@@ -14,10 +14,10 @@ type StashPopInput struct {
 	Service staging.Service
 	// Keep preserves the file after draining.
 	Keep bool
-	// Force overwrites agent memory without checking for conflicts.
-	Force bool
-	// Merge combines file changes with existing agent memory.
-	Merge bool
+	// Mode determines how to handle conflicts with existing agent memory.
+	// StashModeMerge combines file changes with existing agent memory.
+	// StashModeOverwrite replaces existing agent memory.
+	Mode StashMode
 }
 
 // StashPopOutput holds the result of the drain use case.
@@ -59,31 +59,38 @@ func (u *StashPopUseCase) Execute(ctx context.Context, input StashPopInput) (*St
 		agentState = staging.NewEmptyState()
 	}
 
-	// Check for conflicts
-	agentServiceState := agentState.ExtractService(input.Service)
-	if !agentServiceState.IsEmpty() && !input.Force && !input.Merge {
-		return nil, ErrAgentHasChanges
-	}
-
-	// Prepare final state
+	// Determine final state based on mode and scope
 	var finalState *staging.State
 
 	merged := false
 
+	// Check if agent has data BEFORE any modifications (for merged output)
+	agentServiceState := agentState.ExtractService(input.Service)
+	hasExistingData := !agentServiceState.IsEmpty()
+	agentWasEmpty := agentState.IsEmpty()
+
 	switch {
-	case input.Merge && !agentState.IsEmpty():
-		// Merge states: start with agent state, merge drain state (drain takes precedence)
+	case input.Service != "":
+		// Service-specific: always preserve other services from agent
+		finalState = agentState
+		if input.Mode == StashModeOverwrite {
+			// Overwrite: clear target service, then add file's data
+			finalState.RemoveService(input.Service)
+			finalState.Merge(drainState)
+		} else {
+			// Merge: combine agent's target service with file's target service
+			finalState.Merge(drainState)
+
+			merged = hasExistingData
+		}
+	case input.Mode == StashModeMerge:
+		// Global merge: combine agent state with file state
 		finalState = agentState
 		finalState.Merge(drainState)
 
-		merged = true
-	case input.Service != "":
-		// Service-specific: merge with existing agent state for other services
-		finalState = agentState
-		finalState.RemoveService(input.Service) // Clear the target service
-		finalState.Merge(drainState)
+		merged = !agentWasEmpty
 	default:
-		// Replace all: use file state directly
+		// Global overwrite: replace entire agent state with file state
 		finalState = drainState
 	}
 
@@ -141,8 +148,6 @@ func (u *StashPopUseCase) Execute(ctx context.Context, input StashPopInput) (*St
 var (
 	// ErrNothingToStashPop is returned when there are no staged changes in file to drain.
 	ErrNothingToStashPop = errors.New("no staged changes in file to drain")
-	// ErrAgentHasChanges is returned when agent has staged changes and neither force nor merge is specified.
-	ErrAgentHasChanges = errors.New("agent already has staged changes; use --force to overwrite or --merge to combine")
 )
 
 // StashPopError represents an error during drain operation.

@@ -537,3 +537,77 @@ func TestStore_Persist(t *testing.T) {
 		assert.Contains(t, err.Error(), "failed to write state file")
 	})
 }
+
+func TestStore_Delete(t *testing.T) {
+	t.Parallel()
+
+	t.Run("delete existing file", func(t *testing.T) {
+		t.Parallel()
+
+		tmpDir := t.TempDir()
+		path := filepath.Join(tmpDir, "stage.json")
+		store := file.NewStoreWithPath(path)
+
+		// Create the file
+		err := os.WriteFile(path, []byte(`{"version":1}`), 0o600)
+		require.NoError(t, err)
+
+		// Verify file exists
+		_, err = os.Stat(path)
+		require.NoError(t, err)
+
+		// Delete
+		err = store.Delete()
+		require.NoError(t, err)
+
+		// Verify file is deleted
+		_, err = os.Stat(path)
+		assert.True(t, os.IsNotExist(err))
+	})
+
+	t.Run("delete non-existent file (no error)", func(t *testing.T) {
+		t.Parallel()
+
+		tmpDir := t.TempDir()
+		path := filepath.Join(tmpDir, "nonexistent.json")
+		store := file.NewStoreWithPath(path)
+
+		// Delete should not error even if file doesn't exist
+		err := store.Delete()
+		require.NoError(t, err)
+	})
+
+	t.Run("delete encrypted file", func(t *testing.T) {
+		t.Parallel()
+
+		tmpDir := t.TempDir()
+		path := filepath.Join(tmpDir, "stage.json")
+
+		// Create encrypted store
+		storeWithPass := file.NewStoreWithPath(path)
+		storeWithPass.SetPassphrase("test-passphrase")
+
+		// Write encrypted state
+		state := staging.NewEmptyState()
+		state.Entries[staging.ServiceParam]["/app/config"] = staging.Entry{
+			Operation: staging.OperationUpdate,
+			Value:     lo.ToPtr("secret-value"),
+		}
+		err := storeWithPass.WriteState(t.Context(), "", state)
+		require.NoError(t, err)
+
+		// Verify file is encrypted
+		data, err := os.ReadFile(path) //nolint:gosec // Test file path from temp directory
+		require.NoError(t, err)
+		assert.True(t, crypt.IsEncrypted(data))
+
+		// Create store without passphrase and delete
+		storeNoPass := file.NewStoreWithPath(path)
+		err = storeNoPass.Delete()
+		require.NoError(t, err)
+
+		// Verify file is deleted
+		_, err = os.Stat(path)
+		assert.True(t, os.IsNotExist(err))
+	})
+}

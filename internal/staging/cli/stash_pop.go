@@ -8,7 +8,9 @@ import (
 
 	"github.com/urfave/cli/v3"
 
+	"github.com/mpyw/suve/internal/cli/confirm"
 	"github.com/mpyw/suve/internal/cli/output"
+	"github.com/mpyw/suve/internal/cli/terminal"
 	"github.com/mpyw/suve/internal/infra"
 	"github.com/mpyw/suve/internal/staging"
 	"github.com/mpyw/suve/internal/staging/store/agent"
@@ -29,10 +31,8 @@ type StashPopOptions struct {
 	Service staging.Service
 	// Keep preserves the file after popping.
 	Keep bool
-	// Force overwrites agent memory without checking for conflicts.
-	Force bool
-	// Merge combines file changes with existing agent memory.
-	Merge bool
+	// Mode determines how to handle conflicts with existing agent memory.
+	Mode stagingusecase.StashMode
 }
 
 // Run executes the stash pop command.
@@ -40,8 +40,7 @@ func (r *StashPopRunner) Run(ctx context.Context, opts StashPopOptions) error {
 	result, err := r.UseCase.Execute(ctx, stagingusecase.StashPopInput{
 		Service: opts.Service,
 		Keep:    opts.Keep,
-		Force:   opts.Force,
-		Merge:   opts.Merge,
+		Mode:    opts.Mode,
 	})
 	if err != nil {
 		// Check for non-fatal error (state was written but file cleanup failed)
@@ -80,16 +79,32 @@ func stashPopFlags() []cli.Flag {
 			Usage: "Keep the file after restoring into memory",
 		},
 		&cli.BoolFlag{
-			Name:  "force",
-			Usage: "Overwrite agent memory without prompt",
+			Name:  "yes",
+			Usage: "Skip confirmation prompt",
 		},
 		&cli.BoolFlag{
 			Name:  "merge",
-			Usage: "Merge file changes with existing memory",
+			Usage: "Merge with existing agent memory (default)",
+		},
+		&cli.BoolFlag{
+			Name:  "overwrite",
+			Usage: "Overwrite agent memory",
 		},
 		&cli.BoolFlag{
 			Name:  "passphrase-stdin",
 			Usage: "Read passphrase from stdin (for scripts/automation)",
+		},
+	}
+}
+
+// stashPopMutuallyExclusiveFlags returns the mutually exclusive flags constraint.
+func stashPopMutuallyExclusiveFlags() []cli.MutuallyExclusiveFlags {
+	return []cli.MutuallyExclusiveFlags{
+		{
+			Flags: [][]cli.Flag{
+				{&cli.BoolFlag{Name: "merge"}},
+				{&cli.BoolFlag{Name: "overwrite"}},
+			},
 		},
 	}
 }
@@ -110,6 +125,66 @@ func stashPopAction(service staging.Service) func(context.Context, *cli.Command)
 		agentStore := agent.NewStore(identity.AccountID, identity.Region)
 
 		err = lifecycle.ExecuteWrite0(ctx, agentStore, lifecycle.CmdStashPop, func() error {
+			// Determine mode based on flags or interactive prompt
+			mergeFlag := cmd.Bool("merge")
+			overwriteFlag := cmd.Bool("overwrite")
+
+			var mode stagingusecase.StashMode
+
+			switch {
+			case overwriteFlag:
+				mode = stagingusecase.StashModeOverwrite
+			case mergeFlag:
+				mode = stagingusecase.StashModeMerge
+			default:
+				// No explicit flag - check if we need to prompt
+				// Check if agent has existing changes
+				existingState, err := agentStore.Drain(ctx, service, true) // keep=true to peek
+				if err != nil {
+					return fmt.Errorf("failed to check agent state: %w", err)
+				}
+
+				hasChanges := !existingState.IsEmpty()
+
+				// Only prompt if agent has changes and TTY available
+				if hasChanges && terminal.IsTerminalWriter(cmd.Root().ErrWriter) {
+					itemCount := existingState.TotalCount()
+
+					confirmPrompter := &confirm.Prompter{
+						Stdin:     cmd.Root().Reader,
+						Stdout:    cmd.Root().Writer,
+						Stderr:    cmd.Root().ErrWriter,
+						AccountID: identity.AccountID,
+						Region:    identity.Region,
+					}
+
+					output.Warning(cmd.Root().ErrWriter, "Agent already has %d staged change(s).", itemCount)
+
+					choice, err := confirmPrompter.ConfirmChoice("How do you want to proceed?", []confirm.Choice{
+						{Label: "Merge", Description: "combine stashed changes with existing"},
+						{Label: "Overwrite", Description: "replace existing with stashed changes"},
+						{Label: "Cancel", Description: "abort operation"},
+					})
+					if err != nil {
+						return fmt.Errorf("failed to get confirmation: %w", err)
+					}
+
+					switch choice {
+					case 0: // Merge
+						mode = stagingusecase.StashModeMerge
+					case 1: // Overwrite
+						mode = stagingusecase.StashModeOverwrite
+					default: // Cancel or error
+						output.Info(cmd.Root().Writer, "Operation cancelled.")
+
+						return nil
+					}
+				} else {
+					// Default to merge when no prompt needed
+					mode = stagingusecase.StashModeMerge
+				}
+			}
+
 			r := &StashPopRunner{
 				UseCase: &stagingusecase.StashPopUseCase{
 					FileStore:  fileStore,
@@ -122,8 +197,7 @@ func stashPopAction(service staging.Service) func(context.Context, *cli.Command)
 			return r.Run(ctx, StashPopOptions{
 				Service: service,
 				Keep:    cmd.Bool("keep"),
-				Force:   cmd.Bool("force"),
-				Merge:   cmd.Bool("merge"),
+				Mode:    mode,
 			})
 		})
 
@@ -144,18 +218,15 @@ This command loads the staging state from the persistent file storage
 By default, the file is deleted after restoring.
 Use --keep to retain the file after popping (same as 'stash apply').
 
-If the agent already has staged changes, you'll be prompted to confirm
-the action. Use --force to skip the prompt and overwrite, or --merge
-to merge the file changes with existing memory changes.
-
 EXAMPLES:
    suve stage stash pop                            Restore from file and delete file
    suve stage stash pop --keep                     Restore from file and keep file
-   suve stage stash pop --force                    Overwrite agent memory without prompt
-   suve stage stash pop --merge                    Merge file with existing memory
+   suve stage stash pop --merge                    Merge with existing agent memory
+   suve stage stash pop --overwrite                Overwrite agent memory
    echo "secret" | suve stage stash pop --passphrase-stdin   Decrypt with passphrase from stdin`,
-		Flags:  stashPopFlags(),
-		Action: stashPopAction(""), // Empty service = all services
+		Flags:                  stashPopFlags(),
+		MutuallyExclusiveFlags: stashPopMutuallyExclusiveFlags(),
+		Action:                 stashPopAction(""), // Empty service = all services
 	}
 }
 
@@ -175,17 +246,12 @@ This command loads the staging state for %ss from the persistent file storage
 By default, the %s entries are removed from the file after restoring.
 Use --keep to retain them in the file.
 
-If the agent already has staged %s changes, you'll be prompted to confirm
-the action. Use --force to skip the prompt and overwrite, or --merge
-to merge the file changes with existing memory changes.
-
 EXAMPLES:
    suve stage %s stash pop                            Restore from file
    suve stage %s stash pop --keep                     Restore from file and keep in file
-   suve stage %s stash pop --force                    Overwrite agent memory without prompt
-   suve stage %s stash pop --merge                    Merge file with existing memory
+   suve stage %s stash pop --merge                    Merge with existing agent memory
+   suve stage %s stash pop --overwrite                Overwrite agent memory
    echo "secret" | suve stage %s stash pop --passphrase-stdin   Decrypt with passphrase from stdin`,
-			cfg.ItemName,
 			cfg.ItemName,
 			cfg.ItemName,
 			cfg.ItemName,
@@ -194,7 +260,8 @@ EXAMPLES:
 			cfg.CommandName,
 			cfg.CommandName,
 			cfg.CommandName),
-		Flags:  stashPopFlags(),
-		Action: stashPopAction(service),
+		Flags:                  stashPopFlags(),
+		MutuallyExclusiveFlags: stashPopMutuallyExclusiveFlags(),
+		Action:                 stashPopAction(service),
 	}
 }

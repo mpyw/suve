@@ -224,7 +224,7 @@ func TestPersistUseCase_PersistMode(t *testing.T) {
 		}
 
 		_, err := usecase.Execute(t.Context(), stagingusecase.StashPushInput{
-			Mode: stagingusecase.StashPushModeOverwrite,
+			Mode: stagingusecase.StashModeOverwrite,
 		})
 		require.NoError(t, err)
 
@@ -272,7 +272,7 @@ func TestPersistUseCase_PersistMode(t *testing.T) {
 		}
 
 		_, err := usecase.Execute(t.Context(), stagingusecase.StashPushInput{
-			Mode: stagingusecase.StashPushModeMerge,
+			Mode: stagingusecase.StashModeMerge,
 		})
 		require.NoError(t, err)
 
@@ -311,7 +311,7 @@ func TestPersistUseCase_PersistMode(t *testing.T) {
 		}
 
 		_, err := usecase.Execute(t.Context(), stagingusecase.StashPushInput{
-			Mode: stagingusecase.StashPushModeMerge,
+			Mode: stagingusecase.StashModeMerge,
 		})
 		require.NoError(t, err)
 
@@ -435,9 +435,10 @@ func TestPersistUseCase_ServiceSpecific_EdgeCases(t *testing.T) {
 			FileStore:  fileStore,
 		}
 
-		// Push param only
+		// Push param only with overwrite (replaces existing param entries)
 		_, err := usecase.Execute(t.Context(), stagingusecase.StashPushInput{
 			Service: staging.ServiceParam,
+			Mode:    stagingusecase.StashModeOverwrite,
 		})
 		require.NoError(t, err)
 
@@ -445,7 +446,7 @@ func TestPersistUseCase_ServiceSpecific_EdgeCases(t *testing.T) {
 		_, err = fileStore.GetEntry(t.Context(), staging.ServiceParam, "/new/param")
 		require.NoError(t, err)
 
-		// Old param should be gone (replaced)
+		// Old param should be gone (replaced due to overwrite mode)
 		_, err = fileStore.GetEntry(t.Context(), staging.ServiceParam, "/old/param")
 		require.ErrorIs(t, err, staging.ErrNotStaged)
 
@@ -482,7 +483,7 @@ func TestPersistUseCase_ServiceSpecific_EdgeCases(t *testing.T) {
 		// Even with Overwrite mode, service-specific push preserves other services
 		_, err := usecase.Execute(t.Context(), stagingusecase.StashPushInput{
 			Service: staging.ServiceParam,
-			Mode:    stagingusecase.StashPushModeOverwrite, // This is ignored for service-specific
+			Mode:    stagingusecase.StashModeOverwrite, // This is ignored for service-specific
 		})
 		require.NoError(t, err)
 
@@ -766,7 +767,7 @@ func TestPersistUseCase_FileDrainError_TreatedAsFresh(t *testing.T) {
 		}
 
 		// Should succeed because file drain error is treated as empty state (start fresh)
-		output, err := usecase.Execute(t.Context(), stagingusecase.StashPushInput{Mode: stagingusecase.StashPushModeMerge})
+		output, err := usecase.Execute(t.Context(), stagingusecase.StashPushInput{Mode: stagingusecase.StashModeMerge})
 		require.NoError(t, err)
 		assert.Equal(t, 1, output.EntryCount)
 

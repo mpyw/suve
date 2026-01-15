@@ -71,6 +71,14 @@ make gui-test     # Run Playwright tests
 - TailwindCSS
 - Playwright for testing
 
+### Staging API
+
+The `StagingDrain` method uses a mode string parameter:
+- `mode: "merge"` - Combine with existing agent memory (default)
+- `mode: "overwrite"` - Replace agent memory
+
+Frontend uses radio buttons for mode selection (mutually exclusive).
+
 ## References
 
 ```yaml

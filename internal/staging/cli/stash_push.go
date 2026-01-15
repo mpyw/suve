@@ -35,7 +35,7 @@ type StashPushOptions struct {
 	// Keep preserves the agent memory after pushing to file.
 	Keep bool
 	// Mode determines how to handle existing stash file.
-	Mode usestaging.StashPushMode
+	Mode usestaging.StashMode
 }
 
 // Run executes the stash push command.
@@ -87,16 +87,32 @@ func stashPushFlags() []cli.Flag {
 			Usage: "Keep staged changes in agent memory after stashing",
 		},
 		&cli.BoolFlag{
-			Name:  "force",
-			Usage: "Overwrite existing stash without prompt",
+			Name:  "yes",
+			Usage: "Skip confirmation prompt",
 		},
 		&cli.BoolFlag{
 			Name:  "merge",
-			Usage: "Merge with existing stash without prompt",
+			Usage: "Merge with existing stash (default)",
+		},
+		&cli.BoolFlag{
+			Name:  "overwrite",
+			Usage: "Overwrite existing stash",
 		},
 		&cli.BoolFlag{
 			Name:  "passphrase-stdin",
 			Usage: "Read passphrase from stdin (for scripts/automation)",
+		},
+	}
+}
+
+// stashPushMutuallyExclusiveFlags returns the mutually exclusive flags constraint.
+func stashPushMutuallyExclusiveFlags() []cli.MutuallyExclusiveFlags {
+	return []cli.MutuallyExclusiveFlags{
+		{
+			Flags: [][]cli.Flag{
+				{&cli.BoolFlag{Name: "merge"}},
+				{&cli.BoolFlag{Name: "overwrite"}},
+			},
 		},
 	}
 }
@@ -118,25 +134,28 @@ func stashPushAction(service staging.Service) func(context.Context, *cli.Command
 				return fmt.Errorf("failed to create file store: %w", err)
 			}
 
-			// Determine mode based on flags and file existence
-			mode := usestaging.StashPushModeMerge // Default to merge (safer)
-			forceFlag := cmd.Bool("force")
+			// Determine mode based on flags
 			mergeFlag := cmd.Bool("merge")
+			overwriteFlag := cmd.Bool("overwrite")
+			skipConfirm := cmd.Bool("yes")
+
+			var mode usestaging.StashMode
 
 			switch {
-			case forceFlag:
-				mode = usestaging.StashPushModeOverwrite
-			case mergeFlag:
-				mode = usestaging.StashPushModeMerge
+			case overwriteFlag:
+				mode = usestaging.StashModeOverwrite
+			case mergeFlag || skipConfirm:
+				// --merge or --yes (without explicit mode) defaults to merge
+				mode = usestaging.StashModeMerge
 			default:
-				// Check if we need to prompt
+				// No flag specified - check if we need to prompt
 				exists, err := basicFileStore.Exists()
 				if err != nil {
 					return fmt.Errorf("failed to check stash file: %w", err)
 				}
 
-				// Only prompt for global push when file exists
-				// Service-specific push always merges (preserves other services)
+				// Only prompt for global push when file exists and TTY available
+				// Service-specific push defaults to merge (preserves other services)
 				if exists && service == "" && terminal.IsTerminalWriter(cmd.Root().ErrWriter) {
 					// Count existing items for the prompt message
 					existingState, err := basicFileStore.Drain(ctx, "", true)
@@ -165,14 +184,17 @@ func stashPushAction(service staging.Service) func(context.Context, *cli.Command
 
 					switch choice {
 					case 0: // Merge
-						mode = usestaging.StashPushModeMerge
+						mode = usestaging.StashModeMerge
 					case 1: // Overwrite
-						mode = usestaging.StashPushModeOverwrite
+						mode = usestaging.StashModeOverwrite
 					default: // Cancel or error
 						output.Info(cmd.Root().Writer, "Operation cancelled.")
 
 						return nil
 					}
+				} else {
+					// Default to merge when no TTY or service-specific
+					mode = usestaging.StashModeMerge
 				}
 			}
 
@@ -262,8 +284,9 @@ EXAMPLES:
    suve stage stash push                            Save to file and clear agent memory
    suve stage stash push --keep                     Save to file and keep agent memory
    echo "secret" | suve stage stash push --passphrase-stdin   Use passphrase from stdin`,
-		Flags:  stashPushFlags(),
-		Action: stashPushAction(""), // Empty service = all services
+		Flags:                  stashPushFlags(),
+		MutuallyExclusiveFlags: stashPushMutuallyExclusiveFlags(),
+		Action:                 stashPushAction(""), // Empty service = all services
 	}
 }
 
@@ -293,7 +316,8 @@ EXAMPLES:
 			cfg.CommandName,
 			cfg.CommandName,
 			cfg.CommandName),
-		Flags:  stashPushFlags(),
-		Action: stashPushAction(service),
+		Flags:                  stashPushFlags(),
+		MutuallyExclusiveFlags: stashPushMutuallyExclusiveFlags(),
+		Action:                 stashPushAction(service),
 	}
 }

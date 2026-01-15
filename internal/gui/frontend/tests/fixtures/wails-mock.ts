@@ -56,6 +56,14 @@ export interface AWSIdentity {
   profile: string;
 }
 
+export interface StashFileState {
+  exists: boolean;
+  encrypted: boolean;
+  // Stored entries (for pop/drain)
+  entries: StagedEntry[];
+  tags: StagedTagEntry[];
+}
+
 export interface MockState {
   params: Parameter[];
   secrets: Secret[];
@@ -73,6 +81,8 @@ export interface MockState {
   pageSize: number;
   // AWS Identity
   awsIdentity: AWSIdentity;
+  // Stash file state
+  stashFile: StashFileState;
   // Error simulation
   simulateError?: {
     operation: string;
@@ -170,6 +180,12 @@ export const defaultMockState: MockState = {
     accountId: '123456789012',
     region: 'ap-northeast-1',
     profile: 'production',
+  },
+  stashFile: {
+    exists: false,
+    encrypted: false,
+    entries: [],
+    tags: [],
   },
 };
 
@@ -337,6 +353,88 @@ export function createPaginationTestState(itemCount: number = 25): Partial<MockS
 export function createErrorState(operation: string, message: string): Partial<MockState> {
   return {
     simulateError: { operation, message },
+  };
+}
+
+/**
+ * State with existing stash file (unencrypted)
+ */
+export function createStashFileState(
+  entries: StagedEntry[] = [],
+  tags: StagedTagEntry[] = [],
+  encrypted: boolean = false
+): Partial<MockState> {
+  return {
+    stashFile: {
+      exists: true,
+      encrypted,
+      entries,
+      tags,
+    },
+  };
+}
+
+/**
+ * State with encrypted stash file
+ */
+export function createEncryptedStashFileState(
+  entries: StagedEntry[] = [],
+  tags: StagedTagEntry[] = []
+): Partial<MockState> {
+  return createStashFileState(entries, tags, true);
+}
+
+/**
+ * State with no stash file
+ */
+export function createNoStashFileState(): Partial<MockState> {
+  return {
+    stashFile: {
+      exists: false,
+      encrypted: false,
+      entries: [],
+      tags: [],
+    },
+  };
+}
+
+/**
+ * State with staged changes ready to push
+ */
+export function createStagedForPushState(): Partial<MockState> {
+  return {
+    stagedParam: [
+      createStagedValue('/test/param', 'create', 'new-value'),
+    ],
+    stagedSecret: [
+      createStagedValue('test-secret', 'update', 'updated-value'),
+    ],
+    stashFile: {
+      exists: false,
+      encrypted: false,
+      entries: [],
+      tags: [],
+    },
+  };
+}
+
+/**
+ * State with both agent staged and file staged (for merge/overwrite tests)
+ */
+export function createBothStagedState(): Partial<MockState> {
+  return {
+    stagedParam: [
+      createStagedValue('/agent/param', 'create', 'agent-value'),
+    ],
+    stagedSecret: [],
+    stashFile: {
+      exists: true,
+      encrypted: false,
+      entries: [
+        createStagedValue('/file/param', 'update', 'file-value'),
+      ],
+      tags: [],
+    },
   };
 }
 
@@ -765,13 +863,111 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
         return { name };
       },
       StagingFileStatus: async () => {
-        return { exists: false, encrypted: false };
+        if (state.simulateError?.operation === 'StagingFileStatus') {
+          throw new Error(state.simulateError.message);
+        }
+        return { exists: state.stashFile.exists, encrypted: state.stashFile.encrypted };
       },
-      StagingPersist: async (_service: string, _passphrase: string, _keep: boolean) => {
-        return { filePath: '/tmp/staging.json', entryCount: 0, tagCount: 0, encrypted: false };
+      StagingPersist: async (_service: string, passphrase: string, keep: boolean, mode: string) => {
+        if (state.simulateError?.operation === 'StagingPersist') {
+          throw new Error(state.simulateError.message);
+        }
+        // Count entries and tags to persist
+        const entryCount = state.stagedParam.length + state.stagedSecret.length;
+        const tagCount = state.stagedParamTags.length + state.stagedSecretTags.length;
+
+        if (entryCount === 0 && tagCount === 0) {
+          throw new Error('nothing to stash');
+        }
+
+        // Merge or overwrite file based on mode
+        if (mode === 'merge' && state.stashFile.exists) {
+          // Merge: combine with existing
+          state.stashFile.entries = [...state.stashFile.entries, ...state.stagedParam, ...state.stagedSecret];
+          state.stashFile.tags = [...state.stashFile.tags, ...state.stagedParamTags, ...state.stagedSecretTags];
+        } else {
+          // Overwrite: replace
+          state.stashFile.entries = [...state.stagedParam, ...state.stagedSecret];
+          state.stashFile.tags = [...state.stagedParamTags, ...state.stagedSecretTags];
+        }
+
+        // Update file state
+        state.stashFile.exists = true;
+        state.stashFile.encrypted = passphrase !== '';
+
+        // Clear agent memory unless keep=true
+        if (!keep) {
+          state.stagedParam = [];
+          state.stagedSecret = [];
+          state.stagedParamTags = [];
+          state.stagedSecretTags = [];
+        }
+
+        return { entryCount, tagCount };
       },
-      StagingDrain: async (_service: string, _passphrase: string, _keep: boolean, _force: boolean, _merge: boolean) => {
-        return { entryCount: 0, tagCount: 0, merged: false };
+      StagingDrain: async (_service: string, passphrase: string, keep: boolean, mode: string) => {
+        if (state.simulateError?.operation === 'StagingDrain') {
+          throw new Error(state.simulateError.message);
+        }
+
+        if (!state.stashFile.exists) {
+          throw new Error('no staged changes in file to drain');
+        }
+
+        // Check passphrase for encrypted files
+        if (state.stashFile.encrypted && !passphrase) {
+          throw new Error('passphrase required for encrypted file');
+        }
+
+        // Check if agent has existing changes
+        const agentHasChanges = state.stagedParam.length > 0 || state.stagedSecret.length > 0 ||
+                               state.stagedParamTags.length > 0 || state.stagedSecretTags.length > 0;
+
+        const fileEntries = state.stashFile.entries;
+        const fileTags = state.stashFile.tags;
+
+        // Apply mode
+        let merged = false;
+        if (mode === 'merge' && agentHasChanges) {
+          // Merge: combine file with agent
+          state.stagedParam = [...state.stagedParam, ...fileEntries.filter(e => e.name.startsWith('/'))];
+          state.stagedSecret = [...state.stagedSecret, ...fileEntries.filter(e => !e.name.startsWith('/'))];
+          state.stagedParamTags = [...state.stagedParamTags, ...fileTags];
+          merged = true;
+        } else {
+          // Overwrite: replace agent with file
+          state.stagedParam = fileEntries.filter(e => e.name.startsWith('/'));
+          state.stagedSecret = fileEntries.filter(e => !e.name.startsWith('/'));
+          state.stagedParamTags = fileTags.filter(t => t.name.startsWith('/'));
+          state.stagedSecretTags = fileTags.filter(t => !t.name.startsWith('/'));
+        }
+
+        // Delete file unless keep=true
+        if (!keep) {
+          state.stashFile.exists = false;
+          state.stashFile.encrypted = false;
+          state.stashFile.entries = [];
+          state.stashFile.tags = [];
+        }
+
+        return { entryCount: fileEntries.length, tagCount: fileTags.length, merged };
+      },
+      StagingDrop: async () => {
+        if (state.simulateError?.operation === 'StagingDrop') {
+          throw new Error(state.simulateError.message);
+        }
+
+        if (!state.stashFile.exists) {
+          throw new Error('no stashed changes to drop');
+        }
+
+        // Delete file directly (works even for encrypted files)
+        state.stashFile.exists = false;
+        state.stashFile.encrypted = false;
+        state.stashFile.entries = [];
+        state.stashFile.tags = [];
+
+        return { dropped: true };
       },
       StagingCheckStatus: async (service: string, name: string) => {
         const staged = service === 'param' ? state.stagedParam : state.stagedSecret;

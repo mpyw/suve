@@ -94,6 +94,16 @@ cmd := cli.NewAddCommand(cfg)
 - `stash show` - preview file contents
 - `stash drop` - delete file
 
+### Stash Mode Flags
+
+Both `stash push` and `stash pop` support mutually exclusive mode flags:
+- `--merge` - Combine source data with existing destination data (default)
+- `--overwrite` - Replace destination data with source data
+
+These flags use urfave/cli v3's `MutuallyExclusiveFlags` to ensure only one can be specified.
+
+Additionally, `--yes` flag skips confirmation prompts (can be combined with either mode).
+
 ## References
 
 ```yaml

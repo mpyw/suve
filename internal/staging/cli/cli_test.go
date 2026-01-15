@@ -2418,7 +2418,7 @@ func TestStashPopRunner_Run(t *testing.T) {
 			Stderr: &stderr,
 		}
 
-		err := r.Run(t.Context(), cli.StashPopOptions{Merge: true})
+		err := r.Run(t.Context(), cli.StashPopOptions{Mode: stagingusecase.StashModeMerge})
 		require.NoError(t, err)
 		assert.Contains(t, stdout.String(), "merged")
 
@@ -2460,7 +2460,7 @@ func TestStashPopRunner_Run(t *testing.T) {
 			Stderr: &stderr,
 		}
 
-		err := r.Run(t.Context(), cli.StashPopOptions{Merge: true, Keep: true})
+		err := r.Run(t.Context(), cli.StashPopOptions{Mode: stagingusecase.StashModeMerge, Keep: true})
 		require.NoError(t, err)
 		assert.Contains(t, stdout.String(), "merged")
 		assert.Contains(t, stdout.String(), "file kept")
@@ -2498,7 +2498,7 @@ func TestStashPopRunner_Run(t *testing.T) {
 		assert.ErrorIs(t, err, stagingusecase.ErrNothingToStashPop)
 	})
 
-	t.Run("drain error - agent has changes without force/merge", func(t *testing.T) {
+	t.Run("drain defaults to merge when agent has changes", func(t *testing.T) {
 		t.Parallel()
 
 		fileStore := testutil.NewMockStore()
@@ -2529,9 +2529,16 @@ func TestStashPopRunner_Run(t *testing.T) {
 			Stderr: &stderr,
 		}
 
+		// Default mode is merge, so both entries should exist
 		err := r.Run(t.Context(), cli.StashPopOptions{})
-		require.Error(t, err)
-		assert.ErrorIs(t, err, stagingusecase.ErrAgentHasChanges)
+		require.NoError(t, err)
+		assert.Contains(t, stdout.String(), "merged")
+
+		// Verify both entries exist in agent
+		_, err = agentStore.GetEntry(t.Context(), staging.ServiceParam, "/app/existing")
+		require.NoError(t, err)
+		_, err = agentStore.GetEntry(t.Context(), staging.ServiceParam, "/app/new")
+		require.NoError(t, err)
 	})
 
 	t.Run("drain success - with force overwrite", func(t *testing.T) {
@@ -2565,10 +2572,10 @@ func TestStashPopRunner_Run(t *testing.T) {
 			Stderr: &stderr,
 		}
 
-		err := r.Run(t.Context(), cli.StashPopOptions{Force: true})
+		err := r.Run(t.Context(), cli.StashPopOptions{Mode: stagingusecase.StashModeOverwrite})
 		require.NoError(t, err)
 
-		// With force, file content replaces agent content
+		// With overwrite, file content replaces agent content
 		_, err = agentStore.GetEntry(t.Context(), staging.ServiceParam, "/app/new")
 		require.NoError(t, err)
 	})

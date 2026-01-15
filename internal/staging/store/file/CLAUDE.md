@@ -65,6 +65,11 @@ Encrypted: Binary format with salt prefix + AES-GCM ciphertext
 - Non-empty passphrase = encrypted storage
 - Wrong passphrase returns authentication error
 
+### Delete Operation
+
+The `Delete()` method removes the stash file without reading its contents.
+This allows global stash drop to work on encrypted files without requiring a passphrase.
+
 ## References
 
 ```yaml
