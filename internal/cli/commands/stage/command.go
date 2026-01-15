@@ -18,8 +18,9 @@ import (
 // Command returns the global stage command with subcommands.
 func Command() *cli.Command {
 	return &cli.Command{
-		Name:  "stage",
-		Usage: "Manage staged changes for AWS Parameter Store and Secrets Manager",
+		Name:    "stage",
+		Aliases: []string{"stg"},
+		Usage:   "Manage staged changes for AWS Parameter Store and Secrets Manager",
 		Description: `Stage changes locally before applying to AWS.
 
 Use 'suve stage param' for SSM Parameter Store operations.

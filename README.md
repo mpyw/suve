@@ -25,11 +25,12 @@ A **Git-like CLI/GUI** for AWS Parameter Store and Secrets Manager. Familiar com
 
 ## Features
 
-- **Git-like commands**: `show`, `log`, `diff`, `ls`, `create`, `update`, `rm`
+- **Git-like commands**: `show`, `log`, `diff`, `ls`, `tag`, `stash`
 - **Staging workflow**: `edit` → `status` → `diff` → `apply` (review changes before applying)
 - **Version navigation**: `#VERSION`, `~SHIFT`, `:LABEL` syntax
 - **Colored diff output**: Easy-to-read unified diff format
-- **Both services**: SSM Parameter Store and Secrets Manager
+- **Both services**: [SSM Parameter Store](https://docs.aws.amazon.com/systems-manager/latest/userguide/systems-manager-parameter-store.html) and [Secrets Manager](https://docs.aws.amazon.com/secretsmanager/latest/userguide/intro.html)
+- **Secure staging**: In-memory daemon with [mlock](https://man7.org/linux/man-pages/man2/mlock.2.html), encrypted stash ([Argon2](https://en.wikipedia.org/wiki/Argon2) + [AES-GCM](https://en.wikipedia.org/wiki/Galois/Counter_Mode))
 - **GUI mode**: Desktop application via `--gui` flag (built with [Wails](https://wails.io/))
 
 ## Installation
@@ -450,6 +451,7 @@ where ~SHIFT = ~ | ~N  (repeatable, cumulative)
 |---------|---------|
 | [SSM Parameter Store](docs/param.md) | `param`, `ssm`, `ps` |
 | [Secrets Manager](docs/secret.md) | `secret`, `sm` |
+| Staging | `stage`, `stg` |
 
 ### SSM Parameter Store
 
