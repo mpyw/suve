@@ -67,7 +67,7 @@
   // Push options modal (when file exists)
   let showPushOptionsModal = $state(false);
   let pushPassphrase = $state('');
-  let pushMode: 'overwrite' | 'merge' = $state('overwrite');
+  let pushMode: 'overwrite' | 'merge' = $state('merge');
 
   // Drop confirmation modal
   let showDropModal = $state(false);
@@ -283,7 +283,7 @@
     persistError = '';
     persistResult = null;
     pushPassphrase = '';
-    pushMode = 'overwrite';
+    pushMode = 'merge';
 
     try {
       // Check if file exists first
@@ -1018,14 +1018,14 @@
 
     <div class="options-group">
       <label class="radio-label">
+        <input type="radio" name="pushMode" value="merge" bind:group={pushMode} />
+        <span>Merge</span>
+        <span class="option-desc">Combine with existing stash file</span>
+      </label>
+      <label class="radio-label">
         <input type="radio" name="pushMode" value="overwrite" bind:group={pushMode} />
         <span>Overwrite</span>
         <span class="option-desc">Replace existing stash file</span>
-      </label>
-      <label class="radio-label">
-        <input type="radio" name="pushMode" value="merge" bind:group={pushMode} />
-        <span>Merge</span>
-        <span class="option-desc">Merge with existing stash file</span>
       </label>
     </div>
 

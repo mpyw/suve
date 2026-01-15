@@ -110,8 +110,8 @@ export function StagingDiff(arg1, arg2) {
   return window['go']['gui']['App']['StagingDiff'](arg1, arg2);
 }
 
-export function StagingDrain(arg1, arg2, arg3, arg4, arg5) {
-  return window['go']['gui']['App']['StagingDrain'](arg1, arg2, arg3, arg4, arg5);
+export function StagingDrain(arg1, arg2, arg3, arg4) {
+  return window['go']['gui']['App']['StagingDrain'](arg1, arg2, arg3, arg4);
 }
 
 export function StagingDrop() {
