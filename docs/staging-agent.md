@@ -140,8 +140,8 @@ suve stage stash pop
 # Restore but keep file
 suve stage stash pop --keep
 
-# Force overwrite existing memory (no prompt)
-suve stage stash pop --force
+# Overwrite existing memory (no prompt)
+suve stage stash pop --overwrite
 
 # Merge with existing memory
 suve stage stash pop --merge
@@ -159,7 +159,7 @@ suve stage stash show -v  # Verbose mode
 
 # Delete stash file
 suve stage stash drop
-suve stage stash drop --force  # Skip confirmation
+suve stage stash drop --yes  # Skip confirmation
 ```
 
 ### Service-Specific Stash
@@ -199,7 +199,7 @@ When restoring stashed changes with `stash pop`:
 | Scenario | Default Behavior | Options |
 |----------|-----------------|---------|
 | Agent memory is empty | Restore directly | N/A |
-| Agent has changes | Prompt for action | `--force` (overwrite), `--merge` (combine) |
+| Agent has changes | Prompt for action | `--overwrite` (replace), `--merge` (combine) |
 | File has conflicts | User chooses | Interactive prompt in TTY |
 
 When using `--merge`:

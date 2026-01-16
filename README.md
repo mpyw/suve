@@ -524,10 +524,10 @@ where ~SHIFT = ~ | ~N  (repeatable, cumulative)
 | Command | Options | Description |
 |---------|---------|-------------|
 | `suve stage stash` | | Save staged changes to file (alias for `push`) |
-| `suve stage stash push` | `--keep`<br>`--force`<br>`--merge`<br>`--passphrase-stdin` | Save staged changes from memory to file |
-| `suve stage stash pop` | `--keep`<br>`--force`<br>`--merge`<br>`--passphrase-stdin` | Restore staged changes from file |
+| `suve stage stash push` | `--keep`<br>`--yes`<br>`--merge`<br>`--overwrite`<br>`--passphrase-stdin` | Save staged changes from memory to file |
+| `suve stage stash pop` | `--keep`<br>`--yes`<br>`--merge`<br>`--overwrite`<br>`--passphrase-stdin` | Restore staged changes from file |
 | `suve stage stash show` | `--verbose` (`-v`)<br>`--passphrase-stdin` | Preview stashed changes |
-| `suve stage stash drop` | `--force`<br>`--passphrase-stdin` | Delete stash file |
+| `suve stage stash drop` | `--yes`<br>`--passphrase-stdin` | Delete stash file |
 
 ### Agent Commands
 
