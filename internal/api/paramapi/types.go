@@ -118,3 +118,9 @@ var NewDescribeParametersPaginator = ssm.NewDescribeParametersPaginator
 const (
 	FilterNameStringTypeName = types.ParametersFilterKeyName
 )
+
+// ParameterTier is a re-exported SSM model type.
+type ParameterTier = types.ParameterTier
+
+// ParameterInlinePolicy is a re-exported SSM model type.
+type ParameterInlinePolicy = types.ParameterInlinePolicy
