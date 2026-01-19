@@ -2,7 +2,7 @@ package cli_test
 
 import (
 	"bytes"
-	"encoding/json"
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -25,7 +25,6 @@ func TestGlobalDropRunner_Run(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
-		path := filepath.Join(tmpDir, "stage.json")
 
 		// Write test data
 		state := staging.NewEmptyState()
@@ -39,11 +38,9 @@ func TestGlobalDropRunner_Run(t *testing.T) {
 			Value:     lo.ToPtr("secret-value"),
 			StagedAt:  time.Now(),
 		}
-		data, err := json.MarshalIndent(state, "", "  ")
-		require.NoError(t, err)
-		require.NoError(t, os.WriteFile(path, data, 0o600))
+		fileStore := file.NewStoreWithDir(tmpDir)
+		require.NoError(t, fileStore.WriteState(context.Background(), "", state))
 
-		fileStore := file.NewStoreWithPath(path)
 		stdout := &bytes.Buffer{}
 
 		runner := &cli.GlobalDropRunner{
@@ -51,12 +48,16 @@ func TestGlobalDropRunner_Run(t *testing.T) {
 			Stdout:    stdout,
 		}
 
-		err = runner.Run()
+		err := runner.Run()
 		require.NoError(t, err)
 		assert.Contains(t, stdout.String(), "All stashed changes dropped")
 
-		// File should be deleted
-		_, err = os.Stat(path)
+		// Files should be deleted
+		paramPath := filepath.Join(tmpDir, "param.json")
+		secretPath := filepath.Join(tmpDir, "secret.json")
+		_, err = os.Stat(paramPath)
+		assert.True(t, os.IsNotExist(err))
+		_, err = os.Stat(secretPath)
 		assert.True(t, os.IsNotExist(err))
 	})
 
@@ -64,10 +65,9 @@ func TestGlobalDropRunner_Run(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
-		path := filepath.Join(tmpDir, "stage.json")
-		// Don't create the file
+		// Don't create any files
 
-		fileStore := file.NewStoreWithPath(path)
+		fileStore := file.NewStoreWithDir(tmpDir)
 		stdout := &bytes.Buffer{}
 
 		runner := &cli.GlobalDropRunner{
@@ -89,7 +89,6 @@ func TestServiceDropRunner_Run(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
-		path := filepath.Join(tmpDir, "stage.json")
 
 		// Write test data with both services
 		state := staging.NewEmptyState()
@@ -103,11 +102,9 @@ func TestServiceDropRunner_Run(t *testing.T) {
 			Value:     lo.ToPtr("secret-value"),
 			StagedAt:  time.Now(),
 		}
-		data, err := json.MarshalIndent(state, "", "  ")
-		require.NoError(t, err)
-		require.NoError(t, os.WriteFile(path, data, 0o600))
+		fileStore := file.NewStoreWithDir(tmpDir)
+		require.NoError(t, fileStore.WriteState(context.Background(), "", state))
 
-		fileStore := file.NewStoreWithPath(path)
 		stdout := &bytes.Buffer{}
 
 		runner := &cli.ServiceDropRunner{
@@ -117,12 +114,16 @@ func TestServiceDropRunner_Run(t *testing.T) {
 		}
 
 		// Drop only param service
-		err = runner.Run(t.Context())
+		err := runner.Run(t.Context())
 		require.NoError(t, err)
 		assert.Contains(t, stdout.String(), "Stashed param changes dropped")
 
-		// File should still exist with secret service
-		_, err = os.Stat(path)
+		// param.json should be deleted, secret.json should exist
+		paramPath := filepath.Join(tmpDir, "param.json")
+		secretPath := filepath.Join(tmpDir, "secret.json")
+		_, err = os.Stat(paramPath)
+		assert.True(t, os.IsNotExist(err))
+		_, err = os.Stat(secretPath)
 		require.NoError(t, err)
 
 		// Verify secret service is preserved
@@ -136,7 +137,6 @@ func TestServiceDropRunner_Run(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
-		path := filepath.Join(tmpDir, "stage.json")
 
 		// Write test data with tags
 		state := staging.NewEmptyState()
@@ -144,11 +144,9 @@ func TestServiceDropRunner_Run(t *testing.T) {
 			Add:    map[string]string{"env": "prod"},
 			Remove: maputil.NewSet("old-tag"),
 		}
-		data, err := json.MarshalIndent(state, "", "  ")
-		require.NoError(t, err)
-		require.NoError(t, os.WriteFile(path, data, 0o600))
+		fileStore := file.NewStoreWithDir(tmpDir)
+		require.NoError(t, fileStore.WriteState(context.Background(), "", state))
 
-		fileStore := file.NewStoreWithPath(path)
 		stdout := &bytes.Buffer{}
 
 		runner := &cli.ServiceDropRunner{
@@ -157,12 +155,13 @@ func TestServiceDropRunner_Run(t *testing.T) {
 			Stdout:    stdout,
 		}
 
-		err = runner.Run(t.Context())
+		err := runner.Run(t.Context())
 		require.NoError(t, err)
 		assert.Contains(t, stdout.String(), "Stashed param changes dropped")
 
-		// File should be deleted (empty state)
-		_, err = os.Stat(path)
+		// param.json should be deleted (empty state)
+		paramPath := filepath.Join(tmpDir, "param.json")
+		_, err = os.Stat(paramPath)
 		assert.True(t, os.IsNotExist(err))
 	})
 
@@ -170,7 +169,6 @@ func TestServiceDropRunner_Run(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
-		path := filepath.Join(tmpDir, "stage.json")
 
 		// Write test data with only param service
 		state := staging.NewEmptyState()
@@ -179,11 +177,9 @@ func TestServiceDropRunner_Run(t *testing.T) {
 			Value:     lo.ToPtr("test-value"),
 			StagedAt:  time.Now(),
 		}
-		data, err := json.MarshalIndent(state, "", "  ")
-		require.NoError(t, err)
-		require.NoError(t, os.WriteFile(path, data, 0o600))
+		fileStore := file.NewStoreWithDir(tmpDir)
+		require.NoError(t, fileStore.WriteState(context.Background(), "", state))
 
-		fileStore := file.NewStoreWithPath(path)
 		stdout := &bytes.Buffer{}
 
 		runner := &cli.ServiceDropRunner{
@@ -193,7 +189,7 @@ func TestServiceDropRunner_Run(t *testing.T) {
 		}
 
 		// Try to drop secret service which has no entries
-		err = runner.Run(t.Context())
+		err := runner.Run(t.Context())
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "no stashed changes for secret")
 	})
@@ -202,7 +198,6 @@ func TestServiceDropRunner_Run(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
-		path := filepath.Join(tmpDir, "stage.json")
 
 		// Write test data with only one service
 		state := staging.NewEmptyState()
@@ -211,11 +206,9 @@ func TestServiceDropRunner_Run(t *testing.T) {
 			Value:     lo.ToPtr("test-value"),
 			StagedAt:  time.Now(),
 		}
-		data, err := json.MarshalIndent(state, "", "  ")
-		require.NoError(t, err)
-		require.NoError(t, os.WriteFile(path, data, 0o600))
+		fileStore := file.NewStoreWithDir(tmpDir)
+		require.NoError(t, fileStore.WriteState(context.Background(), "", state))
 
-		fileStore := file.NewStoreWithPath(path)
 		stdout := &bytes.Buffer{}
 
 		runner := &cli.ServiceDropRunner{
@@ -225,11 +218,12 @@ func TestServiceDropRunner_Run(t *testing.T) {
 		}
 
 		// Drop the only service
-		err = runner.Run(t.Context())
+		err := runner.Run(t.Context())
 		require.NoError(t, err)
 
 		// File should be deleted because state is now empty
-		_, err = os.Stat(path)
+		paramPath := filepath.Join(tmpDir, "param.json")
+		_, err = os.Stat(paramPath)
 		assert.True(t, os.IsNotExist(err))
 	})
 
@@ -237,7 +231,6 @@ func TestServiceDropRunner_Run(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
-		path := filepath.Join(tmpDir, "stage.json")
 
 		// Write test data with both services
 		state := staging.NewEmptyState()
@@ -251,11 +244,9 @@ func TestServiceDropRunner_Run(t *testing.T) {
 			Value:     lo.ToPtr("secret-value"),
 			StagedAt:  time.Now(),
 		}
-		data, err := json.MarshalIndent(state, "", "  ")
-		require.NoError(t, err)
-		require.NoError(t, os.WriteFile(path, data, 0o600))
+		fileStore := file.NewStoreWithDir(tmpDir)
+		require.NoError(t, fileStore.WriteState(context.Background(), "", state))
 
-		fileStore := file.NewStoreWithPath(path)
 		stdout := &bytes.Buffer{}
 
 		runner := &cli.ServiceDropRunner{
@@ -264,20 +255,20 @@ func TestServiceDropRunner_Run(t *testing.T) {
 			Stdout:    stdout,
 		}
 
-		err = runner.Run(t.Context())
+		err := runner.Run(t.Context())
 		require.NoError(t, err)
 
-		// File should still exist
-		_, err = os.Stat(path)
+		// secret.json should still exist, param.json should be deleted
+		paramPath := filepath.Join(tmpDir, "param.json")
+		secretPath := filepath.Join(tmpDir, "secret.json")
+		_, err = os.Stat(paramPath)
+		assert.True(t, os.IsNotExist(err))
+		_, err = os.Stat(secretPath)
 		require.NoError(t, err)
 
 		// Read and verify remaining data
-		//nolint:gosec // G304: path is from t.TempDir(), safe for test
-		remainingData, err := os.ReadFile(path)
+		remainingState, err := fileStore.Drain(t.Context(), staging.ServiceSecret, true)
 		require.NoError(t, err)
-
-		var remainingState staging.State
-		require.NoError(t, json.Unmarshal(remainingData, &remainingState))
 		assert.Empty(t, remainingState.Entries[staging.ServiceParam])
 		assert.Len(t, remainingState.Entries[staging.ServiceSecret], 1)
 	})
