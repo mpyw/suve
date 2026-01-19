@@ -6,53 +6,63 @@ import (
 	"testing"
 	"time"
 
-	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/mpyw/suve/internal/api/secretapi"
+	"github.com/mpyw/suve/internal/model"
 	"github.com/mpyw/suve/internal/usecase/secret"
 	"github.com/mpyw/suve/internal/version/secretversion"
 )
 
 type mockShowClient struct {
-	getSecretValueResult *secretapi.GetSecretValueOutput
-	getSecretValueErr    error
-	listVersionsResult   *secretapi.ListSecretVersionIDsOutput
-	listVersionsErr      error
-	describeSecretResult *secretapi.DescribeSecretOutput
-	describeSecretErr    error
+	getSecretResult   *model.Secret
+	getSecretErr      error
+	getVersionsResult []*model.SecretVersion
+	getVersionsErr    error
+	listSecretsResult []*model.SecretListItem
+	listSecretsErr    error
+	getTagsResult     map[string]string
+	getTagsErr        error
 }
 
-//nolint:lll // mock function signature must match AWS SDK interface
-func (m *mockShowClient) GetSecretValue(_ context.Context, _ *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) {
-	if m.getSecretValueErr != nil {
-		return nil, m.getSecretValueErr
+func (m *mockShowClient) GetSecret(_ context.Context, _ string, _ string, _ string) (*model.Secret, error) {
+	if m.getSecretErr != nil {
+		return nil, m.getSecretErr
 	}
 
-	return m.getSecretValueResult, nil
+	return m.getSecretResult, nil
 }
 
-//nolint:revive,stylecheck,lll // Method name must match AWS SDK interface
-func (m *mockShowClient) ListSecretVersionIds(_ context.Context, _ *secretapi.ListSecretVersionIDsInput, _ ...func(*secretapi.Options)) (*secretapi.ListSecretVersionIDsOutput, error) {
-	if m.listVersionsErr != nil {
-		return nil, m.listVersionsErr
+func (m *mockShowClient) GetSecretVersions(_ context.Context, _ string) ([]*model.SecretVersion, error) {
+	if m.getVersionsErr != nil {
+		return nil, m.getVersionsErr
 	}
 
-	return m.listVersionsResult, nil
+	return m.getVersionsResult, nil
 }
 
-//nolint:lll // mock function signature
-func (m *mockShowClient) DescribeSecret(_ context.Context, _ *secretapi.DescribeSecretInput, _ ...func(*secretapi.Options)) (*secretapi.DescribeSecretOutput, error) {
-	if m.describeSecretErr != nil {
-		return nil, m.describeSecretErr
+func (m *mockShowClient) ListSecrets(_ context.Context) ([]*model.SecretListItem, error) {
+	if m.listSecretsErr != nil {
+		return nil, m.listSecretsErr
 	}
 
-	if m.describeSecretResult != nil {
-		return m.describeSecretResult, nil
+	return m.listSecretsResult, nil
+}
+
+func (m *mockShowClient) GetTags(_ context.Context, _ string) (map[string]string, error) {
+	if m.getTagsErr != nil {
+		return nil, m.getTagsErr
 	}
 
-	return &secretapi.DescribeSecretOutput{}, nil
+	return m.getTagsResult, nil
+}
+
+func (m *mockShowClient) AddTags(_ context.Context, _ string, _ map[string]string) error {
+	return nil
+}
+
+func (m *mockShowClient) RemoveTags(_ context.Context, _ string, _ []string) error {
+	return nil
 }
 
 func TestShowUseCase_Execute(t *testing.T) {
@@ -60,12 +70,14 @@ func TestShowUseCase_Execute(t *testing.T) {
 
 	now := time.Now()
 	client := &mockShowClient{
-		getSecretValueResult: &secretapi.GetSecretValueOutput{
-			Name:          lo.ToPtr("my-secret"),
-			SecretString:  lo.ToPtr("secret-value"),
-			VersionId:     lo.ToPtr("abc123"),
-			VersionStages: []string{"AWSCURRENT"},
-			CreatedDate:   &now,
+		getSecretResult: &model.Secret{
+			Name:        "my-secret",
+			Value:       "secret-value",
+			VersionID:   "abc123",
+			CreatedDate: &now,
+			Metadata: model.AWSSecretMeta{
+				VersionStages: []string{"AWSCURRENT"},
+			},
 		},
 	}
 
@@ -89,11 +101,13 @@ func TestShowUseCase_Execute_WithVersionID(t *testing.T) {
 	t.Parallel()
 
 	client := &mockShowClient{
-		getSecretValueResult: &secretapi.GetSecretValueOutput{
-			Name:          lo.ToPtr("my-secret"),
-			SecretString:  lo.ToPtr("old-value"),
-			VersionId:     lo.ToPtr("old-version-id"),
-			VersionStages: []string{"AWSPREVIOUS"},
+		getSecretResult: &model.Secret{
+			Name:      "my-secret",
+			Value:     "old-value",
+			VersionID: "old-version-id",
+			Metadata: model.AWSSecretMeta{
+				VersionStages: []string{"AWSPREVIOUS"},
+			},
 		},
 	}
 
@@ -115,11 +129,13 @@ func TestShowUseCase_Execute_WithLabel(t *testing.T) {
 	t.Parallel()
 
 	client := &mockShowClient{
-		getSecretValueResult: &secretapi.GetSecretValueOutput{
-			Name:          lo.ToPtr("my-secret"),
-			SecretString:  lo.ToPtr("current-value"),
-			VersionId:     lo.ToPtr("current-id"),
-			VersionStages: []string{"AWSCURRENT"},
+		getSecretResult: &model.Secret{
+			Name:      "my-secret",
+			Value:     "current-value",
+			VersionID: "current-id",
+			Metadata: model.AWSSecretMeta{
+				VersionStages: []string{"AWSCURRENT"},
+			},
 		},
 	}
 
@@ -139,7 +155,7 @@ func TestShowUseCase_Execute_Error(t *testing.T) {
 	t.Parallel()
 
 	client := &mockShowClient{
-		getSecretValueErr: errors.New("aws error"),
+		getSecretErr: errors.New("aws error"),
 	}
 
 	uc := &secret.ShowUseCase{Client: client}
@@ -157,10 +173,10 @@ func TestShowUseCase_Execute_NoCreatedDate(t *testing.T) {
 	t.Parallel()
 
 	client := &mockShowClient{
-		getSecretValueResult: &secretapi.GetSecretValueOutput{
-			Name:         lo.ToPtr("my-secret"),
-			SecretString: lo.ToPtr("secret-value"),
-			VersionId:    lo.ToPtr("abc123"),
+		getSecretResult: &model.Secret{
+			Name:      "my-secret",
+			Value:     "secret-value",
+			VersionID: "abc123",
 		},
 	}
 
@@ -180,18 +196,19 @@ func TestShowUseCase_Execute_WithShift(t *testing.T) {
 	t.Parallel()
 
 	now := time.Now()
+	t1 := now.Add(-2 * time.Hour)
+	t2 := now.Add(-1 * time.Hour)
+
 	client := &mockShowClient{
-		listVersionsResult: &secretapi.ListSecretVersionIDsOutput{
-			Versions: []secretapi.SecretVersionsListEntry{
-				{VersionId: lo.ToPtr("v1-id"), CreatedDate: lo.ToPtr(now.Add(-2 * time.Hour))},
-				{VersionId: lo.ToPtr("v2-id"), CreatedDate: lo.ToPtr(now.Add(-1 * time.Hour))},
-				{VersionId: lo.ToPtr("v3-id"), CreatedDate: lo.ToPtr(now)},
-			},
+		getVersionsResult: []*model.SecretVersion{
+			{VersionID: "v1-id", CreatedDate: &t1, Metadata: model.AWSSecretMeta{}},
+			{VersionID: "v2-id", CreatedDate: &t2, Metadata: model.AWSSecretMeta{}},
+			{VersionID: "v3-id", CreatedDate: &now, Metadata: model.AWSSecretMeta{}},
 		},
-		getSecretValueResult: &secretapi.GetSecretValueOutput{
-			Name:         lo.ToPtr("my-secret"),
-			SecretString: lo.ToPtr("v2-value"),
-			VersionId:    lo.ToPtr("v2-id"),
+		getSecretResult: &model.Secret{
+			Name:      "my-secret",
+			Value:     "v2-value",
+			VersionID: "v2-id",
 		},
 	}
 
@@ -212,16 +229,14 @@ func TestShowUseCase_Execute_WithTags(t *testing.T) {
 	t.Parallel()
 
 	client := &mockShowClient{
-		getSecretValueResult: &secretapi.GetSecretValueOutput{
-			Name:         lo.ToPtr("my-secret"),
-			SecretString: lo.ToPtr("secret-value"),
-			VersionId:    lo.ToPtr("abc123"),
+		getSecretResult: &model.Secret{
+			Name:      "my-secret",
+			Value:     "secret-value",
+			VersionID: "abc123",
 		},
-		describeSecretResult: &secretapi.DescribeSecretOutput{
-			Tags: []secretapi.Tag{
-				{Key: lo.ToPtr("env"), Value: lo.ToPtr("prod")},
-				{Key: lo.ToPtr("team"), Value: lo.ToPtr("backend")},
-			},
+		getTagsResult: map[string]string{
+			"env":  "prod",
+			"team": "backend",
 		},
 	}
 
@@ -235,8 +250,13 @@ func TestShowUseCase_Execute_WithTags(t *testing.T) {
 	})
 	require.NoError(t, err)
 	assert.Len(t, output.Tags, 2)
-	assert.Equal(t, "env", output.Tags[0].Key)
-	assert.Equal(t, "prod", output.Tags[0].Value)
-	assert.Equal(t, "team", output.Tags[1].Key)
-	assert.Equal(t, "backend", output.Tags[1].Value)
+
+	// Convert to map for easier testing (order not guaranteed)
+	tagMap := make(map[string]string)
+	for _, tag := range output.Tags {
+		tagMap[tag.Key] = tag.Value
+	}
+
+	assert.Equal(t, "prod", tagMap["env"])
+	assert.Equal(t, "backend", tagMap["team"])
 }

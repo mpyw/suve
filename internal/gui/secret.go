@@ -136,12 +136,12 @@ func (a *App) SecretShow(specStr string) (*SecretShowResult, error) {
 		return nil, err
 	}
 
-	client, err := a.getSecretClient()
+	adapter, err := awssecret.NewAdapter(a.ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	uc := &secret.ShowUseCase{Client: client}
+	uc := &secret.ShowUseCase{Client: adapter}
 
 	result, err := uc.Execute(a.ctx, secret.ShowInput{Spec: spec})
 	if err != nil {

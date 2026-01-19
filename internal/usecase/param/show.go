@@ -3,19 +3,17 @@ package param
 
 import (
 	"context"
+	"strconv"
 	"time"
 
-	"github.com/samber/lo"
-
-	"github.com/mpyw/suve/internal/api/paramapi"
+	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/version/paramversion"
 )
 
 // ShowClient is the interface for the show use case.
 type ShowClient interface {
-	paramapi.GetParameterAPI
-	paramapi.GetParameterHistoryAPI
-	paramapi.ListTagsForResourceAPI
+	provider.ParameterReader
+	provider.ParameterTagger
 }
 
 // ShowInput holds input for the show use case.
@@ -34,7 +32,7 @@ type ShowOutput struct {
 	Name         string
 	Value        string
 	Version      int64
-	Type         paramapi.ParameterType
+	Type         string
 	Description  string
 	LastModified *time.Time
 	Tags         []ShowTag
@@ -47,34 +45,32 @@ type ShowUseCase struct {
 
 // Execute runs the show use case.
 func (u *ShowUseCase) Execute(ctx context.Context, input ShowInput) (*ShowOutput, error) {
-	param, err := paramversion.GetParameterWithVersion(ctx, u.Client, input.Spec)
+	param, err := paramversion.Resolve(ctx, u.Client, input.Spec)
 	if err != nil {
 		return nil, err
 	}
 
+	version, _ := strconv.ParseInt(param.Version, 10, 64)
+
 	output := &ShowOutput{
-		Name:        lo.FromPtr(param.Name),
-		Value:       lo.FromPtr(param.Value),
-		Version:     param.Version,
-		Type:        param.Type,
-		Description: lo.FromPtr(param.Description),
-	}
-	if param.LastModifiedDate != nil {
-		output.LastModified = param.LastModifiedDate
+		Name:         param.Name,
+		Value:        param.Value,
+		Version:      version,
+		Type:         param.Type,
+		Description:  param.Description,
+		LastModified: param.LastModified,
 	}
 
 	// Fetch tags
-	tagsOutput, err := u.Client.ListTagsForResource(ctx, &paramapi.ListTagsForResourceInput{
-		ResourceType: paramapi.ResourceTypeForTaggingParameter,
-		ResourceId:   param.Name,
-	})
-	if err == nil && tagsOutput != nil {
-		output.Tags = lo.Map(tagsOutput.TagList, func(tag paramapi.Tag, _ int) ShowTag {
-			return ShowTag{
-				Key:   lo.FromPtr(tag.Key),
-				Value: lo.FromPtr(tag.Value),
-			}
-		})
+	tags, err := u.Client.GetTags(ctx, param.Name)
+	if err == nil && tags != nil {
+		output.Tags = make([]ShowTag, 0, len(tags))
+		for k, v := range tags {
+			output.Tags = append(output.Tags, ShowTag{
+				Key:   k,
+				Value: v,
+			})
+		}
 	}
 
 	return output, nil

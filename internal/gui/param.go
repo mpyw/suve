@@ -124,12 +124,12 @@ func (a *App) ParamShow(specStr string) (*ParamShowResult, error) {
 		return nil, err
 	}
 
-	client, err := a.getParamClient()
+	adapter, err := awsparam.NewAdapter(a.ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	uc := &param.ShowUseCase{Client: client}
+	uc := &param.ShowUseCase{Client: adapter}
 
 	result, err := uc.Execute(a.ctx, param.ShowInput{Spec: spec})
 	if err != nil {
@@ -140,7 +140,7 @@ func (a *App) ParamShow(specStr string) (*ParamShowResult, error) {
 		Name:        result.Name,
 		Value:       result.Value,
 		Version:     result.Version,
-		Type:        string(result.Type),
+		Type:        result.Type,
 		Description: result.Description,
 		Tags:        make([]ParamShowTag, 0, len(result.Tags)),
 	}

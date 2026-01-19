@@ -5,17 +5,15 @@ import (
 	"context"
 	"time"
 
-	"github.com/samber/lo"
-
-	"github.com/mpyw/suve/internal/api/secretapi"
+	"github.com/mpyw/suve/internal/model"
+	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/version/secretversion"
 )
 
 // ShowClient is the interface for the show use case.
 type ShowClient interface {
-	secretapi.GetSecretValueAPI
-	secretapi.ListSecretVersionIDsAPI
-	secretapi.DescribeSecretAPI
+	provider.SecretReader
+	provider.SecretTagger
 }
 
 // ShowInput holds input for the show use case.
@@ -48,30 +46,33 @@ type ShowUseCase struct {
 
 // Execute runs the show use case.
 func (u *ShowUseCase) Execute(ctx context.Context, input ShowInput) (*ShowOutput, error) {
-	secret, err := secretversion.GetSecretWithVersion(ctx, u.Client, input.Spec)
+	secret, err := secretversion.Resolve(ctx, u.Client, input.Spec)
 	if err != nil {
 		return nil, err
 	}
 
 	output := &ShowOutput{
-		Name:         lo.FromPtr(secret.Name),
-		ARN:          lo.FromPtr(secret.ARN),
-		Value:        lo.FromPtr(secret.SecretString),
-		VersionID:    lo.FromPtr(secret.VersionId),
-		VersionStage: secret.VersionStages,
-		CreatedDate:  secret.CreatedDate,
+		Name:        secret.Name,
+		ARN:         secret.ARN,
+		Value:       secret.Value,
+		VersionID:   secret.VersionID,
+		Description: secret.Description,
+		CreatedDate: secret.CreatedDate,
 	}
 
-	// Fetch tags and description via DescribeSecret
-	describeOutput, err := u.Client.DescribeSecret(ctx, &secretapi.DescribeSecretInput{
-		SecretId: secret.Name,
-	})
-	if err == nil && describeOutput != nil {
-		output.Description = lo.FromPtr(describeOutput.Description)
-		for _, tag := range describeOutput.Tags {
+	// Extract version stages from metadata if available
+	if meta, ok := secret.Metadata.(model.AWSSecretMeta); ok {
+		output.VersionStage = meta.VersionStages
+	}
+
+	// Fetch tags
+	tags, err := u.Client.GetTags(ctx, secret.Name)
+	if err == nil && tags != nil {
+		output.Tags = make([]ShowTag, 0, len(tags))
+		for k, v := range tags {
 			output.Tags = append(output.Tags, ShowTag{
-				Key:   lo.FromPtr(tag.Key),
-				Value: lo.FromPtr(tag.Value),
+				Key:   k,
+				Value: v,
 			})
 		}
 	}

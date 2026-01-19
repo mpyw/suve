@@ -8,14 +8,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/mpyw/suve/internal/api/paramapi"
 	appcli "github.com/mpyw/suve/internal/cli/commands"
 	"github.com/mpyw/suve/internal/cli/commands/param/show"
 	"github.com/mpyw/suve/internal/cli/output"
+	"github.com/mpyw/suve/internal/model"
 	"github.com/mpyw/suve/internal/usecase/param"
 	"github.com/mpyw/suve/internal/version/paramversion"
 )
@@ -42,30 +41,38 @@ func TestCommand_Validation(t *testing.T) {
 	})
 }
 
-//nolint:lll // mock struct fields match AWS SDK interface signatures
 type mockClient struct {
-	getParameterFunc        func(ctx context.Context, params *paramapi.GetParameterInput, optFns ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error)
-	getParameterHistoryFunc func(ctx context.Context, params *paramapi.GetParameterHistoryInput, optFns ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error)
-	listTagsForResourceFunc func(ctx context.Context, params *paramapi.ListTagsForResourceInput, optFns ...func(*paramapi.Options)) (*paramapi.ListTagsForResourceOutput, error)
+	getParameterFunc        func(ctx context.Context, name string, version string) (*model.Parameter, error)
+	getParameterHistoryFunc func(ctx context.Context, name string) (*model.ParameterHistory, error)
+	getTagsFunc             func(ctx context.Context, name string) (map[string]string, error)
 }
 
-//nolint:lll // mock function signature must match AWS SDK interface
-func (m *mockClient) GetParameter(ctx context.Context, params *paramapi.GetParameterInput, optFns ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
-	return m.getParameterFunc(ctx, params, optFns...)
+func (m *mockClient) GetParameter(ctx context.Context, name string, version string) (*model.Parameter, error) {
+	return m.getParameterFunc(ctx, name, version)
 }
 
-//nolint:lll // mock function signature must match AWS SDK interface
-func (m *mockClient) GetParameterHistory(ctx context.Context, params *paramapi.GetParameterHistoryInput, optFns ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
-	return m.getParameterHistoryFunc(ctx, params, optFns...)
+func (m *mockClient) GetParameterHistory(ctx context.Context, name string) (*model.ParameterHistory, error) {
+	return m.getParameterHistoryFunc(ctx, name)
 }
 
-//nolint:lll // mock function signature must match AWS SDK interface
-func (m *mockClient) ListTagsForResource(ctx context.Context, params *paramapi.ListTagsForResourceInput, optFns ...func(*paramapi.Options)) (*paramapi.ListTagsForResourceOutput, error) {
-	if m.listTagsForResourceFunc != nil {
-		return m.listTagsForResourceFunc(ctx, params, optFns...)
+func (m *mockClient) ListParameters(_ context.Context, _ string, _ bool) ([]*model.ParameterListItem, error) {
+	return nil, nil
+}
+
+func (m *mockClient) GetTags(ctx context.Context, name string) (map[string]string, error) {
+	if m.getTagsFunc != nil {
+		return m.getTagsFunc(ctx, name)
 	}
 
-	return &paramapi.ListTagsForResourceOutput{}, nil
+	return nil, nil //nolint:nilnil // return empty tags by default
+}
+
+func (m *mockClient) AddTags(_ context.Context, _ string, _ map[string]string) error {
+	return nil
+}
+
+func (m *mockClient) RemoveTags(_ context.Context, _ string, _ []string) error {
+	return nil
 }
 
 //nolint:funlen // Table-driven test with many cases
@@ -73,6 +80,8 @@ func TestRun(t *testing.T) {
 	t.Parallel()
 
 	now := time.Now()
+	t1 := now.Add(-1 * time.Hour)
+	t2 := now.Add(-2 * time.Hour)
 
 	tests := []struct {
 		name    string
@@ -87,15 +96,13 @@ func TestRun(t *testing.T) {
 				Spec: &paramversion.Spec{Name: "/my/param"},
 			},
 			mock: &mockClient{
-				getParameterFunc: func(_ context.Context, _ *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
-					return &paramapi.GetParameterOutput{
-						Parameter: &paramapi.Parameter{
-							Name:             lo.ToPtr("/my/param"),
-							Value:            lo.ToPtr("test-value"),
-							Version:          3,
-							Type:             paramapi.ParameterTypeString,
-							LastModifiedDate: &now,
-						},
+				getParameterFunc: func(_ context.Context, _ string, _ string) (*model.Parameter, error) {
+					return &model.Parameter{
+						Name:         "/my/param",
+						Value:        "test-value",
+						Version:      "3",
+						Type:         "String",
+						LastModified: &now,
 					}, nil
 				},
 			},
@@ -111,13 +118,13 @@ func TestRun(t *testing.T) {
 				Spec: &paramversion.Spec{Name: "/my/param", Shift: 1},
 			},
 			mock: &mockClient{
-				//nolint:lll // inline mock function in test table
-				getParameterHistoryFunc: func(_ context.Context, _ *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
-					return &paramapi.GetParameterHistoryOutput{
-						Parameters: []paramapi.ParameterHistory{
-							{Name: lo.ToPtr("/my/param"), Value: lo.ToPtr("v3"), Version: 3, LastModifiedDate: &now},
-							{Name: lo.ToPtr("/my/param"), Value: lo.ToPtr("v2"), Version: 2, LastModifiedDate: lo.ToPtr(now.Add(-time.Hour))},
-							{Name: lo.ToPtr("/my/param"), Value: lo.ToPtr("v1"), Version: 1, LastModifiedDate: lo.ToPtr(now.Add(-2 * time.Hour))},
+				getParameterHistoryFunc: func(_ context.Context, _ string) (*model.ParameterHistory, error) {
+					return &model.ParameterHistory{
+						Name: "/my/param",
+						Parameters: []*model.Parameter{
+							{Name: "/my/param", Value: "v3", Version: "3", LastModified: &now},
+							{Name: "/my/param", Value: "v2", Version: "2", LastModified: &t1},
+							{Name: "/my/param", Value: "v1", Version: "1", LastModified: &t2},
 						},
 					}, nil
 				},
@@ -134,15 +141,13 @@ func TestRun(t *testing.T) {
 				ParseJSON: true,
 			},
 			mock: &mockClient{
-				getParameterFunc: func(_ context.Context, _ *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
-					return &paramapi.GetParameterOutput{
-						Parameter: &paramapi.Parameter{
-							Name:             lo.ToPtr("/my/param"),
-							Value:            lo.ToPtr(`{"zebra":"last","apple":"first"}`),
-							Version:          1,
-							Type:             paramapi.ParameterTypeString,
-							LastModifiedDate: &now,
-						},
+				getParameterFunc: func(_ context.Context, _ string, _ string) (*model.Parameter, error) {
+					return &model.Parameter{
+						Name:         "/my/param",
+						Value:        `{"zebra":"last","apple":"first"}`,
+						Version:      "1",
+						Type:         "String",
+						LastModified: &now,
 					}, nil
 				},
 			},
@@ -162,7 +167,7 @@ func TestRun(t *testing.T) {
 			name: "error from AWS",
 			opts: show.Options{Spec: &paramversion.Spec{Name: "/my/param"}},
 			mock: &mockClient{
-				getParameterFunc: func(_ context.Context, _ *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
+				getParameterFunc: func(_ context.Context, _ string, _ string) (*model.Parameter, error) {
 					return nil, fmt.Errorf("AWS error")
 				},
 			},
@@ -172,14 +177,12 @@ func TestRun(t *testing.T) {
 			name: "show without LastModifiedDate",
 			opts: show.Options{Spec: &paramversion.Spec{Name: "/my/param"}},
 			mock: &mockClient{
-				getParameterFunc: func(_ context.Context, _ *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
-					return &paramapi.GetParameterOutput{
-						Parameter: &paramapi.Parameter{
-							Name:    lo.ToPtr("/my/param"),
-							Value:   lo.ToPtr("test-value"),
-							Version: 1,
-							Type:    paramapi.ParameterTypeString,
-						},
+				getParameterFunc: func(_ context.Context, _ string, _ string) (*model.Parameter, error) {
+					return &model.Parameter{
+						Name:    "/my/param",
+						Value:   "test-value",
+						Version: "1",
+						Type:    "String",
 					}, nil
 				},
 			},
@@ -196,14 +199,12 @@ func TestRun(t *testing.T) {
 				ParseJSON: true,
 			},
 			mock: &mockClient{
-				getParameterFunc: func(_ context.Context, _ *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
-					return &paramapi.GetParameterOutput{
-						Parameter: &paramapi.Parameter{
-							Name:    lo.ToPtr("/my/param"),
-							Value:   lo.ToPtr("a,b,c"),
-							Version: 1,
-							Type:    paramapi.ParameterTypeStringList,
-						},
+				getParameterFunc: func(_ context.Context, _ string, _ string) (*model.Parameter, error) {
+					return &model.Parameter{
+						Name:    "/my/param",
+						Value:   "a,b,c",
+						Version: "1",
+						Type:    "StringList",
 					}, nil
 				},
 			},
@@ -219,14 +220,12 @@ func TestRun(t *testing.T) {
 				ParseJSON: true,
 			},
 			mock: &mockClient{
-				getParameterFunc: func(_ context.Context, _ *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
-					return &paramapi.GetParameterOutput{
-						Parameter: &paramapi.Parameter{
-							Name:    lo.ToPtr("/my/param"),
-							Value:   lo.ToPtr("encrypted-blob"),
-							Version: 1,
-							Type:    paramapi.ParameterTypeSecureString,
-						},
+				getParameterFunc: func(_ context.Context, _ string, _ string) (*model.Parameter, error) {
+					return &model.Parameter{
+						Name:    "/my/param",
+						Value:   "encrypted-blob",
+						Version: "1",
+						Type:    "SecureString",
 					}, nil
 				},
 			},
@@ -243,14 +242,12 @@ func TestRun(t *testing.T) {
 				ParseJSON: true,
 			},
 			mock: &mockClient{
-				getParameterFunc: func(_ context.Context, _ *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
-					return &paramapi.GetParameterOutput{
-						Parameter: &paramapi.Parameter{
-							Name:    lo.ToPtr("/my/param"),
-							Value:   lo.ToPtr("not json"),
-							Version: 1,
-							Type:    paramapi.ParameterTypeString,
-						},
+				getParameterFunc: func(_ context.Context, _ string, _ string) (*model.Parameter, error) {
+					return &model.Parameter{
+						Name:    "/my/param",
+						Value:   "not json",
+						Version: "1",
+						Type:    "String",
 					}, nil
 				},
 			},
@@ -268,15 +265,13 @@ func TestRun(t *testing.T) {
 				Raw:  true,
 			},
 			mock: &mockClient{
-				getParameterFunc: func(_ context.Context, _ *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
-					return &paramapi.GetParameterOutput{
-						Parameter: &paramapi.Parameter{
-							Name:             lo.ToPtr("/my/param"),
-							Value:            lo.ToPtr("raw-value"),
-							Version:          1,
-							Type:             paramapi.ParameterTypeString,
-							LastModifiedDate: &now,
-						},
+				getParameterFunc: func(_ context.Context, _ string, _ string) (*model.Parameter, error) {
+					return &model.Parameter{
+						Name:         "/my/param",
+						Value:        "raw-value",
+						Version:      "1",
+						Type:         "String",
+						LastModified: &now,
 					}, nil
 				},
 			},
@@ -293,12 +288,12 @@ func TestRun(t *testing.T) {
 				Raw:  true,
 			},
 			mock: &mockClient{
-				//nolint:lll // inline mock function in test table
-				getParameterHistoryFunc: func(_ context.Context, _ *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
-					return &paramapi.GetParameterHistoryOutput{
-						Parameters: []paramapi.ParameterHistory{
-							{Name: lo.ToPtr("/my/param"), Value: lo.ToPtr("v1"), Version: 1, LastModifiedDate: lo.ToPtr(now.Add(-time.Hour))},
-							{Name: lo.ToPtr("/my/param"), Value: lo.ToPtr("v2"), Version: 2, LastModifiedDate: &now},
+				getParameterHistoryFunc: func(_ context.Context, _ string) (*model.ParameterHistory, error) {
+					return &model.ParameterHistory{
+						Name: "/my/param",
+						Parameters: []*model.Parameter{
+							{Name: "/my/param", Value: "v1", Version: "1", LastModified: &t1},
+							{Name: "/my/param", Value: "v2", Version: "2", LastModified: &now},
 						},
 					}, nil
 				},
@@ -317,15 +312,13 @@ func TestRun(t *testing.T) {
 				Raw:       true,
 			},
 			mock: &mockClient{
-				getParameterFunc: func(_ context.Context, _ *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
-					return &paramapi.GetParameterOutput{
-						Parameter: &paramapi.Parameter{
-							Name:             lo.ToPtr("/my/param"),
-							Value:            lo.ToPtr(`{"zebra":"last","apple":"first"}`),
-							Version:          1,
-							Type:             paramapi.ParameterTypeString,
-							LastModifiedDate: &now,
-						},
+				getParameterFunc: func(_ context.Context, _ string, _ string) (*model.Parameter, error) {
+					return &model.Parameter{
+						Name:         "/my/param",
+						Value:        `{"zebra":"last","apple":"first"}`,
+						Version:      "1",
+						Type:         "String",
+						LastModified: &now,
 					}, nil
 				},
 			},
@@ -346,24 +339,19 @@ func TestRun(t *testing.T) {
 				Spec: &paramversion.Spec{Name: "/my/param"},
 			},
 			mock: &mockClient{
-				getParameterFunc: func(_ context.Context, _ *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
-					return &paramapi.GetParameterOutput{
-						Parameter: &paramapi.Parameter{
-							Name:             lo.ToPtr("/my/param"),
-							Value:            lo.ToPtr("test-value"),
-							Version:          1,
-							Type:             paramapi.ParameterTypeString,
-							LastModifiedDate: &now,
-						},
+				getParameterFunc: func(_ context.Context, _ string, _ string) (*model.Parameter, error) {
+					return &model.Parameter{
+						Name:         "/my/param",
+						Value:        "test-value",
+						Version:      "1",
+						Type:         "String",
+						LastModified: &now,
 					}, nil
 				},
-				//nolint:lll // inline mock function in test table
-				listTagsForResourceFunc: func(_ context.Context, _ *paramapi.ListTagsForResourceInput, _ ...func(*paramapi.Options)) (*paramapi.ListTagsForResourceOutput, error) {
-					return &paramapi.ListTagsForResourceOutput{
-						TagList: []paramapi.Tag{
-							{Key: lo.ToPtr("Environment"), Value: lo.ToPtr("production")},
-							{Key: lo.ToPtr("Team"), Value: lo.ToPtr("backend")},
-						},
+				getTagsFunc: func(_ context.Context, _ string) (map[string]string, error) {
+					return map[string]string{
+						"Environment": "production",
+						"Team":        "backend",
 					}, nil
 				},
 			},
@@ -385,24 +373,19 @@ func TestRun(t *testing.T) {
 				Output: output.FormatJSON,
 			},
 			mock: &mockClient{
-				getParameterFunc: func(_ context.Context, _ *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
-					return &paramapi.GetParameterOutput{
-						Parameter: &paramapi.Parameter{
-							Name:             lo.ToPtr("/my/param"),
-							Value:            lo.ToPtr("test-value"),
-							Version:          1,
-							Type:             paramapi.ParameterTypeString,
-							LastModifiedDate: &now,
-						},
+				getParameterFunc: func(_ context.Context, _ string, _ string) (*model.Parameter, error) {
+					return &model.Parameter{
+						Name:         "/my/param",
+						Value:        "test-value",
+						Version:      "1",
+						Type:         "String",
+						LastModified: &now,
 					}, nil
 				},
-				//nolint:lll // inline mock function in test table
-				listTagsForResourceFunc: func(_ context.Context, _ *paramapi.ListTagsForResourceInput, _ ...func(*paramapi.Options)) (*paramapi.ListTagsForResourceOutput, error) {
-					return &paramapi.ListTagsForResourceOutput{
-						TagList: []paramapi.Tag{
-							{Key: lo.ToPtr("Environment"), Value: lo.ToPtr("production")},
-							{Key: lo.ToPtr("Team"), Value: lo.ToPtr("backend")},
-						},
+				getTagsFunc: func(_ context.Context, _ string) (map[string]string, error) {
+					return map[string]string{
+						"Environment": "production",
+						"Team":        "backend",
 					}, nil
 				},
 			},
@@ -423,14 +406,12 @@ func TestRun(t *testing.T) {
 				Output: output.FormatJSON,
 			},
 			mock: &mockClient{
-				getParameterFunc: func(_ context.Context, _ *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
-					return &paramapi.GetParameterOutput{
-						Parameter: &paramapi.Parameter{
-							Name:    lo.ToPtr("/my/param"),
-							Value:   lo.ToPtr("test-value"),
-							Version: 1,
-							Type:    paramapi.ParameterTypeString,
-						},
+				getParameterFunc: func(_ context.Context, _ string, _ string) (*model.Parameter, error) {
+					return &model.Parameter{
+						Name:    "/my/param",
+						Value:   "test-value",
+						Version: "1",
+						Type:    "String",
 					}, nil
 				},
 			},
