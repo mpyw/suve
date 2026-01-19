@@ -7,6 +7,7 @@ import (
 
 	"github.com/mpyw/suve/internal/model"
 	"github.com/mpyw/suve/internal/provider"
+	"github.com/mpyw/suve/internal/usecase/resource"
 	"github.com/mpyw/suve/internal/version/secretversion"
 )
 
@@ -22,10 +23,7 @@ type ShowInput struct {
 }
 
 // ShowTag represents a tag key-value pair.
-type ShowTag struct {
-	Key   string
-	Value string
-}
+type ShowTag = resource.ShowTag
 
 // ShowOutput holds the result of the show use case.
 type ShowOutput struct {
@@ -46,35 +44,36 @@ type ShowUseCase struct {
 
 // Execute runs the show use case.
 func (u *ShowUseCase) Execute(ctx context.Context, input ShowInput) (*ShowOutput, error) {
+	// Resolve secret version
 	secret, err := secretversion.Resolve(ctx, u.Client, input.Spec)
 	if err != nil {
 		return nil, err
 	}
 
+	// Use unified resource usecase for common logic (tag fetching)
+	uc := &resource.ShowUseCase{Client: u.Client}
+
+	result, err := uc.Execute(ctx, resource.ShowInput{
+		Resource: secret.ToResource(),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert to secret-specific output
 	output := &ShowOutput{
-		Name:        secret.Name,
-		ARN:         secret.ARN,
-		Value:       secret.Value,
-		VersionID:   secret.VersionID,
-		Description: secret.Description,
-		CreatedDate: secret.CreatedDate,
+		Name:        result.Name,
+		ARN:         result.ARN,
+		Value:       result.Value,
+		VersionID:   result.Version,
+		Description: result.Description,
+		CreatedDate: result.ModifiedAt,
+		Tags:        result.Tags,
 	}
 
 	// Extract version stages from metadata if available
-	if meta, ok := secret.Metadata.(model.AWSSecretMeta); ok {
+	if meta, ok := result.Metadata.(model.AWSSecretMeta); ok {
 		output.VersionStage = meta.VersionStages
-	}
-
-	// Fetch tags
-	tags, err := u.Client.GetTags(ctx, secret.Name)
-	if err == nil && tags != nil {
-		output.Tags = make([]ShowTag, 0, len(tags))
-		for k, v := range tags {
-			output.Tags = append(output.Tags, ShowTag{
-				Key:   k,
-				Value: v,
-			})
-		}
 	}
 
 	return output, nil

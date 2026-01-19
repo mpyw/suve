@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/mpyw/suve/internal/provider"
+	"github.com/mpyw/suve/internal/usecase/resource"
 	"github.com/mpyw/suve/internal/version/paramversion"
 )
 
@@ -22,10 +23,7 @@ type ShowInput struct {
 }
 
 // ShowTag represents a tag key-value pair.
-type ShowTag struct {
-	Key   string
-	Value string
-}
+type ShowTag = resource.ShowTag
 
 // ShowOutput holds the result of the show use case.
 type ShowOutput struct {
@@ -45,33 +43,32 @@ type ShowUseCase struct {
 
 // Execute runs the show use case.
 func (u *ShowUseCase) Execute(ctx context.Context, input ShowInput) (*ShowOutput, error) {
+	// Resolve parameter version
 	param, err := paramversion.Resolve(ctx, u.Client, input.Spec)
 	if err != nil {
 		return nil, err
 	}
 
-	version, _ := strconv.ParseInt(param.Version, 10, 64)
+	// Use unified resource usecase for common logic (tag fetching)
+	uc := &resource.ShowUseCase{Client: u.Client}
 
-	output := &ShowOutput{
-		Name:         param.Name,
-		Value:        param.Value,
+	result, err := uc.Execute(ctx, resource.ShowInput{
+		Resource: param.ToResource(),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert to param-specific output
+	version, _ := strconv.ParseInt(result.Version, 10, 64)
+
+	return &ShowOutput{
+		Name:         result.Name,
+		Value:        result.Value,
 		Version:      version,
-		Type:         param.Type,
-		Description:  param.Description,
-		LastModified: param.LastModified,
-	}
-
-	// Fetch tags
-	tags, err := u.Client.GetTags(ctx, param.Name)
-	if err == nil && tags != nil {
-		output.Tags = make([]ShowTag, 0, len(tags))
-		for k, v := range tags {
-			output.Tags = append(output.Tags, ShowTag{
-				Key:   k,
-				Value: v,
-			})
-		}
-	}
-
-	return output, nil
+		Type:         result.Type,
+		Description:  result.Description,
+		LastModified: result.ModifiedAt,
+		Tags:         result.Tags,
+	}, nil
 }
