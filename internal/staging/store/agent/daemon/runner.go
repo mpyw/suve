@@ -22,27 +22,25 @@ func WithAutoShutdownDisabled() RunnerOption {
 }
 
 // Runner represents the staging agent daemon process.
+// A single daemon handles requests for all scopes.
 type Runner struct {
-	accountID            string
-	region               string
 	server               *ipc.Server
 	handler              *server.Handler
 	autoShutdownDisabled bool
 	cancel               context.CancelFunc
 }
 
-// NewRunner creates a new daemon runner for a specific AWS account and region.
-func NewRunner(accountID, region string, opts ...RunnerOption) *Runner {
+// NewRunner creates a new daemon runner.
+// The runner is scope-independent; scope is passed with each request.
+func NewRunner(opts ...RunnerOption) *Runner {
 	r := &Runner{
-		accountID: accountID,
-		region:    region,
-		handler:   server.NewHandler(),
+		handler: server.NewHandler(),
 	}
 	for _, opt := range opts {
 		opt(r)
 	}
 
-	r.server = ipc.NewServer(accountID, region, r.handler.HandleRequest, r.checkAutoShutdown, r.Shutdown)
+	r.server = ipc.NewServer(r.handler.HandleRequest, r.checkAutoShutdown, r.Shutdown)
 
 	return r
 }

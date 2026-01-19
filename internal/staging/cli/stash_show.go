@@ -129,8 +129,9 @@ func stashShowAction(service staging.Service) func(context.Context, *cli.Command
 			return fmt.Errorf("failed to get AWS identity: %w", err)
 		}
 
+		scope := staging.AWSScope(identity.AccountID, identity.Region)
 		err = lifecycle.ExecuteFile0(ctx, lifecycle.CmdStashShow, func() error {
-			fileStore, err := fileStoreForReading(cmd, identity.AccountID, identity.Region, true)
+			fileStore, err := fileStoreForReading(cmd, scope, true)
 			if err != nil {
 				return err
 			}

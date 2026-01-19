@@ -121,8 +121,10 @@ func globalStashDropAction() func(context.Context, *cli.Command) error {
 			return fmt.Errorf("failed to get AWS identity: %w", err)
 		}
 
+		scope := staging.AWSScope(identity.AccountID, identity.Region)
+
 		return lifecycle.ExecuteFile0(ctx, lifecycle.CmdStashDrop, func() error {
-			fileStore, err := file.NewStore(identity.AccountID, identity.Region)
+			fileStore, err := file.NewStore(scope)
 			if err != nil {
 				return fmt.Errorf("failed to create file store: %w", err)
 			}
@@ -200,9 +202,11 @@ func serviceStashDropAction(service staging.Service) func(context.Context, *cli.
 			return fmt.Errorf("failed to get AWS identity: %w", err)
 		}
 
+		scope := staging.AWSScope(identity.AccountID, identity.Region)
+
 		return lifecycle.ExecuteFile0(ctx, lifecycle.CmdStashDrop, func() error {
 			// Use fileStoreForReading which handles passphrase prompting for encrypted files
-			fileStore, err := fileStoreForReading(cmd, identity.AccountID, identity.Region, true)
+			fileStore, err := fileStoreForReading(cmd, scope, true)
 			if err != nil {
 				return err
 			}

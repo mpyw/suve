@@ -7,11 +7,11 @@ import (
 	"path/filepath"
 )
 
-// socketPathForAccount returns the path for the daemon socket on Linux for a specific account/region.
-func socketPathForAccount(accountID, region string) string {
+// socketPath returns the path for the daemon socket on Linux.
+func socketPath() string {
 	if xdgRuntime := os.Getenv("XDG_RUNTIME_DIR"); xdgRuntime != "" {
-		return filepath.Join(xdgRuntime, socketDirName, accountID, region, socketFileName)
+		return filepath.Join(xdgRuntime, socketDirName, socketFileName)
 	}
 
-	return socketPathFallback(accountID, region)
+	return socketPathFallback()
 }

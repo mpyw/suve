@@ -16,8 +16,9 @@ import (
 )
 
 const (
-	stateFileName = "stage.json"
-	stateDirName  = ".suve"
+	stateFileName = "state.json"
+	baseDirName   = ".suve"
+	stagingDir    = "staging"
 )
 
 // fileMu protects concurrent access to the state file within a process.
@@ -38,15 +39,15 @@ type Store struct {
 }
 
 // NewStore creates a new file Store with the default state file path.
-// The state file is stored under ~/.suve/{accountID}/{region}/stage.json
-// to isolate staging state per AWS account and region.
-func NewStore(accountID, region string) (*Store, error) {
+// The state file is stored under ~/.suve/staging/{scope.Key()}/state.json
+// to isolate staging state per cloud provider scope.
+func NewStore(scope staging.Scope) (*Store, error) {
 	homeDir, err := userHomeDirFunc()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get home directory: %w", err)
 	}
 
-	stateDir := filepath.Join(homeDir, stateDirName, accountID, region)
+	stateDir := filepath.Join(homeDir, baseDirName, stagingDir, scope.Key())
 
 	return &Store{
 		stateFilePath: filepath.Join(stateDir, stateFileName),
@@ -63,8 +64,8 @@ func NewStoreWithPath(path string) *Store {
 
 // NewStoreWithPassphrase creates a new file Store with a passphrase for encryption.
 // This is used by drain/persist commands that need StateIO interface.
-func NewStoreWithPassphrase(accountID, region, passphrase string) (*Store, error) {
-	store, err := NewStore(accountID, region)
+func NewStoreWithPassphrase(scope staging.Scope, passphrase string) (*Store, error) {
+	store, err := NewStore(scope)
 	if err != nil {
 		return nil, err
 	}

@@ -1134,7 +1134,7 @@ func TestDaemonLauncher_Ping(t *testing.T) {
 	setupTempHome(t)
 
 	// Create launcher for the running test daemon
-	launcher := daemon.NewLauncher("000000000000", "us-east-1", daemon.WithAutoStartDisabled())
+	launcher := daemon.NewLauncher(daemon.WithAutoStartDisabled())
 
 	// Test Ping
 	t.Run("ping-success", func(t *testing.T) {
@@ -1166,7 +1166,7 @@ func TestDaemonLauncher_EnsureRunning(t *testing.T) {
 	setupTempHome(t)
 
 	// Create launcher for the running test daemon
-	launcher := daemon.NewLauncher("000000000000", "us-east-1", daemon.WithAutoStartDisabled())
+	launcher := daemon.NewLauncher(daemon.WithAutoStartDisabled())
 
 	// Test EnsureRunning (daemon is already running from TestMain)
 	t.Run("ensure-running-when-running", func(t *testing.T) {
@@ -1231,13 +1231,21 @@ func TestDaemonLauncher_ViaStore(t *testing.T) {
 	})
 }
 
+// setupIsolatedSocketPath sets TMPDIR to a temp directory, causing the daemon
+// to look for a socket in a different location where no daemon is running.
+// This simulates the "daemon not running" scenario for E2E tests.
+func setupIsolatedSocketPath(t *testing.T) {
+	t.Helper()
+	t.Setenv("TMPDIR", t.TempDir())
+}
+
 // TestDaemonLauncher_NotRunning tests launcher behavior when daemon is not running.
 func TestDaemonLauncher_NotRunning(t *testing.T) {
 	setupEnv(t)
 	setupTempHome(t)
+	setupIsolatedSocketPath(t) // Use different socket path where no daemon exists
 
-	// Create launcher for a different account where no daemon is running
-	launcher := daemon.NewLauncher("999999999999", "ap-northeast-1", daemon.WithAutoStartDisabled())
+	launcher := daemon.NewLauncher(daemon.WithAutoStartDisabled())
 
 	// Test Ping fails when daemon not running
 	t.Run("ping-not-running", func(t *testing.T) {
@@ -1257,9 +1265,9 @@ func TestDaemonLauncher_NotRunning(t *testing.T) {
 func TestAgentStore_NotRunning(t *testing.T) {
 	setupEnv(t)
 	setupTempHome(t)
+	setupIsolatedSocketPath(t) // Use different socket path where no daemon exists
 
-	// Create store for a different account where no daemon is running
-	store := newStoreForAccount("999999999999", "ap-northeast-1")
+	store := newStore()
 
 	// Test GetEntry fails when daemon not running
 	t.Run("get-entry-not-running", func(t *testing.T) {

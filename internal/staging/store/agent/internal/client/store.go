@@ -27,16 +27,14 @@ func WithAutoStartDisabled() StoreOption {
 // Store implements store.ReadWriteOperator using the daemon.
 type Store struct {
 	launcher          *daemon.Launcher
-	accountID         string
-	region            string
+	scope             staging.Scope
 	autoStartDisabled bool
 }
 
 // NewStore creates a new Store.
-func NewStore(accountID, region string, opts ...StoreOption) *Store {
+func NewStore(scope staging.Scope, opts ...StoreOption) *Store {
 	s := &Store{
-		accountID: accountID,
-		region:    region,
+		scope: scope,
 	}
 	for _, opt := range opts {
 		opt(s)
@@ -48,7 +46,7 @@ func NewStore(accountID, region string, opts ...StoreOption) *Store {
 		launcherOpts = append(launcherOpts, daemon.WithAutoStartDisabled())
 	}
 
-	s.launcher = daemon.NewLauncher(accountID, region, launcherOpts...)
+	s.launcher = daemon.NewLauncher(launcherOpts...)
 
 	return s
 }
@@ -56,11 +54,10 @@ func NewStore(accountID, region string, opts ...StoreOption) *Store {
 // GetEntry retrieves a staged entry.
 func (s *Store) GetEntry(ctx context.Context, service staging.Service, name string) (*staging.Entry, error) {
 	entry, err := doRequestWithResultEnsuringDaemon(ctx, s, &protocol.Request{
-		Method:    protocol.MethodGetEntry,
-		AccountID: s.accountID,
-		Region:    s.region,
-		Service:   service,
-		Name:      name,
+		Method:  protocol.MethodGetEntry,
+		Scope:   s.scope,
+		Service: service,
+		Name:    name,
 	}, func(r *protocol.EntryResponse) *staging.Entry { return r.Entry })
 	if err != nil {
 		return nil, err
@@ -76,11 +73,10 @@ func (s *Store) GetEntry(ctx context.Context, service staging.Service, name stri
 // GetTag retrieves staged tag changes.
 func (s *Store) GetTag(ctx context.Context, service staging.Service, name string) (*staging.TagEntry, error) {
 	tagEntry, err := doRequestWithResultEnsuringDaemon(ctx, s, &protocol.Request{
-		Method:    protocol.MethodGetTag,
-		AccountID: s.accountID,
-		Region:    s.region,
-		Service:   service,
-		Name:      name,
+		Method:  protocol.MethodGetTag,
+		Scope:   s.scope,
+		Service: service,
+		Name:    name,
 	}, func(r *protocol.TagResponse) *staging.TagEntry { return r.TagEntry })
 	if err != nil {
 		return nil, err
@@ -96,53 +92,48 @@ func (s *Store) GetTag(ctx context.Context, service staging.Service, name string
 // ListEntries returns all staged entries for a service.
 func (s *Store) ListEntries(ctx context.Context, service staging.Service) (map[staging.Service]map[string]staging.Entry, error) {
 	return doRequestWithResultEnsuringDaemon(ctx, s, &protocol.Request{
-		Method:    protocol.MethodListEntries,
-		AccountID: s.accountID,
-		Region:    s.region,
-		Service:   service,
+		Method:  protocol.MethodListEntries,
+		Scope:   s.scope,
+		Service: service,
 	}, func(r *protocol.ListEntriesResponse) map[staging.Service]map[string]staging.Entry { return r.Entries })
 }
 
 // ListTags returns all staged tag changes for a service.
 func (s *Store) ListTags(ctx context.Context, service staging.Service) (map[staging.Service]map[string]staging.TagEntry, error) {
 	return doRequestWithResultEnsuringDaemon(ctx, s, &protocol.Request{
-		Method:    protocol.MethodListTags,
-		AccountID: s.accountID,
-		Region:    s.region,
-		Service:   service,
+		Method:  protocol.MethodListTags,
+		Scope:   s.scope,
+		Service: service,
 	}, func(r *protocol.ListTagsResponse) map[staging.Service]map[string]staging.TagEntry { return r.Tags })
 }
 
 // Load loads the current staging state.
 func (s *Store) Load(ctx context.Context) (*staging.State, error) {
 	return doRequestWithResultEnsuringDaemon(ctx, s, &protocol.Request{
-		Method:    protocol.MethodLoad,
-		AccountID: s.accountID,
-		Region:    s.region,
+		Method: protocol.MethodLoad,
+		Scope:  s.scope,
 	}, func(r *protocol.StateResponse) *staging.State { return r.State })
 }
 
 // StageEntry adds or updates a staged entry.
 func (s *Store) StageEntry(ctx context.Context, service staging.Service, name string, entry staging.Entry) error {
 	return s.doSimpleRequestEnsuringDaemon(ctx, &protocol.Request{
-		Method:    protocol.MethodStageEntry,
-		AccountID: s.accountID,
-		Region:    s.region,
-		Service:   service,
-		Name:      name,
-		Entry:     &entry,
+		Method:  protocol.MethodStageEntry,
+		Scope:   s.scope,
+		Service: service,
+		Name:    name,
+		Entry:   &entry,
 	})
 }
 
 // StageTag adds or updates staged tag changes.
 func (s *Store) StageTag(ctx context.Context, service staging.Service, name string, tagEntry staging.TagEntry) error {
 	return s.doSimpleRequestEnsuringDaemon(ctx, &protocol.Request{
-		Method:    protocol.MethodStageTag,
-		AccountID: s.accountID,
-		Region:    s.region,
-		Service:   service,
-		Name:      name,
-		TagEntry:  &tagEntry,
+		Method:   protocol.MethodStageTag,
+		Scope:    s.scope,
+		Service:  service,
+		Name:     name,
+		TagEntry: &tagEntry,
 	})
 }
 
@@ -154,12 +145,11 @@ func (s *Store) UnstageEntry(ctx context.Context, service staging.Service, name 
 // UnstageEntryWithHint removes a staged entry with an operation hint for shutdown messages.
 func (s *Store) UnstageEntryWithHint(ctx context.Context, service staging.Service, name string, hint string) error {
 	return s.doSimpleRequestEnsuringDaemon(ctx, &protocol.Request{
-		Method:    protocol.MethodUnstageEntry,
-		AccountID: s.accountID,
-		Region:    s.region,
-		Service:   service,
-		Name:      name,
-		Hint:      hint,
+		Method:  protocol.MethodUnstageEntry,
+		Scope:   s.scope,
+		Service: service,
+		Name:    name,
+		Hint:    hint,
 	})
 }
 
@@ -171,12 +161,11 @@ func (s *Store) UnstageTag(ctx context.Context, service staging.Service, name st
 // UnstageTagWithHint removes staged tag changes with an operation hint for shutdown messages.
 func (s *Store) UnstageTagWithHint(ctx context.Context, service staging.Service, name string, hint string) error {
 	return s.doSimpleRequestEnsuringDaemon(ctx, &protocol.Request{
-		Method:    protocol.MethodUnstageTag,
-		AccountID: s.accountID,
-		Region:    s.region,
-		Service:   service,
-		Name:      name,
-		Hint:      hint,
+		Method:  protocol.MethodUnstageTag,
+		Scope:   s.scope,
+		Service: service,
+		Name:    name,
+		Hint:    hint,
 	})
 }
 
@@ -188,11 +177,10 @@ func (s *Store) UnstageAll(ctx context.Context, service staging.Service) error {
 // UnstageAllWithHint removes all staged changes for a service with an operation hint for shutdown messages.
 func (s *Store) UnstageAllWithHint(ctx context.Context, service staging.Service, hint string) error {
 	return s.doSimpleRequestEnsuringDaemon(ctx, &protocol.Request{
-		Method:    protocol.MethodUnstageAll,
-		AccountID: s.accountID,
-		Region:    s.region,
-		Service:   service,
-		Hint:      hint,
+		Method:  protocol.MethodUnstageAll,
+		Scope:   s.scope,
+		Service: service,
+		Hint:    hint,
 	})
 }
 
@@ -200,9 +188,8 @@ func (s *Store) UnstageAllWithHint(ctx context.Context, service staging.Service,
 // If service is empty, returns all services; otherwise filters to the specified service.
 func (s *Store) Drain(ctx context.Context, service staging.Service, keep bool) (*staging.State, error) {
 	state, err := doRequestWithResult(ctx, s, &protocol.Request{
-		Method:    protocol.MethodGetState,
-		AccountID: s.accountID,
-		Region:    s.region,
+		Method: protocol.MethodGetState,
+		Scope:  s.scope,
 	}, func(r *protocol.StateResponse) *staging.State { return r.State })
 	if err != nil {
 		return nil, err
@@ -214,10 +201,9 @@ func (s *Store) Drain(ctx context.Context, service staging.Service, keep bool) (
 
 	if !keep {
 		if err := s.doSimpleRequestEnsuringDaemon(ctx, &protocol.Request{
-			Method:    protocol.MethodUnstageAll,
-			AccountID: s.accountID,
-			Region:    s.region,
-			Service:   "",
+			Method:  protocol.MethodUnstageAll,
+			Scope:   s.scope,
+			Service: "",
 		}); err != nil {
 			return nil, err
 		}
@@ -240,10 +226,9 @@ func (s *Store) WriteState(ctx context.Context, service staging.Service, state *
 	}
 
 	return s.doSimpleRequestEnsuringDaemon(ctx, &protocol.Request{
-		Method:    protocol.MethodSetState,
-		AccountID: s.accountID,
-		Region:    s.region,
-		State:     state,
+		Method: protocol.MethodSetState,
+		Scope:  s.scope,
+		State:  state,
 	})
 }
 

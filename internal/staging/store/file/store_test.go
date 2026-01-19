@@ -17,7 +17,7 @@ import (
 func TestNewStore(t *testing.T) {
 	t.Parallel()
 
-	store, err := file.NewStore("123456789012", "ap-northeast-1")
+	store, err := file.NewStore(staging.AWSScope("123456789012", "ap-northeast-1"))
 	require.NoError(t, err)
 	assert.NotNil(t, store)
 }
@@ -77,7 +77,7 @@ func TestStore_Exists(t *testing.T) {
 func TestNewStoreWithPassphrase(t *testing.T) {
 	t.Parallel()
 
-	store, err := file.NewStoreWithPassphrase("123456789012", "ap-northeast-1", "secret")
+	store, err := file.NewStoreWithPassphrase(staging.AWSScope("123456789012", "ap-northeast-1"), "secret")
 	require.NoError(t, err)
 	assert.NotNil(t, store)
 }

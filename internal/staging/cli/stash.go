@@ -8,6 +8,7 @@ import (
 
 	"github.com/mpyw/suve/internal/cli/passphrase"
 	"github.com/mpyw/suve/internal/cli/terminal"
+	"github.com/mpyw/suve/internal/staging"
 	"github.com/mpyw/suve/internal/staging/store/file"
 )
 
@@ -87,8 +88,8 @@ EXAMPLES:
 // fileStoreForReading creates a file store for reading operations.
 // It handles passphrase prompting if the file is encrypted.
 // If checkExists is true, returns an error if the file doesn't exist.
-func fileStoreForReading(cmd *cli.Command, accountID, region string, checkExists bool) (*file.Store, error) {
-	basicFileStore, err := file.NewStore(accountID, region)
+func fileStoreForReading(cmd *cli.Command, scope staging.Scope, checkExists bool) (*file.Store, error) {
+	basicFileStore, err := file.NewStore(scope)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create file store: %w", err)
 	}
@@ -134,5 +135,5 @@ func fileStoreForReading(cmd *cli.Command, accountID, region string, checkExists
 		}
 	}
 
-	return file.NewStoreWithPassphrase(accountID, region, pass)
+	return file.NewStoreWithPassphrase(scope, pass)
 }

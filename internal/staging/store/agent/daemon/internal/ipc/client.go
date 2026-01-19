@@ -23,15 +23,17 @@ const (
 var ErrNotConnected = errors.New("daemon not connected")
 
 // Client provides low-level IPC communication with the daemon.
+// A single client communicates with the scope-independent daemon.
 type Client struct {
 	socketPath string
 	mu         sync.Mutex
 }
 
-// NewClient creates a new IPC client for a specific AWS account and region.
-func NewClient(accountID, region string) *Client {
+// NewClient creates a new IPC client.
+// The client connects to the scope-independent daemon; scope is passed with each request.
+func NewClient() *Client {
 	return &Client{
-		socketPath: protocol.SocketPathForAccount(accountID, region),
+		socketPath: protocol.SocketPath(),
 	}
 }
 

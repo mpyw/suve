@@ -60,7 +60,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		return fmt.Errorf("failed to get AWS identity: %w", err)
 	}
 
-	store := agent.NewStore(identity.AccountID, identity.Region)
+	store := agent.NewStore(staging.AWSScope(identity.AccountID, identity.Region))
 
 	opts := Options{
 		Verbose: cmd.Bool("verbose"),

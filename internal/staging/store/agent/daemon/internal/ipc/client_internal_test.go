@@ -17,17 +17,17 @@ import (
 func TestNewClient(t *testing.T) {
 	t.Parallel()
 
-	c := NewClient(testAccountID, testRegion)
+	c := NewClient()
 	require.NotNil(t, c)
 	assert.NotEmpty(t, c.socketPath)
-	assert.Contains(t, c.socketPath, testAccountID)
-	assert.Contains(t, c.socketPath, testRegion)
+	assert.Contains(t, c.socketPath, "agent.sock")
 }
 
 func TestClient_SendRequest_NotConnected(t *testing.T) {
 	t.Parallel()
 
-	c := NewClient("nonexistent", "nonexistent")
+	// Use a non-existent socket path
+	c := &Client{socketPath: "/nonexistent/path/to/socket.sock"}
 	resp, err := c.SendRequest(t.Context(), &protocol.Request{Method: protocol.MethodPing})
 
 	require.Error(t, err)
@@ -38,7 +38,8 @@ func TestClient_SendRequest_NotConnected(t *testing.T) {
 func TestClient_Ping_NotConnected(t *testing.T) {
 	t.Parallel()
 
-	c := NewClient("nonexistent", "nonexistent")
+	// Use a non-existent socket path
+	c := &Client{socketPath: "/nonexistent/path/to/socket.sock"}
 	err := c.Ping(t.Context())
 
 	require.Error(t, err)
