@@ -6,11 +6,9 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/mpyw/suve/internal/api/paramapi"
 	appcli "github.com/mpyw/suve/internal/cli/commands"
 	"github.com/mpyw/suve/internal/cli/commands/param/untag"
 	"github.com/mpyw/suve/internal/usecase/param"
@@ -38,28 +36,30 @@ func TestCommand_Validation(t *testing.T) {
 	})
 }
 
-//nolint:lll // mock struct fields match AWS SDK interface signatures
+// mockClient implements provider.ParameterTagger for testing.
 type mockClient struct {
-	addTagsFunc    func(ctx context.Context, params *paramapi.AddTagsToResourceInput, optFns ...func(*paramapi.Options)) (*paramapi.AddTagsToResourceOutput, error)
-	removeTagsFunc func(ctx context.Context, params *paramapi.RemoveTagsFromResourceInput, optFns ...func(*paramapi.Options)) (*paramapi.RemoveTagsFromResourceOutput, error)
+	addTagsFunc    func(ctx context.Context, name string, tags map[string]string) error
+	removeTagsFunc func(ctx context.Context, name string, keys []string) error
 }
 
-//nolint:lll // mock function signature must match AWS SDK interface
-func (m *mockClient) AddTagsToResource(ctx context.Context, params *paramapi.AddTagsToResourceInput, optFns ...func(*paramapi.Options)) (*paramapi.AddTagsToResourceOutput, error) {
+func (m *mockClient) GetTags(_ context.Context, _ string) (map[string]string, error) {
+	return nil, nil //nolint:nilnil // mock implementation
+}
+
+func (m *mockClient) AddTags(ctx context.Context, name string, tags map[string]string) error {
 	if m.addTagsFunc != nil {
-		return m.addTagsFunc(ctx, params, optFns...)
+		return m.addTagsFunc(ctx, name, tags)
 	}
 
-	return &paramapi.AddTagsToResourceOutput{}, nil
+	return nil
 }
 
-//nolint:lll // mock function signature must match AWS SDK interface
-func (m *mockClient) RemoveTagsFromResource(ctx context.Context, params *paramapi.RemoveTagsFromResourceInput, optFns ...func(*paramapi.Options)) (*paramapi.RemoveTagsFromResourceOutput, error) {
+func (m *mockClient) RemoveTags(ctx context.Context, name string, keys []string) error {
 	if m.removeTagsFunc != nil {
-		return m.removeTagsFunc(ctx, params, optFns...)
+		return m.removeTagsFunc(ctx, name, keys)
 	}
 
-	return &paramapi.RemoveTagsFromResourceOutput{}, nil
+	return nil
 }
 
 func TestRun(t *testing.T) {
@@ -79,13 +79,11 @@ func TestRun(t *testing.T) {
 				Keys: []string{"env"},
 			},
 			mock: &mockClient{
-				//nolint:lll // inline mock function in test table
-				removeTagsFunc: func(_ context.Context, params *paramapi.RemoveTagsFromResourceInput, _ ...func(*paramapi.Options)) (*paramapi.RemoveTagsFromResourceOutput, error) {
-					assert.Equal(t, "/app/param", lo.FromPtr(params.ResourceId))
-					assert.Equal(t, paramapi.ResourceTypeForTaggingParameter, params.ResourceType)
-					assert.Equal(t, []string{"env"}, params.TagKeys)
+				removeTagsFunc: func(_ context.Context, name string, keys []string) error {
+					assert.Equal(t, "/app/param", name)
+					assert.Equal(t, []string{"env"}, keys)
 
-					return &paramapi.RemoveTagsFromResourceOutput{}, nil
+					return nil
 				},
 			},
 			check: func(t *testing.T, output string) {
@@ -101,11 +99,10 @@ func TestRun(t *testing.T) {
 				Keys: []string{"env", "team"},
 			},
 			mock: &mockClient{
-				//nolint:lll // inline mock function in test table
-				removeTagsFunc: func(_ context.Context, params *paramapi.RemoveTagsFromResourceInput, _ ...func(*paramapi.Options)) (*paramapi.RemoveTagsFromResourceOutput, error) {
-					assert.Len(t, params.TagKeys, 2)
+				removeTagsFunc: func(_ context.Context, _ string, keys []string) error {
+					assert.Len(t, keys, 2)
 
-					return &paramapi.RemoveTagsFromResourceOutput{}, nil
+					return nil
 				},
 			},
 			check: func(t *testing.T, output string) {
@@ -120,9 +117,8 @@ func TestRun(t *testing.T) {
 				Keys: []string{"env"},
 			},
 			mock: &mockClient{
-				//nolint:lll // inline mock function in test table
-				removeTagsFunc: func(_ context.Context, _ *paramapi.RemoveTagsFromResourceInput, _ ...func(*paramapi.Options)) (*paramapi.RemoveTagsFromResourceOutput, error) {
-					return nil, fmt.Errorf("AWS error")
+				removeTagsFunc: func(_ context.Context, _ string, _ []string) error {
+					return fmt.Errorf("AWS error")
 				},
 			},
 			wantErr: "failed to remove tags",
