@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - multicloud
     paths:
       - ".github/labels.yml"
       - ".github/workflows/labels.yml"
