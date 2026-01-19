@@ -4,15 +4,13 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/samber/lo"
-
-	"github.com/mpyw/suve/internal/api/paramapi"
+	"github.com/mpyw/suve/internal/provider"
 )
 
 // TagClient is the interface for the tag use case.
+// It uses the provider-agnostic ParameterTagger interface.
 type TagClient interface {
-	paramapi.AddTagsToResourceAPI
-	paramapi.RemoveTagsFromResourceAPI
+	provider.ParameterTagger
 }
 
 // TagInput holds input for the tag use case.
@@ -31,31 +29,14 @@ type TagUseCase struct {
 func (u *TagUseCase) Execute(ctx context.Context, input TagInput) error {
 	// Add tags
 	if len(input.Add) > 0 {
-		tags := lo.MapToSlice(input.Add, func(k, v string) paramapi.Tag {
-			return paramapi.Tag{
-				Key:   lo.ToPtr(k),
-				Value: lo.ToPtr(v),
-			}
-		})
-
-		_, err := u.Client.AddTagsToResource(ctx, &paramapi.AddTagsToResourceInput{
-			ResourceId:   lo.ToPtr(input.Name),
-			ResourceType: paramapi.ResourceTypeForTaggingParameter,
-			Tags:         tags,
-		})
-		if err != nil {
+		if err := u.Client.AddTags(ctx, input.Name, input.Add); err != nil {
 			return fmt.Errorf("failed to add tags: %w", err)
 		}
 	}
 
 	// Remove tags
 	if len(input.Remove) > 0 {
-		_, err := u.Client.RemoveTagsFromResource(ctx, &paramapi.RemoveTagsFromResourceInput{
-			ResourceId:   lo.ToPtr(input.Name),
-			ResourceType: paramapi.ResourceTypeForTaggingParameter,
-			TagKeys:      input.Remove,
-		})
-		if err != nil {
+		if err := u.Client.RemoveTags(ctx, input.Name, input.Remove); err != nil {
 			return fmt.Errorf("failed to remove tags: %w", err)
 		}
 	}

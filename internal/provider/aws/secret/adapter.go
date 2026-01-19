@@ -5,6 +5,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
 	"github.com/samber/lo"
 
 	"github.com/mpyw/suve/internal/api/secretapi"
@@ -31,7 +33,17 @@ type Adapter struct {
 	client Client
 }
 
-// New creates a new AWS Secrets Manager adapter.
+// NewAdapter creates a new AWS Secrets Manager adapter using the default AWS configuration.
+func NewAdapter(ctx context.Context) (*Adapter, error) {
+	cfg, err := config.LoadDefaultConfig(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load AWS config: %w", err)
+	}
+
+	return &Adapter{client: secretsmanager.NewFromConfig(cfg)}, nil
+}
+
+// New creates a new AWS Secrets Manager adapter from an existing client.
 func New(client Client) *Adapter {
 	return &Adapter{client: client}
 }

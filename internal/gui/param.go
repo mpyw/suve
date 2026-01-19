@@ -6,6 +6,7 @@ import (
 	"errors"
 
 	"github.com/mpyw/suve/internal/api/paramapi"
+	awsparam "github.com/mpyw/suve/internal/provider/aws/param"
 	"github.com/mpyw/suve/internal/usecase/param"
 	"github.com/mpyw/suve/internal/version/paramversion"
 )
@@ -293,12 +294,12 @@ func (a *App) ParamDelete(name string) (*ParamDeleteResult, error) {
 
 // ParamAddTag adds or updates a tag on a parameter.
 func (a *App) ParamAddTag(name, key, value string) error {
-	client, err := a.getParamClient()
+	adapter, err := awsparam.NewAdapter(a.ctx)
 	if err != nil {
 		return err
 	}
 
-	uc := &param.TagUseCase{Client: client}
+	uc := &param.TagUseCase{Client: adapter}
 
 	return uc.Execute(a.ctx, param.TagInput{
 		Name: name,
@@ -308,12 +309,12 @@ func (a *App) ParamAddTag(name, key, value string) error {
 
 // ParamRemoveTag removes a tag from a parameter.
 func (a *App) ParamRemoveTag(name, key string) error {
-	client, err := a.getParamClient()
+	adapter, err := awsparam.NewAdapter(a.ctx)
 	if err != nil {
 		return err
 	}
 
-	uc := &param.TagUseCase{Client: client}
+	uc := &param.TagUseCase{Client: adapter}
 
 	return uc.Execute(a.ctx, param.TagInput{
 		Name:   name,

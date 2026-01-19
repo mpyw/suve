@@ -7,7 +7,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/mpyw/suve/internal/api/paramapi"
 	"github.com/mpyw/suve/internal/usecase/param"
 )
 
@@ -16,22 +15,16 @@ type mockTagClient struct {
 	removeTagsErr error
 }
 
-//nolint:lll // mock function signature must match AWS SDK interface
-func (m *mockTagClient) AddTagsToResource(_ context.Context, _ *paramapi.AddTagsToResourceInput, _ ...func(*paramapi.Options)) (*paramapi.AddTagsToResourceOutput, error) {
-	if m.addTagsErr != nil {
-		return nil, m.addTagsErr
-	}
-
-	return &paramapi.AddTagsToResourceOutput{}, nil
+func (m *mockTagClient) GetTags(_ context.Context, _ string) (map[string]string, error) {
+	return nil, nil //nolint:nilnil // mock implementation
 }
 
-//nolint:lll // mock function signature must match AWS SDK interface
-func (m *mockTagClient) RemoveTagsFromResource(_ context.Context, _ *paramapi.RemoveTagsFromResourceInput, _ ...func(*paramapi.Options)) (*paramapi.RemoveTagsFromResourceOutput, error) {
-	if m.removeTagsErr != nil {
-		return nil, m.removeTagsErr
-	}
+func (m *mockTagClient) AddTags(_ context.Context, _ string, _ map[string]string) error {
+	return m.addTagsErr
+}
 
-	return &paramapi.RemoveTagsFromResourceOutput{}, nil
+func (m *mockTagClient) RemoveTags(_ context.Context, _ string, _ []string) error {
+	return m.removeTagsErr
 }
 
 func TestTagUseCase_Execute_AddTags(t *testing.T) {

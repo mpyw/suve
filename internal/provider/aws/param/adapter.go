@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/samber/lo"
 
 	"github.com/mpyw/suve/internal/api/paramapi"
@@ -30,7 +32,17 @@ type Adapter struct {
 	client Client
 }
 
-// New creates a new AWS SSM adapter.
+// NewAdapter creates a new AWS SSM adapter using the default AWS configuration.
+func NewAdapter(ctx context.Context) (*Adapter, error) {
+	cfg, err := config.LoadDefaultConfig(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load AWS config: %w", err)
+	}
+
+	return &Adapter{client: ssm.NewFromConfig(cfg)}, nil
+}
+
+// New creates a new AWS SSM adapter from an existing client.
 func New(client Client) *Adapter {
 	return &Adapter{client: client}
 }

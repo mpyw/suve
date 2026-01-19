@@ -3,6 +3,7 @@
 package gui
 
 import (
+	awssecret "github.com/mpyw/suve/internal/provider/aws/secret"
 	"github.com/mpyw/suve/internal/usecase/secret"
 	"github.com/mpyw/suve/internal/version/secretversion"
 )
@@ -283,12 +284,12 @@ func (a *App) SecretDelete(name string, force bool) (*SecretDeleteResult, error)
 
 // SecretAddTag adds or updates a tag on a secret.
 func (a *App) SecretAddTag(name, key, value string) error {
-	client, err := a.getSecretClient()
+	adapter, err := awssecret.NewAdapter(a.ctx)
 	if err != nil {
 		return err
 	}
 
-	uc := &secret.TagUseCase{Client: client}
+	uc := &secret.TagUseCase{Client: adapter}
 
 	return uc.Execute(a.ctx, secret.TagInput{
 		Name: name,
@@ -298,12 +299,12 @@ func (a *App) SecretAddTag(name, key, value string) error {
 
 // SecretRemoveTag removes a tag from a secret.
 func (a *App) SecretRemoveTag(name, key string) error {
-	client, err := a.getSecretClient()
+	adapter, err := awssecret.NewAdapter(a.ctx)
 	if err != nil {
 		return err
 	}
 
-	uc := &secret.TagUseCase{Client: client}
+	uc := &secret.TagUseCase{Client: adapter}
 
 	return uc.Execute(a.ctx, secret.TagInput{
 		Name:   name,
