@@ -17,11 +17,11 @@ func TestTypedParameter_ToBase(t *testing.T) {
 		Name:         "test-param",
 		Value:        "test-value",
 		Version:      "1",
-		Type:         "String",
 		Description:  "test description",
 		LastModified: &now,
 		Tags:         map[string]string{"key": "value"},
 		Metadata: model.AWSParameterMeta{
+			Type: "String",
 			ARN:  "arn:aws:ssm:us-east-1:123456789012:parameter/test-param",
 			Tier: "Standard",
 		},
@@ -32,11 +32,15 @@ func TestTypedParameter_ToBase(t *testing.T) {
 	assert.Equal(t, typed.Name, base.Name)
 	assert.Equal(t, typed.Value, base.Value)
 	assert.Equal(t, typed.Version, base.Version)
-	assert.Equal(t, typed.Type, base.Type)
 	assert.Equal(t, typed.Description, base.Description)
 	assert.Equal(t, typed.LastModified, base.LastModified)
 	assert.Equal(t, typed.Tags, base.Tags)
 	assert.IsType(t, model.AWSParameterMeta{}, base.Metadata)
+
+	// Verify Type is in Metadata
+	meta := base.AWSMeta()
+	assert.NotNil(t, meta)
+	assert.Equal(t, "String", meta.Type)
 }
 
 func TestTypedMetadata(t *testing.T) {

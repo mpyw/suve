@@ -13,7 +13,6 @@ type TypedParameter[M any] struct {
 	Name         string
 	Value        string
 	Version      string
-	Type         string // Parameter type (e.g., String, SecureString)
 	Description  string
 	LastModified *time.Time
 	Tags         map[string]string
@@ -26,7 +25,6 @@ func (p *TypedParameter[M]) ToBase() *Parameter {
 		Name:         p.Name,
 		Value:        p.Value,
 		Version:      p.Version,
-		Type:         p.Type,
 		Description:  p.Description,
 		LastModified: p.LastModified,
 		Tags:         p.Tags,
@@ -43,11 +41,23 @@ type Parameter struct {
 	Name         string
 	Value        string
 	Version      string
-	Type         string // Parameter type (e.g., String, SecureString)
 	Description  string
 	LastModified *time.Time
 	Tags         map[string]string
-	Metadata     any // Provider-specific metadata (e.g., *AWSParameterMeta)
+	Metadata     any // Provider-specific metadata (e.g., AWSParameterMeta)
+}
+
+// AWSMeta returns the AWS-specific metadata if available.
+func (p *Parameter) AWSMeta() *AWSParameterMeta {
+	if meta, ok := p.Metadata.(AWSParameterMeta); ok {
+		return &meta
+	}
+
+	if meta, ok := p.Metadata.(*AWSParameterMeta); ok {
+		return meta
+	}
+
+	return nil
 }
 
 // TypedMetadata casts Metadata to a specific type.
@@ -63,6 +73,8 @@ func TypedMetadata[M any](p *Parameter) (M, bool) {
 
 // AWSParameterMeta contains AWS SSM Parameter Store-specific metadata.
 type AWSParameterMeta struct {
+	// Type is the parameter type (e.g., String, SecureString, StringList).
+	Type string
 	// ARN is the Amazon Resource Name of the parameter.
 	ARN string
 	// Tier is the parameter tier (Standard, Advanced, Intelligent-Tiering).
@@ -136,8 +148,27 @@ type AWSParameterHistory = TypedParameterHistory[AWSParameterMeta]
 // ParameterListItem represents a parameter in a list (without value).
 type ParameterListItem struct {
 	Name         string
-	Type         string
 	Description  string
 	LastModified *time.Time
 	Tags         map[string]string
+	Metadata     any // Provider-specific metadata (e.g., AWSParameterListItemMeta)
+}
+
+// AWSMeta returns the AWS-specific metadata if available.
+func (p *ParameterListItem) AWSMeta() *AWSParameterListItemMeta {
+	if meta, ok := p.Metadata.(AWSParameterListItemMeta); ok {
+		return &meta
+	}
+
+	if meta, ok := p.Metadata.(*AWSParameterListItemMeta); ok {
+		return meta
+	}
+
+	return nil
+}
+
+// AWSParameterListItemMeta contains AWS SSM-specific metadata for list items.
+type AWSParameterListItemMeta struct {
+	// Type is the parameter type (e.g., String, SecureString, StringList).
+	Type string
 }

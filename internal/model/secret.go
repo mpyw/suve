@@ -10,7 +10,6 @@ import "time"
 // This type is used at the Provider layer for type-safe access to metadata.
 type TypedSecret[M any] struct {
 	Name        string
-	ARN         string // Resource identifier (ARN for AWS, resource ID for others)
 	Value       string
 	VersionID   string
 	Description string
@@ -23,7 +22,6 @@ type TypedSecret[M any] struct {
 func (s *TypedSecret[M]) ToBase() *Secret {
 	return &Secret{
 		Name:        s.Name,
-		ARN:         s.ARN,
 		Value:       s.Value,
 		VersionID:   s.VersionID,
 		Description: s.Description,
@@ -40,13 +38,25 @@ func (s *TypedSecret[M]) ToBase() *Secret {
 // Secret is a provider-agnostic secret for the UseCase layer.
 type Secret struct {
 	Name        string
-	ARN         string // Resource identifier
 	Value       string
 	VersionID   string
 	Description string
 	CreatedDate *time.Time
 	Tags        map[string]string
-	Metadata    any // Provider-specific metadata (e.g., *AWSSecretMeta)
+	Metadata    any // Provider-specific metadata (e.g., AWSSecretMeta)
+}
+
+// AWSMeta returns the AWS-specific metadata if available.
+func (s *Secret) AWSMeta() *AWSSecretMeta {
+	if meta, ok := s.Metadata.(AWSSecretMeta); ok {
+		return &meta
+	}
+
+	if meta, ok := s.Metadata.(*AWSSecretMeta); ok {
+		return meta
+	}
+
+	return nil
 }
 
 // TypedSecretMetadata casts Metadata to a specific type.
@@ -62,6 +72,8 @@ func TypedSecretMetadata[M any](s *Secret) (M, bool) {
 
 // AWSSecretMeta contains AWS Secrets Manager-specific metadata.
 type AWSSecretMeta struct {
+	// ARN is the Amazon Resource Name of the secret.
+	ARN string
 	// VersionStages are the staging labels for this version.
 	VersionStages []string
 	// KmsKeyID is the ARN of the KMS key used for encryption.
@@ -160,11 +172,30 @@ type AWSSecretVersion = TypedSecretVersion[AWSSecretVersionMeta]
 // SecretListItem represents a secret in a list (without value).
 type SecretListItem struct {
 	Name         string
-	ARN          string
 	Description  string
 	CreatedDate  *time.Time
 	LastModified *time.Time
 	Tags         map[string]string
+	Metadata     any // Provider-specific metadata (e.g., AWSSecretListItemMeta)
+}
+
+// AWSMeta returns the AWS-specific metadata if available.
+func (s *SecretListItem) AWSMeta() *AWSSecretListItemMeta {
+	if meta, ok := s.Metadata.(AWSSecretListItemMeta); ok {
+		return &meta
+	}
+
+	if meta, ok := s.Metadata.(*AWSSecretListItemMeta); ok {
+		return meta
+	}
+
+	return nil
+}
+
+// AWSSecretListItemMeta contains AWS Secrets Manager-specific metadata for list items.
+type AWSSecretListItemMeta struct {
+	// ARN is the Amazon Resource Name of the secret.
+	ARN string
 	// DeletedDate is set if the secret is scheduled for deletion.
 	DeletedDate *time.Time
 }

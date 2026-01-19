@@ -144,9 +144,6 @@ func (a *Adapter) PutParameter(
 	ctx context.Context, param *model.Parameter, overwrite bool,
 ) error {
 	paramType := paramapi.ParameterTypeString
-	if param.Type != "" {
-		paramType = paramapi.ParameterType(param.Type)
-	}
 
 	input := &paramapi.PutParameterInput{
 		Name:      lo.ToPtr(param.Name),
@@ -165,7 +162,11 @@ func (a *Adapter) PutParameter(
 	}
 
 	// Apply AWS-specific metadata if present
-	if meta, ok := model.TypedMetadata[model.AWSParameterMeta](param); ok {
+	if meta := param.AWSMeta(); meta != nil {
+		if meta.Type != "" {
+			input.Type = paramapi.ParameterType(meta.Type)
+		}
+
 		if meta.Tier != "" {
 			input.Tier = paramapi.ParameterTier(meta.Tier)
 		}
@@ -289,9 +290,9 @@ func convertParameter(p *paramapi.Parameter) *model.Parameter {
 		Name:         lo.FromPtr(p.Name),
 		Value:        lo.FromPtr(p.Value),
 		Version:      version,
-		Type:         string(p.Type),
 		LastModified: p.LastModifiedDate,
 		Metadata: model.AWSParameterMeta{
+			Type:     string(p.Type),
 			ARN:      lo.FromPtr(p.ARN),
 			DataType: lo.FromPtr(p.DataType),
 		},
@@ -310,10 +311,10 @@ func convertParameterHistory(name string, history []paramapi.ParameterHistory) *
 			Name:         name,
 			Value:        lo.FromPtr(h.Value),
 			Version:      version,
-			Type:         string(h.Type),
 			Description:  lo.FromPtr(h.Description),
 			LastModified: h.LastModifiedDate,
 			Metadata: model.AWSParameterMeta{
+				Type:           string(h.Type),
 				Tier:           string(h.Tier),
 				AllowedPattern: lo.FromPtr(h.AllowedPattern),
 				Policies:       policiesToString(h.Policies),
@@ -334,9 +335,11 @@ func convertParameterMetadata(m *paramapi.ParameterMetadata) *model.ParameterLis
 
 	return &model.ParameterListItem{
 		Name:         lo.FromPtr(m.Name),
-		Type:         string(m.Type),
 		Description:  lo.FromPtr(m.Description),
 		LastModified: m.LastModifiedDate,
+		Metadata: model.AWSParameterListItemMeta{
+			Type: string(m.Type),
+		},
 	}
 }
 

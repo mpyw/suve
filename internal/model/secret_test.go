@@ -15,13 +15,13 @@ func TestTypedSecret_ToBase(t *testing.T) {
 	now := time.Now()
 	typed := &model.TypedSecret[model.AWSSecretMeta]{
 		Name:        "test-secret",
-		ARN:         "arn:aws:secretsmanager:us-east-1:123456789012:secret:test-secret",
 		Value:       "test-value",
 		VersionID:   "v1",
 		Description: "test description",
 		CreatedDate: &now,
 		Tags:        map[string]string{"key": "value"},
 		Metadata: model.AWSSecretMeta{
+			ARN:             "arn:aws:secretsmanager:us-east-1:123456789012:secret:test-secret",
 			VersionStages:   []string{"AWSCURRENT"},
 			KmsKeyID:        "arn:aws:kms:us-east-1:123456789012:key/test",
 			RotationEnabled: true,
@@ -31,13 +31,17 @@ func TestTypedSecret_ToBase(t *testing.T) {
 	base := typed.ToBase()
 
 	assert.Equal(t, typed.Name, base.Name)
-	assert.Equal(t, typed.ARN, base.ARN)
 	assert.Equal(t, typed.Value, base.Value)
 	assert.Equal(t, typed.VersionID, base.VersionID)
 	assert.Equal(t, typed.Description, base.Description)
 	assert.Equal(t, typed.CreatedDate, base.CreatedDate)
 	assert.Equal(t, typed.Tags, base.Tags)
 	assert.IsType(t, model.AWSSecretMeta{}, base.Metadata)
+
+	// Verify ARN is in Metadata
+	meta := base.AWSMeta()
+	assert.NotNil(t, meta)
+	assert.Equal(t, "arn:aws:secretsmanager:us-east-1:123456789012:secret:test-secret", meta.ARN)
 }
 
 func TestTypedSecretMetadata(t *testing.T) {

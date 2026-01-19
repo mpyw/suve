@@ -299,11 +299,11 @@ func convertGetSecretValueOutput(o *secretapi.GetSecretValueOutput) *model.Secre
 
 	return &model.Secret{
 		Name:        lo.FromPtr(o.Name),
-		ARN:         lo.FromPtr(o.ARN),
 		Value:       lo.FromPtr(o.SecretString),
 		VersionID:   lo.FromPtr(o.VersionId),
 		CreatedDate: o.CreatedDate,
 		Metadata: model.AWSSecretMeta{
+			ARN:           lo.FromPtr(o.ARN),
 			VersionStages: o.VersionStages,
 		},
 	}
@@ -330,12 +330,14 @@ func convertSecretListEntry(e *secretapi.SecretListEntry) *model.SecretListItem 
 
 	return &model.SecretListItem{
 		Name:         lo.FromPtr(e.Name),
-		ARN:          lo.FromPtr(e.ARN),
 		Description:  lo.FromPtr(e.Description),
 		CreatedDate:  e.CreatedDate,
 		LastModified: e.LastChangedDate,
 		Tags:         convertFromAWSTags(e.Tags),
-		DeletedDate:  e.DeletedDate,
+		Metadata: model.AWSSecretListItemMeta{
+			ARN:         lo.FromPtr(e.ARN),
+			DeletedDate: e.DeletedDate,
+		},
 	}
 }
 
@@ -346,12 +348,14 @@ func convertDescribeSecretOutput(o *secretapi.DescribeSecretOutput) *model.Secre
 
 	return &model.SecretListItem{
 		Name:         lo.FromPtr(o.Name),
-		ARN:          lo.FromPtr(o.ARN),
 		Description:  lo.FromPtr(o.Description),
 		CreatedDate:  o.CreatedDate,
 		LastModified: o.LastChangedDate,
 		Tags:         convertFromAWSTags(o.Tags),
-		DeletedDate:  o.DeletedDate,
+		Metadata: model.AWSSecretListItemMeta{
+			ARN:         lo.FromPtr(o.ARN),
+			DeletedDate: o.DeletedDate,
+		},
 	}
 }
 
