@@ -390,6 +390,7 @@ jobs:
     runs-on: windows-latest
     if: >-
       github.ref == 'refs/heads/main' ||
+      github.ref == 'refs/heads/multicloud' ||
       contains(github.event.head_commit.message, '[CI: windows]')
     defaults:
       run:

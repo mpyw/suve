@@ -1231,12 +1231,16 @@ func TestDaemonLauncher_ViaStore(t *testing.T) {
 	})
 }
 
-// setupIsolatedSocketPath sets TMPDIR to a temp directory, causing the daemon
-// to look for a socket in a different location where no daemon is running.
+// setupIsolatedSocketPath sets socket-related environment variables to a temp directory,
+// causing the daemon to look for a socket in a different location where no daemon is running.
 // This simulates the "daemon not running" scenario for E2E tests.
+// Darwin uses TMPDIR, Linux uses XDG_RUNTIME_DIR, Windows uses LOCALAPPDATA.
 func setupIsolatedSocketPath(t *testing.T) {
 	t.Helper()
-	t.Setenv("TMPDIR", t.TempDir())
+	tempDir := t.TempDir()
+	t.Setenv("TMPDIR", tempDir)
+	t.Setenv("XDG_RUNTIME_DIR", tempDir)
+	t.Setenv("LOCALAPPDATA", tempDir)
 }
 
 // TestDaemonLauncher_NotRunning tests launcher behavior when daemon is not running.
