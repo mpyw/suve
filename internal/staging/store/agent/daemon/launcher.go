@@ -22,20 +22,20 @@ const (
 // processSpawner is an interface for spawning daemon processes.
 // This allows mocking in tests.
 type processSpawner interface {
-	Spawn(accountID, region string) error
+	Spawn() error
 }
 
 // defaultProcessSpawner spawns daemon processes using exec.Command.
 type defaultProcessSpawner struct{}
 
-func (s *defaultProcessSpawner) Spawn(accountID, region string) error {
+func (s *defaultProcessSpawner) Spawn() error {
 	executable, err := os.Executable()
 	if err != nil {
 		return fmt.Errorf("failed to get executable path: %w", err)
 	}
 
 	//nolint:gosec,noctx // G204: executable is from os.Executable(), not user input; noctx: intentionally no context for background daemon
-	cmd := exec.Command(executable, "stage", "agent", "start", "--foreground", "--account", accountID, "--region", region)
+	cmd := exec.Command(executable, "stage", "agent", "start", "--foreground")
 	cmd.Stdout = nil
 	cmd.Stderr = nil
 	cmd.Stdin = nil
@@ -69,22 +69,20 @@ func withSpawner(spawner processSpawner) LauncherOption {
 }
 
 // Launcher manages daemon startup and connectivity.
+// A single launcher communicates with the scope-independent daemon.
 type Launcher struct {
-	accountID         string
-	region            string
 	client            *ipc.Client
 	spawner           processSpawner
 	autoStartDisabled bool
 	mu                sync.Mutex // protects EnsureRunning from concurrent calls
 }
 
-// NewLauncher creates a new daemon launcher for a specific AWS account and region.
-func NewLauncher(accountID, region string, opts ...LauncherOption) *Launcher {
+// NewLauncher creates a new daemon launcher.
+// The launcher is scope-independent; scope is passed with each request.
+func NewLauncher(opts ...LauncherOption) *Launcher {
 	l := &Launcher{
-		accountID: accountID,
-		region:    region,
-		client:    ipc.NewClient(accountID, region),
-		spawner:   &defaultProcessSpawner{},
+		client:  ipc.NewClient(),
+		spawner: &defaultProcessSpawner{},
 	}
 	for _, opt := range opts {
 		opt(l)
@@ -125,7 +123,7 @@ func (l *Launcher) EnsureRunning(ctx context.Context) error {
 	deadline := time.Now().Add(connectTimeout)
 	for time.Now().Before(deadline) {
 		if err := l.client.Ping(ctx); err == nil {
-			output.Info(os.Stderr, "Staging agent started for account %s (%s)", l.accountID, l.region)
+			output.Info(os.Stderr, "Staging agent started")
 
 			return nil
 		}
@@ -150,11 +148,10 @@ func (l *Launcher) Shutdown(ctx context.Context) error {
 func (l *Launcher) startProcess() error {
 	if l.autoStartDisabled {
 		return fmt.Errorf(
-			"daemon not running and auto-start is disabled; "+
-				"run 'suve stage agent start --account %s --region %s' manually",
-			l.accountID, l.region,
+			"daemon not running and auto-start is disabled; " +
+				"start agent manually with 'suve stage agent start'",
 		)
 	}
 
-	return l.spawner.Spawn(l.accountID, l.region)
+	return l.spawner.Spawn()
 }

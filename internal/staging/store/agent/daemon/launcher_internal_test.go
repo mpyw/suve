@@ -13,26 +13,20 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/mpyw/suve/internal/staging/store/agent/daemon/internal/ipc"
 	"github.com/mpyw/suve/internal/staging/store/agent/internal/protocol"
-)
-
-const (
-	testAccountID = "123456789012"
-	testRegion    = "us-east-1"
 )
 
 // mockSpawner is a test mock for processSpawner.
 type mockSpawner struct {
-	spawnFunc  func(accountID, region string) error
+	spawnFunc  func() error
 	spawnCount atomic.Int32
 }
 
-func (m *mockSpawner) Spawn(accountID, region string) error {
+func (m *mockSpawner) Spawn() error {
 	m.spawnCount.Add(1)
 
 	if m.spawnFunc != nil {
-		return m.spawnFunc(accountID, region)
+		return m.spawnFunc()
 	}
 
 	return nil
@@ -44,18 +38,16 @@ func TestNewLauncher(t *testing.T) {
 	t.Run("default options", func(t *testing.T) {
 		t.Parallel()
 
-		l := NewLauncher(testAccountID, testRegion)
+		l := NewLauncher()
 		require.NotNil(t, l)
 		assert.NotNil(t, l.client)
-		assert.Equal(t, testAccountID, l.accountID)
-		assert.Equal(t, testRegion, l.region)
 		assert.False(t, l.autoStartDisabled)
 	})
 
 	t.Run("with auto start disabled", func(t *testing.T) {
 		t.Parallel()
 
-		l := NewLauncher(testAccountID, testRegion, WithAutoStartDisabled())
+		l := NewLauncher(WithAutoStartDisabled())
 		require.NotNil(t, l)
 		assert.True(t, l.autoStartDisabled)
 	})
@@ -67,14 +59,12 @@ func TestLauncher_startProcess(t *testing.T) {
 	t.Run("auto start disabled returns error", func(t *testing.T) {
 		t.Parallel()
 
-		l := NewLauncher(testAccountID, testRegion, WithAutoStartDisabled())
+		l := NewLauncher(WithAutoStartDisabled())
 
 		err := l.startProcess()
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "daemon not running and auto-start is disabled")
 		assert.Contains(t, err.Error(), "suve stage agent start")
-		assert.Contains(t, err.Error(), "--account")
-		assert.Contains(t, err.Error(), "--region")
 	})
 }
 
@@ -84,7 +74,7 @@ func TestLauncher_EnsureRunning(t *testing.T) {
 	t.Run("daemon not running and auto start disabled", func(t *testing.T) {
 		t.Parallel()
 
-		l := NewLauncher(testAccountID, testRegion, WithAutoStartDisabled())
+		l := NewLauncher(WithAutoStartDisabled())
 
 		// EnsureRunning should fail because daemon is not running
 		// and auto-start is disabled
@@ -100,7 +90,7 @@ func TestLauncher_Ping(t *testing.T) {
 	t.Run("daemon not running", func(t *testing.T) {
 		t.Parallel()
 
-		l := NewLauncher(testAccountID, testRegion, WithAutoStartDisabled())
+		l := NewLauncher(WithAutoStartDisabled())
 
 		err := l.Ping(t.Context())
 		require.Error(t, err)
@@ -115,7 +105,7 @@ func TestLauncher_Shutdown(t *testing.T) {
 	t.Run("daemon not running", func(t *testing.T) {
 		t.Parallel()
 
-		l := NewLauncher(testAccountID, testRegion, WithAutoStartDisabled())
+		l := NewLauncher(WithAutoStartDisabled())
 
 		err := l.Shutdown(t.Context())
 		require.Error(t, err)
@@ -129,7 +119,7 @@ func TestLauncher_SendRequest(t *testing.T) {
 	t.Run("daemon not running", func(t *testing.T) {
 		t.Parallel()
 
-		l := NewLauncher(testAccountID, testRegion, WithAutoStartDisabled())
+		l := NewLauncher(WithAutoStartDisabled())
 
 		resp, err := l.SendRequest(t.Context(), &protocol.Request{Method: protocol.MethodPing})
 		require.Error(t, err)
@@ -144,10 +134,7 @@ func TestLauncher_EnsureRunning_AlreadyRunning(t *testing.T) {
 	t.Cleanup(func() { _ = os.RemoveAll(tmpDir) })
 	t.Setenv("TMPDIR", tmpDir)
 
-	accountID := "b1"
-	region := "r1"
-
-	socketPath := protocol.SocketPathForAccount(accountID, region)
+	socketPath := protocol.SocketPath()
 
 	// Create socket directory
 	err = os.MkdirAll(filepath.Dir(socketPath), 0o700)
@@ -186,7 +173,7 @@ func TestLauncher_EnsureRunning_AlreadyRunning(t *testing.T) {
 	}()
 
 	// EnsureRunning should succeed immediately (daemon already running)
-	l := NewLauncher(accountID, region, WithAutoStartDisabled())
+	l := NewLauncher(WithAutoStartDisabled())
 	err = l.EnsureRunning(t.Context())
 	require.NoError(t, err)
 }
@@ -195,7 +182,7 @@ func TestLauncher_MultipleOptions(t *testing.T) {
 	t.Parallel()
 
 	// Test that options are applied in order
-	l := NewLauncher(testAccountID, testRegion,
+	l := NewLauncher(
 		WithAutoStartDisabled(),
 	)
 	require.NotNil(t, l)
@@ -209,10 +196,7 @@ func TestLauncher_PingWithRunningDaemon(t *testing.T) {
 	t.Cleanup(func() { _ = os.RemoveAll(tmpDir) })
 	t.Setenv("TMPDIR", tmpDir)
 
-	accountID := "b2"
-	region := "r2"
-
-	socketPath := protocol.SocketPathForAccount(accountID, region)
+	socketPath := protocol.SocketPath()
 
 	// Create socket directory
 	err = os.MkdirAll(filepath.Dir(socketPath), 0o700)
@@ -250,7 +234,7 @@ func TestLauncher_PingWithRunningDaemon(t *testing.T) {
 		}
 	}()
 
-	l := NewLauncher(accountID, region, WithAutoStartDisabled())
+	l := NewLauncher(WithAutoStartDisabled())
 	err = l.Ping(t.Context())
 	require.NoError(t, err)
 }
@@ -262,10 +246,7 @@ func TestLauncher_ShutdownWithRunningDaemon(t *testing.T) {
 	t.Cleanup(func() { _ = os.RemoveAll(tmpDir) })
 	t.Setenv("TMPDIR", tmpDir)
 
-	accountID := "b3"
-	region := "r3"
-
-	socketPath := protocol.SocketPathForAccount(accountID, region)
+	socketPath := protocol.SocketPath()
 
 	// Create socket directory
 	err = os.MkdirAll(filepath.Dir(socketPath), 0o700)
@@ -303,7 +284,7 @@ func TestLauncher_ShutdownWithRunningDaemon(t *testing.T) {
 		}
 	}()
 
-	l := NewLauncher(accountID, region, WithAutoStartDisabled())
+	l := NewLauncher(WithAutoStartDisabled())
 	err = l.Shutdown(t.Context())
 	require.NoError(t, err)
 }
@@ -315,10 +296,7 @@ func TestLauncher_ShutdownWithServerError(t *testing.T) {
 	t.Cleanup(func() { _ = os.RemoveAll(tmpDir) })
 	t.Setenv("TMPDIR", tmpDir)
 
-	accountID := "b4"
-	region := "r4"
-
-	socketPath := protocol.SocketPathForAccount(accountID, region)
+	socketPath := protocol.SocketPath()
 
 	// Create socket directory
 	err = os.MkdirAll(filepath.Dir(socketPath), 0o700)
@@ -356,7 +334,7 @@ func TestLauncher_ShutdownWithServerError(t *testing.T) {
 		}
 	}()
 
-	l := NewLauncher(accountID, region, WithAutoStartDisabled())
+	l := NewLauncher(WithAutoStartDisabled())
 	err = l.Shutdown(t.Context())
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "shutdown failed")
@@ -369,11 +347,8 @@ func TestLauncher_EnsureRunning_Timeout(t *testing.T) {
 	t.Cleanup(func() { _ = os.RemoveAll(tmpDir) })
 	t.Setenv("TMPDIR", tmpDir)
 
-	accountID := "b5"
-	region := "r5"
-
 	// Don't create a socket - let it timeout
-	l := NewLauncher(accountID, region, WithAutoStartDisabled())
+	l := NewLauncher(WithAutoStartDisabled())
 
 	// This should fail because daemon is not running and auto-start is disabled
 	start := time.Now()
@@ -391,11 +366,8 @@ func TestLauncher_EnsureRunning_Timeout(t *testing.T) {
 func TestLauncher_ClientIntegration(t *testing.T) {
 	t.Parallel()
 
-	l := NewLauncher(testAccountID, testRegion)
+	l := NewLauncher()
 	require.NotNil(t, l.client)
-
-	// Verify the client is an IPC client
-	_ = ipc.NewClient(testAccountID, testRegion) // Just verify the import works
 }
 
 // TestLauncher_EnsureRunning_WithMockSpawner tests EnsureRunning with a mock spawner.
@@ -406,10 +378,7 @@ func TestLauncher_EnsureRunning_WithMockSpawner(t *testing.T) {
 	t.Cleanup(func() { _ = os.RemoveAll(tmpDir) })
 	t.Setenv("TMPDIR", tmpDir)
 
-	accountID := "m1"
-	region := "r1"
-
-	socketPath := protocol.SocketPathForAccount(accountID, region)
+	socketPath := protocol.SocketPath()
 
 	// Create socket directory
 	err = os.MkdirAll(filepath.Dir(socketPath), 0o700)
@@ -420,11 +389,7 @@ func TestLauncher_EnsureRunning_WithMockSpawner(t *testing.T) {
 
 	var listener net.Listener
 
-	spawner.spawnFunc = func(aid, reg string) error {
-		// Verify correct parameters
-		assert.Equal(t, accountID, aid)
-		assert.Equal(t, region, reg)
-
+	spawner.spawnFunc = func() error {
 		// Start mock server
 		var err error
 
@@ -468,7 +433,7 @@ func TestLauncher_EnsureRunning_WithMockSpawner(t *testing.T) {
 		}
 	}()
 
-	l := NewLauncher(accountID, region, withSpawner(spawner))
+	l := NewLauncher(withSpawner(spawner))
 
 	// EnsureRunning should start the daemon via spawner and then ping successfully
 	err = l.EnsureRunning(t.Context())
@@ -486,16 +451,13 @@ func TestLauncher_EnsureRunning_SpawnError(t *testing.T) {
 	t.Cleanup(func() { _ = os.RemoveAll(tmpDir) })
 	t.Setenv("TMPDIR", tmpDir)
 
-	accountID := "m2"
-	region := "r2"
-
 	spawner := &mockSpawner{
-		spawnFunc: func(_, _ string) error {
+		spawnFunc: func() error {
 			return errors.New("spawn failed")
 		},
 	}
 
-	l := NewLauncher(accountID, region, withSpawner(spawner))
+	l := NewLauncher(withSpawner(spawner))
 
 	err = l.EnsureRunning(t.Context())
 	require.Error(t, err)
@@ -511,18 +473,15 @@ func TestLauncher_EnsureRunning_TimeoutWithMockSpawner(t *testing.T) {
 	t.Cleanup(func() { _ = os.RemoveAll(tmpDir) })
 	t.Setenv("TMPDIR", tmpDir)
 
-	accountID := "m3"
-	region := "r3"
-
 	// Spawner that succeeds but doesn't start a server
 	spawner := &mockSpawner{
-		spawnFunc: func(_, _ string) error {
+		spawnFunc: func() error {
 			// Don't actually start anything - simulate daemon failing to start
 			return nil
 		},
 	}
 
-	l := NewLauncher(accountID, region, withSpawner(spawner))
+	l := NewLauncher(withSpawner(spawner))
 
 	// Should timeout since no daemon is listening
 	err = l.EnsureRunning(t.Context())
@@ -538,7 +497,7 @@ func TestLauncher_startProcess_WithMockSpawner(t *testing.T) {
 		t.Parallel()
 
 		spawner := &mockSpawner{}
-		l := NewLauncher(testAccountID, testRegion, withSpawner(spawner))
+		l := NewLauncher(withSpawner(spawner))
 
 		err := l.startProcess()
 		require.NoError(t, err)
@@ -549,11 +508,11 @@ func TestLauncher_startProcess_WithMockSpawner(t *testing.T) {
 		t.Parallel()
 
 		spawner := &mockSpawner{
-			spawnFunc: func(_, _ string) error {
+			spawnFunc: func() error {
 				return errors.New("failed to spawn")
 			},
 		}
-		l := NewLauncher(testAccountID, testRegion, withSpawner(spawner))
+		l := NewLauncher(withSpawner(spawner))
 
 		err := l.startProcess()
 		require.Error(t, err)
@@ -570,14 +529,14 @@ func TestDefaultProcessSpawner_Spawn(t *testing.T) {
 		// Since the test binary doesn't have "stage agent start" command, it will exit
 		// quickly, but the Spawn itself should succeed (process starts and releases).
 		spawner := &defaultProcessSpawner{}
-		err := spawner.Spawn(testAccountID, testRegion)
+		err := spawner.Spawn()
 		require.NoError(t, err)
 	})
 
 	t.Run("launcher uses default spawner", func(t *testing.T) {
 		t.Parallel()
 
-		l := NewLauncher(testAccountID, testRegion)
+		l := NewLauncher()
 		require.NotNil(t, l.spawner)
 		// Verify it's the default spawner type
 		_, ok := l.spawner.(*defaultProcessSpawner)
@@ -590,7 +549,7 @@ func TestWithSpawner(t *testing.T) {
 	t.Parallel()
 
 	spawner := &mockSpawner{}
-	l := NewLauncher(testAccountID, testRegion, withSpawner(spawner))
+	l := NewLauncher(withSpawner(spawner))
 
 	require.Same(t, spawner, l.spawner)
 }

@@ -178,12 +178,14 @@ func stashPopAction(service staging.Service) func(context.Context, *cli.Command)
 			return fmt.Errorf("failed to get AWS identity: %w", err)
 		}
 
-		fileStore, err := fileStoreForReading(cmd, identity.AccountID, identity.Region, false)
+		scope := staging.AWSScope(identity.AccountID, identity.Region)
+
+		fileStore, err := fileStoreForReading(cmd, scope, false)
 		if err != nil {
 			return err
 		}
 
-		agentStore := agent.NewStore(identity.AccountID, identity.Region)
+		agentStore := agent.NewStore(scope)
 
 		err = lifecycle.ExecuteWrite0(ctx, agentStore, lifecycle.CmdStashPop, func() error {
 			// Check if agent has existing changes

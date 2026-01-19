@@ -8,8 +8,8 @@ import (
 	"path/filepath"
 )
 
-// socketPathFallback returns the fallback socket path for a specific account/region.
+// socketPathFallback returns the fallback socket path.
 // Used by darwin, linux, and other Unix-like platforms when preferred paths are unavailable.
-func socketPathFallback(accountID, region string) string {
-	return filepath.Join(fmt.Sprintf("/tmp/%s-%d", socketDirName, os.Getuid()), accountID, region, socketFileName)
+func socketPathFallback() string {
+	return filepath.Join(fmt.Sprintf("/tmp/%s-%d", socketDirName, os.Getuid()), socketFileName)
 }

@@ -102,7 +102,7 @@ func TestNewStore_UserHomeDirError(t *testing.T) {
 		return "", errors.New("home directory not available")
 	}
 
-	store, err := NewStore("123456789012", "ap-northeast-1")
+	store, err := NewStore(staging.AWSScope("123456789012", "ap-northeast-1"))
 	assert.Nil(t, store)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to get home directory")
@@ -122,7 +122,7 @@ func TestNewStoreWithPassphrase_UserHomeDirError(t *testing.T) {
 		return "", errors.New("home directory not available")
 	}
 
-	store, err := NewStoreWithPassphrase("123456789012", "ap-northeast-1", "secret")
+	store, err := NewStoreWithPassphrase(staging.AWSScope("123456789012", "ap-northeast-1"), "secret")
 	assert.Nil(t, store)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to get home directory")

@@ -36,9 +36,8 @@ type ResponseCallback func(*protocol.Request, *protocol.Response)
 type ShutdownCallback func()
 
 // Server provides low-level IPC server functionality.
+// A single server handles requests for all scopes.
 type Server struct {
-	accountID  string
-	region     string
 	listener   net.Listener
 	handler    RequestHandler
 	onResponse ResponseCallback
@@ -46,11 +45,10 @@ type Server struct {
 	wg         sync.WaitGroup
 }
 
-// NewServer creates a new IPC server for a specific AWS account and region.
-func NewServer(accountID, region string, handler RequestHandler, onResponse ResponseCallback, onShutdown ShutdownCallback) *Server {
+// NewServer creates a new IPC server.
+// The server is scope-independent; scope is passed with each request.
+func NewServer(handler RequestHandler, onResponse ResponseCallback, onShutdown ShutdownCallback) *Server {
 	return &Server{
-		accountID:  accountID,
-		region:     region,
 		handler:    handler,
 		onResponse: onResponse,
 		onShutdown: onShutdown,
@@ -63,7 +61,7 @@ func (s *Server) Start(ctx context.Context) error {
 		return fmt.Errorf("failed to setup process security: %w", err)
 	}
 
-	socketPath := protocol.SocketPathForAccount(s.accountID, s.region)
+	socketPath := protocol.SocketPath()
 
 	if err := s.createSocketDir(socketPath); err != nil {
 		return err

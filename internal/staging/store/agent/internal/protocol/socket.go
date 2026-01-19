@@ -7,8 +7,8 @@ const (
 	socketFileName = "agent.sock"
 )
 
-// SocketPathForAccount returns the socket path for a specific AWS account and region.
-// This ensures each account/region combination has its own daemon instance.
-func SocketPathForAccount(accountID, region string) string {
-	return socketPathForAccount(accountID, region)
+// SocketPath returns the socket path for the agent daemon.
+// A single daemon handles all scopes, so the path is scope-independent.
+func SocketPath() string {
+	return socketPath()
 }

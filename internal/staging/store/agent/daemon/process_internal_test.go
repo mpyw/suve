@@ -1,8 +1,8 @@
 package daemon
 
 import (
+	"encoding/json"
 	"os"
-	"path/filepath"
 	"testing"
 	"time"
 
@@ -14,40 +14,14 @@ import (
 	"github.com/mpyw/suve/internal/staging/store/agent/internal/protocol"
 )
 
-// TestDaemonProcess_AccountIsolation tests that daemons for different accounts are isolated.
-func TestDaemonProcess_AccountIsolation(t *testing.T) {
-	t.Parallel()
-
-	account1 := "111111111111"
-	account2 := "222222222222"
-	region := "us-east-1"
-
-	// Socket paths should be different for different accounts
-	path1 := protocol.SocketPathForAccount(account1, region)
-	path2 := protocol.SocketPathForAccount(account2, region)
-
-	assert.NotEqual(t, path1, path2, "different accounts should have different socket paths")
-	assert.Contains(t, path1, account1)
-	assert.Contains(t, path2, account2)
-}
-
-// TestDaemonProcess_RegionIsolation tests that daemons for different regions are isolated.
-func TestDaemonProcess_RegionIsolation(t *testing.T) {
-	t.Parallel()
-
-	account := "123456789012"
-	region1 := "us-east-1"
-	region2 := "us-west-2"
-
-	// Socket paths should be different for different regions
-	path1 := protocol.SocketPathForAccount(account, region1)
-	path2 := protocol.SocketPathForAccount(account, region2)
-
-	assert.NotEqual(t, path1, path2, "different regions should have different socket paths")
-	assert.Contains(t, path1, region1)
-	assert.Contains(t, path1, region1)
-	assert.Contains(t, path2, region2)
-}
+// testProcessScope1 and testProcessScope2 are used in tests that need to verify
+// a single daemon can handle multiple scopes.
+//
+//nolint:gochecknoglobals // Test-only constants
+var (
+	testProcessScope1 = staging.AWSScope("111111111111", "us-east-1")
+	testProcessScope2 = staging.AWSScope("222222222222", "us-west-2")
+)
 
 // TestDaemonProcess_StartupAndShutdown tests daemon startup and shutdown.
 // Note: This test cannot run in parallel because it modifies TMPDIR.
@@ -58,11 +32,8 @@ func TestDaemonProcess_StartupAndShutdown(t *testing.T) {
 	t.Cleanup(func() { _ = os.RemoveAll(tmpDir) })
 	t.Setenv("TMPDIR", tmpDir)
 
-	accountID := "a1"
-	region := "r1"
-
 	// Create daemon with auto-shutdown disabled for controlled testing
-	runner := NewRunner(accountID, region, WithAutoShutdownDisabled())
+	runner := NewRunner(WithAutoShutdownDisabled())
 
 	// Start in background
 	errCh := make(chan error, 1)
@@ -72,7 +43,7 @@ func TestDaemonProcess_StartupAndShutdown(t *testing.T) {
 	}()
 
 	// Wait for daemon to be ready
-	launcher := NewLauncher(accountID, region, WithAutoStartDisabled())
+	launcher := NewLauncher(WithAutoStartDisabled())
 	deadline := time.Now().Add(5 * time.Second)
 
 	var ready bool
@@ -90,7 +61,7 @@ func TestDaemonProcess_StartupAndShutdown(t *testing.T) {
 	require.True(t, ready, "daemon should be ready within timeout")
 
 	// Verify socket file exists
-	socketPath := protocol.SocketPathForAccount(accountID, region)
+	socketPath := protocol.SocketPath()
 	_, statErr := os.Stat(socketPath)
 	require.NoError(t, statErr, "socket file should exist")
 
@@ -107,74 +78,122 @@ func TestDaemonProcess_StartupAndShutdown(t *testing.T) {
 	}
 }
 
-// TestDaemonProcess_MultipleAccountsSimultaneous tests running daemons for different accounts simultaneously.
+// TestDaemonProcess_MultipleScopes tests that a single daemon can handle multiple scopes.
 // Note: This test cannot run in parallel because it modifies TMPDIR.
-func TestDaemonProcess_MultipleAccountsSimultaneous(t *testing.T) {
+func TestDaemonProcess_MultipleScopes(t *testing.T) {
 	// Create temp directory for socket (use /tmp to keep path short on macOS)
-	tmpDir, err := os.MkdirTemp("/tmp", "suve-multi-*")
+	tmpDir, err := os.MkdirTemp("/tmp", "suve-multi-scope-*")
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = os.RemoveAll(tmpDir) })
 	t.Setenv("TMPDIR", tmpDir)
 
-	// Two different accounts
-	account1 := "a1"
-	account2 := "a2"
-	region := "r1"
-
-	// Start daemon for account1
-	runner1 := NewRunner(account1, region, WithAutoShutdownDisabled())
-	errCh1 := make(chan error, 1)
+	// Start a single daemon
+	runner := NewRunner(WithAutoShutdownDisabled())
+	errCh := make(chan error, 1)
 
 	go func() {
-		errCh1 <- runner1.Run(t.Context())
+		errCh <- runner.Run(t.Context())
 	}()
 
-	// Start daemon for account2
-	runner2 := NewRunner(account2, region, WithAutoShutdownDisabled())
-	errCh2 := make(chan error, 1)
-
-	go func() {
-		errCh2 <- runner2.Run(t.Context())
-	}()
-
-	// Wait for both daemons to be ready
-	launcher1 := NewLauncher(account1, region, WithAutoStartDisabled())
-	launcher2 := NewLauncher(account2, region, WithAutoStartDisabled())
+	// Wait for daemon to be ready
+	launcher := NewLauncher(WithAutoStartDisabled())
 
 	deadline := time.Now().Add(5 * time.Second)
-
-	var ready1, ready2 bool
-
-	for time.Now().Before(deadline) && (!ready1 || !ready2) {
-		if !ready1 && launcher1.Ping(t.Context()) == nil {
-			ready1 = true
-		}
-
-		if !ready2 && launcher2.Ping(t.Context()) == nil {
-			ready2 = true
+	for time.Now().Before(deadline) {
+		if err := launcher.Ping(t.Context()); err == nil {
+			break
 		}
 
 		time.Sleep(50 * time.Millisecond)
 	}
 
-	require.True(t, ready1, "daemon for account1 should be ready")
-	require.True(t, ready2, "daemon for account2 should be ready")
+	require.NoError(t, launcher.Ping(t.Context()), "daemon should be ready")
 
-	// Both should respond independently
-	require.NoError(t, launcher1.Ping(t.Context()))
-	require.NoError(t, launcher2.Ping(t.Context()))
+	// Stage entries for two different scopes
+	stageReq1 := &protocol.Request{
+		Method:  protocol.MethodStageEntry,
+		Scope:   testProcessScope1,
+		Service: staging.ServiceParam,
+		Name:    "/scope1/param",
+		Entry: &staging.Entry{
+			Value:     lo.ToPtr("value1"),
+			Operation: staging.OperationCreate,
+		},
+	}
+	resp, err := launcher.SendRequest(t.Context(), stageReq1)
+	require.NoError(t, err)
+	require.True(t, resp.Success)
+
+	stageReq2 := &protocol.Request{
+		Method:  protocol.MethodStageEntry,
+		Scope:   testProcessScope2,
+		Service: staging.ServiceParam,
+		Name:    "/scope2/param",
+		Entry: &staging.Entry{
+			Value:     lo.ToPtr("value2"),
+			Operation: staging.OperationCreate,
+		},
+	}
+	resp, err = launcher.SendRequest(t.Context(), stageReq2)
+	require.NoError(t, err)
+	require.True(t, resp.Success)
+
+	// Verify both entries can be retrieved
+	getReq1 := &protocol.Request{
+		Method:  protocol.MethodGetEntry,
+		Scope:   testProcessScope1,
+		Service: staging.ServiceParam,
+		Name:    "/scope1/param",
+	}
+	resp, err = launcher.SendRequest(t.Context(), getReq1)
+	require.NoError(t, err)
+	require.True(t, resp.Success)
+
+	var result1 protocol.EntryResponse
+
+	err = json.Unmarshal(resp.Data, &result1)
+	require.NoError(t, err)
+	require.NotNil(t, result1.Entry)
+	assert.Equal(t, "value1", *result1.Entry.Value)
+
+	getReq2 := &protocol.Request{
+		Method:  protocol.MethodGetEntry,
+		Scope:   testProcessScope2,
+		Service: staging.ServiceParam,
+		Name:    "/scope2/param",
+	}
+	resp, err = launcher.SendRequest(t.Context(), getReq2)
+	require.NoError(t, err)
+	require.True(t, resp.Success)
+
+	var result2 protocol.EntryResponse
+
+	err = json.Unmarshal(resp.Data, &result2)
+	require.NoError(t, err)
+	require.NotNil(t, result2.Entry)
+	assert.Equal(t, "value2", *result2.Entry.Value)
+
+	// Verify scope isolation - entry from scope1 should not exist in scope2
+	getReqWrong := &protocol.Request{
+		Method:  protocol.MethodGetEntry,
+		Scope:   testProcessScope2,
+		Service: staging.ServiceParam,
+		Name:    "/scope1/param",
+	}
+	resp, err = launcher.SendRequest(t.Context(), getReqWrong)
+	require.NoError(t, err)
+	require.True(t, resp.Success)
+
+	var resultWrong protocol.EntryResponse
+
+	_ = json.Unmarshal(resp.Data, &resultWrong)
+	assert.Nil(t, resultWrong.Entry, "entry from scope1 should not exist in scope2")
 
 	// Cleanup
-	runner1.Shutdown()
-	runner2.Shutdown()
+	runner.Shutdown()
 
 	select {
-	case <-errCh1:
-	case <-time.After(5 * time.Second):
-	}
-
-	select {
-	case <-errCh2:
+	case <-errCh:
 	case <-time.After(5 * time.Second):
 	}
 }
@@ -188,11 +207,10 @@ func TestDaemonProcess_AutoShutdown(t *testing.T) {
 	t.Cleanup(func() { _ = os.RemoveAll(tmpDir) })
 	t.Setenv("TMPDIR", tmpDir)
 
-	accountID := "a3"
-	region := "r3"
+	scope := staging.AWSScope("a3", "r3")
 
 	// Create daemon WITHOUT disabling auto-shutdown
-	runner := NewRunner(accountID, region)
+	runner := NewRunner()
 
 	// Start in background
 	errCh := make(chan error, 1)
@@ -202,7 +220,7 @@ func TestDaemonProcess_AutoShutdown(t *testing.T) {
 	}()
 
 	// Wait for daemon to be ready
-	launcher := NewLauncher(accountID, region, WithAutoStartDisabled())
+	launcher := NewLauncher(WithAutoStartDisabled())
 
 	deadline := time.Now().Add(5 * time.Second)
 	for time.Now().Before(deadline) {
@@ -215,11 +233,10 @@ func TestDaemonProcess_AutoShutdown(t *testing.T) {
 
 	// Stage an entry
 	stageReq := &protocol.Request{
-		Method:    protocol.MethodStageEntry,
-		AccountID: accountID,
-		Region:    region,
-		Service:   staging.ServiceParam,
-		Name:      "/test/param",
+		Method:  protocol.MethodStageEntry,
+		Scope:   scope,
+		Service: staging.ServiceParam,
+		Name:    "/test/param",
 		Entry: &staging.Entry{
 			Value:     lo.ToPtr("test-value"),
 			Operation: staging.OperationCreate,
@@ -231,11 +248,10 @@ func TestDaemonProcess_AutoShutdown(t *testing.T) {
 
 	// Unstage the entry - this should trigger auto-shutdown because state becomes empty
 	unstageReq := &protocol.Request{
-		Method:    protocol.MethodUnstageEntry,
-		AccountID: accountID,
-		Region:    region,
-		Service:   staging.ServiceParam,
-		Name:      "/test/param",
+		Method:  protocol.MethodUnstageEntry,
+		Scope:   scope,
+		Service: staging.ServiceParam,
+		Name:    "/test/param",
 	}
 	resp, err = launcher.SendRequest(t.Context(), unstageReq)
 	require.NoError(t, err)
@@ -262,11 +278,10 @@ func TestDaemonProcess_ManualModeDisablesAutoShutdown(t *testing.T) {
 	t.Cleanup(func() { _ = os.RemoveAll(tmpDir) })
 	t.Setenv("TMPDIR", tmpDir)
 
-	accountID := "a4"
-	region := "r4"
+	scope := staging.AWSScope("a4", "r4")
 
 	// Create daemon with auto-shutdown DISABLED (manual mode)
-	runner := NewRunner(accountID, region, WithAutoShutdownDisabled())
+	runner := NewRunner(WithAutoShutdownDisabled())
 
 	// Start in background
 	errCh := make(chan error, 1)
@@ -276,7 +291,7 @@ func TestDaemonProcess_ManualModeDisablesAutoShutdown(t *testing.T) {
 	}()
 
 	// Wait for daemon to be ready
-	launcher := NewLauncher(accountID, region, WithAutoStartDisabled())
+	launcher := NewLauncher(WithAutoStartDisabled())
 
 	deadline := time.Now().Add(5 * time.Second)
 	for time.Now().Before(deadline) {
@@ -289,11 +304,10 @@ func TestDaemonProcess_ManualModeDisablesAutoShutdown(t *testing.T) {
 
 	// Stage and unstage an entry
 	stageReq := &protocol.Request{
-		Method:    protocol.MethodStageEntry,
-		AccountID: accountID,
-		Region:    region,
-		Service:   staging.ServiceParam,
-		Name:      "/test/param",
+		Method:  protocol.MethodStageEntry,
+		Scope:   scope,
+		Service: staging.ServiceParam,
+		Name:    "/test/param",
 		Entry: &staging.Entry{
 			Value:     lo.ToPtr("test-value"),
 			Operation: staging.OperationCreate,
@@ -304,11 +318,10 @@ func TestDaemonProcess_ManualModeDisablesAutoShutdown(t *testing.T) {
 	require.True(t, resp.Success)
 
 	unstageReq := &protocol.Request{
-		Method:    protocol.MethodUnstageEntry,
-		AccountID: accountID,
-		Region:    region,
-		Service:   staging.ServiceParam,
-		Name:      "/test/param",
+		Method:  protocol.MethodUnstageEntry,
+		Scope:   scope,
+		Service: staging.ServiceParam,
+		Name:    "/test/param",
 	}
 	resp, err = launcher.SendRequest(t.Context(), unstageReq)
 	require.NoError(t, err)
@@ -343,17 +356,16 @@ func TestDaemonProcess_AutoShutdown_UnstageAll(t *testing.T) {
 	t.Cleanup(func() { _ = os.RemoveAll(tmpDir) })
 	t.Setenv("TMPDIR", tmpDir)
 
-	accountID := "a5"
-	region := "r5"
+	scope := staging.AWSScope("a5", "r5")
 
-	runner := NewRunner(accountID, region)
+	runner := NewRunner()
 	errCh := make(chan error, 1)
 
 	go func() {
 		errCh <- runner.Run(t.Context())
 	}()
 
-	launcher := NewLauncher(accountID, region, WithAutoStartDisabled())
+	launcher := NewLauncher(WithAutoStartDisabled())
 
 	deadline := time.Now().Add(5 * time.Second)
 	for time.Now().Before(deadline) {
@@ -367,11 +379,10 @@ func TestDaemonProcess_AutoShutdown_UnstageAll(t *testing.T) {
 	// Stage entries for both services
 	for _, svc := range []staging.Service{staging.ServiceParam, staging.ServiceSecret} {
 		stageReq := &protocol.Request{
-			Method:    protocol.MethodStageEntry,
-			AccountID: accountID,
-			Region:    region,
-			Service:   svc,
-			Name:      "/test/param",
+			Method:  protocol.MethodStageEntry,
+			Scope:   scope,
+			Service: svc,
+			Name:    "/test/param",
 			Entry: &staging.Entry{
 				Value:     lo.ToPtr("test-value"),
 				Operation: staging.OperationCreate,
@@ -384,10 +395,9 @@ func TestDaemonProcess_AutoShutdown_UnstageAll(t *testing.T) {
 
 	// UnstageAll with empty service clears both services and triggers auto-shutdown
 	unstageReq := &protocol.Request{
-		Method:    protocol.MethodUnstageAll,
-		AccountID: accountID,
-		Region:    region,
-		Service:   "", // Empty clears all services
+		Method:  protocol.MethodUnstageAll,
+		Scope:   scope,
+		Service: "", // Empty clears all services
 	}
 	resp, err := launcher.SendRequest(t.Context(), unstageReq)
 	require.NoError(t, err)
@@ -411,17 +421,16 @@ func TestDaemonProcess_AutoShutdown_UnstageTag(t *testing.T) {
 	t.Cleanup(func() { _ = os.RemoveAll(tmpDir) })
 	t.Setenv("TMPDIR", tmpDir)
 
-	accountID := "a6"
-	region := "r6"
+	scope := staging.AWSScope("a6", "r6")
 
-	runner := NewRunner(accountID, region)
+	runner := NewRunner()
 	errCh := make(chan error, 1)
 
 	go func() {
 		errCh <- runner.Run(t.Context())
 	}()
 
-	launcher := NewLauncher(accountID, region, WithAutoStartDisabled())
+	launcher := NewLauncher(WithAutoStartDisabled())
 
 	deadline := time.Now().Add(5 * time.Second)
 	for time.Now().Before(deadline) {
@@ -434,11 +443,10 @@ func TestDaemonProcess_AutoShutdown_UnstageTag(t *testing.T) {
 
 	// Stage only a tag (no entry)
 	stageReq := &protocol.Request{
-		Method:    protocol.MethodStageTag,
-		AccountID: accountID,
-		Region:    region,
-		Service:   staging.ServiceParam,
-		Name:      "/test/param",
+		Method:  protocol.MethodStageTag,
+		Scope:   scope,
+		Service: staging.ServiceParam,
+		Name:    "/test/param",
 		TagEntry: &staging.TagEntry{
 			Add: map[string]string{"key": "value"},
 		},
@@ -449,11 +457,10 @@ func TestDaemonProcess_AutoShutdown_UnstageTag(t *testing.T) {
 
 	// UnstageTag should trigger auto-shutdown when state becomes empty
 	unstageReq := &protocol.Request{
-		Method:    protocol.MethodUnstageTag,
-		AccountID: accountID,
-		Region:    region,
-		Service:   staging.ServiceParam,
-		Name:      "/test/param",
+		Method:  protocol.MethodUnstageTag,
+		Scope:   scope,
+		Service: staging.ServiceParam,
+		Name:    "/test/param",
 	}
 	resp, err = launcher.SendRequest(t.Context(), unstageReq)
 	require.NoError(t, err)
@@ -477,17 +484,16 @@ func TestDaemonProcess_AutoShutdown_SetState(t *testing.T) {
 	t.Cleanup(func() { _ = os.RemoveAll(tmpDir) })
 	t.Setenv("TMPDIR", tmpDir)
 
-	accountID := "a7"
-	region := "r7"
+	scope := staging.AWSScope("a7", "r7")
 
-	runner := NewRunner(accountID, region)
+	runner := NewRunner()
 	errCh := make(chan error, 1)
 
 	go func() {
 		errCh <- runner.Run(t.Context())
 	}()
 
-	launcher := NewLauncher(accountID, region, WithAutoStartDisabled())
+	launcher := NewLauncher(WithAutoStartDisabled())
 
 	deadline := time.Now().Add(5 * time.Second)
 	for time.Now().Before(deadline) {
@@ -500,11 +506,10 @@ func TestDaemonProcess_AutoShutdown_SetState(t *testing.T) {
 
 	// Stage an entry
 	stageReq := &protocol.Request{
-		Method:    protocol.MethodStageEntry,
-		AccountID: accountID,
-		Region:    region,
-		Service:   staging.ServiceParam,
-		Name:      "/test/param",
+		Method:  protocol.MethodStageEntry,
+		Scope:   scope,
+		Service: staging.ServiceParam,
+		Name:    "/test/param",
 		Entry: &staging.Entry{
 			Value:     lo.ToPtr("test-value"),
 			Operation: staging.OperationCreate,
@@ -516,10 +521,9 @@ func TestDaemonProcess_AutoShutdown_SetState(t *testing.T) {
 
 	// SetState with empty state should trigger auto-shutdown
 	setStateReq := &protocol.Request{
-		Method:    protocol.MethodSetState,
-		AccountID: accountID,
-		Region:    region,
-		State:     staging.NewEmptyState(),
+		Method: protocol.MethodSetState,
+		Scope:  scope,
+		State:  staging.NewEmptyState(),
 	}
 	resp, err = launcher.SendRequest(t.Context(), setStateReq)
 	require.NoError(t, err)
@@ -543,17 +547,16 @@ func TestDaemonProcess_AutoShutdown_UnstageAllEmpty(t *testing.T) {
 	t.Cleanup(func() { _ = os.RemoveAll(tmpDir) })
 	t.Setenv("TMPDIR", tmpDir)
 
-	accountID := "a8"
-	region := "r8"
+	scope := staging.AWSScope("a8", "r8")
 
-	runner := NewRunner(accountID, region)
+	runner := NewRunner()
 	errCh := make(chan error, 1)
 
 	go func() {
 		errCh <- runner.Run(t.Context())
 	}()
 
-	launcher := NewLauncher(accountID, region, WithAutoStartDisabled())
+	launcher := NewLauncher(WithAutoStartDisabled())
 
 	deadline := time.Now().Add(5 * time.Second)
 	for time.Now().Before(deadline) {
@@ -567,10 +570,9 @@ func TestDaemonProcess_AutoShutdown_UnstageAllEmpty(t *testing.T) {
 	// Don't stage anything - state is already empty
 	// UnstageAll on empty state should still trigger auto-shutdown check
 	unstageReq := &protocol.Request{
-		Method:    protocol.MethodUnstageAll,
-		AccountID: accountID,
-		Region:    region,
-		Service:   "", // Empty clears all services
+		Method:  protocol.MethodUnstageAll,
+		Scope:   scope,
+		Service: "", // Empty clears all services
 	}
 	resp, err := launcher.SendRequest(t.Context(), unstageReq)
 	require.NoError(t, err)
@@ -586,22 +588,12 @@ func TestDaemonProcess_AutoShutdown_UnstageAllEmpty(t *testing.T) {
 	}
 }
 
-// TestDaemonProcess_SocketPathStructure tests the socket path structure includes account and region.
-func TestDaemonProcess_SocketPathStructure(t *testing.T) {
+// TestDaemonProcess_SocketPath tests the socket path structure.
+func TestDaemonProcess_SocketPath(t *testing.T) {
 	t.Parallel()
 
-	accountID := "123456789012"
-	region := "ap-northeast-1"
+	path := protocol.SocketPath()
 
-	path := protocol.SocketPathForAccount(accountID, region)
-
-	// Path should contain account ID and region as directory components
-	assert.Contains(t, path, accountID)
-	assert.Contains(t, path, region)
+	// Path should end with agent.sock
 	assert.Contains(t, path, "agent.sock")
-
-	// Path should have proper structure
-	dir := filepath.Dir(path)
-	assert.Contains(t, dir, accountID)
-	assert.Contains(t, dir, region)
 }

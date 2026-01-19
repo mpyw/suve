@@ -68,7 +68,7 @@ EXAMPLES:
 				return fmt.Errorf("failed to get AWS identity: %w", err)
 			}
 
-			store := agent.NewStore(identity.AccountID, identity.Region)
+			store := agent.NewStore(staging.AWSScope(identity.AccountID, identity.Region))
 
 			opts := StatusOptions{
 				Verbose: cmd.Bool("verbose"),
@@ -155,7 +155,7 @@ EXAMPLES:
 				return fmt.Errorf("failed to get AWS identity: %w", err)
 			}
 
-			store := agent.NewStore(identity.AccountID, identity.Region)
+			store := agent.NewStore(staging.AWSScope(identity.AccountID, identity.Region))
 
 			opts := DiffOptions{
 				Name:      name,
@@ -245,7 +245,7 @@ EXAMPLES:
 				return fmt.Errorf("failed to get AWS identity: %w", err)
 			}
 
-			store := agent.NewStore(identity.AccountID, identity.Region)
+			store := agent.NewStore(staging.AWSScope(identity.AccountID, identity.Region))
 
 			strategy, err := cfg.Factory(ctx)
 			if err != nil {
@@ -322,7 +322,7 @@ EXAMPLES:
 				return fmt.Errorf("failed to get AWS identity: %w", err)
 			}
 
-			store := agent.NewStore(identity.AccountID, identity.Region)
+			store := agent.NewStore(staging.AWSScope(identity.AccountID, identity.Region))
 
 			strategy, err := cfg.Factory(ctx)
 			if err != nil {
@@ -398,7 +398,7 @@ EXAMPLES:
 				return fmt.Errorf("failed to get AWS identity: %w", err)
 			}
 
-			store := agent.NewStore(identity.AccountID, identity.Region)
+			store := agent.NewStore(staging.AWSScope(identity.AccountID, identity.Region))
 			parser := cfg.ParserFactory()
 
 			result, err := lifecycle.ExecuteRead0(ctx, store, lifecycle.CmdApply, func() error {
@@ -553,7 +553,7 @@ EXAMPLES:
 				return fmt.Errorf("failed to get AWS identity: %w", err)
 			}
 
-			store := agent.NewStore(identity.AccountID, identity.Region)
+			store := agent.NewStore(staging.AWSScope(identity.AccountID, identity.Region))
 
 			if hasVersion {
 				// Reset with version spec - write operation, auto-start the agent
@@ -689,7 +689,7 @@ EXAMPLES:
 				return fmt.Errorf("failed to get AWS identity: %w", err)
 			}
 
-			store := agent.NewStore(identity.AccountID, identity.Region)
+			store := agent.NewStore(staging.AWSScope(identity.AccountID, identity.Region))
 
 			strategy, err := cfg.Factory(ctx)
 			if err != nil {
@@ -742,7 +742,7 @@ func tagAction(cfg CommandConfig, usageMsg string, runner tagCommandRunner) func
 			return fmt.Errorf("failed to get AWS identity: %w", err)
 		}
 
-		store := agent.NewStore(identity.AccountID, identity.Region)
+		store := agent.NewStore(staging.AWSScope(identity.AccountID, identity.Region))
 
 		strategy, err := cfg.Factory(ctx)
 		if err != nil {

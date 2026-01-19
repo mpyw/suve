@@ -101,7 +101,7 @@ func (h *Handler) handlePing() *protocol.Response {
 
 // handleGetEntry handles the GetEntry method.
 func (h *Handler) handleGetEntry(req *protocol.Request) *protocol.Response {
-	state, err := h.state.get(req.AccountID, req.Region)
+	state, err := h.state.get(req.Scope)
 	if err != nil {
 		return errorResponse(err)
 	}
@@ -119,7 +119,7 @@ func (h *Handler) handleGetEntry(req *protocol.Request) *protocol.Response {
 
 // handleGetTag handles the GetTag method.
 func (h *Handler) handleGetTag(req *protocol.Request) *protocol.Response {
-	state, err := h.state.get(req.AccountID, req.Region)
+	state, err := h.state.get(req.Scope)
 	if err != nil {
 		return errorResponse(err)
 	}
@@ -137,7 +137,7 @@ func (h *Handler) handleGetTag(req *protocol.Request) *protocol.Response {
 
 // handleListEntries handles the ListEntries method.
 func (h *Handler) handleListEntries(req *protocol.Request) *protocol.Response {
-	state, err := h.state.get(req.AccountID, req.Region)
+	state, err := h.state.get(req.Scope)
 	if err != nil {
 		return errorResponse(err)
 	}
@@ -157,7 +157,7 @@ func (h *Handler) handleListEntries(req *protocol.Request) *protocol.Response {
 
 // handleListTags handles the ListTags method.
 func (h *Handler) handleListTags(req *protocol.Request) *protocol.Response {
-	state, err := h.state.get(req.AccountID, req.Region)
+	state, err := h.state.get(req.Scope)
 	if err != nil {
 		return errorResponse(err)
 	}
@@ -182,7 +182,7 @@ func (h *Handler) handleLoad(req *protocol.Request) *protocol.Response {
 
 // handleStageEntry handles the StageEntry method.
 func (h *Handler) handleStageEntry(req *protocol.Request) *protocol.Response {
-	state, err := h.state.get(req.AccountID, req.Region)
+	state, err := h.state.get(req.Scope)
 	if err != nil {
 		return errorResponse(err)
 	}
@@ -193,7 +193,7 @@ func (h *Handler) handleStageEntry(req *protocol.Request) *protocol.Response {
 
 	state.Entries[req.Service][req.Name] = *req.Entry
 
-	if err := h.state.set(req.AccountID, req.Region, state); err != nil {
+	if err := h.state.set(req.Scope, state); err != nil {
 		return errorResponse(err)
 	}
 
@@ -202,7 +202,7 @@ func (h *Handler) handleStageEntry(req *protocol.Request) *protocol.Response {
 
 // handleStageTag handles the StageTag method.
 func (h *Handler) handleStageTag(req *protocol.Request) *protocol.Response {
-	state, err := h.state.get(req.AccountID, req.Region)
+	state, err := h.state.get(req.Scope)
 	if err != nil {
 		return errorResponse(err)
 	}
@@ -213,7 +213,7 @@ func (h *Handler) handleStageTag(req *protocol.Request) *protocol.Response {
 
 	state.Tags[req.Service][req.Name] = *req.TagEntry
 
-	if err := h.state.set(req.AccountID, req.Region, state); err != nil {
+	if err := h.state.set(req.Scope, state); err != nil {
 		return errorResponse(err)
 	}
 
@@ -222,7 +222,7 @@ func (h *Handler) handleStageTag(req *protocol.Request) *protocol.Response {
 
 // handleUnstageEntry handles the UnstageEntry method.
 func (h *Handler) handleUnstageEntry(req *protocol.Request) *protocol.Response {
-	state, err := h.state.get(req.AccountID, req.Region)
+	state, err := h.state.get(req.Scope)
 	if err != nil {
 		return errorResponse(err)
 	}
@@ -231,7 +231,7 @@ func (h *Handler) handleUnstageEntry(req *protocol.Request) *protocol.Response {
 		if _, ok := entries[req.Name]; ok {
 			delete(entries, req.Name)
 
-			if err := h.state.set(req.AccountID, req.Region, state); err != nil {
+			if err := h.state.set(req.Scope, state); err != nil {
 				return errorResponse(err)
 			}
 
@@ -244,7 +244,7 @@ func (h *Handler) handleUnstageEntry(req *protocol.Request) *protocol.Response {
 
 // handleUnstageTag handles the UnstageTag method.
 func (h *Handler) handleUnstageTag(req *protocol.Request) *protocol.Response {
-	state, err := h.state.get(req.AccountID, req.Region)
+	state, err := h.state.get(req.Scope)
 	if err != nil {
 		return errorResponse(err)
 	}
@@ -253,7 +253,7 @@ func (h *Handler) handleUnstageTag(req *protocol.Request) *protocol.Response {
 		if _, ok := tags[req.Name]; ok {
 			delete(tags, req.Name)
 
-			if err := h.state.set(req.AccountID, req.Region, state); err != nil {
+			if err := h.state.set(req.Scope, state); err != nil {
 				return errorResponse(err)
 			}
 
@@ -266,7 +266,7 @@ func (h *Handler) handleUnstageTag(req *protocol.Request) *protocol.Response {
 
 // handleUnstageAll handles the UnstageAll method.
 func (h *Handler) handleUnstageAll(req *protocol.Request) *protocol.Response {
-	state, err := h.state.get(req.AccountID, req.Region)
+	state, err := h.state.get(req.Scope)
 	if err != nil {
 		return errorResponse(err)
 	}
@@ -287,7 +287,7 @@ func (h *Handler) handleUnstageAll(req *protocol.Request) *protocol.Response {
 		state.Tags[req.Service] = make(map[string]staging.TagEntry)
 	}
 
-	if err := h.state.set(req.AccountID, req.Region, state); err != nil {
+	if err := h.state.set(req.Scope, state); err != nil {
 		return errorResponse(err)
 	}
 
@@ -296,7 +296,7 @@ func (h *Handler) handleUnstageAll(req *protocol.Request) *protocol.Response {
 
 // handleGetState handles the GetState method (for persist).
 func (h *Handler) handleGetState(req *protocol.Request) *protocol.Response {
-	state, err := h.state.get(req.AccountID, req.Region)
+	state, err := h.state.get(req.Scope)
 	if err != nil {
 		return errorResponse(err)
 	}
@@ -310,7 +310,7 @@ func (h *Handler) handleSetState(req *protocol.Request) *protocol.Response {
 		return errorMessageResponse("state is required")
 	}
 
-	if err := h.state.set(req.AccountID, req.Region, req.State); err != nil {
+	if err := h.state.set(req.Scope, req.State); err != nil {
 		return errorResponse(err)
 	}
 

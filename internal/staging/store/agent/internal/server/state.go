@@ -8,33 +8,25 @@ import (
 	"github.com/mpyw/suve/internal/staging/store/agent/internal/server/security"
 )
 
-// stateKey uniquely identifies a staging state by account and region.
-type stateKey struct {
-	AccountID string
-	Region    string
-}
-
 // secureState holds the staging state in secure memory.
 type secureState struct {
 	mu     sync.RWMutex
-	states map[stateKey]*security.Buffer
+	states map[staging.Scope]*security.Buffer
 }
 
 // newSecureState creates a new secure state store.
 func newSecureState() *secureState {
 	return &secureState{
-		states: make(map[stateKey]*security.Buffer),
+		states: make(map[staging.Scope]*security.Buffer),
 	}
 }
 
-// get retrieves the state for the given account/region.
-func (s *secureState) get(accountID, region string) (*staging.State, error) {
+// get retrieves the state for the given scope.
+func (s *secureState) get(scope staging.Scope) (*staging.State, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	key := stateKey{AccountID: accountID, Region: region}
-
-	buf, ok := s.states[key]
+	buf, ok := s.states[scope]
 	if !ok || buf.IsEmpty() {
 		return staging.NewEmptyState(), nil
 	}
@@ -53,21 +45,19 @@ func (s *secureState) get(accountID, region string) (*staging.State, error) {
 	return &state, nil
 }
 
-// set stores the state for the given account/region.
-func (s *secureState) set(accountID, region string, state *staging.State) error {
+// set stores the state for the given scope.
+func (s *secureState) set(scope staging.Scope, state *staging.State) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	key := stateKey{AccountID: accountID, Region: region}
-
 	// Destroy old buffer if exists
-	if old, ok := s.states[key]; ok {
+	if old, ok := s.states[scope]; ok {
 		old.Destroy()
 	}
 
 	// Check if state is empty
 	if state.IsEmpty() {
-		delete(s.states, key)
+		delete(s.states, scope)
 
 		return nil
 	}
@@ -77,7 +67,7 @@ func (s *secureState) set(accountID, region string, state *staging.State) error 
 		return err
 	}
 	// NewBuffer zeros the input data
-	s.states[key] = security.NewBuffer(data)
+	s.states[scope] = security.NewBuffer(data)
 
 	return nil
 }
@@ -99,7 +89,7 @@ func (s *secureState) destroy() {
 		buf.Destroy()
 	}
 
-	s.states = make(map[stateKey]*security.Buffer)
+	s.states = make(map[staging.Scope]*security.Buffer)
 }
 
 // zeroBytes securely zeros a byte slice.

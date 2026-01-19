@@ -80,7 +80,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		return fmt.Errorf("failed to get AWS identity: %w", err)
 	}
 
-	store := agent.NewStore(identity.AccountID, identity.Region)
+	store := agent.NewStore(staging.AWSScope(identity.AccountID, identity.Region))
 
 	result, err := lifecycle.ExecuteRead0(ctx, store, lifecycle.CmdApply, func() error {
 		// Check if there are any staged changes
