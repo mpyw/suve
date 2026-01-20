@@ -11,11 +11,10 @@ import (
 	"github.com/samber/lo"
 	"github.com/urfave/cli/v3"
 
-	"github.com/mpyw/suve/internal/api/paramapi"
 	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/cli/pager"
-	"github.com/mpyw/suve/internal/infra"
 	"github.com/mpyw/suve/internal/jsonutil"
+	awsparam "github.com/mpyw/suve/internal/provider/aws/param"
 	"github.com/mpyw/suve/internal/timeutil"
 	"github.com/mpyw/suve/internal/usecase/param"
 	"github.com/mpyw/suve/internal/version/paramversion"
@@ -112,7 +111,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		return fmt.Errorf("--raw and --output=json cannot be used together")
 	}
 
-	client, err := infra.NewParamClient(ctx)
+	adapter, err := awsparam.NewAdapter(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to initialize AWS client: %w", err)
 	}
@@ -130,7 +129,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 
 	return pager.WithPagerWriter(cmd.Root().Writer, noPager, func(w io.Writer) error {
 		r := &Runner{
-			UseCase: &param.ShowUseCase{Client: client},
+			UseCase: &param.ShowUseCase{Client: adapter},
 			Stdout:  w,
 			Stderr:  cmd.Root().ErrWriter,
 		}
@@ -154,7 +153,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 	// Warn if --parse-json is used in cases where it's not meaningful
 	if opts.ParseJSON {
 		switch result.Type {
-		case paramapi.ParameterTypeStringList:
+		case "StringList":
 			output.Warning(r.Stderr, "--parse-json has no effect on StringList type (comma-separated values)")
 		default:
 			formatted := jsonutil.TryFormatOrWarn(value, r.Stderr, "")
@@ -174,10 +173,11 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 
 	// JSON output mode
 	if opts.Output == output.FormatJSON {
+		version, _ := strconv.ParseInt(result.Version, 10, 64)
 		jsonOut := JSONOutput{
 			Name:    result.Name,
-			Version: result.Version,
-			Type:    string(result.Type),
+			Version: version,
+			Type:    result.Type,
 			Value:   value,
 		}
 		// Show json_parsed only when --parse-json was used and succeeded
@@ -203,8 +203,8 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 	// Normal mode: show metadata + value
 	out := output.New(r.Stdout)
 	out.Field("Name", result.Name)
-	out.Field("Version", strconv.FormatInt(result.Version, 10))
-	out.Field("Type", string(result.Type))
+	out.Field("Version", result.Version)
+	out.Field("Type", result.Type)
 	// Show json_parsed only when --parse-json was used and succeeded
 	if jsonParsed {
 		out.Field("JsonParsed", "true")

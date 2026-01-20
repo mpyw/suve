@@ -5,26 +5,25 @@ import (
 	"testing"
 	"time"
 
-	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/mpyw/suve/internal/api/paramapi"
+	"github.com/mpyw/suve/internal/model"
 	"github.com/mpyw/suve/internal/usecase/param"
 	"github.com/mpyw/suve/internal/version/paramversion"
 )
 
 type mockShowClient struct {
-	getParameterResult *paramapi.GetParameterOutput
+	getParameterResult *model.Parameter
 	getParameterErr    error
-	getHistoryResult   *paramapi.GetParameterHistoryOutput
+	getHistoryResult   *model.ParameterHistory
 	getHistoryErr      error
-	listTagsResult     *paramapi.ListTagsForResourceOutput
-	listTagsErr        error
+	listParametersErr  error
+	getTagsResult      map[string]string
+	getTagsErr         error
 }
 
-//nolint:lll // mock function signature must match AWS SDK interface
-func (m *mockShowClient) GetParameter(_ context.Context, _ *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
+func (m *mockShowClient) GetParameter(_ context.Context, _ string, _ string) (*model.Parameter, error) {
 	if m.getParameterErr != nil {
 		return nil, m.getParameterErr
 	}
@@ -32,30 +31,40 @@ func (m *mockShowClient) GetParameter(_ context.Context, _ *paramapi.GetParamete
 	return m.getParameterResult, nil
 }
 
-//nolint:lll // mock function signature must match AWS SDK interface
-func (m *mockShowClient) GetParameterHistory(_ context.Context, _ *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
+func (m *mockShowClient) GetParameterHistory(_ context.Context, _ string) (*model.ParameterHistory, error) {
 	if m.getHistoryErr != nil {
 		return nil, m.getHistoryErr
 	}
 
 	if m.getHistoryResult == nil {
-		return &paramapi.GetParameterHistoryOutput{}, nil
+		return &model.ParameterHistory{}, nil
 	}
 
 	return m.getHistoryResult, nil
 }
 
-//nolint:lll // mock function signature must match AWS SDK interface
-func (m *mockShowClient) ListTagsForResource(_ context.Context, _ *paramapi.ListTagsForResourceInput, _ ...func(*paramapi.Options)) (*paramapi.ListTagsForResourceOutput, error) {
-	if m.listTagsErr != nil {
-		return nil, m.listTagsErr
+func (m *mockShowClient) ListParameters(_ context.Context, _ string, _ bool) ([]*model.ParameterListItem, error) {
+	if m.listParametersErr != nil {
+		return nil, m.listParametersErr
 	}
 
-	if m.listTagsResult != nil {
-		return m.listTagsResult, nil
+	return nil, nil
+}
+
+func (m *mockShowClient) GetTags(_ context.Context, _ string) (map[string]string, error) {
+	if m.getTagsErr != nil {
+		return nil, m.getTagsErr
 	}
 
-	return &paramapi.ListTagsForResourceOutput{}, nil
+	return m.getTagsResult, nil
+}
+
+func (m *mockShowClient) AddTags(_ context.Context, _ string, _ map[string]string) error {
+	return nil
+}
+
+func (m *mockShowClient) RemoveTags(_ context.Context, _ string, _ []string) error {
+	return nil
 }
 
 func TestShowUseCase_Execute(t *testing.T) {
@@ -63,13 +72,13 @@ func TestShowUseCase_Execute(t *testing.T) {
 
 	now := time.Now()
 	client := &mockShowClient{
-		getParameterResult: &paramapi.GetParameterOutput{
-			Parameter: &paramapi.Parameter{
-				Name:             lo.ToPtr("/app/config"),
-				Value:            lo.ToPtr("secret-value"),
-				Version:          5,
-				Type:             paramapi.ParameterTypeSecureString,
-				LastModifiedDate: &now,
+		getParameterResult: &model.Parameter{
+			Name:         "/app/config",
+			Value:        "secret-value",
+			Version:      "5",
+			LastModified: &now,
+			Metadata: model.AWSParameterMeta{
+				Type: "SecureString",
 			},
 		},
 	}
@@ -85,8 +94,8 @@ func TestShowUseCase_Execute(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "/app/config", output.Name)
 	assert.Equal(t, "secret-value", output.Value)
-	assert.Equal(t, int64(5), output.Version)
-	assert.Equal(t, paramapi.ParameterTypeSecureString, output.Type)
+	assert.Equal(t, "5", output.Version)
+	assert.Equal(t, "SecureString", output.Type)
 	assert.NotNil(t, output.LastModified)
 }
 
@@ -95,12 +104,12 @@ func TestShowUseCase_Execute_WithVersion(t *testing.T) {
 
 	// #VERSION spec without shift uses GetParameter (SSM supports name:version format)
 	client := &mockShowClient{
-		getParameterResult: &paramapi.GetParameterOutput{
-			Parameter: &paramapi.Parameter{
-				Name:    lo.ToPtr("/app/config"),
-				Value:   lo.ToPtr("old-value"),
-				Version: 3,
-				Type:    paramapi.ParameterTypeString,
+		getParameterResult: &model.Parameter{
+			Name:    "/app/config",
+			Value:   "old-value",
+			Version: "3",
+			Metadata: model.AWSParameterMeta{
+				Type: "String",
 			},
 		},
 	}
@@ -116,7 +125,7 @@ func TestShowUseCase_Execute_WithVersion(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "/app/config", output.Name)
 	assert.Equal(t, "old-value", output.Value)
-	assert.Equal(t, int64(3), output.Version)
+	assert.Equal(t, "3", output.Version)
 }
 
 func TestShowUseCase_Execute_WithShift(t *testing.T) {
@@ -124,11 +133,12 @@ func TestShowUseCase_Execute_WithShift(t *testing.T) {
 
 	// Spec with shift uses GetParameterHistory
 	client := &mockShowClient{
-		getHistoryResult: &paramapi.GetParameterHistoryOutput{
-			Parameters: []paramapi.ParameterHistory{
-				{Name: lo.ToPtr("/app/config"), Value: lo.ToPtr("v1"), Version: 1, Type: paramapi.ParameterTypeString},
-				{Name: lo.ToPtr("/app/config"), Value: lo.ToPtr("v2"), Version: 2, Type: paramapi.ParameterTypeString},
-				{Name: lo.ToPtr("/app/config"), Value: lo.ToPtr("v3"), Version: 3, Type: paramapi.ParameterTypeString},
+		getHistoryResult: &model.ParameterHistory{
+			Name: "/app/config",
+			Parameters: []*model.Parameter{
+				{Name: "/app/config", Value: "v1", Version: "1", Metadata: model.AWSParameterMeta{Type: "String"}},
+				{Name: "/app/config", Value: "v2", Version: "2", Metadata: model.AWSParameterMeta{Type: "String"}},
+				{Name: "/app/config", Value: "v3", Version: "3", Metadata: model.AWSParameterMeta{Type: "String"}},
 			},
 		},
 	}
@@ -144,7 +154,7 @@ func TestShowUseCase_Execute_WithShift(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "/app/config", output.Name)
 	assert.Equal(t, "v2", output.Value) // v3 - 1 = v2
-	assert.Equal(t, int64(2), output.Version)
+	assert.Equal(t, "2", output.Version)
 }
 
 func TestShowUseCase_Execute_Error(t *testing.T) {
@@ -169,12 +179,12 @@ func TestShowUseCase_Execute_NoLastModified(t *testing.T) {
 	t.Parallel()
 
 	client := &mockShowClient{
-		getParameterResult: &paramapi.GetParameterOutput{
-			Parameter: &paramapi.Parameter{
-				Name:    lo.ToPtr("/app/config"),
-				Value:   lo.ToPtr("value"),
-				Version: 1,
-				Type:    paramapi.ParameterTypeString,
+		getParameterResult: &model.Parameter{
+			Name:    "/app/config",
+			Value:   "value",
+			Version: "1",
+			Metadata: model.AWSParameterMeta{
+				Type: "String",
 			},
 		},
 	}
@@ -195,19 +205,17 @@ func TestShowUseCase_Execute_WithTags(t *testing.T) {
 	t.Parallel()
 
 	client := &mockShowClient{
-		getParameterResult: &paramapi.GetParameterOutput{
-			Parameter: &paramapi.Parameter{
-				Name:    lo.ToPtr("/app/config"),
-				Value:   lo.ToPtr("value"),
-				Version: 1,
-				Type:    paramapi.ParameterTypeString,
+		getParameterResult: &model.Parameter{
+			Name:    "/app/config",
+			Value:   "value",
+			Version: "1",
+			Metadata: model.AWSParameterMeta{
+				Type: "String",
 			},
 		},
-		listTagsResult: &paramapi.ListTagsForResourceOutput{
-			TagList: []paramapi.Tag{
-				{Key: lo.ToPtr("env"), Value: lo.ToPtr("prod")},
-				{Key: lo.ToPtr("team"), Value: lo.ToPtr("backend")},
-			},
+		getTagsResult: map[string]string{
+			"env":  "prod",
+			"team": "backend",
 		},
 	}
 
@@ -221,8 +229,13 @@ func TestShowUseCase_Execute_WithTags(t *testing.T) {
 	})
 	require.NoError(t, err)
 	assert.Len(t, output.Tags, 2)
-	assert.Equal(t, "env", output.Tags[0].Key)
-	assert.Equal(t, "prod", output.Tags[0].Value)
-	assert.Equal(t, "team", output.Tags[1].Key)
-	assert.Equal(t, "backend", output.Tags[1].Value)
+
+	// Tags are now from a map, so order is not guaranteed
+	tagMap := make(map[string]string)
+	for _, tag := range output.Tags {
+		tagMap[tag.Key] = tag.Value
+	}
+
+	assert.Equal(t, "prod", tagMap["env"])
+	assert.Equal(t, "backend", tagMap["team"])
 }

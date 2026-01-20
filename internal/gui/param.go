@@ -4,12 +4,18 @@ package gui
 
 import (
 	"errors"
+	"strconv"
 
 	"github.com/mpyw/suve/internal/api/paramapi"
 	awsparam "github.com/mpyw/suve/internal/provider/aws/param"
 	"github.com/mpyw/suve/internal/usecase/param"
 	"github.com/mpyw/suve/internal/version/paramversion"
 )
+
+// parseInt64 converts a string to int64, returning 0 on error.
+func parseInt64(s string) (int64, error) {
+	return strconv.ParseInt(s, 10, 64)
+}
 
 // =============================================================================
 // Param Types
@@ -124,23 +130,25 @@ func (a *App) ParamShow(specStr string) (*ParamShowResult, error) {
 		return nil, err
 	}
 
-	client, err := a.getParamClient()
+	adapter, err := awsparam.NewAdapter(a.ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	uc := &param.ShowUseCase{Client: client}
+	uc := &param.ShowUseCase{Client: adapter}
 
 	result, err := uc.Execute(a.ctx, param.ShowInput{Spec: spec})
 	if err != nil {
 		return nil, err
 	}
 
+	version, _ := parseInt64(result.Version)
+
 	r := &ParamShowResult{
 		Name:        result.Name,
 		Value:       result.Value,
-		Version:     result.Version,
-		Type:        string(result.Type),
+		Version:     version,
+		Type:        result.Type,
 		Description: result.Description,
 		Tags:        make([]ParamShowTag, 0, len(result.Tags)),
 	}
