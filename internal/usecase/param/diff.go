@@ -2,17 +2,17 @@ package param
 
 import (
 	"context"
+	"strconv"
 
-	"github.com/samber/lo"
-
-	"github.com/mpyw/suve/internal/api/paramapi"
+	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/version/paramversion"
 )
 
 // DiffClient is the interface for the diff use case.
+//
+//nolint:iface // Intentionally aliases ParameterReader for type clarity in DiffUseCase.
 type DiffClient interface {
-	paramapi.GetParameterAPI
-	paramapi.GetParameterHistoryAPI
+	provider.ParameterReader
 }
 
 // DiffInput holds input for the diff use case.
@@ -48,12 +48,15 @@ func (u *DiffUseCase) Execute(ctx context.Context, input DiffInput) (*DiffOutput
 		return nil, err
 	}
 
+	oldVersion, _ := strconv.ParseInt(param1.Version, 10, 64)
+	newVersion, _ := strconv.ParseInt(param2.Version, 10, 64)
+
 	return &DiffOutput{
-		OldName:    lo.FromPtr(param1.Name),
-		OldVersion: param1.Version,
-		OldValue:   lo.FromPtr(param1.Value),
-		NewName:    lo.FromPtr(param2.Name),
-		NewVersion: param2.Version,
-		NewValue:   lo.FromPtr(param2.Value),
+		OldName:    param1.Name,
+		OldVersion: oldVersion,
+		OldValue:   param1.Value,
+		NewName:    param2.Name,
+		NewVersion: newVersion,
+		NewValue:   param2.Value,
 	}, nil
 }

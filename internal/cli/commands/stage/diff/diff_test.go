@@ -17,6 +17,7 @@ import (
 	appcli "github.com/mpyw/suve/internal/cli/commands"
 	stagediff "github.com/mpyw/suve/internal/cli/commands/stage/diff"
 	"github.com/mpyw/suve/internal/maputil"
+	"github.com/mpyw/suve/internal/model"
 	"github.com/mpyw/suve/internal/staging"
 	"github.com/mpyw/suve/internal/staging/store/testutil"
 )
@@ -131,6 +132,59 @@ func (m *mockSecretClient) DescribeSecret(
 	return &secretapi.DescribeSecretOutput{}, nil
 }
 
+// paramReaderMock implements provider.ParameterReader for testing.
+type paramReaderMock struct {
+	getParameterFunc        func(ctx context.Context, name string, version string) (*model.Parameter, error)
+	getParameterHistoryFunc func(ctx context.Context, name string) (*model.ParameterHistory, error)
+}
+
+func (m *paramReaderMock) GetParameter(ctx context.Context, name string, version string) (*model.Parameter, error) {
+	if m.getParameterFunc != nil {
+		return m.getParameterFunc(ctx, name, version)
+	}
+
+	return nil, fmt.Errorf("GetParameter not mocked")
+}
+
+func (m *paramReaderMock) GetParameterHistory(ctx context.Context, name string) (*model.ParameterHistory, error) {
+	if m.getParameterHistoryFunc != nil {
+		return m.getParameterHistoryFunc(ctx, name)
+	}
+
+	return nil, fmt.Errorf("GetParameterHistory not mocked")
+}
+
+func (m *paramReaderMock) ListParameters(_ context.Context, _ string, _ bool) ([]*model.ParameterListItem, error) {
+	return nil, fmt.Errorf("ListParameters not mocked")
+}
+
+// newDefaultParamReader creates a paramReaderMock that returns a test value based on the name.
+func newDefaultParamReader() *paramReaderMock {
+	return newParamReaderWithValue("aws-value")
+}
+
+// newParamReaderWithValue creates a paramReaderMock that returns the specified value.
+func newParamReaderWithValue(value string) *paramReaderMock {
+	return &paramReaderMock{
+		getParameterFunc: func(_ context.Context, name string, _ string) (*model.Parameter, error) {
+			return &model.Parameter{
+				Name:    name,
+				Value:   value,
+				Version: "1",
+			}, nil
+		},
+	}
+}
+
+// newParamReaderWithError creates a paramReaderMock that returns an error.
+func newParamReaderWithError(err error) *paramReaderMock {
+	return &paramReaderMock{
+		getParameterFunc: func(_ context.Context, _ string, _ string) (*model.Parameter, error) {
+			return nil, err
+		},
+	}
+}
+
 func TestCommand_Validation(t *testing.T) {
 	t.Parallel()
 
@@ -205,6 +259,7 @@ func TestRun_ParamOnly(t *testing.T) {
 
 	r := &stagediff.Runner{
 		ParamClient: paramMock,
+		ParamReader: newParamReaderWithValue("old-value"),
 		Store:       store,
 		Stdout:      &stdout,
 		Stderr:      &stderr,
@@ -308,6 +363,7 @@ func TestRun_BothServices(t *testing.T) {
 
 	r := &stagediff.Runner{
 		ParamClient:  paramMock,
+		ParamReader:  newParamReaderWithValue("param-old"),
 		SecretClient: secretMock,
 		Store:        store,
 		Stdout:       &stdout,
@@ -371,6 +427,7 @@ func TestRun_DeleteOperations(t *testing.T) {
 
 	r := &stagediff.Runner{
 		ParamClient:  paramMock,
+		ParamReader:  newParamReaderWithValue("existing-value"),
 		SecretClient: secretMock,
 		Store:        store,
 		Stdout:       &stdout,
@@ -414,6 +471,7 @@ func TestRun_IdenticalValues(t *testing.T) {
 
 	r := &stagediff.Runner{
 		ParamClient: paramMock,
+		ParamReader: newParamReaderWithValue("same-value"), // same as staged value
 		Store:       store,
 		Stdout:      &stdout,
 		Stderr:      &stderr,
@@ -458,6 +516,7 @@ func TestRun_ParseJSON(t *testing.T) {
 
 	r := &stagediff.Runner{
 		ParamClient: paramMock,
+		ParamReader: newDefaultParamReader(),
 		Store:       store,
 		Stdout:      &stdout,
 		Stderr:      &stderr,
@@ -493,6 +552,7 @@ func TestRun_ParamUpdateAutoUnstageWhenDeleted(t *testing.T) {
 
 	r := &stagediff.Runner{
 		ParamClient: paramMock,
+		ParamReader: newParamReaderWithError(fmt.Errorf("parameter not found")),
 		Store:       store,
 		Stdout:      &stdout,
 		Stderr:      &stderr,
@@ -699,6 +759,7 @@ func TestRun_ParamCreateOperation(t *testing.T) {
 
 	r := &stagediff.Runner{
 		ParamClient: paramMock,
+		ParamReader: newParamReaderWithError(fmt.Errorf("parameter not found")),
 		Store:       store,
 		Stdout:      &stdout,
 		Stderr:      &stderr,
@@ -775,16 +836,13 @@ func TestRun_CreateWithParseJSON(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	paramMock := &mockParamClient{
-		getParameterFunc: func(_ context.Context, _ *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
-			return nil, fmt.Errorf("parameter not found")
-		},
-	}
+	paramMock := &mockParamClient{}
 
 	var stdout, stderr bytes.Buffer
 
 	r := &stagediff.Runner{
 		ParamClient: paramMock,
+		ParamReader: newParamReaderWithError(fmt.Errorf("parameter not found")),
 		Store:       store,
 		Stdout:      &stdout,
 		Stderr:      &stderr,
@@ -810,16 +868,13 @@ func TestRun_DeleteAutoUnstageWhenAlreadyDeleted(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	paramMock := &mockParamClient{
-		getParameterFunc: func(_ context.Context, _ *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
-			return nil, fmt.Errorf("parameter not found")
-		},
-	}
+	paramMock := &mockParamClient{}
 
 	var stdout, stderr bytes.Buffer
 
 	r := &stagediff.Runner{
 		ParamClient: paramMock,
+		ParamReader: newParamReaderWithError(fmt.Errorf("parameter not found")),
 		Store:       store,
 		Stdout:      &stdout,
 		Stderr:      &stderr,
@@ -902,6 +957,7 @@ func TestRun_MetadataWithDescription(t *testing.T) {
 
 	r := &stagediff.Runner{
 		ParamClient: paramMock,
+		ParamReader: newDefaultParamReader(),
 		Store:       store,
 		Stdout:      &stdout,
 		Stderr:      &stderr,
@@ -948,6 +1004,7 @@ func TestRun_MetadataWithTags(t *testing.T) {
 
 	r := &stagediff.Runner{
 		ParamClient: paramMock,
+		ParamReader: newDefaultParamReader(),
 		Store:       store,
 		Stdout:      &stdout,
 		Stderr:      &stderr,
@@ -1133,6 +1190,7 @@ func TestRun_BothEntriesAndTags(t *testing.T) {
 
 	r := &stagediff.Runner{
 		ParamClient: paramMock,
+		ParamReader: newParamReaderWithValue("old-value"),
 		Store:       store,
 		Stdout:      &stdout,
 		Stderr:      &stderr,
@@ -1182,6 +1240,7 @@ func TestRun_ParamTagDiffWithValues(t *testing.T) {
 
 	r := &stagediff.Runner{
 		ParamClient: paramMock,
+		ParamReader: newDefaultParamReader(),
 		Store:       store,
 		Stdout:      &stdout,
 		Stderr:      &stderr,
@@ -1265,6 +1324,7 @@ func TestRun_ParamTagDiffAPIError(t *testing.T) {
 
 	r := &stagediff.Runner{
 		ParamClient: paramMock,
+		ParamReader: newDefaultParamReader(),
 		Store:       store,
 		Stdout:      &stdout,
 		Stderr:      &stderr,
@@ -1348,6 +1408,7 @@ func TestRun_TagDiffWithMissingValue(t *testing.T) {
 
 	r := &stagediff.Runner{
 		ParamClient: paramMock,
+		ParamReader: newDefaultParamReader(),
 		Store:       store,
 		Stdout:      &stdout,
 		Stderr:      &stderr,

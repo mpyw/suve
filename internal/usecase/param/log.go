@@ -12,6 +12,8 @@ import (
 )
 
 // LogClient is the interface for the log use case.
+//
+//nolint:iface // Intentionally aliases ParameterReader for type clarity in LogUseCase.
 type LogClient interface {
 	provider.ParameterReader
 }

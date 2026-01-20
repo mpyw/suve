@@ -220,7 +220,9 @@ func (a *App) ParamDiff(spec1Str, spec2Str string) (*ParamDiffResult, error) {
 		return nil, err
 	}
 
-	uc := &param.DiffUseCase{Client: client}
+	// Create adapter that implements provider.ParameterReader
+	adapter := awsparam.New(client)
+	uc := &param.DiffUseCase{Client: adapter}
 
 	result, err := uc.Execute(a.ctx, param.DiffInput{
 		Spec1: spec1,

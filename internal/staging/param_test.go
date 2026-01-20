@@ -3,6 +3,7 @@ package staging_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -12,6 +13,7 @@ import (
 
 	"github.com/mpyw/suve/internal/api/paramapi"
 	"github.com/mpyw/suve/internal/maputil"
+	"github.com/mpyw/suve/internal/model"
 	"github.com/mpyw/suve/internal/staging"
 )
 
@@ -107,6 +109,32 @@ func (m *paramMockClient) ListTagsForResource(
 	}
 
 	return &paramapi.ListTagsForResourceOutput{}, nil
+}
+
+// paramReaderMock implements provider.ParameterReader for testing.
+type paramReaderMock struct {
+	getParameterFunc        func(ctx context.Context, name string, version string) (*model.Parameter, error)
+	getParameterHistoryFunc func(ctx context.Context, name string) (*model.ParameterHistory, error)
+}
+
+func (m *paramReaderMock) GetParameter(ctx context.Context, name string, version string) (*model.Parameter, error) {
+	if m.getParameterFunc != nil {
+		return m.getParameterFunc(ctx, name, version)
+	}
+
+	return nil, fmt.Errorf("GetParameter not mocked")
+}
+
+func (m *paramReaderMock) GetParameterHistory(ctx context.Context, name string) (*model.ParameterHistory, error) {
+	if m.getParameterHistoryFunc != nil {
+		return m.getParameterHistoryFunc(ctx, name)
+	}
+
+	return nil, fmt.Errorf("GetParameterHistory not mocked")
+}
+
+func (m *paramReaderMock) ListParameters(_ context.Context, _ string, _ bool) ([]*model.ParameterListItem, error) {
+	return nil, fmt.Errorf("ListParameters not mocked")
 }
 
 func TestParamStrategy_BasicMethods(t *testing.T) {
@@ -326,19 +354,19 @@ func TestParamStrategy_FetchCurrent(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		t.Parallel()
 
-		mock := &paramMockClient{
-			getParameterFunc: func(_ context.Context, _ *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
-				return &paramapi.GetParameterOutput{
-					Parameter: &paramapi.Parameter{
-						Name:    lo.ToPtr("/app/param"),
-						Value:   lo.ToPtr("current-value"),
-						Version: 5,
-					},
+		reader := &paramReaderMock{
+			getParameterFunc: func(_ context.Context, name string, _ string) (*model.Parameter, error) {
+				assert.Equal(t, "/app/param", name)
+
+				return &model.Parameter{
+					Name:    "/app/param",
+					Value:   "current-value",
+					Version: "5",
 				}, nil
 			},
 		}
 
-		s := staging.NewParamStrategy(mock)
+		s := &staging.ParamStrategy{Reader: reader}
 		result, err := s.FetchCurrent(t.Context(), "/app/param")
 		require.NoError(t, err)
 		assert.Equal(t, "current-value", result.Value)
@@ -348,13 +376,13 @@ func TestParamStrategy_FetchCurrent(t *testing.T) {
 	t.Run("error", func(t *testing.T) {
 		t.Parallel()
 
-		mock := &paramMockClient{
-			getParameterFunc: func(_ context.Context, _ *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
+		reader := &paramReaderMock{
+			getParameterFunc: func(_ context.Context, _ string, _ string) (*model.Parameter, error) {
 				return nil, errors.New("not found")
 			},
 		}
 
-		s := staging.NewParamStrategy(mock)
+		s := &staging.ParamStrategy{Reader: reader}
 		_, err := s.FetchCurrent(t.Context(), "/app/param")
 		require.Error(t, err)
 	})
@@ -413,18 +441,20 @@ func TestParamStrategy_FetchCurrentValue(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		t.Parallel()
 
-		mock := &paramMockClient{
-			getParameterFunc: func(_ context.Context, _ *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
-				return &paramapi.GetParameterOutput{
-					Parameter: &paramapi.Parameter{
-						Value:            lo.ToPtr("fetched-value"),
-						LastModifiedDate: &now,
-					},
+		reader := &paramReaderMock{
+			getParameterFunc: func(_ context.Context, name string, _ string) (*model.Parameter, error) {
+				assert.Equal(t, "/app/param", name)
+
+				return &model.Parameter{
+					Name:      "/app/param",
+					Value:     "fetched-value",
+					Version:   "1",
+					UpdatedAt: &now,
 				}, nil
 			},
 		}
 
-		s := staging.NewParamStrategy(mock)
+		s := &staging.ParamStrategy{Reader: reader}
 		result, err := s.FetchCurrentValue(t.Context(), "/app/param")
 		require.NoError(t, err)
 		assert.Equal(t, "fetched-value", result.Value)
@@ -434,13 +464,13 @@ func TestParamStrategy_FetchCurrentValue(t *testing.T) {
 	t.Run("error", func(t *testing.T) {
 		t.Parallel()
 
-		mock := &paramMockClient{
-			getParameterFunc: func(_ context.Context, _ *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
+		reader := &paramReaderMock{
+			getParameterFunc: func(_ context.Context, _ string, _ string) (*model.Parameter, error) {
 				return nil, errors.New("fetch error")
 			},
 		}
 
-		s := staging.NewParamStrategy(mock)
+		s := &staging.ParamStrategy{Reader: reader}
 		_, err := s.FetchCurrentValue(t.Context(), "/app/param")
 		require.Error(t, err)
 	})
@@ -492,20 +522,20 @@ func TestParamStrategy_FetchVersion(t *testing.T) {
 	t.Run("success with version", func(t *testing.T) {
 		t.Parallel()
 
-		mock := &paramMockClient{
-			getParameterFunc: func(_ context.Context, params *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
-				// Version selector uses GetParameter with name:version format
-				return &paramapi.GetParameterOutput{
-					Parameter: &paramapi.Parameter{
-						Name:    params.Name,
-						Value:   lo.ToPtr("v2"),
-						Version: 2,
-					},
+		reader := &paramReaderMock{
+			getParameterFunc: func(_ context.Context, name string, version string) (*model.Parameter, error) {
+				assert.Equal(t, "/app/param", name)
+				assert.Equal(t, "2", version)
+
+				return &model.Parameter{
+					Name:    "/app/param",
+					Value:   "v2",
+					Version: "2",
 				}, nil
 			},
 		}
 
-		s := staging.NewParamStrategy(mock)
+		s := &staging.ParamStrategy{Reader: reader}
 		value, label, err := s.FetchVersion(t.Context(), "/app/param#2")
 		require.NoError(t, err)
 		assert.Equal(t, "v2", value)
@@ -515,21 +545,22 @@ func TestParamStrategy_FetchVersion(t *testing.T) {
 	t.Run("success with shift", func(t *testing.T) {
 		t.Parallel()
 
-		mock := &paramMockClient{
-			getParameterHistoryFunc: func(
-				_ context.Context, _ *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options),
-			) (*paramapi.GetParameterHistoryOutput, error) {
-				return &paramapi.GetParameterHistoryOutput{
-					Parameters: []paramapi.ParameterHistory{
-						{Version: 1, Value: lo.ToPtr("v1")},
-						{Version: 2, Value: lo.ToPtr("v2")},
-						{Version: 3, Value: lo.ToPtr("v3")},
+		reader := &paramReaderMock{
+			getParameterHistoryFunc: func(_ context.Context, name string) (*model.ParameterHistory, error) {
+				assert.Equal(t, "/app/param", name)
+
+				return &model.ParameterHistory{
+					Name: "/app/param",
+					Parameters: []*model.Parameter{
+						{Name: "/app/param", Version: "1", Value: "v1"},
+						{Name: "/app/param", Version: "2", Value: "v2"},
+						{Name: "/app/param", Version: "3", Value: "v3"},
 					},
 				}, nil
 			},
 		}
 
-		s := staging.NewParamStrategy(mock)
+		s := &staging.ParamStrategy{Reader: reader}
 		value, label, err := s.FetchVersion(t.Context(), "/app/param~1")
 		require.NoError(t, err)
 		assert.Equal(t, "v2", value)
@@ -547,15 +578,13 @@ func TestParamStrategy_FetchVersion(t *testing.T) {
 	t.Run("fetch error", func(t *testing.T) {
 		t.Parallel()
 
-		mock := &paramMockClient{
-			getParameterHistoryFunc: func(
-				_ context.Context, _ *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options),
-			) (*paramapi.GetParameterHistoryOutput, error) {
+		reader := &paramReaderMock{
+			getParameterFunc: func(_ context.Context, _ string, _ string) (*model.Parameter, error) {
 				return nil, errors.New("fetch error")
 			},
 		}
 
-		s := staging.NewParamStrategy(mock)
+		s := &staging.ParamStrategy{Reader: reader}
 		_, _, err := s.FetchVersion(t.Context(), "/app/param#2")
 		require.Error(t, err)
 	})
@@ -859,18 +888,20 @@ func TestParamStrategy_ApplyTags(t *testing.T) {
 func TestParamStrategy_FetchCurrentValue_NoLastModified(t *testing.T) {
 	t.Parallel()
 
-	mock := &paramMockClient{
-		getParameterFunc: func(_ context.Context, _ *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
-			return &paramapi.GetParameterOutput{
-				Parameter: &paramapi.Parameter{
-					Value:            lo.ToPtr("value"),
-					LastModifiedDate: nil,
-				},
+	reader := &paramReaderMock{
+		getParameterFunc: func(_ context.Context, name string, _ string) (*model.Parameter, error) {
+			assert.Equal(t, "/app/param", name)
+
+			return &model.Parameter{
+				Name:      "/app/param",
+				Value:     "value",
+				Version:   "1",
+				UpdatedAt: nil,
 			}, nil
 		},
 	}
 
-	s := staging.NewParamStrategy(mock)
+	s := &staging.ParamStrategy{Reader: reader}
 	result, err := s.FetchCurrentValue(t.Context(), "/app/param")
 	require.NoError(t, err)
 	assert.Equal(t, "value", result.Value)

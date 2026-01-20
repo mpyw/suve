@@ -18,7 +18,10 @@ import (
 	"github.com/mpyw/suve/internal/infra"
 	"github.com/mpyw/suve/internal/jsonutil"
 	"github.com/mpyw/suve/internal/maputil"
+	"github.com/mpyw/suve/internal/model"
 	"github.com/mpyw/suve/internal/parallel"
+	"github.com/mpyw/suve/internal/provider"
+	awsparam "github.com/mpyw/suve/internal/provider/aws/param"
 	"github.com/mpyw/suve/internal/staging"
 	"github.com/mpyw/suve/internal/staging/store"
 	"github.com/mpyw/suve/internal/staging/store/agent"
@@ -44,6 +47,7 @@ type SecretClient interface {
 // Runner executes the diff command.
 type Runner struct {
 	ParamClient  ParamClient
+	ParamReader  provider.ParameterReader // for version resolution
 	SecretClient SecretClient
 	Store        store.ReadWriteOperator
 	Stdout       io.Writer
@@ -144,6 +148,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 			}
 
 			r.ParamClient = paramClient
+			r.ParamReader = awsparam.New(paramClient)
 		}
 
 		if hasSecret {
@@ -193,10 +198,10 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 	paramResults := parallel.ExecuteMap(
 		ctx,
 		paramEntries,
-		func(ctx context.Context, name string, _ staging.Entry) (*paramapi.ParameterHistory, error) {
+		func(ctx context.Context, name string, _ staging.Entry) (*model.Parameter, error) {
 			spec := &paramversion.Spec{Name: name}
 
-			return paramversion.GetParameterWithVersion(ctx, r.ParamClient, spec)
+			return paramversion.GetParameterWithVersion(ctx, r.ParamReader, spec)
 		},
 	)
 
@@ -353,8 +358,8 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 	return nil
 }
 
-func (r *Runner) outputParamDiff(ctx context.Context, opts Options, name string, entry staging.Entry, param *paramapi.ParameterHistory) error {
-	awsValue := lo.FromPtr(param.Value)
+func (r *Runner) outputParamDiff(ctx context.Context, opts Options, name string, entry staging.Entry, param *model.Parameter) error {
+	awsValue := param.Value
 	stagedValue := lo.FromPtr(entry.Value)
 
 	// For delete operation, staged value is empty
@@ -378,7 +383,7 @@ func (r *Runner) outputParamDiff(ctx context.Context, opts Options, name string,
 		return nil
 	}
 
-	label1 := fmt.Sprintf("%s#%d (AWS)", name, param.Version)
+	label1 := fmt.Sprintf("%s#%s (AWS)", name, param.Version)
 	label2 := fmt.Sprintf(lo.Ternary(
 		entry.Operation == staging.OperationDelete,
 		"%s (staged for deletion)",

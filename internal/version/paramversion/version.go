@@ -5,21 +5,15 @@ import (
 	"context"
 	"fmt"
 	"slices"
+	"strconv"
 
-	"github.com/samber/lo"
-
-	"github.com/mpyw/suve/internal/api/paramapi"
+	"github.com/mpyw/suve/internal/model"
+	"github.com/mpyw/suve/internal/provider"
 )
-
-// Client is the interface for GetParameterWithVersion.
-type Client interface {
-	paramapi.GetParameterAPI
-	paramapi.GetParameterHistoryAPI
-}
 
 // GetParameterWithVersion retrieves a parameter with version/shift support.
 // SecureString values are always decrypted.
-func GetParameterWithVersion(ctx context.Context, client Client, spec *Spec) (*paramapi.ParameterHistory, error) {
+func GetParameterWithVersion(ctx context.Context, client provider.ParameterReader, spec *Spec) (*model.Parameter, error) {
 	if spec.HasShift() {
 		return getParameterWithShift(ctx, client, spec)
 	}
@@ -27,11 +21,8 @@ func GetParameterWithVersion(ctx context.Context, client Client, spec *Spec) (*p
 	return getParameterDirect(ctx, client, spec)
 }
 
-func getParameterWithShift(ctx context.Context, client paramapi.GetParameterHistoryAPI, spec *Spec) (*paramapi.ParameterHistory, error) {
-	history, err := client.GetParameterHistory(ctx, &paramapi.GetParameterHistoryInput{
-		Name:           lo.ToPtr(spec.Name),
-		WithDecryption: lo.ToPtr(true),
-	})
+func getParameterWithShift(ctx context.Context, client provider.ParameterReader, spec *Spec) (*model.Parameter, error) {
+	history, err := client.GetParameterHistory(ctx, spec.Name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get parameter history: %w", err)
 	}
@@ -40,18 +31,26 @@ func getParameterWithShift(ctx context.Context, client paramapi.GetParameterHist
 		return nil, fmt.Errorf("parameter not found: %s", spec.Name)
 	}
 
-	// Reverse to get newest first
-	params := history.Parameters
+	// Copy and reverse to get newest first
+	params := make([]*model.Parameter, len(history.Parameters))
+	copy(params, history.Parameters)
 	slices.Reverse(params)
 
 	baseIdx := 0
 
 	if spec.Absolute.Version != nil {
-		var found bool
+		targetVersion := strconv.FormatInt(*spec.Absolute.Version, 10)
+		found := false
 
-		_, baseIdx, found = lo.FindIndexOf(params, func(p paramapi.ParameterHistory) bool {
-			return p.Version == *spec.Absolute.Version
-		})
+		for i, p := range params {
+			if p.Version == targetVersion {
+				baseIdx = i
+				found = true
+
+				break
+			}
+		}
+
 		if !found {
 			return nil, fmt.Errorf("version %d not found", *spec.Absolute.Version)
 		}
@@ -62,32 +61,19 @@ func getParameterWithShift(ctx context.Context, client paramapi.GetParameterHist
 		return nil, fmt.Errorf("version shift out of range: ~%d", spec.Shift)
 	}
 
-	return &params[targetIdx], nil
+	return params[targetIdx], nil
 }
 
-func getParameterDirect(ctx context.Context, client paramapi.GetParameterAPI, spec *Spec) (*paramapi.ParameterHistory, error) {
-	var nameWithVersion string
+func getParameterDirect(ctx context.Context, client provider.ParameterReader, spec *Spec) (*model.Parameter, error) {
+	version := ""
 	if spec.Absolute.Version != nil {
-		nameWithVersion = fmt.Sprintf("%s:%d", spec.Name, *spec.Absolute.Version)
-	} else {
-		nameWithVersion = spec.Name
+		version = strconv.FormatInt(*spec.Absolute.Version, 10)
 	}
 
-	result, err := client.GetParameter(ctx, &paramapi.GetParameterInput{
-		Name:           lo.ToPtr(nameWithVersion),
-		WithDecryption: lo.ToPtr(true),
-	})
+	param, err := client.GetParameter(ctx, spec.Name, version)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get parameter: %w", err)
 	}
 
-	param := result.Parameter
-
-	return &paramapi.ParameterHistory{
-		Name:             param.Name,
-		Value:            param.Value,
-		Type:             param.Type,
-		Version:          param.Version,
-		LastModifiedDate: param.LastModifiedDate,
-	}, nil
+	return param, nil
 }
