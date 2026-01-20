@@ -14,9 +14,9 @@ require (
 	github.com/mattn/go-isatty v0.0.20
 	github.com/samber/lo v1.52.0
 	github.com/stretchr/testify v1.11.1
-	github.com/urfave/cli/v3 v3.6.1
+	github.com/urfave/cli/v3 v3.6.2
 	github.com/wailsapp/wails/v2 v2.11.0
-	github.com/walles/moor/v2 v2.10.1
+	github.com/walles/moor/v2 v2.10.2
 	golang.org/x/crypto v0.47.0
 	golang.org/x/sync v0.19.0
 	golang.org/x/sys v0.40.0
@@ -26,7 +26,7 @@ require (
 
 require (
 	github.com/adrg/xdg v0.5.3 // indirect
-	github.com/alecthomas/chroma/v2 v2.21.1 // indirect
+	github.com/alecthomas/chroma/v2 v2.22.0 // indirect
 	github.com/awnumar/memcall v0.4.0 // indirect
 	github.com/aws/aws-sdk-go-v2/credentials v1.19.7 // indirect
 	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.18.17 // indirect
