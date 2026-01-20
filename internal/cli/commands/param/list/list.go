@@ -12,6 +12,7 @@ import (
 
 	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/infra"
+	awsparam "github.com/mpyw/suve/internal/provider/aws/param"
 	"github.com/mpyw/suve/internal/usecase/param"
 )
 
@@ -101,8 +102,10 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		return fmt.Errorf("failed to initialize AWS client: %w", err)
 	}
 
+	adapter := awsparam.New(client)
+
 	r := &Runner{
-		UseCase: &param.ListUseCase{Client: client},
+		UseCase: &param.ListUseCase{Client: adapter},
 		Stdout:  cmd.Root().Writer,
 		Stderr:  cmd.Root().ErrWriter,
 	}

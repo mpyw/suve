@@ -97,7 +97,8 @@ func (a *App) ParamList(prefix string, recursive bool, withValue bool, filter st
 		return nil, err
 	}
 
-	uc := &param.ListUseCase{Client: client}
+	adapter := awsparam.New(client)
+	uc := &param.ListUseCase{Client: adapter}
 
 	result, err := uc.Execute(a.ctx, param.ListInput{
 		Prefix:     prefix,

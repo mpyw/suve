@@ -13,6 +13,7 @@ import (
 	"github.com/mpyw/suve/internal/cli/pager"
 	"github.com/mpyw/suve/internal/infra"
 	"github.com/mpyw/suve/internal/jsonutil"
+	awssecret "github.com/mpyw/suve/internal/provider/aws/secret"
 	"github.com/mpyw/suve/internal/timeutil"
 	"github.com/mpyw/suve/internal/usecase/secret"
 	"github.com/mpyw/suve/internal/version/secretversion"
@@ -115,6 +116,8 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		return fmt.Errorf("failed to initialize AWS client: %w", err)
 	}
 
+	adapter := awssecret.New(client)
+
 	opts := Options{
 		Spec:      spec,
 		ParseJSON: cmd.Bool("parse-json"),
@@ -128,7 +131,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 
 	return pager.WithPagerWriter(cmd.Root().Writer, noPager, func(w io.Writer) error {
 		r := &Runner{
-			UseCase: &secret.ShowUseCase{Client: client},
+			UseCase: &secret.ShowUseCase{Client: adapter},
 			Stdout:  w,
 			Stderr:  cmd.Root().ErrWriter,
 		}

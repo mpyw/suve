@@ -4,17 +4,15 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"fmt"
 	"testing"
 
-	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/mpyw/suve/internal/api/secretapi"
 	appcli "github.com/mpyw/suve/internal/cli/commands"
 	"github.com/mpyw/suve/internal/cli/commands/secret/list"
 	"github.com/mpyw/suve/internal/cli/output"
+	"github.com/mpyw/suve/internal/model"
 	"github.com/mpyw/suve/internal/usecase/secret"
 )
 
@@ -34,31 +32,40 @@ func TestCommand_Help(t *testing.T) {
 }
 
 type mockClient struct {
-	//nolint:lll // mock function signature
-	listSecretsFunc func(ctx context.Context, params *secretapi.ListSecretsInput, optFns ...func(*secretapi.Options)) (*secretapi.ListSecretsOutput, error)
-	//nolint:lll // mock function signature
-	getSecretValueFunc func(ctx context.Context, params *secretapi.GetSecretValueInput, optFns ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error)
+	listSecretsResult []*model.SecretListItem
+	listSecretsErr    error
+	getSecretValues   map[string]string
+	getSecretErr      map[string]error
 }
 
-//nolint:lll // mock function signature
-func (m *mockClient) ListSecrets(ctx context.Context, params *secretapi.ListSecretsInput, optFns ...func(*secretapi.Options)) (*secretapi.ListSecretsOutput, error) {
-	if m.listSecretsFunc != nil {
-		return m.listSecretsFunc(ctx, params, optFns...)
+func (m *mockClient) ListSecrets(_ context.Context) ([]*model.SecretListItem, error) {
+	if m.listSecretsErr != nil {
+		return nil, m.listSecretsErr
 	}
 
-	return nil, fmt.Errorf("ListSecrets not mocked")
+	return m.listSecretsResult, nil
 }
 
-//nolint:lll // mock function signature
-func (m *mockClient) GetSecretValue(ctx context.Context, params *secretapi.GetSecretValueInput, optFns ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) {
-	if m.getSecretValueFunc != nil {
-		return m.getSecretValueFunc(ctx, params, optFns...)
+func (m *mockClient) GetSecret(_ context.Context, name, _, _ string) (*model.Secret, error) {
+	if m.getSecretErr != nil {
+		if err, ok := m.getSecretErr[name]; ok {
+			return nil, err
+		}
 	}
 
-	return nil, fmt.Errorf("GetSecretValue not mocked")
+	if m.getSecretValues != nil {
+		if value, ok := m.getSecretValues[name]; ok {
+			return &model.Secret{Name: name, Value: value}, nil
+		}
+	}
+
+	return nil, errors.New("not found")
 }
 
-//nolint:funlen // Table-driven test with many cases
+func (m *mockClient) GetSecretVersions(_ context.Context, _ string) ([]*model.SecretVersion, error) {
+	return nil, errors.New("not implemented")
+}
+
 func TestRun(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
@@ -72,13 +79,9 @@ func TestRun(t *testing.T) {
 			name: "list all secrets",
 			opts: list.Options{},
 			mock: &mockClient{
-				listSecretsFunc: func(_ context.Context, _ *secretapi.ListSecretsInput, _ ...func(*secretapi.Options)) (*secretapi.ListSecretsOutput, error) {
-					return &secretapi.ListSecretsOutput{
-						SecretList: []secretapi.SecretListEntry{
-							{Name: lo.ToPtr("secret1")},
-							{Name: lo.ToPtr("secret2")},
-						},
-					}, nil
+				listSecretsResult: []*model.SecretListItem{
+					{Name: "secret1"},
+					{Name: "secret2"},
 				},
 			},
 			check: func(t *testing.T, output string) {
@@ -91,15 +94,8 @@ func TestRun(t *testing.T) {
 			name: "list with prefix filter",
 			opts: list.Options{Prefix: "app/"},
 			mock: &mockClient{
-				//nolint:lll // mock function signature
-				listSecretsFunc: func(_ context.Context, params *secretapi.ListSecretsInput, _ ...func(*secretapi.Options)) (*secretapi.ListSecretsOutput, error) {
-					require.NotEmpty(t, params.Filters, "expected filter to be set")
-
-					return &secretapi.ListSecretsOutput{
-						SecretList: []secretapi.SecretListEntry{
-							{Name: lo.ToPtr("app/secret1")},
-						},
-					}, nil
+				listSecretsResult: []*model.SecretListItem{
+					{Name: "app/secret1"},
 				},
 			},
 			check: func(t *testing.T, output string) {
@@ -111,9 +107,7 @@ func TestRun(t *testing.T) {
 			name: "error from AWS",
 			opts: list.Options{},
 			mock: &mockClient{
-				listSecretsFunc: func(_ context.Context, _ *secretapi.ListSecretsInput, _ ...func(*secretapi.Options)) (*secretapi.ListSecretsOutput, error) {
-					return nil, fmt.Errorf("AWS error")
-				},
+				listSecretsErr: errors.New("AWS error"),
 			},
 			wantErr: true,
 		},
@@ -121,14 +115,10 @@ func TestRun(t *testing.T) {
 			name: "filter by regex",
 			opts: list.Options{Filter: "prod"},
 			mock: &mockClient{
-				listSecretsFunc: func(_ context.Context, _ *secretapi.ListSecretsInput, _ ...func(*secretapi.Options)) (*secretapi.ListSecretsOutput, error) {
-					return &secretapi.ListSecretsOutput{
-						SecretList: []secretapi.SecretListEntry{
-							{Name: lo.ToPtr("app/prod/secret1")},
-							{Name: lo.ToPtr("app/dev/secret2")},
-							{Name: lo.ToPtr("app/prod/secret3")},
-						},
-					}, nil
+				listSecretsResult: []*model.SecretListItem{
+					{Name: "app/prod/secret1"},
+					{Name: "app/dev/secret2"},
+					{Name: "app/prod/secret3"},
 				},
 			},
 			check: func(t *testing.T, output string) {
@@ -142,9 +132,7 @@ func TestRun(t *testing.T) {
 			name: "invalid regex filter",
 			opts: list.Options{Filter: "[invalid"},
 			mock: &mockClient{
-				listSecretsFunc: func(_ context.Context, _ *secretapi.ListSecretsInput, _ ...func(*secretapi.Options)) (*secretapi.ListSecretsOutput, error) {
-					return &secretapi.ListSecretsOutput{}, nil
-				},
+				listSecretsResult: []*model.SecretListItem{},
 			},
 			wantErr: true,
 		},
@@ -152,26 +140,13 @@ func TestRun(t *testing.T) {
 			name: "show secret values",
 			opts: list.Options{Show: true},
 			mock: &mockClient{
-				listSecretsFunc: func(_ context.Context, _ *secretapi.ListSecretsInput, _ ...func(*secretapi.Options)) (*secretapi.ListSecretsOutput, error) {
-					return &secretapi.ListSecretsOutput{
-						SecretList: []secretapi.SecretListEntry{
-							{Name: lo.ToPtr("secret1")},
-							{Name: lo.ToPtr("secret2")},
-						},
-					}, nil
+				listSecretsResult: []*model.SecretListItem{
+					{Name: "secret1"},
+					{Name: "secret2"},
 				},
-				//nolint:lll // mock function signature
-				getSecretValueFunc: func(_ context.Context, params *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) {
-					name := lo.FromPtr(params.SecretId)
-					values := map[string]string{
-						"secret1": "value1",
-						"secret2": "value2",
-					}
-
-					return &secretapi.GetSecretValueOutput{
-						Name:         params.SecretId,
-						SecretString: lo.ToPtr(values[name]),
-					}, nil
+				getSecretValues: map[string]string{
+					"secret1": "value1",
+					"secret2": "value2",
 				},
 			},
 			check: func(t *testing.T, out string) {
@@ -184,13 +159,9 @@ func TestRun(t *testing.T) {
 			name: "JSON output without show",
 			opts: list.Options{Output: output.FormatJSON},
 			mock: &mockClient{
-				listSecretsFunc: func(_ context.Context, _ *secretapi.ListSecretsInput, _ ...func(*secretapi.Options)) (*secretapi.ListSecretsOutput, error) {
-					return &secretapi.ListSecretsOutput{
-						SecretList: []secretapi.SecretListEntry{
-							{Name: lo.ToPtr("secret1")},
-							{Name: lo.ToPtr("secret2")},
-						},
-					}, nil
+				listSecretsResult: []*model.SecretListItem{
+					{Name: "secret1"},
+					{Name: "secret2"},
 				},
 			},
 			check: func(t *testing.T, out string) {
@@ -204,19 +175,11 @@ func TestRun(t *testing.T) {
 			name: "JSON output with show",
 			opts: list.Options{Output: output.FormatJSON, Show: true},
 			mock: &mockClient{
-				listSecretsFunc: func(_ context.Context, _ *secretapi.ListSecretsInput, _ ...func(*secretapi.Options)) (*secretapi.ListSecretsOutput, error) {
-					return &secretapi.ListSecretsOutput{
-						SecretList: []secretapi.SecretListEntry{
-							{Name: lo.ToPtr("secret1")},
-						},
-					}, nil
+				listSecretsResult: []*model.SecretListItem{
+					{Name: "secret1"},
 				},
-				//nolint:lll // mock function signature
-				getSecretValueFunc: func(_ context.Context, params *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) {
-					return &secretapi.GetSecretValueOutput{
-						Name:         params.SecretId,
-						SecretString: lo.ToPtr("secret-value"),
-					}, nil
+				getSecretValues: map[string]string{
+					"secret1": "secret-value",
 				},
 			},
 			check: func(t *testing.T, out string) {
@@ -229,36 +192,28 @@ func TestRun(t *testing.T) {
 			name: "JSON output with show and error",
 			opts: list.Options{Output: output.FormatJSON, Show: true},
 			mock: &mockClient{
-				listSecretsFunc: func(_ context.Context, _ *secretapi.ListSecretsInput, _ ...func(*secretapi.Options)) (*secretapi.ListSecretsOutput, error) {
-					return &secretapi.ListSecretsOutput{
-						SecretList: []secretapi.SecretListEntry{
-							{Name: lo.ToPtr("error-secret")},
-						},
-					}, nil
+				listSecretsResult: []*model.SecretListItem{
+					{Name: "error-secret"},
 				},
-				getSecretValueFunc: func(_ context.Context, _ *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) { //nolint:lll
-					return nil, errors.New("access denied")
+				getSecretErr: map[string]error{
+					"error-secret": errors.New("access denied"),
 				},
 			},
 			check: func(t *testing.T, out string) {
 				t.Helper()
 				assert.Contains(t, out, `"name": "error-secret"`)
-				assert.Contains(t, out, `"error": "access denied"`)
+				assert.Contains(t, out, `access denied`)
 			},
 		},
 		{
 			name: "text output with error",
 			opts: list.Options{Show: true},
 			mock: &mockClient{
-				listSecretsFunc: func(_ context.Context, _ *secretapi.ListSecretsInput, _ ...func(*secretapi.Options)) (*secretapi.ListSecretsOutput, error) {
-					return &secretapi.ListSecretsOutput{
-						SecretList: []secretapi.SecretListEntry{
-							{Name: lo.ToPtr("error-secret")},
-						},
-					}, nil
+				listSecretsResult: []*model.SecretListItem{
+					{Name: "error-secret"},
 				},
-				getSecretValueFunc: func(_ context.Context, _ *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) { //nolint:lll
-					return nil, errors.New("fetch error")
+				getSecretErr: map[string]error{
+					"error-secret": errors.New("fetch error"),
 				},
 			},
 			check: func(t *testing.T, out string) {

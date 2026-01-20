@@ -12,6 +12,7 @@ import (
 
 	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/infra"
+	awssecret "github.com/mpyw/suve/internal/provider/aws/secret"
 	"github.com/mpyw/suve/internal/usecase/secret"
 )
 
@@ -94,8 +95,10 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		return fmt.Errorf("failed to initialize AWS client: %w", err)
 	}
 
+	adapter := awssecret.New(client)
+
 	r := &Runner{
-		UseCase: &secret.ListUseCase{Client: client},
+		UseCase: &secret.ListUseCase{Client: adapter},
 		Stdout:  cmd.Root().Writer,
 		Stderr:  cmd.Root().ErrWriter,
 	}

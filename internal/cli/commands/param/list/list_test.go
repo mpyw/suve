@@ -3,17 +3,16 @@ package list_test
 import (
 	"bytes"
 	"context"
-	"fmt"
+	"errors"
 	"testing"
 
-	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/mpyw/suve/internal/api/paramapi"
 	appcli "github.com/mpyw/suve/internal/cli/commands"
 	"github.com/mpyw/suve/internal/cli/commands/param/list"
 	"github.com/mpyw/suve/internal/cli/output"
+	"github.com/mpyw/suve/internal/model"
 	"github.com/mpyw/suve/internal/usecase/param"
 )
 
@@ -33,31 +32,41 @@ func TestCommand_Help(t *testing.T) {
 	assert.Contains(t, buf.String(), "--show")
 }
 
-//nolint:lll // mock struct fields match AWS SDK interface signatures
 type mockClient struct {
-	describeParametersFunc func(ctx context.Context, params *paramapi.DescribeParametersInput, optFns ...func(*paramapi.Options)) (*paramapi.DescribeParametersOutput, error)
-	getParametersFunc      func(ctx context.Context, params *paramapi.GetParametersInput, optFns ...func(*paramapi.Options)) (*paramapi.GetParametersOutput, error)
+	listParametersResult []*model.ParameterListItem
+	listParametersErr    error
+	getParameterValues   map[string]string
+	getParameterErr      map[string]error
 }
 
-//nolint:lll // mock function signature must match AWS SDK interface
-func (m *mockClient) DescribeParameters(ctx context.Context, params *paramapi.DescribeParametersInput, optFns ...func(*paramapi.Options)) (*paramapi.DescribeParametersOutput, error) {
-	if m.describeParametersFunc != nil {
-		return m.describeParametersFunc(ctx, params, optFns...)
+func (m *mockClient) ListParameters(_ context.Context, _ string, _ bool) ([]*model.ParameterListItem, error) {
+	if m.listParametersErr != nil {
+		return nil, m.listParametersErr
 	}
 
-	return nil, fmt.Errorf("DescribeParameters not mocked")
+	return m.listParametersResult, nil
 }
 
-//nolint:lll // mock function signature must match AWS SDK interface
-func (m *mockClient) GetParameters(ctx context.Context, params *paramapi.GetParametersInput, optFns ...func(*paramapi.Options)) (*paramapi.GetParametersOutput, error) {
-	if m.getParametersFunc != nil {
-		return m.getParametersFunc(ctx, params, optFns...)
+func (m *mockClient) GetParameter(_ context.Context, name, _ string) (*model.Parameter, error) {
+	if m.getParameterErr != nil {
+		if err, ok := m.getParameterErr[name]; ok {
+			return nil, err
+		}
 	}
 
-	return nil, fmt.Errorf("GetParameters not mocked")
+	if m.getParameterValues != nil {
+		if value, ok := m.getParameterValues[name]; ok {
+			return &model.Parameter{Name: name, Value: value}, nil
+		}
+	}
+
+	return nil, errors.New("not found")
 }
 
-//nolint:funlen // Table-driven test with many cases
+func (m *mockClient) GetParameterHistory(_ context.Context, _ string) (*model.ParameterHistory, error) {
+	return nil, errors.New("not implemented")
+}
+
 func TestRun(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
@@ -71,14 +80,9 @@ func TestRun(t *testing.T) {
 			name: "list all parameters",
 			opts: list.Options{},
 			mock: &mockClient{
-				//nolint:lll // inline mock function in test table
-				describeParametersFunc: func(_ context.Context, _ *paramapi.DescribeParametersInput, _ ...func(*paramapi.Options)) (*paramapi.DescribeParametersOutput, error) {
-					return &paramapi.DescribeParametersOutput{
-						Parameters: []paramapi.ParameterMetadata{
-							{Name: lo.ToPtr("/app/param1")},
-							{Name: lo.ToPtr("/app/param2")},
-						},
-					}, nil
+				listParametersResult: []*model.ParameterListItem{
+					{Name: "/app/param1"},
+					{Name: "/app/param2"},
 				},
 			},
 			check: func(t *testing.T, output string) {
@@ -91,15 +95,8 @@ func TestRun(t *testing.T) {
 			name: "list with prefix",
 			opts: list.Options{Prefix: "/app/"},
 			mock: &mockClient{
-				//nolint:lll // inline mock function in test table
-				describeParametersFunc: func(_ context.Context, params *paramapi.DescribeParametersInput, _ ...func(*paramapi.Options)) (*paramapi.DescribeParametersOutput, error) {
-					require.NotEmpty(t, params.ParameterFilters, "expected filter to be set")
-
-					return &paramapi.DescribeParametersOutput{
-						Parameters: []paramapi.ParameterMetadata{
-							{Name: lo.ToPtr("/app/param1")},
-						},
-					}, nil
+				listParametersResult: []*model.ParameterListItem{
+					{Name: "/app/param1"},
 				},
 			},
 			check: func(t *testing.T, output string) {
@@ -111,16 +108,8 @@ func TestRun(t *testing.T) {
 			name: "recursive listing",
 			opts: list.Options{Prefix: "/app/", Recursive: true},
 			mock: &mockClient{
-				//nolint:lll // inline mock function in test table
-				describeParametersFunc: func(_ context.Context, params *paramapi.DescribeParametersInput, _ ...func(*paramapi.Options)) (*paramapi.DescribeParametersOutput, error) {
-					require.NotEmpty(t, params.ParameterFilters, "expected filter to be set")
-					assert.Equal(t, "Recursive", lo.FromPtr(params.ParameterFilters[0].Option))
-
-					return &paramapi.DescribeParametersOutput{
-						Parameters: []paramapi.ParameterMetadata{
-							{Name: lo.ToPtr("/app/sub/param")},
-						},
-					}, nil
+				listParametersResult: []*model.ParameterListItem{
+					{Name: "/app/sub/param"},
 				},
 			},
 			check: func(t *testing.T, output string) {
@@ -132,10 +121,7 @@ func TestRun(t *testing.T) {
 			name: "error from AWS",
 			opts: list.Options{},
 			mock: &mockClient{
-				//nolint:lll // inline mock function in test table
-				describeParametersFunc: func(_ context.Context, _ *paramapi.DescribeParametersInput, _ ...func(*paramapi.Options)) (*paramapi.DescribeParametersOutput, error) {
-					return nil, fmt.Errorf("AWS error")
-				},
+				listParametersErr: errors.New("AWS error"),
 			},
 			wantErr: true,
 		},
@@ -143,15 +129,10 @@ func TestRun(t *testing.T) {
 			name: "filter by regex",
 			opts: list.Options{Filter: "prod"},
 			mock: &mockClient{
-				//nolint:lll // inline mock function in test table
-				describeParametersFunc: func(_ context.Context, _ *paramapi.DescribeParametersInput, _ ...func(*paramapi.Options)) (*paramapi.DescribeParametersOutput, error) {
-					return &paramapi.DescribeParametersOutput{
-						Parameters: []paramapi.ParameterMetadata{
-							{Name: lo.ToPtr("/app/prod/param1")},
-							{Name: lo.ToPtr("/app/dev/param2")},
-							{Name: lo.ToPtr("/app/prod/param3")},
-						},
-					}, nil
+				listParametersResult: []*model.ParameterListItem{
+					{Name: "/app/prod/param1"},
+					{Name: "/app/dev/param2"},
+					{Name: "/app/prod/param3"},
 				},
 			},
 			check: func(t *testing.T, output string) {
@@ -165,10 +146,7 @@ func TestRun(t *testing.T) {
 			name: "invalid regex filter",
 			opts: list.Options{Filter: "[invalid"},
 			mock: &mockClient{
-				//nolint:lll // mock function signature
-				describeParametersFunc: func(_ context.Context, _ *paramapi.DescribeParametersInput, _ ...func(*paramapi.Options)) (*paramapi.DescribeParametersOutput, error) {
-					return &paramapi.DescribeParametersOutput{}, nil
-				},
+				listParametersResult: []*model.ParameterListItem{},
 			},
 			wantErr: true,
 		},
@@ -176,36 +154,13 @@ func TestRun(t *testing.T) {
 			name: "show parameter values",
 			opts: list.Options{Show: true},
 			mock: &mockClient{
-				//nolint:lll // inline mock function in test table
-				describeParametersFunc: func(_ context.Context, _ *paramapi.DescribeParametersInput, _ ...func(*paramapi.Options)) (*paramapi.DescribeParametersOutput, error) {
-					return &paramapi.DescribeParametersOutput{
-						Parameters: []paramapi.ParameterMetadata{
-							{Name: lo.ToPtr("/app/param1")},
-							{Name: lo.ToPtr("/app/param2")},
-						},
-					}, nil
+				listParametersResult: []*model.ParameterListItem{
+					{Name: "/app/param1"},
+					{Name: "/app/param2"},
 				},
-				//nolint:lll // mock function signature
-				getParametersFunc: func(_ context.Context, params *paramapi.GetParametersInput, _ ...func(*paramapi.Options)) (*paramapi.GetParametersOutput, error) {
-					values := map[string]string{
-						"/app/param1": "value1",
-						"/app/param2": "value2",
-					}
-
-					var result []paramapi.Parameter
-
-					for _, name := range params.Names {
-						if val, ok := values[name]; ok {
-							result = append(result, paramapi.Parameter{
-								Name:  lo.ToPtr(name),
-								Value: lo.ToPtr(val),
-							})
-						}
-					}
-
-					return &paramapi.GetParametersOutput{
-						Parameters: result,
-					}, nil
+				getParameterValues: map[string]string{
+					"/app/param1": "value1",
+					"/app/param2": "value2",
 				},
 			},
 			check: func(t *testing.T, output string) {
@@ -218,14 +173,9 @@ func TestRun(t *testing.T) {
 			name: "JSON output without show",
 			opts: list.Options{Output: output.FormatJSON},
 			mock: &mockClient{
-				//nolint:lll // mock function signature
-				describeParametersFunc: func(_ context.Context, _ *paramapi.DescribeParametersInput, _ ...func(*paramapi.Options)) (*paramapi.DescribeParametersOutput, error) {
-					return &paramapi.DescribeParametersOutput{
-						Parameters: []paramapi.ParameterMetadata{
-							{Name: lo.ToPtr("/app/param1")},
-							{Name: lo.ToPtr("/app/param2")},
-						},
-					}, nil
+				listParametersResult: []*model.ParameterListItem{
+					{Name: "/app/param1"},
+					{Name: "/app/param2"},
 				},
 			},
 			check: func(t *testing.T, out string) {
@@ -239,27 +189,11 @@ func TestRun(t *testing.T) {
 			name: "JSON output with show",
 			opts: list.Options{Output: output.FormatJSON, Show: true},
 			mock: &mockClient{
-				//nolint:lll // mock function signature
-				describeParametersFunc: func(_ context.Context, _ *paramapi.DescribeParametersInput, _ ...func(*paramapi.Options)) (*paramapi.DescribeParametersOutput, error) {
-					return &paramapi.DescribeParametersOutput{
-						Parameters: []paramapi.ParameterMetadata{
-							{Name: lo.ToPtr("/app/param1")},
-						},
-					}, nil
+				listParametersResult: []*model.ParameterListItem{
+					{Name: "/app/param1"},
 				},
-				//nolint:lll // mock function signature
-				getParametersFunc: func(_ context.Context, params *paramapi.GetParametersInput, _ ...func(*paramapi.Options)) (*paramapi.GetParametersOutput, error) {
-					result := make([]paramapi.Parameter, 0, len(params.Names))
-					for _, name := range params.Names {
-						result = append(result, paramapi.Parameter{
-							Name:  lo.ToPtr(name),
-							Value: lo.ToPtr("secret-value"),
-						})
-					}
-
-					return &paramapi.GetParametersOutput{
-						Parameters: result,
-					}, nil
+				getParameterValues: map[string]string{
+					"/app/param1": "secret-value",
 				},
 			},
 			check: func(t *testing.T, out string) {
@@ -272,20 +206,11 @@ func TestRun(t *testing.T) {
 			name: "JSON output with show and error",
 			opts: list.Options{Output: output.FormatJSON, Show: true},
 			mock: &mockClient{
-				//nolint:lll // mock function signature
-				describeParametersFunc: func(_ context.Context, _ *paramapi.DescribeParametersInput, _ ...func(*paramapi.Options)) (*paramapi.DescribeParametersOutput, error) {
-					return &paramapi.DescribeParametersOutput{
-						Parameters: []paramapi.ParameterMetadata{
-							{Name: lo.ToPtr("/app/error-param")},
-						},
-					}, nil
+				listParametersResult: []*model.ParameterListItem{
+					{Name: "/app/error-param"},
 				},
-				//nolint:lll // mock function signature
-				getParametersFunc: func(_ context.Context, params *paramapi.GetParametersInput, _ ...func(*paramapi.Options)) (*paramapi.GetParametersOutput, error) {
-					// Return all requested parameters as invalid (simulates not found)
-					return &paramapi.GetParametersOutput{
-						InvalidParameters: params.Names,
-					}, nil
+				getParameterErr: map[string]error{
+					"/app/error-param": errors.New("parameter not found"),
 				},
 			},
 			check: func(t *testing.T, out string) {
@@ -298,20 +223,11 @@ func TestRun(t *testing.T) {
 			name: "text output with error",
 			opts: list.Options{Show: true},
 			mock: &mockClient{
-				//nolint:lll // mock function signature
-				describeParametersFunc: func(_ context.Context, _ *paramapi.DescribeParametersInput, _ ...func(*paramapi.Options)) (*paramapi.DescribeParametersOutput, error) {
-					return &paramapi.DescribeParametersOutput{
-						Parameters: []paramapi.ParameterMetadata{
-							{Name: lo.ToPtr("/app/error-param")},
-						},
-					}, nil
+				listParametersResult: []*model.ParameterListItem{
+					{Name: "/app/error-param"},
 				},
-				//nolint:lll // mock function signature
-				getParametersFunc: func(_ context.Context, params *paramapi.GetParametersInput, _ ...func(*paramapi.Options)) (*paramapi.GetParametersOutput, error) {
-					// Return all requested parameters as invalid (simulates not found)
-					return &paramapi.GetParametersOutput{
-						InvalidParameters: params.Names,
-					}, nil
+				getParameterErr: map[string]error{
+					"/app/error-param": errors.New("fetch error"),
 				},
 			},
 			check: func(t *testing.T, out string) {

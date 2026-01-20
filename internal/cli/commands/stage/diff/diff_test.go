@@ -185,6 +185,56 @@ func newParamReaderWithError(err error) *paramReaderMock {
 	}
 }
 
+// secretReaderMock implements provider.SecretReader for testing.
+type secretReaderMock struct {
+	getSecretFunc func(ctx context.Context, name string, versionID string, versionStage string) (*model.Secret, error)
+}
+
+func (m *secretReaderMock) GetSecret(
+	ctx context.Context, name string, versionID string, versionStage string,
+) (*model.Secret, error) {
+	if m.getSecretFunc != nil {
+		return m.getSecretFunc(ctx, name, versionID, versionStage)
+	}
+
+	return nil, fmt.Errorf("GetSecret not mocked")
+}
+
+func (m *secretReaderMock) GetSecretVersions(_ context.Context, _ string) ([]*model.SecretVersion, error) {
+	return nil, fmt.Errorf("GetSecretVersions not mocked")
+}
+
+func (m *secretReaderMock) ListSecrets(_ context.Context) ([]*model.SecretListItem, error) {
+	return nil, fmt.Errorf("ListSecrets not mocked")
+}
+
+// newDefaultSecretReader creates a secretReaderMock that returns a test value based on the name.
+func newDefaultSecretReader() *secretReaderMock {
+	return newSecretReaderWithValue("aws-secret-value")
+}
+
+// newSecretReaderWithValue creates a secretReaderMock that returns the specified value.
+func newSecretReaderWithValue(value string) *secretReaderMock {
+	return &secretReaderMock{
+		getSecretFunc: func(_ context.Context, name string, _ string, _ string) (*model.Secret, error) {
+			return &model.Secret{
+				Name:    name,
+				Value:   value,
+				Version: "abc123",
+			}, nil
+		},
+	}
+}
+
+// newSecretReaderWithError creates a secretReaderMock that returns an error.
+func newSecretReaderWithError(err error) *secretReaderMock {
+	return &secretReaderMock{
+		getSecretFunc: func(_ context.Context, _ string, _ string, _ string) (*model.Secret, error) {
+			return nil, err
+		},
+	}
+}
+
 func TestCommand_Validation(t *testing.T) {
 	t.Parallel()
 
@@ -303,6 +353,7 @@ func TestRun_SecretOnly(t *testing.T) {
 
 	r := &stagediff.Runner{
 		SecretClient: secretMock,
+		SecretReader: newSecretReaderWithValue("old-secret"),
 		Store:        store,
 		Stdout:       &stdout,
 		Stderr:       &stderr,
@@ -365,6 +416,7 @@ func TestRun_BothServices(t *testing.T) {
 		ParamClient:  paramMock,
 		ParamReader:  newParamReaderWithValue("param-old"),
 		SecretClient: secretMock,
+		SecretReader: newSecretReaderWithValue("secret-old"),
 		Store:        store,
 		Stdout:       &stdout,
 		Stderr:       &stderr,
@@ -429,6 +481,7 @@ func TestRun_DeleteOperations(t *testing.T) {
 		ParamClient:  paramMock,
 		ParamReader:  newParamReaderWithValue("existing-value"),
 		SecretClient: secretMock,
+		SecretReader: newSecretReaderWithValue("existing-secret"),
 		Store:        store,
 		Stdout:       &stdout,
 		Stderr:       &stderr,
@@ -592,6 +645,7 @@ func TestRun_SecretUpdateAutoUnstageWhenDeleted(t *testing.T) {
 
 	r := &stagediff.Runner{
 		SecretClient: secretMock,
+		SecretReader: newSecretReaderWithError(fmt.Errorf("secret not found")),
 		Store:        store,
 		Stdout:       &stdout,
 		Stderr:       &stderr,
@@ -635,6 +689,7 @@ func TestRun_SecretIdenticalValues(t *testing.T) {
 
 	r := &stagediff.Runner{
 		SecretClient: secretMock,
+		SecretReader: newSecretReaderWithValue("same-value"),
 		Store:        store,
 		Stdout:       &stdout,
 		Stderr:       &stderr,
@@ -679,6 +734,7 @@ func TestRun_SecretParseJSON(t *testing.T) {
 
 	r := &stagediff.Runner{
 		SecretClient: secretMock,
+		SecretReader: newSecretReaderWithValue(`{"key":"old"}`),
 		Store:        store,
 		Stdout:       &stdout,
 		Stderr:       &stderr,
@@ -720,6 +776,7 @@ func TestRun_SecretParseJSONMixed(t *testing.T) {
 
 	r := &stagediff.Runner{
 		SecretClient: secretMock,
+		SecretReader: newSecretReaderWithValue(`{"key":"old"}`),
 		Store:        store,
 		Stdout:       &stdout,
 		Stderr:       &stderr,
@@ -807,6 +864,7 @@ func TestRun_SecretCreateOperation(t *testing.T) {
 
 	r := &stagediff.Runner{
 		SecretClient: secretMock,
+		SecretReader: newSecretReaderWithError(fmt.Errorf("secret not found")),
 		Store:        store,
 		Stdout:       &stdout,
 		Stderr:       &stderr,
@@ -913,6 +971,7 @@ func TestRun_SecretDeleteAutoUnstageWhenAlreadyDeleted(t *testing.T) {
 
 	r := &stagediff.Runner{
 		SecretClient: secretMock,
+		SecretReader: newSecretReaderWithError(fmt.Errorf("secret not found")),
 		Store:        store,
 		Stdout:       &stdout,
 		Stderr:       &stderr,
@@ -1140,6 +1199,7 @@ func TestRun_SecretCreateWithParseJSON(t *testing.T) {
 
 	r := &stagediff.Runner{
 		SecretClient: secretMock,
+		SecretReader: newSecretReaderWithError(fmt.Errorf("secret not found")),
 		Store:        store,
 		Stdout:       &stdout,
 		Stderr:       &stderr,
@@ -1285,6 +1345,7 @@ func TestRun_SecretTagDiffWithValues(t *testing.T) {
 
 	r := &stagediff.Runner{
 		SecretClient: secretMock,
+		SecretReader: newDefaultSecretReader(),
 		Store:        store,
 		Stdout:       &stdout,
 		Stderr:       &stderr,
@@ -1364,6 +1425,7 @@ func TestRun_SecretTagDiffAPIError(t *testing.T) {
 
 	r := &stagediff.Runner{
 		SecretClient: secretMock,
+		SecretReader: newDefaultSecretReader(),
 		Store:        store,
 		Stdout:       &stdout,
 		Stderr:       &stderr,

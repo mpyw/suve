@@ -105,7 +105,8 @@ func (a *App) SecretList(prefix string, withValue bool, filter string, maxResult
 		return nil, err
 	}
 
-	uc := &secret.ListUseCase{Client: client}
+	adapter := awssecret.New(client)
+	uc := &secret.ListUseCase{Client: adapter}
 
 	result, err := uc.Execute(a.ctx, secret.ListInput{
 		Prefix:     prefix,
@@ -141,7 +142,8 @@ func (a *App) SecretShow(specStr string) (*SecretShowResult, error) {
 		return nil, err
 	}
 
-	uc := &secret.ShowUseCase{Client: client}
+	adapter := awssecret.New(client)
+	uc := &secret.ShowUseCase{Client: adapter}
 
 	result, err := uc.Execute(a.ctx, secret.ShowInput{Spec: spec})
 	if err != nil {
@@ -178,7 +180,8 @@ func (a *App) SecretLog(name string, maxResults int32) (*SecretLogResult, error)
 		return nil, err
 	}
 
-	uc := &secret.LogUseCase{Client: client}
+	adapter := awssecret.New(client)
+	uc := &secret.LogUseCase{Client: adapter}
 
 	result, err := uc.Execute(a.ctx, secret.LogInput{
 		Name:       name,
@@ -329,7 +332,8 @@ func (a *App) SecretDiff(spec1Str, spec2Str string) (*SecretDiffResult, error) {
 		return nil, err
 	}
 
-	uc := &secret.DiffUseCase{Client: client}
+	adapter := awssecret.New(client)
+	uc := &secret.DiffUseCase{Client: adapter}
 
 	result, err := uc.Execute(a.ctx, secret.DiffInput{
 		Spec1: spec1,

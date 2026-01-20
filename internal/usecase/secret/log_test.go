@@ -6,46 +6,46 @@ import (
 	"testing"
 	"time"
 
-	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/mpyw/suve/internal/api/secretapi"
+	"github.com/mpyw/suve/internal/model"
 	"github.com/mpyw/suve/internal/usecase/secret"
 )
 
 type mockLogClient struct {
-	listVersionsResult  *secretapi.ListSecretVersionIDsOutput
-	listVersionsErr     error
-	getSecretValueValue map[string]string
-	getSecretValueErr   map[string]error
+	versionsResult []*model.SecretVersion
+	versionsErr    error
+	getSecretValue map[string]string
+	getSecretErr   map[string]error
 }
 
-//nolint:revive,stylecheck,lll // Method name must match AWS SDK interface
-func (m *mockLogClient) ListSecretVersionIds(_ context.Context, _ *secretapi.ListSecretVersionIDsInput, _ ...func(*secretapi.Options)) (*secretapi.ListSecretVersionIDsOutput, error) {
-	if m.listVersionsErr != nil {
-		return nil, m.listVersionsErr
+func (m *mockLogClient) GetSecretVersions(_ context.Context, _ string) ([]*model.SecretVersion, error) {
+	if m.versionsErr != nil {
+		return nil, m.versionsErr
 	}
 
-	return m.listVersionsResult, nil
+	return m.versionsResult, nil
 }
 
-//nolint:lll // mock function signature must match AWS SDK interface
-func (m *mockLogClient) GetSecretValue(_ context.Context, input *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) {
-	versionID := lo.FromPtr(input.VersionId)
-	if m.getSecretValueErr != nil {
-		if err, ok := m.getSecretValueErr[versionID]; ok {
+func (m *mockLogClient) GetSecret(_ context.Context, _ string, versionID, _ string) (*model.Secret, error) {
+	if m.getSecretErr != nil {
+		if err, ok := m.getSecretErr[versionID]; ok {
 			return nil, err
 		}
 	}
 
-	if m.getSecretValueValue != nil {
-		if value, ok := m.getSecretValueValue[versionID]; ok {
-			return &secretapi.GetSecretValueOutput{SecretString: lo.ToPtr(value)}, nil
+	if m.getSecretValue != nil {
+		if value, ok := m.getSecretValue[versionID]; ok {
+			return &model.Secret{Version: versionID, Value: value}, nil
 		}
 	}
 
-	return nil, &secretapi.ResourceNotFoundException{Message: lo.ToPtr("not found")}
+	return nil, errors.New("not found")
+}
+
+func (m *mockLogClient) ListSecrets(_ context.Context) ([]*model.SecretListItem, error) {
+	return nil, errors.New("not implemented")
 }
 
 func TestLogUseCase_Execute(t *testing.T) {
@@ -53,14 +53,12 @@ func TestLogUseCase_Execute(t *testing.T) {
 
 	now := time.Now()
 	client := &mockLogClient{
-		listVersionsResult: &secretapi.ListSecretVersionIDsOutput{
-			Versions: []secretapi.SecretVersionsListEntry{
-				{VersionId: lo.ToPtr("v1-id"), CreatedDate: lo.ToPtr(now.Add(-2 * time.Hour)), VersionStages: []string{}},
-				{VersionId: lo.ToPtr("v2-id"), CreatedDate: lo.ToPtr(now.Add(-1 * time.Hour)), VersionStages: []string{}},
-				{VersionId: lo.ToPtr("v3-id"), CreatedDate: lo.ToPtr(now), VersionStages: []string{"AWSCURRENT"}},
-			},
+		versionsResult: []*model.SecretVersion{
+			{Version: "v1-id", CreatedAt: ptrTime(now.Add(-2 * time.Hour)), Metadata: model.AWSSecretVersionMeta{VersionStages: []string{}}},
+			{Version: "v2-id", CreatedAt: ptrTime(now.Add(-1 * time.Hour)), Metadata: model.AWSSecretVersionMeta{VersionStages: []string{}}},
+			{Version: "v3-id", CreatedAt: ptrTime(now), Metadata: model.AWSSecretVersionMeta{VersionStages: []string{"AWSCURRENT"}}},
 		},
-		getSecretValueValue: map[string]string{
+		getSecretValue: map[string]string{
 			"v1-id": "value-1",
 			"v2-id": "value-2",
 			"v3-id": "value-3",
@@ -87,9 +85,7 @@ func TestLogUseCase_Execute_Empty(t *testing.T) {
 	t.Parallel()
 
 	client := &mockLogClient{
-		listVersionsResult: &secretapi.ListSecretVersionIDsOutput{
-			Versions: []secretapi.SecretVersionsListEntry{},
-		},
+		versionsResult: []*model.SecretVersion{},
 	}
 
 	uc := &secret.LogUseCase{Client: client}
@@ -105,7 +101,7 @@ func TestLogUseCase_Execute_Error(t *testing.T) {
 	t.Parallel()
 
 	client := &mockLogClient{
-		listVersionsErr: errors.New("aws error"),
+		versionsErr: errors.New("aws error"),
 	}
 
 	uc := &secret.LogUseCase{Client: client}
@@ -122,14 +118,12 @@ func TestLogUseCase_Execute_Reverse(t *testing.T) {
 
 	now := time.Now()
 	client := &mockLogClient{
-		listVersionsResult: &secretapi.ListSecretVersionIDsOutput{
-			Versions: []secretapi.SecretVersionsListEntry{
-				{VersionId: lo.ToPtr("v1-id"), CreatedDate: lo.ToPtr(now.Add(-2 * time.Hour))},
-				{VersionId: lo.ToPtr("v2-id"), CreatedDate: lo.ToPtr(now.Add(-1 * time.Hour))},
-				{VersionId: lo.ToPtr("v3-id"), CreatedDate: lo.ToPtr(now)},
-			},
+		versionsResult: []*model.SecretVersion{
+			{Version: "v1-id", CreatedAt: ptrTime(now.Add(-2 * time.Hour))},
+			{Version: "v2-id", CreatedAt: ptrTime(now.Add(-1 * time.Hour))},
+			{Version: "v3-id", CreatedAt: ptrTime(now)},
 		},
-		getSecretValueValue: map[string]string{
+		getSecretValue: map[string]string{
 			"v1-id": "value-1",
 			"v2-id": "value-2",
 			"v3-id": "value-3",
@@ -155,14 +149,12 @@ func TestLogUseCase_Execute_SinceFilter(t *testing.T) {
 
 	now := time.Now()
 	client := &mockLogClient{
-		listVersionsResult: &secretapi.ListSecretVersionIDsOutput{
-			Versions: []secretapi.SecretVersionsListEntry{
-				{VersionId: lo.ToPtr("v1-id"), CreatedDate: lo.ToPtr(now.Add(-3 * time.Hour))},
-				{VersionId: lo.ToPtr("v2-id"), CreatedDate: lo.ToPtr(now.Add(-1 * time.Hour))},
-				{VersionId: lo.ToPtr("v3-id"), CreatedDate: lo.ToPtr(now)},
-			},
+		versionsResult: []*model.SecretVersion{
+			{Version: "v1-id", CreatedAt: ptrTime(now.Add(-3 * time.Hour))},
+			{Version: "v2-id", CreatedAt: ptrTime(now.Add(-1 * time.Hour))},
+			{Version: "v3-id", CreatedAt: ptrTime(now)},
 		},
-		getSecretValueValue: map[string]string{
+		getSecretValue: map[string]string{
 			"v2-id": "value-2",
 			"v3-id": "value-3",
 		},
@@ -186,14 +178,12 @@ func TestLogUseCase_Execute_UntilFilter(t *testing.T) {
 
 	now := time.Now()
 	client := &mockLogClient{
-		listVersionsResult: &secretapi.ListSecretVersionIDsOutput{
-			Versions: []secretapi.SecretVersionsListEntry{
-				{VersionId: lo.ToPtr("v1-id"), CreatedDate: lo.ToPtr(now.Add(-3 * time.Hour))},
-				{VersionId: lo.ToPtr("v2-id"), CreatedDate: lo.ToPtr(now.Add(-1 * time.Hour))},
-				{VersionId: lo.ToPtr("v3-id"), CreatedDate: lo.ToPtr(now)},
-			},
+		versionsResult: []*model.SecretVersion{
+			{Version: "v1-id", CreatedAt: ptrTime(now.Add(-3 * time.Hour))},
+			{Version: "v2-id", CreatedAt: ptrTime(now.Add(-1 * time.Hour))},
+			{Version: "v3-id", CreatedAt: ptrTime(now)},
 		},
-		getSecretValueValue: map[string]string{
+		getSecretValue: map[string]string{
 			"v1-id": "value-1",
 			"v2-id": "value-2",
 		},
@@ -217,12 +207,10 @@ func TestLogUseCase_Execute_GetValueError(t *testing.T) {
 
 	now := time.Now()
 	client := &mockLogClient{
-		listVersionsResult: &secretapi.ListSecretVersionIDsOutput{
-			Versions: []secretapi.SecretVersionsListEntry{
-				{VersionId: lo.ToPtr("v1-id"), CreatedDate: lo.ToPtr(now)},
-			},
+		versionsResult: []*model.SecretVersion{
+			{Version: "v1-id", CreatedAt: ptrTime(now)},
 		},
-		getSecretValueErr: map[string]error{
+		getSecretErr: map[string]error{
 			"v1-id": errors.New("get value error"),
 		},
 	}
@@ -233,7 +221,7 @@ func TestLogUseCase_Execute_GetValueError(t *testing.T) {
 		Name: "my-secret",
 	})
 	require.NoError(t, err)
-	// GetSecretValue errors are swallowed; value will be empty
+	// GetSecret errors are swallowed; value will be empty
 	assert.Len(t, output.Entries, 1)
 	assert.Empty(t, output.Entries[0].Value)
 }
@@ -242,12 +230,10 @@ func TestLogUseCase_Execute_NilCreatedDate(t *testing.T) {
 	t.Parallel()
 
 	client := &mockLogClient{
-		listVersionsResult: &secretapi.ListSecretVersionIDsOutput{
-			Versions: []secretapi.SecretVersionsListEntry{
-				{VersionId: lo.ToPtr("v1-id"), CreatedDate: nil},
-			},
+		versionsResult: []*model.SecretVersion{
+			{Version: "v1-id", CreatedAt: nil},
 		},
-		getSecretValueValue: map[string]string{
+		getSecretValue: map[string]string{
 			"v1-id": "value-1",
 		},
 	}
@@ -267,10 +253,8 @@ func TestLogUseCase_Execute_NilVersionId(t *testing.T) {
 
 	now := time.Now()
 	client := &mockLogClient{
-		listVersionsResult: &secretapi.ListSecretVersionIDsOutput{
-			Versions: []secretapi.SecretVersionsListEntry{
-				{VersionId: nil, CreatedDate: lo.ToPtr(now)},
-			},
+		versionsResult: []*model.SecretVersion{
+			{Version: "", CreatedAt: ptrTime(now)},
 		},
 	}
 
@@ -282,23 +266,21 @@ func TestLogUseCase_Execute_NilVersionId(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, output.Entries, 1)
 	assert.Empty(t, output.Entries[0].VersionID)
-	assert.Empty(t, output.Entries[0].Value) // Value fetch is skipped when VersionId is nil
+	assert.Empty(t, output.Entries[0].Value) // Value fetch is skipped when Version is empty
 }
 
 func TestLogUseCase_Execute_SortWithNilCreatedDate(t *testing.T) {
 	t.Parallel()
 
 	now := time.Now()
-	// Test sorting when some entries have nil CreatedDate
+	// Test sorting when some entries have nil CreatedAt
 	client := &mockLogClient{
-		listVersionsResult: &secretapi.ListSecretVersionIDsOutput{
-			Versions: []secretapi.SecretVersionsListEntry{
-				{VersionId: lo.ToPtr("v1-id"), CreatedDate: nil},
-				{VersionId: lo.ToPtr("v2-id"), CreatedDate: lo.ToPtr(now)},
-				{VersionId: lo.ToPtr("v3-id"), CreatedDate: nil},
-			},
+		versionsResult: []*model.SecretVersion{
+			{Version: "v1-id", CreatedAt: nil},
+			{Version: "v2-id", CreatedAt: ptrTime(now)},
+			{Version: "v3-id", CreatedAt: nil},
 		},
-		getSecretValueValue: map[string]string{
+		getSecretValue: map[string]string{
 			"v1-id": "value-1",
 			"v2-id": "value-2",
 			"v3-id": "value-3",
@@ -318,15 +300,13 @@ func TestLogUseCase_Execute_SortWithEqualDates(t *testing.T) {
 	t.Parallel()
 
 	now := time.Now()
-	// Test sorting when entries have the same CreatedDate
+	// Test sorting when entries have the same CreatedAt
 	client := &mockLogClient{
-		listVersionsResult: &secretapi.ListSecretVersionIDsOutput{
-			Versions: []secretapi.SecretVersionsListEntry{
-				{VersionId: lo.ToPtr("v1-id"), CreatedDate: lo.ToPtr(now)},
-				{VersionId: lo.ToPtr("v2-id"), CreatedDate: lo.ToPtr(now)},
-			},
+		versionsResult: []*model.SecretVersion{
+			{Version: "v1-id", CreatedAt: ptrTime(now)},
+			{Version: "v2-id", CreatedAt: ptrTime(now)},
 		},
-		getSecretValueValue: map[string]string{
+		getSecretValue: map[string]string{
 			"v1-id": "value-1",
 			"v2-id": "value-2",
 		},
@@ -348,17 +328,15 @@ func TestLogUseCase_Execute_SortUnsortedInput(t *testing.T) {
 	// Test sorting when input is in unsorted order (oldest first)
 	// This ensures the sorting "a.Before(b)" branch is covered
 	client := &mockLogClient{
-		listVersionsResult: &secretapi.ListSecretVersionIDsOutput{
-			Versions: []secretapi.SecretVersionsListEntry{
-				// Oldest first in input
-				{VersionId: lo.ToPtr("v1-id"), CreatedDate: lo.ToPtr(now.Add(-2 * time.Hour))},
-				// Newest in input
-				{VersionId: lo.ToPtr("v3-id"), CreatedDate: lo.ToPtr(now)},
-				// Middle in input
-				{VersionId: lo.ToPtr("v2-id"), CreatedDate: lo.ToPtr(now.Add(-1 * time.Hour))},
-			},
+		versionsResult: []*model.SecretVersion{
+			// Oldest first in input
+			{Version: "v1-id", CreatedAt: ptrTime(now.Add(-2 * time.Hour))},
+			// Newest in input
+			{Version: "v3-id", CreatedAt: ptrTime(now)},
+			// Middle in input
+			{Version: "v2-id", CreatedAt: ptrTime(now.Add(-1 * time.Hour))},
 		},
-		getSecretValueValue: map[string]string{
+		getSecretValue: map[string]string{
 			"v1-id": "value-1",
 			"v2-id": "value-2",
 			"v3-id": "value-3",
@@ -383,15 +361,13 @@ func TestLogUseCase_Execute_FilterWithNilCreatedDate(t *testing.T) {
 	t.Parallel()
 
 	now := time.Now()
-	// Test date filtering when entry has nil CreatedDate (should be filtered out when date filter is applied)
+	// Test date filtering when entry has nil CreatedAt (should be filtered out when date filter is applied)
 	client := &mockLogClient{
-		listVersionsResult: &secretapi.ListSecretVersionIDsOutput{
-			Versions: []secretapi.SecretVersionsListEntry{
-				{VersionId: lo.ToPtr("v1-id"), CreatedDate: nil},
-				{VersionId: lo.ToPtr("v2-id"), CreatedDate: lo.ToPtr(now)},
-			},
+		versionsResult: []*model.SecretVersion{
+			{Version: "v1-id", CreatedAt: nil},
+			{Version: "v2-id", CreatedAt: ptrTime(now)},
 		},
-		getSecretValueValue: map[string]string{
+		getSecretValue: map[string]string{
 			"v1-id": "value-1",
 			"v2-id": "value-2",
 		},
@@ -405,7 +381,7 @@ func TestLogUseCase_Execute_FilterWithNilCreatedDate(t *testing.T) {
 		Since: &since,
 	})
 	require.NoError(t, err)
-	// v1 has nil CreatedDate, so it is skipped when date filter is applied; only v2 remains
+	// v1 has nil CreatedAt, so it is skipped when date filter is applied; only v2 remains
 	assert.Len(t, output.Entries, 1)
 	assert.Equal(t, "v2-id", output.Entries[0].VersionID)
 }
