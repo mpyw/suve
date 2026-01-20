@@ -132,7 +132,7 @@ func (a *Adapter) ListSecrets(ctx context.Context) ([]*model.SecretListItem, err
 // ============================================================================
 
 // CreateSecret creates a new secret.
-func (a *Adapter) CreateSecret(ctx context.Context, secret *model.Secret) error {
+func (a *Adapter) CreateSecret(ctx context.Context, secret *model.Secret) (*model.SecretWriteResult, error) {
 	input := &secretapi.CreateSecretInput{
 		Name:         lo.ToPtr(secret.Name),
 		SecretString: lo.ToPtr(secret.Value),
@@ -153,42 +153,54 @@ func (a *Adapter) CreateSecret(ctx context.Context, secret *model.Secret) error 
 		}
 	}
 
-	_, err := a.client.CreateSecret(ctx, input)
+	output, err := a.client.CreateSecret(ctx, input)
 	if err != nil {
-		return fmt.Errorf("failed to create secret: %w", err)
+		return nil, fmt.Errorf("failed to create secret: %w", err)
 	}
 
-	return nil
+	return &model.SecretWriteResult{
+		Name:    lo.FromPtr(output.Name),
+		Version: lo.FromPtr(output.VersionId),
+		ARN:     lo.FromPtr(output.ARN),
+	}, nil
 }
 
 // UpdateSecret updates the value of an existing secret.
-func (a *Adapter) UpdateSecret(ctx context.Context, name string, value string) error {
+func (a *Adapter) UpdateSecret(ctx context.Context, name string, value string) (*model.SecretWriteResult, error) {
 	input := &secretapi.PutSecretValueInput{
 		SecretId:     lo.ToPtr(name),
 		SecretString: lo.ToPtr(value),
 	}
 
-	_, err := a.client.PutSecretValue(ctx, input)
+	output, err := a.client.PutSecretValue(ctx, input)
 	if err != nil {
-		return fmt.Errorf("failed to update secret: %w", err)
+		return nil, fmt.Errorf("failed to update secret: %w", err)
 	}
 
-	return nil
+	return &model.SecretWriteResult{
+		Name:    lo.FromPtr(output.Name),
+		Version: lo.FromPtr(output.VersionId),
+		ARN:     lo.FromPtr(output.ARN),
+	}, nil
 }
 
 // DeleteSecret deletes a secret.
-func (a *Adapter) DeleteSecret(ctx context.Context, name string, forceDelete bool) error {
+func (a *Adapter) DeleteSecret(ctx context.Context, name string, forceDelete bool) (*model.SecretDeleteResult, error) {
 	input := &secretapi.DeleteSecretInput{
 		SecretId:                   lo.ToPtr(name),
 		ForceDeleteWithoutRecovery: lo.ToPtr(forceDelete),
 	}
 
-	_, err := a.client.DeleteSecret(ctx, input)
+	output, err := a.client.DeleteSecret(ctx, input)
 	if err != nil {
-		return fmt.Errorf("failed to delete secret: %w", err)
+		return nil, fmt.Errorf("failed to delete secret: %w", err)
 	}
 
-	return nil
+	return &model.SecretDeleteResult{
+		Name:         lo.FromPtr(output.Name),
+		ARN:          lo.FromPtr(output.ARN),
+		DeletionDate: output.DeletionDate,
+	}, nil
 }
 
 // ============================================================================
@@ -244,17 +256,20 @@ func (a *Adapter) RemoveTags(ctx context.Context, name string, keys []string) er
 // ============================================================================
 
 // RestoreSecret restores a previously deleted secret.
-func (a *Adapter) RestoreSecret(ctx context.Context, name string) error {
+func (a *Adapter) RestoreSecret(ctx context.Context, name string) (*model.SecretRestoreResult, error) {
 	input := &secretapi.RestoreSecretInput{
 		SecretId: lo.ToPtr(name),
 	}
 
-	_, err := a.client.RestoreSecret(ctx, input)
+	output, err := a.client.RestoreSecret(ctx, input)
 	if err != nil {
-		return fmt.Errorf("failed to restore secret: %w", err)
+		return nil, fmt.Errorf("failed to restore secret: %w", err)
 	}
 
-	return nil
+	return &model.SecretRestoreResult{
+		Name: lo.FromPtr(output.Name),
+		ARN:  lo.FromPtr(output.ARN),
+	}, nil
 }
 
 // ============================================================================

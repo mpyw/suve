@@ -4,23 +4,23 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/samber/lo"
-
-	"github.com/mpyw/suve/internal/api/secretapi"
+	"github.com/mpyw/suve/internal/model"
 )
 
 // UpdateClient is the interface for the update use case.
 type UpdateClient interface {
-	secretapi.GetSecretValueAPI
-	secretapi.UpdateSecretAPI
-	secretapi.PutSecretValueAPI
+	// GetSecret retrieves a secret by name with optional version specifier.
+	GetSecret(ctx context.Context, name string, versionID string, versionStage string) (*model.Secret, error)
+	// UpdateSecret updates the value of an existing secret.
+	UpdateSecret(ctx context.Context, name string, value string) (*model.SecretWriteResult, error)
 }
 
 // UpdateInput holds input for the update use case.
 type UpdateInput struct {
-	Name        string
-	Value       string
-	Description string
+	Name  string
+	Value string
+	// Description is currently not supported through the provider interface.
+	// AWS-specific description updates should be handled separately.
 }
 
 // UpdateOutput holds the result of the update use case.
@@ -37,54 +37,24 @@ type UpdateUseCase struct {
 
 // GetCurrentValue fetches the current secret value.
 func (u *UpdateUseCase) GetCurrentValue(ctx context.Context, name string) (string, error) {
-	out, err := u.Client.GetSecretValue(ctx, &secretapi.GetSecretValueInput{
-		SecretId: lo.ToPtr(name),
-	})
+	secret, err := u.Client.GetSecret(ctx, name, "", "")
 	if err != nil {
 		return "", err
 	}
 
-	return lo.FromPtr(out.SecretString), nil
+	return secret.Value, nil
 }
 
 // Execute runs the update use case.
 func (u *UpdateUseCase) Execute(ctx context.Context, input UpdateInput) (*UpdateOutput, error) {
-	var versionID, arn string
-
-	// Update value
-	if input.Value != "" {
-		result, err := u.Client.PutSecretValue(ctx, &secretapi.PutSecretValueInput{
-			SecretId:     lo.ToPtr(input.Name),
-			SecretString: lo.ToPtr(input.Value),
-		})
-		if err != nil {
-			return nil, fmt.Errorf("failed to update secret value: %w", err)
-		}
-
-		versionID = lo.FromPtr(result.VersionId)
-		arn = lo.FromPtr(result.ARN)
-	}
-
-	// Update description if provided
-	if input.Description != "" {
-		result, err := u.Client.UpdateSecret(ctx, &secretapi.UpdateSecretInput{
-			SecretId:    lo.ToPtr(input.Name),
-			Description: lo.ToPtr(input.Description),
-		})
-		if err != nil {
-			return nil, fmt.Errorf("failed to update secret description: %w", err)
-		}
-
-		if versionID == "" {
-			versionID = lo.FromPtr(result.VersionId)
-		}
-
-		arn = lo.FromPtr(result.ARN)
+	result, err := u.Client.UpdateSecret(ctx, input.Name, input.Value)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update secret: %w", err)
 	}
 
 	return &UpdateOutput{
-		Name:      input.Name,
-		VersionID: versionID,
-		ARN:       arn,
+		Name:      result.Name,
+		VersionID: result.Version,
+		ARN:       result.ARN,
 	}, nil
 }

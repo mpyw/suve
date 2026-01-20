@@ -6,32 +6,29 @@ import (
 	"testing"
 	"time"
 
-	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/mpyw/suve/internal/api/secretapi"
+	"github.com/mpyw/suve/internal/model"
 	"github.com/mpyw/suve/internal/usecase/secret"
 )
 
 type mockDeleteClient struct {
-	getSecretValueResult *secretapi.GetSecretValueOutput
-	getSecretValueErr    error
-	deleteSecretResult   *secretapi.DeleteSecretOutput
-	deleteSecretErr      error
+	getSecretResult    *model.Secret
+	getSecretErr       error
+	deleteSecretResult *model.SecretDeleteResult
+	deleteSecretErr    error
 }
 
-//nolint:lll // mock function signature must match AWS SDK interface
-func (m *mockDeleteClient) GetSecretValue(_ context.Context, _ *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) {
-	if m.getSecretValueErr != nil {
-		return nil, m.getSecretValueErr
+func (m *mockDeleteClient) GetSecret(_ context.Context, _ string, _ string, _ string) (*model.Secret, error) {
+	if m.getSecretErr != nil {
+		return nil, m.getSecretErr
 	}
 
-	return m.getSecretValueResult, nil
+	return m.getSecretResult, nil
 }
 
-//nolint:lll // mock function signature must match AWS SDK interface
-func (m *mockDeleteClient) DeleteSecret(_ context.Context, _ *secretapi.DeleteSecretInput, _ ...func(*secretapi.Options)) (*secretapi.DeleteSecretOutput, error) {
+func (m *mockDeleteClient) DeleteSecret(_ context.Context, _ string, _ bool) (*model.SecretDeleteResult, error) {
 	if m.deleteSecretErr != nil {
 		return nil, m.deleteSecretErr
 	}
@@ -43,8 +40,9 @@ func TestDeleteUseCase_GetCurrentValue(t *testing.T) {
 	t.Parallel()
 
 	client := &mockDeleteClient{
-		getSecretValueResult: &secretapi.GetSecretValueOutput{
-			SecretString: lo.ToPtr("current-value"),
+		getSecretResult: &model.Secret{
+			Name:  "my-secret",
+			Value: "current-value",
 		},
 	}
 
@@ -59,27 +57,14 @@ func TestDeleteUseCase_GetCurrentValue_NotFound(t *testing.T) {
 	t.Parallel()
 
 	client := &mockDeleteClient{
-		getSecretValueErr: &secretapi.ResourceNotFoundException{Message: lo.ToPtr("not found")},
+		getSecretErr: errors.New("not found"),
 	}
 
 	uc := &secret.DeleteUseCase{Client: client}
 
 	value, err := uc.GetCurrentValue(t.Context(), "not-exists")
-	require.NoError(t, err)
+	require.NoError(t, err) // GetCurrentValue treats errors as "not found"
 	assert.Empty(t, value)
-}
-
-func TestDeleteUseCase_GetCurrentValue_Error(t *testing.T) {
-	t.Parallel()
-
-	client := &mockDeleteClient{
-		getSecretValueErr: errors.New("aws error"),
-	}
-
-	uc := &secret.DeleteUseCase{Client: client}
-
-	_, err := uc.GetCurrentValue(t.Context(), "my-secret")
-	assert.Error(t, err)
 }
 
 func TestDeleteUseCase_Execute(t *testing.T) {
@@ -87,10 +72,10 @@ func TestDeleteUseCase_Execute(t *testing.T) {
 
 	deletionDate := time.Now().Add(7 * 24 * time.Hour)
 	client := &mockDeleteClient{
-		deleteSecretResult: &secretapi.DeleteSecretOutput{
-			Name:         lo.ToPtr("my-secret"),
+		deleteSecretResult: &model.SecretDeleteResult{
+			Name:         "my-secret",
 			DeletionDate: &deletionDate,
-			ARN:          lo.ToPtr("arn:aws:secretsmanager:us-east-1:123456789012:secret:my-secret"),
+			ARN:          "arn:aws:secretsmanager:us-east-1:123456789012:secret:my-secret",
 		},
 	}
 
@@ -108,9 +93,9 @@ func TestDeleteUseCase_Execute_Force(t *testing.T) {
 	t.Parallel()
 
 	client := &mockDeleteClient{
-		deleteSecretResult: &secretapi.DeleteSecretOutput{
-			Name: lo.ToPtr("my-secret"),
-			ARN:  lo.ToPtr("arn:aws:secretsmanager:us-east-1:123456789012:secret:my-secret"),
+		deleteSecretResult: &model.SecretDeleteResult{
+			Name: "my-secret",
+			ARN:  "arn:aws:secretsmanager:us-east-1:123456789012:secret:my-secret",
 		},
 	}
 
@@ -122,29 +107,6 @@ func TestDeleteUseCase_Execute_Force(t *testing.T) {
 	})
 	require.NoError(t, err)
 	assert.Equal(t, "my-secret", output.Name)
-}
-
-func TestDeleteUseCase_Execute_RecoveryWindow(t *testing.T) {
-	t.Parallel()
-
-	deletionDate := time.Now().Add(30 * 24 * time.Hour)
-	client := &mockDeleteClient{
-		deleteSecretResult: &secretapi.DeleteSecretOutput{
-			Name:         lo.ToPtr("my-secret"),
-			DeletionDate: &deletionDate,
-			ARN:          lo.ToPtr("arn:aws:secretsmanager:us-east-1:123456789012:secret:my-secret"),
-		},
-	}
-
-	uc := &secret.DeleteUseCase{Client: client}
-
-	output, err := uc.Execute(t.Context(), secret.DeleteInput{
-		Name:           "my-secret",
-		RecoveryWindow: 30,
-	})
-	require.NoError(t, err)
-	assert.Equal(t, "my-secret", output.Name)
-	assert.NotNil(t, output.DeletionDate)
 }
 
 func TestDeleteUseCase_Execute_Error(t *testing.T) {

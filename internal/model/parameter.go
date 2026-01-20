@@ -176,3 +176,13 @@ type AWSParameterListItemMeta struct {
 	// Type is the parameter type (e.g., String, SecureString, StringList).
 	Type string
 }
+
+// ============================================================================
+// Write Result Types
+// ============================================================================
+
+// ParameterWriteResult contains the result of a parameter write operation.
+type ParameterWriteResult struct {
+	Name    string
+	Version string
+}

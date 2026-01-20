@@ -7,13 +7,12 @@ import (
 	"io"
 	"os"
 
-	"github.com/samber/lo"
 	"github.com/urfave/cli/v3"
 
-	"github.com/mpyw/suve/internal/api/paramapi"
 	"github.com/mpyw/suve/internal/cli/confirm"
 	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/infra"
+	awsparam "github.com/mpyw/suve/internal/provider/aws/param"
 	"github.com/mpyw/suve/internal/usecase/param"
 )
 
@@ -100,17 +99,17 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	name := cmd.Args().Get(0)
 	skipConfirm := cmd.Bool("yes")
 
-	client, err := infra.NewParamClient(ctx)
+	adapter, err := awsparam.NewAdapter(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to initialize AWS client: %w", err)
 	}
 
-	uc := &param.UpdateUseCase{Client: client}
+	uc := &param.UpdateUseCase{Client: adapter}
 	newValue := cmd.Args().Get(1)
 
 	// Fetch current value and show diff before confirming
 	if !skipConfirm {
-		currentValue, _ := getCurrentValue(ctx, client, name)
+		currentValue, _ := uc.GetCurrentValue(ctx, name)
 		if currentValue != "" {
 			diff := output.Diff(name+" (AWS)", name+" (new)", currentValue, newValue)
 			if diff != "" {
@@ -159,7 +158,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 	result, err := r.UseCase.Execute(ctx, param.UpdateInput{
 		Name:        opts.Name,
 		Value:       opts.Value,
-		Type:        paramapi.ParameterType(opts.Type),
+		Type:        opts.Type,
 		Description: opts.Description,
 	})
 	if err != nil {
@@ -169,22 +168,4 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 	output.Success(r.Stdout, "Updated parameter %s (version: %d)", result.Name, result.Version)
 
 	return nil
-}
-
-// getCurrentValue fetches the current parameter value.
-// Returns the value if exists, empty string if not found.
-func getCurrentValue(ctx context.Context, client paramapi.GetParameterAPI, name string) (string, bool) {
-	result, err := client.GetParameter(ctx, &paramapi.GetParameterInput{
-		Name:           lo.ToPtr(name),
-		WithDecryption: lo.ToPtr(true),
-	})
-	if err != nil {
-		return "", false
-	}
-
-	if result.Parameter == nil || result.Parameter.Value == nil {
-		return "", false
-	}
-
-	return *result.Parameter.Value, true
 }

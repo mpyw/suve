@@ -5,21 +5,19 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/mpyw/suve/internal/api/secretapi"
+	"github.com/mpyw/suve/internal/model"
 	"github.com/mpyw/suve/internal/usecase/secret"
 )
 
 type mockRestoreClient struct {
-	restoreResult *secretapi.RestoreSecretOutput
+	restoreResult *model.SecretRestoreResult
 	restoreErr    error
 }
 
-//nolint:lll // mock function signature must match AWS SDK interface
-func (m *mockRestoreClient) RestoreSecret(_ context.Context, _ *secretapi.RestoreSecretInput, _ ...func(*secretapi.Options)) (*secretapi.RestoreSecretOutput, error) {
+func (m *mockRestoreClient) RestoreSecret(_ context.Context, _ string) (*model.SecretRestoreResult, error) {
 	if m.restoreErr != nil {
 		return nil, m.restoreErr
 	}
@@ -31,9 +29,9 @@ func TestRestoreUseCase_Execute(t *testing.T) {
 	t.Parallel()
 
 	client := &mockRestoreClient{
-		restoreResult: &secretapi.RestoreSecretOutput{
-			Name: lo.ToPtr("my-secret"),
-			ARN:  lo.ToPtr("arn:aws:secretsmanager:us-east-1:123456789012:secret:my-secret"),
+		restoreResult: &model.SecretRestoreResult{
+			Name: "my-secret",
+			ARN:  "arn:aws:secretsmanager:us-east-1:123456789012:secret:my-secret",
 		},
 	}
 

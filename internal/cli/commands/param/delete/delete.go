@@ -13,6 +13,7 @@ import (
 	"github.com/mpyw/suve/internal/cli/confirm"
 	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/infra"
+	awsparam "github.com/mpyw/suve/internal/provider/aws/param"
 	"github.com/mpyw/suve/internal/usecase/param"
 )
 
@@ -61,7 +62,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	name := cmd.Args().First()
 	skipConfirm := cmd.Bool("yes")
 
-	client, err := infra.NewParamClient(ctx)
+	adapter, err := awsparam.NewAdapter(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to initialize AWS client: %w", err)
 	}
@@ -72,7 +73,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		identity, _ = infra.GetAWSIdentity(ctx)
 	}
 
-	useCase := &param.DeleteUseCase{Client: client}
+	useCase := &param.DeleteUseCase{Client: adapter}
 
 	// Show current value before confirming
 	if !skipConfirm {

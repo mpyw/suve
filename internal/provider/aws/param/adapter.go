@@ -142,7 +142,7 @@ func (a *Adapter) ListParameters(
 // PutParameter creates or updates a parameter.
 func (a *Adapter) PutParameter(
 	ctx context.Context, param *model.Parameter, overwrite bool,
-) error {
+) (*model.ParameterWriteResult, error) {
 	paramType := paramapi.ParameterTypeString
 
 	input := &paramapi.PutParameterInput{
@@ -184,12 +184,15 @@ func (a *Adapter) PutParameter(
 		}
 	}
 
-	_, err := a.client.PutParameter(ctx, input)
+	output, err := a.client.PutParameter(ctx, input)
 	if err != nil {
-		return fmt.Errorf("failed to put parameter: %w", err)
+		return nil, fmt.Errorf("failed to put parameter: %w", err)
 	}
 
-	return nil
+	return &model.ParameterWriteResult{
+		Name:    param.Name,
+		Version: strconv.FormatInt(output.Version, 10),
+	}, nil
 }
 
 // DeleteParameter deletes a parameter by name.

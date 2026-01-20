@@ -3,16 +3,15 @@ package create_test
 import (
 	"bytes"
 	"context"
-	"fmt"
+	"errors"
 	"testing"
 
-	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/mpyw/suve/internal/api/secretapi"
 	appcli "github.com/mpyw/suve/internal/cli/commands"
 	"github.com/mpyw/suve/internal/cli/commands/secret/create"
+	"github.com/mpyw/suve/internal/model"
 	"github.com/mpyw/suve/internal/usecase/secret"
 )
 
@@ -39,17 +38,15 @@ func TestCommand_Validation(t *testing.T) {
 }
 
 type mockClient struct {
-	//nolint:lll // mock function signature
-	createSecretFunc func(ctx context.Context, params *secretapi.CreateSecretInput, optFns ...func(*secretapi.Options)) (*secretapi.CreateSecretOutput, error)
+	createSecretFunc func(ctx context.Context, s *model.Secret) (*model.SecretWriteResult, error)
 }
 
-//nolint:lll // mock function signature
-func (m *mockClient) CreateSecret(ctx context.Context, params *secretapi.CreateSecretInput, optFns ...func(*secretapi.Options)) (*secretapi.CreateSecretOutput, error) {
+func (m *mockClient) CreateSecret(ctx context.Context, s *model.Secret) (*model.SecretWriteResult, error) {
 	if m.createSecretFunc != nil {
-		return m.createSecretFunc(ctx, params, optFns...)
+		return m.createSecretFunc(ctx, s)
 	}
 
-	return nil, fmt.Errorf("CreateSecret not mocked")
+	return nil, errors.New("CreateSecret not mocked")
 }
 
 func TestRun(t *testing.T) {
@@ -65,14 +62,13 @@ func TestRun(t *testing.T) {
 			name: "create secret",
 			opts: create.Options{Name: "my-secret", Value: "secret-value"},
 			mock: &mockClient{
-				//nolint:lll // mock function signature
-				createSecretFunc: func(_ context.Context, params *secretapi.CreateSecretInput, _ ...func(*secretapi.Options)) (*secretapi.CreateSecretOutput, error) {
-					assert.Equal(t, "my-secret", lo.FromPtr(params.Name))
-					assert.Equal(t, "secret-value", lo.FromPtr(params.SecretString))
+				createSecretFunc: func(_ context.Context, s *model.Secret) (*model.SecretWriteResult, error) {
+					assert.Equal(t, "my-secret", s.Name)
+					assert.Equal(t, "secret-value", s.Value)
 
-					return &secretapi.CreateSecretOutput{
-						Name:      lo.ToPtr("my-secret"),
-						VersionId: lo.ToPtr("abc123"),
+					return &model.SecretWriteResult{
+						Name:    "my-secret",
+						Version: "abc123",
 					}, nil
 				},
 			},
@@ -86,13 +82,12 @@ func TestRun(t *testing.T) {
 			name: "create with description",
 			opts: create.Options{Name: "my-secret", Value: "secret-value", Description: "Test description"},
 			mock: &mockClient{
-				//nolint:lll // mock function signature
-				createSecretFunc: func(_ context.Context, params *secretapi.CreateSecretInput, _ ...func(*secretapi.Options)) (*secretapi.CreateSecretOutput, error) {
-					assert.Equal(t, "Test description", lo.FromPtr(params.Description))
+				createSecretFunc: func(_ context.Context, s *model.Secret) (*model.SecretWriteResult, error) {
+					assert.Equal(t, "Test description", s.Description)
 
-					return &secretapi.CreateSecretOutput{
-						Name:      lo.ToPtr("my-secret"),
-						VersionId: lo.ToPtr("abc123"),
+					return &model.SecretWriteResult{
+						Name:    "my-secret",
+						Version: "abc123",
 					}, nil
 				},
 			},
@@ -102,8 +97,8 @@ func TestRun(t *testing.T) {
 			opts:    create.Options{Name: "my-secret", Value: "secret-value"},
 			wantErr: "failed to create secret",
 			mock: &mockClient{
-				createSecretFunc: func(_ context.Context, _ *secretapi.CreateSecretInput, _ ...func(*secretapi.Options)) (*secretapi.CreateSecretOutput, error) {
-					return nil, fmt.Errorf("AWS error")
+				createSecretFunc: func(_ context.Context, _ *model.Secret) (*model.SecretWriteResult, error) {
+					return nil, errors.New("AWS error")
 				},
 			},
 		},
