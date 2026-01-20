@@ -12,5 +12,5 @@ var (
 	errAddTagsFailed    = errors.New("add tags failed")
 	errRemoveTagsFailed = errors.New("remove tags failed")
 	errAccessDenied     = errors.New("access denied")
-	errUnexpectedCall   = errors.New("unexpected GetParameter call")
+	errNotFound         = errors.New("not found")
 )

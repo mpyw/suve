@@ -2,7 +2,7 @@ package cli_test
 
 import (
 	"bytes"
-	"encoding/json"
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -26,7 +26,6 @@ func TestStashShowRunner_Run(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
-		path := filepath.Join(tmpDir, "stage.json")
 
 		// Write test data
 		state := staging.NewEmptyState()
@@ -40,11 +39,9 @@ func TestStashShowRunner_Run(t *testing.T) {
 			Value:     lo.ToPtr("secret-value"),
 			StagedAt:  time.Now(),
 		}
-		data, err := json.MarshalIndent(state, "", "  ")
-		require.NoError(t, err)
-		require.NoError(t, os.WriteFile(path, data, 0o600))
+		fileStore := file.NewStoreWithDir(tmpDir)
+		require.NoError(t, fileStore.WriteState(context.Background(), "", state))
 
-		fileStore := file.NewStoreWithPath(path)
 		stdout := &bytes.Buffer{}
 		stderr := &bytes.Buffer{}
 
@@ -54,7 +51,7 @@ func TestStashShowRunner_Run(t *testing.T) {
 			Stderr:    stderr,
 		}
 
-		err = runner.Run(t.Context(), cli.StashShowOptions{})
+		err := runner.Run(t.Context(), cli.StashShowOptions{})
 		require.NoError(t, err)
 		assert.Contains(t, stdout.String(), "/app/config")
 		assert.Contains(t, stdout.String(), "my-secret")
@@ -65,7 +62,6 @@ func TestStashShowRunner_Run(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
-		path := filepath.Join(tmpDir, "stage.json")
 
 		// Write test data with both services
 		state := staging.NewEmptyState()
@@ -79,11 +75,9 @@ func TestStashShowRunner_Run(t *testing.T) {
 			Value:     lo.ToPtr("secret-value"),
 			StagedAt:  time.Now(),
 		}
-		data, err := json.MarshalIndent(state, "", "  ")
-		require.NoError(t, err)
-		require.NoError(t, os.WriteFile(path, data, 0o600))
+		fileStore := file.NewStoreWithDir(tmpDir)
+		require.NoError(t, fileStore.WriteState(context.Background(), "", state))
 
-		fileStore := file.NewStoreWithPath(path)
 		stdout := &bytes.Buffer{}
 		stderr := &bytes.Buffer{}
 
@@ -93,7 +87,7 @@ func TestStashShowRunner_Run(t *testing.T) {
 			Stderr:    stderr,
 		}
 
-		err = runner.Run(t.Context(), cli.StashShowOptions{Service: staging.ServiceParam})
+		err := runner.Run(t.Context(), cli.StashShowOptions{Service: staging.ServiceParam})
 		require.NoError(t, err)
 		assert.Contains(t, stdout.String(), "/app/config")
 		assert.NotContains(t, stdout.String(), "my-secret")
@@ -104,7 +98,6 @@ func TestStashShowRunner_Run(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
-		path := filepath.Join(tmpDir, "stage.json")
 
 		// Write test data with tags
 		state := staging.NewEmptyState()
@@ -112,11 +105,9 @@ func TestStashShowRunner_Run(t *testing.T) {
 			Add:    map[string]string{"env": "prod"},
 			Remove: maputil.NewSet("old-tag"),
 		}
-		data, err := json.MarshalIndent(state, "", "  ")
-		require.NoError(t, err)
-		require.NoError(t, os.WriteFile(path, data, 0o600))
+		fileStore := file.NewStoreWithDir(tmpDir)
+		require.NoError(t, fileStore.WriteState(context.Background(), "", state))
 
-		fileStore := file.NewStoreWithPath(path)
 		stdout := &bytes.Buffer{}
 		stderr := &bytes.Buffer{}
 
@@ -126,7 +117,7 @@ func TestStashShowRunner_Run(t *testing.T) {
 			Stderr:    stderr,
 		}
 
-		err = runner.Run(t.Context(), cli.StashShowOptions{})
+		err := runner.Run(t.Context(), cli.StashShowOptions{})
 		require.NoError(t, err)
 		assert.Contains(t, stdout.String(), "/app/config")
 		assert.Contains(t, stdout.String(), "+1 tags")
@@ -137,7 +128,6 @@ func TestStashShowRunner_Run(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
-		path := filepath.Join(tmpDir, "stage.json")
 
 		// Write test data with tags (add only)
 		state := staging.NewEmptyState()
@@ -145,11 +135,9 @@ func TestStashShowRunner_Run(t *testing.T) {
 			Add:    map[string]string{"env": "prod", "team": "backend"},
 			Remove: maputil.NewSet[string](),
 		}
-		data, err := json.MarshalIndent(state, "", "  ")
-		require.NoError(t, err)
-		require.NoError(t, os.WriteFile(path, data, 0o600))
+		fileStore := file.NewStoreWithDir(tmpDir)
+		require.NoError(t, fileStore.WriteState(context.Background(), "", state))
 
-		fileStore := file.NewStoreWithPath(path)
 		stdout := &bytes.Buffer{}
 		stderr := &bytes.Buffer{}
 
@@ -159,7 +147,7 @@ func TestStashShowRunner_Run(t *testing.T) {
 			Stderr:    stderr,
 		}
 
-		err = runner.Run(t.Context(), cli.StashShowOptions{})
+		err := runner.Run(t.Context(), cli.StashShowOptions{})
 		require.NoError(t, err)
 		assert.Contains(t, stdout.String(), "/app/config")
 		assert.Contains(t, stdout.String(), "+2 tags")
@@ -170,7 +158,6 @@ func TestStashShowRunner_Run(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
-		path := filepath.Join(tmpDir, "stage.json")
 
 		// Write test data with tags (remove only)
 		state := staging.NewEmptyState()
@@ -178,11 +165,9 @@ func TestStashShowRunner_Run(t *testing.T) {
 			Add:    map[string]string{},
 			Remove: maputil.NewSet("deprecated", "obsolete"),
 		}
-		data, err := json.MarshalIndent(state, "", "  ")
-		require.NoError(t, err)
-		require.NoError(t, os.WriteFile(path, data, 0o600))
+		fileStore := file.NewStoreWithDir(tmpDir)
+		require.NoError(t, fileStore.WriteState(context.Background(), "", state))
 
-		fileStore := file.NewStoreWithPath(path)
 		stdout := &bytes.Buffer{}
 		stderr := &bytes.Buffer{}
 
@@ -192,7 +177,7 @@ func TestStashShowRunner_Run(t *testing.T) {
 			Stderr:    stderr,
 		}
 
-		err = runner.Run(t.Context(), cli.StashShowOptions{})
+		err := runner.Run(t.Context(), cli.StashShowOptions{})
 		require.NoError(t, err)
 		assert.Contains(t, stdout.String(), "/app/config")
 		assert.Contains(t, stdout.String(), "-2 tags")
@@ -203,10 +188,9 @@ func TestStashShowRunner_Run(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
-		path := filepath.Join(tmpDir, "stage.json")
-		// Don't create the file
+		// Don't create any files
 
-		fileStore := file.NewStoreWithPath(path)
+		fileStore := file.NewStoreWithDir(tmpDir)
 		stdout := &bytes.Buffer{}
 		stderr := &bytes.Buffer{}
 
@@ -225,7 +209,6 @@ func TestStashShowRunner_Run(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
-		path := filepath.Join(tmpDir, "stage.json")
 
 		// Write test data with only param service
 		state := staging.NewEmptyState()
@@ -234,11 +217,9 @@ func TestStashShowRunner_Run(t *testing.T) {
 			Value:     lo.ToPtr("test-value"),
 			StagedAt:  time.Now(),
 		}
-		data, err := json.MarshalIndent(state, "", "  ")
-		require.NoError(t, err)
-		require.NoError(t, os.WriteFile(path, data, 0o600))
+		fileStore := file.NewStoreWithDir(tmpDir)
+		require.NoError(t, fileStore.WriteState(context.Background(), "", state))
 
-		fileStore := file.NewStoreWithPath(path)
 		stdout := &bytes.Buffer{}
 		stderr := &bytes.Buffer{}
 
@@ -249,7 +230,7 @@ func TestStashShowRunner_Run(t *testing.T) {
 		}
 
 		// Try to show secret service which has no entries
-		err = runner.Run(t.Context(), cli.StashShowOptions{Service: staging.ServiceSecret})
+		err := runner.Run(t.Context(), cli.StashShowOptions{Service: staging.ServiceSecret})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "no stashed changes for secret")
 	})
@@ -258,7 +239,6 @@ func TestStashShowRunner_Run(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
-		path := filepath.Join(tmpDir, "stage.json")
 
 		// Write test data
 		state := staging.NewEmptyState()
@@ -267,11 +247,9 @@ func TestStashShowRunner_Run(t *testing.T) {
 			Value:     lo.ToPtr("test-value"),
 			StagedAt:  time.Now(),
 		}
-		data, err := json.MarshalIndent(state, "", "  ")
-		require.NoError(t, err)
-		require.NoError(t, os.WriteFile(path, data, 0o600))
+		fileStore := file.NewStoreWithDir(tmpDir)
+		require.NoError(t, fileStore.WriteState(context.Background(), "", state))
 
-		fileStore := file.NewStoreWithPath(path)
 		stdout := &bytes.Buffer{}
 		stderr := &bytes.Buffer{}
 
@@ -281,7 +259,7 @@ func TestStashShowRunner_Run(t *testing.T) {
 			Stderr:    stderr,
 		}
 
-		err = runner.Run(t.Context(), cli.StashShowOptions{Verbose: true})
+		err := runner.Run(t.Context(), cli.StashShowOptions{Verbose: true})
 		require.NoError(t, err)
 		assert.Contains(t, stdout.String(), "/app/config")
 		// Verbose output includes the value
@@ -292,7 +270,6 @@ func TestStashShowRunner_Run(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
-		path := filepath.Join(tmpDir, "stage.json")
 
 		// Write test data
 		state := staging.NewEmptyState()
@@ -301,11 +278,9 @@ func TestStashShowRunner_Run(t *testing.T) {
 			Value:     lo.ToPtr("test-value"),
 			StagedAt:  time.Now(),
 		}
-		data, err := json.MarshalIndent(state, "", "  ")
-		require.NoError(t, err)
-		require.NoError(t, os.WriteFile(path, data, 0o600))
+		fileStore := file.NewStoreWithDir(tmpDir)
+		require.NoError(t, fileStore.WriteState(context.Background(), "", state))
 
-		fileStore := file.NewStoreWithPath(path)
 		stdout := &bytes.Buffer{}
 		stderr := &bytes.Buffer{}
 
@@ -315,11 +290,12 @@ func TestStashShowRunner_Run(t *testing.T) {
 			Stderr:    stderr,
 		}
 
-		err = runner.Run(t.Context(), cli.StashShowOptions{})
+		err := runner.Run(t.Context(), cli.StashShowOptions{})
 		require.NoError(t, err)
 
-		// File should still exist
-		_, err = os.Stat(path)
+		// File should still exist (param.json since we wrote param entries)
+		paramPath := filepath.Join(tmpDir, "param.json")
+		_, err = os.Stat(paramPath)
 		assert.NoError(t, err)
 	})
 }

@@ -3,22 +3,22 @@ package param
 import (
 	"context"
 	"fmt"
+	"strconv"
 
-	"github.com/samber/lo"
-
-	"github.com/mpyw/suve/internal/api/paramapi"
+	"github.com/mpyw/suve/internal/model"
 )
 
 // CreateClient is the interface for the create use case.
 type CreateClient interface {
-	paramapi.PutParameterAPI
+	// PutParameter creates or updates a parameter.
+	PutParameter(ctx context.Context, param *model.Parameter, overwrite bool) (*model.ParameterWriteResult, error)
 }
 
 // CreateInput holds input for the create use case.
 type CreateInput struct {
 	Name        string
 	Value       string
-	Type        paramapi.ParameterType
+	Type        string // Parameter type (e.g., "String", "SecureString")
 	Description string
 }
 
@@ -36,23 +36,22 @@ type CreateUseCase struct {
 // Execute runs the create use case.
 // It creates a new parameter. If the parameter already exists, returns an error.
 func (u *CreateUseCase) Execute(ctx context.Context, input CreateInput) (*CreateOutput, error) {
-	putInput := &paramapi.PutParameterInput{
-		Name:      lo.ToPtr(input.Name),
-		Value:     lo.ToPtr(input.Value),
-		Type:      input.Type,
-		Overwrite: lo.ToPtr(false), // Do not overwrite existing parameters
-	}
-	if input.Description != "" {
-		putInput.Description = lo.ToPtr(input.Description)
+	param := &model.Parameter{
+		Name:        input.Name,
+		Value:       input.Value,
+		Description: input.Description,
+		Metadata:    model.AWSParameterMeta{Type: input.Type},
 	}
 
-	putOutput, err := u.Client.PutParameter(ctx, putInput)
+	result, err := u.Client.PutParameter(ctx, param, false) // Do not overwrite existing parameters
 	if err != nil {
 		return nil, fmt.Errorf("failed to create parameter: %w", err)
 	}
 
+	version, _ := strconv.ParseInt(result.Version, 10, 64)
+
 	return &CreateOutput{
-		Name:    input.Name,
-		Version: putOutput.Version,
+		Name:    result.Name,
+		Version: version,
 	}, nil
 }

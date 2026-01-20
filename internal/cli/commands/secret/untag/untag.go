@@ -9,7 +9,7 @@ import (
 	"github.com/urfave/cli/v3"
 
 	"github.com/mpyw/suve/internal/cli/output"
-	"github.com/mpyw/suve/internal/infra"
+	awssecret "github.com/mpyw/suve/internal/provider/aws/secret"
 	"github.com/mpyw/suve/internal/usecase/secret"
 )
 
@@ -50,13 +50,13 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	name := cmd.Args().Get(0)
 	keys := cmd.Args().Slice()[1:]
 
-	client, err := infra.NewSecretClient(ctx)
+	adapter, err := awssecret.NewAdapter(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to initialize AWS client: %w", err)
 	}
 
 	r := &Runner{
-		UseCase: &secret.TagUseCase{Client: client},
+		UseCase: &secret.TagUseCase{Client: adapter},
 		Stdout:  cmd.Root().Writer,
 	}
 

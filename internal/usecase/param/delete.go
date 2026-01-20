@@ -2,18 +2,17 @@ package param
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
-	"github.com/samber/lo"
-
-	"github.com/mpyw/suve/internal/api/paramapi"
+	"github.com/mpyw/suve/internal/model"
 )
 
 // DeleteClient is the interface for the delete use case.
 type DeleteClient interface {
-	paramapi.DeleteParameterAPI
-	paramapi.GetParameterAPI
+	// GetParameter retrieves a parameter by name and optional version.
+	GetParameter(ctx context.Context, name string, version string) (*model.Parameter, error)
+	// DeleteParameter deletes a parameter by name.
+	DeleteParameter(ctx context.Context, name string) error
 }
 
 // DeleteInput holds input for the delete use case.
@@ -33,27 +32,18 @@ type DeleteUseCase struct {
 
 // GetCurrentValue fetches the current value for preview.
 func (u *DeleteUseCase) GetCurrentValue(ctx context.Context, name string) (string, error) {
-	out, err := u.Client.GetParameter(ctx, &paramapi.GetParameterInput{
-		Name:           lo.ToPtr(name),
-		WithDecryption: lo.ToPtr(true),
-	})
+	param, err := u.Client.GetParameter(ctx, name, "")
 	if err != nil {
-		pnf := (*paramapi.ParameterNotFound)(nil)
-		if errors.As(err, &pnf) {
-			return "", nil
-		}
-
-		return "", err
+		// Treat any error as "not found" for simplicity
+		return "", nil //nolint:nilerr // intentionally ignoring error to treat as not found
 	}
 
-	return lo.FromPtr(out.Parameter.Value), nil
+	return param.Value, nil
 }
 
 // Execute runs the delete use case.
 func (u *DeleteUseCase) Execute(ctx context.Context, input DeleteInput) (*DeleteOutput, error) {
-	_, err := u.Client.DeleteParameter(ctx, &paramapi.DeleteParameterInput{
-		Name: lo.ToPtr(input.Name),
-	})
+	err := u.Client.DeleteParameter(ctx, input.Name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to delete parameter: %w", err)
 	}

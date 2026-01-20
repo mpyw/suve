@@ -63,22 +63,20 @@ func TestHandler_HandleRequest(t *testing.T) {
 
 		// Stage entry
 		resp := h.HandleRequest(&protocol.Request{
-			Method:    protocol.MethodStageEntry,
-			AccountID: "123456789012",
-			Region:    "us-east-1",
-			Service:   staging.ServiceParam,
-			Name:      "/app/config",
-			Entry:     &entry,
+			Method:  protocol.MethodStageEntry,
+			Scope:   staging.AWSScope("123456789012", "us-east-1"),
+			Service: staging.ServiceParam,
+			Name:    "/app/config",
+			Entry:   &entry,
 		})
 		assert.True(t, resp.Success)
 
 		// Get entry
 		resp = h.HandleRequest(&protocol.Request{
-			Method:    protocol.MethodGetEntry,
-			AccountID: "123456789012",
-			Region:    "us-east-1",
-			Service:   staging.ServiceParam,
-			Name:      "/app/config",
+			Method:  protocol.MethodGetEntry,
+			Scope:   staging.AWSScope("123456789012", "us-east-1"),
+			Service: staging.ServiceParam,
+			Name:    "/app/config",
 		})
 		assert.True(t, resp.Success)
 
@@ -97,11 +95,10 @@ func TestHandler_HandleRequest(t *testing.T) {
 		defer h.Destroy()
 
 		resp := h.HandleRequest(&protocol.Request{
-			Method:    protocol.MethodGetEntry,
-			AccountID: "123456789012",
-			Region:    "us-east-1",
-			Service:   staging.ServiceParam,
-			Name:      "/app/nonexistent",
+			Method:  protocol.MethodGetEntry,
+			Scope:   staging.AWSScope("123456789012", "us-east-1"),
+			Service: staging.ServiceParam,
+			Name:    "/app/nonexistent",
 		})
 		assert.True(t, resp.Success)
 
@@ -125,22 +122,20 @@ func TestHandler_HandleRequest(t *testing.T) {
 
 		// Stage tag
 		resp := h.HandleRequest(&protocol.Request{
-			Method:    protocol.MethodStageTag,
-			AccountID: "123456789012",
-			Region:    "us-east-1",
-			Service:   staging.ServiceParam,
-			Name:      "/app/config",
-			TagEntry:  &tagEntry,
+			Method:   protocol.MethodStageTag,
+			Scope:    staging.AWSScope("123456789012", "us-east-1"),
+			Service:  staging.ServiceParam,
+			Name:     "/app/config",
+			TagEntry: &tagEntry,
 		})
 		assert.True(t, resp.Success)
 
 		// Get tag
 		resp = h.HandleRequest(&protocol.Request{
-			Method:    protocol.MethodGetTag,
-			AccountID: "123456789012",
-			Region:    "us-east-1",
-			Service:   staging.ServiceParam,
-			Name:      "/app/config",
+			Method:  protocol.MethodGetTag,
+			Scope:   staging.AWSScope("123456789012", "us-east-1"),
+			Service: staging.ServiceParam,
+			Name:    "/app/config",
 		})
 		assert.True(t, resp.Success)
 
@@ -159,11 +154,10 @@ func TestHandler_HandleRequest(t *testing.T) {
 		defer h.Destroy()
 
 		resp := h.HandleRequest(&protocol.Request{
-			Method:    protocol.MethodGetTag,
-			AccountID: "123456789012",
-			Region:    "us-east-1",
-			Service:   staging.ServiceParam,
-			Name:      "/app/nonexistent",
+			Method:  protocol.MethodGetTag,
+			Scope:   staging.AWSScope("123456789012", "us-east-1"),
+			Service: staging.ServiceParam,
+			Name:    "/app/nonexistent",
 		})
 		assert.True(t, resp.Success)
 
@@ -182,27 +176,24 @@ func TestHandler_HandleRequest(t *testing.T) {
 
 		// Stage entries
 		h.HandleRequest(&protocol.Request{
-			Method:    protocol.MethodStageEntry,
-			AccountID: "123456789012",
-			Region:    "us-east-1",
-			Service:   staging.ServiceParam,
-			Name:      "/app/config1",
-			Entry:     &staging.Entry{Operation: staging.OperationUpdate, Value: lo.ToPtr("value1"), StagedAt: time.Now()},
+			Method:  protocol.MethodStageEntry,
+			Scope:   staging.AWSScope("123456789012", "us-east-1"),
+			Service: staging.ServiceParam,
+			Name:    "/app/config1",
+			Entry:   &staging.Entry{Operation: staging.OperationUpdate, Value: lo.ToPtr("value1"), StagedAt: time.Now()},
 		})
 		h.HandleRequest(&protocol.Request{
-			Method:    protocol.MethodStageEntry,
-			AccountID: "123456789012",
-			Region:    "us-east-1",
-			Service:   staging.ServiceParam,
-			Name:      "/app/config2",
-			Entry:     &staging.Entry{Operation: staging.OperationUpdate, Value: lo.ToPtr("value2"), StagedAt: time.Now()},
+			Method:  protocol.MethodStageEntry,
+			Scope:   staging.AWSScope("123456789012", "us-east-1"),
+			Service: staging.ServiceParam,
+			Name:    "/app/config2",
+			Entry:   &staging.Entry{Operation: staging.OperationUpdate, Value: lo.ToPtr("value2"), StagedAt: time.Now()},
 		})
 
 		// List all entries
 		resp := h.HandleRequest(&protocol.Request{
-			Method:    protocol.MethodListEntries,
-			AccountID: "123456789012",
-			Region:    "us-east-1",
+			Method: protocol.MethodListEntries,
+			Scope:  staging.AWSScope("123456789012", "us-east-1"),
 		})
 		assert.True(t, resp.Success)
 
@@ -221,28 +212,25 @@ func TestHandler_HandleRequest(t *testing.T) {
 
 		// Stage entries in different services
 		h.HandleRequest(&protocol.Request{
-			Method:    protocol.MethodStageEntry,
-			AccountID: "123456789012",
-			Region:    "us-east-1",
-			Service:   staging.ServiceParam,
-			Name:      "/app/config",
-			Entry:     &staging.Entry{Operation: staging.OperationUpdate, Value: lo.ToPtr("param-value"), StagedAt: time.Now()},
+			Method:  protocol.MethodStageEntry,
+			Scope:   staging.AWSScope("123456789012", "us-east-1"),
+			Service: staging.ServiceParam,
+			Name:    "/app/config",
+			Entry:   &staging.Entry{Operation: staging.OperationUpdate, Value: lo.ToPtr("param-value"), StagedAt: time.Now()},
 		})
 		h.HandleRequest(&protocol.Request{
-			Method:    protocol.MethodStageEntry,
-			AccountID: "123456789012",
-			Region:    "us-east-1",
-			Service:   staging.ServiceSecret,
-			Name:      "my-secret",
-			Entry:     &staging.Entry{Operation: staging.OperationUpdate, Value: lo.ToPtr("secret-value"), StagedAt: time.Now()},
+			Method:  protocol.MethodStageEntry,
+			Scope:   staging.AWSScope("123456789012", "us-east-1"),
+			Service: staging.ServiceSecret,
+			Name:    "my-secret",
+			Entry:   &staging.Entry{Operation: staging.OperationUpdate, Value: lo.ToPtr("secret-value"), StagedAt: time.Now()},
 		})
 
 		// List param entries only
 		resp := h.HandleRequest(&protocol.Request{
-			Method:    protocol.MethodListEntries,
-			AccountID: "123456789012",
-			Region:    "us-east-1",
-			Service:   staging.ServiceParam,
+			Method:  protocol.MethodListEntries,
+			Scope:   staging.AWSScope("123456789012", "us-east-1"),
+			Service: staging.ServiceParam,
 		})
 		assert.True(t, resp.Success)
 
@@ -262,19 +250,17 @@ func TestHandler_HandleRequest(t *testing.T) {
 
 		// Stage tags
 		h.HandleRequest(&protocol.Request{
-			Method:    protocol.MethodStageTag,
-			AccountID: "123456789012",
-			Region:    "us-east-1",
-			Service:   staging.ServiceParam,
-			Name:      "/app/config",
-			TagEntry:  &staging.TagEntry{Add: map[string]string{"env": "prod"}, StagedAt: time.Now()},
+			Method:   protocol.MethodStageTag,
+			Scope:    staging.AWSScope("123456789012", "us-east-1"),
+			Service:  staging.ServiceParam,
+			Name:     "/app/config",
+			TagEntry: &staging.TagEntry{Add: map[string]string{"env": "prod"}, StagedAt: time.Now()},
 		})
 
 		// List tags
 		resp := h.HandleRequest(&protocol.Request{
-			Method:    protocol.MethodListTags,
-			AccountID: "123456789012",
-			Region:    "us-east-1",
+			Method: protocol.MethodListTags,
+			Scope:  staging.AWSScope("123456789012", "us-east-1"),
 		})
 		assert.True(t, resp.Success)
 
@@ -293,28 +279,25 @@ func TestHandler_HandleRequest(t *testing.T) {
 
 		// Stage tags in different services
 		h.HandleRequest(&protocol.Request{
-			Method:    protocol.MethodStageTag,
-			AccountID: "123456789012",
-			Region:    "us-east-1",
-			Service:   staging.ServiceParam,
-			Name:      "/app/config",
-			TagEntry:  &staging.TagEntry{Add: map[string]string{"env": "prod"}, StagedAt: time.Now()},
+			Method:   protocol.MethodStageTag,
+			Scope:    staging.AWSScope("123456789012", "us-east-1"),
+			Service:  staging.ServiceParam,
+			Name:     "/app/config",
+			TagEntry: &staging.TagEntry{Add: map[string]string{"env": "prod"}, StagedAt: time.Now()},
 		})
 		h.HandleRequest(&protocol.Request{
-			Method:    protocol.MethodStageTag,
-			AccountID: "123456789012",
-			Region:    "us-east-1",
-			Service:   staging.ServiceSecret,
-			Name:      "my-secret",
-			TagEntry:  &staging.TagEntry{Add: map[string]string{"team": "backend"}, StagedAt: time.Now()},
+			Method:   protocol.MethodStageTag,
+			Scope:    staging.AWSScope("123456789012", "us-east-1"),
+			Service:  staging.ServiceSecret,
+			Name:     "my-secret",
+			TagEntry: &staging.TagEntry{Add: map[string]string{"team": "backend"}, StagedAt: time.Now()},
 		})
 
 		// List secret tags only
 		resp := h.HandleRequest(&protocol.Request{
-			Method:    protocol.MethodListTags,
-			AccountID: "123456789012",
-			Region:    "us-east-1",
-			Service:   staging.ServiceSecret,
+			Method:  protocol.MethodListTags,
+			Scope:   staging.AWSScope("123456789012", "us-east-1"),
+			Service: staging.ServiceSecret,
 		})
 		assert.True(t, resp.Success)
 
@@ -334,31 +317,28 @@ func TestHandler_HandleRequest(t *testing.T) {
 
 		// Stage entry
 		h.HandleRequest(&protocol.Request{
-			Method:    protocol.MethodStageEntry,
-			AccountID: "123456789012",
-			Region:    "us-east-1",
-			Service:   staging.ServiceParam,
-			Name:      "/app/config",
-			Entry:     &staging.Entry{Operation: staging.OperationUpdate, Value: lo.ToPtr("value"), StagedAt: time.Now()},
+			Method:  protocol.MethodStageEntry,
+			Scope:   staging.AWSScope("123456789012", "us-east-1"),
+			Service: staging.ServiceParam,
+			Name:    "/app/config",
+			Entry:   &staging.Entry{Operation: staging.OperationUpdate, Value: lo.ToPtr("value"), StagedAt: time.Now()},
 		})
 
 		// Unstage entry
 		resp := h.HandleRequest(&protocol.Request{
-			Method:    protocol.MethodUnstageEntry,
-			AccountID: "123456789012",
-			Region:    "us-east-1",
-			Service:   staging.ServiceParam,
-			Name:      "/app/config",
+			Method:  protocol.MethodUnstageEntry,
+			Scope:   staging.AWSScope("123456789012", "us-east-1"),
+			Service: staging.ServiceParam,
+			Name:    "/app/config",
 		})
 		assert.True(t, resp.Success)
 
 		// Verify entry is gone
 		resp = h.HandleRequest(&protocol.Request{
-			Method:    protocol.MethodGetEntry,
-			AccountID: "123456789012",
-			Region:    "us-east-1",
-			Service:   staging.ServiceParam,
-			Name:      "/app/config",
+			Method:  protocol.MethodGetEntry,
+			Scope:   staging.AWSScope("123456789012", "us-east-1"),
+			Service: staging.ServiceParam,
+			Name:    "/app/config",
 		})
 
 		var result protocol.EntryResponse
@@ -374,11 +354,10 @@ func TestHandler_HandleRequest(t *testing.T) {
 		defer h.Destroy()
 
 		resp := h.HandleRequest(&protocol.Request{
-			Method:    protocol.MethodUnstageEntry,
-			AccountID: "123456789012",
-			Region:    "us-east-1",
-			Service:   staging.ServiceParam,
-			Name:      "/app/nonexistent",
+			Method:  protocol.MethodUnstageEntry,
+			Scope:   staging.AWSScope("123456789012", "us-east-1"),
+			Service: staging.ServiceParam,
+			Name:    "/app/nonexistent",
 		})
 		assert.False(t, resp.Success)
 		assert.Equal(t, staging.ErrNotStaged.Error(), resp.Error)
@@ -392,31 +371,28 @@ func TestHandler_HandleRequest(t *testing.T) {
 
 		// Stage tag
 		h.HandleRequest(&protocol.Request{
-			Method:    protocol.MethodStageTag,
-			AccountID: "123456789012",
-			Region:    "us-east-1",
-			Service:   staging.ServiceParam,
-			Name:      "/app/config",
-			TagEntry:  &staging.TagEntry{Add: map[string]string{"env": "prod"}, StagedAt: time.Now()},
+			Method:   protocol.MethodStageTag,
+			Scope:    staging.AWSScope("123456789012", "us-east-1"),
+			Service:  staging.ServiceParam,
+			Name:     "/app/config",
+			TagEntry: &staging.TagEntry{Add: map[string]string{"env": "prod"}, StagedAt: time.Now()},
 		})
 
 		// Unstage tag
 		resp := h.HandleRequest(&protocol.Request{
-			Method:    protocol.MethodUnstageTag,
-			AccountID: "123456789012",
-			Region:    "us-east-1",
-			Service:   staging.ServiceParam,
-			Name:      "/app/config",
+			Method:  protocol.MethodUnstageTag,
+			Scope:   staging.AWSScope("123456789012", "us-east-1"),
+			Service: staging.ServiceParam,
+			Name:    "/app/config",
 		})
 		assert.True(t, resp.Success)
 
 		// Verify tag is gone
 		resp = h.HandleRequest(&protocol.Request{
-			Method:    protocol.MethodGetTag,
-			AccountID: "123456789012",
-			Region:    "us-east-1",
-			Service:   staging.ServiceParam,
-			Name:      "/app/config",
+			Method:  protocol.MethodGetTag,
+			Scope:   staging.AWSScope("123456789012", "us-east-1"),
+			Service: staging.ServiceParam,
+			Name:    "/app/config",
 		})
 
 		var result protocol.TagResponse
@@ -432,11 +408,10 @@ func TestHandler_HandleRequest(t *testing.T) {
 		defer h.Destroy()
 
 		resp := h.HandleRequest(&protocol.Request{
-			Method:    protocol.MethodUnstageTag,
-			AccountID: "123456789012",
-			Region:    "us-east-1",
-			Service:   staging.ServiceParam,
-			Name:      "/app/nonexistent",
+			Method:  protocol.MethodUnstageTag,
+			Scope:   staging.AWSScope("123456789012", "us-east-1"),
+			Service: staging.ServiceParam,
+			Name:    "/app/nonexistent",
 		})
 		assert.False(t, resp.Success)
 		assert.Equal(t, staging.ErrNotStaged.Error(), resp.Error)
@@ -450,36 +425,32 @@ func TestHandler_HandleRequest(t *testing.T) {
 
 		// Stage entries in both services
 		h.HandleRequest(&protocol.Request{
-			Method:    protocol.MethodStageEntry,
-			AccountID: "123456789012",
-			Region:    "us-east-1",
-			Service:   staging.ServiceParam,
-			Name:      "/app/config",
-			Entry:     &staging.Entry{Operation: staging.OperationUpdate, Value: lo.ToPtr("value"), StagedAt: time.Now()},
+			Method:  protocol.MethodStageEntry,
+			Scope:   staging.AWSScope("123456789012", "us-east-1"),
+			Service: staging.ServiceParam,
+			Name:    "/app/config",
+			Entry:   &staging.Entry{Operation: staging.OperationUpdate, Value: lo.ToPtr("value"), StagedAt: time.Now()},
 		})
 		h.HandleRequest(&protocol.Request{
-			Method:    protocol.MethodStageEntry,
-			AccountID: "123456789012",
-			Region:    "us-east-1",
-			Service:   staging.ServiceSecret,
-			Name:      "my-secret",
-			Entry:     &staging.Entry{Operation: staging.OperationUpdate, Value: lo.ToPtr("value"), StagedAt: time.Now()},
+			Method:  protocol.MethodStageEntry,
+			Scope:   staging.AWSScope("123456789012", "us-east-1"),
+			Service: staging.ServiceSecret,
+			Name:    "my-secret",
+			Entry:   &staging.Entry{Operation: staging.OperationUpdate, Value: lo.ToPtr("value"), StagedAt: time.Now()},
 		})
 
 		// Unstage all
 		resp := h.HandleRequest(&protocol.Request{
-			Method:    protocol.MethodUnstageAll,
-			AccountID: "123456789012",
-			Region:    "us-east-1",
-			Service:   "",
+			Method:  protocol.MethodUnstageAll,
+			Scope:   staging.AWSScope("123456789012", "us-east-1"),
+			Service: "",
 		})
 		assert.True(t, resp.Success)
 
 		// Verify all entries are gone
 		resp = h.HandleRequest(&protocol.Request{
-			Method:    protocol.MethodListEntries,
-			AccountID: "123456789012",
-			Region:    "us-east-1",
+			Method: protocol.MethodListEntries,
+			Scope:  staging.AWSScope("123456789012", "us-east-1"),
 		})
 
 		var result protocol.ListEntriesResponse
@@ -497,36 +468,32 @@ func TestHandler_HandleRequest(t *testing.T) {
 
 		// Stage entries in both services
 		h.HandleRequest(&protocol.Request{
-			Method:    protocol.MethodStageEntry,
-			AccountID: "123456789012",
-			Region:    "us-east-1",
-			Service:   staging.ServiceParam,
-			Name:      "/app/config",
-			Entry:     &staging.Entry{Operation: staging.OperationUpdate, Value: lo.ToPtr("value"), StagedAt: time.Now()},
+			Method:  protocol.MethodStageEntry,
+			Scope:   staging.AWSScope("123456789012", "us-east-1"),
+			Service: staging.ServiceParam,
+			Name:    "/app/config",
+			Entry:   &staging.Entry{Operation: staging.OperationUpdate, Value: lo.ToPtr("value"), StagedAt: time.Now()},
 		})
 		h.HandleRequest(&protocol.Request{
-			Method:    protocol.MethodStageEntry,
-			AccountID: "123456789012",
-			Region:    "us-east-1",
-			Service:   staging.ServiceSecret,
-			Name:      "my-secret",
-			Entry:     &staging.Entry{Operation: staging.OperationUpdate, Value: lo.ToPtr("value"), StagedAt: time.Now()},
+			Method:  protocol.MethodStageEntry,
+			Scope:   staging.AWSScope("123456789012", "us-east-1"),
+			Service: staging.ServiceSecret,
+			Name:    "my-secret",
+			Entry:   &staging.Entry{Operation: staging.OperationUpdate, Value: lo.ToPtr("value"), StagedAt: time.Now()},
 		})
 
 		// Unstage only param service
 		resp := h.HandleRequest(&protocol.Request{
-			Method:    protocol.MethodUnstageAll,
-			AccountID: "123456789012",
-			Region:    "us-east-1",
-			Service:   staging.ServiceParam,
+			Method:  protocol.MethodUnstageAll,
+			Scope:   staging.AWSScope("123456789012", "us-east-1"),
+			Service: staging.ServiceParam,
 		})
 		assert.True(t, resp.Success)
 
 		// Verify param is empty but secret still exists
 		resp = h.HandleRequest(&protocol.Request{
-			Method:    protocol.MethodListEntries,
-			AccountID: "123456789012",
-			Region:    "us-east-1",
+			Method: protocol.MethodListEntries,
+			Scope:  staging.AWSScope("123456789012", "us-east-1"),
 		})
 
 		var result protocol.ListEntriesResponse
@@ -551,18 +518,16 @@ func TestHandler_HandleRequest(t *testing.T) {
 
 		// Set state
 		resp := h.HandleRequest(&protocol.Request{
-			Method:    protocol.MethodSetState,
-			AccountID: "123456789012",
-			Region:    "us-east-1",
-			State:     state,
+			Method: protocol.MethodSetState,
+			Scope:  staging.AWSScope("123456789012", "us-east-1"),
+			State:  state,
 		})
 		assert.True(t, resp.Success)
 
 		// Get state
 		resp = h.HandleRequest(&protocol.Request{
-			Method:    protocol.MethodGetState,
-			AccountID: "123456789012",
-			Region:    "us-east-1",
+			Method: protocol.MethodGetState,
+			Scope:  staging.AWSScope("123456789012", "us-east-1"),
 		})
 		assert.True(t, resp.Success)
 
@@ -581,10 +546,9 @@ func TestHandler_HandleRequest(t *testing.T) {
 		defer h.Destroy()
 
 		resp := h.HandleRequest(&protocol.Request{
-			Method:    protocol.MethodSetState,
-			AccountID: "123456789012",
-			Region:    "us-east-1",
-			State:     nil,
+			Method: protocol.MethodSetState,
+			Scope:  staging.AWSScope("123456789012", "us-east-1"),
+			State:  nil,
 		})
 		assert.False(t, resp.Success)
 		assert.Contains(t, resp.Error, "state is required")
@@ -598,19 +562,17 @@ func TestHandler_HandleRequest(t *testing.T) {
 
 		// Stage an entry
 		h.HandleRequest(&protocol.Request{
-			Method:    protocol.MethodStageEntry,
-			AccountID: "123456789012",
-			Region:    "us-east-1",
-			Service:   staging.ServiceParam,
-			Name:      "/app/config",
-			Entry:     &staging.Entry{Operation: staging.OperationUpdate, Value: lo.ToPtr("value"), StagedAt: time.Now()},
+			Method:  protocol.MethodStageEntry,
+			Scope:   staging.AWSScope("123456789012", "us-east-1"),
+			Service: staging.ServiceParam,
+			Name:    "/app/config",
+			Entry:   &staging.Entry{Operation: staging.OperationUpdate, Value: lo.ToPtr("value"), StagedAt: time.Now()},
 		})
 
 		// Load
 		resp := h.HandleRequest(&protocol.Request{
-			Method:    protocol.MethodLoad,
-			AccountID: "123456789012",
-			Region:    "us-east-1",
+			Method: protocol.MethodLoad,
+			Scope:  staging.AWSScope("123456789012", "us-east-1"),
 		})
 		assert.True(t, resp.Success)
 
@@ -648,12 +610,11 @@ func TestHandler_HandleRequest(t *testing.T) {
 
 		// Stage an entry
 		h.HandleRequest(&protocol.Request{
-			Method:    protocol.MethodStageEntry,
-			AccountID: "123456789012",
-			Region:    "us-east-1",
-			Service:   staging.ServiceParam,
-			Name:      "/app/config",
-			Entry:     &staging.Entry{Operation: staging.OperationUpdate, Value: lo.ToPtr("value"), StagedAt: time.Now()},
+			Method:  protocol.MethodStageEntry,
+			Scope:   staging.AWSScope("123456789012", "us-east-1"),
+			Service: staging.ServiceParam,
+			Name:    "/app/config",
+			Entry:   &staging.Entry{Operation: staging.OperationUpdate, Value: lo.ToPtr("value"), StagedAt: time.Now()},
 		})
 
 		assert.False(t, h.IsEmpty())
@@ -674,31 +635,28 @@ func TestHandler_HandleRequest(t *testing.T) {
 
 		// Stage entry in account 1
 		h.HandleRequest(&protocol.Request{
-			Method:    protocol.MethodStageEntry,
-			AccountID: "111111111111",
-			Region:    "us-east-1",
-			Service:   staging.ServiceParam,
-			Name:      "/app/config",
-			Entry:     &staging.Entry{Operation: staging.OperationUpdate, Value: lo.ToPtr("account1-value"), StagedAt: time.Now()},
+			Method:  protocol.MethodStageEntry,
+			Scope:   staging.AWSScope("111111111111", "us-east-1"),
+			Service: staging.ServiceParam,
+			Name:    "/app/config",
+			Entry:   &staging.Entry{Operation: staging.OperationUpdate, Value: lo.ToPtr("account1-value"), StagedAt: time.Now()},
 		})
 
 		// Stage entry in account 2
 		h.HandleRequest(&protocol.Request{
-			Method:    protocol.MethodStageEntry,
-			AccountID: "222222222222",
-			Region:    "us-east-1",
-			Service:   staging.ServiceParam,
-			Name:      "/app/config",
-			Entry:     &staging.Entry{Operation: staging.OperationUpdate, Value: lo.ToPtr("account2-value"), StagedAt: time.Now()},
+			Method:  protocol.MethodStageEntry,
+			Scope:   staging.AWSScope("222222222222", "us-east-1"),
+			Service: staging.ServiceParam,
+			Name:    "/app/config",
+			Entry:   &staging.Entry{Operation: staging.OperationUpdate, Value: lo.ToPtr("account2-value"), StagedAt: time.Now()},
 		})
 
 		// Get entry from account 1
 		resp := h.HandleRequest(&protocol.Request{
-			Method:    protocol.MethodGetEntry,
-			AccountID: "111111111111",
-			Region:    "us-east-1",
-			Service:   staging.ServiceParam,
-			Name:      "/app/config",
+			Method:  protocol.MethodGetEntry,
+			Scope:   staging.AWSScope("111111111111", "us-east-1"),
+			Service: staging.ServiceParam,
+			Name:    "/app/config",
 		})
 
 		var result1 protocol.EntryResponse
@@ -708,11 +666,10 @@ func TestHandler_HandleRequest(t *testing.T) {
 
 		// Get entry from account 2
 		resp = h.HandleRequest(&protocol.Request{
-			Method:    protocol.MethodGetEntry,
-			AccountID: "222222222222",
-			Region:    "us-east-1",
-			Service:   staging.ServiceParam,
-			Name:      "/app/config",
+			Method:  protocol.MethodGetEntry,
+			Scope:   staging.AWSScope("222222222222", "us-east-1"),
+			Service: staging.ServiceParam,
+			Name:    "/app/config",
 		})
 
 		var result2 protocol.EntryResponse

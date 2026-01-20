@@ -125,11 +125,12 @@ func stashPushAction(service staging.Service) func(context.Context, *cli.Command
 			return fmt.Errorf("failed to get AWS identity: %w", err)
 		}
 
-		agentStore := agent.NewStore(identity.AccountID, identity.Region)
+		scope := staging.AWSScope(identity.AccountID, identity.Region)
+		agentStore := agent.NewStore(scope)
 
 		result, err := lifecycle.ExecuteRead0(ctx, agentStore, lifecycle.CmdStashPush, func() error {
 			// Check if stash file already exists
-			basicFileStore, err := file.NewStore(identity.AccountID, identity.Region)
+			basicFileStore, err := file.NewStore(scope)
 			if err != nil {
 				return fmt.Errorf("failed to create file store: %w", err)
 			}
@@ -227,7 +228,7 @@ func stashPushAction(service staging.Service) func(context.Context, *cli.Command
 				// pass remains empty = plain text
 			}
 
-			fileStore, err := file.NewStoreWithPassphrase(identity.AccountID, identity.Region, pass)
+			fileStore, err := file.NewStoreWithPassphrase(scope, pass)
 			if err != nil {
 				return fmt.Errorf("failed to create file store: %w", err)
 			}

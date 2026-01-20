@@ -14,10 +14,10 @@ import (
 	"github.com/mpyw/suve/internal/staging/store/agent/internal/protocol"
 )
 
-const (
-	testRunnerAccountID = "123456789012"
-	testRunnerRegion    = "us-east-1"
-)
+// testScope is used in protocol requests that need a scope.
+//
+//nolint:gochecknoglobals // Test-only constant
+var testScope = staging.AWSScope("123456789012", "us-east-1")
 
 func TestNewRunner(t *testing.T) {
 	t.Parallel()
@@ -25,19 +25,17 @@ func TestNewRunner(t *testing.T) {
 	t.Run("default options", func(t *testing.T) {
 		t.Parallel()
 
-		r := NewRunner(testRunnerAccountID, testRunnerRegion)
+		r := NewRunner()
 		require.NotNil(t, r)
 		assert.NotNil(t, r.server)
 		assert.NotNil(t, r.handler)
-		assert.Equal(t, testRunnerAccountID, r.accountID)
-		assert.Equal(t, testRunnerRegion, r.region)
 		assert.False(t, r.autoShutdownDisabled)
 	})
 
 	t.Run("with auto shutdown disabled", func(t *testing.T) {
 		t.Parallel()
 
-		r := NewRunner(testRunnerAccountID, testRunnerRegion, WithAutoShutdownDisabled())
+		r := NewRunner(WithAutoShutdownDisabled())
 		require.NotNil(t, r)
 		assert.True(t, r.autoShutdownDisabled)
 	})
@@ -49,7 +47,7 @@ func TestRunner_Shutdown(t *testing.T) {
 	t.Run("shutdown without running server", func(t *testing.T) {
 		t.Parallel()
 
-		r := NewRunner(testRunnerAccountID, testRunnerRegion)
+		r := NewRunner()
 		// This should not panic
 		r.Shutdown()
 	})
@@ -61,7 +59,7 @@ func TestRunner_checkAutoShutdown(t *testing.T) {
 	t.Run("does not set WillShutdown when auto shutdown disabled", func(t *testing.T) {
 		t.Parallel()
 
-		r := NewRunner(testRunnerAccountID, testRunnerRegion, WithAutoShutdownDisabled())
+		r := NewRunner(WithAutoShutdownDisabled())
 
 		req := &protocol.Request{Method: protocol.MethodUnstageAll}
 		resp := &protocol.Response{Success: true}
@@ -74,7 +72,7 @@ func TestRunner_checkAutoShutdown(t *testing.T) {
 	t.Run("does not set WillShutdown on non-unstage methods", func(t *testing.T) {
 		t.Parallel()
 
-		r := NewRunner(testRunnerAccountID, testRunnerRegion)
+		r := NewRunner()
 
 		req := &protocol.Request{Method: protocol.MethodPing}
 		resp := &protocol.Response{Success: true}
@@ -87,7 +85,7 @@ func TestRunner_checkAutoShutdown(t *testing.T) {
 	t.Run("does not set WillShutdown on failed response", func(t *testing.T) {
 		t.Parallel()
 
-		r := NewRunner(testRunnerAccountID, testRunnerRegion)
+		r := NewRunner()
 
 		req := &protocol.Request{Method: protocol.MethodUnstageAll}
 		resp := &protocol.Response{Success: false}
@@ -106,7 +104,7 @@ func TestRunner_checkAutoShutdown_ShutdownReasons(t *testing.T) {
 	t.Run("UnstageEntry with no hint returns empty reason", func(t *testing.T) {
 		t.Parallel()
 
-		r := NewRunner(testRunnerAccountID, testRunnerRegion)
+		r := NewRunner()
 
 		req := &protocol.Request{Method: protocol.MethodUnstageEntry}
 		resp := &protocol.Response{Success: true}
@@ -119,7 +117,7 @@ func TestRunner_checkAutoShutdown_ShutdownReasons(t *testing.T) {
 	t.Run("UnstageEntry with apply hint returns applied reason", func(t *testing.T) {
 		t.Parallel()
 
-		r := NewRunner(testRunnerAccountID, testRunnerRegion)
+		r := NewRunner()
 
 		req := &protocol.Request{Method: protocol.MethodUnstageEntry, Hint: protocol.HintApply}
 		resp := &protocol.Response{Success: true}
@@ -132,7 +130,7 @@ func TestRunner_checkAutoShutdown_ShutdownReasons(t *testing.T) {
 	t.Run("UnstageEntry with reset hint returns unstaged reason", func(t *testing.T) {
 		t.Parallel()
 
-		r := NewRunner(testRunnerAccountID, testRunnerRegion)
+		r := NewRunner()
 
 		req := &protocol.Request{Method: protocol.MethodUnstageEntry, Hint: protocol.HintReset}
 		resp := &protocol.Response{Success: true}
@@ -145,7 +143,7 @@ func TestRunner_checkAutoShutdown_ShutdownReasons(t *testing.T) {
 	t.Run("UnstageEntry with persist hint returns persisted reason", func(t *testing.T) {
 		t.Parallel()
 
-		r := NewRunner(testRunnerAccountID, testRunnerRegion)
+		r := NewRunner()
 
 		req := &protocol.Request{Method: protocol.MethodUnstageEntry, Hint: protocol.HintPersist}
 		resp := &protocol.Response{Success: true}
@@ -159,7 +157,7 @@ func TestRunner_checkAutoShutdown_ShutdownReasons(t *testing.T) {
 	t.Run("UnstageTag with no hint returns empty reason", func(t *testing.T) {
 		t.Parallel()
 
-		r := NewRunner(testRunnerAccountID, testRunnerRegion)
+		r := NewRunner()
 
 		req := &protocol.Request{Method: protocol.MethodUnstageTag}
 		resp := &protocol.Response{Success: true}
@@ -172,7 +170,7 @@ func TestRunner_checkAutoShutdown_ShutdownReasons(t *testing.T) {
 	t.Run("UnstageTag with apply hint returns applied reason", func(t *testing.T) {
 		t.Parallel()
 
-		r := NewRunner(testRunnerAccountID, testRunnerRegion)
+		r := NewRunner()
 
 		req := &protocol.Request{Method: protocol.MethodUnstageTag, Hint: protocol.HintApply}
 		resp := &protocol.Response{Success: true}
@@ -185,7 +183,7 @@ func TestRunner_checkAutoShutdown_ShutdownReasons(t *testing.T) {
 	t.Run("UnstageTag with reset hint returns unstaged reason", func(t *testing.T) {
 		t.Parallel()
 
-		r := NewRunner(testRunnerAccountID, testRunnerRegion)
+		r := NewRunner()
 
 		req := &protocol.Request{Method: protocol.MethodUnstageTag, Hint: protocol.HintReset}
 		resp := &protocol.Response{Success: true}
@@ -198,7 +196,7 @@ func TestRunner_checkAutoShutdown_ShutdownReasons(t *testing.T) {
 	t.Run("UnstageTag with persist hint returns persisted reason", func(t *testing.T) {
 		t.Parallel()
 
-		r := NewRunner(testRunnerAccountID, testRunnerRegion)
+		r := NewRunner()
 
 		req := &protocol.Request{Method: protocol.MethodUnstageTag, Hint: protocol.HintPersist}
 		resp := &protocol.Response{Success: true}
@@ -212,7 +210,7 @@ func TestRunner_checkAutoShutdown_ShutdownReasons(t *testing.T) {
 	t.Run("UnstageAll with no hint returns unstaged reason", func(t *testing.T) {
 		t.Parallel()
 
-		r := NewRunner(testRunnerAccountID, testRunnerRegion)
+		r := NewRunner()
 
 		req := &protocol.Request{Method: protocol.MethodUnstageAll}
 		resp := &protocol.Response{Success: true}
@@ -225,7 +223,7 @@ func TestRunner_checkAutoShutdown_ShutdownReasons(t *testing.T) {
 	t.Run("UnstageAll with apply hint returns applied reason", func(t *testing.T) {
 		t.Parallel()
 
-		r := NewRunner(testRunnerAccountID, testRunnerRegion)
+		r := NewRunner()
 
 		req := &protocol.Request{Method: protocol.MethodUnstageAll, Hint: protocol.HintApply}
 		resp := &protocol.Response{Success: true}
@@ -238,7 +236,7 @@ func TestRunner_checkAutoShutdown_ShutdownReasons(t *testing.T) {
 	t.Run("UnstageAll with reset hint returns unstaged reason", func(t *testing.T) {
 		t.Parallel()
 
-		r := NewRunner(testRunnerAccountID, testRunnerRegion)
+		r := NewRunner()
 
 		req := &protocol.Request{Method: protocol.MethodUnstageAll, Hint: protocol.HintReset}
 		resp := &protocol.Response{Success: true}
@@ -251,7 +249,7 @@ func TestRunner_checkAutoShutdown_ShutdownReasons(t *testing.T) {
 	t.Run("UnstageAll with persist hint returns persisted reason", func(t *testing.T) {
 		t.Parallel()
 
-		r := NewRunner(testRunnerAccountID, testRunnerRegion)
+		r := NewRunner()
 
 		req := &protocol.Request{Method: protocol.MethodUnstageAll, Hint: protocol.HintPersist}
 		resp := &protocol.Response{Success: true}
@@ -265,7 +263,7 @@ func TestRunner_checkAutoShutdown_ShutdownReasons(t *testing.T) {
 	t.Run("SetState returns cleared reason", func(t *testing.T) {
 		t.Parallel()
 
-		r := NewRunner(testRunnerAccountID, testRunnerRegion)
+		r := NewRunner()
 
 		req := &protocol.Request{Method: protocol.MethodSetState}
 		resp := &protocol.Response{Success: true}
@@ -284,15 +282,14 @@ func TestRunner_checkAutoShutdown_NonEmptyState(t *testing.T) {
 	t.Run("UnstageEntry does not shutdown when state not empty", func(t *testing.T) {
 		t.Parallel()
 
-		r := NewRunner(testRunnerAccountID, testRunnerRegion)
+		r := NewRunner()
 
 		// Stage an entry to make state non-empty
 		stageReq := protocol.Request{
-			Method:    protocol.MethodStageEntry,
-			AccountID: testRunnerAccountID,
-			Region:    testRunnerRegion,
-			Service:   staging.ServiceParam,
-			Name:      "/test/param",
+			Method:  protocol.MethodStageEntry,
+			Scope:   testScope,
+			Service: staging.ServiceParam,
+			Name:    "/test/param",
 			Entry: &staging.Entry{
 				Value:     lo.ToPtr("value"),
 				Operation: staging.OperationCreate,
@@ -303,11 +300,10 @@ func TestRunner_checkAutoShutdown_NonEmptyState(t *testing.T) {
 
 		// Stage another entry
 		stageReq2 := protocol.Request{
-			Method:    protocol.MethodStageEntry,
-			AccountID: testRunnerAccountID,
-			Region:    testRunnerRegion,
-			Service:   staging.ServiceParam,
-			Name:      "/test/param2",
+			Method:  protocol.MethodStageEntry,
+			Scope:   testScope,
+			Service: staging.ServiceParam,
+			Name:    "/test/param2",
 			Entry: &staging.Entry{
 				Value:     lo.ToPtr("value2"),
 				Operation: staging.OperationCreate,
@@ -318,11 +314,10 @@ func TestRunner_checkAutoShutdown_NonEmptyState(t *testing.T) {
 
 		// Unstage one entry - state should not be empty
 		unstageReq := protocol.Request{
-			Method:    protocol.MethodUnstageEntry,
-			AccountID: testRunnerAccountID,
-			Region:    testRunnerRegion,
-			Service:   staging.ServiceParam,
-			Name:      "/test/param",
+			Method:  protocol.MethodUnstageEntry,
+			Scope:   testScope,
+			Service: staging.ServiceParam,
+			Name:    "/test/param",
 		}
 		resp = r.handler.HandleRequest(&unstageReq)
 		require.True(t, resp.Success)
@@ -336,15 +331,14 @@ func TestRunner_checkAutoShutdown_NonEmptyState(t *testing.T) {
 	t.Run("UnstageTag does not shutdown when state not empty", func(t *testing.T) {
 		t.Parallel()
 
-		r := NewRunner(testRunnerAccountID, testRunnerRegion)
+		r := NewRunner()
 
 		// Stage an entry
 		stageReq := protocol.Request{
-			Method:    protocol.MethodStageEntry,
-			AccountID: testRunnerAccountID,
-			Region:    testRunnerRegion,
-			Service:   staging.ServiceParam,
-			Name:      "/test/param",
+			Method:  protocol.MethodStageEntry,
+			Scope:   testScope,
+			Service: staging.ServiceParam,
+			Name:    "/test/param",
 			Entry: &staging.Entry{
 				Value:     lo.ToPtr("value"),
 				Operation: staging.OperationCreate,
@@ -355,11 +349,10 @@ func TestRunner_checkAutoShutdown_NonEmptyState(t *testing.T) {
 
 		// UnstageTag should not trigger shutdown since there's still an entry
 		unstageReq := protocol.Request{
-			Method:    protocol.MethodUnstageTag,
-			AccountID: testRunnerAccountID,
-			Region:    testRunnerRegion,
-			Service:   staging.ServiceParam,
-			Name:      "/test/another",
+			Method:  protocol.MethodUnstageTag,
+			Scope:   testScope,
+			Service: staging.ServiceParam,
+			Name:    "/test/another",
 		}
 		checkResp := &protocol.Response{Success: true}
 		r.checkAutoShutdown(&unstageReq, checkResp)
@@ -377,10 +370,7 @@ func TestRunner_Run_ContextCancellation(t *testing.T) {
 	t.Cleanup(func() { _ = os.RemoveAll(tmpDir) })
 	t.Setenv("TMPDIR", tmpDir)
 
-	accountID := "c1"
-	region := "r1"
-
-	runner := NewRunner(accountID, region, WithAutoShutdownDisabled())
+	runner := NewRunner(WithAutoShutdownDisabled())
 
 	// Create a cancellable context
 	ctx, cancel := context.WithCancel(t.Context())
@@ -392,7 +382,7 @@ func TestRunner_Run_ContextCancellation(t *testing.T) {
 	}()
 
 	// Wait for daemon to be ready
-	launcher := NewLauncher(accountID, region, WithAutoStartDisabled())
+	launcher := NewLauncher(WithAutoStartDisabled())
 
 	deadline := time.Now().Add(5 * time.Second)
 	for time.Now().Before(deadline) {
@@ -421,9 +411,7 @@ func TestRunner_Run_ContextCancellation(t *testing.T) {
 func TestRunner_MultipleOptions(t *testing.T) {
 	t.Parallel()
 
-	r := NewRunner(testRunnerAccountID, testRunnerRegion,
-		WithAutoShutdownDisabled(),
-	)
+	r := NewRunner(WithAutoShutdownDisabled())
 	require.NotNil(t, r)
 	assert.True(t, r.autoShutdownDisabled)
 }
@@ -450,7 +438,7 @@ func TestRunner_checkAutoShutdown_AllMethods(t *testing.T) {
 		t.Run(method, func(t *testing.T) {
 			t.Parallel()
 
-			r := NewRunner(testRunnerAccountID, testRunnerRegion)
+			r := NewRunner()
 
 			req := &protocol.Request{Method: method}
 			resp := &protocol.Response{Success: true}
@@ -469,10 +457,7 @@ func TestRunner_Run_StartError(t *testing.T) {
 	// /proc/1/root is typically not writable on Linux
 	t.Setenv("TMPDIR", "/proc/1/root/nonexistent")
 
-	accountID := "run-start-err"
-	region := "r1"
-
-	runner := NewRunner(accountID, region)
+	runner := NewRunner()
 
 	// Use a short timeout context in case the server unexpectedly starts
 	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Second)

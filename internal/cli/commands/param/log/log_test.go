@@ -12,10 +12,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/mpyw/suve/internal/api/paramapi"
 	appcli "github.com/mpyw/suve/internal/cli/commands"
 	"github.com/mpyw/suve/internal/cli/commands/param/log"
 	"github.com/mpyw/suve/internal/cli/output"
+	"github.com/mpyw/suve/internal/model"
 	"github.com/mpyw/suve/internal/usecase/param"
 )
 
@@ -107,18 +107,40 @@ func TestCommand_Validation(t *testing.T) {
 	})
 }
 
-//nolint:lll // mock struct fields match AWS SDK interface signatures
 type mockClient struct {
-	getParameterHistoryFunc func(ctx context.Context, params *paramapi.GetParameterHistoryInput, optFns ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error)
+	getParameterResult *model.Parameter
+	getParameterErr    error
+	getHistoryResult   *model.ParameterHistory
+	getHistoryErr      error
+	listParametersErr  error
 }
 
-//nolint:lll // mock function signature must match AWS SDK interface
-func (m *mockClient) GetParameterHistory(ctx context.Context, params *paramapi.GetParameterHistoryInput, optFns ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
-	if m.getParameterHistoryFunc != nil {
-		return m.getParameterHistoryFunc(ctx, params, optFns...)
+func (m *mockClient) GetParameter(_ context.Context, _ string, _ string) (*model.Parameter, error) {
+	if m.getParameterErr != nil {
+		return nil, m.getParameterErr
 	}
 
-	return nil, fmt.Errorf("GetParameterHistory not mocked")
+	return m.getParameterResult, nil
+}
+
+func (m *mockClient) GetParameterHistory(_ context.Context, _ string) (*model.ParameterHistory, error) {
+	if m.getHistoryErr != nil {
+		return nil, m.getHistoryErr
+	}
+
+	if m.getHistoryResult == nil {
+		return &model.ParameterHistory{}, nil
+	}
+
+	return m.getHistoryResult, nil
+}
+
+func (m *mockClient) ListParameters(_ context.Context, _ string, _ bool) ([]*model.ParameterListItem, error) {
+	if m.listParametersErr != nil {
+		return nil, m.listParametersErr
+	}
+
+	return nil, nil
 }
 
 //nolint:funlen // Table-driven test with many cases
@@ -138,16 +160,12 @@ func TestRun(t *testing.T) {
 			name: "show history",
 			opts: log.Options{Name: "/app/param", MaxResults: 10},
 			mock: &mockClient{
-				//nolint:lll // inline mock
-				getParameterHistoryFunc: func(_ context.Context, params *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
-					assert.Equal(t, "/app/param", lo.FromPtr(params.Name))
-
-					return &paramapi.GetParameterHistoryOutput{
-						Parameters: []paramapi.ParameterHistory{
-							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr("v1"), Version: 1, LastModifiedDate: lo.ToPtr(now.Add(-time.Hour))},
-							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr("v2"), Version: 2, LastModifiedDate: &now},
-						},
-					}, nil
+				getHistoryResult: &model.ParameterHistory{
+					Name: "/app/param",
+					Parameters: []*model.Parameter{
+						{Name: "/app/param", Value: "v1", Version: "1", UpdatedAt: lo.ToPtr(now.Add(-time.Hour)), Metadata: model.AWSParameterMeta{Type: "String"}},
+						{Name: "/app/param", Value: "v2", Version: "2", UpdatedAt: &now, Metadata: model.AWSParameterMeta{Type: "String"}},
+					},
 				},
 			},
 			check: func(t *testing.T, output string) {
@@ -161,15 +179,14 @@ func TestRun(t *testing.T) {
 			name: "normal mode shows full value without truncation",
 			opts: log.Options{Name: "/app/param", MaxResults: 10},
 			mock: &mockClient{
-				//nolint:lll // inline mock
-				getParameterHistoryFunc: func(_ context.Context, _ *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
-					longValue := "this is a very long value that should NOT be truncated in normal mode"
-
-					return &paramapi.GetParameterHistoryOutput{
-						Parameters: []paramapi.ParameterHistory{
-							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr(longValue), Version: 1, LastModifiedDate: &now},
+				getHistoryResult: &model.ParameterHistory{
+					Name: "/app/param",
+					Parameters: []*model.Parameter{
+						{
+							Name: "/app/param", Value: "this is a very long value that should NOT be truncated in normal mode",
+							Version: "1", UpdatedAt: &now, Metadata: model.AWSParameterMeta{Type: "String"},
 						},
-					}, nil
+					},
 				},
 			},
 			check: func(t *testing.T, output string) {
@@ -183,15 +200,14 @@ func TestRun(t *testing.T) {
 			name: "max-value-length truncates in normal mode",
 			opts: log.Options{Name: "/app/param", MaxResults: 10, MaxValueLength: 20},
 			mock: &mockClient{
-				//nolint:lll // inline mock
-				getParameterHistoryFunc: func(_ context.Context, _ *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
-					longValue := "this is a very long value that should be truncated"
-
-					return &paramapi.GetParameterHistoryOutput{
-						Parameters: []paramapi.ParameterHistory{
-							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr(longValue), Version: 1, LastModifiedDate: &now},
+				getHistoryResult: &model.ParameterHistory{
+					Name: "/app/param",
+					Parameters: []*model.Parameter{
+						{
+							Name: "/app/param", Value: "this is a very long value that should be truncated",
+							Version: "1", UpdatedAt: &now, Metadata: model.AWSParameterMeta{Type: "String"},
 						},
-					}, nil
+					},
 				},
 			},
 			check: func(t *testing.T, output string) {
@@ -205,14 +221,18 @@ func TestRun(t *testing.T) {
 			name: "show patch between versions",
 			opts: log.Options{Name: "/app/param", MaxResults: 10, ShowPatch: true},
 			mock: &mockClient{
-				//nolint:lll // inline mock
-				getParameterHistoryFunc: func(_ context.Context, _ *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
-					return &paramapi.GetParameterHistoryOutput{
-						Parameters: []paramapi.ParameterHistory{
-							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr("old-value"), Version: 1, LastModifiedDate: lo.ToPtr(now.Add(-time.Hour))},
-							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr("new-value"), Version: 2, LastModifiedDate: &now},
+				getHistoryResult: &model.ParameterHistory{
+					Name: "/app/param",
+					Parameters: []*model.Parameter{
+						{
+							Name: "/app/param", Value: "old-value", Version: "1",
+							UpdatedAt: lo.ToPtr(now.Add(-time.Hour)), Metadata: model.AWSParameterMeta{Type: "String"},
 						},
-					}, nil
+						{
+							Name: "/app/param", Value: "new-value", Version: "2",
+							UpdatedAt: &now, Metadata: model.AWSParameterMeta{Type: "String"},
+						},
+					},
 				},
 			},
 			check: func(t *testing.T, output string) {
@@ -227,13 +247,11 @@ func TestRun(t *testing.T) {
 			name: "patch with single version shows no diff",
 			opts: log.Options{Name: "/app/param", MaxResults: 10, ShowPatch: true},
 			mock: &mockClient{
-				//nolint:lll // inline mock
-				getParameterHistoryFunc: func(_ context.Context, _ *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
-					return &paramapi.GetParameterHistoryOutput{
-						Parameters: []paramapi.ParameterHistory{
-							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr("only-value"), Version: 1, LastModifiedDate: &now},
-						},
-					}, nil
+				getHistoryResult: &model.ParameterHistory{
+					Name: "/app/param",
+					Parameters: []*model.Parameter{
+						{Name: "/app/param", Value: "only-value", Version: "1", UpdatedAt: &now, Metadata: model.AWSParameterMeta{Type: "String"}},
+					},
 				},
 			},
 			check: func(t *testing.T, output string) {
@@ -243,28 +261,21 @@ func TestRun(t *testing.T) {
 			},
 		},
 		{
-			name: "error from AWS",
-			opts: log.Options{Name: "/app/param", MaxResults: 10},
-			mock: &mockClient{
-				//nolint:lll // inline mock
-				getParameterHistoryFunc: func(_ context.Context, _ *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
-					return nil, fmt.Errorf("AWS error")
-				},
-			},
+			name:    "error from AWS",
+			opts:    log.Options{Name: "/app/param", MaxResults: 10},
+			mock:    &mockClient{getHistoryErr: fmt.Errorf("AWS error")},
 			wantErr: true,
 		},
 		{
 			name: "reverse order shows oldest first",
 			opts: log.Options{Name: "/app/param", MaxResults: 10, Reverse: true},
 			mock: &mockClient{
-				//nolint:lll // inline mock
-				getParameterHistoryFunc: func(_ context.Context, _ *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
-					return &paramapi.GetParameterHistoryOutput{
-						Parameters: []paramapi.ParameterHistory{
-							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr("v1"), Version: 1, LastModifiedDate: lo.ToPtr(now.Add(-time.Hour))},
-							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr("v2"), Version: 2, LastModifiedDate: &now},
-						},
-					}, nil
+				getHistoryResult: &model.ParameterHistory{
+					Name: "/app/param",
+					Parameters: []*model.Parameter{
+						{Name: "/app/param", Value: "v1", Version: "1", UpdatedAt: lo.ToPtr(now.Add(-time.Hour)), Metadata: model.AWSParameterMeta{Type: "String"}},
+						{Name: "/app/param", Value: "v2", Version: "2", UpdatedAt: &now, Metadata: model.AWSParameterMeta{Type: "String"}},
+					},
 				},
 			},
 			check: func(t *testing.T, output string) {
@@ -285,14 +296,18 @@ func TestRun(t *testing.T) {
 			name: "reverse with patch shows diff correctly",
 			opts: log.Options{Name: "/app/param", MaxResults: 10, ShowPatch: true, Reverse: true},
 			mock: &mockClient{
-				//nolint:lll // inline mock
-				getParameterHistoryFunc: func(_ context.Context, _ *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
-					return &paramapi.GetParameterHistoryOutput{
-						Parameters: []paramapi.ParameterHistory{
-							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr("old-value"), Version: 1, LastModifiedDate: lo.ToPtr(now.Add(-time.Hour))},
-							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr("new-value"), Version: 2, LastModifiedDate: &now},
+				getHistoryResult: &model.ParameterHistory{
+					Name: "/app/param",
+					Parameters: []*model.Parameter{
+						{
+							Name: "/app/param", Value: "old-value", Version: "1",
+							UpdatedAt: lo.ToPtr(now.Add(-time.Hour)), Metadata: model.AWSParameterMeta{Type: "String"},
 						},
-					}, nil
+						{
+							Name: "/app/param", Value: "new-value", Version: "2",
+							UpdatedAt: &now, Metadata: model.AWSParameterMeta{Type: "String"},
+						},
+					},
 				},
 			},
 			check: func(t *testing.T, output string) {
@@ -307,11 +322,9 @@ func TestRun(t *testing.T) {
 			name: "empty history",
 			opts: log.Options{Name: "/app/param", MaxResults: 10},
 			mock: &mockClient{
-				//nolint:lll // inline mock
-				getParameterHistoryFunc: func(_ context.Context, _ *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
-					return &paramapi.GetParameterHistoryOutput{
-						Parameters: []paramapi.ParameterHistory{},
-					}, nil
+				getHistoryResult: &model.ParameterHistory{
+					Name:       "/app/param",
+					Parameters: []*model.Parameter{},
 				},
 			},
 			check: func(t *testing.T, output string) {
@@ -323,14 +336,12 @@ func TestRun(t *testing.T) {
 			name: "oneline format",
 			opts: log.Options{Name: "/app/param", MaxResults: 10, Oneline: true},
 			mock: &mockClient{
-				//nolint:lll // inline mock
-				getParameterHistoryFunc: func(_ context.Context, _ *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
-					return &paramapi.GetParameterHistoryOutput{
-						Parameters: []paramapi.ParameterHistory{
-							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr("v1"), Version: 1, LastModifiedDate: lo.ToPtr(now.Add(-time.Hour))},
-							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr("v2"), Version: 2, LastModifiedDate: &now},
-						},
-					}, nil
+				getHistoryResult: &model.ParameterHistory{
+					Name: "/app/param",
+					Parameters: []*model.Parameter{
+						{Name: "/app/param", Value: "v1", Version: "1", UpdatedAt: lo.ToPtr(now.Add(-time.Hour)), Metadata: model.AWSParameterMeta{Type: "String"}},
+						{Name: "/app/param", Value: "v2", Version: "2", UpdatedAt: &now, Metadata: model.AWSParameterMeta{Type: "String"}},
+					},
 				},
 			},
 			check: func(t *testing.T, output string) {
@@ -347,15 +358,14 @@ func TestRun(t *testing.T) {
 			name: "oneline truncates long values",
 			opts: log.Options{Name: "/app/param", MaxResults: 10, Oneline: true},
 			mock: &mockClient{
-				//nolint:lll // inline mock
-				getParameterHistoryFunc: func(_ context.Context, _ *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
-					longValue := "this is a very long value that exceeds forty characters"
-
-					return &paramapi.GetParameterHistoryOutput{
-						Parameters: []paramapi.ParameterHistory{
-							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr(longValue), Version: 1, LastModifiedDate: &now},
+				getHistoryResult: &model.ParameterHistory{
+					Name: "/app/param",
+					Parameters: []*model.Parameter{
+						{
+							Name: "/app/param", Value: "this is a very long value that exceeds forty characters",
+							Version: "1", UpdatedAt: &now, Metadata: model.AWSParameterMeta{Type: "String"},
 						},
-					}, nil
+					},
 				},
 			},
 			check: func(t *testing.T, output string) {
@@ -369,15 +379,13 @@ func TestRun(t *testing.T) {
 			name: "filter by since date",
 			opts: log.Options{Name: "/app/param", MaxResults: 10, Since: lo.ToPtr(now.Add(-90 * time.Minute))},
 			mock: &mockClient{
-				//nolint:lll // inline mock
-				getParameterHistoryFunc: func(_ context.Context, _ *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
-					return &paramapi.GetParameterHistoryOutput{
-						Parameters: []paramapi.ParameterHistory{
-							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr("v1"), Version: 1, LastModifiedDate: lo.ToPtr(now.Add(-2 * time.Hour))},
-							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr("v2"), Version: 2, LastModifiedDate: lo.ToPtr(now.Add(-time.Hour))},
-							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr("v3"), Version: 3, LastModifiedDate: &now},
-						},
-					}, nil
+				getHistoryResult: &model.ParameterHistory{
+					Name: "/app/param",
+					Parameters: []*model.Parameter{
+						{Name: "/app/param", Value: "v1", Version: "1", UpdatedAt: lo.ToPtr(now.Add(-2 * time.Hour)), Metadata: model.AWSParameterMeta{Type: "String"}},
+						{Name: "/app/param", Value: "v2", Version: "2", UpdatedAt: lo.ToPtr(now.Add(-time.Hour)), Metadata: model.AWSParameterMeta{Type: "String"}},
+						{Name: "/app/param", Value: "v3", Version: "3", UpdatedAt: &now, Metadata: model.AWSParameterMeta{Type: "String"}},
+					},
 				},
 			},
 			check: func(t *testing.T, output string) {
@@ -391,15 +399,13 @@ func TestRun(t *testing.T) {
 			name: "filter by until date",
 			opts: log.Options{Name: "/app/param", MaxResults: 10, Until: lo.ToPtr(now.Add(-30 * time.Minute))},
 			mock: &mockClient{
-				//nolint:lll // inline mock
-				getParameterHistoryFunc: func(_ context.Context, _ *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
-					return &paramapi.GetParameterHistoryOutput{
-						Parameters: []paramapi.ParameterHistory{
-							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr("v1"), Version: 1, LastModifiedDate: lo.ToPtr(now.Add(-2 * time.Hour))},
-							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr("v2"), Version: 2, LastModifiedDate: lo.ToPtr(now.Add(-time.Hour))},
-							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr("v3"), Version: 3, LastModifiedDate: &now},
-						},
-					}, nil
+				getHistoryResult: &model.ParameterHistory{
+					Name: "/app/param",
+					Parameters: []*model.Parameter{
+						{Name: "/app/param", Value: "v1", Version: "1", UpdatedAt: lo.ToPtr(now.Add(-2 * time.Hour)), Metadata: model.AWSParameterMeta{Type: "String"}},
+						{Name: "/app/param", Value: "v2", Version: "2", UpdatedAt: lo.ToPtr(now.Add(-time.Hour)), Metadata: model.AWSParameterMeta{Type: "String"}},
+						{Name: "/app/param", Value: "v3", Version: "3", UpdatedAt: &now, Metadata: model.AWSParameterMeta{Type: "String"}},
+					},
 				},
 			},
 			check: func(t *testing.T, output string) {
@@ -413,16 +419,14 @@ func TestRun(t *testing.T) {
 			name: "filter by since and until date range",
 			opts: log.Options{Name: "/app/param", MaxResults: 10, Since: lo.ToPtr(now.Add(-150 * time.Minute)), Until: lo.ToPtr(now.Add(-30 * time.Minute))},
 			mock: &mockClient{
-				//nolint:lll // inline mock
-				getParameterHistoryFunc: func(_ context.Context, _ *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
-					return &paramapi.GetParameterHistoryOutput{
-						Parameters: []paramapi.ParameterHistory{
-							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr("v1"), Version: 1, LastModifiedDate: lo.ToPtr(now.Add(-3 * time.Hour))},
-							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr("v2"), Version: 2, LastModifiedDate: lo.ToPtr(now.Add(-2 * time.Hour))},
-							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr("v3"), Version: 3, LastModifiedDate: lo.ToPtr(now.Add(-time.Hour))},
-							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr("v4"), Version: 4, LastModifiedDate: &now},
-						},
-					}, nil
+				getHistoryResult: &model.ParameterHistory{
+					Name: "/app/param",
+					Parameters: []*model.Parameter{
+						{Name: "/app/param", Value: "v1", Version: "1", UpdatedAt: lo.ToPtr(now.Add(-3 * time.Hour)), Metadata: model.AWSParameterMeta{Type: "String"}},
+						{Name: "/app/param", Value: "v2", Version: "2", UpdatedAt: lo.ToPtr(now.Add(-2 * time.Hour)), Metadata: model.AWSParameterMeta{Type: "String"}},
+						{Name: "/app/param", Value: "v3", Version: "3", UpdatedAt: lo.ToPtr(now.Add(-time.Hour)), Metadata: model.AWSParameterMeta{Type: "String"}},
+						{Name: "/app/param", Value: "v4", Version: "4", UpdatedAt: &now, Metadata: model.AWSParameterMeta{Type: "String"}},
+					},
 				},
 			},
 			check: func(t *testing.T, output string) {
@@ -437,13 +441,11 @@ func TestRun(t *testing.T) {
 			name: "filter with no matching dates returns empty",
 			opts: log.Options{Name: "/app/param", MaxResults: 10, Since: lo.ToPtr(now.Add(time.Hour)), Until: lo.ToPtr(now.Add(2 * time.Hour))},
 			mock: &mockClient{
-				//nolint:lll // inline mock
-				getParameterHistoryFunc: func(_ context.Context, _ *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
-					return &paramapi.GetParameterHistoryOutput{
-						Parameters: []paramapi.ParameterHistory{
-							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr("v1"), Version: 1, LastModifiedDate: &now},
-						},
-					}, nil
+				getHistoryResult: &model.ParameterHistory{
+					Name: "/app/param",
+					Parameters: []*model.Parameter{
+						{Name: "/app/param", Value: "v1", Version: "1", UpdatedAt: &now, Metadata: model.AWSParameterMeta{Type: "String"}},
+					},
 				},
 			},
 			check: func(t *testing.T, output string) {
@@ -455,14 +457,12 @@ func TestRun(t *testing.T) {
 			name: "filter skips versions without LastModifiedDate",
 			opts: log.Options{Name: "/app/param", MaxResults: 10, Since: lo.ToPtr(now.Add(-30 * time.Minute))},
 			mock: &mockClient{
-				//nolint:lll // inline mock
-				getParameterHistoryFunc: func(_ context.Context, _ *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
-					return &paramapi.GetParameterHistoryOutput{
-						Parameters: []paramapi.ParameterHistory{
-							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr("v1"), Version: 1, LastModifiedDate: nil},
-							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr("v2"), Version: 2, LastModifiedDate: &now},
-						},
-					}, nil
+				getHistoryResult: &model.ParameterHistory{
+					Name: "/app/param",
+					Parameters: []*model.Parameter{
+						{Name: "/app/param", Value: "v1", Version: "1", UpdatedAt: nil, Metadata: model.AWSParameterMeta{Type: "String"}},
+						{Name: "/app/param", Value: "v2", Version: "2", UpdatedAt: &now, Metadata: model.AWSParameterMeta{Type: "String"}},
+					},
 				},
 			},
 			check: func(t *testing.T, output string) {
@@ -475,14 +475,12 @@ func TestRun(t *testing.T) {
 			name: "JSON output format",
 			opts: log.Options{Name: "/app/param", MaxResults: 10, Output: output.FormatJSON},
 			mock: &mockClient{
-				//nolint:lll // inline mock
-				getParameterHistoryFunc: func(_ context.Context, _ *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
-					return &paramapi.GetParameterHistoryOutput{
-						Parameters: []paramapi.ParameterHistory{
-							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr("value1"), Version: 1, Type: paramapi.ParameterTypeString, LastModifiedDate: lo.ToPtr(now.Add(-time.Hour))},
-							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr("value2"), Version: 2, Type: paramapi.ParameterTypeSecureString, LastModifiedDate: &now},
-						},
-					}, nil
+				getHistoryResult: &model.ParameterHistory{
+					Name: "/app/param",
+					Parameters: []*model.Parameter{
+						{Name: "/app/param", Value: "value1", Version: "1", UpdatedAt: lo.ToPtr(now.Add(-time.Hour)), Metadata: model.AWSParameterMeta{Type: "String"}},
+						{Name: "/app/param", Value: "value2", Version: "2", UpdatedAt: &now, Metadata: model.AWSParameterMeta{Type: "SecureString"}},
+					},
 				},
 			},
 			check: func(t *testing.T, output string) {
@@ -497,13 +495,11 @@ func TestRun(t *testing.T) {
 			name: "JSON output without LastModifiedDate",
 			opts: log.Options{Name: "/app/param", MaxResults: 10, Output: output.FormatJSON},
 			mock: &mockClient{
-				//nolint:lll // inline mock
-				getParameterHistoryFunc: func(_ context.Context, _ *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
-					return &paramapi.GetParameterHistoryOutput{
-						Parameters: []paramapi.ParameterHistory{
-							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr("value1"), Version: 1, Type: paramapi.ParameterTypeString, LastModifiedDate: nil},
-						},
-					}, nil
+				getHistoryResult: &model.ParameterHistory{
+					Name: "/app/param",
+					Parameters: []*model.Parameter{
+						{Name: "/app/param", Value: "value1", Version: "1", UpdatedAt: nil, Metadata: model.AWSParameterMeta{Type: "String"}},
+					},
 				},
 			},
 			check: func(t *testing.T, output string) {
@@ -516,14 +512,18 @@ func TestRun(t *testing.T) {
 			name: "patch with JSON format",
 			opts: log.Options{Name: "/app/param", MaxResults: 10, ShowPatch: true, ParseJSON: true},
 			mock: &mockClient{
-				//nolint:lll // inline mock
-				getParameterHistoryFunc: func(_ context.Context, _ *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
-					return &paramapi.GetParameterHistoryOutput{
-						Parameters: []paramapi.ParameterHistory{
-							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr(`{"key":"old"}`), Version: 1, LastModifiedDate: lo.ToPtr(now.Add(-time.Hour))},
-							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr(`{"key":"new"}`), Version: 2, LastModifiedDate: &now},
+				getHistoryResult: &model.ParameterHistory{
+					Name: "/app/param",
+					Parameters: []*model.Parameter{
+						{
+							Name: "/app/param", Value: `{"key":"old"}`, Version: "1",
+							UpdatedAt: lo.ToPtr(now.Add(-time.Hour)), Metadata: model.AWSParameterMeta{Type: "String"},
 						},
-					}, nil
+						{
+							Name: "/app/param", Value: `{"key":"new"}`, Version: "2",
+							UpdatedAt: &now, Metadata: model.AWSParameterMeta{Type: "String"},
+						},
+					},
 				},
 			},
 			check: func(t *testing.T, output string) {
@@ -532,16 +532,14 @@ func TestRun(t *testing.T) {
 			},
 		},
 		{
-			name: "version without LastModifiedDate shows correctly",
+			name: "version without UpdatedAt shows correctly",
 			opts: log.Options{Name: "/app/param", MaxResults: 10},
 			mock: &mockClient{
-				//nolint:lll // inline mock
-				getParameterHistoryFunc: func(_ context.Context, _ *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
-					return &paramapi.GetParameterHistoryOutput{
-						Parameters: []paramapi.ParameterHistory{
-							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr("v1"), Version: 1, LastModifiedDate: nil},
-						},
-					}, nil
+				getHistoryResult: &model.ParameterHistory{
+					Name: "/app/param",
+					Parameters: []*model.Parameter{
+						{Name: "/app/param", Value: "v1", Version: "1", UpdatedAt: nil, Metadata: model.AWSParameterMeta{Type: "String"}},
+					},
 				},
 			},
 			check: func(t *testing.T, output string) {
@@ -554,13 +552,11 @@ func TestRun(t *testing.T) {
 			name: "oneline without LastModifiedDate",
 			opts: log.Options{Name: "/app/param", MaxResults: 10, Oneline: true},
 			mock: &mockClient{
-				//nolint:lll // inline mock
-				getParameterHistoryFunc: func(_ context.Context, _ *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
-					return &paramapi.GetParameterHistoryOutput{
-						Parameters: []paramapi.ParameterHistory{
-							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr("v1"), Version: 1, LastModifiedDate: nil},
-						},
-					}, nil
+				getHistoryResult: &model.ParameterHistory{
+					Name: "/app/param",
+					Parameters: []*model.Parameter{
+						{Name: "/app/param", Value: "v1", Version: "1", UpdatedAt: nil, Metadata: model.AWSParameterMeta{Type: "String"}},
+					},
 				},
 			},
 			check: func(t *testing.T, output string) {
@@ -572,14 +568,18 @@ func TestRun(t *testing.T) {
 			name: "patch with identical values shows no diff",
 			opts: log.Options{Name: "/app/param", MaxResults: 10, ShowPatch: true},
 			mock: &mockClient{
-				//nolint:lll // inline mock
-				getParameterHistoryFunc: func(_ context.Context, _ *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
-					return &paramapi.GetParameterHistoryOutput{
-						Parameters: []paramapi.ParameterHistory{
-							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr("same-value"), Version: 1, LastModifiedDate: lo.ToPtr(now.Add(-time.Hour))},
-							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr("same-value"), Version: 2, LastModifiedDate: &now},
+				getHistoryResult: &model.ParameterHistory{
+					Name: "/app/param",
+					Parameters: []*model.Parameter{
+						{
+							Name: "/app/param", Value: "same-value", Version: "1",
+							UpdatedAt: lo.ToPtr(now.Add(-time.Hour)), Metadata: model.AWSParameterMeta{Type: "String"},
 						},
-					}, nil
+						{
+							Name: "/app/param", Value: "same-value", Version: "2",
+							UpdatedAt: &now, Metadata: model.AWSParameterMeta{Type: "String"},
+						},
+					},
 				},
 			},
 			check: func(t *testing.T, output string) {

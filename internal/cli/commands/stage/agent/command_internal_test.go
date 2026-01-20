@@ -64,8 +64,6 @@ func TestStartCommand_HasExpectedFlags(t *testing.T) {
 		return ""
 	})
 
-	assert.Contains(t, flagNames, "account")
-	assert.Contains(t, flagNames, "region")
 	assert.Contains(t, flagNames, "foreground")
 }
 

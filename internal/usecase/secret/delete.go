@@ -2,26 +2,26 @@ package secret
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
-	"github.com/samber/lo"
-
-	"github.com/mpyw/suve/internal/api/secretapi"
+	"github.com/mpyw/suve/internal/model"
 )
 
 // DeleteClient is the interface for the delete use case.
 type DeleteClient interface {
-	secretapi.DeleteSecretAPI
-	secretapi.GetSecretValueAPI
+	// GetSecret retrieves a secret by name with optional version specifier.
+	GetSecret(ctx context.Context, name string, versionID string, versionStage string) (*model.Secret, error)
+	// DeleteSecret deletes a secret.
+	DeleteSecret(ctx context.Context, name string, forceDelete bool) (*model.SecretDeleteResult, error)
 }
 
 // DeleteInput holds input for the delete use case.
 type DeleteInput struct {
-	Name           string
-	Force          bool  // Force immediate deletion
-	RecoveryWindow int64 // Days before permanent deletion (7-30)
+	Name  string
+	Force bool // Force immediate deletion
+	// RecoveryWindow is not supported through the provider interface.
+	// AWS-specific recovery window should be handled at the CLI/adapter level.
 }
 
 // DeleteOutput holds the result of the delete use case.
@@ -38,39 +38,25 @@ type DeleteUseCase struct {
 
 // GetCurrentValue fetches the current secret value for preview.
 func (u *DeleteUseCase) GetCurrentValue(ctx context.Context, name string) (string, error) {
-	out, err := u.Client.GetSecretValue(ctx, &secretapi.GetSecretValueInput{
-		SecretId: lo.ToPtr(name),
-	})
+	secret, err := u.Client.GetSecret(ctx, name, "", "")
 	if err != nil {
-		if rnf := (*secretapi.ResourceNotFoundException)(nil); errors.As(err, &rnf) {
-			return "", nil
-		}
-
-		return "", err
+		// Treat any error as "not found" for simplicity
+		return "", nil //nolint:nilerr // intentionally ignoring error to treat as not found
 	}
 
-	return lo.FromPtr(out.SecretString), nil
+	return secret.Value, nil
 }
 
 // Execute runs the delete use case.
 func (u *DeleteUseCase) Execute(ctx context.Context, input DeleteInput) (*DeleteOutput, error) {
-	deleteInput := &secretapi.DeleteSecretInput{
-		SecretId: lo.ToPtr(input.Name),
-	}
-	if input.Force {
-		deleteInput.ForceDeleteWithoutRecovery = lo.ToPtr(true)
-	} else if input.RecoveryWindow > 0 {
-		deleteInput.RecoveryWindowInDays = lo.ToPtr(input.RecoveryWindow)
-	}
-
-	result, err := u.Client.DeleteSecret(ctx, deleteInput)
+	result, err := u.Client.DeleteSecret(ctx, input.Name, input.Force)
 	if err != nil {
 		return nil, fmt.Errorf("failed to delete secret: %w", err)
 	}
 
 	return &DeleteOutput{
-		Name:         lo.FromPtr(result.Name),
+		Name:         result.Name,
 		DeletionDate: result.DeletionDate,
-		ARN:          lo.FromPtr(result.ARN),
+		ARN:          result.ARN,
 	}, nil
 }

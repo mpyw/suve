@@ -701,7 +701,7 @@ func (a *App) StagingFileStatus() (*StagingFileStatusResult, error) {
 		return nil, err
 	}
 
-	fileStore, err := file.NewStore(identity.AccountID, identity.Region)
+	fileStore, err := file.NewStore(staging.AWSScope(identity.AccountID, identity.Region))
 	if err != nil {
 		return nil, err
 	}
@@ -736,7 +736,7 @@ func (a *App) StagingDrain(service string, passphrase string, keep bool, mode st
 		return nil, err
 	}
 
-	fileStore, err := file.NewStoreWithPassphrase(identity.AccountID, identity.Region, passphrase)
+	fileStore, err := file.NewStoreWithPassphrase(staging.AWSScope(identity.AccountID, identity.Region), passphrase)
 	if err != nil {
 		return nil, err
 	}
@@ -789,7 +789,7 @@ func (a *App) StagingPersist(service string, passphrase string, keep bool, mode 
 		return nil, err
 	}
 
-	fileStore, err := file.NewStoreWithPassphrase(identity.AccountID, identity.Region, passphrase)
+	fileStore, err := file.NewStoreWithPassphrase(staging.AWSScope(identity.AccountID, identity.Region), passphrase)
 	if err != nil {
 		return nil, err
 	}
@@ -845,7 +845,7 @@ func (a *App) StagingDrop() (*StagingDropResult, error) {
 		return nil, err
 	}
 
-	fileStore, err := file.NewStore(identity.AccountID, identity.Region)
+	fileStore, err := file.NewStore(staging.AWSScope(identity.AccountID, identity.Region))
 	if err != nil {
 		return nil, err
 	}

@@ -3,16 +3,15 @@ package restore_test
 import (
 	"bytes"
 	"context"
-	"fmt"
+	"errors"
 	"testing"
 
-	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/mpyw/suve/internal/api/secretapi"
 	appcli "github.com/mpyw/suve/internal/cli/commands"
 	"github.com/mpyw/suve/internal/cli/commands/secret/restore"
+	"github.com/mpyw/suve/internal/model"
 	"github.com/mpyw/suve/internal/usecase/secret"
 )
 
@@ -30,17 +29,15 @@ func TestCommand_Validation(t *testing.T) {
 }
 
 type mockClient struct {
-	//nolint:lll // mock function signature
-	restoreSecretFunc func(ctx context.Context, params *secretapi.RestoreSecretInput, optFns ...func(*secretapi.Options)) (*secretapi.RestoreSecretOutput, error)
+	restoreSecretFunc func(ctx context.Context, name string) (*model.SecretRestoreResult, error)
 }
 
-//nolint:lll // mock function signature
-func (m *mockClient) RestoreSecret(ctx context.Context, params *secretapi.RestoreSecretInput, optFns ...func(*secretapi.Options)) (*secretapi.RestoreSecretOutput, error) {
+func (m *mockClient) RestoreSecret(ctx context.Context, name string) (*model.SecretRestoreResult, error) {
 	if m.restoreSecretFunc != nil {
-		return m.restoreSecretFunc(ctx, params, optFns...)
+		return m.restoreSecretFunc(ctx, name)
 	}
 
-	return nil, fmt.Errorf("RestoreSecret not mocked")
+	return nil, errors.New("RestoreSecret not mocked")
 }
 
 func TestRun(t *testing.T) {
@@ -56,12 +53,11 @@ func TestRun(t *testing.T) {
 			name: "restore secret",
 			opts: restore.Options{Name: "my-secret"},
 			mock: &mockClient{
-				//nolint:lll // mock function signature
-				restoreSecretFunc: func(_ context.Context, params *secretapi.RestoreSecretInput, _ ...func(*secretapi.Options)) (*secretapi.RestoreSecretOutput, error) {
-					assert.Equal(t, "my-secret", lo.FromPtr(params.SecretId))
+				restoreSecretFunc: func(_ context.Context, name string) (*model.SecretRestoreResult, error) {
+					assert.Equal(t, "my-secret", name)
 
-					return &secretapi.RestoreSecretOutput{
-						Name: lo.ToPtr("my-secret"),
+					return &model.SecretRestoreResult{
+						Name: "my-secret",
 					}, nil
 				},
 			},
@@ -75,9 +71,8 @@ func TestRun(t *testing.T) {
 			name: "error from AWS",
 			opts: restore.Options{Name: "my-secret"},
 			mock: &mockClient{
-				//nolint:lll // mock function signature
-				restoreSecretFunc: func(_ context.Context, _ *secretapi.RestoreSecretInput, _ ...func(*secretapi.Options)) (*secretapi.RestoreSecretOutput, error) {
-					return nil, fmt.Errorf("AWS error")
+				restoreSecretFunc: func(_ context.Context, _ string) (*model.SecretRestoreResult, error) {
+					return nil, errors.New("AWS error")
 				},
 			},
 			wantErr: true,

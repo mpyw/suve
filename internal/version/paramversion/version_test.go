@@ -6,36 +6,36 @@ import (
 	"testing"
 	"time"
 
-	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/mpyw/suve/internal/api/paramapi"
+	"github.com/mpyw/suve/internal/model"
 	"github.com/mpyw/suve/internal/version/paramversion"
 )
 
-//nolint:lll // mock struct fields match AWS SDK interface signatures
 type mockClient struct {
-	getParameterFunc        func(ctx context.Context, params *paramapi.GetParameterInput, optFns ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error)
-	getParameterHistoryFunc func(ctx context.Context, params *paramapi.GetParameterHistoryInput, optFns ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error)
+	getParameterFunc        func(ctx context.Context, name string, version string) (*model.Parameter, error)
+	getParameterHistoryFunc func(ctx context.Context, name string) (*model.ParameterHistory, error)
 }
 
-//nolint:lll // mock function signature must match AWS SDK interface
-func (m *mockClient) GetParameter(ctx context.Context, params *paramapi.GetParameterInput, optFns ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
+func (m *mockClient) GetParameter(ctx context.Context, name string, version string) (*model.Parameter, error) {
 	if m.getParameterFunc != nil {
-		return m.getParameterFunc(ctx, params, optFns...)
+		return m.getParameterFunc(ctx, name, version)
 	}
 
 	return nil, fmt.Errorf("GetParameter not mocked")
 }
 
-//nolint:lll // mock function signature must match AWS SDK interface
-func (m *mockClient) GetParameterHistory(ctx context.Context, params *paramapi.GetParameterHistoryInput, optFns ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
+func (m *mockClient) GetParameterHistory(ctx context.Context, name string) (*model.ParameterHistory, error) {
 	if m.getParameterHistoryFunc != nil {
-		return m.getParameterHistoryFunc(ctx, params, optFns...)
+		return m.getParameterHistoryFunc(ctx, name)
 	}
 
 	return nil, fmt.Errorf("GetParameterHistory not mocked")
+}
+
+func (m *mockClient) ListParameters(_ context.Context, _ string, _ bool) ([]*model.ParameterListItem, error) {
+	return nil, fmt.Errorf("ListParameters not mocked")
 }
 
 func TestGetParameterWithVersion_Latest(t *testing.T) {
@@ -43,17 +43,16 @@ func TestGetParameterWithVersion_Latest(t *testing.T) {
 
 	now := time.Now()
 	mock := &mockClient{
-		getParameterFunc: func(_ context.Context, params *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
-			assert.Equal(t, "/my/param", lo.FromPtr(params.Name))
+		getParameterFunc: func(_ context.Context, name string, version string) (*model.Parameter, error) {
+			assert.Equal(t, "/my/param", name)
+			assert.Empty(t, version)
 
-			return &paramapi.GetParameterOutput{
-				Parameter: &paramapi.Parameter{
-					Name:             lo.ToPtr("/my/param"),
-					Value:            lo.ToPtr("test-value"),
-					Version:          3,
-					Type:             paramapi.ParameterTypeString,
-					LastModifiedDate: &now,
-				},
+			return &model.Parameter{
+				Name:      "/my/param",
+				Value:     "test-value",
+				Version:   "3",
+				UpdatedAt: &now,
+				Metadata:  model.AWSParameterMeta{Type: "String"},
 			}, nil
 		},
 	}
@@ -62,25 +61,24 @@ func TestGetParameterWithVersion_Latest(t *testing.T) {
 	result, err := paramversion.GetParameterWithVersion(t.Context(), mock, spec)
 
 	require.NoError(t, err)
-	assert.Equal(t, "/my/param", lo.FromPtr(result.Name))
-	assert.Equal(t, "test-value", lo.FromPtr(result.Value))
-	assert.Equal(t, int64(3), result.Version)
+	assert.Equal(t, "/my/param", result.Name)
+	assert.Equal(t, "test-value", result.Value)
+	assert.Equal(t, "3", result.Version)
 }
 
 func TestGetParameterWithVersion_SpecificVersion(t *testing.T) {
 	t.Parallel()
 
 	mock := &mockClient{
-		getParameterFunc: func(_ context.Context, params *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
-			assert.Equal(t, "/my/param:2", lo.FromPtr(params.Name))
+		getParameterFunc: func(_ context.Context, name string, version string) (*model.Parameter, error) {
+			assert.Equal(t, "/my/param", name)
+			assert.Equal(t, "2", version)
 
-			return &paramapi.GetParameterOutput{
-				Parameter: &paramapi.Parameter{
-					Name:    lo.ToPtr("/my/param"),
-					Value:   lo.ToPtr("old-value"),
-					Version: 2,
-					Type:    paramapi.ParameterTypeString,
-				},
+			return &model.Parameter{
+				Name:     "/my/param",
+				Value:    "old-value",
+				Version:  "2",
+				Metadata: model.AWSParameterMeta{Type: "String"},
 			}, nil
 		},
 	}
@@ -90,8 +88,8 @@ func TestGetParameterWithVersion_SpecificVersion(t *testing.T) {
 	result, err := paramversion.GetParameterWithVersion(t.Context(), mock, spec)
 
 	require.NoError(t, err)
-	assert.Equal(t, "old-value", lo.FromPtr(result.Value))
-	assert.Equal(t, int64(2), result.Version)
+	assert.Equal(t, "old-value", result.Value)
+	assert.Equal(t, "2", result.Version)
 }
 
 func TestGetParameterWithVersion_Shift(t *testing.T) {
@@ -99,15 +97,15 @@ func TestGetParameterWithVersion_Shift(t *testing.T) {
 
 	now := time.Now()
 	mock := &mockClient{
-		//nolint:lll // inline mock function
-		getParameterHistoryFunc: func(_ context.Context, params *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
-			assert.Equal(t, "/my/param", lo.FromPtr(params.Name))
+		getParameterHistoryFunc: func(_ context.Context, name string) (*model.ParameterHistory, error) {
+			assert.Equal(t, "/my/param", name)
 			// History is returned oldest first by AWS
-			return &paramapi.GetParameterHistoryOutput{
-				Parameters: []paramapi.ParameterHistory{
-					{Name: lo.ToPtr("/my/param"), Value: lo.ToPtr("v1"), Version: 1, LastModifiedDate: lo.ToPtr(now.Add(-2 * time.Hour))},
-					{Name: lo.ToPtr("/my/param"), Value: lo.ToPtr("v2"), Version: 2, LastModifiedDate: lo.ToPtr(now.Add(-time.Hour))},
-					{Name: lo.ToPtr("/my/param"), Value: lo.ToPtr("v3"), Version: 3, LastModifiedDate: &now},
+			return &model.ParameterHistory{
+				Name: "/my/param",
+				Parameters: []*model.Parameter{
+					{Name: "/my/param", Value: "v1", Version: "1", UpdatedAt: timePtr(now.Add(-2 * time.Hour))},
+					{Name: "/my/param", Value: "v2", Version: "2", UpdatedAt: timePtr(now.Add(-time.Hour))},
+					{Name: "/my/param", Value: "v3", Version: "3", UpdatedAt: &now},
 				},
 			}, nil
 		},
@@ -118,8 +116,8 @@ func TestGetParameterWithVersion_Shift(t *testing.T) {
 
 	require.NoError(t, err)
 	// Shift 1 means one version back from latest (v3), so v2
-	assert.Equal(t, "v2", lo.FromPtr(result.Value))
-	assert.Equal(t, int64(2), result.Version)
+	assert.Equal(t, "v2", result.Value)
+	assert.Equal(t, "2", result.Version)
 }
 
 func TestGetParameterWithVersion_ShiftFromSpecificVersion(t *testing.T) {
@@ -127,13 +125,13 @@ func TestGetParameterWithVersion_ShiftFromSpecificVersion(t *testing.T) {
 
 	now := time.Now()
 	mock := &mockClient{
-		//nolint:lll // inline mock function
-		getParameterHistoryFunc: func(_ context.Context, _ *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
-			return &paramapi.GetParameterHistoryOutput{
-				Parameters: []paramapi.ParameterHistory{
-					{Name: lo.ToPtr("/my/param"), Value: lo.ToPtr("v1"), Version: 1, LastModifiedDate: lo.ToPtr(now.Add(-2 * time.Hour))},
-					{Name: lo.ToPtr("/my/param"), Value: lo.ToPtr("v2"), Version: 2, LastModifiedDate: lo.ToPtr(now.Add(-time.Hour))},
-					{Name: lo.ToPtr("/my/param"), Value: lo.ToPtr("v3"), Version: 3, LastModifiedDate: &now},
+		getParameterHistoryFunc: func(_ context.Context, _ string) (*model.ParameterHistory, error) {
+			return &model.ParameterHistory{
+				Name: "/my/param",
+				Parameters: []*model.Parameter{
+					{Name: "/my/param", Value: "v1", Version: "1", UpdatedAt: timePtr(now.Add(-2 * time.Hour))},
+					{Name: "/my/param", Value: "v2", Version: "2", UpdatedAt: timePtr(now.Add(-time.Hour))},
+					{Name: "/my/param", Value: "v3", Version: "3", UpdatedAt: &now},
 				},
 			}, nil
 		},
@@ -145,7 +143,7 @@ func TestGetParameterWithVersion_ShiftFromSpecificVersion(t *testing.T) {
 
 	require.NoError(t, err)
 	// Version 3, shift 2 means v3 -> v2 -> v1
-	assert.Equal(t, "v1", lo.FromPtr(result.Value))
+	assert.Equal(t, "v1", result.Value)
 }
 
 func TestGetParameterWithVersion_ShiftOutOfRange(t *testing.T) {
@@ -153,11 +151,11 @@ func TestGetParameterWithVersion_ShiftOutOfRange(t *testing.T) {
 
 	now := time.Now()
 	mock := &mockClient{
-		//nolint:lll // mock function signature
-		getParameterHistoryFunc: func(_ context.Context, _ *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
-			return &paramapi.GetParameterHistoryOutput{
-				Parameters: []paramapi.ParameterHistory{
-					{Name: lo.ToPtr("/my/param"), Value: lo.ToPtr("v1"), Version: 1, LastModifiedDate: &now},
+		getParameterHistoryFunc: func(_ context.Context, _ string) (*model.ParameterHistory, error) {
+			return &model.ParameterHistory{
+				Name: "/my/param",
+				Parameters: []*model.Parameter{
+					{Name: "/my/param", Value: "v1", Version: "1", UpdatedAt: &now},
 				},
 			}, nil
 		},
@@ -175,11 +173,11 @@ func TestGetParameterWithVersion_VersionNotFound(t *testing.T) {
 
 	now := time.Now()
 	mock := &mockClient{
-		//nolint:lll // mock function signature
-		getParameterHistoryFunc: func(_ context.Context, _ *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
-			return &paramapi.GetParameterHistoryOutput{
-				Parameters: []paramapi.ParameterHistory{
-					{Name: lo.ToPtr("/my/param"), Value: lo.ToPtr("v1"), Version: 1, LastModifiedDate: &now},
+		getParameterHistoryFunc: func(_ context.Context, _ string) (*model.ParameterHistory, error) {
+			return &model.ParameterHistory{
+				Name: "/my/param",
+				Parameters: []*model.Parameter{
+					{Name: "/my/param", Value: "v1", Version: "1", UpdatedAt: &now},
 				},
 			}, nil
 		},
@@ -197,10 +195,10 @@ func TestGetParameterWithVersion_EmptyHistory(t *testing.T) {
 	t.Parallel()
 
 	mock := &mockClient{
-		//nolint:lll // mock function signature
-		getParameterHistoryFunc: func(_ context.Context, _ *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
-			return &paramapi.GetParameterHistoryOutput{
-				Parameters: []paramapi.ParameterHistory{},
+		getParameterHistoryFunc: func(_ context.Context, _ string) (*model.ParameterHistory, error) {
+			return &model.ParameterHistory{
+				Name:       "/my/param",
+				Parameters: []*model.Parameter{},
 			}, nil
 		},
 	}
@@ -216,7 +214,7 @@ func TestGetParameterWithVersion_GetParameterError(t *testing.T) {
 	t.Parallel()
 
 	mock := &mockClient{
-		getParameterFunc: func(_ context.Context, _ *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
+		getParameterFunc: func(_ context.Context, _ string, _ string) (*model.Parameter, error) {
 			return nil, fmt.Errorf("AWS error")
 		},
 	}
@@ -232,8 +230,7 @@ func TestGetParameterWithVersion_GetParameterHistoryError(t *testing.T) {
 	t.Parallel()
 
 	mock := &mockClient{
-		//nolint:lll // mock function signature
-		getParameterHistoryFunc: func(_ context.Context, _ *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
+		getParameterHistoryFunc: func(_ context.Context, _ string) (*model.ParameterHistory, error) {
 			return nil, fmt.Errorf("AWS error")
 		},
 	}
@@ -245,28 +242,6 @@ func TestGetParameterWithVersion_GetParameterHistoryError(t *testing.T) {
 	assert.Equal(t, "failed to get parameter history: AWS error", err.Error())
 }
 
-func TestGetParameterWithVersion_AlwaysDecrypts(t *testing.T) {
-	t.Parallel()
-
-	mock := &mockClient{
-		getParameterFunc: func(_ context.Context, params *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
-			// Verify that WithDecryption is always true
-			assert.True(t, lo.FromPtr(params.WithDecryption))
-
-			return &paramapi.GetParameterOutput{
-				Parameter: &paramapi.Parameter{
-					Name:    lo.ToPtr("/my/param"),
-					Value:   lo.ToPtr("decrypted-value"),
-					Version: 1,
-					Type:    paramapi.ParameterTypeSecureString,
-				},
-			}, nil
-		},
-	}
-
-	spec := &paramversion.Spec{Name: "/my/param"}
-	result, err := paramversion.GetParameterWithVersion(t.Context(), mock, spec)
-
-	require.NoError(t, err)
-	assert.Equal(t, "decrypted-value", lo.FromPtr(result.Value))
+func timePtr(t time.Time) *time.Time {
+	return &t
 }

@@ -524,10 +524,9 @@ func TestFileDrainPersist(t *testing.T) {
 		t.Parallel()
 
 		localTmpDir := t.TempDir()
-		localFilePath := filepath.Join(localTmpDir, "stage.json")
 
 		// Create file store
-		fileStore := file.NewStoreWithPath(localFilePath)
+		fileStore := file.NewStoreWithDir(localTmpDir)
 
 		// Create state with entries
 		state := staging.NewEmptyState()
@@ -560,10 +559,9 @@ func TestFileDrainPersist(t *testing.T) {
 		t.Parallel()
 
 		localTmpDir := t.TempDir()
-		localFilePath := filepath.Join(localTmpDir, "stage.json")
 
 		// Create file store with passphrase
-		fileStore := file.NewStoreWithPath(localFilePath)
+		fileStore := file.NewStoreWithDir(localTmpDir)
 		fileStore.SetPassphrase("test-passphrase")
 
 		// Create state
@@ -588,7 +586,7 @@ func TestFileDrainPersist(t *testing.T) {
 		assert.Equal(t, "secret-value", lo.FromPtr(drainedState.Entries[staging.ServiceSecret]["my-secret"].Value))
 
 		// Drain with wrong passphrase should fail
-		wrongStore := file.NewStoreWithPath(localFilePath)
+		wrongStore := file.NewStoreWithDir(localTmpDir)
 		wrongStore.SetPassphrase("wrong-passphrase")
 		_, err = wrongStore.Drain(context.Background(), "", true)
 		require.Error(t, err)
@@ -599,9 +597,8 @@ func TestFileDrainPersist(t *testing.T) {
 		t.Parallel()
 
 		localTmpDir := t.TempDir()
-		localFilePath := filepath.Join(localTmpDir, "stage.json")
 
-		fileStore := file.NewStoreWithPath(localFilePath)
+		fileStore := file.NewStoreWithDir(localTmpDir)
 
 		// Create and write state
 		state := staging.NewEmptyState()
@@ -628,9 +625,8 @@ func TestFileDrainPersist(t *testing.T) {
 		t.Parallel()
 
 		localTmpDir := t.TempDir()
-		localFilePath := filepath.Join(localTmpDir, "stage.json")
 
-		fileStore := file.NewStoreWithPath(localFilePath)
+		fileStore := file.NewStoreWithDir(localTmpDir)
 
 		// Create state with tags only (no entries)
 		state := staging.NewEmptyState()
@@ -653,9 +649,8 @@ func TestFileDrainPersist(t *testing.T) {
 		t.Parallel()
 
 		localTmpDir := t.TempDir()
-		localFilePath := filepath.Join(localTmpDir, "stage.json")
 
-		fileStore := file.NewStoreWithPath(localFilePath)
+		fileStore := file.NewStoreWithDir(localTmpDir)
 
 		// Create state with both services
 		state := staging.NewEmptyState()
@@ -682,9 +677,8 @@ func TestFileDrainPersist(t *testing.T) {
 		t.Parallel()
 
 		localTmpDir := t.TempDir()
-		localFilePath := filepath.Join(localTmpDir, "nonexistent.json")
 
-		fileStore := file.NewStoreWithPath(localFilePath)
+		fileStore := file.NewStoreWithDir(localTmpDir)
 
 		exists, err := fileStore.Exists()
 		require.NoError(t, err)
@@ -701,9 +695,8 @@ func TestFileDrainPersist(t *testing.T) {
 		t.Parallel()
 
 		localTmpDir := t.TempDir()
-		localFilePath := filepath.Join(localTmpDir, "stage.json")
 
-		fileStore := file.NewStoreWithPath(localFilePath)
+		fileStore := file.NewStoreWithDir(localTmpDir)
 
 		// Write first state
 		state1 := staging.NewEmptyState()

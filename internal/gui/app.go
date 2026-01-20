@@ -135,7 +135,7 @@ func (a *App) getAgentStore() (store.AgentStore, error) {
 		return nil, err
 	}
 
-	s := agent.NewStore(identity.AccountID, identity.Region)
+	s := agent.NewStore(staging.AWSScope(identity.AccountID, identity.Region))
 	a.stagingStore = s
 
 	return s, nil

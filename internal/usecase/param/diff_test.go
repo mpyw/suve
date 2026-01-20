@@ -2,63 +2,62 @@ package param_test
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
-	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/mpyw/suve/internal/api/paramapi"
+	"github.com/mpyw/suve/internal/model"
 	"github.com/mpyw/suve/internal/usecase/param"
 	"github.com/mpyw/suve/internal/version/paramversion"
 )
 
 type mockDiffClient struct {
-	getParameterResults []*paramapi.GetParameterOutput
-	getParameterErrs    []error
-	getParameterCalls   int
-	// historyParams stores the base data; each call returns a fresh copy
-	historyParams []paramapi.ParameterHistory
-	getHistoryErr error
+	getParameterFunc        func(ctx context.Context, name string, version string) (*model.Parameter, error)
+	getParameterHistoryFunc func(ctx context.Context, name string) (*model.ParameterHistory, error)
 }
 
-//nolint:lll // mock function signature must match AWS SDK interface
-func (m *mockDiffClient) GetParameter(_ context.Context, _ *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
-	idx := m.getParameterCalls
-	m.getParameterCalls++
-
-	if idx < len(m.getParameterErrs) && m.getParameterErrs[idx] != nil {
-		return nil, m.getParameterErrs[idx]
+func (m *mockDiffClient) GetParameter(ctx context.Context, name string, version string) (*model.Parameter, error) {
+	if m.getParameterFunc != nil {
+		return m.getParameterFunc(ctx, name, version)
 	}
 
-	if idx < len(m.getParameterResults) {
-		return m.getParameterResults[idx], nil
-	}
-
-	return nil, errUnexpectedCall
+	return nil, fmt.Errorf("GetParameter not mocked")
 }
 
-//nolint:lll // mock function signature must match AWS SDK interface
-func (m *mockDiffClient) GetParameterHistory(_ context.Context, _ *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
-	if m.getHistoryErr != nil {
-		return nil, m.getHistoryErr
+func (m *mockDiffClient) GetParameterHistory(ctx context.Context, name string) (*model.ParameterHistory, error) {
+	if m.getParameterHistoryFunc != nil {
+		return m.getParameterHistoryFunc(ctx, name)
 	}
 
-	// Return a fresh copy to avoid in-place mutations affecting subsequent calls
-	params := make([]paramapi.ParameterHistory, len(m.historyParams))
-	copy(params, m.historyParams)
+	return nil, fmt.Errorf("GetParameterHistory not mocked")
+}
 
-	return &paramapi.GetParameterHistoryOutput{Parameters: params}, nil
+func (m *mockDiffClient) ListParameters(_ context.Context, _ string, _ bool) ([]*model.ParameterListItem, error) {
+	return nil, fmt.Errorf("ListParameters not mocked")
 }
 
 func TestDiffUseCase_Execute(t *testing.T) {
 	t.Parallel()
 
 	// #VERSION specs without shift use GetParameter (with name:version format)
+	callCount := 0
 	client := &mockDiffClient{
-		getParameterResults: []*paramapi.GetParameterOutput{
-			{Parameter: &paramapi.Parameter{Name: lo.ToPtr("/app/config"), Value: lo.ToPtr("old-value"), Version: 1}},
-			{Parameter: &paramapi.Parameter{Name: lo.ToPtr("/app/config"), Value: lo.ToPtr("new-value"), Version: 2}},
+		getParameterFunc: func(_ context.Context, name string, version string) (*model.Parameter, error) {
+			callCount++
+
+			assert.Equal(t, "/app/config", name)
+
+			if callCount == 1 {
+				assert.Equal(t, "1", version)
+
+				return &model.Parameter{Name: "/app/config", Value: "old-value", Version: "1"}, nil
+			}
+
+			assert.Equal(t, "2", version)
+
+			return &model.Parameter{Name: "/app/config", Value: "new-value", Version: "2"}, nil
 		},
 	}
 
@@ -84,7 +83,9 @@ func TestDiffUseCase_Execute_Spec1Error(t *testing.T) {
 	t.Parallel()
 
 	client := &mockDiffClient{
-		getParameterErrs: []error{errGetParameter},
+		getParameterFunc: func(_ context.Context, _ string, _ string) (*model.Parameter, error) {
+			return nil, errGetParameter
+		},
 	}
 
 	uc := &param.DiffUseCase{Client: client}
@@ -102,11 +103,16 @@ func TestDiffUseCase_Execute_Spec1Error(t *testing.T) {
 func TestDiffUseCase_Execute_Spec2Error(t *testing.T) {
 	t.Parallel()
 
+	callCount := 0
 	client := &mockDiffClient{
-		getParameterResults: []*paramapi.GetParameterOutput{
-			{Parameter: &paramapi.Parameter{Name: lo.ToPtr("/app/config"), Value: lo.ToPtr("old-value"), Version: 1}},
+		getParameterFunc: func(_ context.Context, _ string, _ string) (*model.Parameter, error) {
+			callCount++
+			if callCount == 1 {
+				return &model.Parameter{Name: "/app/config", Value: "old-value", Version: "1"}, nil
+			}
+
+			return nil, errGetParameter
 		},
-		getParameterErrs: []error{nil, errGetParameter},
 	}
 
 	uc := &param.DiffUseCase{Client: client}
@@ -125,10 +131,19 @@ func TestDiffUseCase_Execute_WithLatest(t *testing.T) {
 	t.Parallel()
 
 	// Both specs without shift use GetParameter
+	callCount := 0
 	client := &mockDiffClient{
-		getParameterResults: []*paramapi.GetParameterOutput{
-			{Parameter: &paramapi.Parameter{Name: lo.ToPtr("/app/config"), Value: lo.ToPtr("old-value"), Version: 3}},
-			{Parameter: &paramapi.Parameter{Name: lo.ToPtr("/app/config"), Value: lo.ToPtr("latest-value"), Version: 5}},
+		getParameterFunc: func(_ context.Context, _ string, version string) (*model.Parameter, error) {
+			callCount++
+			if callCount == 1 {
+				assert.Equal(t, "3", version)
+
+				return &model.Parameter{Name: "/app/config", Value: "old-value", Version: "3"}, nil
+			}
+
+			assert.Empty(t, version) // latest
+
+			return &model.Parameter{Name: "/app/config", Value: "latest-value", Version: "5"}, nil
 		},
 	}
 
@@ -151,10 +166,17 @@ func TestDiffUseCase_Execute_WithShift(t *testing.T) {
 
 	// Specs with shift use GetParameterHistory
 	client := &mockDiffClient{
-		historyParams: []paramapi.ParameterHistory{
-			{Name: lo.ToPtr("/app/config"), Value: lo.ToPtr("v1"), Version: 1},
-			{Name: lo.ToPtr("/app/config"), Value: lo.ToPtr("v2"), Version: 2},
-			{Name: lo.ToPtr("/app/config"), Value: lo.ToPtr("v3"), Version: 3},
+		getParameterHistoryFunc: func(_ context.Context, name string) (*model.ParameterHistory, error) {
+			assert.Equal(t, "/app/config", name)
+
+			return &model.ParameterHistory{
+				Name: "/app/config",
+				Parameters: []*model.Parameter{
+					{Name: "/app/config", Value: "v1", Version: "1"},
+					{Name: "/app/config", Value: "v2", Version: "2"},
+					{Name: "/app/config", Value: "v3", Version: "3"},
+				},
+			}, nil
 		},
 	}
 
@@ -178,7 +200,9 @@ func TestDiffUseCase_Execute_WithShift_Error(t *testing.T) {
 	t.Parallel()
 
 	client := &mockDiffClient{
-		getHistoryErr: errHistoryFailed,
+		getParameterHistoryFunc: func(_ context.Context, _ string) (*model.ParameterHistory, error) {
+			return nil, errHistoryFailed
+		},
 	}
 
 	uc := &param.DiffUseCase{Client: client}

@@ -47,15 +47,14 @@ const (
 //
 //nolint:tagliatelle // JSON field names use snake_case for consistency with IPC protocol
 type Request struct {
-	Method    string            `json:"method"`
-	AccountID string            `json:"account_id"`
-	Region    string            `json:"region"`
-	Service   staging.Service   `json:"service,omitempty"`
-	Name      string            `json:"name,omitempty"`
-	Entry     *staging.Entry    `json:"entry,omitempty"`
-	TagEntry  *staging.TagEntry `json:"tag_entry,omitempty"`
-	State     *staging.State    `json:"state,omitempty"`
-	Hint      string            `json:"hint,omitempty"` // Optional context hint for shutdown messages (HintApply, HintReset, HintPersist)
+	Method   string            `json:"method"`
+	Scope    staging.Scope     `json:"scope"`
+	Service  staging.Service   `json:"service,omitempty"`
+	Name     string            `json:"name,omitempty"`
+	Entry    *staging.Entry    `json:"entry,omitempty"`
+	TagEntry *staging.TagEntry `json:"tag_entry,omitempty"`
+	State    *staging.State    `json:"state,omitempty"`
+	Hint     string            `json:"hint,omitempty"` // Optional context hint for shutdown messages (HintApply, HintReset, HintPersist)
 }
 
 // Response represents a JSON-RPC response from the daemon.

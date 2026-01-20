@@ -5,34 +5,29 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/mpyw/suve/internal/api/secretapi"
+	"github.com/mpyw/suve/internal/model"
 	"github.com/mpyw/suve/internal/usecase/secret"
 )
 
 type mockUpdateClient struct {
-	getSecretValueResult *secretapi.GetSecretValueOutput
-	getSecretValueErr    error
-	updateSecretResult   *secretapi.UpdateSecretOutput
-	updateSecretErr      error
-	putSecretValueResult *secretapi.PutSecretValueOutput
-	putSecretValueErr    error
+	getSecretResult    *model.Secret
+	getSecretErr       error
+	updateSecretResult *model.SecretWriteResult
+	updateSecretErr    error
 }
 
-//nolint:lll // mock function signature must match AWS SDK interface
-func (m *mockUpdateClient) GetSecretValue(_ context.Context, _ *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) {
-	if m.getSecretValueErr != nil {
-		return nil, m.getSecretValueErr
+func (m *mockUpdateClient) GetSecret(_ context.Context, _ string, _ string, _ string) (*model.Secret, error) {
+	if m.getSecretErr != nil {
+		return nil, m.getSecretErr
 	}
 
-	return m.getSecretValueResult, nil
+	return m.getSecretResult, nil
 }
 
-//nolint:lll // mock function signature must match AWS SDK interface
-func (m *mockUpdateClient) UpdateSecret(_ context.Context, _ *secretapi.UpdateSecretInput, _ ...func(*secretapi.Options)) (*secretapi.UpdateSecretOutput, error) {
+func (m *mockUpdateClient) UpdateSecret(_ context.Context, _ string, _ string) (*model.SecretWriteResult, error) {
 	if m.updateSecretErr != nil {
 		return nil, m.updateSecretErr
 	}
@@ -40,21 +35,13 @@ func (m *mockUpdateClient) UpdateSecret(_ context.Context, _ *secretapi.UpdateSe
 	return m.updateSecretResult, nil
 }
 
-//nolint:lll // mock function signature must match AWS SDK interface
-func (m *mockUpdateClient) PutSecretValue(_ context.Context, _ *secretapi.PutSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.PutSecretValueOutput, error) {
-	if m.putSecretValueErr != nil {
-		return nil, m.putSecretValueErr
-	}
-
-	return m.putSecretValueResult, nil
-}
-
 func TestUpdateUseCase_GetCurrentValue(t *testing.T) {
 	t.Parallel()
 
 	client := &mockUpdateClient{
-		getSecretValueResult: &secretapi.GetSecretValueOutput{
-			SecretString: lo.ToPtr("current-value"),
+		getSecretResult: &model.Secret{
+			Name:  "my-secret",
+			Value: "current-value",
 		},
 	}
 
@@ -69,7 +56,7 @@ func TestUpdateUseCase_GetCurrentValue_Error(t *testing.T) {
 	t.Parallel()
 
 	client := &mockUpdateClient{
-		getSecretValueErr: errors.New("aws error"),
+		getSecretErr: errors.New("aws error"),
 	}
 
 	uc := &secret.UpdateUseCase{Client: client}
@@ -82,9 +69,10 @@ func TestUpdateUseCase_Execute_UpdateValue(t *testing.T) {
 	t.Parallel()
 
 	client := &mockUpdateClient{
-		putSecretValueResult: &secretapi.PutSecretValueOutput{
-			VersionId: lo.ToPtr("new-version-id"),
-			ARN:       lo.ToPtr("arn:aws:secretsmanager:us-east-1:123456789012:secret:my-secret"),
+		updateSecretResult: &model.SecretWriteResult{
+			Name:    "my-secret",
+			Version: "new-version-id",
+			ARN:     "arn:aws:secretsmanager:us-east-1:123456789012:secret:my-secret",
 		},
 	}
 
@@ -99,71 +87,7 @@ func TestUpdateUseCase_Execute_UpdateValue(t *testing.T) {
 	assert.Equal(t, "new-version-id", output.VersionID)
 }
 
-func TestUpdateUseCase_Execute_UpdateDescription(t *testing.T) {
-	t.Parallel()
-
-	client := &mockUpdateClient{
-		updateSecretResult: &secretapi.UpdateSecretOutput{
-			VersionId: lo.ToPtr("version-id"),
-			ARN:       lo.ToPtr("arn:aws:secretsmanager:us-east-1:123456789012:secret:my-secret"),
-		},
-	}
-
-	uc := &secret.UpdateUseCase{Client: client}
-
-	output, err := uc.Execute(t.Context(), secret.UpdateInput{
-		Name:        "my-secret",
-		Description: "new description",
-	})
-	require.NoError(t, err)
-	assert.Equal(t, "my-secret", output.Name)
-	assert.Equal(t, "version-id", output.VersionID)
-}
-
-func TestUpdateUseCase_Execute_UpdateValueAndDescription(t *testing.T) {
-	t.Parallel()
-
-	client := &mockUpdateClient{
-		putSecretValueResult: &secretapi.PutSecretValueOutput{
-			VersionId: lo.ToPtr("new-version-id"),
-			ARN:       lo.ToPtr("arn:aws:secretsmanager:us-east-1:123456789012:secret:my-secret"),
-		},
-		updateSecretResult: &secretapi.UpdateSecretOutput{
-			VersionId: lo.ToPtr("desc-version-id"),
-			ARN:       lo.ToPtr("arn:aws:secretsmanager:us-east-1:123456789012:secret:my-secret"),
-		},
-	}
-
-	uc := &secret.UpdateUseCase{Client: client}
-
-	output, err := uc.Execute(t.Context(), secret.UpdateInput{
-		Name:        "my-secret",
-		Value:       "new-value",
-		Description: "new description",
-	})
-	require.NoError(t, err)
-	// VersionID from PutSecretValue takes precedence
-	assert.Equal(t, "new-version-id", output.VersionID)
-}
-
-func TestUpdateUseCase_Execute_PutValueError(t *testing.T) {
-	t.Parallel()
-
-	client := &mockUpdateClient{
-		putSecretValueErr: errors.New("put value failed"),
-	}
-
-	uc := &secret.UpdateUseCase{Client: client}
-
-	_, err := uc.Execute(t.Context(), secret.UpdateInput{
-		Name:  "my-secret",
-		Value: "new-value",
-	})
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to update secret value")
-}
-
-func TestUpdateUseCase_Execute_UpdateDescriptionError(t *testing.T) {
+func TestUpdateUseCase_Execute_UpdateValueError(t *testing.T) {
 	t.Parallel()
 
 	client := &mockUpdateClient{
@@ -173,9 +97,9 @@ func TestUpdateUseCase_Execute_UpdateDescriptionError(t *testing.T) {
 	uc := &secret.UpdateUseCase{Client: client}
 
 	_, err := uc.Execute(t.Context(), secret.UpdateInput{
-		Name:        "my-secret",
-		Description: "new description",
+		Name:  "my-secret",
+		Value: "new-value",
 	})
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to update secret description")
+	assert.Contains(t, err.Error(), "failed to update secret")
 }
