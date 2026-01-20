@@ -74,7 +74,7 @@ func TestGetSecretWithVersion_WithLabel(t *testing.T) {
 	t.Parallel()
 
 	mock := &mockClient{
-		getSecretFunc: func(_ context.Context, name, versionID, versionStage string) (*model.Secret, error) {
+		getSecretFunc: func(_ context.Context, _, _, versionStage string) (*model.Secret, error) {
 			assert.Equal(t, "AWSPREVIOUS", versionStage)
 
 			return &model.Secret{
@@ -110,7 +110,7 @@ func TestGetSecretWithVersion_Shift(t *testing.T) {
 				{Version: "v3", CreatedAt: &now},
 			}, nil
 		},
-		getSecretFunc: func(_ context.Context, name, versionID, versionStage string) (*model.Secret, error) {
+		getSecretFunc: func(_ context.Context, _, versionID, _ string) (*model.Secret, error) {
 			// After sorting by date descending, shift 1 should give v2
 			assert.Equal(t, "v2", versionID)
 

@@ -17,6 +17,8 @@ import (
 )
 
 // SecretClient is the combined interface for Secrets Manager stage operations.
+//
+//nolint:interfacebloat // Requires all staging operations in one interface
 type SecretClient interface {
 	secretapi.GetSecretValueAPI
 	secretapi.ListSecretVersionIDsAPI
