@@ -5,26 +5,47 @@ import (
 	"testing"
 	"time"
 
-	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/mpyw/suve/internal/api/paramapi"
+	"github.com/mpyw/suve/internal/model"
 	"github.com/mpyw/suve/internal/usecase/param"
 )
 
 type mockLogClient struct {
-	getHistoryResult *paramapi.GetParameterHistoryOutput
-	getHistoryErr    error
+	getParameterResult *model.Parameter
+	getParameterErr    error
+	getHistoryResult   *model.ParameterHistory
+	getHistoryErr      error
+	listParametersErr  error
 }
 
-//nolint:lll // mock function signature must match AWS SDK interface
-func (m *mockLogClient) GetParameterHistory(_ context.Context, _ *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
+func (m *mockLogClient) GetParameter(_ context.Context, _ string, _ string) (*model.Parameter, error) {
+	if m.getParameterErr != nil {
+		return nil, m.getParameterErr
+	}
+
+	return m.getParameterResult, nil
+}
+
+func (m *mockLogClient) GetParameterHistory(_ context.Context, _ string) (*model.ParameterHistory, error) {
 	if m.getHistoryErr != nil {
 		return nil, m.getHistoryErr
 	}
 
+	if m.getHistoryResult == nil {
+		return &model.ParameterHistory{}, nil
+	}
+
 	return m.getHistoryResult, nil
+}
+
+func (m *mockLogClient) ListParameters(_ context.Context, _ string, _ bool) ([]*model.ParameterListItem, error) {
+	if m.listParametersErr != nil {
+		return nil, m.listParametersErr
+	}
+
+	return nil, nil
 }
 
 func TestLogUseCase_Execute(t *testing.T) {
@@ -32,19 +53,23 @@ func TestLogUseCase_Execute(t *testing.T) {
 
 	now := time.Now()
 	client := &mockLogClient{
-		getHistoryResult: &paramapi.GetParameterHistoryOutput{
-			Parameters: []paramapi.ParameterHistory{
+		getHistoryResult: &model.ParameterHistory{
+			Name: "/app/config",
+			Parameters: []*model.Parameter{
 				{
-					Name: lo.ToPtr("/app/config"), Value: lo.ToPtr("v1"), Version: 1,
-					Type: paramapi.ParameterTypeString, LastModifiedDate: lo.ToPtr(now.Add(-2 * time.Hour)),
+					Name: "/app/config", Value: "v1", Version: "1",
+					UpdatedAt: timePtr(now.Add(-2 * time.Hour)),
+					Metadata:  model.AWSParameterMeta{Type: "String"},
 				},
 				{
-					Name: lo.ToPtr("/app/config"), Value: lo.ToPtr("v2"), Version: 2,
-					Type: paramapi.ParameterTypeString, LastModifiedDate: lo.ToPtr(now.Add(-1 * time.Hour)),
+					Name: "/app/config", Value: "v2", Version: "2",
+					UpdatedAt: timePtr(now.Add(-1 * time.Hour)),
+					Metadata:  model.AWSParameterMeta{Type: "String"},
 				},
 				{
-					Name: lo.ToPtr("/app/config"), Value: lo.ToPtr("v3"), Version: 3,
-					Type: paramapi.ParameterTypeString, LastModifiedDate: lo.ToPtr(now),
+					Name: "/app/config", Value: "v3", Version: "3",
+					UpdatedAt: &now,
+					Metadata:  model.AWSParameterMeta{Type: "String"},
 				},
 			},
 		},
@@ -60,9 +85,9 @@ func TestLogUseCase_Execute(t *testing.T) {
 	assert.Len(t, output.Entries, 3)
 
 	// Newest first (default order)
-	assert.Equal(t, int64(3), output.Entries[0].Version)
-	assert.Equal(t, int64(2), output.Entries[1].Version)
-	assert.Equal(t, int64(1), output.Entries[2].Version)
+	assert.Equal(t, "3", output.Entries[0].Version)
+	assert.Equal(t, "2", output.Entries[1].Version)
+	assert.Equal(t, "1", output.Entries[2].Version)
 
 	// IsCurrent flag
 	assert.True(t, output.Entries[0].IsCurrent)
@@ -74,8 +99,9 @@ func TestLogUseCase_Execute_Empty(t *testing.T) {
 	t.Parallel()
 
 	client := &mockLogClient{
-		getHistoryResult: &paramapi.GetParameterHistoryOutput{
-			Parameters: []paramapi.ParameterHistory{},
+		getHistoryResult: &model.ParameterHistory{
+			Name:       "/app/config",
+			Parameters: []*model.Parameter{},
 		},
 	}
 
@@ -110,11 +136,12 @@ func TestLogUseCase_Execute_Reverse(t *testing.T) {
 
 	now := time.Now()
 	client := &mockLogClient{
-		getHistoryResult: &paramapi.GetParameterHistoryOutput{
-			Parameters: []paramapi.ParameterHistory{
-				{Name: lo.ToPtr("/app/config"), Value: lo.ToPtr("v1"), Version: 1, LastModifiedDate: lo.ToPtr(now.Add(-2 * time.Hour))},
-				{Name: lo.ToPtr("/app/config"), Value: lo.ToPtr("v2"), Version: 2, LastModifiedDate: lo.ToPtr(now.Add(-1 * time.Hour))},
-				{Name: lo.ToPtr("/app/config"), Value: lo.ToPtr("v3"), Version: 3, LastModifiedDate: lo.ToPtr(now)},
+		getHistoryResult: &model.ParameterHistory{
+			Name: "/app/config",
+			Parameters: []*model.Parameter{
+				{Name: "/app/config", Value: "v1", Version: "1", UpdatedAt: timePtr(now.Add(-2 * time.Hour)), Metadata: model.AWSParameterMeta{Type: "String"}},
+				{Name: "/app/config", Value: "v2", Version: "2", UpdatedAt: timePtr(now.Add(-1 * time.Hour)), Metadata: model.AWSParameterMeta{Type: "String"}},
+				{Name: "/app/config", Value: "v3", Version: "3", UpdatedAt: &now, Metadata: model.AWSParameterMeta{Type: "String"}},
 			},
 		},
 	}
@@ -128,9 +155,9 @@ func TestLogUseCase_Execute_Reverse(t *testing.T) {
 	require.NoError(t, err)
 
 	// Oldest first when Reverse is true (keeps AWS order)
-	assert.Equal(t, int64(1), output.Entries[0].Version)
-	assert.Equal(t, int64(2), output.Entries[1].Version)
-	assert.Equal(t, int64(3), output.Entries[2].Version)
+	assert.Equal(t, "1", output.Entries[0].Version)
+	assert.Equal(t, "2", output.Entries[1].Version)
+	assert.Equal(t, "3", output.Entries[2].Version)
 }
 
 func TestLogUseCase_Execute_SinceFilter(t *testing.T) {
@@ -138,11 +165,12 @@ func TestLogUseCase_Execute_SinceFilter(t *testing.T) {
 
 	now := time.Now()
 	client := &mockLogClient{
-		getHistoryResult: &paramapi.GetParameterHistoryOutput{
-			Parameters: []paramapi.ParameterHistory{
-				{Name: lo.ToPtr("/app/config"), Value: lo.ToPtr("v1"), Version: 1, LastModifiedDate: lo.ToPtr(now.Add(-3 * time.Hour))},
-				{Name: lo.ToPtr("/app/config"), Value: lo.ToPtr("v2"), Version: 2, LastModifiedDate: lo.ToPtr(now.Add(-1 * time.Hour))},
-				{Name: lo.ToPtr("/app/config"), Value: lo.ToPtr("v3"), Version: 3, LastModifiedDate: lo.ToPtr(now)},
+		getHistoryResult: &model.ParameterHistory{
+			Name: "/app/config",
+			Parameters: []*model.Parameter{
+				{Name: "/app/config", Value: "v1", Version: "1", UpdatedAt: timePtr(now.Add(-3 * time.Hour)), Metadata: model.AWSParameterMeta{Type: "String"}},
+				{Name: "/app/config", Value: "v2", Version: "2", UpdatedAt: timePtr(now.Add(-1 * time.Hour)), Metadata: model.AWSParameterMeta{Type: "String"}},
+				{Name: "/app/config", Value: "v3", Version: "3", UpdatedAt: &now, Metadata: model.AWSParameterMeta{Type: "String"}},
 			},
 		},
 	}
@@ -158,8 +186,8 @@ func TestLogUseCase_Execute_SinceFilter(t *testing.T) {
 
 	// v1 is before the since filter, so only v2 and v3 should be included
 	assert.Len(t, output.Entries, 2)
-	assert.Equal(t, int64(3), output.Entries[0].Version)
-	assert.Equal(t, int64(2), output.Entries[1].Version)
+	assert.Equal(t, "3", output.Entries[0].Version)
+	assert.Equal(t, "2", output.Entries[1].Version)
 }
 
 func TestLogUseCase_Execute_UntilFilter(t *testing.T) {
@@ -167,11 +195,12 @@ func TestLogUseCase_Execute_UntilFilter(t *testing.T) {
 
 	now := time.Now()
 	client := &mockLogClient{
-		getHistoryResult: &paramapi.GetParameterHistoryOutput{
-			Parameters: []paramapi.ParameterHistory{
-				{Name: lo.ToPtr("/app/config"), Value: lo.ToPtr("v1"), Version: 1, LastModifiedDate: lo.ToPtr(now.Add(-3 * time.Hour))},
-				{Name: lo.ToPtr("/app/config"), Value: lo.ToPtr("v2"), Version: 2, LastModifiedDate: lo.ToPtr(now.Add(-1 * time.Hour))},
-				{Name: lo.ToPtr("/app/config"), Value: lo.ToPtr("v3"), Version: 3, LastModifiedDate: lo.ToPtr(now)},
+		getHistoryResult: &model.ParameterHistory{
+			Name: "/app/config",
+			Parameters: []*model.Parameter{
+				{Name: "/app/config", Value: "v1", Version: "1", UpdatedAt: timePtr(now.Add(-3 * time.Hour)), Metadata: model.AWSParameterMeta{Type: "String"}},
+				{Name: "/app/config", Value: "v2", Version: "2", UpdatedAt: timePtr(now.Add(-1 * time.Hour)), Metadata: model.AWSParameterMeta{Type: "String"}},
+				{Name: "/app/config", Value: "v3", Version: "3", UpdatedAt: &now, Metadata: model.AWSParameterMeta{Type: "String"}},
 			},
 		},
 	}
@@ -187,8 +216,8 @@ func TestLogUseCase_Execute_UntilFilter(t *testing.T) {
 
 	// v3 is after the until filter, so only v1 and v2 should be included
 	assert.Len(t, output.Entries, 2)
-	assert.Equal(t, int64(2), output.Entries[0].Version)
-	assert.Equal(t, int64(1), output.Entries[1].Version)
+	assert.Equal(t, "2", output.Entries[0].Version)
+	assert.Equal(t, "1", output.Entries[1].Version)
 }
 
 func TestLogUseCase_Execute_DateRangeFilter(t *testing.T) {
@@ -196,11 +225,12 @@ func TestLogUseCase_Execute_DateRangeFilter(t *testing.T) {
 
 	now := time.Now()
 	client := &mockLogClient{
-		getHistoryResult: &paramapi.GetParameterHistoryOutput{
-			Parameters: []paramapi.ParameterHistory{
-				{Name: lo.ToPtr("/app/config"), Value: lo.ToPtr("v1"), Version: 1, LastModifiedDate: lo.ToPtr(now.Add(-4 * time.Hour))},
-				{Name: lo.ToPtr("/app/config"), Value: lo.ToPtr("v2"), Version: 2, LastModifiedDate: lo.ToPtr(now.Add(-2 * time.Hour))},
-				{Name: lo.ToPtr("/app/config"), Value: lo.ToPtr("v3"), Version: 3, LastModifiedDate: lo.ToPtr(now)},
+		getHistoryResult: &model.ParameterHistory{
+			Name: "/app/config",
+			Parameters: []*model.Parameter{
+				{Name: "/app/config", Value: "v1", Version: "1", UpdatedAt: timePtr(now.Add(-4 * time.Hour)), Metadata: model.AWSParameterMeta{Type: "String"}},
+				{Name: "/app/config", Value: "v2", Version: "2", UpdatedAt: timePtr(now.Add(-2 * time.Hour)), Metadata: model.AWSParameterMeta{Type: "String"}},
+				{Name: "/app/config", Value: "v3", Version: "3", UpdatedAt: &now, Metadata: model.AWSParameterMeta{Type: "String"}},
 			},
 		},
 	}
@@ -218,16 +248,17 @@ func TestLogUseCase_Execute_DateRangeFilter(t *testing.T) {
 
 	// Only v2 should be within the range
 	assert.Len(t, output.Entries, 1)
-	assert.Equal(t, int64(2), output.Entries[0].Version)
+	assert.Equal(t, "2", output.Entries[0].Version)
 }
 
 func TestLogUseCase_Execute_NoLastModifiedDate(t *testing.T) {
 	t.Parallel()
 
 	client := &mockLogClient{
-		getHistoryResult: &paramapi.GetParameterHistoryOutput{
-			Parameters: []paramapi.ParameterHistory{
-				{Name: lo.ToPtr("/app/config"), Value: lo.ToPtr("v1"), Version: 1, LastModifiedDate: nil},
+		getHistoryResult: &model.ParameterHistory{
+			Name: "/app/config",
+			Parameters: []*model.Parameter{
+				{Name: "/app/config", Value: "v1", Version: "1", UpdatedAt: nil, Metadata: model.AWSParameterMeta{Type: "String"}},
 			},
 		},
 	}
@@ -239,7 +270,7 @@ func TestLogUseCase_Execute_NoLastModifiedDate(t *testing.T) {
 	})
 	require.NoError(t, err)
 	assert.Len(t, output.Entries, 1)
-	assert.Nil(t, output.Entries[0].LastModified)
+	assert.Nil(t, output.Entries[0].UpdatedAt)
 }
 
 func TestLogUseCase_Execute_FilterWithNilLastModifiedDate(t *testing.T) {
@@ -247,10 +278,11 @@ func TestLogUseCase_Execute_FilterWithNilLastModifiedDate(t *testing.T) {
 
 	now := time.Now()
 	client := &mockLogClient{
-		getHistoryResult: &paramapi.GetParameterHistoryOutput{
-			Parameters: []paramapi.ParameterHistory{
-				{Name: lo.ToPtr("/app/config"), Value: lo.ToPtr("v1"), Version: 1, LastModifiedDate: nil},
-				{Name: lo.ToPtr("/app/config"), Value: lo.ToPtr("v2"), Version: 2, LastModifiedDate: lo.ToPtr(now)},
+		getHistoryResult: &model.ParameterHistory{
+			Name: "/app/config",
+			Parameters: []*model.Parameter{
+				{Name: "/app/config", Value: "v1", Version: "1", UpdatedAt: nil, Metadata: model.AWSParameterMeta{Type: "String"}},
+				{Name: "/app/config", Value: "v2", Version: "2", UpdatedAt: &now, Metadata: model.AWSParameterMeta{Type: "String"}},
 			},
 		},
 	}
@@ -264,7 +296,11 @@ func TestLogUseCase_Execute_FilterWithNilLastModifiedDate(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	// v1 has nil LastModifiedDate, so it is skipped when date filter is applied; only v2 remains
+	// v1 has nil LastModified, so it is skipped when date filter is applied; only v2 remains
 	assert.Len(t, output.Entries, 1)
-	assert.Equal(t, int64(2), output.Entries[0].Version)
+	assert.Equal(t, "2", output.Entries[0].Version)
+}
+
+func timePtr(t time.Time) *time.Time {
+	return &t
 }

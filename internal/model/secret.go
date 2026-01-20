@@ -11,9 +11,10 @@ import "time"
 type TypedSecret[M any] struct {
 	Name        string
 	Value       string
-	VersionID   string
+	Version     string
 	Description string
-	CreatedDate *time.Time
+	CreatedAt   *time.Time
+	UpdatedAt   *time.Time
 	Tags        map[string]string
 	Metadata    M
 }
@@ -23,9 +24,10 @@ func (s *TypedSecret[M]) ToBase() *Secret {
 	return &Secret{
 		Name:        s.Name,
 		Value:       s.Value,
-		VersionID:   s.VersionID,
+		Version:     s.Version,
 		Description: s.Description,
-		CreatedDate: s.CreatedDate,
+		CreatedAt:   s.CreatedAt,
+		UpdatedAt:   s.UpdatedAt,
 		Tags:        s.Tags,
 		Metadata:    s.Metadata,
 	}
@@ -39,9 +41,10 @@ func (s *TypedSecret[M]) ToBase() *Secret {
 type Secret struct {
 	Name        string
 	Value       string
-	VersionID   string
+	Version     string
 	Description string
-	CreatedDate *time.Time
+	CreatedAt   *time.Time
+	UpdatedAt   *time.Time
 	Tags        map[string]string
 	Metadata    any // Provider-specific metadata (e.g., AWSSecretMeta)
 }
@@ -136,25 +139,25 @@ type AzureSecret = TypedSecret[AzureKeyVaultMeta]
 
 // TypedSecretVersion represents a version of a typed secret.
 type TypedSecretVersion[M any] struct {
-	VersionID   string
-	CreatedDate *time.Time
-	Metadata    M
+	Version   string
+	CreatedAt *time.Time
+	Metadata  M
 }
 
 // ToBase converts to a UseCase layer type.
 func (v *TypedSecretVersion[M]) ToBase() *SecretVersion {
 	return &SecretVersion{
-		VersionID:   v.VersionID,
-		CreatedDate: v.CreatedDate,
-		Metadata:    v.Metadata,
+		Version:   v.Version,
+		CreatedAt: v.CreatedAt,
+		Metadata:  v.Metadata,
 	}
 }
 
 // SecretVersion represents a version of a secret.
 type SecretVersion struct {
-	VersionID   string
-	CreatedDate *time.Time
-	Metadata    any // Provider-specific metadata
+	Version   string
+	CreatedAt *time.Time
+	Metadata  any // Provider-specific metadata
 }
 
 // AWSSecretVersionMeta contains AWS-specific version metadata.
@@ -171,12 +174,12 @@ type AWSSecretVersion = TypedSecretVersion[AWSSecretVersionMeta]
 
 // SecretListItem represents a secret in a list (without value).
 type SecretListItem struct {
-	Name         string
-	Description  string
-	CreatedDate  *time.Time
-	LastModified *time.Time
-	Tags         map[string]string
-	Metadata     any // Provider-specific metadata (e.g., AWSSecretListItemMeta)
+	Name        string
+	Description string
+	CreatedAt   *time.Time
+	UpdatedAt   *time.Time
+	Tags        map[string]string
+	Metadata    any // Provider-specific metadata (e.g., AWSSecretListItemMeta)
 }
 
 // AWSMeta returns the AWS-specific metadata if available.

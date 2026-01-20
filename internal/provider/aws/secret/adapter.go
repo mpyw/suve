@@ -298,10 +298,10 @@ func convertGetSecretValueOutput(o *secretapi.GetSecretValueOutput) *model.Secre
 	}
 
 	return &model.Secret{
-		Name:        lo.FromPtr(o.Name),
-		Value:       lo.FromPtr(o.SecretString),
-		VersionID:   lo.FromPtr(o.VersionId),
-		CreatedDate: o.CreatedDate,
+		Name:      lo.FromPtr(o.Name),
+		Value:     lo.FromPtr(o.SecretString),
+		Version:   lo.FromPtr(o.VersionId),
+		CreatedAt: o.CreatedDate,
 		Metadata: model.AWSSecretMeta{
 			ARN:           lo.FromPtr(o.ARN),
 			VersionStages: o.VersionStages,
@@ -315,8 +315,8 @@ func convertSecretVersion(v *secretapi.SecretVersionsListEntry) *model.SecretVer
 	}
 
 	return &model.SecretVersion{
-		VersionID:   lo.FromPtr(v.VersionId),
-		CreatedDate: v.CreatedDate,
+		Version:   lo.FromPtr(v.VersionId),
+		CreatedAt: v.CreatedDate,
 		Metadata: model.AWSSecretVersionMeta{
 			VersionStages: v.VersionStages,
 		},
@@ -329,11 +329,11 @@ func convertSecretListEntry(e *secretapi.SecretListEntry) *model.SecretListItem 
 	}
 
 	return &model.SecretListItem{
-		Name:         lo.FromPtr(e.Name),
-		Description:  lo.FromPtr(e.Description),
-		CreatedDate:  e.CreatedDate,
-		LastModified: e.LastChangedDate,
-		Tags:         convertFromAWSTags(e.Tags),
+		Name:        lo.FromPtr(e.Name),
+		Description: lo.FromPtr(e.Description),
+		CreatedAt:   e.CreatedDate,
+		UpdatedAt:   e.LastChangedDate,
+		Tags:        convertFromAWSTags(e.Tags),
 		Metadata: model.AWSSecretListItemMeta{
 			ARN:         lo.FromPtr(e.ARN),
 			DeletedDate: e.DeletedDate,
@@ -347,11 +347,11 @@ func convertDescribeSecretOutput(o *secretapi.DescribeSecretOutput) *model.Secre
 	}
 
 	return &model.SecretListItem{
-		Name:         lo.FromPtr(o.Name),
-		Description:  lo.FromPtr(o.Description),
-		CreatedDate:  o.CreatedDate,
-		LastModified: o.LastChangedDate,
-		Tags:         convertFromAWSTags(o.Tags),
+		Name:        lo.FromPtr(o.Name),
+		Description: lo.FromPtr(o.Description),
+		CreatedAt:   o.CreatedDate,
+		UpdatedAt:   o.LastChangedDate,
+		Tags:        convertFromAWSTags(o.Tags),
 		Metadata: model.AWSSecretListItemMeta{
 			ARN:         lo.FromPtr(o.ARN),
 			DeletedDate: o.DeletedDate,

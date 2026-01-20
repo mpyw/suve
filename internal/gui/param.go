@@ -4,12 +4,18 @@ package gui
 
 import (
 	"errors"
+	"strconv"
 
 	"github.com/mpyw/suve/internal/api/paramapi"
 	awsparam "github.com/mpyw/suve/internal/provider/aws/param"
 	"github.com/mpyw/suve/internal/usecase/param"
 	"github.com/mpyw/suve/internal/version/paramversion"
 )
+
+// parseInt64 converts a string to int64, returning 0 on error.
+func parseInt64(s string) (int64, error) {
+	return strconv.ParseInt(s, 10, 64)
+}
 
 // =============================================================================
 // Param Types
@@ -124,28 +130,30 @@ func (a *App) ParamShow(specStr string) (*ParamShowResult, error) {
 		return nil, err
 	}
 
-	client, err := a.getParamClient()
+	adapter, err := awsparam.NewAdapter(a.ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	uc := &param.ShowUseCase{Client: client}
+	uc := &param.ShowUseCase{Client: adapter}
 
 	result, err := uc.Execute(a.ctx, param.ShowInput{Spec: spec})
 	if err != nil {
 		return nil, err
 	}
 
+	version, _ := parseInt64(result.Version)
+
 	r := &ParamShowResult{
 		Name:        result.Name,
 		Value:       result.Value,
-		Version:     result.Version,
-		Type:        string(result.Type),
+		Version:     version,
+		Type:        result.Type,
 		Description: result.Description,
 		Tags:        make([]ParamShowTag, 0, len(result.Tags)),
 	}
-	if result.LastModified != nil {
-		r.LastModified = result.LastModified.Format("2006-01-02T15:04:05Z07:00")
+	if result.UpdatedAt != nil {
+		r.LastModified = result.UpdatedAt.Format("2006-01-02T15:04:05Z07:00")
 	}
 
 	for _, tag := range result.Tags {
@@ -160,12 +168,12 @@ func (a *App) ParamShow(specStr string) (*ParamShowResult, error) {
 
 // ParamLog shows parameter version history.
 func (a *App) ParamLog(name string, maxResults int32) (*ParamLogResult, error) {
-	client, err := a.getParamClient()
+	adapter, err := awsparam.NewAdapter(a.ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	uc := &param.LogUseCase{Client: client}
+	uc := &param.LogUseCase{Client: adapter}
 
 	result, err := uc.Execute(a.ctx, param.LogInput{
 		Name:       name,
@@ -177,14 +185,16 @@ func (a *App) ParamLog(name string, maxResults int32) (*ParamLogResult, error) {
 
 	entries := make([]ParamLogEntry, len(result.Entries))
 	for i, e := range result.Entries {
+		version, _ := parseInt64(e.Version)
+
 		entry := ParamLogEntry{
-			Version:   e.Version,
+			Version:   version,
 			Value:     e.Value,
-			Type:      string(e.Type),
+			Type:      e.Type,
 			IsCurrent: e.IsCurrent,
 		}
-		if e.LastModified != nil {
-			entry.LastModified = e.LastModified.Format("2006-01-02T15:04:05Z07:00")
+		if e.UpdatedAt != nil {
+			entry.LastModified = e.UpdatedAt.Format("2006-01-02T15:04:05Z07:00")
 		}
 
 		entries[i] = entry
@@ -210,7 +220,9 @@ func (a *App) ParamDiff(spec1Str, spec2Str string) (*ParamDiffResult, error) {
 		return nil, err
 	}
 
-	uc := &param.DiffUseCase{Client: client}
+	// Create adapter that implements provider.ParameterReader
+	adapter := awsparam.New(client)
+	uc := &param.DiffUseCase{Client: adapter}
 
 	result, err := uc.Execute(a.ctx, param.DiffInput{
 		Spec1: spec1,

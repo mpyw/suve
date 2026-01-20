@@ -287,10 +287,10 @@ func convertParameter(p *paramapi.Parameter) *model.Parameter {
 	}
 
 	return &model.Parameter{
-		Name:         lo.FromPtr(p.Name),
-		Value:        lo.FromPtr(p.Value),
-		Version:      version,
-		LastModified: p.LastModifiedDate,
+		Name:      lo.FromPtr(p.Name),
+		Value:     lo.FromPtr(p.Value),
+		Version:   version,
+		UpdatedAt: p.LastModifiedDate,
 		Metadata: model.AWSParameterMeta{
 			Type:     string(p.Type),
 			ARN:      lo.FromPtr(p.ARN),
@@ -308,11 +308,11 @@ func convertParameterHistory(name string, history []paramapi.ParameterHistory) *
 		}
 
 		params[i] = &model.Parameter{
-			Name:         name,
-			Value:        lo.FromPtr(h.Value),
-			Version:      version,
-			Description:  lo.FromPtr(h.Description),
-			LastModified: h.LastModifiedDate,
+			Name:        name,
+			Value:       lo.FromPtr(h.Value),
+			Version:     version,
+			Description: lo.FromPtr(h.Description),
+			UpdatedAt:   h.LastModifiedDate,
 			Metadata: model.AWSParameterMeta{
 				Type:           string(h.Type),
 				Tier:           string(h.Tier),
@@ -334,9 +334,9 @@ func convertParameterMetadata(m *paramapi.ParameterMetadata) *model.ParameterLis
 	}
 
 	return &model.ParameterListItem{
-		Name:         lo.FromPtr(m.Name),
-		Description:  lo.FromPtr(m.Description),
-		LastModified: m.LastModifiedDate,
+		Name:        lo.FromPtr(m.Name),
+		Description: lo.FromPtr(m.Description),
+		UpdatedAt:   m.LastModifiedDate,
 		Metadata: model.AWSParameterListItemMeta{
 			Type: string(m.Type),
 		},

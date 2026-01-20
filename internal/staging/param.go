@@ -10,6 +10,8 @@ import (
 
 	"github.com/mpyw/suve/internal/api/paramapi"
 	"github.com/mpyw/suve/internal/infra"
+	"github.com/mpyw/suve/internal/provider"
+	awsparam "github.com/mpyw/suve/internal/provider/aws/param"
 	"github.com/mpyw/suve/internal/tagging"
 	"github.com/mpyw/suve/internal/version/paramversion"
 )
@@ -28,9 +30,11 @@ type ParamClient interface {
 // ParamStrategy implements ServiceStrategy for SSM Parameter Store.
 type ParamStrategy struct {
 	Client ParamClient
+	Reader provider.ParameterReader // for version resolution
 }
 
 // NewParamStrategy creates a new SSM Parameter Store strategy.
+// Note: Reader must be set separately for version resolution to work.
 func NewParamStrategy(client ParamClient) *ParamStrategy {
 	return &ParamStrategy{Client: client}
 }
@@ -189,14 +193,14 @@ func (s *ParamStrategy) FetchLastModified(ctx context.Context, name string) (tim
 func (s *ParamStrategy) FetchCurrent(ctx context.Context, name string) (*FetchResult, error) {
 	spec := &paramversion.Spec{Name: name}
 
-	param, err := paramversion.GetParameterWithVersion(ctx, s.Client, spec)
+	param, err := paramversion.GetParameterWithVersion(ctx, s.Reader, spec)
 	if err != nil {
 		return nil, err
 	}
 
 	return &FetchResult{
-		Value:      lo.FromPtr(param.Value),
-		Identifier: fmt.Sprintf("#%d", param.Version),
+		Value:      param.Value,
+		Identifier: "#" + param.Version,
 	}, nil
 }
 
@@ -248,7 +252,7 @@ func (s *ParamStrategy) ParseName(input string) (string, error) {
 func (s *ParamStrategy) FetchCurrentValue(ctx context.Context, name string) (*EditFetchResult, error) {
 	spec := &paramversion.Spec{Name: name}
 
-	param, err := paramversion.GetParameterWithVersion(ctx, s.Client, spec)
+	param, err := paramversion.GetParameterWithVersion(ctx, s.Reader, spec)
 	if err != nil {
 		if pnf := (*paramapi.ParameterNotFound)(nil); errors.As(err, &pnf) {
 			return nil, &ResourceNotFoundError{Err: err}
@@ -258,11 +262,11 @@ func (s *ParamStrategy) FetchCurrentValue(ctx context.Context, name string) (*Ed
 	}
 
 	result := &EditFetchResult{
-		Value: lo.FromPtr(param.Value),
+		Value: param.Value,
 	}
 
-	if param.LastModifiedDate != nil {
-		result.LastModified = *param.LastModifiedDate
+	if param.UpdatedAt != nil {
+		result.LastModified = *param.UpdatedAt
 	}
 
 	return result, nil
@@ -287,22 +291,29 @@ func (s *ParamStrategy) FetchVersion(ctx context.Context, input string) (value s
 		return "", "", err
 	}
 
-	param, err := paramversion.GetParameterWithVersion(ctx, s.Client, spec)
+	param, err := paramversion.GetParameterWithVersion(ctx, s.Reader, spec)
 	if err != nil {
 		return "", "", err
 	}
 
-	return lo.FromPtr(param.Value), fmt.Sprintf("#%d", param.Version), nil
+	return param.Value, "#" + param.Version, nil
 }
 
 // ParamFactory creates a FullStrategy with an initialized AWS client.
 func ParamFactory(ctx context.Context) (FullStrategy, error) {
+	// Create raw client for apply operations (paramapi interface)
 	client, err := infra.NewParamClient(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize AWS client: %w", err)
 	}
 
-	return NewParamStrategy(client), nil
+	// Create adapter for version resolution (provider interface)
+	adapter := awsparam.New(client)
+
+	return &ParamStrategy{
+		Client: client,
+		Reader: adapter,
+	}, nil
 }
 
 // ParamParserFactory creates a Parser without an AWS client.

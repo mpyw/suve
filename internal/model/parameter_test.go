@@ -14,12 +14,13 @@ func TestTypedParameter_ToBase(t *testing.T) {
 
 	now := time.Now()
 	typed := &model.TypedParameter[model.AWSParameterMeta]{
-		Name:         "test-param",
-		Value:        "test-value",
-		Version:      "1",
-		Description:  "test description",
-		LastModified: &now,
-		Tags:         map[string]string{"key": "value"},
+		Name:        "test-param",
+		Value:       "test-value",
+		Version:     "1",
+		Description: "test description",
+		CreatedAt:   &now,
+		UpdatedAt:   &now,
+		Tags:        map[string]string{"key": "value"},
 		Metadata: model.AWSParameterMeta{
 			Type: "String",
 			ARN:  "arn:aws:ssm:us-east-1:123456789012:parameter/test-param",
@@ -33,7 +34,8 @@ func TestTypedParameter_ToBase(t *testing.T) {
 	assert.Equal(t, typed.Value, base.Value)
 	assert.Equal(t, typed.Version, base.Version)
 	assert.Equal(t, typed.Description, base.Description)
-	assert.Equal(t, typed.LastModified, base.LastModified)
+	assert.Equal(t, typed.CreatedAt, base.CreatedAt)
+	assert.Equal(t, typed.UpdatedAt, base.UpdatedAt)
 	assert.Equal(t, typed.Tags, base.Tags)
 	assert.IsType(t, model.AWSParameterMeta{}, base.Metadata)
 
@@ -86,18 +88,18 @@ func TestTypedParameterHistory_ToBase(t *testing.T) {
 		Name: "test-param",
 		Parameters: []*model.TypedParameter[model.AWSParameterMeta]{
 			{
-				Name:         "test-param",
-				Value:        "value1",
-				Version:      "1",
-				LastModified: &now,
-				Metadata:     model.AWSParameterMeta{Tier: "Standard"},
+				Name:      "test-param",
+				Value:     "value1",
+				Version:   "1",
+				UpdatedAt: &now,
+				Metadata:  model.AWSParameterMeta{Tier: "Standard"},
 			},
 			{
-				Name:         "test-param",
-				Value:        "value2",
-				Version:      "2",
-				LastModified: &now,
-				Metadata:     model.AWSParameterMeta{Tier: "Advanced"},
+				Name:      "test-param",
+				Value:     "value2",
+				Version:   "2",
+				UpdatedAt: &now,
+				Metadata:  model.AWSParameterMeta{Tier: "Advanced"},
 			},
 		},
 	}

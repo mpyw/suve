@@ -32,9 +32,9 @@ func TestWrapTypedSecretReader_GetSecret(t *testing.T) {
 		mock := &mockTypedSecretReader{
 			getTypedSecretFunc: func(_ context.Context, name, versionID, _ string) (*model.TypedSecret[model.AWSSecretMeta], error) {
 				return &model.TypedSecret[model.AWSSecretMeta]{
-					Name:      name,
-					Value:     "test-value",
-					VersionID: versionID,
+					Name:    name,
+					Value:   "test-value",
+					Version: versionID,
 					Metadata: model.AWSSecretMeta{
 						VersionStages: []string{"AWSCURRENT"},
 					},
@@ -48,7 +48,7 @@ func TestWrapTypedSecretReader_GetSecret(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, "test-secret", secret.Name)
 		assert.Equal(t, "test-value", secret.Value)
-		assert.Equal(t, "v1", secret.VersionID)
+		assert.Equal(t, "v1", secret.Version)
 	})
 
 	t.Run("error", func(t *testing.T) {

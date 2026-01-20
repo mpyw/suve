@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"strconv"
 	"time"
 
 	"github.com/urfave/cli/v3"
@@ -17,8 +18,8 @@ import (
 	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/cli/pager"
 	"github.com/mpyw/suve/internal/cli/terminal"
-	"github.com/mpyw/suve/internal/infra"
 	"github.com/mpyw/suve/internal/jsonutil"
+	awsparam "github.com/mpyw/suve/internal/provider/aws/param"
 	"github.com/mpyw/suve/internal/timeutil"
 	"github.com/mpyw/suve/internal/usecase/param"
 )
@@ -198,7 +199,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		}
 	}
 
-	client, err := infra.NewParamClient(ctx)
+	adapter, err := awsparam.NewAdapter(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to initialize AWS client: %w", err)
 	}
@@ -208,7 +209,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 
 	return pager.WithPagerWriter(cmd.Root().Writer, noPager, func(w io.Writer) error {
 		r := &Runner{
-			UseCase: &param.LogUseCase{Client: client},
+			UseCase: &param.LogUseCase{Client: adapter},
 			Stdout:  w,
 			Stderr:  cmd.Root().ErrWriter,
 		}
@@ -239,13 +240,15 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 	if opts.Output == output.FormatJSON {
 		items := make([]JSONOutputItem, len(entries))
 		for i, entry := range entries {
+			version, _ := strconv.ParseInt(entry.Version, 10, 64)
+
 			items[i] = JSONOutputItem{
-				Version: entry.Version,
-				Type:    string(entry.Type),
+				Version: version,
+				Type:    entry.Type,
 				Value:   entry.Value,
 			}
-			if entry.LastModified != nil {
-				items[i].Modified = timeutil.FormatRFC3339(*entry.LastModified)
+			if entry.UpdatedAt != nil {
+				items[i].Modified = timeutil.FormatRFC3339(*entry.UpdatedAt)
 			}
 		}
 
@@ -259,8 +262,8 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 		if opts.Oneline && !opts.ShowPatch {
 			// Compact one-line format: VERSION  DATE  VALUE_PREVIEW
 			dateStr := ""
-			if entry.LastModified != nil {
-				dateStr = entry.LastModified.Format("2006-01-02")
+			if entry.UpdatedAt != nil {
+				dateStr = entry.UpdatedAt.Format("2006-01-02")
 			}
 
 			value := entry.Value
@@ -287,7 +290,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 				currentMark = colors.Current(" (current)")
 			}
 
-			output.Printf(r.Stdout, "%s%d%s  %s  %s\n",
+			output.Printf(r.Stdout, "%s%s%s  %s  %s\n",
 				colors.Version(""),
 				entry.Version,
 				currentMark,
@@ -298,15 +301,15 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 			continue
 		}
 
-		versionLabel := fmt.Sprintf("Version %d", entry.Version)
+		versionLabel := fmt.Sprintf("Version %s", entry.Version)
 		if entry.IsCurrent {
 			versionLabel += " " + colors.Current("(current)")
 		}
 
 		output.Println(r.Stdout, colors.Version(versionLabel))
 
-		if entry.LastModified != nil {
-			output.Printf(r.Stdout, "%s %s\n", colors.FieldLabel("Date:"), timeutil.FormatRFC3339(*entry.LastModified))
+		if entry.UpdatedAt != nil {
+			output.Printf(r.Stdout, "%s %s\n", colors.FieldLabel("Date:"), timeutil.FormatRFC3339(*entry.UpdatedAt))
 		}
 
 		if opts.ShowPatch {
@@ -331,8 +334,8 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 					oldValue, newValue = jsonutil.TryFormatOrWarn2(oldValue, newValue, r.Stderr, "")
 				}
 
-				oldName := fmt.Sprintf("%s#%d", result.Name, oldEntry.Version)
-				newName := fmt.Sprintf("%s#%d", result.Name, newEntry.Version)
+				oldName := fmt.Sprintf("%s#%s", result.Name, oldEntry.Version)
+				newName := fmt.Sprintf("%s#%s", result.Name, newEntry.Version)
 
 				diff := output.Diff(oldName, newName, oldValue, newValue)
 				if diff != "" {
