@@ -6,9 +6,7 @@ import (
 	"slices"
 	"time"
 
-	"github.com/samber/lo"
-
-	"github.com/mpyw/suve/internal/api/secretapi"
+	"github.com/mpyw/suve/internal/model"
 )
 
 // LogClient is the interface for the log use case.
@@ -47,30 +45,31 @@ type LogUseCase struct {
 // Execute runs the log use case.
 func (u *LogUseCase) Execute(ctx context.Context, input LogInput) (*LogOutput, error) {
 	// List all versions
-	result, err := u.Client.ListSecretVersionIds(ctx, &secretapi.ListSecretVersionIDsInput{
-		SecretId:   lo.ToPtr(input.Name),
-		MaxResults: lo.ToPtr(input.MaxResults),
-	})
+	versions, err := u.Client.GetSecretVersions(ctx, input.Name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list secret versions: %w", err)
 	}
 
-	versions := result.Versions
 	if len(versions) == 0 {
 		return &LogOutput{Name: input.Name}, nil
 	}
 
+	// Apply MaxResults limit if specified
+	if input.MaxResults > 0 && int(input.MaxResults) < len(versions) {
+		versions = versions[:input.MaxResults]
+	}
+
 	// Sort by creation date (newest first by default)
-	slices.SortFunc(versions, func(a, b secretapi.SecretVersionsListEntry) int {
-		if a.CreatedDate == nil || b.CreatedDate == nil {
+	slices.SortFunc(versions, func(a, b *model.SecretVersion) int {
+		if a.CreatedAt == nil || b.CreatedAt == nil {
 			return 0
 		}
 
-		if a.CreatedDate.After(*b.CreatedDate) {
+		if a.CreatedAt.After(*b.CreatedAt) {
 			return -1
 		}
 
-		if a.CreatedDate.Before(*b.CreatedDate) {
+		if a.CreatedAt.Before(*b.CreatedAt) {
 			return 1
 		}
 
@@ -86,17 +85,17 @@ func (u *LogUseCase) Execute(ctx context.Context, input LogInput) (*LogOutput, e
 	entries := make([]LogEntry, 0, len(versions))
 
 	for _, v := range versions {
-		// Apply date filters (skip entries without CreatedDate when filters are applied)
+		// Apply date filters (skip entries without CreatedAt when filters are applied)
 		if input.Since != nil || input.Until != nil {
-			if v.CreatedDate == nil {
+			if v.CreatedAt == nil {
 				continue
 			}
 
-			if input.Since != nil && v.CreatedDate.Before(*input.Since) {
+			if input.Since != nil && v.CreatedAt.Before(*input.Since) {
 				continue
 			}
 
-			if input.Until != nil && v.CreatedDate.After(*input.Until) {
+			if input.Until != nil && v.CreatedAt.After(*input.Until) {
 				continue
 			}
 		}
@@ -107,26 +106,30 @@ func (u *LogUseCase) Execute(ctx context.Context, input LogInput) (*LogOutput, e
 			fetchErr error
 		)
 
-		if v.VersionId != nil {
-			secretOut, err := u.Client.GetSecretValue(ctx, &secretapi.GetSecretValueInput{
-				SecretId:  lo.ToPtr(input.Name),
-				VersionId: v.VersionId,
-			})
+		if v.Version != "" {
+			secret, err := u.Client.GetSecret(ctx, input.Name, v.Version, "")
 			if err != nil {
 				fetchErr = err
 			} else {
-				value = lo.FromPtr(secretOut.SecretString)
+				value = secret.Value
 			}
 		}
 
 		// Check if this is the current version (has AWSCURRENT stage)
-		isCurrent := slices.Contains(v.VersionStages, "AWSCURRENT")
+		var versionStages []string
+
+		isCurrent := false
+
+		if meta, ok := v.Metadata.(model.AWSSecretVersionMeta); ok {
+			versionStages = meta.VersionStages
+			isCurrent = slices.Contains(meta.VersionStages, "AWSCURRENT")
+		}
 
 		entries = append(entries, LogEntry{
-			VersionID:    lo.FromPtr(v.VersionId),
-			VersionStage: v.VersionStages,
+			VersionID:    v.Version,
+			VersionStage: versionStages,
 			Value:        value,
-			CreatedDate:  v.CreatedDate,
+			CreatedDate:  v.CreatedAt,
 			IsCurrent:    isCurrent,
 			Error:        fetchErr,
 		})

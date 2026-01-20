@@ -22,6 +22,7 @@ import (
 	"github.com/mpyw/suve/internal/parallel"
 	"github.com/mpyw/suve/internal/provider"
 	awsparam "github.com/mpyw/suve/internal/provider/aws/param"
+	awssecret "github.com/mpyw/suve/internal/provider/aws/secret"
 	"github.com/mpyw/suve/internal/staging"
 	"github.com/mpyw/suve/internal/staging/store"
 	"github.com/mpyw/suve/internal/staging/store/agent"
@@ -49,6 +50,7 @@ type Runner struct {
 	ParamClient  ParamClient
 	ParamReader  provider.ParameterReader // for version resolution
 	SecretClient SecretClient
+	SecretReader provider.SecretReader // for version resolution
 	Store        store.ReadWriteOperator
 	Stdout       io.Writer
 	Stderr       io.Writer
@@ -158,6 +160,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 			}
 
 			r.SecretClient = secretClient
+			r.SecretReader = awssecret.New(secretClient)
 		}
 
 		return pager.WithPagerWriter(cmd.Root().Writer, opts.NoPager, func(w io.Writer) error {
@@ -208,10 +211,10 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 	secretResults := parallel.ExecuteMap(
 		ctx,
 		secretEntries,
-		func(ctx context.Context, name string, _ staging.Entry) (*secretapi.GetSecretValueOutput, error) {
+		func(ctx context.Context, name string, _ staging.Entry) (*model.Secret, error) {
 			spec := &secretversion.Spec{Name: name}
 
-			return secretversion.GetSecretWithVersion(ctx, r.SecretClient, spec)
+			return secretversion.GetSecretWithVersion(ctx, r.SecretReader, spec)
 		},
 	)
 
@@ -399,8 +402,8 @@ func (r *Runner) outputParamDiff(ctx context.Context, opts Options, name string,
 	return nil
 }
 
-func (r *Runner) outputSecretDiff(ctx context.Context, opts Options, name string, entry staging.Entry, secret *secretapi.GetSecretValueOutput) error {
-	awsValue := lo.FromPtr(secret.SecretString)
+func (r *Runner) outputSecretDiff(ctx context.Context, opts Options, name string, entry staging.Entry, secret *model.Secret) error {
+	awsValue := secret.Value
 	stagedValue := lo.FromPtr(entry.Value)
 
 	// For delete operation, staged value is empty
@@ -424,7 +427,7 @@ func (r *Runner) outputSecretDiff(ctx context.Context, opts Options, name string
 		return nil
 	}
 
-	versionID := secretversion.TruncateVersionID(lo.FromPtr(secret.VersionId))
+	versionID := secretversion.TruncateVersionID(secret.Version)
 	label1 := fmt.Sprintf("%s#%s (AWS)", name, versionID)
 	label2 := fmt.Sprintf(lo.Ternary(
 		entry.Operation == staging.OperationDelete,

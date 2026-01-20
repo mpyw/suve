@@ -5,17 +5,15 @@ import (
 	"context"
 	"time"
 
-	"github.com/samber/lo"
-
-	"github.com/mpyw/suve/internal/api/secretapi"
+	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/version/secretversion"
 )
 
 // ShowClient is the interface for the show use case.
 type ShowClient interface {
-	secretapi.GetSecretValueAPI
-	secretapi.ListSecretVersionIDsAPI
-	secretapi.DescribeSecretAPI
+	provider.SecretReader
+	provider.SecretDescriber
+	provider.SecretTagger
 }
 
 // ShowInput holds input for the show use case.
@@ -54,25 +52,29 @@ func (u *ShowUseCase) Execute(ctx context.Context, input ShowInput) (*ShowOutput
 	}
 
 	output := &ShowOutput{
-		Name:         lo.FromPtr(secret.Name),
-		ARN:          lo.FromPtr(secret.ARN),
-		Value:        lo.FromPtr(secret.SecretString),
-		VersionID:    lo.FromPtr(secret.VersionId),
-		VersionStage: secret.VersionStages,
-		CreatedDate:  secret.CreatedDate,
+		Name:        secret.Name,
+		Value:       secret.Value,
+		VersionID:   secret.Version,
+		CreatedDate: secret.CreatedAt,
 	}
 
-	// Fetch tags and description via DescribeSecret
-	describeOutput, err := u.Client.DescribeSecret(ctx, &secretapi.DescribeSecretInput{
-		SecretId: secret.Name,
-	})
+	// Extract AWS-specific metadata
+	if meta := secret.AWSMeta(); meta != nil {
+		output.ARN = meta.ARN
+		output.VersionStage = meta.VersionStages
+	}
+
+	// Fetch description via DescribeSecret
+	describeOutput, err := u.Client.DescribeSecret(ctx, secret.Name)
 	if err == nil && describeOutput != nil {
-		output.Description = lo.FromPtr(describeOutput.Description)
-		for _, tag := range describeOutput.Tags {
-			output.Tags = append(output.Tags, ShowTag{
-				Key:   lo.FromPtr(tag.Key),
-				Value: lo.FromPtr(tag.Value),
-			})
+		output.Description = describeOutput.Description
+	}
+
+	// Fetch tags
+	tags, err := u.Client.GetTags(ctx, secret.Name)
+	if err == nil && tags != nil {
+		for k, v := range tags {
+			output.Tags = append(output.Tags, ShowTag{Key: k, Value: v})
 		}
 	}
 

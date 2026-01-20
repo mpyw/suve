@@ -2,6 +2,7 @@ package param_test
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"testing"
 
@@ -9,88 +10,55 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/mpyw/suve/internal/api/paramapi"
+	"github.com/mpyw/suve/internal/model"
 	"github.com/mpyw/suve/internal/usecase/param"
 )
 
 type mockListClient struct {
-	describeResult    *paramapi.DescribeParametersOutput
-	describeResults   []*paramapi.DescribeParametersOutput // For pagination tests
-	describeCallCount int
-	describeErr       error
-	getParameterValue map[string]string
-	invalidParameters []string // Parameters that should be returned as invalid
-	getParametersErr  error    // Error to return from GetParameters
+	listParametersResult  []*model.ParameterListItem
+	listParametersErr     error
+	getParameterResult    map[string]*model.Parameter
+	getParameterErr       map[string]error // Per-name errors
+	getParameterGlobalErr error            // Global error for all GetParameter calls
 }
 
-//nolint:lll // mock function signature must match AWS SDK interface
-func (m *mockListClient) DescribeParameters(_ context.Context, _ *paramapi.DescribeParametersInput, _ ...func(*paramapi.Options)) (*paramapi.DescribeParametersOutput, error) {
-	if m.describeErr != nil {
-		return nil, m.describeErr
+func (m *mockListClient) ListParameters(_ context.Context, _ string, _ bool) ([]*model.ParameterListItem, error) {
+	if m.listParametersErr != nil {
+		return nil, m.listParametersErr
 	}
 
-	// Support paginated results for testing
-	if len(m.describeResults) > 0 {
-		idx := m.describeCallCount
-
-		m.describeCallCount++
-
-		if idx < len(m.describeResults) {
-			return m.describeResults[idx], nil
-		}
-
-		return &paramapi.DescribeParametersOutput{}, nil
-	}
-
-	return m.describeResult, nil
+	return m.listParametersResult, nil
 }
 
-//nolint:lll // mock function signature must match AWS SDK interface
-func (m *mockListClient) GetParameters(_ context.Context, input *paramapi.GetParametersInput, _ ...func(*paramapi.Options)) (*paramapi.GetParametersOutput, error) {
-	if m.getParametersErr != nil {
-		return nil, m.getParametersErr
+func (m *mockListClient) GetParameter(_ context.Context, name string, _ string) (*model.Parameter, error) {
+	if m.getParameterGlobalErr != nil {
+		return nil, m.getParameterGlobalErr
 	}
 
-	var params []paramapi.Parameter
-
-	var invalidParams []string
-
-	invalidSet := make(map[string]bool)
-
-	for _, name := range m.invalidParameters {
-		invalidSet[name] = true
-	}
-
-	for _, name := range input.Names {
-		if invalidSet[name] {
-			invalidParams = append(invalidParams, name)
-
-			continue
-		}
-
-		if m.getParameterValue != nil {
-			if value, ok := m.getParameterValue[name]; ok {
-				params = append(params, paramapi.Parameter{
-					Name:  lo.ToPtr(name),
-					Value: lo.ToPtr(value),
-				})
-			}
+	if m.getParameterErr != nil {
+		if err, ok := m.getParameterErr[name]; ok {
+			return nil, err
 		}
 	}
 
-	return &paramapi.GetParametersOutput{
-		Parameters:        params,
-		InvalidParameters: invalidParams,
-	}, nil
+	if m.getParameterResult != nil {
+		if p, ok := m.getParameterResult[name]; ok {
+			return p, nil
+		}
+	}
+
+	return nil, errors.New("parameter not found")
+}
+
+func (m *mockListClient) GetParameterHistory(_ context.Context, _ string) (*model.ParameterHistory, error) {
+	return nil, errors.New("not implemented")
 }
 
 func TestListUseCase_Execute_Empty(t *testing.T) {
 	t.Parallel()
 
 	client := &mockListClient{
-		describeResult: &paramapi.DescribeParametersOutput{
-			Parameters: []paramapi.ParameterMetadata{},
-		},
+		listParametersResult: []*model.ParameterListItem{},
 	}
 
 	uc := &param.ListUseCase{Client: client}
@@ -104,11 +72,9 @@ func TestListUseCase_Execute_WithPrefix(t *testing.T) {
 	t.Parallel()
 
 	client := &mockListClient{
-		describeResult: &paramapi.DescribeParametersOutput{
-			Parameters: []paramapi.ParameterMetadata{
-				{Name: lo.ToPtr("/app/config")},
-				{Name: lo.ToPtr("/app/secret")},
-			},
+		listParametersResult: []*model.ParameterListItem{
+			{Name: "/app/config", Metadata: model.AWSParameterListItemMeta{Type: "String"}},
+			{Name: "/app/secret", Metadata: model.AWSParameterListItemMeta{Type: "SecureString"}},
 		},
 	}
 
@@ -125,11 +91,9 @@ func TestListUseCase_Execute_Recursive(t *testing.T) {
 	t.Parallel()
 
 	client := &mockListClient{
-		describeResult: &paramapi.DescribeParametersOutput{
-			Parameters: []paramapi.ParameterMetadata{
-				{Name: lo.ToPtr("/app/config")},
-				{Name: lo.ToPtr("/app/sub/nested")},
-			},
+		listParametersResult: []*model.ParameterListItem{
+			{Name: "/app/config"},
+			{Name: "/app/sub/nested"},
 		},
 	}
 
@@ -147,12 +111,10 @@ func TestListUseCase_Execute_WithFilter(t *testing.T) {
 	t.Parallel()
 
 	client := &mockListClient{
-		describeResult: &paramapi.DescribeParametersOutput{
-			Parameters: []paramapi.ParameterMetadata{
-				{Name: lo.ToPtr("/app/config")},
-				{Name: lo.ToPtr("/app/secret")},
-				{Name: lo.ToPtr("/app/other")},
-			},
+		listParametersResult: []*model.ParameterListItem{
+			{Name: "/app/config"},
+			{Name: "/app/secret"},
+			{Name: "/app/other"},
 		},
 	}
 
@@ -169,7 +131,7 @@ func TestListUseCase_Execute_InvalidFilter(t *testing.T) {
 	t.Parallel()
 
 	client := &mockListClient{
-		describeResult: &paramapi.DescribeParametersOutput{},
+		listParametersResult: []*model.ParameterListItem{},
 	}
 
 	uc := &param.ListUseCase{Client: client}
@@ -181,33 +143,31 @@ func TestListUseCase_Execute_InvalidFilter(t *testing.T) {
 	assert.Contains(t, err.Error(), "invalid filter regex")
 }
 
-func TestListUseCase_Execute_DescribeError(t *testing.T) {
+func TestListUseCase_Execute_ListError(t *testing.T) {
 	t.Parallel()
 
 	client := &mockListClient{
-		describeErr: errAWS,
+		listParametersErr: errAWS,
 	}
 
 	uc := &param.ListUseCase{Client: client}
 
 	_, err := uc.Execute(t.Context(), param.ListInput{})
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to describe parameters")
+	assert.Contains(t, err.Error(), "failed to list parameters")
 }
 
 func TestListUseCase_Execute_WithValue(t *testing.T) {
 	t.Parallel()
 
 	client := &mockListClient{
-		describeResult: &paramapi.DescribeParametersOutput{
-			Parameters: []paramapi.ParameterMetadata{
-				{Name: lo.ToPtr("/app/config")},
-				{Name: lo.ToPtr("/app/secret")},
-			},
+		listParametersResult: []*model.ParameterListItem{
+			{Name: "/app/config", Metadata: model.AWSParameterListItemMeta{Type: "String"}},
+			{Name: "/app/secret", Metadata: model.AWSParameterListItemMeta{Type: "SecureString"}},
 		},
-		getParameterValue: map[string]string{
-			"/app/config": "config-value",
-			"/app/secret": "secret-value",
+		getParameterResult: map[string]*model.Parameter{
+			"/app/config": {Name: "/app/config", Value: "config-value"},
+			"/app/secret": {Name: "/app/secret", Value: "secret-value"},
 		},
 	}
 
@@ -236,16 +196,16 @@ func TestListUseCase_Execute_WithValue_PartialError(t *testing.T) {
 	t.Parallel()
 
 	client := &mockListClient{
-		describeResult: &paramapi.DescribeParametersOutput{
-			Parameters: []paramapi.ParameterMetadata{
-				{Name: lo.ToPtr("/app/config")},
-				{Name: lo.ToPtr("/app/invalid")},
-			},
+		listParametersResult: []*model.ParameterListItem{
+			{Name: "/app/config"},
+			{Name: "/app/invalid"},
 		},
-		getParameterValue: map[string]string{
-			"/app/config": "config-value",
+		getParameterResult: map[string]*model.Parameter{
+			"/app/config": {Name: "/app/config", Value: "config-value"},
 		},
-		invalidParameters: []string{"/app/invalid"},
+		getParameterErr: map[string]error{
+			"/app/invalid": errors.New("parameter not found"),
+		},
 	}
 
 	uc := &param.ListUseCase{Client: client}
@@ -266,7 +226,7 @@ func TestListUseCase_Execute_WithValue_PartialError(t *testing.T) {
 		case "/app/invalid":
 			assert.Nil(t, entry.Value)
 			require.Error(t, entry.Error)
-			assert.Contains(t, entry.Error.Error(), "parameter not found")
+			assert.Contains(t, entry.Error.Error(), "failed to get parameter")
 		default:
 			t.Errorf("unexpected entry: %s", entry.Name)
 		}
@@ -277,19 +237,10 @@ func TestListUseCase_Execute_WithPagination(t *testing.T) {
 	t.Parallel()
 
 	client := &mockListClient{
-		describeResults: []*paramapi.DescribeParametersOutput{
-			{
-				Parameters: []paramapi.ParameterMetadata{
-					{Name: lo.ToPtr("/app/p1")},
-					{Name: lo.ToPtr("/app/p2")},
-				},
-				NextToken: lo.ToPtr("token1"),
-			},
-			{
-				Parameters: []paramapi.ParameterMetadata{
-					{Name: lo.ToPtr("/app/p3")},
-				},
-			},
+		listParametersResult: []*model.ParameterListItem{
+			{Name: "/app/p1"},
+			{Name: "/app/p2"},
+			{Name: "/app/p3"},
 		},
 	}
 
@@ -307,45 +258,37 @@ func TestListUseCase_Execute_WithPagination_ContinueToken(t *testing.T) {
 	t.Parallel()
 
 	client := &mockListClient{
-		describeResults: []*paramapi.DescribeParametersOutput{
-			{
-				Parameters: []paramapi.ParameterMetadata{
-					{Name: lo.ToPtr("/app/p3")},
-					{Name: lo.ToPtr("/app/p4")},
-				},
-			},
+		listParametersResult: []*model.ParameterListItem{
+			{Name: "/app/p1"},
+			{Name: "/app/p2"},
+			{Name: "/app/p3"},
+			{Name: "/app/p4"},
 		},
 	}
 
 	uc := &param.ListUseCase{Client: client}
 
+	// Simulate continuation from /app/p2 (NextToken is the last item of previous page)
 	output, err := uc.Execute(t.Context(), param.ListInput{
 		MaxResults: 5,
-		NextToken:  "token1",
+		NextToken:  "/app/p2",
 	})
 	require.NoError(t, err)
-	assert.Len(t, output.Entries, 2)
+	assert.Len(t, output.Entries, 2) // p3 and p4
 	assert.Empty(t, output.NextToken)
+	assert.Equal(t, "/app/p3", output.Entries[0].Name)
+	assert.Equal(t, "/app/p4", output.Entries[1].Name)
 }
 
 func TestListUseCase_Execute_WithPagination_FilterApplied(t *testing.T) {
 	t.Parallel()
 
 	client := &mockListClient{
-		describeResults: []*paramapi.DescribeParametersOutput{
-			{
-				Parameters: []paramapi.ParameterMetadata{
-					{Name: lo.ToPtr("/app/config1")},
-					{Name: lo.ToPtr("/app/secret1")},
-					{Name: lo.ToPtr("/app/config2")},
-				},
-				NextToken: lo.ToPtr("token1"),
-			},
-			{
-				Parameters: []paramapi.ParameterMetadata{
-					{Name: lo.ToPtr("/app/config3")},
-				},
-			},
+		listParametersResult: []*model.ParameterListItem{
+			{Name: "/app/config1"},
+			{Name: "/app/secret1"},
+			{Name: "/app/config2"},
+			{Name: "/app/config3"},
 		},
 	}
 
@@ -367,7 +310,7 @@ func TestListUseCase_Execute_WithPagination_Error(t *testing.T) {
 	t.Parallel()
 
 	client := &mockListClient{
-		describeErr: errAWS,
+		listParametersErr: errAWS,
 	}
 
 	uc := &param.ListUseCase{Client: client}
@@ -376,24 +319,18 @@ func TestListUseCase_Execute_WithPagination_Error(t *testing.T) {
 		MaxResults: 10,
 	})
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to describe parameters")
+	assert.Contains(t, err.Error(), "failed to list parameters")
 }
 
 func TestListUseCase_Execute_WithPagination_TrimResults(t *testing.T) {
 	t.Parallel()
 
-	// Return more results than requested to trigger trimming
 	client := &mockListClient{
-		describeResults: []*paramapi.DescribeParametersOutput{
-			{
-				Parameters: []paramapi.ParameterMetadata{
-					{Name: lo.ToPtr("/app/p1")},
-					{Name: lo.ToPtr("/app/p2")},
-					{Name: lo.ToPtr("/app/p3")},
-					{Name: lo.ToPtr("/app/p4")},
-				},
-				NextToken: lo.ToPtr("token1"),
-			},
+		listParametersResult: []*model.ParameterListItem{
+			{Name: "/app/p1"},
+			{Name: "/app/p2"},
+			{Name: "/app/p3"},
+			{Name: "/app/p4"},
 		},
 	}
 
@@ -408,17 +345,15 @@ func TestListUseCase_Execute_WithPagination_TrimResults(t *testing.T) {
 	assert.Equal(t, "/app/p2", output.Entries[1].Name)
 }
 
-func TestListUseCase_Execute_WithValue_GetParametersError(t *testing.T) {
+func TestListUseCase_Execute_WithValue_GetParameterError(t *testing.T) {
 	t.Parallel()
 
 	client := &mockListClient{
-		describeResult: &paramapi.DescribeParametersOutput{
-			Parameters: []paramapi.ParameterMetadata{
-				{Name: lo.ToPtr("/app/param1")},
-				{Name: lo.ToPtr("/app/param2")},
-			},
+		listParametersResult: []*model.ParameterListItem{
+			{Name: "/app/param1"},
+			{Name: "/app/param2"},
 		},
-		getParametersErr: errAccessDenied,
+		getParameterGlobalErr: errAccessDenied,
 	}
 
 	uc := &param.ListUseCase{Client: client}
@@ -429,7 +364,7 @@ func TestListUseCase_Execute_WithValue_GetParametersError(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, output.Entries, 2)
 
-	// All entries should have errors since GetParameters failed
+	// All entries should have errors since GetParameter failed
 	for _, entry := range output.Entries {
 		assert.Nil(t, entry.Value)
 		require.Error(t, entry.Error)
@@ -440,24 +375,24 @@ func TestListUseCase_Execute_WithValue_GetParametersError(t *testing.T) {
 func TestListUseCase_Execute_WithValue_LargeBatch(t *testing.T) {
 	t.Parallel()
 
-	// Create 15 parameters to test batching (should split into 10 + 5)
+	// Create 15 parameters to test parallel execution
 	const numParams = 15
 
-	metadata := make([]paramapi.ParameterMetadata, numParams)
-
-	expectedValues := make(map[string]string, numParams)
+	items := make([]*model.ParameterListItem, numParams)
+	paramResults := make(map[string]*model.Parameter, numParams)
 
 	for i := range numParams {
 		name := fmt.Sprintf("/app/param%d", i)
-		metadata[i] = paramapi.ParameterMetadata{Name: lo.ToPtr(name)}
-		expectedValues[name] = fmt.Sprintf("value%d", i)
+		items[i] = &model.ParameterListItem{Name: name}
+		paramResults[name] = &model.Parameter{
+			Name:  name,
+			Value: fmt.Sprintf("value%d", i),
+		}
 	}
 
 	client := &mockListClient{
-		describeResult: &paramapi.DescribeParametersOutput{
-			Parameters: metadata,
-		},
-		getParameterValue: expectedValues,
+		listParametersResult: items,
+		getParameterResult:   paramResults,
 	}
 
 	uc := &param.ListUseCase{Client: client}
@@ -468,11 +403,13 @@ func TestListUseCase_Execute_WithValue_LargeBatch(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, output.Entries, numParams)
 
-	// Verify all entries have correct values (ensures batching works correctly)
+	// Verify all entries have correct values
 	for _, entry := range output.Entries {
 		require.NotNil(t, entry.Value, "entry %s should have value", entry.Name)
 		require.NoError(t, entry.Error, "entry %s should not have error", entry.Name)
-		assert.Equal(t, expectedValues[entry.Name], *entry.Value, "entry %s should have correct value", entry.Name)
+
+		expected := paramResults[entry.Name].Value
+		assert.Equal(t, expected, lo.FromPtr(entry.Value), "entry %s should have correct value", entry.Name)
 	}
 }
 
@@ -480,9 +417,7 @@ func TestListUseCase_Execute_WithValue_Empty(t *testing.T) {
 	t.Parallel()
 
 	client := &mockListClient{
-		describeResult: &paramapi.DescribeParametersOutput{
-			Parameters: []paramapi.ParameterMetadata{},
-		},
+		listParametersResult: []*model.ParameterListItem{},
 	}
 
 	uc := &param.ListUseCase{Client: client}

@@ -6,56 +6,57 @@ import (
 	"testing"
 	"time"
 
-	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/mpyw/suve/internal/api/secretapi"
+	"github.com/mpyw/suve/internal/model"
 	"github.com/mpyw/suve/internal/usecase/secret"
 	"github.com/mpyw/suve/internal/version/secretversion"
 )
 
 type mockDiffClient struct {
-	getSecretValueResults []*secretapi.GetSecretValueOutput
-	getSecretValueErrs    []error
-	getSecretValueCalls   int
-	listVersionsResult    *secretapi.ListSecretVersionIDsOutput
-	listVersionsErr       error
+	getSecretResults []*model.Secret
+	getSecretErrs    []error
+	getSecretCalls   int
+	versionsResult   []*model.SecretVersion
+	versionsErr      error
 }
 
-//nolint:lll // mock function signature must match AWS SDK interface
-func (m *mockDiffClient) GetSecretValue(_ context.Context, _ *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) {
-	idx := m.getSecretValueCalls
-	m.getSecretValueCalls++
+func (m *mockDiffClient) GetSecret(_ context.Context, _, _, _ string) (*model.Secret, error) {
+	idx := m.getSecretCalls
+	m.getSecretCalls++
 
-	if idx < len(m.getSecretValueErrs) && m.getSecretValueErrs[idx] != nil {
-		return nil, m.getSecretValueErrs[idx]
+	if idx < len(m.getSecretErrs) && m.getSecretErrs[idx] != nil {
+		return nil, m.getSecretErrs[idx]
 	}
 
-	if idx < len(m.getSecretValueResults) {
-		return m.getSecretValueResults[idx], nil
+	if idx < len(m.getSecretResults) {
+		return m.getSecretResults[idx], nil
 	}
 
-	return nil, errors.New("unexpected GetSecretValue call")
+	return nil, errors.New("unexpected GetSecret call")
 }
 
-//nolint:revive,stylecheck,lll // Method name must match AWS SDK interface
-func (m *mockDiffClient) ListSecretVersionIds(_ context.Context, _ *secretapi.ListSecretVersionIDsInput, _ ...func(*secretapi.Options)) (*secretapi.ListSecretVersionIDsOutput, error) {
-	if m.listVersionsErr != nil {
-		return nil, m.listVersionsErr
+func (m *mockDiffClient) GetSecretVersions(_ context.Context, _ string) ([]*model.SecretVersion, error) {
+	if m.versionsErr != nil {
+		return nil, m.versionsErr
 	}
 
-	return m.listVersionsResult, nil
+	return m.versionsResult, nil
+}
+
+func (m *mockDiffClient) ListSecrets(_ context.Context) ([]*model.SecretListItem, error) {
+	return nil, errors.New("not implemented")
 }
 
 func TestDiffUseCase_Execute(t *testing.T) {
 	t.Parallel()
 
-	// Specs without shift use GetSecretValue directly
+	// Specs without shift use GetSecret directly
 	client := &mockDiffClient{
-		getSecretValueResults: []*secretapi.GetSecretValueOutput{
-			{Name: lo.ToPtr("my-secret"), VersionId: lo.ToPtr("v1-id"), SecretString: lo.ToPtr("old-value")},
-			{Name: lo.ToPtr("my-secret"), VersionId: lo.ToPtr("v2-id"), SecretString: lo.ToPtr("new-value")},
+		getSecretResults: []*model.Secret{
+			{Name: "my-secret", Version: "v1-id", Value: "old-value"},
+			{Name: "my-secret", Version: "v2-id", Value: "new-value"},
 		},
 	}
 
@@ -81,7 +82,7 @@ func TestDiffUseCase_Execute_Spec1Error(t *testing.T) {
 	t.Parallel()
 
 	client := &mockDiffClient{
-		getSecretValueErrs: []error{errors.New("get secret error")},
+		getSecretErrs: []error{errors.New("get secret error")},
 	}
 
 	uc := &secret.DiffUseCase{Client: client}
@@ -100,10 +101,10 @@ func TestDiffUseCase_Execute_Spec2Error(t *testing.T) {
 	t.Parallel()
 
 	client := &mockDiffClient{
-		getSecretValueResults: []*secretapi.GetSecretValueOutput{
-			{Name: lo.ToPtr("my-secret"), VersionId: lo.ToPtr("v1-id"), SecretString: lo.ToPtr("old-value")},
+		getSecretResults: []*model.Secret{
+			{Name: "my-secret", Version: "v1-id", Value: "old-value"},
 		},
-		getSecretValueErrs: []error{nil, errors.New("second get secret error")},
+		getSecretErrs: []error{nil, errors.New("second get secret error")},
 	}
 
 	uc := &secret.DiffUseCase{Client: client}
@@ -121,11 +122,11 @@ func TestDiffUseCase_Execute_Spec2Error(t *testing.T) {
 func TestDiffUseCase_Execute_WithLabel(t *testing.T) {
 	t.Parallel()
 
-	// Specs with label use GetSecretValue directly
+	// Specs with label use GetSecret directly
 	client := &mockDiffClient{
-		getSecretValueResults: []*secretapi.GetSecretValueOutput{
-			{Name: lo.ToPtr("my-secret"), VersionId: lo.ToPtr("v1-id"), SecretString: lo.ToPtr("previous-value")},
-			{Name: lo.ToPtr("my-secret"), VersionId: lo.ToPtr("v2-id"), SecretString: lo.ToPtr("current-value")},
+		getSecretResults: []*model.Secret{
+			{Name: "my-secret", Version: "v1-id", Value: "previous-value"},
+			{Name: "my-secret", Version: "v2-id", Value: "current-value"},
 		},
 	}
 
@@ -147,18 +148,16 @@ func TestDiffUseCase_Execute_WithShift(t *testing.T) {
 	t.Parallel()
 
 	now := time.Now()
-	// Specs with shift use ListSecretVersionIds + GetSecretValue
+	// Specs with shift use GetSecretVersions + GetSecret
 	client := &mockDiffClient{
-		listVersionsResult: &secretapi.ListSecretVersionIDsOutput{
-			Versions: []secretapi.SecretVersionsListEntry{
-				{VersionId: lo.ToPtr("v1-id"), CreatedDate: lo.ToPtr(now.Add(-2 * time.Hour))},
-				{VersionId: lo.ToPtr("v2-id"), CreatedDate: lo.ToPtr(now.Add(-1 * time.Hour))},
-				{VersionId: lo.ToPtr("v3-id"), CreatedDate: lo.ToPtr(now)},
-			},
+		versionsResult: []*model.SecretVersion{
+			{Version: "v1-id", CreatedAt: ptrTime(now.Add(-2 * time.Hour))},
+			{Version: "v2-id", CreatedAt: ptrTime(now.Add(-1 * time.Hour))},
+			{Version: "v3-id", CreatedAt: ptrTime(now)},
 		},
-		getSecretValueResults: []*secretapi.GetSecretValueOutput{
-			{Name: lo.ToPtr("my-secret"), VersionId: lo.ToPtr("v1-id"), SecretString: lo.ToPtr("v1-value")},
-			{Name: lo.ToPtr("my-secret"), VersionId: lo.ToPtr("v2-id"), SecretString: lo.ToPtr("v2-value")},
+		getSecretResults: []*model.Secret{
+			{Name: "my-secret", Version: "v1-id", Value: "v1-value"},
+			{Name: "my-secret", Version: "v2-id", Value: "v2-value"},
 		},
 	}
 
@@ -176,4 +175,8 @@ func TestDiffUseCase_Execute_WithShift(t *testing.T) {
 	assert.Equal(t, "v1-value", output.OldValue)
 	assert.Equal(t, "v2-id", output.NewVersionID)
 	assert.Equal(t, "v2-value", output.NewValue)
+}
+
+func ptrTime(t time.Time) *time.Time {
+	return &t
 }

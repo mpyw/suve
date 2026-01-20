@@ -10,35 +10,35 @@ import (
 
 	"github.com/samber/lo"
 
-	"github.com/mpyw/suve/internal/api/secretapi"
+	"github.com/mpyw/suve/internal/model"
+	"github.com/mpyw/suve/internal/provider"
 )
 
 // Client is the interface for GetSecretWithVersion.
+// It requires SecretReader methods for version resolution.
 type Client interface {
-	secretapi.GetSecretValueAPI
-	secretapi.ListSecretVersionIDsAPI
+	provider.SecretReader
 }
 
 // GetSecretWithVersion retrieves a secret with version/shift/label support.
-func GetSecretWithVersion(ctx context.Context, client Client, spec *Spec) (*secretapi.GetSecretValueOutput, error) {
-	input := &secretapi.GetSecretValueInput{
-		SecretId: lo.ToPtr(spec.Name),
-	}
-
+func GetSecretWithVersion(ctx context.Context, client Client, spec *Spec) (*model.Secret, error) {
 	if spec.HasShift() {
 		return getSecretWithShift(ctx, client, spec)
 	}
 
 	// No shift: use ID or Label directly
+	versionID := ""
+	versionStage := ""
+
 	if spec.Absolute.ID != nil {
-		input.VersionId = spec.Absolute.ID
+		versionID = *spec.Absolute.ID
 	}
 
 	if spec.Absolute.Label != nil {
-		input.VersionStage = spec.Absolute.Label
+		versionStage = *spec.Absolute.Label
 	}
 
-	return client.GetSecretValue(ctx, input)
+	return client.GetSecret(ctx, spec.Name, versionID, versionStage)
 }
 
 // TruncateVersionID truncates a version ID to 8 characters for display.
@@ -56,69 +56,68 @@ func TruncateVersionID(id string) string {
 	return id
 }
 
-func getSecretWithShift(ctx context.Context, client Client, spec *Spec) (*secretapi.GetSecretValueOutput, error) {
-	versions, err := client.ListSecretVersionIds(ctx, &secretapi.ListSecretVersionIDsInput{
-		SecretId: lo.ToPtr(spec.Name),
-	})
+func getSecretWithShift(ctx context.Context, client Client, spec *Spec) (*model.Secret, error) {
+	versions, err := client.GetSecretVersions(ctx, spec.Name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list versions: %w", err)
 	}
 
-	versionList := versions.Versions
-	if len(versionList) == 0 {
+	if len(versions) == 0 {
 		return nil, fmt.Errorf("secret not found or has no versions: %s", spec.Name)
 	}
 
-	sort.Slice(versionList, func(i, j int) bool {
-		if versionList[i].CreatedDate == nil {
+	// Sort by CreatedDate descending (newest first)
+	sort.Slice(versions, func(i, j int) bool {
+		if versions[i].CreatedAt == nil {
 			return false
 		}
 
-		if versionList[j].CreatedDate == nil {
+		if versions[j].CreatedAt == nil {
 			return true
 		}
 
-		return versionList[i].CreatedDate.After(*versionList[j].CreatedDate)
+		return versions[i].CreatedAt.After(*versions[j].CreatedAt)
 	})
 
 	// Find base index
 	baseIdx := 0
 
 	var (
-		predicate func(secretapi.SecretVersionsListEntry) bool
+		predicate func(*model.SecretVersion) bool
 		errMsg    string
 		found     bool
 	)
 
 	switch {
 	case spec.Absolute.ID != nil:
-		predicate = func(v secretapi.SecretVersionsListEntry) bool {
-			return lo.FromPtr(v.VersionId) == *spec.Absolute.ID
+		predicate = func(v *model.SecretVersion) bool {
+			return v.Version == *spec.Absolute.ID
 		}
 		errMsg = fmt.Sprintf("version ID not found: %s", *spec.Absolute.ID)
 	case spec.Absolute.Label != nil:
-		predicate = func(v secretapi.SecretVersionsListEntry) bool {
-			return slices.Contains(v.VersionStages, *spec.Absolute.Label)
+		predicate = func(v *model.SecretVersion) bool {
+			if meta, ok := v.Metadata.(model.AWSSecretVersionMeta); ok {
+				return slices.Contains(meta.VersionStages, *spec.Absolute.Label)
+			}
+
+			return false
 		}
 		errMsg = fmt.Sprintf("version label not found: %s", *spec.Absolute.Label)
 	}
 
 	if predicate != nil {
-		_, baseIdx, found = lo.FindIndexOf(versionList, predicate)
+		_, baseIdx, found = lo.FindIndexOf(versions, predicate)
 		if !found {
 			return nil, errors.New(errMsg)
 		}
 	}
 
 	targetIdx := baseIdx + spec.Shift
-	if targetIdx >= len(versionList) {
+	if targetIdx >= len(versions) {
 		return nil, fmt.Errorf("version shift out of range: ~%d", spec.Shift)
 	}
 
-	targetVersion := versionList[targetIdx]
+	targetVersion := versions[targetIdx]
 
-	return client.GetSecretValue(ctx, &secretapi.GetSecretValueInput{
-		SecretId:  lo.ToPtr(spec.Name),
-		VersionId: targetVersion.VersionId,
-	})
+	return client.GetSecret(ctx, spec.Name, targetVersion.Version, "")
 }

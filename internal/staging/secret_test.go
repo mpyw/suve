@@ -23,6 +23,9 @@ type secretMockClient struct {
 	listSecretVersionIdsFunc func(
 		ctx context.Context, params *secretapi.ListSecretVersionIDsInput, optFns ...func(*secretapi.Options),
 	) (*secretapi.ListSecretVersionIDsOutput, error)
+	listSecretsFunc func(
+		ctx context.Context, params *secretapi.ListSecretsInput, optFns ...func(*secretapi.Options),
+	) (*secretapi.ListSecretsOutput, error)
 	createSecretFunc func(
 		ctx context.Context, params *secretapi.CreateSecretInput, optFns ...func(*secretapi.Options),
 	) (*secretapi.CreateSecretOutput, error)
@@ -32,6 +35,9 @@ type secretMockClient struct {
 	deleteSecretFunc func(
 		ctx context.Context, params *secretapi.DeleteSecretInput, optFns ...func(*secretapi.Options),
 	) (*secretapi.DeleteSecretOutput, error)
+	restoreSecretFunc func(
+		ctx context.Context, params *secretapi.RestoreSecretInput, optFns ...func(*secretapi.Options),
+	) (*secretapi.RestoreSecretOutput, error)
 	updateSecretFunc func(
 		ctx context.Context, params *secretapi.UpdateSecretInput, optFns ...func(*secretapi.Options),
 	) (*secretapi.UpdateSecretOutput, error)
@@ -67,6 +73,16 @@ func (m *secretMockClient) ListSecretVersionIds(
 	return nil, errors.New("ListSecretVersionIds not mocked")
 }
 
+func (m *secretMockClient) ListSecrets(
+	ctx context.Context, params *secretapi.ListSecretsInput, optFns ...func(*secretapi.Options),
+) (*secretapi.ListSecretsOutput, error) {
+	if m.listSecretsFunc != nil {
+		return m.listSecretsFunc(ctx, params, optFns...)
+	}
+
+	return &secretapi.ListSecretsOutput{}, nil
+}
+
 func (m *secretMockClient) CreateSecret(
 	ctx context.Context, params *secretapi.CreateSecretInput, optFns ...func(*secretapi.Options),
 ) (*secretapi.CreateSecretOutput, error) {
@@ -95,6 +111,16 @@ func (m *secretMockClient) DeleteSecret(
 	}
 
 	return nil, errors.New("DeleteSecret not mocked")
+}
+
+func (m *secretMockClient) RestoreSecret(
+	ctx context.Context, params *secretapi.RestoreSecretInput, optFns ...func(*secretapi.Options),
+) (*secretapi.RestoreSecretOutput, error) {
+	if m.restoreSecretFunc != nil {
+		return m.restoreSecretFunc(ctx, params, optFns...)
+	}
+
+	return &secretapi.RestoreSecretOutput{}, nil
 }
 
 func (m *secretMockClient) UpdateSecret(

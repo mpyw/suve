@@ -10,6 +10,8 @@ import (
 
 	"github.com/mpyw/suve/internal/api/secretapi"
 	"github.com/mpyw/suve/internal/infra"
+	"github.com/mpyw/suve/internal/provider"
+	awssecret "github.com/mpyw/suve/internal/provider/aws/secret"
 	"github.com/mpyw/suve/internal/tagging"
 	"github.com/mpyw/suve/internal/version/secretversion"
 )
@@ -18,9 +20,11 @@ import (
 type SecretClient interface {
 	secretapi.GetSecretValueAPI
 	secretapi.ListSecretVersionIDsAPI
+	secretapi.ListSecretsAPI
 	secretapi.CreateSecretAPI
 	secretapi.PutSecretValueAPI
 	secretapi.DeleteSecretAPI
+	secretapi.RestoreSecretAPI
 	secretapi.UpdateSecretAPI
 	secretapi.TagResourceAPI
 	secretapi.UntagResourceAPI
@@ -30,11 +34,18 @@ type SecretClient interface {
 // SecretStrategy implements ServiceStrategy for Secrets Manager.
 type SecretStrategy struct {
 	Client SecretClient
+	Reader provider.SecretReader // for version resolution
 }
 
 // NewSecretStrategy creates a new Secrets Manager strategy.
+// Reader is automatically created from client for version resolution.
 func NewSecretStrategy(client SecretClient) *SecretStrategy {
-	return &SecretStrategy{Client: client}
+	s := &SecretStrategy{Client: client}
+	if client != nil {
+		s.Reader = awssecret.New(client)
+	}
+
+	return s
 }
 
 // Service returns the service type.
@@ -181,15 +192,15 @@ func (s *SecretStrategy) FetchLastModified(ctx context.Context, name string) (ti
 func (s *SecretStrategy) FetchCurrent(ctx context.Context, name string) (*FetchResult, error) {
 	spec := &secretversion.Spec{Name: name}
 
-	secret, err := secretversion.GetSecretWithVersion(ctx, s.Client, spec)
+	secret, err := secretversion.GetSecretWithVersion(ctx, s.Reader, spec)
 	if err != nil {
 		return nil, err
 	}
 
-	versionID := secretversion.TruncateVersionID(lo.FromPtr(secret.VersionId))
+	versionID := secretversion.TruncateVersionID(secret.Version)
 
 	return &FetchResult{
-		Value:      lo.FromPtr(secret.SecretString),
+		Value:      secret.Value,
 		Identifier: "#" + versionID,
 	}, nil
 }
@@ -241,7 +252,7 @@ func (s *SecretStrategy) ParseName(input string) (string, error) {
 func (s *SecretStrategy) FetchCurrentValue(ctx context.Context, name string) (*EditFetchResult, error) {
 	spec := &secretversion.Spec{Name: name}
 
-	secret, err := secretversion.GetSecretWithVersion(ctx, s.Client, spec)
+	secret, err := secretversion.GetSecretWithVersion(ctx, s.Reader, spec)
 	if err != nil {
 		if rnf := (*secretapi.ResourceNotFoundException)(nil); errors.As(err, &rnf) {
 			return nil, &ResourceNotFoundError{Err: err}
@@ -251,10 +262,10 @@ func (s *SecretStrategy) FetchCurrentValue(ctx context.Context, name string) (*E
 	}
 
 	result := &EditFetchResult{
-		Value: lo.FromPtr(secret.SecretString),
+		Value: secret.Value,
 	}
-	if secret.CreatedDate != nil {
-		result.LastModified = *secret.CreatedDate
+	if secret.CreatedAt != nil {
+		result.LastModified = *secret.CreatedAt
 	}
 
 	return result, nil
@@ -279,24 +290,31 @@ func (s *SecretStrategy) FetchVersion(ctx context.Context, input string) (value 
 		return "", "", err
 	}
 
-	secret, err := secretversion.GetSecretWithVersion(ctx, s.Client, spec)
+	secret, err := secretversion.GetSecretWithVersion(ctx, s.Reader, spec)
 	if err != nil {
 		return "", "", err
 	}
 
-	versionID := secretversion.TruncateVersionID(lo.FromPtr(secret.VersionId))
+	versionID := secretversion.TruncateVersionID(secret.Version)
 
-	return lo.FromPtr(secret.SecretString), "#" + versionID, nil
+	return secret.Value, "#" + versionID, nil
 }
 
 // SecretFactory creates a FullStrategy with an initialized AWS client.
 func SecretFactory(ctx context.Context) (FullStrategy, error) {
+	// Create raw client for apply operations (secretapi interface)
 	client, err := infra.NewSecretClient(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize AWS client: %w", err)
 	}
 
-	return NewSecretStrategy(client), nil
+	// Create adapter for version resolution (provider interface)
+	adapter := awssecret.New(client)
+
+	return &SecretStrategy{
+		Client: client,
+		Reader: adapter,
+	}, nil
 }
 
 // SecretParserFactory creates a Parser without an AWS client.

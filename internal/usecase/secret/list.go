@@ -4,22 +4,25 @@ import (
 	"context"
 	"fmt"
 	"regexp"
+	"strings"
 
 	"github.com/samber/lo"
 
-	"github.com/mpyw/suve/internal/api/secretapi"
+	"github.com/mpyw/suve/internal/model"
 	"github.com/mpyw/suve/internal/parallel"
+	"github.com/mpyw/suve/internal/provider"
 )
 
 // ListClient is the interface for the list use case.
+//
+//nolint:iface // Intentional type alias for semantic clarity
 type ListClient interface {
-	secretapi.ListSecretsAPI
-	secretapi.GetSecretValueAPI
+	provider.SecretReader
 }
 
 // ListInput holds input for the list use case.
 type ListInput struct {
-	Prefix     string // AWS-side name filter (substring match)
+	Prefix     string // Prefix filter (client-side substring match)
 	Filter     string // Regex filter pattern (client-side)
 	WithValue  bool   // Include secret values
 	MaxResults int    // Max results per page (0 = all)
@@ -58,149 +61,129 @@ func (u *ListUseCase) Execute(ctx context.Context, input ListInput) (*ListOutput
 		}
 	}
 
-	// Build list input with optional prefix filter
-	listInput := &secretapi.ListSecretsInput{}
-	if input.Prefix != "" {
-		listInput.Filters = []secretapi.Filter{
-			{
-				Key:    secretapi.FilterNameStringTypeName,
-				Values: []string{input.Prefix},
-			},
-		}
+	// Fetch all secrets via provider interface
+	items, err := u.Client.ListSecrets(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list secrets: %w", err)
 	}
 
-	// Pagination mode: fetch one page at a time
-	if input.MaxResults > 0 {
-		return u.executeWithPagination(ctx, input, listInput, filterRegex)
-	}
+	// Apply filters
+	//nolint:prealloc // Can't pre-allocate when filtering
+	var filtered []*model.SecretListItem
 
-	// Non-pagination mode: fetch all pages
-	return u.executeAll(ctx, input, listInput, filterRegex)
-}
-
-// executeAll fetches all pages (original behavior).
-func (u *ListUseCase) executeAll(
-	ctx context.Context, input ListInput, listInput *secretapi.ListSecretsInput, filterRegex *regexp.Regexp,
-) (*ListOutput, error) {
-	var names []string
-
-	paginator := secretapi.NewListSecretsPaginator(u.Client, listInput)
-	for paginator.HasMorePages() {
-		page, err := paginator.NextPage(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("failed to list secrets: %w", err)
+	for _, item := range items {
+		// Apply prefix filter (substring match)
+		if input.Prefix != "" && !strings.Contains(item.Name, input.Prefix) {
+			continue
 		}
 
-		for _, s := range page.SecretList {
-			name := lo.FromPtr(s.Name)
-			if filterRegex != nil && !filterRegex.MatchString(name) {
-				continue
+		// Apply regex filter
+		if filterRegex != nil && !filterRegex.MatchString(item.Name) {
+			continue
+		}
+
+		filtered = append(filtered, item)
+	}
+
+	// Apply pagination (client-side since provider returns all)
+	startIndex := 0
+
+	if input.NextToken != "" {
+		// Find the index after the NextToken
+		for i, item := range filtered {
+			if item.Name == input.NextToken {
+				startIndex = i + 1
+
+				break
 			}
-
-			names = append(names, name)
 		}
 	}
 
-	return u.buildOutput(ctx, input.WithValue, names, "")
-}
-
-// executeWithPagination fetches pages until MaxResults is reached or no more pages.
-func (u *ListUseCase) executeWithPagination(
-	ctx context.Context, input ListInput, listInput *secretapi.ListSecretsInput, filterRegex *regexp.Regexp,
-) (*ListOutput, error) {
-	var names []string
-
-	nextToken := input.NextToken
-
-	// AWS ListSecrets max is 100, request more to account for filtering
-	const awsMaxResults int32 = 100
-
-	for {
-		// Set pagination params
-		listInput.MaxResults = lo.ToPtr(awsMaxResults)
-		if nextToken != "" {
-			listInput.NextToken = lo.ToPtr(nextToken)
-		} else {
-			listInput.NextToken = nil
-		}
-
-		page, err := u.Client.ListSecrets(ctx, listInput)
-		if err != nil {
-			return nil, fmt.Errorf("failed to list secrets: %w", err)
-		}
-
-		for _, s := range page.SecretList {
-			name := lo.FromPtr(s.Name)
-			if filterRegex != nil && !filterRegex.MatchString(name) {
-				continue
-			}
-
-			names = append(names, name)
-		}
-
-		// Update next token
-		nextToken = lo.FromPtr(page.NextToken)
-
-		// Check if we have enough results or no more pages
-		if len(names) >= input.MaxResults || nextToken == "" {
-			break
-		}
+	// Slice from start index
+	if startIndex > 0 && startIndex < len(filtered) {
+		filtered = filtered[startIndex:]
+	} else if startIndex >= len(filtered) {
+		filtered = nil
 	}
 
-	// Trim to MaxResults if we got more
-	outputNextToken := nextToken
-
-	if len(names) > input.MaxResults {
-		names = names[:input.MaxResults]
-		// Keep the nextToken so caller can fetch more
+	// Apply MaxResults limit
+	var nextToken string
+	if input.MaxResults > 0 && len(filtered) > input.MaxResults {
+		nextToken = filtered[input.MaxResults-1].Name
+		filtered = filtered[:input.MaxResults]
 	}
 
-	return u.buildOutput(ctx, input.WithValue, names, outputNextToken)
+	// Build output
+	return u.buildOutput(ctx, input.WithValue, filtered, nextToken)
 }
 
 // buildOutput creates the output with optional values.
-func (u *ListUseCase) buildOutput(ctx context.Context, withValue bool, names []string, nextToken string) (*ListOutput, error) {
+func (u *ListUseCase) buildOutput(
+	ctx context.Context, withValue bool, items []*model.SecretListItem, nextToken string,
+) (*ListOutput, error) {
 	output := &ListOutput{NextToken: nextToken}
 
 	// If values are not requested, return names only
 	if !withValue {
-		for _, name := range names {
-			output.Entries = append(output.Entries, ListEntry{Name: name})
+		for _, item := range items {
+			output.Entries = append(output.Entries, ListEntry{Name: item.Name})
 		}
 
 		return output, nil
 	}
 
-	// Fetch values in parallel
-	namesMap := make(map[string]struct{}, len(names))
-	for _, name := range names {
-		namesMap[name] = struct{}{}
-	}
-
-	results := parallel.ExecuteMap(ctx, namesMap, func(ctx context.Context, name string, _ struct{}) (string, error) {
-		out, err := u.Client.GetSecretValue(ctx, &secretapi.GetSecretValueInput{
-			SecretId: lo.ToPtr(name),
-		})
-		if err != nil {
-			return "", err
-		}
-
-		return lo.FromPtr(out.SecretString), nil
-	})
+	// Fetch values using parallel GetSecret calls
+	values, errs := u.fetchValues(ctx, items)
 
 	// Collect results in order
-	for _, name := range names {
-		result := results[name]
+	for _, item := range items {
+		entry := ListEntry{Name: item.Name}
 
-		entry := ListEntry{Name: name}
-		if result.Err != nil {
-			entry.Error = result.Err
-		} else {
-			entry.Value = lo.ToPtr(result.Value)
+		if err, hasErr := errs[item.Name]; hasErr {
+			entry.Error = err
+		} else if val, hasVal := values[item.Name]; hasVal {
+			entry.Value = lo.ToPtr(val)
 		}
 
 		output.Entries = append(output.Entries, entry)
 	}
 
 	return output, nil
+}
+
+// fetchValues fetches secret values in parallel using GetSecret.
+// Returns maps of name->value and name->error.
+func (u *ListUseCase) fetchValues(
+	ctx context.Context, items []*model.SecretListItem,
+) (map[string]string, map[string]error) {
+	if len(items) == 0 {
+		return nil, nil
+	}
+
+	// Create name map for parallel execution
+	nameMap := make(map[string]string, len(items))
+	for _, item := range items {
+		nameMap[item.Name] = item.Name
+	}
+
+	// Execute in parallel
+	results := parallel.ExecuteMap(ctx, nameMap, func(ctx context.Context, _ string, name string) (*model.Secret, error) {
+		return u.Client.GetSecret(ctx, name, "", "")
+	})
+
+	// Collect results
+	values := make(map[string]string)
+	errs := make(map[string]error)
+
+	for name, result := range results {
+		if result.Err != nil {
+			errs[name] = fmt.Errorf("failed to get secret: %w", result.Err)
+
+			continue
+		}
+
+		values[name] = result.Value.Value
+	}
+
+	return values, errs
 }

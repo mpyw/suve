@@ -3,8 +3,6 @@ package secret
 import (
 	"context"
 
-	"github.com/samber/lo"
-
 	"github.com/mpyw/suve/internal/version/secretversion"
 )
 
@@ -45,11 +43,11 @@ func (u *DiffUseCase) Execute(ctx context.Context, input DiffInput) (*DiffOutput
 	}
 
 	return &DiffOutput{
-		OldName:      lo.FromPtr(secret1.Name),
-		OldVersionID: lo.FromPtr(secret1.VersionId),
-		OldValue:     lo.FromPtr(secret1.SecretString),
-		NewName:      lo.FromPtr(secret2.Name),
-		NewVersionID: lo.FromPtr(secret2.VersionId),
-		NewValue:     lo.FromPtr(secret2.SecretString),
+		OldName:      secret1.Name,
+		OldVersionID: secret1.Version,
+		OldValue:     secret1.Value,
+		NewName:      secret2.Name,
+		NewVersionID: secret2.Version,
+		NewValue:     secret2.Value,
 	}, nil
 }
