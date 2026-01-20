@@ -9,9 +9,8 @@ import (
 
 	"github.com/urfave/cli/v3"
 
-	"github.com/mpyw/suve/internal/api/paramapi"
 	"github.com/mpyw/suve/internal/cli/output"
-	"github.com/mpyw/suve/internal/infra"
+	awsparam "github.com/mpyw/suve/internal/provider/aws/param"
 	"github.com/mpyw/suve/internal/usecase/param"
 )
 
@@ -92,13 +91,13 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		paramType = "SecureString"
 	}
 
-	client, err := infra.NewParamClient(ctx)
+	adapter, err := awsparam.NewAdapter(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to initialize AWS client: %w", err)
 	}
 
 	r := &Runner{
-		UseCase: &param.CreateUseCase{Client: client},
+		UseCase: &param.CreateUseCase{Client: adapter},
 		Stdout:  cmd.Root().Writer,
 		Stderr:  cmd.Root().ErrWriter,
 	}
@@ -116,7 +115,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 	result, err := r.UseCase.Execute(ctx, param.CreateInput{
 		Name:        opts.Name,
 		Value:       opts.Value,
-		Type:        paramapi.ParameterType(opts.Type),
+		Type:        opts.Type,
 		Description: opts.Description,
 	})
 	if err != nil {

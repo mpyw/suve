@@ -12,6 +12,7 @@ import (
 	"github.com/mpyw/suve/internal/cli/confirm"
 	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/infra"
+	awssecret "github.com/mpyw/suve/internal/provider/aws/secret"
 	"github.com/mpyw/suve/internal/usecase/secret"
 )
 
@@ -81,7 +82,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	name := cmd.Args().First()
 	skipConfirm := cmd.Bool("yes")
 
-	client, err := infra.NewSecretClient(ctx)
+	adapter, err := awssecret.NewAdapter(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to initialize AWS client: %w", err)
 	}
@@ -92,7 +93,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		identity, _ = infra.GetAWSIdentity(ctx)
 	}
 
-	uc := &secret.DeleteUseCase{Client: client}
+	uc := &secret.DeleteUseCase{Client: adapter}
 
 	// Show current value before confirming
 	if !skipConfirm {
@@ -142,9 +143,8 @@ func action(ctx context.Context, cmd *cli.Command) error {
 // Run executes the delete command.
 func (r *Runner) Run(ctx context.Context, opts Options) error {
 	result, err := r.UseCase.Execute(ctx, secret.DeleteInput{
-		Name:           opts.Name,
-		Force:          opts.Force,
-		RecoveryWindow: int64(opts.RecoveryWindow),
+		Name:  opts.Name,
+		Force: opts.Force,
 	})
 	if err != nil {
 		return err

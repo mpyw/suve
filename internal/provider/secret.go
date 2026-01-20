@@ -27,14 +27,14 @@ type SecretReader interface {
 // SecretWriter provides write access to secrets.
 type SecretWriter interface {
 	// CreateSecret creates a new secret.
-	CreateSecret(ctx context.Context, secret *model.Secret) error
+	CreateSecret(ctx context.Context, secret *model.Secret) (*model.SecretWriteResult, error)
 
 	// UpdateSecret updates the value of an existing secret.
-	UpdateSecret(ctx context.Context, name string, value string) error
+	UpdateSecret(ctx context.Context, name string, value string) (*model.SecretWriteResult, error)
 
 	// DeleteSecret deletes a secret.
 	// If forceDelete is true, immediately deletes without recovery window.
-	DeleteSecret(ctx context.Context, name string, forceDelete bool) error
+	DeleteSecret(ctx context.Context, name string, forceDelete bool) (*model.SecretDeleteResult, error)
 }
 
 // SecretTagger provides tag management for secrets.
@@ -66,7 +66,7 @@ type SecretService interface {
 // This is an optional interface for providers that support restoring deleted secrets.
 type SecretRestorer interface {
 	// RestoreSecret restores a previously deleted secret.
-	RestoreSecret(ctx context.Context, name string) error
+	RestoreSecret(ctx context.Context, name string) (*model.SecretRestoreResult, error)
 }
 
 // SecretDescriber provides secret metadata without the value.

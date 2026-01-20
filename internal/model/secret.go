@@ -202,3 +202,27 @@ type AWSSecretListItemMeta struct {
 	// DeletedDate is set if the secret is scheduled for deletion.
 	DeletedDate *time.Time
 }
+
+// ============================================================================
+// Write Result Types
+// ============================================================================
+
+// SecretWriteResult contains the result of a secret write operation.
+type SecretWriteResult struct {
+	Name    string
+	Version string
+	ARN     string
+}
+
+// SecretDeleteResult contains the result of a secret delete operation.
+type SecretDeleteResult struct {
+	Name         string
+	ARN          string
+	DeletionDate *time.Time
+}
+
+// SecretRestoreResult contains the result of a secret restore operation.
+type SecretRestoreResult struct {
+	Name string
+	ARN  string
+}

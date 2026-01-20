@@ -208,12 +208,12 @@ func (a *App) SecretLog(name string, maxResults int32) (*SecretLogResult, error)
 
 // SecretCreate creates a new secret.
 func (a *App) SecretCreate(name, value string) (*SecretCreateResult, error) {
-	client, err := a.getSecretClient()
+	adapter, err := awssecret.NewAdapter(a.ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	uc := &secret.CreateUseCase{Client: client}
+	uc := &secret.CreateUseCase{Client: adapter}
 
 	result, err := uc.Execute(a.ctx, secret.CreateInput{
 		Name:  name,
@@ -232,12 +232,12 @@ func (a *App) SecretCreate(name, value string) (*SecretCreateResult, error) {
 
 // SecretUpdate updates an existing secret.
 func (a *App) SecretUpdate(name, value string) (*SecretUpdateResult, error) {
-	client, err := a.getSecretClient()
+	adapter, err := awssecret.NewAdapter(a.ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	uc := &secret.UpdateUseCase{Client: client}
+	uc := &secret.UpdateUseCase{Client: adapter}
 
 	result, err := uc.Execute(a.ctx, secret.UpdateInput{
 		Name:  name,
@@ -256,12 +256,12 @@ func (a *App) SecretUpdate(name, value string) (*SecretUpdateResult, error) {
 
 // SecretDelete deletes a secret (with recovery window).
 func (a *App) SecretDelete(name string, force bool) (*SecretDeleteResult, error) {
-	client, err := a.getSecretClient()
+	adapter, err := awssecret.NewAdapter(a.ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	uc := &secret.DeleteUseCase{Client: client}
+	uc := &secret.DeleteUseCase{Client: adapter}
 
 	result, err := uc.Execute(a.ctx, secret.DeleteInput{
 		Name:  name,
@@ -351,12 +351,12 @@ func (a *App) SecretDiff(spec1Str, spec2Str string) (*SecretDiffResult, error) {
 
 // SecretRestore restores a deleted secret.
 func (a *App) SecretRestore(name string) (*SecretRestoreResult, error) {
-	client, err := a.getSecretClient()
+	adapter, err := awssecret.NewAdapter(a.ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	uc := &secret.RestoreUseCase{Client: client}
+	uc := &secret.RestoreUseCase{Client: adapter}
 
 	result, err := uc.Execute(a.ctx, secret.RestoreInput{Name: name})
 	if err != nil {

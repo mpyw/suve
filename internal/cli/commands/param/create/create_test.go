@@ -3,16 +3,15 @@ package create_test
 import (
 	"bytes"
 	"context"
-	"fmt"
+	"errors"
 	"testing"
 
-	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/mpyw/suve/internal/api/paramapi"
 	appcli "github.com/mpyw/suve/internal/cli/commands"
 	"github.com/mpyw/suve/internal/cli/commands/param/create"
+	"github.com/mpyw/suve/internal/model"
 	"github.com/mpyw/suve/internal/usecase/param"
 )
 
@@ -47,18 +46,16 @@ func TestCommand_Validation(t *testing.T) {
 	})
 }
 
-//nolint:lll // mock struct fields match AWS SDK interface signatures
 type mockClient struct {
-	putParameterFunc func(ctx context.Context, params *paramapi.PutParameterInput, optFns ...func(*paramapi.Options)) (*paramapi.PutParameterOutput, error)
+	putParameterFunc func(ctx context.Context, p *model.Parameter, overwrite bool) (*model.ParameterWriteResult, error)
 }
 
-//nolint:lll // mock function signature must match AWS SDK interface
-func (m *mockClient) PutParameter(ctx context.Context, params *paramapi.PutParameterInput, optFns ...func(*paramapi.Options)) (*paramapi.PutParameterOutput, error) {
+func (m *mockClient) PutParameter(ctx context.Context, p *model.Parameter, overwrite bool) (*model.ParameterWriteResult, error) {
 	if m.putParameterFunc != nil {
-		return m.putParameterFunc(ctx, params, optFns...)
+		return m.putParameterFunc(ctx, p, overwrite)
 	}
 
-	return nil, fmt.Errorf("PutParameter not mocked")
+	return nil, errors.New("PutParameter not mocked")
 }
 
 func TestRun(t *testing.T) {
@@ -79,15 +76,19 @@ func TestRun(t *testing.T) {
 				Type:  "SecureString",
 			},
 			mock: &mockClient{
-				//nolint:lll // inline mock function in test table
-				putParameterFunc: func(_ context.Context, params *paramapi.PutParameterInput, _ ...func(*paramapi.Options)) (*paramapi.PutParameterOutput, error) {
-					assert.Equal(t, "/app/param", lo.FromPtr(params.Name))
-					assert.Equal(t, "test-value", lo.FromPtr(params.Value))
-					assert.Equal(t, paramapi.ParameterTypeSecureString, params.Type)
-					assert.False(t, lo.FromPtr(params.Overwrite))
+				putParameterFunc: func(_ context.Context, p *model.Parameter, overwrite bool) (*model.ParameterWriteResult, error) {
+					assert.Equal(t, "/app/param", p.Name)
+					assert.Equal(t, "test-value", p.Value)
 
-					return &paramapi.PutParameterOutput{
-						Version: 1,
+					if meta := p.AWSMeta(); meta != nil {
+						assert.Equal(t, "SecureString", meta.Type)
+					}
+
+					assert.False(t, overwrite)
+
+					return &model.ParameterWriteResult{
+						Name:    "/app/param",
+						Version: "1",
 					}, nil
 				},
 			},
@@ -107,13 +108,13 @@ func TestRun(t *testing.T) {
 				Description: "Test description",
 			},
 			mock: &mockClient{
-				//nolint:lll // inline mock function in test table
-				putParameterFunc: func(_ context.Context, params *paramapi.PutParameterInput, _ ...func(*paramapi.Options)) (*paramapi.PutParameterOutput, error) {
-					assert.Equal(t, "Test description", lo.FromPtr(params.Description))
-					assert.False(t, lo.FromPtr(params.Overwrite))
+				putParameterFunc: func(_ context.Context, p *model.Parameter, overwrite bool) (*model.ParameterWriteResult, error) {
+					assert.Equal(t, "Test description", p.Description)
+					assert.False(t, overwrite)
 
-					return &paramapi.PutParameterOutput{
-						Version: 1,
+					return &model.ParameterWriteResult{
+						Name:    "/app/param",
+						Version: "1",
 					}, nil
 				},
 			},
@@ -123,8 +124,8 @@ func TestRun(t *testing.T) {
 			opts:    create.Options{Name: "/app/param", Value: "test-value", Type: "String"},
 			wantErr: "failed to create parameter",
 			mock: &mockClient{
-				putParameterFunc: func(_ context.Context, _ *paramapi.PutParameterInput, _ ...func(*paramapi.Options)) (*paramapi.PutParameterOutput, error) {
-					return nil, &paramapi.ParameterAlreadyExists{Message: lo.ToPtr("already exists")}
+				putParameterFunc: func(_ context.Context, _ *model.Parameter, _ bool) (*model.ParameterWriteResult, error) {
+					return nil, errors.New("parameter already exists")
 				},
 			},
 		},
@@ -133,8 +134,8 @@ func TestRun(t *testing.T) {
 			opts:    create.Options{Name: "/app/param", Value: "test-value", Type: "String"},
 			wantErr: "failed to create parameter",
 			mock: &mockClient{
-				putParameterFunc: func(_ context.Context, _ *paramapi.PutParameterInput, _ ...func(*paramapi.Options)) (*paramapi.PutParameterOutput, error) {
-					return nil, fmt.Errorf("AWS error")
+				putParameterFunc: func(_ context.Context, _ *model.Parameter, _ bool) (*model.ParameterWriteResult, error) {
+					return nil, errors.New("AWS error")
 				},
 			},
 		},

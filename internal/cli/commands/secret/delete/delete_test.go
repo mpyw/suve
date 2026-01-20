@@ -3,17 +3,16 @@ package delete_test
 import (
 	"bytes"
 	"context"
-	"fmt"
+	"errors"
 	"testing"
 	"time"
 
-	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/mpyw/suve/internal/api/secretapi"
 	appcli "github.com/mpyw/suve/internal/cli/commands"
 	"github.com/mpyw/suve/internal/cli/commands/secret/delete"
+	"github.com/mpyw/suve/internal/model"
 	"github.com/mpyw/suve/internal/usecase/secret"
 )
 
@@ -31,28 +30,24 @@ func TestCommand_Validation(t *testing.T) {
 }
 
 type mockClient struct {
-	//nolint:lll // mock function signature
-	getSecretValueFunc func(ctx context.Context, params *secretapi.GetSecretValueInput, optFns ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error)
-	//nolint:lll // mock function signature
-	deleteSecretFunc func(ctx context.Context, params *secretapi.DeleteSecretInput, optFns ...func(*secretapi.Options)) (*secretapi.DeleteSecretOutput, error)
+	getSecretFunc    func(ctx context.Context, name string, versionID string, versionStage string) (*model.Secret, error)
+	deleteSecretFunc func(ctx context.Context, name string, forceDelete bool) (*model.SecretDeleteResult, error)
 }
 
-//nolint:lll // mock function signature
-func (m *mockClient) GetSecretValue(ctx context.Context, params *secretapi.GetSecretValueInput, optFns ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) {
-	if m.getSecretValueFunc != nil {
-		return m.getSecretValueFunc(ctx, params, optFns...)
+func (m *mockClient) GetSecret(ctx context.Context, name string, versionID string, versionStage string) (*model.Secret, error) {
+	if m.getSecretFunc != nil {
+		return m.getSecretFunc(ctx, name, versionID, versionStage)
 	}
 
-	return nil, &secretapi.ResourceNotFoundException{Message: lo.ToPtr("not found")}
+	return nil, errors.New("not found")
 }
 
-//nolint:lll // mock function signature
-func (m *mockClient) DeleteSecret(ctx context.Context, params *secretapi.DeleteSecretInput, optFns ...func(*secretapi.Options)) (*secretapi.DeleteSecretOutput, error) {
+func (m *mockClient) DeleteSecret(ctx context.Context, name string, forceDelete bool) (*model.SecretDeleteResult, error) {
 	if m.deleteSecretFunc != nil {
-		return m.deleteSecretFunc(ctx, params, optFns...)
+		return m.deleteSecretFunc(ctx, name, forceDelete)
 	}
 
-	return nil, fmt.Errorf("DeleteSecret not mocked")
+	return nil, errors.New("DeleteSecret not mocked")
 }
 
 func TestRun(t *testing.T) {
@@ -72,13 +67,12 @@ func TestRun(t *testing.T) {
 			name: "delete with recovery window",
 			opts: delete.Options{Name: "my-secret", Force: false, RecoveryWindow: 30},
 			mock: &mockClient{
-				//nolint:lll // mock function signature
-				deleteSecretFunc: func(_ context.Context, params *secretapi.DeleteSecretInput, _ ...func(*secretapi.Options)) (*secretapi.DeleteSecretOutput, error) {
-					assert.False(t, lo.FromPtr(params.ForceDeleteWithoutRecovery), "expected ForceDeleteWithoutRecovery to be false")
-					assert.Equal(t, int64(30), lo.FromPtr(params.RecoveryWindowInDays))
+				deleteSecretFunc: func(_ context.Context, name string, forceDelete bool) (*model.SecretDeleteResult, error) {
+					assert.Equal(t, "my-secret", name)
+					assert.False(t, forceDelete)
 
-					return &secretapi.DeleteSecretOutput{
-						Name:         lo.ToPtr("my-secret"),
+					return &model.SecretDeleteResult{
+						Name:         "my-secret",
 						DeletionDate: &deletionDate,
 					}, nil
 				},
@@ -93,12 +87,12 @@ func TestRun(t *testing.T) {
 			name: "force delete",
 			opts: delete.Options{Name: "my-secret", Force: true},
 			mock: &mockClient{
-				//nolint:lll // mock function signature
-				deleteSecretFunc: func(_ context.Context, params *secretapi.DeleteSecretInput, _ ...func(*secretapi.Options)) (*secretapi.DeleteSecretOutput, error) {
-					assert.True(t, lo.FromPtr(params.ForceDeleteWithoutRecovery), "expected ForceDeleteWithoutRecovery to be true")
+				deleteSecretFunc: func(_ context.Context, name string, forceDelete bool) (*model.SecretDeleteResult, error) {
+					assert.Equal(t, "my-secret", name)
+					assert.True(t, forceDelete)
 
-					return &secretapi.DeleteSecretOutput{
-						Name: lo.ToPtr("my-secret"),
+					return &model.SecretDeleteResult{
+						Name: "my-secret",
 					}, nil
 				},
 			},
@@ -111,8 +105,8 @@ func TestRun(t *testing.T) {
 			name: "error from AWS",
 			opts: delete.Options{Name: "my-secret"},
 			mock: &mockClient{
-				deleteSecretFunc: func(_ context.Context, _ *secretapi.DeleteSecretInput, _ ...func(*secretapi.Options)) (*secretapi.DeleteSecretOutput, error) {
-					return nil, fmt.Errorf("AWS error")
+				deleteSecretFunc: func(_ context.Context, _ string, _ bool) (*model.SecretDeleteResult, error) {
+					return nil, errors.New("AWS error")
 				},
 			},
 			wantErr: true,

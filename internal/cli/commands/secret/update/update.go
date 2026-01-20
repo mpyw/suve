@@ -12,6 +12,7 @@ import (
 	"github.com/mpyw/suve/internal/cli/confirm"
 	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/infra"
+	awssecret "github.com/mpyw/suve/internal/provider/aws/secret"
 	"github.com/mpyw/suve/internal/usecase/secret"
 )
 
@@ -69,12 +70,12 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	name := cmd.Args().Get(0)
 	skipConfirm := cmd.Bool("yes")
 
-	client, err := infra.NewSecretClient(ctx)
+	adapter, err := awssecret.NewAdapter(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to initialize AWS client: %w", err)
 	}
 
-	uc := &secret.UpdateUseCase{Client: client}
+	uc := &secret.UpdateUseCase{Client: adapter}
 	newValue := cmd.Args().Get(1)
 
 	// Fetch current value and show diff before confirming
@@ -125,9 +126,8 @@ func action(ctx context.Context, cmd *cli.Command) error {
 // Run executes the update command.
 func (r *Runner) Run(ctx context.Context, opts Options) error {
 	result, err := r.UseCase.Execute(ctx, secret.UpdateInput{
-		Name:        opts.Name,
-		Value:       opts.Value,
-		Description: opts.Description,
+		Name:  opts.Name,
+		Value: opts.Value,
 	})
 	if err != nil {
 		return err

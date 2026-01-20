@@ -243,18 +243,18 @@ func (a *App) ParamDiff(spec1Str, spec2Str string) (*ParamDiffResult, error) {
 // ParamSet creates or updates a parameter.
 // It first tries to create the parameter; if it already exists, it updates instead.
 func (a *App) ParamSet(name, value, paramType string) (*ParamSetResult, error) {
-	client, err := a.getParamClient()
+	adapter, err := awsparam.NewAdapter(a.ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	// Try to create first
-	createUC := &param.CreateUseCase{Client: client}
+	createUC := &param.CreateUseCase{Client: adapter}
 
 	createResult, err := createUC.Execute(a.ctx, param.CreateInput{
 		Name:  name,
 		Value: value,
-		Type:  paramapi.ParameterType(paramType),
+		Type:  paramType,
 	})
 	if err == nil {
 		return &ParamSetResult{
@@ -265,13 +265,14 @@ func (a *App) ParamSet(name, value, paramType string) (*ParamSetResult, error) {
 	}
 
 	// If parameter already exists, update it
-	if pae := (*paramapi.ParameterAlreadyExists)(nil); errors.As(err, &pae) {
-		updateUC := &param.UpdateUseCase{Client: client}
+	var pae *paramapi.ParameterAlreadyExists
+	if errors.As(err, &pae) {
+		updateUC := &param.UpdateUseCase{Client: adapter}
 
 		updateResult, err := updateUC.Execute(a.ctx, param.UpdateInput{
 			Name:  name,
 			Value: value,
-			Type:  paramapi.ParameterType(paramType),
+			Type:  paramType,
 		})
 		if err != nil {
 			return nil, err
@@ -289,12 +290,12 @@ func (a *App) ParamSet(name, value, paramType string) (*ParamSetResult, error) {
 
 // ParamDelete deletes a parameter.
 func (a *App) ParamDelete(name string) (*ParamDeleteResult, error) {
-	client, err := a.getParamClient()
+	adapter, err := awsparam.NewAdapter(a.ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	uc := &param.DeleteUseCase{Client: client}
+	uc := &param.DeleteUseCase{Client: adapter}
 
 	result, err := uc.Execute(a.ctx, param.DeleteInput{Name: name})
 	if err != nil {

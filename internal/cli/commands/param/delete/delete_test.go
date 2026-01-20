@@ -3,15 +3,15 @@ package delete_test
 import (
 	"bytes"
 	"context"
-	"fmt"
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/mpyw/suve/internal/api/paramapi"
 	appcli "github.com/mpyw/suve/internal/cli/commands"
 	"github.com/mpyw/suve/internal/cli/commands/param/delete"
+	"github.com/mpyw/suve/internal/model"
 	"github.com/mpyw/suve/internal/usecase/param"
 )
 
@@ -28,28 +28,25 @@ func TestCommand_Validation(t *testing.T) {
 	})
 }
 
-//nolint:lll // mock struct fields match AWS SDK interface signatures
 type mockClient struct {
-	deleteParameterFunc func(ctx context.Context, params *paramapi.DeleteParameterInput, optFns ...func(*paramapi.Options)) (*paramapi.DeleteParameterOutput, error)
-	getParameterFunc    func(ctx context.Context, params *paramapi.GetParameterInput, optFns ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error)
+	deleteParameterFunc func(ctx context.Context, name string) error
+	getParameterFunc    func(ctx context.Context, name string, version string) (*model.Parameter, error)
 }
 
-//nolint:lll // mock function signature must match AWS SDK interface
-func (m *mockClient) DeleteParameter(ctx context.Context, params *paramapi.DeleteParameterInput, optFns ...func(*paramapi.Options)) (*paramapi.DeleteParameterOutput, error) {
+func (m *mockClient) DeleteParameter(ctx context.Context, name string) error {
 	if m.deleteParameterFunc != nil {
-		return m.deleteParameterFunc(ctx, params, optFns...)
+		return m.deleteParameterFunc(ctx, name)
 	}
 
-	return nil, fmt.Errorf("DeleteParameter not mocked")
+	return errors.New("DeleteParameter not mocked")
 }
 
-//nolint:lll // mock function signature must match AWS SDK interface
-func (m *mockClient) GetParameter(ctx context.Context, params *paramapi.GetParameterInput, optFns ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
+func (m *mockClient) GetParameter(ctx context.Context, name string, version string) (*model.Parameter, error) {
 	if m.getParameterFunc != nil {
-		return m.getParameterFunc(ctx, params, optFns...)
+		return m.getParameterFunc(ctx, name, version)
 	}
 
-	return nil, &paramapi.ParameterNotFound{}
+	return nil, errors.New("not found")
 }
 
 func TestRun(t *testing.T) {
@@ -65,9 +62,8 @@ func TestRun(t *testing.T) {
 			name: "delete parameter",
 			opts: delete.Options{Name: "/app/param"},
 			mock: &mockClient{
-				//nolint:lll // inline mock
-				deleteParameterFunc: func(_ context.Context, _ *paramapi.DeleteParameterInput, _ ...func(*paramapi.Options)) (*paramapi.DeleteParameterOutput, error) {
-					return &paramapi.DeleteParameterOutput{}, nil
+				deleteParameterFunc: func(_ context.Context, _ string) error {
+					return nil
 				},
 			},
 			check: func(t *testing.T, output string) {
@@ -80,9 +76,8 @@ func TestRun(t *testing.T) {
 			name: "error from AWS",
 			opts: delete.Options{Name: "/app/param"},
 			mock: &mockClient{
-				//nolint:lll // inline mock
-				deleteParameterFunc: func(_ context.Context, _ *paramapi.DeleteParameterInput, _ ...func(*paramapi.Options)) (*paramapi.DeleteParameterOutput, error) {
-					return nil, fmt.Errorf("AWS error")
+				deleteParameterFunc: func(_ context.Context, _ string) error {
+					return errors.New("AWS error")
 				},
 			},
 			wantErr: true,

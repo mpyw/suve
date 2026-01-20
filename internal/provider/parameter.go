@@ -29,7 +29,7 @@ type ParameterReader interface {
 type ParameterWriter interface {
 	// PutParameter creates or updates a parameter.
 	// If overwrite is false and the parameter exists, returns an error.
-	PutParameter(ctx context.Context, param *model.Parameter, overwrite bool) error
+	PutParameter(ctx context.Context, param *model.Parameter, overwrite bool) (*model.ParameterWriteResult, error)
 
 	// DeleteParameter deletes a parameter by name.
 	DeleteParameter(ctx context.Context, name string) error

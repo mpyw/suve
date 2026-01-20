@@ -5,21 +5,19 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/mpyw/suve/internal/api/secretapi"
+	"github.com/mpyw/suve/internal/model"
 	"github.com/mpyw/suve/internal/usecase/secret"
 )
 
 type mockCreateClient struct {
-	createResult *secretapi.CreateSecretOutput
+	createResult *model.SecretWriteResult
 	createErr    error
 }
 
-//nolint:lll // mock function signature must match AWS SDK interface
-func (m *mockCreateClient) CreateSecret(_ context.Context, _ *secretapi.CreateSecretInput, _ ...func(*secretapi.Options)) (*secretapi.CreateSecretOutput, error) {
+func (m *mockCreateClient) CreateSecret(_ context.Context, _ *model.Secret) (*model.SecretWriteResult, error) {
 	if m.createErr != nil {
 		return nil, m.createErr
 	}
@@ -31,10 +29,10 @@ func TestCreateUseCase_Execute(t *testing.T) {
 	t.Parallel()
 
 	client := &mockCreateClient{
-		createResult: &secretapi.CreateSecretOutput{
-			Name:      lo.ToPtr("my-secret"),
-			VersionId: lo.ToPtr("abc123"),
-			ARN:       lo.ToPtr("arn:aws:secretsmanager:us-east-1:123456789012:secret:my-secret"),
+		createResult: &model.SecretWriteResult{
+			Name:    "my-secret",
+			Version: "abc123",
+			ARN:     "arn:aws:secretsmanager:us-east-1:123456789012:secret:my-secret",
 		},
 	}
 
@@ -54,10 +52,10 @@ func TestCreateUseCase_Execute_WithDescription(t *testing.T) {
 	t.Parallel()
 
 	client := &mockCreateClient{
-		createResult: &secretapi.CreateSecretOutput{
-			Name:      lo.ToPtr("my-secret"),
-			VersionId: lo.ToPtr("abc123"),
-			ARN:       lo.ToPtr("arn:aws:secretsmanager:us-east-1:123456789012:secret:my-secret"),
+		createResult: &model.SecretWriteResult{
+			Name:    "my-secret",
+			Version: "abc123",
+			ARN:     "arn:aws:secretsmanager:us-east-1:123456789012:secret:my-secret",
 		},
 	}
 
