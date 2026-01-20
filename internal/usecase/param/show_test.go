@@ -73,10 +73,10 @@ func TestShowUseCase_Execute(t *testing.T) {
 	now := time.Now()
 	client := &mockShowClient{
 		getParameterResult: &model.Parameter{
-			Name:         "/app/config",
-			Value:        "secret-value",
-			Version:      "5",
-			LastModified: &now,
+			Name:      "/app/config",
+			Value:     "secret-value",
+			Version:   "5",
+			UpdatedAt: &now,
 			Metadata: model.AWSParameterMeta{
 				Type: "SecureString",
 			},
@@ -96,7 +96,7 @@ func TestShowUseCase_Execute(t *testing.T) {
 	assert.Equal(t, "secret-value", output.Value)
 	assert.Equal(t, "5", output.Version)
 	assert.Equal(t, "SecureString", output.Type)
-	assert.NotNil(t, output.LastModified)
+	assert.NotNil(t, output.UpdatedAt)
 }
 
 func TestShowUseCase_Execute_WithVersion(t *testing.T) {
@@ -175,7 +175,7 @@ func TestShowUseCase_Execute_Error(t *testing.T) {
 	require.Error(t, err)
 }
 
-func TestShowUseCase_Execute_NoLastModified(t *testing.T) {
+func TestShowUseCase_Execute_NoUpdatedAt(t *testing.T) {
 	t.Parallel()
 
 	client := &mockShowClient{
@@ -198,7 +198,7 @@ func TestShowUseCase_Execute_NoLastModified(t *testing.T) {
 		Spec: spec,
 	})
 	require.NoError(t, err)
-	assert.Nil(t, output.LastModified)
+	assert.Nil(t, output.UpdatedAt)
 }
 
 func TestShowUseCase_Execute_WithTags(t *testing.T) {

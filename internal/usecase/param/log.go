@@ -4,16 +4,16 @@ import (
 	"context"
 	"fmt"
 	"slices"
+	"strconv"
 	"time"
 
-	"github.com/samber/lo"
-
-	"github.com/mpyw/suve/internal/api/paramapi"
+	"github.com/mpyw/suve/internal/model"
+	"github.com/mpyw/suve/internal/provider"
 )
 
 // LogClient is the interface for the log use case.
 type LogClient interface {
-	paramapi.GetParameterHistoryAPI
+	provider.ParameterReader
 }
 
 // LogInput holds input for the log use case.
@@ -27,11 +27,11 @@ type LogInput struct {
 
 // LogEntry represents a single version entry.
 type LogEntry struct {
-	Version      int64
-	Type         paramapi.ParameterType
-	Value        string
-	LastModified *time.Time
-	IsCurrent    bool
+	Version   string
+	Type      string // Parameter type (e.g., "String", "SecureString")
+	Value     string
+	UpdatedAt *time.Time
+	IsCurrent bool
 }
 
 // LogOutput holds the result of the log use case.
@@ -47,63 +47,97 @@ type LogUseCase struct {
 
 // Execute runs the log use case.
 func (u *LogUseCase) Execute(ctx context.Context, input LogInput) (*LogOutput, error) {
-	result, err := u.Client.GetParameterHistory(ctx, &paramapi.GetParameterHistoryInput{
-		Name:           lo.ToPtr(input.Name),
-		WithDecryption: lo.ToPtr(true),
-		MaxResults:     lo.ToPtr(input.MaxResults),
-	})
+	history, err := u.Client.GetParameterHistory(ctx, input.Name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get parameter history: %w", err)
 	}
 
-	params := result.Parameters
+	params := history.Parameters
 	if len(params) == 0 {
 		return &LogOutput{Name: input.Name}, nil
 	}
 
-	// Find max version using lo.MaxBy
-	maxVersion := lo.MaxBy(params, func(a, b paramapi.ParameterHistory) bool {
-		return a.Version > b.Version
-	}).Version
+	// Find max version for IsCurrent flag
+	maxVersion := findMaxVersion(params)
 
-	// Apply date filters using lo.Filter
-	filtered := lo.Filter(params, func(h paramapi.ParameterHistory, _ int) bool {
-		// Skip entries without LastModifiedDate when date filters are applied
-		if input.Since != nil || input.Until != nil {
-			if h.LastModifiedDate == nil {
-				return false
-			}
+	// Apply date filters
+	filtered := filterByDate(params, input.Since, input.Until)
 
-			if input.Since != nil && h.LastModifiedDate.Before(*input.Since) {
-				return false
-			}
-
-			if input.Until != nil && h.LastModifiedDate.After(*input.Until) {
-				return false
-			}
+	// Convert to entries
+	entries := make([]LogEntry, len(filtered))
+	for i, p := range filtered {
+		entry := LogEntry{
+			Version:   p.Version,
+			Value:     p.Value,
+			UpdatedAt: p.UpdatedAt,
+			IsCurrent: p.Version == maxVersion,
 		}
 
-		return true
-	})
-
-	// Convert to entries using lo.Map
-	entries := lo.Map(filtered, func(h paramapi.ParameterHistory, _ int) LogEntry {
-		return LogEntry{
-			Version:      h.Version,
-			Type:         h.Type,
-			Value:        lo.FromPtr(h.Value),
-			LastModified: h.LastModifiedDate,
-			IsCurrent:    h.Version == maxVersion,
+		// Extract Type from AWS metadata if available
+		if meta := p.AWSMeta(); meta != nil {
+			entry.Type = meta.Type
 		}
-	})
+
+		entries[i] = entry
+	}
 
 	// AWS returns oldest first; reverse to show newest first (unless --reverse)
 	if !input.Reverse {
 		slices.Reverse(entries)
 	}
 
+	// Apply MaxResults limit after sorting
+	if input.MaxResults > 0 && len(entries) > int(input.MaxResults) {
+		entries = entries[:input.MaxResults]
+	}
+
 	return &LogOutput{
 		Name:    input.Name,
 		Entries: entries,
 	}, nil
+}
+
+// findMaxVersion returns the maximum version string from the parameters.
+func findMaxVersion(params []*model.Parameter) string {
+	maxVersion := ""
+	maxVersionNum := int64(-1)
+
+	for _, p := range params {
+		if v, err := strconv.ParseInt(p.Version, 10, 64); err == nil {
+			if v > maxVersionNum {
+				maxVersionNum = v
+				maxVersion = p.Version
+			}
+		}
+	}
+
+	return maxVersion
+}
+
+// filterByDate filters parameters by modification date range.
+func filterByDate(params []*model.Parameter, since, until *time.Time) []*model.Parameter {
+	if since == nil && until == nil {
+		return params
+	}
+
+	filtered := make([]*model.Parameter, 0, len(params))
+
+	for _, p := range params {
+		// Skip entries without LastModified when date filters are applied
+		if p.UpdatedAt == nil {
+			continue
+		}
+
+		if since != nil && p.UpdatedAt.Before(*since) {
+			continue
+		}
+
+		if until != nil && p.UpdatedAt.After(*until) {
+			continue
+		}
+
+		filtered = append(filtered, p)
+	}
+
+	return filtered
 }

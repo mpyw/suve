@@ -10,25 +10,27 @@ import "time"
 // TypedParameter is a parameter with provider-specific metadata.
 // This type is used at the Provider layer for type-safe access to metadata.
 type TypedParameter[M any] struct {
-	Name         string
-	Value        string
-	Version      string
-	Description  string
-	LastModified *time.Time
-	Tags         map[string]string
-	Metadata     M
+	Name        string
+	Value       string
+	Version     string
+	Description string
+	CreatedAt   *time.Time
+	UpdatedAt   *time.Time
+	Tags        map[string]string
+	Metadata    M
 }
 
 // ToBase converts to a UseCase layer type.
 func (p *TypedParameter[M]) ToBase() *Parameter {
 	return &Parameter{
-		Name:         p.Name,
-		Value:        p.Value,
-		Version:      p.Version,
-		Description:  p.Description,
-		LastModified: p.LastModified,
-		Tags:         p.Tags,
-		Metadata:     p.Metadata,
+		Name:        p.Name,
+		Value:       p.Value,
+		Version:     p.Version,
+		Description: p.Description,
+		CreatedAt:   p.CreatedAt,
+		UpdatedAt:   p.UpdatedAt,
+		Tags:        p.Tags,
+		Metadata:    p.Metadata,
 	}
 }
 
@@ -38,13 +40,14 @@ func (p *TypedParameter[M]) ToBase() *Parameter {
 
 // Parameter is a provider-agnostic parameter for the UseCase layer.
 type Parameter struct {
-	Name         string
-	Value        string
-	Version      string
-	Description  string
-	LastModified *time.Time
-	Tags         map[string]string
-	Metadata     any // Provider-specific metadata (e.g., AWSParameterMeta)
+	Name        string
+	Value       string
+	Version     string
+	Description string
+	CreatedAt   *time.Time
+	UpdatedAt   *time.Time
+	Tags        map[string]string
+	Metadata    any // Provider-specific metadata (e.g., AWSParameterMeta)
 }
 
 // AWSMeta returns the AWS-specific metadata if available.
@@ -147,11 +150,12 @@ type AWSParameterHistory = TypedParameterHistory[AWSParameterMeta]
 
 // ParameterListItem represents a parameter in a list (without value).
 type ParameterListItem struct {
-	Name         string
-	Description  string
-	LastModified *time.Time
-	Tags         map[string]string
-	Metadata     any // Provider-specific metadata (e.g., AWSParameterListItemMeta)
+	Name        string
+	Description string
+	CreatedAt   *time.Time
+	UpdatedAt   *time.Time
+	Tags        map[string]string
+	Metadata    any // Provider-specific metadata (e.g., AWSParameterListItemMeta)
 }
 
 // AWSMeta returns the AWS-specific metadata if available.

@@ -152,8 +152,8 @@ func (a *App) ParamShow(specStr string) (*ParamShowResult, error) {
 		Description: result.Description,
 		Tags:        make([]ParamShowTag, 0, len(result.Tags)),
 	}
-	if result.LastModified != nil {
-		r.LastModified = result.LastModified.Format("2006-01-02T15:04:05Z07:00")
+	if result.UpdatedAt != nil {
+		r.LastModified = result.UpdatedAt.Format("2006-01-02T15:04:05Z07:00")
 	}
 
 	for _, tag := range result.Tags {
@@ -168,12 +168,12 @@ func (a *App) ParamShow(specStr string) (*ParamShowResult, error) {
 
 // ParamLog shows parameter version history.
 func (a *App) ParamLog(name string, maxResults int32) (*ParamLogResult, error) {
-	client, err := a.getParamClient()
+	adapter, err := awsparam.NewAdapter(a.ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	uc := &param.LogUseCase{Client: client}
+	uc := &param.LogUseCase{Client: adapter}
 
 	result, err := uc.Execute(a.ctx, param.LogInput{
 		Name:       name,
@@ -185,14 +185,16 @@ func (a *App) ParamLog(name string, maxResults int32) (*ParamLogResult, error) {
 
 	entries := make([]ParamLogEntry, len(result.Entries))
 	for i, e := range result.Entries {
+		version, _ := parseInt64(e.Version)
+
 		entry := ParamLogEntry{
-			Version:   e.Version,
+			Version:   version,
 			Value:     e.Value,
-			Type:      string(e.Type),
+			Type:      e.Type,
 			IsCurrent: e.IsCurrent,
 		}
-		if e.LastModified != nil {
-			entry.LastModified = e.LastModified.Format("2006-01-02T15:04:05Z07:00")
+		if e.UpdatedAt != nil {
+			entry.LastModified = e.UpdatedAt.Format("2006-01-02T15:04:05Z07:00")
 		}
 
 		entries[i] = entry

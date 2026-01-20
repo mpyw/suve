@@ -16,9 +16,10 @@ func TestTypedSecret_ToBase(t *testing.T) {
 	typed := &model.TypedSecret[model.AWSSecretMeta]{
 		Name:        "test-secret",
 		Value:       "test-value",
-		VersionID:   "v1",
+		Version:     "v1",
 		Description: "test description",
-		CreatedDate: &now,
+		CreatedAt:   &now,
+		UpdatedAt:   &now,
 		Tags:        map[string]string{"key": "value"},
 		Metadata: model.AWSSecretMeta{
 			ARN:             "arn:aws:secretsmanager:us-east-1:123456789012:secret:test-secret",
@@ -32,9 +33,10 @@ func TestTypedSecret_ToBase(t *testing.T) {
 
 	assert.Equal(t, typed.Name, base.Name)
 	assert.Equal(t, typed.Value, base.Value)
-	assert.Equal(t, typed.VersionID, base.VersionID)
+	assert.Equal(t, typed.Version, base.Version)
 	assert.Equal(t, typed.Description, base.Description)
-	assert.Equal(t, typed.CreatedDate, base.CreatedDate)
+	assert.Equal(t, typed.CreatedAt, base.CreatedAt)
+	assert.Equal(t, typed.UpdatedAt, base.UpdatedAt)
 	assert.Equal(t, typed.Tags, base.Tags)
 	assert.IsType(t, model.AWSSecretMeta{}, base.Metadata)
 
@@ -84,8 +86,8 @@ func TestTypedSecretVersion_ToBase(t *testing.T) {
 
 	now := time.Now()
 	typed := &model.TypedSecretVersion[model.AWSSecretVersionMeta]{
-		VersionID:   "v1",
-		CreatedDate: &now,
+		Version:   "v1",
+		CreatedAt: &now,
 		Metadata: model.AWSSecretVersionMeta{
 			VersionStages: []string{"AWSCURRENT"},
 		},
@@ -93,7 +95,7 @@ func TestTypedSecretVersion_ToBase(t *testing.T) {
 
 	base := typed.ToBase()
 
-	assert.Equal(t, typed.VersionID, base.VersionID)
-	assert.Equal(t, typed.CreatedDate, base.CreatedDate)
+	assert.Equal(t, typed.Version, base.Version)
+	assert.Equal(t, typed.CreatedAt, base.CreatedAt)
 	assert.IsType(t, model.AWSSecretVersionMeta{}, base.Metadata)
 }

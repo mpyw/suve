@@ -116,10 +116,10 @@ func TestRun(t *testing.T) {
 			},
 			mock: &mockClient{
 				getParameterResult: &model.Parameter{
-					Name:         "/my/param",
-					Value:        "test-value",
-					Version:      "3",
-					LastModified: &now,
+					Name:      "/my/param",
+					Value:     "test-value",
+					Version:   "3",
+					UpdatedAt: &now,
 					Metadata: model.AWSParameterMeta{
 						Type: "String",
 					},
@@ -140,12 +140,12 @@ func TestRun(t *testing.T) {
 				getHistoryResult: &model.ParameterHistory{
 					Name: "/my/param",
 					Parameters: []*model.Parameter{
-						{Name: "/my/param", Value: "v3", Version: "3", LastModified: &now, Metadata: model.AWSParameterMeta{Type: "String"}},
-						{Name: "/my/param", Value: "v2", Version: "2", LastModified: timePtr(now.Add(-time.Hour)), Metadata: model.AWSParameterMeta{Type: "String"}},
+						{Name: "/my/param", Value: "v3", Version: "3", UpdatedAt: &now, Metadata: model.AWSParameterMeta{Type: "String"}},
+						{Name: "/my/param", Value: "v2", Version: "2", UpdatedAt: timePtr(now.Add(-time.Hour)), Metadata: model.AWSParameterMeta{Type: "String"}},
 						{
 							Name: "/my/param", Value: "v1", Version: "1",
-							LastModified: timePtr(now.Add(-2 * time.Hour)),
-							Metadata:     model.AWSParameterMeta{Type: "String"},
+							UpdatedAt: timePtr(now.Add(-2 * time.Hour)),
+							Metadata:  model.AWSParameterMeta{Type: "String"},
 						},
 					},
 				},
@@ -163,10 +163,10 @@ func TestRun(t *testing.T) {
 			},
 			mock: &mockClient{
 				getParameterResult: &model.Parameter{
-					Name:         "/my/param",
-					Value:        `{"zebra":"last","apple":"first"}`,
-					Version:      "1",
-					LastModified: &now,
+					Name:      "/my/param",
+					Value:     `{"zebra":"last","apple":"first"}`,
+					Version:   "1",
+					UpdatedAt: &now,
 					Metadata: model.AWSParameterMeta{
 						Type: "String",
 					},
@@ -283,10 +283,10 @@ func TestRun(t *testing.T) {
 			},
 			mock: &mockClient{
 				getParameterResult: &model.Parameter{
-					Name:         "/my/param",
-					Value:        "raw-value",
-					Version:      "1",
-					LastModified: &now,
+					Name:      "/my/param",
+					Value:     "raw-value",
+					Version:   "1",
+					UpdatedAt: &now,
 					Metadata: model.AWSParameterMeta{
 						Type: "String",
 					},
@@ -308,8 +308,8 @@ func TestRun(t *testing.T) {
 				getHistoryResult: &model.ParameterHistory{
 					Name: "/my/param",
 					Parameters: []*model.Parameter{
-						{Name: "/my/param", Value: "v1", Version: "1", LastModified: timePtr(now.Add(-time.Hour)), Metadata: model.AWSParameterMeta{Type: "String"}},
-						{Name: "/my/param", Value: "v2", Version: "2", LastModified: &now, Metadata: model.AWSParameterMeta{Type: "String"}},
+						{Name: "/my/param", Value: "v1", Version: "1", UpdatedAt: timePtr(now.Add(-time.Hour)), Metadata: model.AWSParameterMeta{Type: "String"}},
+						{Name: "/my/param", Value: "v2", Version: "2", UpdatedAt: &now, Metadata: model.AWSParameterMeta{Type: "String"}},
 					},
 				},
 			},
@@ -328,10 +328,10 @@ func TestRun(t *testing.T) {
 			},
 			mock: &mockClient{
 				getParameterResult: &model.Parameter{
-					Name:         "/my/param",
-					Value:        `{"zebra":"last","apple":"first"}`,
-					Version:      "1",
-					LastModified: &now,
+					Name:      "/my/param",
+					Value:     `{"zebra":"last","apple":"first"}`,
+					Version:   "1",
+					UpdatedAt: &now,
 					Metadata: model.AWSParameterMeta{
 						Type: "String",
 					},
@@ -355,10 +355,10 @@ func TestRun(t *testing.T) {
 			},
 			mock: &mockClient{
 				getParameterResult: &model.Parameter{
-					Name:         "/my/param",
-					Value:        "test-value",
-					Version:      "1",
-					LastModified: &now,
+					Name:      "/my/param",
+					Value:     "test-value",
+					Version:   "1",
+					UpdatedAt: &now,
 					Metadata: model.AWSParameterMeta{
 						Type: "String",
 					},
@@ -387,10 +387,10 @@ func TestRun(t *testing.T) {
 			},
 			mock: &mockClient{
 				getParameterResult: &model.Parameter{
-					Name:         "/my/param",
-					Value:        "test-value",
-					Version:      "1",
-					LastModified: &now,
+					Name:      "/my/param",
+					Value:     "test-value",
+					Version:   "1",
+					UpdatedAt: &now,
 					Metadata: model.AWSParameterMeta{
 						Type: "String",
 					},

@@ -185,8 +185,8 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 			jsonOut.JSONParsed = lo.ToPtr(true)
 		}
 
-		if result.LastModified != nil {
-			jsonOut.Modified = timeutil.FormatRFC3339(*result.LastModified)
+		if result.UpdatedAt != nil {
+			jsonOut.Modified = timeutil.FormatRFC3339(*result.UpdatedAt)
 		}
 
 		jsonOut.Tags = make(map[string]string)
@@ -210,8 +210,8 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 		out.Field("JsonParsed", "true")
 	}
 
-	if result.LastModified != nil {
-		out.Field("Modified", timeutil.FormatRFC3339(*result.LastModified))
+	if result.UpdatedAt != nil {
+		out.Field("Modified", timeutil.FormatRFC3339(*result.UpdatedAt))
 	}
 
 	if len(result.Tags) > 0 {

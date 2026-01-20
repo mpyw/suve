@@ -32,13 +32,13 @@ type ShowTag struct {
 
 // ShowOutput holds the result of the show use case.
 type ShowOutput struct {
-	Name         string
-	Value        string
-	Version      string
-	Type         string // Parameter type (e.g., "String", "SecureString")
-	Description  string
-	LastModified *time.Time
-	Tags         []ShowTag
+	Name        string
+	Value       string
+	Version     string
+	Type        string // Parameter type (e.g., "String", "SecureString")
+	Description string
+	UpdatedAt   *time.Time
+	Tags        []ShowTag
 }
 
 // ShowUseCase executes show operations.
@@ -54,11 +54,11 @@ func (u *ShowUseCase) Execute(ctx context.Context, input ShowInput) (*ShowOutput
 	}
 
 	output := &ShowOutput{
-		Name:         param.Name,
-		Value:        param.Value,
-		Version:      param.Version,
-		Description:  param.Description,
-		LastModified: param.LastModified,
+		Name:        param.Name,
+		Value:       param.Value,
+		Version:     param.Version,
+		Description: param.Description,
+		UpdatedAt:   param.UpdatedAt,
 	}
 
 	// Extract Type from AWS metadata if available
