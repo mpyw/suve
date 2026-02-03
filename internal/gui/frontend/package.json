@@ -18,12 +18,12 @@
     "test:headed": "playwright test --headed"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.3.11",
-    "@playwright/test": "^1.57.0",
+    "@biomejs/biome": "2.3.13",
+    "@playwright/test": "^1.58.1",
     "@sveltejs/vite-plugin-svelte": "^6.2.4",
     "@tsconfig/svelte": "^5.0.4",
-    "svelte": "^5.46.4",
-    "svelte-check": "^4.0.0",
+    "svelte": "^5.49.1",
+    "svelte-check": "^4.3.6",
     "tslib": "^2.6.3",
     "typescript": "^5.4.5",
     "vite": "^7.3.1"
