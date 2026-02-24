@@ -12,6 +12,6 @@ jobs:
       pull-requests: write
     steps:
       - name: Label PR based on changed files
-        uses: actions/labeler@v5
+        uses: actions/labeler@v6
         with:
           configuration-path: .github/pr-labeler.yml
