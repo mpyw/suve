@@ -72,7 +72,7 @@ jobs:
           npm run build
 
       - name: Build suve (darwin-arm64)
-        uses: goreleaser/goreleaser-action@v6
+        uses: goreleaser/goreleaser-action@v7
         with:
           distribution: goreleaser
           version: "~> v2"
@@ -81,7 +81,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload arm64 artifacts
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: dist-darwin-arm64
           path: dist/
@@ -91,7 +91,7 @@ jobs:
         run: rm -rf dist/
 
       - name: Build suve (darwin-amd64, cross-compile)
-        uses: goreleaser/goreleaser-action@v6
+        uses: goreleaser/goreleaser-action@v7
         with:
           distribution: goreleaser
           version: "~> v2"
@@ -101,7 +101,7 @@ jobs:
           GOARCH: amd64
 
       - name: Upload amd64 artifacts
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: dist-darwin-amd64
           path: dist/
@@ -137,7 +137,7 @@ jobs:
           npm run build
 
       - name: Build suve (linux-amd64)
-        uses: goreleaser/goreleaser-action@v6
+        uses: goreleaser/goreleaser-action@v7
         with:
           distribution: goreleaser
           version: "~> v2"
@@ -146,7 +146,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: dist-linux-amd64
           path: dist/
@@ -179,7 +179,7 @@ jobs:
           npm run build
 
       - name: Build suve (linux-arm64)
-        uses: goreleaser/goreleaser-action@v6
+        uses: goreleaser/goreleaser-action@v7
         with:
           distribution: goreleaser
           version: "~> v2"
@@ -188,7 +188,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: dist-linux-arm64
           path: dist/
@@ -224,7 +224,7 @@ jobs:
           npm run build
 
       - name: Build suve (linux-amd64-webkit2_41)
-        uses: goreleaser/goreleaser-action@v6
+        uses: goreleaser/goreleaser-action@v7
         with:
           distribution: goreleaser
           version: "~> v2"
@@ -233,7 +233,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: dist-linux-amd64-webkit2_41
           path: dist/
@@ -266,7 +266,7 @@ jobs:
           npm run build
 
       - name: Build suve (linux-arm64-webkit2_41)
-        uses: goreleaser/goreleaser-action@v6
+        uses: goreleaser/goreleaser-action@v7
         with:
           distribution: goreleaser
           version: "~> v2"
@@ -275,7 +275,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: dist-linux-arm64-webkit2_41
           path: dist/
@@ -300,7 +300,7 @@ jobs:
           go-version-file: go.mod
 
       - name: Build suve-cli (linux-amd64, linux-arm64)
-        uses: goreleaser/goreleaser-action@v6
+        uses: goreleaser/goreleaser-action@v7
         with:
           distribution: goreleaser
           version: "~> v2"
@@ -309,7 +309,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: dist-linux-cli
           path: dist/
@@ -365,7 +365,7 @@ jobs:
           go run github.com/josephspurrier/goversioninfo/cmd/goversioninfo@v1.5.0 -arm -o resource_windows_arm64.syso
 
       - name: Build suve (windows)
-        uses: goreleaser/goreleaser-action@v6
+        uses: goreleaser/goreleaser-action@v7
         with:
           distribution: goreleaser
           version: "~> v2"
@@ -374,7 +374,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: dist-windows
           path: dist/
@@ -401,7 +401,7 @@ jobs:
           fetch-depth: 0
 
       - name: Download all artifacts
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           path: dist
           pattern: dist-*
