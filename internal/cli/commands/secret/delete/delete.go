@@ -9,6 +9,7 @@ import (
 
 	"github.com/urfave/cli/v3"
 
+	"github.com/mpyw/suve/internal/cli/commands/internal"
 	"github.com/mpyw/suve/internal/cli/confirm"
 	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/infra"
@@ -81,9 +82,9 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	name := cmd.Args().First()
 	skipConfirm := cmd.Bool("yes")
 
-	client, err := infra.NewSecretClient(ctx)
+	client, err := internal.NewSecretClient(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to initialize AWS client: %w", err)
+		return err
 	}
 
 	// Get AWS identity for confirmation display

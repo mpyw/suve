@@ -3,15 +3,13 @@ package list
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
 	"io"
 
 	"github.com/samber/lo"
 	"github.com/urfave/cli/v3"
 
+	"github.com/mpyw/suve/internal/cli/commands/internal"
 	"github.com/mpyw/suve/internal/cli/output"
-	"github.com/mpyw/suve/internal/infra"
 	"github.com/mpyw/suve/internal/usecase/param"
 )
 
@@ -96,9 +94,9 @@ EXAMPLES:
 }
 
 func action(ctx context.Context, cmd *cli.Command) error {
-	client, err := infra.NewParamClient(ctx)
+	client, err := internal.NewParamClient(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to initialize AWS client: %w", err)
+		return err
 	}
 
 	r := &Runner{
@@ -144,10 +142,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 			items[i] = JSONOutputItem{Name: entry.Name}
 		}
 
-		enc := json.NewEncoder(r.Stdout)
-		enc.SetIndent("", "  ")
-
-		return enc.Encode(items)
+		return output.WriteJSON(r.Stdout, items)
 	}
 
 	// JSON output with values
@@ -161,10 +156,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 			}
 		}
 
-		enc := json.NewEncoder(r.Stdout)
-		enc.SetIndent("", "  ")
-
-		return enc.Encode(items)
+		return output.WriteJSON(r.Stdout, items)
 	}
 
 	// Text output with values

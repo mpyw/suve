@@ -11,6 +11,7 @@ import (
 	"github.com/urfave/cli/v3"
 
 	"github.com/mpyw/suve/internal/api/paramapi"
+	"github.com/mpyw/suve/internal/cli/commands/internal"
 	"github.com/mpyw/suve/internal/cli/confirm"
 	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/infra"
@@ -100,9 +101,9 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	name := cmd.Args().Get(0)
 	skipConfirm := cmd.Bool("yes")
 
-	client, err := infra.NewParamClient(ctx)
+	client, err := internal.NewParamClient(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to initialize AWS client: %w", err)
+		return err
 	}
 
 	uc := &param.UpdateUseCase{Client: client}
