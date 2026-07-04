@@ -38,6 +38,7 @@ type SecretClient interface {
 	secretapi.ListSecretsAPI
 	secretapi.DescribeSecretAPI
 	secretapi.RestoreSecretAPI
+	secretapi.RotateSecretAPI
 }
 
 // =============================================================================

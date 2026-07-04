@@ -5,166 +5,96 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/mpyw/suve/internal/api/secretapi"
+	"github.com/mpyw/suve/internal/provider/providermock"
 	"github.com/mpyw/suve/internal/usecase/secret"
 )
-
-type mockTagClient struct {
-	describeResult *secretapi.DescribeSecretOutput
-	describeErr    error
-	tagErr         error
-	untagErr       error
-}
-
-//nolint:lll // mock function signature must match AWS SDK interface
-func (m *mockTagClient) DescribeSecret(_ context.Context, _ *secretapi.DescribeSecretInput, _ ...func(*secretapi.Options)) (*secretapi.DescribeSecretOutput, error) {
-	if m.describeErr != nil {
-		return nil, m.describeErr
-	}
-
-	return m.describeResult, nil
-}
-
-//nolint:lll // mock function signature must match AWS SDK interface
-func (m *mockTagClient) TagResource(_ context.Context, _ *secretapi.TagResourceInput, _ ...func(*secretapi.Options)) (*secretapi.TagResourceOutput, error) {
-	if m.tagErr != nil {
-		return nil, m.tagErr
-	}
-
-	return &secretapi.TagResourceOutput{}, nil
-}
-
-//nolint:lll // mock function signature must match AWS SDK interface
-func (m *mockTagClient) UntagResource(_ context.Context, _ *secretapi.UntagResourceInput, _ ...func(*secretapi.Options)) (*secretapi.UntagResourceOutput, error) {
-	if m.untagErr != nil {
-		return nil, m.untagErr
-	}
-
-	return &secretapi.UntagResourceOutput{}, nil
-}
 
 func TestTagUseCase_Execute_AddTags(t *testing.T) {
 	t.Parallel()
 
-	client := &mockTagClient{
-		describeResult: &secretapi.DescribeSecretOutput{
-			ARN: lo.ToPtr("arn:aws:secretsmanager:us-east-1:123456789012:secret:my-secret"),
+	var gotAdd map[string]string
+
+	store := &providermock.Store{
+		TagFunc: func(_ context.Context, _ string, add map[string]string) error {
+			gotAdd = add
+
+			return nil
 		},
 	}
-	uc := &secret.TagUseCase{Client: client}
+
+	uc := &secret.TagUseCase{Tagger: store}
 
 	err := uc.Execute(t.Context(), secret.TagInput{
 		Name: "my-secret",
-		Add:  map[string]string{"env": "prod", "team": "backend"},
+		Add:  map[string]string{"env": "prod"},
 	})
 	require.NoError(t, err)
+	assert.Equal(t, map[string]string{"env": "prod"}, gotAdd)
 }
 
 func TestTagUseCase_Execute_RemoveTags(t *testing.T) {
 	t.Parallel()
 
-	client := &mockTagClient{
-		describeResult: &secretapi.DescribeSecretOutput{
-			ARN: lo.ToPtr("arn:aws:secretsmanager:us-east-1:123456789012:secret:my-secret"),
+	var gotKeys []string
+
+	store := &providermock.Store{
+		UntagFunc: func(_ context.Context, _ string, keys []string) error {
+			gotKeys = keys
+
+			return nil
 		},
 	}
-	uc := &secret.TagUseCase{Client: client}
+
+	uc := &secret.TagUseCase{Tagger: store}
 
 	err := uc.Execute(t.Context(), secret.TagInput{
 		Name:   "my-secret",
-		Remove: []string{"old-tag", "deprecated"},
+		Remove: []string{"env", "team"},
 	})
 	require.NoError(t, err)
+	assert.Equal(t, []string{"env", "team"}, gotKeys)
 }
 
-func TestTagUseCase_Execute_AddAndRemoveTags(t *testing.T) {
+func TestTagUseCase_Execute_AddError(t *testing.T) {
 	t.Parallel()
 
-	client := &mockTagClient{
-		describeResult: &secretapi.DescribeSecretOutput{
-			ARN: lo.ToPtr("arn:aws:secretsmanager:us-east-1:123456789012:secret:my-secret"),
+	store := &providermock.Store{
+		TagFunc: func(_ context.Context, _ string, _ map[string]string) error {
+			return errors.New("tag failed")
 		},
 	}
-	uc := &secret.TagUseCase{Client: client}
 
-	err := uc.Execute(t.Context(), secret.TagInput{
-		Name:   "my-secret",
-		Add:    map[string]string{"env": "prod"},
-		Remove: []string{"old-tag"},
-	})
-	require.NoError(t, err)
-}
+	uc := &secret.TagUseCase{Tagger: store}
 
-func TestTagUseCase_Execute_NoTags(t *testing.T) {
-	t.Parallel()
-
-	client := &mockTagClient{
-		describeResult: &secretapi.DescribeSecretOutput{
-			ARN: lo.ToPtr("arn:aws:secretsmanager:us-east-1:123456789012:secret:my-secret"),
-		},
-	}
-	uc := &secret.TagUseCase{Client: client}
-
-	err := uc.Execute(t.Context(), secret.TagInput{
-		Name: "my-secret",
-	})
-	require.NoError(t, err)
-}
-
-func TestTagUseCase_Execute_DescribeError(t *testing.T) {
-	t.Parallel()
-
-	client := &mockTagClient{
-		describeErr: errors.New("describe failed"),
-	}
-	uc := &secret.TagUseCase{Client: client}
-
-	err := uc.Execute(t.Context(), secret.TagInput{
-		Name: "my-secret",
-		Add:  map[string]string{"env": "prod"},
-	})
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to describe secret")
-}
-
-func TestTagUseCase_Execute_AddTagsError(t *testing.T) {
-	t.Parallel()
-
-	client := &mockTagClient{
-		describeResult: &secretapi.DescribeSecretOutput{
-			ARN: lo.ToPtr("arn:aws:secretsmanager:us-east-1:123456789012:secret:my-secret"),
-		},
-		tagErr: errors.New("tag failed"),
-	}
-	uc := &secret.TagUseCase{Client: client}
-
-	err := uc.Execute(t.Context(), secret.TagInput{
-		Name: "my-secret",
-		Add:  map[string]string{"env": "prod"},
-	})
+	err := uc.Execute(t.Context(), secret.TagInput{Name: "my-secret", Add: map[string]string{"env": "prod"}})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to add tags")
 }
 
-func TestTagUseCase_Execute_RemoveTagsError(t *testing.T) {
+func TestTagUseCase_Execute_RemoveError(t *testing.T) {
 	t.Parallel()
 
-	client := &mockTagClient{
-		describeResult: &secretapi.DescribeSecretOutput{
-			ARN: lo.ToPtr("arn:aws:secretsmanager:us-east-1:123456789012:secret:my-secret"),
+	store := &providermock.Store{
+		UntagFunc: func(_ context.Context, _ string, _ []string) error {
+			return errors.New("untag failed")
 		},
-		untagErr: errors.New("untag failed"),
 	}
-	uc := &secret.TagUseCase{Client: client}
 
-	err := uc.Execute(t.Context(), secret.TagInput{
-		Name:   "my-secret",
-		Remove: []string{"old-tag"},
-	})
+	uc := &secret.TagUseCase{Tagger: store}
+
+	err := uc.Execute(t.Context(), secret.TagInput{Name: "my-secret", Remove: []string{"env"}})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to remove tags")
+}
+
+func TestTagUseCase_Execute_NoOp(t *testing.T) {
+	t.Parallel()
+
+	uc := &secret.TagUseCase{Tagger: &providermock.Store{}}
+
+	err := uc.Execute(t.Context(), secret.TagInput{Name: "my-secret"})
+	require.NoError(t, err)
 }

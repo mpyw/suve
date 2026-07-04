@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"time"
 
 	"github.com/urfave/cli/v3"
 
@@ -13,8 +14,15 @@ import (
 	"github.com/mpyw/suve/internal/cli/confirm"
 	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/infra"
+	"github.com/mpyw/suve/internal/provider"
+	awssecret "github.com/mpyw/suve/internal/provider/aws/secret"
 	"github.com/mpyw/suve/internal/usecase/secret"
 )
+
+// defaultRecoveryWindow is the AWS Secrets Manager default recovery window in
+// days, used to compute the displayed scheduled deletion date when no explicit
+// window is given.
+const defaultRecoveryWindow = 30
 
 // Runner executes the delete command.
 type Runner struct {
@@ -93,7 +101,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		identity, _ = infra.GetAWSIdentity(ctx)
 	}
 
-	uc := &secret.DeleteUseCase{Client: client}
+	uc := &secret.DeleteUseCase{Store: awssecret.New(client)}
 
 	// Show current value before confirming
 	if !skipConfirm {
@@ -142,10 +150,18 @@ func action(ctx context.Context, cmd *cli.Command) error {
 
 // Run executes the delete command.
 func (r *Runner) Run(ctx context.Context, opts Options) error {
+	var options []provider.DeleteOption
+
+	switch {
+	case opts.Force:
+		options = append(options, awssecret.ForceDelete{})
+	case opts.RecoveryWindow > 0:
+		options = append(options, awssecret.RecoveryWindow{Days: int64(opts.RecoveryWindow)})
+	}
+
 	result, err := r.UseCase.Execute(ctx, secret.DeleteInput{
-		Name:           opts.Name,
-		Force:          opts.Force,
-		RecoveryWindow: int64(opts.RecoveryWindow),
+		Name:    opts.Name,
+		Options: options,
 	})
 	if err != nil {
 		return err
@@ -153,12 +169,24 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 
 	if opts.Force {
 		output.Success(r.Stdout, "Permanently deleted secret %s", result.Name)
-	} else {
-		output.Success(r.Stdout, "Scheduled deletion of secret %s (deletion date: %s)",
-			result.Name,
-			result.DeletionDate.Format("2006-01-02"),
-		)
+
+		return nil
 	}
+
+	// The provider Delete returns only an error, so the scheduled deletion date
+	// is computed client-side (now + recovery window) — the same calendar date
+	// AWS itself schedules.
+	window := opts.RecoveryWindow
+	if window <= 0 {
+		window = defaultRecoveryWindow
+	}
+
+	deletionDate := time.Now().AddDate(0, 0, window)
+
+	output.Success(r.Stdout, "Scheduled deletion of secret %s (deletion date: %s)",
+		result.Name,
+		deletionDate.Format("2006-01-02"),
+	)
 
 	return nil
 }

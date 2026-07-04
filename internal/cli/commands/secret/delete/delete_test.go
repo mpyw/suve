@@ -3,17 +3,17 @@ package delete_test
 import (
 	"bytes"
 	"context"
-	"fmt"
+	"errors"
 	"testing"
-	"time"
 
-	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/mpyw/suve/internal/api/secretapi"
 	appcli "github.com/mpyw/suve/internal/cli/commands"
 	"github.com/mpyw/suve/internal/cli/commands/secret/delete"
+	"github.com/mpyw/suve/internal/provider"
+	awssecret "github.com/mpyw/suve/internal/provider/aws/secret"
+	"github.com/mpyw/suve/internal/provider/providermock"
 	"github.com/mpyw/suve/internal/usecase/secret"
 )
 
@@ -30,58 +30,26 @@ func TestCommand_Validation(t *testing.T) {
 	})
 }
 
-type mockClient struct {
-	//nolint:lll // mock function signature
-	getSecretValueFunc func(ctx context.Context, params *secretapi.GetSecretValueInput, optFns ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error)
-	//nolint:lll // mock function signature
-	deleteSecretFunc func(ctx context.Context, params *secretapi.DeleteSecretInput, optFns ...func(*secretapi.Options)) (*secretapi.DeleteSecretOutput, error)
-}
-
-//nolint:lll // mock function signature
-func (m *mockClient) GetSecretValue(ctx context.Context, params *secretapi.GetSecretValueInput, optFns ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) {
-	if m.getSecretValueFunc != nil {
-		return m.getSecretValueFunc(ctx, params, optFns...)
-	}
-
-	return nil, &secretapi.ResourceNotFoundException{Message: lo.ToPtr("not found")}
-}
-
-//nolint:lll // mock function signature
-func (m *mockClient) DeleteSecret(ctx context.Context, params *secretapi.DeleteSecretInput, optFns ...func(*secretapi.Options)) (*secretapi.DeleteSecretOutput, error) {
-	if m.deleteSecretFunc != nil {
-		return m.deleteSecretFunc(ctx, params, optFns...)
-	}
-
-	return nil, fmt.Errorf("DeleteSecret not mocked")
-}
-
 func TestRun(t *testing.T) {
 	t.Parallel()
 
-	now := time.Now()
-	deletionDate := now.Add(30 * 24 * time.Hour)
-
 	tests := []struct {
-		name    string
-		opts    delete.Options
-		mock    *mockClient
-		wantErr bool
-		check   func(t *testing.T, output string)
+		name      string
+		opts      delete.Options
+		deleteErr error
+		wantErr   bool
+		checkOpts func(t *testing.T, opts []provider.DeleteOption)
+		check     func(t *testing.T, output string)
 	}{
 		{
 			name: "delete with recovery window",
 			opts: delete.Options{Name: "my-secret", Force: false, RecoveryWindow: 30},
-			mock: &mockClient{
-				//nolint:lll // mock function signature
-				deleteSecretFunc: func(_ context.Context, params *secretapi.DeleteSecretInput, _ ...func(*secretapi.Options)) (*secretapi.DeleteSecretOutput, error) {
-					assert.False(t, lo.FromPtr(params.ForceDeleteWithoutRecovery), "expected ForceDeleteWithoutRecovery to be false")
-					assert.Equal(t, int64(30), lo.FromPtr(params.RecoveryWindowInDays))
-
-					return &secretapi.DeleteSecretOutput{
-						Name:         lo.ToPtr("my-secret"),
-						DeletionDate: &deletionDate,
-					}, nil
-				},
+			checkOpts: func(t *testing.T, opts []provider.DeleteOption) {
+				t.Helper()
+				require.Len(t, opts, 1)
+				rw, ok := opts[0].(awssecret.RecoveryWindow)
+				require.True(t, ok, "expected a RecoveryWindow option")
+				assert.Equal(t, int64(30), rw.Days)
 			},
 			check: func(t *testing.T, output string) {
 				t.Helper()
@@ -92,15 +60,10 @@ func TestRun(t *testing.T) {
 		{
 			name: "force delete",
 			opts: delete.Options{Name: "my-secret", Force: true},
-			mock: &mockClient{
-				//nolint:lll // mock function signature
-				deleteSecretFunc: func(_ context.Context, params *secretapi.DeleteSecretInput, _ ...func(*secretapi.Options)) (*secretapi.DeleteSecretOutput, error) {
-					assert.True(t, lo.FromPtr(params.ForceDeleteWithoutRecovery), "expected ForceDeleteWithoutRecovery to be true")
-
-					return &secretapi.DeleteSecretOutput{
-						Name: lo.ToPtr("my-secret"),
-					}, nil
-				},
+			checkOpts: func(t *testing.T, opts []provider.DeleteOption) {
+				t.Helper()
+				require.Len(t, opts, 1)
+				assert.IsType(t, awssecret.ForceDelete{}, opts[0])
 			},
 			check: func(t *testing.T, output string) {
 				t.Helper()
@@ -108,14 +71,10 @@ func TestRun(t *testing.T) {
 			},
 		},
 		{
-			name: "error from AWS",
-			opts: delete.Options{Name: "my-secret"},
-			mock: &mockClient{
-				deleteSecretFunc: func(_ context.Context, _ *secretapi.DeleteSecretInput, _ ...func(*secretapi.Options)) (*secretapi.DeleteSecretOutput, error) {
-					return nil, fmt.Errorf("AWS error")
-				},
-			},
-			wantErr: true,
+			name:      "error from AWS",
+			opts:      delete.Options{Name: "my-secret"},
+			deleteErr: errors.New("AWS error"),
+			wantErr:   true,
 		},
 	}
 
@@ -123,10 +82,20 @@ func TestRun(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
+			var gotOpts []provider.DeleteOption
+
+			store := &providermock.Store{
+				DeleteFunc: func(_ context.Context, _ string, opts ...provider.DeleteOption) error {
+					gotOpts = opts
+
+					return tt.deleteErr
+				},
+			}
+
 			var buf, errBuf bytes.Buffer
 
 			r := &delete.Runner{
-				UseCase: &secret.DeleteUseCase{Client: tt.mock},
+				UseCase: &secret.DeleteUseCase{Store: store},
 				Stdout:  &buf,
 				Stderr:  &errBuf,
 			}
@@ -139,6 +108,10 @@ func TestRun(t *testing.T) {
 			}
 
 			require.NoError(t, err)
+
+			if tt.checkOpts != nil {
+				tt.checkOpts(t, gotOpts)
+			}
 
 			if tt.check != nil {
 				tt.check(t, buf.String())

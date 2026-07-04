@@ -3,16 +3,17 @@ package create_test
 import (
 	"bytes"
 	"context"
-	"fmt"
+	"errors"
 	"testing"
 
-	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/mpyw/suve/internal/api/secretapi"
 	appcli "github.com/mpyw/suve/internal/cli/commands"
 	"github.com/mpyw/suve/internal/cli/commands/secret/create"
+	"github.com/mpyw/suve/internal/domain"
+	"github.com/mpyw/suve/internal/provider"
+	"github.com/mpyw/suve/internal/provider/providermock"
 	"github.com/mpyw/suve/internal/usecase/secret"
 )
 
@@ -38,42 +39,27 @@ func TestCommand_Validation(t *testing.T) {
 	})
 }
 
-type mockClient struct {
-	//nolint:lll // mock function signature
-	createSecretFunc func(ctx context.Context, params *secretapi.CreateSecretInput, optFns ...func(*secretapi.Options)) (*secretapi.CreateSecretOutput, error)
-}
-
-//nolint:lll // mock function signature
-func (m *mockClient) CreateSecret(ctx context.Context, params *secretapi.CreateSecretInput, optFns ...func(*secretapi.Options)) (*secretapi.CreateSecretOutput, error) {
-	if m.createSecretFunc != nil {
-		return m.createSecretFunc(ctx, params, optFns...)
-	}
-
-	return nil, fmt.Errorf("CreateSecret not mocked")
-}
-
 func TestRun(t *testing.T) {
 	t.Parallel()
+
 	tests := []struct {
 		name    string
 		opts    create.Options
-		mock    *mockClient
+		store   *providermock.Store
 		wantErr string
 		check   func(t *testing.T, output string)
 	}{
 		{
 			name: "create secret",
 			opts: create.Options{Name: "my-secret", Value: "secret-value"},
-			mock: &mockClient{
-				//nolint:lll // mock function signature
-				createSecretFunc: func(_ context.Context, params *secretapi.CreateSecretInput, _ ...func(*secretapi.Options)) (*secretapi.CreateSecretOutput, error) {
-					assert.Equal(t, "my-secret", lo.FromPtr(params.Name))
-					assert.Equal(t, "secret-value", lo.FromPtr(params.SecretString))
+			store: &providermock.Store{
+				CreateFunc: func(
+					_ context.Context, name, value string, _ domain.ValueType, _ string, _ ...provider.WriteOption,
+				) (domain.Version, error) {
+					assert.Equal(t, "my-secret", name)
+					assert.Equal(t, "secret-value", value)
 
-					return &secretapi.CreateSecretOutput{
-						Name:      lo.ToPtr("my-secret"),
-						VersionId: lo.ToPtr("abc123"),
-					}, nil
+					return domain.Version{ID: "abc123"}, nil
 				},
 			},
 			check: func(t *testing.T, output string) {
@@ -85,15 +71,13 @@ func TestRun(t *testing.T) {
 		{
 			name: "create with description",
 			opts: create.Options{Name: "my-secret", Value: "secret-value", Description: "Test description"},
-			mock: &mockClient{
-				//nolint:lll // mock function signature
-				createSecretFunc: func(_ context.Context, params *secretapi.CreateSecretInput, _ ...func(*secretapi.Options)) (*secretapi.CreateSecretOutput, error) {
-					assert.Equal(t, "Test description", lo.FromPtr(params.Description))
+			store: &providermock.Store{
+				CreateFunc: func(
+					_ context.Context, _, _ string, _ domain.ValueType, description string, _ ...provider.WriteOption,
+				) (domain.Version, error) {
+					assert.Equal(t, "Test description", description)
 
-					return &secretapi.CreateSecretOutput{
-						Name:      lo.ToPtr("my-secret"),
-						VersionId: lo.ToPtr("abc123"),
-					}, nil
+					return domain.Version{ID: "abc123"}, nil
 				},
 			},
 		},
@@ -101,9 +85,11 @@ func TestRun(t *testing.T) {
 			name:    "error from AWS",
 			opts:    create.Options{Name: "my-secret", Value: "secret-value"},
 			wantErr: "failed to create secret",
-			mock: &mockClient{
-				createSecretFunc: func(_ context.Context, _ *secretapi.CreateSecretInput, _ ...func(*secretapi.Options)) (*secretapi.CreateSecretOutput, error) {
-					return nil, fmt.Errorf("AWS error")
+			store: &providermock.Store{
+				CreateFunc: func(
+					_ context.Context, _, _ string, _ domain.ValueType, _ string, _ ...provider.WriteOption,
+				) (domain.Version, error) {
+					return domain.Version{}, errors.New("AWS error")
 				},
 			},
 		},
@@ -116,7 +102,7 @@ func TestRun(t *testing.T) {
 			var buf, errBuf bytes.Buffer
 
 			r := &create.Runner{
-				UseCase: &secret.CreateUseCase{Client: tt.mock},
+				UseCase: &secret.CreateUseCase{Writer: tt.store},
 				Stdout:  &buf,
 				Stderr:  &errBuf,
 			}

@@ -9,67 +9,35 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/mpyw/suve/internal/api/secretapi"
+	"github.com/mpyw/suve/internal/domain"
+	"github.com/mpyw/suve/internal/provider"
+	"github.com/mpyw/suve/internal/provider/providermock"
 	"github.com/mpyw/suve/internal/usecase/secret"
 )
 
-type mockListClient struct {
-	listSecretsResult    *secretapi.ListSecretsOutput
-	listSecretsResults   []*secretapi.ListSecretsOutput // For pagination tests
-	listSecretsCallCount int
-	listSecretsErr       error
-	getSecretValueValue  map[string]string
-	getSecretValueErr    map[string]error
-}
+// listStore builds a mock reader returning the given names, and (when values are
+// requested) values/errors keyed by name.
+func listStore(names []string, values map[string]string, errs map[string]error) *providermock.Store {
+	return &providermock.Store{
+		ListFunc: func(_ context.Context) ([]string, error) {
+			return names, nil
+		},
+		GetFunc: func(_ context.Context, name string, _ provider.VersionRef) (*domain.Entry, error) {
+			if errs != nil {
+				if err, ok := errs[name]; ok {
+					return nil, err
+				}
+			}
 
-//nolint:lll // mock function signature must match AWS SDK interface
-func (m *mockListClient) ListSecrets(_ context.Context, _ *secretapi.ListSecretsInput, _ ...func(*secretapi.Options)) (*secretapi.ListSecretsOutput, error) {
-	if m.listSecretsErr != nil {
-		return nil, m.listSecretsErr
+			return &domain.Entry{Name: name, Value: values[name]}, nil
+		},
 	}
-	// Support paginated results for testing
-	if len(m.listSecretsResults) > 0 {
-		idx := m.listSecretsCallCount
-
-		m.listSecretsCallCount++
-		if idx < len(m.listSecretsResults) {
-			return m.listSecretsResults[idx], nil
-		}
-
-		return &secretapi.ListSecretsOutput{}, nil
-	}
-
-	return m.listSecretsResult, nil
-}
-
-//nolint:lll // mock function signature must match AWS SDK interface
-func (m *mockListClient) GetSecretValue(_ context.Context, input *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) {
-	name := lo.FromPtr(input.SecretId)
-	if m.getSecretValueErr != nil {
-		if err, ok := m.getSecretValueErr[name]; ok {
-			return nil, err
-		}
-	}
-
-	if m.getSecretValueValue != nil {
-		if value, ok := m.getSecretValueValue[name]; ok {
-			return &secretapi.GetSecretValueOutput{SecretString: lo.ToPtr(value)}, nil
-		}
-	}
-
-	return nil, &secretapi.ResourceNotFoundException{Message: lo.ToPtr("not found")}
 }
 
 func TestListUseCase_Execute_Empty(t *testing.T) {
 	t.Parallel()
 
-	client := &mockListClient{
-		listSecretsResult: &secretapi.ListSecretsOutput{
-			SecretList: []secretapi.SecretListEntry{},
-		},
-	}
-
-	uc := &secret.ListUseCase{Client: client}
+	uc := &secret.ListUseCase{Reader: listStore(nil, nil, nil)}
 
 	output, err := uc.Execute(t.Context(), secret.ListInput{})
 	require.NoError(t, err)
@@ -79,63 +47,43 @@ func TestListUseCase_Execute_Empty(t *testing.T) {
 func TestListUseCase_Execute_WithSecrets(t *testing.T) {
 	t.Parallel()
 
-	client := &mockListClient{
-		listSecretsResult: &secretapi.ListSecretsOutput{
-			SecretList: []secretapi.SecretListEntry{
-				{Name: lo.ToPtr("secret-a")},
-				{Name: lo.ToPtr("secret-b")},
-			},
-		},
-	}
-
-	uc := &secret.ListUseCase{Client: client}
+	uc := &secret.ListUseCase{Reader: listStore([]string{"secret-a", "secret-b"}, nil, nil)}
 
 	output, err := uc.Execute(t.Context(), secret.ListInput{})
 	require.NoError(t, err)
-	assert.Len(t, output.Entries, 2)
+	require.Len(t, output.Entries, 2)
 	assert.Equal(t, "secret-a", output.Entries[0].Name)
 	assert.Equal(t, "secret-b", output.Entries[1].Name)
 }
 
+// TestListUseCase_Execute_WithPrefix is a genuine anti-regression test: the
+// name filter is a case-sensitive PREFIX match applied client-side.
 func TestListUseCase_Execute_WithPrefix(t *testing.T) {
 	t.Parallel()
 
-	client := &mockListClient{
-		listSecretsResult: &secretapi.ListSecretsOutput{
-			SecretList: []secretapi.SecretListEntry{
-				{Name: lo.ToPtr("app/config")},
-				{Name: lo.ToPtr("app/secret")},
-			},
-		},
-	}
+	uc := &secret.ListUseCase{Reader: listStore(
+		[]string{"app/config", "app/secret", "other/thing", "App/upper"}, nil, nil,
+	)}
 
-	uc := &secret.ListUseCase{Client: client}
-
-	output, err := uc.Execute(t.Context(), secret.ListInput{
-		Prefix: "app/",
-	})
+	output, err := uc.Execute(t.Context(), secret.ListInput{Prefix: "app/"})
 	require.NoError(t, err)
-	assert.Len(t, output.Entries, 2)
+
+	names := lo.Map(output.Entries, func(e secret.ListEntry, _ int) string { return e.Name })
+	assert.ElementsMatch(t, []string{"app/config", "app/secret"}, names)
+	// Case-sensitive: "App/upper" must NOT match prefix "app/".
+	assert.NotContains(t, names, "App/upper")
+	// Non-prefix names must be excluded.
+	assert.NotContains(t, names, "other/thing")
 }
 
 func TestListUseCase_Execute_WithFilter(t *testing.T) {
 	t.Parallel()
 
-	client := &mockListClient{
-		listSecretsResult: &secretapi.ListSecretsOutput{
-			SecretList: []secretapi.SecretListEntry{
-				{Name: lo.ToPtr("config-a")},
-				{Name: lo.ToPtr("secret-b")},
-				{Name: lo.ToPtr("config-c")},
-			},
-		},
-	}
+	uc := &secret.ListUseCase{Reader: listStore(
+		[]string{"config-a", "secret-b", "config-c"}, nil, nil,
+	)}
 
-	uc := &secret.ListUseCase{Client: client}
-
-	output, err := uc.Execute(t.Context(), secret.ListInput{
-		Filter: "config",
-	})
+	output, err := uc.Execute(t.Context(), secret.ListInput{Filter: "config"})
 	require.NoError(t, err)
 	assert.Len(t, output.Entries, 2)
 }
@@ -143,15 +91,9 @@ func TestListUseCase_Execute_WithFilter(t *testing.T) {
 func TestListUseCase_Execute_InvalidFilter(t *testing.T) {
 	t.Parallel()
 
-	client := &mockListClient{
-		listSecretsResult: &secretapi.ListSecretsOutput{},
-	}
+	uc := &secret.ListUseCase{Reader: listStore(nil, nil, nil)}
 
-	uc := &secret.ListUseCase{Client: client}
-
-	_, err := uc.Execute(t.Context(), secret.ListInput{
-		Filter: "[invalid",
-	})
+	_, err := uc.Execute(t.Context(), secret.ListInput{Filter: "[invalid"})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "invalid filter regex")
 }
@@ -159,11 +101,13 @@ func TestListUseCase_Execute_InvalidFilter(t *testing.T) {
 func TestListUseCase_Execute_ListError(t *testing.T) {
 	t.Parallel()
 
-	client := &mockListClient{
-		listSecretsErr: errors.New("aws error"),
+	store := &providermock.Store{
+		ListFunc: func(_ context.Context) ([]string, error) {
+			return nil, errors.New("aws error")
+		},
 	}
 
-	uc := &secret.ListUseCase{Client: client}
+	uc := &secret.ListUseCase{Reader: store}
 
 	_, err := uc.Execute(t.Context(), secret.ListInput{})
 	require.Error(t, err)
@@ -173,26 +117,15 @@ func TestListUseCase_Execute_ListError(t *testing.T) {
 func TestListUseCase_Execute_WithValue(t *testing.T) {
 	t.Parallel()
 
-	client := &mockListClient{
-		listSecretsResult: &secretapi.ListSecretsOutput{
-			SecretList: []secretapi.SecretListEntry{
-				{Name: lo.ToPtr("secret-a")},
-				{Name: lo.ToPtr("secret-b")},
-			},
-		},
-		getSecretValueValue: map[string]string{
-			"secret-a": "value-a",
-			"secret-b": "value-b",
-		},
-	}
+	uc := &secret.ListUseCase{Reader: listStore(
+		[]string{"secret-a", "secret-b"},
+		map[string]string{"secret-a": "value-a", "secret-b": "value-b"},
+		nil,
+	)}
 
-	uc := &secret.ListUseCase{Client: client}
-
-	output, err := uc.Execute(t.Context(), secret.ListInput{
-		WithValue: true,
-	})
+	output, err := uc.Execute(t.Context(), secret.ListInput{WithValue: true})
 	require.NoError(t, err)
-	assert.Len(t, output.Entries, 2)
+	require.Len(t, output.Entries, 2)
 
 	for _, entry := range output.Entries {
 		assert.NotNil(t, entry.Value)
@@ -203,28 +136,15 @@ func TestListUseCase_Execute_WithValue(t *testing.T) {
 func TestListUseCase_Execute_WithValue_PartialError(t *testing.T) {
 	t.Parallel()
 
-	client := &mockListClient{
-		listSecretsResult: &secretapi.ListSecretsOutput{
-			SecretList: []secretapi.SecretListEntry{
-				{Name: lo.ToPtr("secret-a")},
-				{Name: lo.ToPtr("secret-error")},
-			},
-		},
-		getSecretValueValue: map[string]string{
-			"secret-a": "value-a",
-		},
-		getSecretValueErr: map[string]error{
-			"secret-error": errors.New("fetch error"),
-		},
-	}
+	uc := &secret.ListUseCase{Reader: listStore(
+		[]string{"secret-a", "secret-error"},
+		map[string]string{"secret-a": "value-a"},
+		map[string]error{"secret-error": errors.New("fetch error")},
+	)}
 
-	uc := &secret.ListUseCase{Client: client}
-
-	output, err := uc.Execute(t.Context(), secret.ListInput{
-		WithValue: true,
-	})
+	output, err := uc.Execute(t.Context(), secret.ListInput{WithValue: true})
 	require.NoError(t, err)
-	assert.Len(t, output.Entries, 2)
+	require.Len(t, output.Entries, 2)
 
 	var hasValue, hasError bool
 
@@ -240,139 +160,4 @@ func TestListUseCase_Execute_WithValue_PartialError(t *testing.T) {
 
 	assert.True(t, hasValue)
 	assert.True(t, hasError)
-}
-
-func TestListUseCase_Execute_WithPagination(t *testing.T) {
-	t.Parallel()
-
-	client := &mockListClient{
-		listSecretsResults: []*secretapi.ListSecretsOutput{
-			{
-				SecretList: []secretapi.SecretListEntry{
-					{Name: lo.ToPtr("secret-1")},
-					{Name: lo.ToPtr("secret-2")},
-				},
-				NextToken: lo.ToPtr("token1"),
-			},
-			{
-				SecretList: []secretapi.SecretListEntry{
-					{Name: lo.ToPtr("secret-3")},
-				},
-			},
-		},
-	}
-
-	uc := &secret.ListUseCase{Client: client}
-
-	output, err := uc.Execute(t.Context(), secret.ListInput{
-		MaxResults: 2,
-	})
-	require.NoError(t, err)
-	assert.Len(t, output.Entries, 2)
-	assert.NotEmpty(t, output.NextToken)
-}
-
-func TestListUseCase_Execute_WithPagination_ContinueToken(t *testing.T) {
-	t.Parallel()
-
-	client := &mockListClient{
-		listSecretsResults: []*secretapi.ListSecretsOutput{
-			{
-				SecretList: []secretapi.SecretListEntry{
-					{Name: lo.ToPtr("secret-3")},
-					{Name: lo.ToPtr("secret-4")},
-				},
-			},
-		},
-	}
-
-	uc := &secret.ListUseCase{Client: client}
-
-	output, err := uc.Execute(t.Context(), secret.ListInput{
-		MaxResults: 5,
-		NextToken:  "token1",
-	})
-	require.NoError(t, err)
-	assert.Len(t, output.Entries, 2)
-	assert.Empty(t, output.NextToken)
-}
-
-func TestListUseCase_Execute_WithPagination_FilterApplied(t *testing.T) {
-	t.Parallel()
-
-	client := &mockListClient{
-		listSecretsResults: []*secretapi.ListSecretsOutput{
-			{
-				SecretList: []secretapi.SecretListEntry{
-					{Name: lo.ToPtr("config-1")},
-					{Name: lo.ToPtr("secret-1")},
-					{Name: lo.ToPtr("config-2")},
-				},
-				NextToken: lo.ToPtr("token1"),
-			},
-			{
-				SecretList: []secretapi.SecretListEntry{
-					{Name: lo.ToPtr("config-3")},
-				},
-			},
-		},
-	}
-
-	uc := &secret.ListUseCase{Client: client}
-
-	output, err := uc.Execute(t.Context(), secret.ListInput{
-		MaxResults: 2,
-		Filter:     "config",
-	})
-	require.NoError(t, err)
-	assert.Len(t, output.Entries, 2)
-
-	for _, entry := range output.Entries {
-		assert.Contains(t, entry.Name, "config")
-	}
-}
-
-func TestListUseCase_Execute_WithPagination_Error(t *testing.T) {
-	t.Parallel()
-
-	client := &mockListClient{
-		listSecretsErr: errors.New("aws error"),
-	}
-
-	uc := &secret.ListUseCase{Client: client}
-
-	_, err := uc.Execute(t.Context(), secret.ListInput{
-		MaxResults: 10,
-	})
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to list secrets")
-}
-
-func TestListUseCase_Execute_WithPagination_TrimResults(t *testing.T) {
-	t.Parallel()
-
-	// Return more results than requested to trigger trimming
-	client := &mockListClient{
-		listSecretsResults: []*secretapi.ListSecretsOutput{
-			{
-				SecretList: []secretapi.SecretListEntry{
-					{Name: lo.ToPtr("secret-1")},
-					{Name: lo.ToPtr("secret-2")},
-					{Name: lo.ToPtr("secret-3")},
-					{Name: lo.ToPtr("secret-4")},
-				},
-				NextToken: lo.ToPtr("token1"),
-			},
-		},
-	}
-
-	uc := &secret.ListUseCase{Client: client}
-
-	output, err := uc.Execute(t.Context(), secret.ListInput{
-		MaxResults: 2,
-	})
-	require.NoError(t, err)
-	assert.Len(t, output.Entries, 2)
-	assert.Equal(t, "secret-1", output.Entries[0].Name)
-	assert.Equal(t, "secret-2", output.Entries[1].Name)
 }

@@ -29,13 +29,17 @@ type Store struct {
 	PutFunc func(
 		ctx context.Context, name, value string, valueType domain.ValueType, description string, opts ...provider.WriteOption,
 	) (domain.Version, error)
-	DeleteFunc func(ctx context.Context, name string, opts ...provider.DeleteOption) error
-	TagFunc    func(ctx context.Context, name string, add map[string]string) error
-	UntagFunc  func(ctx context.Context, name string, keys []string) error
+	DeleteFunc  func(ctx context.Context, name string, opts ...provider.DeleteOption) error
+	TagFunc     func(ctx context.Context, name string, add map[string]string) error
+	UntagFunc   func(ctx context.Context, name string, keys []string) error
+	RestoreFunc func(ctx context.Context, name string) error
 }
 
-// Compile-time assertion that *Store implements the full provider contract.
-var _ provider.Store = (*Store)(nil)
+// Compile-time assertions that *Store implements the provider contracts.
+var (
+	_ provider.Store    = (*Store)(nil)
+	_ provider.Restorer = (*Store)(nil)
+)
 
 // Resolve delegates to ResolveFunc.
 func (s *Store) Resolve(ctx context.Context, name, spec string) (provider.VersionRef, error) {
@@ -120,4 +124,13 @@ func (s *Store) Untag(ctx context.Context, name string, keys []string) error {
 	}
 
 	return s.UntagFunc(ctx, name, keys)
+}
+
+// Restore delegates to RestoreFunc.
+func (s *Store) Restore(ctx context.Context, name string) error {
+	if s.RestoreFunc == nil {
+		return ErrNotConfigured
+	}
+
+	return s.RestoreFunc(ctx, name)
 }

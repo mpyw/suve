@@ -2,71 +2,40 @@ package secret_test
 
 import (
 	"context"
-	"errors"
 	"testing"
-	"time"
 
-	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/mpyw/suve/internal/api/secretapi"
+	"github.com/mpyw/suve/internal/domain"
+	"github.com/mpyw/suve/internal/provider"
+	"github.com/mpyw/suve/internal/provider/providermock"
 	"github.com/mpyw/suve/internal/usecase/secret"
-	"github.com/mpyw/suve/internal/version/secretversion"
 )
-
-type mockDiffClient struct {
-	getSecretValueResults []*secretapi.GetSecretValueOutput
-	getSecretValueErrs    []error
-	getSecretValueCalls   int
-	listVersionsResult    *secretapi.ListSecretVersionIDsOutput
-	listVersionsErr       error
-}
-
-//nolint:lll // mock function signature must match AWS SDK interface
-func (m *mockDiffClient) GetSecretValue(_ context.Context, _ *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options)) (*secretapi.GetSecretValueOutput, error) {
-	idx := m.getSecretValueCalls
-	m.getSecretValueCalls++
-
-	if idx < len(m.getSecretValueErrs) && m.getSecretValueErrs[idx] != nil {
-		return nil, m.getSecretValueErrs[idx]
-	}
-
-	if idx < len(m.getSecretValueResults) {
-		return m.getSecretValueResults[idx], nil
-	}
-
-	return nil, errors.New("unexpected GetSecretValue call")
-}
-
-//nolint:revive,stylecheck,lll // Method name must match AWS SDK interface
-func (m *mockDiffClient) ListSecretVersionIds(_ context.Context, _ *secretapi.ListSecretVersionIDsInput, _ ...func(*secretapi.Options)) (*secretapi.ListSecretVersionIDsOutput, error) {
-	if m.listVersionsErr != nil {
-		return nil, m.listVersionsErr
-	}
-
-	return m.listVersionsResult, nil
-}
 
 func TestDiffUseCase_Execute(t *testing.T) {
 	t.Parallel()
 
-	// Specs without shift use GetSecretValue directly
-	client := &mockDiffClient{
-		getSecretValueResults: []*secretapi.GetSecretValueOutput{
-			{Name: lo.ToPtr("my-secret"), VersionId: lo.ToPtr("v1-id"), SecretString: lo.ToPtr("old-value")},
-			{Name: lo.ToPtr("my-secret"), VersionId: lo.ToPtr("v2-id"), SecretString: lo.ToPtr("new-value")},
+	entries := map[string]*domain.Entry{
+		"":       {Name: "my-secret", Value: "new-value", Version: domain.Version{ID: "v2-id"}},
+		"#v1-id": {Name: "my-secret", Value: "old-value", Version: domain.Version{ID: "v1-id"}},
+	}
+
+	store := &providermock.Store{
+		ResolveFunc: func(_ context.Context, _, spec string) (provider.VersionRef, error) {
+			// Encode the spec into the ref id so Get can pick the right entry.
+			return provider.NewVersionRef(spec), nil
+		},
+		GetFunc: func(_ context.Context, _ string, ref provider.VersionRef) (*domain.Entry, error) {
+			return entries[ref.ID()], nil
 		},
 	}
 
-	uc := &secret.DiffUseCase{Client: client}
-
-	spec1, _ := secretversion.Parse("my-secret#v1-id")
-	spec2, _ := secretversion.Parse("my-secret#v2-id")
+	uc := &secret.DiffUseCase{Reader: store}
 
 	output, err := uc.Execute(t.Context(), secret.DiffInput{
-		Spec1: spec1,
-		Spec2: spec2,
+		Spec1: mustParseSpec(t, "my-secret#v1-id"),
+		Spec2: mustParseSpec(t, "my-secret"),
 	})
 	require.NoError(t, err)
 	assert.Equal(t, "my-secret", output.OldName)
@@ -77,103 +46,41 @@ func TestDiffUseCase_Execute(t *testing.T) {
 	assert.Equal(t, "new-value", output.NewValue)
 }
 
-func TestDiffUseCase_Execute_Spec1Error(t *testing.T) {
+func TestDiffUseCase_Execute_ResolveError(t *testing.T) {
 	t.Parallel()
 
-	client := &mockDiffClient{
-		getSecretValueErrs: []error{errors.New("get secret error")},
+	store := &providermock.Store{
+		ResolveFunc: func(_ context.Context, _, _ string) (provider.VersionRef, error) {
+			return provider.VersionRef{}, assert.AnError
+		},
 	}
 
-	uc := &secret.DiffUseCase{Client: client}
-
-	spec1, _ := secretversion.Parse("my-secret#v1-id")
-	spec2, _ := secretversion.Parse("my-secret#v2-id")
+	uc := &secret.DiffUseCase{Reader: store}
 
 	_, err := uc.Execute(t.Context(), secret.DiffInput{
-		Spec1: spec1,
-		Spec2: spec2,
+		Spec1: mustParseSpec(t, "my-secret"),
+		Spec2: mustParseSpec(t, "my-secret~1"),
 	})
 	assert.Error(t, err)
 }
 
-func TestDiffUseCase_Execute_Spec2Error(t *testing.T) {
+func TestDiffUseCase_Execute_GetError(t *testing.T) {
 	t.Parallel()
 
-	client := &mockDiffClient{
-		getSecretValueResults: []*secretapi.GetSecretValueOutput{
-			{Name: lo.ToPtr("my-secret"), VersionId: lo.ToPtr("v1-id"), SecretString: lo.ToPtr("old-value")},
+	store := &providermock.Store{
+		ResolveFunc: func(_ context.Context, _, _ string) (provider.VersionRef, error) {
+			return provider.VersionRef{}, nil
 		},
-		getSecretValueErrs: []error{nil, errors.New("second get secret error")},
+		GetFunc: func(_ context.Context, _ string, _ provider.VersionRef) (*domain.Entry, error) {
+			return nil, assert.AnError
+		},
 	}
 
-	uc := &secret.DiffUseCase{Client: client}
-
-	spec1, _ := secretversion.Parse("my-secret#v1-id")
-	spec2, _ := secretversion.Parse("my-secret#v2-id")
+	uc := &secret.DiffUseCase{Reader: store}
 
 	_, err := uc.Execute(t.Context(), secret.DiffInput{
-		Spec1: spec1,
-		Spec2: spec2,
+		Spec1: mustParseSpec(t, "my-secret"),
+		Spec2: mustParseSpec(t, "my-secret~1"),
 	})
 	assert.Error(t, err)
-}
-
-func TestDiffUseCase_Execute_WithLabel(t *testing.T) {
-	t.Parallel()
-
-	// Specs with label use GetSecretValue directly
-	client := &mockDiffClient{
-		getSecretValueResults: []*secretapi.GetSecretValueOutput{
-			{Name: lo.ToPtr("my-secret"), VersionId: lo.ToPtr("v1-id"), SecretString: lo.ToPtr("previous-value")},
-			{Name: lo.ToPtr("my-secret"), VersionId: lo.ToPtr("v2-id"), SecretString: lo.ToPtr("current-value")},
-		},
-	}
-
-	uc := &secret.DiffUseCase{Client: client}
-
-	spec1, _ := secretversion.Parse("my-secret:AWSPREVIOUS")
-	spec2, _ := secretversion.Parse("my-secret:AWSCURRENT")
-
-	output, err := uc.Execute(t.Context(), secret.DiffInput{
-		Spec1: spec1,
-		Spec2: spec2,
-	})
-	require.NoError(t, err)
-	assert.Equal(t, "v1-id", output.OldVersionID)
-	assert.Equal(t, "v2-id", output.NewVersionID)
-}
-
-func TestDiffUseCase_Execute_WithShift(t *testing.T) {
-	t.Parallel()
-
-	now := time.Now()
-	// Specs with shift use ListSecretVersionIds + GetSecretValue
-	client := &mockDiffClient{
-		listVersionsResult: &secretapi.ListSecretVersionIDsOutput{
-			Versions: []secretapi.SecretVersionsListEntry{
-				{VersionId: lo.ToPtr("v1-id"), CreatedDate: lo.ToPtr(now.Add(-2 * time.Hour))},
-				{VersionId: lo.ToPtr("v2-id"), CreatedDate: lo.ToPtr(now.Add(-1 * time.Hour))},
-				{VersionId: lo.ToPtr("v3-id"), CreatedDate: lo.ToPtr(now)},
-			},
-		},
-		getSecretValueResults: []*secretapi.GetSecretValueOutput{
-			{Name: lo.ToPtr("my-secret"), VersionId: lo.ToPtr("v1-id"), SecretString: lo.ToPtr("v1-value")},
-			{Name: lo.ToPtr("my-secret"), VersionId: lo.ToPtr("v2-id"), SecretString: lo.ToPtr("v2-value")},
-		},
-	}
-
-	uc := &secret.DiffUseCase{Client: client}
-
-	spec1, _ := secretversion.Parse("my-secret~2") // 2 versions back from latest
-	spec2, _ := secretversion.Parse("my-secret~1") // 1 version back from latest
-
-	output, err := uc.Execute(t.Context(), secret.DiffInput{
-		Spec1: spec1,
-		Spec2: spec2,
-	})
-	require.NoError(t, err)
-	assert.Equal(t, "v1-id", output.OldVersionID)
-	assert.Equal(t, "v1-value", output.OldValue)
-	assert.Equal(t, "v2-id", output.NewVersionID)
-	assert.Equal(t, "v2-value", output.NewValue)
 }

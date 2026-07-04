@@ -45,6 +45,11 @@ type UpdateSecretAPI interface {
 	UpdateSecret(ctx context.Context, params *UpdateSecretInput, optFns ...func(*Options)) (*UpdateSecretOutput, error)
 }
 
+// RotateSecretAPI is the interface for configuring/triggering secret rotation.
+type RotateSecretAPI interface {
+	RotateSecret(ctx context.Context, params *RotateSecretInput, optFns ...func(*Options)) (*RotateSecretOutput, error)
+}
+
 // TagResourceAPI is the interface for tagging a secret.
 type TagResourceAPI interface {
 	TagResource(ctx context.Context, params *TagResourceInput, optFns ...func(*Options)) (*TagResourceOutput, error)
