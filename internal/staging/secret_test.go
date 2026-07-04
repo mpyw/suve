@@ -3,6 +3,7 @@ package staging_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -10,131 +11,16 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/mpyw/suve/internal/api/secretapi"
+	"github.com/mpyw/suve/internal/domain"
 	"github.com/mpyw/suve/internal/maputil"
+	"github.com/mpyw/suve/internal/provider"
+	awssecret "github.com/mpyw/suve/internal/provider/aws/secret"
+	"github.com/mpyw/suve/internal/provider/providermock"
 	"github.com/mpyw/suve/internal/staging"
 )
 
-type secretMockClient struct {
-	getSecretValueFunc func(
-		ctx context.Context, params *secretapi.GetSecretValueInput, optFns ...func(*secretapi.Options),
-	) (*secretapi.GetSecretValueOutput, error)
-	//nolint:revive,stylecheck // AWS SDK uses inconsistent naming
-	listSecretVersionIdsFunc func(
-		ctx context.Context, params *secretapi.ListSecretVersionIDsInput, optFns ...func(*secretapi.Options),
-	) (*secretapi.ListSecretVersionIDsOutput, error)
-	createSecretFunc func(
-		ctx context.Context, params *secretapi.CreateSecretInput, optFns ...func(*secretapi.Options),
-	) (*secretapi.CreateSecretOutput, error)
-	putSecretValueFunc func(
-		ctx context.Context, params *secretapi.PutSecretValueInput, optFns ...func(*secretapi.Options),
-	) (*secretapi.PutSecretValueOutput, error)
-	deleteSecretFunc func(
-		ctx context.Context, params *secretapi.DeleteSecretInput, optFns ...func(*secretapi.Options),
-	) (*secretapi.DeleteSecretOutput, error)
-	updateSecretFunc func(
-		ctx context.Context, params *secretapi.UpdateSecretInput, optFns ...func(*secretapi.Options),
-	) (*secretapi.UpdateSecretOutput, error)
-	tagResourceFunc func(
-		ctx context.Context, params *secretapi.TagResourceInput, optFns ...func(*secretapi.Options),
-	) (*secretapi.TagResourceOutput, error)
-	untagResourceFunc func(
-		ctx context.Context, params *secretapi.UntagResourceInput, optFns ...func(*secretapi.Options),
-	) (*secretapi.UntagResourceOutput, error)
-	describeSecretFunc func(
-		ctx context.Context, params *secretapi.DescribeSecretInput, optFns ...func(*secretapi.Options),
-	) (*secretapi.DescribeSecretOutput, error)
-}
-
-func (m *secretMockClient) GetSecretValue(
-	ctx context.Context, params *secretapi.GetSecretValueInput, optFns ...func(*secretapi.Options),
-) (*secretapi.GetSecretValueOutput, error) {
-	if m.getSecretValueFunc != nil {
-		return m.getSecretValueFunc(ctx, params, optFns...)
-	}
-
-	return nil, errors.New("GetSecretValue not mocked")
-}
-
-//nolint:revive,stylecheck // AWS SDK uses inconsistent naming
-func (m *secretMockClient) ListSecretVersionIds(
-	ctx context.Context, params *secretapi.ListSecretVersionIDsInput, optFns ...func(*secretapi.Options),
-) (*secretapi.ListSecretVersionIDsOutput, error) {
-	if m.listSecretVersionIdsFunc != nil {
-		return m.listSecretVersionIdsFunc(ctx, params, optFns...)
-	}
-
-	return nil, errors.New("ListSecretVersionIds not mocked")
-}
-
-func (m *secretMockClient) CreateSecret(
-	ctx context.Context, params *secretapi.CreateSecretInput, optFns ...func(*secretapi.Options),
-) (*secretapi.CreateSecretOutput, error) {
-	if m.createSecretFunc != nil {
-		return m.createSecretFunc(ctx, params, optFns...)
-	}
-
-	return nil, errors.New("CreateSecret not mocked")
-}
-
-func (m *secretMockClient) PutSecretValue(
-	ctx context.Context, params *secretapi.PutSecretValueInput, optFns ...func(*secretapi.Options),
-) (*secretapi.PutSecretValueOutput, error) {
-	if m.putSecretValueFunc != nil {
-		return m.putSecretValueFunc(ctx, params, optFns...)
-	}
-
-	return nil, errors.New("PutSecretValue not mocked")
-}
-
-func (m *secretMockClient) DeleteSecret(
-	ctx context.Context, params *secretapi.DeleteSecretInput, optFns ...func(*secretapi.Options),
-) (*secretapi.DeleteSecretOutput, error) {
-	if m.deleteSecretFunc != nil {
-		return m.deleteSecretFunc(ctx, params, optFns...)
-	}
-
-	return nil, errors.New("DeleteSecret not mocked")
-}
-
-func (m *secretMockClient) UpdateSecret(
-	ctx context.Context, params *secretapi.UpdateSecretInput, optFns ...func(*secretapi.Options),
-) (*secretapi.UpdateSecretOutput, error) {
-	if m.updateSecretFunc != nil {
-		return m.updateSecretFunc(ctx, params, optFns...)
-	}
-
-	return &secretapi.UpdateSecretOutput{}, nil
-}
-
-func (m *secretMockClient) TagResource(
-	ctx context.Context, params *secretapi.TagResourceInput, optFns ...func(*secretapi.Options),
-) (*secretapi.TagResourceOutput, error) {
-	if m.tagResourceFunc != nil {
-		return m.tagResourceFunc(ctx, params, optFns...)
-	}
-
-	return &secretapi.TagResourceOutput{}, nil
-}
-
-func (m *secretMockClient) UntagResource(
-	ctx context.Context, params *secretapi.UntagResourceInput, optFns ...func(*secretapi.Options),
-) (*secretapi.UntagResourceOutput, error) {
-	if m.untagResourceFunc != nil {
-		return m.untagResourceFunc(ctx, params, optFns...)
-	}
-
-	return &secretapi.UntagResourceOutput{}, nil
-}
-
-func (m *secretMockClient) DescribeSecret(
-	ctx context.Context, params *secretapi.DescribeSecretInput, optFns ...func(*secretapi.Options),
-) (*secretapi.DescribeSecretOutput, error) {
-	if m.describeSecretFunc != nil {
-		return m.describeSecretFunc(ctx, params, optFns...)
-	}
-
-	return &secretapi.DescribeSecretOutput{}, nil
+func secretNotFound(name string) error {
+	return fmt.Errorf("%w: %s", provider.ErrNotFound, name)
 }
 
 func TestSecretStrategy_BasicMethods(t *testing.T) {
@@ -169,14 +55,15 @@ func TestSecretStrategy_Apply(t *testing.T) {
 	t.Run("create operation", func(t *testing.T) {
 		t.Parallel()
 
-		mock := &secretMockClient{
-			createSecretFunc: func(
-				_ context.Context, params *secretapi.CreateSecretInput, _ ...func(*secretapi.Options),
-			) (*secretapi.CreateSecretOutput, error) {
-				assert.Equal(t, "my-secret", lo.FromPtr(params.Name))
-				assert.Equal(t, "secret-value", lo.FromPtr(params.SecretString))
+		mock := &providermock.Store{
+			CreateFunc: func(
+				_ context.Context, name, value string, valueType domain.ValueType, _ string, _ ...provider.WriteOption,
+			) (domain.Version, error) {
+				assert.Equal(t, "my-secret", name)
+				assert.Equal(t, "secret-value", value)
+				assert.Equal(t, domain.ValueTypeSecret, valueType)
 
-				return &secretapi.CreateSecretOutput{}, nil
+				return domain.Version{ID: "v1"}, nil
 			},
 		}
 
@@ -191,11 +78,11 @@ func TestSecretStrategy_Apply(t *testing.T) {
 	t.Run("create operation error", func(t *testing.T) {
 		t.Parallel()
 
-		mock := &secretMockClient{
-			createSecretFunc: func(
-				_ context.Context, _ *secretapi.CreateSecretInput, _ ...func(*secretapi.Options),
-			) (*secretapi.CreateSecretOutput, error) {
-				return nil, errors.New("create failed")
+		mock := &providermock.Store{
+			CreateFunc: func(
+				_ context.Context, _, _ string, _ domain.ValueType, _ string, _ ...provider.WriteOption,
+			) (domain.Version, error) {
+				return domain.Version{}, errors.New("create failed")
 			},
 		}
 
@@ -211,14 +98,15 @@ func TestSecretStrategy_Apply(t *testing.T) {
 	t.Run("update operation", func(t *testing.T) {
 		t.Parallel()
 
-		mock := &secretMockClient{
-			putSecretValueFunc: func(
-				_ context.Context, params *secretapi.PutSecretValueInput, _ ...func(*secretapi.Options),
-			) (*secretapi.PutSecretValueOutput, error) {
-				assert.Equal(t, "my-secret", lo.FromPtr(params.SecretId))
-				assert.Equal(t, "updated-value", lo.FromPtr(params.SecretString))
+		mock := &providermock.Store{
+			PutFunc: func(
+				_ context.Context, name, value string, valueType domain.ValueType, _ string, _ ...provider.WriteOption,
+			) (domain.Version, error) {
+				assert.Equal(t, "my-secret", name)
+				assert.Equal(t, "updated-value", value)
+				assert.Equal(t, domain.ValueTypeSecret, valueType)
 
-				return &secretapi.PutSecretValueOutput{}, nil
+				return domain.Version{ID: "v2"}, nil
 			},
 		}
 
@@ -233,11 +121,11 @@ func TestSecretStrategy_Apply(t *testing.T) {
 	t.Run("update operation error", func(t *testing.T) {
 		t.Parallel()
 
-		mock := &secretMockClient{
-			putSecretValueFunc: func(
-				_ context.Context, _ *secretapi.PutSecretValueInput, _ ...func(*secretapi.Options),
-			) (*secretapi.PutSecretValueOutput, error) {
-				return nil, errors.New("update failed")
+		mock := &providermock.Store{
+			PutFunc: func(
+				_ context.Context, _, _ string, _ domain.ValueType, _ string, _ ...provider.WriteOption,
+			) (domain.Version, error) {
+				return domain.Version{}, errors.New("update failed")
 			},
 		}
 
@@ -253,15 +141,12 @@ func TestSecretStrategy_Apply(t *testing.T) {
 	t.Run("delete operation - basic", func(t *testing.T) {
 		t.Parallel()
 
-		mock := &secretMockClient{
-			deleteSecretFunc: func(
-				_ context.Context, params *secretapi.DeleteSecretInput, _ ...func(*secretapi.Options),
-			) (*secretapi.DeleteSecretOutput, error) {
-				assert.Equal(t, "my-secret", lo.FromPtr(params.SecretId))
-				assert.Nil(t, params.ForceDeleteWithoutRecovery)
-				assert.Nil(t, params.RecoveryWindowInDays)
+		mock := &providermock.Store{
+			DeleteFunc: func(_ context.Context, name string, opts ...provider.DeleteOption) error {
+				assert.Equal(t, "my-secret", name)
+				assert.Empty(t, opts)
 
-				return &secretapi.DeleteSecretOutput{}, nil
+				return nil
 			},
 		}
 
@@ -275,13 +160,12 @@ func TestSecretStrategy_Apply(t *testing.T) {
 	t.Run("delete operation - with force", func(t *testing.T) {
 		t.Parallel()
 
-		mock := &secretMockClient{
-			deleteSecretFunc: func(
-				_ context.Context, params *secretapi.DeleteSecretInput, _ ...func(*secretapi.Options),
-			) (*secretapi.DeleteSecretOutput, error) {
-				assert.True(t, lo.FromPtr(params.ForceDeleteWithoutRecovery))
+		mock := &providermock.Store{
+			DeleteFunc: func(_ context.Context, _ string, opts ...provider.DeleteOption) error {
+				require.Len(t, opts, 1)
+				assert.IsType(t, awssecret.ForceDelete{}, opts[0])
 
-				return &secretapi.DeleteSecretOutput{}, nil
+				return nil
 			},
 		}
 
@@ -298,14 +182,14 @@ func TestSecretStrategy_Apply(t *testing.T) {
 	t.Run("delete operation - with recovery window", func(t *testing.T) {
 		t.Parallel()
 
-		mock := &secretMockClient{
-			deleteSecretFunc: func(
-				_ context.Context, params *secretapi.DeleteSecretInput, _ ...func(*secretapi.Options),
-			) (*secretapi.DeleteSecretOutput, error) {
-				assert.Nil(t, params.ForceDeleteWithoutRecovery)
-				assert.Equal(t, int64(14), lo.FromPtr(params.RecoveryWindowInDays))
+		mock := &providermock.Store{
+			DeleteFunc: func(_ context.Context, _ string, opts ...provider.DeleteOption) error {
+				require.Len(t, opts, 1)
+				rw, ok := opts[0].(awssecret.RecoveryWindow)
+				require.True(t, ok)
+				assert.Equal(t, int64(14), rw.Days)
 
-				return &secretapi.DeleteSecretOutput{}, nil
+				return nil
 			},
 		}
 
@@ -322,11 +206,9 @@ func TestSecretStrategy_Apply(t *testing.T) {
 	t.Run("delete operation error", func(t *testing.T) {
 		t.Parallel()
 
-		mock := &secretMockClient{
-			deleteSecretFunc: func(
-				_ context.Context, _ *secretapi.DeleteSecretInput, _ ...func(*secretapi.Options),
-			) (*secretapi.DeleteSecretOutput, error) {
-				return nil, errors.New("delete failed")
+		mock := &providermock.Store{
+			DeleteFunc: func(_ context.Context, _ string, _ ...provider.DeleteOption) error {
+				return errors.New("delete failed")
 			},
 		}
 
@@ -341,7 +223,7 @@ func TestSecretStrategy_Apply(t *testing.T) {
 	t.Run("unknown operation", func(t *testing.T) {
 		t.Parallel()
 
-		s := staging.NewSecretStrategy(&secretMockClient{})
+		s := staging.NewSecretStrategy(&providermock.Store{})
 		err := s.Apply(t.Context(), "my-secret", staging.Entry{
 			Operation: staging.Operation("unknown"),
 		})
@@ -356,13 +238,11 @@ func TestSecretStrategy_FetchCurrent(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		t.Parallel()
 
-		mock := &secretMockClient{
-			getSecretValueFunc: func(
-				_ context.Context, _ *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options),
-			) (*secretapi.GetSecretValueOutput, error) {
-				return &secretapi.GetSecretValueOutput{
-					SecretString: lo.ToPtr("secret-value"),
-					VersionId:    lo.ToPtr("abcdefgh-1234-5678-9abc-def012345678"),
+		mock := &providermock.Store{
+			GetFunc: func(_ context.Context, _ string, _ provider.VersionRef) (*domain.Entry, error) {
+				return &domain.Entry{
+					Value:   "secret-value",
+					Version: domain.Version{ID: "abcdefgh-1234-5678-9abc-def012345678"},
 				}, nil
 			},
 		}
@@ -377,10 +257,8 @@ func TestSecretStrategy_FetchCurrent(t *testing.T) {
 	t.Run("error", func(t *testing.T) {
 		t.Parallel()
 
-		mock := &secretMockClient{
-			getSecretValueFunc: func(
-				_ context.Context, _ *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options),
-			) (*secretapi.GetSecretValueOutput, error) {
+		mock := &providermock.Store{
+			GetFunc: func(_ context.Context, _ string, _ provider.VersionRef) (*domain.Entry, error) {
 				return nil, errors.New("not found")
 			},
 		}
@@ -451,14 +329,9 @@ func TestSecretStrategy_FetchCurrentValue(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		t.Parallel()
 
-		mock := &secretMockClient{
-			getSecretValueFunc: func(
-				_ context.Context, _ *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options),
-			) (*secretapi.GetSecretValueOutput, error) {
-				return &secretapi.GetSecretValueOutput{
-					SecretString: lo.ToPtr("fetched-secret"),
-					CreatedDate:  &now,
-				}, nil
+		mock := &providermock.Store{
+			GetFunc: func(_ context.Context, _ string, _ provider.VersionRef) (*domain.Entry, error) {
+				return &domain.Entry{Value: "fetched-secret", Modified: &now}, nil
 			},
 		}
 
@@ -469,13 +342,28 @@ func TestSecretStrategy_FetchCurrentValue(t *testing.T) {
 		assert.Equal(t, now, result.LastModified)
 	})
 
+	t.Run("not found returns ResourceNotFoundError", func(t *testing.T) {
+		t.Parallel()
+
+		mock := &providermock.Store{
+			GetFunc: func(_ context.Context, _ string, _ provider.VersionRef) (*domain.Entry, error) {
+				return nil, secretNotFound("my-secret")
+			},
+		}
+
+		s := staging.NewSecretStrategy(mock)
+		_, err := s.FetchCurrentValue(t.Context(), "my-secret")
+		require.Error(t, err)
+
+		var notFound *staging.ResourceNotFoundError
+		assert.ErrorAs(t, err, &notFound)
+	})
+
 	t.Run("error", func(t *testing.T) {
 		t.Parallel()
 
-		mock := &secretMockClient{
-			getSecretValueFunc: func(
-				_ context.Context, _ *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options),
-			) (*secretapi.GetSecretValueOutput, error) {
+		mock := &providermock.Store{
+			GetFunc: func(_ context.Context, _ string, _ provider.VersionRef) (*domain.Entry, error) {
 				return nil, errors.New("fetch error")
 			},
 		}
@@ -548,15 +436,17 @@ func TestSecretStrategy_FetchVersion(t *testing.T) {
 	t.Run("success with label", func(t *testing.T) {
 		t.Parallel()
 
-		mock := &secretMockClient{
-			getSecretValueFunc: func(
-				_ context.Context, params *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options),
-			) (*secretapi.GetSecretValueOutput, error) {
-				assert.Equal(t, "AWSPREVIOUS", lo.FromPtr(params.VersionStage))
+		mock := &providermock.Store{
+			ResolveFunc: func(_ context.Context, name, spec string) (provider.VersionRef, error) {
+				assert.Equal(t, "my-secret", name)
+				assert.Equal(t, ":AWSPREVIOUS", spec)
 
-				return &secretapi.GetSecretValueOutput{
-					SecretString: lo.ToPtr("previous-value"),
-					VersionId:    lo.ToPtr("12345678-abcd-efgh-ijkl-mnopqrstuvwx"),
+				return provider.NewVersionRef("12345678-abcd-efgh-ijkl-mnopqrstuvwx"), nil
+			},
+			GetFunc: func(_ context.Context, _ string, _ provider.VersionRef) (*domain.Entry, error) {
+				return &domain.Entry{
+					Value:   "previous-value",
+					Version: domain.Version{ID: "12345678-abcd-efgh-ijkl-mnopqrstuvwx"},
 				}, nil
 			},
 		}
@@ -571,30 +461,17 @@ func TestSecretStrategy_FetchVersion(t *testing.T) {
 	t.Run("success with shift", func(t *testing.T) {
 		t.Parallel()
 
-		mock := &secretMockClient{
-			getSecretValueFunc: func(
-				_ context.Context, params *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options),
-			) (*secretapi.GetSecretValueOutput, error) {
-				if params.VersionStage != nil && lo.FromPtr(params.VersionStage) == "AWSCURRENT" {
-					return &secretapi.GetSecretValueOutput{
-						SecretString: lo.ToPtr("current-value"),
-						VersionId:    lo.ToPtr("version-current"),
-					}, nil
-				}
+		mock := &providermock.Store{
+			ResolveFunc: func(_ context.Context, name, spec string) (provider.VersionRef, error) {
+				assert.Equal(t, "my-secret", name)
+				assert.Equal(t, "~1", spec)
 
-				return &secretapi.GetSecretValueOutput{
-					SecretString: lo.ToPtr("shifted-value"),
-					VersionId:    lo.ToPtr("version-shifted"),
-				}, nil
+				return provider.NewVersionRef("version-shifted"), nil
 			},
-			listSecretVersionIdsFunc: func(
-				_ context.Context, _ *secretapi.ListSecretVersionIDsInput, _ ...func(*secretapi.Options),
-			) (*secretapi.ListSecretVersionIDsOutput, error) {
-				return &secretapi.ListSecretVersionIDsOutput{
-					Versions: []secretapi.SecretVersionsListEntry{
-						{VersionId: lo.ToPtr("version-current"), VersionStages: []string{"AWSCURRENT"}},
-						{VersionId: lo.ToPtr("version-shifted"), VersionStages: []string{"AWSPREVIOUS"}},
-					},
+			GetFunc: func(_ context.Context, _ string, _ provider.VersionRef) (*domain.Entry, error) {
+				return &domain.Entry{
+					Value:   "shifted-value",
+					Version: domain.Version{ID: "version-shifted"},
 				}, nil
 			},
 		}
@@ -609,7 +486,7 @@ func TestSecretStrategy_FetchVersion(t *testing.T) {
 	t.Run("parse error", func(t *testing.T) {
 		t.Parallel()
 
-		s := staging.NewSecretStrategy(&secretMockClient{})
+		s := staging.NewSecretStrategy(&providermock.Store{})
 		_, _, err := s.FetchVersion(t.Context(), "")
 		require.Error(t, err)
 	})
@@ -617,11 +494,9 @@ func TestSecretStrategy_FetchVersion(t *testing.T) {
 	t.Run("fetch error", func(t *testing.T) {
 		t.Parallel()
 
-		mock := &secretMockClient{
-			getSecretValueFunc: func(
-				_ context.Context, _ *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options),
-			) (*secretapi.GetSecretValueOutput, error) {
-				return nil, errors.New("fetch error")
+		mock := &providermock.Store{
+			ResolveFunc: func(_ context.Context, _, _ string) (provider.VersionRef, error) {
+				return provider.VersionRef{}, errors.New("fetch error")
 			},
 		}
 
@@ -644,17 +519,12 @@ func TestSecretStrategy_FetchLastModified(t *testing.T) {
 
 	now := time.Now()
 
-	t.Run("success - returns created date", func(t *testing.T) {
+	t.Run("success - returns modified time", func(t *testing.T) {
 		t.Parallel()
 
-		mock := &secretMockClient{
-			getSecretValueFunc: func(
-				_ context.Context, _ *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options),
-			) (*secretapi.GetSecretValueOutput, error) {
-				return &secretapi.GetSecretValueOutput{
-					Name:        lo.ToPtr("my-secret"),
-					CreatedDate: &now,
-				}, nil
+		mock := &providermock.Store{
+			GetFunc: func(_ context.Context, _ string, _ provider.VersionRef) (*domain.Entry, error) {
+				return &domain.Entry{Modified: &now}, nil
 			},
 		}
 
@@ -667,11 +537,9 @@ func TestSecretStrategy_FetchLastModified(t *testing.T) {
 	t.Run("not found - returns zero time", func(t *testing.T) {
 		t.Parallel()
 
-		mock := &secretMockClient{
-			getSecretValueFunc: func(
-				_ context.Context, _ *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options),
-			) (*secretapi.GetSecretValueOutput, error) {
-				return nil, &secretapi.ResourceNotFoundException{}
+		mock := &providermock.Store{
+			GetFunc: func(_ context.Context, _ string, _ provider.VersionRef) (*domain.Entry, error) {
+				return nil, secretNotFound("my-secret")
 			},
 		}
 
@@ -684,10 +552,8 @@ func TestSecretStrategy_FetchLastModified(t *testing.T) {
 	t.Run("other error - returns error", func(t *testing.T) {
 		t.Parallel()
 
-		mock := &secretMockClient{
-			getSecretValueFunc: func(
-				_ context.Context, _ *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options),
-			) (*secretapi.GetSecretValueOutput, error) {
+		mock := &providermock.Store{
+			GetFunc: func(_ context.Context, _ string, _ provider.VersionRef) (*domain.Entry, error) {
 				return nil, errors.New("access denied")
 			},
 		}
@@ -698,17 +564,12 @@ func TestSecretStrategy_FetchLastModified(t *testing.T) {
 		assert.Contains(t, err.Error(), "failed to get secret")
 	})
 
-	t.Run("nil CreatedDate - returns zero time", func(t *testing.T) {
+	t.Run("nil modified time - returns zero time", func(t *testing.T) {
 		t.Parallel()
 
-		mock := &secretMockClient{
-			getSecretValueFunc: func(
-				_ context.Context, _ *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options),
-			) (*secretapi.GetSecretValueOutput, error) {
-				return &secretapi.GetSecretValueOutput{
-					Name:        lo.ToPtr("my-secret"),
-					CreatedDate: nil,
-				}, nil
+		mock := &providermock.Store{
+			GetFunc: func(_ context.Context, _ string, _ provider.VersionRef) (*domain.Entry, error) {
+				return &domain.Entry{Modified: nil}, nil
 			},
 		}
 
@@ -725,13 +586,13 @@ func TestSecretStrategy_Apply_WithOptions(t *testing.T) {
 	t.Run("create with description", func(t *testing.T) {
 		t.Parallel()
 
-		mock := &secretMockClient{
-			createSecretFunc: func(
-				_ context.Context, params *secretapi.CreateSecretInput, _ ...func(*secretapi.Options),
-			) (*secretapi.CreateSecretOutput, error) {
-				assert.Equal(t, "Test description", lo.FromPtr(params.Description))
+		mock := &providermock.Store{
+			CreateFunc: func(
+				_ context.Context, _, _ string, _ domain.ValueType, description string, _ ...provider.WriteOption,
+			) (domain.Version, error) {
+				assert.Equal(t, "Test description", description)
 
-				return &secretapi.CreateSecretOutput{}, nil
+				return domain.Version{ID: "v1"}, nil
 			},
 		}
 
@@ -747,21 +608,18 @@ func TestSecretStrategy_Apply_WithOptions(t *testing.T) {
 	t.Run("update with description", func(t *testing.T) {
 		t.Parallel()
 
-		updateSecretCalled := false
-		mock := &secretMockClient{
-			putSecretValueFunc: func(
-				_ context.Context, _ *secretapi.PutSecretValueInput, _ ...func(*secretapi.Options),
-			) (*secretapi.PutSecretValueOutput, error) {
-				return &secretapi.PutSecretValueOutput{}, nil
-			},
-			updateSecretFunc: func(
-				_ context.Context, params *secretapi.UpdateSecretInput, _ ...func(*secretapi.Options),
-			) (*secretapi.UpdateSecretOutput, error) {
-				updateSecretCalled = true
+		putCalled := false
+		mock := &providermock.Store{
+			PutFunc: func(
+				_ context.Context, _, value string, _ domain.ValueType, description string, _ ...provider.WriteOption,
+			) (domain.Version, error) {
+				putCalled = true
 
-				assert.Equal(t, "Updated description", lo.FromPtr(params.Description))
+				// Value and description are updated together via a single Put.
+				assert.Equal(t, "updated-value", value)
+				assert.Equal(t, "Updated description", description)
 
-				return &secretapi.UpdateSecretOutput{}, nil
+				return domain.Version{ID: "v2"}, nil
 			},
 		}
 
@@ -772,22 +630,17 @@ func TestSecretStrategy_Apply_WithOptions(t *testing.T) {
 			Description: lo.ToPtr("Updated description"),
 		})
 		require.NoError(t, err)
-		assert.True(t, updateSecretCalled)
+		assert.True(t, putCalled)
 	})
 
 	t.Run("update with description error", func(t *testing.T) {
 		t.Parallel()
 
-		mock := &secretMockClient{
-			putSecretValueFunc: func(
-				_ context.Context, _ *secretapi.PutSecretValueInput, _ ...func(*secretapi.Options),
-			) (*secretapi.PutSecretValueOutput, error) {
-				return &secretapi.PutSecretValueOutput{}, nil
-			},
-			updateSecretFunc: func(
-				_ context.Context, _ *secretapi.UpdateSecretInput, _ ...func(*secretapi.Options),
-			) (*secretapi.UpdateSecretOutput, error) {
-				return nil, errors.New("update description failed")
+		mock := &providermock.Store{
+			PutFunc: func(
+				_ context.Context, _, _ string, _ domain.ValueType, _ string, _ ...provider.WriteOption,
+			) (domain.Version, error) {
+				return domain.Version{}, errors.New("update failed")
 			},
 		}
 
@@ -798,17 +651,15 @@ func TestSecretStrategy_Apply_WithOptions(t *testing.T) {
 			Description: lo.ToPtr("Updated description"),
 		})
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "failed to update description")
+		assert.Contains(t, err.Error(), "failed to update secret")
 	})
 
 	t.Run("delete already deleted", func(t *testing.T) {
 		t.Parallel()
 
-		mock := &secretMockClient{
-			deleteSecretFunc: func(
-				_ context.Context, _ *secretapi.DeleteSecretInput, _ ...func(*secretapi.Options),
-			) (*secretapi.DeleteSecretOutput, error) {
-				return nil, &secretapi.ResourceNotFoundException{}
+		mock := &providermock.Store{
+			DeleteFunc: func(_ context.Context, name string, _ ...provider.DeleteOption) error {
+				return secretNotFound(name)
 			},
 		}
 
@@ -823,14 +674,9 @@ func TestSecretStrategy_Apply_WithOptions(t *testing.T) {
 func TestSecretStrategy_FetchCurrentValue_NoCreatedDate(t *testing.T) {
 	t.Parallel()
 
-	mock := &secretMockClient{
-		getSecretValueFunc: func(
-			_ context.Context, _ *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options),
-		) (*secretapi.GetSecretValueOutput, error) {
-			return &secretapi.GetSecretValueOutput{
-				SecretString: lo.ToPtr("secret-value"),
-				CreatedDate:  nil,
-			}, nil
+	mock := &providermock.Store{
+		GetFunc: func(_ context.Context, _ string, _ provider.VersionRef) (*domain.Entry, error) {
+			return &domain.Entry{Value: "secret-value", Modified: nil}, nil
 		},
 	}
 
@@ -848,16 +694,14 @@ func TestSecretStrategy_ApplyTags(t *testing.T) {
 		t.Parallel()
 
 		tagResourceCalled := false
-		mock := &secretMockClient{
-			tagResourceFunc: func(
-				_ context.Context, params *secretapi.TagResourceInput, _ ...func(*secretapi.Options),
-			) (*secretapi.TagResourceOutput, error) {
+		mock := &providermock.Store{
+			TagFunc: func(_ context.Context, name string, add map[string]string) error {
 				tagResourceCalled = true
 
-				assert.Equal(t, "my-secret", lo.FromPtr(params.SecretId))
-				assert.Len(t, params.Tags, 1)
+				assert.Equal(t, "my-secret", name)
+				assert.Len(t, add, 1)
 
-				return &secretapi.TagResourceOutput{}, nil
+				return nil
 			},
 		}
 
@@ -873,16 +717,14 @@ func TestSecretStrategy_ApplyTags(t *testing.T) {
 		t.Parallel()
 
 		untagResourceCalled := false
-		mock := &secretMockClient{
-			untagResourceFunc: func(
-				_ context.Context, params *secretapi.UntagResourceInput, _ ...func(*secretapi.Options),
-			) (*secretapi.UntagResourceOutput, error) {
+		mock := &providermock.Store{
+			UntagFunc: func(_ context.Context, name string, keys []string) error {
 				untagResourceCalled = true
 
-				assert.Equal(t, "my-secret", lo.FromPtr(params.SecretId))
-				assert.Contains(t, params.TagKeys, "old-tag")
+				assert.Equal(t, "my-secret", name)
+				assert.Contains(t, keys, "old-tag")
 
-				return &secretapi.UntagResourceOutput{}, nil
+				return nil
 			},
 		}
 
@@ -891,7 +733,6 @@ func TestSecretStrategy_ApplyTags(t *testing.T) {
 			Remove: maputil.NewSet("old-tag"),
 		})
 		require.NoError(t, err)
-
 		assert.True(t, untagResourceCalled)
 	})
 
@@ -900,24 +741,20 @@ func TestSecretStrategy_ApplyTags(t *testing.T) {
 
 		tagResourceCalled := false
 		untagResourceCalled := false
-		mock := &secretMockClient{
-			tagResourceFunc: func(
-				_ context.Context, params *secretapi.TagResourceInput, _ ...func(*secretapi.Options),
-			) (*secretapi.TagResourceOutput, error) {
+		mock := &providermock.Store{
+			TagFunc: func(_ context.Context, _ string, add map[string]string) error {
 				tagResourceCalled = true
 
-				assert.Len(t, params.Tags, 1)
+				assert.Len(t, add, 1)
 
-				return &secretapi.TagResourceOutput{}, nil
+				return nil
 			},
-			untagResourceFunc: func(
-				_ context.Context, params *secretapi.UntagResourceInput, _ ...func(*secretapi.Options),
-			) (*secretapi.UntagResourceOutput, error) {
+			UntagFunc: func(_ context.Context, _ string, keys []string) error {
 				untagResourceCalled = true
 
-				assert.Contains(t, params.TagKeys, "deprecated")
+				assert.Contains(t, keys, "deprecated")
 
-				return &secretapi.UntagResourceOutput{}, nil
+				return nil
 			},
 		}
 
@@ -927,7 +764,6 @@ func TestSecretStrategy_ApplyTags(t *testing.T) {
 			Remove: maputil.NewSet("deprecated"),
 		})
 		require.NoError(t, err)
-
 		assert.True(t, tagResourceCalled)
 		assert.True(t, untagResourceCalled)
 	})
@@ -935,11 +771,9 @@ func TestSecretStrategy_ApplyTags(t *testing.T) {
 	t.Run("add tags error", func(t *testing.T) {
 		t.Parallel()
 
-		mock := &secretMockClient{
-			tagResourceFunc: func(
-				_ context.Context, _ *secretapi.TagResourceInput, _ ...func(*secretapi.Options),
-			) (*secretapi.TagResourceOutput, error) {
-				return nil, errors.New("tagging failed")
+		mock := &providermock.Store{
+			TagFunc: func(_ context.Context, _ string, _ map[string]string) error {
+				return errors.New("tagging failed")
 			},
 		}
 
@@ -953,11 +787,9 @@ func TestSecretStrategy_ApplyTags(t *testing.T) {
 	t.Run("remove tags error", func(t *testing.T) {
 		t.Parallel()
 
-		mock := &secretMockClient{
-			untagResourceFunc: func(
-				_ context.Context, _ *secretapi.UntagResourceInput, _ ...func(*secretapi.Options),
-			) (*secretapi.UntagResourceOutput, error) {
-				return nil, errors.New("untagging failed")
+		mock := &providermock.Store{
+			UntagFunc: func(_ context.Context, _ string, _ []string) error {
+				return errors.New("untagging failed")
 			},
 		}
 
@@ -975,18 +807,14 @@ func TestSecretStrategy_FetchCurrentTags(t *testing.T) {
 	t.Run("returns tags successfully", func(t *testing.T) {
 		t.Parallel()
 
-		mock := &secretMockClient{
-			describeSecretFunc: func(
-				_ context.Context, params *secretapi.DescribeSecretInput, _ ...func(*secretapi.Options),
-			) (*secretapi.DescribeSecretOutput, error) {
-				assert.Equal(t, "my-secret", *params.SecretId)
+		mock := &providermock.Store{
+			GetFunc: func(_ context.Context, name string, _ provider.VersionRef) (*domain.Entry, error) {
+				assert.Equal(t, "my-secret", name)
 
-				return &secretapi.DescribeSecretOutput{
-					Tags: []secretapi.Tag{
-						{Key: lo.ToPtr("env"), Value: lo.ToPtr("prod")},
-						{Key: lo.ToPtr("team"), Value: lo.ToPtr("backend")},
-					},
-				}, nil
+				return &domain.Entry{Tags: []domain.Tag{
+					{Key: "env", Value: "prod"},
+					{Key: "team", Value: "backend"},
+				}}, nil
 			},
 		}
 
@@ -999,11 +827,9 @@ func TestSecretStrategy_FetchCurrentTags(t *testing.T) {
 	t.Run("returns nil when secret not found", func(t *testing.T) {
 		t.Parallel()
 
-		mock := &secretMockClient{
-			describeSecretFunc: func(
-				_ context.Context, _ *secretapi.DescribeSecretInput, _ ...func(*secretapi.Options),
-			) (*secretapi.DescribeSecretOutput, error) {
-				return nil, &secretapi.ResourceNotFoundException{}
+		mock := &providermock.Store{
+			GetFunc: func(_ context.Context, _ string, _ provider.VersionRef) (*domain.Entry, error) {
+				return nil, secretNotFound("nonexistent-secret")
 			},
 		}
 
@@ -1016,10 +842,8 @@ func TestSecretStrategy_FetchCurrentTags(t *testing.T) {
 	t.Run("returns error for other API errors", func(t *testing.T) {
 		t.Parallel()
 
-		mock := &secretMockClient{
-			describeSecretFunc: func(
-				_ context.Context, _ *secretapi.DescribeSecretInput, _ ...func(*secretapi.Options),
-			) (*secretapi.DescribeSecretOutput, error) {
+		mock := &providermock.Store{
+			GetFunc: func(_ context.Context, _ string, _ provider.VersionRef) (*domain.Entry, error) {
 				return nil, errors.New("API error")
 			},
 		}
@@ -1034,13 +858,9 @@ func TestSecretStrategy_FetchCurrentTags(t *testing.T) {
 	t.Run("returns nil when no tags exist", func(t *testing.T) {
 		t.Parallel()
 
-		mock := &secretMockClient{
-			describeSecretFunc: func(
-				_ context.Context, _ *secretapi.DescribeSecretInput, _ ...func(*secretapi.Options),
-			) (*secretapi.DescribeSecretOutput, error) {
-				return &secretapi.DescribeSecretOutput{
-					Tags: []secretapi.Tag{},
-				}, nil
+		mock := &providermock.Store{
+			GetFunc: func(_ context.Context, _ string, _ provider.VersionRef) (*domain.Entry, error) {
+				return &domain.Entry{Tags: nil}, nil
 			},
 		}
 
@@ -1048,45 +868,5 @@ func TestSecretStrategy_FetchCurrentTags(t *testing.T) {
 		tags, err := s.FetchCurrentTags(t.Context(), "my-secret")
 		require.NoError(t, err)
 		assert.Nil(t, tags)
-	})
-
-	t.Run("returns nil when result is nil", func(t *testing.T) {
-		t.Parallel()
-
-		mock := &secretMockClient{
-			describeSecretFunc: func(
-				_ context.Context, _ *secretapi.DescribeSecretInput, _ ...func(*secretapi.Options),
-			) (*secretapi.DescribeSecretOutput, error) {
-				return nil, nil //nolint:nilnil // testing nil result
-			},
-		}
-
-		s := staging.NewSecretStrategy(mock)
-		tags, err := s.FetchCurrentTags(t.Context(), "my-secret")
-		require.NoError(t, err)
-		assert.Nil(t, tags)
-	})
-
-	t.Run("skips tags with nil key or value", func(t *testing.T) {
-		t.Parallel()
-
-		mock := &secretMockClient{
-			describeSecretFunc: func(
-				_ context.Context, _ *secretapi.DescribeSecretInput, _ ...func(*secretapi.Options),
-			) (*secretapi.DescribeSecretOutput, error) {
-				return &secretapi.DescribeSecretOutput{
-					Tags: []secretapi.Tag{
-						{Key: lo.ToPtr("valid"), Value: lo.ToPtr("tag")},
-						{Key: nil, Value: lo.ToPtr("no-key")},
-						{Key: lo.ToPtr("no-value"), Value: nil},
-					},
-				}, nil
-			},
-		}
-
-		s := staging.NewSecretStrategy(mock)
-		tags, err := s.FetchCurrentTags(t.Context(), "my-secret")
-		require.NoError(t, err)
-		assert.Equal(t, map[string]string{"valid": "tag"}, tags)
 	})
 }

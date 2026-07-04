@@ -13,7 +13,7 @@ import (
 var config = stgcli.CommandConfig{
 	CommandName:   "secret",
 	ItemName:      "secret",
-	Factory:       staging.SecretFactory,
+	Factory:       cliinternal.SecretStrategyFactory,
 	ParserFactory: staging.SecretParserFactory,
 }
 

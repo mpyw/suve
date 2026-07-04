@@ -31,6 +31,22 @@ type UpdateUseCase struct {
 	Store provider.Store
 }
 
+// GetCurrentValue fetches the current parameter value for preview. A
+// non-existent parameter yields an empty value with no error; any other read
+// failure is propagated.
+func (u *UpdateUseCase) GetCurrentValue(ctx context.Context, name string) (string, error) {
+	entry, err := u.Store.Get(ctx, name, provider.VersionRef{})
+
+	switch {
+	case errors.Is(err, provider.ErrNotFound):
+		return "", nil
+	case err != nil:
+		return "", err
+	}
+
+	return entry.Value, nil
+}
+
 // Execute runs the update use case. It updates an existing parameter; if the
 // parameter doesn't exist it returns ErrParameterNotFound. A read failure other
 // than not-found is propagated unchanged (never treated as "does not exist").

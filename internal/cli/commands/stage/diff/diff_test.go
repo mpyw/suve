@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"fmt"
 	"testing"
 	"time"
 
@@ -12,139 +11,45 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/mpyw/suve/internal/api/paramapi"
-	"github.com/mpyw/suve/internal/api/secretapi"
 	appcli "github.com/mpyw/suve/internal/cli/commands"
 	stagediff "github.com/mpyw/suve/internal/cli/commands/stage/diff"
+	"github.com/mpyw/suve/internal/domain"
 	"github.com/mpyw/suve/internal/maputil"
+	"github.com/mpyw/suve/internal/provider"
+	"github.com/mpyw/suve/internal/provider/providermock"
 	"github.com/mpyw/suve/internal/staging"
 	"github.com/mpyw/suve/internal/staging/store/testutil"
 )
 
-type mockParamClient struct {
-	// Embedded to satisfy the full staging.ParamClient interface. These are
-	// never called by the diff command; only the explicit methods below run.
-	paramapi.PutParameterAPI
-	paramapi.DeleteParameterAPI
-	paramapi.AddTagsToResourceAPI
-	paramapi.RemoveTagsFromResourceAPI
-
-	getParameterFunc func(
-		ctx context.Context,
-		params *paramapi.GetParameterInput,
-		optFns ...func(*paramapi.Options),
-	) (*paramapi.GetParameterOutput, error)
-	getParameterHistoryFunc func(
-		ctx context.Context,
-		params *paramapi.GetParameterHistoryInput,
-		optFns ...func(*paramapi.Options),
-	) (*paramapi.GetParameterHistoryOutput, error)
-	listTagsForResourceFunc func(
-		ctx context.Context,
-		params *paramapi.ListTagsForResourceInput,
-		optFns ...func(*paramapi.Options),
-	) (*paramapi.ListTagsForResourceOutput, error)
-}
-
-func (m *mockParamClient) GetParameter(
-	ctx context.Context,
-	params *paramapi.GetParameterInput,
-	optFns ...func(*paramapi.Options),
-) (*paramapi.GetParameterOutput, error) {
-	if m.getParameterFunc != nil {
-		return m.getParameterFunc(ctx, params, optFns...)
+// storeReturning builds a provider.Store mock whose Get returns an entry with
+// the given value and version id. The staging diff path only calls Get (via
+// FetchCurrent / FetchCurrentTags), so that is all the mock needs to implement.
+func storeReturning(value, versionID string) *providermock.Store {
+	return &providermock.Store{
+		GetFunc: func(_ context.Context, _ string, _ provider.VersionRef) (*domain.Entry, error) {
+			return &domain.Entry{Value: value, Version: domain.Version{ID: versionID}}, nil
+		},
 	}
-
-	return nil, fmt.Errorf("GetParameter not mocked")
 }
 
-func (m *mockParamClient) GetParameterHistory(
-	ctx context.Context,
-	params *paramapi.GetParameterHistoryInput,
-	optFns ...func(*paramapi.Options),
-) (*paramapi.GetParameterHistoryOutput, error) {
-	if m.getParameterHistoryFunc != nil {
-		return m.getParameterHistoryFunc(ctx, params, optFns...)
+// storeGetError builds a provider.Store mock whose Get fails, simulating a
+// resource that no longer exists in the provider.
+func storeGetError(msg string) *providermock.Store {
+	return &providermock.Store{
+		GetFunc: func(_ context.Context, _ string, _ provider.VersionRef) (*domain.Entry, error) {
+			return nil, errors.New(msg)
+		},
 	}
-
-	return nil, fmt.Errorf("GetParameterHistory not mocked")
 }
 
-func (m *mockParamClient) ListTagsForResource(
-	ctx context.Context,
-	params *paramapi.ListTagsForResourceInput,
-	optFns ...func(*paramapi.Options),
-) (*paramapi.ListTagsForResourceOutput, error) {
-	if m.listTagsForResourceFunc != nil {
-		return m.listTagsForResourceFunc(ctx, params, optFns...)
+// storeWithTags builds a provider.Store mock whose Get returns an entry
+// carrying the given tags (used to drive FetchCurrentTags for tag diffs).
+func storeWithTags(tags ...domain.Tag) *providermock.Store {
+	return &providermock.Store{
+		GetFunc: func(_ context.Context, _ string, _ provider.VersionRef) (*domain.Entry, error) {
+			return &domain.Entry{Tags: tags}, nil
+		},
 	}
-
-	return &paramapi.ListTagsForResourceOutput{}, nil
-}
-
-type mockSecretClient struct {
-	// Embedded to satisfy the full staging.SecretClient interface. These are
-	// never called by the diff command; only the explicit methods below run.
-	secretapi.CreateSecretAPI
-	secretapi.PutSecretValueAPI
-	secretapi.DeleteSecretAPI
-	secretapi.UpdateSecretAPI
-	secretapi.TagResourceAPI
-	secretapi.UntagResourceAPI
-
-	getSecretValueFunc func(
-		ctx context.Context,
-		params *secretapi.GetSecretValueInput,
-		optFns ...func(*secretapi.Options),
-	) (*secretapi.GetSecretValueOutput, error)
-	//nolint:revive // Field name matches AWS SDK method naming convention
-	listSecretVersionIdsFunc func(
-		ctx context.Context,
-		params *secretapi.ListSecretVersionIDsInput,
-		optFns ...func(*secretapi.Options),
-	) (*secretapi.ListSecretVersionIDsOutput, error)
-	describeSecretFunc func(
-		ctx context.Context,
-		params *secretapi.DescribeSecretInput,
-		optFns ...func(*secretapi.Options),
-	) (*secretapi.DescribeSecretOutput, error)
-}
-
-func (m *mockSecretClient) GetSecretValue(
-	ctx context.Context,
-	params *secretapi.GetSecretValueInput,
-	optFns ...func(*secretapi.Options),
-) (*secretapi.GetSecretValueOutput, error) {
-	if m.getSecretValueFunc != nil {
-		return m.getSecretValueFunc(ctx, params, optFns...)
-	}
-
-	return nil, fmt.Errorf("GetSecretValue not mocked")
-}
-
-//nolint:revive // Method name matches AWS SDK interface naming convention
-func (m *mockSecretClient) ListSecretVersionIds(
-	ctx context.Context,
-	params *secretapi.ListSecretVersionIDsInput,
-	optFns ...func(*secretapi.Options),
-) (*secretapi.ListSecretVersionIDsOutput, error) {
-	if m.listSecretVersionIdsFunc != nil {
-		return m.listSecretVersionIdsFunc(ctx, params, optFns...)
-	}
-
-	return nil, fmt.Errorf("ListSecretVersionIds not mocked")
-}
-
-func (m *mockSecretClient) DescribeSecret(
-	ctx context.Context,
-	params *secretapi.DescribeSecretInput,
-	optFns ...func(*secretapi.Options),
-) (*secretapi.DescribeSecretOutput, error) {
-	if m.describeSecretFunc != nil {
-		return m.describeSecretFunc(ctx, params, optFns...)
-	}
-
-	return &secretapi.DescribeSecretOutput{}, nil
 }
 
 func TestCommand_Validation(t *testing.T) {
@@ -205,22 +110,10 @@ func TestRun_ParamOnly(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	paramMock := &mockParamClient{
-		getParameterFunc: func(_ context.Context, _ *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
-			return &paramapi.GetParameterOutput{
-				Parameter: &paramapi.Parameter{
-					Name:    lo.ToPtr("/app/config"),
-					Value:   lo.ToPtr("old-value"),
-					Version: 1,
-				},
-			}, nil
-		},
-	}
-
 	var stdout, stderr bytes.Buffer
 
 	r := &stagediff.Runner{
-		ParamStrategy: staging.NewParamStrategy(paramMock),
+		ParamStrategy: staging.NewParamStrategy(storeReturning("old-value", "1")),
 		Store:         store,
 		Stdout:        &stdout,
 		Stderr:        &stderr,
@@ -248,22 +141,10 @@ func TestRun_SecretOnly(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	secretMock := &mockSecretClient{
-		getSecretValueFunc: func(
-			_ context.Context, _ *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options),
-		) (*secretapi.GetSecretValueOutput, error) {
-			return &secretapi.GetSecretValueOutput{
-				Name:         lo.ToPtr("my-secret"),
-				SecretString: lo.ToPtr("old-secret"),
-				VersionId:    lo.ToPtr("abc123def456"),
-			}, nil
-		},
-	}
-
 	var stdout, stderr bytes.Buffer
 
 	r := &stagediff.Runner{
-		SecretStrategy: staging.NewSecretStrategy(secretMock),
+		SecretStrategy: staging.NewSecretStrategy(storeReturning("old-secret", "abc123def456")),
 		Store:          store,
 		Stdout:         &stdout,
 		Stderr:         &stderr,
@@ -296,35 +177,11 @@ func TestRun_BothServices(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	paramMock := &mockParamClient{
-		getParameterFunc: func(_ context.Context, _ *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
-			return &paramapi.GetParameterOutput{
-				Parameter: &paramapi.Parameter{
-					Name:    lo.ToPtr("/app/config"),
-					Value:   lo.ToPtr("param-old"),
-					Version: 1,
-				},
-			}, nil
-		},
-	}
-
-	secretMock := &mockSecretClient{
-		getSecretValueFunc: func(
-			_ context.Context, _ *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options),
-		) (*secretapi.GetSecretValueOutput, error) {
-			return &secretapi.GetSecretValueOutput{
-				Name:         lo.ToPtr("my-secret"),
-				SecretString: lo.ToPtr("secret-old"),
-				VersionId:    lo.ToPtr("abc123def456"),
-			}, nil
-		},
-	}
-
 	var stdout, stderr bytes.Buffer
 
 	r := &stagediff.Runner{
-		ParamStrategy:  staging.NewParamStrategy(paramMock),
-		SecretStrategy: staging.NewSecretStrategy(secretMock),
+		ParamStrategy:  staging.NewParamStrategy(storeReturning("param-old", "1")),
+		SecretStrategy: staging.NewSecretStrategy(storeReturning("secret-old", "abc123def456")),
 		Store:          store,
 		Stdout:         &stdout,
 		Stderr:         &stderr,
@@ -359,35 +216,11 @@ func TestRun_DeleteOperations(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	paramMock := &mockParamClient{
-		getParameterFunc: func(_ context.Context, _ *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
-			return &paramapi.GetParameterOutput{
-				Parameter: &paramapi.Parameter{
-					Name:    lo.ToPtr("/app/config"),
-					Value:   lo.ToPtr("existing-value"),
-					Version: 1,
-				},
-			}, nil
-		},
-	}
-
-	secretMock := &mockSecretClient{
-		getSecretValueFunc: func(
-			_ context.Context, _ *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options),
-		) (*secretapi.GetSecretValueOutput, error) {
-			return &secretapi.GetSecretValueOutput{
-				Name:         lo.ToPtr("my-secret"),
-				SecretString: lo.ToPtr("existing-secret"),
-				VersionId:    lo.ToPtr("abc123def456"),
-			}, nil
-		},
-	}
-
 	var stdout, stderr bytes.Buffer
 
 	r := &stagediff.Runner{
-		ParamStrategy:  staging.NewParamStrategy(paramMock),
-		SecretStrategy: staging.NewSecretStrategy(secretMock),
+		ParamStrategy:  staging.NewParamStrategy(storeReturning("existing-value", "1")),
+		SecretStrategy: staging.NewSecretStrategy(storeReturning("existing-secret", "abc123def456")),
 		Store:          store,
 		Stdout:         &stdout,
 		Stderr:         &stderr,
@@ -414,22 +247,10 @@ func TestRun_IdenticalValues(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	paramMock := &mockParamClient{
-		getParameterFunc: func(_ context.Context, _ *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
-			return &paramapi.GetParameterOutput{
-				Parameter: &paramapi.Parameter{
-					Name:    lo.ToPtr("/app/config"),
-					Value:   lo.ToPtr("same-value"),
-					Version: 1,
-				},
-			}, nil
-		},
-	}
-
 	var stdout, stderr bytes.Buffer
 
 	r := &stagediff.Runner{
-		ParamStrategy: staging.NewParamStrategy(paramMock),
+		ParamStrategy: staging.NewParamStrategy(storeReturning("same-value", "1")),
 		Store:         store,
 		Stdout:        &stdout,
 		Stderr:        &stderr,
@@ -458,22 +279,10 @@ func TestRun_ParseJSON(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	paramMock := &mockParamClient{
-		getParameterFunc: func(_ context.Context, _ *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
-			return &paramapi.GetParameterOutput{
-				Parameter: &paramapi.Parameter{
-					Name:    lo.ToPtr("/app/config"),
-					Value:   lo.ToPtr(`{"key":"old"}`),
-					Version: 1,
-				},
-			}, nil
-		},
-	}
-
 	var stdout, stderr bytes.Buffer
 
 	r := &stagediff.Runner{
-		ParamStrategy: staging.NewParamStrategy(paramMock),
+		ParamStrategy: staging.NewParamStrategy(storeReturning(`{"key":"old"}`, "1")),
 		Store:         store,
 		Stdout:        &stdout,
 		Stderr:        &stderr,
@@ -499,16 +308,10 @@ func TestRun_ParamUpdateAutoUnstageWhenDeleted(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	paramMock := &mockParamClient{
-		getParameterFunc: func(_ context.Context, _ *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
-			return nil, fmt.Errorf("parameter not found")
-		},
-	}
-
 	var stdout, stderr bytes.Buffer
 
 	r := &stagediff.Runner{
-		ParamStrategy: staging.NewParamStrategy(paramMock),
+		ParamStrategy: staging.NewParamStrategy(storeGetError("parameter not found")),
 		Store:         store,
 		Stdout:        &stdout,
 		Stderr:        &stderr,
@@ -536,18 +339,10 @@ func TestRun_SecretUpdateAutoUnstageWhenDeleted(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	secretMock := &mockSecretClient{
-		getSecretValueFunc: func(
-			_ context.Context, _ *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options),
-		) (*secretapi.GetSecretValueOutput, error) {
-			return nil, fmt.Errorf("secret not found")
-		},
-	}
-
 	var stdout, stderr bytes.Buffer
 
 	r := &stagediff.Runner{
-		SecretStrategy: staging.NewSecretStrategy(secretMock),
+		SecretStrategy: staging.NewSecretStrategy(storeGetError("secret not found")),
 		Store:          store,
 		Stdout:         &stdout,
 		Stderr:         &stderr,
@@ -575,22 +370,10 @@ func TestRun_SecretIdenticalValues(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	secretMock := &mockSecretClient{
-		getSecretValueFunc: func(
-			_ context.Context, _ *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options),
-		) (*secretapi.GetSecretValueOutput, error) {
-			return &secretapi.GetSecretValueOutput{
-				Name:         lo.ToPtr("my-secret"),
-				SecretString: lo.ToPtr("same-value"),
-				VersionId:    lo.ToPtr("abc123def456"),
-			}, nil
-		},
-	}
-
 	var stdout, stderr bytes.Buffer
 
 	r := &stagediff.Runner{
-		SecretStrategy: staging.NewSecretStrategy(secretMock),
+		SecretStrategy: staging.NewSecretStrategy(storeReturning("same-value", "abc123def456")),
 		Store:          store,
 		Stdout:         &stdout,
 		Stderr:         &stderr,
@@ -619,22 +402,10 @@ func TestRun_SecretParseJSON(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	secretMock := &mockSecretClient{
-		getSecretValueFunc: func(
-			_ context.Context, _ *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options),
-		) (*secretapi.GetSecretValueOutput, error) {
-			return &secretapi.GetSecretValueOutput{
-				Name:         lo.ToPtr("my-secret"),
-				SecretString: lo.ToPtr(`{"key":"old"}`),
-				VersionId:    lo.ToPtr("abc123def456"),
-			}, nil
-		},
-	}
-
 	var stdout, stderr bytes.Buffer
 
 	r := &stagediff.Runner{
-		SecretStrategy: staging.NewSecretStrategy(secretMock),
+		SecretStrategy: staging.NewSecretStrategy(storeReturning(`{"key":"old"}`, "abc123def456")),
 		Store:          store,
 		Stdout:         &stdout,
 		Stderr:         &stderr,
@@ -660,22 +431,10 @@ func TestRun_SecretParseJSONMixed(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	secretMock := &mockSecretClient{
-		getSecretValueFunc: func(
-			_ context.Context, _ *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options),
-		) (*secretapi.GetSecretValueOutput, error) {
-			return &secretapi.GetSecretValueOutput{
-				Name:         lo.ToPtr("my-secret"),
-				SecretString: lo.ToPtr(`{"key":"old"}`),
-				VersionId:    lo.ToPtr("abc123def456"),
-			}, nil
-		},
-	}
-
 	var stdout, stderr bytes.Buffer
 
 	r := &stagediff.Runner{
-		SecretStrategy: staging.NewSecretStrategy(secretMock),
+		SecretStrategy: staging.NewSecretStrategy(storeReturning(`{"key":"old"}`, "abc123def456")),
 		Store:          store,
 		Stdout:         &stdout,
 		Stderr:         &stderr,
@@ -705,16 +464,10 @@ func TestRun_ParamCreateOperation(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	paramMock := &mockParamClient{
-		getParameterFunc: func(_ context.Context, _ *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
-			return nil, fmt.Errorf("parameter not found")
-		},
-	}
-
 	var stdout, stderr bytes.Buffer
 
 	r := &stagediff.Runner{
-		ParamStrategy: staging.NewParamStrategy(paramMock),
+		ParamStrategy: staging.NewParamStrategy(storeGetError("parameter not found")),
 		Store:         store,
 		Stdout:        &stdout,
 		Stderr:        &stderr,
@@ -750,18 +503,10 @@ func TestRun_SecretCreateOperation(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	secretMock := &mockSecretClient{
-		getSecretValueFunc: func(
-			_ context.Context, _ *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options),
-		) (*secretapi.GetSecretValueOutput, error) {
-			return nil, fmt.Errorf("secret not found")
-		},
-	}
-
 	var stdout, stderr bytes.Buffer
 
 	r := &stagediff.Runner{
-		SecretStrategy: staging.NewSecretStrategy(secretMock),
+		SecretStrategy: staging.NewSecretStrategy(storeGetError("secret not found")),
 		Store:          store,
 		Stdout:         &stdout,
 		Stderr:         &stderr,
@@ -791,16 +536,10 @@ func TestRun_CreateWithParseJSON(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	paramMock := &mockParamClient{
-		getParameterFunc: func(_ context.Context, _ *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
-			return nil, fmt.Errorf("parameter not found")
-		},
-	}
-
 	var stdout, stderr bytes.Buffer
 
 	r := &stagediff.Runner{
-		ParamStrategy: staging.NewParamStrategy(paramMock),
+		ParamStrategy: staging.NewParamStrategy(storeGetError("parameter not found")),
 		Store:         store,
 		Stdout:        &stdout,
 		Stderr:        &stderr,
@@ -826,16 +565,10 @@ func TestRun_DeleteAutoUnstageWhenAlreadyDeleted(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	paramMock := &mockParamClient{
-		getParameterFunc: func(_ context.Context, _ *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
-			return nil, fmt.Errorf("parameter not found")
-		},
-	}
-
 	var stdout, stderr bytes.Buffer
 
 	r := &stagediff.Runner{
-		ParamStrategy: staging.NewParamStrategy(paramMock),
+		ParamStrategy: staging.NewParamStrategy(storeGetError("parameter not found")),
 		Store:         store,
 		Stdout:        &stdout,
 		Stderr:        &stderr,
@@ -862,18 +595,10 @@ func TestRun_SecretDeleteAutoUnstageWhenAlreadyDeleted(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	secretMock := &mockSecretClient{
-		getSecretValueFunc: func(
-			_ context.Context, _ *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options),
-		) (*secretapi.GetSecretValueOutput, error) {
-			return nil, fmt.Errorf("secret not found")
-		},
-	}
-
 	var stdout, stderr bytes.Buffer
 
 	r := &stagediff.Runner{
-		SecretStrategy: staging.NewSecretStrategy(secretMock),
+		SecretStrategy: staging.NewSecretStrategy(storeGetError("secret not found")),
 		Store:          store,
 		Stdout:         &stdout,
 		Stderr:         &stderr,
@@ -902,22 +627,10 @@ func TestRun_MetadataWithDescription(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	paramMock := &mockParamClient{
-		getParameterFunc: func(_ context.Context, _ *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
-			return &paramapi.GetParameterOutput{
-				Parameter: &paramapi.Parameter{
-					Name:    lo.ToPtr("/app/config"),
-					Value:   lo.ToPtr("old-value"),
-					Version: 1,
-				},
-			}, nil
-		},
-	}
-
 	var stdout, stderr bytes.Buffer
 
 	r := &stagediff.Runner{
-		ParamStrategy: staging.NewParamStrategy(paramMock),
+		ParamStrategy: staging.NewParamStrategy(storeReturning("old-value", "1")),
 		Store:         store,
 		Stdout:        &stdout,
 		Stderr:        &stderr,
@@ -948,22 +661,10 @@ func TestRun_MetadataWithTags(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	paramMock := &mockParamClient{
-		getParameterFunc: func(_ context.Context, _ *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
-			return &paramapi.GetParameterOutput{
-				Parameter: &paramapi.Parameter{
-					Name:    lo.ToPtr("/app/config"),
-					Value:   lo.ToPtr("old-value"),
-					Version: 1,
-				},
-			}, nil
-		},
-	}
-
 	var stdout, stderr bytes.Buffer
 
 	r := &stagediff.Runner{
-		ParamStrategy: staging.NewParamStrategy(paramMock),
+		ParamStrategy: staging.NewParamStrategy(storeReturning("old-value", "1")),
 		Store:         store,
 		Stdout:        &stdout,
 		Stderr:        &stderr,
@@ -1087,18 +788,10 @@ func TestRun_SecretCreateWithParseJSON(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	secretMock := &mockSecretClient{
-		getSecretValueFunc: func(
-			_ context.Context, _ *secretapi.GetSecretValueInput, _ ...func(*secretapi.Options),
-		) (*secretapi.GetSecretValueOutput, error) {
-			return nil, fmt.Errorf("secret not found")
-		},
-	}
-
 	var stdout, stderr bytes.Buffer
 
 	r := &stagediff.Runner{
-		SecretStrategy: staging.NewSecretStrategy(secretMock),
+		SecretStrategy: staging.NewSecretStrategy(storeGetError("secret not found")),
 		Store:          store,
 		Stdout:         &stdout,
 		Stderr:         &stderr,
@@ -1133,22 +826,10 @@ func TestRun_BothEntriesAndTags(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	paramMock := &mockParamClient{
-		getParameterFunc: func(_ context.Context, _ *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
-			return &paramapi.GetParameterOutput{
-				Parameter: &paramapi.Parameter{
-					Name:    lo.ToPtr("/app/config"),
-					Value:   lo.ToPtr("old-value"),
-					Version: 1,
-				},
-			}, nil
-		},
-	}
-
 	var stdout, stderr bytes.Buffer
 
 	r := &stagediff.Runner{
-		ParamStrategy: staging.NewParamStrategy(paramMock),
+		ParamStrategy: staging.NewParamStrategy(storeReturning("old-value", "1")),
 		Store:         store,
 		Stdout:        &stdout,
 		Stderr:        &stderr,
@@ -1179,25 +860,17 @@ func TestRun_ParamTagDiffWithValues(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	// Mock ListTagsForResource to return current tag values
-	paramMock := &mockParamClient{
-		listTagsForResourceFunc: func(
-			_ context.Context, _ *paramapi.ListTagsForResourceInput, _ ...func(*paramapi.Options),
-		) (*paramapi.ListTagsForResourceOutput, error) {
-			return &paramapi.ListTagsForResourceOutput{
-				TagList: []paramapi.Tag{
-					{Key: lo.ToPtr("deprecated"), Value: lo.ToPtr("true")},
-					{Key: lo.ToPtr("old-tag"), Value: lo.ToPtr("legacy-value")},
-					{Key: lo.ToPtr("other"), Value: lo.ToPtr("not-staged")},
-				},
-			}, nil
-		},
-	}
+	// Provider returns current tag values for the removal preview.
+	paramStore := storeWithTags(
+		domain.Tag{Key: "deprecated", Value: "true"},
+		domain.Tag{Key: "old-tag", Value: "legacy-value"},
+		domain.Tag{Key: "other", Value: "not-staged"},
+	)
 
 	var stdout, stderr bytes.Buffer
 
 	r := &stagediff.Runner{
-		ParamStrategy: staging.NewParamStrategy(paramMock),
+		ParamStrategy: staging.NewParamStrategy(paramStore),
 		Store:         store,
 		Stdout:        &stdout,
 		Stderr:        &stderr,
@@ -1225,23 +898,13 @@ func TestRun_SecretTagDiffWithValues(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	// Mock DescribeSecret to return current tag values
-	secretMock := &mockSecretClient{
-		describeSecretFunc: func(
-			_ context.Context, _ *secretapi.DescribeSecretInput, _ ...func(*secretapi.Options),
-		) (*secretapi.DescribeSecretOutput, error) {
-			return &secretapi.DescribeSecretOutput{
-				Tags: []secretapi.Tag{
-					{Key: lo.ToPtr("deprecated"), Value: lo.ToPtr("yes")},
-				},
-			}, nil
-		},
-	}
+	// Provider returns current tag values for the removal preview.
+	secretStore := storeWithTags(domain.Tag{Key: "deprecated", Value: "yes"})
 
 	var stdout, stderr bytes.Buffer
 
 	r := &stagediff.Runner{
-		SecretStrategy: staging.NewSecretStrategy(secretMock),
+		SecretStrategy: staging.NewSecretStrategy(secretStore),
 		Store:          store,
 		Stdout:         &stdout,
 		Stderr:         &stderr,
@@ -1268,19 +931,10 @@ func TestRun_ParamTagDiffAPIError(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	// Mock ListTagsForResource to return error
-	paramMock := &mockParamClient{
-		listTagsForResourceFunc: func(
-			_ context.Context, _ *paramapi.ListTagsForResourceInput, _ ...func(*paramapi.Options),
-		) (*paramapi.ListTagsForResourceOutput, error) {
-			return nil, errors.New("API error")
-		},
-	}
-
 	var stdout, stderr bytes.Buffer
 
 	r := &stagediff.Runner{
-		ParamStrategy: staging.NewParamStrategy(paramMock),
+		ParamStrategy: staging.NewParamStrategy(storeGetError("API error")),
 		Store:         store,
 		Stdout:        &stdout,
 		Stderr:        &stderr,
@@ -1307,19 +961,10 @@ func TestRun_SecretTagDiffAPIError(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	// Mock DescribeSecret to return error
-	secretMock := &mockSecretClient{
-		describeSecretFunc: func(
-			_ context.Context, _ *secretapi.DescribeSecretInput, _ ...func(*secretapi.Options),
-		) (*secretapi.DescribeSecretOutput, error) {
-			return nil, errors.New("API error")
-		},
-	}
-
 	var stdout, stderr bytes.Buffer
 
 	r := &stagediff.Runner{
-		SecretStrategy: staging.NewSecretStrategy(secretMock),
+		SecretStrategy: staging.NewSecretStrategy(storeGetError("API error")),
 		Store:          store,
 		Stdout:         &stdout,
 		Stderr:         &stderr,
@@ -1346,24 +991,13 @@ func TestRun_TagDiffWithMissingValue(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	// Mock ListTagsForResource to return only some tags
-	paramMock := &mockParamClient{
-		listTagsForResourceFunc: func(
-			_ context.Context, _ *paramapi.ListTagsForResourceInput, _ ...func(*paramapi.Options),
-		) (*paramapi.ListTagsForResourceOutput, error) {
-			return &paramapi.ListTagsForResourceOutput{
-				TagList: []paramapi.Tag{
-					{Key: lo.ToPtr("has-value"), Value: lo.ToPtr("found")},
-					// no-value tag not in AWS (already deleted?)
-				},
-			}, nil
-		},
-	}
+	// Provider returns only some of the staged tags (no-value not present).
+	paramStore := storeWithTags(domain.Tag{Key: "has-value", Value: "found"})
 
 	var stdout, stderr bytes.Buffer
 
 	r := &stagediff.Runner{
-		ParamStrategy: staging.NewParamStrategy(paramMock),
+		ParamStrategy: staging.NewParamStrategy(paramStore),
 		Store:         store,
 		Stdout:        &stdout,
 		Stderr:        &stderr,

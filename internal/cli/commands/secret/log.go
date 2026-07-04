@@ -13,7 +13,6 @@ import (
 	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/jsonutil"
 	"github.com/mpyw/suve/internal/provider"
-	awssecret "github.com/mpyw/suve/internal/provider/aws/secret"
 	"github.com/mpyw/suve/internal/timeutil"
 	"github.com/mpyw/suve/internal/usecase/secret"
 	"github.com/mpyw/suve/internal/version/secretversion"
@@ -262,12 +261,12 @@ EXAMPLES:
 			},
 		},
 		NewPresenter: func(ctx context.Context, req genericlog.Request) (genericlog.Presenter, error) {
-			client, err := cliinternal.NewSecretClient(ctx)
+			store, err := cliinternal.SecretStore(ctx)
 			if err != nil {
 				return nil, err
 			}
 
-			return NewLogPresenter(awssecret.New(client), req), nil
+			return NewLogPresenter(store, req), nil
 		},
 	})
 }

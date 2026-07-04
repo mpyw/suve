@@ -13,7 +13,6 @@ import (
 	"github.com/mpyw/suve/internal/cli/confirm"
 	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/infra"
-	awssecret "github.com/mpyw/suve/internal/provider/aws/secret"
 	"github.com/mpyw/suve/internal/usecase/secret"
 )
 
@@ -71,12 +70,12 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	name := cmd.Args().Get(0)
 	skipConfirm := cmd.Bool("yes")
 
-	client, err := internal.NewSecretClient(ctx)
+	store, err := internal.SecretStore(ctx)
 	if err != nil {
 		return err
 	}
 
-	uc := &secret.UpdateUseCase{Store: awssecret.New(client)}
+	uc := &secret.UpdateUseCase{Store: store}
 	newValue := cmd.Args().Get(1)
 
 	// Fetch current value and show diff before confirming

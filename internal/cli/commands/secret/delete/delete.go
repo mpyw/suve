@@ -90,7 +90,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	name := cmd.Args().First()
 	skipConfirm := cmd.Bool("yes")
 
-	client, err := internal.NewSecretClient(ctx)
+	store, err := internal.SecretStore(ctx)
 	if err != nil {
 		return err
 	}
@@ -101,7 +101,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		identity, _ = infra.GetAWSIdentity(ctx)
 	}
 
-	uc := &secret.DeleteUseCase{Store: awssecret.New(client)}
+	uc := &secret.DeleteUseCase{Store: store}
 
 	// Show current value before confirming
 	if !skipConfirm {

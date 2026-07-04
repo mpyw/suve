@@ -10,7 +10,7 @@ import (
 
 	"github.com/mpyw/suve/internal/cli/commands/internal"
 	"github.com/mpyw/suve/internal/cli/output"
-	awssecret "github.com/mpyw/suve/internal/provider/aws/secret"
+	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/usecase/secret"
 )
 
@@ -49,13 +49,18 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		return fmt.Errorf("usage: suve secret restore <name>")
 	}
 
-	client, err := internal.NewSecretClient(ctx)
+	store, err := internal.SecretStore(ctx)
 	if err != nil {
 		return err
 	}
 
+	restorer, ok := store.(provider.Restorer)
+	if !ok {
+		return fmt.Errorf("restore is not supported by this provider")
+	}
+
 	r := &Runner{
-		UseCase: &secret.RestoreUseCase{Restorer: awssecret.New(client)},
+		UseCase: &secret.RestoreUseCase{Restorer: restorer},
 		Stdout:  cmd.Root().Writer,
 		Stderr:  cmd.Root().ErrWriter,
 	}

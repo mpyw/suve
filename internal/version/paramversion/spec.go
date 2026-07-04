@@ -1,3 +1,5 @@
+// Package paramversion provides version spec parsing for AWS Systems Manager
+// Parameter Store (name#VERSION~SHIFT).
 package paramversion
 
 import (

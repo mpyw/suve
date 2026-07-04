@@ -4,35 +4,28 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/samber/lo"
 
-	"github.com/mpyw/suve/internal/api/paramapi"
-	"github.com/mpyw/suve/internal/infra"
-	"github.com/mpyw/suve/internal/tagging"
+	"github.com/mpyw/suve/internal/domain"
+	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/version/paramversion"
 )
 
-// ParamClient is the combined interface for SSM Parameter Store stage operations.
-type ParamClient interface {
-	paramapi.GetParameterAPI
-	paramapi.GetParameterHistoryAPI
-	paramapi.PutParameterAPI
-	paramapi.DeleteParameterAPI
-	paramapi.AddTagsToResourceAPI
-	paramapi.RemoveTagsFromResourceAPI
-	paramapi.ListTagsForResourceAPI
-}
-
-// ParamStrategy implements ServiceStrategy for SSM Parameter Store.
+// ParamStrategy implements ServiceStrategy for SSM Parameter Store. It is backed
+// by a provider.Store rather than an AWS SDK client, so it carries no cloud SDK
+// dependency. A nil store yields a parser-only strategy (ParseName/ParseSpec).
 type ParamStrategy struct {
-	Client ParamClient
+	store provider.Store
 }
 
-// NewParamStrategy creates a new SSM Parameter Store strategy.
-func NewParamStrategy(client ParamClient) *ParamStrategy {
-	return &ParamStrategy{Client: client}
+// NewParamStrategy creates a new SSM Parameter Store strategy over the given
+// provider store. A nil store is allowed for parser-only use.
+func NewParamStrategy(store provider.Store) *ParamStrategy {
+	return &ParamStrategy{store: store}
 }
 
 // Service returns the service type.
@@ -55,7 +48,7 @@ func (s *ParamStrategy) HasDeleteOptions() bool {
 	return false
 }
 
-// Apply applies a staged operation to AWS SSM Parameter Store.
+// Apply applies a staged operation to SSM Parameter Store.
 func (s *ParamStrategy) Apply(ctx context.Context, name string, entry Entry) error {
 	switch entry.Operation {
 	case OperationCreate:
@@ -74,18 +67,9 @@ func (s *ParamStrategy) applyCreate(ctx context.Context, name string, entry Entr
 		return nil
 	}
 
-	input := &paramapi.PutParameterInput{
-		Name:      lo.ToPtr(name),
-		Value:     entry.Value,
-		Type:      paramapi.ParameterTypeString,
-		Overwrite: lo.ToPtr(false), // Do not overwrite existing parameters
-	}
-	if entry.Description != nil {
-		input.Description = entry.Description
-	}
-
-	_, err := s.Client.PutParameter(ctx, input)
-	if err != nil {
+	// Create is create-only (never overwrites an existing parameter). New
+	// parameters are created as plain String, matching the prior behavior.
+	if _, err := s.store.Create(ctx, name, *entry.Value, domain.ValueTypePlaintext, lo.FromPtr(entry.Description)); err != nil {
 		return fmt.Errorf("failed to create parameter: %w", err)
 	}
 
@@ -97,64 +81,28 @@ func (s *ParamStrategy) applyUpdate(ctx context.Context, name string, entry Entr
 		return nil
 	}
 
-	// Check if parameter exists
-	existing, err := s.Client.GetParameter(ctx, &paramapi.GetParameterInput{
-		Name: lo.ToPtr(name),
-	})
+	// Preserve the existing parameter type; a missing parameter is a hard error.
+	existing, err := s.store.Get(ctx, name, provider.VersionRef{})
 	if err != nil {
-		if pnf := (*paramapi.ParameterNotFound)(nil); errors.As(err, &pnf) {
+		if errors.Is(err, provider.ErrNotFound) {
 			return fmt.Errorf("parameter not found: %s", name)
 		}
 
 		return fmt.Errorf("failed to get existing parameter: %w", err)
 	}
 
-	// Preserve existing parameter type
-	paramType := paramapi.ParameterTypeString
-	if existing.Parameter != nil {
-		paramType = existing.Parameter.Type
-	}
-
-	input := &paramapi.PutParameterInput{
-		Name:      lo.ToPtr(name),
-		Value:     entry.Value,
-		Type:      paramType,
-		Overwrite: lo.ToPtr(true),
-	}
-	if entry.Description != nil {
-		input.Description = entry.Description
-	}
-
-	_, err = s.Client.PutParameter(ctx, input)
-	if err != nil {
+	// Put overwrites the existing parameter.
+	if _, err := s.store.Put(ctx, name, *entry.Value, existing.Type, lo.FromPtr(entry.Description)); err != nil {
 		return fmt.Errorf("failed to update parameter: %w", err)
 	}
 
 	return nil
 }
 
-// ApplyTags applies staged tag changes to AWS SSM Parameter Store.
-func (s *ParamStrategy) ApplyTags(ctx context.Context, name string, tagEntry TagEntry) error {
-	change := &tagging.Change{
-		Add:    tagEntry.Add,
-		Remove: tagEntry.Remove,
-	}
-	if !change.IsEmpty() {
-		if err := tagging.ApplyParam(ctx, s.Client, name, change); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
 func (s *ParamStrategy) applyDelete(ctx context.Context, name string) error {
-	_, err := s.Client.DeleteParameter(ctx, &paramapi.DeleteParameterInput{
-		Name: lo.ToPtr(name),
-	})
-	if err != nil {
-		// Already deleted is considered success
-		if pnf := (*paramapi.ParameterNotFound)(nil); errors.As(err, &pnf) {
+	if err := s.store.Delete(ctx, name); err != nil {
+		// Already deleted is considered success.
+		if errors.Is(err, provider.ErrNotFound) {
 			return nil
 		}
 
@@ -164,66 +112,74 @@ func (s *ParamStrategy) applyDelete(ctx context.Context, name string) error {
 	return nil
 }
 
-// FetchLastModified returns the last modified time of the parameter in AWS.
+// ApplyTags applies staged tag changes to SSM Parameter Store.
+func (s *ParamStrategy) ApplyTags(ctx context.Context, name string, tagEntry TagEntry) error {
+	if len(tagEntry.Add) > 0 {
+		if err := s.store.Tag(ctx, name, tagEntry.Add); err != nil {
+			return err
+		}
+	}
+
+	if tagEntry.Remove.Len() > 0 {
+		if err := s.store.Untag(ctx, name, tagEntry.Remove.Values()); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// FetchLastModified returns the last modified time of the parameter.
 // Returns zero time if the parameter doesn't exist.
 func (s *ParamStrategy) FetchLastModified(ctx context.Context, name string) (time.Time, error) {
-	result, err := s.Client.GetParameter(ctx, &paramapi.GetParameterInput{
-		Name: lo.ToPtr(name),
-	})
+	entry, err := s.store.Get(ctx, name, provider.VersionRef{})
 	if err != nil {
-		if pnf := (*paramapi.ParameterNotFound)(nil); errors.As(err, &pnf) {
+		if errors.Is(err, provider.ErrNotFound) {
 			return time.Time{}, nil
 		}
 
 		return time.Time{}, fmt.Errorf("failed to get parameter: %w", err)
 	}
 
-	if result.Parameter != nil && result.Parameter.LastModifiedDate != nil {
-		return *result.Parameter.LastModifiedDate, nil
+	if entry.Modified != nil {
+		return *entry.Modified, nil
 	}
 
 	return time.Time{}, nil
 }
 
-// FetchCurrent fetches the current value from AWS SSM Parameter Store for diffing.
+// FetchCurrent fetches the current value from SSM Parameter Store for diffing.
 func (s *ParamStrategy) FetchCurrent(ctx context.Context, name string) (*FetchResult, error) {
-	spec := &paramversion.Spec{Name: name}
-
-	param, err := paramversion.GetParameterWithVersion(ctx, s.Client, spec)
+	entry, err := s.store.Get(ctx, name, provider.VersionRef{})
 	if err != nil {
 		return nil, err
 	}
 
 	return &FetchResult{
-		Value:      lo.FromPtr(param.Value),
-		Identifier: fmt.Sprintf("#%d", param.Version),
+		Value:      entry.Value,
+		Identifier: "#" + entry.Version.ID,
 	}, nil
 }
 
-// FetchCurrentTags fetches the current tags from AWS SSM Parameter Store.
+// FetchCurrentTags fetches the current tags from SSM Parameter Store.
 func (s *ParamStrategy) FetchCurrentTags(ctx context.Context, name string) (map[string]string, error) {
-	result, err := s.Client.ListTagsForResource(ctx, &paramapi.ListTagsForResourceInput{
-		ResourceType: paramapi.ResourceTypeForTaggingParameter,
-		ResourceId:   lo.ToPtr(name),
-	})
+	entry, err := s.store.Get(ctx, name, provider.VersionRef{})
 	if err != nil {
 		// Parameter not found - return nil (no tags available)
-		if pnf := (*paramapi.ParameterNotFound)(nil); errors.As(err, &pnf) {
+		if errors.Is(err, provider.ErrNotFound) {
 			return nil, nil //nolint:nilnil // intentional: no tags for non-existent resource
 		}
 
 		return nil, fmt.Errorf("failed to get tags: %w", err)
 	}
 
-	if result == nil || len(result.TagList) == 0 {
+	if len(entry.Tags) == 0 {
 		return nil, nil //nolint:nilnil // intentional: resource exists but has no tags
 	}
 
-	tags := make(map[string]string, len(result.TagList))
-	for _, tag := range result.TagList {
-		if tag.Key != nil && tag.Value != nil {
-			tags[*tag.Key] = *tag.Value
-		}
+	tags := make(map[string]string, len(entry.Tags))
+	for _, tag := range entry.Tags {
+		tags[tag.Key] = tag.Value
 	}
 
 	return tags, nil
@@ -243,14 +199,12 @@ func (s *ParamStrategy) ParseName(input string) (string, error) {
 	return spec.Name, nil
 }
 
-// FetchCurrentValue fetches the current value from AWS SSM Parameter Store for editing.
+// FetchCurrentValue fetches the current value from SSM Parameter Store for editing.
 // Returns *ResourceNotFoundError if the parameter doesn't exist.
 func (s *ParamStrategy) FetchCurrentValue(ctx context.Context, name string) (*EditFetchResult, error) {
-	spec := &paramversion.Spec{Name: name}
-
-	param, err := paramversion.GetParameterWithVersion(ctx, s.Client, spec)
+	entry, err := s.store.Get(ctx, name, provider.VersionRef{})
 	if err != nil {
-		if pnf := (*paramapi.ParameterNotFound)(nil); errors.As(err, &pnf) {
+		if errors.Is(err, provider.ErrNotFound) {
 			return nil, &ResourceNotFoundError{Err: err}
 		}
 
@@ -258,11 +212,11 @@ func (s *ParamStrategy) FetchCurrentValue(ctx context.Context, name string) (*Ed
 	}
 
 	result := &EditFetchResult{
-		Value: lo.FromPtr(param.Value),
+		Value: entry.Value,
 	}
 
-	if param.LastModifiedDate != nil {
-		result.LastModified = *param.LastModifiedDate
+	if entry.Modified != nil {
+		result.LastModified = *entry.Modified
 	}
 
 	return result, nil
@@ -287,25 +241,38 @@ func (s *ParamStrategy) FetchVersion(ctx context.Context, input string) (value s
 		return "", "", err
 	}
 
-	param, err := paramversion.GetParameterWithVersion(ctx, s.Client, spec)
+	ref, err := s.store.Resolve(ctx, spec.Name, paramSpecSuffix(spec))
 	if err != nil {
 		return "", "", err
 	}
 
-	return lo.FromPtr(param.Value), fmt.Sprintf("#%d", param.Version), nil
-}
-
-// ParamFactory creates a FullStrategy with an initialized AWS client.
-func ParamFactory(ctx context.Context) (FullStrategy, error) {
-	client, err := infra.NewParamClient(ctx)
+	entry, err := s.store.Get(ctx, spec.Name, ref)
 	if err != nil {
-		return nil, fmt.Errorf("failed to initialize AWS client: %w", err)
+		return "", "", err
 	}
 
-	return NewParamStrategy(client), nil
+	return entry.Value, "#" + entry.Version.ID, nil
 }
 
-// ParamParserFactory creates a Parser without an AWS client.
+// paramSpecSuffix reconstructs the version-spec suffix (the part after the name)
+// so that name+suffix re-parses to an equivalent spec, as provider.Reader.Resolve expects.
+func paramSpecSuffix(spec *paramversion.Spec) string {
+	var b strings.Builder
+
+	if spec.Absolute.Version != nil {
+		b.WriteString("#")
+		b.WriteString(strconv.FormatInt(*spec.Absolute.Version, 10))
+	}
+
+	if spec.Shift > 0 {
+		b.WriteString("~")
+		b.WriteString(strconv.Itoa(spec.Shift))
+	}
+
+	return b.String()
+}
+
+// ParamParserFactory creates a Parser without provider access.
 // Use this for operations that don't need AWS access (e.g., status, parsing).
 func ParamParserFactory() Parser {
 	return NewParamStrategy(nil)

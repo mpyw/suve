@@ -13,7 +13,7 @@ import (
 var config = stgcli.CommandConfig{
 	CommandName:   "param",
 	ItemName:      "parameter",
-	Factory:       staging.ParamFactory,
+	Factory:       cliinternal.ParamStrategyFactory,
 	ParserFactory: staging.ParamParserFactory,
 }
 

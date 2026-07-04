@@ -15,7 +15,6 @@ import (
 	"github.com/mpyw/suve/internal/cli/terminal"
 	"github.com/mpyw/suve/internal/jsonutil"
 	"github.com/mpyw/suve/internal/provider"
-	awsparam "github.com/mpyw/suve/internal/provider/aws/param"
 	"github.com/mpyw/suve/internal/timeutil"
 	"github.com/mpyw/suve/internal/usecase/param"
 )
@@ -266,12 +265,12 @@ EXAMPLES:
 			},
 		},
 		NewPresenter: func(ctx context.Context, req genericlog.Request) (genericlog.Presenter, error) {
-			client, err := cliinternal.NewParamClient(ctx)
+			store, err := cliinternal.ParamStore(ctx)
 			if err != nil {
 				return nil, err
 			}
 
-			return NewLogPresenter(awsparam.New(client), req), nil
+			return NewLogPresenter(store, req), nil
 		},
 	})
 }

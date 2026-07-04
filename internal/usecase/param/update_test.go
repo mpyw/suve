@@ -2,6 +2,8 @@ package param_test
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -12,6 +14,53 @@ import (
 	"github.com/mpyw/suve/internal/provider/providermock"
 	"github.com/mpyw/suve/internal/usecase/param"
 )
+
+func TestUpdateUseCase_GetCurrentValue(t *testing.T) {
+	t.Parallel()
+
+	store := &providermock.Store{
+		GetFunc: func(_ context.Context, _ string, _ provider.VersionRef) (*domain.Entry, error) {
+			return &domain.Entry{Value: "current-value"}, nil
+		},
+	}
+
+	uc := &param.UpdateUseCase{Store: store}
+
+	value, err := uc.GetCurrentValue(t.Context(), "/app/config")
+	require.NoError(t, err)
+	assert.Equal(t, "current-value", value)
+}
+
+func TestUpdateUseCase_GetCurrentValue_NotFound(t *testing.T) {
+	t.Parallel()
+
+	store := &providermock.Store{
+		GetFunc: func(_ context.Context, _ string, _ provider.VersionRef) (*domain.Entry, error) {
+			return nil, fmt.Errorf("%w: /app/missing", provider.ErrNotFound)
+		},
+	}
+
+	uc := &param.UpdateUseCase{Store: store}
+
+	value, err := uc.GetCurrentValue(t.Context(), "/app/missing")
+	require.NoError(t, err)
+	assert.Empty(t, value)
+}
+
+func TestUpdateUseCase_GetCurrentValue_Error(t *testing.T) {
+	t.Parallel()
+
+	store := &providermock.Store{
+		GetFunc: func(_ context.Context, _ string, _ provider.VersionRef) (*domain.Entry, error) {
+			return nil, errors.New("aws error")
+		},
+	}
+
+	uc := &param.UpdateUseCase{Store: store}
+
+	_, err := uc.GetCurrentValue(t.Context(), "/app/config")
+	assert.Error(t, err)
+}
 
 func TestUpdateUseCase_Execute(t *testing.T) {
 	t.Parallel()

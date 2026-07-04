@@ -12,7 +12,6 @@ import (
 	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/jsonutil"
 	"github.com/mpyw/suve/internal/provider"
-	awssecret "github.com/mpyw/suve/internal/provider/aws/secret"
 	"github.com/mpyw/suve/internal/timeutil"
 	"github.com/mpyw/suve/internal/usecase/secret"
 	"github.com/mpyw/suve/internal/version/secretversion"
@@ -149,12 +148,12 @@ EXAMPLES:
 		UsageError: "usage: suve secret show <name>",
 		ParseSpec:  secretversion.Parse,
 		NewPresenter: func(ctx context.Context, spec *secretversion.Spec) (genericshow.Presenter, error) {
-			client, err := cliinternal.NewSecretClient(ctx)
+			store, err := cliinternal.SecretStore(ctx)
 			if err != nil {
 				return nil, err
 			}
 
-			return NewShowPresenter(awssecret.New(client), spec), nil
+			return NewShowPresenter(store, spec), nil
 		},
 	})
 }

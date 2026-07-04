@@ -8,17 +8,11 @@ import (
 	generictag "github.com/mpyw/suve/internal/cli/commands/generic/tag"
 	cliinternal "github.com/mpyw/suve/internal/cli/commands/internal"
 	"github.com/mpyw/suve/internal/provider"
-	awsparam "github.com/mpyw/suve/internal/provider/aws/param"
 )
 
 // newTagger builds the SSM Parameter Store provider.Tagger.
 func newTagger(ctx context.Context) (provider.Tagger, error) {
-	client, err := cliinternal.NewParamClient(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	return awsparam.New(client), nil
+	return cliinternal.ParamStore(ctx)
 }
 
 // TagCommand returns the SSM Parameter Store tag command.

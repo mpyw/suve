@@ -11,7 +11,6 @@ import (
 	cliinternal "github.com/mpyw/suve/internal/cli/commands/internal"
 	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/provider"
-	awssecret "github.com/mpyw/suve/internal/provider/aws/secret"
 	"github.com/mpyw/suve/internal/usecase/secret"
 	"github.com/mpyw/suve/internal/version/secretversion"
 )
@@ -107,12 +106,12 @@ EXAMPLES:
 For comparing staged values, use: suve stage secret diff`,
 		ParseDiffArgs: secretversion.ParseDiffArgs,
 		NewPresenter: func(ctx context.Context, spec1, spec2 *secretversion.Spec) (genericdiff.Presenter, error) {
-			client, err := cliinternal.NewSecretClient(ctx)
+			store, err := cliinternal.SecretStore(ctx)
 			if err != nil {
 				return nil, err
 			}
 
-			return NewDiffPresenter(awssecret.New(client), spec1, spec2), nil
+			return NewDiffPresenter(store, spec1, spec2), nil
 		},
 	})
 }
