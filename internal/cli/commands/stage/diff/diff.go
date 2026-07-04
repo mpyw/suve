@@ -92,7 +92,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		return fmt.Errorf("failed to get AWS identity: %w", err)
 	}
 
-	store, err := file.NewStore(identity.AccountID, identity.Region)
+	store, err := file.NewWorkingStore(identity.AccountID, identity.Region)
 	if err != nil {
 		return fmt.Errorf("failed to create staging store: %w", err)
 	}

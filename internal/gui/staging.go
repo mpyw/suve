@@ -745,7 +745,7 @@ func (a *App) StagingDrain(service string, passphrase string, keep bool, mode st
 		return nil, err
 	}
 
-	working, err := file.NewStore(identity.AccountID, identity.Region)
+	working, err := file.NewWorkingStore(identity.AccountID, identity.Region)
 	if err != nil {
 		return nil, err
 	}
@@ -798,7 +798,7 @@ func (a *App) StagingPersist(service string, passphrase string, keep bool, mode 
 		return nil, err
 	}
 
-	working, err := file.NewStore(identity.AccountID, identity.Region)
+	working, err := file.NewWorkingStore(identity.AccountID, identity.Region)
 	if err != nil {
 		return nil, err
 	}
