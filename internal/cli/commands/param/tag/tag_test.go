@@ -3,16 +3,14 @@ package tag_test
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"testing"
 
-	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/mpyw/suve/internal/api/paramapi"
 	appcli "github.com/mpyw/suve/internal/cli/commands"
 	"github.com/mpyw/suve/internal/cli/commands/param/tag"
+	"github.com/mpyw/suve/internal/provider/providermock"
 	"github.com/mpyw/suve/internal/usecase/param"
 )
 
@@ -56,37 +54,13 @@ func TestCommand_Validation(t *testing.T) {
 	})
 }
 
-//nolint:lll // mock struct fields match AWS SDK interface signatures
-type mockClient struct {
-	addTagsFunc    func(ctx context.Context, params *paramapi.AddTagsToResourceInput, optFns ...func(*paramapi.Options)) (*paramapi.AddTagsToResourceOutput, error)
-	removeTagsFunc func(ctx context.Context, params *paramapi.RemoveTagsFromResourceInput, optFns ...func(*paramapi.Options)) (*paramapi.RemoveTagsFromResourceOutput, error)
-}
-
-//nolint:lll // mock function signature must match AWS SDK interface
-func (m *mockClient) AddTagsToResource(ctx context.Context, params *paramapi.AddTagsToResourceInput, optFns ...func(*paramapi.Options)) (*paramapi.AddTagsToResourceOutput, error) {
-	if m.addTagsFunc != nil {
-		return m.addTagsFunc(ctx, params, optFns...)
-	}
-
-	return &paramapi.AddTagsToResourceOutput{}, nil
-}
-
-//nolint:lll // mock function signature must match AWS SDK interface
-func (m *mockClient) RemoveTagsFromResource(ctx context.Context, params *paramapi.RemoveTagsFromResourceInput, optFns ...func(*paramapi.Options)) (*paramapi.RemoveTagsFromResourceOutput, error) {
-	if m.removeTagsFunc != nil {
-		return m.removeTagsFunc(ctx, params, optFns...)
-	}
-
-	return &paramapi.RemoveTagsFromResourceOutput{}, nil
-}
-
 func TestRun(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
 		name    string
 		opts    tag.Options
-		mock    *mockClient
+		store   *providermock.Store
 		wantErr string
 		check   func(t *testing.T, output string)
 	}{
@@ -96,14 +70,12 @@ func TestRun(t *testing.T) {
 				Name: "/app/param",
 				Tags: map[string]string{"env": "prod"},
 			},
-			mock: &mockClient{
-				//nolint:lll // inline mock
-				addTagsFunc: func(_ context.Context, params *paramapi.AddTagsToResourceInput, _ ...func(*paramapi.Options)) (*paramapi.AddTagsToResourceOutput, error) {
-					assert.Equal(t, "/app/param", lo.FromPtr(params.ResourceId))
-					assert.Equal(t, paramapi.ResourceTypeForTaggingParameter, params.ResourceType)
-					assert.Len(t, params.Tags, 1)
+			store: &providermock.Store{
+				TagFunc: func(_ context.Context, name string, add map[string]string) error {
+					assert.Equal(t, "/app/param", name)
+					assert.Len(t, add, 1)
 
-					return &paramapi.AddTagsToResourceOutput{}, nil
+					return nil
 				},
 			},
 			check: func(t *testing.T, output string) {
@@ -118,12 +90,11 @@ func TestRun(t *testing.T) {
 				Name: "/app/param",
 				Tags: map[string]string{"env": "prod", "team": "backend"},
 			},
-			mock: &mockClient{
-				//nolint:lll // inline mock
-				addTagsFunc: func(_ context.Context, params *paramapi.AddTagsToResourceInput, _ ...func(*paramapi.Options)) (*paramapi.AddTagsToResourceOutput, error) {
-					assert.Len(t, params.Tags, 2)
+			store: &providermock.Store{
+				TagFunc: func(_ context.Context, _ string, add map[string]string) error {
+					assert.Len(t, add, 2)
 
-					return &paramapi.AddTagsToResourceOutput{}, nil
+					return nil
 				},
 			},
 			check: func(t *testing.T, output string) {
@@ -137,10 +108,9 @@ func TestRun(t *testing.T) {
 				Name: "/app/param",
 				Tags: map[string]string{"env": "prod"},
 			},
-			mock: &mockClient{
-				//nolint:lll // inline mock function in test table
-				addTagsFunc: func(_ context.Context, _ *paramapi.AddTagsToResourceInput, _ ...func(*paramapi.Options)) (*paramapi.AddTagsToResourceOutput, error) {
-					return nil, fmt.Errorf("AWS error")
+			store: &providermock.Store{
+				TagFunc: func(_ context.Context, _ string, _ map[string]string) error {
+					return assert.AnError
 				},
 			},
 			wantErr: "failed to add tags",
@@ -154,7 +124,7 @@ func TestRun(t *testing.T) {
 			var buf bytes.Buffer
 
 			r := &tag.Runner{
-				UseCase: &param.TagUseCase{Client: tt.mock},
+				UseCase: &param.TagUseCase{Tagger: tt.store},
 				Stdout:  &buf,
 			}
 			err := r.Run(t.Context(), tt.opts)

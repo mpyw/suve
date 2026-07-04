@@ -8,9 +8,10 @@ import (
 
 	"github.com/urfave/cli/v3"
 
-	"github.com/mpyw/suve/internal/api/paramapi"
 	"github.com/mpyw/suve/internal/cli/commands/internal"
+	"github.com/mpyw/suve/internal/cli/commands/param/paramtype"
 	"github.com/mpyw/suve/internal/cli/output"
+	awsparam "github.com/mpyw/suve/internal/provider/aws/param"
 	"github.com/mpyw/suve/internal/usecase/param"
 )
 
@@ -97,7 +98,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	}
 
 	r := &Runner{
-		UseCase: &param.CreateUseCase{Client: client},
+		UseCase: &param.CreateUseCase{Writer: awsparam.New(client)},
 		Stdout:  cmd.Root().Writer,
 		Stderr:  cmd.Root().ErrWriter,
 	}
@@ -115,7 +116,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 	result, err := r.UseCase.Execute(ctx, param.CreateInput{
 		Name:        opts.Name,
 		Value:       opts.Value,
-		Type:        paramapi.ParameterType(opts.Type),
+		Type:        paramtype.Parse(opts.Type),
 		Description: opts.Description,
 	})
 	if err != nil {

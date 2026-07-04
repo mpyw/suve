@@ -11,6 +11,7 @@ import (
 	"github.com/mpyw/suve/internal/cli/commands/internal"
 	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/jsonutil"
+	awsparam "github.com/mpyw/suve/internal/provider/aws/param"
 	"github.com/mpyw/suve/internal/usecase/param"
 	"github.com/mpyw/suve/internal/version/paramversion"
 )
@@ -110,7 +111,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 
 	return internal.WithPager(cmd, noPager, func(stdout, stderr io.Writer) error {
 		r := &Runner{
-			UseCase: &param.DiffUseCase{Client: client},
+			UseCase: &param.DiffUseCase{Reader: awsparam.New(client)},
 			Stdout:  stdout,
 			Stderr:  stderr,
 		}

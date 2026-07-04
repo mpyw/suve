@@ -2,6 +2,8 @@ package param_test
 
 import (
 	"context"
+	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -9,52 +11,69 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/mpyw/suve/internal/api/paramapi"
+	"github.com/mpyw/suve/internal/domain"
+	"github.com/mpyw/suve/internal/provider"
+	"github.com/mpyw/suve/internal/provider/providermock"
 	"github.com/mpyw/suve/internal/usecase/param"
 )
 
-type mockLogClient struct {
-	getHistoryResult *paramapi.GetParameterHistoryOutput
-	getHistoryErr    error
+// logVer describes a single version for the log-store helper.
+type logVer struct {
+	ver      int64
+	value    string
+	typ      domain.ValueType
+	modified *time.Time
 }
 
-//nolint:lll // mock function signature must match AWS SDK interface
-func (m *mockLogClient) GetParameterHistory(_ context.Context, _ *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
-	if m.getHistoryErr != nil {
-		return nil, m.getHistoryErr
+// newLogStore builds a provider mock whose History returns the given versions
+// newest-first (input is oldest-first) and whose Resolve/Get fetch a version's
+// value/type by id, mirroring the AWS param adapter.
+func newLogStore(oldestFirst []logVer) *providermock.Store {
+	byID := make(map[string]logVer, len(oldestFirst))
+
+	versionsNewestFirst := make([]domain.Version, 0, len(oldestFirst))
+
+	for i := len(oldestFirst) - 1; i >= 0; i-- {
+		v := oldestFirst[i]
+		id := strconv.FormatInt(v.ver, 10)
+		byID[id] = v
+		versionsNewestFirst = append(versionsNewestFirst, domain.Version{ID: id, Created: v.modified})
 	}
 
-	return m.getHistoryResult, nil
+	return &providermock.Store{
+		HistoryFunc: func(_ context.Context, _ string) ([]domain.Version, error) {
+			return versionsNewestFirst, nil
+		},
+		ResolveFunc: func(_ context.Context, _, spec string) (provider.VersionRef, error) {
+			return provider.NewVersionRef(strings.TrimPrefix(spec, "#")), nil
+		},
+		GetFunc: func(_ context.Context, name string, ref provider.VersionRef) (*domain.Entry, error) {
+			v := byID[ref.ID()]
+
+			return &domain.Entry{
+				Name:     name,
+				Value:    v.value,
+				Type:     v.typ,
+				Version:  domain.Version{ID: ref.ID(), Created: v.modified},
+				Modified: v.modified,
+			}, nil
+		},
+	}
 }
 
 func TestLogUseCase_Execute(t *testing.T) {
 	t.Parallel()
 
 	now := time.Now()
-	client := &mockLogClient{
-		getHistoryResult: &paramapi.GetParameterHistoryOutput{
-			Parameters: []paramapi.ParameterHistory{
-				{
-					Name: lo.ToPtr("/app/config"), Value: lo.ToPtr("v1"), Version: 1,
-					Type: paramapi.ParameterTypeString, LastModifiedDate: lo.ToPtr(now.Add(-2 * time.Hour)),
-				},
-				{
-					Name: lo.ToPtr("/app/config"), Value: lo.ToPtr("v2"), Version: 2,
-					Type: paramapi.ParameterTypeString, LastModifiedDate: lo.ToPtr(now.Add(-1 * time.Hour)),
-				},
-				{
-					Name: lo.ToPtr("/app/config"), Value: lo.ToPtr("v3"), Version: 3,
-					Type: paramapi.ParameterTypeString, LastModifiedDate: lo.ToPtr(now),
-				},
-			},
-		},
-	}
-
-	uc := &param.LogUseCase{Client: client}
-
-	output, err := uc.Execute(t.Context(), param.LogInput{
-		Name: "/app/config",
+	store := newLogStore([]logVer{
+		{ver: 1, value: "v1", typ: domain.ValueTypePlaintext, modified: lo.ToPtr(now.Add(-2 * time.Hour))},
+		{ver: 2, value: "v2", typ: domain.ValueTypePlaintext, modified: lo.ToPtr(now.Add(-1 * time.Hour))},
+		{ver: 3, value: "v3", typ: domain.ValueTypePlaintext, modified: lo.ToPtr(now)},
 	})
+
+	uc := &param.LogUseCase{Reader: store}
+
+	output, err := uc.Execute(t.Context(), param.LogInput{Name: "/app/config"})
 	require.NoError(t, err)
 	assert.Equal(t, "/app/config", output.Name)
 	assert.Len(t, output.Entries, 3)
@@ -73,17 +92,11 @@ func TestLogUseCase_Execute(t *testing.T) {
 func TestLogUseCase_Execute_Empty(t *testing.T) {
 	t.Parallel()
 
-	client := &mockLogClient{
-		getHistoryResult: &paramapi.GetParameterHistoryOutput{
-			Parameters: []paramapi.ParameterHistory{},
-		},
-	}
+	store := newLogStore(nil)
 
-	uc := &param.LogUseCase{Client: client}
+	uc := &param.LogUseCase{Reader: store}
 
-	output, err := uc.Execute(t.Context(), param.LogInput{
-		Name: "/app/config",
-	})
+	output, err := uc.Execute(t.Context(), param.LogInput{Name: "/app/config"})
 	require.NoError(t, err)
 	assert.Equal(t, "/app/config", output.Name)
 	assert.Empty(t, output.Entries)
@@ -92,42 +105,34 @@ func TestLogUseCase_Execute_Empty(t *testing.T) {
 func TestLogUseCase_Execute_Error(t *testing.T) {
 	t.Parallel()
 
-	client := &mockLogClient{
-		getHistoryErr: errAWS,
+	store := &providermock.Store{
+		HistoryFunc: func(_ context.Context, _ string) ([]domain.Version, error) {
+			return nil, errHistoryFailed
+		},
 	}
 
-	uc := &param.LogUseCase{Client: client}
+	uc := &param.LogUseCase{Reader: store}
 
-	_, err := uc.Execute(t.Context(), param.LogInput{
-		Name: "/app/config",
-	})
+	_, err := uc.Execute(t.Context(), param.LogInput{Name: "/app/config"})
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to get parameter history")
 }
 
 func TestLogUseCase_Execute_Reverse(t *testing.T) {
 	t.Parallel()
 
 	now := time.Now()
-	client := &mockLogClient{
-		getHistoryResult: &paramapi.GetParameterHistoryOutput{
-			Parameters: []paramapi.ParameterHistory{
-				{Name: lo.ToPtr("/app/config"), Value: lo.ToPtr("v1"), Version: 1, LastModifiedDate: lo.ToPtr(now.Add(-2 * time.Hour))},
-				{Name: lo.ToPtr("/app/config"), Value: lo.ToPtr("v2"), Version: 2, LastModifiedDate: lo.ToPtr(now.Add(-1 * time.Hour))},
-				{Name: lo.ToPtr("/app/config"), Value: lo.ToPtr("v3"), Version: 3, LastModifiedDate: lo.ToPtr(now)},
-			},
-		},
-	}
-
-	uc := &param.LogUseCase{Client: client}
-
-	output, err := uc.Execute(t.Context(), param.LogInput{
-		Name:    "/app/config",
-		Reverse: true,
+	store := newLogStore([]logVer{
+		{ver: 1, value: "v1", modified: lo.ToPtr(now.Add(-2 * time.Hour))},
+		{ver: 2, value: "v2", modified: lo.ToPtr(now.Add(-1 * time.Hour))},
+		{ver: 3, value: "v3", modified: lo.ToPtr(now)},
 	})
+
+	uc := &param.LogUseCase{Reader: store}
+
+	output, err := uc.Execute(t.Context(), param.LogInput{Name: "/app/config", Reverse: true})
 	require.NoError(t, err)
 
-	// Oldest first when Reverse is true (keeps AWS order)
+	// Oldest first when Reverse is true
 	assert.Equal(t, int64(1), output.Entries[0].Version)
 	assert.Equal(t, int64(2), output.Entries[1].Version)
 	assert.Equal(t, int64(3), output.Entries[2].Version)
@@ -137,26 +142,18 @@ func TestLogUseCase_Execute_SinceFilter(t *testing.T) {
 	t.Parallel()
 
 	now := time.Now()
-	client := &mockLogClient{
-		getHistoryResult: &paramapi.GetParameterHistoryOutput{
-			Parameters: []paramapi.ParameterHistory{
-				{Name: lo.ToPtr("/app/config"), Value: lo.ToPtr("v1"), Version: 1, LastModifiedDate: lo.ToPtr(now.Add(-3 * time.Hour))},
-				{Name: lo.ToPtr("/app/config"), Value: lo.ToPtr("v2"), Version: 2, LastModifiedDate: lo.ToPtr(now.Add(-1 * time.Hour))},
-				{Name: lo.ToPtr("/app/config"), Value: lo.ToPtr("v3"), Version: 3, LastModifiedDate: lo.ToPtr(now)},
-			},
-		},
-	}
+	store := newLogStore([]logVer{
+		{ver: 1, value: "v1", modified: lo.ToPtr(now.Add(-3 * time.Hour))},
+		{ver: 2, value: "v2", modified: lo.ToPtr(now.Add(-1 * time.Hour))},
+		{ver: 3, value: "v3", modified: lo.ToPtr(now)},
+	})
 
-	uc := &param.LogUseCase{Client: client}
+	uc := &param.LogUseCase{Reader: store}
 
 	since := now.Add(-2 * time.Hour)
-	output, err := uc.Execute(t.Context(), param.LogInput{
-		Name:  "/app/config",
-		Since: &since,
-	})
+	output, err := uc.Execute(t.Context(), param.LogInput{Name: "/app/config", Since: &since})
 	require.NoError(t, err)
 
-	// v1 is before the since filter, so only v2 and v3 should be included
 	assert.Len(t, output.Entries, 2)
 	assert.Equal(t, int64(3), output.Entries[0].Version)
 	assert.Equal(t, int64(2), output.Entries[1].Version)
@@ -166,26 +163,18 @@ func TestLogUseCase_Execute_UntilFilter(t *testing.T) {
 	t.Parallel()
 
 	now := time.Now()
-	client := &mockLogClient{
-		getHistoryResult: &paramapi.GetParameterHistoryOutput{
-			Parameters: []paramapi.ParameterHistory{
-				{Name: lo.ToPtr("/app/config"), Value: lo.ToPtr("v1"), Version: 1, LastModifiedDate: lo.ToPtr(now.Add(-3 * time.Hour))},
-				{Name: lo.ToPtr("/app/config"), Value: lo.ToPtr("v2"), Version: 2, LastModifiedDate: lo.ToPtr(now.Add(-1 * time.Hour))},
-				{Name: lo.ToPtr("/app/config"), Value: lo.ToPtr("v3"), Version: 3, LastModifiedDate: lo.ToPtr(now)},
-			},
-		},
-	}
+	store := newLogStore([]logVer{
+		{ver: 1, value: "v1", modified: lo.ToPtr(now.Add(-3 * time.Hour))},
+		{ver: 2, value: "v2", modified: lo.ToPtr(now.Add(-1 * time.Hour))},
+		{ver: 3, value: "v3", modified: lo.ToPtr(now)},
+	})
 
-	uc := &param.LogUseCase{Client: client}
+	uc := &param.LogUseCase{Reader: store}
 
 	until := now.Add(-30 * time.Minute)
-	output, err := uc.Execute(t.Context(), param.LogInput{
-		Name:  "/app/config",
-		Until: &until,
-	})
+	output, err := uc.Execute(t.Context(), param.LogInput{Name: "/app/config", Until: &until})
 	require.NoError(t, err)
 
-	// v3 is after the until filter, so only v1 and v2 should be included
 	assert.Len(t, output.Entries, 2)
 	assert.Equal(t, int64(2), output.Entries[0].Version)
 	assert.Equal(t, int64(1), output.Entries[1].Version)
@@ -195,28 +184,19 @@ func TestLogUseCase_Execute_DateRangeFilter(t *testing.T) {
 	t.Parallel()
 
 	now := time.Now()
-	client := &mockLogClient{
-		getHistoryResult: &paramapi.GetParameterHistoryOutput{
-			Parameters: []paramapi.ParameterHistory{
-				{Name: lo.ToPtr("/app/config"), Value: lo.ToPtr("v1"), Version: 1, LastModifiedDate: lo.ToPtr(now.Add(-4 * time.Hour))},
-				{Name: lo.ToPtr("/app/config"), Value: lo.ToPtr("v2"), Version: 2, LastModifiedDate: lo.ToPtr(now.Add(-2 * time.Hour))},
-				{Name: lo.ToPtr("/app/config"), Value: lo.ToPtr("v3"), Version: 3, LastModifiedDate: lo.ToPtr(now)},
-			},
-		},
-	}
+	store := newLogStore([]logVer{
+		{ver: 1, value: "v1", modified: lo.ToPtr(now.Add(-4 * time.Hour))},
+		{ver: 2, value: "v2", modified: lo.ToPtr(now.Add(-2 * time.Hour))},
+		{ver: 3, value: "v3", modified: lo.ToPtr(now)},
+	})
 
-	uc := &param.LogUseCase{Client: client}
+	uc := &param.LogUseCase{Reader: store}
 
 	since := now.Add(-3 * time.Hour)
 	until := now.Add(-1 * time.Hour)
-	output, err := uc.Execute(t.Context(), param.LogInput{
-		Name:  "/app/config",
-		Since: &since,
-		Until: &until,
-	})
+	output, err := uc.Execute(t.Context(), param.LogInput{Name: "/app/config", Since: &since, Until: &until})
 	require.NoError(t, err)
 
-	// Only v2 should be within the range
 	assert.Len(t, output.Entries, 1)
 	assert.Equal(t, int64(2), output.Entries[0].Version)
 }
@@ -224,19 +204,13 @@ func TestLogUseCase_Execute_DateRangeFilter(t *testing.T) {
 func TestLogUseCase_Execute_NoLastModifiedDate(t *testing.T) {
 	t.Parallel()
 
-	client := &mockLogClient{
-		getHistoryResult: &paramapi.GetParameterHistoryOutput{
-			Parameters: []paramapi.ParameterHistory{
-				{Name: lo.ToPtr("/app/config"), Value: lo.ToPtr("v1"), Version: 1, LastModifiedDate: nil},
-			},
-		},
-	}
-
-	uc := &param.LogUseCase{Client: client}
-
-	output, err := uc.Execute(t.Context(), param.LogInput{
-		Name: "/app/config",
+	store := newLogStore([]logVer{
+		{ver: 1, value: "v1", modified: nil},
 	})
+
+	uc := &param.LogUseCase{Reader: store}
+
+	output, err := uc.Execute(t.Context(), param.LogInput{Name: "/app/config"})
 	require.NoError(t, err)
 	assert.Len(t, output.Entries, 1)
 	assert.Nil(t, output.Entries[0].LastModified)
@@ -246,25 +220,18 @@ func TestLogUseCase_Execute_FilterWithNilLastModifiedDate(t *testing.T) {
 	t.Parallel()
 
 	now := time.Now()
-	client := &mockLogClient{
-		getHistoryResult: &paramapi.GetParameterHistoryOutput{
-			Parameters: []paramapi.ParameterHistory{
-				{Name: lo.ToPtr("/app/config"), Value: lo.ToPtr("v1"), Version: 1, LastModifiedDate: nil},
-				{Name: lo.ToPtr("/app/config"), Value: lo.ToPtr("v2"), Version: 2, LastModifiedDate: lo.ToPtr(now)},
-			},
-		},
-	}
+	store := newLogStore([]logVer{
+		{ver: 1, value: "v1", modified: nil},
+		{ver: 2, value: "v2", modified: lo.ToPtr(now)},
+	})
 
-	uc := &param.LogUseCase{Client: client}
+	uc := &param.LogUseCase{Reader: store}
 
 	since := now.Add(-1 * time.Hour)
-	output, err := uc.Execute(t.Context(), param.LogInput{
-		Name:  "/app/config",
-		Since: &since,
-	})
+	output, err := uc.Execute(t.Context(), param.LogInput{Name: "/app/config", Since: &since})
 	require.NoError(t, err)
 
-	// v1 has nil LastModifiedDate, so it is skipped when date filter is applied; only v2 remains
+	// v1 has nil timestamp, so it is skipped when a date filter is applied; only v2 remains.
 	assert.Len(t, output.Entries, 1)
 	assert.Equal(t, int64(2), output.Entries[0].Version)
 }

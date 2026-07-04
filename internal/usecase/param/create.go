@@ -4,21 +4,15 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/samber/lo"
-
-	"github.com/mpyw/suve/internal/api/paramapi"
+	"github.com/mpyw/suve/internal/domain"
+	"github.com/mpyw/suve/internal/provider"
 )
-
-// CreateClient is the interface for the create use case.
-type CreateClient interface {
-	paramapi.PutParameterAPI
-}
 
 // CreateInput holds input for the create use case.
 type CreateInput struct {
 	Name        string
 	Value       string
-	Type        paramapi.ParameterType
+	Type        domain.ValueType
 	Description string
 }
 
@@ -30,29 +24,20 @@ type CreateOutput struct {
 
 // CreateUseCase executes create operations.
 type CreateUseCase struct {
-	Client CreateClient
+	Writer provider.Writer
 }
 
-// Execute runs the create use case.
-// It creates a new parameter. If the parameter already exists, returns an error.
+// Execute runs the create use case. It creates a new parameter via the
+// provider; if the parameter already exists the provider returns a wrapped
+// provider.ErrAlreadyExists and no overwrite occurs.
 func (u *CreateUseCase) Execute(ctx context.Context, input CreateInput) (*CreateOutput, error) {
-	putInput := &paramapi.PutParameterInput{
-		Name:      lo.ToPtr(input.Name),
-		Value:     lo.ToPtr(input.Value),
-		Type:      input.Type,
-		Overwrite: lo.ToPtr(false), // Do not overwrite existing parameters
-	}
-	if input.Description != "" {
-		putInput.Description = lo.ToPtr(input.Description)
-	}
-
-	putOutput, err := u.Client.PutParameter(ctx, putInput)
+	version, err := u.Writer.Create(ctx, input.Name, input.Value, input.Type, input.Description)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create parameter: %w", err)
 	}
 
 	return &CreateOutput{
 		Name:    input.Name,
-		Version: putOutput.Version,
+		Version: parseVersion(version.ID),
 	}, nil
 }

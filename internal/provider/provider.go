@@ -33,7 +33,8 @@ type Reader interface {
 	// Resolve parses a provider-specific version spec string (e.g. "#3~1",
 	// "#abc123", ":AWSCURRENT" for AWS) and resolves it to an opaque VersionRef.
 	Resolve(ctx context.Context, name, spec string) (VersionRef, error)
-	// Get retrieves the entry at the given version ref.
+	// Get retrieves the entry at the given version ref. It returns a wrapped
+	// ErrNotFound if the entry does not exist.
 	Get(ctx context.Context, name string, ref VersionRef) (*domain.Entry, error)
 	// History returns the version history for an entry, newest first.
 	History(ctx context.Context, name string) ([]domain.Version, error)
@@ -43,7 +44,12 @@ type Reader interface {
 
 // Writer provides write access to a provider's entries.
 type Writer interface {
-	// Put creates or updates an entry and returns the resulting version.
+	// Create creates a new entry and returns the resulting version. It returns
+	// a wrapped ErrAlreadyExists if an entry with the same name already exists
+	// (it never overwrites).
+	Create(ctx context.Context, name, value string, valueType domain.ValueType, description string) (domain.Version, error)
+	// Put creates or updates an entry (upsert) and returns the resulting
+	// version. Unlike Create it overwrites an existing entry.
 	Put(ctx context.Context, name, value string, valueType domain.ValueType, description string) (domain.Version, error)
 	// Delete removes an entry.
 	Delete(ctx context.Context, name string) error

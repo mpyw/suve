@@ -3,16 +3,16 @@ package update_test
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"testing"
 
-	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/mpyw/suve/internal/api/paramapi"
 	appcli "github.com/mpyw/suve/internal/cli/commands"
 	"github.com/mpyw/suve/internal/cli/commands/param/update"
+	"github.com/mpyw/suve/internal/domain"
+	"github.com/mpyw/suve/internal/provider"
+	"github.com/mpyw/suve/internal/provider/providermock"
 	"github.com/mpyw/suve/internal/usecase/param"
 )
 
@@ -47,47 +47,18 @@ func TestCommand_Validation(t *testing.T) {
 	})
 }
 
-//nolint:lll // mock struct fields match AWS SDK interface signatures
-type mockClient struct {
-	getParameterFunc func(ctx context.Context, params *paramapi.GetParameterInput, optFns ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error)
-	putParameterFunc func(ctx context.Context, params *paramapi.PutParameterInput, optFns ...func(*paramapi.Options)) (*paramapi.PutParameterOutput, error)
-}
-
-//nolint:lll // mock function signature must match AWS SDK interface
-func (m *mockClient) GetParameter(ctx context.Context, params *paramapi.GetParameterInput, optFns ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
-	if m.getParameterFunc != nil {
-		return m.getParameterFunc(ctx, params, optFns...)
-	}
-
-	return nil, fmt.Errorf("GetParameter not mocked")
-}
-
-//nolint:lll // mock function signature must match AWS SDK interface
-func (m *mockClient) PutParameter(ctx context.Context, params *paramapi.PutParameterInput, optFns ...func(*paramapi.Options)) (*paramapi.PutParameterOutput, error) {
-	if m.putParameterFunc != nil {
-		return m.putParameterFunc(ctx, params, optFns...)
-	}
-
-	return nil, fmt.Errorf("PutParameter not mocked")
-}
-
 func TestRun(t *testing.T) {
 	t.Parallel()
 
-	// Default mock for GetParameter (returns existing parameter)
-	defaultGetParameter := func(_ context.Context, _ *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
-		return &paramapi.GetParameterOutput{
-			Parameter: &paramapi.Parameter{
-				Name:  lo.ToPtr("/app/param"),
-				Value: lo.ToPtr("old-value"),
-			},
-		}, nil
+	// Default GetFunc simulates an existing parameter.
+	existsGet := func(_ context.Context, name string, _ provider.VersionRef) (*domain.Entry, error) {
+		return &domain.Entry{Name: name, Value: "old-value"}, nil
 	}
 
 	tests := []struct {
 		name    string
 		opts    update.Options
-		mock    *mockClient
+		store   *providermock.Store
 		wantErr string
 		check   func(t *testing.T, output string)
 	}{
@@ -98,18 +69,14 @@ func TestRun(t *testing.T) {
 				Value: "test-value",
 				Type:  "SecureString",
 			},
-			mock: &mockClient{
-				getParameterFunc: defaultGetParameter,
-				//nolint:lll // inline mock function in test table
-				putParameterFunc: func(_ context.Context, params *paramapi.PutParameterInput, _ ...func(*paramapi.Options)) (*paramapi.PutParameterOutput, error) {
-					assert.Equal(t, "/app/param", lo.FromPtr(params.Name))
-					assert.Equal(t, "test-value", lo.FromPtr(params.Value))
-					assert.Equal(t, paramapi.ParameterTypeSecureString, params.Type)
-					assert.True(t, lo.FromPtr(params.Overwrite))
+			store: &providermock.Store{
+				GetFunc: existsGet,
+				PutFunc: func(_ context.Context, name, value string, vt domain.ValueType, _ string) (domain.Version, error) {
+					assert.Equal(t, "/app/param", name)
+					assert.Equal(t, "test-value", value)
+					assert.Equal(t, domain.ValueTypeSecret, vt)
 
-					return &paramapi.PutParameterOutput{
-						Version: 2,
-					}, nil
+					return domain.Version{ID: "2"}, nil
 				},
 			},
 			check: func(t *testing.T, output string) {
@@ -127,16 +94,12 @@ func TestRun(t *testing.T) {
 				Type:        "String",
 				Description: "Test description",
 			},
-			mock: &mockClient{
-				getParameterFunc: defaultGetParameter,
-				//nolint:lll // inline mock function in test table
-				putParameterFunc: func(_ context.Context, params *paramapi.PutParameterInput, _ ...func(*paramapi.Options)) (*paramapi.PutParameterOutput, error) {
-					assert.Equal(t, "Test description", lo.FromPtr(params.Description))
-					assert.True(t, lo.FromPtr(params.Overwrite))
+			store: &providermock.Store{
+				GetFunc: existsGet,
+				PutFunc: func(_ context.Context, _, _ string, _ domain.ValueType, description string) (domain.Version, error) {
+					assert.Equal(t, "Test description", description)
 
-					return &paramapi.PutParameterOutput{
-						Version: 2,
-					}, nil
+					return domain.Version{ID: "2"}, nil
 				},
 			},
 		},
@@ -144,9 +107,9 @@ func TestRun(t *testing.T) {
 			name:    "update not found error",
 			opts:    update.Options{Name: "/app/param", Value: "test-value", Type: "String"},
 			wantErr: "parameter not found",
-			mock: &mockClient{
-				getParameterFunc: func(_ context.Context, _ *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
-					return nil, &paramapi.ParameterNotFound{Message: lo.ToPtr("not found")}
+			store: &providermock.Store{
+				GetFunc: func(_ context.Context, _ string, _ provider.VersionRef) (*domain.Entry, error) {
+					return nil, provider.ErrNotFound
 				},
 			},
 		},
@@ -154,10 +117,10 @@ func TestRun(t *testing.T) {
 			name:    "update AWS error",
 			opts:    update.Options{Name: "/app/param", Value: "test-value", Type: "String"},
 			wantErr: "failed to update parameter",
-			mock: &mockClient{
-				getParameterFunc: defaultGetParameter,
-				putParameterFunc: func(_ context.Context, _ *paramapi.PutParameterInput, _ ...func(*paramapi.Options)) (*paramapi.PutParameterOutput, error) {
-					return nil, fmt.Errorf("AWS error")
+			store: &providermock.Store{
+				GetFunc: existsGet,
+				PutFunc: func(_ context.Context, _, _ string, _ domain.ValueType, _ string) (domain.Version, error) {
+					return domain.Version{}, assert.AnError
 				},
 			},
 		},
@@ -170,7 +133,7 @@ func TestRun(t *testing.T) {
 			var buf, errBuf bytes.Buffer
 
 			r := &update.Runner{
-				UseCase: &param.UpdateUseCase{Client: tt.mock},
+				UseCase: &param.UpdateUseCase{Store: tt.store},
 				Stdout:  &buf,
 				Stderr:  &errBuf,
 			}

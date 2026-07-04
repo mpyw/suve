@@ -3,7 +3,7 @@ package log_test
 import (
 	"bytes"
 	"context"
-	"fmt"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -12,10 +12,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/mpyw/suve/internal/api/paramapi"
 	appcli "github.com/mpyw/suve/internal/cli/commands"
 	"github.com/mpyw/suve/internal/cli/commands/param/log"
 	"github.com/mpyw/suve/internal/cli/output"
+	"github.com/mpyw/suve/internal/domain"
+	"github.com/mpyw/suve/internal/provider"
+	"github.com/mpyw/suve/internal/provider/providermock"
 	"github.com/mpyw/suve/internal/usecase/param"
 )
 
@@ -107,18 +109,47 @@ func TestCommand_Validation(t *testing.T) {
 	})
 }
 
-//nolint:lll // mock struct fields match AWS SDK interface signatures
-type mockClient struct {
-	getParameterHistoryFunc func(ctx context.Context, params *paramapi.GetParameterHistoryInput, optFns ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error)
+// logVer describes one version for the log-store helper (oldest-first input).
+type logVer struct {
+	ver      int64
+	value    string
+	typ      domain.ValueType
+	modified *time.Time
 }
 
-//nolint:lll // mock function signature must match AWS SDK interface
-func (m *mockClient) GetParameterHistory(ctx context.Context, params *paramapi.GetParameterHistoryInput, optFns ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
-	if m.getParameterHistoryFunc != nil {
-		return m.getParameterHistoryFunc(ctx, params, optFns...)
+// logStore builds a provider mock: History returns the versions newest-first,
+// and Resolve/Get fetch a version's value/type by id (mirroring the adapter).
+func logStore(oldestFirst []logVer) *providermock.Store {
+	byID := make(map[string]logVer, len(oldestFirst))
+
+	versionsNewestFirst := make([]domain.Version, 0, len(oldestFirst))
+
+	for i := len(oldestFirst) - 1; i >= 0; i-- {
+		v := oldestFirst[i]
+		id := strconv.FormatInt(v.ver, 10)
+		byID[id] = v
+		versionsNewestFirst = append(versionsNewestFirst, domain.Version{ID: id, Created: v.modified})
 	}
 
-	return nil, fmt.Errorf("GetParameterHistory not mocked")
+	return &providermock.Store{
+		HistoryFunc: func(_ context.Context, _ string) ([]domain.Version, error) {
+			return versionsNewestFirst, nil
+		},
+		ResolveFunc: func(_ context.Context, _, spec string) (provider.VersionRef, error) {
+			return provider.NewVersionRef(strings.TrimPrefix(spec, "#")), nil
+		},
+		GetFunc: func(_ context.Context, name string, ref provider.VersionRef) (*domain.Entry, error) {
+			v := byID[ref.ID()]
+
+			return &domain.Entry{
+				Name:     name,
+				Value:    v.value,
+				Type:     v.typ,
+				Version:  domain.Version{ID: ref.ID(), Created: v.modified},
+				Modified: v.modified,
+			}, nil
+		},
+	}
 }
 
 //nolint:funlen // Table-driven test with many cases
@@ -130,26 +161,17 @@ func TestRun(t *testing.T) {
 	tests := []struct {
 		name    string
 		opts    log.Options
-		mock    *mockClient
+		store   *providermock.Store
 		wantErr bool
 		check   func(t *testing.T, output string)
 	}{
 		{
 			name: "show history",
 			opts: log.Options{Name: "/app/param", MaxResults: 10},
-			mock: &mockClient{
-				//nolint:lll // inline mock
-				getParameterHistoryFunc: func(_ context.Context, params *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
-					assert.Equal(t, "/app/param", lo.FromPtr(params.Name))
-
-					return &paramapi.GetParameterHistoryOutput{
-						Parameters: []paramapi.ParameterHistory{
-							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr("v1"), Version: 1, LastModifiedDate: lo.ToPtr(now.Add(-time.Hour))},
-							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr("v2"), Version: 2, LastModifiedDate: &now},
-						},
-					}, nil
-				},
-			},
+			store: logStore([]logVer{
+				{ver: 1, value: "v1", modified: lo.ToPtr(now.Add(-time.Hour))},
+				{ver: 2, value: "v2", modified: &now},
+			}),
 			check: func(t *testing.T, output string) {
 				t.Helper()
 				assert.Contains(t, output, "Version 2")
@@ -160,21 +182,11 @@ func TestRun(t *testing.T) {
 		{
 			name: "normal mode shows full value without truncation",
 			opts: log.Options{Name: "/app/param", MaxResults: 10},
-			mock: &mockClient{
-				//nolint:lll // inline mock
-				getParameterHistoryFunc: func(_ context.Context, _ *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
-					longValue := "this is a very long value that should NOT be truncated in normal mode"
-
-					return &paramapi.GetParameterHistoryOutput{
-						Parameters: []paramapi.ParameterHistory{
-							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr(longValue), Version: 1, LastModifiedDate: &now},
-						},
-					}, nil
-				},
-			},
+			store: logStore([]logVer{
+				{ver: 1, value: "this is a very long value that should NOT be truncated in normal mode", modified: &now},
+			}),
 			check: func(t *testing.T, output string) {
 				t.Helper()
-				// Normal mode shows full value without truncation
 				assert.Contains(t, output, "should NOT be truncated in normal mode")
 				assert.NotContains(t, output, "...")
 			},
@@ -182,39 +194,22 @@ func TestRun(t *testing.T) {
 		{
 			name: "max-value-length truncates in normal mode",
 			opts: log.Options{Name: "/app/param", MaxResults: 10, MaxValueLength: 20},
-			mock: &mockClient{
-				//nolint:lll // inline mock
-				getParameterHistoryFunc: func(_ context.Context, _ *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
-					longValue := "this is a very long value that should be truncated"
-
-					return &paramapi.GetParameterHistoryOutput{
-						Parameters: []paramapi.ParameterHistory{
-							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr(longValue), Version: 1, LastModifiedDate: &now},
-						},
-					}, nil
-				},
-			},
+			store: logStore([]logVer{
+				{ver: 1, value: "this is a very long value that should be truncated", modified: &now},
+			}),
 			check: func(t *testing.T, output string) {
 				t.Helper()
 				assert.Contains(t, output, "...")
-				// Full value should not appear
 				assert.NotContains(t, output, "should be truncated")
 			},
 		},
 		{
 			name: "show patch between versions",
 			opts: log.Options{Name: "/app/param", MaxResults: 10, ShowPatch: true},
-			mock: &mockClient{
-				//nolint:lll // inline mock
-				getParameterHistoryFunc: func(_ context.Context, _ *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
-					return &paramapi.GetParameterHistoryOutput{
-						Parameters: []paramapi.ParameterHistory{
-							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr("old-value"), Version: 1, LastModifiedDate: lo.ToPtr(now.Add(-time.Hour))},
-							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr("new-value"), Version: 2, LastModifiedDate: &now},
-						},
-					}, nil
-				},
-			},
+			store: logStore([]logVer{
+				{ver: 1, value: "old-value", modified: lo.ToPtr(now.Add(-time.Hour))},
+				{ver: 2, value: "new-value", modified: &now},
+			}),
 			check: func(t *testing.T, output string) {
 				t.Helper()
 				assert.Contains(t, output, "-old-value")
@@ -226,16 +221,9 @@ func TestRun(t *testing.T) {
 		{
 			name: "patch with single version shows no diff",
 			opts: log.Options{Name: "/app/param", MaxResults: 10, ShowPatch: true},
-			mock: &mockClient{
-				//nolint:lll // inline mock
-				getParameterHistoryFunc: func(_ context.Context, _ *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
-					return &paramapi.GetParameterHistoryOutput{
-						Parameters: []paramapi.ParameterHistory{
-							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr("only-value"), Version: 1, LastModifiedDate: &now},
-						},
-					}, nil
-				},
-			},
+			store: logStore([]logVer{
+				{ver: 1, value: "only-value", modified: &now},
+			}),
 			check: func(t *testing.T, output string) {
 				t.Helper()
 				assert.Contains(t, output, "Version 1")
@@ -245,10 +233,9 @@ func TestRun(t *testing.T) {
 		{
 			name: "error from AWS",
 			opts: log.Options{Name: "/app/param", MaxResults: 10},
-			mock: &mockClient{
-				//nolint:lll // inline mock
-				getParameterHistoryFunc: func(_ context.Context, _ *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
-					return nil, fmt.Errorf("AWS error")
+			store: &providermock.Store{
+				HistoryFunc: func(_ context.Context, _ string) ([]domain.Version, error) {
+					return nil, assert.AnError
 				},
 			},
 			wantErr: true,
@@ -256,17 +243,10 @@ func TestRun(t *testing.T) {
 		{
 			name: "reverse order shows oldest first",
 			opts: log.Options{Name: "/app/param", MaxResults: 10, Reverse: true},
-			mock: &mockClient{
-				//nolint:lll // inline mock
-				getParameterHistoryFunc: func(_ context.Context, _ *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
-					return &paramapi.GetParameterHistoryOutput{
-						Parameters: []paramapi.ParameterHistory{
-							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr("v1"), Version: 1, LastModifiedDate: lo.ToPtr(now.Add(-time.Hour))},
-							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr("v2"), Version: 2, LastModifiedDate: &now},
-						},
-					}, nil
-				},
-			},
+			store: logStore([]logVer{
+				{ver: 1, value: "v1", modified: lo.ToPtr(now.Add(-time.Hour))},
+				{ver: 2, value: "v2", modified: &now},
+			}),
 			check: func(t *testing.T, output string) {
 				t.Helper()
 
@@ -284,17 +264,10 @@ func TestRun(t *testing.T) {
 		{
 			name: "reverse with patch shows diff correctly",
 			opts: log.Options{Name: "/app/param", MaxResults: 10, ShowPatch: true, Reverse: true},
-			mock: &mockClient{
-				//nolint:lll // inline mock
-				getParameterHistoryFunc: func(_ context.Context, _ *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
-					return &paramapi.GetParameterHistoryOutput{
-						Parameters: []paramapi.ParameterHistory{
-							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr("old-value"), Version: 1, LastModifiedDate: lo.ToPtr(now.Add(-time.Hour))},
-							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr("new-value"), Version: 2, LastModifiedDate: &now},
-						},
-					}, nil
-				},
-			},
+			store: logStore([]logVer{
+				{ver: 1, value: "old-value", modified: lo.ToPtr(now.Add(-time.Hour))},
+				{ver: 2, value: "new-value", modified: &now},
+			}),
 			check: func(t *testing.T, output string) {
 				t.Helper()
 				assert.Contains(t, output, "-old-value")
@@ -304,16 +277,9 @@ func TestRun(t *testing.T) {
 			},
 		},
 		{
-			name: "empty history",
-			opts: log.Options{Name: "/app/param", MaxResults: 10},
-			mock: &mockClient{
-				//nolint:lll // inline mock
-				getParameterHistoryFunc: func(_ context.Context, _ *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
-					return &paramapi.GetParameterHistoryOutput{
-						Parameters: []paramapi.ParameterHistory{},
-					}, nil
-				},
-			},
+			name:  "empty history",
+			opts:  log.Options{Name: "/app/param", MaxResults: 10},
+			store: logStore(nil),
 			check: func(t *testing.T, output string) {
 				t.Helper()
 				assert.Empty(t, output)
@@ -322,64 +288,38 @@ func TestRun(t *testing.T) {
 		{
 			name: "oneline format",
 			opts: log.Options{Name: "/app/param", MaxResults: 10, Oneline: true},
-			mock: &mockClient{
-				//nolint:lll // inline mock
-				getParameterHistoryFunc: func(_ context.Context, _ *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
-					return &paramapi.GetParameterHistoryOutput{
-						Parameters: []paramapi.ParameterHistory{
-							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr("v1"), Version: 1, LastModifiedDate: lo.ToPtr(now.Add(-time.Hour))},
-							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr("v2"), Version: 2, LastModifiedDate: &now},
-						},
-					}, nil
-				},
-			},
+			store: logStore([]logVer{
+				{ver: 1, value: "v1", modified: lo.ToPtr(now.Add(-time.Hour))},
+				{ver: 2, value: "v2", modified: &now},
+			}),
 			check: func(t *testing.T, output string) {
 				t.Helper()
-				// Oneline format should be compact
 				assert.Contains(t, output, "2")
 				assert.Contains(t, output, "(current)")
 				assert.Contains(t, output, "v2")
-				// Should not have "Version" prefix like normal format
 				assert.NotContains(t, output, "Version 2")
 			},
 		},
 		{
 			name: "oneline truncates long values",
 			opts: log.Options{Name: "/app/param", MaxResults: 10, Oneline: true},
-			mock: &mockClient{
-				//nolint:lll // inline mock
-				getParameterHistoryFunc: func(_ context.Context, _ *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
-					longValue := "this is a very long value that exceeds forty characters"
-
-					return &paramapi.GetParameterHistoryOutput{
-						Parameters: []paramapi.ParameterHistory{
-							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr(longValue), Version: 1, LastModifiedDate: &now},
-						},
-					}, nil
-				},
-			},
+			store: logStore([]logVer{
+				{ver: 1, value: "this is a very long value that exceeds forty characters", modified: &now},
+			}),
 			check: func(t *testing.T, output string) {
 				t.Helper()
 				assert.Contains(t, output, "...")
-				// Full value should not appear
 				assert.NotContains(t, output, "exceeds forty characters")
 			},
 		},
 		{
 			name: "filter by since date",
 			opts: log.Options{Name: "/app/param", MaxResults: 10, Since: lo.ToPtr(now.Add(-90 * time.Minute))},
-			mock: &mockClient{
-				//nolint:lll // inline mock
-				getParameterHistoryFunc: func(_ context.Context, _ *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
-					return &paramapi.GetParameterHistoryOutput{
-						Parameters: []paramapi.ParameterHistory{
-							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr("v1"), Version: 1, LastModifiedDate: lo.ToPtr(now.Add(-2 * time.Hour))},
-							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr("v2"), Version: 2, LastModifiedDate: lo.ToPtr(now.Add(-time.Hour))},
-							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr("v3"), Version: 3, LastModifiedDate: &now},
-						},
-					}, nil
-				},
-			},
+			store: logStore([]logVer{
+				{ver: 1, value: "v1", modified: lo.ToPtr(now.Add(-2 * time.Hour))},
+				{ver: 2, value: "v2", modified: lo.ToPtr(now.Add(-time.Hour))},
+				{ver: 3, value: "v3", modified: &now},
+			}),
 			check: func(t *testing.T, output string) {
 				t.Helper()
 				assert.Contains(t, output, "Version 2")
@@ -390,18 +330,11 @@ func TestRun(t *testing.T) {
 		{
 			name: "filter by until date",
 			opts: log.Options{Name: "/app/param", MaxResults: 10, Until: lo.ToPtr(now.Add(-30 * time.Minute))},
-			mock: &mockClient{
-				//nolint:lll // inline mock
-				getParameterHistoryFunc: func(_ context.Context, _ *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
-					return &paramapi.GetParameterHistoryOutput{
-						Parameters: []paramapi.ParameterHistory{
-							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr("v1"), Version: 1, LastModifiedDate: lo.ToPtr(now.Add(-2 * time.Hour))},
-							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr("v2"), Version: 2, LastModifiedDate: lo.ToPtr(now.Add(-time.Hour))},
-							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr("v3"), Version: 3, LastModifiedDate: &now},
-						},
-					}, nil
-				},
-			},
+			store: logStore([]logVer{
+				{ver: 1, value: "v1", modified: lo.ToPtr(now.Add(-2 * time.Hour))},
+				{ver: 2, value: "v2", modified: lo.ToPtr(now.Add(-time.Hour))},
+				{ver: 3, value: "v3", modified: &now},
+			}),
 			check: func(t *testing.T, output string) {
 				t.Helper()
 				assert.Contains(t, output, "Version 1")
@@ -412,19 +345,12 @@ func TestRun(t *testing.T) {
 		{
 			name: "filter by since and until date range",
 			opts: log.Options{Name: "/app/param", MaxResults: 10, Since: lo.ToPtr(now.Add(-150 * time.Minute)), Until: lo.ToPtr(now.Add(-30 * time.Minute))},
-			mock: &mockClient{
-				//nolint:lll // inline mock
-				getParameterHistoryFunc: func(_ context.Context, _ *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
-					return &paramapi.GetParameterHistoryOutput{
-						Parameters: []paramapi.ParameterHistory{
-							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr("v1"), Version: 1, LastModifiedDate: lo.ToPtr(now.Add(-3 * time.Hour))},
-							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr("v2"), Version: 2, LastModifiedDate: lo.ToPtr(now.Add(-2 * time.Hour))},
-							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr("v3"), Version: 3, LastModifiedDate: lo.ToPtr(now.Add(-time.Hour))},
-							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr("v4"), Version: 4, LastModifiedDate: &now},
-						},
-					}, nil
-				},
-			},
+			store: logStore([]logVer{
+				{ver: 1, value: "v1", modified: lo.ToPtr(now.Add(-3 * time.Hour))},
+				{ver: 2, value: "v2", modified: lo.ToPtr(now.Add(-2 * time.Hour))},
+				{ver: 3, value: "v3", modified: lo.ToPtr(now.Add(-time.Hour))},
+				{ver: 4, value: "v4", modified: &now},
+			}),
 			check: func(t *testing.T, output string) {
 				t.Helper()
 				assert.NotContains(t, output, "Version 1")
@@ -436,16 +362,9 @@ func TestRun(t *testing.T) {
 		{
 			name: "filter with no matching dates returns empty",
 			opts: log.Options{Name: "/app/param", MaxResults: 10, Since: lo.ToPtr(now.Add(time.Hour)), Until: lo.ToPtr(now.Add(2 * time.Hour))},
-			mock: &mockClient{
-				//nolint:lll // inline mock
-				getParameterHistoryFunc: func(_ context.Context, _ *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
-					return &paramapi.GetParameterHistoryOutput{
-						Parameters: []paramapi.ParameterHistory{
-							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr("v1"), Version: 1, LastModifiedDate: &now},
-						},
-					}, nil
-				},
-			},
+			store: logStore([]logVer{
+				{ver: 1, value: "v1", modified: &now},
+			}),
 			check: func(t *testing.T, output string) {
 				t.Helper()
 				assert.Empty(t, output)
@@ -454,17 +373,10 @@ func TestRun(t *testing.T) {
 		{
 			name: "filter skips versions without LastModifiedDate",
 			opts: log.Options{Name: "/app/param", MaxResults: 10, Since: lo.ToPtr(now.Add(-30 * time.Minute))},
-			mock: &mockClient{
-				//nolint:lll // inline mock
-				getParameterHistoryFunc: func(_ context.Context, _ *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
-					return &paramapi.GetParameterHistoryOutput{
-						Parameters: []paramapi.ParameterHistory{
-							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr("v1"), Version: 1, LastModifiedDate: nil},
-							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr("v2"), Version: 2, LastModifiedDate: &now},
-						},
-					}, nil
-				},
-			},
+			store: logStore([]logVer{
+				{ver: 1, value: "v1", modified: nil},
+				{ver: 2, value: "v2", modified: &now},
+			}),
 			check: func(t *testing.T, output string) {
 				t.Helper()
 				assert.Contains(t, output, "Version 2")
@@ -474,17 +386,10 @@ func TestRun(t *testing.T) {
 		{
 			name: "JSON output format",
 			opts: log.Options{Name: "/app/param", MaxResults: 10, Output: output.FormatJSON},
-			mock: &mockClient{
-				//nolint:lll // inline mock
-				getParameterHistoryFunc: func(_ context.Context, _ *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
-					return &paramapi.GetParameterHistoryOutput{
-						Parameters: []paramapi.ParameterHistory{
-							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr("value1"), Version: 1, Type: paramapi.ParameterTypeString, LastModifiedDate: lo.ToPtr(now.Add(-time.Hour))},
-							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr("value2"), Version: 2, Type: paramapi.ParameterTypeSecureString, LastModifiedDate: &now},
-						},
-					}, nil
-				},
-			},
+			store: logStore([]logVer{
+				{ver: 1, value: "value1", typ: domain.ValueTypePlaintext, modified: lo.ToPtr(now.Add(-time.Hour))},
+				{ver: 2, value: "value2", typ: domain.ValueTypeSecret, modified: &now},
+			}),
 			check: func(t *testing.T, output string) {
 				t.Helper()
 				assert.Contains(t, output, `"version"`)
@@ -496,16 +401,9 @@ func TestRun(t *testing.T) {
 		{
 			name: "JSON output without LastModifiedDate",
 			opts: log.Options{Name: "/app/param", MaxResults: 10, Output: output.FormatJSON},
-			mock: &mockClient{
-				//nolint:lll // inline mock
-				getParameterHistoryFunc: func(_ context.Context, _ *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
-					return &paramapi.GetParameterHistoryOutput{
-						Parameters: []paramapi.ParameterHistory{
-							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr("value1"), Version: 1, Type: paramapi.ParameterTypeString, LastModifiedDate: nil},
-						},
-					}, nil
-				},
-			},
+			store: logStore([]logVer{
+				{ver: 1, value: "value1", typ: domain.ValueTypePlaintext, modified: nil},
+			}),
 			check: func(t *testing.T, output string) {
 				t.Helper()
 				assert.Contains(t, output, `"version"`)
@@ -515,17 +413,10 @@ func TestRun(t *testing.T) {
 		{
 			name: "patch with JSON format",
 			opts: log.Options{Name: "/app/param", MaxResults: 10, ShowPatch: true, ParseJSON: true},
-			mock: &mockClient{
-				//nolint:lll // inline mock
-				getParameterHistoryFunc: func(_ context.Context, _ *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
-					return &paramapi.GetParameterHistoryOutput{
-						Parameters: []paramapi.ParameterHistory{
-							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr(`{"key":"old"}`), Version: 1, LastModifiedDate: lo.ToPtr(now.Add(-time.Hour))},
-							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr(`{"key":"new"}`), Version: 2, LastModifiedDate: &now},
-						},
-					}, nil
-				},
-			},
+			store: logStore([]logVer{
+				{ver: 1, value: `{"key":"old"}`, modified: lo.ToPtr(now.Add(-time.Hour))},
+				{ver: 2, value: `{"key":"new"}`, modified: &now},
+			}),
 			check: func(t *testing.T, output string) {
 				t.Helper()
 				assert.Contains(t, output, "Version")
@@ -534,16 +425,9 @@ func TestRun(t *testing.T) {
 		{
 			name: "version without LastModifiedDate shows correctly",
 			opts: log.Options{Name: "/app/param", MaxResults: 10},
-			mock: &mockClient{
-				//nolint:lll // inline mock
-				getParameterHistoryFunc: func(_ context.Context, _ *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
-					return &paramapi.GetParameterHistoryOutput{
-						Parameters: []paramapi.ParameterHistory{
-							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr("v1"), Version: 1, LastModifiedDate: nil},
-						},
-					}, nil
-				},
-			},
+			store: logStore([]logVer{
+				{ver: 1, value: "v1", modified: nil},
+			}),
 			check: func(t *testing.T, output string) {
 				t.Helper()
 				assert.Contains(t, output, "Version 1")
@@ -553,16 +437,9 @@ func TestRun(t *testing.T) {
 		{
 			name: "oneline without LastModifiedDate",
 			opts: log.Options{Name: "/app/param", MaxResults: 10, Oneline: true},
-			mock: &mockClient{
-				//nolint:lll // inline mock
-				getParameterHistoryFunc: func(_ context.Context, _ *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
-					return &paramapi.GetParameterHistoryOutput{
-						Parameters: []paramapi.ParameterHistory{
-							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr("v1"), Version: 1, LastModifiedDate: nil},
-						},
-					}, nil
-				},
-			},
+			store: logStore([]logVer{
+				{ver: 1, value: "v1", modified: nil},
+			}),
 			check: func(t *testing.T, output string) {
 				t.Helper()
 				assert.Contains(t, output, "1")
@@ -571,22 +448,13 @@ func TestRun(t *testing.T) {
 		{
 			name: "patch with identical values shows no diff",
 			opts: log.Options{Name: "/app/param", MaxResults: 10, ShowPatch: true},
-			mock: &mockClient{
-				//nolint:lll // inline mock
-				getParameterHistoryFunc: func(_ context.Context, _ *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
-					return &paramapi.GetParameterHistoryOutput{
-						Parameters: []paramapi.ParameterHistory{
-							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr("same-value"), Version: 1, LastModifiedDate: lo.ToPtr(now.Add(-time.Hour))},
-							{Name: lo.ToPtr("/app/param"), Value: lo.ToPtr("same-value"), Version: 2, LastModifiedDate: &now},
-						},
-					}, nil
-				},
-			},
+			store: logStore([]logVer{
+				{ver: 1, value: "same-value", modified: lo.ToPtr(now.Add(-time.Hour))},
+				{ver: 2, value: "same-value", modified: &now},
+			}),
 			check: func(t *testing.T, output string) {
 				t.Helper()
-
 				assert.Contains(t, output, "Version")
-				// No diff should be shown since values are identical
 				assert.NotContains(t, output, "-same-value")
 				assert.NotContains(t, output, "+same-value")
 			},
@@ -600,7 +468,7 @@ func TestRun(t *testing.T) {
 			var buf, errBuf bytes.Buffer
 
 			r := &log.Runner{
-				UseCase: &param.LogUseCase{Client: tt.mock},
+				UseCase: &param.LogUseCase{Reader: tt.store},
 				Stdout:  &buf,
 				Stderr:  &errBuf,
 			}

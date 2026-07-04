@@ -7,64 +7,69 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/mpyw/suve/internal/api/paramapi"
+	"github.com/mpyw/suve/internal/provider/providermock"
 	"github.com/mpyw/suve/internal/usecase/param"
 )
-
-type mockTagClient struct {
-	addTagsErr    error
-	removeTagsErr error
-}
-
-//nolint:lll // mock function signature must match AWS SDK interface
-func (m *mockTagClient) AddTagsToResource(_ context.Context, _ *paramapi.AddTagsToResourceInput, _ ...func(*paramapi.Options)) (*paramapi.AddTagsToResourceOutput, error) {
-	if m.addTagsErr != nil {
-		return nil, m.addTagsErr
-	}
-
-	return &paramapi.AddTagsToResourceOutput{}, nil
-}
-
-//nolint:lll // mock function signature must match AWS SDK interface
-func (m *mockTagClient) RemoveTagsFromResource(_ context.Context, _ *paramapi.RemoveTagsFromResourceInput, _ ...func(*paramapi.Options)) (*paramapi.RemoveTagsFromResourceOutput, error) {
-	if m.removeTagsErr != nil {
-		return nil, m.removeTagsErr
-	}
-
-	return &paramapi.RemoveTagsFromResourceOutput{}, nil
-}
 
 func TestTagUseCase_Execute_AddTags(t *testing.T) {
 	t.Parallel()
 
-	client := &mockTagClient{}
-	uc := &param.TagUseCase{Client: client}
+	var gotAdd map[string]string
+
+	store := &providermock.Store{
+		TagFunc: func(_ context.Context, name string, add map[string]string) error {
+			assert.Equal(t, "/app/config", name)
+
+			gotAdd = add
+
+			return nil
+		},
+	}
+
+	uc := &param.TagUseCase{Tagger: store}
 
 	err := uc.Execute(t.Context(), param.TagInput{
 		Name: "/app/config",
 		Add:  map[string]string{"env": "prod", "team": "backend"},
 	})
 	require.NoError(t, err)
+	assert.Equal(t, map[string]string{"env": "prod", "team": "backend"}, gotAdd)
 }
 
 func TestTagUseCase_Execute_RemoveTags(t *testing.T) {
 	t.Parallel()
 
-	client := &mockTagClient{}
-	uc := &param.TagUseCase{Client: client}
+	var gotKeys []string
+
+	store := &providermock.Store{
+		UntagFunc: func(_ context.Context, name string, keys []string) error {
+			assert.Equal(t, "/app/config", name)
+
+			gotKeys = keys
+
+			return nil
+		},
+	}
+
+	uc := &param.TagUseCase{Tagger: store}
 
 	err := uc.Execute(t.Context(), param.TagInput{
 		Name:   "/app/config",
 		Remove: []string{"old-tag", "deprecated"},
 	})
 	require.NoError(t, err)
+	assert.Equal(t, []string{"old-tag", "deprecated"}, gotKeys)
 }
 
 func TestTagUseCase_Execute_AddAndRemoveTags(t *testing.T) {
 	t.Parallel()
 
-	client := &mockTagClient{}
-	uc := &param.TagUseCase{Client: client}
+	store := &providermock.Store{
+		TagFunc:   func(_ context.Context, _ string, _ map[string]string) error { return nil },
+		UntagFunc: func(_ context.Context, _ string, _ []string) error { return nil },
+	}
+
+	uc := &param.TagUseCase{Tagger: store}
 
 	err := uc.Execute(t.Context(), param.TagInput{
 		Name:   "/app/config",
@@ -77,22 +82,26 @@ func TestTagUseCase_Execute_AddAndRemoveTags(t *testing.T) {
 func TestTagUseCase_Execute_NoTags(t *testing.T) {
 	t.Parallel()
 
-	client := &mockTagClient{}
-	uc := &param.TagUseCase{Client: client}
+	// Neither Tag nor Untag should be called; leaving the funcs nil ensures a
+	// hit would fail with providermock.ErrNotConfigured.
+	store := &providermock.Store{}
 
-	err := uc.Execute(t.Context(), param.TagInput{
-		Name: "/app/config",
-	})
+	uc := &param.TagUseCase{Tagger: store}
+
+	err := uc.Execute(t.Context(), param.TagInput{Name: "/app/config"})
 	require.NoError(t, err)
 }
 
 func TestTagUseCase_Execute_AddTagsError(t *testing.T) {
 	t.Parallel()
 
-	client := &mockTagClient{
-		addTagsErr: errAddTagsFailed,
+	store := &providermock.Store{
+		TagFunc: func(_ context.Context, _ string, _ map[string]string) error {
+			return errAddTagsFailed
+		},
 	}
-	uc := &param.TagUseCase{Client: client}
+
+	uc := &param.TagUseCase{Tagger: store}
 
 	err := uc.Execute(t.Context(), param.TagInput{
 		Name: "/app/config",
@@ -105,10 +114,13 @@ func TestTagUseCase_Execute_AddTagsError(t *testing.T) {
 func TestTagUseCase_Execute_RemoveTagsError(t *testing.T) {
 	t.Parallel()
 
-	client := &mockTagClient{
-		removeTagsErr: errRemoveTagsFailed,
+	store := &providermock.Store{
+		UntagFunc: func(_ context.Context, _ string, _ []string) error {
+			return errRemoveTagsFailed
+		},
 	}
-	uc := &param.TagUseCase{Client: client}
+
+	uc := &param.TagUseCase{Tagger: store}
 
 	err := uc.Execute(t.Context(), param.TagInput{
 		Name:   "/app/config",

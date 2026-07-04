@@ -179,6 +179,11 @@ func (s *Store) Get(ctx context.Context, name string, ref provider.VersionRef) (
 
 	out, err := s.client.GetSecretValue(ctx, input)
 	if err != nil {
+		var notFound *types.ResourceNotFoundException
+		if errors.As(err, &notFound) {
+			return nil, fmt.Errorf("%w: %s", provider.ErrNotFound, name)
+		}
+
 		return nil, fmt.Errorf("failed to get secret value: %w", err)
 	}
 
@@ -256,6 +261,34 @@ func (s *Store) List(ctx context.Context) ([]string, error) {
 	return names, nil
 }
 
+// Create creates a new secret and returns the resulting version. It returns a
+// wrapped provider.ErrAlreadyExists if the secret already exists (it never
+// writes a new version of an existing secret). The valueType is ignored
+// (Secrets Manager values are always secret).
+func (s *Store) Create(
+	ctx context.Context, name, value string, _ domain.ValueType, description string,
+) (domain.Version, error) {
+	input := &secretsmanager.CreateSecretInput{
+		Name:         aws.String(name),
+		SecretString: aws.String(value),
+	}
+	if description != "" {
+		input.Description = aws.String(description)
+	}
+
+	created, err := s.client.CreateSecret(ctx, input)
+	if err != nil {
+		var exists *types.ResourceExistsException
+		if errors.As(err, &exists) {
+			return domain.Version{}, fmt.Errorf("%w: %s", provider.ErrAlreadyExists, name)
+		}
+
+		return domain.Version{}, fmt.Errorf("failed to create secret: %w", err)
+	}
+
+	return domain.Version{ID: aws.ToString(created.VersionId)}, nil
+}
+
 // Put creates the secret, or writes a new version if it already exists. The
 // valueType is ignored (Secrets Manager values are always secret). A
 // description is applied only on creation.
@@ -323,6 +356,11 @@ func (s *Store) Describe(ctx context.Context, name string) (*domain.Entry, error
 		SecretId: aws.String(name),
 	})
 	if err != nil {
+		var notFound *types.ResourceNotFoundException
+		if errors.As(err, &notFound) {
+			return nil, fmt.Errorf("%w: %s", provider.ErrNotFound, name)
+		}
+
 		return nil, fmt.Errorf("failed to describe secret: %w", err)
 	}
 

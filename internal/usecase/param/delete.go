@@ -5,16 +5,8 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/samber/lo"
-
-	"github.com/mpyw/suve/internal/api/paramapi"
+	"github.com/mpyw/suve/internal/provider"
 )
-
-// DeleteClient is the interface for the delete use case.
-type DeleteClient interface {
-	paramapi.DeleteParameterAPI
-	paramapi.GetParameterAPI
-}
 
 // DeleteInput holds input for the delete use case.
 type DeleteInput struct {
@@ -28,33 +20,28 @@ type DeleteOutput struct {
 
 // DeleteUseCase executes delete operations.
 type DeleteUseCase struct {
-	Client DeleteClient
+	Store provider.Store
 }
 
-// GetCurrentValue fetches the current value for preview.
+// GetCurrentValue fetches the current value for preview. A non-existent
+// parameter yields an empty value with no error; any other read failure is
+// propagated.
 func (u *DeleteUseCase) GetCurrentValue(ctx context.Context, name string) (string, error) {
-	out, err := u.Client.GetParameter(ctx, &paramapi.GetParameterInput{
-		Name:           lo.ToPtr(name),
-		WithDecryption: lo.ToPtr(true),
-	})
-	if err != nil {
-		pnf := (*paramapi.ParameterNotFound)(nil)
-		if errors.As(err, &pnf) {
-			return "", nil
-		}
+	entry, err := u.Store.Get(ctx, name, provider.VersionRef{})
 
+	switch {
+	case errors.Is(err, provider.ErrNotFound):
+		return "", nil
+	case err != nil:
 		return "", err
 	}
 
-	return lo.FromPtr(out.Parameter.Value), nil
+	return entry.Value, nil
 }
 
 // Execute runs the delete use case.
 func (u *DeleteUseCase) Execute(ctx context.Context, input DeleteInput) (*DeleteOutput, error) {
-	_, err := u.Client.DeleteParameter(ctx, &paramapi.DeleteParameterInput{
-		Name: lo.ToPtr(input.Name),
-	})
-	if err != nil {
+	if err := u.Store.Delete(ctx, input.Name); err != nil {
 		return nil, fmt.Errorf("failed to delete parameter: %w", err)
 	}
 

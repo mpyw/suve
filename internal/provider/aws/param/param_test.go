@@ -325,3 +325,51 @@ func TestTagAndUntag(t *testing.T) {
 	require.NotNil(t, removeIn)
 	assert.Equal(t, []string{"env"}, removeIn.TagKeys)
 }
+
+func TestCreate_NewReturnsVersion(t *testing.T) {
+	t.Parallel()
+
+	var putIn *ssm.PutParameterInput
+
+	store := param.New(&mockClient{
+		putParameter: func(in *ssm.PutParameterInput) (*ssm.PutParameterOutput, error) {
+			putIn = in
+
+			return &ssm.PutParameterOutput{Version: 1}, nil
+		},
+	})
+
+	got, err := store.Create(t.Context(), "/my/param", "v", domain.ValueTypePlaintext, "")
+	require.NoError(t, err)
+	assert.Equal(t, "1", got.ID)
+	require.NotNil(t, putIn)
+	assert.False(t, aws.ToBool(putIn.Overwrite))
+}
+
+func TestCreate_AlreadyExistsMapsSentinel(t *testing.T) {
+	t.Parallel()
+
+	store := param.New(&mockClient{
+		putParameter: func(*ssm.PutParameterInput) (*ssm.PutParameterOutput, error) {
+			return nil, &types.ParameterAlreadyExists{Message: aws.String("exists")}
+		},
+	})
+
+	_, err := store.Create(t.Context(), "/my/param", "v", domain.ValueTypePlaintext, "")
+	require.Error(t, err)
+	assert.ErrorIs(t, err, provider.ErrAlreadyExists)
+}
+
+func TestGet_NotFoundMapsSentinel(t *testing.T) {
+	t.Parallel()
+
+	store := param.New(&mockClient{
+		getParameter: func(*ssm.GetParameterInput) (*ssm.GetParameterOutput, error) {
+			return nil, &types.ParameterNotFound{Message: aws.String("nope")}
+		},
+	})
+
+	_, err := store.Get(t.Context(), "/my/param", provider.VersionRef{})
+	require.Error(t, err)
+	assert.ErrorIs(t, err, provider.ErrNotFound)
+}

@@ -5,7 +5,9 @@ package gui
 import (
 	"errors"
 
-	"github.com/mpyw/suve/internal/api/paramapi"
+	"github.com/mpyw/suve/internal/cli/commands/param/paramtype"
+	"github.com/mpyw/suve/internal/provider"
+	awsparam "github.com/mpyw/suve/internal/provider/aws/param"
 	"github.com/mpyw/suve/internal/usecase/param"
 	"github.com/mpyw/suve/internal/version/paramversion"
 )
@@ -84,21 +86,19 @@ type ParamDeleteResult struct {
 // =============================================================================
 
 // ParamList lists SSM parameters.
-func (a *App) ParamList(prefix string, recursive bool, withValue bool, filter string, maxResults int, nextToken string) (*ParamListResult, error) {
+func (a *App) ParamList(prefix string, recursive bool, withValue bool, filter string, _ int, _ string) (*ParamListResult, error) {
 	client, err := a.getParamClient()
 	if err != nil {
 		return nil, err
 	}
 
-	uc := &param.ListUseCase{Client: client}
+	uc := &param.ListUseCase{Reader: awsparam.New(client)}
 
 	result, err := uc.Execute(a.ctx, param.ListInput{
-		Prefix:     prefix,
-		Recursive:  recursive,
-		WithValue:  withValue,
-		Filter:     filter,
-		MaxResults: maxResults,
-		NextToken:  nextToken,
+		Prefix:    prefix,
+		Recursive: recursive,
+		WithValue: withValue,
+		Filter:    filter,
 	})
 	if err != nil {
 		return nil, err
@@ -108,12 +108,11 @@ func (a *App) ParamList(prefix string, recursive bool, withValue bool, filter st
 	for i, e := range result.Entries {
 		entries[i] = ParamListEntry{
 			Name:  e.Name,
-			Type:  e.Type,
 			Value: e.Value,
 		}
 	}
 
-	return &ParamListResult{Entries: entries, NextToken: result.NextToken}, nil
+	return &ParamListResult{Entries: entries}, nil
 }
 
 // ParamShow shows a parameter value.
@@ -128,7 +127,7 @@ func (a *App) ParamShow(specStr string) (*ParamShowResult, error) {
 		return nil, err
 	}
 
-	uc := &param.ShowUseCase{Client: client}
+	uc := &param.ShowUseCase{Reader: awsparam.New(client)}
 
 	result, err := uc.Execute(a.ctx, param.ShowInput{Spec: spec})
 	if err != nil {
@@ -139,7 +138,7 @@ func (a *App) ParamShow(specStr string) (*ParamShowResult, error) {
 		Name:        result.Name,
 		Value:       result.Value,
 		Version:     result.Version,
-		Type:        string(result.Type),
+		Type:        paramtype.Display(result.Type),
 		Description: result.Description,
 		Tags:        make([]ParamShowTag, 0, len(result.Tags)),
 	}
@@ -164,7 +163,7 @@ func (a *App) ParamLog(name string, maxResults int32) (*ParamLogResult, error) {
 		return nil, err
 	}
 
-	uc := &param.LogUseCase{Client: client}
+	uc := &param.LogUseCase{Reader: awsparam.New(client)}
 
 	result, err := uc.Execute(a.ctx, param.LogInput{
 		Name:       name,
@@ -179,7 +178,7 @@ func (a *App) ParamLog(name string, maxResults int32) (*ParamLogResult, error) {
 		entry := ParamLogEntry{
 			Version:   e.Version,
 			Value:     e.Value,
-			Type:      string(e.Type),
+			Type:      paramtype.Display(e.Type),
 			IsCurrent: e.IsCurrent,
 		}
 		if e.LastModified != nil {
@@ -209,7 +208,7 @@ func (a *App) ParamDiff(spec1Str, spec2Str string) (*ParamDiffResult, error) {
 		return nil, err
 	}
 
-	uc := &param.DiffUseCase{Client: client}
+	uc := &param.DiffUseCase{Reader: awsparam.New(client)}
 
 	result, err := uc.Execute(a.ctx, param.DiffInput{
 		Spec1: spec1,
@@ -235,13 +234,16 @@ func (a *App) ParamSet(name, value, paramType string) (*ParamSetResult, error) {
 		return nil, err
 	}
 
-	// Try to create first
-	createUC := &param.CreateUseCase{Client: client}
+	store := awsparam.New(client)
+	valueType := paramtype.Parse(paramType)
+
+	// Try to create first; if the parameter already exists, update it instead.
+	createUC := &param.CreateUseCase{Writer: store}
 
 	createResult, err := createUC.Execute(a.ctx, param.CreateInput{
 		Name:  name,
 		Value: value,
-		Type:  paramapi.ParameterType(paramType),
+		Type:  valueType,
 	})
 	if err == nil {
 		return &ParamSetResult{
@@ -251,27 +253,26 @@ func (a *App) ParamSet(name, value, paramType string) (*ParamSetResult, error) {
 		}, nil
 	}
 
-	// If parameter already exists, update it
-	if pae := (*paramapi.ParameterAlreadyExists)(nil); errors.As(err, &pae) {
-		updateUC := &param.UpdateUseCase{Client: client}
-
-		updateResult, err := updateUC.Execute(a.ctx, param.UpdateInput{
-			Name:  name,
-			Value: value,
-			Type:  paramapi.ParameterType(paramType),
-		})
-		if err != nil {
-			return nil, err
-		}
-
-		return &ParamSetResult{
-			Name:      updateResult.Name,
-			Version:   updateResult.Version,
-			IsCreated: false,
-		}, nil
+	if !errors.Is(err, provider.ErrAlreadyExists) {
+		return nil, err
 	}
 
-	return nil, err
+	updateUC := &param.UpdateUseCase{Store: store}
+
+	updateResult, err := updateUC.Execute(a.ctx, param.UpdateInput{
+		Name:  name,
+		Value: value,
+		Type:  valueType,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return &ParamSetResult{
+		Name:      updateResult.Name,
+		Version:   updateResult.Version,
+		IsCreated: false,
+	}, nil
 }
 
 // ParamDelete deletes a parameter.
@@ -281,7 +282,7 @@ func (a *App) ParamDelete(name string) (*ParamDeleteResult, error) {
 		return nil, err
 	}
 
-	uc := &param.DeleteUseCase{Client: client}
+	uc := &param.DeleteUseCase{Store: awsparam.New(client)}
 
 	result, err := uc.Execute(a.ctx, param.DeleteInput{Name: name})
 	if err != nil {
@@ -298,7 +299,7 @@ func (a *App) ParamAddTag(name, key, value string) error {
 		return err
 	}
 
-	uc := &param.TagUseCase{Client: client}
+	uc := &param.TagUseCase{Tagger: awsparam.New(client)}
 
 	return uc.Execute(a.ctx, param.TagInput{
 		Name: name,
@@ -313,7 +314,7 @@ func (a *App) ParamRemoveTag(name, key string) error {
 		return err
 	}
 
-	uc := &param.TagUseCase{Client: client}
+	uc := &param.TagUseCase{Tagger: awsparam.New(client)}
 
 	return uc.Execute(a.ctx, param.TagInput{
 		Name:   name,

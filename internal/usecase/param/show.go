@@ -7,16 +7,10 @@ import (
 
 	"github.com/samber/lo"
 
-	"github.com/mpyw/suve/internal/api/paramapi"
+	"github.com/mpyw/suve/internal/domain"
+	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/version/paramversion"
 )
-
-// ShowClient is the interface for the show use case.
-type ShowClient interface {
-	paramapi.GetParameterAPI
-	paramapi.GetParameterHistoryAPI
-	paramapi.ListTagsForResourceAPI
-}
 
 // ShowInput holds input for the show use case.
 type ShowInput struct {
@@ -34,7 +28,7 @@ type ShowOutput struct {
 	Name         string
 	Value        string
 	Version      int64
-	Type         paramapi.ParameterType
+	Type         domain.ValueType
 	Description  string
 	LastModified *time.Time
 	Tags         []ShowTag
@@ -42,39 +36,31 @@ type ShowOutput struct {
 
 // ShowUseCase executes show operations.
 type ShowUseCase struct {
-	Client ShowClient
+	Reader provider.Reader
 }
 
 // Execute runs the show use case.
 func (u *ShowUseCase) Execute(ctx context.Context, input ShowInput) (*ShowOutput, error) {
-	param, err := paramversion.GetParameterWithVersion(ctx, u.Client, input.Spec)
+	ref, err := u.Reader.Resolve(ctx, input.Spec.Name, specSuffix(input.Spec))
+	if err != nil {
+		return nil, err
+	}
+
+	entry, err := u.Reader.Get(ctx, input.Spec.Name, ref)
 	if err != nil {
 		return nil, err
 	}
 
 	output := &ShowOutput{
-		Name:        lo.FromPtr(param.Name),
-		Value:       lo.FromPtr(param.Value),
-		Version:     param.Version,
-		Type:        param.Type,
-		Description: lo.FromPtr(param.Description),
-	}
-	if param.LastModifiedDate != nil {
-		output.LastModified = param.LastModifiedDate
-	}
-
-	// Fetch tags
-	tagsOutput, err := u.Client.ListTagsForResource(ctx, &paramapi.ListTagsForResourceInput{
-		ResourceType: paramapi.ResourceTypeForTaggingParameter,
-		ResourceId:   param.Name,
-	})
-	if err == nil && tagsOutput != nil {
-		output.Tags = lo.Map(tagsOutput.TagList, func(tag paramapi.Tag, _ int) ShowTag {
-			return ShowTag{
-				Key:   lo.FromPtr(tag.Key),
-				Value: lo.FromPtr(tag.Value),
-			}
-		})
+		Name:         entry.Name,
+		Value:        entry.Value,
+		Version:      parseVersion(entry.Version.ID),
+		Type:         entry.Type,
+		Description:  entry.Description,
+		LastModified: entry.Modified,
+		Tags: lo.Map(entry.Tags, func(tag domain.Tag, _ int) ShowTag {
+			return ShowTag{Key: tag.Key, Value: tag.Value}
+		}),
 	}
 
 	return output, nil

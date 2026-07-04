@@ -12,9 +12,11 @@ import (
 
 	"github.com/mpyw/suve/internal/api/paramapi"
 	"github.com/mpyw/suve/internal/cli/commands/internal"
+	"github.com/mpyw/suve/internal/cli/commands/param/paramtype"
 	"github.com/mpyw/suve/internal/cli/confirm"
 	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/infra"
+	awsparam "github.com/mpyw/suve/internal/provider/aws/param"
 	"github.com/mpyw/suve/internal/usecase/param"
 )
 
@@ -106,7 +108,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		return err
 	}
 
-	uc := &param.UpdateUseCase{Client: client}
+	uc := &param.UpdateUseCase{Store: awsparam.New(client)}
 	newValue := cmd.Args().Get(1)
 
 	// Fetch current value and show diff before confirming
@@ -160,7 +162,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 	result, err := r.UseCase.Execute(ctx, param.UpdateInput{
 		Name:        opts.Name,
 		Value:       opts.Value,
-		Type:        paramapi.ParameterType(opts.Type),
+		Type:        paramtype.Parse(opts.Type),
 		Description: opts.Description,
 	})
 	if err != nil {

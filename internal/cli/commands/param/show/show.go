@@ -10,10 +10,12 @@ import (
 	"github.com/samber/lo"
 	"github.com/urfave/cli/v3"
 
-	"github.com/mpyw/suve/internal/api/paramapi"
 	"github.com/mpyw/suve/internal/cli/commands/internal"
+	"github.com/mpyw/suve/internal/cli/commands/param/paramtype"
 	"github.com/mpyw/suve/internal/cli/output"
+	"github.com/mpyw/suve/internal/domain"
 	"github.com/mpyw/suve/internal/jsonutil"
+	awsparam "github.com/mpyw/suve/internal/provider/aws/param"
 	"github.com/mpyw/suve/internal/timeutil"
 	"github.com/mpyw/suve/internal/usecase/param"
 	"github.com/mpyw/suve/internal/version/paramversion"
@@ -128,7 +130,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 
 	return internal.WithPager(cmd, noPager, func(stdout, stderr io.Writer) error {
 		r := &Runner{
-			UseCase: &param.ShowUseCase{Client: client},
+			UseCase: &param.ShowUseCase{Reader: awsparam.New(client)},
 			Stdout:  stdout,
 			Stderr:  stderr,
 		}
@@ -152,7 +154,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 	// Warn if --parse-json is used in cases where it's not meaningful
 	if opts.ParseJSON {
 		switch result.Type {
-		case paramapi.ParameterTypeStringList:
+		case domain.ValueTypeList:
 			output.Warning(r.Stderr, "--parse-json has no effect on StringList type (comma-separated values)")
 		default:
 			formatted := jsonutil.TryFormatOrWarn(value, r.Stderr, "")
@@ -175,7 +177,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 		jsonOut := JSONOutput{
 			Name:    result.Name,
 			Version: result.Version,
-			Type:    string(result.Type),
+			Type:    paramtype.Display(result.Type),
 			Value:   value,
 		}
 		// Show json_parsed only when --parse-json was used and succeeded
@@ -199,7 +201,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 	out := output.New(r.Stdout)
 	out.Field("Name", result.Name)
 	out.Field("Version", strconv.FormatInt(result.Version, 10))
-	out.Field("Type", string(result.Type))
+	out.Field("Type", paramtype.Display(result.Type))
 	// Show json_parsed only when --parse-json was used and succeeded
 	if jsonParsed {
 		out.Field("JsonParsed", "true")

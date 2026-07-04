@@ -4,98 +4,38 @@ import (
 	"context"
 	"testing"
 
-	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/mpyw/suve/internal/api/paramapi"
+	"github.com/mpyw/suve/internal/domain"
+	"github.com/mpyw/suve/internal/provider"
+	"github.com/mpyw/suve/internal/provider/providermock"
 	"github.com/mpyw/suve/internal/usecase/param"
 )
-
-type mockUpdateClient struct {
-	getParameterResult *paramapi.GetParameterOutput
-	getParameterErr    error
-	putParameterResult *paramapi.PutParameterOutput
-	putParameterErr    error
-}
-
-//nolint:lll // mock function signature must match AWS SDK interface
-func (m *mockUpdateClient) GetParameter(_ context.Context, _ *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
-	if m.getParameterErr != nil {
-		return nil, m.getParameterErr
-	}
-
-	return m.getParameterResult, nil
-}
-
-//nolint:lll // mock function signature
-func (m *mockUpdateClient) PutParameter(_ context.Context, _ *paramapi.PutParameterInput, _ ...func(*paramapi.Options)) (*paramapi.PutParameterOutput, error) {
-	if m.putParameterErr != nil {
-		return nil, m.putParameterErr
-	}
-
-	return m.putParameterResult, nil
-}
-
-func TestUpdateUseCase_Exists(t *testing.T) {
-	t.Parallel()
-
-	client := &mockUpdateClient{
-		getParameterResult: &paramapi.GetParameterOutput{
-			Parameter: &paramapi.Parameter{Name: lo.ToPtr("/app/config")},
-		},
-	}
-
-	uc := &param.UpdateUseCase{Client: client}
-
-	exists, err := uc.Exists(t.Context(), "/app/config")
-	require.NoError(t, err)
-	assert.True(t, exists)
-}
-
-func TestUpdateUseCase_Exists_NotFound(t *testing.T) {
-	t.Parallel()
-
-	client := &mockUpdateClient{
-		getParameterErr: &paramapi.ParameterNotFound{Message: lo.ToPtr("not found")},
-	}
-
-	uc := &param.UpdateUseCase{Client: client}
-
-	exists, err := uc.Exists(t.Context(), "/app/not-exists")
-	require.NoError(t, err)
-	assert.False(t, exists)
-}
-
-func TestUpdateUseCase_Exists_Error(t *testing.T) {
-	t.Parallel()
-
-	client := &mockUpdateClient{
-		getParameterErr: errAWS,
-	}
-
-	uc := &param.UpdateUseCase{Client: client}
-
-	_, err := uc.Exists(t.Context(), "/app/config")
-	require.Error(t, err)
-}
 
 func TestUpdateUseCase_Execute(t *testing.T) {
 	t.Parallel()
 
-	client := &mockUpdateClient{
-		getParameterResult: &paramapi.GetParameterOutput{
-			Parameter: &paramapi.Parameter{Name: lo.ToPtr("/app/config")},
+	store := &providermock.Store{
+		GetFunc: func(_ context.Context, name string, _ provider.VersionRef) (*domain.Entry, error) {
+			return &domain.Entry{Name: name}, nil
 		},
-		putParameterResult: &paramapi.PutParameterOutput{Version: 5},
+		PutFunc: func(_ context.Context, name, value string, vt domain.ValueType, description string) (domain.Version, error) {
+			assert.Equal(t, "/app/config", name)
+			assert.Equal(t, "updated-value", value)
+			assert.Equal(t, domain.ValueTypePlaintext, vt)
+			assert.Equal(t, "updated description", description)
+
+			return domain.Version{ID: "5"}, nil
+		},
 	}
 
-	uc := &param.UpdateUseCase{Client: client}
+	uc := &param.UpdateUseCase{Store: store}
 
 	output, err := uc.Execute(t.Context(), param.UpdateInput{
 		Name:        "/app/config",
 		Value:       "updated-value",
-		Type:        paramapi.ParameterTypeString,
+		Type:        domain.ValueTypePlaintext,
 		Description: "updated description",
 	})
 	require.NoError(t, err)
@@ -103,57 +43,69 @@ func TestUpdateUseCase_Execute(t *testing.T) {
 	assert.Equal(t, int64(5), output.Version)
 }
 
+// TestUpdateUseCase_Execute_NotFound verifies a missing parameter is reported
+// as not-found (only provider.ErrNotFound triggers this path).
 func TestUpdateUseCase_Execute_NotFound(t *testing.T) {
 	t.Parallel()
 
-	client := &mockUpdateClient{
-		getParameterErr: &paramapi.ParameterNotFound{Message: lo.ToPtr("not found")},
+	store := &providermock.Store{
+		GetFunc: func(_ context.Context, _ string, _ provider.VersionRef) (*domain.Entry, error) {
+			return nil, provider.ErrNotFound
+		},
 	}
 
-	uc := &param.UpdateUseCase{Client: client}
+	uc := &param.UpdateUseCase{Store: store}
 
 	_, err := uc.Execute(t.Context(), param.UpdateInput{
 		Name:  "/app/not-exists",
 		Value: "value",
-		Type:  paramapi.ParameterTypeString,
+		Type:  domain.ValueTypePlaintext,
 	})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "parameter not found")
 }
 
-func TestUpdateUseCase_Execute_ExistsError(t *testing.T) {
+// TestUpdateUseCase_Execute_ReadError verifies a non-not-found read failure is
+// propagated (NOT swallowed as "does not exist").
+func TestUpdateUseCase_Execute_ReadError(t *testing.T) {
 	t.Parallel()
 
-	client := &mockUpdateClient{
-		getParameterErr: errAWS,
+	store := &providermock.Store{
+		GetFunc: func(_ context.Context, _ string, _ provider.VersionRef) (*domain.Entry, error) {
+			return nil, errAWS
+		},
 	}
 
-	uc := &param.UpdateUseCase{Client: client}
+	uc := &param.UpdateUseCase{Store: store}
 
 	_, err := uc.Execute(t.Context(), param.UpdateInput{
 		Name:  "/app/config",
 		Value: "value",
-		Type:  paramapi.ParameterTypeString,
+		Type:  domain.ValueTypePlaintext,
 	})
 	require.Error(t, err)
+	require.ErrorIs(t, err, errAWS)
+	assert.NotContains(t, err.Error(), "parameter not found")
 }
 
 func TestUpdateUseCase_Execute_PutError(t *testing.T) {
 	t.Parallel()
 
-	client := &mockUpdateClient{
-		getParameterResult: &paramapi.GetParameterOutput{
-			Parameter: &paramapi.Parameter{Name: lo.ToPtr("/app/config")},
+	store := &providermock.Store{
+		GetFunc: func(_ context.Context, name string, _ provider.VersionRef) (*domain.Entry, error) {
+			return &domain.Entry{Name: name}, nil
 		},
-		putParameterErr: errPutFailed,
+		PutFunc: func(_ context.Context, _, _ string, _ domain.ValueType, _ string) (domain.Version, error) {
+			return domain.Version{}, errPutFailed
+		},
 	}
 
-	uc := &param.UpdateUseCase{Client: client}
+	uc := &param.UpdateUseCase{Store: store}
 
 	_, err := uc.Execute(t.Context(), param.UpdateInput{
 		Name:  "/app/config",
 		Value: "value",
-		Type:  paramapi.ParameterTypeString,
+		Type:  domain.ValueTypePlaintext,
 	})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to update parameter")
