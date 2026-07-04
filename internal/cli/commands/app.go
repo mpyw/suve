@@ -7,6 +7,7 @@ import (
 	"github.com/samber/lo"
 	"github.com/urfave/cli/v3"
 
+	"github.com/mpyw/suve/internal/cli/commands/gcloud"
 	"github.com/mpyw/suve/internal/cli/commands/param"
 	"github.com/mpyw/suve/internal/cli/commands/secret"
 	"github.com/mpyw/suve/internal/cli/commands/stage"
@@ -22,12 +23,13 @@ var Version = "dev"
 func MakeApp() *cli.Command {
 	return &cli.Command{
 		Name:    "suve",
-		Usage:   "Git-like CLI for AWS Parameter Store and Secrets Manager",
+		Usage:   "Git-like CLI for AWS Parameter Store / Secrets Manager and Google Cloud Secret Manager",
 		Version: Version,
 		Commands: []*cli.Command{
 			param.Command(),
 			secret.Command(),
 			stage.Command(),
+			gcloud.Command(),
 		},
 		CommandNotFound: func(_ context.Context, cmd *cli.Command, command string) {
 			_ = cli.ShowAppHelp(cmd)

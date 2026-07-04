@@ -17,23 +17,27 @@ import (
 
 // TestNoAWSSDKOutsideProviderAWS enforces that only internal/provider/aws (plus
 // the allowed low-level package internal/infra, which is not under the guarded
-// roots) imports the AWS service SDK. It fails loudly if a package under
-// internal/cli, internal/usecase, internal/staging, or internal/gui reintroduces
-// a direct SDK dependency, which would break provider pluggability.
+// roots) imports the AWS service SDK, and that only internal/provider/gcp
+// imports the Google Cloud Secret Manager SDK. It fails loudly if a package
+// under internal/cli, internal/usecase, internal/staging, or internal/gui
+// reintroduces a direct cloud-SDK dependency, which would break provider
+// pluggability.
 func TestNoAWSSDKOutsideProviderAWS(t *testing.T) {
 	t.Parallel()
 
 	// guardedRoots are the internal subtrees (relative to this package dir) that
-	// must not import the AWS SDK, or its (now-removed) paramapi/secretapi
+	// must not import a cloud SDK, or the (now-removed) paramapi/secretapi
 	// aliases, directly.
 	guardedRoots := []string{"cli", "usecase", "staging", "gui"}
 
 	// forbiddenPrefixes are import paths banned in non-test packages under a
 	// guarded root. SDK service packages are matched by prefix so their
-	// subpackages (e.g. .../service/ssm/types) are caught too.
+	// subpackages (e.g. .../service/ssm/types, .../secretmanager/apiv1/...) are
+	// caught too.
 	forbiddenPrefixes := []string{
 		"github.com/aws/aws-sdk-go-v2/service/ssm",
 		"github.com/aws/aws-sdk-go-v2/service/secretsmanager",
+		"cloud.google.com/go/secretmanager",
 		"github.com/mpyw/suve/internal/api/paramapi",
 		"github.com/mpyw/suve/internal/api/secretapi",
 	}
