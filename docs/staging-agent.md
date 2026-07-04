@@ -360,13 +360,6 @@ If the daemon stopped unexpectedly:
 
 For developers working on the staging system:
 
-- **CLAUDE.md files**: Each sub-package has its own documentation
-  - `internal/staging/CLAUDE.md` - Core staging domain
-  - `internal/staging/store/CLAUDE.md` - Store interfaces
-  - `internal/staging/store/agent/CLAUDE.md` - Agent store
-  - `internal/staging/store/agent/daemon/CLAUDE.md` - Daemon runner/launcher
-  - `internal/staging/store/file/CLAUDE.md` - File store with encryption
-
 - **State transitions**: See [Staging State Transitions](staging-state-transitions.md)
 
 - **Testing**: E2E tests for daemon IPC are in `e2e/staging_daemon_test.go`
