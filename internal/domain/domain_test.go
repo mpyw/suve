@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/mpyw/suve/internal/domain"
 )
@@ -39,6 +40,30 @@ func TestEntry_Fields(t *testing.T) {
 	assert.Len(t, entry.Tags, 1)
 	assert.Equal(t, "env", entry.Tags[0].Key)
 	assert.Equal(t, &modified, entry.Modified)
+}
+
+func TestEntry_Extra(t *testing.T) {
+	t.Parallel()
+
+	entry := domain.Entry{
+		Name: "my-secret",
+		Extra: []domain.Field{
+			{Label: "ARN", Value: "arn:aws:secretsmanager:us-east-1:123:secret:my-secret"},
+		},
+	}
+
+	require.Len(t, entry.Extra, 1)
+	assert.Equal(t, "ARN", entry.Extra[0].Label)
+	assert.Equal(t, "arn:aws:secretsmanager:us-east-1:123:secret:my-secret", entry.Extra[0].Value)
+}
+
+func TestField_Construction(t *testing.T) {
+	t.Parallel()
+
+	f := domain.Field{Label: "Tier", Value: "Advanced"}
+
+	assert.Equal(t, "Tier", f.Label)
+	assert.Equal(t, "Advanced", f.Value)
 }
 
 func TestValueType_Values(t *testing.T) {

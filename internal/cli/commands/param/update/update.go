@@ -12,6 +12,7 @@ import (
 
 	"github.com/mpyw/suve/internal/api/paramapi"
 	"github.com/mpyw/suve/internal/cli/commands/internal"
+	"github.com/mpyw/suve/internal/cli/commands/param/paramopts"
 	"github.com/mpyw/suve/internal/cli/commands/param/paramtype"
 	"github.com/mpyw/suve/internal/cli/confirm"
 	"github.com/mpyw/suve/internal/cli/output"
@@ -33,6 +34,9 @@ type Options struct {
 	Value       string
 	Type        string
 	Description string
+	// ParamOpts holds the raw AWS-specific option flag values (tier, data
+	// type, allowed pattern, policies). Empty fields contribute no option.
+	ParamOpts paramopts.Values
 }
 
 // Command returns the update command.
@@ -74,6 +78,22 @@ EXAMPLES:
 				Name:  "description",
 				Usage: "Parameter description",
 			},
+			&cli.StringFlag{
+				Name:  "tier",
+				Usage: "Parameter tier (Standard, Advanced, Intelligent-Tiering)",
+			},
+			&cli.StringFlag{
+				Name:  "data-type",
+				Usage: "Parameter data type (e.g. text, aws:ec2:image)",
+			},
+			&cli.StringFlag{
+				Name:  "allowed-pattern",
+				Usage: "Regular expression the value must match",
+			},
+			&cli.StringFlag{
+				Name:  "policies",
+				Usage: "Parameter policies as a JSON document",
+			},
 			&cli.BoolFlag{
 				Name:  "yes",
 				Usage: "Skip confirmation prompt",
@@ -98,6 +118,10 @@ func action(ctx context.Context, cmd *cli.Command) error {
 
 	if secure {
 		paramType = "SecureString"
+	}
+
+	if err := paramopts.ValidateTier(cmd.String("tier")); err != nil {
+		return err
 	}
 
 	name := cmd.Args().Get(0)
@@ -154,6 +178,12 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		Value:       newValue,
 		Type:        paramType,
 		Description: cmd.String("description"),
+		ParamOpts: paramopts.Values{
+			Tier:           cmd.String("tier"),
+			DataType:       cmd.String("data-type"),
+			AllowedPattern: cmd.String("allowed-pattern"),
+			Policies:       cmd.String("policies"),
+		},
 	})
 }
 
@@ -164,6 +194,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 		Value:       opts.Value,
 		Type:        paramtype.Parse(opts.Type),
 		Description: opts.Description,
+		Options:     paramopts.Build(opts.ParamOpts),
 	})
 	if err != nil {
 		return err

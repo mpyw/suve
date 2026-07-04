@@ -24,6 +24,8 @@ import (
 
 // Client is the narrow Secrets Manager surface this adapter needs. The concrete
 // *secretsmanager.Client satisfies it; tests provide their own mock.
+//
+//nolint:interfacebloat // mirrors the Secrets Manager operations this adapter uses; splitting adds no value
 type Client interface {
 	GetSecretValue(
 		ctx context.Context, params *secretsmanager.GetSecretValueInput, optFns ...func(*secretsmanager.Options),
@@ -37,9 +39,12 @@ type Client interface {
 	CreateSecret(
 		ctx context.Context, params *secretsmanager.CreateSecretInput, optFns ...func(*secretsmanager.Options),
 	) (*secretsmanager.CreateSecretOutput, error)
-	PutSecretValue(
-		ctx context.Context, params *secretsmanager.PutSecretValueInput, optFns ...func(*secretsmanager.Options),
-	) (*secretsmanager.PutSecretValueOutput, error)
+	UpdateSecret(
+		ctx context.Context, params *secretsmanager.UpdateSecretInput, optFns ...func(*secretsmanager.Options),
+	) (*secretsmanager.UpdateSecretOutput, error)
+	RotateSecret(
+		ctx context.Context, params *secretsmanager.RotateSecretInput, optFns ...func(*secretsmanager.Options),
+	) (*secretsmanager.RotateSecretOutput, error)
 	DeleteSecret(
 		ctx context.Context, params *secretsmanager.DeleteSecretInput, optFns ...func(*secretsmanager.Options),
 	) (*secretsmanager.DeleteSecretOutput, error)
@@ -197,6 +202,7 @@ func (s *Store) Get(ctx context.Context, name string, ref provider.VersionRef) (
 			Created: out.CreatedDate,
 		},
 		Modified: out.CreatedDate,
+		Extra:    []domain.Field{{Label: "ARN", Value: aws.ToString(out.ARN)}},
 	}
 
 	// Description and tags are best-effort via DescribeSecret.
@@ -266,7 +272,7 @@ func (s *Store) List(ctx context.Context) ([]string, error) {
 // writes a new version of an existing secret). The valueType is ignored
 // (Secrets Manager values are always secret).
 func (s *Store) Create(
-	ctx context.Context, name, value string, _ domain.ValueType, description string,
+	ctx context.Context, name, value string, _ domain.ValueType, description string, opts ...provider.WriteOption,
 ) (domain.Version, error) {
 	input := &secretsmanager.CreateSecretInput{
 		Name:         aws.String(name),
@@ -275,6 +281,8 @@ func (s *Store) Create(
 	if description != "" {
 		input.Description = aws.String(description)
 	}
+
+	applyCreateOptions(input, opts)
 
 	created, err := s.client.CreateSecret(ctx, input)
 	if err != nil {
@@ -286,14 +294,19 @@ func (s *Store) Create(
 		return domain.Version{}, fmt.Errorf("failed to create secret: %w", err)
 	}
 
+	if err := s.applyRotation(ctx, name, opts); err != nil {
+		return domain.Version{}, err
+	}
+
 	return domain.Version{ID: aws.ToString(created.VersionId)}, nil
 }
 
-// Put creates the secret, or writes a new version if it already exists. The
-// valueType is ignored (Secrets Manager values are always secret). A
-// description is applied only on creation.
+// Put creates the secret, or updates it (new version + metadata) if it already
+// exists. The valueType is ignored (Secrets Manager values are always secret).
+// On an existing secret the description is updated as well (via UpdateSecret),
+// unlike Create which is create-only.
 func (s *Store) Put(
-	ctx context.Context, name, value string, _ domain.ValueType, description string,
+	ctx context.Context, name, value string, _ domain.ValueType, description string, opts ...provider.WriteOption,
 ) (domain.Version, error) {
 	createInput := &secretsmanager.CreateSecretInput{
 		Name:         aws.String(name),
@@ -303,33 +316,71 @@ func (s *Store) Put(
 		createInput.Description = aws.String(description)
 	}
 
+	applyCreateOptions(createInput, opts)
+
 	created, err := s.client.CreateSecret(ctx, createInput)
 	if err == nil {
+		if err := s.applyRotation(ctx, name, opts); err != nil {
+			return domain.Version{}, err
+		}
+
 		return domain.Version{ID: aws.ToString(created.VersionId)}, nil
 	}
 
-	// Already exists: write a new version instead.
+	// Already exists: update the value (new version) and metadata in one call.
 	var exists *types.ResourceExistsException
 	if !errors.As(err, &exists) {
 		return domain.Version{}, fmt.Errorf("failed to create secret: %w", err)
 	}
 
-	put, err := s.client.PutSecretValue(ctx, &secretsmanager.PutSecretValueInput{
+	updateInput := &secretsmanager.UpdateSecretInput{
 		SecretId:     aws.String(name),
 		SecretString: aws.String(value),
-	})
-	if err != nil {
-		return domain.Version{}, fmt.Errorf("failed to put secret value: %w", err)
+	}
+	if description != "" {
+		updateInput.Description = aws.String(description)
 	}
 
-	return domain.Version{ID: aws.ToString(put.VersionId)}, nil
+	applyUpdateOptions(updateInput, opts)
+
+	updated, err := s.client.UpdateSecret(ctx, updateInput)
+	if err != nil {
+		return domain.Version{}, fmt.Errorf("failed to update secret: %w", err)
+	}
+
+	if err := s.applyRotation(ctx, name, opts); err != nil {
+		return domain.Version{}, err
+	}
+
+	return domain.Version{ID: aws.ToString(updated.VersionId)}, nil
 }
 
-// Delete schedules a secret for deletion (default recovery window).
-func (s *Store) Delete(ctx context.Context, name string) error {
-	_, err := s.client.DeleteSecret(ctx, &secretsmanager.DeleteSecretInput{
+// applyRotation issues a RotateSecret request when a RotationRules option with a
+// non-zero interval was provided; otherwise it is a no-op.
+func (s *Store) applyRotation(ctx context.Context, name string, opts []provider.WriteOption) error {
+	rules, ok := rotationOption(opts)
+	if !ok {
+		return nil
+	}
+
+	if _, err := s.client.RotateSecret(ctx, rotationInput(name, rules)); err != nil {
+		return fmt.Errorf("failed to configure secret rotation: %w", err)
+	}
+
+	return nil
+}
+
+// Delete schedules a secret for deletion. DeleteOptions select immediate
+// deletion (ForceDelete) or a custom recovery window (RecoveryWindow); with no
+// options the AWS default recovery window applies.
+func (s *Store) Delete(ctx context.Context, name string, opts ...provider.DeleteOption) error {
+	input := &secretsmanager.DeleteSecretInput{
 		SecretId: aws.String(name),
-	})
+	}
+
+	applyDeleteOptions(input, opts)
+
+	_, err := s.client.DeleteSecret(ctx, input)
 	if err != nil {
 		return fmt.Errorf("failed to delete secret: %w", err)
 	}
@@ -370,6 +421,7 @@ func (s *Store) Describe(ctx context.Context, name string) (*domain.Entry, error
 		Description: aws.ToString(desc.Description),
 		Tags:        mapTags(desc.Tags),
 		Modified:    desc.LastChangedDate,
+		Extra:       []domain.Field{{Label: "ARN", Value: aws.ToString(desc.ARN)}},
 	}
 
 	// Best-effort: surface the current (AWSCURRENT) version if present.

@@ -15,6 +15,9 @@ type UpdateInput struct {
 	Value       string
 	Type        domain.ValueType
 	Description string
+	// Options carries provider-specific write options (e.g. AWS param Tier,
+	// DataType). They are passed through to the provider unchanged.
+	Options []provider.WriteOption
 }
 
 // UpdateOutput holds the result of the update use case.
@@ -41,7 +44,7 @@ func (u *UpdateUseCase) Execute(ctx context.Context, input UpdateInput) (*Update
 		return nil, err
 	}
 
-	version, err := u.Store.Put(ctx, input.Name, input.Value, input.Type, input.Description)
+	version, err := u.Store.Put(ctx, input.Name, input.Value, input.Type, input.Description, input.Options...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update parameter: %w", err)
 	}

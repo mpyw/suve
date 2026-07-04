@@ -23,11 +23,15 @@ type Store struct {
 	GetFunc     func(ctx context.Context, name string, ref provider.VersionRef) (*domain.Entry, error)
 	HistoryFunc func(ctx context.Context, name string) ([]domain.Version, error)
 	ListFunc    func(ctx context.Context) ([]string, error)
-	CreateFunc  func(ctx context.Context, name, value string, valueType domain.ValueType, description string) (domain.Version, error)
-	PutFunc     func(ctx context.Context, name, value string, valueType domain.ValueType, description string) (domain.Version, error)
-	DeleteFunc  func(ctx context.Context, name string) error
-	TagFunc     func(ctx context.Context, name string, add map[string]string) error
-	UntagFunc   func(ctx context.Context, name string, keys []string) error
+	CreateFunc  func(
+		ctx context.Context, name, value string, valueType domain.ValueType, description string, opts ...provider.WriteOption,
+	) (domain.Version, error)
+	PutFunc func(
+		ctx context.Context, name, value string, valueType domain.ValueType, description string, opts ...provider.WriteOption,
+	) (domain.Version, error)
+	DeleteFunc func(ctx context.Context, name string, opts ...provider.DeleteOption) error
+	TagFunc    func(ctx context.Context, name string, add map[string]string) error
+	UntagFunc  func(ctx context.Context, name string, keys []string) error
 }
 
 // Compile-time assertion that *Store implements the full provider contract.
@@ -71,33 +75,33 @@ func (s *Store) List(ctx context.Context) ([]string, error) {
 
 // Create delegates to CreateFunc.
 func (s *Store) Create(
-	ctx context.Context, name, value string, valueType domain.ValueType, description string,
+	ctx context.Context, name, value string, valueType domain.ValueType, description string, opts ...provider.WriteOption,
 ) (domain.Version, error) {
 	if s.CreateFunc == nil {
 		return domain.Version{}, ErrNotConfigured
 	}
 
-	return s.CreateFunc(ctx, name, value, valueType, description)
+	return s.CreateFunc(ctx, name, value, valueType, description, opts...)
 }
 
 // Put delegates to PutFunc.
 func (s *Store) Put(
-	ctx context.Context, name, value string, valueType domain.ValueType, description string,
+	ctx context.Context, name, value string, valueType domain.ValueType, description string, opts ...provider.WriteOption,
 ) (domain.Version, error) {
 	if s.PutFunc == nil {
 		return domain.Version{}, ErrNotConfigured
 	}
 
-	return s.PutFunc(ctx, name, value, valueType, description)
+	return s.PutFunc(ctx, name, value, valueType, description, opts...)
 }
 
 // Delete delegates to DeleteFunc.
-func (s *Store) Delete(ctx context.Context, name string) error {
+func (s *Store) Delete(ctx context.Context, name string, opts ...provider.DeleteOption) error {
 	if s.DeleteFunc == nil {
 		return ErrNotConfigured
 	}
 
-	return s.DeleteFunc(ctx, name)
+	return s.DeleteFunc(ctx, name, opts...)
 }
 
 // Tag delegates to TagFunc.

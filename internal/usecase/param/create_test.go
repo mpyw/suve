@@ -17,7 +17,7 @@ func TestCreateUseCase_Execute(t *testing.T) {
 	t.Parallel()
 
 	store := &providermock.Store{
-		CreateFunc: func(_ context.Context, name, value string, vt domain.ValueType, _ string) (domain.Version, error) {
+		CreateFunc: func(_ context.Context, name, value string, vt domain.ValueType, _ string, _ ...provider.WriteOption) (domain.Version, error) {
 			assert.Equal(t, "/app/new", name)
 			assert.Equal(t, "new-value", value)
 			assert.Equal(t, domain.ValueTypePlaintext, vt)
@@ -42,7 +42,7 @@ func TestCreateUseCase_Execute_WithDescription(t *testing.T) {
 	t.Parallel()
 
 	store := &providermock.Store{
-		CreateFunc: func(_ context.Context, _, _ string, _ domain.ValueType, description string) (domain.Version, error) {
+		CreateFunc: func(_ context.Context, _, _ string, _ domain.ValueType, description string, _ ...provider.WriteOption) (domain.Version, error) {
 			assert.Equal(t, "my description", description)
 
 			return domain.Version{ID: "1"}, nil
@@ -69,7 +69,7 @@ func TestCreateUseCase_Execute_AlreadyExists(t *testing.T) {
 	t.Parallel()
 
 	store := &providermock.Store{
-		CreateFunc: func(_ context.Context, _, _ string, _ domain.ValueType, _ string) (domain.Version, error) {
+		CreateFunc: func(_ context.Context, _, _ string, _ domain.ValueType, _ string, _ ...provider.WriteOption) (domain.Version, error) {
 			return domain.Version{}, provider.ErrAlreadyExists
 		},
 	}
@@ -90,7 +90,7 @@ func TestCreateUseCase_Execute_CreateError(t *testing.T) {
 	t.Parallel()
 
 	store := &providermock.Store{
-		CreateFunc: func(_ context.Context, _, _ string, _ domain.ValueType, _ string) (domain.Version, error) {
+		CreateFunc: func(_ context.Context, _, _ string, _ domain.ValueType, _ string, _ ...provider.WriteOption) (domain.Version, error) {
 			return domain.Version{}, errPutFailed
 		},
 	}

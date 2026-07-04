@@ -20,7 +20,7 @@ func TestUpdateUseCase_Execute(t *testing.T) {
 		GetFunc: func(_ context.Context, name string, _ provider.VersionRef) (*domain.Entry, error) {
 			return &domain.Entry{Name: name}, nil
 		},
-		PutFunc: func(_ context.Context, name, value string, vt domain.ValueType, description string) (domain.Version, error) {
+		PutFunc: func(_ context.Context, name, value string, vt domain.ValueType, description string, _ ...provider.WriteOption) (domain.Version, error) {
 			assert.Equal(t, "/app/config", name)
 			assert.Equal(t, "updated-value", value)
 			assert.Equal(t, domain.ValueTypePlaintext, vt)
@@ -95,7 +95,7 @@ func TestUpdateUseCase_Execute_PutError(t *testing.T) {
 		GetFunc: func(_ context.Context, name string, _ provider.VersionRef) (*domain.Entry, error) {
 			return &domain.Entry{Name: name}, nil
 		},
-		PutFunc: func(_ context.Context, _, _ string, _ domain.ValueType, _ string) (domain.Version, error) {
+		PutFunc: func(_ context.Context, _, _ string, _ domain.ValueType, _ string, _ ...provider.WriteOption) (domain.Version, error) {
 			return domain.Version{}, errPutFailed
 		},
 	}

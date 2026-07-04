@@ -213,7 +213,7 @@ func (s *Store) List(ctx context.Context) ([]string, error) {
 // version. It returns a wrapped provider.ErrAlreadyExists if the parameter
 // already exists.
 func (s *Store) Create(
-	ctx context.Context, name, value string, valueType domain.ValueType, description string,
+	ctx context.Context, name, value string, valueType domain.ValueType, description string, opts ...provider.WriteOption,
 ) (domain.Version, error) {
 	input := &ssm.PutParameterInput{
 		Name:      aws.String(name),
@@ -224,6 +224,8 @@ func (s *Store) Create(
 	if description != "" {
 		input.Description = aws.String(description)
 	}
+
+	applyWriteOptions(input, opts)
 
 	out, err := s.client.PutParameter(ctx, input)
 	if err != nil {
@@ -240,7 +242,7 @@ func (s *Store) Create(
 
 // Put creates or updates a parameter (Overwrite=true) and returns the resulting version.
 func (s *Store) Put(
-	ctx context.Context, name, value string, valueType domain.ValueType, description string,
+	ctx context.Context, name, value string, valueType domain.ValueType, description string, opts ...provider.WriteOption,
 ) (domain.Version, error) {
 	input := &ssm.PutParameterInput{
 		Name:      aws.String(name),
@@ -252,6 +254,8 @@ func (s *Store) Put(
 		input.Description = aws.String(description)
 	}
 
+	applyWriteOptions(input, opts)
+
 	out, err := s.client.PutParameter(ctx, input)
 	if err != nil {
 		return domain.Version{}, fmt.Errorf("failed to put parameter: %w", err)
@@ -260,8 +264,9 @@ func (s *Store) Put(
 	return domain.Version{ID: strconv.FormatInt(out.Version, 10)}, nil
 }
 
-// Delete removes a parameter.
-func (s *Store) Delete(ctx context.Context, name string) error {
+// Delete removes a parameter. Parameter Store exposes no delete options, so any
+// provided DeleteOptions are ignored.
+func (s *Store) Delete(ctx context.Context, name string, _ ...provider.DeleteOption) error {
 	_, err := s.client.DeleteParameter(ctx, &ssm.DeleteParameterInput{
 		Name: aws.String(name),
 	})

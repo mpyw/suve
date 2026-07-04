@@ -28,6 +28,41 @@ func (r VersionRef) ID() string { return r.id }
 // IsLatest reports whether the ref denotes the latest/current version.
 func (r VersionRef) IsLatest() bool { return r.id == "" }
 
+// WriteOption is a provider-interpreted functional option for create/update
+// operations. Providers define concrete option types (e.g. AWS param Tier or
+// DataType) that satisfy this marker by embedding WriteOptionMarker.
+//
+// Consumers (usecases, CLI) build and pass these options through WITHOUT
+// type-asserting them; the provider adapter type-switches over the options it
+// understands and silently ignores the rest. This keeps provider-specific
+// options out of the neutral domain model while remaining strongly typed.
+//
+// The marker method is unexported, so the WriteOption set stays closed to types
+// that embed WriteOptionMarker; arbitrary external types cannot masquerade as
+// options.
+type WriteOption interface{ writeOption() }
+
+// WriteOptionMarker is embedded by provider-specific option types to satisfy
+// WriteOption. Embedding it (rather than defining the unexported method in
+// each provider package, which Go forbids across packages) is what lets the
+// AWS adapters declare their own option types against this sealed interface.
+type WriteOptionMarker struct{}
+
+func (WriteOptionMarker) writeOption() {}
+
+// DeleteOption is a provider-interpreted functional option for delete
+// operations (e.g. AWS Secrets Manager ForceDelete / RecoveryWindow). It
+// follows the same pass-through contract as WriteOption: consumers pass options
+// through untyped and the adapter interprets the ones it recognizes. Concrete
+// options satisfy it by embedding DeleteOptionMarker.
+type DeleteOption interface{ deleteOption() }
+
+// DeleteOptionMarker is embedded by provider-specific delete-option types to
+// satisfy DeleteOption. See WriteOptionMarker for the rationale.
+type DeleteOptionMarker struct{}
+
+func (DeleteOptionMarker) deleteOption() {}
+
 // Reader provides read access to a provider's entries.
 type Reader interface {
 	// Resolve parses a provider-specific version spec string (e.g. "#3~1",
@@ -46,13 +81,20 @@ type Reader interface {
 type Writer interface {
 	// Create creates a new entry and returns the resulting version. It returns
 	// a wrapped ErrAlreadyExists if an entry with the same name already exists
-	// (it never overwrites).
-	Create(ctx context.Context, name, value string, valueType domain.ValueType, description string) (domain.Version, error)
+	// (it never overwrites). Provider-specific WriteOptions are interpreted by
+	// the adapter and ignored when unrecognized.
+	Create(
+		ctx context.Context, name, value string, valueType domain.ValueType, description string, opts ...WriteOption,
+	) (domain.Version, error)
 	// Put creates or updates an entry (upsert) and returns the resulting
-	// version. Unlike Create it overwrites an existing entry.
-	Put(ctx context.Context, name, value string, valueType domain.ValueType, description string) (domain.Version, error)
-	// Delete removes an entry.
-	Delete(ctx context.Context, name string) error
+	// version. Unlike Create it overwrites an existing entry. Provider-specific
+	// WriteOptions are interpreted by the adapter and ignored when unrecognized.
+	Put(
+		ctx context.Context, name, value string, valueType domain.ValueType, description string, opts ...WriteOption,
+	) (domain.Version, error)
+	// Delete removes an entry. Provider-specific DeleteOptions are interpreted
+	// by the adapter and ignored when unrecognized.
+	Delete(ctx context.Context, name string, opts ...DeleteOption) error
 }
 
 // Tagger provides tag mutation for a provider's entries.

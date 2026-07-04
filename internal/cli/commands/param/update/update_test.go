@@ -9,9 +9,11 @@ import (
 	"github.com/stretchr/testify/require"
 
 	appcli "github.com/mpyw/suve/internal/cli/commands"
+	"github.com/mpyw/suve/internal/cli/commands/param/paramopts"
 	"github.com/mpyw/suve/internal/cli/commands/param/update"
 	"github.com/mpyw/suve/internal/domain"
 	"github.com/mpyw/suve/internal/provider"
+	awsparam "github.com/mpyw/suve/internal/provider/aws/param"
 	"github.com/mpyw/suve/internal/provider/providermock"
 	"github.com/mpyw/suve/internal/usecase/param"
 )
@@ -45,6 +47,81 @@ func TestCommand_Validation(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "cannot use --secure with --type")
 	})
+
+	t.Run("invalid tier value", func(t *testing.T) {
+		t.Parallel()
+
+		app := appcli.MakeApp()
+		err := app.Run(t.Context(), []string{"suve", "param", "update", "--yes", "--tier", "Bogus", "/app/param", "value"})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid --tier")
+	})
+}
+
+func TestRun_WriteOptions(t *testing.T) {
+	t.Parallel()
+
+	existsGet := func(_ context.Context, name string, _ provider.VersionRef) (*domain.Entry, error) {
+		return &domain.Entry{Name: name, Value: "old-value"}, nil
+	}
+
+	t.Run("set flags produce options", func(t *testing.T) {
+		t.Parallel()
+
+		var gotOpts []provider.WriteOption
+
+		store := &providermock.Store{
+			GetFunc: existsGet,
+			PutFunc: func(
+				_ context.Context, _, _ string, _ domain.ValueType, _ string, opts ...provider.WriteOption,
+			) (domain.Version, error) {
+				gotOpts = opts
+
+				return domain.Version{ID: "2"}, nil
+			},
+		}
+
+		var buf, errBuf bytes.Buffer
+
+		r := &update.Runner{UseCase: &param.UpdateUseCase{Store: store}, Stdout: &buf, Stderr: &errBuf}
+		err := r.Run(t.Context(), update.Options{
+			Name:  "/app/param",
+			Value: "v",
+			Type:  "String",
+			ParamOpts: paramopts.Values{
+				Tier:     "Intelligent-Tiering",
+				DataType: "text",
+			},
+		})
+		require.NoError(t, err)
+		require.Len(t, gotOpts, 2)
+		assert.Contains(t, gotOpts, awsparam.Tier{Value: "Intelligent-Tiering"})
+		assert.Contains(t, gotOpts, awsparam.DataType{Value: "text"})
+	})
+
+	t.Run("unset flags produce no options", func(t *testing.T) {
+		t.Parallel()
+
+		var gotOpts []provider.WriteOption
+
+		store := &providermock.Store{
+			GetFunc: existsGet,
+			PutFunc: func(
+				_ context.Context, _, _ string, _ domain.ValueType, _ string, opts ...provider.WriteOption,
+			) (domain.Version, error) {
+				gotOpts = opts
+
+				return domain.Version{ID: "2"}, nil
+			},
+		}
+
+		var buf, errBuf bytes.Buffer
+
+		r := &update.Runner{UseCase: &param.UpdateUseCase{Store: store}, Stdout: &buf, Stderr: &errBuf}
+		err := r.Run(t.Context(), update.Options{Name: "/app/param", Value: "v", Type: "String"})
+		require.NoError(t, err)
+		assert.Empty(t, gotOpts)
+	})
 }
 
 func TestRun(t *testing.T) {
@@ -71,7 +148,7 @@ func TestRun(t *testing.T) {
 			},
 			store: &providermock.Store{
 				GetFunc: existsGet,
-				PutFunc: func(_ context.Context, name, value string, vt domain.ValueType, _ string) (domain.Version, error) {
+				PutFunc: func(_ context.Context, name, value string, vt domain.ValueType, _ string, _ ...provider.WriteOption) (domain.Version, error) {
 					assert.Equal(t, "/app/param", name)
 					assert.Equal(t, "test-value", value)
 					assert.Equal(t, domain.ValueTypeSecret, vt)
@@ -96,7 +173,7 @@ func TestRun(t *testing.T) {
 			},
 			store: &providermock.Store{
 				GetFunc: existsGet,
-				PutFunc: func(_ context.Context, _, _ string, _ domain.ValueType, description string) (domain.Version, error) {
+				PutFunc: func(_ context.Context, _, _ string, _ domain.ValueType, description string, _ ...provider.WriteOption) (domain.Version, error) {
 					assert.Equal(t, "Test description", description)
 
 					return domain.Version{ID: "2"}, nil
@@ -119,7 +196,7 @@ func TestRun(t *testing.T) {
 			wantErr: "failed to update parameter",
 			store: &providermock.Store{
 				GetFunc: existsGet,
-				PutFunc: func(_ context.Context, _, _ string, _ domain.ValueType, _ string) (domain.Version, error) {
+				PutFunc: func(_ context.Context, _, _ string, _ domain.ValueType, _ string, _ ...provider.WriteOption) (domain.Version, error) {
 					return domain.Version{}, assert.AnError
 				},
 			},

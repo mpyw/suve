@@ -10,6 +10,7 @@ import (
 
 	appcli "github.com/mpyw/suve/internal/cli/commands"
 	"github.com/mpyw/suve/internal/cli/commands/param/delete"
+	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/provider/providermock"
 	"github.com/mpyw/suve/internal/usecase/param"
 )
@@ -40,7 +41,7 @@ func TestRun(t *testing.T) {
 			name: "delete parameter",
 			opts: delete.Options{Name: "/app/param"},
 			store: &providermock.Store{
-				DeleteFunc: func(_ context.Context, _ string) error {
+				DeleteFunc: func(_ context.Context, _ string, _ ...provider.DeleteOption) error {
 					return nil
 				},
 			},
@@ -54,7 +55,7 @@ func TestRun(t *testing.T) {
 			name: "error from AWS",
 			opts: delete.Options{Name: "/app/param"},
 			store: &providermock.Store{
-				DeleteFunc: func(_ context.Context, _ string) error {
+				DeleteFunc: func(_ context.Context, _ string, _ ...provider.DeleteOption) error {
 					return assert.AnError
 				},
 			},

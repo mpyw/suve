@@ -22,7 +22,8 @@ type mockClient struct {
 	listVersion func(*secretsmanager.ListSecretVersionIdsInput) (*secretsmanager.ListSecretVersionIdsOutput, error)
 	describe    func(*secretsmanager.DescribeSecretInput) (*secretsmanager.DescribeSecretOutput, error)
 	create      func(*secretsmanager.CreateSecretInput) (*secretsmanager.CreateSecretOutput, error)
-	putValue    func(*secretsmanager.PutSecretValueInput) (*secretsmanager.PutSecretValueOutput, error)
+	updateSec   func(*secretsmanager.UpdateSecretInput) (*secretsmanager.UpdateSecretOutput, error)
+	rotate      func(*secretsmanager.RotateSecretInput) (*secretsmanager.RotateSecretOutput, error)
 	deleteSec   func(*secretsmanager.DeleteSecretInput) (*secretsmanager.DeleteSecretOutput, error)
 	restore     func(*secretsmanager.RestoreSecretInput) (*secretsmanager.RestoreSecretOutput, error)
 	tag         func(*secretsmanager.TagResourceInput) (*secretsmanager.TagResourceOutput, error)
@@ -55,10 +56,16 @@ func (m *mockClient) CreateSecret(
 	return m.create(in)
 }
 
-func (m *mockClient) PutSecretValue(
-	_ context.Context, in *secretsmanager.PutSecretValueInput, _ ...func(*secretsmanager.Options),
-) (*secretsmanager.PutSecretValueOutput, error) {
-	return m.putValue(in)
+func (m *mockClient) UpdateSecret(
+	_ context.Context, in *secretsmanager.UpdateSecretInput, _ ...func(*secretsmanager.Options),
+) (*secretsmanager.UpdateSecretOutput, error) {
+	return m.updateSec(in)
+}
+
+func (m *mockClient) RotateSecret(
+	_ context.Context, in *secretsmanager.RotateSecretInput, _ ...func(*secretsmanager.Options),
+) (*secretsmanager.RotateSecretOutput, error) {
+	return m.rotate(in)
 }
 
 func (m *mockClient) DeleteSecret(
@@ -282,26 +289,29 @@ func TestPut_CreateWhenNew(t *testing.T) {
 	assert.Equal(t, "desc", aws.ToString(createIn.Description))
 }
 
-func TestPut_PutsNewVersionWhenExists(t *testing.T) {
+func TestPut_UpdatesWhenExists(t *testing.T) {
 	t.Parallel()
 
-	var putCalled bool
+	var updateIn *secretsmanager.UpdateSecretInput
 
 	store := secret.New(&mockClient{
 		create: func(_ *secretsmanager.CreateSecretInput) (*secretsmanager.CreateSecretOutput, error) {
 			return nil, &types.ResourceExistsException{Message: aws.String("exists")}
 		},
-		putValue: func(_ *secretsmanager.PutSecretValueInput) (*secretsmanager.PutSecretValueOutput, error) {
-			putCalled = true
+		updateSec: func(in *secretsmanager.UpdateSecretInput) (*secretsmanager.UpdateSecretOutput, error) {
+			updateIn = in
 
-			return &secretsmanager.PutSecretValueOutput{VersionId: aws.String("ver-2")}, nil
+			return &secretsmanager.UpdateSecretOutput{VersionId: aws.String("ver-2")}, nil
 		},
 	})
 
-	v, err := store.Put(t.Context(), "my-secret", "val", domain.ValueTypeSecret, "")
+	// Put on an existing secret updates both value and description in one call.
+	v, err := store.Put(t.Context(), "my-secret", "val", domain.ValueTypeSecret, "new desc")
 	require.NoError(t, err)
-	assert.True(t, putCalled)
 	assert.Equal(t, "ver-2", v.ID)
+	require.NotNil(t, updateIn)
+	assert.Equal(t, "val", aws.ToString(updateIn.SecretString))
+	assert.Equal(t, "new desc", aws.ToString(updateIn.Description))
 }
 
 func TestDelete(t *testing.T) {
@@ -319,6 +329,101 @@ func TestDelete(t *testing.T) {
 
 	require.NoError(t, store.Delete(t.Context(), "my-secret"))
 	assert.Equal(t, "my-secret", gotID)
+}
+
+func TestDelete_ForceDelete(t *testing.T) {
+	t.Parallel()
+
+	var in *secretsmanager.DeleteSecretInput
+
+	store := secret.New(&mockClient{
+		deleteSec: func(got *secretsmanager.DeleteSecretInput) (*secretsmanager.DeleteSecretOutput, error) {
+			in = got
+
+			return &secretsmanager.DeleteSecretOutput{}, nil
+		},
+	})
+
+	require.NoError(t, store.Delete(t.Context(), "my-secret", secret.ForceDelete{}))
+	require.NotNil(t, in)
+	assert.True(t, aws.ToBool(in.ForceDeleteWithoutRecovery))
+	assert.Nil(t, in.RecoveryWindowInDays)
+}
+
+func TestDelete_RecoveryWindow(t *testing.T) {
+	t.Parallel()
+
+	var in *secretsmanager.DeleteSecretInput
+
+	store := secret.New(&mockClient{
+		deleteSec: func(got *secretsmanager.DeleteSecretInput) (*secretsmanager.DeleteSecretOutput, error) {
+			in = got
+
+			return &secretsmanager.DeleteSecretOutput{}, nil
+		},
+	})
+
+	require.NoError(t, store.Delete(t.Context(), "my-secret", secret.RecoveryWindow{Days: 14}))
+	require.NotNil(t, in)
+	assert.Equal(t, int64(14), aws.ToInt64(in.RecoveryWindowInDays))
+	assert.Nil(t, in.ForceDeleteWithoutRecovery)
+}
+
+func TestGet_PopulatesExtraARN(t *testing.T) {
+	t.Parallel()
+
+	store := secret.New(&mockClient{
+		getValue: func(*secretsmanager.GetSecretValueInput) (*secretsmanager.GetSecretValueOutput, error) {
+			return &secretsmanager.GetSecretValueOutput{
+				Name:         aws.String("my-secret"),
+				ARN:          aws.String("arn:aws:secretsmanager:us-east-1:123:secret:my-secret-AbCdEf"),
+				SecretString: aws.String("val"),
+				VersionId:    aws.String("id-3"),
+			}, nil
+		},
+		describe: func(*secretsmanager.DescribeSecretInput) (*secretsmanager.DescribeSecretOutput, error) {
+			return &secretsmanager.DescribeSecretOutput{}, nil
+		},
+	})
+
+	entry, err := store.Get(t.Context(), "my-secret", provider.VersionRef{})
+	require.NoError(t, err)
+	require.Len(t, entry.Extra, 1)
+	assert.Equal(t, "ARN", entry.Extra[0].Label)
+	assert.Equal(t, "arn:aws:secretsmanager:us-east-1:123:secret:my-secret-AbCdEf", entry.Extra[0].Value)
+}
+
+func TestCreate_AppliesKMSKeyAndRotation(t *testing.T) {
+	t.Parallel()
+
+	var (
+		createIn *secretsmanager.CreateSecretInput
+		rotateIn *secretsmanager.RotateSecretInput
+	)
+
+	store := secret.New(&mockClient{
+		create: func(in *secretsmanager.CreateSecretInput) (*secretsmanager.CreateSecretOutput, error) {
+			createIn = in
+
+			return &secretsmanager.CreateSecretOutput{VersionId: aws.String("new-id")}, nil
+		},
+		rotate: func(in *secretsmanager.RotateSecretInput) (*secretsmanager.RotateSecretOutput, error) {
+			rotateIn = in
+
+			return &secretsmanager.RotateSecretOutput{}, nil
+		},
+	})
+
+	_, err := store.Create(t.Context(), "my-secret", "val", domain.ValueTypeSecret, "",
+		secret.KMSKeyID{Value: "alias/my-key"},
+		secret.RotationRules{AutomaticallyAfterDays: 30},
+	)
+	require.NoError(t, err)
+	require.NotNil(t, createIn)
+	assert.Equal(t, "alias/my-key", aws.ToString(createIn.KmsKeyId))
+	require.NotNil(t, rotateIn)
+	require.NotNil(t, rotateIn.RotationRules)
+	assert.Equal(t, int64(30), aws.ToInt64(rotateIn.RotationRules.AutomaticallyAfterDays))
 }
 
 func TestRestore(t *testing.T) {
