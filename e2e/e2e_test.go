@@ -43,10 +43,17 @@ func TestMain(m *testing.M) {
 		os.Exit(1)
 	}
 
-	// Set TMPDIR so protocol.SocketPath() uses our isolated directory
-	if err := os.Setenv("TMPDIR", tmpDir); err != nil {
-		output.Printf(os.Stderr, "failed to set TMPDIR: %v\n", err)
-		os.Exit(1)
+	// Point every platform's socket-path env var at our isolated directory so
+	// protocol.SocketPath() resolves there regardless of OS: TMPDIR on macOS,
+	// XDG_RUNTIME_DIR on Linux, LOCALAPPDATA on Windows. Without this the Linux
+	// daemon socket escapes to the host's XDG_RUNTIME_DIR when it is set.
+	// (Ported from the multicloud branch's setupIsolatedSocketPath fix; the
+	// short /tmp path is kept to stay under macOS's 104-byte socket limit.)
+	for _, key := range []string{"TMPDIR", "XDG_RUNTIME_DIR", "LOCALAPPDATA"} {
+		if err := os.Setenv(key, tmpDir); err != nil {
+			output.Printf(os.Stderr, "failed to set %s: %v\n", key, err)
+			os.Exit(1)
+		}
 	}
 
 	// Enable manual mode to prevent fork bomb from test binary
