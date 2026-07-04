@@ -2,20 +2,45 @@ package internal
 
 import (
 	"context"
+	"errors"
 
 	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/provider/aws"
+	"github.com/mpyw/suve/internal/provider/gcp"
 	"github.com/mpyw/suve/internal/staging"
 )
 
 // registry is the provider registry reachable by every CLI command. It is the
-// single composition point where cloud backends are wired in; today only AWS is
-// registered, so AWS is the default (and only) provider. Future top-level
-// command groups (e.g. "suve gcloud") would build their own provider.Scope and
-// resolve stores through this same registry.
+// single composition point where cloud backends are wired in: AWS (param +
+// secret) and Google Cloud (secret only) are registered here. Top-level command
+// groups build their own provider.Scope and resolve stores through this same
+// registry.
 //
 //nolint:gochecknoglobals // process-wide provider registry, built once
-var registry = aws.NewRegistry()
+var registry = func() *provider.Registry {
+	reg := aws.NewRegistry()
+	gcp.Register(reg)
+
+	return reg
+}()
+
+// gcpProjectContextKey keys the resolved Google Cloud project id stored in the
+// context by the gcloud command group's Before hook.
+type gcpProjectContextKey struct{}
+
+// WithGCPProject returns a context carrying the resolved Google Cloud project
+// id. The gcloud command group sets it once (from --project or the
+// GOOGLE_CLOUD_PROJECT env) so every gcloud subcommand can resolve a store
+// without threading the flag through the generic command Config.
+func WithGCPProject(ctx context.Context, project string) context.Context {
+	return context.WithValue(ctx, gcpProjectContextKey{}, project)
+}
+
+func gcpProjectFromContext(ctx context.Context) string {
+	project, _ := ctx.Value(gcpProjectContextKey{}).(string)
+
+	return project
+}
 
 // storeScope is the provider selector for read/write commands. Only the
 // Provider field is needed: the AWS factory builds its SSM/Secrets Manager
@@ -37,6 +62,20 @@ func ParamStore(ctx context.Context) (provider.Store, error) {
 // registry (AWS by default).
 func SecretStore(ctx context.Context) (provider.Store, error) {
 	return storeForKind(ctx, provider.KindSecret)
+}
+
+// GCPSecretStore resolves a provider.Store for the Google Cloud Secret Manager
+// service. The project id is read from the context (see WithGCPProject); it
+// returns a clear error when no project could be resolved.
+func GCPSecretStore(ctx context.Context) (provider.Store, error) {
+	project := gcpProjectFromContext(ctx)
+	if project == "" {
+		return nil, errors.New(
+			"no Google Cloud project specified: set --project or the GOOGLE_CLOUD_PROJECT environment variable",
+		)
+	}
+
+	return registry.Store(ctx, provider.GoogleCloudScope(project), provider.KindSecret)
 }
 
 func storeForKind(ctx context.Context, kind provider.Kind) (provider.Store, error) {
