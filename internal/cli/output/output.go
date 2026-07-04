@@ -10,6 +10,7 @@
 package output
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"strings"
@@ -67,14 +68,46 @@ func (o *Writer) Value(value string) {
 	}
 }
 
+// The functions below form the CLI's set of user-feedback primitives. Each
+// emits a single colored line to w and serves a distinct role, so they are not
+// interchangeable — pick the one whose prefix, color, and tone match the intent:
+//
+//   - Warning — "Warning: X" (yellow): a non-critical issue that does not stop the command.
+//   - Warn    — "! X" (yellow): a per-item caveat within a larger operation.
+//   - Info    — "X" (cyan): neutral status or progress, no prefix.
+//   - Hint    — "Hint: X" (cyan): an actionable suggestion, usually after a Warning.
+//   - Error   — "Error: X" (red): a user-facing error that is not a Go error value.
+//   - Success — "✓ X": a completed action.
+//   - Failed  — "Failed NAME: ERR" (red "Failed"): a per-item failure carrying its error.
+//
+// Warning, Warn, Info, Hint, and Error share two internal shapes (labeled and
+// prefixed) so the exact byte layout of each family stays consistent.
+
+// labeled formats a message and prints it as a single line, coloring the whole
+// "label+message" string with colorize. A label of "" colors the message alone.
+//
+//nolint:goprintffuncname // intentionally named without 'f' suffix for cleaner API
+func labeled(w io.Writer, colorize func(...any) string, label, format string, args ...any) {
+	msg := fmt.Sprintf(format, args...)
+	_, _ = fmt.Fprintln(w, colorize(label+msg))
+}
+
+// prefixed formats a message and prints it as "prefix message" on a single
+// line, where only prefix carries color and the message stays uncolored.
+//
+//nolint:goprintffuncname // intentionally named without 'f' suffix for cleaner API
+func prefixed(w io.Writer, prefix, format string, args ...any) {
+	msg := fmt.Sprintf(format, args...)
+	_, _ = fmt.Fprintf(w, "%s %s\n", prefix, msg)
+}
+
 // Warning prints a warning message in yellow.
 // Used to alert users about non-critical issues that don't prevent command execution.
 // Example: "Warning: comparing identical versions".
 //
 //nolint:goprintffuncname // intentionally named without 'f' suffix for cleaner API
 func Warning(w io.Writer, format string, args ...any) {
-	msg := fmt.Sprintf(format, args...)
-	_, _ = fmt.Fprintln(w, colors.Warning("Warning: "+msg))
+	labeled(w, colors.Warning, "Warning: ", format, args...)
 }
 
 // Hint prints a hint message in cyan.
@@ -83,8 +116,7 @@ func Warning(w io.Writer, format string, args ...any) {
 //
 //nolint:goprintffuncname // intentionally named without 'f' suffix for cleaner API
 func Hint(w io.Writer, format string, args ...any) {
-	msg := fmt.Sprintf(format, args...)
-	_, _ = fmt.Fprintln(w, colors.Info("Hint: "+msg))
+	labeled(w, colors.Info, "Hint: ", format, args...)
 }
 
 // Error prints an error message in red.
@@ -93,42 +125,51 @@ func Hint(w io.Writer, format string, args ...any) {
 //
 //nolint:goprintffuncname // intentionally named without 'f' suffix for cleaner API
 func Error(w io.Writer, format string, args ...any) {
-	msg := fmt.Sprintf(format, args...)
-	_, _ = fmt.Fprintln(w, colors.Error("Error: "+msg))
+	labeled(w, colors.Error, "Error: ", format, args...)
 }
 
-// Success prints a success message with green checkmark.
-// Example: "✓ Created parameter /app/config".
-//
-//nolint:goprintffuncname // intentionally named without 'f' suffix for cleaner API
-func Success(w io.Writer, format string, args ...any) {
-	msg := fmt.Sprintf(format, args...)
-	_, _ = fmt.Fprintf(w, "%s %s\n", colors.Success("✓"), msg)
-}
-
-// Failed prints a failure message in red.
-// Example: "Failed /app/config: error message".
-func Failed(w io.Writer, name string, err error) {
-	_, _ = fmt.Fprintf(w, "%s %s: %v\n", colors.Failed("Failed"), name, err)
-}
-
-// Info prints an informational message in cyan.
+// Info prints an informational message in cyan with no prefix.
 // Used for status updates, progress messages, and neutral information.
 // Example: "No changes staged.", "Agent started".
 //
 //nolint:goprintffuncname // intentionally named without 'f' suffix for cleaner API
 func Info(w io.Writer, format string, args ...any) {
-	msg := fmt.Sprintf(format, args...)
-	_, _ = fmt.Fprintln(w, colors.Info(msg))
+	labeled(w, colors.Info, "", format, args...)
 }
 
-// Warn prints a warning message with yellow "!" prefix.
+// Warn prints a warning message with a yellow "!" prefix.
+// Used for per-item caveats within a larger operation.
 // Example: "! Skipped /app/config (same as AWS)".
 //
 //nolint:goprintffuncname // intentionally named without 'f' suffix for cleaner API
 func Warn(w io.Writer, format string, args ...any) {
-	msg := fmt.Sprintf(format, args...)
-	_, _ = fmt.Fprintf(w, "%s %s\n", colors.Warning("!"), msg)
+	prefixed(w, colors.Warning("!"), format, args...)
+}
+
+// Success prints a success message with a green checkmark prefix.
+// Used to confirm a completed action.
+// Example: "✓ Created parameter /app/config".
+//
+//nolint:goprintffuncname // intentionally named without 'f' suffix for cleaner API
+func Success(w io.Writer, format string, args ...any) {
+	prefixed(w, colors.Success("✓"), format, args...)
+}
+
+// Failed prints a per-item failure message with a red "Failed" prefix,
+// appending the error that caused it.
+// Example: "Failed /app/config: error message".
+func Failed(w io.Writer, name string, err error) {
+	_, _ = fmt.Fprintf(w, "%s %s: %v\n", colors.Failed("Failed"), name, err)
+}
+
+// WriteJSON encodes v as indented JSON (two-space indent) followed by a
+// trailing newline, writing the result to w. It is the shared implementation
+// for the CLI's --output=json modes.
+func WriteJSON(w io.Writer, v any) error {
+	enc := json.NewEncoder(w)
+	enc.SetIndent("", "  ")
+
+	return enc.Encode(v)
 }
 
 // Diff generates a unified diff between two strings with ANSI colors.

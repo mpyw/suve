@@ -9,8 +9,8 @@ import (
 
 	"github.com/urfave/cli/v3"
 
+	"github.com/mpyw/suve/internal/cli/commands/internal"
 	"github.com/mpyw/suve/internal/cli/output"
-	"github.com/mpyw/suve/internal/infra"
 	"github.com/mpyw/suve/internal/usecase/param"
 )
 
@@ -57,9 +57,9 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		return err
 	}
 
-	client, err := infra.NewParamClient(ctx)
+	client, err := internal.NewParamClient(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to initialize AWS client: %w", err)
+		return err
 	}
 
 	r := &Runner{

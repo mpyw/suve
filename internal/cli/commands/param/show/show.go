@@ -3,7 +3,6 @@ package show
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"strconv"
@@ -12,9 +11,8 @@ import (
 	"github.com/urfave/cli/v3"
 
 	"github.com/mpyw/suve/internal/api/paramapi"
+	"github.com/mpyw/suve/internal/cli/commands/internal"
 	"github.com/mpyw/suve/internal/cli/output"
-	"github.com/mpyw/suve/internal/cli/pager"
-	"github.com/mpyw/suve/internal/infra"
 	"github.com/mpyw/suve/internal/jsonutil"
 	"github.com/mpyw/suve/internal/timeutil"
 	"github.com/mpyw/suve/internal/usecase/param"
@@ -112,9 +110,9 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		return fmt.Errorf("--raw and --output=json cannot be used together")
 	}
 
-	client, err := infra.NewParamClient(ctx)
+	client, err := internal.NewParamClient(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to initialize AWS client: %w", err)
+		return err
 	}
 
 	opts := Options{
@@ -128,11 +126,11 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	// Raw mode and JSON output disable pager
 	noPager := opts.NoPager || opts.Raw || opts.Output == output.FormatJSON
 
-	return pager.WithPagerWriter(cmd.Root().Writer, noPager, func(w io.Writer) error {
+	return internal.WithPager(cmd, noPager, func(stdout, stderr io.Writer) error {
 		r := &Runner{
 			UseCase: &param.ShowUseCase{Client: client},
-			Stdout:  w,
-			Stderr:  cmd.Root().ErrWriter,
+			Stdout:  stdout,
+			Stderr:  stderr,
 		}
 
 		return r.Run(ctx, opts)
@@ -194,10 +192,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 			jsonOut.Tags[tag.Key] = tag.Value
 		}
 
-		enc := json.NewEncoder(r.Stdout)
-		enc.SetIndent("", "  ")
-
-		return enc.Encode(jsonOut)
+		return output.WriteJSON(r.Stdout, jsonOut)
 	}
 
 	// Normal mode: show metadata + value
