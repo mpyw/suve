@@ -30,8 +30,8 @@ func TestPersistUseCase_Execute(t *testing.T) {
 		})
 
 		usecase := &stagingusecase.StashPushUseCase{
-			AgentStore: agentStore,
-			FileStore:  fileStore,
+			Working: agentStore,
+			Stash:   fileStore,
 		}
 
 		output, err := usecase.Execute(t.Context(), stagingusecase.StashPushInput{})
@@ -61,8 +61,8 @@ func TestPersistUseCase_Execute(t *testing.T) {
 		})
 
 		usecase := &stagingusecase.StashPushUseCase{
-			AgentStore: agentStore,
-			FileStore:  fileStore,
+			Working: agentStore,
+			Stash:   fileStore,
 		}
 
 		_, err := usecase.Execute(t.Context(), stagingusecase.StashPushInput{Keep: true})
@@ -82,8 +82,8 @@ func TestPersistUseCase_Execute(t *testing.T) {
 		fileStore := testutil.NewMockStore()
 
 		usecase := &stagingusecase.StashPushUseCase{
-			AgentStore: agentStore,
-			FileStore:  fileStore,
+			Working: agentStore,
+			Stash:   fileStore,
 		}
 
 		_, err := usecase.Execute(t.Context(), stagingusecase.StashPushInput{})
@@ -108,8 +108,8 @@ func TestPersistUseCase_Execute(t *testing.T) {
 		})
 
 		usecase := &stagingusecase.StashPushUseCase{
-			AgentStore: agentStore,
-			FileStore:  fileStore,
+			Working: agentStore,
+			Stash:   fileStore,
 		}
 
 		_, err := usecase.Execute(t.Context(), stagingusecase.StashPushInput{Service: staging.ServiceParam})
@@ -123,7 +123,7 @@ func TestPersistUseCase_Execute(t *testing.T) {
 		_, err = agentStore.GetEntry(t.Context(), staging.ServiceSecret, "my-secret")
 		require.NoError(t, err)
 
-		// Param should be cleared from agent (not kept)
+		// Param should be cleared from the working staging area (not kept)
 		_, err = agentStore.GetEntry(t.Context(), staging.ServiceParam, "/app/param")
 		assert.ErrorIs(t, err, staging.ErrNotStaged)
 	})
@@ -140,8 +140,8 @@ func TestPersistUseCase_Execute(t *testing.T) {
 		})
 
 		usecase := &stagingusecase.StashPushUseCase{
-			AgentStore: agentStore,
-			FileStore:  fileStore,
+			Working: agentStore,
+			Stash:   fileStore,
 		}
 
 		output, err := usecase.Execute(t.Context(), stagingusecase.StashPushInput{})
@@ -175,8 +175,8 @@ func TestPersistUseCase_Execute(t *testing.T) {
 		})
 
 		usecase := &stagingusecase.StashPushUseCase{
-			AgentStore: agentStore,
-			FileStore:  fileStore,
+			Working: agentStore,
+			Stash:   fileStore,
 		}
 
 		_, err := usecase.Execute(t.Context(), stagingusecase.StashPushInput{Service: staging.ServiceParam})
@@ -219,8 +219,8 @@ func TestPersistUseCase_PersistMode(t *testing.T) {
 		})
 
 		usecase := &stagingusecase.StashPushUseCase{
-			AgentStore: agentStore,
-			FileStore:  fileStore,
+			Working: agentStore,
+			Stash:   fileStore,
 		}
 
 		_, err := usecase.Execute(t.Context(), stagingusecase.StashPushInput{
@@ -267,8 +267,8 @@ func TestPersistUseCase_PersistMode(t *testing.T) {
 		})
 
 		usecase := &stagingusecase.StashPushUseCase{
-			AgentStore: agentStore,
-			FileStore:  fileStore,
+			Working: agentStore,
+			Stash:   fileStore,
 		}
 
 		_, err := usecase.Execute(t.Context(), stagingusecase.StashPushInput{
@@ -306,8 +306,8 @@ func TestPersistUseCase_PersistMode(t *testing.T) {
 		})
 
 		usecase := &stagingusecase.StashPushUseCase{
-			AgentStore: agentStore,
-			FileStore:  fileStore,
+			Working: agentStore,
+			Stash:   fileStore,
 		}
 
 		_, err := usecase.Execute(t.Context(), stagingusecase.StashPushInput{
@@ -346,8 +346,8 @@ func TestPersistUseCase_ServiceSpecific_EdgeCases(t *testing.T) {
 		})
 
 		usecase := &stagingusecase.StashPushUseCase{
-			AgentStore: agentStore,
-			FileStore:  fileStore,
+			Working: agentStore,
+			Stash:   fileStore,
 		}
 
 		// Push param only
@@ -386,8 +386,8 @@ func TestPersistUseCase_ServiceSpecific_EdgeCases(t *testing.T) {
 		})
 
 		usecase := &stagingusecase.StashPushUseCase{
-			AgentStore: agentStore,
-			FileStore:  fileStore,
+			Working: agentStore,
+			Stash:   fileStore,
 		}
 
 		// Push secret only
@@ -431,8 +431,8 @@ func TestPersistUseCase_ServiceSpecific_EdgeCases(t *testing.T) {
 		})
 
 		usecase := &stagingusecase.StashPushUseCase{
-			AgentStore: agentStore,
-			FileStore:  fileStore,
+			Working: agentStore,
+			Stash:   fileStore,
 		}
 
 		// Push param only with overwrite (replaces existing param entries)
@@ -476,8 +476,8 @@ func TestPersistUseCase_ServiceSpecific_EdgeCases(t *testing.T) {
 		})
 
 		usecase := &stagingusecase.StashPushUseCase{
-			AgentStore: agentStore,
-			FileStore:  fileStore,
+			Working: agentStore,
+			Stash:   fileStore,
 		}
 
 		// Even with Overwrite mode, service-specific push preserves other services
@@ -508,8 +508,8 @@ func TestPersistUseCase_Execute_Errors(t *testing.T) {
 		fileStore := testutil.NewMockStore()
 
 		usecase := &stagingusecase.StashPushUseCase{
-			AgentStore: agentStore,
-			FileStore:  fileStore,
+			Working: agentStore,
+			Stash:   fileStore,
 		}
 
 		_, err := usecase.Execute(t.Context(), stagingusecase.StashPushInput{})
@@ -533,8 +533,8 @@ func TestPersistUseCase_Execute_Errors(t *testing.T) {
 		fileStore.WriteStateErr = errors.New("write error")
 
 		usecase := &stagingusecase.StashPushUseCase{
-			AgentStore: agentStore,
-			FileStore:  fileStore,
+			Working: agentStore,
+			Stash:   fileStore,
 		}
 
 		_, err := usecase.Execute(t.Context(), stagingusecase.StashPushInput{})
@@ -552,7 +552,7 @@ func TestPersistError(t *testing.T) {
 		t.Parallel()
 
 		err := &stagingusecase.StashPushError{Op: "load", Err: errors.New("connection failed")}
-		assert.Contains(t, err.Error(), "failed to get state from agent")
+		assert.Contains(t, err.Error(), "failed to read the working staging area")
 		assert.Contains(t, err.Error(), "connection failed")
 	})
 
@@ -567,7 +567,7 @@ func TestPersistError(t *testing.T) {
 		t.Parallel()
 
 		err := &stagingusecase.StashPushError{Op: "clear", Err: errors.New("clear failed")}
-		assert.Contains(t, err.Error(), "failed to clear agent memory")
+		assert.Contains(t, err.Error(), "failed to clear the working staging area")
 	})
 
 	t.Run("error message - unknown op", func(t *testing.T) {
@@ -587,59 +587,29 @@ func TestPersistError(t *testing.T) {
 	})
 }
 
-// =============================================================================
-// HintedUnstager Tests
-// =============================================================================
-
-func TestPersistUseCase_WithHintedUnstager(t *testing.T) {
+func TestPersistUseCase_GlobalClearError(t *testing.T) {
 	t.Parallel()
 
-	t.Run("uses persist hint for UnstageAll", func(t *testing.T) {
+	t.Run("global clear (working WriteState) error is non-fatal", func(t *testing.T) {
 		t.Parallel()
 
-		agentStore := testutil.NewHintedMockStore()
-		fileStore := testutil.NewMockStore()
+		workingStore := testutil.NewMockStore()
+		stashStore := testutil.NewMockStore()
 
-		_ = agentStore.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
+		_ = workingStore.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("agent-value"),
 			StagedAt:  time.Now(),
 		})
 
 		usecase := &stagingusecase.StashPushUseCase{
-			AgentStore: agentStore,
-			FileStore:  fileStore,
+			Working: workingStore,
+			Stash:   stashStore,
 		}
 
-		output, err := usecase.Execute(t.Context(), stagingusecase.StashPushInput{})
-		require.NoError(t, err)
-		assert.Equal(t, 1, output.EntryCount)
-
-		// Verify persist hint was used
-		assert.Equal(t, "persist", agentStore.LastHint)
-
-		// Verify agent is cleared
-		_, err = agentStore.GetEntry(t.Context(), staging.ServiceParam, "/app/config")
-		assert.ErrorIs(t, err, staging.ErrNotStaged)
-	})
-
-	t.Run("hinted unstage error is non-fatal", func(t *testing.T) {
-		t.Parallel()
-
-		agentStore := testutil.NewHintedMockStore()
-		fileStore := testutil.NewMockStore()
-
-		_ = agentStore.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
-			Operation: staging.OperationUpdate,
-			Value:     lo.ToPtr("agent-value"),
-			StagedAt:  time.Now(),
-		})
-		agentStore.UnstageAllWithHintErr = errors.New("hinted unstage error")
-
-		usecase := &stagingusecase.StashPushUseCase{
-			AgentStore: agentStore,
-			FileStore:  fileStore,
-		}
+		// Make the working-area clear step fail. The stash write happens first
+		// (and succeeds), so this is a non-fatal error.
+		workingStore.WriteStateErr = errors.New("clear error")
 
 		output, err := usecase.Execute(t.Context(), stagingusecase.StashPushInput{})
 		// Should return output even on error since it's non-fatal
@@ -652,39 +622,9 @@ func TestPersistUseCase_WithHintedUnstager(t *testing.T) {
 		assert.Equal(t, "clear", persistErr.Op)
 		assert.True(t, persistErr.NonFatal)
 
-		// File should still have the entry (write succeeded)
-		_, err = fileStore.GetEntry(t.Context(), staging.ServiceParam, "/app/config")
+		// Stash should still have the entry (write succeeded)
+		_, err = stashStore.GetEntry(t.Context(), staging.ServiceParam, "/app/config")
 		require.NoError(t, err)
-	})
-
-	t.Run("non-hinted agent UnstageAll error is non-fatal", func(t *testing.T) {
-		t.Parallel()
-
-		agentStore := testutil.NewMockStore()
-		fileStore := testutil.NewMockStore()
-
-		_ = agentStore.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
-			Operation: staging.OperationUpdate,
-			Value:     lo.ToPtr("agent-value"),
-			StagedAt:  time.Now(),
-		})
-		agentStore.UnstageAllErr = errors.New("unstage all error")
-
-		usecase := &stagingusecase.StashPushUseCase{
-			AgentStore: agentStore,
-			FileStore:  fileStore,
-		}
-
-		output, err := usecase.Execute(t.Context(), stagingusecase.StashPushInput{})
-		// Should return output even on error since it's non-fatal
-		assert.NotNil(t, output)
-		assert.Equal(t, 1, output.EntryCount)
-
-		// Error should be returned but as non-fatal
-		var persistErr *stagingusecase.StashPushError
-		require.ErrorAs(t, err, &persistErr)
-		assert.Equal(t, "clear", persistErr.Op)
-		assert.True(t, persistErr.NonFatal)
 	})
 }
 
@@ -710,8 +650,8 @@ func TestPersistUseCase_ServiceSpecific_ClearError(t *testing.T) {
 		})
 
 		usecase := &stagingusecase.StashPushUseCase{
-			AgentStore: agentStore,
-			FileStore:  fileStore,
+			Working: agentStore,
+			Stash:   fileStore,
 		}
 
 		// First push succeeds
@@ -762,8 +702,8 @@ func TestPersistUseCase_FileDrainError_TreatedAsFresh(t *testing.T) {
 		fileStore.DrainErr = errors.New("file not found")
 
 		usecase := &stagingusecase.StashPushUseCase{
-			AgentStore: agentStore,
-			FileStore:  fileStore,
+			Working: agentStore,
+			Stash:   fileStore,
 		}
 
 		// Should succeed because file drain error is treated as empty state (start fresh)
@@ -793,8 +733,8 @@ func TestPersistUseCase_FileDrainError_TreatedAsFresh(t *testing.T) {
 		fileStore.DrainErr = errors.New("file not found")
 
 		usecase := &stagingusecase.StashPushUseCase{
-			AgentStore: agentStore,
-			FileStore:  fileStore,
+			Working: agentStore,
+			Stash:   fileStore,
 		}
 
 		// Should succeed because file drain error is treated as empty state (start fresh)

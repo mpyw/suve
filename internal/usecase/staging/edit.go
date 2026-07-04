@@ -37,31 +37,14 @@ func (u *EditUseCase) Execute(ctx context.Context, input EditInput) (*EditOutput
 	service := u.Strategy.Service()
 
 	// Check staged state first to avoid unnecessary AWS fetch
-	// Only ping-check if Store implements Pinger
 	var stagedEntry *staging.Entry
 
-	if pinger, ok := u.Store.(store.Pinger); ok {
-		if pinger.Ping(ctx) != nil {
-			// Daemon not running → nothing staged, will fetch from AWS below
-			stagedEntry = nil
-		} else {
-			// Daemon running → check staged state
-			entry, err := u.Store.GetEntry(ctx, service, input.Name)
-			if err != nil && !errors.Is(err, staging.ErrNotStaged) {
-				return nil, err
-			}
-
-			stagedEntry = entry
-		}
-	} else {
-		// Not Pinger (e.g., FileStore) → check staged state directly
-		entry, err := u.Store.GetEntry(ctx, service, input.Name)
-		if err != nil && !errors.Is(err, staging.ErrNotStaged) {
-			return nil, err
-		}
-
-		stagedEntry = entry
+	entry, err := u.Store.GetEntry(ctx, service, input.Name)
+	if err != nil && !errors.Is(err, staging.ErrNotStaged) {
+		return nil, err
 	}
+
+	stagedEntry = entry
 
 	// Determine if we need to fetch from AWS
 	var currentValue *string
@@ -182,17 +165,6 @@ type BaselineOutput struct {
 // Baseline returns the baseline value for editing (staged value if exists, otherwise from AWS).
 func (u *EditUseCase) Baseline(ctx context.Context, input BaselineInput) (*BaselineOutput, error) {
 	service := u.Strategy.Service()
-
-	// Only ping-check if Store implements Pinger
-	// - Pinger + ping fails → daemon not running, skip staged check
-	// - Pinger + ping succeeds → daemon running, check staged
-	// - Not Pinger (e.g., FileStore) → proceed to GetEntry directly
-	if pinger, ok := u.Store.(store.Pinger); ok {
-		if pinger.Ping(ctx) != nil {
-			// Daemon not running → skip staged check, go to AWS
-			return u.fetchBaselineFromAWS(ctx, input.Name)
-		}
-	}
 
 	// Check if already staged
 	stagedEntry, err := u.Store.GetEntry(ctx, service, input.Name)

@@ -12,8 +12,7 @@ import (
 	"github.com/mpyw/suve/internal/infra"
 	"github.com/mpyw/suve/internal/staging"
 	"github.com/mpyw/suve/internal/staging/store"
-	"github.com/mpyw/suve/internal/staging/store/agent"
-	"github.com/mpyw/suve/internal/staging/store/agent/daemon/lifecycle"
+	"github.com/mpyw/suve/internal/staging/store/file"
 )
 
 // Runner executes the reset command.
@@ -60,26 +59,18 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		return fmt.Errorf("failed to get AWS identity: %w", err)
 	}
 
-	store := agent.NewStore(identity.AccountID, identity.Region)
-
-	result, err := lifecycle.ExecuteRead0(ctx, store, lifecycle.CmdReset, func() error {
-		r := &Runner{
-			Store:  store,
-			Stdout: cmd.Root().Writer,
-			Stderr: cmd.Root().ErrWriter,
-		}
-
-		return r.Run(ctx)
-	})
+	store, err := file.NewStore(identity.AccountID, identity.Region)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create staging store: %w", err)
 	}
 
-	if result.NothingStaged {
-		output.Info(cmd.Root().Writer, "No changes staged.")
+	r := &Runner{
+		Store:  store,
+		Stdout: cmd.Root().Writer,
+		Stderr: cmd.Root().ErrWriter,
 	}
 
-	return nil
+	return r.Run(ctx)
 }
 
 // Run executes the reset command.
@@ -105,14 +96,8 @@ func (r *Runner) Run(ctx context.Context) error {
 
 	totalCount := paramCount + secretCount
 
-	// Always call UnstageAll to trigger daemon auto-shutdown check
 	// Empty service ("") clears both SSM Parameter Store and Secrets Manager
-	// Use hint for context-aware shutdown message
-	if hinted, ok := r.Store.(store.HintedUnstager); ok {
-		if err := hinted.UnstageAllWithHint(ctx, "", store.HintReset); err != nil {
-			return err
-		}
-	} else if err := r.Store.UnstageAll(ctx, ""); err != nil {
+	if err := r.Store.UnstageAll(ctx, ""); err != nil {
 		return err
 	}
 

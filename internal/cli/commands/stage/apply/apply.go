@@ -17,8 +17,7 @@ import (
 	"github.com/mpyw/suve/internal/parallel"
 	"github.com/mpyw/suve/internal/staging"
 	"github.com/mpyw/suve/internal/staging/store"
-	"github.com/mpyw/suve/internal/staging/store/agent"
-	"github.com/mpyw/suve/internal/staging/store/agent/daemon/lifecycle"
+	"github.com/mpyw/suve/internal/staging/store/file"
 )
 
 // serviceConflictCheck holds entries and strategy for a single service's conflict checking.
@@ -80,102 +79,94 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		return fmt.Errorf("failed to get AWS identity: %w", err)
 	}
 
-	store := agent.NewStore(identity.AccountID, identity.Region)
+	store, err := file.NewStore(identity.AccountID, identity.Region)
+	if err != nil {
+		return fmt.Errorf("failed to create staging store: %w", err)
+	}
 
-	result, err := lifecycle.ExecuteRead0(ctx, store, lifecycle.CmdApply, func() error {
-		// Check if there are any staged changes
-		paramStaged, err := store.ListEntries(ctx, staging.ServiceParam)
-		if err != nil {
-			return err
-		}
-
-		secretStaged, err := store.ListEntries(ctx, staging.ServiceSecret)
-		if err != nil {
-			return err
-		}
-
-		paramTagStaged, err := store.ListTags(ctx, staging.ServiceParam)
-		if err != nil {
-			return err
-		}
-
-		secretTagStaged, err := store.ListTags(ctx, staging.ServiceSecret)
-		if err != nil {
-			return err
-		}
-
-		hasParam := len(paramStaged[staging.ServiceParam]) > 0 || len(paramTagStaged[staging.ServiceParam]) > 0
-		hasSecret := len(secretStaged[staging.ServiceSecret]) > 0 || len(secretTagStaged[staging.ServiceSecret]) > 0
-
-		if !hasParam && !hasSecret {
-			output.Info(cmd.Root().Writer, "No changes staged.")
-
-			return nil
-		}
-
-		// Count total staged changes
-		totalStaged := len(paramStaged[staging.ServiceParam]) + len(secretStaged[staging.ServiceSecret]) +
-			len(paramTagStaged[staging.ServiceParam]) + len(secretTagStaged[staging.ServiceSecret])
-
-		// Confirm apply
-		skipConfirm := cmd.Bool("yes")
-		prompter := &confirm.Prompter{
-			Stdin:  os.Stdin,
-			Stdout: cmd.Root().Writer,
-			Stderr: cmd.Root().ErrWriter,
-		}
-		prompter.AccountID = identity.AccountID
-		prompter.Region = identity.Region
-		prompter.Profile = identity.Profile
-
-		message := fmt.Sprintf("Apply %d staged change(s) to AWS?", totalStaged)
-
-		confirmed, err := prompter.Confirm(message, skipConfirm)
-		if err != nil {
-			return err
-		}
-
-		if !confirmed {
-			return nil
-		}
-
-		r := &Runner{
-			Store:           store,
-			Stdout:          cmd.Root().Writer,
-			Stderr:          cmd.Root().ErrWriter,
-			IgnoreConflicts: cmd.Bool("ignore-conflicts"),
-		}
-
-		// Initialize strategies only if needed
-		if hasParam {
-			strategy, err := staging.ParamFactory(ctx)
-			if err != nil {
-				return err
-			}
-
-			r.ParamStrategy = strategy
-		}
-
-		if hasSecret {
-			strategy, err := staging.SecretFactory(ctx)
-			if err != nil {
-				return err
-			}
-
-			r.SecretStrategy = strategy
-		}
-
-		return r.Run(ctx)
-	})
+	// Check if there are any staged changes
+	paramStaged, err := store.ListEntries(ctx, staging.ServiceParam)
 	if err != nil {
 		return err
 	}
 
-	if result.NothingStaged {
-		output.Info(cmd.Root().Writer, "No changes staged.")
+	secretStaged, err := store.ListEntries(ctx, staging.ServiceSecret)
+	if err != nil {
+		return err
 	}
 
-	return nil
+	paramTagStaged, err := store.ListTags(ctx, staging.ServiceParam)
+	if err != nil {
+		return err
+	}
+
+	secretTagStaged, err := store.ListTags(ctx, staging.ServiceSecret)
+	if err != nil {
+		return err
+	}
+
+	hasParam := len(paramStaged[staging.ServiceParam]) > 0 || len(paramTagStaged[staging.ServiceParam]) > 0
+	hasSecret := len(secretStaged[staging.ServiceSecret]) > 0 || len(secretTagStaged[staging.ServiceSecret]) > 0
+
+	if !hasParam && !hasSecret {
+		output.Info(cmd.Root().Writer, "No changes staged.")
+
+		return nil
+	}
+
+	// Count total staged changes
+	totalStaged := len(paramStaged[staging.ServiceParam]) + len(secretStaged[staging.ServiceSecret]) +
+		len(paramTagStaged[staging.ServiceParam]) + len(secretTagStaged[staging.ServiceSecret])
+
+	// Confirm apply
+	skipConfirm := cmd.Bool("yes")
+	prompter := &confirm.Prompter{
+		Stdin:  os.Stdin,
+		Stdout: cmd.Root().Writer,
+		Stderr: cmd.Root().ErrWriter,
+	}
+	prompter.AccountID = identity.AccountID
+	prompter.Region = identity.Region
+	prompter.Profile = identity.Profile
+
+	message := fmt.Sprintf("Apply %d staged change(s) to AWS?", totalStaged)
+
+	confirmed, err := prompter.Confirm(message, skipConfirm)
+	if err != nil {
+		return err
+	}
+
+	if !confirmed {
+		return nil
+	}
+
+	r := &Runner{
+		Store:           store,
+		Stdout:          cmd.Root().Writer,
+		Stderr:          cmd.Root().ErrWriter,
+		IgnoreConflicts: cmd.Bool("ignore-conflicts"),
+	}
+
+	// Initialize strategies only if needed
+	if hasParam {
+		strategy, err := staging.ParamFactory(ctx)
+		if err != nil {
+			return err
+		}
+
+		r.ParamStrategy = strategy
+	}
+
+	if hasSecret {
+		strategy, err := staging.SecretFactory(ctx)
+		if err != nil {
+			return err
+		}
+
+		r.SecretStrategy = strategy
+	}
+
+	return r.Run(ctx)
 }
 
 // Run executes the apply command.
@@ -290,12 +281,8 @@ func (r *Runner) applyService(ctx context.Context, strategy staging.ApplyStrateg
 			case staging.OperationDelete:
 				output.Success(r.Stdout, "%s: Deleted %s", serviceName, name)
 			}
-			// Use hint for context-aware shutdown message
-			if hinted, ok := r.Store.(store.HintedUnstager); ok {
-				if err := hinted.UnstageEntryWithHint(ctx, service, name, store.HintApply); err != nil {
-					output.Warning(r.Stderr, "failed to clear staging for %s: %v", name, err)
-				}
-			} else if err := r.Store.UnstageEntry(ctx, service, name); err != nil {
+
+			if err := r.Store.UnstageEntry(ctx, service, name); err != nil {
 				output.Warning(r.Stderr, "failed to clear staging for %s: %v", name, err)
 			}
 
@@ -326,12 +313,8 @@ func (r *Runner) applyTagService(ctx context.Context, strategy staging.ApplyStra
 			failed++
 		} else {
 			output.Success(r.Stdout, "%s: Tagged %s%s", serviceName, name, formatTagApplySummary(tagEntry))
-			// Use hint for context-aware shutdown message
-			if hinted, ok := r.Store.(store.HintedUnstager); ok {
-				if err := hinted.UnstageTagWithHint(ctx, service, name, store.HintApply); err != nil {
-					output.Warning(r.Stderr, "failed to clear staging for %s tags: %v", name, err)
-				}
-			} else if err := r.Store.UnstageTag(ctx, service, name); err != nil {
+
+			if err := r.Store.UnstageTag(ctx, service, name); err != nil {
 				output.Warning(r.Stderr, "failed to clear staging for %s tags: %v", name, err)
 			}
 

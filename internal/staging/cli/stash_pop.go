@@ -13,8 +13,7 @@ import (
 	"github.com/mpyw/suve/internal/cli/terminal"
 	"github.com/mpyw/suve/internal/infra"
 	"github.com/mpyw/suve/internal/staging"
-	"github.com/mpyw/suve/internal/staging/store/agent"
-	"github.com/mpyw/suve/internal/staging/store/agent/daemon/lifecycle"
+	"github.com/mpyw/suve/internal/staging/store/file"
 	stagingusecase "github.com/mpyw/suve/internal/usecase/staging"
 )
 
@@ -31,7 +30,7 @@ type StashPopOptions struct {
 	Service staging.Service
 	// Keep preserves the file after popping.
 	Keep bool
-	// Mode determines how to handle conflicts with existing agent memory.
+	// Mode determines how to handle conflicts with the existing working staging area.
 	Mode stagingusecase.StashMode
 }
 
@@ -84,11 +83,11 @@ func stashPopFlags() []cli.Flag {
 		},
 		&cli.BoolFlag{
 			Name:  "merge",
-			Usage: "Merge with existing agent memory (default)",
+			Usage: "Merge with the existing working staging area (default)",
 		},
 		&cli.BoolFlag{
 			Name:  "overwrite",
-			Usage: "Overwrite agent memory",
+			Usage: "Overwrite the working staging area",
 		},
 		&cli.BoolFlag{
 			Name:  "passphrase-stdin",
@@ -143,9 +142,9 @@ func (c *StashPopModeChooser) ChooseMode(input StashPopModeInput) (StashPopModeR
 	}
 
 	// No explicit flag - check if we need to prompt
-	// Only prompt if agent has changes and TTY available
+	// Only prompt if the working area has changes and TTY available
 	if input.HasChanges && input.IsTTY {
-		output.Warning(c.Stderr, "Agent already has %d staged change(s).", input.ItemCount)
+		output.Warning(c.Stderr, "Working staging area already has %d staged change(s).", input.ItemCount)
 
 		choice, err := c.Prompter.ConfirmChoice("How do you want to proceed?", []confirm.Choice{
 			{Label: "Merge", Description: "combine stashed changes with existing"},
@@ -178,67 +177,66 @@ func stashPopAction(service staging.Service) func(context.Context, *cli.Command)
 			return fmt.Errorf("failed to get AWS identity: %w", err)
 		}
 
-		fileStore, err := fileStoreForReading(cmd, identity.AccountID, identity.Region, false)
+		stashStore, err := fileStoreForReading(cmd, identity.AccountID, identity.Region, false)
 		if err != nil {
 			return err
 		}
 
-		agentStore := agent.NewStore(identity.AccountID, identity.Region)
+		working, err := file.NewStore(identity.AccountID, identity.Region)
+		if err != nil {
+			return fmt.Errorf("failed to create staging store: %w", err)
+		}
 
-		err = lifecycle.ExecuteWrite0(ctx, agentStore, lifecycle.CmdStashPop, func() error {
-			// Check if agent has existing changes
-			existingState, err := agentStore.Drain(ctx, service, true) // keep=true to peek
-			if err != nil {
-				return fmt.Errorf("failed to check agent state: %w", err)
-			}
+		// Check if the working staging area has existing changes
+		existingState, err := working.Drain(ctx, service, true) // keep=true to peek
+		if err != nil {
+			return fmt.Errorf("failed to check working staging area: %w", err)
+		}
 
-			// Use mode chooser to determine mode
-			chooser := &StashPopModeChooser{
-				Prompter: &confirm.Prompter{
-					Stdin:     cmd.Root().Reader,
-					Stdout:    cmd.Root().Writer,
-					Stderr:    cmd.Root().ErrWriter,
-					AccountID: identity.AccountID,
-					Region:    identity.Region,
-				},
-				Stderr: cmd.Root().ErrWriter,
-				Stdout: cmd.Root().Writer,
-			}
+		// Use mode chooser to determine mode
+		chooser := &StashPopModeChooser{
+			Prompter: &confirm.Prompter{
+				Stdin:     cmd.Root().Reader,
+				Stdout:    cmd.Root().Writer,
+				Stderr:    cmd.Root().ErrWriter,
+				AccountID: identity.AccountID,
+				Region:    identity.Region,
+			},
+			Stderr: cmd.Root().ErrWriter,
+			Stdout: cmd.Root().Writer,
+		}
 
-			result, err := chooser.ChooseMode(StashPopModeInput{
-				MergeFlag:     cmd.Bool("merge"),
-				OverwriteFlag: cmd.Bool("overwrite"),
-				HasChanges:    !existingState.IsEmpty(),
-				ItemCount:     existingState.TotalCount(),
-				IsTTY:         terminal.IsTerminalWriter(cmd.Root().ErrWriter),
-			})
-			if err != nil {
-				return err
-			}
-
-			if result.Cancelled {
-				output.Info(cmd.Root().Writer, "Operation cancelled.")
-
-				return nil
-			}
-
-			r := &StashPopRunner{
-				UseCase: &stagingusecase.StashPopUseCase{
-					FileStore:  fileStore,
-					AgentStore: agentStore,
-				},
-				Stdout: cmd.Root().Writer,
-				Stderr: cmd.Root().ErrWriter,
-			}
-
-			return r.Run(ctx, StashPopOptions{
-				Service: service,
-				Keep:    cmd.Bool("keep"),
-				Mode:    result.Mode,
-			})
+		result, err := chooser.ChooseMode(StashPopModeInput{
+			MergeFlag:     cmd.Bool("merge"),
+			OverwriteFlag: cmd.Bool("overwrite"),
+			HasChanges:    !existingState.IsEmpty(),
+			ItemCount:     existingState.TotalCount(),
+			IsTTY:         terminal.IsTerminalWriter(cmd.Root().ErrWriter),
 		})
+		if err != nil {
+			return err
+		}
 
-		return err
+		if result.Cancelled {
+			output.Info(cmd.Root().Writer, "Operation cancelled.")
+
+			return nil
+		}
+
+		r := &StashPopRunner{
+			UseCase: &stagingusecase.StashPopUseCase{
+				Stash:   stashStore,
+				Working: working,
+			},
+			Stdout: cmd.Root().Writer,
+			Stderr: cmd.Root().ErrWriter,
+		}
+
+		return r.Run(ctx, StashPopOptions{
+			Service: service,
+			Keep:    cmd.Bool("keep"),
+			Mode:    result.Mode,
+		})
 	}
 }
 
@@ -246,20 +244,21 @@ func stashPopAction(service staging.Service) func(context.Context, *cli.Command)
 func newGlobalStashPopCommand() *cli.Command {
 	return &cli.Command{
 		Name:  "pop",
-		Usage: "Restore staged changes from file into memory",
-		Description: `Restore staged changes from file into the in-memory agent.
+		Usage: "Restore staged changes from the stash file into the working staging area",
+		Description: `Restore staged changes from the stash file into the working staging area.
 
-This command loads the staging state from the persistent file storage
-(~/.suve/{accountID}/{region}/stage.json) into the agent daemon.
+This command loads the staging state from the stash file
+(~/.suve/{accountID}/{region}/stash.json) into the working staging area
+(~/.suve/{accountID}/{region}/stage.json).
 
-By default, the file is deleted after restoring.
-Use --keep to retain the file after popping (same as 'stash apply').
+By default, the stash file is deleted after restoring.
+Use --keep to retain the stash file after popping (same as 'stash apply').
 
 EXAMPLES:
-   suve stage stash pop                            Restore from file and delete file
-   suve stage stash pop --keep                     Restore from file and keep file
-   suve stage stash pop --merge                    Merge with existing agent memory
-   suve stage stash pop --overwrite                Overwrite agent memory
+   suve stage stash pop                            Restore from stash and delete the stash file
+   suve stage stash pop --keep                     Restore from stash and keep the stash file
+   suve stage stash pop --merge                    Merge with the existing working staging area
+   suve stage stash pop --overwrite                Overwrite the working staging area
    echo "secret" | suve stage stash pop --passphrase-stdin   Decrypt with passphrase from stdin`,
 		Flags:                  stashPopFlags(),
 		MutuallyExclusiveFlags: stashPopMutuallyExclusiveFlags(),
@@ -274,20 +273,21 @@ func newStashPopCommand(cfg CommandConfig) *cli.Command {
 
 	return &cli.Command{
 		Name:  "pop",
-		Usage: fmt.Sprintf("Restore staged %s changes from file into memory", cfg.ItemName),
-		Description: fmt.Sprintf(`Restore staged %s changes from file into the in-memory agent.
+		Usage: fmt.Sprintf("Restore staged %s changes from the stash file into the working staging area", cfg.ItemName),
+		Description: fmt.Sprintf(`Restore staged %s changes from the stash file into the working staging area.
 
-This command loads the staging state for %ss from the persistent file storage
-(~/.suve/{accountID}/{region}/stage.json) into the agent daemon.
+This command loads the staging state for %ss from the stash file
+(~/.suve/{accountID}/{region}/stash.json) into the working staging area
+(~/.suve/{accountID}/{region}/stage.json).
 
-By default, the %s entries are removed from the file after restoring.
-Use --keep to retain them in the file.
+By default, the %s entries are removed from the stash file after restoring.
+Use --keep to retain them in the stash file.
 
 EXAMPLES:
-   suve stage %s stash pop                            Restore from file
-   suve stage %s stash pop --keep                     Restore from file and keep in file
-   suve stage %s stash pop --merge                    Merge with existing agent memory
-   suve stage %s stash pop --overwrite                Overwrite agent memory
+   suve stage %s stash pop                            Restore from stash
+   suve stage %s stash pop --keep                     Restore from stash and keep in the stash file
+   suve stage %s stash pop --merge                    Merge with the existing working staging area
+   suve stage %s stash pop --overwrite                Overwrite the working staging area
    echo "secret" | suve stage %s stash pop --passphrase-stdin   Decrypt with passphrase from stdin`,
 			cfg.ItemName,
 			cfg.ItemName,

@@ -83,17 +83,8 @@ func (u *ResetUseCase) unstageAll(ctx context.Context, serviceName, itemName str
 	serviceStagedTags := stagedTags[service]
 	totalCount := len(serviceStaged) + len(serviceStagedTags)
 
-	// Always call UnstageAll to trigger daemon auto-shutdown check
-	// even if there's nothing staged for this service
-	// Use hint for context-aware shutdown message
-	if hinted, ok := u.Store.(store.HintedUnstager); ok {
-		if err := hinted.UnstageAllWithHint(ctx, service, store.HintReset); err != nil {
-			return nil, err
-		}
-	} else {
-		if err := u.Store.UnstageAll(ctx, service); err != nil {
-			return nil, err
-		}
+	if err := u.Store.UnstageAll(ctx, service); err != nil {
+		return nil, err
 	}
 
 	if totalCount == 0 {

@@ -17,6 +17,7 @@ import (
 
 const (
 	stateFileName = "stage.json"
+	stashFileName = "stash.json"
 	stateDirName  = ".suve"
 )
 
@@ -37,10 +38,9 @@ type Store struct {
 	passphrase    string
 }
 
-// NewStore creates a new file Store with the default state file path.
-// The state file is stored under ~/.suve/{accountID}/{region}/stage.json
-// to isolate staging state per AWS account and region.
-func NewStore(accountID, region string) (*Store, error) {
+// newStore creates a new file Store using the given file name under
+// ~/.suve/{accountID}/{region}/ to isolate state per AWS account and region.
+func newStore(accountID, region, fileName string) (*Store, error) {
 	homeDir, err := userHomeDirFunc()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get home directory: %w", err)
@@ -49,8 +49,16 @@ func NewStore(accountID, region string) (*Store, error) {
 	stateDir := filepath.Join(homeDir, stateDirName, accountID, region)
 
 	return &Store{
-		stateFilePath: filepath.Join(stateDir, stateFileName),
+		stateFilePath: filepath.Join(stateDir, fileName),
 	}, nil
+}
+
+// NewStore creates a new file Store with the default state file path.
+// The state file is stored under ~/.suve/{accountID}/{region}/stage.json
+// to isolate staging state per AWS account and region.
+// This is the working staging area used by stage add/edit/delete/status/diff/apply/reset.
+func NewStore(accountID, region string) (*Store, error) {
+	return newStore(accountID, region, stateFileName)
 }
 
 // NewStoreWithPath creates a new file Store with a custom state file path.
@@ -62,16 +70,34 @@ func NewStoreWithPath(path string) *Store {
 }
 
 // NewStoreWithPassphrase creates a new file Store with a passphrase for encryption.
-// This is used by drain/persist commands that need StateIO interface.
 func NewStoreWithPassphrase(accountID, region, passphrase string) (*Store, error) {
-	store, err := NewStore(accountID, region)
+	s, err := NewStore(accountID, region)
 	if err != nil {
 		return nil, err
 	}
 
-	store.passphrase = passphrase
+	s.passphrase = passphrase
 
-	return store, nil
+	return s, nil
+}
+
+// NewStashStore creates a new file Store backed by the stash file.
+// The stash file is stored under ~/.suve/{accountID}/{region}/stash.json
+// and is used by stage stash push/pop/show/drop.
+func NewStashStore(accountID, region string) (*Store, error) {
+	return newStore(accountID, region, stashFileName)
+}
+
+// NewStashStoreWithPassphrase creates a new stash Store with a passphrase for encryption.
+func NewStashStoreWithPassphrase(accountID, region, passphrase string) (*Store, error) {
+	s, err := NewStashStore(accountID, region)
+	if err != nil {
+		return nil, err
+	}
+
+	s.passphrase = passphrase
+
+	return s, nil
 }
 
 // SetPassphrase sets the passphrase for encryption/decryption.
@@ -108,14 +134,10 @@ func (s *Store) IsEncrypted() (bool, error) {
 	return crypt.IsEncrypted(data), nil
 }
 
-// Drain reads the state from file, optionally deleting the file.
-// This implements StateDrainer for file-based storage.
-// If service is empty, returns all services; otherwise filters to the specified service.
-// If keep is false, the file is deleted after reading.
-func (s *Store) Drain(_ context.Context, service staging.Service, keep bool) (*staging.State, error) {
-	fileMu.Lock()
-	defer fileMu.Unlock()
-
+// readStateLocked reads and decrypts the state from the file.
+// The caller must hold fileMu.
+// If the file does not exist, an empty state is returned.
+func (s *Store) readStateLocked() (*staging.State, error) {
 	data, err := os.ReadFile(s.stateFilePath)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -145,33 +167,13 @@ func (s *Store) Drain(_ context.Context, service staging.Service, keep bool) (*s
 	// Initialize maps if nil
 	initializeStateMaps(&state)
 
-	// Delete file if keep is false
-	if !keep {
-		if err := os.Remove(s.stateFilePath); err != nil && !os.IsNotExist(err) {
-			return nil, fmt.Errorf("failed to remove state file: %w", err)
-		}
-	}
-
-	// Filter by service if specified
-	if service != "" {
-		return state.ExtractService(service), nil
-	}
-
 	return &state, nil
 }
 
-// WriteState saves the state to file.
-// This implements StateWriter for file-based storage.
-// If service is empty, writes all services; otherwise writes only the specified service.
-func (s *Store) WriteState(_ context.Context, service staging.Service, state *staging.State) error {
-	fileMu.Lock()
-	defer fileMu.Unlock()
-
-	// Filter by service if specified
-	if service != "" {
-		state = state.ExtractService(service)
-	}
-
+// writeStateLocked writes the state to the file.
+// The caller must hold fileMu.
+// If the state is empty, the file is removed instead.
+func (s *Store) writeStateLocked(state *staging.State) error {
 	// Ensure directory exists
 	dir := filepath.Dir(s.stateFilePath)
 	if err := os.MkdirAll(dir, 0o700); err != nil { //nolint:mnd // owner-only directory permissions
@@ -206,6 +208,223 @@ func (s *Store) WriteState(_ context.Context, service staging.Service, state *st
 	}
 
 	return nil
+}
+
+// Drain reads the state from file, optionally deleting the file.
+// This implements StateDrainer for file-based storage.
+// If service is empty, returns all services; otherwise filters to the specified service.
+// If keep is false, the file is deleted after reading.
+func (s *Store) Drain(_ context.Context, service staging.Service, keep bool) (*staging.State, error) {
+	fileMu.Lock()
+	defer fileMu.Unlock()
+
+	state, err := s.readStateLocked()
+	if err != nil {
+		return nil, err
+	}
+
+	// Delete file if keep is false
+	if !keep {
+		if err := os.Remove(s.stateFilePath); err != nil && !os.IsNotExist(err) {
+			return nil, fmt.Errorf("failed to remove state file: %w", err)
+		}
+	}
+
+	// Filter by service if specified
+	if service != "" {
+		return state.ExtractService(service), nil
+	}
+
+	return state, nil
+}
+
+// WriteState saves the state to file.
+// This implements StateWriter for file-based storage.
+// If service is empty, writes all services; otherwise writes only the specified service.
+func (s *Store) WriteState(_ context.Context, service staging.Service, state *staging.State) error {
+	fileMu.Lock()
+	defer fileMu.Unlock()
+
+	// Filter by service if specified
+	if service != "" {
+		state = state.ExtractService(service)
+	}
+
+	return s.writeStateLocked(state)
+}
+
+// GetEntry retrieves a staged entry.
+func (s *Store) GetEntry(_ context.Context, service staging.Service, name string) (*staging.Entry, error) {
+	fileMu.Lock()
+	defer fileMu.Unlock()
+
+	state, err := s.readStateLocked()
+	if err != nil {
+		return nil, err
+	}
+
+	if entry, ok := state.Entries[service][name]; ok {
+		return &entry, nil
+	}
+
+	return nil, staging.ErrNotStaged
+}
+
+// GetTag retrieves staged tag changes.
+func (s *Store) GetTag(_ context.Context, service staging.Service, name string) (*staging.TagEntry, error) {
+	fileMu.Lock()
+	defer fileMu.Unlock()
+
+	state, err := s.readStateLocked()
+	if err != nil {
+		return nil, err
+	}
+
+	if tag, ok := state.Tags[service][name]; ok {
+		return &tag, nil
+	}
+
+	return nil, staging.ErrNotStaged
+}
+
+// ListEntries returns all staged entries for a service.
+// If service is empty, returns entries for all services.
+// Empty service maps are omitted from the result.
+func (s *Store) ListEntries(_ context.Context, service staging.Service) (map[staging.Service]map[string]staging.Entry, error) {
+	fileMu.Lock()
+	defer fileMu.Unlock()
+
+	state, err := s.readStateLocked()
+	if err != nil {
+		return nil, err
+	}
+
+	result := make(map[staging.Service]map[string]staging.Entry)
+
+	for _, svc := range servicesFor(service) {
+		if len(state.Entries[svc]) > 0 {
+			result[svc] = state.Entries[svc]
+		}
+	}
+
+	return result, nil
+}
+
+// ListTags returns all staged tag changes for a service.
+// If service is empty, returns tags for all services.
+// Empty service maps are omitted from the result.
+func (s *Store) ListTags(_ context.Context, service staging.Service) (map[staging.Service]map[string]staging.TagEntry, error) {
+	fileMu.Lock()
+	defer fileMu.Unlock()
+
+	state, err := s.readStateLocked()
+	if err != nil {
+		return nil, err
+	}
+
+	result := make(map[staging.Service]map[string]staging.TagEntry)
+
+	for _, svc := range servicesFor(service) {
+		if len(state.Tags[svc]) > 0 {
+			result[svc] = state.Tags[svc]
+		}
+	}
+
+	return result, nil
+}
+
+// StageEntry adds or updates a staged entry.
+func (s *Store) StageEntry(_ context.Context, service staging.Service, name string, entry staging.Entry) error {
+	fileMu.Lock()
+	defer fileMu.Unlock()
+
+	state, err := s.readStateLocked()
+	if err != nil {
+		return err
+	}
+
+	state.Entries[service][name] = entry
+
+	return s.writeStateLocked(state)
+}
+
+// StageTag adds or updates staged tag changes.
+func (s *Store) StageTag(_ context.Context, service staging.Service, name string, tagEntry staging.TagEntry) error {
+	fileMu.Lock()
+	defer fileMu.Unlock()
+
+	state, err := s.readStateLocked()
+	if err != nil {
+		return err
+	}
+
+	state.Tags[service][name] = tagEntry
+
+	return s.writeStateLocked(state)
+}
+
+// UnstageEntry removes a staged entry.
+func (s *Store) UnstageEntry(_ context.Context, service staging.Service, name string) error {
+	fileMu.Lock()
+	defer fileMu.Unlock()
+
+	state, err := s.readStateLocked()
+	if err != nil {
+		return err
+	}
+
+	if _, ok := state.Entries[service][name]; !ok {
+		return staging.ErrNotStaged
+	}
+
+	delete(state.Entries[service], name)
+
+	return s.writeStateLocked(state)
+}
+
+// UnstageTag removes staged tag changes.
+func (s *Store) UnstageTag(_ context.Context, service staging.Service, name string) error {
+	fileMu.Lock()
+	defer fileMu.Unlock()
+
+	state, err := s.readStateLocked()
+	if err != nil {
+		return err
+	}
+
+	if _, ok := state.Tags[service][name]; !ok {
+		return staging.ErrNotStaged
+	}
+
+	delete(state.Tags[service], name)
+
+	return s.writeStateLocked(state)
+}
+
+// UnstageAll removes all staged changes for a service.
+// If service is empty, all services are cleared.
+func (s *Store) UnstageAll(_ context.Context, service staging.Service) error {
+	fileMu.Lock()
+	defer fileMu.Unlock()
+
+	state, err := s.readStateLocked()
+	if err != nil {
+		return err
+	}
+
+	state.RemoveService(service)
+
+	return s.writeStateLocked(state)
+}
+
+// servicesFor returns the services to operate on for the given service filter.
+// An empty filter expands to all services.
+func servicesFor(service staging.Service) []staging.Service {
+	if service == "" {
+		return []staging.Service{staging.ServiceParam, staging.ServiceSecret}
+	}
+
+	return []staging.Service{service}
 }
 
 // initializeStateMaps ensures all nested maps are initialized.
@@ -248,5 +467,8 @@ func (s *Store) Delete() error {
 	return nil
 }
 
-// Compile-time check that Store implements FileStore.
-var _ store.FileStore = (*Store)(nil)
+// Compile-time checks that Store implements the storage interfaces.
+var (
+	_ store.FileStore         = (*Store)(nil)
+	_ store.ReadWriteOperator = (*Store)(nil)
+)
