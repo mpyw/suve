@@ -10,6 +10,7 @@ import (
 
 	"github.com/mpyw/suve/internal/cli/commands/internal"
 	"github.com/mpyw/suve/internal/cli/output"
+	awsparam "github.com/mpyw/suve/internal/provider/aws/param"
 	"github.com/mpyw/suve/internal/usecase/param"
 )
 
@@ -56,7 +57,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	}
 
 	r := &Runner{
-		UseCase: &param.TagUseCase{Client: client},
+		UseCase: &param.TagUseCase{Tagger: awsparam.New(client)},
 		Stdout:  cmd.Root().Writer,
 	}
 

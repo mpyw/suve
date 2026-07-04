@@ -5,114 +5,77 @@ import (
 	"testing"
 	"time"
 
-	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/mpyw/suve/internal/api/paramapi"
+	"github.com/mpyw/suve/internal/domain"
+	"github.com/mpyw/suve/internal/provider"
+	"github.com/mpyw/suve/internal/provider/providermock"
 	"github.com/mpyw/suve/internal/usecase/param"
 	"github.com/mpyw/suve/internal/version/paramversion"
 )
-
-type mockShowClient struct {
-	getParameterResult *paramapi.GetParameterOutput
-	getParameterErr    error
-	getHistoryResult   *paramapi.GetParameterHistoryOutput
-	getHistoryErr      error
-	listTagsResult     *paramapi.ListTagsForResourceOutput
-	listTagsErr        error
-}
-
-//nolint:lll // mock function signature must match AWS SDK interface
-func (m *mockShowClient) GetParameter(_ context.Context, _ *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
-	if m.getParameterErr != nil {
-		return nil, m.getParameterErr
-	}
-
-	return m.getParameterResult, nil
-}
-
-//nolint:lll // mock function signature must match AWS SDK interface
-func (m *mockShowClient) GetParameterHistory(_ context.Context, _ *paramapi.GetParameterHistoryInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
-	if m.getHistoryErr != nil {
-		return nil, m.getHistoryErr
-	}
-
-	if m.getHistoryResult == nil {
-		return &paramapi.GetParameterHistoryOutput{}, nil
-	}
-
-	return m.getHistoryResult, nil
-}
-
-//nolint:lll // mock function signature must match AWS SDK interface
-func (m *mockShowClient) ListTagsForResource(_ context.Context, _ *paramapi.ListTagsForResourceInput, _ ...func(*paramapi.Options)) (*paramapi.ListTagsForResourceOutput, error) {
-	if m.listTagsErr != nil {
-		return nil, m.listTagsErr
-	}
-
-	if m.listTagsResult != nil {
-		return m.listTagsResult, nil
-	}
-
-	return &paramapi.ListTagsForResourceOutput{}, nil
-}
 
 func TestShowUseCase_Execute(t *testing.T) {
 	t.Parallel()
 
 	now := time.Now()
-	client := &mockShowClient{
-		getParameterResult: &paramapi.GetParameterOutput{
-			Parameter: &paramapi.Parameter{
-				Name:             lo.ToPtr("/app/config"),
-				Value:            lo.ToPtr("secret-value"),
-				Version:          5,
-				Type:             paramapi.ParameterTypeSecureString,
-				LastModifiedDate: &now,
-			},
+	store := &providermock.Store{
+		ResolveFunc: func(_ context.Context, name, spec string) (provider.VersionRef, error) {
+			assert.Equal(t, "/app/config", name)
+			assert.Empty(t, spec) // latest: no suffix
+
+			return provider.VersionRef{}, nil
+		},
+		GetFunc: func(_ context.Context, _ string, _ provider.VersionRef) (*domain.Entry, error) {
+			return &domain.Entry{
+				Name:     "/app/config",
+				Value:    "secret-value",
+				Version:  domain.Version{ID: "5"},
+				Type:     domain.ValueTypeSecret,
+				Modified: &now,
+			}, nil
 		},
 	}
 
-	uc := &param.ShowUseCase{Client: client}
+	uc := &param.ShowUseCase{Reader: store}
 
 	spec, err := paramversion.Parse("/app/config")
 	require.NoError(t, err)
 
-	output, err := uc.Execute(t.Context(), param.ShowInput{
-		Spec: spec,
-	})
+	output, err := uc.Execute(t.Context(), param.ShowInput{Spec: spec})
 	require.NoError(t, err)
 	assert.Equal(t, "/app/config", output.Name)
 	assert.Equal(t, "secret-value", output.Value)
 	assert.Equal(t, int64(5), output.Version)
-	assert.Equal(t, paramapi.ParameterTypeSecureString, output.Type)
+	assert.Equal(t, domain.ValueTypeSecret, output.Type)
 	assert.NotNil(t, output.LastModified)
 }
 
 func TestShowUseCase_Execute_WithVersion(t *testing.T) {
 	t.Parallel()
 
-	// #VERSION spec without shift uses GetParameter (SSM supports name:version format)
-	client := &mockShowClient{
-		getParameterResult: &paramapi.GetParameterOutput{
-			Parameter: &paramapi.Parameter{
-				Name:    lo.ToPtr("/app/config"),
-				Value:   lo.ToPtr("old-value"),
-				Version: 3,
-				Type:    paramapi.ParameterTypeString,
-			},
+	store := &providermock.Store{
+		ResolveFunc: func(_ context.Context, _, spec string) (provider.VersionRef, error) {
+			assert.Equal(t, "#3", spec)
+
+			return provider.NewVersionRef("3"), nil
+		},
+		GetFunc: func(_ context.Context, _ string, _ provider.VersionRef) (*domain.Entry, error) {
+			return &domain.Entry{
+				Name:    "/app/config",
+				Value:   "old-value",
+				Version: domain.Version{ID: "3"},
+				Type:    domain.ValueTypePlaintext,
+			}, nil
 		},
 	}
 
-	uc := &param.ShowUseCase{Client: client}
+	uc := &param.ShowUseCase{Reader: store}
 
 	spec, err := paramversion.Parse("/app/config#3")
 	require.NoError(t, err)
 
-	output, err := uc.Execute(t.Context(), param.ShowInput{
-		Spec: spec,
-	})
+	output, err := uc.Execute(t.Context(), param.ShowInput{Spec: spec})
 	require.NoError(t, err)
 	assert.Equal(t, "/app/config", output.Name)
 	assert.Equal(t, "old-value", output.Value)
@@ -122,71 +85,96 @@ func TestShowUseCase_Execute_WithVersion(t *testing.T) {
 func TestShowUseCase_Execute_WithShift(t *testing.T) {
 	t.Parallel()
 
-	// Spec with shift uses GetParameterHistory
-	client := &mockShowClient{
-		getHistoryResult: &paramapi.GetParameterHistoryOutput{
-			Parameters: []paramapi.ParameterHistory{
-				{Name: lo.ToPtr("/app/config"), Value: lo.ToPtr("v1"), Version: 1, Type: paramapi.ParameterTypeString},
-				{Name: lo.ToPtr("/app/config"), Value: lo.ToPtr("v2"), Version: 2, Type: paramapi.ParameterTypeString},
-				{Name: lo.ToPtr("/app/config"), Value: lo.ToPtr("v3"), Version: 3, Type: paramapi.ParameterTypeString},
-			},
+	store := &providermock.Store{
+		ResolveFunc: func(_ context.Context, _, spec string) (provider.VersionRef, error) {
+			assert.Equal(t, "~1", spec)
+
+			return provider.NewVersionRef("2"), nil
+		},
+		GetFunc: func(_ context.Context, _ string, _ provider.VersionRef) (*domain.Entry, error) {
+			return &domain.Entry{
+				Name:    "/app/config",
+				Value:   "v2",
+				Version: domain.Version{ID: "2"},
+				Type:    domain.ValueTypePlaintext,
+			}, nil
 		},
 	}
 
-	uc := &param.ShowUseCase{Client: client}
+	uc := &param.ShowUseCase{Reader: store}
 
-	spec, err := paramversion.Parse("/app/config~1") // 1 version back from latest
+	spec, err := paramversion.Parse("/app/config~1")
 	require.NoError(t, err)
 
-	output, err := uc.Execute(t.Context(), param.ShowInput{
-		Spec: spec,
-	})
+	output, err := uc.Execute(t.Context(), param.ShowInput{Spec: spec})
 	require.NoError(t, err)
 	assert.Equal(t, "/app/config", output.Name)
-	assert.Equal(t, "v2", output.Value) // v3 - 1 = v2
+	assert.Equal(t, "v2", output.Value)
 	assert.Equal(t, int64(2), output.Version)
 }
 
 func TestShowUseCase_Execute_Error(t *testing.T) {
 	t.Parallel()
 
-	client := &mockShowClient{
-		getParameterErr: errAWS,
+	store := &providermock.Store{
+		ResolveFunc: func(_ context.Context, _, _ string) (provider.VersionRef, error) {
+			return provider.VersionRef{}, nil
+		},
+		GetFunc: func(_ context.Context, _ string, _ provider.VersionRef) (*domain.Entry, error) {
+			return nil, errAWS
+		},
 	}
 
-	uc := &param.ShowUseCase{Client: client}
+	uc := &param.ShowUseCase{Reader: store}
 
 	spec, err := paramversion.Parse("/app/config")
 	require.NoError(t, err)
 
-	_, err = uc.Execute(t.Context(), param.ShowInput{
-		Spec: spec,
-	})
+	_, err = uc.Execute(t.Context(), param.ShowInput{Spec: spec})
+	require.Error(t, err)
+}
+
+func TestShowUseCase_Execute_ResolveError(t *testing.T) {
+	t.Parallel()
+
+	store := &providermock.Store{
+		ResolveFunc: func(_ context.Context, _, _ string) (provider.VersionRef, error) {
+			return provider.VersionRef{}, errAWS
+		},
+	}
+
+	uc := &param.ShowUseCase{Reader: store}
+
+	spec, err := paramversion.Parse("/app/config")
+	require.NoError(t, err)
+
+	_, err = uc.Execute(t.Context(), param.ShowInput{Spec: spec})
 	require.Error(t, err)
 }
 
 func TestShowUseCase_Execute_NoLastModified(t *testing.T) {
 	t.Parallel()
 
-	client := &mockShowClient{
-		getParameterResult: &paramapi.GetParameterOutput{
-			Parameter: &paramapi.Parameter{
-				Name:    lo.ToPtr("/app/config"),
-				Value:   lo.ToPtr("value"),
-				Version: 1,
-				Type:    paramapi.ParameterTypeString,
-			},
+	store := &providermock.Store{
+		ResolveFunc: func(_ context.Context, _, _ string) (provider.VersionRef, error) {
+			return provider.VersionRef{}, nil
+		},
+		GetFunc: func(_ context.Context, _ string, _ provider.VersionRef) (*domain.Entry, error) {
+			return &domain.Entry{
+				Name:    "/app/config",
+				Value:   "value",
+				Version: domain.Version{ID: "1"},
+				Type:    domain.ValueTypePlaintext,
+			}, nil
 		},
 	}
 
-	uc := &param.ShowUseCase{Client: client}
+	uc := &param.ShowUseCase{Reader: store}
 
 	spec, err := paramversion.Parse("/app/config")
 	require.NoError(t, err)
 
-	output, err := uc.Execute(t.Context(), param.ShowInput{
-		Spec: spec,
-	})
+	output, err := uc.Execute(t.Context(), param.ShowInput{Spec: spec})
 	require.NoError(t, err)
 	assert.Nil(t, output.LastModified)
 }
@@ -194,31 +182,30 @@ func TestShowUseCase_Execute_NoLastModified(t *testing.T) {
 func TestShowUseCase_Execute_WithTags(t *testing.T) {
 	t.Parallel()
 
-	client := &mockShowClient{
-		getParameterResult: &paramapi.GetParameterOutput{
-			Parameter: &paramapi.Parameter{
-				Name:    lo.ToPtr("/app/config"),
-				Value:   lo.ToPtr("value"),
-				Version: 1,
-				Type:    paramapi.ParameterTypeString,
-			},
+	store := &providermock.Store{
+		ResolveFunc: func(_ context.Context, _, _ string) (provider.VersionRef, error) {
+			return provider.VersionRef{}, nil
 		},
-		listTagsResult: &paramapi.ListTagsForResourceOutput{
-			TagList: []paramapi.Tag{
-				{Key: lo.ToPtr("env"), Value: lo.ToPtr("prod")},
-				{Key: lo.ToPtr("team"), Value: lo.ToPtr("backend")},
-			},
+		GetFunc: func(_ context.Context, _ string, _ provider.VersionRef) (*domain.Entry, error) {
+			return &domain.Entry{
+				Name:    "/app/config",
+				Value:   "value",
+				Version: domain.Version{ID: "1"},
+				Type:    domain.ValueTypePlaintext,
+				Tags: []domain.Tag{
+					{Key: "env", Value: "prod"},
+					{Key: "team", Value: "backend"},
+				},
+			}, nil
 		},
 	}
 
-	uc := &param.ShowUseCase{Client: client}
+	uc := &param.ShowUseCase{Reader: store}
 
 	spec, err := paramversion.Parse("/app/config")
 	require.NoError(t, err)
 
-	output, err := uc.Execute(t.Context(), param.ShowInput{
-		Spec: spec,
-	})
+	output, err := uc.Execute(t.Context(), param.ShowInput{Spec: spec})
 	require.NoError(t, err)
 	assert.Len(t, output.Tags, 2)
 	assert.Equal(t, "env", output.Tags[0].Key)

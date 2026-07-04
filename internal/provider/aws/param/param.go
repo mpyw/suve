@@ -6,6 +6,7 @@ package param
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"slices"
 	"strconv"
@@ -122,6 +123,11 @@ func (s *Store) Get(ctx context.Context, name string, ref provider.VersionRef) (
 		WithDecryption: aws.Bool(true),
 	})
 	if err != nil {
+		var notFound *types.ParameterNotFound
+		if errors.As(err, &notFound) {
+			return nil, fmt.Errorf("%w: %s", provider.ErrNotFound, name)
+		}
+
 		return nil, fmt.Errorf("failed to get parameter: %w", err)
 	}
 
@@ -203,7 +209,36 @@ func (s *Store) List(ctx context.Context) ([]string, error) {
 	return names, nil
 }
 
-// Put creates or updates a parameter and returns the resulting version.
+// Create creates a new parameter (Overwrite=false) and returns the resulting
+// version. It returns a wrapped provider.ErrAlreadyExists if the parameter
+// already exists.
+func (s *Store) Create(
+	ctx context.Context, name, value string, valueType domain.ValueType, description string,
+) (domain.Version, error) {
+	input := &ssm.PutParameterInput{
+		Name:      aws.String(name),
+		Value:     aws.String(value),
+		Type:      mapDomainToType(valueType),
+		Overwrite: aws.Bool(false),
+	}
+	if description != "" {
+		input.Description = aws.String(description)
+	}
+
+	out, err := s.client.PutParameter(ctx, input)
+	if err != nil {
+		var exists *types.ParameterAlreadyExists
+		if errors.As(err, &exists) {
+			return domain.Version{}, fmt.Errorf("%w: %s", provider.ErrAlreadyExists, name)
+		}
+
+		return domain.Version{}, fmt.Errorf("failed to create parameter: %w", err)
+	}
+
+	return domain.Version{ID: strconv.FormatInt(out.Version, 10)}, nil
+}
+
+// Put creates or updates a parameter (Overwrite=true) and returns the resulting version.
 func (s *Store) Put(
 	ctx context.Context, name, value string, valueType domain.ValueType, description string,
 ) (domain.Version, error) {

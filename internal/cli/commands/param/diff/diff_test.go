@@ -4,22 +4,22 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"strings"
 	"testing"
-	"time"
 
 	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/mpyw/suve/internal/api/paramapi"
 	appcli "github.com/mpyw/suve/internal/cli/commands"
 	paramdiff "github.com/mpyw/suve/internal/cli/commands/param/diff"
 	"github.com/mpyw/suve/internal/cli/diffargs"
+	"github.com/mpyw/suve/internal/domain"
+	"github.com/mpyw/suve/internal/provider"
+	"github.com/mpyw/suve/internal/provider/providermock"
 	"github.com/mpyw/suve/internal/usecase/param"
 	"github.com/mpyw/suve/internal/version/paramversion"
 )
-
-const testParamVersion1 = "/app/param:1"
 
 func TestCommand_Validation(t *testing.T) {
 	t.Parallel()
@@ -377,76 +377,45 @@ func assertSpec(t *testing.T, label string, got *paramversion.Spec, want *wantSp
 	assert.Equal(t, want.shift, got.Shift, "%s.Shift", label)
 }
 
-//nolint:lll // mock struct fields match AWS SDK interface signatures
-type mockClient struct {
-	getParameterFunc        func(ctx context.Context, params *paramapi.GetParameterInput, optFns ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error)
-	getParameterHistoryFunc func(ctx context.Context, params *paramapi.GetParameterHistoryInput, optFns ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error)
-}
+// diffStore resolves a version-spec suffix ("#N" or "" for latest) to a ref and
+// returns the mapped entry, erroring for unmapped refs (simulating not-found).
+func diffStore(byRef map[string]*domain.Entry) *providermock.Store {
+	return &providermock.Store{
+		ResolveFunc: func(_ context.Context, _, spec string) (provider.VersionRef, error) {
+			return provider.NewVersionRef(strings.TrimPrefix(spec, "#")), nil
+		},
+		GetFunc: func(_ context.Context, _ string, ref provider.VersionRef) (*domain.Entry, error) {
+			entry, ok := byRef[ref.ID()]
+			if !ok {
+				return nil, fmt.Errorf("version not found")
+			}
 
-//nolint:lll // mock function signature must match AWS SDK interface
-func (m *mockClient) GetParameter(ctx context.Context, params *paramapi.GetParameterInput, optFns ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
-	if m.getParameterFunc != nil {
-		return m.getParameterFunc(ctx, params, optFns...)
+			return entry, nil
+		},
 	}
-
-	return nil, fmt.Errorf("GetParameter not mocked")
 }
 
-//nolint:lll // mock function signature must match AWS SDK interface
-func (m *mockClient) GetParameterHistory(ctx context.Context, params *paramapi.GetParameterHistoryInput, optFns ...func(*paramapi.Options)) (*paramapi.GetParameterHistoryOutput, error) {
-	if m.getParameterHistoryFunc != nil {
-		return m.getParameterHistoryFunc(ctx, params, optFns...)
-	}
-
-	return nil, fmt.Errorf("GetParameterHistory not mocked")
+func versionSpec(v int64) *paramversion.Spec {
+	return &paramversion.Spec{Name: "/app/param", Absolute: paramversion.AbsoluteSpec{Version: lo.ToPtr(v)}}
 }
 
-//nolint:funlen // Table-driven test with many cases
 func TestRun(t *testing.T) {
 	t.Parallel()
-
-	now := time.Now()
 
 	tests := []struct {
 		name    string
 		opts    paramdiff.Options
-		mock    *mockClient
+		store   *providermock.Store
 		wantErr bool
 		check   func(t *testing.T, output string)
 	}{
 		{
 			name: "diff between two versions",
-			opts: paramdiff.Options{
-				Spec1: &paramversion.Spec{Name: "/app/param", Absolute: paramversion.AbsoluteSpec{Version: lo.ToPtr(int64(1))}},
-				Spec2: &paramversion.Spec{Name: "/app/param", Absolute: paramversion.AbsoluteSpec{Version: lo.ToPtr(int64(2))}},
-			},
-			mock: &mockClient{
-				//nolint:lll // inline mock function in test table
-				getParameterFunc: func(_ context.Context, params *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
-					name := lo.FromPtr(params.Name)
-					if name == testParamVersion1 {
-						return &paramapi.GetParameterOutput{
-							Parameter: &paramapi.Parameter{
-								Name:             lo.ToPtr("/app/param"),
-								Value:            lo.ToPtr("old-value"),
-								Version:          1,
-								Type:             paramapi.ParameterTypeString,
-								LastModifiedDate: lo.ToPtr(now.Add(-time.Hour)),
-							},
-						}, nil
-					}
-
-					return &paramapi.GetParameterOutput{
-						Parameter: &paramapi.Parameter{
-							Name:             lo.ToPtr("/app/param"),
-							Value:            lo.ToPtr("new-value"),
-							Version:          2,
-							Type:             paramapi.ParameterTypeString,
-							LastModifiedDate: &now,
-						},
-					}, nil
-				},
-			},
+			opts: paramdiff.Options{Spec1: versionSpec(1), Spec2: versionSpec(2)},
+			store: diffStore(map[string]*domain.Entry{
+				"1": {Name: "/app/param", Value: "old-value", Version: domain.Version{ID: "1"}},
+				"2": {Name: "/app/param", Value: "new-value", Version: domain.Version{ID: "2"}},
+			}),
 			check: func(t *testing.T, output string) {
 				t.Helper()
 				assert.Contains(t, output, "-old-value")
@@ -455,108 +424,39 @@ func TestRun(t *testing.T) {
 		},
 		{
 			name: "no diff when same content",
-			opts: paramdiff.Options{
-				Spec1: &paramversion.Spec{Name: "/app/param", Absolute: paramversion.AbsoluteSpec{Version: lo.ToPtr(int64(1))}},
-				Spec2: &paramversion.Spec{Name: "/app/param", Absolute: paramversion.AbsoluteSpec{Version: lo.ToPtr(int64(2))}},
-			},
-			mock: &mockClient{
-				getParameterFunc: func(_ context.Context, _ *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
-					return &paramapi.GetParameterOutput{
-						Parameter: &paramapi.Parameter{
-							Name:    lo.ToPtr("/app/param"),
-							Value:   lo.ToPtr("same-value"),
-							Version: 1,
-							Type:    paramapi.ParameterTypeString,
-						},
-					}, nil
-				},
-			},
+			opts: paramdiff.Options{Spec1: versionSpec(1), Spec2: versionSpec(2)},
+			store: diffStore(map[string]*domain.Entry{
+				"1": {Name: "/app/param", Value: "same-value", Version: domain.Version{ID: "1"}},
+				"2": {Name: "/app/param", Value: "same-value", Version: domain.Version{ID: "2"}},
+			}),
 			check: func(t *testing.T, output string) {
 				t.Helper()
-				// No diff lines expected for identical content
 				assert.NotContains(t, output, "-same-value")
 			},
 		},
 		{
 			name: "error getting first version",
-			opts: paramdiff.Options{
-				Spec1: &paramversion.Spec{Name: "/app/param", Absolute: paramversion.AbsoluteSpec{Version: lo.ToPtr(int64(1))}},
-				Spec2: &paramversion.Spec{Name: "/app/param", Absolute: paramversion.AbsoluteSpec{Version: lo.ToPtr(int64(2))}},
-			},
-			mock: &mockClient{
-				//nolint:lll // inline mock function in test table
-				getParameterFunc: func(_ context.Context, params *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
-					if lo.FromPtr(params.Name) == testParamVersion1 {
-						return nil, fmt.Errorf("version not found")
-					}
-
-					return &paramapi.GetParameterOutput{
-						Parameter: &paramapi.Parameter{
-							Name:    lo.ToPtr("/app/param"),
-							Value:   lo.ToPtr("value"),
-							Version: 2,
-						},
-					}, nil
-				},
-			},
+			opts: paramdiff.Options{Spec1: versionSpec(1), Spec2: versionSpec(2)},
+			store: diffStore(map[string]*domain.Entry{
+				"2": {Name: "/app/param", Value: "value", Version: domain.Version{ID: "2"}},
+			}),
 			wantErr: true,
 		},
 		{
 			name: "error getting second version",
-			opts: paramdiff.Options{
-				Spec1: &paramversion.Spec{Name: "/app/param", Absolute: paramversion.AbsoluteSpec{Version: lo.ToPtr(int64(1))}},
-				Spec2: &paramversion.Spec{Name: "/app/param", Absolute: paramversion.AbsoluteSpec{Version: lo.ToPtr(int64(2))}},
-			},
-			mock: &mockClient{
-				//nolint:lll // inline mock function in test table
-				getParameterFunc: func(_ context.Context, params *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
-					if lo.FromPtr(params.Name) == "/app/param:2" {
-						return nil, fmt.Errorf("version not found")
-					}
-
-					return &paramapi.GetParameterOutput{
-						Parameter: &paramapi.Parameter{
-							Name:    lo.ToPtr("/app/param"),
-							Value:   lo.ToPtr("value"),
-							Version: 1,
-						},
-					}, nil
-				},
-			},
+			opts: paramdiff.Options{Spec1: versionSpec(1), Spec2: versionSpec(2)},
+			store: diffStore(map[string]*domain.Entry{
+				"1": {Name: "/app/param", Value: "value", Version: domain.Version{ID: "1"}},
+			}),
 			wantErr: true,
 		},
 		{
 			name: "json format with valid JSON values",
-			opts: paramdiff.Options{
-				Spec1:     &paramversion.Spec{Name: "/app/param", Absolute: paramversion.AbsoluteSpec{Version: lo.ToPtr(int64(1))}},
-				Spec2:     &paramversion.Spec{Name: "/app/param", Absolute: paramversion.AbsoluteSpec{Version: lo.ToPtr(int64(2))}},
-				ParseJSON: true,
-			},
-			mock: &mockClient{
-				//nolint:lll // mock function signature
-				getParameterFunc: func(_ context.Context, params *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
-					name := lo.FromPtr(params.Name)
-					if name == testParamVersion1 {
-						return &paramapi.GetParameterOutput{
-							Parameter: &paramapi.Parameter{
-								Name:    lo.ToPtr("/app/param"),
-								Value:   lo.ToPtr(`{"key":"old"}`),
-								Version: 1,
-								Type:    paramapi.ParameterTypeString,
-							},
-						}, nil
-					}
-
-					return &paramapi.GetParameterOutput{
-						Parameter: &paramapi.Parameter{
-							Name:    lo.ToPtr("/app/param"),
-							Value:   lo.ToPtr(`{"key":"new"}`),
-							Version: 2,
-							Type:    paramapi.ParameterTypeString,
-						},
-					}, nil
-				},
-			},
+			opts: paramdiff.Options{Spec1: versionSpec(1), Spec2: versionSpec(2), ParseJSON: true},
+			store: diffStore(map[string]*domain.Entry{
+				"1": {Name: "/app/param", Value: `{"key":"old"}`, Version: domain.Version{ID: "1"}},
+				"2": {Name: "/app/param", Value: `{"key":"new"}`, Version: domain.Version{ID: "2"}},
+			}),
 			check: func(t *testing.T, output string) {
 				t.Helper()
 				assert.Contains(t, output, "-")
@@ -565,36 +465,11 @@ func TestRun(t *testing.T) {
 		},
 		{
 			name: "json format with non-JSON values warns",
-			opts: paramdiff.Options{
-				Spec1:     &paramversion.Spec{Name: "/app/param", Absolute: paramversion.AbsoluteSpec{Version: lo.ToPtr(int64(1))}},
-				Spec2:     &paramversion.Spec{Name: "/app/param", Absolute: paramversion.AbsoluteSpec{Version: lo.ToPtr(int64(2))}},
-				ParseJSON: true,
-			},
-			mock: &mockClient{
-				//nolint:lll // mock function signature
-				getParameterFunc: func(_ context.Context, params *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
-					name := lo.FromPtr(params.Name)
-					if name == testParamVersion1 {
-						return &paramapi.GetParameterOutput{
-							Parameter: &paramapi.Parameter{
-								Name:    lo.ToPtr("/app/param"),
-								Value:   lo.ToPtr("not json"),
-								Version: 1,
-								Type:    paramapi.ParameterTypeString,
-							},
-						}, nil
-					}
-
-					return &paramapi.GetParameterOutput{
-						Parameter: &paramapi.Parameter{
-							Name:    lo.ToPtr("/app/param"),
-							Value:   lo.ToPtr("also not json"),
-							Version: 2,
-							Type:    paramapi.ParameterTypeString,
-						},
-					}, nil
-				},
-			},
+			opts: paramdiff.Options{Spec1: versionSpec(1), Spec2: versionSpec(2), ParseJSON: true},
+			store: diffStore(map[string]*domain.Entry{
+				"1": {Name: "/app/param", Value: "not json", Version: domain.Version{ID: "1"}},
+				"2": {Name: "/app/param", Value: "also not json", Version: domain.Version{ID: "2"}},
+			}),
 			check: func(t *testing.T, output string) {
 				t.Helper()
 				assert.Contains(t, output, "-not json")
@@ -610,7 +485,7 @@ func TestRun(t *testing.T) {
 			var buf, errBuf bytes.Buffer
 
 			r := &paramdiff.Runner{
-				UseCase: &param.DiffUseCase{Client: tt.mock},
+				UseCase: &param.DiffUseCase{Reader: tt.store},
 				Stdout:  &buf,
 				Stderr:  &errBuf,
 			}
@@ -634,23 +509,14 @@ func TestRun(t *testing.T) {
 func TestRun_IdenticalWarning(t *testing.T) {
 	t.Parallel()
 
-	mock := &mockClient{
-		getParameterFunc: func(_ context.Context, _ *paramapi.GetParameterInput, _ ...func(*paramapi.Options)) (*paramapi.GetParameterOutput, error) {
-			return &paramapi.GetParameterOutput{
-				Parameter: &paramapi.Parameter{
-					Name:    lo.ToPtr("/app/param"),
-					Value:   lo.ToPtr("same-value"),
-					Version: 1,
-					Type:    paramapi.ParameterTypeString,
-				},
-			}, nil
-		},
-	}
+	store := diffStore(map[string]*domain.Entry{
+		"": {Name: "/app/param", Value: "same-value", Version: domain.Version{ID: "1"}},
+	})
 
 	var stdout, stderr bytes.Buffer
 
 	r := &paramdiff.Runner{
-		UseCase: &param.DiffUseCase{Client: mock},
+		UseCase: &param.DiffUseCase{Reader: store},
 		Stdout:  &stdout,
 		Stderr:  &stderr,
 	}

@@ -3,17 +3,10 @@ package param
 import (
 	"context"
 
-	"github.com/samber/lo"
-
-	"github.com/mpyw/suve/internal/api/paramapi"
+	"github.com/mpyw/suve/internal/domain"
+	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/version/paramversion"
 )
-
-// DiffClient is the interface for the diff use case.
-type DiffClient interface {
-	paramapi.GetParameterAPI
-	paramapi.GetParameterHistoryAPI
-}
 
 // DiffInput holds input for the diff use case.
 type DiffInput struct {
@@ -33,27 +26,37 @@ type DiffOutput struct {
 
 // DiffUseCase executes diff operations.
 type DiffUseCase struct {
-	Client DiffClient
+	Reader provider.Reader
 }
 
 // Execute runs the diff use case.
 func (u *DiffUseCase) Execute(ctx context.Context, input DiffInput) (*DiffOutput, error) {
-	param1, err := paramversion.GetParameterWithVersion(ctx, u.Client, input.Spec1)
+	entry1, err := u.resolveAndGet(ctx, input.Spec1)
 	if err != nil {
 		return nil, err
 	}
 
-	param2, err := paramversion.GetParameterWithVersion(ctx, u.Client, input.Spec2)
+	entry2, err := u.resolveAndGet(ctx, input.Spec2)
 	if err != nil {
 		return nil, err
 	}
 
 	return &DiffOutput{
-		OldName:    lo.FromPtr(param1.Name),
-		OldVersion: param1.Version,
-		OldValue:   lo.FromPtr(param1.Value),
-		NewName:    lo.FromPtr(param2.Name),
-		NewVersion: param2.Version,
-		NewValue:   lo.FromPtr(param2.Value),
+		OldName:    entry1.Name,
+		OldVersion: parseVersion(entry1.Version.ID),
+		OldValue:   entry1.Value,
+		NewName:    entry2.Name,
+		NewVersion: parseVersion(entry2.Version.ID),
+		NewValue:   entry2.Value,
 	}, nil
+}
+
+// resolveAndGet resolves a spec to a version ref and fetches the entry.
+func (u *DiffUseCase) resolveAndGet(ctx context.Context, spec *paramversion.Spec) (*domain.Entry, error) {
+	ref, err := u.Reader.Resolve(ctx, spec.Name, specSuffix(spec))
+	if err != nil {
+		return nil, err
+	}
+
+	return u.Reader.Get(ctx, spec.Name, ref)
 }

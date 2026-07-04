@@ -5,22 +5,15 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/samber/lo"
-
-	"github.com/mpyw/suve/internal/api/paramapi"
+	"github.com/mpyw/suve/internal/domain"
+	"github.com/mpyw/suve/internal/provider"
 )
-
-// UpdateClient is the interface for the update use case.
-type UpdateClient interface {
-	paramapi.GetParameterAPI
-	paramapi.PutParameterAPI
-}
 
 // UpdateInput holds input for the update use case.
 type UpdateInput struct {
 	Name        string
 	Value       string
-	Type        paramapi.ParameterType
+	Type        domain.ValueType
 	Description string
 }
 
@@ -32,57 +25,29 @@ type UpdateOutput struct {
 
 // UpdateUseCase executes update operations.
 type UpdateUseCase struct {
-	Client UpdateClient
+	Store provider.Store
 }
 
-// Exists checks if a parameter exists.
-func (u *UpdateUseCase) Exists(ctx context.Context, name string) (bool, error) {
-	_, err := u.Client.GetParameter(ctx, &paramapi.GetParameterInput{
-		Name: lo.ToPtr(name),
-	})
-	if err != nil {
-		pnf := (*paramapi.ParameterNotFound)(nil)
-		if errors.As(err, &pnf) {
-			return false, nil
-		}
-
-		return false, err
-	}
-
-	return true, nil
-}
-
-// Execute runs the update use case.
-// It updates an existing parameter. If the parameter doesn't exist, returns an error.
+// Execute runs the update use case. It updates an existing parameter; if the
+// parameter doesn't exist it returns ErrParameterNotFound. A read failure other
+// than not-found is propagated unchanged (never treated as "does not exist").
 func (u *UpdateUseCase) Execute(ctx context.Context, input UpdateInput) (*UpdateOutput, error) {
-	// Check if parameter exists
-	exists, err := u.Exists(ctx, input.Name)
-	if err != nil {
+	_, err := u.Store.Get(ctx, input.Name, provider.VersionRef{})
+
+	switch {
+	case errors.Is(err, provider.ErrNotFound):
+		return nil, fmt.Errorf("%w: %s", ErrParameterNotFound, input.Name)
+	case err != nil:
 		return nil, err
 	}
 
-	if !exists {
-		return nil, fmt.Errorf("%w: %s", ErrParameterNotFound, input.Name)
-	}
-
-	// Update parameter
-	putInput := &paramapi.PutParameterInput{
-		Name:      lo.ToPtr(input.Name),
-		Value:     lo.ToPtr(input.Value),
-		Type:      input.Type,
-		Overwrite: lo.ToPtr(true),
-	}
-	if input.Description != "" {
-		putInput.Description = lo.ToPtr(input.Description)
-	}
-
-	putOutput, err := u.Client.PutParameter(ctx, putInput)
+	version, err := u.Store.Put(ctx, input.Name, input.Value, input.Type, input.Description)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update parameter: %w", err)
 	}
 
 	return &UpdateOutput{
 		Name:    input.Name,
-		Version: putOutput.Version,
+		Version: parseVersion(version.ID),
 	}, nil
 }

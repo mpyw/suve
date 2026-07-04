@@ -393,3 +393,65 @@ func TestTagAndUntag(t *testing.T) {
 	require.NotNil(t, untagIn)
 	assert.Equal(t, []string{"env"}, untagIn.TagKeys)
 }
+
+func TestCreate_NewReturnsVersion(t *testing.T) {
+	t.Parallel()
+
+	var createIn *secretsmanager.CreateSecretInput
+
+	store := secret.New(&mockClient{
+		create: func(in *secretsmanager.CreateSecretInput) (*secretsmanager.CreateSecretOutput, error) {
+			createIn = in
+
+			return &secretsmanager.CreateSecretOutput{VersionId: aws.String("new-id")}, nil
+		},
+	})
+
+	v, err := store.Create(t.Context(), "my-secret", "val", domain.ValueTypeSecret, "desc")
+	require.NoError(t, err)
+	assert.Equal(t, "new-id", v.ID)
+	require.NotNil(t, createIn)
+	assert.Equal(t, "desc", aws.ToString(createIn.Description))
+}
+
+func TestCreate_AlreadyExistsMapsSentinel(t *testing.T) {
+	t.Parallel()
+
+	store := secret.New(&mockClient{
+		create: func(*secretsmanager.CreateSecretInput) (*secretsmanager.CreateSecretOutput, error) {
+			return nil, &types.ResourceExistsException{Message: aws.String("exists")}
+		},
+	})
+
+	_, err := store.Create(t.Context(), "my-secret", "val", domain.ValueTypeSecret, "")
+	require.Error(t, err)
+	assert.ErrorIs(t, err, provider.ErrAlreadyExists)
+}
+
+func TestGet_NotFoundMapsSentinel(t *testing.T) {
+	t.Parallel()
+
+	store := secret.New(&mockClient{
+		getValue: func(*secretsmanager.GetSecretValueInput) (*secretsmanager.GetSecretValueOutput, error) {
+			return nil, &types.ResourceNotFoundException{Message: aws.String("nope")}
+		},
+	})
+
+	_, err := store.Get(t.Context(), "my-secret", provider.VersionRef{})
+	require.Error(t, err)
+	assert.ErrorIs(t, err, provider.ErrNotFound)
+}
+
+func TestDescribe_NotFoundMapsSentinel(t *testing.T) {
+	t.Parallel()
+
+	store := secret.New(&mockClient{
+		describe: func(*secretsmanager.DescribeSecretInput) (*secretsmanager.DescribeSecretOutput, error) {
+			return nil, &types.ResourceNotFoundException{Message: aws.String("nope")}
+		},
+	})
+
+	_, err := store.Describe(t.Context(), "my-secret")
+	require.Error(t, err)
+	assert.ErrorIs(t, err, provider.ErrNotFound)
+}

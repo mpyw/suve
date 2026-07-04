@@ -4,41 +4,34 @@ import (
 	"context"
 	"testing"
 
-	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/mpyw/suve/internal/api/paramapi"
+	"github.com/mpyw/suve/internal/domain"
+	"github.com/mpyw/suve/internal/provider"
+	"github.com/mpyw/suve/internal/provider/providermock"
 	"github.com/mpyw/suve/internal/usecase/param"
 )
-
-type mockCreateClient struct {
-	putParameterResult *paramapi.PutParameterOutput
-	putParameterErr    error
-}
-
-//nolint:lll // mock function signature must match AWS SDK interface
-func (m *mockCreateClient) PutParameter(_ context.Context, _ *paramapi.PutParameterInput, _ ...func(*paramapi.Options)) (*paramapi.PutParameterOutput, error) {
-	if m.putParameterErr != nil {
-		return nil, m.putParameterErr
-	}
-
-	return m.putParameterResult, nil
-}
 
 func TestCreateUseCase_Execute(t *testing.T) {
 	t.Parallel()
 
-	client := &mockCreateClient{
-		putParameterResult: &paramapi.PutParameterOutput{Version: 1},
+	store := &providermock.Store{
+		CreateFunc: func(_ context.Context, name, value string, vt domain.ValueType, _ string) (domain.Version, error) {
+			assert.Equal(t, "/app/new", name)
+			assert.Equal(t, "new-value", value)
+			assert.Equal(t, domain.ValueTypePlaintext, vt)
+
+			return domain.Version{ID: "1"}, nil
+		},
 	}
 
-	uc := &param.CreateUseCase{Client: client}
+	uc := &param.CreateUseCase{Writer: store}
 
 	output, err := uc.Execute(t.Context(), param.CreateInput{
 		Name:  "/app/new",
 		Value: "new-value",
-		Type:  paramapi.ParameterTypeString,
+		Type:  domain.ValueTypePlaintext,
 	})
 	require.NoError(t, err)
 	assert.Equal(t, "/app/new", output.Name)
@@ -48,16 +41,20 @@ func TestCreateUseCase_Execute(t *testing.T) {
 func TestCreateUseCase_Execute_WithDescription(t *testing.T) {
 	t.Parallel()
 
-	client := &mockCreateClient{
-		putParameterResult: &paramapi.PutParameterOutput{Version: 1},
+	store := &providermock.Store{
+		CreateFunc: func(_ context.Context, _, _ string, _ domain.ValueType, description string) (domain.Version, error) {
+			assert.Equal(t, "my description", description)
+
+			return domain.Version{ID: "1"}, nil
+		},
 	}
 
-	uc := &param.CreateUseCase{Client: client}
+	uc := &param.CreateUseCase{Writer: store}
 
 	output, err := uc.Execute(t.Context(), param.CreateInput{
 		Name:        "/app/new",
 		Value:       "new-value",
-		Type:        paramapi.ParameterTypeString,
+		Type:        domain.ValueTypePlaintext,
 		Description: "my description",
 	})
 	require.NoError(t, err)
@@ -65,37 +62,45 @@ func TestCreateUseCase_Execute_WithDescription(t *testing.T) {
 	assert.Equal(t, int64(1), output.Version)
 }
 
+// TestCreateUseCase_Execute_AlreadyExists verifies the create-only behavior:
+// when the provider reports the entry already exists, create surfaces the error
+// (and never overwrites).
 func TestCreateUseCase_Execute_AlreadyExists(t *testing.T) {
 	t.Parallel()
 
-	client := &mockCreateClient{
-		putParameterErr: &paramapi.ParameterAlreadyExists{Message: lo.ToPtr("already exists")},
+	store := &providermock.Store{
+		CreateFunc: func(_ context.Context, _, _ string, _ domain.ValueType, _ string) (domain.Version, error) {
+			return domain.Version{}, provider.ErrAlreadyExists
+		},
 	}
 
-	uc := &param.CreateUseCase{Client: client}
+	uc := &param.CreateUseCase{Writer: store}
 
 	_, err := uc.Execute(t.Context(), param.CreateInput{
 		Name:  "/app/existing",
 		Value: "value",
-		Type:  paramapi.ParameterTypeString,
+		Type:  domain.ValueTypePlaintext,
 	})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to create parameter")
+	require.ErrorIs(t, err, provider.ErrAlreadyExists)
 }
 
-func TestCreateUseCase_Execute_PutError(t *testing.T) {
+func TestCreateUseCase_Execute_CreateError(t *testing.T) {
 	t.Parallel()
 
-	client := &mockCreateClient{
-		putParameterErr: errAWS,
+	store := &providermock.Store{
+		CreateFunc: func(_ context.Context, _, _ string, _ domain.ValueType, _ string) (domain.Version, error) {
+			return domain.Version{}, errPutFailed
+		},
 	}
 
-	uc := &param.CreateUseCase{Client: client}
+	uc := &param.CreateUseCase{Writer: store}
 
 	_, err := uc.Execute(t.Context(), param.CreateInput{
 		Name:  "/app/config",
 		Value: "value",
-		Type:  paramapi.ParameterTypeString,
+		Type:  domain.ValueTypePlaintext,
 	})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to create parameter")
