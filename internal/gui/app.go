@@ -10,6 +10,7 @@ import (
 	"github.com/mpyw/suve/internal/api/paramapi"
 	"github.com/mpyw/suve/internal/api/secretapi"
 	"github.com/mpyw/suve/internal/infra"
+	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/staging"
 	"github.com/mpyw/suve/internal/staging/store"
 	"github.com/mpyw/suve/internal/staging/store/file"
@@ -126,7 +127,7 @@ func (a *App) getStagingStore() (store.ReadWriteOperator, error) {
 		return nil, err
 	}
 
-	s, err := file.NewWorkingStore(identity.AccountID, identity.Region)
+	s, err := file.NewWorkingStore(provider.AWSScope(identity.AccountID, identity.Region))
 	if err != nil {
 		return nil, err
 	}

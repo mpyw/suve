@@ -13,6 +13,7 @@ import (
 	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/cli/terminal"
 	"github.com/mpyw/suve/internal/infra"
+	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/staging"
 	"github.com/mpyw/suve/internal/staging/store/file"
 )
@@ -120,7 +121,7 @@ func globalStashDropAction() func(context.Context, *cli.Command) error {
 			return fmt.Errorf("failed to get AWS identity: %w", err)
 		}
 
-		fileStore, err := file.NewStashStore(identity.AccountID, identity.Region)
+		fileStore, err := file.NewStashStore(provider.AWSScope(identity.AccountID, identity.Region))
 		if err != nil {
 			return fmt.Errorf("failed to create stash store: %w", err)
 		}

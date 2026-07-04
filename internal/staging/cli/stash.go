@@ -8,6 +8,7 @@ import (
 
 	"github.com/mpyw/suve/internal/cli/passphrase"
 	"github.com/mpyw/suve/internal/cli/terminal"
+	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/staging/store/file"
 )
 
@@ -88,7 +89,7 @@ EXAMPLES:
 // It handles passphrase prompting if the file is encrypted.
 // If checkExists is true, returns an error if the file doesn't exist.
 func fileStoreForReading(cmd *cli.Command, accountID, region string, checkExists bool) (*file.Store, error) {
-	basicFileStore, err := file.NewStashStore(accountID, region)
+	basicFileStore, err := file.NewStashStore(provider.AWSScope(accountID, region))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create stash store: %w", err)
 	}
@@ -134,5 +135,5 @@ func fileStoreForReading(cmd *cli.Command, accountID, region string, checkExists
 		}
 	}
 
-	return file.NewStashStoreWithPassphrase(accountID, region, pass)
+	return file.NewStashStoreWithPassphrase(provider.AWSScope(accountID, region), pass)
 }

@@ -13,6 +13,7 @@ import (
 	"github.com/mpyw/suve/internal/cli/passphrase"
 	"github.com/mpyw/suve/internal/cli/terminal"
 	"github.com/mpyw/suve/internal/infra"
+	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/staging"
 	"github.com/mpyw/suve/internal/staging/store/file"
 	usestaging "github.com/mpyw/suve/internal/usecase/staging"
@@ -124,13 +125,13 @@ func stashPushAction(service staging.Service) func(context.Context, *cli.Command
 		}
 
 		// Working staging area is the source of the push.
-		working, err := file.NewWorkingStore(identity.AccountID, identity.Region)
+		working, err := file.NewWorkingStore(provider.AWSScope(identity.AccountID, identity.Region))
 		if err != nil {
 			return fmt.Errorf("failed to create staging store: %w", err)
 		}
 
 		// Stash file is the destination of the push.
-		basicStashStore, err := file.NewStashStore(identity.AccountID, identity.Region)
+		basicStashStore, err := file.NewStashStore(provider.AWSScope(identity.AccountID, identity.Region))
 		if err != nil {
 			return fmt.Errorf("failed to create stash store: %w", err)
 		}
@@ -228,7 +229,7 @@ func stashPushAction(service staging.Service) func(context.Context, *cli.Command
 			// pass remains empty = plain text
 		}
 
-		stashStore, err := file.NewStashStoreWithPassphrase(identity.AccountID, identity.Region, pass)
+		stashStore, err := file.NewStashStoreWithPassphrase(provider.AWSScope(identity.AccountID, identity.Region), pass)
 		if err != nil {
 			return fmt.Errorf("failed to create stash store: %w", err)
 		}

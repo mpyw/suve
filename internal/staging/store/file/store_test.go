@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/staging"
 	"github.com/mpyw/suve/internal/staging/store/file"
 	"github.com/mpyw/suve/internal/staging/store/file/internal/crypt"
@@ -17,7 +18,7 @@ import (
 func TestNewStore(t *testing.T) {
 	t.Parallel()
 
-	store, err := file.NewStore("123456789012", "ap-northeast-1")
+	store, err := file.NewStore(provider.AWSScope("123456789012", "ap-northeast-1"))
 	require.NoError(t, err)
 	assert.NotNil(t, store)
 }
@@ -77,7 +78,7 @@ func TestStore_Exists(t *testing.T) {
 func TestNewStoreWithPassphrase(t *testing.T) {
 	t.Parallel()
 
-	store, err := file.NewStoreWithPassphrase("123456789012", "ap-northeast-1", "secret")
+	store, err := file.NewStoreWithPassphrase(provider.AWSScope("123456789012", "ap-northeast-1"), "secret")
 	require.NoError(t, err)
 	assert.NotNil(t, store)
 }
