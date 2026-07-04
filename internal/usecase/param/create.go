@@ -14,6 +14,9 @@ type CreateInput struct {
 	Value       string
 	Type        domain.ValueType
 	Description string
+	// Options carries provider-specific write options (e.g. AWS param Tier,
+	// DataType). They are passed through to the provider unchanged.
+	Options []provider.WriteOption
 }
 
 // CreateOutput holds the result of the create use case.
@@ -31,7 +34,7 @@ type CreateUseCase struct {
 // provider; if the parameter already exists the provider returns a wrapped
 // provider.ErrAlreadyExists and no overwrite occurs.
 func (u *CreateUseCase) Execute(ctx context.Context, input CreateInput) (*CreateOutput, error) {
-	version, err := u.Writer.Create(ctx, input.Name, input.Value, input.Type, input.Description)
+	version, err := u.Writer.Create(ctx, input.Name, input.Value, input.Type, input.Description, input.Options...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create parameter: %w", err)
 	}

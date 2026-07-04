@@ -278,6 +278,64 @@ func TestPut_MapsTypeAndReturnsVersion(t *testing.T) {
 	assert.Equal(t, "desc", aws.ToString(got.Description))
 }
 
+func TestCreate_AppliesWriteOptions(t *testing.T) {
+	t.Parallel()
+
+	var got *ssm.PutParameterInput
+
+	store := param.New(&mockClient{
+		putParameter: func(in *ssm.PutParameterInput) (*ssm.PutParameterOutput, error) {
+			got = in
+
+			return &ssm.PutParameterOutput{Version: 1}, nil
+		},
+	})
+
+	_, err := store.Create(t.Context(), "/my/param", "v", domain.ValueTypePlaintext, "",
+		param.Tier{Value: "Advanced"},
+		param.DataType{Value: "aws:ec2:image"},
+		param.AllowedPattern{Value: "^ami-"},
+		param.Policies{JSON: `[{"Type":"Expiration"}]`},
+	)
+	require.NoError(t, err)
+	require.NotNil(t, got)
+	assert.Equal(t, types.ParameterTierAdvanced, got.Tier)
+	assert.Equal(t, "aws:ec2:image", aws.ToString(got.DataType))
+	assert.Equal(t, "^ami-", aws.ToString(got.AllowedPattern))
+	assert.JSONEq(t, `[{"Type":"Expiration"}]`, aws.ToString(got.Policies))
+}
+
+func TestPut_AppliesWriteOptionsAndIgnoresUnknown(t *testing.T) {
+	t.Parallel()
+
+	var got *ssm.PutParameterInput
+
+	store := param.New(&mockClient{
+		putParameter: func(in *ssm.PutParameterInput) (*ssm.PutParameterOutput, error) {
+			got = in
+
+			return &ssm.PutParameterOutput{Version: 2}, nil
+		},
+	})
+
+	// unknownOption is not one this adapter understands; it must be ignored.
+	_, err := store.Put(t.Context(), "/my/param", "v", domain.ValueTypePlaintext, "",
+		param.Tier{Value: "Intelligent-Tiering"},
+		unknownOption{},
+	)
+	require.NoError(t, err)
+	require.NotNil(t, got)
+	assert.Equal(t, types.ParameterTierIntelligentTiering, got.Tier)
+	// Options that were not provided stay unset.
+	assert.Nil(t, got.DataType)
+	assert.Nil(t, got.AllowedPattern)
+	assert.Nil(t, got.Policies)
+}
+
+// unknownOption is a WriteOption the param adapter does not recognize; it
+// exercises the "ignore unknown options" branch of the pass-through contract.
+type unknownOption struct{ provider.WriteOptionMarker }
+
 func TestDelete(t *testing.T) {
 	t.Parallel()
 

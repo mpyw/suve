@@ -68,7 +68,7 @@ func TestDeleteUseCase_Execute(t *testing.T) {
 	t.Parallel()
 
 	store := &providermock.Store{
-		DeleteFunc: func(_ context.Context, name string) error {
+		DeleteFunc: func(_ context.Context, name string, _ ...provider.DeleteOption) error {
 			assert.Equal(t, "/app/to-delete", name)
 
 			return nil
@@ -86,7 +86,7 @@ func TestDeleteUseCase_Execute_Error(t *testing.T) {
 	t.Parallel()
 
 	store := &providermock.Store{
-		DeleteFunc: func(_ context.Context, _ string) error {
+		DeleteFunc: func(_ context.Context, _ string, _ ...provider.DeleteOption) error {
 			return errDeleteFailed
 		},
 	}

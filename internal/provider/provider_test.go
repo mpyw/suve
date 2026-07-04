@@ -34,3 +34,21 @@ func TestNewVersionRef_EmptyIDIsLatest(t *testing.T) {
 	assert.True(t, ref.IsLatest())
 	assert.Empty(t, ref.ID())
 }
+
+// sampleWriteOption / sampleDeleteOption prove the marker interfaces are
+// satisfiable from outside the provider package by embedding the markers.
+type sampleWriteOption struct{ provider.WriteOptionMarker }
+
+type sampleDeleteOption struct{ provider.DeleteOptionMarker }
+
+func TestOptionMarkers_SatisfyInterfaces(t *testing.T) {
+	t.Parallel()
+
+	var (
+		w provider.WriteOption  = sampleWriteOption{}
+		d provider.DeleteOption = sampleDeleteOption{}
+	)
+
+	assert.NotNil(t, w)
+	assert.NotNil(t, d)
+}

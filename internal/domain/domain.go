@@ -35,6 +35,19 @@ type Version struct {
 // Tag is a single key/value label attached to an entry.
 type Tag struct{ Key, Value string }
 
+// Field is a neutral, display-only piece of provider metadata surfaced on a
+// read Entry (e.g. an AWS Secrets Manager ARN). It carries a human-facing Label
+// and a pre-formatted string Value only: it is deliberately provider-neutral in
+// SHAPE (no AWS types, no any) so the usecase/CLI layers can render it without
+// knowing which provider produced it. Providers populate Entry.Extra; consumers
+// display it verbatim and never interpret it.
+type Field struct {
+	// Label is the human-facing field name (e.g. "ARN").
+	Label string
+	// Value is the pre-formatted display value.
+	Value string
+}
+
 // TagChange describes staged tag mutations (add/update + remove-by-key).
 type TagChange struct {
 	// Add holds tags to create or update, keyed by tag key.
@@ -60,4 +73,9 @@ type Entry struct {
 	Tags []Tag
 	// Modified is the last-modified time, if known.
 	Modified *time.Time
+	// Extra holds provider-populated, display-only metadata (e.g. an AWS
+	// Secrets Manager ARN). Its SHAPE is provider-neutral: a list of neutral
+	// Field values, never AWS types or an untyped any. Providers may leave it
+	// empty when they have no extra metadata to surface.
+	Extra []Field
 }
