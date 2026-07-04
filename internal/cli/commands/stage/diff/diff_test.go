@@ -22,6 +22,13 @@ import (
 )
 
 type mockParamClient struct {
+	// Embedded to satisfy the full staging.ParamClient interface. These are
+	// never called by the diff command; only the explicit methods below run.
+	paramapi.PutParameterAPI
+	paramapi.DeleteParameterAPI
+	paramapi.AddTagsToResourceAPI
+	paramapi.RemoveTagsFromResourceAPI
+
 	getParameterFunc func(
 		ctx context.Context,
 		params *paramapi.GetParameterInput,
@@ -76,6 +83,15 @@ func (m *mockParamClient) ListTagsForResource(
 }
 
 type mockSecretClient struct {
+	// Embedded to satisfy the full staging.SecretClient interface. These are
+	// never called by the diff command; only the explicit methods below run.
+	secretapi.CreateSecretAPI
+	secretapi.PutSecretValueAPI
+	secretapi.DeleteSecretAPI
+	secretapi.UpdateSecretAPI
+	secretapi.TagResourceAPI
+	secretapi.UntagResourceAPI
+
 	getSecretValueFunc func(
 		ctx context.Context,
 		params *secretapi.GetSecretValueInput,
@@ -204,10 +220,10 @@ func TestRun_ParamOnly(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 
 	r := &stagediff.Runner{
-		ParamClient: paramMock,
-		Store:       store,
-		Stdout:      &stdout,
-		Stderr:      &stderr,
+		ParamStrategy: staging.NewParamStrategy(paramMock),
+		Store:         store,
+		Stdout:        &stdout,
+		Stderr:        &stderr,
 	}
 
 	err = r.Run(t.Context(), stagediff.Options{})
@@ -247,10 +263,10 @@ func TestRun_SecretOnly(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 
 	r := &stagediff.Runner{
-		SecretClient: secretMock,
-		Store:        store,
-		Stdout:       &stdout,
-		Stderr:       &stderr,
+		SecretStrategy: staging.NewSecretStrategy(secretMock),
+		Store:          store,
+		Stdout:         &stdout,
+		Stderr:         &stderr,
 	}
 
 	err = r.Run(t.Context(), stagediff.Options{})
@@ -307,11 +323,11 @@ func TestRun_BothServices(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 
 	r := &stagediff.Runner{
-		ParamClient:  paramMock,
-		SecretClient: secretMock,
-		Store:        store,
-		Stdout:       &stdout,
-		Stderr:       &stderr,
+		ParamStrategy:  staging.NewParamStrategy(paramMock),
+		SecretStrategy: staging.NewSecretStrategy(secretMock),
+		Store:          store,
+		Stdout:         &stdout,
+		Stderr:         &stderr,
 	}
 
 	err = r.Run(t.Context(), stagediff.Options{})
@@ -370,11 +386,11 @@ func TestRun_DeleteOperations(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 
 	r := &stagediff.Runner{
-		ParamClient:  paramMock,
-		SecretClient: secretMock,
-		Store:        store,
-		Stdout:       &stdout,
-		Stderr:       &stderr,
+		ParamStrategy:  staging.NewParamStrategy(paramMock),
+		SecretStrategy: staging.NewSecretStrategy(secretMock),
+		Store:          store,
+		Stdout:         &stdout,
+		Stderr:         &stderr,
 	}
 
 	err = r.Run(t.Context(), stagediff.Options{})
@@ -413,10 +429,10 @@ func TestRun_IdenticalValues(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 
 	r := &stagediff.Runner{
-		ParamClient: paramMock,
-		Store:       store,
-		Stdout:      &stdout,
-		Stderr:      &stderr,
+		ParamStrategy: staging.NewParamStrategy(paramMock),
+		Store:         store,
+		Stdout:        &stdout,
+		Stderr:        &stderr,
 	}
 
 	err = r.Run(t.Context(), stagediff.Options{})
@@ -457,10 +473,10 @@ func TestRun_ParseJSON(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 
 	r := &stagediff.Runner{
-		ParamClient: paramMock,
-		Store:       store,
-		Stdout:      &stdout,
-		Stderr:      &stderr,
+		ParamStrategy: staging.NewParamStrategy(paramMock),
+		Store:         store,
+		Stdout:        &stdout,
+		Stderr:        &stderr,
 	}
 
 	err = r.Run(t.Context(), stagediff.Options{ParseJSON: true})
@@ -492,10 +508,10 @@ func TestRun_ParamUpdateAutoUnstageWhenDeleted(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 
 	r := &stagediff.Runner{
-		ParamClient: paramMock,
-		Store:       store,
-		Stdout:      &stdout,
-		Stderr:      &stderr,
+		ParamStrategy: staging.NewParamStrategy(paramMock),
+		Store:         store,
+		Stdout:        &stdout,
+		Stderr:        &stderr,
 	}
 
 	err = r.Run(t.Context(), stagediff.Options{})
@@ -531,10 +547,10 @@ func TestRun_SecretUpdateAutoUnstageWhenDeleted(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 
 	r := &stagediff.Runner{
-		SecretClient: secretMock,
-		Store:        store,
-		Stdout:       &stdout,
-		Stderr:       &stderr,
+		SecretStrategy: staging.NewSecretStrategy(secretMock),
+		Store:          store,
+		Stdout:         &stdout,
+		Stderr:         &stderr,
 	}
 
 	err = r.Run(t.Context(), stagediff.Options{})
@@ -574,10 +590,10 @@ func TestRun_SecretIdenticalValues(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 
 	r := &stagediff.Runner{
-		SecretClient: secretMock,
-		Store:        store,
-		Stdout:       &stdout,
-		Stderr:       &stderr,
+		SecretStrategy: staging.NewSecretStrategy(secretMock),
+		Store:          store,
+		Stdout:         &stdout,
+		Stderr:         &stderr,
 	}
 
 	err = r.Run(t.Context(), stagediff.Options{})
@@ -618,10 +634,10 @@ func TestRun_SecretParseJSON(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 
 	r := &stagediff.Runner{
-		SecretClient: secretMock,
-		Store:        store,
-		Stdout:       &stdout,
-		Stderr:       &stderr,
+		SecretStrategy: staging.NewSecretStrategy(secretMock),
+		Store:          store,
+		Stdout:         &stdout,
+		Stderr:         &stderr,
 	}
 
 	err = r.Run(t.Context(), stagediff.Options{ParseJSON: true})
@@ -659,10 +675,10 @@ func TestRun_SecretParseJSONMixed(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 
 	r := &stagediff.Runner{
-		SecretClient: secretMock,
-		Store:        store,
-		Stdout:       &stdout,
-		Stderr:       &stderr,
+		SecretStrategy: staging.NewSecretStrategy(secretMock),
+		Store:          store,
+		Stdout:         &stdout,
+		Stderr:         &stderr,
 	}
 
 	err = r.Run(t.Context(), stagediff.Options{ParseJSON: true})
@@ -698,10 +714,10 @@ func TestRun_ParamCreateOperation(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 
 	r := &stagediff.Runner{
-		ParamClient: paramMock,
-		Store:       store,
-		Stdout:      &stdout,
-		Stderr:      &stderr,
+		ParamStrategy: staging.NewParamStrategy(paramMock),
+		Store:         store,
+		Stdout:        &stdout,
+		Stderr:        &stderr,
 	}
 
 	err = r.Run(t.Context(), stagediff.Options{})
@@ -745,10 +761,10 @@ func TestRun_SecretCreateOperation(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 
 	r := &stagediff.Runner{
-		SecretClient: secretMock,
-		Store:        store,
-		Stdout:       &stdout,
-		Stderr:       &stderr,
+		SecretStrategy: staging.NewSecretStrategy(secretMock),
+		Store:          store,
+		Stdout:         &stdout,
+		Stderr:         &stderr,
 	}
 
 	err = r.Run(t.Context(), stagediff.Options{})
@@ -784,10 +800,10 @@ func TestRun_CreateWithParseJSON(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 
 	r := &stagediff.Runner{
-		ParamClient: paramMock,
-		Store:       store,
-		Stdout:      &stdout,
-		Stderr:      &stderr,
+		ParamStrategy: staging.NewParamStrategy(paramMock),
+		Store:         store,
+		Stdout:        &stdout,
+		Stderr:        &stderr,
 	}
 
 	err = r.Run(t.Context(), stagediff.Options{ParseJSON: true})
@@ -819,10 +835,10 @@ func TestRun_DeleteAutoUnstageWhenAlreadyDeleted(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 
 	r := &stagediff.Runner{
-		ParamClient: paramMock,
-		Store:       store,
-		Stdout:      &stdout,
-		Stderr:      &stderr,
+		ParamStrategy: staging.NewParamStrategy(paramMock),
+		Store:         store,
+		Stdout:        &stdout,
+		Stderr:        &stderr,
 	}
 
 	err = r.Run(t.Context(), stagediff.Options{})
@@ -857,10 +873,10 @@ func TestRun_SecretDeleteAutoUnstageWhenAlreadyDeleted(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 
 	r := &stagediff.Runner{
-		SecretClient: secretMock,
-		Store:        store,
-		Stdout:       &stdout,
-		Stderr:       &stderr,
+		SecretStrategy: staging.NewSecretStrategy(secretMock),
+		Store:          store,
+		Stdout:         &stdout,
+		Stderr:         &stderr,
 	}
 
 	err = r.Run(t.Context(), stagediff.Options{})
@@ -901,10 +917,10 @@ func TestRun_MetadataWithDescription(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 
 	r := &stagediff.Runner{
-		ParamClient: paramMock,
-		Store:       store,
-		Stdout:      &stdout,
-		Stderr:      &stderr,
+		ParamStrategy: staging.NewParamStrategy(paramMock),
+		Store:         store,
+		Stdout:        &stdout,
+		Stderr:        &stderr,
 	}
 
 	err = r.Run(t.Context(), stagediff.Options{})
@@ -947,10 +963,10 @@ func TestRun_MetadataWithTags(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 
 	r := &stagediff.Runner{
-		ParamClient: paramMock,
-		Store:       store,
-		Stdout:      &stdout,
-		Stderr:      &stderr,
+		ParamStrategy: staging.NewParamStrategy(paramMock),
+		Store:         store,
+		Stdout:        &stdout,
+		Stderr:        &stderr,
 	}
 
 	err = r.Run(t.Context(), stagediff.Options{})
@@ -1082,10 +1098,10 @@ func TestRun_SecretCreateWithParseJSON(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 
 	r := &stagediff.Runner{
-		SecretClient: secretMock,
-		Store:        store,
-		Stdout:       &stdout,
-		Stderr:       &stderr,
+		SecretStrategy: staging.NewSecretStrategy(secretMock),
+		Store:          store,
+		Stdout:         &stdout,
+		Stderr:         &stderr,
 	}
 
 	err = r.Run(t.Context(), stagediff.Options{ParseJSON: true})
@@ -1132,10 +1148,10 @@ func TestRun_BothEntriesAndTags(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 
 	r := &stagediff.Runner{
-		ParamClient: paramMock,
-		Store:       store,
-		Stdout:      &stdout,
-		Stderr:      &stderr,
+		ParamStrategy: staging.NewParamStrategy(paramMock),
+		Store:         store,
+		Stdout:        &stdout,
+		Stderr:        &stderr,
 	}
 
 	err = r.Run(t.Context(), stagediff.Options{})
@@ -1181,10 +1197,10 @@ func TestRun_ParamTagDiffWithValues(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 
 	r := &stagediff.Runner{
-		ParamClient: paramMock,
-		Store:       store,
-		Stdout:      &stdout,
-		Stderr:      &stderr,
+		ParamStrategy: staging.NewParamStrategy(paramMock),
+		Store:         store,
+		Stdout:        &stdout,
+		Stderr:        &stderr,
 	}
 
 	err = r.Run(t.Context(), stagediff.Options{})
@@ -1225,10 +1241,10 @@ func TestRun_SecretTagDiffWithValues(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 
 	r := &stagediff.Runner{
-		SecretClient: secretMock,
-		Store:        store,
-		Stdout:       &stdout,
-		Stderr:       &stderr,
+		SecretStrategy: staging.NewSecretStrategy(secretMock),
+		Store:          store,
+		Stdout:         &stdout,
+		Stderr:         &stderr,
 	}
 
 	err = r.Run(t.Context(), stagediff.Options{})
@@ -1264,10 +1280,10 @@ func TestRun_ParamTagDiffAPIError(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 
 	r := &stagediff.Runner{
-		ParamClient: paramMock,
-		Store:       store,
-		Stdout:      &stdout,
-		Stderr:      &stderr,
+		ParamStrategy: staging.NewParamStrategy(paramMock),
+		Store:         store,
+		Stdout:        &stdout,
+		Stderr:        &stderr,
 	}
 
 	err = r.Run(t.Context(), stagediff.Options{})
@@ -1303,10 +1319,10 @@ func TestRun_SecretTagDiffAPIError(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 
 	r := &stagediff.Runner{
-		SecretClient: secretMock,
-		Store:        store,
-		Stdout:       &stdout,
-		Stderr:       &stderr,
+		SecretStrategy: staging.NewSecretStrategy(secretMock),
+		Store:          store,
+		Stdout:         &stdout,
+		Stderr:         &stderr,
 	}
 
 	err = r.Run(t.Context(), stagediff.Options{})
@@ -1347,10 +1363,10 @@ func TestRun_TagDiffWithMissingValue(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 
 	r := &stagediff.Runner{
-		ParamClient: paramMock,
-		Store:       store,
-		Stdout:      &stdout,
-		Stderr:      &stderr,
+		ParamStrategy: staging.NewParamStrategy(paramMock),
+		Store:         store,
+		Stdout:        &stdout,
+		Stderr:        &stderr,
 	}
 
 	err = r.Run(t.Context(), stagediff.Options{})
