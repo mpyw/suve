@@ -16,20 +16,17 @@ import (
 )
 
 // TestNoAWSSDKOutsideProviderAWS enforces that only internal/provider/aws (plus
-// the allowed low-level packages internal/api and internal/infra, which are not
-// under the guarded roots) imports the AWS service SDK. It fails loudly if a
-// package under internal/cli, internal/usecase, or internal/staging reintroduces
+// the allowed low-level package internal/infra, which is not under the guarded
+// roots) imports the AWS service SDK. It fails loudly if a package under
+// internal/cli, internal/usecase, internal/staging, or internal/gui reintroduces
 // a direct SDK dependency, which would break provider pluggability.
-//
-// internal/gui is intentionally NOT guarded: its migration onto the provider
-// seam is tracked separately.
-// TODO(#206): migrate internal/gui onto the provider registry and guard it too.
 func TestNoAWSSDKOutsideProviderAWS(t *testing.T) {
 	t.Parallel()
 
 	// guardedRoots are the internal subtrees (relative to this package dir) that
-	// must not import the AWS SDK, or its paramapi/secretapi aliases, directly.
-	guardedRoots := []string{"cli", "usecase", "staging"}
+	// must not import the AWS SDK, or its (now-removed) paramapi/secretapi
+	// aliases, directly.
+	guardedRoots := []string{"cli", "usecase", "staging", "gui"}
 
 	// forbiddenPrefixes are import paths banned in non-test packages under a
 	// guarded root. SDK service packages are matched by prefix so their

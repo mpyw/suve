@@ -20,6 +20,8 @@ export function ParamSet(arg1:string,arg2:string,arg3:string):Promise<gui.ParamS
 
 export function ParamShow(arg1:string):Promise<gui.ParamShowResult>;
 
+export function ParamTypeOptions():Promise<Array<string>>;
+
 export function SecretAddTag(arg1:string,arg2:string,arg3:string):Promise<void>;
 
 export function SecretCreate(arg1:string,arg2:string):Promise<gui.SecretCreateResult>;

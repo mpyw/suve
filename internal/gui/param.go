@@ -6,8 +6,8 @@ import (
 	"errors"
 
 	"github.com/mpyw/suve/internal/cli/commands/param/paramtype"
+	"github.com/mpyw/suve/internal/domain"
 	"github.com/mpyw/suve/internal/provider"
-	awsparam "github.com/mpyw/suve/internal/provider/aws/param"
 	"github.com/mpyw/suve/internal/usecase/param"
 	"github.com/mpyw/suve/internal/version/paramversion"
 )
@@ -24,9 +24,12 @@ type ParamListResult struct {
 
 // ParamListEntry represents a single parameter in the list.
 type ParamListEntry struct {
-	Name  string  `json:"name"`
-	Type  string  `json:"type"`
-	Value *string `json:"value,omitempty"`
+	Name string `json:"name"`
+	Type string `json:"type"`
+	// Secret reports whether the value is a secret (masked in the UI),
+	// provider-neutrally derived from the domain value type.
+	Secret bool    `json:"secret"`
+	Value  *string `json:"value,omitempty"`
 }
 
 // ParamShowTag represents a tag key-value pair.
@@ -37,10 +40,13 @@ type ParamShowTag struct {
 
 // ParamShowResult represents the result of showing a parameter.
 type ParamShowResult struct {
-	Name         string         `json:"name"`
-	Value        string         `json:"value"`
-	Version      int64          `json:"version"`
-	Type         string         `json:"type"`
+	Name    string `json:"name"`
+	Value   string `json:"value"`
+	Version int64  `json:"version"`
+	Type    string `json:"type"`
+	// Secret reports whether the value is a secret (masked in the UI),
+	// provider-neutrally derived from the domain value type.
+	Secret       bool           `json:"secret"`
 	Description  string         `json:"description,omitempty"`
 	LastModified string         `json:"lastModified,omitempty"`
 	Tags         []ParamShowTag `json:"tags"`
@@ -54,9 +60,12 @@ type ParamLogResult struct {
 
 // ParamLogEntry represents a single version in the history.
 type ParamLogEntry struct {
-	Version      int64  `json:"version"`
-	Value        string `json:"value"`
-	Type         string `json:"type"`
+	Version int64  `json:"version"`
+	Value   string `json:"value"`
+	Type    string `json:"type"`
+	// Secret reports whether the value is a secret (masked in the UI),
+	// provider-neutrally derived from the domain value type.
+	Secret       bool   `json:"secret"`
 	IsCurrent    bool   `json:"isCurrent"`
 	LastModified string `json:"lastModified,omitempty"`
 }
@@ -87,12 +96,12 @@ type ParamDeleteResult struct {
 
 // ParamList lists SSM parameters.
 func (a *App) ParamList(prefix string, recursive bool, withValue bool, filter string, _ int, _ string) (*ParamListResult, error) {
-	client, err := a.getParamClient()
+	store, err := a.paramStore()
 	if err != nil {
 		return nil, err
 	}
 
-	uc := &param.ListUseCase{Reader: awsparam.New(client)}
+	uc := &param.ListUseCase{Reader: store}
 
 	result, err := uc.Execute(a.ctx, param.ListInput{
 		Prefix:    prefix,
@@ -122,12 +131,12 @@ func (a *App) ParamShow(specStr string) (*ParamShowResult, error) {
 		return nil, err
 	}
 
-	client, err := a.getParamClient()
+	store, err := a.paramStore()
 	if err != nil {
 		return nil, err
 	}
 
-	uc := &param.ShowUseCase{Reader: awsparam.New(client)}
+	uc := &param.ShowUseCase{Reader: store}
 
 	result, err := uc.Execute(a.ctx, param.ShowInput{Spec: spec})
 	if err != nil {
@@ -139,6 +148,7 @@ func (a *App) ParamShow(specStr string) (*ParamShowResult, error) {
 		Value:       result.Value,
 		Version:     result.Version,
 		Type:        paramtype.Display(result.Type),
+		Secret:      result.Type == domain.ValueTypeSecret,
 		Description: result.Description,
 		Tags:        make([]ParamShowTag, 0, len(result.Tags)),
 	}
@@ -158,12 +168,12 @@ func (a *App) ParamShow(specStr string) (*ParamShowResult, error) {
 
 // ParamLog shows parameter version history.
 func (a *App) ParamLog(name string, maxResults int32) (*ParamLogResult, error) {
-	client, err := a.getParamClient()
+	store, err := a.paramStore()
 	if err != nil {
 		return nil, err
 	}
 
-	uc := &param.LogUseCase{Reader: awsparam.New(client)}
+	uc := &param.LogUseCase{Reader: store}
 
 	result, err := uc.Execute(a.ctx, param.LogInput{
 		Name:       name,
@@ -179,6 +189,7 @@ func (a *App) ParamLog(name string, maxResults int32) (*ParamLogResult, error) {
 			Version:   e.Version,
 			Value:     e.Value,
 			Type:      paramtype.Display(e.Type),
+			Secret:    e.Type == domain.ValueTypeSecret,
 			IsCurrent: e.IsCurrent,
 		}
 		if e.LastModified != nil {
@@ -203,12 +214,12 @@ func (a *App) ParamDiff(spec1Str, spec2Str string) (*ParamDiffResult, error) {
 		return nil, err
 	}
 
-	client, err := a.getParamClient()
+	store, err := a.paramStore()
 	if err != nil {
 		return nil, err
 	}
 
-	uc := &param.DiffUseCase{Reader: awsparam.New(client)}
+	uc := &param.DiffUseCase{Reader: store}
 
 	result, err := uc.Execute(a.ctx, param.DiffInput{
 		Spec1: spec1,
@@ -229,12 +240,11 @@ func (a *App) ParamDiff(spec1Str, spec2Str string) (*ParamDiffResult, error) {
 // ParamSet creates or updates a parameter.
 // It first tries to create the parameter; if it already exists, it updates instead.
 func (a *App) ParamSet(name, value, paramType string) (*ParamSetResult, error) {
-	client, err := a.getParamClient()
+	store, err := a.paramStore()
 	if err != nil {
 		return nil, err
 	}
 
-	store := awsparam.New(client)
 	valueType := paramtype.Parse(paramType)
 
 	// Try to create first; if the parameter already exists, update it instead.
@@ -277,12 +287,12 @@ func (a *App) ParamSet(name, value, paramType string) (*ParamSetResult, error) {
 
 // ParamDelete deletes a parameter.
 func (a *App) ParamDelete(name string) (*ParamDeleteResult, error) {
-	client, err := a.getParamClient()
+	store, err := a.paramStore()
 	if err != nil {
 		return nil, err
 	}
 
-	uc := &param.DeleteUseCase{Store: awsparam.New(client)}
+	uc := &param.DeleteUseCase{Store: store}
 
 	result, err := uc.Execute(a.ctx, param.DeleteInput{Name: name})
 	if err != nil {
@@ -294,12 +304,12 @@ func (a *App) ParamDelete(name string) (*ParamDeleteResult, error) {
 
 // ParamAddTag adds or updates a tag on a parameter.
 func (a *App) ParamAddTag(name, key, value string) error {
-	client, err := a.getParamClient()
+	store, err := a.paramStore()
 	if err != nil {
 		return err
 	}
 
-	uc := &param.TagUseCase{Tagger: awsparam.New(client)}
+	uc := &param.TagUseCase{Tagger: store}
 
 	return uc.Execute(a.ctx, param.TagInput{
 		Name: name,
@@ -309,15 +319,22 @@ func (a *App) ParamAddTag(name, key, value string) error {
 
 // ParamRemoveTag removes a tag from a parameter.
 func (a *App) ParamRemoveTag(name, key string) error {
-	client, err := a.getParamClient()
+	store, err := a.paramStore()
 	if err != nil {
 		return err
 	}
 
-	uc := &param.TagUseCase{Tagger: awsparam.New(client)}
+	uc := &param.TagUseCase{Tagger: store}
 
 	return uc.Execute(a.ctx, param.TagInput{
 		Name:   name,
 		Remove: []string{key},
 	})
+}
+
+// ParamTypeOptions returns the selectable parameter type display names for the
+// current provider (AWS: "String", "SecureString", "StringList"). The frontend
+// renders its type dropdown from this list instead of hardcoding SSM strings.
+func (a *App) ParamTypeOptions() []string {
+	return paramtype.Options()
 }

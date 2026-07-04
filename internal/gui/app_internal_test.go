@@ -27,9 +27,7 @@ func TestNewApp(t *testing.T) {
 
 	app := NewApp()
 	assert.NotNil(t, app)
-	// Verify fields are nil (lazy initialization)
-	assert.Nil(t, app.paramClient)
-	assert.Nil(t, app.secretClient)
+	// Verify the staging store is nil (lazy initialization).
 	assert.Nil(t, app.stagingStore)
 }
 

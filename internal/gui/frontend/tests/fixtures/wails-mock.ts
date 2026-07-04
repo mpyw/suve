@@ -513,6 +513,7 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
             entries: filtered.slice(startIndex, endIndex).map((p: any) => ({
               name: p.name,
               type: p.type,
+              secret: p.type === 'SecureString',
               value: withValue ? p.value : undefined
             })),
             nextToken: hasMore ? String(endIndex) : '',
@@ -523,6 +524,7 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
           entries: filtered.map((p: any) => ({
             name: p.name,
             type: p.type,
+            secret: p.type === 'SecureString',
             value: withValue ? p.value : undefined
           })),
           nextToken: '',
@@ -533,23 +535,26 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
         const tags = state.paramTags[name] || [];
         const versions = state.paramVersions[name];
         const currentVersion = versions ? versions.find((v: any) => v.isCurrent) : null;
+        const showType = param?.type || 'String';
         return {
           name,
           value: param?.value || 'mock-value',
           version: currentVersion?.version || 1,
-          type: param?.type || 'String',
+          type: showType,
+          secret: showType === 'SecureString',
           description: '',
           lastModified: currentVersion?.lastModified || new Date().toISOString(),
           tags,
         };
       },
+      ParamTypeOptions: async () => ['String', 'SecureString', 'StringList'],
       ParamLog: async (name: string, _limit?: number) => {
         const versions = state.paramVersions[name] || [
           { version: 1, value: 'current', type: 'String', isCurrent: true, lastModified: new Date().toISOString() },
         ];
         return {
           name,
-          entries: versions,
+          entries: versions.map((v: any) => ({ ...v, secret: v.type === 'SecureString' })),
         };
       },
       ParamSet: async (name: string, value: string, _type: string) => {

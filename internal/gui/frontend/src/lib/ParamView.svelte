@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { ParamAddTag, ParamDelete, ParamDiff, ParamList, ParamLog, ParamRemoveTag, ParamSet, ParamShow, StagingAdd, StagingAddTag, StagingCheckStatus, StagingDelete, StagingEdit, StagingRemoveTag } from '../../wailsjs/go/gui/App';
+  import { ParamAddTag, ParamDelete, ParamDiff, ParamList, ParamLog, ParamRemoveTag, ParamSet, ParamShow, ParamTypeOptions, StagingAdd, StagingAddTag, StagingCheckStatus, StagingDelete, StagingEdit, StagingRemoveTag } from '../../wailsjs/go/gui/App';
   import type { gui } from '../../wailsjs/go/models';
   import DiffDisplay from './DiffDisplay.svelte';
   import CloseIcon from './icons/CloseIcon.svelte';
@@ -46,7 +46,10 @@
   let showSetModal = $state(false);
   let showDeleteModal = $state(false);
   let showDiffModal = $state(false);
-  let setForm = $state({ name: '', value: '', type: 'String' });
+  // Parameter type options are provider-driven (fetched from the backend), so
+  // the UI never hardcodes SSM type strings.
+  let paramTypeOptions: string[] = $state([]);
+  let setForm = $state({ name: '', value: '', type: '' });
   let isEditMode = $state(false);
   let deleteTarget = $state('');
   let modalLoading = $state(false);
@@ -207,7 +210,7 @@
       setForm = { name, value: paramDetail.value, type: paramDetail.type };
       isEditMode = true;
     } else {
-      setForm = { name: prefix || '', value: '', type: 'String' };
+      setForm = { name: prefix || '', value: '', type: paramTypeOptions[0] ?? '' };
       isEditMode = false;
     }
     modalError = '';
@@ -362,6 +365,11 @@
   }
 
   onMount(async () => {
+    try {
+      paramTypeOptions = await ParamTypeOptions();
+    } catch {
+      paramTypeOptions = [];
+    }
     await loadParams({ prefix, filter, recursive, withValue });
     initialLoadDone = true;
   });
@@ -467,7 +475,7 @@
             <div class="detail-section">
               <div class="section-header-value">
                 <h4>Current Value</h4>
-                {#if paramDetail.type === 'SecureString'}
+                {#if paramDetail.secret}
                   <button
                     class="btn-toggle"
                     class:active={showValue}
@@ -484,7 +492,7 @@
                   </button>
                 {/if}
               </div>
-              <pre class="value-display" class:masked={paramDetail.type === 'SecureString' && !showValue}>{paramDetail.type === 'SecureString' && !showValue ? maskValue(paramDetail.value) : paramDetail.value}</pre>
+              <pre class="value-display" class:masked={paramDetail.secret && !showValue}>{paramDetail.secret && !showValue ? maskValue(paramDetail.value) : paramDetail.value}</pre>
             </div>
 
             <div class="detail-meta">
@@ -569,7 +577,7 @@
                           {/if}
                           <span class="history-date">{formatDate(logEntry.lastModified)}</span>
                         </div>
-                        <pre class="history-value" class:masked={logEntry.type === 'SecureString' && !showValue}>{logEntry.type === 'SecureString' && !showValue ? maskValue(logEntry.value) : logEntry.value}</pre>
+                        <pre class="history-value" class:masked={logEntry.secret && !showValue}>{logEntry.secret && !showValue ? maskValue(logEntry.value) : logEntry.value}</pre>
                       </div>
                     </li>
                   {/each}
@@ -603,9 +611,9 @@
     <div class="form-group">
       <label for="param-type">Type</label>
       <select id="param-type" class="form-input" bind:value={setForm.type}>
-        <option value="String">String</option>
-        <option value="SecureString">SecureString</option>
-        <option value="StringList">StringList</option>
+        {#each paramTypeOptions as typeOption}
+          <option value={typeOption}>{typeOption}</option>
+        {/each}
       </select>
     </div>
     <div class="form-group">
