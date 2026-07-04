@@ -22,6 +22,7 @@ import (
 	"github.com/urfave/cli/v3"
 
 	"github.com/mpyw/suve/internal/cli/output"
+	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/staging/store/file"
 )
 
@@ -82,7 +83,7 @@ func setupTempHome(t *testing.T) {
 // newStore creates a new staging store for E2E tests.
 // localstack uses account ID "000000000000" and region "us-east-1".
 func newStore() *file.Store {
-	s, err := file.NewStore("000000000000", "us-east-1")
+	s, err := file.NewStore(provider.AWSScope("000000000000", "us-east-1"))
 	if err != nil {
 		panic(err)
 	}
@@ -92,7 +93,7 @@ func newStore() *file.Store {
 
 // newStoreForAccount creates a staging store for a specific account and region.
 func newStoreForAccount(accountID, region string) *file.Store {
-	s, err := file.NewStore(accountID, region)
+	s, err := file.NewStore(provider.AWSScope(accountID, region))
 	if err != nil {
 		panic(err)
 	}

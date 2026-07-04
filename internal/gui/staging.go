@@ -7,6 +7,7 @@ import (
 
 	"github.com/mpyw/suve/internal/infra"
 	"github.com/mpyw/suve/internal/maputil"
+	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/staging"
 	"github.com/mpyw/suve/internal/staging/store/file"
 	stagingusecase "github.com/mpyw/suve/internal/usecase/staging"
@@ -705,7 +706,7 @@ func (a *App) StagingFileStatus() (*StagingFileStatusResult, error) {
 		return nil, err
 	}
 
-	fileStore, err := file.NewStashStore(identity.AccountID, identity.Region)
+	fileStore, err := file.NewStashStore(provider.AWSScope(identity.AccountID, identity.Region))
 	if err != nil {
 		return nil, err
 	}
@@ -740,12 +741,12 @@ func (a *App) StagingDrain(service string, passphrase string, keep bool, mode st
 		return nil, err
 	}
 
-	stashStore, err := file.NewStashStoreWithPassphrase(identity.AccountID, identity.Region, passphrase)
+	stashStore, err := file.NewStashStoreWithPassphrase(provider.AWSScope(identity.AccountID, identity.Region), passphrase)
 	if err != nil {
 		return nil, err
 	}
 
-	working, err := file.NewWorkingStore(identity.AccountID, identity.Region)
+	working, err := file.NewWorkingStore(provider.AWSScope(identity.AccountID, identity.Region))
 	if err != nil {
 		return nil, err
 	}
@@ -793,12 +794,12 @@ func (a *App) StagingPersist(service string, passphrase string, keep bool, mode 
 		return nil, err
 	}
 
-	stashStore, err := file.NewStashStoreWithPassphrase(identity.AccountID, identity.Region, passphrase)
+	stashStore, err := file.NewStashStoreWithPassphrase(provider.AWSScope(identity.AccountID, identity.Region), passphrase)
 	if err != nil {
 		return nil, err
 	}
 
-	working, err := file.NewWorkingStore(identity.AccountID, identity.Region)
+	working, err := file.NewWorkingStore(provider.AWSScope(identity.AccountID, identity.Region))
 	if err != nil {
 		return nil, err
 	}
@@ -849,7 +850,7 @@ func (a *App) StagingDrop() (*StagingDropResult, error) {
 		return nil, err
 	}
 
-	fileStore, err := file.NewStashStore(identity.AccountID, identity.Region)
+	fileStore, err := file.NewStashStore(provider.AWSScope(identity.AccountID, identity.Region))
 	if err != nil {
 		return nil, err
 	}

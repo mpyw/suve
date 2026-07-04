@@ -8,8 +8,14 @@ import (
 // Provider identifies a cloud provider backend.
 type Provider string
 
-// ProviderAWS is the Amazon Web Services provider.
-const ProviderAWS Provider = "aws"
+const (
+	// ProviderAWS is the Amazon Web Services provider.
+	ProviderAWS Provider = "aws"
+	// ProviderGoogleCloud is the Google Cloud Platform provider.
+	ProviderGoogleCloud Provider = "googlecloud"
+	// ProviderAzure is the Microsoft Azure provider.
+	ProviderAzure Provider = "azure"
+)
 
 // Kind selects a store kind within a provider (some providers offer only one).
 type Kind string
@@ -20,18 +26,6 @@ const (
 	// KindSecret selects a secret store (e.g. AWS Secrets Manager).
 	KindSecret Kind = "secret"
 )
-
-// Scope identifies a provider-specific namespace. The full multi-field Scope
-// (and scope-keyed storage) is ported in #200; this is the minimal contract
-// the registry needs.
-type Scope struct {
-	// Provider selects which backend the scope belongs to.
-	Provider Provider
-	// AccountID is the AWS account id (AWS).
-	AccountID string // AWS
-	// Region is the AWS region (AWS).
-	Region string // AWS
-}
 
 // Factory builds a Store for a scope + kind. It returns ErrUnsupportedKind if
 // the provider does not offer that kind (e.g. GCP has no param store).

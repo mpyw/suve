@@ -12,6 +12,7 @@ import (
 	"github.com/mpyw/suve/internal/cli/confirm"
 	"github.com/mpyw/suve/internal/cli/pager"
 	"github.com/mpyw/suve/internal/infra"
+	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/staging"
 	"github.com/mpyw/suve/internal/staging/store/file"
 	stagingusecase "github.com/mpyw/suve/internal/usecase/staging"
@@ -52,7 +53,7 @@ func NewStatusCommand(cfg CommandConfig) *cli.Command {
 				return fmt.Errorf("failed to get AWS identity: %w", err)
 			}
 
-			store, err := file.NewWorkingStore(identity.AccountID, identity.Region)
+			store, err := file.NewWorkingStore(provider.AWSScope(identity.AccountID, identity.Region))
 			if err != nil {
 				return fmt.Errorf("failed to create staging store: %w", err)
 			}
@@ -119,7 +120,7 @@ func NewDiffCommand(cfg CommandConfig) *cli.Command {
 				return fmt.Errorf("failed to get AWS identity: %w", err)
 			}
 
-			store, err := file.NewWorkingStore(identity.AccountID, identity.Region)
+			store, err := file.NewWorkingStore(provider.AWSScope(identity.AccountID, identity.Region))
 			if err != nil {
 				return fmt.Errorf("failed to create staging store: %w", err)
 			}
@@ -181,7 +182,7 @@ func NewAddCommand(cfg CommandConfig) *cli.Command {
 				return fmt.Errorf("failed to get AWS identity: %w", err)
 			}
 
-			store, err := file.NewWorkingStore(identity.AccountID, identity.Region)
+			store, err := file.NewWorkingStore(provider.AWSScope(identity.AccountID, identity.Region))
 			if err != nil {
 				return fmt.Errorf("failed to create staging store: %w", err)
 			}
@@ -239,7 +240,7 @@ func NewEditCommand(cfg CommandConfig) *cli.Command {
 				return fmt.Errorf("failed to get AWS identity: %w", err)
 			}
 
-			store, err := file.NewWorkingStore(identity.AccountID, identity.Region)
+			store, err := file.NewWorkingStore(provider.AWSScope(identity.AccountID, identity.Region))
 			if err != nil {
 				return fmt.Errorf("failed to create staging store: %w", err)
 			}
@@ -291,7 +292,7 @@ func NewApplyCommand(cfg CommandConfig) *cli.Command {
 				return fmt.Errorf("failed to get AWS identity: %w", err)
 			}
 
-			store, err := file.NewWorkingStore(identity.AccountID, identity.Region)
+			store, err := file.NewWorkingStore(provider.AWSScope(identity.AccountID, identity.Region))
 			if err != nil {
 				return fmt.Errorf("failed to create staging store: %w", err)
 			}
@@ -380,7 +381,7 @@ func NewResetCommand(cfg CommandConfig) *cli.Command {
 				return fmt.Errorf("failed to get AWS identity: %w", err)
 			}
 
-			store, err := file.NewWorkingStore(identity.AccountID, identity.Region)
+			store, err := file.NewWorkingStore(provider.AWSScope(identity.AccountID, identity.Region))
 			if err != nil {
 				return fmt.Errorf("failed to create staging store: %w", err)
 			}
@@ -449,7 +450,7 @@ func NewDeleteCommand(cfg CommandConfig) *cli.Command {
 				return fmt.Errorf("failed to get AWS identity: %w", err)
 			}
 
-			store, err := file.NewWorkingStore(identity.AccountID, identity.Region)
+			store, err := file.NewWorkingStore(provider.AWSScope(identity.AccountID, identity.Region))
 			if err != nil {
 				return fmt.Errorf("failed to create staging store: %w", err)
 			}
@@ -505,7 +506,7 @@ func tagAction(cfg CommandConfig, usageMsg string, runner tagCommandRunner) func
 			return fmt.Errorf("failed to get AWS identity: %w", err)
 		}
 
-		store, err := file.NewWorkingStore(identity.AccountID, identity.Region)
+		store, err := file.NewWorkingStore(provider.AWSScope(identity.AccountID, identity.Region))
 		if err != nil {
 			return fmt.Errorf("failed to create staging store: %w", err)
 		}

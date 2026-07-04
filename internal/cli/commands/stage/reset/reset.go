@@ -10,6 +10,7 @@ import (
 
 	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/infra"
+	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/staging"
 	"github.com/mpyw/suve/internal/staging/store"
 	"github.com/mpyw/suve/internal/staging/store/file"
@@ -59,7 +60,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		return fmt.Errorf("failed to get AWS identity: %w", err)
 	}
 
-	store, err := file.NewWorkingStore(identity.AccountID, identity.Region)
+	store, err := file.NewWorkingStore(provider.AWSScope(identity.AccountID, identity.Region))
 	if err != nil {
 		return fmt.Errorf("failed to create staging store: %w", err)
 	}

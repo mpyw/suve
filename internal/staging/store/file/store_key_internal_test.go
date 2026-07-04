@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/staging"
 	"github.com/mpyw/suve/internal/staging/store/file/internal/crypt"
 )
@@ -115,7 +116,7 @@ func TestNewWorkingStore_KeyConfigured(t *testing.T) {
 	key := newTestKey()
 	resolveKeyFunc = func() ([]byte, bool, error) { return key, false, nil }
 
-	s, err := NewWorkingStore("123456789012", "ap-northeast-1")
+	s, err := NewWorkingStore(provider.AWSScope("123456789012", "ap-northeast-1"))
 	require.NoError(t, err)
 	assert.Equal(t, key, s.key)
 	assert.Empty(t, s.passphrase)
@@ -138,7 +139,7 @@ func TestNewWorkingStore_PlaintextFallback(t *testing.T) {
 
 	resolveKeyFunc = func() ([]byte, bool, error) { return nil, true, nil }
 
-	s, err := NewWorkingStore("123456789012", "ap-northeast-1")
+	s, err := NewWorkingStore(provider.AWSScope("123456789012", "ap-northeast-1"))
 	require.NoError(t, err)
 	assert.Nil(t, s.key)
 }
@@ -159,7 +160,7 @@ func TestNewWorkingStore_ResolveError(t *testing.T) {
 
 	resolveKeyFunc = func() ([]byte, bool, error) { return nil, false, errors.New("bad key") }
 
-	s, err := NewWorkingStore("123456789012", "ap-northeast-1")
+	s, err := NewWorkingStore(provider.AWSScope("123456789012", "ap-northeast-1"))
 	require.Error(t, err)
 	assert.Nil(t, s)
 	assert.Contains(t, err.Error(), "failed to resolve staging encryption key")

@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/staging"
 	"github.com/mpyw/suve/internal/staging/store/file/internal/crypt"
 )
@@ -102,7 +103,7 @@ func TestNewStore_UserHomeDirError(t *testing.T) {
 		return "", errors.New("home directory not available")
 	}
 
-	store, err := NewStore("123456789012", "ap-northeast-1")
+	store, err := NewStore(provider.AWSScope("123456789012", "ap-northeast-1"))
 	assert.Nil(t, store)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to get home directory")
@@ -122,7 +123,7 @@ func TestNewStoreWithPassphrase_UserHomeDirError(t *testing.T) {
 		return "", errors.New("home directory not available")
 	}
 
-	store, err := NewStoreWithPassphrase("123456789012", "ap-northeast-1", "secret")
+	store, err := NewStoreWithPassphrase(provider.AWSScope("123456789012", "ap-northeast-1"), "secret")
 	assert.Nil(t, store)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to get home directory")
