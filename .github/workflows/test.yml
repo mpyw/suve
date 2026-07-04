@@ -126,6 +126,7 @@ jobs:
       - name: Run golangci-lint (default build)
         uses: golangci/golangci-lint-action@v9
         with:
+          version: v2.11.4
           args: --timeout=5m
 
       - name: Create dummy frontend dist for production lint
@@ -139,6 +140,7 @@ jobs:
       - name: Run golangci-lint (production build)
         uses: golangci/golangci-lint-action@v9
         with:
+          version: v2.11.4
           args: --timeout=5m --build-tags=production,webkit2_41
 
       - name: Run goroutinectx
@@ -508,6 +510,7 @@ jobs:
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@v9
         with:
+          version: v2.11.4
           args: --timeout=5m
 
   platform-build:

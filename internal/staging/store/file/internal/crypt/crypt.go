@@ -16,9 +16,9 @@ import (
 //
 //nolint:gochecknoglobals // Testing hooks to inject errors into crypto operations.
 var (
-	randReader    io.Reader                                      = rand.Reader
-	newCipherFunc func(key []byte) (cipher.Block, error)         = aes.NewCipher
-	newGCMFunc    func(cipher cipher.Block) (cipher.AEAD, error) = cipher.NewGCM
+	randReader    = rand.Reader
+	newCipherFunc = aes.NewCipher
+	newGCMFunc    = cipher.NewGCM
 )
 
 // SetRandReader sets the random reader for testing purposes.

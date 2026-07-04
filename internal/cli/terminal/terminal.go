@@ -3,6 +3,7 @@ package terminal
 
 import (
 	"io"
+	"math"
 
 	"github.com/mattn/go-isatty"
 	"golang.org/x/term"
@@ -14,6 +15,18 @@ const DefaultWidth = 50
 // Fder is an interface for types that have a file descriptor.
 type Fder interface {
 	Fd() uintptr
+}
+
+// FdToInt safely converts a file descriptor from uintptr to int.
+// File descriptors are always small non-negative values, so this only
+// guards against a theoretical overflow on 32-bit platforms; on overflow
+// it returns -1, which callers treat as an invalid descriptor.
+func FdToInt(fd uintptr) int {
+	if fd > uintptr(math.MaxInt) {
+		return -1
+	}
+
+	return int(fd)
 }
 
 // GetSize returns the terminal width and height for the given file descriptor.
@@ -36,7 +49,7 @@ func GetWidthFromWriter(w io.Writer) int {
 		return DefaultWidth
 	}
 
-	width, _, err := GetSize(int(f.Fd()))
+	width, _, err := GetSize(FdToInt(f.Fd()))
 	if err != nil || width <= 0 {
 		return DefaultWidth
 	}

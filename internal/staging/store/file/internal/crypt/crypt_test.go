@@ -33,7 +33,7 @@ func TestEncryptDecrypt(t *testing.T) {
 			data:       []byte(`{"version":2,"entries":{}}`),
 			passphrase: "my-passphrase",
 		},
-		{
+		{ //nolint:gosec // G101: test fixture passphrase, not a real credential.
 			name:       "unicode passphrase",
 			data:       []byte("test data"),
 			passphrase: "パスワード123",
