@@ -85,6 +85,7 @@ linters:
           files:
             - "!**/internal/api/**"
             - "!**/internal/infra/**"
+            - "!**/internal/provider/aws/**"
           deny:
             - pkg: "github.com/aws/aws-sdk-go-v2/service/ssm"
               desc: "Use github.com/mpyw/suve/internal/api/paramapi instead"
