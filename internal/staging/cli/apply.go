@@ -10,14 +10,29 @@ import (
 
 	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/maputil"
+	"github.com/mpyw/suve/internal/staging"
+	"github.com/mpyw/suve/internal/staging/store"
 	stagingusecase "github.com/mpyw/suve/internal/usecase/staging"
 )
 
-// ApplyRunner executes apply operations using a usecase.
+// confirmer prompts the user to confirm an action. *confirm.Prompter satisfies
+// this interface; it is kept small so the apply flow stays testable.
+type confirmer interface {
+	Confirm(message string, skip bool) (bool, error)
+}
+
+// ApplyRunner applies staged changes via the ApplyUseCase and reports the
+// results. RunInteractive wraps Run with the presentation-layer orchestration
+// (empty-check, name validation, and interactive confirmation) that the
+// `stage <service> apply` command performs before applying.
 type ApplyRunner struct {
-	UseCase *stagingusecase.ApplyUseCase
-	Stdout  io.Writer
-	Stderr  io.Writer
+	UseCase     *stagingusecase.ApplyUseCase
+	Store       store.ReadWriteOperator
+	Parser      staging.Parser
+	Confirmer   confirmer
+	SkipConfirm bool
+	Stdout      io.Writer
+	Stderr      io.Writer
 }
 
 // ApplyOptions holds options for the apply command.
@@ -26,7 +41,54 @@ type ApplyOptions struct {
 	IgnoreConflicts bool   // Skip conflict detection and force apply
 }
 
-// Run executes the apply command.
+// RunInteractive performs the command-level apply flow: it lists staged
+// entries, short-circuits when nothing is staged, validates an optional target
+// name, asks for confirmation, and then delegates to Run. Interactive
+// confirmation lives here (presentation layer) rather than in the usecase.
+func (r *ApplyRunner) RunInteractive(ctx context.Context, opts ApplyOptions) error {
+	service := r.Parser.Service()
+
+	// Get entries to show what will be applied
+	entries, err := r.Store.ListEntries(ctx, service)
+	if err != nil {
+		return err
+	}
+
+	serviceEntries := entries[service]
+	if len(serviceEntries) == 0 {
+		output.Info(r.Stdout, "No %s changes staged.", r.Parser.ServiceName())
+
+		return nil
+	}
+
+	// Validate the target name if specified
+	if opts.Name != "" {
+		if _, ok := serviceEntries[opts.Name]; !ok {
+			return fmt.Errorf("%s is not staged", opts.Name)
+		}
+	}
+
+	// Confirm apply
+	var message string
+	if opts.Name != "" {
+		message = fmt.Sprintf("Apply staged changes for %s to AWS?", opts.Name)
+	} else {
+		message = fmt.Sprintf("Apply %d staged %s change(s) to AWS?", len(serviceEntries), r.Parser.ServiceName())
+	}
+
+	confirmed, err := r.Confirmer.Confirm(message, r.SkipConfirm)
+	if err != nil {
+		return err
+	}
+
+	if !confirmed {
+		return nil
+	}
+
+	return r.Run(ctx, opts)
+}
+
+// Run applies the staged changes via the usecase and reports the results.
 func (r *ApplyRunner) Run(ctx context.Context, opts ApplyOptions) error {
 	result, err := r.UseCase.Execute(ctx, stagingusecase.ApplyInput{
 		Name:            opts.Name,
