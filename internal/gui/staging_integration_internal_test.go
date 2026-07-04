@@ -4,6 +4,7 @@ package gui
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -1117,4 +1118,40 @@ func TestApp_StagingReset_ResetBothEntriesAndTags(t *testing.T) {
 		assert.Empty(t, status.Param)
 		assert.Empty(t, status.ParamTags)
 	})
+}
+
+// stubParamClient satisfies the ParamClient interface without any real
+// behavior. It is used by tests that must reach StagingApply's Execute call
+// but never actually invoke a client method (the embedded nil interface would
+// panic if a method were called, which must not happen).
+type stubParamClient struct {
+	ParamClient
+}
+
+// TestApp_StagingApply_ExecuteError is a regression test: StagingApply used to
+// read result.* fields before checking the error returned by Execute, so a
+// (nil, err) return panicked with a nil dereference. It must now return the
+// error cleanly without panicking.
+func TestApp_StagingApply_ExecuteError(t *testing.T) {
+	t.Parallel()
+
+	app := setupTestApp(t)
+	app.paramClient = stubParamClient{}
+
+	mockStore := testutil.NewMockStore()
+	mockStore.ListEntriesErr = errors.New("list boom")
+	app.stagingStore = mockStore
+
+	var (
+		result *StagingApplyResult
+		err    error
+	)
+
+	require.NotPanics(t, func() {
+		result, err = app.StagingApply(string(staging.ServiceParam), false)
+	})
+
+	require.Error(t, err)
+	assert.Nil(t, result)
+	assert.Contains(t, err.Error(), "list boom")
 }

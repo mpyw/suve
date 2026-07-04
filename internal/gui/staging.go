@@ -239,9 +239,13 @@ func (a *App) StagingApply(service string, ignoreConflicts bool) (*StagingApplyR
 		Strategy: strategy,
 		Store:    store,
 	}
+
 	result, err := uc.Execute(a.ctx, stagingusecase.ApplyInput{
 		IgnoreConflicts: ignoreConflicts,
 	})
+	if err != nil {
+		return nil, err
+	}
 
 	output := &StagingApplyResult{
 		ServiceName:    result.ServiceName,
@@ -286,7 +290,7 @@ func (a *App) StagingApply(service string, ignoreConflicts bool) (*StagingApplyR
 		output.TagResults = append(output.TagResults, tagResult)
 	}
 
-	return output, err
+	return output, nil
 }
 
 // StagingReset resets (unstages) all staged changes for a service.
