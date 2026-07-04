@@ -30,6 +30,7 @@ func VerifyPeerCredentials(conn net.Conn) error {
 	var credErr error
 
 	controlErr := rawConn.Control(func(fd uintptr) {
+		//nolint:gosec // G115: fd is a valid socket descriptor (small non-negative); file removed in #194.
 		cred, err := unix.GetsockoptXucred(int(fd), unix.SOL_LOCAL, unix.LOCAL_PEERCRED)
 		if err != nil {
 			credErr = fmt.Errorf("failed to get peer credentials: %w", err)

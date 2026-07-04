@@ -129,7 +129,7 @@ func (p *Prompter) confirmPlainText() bool {
 func (p *Prompter) readPassword() (string, error) {
 	// Try to get file descriptor for secure password reading
 	if f, ok := p.Stdin.(terminal.Fder); ok && terminal.IsTTY(f.Fd()) {
-		pass, err := term.ReadPassword(int(f.Fd()))
+		pass, err := term.ReadPassword(terminal.FdToInt(f.Fd()))
 		if err != nil {
 			return "", err
 		}

@@ -45,6 +45,7 @@ var parser = version.AbsoluteParser[AbsoluteSpec]{
 				if err != nil {
 					return abs, err
 				}
+
 				abs.Version = lo.ToPtr(v)
 
 				return abs, nil
