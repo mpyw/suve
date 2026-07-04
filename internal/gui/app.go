@@ -7,56 +7,34 @@ import (
 	"context"
 	"sync"
 
-	"github.com/mpyw/suve/internal/api/paramapi"
-	"github.com/mpyw/suve/internal/api/secretapi"
 	"github.com/mpyw/suve/internal/infra"
 	"github.com/mpyw/suve/internal/provider"
-	awsparam "github.com/mpyw/suve/internal/provider/aws/param"
-	awssecret "github.com/mpyw/suve/internal/provider/aws/secret"
+	"github.com/mpyw/suve/internal/provider/aws"
 	"github.com/mpyw/suve/internal/staging"
 	"github.com/mpyw/suve/internal/staging/store"
 	"github.com/mpyw/suve/internal/staging/store/file"
 )
 
 // =============================================================================
-// Client Interfaces
+// Provider Registry
 // =============================================================================
 
-// ParamClient is the combined interface for all SSM Parameter Store operations.
-// It is defined against the raw SSM SDK aliases (paramapi) rather than the
-// provider seam; the GUI is intentionally not migrated to the provider registry
-// yet (see #206), so it keeps constructing AWS clients directly here.
-type ParamClient interface {
-	paramapi.GetParameterAPI
-	paramapi.GetParameterHistoryAPI
-	paramapi.PutParameterAPI
-	paramapi.DeleteParameterAPI
-	paramapi.AddTagsToResourceAPI
-	paramapi.RemoveTagsFromResourceAPI
-	paramapi.DescribeParametersAPI
-	paramapi.GetParametersAPI
-	paramapi.ListTagsForResourceAPI
-}
-
-// SecretClient is the combined interface for all Secrets Manager operations.
-// See ParamClient: the GUI still uses the raw SDK aliases pending the #206
-// migration to the provider registry.
+// registry is the provider registry backing the GUI's read/write operations.
+// It mirrors the CLI composition point (internal/cli/commands/internal): today
+// only AWS is registered, so AWS is the default (and only) provider.
 //
-//nolint:interfacebloat // mirrors the Secrets Manager operations the GUI uses; splitting adds no value
-type SecretClient interface {
-	secretapi.GetSecretValueAPI
-	secretapi.ListSecretVersionIDsAPI
-	secretapi.CreateSecretAPI
-	secretapi.PutSecretValueAPI
-	secretapi.DeleteSecretAPI
-	secretapi.UpdateSecretAPI
-	secretapi.TagResourceAPI
-	secretapi.UntagResourceAPI
-	secretapi.ListSecretsAPI
-	secretapi.DescribeSecretAPI
-	secretapi.RestoreSecretAPI
-	secretapi.RotateSecretAPI
-}
+//nolint:gochecknoglobals // process-wide provider registry, built once
+var registry = aws.NewRegistry()
+
+// storeScope is the provider selector for GUI read/write operations. Only the
+// Provider field is needed: the AWS factory builds its SSM/Secrets Manager
+// client from the ambient AWS config (region from env/profile), so no
+// account/region lookup — and therefore no STS GetCallerIdentity call — is
+// required to construct a store. (Account/region only matter for staging-state
+// file keying, which getStagingStore derives from the AWS identity separately.)
+//
+//nolint:gochecknoglobals // immutable provider selector for read/write operations
+var storeScope = provider.Scope{Provider: provider.ProviderAWS}
 
 // =============================================================================
 // App Struct
@@ -67,10 +45,6 @@ type SecretClient interface {
 //nolint:containedctx // Wails apps require storing context from Startup
 type App struct {
 	ctx context.Context
-
-	// AWS clients (lazily initialized)
-	paramClient  ParamClient
-	secretClient SecretClient
 
 	// Staging store (the working staging area, backed by stage.json)
 	stagingStore   store.ReadWriteOperator
@@ -102,34 +76,16 @@ func (e stringError) Error() string { return string(e) }
 // Helper Methods
 // =============================================================================
 
-func (a *App) getParamClient() (ParamClient, error) {
-	if a.paramClient != nil {
-		return a.paramClient, nil
-	}
-
-	client, err := infra.NewParamClient(a.ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	a.paramClient = client
-
-	return client, nil
+// paramStore resolves a provider.Store for the parameter service via the
+// registry (AWS by default).
+func (a *App) paramStore() (provider.Store, error) {
+	return registry.Store(a.ctx, storeScope, provider.KindParam)
 }
 
-func (a *App) getSecretClient() (SecretClient, error) {
-	if a.secretClient != nil {
-		return a.secretClient, nil
-	}
-
-	client, err := infra.NewSecretClient(a.ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	a.secretClient = client
-
-	return client, nil
+// secretStore resolves a provider.Store for the secret service via the
+// registry (AWS by default).
+func (a *App) secretStore() (provider.Store, error) {
+	return registry.Store(a.ctx, storeScope, provider.KindSecret)
 }
 
 func (a *App) getStagingStore() (store.ReadWriteOperator, error) {
@@ -177,88 +133,72 @@ func (a *App) getParser(service string) (staging.Parser, error) {
 	}
 }
 
-func (a *App) getEditStrategy(service string) (staging.EditStrategy, error) {
+// serviceStrategy builds the staging strategy for a service, wrapping a
+// provider.Store resolved through the registry. The returned *ParamStrategy /
+// *SecretStrategy satisfies every staging strategy interface (Edit, Delete,
+// Apply, Diff), so the typed getters below narrow it as needed.
+func (a *App) serviceStrategy(service string) (staging.FullStrategy, error) {
 	switch service {
 	case string(staging.ServiceParam):
-		client, err := a.getParamClient()
+		s, err := a.paramStore()
 		if err != nil {
 			return nil, err
 		}
 
-		return staging.NewParamStrategy(awsparam.New(client)), nil
+		return staging.NewParamStrategy(s), nil
 	case string(staging.ServiceSecret):
-		client, err := a.getSecretClient()
+		s, err := a.secretStore()
 		if err != nil {
 			return nil, err
 		}
 
-		return staging.NewSecretStrategy(awssecret.New(client)), nil
+		return staging.NewSecretStrategy(s), nil
 	default:
 		return nil, errInvalidService
 	}
+}
+
+func (a *App) getEditStrategy(service string) (staging.EditStrategy, error) {
+	strategy, err := a.serviceStrategy(service)
+	if err != nil {
+		return nil, err
+	}
+
+	return strategy, nil
 }
 
 func (a *App) getDeleteStrategy(service string) (staging.DeleteStrategy, error) {
-	switch service {
-	case string(staging.ServiceParam):
-		client, err := a.getParamClient()
-		if err != nil {
-			return nil, err
-		}
+	strategy, err := a.serviceStrategy(service)
+	if err != nil {
+		return nil, err
+	}
 
-		return staging.NewParamStrategy(awsparam.New(client)), nil
-	case string(staging.ServiceSecret):
-		client, err := a.getSecretClient()
-		if err != nil {
-			return nil, err
-		}
-
-		return staging.NewSecretStrategy(awssecret.New(client)), nil
-	default:
+	// FullStrategy does not embed DeleteStrategy, but the concrete
+	// *ParamStrategy / *SecretStrategy both implement it.
+	deleter, ok := strategy.(staging.DeleteStrategy)
+	if !ok {
 		return nil, errInvalidService
 	}
+
+	return deleter, nil
 }
 
 func (a *App) getApplyStrategy(service string) (staging.ApplyStrategy, error) {
-	switch service {
-	case string(staging.ServiceParam):
-		client, err := a.getParamClient()
-		if err != nil {
-			return nil, err
-		}
-
-		return staging.NewParamStrategy(awsparam.New(client)), nil
-	case string(staging.ServiceSecret):
-		client, err := a.getSecretClient()
-		if err != nil {
-			return nil, err
-		}
-
-		return staging.NewSecretStrategy(awssecret.New(client)), nil
-	default:
-		return nil, errInvalidService
+	strategy, err := a.serviceStrategy(service)
+	if err != nil {
+		return nil, err
 	}
+
+	return strategy, nil
 }
 
 func (a *App) getDiffStrategy(service string) (staging.DiffStrategy, error) {
-	switch service {
-	case string(staging.ServiceParam):
-		client, err := a.getParamClient()
-		if err != nil {
-			return nil, err
-		}
-
-		return staging.NewParamStrategy(awsparam.New(client)), nil
-	case string(staging.ServiceSecret):
-		client, err := a.getSecretClient()
-		if err != nil {
-			return nil, err
-		}
-
-		return staging.NewSecretStrategy(awssecret.New(client)), nil
-	default:
-		return nil, errInvalidService
+	strategy, err := a.serviceStrategy(service)
+	if err != nil {
+		return nil, err
 	}
+
+	return strategy, nil
 }
 
 // =============================================================================

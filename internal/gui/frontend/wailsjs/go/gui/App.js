@@ -38,6 +38,10 @@ export function ParamShow(arg1) {
   return window['go']['gui']['App']['ParamShow'](arg1);
 }
 
+export function ParamTypeOptions() {
+  return window['go']['gui']['App']['ParamTypeOptions']();
+}
+
 export function SecretAddTag(arg1, arg2, arg3) {
   return window['go']['gui']['App']['SecretAddTag'](arg1, arg2, arg3);
 }

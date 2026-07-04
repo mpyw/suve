@@ -49,16 +49,18 @@ export namespace gui {
 	export class ParamListEntry {
 	    name: string;
 	    type: string;
+	    secret: boolean;
 	    value?: string;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new ParamListEntry(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.name = source["name"];
 	        this.type = source["type"];
+	        this.secret = source["secret"];
 	        this.value = source["value"];
 	    }
 	}
@@ -98,18 +100,20 @@ export namespace gui {
 	    version: number;
 	    value: string;
 	    type: string;
+	    secret: boolean;
 	    isCurrent: boolean;
 	    lastModified?: string;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new ParamLogEntry(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.version = source["version"];
 	        this.value = source["value"];
 	        this.type = source["type"];
+	        this.secret = source["secret"];
 	        this.isCurrent = source["isCurrent"];
 	        this.lastModified = source["lastModified"];
 	    }
@@ -181,20 +185,22 @@ export namespace gui {
 	    value: string;
 	    version: number;
 	    type: string;
+	    secret: boolean;
 	    description?: string;
 	    lastModified?: string;
 	    tags: ParamShowTag[];
-	
+
 	    static createFrom(source: any = {}) {
 	        return new ParamShowResult(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.name = source["name"];
 	        this.value = source["value"];
 	        this.version = source["version"];
 	        this.type = source["type"];
+	        this.secret = source["secret"];
 	        this.description = source["description"];
 	        this.lastModified = source["lastModified"];
 	        this.tags = this.convertValues(source["tags"], ParamShowTag);

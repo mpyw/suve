@@ -13,6 +13,13 @@ const (
 	StringList   = "StringList"
 )
 
+// Options returns the SSM parameter type display names in their canonical
+// order. It is the single source of truth for the set of selectable parameter
+// types (e.g. the GUI type dropdown), so callers never hardcode the list.
+func Options() []string {
+	return []string{String, SecureString, StringList}
+}
+
 // Display maps a domain.ValueType to its SSM type name for output. It preserves
 // the historical byte-for-byte rendering:
 //   - domain.ValueTypePlaintext -> "String"

@@ -11,6 +11,10 @@ import (
 	"github.com/mpyw/suve/internal/version/secretversion"
 )
 
+// errRestoreUnsupported is returned when the active provider does not support
+// restoring soft-deleted secrets.
+var errRestoreUnsupported = stringError("restore is not supported by this provider")
+
 // =============================================================================
 // Secret Types
 // =============================================================================
@@ -103,12 +107,12 @@ type SecretRestoreResult struct {
 
 // SecretList lists Secrets Manager secrets.
 func (a *App) SecretList(prefix string, withValue bool, filter string, _ int, _ string) (*SecretListResult, error) {
-	client, err := a.getSecretClient()
+	store, err := a.secretStore()
 	if err != nil {
 		return nil, err
 	}
 
-	uc := &secret.ListUseCase{Reader: awssecret.New(client)}
+	uc := &secret.ListUseCase{Reader: store}
 
 	result, err := uc.Execute(a.ctx, secret.ListInput{
 		Prefix:    prefix,
@@ -137,12 +141,12 @@ func (a *App) SecretShow(specStr string) (*SecretShowResult, error) {
 		return nil, err
 	}
 
-	client, err := a.getSecretClient()
+	store, err := a.secretStore()
 	if err != nil {
 		return nil, err
 	}
 
-	uc := &secret.ShowUseCase{Reader: awssecret.New(client)}
+	uc := &secret.ShowUseCase{Reader: store}
 
 	result, err := uc.Execute(a.ctx, secret.ShowInput{Spec: spec})
 	if err != nil {
@@ -174,12 +178,12 @@ func (a *App) SecretShow(specStr string) (*SecretShowResult, error) {
 
 // SecretLog shows secret version history.
 func (a *App) SecretLog(name string, maxResults int32) (*SecretLogResult, error) {
-	client, err := a.getSecretClient()
+	store, err := a.secretStore()
 	if err != nil {
 		return nil, err
 	}
 
-	uc := &secret.LogUseCase{Reader: awssecret.New(client)}
+	uc := &secret.LogUseCase{Reader: store}
 
 	result, err := uc.Execute(a.ctx, secret.LogInput{
 		Name:       name,
@@ -209,12 +213,12 @@ func (a *App) SecretLog(name string, maxResults int32) (*SecretLogResult, error)
 
 // SecretCreate creates a new secret.
 func (a *App) SecretCreate(name, value string) (*SecretCreateResult, error) {
-	client, err := a.getSecretClient()
+	store, err := a.secretStore()
 	if err != nil {
 		return nil, err
 	}
 
-	uc := &secret.CreateUseCase{Writer: awssecret.New(client)}
+	uc := &secret.CreateUseCase{Writer: store}
 
 	result, err := uc.Execute(a.ctx, secret.CreateInput{
 		Name:  name,
@@ -232,12 +236,12 @@ func (a *App) SecretCreate(name, value string) (*SecretCreateResult, error) {
 
 // SecretUpdate updates an existing secret.
 func (a *App) SecretUpdate(name, value string) (*SecretUpdateResult, error) {
-	client, err := a.getSecretClient()
+	store, err := a.secretStore()
 	if err != nil {
 		return nil, err
 	}
 
-	uc := &secret.UpdateUseCase{Store: awssecret.New(client)}
+	uc := &secret.UpdateUseCase{Store: store}
 
 	result, err := uc.Execute(a.ctx, secret.UpdateInput{
 		Name:  name,
@@ -255,12 +259,12 @@ func (a *App) SecretUpdate(name, value string) (*SecretUpdateResult, error) {
 
 // SecretDelete deletes a secret (with recovery window).
 func (a *App) SecretDelete(name string, force bool) (*SecretDeleteResult, error) {
-	client, err := a.getSecretClient()
+	store, err := a.secretStore()
 	if err != nil {
 		return nil, err
 	}
 
-	uc := &secret.DeleteUseCase{Store: awssecret.New(client)}
+	uc := &secret.DeleteUseCase{Store: store}
 
 	var options []provider.DeleteOption
 	if force {
@@ -291,12 +295,12 @@ func (a *App) SecretDelete(name string, force bool) (*SecretDeleteResult, error)
 
 // SecretAddTag adds or updates a tag on a secret.
 func (a *App) SecretAddTag(name, key, value string) error {
-	client, err := a.getSecretClient()
+	store, err := a.secretStore()
 	if err != nil {
 		return err
 	}
 
-	uc := &secret.TagUseCase{Tagger: awssecret.New(client)}
+	uc := &secret.TagUseCase{Tagger: store}
 
 	return uc.Execute(a.ctx, secret.TagInput{
 		Name: name,
@@ -306,12 +310,12 @@ func (a *App) SecretAddTag(name, key, value string) error {
 
 // SecretRemoveTag removes a tag from a secret.
 func (a *App) SecretRemoveTag(name, key string) error {
-	client, err := a.getSecretClient()
+	store, err := a.secretStore()
 	if err != nil {
 		return err
 	}
 
-	uc := &secret.TagUseCase{Tagger: awssecret.New(client)}
+	uc := &secret.TagUseCase{Tagger: store}
 
 	return uc.Execute(a.ctx, secret.TagInput{
 		Name:   name,
@@ -331,12 +335,12 @@ func (a *App) SecretDiff(spec1Str, spec2Str string) (*SecretDiffResult, error) {
 		return nil, err
 	}
 
-	client, err := a.getSecretClient()
+	store, err := a.secretStore()
 	if err != nil {
 		return nil, err
 	}
 
-	uc := &secret.DiffUseCase{Reader: awssecret.New(client)}
+	uc := &secret.DiffUseCase{Reader: store}
 
 	result, err := uc.Execute(a.ctx, secret.DiffInput{
 		Spec1: spec1,
@@ -358,12 +362,17 @@ func (a *App) SecretDiff(spec1Str, spec2Str string) (*SecretDiffResult, error) {
 
 // SecretRestore restores a deleted secret.
 func (a *App) SecretRestore(name string) (*SecretRestoreResult, error) {
-	client, err := a.getSecretClient()
+	store, err := a.secretStore()
 	if err != nil {
 		return nil, err
 	}
 
-	uc := &secret.RestoreUseCase{Restorer: awssecret.New(client)}
+	restorer, ok := store.(provider.Restorer)
+	if !ok {
+		return nil, errRestoreUnsupported
+	}
+
+	uc := &secret.RestoreUseCase{Restorer: restorer}
 
 	result, err := uc.Execute(a.ctx, secret.RestoreInput{Name: name})
 	if err != nil {
