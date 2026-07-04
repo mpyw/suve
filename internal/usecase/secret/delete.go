@@ -4,73 +4,51 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"time"
 
-	"github.com/samber/lo"
-
-	"github.com/mpyw/suve/internal/api/secretapi"
+	"github.com/mpyw/suve/internal/provider"
 )
-
-// DeleteClient is the interface for the delete use case.
-type DeleteClient interface {
-	secretapi.DeleteSecretAPI
-	secretapi.GetSecretValueAPI
-}
 
 // DeleteInput holds input for the delete use case.
 type DeleteInput struct {
-	Name           string
-	Force          bool  // Force immediate deletion
-	RecoveryWindow int64 // Days before permanent deletion (7-30)
+	Name string
+	// Options carries provider-specific delete options (e.g. AWS Secrets Manager
+	// ForceDelete / RecoveryWindow). They are passed through to the provider
+	// unchanged.
+	Options []provider.DeleteOption
 }
 
 // DeleteOutput holds the result of the delete use case.
 type DeleteOutput struct {
-	Name         string
-	DeletionDate *time.Time
-	ARN          string
+	Name string
 }
 
 // DeleteUseCase executes delete operations.
 type DeleteUseCase struct {
-	Client DeleteClient
+	Store provider.Store
 }
 
-// GetCurrentValue fetches the current secret value for preview.
+// GetCurrentValue fetches the current secret value for preview. A non-existent
+// secret yields an empty value with no error; any other read failure is
+// propagated.
 func (u *DeleteUseCase) GetCurrentValue(ctx context.Context, name string) (string, error) {
-	out, err := u.Client.GetSecretValue(ctx, &secretapi.GetSecretValueInput{
-		SecretId: lo.ToPtr(name),
-	})
-	if err != nil {
-		if rnf := (*secretapi.ResourceNotFoundException)(nil); errors.As(err, &rnf) {
-			return "", nil
-		}
+	entry, err := u.Store.Get(ctx, name, provider.VersionRef{})
 
+	switch {
+	case errors.Is(err, provider.ErrNotFound):
+		return "", nil
+	case err != nil:
 		return "", err
 	}
 
-	return lo.FromPtr(out.SecretString), nil
+	return entry.Value, nil
 }
 
-// Execute runs the delete use case.
+// Execute runs the delete use case. Deletion behavior (force / recovery window)
+// is carried by the provider.DeleteOptions in the input.
 func (u *DeleteUseCase) Execute(ctx context.Context, input DeleteInput) (*DeleteOutput, error) {
-	deleteInput := &secretapi.DeleteSecretInput{
-		SecretId: lo.ToPtr(input.Name),
-	}
-	if input.Force {
-		deleteInput.ForceDeleteWithoutRecovery = lo.ToPtr(true)
-	} else if input.RecoveryWindow > 0 {
-		deleteInput.RecoveryWindowInDays = lo.ToPtr(input.RecoveryWindow)
-	}
-
-	result, err := u.Client.DeleteSecret(ctx, deleteInput)
-	if err != nil {
+	if err := u.Store.Delete(ctx, input.Name, input.Options...); err != nil {
 		return nil, fmt.Errorf("failed to delete secret: %w", err)
 	}
 
-	return &DeleteOutput{
-		Name:         lo.FromPtr(result.Name),
-		DeletionDate: result.DeletionDate,
-		ARN:          lo.FromPtr(result.ARN),
-	}, nil
+	return &DeleteOutput{Name: input.Name}, nil
 }

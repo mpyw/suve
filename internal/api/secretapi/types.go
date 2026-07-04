@@ -53,6 +53,12 @@ type RestoreSecretInput = secretsmanager.RestoreSecretInput
 // RestoreSecretOutput is a re-exported Secrets Manager output type.
 type RestoreSecretOutput = secretsmanager.RestoreSecretOutput
 
+// RotateSecretInput is a re-exported Secrets Manager input type.
+type RotateSecretInput = secretsmanager.RotateSecretInput
+
+// RotateSecretOutput is a re-exported Secrets Manager output type.
+type RotateSecretOutput = secretsmanager.RotateSecretOutput
+
 // UpdateSecretInput is a re-exported Secrets Manager input type.
 type UpdateSecretInput = secretsmanager.UpdateSecretInput
 

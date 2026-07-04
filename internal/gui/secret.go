@@ -3,6 +3,10 @@
 package gui
 
 import (
+	"time"
+
+	"github.com/mpyw/suve/internal/provider"
+	awssecret "github.com/mpyw/suve/internal/provider/aws/secret"
 	"github.com/mpyw/suve/internal/usecase/secret"
 	"github.com/mpyw/suve/internal/version/secretversion"
 )
@@ -98,20 +102,18 @@ type SecretRestoreResult struct {
 // =============================================================================
 
 // SecretList lists Secrets Manager secrets.
-func (a *App) SecretList(prefix string, withValue bool, filter string, maxResults int, nextToken string) (*SecretListResult, error) {
+func (a *App) SecretList(prefix string, withValue bool, filter string, _ int, _ string) (*SecretListResult, error) {
 	client, err := a.getSecretClient()
 	if err != nil {
 		return nil, err
 	}
 
-	uc := &secret.ListUseCase{Client: client}
+	uc := &secret.ListUseCase{Reader: awssecret.New(client)}
 
 	result, err := uc.Execute(a.ctx, secret.ListInput{
-		Prefix:     prefix,
-		WithValue:  withValue,
-		Filter:     filter,
-		MaxResults: maxResults,
-		NextToken:  nextToken,
+		Prefix:    prefix,
+		WithValue: withValue,
+		Filter:    filter,
 	})
 	if err != nil {
 		return nil, err
@@ -140,7 +142,7 @@ func (a *App) SecretShow(specStr string) (*SecretShowResult, error) {
 		return nil, err
 	}
 
-	uc := &secret.ShowUseCase{Client: client}
+	uc := &secret.ShowUseCase{Reader: awssecret.New(client)}
 
 	result, err := uc.Execute(a.ctx, secret.ShowInput{Spec: spec})
 	if err != nil {
@@ -177,7 +179,7 @@ func (a *App) SecretLog(name string, maxResults int32) (*SecretLogResult, error)
 		return nil, err
 	}
 
-	uc := &secret.LogUseCase{Client: client}
+	uc := &secret.LogUseCase{Reader: awssecret.New(client)}
 
 	result, err := uc.Execute(a.ctx, secret.LogInput{
 		Name:       name,
@@ -212,7 +214,7 @@ func (a *App) SecretCreate(name, value string) (*SecretCreateResult, error) {
 		return nil, err
 	}
 
-	uc := &secret.CreateUseCase{Client: client}
+	uc := &secret.CreateUseCase{Writer: awssecret.New(client)}
 
 	result, err := uc.Execute(a.ctx, secret.CreateInput{
 		Name:  name,
@@ -225,7 +227,6 @@ func (a *App) SecretCreate(name, value string) (*SecretCreateResult, error) {
 	return &SecretCreateResult{
 		Name:      result.Name,
 		VersionID: result.VersionID,
-		ARN:       result.ARN,
 	}, nil
 }
 
@@ -236,7 +237,7 @@ func (a *App) SecretUpdate(name, value string) (*SecretUpdateResult, error) {
 		return nil, err
 	}
 
-	uc := &secret.UpdateUseCase{Client: client}
+	uc := &secret.UpdateUseCase{Store: awssecret.New(client)}
 
 	result, err := uc.Execute(a.ctx, secret.UpdateInput{
 		Name:  name,
@@ -249,7 +250,6 @@ func (a *App) SecretUpdate(name, value string) (*SecretUpdateResult, error) {
 	return &SecretUpdateResult{
 		Name:      result.Name,
 		VersionID: result.VersionID,
-		ARN:       result.ARN,
 	}, nil
 }
 
@@ -260,11 +260,16 @@ func (a *App) SecretDelete(name string, force bool) (*SecretDeleteResult, error)
 		return nil, err
 	}
 
-	uc := &secret.DeleteUseCase{Client: client}
+	uc := &secret.DeleteUseCase{Store: awssecret.New(client)}
+
+	var options []provider.DeleteOption
+	if force {
+		options = append(options, awssecret.ForceDelete{})
+	}
 
 	result, err := uc.Execute(a.ctx, secret.DeleteInput{
-		Name:  name,
-		Force: force,
+		Name:    name,
+		Options: options,
 	})
 	if err != nil {
 		return nil, err
@@ -272,10 +277,13 @@ func (a *App) SecretDelete(name string, force bool) (*SecretDeleteResult, error)
 
 	r := &SecretDeleteResult{
 		Name: result.Name,
-		ARN:  result.ARN,
 	}
-	if result.DeletionDate != nil {
-		r.DeletionDate = result.DeletionDate.Format("2006-01-02T15:04:05Z07:00")
+	// The provider Delete returns only an error; when not forcing, compute the
+	// scheduled deletion date client-side (now + AWS default recovery window).
+	if !force {
+		const defaultRecoveryWindowDays = 30
+
+		r.DeletionDate = time.Now().AddDate(0, 0, defaultRecoveryWindowDays).Format("2006-01-02T15:04:05Z07:00")
 	}
 
 	return r, nil
@@ -288,7 +296,7 @@ func (a *App) SecretAddTag(name, key, value string) error {
 		return err
 	}
 
-	uc := &secret.TagUseCase{Client: client}
+	uc := &secret.TagUseCase{Tagger: awssecret.New(client)}
 
 	return uc.Execute(a.ctx, secret.TagInput{
 		Name: name,
@@ -303,7 +311,7 @@ func (a *App) SecretRemoveTag(name, key string) error {
 		return err
 	}
 
-	uc := &secret.TagUseCase{Client: client}
+	uc := &secret.TagUseCase{Tagger: awssecret.New(client)}
 
 	return uc.Execute(a.ctx, secret.TagInput{
 		Name:   name,
@@ -328,7 +336,7 @@ func (a *App) SecretDiff(spec1Str, spec2Str string) (*SecretDiffResult, error) {
 		return nil, err
 	}
 
-	uc := &secret.DiffUseCase{Client: client}
+	uc := &secret.DiffUseCase{Reader: awssecret.New(client)}
 
 	result, err := uc.Execute(a.ctx, secret.DiffInput{
 		Spec1: spec1,
@@ -355,7 +363,7 @@ func (a *App) SecretRestore(name string) (*SecretRestoreResult, error) {
 		return nil, err
 	}
 
-	uc := &secret.RestoreUseCase{Client: client}
+	uc := &secret.RestoreUseCase{Restorer: awssecret.New(client)}
 
 	result, err := uc.Execute(a.ctx, secret.RestoreInput{Name: name})
 	if err != nil {
@@ -364,6 +372,5 @@ func (a *App) SecretRestore(name string) (*SecretRestoreResult, error) {
 
 	return &SecretRestoreResult{
 		Name: result.Name,
-		ARN:  result.ARN,
 	}, nil
 }

@@ -6,13 +6,8 @@ import (
 	"slices"
 	"time"
 
-	"github.com/samber/lo"
-
-	"github.com/mpyw/suve/internal/api/secretapi"
+	"github.com/mpyw/suve/internal/provider"
 )
-
-// LogClient is the interface for the log use case.
-type LogClient = VersionResolverClient
 
 // LogInput holds input for the log use case.
 type LogInput struct {
@@ -41,93 +36,61 @@ type LogOutput struct {
 
 // LogUseCase executes log operations.
 type LogUseCase struct {
-	Client LogClient
+	Reader provider.Reader
 }
 
 // Execute runs the log use case.
+//
+// It fetches the version history (newest first) via the provider, caps it to
+// MaxResults, optionally reverses it, applies the date filters, then retrieves
+// each surviving version's value. A per-version fetch failure is recorded on
+// the entry's Error field rather than aborting the whole listing.
 func (u *LogUseCase) Execute(ctx context.Context, input LogInput) (*LogOutput, error) {
-	// List all versions
-	result, err := u.Client.ListSecretVersionIds(ctx, &secretapi.ListSecretVersionIDsInput{
-		SecretId:   lo.ToPtr(input.Name),
-		MaxResults: lo.ToPtr(input.MaxResults),
-	})
+	versions, err := u.Reader.History(ctx, input.Name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list secret versions: %w", err)
 	}
 
-	versions := result.Versions
 	if len(versions) == 0 {
 		return &LogOutput{Name: input.Name}, nil
 	}
 
-	// Sort by creation date (newest first by default)
-	slices.SortFunc(versions, func(a, b secretapi.SecretVersionsListEntry) int {
-		if a.CreatedDate == nil || b.CreatedDate == nil {
-			return 0
-		}
+	// History is newest first; MaxResults caps the number of versions shown.
+	if input.MaxResults > 0 && len(versions) > int(input.MaxResults) {
+		versions = versions[:input.MaxResults]
+	}
 
-		if a.CreatedDate.After(*b.CreatedDate) {
-			return -1
-		}
-
-		if a.CreatedDate.Before(*b.CreatedDate) {
-			return 1
-		}
-
-		return 0
-	})
-
-	// Reverse if requested
+	// History yields newest first (default). Reverse to oldest first on request.
 	if input.Reverse {
 		slices.Reverse(versions)
 	}
 
-	// Build entries
 	entries := make([]LogEntry, 0, len(versions))
 
 	for _, v := range versions {
-		// Apply date filters (skip entries without CreatedDate when filters are applied)
+		// Apply date filters (skip entries without CreatedDate when filters are applied).
 		if input.Since != nil || input.Until != nil {
-			if v.CreatedDate == nil {
+			if v.Created == nil {
 				continue
 			}
 
-			if input.Since != nil && v.CreatedDate.Before(*input.Since) {
+			if input.Since != nil && v.Created.Before(*input.Since) {
 				continue
 			}
 
-			if input.Until != nil && v.CreatedDate.After(*input.Until) {
+			if input.Until != nil && v.Created.After(*input.Until) {
 				continue
 			}
 		}
 
-		// Fetch the value for this version
-		var (
-			value    string
-			fetchErr error
-		)
-
-		if v.VersionId != nil {
-			secretOut, err := u.Client.GetSecretValue(ctx, &secretapi.GetSecretValueInput{
-				SecretId:  lo.ToPtr(input.Name),
-				VersionId: v.VersionId,
-			})
-			if err != nil {
-				fetchErr = err
-			} else {
-				value = lo.FromPtr(secretOut.SecretString)
-			}
-		}
-
-		// Check if this is the current version (has AWSCURRENT stage)
-		isCurrent := slices.Contains(v.VersionStages, "AWSCURRENT")
+		value, fetchErr := u.getValue(ctx, input.Name, v.ID)
 
 		entries = append(entries, LogEntry{
-			VersionID:    lo.FromPtr(v.VersionId),
-			VersionStage: v.VersionStages,
+			VersionID:    v.ID,
+			VersionStage: stages(v.Label),
 			Value:        value,
-			CreatedDate:  v.CreatedDate,
-			IsCurrent:    isCurrent,
+			CreatedDate:  v.Created,
+			IsCurrent:    v.Label == "AWSCURRENT",
 			Error:        fetchErr,
 		})
 	}
@@ -136,4 +99,24 @@ func (u *LogUseCase) Execute(ctx context.Context, input LogInput) (*LogOutput, e
 		Name:    input.Name,
 		Entries: entries,
 	}, nil
+}
+
+// getValue fetches the value for a specific version id, tolerating fetch
+// failures by returning them as an error (the caller records it per-entry).
+func (u *LogUseCase) getValue(ctx context.Context, name, versionID string) (string, error) {
+	if versionID == "" {
+		return "", nil
+	}
+
+	ref, err := u.Reader.Resolve(ctx, name, "#"+versionID)
+	if err != nil {
+		return "", err
+	}
+
+	entry, err := u.Reader.Get(ctx, name, ref)
+	if err != nil {
+		return "", err
+	}
+
+	return entry.Value, nil
 }

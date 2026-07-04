@@ -2,89 +2,71 @@ package secret
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
-	"github.com/samber/lo"
-
-	"github.com/mpyw/suve/internal/api/secretapi"
+	"github.com/mpyw/suve/internal/domain"
+	"github.com/mpyw/suve/internal/provider"
 )
-
-// UpdateClient is the interface for the update use case.
-type UpdateClient interface {
-	secretapi.GetSecretValueAPI
-	secretapi.UpdateSecretAPI
-	secretapi.PutSecretValueAPI
-}
 
 // UpdateInput holds input for the update use case.
 type UpdateInput struct {
 	Name        string
 	Value       string
 	Description string
+	// Options carries provider-specific write options (e.g. AWS Secrets Manager
+	// KMS key, rotation). They are passed through to the provider unchanged.
+	Options []provider.WriteOption
 }
 
 // UpdateOutput holds the result of the update use case.
 type UpdateOutput struct {
 	Name      string
 	VersionID string
-	ARN       string
 }
 
 // UpdateUseCase executes update operations.
 type UpdateUseCase struct {
-	Client UpdateClient
+	Store provider.Store
 }
 
-// GetCurrentValue fetches the current secret value.
+// GetCurrentValue fetches the current secret value for preview. A non-existent
+// secret yields an empty value with no error; any other read failure is
+// propagated.
 func (u *UpdateUseCase) GetCurrentValue(ctx context.Context, name string) (string, error) {
-	out, err := u.Client.GetSecretValue(ctx, &secretapi.GetSecretValueInput{
-		SecretId: lo.ToPtr(name),
-	})
-	if err != nil {
+	entry, err := u.Store.Get(ctx, name, provider.VersionRef{})
+
+	switch {
+	case errors.Is(err, provider.ErrNotFound):
+		return "", nil
+	case err != nil:
 		return "", err
 	}
 
-	return lo.FromPtr(out.SecretString), nil
+	return entry.Value, nil
 }
 
-// Execute runs the update use case.
+// Execute runs the update use case. It updates an existing secret (new version
+// plus, when provided, description); if the secret doesn't exist it returns
+// ErrSecretNotFound. A read failure other than not-found is propagated unchanged
+// (never treated as "does not exist").
 func (u *UpdateUseCase) Execute(ctx context.Context, input UpdateInput) (*UpdateOutput, error) {
-	var versionID, arn string
+	_, err := u.Store.Get(ctx, input.Name, provider.VersionRef{})
 
-	// Update value
-	if input.Value != "" {
-		result, err := u.Client.PutSecretValue(ctx, &secretapi.PutSecretValueInput{
-			SecretId:     lo.ToPtr(input.Name),
-			SecretString: lo.ToPtr(input.Value),
-		})
-		if err != nil {
-			return nil, fmt.Errorf("failed to update secret value: %w", err)
-		}
-
-		versionID = lo.FromPtr(result.VersionId)
-		arn = lo.FromPtr(result.ARN)
+	switch {
+	case errors.Is(err, provider.ErrNotFound):
+		return nil, fmt.Errorf("%w: %s", ErrSecretNotFound, input.Name)
+	case err != nil:
+		return nil, err
 	}
 
-	// Update description if provided
-	if input.Description != "" {
-		result, err := u.Client.UpdateSecret(ctx, &secretapi.UpdateSecretInput{
-			SecretId:    lo.ToPtr(input.Name),
-			Description: lo.ToPtr(input.Description),
-		})
-		if err != nil {
-			return nil, fmt.Errorf("failed to update secret description: %w", err)
-		}
-
-		if versionID == "" {
-			versionID = lo.FromPtr(result.VersionId)
-		}
-
-		arn = lo.FromPtr(result.ARN)
+	version, err := u.Store.Put(ctx, input.Name, input.Value, domain.ValueTypeSecret, input.Description, input.Options...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update secret: %w", err)
 	}
 
 	return &UpdateOutput{
 		Name:      input.Name,
-		VersionID: versionID,
-		ARN:       arn,
+		VersionID: version.ID,
 	}, nil
 }

@@ -11,6 +11,7 @@ import (
 
 	"github.com/mpyw/suve/internal/cli/commands/internal"
 	"github.com/mpyw/suve/internal/cli/output"
+	awssecret "github.com/mpyw/suve/internal/provider/aws/secret"
 	"github.com/mpyw/suve/internal/usecase/secret"
 )
 
@@ -63,7 +64,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	}
 
 	r := &Runner{
-		UseCase: &secret.TagUseCase{Client: client},
+		UseCase: &secret.TagUseCase{Tagger: awssecret.New(client)},
 		Stdout:  cmd.Root().Writer,
 	}
 

@@ -13,6 +13,7 @@ import (
 	"github.com/mpyw/suve/internal/cli/confirm"
 	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/infra"
+	awssecret "github.com/mpyw/suve/internal/provider/aws/secret"
 	"github.com/mpyw/suve/internal/usecase/secret"
 )
 
@@ -75,7 +76,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		return err
 	}
 
-	uc := &secret.UpdateUseCase{Client: client}
+	uc := &secret.UpdateUseCase{Store: awssecret.New(client)}
 	newValue := cmd.Args().Get(1)
 
 	// Fetch current value and show diff before confirming

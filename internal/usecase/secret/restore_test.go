@@ -5,60 +5,46 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/mpyw/suve/internal/api/secretapi"
+	"github.com/mpyw/suve/internal/provider/providermock"
 	"github.com/mpyw/suve/internal/usecase/secret"
 )
-
-type mockRestoreClient struct {
-	restoreResult *secretapi.RestoreSecretOutput
-	restoreErr    error
-}
-
-//nolint:lll // mock function signature must match AWS SDK interface
-func (m *mockRestoreClient) RestoreSecret(_ context.Context, _ *secretapi.RestoreSecretInput, _ ...func(*secretapi.Options)) (*secretapi.RestoreSecretOutput, error) {
-	if m.restoreErr != nil {
-		return nil, m.restoreErr
-	}
-
-	return m.restoreResult, nil
-}
 
 func TestRestoreUseCase_Execute(t *testing.T) {
 	t.Parallel()
 
-	client := &mockRestoreClient{
-		restoreResult: &secretapi.RestoreSecretOutput{
-			Name: lo.ToPtr("my-secret"),
-			ARN:  lo.ToPtr("arn:aws:secretsmanager:us-east-1:123456789012:secret:my-secret"),
+	var gotName string
+
+	store := &providermock.Store{
+		RestoreFunc: func(_ context.Context, name string) error {
+			gotName = name
+
+			return nil
 		},
 	}
 
-	uc := &secret.RestoreUseCase{Client: client}
+	uc := &secret.RestoreUseCase{Restorer: store}
 
-	output, err := uc.Execute(t.Context(), secret.RestoreInput{
-		Name: "my-secret",
-	})
+	output, err := uc.Execute(t.Context(), secret.RestoreInput{Name: "my-secret"})
 	require.NoError(t, err)
 	assert.Equal(t, "my-secret", output.Name)
-	assert.Equal(t, "arn:aws:secretsmanager:us-east-1:123456789012:secret:my-secret", output.ARN)
+	assert.Equal(t, "my-secret", gotName)
 }
 
 func TestRestoreUseCase_Execute_Error(t *testing.T) {
 	t.Parallel()
 
-	client := &mockRestoreClient{
-		restoreErr: errors.New("restore failed"),
+	store := &providermock.Store{
+		RestoreFunc: func(_ context.Context, _ string) error {
+			return errors.New("restore failed")
+		},
 	}
 
-	uc := &secret.RestoreUseCase{Client: client}
+	uc := &secret.RestoreUseCase{Restorer: store}
 
-	_, err := uc.Execute(t.Context(), secret.RestoreInput{
-		Name: "my-secret",
-	})
+	_, err := uc.Execute(t.Context(), secret.RestoreInput{Name: "my-secret"})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to restore secret")
 }

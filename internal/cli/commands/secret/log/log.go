@@ -16,6 +16,7 @@ import (
 	"github.com/mpyw/suve/internal/cli/commands/internal"
 	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/jsonutil"
+	awssecret "github.com/mpyw/suve/internal/provider/aws/secret"
 	"github.com/mpyw/suve/internal/timeutil"
 	"github.com/mpyw/suve/internal/usecase/secret"
 	"github.com/mpyw/suve/internal/version/secretversion"
@@ -194,7 +195,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 
 	return internal.WithPager(cmd, noPager, func(stdout, stderr io.Writer) error {
 		r := &Runner{
-			UseCase: &secret.LogUseCase{Client: client},
+			UseCase: &secret.LogUseCase{Reader: awssecret.New(client)},
 			Stdout:  stdout,
 			Stderr:  stderr,
 		}
