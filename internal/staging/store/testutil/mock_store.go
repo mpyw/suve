@@ -27,8 +27,6 @@ type MockStore struct {
 	ListTagsErr     error
 	DrainErr        error
 	WriteStateErr   error
-	PingErr         error
-	StartErr        error
 
 	// DrainCallCount tracks the number of Drain calls
 	DrainCallCount int
@@ -305,65 +303,8 @@ func (m *MockStore) WriteState(_ context.Context, service staging.Service, state
 	return nil
 }
 
-// Ping checks if the agent daemon is running.
-func (m *MockStore) Ping(_ context.Context) error {
-	return m.PingErr
-}
-
-// Start ensures the agent daemon is running, starting it if necessary.
-func (m *MockStore) Start(_ context.Context) error {
-	return m.StartErr
-}
-
-// HintedMockStore extends MockStore with HintedUnstager support.
-type HintedMockStore struct {
-	*MockStore
-
-	UnstageEntryWithHintErr error
-	UnstageTagWithHintErr   error
-	UnstageAllWithHintErr   error
-	LastHint                string // Records the last hint used
-}
-
-// NewHintedMockStore creates a new HintedMockStore with initialized maps.
-func NewHintedMockStore() *HintedMockStore {
-	return &HintedMockStore{
-		MockStore: NewMockStore(),
-	}
-}
-
-// UnstageEntryWithHint removes a staged entry with an operation hint.
-func (m *HintedMockStore) UnstageEntryWithHint(ctx context.Context, service staging.Service, name string, hint string) error {
-	m.LastHint = hint
-	if m.UnstageEntryWithHintErr != nil {
-		return m.UnstageEntryWithHintErr
-	}
-
-	return m.UnstageEntry(ctx, service, name)
-}
-
-// UnstageTagWithHint removes staged tag changes with an operation hint.
-func (m *HintedMockStore) UnstageTagWithHint(ctx context.Context, service staging.Service, name string, hint string) error {
-	m.LastHint = hint
-	if m.UnstageTagWithHintErr != nil {
-		return m.UnstageTagWithHintErr
-	}
-
-	return m.UnstageTag(ctx, service, name)
-}
-
-// UnstageAllWithHint removes all staged changes with an operation hint.
-func (m *HintedMockStore) UnstageAllWithHint(ctx context.Context, service staging.Service, hint string) error {
-	m.LastHint = hint
-	if m.UnstageAllWithHintErr != nil {
-		return m.UnstageAllWithHintErr
-	}
-
-	return m.UnstageAll(ctx, service)
-}
-
 // Compile-time checks that MockStore implements interfaces.
-var _ store.ReadWriteOperator = (*MockStore)(nil)
-var _ store.FileStore = (*MockStore)(nil)
-var _ store.AgentStore = (*MockStore)(nil)
-var _ store.HintedUnstager = (*HintedMockStore)(nil)
+var (
+	_ store.ReadWriteOperator = (*MockStore)(nil)
+	_ store.FileStore         = (*MockStore)(nil)
+)

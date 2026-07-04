@@ -13,42 +13,30 @@ package e2e_test
 
 import (
 	"bytes"
-	"context"
 	"fmt"
 	"io"
 	"os"
 	"testing"
-	"time"
 
 	"github.com/samber/lo"
 	"github.com/urfave/cli/v3"
 
 	"github.com/mpyw/suve/internal/cli/output"
-	"github.com/mpyw/suve/internal/staging/store"
-	"github.com/mpyw/suve/internal/staging/store/agent"
-	"github.com/mpyw/suve/internal/staging/store/agent/daemon"
+	"github.com/mpyw/suve/internal/staging/store/file"
 )
 
-//nolint:gochecknoglobals // E2E test requires shared daemon instance across all tests
-var testDaemon *daemon.Runner
-
-// TestMain sets up the staging agent daemon before running tests.
+// TestMain sets up the environment before running tests.
 func TestMain(m *testing.M) {
-	// Create isolated temp directory for socket path
-	// Use /tmp directly to avoid socket path length limit issues on macOS
-	// (macOS has a 104-byte limit for Unix socket paths)
+	// Create an isolated temp directory. The staging area and stash files live
+	// under HOME (set per-test via setupTempHome), but keep the platform's
+	// runtime-dir env vars pinned to a short, isolated path for consistency.
+	// Use /tmp directly to avoid path length limit issues on macOS.
 	tmpDir, err := os.MkdirTemp("/tmp", "suve-e2e-")
 	if err != nil {
 		output.Printf(os.Stderr, "failed to create temp dir: %v\n", err)
 		os.Exit(1)
 	}
 
-	// Point every platform's socket-path env var at our isolated directory so
-	// protocol.SocketPath() resolves there regardless of OS: TMPDIR on macOS,
-	// XDG_RUNTIME_DIR on Linux, LOCALAPPDATA on Windows. Without this the Linux
-	// daemon socket escapes to the host's XDG_RUNTIME_DIR when it is set.
-	// (Ported from the multicloud branch's setupIsolatedSocketPath fix; the
-	// short /tmp path is kept to stay under macOS's 104-byte socket limit.)
 	for _, key := range []string{"TMPDIR", "XDG_RUNTIME_DIR", "LOCALAPPDATA"} {
 		if err := os.Setenv(key, tmpDir); err != nil {
 			output.Printf(os.Stderr, "failed to set %s: %v\n", key, err)
@@ -56,71 +44,13 @@ func TestMain(m *testing.M) {
 		}
 	}
 
-	// Enable manual mode to prevent fork bomb from test binary
-	// This disables both auto-start and auto-shutdown
-	if err := os.Setenv(agent.EnvDaemonManualMode, "1"); err != nil {
-		output.Printf(os.Stderr, "failed to set manual mode: %v\n", err)
-		os.Exit(1)
-	}
-
-	// Start daemon with error channel (localstack uses account "000000000000" and region "us-east-1")
-	testDaemon = daemon.NewRunner("000000000000", "us-east-1", agent.DaemonOptions()...)
-	daemonErrCh := make(chan error, 1)
-
-	go func() {
-		daemonErrCh <- testDaemon.Run(context.Background())
-	}()
-
-	// Wait for daemon to be ready by polling with ping
-	if err := waitForDaemon(5*time.Second, daemonErrCh); err != nil {
-		output.Printf(os.Stderr, "failed to start daemon: %v\n", err)
-		testDaemon.Shutdown()
-
-		_ = os.RemoveAll(tmpDir)
-
-		os.Exit(1)
-	}
-
 	// Run tests
 	code := m.Run()
 
 	// Cleanup
-	testDaemon.Shutdown()
-
 	_ = os.RemoveAll(tmpDir)
 
 	os.Exit(code)
-}
-
-// waitForDaemon waits for the daemon to be ready by polling with ping.
-func waitForDaemon(timeout time.Duration, daemonErrCh <-chan error) error {
-	// Use same account/region as the daemon
-	launcher := daemon.NewLauncher("000000000000", "us-east-1", daemon.WithAutoStartDisabled())
-
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
-	ticker := time.NewTicker(50 * time.Millisecond)
-	defer ticker.Stop()
-
-	var lastErr error
-
-	for {
-		select {
-		case err := <-daemonErrCh:
-			// Daemon exited with error
-			return fmt.Errorf("daemon exited: %w", err)
-		case <-ctx.Done():
-			return fmt.Errorf("daemon did not become ready within %v (last error: %w)", timeout, lastErr)
-		case <-ticker.C:
-			// Try to ping daemon (any successful request means it's ready)
-			if err := launcher.Ping(ctx); err == nil {
-				return nil
-			} else {
-				lastErr = err
-			}
-		}
-	}
 }
 
 func getEndpoint() string {
@@ -151,14 +81,23 @@ func setupTempHome(t *testing.T) {
 
 // newStore creates a new staging store for E2E tests.
 // localstack uses account ID "000000000000" and region "us-east-1".
-func newStore() store.AgentStore {
-	return agent.NewStore("000000000000", "us-east-1")
+func newStore() *file.Store {
+	s, err := file.NewStore("000000000000", "us-east-1")
+	if err != nil {
+		panic(err)
+	}
+
+	return s
 }
 
 // newStoreForAccount creates a staging store for a specific account and region.
-// Used for testing error cases when daemon is not running for that account.
-func newStoreForAccount(accountID, region string) store.AgentStore {
-	return agent.NewStore(accountID, region)
+func newStoreForAccount(accountID, region string) *file.Store {
+	s, err := file.NewStore(accountID, region)
+	if err != nil {
+		panic(err)
+	}
+
+	return s
 }
 
 // runCommand executes a CLI command and returns stdout, stderr, and error.

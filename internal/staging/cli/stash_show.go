@@ -11,7 +11,6 @@ import (
 	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/infra"
 	"github.com/mpyw/suve/internal/staging"
-	"github.com/mpyw/suve/internal/staging/store/agent/daemon/lifecycle"
 	"github.com/mpyw/suve/internal/staging/store/file"
 )
 
@@ -129,25 +128,21 @@ func stashShowAction(service staging.Service) func(context.Context, *cli.Command
 			return fmt.Errorf("failed to get AWS identity: %w", err)
 		}
 
-		err = lifecycle.ExecuteFile0(ctx, lifecycle.CmdStashShow, func() error {
-			fileStore, err := fileStoreForReading(cmd, identity.AccountID, identity.Region, true)
-			if err != nil {
-				return err
-			}
+		fileStore, err := fileStoreForReading(cmd, identity.AccountID, identity.Region, true)
+		if err != nil {
+			return err
+		}
 
-			r := &StashShowRunner{
-				FileStore: fileStore,
-				Stdout:    cmd.Root().Writer,
-				Stderr:    cmd.Root().ErrWriter,
-			}
+		r := &StashShowRunner{
+			FileStore: fileStore,
+			Stdout:    cmd.Root().Writer,
+			Stderr:    cmd.Root().ErrWriter,
+		}
 
-			return r.Run(ctx, StashShowOptions{
-				Service: service,
-				Verbose: cmd.Bool("verbose"),
-			})
+		return r.Run(ctx, StashShowOptions{
+			Service: service,
+			Verbose: cmd.Bool("verbose"),
 		})
-
-		return err
 	}
 }
 
@@ -156,10 +151,10 @@ func newGlobalStashShowCommand() *cli.Command {
 	return &cli.Command{
 		Name:  "show",
 		Usage: "Preview stashed changes without restoring",
-		Description: `Preview the contents of stashed changes without loading them into memory.
+		Description: `Preview the contents of stashed changes without restoring them.
 
-This command reads and displays the staging state from the persistent file
-without affecting the agent memory or deleting the file.
+This command reads and displays the staging state from the stash file
+without affecting the working staging area or deleting the stash file.
 
 EXAMPLES:
    suve stage stash show                            Show all stashed changes
@@ -178,10 +173,10 @@ func newStashShowCommand(cfg CommandConfig) *cli.Command {
 	return &cli.Command{
 		Name:  "show",
 		Usage: fmt.Sprintf("Preview stashed %s changes without restoring", cfg.ItemName),
-		Description: fmt.Sprintf(`Preview the contents of stashed %s changes without loading them into memory.
+		Description: fmt.Sprintf(`Preview the contents of stashed %s changes without restoring them.
 
-This command reads and displays the staging state for %ss from the persistent
-file without affecting the agent memory or deleting the file.
+This command reads and displays the staging state for %ss from the stash file
+without affecting the working staging area or deleting the stash file.
 
 EXAMPLES:
    suve stage %s stash show                            Show stashed %s changes

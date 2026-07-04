@@ -12,7 +12,7 @@ import (
 	"github.com/mpyw/suve/internal/infra"
 	"github.com/mpyw/suve/internal/staging"
 	"github.com/mpyw/suve/internal/staging/store"
-	"github.com/mpyw/suve/internal/staging/store/agent"
+	"github.com/mpyw/suve/internal/staging/store/file"
 )
 
 // =============================================================================
@@ -53,8 +53,8 @@ type App struct {
 	paramClient  ParamClient
 	secretClient SecretClient
 
-	// Staging store (AgentStore includes ReadWriteOperator)
-	stagingStore   store.AgentStore
+	// Staging store (the working staging area, backed by stage.json)
+	stagingStore   store.ReadWriteOperator
 	stagingStoreMu sync.Mutex // protects stagingStore initialization
 }
 
@@ -114,15 +114,6 @@ func (a *App) getSecretClient() (SecretClient, error) {
 }
 
 func (a *App) getStagingStore() (store.ReadWriteOperator, error) {
-	s, err := a.getAgentStore()
-	if err != nil {
-		return nil, err
-	}
-
-	return s, nil
-}
-
-func (a *App) getAgentStore() (store.AgentStore, error) {
 	a.stagingStoreMu.Lock()
 	defer a.stagingStoreMu.Unlock()
 
@@ -135,7 +126,11 @@ func (a *App) getAgentStore() (store.AgentStore, error) {
 		return nil, err
 	}
 
-	s := agent.NewStore(identity.AccountID, identity.Region)
+	s, err := file.NewStore(identity.AccountID, identity.Region)
+	if err != nil {
+		return nil, err
+	}
+
 	a.stagingStore = s
 
 	return s, nil

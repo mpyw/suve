@@ -44,7 +44,6 @@ func TestCommand_HasExpectedSubcommands(t *testing.T) {
 		"apply",
 		"reset",
 		"stash",
-		"agent",
 	}
 
 	for _, expected := range expectedSubcommands {
@@ -85,21 +84,4 @@ func TestCommand_SecretSubcommand(t *testing.T) {
 	require.NotNil(t, secretCmd)
 	assert.Equal(t, "secret", secretCmd.Name)
 	assert.Contains(t, secretCmd.Aliases, "sm")
-}
-
-func TestCommand_AgentSubcommand(t *testing.T) {
-	t.Parallel()
-
-	cmd := stage.Command()
-	require.NotNil(t, cmd)
-
-	// Find agent subcommand
-	agentCmd, found := lo.Find(cmd.Commands, func(c *cli.Command) bool {
-		return c.Name == "agent"
-	})
-
-	require.True(t, found, "should have agent subcommand")
-	require.NotNil(t, agentCmd)
-	assert.Equal(t, "agent", agentCmd.Name)
-	assert.NotEmpty(t, agentCmd.Commands) // Has start and stop
 }

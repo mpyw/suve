@@ -16,20 +16,20 @@ func NewGlobalStashCommand() *cli.Command {
 	return &cli.Command{
 		Name:  "stash",
 		Usage: "Save staged changes to file for later use",
-		Description: `Save staged changes from memory to a file for later restoration.
+		Description: `Save staged changes from the working staging area to the stash file for later restoration.
 
 This command group provides Git-like stash functionality:
-   push     Save staged changes to file (default when running 'stash' alone)
-   pop      Restore staged changes from file (use --keep to preserve file)
+   push     Save staged changes to the stash file (default when running 'stash' alone)
+   pop      Restore staged changes from the stash file (use --keep to preserve it)
    show     Preview stashed changes without restoring
    drop     Delete stashed changes without restoring
 
 EXAMPLES:
-   suve stage stash                    Save changes to file (same as 'stash push')
-   suve stage stash push               Save changes to file and clear memory
-   suve stage stash push --keep        Save changes to file but keep in memory
-   suve stage stash pop                Restore from file and delete file
-   suve stage stash pop --keep         Restore from file but keep file
+   suve stage stash                    Save changes to the stash file (same as 'stash push')
+   suve stage stash push               Save changes to the stash file and clear the working staging area
+   suve stage stash push --keep        Save changes to the stash file but keep the working staging area
+   suve stage stash pop                Restore from the stash file and delete it
+   suve stage stash pop --keep         Restore from the stash file but keep it
    suve stage stash show               Preview stashed changes
    suve stage stash drop               Delete stashed changes`,
 		Action: stashPushAction(""), // Default action = push
@@ -51,19 +51,19 @@ func NewStashCommand(cfg CommandConfig) *cli.Command {
 	return &cli.Command{
 		Name:  "stash",
 		Usage: fmt.Sprintf("Save staged %s changes to file for later use", cfg.ItemName),
-		Description: fmt.Sprintf(`Save staged %s changes from memory to a file for later restoration.
+		Description: fmt.Sprintf(`Save staged %s changes from the working staging area to the stash file for later restoration.
 
 This command group provides Git-like stash functionality:
-   push     Save staged changes to file (default when running 'stash' alone)
-   pop      Restore staged changes from file (use --keep to preserve file)
+   push     Save staged changes to the stash file (default when running 'stash' alone)
+   pop      Restore staged changes from the stash file (use --keep to preserve it)
    show     Preview stashed changes without restoring
    drop     Delete stashed changes without restoring
 
 EXAMPLES:
-   suve stage %s stash                    Save changes to file
-   suve stage %s stash push               Save changes to file and clear memory
-   suve stage %s stash pop                Restore from file and delete file
-   suve stage %s stash pop --keep         Restore from file but keep file
+   suve stage %s stash                    Save changes to the stash file
+   suve stage %s stash push               Save changes to the stash file and clear the working staging area
+   suve stage %s stash pop                Restore from the stash file and delete it
+   suve stage %s stash pop --keep         Restore from the stash file but keep it
    suve stage %s stash show               Preview stashed changes
    suve stage %s stash drop               Delete stashed changes`,
 			cfg.ItemName,
@@ -88,9 +88,9 @@ EXAMPLES:
 // It handles passphrase prompting if the file is encrypted.
 // If checkExists is true, returns an error if the file doesn't exist.
 func fileStoreForReading(cmd *cli.Command, accountID, region string, checkExists bool) (*file.Store, error) {
-	basicFileStore, err := file.NewStore(accountID, region)
+	basicFileStore, err := file.NewStashStore(accountID, region)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create file store: %w", err)
+		return nil, fmt.Errorf("failed to create stash store: %w", err)
 	}
 
 	if checkExists {
@@ -134,5 +134,5 @@ func fileStoreForReading(cmd *cli.Command, accountID, region string, checkExists
 		}
 	}
 
-	return file.NewStoreWithPassphrase(accountID, region, pass)
+	return file.NewStashStoreWithPassphrase(accountID, region, pass)
 }

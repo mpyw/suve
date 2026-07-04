@@ -12,11 +12,11 @@ import (
 type StashPushInput struct {
 	// Service filters the persist to a specific service. Empty means all services.
 	Service staging.Service
-	// Keep preserves the agent memory after persisting.
+	// Keep preserves the working staging area after persisting.
 	Keep bool
 	// Mode determines how to handle existing stash file.
-	// StashModeMerge combines agent data with existing file data.
-	// StashModeOverwrite replaces existing file data.
+	// StashModeMerge combines working data with existing stash data.
+	// StashModeOverwrite replaces existing stash data.
 	Mode StashMode
 }
 
@@ -28,22 +28,24 @@ type StashPushOutput struct {
 	TagCount int
 }
 
-// StashPushUseCase executes persist operations (agent -> file).
+// StashPushUseCase executes persist operations (working stage.json -> stash.json).
 type StashPushUseCase struct {
-	AgentStore store.AgentStore
-	FileStore  store.FileStore
+	// Working is the working staging area (stage.json).
+	Working store.FileStore
+	// Stash is the stash file (stash.json).
+	Stash store.FileStore
 }
 
 // Execute runs the persist use case.
 func (u *StashPushUseCase) Execute(ctx context.Context, input StashPushInput) (*StashPushOutput, error) {
-	// Drain state from agent (keep for now, will clear after successful file write if needed)
-	agentState, err := u.AgentStore.Drain(ctx, "", true)
+	// Read state from the working staging area (keep for now, will clear after successful stash write if needed)
+	workingState, err := u.Working.Drain(ctx, "", true)
 	if err != nil {
 		return nil, &StashPushError{Op: "load", Err: err}
 	}
 
 	// Extract service-specific state if filtered
-	persistState := agentState.ExtractService(input.Service)
+	persistState := workingState.ExtractService(input.Service)
 
 	// Check if there's anything to persist
 	if persistState.IsEmpty() {
@@ -55,39 +57,39 @@ func (u *StashPushUseCase) Execute(ctx context.Context, input StashPushInput) (*
 
 	switch {
 	case input.Service != "":
-		// Service-specific: always preserve other services from file
-		fileState, err := u.FileStore.Drain(ctx, "", true)
+		// Service-specific: always preserve other services from stash
+		stashState, err := u.Stash.Drain(ctx, "", true)
 		if err != nil {
-			// File might not exist, which is fine - start fresh
-			fileState = staging.NewEmptyState()
+			// Stash might not exist, which is fine - start fresh
+			stashState = staging.NewEmptyState()
 		}
 
-		finalState = fileState
+		finalState = stashState
 		if input.Mode == StashModeOverwrite {
-			// Overwrite: clear target service, then add agent's data
+			// Overwrite: clear target service, then add working's data
 			finalState.RemoveService(input.Service)
 			finalState.Merge(persistState)
 		} else {
-			// Merge: combine file's target service with agent's target service
+			// Merge: combine stash's target service with working's target service
 			finalState.Merge(persistState)
 		}
 	case input.Mode == StashModeMerge:
-		// Global merge: combine file state with agent state
-		fileState, err := u.FileStore.Drain(ctx, "", true)
+		// Global merge: combine stash state with working state
+		stashState, err := u.Stash.Drain(ctx, "", true)
 		if err != nil {
-			// File might not exist, which is fine - start fresh
-			fileState = staging.NewEmptyState()
+			// Stash might not exist, which is fine - start fresh
+			stashState = staging.NewEmptyState()
 		}
 
-		finalState = fileState
+		finalState = stashState
 		finalState.Merge(persistState)
 	default:
-		// Global overwrite: replace entire file with agent state
+		// Global overwrite: replace entire stash with working state
 		finalState = persistState
 	}
 
-	// Write to file
-	if err := u.FileStore.WriteState(ctx, "", finalState); err != nil {
+	// Write to stash file
+	if err := u.Stash.WriteState(ctx, "", finalState); err != nil {
 		return nil, &StashPushError{Op: "write", Err: err}
 	}
 
@@ -107,24 +109,18 @@ func (u *StashPushUseCase) Execute(ctx context.Context, input StashPushInput) (*
 		TagCount:   tagCount,
 	}
 
-	// Clear agent memory for the persisted service unless --keep is specified
+	// Clear the working staging area for the persisted service unless --keep is specified
 	if !input.Keep {
 		if input.Service != "" {
-			// Remove only the persisted service from agent, keep the rest
-			agentState.RemoveService(input.Service)
-
-			if err := u.AgentStore.WriteState(ctx, "", agentState); err != nil {
-				return output, &StashPushError{Op: "clear", Err: err, NonFatal: true}
-			}
+			// Remove only the persisted service from working, keep the rest
+			workingState.RemoveService(input.Service)
 		} else {
-			// Clear all memory with persist hint for proper shutdown message
-			if hinted, ok := u.AgentStore.(store.HintedUnstager); ok {
-				if err := hinted.UnstageAllWithHint(ctx, "", store.HintPersist); err != nil {
-					return output, &StashPushError{Op: "clear", Err: err, NonFatal: true}
-				}
-			} else if err := u.AgentStore.UnstageAll(ctx, ""); err != nil {
-				return output, &StashPushError{Op: "clear", Err: err, NonFatal: true}
-			}
+			// Clear all working state
+			workingState = staging.NewEmptyState()
+		}
+
+		if err := u.Working.WriteState(ctx, "", workingState); err != nil {
+			return output, &StashPushError{Op: "clear", Err: err, NonFatal: true}
 		}
 	}
 
@@ -146,11 +142,11 @@ type StashPushError struct {
 func (e *StashPushError) Error() string {
 	switch e.Op {
 	case "load":
-		return "failed to get state from agent: " + e.Err.Error()
+		return "failed to read the working staging area: " + e.Err.Error()
 	case "write":
 		return "failed to save state to file: " + e.Err.Error()
 	case "clear":
-		return "failed to clear agent memory: " + e.Err.Error()
+		return "failed to clear the working staging area: " + e.Err.Error()
 	default:
 		return e.Err.Error()
 	}

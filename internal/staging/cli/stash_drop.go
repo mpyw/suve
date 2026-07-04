@@ -14,7 +14,6 @@ import (
 	"github.com/mpyw/suve/internal/cli/terminal"
 	"github.com/mpyw/suve/internal/infra"
 	"github.com/mpyw/suve/internal/staging"
-	"github.com/mpyw/suve/internal/staging/store/agent/daemon/lifecycle"
 	"github.com/mpyw/suve/internal/staging/store/file"
 )
 
@@ -121,74 +120,72 @@ func globalStashDropAction() func(context.Context, *cli.Command) error {
 			return fmt.Errorf("failed to get AWS identity: %w", err)
 		}
 
-		return lifecycle.ExecuteFile0(ctx, lifecycle.CmdStashDrop, func() error {
-			fileStore, err := file.NewStore(identity.AccountID, identity.Region)
+		fileStore, err := file.NewStashStore(identity.AccountID, identity.Region)
+		if err != nil {
+			return fmt.Errorf("failed to create stash store: %w", err)
+		}
+
+		// Check if file exists
+		exists, err := fileStore.Exists()
+		if err != nil {
+			return fmt.Errorf("failed to check stash file: %w", err)
+		}
+
+		if !exists {
+			return errors.New("no stashed changes to drop")
+		}
+
+		// Confirm unless --yes
+		skipConfirm := cmd.Bool("yes")
+		if !skipConfirm && terminal.IsTerminalWriter(cmd.Root().ErrWriter) {
+			// Check if encrypted to decide confirmation message
+			isEncrypted, err := fileStore.IsEncrypted()
 			if err != nil {
-				return fmt.Errorf("failed to create file store: %w", err)
+				return fmt.Errorf("failed to check file encryption: %w", err)
 			}
 
-			// Check if file exists
-			exists, err := fileStore.Exists()
+			confirmer := &dropConfirmer{
+				stdin:  cmd.Root().Reader,
+				stdout: cmd.Root().Writer,
+				stderr: cmd.Root().ErrWriter,
+			}
+
+			var confirmed bool
+			if isEncrypted {
+				// Can't count items without decryption, show generic message
+				confirmed, err = confirmer.confirmGlobalDrop(true, 0)
+			} else {
+				// Read to count items for confirmation message
+				state, readErr := fileStore.Drain(ctx, "", true)
+				if readErr != nil {
+					return fmt.Errorf("failed to read stash file: %w", readErr)
+				}
+
+				itemCount := state.TotalCount()
+				if itemCount == 0 {
+					return errors.New("no stashed changes to drop")
+				}
+
+				confirmed, err = confirmer.confirmGlobalDrop(false, itemCount)
+			}
+
 			if err != nil {
-				return fmt.Errorf("failed to check stash file: %w", err)
+				return fmt.Errorf("failed to get confirmation: %w", err)
 			}
 
-			if !exists {
-				return errors.New("no stashed changes to drop")
+			if !confirmed {
+				output.Info(cmd.Root().Writer, "Operation cancelled.")
+
+				return nil
 			}
+		}
 
-			// Confirm unless --yes
-			skipConfirm := cmd.Bool("yes")
-			if !skipConfirm && terminal.IsTerminalWriter(cmd.Root().ErrWriter) {
-				// Check if encrypted to decide confirmation message
-				isEncrypted, err := fileStore.IsEncrypted()
-				if err != nil {
-					return fmt.Errorf("failed to check file encryption: %w", err)
-				}
+		r := &GlobalDropRunner{
+			FileStore: fileStore,
+			Stdout:    cmd.Root().Writer,
+		}
 
-				confirmer := &dropConfirmer{
-					stdin:  cmd.Root().Reader,
-					stdout: cmd.Root().Writer,
-					stderr: cmd.Root().ErrWriter,
-				}
-
-				var confirmed bool
-				if isEncrypted {
-					// Can't count items without decryption, show generic message
-					confirmed, err = confirmer.confirmGlobalDrop(true, 0)
-				} else {
-					// Read to count items for confirmation message
-					state, readErr := fileStore.Drain(ctx, "", true)
-					if readErr != nil {
-						return fmt.Errorf("failed to read stash file: %w", readErr)
-					}
-
-					itemCount := state.TotalCount()
-					if itemCount == 0 {
-						return errors.New("no stashed changes to drop")
-					}
-
-					confirmed, err = confirmer.confirmGlobalDrop(false, itemCount)
-				}
-
-				if err != nil {
-					return fmt.Errorf("failed to get confirmation: %w", err)
-				}
-
-				if !confirmed {
-					output.Info(cmd.Root().Writer, "Operation cancelled.")
-
-					return nil
-				}
-			}
-
-			r := &GlobalDropRunner{
-				FileStore: fileStore,
-				Stdout:    cmd.Root().Writer,
-			}
-
-			return r.Run()
-		})
+		return r.Run()
 	}
 }
 
@@ -200,53 +197,51 @@ func serviceStashDropAction(service staging.Service) func(context.Context, *cli.
 			return fmt.Errorf("failed to get AWS identity: %w", err)
 		}
 
-		return lifecycle.ExecuteFile0(ctx, lifecycle.CmdStashDrop, func() error {
-			// Use fileStoreForReading which handles passphrase prompting for encrypted files
-			fileStore, err := fileStoreForReading(cmd, identity.AccountID, identity.Region, true)
+		// Use fileStoreForReading which handles passphrase prompting for encrypted files
+		fileStore, err := fileStoreForReading(cmd, identity.AccountID, identity.Region, true)
+		if err != nil {
+			return err
+		}
+
+		// Confirm unless --yes
+		skipConfirm := cmd.Bool("yes")
+		if !skipConfirm && terminal.IsTerminalWriter(cmd.Root().ErrWriter) {
+			// Count items for the message
+			state, err := fileStore.Drain(ctx, "", true)
 			if err != nil {
-				return err
+				return fmt.Errorf("failed to read stash file: %w", err)
 			}
 
-			// Confirm unless --yes
-			skipConfirm := cmd.Bool("yes")
-			if !skipConfirm && terminal.IsTerminalWriter(cmd.Root().ErrWriter) {
-				// Count items for the message
-				state, err := fileStore.Drain(ctx, "", true)
-				if err != nil {
-					return fmt.Errorf("failed to read stash file: %w", err)
-				}
-
-				itemCount := len(state.Entries[service]) + len(state.Tags[service])
-				if itemCount == 0 {
-					return fmt.Errorf("no stashed changes for %s", service)
-				}
-
-				confirmer := &dropConfirmer{
-					stdin:  cmd.Root().Reader,
-					stdout: cmd.Root().Writer,
-					stderr: cmd.Root().ErrWriter,
-				}
-
-				confirmed, err := confirmer.confirmServiceDrop(service, itemCount)
-				if err != nil {
-					return fmt.Errorf("failed to get confirmation: %w", err)
-				}
-
-				if !confirmed {
-					output.Info(cmd.Root().Writer, "Operation cancelled.")
-
-					return nil
-				}
+			itemCount := len(state.Entries[service]) + len(state.Tags[service])
+			if itemCount == 0 {
+				return fmt.Errorf("no stashed changes for %s", service)
 			}
 
-			r := &ServiceDropRunner{
-				FileStore: fileStore,
-				Service:   service,
-				Stdout:    cmd.Root().Writer,
+			confirmer := &dropConfirmer{
+				stdin:  cmd.Root().Reader,
+				stdout: cmd.Root().Writer,
+				stderr: cmd.Root().ErrWriter,
 			}
 
-			return r.Run(ctx)
-		})
+			confirmed, err := confirmer.confirmServiceDrop(service, itemCount)
+			if err != nil {
+				return fmt.Errorf("failed to get confirmation: %w", err)
+			}
+
+			if !confirmed {
+				output.Info(cmd.Root().Writer, "Operation cancelled.")
+
+				return nil
+			}
+		}
+
+		r := &ServiceDropRunner{
+			FileStore: fileStore,
+			Service:   service,
+			Stdout:    cmd.Root().Writer,
+		}
+
+		return r.Run(ctx)
 	}
 }
 

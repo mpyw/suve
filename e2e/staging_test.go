@@ -28,7 +28,6 @@ import (
 	"github.com/mpyw/suve/internal/maputil"
 	"github.com/mpyw/suve/internal/staging"
 	stgcli "github.com/mpyw/suve/internal/staging/cli"
-	"github.com/mpyw/suve/internal/staging/store/agent/daemon"
 )
 
 // =============================================================================
@@ -373,7 +372,7 @@ func TestGlobal_StashPushAndPop(t *testing.T) {
 		_, _, _ = runCommand(t, globalreset.Command(), "--yes")
 	})
 
-	// Stage a parameter in agent memory
+	// Stage a parameter in the working staging area
 	t.Run("stage-add", func(t *testing.T) {
 		stdout, _, err := runCommand(t, paramstage.Command(), "add", paramName, "test-value")
 		require.NoError(t, err)
@@ -576,7 +575,7 @@ func TestMixed_ServiceSpecificStashPushPop(t *testing.T) {
 		require.NoError(t, err)
 	})
 
-	// Param should be gone from agent, secret should remain
+	// Param should be gone from the working staging area, secret should remain
 	t.Run("verify-param-gone-secret-remains", func(t *testing.T) {
 		paramStatus, _, err := runSubCommand(t, paramstage.Command(), "status")
 		require.NoError(t, err)
@@ -1125,59 +1124,11 @@ func TestAgentStore_ListMethods(t *testing.T) {
 }
 
 // =============================================================================
-// Daemon Launcher Tests (for IPC coverage)
+// Store Sequential Operation Tests
 // =============================================================================
 
-// TestDaemonLauncher_Ping tests the launcher Ping method directly.
-func TestDaemonLauncher_Ping(t *testing.T) {
-	setupEnv(t)
-	setupTempHome(t)
-
-	// Create launcher for the running test daemon
-	launcher := daemon.NewLauncher("000000000000", "us-east-1", daemon.WithAutoStartDisabled())
-
-	// Test Ping
-	t.Run("ping-success", func(t *testing.T) {
-		err := launcher.Ping(t.Context())
-		require.NoError(t, err)
-	})
-
-	// Test multiple pings (concurrent access)
-	t.Run("ping-concurrent", func(t *testing.T) {
-		ctx := t.Context()
-		done := make(chan error, 10)
-
-		for range 10 {
-			go func() {
-				done <- launcher.Ping(ctx)
-			}()
-		}
-
-		for range 10 {
-			err := <-done
-			assert.NoError(t, err)
-		}
-	})
-}
-
-// TestDaemonLauncher_EnsureRunning tests the EnsureRunning method.
-func TestDaemonLauncher_EnsureRunning(t *testing.T) {
-	setupEnv(t)
-	setupTempHome(t)
-
-	// Create launcher for the running test daemon
-	launcher := daemon.NewLauncher("000000000000", "us-east-1", daemon.WithAutoStartDisabled())
-
-	// Test EnsureRunning (daemon is already running from TestMain)
-	t.Run("ensure-running-when-running", func(t *testing.T) {
-		err := launcher.EnsureRunning(t.Context())
-		require.NoError(t, err)
-	})
-}
-
-// TestDaemonLauncher_ViaStore tests launcher IPC indirectly through store operations.
-// This exercises the SendRequest method via the store's methods.
-func TestDaemonLauncher_ViaStore(t *testing.T) {
+// TestStore_SequentialOperations exercises the store through repeated operations.
+func TestStore_SequentialOperations(t *testing.T) {
 	setupEnv(t)
 	setupTempHome(t)
 
@@ -1231,51 +1182,30 @@ func TestDaemonLauncher_ViaStore(t *testing.T) {
 	})
 }
 
-// TestDaemonLauncher_NotRunning tests launcher behavior when daemon is not running.
-func TestDaemonLauncher_NotRunning(t *testing.T) {
+// TestStore_SeparateAccounts verifies that stores for different accounts are isolated.
+func TestStore_SeparateAccounts(t *testing.T) {
 	setupEnv(t)
 	setupTempHome(t)
 
-	// Create launcher for a different account where no daemon is running
-	launcher := daemon.NewLauncher("999999999999", "ap-northeast-1", daemon.WithAutoStartDisabled())
-
-	// Test Ping fails when daemon not running
-	t.Run("ping-not-running", func(t *testing.T) {
-		err := launcher.Ping(t.Context())
-		assert.Error(t, err)
-	})
-
-	// Test EnsureRunning fails when auto-start is disabled
-	t.Run("ensure-running-fails", func(t *testing.T) {
-		err := launcher.EnsureRunning(t.Context())
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "auto-start is disabled")
-	})
-}
-
-// TestAgentStore_NotRunning tests store behavior when daemon is not running.
-func TestAgentStore_NotRunning(t *testing.T) {
-	setupEnv(t)
-	setupTempHome(t)
-
-	// Create store for a different account where no daemon is running
+	// Create store for a different account (isolated staging area).
 	store := newStoreForAccount("999999999999", "ap-northeast-1")
 
-	// Test GetEntry fails when daemon not running
-	t.Run("get-entry-not-running", func(t *testing.T) {
+	// GetEntry on an empty staging area returns ErrNotStaged.
+	t.Run("get-entry-empty", func(t *testing.T) {
 		_, err := store.GetEntry(t.Context(), staging.ServiceParam, "/test")
-		assert.Error(t, err)
+		assert.ErrorIs(t, err, staging.ErrNotStaged)
 	})
 
-	// Test ListEntries fails when daemon not running
-	t.Run("list-entries-not-running", func(t *testing.T) {
-		_, err := store.ListEntries(t.Context(), staging.ServiceParam)
-		assert.Error(t, err)
+	// ListEntries on an empty staging area returns an empty result without error.
+	t.Run("list-entries-empty", func(t *testing.T) {
+		entries, err := store.ListEntries(t.Context(), staging.ServiceParam)
+		require.NoError(t, err)
+		assert.Empty(t, entries[staging.ServiceParam])
 	})
 }
 
 // =============================================================================
-// Agent Lifecycle Tests - Commands should NOT start agent when nothing staged
+// Empty-State Command Tests - Commands report empty state without side effects
 // =============================================================================
 
 // TestAgentLifecycle_StatusDoesNotStartAgent verifies that status command
@@ -1629,7 +1559,7 @@ func TestStash_ServiceFilteredPush(t *testing.T) {
 		require.NoError(t, err)
 		t.Logf("param stash push output: %s", stdout)
 
-		// Verify param is gone from agent
+		// Verify param is gone from the working staging area
 		stdout, _, err = runSubCommand(t, paramstage.Command(), "status")
 		require.NoError(t, err)
 		assert.NotContains(t, stdout, paramName)

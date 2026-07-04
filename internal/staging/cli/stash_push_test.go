@@ -36,8 +36,8 @@ func TestStashPushRunner_RunBasic(t *testing.T) {
 
 		runner := &cli.StashPushRunner{
 			UseCase: &stagingusecase.StashPushUseCase{
-				AgentStore: agentStore,
-				FileStore:  fileStore,
+				Working: agentStore,
+				Stash:   fileStore,
 			},
 			Stdout:    stdout,
 			Stderr:    stderr,
@@ -47,7 +47,7 @@ func TestStashPushRunner_RunBasic(t *testing.T) {
 		err := runner.Run(t.Context(), cli.StashPushOptions{})
 		require.NoError(t, err)
 		assert.Contains(t, stdout.String(), "Staged changes stashed to file")
-		assert.Contains(t, stdout.String(), "cleared from memory")
+		assert.Contains(t, stdout.String(), "cleared from the working staging area")
 		// Should warn about plain text
 		assert.Contains(t, stderr.String(), "plain text")
 	})
@@ -69,8 +69,8 @@ func TestStashPushRunner_RunBasic(t *testing.T) {
 
 		runner := &cli.StashPushRunner{
 			UseCase: &stagingusecase.StashPushUseCase{
-				AgentStore: agentStore,
-				FileStore:  fileStore,
+				Working: agentStore,
+				Stash:   fileStore,
 			},
 			Stdout:    stdout,
 			Stderr:    stderr,
@@ -101,8 +101,8 @@ func TestStashPushRunner_RunBasic(t *testing.T) {
 
 		runner := &cli.StashPushRunner{
 			UseCase: &stagingusecase.StashPushUseCase{
-				AgentStore: agentStore,
-				FileStore:  fileStore,
+				Working: agentStore,
+				Stash:   fileStore,
 			},
 			Stdout:    stdout,
 			Stderr:    stderr,
@@ -111,7 +111,7 @@ func TestStashPushRunner_RunBasic(t *testing.T) {
 
 		err := runner.Run(t.Context(), cli.StashPushOptions{Keep: true})
 		require.NoError(t, err)
-		assert.Contains(t, stdout.String(), "kept in memory")
+		assert.Contains(t, stdout.String(), "kept in the working staging area")
 	})
 
 	t.Run("success - stash push encrypted with keep", func(t *testing.T) {
@@ -131,8 +131,8 @@ func TestStashPushRunner_RunBasic(t *testing.T) {
 
 		runner := &cli.StashPushRunner{
 			UseCase: &stagingusecase.StashPushUseCase{
-				AgentStore: agentStore,
-				FileStore:  fileStore,
+				Working: agentStore,
+				Stash:   fileStore,
 			},
 			Stdout:    stdout,
 			Stderr:    stderr,
@@ -142,7 +142,7 @@ func TestStashPushRunner_RunBasic(t *testing.T) {
 		err := runner.Run(t.Context(), cli.StashPushOptions{Keep: true})
 		require.NoError(t, err)
 		assert.Contains(t, stdout.String(), "encrypted")
-		assert.Contains(t, stdout.String(), "kept in memory")
+		assert.Contains(t, stdout.String(), "kept in the working staging area")
 	})
 
 	t.Run("error - nothing to stash", func(t *testing.T) {
@@ -156,8 +156,8 @@ func TestStashPushRunner_RunBasic(t *testing.T) {
 
 		runner := &cli.StashPushRunner{
 			UseCase: &stagingusecase.StashPushUseCase{
-				AgentStore: agentStore,
-				FileStore:  fileStore,
+				Working: agentStore,
+				Stash:   fileStore,
 			},
 			Stdout:    stdout,
 			Stderr:    stderr,
@@ -190,8 +190,8 @@ func TestStashPushRunner_RunBasic(t *testing.T) {
 
 		runner := &cli.StashPushRunner{
 			UseCase: &stagingusecase.StashPushUseCase{
-				AgentStore: agentStore,
-				FileStore:  fileStore,
+				Working: agentStore,
+				Stash:   fileStore,
 			},
 			Stdout:    stdout,
 			Stderr:    stderr,
@@ -222,7 +222,7 @@ func TestStashPushRunner_NonFatalError(t *testing.T) {
 	}
 
 	assert.True(t, nonFatalErr.NonFatal)
-	assert.Contains(t, nonFatalErr.Error(), "failed to clear agent memory")
+	assert.Contains(t, nonFatalErr.Error(), "failed to clear the working staging area")
 }
 
 func TestStashPushRunner_Run_NonFatalErrorContinues(t *testing.T) {
@@ -252,8 +252,8 @@ func TestStashPushRunner_Run_NonFatalErrorContinues(t *testing.T) {
 
 	runner := &cli.StashPushRunner{
 		UseCase: &stagingusecase.StashPushUseCase{
-			AgentStore: agentStore,
-			FileStore:  fileStore,
+			Working: agentStore,
+			Stash:   fileStore,
 		},
 		Stdout:    stdout,
 		Stderr:    stderr,
@@ -300,8 +300,8 @@ func TestStashPushRunner_Run_WithModes(t *testing.T) {
 
 		runner := &cli.StashPushRunner{
 			UseCase: &stagingusecase.StashPushUseCase{
-				AgentStore: agentStore,
-				FileStore:  fileStore,
+				Working: agentStore,
+				Stash:   fileStore,
 			},
 			Stdout:    stdout,
 			Stderr:    stderr,
@@ -345,8 +345,8 @@ func TestStashPushRunner_Run_WithModes(t *testing.T) {
 
 		runner := &cli.StashPushRunner{
 			UseCase: &stagingusecase.StashPushUseCase{
-				AgentStore: agentStore,
-				FileStore:  fileStore,
+				Working: agentStore,
+				Stash:   fileStore,
 			},
 			Stdout:    stdout,
 			Stderr:    stderr,

@@ -2332,8 +2332,8 @@ func TestStashPopRunner_Run(t *testing.T) {
 
 		r := &cli.StashPopRunner{
 			UseCase: &stagingusecase.StashPopUseCase{
-				FileStore:  fileStore,
-				AgentStore: agentStore,
+				Stash:   fileStore,
+				Working: agentStore,
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -2369,8 +2369,8 @@ func TestStashPopRunner_Run(t *testing.T) {
 
 		r := &cli.StashPopRunner{
 			UseCase: &stagingusecase.StashPopUseCase{
-				FileStore:  fileStore,
-				AgentStore: agentStore,
+				Stash:   fileStore,
+				Working: agentStore,
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -2411,8 +2411,8 @@ func TestStashPopRunner_Run(t *testing.T) {
 
 		r := &cli.StashPopRunner{
 			UseCase: &stagingusecase.StashPopUseCase{
-				FileStore:  fileStore,
-				AgentStore: agentStore,
+				Stash:   fileStore,
+				Working: agentStore,
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -2453,8 +2453,8 @@ func TestStashPopRunner_Run(t *testing.T) {
 
 		r := &cli.StashPopRunner{
 			UseCase: &stagingusecase.StashPopUseCase{
-				FileStore:  fileStore,
-				AgentStore: agentStore,
+				Stash:   fileStore,
+				Working: agentStore,
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -2486,8 +2486,8 @@ func TestStashPopRunner_Run(t *testing.T) {
 
 		r := &cli.StashPopRunner{
 			UseCase: &stagingusecase.StashPopUseCase{
-				FileStore:  fileStore,
-				AgentStore: agentStore,
+				Stash:   fileStore,
+				Working: agentStore,
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -2522,8 +2522,8 @@ func TestStashPopRunner_Run(t *testing.T) {
 
 		r := &cli.StashPopRunner{
 			UseCase: &stagingusecase.StashPopUseCase{
-				FileStore:  fileStore,
-				AgentStore: agentStore,
+				Stash:   fileStore,
+				Working: agentStore,
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -2565,8 +2565,8 @@ func TestStashPopRunner_Run(t *testing.T) {
 
 		r := &cli.StashPopRunner{
 			UseCase: &stagingusecase.StashPopUseCase{
-				FileStore:  fileStore,
-				AgentStore: agentStore,
+				Stash:   fileStore,
+				Working: agentStore,
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -2602,8 +2602,8 @@ func TestStashPopRunner_Run(t *testing.T) {
 
 		r := &cli.StashPopRunner{
 			UseCase: &stagingusecase.StashPopUseCase{
-				FileStore:  fileStore,
-				AgentStore: agentStore,
+				Stash:   fileStore,
+				Working: agentStore,
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -2638,8 +2638,8 @@ func TestStashPopRunner_Run(t *testing.T) {
 
 		r := &cli.StashPopRunner{
 			UseCase: &stagingusecase.StashPopUseCase{
-				FileStore:  fileStore,
-				AgentStore: agentStore,
+				Stash:   fileStore,
+				Working: agentStore,
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -2679,8 +2679,8 @@ func TestStashPushRunner_Run(t *testing.T) {
 
 		r := &cli.StashPushRunner{
 			UseCase: &stagingusecase.StashPushUseCase{
-				AgentStore: agentStore,
-				FileStore:  fileStore,
+				Working: agentStore,
+				Stash:   fileStore,
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -2688,7 +2688,7 @@ func TestStashPushRunner_Run(t *testing.T) {
 
 		err := r.Run(t.Context(), cli.StashPushOptions{})
 		require.NoError(t, err)
-		assert.Contains(t, stdout.String(), "Staged changes stashed to file and cleared from memory")
+		assert.Contains(t, stdout.String(), "Staged changes stashed to file and cleared from the working staging area")
 		assert.Contains(t, stderr.String(), "plain text") // Warning about plain text storage
 
 		// Verify entry was moved to file
@@ -2717,8 +2717,8 @@ func TestStashPushRunner_Run(t *testing.T) {
 
 		r := &cli.StashPushRunner{
 			UseCase: &stagingusecase.StashPushUseCase{
-				AgentStore: agentStore,
-				FileStore:  fileStore,
+				Working: agentStore,
+				Stash:   fileStore,
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -2726,7 +2726,7 @@ func TestStashPushRunner_Run(t *testing.T) {
 
 		err := r.Run(t.Context(), cli.StashPushOptions{Keep: true})
 		require.NoError(t, err)
-		assert.Contains(t, stdout.String(), "kept in memory")
+		assert.Contains(t, stdout.String(), "kept in the working staging area")
 
 		// Verify entry exists in both stores
 		_, err = fileStore.GetEntry(t.Context(), staging.ServiceParam, "/app/config")
@@ -2751,8 +2751,8 @@ func TestStashPushRunner_Run(t *testing.T) {
 
 		r := &cli.StashPushRunner{
 			UseCase: &stagingusecase.StashPushUseCase{
-				AgentStore: agentStore,
-				FileStore:  fileStore,
+				Working: agentStore,
+				Stash:   fileStore,
 			},
 			Stdout:    &stdout,
 			Stderr:    &stderr,
@@ -2775,8 +2775,8 @@ func TestStashPushRunner_Run(t *testing.T) {
 
 		r := &cli.StashPushRunner{
 			UseCase: &stagingusecase.StashPushUseCase{
-				AgentStore: agentStore,
-				FileStore:  fileStore,
+				Working: agentStore,
+				Stash:   fileStore,
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -2809,8 +2809,8 @@ func TestStashPushRunner_Run(t *testing.T) {
 
 		r := &cli.StashPushRunner{
 			UseCase: &stagingusecase.StashPushUseCase{
-				AgentStore: agentStore,
-				FileStore:  fileStore,
+				Working: agentStore,
+				Stash:   fileStore,
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -2845,8 +2845,8 @@ func TestStashPushRunner_Run(t *testing.T) {
 
 		r := &cli.StashPushRunner{
 			UseCase: &stagingusecase.StashPushUseCase{
-				AgentStore: agentStore,
-				FileStore:  fileStore,
+				Working: agentStore,
+				Stash:   fileStore,
 			},
 			Stdout:    &stdout,
 			Stderr:    &stderr,
@@ -2855,7 +2855,7 @@ func TestStashPushRunner_Run(t *testing.T) {
 
 		err := r.Run(t.Context(), cli.StashPushOptions{Keep: true})
 		require.NoError(t, err)
-		assert.Contains(t, stdout.String(), "encrypted, kept in memory")
+		assert.Contains(t, stdout.String(), "encrypted, kept in the working staging area")
 	})
 }
 

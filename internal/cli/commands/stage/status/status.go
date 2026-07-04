@@ -15,8 +15,7 @@ import (
 	"github.com/mpyw/suve/internal/maputil"
 	"github.com/mpyw/suve/internal/staging"
 	"github.com/mpyw/suve/internal/staging/store"
-	"github.com/mpyw/suve/internal/staging/store/agent"
-	"github.com/mpyw/suve/internal/staging/store/agent/daemon/lifecycle"
+	"github.com/mpyw/suve/internal/staging/store/file"
 )
 
 // Runner executes the status command.
@@ -60,30 +59,22 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		return fmt.Errorf("failed to get AWS identity: %w", err)
 	}
 
-	store := agent.NewStore(identity.AccountID, identity.Region)
+	store, err := file.NewStore(identity.AccountID, identity.Region)
+	if err != nil {
+		return fmt.Errorf("failed to create staging store: %w", err)
+	}
 
 	opts := Options{
 		Verbose: cmd.Bool("verbose"),
 	}
 
-	result, err := lifecycle.ExecuteRead0(ctx, store, lifecycle.CmdStatus, func() error {
-		r := &Runner{
-			Store:  store,
-			Stdout: cmd.Root().Writer,
-			Stderr: cmd.Root().ErrWriter,
-		}
-
-		return r.Run(ctx, opts)
-	})
-	if err != nil {
-		return err
+	r := &Runner{
+		Store:  store,
+		Stdout: cmd.Root().Writer,
+		Stderr: cmd.Root().ErrWriter,
 	}
 
-	if result.NothingStaged {
-		output.Info(cmd.Root().Writer, "No changes staged.")
-	}
-
-	return nil
+	return r.Run(ctx, opts)
 }
 
 // Run executes the status command.

@@ -675,14 +675,14 @@ func (a *App) StagingDiff(service string, name string) (*StagingDiffResult, erro
 // Drain/Persist Types
 // =============================================================================
 
-// StagingDrainResult represents the result of draining from file to agent.
+// StagingDrainResult represents the result of draining from the stash file to the working staging area.
 type StagingDrainResult struct {
 	Merged     bool `json:"merged"`
 	EntryCount int  `json:"entryCount"`
 	TagCount   int  `json:"tagCount"`
 }
 
-// StagingPersistResult represents the result of persisting from agent to file.
+// StagingPersistResult represents the result of persisting from the working staging area to the stash file.
 type StagingPersistResult struct {
 	EntryCount int `json:"entryCount"`
 	TagCount   int `json:"tagCount"`
@@ -705,7 +705,7 @@ func (a *App) StagingFileStatus() (*StagingFileStatusResult, error) {
 		return nil, err
 	}
 
-	fileStore, err := file.NewStore(identity.AccountID, identity.Region)
+	fileStore, err := file.NewStashStore(identity.AccountID, identity.Region)
 	if err != nil {
 		return nil, err
 	}
@@ -731,7 +731,7 @@ func (a *App) StagingFileStatus() (*StagingFileStatusResult, error) {
 	return result, nil
 }
 
-// StagingDrain loads staged changes from file into agent memory.
+// StagingDrain loads staged changes from the stash file into the working staging area.
 // If the file is encrypted, passphrase must be provided.
 // mode: "overwrite" or "merge" (default)
 func (a *App) StagingDrain(service string, passphrase string, keep bool, mode string) (*StagingDrainResult, error) {
@@ -740,12 +740,12 @@ func (a *App) StagingDrain(service string, passphrase string, keep bool, mode st
 		return nil, err
 	}
 
-	fileStore, err := file.NewStoreWithPassphrase(identity.AccountID, identity.Region, passphrase)
+	stashStore, err := file.NewStashStoreWithPassphrase(identity.AccountID, identity.Region, passphrase)
 	if err != nil {
 		return nil, err
 	}
 
-	agentStore, err := a.getAgentStore()
+	working, err := file.NewStore(identity.AccountID, identity.Region)
 	if err != nil {
 		return nil, err
 	}
@@ -764,8 +764,8 @@ func (a *App) StagingDrain(service string, passphrase string, keep bool, mode st
 	}
 
 	uc := &stagingusecase.StashPopUseCase{
-		FileStore:  fileStore,
-		AgentStore: agentStore,
+		Stash:   stashStore,
+		Working: working,
 	}
 
 	result, err := uc.Execute(a.ctx, stagingusecase.StashPopInput{
@@ -784,7 +784,7 @@ func (a *App) StagingDrain(service string, passphrase string, keep bool, mode st
 	}, nil
 }
 
-// StagingPersist saves staged changes from agent memory to file.
+// StagingPersist saves staged changes from the working staging area to the stash file.
 // If passphrase is provided, the file will be encrypted.
 // mode: "overwrite" or "merge"
 func (a *App) StagingPersist(service string, passphrase string, keep bool, mode string) (*StagingPersistResult, error) {
@@ -793,12 +793,12 @@ func (a *App) StagingPersist(service string, passphrase string, keep bool, mode 
 		return nil, err
 	}
 
-	fileStore, err := file.NewStoreWithPassphrase(identity.AccountID, identity.Region, passphrase)
+	stashStore, err := file.NewStashStoreWithPassphrase(identity.AccountID, identity.Region, passphrase)
 	if err != nil {
 		return nil, err
 	}
 
-	agentStore, err := a.getAgentStore()
+	working, err := file.NewStore(identity.AccountID, identity.Region)
 	if err != nil {
 		return nil, err
 	}
@@ -817,8 +817,8 @@ func (a *App) StagingPersist(service string, passphrase string, keep bool, mode 
 	}
 
 	uc := &stagingusecase.StashPushUseCase{
-		AgentStore: agentStore,
-		FileStore:  fileStore,
+		Working: working,
+		Stash:   stashStore,
 	}
 
 	result, err := uc.Execute(a.ctx, stagingusecase.StashPushInput{
@@ -849,7 +849,7 @@ func (a *App) StagingDrop() (*StagingDropResult, error) {
 		return nil, err
 	}
 
-	fileStore, err := file.NewStore(identity.AccountID, identity.Region)
+	fileStore, err := file.NewStashStore(identity.AccountID, identity.Region)
 	if err != nil {
 		return nil, err
 	}

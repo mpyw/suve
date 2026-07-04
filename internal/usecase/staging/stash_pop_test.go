@@ -31,8 +31,8 @@ func TestDrainUseCase_Execute(t *testing.T) {
 		})
 
 		usecase := &stagingusecase.StashPopUseCase{
-			FileStore:  fileStore,
-			AgentStore: agentStore,
+			Stash:   fileStore,
+			Working: agentStore,
 		}
 
 		output, err := usecase.Execute(t.Context(), stagingusecase.StashPopInput{})
@@ -63,8 +63,8 @@ func TestDrainUseCase_Execute(t *testing.T) {
 		})
 
 		usecase := &stagingusecase.StashPopUseCase{
-			FileStore:  fileStore,
-			AgentStore: agentStore,
+			Stash:   fileStore,
+			Working: agentStore,
 		}
 
 		_, err := usecase.Execute(t.Context(), stagingusecase.StashPopInput{Keep: true})
@@ -95,8 +95,8 @@ func TestDrainUseCase_Execute(t *testing.T) {
 		})
 
 		usecase := &stagingusecase.StashPopUseCase{
-			FileStore:  fileStore,
-			AgentStore: agentStore,
+			Stash:   fileStore,
+			Working: agentStore,
 		}
 
 		output, err := usecase.Execute(t.Context(), stagingusecase.StashPopInput{Mode: stagingusecase.StashModeMerge})
@@ -128,8 +128,8 @@ func TestDrainUseCase_Execute(t *testing.T) {
 		})
 
 		usecase := &stagingusecase.StashPopUseCase{
-			FileStore:  fileStore,
-			AgentStore: agentStore,
+			Stash:   fileStore,
+			Working: agentStore,
 		}
 
 		_, err := usecase.Execute(t.Context(), stagingusecase.StashPopInput{Mode: stagingusecase.StashModeOverwrite})
@@ -147,8 +147,8 @@ func TestDrainUseCase_Execute(t *testing.T) {
 		agentStore := testutil.NewMockStore()
 
 		usecase := &stagingusecase.StashPopUseCase{
-			FileStore:  fileStore,
-			AgentStore: agentStore,
+			Stash:   fileStore,
+			Working: agentStore,
 		}
 
 		_, err := usecase.Execute(t.Context(), stagingusecase.StashPopInput{})
@@ -173,8 +173,8 @@ func TestDrainUseCase_Execute(t *testing.T) {
 		})
 
 		usecase := &stagingusecase.StashPopUseCase{
-			FileStore:  fileStore,
-			AgentStore: agentStore,
+			Stash:   fileStore,
+			Working: agentStore,
 		}
 
 		// Default mode (StashModeMerge) should merge instead of erroring
@@ -207,8 +207,8 @@ func TestDrainUseCase_Execute(t *testing.T) {
 		})
 
 		usecase := &stagingusecase.StashPopUseCase{
-			FileStore:  fileStore,
-			AgentStore: agentStore,
+			Stash:   fileStore,
+			Working: agentStore,
 		}
 
 		_, err := usecase.Execute(t.Context(), stagingusecase.StashPopInput{Service: staging.ServiceParam})
@@ -235,8 +235,8 @@ func TestDrainUseCase_Execute(t *testing.T) {
 		})
 
 		usecase := &stagingusecase.StashPopUseCase{
-			FileStore:  fileStore,
-			AgentStore: agentStore,
+			Stash:   fileStore,
+			Working: agentStore,
 		}
 
 		output, err := usecase.Execute(t.Context(), stagingusecase.StashPopInput{})
@@ -261,8 +261,8 @@ func TestDrainUseCase_Execute_Errors(t *testing.T) {
 		agentStore := testutil.NewMockStore()
 
 		usecase := &stagingusecase.StashPopUseCase{
-			FileStore:  fileStore,
-			AgentStore: agentStore,
+			Stash:   fileStore,
+			Working: agentStore,
 		}
 
 		_, err := usecase.Execute(t.Context(), stagingusecase.StashPopInput{})
@@ -286,8 +286,8 @@ func TestDrainUseCase_Execute_Errors(t *testing.T) {
 		agentStore.WriteStateErr = errors.New("write error")
 
 		usecase := &stagingusecase.StashPopUseCase{
-			FileStore:  fileStore,
-			AgentStore: agentStore,
+			Stash:   fileStore,
+			Working: agentStore,
 		}
 
 		_, err := usecase.Execute(t.Context(), stagingusecase.StashPopInput{})
@@ -313,7 +313,7 @@ func TestDrainError(t *testing.T) {
 		t.Parallel()
 
 		err := &stagingusecase.StashPopError{Op: "write", Err: errors.New("write failed")}
-		assert.Contains(t, err.Error(), "failed to set state in agent")
+		assert.Contains(t, err.Error(), "failed to write the working staging area")
 	})
 
 	t.Run("error message - delete", func(t *testing.T) {
@@ -366,8 +366,8 @@ func TestDrainUseCase_ServiceSpecific_FileDeleteErrors(t *testing.T) {
 		})
 
 		usecase := &stagingusecase.StashPopUseCase{
-			FileStore:  fileStore,
-			AgentStore: agentStore,
+			Stash:   fileStore,
+			Working: agentStore,
 		}
 
 		// Make WriteState fail (for writing back remaining state)
@@ -415,8 +415,8 @@ func TestDrainUseCase_ServiceSpecific_MergeWithAgentState(t *testing.T) {
 		})
 
 		usecase := &stagingusecase.StashPopUseCase{
-			FileStore:  fileStore,
-			AgentStore: agentStore,
+			Stash:   fileStore,
+			Working: agentStore,
 		}
 
 		_, err := usecase.Execute(t.Context(), stagingusecase.StashPopInput{
@@ -449,8 +449,8 @@ func TestDrainUseCase_AgentDrainError_TreatedAsEmpty(t *testing.T) {
 	agentStore.DrainErr = errors.New("agent not available")
 
 	usecase := &stagingusecase.StashPopUseCase{
-		FileStore:  fileStore,
-		AgentStore: agentStore,
+		Stash:   fileStore,
+		Working: agentStore,
 	}
 
 	// Should succeed because agent drain error is treated as empty state
@@ -484,8 +484,8 @@ func TestDrainUseCase_ServiceSpecific_FileDeleteDrainError(t *testing.T) {
 		fileStore.DrainErrOnCall = 2 // Fail on second Drain call only
 
 		usecase := &stagingusecase.StashPopUseCase{
-			FileStore:  fileStore,
-			AgentStore: agentStore,
+			Stash:   fileStore,
+			Working: agentStore,
 		}
 
 		// Execute should succeed with non-fatal error (state already transferred)
@@ -519,8 +519,8 @@ func TestDrainUseCase_ServiceSpecific_FileDeleteDrainError(t *testing.T) {
 		fileStore.DrainErrOnCall = 2 // Fail on second Drain call only
 
 		usecase := &stagingusecase.StashPopUseCase{
-			FileStore:  fileStore,
-			AgentStore: agentStore,
+			Stash:   fileStore,
+			Working: agentStore,
 		}
 
 		// Execute should succeed with non-fatal error (state already transferred)

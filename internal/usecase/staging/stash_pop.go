@@ -12,17 +12,17 @@ import (
 type StashPopInput struct {
 	// Service filters the drain to a specific service. Empty means all services.
 	Service staging.Service
-	// Keep preserves the file after draining.
+	// Keep preserves the stash file after popping.
 	Keep bool
-	// Mode determines how to handle conflicts with existing agent memory.
-	// StashModeMerge combines file changes with existing agent memory.
-	// StashModeOverwrite replaces existing agent memory.
+	// Mode determines how to handle conflicts with existing working staging area.
+	// StashModeMerge combines stash changes with the existing working staging area.
+	// StashModeOverwrite replaces the existing working staging area.
 	Mode StashMode
 }
 
 // StashPopOutput holds the result of the drain use case.
 type StashPopOutput struct {
-	// Merged indicates whether the state was merged with existing agent state.
+	// Merged indicates whether the state was merged with the existing working state.
 	Merged bool
 	// EntryCount is the number of entries in the final state.
 	EntryCount int
@@ -30,33 +30,35 @@ type StashPopOutput struct {
 	TagCount int
 }
 
-// StashPopUseCase executes drain operations (file -> agent).
+// StashPopUseCase executes drain operations (stash.json -> working stage.json).
 type StashPopUseCase struct {
-	FileStore  store.FileStore
-	AgentStore store.AgentStore
+	// Stash is the stash file (stash.json).
+	Stash store.FileStore
+	// Working is the working staging area (stage.json).
+	Working store.FileStore
 }
 
 // Execute runs the drain use case.
 func (u *StashPopUseCase) Execute(ctx context.Context, input StashPopInput) (*StashPopOutput, error) {
-	// Drain from file (keep file for now, we'll delete after successful agent write)
-	fileState, err := u.FileStore.Drain(ctx, "", true)
+	// Read from the stash (keep for now, we'll delete after successful working write)
+	stashState, err := u.Stash.Drain(ctx, "", true)
 	if err != nil {
 		return nil, &StashPopError{Op: "load", Err: err}
 	}
 
 	// Extract service-specific state if filtered
-	drainState := fileState.ExtractService(input.Service)
+	drainState := stashState.ExtractService(input.Service)
 
 	// Check if there's anything to drain
 	if drainState.IsEmpty() {
 		return nil, ErrNothingToStashPop
 	}
 
-	// Check if agent already has staged changes
-	agentState, err := u.AgentStore.Drain(ctx, "", true) // keep=true to not clear yet
+	// Check if the working staging area already has staged changes
+	workingState, err := u.Working.Drain(ctx, "", true) // keep=true to not clear yet
 	if err != nil {
-		// Agent might not be running, which is fine - treat as empty
-		agentState = staging.NewEmptyState()
+		// Working might not exist, which is fine - treat as empty
+		workingState = staging.NewEmptyState()
 	}
 
 	// Determine final state based on mode and scope
@@ -64,38 +66,38 @@ func (u *StashPopUseCase) Execute(ctx context.Context, input StashPopInput) (*St
 
 	merged := false
 
-	// Check if agent has data BEFORE any modifications (for merged output)
-	agentServiceState := agentState.ExtractService(input.Service)
-	hasExistingData := !agentServiceState.IsEmpty()
-	agentWasEmpty := agentState.IsEmpty()
+	// Check if working area has data BEFORE any modifications (for merged output)
+	workingServiceState := workingState.ExtractService(input.Service)
+	hasExistingData := !workingServiceState.IsEmpty()
+	workingWasEmpty := workingState.IsEmpty()
 
 	switch {
 	case input.Service != "":
-		// Service-specific: always preserve other services from agent
-		finalState = agentState
+		// Service-specific: always preserve other services from working area
+		finalState = workingState
 		if input.Mode == StashModeOverwrite {
-			// Overwrite: clear target service, then add file's data
+			// Overwrite: clear target service, then add stash's data
 			finalState.RemoveService(input.Service)
 			finalState.Merge(drainState)
 		} else {
-			// Merge: combine agent's target service with file's target service
+			// Merge: combine working's target service with stash's target service
 			finalState.Merge(drainState)
 
 			merged = hasExistingData
 		}
 	case input.Mode == StashModeMerge:
-		// Global merge: combine agent state with file state
-		finalState = agentState
+		// Global merge: combine working state with stash state
+		finalState = workingState
 		finalState.Merge(drainState)
 
-		merged = !agentWasEmpty
+		merged = !workingWasEmpty
 	default:
-		// Global overwrite: replace entire agent state with file state
+		// Global overwrite: replace entire working state with stash state
 		finalState = drainState
 	}
 
-	// Set state in agent
-	if err := u.AgentStore.WriteState(ctx, "", finalState); err != nil {
+	// Set state in the working staging area
+	if err := u.Working.WriteState(ctx, "", finalState); err != nil {
 		return nil, &StashPopError{Op: "write", Err: err}
 	}
 
@@ -116,27 +118,27 @@ func (u *StashPopUseCase) Execute(ctx context.Context, input StashPopInput) (*St
 		TagCount:   tagCount,
 	}
 
-	// Delete file content (service-specific or all)
+	// Delete stash content (service-specific or all)
 	if !input.Keep {
 		if input.Service != "" {
-			// Remove only the drained service from file, keep the rest
-			fileState.RemoveService(input.Service)
+			// Remove only the drained service from stash, keep the rest
+			stashState.RemoveService(input.Service)
 
-			if fileState.IsEmpty() {
-				// Delete the file entirely
-				if _, err := u.FileStore.Drain(ctx, "", false); err != nil {
-					// Non-fatal: state is already in agent
+			if stashState.IsEmpty() {
+				// Delete the stash file entirely
+				if _, err := u.Stash.Drain(ctx, "", false); err != nil {
+					// Non-fatal: state is already in the working area
 					return output, &StashPopError{Op: "delete", Err: err, NonFatal: true}
 				}
 			} else {
 				// Write back the remaining state
-				if err := u.FileStore.WriteState(ctx, "", fileState); err != nil {
+				if err := u.Stash.WriteState(ctx, "", stashState); err != nil {
 					return output, &StashPopError{Op: "delete", Err: err, NonFatal: true}
 				}
 			}
 		} else {
-			// Drain again with keep=false to delete the file
-			if _, err := u.FileStore.Drain(ctx, "", false); err != nil {
+			// Drain again with keep=false to delete the stash file
+			if _, err := u.Stash.Drain(ctx, "", false); err != nil {
 				return output, &StashPopError{Op: "delete", Err: err, NonFatal: true}
 			}
 		}
@@ -162,7 +164,7 @@ func (e *StashPopError) Error() string {
 	case "load":
 		return "failed to load state from file: " + e.Err.Error()
 	case "write":
-		return "failed to set state in agent: " + e.Err.Error()
+		return "failed to write the working staging area: " + e.Err.Error()
 	case "delete":
 		return "failed to delete file: " + e.Err.Error()
 	default:

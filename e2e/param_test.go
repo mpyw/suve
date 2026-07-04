@@ -2201,12 +2201,12 @@ func TestParam_StashPushWithKeep(t *testing.T) {
 	_, _, err := runSubCommand(t, paramstage.Command(), "add", paramName, "test-value")
 	require.NoError(t, err)
 
-	// Stash push with --keep (should keep in agent memory)
+	// Stash push with --keep (should keep in the working staging area)
 	t.Run("stash-push-with-keep", func(t *testing.T) {
 		stdout, _, err := runSubCommand(t, paramstage.Command(), "stash", "push", "--keep")
 		require.NoError(t, err)
 		t.Logf("stash push --keep output: %s", stdout)
-		assert.Contains(t, stdout, "kept in memory")
+		assert.Contains(t, stdout, "kept in the working staging area")
 	})
 
 	// Param should still be in agent

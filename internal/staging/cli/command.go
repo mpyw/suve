@@ -14,8 +14,7 @@ import (
 	"github.com/mpyw/suve/internal/cli/pager"
 	"github.com/mpyw/suve/internal/infra"
 	"github.com/mpyw/suve/internal/staging"
-	"github.com/mpyw/suve/internal/staging/store/agent"
-	"github.com/mpyw/suve/internal/staging/store/agent/daemon/lifecycle"
+	"github.com/mpyw/suve/internal/staging/store/file"
 	stagingusecase "github.com/mpyw/suve/internal/usecase/staging"
 )
 
@@ -68,7 +67,10 @@ EXAMPLES:
 				return fmt.Errorf("failed to get AWS identity: %w", err)
 			}
 
-			store := agent.NewStore(identity.AccountID, identity.Region)
+			store, err := file.NewStore(identity.AccountID, identity.Region)
+			if err != nil {
+				return fmt.Errorf("failed to create staging store: %w", err)
+			}
 
 			opts := StatusOptions{
 				Verbose: cmd.Bool("verbose"),
@@ -77,27 +79,16 @@ EXAMPLES:
 				opts.Name = cmd.Args().First()
 			}
 
-			result, err := lifecycle.ExecuteRead0(ctx, store, lifecycle.CmdStatus, func() error {
-				r := &StatusRunner{
-					UseCase: &stagingusecase.StatusUseCase{
-						Strategy: cfg.ParserFactory(),
-						Store:    store,
-					},
-					Stdout: cmd.Root().Writer,
-					Stderr: cmd.Root().ErrWriter,
-				}
-
-				return r.Run(ctx, opts)
-			})
-			if err != nil {
-				return err
+			r := &StatusRunner{
+				UseCase: &stagingusecase.StatusUseCase{
+					Strategy: cfg.ParserFactory(),
+					Store:    store,
+				},
+				Stdout: cmd.Root().Writer,
+				Stderr: cmd.Root().ErrWriter,
 			}
 
-			if result.NothingStaged {
-				output.Info(cmd.Root().Writer, "No %s changes staged.", cfg.ItemName)
-			}
-
-			return nil
+			return r.Run(ctx, opts)
 		},
 	}
 }
@@ -155,7 +146,10 @@ EXAMPLES:
 				return fmt.Errorf("failed to get AWS identity: %w", err)
 			}
 
-			store := agent.NewStore(identity.AccountID, identity.Region)
+			store, err := file.NewStore(identity.AccountID, identity.Region)
+			if err != nil {
+				return fmt.Errorf("failed to create staging store: %w", err)
+			}
 
 			opts := DiffOptions{
 				Name:      name,
@@ -163,34 +157,23 @@ EXAMPLES:
 				NoPager:   cmd.Bool("no-pager"),
 			}
 
-			result, err := lifecycle.ExecuteRead0(ctx, store, lifecycle.CmdDiff, func() error {
-				strategy, err := cfg.Factory(ctx)
-				if err != nil {
-					return err
-				}
-
-				return pager.WithPagerWriter(cmd.Root().Writer, opts.NoPager, func(w io.Writer) error {
-					r := &DiffRunner{
-						UseCase: &stagingusecase.DiffUseCase{
-							Strategy: strategy,
-							Store:    store,
-						},
-						Stdout: w,
-						Stderr: cmd.Root().ErrWriter,
-					}
-
-					return r.Run(ctx, opts)
-				})
-			})
+			strategy, err := cfg.Factory(ctx)
 			if err != nil {
 				return err
 			}
 
-			if result.NothingStaged {
-				output.Warning(cmd.Root().ErrWriter, "nothing staged")
-			}
+			return pager.WithPagerWriter(cmd.Root().Writer, opts.NoPager, func(w io.Writer) error {
+				r := &DiffRunner{
+					UseCase: &stagingusecase.DiffUseCase{
+						Strategy: strategy,
+						Store:    store,
+					},
+					Stdout: w,
+					Stderr: cmd.Root().ErrWriter,
+				}
 
-			return nil
+				return r.Run(ctx, opts)
+			})
 		},
 	}
 }
@@ -245,7 +228,10 @@ EXAMPLES:
 				return fmt.Errorf("failed to get AWS identity: %w", err)
 			}
 
-			store := agent.NewStore(identity.AccountID, identity.Region)
+			store, err := file.NewStore(identity.AccountID, identity.Region)
+			if err != nil {
+				return fmt.Errorf("failed to create staging store: %w", err)
+			}
 
 			strategy, err := cfg.Factory(ctx)
 			if err != nil {
@@ -322,7 +308,10 @@ EXAMPLES:
 				return fmt.Errorf("failed to get AWS identity: %w", err)
 			}
 
-			store := agent.NewStore(identity.AccountID, identity.Region)
+			store, err := file.NewStore(identity.AccountID, identity.Region)
+			if err != nil {
+				return fmt.Errorf("failed to create staging store: %w", err)
+			}
 
 			strategy, err := cfg.Factory(ctx)
 			if err != nil {
@@ -398,85 +387,78 @@ EXAMPLES:
 				return fmt.Errorf("failed to get AWS identity: %w", err)
 			}
 
-			store := agent.NewStore(identity.AccountID, identity.Region)
+			store, err := file.NewStore(identity.AccountID, identity.Region)
+			if err != nil {
+				return fmt.Errorf("failed to create staging store: %w", err)
+			}
+
 			parser := cfg.ParserFactory()
 
-			result, err := lifecycle.ExecuteRead0(ctx, store, lifecycle.CmdApply, func() error {
-				// Get entries to show what will be applied
-				service := parser.Service()
+			// Get entries to show what will be applied
+			service := parser.Service()
 
-				entries, err := store.ListEntries(ctx, service)
-				if err != nil {
-					return err
-				}
-
-				serviceEntries := entries[service]
-				if len(serviceEntries) == 0 {
-					output.Info(cmd.Root().Writer, "No %s changes staged.", parser.ServiceName())
-
-					return nil
-				}
-
-				// Filter by name if specified
-				opts := ApplyOptions{
-					IgnoreConflicts: cmd.Bool("ignore-conflicts"),
-				}
-				if cmd.Args().Len() > 0 {
-					opts.Name = cmd.Args().First()
-					if _, ok := serviceEntries[opts.Name]; !ok {
-						return fmt.Errorf("%s is not staged", opts.Name)
-					}
-				}
-
-				// Confirm apply
-				skipConfirm := cmd.Bool("yes")
-				prompter := &confirm.Prompter{
-					Stdin:  os.Stdin,
-					Stdout: cmd.Root().Writer,
-					Stderr: cmd.Root().ErrWriter,
-				}
-
-				var message string
-				if opts.Name != "" {
-					message = fmt.Sprintf("Apply staged changes for %s to AWS?", opts.Name)
-				} else {
-					message = fmt.Sprintf("Apply %d staged %s change(s) to AWS?", len(serviceEntries), parser.ServiceName())
-				}
-
-				confirmed, err := prompter.Confirm(message, skipConfirm)
-				if err != nil {
-					return err
-				}
-
-				if !confirmed {
-					return nil
-				}
-
-				strategy, err := cfg.Factory(ctx)
-				if err != nil {
-					return err
-				}
-
-				r := &ApplyRunner{
-					UseCase: &stagingusecase.ApplyUseCase{
-						Strategy: strategy,
-						Store:    store,
-					},
-					Stdout: cmd.Root().Writer,
-					Stderr: cmd.Root().ErrWriter,
-				}
-
-				return r.Run(ctx, opts)
-			})
+			entries, err := store.ListEntries(ctx, service)
 			if err != nil {
 				return err
 			}
 
-			if result.NothingStaged {
+			serviceEntries := entries[service]
+			if len(serviceEntries) == 0 {
 				output.Info(cmd.Root().Writer, "No %s changes staged.", parser.ServiceName())
+
+				return nil
 			}
 
-			return nil
+			// Filter by name if specified
+			opts := ApplyOptions{
+				IgnoreConflicts: cmd.Bool("ignore-conflicts"),
+			}
+			if cmd.Args().Len() > 0 {
+				opts.Name = cmd.Args().First()
+				if _, ok := serviceEntries[opts.Name]; !ok {
+					return fmt.Errorf("%s is not staged", opts.Name)
+				}
+			}
+
+			// Confirm apply
+			skipConfirm := cmd.Bool("yes")
+			prompter := &confirm.Prompter{
+				Stdin:  os.Stdin,
+				Stdout: cmd.Root().Writer,
+				Stderr: cmd.Root().ErrWriter,
+			}
+
+			var message string
+			if opts.Name != "" {
+				message = fmt.Sprintf("Apply staged changes for %s to AWS?", opts.Name)
+			} else {
+				message = fmt.Sprintf("Apply %d staged %s change(s) to AWS?", len(serviceEntries), parser.ServiceName())
+			}
+
+			confirmed, err := prompter.Confirm(message, skipConfirm)
+			if err != nil {
+				return err
+			}
+
+			if !confirmed {
+				return nil
+			}
+
+			strategy, err := cfg.Factory(ctx)
+			if err != nil {
+				return err
+			}
+
+			r := &ApplyRunner{
+				UseCase: &stagingusecase.ApplyUseCase{
+					Strategy: strategy,
+					Store:    store,
+				},
+				Stdout: cmd.Root().Writer,
+				Stderr: cmd.Root().ErrWriter,
+			}
+
+			return r.Run(ctx, opts)
 		},
 	}
 }
@@ -535,8 +517,8 @@ EXAMPLES:
 
 			parser := cfg.ParserFactory()
 
-			// Check if version spec is provided before choosing the execution path
-			// If version spec exists, this is a write operation that should auto-start the agent
+			// Check if a version spec is provided. If so, we need a fetcher strategy
+			// to restore the value from AWS.
 			var hasVersion bool
 
 			if !resetAll && opts.Spec != "" {
@@ -553,55 +535,33 @@ EXAMPLES:
 				return fmt.Errorf("failed to get AWS identity: %w", err)
 			}
 
-			store := agent.NewStore(identity.AccountID, identity.Region)
+			store, err := file.NewStore(identity.AccountID, identity.Region)
+			if err != nil {
+				return fmt.Errorf("failed to create staging store: %w", err)
+			}
+
+			var fetcher staging.ResetStrategy
 
 			if hasVersion {
-				// Reset with version spec - write operation, auto-start the agent
-				err := lifecycle.ExecuteWrite0(ctx, store, lifecycle.CmdResetVersion, func() error {
-					strategy, err := cfg.Factory(ctx)
-					if err != nil {
-						return err
-					}
-
-					r := &ResetRunner{
-						UseCase: &stagingusecase.ResetUseCase{
-							Parser:  parser,
-							Fetcher: strategy,
-							Store:   store,
-						},
-						Stdout: cmd.Root().Writer,
-						Stderr: cmd.Root().ErrWriter,
-					}
-
-					return r.Run(ctx, opts)
-				})
-
-				return err
-			}
-
-			// Reset without version spec - read operation, check if agent is running
-			result, err := lifecycle.ExecuteRead0(ctx, store, lifecycle.CmdReset, func() error {
-				r := &ResetRunner{
-					UseCase: &stagingusecase.ResetUseCase{
-						Parser:  parser,
-						Fetcher: nil,
-						Store:   store,
-					},
-					Stdout: cmd.Root().Writer,
-					Stderr: cmd.Root().ErrWriter,
+				strategy, err := cfg.Factory(ctx)
+				if err != nil {
+					return err
 				}
 
-				return r.Run(ctx, opts)
-			})
-			if err != nil {
-				return err
+				fetcher = strategy
 			}
 
-			if result.NothingStaged {
-				output.Info(cmd.Root().Writer, "No %s changes staged.", cfg.ItemName)
+			r := &ResetRunner{
+				UseCase: &stagingusecase.ResetUseCase{
+					Parser:  parser,
+					Fetcher: fetcher,
+					Store:   store,
+				},
+				Stdout: cmd.Root().Writer,
+				Stderr: cmd.Root().ErrWriter,
 			}
 
-			return nil
+			return r.Run(ctx, opts)
 		},
 	}
 }
@@ -689,7 +649,10 @@ EXAMPLES:
 				return fmt.Errorf("failed to get AWS identity: %w", err)
 			}
 
-			store := agent.NewStore(identity.AccountID, identity.Region)
+			store, err := file.NewStore(identity.AccountID, identity.Region)
+			if err != nil {
+				return fmt.Errorf("failed to create staging store: %w", err)
+			}
 
 			strategy, err := cfg.Factory(ctx)
 			if err != nil {
@@ -742,7 +705,10 @@ func tagAction(cfg CommandConfig, usageMsg string, runner tagCommandRunner) func
 			return fmt.Errorf("failed to get AWS identity: %w", err)
 		}
 
-		store := agent.NewStore(identity.AccountID, identity.Region)
+		store, err := file.NewStore(identity.AccountID, identity.Region)
+		if err != nil {
+			return fmt.Errorf("failed to create staging store: %w", err)
+		}
 
 		strategy, err := cfg.Factory(ctx)
 		if err != nil {

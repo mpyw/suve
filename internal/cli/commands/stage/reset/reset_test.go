@@ -255,32 +255,6 @@ func TestRun_UnstageEntriesAndTags(t *testing.T) {
 	assert.Equal(t, staging.ErrNotStaged, err)
 }
 
-func TestRun_WithHintedStore(t *testing.T) {
-	t.Parallel()
-
-	store := testutil.NewHintedMockStore()
-
-	// Stage an entry
-	_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
-		Operation: staging.OperationUpdate,
-		Value:     lo.ToPtr("param-value"),
-		StagedAt:  time.Now(),
-	})
-
-	var buf bytes.Buffer
-
-	r := &reset.Runner{
-		Store:  store,
-		Stdout: &buf,
-		Stderr: &bytes.Buffer{},
-	}
-
-	err := r.Run(t.Context())
-	require.NoError(t, err)
-	assert.Contains(t, buf.String(), "Unstaged all changes")
-	assert.Equal(t, "reset", store.LastHint)
-}
-
 func TestRun_ListTagsError(t *testing.T) {
 	t.Parallel()
 
@@ -331,30 +305,4 @@ func TestRun_UnstageAllError(t *testing.T) {
 	err := r.Run(t.Context())
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "mock unstage all error")
-}
-
-func TestRun_WithHintedStoreError(t *testing.T) {
-	t.Parallel()
-
-	store := testutil.NewHintedMockStore()
-	store.UnstageAllWithHintErr = errors.New("mock hinted unstage all error")
-
-	// Stage an entry
-	_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
-		Operation: staging.OperationUpdate,
-		Value:     lo.ToPtr("param-value"),
-		StagedAt:  time.Now(),
-	})
-
-	var buf bytes.Buffer
-
-	r := &reset.Runner{
-		Store:  store,
-		Stdout: &buf,
-		Stderr: &bytes.Buffer{},
-	}
-
-	err := r.Run(t.Context())
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "mock hinted unstage all error")
 }
