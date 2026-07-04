@@ -2,6 +2,7 @@ package crypt_test
 
 import (
 	"bytes"
+	"encoding/base64"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -219,4 +220,133 @@ func TestDecrypt_UnsupportedVersion(t *testing.T) {
 	_, err := crypt.Decrypt(data, "any-passphrase")
 	require.ErrorIs(t, err, crypt.ErrInvalidFormat)
 	assert.Contains(t, err.Error(), "unsupported version 99")
+}
+
+func TestEncryptDecryptWithKey(t *testing.T) {
+	t.Parallel()
+
+	key := make([]byte, crypt.RawKeyLen)
+	for i := range key {
+		key[i] = byte(i)
+	}
+
+	tests := []struct {
+		name string
+		data []byte
+	}{
+		{name: "simple text", data: []byte("hello world")},
+		{name: "empty data", data: []byte{}},
+		{name: "JSON data", data: []byte(`{"version":2,"entries":{}}`)},
+		{name: "binary data", data: []byte{0x00, 0x01, 0x02, 0xff, 0xfe, 0xfd}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			encrypted, err := crypt.EncryptWithKey(tt.data, key)
+			require.NoError(t, err)
+
+			// v2 must still be recognized as encrypted.
+			assert.True(t, crypt.IsEncrypted(encrypted))
+			// Version byte must be the raw-key version.
+			assert.Equal(t, crypt.VersionRawKey, encrypted[len(crypt.MagicHeader)])
+
+			if len(tt.data) > 0 {
+				assert.False(t, bytes.Contains(encrypted, tt.data))
+			}
+
+			decrypted, err := crypt.DecryptWithKey(encrypted, key)
+			require.NoError(t, err)
+
+			if len(tt.data) != 0 || len(decrypted) != 0 {
+				assert.Equal(t, tt.data, decrypted)
+			}
+		})
+	}
+}
+
+func TestEncryptWithKey_InvalidKeyLength(t *testing.T) {
+	t.Parallel()
+
+	_, err := crypt.EncryptWithKey([]byte("data"), make([]byte, 16))
+	assert.ErrorIs(t, err, crypt.ErrInvalidKeyLength)
+}
+
+func TestDecryptWithKey_InvalidKeyLength(t *testing.T) {
+	t.Parallel()
+
+	_, err := crypt.DecryptWithKey([]byte("data"), make([]byte, 16))
+	assert.ErrorIs(t, err, crypt.ErrInvalidKeyLength)
+}
+
+func TestDecryptWithKey_WrongKey(t *testing.T) {
+	t.Parallel()
+
+	key := make([]byte, crypt.RawKeyLen)
+	wrongKey := make([]byte, crypt.RawKeyLen)
+	wrongKey[0] = 0xff
+
+	encrypted, err := crypt.EncryptWithKey([]byte("secret"), key)
+	require.NoError(t, err)
+
+	_, err = crypt.DecryptWithKey(encrypted, wrongKey)
+	assert.ErrorIs(t, err, crypt.ErrDecryptionFailed)
+}
+
+// TestCrossReject verifies the two formats reject each other's data.
+func TestCrossReject(t *testing.T) {
+	t.Parallel()
+
+	key := make([]byte, crypt.RawKeyLen)
+
+	t.Run("Decrypt (passphrase) rejects v2 data", func(t *testing.T) {
+		t.Parallel()
+
+		v2, err := crypt.EncryptWithKey([]byte("data"), key)
+		require.NoError(t, err)
+
+		_, err = crypt.Decrypt(v2, "any-passphrase")
+		require.ErrorIs(t, err, crypt.ErrInvalidFormat)
+		assert.Contains(t, err.Error(), "raw-key")
+	})
+
+	t.Run("DecryptWithKey rejects v1 data", func(t *testing.T) {
+		t.Parallel()
+
+		v1, err := crypt.Encrypt([]byte("data"), "passphrase")
+		require.NoError(t, err)
+
+		_, err = crypt.DecryptWithKey(v1, key)
+		require.ErrorIs(t, err, crypt.ErrInvalidFormat)
+		assert.Contains(t, err.Error(), "version 1")
+	})
+}
+
+func TestDecryptWithKey_NotEncrypted(t *testing.T) {
+	t.Parallel()
+
+	_, err := crypt.DecryptWithKey([]byte(`{"plain":true}`), make([]byte, crypt.RawKeyLen))
+	assert.ErrorIs(t, err, crypt.ErrNotEncrypted)
+}
+
+// TestDecrypt_V1BackwardCompat verifies a v1 blob produced by an earlier build
+// still decrypts. This is a golden fixture: the salt/nonce are embedded, so the
+// Argon2 parameters must be resolved from the version byte via the params
+// table for this to succeed.
+func TestDecrypt_V1BackwardCompat(t *testing.T) {
+	t.Parallel()
+
+	const goldenV1 = "U1VWRV9FTkMBMV+dH6A0LNn0lG8s9emCVJeLMiC2iSLX+G+ASrVwRHB4n4g+ir2sxHh6dm/WXWFWlY86eisG0WKEolYqnEFBy9EG2OWIQtiNs96Zkas="
+
+	blob, err := base64.StdEncoding.DecodeString(goldenV1)
+	require.NoError(t, err)
+
+	// Sanity: it is a v1 blob.
+	require.True(t, crypt.IsEncrypted(blob))
+	require.Equal(t, crypt.Version, blob[len(crypt.MagicHeader)])
+
+	decrypted, err := crypt.Decrypt(blob, "golden-passphrase")
+	require.NoError(t, err)
+	assert.JSONEq(t, `{"hello":"world"}`, string(decrypted))
 }

@@ -182,7 +182,7 @@ func stashPopAction(service staging.Service) func(context.Context, *cli.Command)
 			return err
 		}
 
-		working, err := file.NewStore(identity.AccountID, identity.Region)
+		working, err := file.NewWorkingStore(identity.AccountID, identity.Region)
 		if err != nil {
 			return fmt.Errorf("failed to create staging store: %w", err)
 		}

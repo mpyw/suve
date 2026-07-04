@@ -126,7 +126,7 @@ func (a *App) getStagingStore() (store.ReadWriteOperator, error) {
 		return nil, err
 	}
 
-	s, err := file.NewStore(identity.AccountID, identity.Region)
+	s, err := file.NewWorkingStore(identity.AccountID, identity.Region)
 	if err != nil {
 		return nil, err
 	}

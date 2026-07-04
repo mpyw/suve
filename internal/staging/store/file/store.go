@@ -13,6 +13,7 @@ import (
 	"github.com/mpyw/suve/internal/staging"
 	"github.com/mpyw/suve/internal/staging/store"
 	"github.com/mpyw/suve/internal/staging/store/file/internal/crypt"
+	"github.com/mpyw/suve/internal/staging/store/file/internal/keyprovider"
 )
 
 const (
@@ -31,11 +32,25 @@ var fileMu sync.Mutex
 //nolint:gochecknoglobals // test hook for dependency injection
 var userHomeDirFunc = os.UserHomeDir
 
+// resolveKeyFunc resolves the working-store data key. Overridable for testing.
+//
+//nolint:gochecknoglobals // test hook for dependency injection
+var resolveKeyFunc = keyprovider.Resolve
+
+// plaintextWarnOnce ensures the plaintext fallback warning is emitted only once
+// per process.
+//
+//nolint:gochecknoglobals // process-wide one-time warning guard.
+var plaintextWarnOnce sync.Once
+
 // Store manages the staging state using the filesystem.
 // It implements StateIO interface for drain/persist operations.
 type Store struct {
 	stateFilePath string
 	passphrase    string
+	// key, when non-nil, is a 32-byte AES-256 key used for raw-key (v2)
+	// encryption of the working store. It takes precedence over passphrase.
+	key []byte
 }
 
 // newStore creates a new file Store using the given file name under
@@ -59,6 +74,43 @@ func newStore(accountID, region, fileName string) (*Store, error) {
 // This is the working staging area used by stage add/edit/delete/status/diff/apply/reset.
 func NewStore(accountID, region string) (*Store, error) {
 	return newStore(accountID, region, stateFileName)
+}
+
+// NewWorkingStore creates the working staging-area Store (stage.json) with its
+// encryption key resolved via the key provider fallback chain:
+// SUVE_STAGING_KEY env var -> OS keychain (get-or-create) -> plaintext.
+//
+// When falling back to plaintext, a one-time warning is emitted to stderr.
+// This is the constructor to use for all working-area (stage.json) operations
+// (stage add/edit/delete/status/diff/apply/reset and the working side of
+// stash push/pop). The stash file (stash.json) keeps its passphrase flow.
+func NewWorkingStore(accountID, region string) (*Store, error) {
+	s, err := NewStore(accountID, region)
+	if err != nil {
+		return nil, err
+	}
+
+	key, plaintext, err := resolveKeyFunc()
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve staging encryption key: %w", err)
+	}
+
+	if plaintext {
+		plaintextWarnOnce.Do(func() {
+			// Direct stderr write: this low-level store package intentionally
+			// avoids depending on the cli/output package.
+			//nolint:forbidigo // one-time operator warning to stderr.
+			fmt.Fprintln(os.Stderr,
+				"warning: staging state is stored UNENCRYPTED; "+
+					"set SUVE_STAGING_KEY or enable an OS keychain to encrypt")
+		})
+
+		return s, nil
+	}
+
+	s.key = key
+
+	return s, nil
 }
 
 // NewStoreWithPath creates a new file Store with a custom state file path.
@@ -147,13 +199,18 @@ func (s *Store) readStateLocked() (*staging.State, error) {
 		return nil, fmt.Errorf("failed to read state file: %w", err)
 	}
 
-	// Decrypt if encrypted
+	// Decrypt if encrypted. Reading an unencrypted (plaintext/legacy) file is
+	// always allowed so migration from an older/plaintext state works.
 	if crypt.IsEncrypted(data) {
-		if s.passphrase == "" {
+		switch {
+		case s.key != nil:
+			data, err = crypt.DecryptWithKey(data, s.key)
+		case s.passphrase != "":
+			data, err = crypt.Decrypt(data, s.passphrase)
+		default:
 			return nil, crypt.ErrDecryptionFailed
 		}
 
-		data, err = crypt.Decrypt(data, s.passphrase)
 		if err != nil {
 			return nil, err
 		}
@@ -195,8 +252,15 @@ func (s *Store) writeStateLocked(state *staging.State) error {
 		return fmt.Errorf("failed to marshal state: %w", err)
 	}
 
-	// Encrypt if passphrase is provided
-	if s.passphrase != "" {
+	// Encrypt: prefer the raw key (v2) when configured, else fall back to the
+	// passphrase (v1); otherwise write plaintext.
+	switch {
+	case s.key != nil:
+		data, err = crypt.EncryptWithKey(data, s.key)
+		if err != nil {
+			return fmt.Errorf("failed to encrypt state: %w", err)
+		}
+	case s.passphrase != "":
 		data, err = crypt.Encrypt(data, s.passphrase)
 		if err != nil {
 			return fmt.Errorf("failed to encrypt state: %w", err)

@@ -67,7 +67,7 @@ EXAMPLES:
 				return fmt.Errorf("failed to get AWS identity: %w", err)
 			}
 
-			store, err := file.NewStore(identity.AccountID, identity.Region)
+			store, err := file.NewWorkingStore(identity.AccountID, identity.Region)
 			if err != nil {
 				return fmt.Errorf("failed to create staging store: %w", err)
 			}
@@ -146,7 +146,7 @@ EXAMPLES:
 				return fmt.Errorf("failed to get AWS identity: %w", err)
 			}
 
-			store, err := file.NewStore(identity.AccountID, identity.Region)
+			store, err := file.NewWorkingStore(identity.AccountID, identity.Region)
 			if err != nil {
 				return fmt.Errorf("failed to create staging store: %w", err)
 			}
@@ -228,7 +228,7 @@ EXAMPLES:
 				return fmt.Errorf("failed to get AWS identity: %w", err)
 			}
 
-			store, err := file.NewStore(identity.AccountID, identity.Region)
+			store, err := file.NewWorkingStore(identity.AccountID, identity.Region)
 			if err != nil {
 				return fmt.Errorf("failed to create staging store: %w", err)
 			}
@@ -308,7 +308,7 @@ EXAMPLES:
 				return fmt.Errorf("failed to get AWS identity: %w", err)
 			}
 
-			store, err := file.NewStore(identity.AccountID, identity.Region)
+			store, err := file.NewWorkingStore(identity.AccountID, identity.Region)
 			if err != nil {
 				return fmt.Errorf("failed to create staging store: %w", err)
 			}
@@ -387,7 +387,7 @@ EXAMPLES:
 				return fmt.Errorf("failed to get AWS identity: %w", err)
 			}
 
-			store, err := file.NewStore(identity.AccountID, identity.Region)
+			store, err := file.NewWorkingStore(identity.AccountID, identity.Region)
 			if err != nil {
 				return fmt.Errorf("failed to create staging store: %w", err)
 			}
@@ -535,7 +535,7 @@ EXAMPLES:
 				return fmt.Errorf("failed to get AWS identity: %w", err)
 			}
 
-			store, err := file.NewStore(identity.AccountID, identity.Region)
+			store, err := file.NewWorkingStore(identity.AccountID, identity.Region)
 			if err != nil {
 				return fmt.Errorf("failed to create staging store: %w", err)
 			}
@@ -649,7 +649,7 @@ EXAMPLES:
 				return fmt.Errorf("failed to get AWS identity: %w", err)
 			}
 
-			store, err := file.NewStore(identity.AccountID, identity.Region)
+			store, err := file.NewWorkingStore(identity.AccountID, identity.Region)
 			if err != nil {
 				return fmt.Errorf("failed to create staging store: %w", err)
 			}
@@ -705,7 +705,7 @@ func tagAction(cfg CommandConfig, usageMsg string, runner tagCommandRunner) func
 			return fmt.Errorf("failed to get AWS identity: %w", err)
 		}
 
-		store, err := file.NewStore(identity.AccountID, identity.Region)
+		store, err := file.NewWorkingStore(identity.AccountID, identity.Region)
 		if err != nil {
 			return fmt.Errorf("failed to create staging store: %w", err)
 		}
