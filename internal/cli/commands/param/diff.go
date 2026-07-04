@@ -11,7 +11,6 @@ import (
 	cliinternal "github.com/mpyw/suve/internal/cli/commands/internal"
 	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/provider"
-	awsparam "github.com/mpyw/suve/internal/provider/aws/param"
 	"github.com/mpyw/suve/internal/usecase/param"
 	"github.com/mpyw/suve/internal/version/paramversion"
 )
@@ -105,12 +104,12 @@ EXAMPLES:
 For comparing staged values, use: suve stage param diff`,
 		ParseDiffArgs: paramversion.ParseDiffArgs,
 		NewPresenter: func(ctx context.Context, spec1, spec2 *paramversion.Spec) (genericdiff.Presenter, error) {
-			client, err := cliinternal.NewParamClient(ctx)
+			store, err := cliinternal.ParamStore(ctx)
 			if err != nil {
 				return nil, err
 			}
 
-			return NewDiffPresenter(awsparam.New(client), spec1, spec2), nil
+			return NewDiffPresenter(store, spec1, spec2), nil
 		},
 	})
 }

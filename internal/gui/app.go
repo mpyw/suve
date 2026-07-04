@@ -11,6 +11,8 @@ import (
 	"github.com/mpyw/suve/internal/api/secretapi"
 	"github.com/mpyw/suve/internal/infra"
 	"github.com/mpyw/suve/internal/provider"
+	awsparam "github.com/mpyw/suve/internal/provider/aws/param"
+	awssecret "github.com/mpyw/suve/internal/provider/aws/secret"
 	"github.com/mpyw/suve/internal/staging"
 	"github.com/mpyw/suve/internal/staging/store"
 	"github.com/mpyw/suve/internal/staging/store/file"
@@ -21,20 +23,35 @@ import (
 // =============================================================================
 
 // ParamClient is the combined interface for all SSM Parameter Store operations.
+// It is defined against the raw SSM SDK aliases (paramapi) rather than the
+// provider seam; the GUI is intentionally not migrated to the provider registry
+// yet (see #206), so it keeps constructing AWS clients directly here.
 type ParamClient interface {
-	// For staging
-	staging.ParamClient
-	// For usecases (additional methods not in staging.ParamClient)
+	paramapi.GetParameterAPI
+	paramapi.GetParameterHistoryAPI
+	paramapi.PutParameterAPI
+	paramapi.DeleteParameterAPI
+	paramapi.AddTagsToResourceAPI
+	paramapi.RemoveTagsFromResourceAPI
 	paramapi.DescribeParametersAPI
 	paramapi.GetParametersAPI
 	paramapi.ListTagsForResourceAPI
 }
 
 // SecretClient is the combined interface for all Secrets Manager operations.
+// See ParamClient: the GUI still uses the raw SDK aliases pending the #206
+// migration to the provider registry.
+//
+//nolint:interfacebloat // mirrors the Secrets Manager operations the GUI uses; splitting adds no value
 type SecretClient interface {
-	// For staging
-	staging.SecretClient
-	// For usecases (additional methods not in staging.SecretClient)
+	secretapi.GetSecretValueAPI
+	secretapi.ListSecretVersionIDsAPI
+	secretapi.CreateSecretAPI
+	secretapi.PutSecretValueAPI
+	secretapi.DeleteSecretAPI
+	secretapi.UpdateSecretAPI
+	secretapi.TagResourceAPI
+	secretapi.UntagResourceAPI
 	secretapi.ListSecretsAPI
 	secretapi.DescribeSecretAPI
 	secretapi.RestoreSecretAPI
@@ -168,14 +185,14 @@ func (a *App) getEditStrategy(service string) (staging.EditStrategy, error) {
 			return nil, err
 		}
 
-		return staging.NewParamStrategy(client), nil
+		return staging.NewParamStrategy(awsparam.New(client)), nil
 	case string(staging.ServiceSecret):
 		client, err := a.getSecretClient()
 		if err != nil {
 			return nil, err
 		}
 
-		return staging.NewSecretStrategy(client), nil
+		return staging.NewSecretStrategy(awssecret.New(client)), nil
 	default:
 		return nil, errInvalidService
 	}
@@ -189,14 +206,14 @@ func (a *App) getDeleteStrategy(service string) (staging.DeleteStrategy, error) 
 			return nil, err
 		}
 
-		return staging.NewParamStrategy(client), nil
+		return staging.NewParamStrategy(awsparam.New(client)), nil
 	case string(staging.ServiceSecret):
 		client, err := a.getSecretClient()
 		if err != nil {
 			return nil, err
 		}
 
-		return staging.NewSecretStrategy(client), nil
+		return staging.NewSecretStrategy(awssecret.New(client)), nil
 	default:
 		return nil, errInvalidService
 	}
@@ -210,14 +227,14 @@ func (a *App) getApplyStrategy(service string) (staging.ApplyStrategy, error) {
 			return nil, err
 		}
 
-		return staging.NewParamStrategy(client), nil
+		return staging.NewParamStrategy(awsparam.New(client)), nil
 	case string(staging.ServiceSecret):
 		client, err := a.getSecretClient()
 		if err != nil {
 			return nil, err
 		}
 
-		return staging.NewSecretStrategy(client), nil
+		return staging.NewSecretStrategy(awssecret.New(client)), nil
 	default:
 		return nil, errInvalidService
 	}
@@ -231,14 +248,14 @@ func (a *App) getDiffStrategy(service string) (staging.DiffStrategy, error) {
 			return nil, err
 		}
 
-		return staging.NewParamStrategy(client), nil
+		return staging.NewParamStrategy(awsparam.New(client)), nil
 	case string(staging.ServiceSecret):
 		client, err := a.getSecretClient()
 		if err != nil {
 			return nil, err
 		}
 
-		return staging.NewSecretStrategy(client), nil
+		return staging.NewSecretStrategy(awssecret.New(client)), nil
 	default:
 		return nil, errInvalidService
 	}

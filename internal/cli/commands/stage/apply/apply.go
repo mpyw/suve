@@ -10,6 +10,7 @@ import (
 
 	"github.com/urfave/cli/v3"
 
+	cliinternal "github.com/mpyw/suve/internal/cli/commands/internal"
 	"github.com/mpyw/suve/internal/cli/confirm"
 	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/infra"
@@ -150,7 +151,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 
 	// Initialize strategies only if needed
 	if hasParam {
-		strategy, err := staging.ParamFactory(ctx)
+		strategy, err := cliinternal.ParamStrategyFactory(ctx)
 		if err != nil {
 			return err
 		}
@@ -159,7 +160,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	}
 
 	if hasSecret {
-		strategy, err := staging.SecretFactory(ctx)
+		strategy, err := cliinternal.SecretStrategyFactory(ctx)
 		if err != nil {
 			return err
 		}

@@ -16,7 +16,6 @@ import (
 	"github.com/mpyw/suve/internal/domain"
 	"github.com/mpyw/suve/internal/jsonutil"
 	"github.com/mpyw/suve/internal/provider"
-	awsparam "github.com/mpyw/suve/internal/provider/aws/param"
 	"github.com/mpyw/suve/internal/timeutil"
 	"github.com/mpyw/suve/internal/usecase/param"
 	"github.com/mpyw/suve/internal/version/paramversion"
@@ -157,12 +156,12 @@ EXAMPLES:
 		UsageError: "usage: suve param show <name>",
 		ParseSpec:  paramversion.Parse,
 		NewPresenter: func(ctx context.Context, spec *paramversion.Spec) (genericshow.Presenter, error) {
-			client, err := cliinternal.NewParamClient(ctx)
+			store, err := cliinternal.ParamStore(ctx)
 			if err != nil {
 				return nil, err
 			}
 
-			return NewShowPresenter(awsparam.New(client), spec), nil
+			return NewShowPresenter(store, spec), nil
 		},
 	})
 }

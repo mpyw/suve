@@ -382,6 +382,11 @@ func (s *Store) Delete(ctx context.Context, name string, opts ...provider.Delete
 
 	_, err := s.client.DeleteSecret(ctx, input)
 	if err != nil {
+		var notFound *types.ResourceNotFoundException
+		if errors.As(err, &notFound) {
+			return fmt.Errorf("%w: %s", provider.ErrNotFound, name)
+		}
+
 		return fmt.Errorf("failed to delete secret: %w", err)
 	}
 

@@ -13,7 +13,6 @@ import (
 	"github.com/mpyw/suve/internal/cli/confirm"
 	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/infra"
-	awsparam "github.com/mpyw/suve/internal/provider/aws/param"
 	"github.com/mpyw/suve/internal/usecase/param"
 )
 
@@ -62,7 +61,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	name := cmd.Args().First()
 	skipConfirm := cmd.Bool("yes")
 
-	client, err := internal.NewParamClient(ctx)
+	store, err := internal.ParamStore(ctx)
 	if err != nil {
 		return err
 	}
@@ -73,7 +72,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		identity, _ = infra.GetAWSIdentity(ctx)
 	}
 
-	useCase := &param.DeleteUseCase{Store: awsparam.New(client)}
+	useCase := &param.DeleteUseCase{Store: store}
 
 	// Show current value before confirming
 	if !skipConfirm {

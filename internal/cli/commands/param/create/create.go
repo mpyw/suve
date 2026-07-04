@@ -12,7 +12,6 @@ import (
 	"github.com/mpyw/suve/internal/cli/commands/param/paramopts"
 	"github.com/mpyw/suve/internal/cli/commands/param/paramtype"
 	"github.com/mpyw/suve/internal/cli/output"
-	awsparam "github.com/mpyw/suve/internal/provider/aws/param"
 	"github.com/mpyw/suve/internal/usecase/param"
 )
 
@@ -116,13 +115,13 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		return err
 	}
 
-	client, err := internal.NewParamClient(ctx)
+	store, err := internal.ParamStore(ctx)
 	if err != nil {
 		return err
 	}
 
 	r := &Runner{
-		UseCase: &param.CreateUseCase{Writer: awsparam.New(client)},
+		UseCase: &param.CreateUseCase{Writer: store},
 		Stdout:  cmd.Root().Writer,
 		Stderr:  cmd.Root().ErrWriter,
 	}

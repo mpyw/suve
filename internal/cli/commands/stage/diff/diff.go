@@ -11,6 +11,7 @@ import (
 	"github.com/urfave/cli/v3"
 
 	"github.com/mpyw/suve/internal/cli/colors"
+	cliinternal "github.com/mpyw/suve/internal/cli/commands/internal"
 	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/cli/pager"
 	"github.com/mpyw/suve/internal/infra"
@@ -120,23 +121,23 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		Stderr: cmd.Root().ErrWriter,
 	}
 
-	// Initialize clients only if needed
+	// Initialize strategies only if needed
 	if hasParam {
-		paramClient, err := infra.NewParamClient(ctx)
+		strategy, err := cliinternal.ParamStrategyFactory(ctx)
 		if err != nil {
 			return fmt.Errorf("failed to initialize SSM Parameter Store client: %w", err)
 		}
 
-		r.ParamStrategy = staging.NewParamStrategy(paramClient)
+		r.ParamStrategy = strategy
 	}
 
 	if hasSecret {
-		secretClient, err := infra.NewSecretClient(ctx)
+		strategy, err := cliinternal.SecretStrategyFactory(ctx)
 		if err != nil {
 			return fmt.Errorf("failed to initialize Secrets Manager client: %w", err)
 		}
 
-		r.SecretStrategy = staging.NewSecretStrategy(secretClient)
+		r.SecretStrategy = strategy
 	}
 
 	return pager.WithPagerWriter(cmd.Root().Writer, opts.NoPager, func(w io.Writer) error {

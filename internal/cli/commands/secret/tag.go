@@ -8,17 +8,11 @@ import (
 	generictag "github.com/mpyw/suve/internal/cli/commands/generic/tag"
 	cliinternal "github.com/mpyw/suve/internal/cli/commands/internal"
 	"github.com/mpyw/suve/internal/provider"
-	awssecret "github.com/mpyw/suve/internal/provider/aws/secret"
 )
 
 // newTagger builds the Secrets Manager provider.Tagger.
 func newTagger(ctx context.Context) (provider.Tagger, error) {
-	client, err := cliinternal.NewSecretClient(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	return awssecret.New(client), nil
+	return cliinternal.SecretStore(ctx)
 }
 
 // TagCommand returns the Secrets Manager tag command.

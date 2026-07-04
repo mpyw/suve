@@ -7,7 +7,6 @@ import (
 
 	genericlist "github.com/mpyw/suve/internal/cli/commands/generic/list"
 	cliinternal "github.com/mpyw/suve/internal/cli/commands/internal"
-	awssecret "github.com/mpyw/suve/internal/provider/aws/secret"
 	"github.com/mpyw/suve/internal/usecase/secret"
 )
 
@@ -59,12 +58,12 @@ EXAMPLES:
 		NewList: func(
 			ctx context.Context, cmd *cli.Command, withValue bool,
 		) (func(context.Context) ([]genericlist.Entry, error), error) {
-			client, err := cliinternal.NewSecretClient(ctx)
+			store, err := cliinternal.SecretStore(ctx)
 			if err != nil {
 				return nil, err
 			}
 
-			uc := &secret.ListUseCase{Reader: awssecret.New(client)}
+			uc := &secret.ListUseCase{Reader: store}
 			input := secret.ListInput{
 				Prefix:    cmd.Args().First(),
 				Filter:    cmd.String("filter"),

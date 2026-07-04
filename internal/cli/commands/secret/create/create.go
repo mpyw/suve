@@ -10,7 +10,6 @@ import (
 
 	"github.com/mpyw/suve/internal/cli/commands/internal"
 	"github.com/mpyw/suve/internal/cli/output"
-	awssecret "github.com/mpyw/suve/internal/provider/aws/secret"
 	"github.com/mpyw/suve/internal/usecase/secret"
 )
 
@@ -63,13 +62,13 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		return fmt.Errorf("usage: suve secret create <name> <value>")
 	}
 
-	client, err := internal.NewSecretClient(ctx)
+	store, err := internal.SecretStore(ctx)
 	if err != nil {
 		return err
 	}
 
 	r := &Runner{
-		UseCase: &secret.CreateUseCase{Writer: awssecret.New(client)},
+		UseCase: &secret.CreateUseCase{Writer: store},
 		Stdout:  cmd.Root().Writer,
 		Stderr:  cmd.Root().ErrWriter,
 	}

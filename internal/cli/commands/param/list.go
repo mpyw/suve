@@ -7,7 +7,6 @@ import (
 
 	genericlist "github.com/mpyw/suve/internal/cli/commands/generic/list"
 	cliinternal "github.com/mpyw/suve/internal/cli/commands/internal"
-	awsparam "github.com/mpyw/suve/internal/provider/aws/param"
 	"github.com/mpyw/suve/internal/usecase/param"
 )
 
@@ -65,12 +64,12 @@ EXAMPLES:
 		NewList: func(
 			ctx context.Context, cmd *cli.Command, withValue bool,
 		) (func(context.Context) ([]genericlist.Entry, error), error) {
-			client, err := cliinternal.NewParamClient(ctx)
+			store, err := cliinternal.ParamStore(ctx)
 			if err != nil {
 				return nil, err
 			}
 
-			uc := &param.ListUseCase{Reader: awsparam.New(client)}
+			uc := &param.ListUseCase{Reader: store}
 			input := param.ListInput{
 				Prefix:    cmd.Args().First(),
 				Recursive: cmd.Bool("recursive"),

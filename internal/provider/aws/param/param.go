@@ -265,12 +265,18 @@ func (s *Store) Put(
 }
 
 // Delete removes a parameter. Parameter Store exposes no delete options, so any
-// provided DeleteOptions are ignored.
+// provided DeleteOptions are ignored. A missing parameter maps to the wrapped
+// provider.ErrNotFound sentinel so callers can treat it idempotently.
 func (s *Store) Delete(ctx context.Context, name string, _ ...provider.DeleteOption) error {
 	_, err := s.client.DeleteParameter(ctx, &ssm.DeleteParameterInput{
 		Name: aws.String(name),
 	})
 	if err != nil {
+		var notFound *types.ParameterNotFound
+		if errors.As(err, &notFound) {
+			return fmt.Errorf("%w: %s", provider.ErrNotFound, name)
+		}
+
 		return fmt.Errorf("failed to delete parameter: %w", err)
 	}
 
