@@ -12,15 +12,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	cmdsecret "github.com/mpyw/suve/internal/cli/commands/secret"
 	secretcreate "github.com/mpyw/suve/internal/cli/commands/secret/create"
 	secretdelete "github.com/mpyw/suve/internal/cli/commands/secret/delete"
-	secretdiff "github.com/mpyw/suve/internal/cli/commands/secret/diff"
-	secretlist "github.com/mpyw/suve/internal/cli/commands/secret/list"
-	secretlog "github.com/mpyw/suve/internal/cli/commands/secret/log"
 	secretrestore "github.com/mpyw/suve/internal/cli/commands/secret/restore"
-	secretshow "github.com/mpyw/suve/internal/cli/commands/secret/show"
-	secrettag "github.com/mpyw/suve/internal/cli/commands/secret/tag"
-	secretuntag "github.com/mpyw/suve/internal/cli/commands/secret/untag"
 	secretupdate "github.com/mpyw/suve/internal/cli/commands/secret/update"
 	globalreset "github.com/mpyw/suve/internal/cli/commands/stage/reset"
 	secretstage "github.com/mpyw/suve/internal/cli/commands/stage/secret"
@@ -52,7 +47,7 @@ func TestSecret_FullWorkflow(t *testing.T) {
 
 	// 2. Show secret
 	t.Run("show", func(t *testing.T) {
-		stdout, _, err := runCommand(t, secretshow.Command(), secretName)
+		stdout, _, err := runCommand(t, cmdsecret.ShowCommand(), secretName)
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "initial-secret")
 		t.Logf("show output: %s", stdout)
@@ -60,7 +55,7 @@ func TestSecret_FullWorkflow(t *testing.T) {
 
 	// 3. Cat secret
 	t.Run("cat", func(t *testing.T) {
-		stdout, _, err := runCommand(t, secretshow.Command(), "--raw", secretName)
+		stdout, _, err := runCommand(t, cmdsecret.ShowCommand(), "--raw", secretName)
 		require.NoError(t, err)
 		assert.Equal(t, "initial-secret", stdout)
 	})
@@ -73,7 +68,7 @@ func TestSecret_FullWorkflow(t *testing.T) {
 
 	// 5. Log
 	t.Run("log", func(t *testing.T) {
-		stdout, _, err := runCommand(t, secretlog.Command(), secretName)
+		stdout, _, err := runCommand(t, cmdsecret.LogCommand(), secretName)
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "Version")
 		t.Logf("log output: %s", stdout)
@@ -82,12 +77,12 @@ func TestSecret_FullWorkflow(t *testing.T) {
 	// 6. Log with options
 	t.Run("log-with-options", func(t *testing.T) {
 		// --oneline
-		stdout, _, err := runCommand(t, secretlog.Command(), "--oneline", secretName)
+		stdout, _, err := runCommand(t, cmdsecret.LogCommand(), "--oneline", secretName)
 		require.NoError(t, err)
 		t.Logf("log --oneline output: %s", stdout)
 
 		// -p (patch) - log shows from newest to oldest, so diff is current→previous
-		stdout, _, err = runCommand(t, secretlog.Command(), "-p", secretName)
+		stdout, _, err = runCommand(t, cmdsecret.LogCommand(), "-p", secretName)
 		require.NoError(t, err)
 		// Check that diff contains both values (order depends on log direction)
 		assert.Contains(t, stdout, "initial-secret")
@@ -97,7 +92,7 @@ func TestSecret_FullWorkflow(t *testing.T) {
 
 	// 7. Diff - Compare AWSPREVIOUS with AWSCURRENT
 	t.Run("diff", func(t *testing.T) {
-		stdout, _, err := runCommand(t, secretdiff.Command(), secretName+":AWSPREVIOUS", secretName+":AWSCURRENT")
+		stdout, _, err := runCommand(t, cmdsecret.DiffCommand(), secretName+":AWSPREVIOUS", secretName+":AWSCURRENT")
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "-initial-secret")
 		assert.Contains(t, stdout, "+updated-secret")
@@ -106,7 +101,7 @@ func TestSecret_FullWorkflow(t *testing.T) {
 
 	// 8. Diff with single arg
 	t.Run("diff-single-arg", func(t *testing.T) {
-		stdout, _, err := runCommand(t, secretdiff.Command(), secretName+":AWSPREVIOUS")
+		stdout, _, err := runCommand(t, cmdsecret.DiffCommand(), secretName+":AWSPREVIOUS")
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "-initial-secret")
 		assert.Contains(t, stdout, "+updated-secret")
@@ -115,7 +110,7 @@ func TestSecret_FullWorkflow(t *testing.T) {
 	// 9. Diff with ~SHIFT
 	// Note: Secrets Manager shift (~) may not work correctly in localstack due to version history limitations
 	t.Run("diff-shift", func(t *testing.T) {
-		stdout, stderr, err := runCommand(t, secretdiff.Command(), secretName+"~1")
+		stdout, stderr, err := runCommand(t, cmdsecret.DiffCommand(), secretName+"~1")
 		t.Logf("diff-shift stdout: %s", stdout)
 		t.Logf("diff-shift stderr: %s", stderr)
 		// Skip strict assertion - localstack may not support shift properly
@@ -127,7 +122,7 @@ func TestSecret_FullWorkflow(t *testing.T) {
 
 	// 10. List
 	t.Run("list", func(t *testing.T) {
-		stdout, _, err := runCommand(t, secretlist.Command())
+		stdout, _, err := runCommand(t, cmdsecret.ListCommand())
 		require.NoError(t, err)
 		assert.Contains(t, stdout, secretName)
 		t.Logf("list output: %s", stdout)
@@ -147,7 +142,7 @@ func TestSecret_FullWorkflow(t *testing.T) {
 
 	// 13. Verify restored
 	t.Run("verify-restored", func(t *testing.T) {
-		_, _, err := runCommand(t, secretshow.Command(), secretName)
+		_, _, err := runCommand(t, cmdsecret.ShowCommand(), secretName)
 		require.NoError(t, err)
 	})
 
@@ -159,7 +154,7 @@ func TestSecret_FullWorkflow(t *testing.T) {
 
 	// 15. Verify deleted
 	t.Run("verify-deleted", func(t *testing.T) {
-		_, _, err := runCommand(t, secretshow.Command(), secretName)
+		_, _, err := runCommand(t, cmdsecret.ShowCommand(), secretName)
 		assert.Error(t, err, "expected error after deletion")
 	})
 }
@@ -186,11 +181,11 @@ func TestSecret_VersionSpecifiers(t *testing.T) {
 
 	// Test :LABEL
 	t.Run("label", func(t *testing.T) {
-		stdout, _, err := runCommand(t, secretshow.Command(), "--raw", secretName+":AWSCURRENT")
+		stdout, _, err := runCommand(t, cmdsecret.ShowCommand(), "--raw", secretName+":AWSCURRENT")
 		require.NoError(t, err)
 		assert.Equal(t, "v3", stdout)
 
-		stdout, _, err = runCommand(t, secretshow.Command(), "--raw", secretName+":AWSPREVIOUS")
+		stdout, _, err = runCommand(t, cmdsecret.ShowCommand(), "--raw", secretName+":AWSPREVIOUS")
 		require.NoError(t, err)
 		assert.Equal(t, "v2", stdout)
 	})
@@ -199,7 +194,7 @@ func TestSecret_VersionSpecifiers(t *testing.T) {
 	// Note: Secrets Manager shift (~) may not work correctly in localstack due to version history limitations
 	t.Run("shift", func(t *testing.T) {
 		// ~1 = 1 version ago
-		stdout, _, err := runCommand(t, secretshow.Command(), "--raw", secretName+"~1")
+		stdout, _, err := runCommand(t, cmdsecret.ShowCommand(), "--raw", secretName+"~1")
 		// Localstack may not support shift properly, skip strict assertion
 		t.Logf("shift ~1 stdout: %s, err: %v", stdout, err)
 
@@ -214,7 +209,7 @@ func TestSecret_VersionSpecifiers(t *testing.T) {
 	// Note: May not work in localstack due to version history limitations
 	t.Run("label-and-shift", func(t *testing.T) {
 		// :AWSCURRENT~1 = 1 version before current
-		stdout, _, err := runCommand(t, secretshow.Command(), "--raw", secretName+":AWSCURRENT~1")
+		stdout, _, err := runCommand(t, cmdsecret.ShowCommand(), "--raw", secretName+":AWSCURRENT~1")
 		t.Logf("label-and-shift stdout: %s, err: %v", stdout, err)
 		// Skip strict assertion - localstack may error with "version shift out of range"
 		if err == nil {
@@ -283,7 +278,7 @@ func TestSecret_StagingWorkflow(t *testing.T) {
 
 	// 6. Verify
 	t.Run("verify", func(t *testing.T) {
-		stdout, _, err := runCommand(t, secretshow.Command(), "--raw", secretName)
+		stdout, _, err := runCommand(t, cmdsecret.ShowCommand(), "--raw", secretName)
 		require.NoError(t, err)
 		assert.Equal(t, "staged-secret", stdout)
 	})
@@ -310,7 +305,7 @@ func TestSecret_StagingWorkflow(t *testing.T) {
 
 	// 10. Verify deleted
 	t.Run("verify-deleted", func(t *testing.T) {
-		_, _, err := runCommand(t, secretshow.Command(), secretName)
+		_, _, err := runCommand(t, cmdsecret.ShowCommand(), secretName)
 		assert.Error(t, err)
 	})
 }
@@ -352,7 +347,7 @@ func TestSecret_ErrorCases(t *testing.T) {
 
 	// Show non-existent secret
 	t.Run("show-nonexistent", func(t *testing.T) {
-		_, _, err := runCommand(t, secretshow.Command(), "nonexistent-secret-12345")
+		_, _, err := runCommand(t, cmdsecret.ShowCommand(), "nonexistent-secret-12345")
 		assert.Error(t, err)
 	})
 
@@ -361,7 +356,7 @@ func TestSecret_ErrorCases(t *testing.T) {
 
 	// Invalid label
 	t.Run("invalid-label", func(t *testing.T) {
-		_, _, err := runCommand(t, secretshow.Command(), "secret:INVALIDLABEL")
+		_, _, err := runCommand(t, cmdsecret.ShowCommand(), "secret:INVALIDLABEL")
 		assert.Error(t, err)
 	})
 
@@ -396,7 +391,7 @@ func TestSecret_SpecialCharactersInName(t *testing.T) {
 			_, _, err := runCommand(t, secretcreate.Command(), tc.secretName, "test-value")
 			require.NoError(t, err)
 
-			stdout, _, err := runCommand(t, secretshow.Command(), "--raw", tc.secretName)
+			stdout, _, err := runCommand(t, cmdsecret.ShowCommand(), "--raw", tc.secretName)
 			require.NoError(t, err)
 			assert.Equal(t, "test-value", stdout)
 		})
@@ -440,7 +435,7 @@ func TestSecret_StagingAddViaCLI(t *testing.T) {
 
 	// 4. Verify created
 	t.Run("verify", func(t *testing.T) {
-		stdout, _, err := runCommand(t, secretshow.Command(), "--raw", secretName)
+		stdout, _, err := runCommand(t, cmdsecret.ShowCommand(), "--raw", secretName)
 		require.NoError(t, err)
 		assert.Equal(t, "cli-staged-secret", stdout)
 	})
@@ -492,7 +487,7 @@ func TestSecret_TagAndUntag(t *testing.T) {
 
 	// Add tags
 	t.Run("tag", func(t *testing.T) {
-		stdout, _, err := runCommand(t, secrettag.Command(), secretName, "env=test", "team=suve")
+		stdout, _, err := runCommand(t, cmdsecret.TagCommand(), secretName, "env=test", "team=suve")
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "Tagged")
 		t.Logf("tag output: %s", stdout)
@@ -500,7 +495,7 @@ func TestSecret_TagAndUntag(t *testing.T) {
 
 	// Verify tags are added
 	t.Run("verify-tags", func(t *testing.T) {
-		stdout, _, err := runCommand(t, secretshow.Command(), secretName)
+		stdout, _, err := runCommand(t, cmdsecret.ShowCommand(), secretName)
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "env: test")
 		assert.Contains(t, stdout, "team: suve")
@@ -508,7 +503,7 @@ func TestSecret_TagAndUntag(t *testing.T) {
 
 	// Remove one tag
 	t.Run("untag", func(t *testing.T) {
-		stdout, _, err := runCommand(t, secretuntag.Command(), secretName, "team")
+		stdout, _, err := runCommand(t, cmdsecret.UntagCommand(), secretName, "team")
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "Untagged")
 		t.Logf("untag output: %s", stdout)
@@ -516,7 +511,7 @@ func TestSecret_TagAndUntag(t *testing.T) {
 
 	// Verify tag is removed
 	t.Run("verify-untag", func(t *testing.T) {
-		stdout, _, err := runCommand(t, secretshow.Command(), secretName)
+		stdout, _, err := runCommand(t, cmdsecret.ShowCommand(), secretName)
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "env: test")
 		assert.NotContains(t, stdout, "team: suve")
@@ -541,7 +536,7 @@ func TestSecret_TagInvalidFormat(t *testing.T) {
 
 	// Try to add invalid tag format
 	t.Run("invalid-format", func(t *testing.T) {
-		_, _, err := runCommand(t, secrettag.Command(), secretName, "invalid-tag-no-equals")
+		_, _, err := runCommand(t, cmdsecret.TagCommand(), secretName, "invalid-tag-no-equals")
 		require.Error(t, err)
 		t.Logf("expected error: %v", err)
 	})
@@ -557,7 +552,7 @@ func TestSecret_TagNonExistent(t *testing.T) {
 	_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
 
 	// Try to tag non-existent secret
-	_, _, err := runCommand(t, secrettag.Command(), secretName, "env=test")
+	_, _, err := runCommand(t, cmdsecret.TagCommand(), secretName, "env=test")
 	require.Error(t, err)
 	t.Logf("expected error: %v", err)
 }
@@ -572,7 +567,7 @@ func TestSecret_UntagNonExistent(t *testing.T) {
 	_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
 
 	// Try to untag non-existent secret
-	_, _, err := runCommand(t, secretuntag.Command(), secretName, "env")
+	_, _, err := runCommand(t, cmdsecret.UntagCommand(), secretName, "env")
 	require.Error(t, err)
 	t.Logf("expected error: %v", err)
 }
@@ -618,7 +613,7 @@ func TestSecret_LogNonExistent(t *testing.T) {
 	_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
 
 	// Try to get log
-	_, _, err := runCommand(t, secretlog.Command(), secretName)
+	_, _, err := runCommand(t, cmdsecret.LogCommand(), secretName)
 	assert.Error(t, err)
 }
 
@@ -632,7 +627,7 @@ func TestSecret_DiffNonExistent(t *testing.T) {
 	_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
 
 	// Try to diff
-	_, _, err := runCommand(t, secretdiff.Command(), secretName)
+	_, _, err := runCommand(t, cmdsecret.DiffCommand(), secretName)
 	assert.Error(t, err)
 }
 
@@ -655,7 +650,7 @@ func TestSecret_ShowRaw(t *testing.T) {
 
 	// Show raw
 	t.Run("raw", func(t *testing.T) {
-		stdout, _, err := runCommand(t, secretshow.Command(), "--raw", secretName)
+		stdout, _, err := runCommand(t, cmdsecret.ShowCommand(), "--raw", secretName)
 		require.NoError(t, err)
 		assert.Equal(t, secretValue, strings.TrimSuffix(stdout, "\n"))
 	})
@@ -671,7 +666,7 @@ func TestSecret_ShowNonExistent(t *testing.T) {
 	_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
 
 	// Try to show
-	_, _, err := runCommand(t, secretshow.Command(), secretName)
+	_, _, err := runCommand(t, cmdsecret.ShowCommand(), secretName)
 	assert.Error(t, err)
 }
 
@@ -693,11 +688,11 @@ func TestSecret_CreateAndTag(t *testing.T) {
 	assert.Contains(t, stdout, "Created")
 
 	// Add tags after creation
-	_, _, err = runCommand(t, secrettag.Command(), secretName, "env=test", "team=suve")
+	_, _, err = runCommand(t, cmdsecret.TagCommand(), secretName, "env=test", "team=suve")
 	require.NoError(t, err)
 
 	// Verify tags
-	stdout, _, err = runCommand(t, secretshow.Command(), secretName)
+	stdout, _, err = runCommand(t, cmdsecret.ShowCommand(), secretName)
 	require.NoError(t, err)
 	assert.Contains(t, stdout, "env: test")
 	assert.Contains(t, stdout, "team: suve")
@@ -797,7 +792,7 @@ func TestSecret_ListJSON(t *testing.T) {
 	_, _, _ = runCommand(t, secretcreate.Command(), secretName, "v1")
 
 	// List with JSON format
-	stdout, _, err := runCommand(t, secretlist.Command(), "--output", "json")
+	stdout, _, err := runCommand(t, cmdsecret.ListCommand(), "--output", "json")
 	require.NoError(t, err)
 	assert.True(t, strings.HasPrefix(strings.TrimSpace(stdout), "[") || strings.HasPrefix(strings.TrimSpace(stdout), "{"))
 }
