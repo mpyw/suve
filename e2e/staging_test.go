@@ -12,12 +12,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	cmdparam "github.com/mpyw/suve/internal/cli/commands/param"
 	paramcreate "github.com/mpyw/suve/internal/cli/commands/param/create"
 	paramdelete "github.com/mpyw/suve/internal/cli/commands/param/delete"
-	paramshow "github.com/mpyw/suve/internal/cli/commands/param/show"
+	cmdsecret "github.com/mpyw/suve/internal/cli/commands/secret"
 	secretcreate "github.com/mpyw/suve/internal/cli/commands/secret/create"
 	secretdelete "github.com/mpyw/suve/internal/cli/commands/secret/delete"
-	secretshow "github.com/mpyw/suve/internal/cli/commands/secret/show"
 	globalstage "github.com/mpyw/suve/internal/cli/commands/stage"
 	globalapply "github.com/mpyw/suve/internal/cli/commands/stage/apply"
 	globaldiff "github.com/mpyw/suve/internal/cli/commands/stage/diff"
@@ -100,11 +100,11 @@ func TestGlobal_StageWorkflow(t *testing.T) {
 
 	// 4. Verify both updated
 	t.Run("verify", func(t *testing.T) {
-		stdout, _, err := runCommand(t, paramshow.Command(), "--raw", paramName)
+		stdout, _, err := runCommand(t, cmdparam.ShowCommand(), "--raw", paramName)
 		require.NoError(t, err)
 		assert.Equal(t, "staged-param", stdout)
 
-		stdout, _, err = runCommand(t, secretshow.Command(), "--raw", secretName)
+		stdout, _, err = runCommand(t, cmdsecret.ShowCommand(), "--raw", secretName)
 		require.NoError(t, err)
 		assert.Equal(t, "staged-secret", stdout)
 	})
@@ -300,7 +300,7 @@ func TestGlobal_StagingWithTags(t *testing.T) {
 		t.Logf("global apply with tags output: %s", stdout)
 
 		// Verify tags were applied by checking show output
-		stdout, _, err = runCommand(t, paramshow.Command(), paramName)
+		stdout, _, err = runCommand(t, cmdparam.ShowCommand(), paramName)
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "env: test")
 		assert.Contains(t, stdout, "team: e2e")
@@ -424,7 +424,7 @@ func TestGlobal_StashPushAndPop(t *testing.T) {
 
 	// Verify the parameter was created
 	t.Run("verify-created", func(t *testing.T) {
-		stdout, _, err := runCommand(t, paramshow.Command(), "--raw", paramName)
+		stdout, _, err := runCommand(t, cmdparam.ShowCommand(), "--raw", paramName)
 		require.NoError(t, err)
 		assert.Equal(t, "test-value", strings.TrimSpace(stdout))
 	})

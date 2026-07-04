@@ -12,14 +12,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	cmdparam "github.com/mpyw/suve/internal/cli/commands/param"
 	paramcreate "github.com/mpyw/suve/internal/cli/commands/param/create"
 	paramdelete "github.com/mpyw/suve/internal/cli/commands/param/delete"
-	paramdiff "github.com/mpyw/suve/internal/cli/commands/param/diff"
-	paramlist "github.com/mpyw/suve/internal/cli/commands/param/list"
-	paramlog "github.com/mpyw/suve/internal/cli/commands/param/log"
-	paramshow "github.com/mpyw/suve/internal/cli/commands/param/show"
-	paramtag "github.com/mpyw/suve/internal/cli/commands/param/tag"
-	paramuntag "github.com/mpyw/suve/internal/cli/commands/param/untag"
 	paramupdate "github.com/mpyw/suve/internal/cli/commands/param/update"
 	globaldiff "github.com/mpyw/suve/internal/cli/commands/stage/diff"
 	paramstage "github.com/mpyw/suve/internal/cli/commands/stage/param"
@@ -54,7 +49,7 @@ func TestParam_FullWorkflow(t *testing.T) {
 
 	// 2. Show parameter
 	t.Run("show", func(t *testing.T) {
-		stdout, _, err := runCommand(t, paramshow.Command(), paramName)
+		stdout, _, err := runCommand(t, cmdparam.ShowCommand(), paramName)
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "initial-value")
 		assert.Contains(t, stdout, paramName)
@@ -63,7 +58,7 @@ func TestParam_FullWorkflow(t *testing.T) {
 
 	// 3. Show --raw (raw output without trailing newline)
 	t.Run("show-raw", func(t *testing.T) {
-		stdout, _, err := runCommand(t, paramshow.Command(), "--raw", paramName)
+		stdout, _, err := runCommand(t, cmdparam.ShowCommand(), "--raw", paramName)
 		require.NoError(t, err)
 		assert.Equal(t, "initial-value", stdout)
 	})
@@ -76,7 +71,7 @@ func TestParam_FullWorkflow(t *testing.T) {
 
 	// 5. Log (basic)
 	t.Run("log", func(t *testing.T) {
-		stdout, _, err := runCommand(t, paramlog.Command(), paramName)
+		stdout, _, err := runCommand(t, cmdparam.LogCommand(), paramName)
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "Version 1")
 		assert.Contains(t, stdout, "Version 2")
@@ -86,20 +81,20 @@ func TestParam_FullWorkflow(t *testing.T) {
 	// 6. Log with options
 	t.Run("log-with-options", func(t *testing.T) {
 		// --oneline format: "VERSION  DATE  VALUE"
-		stdout, _, err := runCommand(t, paramlog.Command(), "--oneline", paramName)
+		stdout, _, err := runCommand(t, cmdparam.LogCommand(), "--oneline", paramName)
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "1")
 		assert.Contains(t, stdout, "2")
 		t.Logf("log --oneline output: %s", stdout)
 
 		// -n 1 (limit) - shows only most recent
-		stdout, _, err = runCommand(t, paramlog.Command(), "-n", "1", paramName)
+		stdout, _, err = runCommand(t, cmdparam.LogCommand(), "-n", "1", paramName)
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "current") // Most recent has "(current)"
 		t.Logf("log -n 1 output: %s", stdout)
 
 		// --reverse - oldest first
-		stdout, _, err = runCommand(t, paramlog.Command(), "--reverse", paramName)
+		stdout, _, err = runCommand(t, cmdparam.LogCommand(), "--reverse", paramName)
 		require.NoError(t, err)
 		// First entry should be Version 1 when reversed
 		lines := strings.Split(strings.TrimSpace(stdout), "\n")
@@ -107,7 +102,7 @@ func TestParam_FullWorkflow(t *testing.T) {
 		t.Logf("log --reverse output: %s", stdout)
 
 		// -p (patch)
-		stdout, _, err = runCommand(t, paramlog.Command(), "-p", paramName)
+		stdout, _, err = runCommand(t, cmdparam.LogCommand(), "-p", paramName)
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "-initial-value")
 		assert.Contains(t, stdout, "+updated-value")
@@ -116,7 +111,7 @@ func TestParam_FullWorkflow(t *testing.T) {
 
 	// 7. Diff - Compare version 1 with version 2
 	t.Run("diff", func(t *testing.T) {
-		stdout, _, err := runCommand(t, paramdiff.Command(), paramName+"#1", paramName+"#2")
+		stdout, _, err := runCommand(t, cmdparam.DiffCommand(), paramName+"#1", paramName+"#2")
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "-initial-value")
 		assert.Contains(t, stdout, "+updated-value")
@@ -125,7 +120,7 @@ func TestParam_FullWorkflow(t *testing.T) {
 
 	// 8. Diff with single arg (compare with current)
 	t.Run("diff-single-arg", func(t *testing.T) {
-		stdout, _, err := runCommand(t, paramdiff.Command(), paramName+"#1")
+		stdout, _, err := runCommand(t, cmdparam.DiffCommand(), paramName+"#1")
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "-initial-value")
 		assert.Contains(t, stdout, "+updated-value")
@@ -133,7 +128,7 @@ func TestParam_FullWorkflow(t *testing.T) {
 
 	// 9. Diff with ~SHIFT
 	t.Run("diff-shift", func(t *testing.T) {
-		stdout, _, err := runCommand(t, paramdiff.Command(), paramName+"~1")
+		stdout, _, err := runCommand(t, cmdparam.DiffCommand(), paramName+"~1")
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "-initial-value")
 		assert.Contains(t, stdout, "+updated-value")
@@ -141,7 +136,7 @@ func TestParam_FullWorkflow(t *testing.T) {
 
 	// 10. List (note: localstack may not support path filtering perfectly)
 	t.Run("list", func(t *testing.T) {
-		stdout, _, err := runCommand(t, paramlist.Command(), "/suve-e2e-test/basic/")
+		stdout, _, err := runCommand(t, cmdparam.ListCommand(), "/suve-e2e-test/basic/")
 		require.NoError(t, err)
 		// Localstack might return empty for path-filtered list, skip assertion if empty
 		if stdout != "" {
@@ -159,7 +154,7 @@ func TestParam_FullWorkflow(t *testing.T) {
 
 	// 12. Verify deletion
 	t.Run("verify-deleted", func(t *testing.T) {
-		_, _, err := runCommand(t, paramshow.Command(), paramName)
+		_, _, err := runCommand(t, cmdparam.ShowCommand(), paramName)
 		assert.Error(t, err, "expected error after deletion")
 	})
 }
@@ -186,11 +181,11 @@ func TestParam_VersionSpecifiers(t *testing.T) {
 
 	// Test #VERSION
 	t.Run("version-number", func(t *testing.T) {
-		stdout, _, err := runCommand(t, paramshow.Command(), "--raw", paramName+"#1")
+		stdout, _, err := runCommand(t, cmdparam.ShowCommand(), "--raw", paramName+"#1")
 		require.NoError(t, err)
 		assert.Equal(t, "v1", stdout)
 
-		stdout, _, err = runCommand(t, paramshow.Command(), "--raw", paramName+"#2")
+		stdout, _, err = runCommand(t, cmdparam.ShowCommand(), "--raw", paramName+"#2")
 		require.NoError(t, err)
 		assert.Equal(t, "v2", stdout)
 	})
@@ -198,22 +193,22 @@ func TestParam_VersionSpecifiers(t *testing.T) {
 	// Test ~SHIFT
 	t.Run("shift", func(t *testing.T) {
 		// ~1 = 1 version ago
-		stdout, _, err := runCommand(t, paramshow.Command(), "--raw", paramName+"~1")
+		stdout, _, err := runCommand(t, cmdparam.ShowCommand(), "--raw", paramName+"~1")
 		require.NoError(t, err)
 		assert.Equal(t, "v2", stdout)
 
 		// ~2 = 2 versions ago
-		stdout, _, err = runCommand(t, paramshow.Command(), "--raw", paramName+"~2")
+		stdout, _, err = runCommand(t, cmdparam.ShowCommand(), "--raw", paramName+"~2")
 		require.NoError(t, err)
 		assert.Equal(t, "v1", stdout)
 
 		// ~ alone = ~1
-		stdout, _, err = runCommand(t, paramshow.Command(), "--raw", paramName+"~")
+		stdout, _, err = runCommand(t, cmdparam.ShowCommand(), "--raw", paramName+"~")
 		require.NoError(t, err)
 		assert.Equal(t, "v2", stdout)
 
 		// ~~ = ~1~1 = ~2
-		stdout, _, err = runCommand(t, paramshow.Command(), "--raw", paramName+"~~")
+		stdout, _, err = runCommand(t, cmdparam.ShowCommand(), "--raw", paramName+"~~")
 		require.NoError(t, err)
 		assert.Equal(t, "v1", stdout)
 	})
@@ -221,7 +216,7 @@ func TestParam_VersionSpecifiers(t *testing.T) {
 	// Test #VERSION~SHIFT combination
 	t.Run("version-and-shift", func(t *testing.T) {
 		// #3~1 = version 3, then 1 back = version 2
-		stdout, _, err := runCommand(t, paramshow.Command(), "--raw", paramName+"#3~1")
+		stdout, _, err := runCommand(t, cmdparam.ShowCommand(), "--raw", paramName+"#3~1")
 		require.NoError(t, err)
 		assert.Equal(t, "v2", stdout)
 	})
@@ -247,7 +242,7 @@ func TestParam_ParseJSONFlag(t *testing.T) {
 
 	// Test diff with -j flag (should format and sort keys)
 	t.Run("diff-json", func(t *testing.T) {
-		stdout, _, err := runCommand(t, paramdiff.Command(), "-j", paramName+"#1", paramName+"#2")
+		stdout, _, err := runCommand(t, cmdparam.DiffCommand(), "-j", paramName+"#1", paramName+"#2")
 		require.NoError(t, err)
 		// Keys should be sorted alphabetically in the formatted output
 		assert.Contains(t, stdout, `"a"`)
@@ -258,7 +253,7 @@ func TestParam_ParseJSONFlag(t *testing.T) {
 
 	// Test log with -p -j flags
 	t.Run("log-patch-json", func(t *testing.T) {
-		stdout, _, err := runCommand(t, paramlog.Command(), "-p", "-j", paramName)
+		stdout, _, err := runCommand(t, cmdparam.LogCommand(), "-p", "-j", paramName)
 		require.NoError(t, err)
 		assert.Contains(t, stdout, `"a"`)
 		t.Logf("log -p -j output: %s", stdout)
@@ -327,7 +322,7 @@ func TestParam_StagingWorkflow(t *testing.T) {
 
 	// 6. Verify - check the value was applied
 	t.Run("verify", func(t *testing.T) {
-		stdout, _, err := runCommand(t, paramshow.Command(), "--raw", paramName)
+		stdout, _, err := runCommand(t, cmdparam.ShowCommand(), "--raw", paramName)
 		require.NoError(t, err)
 		assert.Equal(t, "staged-value", stdout)
 	})
@@ -370,7 +365,7 @@ func TestParam_StagingWorkflow(t *testing.T) {
 
 	// 12. Verify parameter still exists after reset
 	t.Run("verify-not-deleted", func(t *testing.T) {
-		stdout, _, err := runCommand(t, paramshow.Command(), "--raw", paramName)
+		stdout, _, err := runCommand(t, cmdparam.ShowCommand(), "--raw", paramName)
 		require.NoError(t, err)
 		assert.Equal(t, "staged-value", stdout)
 	})
@@ -416,7 +411,7 @@ func TestParam_StagingAdd(t *testing.T) {
 
 	// 4. Verify created
 	t.Run("verify", func(t *testing.T) {
-		stdout, _, err := runCommand(t, paramshow.Command(), "--raw", paramName)
+		stdout, _, err := runCommand(t, cmdparam.ShowCommand(), "--raw", paramName)
 		require.NoError(t, err)
 		assert.Equal(t, "new-param-value", stdout)
 	})
@@ -475,7 +470,7 @@ func TestParam_StagingResetWithVersion(t *testing.T) {
 
 	// 5. Verify reverted
 	t.Run("verify-reverted", func(t *testing.T) {
-		stdout, _, err := runCommand(t, paramshow.Command(), "--raw", paramName)
+		stdout, _, err := runCommand(t, cmdparam.ShowCommand(), "--raw", paramName)
 		require.NoError(t, err)
 		assert.Equal(t, "v1", stdout)
 	})
@@ -580,11 +575,11 @@ func TestParam_StagingApplySingle(t *testing.T) {
 
 	// Verify param1 updated, param2 still staged
 	t.Run("verify", func(t *testing.T) {
-		stdout, _, err := runCommand(t, paramshow.Command(), "--raw", param1)
+		stdout, _, err := runCommand(t, cmdparam.ShowCommand(), "--raw", param1)
 		require.NoError(t, err)
 		assert.Equal(t, "staged1", stdout)
 
-		stdout, _, err = runCommand(t, paramshow.Command(), "--raw", param2)
+		stdout, _, err = runCommand(t, cmdparam.ShowCommand(), "--raw", param2)
 		require.NoError(t, err)
 		assert.Equal(t, "original2", stdout) // Not applied yet
 
@@ -606,13 +601,13 @@ func TestParam_ErrorCases(t *testing.T) {
 
 	// Show non-existent parameter
 	t.Run("show-nonexistent", func(t *testing.T) {
-		_, _, err := runCommand(t, paramshow.Command(), "/nonexistent/param/12345")
+		_, _, err := runCommand(t, cmdparam.ShowCommand(), "/nonexistent/param/12345")
 		assert.Error(t, err)
 	})
 
 	// Cat non-existent parameter
 	t.Run("cat-nonexistent", func(t *testing.T) {
-		_, _, err := runCommand(t, paramshow.Command(), "--raw", "/nonexistent/param/12345")
+		_, _, err := runCommand(t, cmdparam.ShowCommand(), "--raw", "/nonexistent/param/12345")
 		assert.Error(t, err)
 	})
 
@@ -624,7 +619,7 @@ func TestParam_ErrorCases(t *testing.T) {
 
 	// Invalid version specifier
 	t.Run("invalid-version", func(t *testing.T) {
-		_, _, err := runCommand(t, paramshow.Command(), "--raw", "/param#abc")
+		_, _, err := runCommand(t, cmdparam.ShowCommand(), "--raw", "/param#abc")
 		assert.Error(t, err)
 	})
 
@@ -635,7 +630,7 @@ func TestParam_ErrorCases(t *testing.T) {
 	})
 
 	t.Run("missing-args-show", func(t *testing.T) {
-		_, _, err := runCommand(t, paramshow.Command())
+		_, _, err := runCommand(t, cmdparam.ShowCommand())
 		assert.Error(t, err)
 	})
 }
@@ -675,7 +670,7 @@ func TestParam_SpecialCharactersInValue(t *testing.T) {
 			_, _, err := runCommand(t, paramcreate.Command(), paramName, tc.value)
 			require.NoError(t, err)
 
-			stdout, _, err := runCommand(t, paramshow.Command(), "--raw", paramName)
+			stdout, _, err := runCommand(t, cmdparam.ShowCommand(), "--raw", paramName)
 			require.NoError(t, err)
 			assert.Equal(t, tc.value, stdout)
 		})
@@ -700,7 +695,7 @@ func TestParam_LongValue(t *testing.T) {
 	_, _, err := runCommand(t, paramcreate.Command(), paramName, longValue)
 	require.NoError(t, err)
 
-	stdout, _, err := runCommand(t, paramshow.Command(), "--raw", paramName)
+	stdout, _, err := runCommand(t, cmdparam.ShowCommand(), "--raw", paramName)
 	require.NoError(t, err)
 	assert.Equal(t, longValue, stdout)
 }
@@ -746,7 +741,7 @@ func TestParam_StagingAddViaCLI(t *testing.T) {
 
 	// 4. Verify created
 	t.Run("verify", func(t *testing.T) {
-		stdout, _, err := runCommand(t, paramshow.Command(), "--raw", paramName)
+		stdout, _, err := runCommand(t, cmdparam.ShowCommand(), "--raw", paramName)
 		require.NoError(t, err)
 		assert.Equal(t, "cli-staged-value", stdout)
 	})
@@ -826,7 +821,7 @@ func TestParam_StagingAddWithOptions(t *testing.T) {
 		_, _, err := runSubCommand(t, paramstage.Command(), "apply", "--yes")
 		require.NoError(t, err)
 
-		stdout, _, err := runCommand(t, paramshow.Command(), "--raw", paramName)
+		stdout, _, err := runCommand(t, cmdparam.ShowCommand(), "--raw", paramName)
 		require.NoError(t, err)
 		assert.Equal(t, "value-with-options", stdout)
 	})
@@ -864,7 +859,7 @@ func TestParam_StagingEditViaCLI(t *testing.T) {
 		_, _, err := runSubCommand(t, paramstage.Command(), "apply", "--yes")
 		require.NoError(t, err)
 
-		stdout, _, err := runCommand(t, paramshow.Command(), "--raw", paramName)
+		stdout, _, err := runCommand(t, cmdparam.ShowCommand(), "--raw", paramName)
 		require.NoError(t, err)
 		assert.Equal(t, "edited-value", stdout)
 	})
@@ -967,7 +962,7 @@ func TestParam_OutputOption(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("show --output=json", func(t *testing.T) {
-		stdout, _, err := runCommand(t, paramshow.Command(), "--output=json", paramName)
+		stdout, _, err := runCommand(t, cmdparam.ShowCommand(), "--output=json", paramName)
 		require.NoError(t, err)
 		assert.Contains(t, stdout, `"name"`)
 		assert.Contains(t, stdout, `"version"`)
@@ -977,7 +972,7 @@ func TestParam_OutputOption(t *testing.T) {
 	})
 
 	t.Run("list --output=json", func(t *testing.T) {
-		stdout, _, err := runCommand(t, paramlist.Command(), "--output=json", "/suve-e2e-output")
+		stdout, _, err := runCommand(t, cmdparam.ListCommand(), "--output=json", "/suve-e2e-output")
 		require.NoError(t, err)
 		assert.Contains(t, stdout, `"name"`)
 		assert.Contains(t, stdout, paramName)
@@ -985,7 +980,7 @@ func TestParam_OutputOption(t *testing.T) {
 	})
 
 	t.Run("list --output=json --show", func(t *testing.T) {
-		stdout, _, err := runCommand(t, paramlist.Command(), "--output=json", "--show", "/suve-e2e-output")
+		stdout, _, err := runCommand(t, cmdparam.ListCommand(), "--output=json", "--show", "/suve-e2e-output")
 		require.NoError(t, err)
 		assert.Contains(t, stdout, `"name"`)
 		assert.Contains(t, stdout, `"value"`)
@@ -994,7 +989,7 @@ func TestParam_OutputOption(t *testing.T) {
 	})
 
 	t.Run("log --output=json", func(t *testing.T) {
-		stdout, _, err := runCommand(t, paramlog.Command(), "--output=json", paramName)
+		stdout, _, err := runCommand(t, cmdparam.LogCommand(), "--output=json", paramName)
 		require.NoError(t, err)
 		assert.Contains(t, stdout, `"version"`)
 		assert.Contains(t, stdout, `"value"`)
@@ -1002,7 +997,7 @@ func TestParam_OutputOption(t *testing.T) {
 	})
 
 	t.Run("diff --output=json", func(t *testing.T) {
-		stdout, _, err := runCommand(t, paramdiff.Command(), "--output=json", paramName+"#1", paramName+"#2")
+		stdout, _, err := runCommand(t, cmdparam.DiffCommand(), "--output=json", paramName+"#1", paramName+"#2")
 		require.NoError(t, err)
 		assert.Contains(t, stdout, `"oldVersion"`)
 		assert.Contains(t, stdout, `"newVersion"`)
@@ -1036,7 +1031,7 @@ func TestParam_FilterOption(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("filter ba", func(t *testing.T) {
-		stdout, _, err := runCommand(t, paramlist.Command(), "--filter", "ba", prefix)
+		stdout, _, err := runCommand(t, cmdparam.ListCommand(), "--filter", "ba", prefix)
 		require.NoError(t, err)
 		assert.Contains(t, stdout, prefix+"/bar")
 		assert.Contains(t, stdout, prefix+"/baz")
@@ -1045,7 +1040,7 @@ func TestParam_FilterOption(t *testing.T) {
 	})
 
 	t.Run("filter regex", func(t *testing.T) {
-		stdout, _, err := runCommand(t, paramlist.Command(), "--filter", "ba.$", prefix)
+		stdout, _, err := runCommand(t, cmdparam.ListCommand(), "--filter", "ba.$", prefix)
 		require.NoError(t, err)
 		assert.Contains(t, stdout, prefix+"/bar")
 		assert.Contains(t, stdout, prefix+"/baz")
@@ -1074,7 +1069,7 @@ func TestParam_ShowOption(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("list without --show", func(t *testing.T) {
-		stdout, _, err := runCommand(t, paramlist.Command(), prefix)
+		stdout, _, err := runCommand(t, cmdparam.ListCommand(), prefix)
 		require.NoError(t, err)
 		assert.Contains(t, stdout, prefix+"/param1")
 		assert.Contains(t, stdout, prefix+"/param2")
@@ -1084,7 +1079,7 @@ func TestParam_ShowOption(t *testing.T) {
 	})
 
 	t.Run("list with --show", func(t *testing.T) {
-		stdout, _, err := runCommand(t, paramlist.Command(), "--show", prefix)
+		stdout, _, err := runCommand(t, cmdparam.ListCommand(), "--show", prefix)
 		require.NoError(t, err)
 		assert.Contains(t, stdout, prefix+"/param1")
 		assert.Contains(t, stdout, prefix+"/param2")
@@ -1268,7 +1263,7 @@ func TestParam_StagingTagStagedCreateSucceeds(t *testing.T) {
 		_, _, err := runSubCommand(t, paramstage.Command(), "apply", "--yes")
 		require.NoError(t, err)
 
-		stdout, _, err := runCommand(t, paramshow.Command(), paramName)
+		stdout, _, err := runCommand(t, cmdparam.ShowCommand(), paramName)
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "new-value")
 		assert.Contains(t, stdout, "env: test")
@@ -1299,7 +1294,7 @@ func TestParam_TagAndUntag(t *testing.T) {
 
 	// Add tags
 	t.Run("tag", func(t *testing.T) {
-		stdout, _, err := runCommand(t, paramtag.Command(), paramName, "env=test", "team=suve")
+		stdout, _, err := runCommand(t, cmdparam.TagCommand(), paramName, "env=test", "team=suve")
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "Tagged")
 		t.Logf("tag output: %s", stdout)
@@ -1307,7 +1302,7 @@ func TestParam_TagAndUntag(t *testing.T) {
 
 	// Verify tags are added
 	t.Run("verify-tags", func(t *testing.T) {
-		stdout, _, err := runCommand(t, paramshow.Command(), paramName)
+		stdout, _, err := runCommand(t, cmdparam.ShowCommand(), paramName)
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "env: test")
 		assert.Contains(t, stdout, "team: suve")
@@ -1315,7 +1310,7 @@ func TestParam_TagAndUntag(t *testing.T) {
 
 	// Remove one tag
 	t.Run("untag", func(t *testing.T) {
-		stdout, _, err := runCommand(t, paramuntag.Command(), paramName, "team")
+		stdout, _, err := runCommand(t, cmdparam.UntagCommand(), paramName, "team")
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "Untagged")
 		t.Logf("untag output: %s", stdout)
@@ -1323,7 +1318,7 @@ func TestParam_TagAndUntag(t *testing.T) {
 
 	// Verify tag is removed
 	t.Run("verify-untag", func(t *testing.T) {
-		stdout, _, err := runCommand(t, paramshow.Command(), paramName)
+		stdout, _, err := runCommand(t, cmdparam.ShowCommand(), paramName)
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "env: test")
 		assert.NotContains(t, stdout, "team: suve")
@@ -1348,7 +1343,7 @@ func TestParam_TagInvalidFormat(t *testing.T) {
 
 	// Try to add invalid tag format
 	t.Run("invalid-format", func(t *testing.T) {
-		_, _, err := runCommand(t, paramtag.Command(), paramName, "invalid-tag-no-equals")
+		_, _, err := runCommand(t, cmdparam.TagCommand(), paramName, "invalid-tag-no-equals")
 		require.Error(t, err)
 		t.Logf("expected error: %v", err)
 	})
@@ -1364,7 +1359,7 @@ func TestParam_TagNonExistent(t *testing.T) {
 	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
 
 	// Try to tag non-existent parameter
-	_, _, err := runCommand(t, paramtag.Command(), paramName, "env=test")
+	_, _, err := runCommand(t, cmdparam.TagCommand(), paramName, "env=test")
 	require.Error(t, err)
 	t.Logf("expected error: %v", err)
 }
@@ -1379,7 +1374,7 @@ func TestParam_UntagNonExistent(t *testing.T) {
 	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
 
 	// Try to untag non-existent parameter
-	_, _, err := runCommand(t, paramuntag.Command(), paramName, "env")
+	_, _, err := runCommand(t, cmdparam.UntagCommand(), paramName, "env")
 	require.Error(t, err)
 	t.Logf("expected error: %v", err)
 }
@@ -1415,7 +1410,7 @@ func TestParam_UpdateWithType(t *testing.T) {
 
 	// Verify the type changed
 	t.Run("verify-secure", func(t *testing.T) {
-		stdout, _, err := runCommand(t, paramshow.Command(), paramName)
+		stdout, _, err := runCommand(t, cmdparam.ShowCommand(), paramName)
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "SecureString")
 	})
@@ -1533,12 +1528,12 @@ func TestParam_LogWithNumber(t *testing.T) {
 	require.NoError(t, err)
 
 	// Get full log to verify versions
-	stdout, _, err = runCommand(t, paramlog.Command(), paramName)
+	stdout, _, err = runCommand(t, cmdparam.LogCommand(), paramName)
 	require.NoError(t, err)
 	t.Logf("full log: %s", stdout)
 
 	// Get log with -n 1 (only most recent)
-	stdout, _, err = runCommand(t, paramlog.Command(), "-n", "1", paramName)
+	stdout, _, err = runCommand(t, cmdparam.LogCommand(), "-n", "1", paramName)
 	require.NoError(t, err)
 	t.Logf("log -n 1: %s", stdout)
 	// Should only have 1 version entry
@@ -1564,7 +1559,7 @@ func TestParam_LogNonExistent(t *testing.T) {
 	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
 
 	// Try to get log
-	_, _, err := runCommand(t, paramlog.Command(), paramName)
+	_, _, err := runCommand(t, cmdparam.LogCommand(), paramName)
 	assert.Error(t, err)
 }
 
@@ -1585,14 +1580,14 @@ func TestParam_LogWithFormat(t *testing.T) {
 
 	// Test JSON format
 	t.Run("json-format", func(t *testing.T) {
-		stdout, _, err := runCommand(t, paramlog.Command(), "--output", "json", paramName)
+		stdout, _, err := runCommand(t, cmdparam.LogCommand(), "--output", "json", paramName)
 		require.NoError(t, err)
 		assert.True(t, strings.HasPrefix(strings.TrimSpace(stdout), "[") || strings.HasPrefix(strings.TrimSpace(stdout), "{"))
 	})
 
 	// Test text format (default)
 	t.Run("text-format", func(t *testing.T) {
-		stdout, _, err := runCommand(t, paramlog.Command(), paramName)
+		stdout, _, err := runCommand(t, cmdparam.LogCommand(), paramName)
 		require.NoError(t, err)
 		// Log output format is "Version N" not "Version:"
 		assert.Contains(t, stdout, "Version")
@@ -1618,7 +1613,7 @@ func TestParam_LogWithPatch(t *testing.T) {
 
 	// Test with patch flag
 	t.Run("with-patch", func(t *testing.T) {
-		stdout, _, err := runCommand(t, paramlog.Command(), "-p", paramName)
+		stdout, _, err := runCommand(t, cmdparam.LogCommand(), "-p", paramName)
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "Version")
 		// Patch output should show diff-like content
@@ -1647,7 +1642,7 @@ func TestParam_LogWithOneline(t *testing.T) {
 
 	// Test with oneline flag
 	t.Run("with-oneline", func(t *testing.T) {
-		stdout, _, err := runCommand(t, paramlog.Command(), "--oneline", paramName)
+		stdout, _, err := runCommand(t, cmdparam.LogCommand(), "--oneline", paramName)
 		require.NoError(t, err)
 		// Oneline format should be compact
 		assert.NotEmpty(t, stdout)
@@ -1655,7 +1650,7 @@ func TestParam_LogWithOneline(t *testing.T) {
 
 	// Test with oneline and max-value-length
 	t.Run("with-oneline-maxlen", func(t *testing.T) {
-		stdout, _, err := runCommand(t, paramlog.Command(), "--oneline", "--max-value-length", "5", paramName)
+		stdout, _, err := runCommand(t, cmdparam.LogCommand(), "--oneline", "--max-value-length", "5", paramName)
 		require.NoError(t, err)
 		assert.NotEmpty(t, stdout)
 	})
@@ -1680,7 +1675,7 @@ func TestParam_LogWithReverse(t *testing.T) {
 
 	// Test with reverse flag
 	t.Run("with-reverse", func(t *testing.T) {
-		stdout, _, err := runCommand(t, paramlog.Command(), "--reverse", paramName)
+		stdout, _, err := runCommand(t, cmdparam.LogCommand(), "--reverse", paramName)
 		require.NoError(t, err)
 		// In reverse mode, should still show versions
 		assert.Contains(t, stdout, "Version")
@@ -1704,7 +1699,7 @@ func TestParam_LogFlagWarnings(t *testing.T) {
 
 	// Test --parse-json without --patch (should warn)
 	t.Run("parse-json-without-patch", func(t *testing.T) {
-		stdout, stderr, err := runCommand(t, paramlog.Command(), "--parse-json", paramName)
+		stdout, stderr, err := runCommand(t, cmdparam.LogCommand(), "--parse-json", paramName)
 		require.NoError(t, err)
 		assert.NotEmpty(t, stdout)
 		// Should have a warning on stderr about --parse-json having no effect
@@ -1713,14 +1708,14 @@ func TestParam_LogFlagWarnings(t *testing.T) {
 
 	// Test --oneline with --patch (should warn)
 	t.Run("oneline-with-patch", func(t *testing.T) {
-		_, _, err := runCommand(t, paramlog.Command(), "--oneline", "-p", paramName)
+		_, _, err := runCommand(t, cmdparam.LogCommand(), "--oneline", "-p", paramName)
 		require.NoError(t, err)
 		// Command should succeed even with conflicting flags
 	})
 
 	// Test --output=json with --patch (should warn)
 	t.Run("json-with-patch", func(t *testing.T) {
-		stdout, _, err := runCommand(t, paramlog.Command(), "--output", "json", "-p", paramName)
+		stdout, _, err := runCommand(t, cmdparam.LogCommand(), "--output", "json", "-p", paramName)
 		require.NoError(t, err)
 		// JSON output should still work
 		assert.True(t, strings.HasPrefix(strings.TrimSpace(stdout), "[") || strings.HasPrefix(strings.TrimSpace(stdout), "{"))
@@ -1728,7 +1723,7 @@ func TestParam_LogFlagWarnings(t *testing.T) {
 
 	// Test --output=json with --oneline (should warn)
 	t.Run("json-with-oneline", func(t *testing.T) {
-		stdout, _, err := runCommand(t, paramlog.Command(), "--output", "json", "--oneline", paramName)
+		stdout, _, err := runCommand(t, cmdparam.LogCommand(), "--output", "json", "--oneline", paramName)
 		require.NoError(t, err)
 		assert.True(t, strings.HasPrefix(strings.TrimSpace(stdout), "[") || strings.HasPrefix(strings.TrimSpace(stdout), "{"))
 	})
@@ -1752,7 +1747,7 @@ func TestParam_LogWithParseJson(t *testing.T) {
 
 	// Test with --parse-json and -p
 	t.Run("parse-json-with-patch", func(t *testing.T) {
-		stdout, _, err := runCommand(t, paramlog.Command(), "-p", "--parse-json", paramName)
+		stdout, _, err := runCommand(t, cmdparam.LogCommand(), "-p", "--parse-json", paramName)
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "key")
 	})
@@ -1781,7 +1776,7 @@ func TestParam_DiffVersions(t *testing.T) {
 
 	// Diff between version 1 and version 3
 	t.Run("diff-v1-v3", func(t *testing.T) {
-		stdout, _, err := runCommand(t, paramdiff.Command(), paramName+"#1", paramName+"#3")
+		stdout, _, err := runCommand(t, cmdparam.DiffCommand(), paramName+"#1", paramName+"#3")
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "version1-value")
 		assert.Contains(t, stdout, "version3-value")
@@ -1789,7 +1784,7 @@ func TestParam_DiffVersions(t *testing.T) {
 
 	// Diff with shift notation
 	t.Run("diff-shift", func(t *testing.T) {
-		stdout, _, err := runCommand(t, paramdiff.Command(), paramName+"~1", paramName)
+		stdout, _, err := runCommand(t, cmdparam.DiffCommand(), paramName+"~1", paramName)
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "version2-value")
 		assert.Contains(t, stdout, "version3-value")
@@ -1806,7 +1801,7 @@ func TestParam_DiffNonExistent(t *testing.T) {
 	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
 
 	// Try to diff
-	_, _, err := runCommand(t, paramdiff.Command(), paramName)
+	_, _, err := runCommand(t, cmdparam.DiffCommand(), paramName)
 	assert.Error(t, err)
 }
 
@@ -1827,7 +1822,7 @@ func TestParam_DiffNoChanges(t *testing.T) {
 	_, _, _ = runCommand(t, paramupdate.Command(), "--yes", paramName, "same-value")
 
 	// Diff should show no changes (or be empty)
-	stdout, _, err := runCommand(t, paramdiff.Command(), paramName+"~1", paramName)
+	stdout, _, err := runCommand(t, cmdparam.DiffCommand(), paramName+"~1", paramName)
 	require.NoError(t, err)
 	// When values are the same, diff might be empty or show no diff
 	t.Logf("diff output: %s", stdout)
@@ -1856,7 +1851,7 @@ func TestParam_ShowRaw(t *testing.T) {
 
 	// Show raw (just the value)
 	t.Run("raw", func(t *testing.T) {
-		stdout, _, err := runCommand(t, paramshow.Command(), "--raw", paramName)
+		stdout, _, err := runCommand(t, cmdparam.ShowCommand(), "--raw", paramName)
 		require.NoError(t, err)
 		// Raw output should be just the value
 		assert.Equal(t, paramValue, strings.TrimSuffix(stdout, "\n"))
@@ -1864,7 +1859,7 @@ func TestParam_ShowRaw(t *testing.T) {
 
 	// Show without raw (formatted)
 	t.Run("formatted", func(t *testing.T) {
-		stdout, _, err := runCommand(t, paramshow.Command(), paramName)
+		stdout, _, err := runCommand(t, cmdparam.ShowCommand(), paramName)
 		require.NoError(t, err)
 		// Formatted output should have metadata and the value
 		assert.Contains(t, stdout, "Name:")
@@ -1891,14 +1886,14 @@ func TestParam_ShowWithVersion(t *testing.T) {
 
 	// Show specific version
 	t.Run("show-v1", func(t *testing.T) {
-		stdout, _, err := runCommand(t, paramshow.Command(), "--raw", paramName+"#1")
+		stdout, _, err := runCommand(t, cmdparam.ShowCommand(), "--raw", paramName+"#1")
 		require.NoError(t, err)
 		assert.Equal(t, "v1", strings.TrimSuffix(stdout, "\n"))
 	})
 
 	// Show with shift
 	t.Run("show-shift", func(t *testing.T) {
-		stdout, _, err := runCommand(t, paramshow.Command(), "--raw", paramName+"~1")
+		stdout, _, err := runCommand(t, cmdparam.ShowCommand(), "--raw", paramName+"~1")
 		require.NoError(t, err)
 		assert.Equal(t, "v1", strings.TrimSuffix(stdout, "\n"))
 	})
@@ -1914,7 +1909,7 @@ func TestParam_ShowNonExistent(t *testing.T) {
 	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
 
 	// Try to show
-	_, _, err := runCommand(t, paramshow.Command(), paramName)
+	_, _, err := runCommand(t, cmdparam.ShowCommand(), paramName)
 	assert.Error(t, err)
 }
 
@@ -1940,11 +1935,11 @@ func TestParam_CreateAndTag(t *testing.T) {
 	assert.Contains(t, stdout, "Created")
 
 	// Add tags after creation
-	_, _, err = runCommand(t, paramtag.Command(), paramName, "env=test", "team=suve")
+	_, _, err = runCommand(t, cmdparam.TagCommand(), paramName, "env=test", "team=suve")
 	require.NoError(t, err)
 
 	// Verify tags
-	stdout, _, err = runCommand(t, paramshow.Command(), paramName)
+	stdout, _, err = runCommand(t, cmdparam.ShowCommand(), paramName)
 	require.NoError(t, err)
 	assert.Contains(t, stdout, "env: test")
 	assert.Contains(t, stdout, "team: suve")
@@ -2051,7 +2046,7 @@ func TestParam_ListWithPath(t *testing.T) {
 
 	// List all under basePath (non-recursive)
 	t.Run("list-all", func(t *testing.T) {
-		stdout, _, err := runCommand(t, paramlist.Command(), basePath)
+		stdout, _, err := runCommand(t, cmdparam.ListCommand(), basePath)
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "param1")
 		assert.Contains(t, stdout, "param2")
@@ -2060,7 +2055,7 @@ func TestParam_ListWithPath(t *testing.T) {
 
 	// List with recursive
 	t.Run("list-recursive", func(t *testing.T) {
-		stdout, _, err := runCommand(t, paramlist.Command(), "--recursive", basePath)
+		stdout, _, err := runCommand(t, cmdparam.ListCommand(), "--recursive", basePath)
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "param1")
 		assert.Contains(t, stdout, "subdir/param3")
@@ -2086,7 +2081,7 @@ func TestParam_ListWithFilter(t *testing.T) {
 	_, _, _ = runCommand(t, paramcreate.Command(), basePath+"/db-config", "v2")
 
 	// List with filter
-	stdout, _, err := runCommand(t, paramlist.Command(), "--filter", "app", basePath)
+	stdout, _, err := runCommand(t, cmdparam.ListCommand(), "--filter", "app", basePath)
 	require.NoError(t, err)
 	assert.Contains(t, stdout, "app-config")
 	assert.NotContains(t, stdout, "db-config")
@@ -2108,7 +2103,7 @@ func TestParam_ListJSON(t *testing.T) {
 	_, _, _ = runCommand(t, paramcreate.Command(), basePath+"/param1", "v1")
 
 	// List with JSON format
-	stdout, _, err := runCommand(t, paramlist.Command(), "--output", "json", basePath)
+	stdout, _, err := runCommand(t, cmdparam.ListCommand(), "--output", "json", basePath)
 	require.NoError(t, err)
 	assert.True(t, strings.HasPrefix(strings.TrimSpace(stdout), "[") || strings.HasPrefix(strings.TrimSpace(stdout), "{"))
 }
@@ -2177,7 +2172,7 @@ func TestParam_StashPushAndPop(t *testing.T) {
 
 	// Verify created
 	t.Run("verify-created", func(t *testing.T) {
-		stdout, _, err := runCommand(t, paramshow.Command(), "--raw", paramName)
+		stdout, _, err := runCommand(t, cmdparam.ShowCommand(), "--raw", paramName)
 		require.NoError(t, err)
 		assert.Equal(t, "test-value", strings.TrimSpace(stdout))
 	})
