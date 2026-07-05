@@ -254,11 +254,14 @@ export namespace gui {
 	    hasVersionSpecifiers: boolean;
 	    hasTags: boolean;
 	    hasRestore: boolean;
-	
+	    hasStaging: boolean;
+	    hasForceDelete: boolean;
+	    hasRecoveryWindow: boolean;
+
 	    static createFrom(source: any = {}) {
 	        return new ServiceCapability(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.service = source["service"];
@@ -267,6 +270,9 @@ export namespace gui {
 	        this.hasVersionSpecifiers = source["hasVersionSpecifiers"];
 	        this.hasTags = source["hasTags"];
 	        this.hasRestore = source["hasRestore"];
+	        this.hasStaging = source["hasStaging"];
+	        this.hasForceDelete = source["hasForceDelete"];
+	        this.hasRecoveryWindow = source["hasRecoveryWindow"];
 	    }
 	}
 	export class ProviderCapability {

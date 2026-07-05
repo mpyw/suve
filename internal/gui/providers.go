@@ -105,6 +105,19 @@ type ServiceCapability struct {
 	// HasRestore is true when a soft-deleted item can be restored (AWS Secrets
 	// Manager only).
 	HasRestore bool `json:"hasRestore"`
+	// HasStaging is true when the GUI's staging workflow applies to this
+	// service. It is AWS-only until scope-keyed multi-provider staging lands
+	// (#270); the frontend hides the staging tab/banner/checkbox when false.
+	HasStaging bool `json:"hasStaging"`
+	// HasForceDelete is true when an immediate (no-recovery-window) delete is
+	// offered (AWS Secrets Manager only). The frontend hides the force-delete
+	// checkbox otherwise.
+	HasForceDelete bool `json:"hasForceDelete"`
+	// HasRecoveryWindow is true when a soft delete schedules a recovery window
+	// whose end date can be surfaced (AWS Secrets Manager only). Other providers
+	// delete immediately or govern retention by policy, so no "recoverable until"
+	// date is shown.
+	HasRecoveryWindow bool `json:"hasRecoveryWindow"`
 }
 
 // ProviderCapability describes a provider and the services it offers.
@@ -134,8 +147,16 @@ func (a *App) Capabilities() []ProviderCapability {
 			DisplayName: "AWS",
 			ScopeFields: []string{},
 			Services: []ServiceCapability{
-				{Service: "param", DisplayName: "Param", HasVersionHistory: true, HasVersionSpecifiers: true, HasTags: true, HasRestore: false},
-				{Service: "secret", DisplayName: "Secret", HasVersionHistory: true, HasVersionSpecifiers: true, HasTags: true, HasRestore: true},
+				{
+					Service: "param", DisplayName: "Param",
+					HasVersionHistory: true, HasVersionSpecifiers: true, HasTags: true, HasRestore: false,
+					HasStaging: true, HasForceDelete: false, HasRecoveryWindow: false,
+				},
+				{
+					Service: "secret", DisplayName: "Secret",
+					HasVersionHistory: true, HasVersionSpecifiers: true, HasTags: true, HasRestore: true,
+					HasStaging: true, HasForceDelete: true, HasRecoveryWindow: true,
+				},
 			},
 		},
 		{
@@ -143,7 +164,11 @@ func (a *App) Capabilities() []ProviderCapability {
 			DisplayName: "Google Cloud",
 			ScopeFields: []string{"project"},
 			Services: []ServiceCapability{
-				{Service: "secret", DisplayName: "Secret", HasVersionHistory: true, HasVersionSpecifiers: true, HasTags: true, HasRestore: false},
+				{
+					Service: "secret", DisplayName: "Secret",
+					HasVersionHistory: true, HasVersionSpecifiers: true, HasTags: true, HasRestore: false,
+					HasStaging: false, HasForceDelete: false, HasRecoveryWindow: false,
+				},
 			},
 		},
 		{
@@ -152,8 +177,16 @@ func (a *App) Capabilities() []ProviderCapability {
 			ScopeFields: []string{"subscription", "resourceGroup"},
 			Services: []ServiceCapability{
 				// App Configuration is unversioned and cannot write tags.
-				{Service: "param", DisplayName: "App Configuration", HasVersionHistory: false, HasVersionSpecifiers: false, HasTags: false, HasRestore: false},
-				{Service: "secret", DisplayName: "Key Vault", HasVersionHistory: true, HasVersionSpecifiers: true, HasTags: true, HasRestore: false},
+				{
+					Service: "param", DisplayName: "App Configuration",
+					HasVersionHistory: false, HasVersionSpecifiers: false, HasTags: false, HasRestore: false,
+					HasStaging: false, HasForceDelete: false, HasRecoveryWindow: false,
+				},
+				{
+					Service: "secret", DisplayName: "Key Vault",
+					HasVersionHistory: true, HasVersionSpecifiers: true, HasTags: true, HasRestore: false,
+					HasStaging: false, HasForceDelete: false, HasRecoveryWindow: false,
+				},
 			},
 		},
 	}

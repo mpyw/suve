@@ -41,6 +41,27 @@ var registry = func() *provider.Registry {
 // errInvalidProvider is returned when SelectScope is given an unknown provider.
 var errInvalidProvider = stringError("invalid provider: must be 'aws', 'googlecloud', or 'azure'")
 
+// Scope-validation errors surfaced by SelectScope. The wording is
+// GUI-appropriate (it names the field, not the CLI flag), since the frontend
+// collects these values through form inputs rather than command-line flags.
+var (
+	// errGoogleCloudProjectRequired is returned when a Google Cloud scope omits
+	// the project id.
+	errGoogleCloudProjectRequired = stringError("Google Cloud project ID is required")
+	// errAzureScopeRequired is returned when an Azure scope specifies neither a
+	// Key Vault name nor an App Configuration store name, so no service could be
+	// resolved.
+	errAzureScopeRequired = stringError("Azure requires a Key Vault name (for secrets) and/or an App Configuration store name (for parameters)")
+)
+
+// errStagingNonAWS is returned by every staging binding when the active scope is
+// not AWS. Staging in the GUI is AWS-only until scope-keyed multi-provider
+// staging lands (#270); the working store is resolved once via AWS STS and
+// cached, so applying it under a non-AWS scope would push AWS-staged entries
+// into the selected provider. The guard rejects that path before any network
+// call (no GetAWSIdentity), so selecting Google Cloud/Azure cannot corrupt data.
+var errStagingNonAWS = stringError("staging is only available for AWS (multi-provider staging is not yet supported)")
+
 // defaultScope is the initial read/write scope (AWS). The AWS factory builds
 // its SSM/Secrets Manager client from the ambient AWS config (region from
 // env/profile), so only the Provider field is needed.
@@ -147,16 +168,25 @@ func (a *App) SelectScope(sel ScopeSelection) error {
 	return nil
 }
 
-// scopeFromSelection maps a frontend selection to a provider.Scope. For Azure a
-// single scope carries both VaultName and StoreName, so the registry can build
-// either the Key Vault (secret) or App Configuration (param) store from it.
+// scopeFromSelection maps a frontend selection to a provider.Scope, rejecting
+// selections whose required fields are empty. For Azure a single scope carries
+// both VaultName and StoreName, so the registry can build either the Key Vault
+// (secret) or App Configuration (param) store from it; at least one must be set.
 func scopeFromSelection(sel ScopeSelection) (provider.Scope, error) {
 	switch provider.Provider(sel.Provider) {
 	case provider.ProviderAWS:
 		return provider.Scope{Provider: provider.ProviderAWS}, nil
 	case provider.ProviderGoogleCloud:
+		if sel.ProjectID == "" {
+			return provider.Scope{}, errGoogleCloudProjectRequired
+		}
+
 		return provider.GoogleCloudScope(sel.ProjectID), nil
 	case provider.ProviderAzure:
+		if sel.VaultName == "" && sel.StoreName == "" {
+			return provider.Scope{}, errAzureScopeRequired
+		}
+
 		return provider.Scope{
 			Provider:       provider.ProviderAzure,
 			SubscriptionID: sel.SubscriptionID,
@@ -175,6 +205,40 @@ func (a *App) currentScope() provider.Scope {
 	defer a.scopeMu.RUnlock()
 
 	return a.scope
+}
+
+// GetCurrentScope returns the active read/write scope as a ScopeSelection so the
+// frontend can prefill its provider/scope forms (including the env-derived
+// initial values from GOOGLE_CLOUD_PROJECT / AZURE_*) instead of silently wiping
+// the backend scope on first render.
+func (a *App) GetCurrentScope() *ScopeSelection {
+	return selectionFromScope(a.currentScope())
+}
+
+// selectionFromScope is the inverse of scopeFromSelection: it projects a
+// provider.Scope back to the frontend DTO. Fields irrelevant to the provider
+// stay empty.
+func selectionFromScope(s provider.Scope) *ScopeSelection {
+	return &ScopeSelection{
+		Provider:       string(s.Provider),
+		ProjectID:      s.ProjectID,
+		SubscriptionID: s.SubscriptionID,
+		ResourceGroup:  s.ResourceGroup,
+		VaultName:      s.VaultName,
+		StoreName:      s.StoreName,
+	}
+}
+
+// requireAWSStaging guards the staging bindings: it returns errStagingNonAWS
+// when the active scope is not AWS, before any network call. Every staging
+// binding calls this first so that selecting Google Cloud/Azure cannot apply
+// AWS-staged entries into another provider (see errStagingNonAWS).
+func (a *App) requireAWSStaging() error {
+	if a.currentScope().Provider != provider.ProviderAWS {
+		return errStagingNonAWS
+	}
+
+	return nil
 }
 
 // =============================================================================
@@ -205,6 +269,13 @@ func (a *App) secretStore() (provider.Store, error) {
 }
 
 func (a *App) getStagingStore() (store.ReadWriteOperator, error) {
+	// Reject non-AWS scopes before touching AWS STS or the cached store; the
+	// cached working store is keyed to the AWS identity it was built for, so
+	// serving it under a non-AWS scope is the corruption path we guard against.
+	if err := a.requireAWSStaging(); err != nil {
+		return nil, err
+	}
+
 	a.stagingStoreMu.Lock()
 	defer a.stagingStoreMu.Unlock()
 

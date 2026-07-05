@@ -14,6 +14,10 @@ export function GetAWSIdentity() {
   return window['go']['gui']['App']['GetAWSIdentity']();
 }
 
+export function GetCurrentScope() {
+  return window['go']['gui']['App']['GetCurrentScope']();
+}
+
 export function InitialProvider() {
   return window['go']['gui']['App']['InitialProvider']();
 }

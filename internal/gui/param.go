@@ -10,7 +10,6 @@ import (
 	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/timeutil"
 	"github.com/mpyw/suve/internal/usecase/param"
-	"github.com/mpyw/suve/internal/version/paramversion"
 )
 
 // =============================================================================
@@ -127,7 +126,7 @@ func (a *App) ParamList(prefix string, recursive bool, withValue bool, filter st
 
 // ParamShow shows a parameter value.
 func (a *App) ParamShow(specStr string) (*ParamShowResult, error) {
-	spec, err := paramversion.Parse(specStr)
+	spec, err := a.parseParamSpec(specStr)
 	if err != nil {
 		return nil, err
 	}
@@ -205,12 +204,12 @@ func (a *App) ParamLog(name string, maxResults int32) (*ParamLogResult, error) {
 
 // ParamDiff compares two parameter versions.
 func (a *App) ParamDiff(spec1Str, spec2Str string) (*ParamDiffResult, error) {
-	spec1, err := paramversion.Parse(spec1Str)
+	spec1, err := a.parseParamSpec(spec1Str)
 	if err != nil {
 		return nil, err
 	}
 
-	spec2, err := paramversion.Parse(spec2Str)
+	spec2, err := a.parseParamSpec(spec2Str)
 	if err != nil {
 		return nil, err
 	}
@@ -336,6 +335,12 @@ func (a *App) ParamRemoveTag(name, key string) error {
 // ParamTypeOptions returns the selectable parameter type display names for the
 // current provider (AWS: "String", "SecureString", "StringList"). The frontend
 // renders its type dropdown from this list instead of hardcoding SSM strings.
+// Only AWS SSM has a value type; Azure App Configuration values are untyped, so
+// the list is empty there and the frontend hides the Type dropdown.
 func (a *App) ParamTypeOptions() []string {
+	if a.currentScope().Provider != provider.ProviderAWS {
+		return []string{}
+	}
+
 	return paramtype.Options()
 }
