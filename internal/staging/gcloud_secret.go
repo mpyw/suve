@@ -49,7 +49,7 @@ func (s *GoogleCloudSecretStrategy) ServiceName() string {
 
 // ItemName returns the item name for messages.
 func (s *GoogleCloudSecretStrategy) ItemName() string {
-	return "secret"
+	return itemNameSecret
 }
 
 // HasDeleteOptions returns false: Google Cloud Secret Manager has no force /

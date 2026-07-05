@@ -41,7 +41,7 @@ func (s *SecretStrategy) ServiceName() string {
 
 // ItemName returns the item name for messages.
 func (s *SecretStrategy) ItemName() string {
-	return "secret"
+	return itemNameSecret
 }
 
 // HasDeleteOptions returns true as Secrets Manager has delete options.

@@ -44,7 +44,7 @@ func (s *AzureKeyVaultSecretStrategy) Service() Service { return ServiceSecret }
 func (s *AzureKeyVaultSecretStrategy) ServiceName() string { return "Key Vault" }
 
 // ItemName returns the item name for messages.
-func (s *AzureKeyVaultSecretStrategy) ItemName() string { return "secret" } //nolint:goconst // per-strategy item name literal
+func (s *AzureKeyVaultSecretStrategy) ItemName() string { return itemNameSecret }
 
 // HasDeleteOptions returns false: Azure Key Vault has no force / recovery-window
 // delete options in this abstraction.
