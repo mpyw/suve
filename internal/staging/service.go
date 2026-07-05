@@ -5,6 +5,11 @@ import (
 	"time"
 )
 
+// itemNameSecret is the display item name shared by the secret staging
+// strategies (AWS Secrets Manager, Google Cloud Secret Manager, Azure Key
+// Vault). Centralizing it avoids repeating the literal across strategies.
+const itemNameSecret = "secret"
+
 // ResourceNotFoundError indicates a resource was not found in AWS.
 type ResourceNotFoundError struct {
 	Err error

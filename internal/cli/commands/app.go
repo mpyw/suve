@@ -118,8 +118,7 @@ func flatStageCommand(p provider.Provider) *cli.Command {
 	case provider.ProviderGoogleCloud:
 		return gcloud.FlatStageCommand("stage")
 	case provider.ProviderAzure:
-		// Azure is not yet staging-capable.
-		return nil
+		return azure.FlatStageCommand("stage")
 	}
 
 	return nil

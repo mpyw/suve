@@ -227,3 +227,61 @@ func GoogleCloudStagingScopeResolver(ctx context.Context) (staging.ResolvedScope
 		Target: "project " + project,
 	}, nil
 }
+
+// AzureKeyVaultSecretStrategyFactory builds a staging FullStrategy for Azure Key
+// Vault secrets, wrapping a provider.Store resolved for the context's vault. It
+// satisfies staging.StrategyFactory.
+func AzureKeyVaultSecretStrategyFactory(ctx context.Context) (staging.FullStrategy, error) {
+	store, err := AzureKeyVaultStore(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return staging.NewAzureKeyVaultSecretStrategy(store), nil
+}
+
+// AzureAppConfigParamStrategyFactory builds a staging FullStrategy for Azure App
+// Configuration, wrapping a provider.Store resolved for the context's store. It
+// satisfies staging.StrategyFactory.
+func AzureAppConfigParamStrategyFactory(ctx context.Context) (staging.FullStrategy, error) {
+	store, err := AzureAppConfigStore(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return staging.NewAzureAppConfigParamStrategy(store), nil
+}
+
+// AzureKeyVaultStagingScopeResolver resolves the Azure Key Vault staging scope
+// from the subscription / resource group / vault stashed in the context (see
+// WithAzureBase / WithAzureVaultName). It performs no network calls.
+func AzureKeyVaultStagingScopeResolver(ctx context.Context) (staging.ResolvedScope, error) {
+	sc := azureScopeFromContext(ctx)
+	if sc.vaultName == "" {
+		return staging.ResolvedScope{}, errors.New(
+			"no Azure Key Vault specified: set --vault-name or the AZURE_KEYVAULT_NAME environment variable",
+		)
+	}
+
+	return staging.ResolvedScope{
+		Scope:  provider.AzureKeyVaultScope(sc.subscription, sc.resourceGroup, sc.vaultName),
+		Target: "vault " + sc.vaultName,
+	}, nil
+}
+
+// AzureAppConfigStagingScopeResolver resolves the Azure App Configuration
+// staging scope from the subscription / resource group / store stashed in the
+// context (see WithAzureBase / WithAzureStoreName). It performs no network calls.
+func AzureAppConfigStagingScopeResolver(ctx context.Context) (staging.ResolvedScope, error) {
+	sc := azureScopeFromContext(ctx)
+	if sc.storeName == "" {
+		return staging.ResolvedScope{}, errors.New(
+			"no Azure App Configuration store specified: set --store-name or the AZURE_APPCONFIG_NAME environment variable",
+		)
+	}
+
+	return staging.ResolvedScope{
+		Scope:  provider.AzureAppConfigScope(sc.subscription, sc.resourceGroup, sc.storeName),
+		Target: "store " + sc.storeName,
+	}, nil
+}
