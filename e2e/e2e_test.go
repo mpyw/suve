@@ -2,13 +2,15 @@
 
 // Package e2e contains end-to-end tests for the suve CLI.
 //
-// These tests run against a real AWS-compatible service (localstack) and verify
-// the complete workflow of each command using the actual CLI commands.
+// These tests run against a real AWS-compatible service (floci, a LocalStack
+// Community replacement) and verify the complete workflow of each command using
+// the actual CLI commands.
 //
 // Run with: make e2e
 //
 // Environment variables:
-//   - SUVE_LOCALSTACK_EXTERNAL_PORT: Custom localstack port (default: 4566)
+//   - SUVE_FLOCI_EXTERNAL_PORT: Custom floci port (default: 4566)
+//     (SUVE_LOCALSTACK_EXTERNAL_PORT is still honored as a fallback)
 package e2e_test
 
 import (
@@ -57,17 +59,21 @@ func TestMain(m *testing.M) {
 func getEndpoint() string {
 	return fmt.Sprintf(
 		"http://127.0.0.1:%s",
-		lo.CoalesceOrEmpty(os.Getenv("SUVE_LOCALSTACK_EXTERNAL_PORT"), "4566"),
+		lo.CoalesceOrEmpty(
+			os.Getenv("SUVE_FLOCI_EXTERNAL_PORT"),
+			os.Getenv("SUVE_LOCALSTACK_EXTERNAL_PORT"), // backward-compatible fallback
+			"4566",
+		),
 	)
 }
 
-// setupEnv sets up environment variables for localstack and returns a cleanup function.
+// setupEnv sets up environment variables for the AWS emulator (floci).
 func setupEnv(t *testing.T) {
 	t.Helper()
 
 	endpoint := getEndpoint()
 
-	// Set AWS environment variables for localstack
+	// Set AWS environment variables for the emulator (floci)
 	t.Setenv("AWS_ENDPOINT_URL", endpoint)
 	t.Setenv("AWS_ACCESS_KEY_ID", "test")
 	t.Setenv("AWS_SECRET_ACCESS_KEY", "test")
@@ -81,7 +87,7 @@ func setupTempHome(t *testing.T) {
 }
 
 // newStore creates a new staging store for E2E tests.
-// localstack uses account ID "000000000000" and region "us-east-1".
+// The AWS emulator uses account ID "000000000000" and region "us-east-1".
 func newStore() *file.Store {
 	s, err := file.NewStore(provider.AWSScope("000000000000", "us-east-1"))
 	if err != nil {

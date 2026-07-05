@@ -108,12 +108,12 @@ func TestSecret_FullWorkflow(t *testing.T) {
 	})
 
 	// 9. Diff with ~SHIFT
-	// Note: Secrets Manager shift (~) may not work correctly in localstack due to version history limitations
+	// Note: Secrets Manager shift (~) may not work correctly in the AWS emulator due to version history limitations
 	t.Run("diff-shift", func(t *testing.T) {
 		stdout, stderr, err := runCommand(t, cmdsecret.DiffCommand(), secretName+"~1")
 		t.Logf("diff-shift stdout: %s", stdout)
 		t.Logf("diff-shift stderr: %s", stderr)
-		// Skip strict assertion - localstack may not support shift properly
+		// Skip strict assertion - the AWS emulator may not support shift properly
 		if err == nil && stdout != "" {
 			// If it works, check for the values
 			assert.True(t, strings.Contains(stdout, "initial-secret") || strings.Contains(stdout, "updated-secret"))
@@ -191,11 +191,11 @@ func TestSecret_VersionSpecifiers(t *testing.T) {
 	})
 
 	// Test ~SHIFT
-	// Note: Secrets Manager shift (~) may not work correctly in localstack due to version history limitations
+	// Note: Secrets Manager shift (~) may not work correctly in the AWS emulator due to version history limitations
 	t.Run("shift", func(t *testing.T) {
 		// ~1 = 1 version ago
 		stdout, _, err := runCommand(t, cmdsecret.ShowCommand(), "--raw", secretName+"~1")
-		// Localstack may not support shift properly, skip strict assertion
+		// The AWS emulator may not support shift properly, skip strict assertion
 		t.Logf("shift ~1 stdout: %s, err: %v", stdout, err)
 
 		if err == nil {
@@ -206,12 +206,12 @@ func TestSecret_VersionSpecifiers(t *testing.T) {
 	})
 
 	// Test :LABEL~SHIFT combination
-	// Note: May not work in localstack due to version history limitations
+	// Note: May not work in the AWS emulator due to version history limitations
 	t.Run("label-and-shift", func(t *testing.T) {
 		// :AWSCURRENT~1 = 1 version before current
 		stdout, _, err := runCommand(t, cmdsecret.ShowCommand(), "--raw", secretName+":AWSCURRENT~1")
 		t.Logf("label-and-shift stdout: %s, err: %v", stdout, err)
-		// Skip strict assertion - localstack may error with "version shift out of range"
+		// Skip strict assertion - the AWS emulator may error with "version shift out of range"
 		if err == nil {
 			assert.True(t, stdout == "v1" || stdout == "v2",
 				"expected v1 or v2, got %s", stdout)
@@ -351,8 +351,8 @@ func TestSecret_ErrorCases(t *testing.T) {
 		assert.Error(t, err)
 	})
 
-	// Note: localstack may not error on delete of non-existent secret
-	// So we skip this test for localstack compatibility
+	// Note: the AWS emulator may not error on delete of non-existent secret
+	// So we skip this test for the AWS emulator compatibility
 
 	// Invalid label
 	t.Run("invalid-label", func(t *testing.T) {
@@ -745,7 +745,7 @@ func TestSecret_DeleteNonExistent(t *testing.T) {
 	// Try to delete (should fail since it doesn't exist)
 	// Note: AWS Secrets Manager returns ResourceNotFoundException for non-existent secrets
 	_, _, err := runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
-	// Localstack may return success for non-existent secrets, so we just log the result
+	// The AWS emulator may return success for non-existent secrets, so we just log the result
 	if err != nil {
 		t.Logf("Delete non-existent returned error as expected: %v", err)
 	}

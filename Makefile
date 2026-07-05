@@ -23,7 +23,7 @@ else
     MISE_RUN :=
 endif
 
-SUVE_LOCALSTACK_EXTERNAL_PORT ?= 4566
+SUVE_FLOCI_EXTERNAL_PORT ?= 4566
 COVERPKG = $(shell go list ./... | grep -v testutil | grep -v /e2e | grep -v internal/gui | grep -v /cmd/ | tr '\n' ',')
 
 help: ## Show this help
@@ -44,17 +44,17 @@ test: ## Run unit tests
 lint: ## Run linter (host OS only, with all build tags)
 	GOOS=$(HOST_GOOS) golangci-lint run --build-tags=e2e,production ./...
 
-up: ## Start localstack container
-	SUVE_LOCALSTACK_EXTERNAL_PORT=$(SUVE_LOCALSTACK_EXTERNAL_PORT) docker compose up -d
-	@echo "Waiting for localstack to be ready on port $(SUVE_LOCALSTACK_EXTERNAL_PORT)..."
-	@until curl -sf http://127.0.0.1:$(SUVE_LOCALSTACK_EXTERNAL_PORT)/_localstack/health > /dev/null 2>&1; do sleep 1; done
-	@echo "localstack is ready"
+up: ## Start floci (AWS emulator) container
+	SUVE_FLOCI_EXTERNAL_PORT=$(SUVE_FLOCI_EXTERNAL_PORT) docker compose up -d floci
+	@echo "Waiting for floci to be ready on port $(SUVE_FLOCI_EXTERNAL_PORT)..."
+	@until curl -sf http://127.0.0.1:$(SUVE_FLOCI_EXTERNAL_PORT)/_localstack/health > /dev/null 2>&1; do sleep 1; done
+	@echo "floci is ready"
 
-down: ## Stop localstack container
+down: ## Stop floci (AWS emulator) container
 	docker compose down
 
-e2e: up ## Run E2E tests (starts localstack)
-	SUVE_LOCALSTACK_EXTERNAL_PORT=$(SUVE_LOCALSTACK_EXTERNAL_PORT) go test -tags=e2e -v ./e2e/...
+e2e: up ## Run E2E tests (starts floci)
+	SUVE_FLOCI_EXTERNAL_PORT=$(SUVE_FLOCI_EXTERNAL_PORT) go test -tags=e2e -v ./e2e/...
 
 clean: ## Clean build artifacts and stop containers
 	rm -rf bin/ *.out
@@ -65,14 +65,14 @@ coverage: ## Run unit tests with coverage
 	go tool cover -func=coverage.out | grep total
 
 coverage-e2e: up ## Run E2E tests with coverage
-	SUVE_LOCALSTACK_EXTERNAL_PORT=$(SUVE_LOCALSTACK_EXTERNAL_PORT) go test -tags=e2e -coverprofile=coverage-e2e.out -coverpkg=$(COVERPKG) ./e2e/...
+	SUVE_FLOCI_EXTERNAL_PORT=$(SUVE_FLOCI_EXTERNAL_PORT) go test -tags=e2e -coverprofile=coverage-e2e.out -coverpkg=$(COVERPKG) ./e2e/...
 	go tool cover -func=coverage-e2e.out | grep total
 
 coverage-all: up ## Run all tests with combined coverage
 	@echo "Running unit tests with coverage..."
 	go test -coverprofile=coverage-unit.out -covermode=atomic -coverpkg=$(COVERPKG) $(shell go list ./... | grep -v internal/gui | grep -v /cmd/)
 	@echo "Running E2E tests with coverage..."
-	SUVE_LOCALSTACK_EXTERNAL_PORT=$(SUVE_LOCALSTACK_EXTERNAL_PORT) go test -tags=e2e -coverprofile=coverage-e2e.out -covermode=atomic -coverpkg=$(COVERPKG) ./e2e/...
+	SUVE_FLOCI_EXTERNAL_PORT=$(SUVE_FLOCI_EXTERNAL_PORT) go test -tags=e2e -coverprofile=coverage-e2e.out -covermode=atomic -coverpkg=$(COVERPKG) ./e2e/...
 	@echo "Merging coverage profiles..."
 	@go run github.com/wadey/gocovmerge@latest coverage-unit.out coverage-e2e.out > coverage-all.out
 	go tool cover -func=coverage-all.out | grep total

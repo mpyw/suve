@@ -158,7 +158,7 @@ suve/
 │   │
 │   └── architecture_test.go      # Arch-guard: forbids cloud SDKs outside their provider/{aws,gcp,azure} + infra
 │
-├── e2e/                          # E2E tests (requires localstack)
+├── e2e/                          # E2E tests (requires the floci AWS emulator)
 │
 ├── .github/workflows/
 │   └── test.yml                  # CI: test + lint on push/PR
@@ -187,10 +187,10 @@ make lint
 # Build CLI
 make build
 
-# E2E tests with localstack
-make up      # Start localstack
+# E2E tests with the AWS emulator (floci)
+make up      # Start floci
 make e2e     # Run E2E tests
-make down    # Stop localstack
+make down    # Stop floci
 
 # Coverage
 make coverage
@@ -204,23 +204,23 @@ make gui-bindings # Regenerate GUI bindings
 ## Testing Strategy
 
 - **Unit tests**: Each command package has `*_test.go` with provider-neutral mocking via `internal/provider/providermock`
-- **E2E tests**: `e2e/e2e_test.go` runs against localstack (SSM only, SM requires Pro)
+- **E2E tests**: `e2e/e2e_test.go` runs against floci (a LocalStack Community replacement), covering SSM Parameter Store and Secrets Manager
 - **GUI tests**: `internal/gui/frontend/tests/` uses Playwright for component/integration testing
 - **Test dependencies**: Uses `github.com/samber/lo` for pointer helpers and `github.com/stretchr/testify` for assertions
 
 ### Running E2E Tests
 
 ```bash
-# Start localstack (SSM service)
+# Start floci (AWS emulator)
 make up
 
 # Run E2E tests
 make e2e
 
 # Or with custom port
-SUVE_LOCALSTACK_EXTERNAL_PORT=4599 make e2e
+SUVE_FLOCI_EXTERNAL_PORT=4599 make e2e
 
-# Stop localstack
+# Stop floci
 make down
 ```
 

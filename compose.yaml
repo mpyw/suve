@@ -1,11 +1,11 @@
 services:
-  localstack:
-    image: localstack/localstack:4
+  floci:
+    # Floci is a drop-in LocalStack Community replacement (MIT, no auth token).
+    # It serves all AWS services on :4566 and keeps the /_localstack/health
+    # endpoint for parity, so the AWS SDK's AWS_ENDPOINT_URL flow is unchanged.
+    image: floci/floci:latest
     ports:
-      - "127.0.0.1:${SUVE_LOCALSTACK_EXTERNAL_PORT:-4566}:4566/tcp"
-    environment:
-      - SERVICES=ssm,secretsmanager,events
-      - DEBUG=0
+      - "127.0.0.1:${SUVE_FLOCI_EXTERNAL_PORT:-4566}:4566/tcp"
     healthcheck:
       test: ["CMD", "curl", "-sf", "http://localhost:4566/_localstack/health"]
       interval: 5s

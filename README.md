@@ -766,29 +766,29 @@ make e2e
 make coverage-all
 ```
 
-### Local Development with Localstack
+### Local Development with an AWS Emulator
 
-To test against [localstack](https://localstack.cloud/) instead of real AWS:
+To test against [floci](https://floci.io/) (a drop-in LocalStack Community replacement) instead of real AWS:
 
 ```bash
-# Start localstack
-SUVE_LOCALSTACK_EXTERNAL_PORT=4566 docker compose up -d
+# Start floci
+SUVE_FLOCI_EXTERNAL_PORT=4566 docker compose up -d floci
 
-# Run commands with localstack
+# Run commands against the emulator
 AWS_ENDPOINT_URL=http://127.0.0.1:4566 \
 AWS_ACCESS_KEY_ID=dummy \
 AWS_SECRET_ACCESS_KEY=dummy \
 AWS_DEFAULT_REGION=us-east-1 \
-suve param ls
+suve aws param ls
 
-# GUI with localstack
+# GUI against the emulator
 AWS_ENDPOINT_URL=http://127.0.0.1:4566 \
 AWS_ACCESS_KEY_ID=dummy \
 AWS_SECRET_ACCESS_KEY=dummy \
 AWS_DEFAULT_REGION=us-east-1 \
 suve --gui
 
-# Stop localstack
+# Stop floci
 docker compose down
 ```
 

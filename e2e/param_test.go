@@ -134,11 +134,11 @@ func TestParam_FullWorkflow(t *testing.T) {
 		assert.Contains(t, stdout, "+updated-value")
 	})
 
-	// 10. List (note: localstack may not support path filtering perfectly)
+	// 10. List (note: the AWS emulator may not support path filtering perfectly)
 	t.Run("list", func(t *testing.T) {
 		stdout, _, err := runCommand(t, cmdparam.ListCommand(), "/suve-e2e-test/basic/")
 		require.NoError(t, err)
-		// Localstack might return empty for path-filtered list, skip assertion if empty
+		// The AWS emulator might return empty for path-filtered list, skip assertion if empty
 		if stdout != "" {
 			assert.Contains(t, stdout, paramName)
 		}
