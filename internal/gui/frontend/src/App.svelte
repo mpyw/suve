@@ -35,11 +35,31 @@
   let region = $state('');
   let profile = $state('');
 
+  // pendingProvider is a provider the user selected that still needs scope input:
+  // its form shows in the sidebar while the previously-active provider stays
+  // mounted, so a rejected/incomplete scope never tears down a working view.
+  let pendingProvider = $state('');
+
   // ---- Derived capability lookups -------------------------------------------
   const activeProvider = $derived(capabilities.find((c) => c.provider === provider) ?? null);
-  const services = $derived(activeProvider?.services ?? []);
+  const allServices = $derived(activeProvider?.services ?? []);
+  // Azure enables a service tab only when its scope name is set (vaultName → Key
+  // Vault secret; storeName → App Configuration param), so a vault-only user
+  // sees no param tab and vice versa. Other providers expose all their services.
+  const services = $derived(
+    provider === 'azure'
+      ? allServices.filter((s) => (s.service === 'secret' ? !!scope?.vaultName : !!scope?.storeName))
+      : allServices,
+  );
   const hasAnyStaging = $derived(services.some((s) => s.hasStaging));
   const isAWS = $derived(provider === 'aws');
+
+  // Which provider the sidebar scope form is for, and its prefill values
+  // (localStorage-cached last scope, else the backend's current scope).
+  const formProvider = $derived(pendingProvider || provider);
+  const formPrefill = $derived(
+    readCachedScope(formProvider) ?? (scope?.provider === formProvider ? scope : null),
+  );
 
   // scopeKey drives the {#key} full remount: any provider/scope change swaps it,
   // so views re-initialize from scratch and no in-flight response from the old
@@ -79,7 +99,7 @@
       }
 
       if (picked) {
-        await selectProvider(picked);
+        await handleSelectProvider(picked);
       }
     } catch (e) {
       initError = parseError(e);
@@ -97,15 +117,42 @@
     return only ?? '';
   }
 
+  // buildSelection assembles the auto-apply candidate from the best prefill
+  // source (localStorage-cached scope, else the backend's env-derived scope).
   function buildSelection(p: string): gui.ScopeSelection {
+    const src = readCachedScope(p) ?? (scope?.provider === p ? scope : null);
     return {
       provider: p,
-      projectId: p === 'googlecloud' ? (scope?.projectId ?? '') : '',
-      subscriptionId: p === 'azure' ? (scope?.subscriptionId ?? '') : '',
-      resourceGroup: p === 'azure' ? (scope?.resourceGroup ?? '') : '',
-      vaultName: p === 'azure' ? (scope?.vaultName ?? '') : '',
-      storeName: p === 'azure' ? (scope?.storeName ?? '') : '',
+      projectId: p === 'googlecloud' ? (src?.projectId ?? '') : '',
+      subscriptionId: p === 'azure' ? (src?.subscriptionId ?? '') : '',
+      resourceGroup: p === 'azure' ? (src?.resourceGroup ?? '') : '',
+      vaultName: p === 'azure' ? (src?.vaultName ?? '') : '',
+      storeName: p === 'azure' ? (src?.storeName ?? '') : '',
     } as gui.ScopeSelection;
+  }
+
+  // ---- localStorage persistence of the last-applied scope per provider ------
+  function scopeStorageKey(p: string): string {
+    return `suve.scope.${p}`;
+  }
+
+  function readCachedScope(p: string): gui.ScopeSelection | null {
+    if (!p || typeof localStorage === 'undefined') return null;
+    try {
+      const raw = localStorage.getItem(scopeStorageKey(p));
+      return raw ? (JSON.parse(raw) as gui.ScopeSelection) : null;
+    } catch {
+      return null;
+    }
+  }
+
+  function persistScope(sel: gui.ScopeSelection): void {
+    if (typeof localStorage === 'undefined') return;
+    try {
+      localStorage.setItem(scopeStorageKey(sel.provider), JSON.stringify(sel));
+    } catch {
+      // localStorage may be unavailable (private mode); persistence is best-effort.
+    }
   }
 
   function hasRequiredScope(sel: gui.ScopeSelection): boolean {
@@ -121,37 +168,52 @@
     }
   }
 
-  // selectProvider switches the active provider. When the (env-prefilled) scope
-  // already has the required fields it applies immediately; otherwise it leaves
-  // scopeReady=false so the sidebar shows the scope form.
-  async function selectProvider(p: string) {
-    provider = p;
-    scopeReady = false;
+  // handleSelectProvider is invoked from the provider dropdown (and at startup).
+  // If the prefilled scope already satisfies the provider it applies at once;
+  // otherwise it parks the choice in pendingProvider so the sidebar shows the
+  // scope form WITHOUT tearing down the currently-active provider's views.
+  async function handleSelectProvider(p: string) {
     scopeError = '';
-    resetIdentity();
 
     const sel = buildSelection(p);
     if (hasRequiredScope(sel)) {
       await applyScope(sel);
+    } else {
+      pendingProvider = p;
     }
   }
 
+  // handleSelectScope is invoked when a scope form is submitted.
+  async function handleSelectScope(sel: gui.ScopeSelection) {
+    await applyScope(sel);
+  }
+
+  // handleCancelScope dismisses a pending scope form (Escape), returning to the
+  // active provider (or the "select a provider" prompt when none is active).
+  function handleCancelScope() {
+    pendingProvider = '';
+    scopeError = '';
+  }
+
   // applyScope validates+commits the scope server-side, then (AWS only) loads
-  // identity and the staging badge.
-  async function applyScope(sel: gui.ScopeSelection) {
+  // identity and the staging badge. On success it switches the active provider
+  // and clears the pending form; on rejection it leaves the previous provider
+  // active (its lists keep working) and surfaces the error in the form.
+  async function applyScope(sel: gui.ScopeSelection): Promise<void> {
     scopeError = '';
     try {
       await SelectScope(sel);
       scope = await GetCurrentScope();
       provider = sel.provider;
+      pendingProvider = '';
       scopeReady = true;
+      persistScope(sel);
       resetIdentity();
       if (sel.provider === 'aws') {
         await loadAWSIdentity();
         await loadStagingCount();
       }
     } catch (e) {
-      scopeReady = false;
       scopeError = parseError(e);
     }
   }
@@ -161,14 +223,6 @@
     accountId = '';
     region = '';
     profile = '';
-  }
-
-  function handleSelectProvider(p: string) {
-    selectProvider(p);
-  }
-
-  function handleSelectScope(sel: gui.ScopeSelection) {
-    applyScope(sel);
   }
 
   function handleNavigate(view: ViewKey) {
@@ -211,10 +265,13 @@
   <Sidebar
     {capabilities}
     {provider}
+    {pendingProvider}
     {services}
     {hasAnyStaging}
     {scope}
     {scopeReady}
+    formScope={formPrefill}
+    {scopeError}
     activeView={effectiveView}
     {stagingCount}
     {accountId}
@@ -223,6 +280,7 @@
     onnavigate={handleNavigate}
     onselectprovider={handleSelectProvider}
     onselectscope={handleSelectScope}
+    oncancelscope={handleCancelScope}
   />
 
   <main class="main-content">
@@ -230,13 +288,7 @@
       <div class="app-status">Loading…</div>
     {:else if initError}
       <div class="app-status app-error">Failed to initialize: {initError}</div>
-    {:else if !provider}
-      <div class="app-status">Select a provider to begin.</div>
-    {:else if !scopeReady}
-      <div class="app-status">
-        {scopeError || 'Enter the required scope in the sidebar to continue.'}
-      </div>
-    {:else}
+    {:else if provider && scopeReady}
       {#key scopeKey}
         {#if effectiveView === 'param' && paramCap}
           <ParamView
@@ -254,6 +306,12 @@
           <StagingView oncountchange={handleStagingCountChange} />
         {/if}
       {/key}
+    {:else if pendingProvider}
+      <div class="app-status">
+        {scopeError || 'Enter the required scope in the sidebar to continue.'}
+      </div>
+    {:else}
+      <div class="app-status">Select a provider to begin.</div>
     {/if}
   </main>
 </div>
