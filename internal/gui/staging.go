@@ -689,6 +689,10 @@ type StagingFileStatusResult struct {
 
 // StagingFileStatus checks if the staging file exists and whether it's encrypted.
 func (a *App) StagingFileStatus() (*StagingFileStatusResult, error) {
+	if err := a.requireAWSStaging(); err != nil {
+		return nil, err
+	}
+
 	identity, err := infra.GetAWSIdentity(a.ctx)
 	if err != nil {
 		return nil, err
@@ -725,6 +729,10 @@ func (a *App) StagingFileStatus() (*StagingFileStatusResult, error) {
 // selector. It is the shared prelude of StagingDrain and StagingPersist. An
 // empty service yields the zero staging.Service (all services).
 func (a *App) stashStores(service, passphrase string) (stash, working *file.Store, svc staging.Service, err error) {
+	if err := a.requireAWSStaging(); err != nil {
+		return nil, nil, "", err
+	}
+
 	identity, err := infra.GetAWSIdentity(a.ctx)
 	if err != nil {
 		return nil, nil, "", err
@@ -829,6 +837,10 @@ type StagingDropResult struct {
 // StagingDrop deletes the staging file without loading it into memory.
 // This works even for encrypted files since it just deletes the file directly.
 func (a *App) StagingDrop() (*StagingDropResult, error) {
+	if err := a.requireAWSStaging(); err != nil {
+		return nil, err
+	}
+
 	identity, err := infra.GetAWSIdentity(a.ctx)
 	if err != nil {
 		return nil, err

@@ -8,6 +8,8 @@ export function DetectProviders():Promise<gui.DetectResult>;
 
 export function GetAWSIdentity():Promise<gui.AWSIdentityResult>;
 
+export function GetCurrentScope():Promise<gui.ScopeSelection>;
+
 export function InitialProvider():Promise<string>;
 
 export function ParamAddTag(arg1:string,arg2:string,arg3:string):Promise<void>;

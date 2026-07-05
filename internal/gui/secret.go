@@ -9,7 +9,6 @@ import (
 	awssecret "github.com/mpyw/suve/internal/provider/aws/secret"
 	"github.com/mpyw/suve/internal/timeutil"
 	"github.com/mpyw/suve/internal/usecase/secret"
-	"github.com/mpyw/suve/internal/version/secretversion"
 )
 
 // errRestoreUnsupported is returned when the active provider does not support
@@ -137,7 +136,7 @@ func (a *App) SecretList(prefix string, withValue bool, filter string, _ int, _ 
 
 // SecretShow shows a secret value.
 func (a *App) SecretShow(specStr string) (*SecretShowResult, error) {
-	spec, err := secretversion.Parse(specStr)
+	spec, err := a.parseSecretSpec(specStr)
 	if err != nil {
 		return nil, err
 	}
@@ -285,7 +284,11 @@ func (a *App) SecretDelete(name string, force bool) (*SecretDeleteResult, error)
 	}
 	// The provider Delete returns only an error; when not forcing, compute the
 	// scheduled deletion date client-side (now + AWS default recovery window).
-	if !force {
+	// Only AWS Secrets Manager has a recovery window: Google Cloud deletes
+	// immediately and Key Vault retention is governed by vault policy, so a
+	// synthetic "recoverable until" date there would be false. Gate on the
+	// active provider (mirrors ServiceCapability.HasRecoveryWindow).
+	if !force && a.currentScope().Provider == provider.ProviderAWS {
 		const defaultRecoveryWindowDays = 30
 
 		r.DeletionDate = timeutil.FormatRFC3339(time.Now().AddDate(0, 0, defaultRecoveryWindowDays))
@@ -326,12 +329,12 @@ func (a *App) SecretRemoveTag(name, key string) error {
 
 // SecretDiff compares two secret versions.
 func (a *App) SecretDiff(spec1Str, spec2Str string) (*SecretDiffResult, error) {
-	spec1, err := secretversion.Parse(spec1Str)
+	spec1, err := a.parseSecretSpec(spec1Str)
 	if err != nil {
 		return nil, err
 	}
 
-	spec2, err := secretversion.Parse(spec2Str)
+	spec2, err := a.parseSecretSpec(spec2Str)
 	if err != nil {
 		return nil, err
 	}
