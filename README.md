@@ -471,18 +471,76 @@ where ~SHIFT = ~ | ~N  (repeatable, cumulative)
 > [!NOTE]
 > Azure App Configuration is unversioned. Version specifiers (`#VERSION`, `~SHIFT`, `:LABEL`) are rejected, and `log` reports that history is unsupported.
 
+## Providers
+
+### Feature support
+
+| Backend | Command | Versioning | Labels / Tags | Staging | Auth |
+|---------|---------|------------|---------------|---------|------|
+| [AWS Parameter Store](docs/param.md) | `aws param` | ✅ numeric | ✅ tags | ✅ | shared config/env/role |
+| [AWS Secrets Manager](docs/secret.md) | `aws secret` | ✅ UUID + staging labels | ✅ tags | ✅ | shared config/env/role |
+| [Google Cloud Secret Manager](docs/gcloud.md) | `gcloud secret` | ✅ integer (`latest`) | ✅ labels | 🔜 [#247](https://github.com/mpyw/suve/issues/247) | Application Default Credentials |
+| [Azure Key Vault](docs/azure.md) | `azure secret` | ✅ opaque id | ✅ tags | 🔜 [#247](https://github.com/mpyw/suve/issues/247) | DefaultAzureCredential |
+| [Azure App Configuration](docs/azure.md) | `azure param` | ❌ unversioned | ❌ unsupported¹ | 🔜 [#247](https://github.com/mpyw/suve/issues/247) | DefaultAzureCredential |
+
+Read/write operations (`show`, `log`, `diff`, `list`, `create`, `update`, `delete`, `tag`, `untag`) are available on every backend, with these caveats: `restore` is AWS Secrets Manager only; on Azure App Configuration `log` reports history unsupported and `tag`/`untag` return an unsupported error; version specifiers (`#VERSION`, `~SHIFT`, `:LABEL`) are rejected on App Configuration. Only AWS Secrets Manager has staging labels (`:AWSCURRENT` etc.).
+
+¹ The `azappconfig` SDK cannot write setting tags without clearing them, so tag writes are refused.
+
+### Provider selection
+
+Every backend has an **explicit command group that is always available**, regardless of environment:
+
+```bash
+suve aws param   ...   # AWS Parameter Store
+suve aws secret  ...   # AWS Secrets Manager
+suve aws stage   ...   # AWS staging
+suve gcloud secret ... # Google Cloud Secret Manager
+suve azure secret  ... # Azure Key Vault
+suve azure param   ... # Azure App Configuration
+```
+
+For convenience, suve also exposes **bare top-level aliases** — `suve param`, `suve secret`, `suve stage` — but only when the environment makes the target unambiguous. `param` and `secret` are resolved independently; `stage` follows AWS (staging is AWS-only for now, see [#247](https://github.com/mpyw/suve/issues/247)):
+
+1. A backend is **active** when its identifying environment variable is set:
+
+   | Backend | Active when set |
+   |---------|-----------------|
+   | AWS | `AWS_ACCESS_KEY_ID`, `AWS_VAULT`, or `AWS_PROFILE` |
+   | Google Cloud | `GOOGLE_CLOUD_PROJECT` |
+   | Azure Key Vault (secret) | `AZURE_KEYVAULT_NAME` |
+   | Azure App Configuration (param) | `AZURE_APPCONFIG_NAME` |
+
+2. The bare alias for a service appears **only when exactly one backend is active** for it. Zero or two-plus active → no alias, use the explicit group. **There is no priority order** — ambiguity is never resolved silently.
+3. **AWS fallback:** if no backend is active via env at all, AWS is accepted via `~/.aws/credentials` (or `$AWS_SHARED_CREDENTIALS_FILE`). If that is also absent, there are no bare aliases.
+
+Examples (`—` = alias not exposed):
+
+| Environment | `param` → | `secret` → | `stage` |
+|-------------|-----------|------------|---------|
+| nothing set, `~/.aws/credentials` present | `aws` | `aws` | ✅ |
+| `AWS_PROFILE` | `aws` | `aws` | ✅ |
+| `GOOGLE_CLOUD_PROJECT` | — | `gcloud` | ❌ |
+| `AZURE_APPCONFIG_NAME` | `azure` | — | ❌ |
+| `AWS_PROFILE` + `GOOGLE_CLOUD_PROJECT` | `aws` | — (ambiguous) | ✅ |
+| nothing set, no credentials file | — | — | ❌ |
+
+`suve --help` lists which aliases are active in the current environment.
+
 ## Command Reference
 
 ### Services
 
-| Service | Aliases |
-|---------|---------|
-| [AWS SSM Parameter Store](docs/param.md) | `param`, `ssm`, `ps` |
-| [AWS Secrets Manager](docs/secret.md) | `secret`, `sm` |
-| [Google Cloud Secret Manager](docs/gcloud.md) | `gcloud secret` |
-| [Azure Key Vault](docs/azure.md) | `azure secret` |
-| [Azure App Configuration](docs/azure.md) | `azure param` |
-| Staging (AWS only) | `stage`, `stg` |
+Explicit command groups (always available) and their bare aliases (exposed per the [provider selection](#provider-selection) rules above):
+
+| Backend | Explicit command | Bare alias (conditional) |
+|---------|------------------|--------------------------|
+| [AWS SSM Parameter Store](docs/param.md) | `aws param` (`ssm`, `ps`) | `param` |
+| [AWS Secrets Manager](docs/secret.md) | `aws secret` (`sm`) | `secret` |
+| AWS Staging | `aws stage` (`stg`) | `stage` |
+| [Google Cloud Secret Manager](docs/gcloud.md) | `gcloud secret` | `secret` |
+| [Azure Key Vault](docs/azure.md) | `azure secret` | `secret` |
+| [Azure App Configuration](docs/azure.md) | `azure param` | `param` |
 
 ### SSM Parameter Store
 

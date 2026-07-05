@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	appcli "github.com/mpyw/suve/internal/cli/commands"
+	"github.com/mpyw/suve/internal/cli/commands/internal/apptest"
 	"github.com/mpyw/suve/internal/cli/commands/param/create"
 	"github.com/mpyw/suve/internal/cli/commands/param/paramopts"
 	"github.com/mpyw/suve/internal/domain"
@@ -24,7 +24,7 @@ func TestCommand_Validation(t *testing.T) {
 	t.Run("missing arguments", func(t *testing.T) {
 		t.Parallel()
 
-		app := appcli.MakeApp()
+		app := apptest.AWSApp()
 		err := app.Run(t.Context(), []string{"suve", "param", "create"})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "usage:")
@@ -33,7 +33,7 @@ func TestCommand_Validation(t *testing.T) {
 	t.Run("missing value argument", func(t *testing.T) {
 		t.Parallel()
 
-		app := appcli.MakeApp()
+		app := apptest.AWSApp()
 		err := app.Run(t.Context(), []string{"suve", "param", "create", "/app/param"})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "usage:")
@@ -42,7 +42,7 @@ func TestCommand_Validation(t *testing.T) {
 	t.Run("conflicting secure and type flags", func(t *testing.T) {
 		t.Parallel()
 
-		app := appcli.MakeApp()
+		app := apptest.AWSApp()
 		err := app.Run(t.Context(), []string{"suve", "param", "create", "--secure", "--type", "String", "/app/param", "value"})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "cannot use --secure with --type")
@@ -51,7 +51,7 @@ func TestCommand_Validation(t *testing.T) {
 	t.Run("invalid tier value", func(t *testing.T) {
 		t.Parallel()
 
-		app := appcli.MakeApp()
+		app := apptest.AWSApp()
 		err := app.Run(t.Context(), []string{"suve", "param", "create", "--tier", "Bogus", "/app/param", "value"})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid --tier")

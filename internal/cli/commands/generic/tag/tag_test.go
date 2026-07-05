@@ -9,8 +9,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	appcli "github.com/mpyw/suve/internal/cli/commands"
 	generictag "github.com/mpyw/suve/internal/cli/commands/generic/tag"
+	"github.com/mpyw/suve/internal/cli/commands/internal/apptest"
 	"github.com/mpyw/suve/internal/provider/providermock"
 )
 
@@ -42,7 +42,7 @@ func TestCommand_Validation(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			app := appcli.MakeApp()
+			app := apptest.AWSApp()
 			err := app.Run(t.Context(), tc.args)
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), tc.wantSub)
