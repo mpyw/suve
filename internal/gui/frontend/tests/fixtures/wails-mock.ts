@@ -22,16 +22,25 @@ export interface Tag {
 
 export type StagedOperation = 'create' | 'update' | 'delete';
 
+export type Service = 'param' | 'secret';
+
 export interface StagedEntry {
   name: string;
   operation: StagedOperation;
   value?: string;
+  // Optional service classifier. When present, stash drain routes the entry by
+  // this field; otherwise it falls back to the AWS name-shape heuristic (a
+  // leading '/' means param). Google Cloud/Azure names have no such convention, so
+  // provider-aware fixtures should set this explicitly.
+  service?: Service;
 }
 
 export interface StagedTagEntry {
   name: string;
   addTags: Record<string, string>;
   removeTags: Record<string, string>;
+  // See StagedEntry.service.
+  service?: Service;
 }
 
 export interface ParamLogEntry {
@@ -54,6 +63,49 @@ export interface AWSIdentity {
   accountId: string;
   region: string;
   profile: string;
+}
+
+// ScopeSelection mirrors the Go binding DTO (internal/gui/app.go). Only the
+// fields relevant to the chosen provider are meaningful.
+export interface ScopeSelection {
+  provider: string;
+  projectId: string;
+  subscriptionId: string;
+  resourceGroup: string;
+  vaultName: string;
+  storeName: string;
+}
+
+// DetectResult mirrors the Go binding DTO (internal/gui/providers.go).
+export interface DetectResult {
+  param: string;
+  secret: string;
+  stage: string;
+  paramActive: string[];
+  secretActive: string[];
+  stageActive: string[];
+}
+
+// ServiceCapability / ProviderCapability mirror the Go binding DTOs
+// (internal/gui/providers.go). The default values in defaultCapabilities MUST
+// stay in lockstep with App.Capabilities() there.
+export interface ServiceCapability {
+  service: string;
+  displayName: string;
+  hasVersionHistory: boolean;
+  hasVersionSpecifiers: boolean;
+  hasTags: boolean;
+  hasRestore: boolean;
+  hasStaging: boolean;
+  hasForceDelete: boolean;
+  hasRecoveryWindow: boolean;
+}
+
+export interface ProviderCapability {
+  provider: string;
+  displayName: string;
+  scopeFields: string[];
+  services: ServiceCapability[];
 }
 
 export interface StashFileState {
@@ -83,6 +135,12 @@ export interface MockState {
   awsIdentity: AWSIdentity;
   // Stash file state
   stashFile: StashFileState;
+  // Provider selection (multi-cloud). Defaults describe an AWS-only environment
+  // so existing AWS specs are unaffected.
+  initialProvider: string;
+  currentScope: ScopeSelection;
+  detectResult: DetectResult;
+  capabilities: ProviderCapability[];
   // Error simulation
   simulateError?: {
     operation: string;
@@ -138,6 +196,66 @@ export function createStagedTags(
 // Preset States for Common Test Scenarios
 // ============================================================================
 
+/**
+ * Default AWS-only scope selection.
+ */
+export const awsScopeSelection: ScopeSelection = {
+  provider: 'aws',
+  projectId: '',
+  subscriptionId: '',
+  resourceGroup: '',
+  vaultName: '',
+  storeName: '',
+};
+
+/**
+ * Default provider detection result describing an AWS-only environment (the
+ * single uniquely-active provider across services).
+ */
+export const awsOnlyDetectResult: DetectResult = {
+  param: 'aws',
+  secret: 'aws',
+  stage: 'aws',
+  paramActive: ['aws'],
+  secretActive: ['aws'],
+  stageActive: ['aws'],
+};
+
+/**
+ * Static capability descriptor. This MUST stay a verbatim copy of
+ * App.Capabilities() in internal/gui/providers.go — dto_contract guards the
+ * DTO shape, not these values, so drift here silently diverges the mock from
+ * the backend.
+ */
+export const defaultCapabilities: ProviderCapability[] = [
+  {
+    provider: 'aws',
+    displayName: 'AWS',
+    scopeFields: [],
+    services: [
+      { service: 'param', displayName: 'Param', hasVersionHistory: true, hasVersionSpecifiers: true, hasTags: true, hasRestore: false, hasStaging: true, hasForceDelete: false, hasRecoveryWindow: false },
+      { service: 'secret', displayName: 'Secret', hasVersionHistory: true, hasVersionSpecifiers: true, hasTags: true, hasRestore: true, hasStaging: true, hasForceDelete: true, hasRecoveryWindow: true },
+    ],
+  },
+  {
+    provider: 'googlecloud',
+    displayName: 'Google Cloud',
+    scopeFields: ['project'],
+    services: [
+      { service: 'secret', displayName: 'Secret', hasVersionHistory: true, hasVersionSpecifiers: true, hasTags: true, hasRestore: false, hasStaging: false, hasForceDelete: false, hasRecoveryWindow: false },
+    ],
+  },
+  {
+    provider: 'azure',
+    displayName: 'Azure',
+    scopeFields: ['subscription', 'resourceGroup'],
+    services: [
+      { service: 'param', displayName: 'App Configuration', hasVersionHistory: false, hasVersionSpecifiers: false, hasTags: false, hasRestore: false, hasStaging: false, hasForceDelete: false, hasRecoveryWindow: false },
+      { service: 'secret', displayName: 'Key Vault', hasVersionHistory: true, hasVersionSpecifiers: true, hasTags: true, hasRestore: false, hasStaging: false, hasForceDelete: false, hasRecoveryWindow: false },
+    ],
+  },
+];
+
 export const defaultMockState: MockState = {
   params: [
     createParam('/app/config', 'config-value', 'String'),
@@ -187,6 +305,10 @@ export const defaultMockState: MockState = {
     entries: [],
     tags: [],
   },
+  initialProvider: 'aws',
+  currentScope: awsScopeSelection,
+  detectResult: awsOnlyDetectResult,
+  capabilities: defaultCapabilities,
 };
 
 /**
@@ -472,6 +594,40 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
     const state = JSON.parse(JSON.stringify(mockState));
 
     const mockApp = {
+      // Provider selection / capabilities (multi-cloud)
+      DetectProviders: async () => state.detectResult,
+      Capabilities: async () => state.capabilities,
+      InitialProvider: async () => state.initialProvider,
+      GetCurrentScope: async () => state.currentScope,
+      SelectScope: async (sel: any) => {
+        if (state.simulateError?.operation === 'SelectScope') {
+          throw new Error(state.simulateError.message);
+        }
+        // Mirror the backend validation (internal/gui/app.go) so provider-aware
+        // specs exercise the same error paths.
+        const p = sel?.provider;
+        if (p === 'googlecloud') {
+          if (!sel.projectId) {
+            throw new Error('Google Cloud project ID is required');
+          }
+        } else if (p === 'azure') {
+          if (!sel.vaultName && !sel.storeName) {
+            throw new Error('Azure requires a Key Vault name (for secrets) and/or an App Configuration store name (for parameters)');
+          }
+        } else if (p !== 'aws') {
+          throw new Error(`invalid provider: must be 'aws', 'googlecloud', or 'azure': ${JSON.stringify(p)}`);
+        }
+        // Keep only the provider-relevant fields, matching scopeFromSelection.
+        state.currentScope = {
+          provider: p,
+          projectId: p === 'googlecloud' ? (sel.projectId || '') : '',
+          subscriptionId: p === 'azure' ? (sel.subscriptionId || '') : '',
+          resourceGroup: p === 'azure' ? (sel.resourceGroup || '') : '',
+          vaultName: p === 'azure' ? (sel.vaultName || '') : '',
+          storeName: p === 'azure' ? (sel.storeName || '') : '',
+        };
+      },
+
       // AWS Identity
       GetAWSIdentity: async () => {
         if (state.simulateError?.operation === 'GetAWSIdentity') {
@@ -547,7 +703,10 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
           tags,
         };
       },
-      ParamTypeOptions: async () => ['String', 'SecureString', 'StringList'],
+      // Only AWS SSM has value types; Azure App Configuration is untyped
+      // (empty list hides the frontend Type dropdown).
+      ParamTypeOptions: async () =>
+        state.currentScope.provider === 'aws' ? ['String', 'SecureString', 'StringList'] : [],
       ParamLog: async (name: string, _limit?: number) => {
         const versions = state.paramVersions[name] || [
           { version: 1, value: 'current', type: 'String', isCurrent: true, lastModified: new Date().toISOString() },
@@ -885,15 +1044,22 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
           throw new Error('nothing to stash');
         }
 
+        // Tag each entry/tag with its originating service so drain can route
+        // without inferring from the name shape (which fails for Google Cloud/Azure).
+        const persistParamEntries = state.stagedParam.map((e: any) => ({ ...e, service: 'param' }));
+        const persistSecretEntries = state.stagedSecret.map((e: any) => ({ ...e, service: 'secret' }));
+        const persistParamTags = state.stagedParamTags.map((t: any) => ({ ...t, service: 'param' }));
+        const persistSecretTags = state.stagedSecretTags.map((t: any) => ({ ...t, service: 'secret' }));
+
         // Merge or overwrite file based on mode
         if (mode === 'merge' && state.stashFile.exists) {
           // Merge: combine with existing
-          state.stashFile.entries = [...state.stashFile.entries, ...state.stagedParam, ...state.stagedSecret];
-          state.stashFile.tags = [...state.stashFile.tags, ...state.stagedParamTags, ...state.stagedSecretTags];
+          state.stashFile.entries = [...state.stashFile.entries, ...persistParamEntries, ...persistSecretEntries];
+          state.stashFile.tags = [...state.stashFile.tags, ...persistParamTags, ...persistSecretTags];
         } else {
           // Overwrite: replace
-          state.stashFile.entries = [...state.stagedParam, ...state.stagedSecret];
-          state.stashFile.tags = [...state.stagedParamTags, ...state.stagedSecretTags];
+          state.stashFile.entries = [...persistParamEntries, ...persistSecretEntries];
+          state.stashFile.tags = [...persistParamTags, ...persistSecretTags];
         }
 
         // Update file state
@@ -931,20 +1097,27 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
         const fileEntries = state.stashFile.entries;
         const fileTags = state.stashFile.tags;
 
+        // Route each entry/tag by its explicit service when present, falling
+        // back to the AWS name-shape heuristic (leading '/' means param) for
+        // fixtures that predate the service field. This keeps AWS specs
+        // unchanged while working for Google Cloud/Azure names, which carry no '/'.
+        const isParam = (item: any) => (item.service ? item.service === 'param' : item.name.startsWith('/'));
+
         // Apply mode
         let merged = false;
         if (mode === 'merge' && agentHasChanges) {
           // Merge: combine file with agent
-          state.stagedParam = [...state.stagedParam, ...fileEntries.filter(e => e.name.startsWith('/'))];
-          state.stagedSecret = [...state.stagedSecret, ...fileEntries.filter(e => !e.name.startsWith('/'))];
-          state.stagedParamTags = [...state.stagedParamTags, ...fileTags];
+          state.stagedParam = [...state.stagedParam, ...fileEntries.filter(isParam)];
+          state.stagedSecret = [...state.stagedSecret, ...fileEntries.filter((e: any) => !isParam(e))];
+          state.stagedParamTags = [...state.stagedParamTags, ...fileTags.filter(isParam)];
+          state.stagedSecretTags = [...state.stagedSecretTags, ...fileTags.filter((t: any) => !isParam(t))];
           merged = true;
         } else {
           // Overwrite: replace agent with file
-          state.stagedParam = fileEntries.filter(e => e.name.startsWith('/'));
-          state.stagedSecret = fileEntries.filter(e => !e.name.startsWith('/'));
-          state.stagedParamTags = fileTags.filter(t => t.name.startsWith('/'));
-          state.stagedSecretTags = fileTags.filter(t => !t.name.startsWith('/'));
+          state.stagedParam = fileEntries.filter(isParam);
+          state.stagedSecret = fileEntries.filter((e: any) => !isParam(e));
+          state.stagedParamTags = fileTags.filter(isParam);
+          state.stagedSecretTags = fileTags.filter((t: any) => !isParam(t));
         }
 
         // Delete file unless keep=true
@@ -1014,9 +1187,23 @@ export async function waitForViewLoaded(page: Page) {
 }
 
 /**
- * Navigate to a specific view
+ * Navigate to a specific view.
+ *
+ * Accepts the legacy AWS labels ('Parameters'/'Secrets') as well as the
+ * capability display names surfaced by the provider-aware sidebar ('Param',
+ * 'Secret', 'Key Vault', 'App Configuration'), so provider-switching specs can
+ * target the right service button regardless of provider.
  */
-export async function navigateTo(page: Page, view: 'Parameters' | 'Secrets' | 'Staging') {
+export type NavLabel =
+  | 'Parameters'
+  | 'Secrets'
+  | 'Staging'
+  | 'Param'
+  | 'Secret'
+  | 'Key Vault'
+  | 'App Configuration';
+
+export async function navigateTo(page: Page, view: NavLabel) {
   await page.getByRole('button', { name: new RegExp(view, 'i') }).click();
 }
 

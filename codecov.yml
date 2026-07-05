@@ -5,8 +5,8 @@ coverage:
   status:
     project:
       default:
-        # 2 (unit + e2e) + 3 (platform: linux, darwin, windows)
-        after_n_builds: 5
+        # 2 (unit + e2e) + 3 (platform: linux, darwin, windows) + 1 (gui)
+        after_n_builds: 6
     patch:
       default:
-        after_n_builds: 5
+        after_n_builds: 6
