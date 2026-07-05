@@ -369,7 +369,7 @@
     <input
       type="text"
       class="filter-input prefix-input"
-      placeholder="Prefix (e.g., /prod/)"
+      placeholder="Filter by prefix"
       bind:value={prefix}
       oninput={handlePrefixInput}
     />

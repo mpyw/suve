@@ -732,8 +732,8 @@ export namespace gui {
 	    name: string;
 	    type: string;
 	    operation?: string;
-	    awsValue?: string;
-	    awsIdentifier?: string;
+	    remoteValue?: string;
+	    remoteIdentifier?: string;
 	    stagedValue?: string;
 	    description?: string;
 	    warning?: string;
@@ -747,8 +747,8 @@ export namespace gui {
 	        this.name = source["name"];
 	        this.type = source["type"];
 	        this.operation = source["operation"];
-	        this.awsValue = source["awsValue"];
-	        this.awsIdentifier = source["awsIdentifier"];
+	        this.remoteValue = source["remoteValue"];
+	        this.remoteIdentifier = source["remoteIdentifier"];
 	        this.stagedValue = source["stagedValue"];
 	        this.description = source["description"];
 	        this.warning = source["warning"];

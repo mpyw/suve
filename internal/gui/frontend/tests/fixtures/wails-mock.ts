@@ -13,6 +13,12 @@ export interface Parameter {
 export interface Secret {
   name: string;
   value: string;
+  // Optional overrides for SecretShow. When omitted, SecretShow synthesizes an
+  // AWS-shaped ARN and an ['AWSCURRENT'] staging label (backward compatible).
+  // A provider without these (e.g. an empty arn / empty stages, as Google Cloud
+  // and Azure return) drives the presence-gated rendering in SecretView.
+  arn?: string;
+  versionStage?: string[];
 }
 
 export interface Tag {
@@ -819,9 +825,9 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
         const tags = state.secretTags[name] || [];
         return {
           name,
-          arn: `arn:aws:secretsmanager:us-east-1:123456789:secret:${name}`,
+          arn: secret?.arn !== undefined ? secret.arn : `arn:aws:secretsmanager:us-east-1:123456789:secret:${name}`,
           versionId: 'v1',
-          versionStage: ['AWSCURRENT'],
+          versionStage: secret?.versionStage !== undefined ? secret.versionStage : ['AWSCURRENT'],
           value: secret?.value || 'mock-secret',
           description: '',
           createdDate: new Date().toISOString(),
@@ -911,8 +917,8 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
             name: s.name,
             type: s.operation === 'create' ? 'create' : 'normal',
             operation: s.operation,
-            awsValue: s.operation === 'create' ? '' : 'aws-value',
-            awsIdentifier: s.operation === 'create' ? '' : '#1',
+            remoteValue: s.operation === 'create' ? '' : 'remote-value',
+            remoteIdentifier: s.operation === 'create' ? '' : '#1',
             stagedValue: s.value || '',
             description: '',
             warning: '',

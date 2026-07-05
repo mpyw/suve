@@ -458,3 +458,32 @@ test.describe('Secret Edge Cases', () => {
     });
   });
 });
+
+test.describe('Secret provider-neutral presence gating (#268)', () => {
+  // A secret from a provider without an ARN or staging labels (as Google Cloud
+  // and Azure return) must not render the AWS-only ARN section or the Labels
+  // row — the fields are presence-gated, no capability flag involved.
+  test.beforeEach(async ({ page }) => {
+    await setupWailsMocks(page, {
+      secrets: [{ name: 'neutral-secret', value: 'v', arn: '', versionStage: [] }],
+      secretTags: {},
+    } as Partial<MockState>);
+    await page.goto('/');
+    await navigateTo(page, 'Secrets');
+    await waitForItemList(page);
+    await clickItemByName(page, 'neutral-secret');
+    await expect(page.locator('.detail-panel')).toBeVisible();
+  });
+
+  test('hides the ARN section when arn is empty', async ({ page }) => {
+    await expect(page.locator('.arn-display')).toHaveCount(0);
+  });
+
+  test('hides the Labels row when there are no staging labels', async ({ page }) => {
+    await expect(page.locator('.meta-label').filter({ hasText: 'Labels' })).toHaveCount(0);
+  });
+
+  test('still renders always-present metadata (Version ID)', async ({ page }) => {
+    await expect(page.locator('.meta-label').filter({ hasText: 'Version ID' })).toBeVisible();
+  });
+});

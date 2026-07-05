@@ -129,11 +129,11 @@
             {#if viewMode === 'diff'}
               <div class="entry-diff">
                 <DiffDisplay
-                  oldValue={entry.awsValue || ''}
+                  oldValue={entry.remoteValue || ''}
                   newValue="(deleted)"
-                  oldLabel="AWS"
+                  oldLabel="Remote"
                   newLabel="Staged"
-                  oldSubLabel={entry.awsIdentifier || ''}
+                  oldSubLabel={entry.remoteIdentifier || ''}
                 />
               </div>
             {:else}
@@ -143,11 +143,11 @@
             {#if viewMode === 'diff' && entry.operation !== 'create'}
               <div class="entry-diff">
                 <DiffDisplay
-                  oldValue={entry.awsValue || ''}
+                  oldValue={entry.remoteValue || ''}
                   newValue={entry.stagedValue}
-                  oldLabel="AWS"
+                  oldLabel="Remote"
                   newLabel="Staged"
-                  oldSubLabel={entry.awsIdentifier || ''}
+                  oldSubLabel={entry.remoteIdentifier || ''}
                 />
               </div>
             {:else}
