@@ -53,7 +53,8 @@ type Result struct {
 	// Stage names the single active provider for the staging workflow, or an
 	// empty Provider ("") when staging is not uniquely resolvable (0 or 2+
 	// staging-capable providers active). Staging is supported for AWS (param +
-	// secret) and Google Cloud (secret); Azure is not yet staging-capable.
+	// secret), Google Cloud (secret), and Azure (Key Vault secret / App
+	// Configuration param).
 	Stage provider.Provider
 
 	// ParamActive and SecretActive list every provider active for that service,
@@ -126,13 +127,17 @@ func Resolve(env Environment) Result {
 	}
 
 	// Staging-capable providers in stable order: AWS (param + secret), Google
-	// Cloud (secret). Azure is not yet staging-capable.
+	// Cloud (secret), Azure (Key Vault secret and/or App Configuration param).
 	if awsActive {
 		res.StageActive = append(res.StageActive, provider.ProviderAWS)
 	}
 
 	if gcloudSecret {
 		res.StageActive = append(res.StageActive, provider.ProviderGoogleCloud)
+	}
+
+	if azureSecret || azureParam {
+		res.StageActive = append(res.StageActive, provider.ProviderAzure)
 	}
 
 	res.Secret = unique(res.SecretActive)

@@ -1,0 +1,195 @@
+//go:build e2e
+
+//nolint:paralleltest // E2E subtests share state and run sequentially, not in parallel
+package e2e_test
+
+import (
+	"bytes"
+	"testing"
+	"time"
+
+	"github.com/samber/lo"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"github.com/urfave/cli/v3"
+
+	"github.com/mpyw/suve/internal/cli/commands/azure"
+	"github.com/mpyw/suve/internal/provider"
+	"github.com/mpyw/suve/internal/staging"
+	"github.com/mpyw/suve/internal/staging/store/file"
+)
+
+// runAzureStage runs `suve azure stage <args...>` in-process through the azure
+// command group and returns stdout.
+func runAzureStage(t *testing.T, args ...string) (string, error) {
+	t.Helper()
+
+	var outBuf, errBuf bytes.Buffer
+
+	app := &cli.Command{
+		Name:      "suve",
+		Writer:    &outBuf,
+		ErrWriter: &errBuf,
+		Commands:  []*cli.Command{azure.Command()},
+	}
+
+	full := append([]string{"suve", "azure", "stage"}, args...)
+	err := app.Run(t.Context(), full)
+
+	return outBuf.String(), err
+}
+
+// TestAzureKeyVaultStage_Workflow exercises `suve azure stage secret`
+// status/diff/apply for update, create, and delete against a local Key Vault
+// emulator (lowkey-vault). Skipped unless the Key Vault emulator endpoint is set.
+func TestAzureKeyVaultStage_Workflow(t *testing.T) {
+	setupAzureKeyVault(t)
+	setupTempHome(t)
+
+	const (
+		updateName = "suve-e2e-az-kv-stage-update"
+		createName = "suve-e2e-az-kv-stage-create"
+		deleteName = "suve-e2e-az-kv-stage-delete"
+	)
+
+	cleanup := func() {
+		_, _ = runAzureSecret(t, "delete", "--yes", updateName)
+		_, _ = runAzureSecret(t, "delete", "--yes", createName)
+		_, _ = runAzureSecret(t, "delete", "--yes", deleteName)
+	}
+	cleanup()
+	t.Cleanup(cleanup)
+
+	_, err := runAzureSecret(t, "create", updateName, "original")
+	require.NoError(t, err)
+	_, err = runAzureSecret(t, "create", deleteName, "to-be-deleted")
+	require.NoError(t, err)
+
+	// The Key Vault staging scope is keyed by (subscription, resource-group,
+	// vault); the emulator setup pins the vault name and leaves sub/rg empty.
+	store, err := file.NewStore(provider.AzureKeyVaultScope("", "", "suve-e2e"))
+	require.NoError(t, err)
+
+	now := time.Now()
+	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceSecret, updateName, staging.Entry{
+		Operation: staging.OperationUpdate, Value: lo.ToPtr("staged-value"), StagedAt: now,
+	}))
+	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceSecret, createName, staging.Entry{
+		Operation: staging.OperationCreate, Value: lo.ToPtr("created-value"), StagedAt: now,
+	}))
+	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceSecret, deleteName, staging.Entry{
+		Operation: staging.OperationDelete, StagedAt: now,
+	}))
+
+	t.Run("status", func(t *testing.T) {
+		stdout, err := runAzureStage(t, "secret", "status")
+		require.NoError(t, err)
+		assert.Contains(t, stdout, "Key Vault")
+		assert.Contains(t, stdout, updateName)
+		assert.Contains(t, stdout, createName)
+		assert.Contains(t, stdout, deleteName)
+	})
+
+	t.Run("diff", func(t *testing.T) {
+		stdout, err := runAzureStage(t, "secret", "diff")
+		require.NoError(t, err)
+		assert.Contains(t, stdout, "-original")
+		assert.Contains(t, stdout, "+staged-value")
+		assert.Contains(t, stdout, "+created-value")
+	})
+
+	t.Run("apply", func(t *testing.T) {
+		stdout, err := runAzureStage(t, "secret", "apply", "--yes")
+		require.NoError(t, err)
+		assert.Contains(t, stdout, updateName)
+		assert.Contains(t, stdout, createName)
+		assert.Contains(t, stdout, deleteName)
+	})
+
+	t.Run("verify", func(t *testing.T) {
+		stdout, err := runAzureSecret(t, "show", "--raw", updateName)
+		require.NoError(t, err)
+		assert.Equal(t, "staged-value", stdout)
+
+		stdout, err = runAzureSecret(t, "show", "--raw", createName)
+		require.NoError(t, err)
+		assert.Equal(t, "created-value", stdout)
+
+		_, err = runAzureSecret(t, "show", "--raw", deleteName)
+		require.Error(t, err)
+	})
+
+	t.Run("status-empty-after-apply", func(t *testing.T) {
+		stdout, err := runAzureStage(t, "secret", "status")
+		require.NoError(t, err)
+		assert.NotContains(t, stdout, updateName)
+	})
+}
+
+// TestAzureAppConfigStage_Workflow exercises `suve azure stage param`
+// status/diff/apply against a local App Configuration emulator. App
+// Configuration is unversioned (last-write-wins) and tags are unsupported, so
+// only value operations are exercised.
+func TestAzureAppConfigStage_Workflow(t *testing.T) {
+	setupAzureAppConfig(t)
+	setupTempHome(t)
+
+	const (
+		updateName = "suve/e2e/az/ac/stage/update"
+		createName = "suve/e2e/az/ac/stage/create"
+	)
+
+	cleanup := func() {
+		_, _ = runAzureParam(t, "delete", "--yes", updateName)
+		_, _ = runAzureParam(t, "delete", "--yes", createName)
+	}
+	cleanup()
+	t.Cleanup(cleanup)
+
+	_, err := runAzureParam(t, "create", updateName, "original")
+	require.NoError(t, err)
+
+	store, err := file.NewStore(provider.AzureAppConfigScope("", "", "suve-e2e"))
+	require.NoError(t, err)
+
+	now := time.Now()
+	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, updateName, staging.Entry{
+		Operation: staging.OperationUpdate, Value: lo.ToPtr("staged-value"), StagedAt: now,
+	}))
+	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, createName, staging.Entry{
+		Operation: staging.OperationCreate, Value: lo.ToPtr("created-value"), StagedAt: now,
+	}))
+
+	t.Run("status", func(t *testing.T) {
+		stdout, err := runAzureStage(t, "param", "status")
+		require.NoError(t, err)
+		assert.Contains(t, stdout, "App Configuration")
+		assert.Contains(t, stdout, updateName)
+		assert.Contains(t, stdout, createName)
+	})
+
+	t.Run("diff", func(t *testing.T) {
+		stdout, err := runAzureStage(t, "param", "diff")
+		require.NoError(t, err)
+		assert.Contains(t, stdout, "-original")
+		assert.Contains(t, stdout, "+staged-value")
+		assert.Contains(t, stdout, "+created-value")
+	})
+
+	t.Run("apply", func(t *testing.T) {
+		stdout, err := runAzureStage(t, "param", "apply", "--yes")
+		require.NoError(t, err)
+		assert.Contains(t, stdout, updateName)
+		assert.Contains(t, stdout, createName)
+	})
+
+	t.Run("verify", func(t *testing.T) {
+		stdout, err := runAzureParam(t, "show", "--raw", updateName)
+		require.NoError(t, err)
+		assert.Equal(t, "staged-value", stdout)
+
+		stdout, err = runAzureParam(t, "show", "--raw", createName)
+		require.NoError(t, err)
+		assert.Equal(t, "created-value", stdout)
+	})
+}

@@ -1,6 +1,7 @@
 package detect_test
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -156,15 +157,22 @@ func TestResolve(t *testing.T) {
 			assert.Equal(t, tt.wantParam != "", got.FlatParam(), "FlatParam")
 			assert.Equal(t, tt.wantSecret != "", got.FlatSecret(), "FlatSecret")
 
-			// Staging-capable providers are AWS and Google Cloud (both appear in
-			// the secret active set when active). Stage is the unique active
-			// staging provider, or "" when 0 or 2+ are active.
+			// Staging-capable providers, in stable order (AWS, Google Cloud,
+			// Azure): AWS/Google Cloud when active for secret; Azure when active
+			// for EITHER service. Stage is the unique active one, or "" for 0/2+.
 			var wantStageSet []provider.Provider
 
-			for _, p := range tt.wantSecretSet {
-				if p == provider.ProviderAWS || p == provider.ProviderGoogleCloud {
-					wantStageSet = append(wantStageSet, p)
-				}
+			if slices.Contains(tt.wantSecretSet, provider.ProviderAWS) {
+				wantStageSet = append(wantStageSet, provider.ProviderAWS)
+			}
+
+			if slices.Contains(tt.wantSecretSet, provider.ProviderGoogleCloud) {
+				wantStageSet = append(wantStageSet, provider.ProviderGoogleCloud)
+			}
+
+			if slices.Contains(tt.wantSecretSet, provider.ProviderAzure) ||
+				slices.Contains(tt.wantParamSet, provider.ProviderAzure) {
+				wantStageSet = append(wantStageSet, provider.ProviderAzure)
 			}
 
 			wantStage := provider.Provider("")

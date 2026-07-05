@@ -480,14 +480,16 @@ where ~SHIFT = ~ | ~N  (repeatable, cumulative)
 | [AWS Parameter Store](docs/aws.md) | `aws param` | ✅ numeric | ✅ tags | ✅ | ✅ | shared config/env/role |
 | [AWS Secrets Manager](docs/aws.md) | `aws secret` | ✅ UUID + staging labels | ✅ tags | ✅ | ✅ | shared config/env/role |
 | [Google Cloud Secret Manager](docs/gcloud.md) | `gcloud secret` | ✅ integer (`latest`) | ✅ labels | ✅ | 🔜 [#250](https://github.com/mpyw/suve/issues/250) | Application Default Credentials |
-| [Azure Key Vault](docs/azure.md) | `azure secret` | ✅ opaque id | ✅ tags | 🔜 [#247](https://github.com/mpyw/suve/issues/247) | 🔜 [#250](https://github.com/mpyw/suve/issues/250) | DefaultAzureCredential |
-| [Azure App Configuration](docs/azure.md) | `azure param` | ❌ unversioned | ❌ unsupported¹ | 🔜 [#247](https://github.com/mpyw/suve/issues/247) | 🔜 [#250](https://github.com/mpyw/suve/issues/250) | DefaultAzureCredential |
+| [Azure Key Vault](docs/azure.md) | `azure secret` | ✅ opaque id | ✅ tags | ✅ | 🔜 [#250](https://github.com/mpyw/suve/issues/250) | DefaultAzureCredential |
+| [Azure App Configuration](docs/azure.md) | `azure param` | ❌ unversioned | ❌ unsupported¹ | ✅³ | 🔜 [#250](https://github.com/mpyw/suve/issues/250) | DefaultAzureCredential |
 
 Read/write operations (`show`, `log`, `diff`, `list`, `create`, `update`, `delete`, `tag`, `untag`) are available on every backend, with these caveats: `restore` is AWS Secrets Manager only; on Azure App Configuration `log` reports history unsupported and `tag`/`untag` return an unsupported error; version specifiers (`#VERSION`, `~SHIFT`, `:LABEL`) are rejected on App Configuration. Only AWS Secrets Manager has staging labels (`:AWSCURRENT` etc.).
 
 ¹ The `azappconfig` SDK cannot write setting tags without clearing them, so tag writes are refused.
 
 ² The bundled GUI (`suve --gui`) is AWS-only today; multi-cloud GUI support is planned ([#250](https://github.com/mpyw/suve/issues/250)). The CLI supports all backends.
+
+³ App Configuration is unversioned, so staging uses **last-write-wins** (no modified-after conflict check) and `tag`/`untag` are unavailable (tags aren't writable).
 
 ### Provider selection
 
@@ -501,9 +503,10 @@ suve gcloud secret ... # Google Cloud Secret Manager
 suve gcloud stage  ... # Google Cloud staging
 suve azure secret  ... # Azure Key Vault
 suve azure param   ... # Azure App Configuration
+suve azure stage   ... # Azure staging (secret = Key Vault, param = App Configuration)
 ```
 
-For convenience, suve also exposes **bare top-level aliases** — `suve param`, `suve secret`, `suve stage` — but only when the environment makes the target unambiguous. `param`, `secret`, and `stage` are each resolved independently. Staging is supported for AWS and Google Cloud, so `stage` follows the same "exactly one active backend" rule (Azure staging is not yet available, see [#247](https://github.com/mpyw/suve/issues/247)):
+For convenience, suve also exposes **bare top-level aliases** — `suve param`, `suve secret`, `suve stage` — but only when the environment makes the target unambiguous. `param`, `secret`, and `stage` are each resolved independently. All backends support staging, so `stage` follows the same "exactly one active backend" rule (Azure is staging-active when either `AZURE_KEYVAULT_NAME` or `AZURE_APPCONFIG_NAME` is set):
 
 1. A backend is **active** when its identifying environment variable is set:
 
@@ -524,7 +527,8 @@ Examples (`—` = alias not exposed):
 | nothing set, `~/.aws/credentials` present | `aws` | `aws` | `aws` |
 | `AWS_PROFILE` | `aws` | `aws` | `aws` |
 | `GOOGLE_CLOUD_PROJECT` | — | `gcloud` | `gcloud` |
-| `AZURE_APPCONFIG_NAME` | `azure` | — | — |
+| `AZURE_KEYVAULT_NAME` | — | `azure` | `azure` |
+| `AZURE_APPCONFIG_NAME` | `azure` | — | `azure` |
 | `AWS_PROFILE` + `GOOGLE_CLOUD_PROJECT` | `aws` | — (ambiguous) | — (ambiguous) |
 | nothing set, no credentials file | — | — | — |
 
@@ -545,6 +549,7 @@ Explicit command groups (always available) and their bare aliases (exposed per t
 | Google Cloud Staging | `gcloud stage` (`stg`) | `stage` |
 | [Azure Key Vault](docs/azure.md) | `azure secret` | `secret` |
 | [Azure App Configuration](docs/azure.md) | `azure param` | `param` |
+| Azure Staging | `azure stage` (`stg`) | `stage` |
 
 ### AWS SSM Parameter Store
 
@@ -650,6 +655,21 @@ Secrets are versioned by opaque IDs and have no staging labels. Select the vault
 | [`suve azure secret tag`](docs/azure.md#suve-azure-secret-tag) | `<KEY>=<VALUE>...` | Add or update tags |
 | [`suve azure secret untag`](docs/azure.md#suve-azure-secret-untag) | `<KEY>...` | Remove tags |
 
+**Staging commands** (under `suve azure stage secret`):
+
+| Command | Options | Description |
+|---------|---------|-------------|
+| `suve azure stage secret add` | `--description=<TEXT>` | Stage a new secret |
+| `suve azure stage secret edit` | `--description=<TEXT>` | Stage a modification (new version) |
+| `suve azure stage secret delete` | | Stage a deletion |
+| `suve azure stage secret status` | `--verbose` (`-v`) | Show staged changes |
+| `suve azure stage secret diff` | `--parse-json` (`-j`)<br>`--no-pager` | Show staged vs Key Vault |
+| `suve azure stage secret apply` | `--yes`<br>`--ignore-conflicts` | Apply staged changes |
+| `suve azure stage secret reset` | `--all` | Unstage changes |
+| `suve azure stage secret tag` | `<KEY>=<VALUE>...` | Stage tag additions |
+| `suve azure stage secret untag` | `<KEY>...` | Stage tag removals |
+| `suve azure stage secret stash` | `push`/`pop`/`show`/`drop` | Save/restore staged changes |
+
 ### Azure App Configuration
 
 Unversioned key-value store. Version specifiers (`#VERSION`, `~SHIFT`, `:LABEL`) are rejected, `log` reports that history is unsupported, and `tag` / `untag` are unsupported (SDK limitation). Select the store with `--store-name` or the `AZURE_APPCONFIG_NAME` environment variable, plus the shared `azure` base flags described above. See [docs/azure.md](docs/azure.md) for details.
@@ -662,10 +682,23 @@ Unversioned key-value store. Version specifiers (`#VERSION`, `~SHIFT`, `:LABEL`)
 | [`suve azure param update`](docs/azure.md#suve-azure-param-update) | `--yes` | Update an existing key |
 | [`suve azure param delete`](docs/azure.md#suve-azure-param-delete) | `--yes` | Delete a key |
 
-> [!NOTE]
-> Azure Key Vault and App Configuration are not covered by the staging workflow. Staging (`suve stage`) is AWS-only.
+**Staging commands** (under `suve azure stage param`; unversioned → last-write-wins, no `tag`/`untag`):
 
-### Global Stage Commands
+| Command | Options | Description |
+|---------|---------|-------------|
+| `suve azure stage param add` | `--description=<TEXT>` | Stage a new setting |
+| `suve azure stage param edit` | `--description=<TEXT>` | Stage a modification |
+| `suve azure stage param delete` | | Stage a deletion |
+| `suve azure stage param status` | `--verbose` (`-v`) | Show staged changes |
+| `suve azure stage param diff` | `--parse-json` (`-j`)<br>`--no-pager` | Show staged vs App Configuration |
+| `suve azure stage param apply` | `--yes` | Apply staged changes |
+| `suve azure stage param reset` | `--all` | Unstage changes |
+| `suve azure stage param stash` | `push`/`pop`/`show`/`drop` | Save/restore staged changes |
+
+> [!NOTE]
+> Azure staging is **per-service**: `suve azure stage secret` (Key Vault) and `suve azure stage param` (App Configuration) keep separate staging state, so there is no cross-service `azure stage status`/`apply` aggregate (unlike `aws stage`).
+
+### Global Stage Commands (AWS)
 
 | Command | Options | Description |
 |---------|---------|-------------|

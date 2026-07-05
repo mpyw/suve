@@ -64,7 +64,7 @@ This file provides guidance to Claude Code when working with code in this reposi
    - `secret` (aliases: `sm`) - AWS Secrets Manager
    - `gcloud` - Google Cloud (`secret` = Secret Manager)
    - `azure` - Azure (`secret` = Key Vault, `param` = App Configuration)
-   - `stage` (alias: `stg`) - Staging operations (AWS + Google Cloud)
+   - `stage` (alias: `stg`) - Staging operations (AWS + Google Cloud + Azure)
 
 ## Architecture
 
@@ -128,7 +128,7 @@ suve/
 │   │
 │   ├── updatecheck/              # Non-blocking update-check notification (#209)
 │   │
-│   ├── staging/                  # Staging core functionality (AWS + Google Cloud)
+│   ├── staging/                  # Staging core functionality (AWS + Google Cloud + Azure)
 │   │   ├── cli/                  # Staging CLI wrappers (service-specific)
 │   │   ├── transition/           # Reducer-based state machine (state/action/reducer/executor)
 │   │   └── store/                # Storage backend

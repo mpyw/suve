@@ -52,6 +52,7 @@ identity, Azure CLI, ...).`,
 		Commands: []*cli.Command{
 			secret.Command(),
 			param.Command(),
+			StageCommand(),
 		},
 		CommandNotFound: cliinternal.CommandNotFound,
 	}

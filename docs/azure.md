@@ -12,8 +12,12 @@ Azure splits into two services under `suve azure`:
 | `suve azure secret` | Key Vault | Versioned by opaque ids, no labels |
 | `suve azure param` | App Configuration | **Unversioned** (single current value) |
 
-> [!NOTE]
-> There is no staging workflow for Azure (staging is AWS-only).
+Azure also supports the local **staging workflow** via `suve azure stage` (or the bare `suve stage` alias when Azure is the only active staging backend). It is **per-service**, because Key Vault and App Configuration keep separate staging state:
+
+- `suve azure stage secret` — Key Vault secrets. Full workflow (`add`/`edit`/`delete`/`status`/`diff`/`apply`/`reset`/`tag`/`untag`/`stash`). Versions are immutable, so a staged `edit` applies as a new version.
+- `suve azure stage param` — App Configuration settings. Because App Configuration is **unversioned**, staging uses **last-write-wins** (no modified-after conflict check), and `tag`/`untag` are unavailable (tags aren't writable). Workflow: `add`/`edit`/`delete`/`status`/`diff`/`apply`/`reset`/`stash`.
+
+Unlike `aws stage`, there is no cross-service `azure stage status`/`apply` aggregate — the two services have distinct staging scopes. See the [staging workflow](../README.md#staging-workflow) overview for the general flow.
 
 ## Authentication and Configuration
 
