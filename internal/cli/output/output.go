@@ -130,7 +130,7 @@ func Error(w io.Writer, format string, args ...any) {
 
 // Info prints an informational message in cyan with no prefix.
 // Used for status updates, progress messages, and neutral information.
-// Example: "No changes staged.", "Agent started".
+// Example: "No changes staged.", "Applied 3 staged changes".
 //
 //nolint:goprintffuncname // intentionally named without 'f' suffix for cleaner API
 func Info(w io.Writer, format string, args ...any) {

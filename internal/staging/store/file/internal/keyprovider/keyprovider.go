@@ -1,5 +1,5 @@
 // Package keyprovider resolves the AES-256 data key used to encrypt the
-// working staging state file (stage.json).
+// working staging state files (param.json/secret.json).
 //
 // The resolution follows a fixed fallback chain:
 //

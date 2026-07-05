@@ -12,7 +12,7 @@
 > [!NOTE]
 > This project was written by AI (Claude Code).
 
-A **Git-like CLI/GUI** for AWS Parameter Store and Secrets Manager. Familiar commands like `show`, `log`, `diff`, and a **staging workflow** for safe, reviewable changes.
+A **Git-like CLI/GUI** for AWS Parameter Store / Secrets Manager, Google Cloud Secret Manager, and Azure Key Vault / App Configuration. Familiar commands like `show`, `log`, `diff`, and a **staging workflow** for safe, reviewable changes.
 
 <p align="center">
   <img src="demo/cli-demo.gif" alt="CLI Demo" width="800">
@@ -28,8 +28,8 @@ A **Git-like CLI/GUI** for AWS Parameter Store and Secrets Manager. Familiar com
 - **Staging workflow**: `edit` → `status` → `diff` → `apply` (review changes before applying)
 - **Version navigation**: `#VERSION`, `~SHIFT`, `:LABEL` syntax
 - **Colored diff output**: Easy-to-read unified diff format
-- **Both services**: [SSM Parameter Store](https://docs.aws.amazon.com/systems-manager/latest/userguide/systems-manager-parameter-store.html) and [Secrets Manager](https://docs.aws.amazon.com/secretsmanager/latest/userguide/intro.html)
-- **Secure staging**: In-memory daemon with [mlock](https://man7.org/linux/man-pages/man2/mlock.2.html), encrypted stash ([Argon2](https://en.wikipedia.org/wiki/Argon2) + [AES-GCM](https://en.wikipedia.org/wiki/Galois/Counter_Mode))
+- **Multi-cloud**: [AWS SSM Parameter Store](https://docs.aws.amazon.com/systems-manager/latest/userguide/systems-manager-parameter-store.html) / [Secrets Manager](https://docs.aws.amazon.com/secretsmanager/latest/userguide/intro.html), [Google Cloud Secret Manager](https://cloud.google.com/secret-manager/docs), and [Azure Key Vault](https://learn.microsoft.com/en-us/azure/key-vault/) / [App Configuration](https://learn.microsoft.com/en-us/azure/azure-app-configuration/)
+- **Secure staging**: Working staging state is encrypted at rest with a data key stored in the OS keychain (override with `SUVE_STAGING_KEY`; plaintext fallback with a warning if unavailable). The stash is separately encrypted ([Argon2](https://en.wikipedia.org/wiki/Argon2) + [AES-GCM](https://en.wikipedia.org/wiki/Galois/Counter_Mode), passphrase-based).
 - **GUI mode**: Desktop application via `--gui` flag (built with [Wails](https://wails.io/))
 
 ## Installation
@@ -109,7 +109,7 @@ go install github.com/mpyw/suve/cmd/suve@latest
 </details>
 
 <details>
-<summary>Using <code>go tool</code> (CLI only, Go 1.24+)</summary>
+<summary>Using <code>go tool</code> (CLI only, Go 1.25+)</summary>
 
 ```bash
 # Add to go.mod as a tool dependency
@@ -125,6 +125,8 @@ go tool suve param show /my/param
 <summary>Building from Source</summary>
 
 For platforms without pre-built packages (e.g., Arch Linux) or if you need the latest development version with GUI:
+
+Requires Go 1.25+.
 
 ```bash
 git clone https://github.com/mpyw/suve.git
@@ -301,10 +303,10 @@ Output will look like:
 
 > [!NOTE]
 > The staging workflow lets you prepare changes locally, review them, and apply when ready—just like `git add` → `git diff --staged` → `git commit`.
-> For detailed documentation, see [Staging State Transitions](docs/staging-state-transitions.md) and [Staging Agent/Daemon](docs/staging-agent.md).
+> For detailed documentation, see [Staging State Transitions](docs/staging-state-transitions.md).
 
 > [!TIP]
-> Staged values are stored in secure memory (daemon process). Use `suve stage stash` to save changes to an encrypted file for later restoration.
+> Staged values live in encrypted files under `~/.suve/staging/`. Use `suve stage stash` to save changes to a separately encrypted file for later restoration.
 
 **1. Stage changes** (opens editor or accepts value directly):
 
@@ -394,7 +396,7 @@ suve stage stash drop
 ```
 
 > [!NOTE]
-> See [Staging Agent/Daemon](docs/staging-agent.md) for detailed stash command documentation.
+> See [Staging State Transitions](docs/staging-state-transitions.md) for detailed staging documentation.
 
 ## Version Specification
 
@@ -442,15 +444,45 @@ where ~SHIFT = ~ | ~N  (repeatable, cumulative)
 > [!TIP]
 > `~` without a number means `~1`. You can chain them: `~~` = `~1~1` = `~2`
 
+### Google Cloud Secret Manager
+
+> [!NOTE]
+> Google Cloud Secret Manager uses integer version numbers (1, 2, 3, ...) plus the `latest` alias. There are no staging labels, so `:LABEL` syntax does not apply.
+
+| Syntax | Description |
+|--------|-------------|
+| `my-secret` | Latest version |
+| `my-secret#3` | Version 3 |
+| `my-secret~1` | 1 version ago |
+
+### Azure Key Vault
+
+> [!NOTE]
+> Azure Key Vault versions are opaque version IDs. There are no staging labels, so `:LABEL` syntax does not apply.
+
+| Syntax | Description |
+|--------|-------------|
+| `my-secret` | Current version |
+| `my-secret#<id>` | Specific version ID |
+| `my-secret~1` | 1 version ago |
+
+### Azure App Configuration
+
+> [!NOTE]
+> Azure App Configuration is unversioned. Version specifiers (`#VERSION`, `~SHIFT`, `:LABEL`) are rejected, and `log` reports that history is unsupported.
+
 ## Command Reference
 
 ### Services
 
 | Service | Aliases |
 |---------|---------|
-| [SSM Parameter Store](docs/param.md) | `param`, `ssm`, `ps` |
-| [Secrets Manager](docs/secret.md) | `secret`, `sm` |
-| Staging | `stage`, `stg` |
+| [AWS SSM Parameter Store](docs/param.md) | `param`, `ssm`, `ps` |
+| [AWS Secrets Manager](docs/secret.md) | `secret`, `sm` |
+| [Google Cloud Secret Manager](docs/gcloud.md) | `gcloud secret` |
+| [Azure Key Vault](docs/azure.md) | `azure secret` |
+| [Azure App Configuration](docs/azure.md) | `azure param` |
+| Staging (AWS only) | `stage`, `stg` |
 
 ### SSM Parameter Store
 
@@ -460,8 +492,8 @@ where ~SHIFT = ~ | ~N  (repeatable, cumulative)
 | [`suve param log`](docs/param.md#log) | `--number=<N>` (`-n`)<br>`--patch` (`-p`)<br>`--parse-json` (`-j`)<br>`--oneline`<br>`--reverse`<br>`--since=<DATE>`<br>`--until=<DATE>`<br>`--no-pager`<br>`--output=<FORMAT>` | Show version history |
 | [`suve param diff`](docs/param.md#diff) | `--parse-json` (`-j`)<br>`--no-pager`<br>`--output=<FORMAT>` | Compare versions |
 | [`suve param list`](docs/param.md#list) | `--recursive` (`-R`)<br>`--filter=<REGEX>`<br>`--show`<br>`--output=<FORMAT>` | List parameters |
-| [`suve param create`](docs/param.md#create) | `--type=<TYPE>`<br>`--secure`<br>`--description=<TEXT>` | Create a new parameter |
-| [`suve param update`](docs/param.md#update) | `--type=<TYPE>`<br>`--secure`<br>`--description=<TEXT>`<br>`--yes` | Update an existing parameter |
+| [`suve param create`](docs/param.md#create) | `--type=<TYPE>`<br>`--secure`<br>`--description=<TEXT>`<br>`--tier=<TIER>`<br>`--data-type=<TYPE>`<br>`--allowed-pattern=<REGEX>`<br>`--policies=<JSON>` | Create a new parameter |
+| [`suve param update`](docs/param.md#update) | `--type=<TYPE>`<br>`--secure`<br>`--description=<TEXT>`<br>`--tier=<TIER>`<br>`--data-type=<TYPE>`<br>`--allowed-pattern=<REGEX>`<br>`--policies=<JSON>`<br>`--yes` | Update an existing parameter |
 | [`suve param delete`](docs/param.md#delete) | `--yes` | Delete parameter |
 | [`suve param tag`](docs/param.md#tag) | `<KEY>=<VALUE>...` | Add or update tags |
 | [`suve param untag`](docs/param.md#untag) | `<KEY>...` | Remove tags |
@@ -509,6 +541,56 @@ where ~SHIFT = ~ | ~N  (repeatable, cumulative)
 | `suve stage secret tag` | `<KEY>=<VALUE>...` | Stage tag additions |
 | `suve stage secret untag` | `<KEY>...` | Stage tag removals |
 
+### Google Cloud Secret Manager
+
+Uses integer version numbers (with the `latest` alias) and has no staging labels. Select the project with `--project` or the `GOOGLE_CLOUD_PROJECT` environment variable. Authentication uses [Application Default Credentials (ADC)](https://cloud.google.com/docs/authentication/application-default-credentials). See [docs/gcloud.md](docs/gcloud.md) for details.
+
+| Command | Options | Description |
+|---------|---------|-------------|
+| `suve gcloud secret show` | `--raw`<br>`--parse-json` (`-j`)<br>`--no-pager`<br>`--output=<FORMAT>` | Display secret with metadata |
+| `suve gcloud secret log` | `--number=<N>` (`-n`)<br>`--patch` (`-p`)<br>`--parse-json` (`-j`)<br>`--oneline`<br>`--reverse`<br>`--no-pager`<br>`--output=<FORMAT>` | Show version history |
+| `suve gcloud secret diff` | `--parse-json` (`-j`)<br>`--no-pager`<br>`--output=<FORMAT>` | Compare versions |
+| `suve gcloud secret list` | `--filter=<REGEX>`<br>`--show`<br>`--output=<FORMAT>` | List secrets |
+| `suve gcloud secret create` | | Create new secret |
+| `suve gcloud secret update` | `--yes` | Update existing secret |
+| `suve gcloud secret delete` | `--yes` | Delete secret |
+| `suve gcloud secret tag` | `<KEY>=<VALUE>...` | Add or update labels |
+| `suve gcloud secret untag` | `<KEY>...` | Remove labels |
+
+> [!NOTE]
+> Google Cloud Secret Manager is not covered by the staging workflow. Staging (`suve stage`) is AWS-only.
+
+### Azure Key Vault
+
+Secrets are versioned by opaque IDs and have no staging labels. Select the vault with `--vault-name` or the `AZURE_KEYVAULT_NAME` environment variable. The shared `azure` base flags are `--subscription` / `AZURE_SUBSCRIPTION_ID` and `--resource-group` / `AZURE_RESOURCE_GROUP`. Authentication uses the [DefaultAzureCredential](https://learn.microsoft.com/en-us/azure/developer/go/azure-sdk-authentication) chain (environment, managed identity, Azure CLI, ...). See [docs/azure.md](docs/azure.md) for details.
+
+| Command | Options | Description |
+|---------|---------|-------------|
+| `suve azure secret show` | `--raw`<br>`--parse-json` (`-j`)<br>`--no-pager`<br>`--output=<FORMAT>` | Display secret with metadata |
+| `suve azure secret log` | `--number=<N>` (`-n`)<br>`--patch` (`-p`)<br>`--parse-json` (`-j`)<br>`--oneline`<br>`--reverse`<br>`--no-pager`<br>`--output=<FORMAT>` | Show version history |
+| `suve azure secret diff` | `--parse-json` (`-j`)<br>`--no-pager`<br>`--output=<FORMAT>` | Compare versions |
+| `suve azure secret list` | `--filter=<REGEX>`<br>`--show`<br>`--output=<FORMAT>` | List secrets |
+| `suve azure secret create` | | Create new secret |
+| `suve azure secret update` | `--yes` | Update existing secret |
+| `suve azure secret delete` | `--yes` | Delete secret |
+| `suve azure secret tag` | `<KEY>=<VALUE>...` | Add or update tags |
+| `suve azure secret untag` | `<KEY>...` | Remove tags |
+
+### Azure App Configuration
+
+Unversioned key-value store. Version specifiers (`#VERSION`, `~SHIFT`, `:LABEL`) are rejected, `log` reports that history is unsupported, and `tag` / `untag` are unsupported (SDK limitation). Select the store with `--store-name` or the `AZURE_APPCONFIG_NAME` environment variable, plus the shared `azure` base flags described above. See [docs/azure.md](docs/azure.md) for details.
+
+| Command | Options | Description |
+|---------|---------|-------------|
+| `suve azure param show` | `--raw`<br>`--parse-json` (`-j`)<br>`--no-pager`<br>`--output=<FORMAT>` | Display value with metadata |
+| `suve azure param list` | `--filter=<REGEX>`<br>`--show`<br>`--output=<FORMAT>` | List keys |
+| `suve azure param create` | | Create a new key |
+| `suve azure param update` | `--yes` | Update an existing key |
+| `suve azure param delete` | `--yes` | Delete a key |
+
+> [!NOTE]
+> Azure Key Vault and App Configuration are not covered by the staging workflow. Staging (`suve stage`) is AWS-only.
+
 ### Global Stage Commands
 
 | Command | Options | Description |
@@ -523,20 +605,10 @@ where ~SHIFT = ~ | ~N  (repeatable, cumulative)
 | Command | Options | Description |
 |---------|---------|-------------|
 | `suve stage stash` | | Save staged changes to file (alias for `push`) |
-| `suve stage stash push` | `--keep`<br>`--yes`<br>`--merge`<br>`--overwrite`<br>`--passphrase-stdin` | Save staged changes from memory to file |
+| `suve stage stash push` | `--keep`<br>`--yes`<br>`--merge`<br>`--overwrite`<br>`--passphrase-stdin` | Save staged changes from the working staging area to the stash file |
 | `suve stage stash pop` | `--keep`<br>`--yes`<br>`--merge`<br>`--overwrite`<br>`--passphrase-stdin` | Restore staged changes from file |
 | `suve stage stash show` | `--verbose` (`-v`)<br>`--passphrase-stdin` | Preview stashed changes |
 | `suve stage stash drop` | `--yes`<br>`--passphrase-stdin` | Delete stash file |
-
-### Agent Commands
-
-| Command | Description |
-|---------|-------------|
-| `suve stage agent start` | Start the staging daemon manually |
-| `suve stage agent stop` | Stop the staging daemon |
-
-> [!NOTE]
-> See [Staging Agent/Daemon](docs/staging-agent.md) for detailed documentation on daemon architecture and stash commands.
 
 ## Environment Variables
 
@@ -553,6 +625,42 @@ TZ=Asia/Tokyo suve param show /app/config
 ```
 
 All timestamps are formatted in RFC3339 format with the local timezone offset applied. If `TZ` is not set, the system's local timezone is used. Invalid timezone values fall back to UTC.
+
+### General
+
+| Variable | Description |
+|----------|-------------|
+| `TZ` | Timezone for date/time formatting (see above) |
+| `SUVE_NO_UPDATE_CHECK` | Opt out of the update-check notification |
+
+### Staging
+
+| Variable | Description |
+|----------|-------------|
+| `SUVE_STAGING_KEY` | Base64-encoded 32-byte key that overrides the OS keychain for encrypting the working staging state |
+
+### AWS
+
+| Variable | Description |
+|----------|-------------|
+| `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` / `AWS_SESSION_TOKEN` | Static credentials |
+| `AWS_PROFILE` | Shared-config profile to load |
+| `AWS_REGION` / `AWS_DEFAULT_REGION` | Region |
+
+### Google Cloud
+
+| Variable | Description |
+|----------|-------------|
+| `GOOGLE_CLOUD_PROJECT` | Project for Secret Manager (or use `--project`) |
+
+### Azure
+
+| Variable | Description |
+|----------|-------------|
+| `AZURE_SUBSCRIPTION_ID` | Subscription (or use `--subscription`) |
+| `AZURE_RESOURCE_GROUP` | Resource group (or use `--resource-group`) |
+| `AZURE_KEYVAULT_NAME` | Key Vault name for `azure secret` (or use `--vault-name`) |
+| `AZURE_APPCONFIG_NAME` | App Configuration store for `azure param` (or use `--store-name`) |
 
 ## AWS Configuration
 
@@ -572,6 +680,9 @@ suve uses standard AWS SDK configuration:
 > Ensure your IAM role/user has appropriate permissions:
 > - SSM: `ssm:GetParameter`, `ssm:GetParameters`, `ssm:GetParameterHistory`, `ssm:PutParameter`, `ssm:DeleteParameter`, `ssm:DescribeParameters`, `ssm:AddTagsToResource`, `ssm:RemoveTagsFromResource`
 > - SM: `secretsmanager:GetSecretValue`, `secretsmanager:ListSecretVersionIds`, `secretsmanager:ListSecrets`, `secretsmanager:CreateSecret`, `secretsmanager:PutSecretValue`, `secretsmanager:UpdateSecret`, `secretsmanager:DeleteSecret`, `secretsmanager:RestoreSecret`, `secretsmanager:TagResource`, `secretsmanager:UntagResource`
+
+> [!NOTE]
+> The `gcloud` and `azure` commands use their own credential chains: Google Cloud uses [Application Default Credentials (ADC)](https://cloud.google.com/docs/authentication/application-default-credentials), and Azure uses [DefaultAzureCredential](https://learn.microsoft.com/en-us/azure/developer/go/azure-sdk-authentication) (environment, managed identity, Azure CLI, ...). See [docs/gcloud.md](docs/gcloud.md) and [docs/azure.md](docs/azure.md) for details.
 
 ## Development
 

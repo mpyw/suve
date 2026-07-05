@@ -272,8 +272,8 @@ func newGlobalStashPushCommand() *cli.Command {
 		Description: `Save staged changes from the working staging area to the stash file.
 
 This command saves the current staging state from the working staging area
-(~/.suve/{accountID}/{region}/stage.json) to the stash file
-(~/.suve/{accountID}/{region}/stash.json).
+(~/.suve/staging/aws/{accountID}/{region}/{param,secret}.json) to the stash file
+(~/.suve/staging/aws/{accountID}/{region}/stash.json).
 
 By default, the working staging area is cleared after stashing.
 Use --keep to retain the staged changes in the working staging area.
@@ -299,8 +299,8 @@ func newStashPushCommand(cfg CommandConfig) *cli.Command {
 		Description: fmt.Sprintf(`Save staged %s changes from the working staging area to the stash file.
 
 This command saves the staging state for %ss from the working staging area
-(~/.suve/{accountID}/{region}/stage.json) to the stash file
-(~/.suve/{accountID}/{region}/stash.json).
+(~/.suve/staging/aws/{accountID}/{region}/{param,secret}.json) to the stash file
+(~/.suve/staging/aws/{accountID}/{region}/stash.json).
 
 By default, the %s entries are cleared from the working staging area after stashing.
 Use --keep to retain them in the working staging area.

@@ -46,7 +46,7 @@ var storeScope = provider.Scope{Provider: provider.ProviderAWS}
 type App struct {
 	ctx context.Context
 
-	// Staging store (the working staging area, backed by stage.json)
+	// Staging store (the working staging area, backed by param.json/secret.json)
 	stagingStore   store.ReadWriteOperator
 	stagingStoreMu sync.Mutex // protects stagingStore initialization
 }

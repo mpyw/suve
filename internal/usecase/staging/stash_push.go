@@ -28,9 +28,9 @@ type StashPushOutput struct {
 	TagCount int
 }
 
-// StashPushUseCase executes persist operations (working stage.json -> stash.json).
+// StashPushUseCase executes persist operations (working param.json/secret.json -> stash.json).
 type StashPushUseCase struct {
-	// Working is the working staging area (stage.json).
+	// Working is the working staging area (param.json/secret.json).
 	Working store.FileStore
 	// Stash is the stash file (stash.json).
 	Stash store.FileStore

@@ -249,8 +249,8 @@ func newGlobalStashPopCommand() *cli.Command {
 		Description: `Restore staged changes from the stash file into the working staging area.
 
 This command loads the staging state from the stash file
-(~/.suve/{accountID}/{region}/stash.json) into the working staging area
-(~/.suve/{accountID}/{region}/stage.json).
+(~/.suve/staging/aws/{accountID}/{region}/stash.json) into the working staging area
+(~/.suve/staging/aws/{accountID}/{region}/{param,secret}.json).
 
 By default, the stash file is deleted after restoring.
 Use --keep to retain the stash file after popping (same as 'stash apply').
@@ -278,8 +278,8 @@ func newStashPopCommand(cfg CommandConfig) *cli.Command {
 		Description: fmt.Sprintf(`Restore staged %s changes from the stash file into the working staging area.
 
 This command loads the staging state for %ss from the stash file
-(~/.suve/{accountID}/{region}/stash.json) into the working staging area
-(~/.suve/{accountID}/{region}/stage.json).
+(~/.suve/staging/aws/{accountID}/{region}/stash.json) into the working staging area
+(~/.suve/staging/aws/{accountID}/{region}/{param,secret}.json).
 
 By default, the %s entries are removed from the stash file after restoring.
 Use --keep to retain them in the stash file.
