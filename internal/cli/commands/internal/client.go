@@ -6,20 +6,22 @@ import (
 
 	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/provider/aws"
+	"github.com/mpyw/suve/internal/provider/azure"
 	"github.com/mpyw/suve/internal/provider/gcp"
 	"github.com/mpyw/suve/internal/staging"
 )
 
 // registry is the provider registry reachable by every CLI command. It is the
 // single composition point where cloud backends are wired in: AWS (param +
-// secret) and Google Cloud (secret only) are registered here. Top-level command
-// groups build their own provider.Scope and resolve stores through this same
-// registry.
+// secret), Google Cloud (secret only), and Azure (Key Vault secret + App
+// Configuration param) are registered here. Top-level command groups build their
+// own provider.Scope and resolve stores through this same registry.
 //
 //nolint:gochecknoglobals // process-wide provider registry, built once
 var registry = func() *provider.Registry {
 	reg := aws.NewRegistry()
 	gcp.Register(reg)
+	azure.Register(reg)
 
 	return reg
 }()
@@ -40,6 +42,59 @@ func gcpProjectFromContext(ctx context.Context) string {
 	project, _ := ctx.Value(gcpProjectContextKey{}).(string)
 
 	return project
+}
+
+// azureScopeContextKey keys the resolved Azure scope fields stored in the
+// context by the azure command group's Before hooks.
+type azureScopeContextKey struct{}
+
+// azureScopeCtx holds the Azure scope fields resolved from flags/env by the
+// azure command group. It is assembled across two Before hooks: the top-level
+// azure command sets subscription/resource-group; each subgroup (secret/param)
+// sets its vault/store name.
+type azureScopeCtx struct {
+	subscription  string
+	resourceGroup string
+	vaultName     string
+	storeName     string
+}
+
+func azureScopeFromContext(ctx context.Context) azureScopeCtx {
+	sc, _ := ctx.Value(azureScopeContextKey{}).(azureScopeCtx)
+
+	return sc
+}
+
+// WithAzureBase returns a context carrying the resolved Azure subscription id and
+// resource group. The azure command group's Before hook sets it once (from
+// --subscription/--resource-group or their env fallbacks).
+func WithAzureBase(ctx context.Context, subscription, resourceGroup string) context.Context {
+	sc := azureScopeFromContext(ctx)
+	sc.subscription = subscription
+	sc.resourceGroup = resourceGroup
+
+	return context.WithValue(ctx, azureScopeContextKey{}, sc)
+}
+
+// WithAzureVaultName returns a context carrying the resolved Azure Key Vault
+// name, merged onto any base scope already present. The azure secret subgroup's
+// Before hook sets it (from --vault-name or its env fallback).
+func WithAzureVaultName(ctx context.Context, vaultName string) context.Context {
+	sc := azureScopeFromContext(ctx)
+	sc.vaultName = vaultName
+
+	return context.WithValue(ctx, azureScopeContextKey{}, sc)
+}
+
+// WithAzureStoreName returns a context carrying the resolved Azure App
+// Configuration store name, merged onto any base scope already present. The
+// azure param subgroup's Before hook sets it (from --store-name or its env
+// fallback).
+func WithAzureStoreName(ctx context.Context, storeName string) context.Context {
+	sc := azureScopeFromContext(ctx)
+	sc.storeName = storeName
+
+	return context.WithValue(ctx, azureScopeContextKey{}, sc)
 }
 
 // storeScope is the provider selector for read/write commands. Only the
@@ -76,6 +131,39 @@ func GCPSecretStore(ctx context.Context) (provider.Store, error) {
 	}
 
 	return registry.Store(ctx, provider.GoogleCloudScope(project), provider.KindSecret)
+}
+
+// AzureKeyVaultStore resolves a provider.Store for the Azure Key Vault (secret)
+// service. The scope fields are read from the context (see WithAzureBase /
+// WithAzureVaultName); it returns a clear error when no vault name was resolved.
+func AzureKeyVaultStore(ctx context.Context) (provider.Store, error) {
+	sc := azureScopeFromContext(ctx)
+	if sc.vaultName == "" {
+		return nil, errors.New(
+			"no Azure Key Vault specified: set --vault-name or the AZURE_KEYVAULT_NAME environment variable",
+		)
+	}
+
+	scope := provider.AzureKeyVaultScope(sc.subscription, sc.resourceGroup, sc.vaultName)
+
+	return registry.Store(ctx, scope, provider.KindSecret)
+}
+
+// AzureAppConfigStore resolves a provider.Store for the Azure App Configuration
+// (param) service. The scope fields are read from the context (see
+// WithAzureBase / WithAzureStoreName); it returns a clear error when no store
+// name was resolved.
+func AzureAppConfigStore(ctx context.Context) (provider.Store, error) {
+	sc := azureScopeFromContext(ctx)
+	if sc.storeName == "" {
+		return nil, errors.New(
+			"no Azure App Configuration store specified: set --store-name or the AZURE_APPCONFIG_NAME environment variable",
+		)
+	}
+
+	scope := provider.AzureAppConfigScope(sc.subscription, sc.resourceGroup, sc.storeName)
+
+	return registry.Store(ctx, scope, provider.KindParam)
 }
 
 func storeForKind(ctx context.Context, kind provider.Kind) (provider.Store, error) {
