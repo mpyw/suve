@@ -82,6 +82,10 @@ export function SecretUpdate(arg1, arg2) {
   return window['go']['gui']['App']['SecretUpdate'](arg1, arg2);
 }
 
+export function SelectScope(arg1) {
+  return window['go']['gui']['App']['SelectScope'](arg1);
+}
+
 export function StagingAdd(arg1, arg2, arg3) {
   return window['go']['gui']['App']['StagingAdd'](arg1, arg2, arg3);
 }

@@ -5,11 +5,14 @@ package gui
 
 import (
 	"context"
+	"fmt"
 	"sync"
 
 	"github.com/mpyw/suve/internal/infra"
 	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/provider/aws"
+	"github.com/mpyw/suve/internal/provider/azure"
+	"github.com/mpyw/suve/internal/provider/gcloud"
 	"github.com/mpyw/suve/internal/staging"
 	"github.com/mpyw/suve/internal/staging/store"
 	"github.com/mpyw/suve/internal/staging/store/file"
@@ -20,21 +23,29 @@ import (
 // =============================================================================
 
 // registry is the provider registry backing the GUI's read/write operations.
-// It mirrors the CLI composition point (internal/cli/commands/internal): today
-// only AWS is registered, so AWS is the default (and only) provider.
+// It mirrors the CLI composition point (internal/cli/commands/internal): AWS
+// (param + secret), Google Cloud (secret), and Azure (Key Vault secret + App
+// Configuration param) are all registered, so the GUI can browse any backend
+// once a scope is selected.
 //
 //nolint:gochecknoglobals // process-wide provider registry, built once
-var registry = aws.NewRegistry()
+var registry = func() *provider.Registry {
+	reg := aws.NewRegistry()
+	gcloud.Register(reg)
+	azure.Register(reg)
 
-// storeScope is the provider selector for GUI read/write operations. Only the
-// Provider field is needed: the AWS factory builds its SSM/Secrets Manager
-// client from the ambient AWS config (region from env/profile), so no
-// account/region lookup — and therefore no STS GetCallerIdentity call — is
-// required to construct a store. (Account/region only matter for staging-state
-// file keying, which getStagingStore derives from the AWS identity separately.)
+	return reg
+}()
+
+// errInvalidProvider is returned when SelectScope is given an unknown provider.
+var errInvalidProvider = stringError("invalid provider: must be 'aws', 'googlecloud', or 'azure'")
+
+// defaultScope is the initial read/write scope (AWS). The AWS factory builds
+// its SSM/Secrets Manager client from the ambient AWS config (region from
+// env/profile), so only the Provider field is needed.
 //
-//nolint:gochecknoglobals // immutable provider selector for read/write operations
-var storeScope = provider.Scope{Provider: provider.ProviderAWS}
+//nolint:gochecknoglobals // immutable default selector
+var defaultScope = provider.Scope{Provider: provider.ProviderAWS}
 
 // =============================================================================
 // App Struct
@@ -46,6 +57,11 @@ var storeScope = provider.Scope{Provider: provider.ProviderAWS}
 type App struct {
 	ctx context.Context
 
+	// scope is the current read/write provider scope, selected from the
+	// frontend via SelectScope. Guarded by scopeMu.
+	scope   provider.Scope
+	scopeMu sync.RWMutex
+
 	// Staging store (the working staging area, backed by param.json/secret.json)
 	stagingStore   store.ReadWriteOperator
 	stagingStoreMu sync.Mutex // protects stagingStore initialization
@@ -53,12 +69,73 @@ type App struct {
 
 // NewApp creates a new App application struct.
 func NewApp() *App {
-	return &App{}
+	return &App{scope: defaultScope}
 }
 
 // Startup is called when the app starts.
 func (a *App) Startup(ctx context.Context) {
 	a.ctx = ctx
+}
+
+// ScopeSelection is the frontend-supplied provider + scope for read/write
+// operations. Only the fields relevant to the chosen provider are read:
+//   - aws: (none; the ambient AWS config supplies the region)
+//   - googlecloud: ProjectID
+//   - azure: SubscriptionID + ResourceGroup, plus VaultName (Key Vault secret)
+//     and/or StoreName (App Configuration param)
+type ScopeSelection struct {
+	Provider       string `json:"provider"`
+	ProjectID      string `json:"projectId"`
+	SubscriptionID string `json:"subscriptionId"`
+	ResourceGroup  string `json:"resourceGroup"`
+	VaultName      string `json:"vaultName"`
+	StoreName      string `json:"storeName"`
+}
+
+// SelectScope sets the current read/write provider scope. It performs no
+// network calls; store construction (and any credential resolution) is deferred
+// to the next param/secret operation.
+func (a *App) SelectScope(sel ScopeSelection) error {
+	scope, err := scopeFromSelection(sel)
+	if err != nil {
+		return err
+	}
+
+	a.scopeMu.Lock()
+	a.scope = scope
+	a.scopeMu.Unlock()
+
+	return nil
+}
+
+// scopeFromSelection maps a frontend selection to a provider.Scope. For Azure a
+// single scope carries both VaultName and StoreName, so the registry can build
+// either the Key Vault (secret) or App Configuration (param) store from it.
+func scopeFromSelection(sel ScopeSelection) (provider.Scope, error) {
+	switch provider.Provider(sel.Provider) {
+	case provider.ProviderAWS:
+		return provider.Scope{Provider: provider.ProviderAWS}, nil
+	case provider.ProviderGoogleCloud:
+		return provider.GoogleCloudScope(sel.ProjectID), nil
+	case provider.ProviderAzure:
+		return provider.Scope{
+			Provider:       provider.ProviderAzure,
+			SubscriptionID: sel.SubscriptionID,
+			ResourceGroup:  sel.ResourceGroup,
+			VaultName:      sel.VaultName,
+			StoreName:      sel.StoreName,
+		}, nil
+	default:
+		return provider.Scope{}, fmt.Errorf("%w: %q", errInvalidProvider, sel.Provider)
+	}
+}
+
+// currentScope returns the active read/write scope.
+func (a *App) currentScope() provider.Scope {
+	a.scopeMu.RLock()
+	defer a.scopeMu.RUnlock()
+
+	return a.scope
 }
 
 // =============================================================================
@@ -79,13 +156,13 @@ func (e stringError) Error() string { return string(e) }
 // paramStore resolves a provider.Store for the parameter service via the
 // registry (AWS by default).
 func (a *App) paramStore() (provider.Store, error) {
-	return registry.Store(a.ctx, storeScope, provider.KindParam)
+	return registry.Store(a.ctx, a.currentScope(), provider.KindParam)
 }
 
 // secretStore resolves a provider.Store for the secret service via the
 // registry (AWS by default).
 func (a *App) secretStore() (provider.Store, error) {
-	return registry.Store(a.ctx, storeScope, provider.KindSecret)
+	return registry.Store(a.ctx, a.currentScope(), provider.KindSecret)
 }
 
 func (a *App) getStagingStore() (store.ReadWriteOperator, error) {
