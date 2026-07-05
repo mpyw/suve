@@ -14,6 +14,15 @@ else
     HOST_GOOS := windows
 endif
 
+# Route GUI tooling through mise so the wails CLI and node/npm match the
+# versions pinned in mise.toml, regardless of the ambient PATH or whether the
+# shell has mise activated. Falls back to bare invocation if mise is absent.
+ifneq ($(shell command -v mise 2>/dev/null),)
+    MISE_RUN := mise exec --
+else
+    MISE_RUN :=
+endif
+
 SUVE_LOCALSTACK_EXTERNAL_PORT ?= 4566
 COVERPKG = $(shell go list ./... | grep -v testutil | grep -v /e2e | grep -v internal/gui | grep -v /cmd/ | tr '\n' ',')
 
@@ -69,16 +78,16 @@ coverage-all: up ## Run all tests with combined coverage
 	go tool cover -func=coverage-all.out | grep total
 
 gui-dev: ## Start GUI development server
-	cd gui && wails dev -skipbindings -tags dev
+	cd gui && $(MISE_RUN) wails dev -skipbindings -tags dev
 
 gui-build: ## Build GUI for production
-	cd gui && wails build -tags production -skipbindings
+	cd gui && $(MISE_RUN) wails build -tags production -skipbindings
 
 gui-bindings: ## Regenerate GUI bindings
 	@echo "Temporarily removing build constraints..."
 	@find gui internal/gui -name '*.go' -exec sed -i.bak 's|^//go:build.*||' {} \;
 	@echo "Generating bindings..."
-	@cd gui && timeout 30 wails dev -tags dev 2>&1 | head -30 || true
+	@cd gui && timeout 30 $(MISE_RUN) wails dev -tags dev 2>&1 | head -30 || true
 	@echo "Restoring build constraints..."
 	@find gui internal/gui -name '*.go.bak' -exec sh -c 'mv "$$1" "$${1%.bak}"' _ {} \;
 	@echo "Done. Check internal/gui/frontend/wailsjs/go/ for updated bindings."
