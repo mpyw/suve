@@ -475,17 +475,19 @@ where ~SHIFT = ~ | ~N  (repeatable, cumulative)
 
 ### Feature support
 
-| Backend | Command | Versioning | Labels / Tags | Staging | Auth |
-|---------|---------|------------|---------------|---------|------|
-| [AWS Parameter Store](docs/param.md) | `aws param` | ✅ numeric | ✅ tags | ✅ | shared config/env/role |
-| [AWS Secrets Manager](docs/secret.md) | `aws secret` | ✅ UUID + staging labels | ✅ tags | ✅ | shared config/env/role |
-| [Google Cloud Secret Manager](docs/gcloud.md) | `gcloud secret` | ✅ integer (`latest`) | ✅ labels | 🔜 [#247](https://github.com/mpyw/suve/issues/247) | Application Default Credentials |
-| [Azure Key Vault](docs/azure.md) | `azure secret` | ✅ opaque id | ✅ tags | 🔜 [#247](https://github.com/mpyw/suve/issues/247) | DefaultAzureCredential |
-| [Azure App Configuration](docs/azure.md) | `azure param` | ❌ unversioned | ❌ unsupported¹ | 🔜 [#247](https://github.com/mpyw/suve/issues/247) | DefaultAzureCredential |
+| Backend | Command | Versioning | Labels / Tags | Staging | GUI² | Auth |
+|---------|---------|------------|---------------|---------|------|------|
+| [AWS Parameter Store](docs/param.md) | `aws param` | ✅ numeric | ✅ tags | ✅ | ✅ | shared config/env/role |
+| [AWS Secrets Manager](docs/secret.md) | `aws secret` | ✅ UUID + staging labels | ✅ tags | ✅ | ✅ | shared config/env/role |
+| [Google Cloud Secret Manager](docs/gcloud.md) | `gcloud secret` | ✅ integer (`latest`) | ✅ labels | 🔜 [#247](https://github.com/mpyw/suve/issues/247) | 🔜 [#250](https://github.com/mpyw/suve/issues/250) | Application Default Credentials |
+| [Azure Key Vault](docs/azure.md) | `azure secret` | ✅ opaque id | ✅ tags | 🔜 [#247](https://github.com/mpyw/suve/issues/247) | 🔜 [#250](https://github.com/mpyw/suve/issues/250) | DefaultAzureCredential |
+| [Azure App Configuration](docs/azure.md) | `azure param` | ❌ unversioned | ❌ unsupported¹ | 🔜 [#247](https://github.com/mpyw/suve/issues/247) | 🔜 [#250](https://github.com/mpyw/suve/issues/250) | DefaultAzureCredential |
 
 Read/write operations (`show`, `log`, `diff`, `list`, `create`, `update`, `delete`, `tag`, `untag`) are available on every backend, with these caveats: `restore` is AWS Secrets Manager only; on Azure App Configuration `log` reports history unsupported and `tag`/`untag` return an unsupported error; version specifiers (`#VERSION`, `~SHIFT`, `:LABEL`) are rejected on App Configuration. Only AWS Secrets Manager has staging labels (`:AWSCURRENT` etc.).
 
 ¹ The `azappconfig` SDK cannot write setting tags without clearing them, so tag writes are refused.
+
+² The bundled GUI (`suve --gui`) is AWS-only today; multi-cloud GUI support is planned ([#250](https://github.com/mpyw/suve/issues/250)). The CLI supports all backends.
 
 ### Provider selection
 
