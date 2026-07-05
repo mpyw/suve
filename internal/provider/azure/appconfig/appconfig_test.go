@@ -24,6 +24,14 @@ func preconditionFailed() error {
 	return &azcore.ResponseError{StatusCode: http.StatusPreconditionFailed}
 }
 
+func conflict() error {
+	return &azcore.ResponseError{StatusCode: http.StatusConflict}
+}
+
+func serverError() error {
+	return &azcore.ResponseError{StatusCode: http.StatusInternalServerError}
+}
+
 // mockClient is a configurable in-test implementation of appconfig.Client.
 type mockClient struct {
 	getFunc    func(ctx context.Context, key string) (azappconfig.GetSettingResponse, error)
@@ -110,6 +118,40 @@ func TestGet_NotFound(t *testing.T) {
 	require.ErrorIs(t, err, provider.ErrNotFound)
 }
 
+func TestGet_NoTags(t *testing.T) {
+	t.Parallel()
+
+	m := &mockClient{
+		getFunc: func(_ context.Context, key string) (azappconfig.GetSettingResponse, error) {
+			return azappconfig.GetSettingResponse{Setting: azappconfig.Setting{
+				Key:   lo.ToPtr(key),
+				Value: lo.ToPtr("v"),
+			}}, nil
+		},
+	}
+	store := appconfig.New(m)
+
+	entry, err := store.Get(t.Context(), "app/timeout", provider.VersionRef{})
+	require.NoError(t, err)
+	assert.Nil(t, entry.Tags)
+}
+
+func TestGet_Error(t *testing.T) {
+	t.Parallel()
+
+	m := &mockClient{
+		getFunc: func(_ context.Context, _ string) (azappconfig.GetSettingResponse, error) {
+			return azappconfig.GetSettingResponse{}, serverError()
+		},
+	}
+	store := appconfig.New(m)
+
+	_, err := store.Get(t.Context(), "app/timeout", provider.VersionRef{})
+	require.Error(t, err)
+	require.NotErrorIs(t, err, provider.ErrNotFound)
+	assert.Contains(t, err.Error(), "get setting")
+}
+
 func TestHistory_Unsupported(t *testing.T) {
 	t.Parallel()
 
@@ -140,18 +182,58 @@ func TestList(t *testing.T) {
 	assert.Equal(t, []string{"alpha", "beta"}, names)
 }
 
-func TestCreate_AlreadyExists(t *testing.T) {
+func TestList_Error(t *testing.T) {
 	t.Parallel()
 
 	m := &mockClient{
-		addFunc: func(_ context.Context, _, _ string) (azappconfig.AddSettingResponse, error) {
-			return azappconfig.AddSettingResponse{}, preconditionFailed()
+		listFunc: func(_ context.Context) ([]azappconfig.Setting, error) {
+			return nil, serverError()
 		},
 	}
 	store := appconfig.New(m)
 
-	_, err := store.Create(t.Context(), "existing", "v", domain.ValueTypePlaintext, "")
-	require.ErrorIs(t, err, provider.ErrAlreadyExists)
+	_, err := store.List(t.Context())
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "list settings")
+}
+
+func TestCreate_AlreadyExists(t *testing.T) {
+	t.Parallel()
+
+	for name, errFn := range map[string]func() error{
+		"precondition_failed": preconditionFailed,
+		"conflict":            conflict,
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			m := &mockClient{
+				addFunc: func(_ context.Context, _, _ string) (azappconfig.AddSettingResponse, error) {
+					return azappconfig.AddSettingResponse{}, errFn()
+				},
+			}
+			store := appconfig.New(m)
+
+			_, err := store.Create(t.Context(), "existing", "v", domain.ValueTypePlaintext, "")
+			require.ErrorIs(t, err, provider.ErrAlreadyExists)
+		})
+	}
+}
+
+func TestCreate_Error(t *testing.T) {
+	t.Parallel()
+
+	m := &mockClient{
+		addFunc: func(_ context.Context, _, _ string) (azappconfig.AddSettingResponse, error) {
+			return azappconfig.AddSettingResponse{}, serverError()
+		},
+	}
+	store := appconfig.New(m)
+
+	_, err := store.Create(t.Context(), "new-key", "v", domain.ValueTypePlaintext, "")
+	require.Error(t, err)
+	require.NotErrorIs(t, err, provider.ErrAlreadyExists)
+	assert.Contains(t, err.Error(), "create setting")
 }
 
 func TestCreate_New(t *testing.T) {
@@ -197,6 +279,21 @@ func TestPut(t *testing.T) {
 	assert.Empty(t, version.ID)
 }
 
+func TestPut_Error(t *testing.T) {
+	t.Parallel()
+
+	m := &mockClient{
+		setFunc: func(_ context.Context, _, _ string) (azappconfig.SetSettingResponse, error) {
+			return azappconfig.SetSettingResponse{}, serverError()
+		},
+	}
+	store := appconfig.New(m)
+
+	_, err := store.Put(t.Context(), "app/timeout", "60", domain.ValueTypePlaintext, "")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "set setting")
+}
+
 func TestDelete(t *testing.T) {
 	t.Parallel()
 
@@ -213,6 +310,36 @@ func TestDelete(t *testing.T) {
 
 	require.NoError(t, store.Delete(t.Context(), "app/timeout"))
 	assert.Equal(t, "app/timeout", deleted)
+}
+
+func TestDelete_NotFound(t *testing.T) {
+	t.Parallel()
+
+	m := &mockClient{
+		deleteFunc: func(_ context.Context, _ string) (azappconfig.DeleteSettingResponse, error) {
+			return azappconfig.DeleteSettingResponse{}, notFound()
+		},
+	}
+	store := appconfig.New(m)
+
+	err := store.Delete(t.Context(), "missing")
+	require.ErrorIs(t, err, provider.ErrNotFound)
+}
+
+func TestDelete_Error(t *testing.T) {
+	t.Parallel()
+
+	m := &mockClient{
+		deleteFunc: func(_ context.Context, _ string) (azappconfig.DeleteSettingResponse, error) {
+			return azappconfig.DeleteSettingResponse{}, serverError()
+		},
+	}
+	store := appconfig.New(m)
+
+	err := store.Delete(t.Context(), "app/timeout")
+	require.Error(t, err)
+	require.NotErrorIs(t, err, provider.ErrNotFound)
+	assert.Contains(t, err.Error(), "delete setting")
 }
 
 func TestTagUntag_Unsupported(t *testing.T) {

@@ -39,3 +39,25 @@ func TestAppConfigStore_ConnectionStringError(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "connection string")
 }
+
+// TestKeyVaultStore_RequiresVaultName verifies a missing vault name is a clear
+// error mentioning --vault-name before any client construction.
+func TestKeyVaultStore_RequiresVaultName(t *testing.T) {
+	t.Parallel()
+
+	_, err := azure.Factory{}.Store(t.Context(), provider.Scope{}, provider.KindSecret)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "--vault-name")
+}
+
+// TestKeyVaultStore_EmulatorSeam exercises the Key Vault emulator seam: with the
+// endpoint env var set to a well-formed URL plus a vault name, Store returns a
+// non-nil store and no error. azsecrets.NewClient is lazy, so this does not hit
+// the network at construction time.
+func TestKeyVaultStore_EmulatorSeam(t *testing.T) {
+	t.Setenv(azure.KeyVaultEndpointEnvVar, "https://localhost:8443")
+
+	store, err := azure.Factory{}.Store(t.Context(), provider.Scope{VaultName: "suve-test"}, provider.KindSecret)
+	require.NoError(t, err)
+	assert.NotNil(t, store)
+}

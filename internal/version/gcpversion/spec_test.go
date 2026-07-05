@@ -122,6 +122,81 @@ func TestParse(t *testing.T) {
 			input:   "   ",
 			wantErr: true,
 		},
+
+		// Additional valid forms (integer versions, allowed name chars, shifts).
+		{
+			name:        "version zero accepted (positivity not enforced at parse time)",
+			input:       "my-secret#0",
+			wantName:    "my-secret",
+			wantVersion: lo.ToPtr(int64(0)),
+		},
+		{
+			name:     "name with @ allowed",
+			input:    "user@example.com",
+			wantName: "user@example.com",
+		},
+		{
+			name:      "name with @ and shift",
+			input:     "user@example.com~1",
+			wantName:  "user@example.com",
+			wantShift: 1,
+		},
+		{
+			name:        "name with slashes and version",
+			input:       "a/b/c#3",
+			wantName:    "a/b/c",
+			wantVersion: lo.ToPtr(int64(3)),
+		},
+		{
+			name:     "name with dots and mixed case",
+			input:    "MY-secret.v2",
+			wantName: "MY-secret.v2",
+		},
+		{
+			name:        "version with cumulative shifts",
+			input:       "my-secret#5~1~2",
+			wantName:    "my-secret",
+			wantVersion: lo.ToPtr(int64(5)),
+			wantShift:   3,
+		},
+		{
+			name:      "large cumulative shift",
+			input:     "my-secret~10~20",
+			wantName:  "my-secret",
+			wantShift: 30,
+		},
+		{
+			name:      "numeric shift zero is a no-op",
+			input:     "my-secret~0",
+			wantName:  "my-secret",
+			wantShift: 0,
+		},
+		{
+			name:     "tilde followed by minus is part of the name",
+			input:    "my-secret~-1",
+			wantName: "my-secret~-1",
+		},
+
+		// Additional rejected forms.
+		{
+			name:    "multiple absolute specifiers rejected",
+			input:   "my#3#4",
+			wantErr: true,
+		},
+		{
+			name:    "empty name (version at start)",
+			input:   "#3",
+			wantErr: true,
+		},
+		{
+			name:    "empty name (shift at start)",
+			input:   "~1",
+			wantErr: true,
+		},
+		// NOTE: version-overflow ("#99999999999999999999999999") and
+		// label-after-version ("#3:latest") are exercised by dedicated tests
+		// (TestParse_VersionOverflow, TestParse_LabelAfterVersionRejected) that
+		// assert the specific error, so they are omitted here.
 	}
 
 	for _, tt := range tests {
@@ -151,6 +226,27 @@ func TestParse_LabelErrorMessage(t *testing.T) {
 	require.ErrorIs(t, err, gcpversion.ErrLabelUnsupported)
 }
 
+// TestParse_LabelAfterVersionRejected exercises the ':' reject path reached
+// AFTER a valid '#' specifier: parseAbsolute advances past "#3" and then hits
+// ':', invoking the label parser's Apply (which returns ErrLabelUnsupported).
+func TestParse_LabelAfterVersionRejected(t *testing.T) {
+	t.Parallel()
+
+	_, err := gcpversion.Parse("my-secret#3:latest")
+	require.Error(t, err)
+	require.ErrorIs(t, err, gcpversion.ErrLabelUnsupported)
+}
+
+// TestParse_VersionOverflow exercises the strconv.ParseInt failure branch when
+// the integer version cannot fit in int64.
+func TestParse_VersionOverflow(t *testing.T) {
+	t.Parallel()
+
+	_, err := gcpversion.Parse("my-secret#99999999999999999999999999")
+	require.Error(t, err)
+	require.ErrorContains(t, err, "out of range")
+}
+
 func TestParseDiffArgs(t *testing.T) {
 	t.Parallel()
 
@@ -170,6 +266,47 @@ func TestParseDiffArgs(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, lo.ToPtr(int64(1)), spec1.Absolute.Version)
 		assert.Equal(t, lo.ToPtr(int64(2)), spec2.Absolute.Version)
+	})
+
+	t.Run("mixed format: full spec plus specifier-only", func(t *testing.T) {
+		t.Parallel()
+
+		spec1, spec2, err := gcpversion.ParseDiffArgs([]string{"my-secret#1", "#2"})
+		require.NoError(t, err)
+		assert.Equal(t, lo.ToPtr(int64(1)), spec1.Absolute.Version)
+		assert.Equal(t, lo.ToPtr(int64(2)), spec2.Absolute.Version)
+	})
+
+	t.Run("partial spec: name plus specifier-only is swapped", func(t *testing.T) {
+		t.Parallel()
+
+		spec1, spec2, err := gcpversion.ParseDiffArgs([]string{"my-secret", "#3"})
+		require.NoError(t, err)
+		assert.Equal(t, lo.ToPtr(int64(3)), spec1.Absolute.Version)
+		assert.Nil(t, spec2.Absolute.Version)
+	})
+
+	t.Run("three args: name plus two specifiers", func(t *testing.T) {
+		t.Parallel()
+
+		spec1, spec2, err := gcpversion.ParseDiffArgs([]string{"my-secret", "#1", "#2"})
+		require.NoError(t, err)
+		assert.Equal(t, lo.ToPtr(int64(1)), spec1.Absolute.Version)
+		assert.Equal(t, lo.ToPtr(int64(2)), spec2.Absolute.Version)
+	})
+
+	t.Run("no args rejected", func(t *testing.T) {
+		t.Parallel()
+
+		_, _, err := gcpversion.ParseDiffArgs([]string{})
+		require.Error(t, err)
+	})
+
+	t.Run("too many args rejected", func(t *testing.T) {
+		t.Parallel()
+
+		_, _, err := gcpversion.ParseDiffArgs([]string{"a", "b", "c", "d"})
+		require.Error(t, err)
 	})
 
 	t.Run("label rejected", func(t *testing.T) {
