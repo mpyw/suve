@@ -295,11 +295,21 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
 
-      - name: Set up toolchain (mise)
-        uses: jdx/mise-action@v4
+      # This job's webkit-4.0 matrix leg runs on Ubuntu 22.04 (the only runner
+      # that still ships libwebkit2gtk-4.0-dev), whose glibc 2.35 is too old for
+      # mise's prebuilt binary. Use the standard setup actions here; the tool
+      # versions are kept in sync with mise.toml.
+      - name: Set up Go
+        uses: actions/setup-go@v6
         with:
-          install_args: "go node nfpm"
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+          go-version-file: go.mod
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: internal/gui/frontend/package-lock.json
 
       - name: Install build dependencies
         run: |
@@ -325,6 +335,9 @@ jobs:
         run: |
           ./suve --help | grep -q '\-\-gui' && echo "GUI flag found" || { echo "ERROR: --gui flag missing!"; exit 1; }
           ./suve --version
+
+      - name: Install nfpm
+        run: go install github.com/goreleaser/nfpm/v2/cmd/nfpm@v2.41.1
 
       - name: Install lintian and rpmlint
         run: for i in {1..5}; do sudo apt-get install -y lintian rpm rpmlint && break || sleep $((i * 5)); done

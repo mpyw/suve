@@ -121,11 +121,13 @@ jobs:
           ref: ${{ inputs.version }}
           fetch-depth: 0
 
-      - name: Set up toolchain (mise)
-        uses: jdx/mise-action@v4
+      # Ubuntu 22.04 (the only runner with libwebkit2gtk-4.0-dev) ships glibc
+      # 2.35, too old for mise's prebuilt binary — use the standard setup-go
+      # here. Go version comes from go.mod; node is the runner's system node.
+      - name: Set up Go
+        uses: actions/setup-go@v6
         with:
-          install_args: "go node"
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+          go-version-file: go.mod
 
       - name: Install dependencies
         run: |
@@ -164,11 +166,13 @@ jobs:
           ref: ${{ inputs.version }}
           fetch-depth: 0
 
-      - name: Set up toolchain (mise)
-        uses: jdx/mise-action@v4
+      # Ubuntu 22.04 (the only runner with libwebkit2gtk-4.0-dev) ships glibc
+      # 2.35, too old for mise's prebuilt binary — use the standard setup-go
+      # here. Go version comes from go.mod; node is the runner's system node.
+      - name: Set up Go
+        uses: actions/setup-go@v6
         with:
-          install_args: "go node"
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+          go-version-file: go.mod
 
       - name: Install dependencies
         run: |
