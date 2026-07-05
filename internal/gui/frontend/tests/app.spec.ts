@@ -12,34 +12,34 @@ test.describe('App Navigation', () => {
   });
 
   test('should show sidebar with navigation items', async ({ page }) => {
-    await expect(page.getByRole('button', { name: /Parameters/i })).toBeVisible();
-    await expect(page.getByRole('button', { name: /Secrets/i })).toBeVisible();
-    await expect(page.getByRole('button', { name: /Staging/i })).toBeVisible();
+    await expect(page.locator('.nav').getByRole('button', { name: /Param/i })).toBeVisible();
+    await expect(page.locator('.nav').getByRole('button', { name: /Secret/i })).toBeVisible();
+    await expect(page.locator('.nav').getByRole('button', { name: /Staging/i })).toBeVisible();
   });
 
   test('should highlight active navigation item', async ({ page }) => {
     // Parameters should be active by default
-    const paramsBtn = page.getByRole('button', { name: /Parameters/i });
+    const paramsBtn = page.locator('.nav').getByRole('button', { name: /Param/i });
     await expect(paramsBtn).toHaveClass(/active/);
 
     // Click on Secrets and verify it becomes active
-    await page.getByRole('button', { name: /Secrets/i }).click();
-    await expect(page.getByRole('button', { name: /Secrets/i })).toHaveClass(/active/);
+    await page.locator('.nav').getByRole('button', { name: /Secret/i }).click();
+    await expect(page.locator('.nav').getByRole('button', { name: /Secret/i })).toHaveClass(/active/);
 
     // Click on Staging and verify it becomes active
-    await page.getByRole('button', { name: /Staging/i }).click();
-    await expect(page.getByRole('button', { name: /Staging/i })).toHaveClass(/active/);
+    await page.locator('.nav').getByRole('button', { name: /Staging/i }).click();
+    await expect(page.locator('.nav').getByRole('button', { name: /Staging/i })).toHaveClass(/active/);
   });
 
   test('should persist active view when refreshing data', async ({ page }) => {
     // Navigate to Secrets
-    await page.getByRole('button', { name: /Secrets/i }).click();
-    await expect(page.getByRole('button', { name: /Secrets/i })).toHaveClass(/active/);
+    await page.locator('.nav').getByRole('button', { name: /Secret/i }).click();
+    await expect(page.locator('.nav').getByRole('button', { name: /Secret/i })).toHaveClass(/active/);
 
     // Click refresh - view should stay on Secrets
     const refreshBtn = page.getByRole('button', { name: /Refresh/i });
     await refreshBtn.click();
-    await expect(page.getByRole('button', { name: /Secrets/i })).toHaveClass(/active/);
+    await expect(page.locator('.nav').getByRole('button', { name: /Secret/i })).toHaveClass(/active/);
   });
 });
 
@@ -67,7 +67,7 @@ test.describe('Secrets View Initial State', () => {
   test.beforeEach(async ({ page }) => {
     await setupWailsMocks(page);
     await page.goto('/');
-    await page.getByRole('button', { name: /Secrets/i }).click();
+    await page.locator('.nav').getByRole('button', { name: /Secret/i }).click();
   });
 
   test('should have a refresh button', async ({ page }) => {
@@ -110,7 +110,7 @@ test.describe('Empty State Handling', () => {
     };
     await setupWailsMocks(page, emptyState);
     await page.goto('/');
-    await page.getByRole('button', { name: /Secrets/i }).click();
+    await page.locator('.nav').getByRole('button', { name: /Secret/i }).click();
     await page.waitForSelector('.filter-bar');
 
     await expect(page.locator('.item-button')).toHaveCount(0);
@@ -212,8 +212,8 @@ test.describe('Error Recovery', () => {
     await expect(page.locator('.detail-panel')).not.toBeVisible();
 
     // Should be able to navigate to another view
-    await page.getByRole('button', { name: /Secrets/i }).click();
-    await expect(page.getByRole('button', { name: /Secrets/i })).toHaveClass(/active/);
+    await page.locator('.nav').getByRole('button', { name: /Secret/i }).click();
+    await expect(page.locator('.nav').getByRole('button', { name: /Secret/i })).toHaveClass(/active/);
   });
 
   test('should allow navigation after cancelling modal', async ({ page }) => {
@@ -230,7 +230,7 @@ test.describe('Error Recovery', () => {
     await expect(page.locator('.modal-backdrop')).not.toBeVisible();
 
     // Should be able to navigate
-    await page.getByRole('button', { name: /Staging/i }).click();
-    await expect(page.getByRole('button', { name: /Staging/i })).toHaveClass(/active/);
+    await page.locator('.nav').getByRole('button', { name: /Staging/i }).click();
+    await expect(page.locator('.nav').getByRole('button', { name: /Staging/i })).toHaveClass(/active/);
   });
 });

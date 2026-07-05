@@ -1,17 +1,85 @@
 <script lang="ts">
+  import type { gui } from '../../wailsjs/go/models';
+
+  type ViewKey = 'param' | 'secret' | 'staging';
+
   interface Props {
-    activeView?: 'param' | 'secret' | 'staging';
+    capabilities?: gui.ProviderCapability[];
+    provider?: string;
+    services?: gui.ServiceCapability[];
+    hasAnyStaging?: boolean;
+    scope?: gui.ScopeSelection | null;
+    scopeReady?: boolean;
+    activeView?: ViewKey;
     stagingCount?: number;
     accountId?: string;
     region?: string;
     profile?: string;
-    onnavigate?: (view: 'param' | 'secret' | 'staging') => void;
+    onnavigate?: (view: ViewKey) => void;
+    onselectprovider?: (provider: string) => void;
+    onselectscope?: (sel: gui.ScopeSelection) => void;
   }
 
-  let { activeView = 'param', stagingCount = 0, accountId = '', region = '', profile = '', onnavigate }: Props = $props();
+  let {
+    capabilities = [],
+    provider = '',
+    services = [],
+    hasAnyStaging = false,
+    scope = null,
+    scopeReady = false,
+    activeView = 'param',
+    stagingCount = 0,
+    accountId = '',
+    region = '',
+    profile = '',
+    onnavigate,
+    onselectprovider,
+    onselectscope,
+  }: Props = $props();
 
-  function navigate(view: 'param' | 'secret' | 'staging') {
+  // Service key → stable nav icon/letter (labels come from capability names).
+  const NAV_ICON: Record<string, string> = { param: 'P', secret: 'S' };
+
+  // Google Cloud project form state (prefilled from the backend's current scope).
+  let projectInput = $state('');
+  $effect(() => {
+    // Re-seed the project field whenever the provider or prefilled scope changes.
+    projectInput = provider === 'googlecloud' ? (scope?.projectId ?? '') : '';
+  });
+
+  // Move keyboard focus to the active tab after a provider switch, so a clamped
+  // view (e.g. Google Cloud dropping the Param tab) doesn't strand focus on a gone tab.
+  let navEl: HTMLElement | undefined = $state();
+  let lastProvider = '';
+  $effect(() => {
+    if (provider !== lastProvider && scopeReady && navEl) {
+      lastProvider = provider;
+      const active = navEl.querySelector<HTMLButtonElement>('.nav-item.active');
+      active?.focus();
+    }
+  });
+
+  function navigate(view: ViewKey) {
     onnavigate?.(view);
+  }
+
+  function handleProviderChange(e: Event) {
+    const value = (e.currentTarget as HTMLSelectElement).value;
+    onselectprovider?.(value);
+  }
+
+  function submitProject(e: SubmitEvent) {
+    e.preventDefault();
+    const projectId = projectInput.trim();
+    if (!projectId) return;
+    onselectscope?.({
+      provider: 'googlecloud',
+      projectId,
+      subscriptionId: '',
+      resourceGroup: '',
+      vaultName: '',
+      storeName: '',
+    } as gui.ScopeSelection);
   }
 </script>
 
@@ -21,54 +89,119 @@
     <span class="logo-sub">Secret Unified Versioning Explorer</span>
   </div>
 
-  <nav class="nav">
-    <button
-      class="nav-item"
-      class:active={activeView === 'param'}
-      onclick={() => navigate('param')}
-    >
-      <span class="nav-icon">P</span>
-      <span class="nav-label">Parameters</span>
-    </button>
-
-    <button
-      class="nav-item"
-      class:active={activeView === 'secret'}
-      onclick={() => navigate('secret')}
-    >
-      <span class="nav-icon">S</span>
-      <span class="nav-label">Secrets</span>
-    </button>
-
-    <button
-      class="nav-item"
-      class:active={activeView === 'staging'}
-      onclick={() => navigate('staging')}
-    >
-      <span class="nav-icon">*</span>
-      <span class="nav-label">Staging</span>
-      {#if stagingCount > 0}
-        <span class="staging-count">{stagingCount}</span>
+  <!-- Provider selector -->
+  <div class="provider-select">
+    <label class="provider-label" for="provider-select">Provider</label>
+    <select id="provider-select" class="provider-dropdown" value={provider} onchange={handleProviderChange}>
+      {#if !provider}
+        <option value="" disabled selected>Select provider…</option>
       {/if}
-    </button>
-  </nav>
+      {#each capabilities as cap}
+        <option value={cap.provider} disabled={cap.provider === 'azure'}>
+          {cap.displayName}{cap.provider === 'azure' ? ' (coming soon)' : ''}
+        </option>
+      {/each}
+    </select>
+  </div>
 
-  {#if accountId && region}
+  <!-- Scope form: only shown when the selected provider still needs input -->
+  {#if provider === 'googlecloud' && !scopeReady}
+    <form class="scope-form" onsubmit={submitProject}>
+      <label class="scope-label" for="gcloud-project">Project ID</label>
+      <input
+        id="gcloud-project"
+        class="scope-input"
+        type="text"
+        placeholder="my-project"
+        bind:value={projectInput}
+      />
+      <button type="submit" class="scope-submit" disabled={!projectInput.trim()}>Connect</button>
+    </form>
+  {:else if provider === 'azure' && !scopeReady}
+    <div class="scope-hint">Azure scope setup ships next.</div>
+  {/if}
+
+  <!-- Navigation tabs: capability-driven, only once a scope is active -->
+  {#if scopeReady}
+    <nav class="nav" bind:this={navEl}>
+      {#each services as svc}
+        <button
+          class="nav-item"
+          class:active={activeView === svc.service}
+          onclick={() => navigate(svc.service as ViewKey)}
+        >
+          <span class="nav-icon">{NAV_ICON[svc.service] ?? svc.displayName.charAt(0)}</span>
+          <span class="nav-label" title={svc.displayName}>{svc.displayName}</span>
+        </button>
+      {/each}
+
+      {#if hasAnyStaging}
+        <button
+          class="nav-item"
+          class:active={activeView === 'staging'}
+          onclick={() => navigate('staging')}
+        >
+          <span class="nav-icon">*</span>
+          <span class="nav-label">Staging</span>
+          {#if stagingCount > 0}
+            <span class="staging-count">{stagingCount}</span>
+          {/if}
+        </button>
+      {/if}
+    </nav>
+  {/if}
+
+  <!-- Identity / scope info -->
+  {#if scopeReady && provider === 'aws' && accountId && region}
     <div class="aws-info">
       {#if profile}
         <div class="aws-info-row">
           <span class="aws-info-label">Profile</span>
-          <span class="aws-info-value aws-info-profile">{profile}</span>
+          <span class="aws-info-value aws-info-profile" title={profile}>{profile}</span>
         </div>
       {/if}
       <div class="aws-info-row">
         <span class="aws-info-label">Account</span>
-        <span class="aws-info-value">{accountId}</span>
+        <span class="aws-info-value" title={accountId}>{accountId}</span>
       </div>
       <div class="aws-info-row">
         <span class="aws-info-label">Region</span>
-        <span class="aws-info-value">{region}</span>
+        <span class="aws-info-value" title={region}>{region}</span>
       </div>
+    </div>
+  {:else if scopeReady && provider === 'googlecloud' && scope?.projectId}
+    <div class="aws-info scope-info">
+      <div class="aws-info-row">
+        <span class="aws-info-label">Project</span>
+        <span class="aws-info-value" title={scope.projectId}>{scope.projectId}</span>
+      </div>
+    </div>
+  {:else if scopeReady && provider === 'azure'}
+    <div class="aws-info scope-info">
+      {#if scope?.subscriptionId}
+        <div class="aws-info-row">
+          <span class="aws-info-label">Subscription</span>
+          <span class="aws-info-value" title={scope.subscriptionId}>{scope.subscriptionId}</span>
+        </div>
+      {/if}
+      {#if scope?.resourceGroup}
+        <div class="aws-info-row">
+          <span class="aws-info-label">Resource Group</span>
+          <span class="aws-info-value" title={scope.resourceGroup}>{scope.resourceGroup}</span>
+        </div>
+      {/if}
+      {#if scope?.vaultName}
+        <div class="aws-info-row">
+          <span class="aws-info-label">Key Vault</span>
+          <span class="aws-info-value" title={scope.vaultName}>{scope.vaultName}</span>
+        </div>
+      {/if}
+      {#if scope?.storeName}
+        <div class="aws-info-row">
+          <span class="aws-info-label">App Config</span>
+          <span class="aws-info-value" title={scope.storeName}>{scope.storeName}</span>
+        </div>
+      {/if}
     </div>
   {/if}
 </aside>
@@ -100,6 +233,77 @@
     color: #666;
     display: block;
     margin-top: 2px;
+  }
+
+  .provider-select {
+    padding: 12px 16px 4px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .provider-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #666;
+  }
+
+  .provider-dropdown {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 6px 8px;
+    background: #252542;
+    color: #fff;
+    border: 1px solid #2d2d44;
+    border-radius: 6px;
+    font-size: 13px;
+  }
+
+  .scope-form {
+    padding: 8px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .scope-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #666;
+  }
+
+  .scope-input {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 6px 8px;
+    background: #252542;
+    color: #fff;
+    border: 1px solid #2d2d44;
+    border-radius: 6px;
+    font-size: 13px;
+  }
+
+  .scope-submit {
+    padding: 6px 8px;
+    background: #e94560;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    font-size: 13px;
+    cursor: pointer;
+  }
+
+  .scope-submit:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .scope-hint {
+    padding: 8px 16px;
+    font-size: 11px;
+    color: #888;
   }
 
   .nav {
@@ -137,6 +341,7 @@
   .nav-icon {
     width: 24px;
     height: 24px;
+    flex-shrink: 0;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -148,11 +353,16 @@
 
   .nav-label {
     flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .staging-count {
     min-width: 18px;
     height: 18px;
+    flex-shrink: 0;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -180,17 +390,23 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
+    gap: 8px;
     padding: 4px 0;
   }
 
   .aws-info-label {
     color: #666;
+    flex-shrink: 0;
   }
 
   .aws-info-value {
     color: #a0a0a0;
     font-family: monospace;
     font-size: 10px;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .aws-info-profile {

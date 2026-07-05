@@ -87,7 +87,7 @@ test.describe('E2E - Secret CRUD Workflow', () => {
   test.beforeEach(async ({ page }) => {
     await setupWailsMocks(page);
     await page.goto('/');
-    await navigateTo(page, 'Secrets');
+    await navigateTo(page, 'Secret');
     await waitForItemList(page);
   });
 
@@ -246,11 +246,11 @@ test.describe('Cross-Service Operations', () => {
     await waitForItemList(page);
 
     // Navigate to Secrets
-    await navigateTo(page, 'Secrets');
+    await navigateTo(page, 'Secret');
     await waitForItemList(page);
 
     // Navigate back to Parameters
-    await navigateTo(page, 'Parameters');
+    await navigateTo(page, 'Param');
     await waitForItemList(page);
 
     // Should still show item list

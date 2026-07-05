@@ -588,6 +588,123 @@ export function createNoAWSIdentityState(): Partial<MockState> {
   };
 }
 
+// ---- Provider-selection states (multi-cloud) ------------------------------
+
+function emptyScope(provider: string): ScopeSelection {
+  return { provider, projectId: '', subscriptionId: '', resourceGroup: '', vaultName: '', storeName: '' };
+}
+
+/**
+ * Launched into Google Cloud (as `suve googlecloud --gui` would), project
+ * prefilled — so the app resolves a ready scope without a prompt.
+ */
+export function createGoogleCloudState(overrides: Partial<MockState> = {}): Partial<MockState> {
+  return {
+    initialProvider: 'googlecloud',
+    currentScope: { ...emptyScope('googlecloud'), projectId: 'my-project' },
+    detectResult: {
+      param: '',
+      secret: 'googlecloud',
+      stage: '',
+      paramActive: [],
+      secretActive: ['googlecloud'],
+      stageActive: [],
+    },
+    // Google Cloud secret versions are integers and carry no ARN/staging labels.
+    secrets: [
+      { name: 'gcloud-secret-1', value: 'v1', arn: '', versionStage: [] },
+      { name: 'gcloud-secret-2', value: 'v2', arn: '', versionStage: [] },
+    ],
+    secretVersions: {
+      'gcloud-secret-1': [
+        { versionId: '2', stages: [], value: 'v2', isCurrent: true, created: new Date().toISOString() },
+        { versionId: '1', stages: [], value: 'v1', isCurrent: false, created: new Date(Date.now() - 86400000).toISOString() },
+      ],
+    },
+    ...overrides,
+  };
+}
+
+/**
+ * Launched into Azure with vault + store present (as env/CLI would supply),
+ * so both Key Vault (secret) and App Configuration (param) mount. The selector
+ * option stays disabled ("greyed") until #267 adds the scope form.
+ */
+export function createAzureState(overrides: Partial<MockState> = {}): Partial<MockState> {
+  return {
+    initialProvider: 'azure',
+    currentScope: {
+      ...emptyScope('azure'),
+      subscriptionId: '00000000-0000-0000-0000-000000000000',
+      resourceGroup: 'rg',
+      vaultName: 'my-vault',
+      storeName: 'my-store',
+    },
+    detectResult: {
+      param: 'azure',
+      secret: 'azure',
+      stage: '',
+      paramActive: ['azure'],
+      secretActive: ['azure'],
+      stageActive: [],
+    },
+    // App Configuration values are untyped/unversioned; Key Vault has no ARN.
+    params: [{ name: 'app/config/key', type: 'String', value: 'v' }],
+    secrets: [{ name: 'kv-secret', value: 'v', arn: '', versionStage: [] }],
+    // Key Vault versions are opaque hex ids with no AWS staging labels.
+    secretVersions: {
+      'kv-secret': [
+        { versionId: 'a1b2c3d4e5f6', stages: [], value: 'v', isCurrent: true, created: new Date().toISOString() },
+      ],
+    },
+    ...overrides,
+  };
+}
+
+/**
+ * No explicit initial provider and two providers active → the app must show a
+ * selector prompt and preselect nothing.
+ */
+export function createAmbiguousProviderState(): Partial<MockState> {
+  return {
+    initialProvider: '',
+    currentScope: emptyScope(''),
+    detectResult: {
+      param: '',
+      secret: '',
+      stage: '',
+      paramActive: ['aws'],
+      secretActive: ['googlecloud'],
+      stageActive: [],
+    },
+  };
+}
+
+/**
+ * No explicit initial provider and nothing active → selector prompt, no crash.
+ */
+export function createNoActiveProviderState(): Partial<MockState> {
+  return {
+    initialProvider: '',
+    currentScope: emptyScope(''),
+    detectResult: {
+      param: '',
+      secret: '',
+      stage: '',
+      paramActive: [],
+      secretActive: [],
+      stageActive: [],
+    },
+  };
+}
+
+/**
+ * Read the binding invocations recorded by the mock (see __wailsCalls).
+ */
+export async function getRecordedCalls(page: Page): Promise<string[]> {
+  return page.evaluate(() => ((window as any).__wailsCalls as string[]) ?? []);
+}
+
 // ============================================================================
 // Main Mock Setup Function
 // ============================================================================
@@ -598,6 +715,11 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
   await page.addInitScript((mockState: MockState) => {
     // Track state changes during test
     const state = JSON.parse(JSON.stringify(mockState));
+
+    // Records binding invocations so specs can assert e.g. that no
+    // GetAWSIdentity / StagingStatus fires under a non-AWS scope (mount gating).
+    const calls: string[] = [];
+    (window as any).__wailsCalls = calls;
 
     const mockApp = {
       // Provider selection / capabilities (multi-cloud)
@@ -636,6 +758,7 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
 
       // AWS Identity
       GetAWSIdentity: async () => {
+        calls.push('GetAWSIdentity');
         if (state.simulateError?.operation === 'GetAWSIdentity') {
           throw new Error(state.simulateError.message);
         }
@@ -902,12 +1025,15 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
       },
 
       // Staging operations
-      StagingStatus: async () => ({
-        param: state.stagedParam,
-        secret: state.stagedSecret,
-        paramTags: state.stagedParamTags,
-        secretTags: state.stagedSecretTags,
-      }),
+      StagingStatus: async () => {
+        calls.push('StagingStatus');
+        return {
+          param: state.stagedParam,
+          secret: state.stagedSecret,
+          paramTags: state.stagedParamTags,
+          secretTags: state.stagedSecretTags,
+        };
+      },
       StagingDiff: async (service: string, _passphrase?: string) => {
         const staged = service === 'param' ? state.stagedParam : state.stagedSecret;
         const tagStaged = service === 'param' ? state.stagedParamTags : state.stagedSecretTags;
@@ -1210,7 +1336,9 @@ export type NavLabel =
   | 'App Configuration';
 
 export async function navigateTo(page: Page, view: NavLabel) {
-  await page.getByRole('button', { name: new RegExp(view, 'i') }).click();
+  // Scope to the sidebar nav so a short capability label (e.g. "Secret") does
+  // not collide with item names that contain the same word (e.g. "my-secret").
+  await page.locator('.nav').getByRole('button', { name: new RegExp(view, 'i') }).click();
 }
 
 /**

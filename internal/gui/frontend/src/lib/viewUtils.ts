@@ -46,15 +46,35 @@ export function getOperationColor(operation: string): string {
 }
 
 /**
+ * A debounced runner. Call it with a callback to (re)arm the timer; call
+ * `.cancel()` to drop any pending callback — required on component unmount so a
+ * pending filter debounce cannot fire a stray call against a newly-selected
+ * provider after a `{#key}` remount.
+ */
+export interface Debouncer {
+  (callback: () => void): void;
+  cancel: () => void;
+}
+
+/**
  * Create a debounced function
  */
-export function createDebouncer(delayMs: number = 300) {
+export function createDebouncer(delayMs: number = 300): Debouncer {
   let timer: ReturnType<typeof setTimeout> | null = null;
 
-  return (callback: () => void) => {
+  const run = ((callback: () => void) => {
     if (timer) clearTimeout(timer);
     timer = setTimeout(callback, delayMs);
+  }) as Debouncer;
+
+  run.cancel = () => {
+    if (timer) {
+      clearTimeout(timer);
+      timer = null;
+    }
   };
+
+  return run;
 }
 
 /**

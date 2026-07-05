@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onDestroy, onMount } from 'svelte';
   import { ParamAddTag, ParamDelete, ParamDiff, ParamList, ParamLog, ParamRemoveTag, ParamSet, ParamShow, ParamTypeOptions, StagingAdd, StagingAddTag, StagingCheckStatus, StagingDelete, StagingEdit, StagingRemoveTag } from '../../wailsjs/go/gui/App';
   import type { gui } from '../../wailsjs/go/models';
   import DiffDisplay from './DiffDisplay.svelte';
@@ -7,7 +7,6 @@
   import EyeIcon from './icons/EyeIcon.svelte';
   import EyeOffIcon from './icons/EyeOffIcon.svelte';
   import Modal from './Modal.svelte';
-  import { withRetry } from './retry';
   import StagingBanner from './StagingBanner.svelte';
   import TagList from './TagList.svelte';
   import { createDiffMode } from './useDiffMode.svelte';
@@ -15,15 +14,26 @@
   import './common.css';
 
   interface Props {
+    capability?: gui.ServiceCapability;
     onnavigatetostaging?: () => void;
     onstagingchange?: () => void;
   }
 
-  let { onnavigatetostaging, onstagingchange }: Props = $props();
+  let { capability, onnavigatetostaging, onstagingchange }: Props = $props();
+
+  // Capability-driven visibility. Absent capability defaults to AWS-like (true)
+  // so the component degrades safely if mounted without one.
+  const stagingEnabled = $derived(capability?.hasStaging ?? true);
+  const tagsEnabled = $derived(capability?.hasTags ?? true);
+  const historyEnabled = $derived(capability?.hasVersionHistory ?? true);
 
   const PAGE_SIZE = 50;
   const debounce = createDebouncer(300);
   const diffMode = createDiffMode<number>();
+
+  // A pending filter debounce must not fire a stray List after a {#key} remount
+  // into a different provider.
+  onDestroy(() => debounce.cancel());
 
   let prefix = $state('');
   let filter = $state('');
@@ -57,6 +67,10 @@
   let modalLoading = $state(false);
   let modalError = $state('');
   let immediateMode = $state(false);
+  // When staging is unavailable, every write is immediate (no staging toggle).
+  const immediate = $derived(immediateMode || !stagingEnabled);
+  // The Type dropdown is scope-aware: empty options (Azure App Config) hide it.
+  const typeEnabled = $derived(paramTypeOptions.length > 0);
 
   // Diff state
   let diffResult: gui.ParamDiffResult | null = $state(null);
@@ -166,18 +180,24 @@
     showValue = withValue;
     stagingStatus = null;
     try {
-      const [detail, log, staging] = await Promise.all([
-        ParamShow(name),
-        ParamLog(name, 10),
-        withRetry(() => StagingCheckStatus('param', name))
-      ]);
+      const [detail, log] = await Promise.all([ParamShow(name), ParamLog(name, 10)]);
       paramDetail = detail;
       paramLog = log?.entries || [];
-      stagingStatus = staging;
     } catch (e) {
       error = parseError(e);
     } finally {
       detailLoading = false;
+    }
+
+    // Staging status is decoupled from the detail fetch: only for
+    // staging-capable providers, and a failure just means no banner — it must
+    // never break the detail pane.
+    if (stagingEnabled) {
+      try {
+        stagingStatus = await StagingCheckStatus('param', name);
+      } catch {
+        stagingStatus = null;
+      }
     }
   }
 
@@ -216,7 +236,7 @@
     modalError = '';
     try {
       const isEdit = paramDetail && selectedParam === setForm.name;
-      if (immediateMode) {
+      if (immediate) {
         await ParamSet(setForm.name, setForm.value, setForm.type);
         await loadParams({ prefix, filter, recursive, withValue });
         if (isEdit) {
@@ -253,7 +273,7 @@
     modalLoading = true;
     modalError = '';
     try {
-      if (immediateMode) {
+      if (immediate) {
         await ParamDelete(deleteTarget);
         if (selectedParam === deleteTarget) {
           closeDetail();
@@ -312,7 +332,7 @@
     tagLoading = true;
     tagError = '';
     try {
-      if (immediateMode) {
+      if (immediate) {
         await ParamAddTag(selectedParam, tagForm.key, tagForm.value);
       } else {
         await StagingAddTag('param', selectedParam, tagForm.key, tagForm.value);
@@ -338,7 +358,7 @@
     removeTagLoading = true;
     removeTagError = '';
     try {
-      if (immediateMode) {
+      if (immediate) {
         await ParamRemoveTag(selectedParam, removeTagTarget);
       } else {
         await StagingRemoveTag('param', selectedParam, removeTagTarget);
@@ -437,7 +457,7 @@
           <div class="detail-actions">
             <button class="btn-action-sm" onclick={() => selectedParam && openSetModal(selectedParam)}>Edit</button>
             <button class="btn-action-sm btn-danger" onclick={() => selectedParam && openDeleteModal(selectedParam)}>Delete</button>
-            {#if paramLog.length >= 2}
+            {#if historyEnabled && paramLog.length >= 2}
               <button class="btn-action-sm" class:active={diffMode.active} onclick={diffMode.toggle}>
                 {diffMode.active ? 'Cancel' : 'Compare'}
               </button>
@@ -448,7 +468,9 @@
           </div>
         </div>
 
-        <StagingBanner {stagingStatus} onnavigate={onnavigatetostaging} />
+        {#if stagingEnabled}
+          <StagingBanner {stagingStatus} onnavigate={onnavigatetostaging} />
+        {/if}
 
         {#if detailLoading}
           <div class="loading">Loading...</div>
@@ -478,14 +500,18 @@
             </div>
 
             <div class="detail-meta">
-              <div class="meta-item">
-                <span class="meta-label">Version</span>
-                <span class="meta-value">{paramDetail.version}</span>
-              </div>
-              <div class="meta-item">
-                <span class="meta-label">Type</span>
-                <span class="meta-value">{paramDetail.type}</span>
-              </div>
+              {#if historyEnabled}
+                <div class="meta-item">
+                  <span class="meta-label">Version</span>
+                  <span class="meta-value">{paramDetail.version}</span>
+                </div>
+              {/if}
+              {#if typeEnabled}
+                <div class="meta-item">
+                  <span class="meta-label">Type</span>
+                  <span class="meta-value">{paramDetail.type}</span>
+                </div>
+              {/if}
               <div class="meta-item">
                 <span class="meta-label">Last Modified</span>
                 <span class="meta-value">{formatDate(paramDetail.lastModified)}</span>
@@ -499,9 +525,11 @@
               </div>
             {/if}
 
-            <TagList tags={paramDetail.tags} serviceClass="param" onadd={openTagModal} onremove={openRemoveTagModal} />
+            {#if tagsEnabled}
+              <TagList tags={paramDetail.tags} serviceClass="param" onadd={openTagModal} onremove={openRemoveTagModal} />
+            {/if}
 
-            {#if paramLog.length > 0}
+            {#if historyEnabled && paramLog.length > 0}
               <div class="detail-section">
                 <div class="section-header">
                   <h4>Version History</h4>
@@ -571,14 +599,16 @@
         disabled={!!paramDetail && selectedParam === setForm.name}
       />
     </div>
-    <div class="form-group">
-      <label for="param-type">Type</label>
-      <select id="param-type" class="form-input" bind:value={setForm.type}>
-        {#each paramTypeOptions as typeOption}
-          <option value={typeOption}>{typeOption}</option>
-        {/each}
-      </select>
-    </div>
+    {#if typeEnabled}
+      <div class="form-group">
+        <label for="param-type">Type</label>
+        <select id="param-type" class="form-input" bind:value={setForm.type}>
+          {#each paramTypeOptions as typeOption}
+            <option value={typeOption}>{typeOption}</option>
+          {/each}
+        </select>
+      </div>
+    {/if}
     <div class="form-group">
       <label for="param-value">Value</label>
       <textarea
@@ -589,14 +619,16 @@
         rows="5"
       ></textarea>
     </div>
-    <label class="checkbox-label immediate-checkbox">
-      <input type="checkbox" bind:checked={immediateMode} />
-      <span>Apply immediately (skip staging)</span>
-    </label>
+    {#if stagingEnabled}
+      <label class="checkbox-label immediate-checkbox">
+        <input type="checkbox" bind:checked={immediateMode} />
+        <span>Apply immediately (skip staging)</span>
+      </label>
+    {/if}
     <div class="form-actions">
       <button type="button" class="btn-secondary" onclick={() => showSetModal = false}>Cancel</button>
       <button type="submit" class="btn-primary" disabled={modalLoading}>
-        {modalLoading ? (immediateMode ? 'Saving...' : 'Staging...') : (immediateMode ? 'Save' : 'Stage')}
+        {modalLoading ? (immediate ? 'Saving...' : 'Staging...') : (immediate ? 'Save' : 'Stage')}
       </button>
     </div>
   </form>
@@ -610,15 +642,17 @@
     {/if}
     <p>Are you sure you want to delete this parameter?</p>
     <code class="delete-target param">{deleteTarget}</code>
-    <p class="warning">{immediateMode ? 'This action cannot be undone.' : 'This will stage a delete operation.'}</p>
-    <label class="checkbox-label immediate-checkbox">
-      <input type="checkbox" bind:checked={immediateMode} />
-      <span>Apply immediately (skip staging)</span>
-    </label>
+    <p class="warning">{immediate ? 'This action cannot be undone.' : 'This will stage a delete operation.'}</p>
+    {#if stagingEnabled}
+      <label class="checkbox-label immediate-checkbox">
+        <input type="checkbox" bind:checked={immediateMode} />
+        <span>Apply immediately (skip staging)</span>
+      </label>
+    {/if}
     <div class="form-actions">
       <button type="button" class="btn-secondary" onclick={() => showDeleteModal = false}>Cancel</button>
       <button type="button" class="btn-danger" onclick={handleDelete} disabled={modalLoading}>
-        {modalLoading ? (immediateMode ? 'Deleting...' : 'Staging...') : (immediateMode ? 'Delete' : 'Stage Delete')}
+        {modalLoading ? (immediate ? 'Deleting...' : 'Staging...') : (immediate ? 'Delete' : 'Stage Delete')}
       </button>
     </div>
   </div>
@@ -632,15 +666,17 @@
     {/if}
     <p>Are you sure you want to remove this tag?</p>
     <code class="delete-target param">{removeTagTarget}</code>
-    <p class="warning">{immediateMode ? 'This action will take effect immediately.' : 'This will stage a tag removal operation.'}</p>
-    <label class="checkbox-label immediate-checkbox">
-      <input type="checkbox" bind:checked={immediateMode} />
-      <span>Apply immediately (skip staging)</span>
-    </label>
+    <p class="warning">{immediate ? 'This action will take effect immediately.' : 'This will stage a tag removal operation.'}</p>
+    {#if stagingEnabled}
+      <label class="checkbox-label immediate-checkbox">
+        <input type="checkbox" bind:checked={immediateMode} />
+        <span>Apply immediately (skip staging)</span>
+      </label>
+    {/if}
     <div class="form-actions">
       <button type="button" class="btn-secondary" onclick={() => showRemoveTagModal = false}>Cancel</button>
       <button type="button" class="btn-danger" onclick={handleRemoveTag} disabled={removeTagLoading}>
-        {removeTagLoading ? (immediateMode ? 'Removing...' : 'Staging...') : (immediateMode ? 'Remove' : 'Stage Remove')}
+        {removeTagLoading ? (immediate ? 'Removing...' : 'Staging...') : (immediate ? 'Remove' : 'Stage Remove')}
       </button>
     </div>
   </div>
@@ -689,14 +725,16 @@
         placeholder="tag-value"
       />
     </div>
-    <label class="checkbox-label immediate-checkbox">
-      <input type="checkbox" bind:checked={immediateMode} />
-      <span>Apply immediately (skip staging)</span>
-    </label>
+    {#if stagingEnabled}
+      <label class="checkbox-label immediate-checkbox">
+        <input type="checkbox" bind:checked={immediateMode} />
+        <span>Apply immediately (skip staging)</span>
+      </label>
+    {/if}
     <div class="form-actions">
       <button type="button" class="btn-secondary" onclick={() => showTagModal = false}>Cancel</button>
       <button type="submit" class="btn-primary" disabled={tagLoading}>
-        {tagLoading ? (immediateMode ? 'Adding...' : 'Staging...') : (immediateMode ? 'Add Tag' : 'Stage Tag')}
+        {tagLoading ? (immediate ? 'Adding...' : 'Staging...') : (immediate ? 'Add Tag' : 'Stage Tag')}
       </button>
     </div>
   </form>
