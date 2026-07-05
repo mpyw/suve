@@ -132,7 +132,7 @@ test.describe('Staging from Secret View', () => {
   test.beforeEach(async ({ page }) => {
     await setupWailsMocks(page);
     await page.goto('/');
-    await navigateTo(page, 'Secrets');
+    await navigateTo(page, 'Secret');
     await waitForItemList(page);
   });
 
@@ -503,7 +503,7 @@ test.describe('Navigation and State', () => {
     await expect(page.locator('.modal-backdrop')).not.toBeVisible();
 
     // Navigate to Secrets
-    await navigateTo(page, 'Secrets');
+    await navigateTo(page, 'Secret');
     await waitForItemList(page);
 
     // Navigate to Staging - changes should still be there
@@ -525,7 +525,7 @@ test.describe('Navigation and State', () => {
     await page.waitForFunction(() => document.querySelector('.entry-item') !== null);
 
     // Go to parameters
-    await navigateTo(page, 'Parameters');
+    await navigateTo(page, 'Param');
     await waitForItemList(page);
 
     // Go back to staging

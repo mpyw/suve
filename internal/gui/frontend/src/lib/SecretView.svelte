@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onDestroy, onMount } from 'svelte';
   import { SecretAddTag, SecretCreate, SecretDelete, SecretDiff, SecretList, SecretLog, SecretRemoveTag, SecretRestore, SecretShow, SecretUpdate, StagingAdd, StagingAddTag, StagingCheckStatus, StagingDelete, StagingEdit, StagingRemoveTag } from '../../wailsjs/go/gui/App';
   import type { gui } from '../../wailsjs/go/models';
   import DiffDisplay from './DiffDisplay.svelte';
@@ -7,7 +7,6 @@
   import EyeIcon from './icons/EyeIcon.svelte';
   import EyeOffIcon from './icons/EyeOffIcon.svelte';
   import Modal from './Modal.svelte';
-  import { withRetry } from './retry';
   import StagingBanner from './StagingBanner.svelte';
   import TagList from './TagList.svelte';
   import { createDiffMode } from './useDiffMode.svelte';
@@ -15,15 +14,28 @@
   import './common.css';
 
   interface Props {
+    capability?: gui.ServiceCapability;
     onnavigatetostaging?: () => void;
     onstagingchange?: () => void;
   }
 
-  let { onnavigatetostaging, onstagingchange }: Props = $props();
+  let { capability, onnavigatetostaging, onstagingchange }: Props = $props();
+
+  // Capability-driven visibility. Absent capability defaults to AWS-like (true).
+  const stagingEnabled = $derived(capability?.hasStaging ?? true);
+  const tagsEnabled = $derived(capability?.hasTags ?? true);
+  const historyEnabled = $derived(capability?.hasVersionHistory ?? true);
+  const restoreEnabled = $derived(capability?.hasRestore ?? true);
+  const forceDeleteEnabled = $derived(capability?.hasForceDelete ?? true);
+  const recoveryWindowEnabled = $derived(capability?.hasRecoveryWindow ?? true);
 
   const PAGE_SIZE = 50;
   const debounce = createDebouncer(300);
   const diffMode = createDiffMode<string>();
+
+  // Cancel a pending filter debounce on unmount so it can't fire against a new
+  // provider after a {#key} remount.
+  onDestroy(() => debounce.cancel());
 
   let prefix = $state('');
   let filter = $state('');
@@ -81,6 +93,8 @@
   let modalLoading = $state(false);
   let modalError = $state('');
   let immediateMode = $state(false); // When false (default), changes are staged
+  // When staging is unavailable, every write is immediate (no staging toggle).
+  const immediate = $derived(immediateMode || !stagingEnabled);
 
   // Diff state
   let diffResult: gui.SecretDiffResult | null = $state(null);
@@ -167,18 +181,23 @@
     showValue = withValue;
     stagingStatus = null;
     try {
-      const [detail, log, staging] = await Promise.all([
-        SecretShow(name),
-        SecretLog(name, 10),
-        withRetry(() => StagingCheckStatus('secret', name))
-      ]);
+      const [detail, log] = await Promise.all([SecretShow(name), SecretLog(name, 10)]);
       secretDetail = detail;
       secretLog = log?.entries || [];
-      stagingStatus = staging;
     } catch (e) {
       error = parseError(e);
     } finally {
       detailLoading = false;
+    }
+
+    // Decoupled staging status: only for staging-capable providers; a failure
+    // just means no banner and never breaks the detail pane.
+    if (stagingEnabled) {
+      try {
+        stagingStatus = await StagingCheckStatus('secret', name);
+      } catch {
+        stagingStatus = null;
+      }
     }
   }
 
@@ -210,7 +229,7 @@
     modalLoading = true;
     modalError = '';
     try {
-      if (immediateMode) {
+      if (immediate) {
         await SecretCreate(createForm.name, createForm.value);
         await loadSecrets({ prefix, filter, withValue });
       } else {
@@ -243,7 +262,7 @@
     modalLoading = true;
     modalError = '';
     try {
-      if (immediateMode) {
+      if (immediate) {
         await SecretUpdate(editForm.name, editForm.value);
         await Promise.all([
           loadSecrets({ prefix, filter, withValue }),
@@ -275,7 +294,7 @@
     modalLoading = true;
     modalError = '';
     try {
-      if (immediateMode) {
+      if (immediate) {
         await SecretDelete(deleteTarget, forceDelete);
         if (selectedSecret === deleteTarget) {
           closeDetail();
@@ -355,7 +374,7 @@
     tagLoading = true;
     tagError = '';
     try {
-      if (immediateMode) {
+      if (immediate) {
         await SecretAddTag(selectedSecret, tagForm.key, tagForm.value);
       } else {
         await StagingAddTag('secret', selectedSecret, tagForm.key, tagForm.value);
@@ -381,7 +400,7 @@
     removeTagLoading = true;
     removeTagError = '';
     try {
-      if (immediateMode) {
+      if (immediate) {
         await SecretRemoveTag(selectedSecret, removeTagTarget);
       } else {
         await StagingRemoveTag('secret', selectedSecret, removeTagTarget);
@@ -428,9 +447,11 @@
     <button class="btn-secondary" onclick={openCreateModal}>
       + New
     </button>
-    <button class="btn-secondary btn-restore" onclick={() => openRestoreModal('')}>
-      Restore
-    </button>
+    {#if restoreEnabled}
+      <button class="btn-secondary btn-restore" onclick={() => openRestoreModal('')}>
+        Restore
+      </button>
+    {/if}
   </div>
 
   {#if error}
@@ -485,7 +506,9 @@
           </div>
         </div>
 
-        <StagingBanner {stagingStatus} onnavigate={onnavigatetostaging} />
+        {#if stagingEnabled}
+          <StagingBanner {stagingStatus} onnavigate={onnavigatetostaging} />
+        {/if}
 
         {#if detailLoading}
           <div class="loading">Loading...</div>
@@ -547,9 +570,11 @@
               </div>
             {/if}
 
-            <TagList tags={secretDetail.tags} serviceClass="secret" onadd={openTagModal} onremove={openRemoveTagModal} />
+            {#if tagsEnabled}
+              <TagList tags={secretDetail.tags} serviceClass="secret" onadd={openTagModal} onremove={openRemoveTagModal} />
+            {/if}
 
-            {#if secretLog.length > 0}
+            {#if historyEnabled && secretLog.length > 0}
               <div class="detail-section">
                 <div class="section-header-history">
                   <h4>Version History</h4>
@@ -635,14 +660,16 @@
         rows="5"
       ></textarea>
     </div>
-    <label class="checkbox-label immediate-checkbox">
-      <input type="checkbox" bind:checked={immediateMode} />
-      <span>Apply immediately (skip staging)</span>
-    </label>
+    {#if stagingEnabled}
+      <label class="checkbox-label immediate-checkbox">
+        <input type="checkbox" bind:checked={immediateMode} />
+        <span>Apply immediately (skip staging)</span>
+      </label>
+    {/if}
     <div class="form-actions">
       <button type="button" class="btn-secondary" onclick={() => showCreateModal = false}>Cancel</button>
       <button type="submit" class="btn-primary" disabled={modalLoading}>
-        {modalLoading ? (immediateMode ? 'Creating...' : 'Staging...') : (immediateMode ? 'Create' : 'Stage')}
+        {modalLoading ? (immediate ? 'Creating...' : 'Staging...') : (immediate ? 'Create' : 'Stage')}
       </button>
     </div>
   </form>
@@ -673,14 +700,16 @@
         rows="8"
       ></textarea>
     </div>
-    <label class="checkbox-label immediate-checkbox">
-      <input type="checkbox" bind:checked={immediateMode} />
-      <span>Apply immediately (skip staging)</span>
-    </label>
+    {#if stagingEnabled}
+      <label class="checkbox-label immediate-checkbox">
+        <input type="checkbox" bind:checked={immediateMode} />
+        <span>Apply immediately (skip staging)</span>
+      </label>
+    {/if}
     <div class="form-actions">
       <button type="button" class="btn-secondary" onclick={() => showEditModal = false}>Cancel</button>
       <button type="submit" class="btn-primary" disabled={modalLoading}>
-        {modalLoading ? (immediateMode ? 'Saving...' : 'Staging...') : (immediateMode ? 'Save' : 'Stage')}
+        {modalLoading ? (immediate ? 'Saving...' : 'Staging...') : (immediate ? 'Save' : 'Stage')}
       </button>
     </div>
   </form>
@@ -694,29 +723,35 @@
     {/if}
     <p>Are you sure you want to delete this secret?</p>
     <code class="delete-target secret">{deleteTarget}</code>
-    <label class="checkbox-label force-delete">
-      <input type="checkbox" bind:checked={forceDelete} />
-      <span>Force delete (skip recovery window)</span>
-    </label>
+    {#if forceDeleteEnabled}
+      <label class="checkbox-label force-delete">
+        <input type="checkbox" bind:checked={forceDelete} />
+        <span>Force delete (skip recovery window)</span>
+      </label>
+    {/if}
     <p class="warning">
-      {#if immediateMode}
+      {#if immediate}
         {#if forceDelete}
           This will permanently delete the secret immediately!
-        {:else}
+        {:else if recoveryWindowEnabled}
           The secret will be scheduled for deletion with a recovery window.
+        {:else}
+          This will delete the secret.
         {/if}
       {:else}
         This will stage a delete operation.
       {/if}
     </p>
-    <label class="checkbox-label immediate-checkbox">
-      <input type="checkbox" bind:checked={immediateMode} />
-      <span>Apply immediately (skip staging)</span>
-    </label>
+    {#if stagingEnabled}
+      <label class="checkbox-label immediate-checkbox">
+        <input type="checkbox" bind:checked={immediateMode} />
+        <span>Apply immediately (skip staging)</span>
+      </label>
+    {/if}
     <div class="form-actions">
       <button type="button" class="btn-secondary" onclick={() => showDeleteModal = false}>Cancel</button>
       <button type="button" class="btn-danger" onclick={handleDelete} disabled={modalLoading}>
-        {modalLoading ? (immediateMode ? 'Deleting...' : 'Staging...') : (immediateMode ? 'Delete' : 'Stage Delete')}
+        {modalLoading ? (immediate ? 'Deleting...' : 'Staging...') : (immediate ? 'Delete' : 'Stage Delete')}
       </button>
     </div>
   </div>
@@ -791,14 +826,16 @@
         placeholder="tag-value"
       />
     </div>
-    <label class="checkbox-label immediate-checkbox">
-      <input type="checkbox" bind:checked={immediateMode} />
-      <span>Apply immediately (skip staging)</span>
-    </label>
+    {#if stagingEnabled}
+      <label class="checkbox-label immediate-checkbox">
+        <input type="checkbox" bind:checked={immediateMode} />
+        <span>Apply immediately (skip staging)</span>
+      </label>
+    {/if}
     <div class="form-actions">
       <button type="button" class="btn-secondary" onclick={() => showTagModal = false}>Cancel</button>
       <button type="submit" class="btn-primary" disabled={tagLoading}>
-        {tagLoading ? (immediateMode ? 'Adding...' : 'Staging...') : (immediateMode ? 'Add Tag' : 'Stage Tag')}
+        {tagLoading ? (immediate ? 'Adding...' : 'Staging...') : (immediate ? 'Add Tag' : 'Stage Tag')}
       </button>
     </div>
   </form>
@@ -812,15 +849,17 @@
     {/if}
     <p>Are you sure you want to remove this tag?</p>
     <code class="delete-target secret">{removeTagTarget}</code>
-    <p class="warning">{immediateMode ? 'This action will take effect immediately.' : 'This will stage a tag removal operation.'}</p>
-    <label class="checkbox-label immediate-checkbox">
-      <input type="checkbox" bind:checked={immediateMode} />
-      <span>Apply immediately (skip staging)</span>
-    </label>
+    <p class="warning">{immediate ? 'This action will take effect immediately.' : 'This will stage a tag removal operation.'}</p>
+    {#if stagingEnabled}
+      <label class="checkbox-label immediate-checkbox">
+        <input type="checkbox" bind:checked={immediateMode} />
+        <span>Apply immediately (skip staging)</span>
+      </label>
+    {/if}
     <div class="form-actions">
       <button type="button" class="btn-secondary" onclick={() => showRemoveTagModal = false}>Cancel</button>
       <button type="button" class="btn-danger" onclick={handleRemoveTag} disabled={removeTagLoading}>
-        {removeTagLoading ? (immediateMode ? 'Removing...' : 'Staging...') : (immediateMode ? 'Remove' : 'Stage Remove')}
+        {removeTagLoading ? (immediate ? 'Removing...' : 'Staging...') : (immediate ? 'Remove' : 'Stage Remove')}
       </button>
     </div>
   </div>

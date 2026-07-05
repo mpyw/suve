@@ -34,8 +34,8 @@ test.describe('Rapid Operations', () => {
   test('should handle rapid navigation switching', async ({ page }) => {
     // Switch between views rapidly
     for (let i = 0; i < 3; i++) {
-      await navigateTo(page, 'Secrets');
-      await navigateTo(page, 'Parameters');
+      await navigateTo(page, 'Secret');
+      await navigateTo(page, 'Param');
       await navigateTo(page, 'Staging');
     }
 
@@ -115,7 +115,7 @@ test.describe('State Consistency', () => {
     await expect(page.locator('.modal-backdrop')).not.toBeVisible();
 
     // Now navigate
-    await navigateTo(page, 'Secrets');
+    await navigateTo(page, 'Secret');
     await waitForItemList(page);
 
     // Should still be functional
@@ -153,7 +153,7 @@ test.describe('Large Dataset Handling', () => {
 
     await setupWailsMocks(page, { secrets: manySecrets });
     await page.goto('/');
-    await navigateTo(page, 'Secrets');
+    await navigateTo(page, 'Secret');
     await waitForItemList(page);
 
     // Should render items
@@ -223,7 +223,7 @@ test.describe('Error State Recovery', () => {
     await expect(page.locator('.error-banner')).toBeVisible();
 
     // Navigate to a different view
-    await navigateTo(page, 'Secrets');
+    await navigateTo(page, 'Secret');
 
     // Should show new view
     await expect(page.locator('.item-list, .error-banner')).toBeVisible();
@@ -297,9 +297,9 @@ test.describe('Memory Management', () => {
   test('should handle many view switches', async ({ page }) => {
     // Switch views many times
     for (let i = 0; i < 10; i++) {
-      await navigateTo(page, 'Secrets');
+      await navigateTo(page, 'Secret');
       await waitForViewLoaded(page);
-      await navigateTo(page, 'Parameters');
+      await navigateTo(page, 'Param');
       await waitForViewLoaded(page);
     }
 
@@ -421,7 +421,7 @@ test.describe('Edge Case Combinations', () => {
     await expect(page.locator('.modal-backdrop')).not.toBeVisible();
 
     // Navigate
-    await navigateTo(page, 'Secrets');
+    await navigateTo(page, 'Secret');
     await waitForItemList(page);
 
     // App should be functional
@@ -436,10 +436,10 @@ test.describe('Edge Case Combinations', () => {
     await expect(page.locator('.error-banner')).toBeVisible();
 
     // Navigate to secrets
-    await navigateTo(page, 'Secrets');
+    await navigateTo(page, 'Secret');
 
     // Navigate back
-    await navigateTo(page, 'Parameters');
+    await navigateTo(page, 'Param');
 
     // Should show error or retry
     await expect(page.locator('.filter-bar')).toBeVisible();

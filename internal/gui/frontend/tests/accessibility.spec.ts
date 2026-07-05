@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test';
 import {
   setupWailsMocks,
   waitForItemList,
+  createGoogleCloudState,
 } from './fixtures/wails-mock';
 
 // ============================================================================
@@ -120,5 +121,37 @@ test.describe('Accessibility - Modals', () => {
 
     await expect(page.getByRole('button', { name: 'Cancel' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Stage' })).toBeVisible();
+  });
+});
+
+// ============================================================================
+// Accessibility - Provider selector (#266)
+// ============================================================================
+
+test.describe('Accessibility - Provider selector', () => {
+  test('provider selector is labeled', async ({ page }) => {
+    await setupWailsMocks(page);
+    await page.goto('/');
+    await waitForItemList(page);
+
+    await expect(page.getByLabel('Provider')).toBeVisible();
+  });
+
+  test('provider selector is keyboard-focusable', async ({ page }) => {
+    await setupWailsMocks(page);
+    await page.goto('/');
+    await waitForItemList(page);
+
+    await page.locator('#provider-select').focus();
+    await expect(page.locator('#provider-select')).toBeFocused();
+  });
+
+  test('focus lands on the active tab after a provider clamp', async ({ page }) => {
+    await setupWailsMocks(page, createGoogleCloudState());
+    await page.goto('/');
+    await waitForItemList(page);
+
+    // Google Cloud has no Param tab; focus moves to the active Secret tab.
+    await expect(page.locator('.nav').getByRole('button', { name: /Secret/i })).toBeFocused();
   });
 });

@@ -16,7 +16,7 @@ test.describe('Secret CRUD Operations', () => {
   test.beforeEach(async ({ page }) => {
     await setupWailsMocks(page);
     await page.goto('/');
-    await navigateTo(page, 'Secrets');
+    await navigateTo(page, 'Secret');
     await waitForItemList(page);
   });
 
@@ -325,7 +325,7 @@ test.describe('Secret Edge Cases', () => {
     test('should handle empty secret list gracefully', async ({ page }) => {
       await setupWailsMocks(page, { secrets: [] });
       await page.goto('/');
-      await navigateTo(page, 'Secrets');
+      await navigateTo(page, 'Secret');
       // Wait for filter bar (always present even when list is empty)
       await page.waitForSelector('.filter-bar');
       await expect(page.locator('.item-button')).toHaveCount(0);
@@ -334,7 +334,7 @@ test.describe('Secret Edge Cases', () => {
     test('should still allow creating new secret when list is empty', async ({ page }) => {
       await setupWailsMocks(page, { secrets: [] });
       await page.goto('/');
-      await navigateTo(page, 'Secrets');
+      await navigateTo(page, 'Secret');
       await page.waitForSelector('.filter-bar');
       await openCreateModal(page);
       await expect(page.locator('.modal-backdrop')).toBeVisible();
@@ -343,7 +343,7 @@ test.describe('Secret Edge Cases', () => {
     test('should still show restore button when list is empty', async ({ page }) => {
       await setupWailsMocks(page, { secrets: [] });
       await page.goto('/');
-      await navigateTo(page, 'Secrets');
+      await navigateTo(page, 'Secret');
       await page.waitForSelector('.filter-bar');
       await expect(page.getByRole('button', { name: 'Restore' })).toBeVisible();
     });
@@ -353,7 +353,7 @@ test.describe('Secret Edge Cases', () => {
     test('should display multiple tags for secret', async ({ page }) => {
       await setupWailsMocks(page, createMultiTagState());
       await page.goto('/');
-      await navigateTo(page, 'Secrets');
+      await navigateTo(page, 'Secret');
       await waitForItemList(page);
       await clickItemByName(page, 'my-secret');
       await expect(page.locator('.tag-item')).toHaveCount(2);
@@ -362,7 +362,7 @@ test.describe('Secret Edge Cases', () => {
     test('should allow adding tag to secret with existing tags', async ({ page }) => {
       await setupWailsMocks(page, createMultiTagState());
       await page.goto('/');
-      await navigateTo(page, 'Secrets');
+      await navigateTo(page, 'Secret');
       await waitForItemList(page);
       await clickItemByName(page, 'my-secret');
       await page.getByRole('button', { name: '+ Add' }).click();
@@ -378,7 +378,7 @@ test.describe('Secret Edge Cases', () => {
     test('should handle secret with no tags', async ({ page }) => {
       await setupWailsMocks(page, createNoTagsState());
       await page.goto('/');
-      await navigateTo(page, 'Secrets');
+      await navigateTo(page, 'Secret');
       await waitForItemList(page);
       await clickItemByName(page, 'my-secret');
       await expect(page.locator('.tag-item')).toHaveCount(0);
@@ -387,7 +387,7 @@ test.describe('Secret Edge Cases', () => {
     test('should show add tag button even when no tags exist', async ({ page }) => {
       await setupWailsMocks(page, createNoTagsState());
       await page.goto('/');
-      await navigateTo(page, 'Secrets');
+      await navigateTo(page, 'Secret');
       await waitForItemList(page);
       await clickItemByName(page, 'my-secret');
       await expect(page.getByRole('button', { name: '+ Add' })).toBeVisible();
@@ -401,7 +401,7 @@ test.describe('Secret Edge Cases', () => {
       };
       await setupWailsMocks(page, jsonSecret);
       await page.goto('/');
-      await navigateTo(page, 'Secrets');
+      await navigateTo(page, 'Secret');
       await waitForItemList(page);
       await clickItemByName(page, 'json-secret');
       await expect(page.locator('.detail-panel')).toBeVisible();
@@ -413,7 +413,7 @@ test.describe('Secret Edge Cases', () => {
       };
       await setupWailsMocks(page, complexJson);
       await page.goto('/');
-      await navigateTo(page, 'Secrets');
+      await navigateTo(page, 'Secret');
       await waitForItemList(page);
       await clickItemByName(page, 'complex-secret');
       await expect(page.locator('.detail-panel')).toBeVisible();
@@ -425,7 +425,7 @@ test.describe('Secret Edge Cases', () => {
       };
       await setupWailsMocks(page, plaintext);
       await page.goto('/');
-      await navigateTo(page, 'Secrets');
+      await navigateTo(page, 'Secret');
       await waitForItemList(page);
       await clickItemByName(page, 'plaintext-secret');
       await expect(page.locator('.detail-panel')).toBeVisible();
@@ -439,7 +439,7 @@ test.describe('Secret Edge Cases', () => {
       };
       await setupWailsMocks(page, specialName);
       await page.goto('/');
-      await navigateTo(page, 'Secrets');
+      await navigateTo(page, 'Secret');
       await waitForItemList(page);
       await clickItemByName(page, 'my-secret_v2.0-test');
       await expect(page.locator('.detail-panel')).toBeVisible();
@@ -451,7 +451,7 @@ test.describe('Secret Edge Cases', () => {
       };
       await setupWailsMocks(page, specialValue);
       await page.goto('/');
-      await navigateTo(page, 'Secrets');
+      await navigateTo(page, 'Secret');
       await waitForItemList(page);
       await clickItemByName(page, 'special-secret');
       await expect(page.locator('.detail-panel')).toBeVisible();
@@ -469,7 +469,7 @@ test.describe('Secret provider-neutral presence gating (#268)', () => {
       secretTags: {},
     } as Partial<MockState>);
     await page.goto('/');
-    await navigateTo(page, 'Secrets');
+    await navigateTo(page, 'Secret');
     await waitForItemList(page);
     await clickItemByName(page, 'neutral-secret');
     await expect(page.locator('.detail-panel')).toBeVisible();

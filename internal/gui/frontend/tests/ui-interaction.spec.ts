@@ -39,7 +39,7 @@ test.describe('Refresh and Loading', () => {
   });
 
   test('should refresh secrets view', async ({ page }) => {
-    await navigateTo(page, 'Secrets');
+    await navigateTo(page, 'Secret');
     await waitForItemList(page);
 
     const refreshBtn = page.getByRole('button', { name: /Refresh/i });
@@ -158,8 +158,8 @@ test.describe('Detail Panel Navigation', () => {
     await expect(page.locator('.detail-panel')).toBeVisible();
 
     // Switch to secrets and back
-    await navigateTo(page, 'Secrets');
-    await navigateTo(page, 'Parameters');
+    await navigateTo(page, 'Secret');
+    await navigateTo(page, 'Param');
 
     // Detail panel should be closed after view switch
     await expect(page.locator('.detail-panel')).not.toBeVisible();
@@ -360,10 +360,10 @@ test.describe('Concurrent Operations', () => {
 
   test('should handle rapid view switching', async ({ page }) => {
     // Switch views rapidly
-    await navigateTo(page, 'Secrets');
-    await navigateTo(page, 'Parameters');
+    await navigateTo(page, 'Secret');
+    await navigateTo(page, 'Param');
     await navigateTo(page, 'Staging');
-    await navigateTo(page, 'Parameters');
+    await navigateTo(page, 'Param');
 
     // Should end on Parameters view
     await waitForViewLoaded(page);
@@ -404,7 +404,7 @@ test.describe('Loading States', () => {
     await waitForItemList(page);
 
     // Switch to secrets
-    await navigateTo(page, 'Secrets');
+    await navigateTo(page, 'Secret');
 
     // Should eventually show secrets view
     await waitForItemList(page);
@@ -435,7 +435,7 @@ test.describe('Restore Secret Feature', () => {
   test.beforeEach(async ({ page }) => {
     await setupWailsMocks(page);
     await page.goto('/');
-    await navigateTo(page, 'Secrets');
+    await navigateTo(page, 'Secret');
     await waitForItemList(page);
   });
 
@@ -480,12 +480,12 @@ test.describe('Navigation State Reset', () => {
     await expect(page.locator('.detail-panel')).toBeVisible();
 
     // Navigate to secrets
-    await navigateTo(page, 'Secrets');
+    await navigateTo(page, 'Secret');
     await waitForItemList(page);
 
     // Detail panel should be for secrets now or closed
     // Navigate back to parameters
-    await navigateTo(page, 'Parameters');
+    await navigateTo(page, 'Param');
     await waitForItemList(page);
 
     // Previous selection should be cleared

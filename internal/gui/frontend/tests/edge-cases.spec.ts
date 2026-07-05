@@ -163,7 +163,7 @@ test.describe('Form Validation', () => {
   });
 
   test('should show error when creating secret without name', async ({ page }) => {
-    await navigateTo(page, 'Secrets');
+    await navigateTo(page, 'Secret');
     await waitForItemList(page);
     await page.getByRole('button', { name: '+ New' }).click();
     await page.locator('#secret-value').fill('some-value');
@@ -172,7 +172,7 @@ test.describe('Form Validation', () => {
   });
 
   test('should show error when creating secret without value', async ({ page }) => {
-    await navigateTo(page, 'Secrets');
+    await navigateTo(page, 'Secret');
     await waitForItemList(page);
     await page.getByRole('button', { name: '+ New' }).click();
     await page.locator('#secret-name').fill('test-secret');
@@ -260,7 +260,7 @@ test.describe('Pagination - Secrets', () => {
   test.beforeEach(async ({ page }) => {
     await setupWailsMocks(page, createPaginationTestState(25));
     await page.goto('/');
-    await navigateTo(page, 'Secrets');
+    await navigateTo(page, 'Secret');
     await waitForItemList(page);
   });
 
@@ -302,7 +302,7 @@ test.describe('API Error Handling - Secret List', () => {
   test('should display error banner when SecretList fails', async ({ page }) => {
     await setupWailsMocks(page, createErrorState('SecretList', 'Access denied'));
     await page.goto('/');
-    await navigateTo(page, 'Secrets');
+    await navigateTo(page, 'Secret');
     await expect(page.locator('.error-banner')).toBeVisible();
     await expect(page.getByText('Access denied')).toBeVisible();
   });
@@ -336,7 +336,7 @@ test.describe('API Error Handling - Create Operations', () => {
       ...createErrorState('SecretCreate', 'Secret quota exceeded'),
     });
     await page.goto('/');
-    await navigateTo(page, 'Secrets');
+    await navigateTo(page, 'Secret');
     await waitForViewLoaded(page);
 
     // Open create modal and try to create secret in immediate mode
@@ -409,7 +409,7 @@ test.describe('Empty States', () => {
   test('should show empty state message for secrets', async ({ page }) => {
     await setupWailsMocks(page, { secrets: [] });
     await page.goto('/');
-    await navigateTo(page, 'Secrets');
+    await navigateTo(page, 'Secret');
     await waitForViewLoaded(page);
 
     await expect(page.locator('.empty-state')).toBeVisible();

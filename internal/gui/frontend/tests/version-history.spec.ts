@@ -113,7 +113,7 @@ test.describe('Secret Version History', () => {
   test.beforeEach(async ({ page }) => {
     await setupWailsMocks(page, createVersionHistoryState());
     await page.goto('/');
-    await navigateTo(page, 'Secrets');
+    await navigateTo(page, 'Secret');
     await waitForItemList(page);
   });
 
@@ -219,14 +219,14 @@ test.describe('Value Masking', () => {
   });
 
   test('should mask secret value by default', async ({ page }) => {
-    await navigateTo(page, 'Secrets');
+    await navigateTo(page, 'Secret');
     await waitForItemList(page);
     await clickItemByName(page, 'my-secret');
     await expect(page.locator('.value-display.masked')).toBeVisible();
   });
 
   test('should toggle secret value visibility', async ({ page }) => {
-    await navigateTo(page, 'Secrets');
+    await navigateTo(page, 'Secret');
     await waitForItemList(page);
     await clickItemByName(page, 'my-secret');
 

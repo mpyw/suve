@@ -151,7 +151,7 @@ test.describe('Focus After Operations', () => {
     await clickItemByName(page, '/app/config');
     await expect(page.locator('.detail-panel')).toBeVisible();
 
-    await navigateTo(page, 'Secrets');
+    await navigateTo(page, 'Secret');
     await waitForItemList(page);
 
     // Detail panel should be closed
