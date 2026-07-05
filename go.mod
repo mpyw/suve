@@ -23,6 +23,7 @@ require (
 	github.com/walles/moor/v2 v2.10.1
 	github.com/zalando/go-keyring v0.2.8
 	golang.org/x/crypto v0.51.0
+	golang.org/x/mod v0.37.0
 	golang.org/x/sync v0.20.0
 	golang.org/x/term v0.43.0
 	google.golang.org/api v0.274.0
