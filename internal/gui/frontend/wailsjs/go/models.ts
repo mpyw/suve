@@ -16,6 +16,28 @@ export namespace gui {
 	        this.profile = source["profile"];
 	    }
 	}
+	export class DetectResult {
+	    param: string;
+	    secret: string;
+	    stage: string;
+	    paramActive: string[];
+	    secretActive: string[];
+	    stageActive: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new DetectResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.param = source["param"];
+	        this.secret = source["secret"];
+	        this.stage = source["stage"];
+	        this.paramActive = source["paramActive"];
+	        this.secretActive = source["secretActive"];
+	        this.stageActive = source["stageActive"];
+	    }
+	}
 	export class ParamDeleteResult {
 	    name: string;
 	
@@ -225,6 +247,64 @@ export namespace gui {
 		}
 	}
 	
+	export class ServiceCapability {
+	    service: string;
+	    displayName: string;
+	    hasVersionHistory: boolean;
+	    hasVersionSpecifiers: boolean;
+	    hasTags: boolean;
+	    hasRestore: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new ServiceCapability(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.service = source["service"];
+	        this.displayName = source["displayName"];
+	        this.hasVersionHistory = source["hasVersionHistory"];
+	        this.hasVersionSpecifiers = source["hasVersionSpecifiers"];
+	        this.hasTags = source["hasTags"];
+	        this.hasRestore = source["hasRestore"];
+	    }
+	}
+	export class ProviderCapability {
+	    provider: string;
+	    displayName: string;
+	    scopeFields: string[];
+	    services: ServiceCapability[];
+	
+	    static createFrom(source: any = {}) {
+	        return new ProviderCapability(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.provider = source["provider"];
+	        this.displayName = source["displayName"];
+	        this.scopeFields = source["scopeFields"];
+	        this.services = this.convertValues(source["services"], ServiceCapability);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class ScopeSelection {
 	    provider: string;
 	    projectId: string;
@@ -488,6 +568,7 @@ export namespace gui {
 	        this.arn = source["arn"];
 	    }
 	}
+	
 	export class StagingAddResult {
 	    name: string;
 	

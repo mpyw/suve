@@ -24,6 +24,8 @@ func dtoContract() []any {
 	return []any{
 		// app.go
 		AWSIdentityResult{}, ScopeSelection{},
+		// providers.go
+		DetectResult{}, ServiceCapability{}, ProviderCapability{},
 		// param.go
 		ParamListResult{}, ParamListEntry{}, ParamShowTag{}, ParamShowResult{},
 		ParamLogResult{}, ParamLogEntry{}, ParamDiffResult{}, ParamSetResult{},
