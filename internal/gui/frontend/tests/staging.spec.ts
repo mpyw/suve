@@ -191,7 +191,10 @@ test.describe('Staging State Combinations', () => {
       await page.goto('/');
       await navigateTo(page, 'Staging');
       await page.waitForFunction(() => document.querySelector('.entry-item') !== null);
-      await expect(page.locator('.entry-item')).toBeVisible();
+      await expect(page.locator('.entry-item')).toHaveCount(1);
+      // Verify the staged entry renders its real name and create badge.
+      await expect(page.locator('.entry-name')).toHaveText('/test/param');
+      await expect(page.locator('.operation-badge')).toHaveText(/create/i);
     });
 
     test('should show empty state in Secret section when only Param has changes', async ({ page }) => {
@@ -217,7 +220,9 @@ test.describe('Staging State Combinations', () => {
       await page.goto('/');
       await navigateTo(page, 'Staging');
       await page.waitForFunction(() => document.querySelector('.entry-item') !== null);
-      await expect(page.locator('.entry-item')).toBeVisible();
+      await expect(page.locator('.entry-item')).toHaveCount(1);
+      // Verify the staged secret entry renders its real name.
+      await expect(page.locator('.entry-name')).toHaveText('new-secret');
     });
 
     test('should show empty state in Param section when only Secret has changes', async ({ page }) => {
@@ -366,6 +371,9 @@ test.describe('Tag Staging Display', () => {
     await page.goto('/');
     await navigateTo(page, 'Staging');
     await page.waitForFunction(() => document.querySelector('.entry-item') !== null);
+    // The entry renders both its name and the staged add-tag chip (key=value).
+    await expect(page.locator('.entry-name')).toHaveText('/app/config');
+    await expect(page.locator('.tag-add')).toContainText('version=2');
   });
 });
 

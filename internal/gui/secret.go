@@ -7,6 +7,7 @@ import (
 
 	"github.com/mpyw/suve/internal/provider"
 	awssecret "github.com/mpyw/suve/internal/provider/aws/secret"
+	"github.com/mpyw/suve/internal/timeutil"
 	"github.com/mpyw/suve/internal/usecase/secret"
 	"github.com/mpyw/suve/internal/version/secretversion"
 )
@@ -163,7 +164,7 @@ func (a *App) SecretShow(specStr string) (*SecretShowResult, error) {
 		Tags:         make([]SecretShowTag, 0, len(result.Tags)),
 	}
 	if result.CreatedDate != nil {
-		r.CreatedDate = result.CreatedDate.Format("2006-01-02T15:04:05Z07:00")
+		r.CreatedDate = timeutil.FormatRFC3339(*result.CreatedDate)
 	}
 
 	for _, tag := range result.Tags {
@@ -202,7 +203,7 @@ func (a *App) SecretLog(name string, maxResults int32) (*SecretLogResult, error)
 			IsCurrent: e.IsCurrent,
 		}
 		if e.CreatedDate != nil {
-			entry.Created = e.CreatedDate.Format("2006-01-02T15:04:05Z07:00")
+			entry.Created = timeutil.FormatRFC3339(*e.CreatedDate)
 		}
 
 		entries[i] = entry
@@ -287,7 +288,7 @@ func (a *App) SecretDelete(name string, force bool) (*SecretDeleteResult, error)
 	if !force {
 		const defaultRecoveryWindowDays = 30
 
-		r.DeletionDate = time.Now().AddDate(0, 0, defaultRecoveryWindowDays).Format("2006-01-02T15:04:05Z07:00")
+		r.DeletionDate = timeutil.FormatRFC3339(time.Now().AddDate(0, 0, defaultRecoveryWindowDays))
 	}
 
 	return r, nil

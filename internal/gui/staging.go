@@ -10,6 +10,7 @@ import (
 	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/staging"
 	"github.com/mpyw/suve/internal/staging/store/file"
+	"github.com/mpyw/suve/internal/timeutil"
 	stagingusecase "github.com/mpyw/suve/internal/usecase/staging"
 )
 
@@ -142,6 +143,35 @@ type StagingDiffTagEntry struct {
 	RemoveTags map[string]string `json:"removeTags,omitempty"` // key=current value from AWS
 }
 
+// Enum → frontend-string lookup tables. Kept as immutable package-level maps so
+// the conversion sites stay a single lookup instead of a repeated switch.
+//
+//nolint:gochecknoglobals // immutable enum→string lookup tables
+var (
+	applyStatusNames = map[stagingusecase.ApplyResultStatus]string{
+		stagingusecase.ApplyResultCreated: "created",
+		stagingusecase.ApplyResultUpdated: "updated",
+		stagingusecase.ApplyResultDeleted: "deleted",
+		stagingusecase.ApplyResultFailed:  "failed",
+	}
+
+	resetTypeNames = map[stagingusecase.ResetResultType]string{
+		stagingusecase.ResetResultUnstaged:      "unstaged",
+		stagingusecase.ResetResultUnstagedAll:   "unstagedAll",
+		stagingusecase.ResetResultRestored:      "restored",
+		stagingusecase.ResetResultNotStaged:     "notStaged",
+		stagingusecase.ResetResultNothingStaged: "nothingStaged",
+		stagingusecase.ResetResultSkipped:       "skipped",
+	}
+
+	diffEntryTypeNames = map[stagingusecase.DiffEntryType]string{
+		stagingusecase.DiffEntryNormal:       "normal",
+		stagingusecase.DiffEntryCreate:       "create",
+		stagingusecase.DiffEntryAutoUnstaged: "autoUnstaged",
+		stagingusecase.DiffEntryWarning:      "warning",
+	}
+)
+
 // =============================================================================
 // Staging Methods
 // =============================================================================
@@ -178,50 +208,44 @@ func (a *App) StagingStatus() (*StagingStatusResult, error) {
 		return nil, err
 	}
 
-	result := &StagingStatusResult{
-		Param:      make([]StagingEntry, len(paramResult.Entries)),
-		Secret:     make([]StagingEntry, len(secretResult.Entries)),
-		ParamTags:  make([]StagingTagEntry, len(paramResult.TagEntries)),
-		SecretTags: make([]StagingTagEntry, len(secretResult.TagEntries)),
-	}
+	return &StagingStatusResult{
+		Param:      toStagingEntries(paramResult.Entries),
+		Secret:     toStagingEntries(secretResult.Entries),
+		ParamTags:  toStagingTagEntries(paramResult.TagEntries),
+		SecretTags: toStagingTagEntries(secretResult.TagEntries),
+	}, nil
+}
 
-	for i, e := range paramResult.Entries {
-		result.Param[i] = StagingEntry{
+// toStagingEntries converts use-case status entries into the frontend DTO,
+// formatting timestamps as RFC3339.
+func toStagingEntries(entries []stagingusecase.StatusEntry) []StagingEntry {
+	out := make([]StagingEntry, len(entries))
+	for i, e := range entries {
+		out[i] = StagingEntry{
 			Name:      e.Name,
 			Operation: string(e.Operation),
 			Value:     e.Value,
-			StagedAt:  e.StagedAt.Format("2006-01-02T15:04:05Z07:00"),
+			StagedAt:  timeutil.FormatRFC3339(e.StagedAt),
 		}
 	}
 
-	for i, e := range secretResult.Entries {
-		result.Secret[i] = StagingEntry{
-			Name:      e.Name,
-			Operation: string(e.Operation),
-			Value:     e.Value,
-			StagedAt:  e.StagedAt.Format("2006-01-02T15:04:05Z07:00"),
-		}
-	}
+	return out
+}
 
-	for i, t := range paramResult.TagEntries {
-		result.ParamTags[i] = StagingTagEntry{
+// toStagingTagEntries converts use-case status tag entries into the frontend
+// DTO, formatting timestamps as RFC3339.
+func toStagingTagEntries(tags []stagingusecase.StatusTagEntry) []StagingTagEntry {
+	out := make([]StagingTagEntry, len(tags))
+	for i, t := range tags {
+		out[i] = StagingTagEntry{
 			Name:       t.Name,
 			AddTags:    t.Add,
 			RemoveTags: t.Remove.Values(),
-			StagedAt:   t.StagedAt.Format("2006-01-02T15:04:05Z07:00"),
+			StagedAt:   timeutil.FormatRFC3339(t.StagedAt),
 		}
 	}
 
-	for i, t := range secretResult.TagEntries {
-		result.SecretTags[i] = StagingTagEntry{
-			Name:       t.Name,
-			AddTags:    t.Add,
-			RemoveTags: t.Remove.Values(),
-			StagedAt:   t.StagedAt.Format("2006-01-02T15:04:05Z07:00"),
-		}
-	}
-
-	return result, nil
+	return out
 }
 
 // StagingApply applies staged changes for a service.
@@ -259,20 +283,11 @@ func (a *App) StagingApply(service string, ignoreConflicts bool) (*StagingApplyR
 
 	for _, r := range result.EntryResults {
 		entry := StagingApplyEntryResult{
-			Name: r.Name,
+			Name:   r.Name,
+			Status: applyStatusNames[r.Status],
 		}
-		switch r.Status {
-		case stagingusecase.ApplyResultCreated:
-			entry.Status = "created"
-		case stagingusecase.ApplyResultUpdated:
-			entry.Status = "updated"
-		case stagingusecase.ApplyResultDeleted:
-			entry.Status = "deleted"
-		case stagingusecase.ApplyResultFailed:
-			entry.Status = "failed"
-			if r.Error != nil {
-				entry.Error = r.Error.Error()
-			}
+		if r.Status == stagingusecase.ApplyResultFailed && r.Error != nil {
+			entry.Error = r.Error.Error()
 		}
 
 		output.EntryResults = append(output.EntryResults, entry)
@@ -316,28 +331,12 @@ func (a *App) StagingReset(service string) (*StagingResetResult, error) {
 		return nil, err
 	}
 
-	output := &StagingResetResult{
+	return &StagingResetResult{
 		ServiceName: result.ServiceName,
 		Name:        result.Name,
 		Count:       result.Count,
-	}
-
-	switch result.Type {
-	case stagingusecase.ResetResultUnstaged:
-		output.Type = "unstaged"
-	case stagingusecase.ResetResultUnstagedAll:
-		output.Type = "unstagedAll"
-	case stagingusecase.ResetResultRestored:
-		output.Type = "restored"
-	case stagingusecase.ResetResultNotStaged:
-		output.Type = "notStaged"
-	case stagingusecase.ResetResultNothingStaged:
-		output.Type = "nothingStaged"
-	case stagingusecase.ResetResultSkipped:
-		output.Type = "skipped"
-	}
-
-	return output, nil
+		Type:        resetTypeNames[result.Type],
+	}, nil
 }
 
 // StagingAdd stages a create operation for a new item.
@@ -633,8 +632,9 @@ func (a *App) StagingDiff(service string, name string) (*StagingDiffResult, erro
 
 	entries := make([]StagingDiffEntry, len(result.Entries))
 	for i, e := range result.Entries {
-		entry := StagingDiffEntry{
+		entries[i] = StagingDiffEntry{
 			Name:          e.Name,
+			Type:          diffEntryTypeNames[e.Type],
 			Operation:     string(e.Operation),
 			AWSValue:      e.AWSValue,
 			AWSIdentifier: e.AWSIdentifier,
@@ -642,18 +642,6 @@ func (a *App) StagingDiff(service string, name string) (*StagingDiffResult, erro
 			Description:   e.Description,
 			Warning:       e.Warning,
 		}
-		switch e.Type {
-		case stagingusecase.DiffEntryNormal:
-			entry.Type = "normal"
-		case stagingusecase.DiffEntryCreate:
-			entry.Type = "create"
-		case stagingusecase.DiffEntryAutoUnstaged:
-			entry.Type = "autoUnstaged"
-		case stagingusecase.DiffEntryWarning:
-			entry.Type = "warning"
-		}
-
-		entries[i] = entry
 	}
 
 	tagEntries := make([]StagingDiffTagEntry, len(result.TagEntries))
@@ -732,31 +720,45 @@ func (a *App) StagingFileStatus() (*StagingFileStatusResult, error) {
 	return result, nil
 }
 
+// stashStores builds the stash (stash.json) and working (stage.json) file
+// stores for the current AWS identity and resolves the optional service
+// selector. It is the shared prelude of StagingDrain and StagingPersist. An
+// empty service yields the zero staging.Service (all services).
+func (a *App) stashStores(service, passphrase string) (stash, working *file.Store, svc staging.Service, err error) {
+	identity, err := infra.GetAWSIdentity(a.ctx)
+	if err != nil {
+		return nil, nil, "", err
+	}
+
+	scope := provider.AWSScope(identity.AccountID, identity.Region)
+
+	stash, err = file.NewStashStoreWithPassphrase(scope, passphrase)
+	if err != nil {
+		return nil, nil, "", err
+	}
+
+	working, err = file.NewWorkingStore(scope)
+	if err != nil {
+		return nil, nil, "", err
+	}
+
+	if service != "" {
+		svc, err = a.getService(service)
+		if err != nil {
+			return nil, nil, "", err
+		}
+	}
+
+	return stash, working, svc, nil
+}
+
 // StagingDrain loads staged changes from the stash file into the working staging area.
 // If the file is encrypted, passphrase must be provided.
 // mode: "overwrite" or "merge" (default)
 func (a *App) StagingDrain(service string, passphrase string, keep bool, mode string) (*StagingDrainResult, error) {
-	identity, err := infra.GetAWSIdentity(a.ctx)
+	stashStore, working, svc, err := a.stashStores(service, passphrase)
 	if err != nil {
 		return nil, err
-	}
-
-	stashStore, err := file.NewStashStoreWithPassphrase(provider.AWSScope(identity.AccountID, identity.Region), passphrase)
-	if err != nil {
-		return nil, err
-	}
-
-	working, err := file.NewWorkingStore(provider.AWSScope(identity.AccountID, identity.Region))
-	if err != nil {
-		return nil, err
-	}
-
-	var svc staging.Service
-	if service != "" {
-		svc, err = a.getService(service)
-		if err != nil {
-			return nil, err
-		}
 	}
 
 	drainMode := stagingusecase.StashModeMerge
@@ -789,27 +791,9 @@ func (a *App) StagingDrain(service string, passphrase string, keep bool, mode st
 // If passphrase is provided, the file will be encrypted.
 // mode: "overwrite" or "merge"
 func (a *App) StagingPersist(service string, passphrase string, keep bool, mode string) (*StagingPersistResult, error) {
-	identity, err := infra.GetAWSIdentity(a.ctx)
+	stashStore, working, svc, err := a.stashStores(service, passphrase)
 	if err != nil {
 		return nil, err
-	}
-
-	stashStore, err := file.NewStashStoreWithPassphrase(provider.AWSScope(identity.AccountID, identity.Region), passphrase)
-	if err != nil {
-		return nil, err
-	}
-
-	working, err := file.NewWorkingStore(provider.AWSScope(identity.AccountID, identity.Region))
-	if err != nil {
-		return nil, err
-	}
-
-	var svc staging.Service
-	if service != "" {
-		svc, err = a.getService(service)
-		if err != nil {
-			return nil, err
-		}
 	}
 
 	persistMode := stagingusecase.StashModeOverwrite

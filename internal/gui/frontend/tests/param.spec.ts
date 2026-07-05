@@ -5,6 +5,7 @@ import {
   createParam,
   createMultiTagState,
   createNoTagsState,
+  createStagedValue,
   waitForItemList,
   clickItemByName,
   openCreateModal,
@@ -345,6 +346,8 @@ test.describe('Parameter Edge Cases', () => {
       await waitForItemList(page);
       await clickItemByName(page, '/app/config');
       await expect(page.locator('.tag-item')).toHaveCount(0);
+      // The TagList empty branch renders an explicit "No tags" message.
+      await expect(page.locator('.no-tags')).toHaveText('No tags');
     });
 
     test('should show add tag button even when no tags exist', async ({ page }) => {
@@ -353,6 +356,43 @@ test.describe('Parameter Edge Cases', () => {
       await waitForItemList(page);
       await clickItemByName(page, '/app/config');
       await expect(page.getByRole('button', { name: '+ Add' })).toBeVisible();
+    });
+  });
+
+  test.describe('Staging Banner', () => {
+    test('should not show staging banner for an item with no staged changes', async ({ page }) => {
+      await setupWailsMocks(page);
+      await page.goto('/');
+      await waitForItemList(page);
+      await clickItemByName(page, '/app/config');
+      await expect(page.locator('.staging-banner')).toHaveCount(0);
+    });
+
+    test('should show staging banner when the selected item has a staged value change', async ({ page }) => {
+      const staged: Partial<MockState> = {
+        stagedParam: [createStagedValue('/app/config', 'update', 'staged-value')],
+      };
+      await setupWailsMocks(page, staged);
+      await page.goto('/');
+      await waitForItemList(page);
+      await clickItemByName(page, '/app/config');
+      const banner = page.locator('.staging-banner');
+      await expect(banner).toBeVisible();
+      await expect(banner).toContainText('This item has staged value changes');
+      await expect(banner).toContainText('View in Staging');
+    });
+
+    test('should navigate to the staging view when the banner is clicked', async ({ page }) => {
+      const staged: Partial<MockState> = {
+        stagedParam: [createStagedValue('/app/config', 'update', 'staged-value')],
+      };
+      await setupWailsMocks(page, staged);
+      await page.goto('/');
+      await waitForItemList(page);
+      await clickItemByName(page, '/app/config');
+      await page.locator('.staging-banner').click();
+      // Clicking the banner switches the active view to the Staging area.
+      await expect(page.getByText('Staging Area')).toBeVisible();
     });
   });
 
