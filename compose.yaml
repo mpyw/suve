@@ -13,6 +13,16 @@ services:
       retries: 10
       start_period: 15s
 
+  gcp-secretmanager:
+    # Google Cloud Secret Manager emulator (gRPC :9090, REST :8080), no auth,
+    # runs entirely offline. Used by the `e2e-gcp` target / CI job; the provider
+    # adapter targets it via SUVE_GCP_SECRETMANAGER_ENDPOINT.
+    profiles:
+      - gcp
+    image: ghcr.io/blackwell-systems/gcp-secret-manager-emulator-dual:latest
+    ports:
+      - "127.0.0.1:${SUVE_GCP_EMULATOR_PORT:-9090}:9090/tcp"
+
   ubuntu-22:
     profiles:
       - ubuntu-22
