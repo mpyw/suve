@@ -6,11 +6,14 @@ import (
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
+
+	"github.com/mpyw/suve/internal/provider"
 )
 
-// Run starts the GUI application.
-func Run() error {
-	app := NewApp()
+// Run starts the GUI application with the given initial provider selection
+// (empty means "no explicit choice" — the frontend falls back to env detection).
+func Run(initial provider.Provider) error {
+	app := NewApp(initial)
 
 	opts := &options.App{
 		Title:  "suve",

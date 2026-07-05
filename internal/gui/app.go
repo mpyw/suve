@@ -6,6 +6,7 @@ package gui
 import (
 	"context"
 	"fmt"
+	"os"
 	"sync"
 
 	"github.com/mpyw/suve/internal/infra"
@@ -57,6 +58,12 @@ var defaultScope = provider.Scope{Provider: provider.ProviderAWS}
 type App struct {
 	ctx context.Context
 
+	// initialProvider is the provider the GUI was launched with (from
+	// `suve <provider> --gui`, or the resolved unique-active provider for a bare
+	// `suve --gui`). Empty means no explicit choice. Surfaced to the frontend
+	// via InitialProvider for the initial selection.
+	initialProvider provider.Provider
+
 	// scope is the current read/write provider scope, selected from the
 	// frontend via SelectScope. Guarded by scopeMu.
 	scope   provider.Scope
@@ -67,9 +74,41 @@ type App struct {
 	stagingStoreMu sync.Mutex // protects stagingStore initialization
 }
 
-// NewApp creates a new App application struct.
-func NewApp() *App {
-	return &App{scope: defaultScope}
+// NewApp creates a new App with the given initial provider. The initial
+// read/write scope is derived from that provider using the ambient environment
+// (project / subscription / resource-group / vault / store); an empty provider
+// defaults to AWS.
+func NewApp(initial provider.Provider) *App {
+	return &App{
+		initialProvider: initial,
+		scope:           initialScope(initial),
+	}
+}
+
+// initialScope derives the launch scope for a provider from the environment.
+func initialScope(p provider.Provider) provider.Scope {
+	switch p {
+	case provider.ProviderGoogleCloud:
+		return provider.GoogleCloudScope(os.Getenv("GOOGLE_CLOUD_PROJECT"))
+	case provider.ProviderAzure:
+		return provider.Scope{
+			Provider:       provider.ProviderAzure,
+			SubscriptionID: os.Getenv("AZURE_SUBSCRIPTION_ID"),
+			ResourceGroup:  os.Getenv("AZURE_RESOURCE_GROUP"),
+			VaultName:      os.Getenv("AZURE_KEYVAULT_NAME"),
+			StoreName:      os.Getenv("AZURE_APPCONFIG_NAME"),
+		}
+	case provider.ProviderAWS:
+		return provider.Scope{Provider: provider.ProviderAWS}
+	default:
+		return defaultScope
+	}
+}
+
+// InitialProvider returns the provider the GUI was launched with (empty when no
+// explicit `--gui` provider was chosen), so the frontend can pre-select it.
+func (a *App) InitialProvider() string {
+	return string(a.initialProvider)
 }
 
 // Startup is called when the app starts.
