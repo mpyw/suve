@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	appcli "github.com/mpyw/suve/internal/cli/commands"
+	"github.com/mpyw/suve/internal/cli/commands/internal/apptest"
 	stagediff "github.com/mpyw/suve/internal/cli/commands/stage/diff"
 	"github.com/mpyw/suve/internal/domain"
 	"github.com/mpyw/suve/internal/maputil"
@@ -58,7 +58,7 @@ func TestCommand_Validation(t *testing.T) {
 	t.Run("help", func(t *testing.T) {
 		t.Parallel()
 
-		app := appcli.MakeApp()
+		app := apptest.AWSApp()
 
 		var buf bytes.Buffer
 
@@ -71,7 +71,7 @@ func TestCommand_Validation(t *testing.T) {
 	t.Run("no arguments allowed", func(t *testing.T) {
 		t.Parallel()
 
-		app := appcli.MakeApp()
+		app := apptest.AWSApp()
 		err := app.Run(t.Context(), []string{"suve", "stage", "diff", "extra-arg"})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "usage:")

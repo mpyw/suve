@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	appcli "github.com/mpyw/suve/internal/cli/commands"
+	"github.com/mpyw/suve/internal/cli/commands/internal/apptest"
 	"github.com/mpyw/suve/internal/cli/commands/secret/delete"
 	"github.com/mpyw/suve/internal/provider"
 	awssecret "github.com/mpyw/suve/internal/provider/aws/secret"
@@ -23,7 +23,7 @@ func TestCommand_Validation(t *testing.T) {
 	t.Run("missing secret name", func(t *testing.T) {
 		t.Parallel()
 
-		app := appcli.MakeApp()
+		app := apptest.AWSApp()
 		err := app.Run(t.Context(), []string{"suve", "secret", "delete"})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "usage:")

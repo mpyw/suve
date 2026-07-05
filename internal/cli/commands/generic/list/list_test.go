@@ -9,8 +9,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	appcli "github.com/mpyw/suve/internal/cli/commands"
 	genericlist "github.com/mpyw/suve/internal/cli/commands/generic/list"
+	"github.com/mpyw/suve/internal/cli/commands/internal/apptest"
 	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/domain"
 	"github.com/mpyw/suve/internal/provider"
@@ -25,7 +25,7 @@ func TestCommand_Help(t *testing.T) {
 	t.Run("param", func(t *testing.T) {
 		t.Parallel()
 
-		app := appcli.MakeApp()
+		app := apptest.AWSApp()
 
 		var buf bytes.Buffer
 
@@ -41,7 +41,7 @@ func TestCommand_Help(t *testing.T) {
 	t.Run("secret", func(t *testing.T) {
 		t.Parallel()
 
-		app := appcli.MakeApp()
+		app := apptest.AWSApp()
 
 		var buf bytes.Buffer
 
