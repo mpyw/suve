@@ -60,10 +60,11 @@ jobs:
           ref: ${{ inputs.version }}
           fetch-depth: 0
 
-      - name: Set up Go
-        uses: actions/setup-go@v6
+      - name: Set up toolchain (mise)
+        uses: jdx/mise-action@v4
         with:
-          go-version-file: go.mod
+          install_args: "go node"
+          github_token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build frontend
         run: |
@@ -120,10 +121,11 @@ jobs:
           ref: ${{ inputs.version }}
           fetch-depth: 0
 
-      - name: Set up Go
-        uses: actions/setup-go@v6
+      - name: Set up toolchain (mise)
+        uses: jdx/mise-action@v4
         with:
-          go-version-file: go.mod
+          install_args: "go node"
+          github_token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install dependencies
         run: |
@@ -162,10 +164,11 @@ jobs:
           ref: ${{ inputs.version }}
           fetch-depth: 0
 
-      - name: Set up Go
-        uses: actions/setup-go@v6
+      - name: Set up toolchain (mise)
+        uses: jdx/mise-action@v4
         with:
-          go-version-file: go.mod
+          install_args: "go node"
+          github_token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install dependencies
         run: |
@@ -207,10 +210,11 @@ jobs:
           ref: ${{ inputs.version }}
           fetch-depth: 0
 
-      - name: Set up Go
-        uses: actions/setup-go@v6
+      - name: Set up toolchain (mise)
+        uses: jdx/mise-action@v4
         with:
-          go-version-file: go.mod
+          install_args: "go node"
+          github_token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install dependencies
         run: |
@@ -249,10 +253,11 @@ jobs:
           ref: ${{ inputs.version }}
           fetch-depth: 0
 
-      - name: Set up Go
-        uses: actions/setup-go@v6
+      - name: Set up toolchain (mise)
+        uses: jdx/mise-action@v4
         with:
-          go-version-file: go.mod
+          install_args: "go node"
+          github_token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install dependencies
         run: |
@@ -294,10 +299,11 @@ jobs:
           ref: ${{ inputs.version }}
           fetch-depth: 0
 
-      - name: Set up Go
-        uses: actions/setup-go@v6
+      - name: Set up toolchain (mise)
+        uses: jdx/mise-action@v4
         with:
-          go-version-file: go.mod
+          install_args: "go"
+          github_token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build suve-cli (linux-amd64, linux-arm64)
         uses: goreleaser/goreleaser-action@v6
@@ -328,10 +334,11 @@ jobs:
           ref: ${{ inputs.version }}
           fetch-depth: 0
 
-      - name: Set up Go
-        uses: actions/setup-go@v6
+      - name: Set up toolchain (mise)
+        uses: jdx/mise-action@v4
         with:
-          go-version-file: go.mod
+          install_args: "go node"
+          github_token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build frontend
         run: |
@@ -399,6 +406,12 @@ jobs:
         with:
           ref: ${{ inputs.version }}
           fetch-depth: 0
+
+      - name: Set up toolchain (mise)
+        uses: jdx/mise-action@v4
+        with:
+          install_args: "nfpm"
+          github_token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Download all artifacts
         uses: actions/download-artifact@v7
@@ -470,9 +483,7 @@ jobs:
           set -euo pipefail
           VERSION="${VERSION#v}"
 
-          # Install nfpm (pinned version for reproducibility)
-          go install github.com/goreleaser/nfpm/v2/cmd/nfpm@v2.41.1
-          export PATH="$(go env GOPATH)/bin:$PATH"
+          # nfpm is provided by mise (version pinned in mise.toml).
 
           for arch in amd64 arm64; do
             case "$arch" in
