@@ -23,6 +23,23 @@ services:
     ports:
       - "127.0.0.1:${SUVE_GCP_EMULATOR_PORT:-9090}:9090/tcp"
 
+  azure-appconfig:
+    # Azure App Configuration emulator (HTTP :8080, HMAC auth over plain HTTP),
+    # runs entirely offline. Used by the `e2e-azure` target / CI job; the
+    # provider adapter targets it via SUVE_AZURE_APPCONFIG_CONNECTION_STRING.
+    #
+    # This is a fork of tnc1997/azure-app-configuration-emulator patched to
+    # interoperate with the official Azure SDKs (comma-separated HMAC parsing,
+    # UTC last_modified timestamps, Sync-Token response header). See
+    # https://github.com/mpyw/azure-app-configuration-emulator.
+    profiles:
+      - azure
+    image: ghcr.io/mpyw/azure-app-configuration-emulator:latest
+    ports:
+      - "127.0.0.1:${SUVE_AZURE_APPCONFIG_PORT:-8080}:8080/tcp"
+    environment:
+      - ASPNETCORE_HTTP_PORTS=8080
+
   ubuntu-22:
     profiles:
       - ubuntu-22

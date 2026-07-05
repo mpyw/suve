@@ -1,4 +1,4 @@
-.PHONY: build test lint e2e e2e-gcp up down clean coverage coverage-e2e coverage-all gui-dev gui-build gui-bindings ubuntu-22 ubuntu-24 x11-setup help
+.PHONY: build test lint e2e e2e-gcp e2e-azure up down clean coverage coverage-e2e coverage-all gui-dev gui-build gui-bindings ubuntu-22 ubuntu-24 x11-setup help
 
 .DEFAULT_GOAL := help
 
@@ -25,6 +25,7 @@ endif
 
 SUVE_LOCALSTACK_EXTERNAL_PORT ?= 4566
 SUVE_GCP_EMULATOR_PORT ?= 9090
+SUVE_AZURE_APPCONFIG_PORT ?= 8080
 COVERPKG = $(shell go list ./... | grep -v testutil | grep -v /e2e | grep -v internal/gui | grep -v /cmd/ | tr '\n' ',')
 
 help: ## Show this help
@@ -63,6 +64,13 @@ e2e-gcp: ## Run Google Cloud Secret Manager E2E tests (starts the emulator)
 	@until bash -c 'echo > /dev/tcp/127.0.0.1/$(SUVE_GCP_EMULATOR_PORT)' 2>/dev/null; do sleep 1; done
 	@echo "emulator is ready"
 	SUVE_GCP_SECRETMANAGER_ENDPOINT=127.0.0.1:$(SUVE_GCP_EMULATOR_PORT) go test -tags=e2e -v -run TestGCP ./e2e/...
+
+e2e-azure: ## Run Azure App Configuration E2E tests (starts the emulator)
+	SUVE_AZURE_APPCONFIG_PORT=$(SUVE_AZURE_APPCONFIG_PORT) docker compose --profile azure up -d azure-appconfig
+	@echo "Waiting for the Azure App Configuration emulator on port $(SUVE_AZURE_APPCONFIG_PORT)..."
+	@until bash -c 'echo > /dev/tcp/127.0.0.1/$(SUVE_AZURE_APPCONFIG_PORT)' 2>/dev/null; do sleep 1; done
+	@echo "emulator is ready"
+	SUVE_AZURE_APPCONFIG_CONNECTION_STRING="Endpoint=http://127.0.0.1:$(SUVE_AZURE_APPCONFIG_PORT);Id=abcd;Secret=c2VjcmV0" go test -tags=e2e -v -run TestAzureAppConfig ./e2e/...
 
 clean: ## Clean build artifacts and stop containers
 	rm -rf bin/ *.out

@@ -136,10 +136,66 @@ jobs:
       - name: Wait for the Secret Manager emulator
         run: timeout 60 bash -c 'until (echo > /dev/tcp/localhost/9090) 2>/dev/null; do sleep 1; done'
 
-      - name: Run Google Cloud e2e tests
-        run: go test -v -tags e2e -run TestGCP ./e2e/...
+      - name: Run Google Cloud e2e tests with coverage
+        run: |
+          COVERPKG=$(go list ./... | grep -v testutil | grep -v /e2e | grep -v internal/gui | grep -v /cmd/ | tr '\n' ',')
+          go test -v -race -tags e2e -run TestGCP -coverprofile=coverage-e2e-gcp.txt -covermode=atomic -coverpkg=$COVERPKG ./e2e/...
         env:
           SUVE_GCP_SECRETMANAGER_ENDPOINT: localhost:9090
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          files: ./coverage-e2e-gcp.txt
+          flags: e2e
+          name: codecov-suve-e2e-gcp
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+        continue-on-error: true
+
+  e2e-azure:
+    name: E2E Test (Azure)
+    runs-on: ubuntu-latest
+    services:
+      # Azure App Configuration emulator (HTTP :8080, HMAC over plain HTTP),
+      # offline. A fork of tnc1997/azure-app-configuration-emulator patched to
+      # interoperate with the official Azure SDKs.
+      # https://github.com/mpyw/azure-app-configuration-emulator
+      azure-appconfig:
+        image: ghcr.io/mpyw/azure-app-configuration-emulator:latest
+        ports:
+          - 8080:8080
+        env:
+          ASPNETCORE_HTTP_PORTS: 8080
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set up toolchain (mise)
+        uses: jdx/mise-action@v4
+        with:
+          install_args: "go"
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Wait for the App Configuration emulator
+        run: timeout 60 bash -c 'until (echo > /dev/tcp/localhost/8080) 2>/dev/null; do sleep 1; done'
+
+      - name: Run Azure e2e tests with coverage
+        run: |
+          COVERPKG=$(go list ./... | grep -v testutil | grep -v /e2e | grep -v internal/gui | grep -v /cmd/ | tr '\n' ',')
+          go test -v -race -tags e2e -run TestAzureAppConfig -coverprofile=coverage-e2e-azure.txt -covermode=atomic -coverpkg=$COVERPKG ./e2e/...
+        env:
+          SUVE_AZURE_APPCONFIG_CONNECTION_STRING: "Endpoint=http://localhost:8080;Id=abcd;Secret=c2VjcmV0"
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          files: ./coverage-e2e-azure.txt
+          flags: e2e
+          name: codecov-suve-e2e-azure
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+        continue-on-error: true
 
   lint:
     name: Lint
