@@ -3,70 +3,81 @@
 suve is built around a provider seam: the CLI and staging layers talk to a
 provider-neutral `provider.Store` (Reader / Writer / Tagger) instead of a cloud
 SDK. A `provider.Registry` maps a `provider.Scope` to the concrete backend that
-serves it. This document describes how a provider is selected today and how new
-clouds will plug in.
+serves it. This document describes how a provider is selected.
 
-## Today: AWS is the default (and only) provider
+## Selection is by top-level command group
 
-The top-level commands are unchanged and always target AWS:
+There is **no `--provider` flag**. The provider is chosen by which top-level
+command group you invoke; each group builds a provider-specific `provider.Scope`
+and reuses the *same* generic commands and the *same* registry:
 
 ```
-suve param  ...   # AWS Systems Manager Parameter Store
-suve secret ...   # AWS Secrets Manager
-suve stage  ...   # staging for the above
+suve param  ...          # AWS Systems Manager Parameter Store  (provider.AWSScope)
+suve secret ...          # AWS Secrets Manager                  (provider.AWSScope)
+suve stage  ...          # staging for the AWS services above
+suve gcloud secret ...   # Google Cloud Secret Manager          (provider.GoogleCloudScope)
+suve azure  secret ...   # Azure Key Vault                      (provider.AzureKeyVaultScope)
+suve azure  param  ...   # Azure App Configuration              (provider.AzureAppConfigScope)
 ```
 
-There is **no `--provider` flag** — AWS is the only registered backend, so
-adding a selection flag now would have nothing to select. Provider resolution
-still goes through the registry:
+The registry is built once with all backends registered
+(`internal/cli/commands/internal/client.go`):
 
-1. The registry is built once with AWS registered
-   (`internal/provider/aws.NewRegistry()`), reachable from the command layer
-   via `internal/cli/commands/internal`.
-2. Each command builds an AWS `provider.Scope` from the current AWS identity
-   (`infra.GetAWSIdentity` → `provider.AWSScope(accountID, region)`).
-3. It asks the registry for the store it needs:
+```go
+reg := aws.NewRegistry()
+gcp.Register(reg)
+azure.Register(reg)
+```
+
+Each command group resolves its store through this shared registry:
+
+1. It builds the provider-specific `provider.Scope`:
+   - **AWS** — from the current AWS identity (`infra.GetAWSIdentity` →
+     `provider.AWSScope(accountID, region)`). Read/write commands only need
+     `provider.Scope{Provider: provider.ProviderAWS}` (the region comes from the
+     ambient AWS config), so they do not pay for an STS call; the account/region
+     identity is resolved separately, only where staging state must be keyed.
+   - **Google Cloud** — the project id from `--project` or `GOOGLE_CLOUD_PROJECT`
+     (`provider.GoogleCloudScope(project)`).
+   - **Azure** — subscription / resource group (`--subscription` /
+     `--resource-group` or `AZURE_*` env) plus the Key Vault name
+     (`--vault-name`) or App Configuration store name (`--store-name`)
+     (`provider.AzureKeyVaultScope(...)` / `provider.AzureAppConfigScope(...)`).
+2. It asks the registry for the store it needs:
    `registry.Store(ctx, scope, provider.KindParam)` (or `KindSecret`).
 
 The returned `provider.Store` is handed to the generic show / diff / list / log
-/ tag / untag commands, the create / update / delete / restore commands, and the
-staging strategies (`staging.NewParamStrategy` / `NewSecretStrategy`). No command
-or usecase constructs an AWS SDK client or adapter directly anymore.
+/ tag / untag commands and the create / update / delete / restore commands. No
+command or usecase constructs a cloud SDK client or adapter directly.
 
-The same AWS scope keys on-disk staging state (see `provider.Scope.Key`), so
-staged changes are partitioned per account/region.
+Staging is AWS-only. The AWS scope keys on-disk staging state (see
+`provider.Scope.Key`), so staged changes are partitioned per account/region
+under `~/.suve/staging/aws/<account>/<region>/`.
 
 ## Enforced boundary
 
 An architecture test (`internal/architecture_test.go`) fails the build if any
-non-test package under `internal/cli`, `internal/usecase`, or `internal/staging`
-imports the AWS service SDK (`aws-sdk-go-v2/service/ssm`,
-`.../secretsmanager`) or the `internal/api/paramapi` / `internal/api/secretapi`
-aliases. The AWS SDK is confined to `internal/provider/aws/**`
-(`internal/api` and `internal/infra` are low-level allowed importers).
+non-test package under `internal/cli`, `internal/usecase`, `internal/staging`,
+or `internal/gui` imports a cloud service SDK directly. Each SDK is confined to
+its own adapter:
 
-> Note: `internal/gui/**` is intentionally excluded from this guard for now; its
-> migration onto the provider registry is tracked by issue #206. Until then the
-> GUI keeps constructing AWS clients directly.
+| SDK (banned outside its adapter)                       | Allowed only in            |
+| ----------------------------------------------------- | -------------------------- |
+| `aws-sdk-go-v2/service/ssm`, `.../secretsmanager`     | `internal/provider/aws/**` |
+| `cloud.google.com/go/secretmanager`                   | `internal/provider/gcp/**` |
+| `github.com/Azure/azure-sdk-for-go`                   | `internal/provider/azure/**` |
 
-## Future: additional clouds as top-level command groups
+`internal/infra` is a low-level allowed importer for AWS client bootstrapping
+and is not under the guarded roots. The `internal/gui` tree is guarded too: it
+constructs stores through the provider registry rather than talking to a cloud
+SDK. depguard (`.golangci.yaml`) enforces the same confinement at lint time.
 
-New providers will be added as their own top-level command groups that build a
-provider-specific `provider.Scope` and reuse the *same* generic commands and the
-*same* registry. Sketch:
+## Adding another cloud
 
-```
-suve gcloud secret ...   # Google Cloud Secret Manager  (provider.GoogleCloudScope)
-suve azure  secret ...   # Azure Key Vault              (provider.AzureKeyVaultScope)
-suve azure  param  ...   # Azure App Configuration      (provider.AzureAppConfigScope)
-```
-
-Each group differs only in how it builds its `provider.Scope` (project id,
-subscription/resource-group/vault, …) and in registering its factory
-(`registry.Register(provider.ProviderGoogleCloud, …)`). Everything downstream —
-version-spec parsing, the generic command presenters, and the staging
-strategies — is provider-neutral and is reused unchanged.
-
-`suve param` / `suve secret` remain AWS-only shortcuts and keep their current
-behavior. Implementing the GCP and Azure backends is out of scope here (tracked
-by #207 and #208); this wiring only makes the selection pluggable.
+A new provider is another top-level command group plus a registered factory:
+implement the `provider.Reader` / `Writer` / `Tagger` interfaces in a new
+`internal/provider/<cloud>/**` adapter, register it
+(`registry.Register(provider.Provider<Cloud>, ...)`), add its version-spec
+parser under `internal/version/`, and wire a command group that builds the
+provider's `provider.Scope`. Everything downstream — the generic command
+presenters and version resolution — is provider-neutral and reused unchanged.

@@ -163,7 +163,7 @@ suve/
 ├── .github/workflows/
 │   └── test.yml                  # CI: test + lint on push/PR
 │
-└── Makefile                      # build, test, lint, e2e, gui, up, down
+└── Makefile                      # build, test, lint, e2e, gui-dev/gui-build/gui-bindings, up, down
 ```
 
 ### Key Design Patterns
