@@ -7,7 +7,10 @@
 #   - the wails CLI is pinned to the same release as the wailsapp/wails/v2
 #     library in gui/go.mod so `wails dev` / `wails build` match the bindings.
 [tools]
-go = "1.25"
+# Pinned to the exact go.mod directive so CI's carve-out jobs (which read the
+# version from go.mod via setup-go) and the mise jobs compile with the same
+# Go patch release.
+go = "1.25.0"
 node = "20"
 golangci-lint = "2.11.4"
 goreleaser = "2"

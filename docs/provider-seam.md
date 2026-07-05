@@ -1,6 +1,13 @@
 # Provider Seam Design
 
-Status: design (issue #199)
+Status: design (issue #199) — **historical**. This is the original design note
+for the seam. It has since shipped and evolved: the AWS/GCP/Azure adapters, the
+usecase/CLI migration, and multi-cloud support all landed. Notably, the
+`internal/api/paramapi` / `internal/api/secretapi` wrappers referenced below
+were **removed** — the AWS adapter now imports the AWS SDK directly (confined to
+`internal/provider/aws/**`). See `docs/provider-selection.md` for the current
+architecture.
+
 Scope of this issue: the provider-neutral **seam** — the `domain` value types and
 the `provider` interfaces/registry — plus this document. No AWS adapters, no
 usecase/CLI migration, no additional cloud providers.

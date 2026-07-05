@@ -548,7 +548,7 @@ Uses integer version numbers (with the `latest` alias) and has no staging labels
 | Command | Options | Description |
 |---------|---------|-------------|
 | `suve gcloud secret show` | `--raw`<br>`--parse-json` (`-j`)<br>`--no-pager`<br>`--output=<FORMAT>` | Display secret with metadata |
-| `suve gcloud secret log` | `--number=<N>` (`-n`)<br>`--patch` (`-p`)<br>`--parse-json` (`-j`)<br>`--oneline`<br>`--reverse`<br>`--no-pager`<br>`--output=<FORMAT>` | Show version history |
+| `suve gcloud secret log` | `--number=<N>` (`-n`)<br>`--patch` (`-p`)<br>`--parse-json` (`-j`)<br>`--oneline`<br>`--reverse`<br>`--since=<DATE>`<br>`--until=<DATE>`<br>`--no-pager`<br>`--output=<FORMAT>` | Show version history |
 | `suve gcloud secret diff` | `--parse-json` (`-j`)<br>`--no-pager`<br>`--output=<FORMAT>` | Compare versions |
 | `suve gcloud secret list` | `--filter=<REGEX>`<br>`--show`<br>`--output=<FORMAT>` | List secrets |
 | `suve gcloud secret create` | | Create new secret |
@@ -567,7 +567,7 @@ Secrets are versioned by opaque IDs and have no staging labels. Select the vault
 | Command | Options | Description |
 |---------|---------|-------------|
 | `suve azure secret show` | `--raw`<br>`--parse-json` (`-j`)<br>`--no-pager`<br>`--output=<FORMAT>` | Display secret with metadata |
-| `suve azure secret log` | `--number=<N>` (`-n`)<br>`--patch` (`-p`)<br>`--parse-json` (`-j`)<br>`--oneline`<br>`--reverse`<br>`--no-pager`<br>`--output=<FORMAT>` | Show version history |
+| `suve azure secret log` | `--number=<N>` (`-n`)<br>`--patch` (`-p`)<br>`--parse-json` (`-j`)<br>`--oneline`<br>`--reverse`<br>`--since=<DATE>`<br>`--until=<DATE>`<br>`--no-pager`<br>`--output=<FORMAT>` | Show version history |
 | `suve azure secret diff` | `--parse-json` (`-j`)<br>`--no-pager`<br>`--output=<FORMAT>` | Compare versions |
 | `suve azure secret list` | `--filter=<REGEX>`<br>`--show`<br>`--output=<FORMAT>` | List secrets |
 | `suve azure secret create` | | Create new secret |
