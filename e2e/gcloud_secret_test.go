@@ -16,17 +16,17 @@ import (
 	"github.com/mpyw/suve/internal/cli/commands/gcloud"
 	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/provider/detect"
-	"github.com/mpyw/suve/internal/provider/gcp"
+	gcloudprovider "github.com/mpyw/suve/internal/provider/gcloud"
 )
 
-// setupGCP skips the test unless the emulator endpoint is configured, and pins a
+// setupGoogleCloud skips the test unless the emulator endpoint is configured, and pins a
 // project id. The endpoint env var itself is provided by the CI job / make
 // target and read by the provider adapter's emulator seam.
-func setupGCP(t *testing.T) {
+func setupGoogleCloud(t *testing.T) {
 	t.Helper()
 
-	if os.Getenv(gcp.EmulatorEnvVar) == "" {
-		t.Skipf("%s not set; skipping GCP Secret Manager e2e", gcp.EmulatorEnvVar)
+	if os.Getenv(gcloudprovider.EmulatorEnvVar) == "" {
+		t.Skipf("%s not set; skipping Google Cloud Secret Manager e2e", gcloudprovider.EmulatorEnvVar)
 	}
 
 	t.Setenv("GOOGLE_CLOUD_PROJECT", "suve-e2e")
@@ -53,14 +53,14 @@ func runGcloud(t *testing.T, args ...string) (string, error) {
 	return outBuf.String(), err
 }
 
-// TestGCPSecret_FullWorkflow exercises the gcloud secret commands against a
+// TestGoogleCloudSecret_FullWorkflow exercises the gcloud secret commands against a
 // local Secret Manager emulator (no real Google Cloud account). It is skipped
-// unless SUVE_GCP_SECRETMANAGER_ENDPOINT points at a running emulator — see the
-// gcp-secretmanager service in compose.yaml and the `e2e-gcp` make target.
-func TestGCPSecret_FullWorkflow(t *testing.T) {
-	setupGCP(t)
+// unless SUVE_GCLOUD_SECRETMANAGER_ENDPOINT points at a running emulator — see the
+// gcloud-secretmanager service in compose.yaml and the `e2e-gcloud` make target.
+func TestGoogleCloudSecret_FullWorkflow(t *testing.T) {
+	setupGoogleCloud(t)
 
-	const name = "suve-e2e-gcp-secret"
+	const name = "suve-e2e-gcloud-secret"
 
 	// Best-effort cleanup from a previous run.
 	_, _ = runGcloud(t, "secret", "delete", "--yes", name)

@@ -103,7 +103,7 @@ suve/
 │   │
 │   ├── provider/                 # Provider seam: Reader/Writer/Tagger/Store interfaces, Registry, Scope, errors
 │   │   ├── aws/                  # AWS adapter (SSM + Secrets Manager); AWS SDK confined here
-│   │   ├── gcp/                  # Google Cloud Secret Manager adapter
+│   │   ├── gcloud/                  # Google Cloud Secret Manager adapter
 │   │   ├── azure/                # Azure Key Vault + App Configuration adapters
 │   │   └── providermock/         # In-memory provider mock for tests
 │   │
@@ -143,7 +143,7 @@ suve/
 │   │   ├── param/                # AWS SSM use cases
 │   │   ├── secret/               # AWS SM use cases
 │   │   ├── staging/              # Staging use cases
-│   │   ├── gcp/                  # Google Cloud use cases
+│   │   ├── gcloud/                  # Google Cloud use cases
 │   │   └── azure/                # Azure use cases
 │   │
 │   ├── version/                  # Version specification parsing
@@ -152,11 +152,11 @@ suve/
 │   │   ├── internal/             # Shared utilities (char checks)
 │   │   ├── paramversion/         # AWS SSM version spec parser
 │   │   ├── secretversion/        # AWS Secrets Manager version spec parser
-│   │   ├── gcpversion/           # Google Cloud integer-version parser
+│   │   ├── gcloudversion/           # Google Cloud integer-version parser
 │   │   ├── azurekvversion/       # Azure Key Vault opaque-id parser
 │   │   └── azureappconfigversion/ # Azure App Config (rejects specifiers; unversioned)
 │   │
-│   └── architecture_test.go      # Arch-guard: forbids cloud SDKs outside their provider/{aws,gcp,azure} + infra
+│   └── architecture_test.go      # Arch-guard: forbids cloud SDKs outside their provider/{aws,gcloud,azure} + infra
 │
 ├── e2e/                          # E2E tests (requires localstack)
 │
@@ -170,7 +170,7 @@ suve/
 
 1. **Unified generic commands**: Commands (show, diff, list, log, tag) share a provider-neutral scaffold in `internal/cli/commands/generic/**` with per-provider presenters; AWS `param`/`secret` still register their own command groups.
 2. **Provider seam**: Core interfaces (`Reader`/`Writer`/`Tagger`/`Store`) live in `internal/provider` and are mocked via `internal/provider/providermock` for testing.
-3. **Version resolution**: `paramversion` and `secretversion` (plus `gcpversion`, `azurekvversion`, `azureappconfigversion`) handle version/shift/label resolution per provider.
+3. **Version resolution**: `paramversion` and `secretversion` (plus `gcloudversion`, `azurekvversion`, `azureappconfigversion`) handle version/shift/label resolution per provider.
 4. **Output abstraction**: Commands write to `io.Writer` for testability
 5. **Staging state machine**: `staging/transition` implements a reducer-based state machine for staging operations
 6. **Keychain-encrypted file store**: Staging is a keychain-encrypted file store, scope-keyed under `~/.suve/staging/{scope.Key()}/`

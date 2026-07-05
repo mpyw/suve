@@ -1,4 +1,4 @@
-package gcp_test
+package gcloud_test
 
 import (
 	"context"
@@ -10,8 +10,8 @@ import (
 	"github.com/mpyw/suve/internal/domain"
 	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/provider/providermock"
-	"github.com/mpyw/suve/internal/usecase/gcp"
-	"github.com/mpyw/suve/internal/version/gcpversion"
+	"github.com/mpyw/suve/internal/usecase/gcloud"
+	"github.com/mpyw/suve/internal/version/gcloudversion"
 )
 
 func TestShowUseCase(t *testing.T) {
@@ -35,17 +35,17 @@ func TestShowUseCase(t *testing.T) {
 		},
 	}
 
-	spec, err := gcpversion.Parse("my-secret#3")
+	spec, err := gcloudversion.Parse("my-secret#3")
 	require.NoError(t, err)
 
-	uc := &gcp.ShowUseCase{Reader: store}
-	out, err := uc.Execute(t.Context(), gcp.ShowInput{Spec: spec})
+	uc := &gcloud.ShowUseCase{Reader: store}
+	out, err := uc.Execute(t.Context(), gcloud.ShowInput{Spec: spec})
 	require.NoError(t, err)
 	assert.Equal(t, "my-secret", out.Name)
 	assert.Equal(t, "hello", out.Value)
 	assert.Equal(t, "3", out.Version)
 	assert.Equal(t, "enabled", out.State)
-	assert.Equal(t, []gcp.ShowTag{{Key: "env", Value: "prod"}}, out.Tags)
+	assert.Equal(t, []gcloud.ShowTag{{Key: "env", Value: "prod"}}, out.Tags)
 }
 
 func TestDiffUseCase(t *testing.T) {
@@ -72,14 +72,14 @@ func TestDiffUseCase(t *testing.T) {
 		},
 	}
 
-	spec1, err := gcpversion.Parse("my-secret#1")
+	spec1, err := gcloudversion.Parse("my-secret#1")
 	require.NoError(t, err)
 
-	spec2, err := gcpversion.Parse("my-secret")
+	spec2, err := gcloudversion.Parse("my-secret")
 	require.NoError(t, err)
 
-	uc := &gcp.DiffUseCase{Reader: store}
-	out, err := uc.Execute(t.Context(), gcp.DiffInput{Spec1: spec1, Spec2: spec2})
+	uc := &gcloud.DiffUseCase{Reader: store}
+	out, err := uc.Execute(t.Context(), gcloud.DiffInput{Spec1: spec1, Spec2: spec2})
 	require.NoError(t, err)
 	assert.Equal(t, "1", out.OldVersion)
 	assert.Equal(t, "val1", out.OldValue)
@@ -96,8 +96,8 @@ func TestListUseCase_PrefixFilter(t *testing.T) {
 		},
 	}
 
-	uc := &gcp.ListUseCase{Reader: store}
-	out, err := uc.Execute(t.Context(), gcp.ListInput{Prefix: "prod"})
+	uc := &gcloud.ListUseCase{Reader: store}
+	out, err := uc.Execute(t.Context(), gcloud.ListInput{Prefix: "prod"})
 	require.NoError(t, err)
 	require.Len(t, out.Entries, 2)
 	assert.Equal(t, "prod-a", out.Entries[0].Name)

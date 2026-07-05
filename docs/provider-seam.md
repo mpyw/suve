@@ -1,7 +1,7 @@
 # Provider Seam Design
 
 Status: design (issue #199) — **historical**. This is the original design note
-for the seam. It has since shipped and evolved: the AWS/GCP/Azure adapters, the
+for the seam. It has since shipped and evolved: the AWS/GoogleCloud/Azure adapters, the
 usecase/CLI migration, and multi-cloud support all landed. Notably, the
 `internal/api/paramapi` / `internal/api/secretapi` wrappers referenced below
 were **removed** — the AWS adapter now imports the AWS SDK directly (confined to
@@ -15,7 +15,7 @@ usecase/CLI migration, no additional cloud providers.
 ## Motivation
 
 suve began as an AWS-only tool. To support multiple cloud backends (AWS SSM,
-AWS Secrets Manager, and later GCP/Azure) we need a **seam**: a small set of
+AWS Secrets Manager, and later GoogleCloud/Azure) we need a **seam**: a small set of
 provider-neutral types and interfaces that the usecase and CLI layers depend
 on, with each cloud's specifics hidden behind an adapter.
 
@@ -247,7 +247,7 @@ following are explicitly **out of scope** here and tracked separately:
 - **Per-provider options / provider-specific metadata** — the typed
   provider-specific path for ARNs, KMS keys, SSM tiers, etc.: issue **#210**.
 - **Full multi-field `Scope` and scope-keyed storage**: issue **#200**.
-- **Additional providers** — GCP (**#207**) and Azure (**#208**).
+- **Additional providers** — GoogleCloud (**#207**) and Azure (**#208**).
 
 No consumers are wired to the new packages in this issue; nothing in the repo
 imports `internal/domain` or `internal/provider` except the new packages' own

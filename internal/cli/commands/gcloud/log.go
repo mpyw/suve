@@ -14,7 +14,7 @@ import (
 	"github.com/mpyw/suve/internal/jsonutil"
 	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/timeutil"
-	"github.com/mpyw/suve/internal/usecase/gcp"
+	"github.com/mpyw/suve/internal/usecase/gcloud"
 )
 
 // logJSONItem represents a single version entry in JSON output.
@@ -28,19 +28,19 @@ type logJSONItem struct {
 
 // logPresenter renders Google Cloud Secret Manager log output.
 type logPresenter struct {
-	uc     *gcp.LogUseCase
+	uc     *gcloud.LogUseCase
 	req    genericlog.Request
-	result *gcp.LogOutput
+	result *gcloud.LogOutput
 	values map[string]string
 }
 
 // NewLogPresenter builds a Google Cloud log presenter over the given reader and request.
 func NewLogPresenter(reader provider.Reader, req genericlog.Request) genericlog.Presenter {
-	return &logPresenter{uc: &gcp.LogUseCase{Reader: reader}, req: req}
+	return &logPresenter{uc: &gcloud.LogUseCase{Reader: reader}, req: req}
 }
 
 func (p *logPresenter) Fetch(ctx context.Context) error {
-	result, err := p.uc.Execute(ctx, gcp.LogInput{
+	result, err := p.uc.Execute(ctx, gcloud.LogInput{
 		Name:       p.req.Name,
 		MaxResults: p.req.MaxResults,
 		Since:      p.req.Since,
@@ -238,7 +238,7 @@ EXAMPLES:
 			},
 		},
 		NewPresenter: func(ctx context.Context, req genericlog.Request) (genericlog.Presenter, error) {
-			store, err := cliinternal.GCPSecretStore(ctx)
+			store, err := cliinternal.GoogleCloudSecretStore(ctx)
 			if err != nil {
 				return nil, err
 			}

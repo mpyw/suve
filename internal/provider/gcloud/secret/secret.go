@@ -2,13 +2,13 @@
 // for Google Cloud Secret Manager. It confines all Secret Manager SDK types to
 // this package: resource-path construction and integer-version resolution live
 // here, so no Google Cloud type escapes the provider seam. Spec PARSING stays
-// generic via gcpversion.Parse.
+// generic via gcloudversion.Parse.
 //
 // Google Cloud Secret Manager differs from AWS Secrets Manager in three ways
 // that shape this adapter:
 //
 //   - Versions are positive integers ("1", "2", ...) or the "latest" alias;
-//     there are no staging labels (a ":LABEL" spec is rejected by gcpversion).
+//     there are no staging labels (a ":LABEL" spec is rejected by gcloudversion).
 //   - Deletion is permanent (no recovery window), so this store implements
 //     neither provider.Restorer nor provider.Describer.
 //   - Tags are secret "labels" mutated via an UpdateSecret read-modify-write.
@@ -32,7 +32,7 @@ import (
 
 	"github.com/mpyw/suve/internal/domain"
 	"github.com/mpyw/suve/internal/provider"
-	"github.com/mpyw/suve/internal/version/gcpversion"
+	"github.com/mpyw/suve/internal/version/gcloudversion"
 )
 
 // Client is the narrow Secret Manager surface this adapter needs. The list
@@ -102,9 +102,9 @@ func (s *Store) versionPath(name, version string) string {
 // Resolve parses the version spec (generic) and resolves it to an opaque
 // VersionRef holding the integer version string (or "" for latest). A ~shift is
 // applied by walking the ENABLED versions newest-first; a "#<int>" without a
-// shift needs no listing. A ":LABEL" spec is rejected by gcpversion.Parse.
+// shift needs no listing. A ":LABEL" spec is rejected by gcloudversion.Parse.
 func (s *Store) Resolve(ctx context.Context, name, spec string) (provider.VersionRef, error) {
-	parsed, err := gcpversion.Parse(name + spec)
+	parsed, err := gcloudversion.Parse(name + spec)
 	if err != nil {
 		return provider.VersionRef{}, err
 	}

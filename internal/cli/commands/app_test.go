@@ -26,7 +26,7 @@ func TestMakeAppWithDetect_flatAliases(t *testing.T) {
 	t.Parallel()
 
 	aws := provider.ProviderAWS
-	gcp := provider.ProviderGoogleCloud
+	gcloud := provider.ProviderGoogleCloud
 	az := provider.ProviderAzure
 
 	tests := []struct {
@@ -38,10 +38,10 @@ func TestMakeAppWithDetect_flatAliases(t *testing.T) {
 	}{
 		{name: "nothing active", det: detect.Result{}},
 		{name: "AWS all", det: detect.Result{Param: aws, Secret: aws, Stage: aws}, wantParam: true, wantSecret: true, wantStage: true},
-		{name: "GCP secret only", det: detect.Result{Secret: gcp}, wantSecret: true},
+		{name: "GoogleCloud secret only", det: detect.Result{Secret: gcloud}, wantSecret: true},
 		{name: "Azure param only", det: detect.Result{Param: az}, wantParam: true},
 		{name: "Azure both", det: detect.Result{Param: az, Secret: az}, wantParam: true, wantSecret: true},
-		{name: "GCP secret + Azure param", det: detect.Result{Param: az, Secret: gcp}, wantParam: true, wantSecret: true},
+		{name: "GoogleCloud secret + Azure param", det: detect.Result{Param: az, Secret: gcloud}, wantParam: true, wantSecret: true},
 	}
 
 	for _, tt := range tests {
@@ -66,7 +66,7 @@ func TestMakeAppWithDetect_flatAliases(t *testing.T) {
 func TestMakeAppWithDetect_flatCommandsAreRunnable(t *testing.T) {
 	t.Parallel()
 
-	// A flat GCP secret alias should behave like `gcloud secret`: it must carry
+	// A flat GoogleCloud secret alias should behave like `gcloud secret`: it must carry
 	// the --project flag folded in from the group. `--help` must succeed.
 	app := commands.MakeAppWithDetect(detect.Result{Secret: provider.ProviderGoogleCloud})
 	err := app.Run(t.Context(), []string{"suve", "secret", "--help"})

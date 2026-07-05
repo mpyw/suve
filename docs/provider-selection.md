@@ -25,7 +25,7 @@ The registry is built once with all backends registered
 
 ```go
 reg := aws.NewRegistry()
-gcp.Register(reg)
+gcloud.Register(reg)
 azure.Register(reg)
 ```
 
@@ -64,7 +64,7 @@ its own adapter:
 | SDK (banned outside its adapter)                       | Allowed only in            |
 | ----------------------------------------------------- | -------------------------- |
 | `aws-sdk-go-v2/service/ssm`, `.../secretsmanager`     | `internal/provider/aws/**` |
-| `cloud.google.com/go/secretmanager`                   | `internal/provider/gcp/**` |
+| `cloud.google.com/go/secretmanager`                   | `internal/provider/gcloud/**` |
 | `github.com/Azure/azure-sdk-for-go`                   | `internal/provider/azure/**` |
 
 `internal/infra` is a low-level allowed importer for AWS client bootstrapping

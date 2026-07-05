@@ -12,54 +12,54 @@ import (
 
 	"github.com/mpyw/suve/internal/domain"
 	"github.com/mpyw/suve/internal/provider"
-	"github.com/mpyw/suve/internal/version/gcpversion"
+	"github.com/mpyw/suve/internal/version/gcloudversion"
 )
 
-// GCPSecretStrategy implements the staging strategies for Google Cloud Secret
+// GoogleCloudSecretStrategy implements the staging strategies for Google Cloud Secret
 // Manager. Like the AWS strategies it is backed by a provider.Store and carries
 // no cloud SDK dependency. It differs from the AWS SecretStrategy in three
 // provider-specific ways:
 //
-//   - Versions are immutable integers, parsed with gcpversion (#N, ~SHIFT); a
+//   - Versions are immutable integers, parsed with gcloudversion (#N, ~SHIFT); a
 //     staged "edit" applies as a new version via Put.
 //   - There are no delete options (no force / recovery window), so
 //     HasDeleteOptions reports false and Delete ignores staged DeleteOptions.
 //   - There are no staging labels (:LABEL).
 //
 // A nil store yields a parser-only strategy (ParseName/ParseSpec).
-type GCPSecretStrategy struct {
+type GoogleCloudSecretStrategy struct {
 	store provider.Store
 }
 
-// NewGCPSecretStrategy creates a Google Cloud Secret Manager staging strategy
+// NewGoogleCloudSecretStrategy creates a Google Cloud Secret Manager staging strategy
 // over the given provider store. A nil store is allowed for parser-only use.
-func NewGCPSecretStrategy(store provider.Store) *GCPSecretStrategy {
-	return &GCPSecretStrategy{store: store}
+func NewGoogleCloudSecretStrategy(store provider.Store) *GoogleCloudSecretStrategy {
+	return &GoogleCloudSecretStrategy{store: store}
 }
 
 // Service returns the service type.
-func (s *GCPSecretStrategy) Service() Service {
+func (s *GoogleCloudSecretStrategy) Service() Service {
 	return ServiceSecret
 }
 
 // ServiceName returns the user-friendly service name.
-func (s *GCPSecretStrategy) ServiceName() string {
+func (s *GoogleCloudSecretStrategy) ServiceName() string {
 	return "Secret Manager"
 }
 
 // ItemName returns the item name for messages.
-func (s *GCPSecretStrategy) ItemName() string {
+func (s *GoogleCloudSecretStrategy) ItemName() string {
 	return "secret"
 }
 
 // HasDeleteOptions returns false: Google Cloud Secret Manager has no force /
 // recovery-window delete options.
-func (s *GCPSecretStrategy) HasDeleteOptions() bool {
+func (s *GoogleCloudSecretStrategy) HasDeleteOptions() bool {
 	return false
 }
 
 // Apply applies a staged operation to Google Cloud Secret Manager.
-func (s *GCPSecretStrategy) Apply(ctx context.Context, name string, entry Entry) error {
+func (s *GoogleCloudSecretStrategy) Apply(ctx context.Context, name string, entry Entry) error {
 	switch entry.Operation {
 	case OperationCreate:
 		return s.applyCreate(ctx, name, entry)
@@ -72,7 +72,7 @@ func (s *GCPSecretStrategy) Apply(ctx context.Context, name string, entry Entry)
 	}
 }
 
-func (s *GCPSecretStrategy) applyCreate(ctx context.Context, name string, entry Entry) error {
+func (s *GoogleCloudSecretStrategy) applyCreate(ctx context.Context, name string, entry Entry) error {
 	if _, err := s.store.Create(ctx, name, lo.FromPtr(entry.Value), domain.ValueTypeSecret, lo.FromPtr(entry.Description)); err != nil {
 		return fmt.Errorf("failed to create secret: %w", err)
 	}
@@ -80,7 +80,7 @@ func (s *GCPSecretStrategy) applyCreate(ctx context.Context, name string, entry 
 	return nil
 }
 
-func (s *GCPSecretStrategy) applyUpdate(ctx context.Context, name string, entry Entry) error {
+func (s *GoogleCloudSecretStrategy) applyUpdate(ctx context.Context, name string, entry Entry) error {
 	if entry.Value == nil {
 		return nil
 	}
@@ -93,7 +93,7 @@ func (s *GCPSecretStrategy) applyUpdate(ctx context.Context, name string, entry 
 	return nil
 }
 
-func (s *GCPSecretStrategy) applyDelete(ctx context.Context, name string) error {
+func (s *GoogleCloudSecretStrategy) applyDelete(ctx context.Context, name string) error {
 	if err := s.store.Delete(ctx, name); err != nil {
 		// Already deleted is considered success.
 		if errors.Is(err, provider.ErrNotFound) {
@@ -107,7 +107,7 @@ func (s *GCPSecretStrategy) applyDelete(ctx context.Context, name string) error 
 }
 
 // ApplyTags applies staged tag (label) changes to Google Cloud Secret Manager.
-func (s *GCPSecretStrategy) ApplyTags(ctx context.Context, name string, tagEntry TagEntry) error {
+func (s *GoogleCloudSecretStrategy) ApplyTags(ctx context.Context, name string, tagEntry TagEntry) error {
 	if len(tagEntry.Add) > 0 {
 		if err := s.store.Tag(ctx, name, tagEntry.Add); err != nil {
 			return err
@@ -125,7 +125,7 @@ func (s *GCPSecretStrategy) ApplyTags(ctx context.Context, name string, tagEntry
 
 // FetchLastModified returns the last modified time of the secret. Returns zero
 // time if the secret doesn't exist.
-func (s *GCPSecretStrategy) FetchLastModified(ctx context.Context, name string) (time.Time, error) {
+func (s *GoogleCloudSecretStrategy) FetchLastModified(ctx context.Context, name string) (time.Time, error) {
 	entry, err := s.store.Get(ctx, name, provider.VersionRef{})
 	if err != nil {
 		if errors.Is(err, provider.ErrNotFound) {
@@ -143,7 +143,7 @@ func (s *GCPSecretStrategy) FetchLastModified(ctx context.Context, name string) 
 }
 
 // FetchCurrent fetches the current value from Secret Manager for diffing.
-func (s *GCPSecretStrategy) FetchCurrent(ctx context.Context, name string) (*FetchResult, error) {
+func (s *GoogleCloudSecretStrategy) FetchCurrent(ctx context.Context, name string) (*FetchResult, error) {
 	entry, err := s.store.Get(ctx, name, provider.VersionRef{})
 	if err != nil {
 		return nil, err
@@ -156,7 +156,7 @@ func (s *GCPSecretStrategy) FetchCurrent(ctx context.Context, name string) (*Fet
 }
 
 // FetchCurrentTags fetches the current labels from Secret Manager.
-func (s *GCPSecretStrategy) FetchCurrentTags(ctx context.Context, name string) (map[string]string, error) {
+func (s *GoogleCloudSecretStrategy) FetchCurrentTags(ctx context.Context, name string) (map[string]string, error) {
 	entry, err := s.store.Get(ctx, name, provider.VersionRef{})
 	if err != nil {
 		if errors.Is(err, provider.ErrNotFound) {
@@ -179,8 +179,8 @@ func (s *GCPSecretStrategy) FetchCurrentTags(ctx context.Context, name string) (
 }
 
 // ParseName parses and validates a name for editing (no version specifier).
-func (s *GCPSecretStrategy) ParseName(input string) (string, error) {
-	spec, err := gcpversion.Parse(input)
+func (s *GoogleCloudSecretStrategy) ParseName(input string) (string, error) {
+	spec, err := gcloudversion.Parse(input)
 	if err != nil {
 		return "", err
 	}
@@ -194,7 +194,7 @@ func (s *GCPSecretStrategy) ParseName(input string) (string, error) {
 
 // FetchCurrentValue fetches the current value from Secret Manager for editing.
 // Returns *ResourceNotFoundError if the secret doesn't exist.
-func (s *GCPSecretStrategy) FetchCurrentValue(ctx context.Context, name string) (*EditFetchResult, error) {
+func (s *GoogleCloudSecretStrategy) FetchCurrentValue(ctx context.Context, name string) (*EditFetchResult, error) {
 	entry, err := s.store.Get(ctx, name, provider.VersionRef{})
 	if err != nil {
 		if errors.Is(err, provider.ErrNotFound) {
@@ -216,8 +216,8 @@ func (s *GCPSecretStrategy) FetchCurrentValue(ctx context.Context, name string) 
 }
 
 // ParseSpec parses a version spec string for reset.
-func (s *GCPSecretStrategy) ParseSpec(input string) (name string, hasVersion bool, err error) {
-	spec, err := gcpversion.Parse(input)
+func (s *GoogleCloudSecretStrategy) ParseSpec(input string) (name string, hasVersion bool, err error) {
+	spec, err := gcloudversion.Parse(input)
 	if err != nil {
 		return "", false, err
 	}
@@ -228,13 +228,13 @@ func (s *GCPSecretStrategy) ParseSpec(input string) (name string, hasVersion boo
 }
 
 // FetchVersion fetches the value for a specific version.
-func (s *GCPSecretStrategy) FetchVersion(ctx context.Context, input string) (value string, versionLabel string, err error) {
-	spec, err := gcpversion.Parse(input)
+func (s *GoogleCloudSecretStrategy) FetchVersion(ctx context.Context, input string) (value string, versionLabel string, err error) {
+	spec, err := gcloudversion.Parse(input)
 	if err != nil {
 		return "", "", err
 	}
 
-	ref, err := s.store.Resolve(ctx, spec.Name, gcpSecretSpecSuffix(spec))
+	ref, err := s.store.Resolve(ctx, spec.Name, gcloudSecretSpecSuffix(spec))
 	if err != nil {
 		return "", "", err
 	}
@@ -247,10 +247,10 @@ func (s *GCPSecretStrategy) FetchVersion(ctx context.Context, input string) (val
 	return entry.Value, "#" + entry.Version.ID, nil
 }
 
-// gcpSecretSpecSuffix reconstructs the version-spec suffix (the part after the
+// gcloudSecretSpecSuffix reconstructs the version-spec suffix (the part after the
 // name) so that name+suffix re-parses to an equivalent spec, as
 // provider.Reader.Resolve expects.
-func gcpSecretSpecSuffix(spec *gcpversion.Spec) string {
+func gcloudSecretSpecSuffix(spec *gcloudversion.Spec) string {
 	var b strings.Builder
 
 	if spec.Absolute.Version != nil {
@@ -266,8 +266,8 @@ func gcpSecretSpecSuffix(spec *gcpversion.Spec) string {
 	return b.String()
 }
 
-// GCPSecretParserFactory creates a Parser without provider access, for
+// GoogleCloudSecretParserFactory creates a Parser without provider access, for
 // operations that don't need Google Cloud access (e.g. status, parsing).
-func GCPSecretParserFactory() Parser {
-	return NewGCPSecretStrategy(nil)
+func GoogleCloudSecretParserFactory() Parser {
+	return NewGoogleCloudSecretStrategy(nil)
 }

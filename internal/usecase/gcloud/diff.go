@@ -1,17 +1,17 @@
-package gcp
+package gcloud
 
 import (
 	"context"
 
 	"github.com/mpyw/suve/internal/domain"
 	"github.com/mpyw/suve/internal/provider"
-	"github.com/mpyw/suve/internal/version/gcpversion"
+	"github.com/mpyw/suve/internal/version/gcloudversion"
 )
 
 // DiffInput holds input for the diff use case.
 type DiffInput struct {
-	Spec1 *gcpversion.Spec
-	Spec2 *gcpversion.Spec
+	Spec1 *gcloudversion.Spec
+	Spec2 *gcloudversion.Spec
 }
 
 // DiffOutput holds the result of the diff use case.
@@ -52,7 +52,7 @@ func (u *DiffUseCase) Execute(ctx context.Context, input DiffInput) (*DiffOutput
 }
 
 // resolveAndGet resolves a spec to a version ref and fetches the entry.
-func (u *DiffUseCase) resolveAndGet(ctx context.Context, spec *gcpversion.Spec) (*domain.Entry, error) {
+func (u *DiffUseCase) resolveAndGet(ctx context.Context, spec *gcloudversion.Spec) (*domain.Entry, error) {
 	ref, err := u.Reader.Resolve(ctx, spec.Name, specSuffix(spec))
 	if err != nil {
 		return nil, err

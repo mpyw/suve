@@ -7,7 +7,7 @@
 //
 //   - A provider is "active via env" when its address/identity env var is set:
 //     AWS     — AWS_ACCESS_KEY_ID | AWS_VAULT | AWS_PROFILE (both services)
-//     GCP     — GOOGLE_CLOUD_PROJECT (secret only)
+//     GoogleCloud     — GOOGLE_CLOUD_PROJECT (secret only)
 //     Azure   — AZURE_KEYVAULT_NAME (secret) / AZURE_APPCONFIG_NAME (param)
 //   - A flat alias is exposed for a service only when exactly ONE provider is
 //     active for it. Zero or two-plus active means no alias — the user must use
@@ -57,11 +57,11 @@ type Result struct {
 	Stage provider.Provider
 
 	// ParamActive and SecretActive list every provider active for that service,
-	// in stable order (AWS, GCP, Azure).
+	// in stable order (AWS, GoogleCloud, Azure).
 	ParamActive  []provider.Provider
 	SecretActive []provider.Provider
 	// StageActive lists every staging-capable provider active, in stable order
-	// (AWS, GCP).
+	// (AWS, GoogleCloud).
 	StageActive []provider.Provider
 
 	// AWSViaFallback is true when AWS became active only through the
@@ -88,11 +88,11 @@ func Resolve(env Environment) Result {
 	awsEnv := getenv("AWS_ACCESS_KEY_ID") != "" ||
 		getenv("AWS_VAULT") != "" ||
 		getenv("AWS_PROFILE") != ""
-	gcpSecret := getenv("GOOGLE_CLOUD_PROJECT") != ""
+	gcloudSecret := getenv("GOOGLE_CLOUD_PROJECT") != ""
 	azureSecret := getenv("AZURE_KEYVAULT_NAME") != ""
 	azureParam := getenv("AZURE_APPCONFIG_NAME") != ""
 
-	anyEnv := awsEnv || gcpSecret || azureSecret || azureParam
+	anyEnv := awsEnv || gcloudSecret || azureSecret || azureParam
 
 	var res Result
 
@@ -102,12 +102,12 @@ func Resolve(env Environment) Result {
 		res.AWSViaFallback = true
 	}
 
-	// Secret candidates in stable order: AWS, GCP, Azure (Key Vault).
+	// Secret candidates in stable order: AWS, GoogleCloud, Azure (Key Vault).
 	if awsActive {
 		res.SecretActive = append(res.SecretActive, provider.ProviderAWS)
 	}
 
-	if gcpSecret {
+	if gcloudSecret {
 		res.SecretActive = append(res.SecretActive, provider.ProviderGoogleCloud)
 	}
 
@@ -115,7 +115,7 @@ func Resolve(env Environment) Result {
 		res.SecretActive = append(res.SecretActive, provider.ProviderAzure)
 	}
 
-	// Param candidates in stable order: AWS, Azure (App Configuration). GCP has
+	// Param candidates in stable order: AWS, Azure (App Configuration). GoogleCloud has
 	// no parameter store.
 	if awsActive {
 		res.ParamActive = append(res.ParamActive, provider.ProviderAWS)
@@ -131,7 +131,7 @@ func Resolve(env Environment) Result {
 		res.StageActive = append(res.StageActive, provider.ProviderAWS)
 	}
 
-	if gcpSecret {
+	if gcloudSecret {
 		res.StageActive = append(res.StageActive, provider.ProviderGoogleCloud)
 	}
 

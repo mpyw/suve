@@ -2,7 +2,7 @@
 // and App Configuration params).
 //
 // The use cases are written against the provider-neutral Reader/Writer/Store
-// interfaces. Unlike the GCP use cases they take a pre-reconstructed version
+// interfaces. Unlike the Google Cloud use cases they take a pre-reconstructed version
 // suffix string (e.g. "#abc123", "~2", or "") rather than a typed spec: the two
 // Azure services use different version grammars (Key Vault has opaque version
 // ids; App Configuration has none), so decoupling the use cases from the spec

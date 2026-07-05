@@ -7,7 +7,7 @@ import (
 	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/provider/aws"
 	"github.com/mpyw/suve/internal/provider/azure"
-	"github.com/mpyw/suve/internal/provider/gcp"
+	"github.com/mpyw/suve/internal/provider/gcloud"
 	"github.com/mpyw/suve/internal/staging"
 )
 
@@ -20,26 +20,26 @@ import (
 //nolint:gochecknoglobals // process-wide provider registry, built once
 var registry = func() *provider.Registry {
 	reg := aws.NewRegistry()
-	gcp.Register(reg)
+	gcloud.Register(reg)
 	azure.Register(reg)
 
 	return reg
 }()
 
-// gcpProjectContextKey keys the resolved Google Cloud project id stored in the
+// gcloudProjectContextKey keys the resolved Google Cloud project id stored in the
 // context by the gcloud command group's Before hook.
-type gcpProjectContextKey struct{}
+type gcloudProjectContextKey struct{}
 
-// WithGCPProject returns a context carrying the resolved Google Cloud project
+// WithGoogleCloudProject returns a context carrying the resolved Google Cloud project
 // id. The gcloud command group sets it once (from --project or the
 // GOOGLE_CLOUD_PROJECT env) so every gcloud subcommand can resolve a store
 // without threading the flag through the generic command Config.
-func WithGCPProject(ctx context.Context, project string) context.Context {
-	return context.WithValue(ctx, gcpProjectContextKey{}, project)
+func WithGoogleCloudProject(ctx context.Context, project string) context.Context {
+	return context.WithValue(ctx, gcloudProjectContextKey{}, project)
 }
 
-func gcpProjectFromContext(ctx context.Context) string {
-	project, _ := ctx.Value(gcpProjectContextKey{}).(string)
+func gcloudProjectFromContext(ctx context.Context) string {
+	project, _ := ctx.Value(gcloudProjectContextKey{}).(string)
 
 	return project
 }
@@ -119,11 +119,11 @@ func SecretStore(ctx context.Context) (provider.Store, error) {
 	return storeForKind(ctx, provider.KindSecret)
 }
 
-// GCPSecretStore resolves a provider.Store for the Google Cloud Secret Manager
-// service. The project id is read from the context (see WithGCPProject); it
+// GoogleCloudSecretStore resolves a provider.Store for the Google Cloud Secret Manager
+// service. The project id is read from the context (see WithGoogleCloudProject); it
 // returns a clear error when no project could be resolved.
-func GCPSecretStore(ctx context.Context) (provider.Store, error) {
-	project := gcpProjectFromContext(ctx)
+func GoogleCloudSecretStore(ctx context.Context) (provider.Store, error) {
+	project := gcloudProjectFromContext(ctx)
 	if project == "" {
 		return nil, errors.New(
 			"no Google Cloud project specified: set --project or the GOOGLE_CLOUD_PROJECT environment variable",
@@ -199,23 +199,23 @@ func SecretStrategyFactory(ctx context.Context) (staging.FullStrategy, error) {
 	return staging.NewSecretStrategy(store), nil
 }
 
-// GCPSecretStrategyFactory builds a staging FullStrategy for Google Cloud Secret
+// GoogleCloudSecretStrategyFactory builds a staging FullStrategy for Google Cloud Secret
 // Manager, wrapping a provider.Store resolved for the context's project. It
 // satisfies staging.StrategyFactory.
-func GCPSecretStrategyFactory(ctx context.Context) (staging.FullStrategy, error) {
-	store, err := GCPSecretStore(ctx)
+func GoogleCloudSecretStrategyFactory(ctx context.Context) (staging.FullStrategy, error) {
+	store, err := GoogleCloudSecretStore(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	return staging.NewGCPSecretStrategy(store), nil
+	return staging.NewGoogleCloudSecretStrategy(store), nil
 }
 
-// GCPStagingScopeResolver resolves the Google Cloud staging scope from the
-// project stashed in the context (see WithGCPProject). It performs no network
+// GoogleCloudStagingScopeResolver resolves the Google Cloud staging scope from the
+// project stashed in the context (see WithGoogleCloudProject). It performs no network
 // calls. It satisfies staging.ScopeResolver.
-func GCPStagingScopeResolver(ctx context.Context) (staging.ResolvedScope, error) {
-	project := gcpProjectFromContext(ctx)
+func GoogleCloudStagingScopeResolver(ctx context.Context) (staging.ResolvedScope, error) {
+	project := gcloudProjectFromContext(ctx)
 	if project == "" {
 		return staging.ResolvedScope{}, errors.New(
 			"no Google Cloud project specified: set --project or the GOOGLE_CLOUD_PROJECT environment variable",

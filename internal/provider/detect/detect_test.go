@@ -20,7 +20,7 @@ func TestResolve(t *testing.T) {
 	t.Parallel()
 
 	aws := provider.ProviderAWS
-	gcp := provider.ProviderGoogleCloud
+	gcloud := provider.ProviderGoogleCloud
 	az := provider.ProviderAzure
 
 	tests := []struct {
@@ -75,11 +75,11 @@ func TestResolve(t *testing.T) {
 			wantSecretSet: []provider.Provider{aws},
 		},
 		{
-			name:          "GCP only -> secret=GCP, no param",
+			name:          "GoogleCloud only -> secret=GoogleCloud, no param",
 			vars:          map[string]string{"GOOGLE_CLOUD_PROJECT": "my-proj"},
-			wantSecret:    gcp,
-			wantSecretSet: []provider.Provider{gcp},
-			// param stays empty: GCP has no parameter store
+			wantSecret:    gcloud,
+			wantSecretSet: []provider.Provider{gcloud},
+			// param stays empty: GoogleCloud has no parameter store
 		},
 		{
 			name:          "Azure Key Vault only -> secret=Azure, no param",
@@ -102,12 +102,12 @@ func TestResolve(t *testing.T) {
 			wantSecretSet: []provider.Provider{az},
 		},
 		{
-			name:          "AWS + GCP -> secret ambiguous (none), param=AWS",
+			name:          "AWS + GoogleCloud -> secret ambiguous (none), param=AWS",
 			vars:          map[string]string{"AWS_PROFILE": "dev", "GOOGLE_CLOUD_PROJECT": "p"},
 			wantParam:     aws,
 			wantSecret:    "",
 			wantParamSet:  []provider.Provider{aws},
-			wantSecretSet: []provider.Provider{aws, gcp},
+			wantSecretSet: []provider.Provider{aws, gcloud},
 		},
 		{
 			name:          "AWS + Azure Key Vault -> secret ambiguous, param=AWS",
@@ -118,12 +118,12 @@ func TestResolve(t *testing.T) {
 			wantSecretSet: []provider.Provider{aws, az},
 		},
 		{
-			name:          "GCP + Azure App Config -> secret=GCP, param=Azure (each unique)",
+			name:          "GoogleCloud + Azure App Config -> secret=GoogleCloud, param=Azure (each unique)",
 			vars:          map[string]string{"GOOGLE_CLOUD_PROJECT": "p", "AZURE_APPCONFIG_NAME": "ac"},
 			wantParam:     az,
-			wantSecret:    gcp,
+			wantSecret:    gcloud,
 			wantParamSet:  []provider.Provider{az},
-			wantSecretSet: []provider.Provider{gcp},
+			wantSecretSet: []provider.Provider{gcloud},
 		},
 		{
 			name:          "AWS + Azure App Config -> param ambiguous, secret=AWS",
@@ -134,10 +134,10 @@ func TestResolve(t *testing.T) {
 			wantSecretSet: []provider.Provider{aws},
 		},
 		{
-			name:       "GCP set with creds file present -> no AWS fallback (env is active)",
+			name:       "GoogleCloud set with creds file present -> no AWS fallback (env is active)",
 			vars:       map[string]string{"GOOGLE_CLOUD_PROJECT": "p"},
 			credsExist: true,
-			wantSecret: gcp, wantSecretSet: []provider.Provider{gcp},
+			wantSecret: gcloud, wantSecretSet: []provider.Provider{gcloud},
 			// AWS must NOT appear: fallback only when nothing is active via env
 		},
 	}

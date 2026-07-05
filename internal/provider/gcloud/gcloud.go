@@ -1,10 +1,10 @@
-// Package gcp wires the Google Cloud Secret Manager adapter into a
+// Package gcloud wires the Google Cloud Secret Manager adapter into a
 // provider.Factory / provider.Registry. It builds a Secret Manager client from
 // Application Default Credentials and hands it to the secret subpackage.
 //
 // Google Cloud offers no parameter store, so the factory returns
 // provider.ErrUnsupportedKind for KindParam.
-package gcp
+package gcloud
 
 import (
 	"context"
@@ -17,7 +17,7 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/mpyw/suve/internal/provider"
-	"github.com/mpyw/suve/internal/provider/gcp/secret"
+	"github.com/mpyw/suve/internal/provider/gcloud/secret"
 )
 
 // EmulatorEnvVar is the environment variable that, when set (e.g. to
@@ -25,7 +25,7 @@ import (
 // plaintext gRPC with no authentication. It is a testing seam only: in normal
 // use it is unset and the client uses Application Default Credentials over TLS.
 // Never set this in production.
-const EmulatorEnvVar = "SUVE_GCP_SECRETMANAGER_ENDPOINT"
+const EmulatorEnvVar = "SUVE_GCLOUD_SECRETMANAGER_ENDPOINT"
 
 // newSecretManagerClient builds the Secret Manager client, honoring the
 // emulator seam (EmulatorEnvVar) when set.

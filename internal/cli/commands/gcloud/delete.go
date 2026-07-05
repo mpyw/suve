@@ -11,12 +11,12 @@ import (
 	cliinternal "github.com/mpyw/suve/internal/cli/commands/internal"
 	"github.com/mpyw/suve/internal/cli/confirm"
 	"github.com/mpyw/suve/internal/cli/output"
-	"github.com/mpyw/suve/internal/usecase/gcp"
+	"github.com/mpyw/suve/internal/usecase/gcloud"
 )
 
 // DeleteRunner executes the delete command.
 type DeleteRunner struct {
-	UseCase *gcp.DeleteUseCase
+	UseCase *gcloud.DeleteUseCase
 	Stdout  io.Writer
 	Stderr  io.Writer
 }
@@ -60,12 +60,12 @@ func deleteAction(ctx context.Context, cmd *cli.Command) error {
 	name := cmd.Args().First()
 	skipConfirm := cmd.Bool("yes")
 
-	store, err := cliinternal.GCPSecretStore(ctx)
+	store, err := cliinternal.GoogleCloudSecretStore(ctx)
 	if err != nil {
 		return err
 	}
 
-	uc := &gcp.DeleteUseCase{Store: store}
+	uc := &gcloud.DeleteUseCase{Store: store}
 
 	if !skipConfirm {
 		currentValue, _ := uc.GetCurrentValue(ctx, name)
@@ -103,7 +103,7 @@ func deleteAction(ctx context.Context, cmd *cli.Command) error {
 
 // Run executes the delete command.
 func (r *DeleteRunner) Run(ctx context.Context, opts DeleteOptions) error {
-	result, err := r.UseCase.Execute(ctx, gcp.DeleteInput{Name: opts.Name})
+	result, err := r.UseCase.Execute(ctx, gcloud.DeleteInput{Name: opts.Name})
 	if err != nil {
 		return err
 	}

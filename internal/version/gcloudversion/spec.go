@@ -1,4 +1,4 @@
-// Package gcpversion provides version spec parsing for Google Cloud Secret
+// Package gcloudversion provides version spec parsing for Google Cloud Secret
 // Manager (name#VERSION~SHIFT).
 //
 // Google Cloud secret versions are positive integers (1, 2, 3, ...) or the
@@ -6,7 +6,7 @@
 // the SSM Parameter Store grammar (an integer #VERSION plus ~SHIFT) rather than
 // the Secrets Manager one, and a ":LABEL" specifier is rejected at parse time
 // with a clear error so the mistake never reaches the provider.
-package gcpversion
+package gcloudversion
 
 import (
 	"errors"

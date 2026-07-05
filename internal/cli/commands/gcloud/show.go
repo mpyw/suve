@@ -13,8 +13,8 @@ import (
 	"github.com/mpyw/suve/internal/jsonutil"
 	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/timeutil"
-	"github.com/mpyw/suve/internal/usecase/gcp"
-	"github.com/mpyw/suve/internal/version/gcpversion"
+	"github.com/mpyw/suve/internal/usecase/gcloud"
+	"github.com/mpyw/suve/internal/version/gcloudversion"
 )
 
 // showJSONOutput represents the JSON output structure for the show command.
@@ -28,18 +28,18 @@ type showJSONOutput struct {
 
 // showPresenter renders Google Cloud Secret Manager show output.
 type showPresenter struct {
-	uc     *gcp.ShowUseCase
-	spec   *gcpversion.Spec
-	result *gcp.ShowOutput
+	uc     *gcloud.ShowUseCase
+	spec   *gcloudversion.Spec
+	result *gcloud.ShowOutput
 }
 
 // NewShowPresenter builds a Google Cloud show presenter over the given reader and spec.
-func NewShowPresenter(reader provider.Reader, spec *gcpversion.Spec) genericshow.Presenter {
-	return &showPresenter{uc: &gcp.ShowUseCase{Reader: reader}, spec: spec}
+func NewShowPresenter(reader provider.Reader, spec *gcloudversion.Spec) genericshow.Presenter {
+	return &showPresenter{uc: &gcloud.ShowUseCase{Reader: reader}, spec: spec}
 }
 
 func (p *showPresenter) Fetch(ctx context.Context) error {
-	result, err := p.uc.Execute(ctx, gcp.ShowInput{Spec: p.spec})
+	result, err := p.uc.Execute(ctx, gcloud.ShowInput{Spec: p.spec})
 	if err != nil {
 		return err
 	}
@@ -111,7 +111,7 @@ func (p *showPresenter) RenderJSON(stdout io.Writer, value string) error {
 
 // ShowCommand returns the Google Cloud Secret Manager show command.
 func ShowCommand() *cli.Command {
-	return genericshow.Command(genericshow.Config[*gcpversion.Spec]{
+	return genericshow.Command(genericshow.Config[*gcloudversion.Spec]{
 		Usage:     "Show secret value with metadata",
 		ArgsUsage: "<name[#VERSION][~SHIFT]*>",
 		Description: `Display a secret's value along with its metadata.
@@ -130,9 +130,9 @@ EXAMPLES:
   suve gcloud secret show --raw my-secret                  Output raw value (for piping)
   suve gcloud secret show --output=json my-secret          Output as JSON`,
 		UsageError: "usage: suve gcloud secret show <name>",
-		ParseSpec:  gcpversion.Parse,
-		NewPresenter: func(ctx context.Context, spec *gcpversion.Spec) (genericshow.Presenter, error) {
-			store, err := cliinternal.GCPSecretStore(ctx)
+		ParseSpec:  gcloudversion.Parse,
+		NewPresenter: func(ctx context.Context, spec *gcloudversion.Spec) (genericshow.Presenter, error) {
+			store, err := cliinternal.GoogleCloudSecretStore(ctx)
 			if err != nil {
 				return nil, err
 			}

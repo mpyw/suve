@@ -1,4 +1,4 @@
-package gcpversion_test
+package gcloudversion_test
 
 import (
 	"testing"
@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/mpyw/suve/internal/version/gcpversion"
+	"github.com/mpyw/suve/internal/version/gcloudversion"
 )
 
 func TestParse(t *testing.T) {
@@ -74,7 +74,7 @@ func TestParse(t *testing.T) {
 			wantName: "my-secret",
 		},
 
-		// :LABEL is rejected (GCP has no staging labels).
+		// :LABEL is rejected (GoogleCloud has no staging labels).
 		{
 			name:    "label rejected",
 			input:   "my-secret:latest",
@@ -203,7 +203,7 @@ func TestParse(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			spec, err := gcpversion.Parse(tt.input)
+			spec, err := gcloudversion.Parse(tt.input)
 			if tt.wantErr {
 				require.Error(t, err)
 
@@ -221,9 +221,9 @@ func TestParse(t *testing.T) {
 func TestParse_LabelErrorMessage(t *testing.T) {
 	t.Parallel()
 
-	_, err := gcpversion.Parse("my-secret:latest")
+	_, err := gcloudversion.Parse("my-secret:latest")
 	require.Error(t, err)
-	require.ErrorIs(t, err, gcpversion.ErrLabelUnsupported)
+	require.ErrorIs(t, err, gcloudversion.ErrLabelUnsupported)
 }
 
 // TestParse_LabelAfterVersionRejected exercises the ':' reject path reached
@@ -232,9 +232,9 @@ func TestParse_LabelErrorMessage(t *testing.T) {
 func TestParse_LabelAfterVersionRejected(t *testing.T) {
 	t.Parallel()
 
-	_, err := gcpversion.Parse("my-secret#3:latest")
+	_, err := gcloudversion.Parse("my-secret#3:latest")
 	require.Error(t, err)
-	require.ErrorIs(t, err, gcpversion.ErrLabelUnsupported)
+	require.ErrorIs(t, err, gcloudversion.ErrLabelUnsupported)
 }
 
 // TestParse_VersionOverflow exercises the strconv.ParseInt failure branch when
@@ -242,7 +242,7 @@ func TestParse_LabelAfterVersionRejected(t *testing.T) {
 func TestParse_VersionOverflow(t *testing.T) {
 	t.Parallel()
 
-	_, err := gcpversion.Parse("my-secret#99999999999999999999999999")
+	_, err := gcloudversion.Parse("my-secret#99999999999999999999999999")
 	require.Error(t, err)
 	require.ErrorContains(t, err, "out of range")
 }
@@ -253,7 +253,7 @@ func TestParseDiffArgs(t *testing.T) {
 	t.Run("single spec compares against latest", func(t *testing.T) {
 		t.Parallel()
 
-		spec1, spec2, err := gcpversion.ParseDiffArgs([]string{"my-secret#3"})
+		spec1, spec2, err := gcloudversion.ParseDiffArgs([]string{"my-secret#3"})
 		require.NoError(t, err)
 		assert.Equal(t, lo.ToPtr(int64(3)), spec1.Absolute.Version)
 		assert.Nil(t, spec2.Absolute.Version)
@@ -262,7 +262,7 @@ func TestParseDiffArgs(t *testing.T) {
 	t.Run("two specs", func(t *testing.T) {
 		t.Parallel()
 
-		spec1, spec2, err := gcpversion.ParseDiffArgs([]string{"my-secret#1", "my-secret#2"})
+		spec1, spec2, err := gcloudversion.ParseDiffArgs([]string{"my-secret#1", "my-secret#2"})
 		require.NoError(t, err)
 		assert.Equal(t, lo.ToPtr(int64(1)), spec1.Absolute.Version)
 		assert.Equal(t, lo.ToPtr(int64(2)), spec2.Absolute.Version)
@@ -271,7 +271,7 @@ func TestParseDiffArgs(t *testing.T) {
 	t.Run("mixed format: full spec plus specifier-only", func(t *testing.T) {
 		t.Parallel()
 
-		spec1, spec2, err := gcpversion.ParseDiffArgs([]string{"my-secret#1", "#2"})
+		spec1, spec2, err := gcloudversion.ParseDiffArgs([]string{"my-secret#1", "#2"})
 		require.NoError(t, err)
 		assert.Equal(t, lo.ToPtr(int64(1)), spec1.Absolute.Version)
 		assert.Equal(t, lo.ToPtr(int64(2)), spec2.Absolute.Version)
@@ -280,7 +280,7 @@ func TestParseDiffArgs(t *testing.T) {
 	t.Run("partial spec: name plus specifier-only is swapped", func(t *testing.T) {
 		t.Parallel()
 
-		spec1, spec2, err := gcpversion.ParseDiffArgs([]string{"my-secret", "#3"})
+		spec1, spec2, err := gcloudversion.ParseDiffArgs([]string{"my-secret", "#3"})
 		require.NoError(t, err)
 		assert.Equal(t, lo.ToPtr(int64(3)), spec1.Absolute.Version)
 		assert.Nil(t, spec2.Absolute.Version)
@@ -289,7 +289,7 @@ func TestParseDiffArgs(t *testing.T) {
 	t.Run("three args: name plus two specifiers", func(t *testing.T) {
 		t.Parallel()
 
-		spec1, spec2, err := gcpversion.ParseDiffArgs([]string{"my-secret", "#1", "#2"})
+		spec1, spec2, err := gcloudversion.ParseDiffArgs([]string{"my-secret", "#1", "#2"})
 		require.NoError(t, err)
 		assert.Equal(t, lo.ToPtr(int64(1)), spec1.Absolute.Version)
 		assert.Equal(t, lo.ToPtr(int64(2)), spec2.Absolute.Version)
@@ -298,21 +298,21 @@ func TestParseDiffArgs(t *testing.T) {
 	t.Run("no args rejected", func(t *testing.T) {
 		t.Parallel()
 
-		_, _, err := gcpversion.ParseDiffArgs([]string{})
+		_, _, err := gcloudversion.ParseDiffArgs([]string{})
 		require.Error(t, err)
 	})
 
 	t.Run("too many args rejected", func(t *testing.T) {
 		t.Parallel()
 
-		_, _, err := gcpversion.ParseDiffArgs([]string{"a", "b", "c", "d"})
+		_, _, err := gcloudversion.ParseDiffArgs([]string{"a", "b", "c", "d"})
 		require.Error(t, err)
 	})
 
 	t.Run("label rejected", func(t *testing.T) {
 		t.Parallel()
 
-		_, _, err := gcpversion.ParseDiffArgs([]string{"my-secret:latest"})
+		_, _, err := gcloudversion.ParseDiffArgs([]string{"my-secret:latest"})
 		require.Error(t, err)
 	})
 }

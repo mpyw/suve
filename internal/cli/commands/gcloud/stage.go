@@ -8,17 +8,17 @@ import (
 	stgcli "github.com/mpyw/suve/internal/staging/cli"
 )
 
-// gcpStageConfig is the staging command config for Google Cloud Secret Manager.
+// gcloudStageConfig is the staging command config for Google Cloud Secret Manager.
 // Because Google Cloud is secret-only, the single config drives the whole
 // `gcloud stage` group directly (no param/secret split). The ScopeResolver keys
 // on-disk staging state by the resolved project.
-func gcpStageConfig() stgcli.CommandConfig {
+func gcloudStageConfig() stgcli.CommandConfig {
 	return stgcli.CommandConfig{
 		CommandName:   "secret",
 		ItemName:      "secret",
-		Factory:       cliinternal.GCPSecretStrategyFactory,
-		ParserFactory: staging.GCPSecretParserFactory,
-		ScopeResolver: cliinternal.GCPStagingScopeResolver,
+		Factory:       cliinternal.GoogleCloudSecretStrategyFactory,
+		ParserFactory: staging.GoogleCloudSecretParserFactory,
+		ScopeResolver: cliinternal.GoogleCloudStagingScopeResolver,
 	}
 }
 
@@ -65,7 +65,7 @@ func StageCommand() *cli.Command {
 		Aliases:         []string{"stg"},
 		Usage:           "Manage staged changes for Google Cloud Secret Manager",
 		Description:     stageDescription,
-		Commands:        stageSubcommands(gcpStageConfig()),
+		Commands:        stageSubcommands(gcloudStageConfig()),
 		CommandNotFound: cliinternal.CommandNotFound,
 	}
 }
@@ -83,7 +83,7 @@ func FlatStageCommand(name string) *cli.Command {
 		Description:     stageDescription,
 		Flags:           projectFlags(),
 		Before:          resolveProject,
-		Commands:        stageSubcommands(gcpStageConfig()),
+		Commands:        stageSubcommands(gcloudStageConfig()),
 		CommandNotFound: cliinternal.CommandNotFound,
 	}
 }

@@ -19,7 +19,7 @@ type Prompter struct {
 
 	// Target is a provider-neutral, human-readable description of where the
 	// operation applies (e.g. "my-profile (123456789012 / us-east-1)" for AWS or
-	// "project my-gcp-project" for Google Cloud). When set, it is shown before
+	// "project my-gcloud-project" for Google Cloud). When set, it is shown before
 	// the prompt. It takes precedence over the AWS-specific fields below.
 	Target string
 

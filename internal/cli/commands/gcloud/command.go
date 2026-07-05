@@ -74,7 +74,7 @@ func resolveProject(ctx context.Context, cmd *cli.Command) (context.Context, err
 		project = os.Getenv("GOOGLE_CLOUD_PROJECT")
 	}
 
-	return cliinternal.WithGCPProject(ctx, project), nil
+	return cliinternal.WithGoogleCloudProject(ctx, project), nil
 }
 
 // SecretCommand returns the "gcloud secret" subcommand group.
