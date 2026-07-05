@@ -103,6 +103,12 @@ linters:
               desc: "The Google Cloud Secret Manager SDK must stay behind the provider seam (internal/provider/gcp only)"
             - pkg: "cloud.google.com/go/secretmanager/apiv1/secretmanagerpb"
               desc: "The Google Cloud Secret Manager SDK must stay behind the provider seam (internal/provider/gcp only)"
+        azure-sdk:
+          files:
+            - "!**/internal/provider/azure/**"
+          deny:
+            - pkg: "github.com/Azure/azure-sdk-for-go"
+              desc: "The Azure SDK must stay behind the provider seam (internal/provider/azure only)"
     forbidigo:
       forbid:
         - pattern: 'fmt\.Fprint(ln|f)?'

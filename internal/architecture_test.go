@@ -17,11 +17,11 @@ import (
 
 // TestNoAWSSDKOutsideProviderAWS enforces that only internal/provider/aws (plus
 // the allowed low-level package internal/infra, which is not under the guarded
-// roots) imports the AWS service SDK, and that only internal/provider/gcp
-// imports the Google Cloud Secret Manager SDK. It fails loudly if a package
-// under internal/cli, internal/usecase, internal/staging, or internal/gui
-// reintroduces a direct cloud-SDK dependency, which would break provider
-// pluggability.
+// roots) imports the AWS service SDK, that only internal/provider/gcp imports
+// the Google Cloud Secret Manager SDK, and that only internal/provider/azure
+// imports the Azure SDK. It fails loudly if a package under internal/cli,
+// internal/usecase, internal/staging, or internal/gui reintroduces a direct
+// cloud-SDK dependency, which would break provider pluggability.
 func TestNoAWSSDKOutsideProviderAWS(t *testing.T) {
 	t.Parallel()
 
@@ -38,6 +38,7 @@ func TestNoAWSSDKOutsideProviderAWS(t *testing.T) {
 		"github.com/aws/aws-sdk-go-v2/service/ssm",
 		"github.com/aws/aws-sdk-go-v2/service/secretsmanager",
 		"cloud.google.com/go/secretmanager",
+		"github.com/Azure/azure-sdk-for-go",
 		"github.com/mpyw/suve/internal/api/paramapi",
 		"github.com/mpyw/suve/internal/api/secretapi",
 	}
