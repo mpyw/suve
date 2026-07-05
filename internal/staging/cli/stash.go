@@ -9,11 +9,14 @@ import (
 	"github.com/mpyw/suve/internal/cli/passphrase"
 	"github.com/mpyw/suve/internal/cli/terminal"
 	"github.com/mpyw/suve/internal/provider"
+	"github.com/mpyw/suve/internal/staging"
 	"github.com/mpyw/suve/internal/staging/store/file"
 )
 
-// NewGlobalStashCommand creates a global stash command group that operates on all services.
-func NewGlobalStashCommand() *cli.Command {
+// NewGlobalStashCommand creates a global stash command group that operates on all
+// services. The resolver determines the provider staging scope (nil defaults to
+// AWS).
+func NewGlobalStashCommand(resolver staging.ScopeResolver) *cli.Command {
 	return &cli.Command{
 		Name:  "stash",
 		Usage: "Save staged changes to file for later use",
@@ -33,13 +36,13 @@ EXAMPLES:
    suve stage stash pop --keep         Restore from the stash file but keep it
    suve stage stash show               Preview stashed changes
    suve stage stash drop               Delete stashed changes`,
-		Action: stashPushAction(""), // Default action = push
-		Flags:  stashPushFlags(),    // Default flags = push flags
+		Action: stashPushAction("", resolver), // Default action = push
+		Flags:  stashPushFlags(),              // Default flags = push flags
 		Commands: []*cli.Command{
-			newGlobalStashPushCommand(),
-			newGlobalStashPopCommand(),
-			newGlobalStashShowCommand(),
-			newGlobalStashDropCommand(),
+			newGlobalStashPushCommand(resolver),
+			newGlobalStashPopCommand(resolver),
+			newGlobalStashShowCommand(resolver),
+			newGlobalStashDropCommand(resolver),
 		},
 	}
 }
@@ -74,8 +77,8 @@ EXAMPLES:
 			cfg.CommandName,
 			cfg.CommandName,
 			cfg.CommandName),
-		Action: stashPushAction(service), // Default action = push
-		Flags:  stashPushFlags(),         // Default flags = push flags
+		Action: stashPushAction(service, cfg.ScopeResolver), // Default action = push
+		Flags:  stashPushFlags(),                            // Default flags = push flags
 		Commands: []*cli.Command{
 			newStashPushCommand(cfg),
 			newStashPopCommand(cfg),
@@ -85,11 +88,11 @@ EXAMPLES:
 	}
 }
 
-// fileStoreForReading creates a file store for reading operations.
-// It handles passphrase prompting if the file is encrypted.
-// If checkExists is true, returns an error if the file doesn't exist.
-func fileStoreForReading(cmd *cli.Command, accountID, region string, checkExists bool) (*file.Store, error) {
-	basicFileStore, err := file.NewStashStore(provider.AWSScope(accountID, region))
+// fileStoreForReading creates a file store for reading operations, keyed by the
+// given provider scope. It handles passphrase prompting if the file is
+// encrypted. If checkExists is true, returns an error if the file doesn't exist.
+func fileStoreForReading(cmd *cli.Command, scope provider.Scope, checkExists bool) (*file.Store, error) {
+	basicFileStore, err := file.NewStashStore(scope)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create stash store: %w", err)
 	}
@@ -135,5 +138,5 @@ func fileStoreForReading(cmd *cli.Command, accountID, region string, checkExists
 		}
 	}
 
-	return file.NewStashStoreWithPassphrase(provider.AWSScope(accountID, region), pass)
+	return file.NewStashStoreWithPassphrase(scope, pass)
 }

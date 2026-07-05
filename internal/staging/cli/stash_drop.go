@@ -12,8 +12,6 @@ import (
 	"github.com/mpyw/suve/internal/cli/confirm"
 	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/cli/terminal"
-	"github.com/mpyw/suve/internal/infra"
-	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/staging"
 	"github.com/mpyw/suve/internal/staging/store/file"
 )
@@ -114,14 +112,14 @@ func (c *dropConfirmer) confirmServiceDrop(service staging.Service, itemCount in
 }
 
 // globalStashDropAction creates the action function for global stash drop.
-func globalStashDropAction() func(context.Context, *cli.Command) error {
+func globalStashDropAction(resolver staging.ScopeResolver) func(context.Context, *cli.Command) error {
 	return func(ctx context.Context, cmd *cli.Command) error {
-		identity, err := infra.GetAWSIdentity(ctx)
+		resolved, err := resolveScope(ctx, resolver)
 		if err != nil {
-			return fmt.Errorf("failed to get AWS identity: %w", err)
+			return err
 		}
 
-		fileStore, err := file.NewStashStore(provider.AWSScope(identity.AccountID, identity.Region))
+		fileStore, err := file.NewStashStore(resolved.Scope)
 		if err != nil {
 			return fmt.Errorf("failed to create stash store: %w", err)
 		}
@@ -191,15 +189,15 @@ func globalStashDropAction() func(context.Context, *cli.Command) error {
 }
 
 // serviceStashDropAction creates the action function for service-specific stash drop.
-func serviceStashDropAction(service staging.Service) func(context.Context, *cli.Command) error {
+func serviceStashDropAction(service staging.Service, resolver staging.ScopeResolver) func(context.Context, *cli.Command) error {
 	return func(ctx context.Context, cmd *cli.Command) error {
-		identity, err := infra.GetAWSIdentity(ctx)
+		resolved, err := resolveScope(ctx, resolver)
 		if err != nil {
-			return fmt.Errorf("failed to get AWS identity: %w", err)
+			return err
 		}
 
 		// Use fileStoreForReading which handles passphrase prompting for encrypted files
-		fileStore, err := fileStoreForReading(cmd, identity.AccountID, identity.Region, true)
+		fileStore, err := fileStoreForReading(cmd, resolved.Scope, true)
 		if err != nil {
 			return err
 		}
@@ -271,7 +269,7 @@ func serviceStashDropFlags() []cli.Flag {
 }
 
 // newGlobalStashDropCommand creates a global stash drop command that operates on all services.
-func newGlobalStashDropCommand() *cli.Command {
+func newGlobalStashDropCommand(resolver staging.ScopeResolver) *cli.Command {
 	return &cli.Command{
 		Name:  "drop",
 		Usage: "Delete stashed changes without restoring",
@@ -287,7 +285,7 @@ EXAMPLES:
    suve stage stash drop                            Delete all stashed changes
    suve stage stash drop --yes                      Delete without confirmation`,
 		Flags:  stashDropFlags(),
-		Action: globalStashDropAction(),
+		Action: globalStashDropAction(resolver),
 	}
 }
 
@@ -317,6 +315,6 @@ EXAMPLES:
 			cfg.ItemName,
 			cfg.CommandName),
 		Flags:  serviceStashDropFlags(),
-		Action: serviceStashDropAction(service),
+		Action: serviceStashDropAction(service, cfg.ScopeResolver),
 	}
 }

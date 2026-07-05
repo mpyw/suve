@@ -12,8 +12,6 @@ import (
 	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/cli/passphrase"
 	"github.com/mpyw/suve/internal/cli/terminal"
-	"github.com/mpyw/suve/internal/infra"
-	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/staging"
 	"github.com/mpyw/suve/internal/staging/store/file"
 	usestaging "github.com/mpyw/suve/internal/usecase/staging"
@@ -117,21 +115,23 @@ func stashPushMutuallyExclusiveFlags() []cli.MutuallyExclusiveFlags {
 }
 
 // stashPushAction creates the action function for stash push commands.
-func stashPushAction(service staging.Service) func(context.Context, *cli.Command) error {
+func stashPushAction(service staging.Service, resolver staging.ScopeResolver) func(context.Context, *cli.Command) error {
 	return func(ctx context.Context, cmd *cli.Command) error {
-		identity, err := infra.GetAWSIdentity(ctx)
+		resolved, err := resolveScope(ctx, resolver)
 		if err != nil {
-			return fmt.Errorf("failed to get AWS identity: %w", err)
+			return err
 		}
 
+		scope := resolved.Scope
+
 		// Working staging area is the source of the push.
-		working, err := file.NewWorkingStore(provider.AWSScope(identity.AccountID, identity.Region))
+		working, err := file.NewWorkingStore(scope)
 		if err != nil {
 			return fmt.Errorf("failed to create staging store: %w", err)
 		}
 
 		// Stash file is the destination of the push.
-		basicStashStore, err := file.NewStashStore(provider.AWSScope(identity.AccountID, identity.Region))
+		basicStashStore, err := file.NewStashStore(scope)
 		if err != nil {
 			return fmt.Errorf("failed to create stash store: %w", err)
 		}
@@ -229,7 +229,7 @@ func stashPushAction(service staging.Service) func(context.Context, *cli.Command
 			// pass remains empty = plain text
 		}
 
-		stashStore, err := file.NewStashStoreWithPassphrase(provider.AWSScope(identity.AccountID, identity.Region), pass)
+		stashStore, err := file.NewStashStoreWithPassphrase(scope, pass)
 		if err != nil {
 			return fmt.Errorf("failed to create stash store: %w", err)
 		}
@@ -265,7 +265,7 @@ func stashPushAction(service staging.Service) func(context.Context, *cli.Command
 }
 
 // newGlobalStashPushCommand creates a global stash push command that operates on all services.
-func newGlobalStashPushCommand() *cli.Command {
+func newGlobalStashPushCommand(resolver staging.ScopeResolver) *cli.Command {
 	return &cli.Command{
 		Name:  "push",
 		Usage: "Save staged changes from the working staging area to the stash file",
@@ -284,7 +284,7 @@ EXAMPLES:
    echo "secret" | suve stage stash push --passphrase-stdin   Use passphrase from stdin`,
 		Flags:                  stashPushFlags(),
 		MutuallyExclusiveFlags: stashPushMutuallyExclusiveFlags(),
-		Action:                 stashPushAction(""), // Empty service = all services
+		Action:                 stashPushAction("", resolver), // Empty service = all services
 	}
 }
 
@@ -317,6 +317,6 @@ EXAMPLES:
 			cfg.CommandName),
 		Flags:                  stashPushFlags(),
 		MutuallyExclusiveFlags: stashPushMutuallyExclusiveFlags(),
-		Action:                 stashPushAction(service),
+		Action:                 stashPushAction(service, cfg.ScopeResolver),
 	}
 }

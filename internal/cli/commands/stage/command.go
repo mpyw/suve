@@ -16,6 +16,8 @@ import (
 
 // Command returns the global stage command with subcommands.
 func Command() *cli.Command {
+	gcfg := stgcli.AWSGlobalConfig(param.Config(), secret.Config())
+
 	return &cli.Command{
 		Name:    "stage",
 		Aliases: []string{"stg"},
@@ -42,11 +44,11 @@ EXAMPLES:
 		Commands: []*cli.Command{
 			param.Command(),
 			secret.Command(),
-			status.Command(),
-			diff.Command(),
-			apply.Command(),
-			reset.Command(),
-			stgcli.NewGlobalStashCommand(),
+			status.Command(gcfg),
+			diff.Command(gcfg),
+			apply.Command(gcfg),
+			reset.Command(gcfg),
+			stgcli.NewGlobalStashCommand(gcfg.ScopeResolver),
 		},
 		CommandNotFound: cliinternal.CommandNotFound,
 	}

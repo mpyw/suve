@@ -11,10 +11,7 @@ import (
 
 	"github.com/mpyw/suve/internal/cli/confirm"
 	"github.com/mpyw/suve/internal/cli/pager"
-	"github.com/mpyw/suve/internal/infra"
-	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/staging"
-	"github.com/mpyw/suve/internal/staging/store/file"
 	stagingusecase "github.com/mpyw/suve/internal/usecase/staging"
 )
 
@@ -26,11 +23,15 @@ type CommandConfig struct {
 	// ItemName is the item name for messages (e.g., "parameter", "secret").
 	ItemName string
 
-	// Factory creates a FullStrategy with an initialized AWS client.
+	// Factory creates a FullStrategy backed by a provider.Store.
 	Factory staging.StrategyFactory
 
-	// ParserFactory creates a Parser without AWS client (for status, parsing).
+	// ParserFactory creates a Parser without provider access (for status, parsing).
 	ParserFactory staging.ParserFactory
+
+	// ScopeResolver resolves the provider staging scope used to key on-disk
+	// state. When nil, it defaults to AWSScopeResolver, preserving AWS behavior.
+	ScopeResolver staging.ScopeResolver
 }
 
 // NewStatusCommand creates a status command with the given config.
@@ -48,14 +49,9 @@ func NewStatusCommand(cfg CommandConfig) *cli.Command {
 			},
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
-			identity, err := infra.GetAWSIdentity(ctx)
+			store, _, err := workingStore(ctx, cfg.ScopeResolver)
 			if err != nil {
-				return fmt.Errorf("failed to get AWS identity: %w", err)
-			}
-
-			store, err := file.NewWorkingStore(provider.AWSScope(identity.AccountID, identity.Region))
-			if err != nil {
-				return fmt.Errorf("failed to create staging store: %w", err)
+				return err
 			}
 
 			opts := StatusOptions{
@@ -115,14 +111,9 @@ func NewDiffCommand(cfg CommandConfig) *cli.Command {
 				name = parsedName
 			}
 
-			identity, err := infra.GetAWSIdentity(ctx)
+			store, _, err := workingStore(ctx, cfg.ScopeResolver)
 			if err != nil {
-				return fmt.Errorf("failed to get AWS identity: %w", err)
-			}
-
-			store, err := file.NewWorkingStore(provider.AWSScope(identity.AccountID, identity.Region))
-			if err != nil {
-				return fmt.Errorf("failed to create staging store: %w", err)
+				return err
 			}
 
 			opts := DiffOptions{
@@ -177,14 +168,9 @@ func NewAddCommand(cfg CommandConfig) *cli.Command {
 				value = cmd.Args().Get(1)
 			}
 
-			identity, err := infra.GetAWSIdentity(ctx)
+			store, _, err := workingStore(ctx, cfg.ScopeResolver)
 			if err != nil {
-				return fmt.Errorf("failed to get AWS identity: %w", err)
-			}
-
-			store, err := file.NewWorkingStore(provider.AWSScope(identity.AccountID, identity.Region))
-			if err != nil {
-				return fmt.Errorf("failed to create staging store: %w", err)
+				return err
 			}
 
 			strategy, err := cfg.Factory(ctx)
@@ -235,14 +221,9 @@ func NewEditCommand(cfg CommandConfig) *cli.Command {
 				value = cmd.Args().Get(1)
 			}
 
-			identity, err := infra.GetAWSIdentity(ctx)
+			store, _, err := workingStore(ctx, cfg.ScopeResolver)
 			if err != nil {
-				return fmt.Errorf("failed to get AWS identity: %w", err)
-			}
-
-			store, err := file.NewWorkingStore(provider.AWSScope(identity.AccountID, identity.Region))
-			if err != nil {
-				return fmt.Errorf("failed to create staging store: %w", err)
+				return err
 			}
 
 			strategy, err := cfg.Factory(ctx)
@@ -287,14 +268,9 @@ func NewApplyCommand(cfg CommandConfig) *cli.Command {
 			},
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
-			identity, err := infra.GetAWSIdentity(ctx)
+			store, resolved, err := workingStore(ctx, cfg.ScopeResolver)
 			if err != nil {
-				return fmt.Errorf("failed to get AWS identity: %w", err)
-			}
-
-			store, err := file.NewWorkingStore(provider.AWSScope(identity.AccountID, identity.Region))
-			if err != nil {
-				return fmt.Errorf("failed to create staging store: %w", err)
+				return err
 			}
 
 			opts := ApplyOptions{
@@ -313,6 +289,7 @@ func NewApplyCommand(cfg CommandConfig) *cli.Command {
 				Stdin:  os.Stdin,
 				Stdout: cmd.Root().Writer,
 				Stderr: cmd.Root().ErrWriter,
+				Target: resolved.Target,
 			}
 
 			r := &ApplyRunner{
@@ -376,14 +353,9 @@ func NewResetCommand(cfg CommandConfig) *cli.Command {
 				}
 			}
 
-			identity, err := infra.GetAWSIdentity(ctx)
+			store, _, err := workingStore(ctx, cfg.ScopeResolver)
 			if err != nil {
-				return fmt.Errorf("failed to get AWS identity: %w", err)
-			}
-
-			store, err := file.NewWorkingStore(provider.AWSScope(identity.AccountID, identity.Region))
-			if err != nil {
-				return fmt.Errorf("failed to create staging store: %w", err)
+				return err
 			}
 
 			var fetcher staging.ResetStrategy
@@ -445,14 +417,9 @@ func NewDeleteCommand(cfg CommandConfig) *cli.Command {
 				return fmt.Errorf("usage: suve stage %s delete <name>", cfg.CommandName)
 			}
 
-			identity, err := infra.GetAWSIdentity(ctx)
+			store, _, err := workingStore(ctx, cfg.ScopeResolver)
 			if err != nil {
-				return fmt.Errorf("failed to get AWS identity: %w", err)
-			}
-
-			store, err := file.NewWorkingStore(provider.AWSScope(identity.AccountID, identity.Region))
-			if err != nil {
-				return fmt.Errorf("failed to create staging store: %w", err)
+				return err
 			}
 
 			strategy, err := cfg.Factory(ctx)
@@ -501,14 +468,9 @@ func tagAction(cfg CommandConfig, usageMsg string, runner tagCommandRunner) func
 		name := cmd.Args().First()
 		args := cmd.Args().Slice()[1:]
 
-		identity, err := infra.GetAWSIdentity(ctx)
+		store, _, err := workingStore(ctx, cfg.ScopeResolver)
 		if err != nil {
-			return fmt.Errorf("failed to get AWS identity: %w", err)
-		}
-
-		store, err := file.NewWorkingStore(provider.AWSScope(identity.AccountID, identity.Region))
-		if err != nil {
-			return fmt.Errorf("failed to create staging store: %w", err)
+			return err
 		}
 
 		strategy, err := cfg.Factory(ctx)

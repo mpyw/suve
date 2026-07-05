@@ -50,15 +50,19 @@ type Result struct {
 	// active) — meaning no flat alias should be exposed for it.
 	Param  provider.Provider
 	Secret provider.Provider
-	// Stage names the active provider for the staging workflow. Staging is
-	// AWS-only, so it is ProviderAWS when AWS is active (via env or the
-	// credentials fallback) and empty otherwise.
+	// Stage names the single active provider for the staging workflow, or an
+	// empty Provider ("") when staging is not uniquely resolvable (0 or 2+
+	// staging-capable providers active). Staging is supported for AWS (param +
+	// secret) and Google Cloud (secret); Azure is not yet staging-capable.
 	Stage provider.Provider
 
 	// ParamActive and SecretActive list every provider active for that service,
 	// in stable order (AWS, GCP, Azure).
 	ParamActive  []provider.Provider
 	SecretActive []provider.Provider
+	// StageActive lists every staging-capable provider active, in stable order
+	// (AWS, GCP).
+	StageActive []provider.Provider
 
 	// AWSViaFallback is true when AWS became active only through the
 	// ~/.aws/credentials fallback (no provider was active via env).
@@ -121,13 +125,19 @@ func Resolve(env Environment) Result {
 		res.ParamActive = append(res.ParamActive, provider.ProviderAzure)
 	}
 
+	// Staging-capable providers in stable order: AWS (param + secret), Google
+	// Cloud (secret). Azure is not yet staging-capable.
+	if awsActive {
+		res.StageActive = append(res.StageActive, provider.ProviderAWS)
+	}
+
+	if gcpSecret {
+		res.StageActive = append(res.StageActive, provider.ProviderGoogleCloud)
+	}
+
 	res.Secret = unique(res.SecretActive)
 	res.Param = unique(res.ParamActive)
-
-	// Staging is AWS-only, so it is active exactly when AWS is.
-	if awsActive {
-		res.Stage = provider.ProviderAWS
-	}
+	res.Stage = unique(res.StageActive)
 
 	return res
 }

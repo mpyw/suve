@@ -9,7 +9,6 @@ import (
 	"github.com/urfave/cli/v3"
 
 	"github.com/mpyw/suve/internal/cli/output"
-	"github.com/mpyw/suve/internal/infra"
 	"github.com/mpyw/suve/internal/staging"
 	"github.com/mpyw/suve/internal/staging/store/file"
 )
@@ -121,14 +120,14 @@ func stashShowFlags() []cli.Flag {
 }
 
 // stashShowAction creates the action function for stash show commands.
-func stashShowAction(service staging.Service) func(context.Context, *cli.Command) error {
+func stashShowAction(service staging.Service, resolver staging.ScopeResolver) func(context.Context, *cli.Command) error {
 	return func(ctx context.Context, cmd *cli.Command) error {
-		identity, err := infra.GetAWSIdentity(ctx)
+		resolved, err := resolveScope(ctx, resolver)
 		if err != nil {
-			return fmt.Errorf("failed to get AWS identity: %w", err)
+			return err
 		}
 
-		fileStore, err := fileStoreForReading(cmd, identity.AccountID, identity.Region, true)
+		fileStore, err := fileStoreForReading(cmd, resolved.Scope, true)
 		if err != nil {
 			return err
 		}
@@ -147,7 +146,7 @@ func stashShowAction(service staging.Service) func(context.Context, *cli.Command
 }
 
 // newGlobalStashShowCommand creates a global stash show command that operates on all services.
-func newGlobalStashShowCommand() *cli.Command {
+func newGlobalStashShowCommand(resolver staging.ScopeResolver) *cli.Command {
 	return &cli.Command{
 		Name:  "show",
 		Usage: "Preview stashed changes without restoring",
@@ -161,7 +160,7 @@ EXAMPLES:
    suve stage stash show -v                         Show detailed information
    echo "secret" | suve stage stash show --passphrase-stdin   Decrypt with passphrase`,
 		Flags:  stashShowFlags(),
-		Action: stashShowAction(""),
+		Action: stashShowAction("", resolver),
 	}
 }
 
@@ -187,6 +186,6 @@ EXAMPLES:
 			cfg.ItemName,
 			cfg.CommandName),
 		Flags:  stashShowFlags(),
-		Action: stashShowAction(service),
+		Action: stashShowAction(service, cfg.ScopeResolver),
 	}
 }

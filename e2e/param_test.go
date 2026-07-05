@@ -790,7 +790,7 @@ func TestParam_StagingAddWithOptions(t *testing.T) {
 
 	// Verify global status shows tag changes
 	t.Run("global-status-shows-tags", func(t *testing.T) {
-		stdout, _, err := runCommand(t, globalstatus.Command())
+		stdout, _, err := runCommand(t, globalstatus.Command(awsStageGlobalConfig()))
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "T")         // T = Tag change marker
 		assert.Contains(t, stdout, "+2 tag(s)") // Two tags being added
@@ -934,7 +934,7 @@ func TestParam_GlobalDiffWithJSON(t *testing.T) {
 	require.NoError(t, err)
 
 	// Check diff with -j flag (--parse-json)
-	stdout, _, err := runCommand(t, globaldiff.Command(), "-j")
+	stdout, _, err := runCommand(t, globaldiff.Command(awsStageGlobalConfig()), "-j")
 	require.NoError(t, err)
 	t.Logf("global diff -j output: %s", stdout)
 	// Should have formatted JSON
@@ -2120,10 +2120,10 @@ func TestParam_StashPushAndPop(t *testing.T) {
 
 	// Cleanup
 	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
-	_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+	_, _, _ = runCommand(t, globalreset.Command(awsStageGlobalConfig()), "--yes")
 	t.Cleanup(func() {
 		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
-		_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+		_, _, _ = runCommand(t, globalreset.Command(awsStageGlobalConfig()), "--yes")
 	})
 
 	// Stage a parameter
@@ -2186,10 +2186,10 @@ func TestParam_StashPushWithKeep(t *testing.T) {
 
 	// Cleanup
 	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
-	_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+	_, _, _ = runCommand(t, globalreset.Command(awsStageGlobalConfig()), "--yes")
 	t.Cleanup(func() {
 		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
-		_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+		_, _, _ = runCommand(t, globalreset.Command(awsStageGlobalConfig()), "--yes")
 	})
 
 	// Stage a parameter
@@ -2222,11 +2222,11 @@ func TestParam_StashPopWithMerge(t *testing.T) {
 	// Cleanup
 	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName1)
 	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName2)
-	_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+	_, _, _ = runCommand(t, globalreset.Command(awsStageGlobalConfig()), "--yes")
 	t.Cleanup(func() {
 		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName1)
 		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName2)
-		_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+		_, _, _ = runCommand(t, globalreset.Command(awsStageGlobalConfig()), "--yes")
 	})
 
 	// Stage param1 and stash push to file

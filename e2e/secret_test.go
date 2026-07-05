@@ -805,10 +805,10 @@ func TestSecret_StashPushAndPop(t *testing.T) {
 
 	// Cleanup
 	_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
-	_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+	_, _, _ = runCommand(t, globalreset.Command(awsStageGlobalConfig()), "--yes")
 	t.Cleanup(func() {
 		_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
-		_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+		_, _, _ = runCommand(t, globalreset.Command(awsStageGlobalConfig()), "--yes")
 	})
 
 	// Stage a secret

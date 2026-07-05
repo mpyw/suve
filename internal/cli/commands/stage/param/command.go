@@ -17,6 +17,12 @@ var config = stgcli.CommandConfig{
 	ParserFactory: staging.ParamParserFactory,
 }
 
+// Config returns the AWS SSM Parameter Store staging command config. It is used
+// by the global (all-service) stage commands to build their provider config.
+func Config() stgcli.CommandConfig {
+	return config
+}
+
 // Command returns the param stage command with all staging subcommands.
 func Command() *cli.Command {
 	return &cli.Command{

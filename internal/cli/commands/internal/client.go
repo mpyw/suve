@@ -198,3 +198,32 @@ func SecretStrategyFactory(ctx context.Context) (staging.FullStrategy, error) {
 
 	return staging.NewSecretStrategy(store), nil
 }
+
+// GCPSecretStrategyFactory builds a staging FullStrategy for Google Cloud Secret
+// Manager, wrapping a provider.Store resolved for the context's project. It
+// satisfies staging.StrategyFactory.
+func GCPSecretStrategyFactory(ctx context.Context) (staging.FullStrategy, error) {
+	store, err := GCPSecretStore(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return staging.NewGCPSecretStrategy(store), nil
+}
+
+// GCPStagingScopeResolver resolves the Google Cloud staging scope from the
+// project stashed in the context (see WithGCPProject). It performs no network
+// calls. It satisfies staging.ScopeResolver.
+func GCPStagingScopeResolver(ctx context.Context) (staging.ResolvedScope, error) {
+	project := gcpProjectFromContext(ctx)
+	if project == "" {
+		return staging.ResolvedScope{}, errors.New(
+			"no Google Cloud project specified: set --project or the GOOGLE_CLOUD_PROJECT environment variable",
+		)
+	}
+
+	return staging.ResolvedScope{
+		Scope:  provider.GoogleCloudScope(project),
+		Target: "project " + project,
+	}, nil
+}

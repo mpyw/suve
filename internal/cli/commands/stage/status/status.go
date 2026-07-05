@@ -11,19 +11,19 @@ import (
 
 	"github.com/mpyw/suve/internal/cli/colors"
 	"github.com/mpyw/suve/internal/cli/output"
-	"github.com/mpyw/suve/internal/infra"
 	"github.com/mpyw/suve/internal/maputil"
-	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/staging"
+	stgcli "github.com/mpyw/suve/internal/staging/cli"
 	"github.com/mpyw/suve/internal/staging/store"
-	"github.com/mpyw/suve/internal/staging/store/file"
 )
 
 // Runner executes the status command.
 type Runner struct {
-	Store  store.ReadWriteOperator
-	Stdout io.Writer
-	Stderr io.Writer
+	Store store.ReadWriteOperator
+	// Services lists the provider services in stable display order.
+	Services []stgcli.GlobalServiceSpec
+	Stdout   io.Writer
+	Stderr   io.Writer
 }
 
 // Options holds the options for the status command.
@@ -31,12 +31,12 @@ type Options struct {
 	Verbose bool
 }
 
-// Command returns the status command.
-func Command() *cli.Command {
+// Command returns the status command for the given provider config.
+func Command(cfg stgcli.GlobalConfig) *cli.Command {
 	return &cli.Command{
 		Name:  "status",
-		Usage: "Show all staged changes (SSM Parameter Store and Secrets Manager)",
-		Description: `Display all staged changes for both SSM Parameter Store and Secrets Manager.
+		Usage: "Show all staged changes",
+		Description: `Display all staged changes for the active provider's services.
 
 Use -v/--verbose to show detailed information including the staged values.
 
@@ -50,32 +50,22 @@ EXAMPLES:
 				Usage:   "Show detailed information including values",
 			},
 		},
-		Action: action,
-	}
-}
+		Action: func(ctx context.Context, cmd *cli.Command) error {
+			store, _, err := stgcli.WorkingStore(ctx, cfg.ScopeResolver)
+			if err != nil {
+				return err
+			}
 
-func action(ctx context.Context, cmd *cli.Command) error {
-	identity, err := infra.GetAWSIdentity(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to get AWS identity: %w", err)
-	}
+			r := &Runner{
+				Store:    store,
+				Services: cfg.Services,
+				Stdout:   cmd.Root().Writer,
+				Stderr:   cmd.Root().ErrWriter,
+			}
 
-	store, err := file.NewWorkingStore(provider.AWSScope(identity.AccountID, identity.Region))
-	if err != nil {
-		return fmt.Errorf("failed to create staging store: %w", err)
+			return r.Run(ctx, Options{Verbose: cmd.Bool("verbose")})
+		},
 	}
-
-	opts := Options{
-		Verbose: cmd.Bool("verbose"),
-	}
-
-	r := &Runner{
-		Store:  store,
-		Stdout: cmd.Root().Writer,
-		Stderr: cmd.Root().ErrWriter,
-	}
-
-	return r.Run(ctx, opts)
 }
 
 // Run executes the status command.
@@ -90,63 +80,56 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 		return err
 	}
 
-	// Check if there are any changes
-	hasChanges := false
-
-	for _, serviceEntries := range entries {
-		if len(serviceEntries) > 0 {
-			hasChanges = true
-
-			break
-		}
-	}
-
-	if !hasChanges {
-		for _, serviceTags := range tagEntries {
-			if len(serviceTags) > 0 {
-				hasChanges = true
-
-				break
-			}
-		}
-	}
-
-	if !hasChanges {
+	if !hasAnyChanges(entries, tagEntries) {
 		output.Info(r.Stdout, "No changes staged.")
 
 		return nil
 	}
 
 	printer := &staging.EntryPrinter{Writer: r.Stdout}
+	printed := false
 
-	// Show SSM Parameter Store changes (no DeleteOptions for SSM Parameter Store)
-	paramEntries := entries[staging.ServiceParam]
-	paramTagEntries := tagEntries[staging.ServiceParam]
+	for _, spec := range r.Services {
+		parser := spec.ParserFactory()
 
-	paramTotal := len(paramEntries) + len(paramTagEntries)
-	if paramTotal > 0 {
-		output.Printf(r.Stdout, "%s (%d):\n", colors.Warning("Staged SSM Parameter Store changes"), paramTotal)
-		printEntries(printer, paramEntries, opts.Verbose, false)
-		printTagEntries(r.Stdout, paramTagEntries, opts.Verbose)
-	}
+		svcEntries := entries[spec.Service]
+		svcTags := tagEntries[spec.Service]
 
-	// Show Secrets Manager changes (with DeleteOptions)
-	secretEntries := entries[staging.ServiceSecret]
-	secretTagEntries := tagEntries[staging.ServiceSecret]
+		total := len(svcEntries) + len(svcTags)
+		if total == 0 {
+			continue
+		}
 
-	secretTotal := len(secretEntries) + len(secretTagEntries)
-	if secretTotal > 0 {
-		// Add spacing if we printed SSM Parameter Store entries
-		if paramTotal > 0 {
+		if printed {
 			output.Println(r.Stdout, "")
 		}
 
-		output.Printf(r.Stdout, "%s (%d):\n", colors.Warning("Staged Secrets Manager changes"), secretTotal)
-		printEntries(printer, secretEntries, opts.Verbose, true)
-		printTagEntries(r.Stdout, secretTagEntries, opts.Verbose)
+		output.Printf(r.Stdout, "%s (%d):\n",
+			colors.Warning("Staged "+parser.ServiceName()+" changes"), total)
+		printEntries(printer, svcEntries, opts.Verbose, parser.HasDeleteOptions())
+		printTagEntries(r.Stdout, svcTags, opts.Verbose)
+
+		printed = true
 	}
 
 	return nil
+}
+
+// hasAnyChanges reports whether any service has staged entries or tags.
+func hasAnyChanges(entries map[staging.Service]map[string]staging.Entry, tagEntries map[staging.Service]map[string]staging.TagEntry) bool {
+	for _, serviceEntries := range entries {
+		if len(serviceEntries) > 0 {
+			return true
+		}
+	}
+
+	for _, serviceTags := range tagEntries {
+		if len(serviceTags) > 0 {
+			return true
+		}
+	}
+
+	return false
 }
 
 func printEntries(printer *staging.EntryPrinter, entries map[string]staging.Entry, verbose, showDeleteOptions bool) {
