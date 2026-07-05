@@ -95,14 +95,14 @@ linters:
               desc: "Use github.com/mpyw/suve/internal/api/secretapi instead"
             - pkg: "github.com/aws/aws-sdk-go-v2/service/secretsmanager/types"
               desc: "Use github.com/mpyw/suve/internal/api/secretapi instead"
-        gcp-sdk:
+        gcloud-sdk:
           files:
-            - "!**/internal/provider/gcp/**"
+            - "!**/internal/provider/gcloud/**"
           deny:
             - pkg: "cloud.google.com/go/secretmanager/apiv1"
-              desc: "The Google Cloud Secret Manager SDK must stay behind the provider seam (internal/provider/gcp only)"
+              desc: "The Google Cloud Secret Manager SDK must stay behind the provider seam (internal/provider/gcloud only)"
             - pkg: "cloud.google.com/go/secretmanager/apiv1/secretmanagerpb"
-              desc: "The Google Cloud Secret Manager SDK must stay behind the provider seam (internal/provider/gcp only)"
+              desc: "The Google Cloud Secret Manager SDK must stay behind the provider seam (internal/provider/gcloud only)"
         azure-sdk:
           files:
             - "!**/internal/provider/azure/**"

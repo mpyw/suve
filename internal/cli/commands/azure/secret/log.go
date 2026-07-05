@@ -123,7 +123,7 @@ func (p *logPresenter) RenderHeader(stdout io.Writer, i int) {
 	}
 }
 
-// RenderValue is a no-op: like the AWS/GCP secret log, Azure Key Vault log does
+// RenderValue is a no-op: like the AWS/GoogleCloud secret log, Azure Key Vault log does
 // not show a default value preview.
 func (p *logPresenter) RenderValue(_ io.Writer, _, _ int) {}
 

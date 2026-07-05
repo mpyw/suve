@@ -114,12 +114,12 @@ jobs:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
         continue-on-error: true
 
-  e2e-gcp:
+  e2e-gcloud:
     name: E2E Test (Google Cloud)
     runs-on: ubuntu-latest
     services:
       # Google Cloud Secret Manager emulator (gRPC :9090), no auth, offline.
-      gcp-secretmanager:
+      gcloud-secretmanager:
         image: ghcr.io/blackwell-systems/gcp-secret-manager-emulator-dual:latest
         ports:
           - 9090:9090
@@ -139,16 +139,16 @@ jobs:
       - name: Run Google Cloud e2e tests with coverage
         run: |
           COVERPKG=$(go list ./... | grep -v testutil | grep -v /e2e | grep -v internal/gui | grep -v /cmd/ | tr '\n' ',')
-          go test -v -race -tags e2e -run TestGCP -coverprofile=coverage-e2e-gcp.txt -covermode=atomic -coverpkg=$COVERPKG ./e2e/...
+          go test -v -race -tags e2e -run TestGoogleCloud -coverprofile=coverage-e2e-gcloud.txt -covermode=atomic -coverpkg=$COVERPKG ./e2e/...
         env:
-          SUVE_GCP_SECRETMANAGER_ENDPOINT: localhost:9090
+          SUVE_GCLOUD_SECRETMANAGER_ENDPOINT: localhost:9090
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v5
         with:
-          files: ./coverage-e2e-gcp.txt
+          files: ./coverage-e2e-gcloud.txt
           flags: e2e
-          name: codecov-suve-e2e-gcp
+          name: codecov-suve-e2e-gcloud
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
         continue-on-error: true

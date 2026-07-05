@@ -479,7 +479,7 @@ where ~SHIFT = ~ | ~N  (repeatable, cumulative)
 |---------|---------|------------|---------------|---------|------|------|
 | [AWS Parameter Store](docs/aws.md) | `aws param` | ✅ numeric | ✅ tags | ✅ | ✅ | shared config/env/role |
 | [AWS Secrets Manager](docs/aws.md) | `aws secret` | ✅ UUID + staging labels | ✅ tags | ✅ | ✅ | shared config/env/role |
-| [Google Cloud Secret Manager](docs/gcloud.md) | `gcloud secret` | ✅ integer (`latest`) | ✅ labels | 🔜 [#247](https://github.com/mpyw/suve/issues/247) | 🔜 [#250](https://github.com/mpyw/suve/issues/250) | Application Default Credentials |
+| [Google Cloud Secret Manager](docs/gcloud.md) | `gcloud secret` | ✅ integer (`latest`) | ✅ labels | ✅ | 🔜 [#250](https://github.com/mpyw/suve/issues/250) | Application Default Credentials |
 | [Azure Key Vault](docs/azure.md) | `azure secret` | ✅ opaque id | ✅ tags | 🔜 [#247](https://github.com/mpyw/suve/issues/247) | 🔜 [#250](https://github.com/mpyw/suve/issues/250) | DefaultAzureCredential |
 | [Azure App Configuration](docs/azure.md) | `azure param` | ❌ unversioned | ❌ unsupported¹ | 🔜 [#247](https://github.com/mpyw/suve/issues/247) | 🔜 [#250](https://github.com/mpyw/suve/issues/250) | DefaultAzureCredential |
 
@@ -494,15 +494,16 @@ Read/write operations (`show`, `log`, `diff`, `list`, `create`, `update`, `delet
 Every backend has an **explicit command group that is always available**, regardless of environment:
 
 ```bash
-suve aws param   ...   # AWS Parameter Store
-suve aws secret  ...   # AWS Secrets Manager
-suve aws stage   ...   # AWS staging
+suve aws param    ...  # AWS Parameter Store
+suve aws secret   ...  # AWS Secrets Manager
+suve aws stage    ...  # AWS staging
 suve gcloud secret ... # Google Cloud Secret Manager
+suve gcloud stage  ... # Google Cloud staging
 suve azure secret  ... # Azure Key Vault
 suve azure param   ... # Azure App Configuration
 ```
 
-For convenience, suve also exposes **bare top-level aliases** — `suve param`, `suve secret`, `suve stage` — but only when the environment makes the target unambiguous. `param` and `secret` are resolved independently; `stage` follows AWS (staging is AWS-only for now, see [#247](https://github.com/mpyw/suve/issues/247)):
+For convenience, suve also exposes **bare top-level aliases** — `suve param`, `suve secret`, `suve stage` — but only when the environment makes the target unambiguous. `param`, `secret`, and `stage` are each resolved independently. Staging is supported for AWS and Google Cloud, so `stage` follows the same "exactly one active backend" rule (Azure staging is not yet available, see [#247](https://github.com/mpyw/suve/issues/247)):
 
 1. A backend is **active** when its identifying environment variable is set:
 
@@ -518,14 +519,14 @@ For convenience, suve also exposes **bare top-level aliases** — `suve param`, 
 
 Examples (`—` = alias not exposed):
 
-| Environment | `param` → | `secret` → | `stage` |
-|-------------|-----------|------------|---------|
-| nothing set, `~/.aws/credentials` present | `aws` | `aws` | ✅ |
-| `AWS_PROFILE` | `aws` | `aws` | ✅ |
-| `GOOGLE_CLOUD_PROJECT` | — | `gcloud` | ❌ |
-| `AZURE_APPCONFIG_NAME` | `azure` | — | ❌ |
-| `AWS_PROFILE` + `GOOGLE_CLOUD_PROJECT` | `aws` | — (ambiguous) | ✅ |
-| nothing set, no credentials file | — | — | ❌ |
+| Environment | `param` → | `secret` → | `stage` → |
+|-------------|-----------|------------|-----------|
+| nothing set, `~/.aws/credentials` present | `aws` | `aws` | `aws` |
+| `AWS_PROFILE` | `aws` | `aws` | `aws` |
+| `GOOGLE_CLOUD_PROJECT` | — | `gcloud` | `gcloud` |
+| `AZURE_APPCONFIG_NAME` | `azure` | — | — |
+| `AWS_PROFILE` + `GOOGLE_CLOUD_PROJECT` | `aws` | — (ambiguous) | — (ambiguous) |
+| nothing set, no credentials file | — | — | — |
 
 `suve --help` lists which aliases are active in the current environment.
 
@@ -541,6 +542,7 @@ Explicit command groups (always available) and their bare aliases (exposed per t
 | [AWS Secrets Manager](docs/aws.md) | `aws secret` (`sm`) | `secret` |
 | AWS Staging | `aws stage` (`stg`) | `stage` |
 | [Google Cloud Secret Manager](docs/gcloud.md) | `gcloud secret` | `secret` |
+| Google Cloud Staging | `gcloud stage` (`stg`) | `stage` |
 | [Azure Key Vault](docs/azure.md) | `azure secret` | `secret` |
 | [Azure App Configuration](docs/azure.md) | `azure param` | `param` |
 
@@ -617,8 +619,20 @@ Uses integer version numbers (with the `latest` alias) and has no staging labels
 | [`suve gcloud secret tag`](docs/gcloud.md#suve-gcloud-secret-tag) | `<KEY>=<VALUE>...` | Add or update labels |
 | [`suve gcloud secret untag`](docs/gcloud.md#suve-gcloud-secret-untag) | `<KEY>...` | Remove labels |
 
-> [!NOTE]
-> Google Cloud Secret Manager is not covered by the staging workflow. Staging (`suve stage`) is AWS-only.
+**Staging commands** (under `suve gcloud stage`; Google Cloud is secret-only, so staging operates on secrets directly):
+
+| Command | Options | Description |
+|---------|---------|-------------|
+| `suve gcloud stage add` | `--description=<TEXT>` | Stage a new secret |
+| `suve gcloud stage edit` | `--description=<TEXT>` | Stage a modification (applies as a new version) |
+| `suve gcloud stage delete` | | Stage a deletion |
+| `suve gcloud stage status` | `--verbose` (`-v`) | Show staged changes |
+| `suve gcloud stage diff` | `--parse-json` (`-j`)<br>`--no-pager` | Show staged vs Google Cloud |
+| `suve gcloud stage apply` | `--yes`<br>`--ignore-conflicts` | Apply staged changes |
+| `suve gcloud stage reset` | `--all` | Unstage changes |
+| `suve gcloud stage tag` | `<KEY>=<VALUE>...` | Stage label additions |
+| `suve gcloud stage untag` | `<KEY>...` | Stage label removals |
+| `suve gcloud stage stash` | `push`/`pop`/`show`/`drop` | Save/restore staged changes |
 
 ### Azure Key Vault
 

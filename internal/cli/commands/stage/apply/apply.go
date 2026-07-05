@@ -10,17 +10,21 @@ import (
 
 	"github.com/urfave/cli/v3"
 
-	cliinternal "github.com/mpyw/suve/internal/cli/commands/internal"
 	"github.com/mpyw/suve/internal/cli/confirm"
 	"github.com/mpyw/suve/internal/cli/output"
-	"github.com/mpyw/suve/internal/infra"
 	"github.com/mpyw/suve/internal/maputil"
 	"github.com/mpyw/suve/internal/parallel"
-	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/staging"
+	stgcli "github.com/mpyw/suve/internal/staging/cli"
 	"github.com/mpyw/suve/internal/staging/store"
-	"github.com/mpyw/suve/internal/staging/store/file"
 )
+
+// ServiceApply pairs a service with its (possibly nil) apply strategy. The
+// strategy is nil when no changes are staged for that service.
+type ServiceApply struct {
+	Service  staging.Service
+	Strategy staging.ApplyStrategy
+}
 
 // serviceConflictCheck holds entries and strategy for a single service's conflict checking.
 type serviceConflictCheck struct {
@@ -30,26 +34,27 @@ type serviceConflictCheck struct {
 
 // Runner executes the apply command.
 type Runner struct {
-	ParamStrategy   staging.ApplyStrategy
-	SecretStrategy  staging.ApplyStrategy
+	// Services lists the provider services in stable apply order.
+	Services []ServiceApply
+	// ProviderLabel is the human-readable provider name (e.g. "AWS").
+	ProviderLabel   string
 	Store           store.ReadWriteOperator
 	Stdout          io.Writer
 	Stderr          io.Writer
 	IgnoreConflicts bool
 }
 
-// Command returns the global apply command.
-func Command() *cli.Command {
+// Command returns the global apply command for the given provider config.
+func Command(cfg stgcli.GlobalConfig) *cli.Command {
 	return &cli.Command{
 		Name:    "apply",
 		Aliases: []string{"push"},
-		Usage:   "Apply all staged changes to AWS",
-		Description: `Apply all staged changes (SSM Parameter Store and Secrets Manager) to AWS.
+		Usage:   "Apply all staged changes",
+		Description: `Apply all staged changes for the active provider's services.
 
 After successful apply, the staged changes are cleared.
 
 Use 'suve stage status' to view all staged changes before applying.
-Use 'suve stage param apply' or 'suve stage secret apply' for service-specific changes.
 
 CONFLICT DETECTION:
    Before applying, suve checks for conflicts to prevent lost updates:
@@ -68,72 +73,54 @@ EXAMPLES:
 			},
 			&cli.BoolFlag{
 				Name:  "ignore-conflicts",
-				Usage: "Apply even if AWS was modified after staging",
+				Usage: "Apply even if the remote store was modified after staging",
 			},
 		},
-		Action: action,
+		Action: func(ctx context.Context, cmd *cli.Command) error {
+			return runAction(ctx, cmd, cfg)
+		},
 	}
 }
 
-func action(ctx context.Context, cmd *cli.Command) error {
-	identity, err := infra.GetAWSIdentity(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to get AWS identity: %w", err)
-	}
-
-	store, err := file.NewWorkingStore(provider.AWSScope(identity.AccountID, identity.Region))
-	if err != nil {
-		return fmt.Errorf("failed to create staging store: %w", err)
-	}
-
-	// Check if there are any staged changes
-	paramStaged, err := store.ListEntries(ctx, staging.ServiceParam)
+func runAction(ctx context.Context, cmd *cli.Command, cfg stgcli.GlobalConfig) error {
+	store, resolved, err := stgcli.WorkingStore(ctx, cfg.ScopeResolver)
 	if err != nil {
 		return err
 	}
 
-	secretStaged, err := store.ListEntries(ctx, staging.ServiceSecret)
+	allStaged, err := store.ListEntries(ctx, "")
 	if err != nil {
 		return err
 	}
 
-	paramTagStaged, err := store.ListTags(ctx, staging.ServiceParam)
+	allTagStaged, err := store.ListTags(ctx, "")
 	if err != nil {
 		return err
 	}
 
-	secretTagStaged, err := store.ListTags(ctx, staging.ServiceSecret)
-	if err != nil {
-		return err
+	// Count staged changes across all services.
+	totalStaged := 0
+	for _, svc := range cfg.Services {
+		totalStaged += len(allStaged[svc.Service]) + len(allTagStaged[svc.Service])
 	}
 
-	hasParam := len(paramStaged[staging.ServiceParam]) > 0 || len(paramTagStaged[staging.ServiceParam]) > 0
-	hasSecret := len(secretStaged[staging.ServiceSecret]) > 0 || len(secretTagStaged[staging.ServiceSecret]) > 0
-
-	if !hasParam && !hasSecret {
+	if totalStaged == 0 {
 		output.Info(cmd.Root().Writer, "No changes staged.")
 
 		return nil
 	}
 
-	// Count total staged changes
-	totalStaged := len(paramStaged[staging.ServiceParam]) + len(secretStaged[staging.ServiceSecret]) +
-		len(paramTagStaged[staging.ServiceParam]) + len(secretTagStaged[staging.ServiceSecret])
-
-	// Confirm apply
-	skipConfirm := cmd.Bool("yes")
+	// Confirm apply.
 	prompter := &confirm.Prompter{
 		Stdin:  os.Stdin,
 		Stdout: cmd.Root().Writer,
 		Stderr: cmd.Root().ErrWriter,
+		Target: resolved.Target,
 	}
-	prompter.AccountID = identity.AccountID
-	prompter.Region = identity.Region
-	prompter.Profile = identity.Profile
 
-	message := fmt.Sprintf("Apply %d staged change(s) to AWS?", totalStaged)
+	message := fmt.Sprintf("Apply %d staged change(s) to %s?", totalStaged, cfg.ProviderLabel)
 
-	confirmed, err := prompter.Confirm(message, skipConfirm)
+	confirmed, err := prompter.Confirm(message, cmd.Bool("yes"))
 	if err != nil {
 		return err
 	}
@@ -143,29 +130,29 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	}
 
 	r := &Runner{
+		ProviderLabel:   cfg.ProviderLabel,
 		Store:           store,
 		Stdout:          cmd.Root().Writer,
 		Stderr:          cmd.Root().ErrWriter,
 		IgnoreConflicts: cmd.Bool("ignore-conflicts"),
 	}
 
-	// Initialize strategies only if needed
-	if hasParam {
-		strategy, err := cliinternal.ParamStrategyFactory(ctx)
-		if err != nil {
-			return err
+	// Initialize a strategy per service that has staged changes.
+	for _, svc := range cfg.Services {
+		has := len(allStaged[svc.Service]) > 0 || len(allTagStaged[svc.Service]) > 0
+
+		var strategy staging.ApplyStrategy
+
+		if has {
+			full, err := svc.Factory(ctx)
+			if err != nil {
+				return err
+			}
+
+			strategy = full
 		}
 
-		r.ParamStrategy = strategy
-	}
-
-	if hasSecret {
-		strategy, err := cliinternal.SecretStrategyFactory(ctx)
-		if err != nil {
-			return err
-		}
-
-		r.SecretStrategy = strategy
+		r.Services = append(r.Services, ServiceApply{Service: svc.Service, Strategy: strategy})
 	}
 
 	return r.Run(ctx)
@@ -173,7 +160,6 @@ func action(ctx context.Context, cmd *cli.Command) error {
 
 // Run executes the apply command.
 func (r *Runner) Run(ctx context.Context) error {
-	// Get all staged changes (empty string means all services)
 	allStaged, err := r.Store.ListEntries(ctx, "")
 	if err != nil {
 		return err
@@ -184,32 +170,21 @@ func (r *Runner) Run(ctx context.Context) error {
 		return err
 	}
 
-	paramStaged := allStaged[staging.ServiceParam]
-	secretStaged := allStaged[staging.ServiceSecret]
-	paramTagStaged := allTagStaged[staging.ServiceParam]
-	secretTagStaged := allTagStaged[staging.ServiceSecret]
-
-	// Check for conflicts unless --ignore-conflicts is specified
+	// Check for conflicts unless --ignore-conflicts is specified.
 	if !r.IgnoreConflicts {
 		var checks []serviceConflictCheck
-		if len(paramStaged) > 0 && r.ParamStrategy != nil {
-			checks = append(checks, serviceConflictCheck{
-				entries:  paramStaged,
-				strategy: r.ParamStrategy,
-			})
-		}
 
-		if len(secretStaged) > 0 && r.SecretStrategy != nil {
-			checks = append(checks, serviceConflictCheck{
-				entries:  secretStaged,
-				strategy: r.SecretStrategy,
-			})
+		for _, svc := range r.Services {
+			entries := allStaged[svc.Service]
+			if len(entries) > 0 && svc.Strategy != nil {
+				checks = append(checks, serviceConflictCheck{entries: entries, strategy: svc.Strategy})
+			}
 		}
 
 		allConflicts := r.checkAllConflicts(ctx, checks)
 		if len(allConflicts) > 0 {
 			for _, name := range maputil.SortedKeys(allConflicts) {
-				output.Warning(r.Stderr, "conflict detected for %s: AWS was modified after staging", name)
+				output.Warning(r.Stderr, "conflict detected for %s: %s was modified after staging", name, r.ProviderLabel)
 			}
 
 			return fmt.Errorf("apply rejected: %d conflict(s) detected (use --ignore-conflicts to force)", len(allConflicts))
@@ -218,34 +193,28 @@ func (r *Runner) Run(ctx context.Context) error {
 
 	var totalSucceeded, totalFailed int
 
-	// Apply SSM Parameter Store changes
-	if len(paramStaged) > 0 {
-		output.Info(r.Stdout, "Applying SSM Parameter Store parameters...")
-		succeeded, failed := r.applyService(ctx, r.ParamStrategy, paramStaged)
+	// Apply value changes in service order.
+	for _, svc := range r.Services {
+		staged := allStaged[svc.Service]
+		if len(staged) == 0 {
+			continue
+		}
+
+		output.Info(r.Stdout, "Applying %s...", svc.Strategy.ServiceName())
+		succeeded, failed := r.applyService(ctx, svc.Strategy, staged)
 		totalSucceeded += succeeded
 		totalFailed += failed
 	}
 
-	// Apply Secrets Manager changes
-	if len(secretStaged) > 0 {
-		output.Info(r.Stdout, "Applying Secrets Manager secrets...")
-		succeeded, failed := r.applyService(ctx, r.SecretStrategy, secretStaged)
-		totalSucceeded += succeeded
-		totalFailed += failed
-	}
+	// Apply tag changes in service order.
+	for _, svc := range r.Services {
+		staged := allTagStaged[svc.Service]
+		if len(staged) == 0 {
+			continue
+		}
 
-	// Apply SSM Parameter Store tag changes
-	if len(paramTagStaged) > 0 {
-		output.Info(r.Stdout, "Applying SSM Parameter Store tags...")
-		succeeded, failed := r.applyTagService(ctx, r.ParamStrategy, paramTagStaged)
-		totalSucceeded += succeeded
-		totalFailed += failed
-	}
-
-	// Apply Secrets Manager tag changes
-	if len(secretTagStaged) > 0 {
-		output.Info(r.Stdout, "Applying Secrets Manager tags...")
-		succeeded, failed := r.applyTagService(ctx, r.SecretStrategy, secretTagStaged)
+		output.Info(r.Stdout, "Applying %s tags...", svc.Strategy.ServiceName())
+		succeeded, failed := r.applyTagService(ctx, svc.Strategy, staged)
 		totalSucceeded += succeeded
 		totalFailed += failed
 	}

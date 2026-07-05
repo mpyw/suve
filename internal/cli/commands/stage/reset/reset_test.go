@@ -14,6 +14,7 @@ import (
 	"github.com/mpyw/suve/internal/cli/commands/stage/reset"
 	"github.com/mpyw/suve/internal/maputil"
 	"github.com/mpyw/suve/internal/staging"
+	stgcli "github.com/mpyw/suve/internal/staging/cli"
 	"github.com/mpyw/suve/internal/staging/store/testutil"
 )
 
@@ -42,9 +43,10 @@ func TestRun_NoChanges(t *testing.T) {
 	var buf bytes.Buffer
 
 	r := &reset.Runner{
-		Store:  store,
-		Stdout: &buf,
-		Stderr: &bytes.Buffer{},
+		Store:    store,
+		Services: awsServices(),
+		Stdout:   &buf,
+		Stderr:   &bytes.Buffer{},
 	}
 
 	err := r.Run(t.Context())
@@ -79,9 +81,10 @@ func TestRun_UnstageAll(t *testing.T) {
 	var buf bytes.Buffer
 
 	r := &reset.Runner{
-		Store:  store,
-		Stdout: &buf,
-		Stderr: &bytes.Buffer{},
+		Store:    store,
+		Services: awsServices(),
+		Stdout:   &buf,
+		Stderr:   &bytes.Buffer{},
 	}
 
 	err := r.Run(t.Context())
@@ -112,9 +115,10 @@ func TestRun_UnstageParamOnly(t *testing.T) {
 	var buf bytes.Buffer
 
 	r := &reset.Runner{
-		Store:  store,
-		Stdout: &buf,
-		Stderr: &bytes.Buffer{},
+		Store:    store,
+		Services: awsServices(),
+		Stdout:   &buf,
+		Stderr:   &bytes.Buffer{},
 	}
 
 	err := r.Run(t.Context())
@@ -137,9 +141,10 @@ func TestRun_UnstageSecretOnly(t *testing.T) {
 	var buf bytes.Buffer
 
 	r := &reset.Runner{
-		Store:  store,
-		Stdout: &buf,
-		Stderr: &bytes.Buffer{},
+		Store:    store,
+		Services: awsServices(),
+		Stdout:   &buf,
+		Stderr:   &bytes.Buffer{},
 	}
 
 	err := r.Run(t.Context())
@@ -156,9 +161,10 @@ func TestRun_StoreError(t *testing.T) {
 	var buf bytes.Buffer
 
 	r := &reset.Runner{
-		Store:  store,
-		Stdout: &buf,
-		Stderr: &bytes.Buffer{},
+		Store:    store,
+		Services: awsServices(),
+		Stdout:   &buf,
+		Stderr:   &bytes.Buffer{},
 	}
 
 	err := r.Run(t.Context())
@@ -184,9 +190,10 @@ func TestRun_UnstageTagsOnly(t *testing.T) {
 	var buf bytes.Buffer
 
 	r := &reset.Runner{
-		Store:  store,
-		Stdout: &buf,
-		Stderr: &bytes.Buffer{},
+		Store:    store,
+		Services: awsServices(),
+		Stdout:   &buf,
+		Stderr:   &bytes.Buffer{},
 	}
 
 	err := r.Run(t.Context())
@@ -234,9 +241,10 @@ func TestRun_UnstageEntriesAndTags(t *testing.T) {
 	var buf bytes.Buffer
 
 	r := &reset.Runner{
-		Store:  store,
-		Stdout: &buf,
-		Stderr: &bytes.Buffer{},
+		Store:    store,
+		Services: awsServices(),
+		Stdout:   &buf,
+		Stderr:   &bytes.Buffer{},
 	}
 
 	err := r.Run(t.Context())
@@ -271,9 +279,10 @@ func TestRun_ListTagsError(t *testing.T) {
 	var buf bytes.Buffer
 
 	r := &reset.Runner{
-		Store:  store,
-		Stdout: &buf,
-		Stderr: &bytes.Buffer{},
+		Store:    store,
+		Services: awsServices(),
+		Stdout:   &buf,
+		Stderr:   &bytes.Buffer{},
 	}
 
 	err := r.Run(t.Context())
@@ -297,12 +306,22 @@ func TestRun_UnstageAllError(t *testing.T) {
 	var buf bytes.Buffer
 
 	r := &reset.Runner{
-		Store:  store,
-		Stdout: &buf,
-		Stderr: &bytes.Buffer{},
+		Store:    store,
+		Services: awsServices(),
+		Stdout:   &buf,
+		Stderr:   &bytes.Buffer{},
 	}
 
 	err := r.Run(t.Context())
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "mock unstage all error")
+}
+
+// awsServices returns the AWS service specs (param + secret) used by the
+// provider-wide reset command.
+func awsServices() []stgcli.GlobalServiceSpec {
+	return []stgcli.GlobalServiceSpec{
+		{Service: staging.ServiceParam, ParserFactory: staging.ParamParserFactory},
+		{Service: staging.ServiceSecret, ParserFactory: staging.SecretParserFactory},
+	}
 }

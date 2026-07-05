@@ -30,6 +30,12 @@ import (
 	stgcli "github.com/mpyw/suve/internal/staging/cli"
 )
 
+// awsStageGlobalConfig builds the AWS provider config for the global stage
+// commands (param + secret), used by the e2e tests.
+func awsStageGlobalConfig() stgcli.GlobalConfig {
+	return stgcli.AWSGlobalConfig(paramstage.Config(), secretstage.Config())
+}
+
 // =============================================================================
 // Global Stage Commands Tests
 // =============================================================================
@@ -69,7 +75,7 @@ func TestGlobal_StageWorkflow(t *testing.T) {
 
 	// 1. Global status shows both
 	t.Run("global-status", func(t *testing.T) {
-		stdout, _, err := runCommand(t, globalstatus.Command())
+		stdout, _, err := runCommand(t, globalstatus.Command(awsStageGlobalConfig()))
 		require.NoError(t, err)
 		assert.Contains(t, stdout, paramName)
 		assert.Contains(t, stdout, secretName)
@@ -80,7 +86,7 @@ func TestGlobal_StageWorkflow(t *testing.T) {
 
 	// 2. Global diff shows both
 	t.Run("global-diff", func(t *testing.T) {
-		stdout, _, err := runCommand(t, globaldiff.Command())
+		stdout, _, err := runCommand(t, globaldiff.Command(awsStageGlobalConfig()))
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "-original-param")
 		assert.Contains(t, stdout, "+staged-param")
@@ -91,7 +97,7 @@ func TestGlobal_StageWorkflow(t *testing.T) {
 
 	// 3. Global apply applies both
 	t.Run("global-apply", func(t *testing.T) {
-		stdout, _, err := runCommand(t, globalapply.Command(), "--yes")
+		stdout, _, err := runCommand(t, globalapply.Command(awsStageGlobalConfig()), "--yes")
 		require.NoError(t, err)
 		assert.Contains(t, stdout, paramName)
 		assert.Contains(t, stdout, secretName)
@@ -111,7 +117,7 @@ func TestGlobal_StageWorkflow(t *testing.T) {
 
 	// 5. Status should be empty
 	t.Run("status-empty", func(t *testing.T) {
-		stdout, _, err := runCommand(t, globalstatus.Command())
+		stdout, _, err := runCommand(t, globalstatus.Command(awsStageGlobalConfig()))
 		require.NoError(t, err)
 		assert.NotContains(t, stdout, paramName)
 		assert.NotContains(t, stdout, secretName)
@@ -152,7 +158,7 @@ func TestGlobal_StageResetAll(t *testing.T) {
 
 	// Global reset requires --all flag
 	t.Run("reset-without-all-warns", func(t *testing.T) {
-		stdout, stderr, err := runCommand(t, globalreset.Command())
+		stdout, stderr, err := runCommand(t, globalreset.Command(awsStageGlobalConfig()))
 		require.NoError(t, err)
 		// Without --all, should show warning
 		assert.Contains(t, stderr, "no effect")
@@ -161,7 +167,7 @@ func TestGlobal_StageResetAll(t *testing.T) {
 
 	// Verify still staged (not reset without --all)
 	t.Run("verify-still-staged", func(t *testing.T) {
-		stdout, _, err := runCommand(t, globalstatus.Command())
+		stdout, _, err := runCommand(t, globalstatus.Command(awsStageGlobalConfig()))
 		require.NoError(t, err)
 		assert.Contains(t, stdout, paramName)
 		assert.Contains(t, stdout, secretName)
@@ -169,14 +175,14 @@ func TestGlobal_StageResetAll(t *testing.T) {
 
 	// Global reset with --all
 	t.Run("reset-with-all", func(t *testing.T) {
-		stdout, _, err := runCommand(t, globalreset.Command(), "--all")
+		stdout, _, err := runCommand(t, globalreset.Command(awsStageGlobalConfig()), "--all")
 		require.NoError(t, err)
 		t.Logf("global reset --all output: %s", stdout)
 	})
 
 	// Verify empty
 	t.Run("verify-empty", func(t *testing.T) {
-		stdout, _, err := runCommand(t, globalstatus.Command())
+		stdout, _, err := runCommand(t, globalstatus.Command(awsStageGlobalConfig()))
 		require.NoError(t, err)
 		assert.NotContains(t, stdout, paramName)
 		assert.NotContains(t, stdout, secretName)
@@ -274,7 +280,7 @@ func TestGlobal_StagingWithTags(t *testing.T) {
 
 	// Test global diff shows tag changes
 	t.Run("global-diff-shows-tags", func(t *testing.T) {
-		stdout, _, err := runCommand(t, globaldiff.Command())
+		stdout, _, err := runCommand(t, globaldiff.Command(awsStageGlobalConfig()))
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "Tags:")
 		assert.Contains(t, stdout, paramName)
@@ -284,7 +290,7 @@ func TestGlobal_StagingWithTags(t *testing.T) {
 
 	// Test global status shows tag changes
 	t.Run("global-status-shows-tags", func(t *testing.T) {
-		stdout, _, err := runCommand(t, globalstatus.Command())
+		stdout, _, err := runCommand(t, globalstatus.Command(awsStageGlobalConfig()))
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "T")         // T = Tag change marker
 		assert.Contains(t, stdout, "+2 tag(s)") // Two tags being added
@@ -293,7 +299,7 @@ func TestGlobal_StagingWithTags(t *testing.T) {
 
 	// Test global apply applies tag changes
 	t.Run("global-apply-applies-tags", func(t *testing.T) {
-		stdout, _, err := runCommand(t, globalapply.Command(), "--yes")
+		stdout, _, err := runCommand(t, globalapply.Command(awsStageGlobalConfig()), "--yes")
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "Applying SSM Parameter Store tags")
 		assert.Contains(t, stdout, "Tagged")
@@ -340,7 +346,7 @@ func TestGlobal_ResetWithTags(t *testing.T) {
 
 	// Test global reset clears both entries and tags
 	t.Run("global-reset-clears-all", func(t *testing.T) {
-		stdout, _, err := runCommand(t, globalreset.Command(), "--all")
+		stdout, _, err := runCommand(t, globalreset.Command(awsStageGlobalConfig()), "--all")
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "Unstaged all changes")
 		assert.Contains(t, stdout, "2 SSM Parameter Store") // 1 entry + 1 tag
@@ -366,10 +372,10 @@ func TestGlobal_StashPushAndPop(t *testing.T) {
 
 	// Cleanup
 	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
-	_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+	_, _, _ = runCommand(t, globalreset.Command(awsStageGlobalConfig()), "--yes")
 	t.Cleanup(func() {
 		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
-		_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+		_, _, _ = runCommand(t, globalreset.Command(awsStageGlobalConfig()), "--yes")
 	})
 
 	// Stage a parameter in the working staging area
@@ -381,14 +387,14 @@ func TestGlobal_StashPushAndPop(t *testing.T) {
 
 	// Verify agent has staged changes
 	t.Run("verify-agent-status", func(t *testing.T) {
-		stdout, _, err := runCommand(t, globalstatus.Command())
+		stdout, _, err := runCommand(t, globalstatus.Command(awsStageGlobalConfig()))
 		require.NoError(t, err)
 		assert.Contains(t, stdout, paramName)
 	})
 
 	// Stash push agent memory to file
 	t.Run("stash-push-to-file", func(t *testing.T) {
-		stdout, _, err := runSubCommand(t, stgcli.NewGlobalStashCommand(), "push")
+		stdout, _, err := runSubCommand(t, stgcli.NewGlobalStashCommand(stgcli.AWSScopeResolver), "push")
 		require.NoError(t, err)
 		t.Logf("stash push output: %s", stdout)
 		assert.Contains(t, stdout, "Staged changes stashed to file")
@@ -396,14 +402,14 @@ func TestGlobal_StashPushAndPop(t *testing.T) {
 
 	// Agent should now be empty
 	t.Run("verify-agent-empty-after-stash-push", func(t *testing.T) {
-		stdout, _, err := runCommand(t, globalstatus.Command())
+		stdout, _, err := runCommand(t, globalstatus.Command(awsStageGlobalConfig()))
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "No changes staged")
 	})
 
 	// Stash pop file back to agent
 	t.Run("stash-pop-from-file", func(t *testing.T) {
-		stdout, _, err := runSubCommand(t, stgcli.NewGlobalStashCommand(), "pop")
+		stdout, _, err := runSubCommand(t, stgcli.NewGlobalStashCommand(stgcli.AWSScopeResolver), "pop")
 		require.NoError(t, err)
 		t.Logf("stash pop output: %s", stdout)
 		assert.Contains(t, stdout, "Stashed changes restored")
@@ -411,14 +417,14 @@ func TestGlobal_StashPushAndPop(t *testing.T) {
 
 	// Agent should have the staged changes again
 	t.Run("verify-agent-has-changes-after-stash-pop", func(t *testing.T) {
-		stdout, _, err := runCommand(t, globalstatus.Command())
+		stdout, _, err := runCommand(t, globalstatus.Command(awsStageGlobalConfig()))
 		require.NoError(t, err)
 		assert.Contains(t, stdout, paramName)
 	})
 
 	// Apply the staged changes
 	t.Run("apply-changes", func(t *testing.T) {
-		_, _, err := runCommand(t, globalapply.Command(), "--yes")
+		_, _, err := runCommand(t, globalapply.Command(awsStageGlobalConfig()), "--yes")
 		require.NoError(t, err)
 	})
 
@@ -438,10 +444,10 @@ func TestGlobal_StashPushWithKeep(t *testing.T) {
 
 	// Cleanup
 	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
-	_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+	_, _, _ = runCommand(t, globalreset.Command(awsStageGlobalConfig()), "--yes")
 	t.Cleanup(func() {
 		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
-		_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+		_, _, _ = runCommand(t, globalreset.Command(awsStageGlobalConfig()), "--yes")
 	})
 
 	// Stage a parameter
@@ -450,14 +456,14 @@ func TestGlobal_StashPushWithKeep(t *testing.T) {
 
 	// Stash push with --keep flag (should keep agent memory)
 	t.Run("stash-push-with-keep", func(t *testing.T) {
-		stdout, _, err := runSubCommand(t, stgcli.NewGlobalStashCommand(), "push", "--keep")
+		stdout, _, err := runSubCommand(t, stgcli.NewGlobalStashCommand(stgcli.AWSScopeResolver), "push", "--keep")
 		require.NoError(t, err)
 		t.Logf("stash push --keep output: %s", stdout)
 	})
 
 	// Agent should still have the changes
 	t.Run("agent-still-has-changes", func(t *testing.T) {
-		stdout, _, err := runCommand(t, globalstatus.Command())
+		stdout, _, err := runCommand(t, globalstatus.Command(awsStageGlobalConfig()))
 		require.NoError(t, err)
 		assert.Contains(t, stdout, paramName)
 	})
@@ -473,17 +479,17 @@ func TestGlobal_StashPopWithMerge(t *testing.T) {
 	// Cleanup
 	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName1)
 	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName2)
-	_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+	_, _, _ = runCommand(t, globalreset.Command(awsStageGlobalConfig()), "--yes")
 	t.Cleanup(func() {
 		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName1)
 		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName2)
-		_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+		_, _, _ = runCommand(t, globalreset.Command(awsStageGlobalConfig()), "--yes")
 	})
 
 	// Stage param1 and stash push to file
 	_, _, err := runCommand(t, paramstage.Command(), "add", paramName1, "value1")
 	require.NoError(t, err)
-	_, _, err = runSubCommand(t, stgcli.NewGlobalStashCommand(), "push")
+	_, _, err = runSubCommand(t, stgcli.NewGlobalStashCommand(stgcli.AWSScopeResolver), "push")
 	require.NoError(t, err)
 
 	// Stage param2 in agent
@@ -492,14 +498,14 @@ func TestGlobal_StashPopWithMerge(t *testing.T) {
 
 	// Stash pop with merge (should combine both)
 	t.Run("stash-pop-with-merge", func(t *testing.T) {
-		stdout, _, err := runSubCommand(t, stgcli.NewGlobalStashCommand(), "pop", "--merge")
+		stdout, _, err := runSubCommand(t, stgcli.NewGlobalStashCommand(stgcli.AWSScopeResolver), "pop", "--merge")
 		require.NoError(t, err)
 		t.Logf("stash pop --merge output: %s", stdout)
 	})
 
 	// Both parameters should be staged
 	t.Run("verify-both-staged", func(t *testing.T) {
-		stdout, _, err := runCommand(t, globalstatus.Command())
+		stdout, _, err := runCommand(t, globalstatus.Command(awsStageGlobalConfig()))
 		require.NoError(t, err)
 		assert.Contains(t, stdout, paramName1)
 		assert.Contains(t, stdout, paramName2)
@@ -511,11 +517,11 @@ func TestGlobal_StashPopEmpty(t *testing.T) {
 	setupEnv(t)
 
 	// Reset to ensure clean state
-	_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+	_, _, _ = runCommand(t, globalreset.Command(awsStageGlobalConfig()), "--yes")
 
 	// Stash pop should fail or indicate nothing to pop
 	t.Run("stash-pop-empty", func(t *testing.T) {
-		_, _, err := runSubCommand(t, stgcli.NewGlobalStashCommand(), "pop")
+		_, _, err := runSubCommand(t, stgcli.NewGlobalStashCommand(stgcli.AWSScopeResolver), "pop")
 		assert.Error(t, err)
 	})
 }
@@ -525,16 +531,16 @@ func TestGlobal_StashPushEmpty(t *testing.T) {
 	setupEnv(t)
 
 	// Reset to ensure clean state (run twice to be safe)
-	_, _, _ = runCommand(t, globalreset.Command(), "--yes")
-	_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+	_, _, _ = runCommand(t, globalreset.Command(awsStageGlobalConfig()), "--yes")
+	_, _, _ = runCommand(t, globalreset.Command(awsStageGlobalConfig()), "--yes")
 
 	// Verify agent is actually empty
-	stdout, _, _ := runCommand(t, globalstatus.Command())
+	stdout, _, _ := runCommand(t, globalstatus.Command(awsStageGlobalConfig()))
 	t.Logf("status before stash push: %s", stdout)
 
 	// Stash push should fail when agent is empty (no staged changes)
 	t.Run("stash-push-empty", func(t *testing.T) {
-		_, stderr, err := runSubCommand(t, stgcli.NewGlobalStashCommand(), "push")
+		_, stderr, err := runSubCommand(t, stgcli.NewGlobalStashCommand(stgcli.AWSScopeResolver), "push")
 		// Either returns error or prints "nothing to stash"
 		if err == nil {
 			// If no error, check output - might indicate nothing was stashed
@@ -556,11 +562,11 @@ func TestMixed_ServiceSpecificStashPushPop(t *testing.T) {
 	// Cleanup
 	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
 	_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
-	_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+	_, _, _ = runCommand(t, globalreset.Command(awsStageGlobalConfig()), "--yes")
 	t.Cleanup(func() {
 		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
 		_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
-		_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+		_, _, _ = runCommand(t, globalreset.Command(awsStageGlobalConfig()), "--yes")
 	})
 
 	// Stage both param and secret
@@ -613,27 +619,27 @@ func TestGlobal_StashDrop(t *testing.T) {
 
 	// Cleanup
 	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
-	_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+	_, _, _ = runCommand(t, globalreset.Command(awsStageGlobalConfig()), "--yes")
 	t.Cleanup(func() {
 		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
-		_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+		_, _, _ = runCommand(t, globalreset.Command(awsStageGlobalConfig()), "--yes")
 	})
 
 	// Stage a parameter and stash push
 	_, _, err := runCommand(t, paramstage.Command(), "add", paramName, "test-value")
 	require.NoError(t, err)
 
-	_, _, err = runSubCommand(t, stgcli.NewGlobalStashCommand(), "push")
+	_, _, err = runSubCommand(t, stgcli.NewGlobalStashCommand(stgcli.AWSScopeResolver), "push")
 	require.NoError(t, err)
 
 	// Verify stash file exists via stash show
-	stdout, _, err := runSubCommand(t, stgcli.NewGlobalStashCommand(), "show")
+	stdout, _, err := runSubCommand(t, stgcli.NewGlobalStashCommand(stgcli.AWSScopeResolver), "show")
 	require.NoError(t, err)
 	assert.Contains(t, stdout, paramName)
 
 	// Drop the stash
 	t.Run("drop-global-stash", func(t *testing.T) {
-		stdout, _, err := runSubCommand(t, stgcli.NewGlobalStashCommand(), "drop", "--yes")
+		stdout, _, err := runSubCommand(t, stgcli.NewGlobalStashCommand(stgcli.AWSScopeResolver), "drop", "--yes")
 		require.NoError(t, err)
 		t.Logf("stash drop output: %s", stdout)
 		assert.Contains(t, stdout, "All stashed changes dropped")
@@ -641,7 +647,7 @@ func TestGlobal_StashDrop(t *testing.T) {
 
 	// Verify stash is gone
 	t.Run("verify-stash-gone", func(t *testing.T) {
-		_, _, err := runSubCommand(t, stgcli.NewGlobalStashCommand(), "show")
+		_, _, err := runSubCommand(t, stgcli.NewGlobalStashCommand(stgcli.AWSScopeResolver), "show")
 		assert.Error(t, err)
 	})
 }
@@ -652,11 +658,11 @@ func TestGlobal_StashDropEmpty(t *testing.T) {
 	setupTempHome(t)
 
 	// Cleanup to ensure no stash file
-	_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+	_, _, _ = runCommand(t, globalreset.Command(awsStageGlobalConfig()), "--yes")
 
 	// Try to drop when no stash exists
 	t.Run("drop-empty-stash", func(t *testing.T) {
-		_, _, err := runSubCommand(t, stgcli.NewGlobalStashCommand(), "drop", "--yes")
+		_, _, err := runSubCommand(t, stgcli.NewGlobalStashCommand(stgcli.AWSScopeResolver), "drop", "--yes")
 		assert.Error(t, err)
 	})
 }
@@ -670,10 +676,10 @@ func TestGlobal_StashDropEncrypted(t *testing.T) {
 
 	// Cleanup
 	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
-	_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+	_, _, _ = runCommand(t, globalreset.Command(awsStageGlobalConfig()), "--yes")
 	t.Cleanup(func() {
 		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
-		_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+		_, _, _ = runCommand(t, globalreset.Command(awsStageGlobalConfig()), "--yes")
 	})
 
 	// Stage a parameter
@@ -681,18 +687,18 @@ func TestGlobal_StashDropEncrypted(t *testing.T) {
 	require.NoError(t, err)
 
 	// Stash push with passphrase (using passphrase-stdin flag)
-	cmd := stgcli.NewGlobalStashCommand()
+	cmd := stgcli.NewGlobalStashCommand(stgcli.AWSScopeResolver)
 	stdin := strings.NewReader("testpassphrase\n")
 	stdout, stderr, err := runSubCommandWithStdin(t, cmd, stdin, "push", "--passphrase-stdin")
 	require.NoError(t, err, "stash push failed: stdout=%s stderr=%s", stdout, stderr)
 
 	// Verify stash file is encrypted by trying to show without passphrase
-	_, _, err = runSubCommand(t, stgcli.NewGlobalStashCommand(), "show")
+	_, _, err = runSubCommand(t, stgcli.NewGlobalStashCommand(stgcli.AWSScopeResolver), "show")
 	require.Error(t, err, "show should fail on encrypted file without passphrase")
 
 	// Drop the encrypted stash without passphrase - should succeed for global drop
 	t.Run("drop-encrypted-stash", func(t *testing.T) {
-		stdout, _, err := runSubCommand(t, stgcli.NewGlobalStashCommand(), "drop", "--yes")
+		stdout, _, err := runSubCommand(t, stgcli.NewGlobalStashCommand(stgcli.AWSScopeResolver), "drop", "--yes")
 		require.NoError(t, err)
 		t.Logf("stash drop output: %s", stdout)
 		assert.Contains(t, stdout, "All stashed changes dropped")
@@ -700,7 +706,7 @@ func TestGlobal_StashDropEncrypted(t *testing.T) {
 
 	// Verify stash is gone
 	t.Run("verify-stash-gone", func(t *testing.T) {
-		_, _, err := runSubCommand(t, stgcli.NewGlobalStashCommand(), "show")
+		_, _, err := runSubCommand(t, stgcli.NewGlobalStashCommand(stgcli.AWSScopeResolver), "show")
 		assert.Error(t, err)
 	})
 }
@@ -716,11 +722,11 @@ func TestService_StashDrop(t *testing.T) {
 	// Cleanup
 	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
 	_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
-	_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+	_, _, _ = runCommand(t, globalreset.Command(awsStageGlobalConfig()), "--yes")
 	t.Cleanup(func() {
 		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
 		_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
-		_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+		_, _, _ = runCommand(t, globalreset.Command(awsStageGlobalConfig()), "--yes")
 	})
 
 	// Stage both param and secret
@@ -730,11 +736,11 @@ func TestService_StashDrop(t *testing.T) {
 	require.NoError(t, err)
 
 	// Stash push both
-	_, _, err = runSubCommand(t, stgcli.NewGlobalStashCommand(), "push")
+	_, _, err = runSubCommand(t, stgcli.NewGlobalStashCommand(stgcli.AWSScopeResolver), "push")
 	require.NoError(t, err)
 
 	// Verify both services are in stash
-	stdout, _, err := runSubCommand(t, stgcli.NewGlobalStashCommand(), "show")
+	stdout, _, err := runSubCommand(t, stgcli.NewGlobalStashCommand(stgcli.AWSScopeResolver), "show")
 	require.NoError(t, err)
 	assert.Contains(t, stdout, paramName)
 	assert.Contains(t, stdout, secretName)
@@ -749,7 +755,7 @@ func TestService_StashDrop(t *testing.T) {
 
 	// Verify param is gone but secret remains
 	t.Run("verify-secret-remains", func(t *testing.T) {
-		stdout, _, err := runSubCommand(t, stgcli.NewGlobalStashCommand(), "show")
+		stdout, _, err := runSubCommand(t, stgcli.NewGlobalStashCommand(stgcli.AWSScopeResolver), "show")
 		require.NoError(t, err)
 		assert.NotContains(t, stdout, paramName)
 		assert.Contains(t, stdout, secretName)
@@ -764,7 +770,7 @@ func TestService_StashDrop(t *testing.T) {
 
 	// Verify stash is now empty (file should be deleted)
 	t.Run("verify-stash-empty", func(t *testing.T) {
-		_, _, err := runSubCommand(t, stgcli.NewGlobalStashCommand(), "show")
+		_, _, err := runSubCommand(t, stgcli.NewGlobalStashCommand(stgcli.AWSScopeResolver), "show")
 		assert.Error(t, err)
 	})
 }
@@ -1221,7 +1227,7 @@ func TestAgentLifecycle_StatusDoesNotStartAgent(t *testing.T) {
 
 	// Global status should return "No changes staged" without error
 	t.Run("global-status-empty", func(t *testing.T) {
-		stdout, _, err := runCommand(t, globalstatus.Command())
+		stdout, _, err := runCommand(t, globalstatus.Command(awsStageGlobalConfig()))
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "No changes staged")
 	})
@@ -1253,7 +1259,7 @@ func TestAgentLifecycle_DiffDoesNotStartAgent(t *testing.T) {
 
 	// Global diff should show warning without error
 	t.Run("global-diff-empty", func(t *testing.T) {
-		_, stderr, err := runCommand(t, globaldiff.Command())
+		_, stderr, err := runCommand(t, globaldiff.Command(awsStageGlobalConfig()))
 		require.NoError(t, err)
 		assert.Contains(t, stderr, "nothing staged")
 	})
@@ -1281,7 +1287,7 @@ func TestAgentLifecycle_ApplyDoesNotStartAgent(t *testing.T) {
 
 	// Global apply should return info message without error
 	t.Run("global-apply-empty", func(t *testing.T) {
-		stdout, _, err := runCommand(t, globalapply.Command(), "--yes")
+		stdout, _, err := runCommand(t, globalapply.Command(awsStageGlobalConfig()), "--yes")
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "No changes staged")
 	})
@@ -1307,7 +1313,7 @@ func TestAgentLifecycle_ResetDoesNotStartAgent(t *testing.T) {
 
 	// Global reset --all should return info message without error
 	t.Run("global-reset-all-empty", func(t *testing.T) {
-		stdout, _, err := runCommand(t, globalreset.Command(), "--all")
+		stdout, _, err := runCommand(t, globalreset.Command(awsStageGlobalConfig()), "--all")
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "No changes staged")
 	})
@@ -1333,7 +1339,7 @@ func TestAgentLifecycle_StashPushDoesNotStartAgent(t *testing.T) {
 
 	// Global stash push should return info message without error
 	t.Run("global-stash-push-empty", func(t *testing.T) {
-		stdout, _, err := runSubCommand(t, stgcli.NewGlobalStashCommand(), "push")
+		stdout, _, err := runSubCommand(t, stgcli.NewGlobalStashCommand(stgcli.AWSScopeResolver), "push")
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "No staged changes")
 	})
@@ -1361,17 +1367,17 @@ func TestStash_PushModes(t *testing.T) {
 	// Cleanup
 	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName1)
 	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName2)
-	_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+	_, _, _ = runCommand(t, globalreset.Command(awsStageGlobalConfig()), "--yes")
 	t.Cleanup(func() {
 		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName1)
 		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName2)
-		_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+		_, _, _ = runCommand(t, globalreset.Command(awsStageGlobalConfig()), "--yes")
 	})
 
 	// Stage param1 and push to file
 	_, _, err := runCommand(t, paramstage.Command(), "add", paramName1, "value1")
 	require.NoError(t, err)
-	_, _, err = runSubCommand(t, stgcli.NewGlobalStashCommand(), "push")
+	_, _, err = runSubCommand(t, stgcli.NewGlobalStashCommand(stgcli.AWSScopeResolver), "push")
 	require.NoError(t, err)
 
 	// Stage param2 in agent
@@ -1380,12 +1386,12 @@ func TestStash_PushModes(t *testing.T) {
 
 	// Test push with merge mode (default) - should add param2 to existing param1 in file
 	t.Run("push-merge-mode", func(t *testing.T) {
-		stdout, _, err := runSubCommand(t, stgcli.NewGlobalStashCommand(), "push", "--merge")
+		stdout, _, err := runSubCommand(t, stgcli.NewGlobalStashCommand(stgcli.AWSScopeResolver), "push", "--merge")
 		require.NoError(t, err)
 		t.Logf("push --merge output: %s", stdout)
 
 		// Verify file has both params
-		stdout, _, err = runSubCommand(t, stgcli.NewGlobalStashCommand(), "show")
+		stdout, _, err = runSubCommand(t, stgcli.NewGlobalStashCommand(stgcli.AWSScopeResolver), "show")
 		require.NoError(t, err)
 		assert.Contains(t, stdout, paramName1)
 		assert.Contains(t, stdout, paramName2)
@@ -1397,12 +1403,12 @@ func TestStash_PushModes(t *testing.T) {
 
 	// Test push with overwrite mode - should replace entire file
 	t.Run("push-overwrite-mode", func(t *testing.T) {
-		stdout, _, err := runSubCommand(t, stgcli.NewGlobalStashCommand(), "push", "--overwrite")
+		stdout, _, err := runSubCommand(t, stgcli.NewGlobalStashCommand(stgcli.AWSScopeResolver), "push", "--overwrite")
 		require.NoError(t, err)
 		t.Logf("push --overwrite output: %s", stdout)
 
 		// Verify file has only param1 (param2 was overwritten)
-		stdout, _, err = runSubCommand(t, stgcli.NewGlobalStashCommand(), "show")
+		stdout, _, err = runSubCommand(t, stgcli.NewGlobalStashCommand(stgcli.AWSScopeResolver), "show")
 		require.NoError(t, err)
 		assert.Contains(t, stdout, paramName1)
 		assert.NotContains(t, stdout, paramName2)
@@ -1420,17 +1426,17 @@ func TestStash_PopModes(t *testing.T) {
 	// Cleanup
 	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName1)
 	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName2)
-	_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+	_, _, _ = runCommand(t, globalreset.Command(awsStageGlobalConfig()), "--yes")
 	t.Cleanup(func() {
 		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName1)
 		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName2)
-		_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+		_, _, _ = runCommand(t, globalreset.Command(awsStageGlobalConfig()), "--yes")
 	})
 
 	// Stage param1 and push to file
 	_, _, err := runCommand(t, paramstage.Command(), "add", paramName1, "value1")
 	require.NoError(t, err)
-	_, _, err = runSubCommand(t, stgcli.NewGlobalStashCommand(), "push")
+	_, _, err = runSubCommand(t, stgcli.NewGlobalStashCommand(stgcli.AWSScopeResolver), "push")
 	require.NoError(t, err)
 
 	// Stage param2 in agent (so agent has param2, file has param1)
@@ -1439,24 +1445,24 @@ func TestStash_PopModes(t *testing.T) {
 
 	// Test pop with merge mode (default) - should combine agent and file
 	t.Run("pop-merge-mode", func(t *testing.T) {
-		stdout, _, err := runSubCommand(t, stgcli.NewGlobalStashCommand(), "pop", "--merge")
+		stdout, _, err := runSubCommand(t, stgcli.NewGlobalStashCommand(stgcli.AWSScopeResolver), "pop", "--merge")
 		require.NoError(t, err)
 		t.Logf("pop --merge output: %s", stdout)
 
 		// Verify agent has both params
-		stdout, _, err = runCommand(t, globalstatus.Command())
+		stdout, _, err = runCommand(t, globalstatus.Command(awsStageGlobalConfig()))
 		require.NoError(t, err)
 		assert.Contains(t, stdout, paramName1)
 		assert.Contains(t, stdout, paramName2)
 	})
 
 	// Clear agent and repopulate for overwrite test
-	_, _, _ = runCommand(t, globalreset.Command(), "--all")
+	_, _, _ = runCommand(t, globalreset.Command(awsStageGlobalConfig()), "--all")
 
 	// Stage param1 and push to file again
 	_, _, err = runCommand(t, paramstage.Command(), "add", paramName1, "value1")
 	require.NoError(t, err)
-	_, _, err = runSubCommand(t, stgcli.NewGlobalStashCommand(), "push")
+	_, _, err = runSubCommand(t, stgcli.NewGlobalStashCommand(stgcli.AWSScopeResolver), "push")
 	require.NoError(t, err)
 
 	// Stage param2 in agent
@@ -1465,12 +1471,12 @@ func TestStash_PopModes(t *testing.T) {
 
 	// Test pop with overwrite mode - should replace agent with file
 	t.Run("pop-overwrite-mode", func(t *testing.T) {
-		stdout, _, err := runSubCommand(t, stgcli.NewGlobalStashCommand(), "pop", "--overwrite")
+		stdout, _, err := runSubCommand(t, stgcli.NewGlobalStashCommand(stgcli.AWSScopeResolver), "pop", "--overwrite")
 		require.NoError(t, err)
 		t.Logf("pop --overwrite output: %s", stdout)
 
 		// Verify agent has only param1 from file (param2 was overwritten)
-		stdout, _, err = runCommand(t, globalstatus.Command())
+		stdout, _, err = runCommand(t, globalstatus.Command(awsStageGlobalConfig()))
 		require.NoError(t, err)
 		assert.Contains(t, stdout, paramName1)
 		assert.NotContains(t, stdout, paramName2)
@@ -1486,31 +1492,31 @@ func TestStash_PopKeepFlag(t *testing.T) {
 
 	// Cleanup
 	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
-	_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+	_, _, _ = runCommand(t, globalreset.Command(awsStageGlobalConfig()), "--yes")
 	t.Cleanup(func() {
 		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
-		_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+		_, _, _ = runCommand(t, globalreset.Command(awsStageGlobalConfig()), "--yes")
 	})
 
 	// Stage and push to file
 	_, _, err := runCommand(t, paramstage.Command(), "add", paramName, "test-value")
 	require.NoError(t, err)
-	_, _, err = runSubCommand(t, stgcli.NewGlobalStashCommand(), "push")
+	_, _, err = runSubCommand(t, stgcli.NewGlobalStashCommand(stgcli.AWSScopeResolver), "push")
 	require.NoError(t, err)
 
 	// Pop with --keep flag - file should remain
 	t.Run("pop-with-keep", func(t *testing.T) {
-		stdout, _, err := runSubCommand(t, stgcli.NewGlobalStashCommand(), "pop", "--keep")
+		stdout, _, err := runSubCommand(t, stgcli.NewGlobalStashCommand(stgcli.AWSScopeResolver), "pop", "--keep")
 		require.NoError(t, err)
 		t.Logf("pop --keep output: %s", stdout)
 
 		// Verify agent has the param
-		stdout, _, err = runCommand(t, globalstatus.Command())
+		stdout, _, err = runCommand(t, globalstatus.Command(awsStageGlobalConfig()))
 		require.NoError(t, err)
 		assert.Contains(t, stdout, paramName)
 
 		// Verify file still exists (show should work)
-		stdout, _, err = runSubCommand(t, stgcli.NewGlobalStashCommand(), "show")
+		stdout, _, err = runSubCommand(t, stgcli.NewGlobalStashCommand(stgcli.AWSScopeResolver), "show")
 		require.NoError(t, err)
 		assert.Contains(t, stdout, paramName)
 	})
@@ -1518,13 +1524,13 @@ func TestStash_PopKeepFlag(t *testing.T) {
 	// Pop again without --keep - file should be deleted
 	t.Run("pop-without-keep", func(t *testing.T) {
 		// Reset agent first
-		_, _, _ = runCommand(t, globalreset.Command(), "--all")
+		_, _, _ = runCommand(t, globalreset.Command(awsStageGlobalConfig()), "--all")
 
-		_, _, err := runSubCommand(t, stgcli.NewGlobalStashCommand(), "pop")
+		_, _, err := runSubCommand(t, stgcli.NewGlobalStashCommand(stgcli.AWSScopeResolver), "pop")
 		require.NoError(t, err)
 
 		// Verify file is gone
-		_, _, err = runSubCommand(t, stgcli.NewGlobalStashCommand(), "show")
+		_, _, err = runSubCommand(t, stgcli.NewGlobalStashCommand(stgcli.AWSScopeResolver), "show")
 		assert.Error(t, err) // File should not exist
 	})
 }
@@ -1540,11 +1546,11 @@ func TestStash_ServiceFilteredPush(t *testing.T) {
 	// Cleanup
 	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
 	_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
-	_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+	_, _, _ = runCommand(t, globalreset.Command(awsStageGlobalConfig()), "--yes")
 	t.Cleanup(func() {
 		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
 		_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
-		_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+		_, _, _ = runCommand(t, globalreset.Command(awsStageGlobalConfig()), "--yes")
 	})
 
 	// Stage both param and secret
@@ -1570,7 +1576,7 @@ func TestStash_ServiceFilteredPush(t *testing.T) {
 		assert.Contains(t, stdout, secretName)
 
 		// Verify file has only param
-		stdout, _, err = runSubCommand(t, stgcli.NewGlobalStashCommand(), "show")
+		stdout, _, err = runSubCommand(t, stgcli.NewGlobalStashCommand(stgcli.AWSScopeResolver), "show")
 		require.NoError(t, err)
 		assert.Contains(t, stdout, paramName)
 		assert.NotContains(t, stdout, secretName)
@@ -1583,7 +1589,7 @@ func TestStash_ServiceFilteredPush(t *testing.T) {
 		t.Logf("secret stash push output: %s", stdout)
 
 		// Verify both in file
-		stdout, _, err = runSubCommand(t, stgcli.NewGlobalStashCommand(), "show")
+		stdout, _, err = runSubCommand(t, stgcli.NewGlobalStashCommand(stgcli.AWSScopeResolver), "show")
 		require.NoError(t, err)
 		assert.Contains(t, stdout, paramName)
 		assert.Contains(t, stdout, secretName)
@@ -1601,11 +1607,11 @@ func TestStash_ServiceFilteredPop(t *testing.T) {
 	// Cleanup
 	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
 	_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
-	_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+	_, _, _ = runCommand(t, globalreset.Command(awsStageGlobalConfig()), "--yes")
 	t.Cleanup(func() {
 		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
 		_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
-		_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+		_, _, _ = runCommand(t, globalreset.Command(awsStageGlobalConfig()), "--yes")
 	})
 
 	// Stage both and push globally to file
@@ -1613,7 +1619,7 @@ func TestStash_ServiceFilteredPop(t *testing.T) {
 	require.NoError(t, err)
 	_, _, err = runSubCommand(t, secretstage.Command(), "add", secretName, "secret-value")
 	require.NoError(t, err)
-	_, _, err = runSubCommand(t, stgcli.NewGlobalStashCommand(), "push")
+	_, _, err = runSubCommand(t, stgcli.NewGlobalStashCommand(stgcli.AWSScopeResolver), "push")
 	require.NoError(t, err)
 
 	// Pop only param service from file
@@ -1633,7 +1639,7 @@ func TestStash_ServiceFilteredPop(t *testing.T) {
 		assert.NotContains(t, stdout, secretName)
 
 		// Verify file still has secret (param was removed from file)
-		stdout, _, err = runSubCommand(t, stgcli.NewGlobalStashCommand(), "show")
+		stdout, _, err = runSubCommand(t, stgcli.NewGlobalStashCommand(stgcli.AWSScopeResolver), "show")
 		require.NoError(t, err)
 		assert.NotContains(t, stdout, paramName)
 		assert.Contains(t, stdout, secretName)
@@ -1651,7 +1657,7 @@ func TestStash_ServiceFilteredPop(t *testing.T) {
 		assert.Contains(t, stdout, secretName)
 
 		// Verify file is now empty (deleted)
-		_, _, err = runSubCommand(t, stgcli.NewGlobalStashCommand(), "show")
+		_, _, err = runSubCommand(t, stgcli.NewGlobalStashCommand(stgcli.AWSScopeResolver), "show")
 		assert.Error(t, err) // File should not exist
 	})
 }
@@ -1667,11 +1673,11 @@ func TestStash_CrossServiceMerge(t *testing.T) {
 	// Cleanup
 	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
 	_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
-	_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+	_, _, _ = runCommand(t, globalreset.Command(awsStageGlobalConfig()), "--yes")
 	t.Cleanup(func() {
 		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
 		_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
-		_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+		_, _, _ = runCommand(t, globalreset.Command(awsStageGlobalConfig()), "--yes")
 	})
 
 	// Stage param and push to file
@@ -1686,12 +1692,12 @@ func TestStash_CrossServiceMerge(t *testing.T) {
 
 	// Global pop with merge - should combine param from file with secret in agent
 	t.Run("global-pop-merges-cross-service", func(t *testing.T) {
-		stdout, _, err := runSubCommand(t, stgcli.NewGlobalStashCommand(), "pop", "--merge")
+		stdout, _, err := runSubCommand(t, stgcli.NewGlobalStashCommand(stgcli.AWSScopeResolver), "pop", "--merge")
 		require.NoError(t, err)
 		t.Logf("global pop --merge output: %s", stdout)
 
 		// Verify both param and secret in agent
-		stdout, _, err = runCommand(t, globalstatus.Command())
+		stdout, _, err = runCommand(t, globalstatus.Command(awsStageGlobalConfig()))
 		require.NoError(t, err)
 		assert.Contains(t, stdout, paramName)
 		assert.Contains(t, stdout, secretName)
@@ -1709,11 +1715,11 @@ func TestStash_EncryptedWithServiceFilter(t *testing.T) {
 	// Cleanup
 	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
 	_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
-	_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+	_, _, _ = runCommand(t, globalreset.Command(awsStageGlobalConfig()), "--yes")
 	t.Cleanup(func() {
 		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
 		_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
-		_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+		_, _, _ = runCommand(t, globalreset.Command(awsStageGlobalConfig()), "--yes")
 	})
 
 	// Stage both
@@ -1724,7 +1730,7 @@ func TestStash_EncryptedWithServiceFilter(t *testing.T) {
 
 	// Push globally with encryption
 	t.Run("encrypted-global-push", func(t *testing.T) {
-		cmd := stgcli.NewGlobalStashCommand()
+		cmd := stgcli.NewGlobalStashCommand(stgcli.AWSScopeResolver)
 		stdin := strings.NewReader("testpass123\n")
 		stdout, stderr, err := runSubCommandWithStdin(t, cmd, stdin, "push", "--passphrase-stdin")
 		require.NoError(t, err, "stdout=%s stderr=%s", stdout, stderr)
@@ -1733,7 +1739,7 @@ func TestStash_EncryptedWithServiceFilter(t *testing.T) {
 
 	// Verify show fails without passphrase (file is encrypted)
 	t.Run("show-fails-without-passphrase", func(t *testing.T) {
-		_, _, err := runSubCommand(t, stgcli.NewGlobalStashCommand(), "show")
+		_, _, err := runSubCommand(t, stgcli.NewGlobalStashCommand(stgcli.AWSScopeResolver), "show")
 		assert.Error(t, err)
 	})
 
@@ -1758,7 +1764,7 @@ func TestStash_EncryptedWithServiceFilter(t *testing.T) {
 
 	// Drop the remaining encrypted file (should not need passphrase)
 	t.Run("encrypted-drop-no-passphrase", func(t *testing.T) {
-		stdout, _, err := runSubCommand(t, stgcli.NewGlobalStashCommand(), "drop", "--yes")
+		stdout, _, err := runSubCommand(t, stgcli.NewGlobalStashCommand(stgcli.AWSScopeResolver), "drop", "--yes")
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "All stashed changes dropped")
 	})
@@ -1775,17 +1781,17 @@ func TestStash_PopModesWithKeep(t *testing.T) {
 	// Cleanup
 	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName1)
 	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName2)
-	_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+	_, _, _ = runCommand(t, globalreset.Command(awsStageGlobalConfig()), "--yes")
 	t.Cleanup(func() {
 		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName1)
 		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName2)
-		_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+		_, _, _ = runCommand(t, globalreset.Command(awsStageGlobalConfig()), "--yes")
 	})
 
 	// Stage param1 and push to file
 	_, _, err := runCommand(t, paramstage.Command(), "add", paramName1, "value1")
 	require.NoError(t, err)
-	_, _, err = runSubCommand(t, stgcli.NewGlobalStashCommand(), "push")
+	_, _, err = runSubCommand(t, stgcli.NewGlobalStashCommand(stgcli.AWSScopeResolver), "push")
 	require.NoError(t, err)
 
 	// Stage param2 in agent
@@ -1794,40 +1800,40 @@ func TestStash_PopModesWithKeep(t *testing.T) {
 
 	// Pop with merge mode and keep flag
 	t.Run("pop-merge-keep", func(t *testing.T) {
-		stdout, _, err := runSubCommand(t, stgcli.NewGlobalStashCommand(), "pop", "--merge", "--keep")
+		stdout, _, err := runSubCommand(t, stgcli.NewGlobalStashCommand(stgcli.AWSScopeResolver), "pop", "--merge", "--keep")
 		require.NoError(t, err)
 		t.Logf("pop --merge --keep output: %s", stdout)
 
 		// Verify agent has both
-		stdout, _, err = runCommand(t, globalstatus.Command())
+		stdout, _, err = runCommand(t, globalstatus.Command(awsStageGlobalConfig()))
 		require.NoError(t, err)
 		assert.Contains(t, stdout, paramName1)
 		assert.Contains(t, stdout, paramName2)
 
 		// Verify file still exists
-		stdout, _, err = runSubCommand(t, stgcli.NewGlobalStashCommand(), "show")
+		stdout, _, err = runSubCommand(t, stgcli.NewGlobalStashCommand(stgcli.AWSScopeResolver), "show")
 		require.NoError(t, err)
 		assert.Contains(t, stdout, paramName1)
 	})
 
 	// Reset and test overwrite with keep
-	_, _, _ = runCommand(t, globalreset.Command(), "--all")
+	_, _, _ = runCommand(t, globalreset.Command(awsStageGlobalConfig()), "--all")
 	_, _, err = runCommand(t, paramstage.Command(), "add", paramName2, "value2")
 	require.NoError(t, err)
 
 	t.Run("pop-overwrite-keep", func(t *testing.T) {
-		stdout, _, err := runSubCommand(t, stgcli.NewGlobalStashCommand(), "pop", "--overwrite", "--keep")
+		stdout, _, err := runSubCommand(t, stgcli.NewGlobalStashCommand(stgcli.AWSScopeResolver), "pop", "--overwrite", "--keep")
 		require.NoError(t, err)
 		t.Logf("pop --overwrite --keep output: %s", stdout)
 
 		// Verify agent has only param1 from file (param2 was overwritten)
-		stdout, _, err = runCommand(t, globalstatus.Command())
+		stdout, _, err = runCommand(t, globalstatus.Command(awsStageGlobalConfig()))
 		require.NoError(t, err)
 		assert.Contains(t, stdout, paramName1)
 		assert.NotContains(t, stdout, paramName2)
 
 		// Verify file still exists
-		stdout, _, err = runSubCommand(t, stgcli.NewGlobalStashCommand(), "show")
+		stdout, _, err = runSubCommand(t, stgcli.NewGlobalStashCommand(stgcli.AWSScopeResolver), "show")
 		require.NoError(t, err)
 		assert.Contains(t, stdout, paramName1)
 	})
@@ -1844,11 +1850,11 @@ func TestStash_ServiceDropWithMixedContent(t *testing.T) {
 	// Cleanup
 	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
 	_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
-	_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+	_, _, _ = runCommand(t, globalreset.Command(awsStageGlobalConfig()), "--yes")
 	t.Cleanup(func() {
 		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
 		_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
-		_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+		_, _, _ = runCommand(t, globalreset.Command(awsStageGlobalConfig()), "--yes")
 	})
 
 	// Stage both and push globally
@@ -1856,7 +1862,7 @@ func TestStash_ServiceDropWithMixedContent(t *testing.T) {
 	require.NoError(t, err)
 	_, _, err = runSubCommand(t, secretstage.Command(), "add", secretName, "secret-value")
 	require.NoError(t, err)
-	_, _, err = runSubCommand(t, stgcli.NewGlobalStashCommand(), "push")
+	_, _, err = runSubCommand(t, stgcli.NewGlobalStashCommand(stgcli.AWSScopeResolver), "push")
 	require.NoError(t, err)
 
 	// Drop only param from file
@@ -1867,7 +1873,7 @@ func TestStash_ServiceDropWithMixedContent(t *testing.T) {
 		assert.Contains(t, stdout, "Stashed param changes dropped")
 
 		// Verify file now has only secret
-		stdout, _, err = runSubCommand(t, stgcli.NewGlobalStashCommand(), "show")
+		stdout, _, err = runSubCommand(t, stgcli.NewGlobalStashCommand(stgcli.AWSScopeResolver), "show")
 		require.NoError(t, err)
 		assert.NotContains(t, stdout, paramName)
 		assert.Contains(t, stdout, secretName)
@@ -1880,7 +1886,7 @@ func TestStash_ServiceDropWithMixedContent(t *testing.T) {
 		assert.Contains(t, stdout, "Stashed secret changes dropped")
 
 		// Verify file is gone
-		_, _, err = runSubCommand(t, stgcli.NewGlobalStashCommand(), "show")
+		_, _, err = runSubCommand(t, stgcli.NewGlobalStashCommand(stgcli.AWSScopeResolver), "show")
 		assert.Error(t, err)
 	})
 }
@@ -1894,10 +1900,10 @@ func TestStash_PushKeepWithModes(t *testing.T) {
 
 	// Cleanup
 	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
-	_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+	_, _, _ = runCommand(t, globalreset.Command(awsStageGlobalConfig()), "--yes")
 	t.Cleanup(func() {
 		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
-		_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+		_, _, _ = runCommand(t, globalreset.Command(awsStageGlobalConfig()), "--yes")
 	})
 
 	// Stage param
@@ -1906,34 +1912,34 @@ func TestStash_PushKeepWithModes(t *testing.T) {
 
 	// Push with keep flag
 	t.Run("push-keep", func(t *testing.T) {
-		stdout, _, err := runSubCommand(t, stgcli.NewGlobalStashCommand(), "push", "--keep")
+		stdout, _, err := runSubCommand(t, stgcli.NewGlobalStashCommand(stgcli.AWSScopeResolver), "push", "--keep")
 		require.NoError(t, err)
 		t.Logf("push --keep output: %s", stdout)
 
 		// Verify agent still has the param
-		stdout, _, err = runCommand(t, globalstatus.Command())
+		stdout, _, err = runCommand(t, globalstatus.Command(awsStageGlobalConfig()))
 		require.NoError(t, err)
 		assert.Contains(t, stdout, paramName)
 
 		// Verify file also has the param
-		stdout, _, err = runSubCommand(t, stgcli.NewGlobalStashCommand(), "show")
+		stdout, _, err = runSubCommand(t, stgcli.NewGlobalStashCommand(stgcli.AWSScopeResolver), "show")
 		require.NoError(t, err)
 		assert.Contains(t, stdout, paramName)
 	})
 
 	// Update param value and push with keep + merge
-	_, _, err = runCommand(t, globalreset.Command(), "--all")
+	_, _, err = runCommand(t, globalreset.Command(awsStageGlobalConfig()), "--all")
 	require.NoError(t, err)
 	_, _, err = runCommand(t, paramstage.Command(), "add", paramName, "updated-value")
 	require.NoError(t, err)
 
 	t.Run("push-keep-merge", func(t *testing.T) {
-		stdout, _, err := runSubCommand(t, stgcli.NewGlobalStashCommand(), "push", "--keep", "--merge")
+		stdout, _, err := runSubCommand(t, stgcli.NewGlobalStashCommand(stgcli.AWSScopeResolver), "push", "--keep", "--merge")
 		require.NoError(t, err)
 		t.Logf("push --keep --merge output: %s", stdout)
 
 		// Agent should still have the param
-		stdout, _, err = runCommand(t, globalstatus.Command())
+		stdout, _, err = runCommand(t, globalstatus.Command(awsStageGlobalConfig()))
 		require.NoError(t, err)
 		assert.Contains(t, stdout, paramName)
 	})
@@ -1954,11 +1960,11 @@ func TestStash_ParamServiceModes(t *testing.T) {
 	// Cleanup
 	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName1)
 	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName2)
-	_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+	_, _, _ = runCommand(t, globalreset.Command(awsStageGlobalConfig()), "--yes")
 	t.Cleanup(func() {
 		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName1)
 		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName2)
-		_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+		_, _, _ = runCommand(t, globalreset.Command(awsStageGlobalConfig()), "--yes")
 	})
 
 	// Stage param1 and push to file via param-specific command
@@ -1978,7 +1984,7 @@ func TestStash_ParamServiceModes(t *testing.T) {
 		t.Logf("param push --merge output: %s", stdout)
 
 		// Verify file has both params
-		stdout, _, err = runSubCommand(t, stgcli.NewGlobalStashCommand(), "show")
+		stdout, _, err = runSubCommand(t, stgcli.NewGlobalStashCommand(stgcli.AWSScopeResolver), "show")
 		require.NoError(t, err)
 		assert.Contains(t, stdout, paramName1)
 		assert.Contains(t, stdout, paramName2)
@@ -1994,14 +2000,14 @@ func TestStash_ParamServiceModes(t *testing.T) {
 		t.Logf("param push --overwrite output: %s", stdout)
 
 		// Verify file has only param1 (overwritten)
-		stdout, _, err = runSubCommand(t, stgcli.NewGlobalStashCommand(), "show")
+		stdout, _, err = runSubCommand(t, stgcli.NewGlobalStashCommand(stgcli.AWSScopeResolver), "show")
 		require.NoError(t, err)
 		assert.Contains(t, stdout, paramName1)
 		assert.NotContains(t, stdout, paramName2)
 	})
 
 	// Setup for pop tests
-	_, _, _ = runCommand(t, globalreset.Command(), "--all")
+	_, _, _ = runCommand(t, globalreset.Command(awsStageGlobalConfig()), "--all")
 	_, _, err = runSubCommand(t, paramstage.Command(), "add", paramName1, "value1")
 	require.NoError(t, err)
 	_, _, err = runSubCommand(t, paramstage.Command(), "stash", "push")
@@ -2022,7 +2028,7 @@ func TestStash_ParamServiceModes(t *testing.T) {
 	})
 
 	// Setup for overwrite test
-	_, _, _ = runCommand(t, globalreset.Command(), "--all")
+	_, _, _ = runCommand(t, globalreset.Command(awsStageGlobalConfig()), "--all")
 	_, _, err = runSubCommand(t, paramstage.Command(), "add", paramName1, "value1")
 	require.NoError(t, err)
 	_, _, err = runSubCommand(t, paramstage.Command(), "stash", "push")
@@ -2054,11 +2060,11 @@ func TestStash_SecretServiceModes(t *testing.T) {
 	// Cleanup
 	_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName1)
 	_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName2)
-	_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+	_, _, _ = runCommand(t, globalreset.Command(awsStageGlobalConfig()), "--yes")
 	t.Cleanup(func() {
 		_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName1)
 		_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName2)
-		_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+		_, _, _ = runCommand(t, globalreset.Command(awsStageGlobalConfig()), "--yes")
 	})
 
 	// Stage secret1 and push
@@ -2078,14 +2084,14 @@ func TestStash_SecretServiceModes(t *testing.T) {
 		t.Logf("secret push --merge output: %s", stdout)
 
 		// Verify file has both secrets
-		stdout, _, err = runSubCommand(t, stgcli.NewGlobalStashCommand(), "show")
+		stdout, _, err = runSubCommand(t, stgcli.NewGlobalStashCommand(stgcli.AWSScopeResolver), "show")
 		require.NoError(t, err)
 		assert.Contains(t, stdout, secretName1)
 		assert.Contains(t, stdout, secretName2)
 	})
 
 	// Setup for pop test
-	_, _, _ = runCommand(t, globalreset.Command(), "--all")
+	_, _, _ = runCommand(t, globalreset.Command(awsStageGlobalConfig()), "--all")
 	_, _, err = runSubCommand(t, secretstage.Command(), "add", secretName1, "secret-value1")
 	require.NoError(t, err)
 	_, _, err = runSubCommand(t, secretstage.Command(), "stash", "push")
@@ -2119,10 +2125,10 @@ func TestStash_ParamServiceKeep(t *testing.T) {
 
 	// Cleanup
 	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
-	_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+	_, _, _ = runCommand(t, globalreset.Command(awsStageGlobalConfig()), "--yes")
 	t.Cleanup(func() {
 		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
-		_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+		_, _, _ = runCommand(t, globalreset.Command(awsStageGlobalConfig()), "--yes")
 	})
 
 	// Stage and push with --keep
@@ -2140,13 +2146,13 @@ func TestStash_ParamServiceKeep(t *testing.T) {
 		assert.Contains(t, stdout, paramName)
 
 		// File should also have param
-		stdout, _, err = runSubCommand(t, stgcli.NewGlobalStashCommand(), "show")
+		stdout, _, err = runSubCommand(t, stgcli.NewGlobalStashCommand(stgcli.AWSScopeResolver), "show")
 		require.NoError(t, err)
 		assert.Contains(t, stdout, paramName)
 	})
 
 	// Reset and setup for pop --keep test
-	_, _, _ = runCommand(t, globalreset.Command(), "--all")
+	_, _, _ = runCommand(t, globalreset.Command(awsStageGlobalConfig()), "--all")
 
 	t.Run("param-pop-keep", func(t *testing.T) {
 		stdout, _, err := runSubCommand(t, paramstage.Command(), "stash", "pop", "--keep")
@@ -2159,7 +2165,7 @@ func TestStash_ParamServiceKeep(t *testing.T) {
 		assert.Contains(t, stdout, paramName)
 
 		// File should still exist
-		stdout, _, err = runSubCommand(t, stgcli.NewGlobalStashCommand(), "show")
+		stdout, _, err = runSubCommand(t, stgcli.NewGlobalStashCommand(stgcli.AWSScopeResolver), "show")
 		require.NoError(t, err)
 		assert.Contains(t, stdout, paramName)
 	})
@@ -2174,10 +2180,10 @@ func TestStash_SecretServiceKeep(t *testing.T) {
 
 	// Cleanup
 	_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
-	_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+	_, _, _ = runCommand(t, globalreset.Command(awsStageGlobalConfig()), "--yes")
 	t.Cleanup(func() {
 		_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
-		_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+		_, _, _ = runCommand(t, globalreset.Command(awsStageGlobalConfig()), "--yes")
 	})
 
 	// Stage and push with --keep
@@ -2195,13 +2201,13 @@ func TestStash_SecretServiceKeep(t *testing.T) {
 		assert.Contains(t, stdout, secretName)
 
 		// File should also have secret
-		stdout, _, err = runSubCommand(t, stgcli.NewGlobalStashCommand(), "show")
+		stdout, _, err = runSubCommand(t, stgcli.NewGlobalStashCommand(stgcli.AWSScopeResolver), "show")
 		require.NoError(t, err)
 		assert.Contains(t, stdout, secretName)
 	})
 
 	// Reset and setup for pop --keep test
-	_, _, _ = runCommand(t, globalreset.Command(), "--all")
+	_, _, _ = runCommand(t, globalreset.Command(awsStageGlobalConfig()), "--all")
 
 	t.Run("secret-pop-keep", func(t *testing.T) {
 		stdout, _, err := runSubCommand(t, secretstage.Command(), "stash", "pop", "--keep")
@@ -2214,7 +2220,7 @@ func TestStash_SecretServiceKeep(t *testing.T) {
 		assert.Contains(t, stdout, secretName)
 
 		// File should still exist
-		stdout, _, err = runSubCommand(t, stgcli.NewGlobalStashCommand(), "show")
+		stdout, _, err = runSubCommand(t, stgcli.NewGlobalStashCommand(stgcli.AWSScopeResolver), "show")
 		require.NoError(t, err)
 		assert.Contains(t, stdout, secretName)
 	})
@@ -2233,10 +2239,10 @@ func TestStash_ParamServiceEncrypted(t *testing.T) {
 
 	// Cleanup
 	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
-	_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+	_, _, _ = runCommand(t, globalreset.Command(awsStageGlobalConfig()), "--yes")
 	t.Cleanup(func() {
 		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
-		_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+		_, _, _ = runCommand(t, globalreset.Command(awsStageGlobalConfig()), "--yes")
 	})
 
 	// Stage param
@@ -2255,7 +2261,7 @@ func TestStash_ParamServiceEncrypted(t *testing.T) {
 
 	// Verify file is encrypted (show without passphrase fails)
 	t.Run("show-encrypted-fails", func(t *testing.T) {
-		_, _, err := runSubCommand(t, stgcli.NewGlobalStashCommand(), "show")
+		_, _, err := runSubCommand(t, stgcli.NewGlobalStashCommand(stgcli.AWSScopeResolver), "show")
 		assert.Error(t, err)
 	})
 
@@ -2283,10 +2289,10 @@ func TestStash_SecretServiceEncrypted(t *testing.T) {
 
 	// Cleanup
 	_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
-	_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+	_, _, _ = runCommand(t, globalreset.Command(awsStageGlobalConfig()), "--yes")
 	t.Cleanup(func() {
 		_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
-		_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+		_, _, _ = runCommand(t, globalreset.Command(awsStageGlobalConfig()), "--yes")
 	})
 
 	// Stage secret
@@ -2329,11 +2335,11 @@ func TestStash_ServiceDropEncrypted(t *testing.T) {
 	// Cleanup
 	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
 	_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
-	_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+	_, _, _ = runCommand(t, globalreset.Command(awsStageGlobalConfig()), "--yes")
 	t.Cleanup(func() {
 		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
 		_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
-		_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+		_, _, _ = runCommand(t, globalreset.Command(awsStageGlobalConfig()), "--yes")
 	})
 
 	// Stage both and push encrypted globally
@@ -2342,7 +2348,7 @@ func TestStash_ServiceDropEncrypted(t *testing.T) {
 	_, _, err = runSubCommand(t, secretstage.Command(), "add", secretName, "secret-value")
 	require.NoError(t, err)
 
-	cmd := stgcli.NewGlobalStashCommand()
+	cmd := stgcli.NewGlobalStashCommand(stgcli.AWSScopeResolver)
 	stdin := strings.NewReader("drop-enc-pass\n")
 	_, _, err = runSubCommandWithStdin(t, cmd, stdin, "push", "--passphrase-stdin")
 	require.NoError(t, err)
@@ -2359,7 +2365,7 @@ func TestStash_ServiceDropEncrypted(t *testing.T) {
 	// Verify secret still in file (but file is still encrypted)
 	// Global show should fail without passphrase
 	t.Run("verify-file-still-encrypted", func(t *testing.T) {
-		_, _, err := runSubCommand(t, stgcli.NewGlobalStashCommand(), "show")
+		_, _, err := runSubCommand(t, stgcli.NewGlobalStashCommand(stgcli.AWSScopeResolver), "show")
 		assert.Error(t, err)
 	})
 
@@ -2374,7 +2380,7 @@ func TestStash_ServiceDropEncrypted(t *testing.T) {
 
 	// File should be deleted now
 	t.Run("verify-file-deleted", func(t *testing.T) {
-		_, _, err := runSubCommand(t, stgcli.NewGlobalStashCommand(), "show")
+		_, _, err := runSubCommand(t, stgcli.NewGlobalStashCommand(stgcli.AWSScopeResolver), "show")
 		assert.Error(t, err)
 	})
 }
@@ -2394,11 +2400,11 @@ func TestStash_CrossServiceEncrypted(t *testing.T) {
 	// Cleanup
 	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
 	_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
-	_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+	_, _, _ = runCommand(t, globalreset.Command(awsStageGlobalConfig()), "--yes")
 	t.Cleanup(func() {
 		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
 		_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
-		_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+		_, _, _ = runCommand(t, globalreset.Command(awsStageGlobalConfig()), "--yes")
 	})
 
 	// Stage param and push encrypted via param command
@@ -2416,14 +2422,14 @@ func TestStash_CrossServiceEncrypted(t *testing.T) {
 
 	// Global pop with merge - should combine encrypted param from file with secret in agent
 	t.Run("global-pop-cross-service-encrypted", func(t *testing.T) {
-		cmd := stgcli.NewGlobalStashCommand()
+		cmd := stgcli.NewGlobalStashCommand(stgcli.AWSScopeResolver)
 		stdin := strings.NewReader("cross-enc-pass\n")
 		stdout, stderr, err := runSubCommandWithStdin(t, cmd, stdin, "pop", "--merge", "--passphrase-stdin")
 		require.NoError(t, err, "stdout=%s stderr=%s", stdout, stderr)
 		t.Logf("global pop cross-service encrypted output: %s", stdout)
 
 		// Verify both param and secret in agent
-		stdout, _, err = runCommand(t, globalstatus.Command())
+		stdout, _, err = runCommand(t, globalstatus.Command(awsStageGlobalConfig()))
 		require.NoError(t, err)
 		assert.Contains(t, stdout, paramName)
 		assert.Contains(t, stdout, secretName)
@@ -2441,17 +2447,17 @@ func TestStash_EncryptedMergeToPlain(t *testing.T) {
 	// Cleanup
 	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName1)
 	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName2)
-	_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+	_, _, _ = runCommand(t, globalreset.Command(awsStageGlobalConfig()), "--yes")
 	t.Cleanup(func() {
 		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName1)
 		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName2)
-		_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+		_, _, _ = runCommand(t, globalreset.Command(awsStageGlobalConfig()), "--yes")
 	})
 
 	// Stage param1 and push plain (no passphrase)
 	_, _, err := runSubCommand(t, paramstage.Command(), "add", paramName1, "value1")
 	require.NoError(t, err)
-	_, _, err = runSubCommand(t, stgcli.NewGlobalStashCommand(), "push")
+	_, _, err = runSubCommand(t, stgcli.NewGlobalStashCommand(stgcli.AWSScopeResolver), "push")
 	require.NoError(t, err)
 
 	// Stage param2 and push encrypted with merge
@@ -2459,7 +2465,7 @@ func TestStash_EncryptedMergeToPlain(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("encrypted-merge-to-plain", func(t *testing.T) {
-		cmd := stgcli.NewGlobalStashCommand()
+		cmd := stgcli.NewGlobalStashCommand(stgcli.AWSScopeResolver)
 		stdin := strings.NewReader("enc-merge-pass\n")
 		stdout, stderr, err := runSubCommandWithStdin(t, cmd, stdin, "push", "--merge", "--passphrase-stdin")
 		require.NoError(t, err, "stdout=%s stderr=%s", stdout, stderr)
@@ -2470,13 +2476,13 @@ func TestStash_EncryptedMergeToPlain(t *testing.T) {
 
 	// Verify file is encrypted
 	t.Run("verify-file-encrypted", func(t *testing.T) {
-		_, _, err := runSubCommand(t, stgcli.NewGlobalStashCommand(), "show")
+		_, _, err := runSubCommand(t, stgcli.NewGlobalStashCommand(stgcli.AWSScopeResolver), "show")
 		assert.Error(t, err) // Should fail without passphrase
 	})
 
 	// Pop and verify both params
 	t.Run("pop-merged-encrypted", func(t *testing.T) {
-		cmd := stgcli.NewGlobalStashCommand()
+		cmd := stgcli.NewGlobalStashCommand(stgcli.AWSScopeResolver)
 		stdin := strings.NewReader("enc-merge-pass\n")
 		stdout, stderr, err := runSubCommandWithStdin(t, cmd, stdin, "pop", "--passphrase-stdin")
 		require.NoError(t, err, "stdout=%s stderr=%s", stdout, stderr)
@@ -2500,18 +2506,18 @@ func TestStash_ServiceFilteredEncryptedMerge(t *testing.T) {
 	// Cleanup
 	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
 	_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
-	_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+	_, _, _ = runCommand(t, globalreset.Command(awsStageGlobalConfig()), "--yes")
 	t.Cleanup(func() {
 		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
 		_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
-		_, _, _ = runCommand(t, globalreset.Command(), "--yes")
+		_, _, _ = runCommand(t, globalreset.Command(awsStageGlobalConfig()), "--yes")
 	})
 
 	// Stage param and push encrypted
 	_, _, err := runSubCommand(t, paramstage.Command(), "add", paramName, "param-value")
 	require.NoError(t, err)
 
-	cmd := stgcli.NewGlobalStashCommand()
+	cmd := stgcli.NewGlobalStashCommand(stgcli.AWSScopeResolver)
 	stdin := strings.NewReader("svc-enc-merge-pass\n")
 	_, _, err = runSubCommandWithStdin(t, cmd, stdin, "push", "--passphrase-stdin")
 	require.NoError(t, err)

@@ -28,7 +28,7 @@ const (
 )
 
 // Factory builds a Store for a scope + kind. It returns ErrUnsupportedKind if
-// the provider does not offer that kind (e.g. GCP has no param store).
+// the provider does not offer that kind (e.g. GoogleCloud has no param store).
 type Factory interface {
 	// Store builds a Store for the given scope and kind.
 	Store(ctx context.Context, scope Scope, kind Kind) (Store, error)

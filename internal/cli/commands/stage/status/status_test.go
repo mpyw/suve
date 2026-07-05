@@ -14,6 +14,7 @@ import (
 	"github.com/mpyw/suve/internal/cli/commands/stage/status"
 	"github.com/mpyw/suve/internal/maputil"
 	"github.com/mpyw/suve/internal/staging"
+	stgcli "github.com/mpyw/suve/internal/staging/cli"
 	"github.com/mpyw/suve/internal/staging/store/testutil"
 )
 
@@ -25,9 +26,10 @@ func TestCommand_NoStagedChanges(t *testing.T) {
 	var buf bytes.Buffer
 
 	r := &status.Runner{
-		Store:  store,
-		Stdout: &buf,
-		Stderr: &bytes.Buffer{},
+		Store:    store,
+		Services: awsServices(),
+		Stdout:   &buf,
+		Stderr:   &bytes.Buffer{},
 	}
 
 	err := r.Run(t.Context(), status.Options{})
@@ -50,9 +52,10 @@ func TestCommand_ShowParamChangesOnly(t *testing.T) {
 	var buf bytes.Buffer
 
 	r := &status.Runner{
-		Store:  store,
-		Stdout: &buf,
-		Stderr: &bytes.Buffer{},
+		Store:    store,
+		Services: awsServices(),
+		Stdout:   &buf,
+		Stderr:   &bytes.Buffer{},
 	}
 
 	err := r.Run(t.Context(), status.Options{})
@@ -79,9 +82,10 @@ func TestCommand_ShowSecretChangesOnly(t *testing.T) {
 	var buf bytes.Buffer
 
 	r := &status.Runner{
-		Store:  store,
-		Stdout: &buf,
-		Stderr: &bytes.Buffer{},
+		Store:    store,
+		Services: awsServices(),
+		Stdout:   &buf,
+		Stderr:   &bytes.Buffer{},
 	}
 
 	err := r.Run(t.Context(), status.Options{})
@@ -112,9 +116,10 @@ func TestCommand_ShowBothParamAndSecretChanges(t *testing.T) {
 	var buf bytes.Buffer
 
 	r := &status.Runner{
-		Store:  store,
-		Stdout: &buf,
-		Stderr: &bytes.Buffer{},
+		Store:    store,
+		Services: awsServices(),
+		Stdout:   &buf,
+		Stderr:   &bytes.Buffer{},
 	}
 
 	err := r.Run(t.Context(), status.Options{})
@@ -149,9 +154,10 @@ func TestCommand_VerboseOutput(t *testing.T) {
 	var buf bytes.Buffer
 
 	r := &status.Runner{
-		Store:  store,
-		Stdout: &buf,
-		Stderr: &bytes.Buffer{},
+		Store:    store,
+		Services: awsServices(),
+		Stdout:   &buf,
+		Stderr:   &bytes.Buffer{},
 	}
 
 	err := r.Run(t.Context(), status.Options{Verbose: true})
@@ -178,9 +184,10 @@ func TestCommand_VerboseWithDelete(t *testing.T) {
 	var buf bytes.Buffer
 
 	r := &status.Runner{
-		Store:  store,
-		Stdout: &buf,
-		Stderr: &bytes.Buffer{},
+		Store:    store,
+		Services: awsServices(),
+		Stdout:   &buf,
+		Stderr:   &bytes.Buffer{},
 	}
 
 	err := r.Run(t.Context(), status.Options{Verbose: true})
@@ -208,9 +215,10 @@ func TestCommand_VerboseTruncatesLongValue(t *testing.T) {
 	var buf bytes.Buffer
 
 	r := &status.Runner{
-		Store:  store,
-		Stdout: &buf,
-		Stderr: &bytes.Buffer{},
+		Store:    store,
+		Services: awsServices(),
+		Stdout:   &buf,
+		Stderr:   &bytes.Buffer{},
 	}
 
 	err := r.Run(t.Context(), status.Options{Verbose: true})
@@ -245,9 +253,10 @@ func TestCommand_StoreError(t *testing.T) {
 	var buf bytes.Buffer
 
 	r := &status.Runner{
-		Store:  store,
-		Stdout: &buf,
-		Stderr: &bytes.Buffer{},
+		Store:    store,
+		Services: awsServices(),
+		Stdout:   &buf,
+		Stderr:   &bytes.Buffer{},
 	}
 
 	err := r.Run(t.Context(), status.Options{})
@@ -269,9 +278,10 @@ func TestCommand_ShowParamTagChangesOnly(t *testing.T) {
 	var buf bytes.Buffer
 
 	r := &status.Runner{
-		Store:  store,
-		Stdout: &buf,
-		Stderr: &bytes.Buffer{},
+		Store:    store,
+		Services: awsServices(),
+		Stdout:   &buf,
+		Stderr:   &bytes.Buffer{},
 	}
 
 	err := r.Run(t.Context(), status.Options{})
@@ -300,9 +310,10 @@ func TestCommand_ShowSecretTagChangesOnly(t *testing.T) {
 	var buf bytes.Buffer
 
 	r := &status.Runner{
-		Store:  store,
-		Stdout: &buf,
-		Stderr: &bytes.Buffer{},
+		Store:    store,
+		Services: awsServices(),
+		Stdout:   &buf,
+		Stderr:   &bytes.Buffer{},
 	}
 
 	err := r.Run(t.Context(), status.Options{})
@@ -338,9 +349,10 @@ func TestCommand_ShowMixedEntryAndTagChanges(t *testing.T) {
 	var buf bytes.Buffer
 
 	r := &status.Runner{
-		Store:  store,
-		Stdout: &buf,
-		Stderr: &bytes.Buffer{},
+		Store:    store,
+		Services: awsServices(),
+		Stdout:   &buf,
+		Stderr:   &bytes.Buffer{},
 	}
 
 	err := r.Run(t.Context(), status.Options{})
@@ -369,9 +381,10 @@ func TestCommand_TagChangesVerbose(t *testing.T) {
 	var buf bytes.Buffer
 
 	r := &status.Runner{
-		Store:  store,
-		Stdout: &buf,
-		Stderr: &bytes.Buffer{},
+		Store:    store,
+		Services: awsServices(),
+		Stdout:   &buf,
+		Stderr:   &bytes.Buffer{},
 	}
 
 	err := r.Run(t.Context(), status.Options{Verbose: true})
@@ -406,9 +419,10 @@ func TestCommand_TagOnlyChangesNoEntries(t *testing.T) {
 	var buf bytes.Buffer
 
 	r := &status.Runner{
-		Store:  store,
-		Stdout: &buf,
-		Stderr: &bytes.Buffer{},
+		Store:    store,
+		Services: awsServices(),
+		Stdout:   &buf,
+		Stderr:   &bytes.Buffer{},
 	}
 
 	err := r.Run(t.Context(), status.Options{})
@@ -420,4 +434,13 @@ func TestCommand_TagOnlyChangesNoEntries(t *testing.T) {
 	assert.Contains(t, output, "Staged Secrets Manager changes (1)")
 	assert.Contains(t, output, "my-secret")
 	assert.NotContains(t, output, "No changes staged")
+}
+
+// awsServices returns the AWS service specs (param + secret) used by the
+// provider-wide status command.
+func awsServices() []stgcli.GlobalServiceSpec {
+	return []stgcli.GlobalServiceSpec{
+		{Service: staging.ServiceParam, ParserFactory: staging.ParamParserFactory},
+		{Service: staging.ServiceSecret, ParserFactory: staging.SecretParserFactory},
+	}
 }

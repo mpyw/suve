@@ -11,12 +11,12 @@ import (
 	cliinternal "github.com/mpyw/suve/internal/cli/commands/internal"
 	"github.com/mpyw/suve/internal/cli/confirm"
 	"github.com/mpyw/suve/internal/cli/output"
-	"github.com/mpyw/suve/internal/usecase/gcp"
+	"github.com/mpyw/suve/internal/usecase/gcloud"
 )
 
 // UpdateRunner executes the update command.
 type UpdateRunner struct {
-	UseCase *gcp.UpdateUseCase
+	UseCase *gcloud.UpdateUseCase
 	Stdout  io.Writer
 	Stderr  io.Writer
 }
@@ -60,12 +60,12 @@ func updateAction(ctx context.Context, cmd *cli.Command) error {
 	newValue := cmd.Args().Get(1)
 	skipConfirm := cmd.Bool("yes")
 
-	store, err := cliinternal.GCPSecretStore(ctx)
+	store, err := cliinternal.GoogleCloudSecretStore(ctx)
 	if err != nil {
 		return err
 	}
 
-	uc := &gcp.UpdateUseCase{Store: store}
+	uc := &gcloud.UpdateUseCase{Store: store}
 
 	if !skipConfirm {
 		currentValue, _ := uc.GetCurrentValue(ctx, name)
@@ -103,7 +103,7 @@ func updateAction(ctx context.Context, cmd *cli.Command) error {
 
 // Run executes the update command.
 func (r *UpdateRunner) Run(ctx context.Context, opts UpdateOptions) error {
-	result, err := r.UseCase.Execute(ctx, gcp.UpdateInput{Name: opts.Name, Value: opts.Value})
+	result, err := r.UseCase.Execute(ctx, gcloud.UpdateInput{Name: opts.Name, Value: opts.Value})
 	if err != nil {
 		return err
 	}

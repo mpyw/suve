@@ -16,8 +16,8 @@ import (
 	"github.com/mpyw/suve/internal/domain"
 	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/provider/providermock"
-	"github.com/mpyw/suve/internal/usecase/gcp"
-	"github.com/mpyw/suve/internal/version/gcpversion"
+	gcloudusecase "github.com/mpyw/suve/internal/usecase/gcloud"
+	"github.com/mpyw/suve/internal/version/gcloudversion"
 )
 
 // TestCommandValidation exercises argument/spec validation that fails before any
@@ -87,7 +87,7 @@ func TestCreateRunner(t *testing.T) {
 	var buf, errBuf bytes.Buffer
 
 	r := &gcloud.CreateRunner{
-		UseCase: &gcp.CreateUseCase{Writer: store},
+		UseCase: &gcloudusecase.CreateUseCase{Writer: store},
 		Stdout:  &buf,
 		Stderr:  &errBuf,
 	}
@@ -115,7 +115,7 @@ func TestUpdateRunner(t *testing.T) {
 	var buf, errBuf bytes.Buffer
 
 	r := &gcloud.UpdateRunner{
-		UseCase: &gcp.UpdateUseCase{Store: store},
+		UseCase: &gcloudusecase.UpdateUseCase{Store: store},
 		Stdout:  &buf,
 		Stderr:  &errBuf,
 	}
@@ -136,12 +136,12 @@ func TestUpdateRunner_NotFound(t *testing.T) {
 	var buf, errBuf bytes.Buffer
 
 	r := &gcloud.UpdateRunner{
-		UseCase: &gcp.UpdateUseCase{Store: store},
+		UseCase: &gcloudusecase.UpdateUseCase{Store: store},
 		Stdout:  &buf,
 		Stderr:  &errBuf,
 	}
 	err := r.Run(t.Context(), gcloud.UpdateOptions{Name: "missing", Value: "new"})
-	require.ErrorIs(t, err, gcp.ErrSecretNotFound)
+	require.ErrorIs(t, err, gcloudusecase.ErrSecretNotFound)
 }
 
 func TestDeleteRunner(t *testing.T) {
@@ -160,7 +160,7 @@ func TestDeleteRunner(t *testing.T) {
 	var buf, errBuf bytes.Buffer
 
 	r := &gcloud.DeleteRunner{
-		UseCase: &gcp.DeleteUseCase{Store: store},
+		UseCase: &gcloudusecase.DeleteUseCase{Store: store},
 		Stdout:  &buf,
 		Stderr:  &errBuf,
 	}
@@ -191,7 +191,7 @@ func TestShowPresenter(t *testing.T) {
 		},
 	}
 
-	spec, err := gcpversion.Parse("my-secret")
+	spec, err := gcloudversion.Parse("my-secret")
 	require.NoError(t, err)
 
 	presenter := gcloud.NewShowPresenter(store, spec)

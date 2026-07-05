@@ -12,7 +12,7 @@ import (
 
 // newTagger builds the Google Cloud Secret Manager provider.Tagger.
 func newTagger(ctx context.Context) (provider.Tagger, error) {
-	return cliinternal.GCPSecretStore(ctx)
+	return cliinternal.GoogleCloudSecretStore(ctx)
 }
 
 // TagCommand returns the Google Cloud Secret Manager tag command.

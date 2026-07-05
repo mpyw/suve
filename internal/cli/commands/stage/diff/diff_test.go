@@ -86,9 +86,11 @@ func TestRun_NothingStaged(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 
 	r := &stagediff.Runner{
-		Store:  store,
-		Stdout: &stdout,
-		Stderr: &stderr,
+		Services:      []stagediff.ServiceStrategy{{Service: staging.ServiceParam}, {Service: staging.ServiceSecret}},
+		ProviderLabel: "AWS",
+		Store:         store,
+		Stdout:        &stdout,
+		Stderr:        &stderr,
 	}
 
 	// When called with empty store, Run should return without error
@@ -113,7 +115,8 @@ func TestRun_ParamOnly(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 
 	r := &stagediff.Runner{
-		ParamStrategy: staging.NewParamStrategy(storeReturning("old-value", "1")),
+		Services:      []stagediff.ServiceStrategy{paramDiff(staging.NewParamStrategy(storeReturning("old-value", "1")))},
+		ProviderLabel: "AWS",
 		Store:         store,
 		Stdout:        &stdout,
 		Stderr:        &stderr,
@@ -144,10 +147,11 @@ func TestRun_SecretOnly(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 
 	r := &stagediff.Runner{
-		SecretStrategy: staging.NewSecretStrategy(storeReturning("old-secret", "abc123def456")),
-		Store:          store,
-		Stdout:         &stdout,
-		Stderr:         &stderr,
+		Services:      []stagediff.ServiceStrategy{secretDiff(staging.NewSecretStrategy(storeReturning("old-secret", "abc123def456")))},
+		ProviderLabel: "AWS",
+		Store:         store,
+		Stdout:        &stdout,
+		Stderr:        &stderr,
 	}
 
 	err = r.Run(t.Context(), stagediff.Options{})
@@ -180,11 +184,14 @@ func TestRun_BothServices(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 
 	r := &stagediff.Runner{
-		ParamStrategy:  staging.NewParamStrategy(storeReturning("param-old", "1")),
-		SecretStrategy: staging.NewSecretStrategy(storeReturning("secret-old", "abc123def456")),
-		Store:          store,
-		Stdout:         &stdout,
-		Stderr:         &stderr,
+		Services: []stagediff.ServiceStrategy{
+			paramDiff(staging.NewParamStrategy(storeReturning("param-old", "1"))),
+			secretDiff(staging.NewSecretStrategy(storeReturning("secret-old", "abc123def456"))),
+		},
+		ProviderLabel: "AWS",
+		Store:         store,
+		Stdout:        &stdout,
+		Stderr:        &stderr,
 	}
 
 	err = r.Run(t.Context(), stagediff.Options{})
@@ -219,11 +226,14 @@ func TestRun_DeleteOperations(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 
 	r := &stagediff.Runner{
-		ParamStrategy:  staging.NewParamStrategy(storeReturning("existing-value", "1")),
-		SecretStrategy: staging.NewSecretStrategy(storeReturning("existing-secret", "abc123def456")),
-		Store:          store,
-		Stdout:         &stdout,
-		Stderr:         &stderr,
+		Services: []stagediff.ServiceStrategy{
+			paramDiff(staging.NewParamStrategy(storeReturning("existing-value", "1"))),
+			secretDiff(staging.NewSecretStrategy(storeReturning("existing-secret", "abc123def456"))),
+		},
+		ProviderLabel: "AWS",
+		Store:         store,
+		Stdout:        &stdout,
+		Stderr:        &stderr,
 	}
 
 	err = r.Run(t.Context(), stagediff.Options{})
@@ -250,7 +260,8 @@ func TestRun_IdenticalValues(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 
 	r := &stagediff.Runner{
-		ParamStrategy: staging.NewParamStrategy(storeReturning("same-value", "1")),
+		Services:      []stagediff.ServiceStrategy{paramDiff(staging.NewParamStrategy(storeReturning("same-value", "1")))},
+		ProviderLabel: "AWS",
 		Store:         store,
 		Stdout:        &stdout,
 		Stderr:        &stderr,
@@ -282,7 +293,8 @@ func TestRun_ParseJSON(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 
 	r := &stagediff.Runner{
-		ParamStrategy: staging.NewParamStrategy(storeReturning(`{"key":"old"}`, "1")),
+		Services:      []stagediff.ServiceStrategy{paramDiff(staging.NewParamStrategy(storeReturning(`{"key":"old"}`, "1")))},
+		ProviderLabel: "AWS",
 		Store:         store,
 		Stdout:        &stdout,
 		Stderr:        &stderr,
@@ -311,7 +323,8 @@ func TestRun_ParamUpdateAutoUnstageWhenDeleted(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 
 	r := &stagediff.Runner{
-		ParamStrategy: staging.NewParamStrategy(storeGetError("parameter not found")),
+		Services:      []stagediff.ServiceStrategy{paramDiff(staging.NewParamStrategy(storeGetError("parameter not found")))},
+		ProviderLabel: "AWS",
 		Store:         store,
 		Stdout:        &stdout,
 		Stderr:        &stderr,
@@ -342,10 +355,11 @@ func TestRun_SecretUpdateAutoUnstageWhenDeleted(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 
 	r := &stagediff.Runner{
-		SecretStrategy: staging.NewSecretStrategy(storeGetError("secret not found")),
-		Store:          store,
-		Stdout:         &stdout,
-		Stderr:         &stderr,
+		Services:      []stagediff.ServiceStrategy{secretDiff(staging.NewSecretStrategy(storeGetError("secret not found")))},
+		ProviderLabel: "AWS",
+		Store:         store,
+		Stdout:        &stdout,
+		Stderr:        &stderr,
 	}
 
 	err = r.Run(t.Context(), stagediff.Options{})
@@ -373,10 +387,11 @@ func TestRun_SecretIdenticalValues(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 
 	r := &stagediff.Runner{
-		SecretStrategy: staging.NewSecretStrategy(storeReturning("same-value", "abc123def456")),
-		Store:          store,
-		Stdout:         &stdout,
-		Stderr:         &stderr,
+		Services:      []stagediff.ServiceStrategy{secretDiff(staging.NewSecretStrategy(storeReturning("same-value", "abc123def456")))},
+		ProviderLabel: "AWS",
+		Store:         store,
+		Stdout:        &stdout,
+		Stderr:        &stderr,
 	}
 
 	err = r.Run(t.Context(), stagediff.Options{})
@@ -405,10 +420,11 @@ func TestRun_SecretParseJSON(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 
 	r := &stagediff.Runner{
-		SecretStrategy: staging.NewSecretStrategy(storeReturning(`{"key":"old"}`, "abc123def456")),
-		Store:          store,
-		Stdout:         &stdout,
-		Stderr:         &stderr,
+		Services:      []stagediff.ServiceStrategy{secretDiff(staging.NewSecretStrategy(storeReturning(`{"key":"old"}`, "abc123def456")))},
+		ProviderLabel: "AWS",
+		Store:         store,
+		Stdout:        &stdout,
+		Stderr:        &stderr,
 	}
 
 	err = r.Run(t.Context(), stagediff.Options{ParseJSON: true})
@@ -434,10 +450,11 @@ func TestRun_SecretParseJSONMixed(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 
 	r := &stagediff.Runner{
-		SecretStrategy: staging.NewSecretStrategy(storeReturning(`{"key":"old"}`, "abc123def456")),
-		Store:          store,
-		Stdout:         &stdout,
-		Stderr:         &stderr,
+		Services:      []stagediff.ServiceStrategy{secretDiff(staging.NewSecretStrategy(storeReturning(`{"key":"old"}`, "abc123def456")))},
+		ProviderLabel: "AWS",
+		Store:         store,
+		Stdout:        &stdout,
+		Stderr:        &stderr,
 	}
 
 	err = r.Run(t.Context(), stagediff.Options{ParseJSON: true})
@@ -467,7 +484,8 @@ func TestRun_ParamCreateOperation(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 
 	r := &stagediff.Runner{
-		ParamStrategy: staging.NewParamStrategy(storeGetError("parameter not found")),
+		Services:      []stagediff.ServiceStrategy{paramDiff(staging.NewParamStrategy(storeGetError("parameter not found")))},
+		ProviderLabel: "AWS",
 		Store:         store,
 		Stdout:        &stdout,
 		Stderr:        &stderr,
@@ -506,10 +524,11 @@ func TestRun_SecretCreateOperation(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 
 	r := &stagediff.Runner{
-		SecretStrategy: staging.NewSecretStrategy(storeGetError("secret not found")),
-		Store:          store,
-		Stdout:         &stdout,
-		Stderr:         &stderr,
+		Services:      []stagediff.ServiceStrategy{secretDiff(staging.NewSecretStrategy(storeGetError("secret not found")))},
+		ProviderLabel: "AWS",
+		Store:         store,
+		Stdout:        &stdout,
+		Stderr:        &stderr,
 	}
 
 	err = r.Run(t.Context(), stagediff.Options{})
@@ -539,7 +558,8 @@ func TestRun_CreateWithParseJSON(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 
 	r := &stagediff.Runner{
-		ParamStrategy: staging.NewParamStrategy(storeGetError("parameter not found")),
+		Services:      []stagediff.ServiceStrategy{paramDiff(staging.NewParamStrategy(storeGetError("parameter not found")))},
+		ProviderLabel: "AWS",
 		Store:         store,
 		Stdout:        &stdout,
 		Stderr:        &stderr,
@@ -568,7 +588,8 @@ func TestRun_DeleteAutoUnstageWhenAlreadyDeleted(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 
 	r := &stagediff.Runner{
-		ParamStrategy: staging.NewParamStrategy(storeGetError("parameter not found")),
+		Services:      []stagediff.ServiceStrategy{paramDiff(staging.NewParamStrategy(storeGetError("parameter not found")))},
+		ProviderLabel: "AWS",
 		Store:         store,
 		Stdout:        &stdout,
 		Stderr:        &stderr,
@@ -598,10 +619,11 @@ func TestRun_SecretDeleteAutoUnstageWhenAlreadyDeleted(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 
 	r := &stagediff.Runner{
-		SecretStrategy: staging.NewSecretStrategy(storeGetError("secret not found")),
-		Store:          store,
-		Stdout:         &stdout,
-		Stderr:         &stderr,
+		Services:      []stagediff.ServiceStrategy{secretDiff(staging.NewSecretStrategy(storeGetError("secret not found")))},
+		ProviderLabel: "AWS",
+		Store:         store,
+		Stdout:        &stdout,
+		Stderr:        &stderr,
 	}
 
 	err = r.Run(t.Context(), stagediff.Options{})
@@ -630,7 +652,8 @@ func TestRun_MetadataWithDescription(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 
 	r := &stagediff.Runner{
-		ParamStrategy: staging.NewParamStrategy(storeReturning("old-value", "1")),
+		Services:      []stagediff.ServiceStrategy{paramDiff(staging.NewParamStrategy(storeReturning("old-value", "1")))},
+		ProviderLabel: "AWS",
 		Store:         store,
 		Stdout:        &stdout,
 		Stderr:        &stderr,
@@ -664,7 +687,8 @@ func TestRun_MetadataWithTags(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 
 	r := &stagediff.Runner{
-		ParamStrategy: staging.NewParamStrategy(storeReturning("old-value", "1")),
+		Services:      []stagediff.ServiceStrategy{paramDiff(staging.NewParamStrategy(storeReturning("old-value", "1")))},
+		ProviderLabel: "AWS",
 		Store:         store,
 		Stdout:        &stdout,
 		Stderr:        &stderr,
@@ -695,9 +719,11 @@ func TestRun_TagOnlyDiff(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 
 	r := &stagediff.Runner{
-		Store:  store,
-		Stdout: &stdout,
-		Stderr: &stderr,
+		Services:      []stagediff.ServiceStrategy{{Service: staging.ServiceParam}, {Service: staging.ServiceSecret}},
+		ProviderLabel: "AWS",
+		Store:         store,
+		Stdout:        &stdout,
+		Stderr:        &stderr,
 	}
 
 	err = r.Run(t.Context(), stagediff.Options{})
@@ -727,9 +753,11 @@ func TestRun_TagOnlyRemovalsDiff(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 
 	r := &stagediff.Runner{
-		Store:  store,
-		Stdout: &stdout,
-		Stderr: &stderr,
+		Services:      []stagediff.ServiceStrategy{{Service: staging.ServiceParam}, {Service: staging.ServiceSecret}},
+		ProviderLabel: "AWS",
+		Store:         store,
+		Stdout:        &stdout,
+		Stderr:        &stderr,
 	}
 
 	err = r.Run(t.Context(), stagediff.Options{})
@@ -759,9 +787,11 @@ func TestRun_SecretTagDiff(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 
 	r := &stagediff.Runner{
-		Store:  store,
-		Stdout: &stdout,
-		Stderr: &stderr,
+		Services:      []stagediff.ServiceStrategy{{Service: staging.ServiceParam}, {Service: staging.ServiceSecret}},
+		ProviderLabel: "AWS",
+		Store:         store,
+		Stdout:        &stdout,
+		Stderr:        &stderr,
 	}
 
 	err = r.Run(t.Context(), stagediff.Options{})
@@ -791,10 +821,11 @@ func TestRun_SecretCreateWithParseJSON(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 
 	r := &stagediff.Runner{
-		SecretStrategy: staging.NewSecretStrategy(storeGetError("secret not found")),
-		Store:          store,
-		Stdout:         &stdout,
-		Stderr:         &stderr,
+		Services:      []stagediff.ServiceStrategy{secretDiff(staging.NewSecretStrategy(storeGetError("secret not found")))},
+		ProviderLabel: "AWS",
+		Store:         store,
+		Stdout:        &stdout,
+		Stderr:        &stderr,
 	}
 
 	err = r.Run(t.Context(), stagediff.Options{ParseJSON: true})
@@ -829,7 +860,8 @@ func TestRun_BothEntriesAndTags(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 
 	r := &stagediff.Runner{
-		ParamStrategy: staging.NewParamStrategy(storeReturning("old-value", "1")),
+		Services:      []stagediff.ServiceStrategy{paramDiff(staging.NewParamStrategy(storeReturning("old-value", "1")))},
+		ProviderLabel: "AWS",
 		Store:         store,
 		Stdout:        &stdout,
 		Stderr:        &stderr,
@@ -870,7 +902,8 @@ func TestRun_ParamTagDiffWithValues(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 
 	r := &stagediff.Runner{
-		ParamStrategy: staging.NewParamStrategy(paramStore),
+		Services:      []stagediff.ServiceStrategy{paramDiff(staging.NewParamStrategy(paramStore))},
+		ProviderLabel: "AWS",
 		Store:         store,
 		Stdout:        &stdout,
 		Stderr:        &stderr,
@@ -904,10 +937,11 @@ func TestRun_SecretTagDiffWithValues(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 
 	r := &stagediff.Runner{
-		SecretStrategy: staging.NewSecretStrategy(secretStore),
-		Store:          store,
-		Stdout:         &stdout,
-		Stderr:         &stderr,
+		Services:      []stagediff.ServiceStrategy{secretDiff(staging.NewSecretStrategy(secretStore))},
+		ProviderLabel: "AWS",
+		Store:         store,
+		Stdout:        &stdout,
+		Stderr:        &stderr,
 	}
 
 	err = r.Run(t.Context(), stagediff.Options{})
@@ -934,7 +968,8 @@ func TestRun_ParamTagDiffAPIError(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 
 	r := &stagediff.Runner{
-		ParamStrategy: staging.NewParamStrategy(storeGetError("API error")),
+		Services:      []stagediff.ServiceStrategy{paramDiff(staging.NewParamStrategy(storeGetError("API error")))},
+		ProviderLabel: "AWS",
 		Store:         store,
 		Stdout:        &stdout,
 		Stderr:        &stderr,
@@ -964,10 +999,11 @@ func TestRun_SecretTagDiffAPIError(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 
 	r := &stagediff.Runner{
-		SecretStrategy: staging.NewSecretStrategy(storeGetError("API error")),
-		Store:          store,
-		Stdout:         &stdout,
-		Stderr:         &stderr,
+		Services:      []stagediff.ServiceStrategy{secretDiff(staging.NewSecretStrategy(storeGetError("API error")))},
+		ProviderLabel: "AWS",
+		Store:         store,
+		Stdout:        &stdout,
+		Stderr:        &stderr,
 	}
 
 	err = r.Run(t.Context(), stagediff.Options{})
@@ -997,7 +1033,8 @@ func TestRun_TagDiffWithMissingValue(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 
 	r := &stagediff.Runner{
-		ParamStrategy: staging.NewParamStrategy(paramStore),
+		Services:      []stagediff.ServiceStrategy{paramDiff(staging.NewParamStrategy(paramStore))},
+		ProviderLabel: "AWS",
 		Store:         store,
 		Stdout:        &stdout,
 		Stderr:        &stderr,
@@ -1011,4 +1048,12 @@ func TestRun_TagDiffWithMissingValue(t *testing.T) {
 	// no-value should appear without value since it's not in AWS
 	assert.Contains(t, output, "no-value")
 	assert.NotContains(t, output, "no-value=")
+}
+
+func paramDiff(s staging.DiffStrategy) stagediff.ServiceStrategy {
+	return stagediff.ServiceStrategy{Service: staging.ServiceParam, Strategy: s}
+}
+
+func secretDiff(s staging.DiffStrategy) stagediff.ServiceStrategy {
+	return stagediff.ServiceStrategy{Service: staging.ServiceSecret, Strategy: s}
 }

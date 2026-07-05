@@ -1,4 +1,4 @@
-package gcp
+package gcloud
 
 import (
 	"context"
@@ -8,12 +8,12 @@ import (
 
 	"github.com/mpyw/suve/internal/domain"
 	"github.com/mpyw/suve/internal/provider"
-	"github.com/mpyw/suve/internal/version/gcpversion"
+	"github.com/mpyw/suve/internal/version/gcloudversion"
 )
 
 // ShowInput holds input for the show use case.
 type ShowInput struct {
-	Spec *gcpversion.Spec
+	Spec *gcloudversion.Spec
 }
 
 // ShowTag represents a tag (label) key-value pair.

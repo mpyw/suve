@@ -11,8 +11,6 @@ import (
 	"github.com/mpyw/suve/internal/cli/confirm"
 	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/cli/terminal"
-	"github.com/mpyw/suve/internal/infra"
-	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/staging"
 	"github.com/mpyw/suve/internal/staging/store/file"
 	stagingusecase "github.com/mpyw/suve/internal/usecase/staging"
@@ -171,19 +169,21 @@ func (c *StashPopModeChooser) ChooseMode(input StashPopModeInput) (StashPopModeR
 }
 
 // stashPopAction creates the action function for stash pop commands.
-func stashPopAction(service staging.Service) func(context.Context, *cli.Command) error {
+func stashPopAction(service staging.Service, resolver staging.ScopeResolver) func(context.Context, *cli.Command) error {
 	return func(ctx context.Context, cmd *cli.Command) error {
-		identity, err := infra.GetAWSIdentity(ctx)
-		if err != nil {
-			return fmt.Errorf("failed to get AWS identity: %w", err)
-		}
-
-		stashStore, err := fileStoreForReading(cmd, identity.AccountID, identity.Region, false)
+		resolved, err := resolveScope(ctx, resolver)
 		if err != nil {
 			return err
 		}
 
-		working, err := file.NewWorkingStore(provider.AWSScope(identity.AccountID, identity.Region))
+		scope := resolved.Scope
+
+		stashStore, err := fileStoreForReading(cmd, scope, false)
+		if err != nil {
+			return err
+		}
+
+		working, err := file.NewWorkingStore(scope)
 		if err != nil {
 			return fmt.Errorf("failed to create staging store: %w", err)
 		}
@@ -197,11 +197,10 @@ func stashPopAction(service staging.Service) func(context.Context, *cli.Command)
 		// Use mode chooser to determine mode
 		chooser := &StashPopModeChooser{
 			Prompter: &confirm.Prompter{
-				Stdin:     cmd.Root().Reader,
-				Stdout:    cmd.Root().Writer,
-				Stderr:    cmd.Root().ErrWriter,
-				AccountID: identity.AccountID,
-				Region:    identity.Region,
+				Stdin:  cmd.Root().Reader,
+				Stdout: cmd.Root().Writer,
+				Stderr: cmd.Root().ErrWriter,
+				Target: resolved.Target,
 			},
 			Stderr: cmd.Root().ErrWriter,
 			Stdout: cmd.Root().Writer,
@@ -242,7 +241,7 @@ func stashPopAction(service staging.Service) func(context.Context, *cli.Command)
 }
 
 // newGlobalStashPopCommand creates a global stash pop command that operates on all services.
-func newGlobalStashPopCommand() *cli.Command {
+func newGlobalStashPopCommand(resolver staging.ScopeResolver) *cli.Command {
 	return &cli.Command{
 		Name:  "pop",
 		Usage: "Restore staged changes from the stash file into the working staging area",
@@ -263,7 +262,7 @@ EXAMPLES:
    echo "secret" | suve stage stash pop --passphrase-stdin   Decrypt with passphrase from stdin`,
 		Flags:                  stashPopFlags(),
 		MutuallyExclusiveFlags: stashPopMutuallyExclusiveFlags(),
-		Action:                 stashPopAction(""), // Empty service = all services
+		Action:                 stashPopAction("", resolver), // Empty service = all services
 	}
 }
 
@@ -300,6 +299,6 @@ EXAMPLES:
 			cfg.CommandName),
 		Flags:                  stashPopFlags(),
 		MutuallyExclusiveFlags: stashPopMutuallyExclusiveFlags(),
-		Action:                 stashPopAction(service),
+		Action:                 stashPopAction(service, cfg.ScopeResolver),
 	}
 }

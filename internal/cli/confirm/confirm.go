@@ -13,16 +13,31 @@ import (
 
 // Prompter handles confirmation prompts.
 type Prompter struct {
-	Stdin     io.Reader
-	Stdout    io.Writer
-	Stderr    io.Writer
+	Stdin  io.Reader
+	Stdout io.Writer
+	Stderr io.Writer
+
+	// Target is a provider-neutral, human-readable description of where the
+	// operation applies (e.g. "my-profile (123456789012 / us-east-1)" for AWS or
+	// "project my-gcloud-project" for Google Cloud). When set, it is shown before
+	// the prompt. It takes precedence over the AWS-specific fields below.
+	Target string
+
+	// AccountID/Region/Profile describe the AWS target. They are used only when
+	// Target is empty, preserving the original AWS confirmation output.
 	AccountID string
 	Region    string
 	Profile   string
 }
 
-// printTargetInfo prints AWS profile, account, and region information if available.
+// printTargetInfo prints the target information before a prompt, if available.
 func (p *Prompter) printTargetInfo() {
+	if p.Target != "" {
+		output.Printf(p.Stderr, "%s Target: %s\n", colors.Info("i"), p.Target)
+
+		return
+	}
+
 	if p.AccountID == "" || p.Region == "" {
 		return
 	}

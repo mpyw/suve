@@ -7,7 +7,7 @@
 //   - Key Vault (secret): opaque-id-versioned, no staging labels.
 //   - App Configuration (param): UNVERSIONED — the abstraction's acid test.
 //
-// Both groups reuse the same generic command scaffolding as the AWS/GCP commands
+// Both groups reuse the same generic command scaffolding as the AWS/GoogleCloud commands
 // via Azure-specific presenters and use cases. The top-level azure command owns
 // the shared --subscription / --resource-group flags; each subgroup owns its
 // address flag (--vault-name / --store-name).

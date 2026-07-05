@@ -3,75 +3,69 @@ package reset
 
 import (
 	"context"
-	"fmt"
 	"io"
+	"strconv"
+	"strings"
 
 	"github.com/urfave/cli/v3"
 
 	"github.com/mpyw/suve/internal/cli/output"
-	"github.com/mpyw/suve/internal/infra"
-	"github.com/mpyw/suve/internal/provider"
-	"github.com/mpyw/suve/internal/staging"
+	stgcli "github.com/mpyw/suve/internal/staging/cli"
 	"github.com/mpyw/suve/internal/staging/store"
-	"github.com/mpyw/suve/internal/staging/store/file"
 )
 
 // Runner executes the reset command.
 type Runner struct {
-	Store  store.ReadWriteOperator
-	Stdout io.Writer
-	Stderr io.Writer
+	Store store.ReadWriteOperator
+	// Services lists the provider services in stable display order.
+	Services []stgcli.GlobalServiceSpec
+	Stdout   io.Writer
+	Stderr   io.Writer
 }
 
-// Command returns the global reset command.
-func Command() *cli.Command {
+// Command returns the global reset command for the given provider config.
+func Command(cfg stgcli.GlobalConfig) *cli.Command {
 	return &cli.Command{
 		Name:  "reset",
 		Usage: "Unstage all changes",
-		Description: `Remove all staged changes (SSM Parameter Store and Secrets Manager) from the staging area.
+		Description: `Remove all staged changes from the staging area.
 
-This does not affect AWS - it only clears the local staging area.
+This does not affect the remote store - it only clears the local staging area.
 
-Use 'suve stage param reset' or 'suve stage secret reset' for service-specific operations.
+Use 'suve stage <service> reset' for service-specific operations.
 
 EXAMPLES:
-   suve stage reset --all    Unstage all changes (SSM Parameter Store and Secrets Manager)`,
+   suve stage reset --all    Unstage all changes`,
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
 				Name:  "all",
 				Usage: "Unstage all changes (required)",
 			},
 		},
-		Action: action,
+		Action: func(ctx context.Context, cmd *cli.Command) error {
+			// Require --all flag for safety
+			if !cmd.Bool("all") {
+				output.Warning(cmd.Root().ErrWriter, "no effect without --all flag")
+				output.Hint(cmd.Root().ErrWriter, "Use 'suve stage reset --all' to unstage all changes")
+
+				return nil
+			}
+
+			store, _, err := stgcli.WorkingStore(ctx, cfg.ScopeResolver)
+			if err != nil {
+				return err
+			}
+
+			r := &Runner{
+				Store:    store,
+				Services: cfg.Services,
+				Stdout:   cmd.Root().Writer,
+				Stderr:   cmd.Root().ErrWriter,
+			}
+
+			return r.Run(ctx)
+		},
 	}
-}
-
-func action(ctx context.Context, cmd *cli.Command) error {
-	// Require --all flag for safety
-	if !cmd.Bool("all") {
-		output.Warning(cmd.Root().ErrWriter, "no effect without --all flag")
-		output.Hint(cmd.Root().ErrWriter, "Use 'suve stage reset --all' to unstage all changes")
-
-		return nil
-	}
-
-	identity, err := infra.GetAWSIdentity(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to get AWS identity: %w", err)
-	}
-
-	store, err := file.NewWorkingStore(provider.AWSScope(identity.AccountID, identity.Region))
-	if err != nil {
-		return fmt.Errorf("failed to create staging store: %w", err)
-	}
-
-	r := &Runner{
-		Store:  store,
-		Stdout: cmd.Root().Writer,
-		Stderr: cmd.Root().ErrWriter,
-	}
-
-	return r.Run(ctx)
 }
 
 // Run executes the reset command.
@@ -87,17 +81,18 @@ func (r *Runner) Run(ctx context.Context) error {
 		return err
 	}
 
-	paramEntryCount := len(staged[staging.ServiceParam])
-	paramTagCount := len(tagStaged[staging.ServiceParam])
-	paramCount := paramEntryCount + paramTagCount
+	var (
+		totalCount int
+		summaries  []string
+	)
 
-	secretEntryCount := len(staged[staging.ServiceSecret])
-	secretTagCount := len(tagStaged[staging.ServiceSecret])
-	secretCount := secretEntryCount + secretTagCount
+	for _, spec := range r.Services {
+		count := len(staged[spec.Service]) + len(tagStaged[spec.Service])
+		totalCount += count
+		summaries = append(summaries, formatCount(count, spec.ParserFactory().ServiceName()))
+	}
 
-	totalCount := paramCount + secretCount
-
-	// Empty service ("") clears both SSM Parameter Store and Secrets Manager
+	// Empty service ("") clears all services.
 	if err := r.Store.UnstageAll(ctx, ""); err != nil {
 		return err
 	}
@@ -108,7 +103,11 @@ func (r *Runner) Run(ctx context.Context) error {
 		return nil
 	}
 
-	output.Success(r.Stdout, "Unstaged all changes (%d SSM Parameter Store, %d Secrets Manager)", paramCount, secretCount)
+	output.Success(r.Stdout, "Unstaged all changes (%s)", strings.Join(summaries, ", "))
 
 	return nil
+}
+
+func formatCount(count int, serviceName string) string {
+	return strconv.Itoa(count) + " " + serviceName
 }

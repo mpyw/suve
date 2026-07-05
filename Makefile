@@ -1,4 +1,4 @@
-.PHONY: build test lint e2e e2e-gcp e2e-azure e2e-azure-keyvault up down clean coverage coverage-e2e coverage-all gui-dev gui-build gui-bindings ubuntu-22 ubuntu-24 x11-setup help
+.PHONY: build test lint e2e e2e-gcloud e2e-azure e2e-azure-keyvault up down clean coverage coverage-e2e coverage-all gui-dev gui-build gui-bindings ubuntu-22 ubuntu-24 x11-setup help
 
 .DEFAULT_GOAL := help
 
@@ -24,7 +24,7 @@ else
 endif
 
 SUVE_LOCALSTACK_EXTERNAL_PORT ?= 4566
-SUVE_GCP_EMULATOR_PORT ?= 9090
+SUVE_GCLOUD_EMULATOR_PORT ?= 9090
 SUVE_AZURE_APPCONFIG_PORT ?= 8080
 SUVE_AZURE_KEYVAULT_PORT ?= 8443
 COVERPKG = $(shell go list ./... | grep -v testutil | grep -v /e2e | grep -v internal/gui | grep -v /cmd/ | tr '\n' ',')
@@ -59,12 +59,12 @@ down: ## Stop localstack container
 e2e: up ## Run E2E tests (starts localstack)
 	SUVE_LOCALSTACK_EXTERNAL_PORT=$(SUVE_LOCALSTACK_EXTERNAL_PORT) go test -tags=e2e -v ./e2e/...
 
-e2e-gcp: ## Run Google Cloud Secret Manager E2E tests (starts the emulator)
-	SUVE_GCP_EMULATOR_PORT=$(SUVE_GCP_EMULATOR_PORT) docker compose --profile gcp up -d gcp-secretmanager
-	@echo "Waiting for the GCP Secret Manager emulator on port $(SUVE_GCP_EMULATOR_PORT)..."
-	@until bash -c 'echo > /dev/tcp/127.0.0.1/$(SUVE_GCP_EMULATOR_PORT)' 2>/dev/null; do sleep 1; done
+e2e-gcloud: ## Run Google Cloud Secret Manager E2E tests (starts the emulator)
+	SUVE_GCLOUD_EMULATOR_PORT=$(SUVE_GCLOUD_EMULATOR_PORT) docker compose --profile gcloud up -d gcloud-secretmanager
+	@echo "Waiting for the Google Cloud Secret Manager emulator on port $(SUVE_GCLOUD_EMULATOR_PORT)..."
+	@until bash -c 'echo > /dev/tcp/127.0.0.1/$(SUVE_GCLOUD_EMULATOR_PORT)' 2>/dev/null; do sleep 1; done
 	@echo "emulator is ready"
-	SUVE_GCP_SECRETMANAGER_ENDPOINT=127.0.0.1:$(SUVE_GCP_EMULATOR_PORT) go test -tags=e2e -v -run TestGCP ./e2e/...
+	SUVE_GCLOUD_SECRETMANAGER_ENDPOINT=127.0.0.1:$(SUVE_GCLOUD_EMULATOR_PORT) go test -tags=e2e -v -run TestGoogleCloud ./e2e/...
 
 e2e-azure: ## Run Azure App Configuration E2E tests (starts the emulator)
 	SUVE_AZURE_APPCONFIG_PORT=$(SUVE_AZURE_APPCONFIG_PORT) docker compose --profile azure up -d azure-appconfig

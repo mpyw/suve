@@ -9,12 +9,12 @@ import (
 
 	cliinternal "github.com/mpyw/suve/internal/cli/commands/internal"
 	"github.com/mpyw/suve/internal/cli/output"
-	"github.com/mpyw/suve/internal/usecase/gcp"
+	"github.com/mpyw/suve/internal/usecase/gcloud"
 )
 
 // CreateRunner executes the create command.
 type CreateRunner struct {
-	UseCase *gcp.CreateUseCase
+	UseCase *gcloud.CreateUseCase
 	Stdout  io.Writer
 	Stderr  io.Writer
 }
@@ -47,13 +47,13 @@ EXAMPLES:
 				return fmt.Errorf("usage: suve gcloud secret create <name> <value>")
 			}
 
-			store, err := cliinternal.GCPSecretStore(ctx)
+			store, err := cliinternal.GoogleCloudSecretStore(ctx)
 			if err != nil {
 				return err
 			}
 
 			r := &CreateRunner{
-				UseCase: &gcp.CreateUseCase{Writer: store},
+				UseCase: &gcloud.CreateUseCase{Writer: store},
 				Stdout:  cmd.Root().Writer,
 				Stderr:  cmd.Root().ErrWriter,
 			}
@@ -65,7 +65,7 @@ EXAMPLES:
 
 // Run executes the create command.
 func (r *CreateRunner) Run(ctx context.Context, opts CreateOptions) error {
-	result, err := r.UseCase.Execute(ctx, gcp.CreateInput{Name: opts.Name, Value: opts.Value})
+	result, err := r.UseCase.Execute(ctx, gcloud.CreateInput{Name: opts.Name, Value: opts.Value})
 	if err != nil {
 		return err
 	}

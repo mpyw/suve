@@ -150,9 +150,9 @@ func TestScope_Constructors(t *testing.T) {
 	assert.Equal(t, "acct", aws.AccountID)
 	assert.Equal(t, "region", aws.Region)
 
-	gcp := provider.GoogleCloudScope("proj")
-	assert.Equal(t, provider.ProviderGoogleCloud, gcp.Provider)
-	assert.Equal(t, "proj", gcp.ProjectID)
+	gcloud := provider.GoogleCloudScope("proj")
+	assert.Equal(t, provider.ProviderGoogleCloud, gcloud.Provider)
+	assert.Equal(t, "proj", gcloud.ProjectID)
 
 	kv := provider.AzureKeyVaultScope("sub", "rg", "vault")
 	assert.Equal(t, provider.ProviderAzure, kv.Provider)

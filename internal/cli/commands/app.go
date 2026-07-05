@@ -56,11 +56,11 @@ func MakeAppWithDetect(det detect.Result) *cli.Command {
 		flat = append(flat, c)
 	}
 
-	// Staging is AWS-only, so the top-level `stage` alias appears only when AWS
-	// is active — consistent with param/secret. It is always reachable
-	// explicitly as `suve aws stage`.
-	if det.FlatStage() {
-		flat = append(flat, stage.Command())
+	// The top-level `stage` alias appears when exactly one staging-capable
+	// provider is active — consistent with param/secret. It is always reachable
+	// explicitly as `suve aws stage` / `suve gcloud stage`.
+	if c := flatStageCommand(det.Stage); c != nil {
+		flat = append(flat, c)
 	}
 
 	return &cli.Command{
@@ -103,6 +103,23 @@ func flatCommand(p provider.Provider, kind provider.Kind) *cli.Command {
 		case provider.ProviderAzure:
 			return azure.FlatSecretCommand("secret")
 		}
+	}
+
+	return nil
+}
+
+// flatStageCommand builds the top-level `stage` alias for the uniquely-active
+// staging provider, or nil when there is none. It reuses each provider's real
+// staging implementation so the alias behaves exactly like the explicit form.
+func flatStageCommand(p provider.Provider) *cli.Command {
+	switch p {
+	case provider.ProviderAWS:
+		return stage.Command()
+	case provider.ProviderGoogleCloud:
+		return gcloud.FlatStageCommand("stage")
+	case provider.ProviderAzure:
+		// Azure is not yet staging-capable.
+		return nil
 	}
 
 	return nil

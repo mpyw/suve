@@ -1,11 +1,11 @@
 // Package gcloud provides CLI commands for Google Cloud Secret Manager,
-// exposed as the "suve gcloud secret <op>" command group.
+// exposed as the "suve gcloud secret <op>" command group plus the
+// "suve gcloud stage <op>" staging workflow.
 //
-// Google Cloud is secret-only (no parameter store) and has no staging workflow,
-// so this group exposes only the read/write/tag commands (show, log, list,
-// diff, create, update, delete, tag, untag). They reuse the same generic
-// command scaffolding as the AWS secret commands via Google Cloud-specific
-// presenters and use cases.
+// Google Cloud is secret-only (no parameter store). The read/write/tag commands
+// (show, log, list, diff, create, update, delete, tag, untag) and the staging
+// commands reuse the same generic scaffolding as their AWS counterparts via
+// Google Cloud-specific presenters, use cases, and staging strategy.
 package gcloud
 
 import (
@@ -35,6 +35,7 @@ environment variable. Authentication uses Application Default Credentials.`,
 		Before: resolveProject,
 		Commands: []*cli.Command{
 			SecretCommand(),
+			StageCommand(),
 		},
 		CommandNotFound: cliinternal.CommandNotFound,
 	}
@@ -73,7 +74,7 @@ func resolveProject(ctx context.Context, cmd *cli.Command) (context.Context, err
 		project = os.Getenv("GOOGLE_CLOUD_PROJECT")
 	}
 
-	return cliinternal.WithGCPProject(ctx, project), nil
+	return cliinternal.WithGoogleCloudProject(ctx, project), nil
 }
 
 // SecretCommand returns the "gcloud secret" subcommand group.
