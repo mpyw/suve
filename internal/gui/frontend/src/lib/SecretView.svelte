@@ -8,6 +8,8 @@
   import EyeOffIcon from './icons/EyeOffIcon.svelte';
   import Modal from './Modal.svelte';
   import { withRetry } from './retry';
+  import StagingBanner from './StagingBanner.svelte';
+  import TagList from './TagList.svelte';
   import { createDiffMode } from './useDiffMode.svelte';
   import { createDebouncer, formatDate, formatJsonValue, maskValue, parseError } from './viewUtils';
   import './common.css';
@@ -186,19 +188,6 @@
     secretLog = [];
     showValue = false;
     stagingStatus = null;
-  }
-
-  function getStagingMessage(): string | null {
-    if (!stagingStatus || (!stagingStatus.hasEntry && !stagingStatus.hasTags)) {
-      return null;
-    }
-    if (stagingStatus.hasEntry && stagingStatus.hasTags) {
-      return 'This item has staged value and tag changes';
-    }
-    if (stagingStatus.hasEntry) {
-      return 'This item has staged value changes';
-    }
-    return 'This item has staged tag changes';
   }
 
   function toggleShowValue() {
@@ -496,14 +485,7 @@
           </div>
         </div>
 
-        {#if getStagingMessage()}
-          <!-- Using div instead of button to avoid conflicts with Playwright button selectors -->
-          <div class="staging-banner" role="link" tabindex="0" onclick={onnavigatetostaging} onkeydown={(e) => e.key === 'Enter' && onnavigatetostaging?.()}>
-            <span class="staging-icon">⚠</span>
-            <span class="staging-text">{getStagingMessage()}</span>
-            <span class="staging-link">View in Staging →</span>
-          </div>
-        {/if}
+        <StagingBanner {stagingStatus} onnavigate={onnavigatetostaging} />
 
         {#if detailLoading}
           <div class="loading">Loading...</div>
@@ -561,26 +543,7 @@
               <code class="arn-display">{secretDetail.arn}</code>
             </div>
 
-            <div class="detail-section">
-              <div class="section-header">
-                <h4>Tags</h4>
-                <button class="btn-action-sm" onclick={openTagModal}>+ Add</button>
-              </div>
-              {#if secretDetail.tags && secretDetail.tags.length > 0}
-                <div class="tags-list">
-                  {#each secretDetail.tags as tag}
-                    <div class="tag-item">
-                      <span class="tag-key secret">{tag.key}</span>
-                      <span class="tag-separator">=</span>
-                      <span class="tag-value">{tag.value}</span>
-                      <button class="btn-tag-remove" onclick={() => openRemoveTagModal(tag.key)} title="Remove tag">×</button>
-                    </div>
-                  {/each}
-                </div>
-              {:else}
-                <p class="no-tags">No tags</p>
-              {/if}
-            </div>
+            <TagList tags={secretDetail.tags} serviceClass="secret" onadd={openTagModal} onremove={openRemoveTagModal} />
 
             {#if secretLog.length > 0}
               <div class="detail-section">
@@ -887,44 +850,5 @@
 
   .btn-restore-confirm:hover {
     background: #43a047;
-  }
-
-  .staging-banner {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    width: 100%;
-    padding: 10px 12px;
-    margin: 8px 0 0 0;
-    background: rgba(255, 193, 7, 0.15);
-    border: 1px solid rgba(255, 193, 7, 0.4);
-    border-radius: 6px;
-    cursor: pointer;
-    transition: background-color 0.2s, border-color 0.2s;
-    text-align: left;
-  }
-
-  .staging-banner:hover {
-    background: rgba(255, 193, 7, 0.25);
-    border-color: rgba(255, 193, 7, 0.6);
-  }
-
-  .staging-icon {
-    color: #ffc107;
-    font-size: 14px;
-    flex-shrink: 0;
-  }
-
-  .staging-text {
-    color: #e0e0e0;
-    font-size: 13px;
-    flex: 1;
-  }
-
-  .staging-link {
-    color: #ffc107;
-    font-size: 12px;
-    font-weight: 500;
-    flex-shrink: 0;
   }
 </style>

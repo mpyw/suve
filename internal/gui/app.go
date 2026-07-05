@@ -158,47 +158,42 @@ func (a *App) serviceStrategy(service string) (staging.FullStrategy, error) {
 	}
 }
 
-func (a *App) getEditStrategy(service string) (staging.EditStrategy, error) {
+// strategyAs resolves the service strategy and narrows it to the requested
+// staging strategy interface T. The concrete *ParamStrategy / *SecretStrategy
+// satisfy every staging strategy interface, so this succeeds for the Edit,
+// Apply and Diff interfaces (which FullStrategy embeds) as well as for
+// DeleteStrategy (which it does not embed but the concrete types implement).
+// It is a free function because Go methods cannot declare type parameters.
+func strategyAs[T any](a *App, service string) (T, error) {
+	var zero T
+
 	strategy, err := a.serviceStrategy(service)
 	if err != nil {
-		return nil, err
+		return zero, err
 	}
 
-	return strategy, nil
+	narrowed, ok := any(strategy).(T)
+	if !ok {
+		return zero, errInvalidService
+	}
+
+	return narrowed, nil
+}
+
+func (a *App) getEditStrategy(service string) (staging.EditStrategy, error) {
+	return strategyAs[staging.EditStrategy](a, service)
 }
 
 func (a *App) getDeleteStrategy(service string) (staging.DeleteStrategy, error) {
-	strategy, err := a.serviceStrategy(service)
-	if err != nil {
-		return nil, err
-	}
-
-	// FullStrategy does not embed DeleteStrategy, but the concrete
-	// *ParamStrategy / *SecretStrategy both implement it.
-	deleter, ok := strategy.(staging.DeleteStrategy)
-	if !ok {
-		return nil, errInvalidService
-	}
-
-	return deleter, nil
+	return strategyAs[staging.DeleteStrategy](a, service)
 }
 
 func (a *App) getApplyStrategy(service string) (staging.ApplyStrategy, error) {
-	strategy, err := a.serviceStrategy(service)
-	if err != nil {
-		return nil, err
-	}
-
-	return strategy, nil
+	return strategyAs[staging.ApplyStrategy](a, service)
 }
 
 func (a *App) getDiffStrategy(service string) (staging.DiffStrategy, error) {
-	strategy, err := a.serviceStrategy(service)
-	if err != nil {
-		return nil, err
-	}
-
-	return strategy, nil
+	return strategyAs[staging.DiffStrategy](a, service)
 }
 
 // =============================================================================

@@ -8,6 +8,7 @@ import (
 	"github.com/mpyw/suve/internal/cli/commands/param/paramtype"
 	"github.com/mpyw/suve/internal/domain"
 	"github.com/mpyw/suve/internal/provider"
+	"github.com/mpyw/suve/internal/timeutil"
 	"github.com/mpyw/suve/internal/usecase/param"
 	"github.com/mpyw/suve/internal/version/paramversion"
 )
@@ -153,7 +154,7 @@ func (a *App) ParamShow(specStr string) (*ParamShowResult, error) {
 		Tags:        make([]ParamShowTag, 0, len(result.Tags)),
 	}
 	if result.LastModified != nil {
-		r.LastModified = result.LastModified.Format("2006-01-02T15:04:05Z07:00")
+		r.LastModified = timeutil.FormatRFC3339(*result.LastModified)
 	}
 
 	for _, tag := range result.Tags {
@@ -193,7 +194,7 @@ func (a *App) ParamLog(name string, maxResults int32) (*ParamLogResult, error) {
 			IsCurrent: e.IsCurrent,
 		}
 		if e.LastModified != nil {
-			entry.LastModified = e.LastModified.Format("2006-01-02T15:04:05Z07:00")
+			entry.LastModified = timeutil.FormatRFC3339(*e.LastModified)
 		}
 
 		entries[i] = entry
