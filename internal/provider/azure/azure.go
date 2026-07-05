@@ -14,6 +14,7 @@ package azure
 import (
 	"context"
 	"fmt"
+	"os"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/Azure/azure-sdk-for-go/sdk/data/azappconfig"
@@ -23,6 +24,13 @@ import (
 	"github.com/mpyw/suve/internal/provider/azure/appconfig"
 	"github.com/mpyw/suve/internal/provider/azure/keyvault"
 )
+
+// AppConfigConnStringEnvVar is the environment variable that, when set, makes
+// the App Configuration client connect via an explicit connection string
+// (Endpoint/Id/Secret) instead of the store endpoint + DefaultAzureCredential.
+// This is how the local App Configuration emulator (HTTP + HMAC) is targeted in
+// e2e tests; in normal use it is unset.
+const AppConfigConnStringEnvVar = "AZURE_APPCONFIG_CONNECTION_STRING"
 
 // Factory builds Azure-backed provider.Store values for a scope + kind.
 type Factory struct{}
@@ -68,6 +76,17 @@ func keyVaultStore(_ context.Context, scope provider.Scope) (provider.Store, err
 
 // appConfigStore builds an App Configuration store for the scope's store.
 func appConfigStore(_ context.Context, scope provider.Scope) (provider.Store, error) {
+	// Emulator/connection-string seam: when set, connect via the connection
+	// string directly (the store name is embedded in it).
+	if connStr := os.Getenv(AppConfigConnStringEnvVar); connStr != "" {
+		client, err := azappconfig.NewClientFromConnectionString(connStr, nil)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create Azure App Configuration client from connection string: %w", err)
+		}
+
+		return appconfig.New(appconfig.Wrap(client)), nil
+	}
+
 	if scope.StoreName == "" {
 		return nil, fmt.Errorf("no Azure App Configuration store specified: set --store-name")
 	}
