@@ -1,6 +1,9 @@
 # Google Cloud Secret Manager Commands
 
-[<- Back to README](../README.md) | [SSM Parameter Store Commands](param.md) | [Secrets Manager Commands](secret.md) | [Azure Commands](azure.md)
+[<- Back to README](../README.md) | [AWS Commands](aws.md) | [Azure Commands](azure.md)
+
+> [!TIP]
+> Invoke as `suve gcloud secret`. You can drop the `gcloud` prefix (`suve secret`) when Google Cloud is the only active secret provider — see [Provider selection](../README.md#provider-selection).
 
 Primary command: `gcloud secret`
 

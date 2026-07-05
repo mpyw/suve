@@ -1,6 +1,9 @@
 # Azure Commands (Key Vault + App Configuration)
 
-[<- Back to README](../README.md) | [SSM Parameter Store Commands](param.md) | [Secrets Manager Commands](secret.md) | [Google Cloud Commands](gcloud.md)
+[<- Back to README](../README.md) | [AWS Commands](aws.md) | [Google Cloud Commands](gcloud.md)
+
+> [!TIP]
+> Invoke as `suve azure secret` (Key Vault) and `suve azure param` (App Configuration). You can drop the `azure` prefix when Azure is the only active provider for that service — see [Provider selection](../README.md#provider-selection).
 
 Azure splits into two services under `suve azure`:
 

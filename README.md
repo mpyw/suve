@@ -477,8 +477,8 @@ where ~SHIFT = ~ | ~N  (repeatable, cumulative)
 
 | Backend | Command | Versioning | Labels / Tags | Staging | GUI² | Auth |
 |---------|---------|------------|---------------|---------|------|------|
-| [AWS Parameter Store](docs/param.md) | `aws param` | ✅ numeric | ✅ tags | ✅ | ✅ | shared config/env/role |
-| [AWS Secrets Manager](docs/secret.md) | `aws secret` | ✅ UUID + staging labels | ✅ tags | ✅ | ✅ | shared config/env/role |
+| [AWS Parameter Store](docs/aws.md) | `aws param` | ✅ numeric | ✅ tags | ✅ | ✅ | shared config/env/role |
+| [AWS Secrets Manager](docs/aws.md) | `aws secret` | ✅ UUID + staging labels | ✅ tags | ✅ | ✅ | shared config/env/role |
 | [Google Cloud Secret Manager](docs/gcloud.md) | `gcloud secret` | ✅ integer (`latest`) | ✅ labels | 🔜 [#247](https://github.com/mpyw/suve/issues/247) | 🔜 [#250](https://github.com/mpyw/suve/issues/250) | Application Default Credentials |
 | [Azure Key Vault](docs/azure.md) | `azure secret` | ✅ opaque id | ✅ tags | 🔜 [#247](https://github.com/mpyw/suve/issues/247) | 🔜 [#250](https://github.com/mpyw/suve/issues/250) | DefaultAzureCredential |
 | [Azure App Configuration](docs/azure.md) | `azure param` | ❌ unversioned | ❌ unsupported¹ | 🔜 [#247](https://github.com/mpyw/suve/issues/247) | 🔜 [#250](https://github.com/mpyw/suve/issues/250) | DefaultAzureCredential |
@@ -537,8 +537,8 @@ Explicit command groups (always available) and their bare aliases (exposed per t
 
 | Backend | Explicit command | Bare alias (conditional) |
 |---------|------------------|--------------------------|
-| [AWS SSM Parameter Store](docs/param.md) | `aws param` (`ssm`, `ps`) | `param` |
-| [AWS Secrets Manager](docs/secret.md) | `aws secret` (`sm`) | `secret` |
+| [AWS SSM Parameter Store](docs/aws.md) | `aws param` (`ssm`, `ps`) | `param` |
+| [AWS Secrets Manager](docs/aws.md) | `aws secret` (`sm`) | `secret` |
 | AWS Staging | `aws stage` (`stg`) | `stage` |
 | [Google Cloud Secret Manager](docs/gcloud.md) | `gcloud secret` | `secret` |
 | [Azure Key Vault](docs/azure.md) | `azure secret` | `secret` |
@@ -548,15 +548,15 @@ Explicit command groups (always available) and their bare aliases (exposed per t
 
 | Command | Options | Description |
 |---------|---------|-------------|
-| [`suve param show`](docs/param.md#show) | `--raw`<br>`--parse-json` (`-j`)<br>`--no-pager`<br>`--output=<FORMAT>` | Display parameter with metadata |
-| [`suve param log`](docs/param.md#log) | `--number=<N>` (`-n`)<br>`--patch` (`-p`)<br>`--parse-json` (`-j`)<br>`--oneline`<br>`--reverse`<br>`--since=<DATE>`<br>`--until=<DATE>`<br>`--no-pager`<br>`--output=<FORMAT>` | Show version history |
-| [`suve param diff`](docs/param.md#diff) | `--parse-json` (`-j`)<br>`--no-pager`<br>`--output=<FORMAT>` | Compare versions |
-| [`suve param list`](docs/param.md#list) | `--recursive` (`-R`)<br>`--filter=<REGEX>`<br>`--show`<br>`--output=<FORMAT>` | List parameters |
-| [`suve param create`](docs/param.md#create) | `--type=<TYPE>`<br>`--secure`<br>`--description=<TEXT>`<br>`--tier=<TIER>`<br>`--data-type=<TYPE>`<br>`--allowed-pattern=<REGEX>`<br>`--policies=<JSON>` | Create a new parameter |
-| [`suve param update`](docs/param.md#update) | `--type=<TYPE>`<br>`--secure`<br>`--description=<TEXT>`<br>`--tier=<TIER>`<br>`--data-type=<TYPE>`<br>`--allowed-pattern=<REGEX>`<br>`--policies=<JSON>`<br>`--yes` | Update an existing parameter |
-| [`suve param delete`](docs/param.md#delete) | `--yes` | Delete parameter |
-| [`suve param tag`](docs/param.md#tag) | `<KEY>=<VALUE>...` | Add or update tags |
-| [`suve param untag`](docs/param.md#untag) | `<KEY>...` | Remove tags |
+| [`suve param show`](docs/aws.md#suve-aws-param-show) | `--raw`<br>`--parse-json` (`-j`)<br>`--no-pager`<br>`--output=<FORMAT>` | Display parameter with metadata |
+| [`suve param log`](docs/aws.md#suve-aws-param-log) | `--number=<N>` (`-n`)<br>`--patch` (`-p`)<br>`--parse-json` (`-j`)<br>`--oneline`<br>`--reverse`<br>`--since=<DATE>`<br>`--until=<DATE>`<br>`--no-pager`<br>`--output=<FORMAT>` | Show version history |
+| [`suve param diff`](docs/aws.md#suve-aws-param-diff) | `--parse-json` (`-j`)<br>`--no-pager`<br>`--output=<FORMAT>` | Compare versions |
+| [`suve param list`](docs/aws.md#suve-aws-param-list) | `--recursive` (`-R`)<br>`--filter=<REGEX>`<br>`--show`<br>`--output=<FORMAT>` | List parameters |
+| [`suve param create`](docs/aws.md#suve-aws-param-create) | `--type=<TYPE>`<br>`--secure`<br>`--description=<TEXT>`<br>`--tier=<TIER>`<br>`--data-type=<TYPE>`<br>`--allowed-pattern=<REGEX>`<br>`--policies=<JSON>` | Create a new parameter |
+| [`suve param update`](docs/aws.md#suve-aws-param-update) | `--type=<TYPE>`<br>`--secure`<br>`--description=<TEXT>`<br>`--tier=<TIER>`<br>`--data-type=<TYPE>`<br>`--allowed-pattern=<REGEX>`<br>`--policies=<JSON>`<br>`--yes` | Update an existing parameter |
+| [`suve param delete`](docs/aws.md#suve-aws-param-delete) | `--yes` | Delete parameter |
+| [`suve param tag`](docs/aws.md#suve-aws-param-tag) | `<KEY>=<VALUE>...` | Add or update tags |
+| [`suve param untag`](docs/aws.md#suve-aws-param-untag) | `<KEY>...` | Remove tags |
 
 **Staging commands** (under `suve stage param`):
 
@@ -576,16 +576,16 @@ Explicit command groups (always available) and their bare aliases (exposed per t
 
 | Command | Options | Description |
 |---------|---------|-------------|
-| [`suve secret show`](docs/secret.md#show) | `--raw`<br>`--parse-json` (`-j`)<br>`--no-pager`<br>`--output=<FORMAT>` | Display secret with metadata |
-| [`suve secret log`](docs/secret.md#log) | `--number=<N>` (`-n`)<br>`--patch` (`-p`)<br>`--parse-json` (`-j`)<br>`--oneline`<br>`--reverse`<br>`--since=<DATE>`<br>`--until=<DATE>`<br>`--no-pager`<br>`--output=<FORMAT>` | Show version history |
-| [`suve secret diff`](docs/secret.md#diff) | `--parse-json` (`-j`)<br>`--no-pager`<br>`--output=<FORMAT>` | Compare versions |
-| [`suve secret list`](docs/secret.md#list) | `--filter=<REGEX>`<br>`--show`<br>`--output=<FORMAT>` | List secrets |
-| [`suve secret create`](docs/secret.md#create) | `--description=<TEXT>` | Create new secret |
-| [`suve secret update`](docs/secret.md#update) | `--description=<TEXT>`<br>`--yes` | Update existing secret |
-| [`suve secret delete`](docs/secret.md#delete) | `--force`<br>`--recovery-window=<DAYS>`<br>`--yes` | Delete secret |
-| [`suve secret restore`](docs/secret.md#restore) | | Restore deleted secret |
-| [`suve secret tag`](docs/secret.md#tag) | `<KEY>=<VALUE>...` | Add or update tags |
-| [`suve secret untag`](docs/secret.md#untag) | `<KEY>...` | Remove tags |
+| [`suve secret show`](docs/aws.md#suve-aws-secret-show) | `--raw`<br>`--parse-json` (`-j`)<br>`--no-pager`<br>`--output=<FORMAT>` | Display secret with metadata |
+| [`suve secret log`](docs/aws.md#suve-aws-secret-log) | `--number=<N>` (`-n`)<br>`--patch` (`-p`)<br>`--parse-json` (`-j`)<br>`--oneline`<br>`--reverse`<br>`--since=<DATE>`<br>`--until=<DATE>`<br>`--no-pager`<br>`--output=<FORMAT>` | Show version history |
+| [`suve secret diff`](docs/aws.md#suve-aws-secret-diff) | `--parse-json` (`-j`)<br>`--no-pager`<br>`--output=<FORMAT>` | Compare versions |
+| [`suve secret list`](docs/aws.md#suve-aws-secret-list) | `--filter=<REGEX>`<br>`--show`<br>`--output=<FORMAT>` | List secrets |
+| [`suve secret create`](docs/aws.md#suve-aws-secret-create) | `--description=<TEXT>` | Create new secret |
+| [`suve secret update`](docs/aws.md#suve-aws-secret-update) | `--description=<TEXT>`<br>`--yes` | Update existing secret |
+| [`suve secret delete`](docs/aws.md#suve-aws-secret-delete) | `--force`<br>`--recovery-window=<DAYS>`<br>`--yes` | Delete secret |
+| [`suve secret restore`](docs/aws.md#suve-aws-secret-restore) | | Restore deleted secret |
+| [`suve secret tag`](docs/aws.md#suve-aws-secret-tag) | `<KEY>=<VALUE>...` | Add or update tags |
+| [`suve secret untag`](docs/aws.md#suve-aws-secret-untag) | `<KEY>...` | Remove tags |
 
 **Staging commands** (under `suve stage secret`):
 
