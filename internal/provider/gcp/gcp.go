@@ -9,12 +9,40 @@ package gcp
 import (
 	"context"
 	"fmt"
+	"os"
 
 	secretmanager "cloud.google.com/go/secretmanager/apiv1"
+	"google.golang.org/api/option"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/provider/gcp/secret"
 )
+
+// EmulatorEnvVar is the environment variable that, when set (e.g. to
+// "localhost:9090"), points the Secret Manager client at a local emulator over
+// plaintext gRPC with no authentication. It is a testing seam only: in normal
+// use it is unset and the client uses Application Default Credentials over TLS.
+// Never set this in production.
+const EmulatorEnvVar = "SUVE_GCP_SECRETMANAGER_ENDPOINT"
+
+// newSecretManagerClient builds the Secret Manager client, honoring the
+// emulator seam (EmulatorEnvVar) when set.
+func newSecretManagerClient(ctx context.Context) (*secretmanager.Client, error) {
+	endpoint := os.Getenv(EmulatorEnvVar)
+	if endpoint == "" {
+		return secretmanager.NewClient(ctx)
+	}
+
+	// Emulator: dial plaintext gRPC and skip authentication entirely.
+	conn, err := grpc.NewClient(endpoint, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		return nil, fmt.Errorf("failed to dial Google Cloud Secret Manager emulator at %s: %w", endpoint, err)
+	}
+
+	return secretmanager.NewClient(ctx, option.WithGRPCConn(conn), option.WithoutAuthentication())
+}
 
 // Factory builds Google Cloud-backed provider.Store values for a scope + kind.
 type Factory struct{}
@@ -28,7 +56,7 @@ var _ provider.Factory = Factory{}
 func (Factory) Store(ctx context.Context, scope provider.Scope, kind provider.Kind) (provider.Store, error) {
 	switch kind {
 	case provider.KindSecret:
-		client, err := secretmanager.NewClient(ctx)
+		client, err := newSecretManagerClient(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create Google Cloud Secret Manager client: %w", err)
 		}

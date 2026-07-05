@@ -114,6 +114,33 @@ jobs:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
         continue-on-error: true
 
+  e2e-gcp:
+    name: E2E Test (Google Cloud)
+    runs-on: ubuntu-latest
+    services:
+      # Google Cloud Secret Manager emulator (gRPC :9090), no auth, offline.
+      gcp-secretmanager:
+        image: ghcr.io/blackwell-systems/gcp-secret-manager-emulator-dual:latest
+        ports:
+          - 9090:9090
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set up toolchain (mise)
+        uses: jdx/mise-action@v4
+        with:
+          install_args: "go"
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Wait for the Secret Manager emulator
+        run: timeout 60 bash -c 'until (echo > /dev/tcp/localhost/9090) 2>/dev/null; do sleep 1; done'
+
+      - name: Run Google Cloud e2e tests
+        run: go test -v -tags e2e -run TestGCP ./e2e/...
+        env:
+          SUVE_GCP_SECRETMANAGER_ENDPOINT: localhost:9090
+
   lint:
     name: Lint
     runs-on: ubuntu-latest

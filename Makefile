@@ -1,4 +1,4 @@
-.PHONY: build test lint e2e up down clean coverage coverage-e2e coverage-all gui-dev gui-build gui-bindings ubuntu-22 ubuntu-24 x11-setup help
+.PHONY: build test lint e2e e2e-gcp up down clean coverage coverage-e2e coverage-all gui-dev gui-build gui-bindings ubuntu-22 ubuntu-24 x11-setup help
 
 .DEFAULT_GOAL := help
 
@@ -24,6 +24,7 @@ else
 endif
 
 SUVE_LOCALSTACK_EXTERNAL_PORT ?= 4566
+SUVE_GCP_EMULATOR_PORT ?= 9090
 COVERPKG = $(shell go list ./... | grep -v testutil | grep -v /e2e | grep -v internal/gui | grep -v /cmd/ | tr '\n' ',')
 
 help: ## Show this help
@@ -55,6 +56,13 @@ down: ## Stop localstack container
 
 e2e: up ## Run E2E tests (starts localstack)
 	SUVE_LOCALSTACK_EXTERNAL_PORT=$(SUVE_LOCALSTACK_EXTERNAL_PORT) go test -tags=e2e -v ./e2e/...
+
+e2e-gcp: ## Run Google Cloud Secret Manager E2E tests (starts the emulator)
+	SUVE_GCP_EMULATOR_PORT=$(SUVE_GCP_EMULATOR_PORT) docker compose --profile gcp up -d gcp-secretmanager
+	@echo "Waiting for the GCP Secret Manager emulator on port $(SUVE_GCP_EMULATOR_PORT)..."
+	@until bash -c 'echo > /dev/tcp/127.0.0.1/$(SUVE_GCP_EMULATOR_PORT)' 2>/dev/null; do sleep 1; done
+	@echo "emulator is ready"
+	SUVE_GCP_SECRETMANAGER_ENDPOINT=127.0.0.1:$(SUVE_GCP_EMULATOR_PORT) go test -tags=e2e -v -run TestGCP ./e2e/...
 
 clean: ## Clean build artifacts and stop containers
 	rm -rf bin/ *.out
