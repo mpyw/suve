@@ -17,10 +17,11 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
 
-      - name: Set up Go
-        uses: actions/setup-go@v6
+      - name: Set up toolchain (mise)
+        uses: jdx/mise-action@v4
         with:
-          go-version-file: go.mod
+          install_args: "go"
+          github_token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build
         run: go build -v ./...
@@ -48,10 +49,11 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
 
-      - name: Set up Go
-        uses: actions/setup-go@v6
+      - name: Set up toolchain (mise)
+        uses: jdx/mise-action@v4
         with:
-          go-version-file: go.mod
+          install_args: "go"
+          github_token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install Wails dependencies (CGO)
         run: |
@@ -85,10 +87,11 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
 
-      - name: Set up Go
-        uses: actions/setup-go@v6
+      - name: Set up toolchain (mise)
+        uses: jdx/mise-action@v4
         with:
-          go-version-file: go.mod
+          install_args: "go"
+          github_token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Wait for localstack
         run: |
@@ -118,16 +121,14 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
 
-      - name: Set up Go
-        uses: actions/setup-go@v6
+      - name: Set up toolchain (mise)
+        uses: jdx/mise-action@v4
         with:
-          go-version-file: go.mod
+          install_args: "go golangci-lint"
+          github_token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Run golangci-lint (default build)
-        uses: golangci/golangci-lint-action@v9
-        with:
-          version: v2.11.4
-          args: --timeout=5m
+        run: golangci-lint run --timeout=5m
 
       - name: Create dummy frontend dist for production lint
         run: mkdir -p internal/gui/frontend/dist && touch internal/gui/frontend/dist/index.html
@@ -138,10 +139,7 @@ jobs:
           for i in {1..5}; do sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev build-essential pkg-config && break || sleep $((i * 5)); done
 
       - name: Run golangci-lint (production build)
-        uses: golangci/golangci-lint-action@v9
-        with:
-          version: v2.11.4
-          args: --timeout=5m --build-tags=production,webkit2_41
+        run: golangci-lint run --timeout=5m --build-tags=production,webkit2_41
 
       - name: Run goroutinectx
         run: go run github.com/mpyw/goroutinectx/cmd/goroutinectx@v0.7.5 ./...
@@ -156,12 +154,11 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
+      - name: Set up toolchain (mise)
+        uses: jdx/mise-action@v4
         with:
-          node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: internal/gui/frontend/package-lock.json
+          install_args: "node"
+          github_token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install dependencies
         run: npm ci
@@ -183,12 +180,11 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
+      - name: Set up toolchain (mise)
+        uses: jdx/mise-action@v4
         with:
-          node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: internal/gui/frontend/package-lock.json
+          install_args: "node"
+          github_token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install dependencies
         run: npm ci
@@ -214,10 +210,11 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
 
-      - name: Set up Go
-        uses: actions/setup-go@v6
+      - name: Set up toolchain (mise)
+        uses: jdx/mise-action@v4
         with:
-          go-version-file: go.mod
+          install_args: "go nfpm"
+          github_token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build CLI binary
         run: |
@@ -228,9 +225,6 @@ jobs:
         run: |
           ./suve-cli --help
           ./suve-cli --version
-
-      - name: Install nfpm
-        run: go install github.com/goreleaser/nfpm/v2/cmd/nfpm@v2.41.1
 
       - name: Install lintian and rpmlint
         run: |
@@ -301,15 +295,14 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
 
+      # This job's webkit-4.0 matrix leg runs on Ubuntu 22.04 (the only runner
+      # that still ships libwebkit2gtk-4.0-dev), whose glibc 2.35 is too old for
+      # mise's prebuilt binary. Use the standard setup actions here; the tool
+      # versions are kept in sync with mise.toml.
       - name: Set up Go
         uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
-
-      - name: Install build dependencies
-        run: |
-          for i in {1..5}; do sudo apt-get update && break || sleep $((i * 5)); done
-          for i in {1..5}; do sudo apt-get install -y libgtk-3-dev libwebkit2gtk-${{ matrix.webkit }}-dev && break || sleep $((i * 5)); done
 
       - name: Setup Node.js
         uses: actions/setup-node@v6
@@ -317,6 +310,11 @@ jobs:
           node-version: '20'
           cache: 'npm'
           cache-dependency-path: internal/gui/frontend/package-lock.json
+
+      - name: Install build dependencies
+        run: |
+          for i in {1..5}; do sudo apt-get update && break || sleep $((i * 5)); done
+          for i in {1..5}; do sudo apt-get install -y libgtk-3-dev libwebkit2gtk-${{ matrix.webkit }}-dev && break || sleep $((i * 5)); done
 
       - name: Build frontend
         run: |
@@ -400,12 +398,11 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
+      - name: Set up toolchain (mise)
+        uses: jdx/mise-action@v4
         with:
-          node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: internal/gui/frontend/package-lock.json
+          install_args: "node"
+          github_token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install dependencies
         run: npm ci
@@ -441,10 +438,11 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
 
-      - name: Set up Go
-        uses: actions/setup-go@v6
+      - name: Set up toolchain (mise)
+        uses: jdx/mise-action@v4
         with:
-          go-version-file: go.mod
+          install_args: "go"
+          github_token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Find platform-specific packages
         id: packages
@@ -502,16 +500,14 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
 
-      - name: Set up Go
-        uses: actions/setup-go@v6
+      - name: Set up toolchain (mise)
+        uses: jdx/mise-action@v4
         with:
-          go-version-file: go.mod
+          install_args: "go golangci-lint"
+          github_token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Run golangci-lint
-        uses: golangci/golangci-lint-action@v9
-        with:
-          version: v2.11.4
-          args: --timeout=5m
+        run: golangci-lint run --timeout=5m
 
   platform-build:
     name: Platform Build (${{ matrix.goos }}/${{ matrix.goarch }})
@@ -532,10 +528,11 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
 
-      - name: Set up Go
-        uses: actions/setup-go@v6
+      - name: Set up toolchain (mise)
+        uses: jdx/mise-action@v4
         with:
-          go-version-file: go.mod
+          install_args: "go"
+          github_token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Find platform-specific packages
         id: packages

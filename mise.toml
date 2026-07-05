@@ -1,0 +1,15 @@
+# Development toolchain for suve — the single source of truth for tool versions.
+#
+# Consumed both locally (`mise install`) and in CI (jdx/mise-action reads this
+# file). Keep the versions here in sync with what the project actually targets:
+#   - `go` matches the directive in go.mod / gui/go.mod (Go 1.25).
+#   - `golangci-lint` matches the version pinned by the lint jobs.
+#   - the wails CLI is pinned to the same release as the wailsapp/wails/v2
+#     library in gui/go.mod so `wails dev` / `wails build` match the bindings.
+[tools]
+go = "1.25"
+node = "20"
+golangci-lint = "2.11.4"
+goreleaser = "2"
+nfpm = "2.41.1"
+"go:github.com/wailsapp/wails/v2/cmd/wails" = "2.11.0"
