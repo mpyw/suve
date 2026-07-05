@@ -402,7 +402,7 @@ suve stage stash drop
 
 Navigate versions with Git-like syntax.
 
-### SSM Parameter Store
+### AWS SSM Parameter Store
 
 > [!NOTE]
 > SSM Parameter Store uses numeric version numbers (1, 2, 3, ...) that auto-increment on each update.
@@ -420,7 +420,7 @@ where ~SHIFT = ~ | ~N  (repeatable, cumulative)
 | `/my/param#5~2` | Version 5 minus 2 = Version 3 |
 | `/my/param~~` | 2 versions ago (`~1~1`) |
 
-### Secrets Manager
+### AWS Secrets Manager
 
 > [!NOTE]
 > Secrets Manager uses UUID version IDs and staging labels instead of numeric versions.
@@ -542,7 +542,7 @@ Explicit command groups (always available) and their bare aliases (exposed per t
 | [Azure Key Vault](docs/azure.md) | `azure secret` | `secret` |
 | [Azure App Configuration](docs/azure.md) | `azure param` | `param` |
 
-### SSM Parameter Store
+### AWS SSM Parameter Store
 
 | Command | Options | Description |
 |---------|---------|-------------|
@@ -570,7 +570,7 @@ Explicit command groups (always available) and their bare aliases (exposed per t
 | `suve stage param tag` | `<KEY>=<VALUE>...` | Stage tag additions |
 | `suve stage param untag` | `<KEY>...` | Stage tag removals |
 
-### Secrets Manager
+### AWS Secrets Manager
 
 | Command | Options | Description |
 |---------|---------|-------------|
