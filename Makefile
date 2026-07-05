@@ -1,4 +1,4 @@
-.PHONY: build test lint e2e e2e-gcp e2e-azure up down clean coverage coverage-e2e coverage-all gui-dev gui-build gui-bindings ubuntu-22 ubuntu-24 x11-setup help
+.PHONY: build test lint e2e e2e-gcp e2e-azure e2e-azure-keyvault up down clean coverage coverage-e2e coverage-all gui-dev gui-build gui-bindings ubuntu-22 ubuntu-24 x11-setup help
 
 .DEFAULT_GOAL := help
 
@@ -26,6 +26,7 @@ endif
 SUVE_LOCALSTACK_EXTERNAL_PORT ?= 4566
 SUVE_GCP_EMULATOR_PORT ?= 9090
 SUVE_AZURE_APPCONFIG_PORT ?= 8080
+SUVE_AZURE_KEYVAULT_PORT ?= 8443
 COVERPKG = $(shell go list ./... | grep -v testutil | grep -v /e2e | grep -v internal/gui | grep -v /cmd/ | tr '\n' ',')
 
 help: ## Show this help
@@ -71,6 +72,13 @@ e2e-azure: ## Run Azure App Configuration E2E tests (starts the emulator)
 	@until bash -c 'echo > /dev/tcp/127.0.0.1/$(SUVE_AZURE_APPCONFIG_PORT)' 2>/dev/null; do sleep 1; done
 	@echo "emulator is ready"
 	SUVE_AZURE_APPCONFIG_CONNECTION_STRING="Endpoint=http://127.0.0.1:$(SUVE_AZURE_APPCONFIG_PORT);Id=abcd;Secret=c2VjcmV0" go test -tags=e2e -v -run TestAzureAppConfig ./e2e/...
+
+e2e-azure-keyvault: ## Run Azure Key Vault E2E tests (starts the lowkey-vault emulator)
+	SUVE_AZURE_KEYVAULT_PORT=$(SUVE_AZURE_KEYVAULT_PORT) docker compose --profile azure up -d azure-keyvault
+	@echo "Waiting for the Key Vault emulator on port $(SUVE_AZURE_KEYVAULT_PORT)..."
+	@until curl -sk -o /dev/null https://127.0.0.1:$(SUVE_AZURE_KEYVAULT_PORT)/ping 2>/dev/null; do sleep 1; done
+	@echo "emulator is ready"
+	SUVE_AZURE_KEYVAULT_ENDPOINT="https://127.0.0.1:$(SUVE_AZURE_KEYVAULT_PORT)" go test -tags=e2e -v -run TestAzureKeyVault ./e2e/...
 
 clean: ## Clean build artifacts and stop containers
 	rm -rf bin/ *.out

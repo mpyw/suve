@@ -40,6 +40,17 @@ services:
     environment:
       - ASPNETCORE_HTTP_PORTS=8080
 
+  azure-keyvault:
+    # Azure Key Vault emulator (lowkey-vault, HTTPS :8443, self-signed cert,
+    # auth present-but-ignored), runs entirely offline. Used by the
+    # `e2e-azure-keyvault` target / CI job; the provider adapter targets it via
+    # SUVE_AZURE_KEYVAULT_ENDPOINT (TLS verification + token challenge disabled).
+    profiles:
+      - azure
+    image: nagyesta/lowkey-vault:7.3.0
+    ports:
+      - "127.0.0.1:${SUVE_AZURE_KEYVAULT_PORT:-8443}:8443/tcp"
+
   ubuntu-22:
     profiles:
       - ubuntu-22

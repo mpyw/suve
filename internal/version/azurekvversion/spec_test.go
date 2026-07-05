@@ -106,6 +106,76 @@ func TestParse(t *testing.T) {
 			input:   "   ",
 			wantErr: true,
 		},
+
+		// Additional valid forms (opaque ids may contain letters, digits, dashes).
+		{
+			name:     "version id with dashes and uppercase",
+			input:    "my-secret#ABC-123",
+			wantName: "my-secret",
+			wantID:   lo.ToPtr("ABC-123"),
+		},
+		{
+			name:     "name with @ allowed",
+			input:    "user@example.com",
+			wantName: "user@example.com",
+		},
+		{
+			name:     "name with slashes and id",
+			input:    "a/b/c#abc",
+			wantName: "a/b/c",
+			wantID:   lo.ToPtr("abc"),
+		},
+		{
+			name:     "id with cumulative shifts",
+			input:    "my-secret#abc~1~2",
+			wantName: "my-secret",
+			wantID:   lo.ToPtr("abc"),
+			wantShif: 3,
+		},
+		{
+			name:     "large numeric shift",
+			input:    "my-secret~100",
+			wantName: "my-secret",
+			wantShif: 100,
+		},
+		{
+			name:     "numeric shift zero is a no-op",
+			input:    "my-secret~0",
+			wantName: "my-secret",
+			wantShif: 0,
+		},
+		{
+			name:     "tilde followed by minus is part of the name",
+			input:    "my-secret~-1",
+			wantName: "my-secret~-1",
+		},
+
+		// Additional rejected forms.
+		{
+			name:    "id stops at underscore then shift parse fails",
+			input:   "my-secret#a_b",
+			wantErr: true,
+		},
+		{
+			name:    "multiple absolute specifiers rejected",
+			input:   "sec#id1#id2",
+			wantErr: true,
+		},
+		{
+			name:    "empty name (version at start)",
+			input:   "#abc",
+			wantErr: true,
+		},
+		{
+			name:    "empty name (shift at start)",
+			input:   "~1",
+			wantErr: true,
+		},
+		{
+			name:    "label after version rejected",
+			input:   "my-secret#abc:latest",
+			wantErr: true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -135,6 +205,17 @@ func TestParse_LabelErrorMessage(t *testing.T) {
 	require.ErrorIs(t, err, azurekvversion.ErrLabelUnsupported)
 }
 
+// TestParse_LabelAfterVersionRejected exercises the ':' reject path reached
+// AFTER a valid '#' specifier: parseAbsolute advances past "#abc" and then hits
+// ':', invoking the label parser's Apply (which returns ErrLabelUnsupported).
+func TestParse_LabelAfterVersionRejected(t *testing.T) {
+	t.Parallel()
+
+	_, err := azurekvversion.Parse("my-secret#abc:latest")
+	require.Error(t, err)
+	require.ErrorIs(t, err, azurekvversion.ErrLabelUnsupported)
+}
+
 func TestParseDiffArgs(t *testing.T) {
 	t.Parallel()
 
@@ -154,6 +235,47 @@ func TestParseDiffArgs(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, lo.ToPtr("abc"), spec1.Absolute.ID)
 		assert.Equal(t, lo.ToPtr("def"), spec2.Absolute.ID)
+	})
+
+	t.Run("mixed format: full spec plus specifier-only", func(t *testing.T) {
+		t.Parallel()
+
+		spec1, spec2, err := azurekvversion.ParseDiffArgs([]string{"my-secret#abc", "#def"})
+		require.NoError(t, err)
+		assert.Equal(t, lo.ToPtr("abc"), spec1.Absolute.ID)
+		assert.Equal(t, lo.ToPtr("def"), spec2.Absolute.ID)
+	})
+
+	t.Run("partial spec: name plus specifier-only is swapped", func(t *testing.T) {
+		t.Parallel()
+
+		spec1, spec2, err := azurekvversion.ParseDiffArgs([]string{"my-secret", "#abc"})
+		require.NoError(t, err)
+		assert.Equal(t, lo.ToPtr("abc"), spec1.Absolute.ID)
+		assert.Nil(t, spec2.Absolute.ID)
+	})
+
+	t.Run("three args: name plus two specifiers", func(t *testing.T) {
+		t.Parallel()
+
+		spec1, spec2, err := azurekvversion.ParseDiffArgs([]string{"my-secret", "#abc", "#def"})
+		require.NoError(t, err)
+		assert.Equal(t, lo.ToPtr("abc"), spec1.Absolute.ID)
+		assert.Equal(t, lo.ToPtr("def"), spec2.Absolute.ID)
+	})
+
+	t.Run("no args rejected", func(t *testing.T) {
+		t.Parallel()
+
+		_, _, err := azurekvversion.ParseDiffArgs([]string{})
+		require.Error(t, err)
+	})
+
+	t.Run("too many args rejected", func(t *testing.T) {
+		t.Parallel()
+
+		_, _, err := azurekvversion.ParseDiffArgs([]string{"a", "b", "c", "d"})
+		require.Error(t, err)
 	})
 
 	t.Run("label rejected", func(t *testing.T) {

@@ -81,6 +81,35 @@ func TestParse(t *testing.T) {
 			wantErr: true,
 		},
 
+		// Additional accepted bare names (no version specifier present).
+		{
+			name:     "name with @ allowed",
+			input:    "user@example.com",
+			wantName: "user@example.com",
+		},
+		{
+			name:     "shift zero collapses to a bare name",
+			input:    "my-key~0",
+			wantName: "my-key",
+		},
+
+		// Additional rejected version specifiers.
+		{
+			name:    "cumulative shift rejected",
+			input:   "my-key~1~2",
+			wantErr: true,
+		},
+		{
+			name:    "version id with shift rejected",
+			input:   "my-key#abc~1",
+			wantErr: true,
+		},
+		{
+			name:    "multiple colons rejected",
+			input:   "a:b:c",
+			wantErr: true,
+		},
+
 		// Empty-input errors are surfaced (not normalized to unsupported).
 		{
 			name:    "empty input",
@@ -121,8 +150,30 @@ func TestParse_VersionSpecErrorIsUnsupported(t *testing.T) {
 	}
 }
 
+// TestParse_EmptyErrorsNotNormalized verifies that empty-input and empty-name
+// errors from the shared grammar are surfaced unchanged rather than being
+// collapsed into ErrVersioningUnsupported.
+func TestParse_EmptyErrorsNotNormalized(t *testing.T) {
+	t.Parallel()
+
+	for _, input := range []string{"", "   "} {
+		_, err := azureappconfigversion.Parse(input)
+		require.Error(t, err)
+		require.NotErrorIs(t, err, azureappconfigversion.ErrVersioningUnsupported, "input=%q", input)
+	}
+}
+
 func TestParseDiffArgs(t *testing.T) {
 	t.Parallel()
+
+	t.Run("single bare key compares against itself", func(t *testing.T) {
+		t.Parallel()
+
+		spec1, spec2, err := azureappconfigversion.ParseDiffArgs([]string{"key-a"})
+		require.NoError(t, err)
+		assert.Equal(t, "key-a", spec1.Name)
+		assert.Equal(t, "key-a", spec2.Name)
+	})
 
 	t.Run("two bare keys compared", func(t *testing.T) {
 		t.Parallel()
@@ -137,6 +188,34 @@ func TestParseDiffArgs(t *testing.T) {
 		t.Parallel()
 
 		_, _, err := azureappconfigversion.ParseDiffArgs([]string{"my-key#1"})
+		require.Error(t, err)
+	})
+
+	t.Run("name plus specifier-only arg rejected", func(t *testing.T) {
+		t.Parallel()
+
+		_, _, err := azureappconfigversion.ParseDiffArgs([]string{"my-key", "#1"})
+		require.Error(t, err)
+	})
+
+	t.Run("three args rejected", func(t *testing.T) {
+		t.Parallel()
+
+		_, _, err := azureappconfigversion.ParseDiffArgs([]string{"my-key", "#1", "#2"})
+		require.Error(t, err)
+	})
+
+	t.Run("no args rejected", func(t *testing.T) {
+		t.Parallel()
+
+		_, _, err := azureappconfigversion.ParseDiffArgs([]string{})
+		require.Error(t, err)
+	})
+
+	t.Run("too many args rejected", func(t *testing.T) {
+		t.Parallel()
+
+		_, _, err := azureappconfigversion.ParseDiffArgs([]string{"a", "b", "c", "d"})
 		require.Error(t, err)
 	})
 }
