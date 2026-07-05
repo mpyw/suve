@@ -5,6 +5,9 @@
 Primary command: `param`
 Aliases: `ssm`, `ps`
 
+> [!NOTE]
+> This document covers AWS. suve also supports Google Cloud Secret Manager (`suve gcloud secret`, see [docs/gcloud.md](gcloud.md)) and Azure Key Vault / App Configuration (`suve azure`, see [docs/azure.md](azure.md)).
+
 ## suve param show
 
 Display parameter value with metadata.
@@ -418,6 +421,10 @@ suve param create [options] <name> <value>
 | `--type` | - | `String` | Parameter type: `String`, `StringList`, or `SecureString` |
 | `--secure` | - | `false` | Shorthand for `--type SecureString` |
 | `--description` | - | - | Parameter description |
+| `--tier` | - | - | Parameter tier: `Standard`, `Advanced`, or `Intelligent-Tiering` |
+| `--data-type` | - | - | Parameter data type (e.g. `text`, `aws:ec2:image`) |
+| `--allowed-pattern` | - | - | Regex the value must match |
+| `--policies` | - | - | Parameter policies as a JSON document |
 
 > [!NOTE]
 > `--secure` and `--type` cannot be used together.
@@ -473,6 +480,10 @@ suve param update [options] <name> <value>
 | `--type` | - | `String` | Parameter type: `String`, `StringList`, or `SecureString` |
 | `--secure` | - | `false` | Shorthand for `--type SecureString` |
 | `--description` | - | - | Parameter description |
+| `--tier` | - | - | Parameter tier: `Standard`, `Advanced`, or `Intelligent-Tiering` |
+| `--data-type` | - | - | Parameter data type (e.g. `text`, `aws:ec2:image`) |
+| `--allowed-pattern` | - | - | Regex the value must match |
+| `--policies` | - | - | Parameter policies as a JSON document |
 | `--yes` | - | `false` | Skip confirmation prompt |
 
 > [!NOTE]
@@ -624,7 +635,10 @@ The staging workflow allows you to prepare changes locally before applying them 
 > [!IMPORTANT]
 > The staging workflow lets you prepare changes locally, review them, and apply when ready--just like `git add` -> `git diff --staged` -> `git commit`.
 
-The stage file is stored at `~/.suve/<ACCOUNT_ID>/<REGION>/stage.json`.
+Working state is split per service and namespaced by provider scope: `~/.suve/staging/aws/<ACCOUNT_ID>/<REGION>/param.json` and `~/.suve/staging/aws/<ACCOUNT_ID>/<REGION>/secret.json`. The stash is stored alongside them at `~/.suve/staging/aws/<ACCOUNT_ID>/<REGION>/stash.json`. There is no longer any single `stage.json`.
+
+> [!NOTE]
+> The working-state files are encrypted at rest. The encryption key is resolved from the `SUVE_STAGING_KEY` environment variable (base64-encoded 32 bytes) if set, otherwise from an OS keychain (created on first use), otherwise the state is stored as plaintext with a warning.
 
 ### Workflow Overview
 

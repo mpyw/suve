@@ -4,7 +4,7 @@ This file provides guidance to Claude Code when working with code in this reposi
 
 ## Project Overview
 
-**suve** (**S**ecret **U**nified **V**ersioning **E**xplorer) is a Git-like CLI for AWS Parameter Store and Secrets Manager. It provides familiar Git-style commands (`show`, `log`, `diff`, `list`, `tag`, `stash`) with version specification syntax (`#VERSION`, `~SHIFT`, `:LABEL`).
+**suve** (**S**ecret **U**nified **V**ersioning **E**xplorer) is a Git-like CLI for multi-cloud secret and parameter management, covering AWS (Parameter Store + Secrets Manager), Google Cloud (Secret Manager), and Azure (Key Vault + App Configuration). It provides familiar Git-style commands (`show`, `log`, `diff`, `list`, `tag`, `stash`) with version specification syntax (`#VERSION`, `~SHIFT`, `:LABEL`).
 
 ### Core Concepts
 
@@ -59,10 +59,12 @@ This file provides guidance to Claude Code when working with code in this reposi
    user@example.com~1     # @ in name is allowed
    ```
 
-5. **Two Services**:
+5. **Command Groups**:
    - `param` (aliases: `ssm`, `ps`) - AWS Systems Manager Parameter Store
    - `secret` (aliases: `sm`) - AWS Secrets Manager
-   - `stage` (alias: `stg`) - Staging operations
+   - `gcloud` - Google Cloud (`secret` = Secret Manager)
+   - `azure` - Azure (`secret` = Key Vault, `param` = App Configuration)
+   - `stage` (alias: `stg`) - Staging operations (AWS-only)
 
 ## Architecture
 
@@ -71,10 +73,6 @@ suve/
 ├── cmd/suve/main.go              # Entry point
 │
 ├── internal/
-│   ├── api/
-│   │   ├── paramapi/             # SSM API interface (for testing)
-│   │   └── secretapi/            # SM API interface (for testing)
-│   │
 │   ├── cli/
 │   │   ├── colors/               # ANSI color codes
 │   │   ├── confirm/              # User confirmation prompts
@@ -86,16 +84,28 @@ suve/
 │   │   ├── terminal/             # Terminal utilities (TTY detection)
 │   │   └── commands/
 │   │       ├── app.go            # urfave/cli v3 app definition
-│   │       ├── param/            # param subcommands
-│   │       ├── secret/           # secret subcommands
+│   │       ├── generic/          # provider-neutral command scaffold (show/diff/list/log/tag) + per-provider presenters
+│   │       ├── internal/         # registry composition + provider/scope wiring for commands
+│   │       ├── param/            # AWS param subcommands
+│   │       ├── secret/           # AWS secret subcommands
+│   │       ├── gcloud/           # Google Cloud command group (secret)
+│   │       ├── azure/            # Azure command group (secret=Key Vault, param=App Config)
 │   │       └── stage/            # staging subcommands
-│   │           ├── agent/        # daemon start/stop commands
+│   │           ├── command.go    # stage command group definition
 │   │           ├── apply/        # apply staged changes
 │   │           ├── diff/         # diff staged vs AWS
-│   │           ├── reset/        # unstage changes
-│   │           ├── status/       # show staged changes
 │   │           ├── param/        # param-specific staging
-│   │           └── secret/       # secret-specific staging
+│   │           ├── reset/        # unstage changes
+│   │           ├── secret/       # secret-specific staging
+│   │           └── status/       # show staged changes
+│   │
+│   ├── domain/                   # Neutral model (Entry, Version, Tag, ValueType, Field) shared across providers
+│   │
+│   ├── provider/                 # Provider seam: Reader/Writer/Tagger/Store interfaces, Registry, Scope, errors
+│   │   ├── aws/                  # AWS adapter (SSM + Secrets Manager); AWS SDK confined here
+│   │   ├── gcp/                  # Google Cloud Secret Manager adapter
+│   │   ├── azure/                # Azure Key Vault + App Configuration adapters
+│   │   └── providermock/         # In-memory provider mock for tests
 │   │
 │   ├── gui/                      # GUI application (Wails + Svelte)
 │   │   ├── app.go                # Wails app definition
@@ -106,7 +116,7 @@ suve/
 │   │       ├── src/              # Svelte components
 │   │       └── tests/            # Playwright tests
 │   │
-│   ├── infra/                    # AWS client initialization
+│   ├── infra/                    # AWS client initialization (SDK confinement boundary w/ provider/aws)
 │   │
 │   ├── jsonutil/                 # JSON formatting utilities
 │   │
@@ -114,41 +124,39 @@ suve/
 │   │
 │   ├── parallel/                 # Parallel execution utilities
 │   │
-│   ├── staging/                  # Staging core functionality
-│   │   ├── param.go              # Param staging strategy
-│   │   ├── secret.go             # Secret staging strategy
-│   │   ├── conflict.go           # Conflict detection
-│   │   ├── cli/                  # Staging CLI wrappers (service-specific)
-│   │   ├── transition/           # State machine for staging operations
-│   │   └── store/                # Storage backends
-│   │       ├── store.go          # Storage interfaces
-│   │       ├── agent/            # In-memory daemon storage
-│   │       │   ├── daemon/       # Daemon process (runner, launcher)
-│   │       │   │   └── internal/
-│   │       │   │       └── ipc/  # Unix socket IPC
-│   │       │   └── internal/
-│   │       │       ├── client/   # Daemon client
-│   │       │       ├── server/   # Request handler
-│   │       │       │   └── security/  # Memory protection, peer auth
-│   │       │       └── protocol/ # IPC protocol definitions
-│   │       ├── file/             # File-based storage (encrypted)
-│   │       │   └── internal/
-│   │       │       └── crypt/    # Argon2 + AES-GCM encryption
-│   │       └── testutil/         # Mock store for testing
-│   │
-│   ├── tagging/                  # Tag operations (add/remove tags)
-│   │
 │   ├── timeutil/                 # Time utilities (timezone handling)
 │   │
-│   ├── usecase/                  # Business logic layer
-│   │   ├── param/                # SSM use cases
-│   │   ├── secret/               # SM use cases
-│   │   └── staging/              # Staging use cases
+│   ├── updatecheck/              # Non-blocking update-check notification (#209)
 │   │
-│   └── version/                  # Version specification parsing
-│       ├── internal/             # Shared utilities (char checks)
-│       ├── paramversion/         # SSM version spec parser
-│       └── secretversion/        # SM version spec parser
+│   ├── staging/                  # Staging core functionality (AWS-only)
+│   │   ├── cli/                  # Staging CLI wrappers (service-specific)
+│   │   ├── transition/           # Reducer-based state machine (state/action/reducer/executor)
+│   │   └── store/                # Storage backend
+│   │       ├── store.go          # Storage interfaces
+│   │       ├── file/             # File-based storage (ONLY backend); scope-keyed split param.json/secret.json + stash.json
+│   │       │   └── internal/
+│   │       │       ├── crypt/        # Argon2 + AES-GCM (stash, passphrase) and raw-key (working) encryption
+│   │       │       └── keyprovider/  # OS-keychain data-key provider (zalando/go-keyring); SUVE_STAGING_KEY override
+│   │       └── testutil/         # Mock store for testing
+│   │
+│   ├── usecase/                  # Business logic layer
+│   │   ├── param/                # AWS SSM use cases
+│   │   ├── secret/               # AWS SM use cases
+│   │   ├── staging/              # Staging use cases
+│   │   ├── gcp/                  # Google Cloud use cases
+│   │   └── azure/                # Azure use cases
+│   │
+│   ├── version/                  # Version specification parsing
+│   │   ├── parse.go              # Shared generic spec parsing
+│   │   ├── shift.go              # Shift (~N) handling
+│   │   ├── internal/             # Shared utilities (char checks)
+│   │   ├── paramversion/         # AWS SSM version spec parser
+│   │   ├── secretversion/        # AWS Secrets Manager version spec parser
+│   │   ├── gcpversion/           # Google Cloud integer-version parser
+│   │   ├── azurekvversion/       # Azure Key Vault opaque-id parser
+│   │   └── azureappconfigversion/ # Azure App Config (rejects specifiers; unversioned)
+│   │
+│   └── architecture_test.go      # Arch-guard: forbids cloud SDKs outside their provider/{aws,gcp,azure} + infra
 │
 ├── e2e/                          # E2E tests (requires localstack)
 │
@@ -160,12 +168,12 @@ suve/
 
 ### Key Design Patterns
 
-1. **Subcommand packages**: Each command (show, etc.) is its own package under `internal/cli/commands/{param,secret}/`
-2. **Interface-based testing**: API interfaces in `internal/api/` enable mock testing
-3. **Version resolution**: `paramversion` and `secretversion` handle version/shift/label resolution
+1. **Unified generic commands**: Commands (show, diff, list, log, tag) share a provider-neutral scaffold in `internal/cli/commands/generic/**` with per-provider presenters; AWS `param`/`secret` still register their own command groups.
+2. **Provider seam**: Core interfaces (`Reader`/`Writer`/`Tagger`/`Store`) live in `internal/provider` and are mocked via `internal/provider/providermock` for testing.
+3. **Version resolution**: `paramversion` and `secretversion` (plus `gcpversion`, `azurekvversion`, `azureappconfigversion`) handle version/shift/label resolution per provider.
 4. **Output abstraction**: Commands write to `io.Writer` for testability
-5. **Staging state machine**: `staging/transition` implements a state machine for staging operations
-6. **Daemon architecture**: Staging uses an in-memory daemon process with IPC for performance and data persistence
+5. **Staging state machine**: `staging/transition` implements a reducer-based state machine for staging operations
+6. **Keychain-encrypted file store**: Staging is a keychain-encrypted file store, scope-keyed under `~/.suve/staging/{scope.Key()}/`
 
 ## Development Commands
 
@@ -188,14 +196,14 @@ make down    # Stop localstack
 make coverage
 
 # GUI development (requires Wails)
-make gui          # Run GUI in dev mode
+make gui-dev      # Run GUI in dev mode
 make gui-build    # Build GUI binary
-make gui-test     # Run Playwright tests
+make gui-bindings # Regenerate GUI bindings
 ```
 
 ## Testing Strategy
 
-- **Unit tests**: Each command package has `*_test.go` with mock AWS clients
+- **Unit tests**: Each command package has `*_test.go` with provider-neutral mocking via `internal/provider/providermock`
 - **E2E tests**: `e2e/e2e_test.go` runs against localstack (SSM only, SM requires Pro)
 - **GUI tests**: `internal/gui/frontend/tests/` uses Playwright for component/integration testing
 - **Test dependencies**: Uses `github.com/samber/lo` for pointer helpers and `github.com/stretchr/testify` for assertions

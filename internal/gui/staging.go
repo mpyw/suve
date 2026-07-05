@@ -720,7 +720,7 @@ func (a *App) StagingFileStatus() (*StagingFileStatusResult, error) {
 	return result, nil
 }
 
-// stashStores builds the stash (stash.json) and working (stage.json) file
+// stashStores builds the stash (stash.json) and working (param.json/secret.json) file
 // stores for the current AWS identity and resolves the optional service
 // selector. It is the shared prelude of StagingDrain and StagingPersist. An
 // empty service yields the zero staging.Service (all services).

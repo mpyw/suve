@@ -30,11 +30,11 @@ type StashPopOutput struct {
 	TagCount int
 }
 
-// StashPopUseCase executes drain operations (stash.json -> working stage.json).
+// StashPopUseCase executes drain operations (stash.json -> working param.json/secret.json).
 type StashPopUseCase struct {
 	// Stash is the stash file (stash.json).
 	Stash store.FileStore
-	// Working is the working staging area (stage.json).
+	// Working is the working staging area (param.json/secret.json).
 	Working store.FileStore
 }
 
