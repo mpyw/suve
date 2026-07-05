@@ -23,7 +23,7 @@ const modelsPath = "frontend/wailsjs/go/models.ts"
 func dtoContract() []any {
 	return []any{
 		// app.go
-		AWSIdentityResult{},
+		AWSIdentityResult{}, ScopeSelection{},
 		// param.go
 		ParamListResult{}, ParamListEntry{}, ParamShowTag{}, ParamShowResult{},
 		ParamLogResult{}, ParamLogEntry{}, ParamDiffResult{}, ParamSetResult{},

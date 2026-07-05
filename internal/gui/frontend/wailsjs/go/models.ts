@@ -51,11 +51,11 @@ export namespace gui {
 	    type: string;
 	    secret: boolean;
 	    value?: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ParamListEntry(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.name = source["name"];
@@ -103,11 +103,11 @@ export namespace gui {
 	    secret: boolean;
 	    isCurrent: boolean;
 	    lastModified?: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ParamLogEntry(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.version = source["version"];
@@ -189,11 +189,11 @@ export namespace gui {
 	    description?: string;
 	    lastModified?: string;
 	    tags: ParamShowTag[];
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ParamShowResult(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.name = source["name"];
@@ -225,6 +225,28 @@ export namespace gui {
 		}
 	}
 	
+	export class ScopeSelection {
+	    provider: string;
+	    projectId: string;
+	    subscriptionId: string;
+	    resourceGroup: string;
+	    vaultName: string;
+	    storeName: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ScopeSelection(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.provider = source["provider"];
+	        this.projectId = source["projectId"];
+	        this.subscriptionId = source["subscriptionId"];
+	        this.resourceGroup = source["resourceGroup"];
+	        this.vaultName = source["vaultName"];
+	        this.storeName = source["storeName"];
+	    }
+	}
 	export class SecretCreateResult {
 	    name: string;
 	    versionId: string;

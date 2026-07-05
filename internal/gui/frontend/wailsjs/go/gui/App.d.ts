@@ -42,6 +42,8 @@ export function SecretShow(arg1:string):Promise<gui.SecretShowResult>;
 
 export function SecretUpdate(arg1:string,arg2:string):Promise<gui.SecretUpdateResult>;
 
+export function SelectScope(arg1:gui.ScopeSelection):Promise<void>;
+
 export function StagingAdd(arg1:string,arg2:string,arg3:string):Promise<gui.StagingAddResult>;
 
 export function StagingAddTag(arg1:string,arg2:string,arg3:string,arg4:string):Promise<gui.StagingAddTagResult>;
