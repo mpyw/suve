@@ -145,14 +145,15 @@ jobs:
     name: E2E Test (Azure)
     runs-on: ubuntu-latest
     services:
-      # Azure App Configuration emulator (HTTP :8080, HMAC auth), offline.
+      # Official Microsoft App Configuration emulator (HTTP :8483), anonymous
+      # auth so no credentials are needed.
       azure-appconfig:
-        image: tnc1997/azure-app-configuration-emulator:latest
+        image: mcr.microsoft.com/azure-app-configuration/app-configuration-emulator:1.0.2
         ports:
-          - 8080:8080
+          - 8483:8483
         env:
-          Authentication__Schemes__Hmac__Credential: xyz
-          Authentication__Schemes__Hmac__Secret: c2VjcmV0
+          Tenant__AnonymousAuthEnabled: "true"
+          Authentication__Anonymous__AnonymousUserRole: Owner
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
@@ -164,12 +165,12 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Wait for the App Configuration emulator
-        run: timeout 60 bash -c 'until (echo > /dev/tcp/localhost/8080) 2>/dev/null; do sleep 1; done'
+        run: timeout 60 bash -c 'until (echo > /dev/tcp/localhost/8483) 2>/dev/null; do sleep 1; done'
 
       - name: Run Azure App Configuration e2e tests
         run: go test -v -tags e2e -run TestAzureAppConfig ./e2e/...
         env:
-          AZURE_APPCONFIG_CONNECTION_STRING: "Endpoint=http://localhost:8080;Id=xyz;Secret=c2VjcmV0"
+          AZURE_APPCONFIG_CONNECTION_STRING: "Endpoint=http://localhost:8483;Id=abcd;Secret=c2VjcmV0"
 
   lint:
     name: Lint

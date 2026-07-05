@@ -24,17 +24,18 @@ services:
       - "127.0.0.1:${SUVE_GCP_EMULATOR_PORT:-9090}:9090/tcp"
 
   azure-appconfig:
-    # Azure App Configuration emulator (HTTP :8080, HMAC auth), runs offline.
-    # Used by the `e2e-azure` target / CI job; the provider adapter targets it
-    # via AZURE_APPCONFIG_CONNECTION_STRING (Id=xyz, Secret=c2VjcmV0 below).
+    # Official Microsoft Azure App Configuration emulator (HTTP :8483), run with
+    # anonymous auth so no credentials are needed. Used by the `e2e-azure`
+    # target / CI job; the provider adapter targets it via
+    # AZURE_APPCONFIG_CONNECTION_STRING (dummy HMAC creds, ignored by anon auth).
     profiles:
       - azure
-    image: tnc1997/azure-app-configuration-emulator:latest
+    image: mcr.microsoft.com/azure-app-configuration/app-configuration-emulator:1.0.2
     ports:
-      - "127.0.0.1:${SUVE_AZURE_APPCONFIG_PORT:-8080}:8080/tcp"
+      - "127.0.0.1:${SUVE_AZURE_APPCONFIG_PORT:-8483}:8483/tcp"
     environment:
-      - Authentication__Schemes__Hmac__Credential=xyz
-      - Authentication__Schemes__Hmac__Secret=c2VjcmV0
+      - Tenant__AnonymousAuthEnabled=true
+      - Authentication__Anonymous__AnonymousUserRole=Owner
 
   ubuntu-22:
     profiles:

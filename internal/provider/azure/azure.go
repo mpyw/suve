@@ -28,8 +28,9 @@ import (
 // AppConfigConnStringEnvVar is the environment variable that, when set, makes
 // the App Configuration client connect via an explicit connection string
 // (Endpoint/Id/Secret) instead of the store endpoint + DefaultAzureCredential.
-// This is how the local App Configuration emulator (HTTP + HMAC) is targeted in
-// e2e tests; in normal use it is unset.
+// This is how the local App Configuration emulator is targeted in e2e tests
+// (an HTTP endpoint with dummy credentials the emulator's anonymous auth
+// ignores); in normal use it is unset.
 const AppConfigConnStringEnvVar = "AZURE_APPCONFIG_CONNECTION_STRING"
 
 // Factory builds Azure-backed provider.Store values for a scope + kind.

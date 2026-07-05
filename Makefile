@@ -25,7 +25,7 @@ endif
 
 SUVE_LOCALSTACK_EXTERNAL_PORT ?= 4566
 SUVE_GCP_EMULATOR_PORT ?= 9090
-SUVE_AZURE_APPCONFIG_PORT ?= 8080
+SUVE_AZURE_APPCONFIG_PORT ?= 8483
 COVERPKG = $(shell go list ./... | grep -v testutil | grep -v /e2e | grep -v internal/gui | grep -v /cmd/ | tr '\n' ',')
 
 help: ## Show this help
@@ -70,7 +70,7 @@ e2e-azure: ## Run Azure App Configuration E2E tests (starts the emulator)
 	@echo "Waiting for the Azure App Configuration emulator on port $(SUVE_AZURE_APPCONFIG_PORT)..."
 	@until bash -c 'echo > /dev/tcp/127.0.0.1/$(SUVE_AZURE_APPCONFIG_PORT)' 2>/dev/null; do sleep 1; done
 	@echo "emulator is ready"
-	AZURE_APPCONFIG_CONNECTION_STRING="Endpoint=http://127.0.0.1:$(SUVE_AZURE_APPCONFIG_PORT);Id=xyz;Secret=c2VjcmV0" go test -tags=e2e -v -run TestAzureAppConfig ./e2e/...
+	AZURE_APPCONFIG_CONNECTION_STRING="Endpoint=http://127.0.0.1:$(SUVE_AZURE_APPCONFIG_PORT);Id=abcd;Secret=c2VjcmV0" go test -tags=e2e -v -run TestAzureAppConfig ./e2e/...
 
 clean: ## Clean build artifacts and stop containers
 	rm -rf bin/ *.out
