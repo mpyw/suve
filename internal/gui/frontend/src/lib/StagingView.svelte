@@ -83,15 +83,15 @@
     error = '';
     try {
       // Load diff data and file status in parallel
-      const [ssmResult, smResult, fileStatusResult] = await Promise.all([
+      const [paramResult, secretResult, fileStatusResult] = await Promise.all([
         withRetry(() => StagingDiff('param', '')),
         withRetry(() => StagingDiff('secret', '')),
         StagingFileStatus().catch(() => null) // Don't fail if file status check fails
       ]);
-      paramEntries = ssmResult?.entries?.filter(e => e.type !== 'autoUnstaged') || [];
-      secretEntries = smResult?.entries?.filter(e => e.type !== 'autoUnstaged') || [];
-      paramTagEntries = ssmResult?.tagEntries || [];
-      secretTagEntries = smResult?.tagEntries || [];
+      paramEntries = paramResult?.entries?.filter(e => e.type !== 'autoUnstaged') || [];
+      secretEntries = secretResult?.entries?.filter(e => e.type !== 'autoUnstaged') || [];
+      paramTagEntries = paramResult?.tagEntries || [];
+      secretTagEntries = secretResult?.tagEntries || [];
       fileStatus = fileStatusResult;
       // Emit count change for sidebar badge
       const totalCount = paramEntries.length + secretEntries.length + paramTagEntries.length + secretTagEntries.length;
@@ -625,7 +625,7 @@
       </div>
     {:else}
       <p>Apply staged changes to {getServiceName(applyService)}?</p>
-      <p class="info">This will push all staged changes to AWS.</p>
+      <p class="info">This will push all staged changes to the remote store.</p>
       <label class="checkbox-label">
         <input type="checkbox" bind:checked={ignoreConflicts} />
         <span>Ignore conflicts</span>

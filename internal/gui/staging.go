@@ -124,16 +124,19 @@ type StagingDiffResult struct {
 	TagEntries []StagingDiffTagEntry `json:"tagEntries"`
 }
 
-// StagingDiffEntry represents a single diff entry.
+// StagingDiffEntry represents a single diff entry. RemoteValue/RemoteIdentifier
+// are the current value and version identifier on the provider being compared
+// against (AWS today; the field names are provider-neutral so Google Cloud and
+// Azure fit without another rename).
 type StagingDiffEntry struct {
-	Name          string  `json:"name"`
-	Type          string  `json:"type"` // "normal", "create", "autoUnstaged", "warning"
-	Operation     string  `json:"operation,omitempty"`
-	AWSValue      string  `json:"awsValue,omitempty"`
-	AWSIdentifier string  `json:"awsIdentifier,omitempty"`
-	StagedValue   string  `json:"stagedValue,omitempty"`
-	Description   *string `json:"description,omitempty"`
-	Warning       string  `json:"warning,omitempty"`
+	Name             string  `json:"name"`
+	Type             string  `json:"type"` // "normal", "create", "autoUnstaged", "warning"
+	Operation        string  `json:"operation,omitempty"`
+	RemoteValue      string  `json:"remoteValue,omitempty"`
+	RemoteIdentifier string  `json:"remoteIdentifier,omitempty"`
+	StagedValue      string  `json:"stagedValue,omitempty"`
+	Description      *string `json:"description,omitempty"`
+	Warning          string  `json:"warning,omitempty"`
 }
 
 // StagingDiffTagEntry represents a single diff tag entry.
@@ -633,14 +636,14 @@ func (a *App) StagingDiff(service string, name string) (*StagingDiffResult, erro
 	entries := make([]StagingDiffEntry, len(result.Entries))
 	for i, e := range result.Entries {
 		entries[i] = StagingDiffEntry{
-			Name:          e.Name,
-			Type:          diffEntryTypeNames[e.Type],
-			Operation:     string(e.Operation),
-			AWSValue:      e.AWSValue,
-			AWSIdentifier: e.AWSIdentifier,
-			StagedValue:   e.StagedValue,
-			Description:   e.Description,
-			Warning:       e.Warning,
+			Name:             e.Name,
+			Type:             diffEntryTypeNames[e.Type],
+			Operation:        string(e.Operation),
+			RemoteValue:      e.AWSValue,
+			RemoteIdentifier: e.AWSIdentifier,
+			StagedValue:      e.StagedValue,
+			Description:      e.Description,
+			Warning:          e.Warning,
 		}
 	}
 

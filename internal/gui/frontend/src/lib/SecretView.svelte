@@ -517,14 +517,16 @@
                 <span class="meta-label">Version ID</span>
                 <span class="meta-value mono">{secretDetail.versionId}</span>
               </div>
-              <div class="meta-item">
-                <span class="meta-label">Labels</span>
-                <span class="meta-value">
-                  {#each secretDetail.versionStage || [] as stage}
-                    <span class="badge badge-stage">{stage}</span>
-                  {/each}
-                </span>
-              </div>
+              {#if (secretDetail.versionStage || []).length > 0}
+                <div class="meta-item">
+                  <span class="meta-label">Labels</span>
+                  <span class="meta-value">
+                    {#each secretDetail.versionStage || [] as stage}
+                      <span class="badge badge-stage">{stage}</span>
+                    {/each}
+                  </span>
+                </div>
+              {/if}
               <div class="meta-item">
                 <span class="meta-label">Created</span>
                 <span class="meta-value">{formatDate(secretDetail.createdDate)}</span>
@@ -538,10 +540,12 @@
               </div>
             {/if}
 
-            <div class="detail-section">
-              <h4>ARN</h4>
-              <code class="arn-display">{secretDetail.arn}</code>
-            </div>
+            {#if secretDetail.arn}
+              <div class="detail-section">
+                <h4>ARN</h4>
+                <code class="arn-display">{secretDetail.arn}</code>
+              </div>
+            {/if}
 
             <TagList tags={secretDetail.tags} serviceClass="secret" onadd={openTagModal} onremove={openRemoveTagModal} />
 
@@ -584,11 +588,13 @@
                           {/if}
                           <span class="history-date">{formatDate(logEntry.created)}</span>
                         </div>
-                        <div class="history-labels">
-                          {#each logEntry.stages || [] as stage}
-                            <span class="badge badge-stage small">{stage}</span>
-                          {/each}
-                        </div>
+                        {#if (logEntry.stages || []).length > 0}
+                          <div class="history-labels">
+                            {#each logEntry.stages || [] as stage}
+                              <span class="badge badge-stage small">{stage}</span>
+                            {/each}
+                          </div>
+                        {/if}
                         <pre class="history-value" class:masked={!showValue}>{showValue ? formatJsonValue(logEntry.value) : maskValue(logEntry.value)}</pre>
                       </div>
                     </li>
