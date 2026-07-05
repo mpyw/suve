@@ -14,7 +14,9 @@ package azure
 import (
 	"context"
 	"fmt"
+	"os"
 
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/Azure/azure-sdk-for-go/sdk/data/azappconfig"
 	"github.com/Azure/azure-sdk-for-go/sdk/security/keyvault/azsecrets"
@@ -23,6 +25,15 @@ import (
 	"github.com/mpyw/suve/internal/provider/azure/appconfig"
 	"github.com/mpyw/suve/internal/provider/azure/keyvault"
 )
+
+// AppConfigConnStringEnvVar is the environment variable that, when set, points
+// the App Configuration adapter at an emulator via a connection string
+// (Endpoint=...;Id=...;Secret=...) instead of the real https://<store>.azconfig.io
+// endpoint with DefaultAzureCredential. It is an emulator-only seam for offline
+// e2e tests (see the azure-appconfig service in compose.yaml and the `e2e-azure`
+// make target); it permits HMAC credentials over plain HTTP, so it must never be
+// set against a production store.
+const AppConfigConnStringEnvVar = "SUVE_AZURE_APPCONFIG_CONNECTION_STRING"
 
 // Factory builds Azure-backed provider.Store values for a scope + kind.
 type Factory struct{}
@@ -70,6 +81,21 @@ func keyVaultStore(_ context.Context, scope provider.Scope) (provider.Store, err
 func appConfigStore(_ context.Context, scope provider.Scope) (provider.Store, error) {
 	if scope.StoreName == "" {
 		return nil, fmt.Errorf("no Azure App Configuration store specified: set --store-name")
+	}
+
+	// Emulator seam: a connection string (offline e2e) bypasses the real
+	// endpoint + DefaultAzureCredential and allows HMAC auth over plain HTTP.
+	if connStr := os.Getenv(AppConfigConnStringEnvVar); connStr != "" {
+		opts := &azappconfig.ClientOptions{
+			ClientOptions: azcore.ClientOptions{InsecureAllowCredentialWithHTTP: true},
+		}
+
+		client, err := azappconfig.NewClientFromConnectionString(connStr, opts)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create Azure App Configuration client from connection string: %w", err)
+		}
+
+		return appconfig.New(appconfig.Wrap(client)), nil
 	}
 
 	cred, err := azidentity.NewDefaultAzureCredential(nil)

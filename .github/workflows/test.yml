@@ -141,6 +141,38 @@ jobs:
         env:
           SUVE_GCP_SECRETMANAGER_ENDPOINT: localhost:9090
 
+  e2e-azure:
+    name: E2E Test (Azure)
+    runs-on: ubuntu-latest
+    services:
+      # Azure App Configuration emulator (HTTP :8080, HMAC over plain HTTP),
+      # offline. A fork of tnc1997/azure-app-configuration-emulator patched to
+      # interoperate with the official Azure SDKs.
+      # https://github.com/mpyw/azure-app-configuration-emulator
+      azure-appconfig:
+        image: ghcr.io/mpyw/azure-app-configuration-emulator:latest
+        ports:
+          - 8080:8080
+        env:
+          ASPNETCORE_HTTP_PORTS: 8080
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set up toolchain (mise)
+        uses: jdx/mise-action@v4
+        with:
+          install_args: "go"
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Wait for the App Configuration emulator
+        run: timeout 60 bash -c 'until (echo > /dev/tcp/localhost/8080) 2>/dev/null; do sleep 1; done'
+
+      - name: Run Azure e2e tests
+        run: go test -v -tags e2e -run TestAzureAppConfig ./e2e/...
+        env:
+          SUVE_AZURE_APPCONFIG_CONNECTION_STRING: "Endpoint=http://localhost:8080;Id=abcd;Secret=c2VjcmV0"
+
   lint:
     name: Lint
     runs-on: ubuntu-latest
