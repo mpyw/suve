@@ -548,15 +548,15 @@ Explicit command groups (always available) and their bare aliases (exposed per t
 
 | Command | Options | Description |
 |---------|---------|-------------|
-| [`suve param show`](docs/aws.md#suve-aws-param-show) | `--raw`<br>`--parse-json` (`-j`)<br>`--no-pager`<br>`--output=<FORMAT>` | Display parameter with metadata |
-| [`suve param log`](docs/aws.md#suve-aws-param-log) | `--number=<N>` (`-n`)<br>`--patch` (`-p`)<br>`--parse-json` (`-j`)<br>`--oneline`<br>`--reverse`<br>`--since=<DATE>`<br>`--until=<DATE>`<br>`--no-pager`<br>`--output=<FORMAT>` | Show version history |
-| [`suve param diff`](docs/aws.md#suve-aws-param-diff) | `--parse-json` (`-j`)<br>`--no-pager`<br>`--output=<FORMAT>` | Compare versions |
-| [`suve param list`](docs/aws.md#suve-aws-param-list) | `--recursive` (`-R`)<br>`--filter=<REGEX>`<br>`--show`<br>`--output=<FORMAT>` | List parameters |
-| [`suve param create`](docs/aws.md#suve-aws-param-create) | `--type=<TYPE>`<br>`--secure`<br>`--description=<TEXT>`<br>`--tier=<TIER>`<br>`--data-type=<TYPE>`<br>`--allowed-pattern=<REGEX>`<br>`--policies=<JSON>` | Create a new parameter |
-| [`suve param update`](docs/aws.md#suve-aws-param-update) | `--type=<TYPE>`<br>`--secure`<br>`--description=<TEXT>`<br>`--tier=<TIER>`<br>`--data-type=<TYPE>`<br>`--allowed-pattern=<REGEX>`<br>`--policies=<JSON>`<br>`--yes` | Update an existing parameter |
-| [`suve param delete`](docs/aws.md#suve-aws-param-delete) | `--yes` | Delete parameter |
-| [`suve param tag`](docs/aws.md#suve-aws-param-tag) | `<KEY>=<VALUE>...` | Add or update tags |
-| [`suve param untag`](docs/aws.md#suve-aws-param-untag) | `<KEY>...` | Remove tags |
+| [`suve aws param show`](docs/aws.md#suve-aws-param-show) | `--raw`<br>`--parse-json` (`-j`)<br>`--no-pager`<br>`--output=<FORMAT>` | Display parameter with metadata |
+| [`suve aws param log`](docs/aws.md#suve-aws-param-log) | `--number=<N>` (`-n`)<br>`--patch` (`-p`)<br>`--parse-json` (`-j`)<br>`--oneline`<br>`--reverse`<br>`--since=<DATE>`<br>`--until=<DATE>`<br>`--no-pager`<br>`--output=<FORMAT>` | Show version history |
+| [`suve aws param diff`](docs/aws.md#suve-aws-param-diff) | `--parse-json` (`-j`)<br>`--no-pager`<br>`--output=<FORMAT>` | Compare versions |
+| [`suve aws param list`](docs/aws.md#suve-aws-param-list) | `--recursive` (`-R`)<br>`--filter=<REGEX>`<br>`--show`<br>`--output=<FORMAT>` | List parameters |
+| [`suve aws param create`](docs/aws.md#suve-aws-param-create) | `--type=<TYPE>`<br>`--secure`<br>`--description=<TEXT>`<br>`--tier=<TIER>`<br>`--data-type=<TYPE>`<br>`--allowed-pattern=<REGEX>`<br>`--policies=<JSON>` | Create a new parameter |
+| [`suve aws param update`](docs/aws.md#suve-aws-param-update) | `--type=<TYPE>`<br>`--secure`<br>`--description=<TEXT>`<br>`--tier=<TIER>`<br>`--data-type=<TYPE>`<br>`--allowed-pattern=<REGEX>`<br>`--policies=<JSON>`<br>`--yes` | Update an existing parameter |
+| [`suve aws param delete`](docs/aws.md#suve-aws-param-delete) | `--yes` | Delete parameter |
+| [`suve aws param tag`](docs/aws.md#suve-aws-param-tag) | `<KEY>=<VALUE>...` | Add or update tags |
+| [`suve aws param untag`](docs/aws.md#suve-aws-param-untag) | `<KEY>...` | Remove tags |
 
 **Staging commands** (under `suve stage param`):
 
@@ -576,16 +576,16 @@ Explicit command groups (always available) and their bare aliases (exposed per t
 
 | Command | Options | Description |
 |---------|---------|-------------|
-| [`suve secret show`](docs/aws.md#suve-aws-secret-show) | `--raw`<br>`--parse-json` (`-j`)<br>`--no-pager`<br>`--output=<FORMAT>` | Display secret with metadata |
-| [`suve secret log`](docs/aws.md#suve-aws-secret-log) | `--number=<N>` (`-n`)<br>`--patch` (`-p`)<br>`--parse-json` (`-j`)<br>`--oneline`<br>`--reverse`<br>`--since=<DATE>`<br>`--until=<DATE>`<br>`--no-pager`<br>`--output=<FORMAT>` | Show version history |
-| [`suve secret diff`](docs/aws.md#suve-aws-secret-diff) | `--parse-json` (`-j`)<br>`--no-pager`<br>`--output=<FORMAT>` | Compare versions |
-| [`suve secret list`](docs/aws.md#suve-aws-secret-list) | `--filter=<REGEX>`<br>`--show`<br>`--output=<FORMAT>` | List secrets |
-| [`suve secret create`](docs/aws.md#suve-aws-secret-create) | `--description=<TEXT>` | Create new secret |
-| [`suve secret update`](docs/aws.md#suve-aws-secret-update) | `--description=<TEXT>`<br>`--yes` | Update existing secret |
-| [`suve secret delete`](docs/aws.md#suve-aws-secret-delete) | `--force`<br>`--recovery-window=<DAYS>`<br>`--yes` | Delete secret |
-| [`suve secret restore`](docs/aws.md#suve-aws-secret-restore) | | Restore deleted secret |
-| [`suve secret tag`](docs/aws.md#suve-aws-secret-tag) | `<KEY>=<VALUE>...` | Add or update tags |
-| [`suve secret untag`](docs/aws.md#suve-aws-secret-untag) | `<KEY>...` | Remove tags |
+| [`suve aws secret show`](docs/aws.md#suve-aws-secret-show) | `--raw`<br>`--parse-json` (`-j`)<br>`--no-pager`<br>`--output=<FORMAT>` | Display secret with metadata |
+| [`suve aws secret log`](docs/aws.md#suve-aws-secret-log) | `--number=<N>` (`-n`)<br>`--patch` (`-p`)<br>`--parse-json` (`-j`)<br>`--oneline`<br>`--reverse`<br>`--since=<DATE>`<br>`--until=<DATE>`<br>`--no-pager`<br>`--output=<FORMAT>` | Show version history |
+| [`suve aws secret diff`](docs/aws.md#suve-aws-secret-diff) | `--parse-json` (`-j`)<br>`--no-pager`<br>`--output=<FORMAT>` | Compare versions |
+| [`suve aws secret list`](docs/aws.md#suve-aws-secret-list) | `--filter=<REGEX>`<br>`--show`<br>`--output=<FORMAT>` | List secrets |
+| [`suve aws secret create`](docs/aws.md#suve-aws-secret-create) | `--description=<TEXT>` | Create new secret |
+| [`suve aws secret update`](docs/aws.md#suve-aws-secret-update) | `--description=<TEXT>`<br>`--yes` | Update existing secret |
+| [`suve aws secret delete`](docs/aws.md#suve-aws-secret-delete) | `--force`<br>`--recovery-window=<DAYS>`<br>`--yes` | Delete secret |
+| [`suve aws secret restore`](docs/aws.md#suve-aws-secret-restore) | | Restore deleted secret |
+| [`suve aws secret tag`](docs/aws.md#suve-aws-secret-tag) | `<KEY>=<VALUE>...` | Add or update tags |
+| [`suve aws secret untag`](docs/aws.md#suve-aws-secret-untag) | `<KEY>...` | Remove tags |
 
 **Staging commands** (under `suve stage secret`):
 
@@ -607,15 +607,15 @@ Uses integer version numbers (with the `latest` alias) and has no staging labels
 
 | Command | Options | Description |
 |---------|---------|-------------|
-| `suve gcloud secret show` | `--raw`<br>`--parse-json` (`-j`)<br>`--no-pager`<br>`--output=<FORMAT>` | Display secret with metadata |
-| `suve gcloud secret log` | `--number=<N>` (`-n`)<br>`--patch` (`-p`)<br>`--parse-json` (`-j`)<br>`--oneline`<br>`--reverse`<br>`--since=<DATE>`<br>`--until=<DATE>`<br>`--no-pager`<br>`--output=<FORMAT>` | Show version history |
-| `suve gcloud secret diff` | `--parse-json` (`-j`)<br>`--no-pager`<br>`--output=<FORMAT>` | Compare versions |
-| `suve gcloud secret list` | `--filter=<REGEX>`<br>`--show`<br>`--output=<FORMAT>` | List secrets |
-| `suve gcloud secret create` | | Create new secret |
-| `suve gcloud secret update` | `--yes` | Update existing secret |
-| `suve gcloud secret delete` | `--yes` | Delete secret |
-| `suve gcloud secret tag` | `<KEY>=<VALUE>...` | Add or update labels |
-| `suve gcloud secret untag` | `<KEY>...` | Remove labels |
+| [`suve gcloud secret show`](docs/gcloud.md#suve-gcloud-secret-show) | `--raw`<br>`--parse-json` (`-j`)<br>`--no-pager`<br>`--output=<FORMAT>` | Display secret with metadata |
+| [`suve gcloud secret log`](docs/gcloud.md#suve-gcloud-secret-log) | `--number=<N>` (`-n`)<br>`--patch` (`-p`)<br>`--parse-json` (`-j`)<br>`--oneline`<br>`--reverse`<br>`--since=<DATE>`<br>`--until=<DATE>`<br>`--no-pager`<br>`--output=<FORMAT>` | Show version history |
+| [`suve gcloud secret diff`](docs/gcloud.md#suve-gcloud-secret-diff) | `--parse-json` (`-j`)<br>`--no-pager`<br>`--output=<FORMAT>` | Compare versions |
+| [`suve gcloud secret list`](docs/gcloud.md#suve-gcloud-secret-list) | `--filter=<REGEX>`<br>`--show`<br>`--output=<FORMAT>` | List secrets |
+| [`suve gcloud secret create`](docs/gcloud.md#suve-gcloud-secret-create) | | Create new secret |
+| [`suve gcloud secret update`](docs/gcloud.md#suve-gcloud-secret-update) | `--yes` | Update existing secret |
+| [`suve gcloud secret delete`](docs/gcloud.md#suve-gcloud-secret-delete) | `--yes` | Delete secret |
+| [`suve gcloud secret tag`](docs/gcloud.md#suve-gcloud-secret-tag) | `<KEY>=<VALUE>...` | Add or update labels |
+| [`suve gcloud secret untag`](docs/gcloud.md#suve-gcloud-secret-untag) | `<KEY>...` | Remove labels |
 
 > [!NOTE]
 > Google Cloud Secret Manager is not covered by the staging workflow. Staging (`suve stage`) is AWS-only.
@@ -626,15 +626,15 @@ Secrets are versioned by opaque IDs and have no staging labels. Select the vault
 
 | Command | Options | Description |
 |---------|---------|-------------|
-| `suve azure secret show` | `--raw`<br>`--parse-json` (`-j`)<br>`--no-pager`<br>`--output=<FORMAT>` | Display secret with metadata |
-| `suve azure secret log` | `--number=<N>` (`-n`)<br>`--patch` (`-p`)<br>`--parse-json` (`-j`)<br>`--oneline`<br>`--reverse`<br>`--since=<DATE>`<br>`--until=<DATE>`<br>`--no-pager`<br>`--output=<FORMAT>` | Show version history |
-| `suve azure secret diff` | `--parse-json` (`-j`)<br>`--no-pager`<br>`--output=<FORMAT>` | Compare versions |
-| `suve azure secret list` | `--filter=<REGEX>`<br>`--show`<br>`--output=<FORMAT>` | List secrets |
-| `suve azure secret create` | | Create new secret |
-| `suve azure secret update` | `--yes` | Update existing secret |
-| `suve azure secret delete` | `--yes` | Delete secret |
-| `suve azure secret tag` | `<KEY>=<VALUE>...` | Add or update tags |
-| `suve azure secret untag` | `<KEY>...` | Remove tags |
+| [`suve azure secret show`](docs/azure.md#suve-azure-secret-show) | `--raw`<br>`--parse-json` (`-j`)<br>`--no-pager`<br>`--output=<FORMAT>` | Display secret with metadata |
+| [`suve azure secret log`](docs/azure.md#suve-azure-secret-log) | `--number=<N>` (`-n`)<br>`--patch` (`-p`)<br>`--parse-json` (`-j`)<br>`--oneline`<br>`--reverse`<br>`--since=<DATE>`<br>`--until=<DATE>`<br>`--no-pager`<br>`--output=<FORMAT>` | Show version history |
+| [`suve azure secret diff`](docs/azure.md#suve-azure-secret-diff) | `--parse-json` (`-j`)<br>`--no-pager`<br>`--output=<FORMAT>` | Compare versions |
+| [`suve azure secret list`](docs/azure.md#suve-azure-secret-list) | `--filter=<REGEX>`<br>`--show`<br>`--output=<FORMAT>` | List secrets |
+| [`suve azure secret create`](docs/azure.md#suve-azure-secret-create) | | Create new secret |
+| [`suve azure secret update`](docs/azure.md#suve-azure-secret-update) | `--yes` | Update existing secret |
+| [`suve azure secret delete`](docs/azure.md#suve-azure-secret-delete) | `--yes` | Delete secret |
+| [`suve azure secret tag`](docs/azure.md#suve-azure-secret-tag) | `<KEY>=<VALUE>...` | Add or update tags |
+| [`suve azure secret untag`](docs/azure.md#suve-azure-secret-untag) | `<KEY>...` | Remove tags |
 
 ### Azure App Configuration
 
@@ -642,11 +642,11 @@ Unversioned key-value store. Version specifiers (`#VERSION`, `~SHIFT`, `:LABEL`)
 
 | Command | Options | Description |
 |---------|---------|-------------|
-| `suve azure param show` | `--raw`<br>`--parse-json` (`-j`)<br>`--no-pager`<br>`--output=<FORMAT>` | Display value with metadata |
-| `suve azure param list` | `--filter=<REGEX>`<br>`--show`<br>`--output=<FORMAT>` | List keys |
-| `suve azure param create` | | Create a new key |
-| `suve azure param update` | `--yes` | Update an existing key |
-| `suve azure param delete` | `--yes` | Delete a key |
+| [`suve azure param show`](docs/azure.md#suve-azure-param-show) | `--raw`<br>`--parse-json` (`-j`)<br>`--no-pager`<br>`--output=<FORMAT>` | Display value with metadata |
+| [`suve azure param list`](docs/azure.md#suve-azure-param-list) | `--filter=<REGEX>`<br>`--show`<br>`--output=<FORMAT>` | List keys |
+| [`suve azure param create`](docs/azure.md#suve-azure-param-create) | | Create a new key |
+| [`suve azure param update`](docs/azure.md#suve-azure-param-update) | `--yes` | Update an existing key |
+| [`suve azure param delete`](docs/azure.md#suve-azure-param-delete) | `--yes` | Delete a key |
 
 > [!NOTE]
 > Azure Key Vault and App Configuration are not covered by the staging workflow. Staging (`suve stage`) is AWS-only.
