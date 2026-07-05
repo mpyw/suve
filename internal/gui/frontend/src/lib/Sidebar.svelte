@@ -6,10 +6,13 @@
   interface Props {
     capabilities?: gui.ProviderCapability[];
     provider?: string;
+    pendingProvider?: string;
     services?: gui.ServiceCapability[];
     hasAnyStaging?: boolean;
     scope?: gui.ScopeSelection | null;
     scopeReady?: boolean;
+    formScope?: gui.ScopeSelection | null;
+    scopeError?: string;
     activeView?: ViewKey;
     stagingCount?: number;
     accountId?: string;
@@ -18,15 +21,19 @@
     onnavigate?: (view: ViewKey) => void;
     onselectprovider?: (provider: string) => void;
     onselectscope?: (sel: gui.ScopeSelection) => void;
+    oncancelscope?: () => void;
   }
 
   let {
     capabilities = [],
     provider = '',
+    pendingProvider = '',
     services = [],
     hasAnyStaging = false,
     scope = null,
     scopeReady = false,
+    formScope = null,
+    scopeError = '',
     activeView = 'param',
     stagingCount = 0,
     accountId = '',
@@ -35,16 +42,37 @@
     onnavigate,
     onselectprovider,
     onselectscope,
+    oncancelscope,
   }: Props = $props();
 
   // Service key → stable nav icon/letter (labels come from capability names).
   const NAV_ICON: Record<string, string> = { param: 'P', secret: 'S' };
 
-  // Google Cloud project form state (prefilled from the backend's current scope).
+  // ---- Scope-form inputs (seeded from the prefill for the pending provider) --
   let projectInput = $state('');
+  let subscriptionInput = $state('');
+  let resourceGroupInput = $state('');
+  let vaultInput = $state('');
+  let storeInput = $state('');
+  let formError = $state('');
+  let firstFieldEl: HTMLInputElement | undefined = $state();
+
   $effect(() => {
-    // Re-seed the project field whenever the provider or prefilled scope changes.
-    projectInput = provider === 'googlecloud' ? (scope?.projectId ?? '') : '';
+    // Re-seed the inputs whenever the pending provider (or its prefill) changes.
+    const s = formScope;
+    projectInput = pendingProvider === 'googlecloud' ? (s?.projectId ?? '') : '';
+    subscriptionInput = pendingProvider === 'azure' ? (s?.subscriptionId ?? '') : '';
+    resourceGroupInput = pendingProvider === 'azure' ? (s?.resourceGroup ?? '') : '';
+    vaultInput = pendingProvider === 'azure' ? (s?.vaultName ?? '') : '';
+    storeInput = pendingProvider === 'azure' ? (s?.storeName ?? '') : '';
+    formError = '';
+  });
+
+  // Focus the first field when a scope form opens (a11y).
+  $effect(() => {
+    if (pendingProvider && firstFieldEl) {
+      firstFieldEl.focus();
+    }
   });
 
   // Move keyboard focus to the active tab after a provider switch, so a clamped
@@ -68,10 +96,21 @@
     onselectprovider?.(value);
   }
 
+  // Escape while a scope form is open cancels the pending selection.
+  function handleWindowKeydown(e: KeyboardEvent) {
+    if (pendingProvider && e.key === 'Escape') {
+      e.preventDefault();
+      oncancelscope?.();
+    }
+  }
+
   function submitProject(e: SubmitEvent) {
     e.preventDefault();
     const projectId = projectInput.trim();
-    if (!projectId) return;
+    if (!projectId) {
+      formError = 'Project ID is required.';
+      return;
+    }
     onselectscope?.({
       provider: 'googlecloud',
       projectId,
@@ -81,7 +120,28 @@
       storeName: '',
     } as gui.ScopeSelection);
   }
+
+  function submitAzure(e: SubmitEvent) {
+    e.preventDefault();
+    const vaultName = vaultInput.trim();
+    const storeName = storeInput.trim();
+    // Mirror the backend rule (#276): at least one service target is required.
+    if (!vaultName && !storeName) {
+      formError = 'Enter a Key Vault name (for secrets) and/or an App Configuration store name (for parameters).';
+      return;
+    }
+    onselectscope?.({
+      provider: 'azure',
+      projectId: '',
+      subscriptionId: subscriptionInput.trim(),
+      resourceGroup: resourceGroupInput.trim(),
+      vaultName,
+      storeName,
+    } as gui.ScopeSelection);
+  }
 </script>
+
+<svelte:window onkeydown={handleWindowKeydown} />
 
 <aside class="sidebar">
   <div class="logo">
@@ -92,20 +152,18 @@
   <!-- Provider selector -->
   <div class="provider-select">
     <label class="provider-label" for="provider-select">Provider</label>
-    <select id="provider-select" class="provider-dropdown" value={provider} onchange={handleProviderChange}>
-      {#if !provider}
+    <select id="provider-select" class="provider-dropdown" value={pendingProvider || provider} onchange={handleProviderChange}>
+      {#if !provider && !pendingProvider}
         <option value="" disabled selected>Select provider…</option>
       {/if}
       {#each capabilities as cap}
-        <option value={cap.provider} disabled={cap.provider === 'azure'}>
-          {cap.displayName}{cap.provider === 'azure' ? ' (coming soon)' : ''}
-        </option>
+        <option value={cap.provider}>{cap.displayName}</option>
       {/each}
     </select>
   </div>
 
-  <!-- Scope form: only shown when the selected provider still needs input -->
-  {#if provider === 'googlecloud' && !scopeReady}
+  <!-- Scope form: shown while a selected provider still needs input -->
+  {#if pendingProvider === 'googlecloud'}
     <form class="scope-form" onsubmit={submitProject}>
       <label class="scope-label" for="gcloud-project">Project ID</label>
       <input
@@ -114,11 +172,35 @@
         type="text"
         placeholder="my-project"
         bind:value={projectInput}
+        bind:this={firstFieldEl}
       />
+      {#if formError || scopeError}
+        <div class="scope-error">{formError || scopeError}</div>
+      {/if}
       <button type="submit" class="scope-submit" disabled={!projectInput.trim()}>Connect</button>
     </form>
-  {:else if provider === 'azure' && !scopeReady}
-    <div class="scope-hint">Azure scope setup ships next.</div>
+  {:else if pendingProvider === 'azure'}
+    <form class="scope-form" onsubmit={submitAzure}>
+      <label class="scope-label" for="azure-subscription">Subscription ID</label>
+      <input
+        id="azure-subscription"
+        class="scope-input"
+        type="text"
+        placeholder="00000000-0000-…"
+        bind:value={subscriptionInput}
+        bind:this={firstFieldEl}
+      />
+      <label class="scope-label" for="azure-resource-group">Resource Group</label>
+      <input id="azure-resource-group" class="scope-input" type="text" placeholder="my-rg" bind:value={resourceGroupInput} />
+      <label class="scope-label" for="azure-vault">Key Vault name</label>
+      <input id="azure-vault" class="scope-input" type="text" placeholder="my-vault (secrets)" bind:value={vaultInput} />
+      <label class="scope-label" for="azure-store">App Configuration store</label>
+      <input id="azure-store" class="scope-input" type="text" placeholder="my-store (params)" bind:value={storeInput} />
+      {#if formError || scopeError}
+        <div class="scope-error">{formError || scopeError}</div>
+      {/if}
+      <button type="submit" class="scope-submit" disabled={!vaultInput.trim() && !storeInput.trim()}>Connect</button>
+    </form>
   {/if}
 
   <!-- Navigation tabs: capability-driven, only once a scope is active -->
@@ -300,10 +382,10 @@
     cursor: not-allowed;
   }
 
-  .scope-hint {
-    padding: 8px 16px;
+  .scope-error {
     font-size: 11px;
-    color: #888;
+    color: #e94560;
+    line-height: 1.4;
   }
 
   .nav {

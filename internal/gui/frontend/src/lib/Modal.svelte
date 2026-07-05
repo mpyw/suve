@@ -66,7 +66,8 @@
   .modal {
     background: #1a1a2e;
     border-radius: 8px;
-    min-width: 400px;
+    /* min(400px, 90vw) so the modal never overflows a 375px viewport. */
+    min-width: min(400px, 90vw);
     max-width: 600px;
     max-height: 80vh;
     display: flex;

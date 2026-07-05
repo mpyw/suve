@@ -19,6 +19,7 @@ export interface Secret {
   // and Azure return) drives the presence-gated rendering in SecretView.
   arn?: string;
   versionStage?: string[];
+  versionId?: string;
 }
 
 export interface Tag {
@@ -650,7 +651,7 @@ export function createAzureState(overrides: Partial<MockState> = {}): Partial<Mo
     },
     // App Configuration values are untyped/unversioned; Key Vault has no ARN.
     params: [{ name: 'app/config/key', type: 'String', value: 'v' }],
-    secrets: [{ name: 'kv-secret', value: 'v', arn: '', versionStage: [] }],
+    secrets: [{ name: 'kv-secret', value: 'v', arn: '', versionStage: [], versionId: 'a1b2c3d4e5f6' }],
     // Key Vault versions are opaque hex ids with no AWS staging labels.
     secretVersions: {
       'kv-secret': [
@@ -705,6 +706,13 @@ export async function getRecordedCalls(page: Page): Promise<string[]> {
   return page.evaluate(() => ((window as any).__wailsCalls as string[]) ?? []);
 }
 
+/**
+ * Read the exact ScopeSelection payloads passed to SelectScope.
+ */
+export async function getSelectScopeCalls(page: Page): Promise<ScopeSelection[]> {
+  return page.evaluate(() => ((window as any).__selectScopeCalls as ScopeSelection[]) ?? []);
+}
+
 // ============================================================================
 // Main Mock Setup Function
 // ============================================================================
@@ -728,8 +736,15 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
       InitialProvider: async () => state.initialProvider,
       GetCurrentScope: async () => state.currentScope,
       SelectScope: async (sel: any) => {
-        if (state.simulateError?.operation === 'SelectScope') {
-          throw new Error(state.simulateError.message);
+        calls.push('SelectScope');
+        // Record the exact payload so specs can assert it (incl. vault vs store
+        // not being swapped). Rejected calls are still recorded (the attempt).
+        (window as any).__selectScopeCalls = (window as any).__selectScopeCalls ?? [];
+        (window as any).__selectScopeCalls.push(JSON.parse(JSON.stringify(sel)));
+        // Runtime-settable failure so a spec can make a *later* SelectScope fail
+        // (e.g. after AWS is already active) to test "keep previous scope".
+        if (state.simulateError?.operation === 'SelectScope' || (window as any).__forceSelectScopeError) {
+          throw new Error(state.simulateError?.message ?? 'scope selection failed');
         }
         // Mirror the backend validation (internal/gui/app.go) so provider-aware
         // specs exercise the same error paths.
@@ -949,7 +964,7 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
         return {
           name,
           arn: secret?.arn !== undefined ? secret.arn : `arn:aws:secretsmanager:us-east-1:123456789:secret:${name}`,
-          versionId: 'v1',
+          versionId: secret?.versionId ?? 'v1',
           versionStage: secret?.versionStage !== undefined ? secret.versionStage : ['AWSCURRENT'],
           value: secret?.value || 'mock-secret',
           description: '',

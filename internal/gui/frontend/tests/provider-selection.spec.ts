@@ -95,12 +95,12 @@ test.describe('Provider selection', () => {
   });
 
   test.describe('Azure', () => {
-    test('is greyed-out (disabled) in the provider selector', async ({ page }) => {
+    test('is selectable in the provider selector (un-greyed by #267)', async ({ page }) => {
       await setupWailsMocks(page);
       await page.goto('/');
       await waitForViewLoaded(page);
 
-      await expect(page.locator('#provider-select option[value="azure"]')).toBeDisabled();
+      await expect(page.locator('#provider-select option[value="azure"]')).toBeEnabled();
     });
 
     test('App Configuration (param): no Type dropdown, no version history, no tags', async ({ page }) => {
