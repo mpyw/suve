@@ -14,6 +14,10 @@ export function GetAWSIdentity() {
   return window['go']['gui']['App']['GetAWSIdentity']();
 }
 
+export function InitialProvider() {
+  return window['go']['gui']['App']['InitialProvider']();
+}
+
 export function ParamAddTag(arg1, arg2, arg3) {
   return window['go']['gui']['App']['ParamAddTag'](arg1, arg2, arg3);
 }

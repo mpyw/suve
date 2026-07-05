@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/mpyw/suve/internal/maputil"
+	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/staging"
 	"github.com/mpyw/suve/internal/staging/store/file"
 	"github.com/mpyw/suve/internal/staging/store/testutil"
@@ -23,7 +24,7 @@ import (
 func setupTestApp(t *testing.T) *App {
 	t.Helper()
 
-	app := NewApp()
+	app := NewApp(provider.ProviderAWS)
 	app.Startup(t.Context())
 	app.stagingStore = testutil.NewMockStore()
 

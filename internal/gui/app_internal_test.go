@@ -7,6 +7,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/mpyw/suve/internal/provider"
 )
 
 func TestStringError_Error(t *testing.T) {
@@ -25,7 +27,7 @@ func TestErrInvalidService(t *testing.T) {
 func TestNewApp(t *testing.T) {
 	t.Parallel()
 
-	app := NewApp()
+	app := NewApp(provider.ProviderAWS)
 	assert.NotNil(t, app)
 	// Verify the staging store is nil (lazy initialization).
 	assert.Nil(t, app.stagingStore)
@@ -34,7 +36,7 @@ func TestNewApp(t *testing.T) {
 func TestApp_Startup(t *testing.T) {
 	t.Parallel()
 
-	app := NewApp()
+	app := NewApp(provider.ProviderAWS)
 	assert.Nil(t, app.ctx)
 
 	app.Startup(t.Context())
