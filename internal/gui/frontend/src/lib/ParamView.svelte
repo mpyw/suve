@@ -179,15 +179,21 @@
     detailLoading = true;
     showValue = withValue;
     stagingStatus = null;
-    try {
-      const [detail, log] = await Promise.all([ParamShow(name), ParamLog(name, 10)]);
-      paramDetail = detail;
-      paramLog = log?.entries || [];
-    } catch (e) {
-      error = parseError(e);
-    } finally {
-      detailLoading = false;
+    error = '';
+    // History is best-effort and unsupported by some providers (Azure App
+    // Configuration): fetch it only when supported, and use allSettled so a
+    // failed ParamLog never blanks out the value shown by ParamShow.
+    const [detailResult, logResult] = await Promise.allSettled([
+      ParamShow(name),
+      historyEnabled ? ParamLog(name, 10) : Promise.resolve(null),
+    ]);
+    if (detailResult.status === 'fulfilled') {
+      paramDetail = detailResult.value;
+    } else {
+      error = parseError(detailResult.reason);
     }
+    paramLog = logResult.status === 'fulfilled' ? (logResult.value?.entries ?? []) : [];
+    detailLoading = false;
 
     // Staging status is decoupled from the detail fetch: only for
     // staging-capable providers, and a failure just means no banner — it must

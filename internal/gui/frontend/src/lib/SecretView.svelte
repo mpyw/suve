@@ -180,15 +180,20 @@
     detailLoading = true;
     showValue = withValue;
     stagingStatus = null;
-    try {
-      const [detail, log] = await Promise.all([SecretShow(name), SecretLog(name, 10)]);
-      secretDetail = detail;
-      secretLog = log?.entries || [];
-    } catch (e) {
-      error = parseError(e);
-    } finally {
-      detailLoading = false;
+    error = '';
+    // History is best-effort: fetch it only when supported, and use allSettled
+    // so a failed SecretLog never blanks out the value shown by SecretShow.
+    const [detailResult, logResult] = await Promise.allSettled([
+      SecretShow(name),
+      historyEnabled ? SecretLog(name, 10) : Promise.resolve(null),
+    ]);
+    if (detailResult.status === 'fulfilled') {
+      secretDetail = detailResult.value;
+    } else {
+      error = parseError(detailResult.reason);
     }
+    secretLog = logResult.status === 'fulfilled' ? (logResult.value?.entries ?? []) : [];
+    detailLoading = false;
 
     // Decoupled staging status: only for staging-capable providers; a failure
     // just means no banner and never breaks the detail pane.

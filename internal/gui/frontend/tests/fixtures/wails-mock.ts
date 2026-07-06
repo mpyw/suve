@@ -877,6 +877,12 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
       ParamTypeOptions: async () =>
         state.currentScope.provider === 'aws' ? ['String', 'SecureString', 'StringList'] : [],
       ParamLog: async (name: string, _limit?: number) => {
+        // Azure App Configuration is unversioned — mirror the backend, which
+        // returns ErrVersioningUnsupported from History (the value must still
+        // be viewable; only history is unavailable).
+        if (state.currentScope?.provider === 'azure') {
+          throw new Error('the Azure App Configuration store does not support versions (no version history)');
+        }
         const versions = state.paramVersions[name] || [
           { version: 1, value: 'current', type: 'String', isCurrent: true, lastModified: new Date().toISOString() },
         ];
