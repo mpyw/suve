@@ -2,7 +2,7 @@
   <img src="gui/build/appicon.png" alt="suve" width="128" height="128">
   <h1>suve</h1>
   <p><strong>S</strong>ecret <strong>U</strong>nified <strong>V</strong>ersioning <strong>E</strong>xplorer</p>
-  <p>for &nbsp; <img width="60" alt="AWS" src="https://github.com/user-attachments/assets/03a2fde5-bf10-45f3-8bf0-722b10b6c97f" />　<img width="60" alt="Google Cloud" src="https://github.com/user-attachments/assets/d6e64422-dd06-482b-90a9-e2eb1e8c3de5" />　<img width="60" alt="Azure" src="https://github.com/user-attachments/assets/5095c477-6f77-4cea-84b6-50eff8e61df4" /></p>
+  <p>for &nbsp; <a href="https://aws.amazon.com/"><img width="60" alt="AWS" src="https://github.com/user-attachments/assets/03a2fde5-bf10-45f3-8bf0-722b10b6c97f" /></a>　<a href="https://cloud.google.com/"><img width="60" alt="Google Cloud" src="https://github.com/user-attachments/assets/d6e64422-dd06-482b-90a9-e2eb1e8c3de5" /></a>　<a href="https://azure.microsoft.com/"><img width="60" alt="Azure" src="https://github.com/user-attachments/assets/5095c477-6f77-4cea-84b6-50eff8e61df4" /></a></p>
 
   [![Go Reference](https://pkg.go.dev/badge/github.com/mpyw/suve.svg)](https://pkg.go.dev/github.com/mpyw/suve)
   [![Test](https://github.com/mpyw/suve/actions/workflows/test.yml/badge.svg)](https://github.com/mpyw/suve/actions/workflows/test.yml)
