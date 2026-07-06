@@ -804,8 +804,10 @@ mise lint
 # Build CLI (without GUI)
 mise build
 
-# Build with GUI support
-go build -tags production -o bin/suve ./cmd/suve
+# Build with GUI support — builds the frontend first, then embeds it into
+# bin/suve. (A bare `go build -tags production` skips the frontend build, so the
+# binary aborts at `suve --gui` with "no index.html could be found".)
+mise build-gui
 
 # Run E2E tests (requires Docker)
 mise e2e

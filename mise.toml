@@ -127,6 +127,21 @@ go run github.com/wadey/gocovmerge@latest coverage-unit.out coverage-e2e.out > c
 go tool cover -func=coverage-all.out | grep total
 '''
 
+[tasks.build-gui]
+description = "Build the single CLI+GUI binary (bin/suve), embedding a freshly-built frontend"
+# A bare `go build -tags production ./cmd/suve` embeds internal/gui/frontend/dist
+# as-is, so without this frontend build the binary aborts at `suve --gui` with
+# 'no index.html could be found'. Linux/webkit2gtk-4.1 needs webkit2_41 — override
+# with SUVE_GUI_TAGS=production,webkit2_41.
+run = '''
+echo "Building the GUI frontend (embedded into the binary)…"
+(cd internal/gui/frontend && npm install && npm run build)
+tags="${SUVE_GUI_TAGS:-production}"
+echo "Building bin/suve (tags: $tags)…"
+CGO_ENABLED=1 go build -tags "$tags" -o bin/suve ./cmd/suve
+echo "Built bin/suve — run 'suve --gui'."
+'''
+
 [tasks.gui-dev]
 description = "Start the GUI development server"
 dir = "gui"
