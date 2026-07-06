@@ -121,6 +121,20 @@ test.describe('Provider selection', () => {
       await expect(page.locator('#param-type')).toHaveCount(0);
     });
 
+    test('App Configuration detail shows the value even though history is unsupported', async ({ page }) => {
+      // Regression: ParamLog fails on App Config (no history). The detail (value)
+      // must still render and no history-error banner must appear — the value
+      // fetch must not be coupled to the failing history fetch.
+      await setupWailsMocks(page, createAzureState());
+      await page.goto('/');
+      await waitForItemList(page);
+
+      await clickItemByName(page, 'app/config/key');
+      await expect(page.locator('.detail-panel')).toBeVisible();
+      await expect(page.locator('.value-display')).toBeVisible();
+      await expect(page.locator('.error-banner')).toHaveCount(0);
+    });
+
     test('Key Vault (secret): version history yes, Restore no', async ({ page }) => {
       await setupWailsMocks(page, createAzureState());
       await page.goto('/');
