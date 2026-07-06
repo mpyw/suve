@@ -21,8 +21,9 @@ import (
 // Command returns the "azure secret" subcommand group.
 func Command() *cli.Command {
 	return &cli.Command{
-		Name:  "secret",
-		Usage: "Interact with Azure Key Vault secrets",
+		Name:    "secret",
+		Aliases: []string{"kv", "keyvault"},
+		Usage:   "Interact with Azure Key Vault secrets",
 		Description: `Interact with Azure Key Vault secrets.
 
 Key Vault secrets are versioned by opaque ids (e.g. a 32-character hex string)

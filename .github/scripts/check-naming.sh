@@ -6,15 +6,18 @@
 #   - "gcloud"        CLI command group, package names, identifiers
 #   - "GoogleCloud"   Go provider identifier (provider.ProviderGoogleCloud)
 #
-# The only allowed occurrence is the third-party emulator image name
-# "gcp-secret-manager-emulator", which we do not control.
+# Two occurrences are allowed:
+#   - the third-party emulator image name "gcp-secret-manager-emulator",
+#     which we do not control;
+#   - any line carrying the inline marker "naming-allow-gcp", used to waive
+#     the ban at a single deliberate site (e.g. a user-facing CLI alias).
 set -euo pipefail
 
 cd "$(git rev-parse --show-toplevel)"
 
 # Word-boundary, case-insensitive match of "gcp" across tracked text files
 # (-I skips binary blobs). This script and the dependency manifests are excluded;
-# the allowlisted third-party image name is dropped afterwards.
+# the allowlisted third-party image name and marked lines are dropped afterwards.
 matches=$(
   git grep -nIwi 'gcp' -- \
     ':(exclude).github/scripts/check-naming.sh' \
@@ -22,7 +25,8 @@ matches=$(
     ':(exclude)go.mod' \
     ':(exclude)**/package-lock.json' \
     ':(exclude)**/*.lock' \
-    | { grep -vi 'gcp-secret-manager-emulator' || true; }
+    | { grep -vi 'gcp-secret-manager-emulator' || true; } \
+    | { grep -v 'naming-allow-gcp' || true; }
 )
 
 if [[ -n "${matches}" ]]; then

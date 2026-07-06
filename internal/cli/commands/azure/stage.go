@@ -70,8 +70,9 @@ func appConfigStageSubcommands(cfg stgcli.CommandConfig) []*cli.Command {
 // --vault-name flag and resolves it into the context for the scope resolver.
 func keyVaultStageGroup() *cli.Command {
 	return &cli.Command{
-		Name:  "secret",
-		Usage: "Staging operations for Azure Key Vault secrets",
+		Name:    "secret",
+		Aliases: []string{"kv", "keyvault"},
+		Usage:   "Staging operations for Azure Key Vault secrets",
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:    "vault-name",
@@ -91,8 +92,9 @@ func keyVaultStageGroup() *cli.Command {
 // owns the --store-name flag and resolves it into the context.
 func appConfigStageGroup() *cli.Command {
 	return &cli.Command{
-		Name:  "param",
-		Usage: "Staging operations for Azure App Configuration settings",
+		Name:    "param",
+		Aliases: []string{"appconfig", "ac", "appcfg"},
+		Usage:   "Staging operations for Azure App Configuration settings",
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:    "store-name",

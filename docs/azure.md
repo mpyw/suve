@@ -3,7 +3,7 @@
 [<- Back to README](../README.md) | [AWS Commands](aws.md) | [Google Cloud Commands](gcloud.md)
 
 > [!TIP]
-> Invoke as `suve azure secret` (Key Vault) and `suve azure param` (App Configuration). You can drop the `azure` prefix when Azure is the only active provider for that service — see [Provider selection](../README.md#provider-selection).
+> Invoke as `suve azure secret` (Key Vault; aliases `kv`, `keyvault`) and `suve azure param` (App Configuration; aliases `appconfig`, `ac`, `appcfg`); the group also answers to `az`, and `stage` to `stg`. You can drop the `azure` prefix when Azure is the only active provider for that service — see [Provider selection](../README.md#provider-selection).
 
 Azure splits into two services under `suve azure`:
 
