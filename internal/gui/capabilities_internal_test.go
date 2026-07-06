@@ -35,8 +35,8 @@ func findService(t *testing.T, caps []ProviderCapability, prov, service string) 
 
 // TestApp_Capabilities_StagingAndDeleteFlags pins the staging/delete capability
 // values that drive control visibility, so a stray edit to providers.go is
-// caught. Staging is AWS-only until #270; force-delete/recovery-window are AWS
-// Secrets Manager only.
+// caught. Staging is available for every provider service;
+// force-delete/recovery-window are AWS Secrets Manager only.
 func TestApp_Capabilities_StagingAndDeleteFlags(t *testing.T) {
 	t.Parallel()
 
@@ -50,7 +50,7 @@ func TestApp_Capabilities_StagingAndDeleteFlags(t *testing.T) {
 		hasRecoveryWindow bool
 		hasRestore        bool
 	}{
-		// Staging is now available for every provider service (#270); force-delete
+		// Staging is now available for every provider service; force-delete
 		// and recovery-window stay AWS Secrets Manager only.
 		{string(provider.ProviderAWS), "param", true, false, false, false},
 		{string(provider.ProviderAWS), "secret", true, true, true, true},
