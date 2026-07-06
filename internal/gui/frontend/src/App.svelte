@@ -52,7 +52,6 @@
       : allServices,
   );
   const hasAnyStaging = $derived(services.some((s) => s.hasStaging));
-  const isAWS = $derived(provider === 'aws');
 
   // Which provider the sidebar scope form is for, and its prefill values
   // (localStorage-cached last scope, else the backend's current scope).
@@ -209,10 +208,12 @@
       scopeReady = true;
       persistScope(sel);
       resetIdentity();
+      // AWS identity is AWS-only; the staging badge is scope-keyed for every
+      // provider (StagingStatus resolves the scope without STS off-AWS).
       if (sel.provider === 'aws') {
         await loadAWSIdentity();
-        await loadStagingCount();
       }
+      await loadStagingCount();
     } catch (e) {
       scopeError = parseError(e);
     }
@@ -244,7 +245,7 @@
   }
 
   function handleStagingChange() {
-    if (isAWS) loadStagingCount();
+    if (scopeReady) loadStagingCount();
   }
 
   async function loadAWSIdentity() {
@@ -303,7 +304,7 @@
             onstagingchange={handleStagingChange}
           />
         {:else if effectiveView === 'staging' && hasAnyStaging}
-          <StagingView oncountchange={handleStagingCountChange} />
+          <StagingView {services} oncountchange={handleStagingCountChange} />
         {/if}
       {/key}
     {:else if pendingProvider}

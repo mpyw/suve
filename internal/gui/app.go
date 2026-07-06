@@ -54,14 +54,6 @@ var (
 	errAzureScopeRequired = stringError("Azure requires a Key Vault name (for secrets) and/or an App Configuration store name (for parameters)")
 )
 
-// errStagingNonAWS is returned by every staging binding when the active scope is
-// not AWS. Staging in the GUI is AWS-only until scope-keyed multi-provider
-// staging lands (#270); the working store is resolved once via AWS STS and
-// cached, so applying it under a non-AWS scope would push AWS-staged entries
-// into the selected provider. The guard rejects that path before any network
-// call (no GetAWSIdentity), so selecting Google Cloud/Azure cannot corrupt data.
-var errStagingNonAWS = stringError("staging is only available for AWS (multi-provider staging is not yet supported)")
-
 // defaultScope is the initial read/write scope (AWS). The AWS factory builds
 // its SSM/Secrets Manager client from the ambient AWS config (region from
 // env/profile), so only the Provider field is needed.
@@ -90,9 +82,17 @@ type App struct {
 	scope   provider.Scope
 	scopeMu sync.RWMutex
 
-	// Staging store (the working staging area, backed by param.json/secret.json)
-	stagingStore   store.ReadWriteOperator
-	stagingStoreMu sync.Mutex // protects stagingStore initialization
+	// stagingStore, when non-nil, is returned by getStagingStore verbatim,
+	// bypassing scope resolution. It is a test seam (tests inject an in-memory
+	// store); production leaves it nil and uses stagingStores.
+	stagingStore store.ReadWriteOperator
+
+	// stagingStores holds the working staging areas (backed by
+	// param.json/secret.json), keyed by provider.Scope.Key() so each
+	// provider/scope has isolated staging state (matching the CLI's
+	// ~/.suve/staging/{scope.Key()} layout).
+	stagingStores  map[string]store.ReadWriteOperator
+	stagingStoreMu sync.Mutex // protects stagingStore + stagingStores
 }
 
 // NewApp creates a new App with the given initial provider. The initial
@@ -229,16 +229,31 @@ func selectionFromScope(s provider.Scope) *ScopeSelection {
 	}
 }
 
-// requireAWSStaging guards the staging bindings: it returns errStagingNonAWS
-// when the active scope is not AWS, before any network call. Every staging
-// binding calls this first so that selecting Google Cloud/Azure cannot apply
-// AWS-staged entries into another provider (see errStagingNonAWS).
-func (a *App) requireAWSStaging() error {
-	if a.currentScope().Provider != provider.ProviderAWS {
-		return errStagingNonAWS
+// stagingScope resolves the provider.Scope that keys on-disk staging state for
+// the active provider. It mirrors the CLI's ScopeResolvers: AWS is keyed by the
+// STS caller identity (account/region), while Google Cloud and Azure are keyed
+// purely from the already-selected scope (project / subscription+group+vault or
+// store) with no network call. Deriving the staging store AND the apply/diff
+// strategy from this one scope keeps them structurally in sync — the invariant
+// that replaces #276's interim non-AWS guard.
+func (a *App) stagingScope() (provider.Scope, error) {
+	sc := a.currentScope()
+	// Non-AWS scopes already carry their keying fields — no network call.
+	if sc.Provider != provider.ProviderAWS {
+		return sc, nil
+	}
+	// An AWS scope that already carries account+region (e.g. injected in tests)
+	// needs no STS round-trip.
+	if sc.AccountID != "" && sc.Region != "" {
+		return sc, nil
 	}
 
-	return nil
+	identity, err := infra.GetAWSIdentity(a.ctx)
+	if err != nil {
+		return provider.Scope{}, err
+	}
+
+	return provider.AWSScope(identity.AccountID, identity.Region), nil
 }
 
 // =============================================================================
@@ -269,31 +284,39 @@ func (a *App) secretStore() (provider.Store, error) {
 }
 
 func (a *App) getStagingStore() (store.ReadWriteOperator, error) {
-	// Reject non-AWS scopes before touching AWS STS or the cached store; the
-	// cached working store is keyed to the AWS identity it was built for, so
-	// serving it under a non-AWS scope is the corruption path we guard against.
-	if err := a.requireAWSStaging(); err != nil {
+	// Test seam: an injected store bypasses scope resolution (and any STS call).
+	a.stagingStoreMu.Lock()
+	if a.stagingStore != nil {
+		defer a.stagingStoreMu.Unlock()
+
+		return a.stagingStore, nil
+	}
+	a.stagingStoreMu.Unlock()
+
+	scope, err := a.stagingScope()
+	if err != nil {
 		return nil, err
 	}
+
+	key := scope.Key()
 
 	a.stagingStoreMu.Lock()
 	defer a.stagingStoreMu.Unlock()
 
-	if a.stagingStore != nil {
-		return a.stagingStore, nil
+	if s := a.stagingStores[key]; s != nil {
+		return s, nil
 	}
 
-	identity, err := infra.GetAWSIdentity(a.ctx)
+	s, err := file.NewWorkingStore(scope)
 	if err != nil {
 		return nil, err
 	}
 
-	s, err := file.NewWorkingStore(provider.AWSScope(identity.AccountID, identity.Region))
-	if err != nil {
-		return nil, err
+	if a.stagingStores == nil {
+		a.stagingStores = make(map[string]store.ReadWriteOperator)
 	}
 
-	a.stagingStore = s
+	a.stagingStores[key] = s
 
 	return s, nil
 }
@@ -309,27 +332,49 @@ func (a *App) getService(service string) (staging.Service, error) {
 	}
 }
 
+// getParser returns a store-less strategy used to interpret staged entries
+// (status/reset): the per-provider strategy so ServiceName/ItemName/delete-option
+// semantics match the active provider (e.g. Azure "App Configuration"/"setting",
+// no delete options). Selection is by the active provider + service.
 func (a *App) getParser(service string) (staging.Parser, error) {
 	switch service {
 	case string(staging.ServiceParam):
+		if a.currentScope().Provider == provider.ProviderAzure {
+			return &staging.AzureAppConfigParamStrategy{}, nil
+		}
+
 		return &staging.ParamStrategy{}, nil
 	case string(staging.ServiceSecret):
-		return &staging.SecretStrategy{}, nil
+		switch a.currentScope().Provider {
+		case provider.ProviderGoogleCloud:
+			return &staging.GoogleCloudSecretStrategy{}, nil
+		case provider.ProviderAzure:
+			return &staging.AzureKeyVaultSecretStrategy{}, nil
+		default:
+			return &staging.SecretStrategy{}, nil
+		}
 	default:
 		return nil, errInvalidService
 	}
 }
 
 // serviceStrategy builds the staging strategy for a service, wrapping a
-// provider.Store resolved through the registry. The returned *ParamStrategy /
-// *SecretStrategy satisfies every staging strategy interface (Edit, Delete,
-// Apply, Diff), so the typed getters below narrow it as needed.
+// provider.Store resolved through the registry for the ACTIVE provider. The
+// concrete strategy is provider-specific (AWS SSM/Secrets Manager, Google Cloud
+// Secret Manager, Azure Key Vault / App Configuration) and satisfies every
+// staging strategy interface, so the typed getters below narrow it as needed.
+// It shares the active scope with getStagingStore (see stagingScope), so a
+// staged entry can only ever apply to the provider it was staged against.
 func (a *App) serviceStrategy(service string) (staging.FullStrategy, error) {
 	switch service {
 	case string(staging.ServiceParam):
 		s, err := a.paramStore()
 		if err != nil {
 			return nil, err
+		}
+
+		if a.currentScope().Provider == provider.ProviderAzure {
+			return staging.NewAzureAppConfigParamStrategy(s), nil
 		}
 
 		return staging.NewParamStrategy(s), nil
@@ -339,7 +384,14 @@ func (a *App) serviceStrategy(service string) (staging.FullStrategy, error) {
 			return nil, err
 		}
 
-		return staging.NewSecretStrategy(s), nil
+		switch a.currentScope().Provider {
+		case provider.ProviderGoogleCloud:
+			return staging.NewGoogleCloudSecretStrategy(s), nil
+		case provider.ProviderAzure:
+			return staging.NewAzureKeyVaultSecretStrategy(s), nil
+		default:
+			return staging.NewSecretStrategy(s), nil
+		}
 	default:
 		return nil, errInvalidService
 	}

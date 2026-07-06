@@ -10,6 +10,9 @@
     entries: gui.StagingDiffEntry[];
     tagEntries: gui.StagingDiffTagEntry[];
     viewMode: 'diff' | 'value';
+    // Whether this service supports tags; when false (Azure App Configuration)
+    // the section renders no tag chips or "Add Tag" control.
+    hasTags?: boolean;
     onapply: () => void;
     onreset: () => void;
     onedit: (entry: gui.StagingDiffEntry) => void;
@@ -27,6 +30,7 @@
     entries,
     tagEntries,
     viewMode,
+    hasTags = true,
     onapply,
     onreset,
     onedit,
@@ -99,6 +103,7 @@
             </div>
           </div>
           <div class="entry-tags">
+            {#if hasTags}
             {#if tagEntry?.addTags && Object.keys(tagEntry.addTags).length > 0}
               <div class="tag-changes tag-add">
                 <span class="tag-label">+ Tags:</span>
@@ -123,6 +128,7 @@
             {/if}
             {#if entry.operation !== 'delete'}
               <button class="btn-add-tag" onclick={() => onaddtag(entry.name)}>+ Add Tag</button>
+            {/if}
             {/if}
           </div>
           {#if entry.operation === 'delete'}

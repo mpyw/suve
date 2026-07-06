@@ -249,7 +249,7 @@ export const defaultCapabilities: ProviderCapability[] = [
     displayName: 'Google Cloud',
     scopeFields: ['project'],
     services: [
-      { service: 'secret', displayName: 'Secret', hasVersionHistory: true, hasVersionSpecifiers: true, hasTags: true, hasRestore: false, hasStaging: false, hasForceDelete: false, hasRecoveryWindow: false },
+      { service: 'secret', displayName: 'Secret', hasVersionHistory: true, hasVersionSpecifiers: true, hasTags: true, hasRestore: false, hasStaging: true, hasForceDelete: false, hasRecoveryWindow: false },
     ],
   },
   {
@@ -257,8 +257,8 @@ export const defaultCapabilities: ProviderCapability[] = [
     displayName: 'Azure',
     scopeFields: ['subscription', 'resourceGroup'],
     services: [
-      { service: 'param', displayName: 'App Configuration', hasVersionHistory: false, hasVersionSpecifiers: false, hasTags: false, hasRestore: false, hasStaging: false, hasForceDelete: false, hasRecoveryWindow: false },
-      { service: 'secret', displayName: 'Key Vault', hasVersionHistory: true, hasVersionSpecifiers: true, hasTags: true, hasRestore: false, hasStaging: false, hasForceDelete: false, hasRecoveryWindow: false },
+      { service: 'param', displayName: 'App Configuration', hasVersionHistory: false, hasVersionSpecifiers: false, hasTags: false, hasRestore: false, hasStaging: true, hasForceDelete: false, hasRecoveryWindow: false },
+      { service: 'secret', displayName: 'Key Vault', hasVersionHistory: true, hasVersionSpecifiers: true, hasTags: true, hasRestore: false, hasStaging: true, hasForceDelete: false, hasRecoveryWindow: false },
     ],
   },
 ];
@@ -729,6 +729,31 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
     const calls: string[] = [];
     (window as any).__wailsCalls = calls;
 
+    // Per-provider staged buckets → staging is scope-isolated (the CLI keys
+    // on-disk state by provider.Scope.Key()). The initial flat state seeds the
+    // AWS bucket; other providers start empty. Every staging method reads/writes
+    // currentBucket(), so switching provider swaps the visible staged set.
+    const stagedBuckets: Record<string, {
+      param: StagedEntry[];
+      secret: StagedEntry[];
+      paramTags: StagedTagEntry[];
+      secretTags: StagedTagEntry[];
+    }> = {};
+    function currentBucket() {
+      const p = state.currentScope?.provider || 'aws';
+      if (!stagedBuckets[p]) {
+        stagedBuckets[p] = p === 'aws'
+          ? {
+              param: state.stagedParam,
+              secret: state.stagedSecret,
+              paramTags: state.stagedParamTags,
+              secretTags: state.stagedSecretTags,
+            }
+          : { param: [], secret: [], paramTags: [], secretTags: [] };
+      }
+      return stagedBuckets[p];
+    }
+
     const mockApp = {
       // Provider selection / capabilities (multi-cloud)
       DetectProviders: async () => state.detectResult,
@@ -1043,15 +1068,15 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
       StagingStatus: async () => {
         calls.push('StagingStatus');
         return {
-          param: state.stagedParam,
-          secret: state.stagedSecret,
-          paramTags: state.stagedParamTags,
-          secretTags: state.stagedSecretTags,
+          param: currentBucket().param,
+          secret: currentBucket().secret,
+          paramTags: currentBucket().paramTags,
+          secretTags: currentBucket().secretTags,
         };
       },
       StagingDiff: async (service: string, _passphrase?: string) => {
-        const staged = service === 'param' ? state.stagedParam : state.stagedSecret;
-        const tagStaged = service === 'param' ? state.stagedParamTags : state.stagedSecretTags;
+        const staged = service === 'param' ? currentBucket().param : currentBucket().secret;
+        const tagStaged = service === 'param' ? currentBucket().paramTags : currentBucket().secretTags;
         return {
           itemName: service === 'param' ? 'parameter' : 'secret',
           entries: staged.map((s: any) => ({
@@ -1072,16 +1097,16 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
         };
       },
       StagingApply: async (service: string) => {
-        const staged = service === 'param' ? state.stagedParam : state.stagedSecret;
-        const tagStaged = service === 'param' ? state.stagedParamTags : state.stagedSecretTags;
+        const staged = service === 'param' ? currentBucket().param : currentBucket().secret;
+        const tagStaged = service === 'param' ? currentBucket().paramTags : currentBucket().secretTags;
         const entryCount = staged.length;
         const tagCount = tagStaged.length;
         if (service === 'param') {
-          state.stagedParam = [];
-          state.stagedParamTags = [];
+          currentBucket().param = [];
+          currentBucket().paramTags = [];
         } else {
-          state.stagedSecret = [];
-          state.stagedSecretTags = [];
+          currentBucket().secret = [];
+          currentBucket().secretTags = [];
         }
         return {
           serviceName: service,
@@ -1096,24 +1121,24 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
       },
       StagingReset: async (service: string) => {
         if (service === 'param') {
-          const count = state.stagedParam.length + state.stagedParamTags.length;
-          state.stagedParam = [];
-          state.stagedParamTags = [];
+          const count = currentBucket().param.length + currentBucket().paramTags.length;
+          currentBucket().param = [];
+          currentBucket().paramTags = [];
           return { type: 'all', serviceName: 'param', count };
         } else {
-          const count = state.stagedSecret.length + state.stagedSecretTags.length;
-          state.stagedSecret = [];
-          state.stagedSecretTags = [];
+          const count = currentBucket().secret.length + currentBucket().secretTags.length;
+          currentBucket().secret = [];
+          currentBucket().secretTags = [];
           return { type: 'all', serviceName: 'secret', count };
         }
       },
       StagingAdd: async (service: string, name: string, value: string) => {
-        const staged = service === 'param' ? state.stagedParam : state.stagedSecret;
+        const staged = service === 'param' ? currentBucket().param : currentBucket().secret;
         staged.push({ name, operation: 'create', value });
         return { name };
       },
       StagingEdit: async (service: string, name: string, value: string) => {
-        const staged = service === 'param' ? state.stagedParam : state.stagedSecret;
+        const staged = service === 'param' ? currentBucket().param : currentBucket().secret;
         const existing = staged.find((s: any) => s.name === name);
         if (existing) {
           existing.value = value;
@@ -1123,22 +1148,22 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
         return { name };
       },
       StagingDelete: async (service: string, name: string, _keepCurrentValue?: boolean, _currentVersion?: number) => {
-        const staged = service === 'param' ? state.stagedParam : state.stagedSecret;
+        const staged = service === 'param' ? currentBucket().param : currentBucket().secret;
         staged.push({ name, operation: 'delete' });
         return { name };
       },
       StagingUnstage: async (service: string, name: string) => {
         if (service === 'param') {
-          state.stagedParam = state.stagedParam.filter((s: any) => s.name !== name);
-          state.stagedParamTags = state.stagedParamTags.filter((s: any) => s.name !== name);
+          currentBucket().param = currentBucket().param.filter((s: any) => s.name !== name);
+          currentBucket().paramTags = currentBucket().paramTags.filter((s: any) => s.name !== name);
         } else {
-          state.stagedSecret = state.stagedSecret.filter((s: any) => s.name !== name);
-          state.stagedSecretTags = state.stagedSecretTags.filter((s: any) => s.name !== name);
+          currentBucket().secret = currentBucket().secret.filter((s: any) => s.name !== name);
+          currentBucket().secretTags = currentBucket().secretTags.filter((s: any) => s.name !== name);
         }
         return { name };
       },
       StagingAddTag: async (service: string, name: string, key: string, value: string) => {
-        const tagStaged = service === 'param' ? state.stagedParamTags : state.stagedSecretTags;
+        const tagStaged = service === 'param' ? currentBucket().paramTags : currentBucket().secretTags;
         let entry = tagStaged.find((t: any) => t.name === name);
         if (!entry) {
           entry = { name, addTags: {}, removeTags: {} };
@@ -1148,7 +1173,7 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
         return { name };
       },
       StagingRemoveTag: async (service: string, name: string, key: string) => {
-        const tagStaged = service === 'param' ? state.stagedParamTags : state.stagedSecretTags;
+        const tagStaged = service === 'param' ? currentBucket().paramTags : currentBucket().secretTags;
         let entry = tagStaged.find((t: any) => t.name === name);
         if (!entry) {
           entry = { name, addTags: {}, removeTags: {} };
@@ -1158,7 +1183,7 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
         return { name };
       },
       StagingCancelAddTag: async (service: string, name: string, key: string) => {
-        const tagStaged = service === 'param' ? state.stagedParamTags : state.stagedSecretTags;
+        const tagStaged = service === 'param' ? currentBucket().paramTags : currentBucket().secretTags;
         const entry = tagStaged.find((t: any) => t.name === name);
         if (entry) {
           delete entry.addTags[key];
@@ -1166,7 +1191,7 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
         return { name };
       },
       StagingCancelRemoveTag: async (service: string, name: string, key: string) => {
-        const tagStaged = service === 'param' ? state.stagedParamTags : state.stagedSecretTags;
+        const tagStaged = service === 'param' ? currentBucket().paramTags : currentBucket().secretTags;
         const entry = tagStaged.find((t: any) => t.name === name);
         if (entry) {
           delete entry.removeTags[key];
@@ -1184,8 +1209,8 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
           throw new Error(state.simulateError.message);
         }
         // Count entries and tags to persist
-        const entryCount = state.stagedParam.length + state.stagedSecret.length;
-        const tagCount = state.stagedParamTags.length + state.stagedSecretTags.length;
+        const entryCount = currentBucket().param.length + currentBucket().secret.length;
+        const tagCount = currentBucket().paramTags.length + currentBucket().secretTags.length;
 
         if (entryCount === 0 && tagCount === 0) {
           throw new Error('nothing to stash');
@@ -1193,10 +1218,10 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
 
         // Tag each entry/tag with its originating service so drain can route
         // without inferring from the name shape (which fails for Google Cloud/Azure).
-        const persistParamEntries = state.stagedParam.map((e: any) => ({ ...e, service: 'param' }));
-        const persistSecretEntries = state.stagedSecret.map((e: any) => ({ ...e, service: 'secret' }));
-        const persistParamTags = state.stagedParamTags.map((t: any) => ({ ...t, service: 'param' }));
-        const persistSecretTags = state.stagedSecretTags.map((t: any) => ({ ...t, service: 'secret' }));
+        const persistParamEntries = currentBucket().param.map((e: any) => ({ ...e, service: 'param' }));
+        const persistSecretEntries = currentBucket().secret.map((e: any) => ({ ...e, service: 'secret' }));
+        const persistParamTags = currentBucket().paramTags.map((t: any) => ({ ...t, service: 'param' }));
+        const persistSecretTags = currentBucket().secretTags.map((t: any) => ({ ...t, service: 'secret' }));
 
         // Merge or overwrite file based on mode
         if (mode === 'merge' && state.stashFile.exists) {
@@ -1215,10 +1240,10 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
 
         // Clear agent memory unless keep=true
         if (!keep) {
-          state.stagedParam = [];
-          state.stagedSecret = [];
-          state.stagedParamTags = [];
-          state.stagedSecretTags = [];
+          currentBucket().param = [];
+          currentBucket().secret = [];
+          currentBucket().paramTags = [];
+          currentBucket().secretTags = [];
         }
 
         return { entryCount, tagCount };
@@ -1238,8 +1263,8 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
         }
 
         // Check if agent has existing changes
-        const agentHasChanges = state.stagedParam.length > 0 || state.stagedSecret.length > 0 ||
-                               state.stagedParamTags.length > 0 || state.stagedSecretTags.length > 0;
+        const agentHasChanges = currentBucket().param.length > 0 || currentBucket().secret.length > 0 ||
+                               currentBucket().paramTags.length > 0 || currentBucket().secretTags.length > 0;
 
         const fileEntries = state.stashFile.entries;
         const fileTags = state.stashFile.tags;
@@ -1254,17 +1279,17 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
         let merged = false;
         if (mode === 'merge' && agentHasChanges) {
           // Merge: combine file with agent
-          state.stagedParam = [...state.stagedParam, ...fileEntries.filter(isParam)];
-          state.stagedSecret = [...state.stagedSecret, ...fileEntries.filter((e: any) => !isParam(e))];
-          state.stagedParamTags = [...state.stagedParamTags, ...fileTags.filter(isParam)];
-          state.stagedSecretTags = [...state.stagedSecretTags, ...fileTags.filter((t: any) => !isParam(t))];
+          currentBucket().param = [...currentBucket().param, ...fileEntries.filter(isParam)];
+          currentBucket().secret = [...currentBucket().secret, ...fileEntries.filter((e: any) => !isParam(e))];
+          currentBucket().paramTags = [...currentBucket().paramTags, ...fileTags.filter(isParam)];
+          currentBucket().secretTags = [...currentBucket().secretTags, ...fileTags.filter((t: any) => !isParam(t))];
           merged = true;
         } else {
           // Overwrite: replace agent with file
-          state.stagedParam = fileEntries.filter(isParam);
-          state.stagedSecret = fileEntries.filter((e: any) => !isParam(e));
-          state.stagedParamTags = fileTags.filter(isParam);
-          state.stagedSecretTags = fileTags.filter((t: any) => !isParam(t));
+          currentBucket().param = fileEntries.filter(isParam);
+          currentBucket().secret = fileEntries.filter((e: any) => !isParam(e));
+          currentBucket().paramTags = fileTags.filter(isParam);
+          currentBucket().secretTags = fileTags.filter((t: any) => !isParam(t));
         }
 
         // Delete file unless keep=true
@@ -1295,8 +1320,8 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
         return { dropped: true };
       },
       StagingCheckStatus: async (service: string, name: string) => {
-        const staged = service === 'param' ? state.stagedParam : state.stagedSecret;
-        const tagStaged = service === 'param' ? state.stagedParamTags : state.stagedSecretTags;
+        const staged = service === 'param' ? currentBucket().param : currentBucket().secret;
+        const tagStaged = service === 'param' ? currentBucket().paramTags : currentBucket().secretTags;
         const hasEntry = staged.some((s: any) => s.name === name);
         const hasTags = tagStaged.some((t: any) => t.name === name);
         return { hasEntry, hasTags };

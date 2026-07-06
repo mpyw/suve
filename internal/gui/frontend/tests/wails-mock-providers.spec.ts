@@ -32,7 +32,8 @@ test.describe('wails-mock provider bindings', () => {
     expect(awsSecret.hasStaging).toBe(true);
     expect(awsSecret.hasRecoveryWindow).toBe(true);
     const gcloudSecret = result.caps[1].services[0];
-    expect(gcloudSecret.hasStaging).toBe(false);
+    expect(gcloudSecret.hasStaging).toBe(true); // multi-provider staging (#270)
+    expect(gcloudSecret.hasForceDelete).toBe(false); // force-delete stays AWS-only
     expect(result.types).toContain('SecureString');
   });
 

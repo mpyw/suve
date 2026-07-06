@@ -50,11 +50,13 @@ func TestApp_Capabilities_StagingAndDeleteFlags(t *testing.T) {
 		hasRecoveryWindow bool
 		hasRestore        bool
 	}{
+		// Staging is now available for every provider service (#270); force-delete
+		// and recovery-window stay AWS Secrets Manager only.
 		{string(provider.ProviderAWS), "param", true, false, false, false},
 		{string(provider.ProviderAWS), "secret", true, true, true, true},
-		{string(provider.ProviderGoogleCloud), "secret", false, false, false, false},
-		{string(provider.ProviderAzure), "param", false, false, false, false},
-		{string(provider.ProviderAzure), "secret", false, false, false, false},
+		{string(provider.ProviderGoogleCloud), "secret", true, false, false, false},
+		{string(provider.ProviderAzure), "param", true, false, false, false},
+		{string(provider.ProviderAzure), "secret", true, false, false, false},
 	}
 
 	for _, tt := range tests {
@@ -70,15 +72,18 @@ func TestApp_Capabilities_StagingAndDeleteFlags(t *testing.T) {
 	}
 }
 
-// TestApp_Capabilities_OnlyAWSHasStaging is a stronger invariant: no non-AWS
-// service may advertise staging until multi-provider staging lands.
-func TestApp_Capabilities_OnlyAWSHasStaging(t *testing.T) {
+// TestApp_Capabilities_DeleteOptionsAWSOnly pins the remaining AWS-only
+// invariant: force-delete and recovery-window are Secrets Manager features, so
+// no other provider/service may advertise them even though they now stage.
+func TestApp_Capabilities_DeleteOptionsAWSOnly(t *testing.T) {
 	t.Parallel()
 
 	for _, p := range (&App{}).Capabilities() {
 		for _, s := range p.Services {
-			if p.Provider != string(provider.ProviderAWS) {
-				assert.False(t, s.HasStaging, "%s/%s must not have staging", p.Provider, s.Service)
+			isAWSSecret := p.Provider == string(provider.ProviderAWS) && s.Service == "secret"
+			if !isAWSSecret {
+				assert.False(t, s.HasForceDelete, "%s/%s must not have force-delete", p.Provider, s.Service)
+				assert.False(t, s.HasRecoveryWindow, "%s/%s must not have a recovery window", p.Provider, s.Service)
 			}
 		}
 	}
