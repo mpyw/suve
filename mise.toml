@@ -16,3 +16,165 @@ golangci-lint = "2.11.4"
 goreleaser = "2"
 nfpm = "2.41.1"
 "go:github.com/wailsapp/wails/v2/cmd/wails" = "2.11.0"
+
+# =============================================================================
+# Tasks (run with `mise run <task>`, or `mise <task>` — no name collides with a
+# mise subcommand). List them with `mise tasks`.
+#
+# GUI tasks invoke `wails` directly: mise puts the pinned wails/node/go on PATH
+# for the task, so versions match the bindings regardless of the ambient shell.
+# =============================================================================
+
+[tasks.build]
+description = "Build the CLI binary"
+run = "go build -o bin/suve ./cmd/suve"
+
+[tasks.test]
+description = "Run unit tests (excludes GUI + cmd)"
+run = "go test $(go list ./... | grep -v internal/gui | grep -v /cmd/)"
+
+[tasks.lint]
+description = "Run golangci-lint on the host OS with all build tags"
+# GOHOSTOS is the build host's OS regardless of any ambient GOOS, matching the
+# old Makefile's uname-based host detection.
+run = "GOOS=$(go env GOHOSTOS) golangci-lint run --build-tags=e2e,production ./..."
+
+[tasks.e2e]
+description = "Run E2E tests against localstack (starts the AWS emulator)"
+run = '''
+port="${SUVE_LOCALSTACK_EXTERNAL_PORT:-4566}"
+SUVE_LOCALSTACK_EXTERNAL_PORT="$port" docker compose --profile aws up -d localstack
+echo "Waiting for localstack to be ready on port $port..."
+until curl -sf "http://127.0.0.1:$port/_localstack/health" > /dev/null 2>&1; do sleep 1; done
+echo "localstack is ready"
+SUVE_LOCALSTACK_EXTERNAL_PORT="$port" go test -tags=e2e -v ./e2e/...
+'''
+
+[tasks.e2e-gcloud]
+description = "Run Google Cloud Secret Manager E2E tests (starts the emulator)"
+shell = "bash -c"
+run = '''
+port="${SUVE_GCLOUD_EMULATOR_PORT:-9090}"
+SUVE_GCLOUD_EMULATOR_PORT="$port" docker compose --profile gcloud up -d gcloud-secretmanager
+echo "Waiting for the Google Cloud Secret Manager emulator on port $port..."
+until bash -c "echo > /dev/tcp/127.0.0.1/$port" 2>/dev/null; do sleep 1; done
+echo "emulator is ready"
+SUVE_GCLOUD_SECRETMANAGER_ENDPOINT="127.0.0.1:$port" go test -tags=e2e -v -run TestGoogleCloud ./e2e/...
+'''
+
+[tasks.e2e-azure-appconfig]
+description = "Run Azure App Configuration E2E tests (starts the emulator)"
+shell = "bash -c"
+run = '''
+port="${SUVE_AZURE_APPCONFIG_PORT:-8080}"
+SUVE_AZURE_APPCONFIG_PORT="$port" docker compose --profile azure up -d azure-appconfig
+echo "Waiting for the Azure App Configuration emulator on port $port..."
+until bash -c "echo > /dev/tcp/127.0.0.1/$port" 2>/dev/null; do sleep 1; done
+echo "emulator is ready"
+SUVE_AZURE_APPCONFIG_CONNECTION_STRING="Endpoint=http://127.0.0.1:$port;Id=abcd;Secret=c2VjcmV0" go test -tags=e2e -v -run TestAzureAppConfig ./e2e/...
+'''
+
+[tasks.e2e-azure-keyvault]
+description = "Run Azure Key Vault E2E tests (starts the lowkey-vault emulator)"
+run = '''
+port="${SUVE_AZURE_KEYVAULT_PORT:-8443}"
+SUVE_AZURE_KEYVAULT_PORT="$port" docker compose --profile azure up -d azure-keyvault
+echo "Waiting for the Key Vault emulator on port $port..."
+until curl -sk -o /dev/null "https://127.0.0.1:$port/ping" 2>/dev/null; do sleep 1; done
+echo "emulator is ready"
+SUVE_AZURE_KEYVAULT_ENDPOINT="https://127.0.0.1:$port" go test -tags=e2e -v -run TestAzureKeyVault ./e2e/...
+'''
+
+[tasks.clean]
+description = "Remove build artifacts and stop containers (incl. volumes)"
+run = '''
+rm -rf bin/ *.out
+docker compose down -v 2>/dev/null || true
+'''
+
+[tasks.coverage]
+description = "Run unit tests with coverage"
+run = '''
+coverpkg=$(go list ./... | grep -v testutil | grep -v /e2e | grep -v internal/gui | grep -v /cmd/ | tr '\n' ',')
+go test -coverprofile=coverage.out -coverpkg="$coverpkg" $(go list ./... | grep -v internal/gui | grep -v /cmd/)
+go tool cover -func=coverage.out | grep total
+'''
+
+[tasks.coverage-e2e]
+description = "Run E2E tests with coverage (starts the AWS emulator)"
+run = '''
+port="${SUVE_LOCALSTACK_EXTERNAL_PORT:-4566}"
+SUVE_LOCALSTACK_EXTERNAL_PORT="$port" docker compose --profile aws up -d localstack
+until curl -sf "http://127.0.0.1:$port/_localstack/health" > /dev/null 2>&1; do sleep 1; done
+coverpkg=$(go list ./... | grep -v testutil | grep -v /e2e | grep -v internal/gui | grep -v /cmd/ | tr '\n' ',')
+SUVE_LOCALSTACK_EXTERNAL_PORT="$port" go test -tags=e2e -coverprofile=coverage-e2e.out -coverpkg="$coverpkg" ./e2e/...
+go tool cover -func=coverage-e2e.out | grep total
+'''
+
+[tasks.coverage-all]
+description = "Run unit + E2E tests and report merged coverage (starts the AWS emulator)"
+run = '''
+port="${SUVE_LOCALSTACK_EXTERNAL_PORT:-4566}"
+SUVE_LOCALSTACK_EXTERNAL_PORT="$port" docker compose --profile aws up -d localstack
+until curl -sf "http://127.0.0.1:$port/_localstack/health" > /dev/null 2>&1; do sleep 1; done
+coverpkg=$(go list ./... | grep -v testutil | grep -v /e2e | grep -v internal/gui | grep -v /cmd/ | tr '\n' ',')
+echo "Running unit tests with coverage..."
+go test -coverprofile=coverage-unit.out -covermode=atomic -coverpkg="$coverpkg" $(go list ./... | grep -v internal/gui | grep -v /cmd/)
+echo "Running E2E tests with coverage..."
+SUVE_LOCALSTACK_EXTERNAL_PORT="$port" go test -tags=e2e -coverprofile=coverage-e2e.out -covermode=atomic -coverpkg="$coverpkg" ./e2e/...
+echo "Merging coverage profiles..."
+go run github.com/wadey/gocovmerge@latest coverage-unit.out coverage-e2e.out > coverage-all.out
+go tool cover -func=coverage-all.out | grep total
+'''
+
+[tasks.build-gui]
+description = "Build the single CLI+GUI binary (bin/suve), embedding a freshly-built frontend"
+# A bare `go build -tags production ./cmd/suve` embeds internal/gui/frontend/dist
+# as-is, so without this frontend build the binary aborts at `suve --gui` with
+# 'no index.html could be found'. Linux/webkit2gtk-4.1 needs webkit2_41 — override
+# with SUVE_GUI_TAGS=production,webkit2_41.
+run = '''
+echo "Building the GUI frontend (embedded into the binary)…"
+(cd internal/gui/frontend && npm install && npm run build)
+tags="${SUVE_GUI_TAGS:-production}"
+echo "Building bin/suve (tags: $tags)…"
+CGO_ENABLED=1 go build -tags "$tags" -o bin/suve ./cmd/suve
+echo "Built bin/suve — run 'suve --gui'."
+'''
+
+[tasks.gui-dev]
+description = "Start the GUI development server"
+dir = "gui"
+run = "wails dev -skipbindings -tags dev"
+
+[tasks.gui-build]
+description = "Build the GUI for production"
+dir = "gui"
+run = "wails build -tags production -skipbindings"
+
+[tasks.gui-bindings]
+description = "Regenerate the GUI wailsjs bindings"
+run = '''
+echo "Temporarily removing build constraints..."
+find gui internal/gui -name '*.go' -exec sed -i.bak 's|^//go:build.*||' {} \;
+echo "Generating bindings..."
+(cd gui && timeout 30 wails dev -tags dev 2>&1 | head -30) || true
+echo "Restoring build constraints..."
+find gui internal/gui -name '*.go.bak' -exec sh -c 'mv "$1" "${1%.bak}"' _ {} \;
+echo "Done. Check internal/gui/frontend/wailsjs/go/ for updated bindings."
+'''
+
+# Linux GUI test environment (requires XQuartz on macOS).
+[tasks.x11-setup]
+description = "Allow local X11 connections for the Linux GUI containers"
+run = "xhost +localhost 2>/dev/null || true"
+
+[tasks.ubuntu-22]
+description = "Start the Ubuntu 22.04 desktop (webkit2gtk-4.0, requires XQuartz)"
+depends = ["x11-setup"]
+run = "HOST_DISPLAY=host.docker.internal:0 docker compose --profile ubuntu-22 run --rm ubuntu-22"
+
+[tasks.ubuntu-24]
+description = "Start the Ubuntu 24.04 desktop (webkit2gtk-4.1, requires XQuartz)"
+depends = ["x11-setup"]
+run = "HOST_DISPLAY=host.docker.internal:0 docker compose --profile ubuntu-24 run --rm ubuntu-24"

@@ -29,13 +29,13 @@ build/: Build assets (icons, Info.plist, etc.)
 
 ```bash
 # Start Wails dev server (hot reload at http://localhost:34115)
-make gui-dev
+mise gui-dev
 
 # Build standalone GUI binary
-make gui-build
+mise gui-build
 
 # Regenerate TypeScript bindings after changing Go backend
-make gui-bindings
+mise gui-bindings
 ```
 
 ## Relationship to internal/gui
