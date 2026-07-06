@@ -24,7 +24,7 @@ echo "=== Setting up demo environment ==="
 # Build suve if needed
 if [[ ! -f bin/suve ]]; then
     echo "Building suve..."
-    make build
+    mise build
 fi
 
 # Reset LocalStack (clean slate)

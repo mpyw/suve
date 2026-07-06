@@ -137,7 +137,7 @@ cd suve
 **CLI only:**
 
 ```bash
-make build
+mise build
 # Binary: bin/suve
 ```
 
@@ -796,22 +796,22 @@ suve uses standard AWS SDK configuration:
 
 ```bash
 # Run tests
-make test
+mise test
 
 # Run linter
-make lint
+mise lint
 
 # Build CLI (without GUI)
-make build
+mise build
 
 # Build with GUI support
 go build -tags production -o bin/suve ./cmd/suve
 
 # Run E2E tests (requires Docker)
-make e2e
+mise e2e
 
 # Coverage (unit + E2E combined)
-make coverage-all
+mise coverage-all
 ```
 
 ### Local Development with Localstack

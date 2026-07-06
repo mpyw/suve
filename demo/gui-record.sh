@@ -42,7 +42,7 @@ echo "=== Setting up demo environment ==="
 # Build suve if needed
 if [[ ! -f bin/suve ]]; then
     echo "Building suve..."
-    make build
+    mise build
 fi
 
 # Reset LocalStack (clean slate)
@@ -87,7 +87,7 @@ echo "Starting staging agent manually..."
 # Start daemon (auto-backgrounds via launcher)
 "$PROJECT_DIR/bin/suve" stage agent start
 
-# Start wails dev in background (same as make gui-dev)
+# Start wails dev in background (same as mise gui-dev)
 cd "$GUI_DIR"
 wails dev -skipbindings -tags dev &
 WAILS_PID=$!

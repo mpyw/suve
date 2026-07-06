@@ -14,9 +14,9 @@
 
 ## Checklist
 
-- [ ] Tests pass (`make test`)
-- [ ] Linter passes (`make lint`)
-- [ ] E2E tests pass if applicable (`make e2e`)
+- [ ] Tests pass (`mise test`)
+- [ ] Linter passes (`mise lint`)
+- [ ] E2E tests pass if applicable (`mise e2e`)
 - [ ] Documentation updated if needed
 - [ ] Breaking changes are documented
 

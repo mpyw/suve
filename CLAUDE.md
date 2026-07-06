@@ -163,7 +163,7 @@ suve/
 ├── .github/workflows/
 │   └── test.yml                  # CI: test + lint on push/PR
 │
-└── Makefile                      # build, test, lint, e2e, gui-dev/gui-build/gui-bindings, up, down
+└── mise.toml                     # toolchain + tasks: build, test, lint, e2e, gui-dev/gui-build/gui-bindings, up, down (run via `mise <task>` / `mise run <task>`)
 ```
 
 ### Key Design Patterns
@@ -179,26 +179,26 @@ suve/
 
 ```bash
 # Run tests
-make test
+mise test
 
 # Run linter
-make lint
+mise lint
 
 # Build CLI
-make build
+mise build
 
 # E2E tests with localstack
-make up      # Start localstack
-make e2e     # Run E2E tests
-make down    # Stop localstack
+mise up      # Start localstack
+mise e2e     # Run E2E tests
+mise down    # Stop localstack
 
 # Coverage
-make coverage
+mise coverage
 
 # GUI development (requires Wails)
-make gui-dev      # Run GUI in dev mode
-make gui-build    # Build GUI binary
-make gui-bindings # Regenerate GUI bindings
+mise gui-dev      # Run GUI in dev mode
+mise gui-build    # Build GUI binary
+mise gui-bindings # Regenerate GUI bindings
 ```
 
 ## Testing Strategy
@@ -212,16 +212,16 @@ make gui-bindings # Regenerate GUI bindings
 
 ```bash
 # Start localstack (SSM service)
-make up
+mise up
 
 # Run E2E tests
-make e2e
+mise e2e
 
 # Or with custom port
-SUVE_LOCALSTACK_EXTERNAL_PORT=4599 make e2e
+SUVE_LOCALSTACK_EXTERNAL_PORT=4599 mise e2e
 
 # Stop localstack
-make down
+mise down
 ```
 
 ### Running GUI Tests
@@ -242,6 +242,6 @@ npm run test:ui     # Run with UI mode
 
 ## Refactoring Guidelines
 
-1. **Tests must pass**: Run `make test` after changes
-2. **Lint must pass**: Run `make lint` after changes
-3. **E2E tests**: Run `make e2e` for command behavior changes (optional, requires Docker)
+1. **Tests must pass**: Run `mise test` after changes
+2. **Lint must pass**: Run `mise lint` after changes
+3. **E2E tests**: Run `mise e2e` for command behavior changes (optional, requires Docker)
