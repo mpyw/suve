@@ -47,13 +47,14 @@ test.describe('Provider selection', () => {
   });
 
   test.describe('Google Cloud', () => {
-    test('no Param tab, no Staging tab; secret view active', async ({ page }) => {
+    test('no Param tab; Secret + Staging tabs; secret view active', async ({ page }) => {
       await setupWailsMocks(page, createGoogleCloudState());
       await page.goto('/');
       await waitForItemList(page);
 
       await expect(nav(page).getByRole('button', { name: /Param/i })).toHaveCount(0);
-      await expect(nav(page).getByRole('button', { name: /Staging/i })).toHaveCount(0);
+      // Google Cloud secret staging is available (#270).
+      await expect(nav(page).getByRole('button', { name: /Staging/i })).toBeVisible();
       const secretTab = nav(page).getByRole('button', { name: /Secret/i });
       await expect(secretTab).toBeVisible();
       await expect(secretTab).toHaveClass(/active/);
@@ -68,17 +69,18 @@ test.describe('Provider selection', () => {
       await expect(page.locator('.aws-info-profile')).toHaveCount(0);
     });
 
-    test('no GetAWSIdentity / StagingStatus calls under a Google Cloud scope', async ({ page }) => {
+    test('no GetAWSIdentity (STS) call under a Google Cloud scope', async ({ page }) => {
       await setupWailsMocks(page, createGoogleCloudState());
       await page.goto('/');
       await waitForItemList(page);
 
+      // Staging is now multi-provider, so StagingStatus may run under Google
+      // Cloud — but it must resolve the scope without any AWS STS round-trip.
       const calls = await getRecordedCalls(page);
       expect(calls).not.toContain('GetAWSIdentity');
-      expect(calls).not.toContain('StagingStatus');
     });
 
-    test('secret detail: no Restore, no staging banner (capability-gated)', async ({ page }) => {
+    test('secret detail: no Restore, no ARN (capability/presence-gated)', async ({ page }) => {
       await setupWailsMocks(page, createGoogleCloudState());
       await page.goto('/');
       await waitForItemList(page);
@@ -88,7 +90,6 @@ test.describe('Provider selection', () => {
 
       await clickItemByName(page, 'gcloud-secret-1');
       await expect(page.locator('.detail-panel')).toBeVisible();
-      await expect(page.locator('.staging-banner')).toHaveCount(0);
       // No ARN section (empty arn) — presence-gated (#268).
       await expect(page.locator('.arn-display')).toHaveCount(0);
     });
@@ -154,7 +155,7 @@ test.describe('Provider selection', () => {
       await expect(nav(page).getByRole('button', { name: /Param/i })).toHaveCount(0);
     });
 
-    test('staging badge resets when switching to a non-AWS provider', async ({ page }) => {
+    test('staging badge is scope-keyed (AWS count does not leak to Google Cloud)', async ({ page }) => {
       await setupWailsMocks(page, createStagedForPushState());
       await page.goto('/');
       await waitForItemList(page);
@@ -167,7 +168,7 @@ test.describe('Provider selection', () => {
       await page.getByRole('button', { name: 'Connect' }).click();
       await waitForItemList(page);
 
-      // No Staging tab (and hence no badge) under Google Cloud.
+      // Google Cloud has its own (empty) staging set → no badge (AWS count gone).
       await expect(page.locator('.staging-count')).toHaveCount(0);
     });
   });

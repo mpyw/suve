@@ -10,10 +10,18 @@
   import './common.css';
 
   interface Props {
+    services?: gui.ServiceCapability[];
     oncountchange?: (count: number) => void;
   }
 
-  let { oncountchange }: Props = $props();
+  let { services = [], oncountchange }: Props = $props();
+
+  // Only render/fetch sections for services the active provider offers (Google
+  // Cloud has no param); headings use the capability display names.
+  const paramSvc = $derived(services.find((s) => s.service === 'param') ?? null);
+  const secretSvc = $derived(services.find((s) => s.service === 'secret') ?? null);
+  const paramLabel = $derived(paramSvc?.displayName ?? 'Parameters');
+  const secretLabel = $derived(secretSvc?.displayName ?? 'Secrets');
 
   let loading = $state(false);
   let error = $state('');
@@ -84,8 +92,8 @@
     try {
       // Load diff data and file status in parallel
       const [paramResult, secretResult, fileStatusResult] = await Promise.all([
-        withRetry(() => StagingDiff('param', '')),
-        withRetry(() => StagingDiff('secret', '')),
+        paramSvc ? withRetry(() => StagingDiff('param', '')) : Promise.resolve(null),
+        secretSvc ? withRetry(() => StagingDiff('secret', '')) : Promise.resolve(null),
         StagingFileStatus().catch(() => null) // Don't fail if file status check fails
       ]);
       paramEntries = paramResult?.entries?.filter(e => e.type !== 'autoUnstaged') || [];
@@ -164,7 +172,7 @@
   }
 
   function getServiceName(service: string): string {
-    return service === 'param' ? 'Parameters' : 'Secrets';
+    return service === 'param' ? paramLabel : secretLabel;
   }
 
   // Edit modal
@@ -450,39 +458,45 @@
   {/if}
 
   <div class="staging-content">
-    <StagingSection
-      icon="P"
-      title="Parameters"
-      emptyText="No staged parameter changes"
-      entries={paramEntries}
-      tagEntries={paramTagEntries}
-      {viewMode}
-      onapply={() => openApplyModal('param')}
-      onreset={() => openResetModal('param')}
-      onedit={(entry) => openEditModal('param', entry)}
-      onunstage={(name) => handleUnstage('param', name)}
-      onaddtag={(entryName) => openAddTagModal('param', entryName)}
-      onedittag={(entryName, key, value) => openEditTagModal('param', entryName, key, value)}
-      onremovetag={(entryName, key) => handleRemoveTag('param', entryName, key)}
-      oncanceluntag={(entryName, key) => handleCancelUntag('param', entryName, key)}
-    />
+    {#if paramSvc}
+      <StagingSection
+        icon="P"
+        title={paramLabel}
+        emptyText="No staged {paramLabel} changes"
+        entries={paramEntries}
+        tagEntries={paramTagEntries}
+        hasTags={paramSvc?.hasTags ?? true}
+        {viewMode}
+        onapply={() => openApplyModal('param')}
+        onreset={() => openResetModal('param')}
+        onedit={(entry) => openEditModal('param', entry)}
+        onunstage={(name) => handleUnstage('param', name)}
+        onaddtag={(entryName) => openAddTagModal('param', entryName)}
+        onedittag={(entryName, key, value) => openEditTagModal('param', entryName, key, value)}
+        onremovetag={(entryName, key) => handleRemoveTag('param', entryName, key)}
+        oncanceluntag={(entryName, key) => handleCancelUntag('param', entryName, key)}
+      />
+    {/if}
 
-    <StagingSection
-      icon="S"
-      title="Secrets"
-      emptyText="No staged secret changes"
-      entries={secretEntries}
-      tagEntries={secretTagEntries}
-      {viewMode}
-      onapply={() => openApplyModal('secret')}
-      onreset={() => openResetModal('secret')}
-      onedit={(entry) => openEditModal('secret', entry)}
-      onunstage={(name) => handleUnstage('secret', name)}
-      onaddtag={(entryName) => openAddTagModal('secret', entryName)}
-      onedittag={(entryName, key, value) => openEditTagModal('secret', entryName, key, value)}
-      onremovetag={(entryName, key) => handleRemoveTag('secret', entryName, key)}
-      oncanceluntag={(entryName, key) => handleCancelUntag('secret', entryName, key)}
-    />
+    {#if secretSvc}
+      <StagingSection
+        icon="S"
+        title={secretLabel}
+        emptyText="No staged {secretLabel} changes"
+        entries={secretEntries}
+        tagEntries={secretTagEntries}
+        hasTags={secretSvc?.hasTags ?? true}
+        {viewMode}
+        onapply={() => openApplyModal('secret')}
+        onreset={() => openResetModal('secret')}
+        onedit={(entry) => openEditModal('secret', entry)}
+        onunstage={(name) => handleUnstage('secret', name)}
+        onaddtag={(entryName) => openAddTagModal('secret', entryName)}
+        onedittag={(entryName, key, value) => openEditTagModal('secret', entryName, key, value)}
+        onremovetag={(entryName, key) => handleRemoveTag('secret', entryName, key)}
+        oncanceluntag={(entryName, key) => handleCancelUntag('secret', entryName, key)}
+      />
+    {/if}
   </div>
 
   <div class="actions">

@@ -31,9 +31,10 @@ test.describe('Staging View Basics', () => {
       await expect(page.getByText('Staging Area')).toBeVisible();
     });
 
-    test('should display Parameters and Secrets sections', async ({ page }) => {
-      await expect(page.getByRole('heading', { name: /Parameters/i })).toBeVisible();
-      await expect(page.getByRole('heading', { name: /Secrets/i })).toBeVisible();
+    test('should display Param and Secret sections', async ({ page }) => {
+      // Section headings use capability display names (AWS: Param / Secret).
+      await expect(page.getByRole('heading', { name: /Param/i })).toBeVisible();
+      await expect(page.getByRole('heading', { name: /Secret/i })).toBeVisible();
     });
 
     test('should show empty state when no staged changes', async ({ page }) => {

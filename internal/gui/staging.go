@@ -5,7 +5,6 @@ package gui
 import (
 	"errors"
 
-	"github.com/mpyw/suve/internal/infra"
 	"github.com/mpyw/suve/internal/maputil"
 	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/staging"
@@ -179,44 +178,61 @@ var (
 // Staging Methods
 // =============================================================================
 
-// StagingStatus gets the current staging status.
+// StagingStatus gets the current staging status. Only the services the active
+// scope supports are queried (Google Cloud has no param service); unsupported
+// services yield empty slices so the capability-gated frontend renders nothing.
 func (a *App) StagingStatus() (*StagingStatusResult, error) {
 	store, err := a.getStagingStore()
 	if err != nil {
 		return nil, err
 	}
 
-	paramParser, _ := a.getParser(string(staging.ServiceParam))
-	secretParser, _ := a.getParser(string(staging.ServiceSecret))
+	scope := a.currentScope()
 
-	// SSM Parameter Store status
-	paramUC := &stagingusecase.StatusUseCase{
-		Strategy: paramParser,
-		Store:    store,
+	var paramResult, secretResult *stagingusecase.StatusOutput
+
+	if scope.SupportsService(provider.KindParam) {
+		parser, _ := a.getParser(string(staging.ServiceParam))
+
+		paramResult, err = (&stagingusecase.StatusUseCase{Strategy: parser, Store: store}).Execute(a.ctx, stagingusecase.StatusInput{})
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	paramResult, err := paramUC.Execute(a.ctx, stagingusecase.StatusInput{})
-	if err != nil {
-		return nil, err
-	}
+	if scope.SupportsService(provider.KindSecret) {
+		parser, _ := a.getParser(string(staging.ServiceSecret))
 
-	// Secrets Manager status
-	secretUC := &stagingusecase.StatusUseCase{
-		Strategy: secretParser,
-		Store:    store,
-	}
-
-	secretResult, err := secretUC.Execute(a.ctx, stagingusecase.StatusInput{})
-	if err != nil {
-		return nil, err
+		secretResult, err = (&stagingusecase.StatusUseCase{Strategy: parser, Store: store}).Execute(a.ctx, stagingusecase.StatusInput{})
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return &StagingStatusResult{
-		Param:      toStagingEntries(paramResult.Entries),
-		Secret:     toStagingEntries(secretResult.Entries),
-		ParamTags:  toStagingTagEntries(paramResult.TagEntries),
-		SecretTags: toStagingTagEntries(secretResult.TagEntries),
+		Param:      toStagingEntries(statusEntries(paramResult)),
+		Secret:     toStagingEntries(statusEntries(secretResult)),
+		ParamTags:  toStagingTagEntries(statusTagEntries(paramResult)),
+		SecretTags: toStagingTagEntries(statusTagEntries(secretResult)),
 	}, nil
+}
+
+// statusEntries / statusTagEntries safely read a (possibly nil, when the
+// service is unsupported by the active scope) StatusOutput.
+func statusEntries(o *stagingusecase.StatusOutput) []stagingusecase.StatusEntry {
+	if o == nil {
+		return nil
+	}
+
+	return o.Entries
+}
+
+func statusTagEntries(o *stagingusecase.StatusOutput) []stagingusecase.StatusTagEntry {
+	if o == nil {
+		return nil
+	}
+
+	return o.TagEntries
 }
 
 // toStagingEntries converts use-case status entries into the frontend DTO,
@@ -692,16 +708,12 @@ type StagingFileStatusResult struct {
 
 // StagingFileStatus checks if the staging file exists and whether it's encrypted.
 func (a *App) StagingFileStatus() (*StagingFileStatusResult, error) {
-	if err := a.requireAWSStaging(); err != nil {
-		return nil, err
-	}
-
-	identity, err := infra.GetAWSIdentity(a.ctx)
+	scope, err := a.stagingScope()
 	if err != nil {
 		return nil, err
 	}
 
-	fileStore, err := file.NewStashStore(provider.AWSScope(identity.AccountID, identity.Region))
+	fileStore, err := file.NewStashStore(scope)
 	if err != nil {
 		return nil, err
 	}
@@ -728,20 +740,14 @@ func (a *App) StagingFileStatus() (*StagingFileStatusResult, error) {
 }
 
 // stashStores builds the stash (stash.json) and working (param.json/secret.json) file
-// stores for the current AWS identity and resolves the optional service
-// selector. It is the shared prelude of StagingDrain and StagingPersist. An
-// empty service yields the zero staging.Service (all services).
+// stores for the active provider's staging scope and resolves the optional
+// service selector. It is the shared prelude of StagingDrain and StagingPersist.
+// An empty service yields the zero staging.Service (all services).
 func (a *App) stashStores(service, passphrase string) (stash, working *file.Store, svc staging.Service, err error) {
-	if err := a.requireAWSStaging(); err != nil {
-		return nil, nil, "", err
-	}
-
-	identity, err := infra.GetAWSIdentity(a.ctx)
+	scope, err := a.stagingScope()
 	if err != nil {
 		return nil, nil, "", err
 	}
-
-	scope := provider.AWSScope(identity.AccountID, identity.Region)
 
 	stash, err = file.NewStashStoreWithPassphrase(scope, passphrase)
 	if err != nil {
@@ -840,16 +846,12 @@ type StagingDropResult struct {
 // StagingDrop deletes the staging file without loading it into memory.
 // This works even for encrypted files since it just deletes the file directly.
 func (a *App) StagingDrop() (*StagingDropResult, error) {
-	if err := a.requireAWSStaging(); err != nil {
-		return nil, err
-	}
-
-	identity, err := infra.GetAWSIdentity(a.ctx)
+	scope, err := a.stagingScope()
 	if err != nil {
 		return nil, err
 	}
 
-	fileStore, err := file.NewStashStore(provider.AWSScope(identity.AccountID, identity.Region))
+	fileStore, err := file.NewStashStore(scope)
 	if err != nil {
 		return nil, err
 	}

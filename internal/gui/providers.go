@@ -167,7 +167,7 @@ func (a *App) Capabilities() []ProviderCapability {
 				{
 					Service: "secret", DisplayName: "Secret",
 					HasVersionHistory: true, HasVersionSpecifiers: true, HasTags: true, HasRestore: false,
-					HasStaging: false, HasForceDelete: false, HasRecoveryWindow: false,
+					HasStaging: true, HasForceDelete: false, HasRecoveryWindow: false,
 				},
 			},
 		},
@@ -180,12 +180,12 @@ func (a *App) Capabilities() []ProviderCapability {
 				{
 					Service: "param", DisplayName: "App Configuration",
 					HasVersionHistory: false, HasVersionSpecifiers: false, HasTags: false, HasRestore: false,
-					HasStaging: false, HasForceDelete: false, HasRecoveryWindow: false,
+					HasStaging: true, HasForceDelete: false, HasRecoveryWindow: false,
 				},
 				{
 					Service: "secret", DisplayName: "Key Vault",
 					HasVersionHistory: true, HasVersionSpecifiers: true, HasTags: true, HasRestore: false,
-					HasStaging: false, HasForceDelete: false, HasRecoveryWindow: false,
+					HasStaging: true, HasForceDelete: false, HasRecoveryWindow: false,
 				},
 			},
 		},
