@@ -106,8 +106,8 @@ type ServiceCapability struct {
 	// Manager only).
 	HasRestore bool `json:"hasRestore"`
 	// HasStaging is true when the GUI's staging workflow applies to this
-	// service. It is AWS-only until scope-keyed multi-provider staging lands
-	// (#270); the frontend hides the staging tab/banner/checkbox when false.
+	// service (every provider service today); the frontend hides the staging
+	// tab/banner/checkbox when false.
 	HasStaging bool `json:"hasStaging"`
 	// HasForceDelete is true when an immediate (no-recovery-window) delete is
 	// offered (AWS Secrets Manager only). The frontend hides the force-delete

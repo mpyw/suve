@@ -628,8 +628,7 @@ export function createGoogleCloudState(overrides: Partial<MockState> = {}): Part
 
 /**
  * Launched into Azure with vault + store present (as env/CLI would supply),
- * so both Key Vault (secret) and App Configuration (param) mount. The selector
- * option stays disabled ("greyed") until #267 adds the scope form.
+ * so both Key Vault (secret) and App Configuration (param) mount.
  */
 export function createAzureState(overrides: Partial<MockState> = {}): Partial<MockState> {
   return {
