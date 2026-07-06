@@ -3,7 +3,7 @@
 [<- Back to README](../README.md) | [AWS Commands](aws.md) | [Azure Commands](azure.md)
 
 > [!TIP]
-> Invoke as `suve gcloud secret`. You can drop the `gcloud` prefix (`suve secret`) when Google Cloud is the only active secret provider — see [Provider selection](../README.md#provider-selection).
+> Invoke as `suve gcloud secret` (`secrets`, `sm`); the group also answers to `gcp` / `google`, and `stage` to `stg`. <!-- naming-allow-gcp --> You can drop the `gcloud` prefix (`suve secret`) when Google Cloud is the only active secret provider — see [Provider selection](../README.md#provider-selection).
 
 Primary command: `gcloud secret`
 

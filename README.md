@@ -544,11 +544,13 @@ Explicit command groups (always available) and their bare aliases (exposed per t
 | [AWS SSM Parameter Store](docs/aws.md) | `aws param` (`ssm`, `ps`) | `param` |
 | [AWS Secrets Manager](docs/aws.md) | `aws secret` (`sm`) | `secret` |
 | AWS Staging | `aws stage` (`stg`) | `stage` |
-| [Google Cloud Secret Manager](docs/gcloud.md) | `gcloud secret` | `secret` |
+| [Google Cloud Secret Manager](docs/gcloud.md) | `gcloud secret` (`secrets`, `sm`) | `secret` |
 | Google Cloud Staging | `gcloud stage` (`stg`) | `stage` |
-| [Azure Key Vault](docs/azure.md) | `azure secret` | `secret` |
-| [Azure App Configuration](docs/azure.md) | `azure param` | `param` |
+| [Azure Key Vault](docs/azure.md) | `azure secret` (`kv`, `keyvault`) | `secret` |
+| [Azure App Configuration](docs/azure.md) | `azure param` (`appconfig`, `ac`, `appcfg`) | `param` |
 | Azure Staging | `azure stage` (`stg`) | `stage` |
+
+The command **groups** themselves also take aliases: `gcloud` → `gcp` / `google`, and `azure` → `az` (e.g. `suve gcp secrets show`, `suve az kv show`). <!-- naming-allow-gcp --> Under `azure stage`, the `secret` / `param` subgroups accept the same aliases as their read/write counterparts (`kv` / `keyvault`, `appconfig` / `ac` / `appcfg`).
 
 ### AWS SSM Parameter Store
 

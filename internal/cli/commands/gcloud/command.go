@@ -20,8 +20,11 @@ import (
 // Command returns the gcloud command with the secret subcommand group.
 func Command() *cli.Command {
 	return &cli.Command{
-		Name:  "gcloud",
-		Usage: "Interact with Google Cloud Secret Manager",
+		Name: "gcloud",
+		// Intentional user-facing alias mirroring AWS's ssm/ps/sm shorthand;
+		// the acronym ban is waived for this line only (see check-naming.sh).
+		Aliases: []string{"gcp", "google"}, // naming-allow-gcp
+		Usage:   "Interact with Google Cloud Secret Manager",
 		Description: `Interact with Google Cloud Secret Manager.
 
 Google Cloud secrets are integer-versioned (1, 2, 3, ... or "latest") and have
@@ -80,8 +83,9 @@ func resolveProject(ctx context.Context, cmd *cli.Command) (context.Context, err
 // SecretCommand returns the "gcloud secret" subcommand group.
 func SecretCommand() *cli.Command {
 	return &cli.Command{
-		Name:  "secret",
-		Usage: "Interact with Google Cloud Secret Manager secrets",
+		Name:    "secret",
+		Aliases: []string{"secrets", "sm"},
+		Usage:   "Interact with Google Cloud Secret Manager secrets",
 		Commands: []*cli.Command{
 			ShowCommand(),
 			LogCommand(),

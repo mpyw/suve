@@ -27,8 +27,9 @@ import (
 // Configuration) subcommand groups.
 func Command() *cli.Command {
 	return &cli.Command{
-		Name:  "azure",
-		Usage: "Interact with Azure Key Vault (secret) and App Configuration (param)",
+		Name:    "azure",
+		Aliases: []string{"az"},
+		Usage:   "Interact with Azure Key Vault (secret) and App Configuration (param)",
 		Description: `Interact with Microsoft Azure secret and parameter stores.
 
 Azure splits the two services:

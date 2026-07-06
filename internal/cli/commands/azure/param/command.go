@@ -20,8 +20,9 @@ import (
 // Command returns the "azure param" subcommand group.
 func Command() *cli.Command {
 	return &cli.Command{
-		Name:  "param",
-		Usage: "Interact with Azure App Configuration key-values",
+		Name:    "param",
+		Aliases: []string{"appconfig", "ac", "appcfg"},
+		Usage:   "Interact with Azure App Configuration key-values",
 		Description: `Interact with Azure App Configuration key-values.
 
 App Configuration is UNVERSIONED: each key (with the default label) holds a
