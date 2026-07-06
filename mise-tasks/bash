@@ -1,0 +1,152 @@
+#!/usr/bin/env bash
+#MISE description="Dev verification shell: start emulators for the chosen clouds and open a shell with their env injected. Flags (0-4, any combo): --aws --gcloud --azure-appconfig --azure-keyvault (--azure = both Azure)."
+#MISE raw=true
+#USAGE flag "--aws" help="AWS emulator (localstack: SSM + Secrets Manager)"
+#USAGE flag "--gcloud" help="Google Cloud Secret Manager emulator"
+#USAGE flag "--azure-appconfig" help="Azure App Configuration emulator"
+#USAGE flag "--azure-keyvault" help="Azure Key Vault emulator (lowkey-vault)"
+#USAGE flag "--azure" help="Alias for --azure-appconfig + --azure-keyvault"
+#
+# Opens an interactive shell with the emulator environment variables injected for
+# the selected cloud(s), after starting their docker compose services. `suve`
+# (and `suve --gui`) then talk to the local emulators and auto-detect the active
+# provider. The containers are left running on exit (stop them with
+# `docker compose down` or `mise run clean`). With no flags, opens a plain shell.
+set -eo pipefail
+
+# Flags are parsed by mise (see #USAGE) and exposed as usage_* env vars.
+want_aws=false
+want_gcloud=false
+want_appconfig=false
+want_keyvault=false
+[ "${usage_aws:-}" = "true" ] && want_aws=true
+[ "${usage_gcloud:-}" = "true" ] && want_gcloud=true
+[ "${usage_azure_appconfig:-}" = "true" ] && want_appconfig=true
+[ "${usage_azure_keyvault:-}" = "true" ] && want_keyvault=true
+# --azure is an alias for both Azure services.
+if [ "${usage_azure:-}" = "true" ]; then
+  want_appconfig=true
+  want_keyvault=true
+fi
+
+# Emulator ports (override-able), matching compose.yaml defaults.
+localstack_port="${SUVE_LOCALSTACK_EXTERNAL_PORT:-4566}"
+gcloud_port="${SUVE_GCLOUD_EMULATOR_PORT:-9090}"
+appconfig_port="${SUVE_AZURE_APPCONFIG_PORT:-8080}"
+keyvault_port="${SUVE_AZURE_KEYVAULT_PORT:-8443}"
+
+profiles=()
+services=()
+env_kv=()
+clouds=()
+
+add_profile() {
+  local p
+  for p in "${profiles[@]}"; do [ "$p" = "$1" ] && return 0; done
+  profiles+=("$1")
+}
+
+if $want_aws; then
+  clouds+=("AWS (localstack: SSM + Secrets Manager)")
+  add_profile aws
+  services+=("localstack")
+  env_kv+=(
+    "AWS_ENDPOINT_URL=http://127.0.0.1:${localstack_port}"
+    "AWS_ACCESS_KEY_ID=test"
+    "AWS_SECRET_ACCESS_KEY=test"
+    "AWS_DEFAULT_REGION=us-east-1"
+    "AWS_REGION=us-east-1"
+  )
+fi
+
+if $want_gcloud; then
+  clouds+=("Google Cloud (Secret Manager emulator)")
+  add_profile gcloud
+  services+=("gcloud-secretmanager")
+  env_kv+=(
+    "SUVE_GCLOUD_SECRETMANAGER_ENDPOINT=127.0.0.1:${gcloud_port}"
+    "GOOGLE_CLOUD_PROJECT=suve-dev"
+  )
+fi
+
+if $want_appconfig; then
+  clouds+=("Azure App Configuration (emulator)")
+  add_profile azure
+  services+=("azure-appconfig")
+  env_kv+=(
+    "SUVE_AZURE_APPCONFIG_CONNECTION_STRING=Endpoint=http://127.0.0.1:${appconfig_port};Id=abcd;Secret=c2VjcmV0"
+    "AZURE_APPCONFIG_NAME=suve-dev"
+    "AZURE_SUBSCRIPTION_ID=00000000-0000-0000-0000-000000000000"
+    "AZURE_RESOURCE_GROUP=suve-dev"
+  )
+fi
+
+if $want_keyvault; then
+  clouds+=("Azure Key Vault (lowkey-vault emulator)")
+  add_profile azure
+  services+=("azure-keyvault")
+  env_kv+=(
+    "SUVE_AZURE_KEYVAULT_ENDPOINT=https://127.0.0.1:${keyvault_port}"
+    "AZURE_KEYVAULT_NAME=suve-dev"
+    "AZURE_SUBSCRIPTION_ID=00000000-0000-0000-0000-000000000000"
+    "AZURE_RESOURCE_GROUP=suve-dev"
+  )
+fi
+
+if [ "${#services[@]}" -gt 0 ]; then
+  profile_args=()
+  for p in "${profiles[@]}"; do profile_args+=(--profile "$p"); done
+
+  echo "==> Starting emulators: ${services[*]}"
+  docker compose "${profile_args[@]}" up -d "${services[@]}"
+
+  if $want_aws; then
+    echo "    waiting for localstack on :${localstack_port} …"
+    until curl -sf "http://127.0.0.1:${localstack_port}/_localstack/health" > /dev/null 2>&1; do sleep 1; done
+  fi
+  if $want_gcloud; then
+    echo "    waiting for the Google Cloud emulator on :${gcloud_port} …"
+    until bash -c "echo > /dev/tcp/127.0.0.1/${gcloud_port}" 2> /dev/null; do sleep 1; done
+  fi
+  if $want_appconfig; then
+    echo "    waiting for the App Configuration emulator on :${appconfig_port} …"
+    until bash -c "echo > /dev/tcp/127.0.0.1/${appconfig_port}" 2> /dev/null; do sleep 1; done
+  fi
+  if $want_keyvault; then
+    echo "    waiting for the Key Vault emulator on :${keyvault_port} …"
+    until curl -sk -o /dev/null "https://127.0.0.1:${keyvault_port}/ping" 2> /dev/null; do sleep 1; done
+  fi
+  echo "    ready."
+fi
+
+# Inject the emulator env into the shell we are about to launch.
+for kv in "${env_kv[@]}"; do
+  export "${kv?}"
+done
+
+echo
+echo "┌──────────────────────────────────────────────────────────────┐"
+echo "  suve dev verification shell"
+if [ "${#clouds[@]}" -eq 0 ]; then
+  echo "  clouds : (none — plain shell, no emulator env or containers)"
+else
+  for c in "${clouds[@]}"; do echo "  cloud  : ${c}"; done
+fi
+if [ "${#env_kv[@]}" -gt 0 ]; then
+  echo "  env    :"
+  for kv in "${env_kv[@]}"; do echo "             ${kv}"; done
+fi
+echo "  try    : suve --gui         (auto-detects the active provider)"
+echo "           suve secret list   /   suve param list"
+if [ "${#services[@]}" -gt 0 ]; then
+  echo "  note   : containers keep running after you exit —"
+  echo "           stop them with 'docker compose down' or 'mise run clean'"
+fi
+echo "└──────────────────────────────────────────────────────────────┘"
+echo
+
+# Launch a fresh interactive bash (via /usr/bin/env, so a PATH bash is used
+# rather than the ambient $SHELL) with the injected env. Containers are
+# intentionally left running on exit (no teardown).
+export SUVE_DEV_SHELL="${clouds[*]:-none}"
+exec /usr/bin/env bash

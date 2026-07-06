@@ -1,5 +1,10 @@
 services:
   localstack:
+    # AWS emulator (SSM + Secrets Manager). Gated behind the `aws` profile so no
+    # cloud starts by default — all three providers require an explicit profile
+    # (aws / gcloud / azure), keeping them symmetric.
+    profiles:
+      - aws
     image: localstack/localstack:4
     ports:
       - "127.0.0.1:${SUVE_LOCALSTACK_EXTERNAL_PORT:-4566}:4566/tcp"

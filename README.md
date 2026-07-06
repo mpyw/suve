@@ -814,34 +814,45 @@ mise e2e
 mise coverage-all
 ```
 
-### Local Development with Localstack
+### Local Development with Emulators
 
-To test against [localstack](https://localstack.cloud/) instead of real AWS:
+`mise run bash` starts the selected cloud's emulator(s) and opens a shell with
+the right environment injected, so `suve` (and `suve --gui`) talk to the local
+emulators and auto-detect the active provider. Flags combine freely (0–4):
 
 ```bash
-# Start localstack
-SUVE_LOCALSTACK_EXTERNAL_PORT=4566 docker compose up -d
+mise run bash --aws               # AWS (localstack: SSM + Secrets Manager)
+mise run bash --gcloud            # Google Cloud Secret Manager
+mise run bash --azure-appconfig   # Azure App Configuration
+mise run bash --azure-keyvault    # Azure Key Vault
+mise run bash --azure             # both Azure services
+mise run bash --aws --gcloud --azure   # everything at once
 
-# Run commands with localstack
+# inside the shell:
+suve --gui        # auto-detects the active provider
+suve param ls
+suve secret list
+```
+
+Containers keep running after you exit the shell; stop them with
+`docker compose down` (or `mise run clean`).
+
+Every cloud is behind a docker compose profile (`aws` / `gcloud` / `azure`), so
+nothing starts by default. To drive the AWS emulator manually instead of the
+shell above:
+
+```bash
+SUVE_LOCALSTACK_EXTERNAL_PORT=4566 docker compose --profile aws up -d
 AWS_ENDPOINT_URL=http://127.0.0.1:4566 \
 AWS_ACCESS_KEY_ID=dummy \
 AWS_SECRET_ACCESS_KEY=dummy \
 AWS_DEFAULT_REGION=us-east-1 \
 suve param ls
-
-# GUI with localstack
-AWS_ENDPOINT_URL=http://127.0.0.1:4566 \
-AWS_ACCESS_KEY_ID=dummy \
-AWS_SECRET_ACCESS_KEY=dummy \
-AWS_DEFAULT_REGION=us-east-1 \
-suve --gui
-
-# Stop localstack
 docker compose down
 ```
 
 > [!IMPORTANT]
-> Dummy credentials (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`) are required to prevent the SDK from attempting IAM role credential fetching.
+> Dummy credentials (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`) are required to prevent the SDK from attempting IAM role credential fetching. The `mise run bash --aws` shell sets these for you.
 
 ## License
 

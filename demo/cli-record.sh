@@ -30,7 +30,7 @@ fi
 # Reset LocalStack (clean slate)
 echo "Resetting LocalStack..."
 docker compose down -v
-docker compose up -d
+docker compose --profile aws up -d
 echo "Waiting for LocalStack to be ready..."
 sleep 3
 

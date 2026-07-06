@@ -39,24 +39,16 @@ description = "Run golangci-lint on the host OS with all build tags"
 # old Makefile's uname-based host detection.
 run = "GOOS=$(go env GOHOSTOS) golangci-lint run --build-tags=e2e,production ./..."
 
-[tasks.up]
-description = "Start the localstack container and wait for readiness"
+[tasks.e2e]
+description = "Run E2E tests against localstack (starts the AWS emulator)"
 run = '''
 port="${SUVE_LOCALSTACK_EXTERNAL_PORT:-4566}"
-SUVE_LOCALSTACK_EXTERNAL_PORT="$port" docker compose up -d
+SUVE_LOCALSTACK_EXTERNAL_PORT="$port" docker compose --profile aws up -d localstack
 echo "Waiting for localstack to be ready on port $port..."
 until curl -sf "http://127.0.0.1:$port/_localstack/health" > /dev/null 2>&1; do sleep 1; done
 echo "localstack is ready"
+SUVE_LOCALSTACK_EXTERNAL_PORT="$port" go test -tags=e2e -v ./e2e/...
 '''
-
-[tasks.down]
-description = "Stop the localstack container"
-run = "docker compose down"
-
-[tasks.e2e]
-description = "Run E2E tests against localstack"
-depends = ["up"]
-run = 'SUVE_LOCALSTACK_EXTERNAL_PORT="${SUVE_LOCALSTACK_EXTERNAL_PORT:-4566}" go test -tags=e2e -v ./e2e/...'
 
 [tasks.e2e-gcloud]
 description = "Run Google Cloud Secret Manager E2E tests (starts the emulator)"
@@ -109,23 +101,27 @@ go tool cover -func=coverage.out | grep total
 '''
 
 [tasks.coverage-e2e]
-description = "Run E2E tests with coverage"
-depends = ["up"]
+description = "Run E2E tests with coverage (starts the AWS emulator)"
 run = '''
+port="${SUVE_LOCALSTACK_EXTERNAL_PORT:-4566}"
+SUVE_LOCALSTACK_EXTERNAL_PORT="$port" docker compose --profile aws up -d localstack
+until curl -sf "http://127.0.0.1:$port/_localstack/health" > /dev/null 2>&1; do sleep 1; done
 coverpkg=$(go list ./... | grep -v testutil | grep -v /e2e | grep -v internal/gui | grep -v /cmd/ | tr '\n' ',')
-SUVE_LOCALSTACK_EXTERNAL_PORT="${SUVE_LOCALSTACK_EXTERNAL_PORT:-4566}" go test -tags=e2e -coverprofile=coverage-e2e.out -coverpkg="$coverpkg" ./e2e/...
+SUVE_LOCALSTACK_EXTERNAL_PORT="$port" go test -tags=e2e -coverprofile=coverage-e2e.out -coverpkg="$coverpkg" ./e2e/...
 go tool cover -func=coverage-e2e.out | grep total
 '''
 
 [tasks.coverage-all]
-description = "Run unit + E2E tests and report merged coverage"
-depends = ["up"]
+description = "Run unit + E2E tests and report merged coverage (starts the AWS emulator)"
 run = '''
+port="${SUVE_LOCALSTACK_EXTERNAL_PORT:-4566}"
+SUVE_LOCALSTACK_EXTERNAL_PORT="$port" docker compose --profile aws up -d localstack
+until curl -sf "http://127.0.0.1:$port/_localstack/health" > /dev/null 2>&1; do sleep 1; done
 coverpkg=$(go list ./... | grep -v testutil | grep -v /e2e | grep -v internal/gui | grep -v /cmd/ | tr '\n' ',')
 echo "Running unit tests with coverage..."
 go test -coverprofile=coverage-unit.out -covermode=atomic -coverpkg="$coverpkg" $(go list ./... | grep -v internal/gui | grep -v /cmd/)
 echo "Running E2E tests with coverage..."
-SUVE_LOCALSTACK_EXTERNAL_PORT="${SUVE_LOCALSTACK_EXTERNAL_PORT:-4566}" go test -tags=e2e -coverprofile=coverage-e2e.out -covermode=atomic -coverpkg="$coverpkg" ./e2e/...
+SUVE_LOCALSTACK_EXTERNAL_PORT="$port" go test -tags=e2e -coverprofile=coverage-e2e.out -covermode=atomic -coverpkg="$coverpkg" ./e2e/...
 echo "Merging coverage profiles..."
 go run github.com/wadey/gocovmerge@latest coverage-unit.out coverage-e2e.out > coverage-all.out
 go tool cover -func=coverage-all.out | grep total

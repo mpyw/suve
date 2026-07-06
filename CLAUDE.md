@@ -187,10 +187,15 @@ mise lint
 # Build CLI
 mise build
 
-# E2E tests with localstack
-mise up      # Start localstack
-mise e2e     # Run E2E tests
-mise down    # Stop localstack
+# E2E tests (each task starts its emulator automatically via docker compose)
+mise e2e                  # AWS (localstack)
+mise e2e-gcloud           # Google Cloud
+mise e2e-azure-appconfig  # Azure App Configuration
+mise e2e-azure-keyvault   # Azure Key Vault
+
+# Dev verification shell: start emulators + inject their env for the chosen
+# cloud(s), then open a shell (any combination of flags; 0 = plain shell).
+mise run bash --aws --gcloud --azure
 
 # Coverage
 mise coverage
@@ -211,17 +216,14 @@ mise gui-bindings # Regenerate GUI bindings
 ### Running E2E Tests
 
 ```bash
-# Start localstack (SSM service)
-mise up
-
-# Run E2E tests
+# Run E2E tests (starts the AWS emulator, localstack, automatically)
 mise e2e
 
-# Or with custom port
+# Or with a custom port
 SUVE_LOCALSTACK_EXTERNAL_PORT=4599 mise e2e
 
-# Stop localstack
-mise down
+# Stop the emulator containers when done
+docker compose down   # or: mise run clean
 ```
 
 ### Running GUI Tests
