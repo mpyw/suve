@@ -3,6 +3,7 @@ package infra
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -13,18 +14,73 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
+	"github.com/aws/smithy-go/logging"
 	"github.com/samber/lo"
 	"gopkg.in/ini.v1"
 
+	"github.com/mpyw/suve/internal/debug"
 	"github.com/mpyw/suve/internal/maputil"
 )
 
 // arnAccountIDRegex extracts AWS account ID (12 digits) from ARN strings.
 var arnAccountIDRegex = regexp.MustCompile(`:(\d{12}):`)
 
-// LoadConfig loads the default AWS configuration.
+// debugLogger adapts the debug writer to smithy's logging.Logger so SDK
+// request/response dumps share the unified "[suve debug ...]" line prefix with
+// every other provider (multi-line HTTP dumps are prefixed on their first line
+// only).
+type debugLogger struct {
+	cfg debug.Config
+}
+
+// Logf implements smithy logging.Logger.
+func (l debugLogger) Logf(classification logging.Classification, format string, v ...any) {
+	l.cfg.Logf("aws sdk %s: %s\n", classification, fmt.Sprintf(format, v...))
+}
+
+// LoadConfig loads the default AWS configuration. When debug is enabled on the
+// context it turns on SDK request/response/retry logging (metadata only — the
+// bodyless LogRequest/LogResponse modes never print secret values) plus config
+// resolution warnings, and logs a one-line summary of the effective region,
+// profile, and credentials source — the facts a user needs first when a command
+// unexpectedly returns nothing (see #306).
 func LoadConfig(ctx context.Context) (aws.Config, error) {
-	return config.LoadDefaultConfig(ctx)
+	d := debug.From(ctx)
+	if !d.Enabled {
+		return config.LoadDefaultConfig(ctx)
+	}
+
+	cfg, err := config.LoadDefaultConfig(ctx,
+		config.WithClientLogMode(aws.LogRequest|aws.LogResponse|aws.LogRetries),
+		config.WithLogger(debugLogger{cfg: d}),
+		config.WithLogConfigurationWarnings(true),
+	)
+	if err != nil {
+		return cfg, err
+	}
+
+	logEffectiveConfig(ctx, d, cfg)
+
+	return cfg, nil
+}
+
+// logEffectiveConfig emits the one-line effective-configuration summary under
+// debug. Resolving the credentials source calls Retrieve, which is cached by
+// the SDK's CredentialsCache, so the first API call would perform the same work
+// anyway; a resolution failure is logged (with the reason) instead of being
+// returned, so the command still fails at the API call exactly as it would
+// without --debug.
+func logEffectiveConfig(ctx context.Context, d debug.Config, cfg aws.Config) {
+	profile := lo.CoalesceOrEmpty(os.Getenv("AWS_PROFILE"), os.Getenv("AWS_DEFAULT_PROFILE"), "default")
+
+	creds, err := cfg.Credentials.Retrieve(ctx)
+	if err != nil {
+		d.Logf("aws: region=%q profile=%q credentials resolution failed: %v\n", cfg.Region, profile, err)
+
+		return
+	}
+
+	d.Logf("aws: region=%q profile=%q credentials-source=%s\n", cfg.Region, profile, creds.Source)
 }
 
 // NewParamClient creates a new SSM Parameter Store client using the default configuration.

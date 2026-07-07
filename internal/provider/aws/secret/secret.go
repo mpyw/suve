@@ -17,6 +17,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager/types"
 	"github.com/samber/lo"
 
+	"github.com/mpyw/suve/internal/debug"
 	"github.com/mpyw/suve/internal/domain"
 	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/version/secretversion"
@@ -240,9 +241,12 @@ func (s *Store) History(ctx context.Context, name string) ([]domain.Version, err
 
 // List returns the names of all secrets, paging through ListSecrets.
 func (s *Store) List(ctx context.Context) ([]string, error) {
+	d := debug.From(ctx)
+
 	var (
 		names []string
 		token *string
+		pages int
 	)
 
 	for {
@@ -252,6 +256,9 @@ func (s *Store) List(ctx context.Context) ([]string, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to list secrets: %w", err)
 		}
+
+		pages++
+		d.Logf("aws secretsmanager: ListSecrets page %d -> %d secrets\n", pages, len(out.SecretList))
 
 		for _, sec := range out.SecretList {
 			names = append(names, aws.ToString(sec.Name))
@@ -263,6 +270,10 @@ func (s *Store) List(ctx context.Context) ([]string, error) {
 
 		token = out.NextToken
 	}
+
+	// The total makes a successful-but-empty result (wrong region/account)
+	// visible at a glance, which a bodyless HTTP log cannot.
+	d.Logf("aws secretsmanager: ListSecrets total %d secrets in %d page(s)\n", len(names), pages)
 
 	return names, nil
 }

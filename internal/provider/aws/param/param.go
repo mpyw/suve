@@ -16,6 +16,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ssm/types"
 	"github.com/samber/lo"
 
+	"github.com/mpyw/suve/internal/debug"
 	"github.com/mpyw/suve/internal/domain"
 	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/version/paramversion"
@@ -182,9 +183,12 @@ func (s *Store) History(ctx context.Context, name string) ([]domain.Version, err
 
 // List returns the names of all parameters, paging through DescribeParameters.
 func (s *Store) List(ctx context.Context) ([]string, error) {
+	d := debug.From(ctx)
+
 	var (
 		names []string
 		token *string
+		pages int
 	)
 
 	for {
@@ -194,6 +198,9 @@ func (s *Store) List(ctx context.Context) ([]string, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to describe parameters: %w", err)
 		}
+
+		pages++
+		d.Logf("aws ssm: DescribeParameters page %d -> %d parameters\n", pages, len(out.Parameters))
 
 		for _, p := range out.Parameters {
 			names = append(names, aws.ToString(p.Name))
@@ -205,6 +212,10 @@ func (s *Store) List(ctx context.Context) ([]string, error) {
 
 		token = out.NextToken
 	}
+
+	// The total makes a successful-but-empty result (wrong region/account)
+	// visible at a glance, which a bodyless HTTP log cannot.
+	d.Logf("aws ssm: DescribeParameters total %d parameters in %d page(s)\n", len(names), pages)
 
 	return names, nil
 }
