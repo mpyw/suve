@@ -10,9 +10,10 @@ import (
 	"github.com/mpyw/suve/internal/provider"
 )
 
-// Run starts the GUI application with the given initial provider selection
-// (empty means "no explicit choice" — the frontend falls back to env detection).
-func Run(initial provider.Provider) error {
+// Run starts the GUI application with the given initial launch scope. A zero
+// Provider means "no explicit choice" — the frontend falls back to env
+// detection; a set Provider (with optional resource fields) pre-selects it.
+func Run(initial provider.Scope) error {
 	app := NewApp(initial)
 
 	opts := &options.App{

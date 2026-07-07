@@ -24,7 +24,7 @@ import (
 func setupTestApp(t *testing.T) *App {
 	t.Helper()
 
-	app := NewApp(provider.ProviderAWS)
+	app := NewApp(provider.Scope{Provider: provider.ProviderAWS})
 	app.Startup(t.Context())
 	app.stagingStore = testutil.NewMockStore()
 

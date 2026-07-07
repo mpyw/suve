@@ -86,7 +86,7 @@ func TestApp_getStagingStore_ScopeKeyed(t *testing.T) {
 	t.Setenv("SUVE_STAGING_KEY", base64.StdEncoding.EncodeToString(make([]byte, 32)))
 	t.Setenv("HOME", t.TempDir())
 
-	app := NewApp(provider.ProviderGoogleCloud)
+	app := NewApp(provider.Scope{Provider: provider.ProviderGoogleCloud})
 	app.Startup(t.Context())
 	app.scope = provider.GoogleCloudScope("proj-a")
 

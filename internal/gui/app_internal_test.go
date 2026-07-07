@@ -27,16 +27,41 @@ func TestErrInvalidService(t *testing.T) {
 func TestNewApp(t *testing.T) {
 	t.Parallel()
 
-	app := NewApp(provider.ProviderAWS)
+	app := NewApp(provider.Scope{Provider: provider.ProviderAWS})
 	assert.NotNil(t, app)
 	// Verify the staging store is nil (lazy initialization).
 	assert.Nil(t, app.stagingStore)
 }
 
+func TestHydrateScope_FlagWinsElseEnv(t *testing.T) {
+	// Not parallel: mutates process env via t.Setenv.
+	t.Setenv("GOOGLE_CLOUD_PROJECT", "env-project")
+	t.Setenv("AZURE_KEYVAULT_NAME", "env-vault")
+	t.Setenv("AZURE_APPCONFIG_NAME", "env-store")
+
+	// Flag-supplied values win over the environment.
+	gc := hydrateScope(provider.Scope{Provider: provider.ProviderGoogleCloud, ProjectID: "flag-project"})
+	assert.Equal(t, "flag-project", gc.ProjectID)
+
+	az := hydrateScope(provider.Scope{Provider: provider.ProviderAzure, VaultName: "flag-vault"})
+	assert.Equal(t, "flag-vault", az.VaultName)
+	// The unset side still falls back to env.
+	assert.Equal(t, "env-store", az.StoreName)
+
+	// Empty scopes fall back to env entirely.
+	assert.Equal(t, "env-project", hydrateScope(provider.Scope{Provider: provider.ProviderGoogleCloud}).ProjectID)
+	azEnv := hydrateScope(provider.Scope{Provider: provider.ProviderAzure})
+	assert.Equal(t, "env-vault", azEnv.VaultName)
+	assert.Equal(t, "env-store", azEnv.StoreName)
+
+	// AWS carries no resource field (region from ambient config).
+	assert.Equal(t, provider.Scope{Provider: provider.ProviderAWS}, hydrateScope(provider.Scope{Provider: provider.ProviderAWS}))
+}
+
 func TestApp_Startup(t *testing.T) {
 	t.Parallel()
 
-	app := NewApp(provider.ProviderAWS)
+	app := NewApp(provider.Scope{Provider: provider.ProviderAWS})
 	assert.Nil(t, app.ctx)
 
 	app.Startup(t.Context())
