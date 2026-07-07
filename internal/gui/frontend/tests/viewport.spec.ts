@@ -95,14 +95,14 @@ test.describe('Viewport - Provider selector', () => {
     expect(noOverflow).toBe(true);
   });
 
-  test('long Azure scope values (UUID) do not overflow the sidebar', async ({ page }) => {
+  test('Azure scope values do not overflow the sidebar', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 667 });
     await setupWailsMocks(page, createAzureState());
     await page.goto('/');
     await waitForItemList(page);
 
-    // Sidebar shows a 36-char subscription UUID + "App Configuration" label,
-    // all ellipsized rather than widening the layout.
+    // Sidebar shows the Key Vault / App Configuration names, ellipsized rather
+    // than widening the layout.
     const noOverflow = await page.evaluate(
       () => document.documentElement.scrollWidth <= document.documentElement.clientWidth,
     );

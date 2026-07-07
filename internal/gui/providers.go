@@ -126,10 +126,10 @@ type ProviderCapability struct {
 	Provider string `json:"provider"`
 	// DisplayName is the provider label (e.g. "Google Cloud").
 	DisplayName string `json:"displayName"`
-	// ScopeFields lists the scope inputs the frontend must collect for this
-	// provider (e.g. ["project"] for Google Cloud; ["subscription",
-	// "resourceGroup"] for Azure — per-service vault/store are added by the
-	// service's own view). Empty for AWS (ambient config).
+	// ScopeFields lists the provider-level scope inputs the frontend must collect
+	// (e.g. ["project"] for Google Cloud). Empty for AWS (ambient config) and for
+	// Azure, whose per-service vault/store names are collected by the service's
+	// own view.
 	ScopeFields []string `json:"scopeFields"`
 	// Services are the param/secret services this provider offers, in stable
 	// display order.
@@ -174,7 +174,7 @@ func (a *App) Capabilities() []ProviderCapability {
 		{
 			Provider:    string(provider.ProviderAzure),
 			DisplayName: "Azure",
-			ScopeFields: []string{"subscription", "resourceGroup"},
+			ScopeFields: []string{},
 			Services: []ServiceCapability{
 				// App Configuration is unversioned and cannot write tags.
 				{

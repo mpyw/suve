@@ -65,7 +65,7 @@
   // scope can land in the new one.
   const scopeKey = $derived(
     scope
-      ? [provider, scope.projectId, scope.subscriptionId, scope.resourceGroup, scope.vaultName, scope.storeName].join('|')
+      ? [provider, scope.projectId, scope.vaultName, scope.storeName].join('|')
       : provider,
   );
 
@@ -123,8 +123,6 @@
     return {
       provider: p,
       projectId: p === 'googlecloud' ? (src?.projectId ?? '') : '',
-      subscriptionId: p === 'azure' ? (src?.subscriptionId ?? '') : '',
-      resourceGroup: p === 'azure' ? (src?.resourceGroup ?? '') : '',
       vaultName: p === 'azure' ? (src?.vaultName ?? '') : '',
       storeName: p === 'azure' ? (src?.storeName ?? '') : '',
     } as gui.ScopeSelection;

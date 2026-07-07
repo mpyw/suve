@@ -49,31 +49,17 @@ func gcloudProjectFromContext(ctx context.Context) string {
 type azureScopeContextKey struct{}
 
 // azureScopeCtx holds the Azure scope fields resolved from flags/env by the
-// azure command group. It is assembled across two Before hooks: the top-level
-// azure command sets subscription/resource-group; each subgroup (secret/param)
-// sets its vault/store name.
+// azure command group. Each subgroup (secret/param) sets its vault/store name
+// via its Before hook.
 type azureScopeCtx struct {
-	subscription  string
-	resourceGroup string
-	vaultName     string
-	storeName     string
+	vaultName string
+	storeName string
 }
 
 func azureScopeFromContext(ctx context.Context) azureScopeCtx {
 	sc, _ := ctx.Value(azureScopeContextKey{}).(azureScopeCtx)
 
 	return sc
-}
-
-// WithAzureBase returns a context carrying the resolved Azure subscription id and
-// resource group. The azure command group's Before hook sets it once (from
-// --subscription/--resource-group or their env fallbacks).
-func WithAzureBase(ctx context.Context, subscription, resourceGroup string) context.Context {
-	sc := azureScopeFromContext(ctx)
-	sc.subscription = subscription
-	sc.resourceGroup = resourceGroup
-
-	return context.WithValue(ctx, azureScopeContextKey{}, sc)
 }
 
 // WithAzureVaultName returns a context carrying the resolved Azure Key Vault
@@ -134,8 +120,8 @@ func GoogleCloudSecretStore(ctx context.Context) (provider.Store, error) {
 }
 
 // AzureKeyVaultStore resolves a provider.Store for the Azure Key Vault (secret)
-// service. The scope fields are read from the context (see WithAzureBase /
-// WithAzureVaultName); it returns a clear error when no vault name was resolved.
+// service. The vault name is read from the context (see WithAzureVaultName); it
+// returns a clear error when no vault name was resolved.
 func AzureKeyVaultStore(ctx context.Context) (provider.Store, error) {
 	sc := azureScopeFromContext(ctx)
 	if sc.vaultName == "" {
@@ -144,15 +130,14 @@ func AzureKeyVaultStore(ctx context.Context) (provider.Store, error) {
 		)
 	}
 
-	scope := provider.AzureKeyVaultScope(sc.subscription, sc.resourceGroup, sc.vaultName)
+	scope := provider.AzureKeyVaultScope(sc.vaultName)
 
 	return registry.Store(ctx, scope, provider.KindSecret)
 }
 
 // AzureAppConfigStore resolves a provider.Store for the Azure App Configuration
-// (param) service. The scope fields are read from the context (see
-// WithAzureBase / WithAzureStoreName); it returns a clear error when no store
-// name was resolved.
+// (param) service. The store name is read from the context (see
+// WithAzureStoreName); it returns a clear error when no store name was resolved.
 func AzureAppConfigStore(ctx context.Context) (provider.Store, error) {
 	sc := azureScopeFromContext(ctx)
 	if sc.storeName == "" {
@@ -161,7 +146,7 @@ func AzureAppConfigStore(ctx context.Context) (provider.Store, error) {
 		)
 	}
 
-	scope := provider.AzureAppConfigScope(sc.subscription, sc.resourceGroup, sc.storeName)
+	scope := provider.AzureAppConfigScope(sc.storeName)
 
 	return registry.Store(ctx, scope, provider.KindParam)
 }
@@ -253,8 +238,8 @@ func AzureAppConfigParamStrategyFactory(ctx context.Context) (staging.FullStrate
 }
 
 // AzureKeyVaultStagingScopeResolver resolves the Azure Key Vault staging scope
-// from the subscription / resource group / vault stashed in the context (see
-// WithAzureBase / WithAzureVaultName). It performs no network calls.
+// from the vault name stashed in the context (see WithAzureVaultName). It
+// performs no network calls.
 func AzureKeyVaultStagingScopeResolver(ctx context.Context) (staging.ResolvedScope, error) {
 	sc := azureScopeFromContext(ctx)
 	if sc.vaultName == "" {
@@ -264,14 +249,14 @@ func AzureKeyVaultStagingScopeResolver(ctx context.Context) (staging.ResolvedSco
 	}
 
 	return staging.ResolvedScope{
-		Scope:  provider.AzureKeyVaultScope(sc.subscription, sc.resourceGroup, sc.vaultName),
+		Scope:  provider.AzureKeyVaultScope(sc.vaultName),
 		Target: "vault " + sc.vaultName,
 	}, nil
 }
 
 // AzureAppConfigStagingScopeResolver resolves the Azure App Configuration
-// staging scope from the subscription / resource group / store stashed in the
-// context (see WithAzureBase / WithAzureStoreName). It performs no network calls.
+// staging scope from the store name stashed in the context (see
+// WithAzureStoreName). It performs no network calls.
 func AzureAppConfigStagingScopeResolver(ctx context.Context) (staging.ResolvedScope, error) {
 	sc := azureScopeFromContext(ctx)
 	if sc.storeName == "" {
@@ -281,7 +266,7 @@ func AzureAppConfigStagingScopeResolver(ctx context.Context) (staging.ResolvedSc
 	}
 
 	return staging.ResolvedScope{
-		Scope:  provider.AzureAppConfigScope(sc.subscription, sc.resourceGroup, sc.storeName),
+		Scope:  provider.AzureAppConfigScope(sc.storeName),
 		Target: "store " + sc.storeName,
 	}, nil
 }

@@ -39,10 +39,11 @@ Each command group resolves its store through this shared registry:
      identity is resolved separately, only where staging state must be keyed.
    - **Google Cloud** — the project id from `--project` or `GOOGLE_CLOUD_PROJECT`
      (`provider.GoogleCloudScope(project)`).
-   - **Azure** — subscription / resource group (`--subscription` /
-     `--resource-group` or `AZURE_*` env) plus the Key Vault name
-     (`--vault-name`) or App Configuration store name (`--store-name`)
-     (`provider.AzureKeyVaultScope(...)` / `provider.AzureAppConfigScope(...)`).
+   - **Azure** — the Key Vault name (`--vault-name` / `AZURE_KEYVAULT_NAME`) or
+     App Configuration store name (`--store-name` / `AZURE_APPCONFIG_NAME`); each
+     is a globally-unique name that fully identifies the resource, so no
+     subscription/resource group is needed
+     (`provider.AzureKeyVaultScope(vault)` / `provider.AzureAppConfigScope(store)`).
 2. It asks the registry for the store it needs:
    `registry.Store(ctx, scope, provider.KindParam)` (or `KindSecret`).
 

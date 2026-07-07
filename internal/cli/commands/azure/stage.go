@@ -138,12 +138,13 @@ func StageCommand() *cli.Command {
 }
 
 // FlatStageCommand returns the Azure stage command as a standalone top-level
-// command named `name` (e.g. "stage"), folding in the base subscription /
-// resource-group flags and hook. Used for the flat `suve stage` alias when
-// Azure is the uniquely active staging provider.
+// command named `name` (e.g. "stage"). The secret/param staging subgroups own
+// their --vault-name / --store-name flags and hooks, so it is self-contained.
+// Used for the flat `suve stage` alias when Azure is the uniquely active staging
+// provider.
 func FlatStageCommand(name string) *cli.Command {
 	c := StageCommand()
 	c.Name = name
 
-	return foldBase(c)
+	return c
 }

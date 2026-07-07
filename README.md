@@ -180,11 +180,81 @@ cd gui && wails build -tags production,webkit2_41 -skipbindings
 
 </details>
 
-> [!TIP]
-> **Using with [aws-vault](https://github.com/99designs/aws-vault)**: Wrap commands with `aws-vault exec` for temporary credentials:
-> ```bash
-> aws-vault exec my-profile -- suve param show /my/param
-> ```
+## Authentication
+
+suve talks to each cloud's **data plane** using that cloud's own SDK credential chain — the same one the native CLI (`aws` / `gcloud` / `az`) uses. There is nothing suve-specific to configure: sign in the normal way, then point suve at the resource with an environment variable (or the equivalent flag).
+
+<table>
+<thead>
+<tr><th>Provider</th><th>Sign in (identity)</th><th>Point at the resource</th></tr>
+</thead>
+<tbody>
+<tr>
+<td><b>AWS</b></td>
+<td>
+
+```bash
+aws sso login \
+  --profile prod
+```
+
+</td>
+<td>
+
+```bash
+export AWS_PROFILE=prod
+export AWS_REGION=us-east-1
+```
+
+</td>
+</tr>
+<tr>
+<td><b>Google<br>Cloud</b></td>
+<td>
+
+```bash
+gcloud auth \
+  application-default \
+  login
+```
+
+</td>
+<td>
+
+```bash
+export GOOGLE_CLOUD_PROJECT=my-project
+```
+
+</td>
+</tr>
+<tr>
+<td><b>Azure</b></td>
+<td>
+
+```bash
+az login
+```
+
+</td>
+<td>
+
+```bash
+# secret
+export AZURE_KEYVAULT_NAME=my-vault
+# param
+export AZURE_APPCONFIG_NAME=my-store
+```
+
+</td>
+</tr>
+</tbody>
+</table>
+
+> [!NOTE]
+> - Every value has a flag equivalent: `--profile`/`--region`, `--project`, `--vault-name`/`--store-name`.
+> - **AWS** — the standard [credential chain](https://docs.aws.amazon.com/sdkref/latest/guide/standardized-credentials.html): SSO, static keys, `~/.aws/credentials`, or an IAM role. With [aws-vault](https://github.com/99designs/aws-vault): `aws-vault exec prod -- suve param show /my/param`.
+> - **Google Cloud** — [Application Default Credentials](https://cloud.google.com/docs/authentication/application-default-credentials); or a service-account key via `GOOGLE_APPLICATION_CREDENTIALS`.
+> - **Azure** — the [DefaultAzureCredential](https://learn.microsoft.com/en-us/azure/developer/go/azure-sdk-authentication) chain; or a service principal via `AZURE_CLIENT_ID` / `AZURE_CLIENT_SECRET` / `AZURE_TENANT_ID`. `az login` sets no environment variables — it caches credentials under `~/.azure`, which suve reuses. The Key Vault / App Configuration name is a globally-unique endpoint, so **no subscription or resource group is needed**.
 
 ## Getting Started
 
@@ -642,7 +712,7 @@ Uses integer version numbers (with the `latest` alias) and has no staging labels
 
 ### Azure Key Vault
 
-Secrets are versioned by opaque IDs and have no staging labels. Select the vault with `--vault-name` or the `AZURE_KEYVAULT_NAME` environment variable. The shared `azure` base flags are `--subscription` / `AZURE_SUBSCRIPTION_ID` and `--resource-group` / `AZURE_RESOURCE_GROUP`. Authentication uses the [DefaultAzureCredential](https://learn.microsoft.com/en-us/azure/developer/go/azure-sdk-authentication) chain (environment, managed identity, Azure CLI, ...). See [docs/azure.md](docs/azure.md) for details.
+Secrets are versioned by opaque IDs and have no staging labels. Select the vault with `--vault-name` or the `AZURE_KEYVAULT_NAME` environment variable — the vault name is a globally-unique endpoint, so no subscription or resource group is needed. Authentication uses the [DefaultAzureCredential](https://learn.microsoft.com/en-us/azure/developer/go/azure-sdk-authentication) chain (environment, managed identity, Azure CLI, ...). See [docs/azure.md](docs/azure.md) for details.
 
 | Command | Options | Description |
 |---------|---------|-------------|
@@ -673,7 +743,7 @@ Secrets are versioned by opaque IDs and have no staging labels. Select the vault
 
 ### Azure App Configuration
 
-Unversioned key-value store. Version specifiers (`#VERSION`, `~SHIFT`, `:LABEL`) are rejected, `log` reports that history is unsupported, and `tag` / `untag` are unsupported (SDK limitation). Select the store with `--store-name` or the `AZURE_APPCONFIG_NAME` environment variable, plus the shared `azure` base flags described above. See [docs/azure.md](docs/azure.md) for details.
+Unversioned key-value store. Version specifiers (`#VERSION`, `~SHIFT`, `:LABEL`) are rejected, `log` reports that history is unsupported, and `tag` / `untag` are unsupported (SDK limitation). Select the store with `--store-name` or the `AZURE_APPCONFIG_NAME` environment variable — the store name is a globally-unique endpoint, so no subscription or resource group is needed. See [docs/azure.md](docs/azure.md) for details.
 
 | Command | Options | Description |
 |---------|---------|-------------|
@@ -765,10 +835,10 @@ All timestamps are formatted in RFC3339 format with the local timezone offset ap
 
 | Variable | Description |
 |----------|-------------|
-| `AZURE_SUBSCRIPTION_ID` | Subscription (or use `--subscription`) |
-| `AZURE_RESOURCE_GROUP` | Resource group (or use `--resource-group`) |
 | `AZURE_KEYVAULT_NAME` | Key Vault name for `azure secret` (or use `--vault-name`) |
 | `AZURE_APPCONFIG_NAME` | App Configuration store for `azure param` (or use `--store-name`) |
+
+Authentication uses the DefaultAzureCredential chain (`az login`, environment, managed identity, ...). The Key Vault / App Configuration name is a globally-unique endpoint, so no subscription or resource group is needed.
 
 ## AWS Configuration
 

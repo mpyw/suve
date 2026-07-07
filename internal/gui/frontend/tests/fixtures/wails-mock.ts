@@ -77,8 +77,6 @@ export interface AWSIdentity {
 export interface ScopeSelection {
   provider: string;
   projectId: string;
-  subscriptionId: string;
-  resourceGroup: string;
   vaultName: string;
   storeName: string;
 }
@@ -209,8 +207,6 @@ export function createStagedTags(
 export const awsScopeSelection: ScopeSelection = {
   provider: 'aws',
   projectId: '',
-  subscriptionId: '',
-  resourceGroup: '',
   vaultName: '',
   storeName: '',
 };
@@ -255,7 +251,7 @@ export const defaultCapabilities: ProviderCapability[] = [
   {
     provider: 'azure',
     displayName: 'Azure',
-    scopeFields: ['subscription', 'resourceGroup'],
+    scopeFields: [],
     services: [
       { service: 'param', displayName: 'App Configuration', hasVersionHistory: false, hasVersionSpecifiers: false, hasTags: false, hasRestore: false, hasStaging: true, hasForceDelete: false, hasRecoveryWindow: false },
       { service: 'secret', displayName: 'Key Vault', hasVersionHistory: true, hasVersionSpecifiers: true, hasTags: true, hasRestore: false, hasStaging: true, hasForceDelete: false, hasRecoveryWindow: false },
@@ -592,7 +588,7 @@ export function createNoAWSIdentityState(): Partial<MockState> {
 // ---- Provider-selection states (multi-cloud) ------------------------------
 
 function emptyScope(provider: string): ScopeSelection {
-  return { provider, projectId: '', subscriptionId: '', resourceGroup: '', vaultName: '', storeName: '' };
+  return { provider, projectId: '', vaultName: '', storeName: '' };
 }
 
 /**
@@ -635,8 +631,6 @@ export function createAzureState(overrides: Partial<MockState> = {}): Partial<Mo
     initialProvider: 'azure',
     currentScope: {
       ...emptyScope('azure'),
-      subscriptionId: '00000000-0000-0000-0000-000000000000',
-      resourceGroup: 'rg',
       vaultName: 'my-vault',
       storeName: 'my-store',
     },
@@ -788,8 +782,6 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
         state.currentScope = {
           provider: p,
           projectId: p === 'googlecloud' ? (sel.projectId || '') : '',
-          subscriptionId: p === 'azure' ? (sel.subscriptionId || '') : '',
-          resourceGroup: p === 'azure' ? (sel.resourceGroup || '') : '',
           vaultName: p === 'azure' ? (sel.vaultName || '') : '',
           storeName: p === 'azure' ? (sel.storeName || '') : '',
         };

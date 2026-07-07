@@ -65,9 +65,9 @@ func TestAzureKeyVaultStage_Workflow(t *testing.T) {
 	_, err = runAzureSecret(t, "create", deleteName, "to-be-deleted")
 	require.NoError(t, err)
 
-	// The Key Vault staging scope is keyed by (subscription, resource-group,
-	// vault); the emulator setup pins the vault name and leaves sub/rg empty.
-	store, err := file.NewStore(provider.AzureKeyVaultScope("", "", "suve-e2e"))
+	// The Key Vault staging scope is keyed by the globally-unique vault name
+	// alone; the emulator setup pins it to "suve-e2e".
+	store, err := file.NewStore(provider.AzureKeyVaultScope("suve-e2e"))
 	require.NoError(t, err)
 
 	now := time.Now()
@@ -149,7 +149,7 @@ func TestAzureAppConfigStage_Workflow(t *testing.T) {
 	_, err := runAzureParam(t, "create", updateName, "original")
 	require.NoError(t, err)
 
-	store, err := file.NewStore(provider.AzureAppConfigScope("", "", "suve-e2e"))
+	store, err := file.NewStore(provider.AzureAppConfigScope("suve-e2e"))
 	require.NoError(t, err)
 
 	now := time.Now()

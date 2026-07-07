@@ -39,8 +39,7 @@ variable.`,
 				Sources: cli.EnvVars("AZURE_APPCONFIG_NAME"),
 			},
 		},
-		// Before merges the resolved store name onto the base scope (subscription
-		// / resource group) set by the parent azure command. Resolution is
+		// Before stashes the resolved store name in the context. Resolution is
 		// deferred to store construction, so `suve azure param --help` works
 		// without a store.
 		Before: func(ctx context.Context, cmd *cli.Command) (context.Context, error) {

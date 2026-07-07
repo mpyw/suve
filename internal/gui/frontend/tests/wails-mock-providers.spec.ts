@@ -50,7 +50,7 @@ test.describe('wails-mock provider bindings', () => {
         errors.push(e.message);
       }
       try {
-        await app.SelectScope({ provider: 'azure', subscriptionId: 's', resourceGroup: 'r' });
+        await app.SelectScope({ provider: 'azure' });
       } catch (e: any) {
         errors.push(e.message);
       }
@@ -78,11 +78,11 @@ test.describe('wails-mock provider bindings', () => {
       const app = (window as any).go.gui.App;
 
       // Key Vault (secret) only — App Configuration (param) absent.
-      await app.SelectScope({ provider: 'azure', subscriptionId: 's', resourceGroup: 'r', vaultName: 'v' });
+      await app.SelectScope({ provider: 'azure', vaultName: 'v' });
       const vaultOnly = await app.GetCurrentScope();
 
       // App Configuration (param) only — Key Vault (secret) absent.
-      await app.SelectScope({ provider: 'azure', subscriptionId: 's', resourceGroup: 'r', storeName: 'c' });
+      await app.SelectScope({ provider: 'azure', storeName: 'c' });
       const storeOnly = await app.GetCurrentScope();
 
       return { vaultOnly, storeOnly };

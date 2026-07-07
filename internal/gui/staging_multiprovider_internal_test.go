@@ -26,8 +26,8 @@ func TestApp_stagingScope_NoSTSForResolvableScopes(t *testing.T) {
 		scope provider.Scope
 	}{
 		{"google cloud", provider.GoogleCloudScope("proj")},
-		{"azure key vault", provider.AzureKeyVaultScope("sub", "rg", "vault")},
-		{"azure app config", provider.AzureAppConfigScope("sub", "rg", "store")},
+		{"azure key vault", provider.AzureKeyVaultScope("vault")},
+		{"azure app config", provider.AzureAppConfigScope("store")},
 		{"aws with account+region", provider.AWSScope("123456789012", "us-east-1")},
 	}
 
