@@ -180,11 +180,81 @@ cd gui && wails build -tags production,webkit2_41 -skipbindings
 
 </details>
 
-> [!TIP]
-> **Using with [aws-vault](https://github.com/99designs/aws-vault)**: Wrap commands with `aws-vault exec` for temporary credentials:
-> ```bash
-> aws-vault exec my-profile -- suve param show /my/param
-> ```
+## Authentication
+
+suve talks to each cloud's **data plane** using that cloud's own SDK credential chain — the same one the native CLI (`aws` / `gcloud` / `az`) uses. There is nothing suve-specific to configure: sign in the normal way, then point suve at the resource with an environment variable (or the equivalent flag).
+
+<table>
+<thead>
+<tr><th>Provider</th><th>Sign in (identity)</th><th>Point at the resource</th></tr>
+</thead>
+<tbody>
+<tr>
+<td><b>AWS</b></td>
+<td>
+
+```bash
+aws sso login \
+  --profile prod
+```
+
+</td>
+<td>
+
+```bash
+export AWS_PROFILE=prod
+export AWS_REGION=us-east-1
+```
+
+</td>
+</tr>
+<tr>
+<td><b>Google<br>Cloud</b></td>
+<td>
+
+```bash
+gcloud auth \
+  application-default \
+  login
+```
+
+</td>
+<td>
+
+```bash
+export GOOGLE_CLOUD_PROJECT=my-project
+```
+
+</td>
+</tr>
+<tr>
+<td><b>Azure</b></td>
+<td>
+
+```bash
+az login
+```
+
+</td>
+<td>
+
+```bash
+# secret
+export AZURE_KEYVAULT_NAME=my-vault
+# param
+export AZURE_APPCONFIG_NAME=my-store
+```
+
+</td>
+</tr>
+</tbody>
+</table>
+
+> [!NOTE]
+> - Every value has a flag equivalent: `--profile`/`--region`, `--project`, `--vault-name`/`--store-name`.
+> - **AWS** — the standard [credential chain](https://docs.aws.amazon.com/sdkref/latest/guide/standardized-credentials.html): SSO, static keys, `~/.aws/credentials`, or an IAM role. With [aws-vault](https://github.com/99designs/aws-vault): `aws-vault exec prod -- suve param show /my/param`.
+> - **Google Cloud** — [Application Default Credentials](https://cloud.google.com/docs/authentication/application-default-credentials); or a service-account key via `GOOGLE_APPLICATION_CREDENTIALS`.
+> - **Azure** — the [DefaultAzureCredential](https://learn.microsoft.com/en-us/azure/developer/go/azure-sdk-authentication) chain; or a service principal via `AZURE_CLIENT_ID` / `AZURE_CLIENT_SECRET` / `AZURE_TENANT_ID`. `az login` sets no environment variables — it caches credentials under `~/.azure`, which suve reuses. The Key Vault / App Configuration name is a globally-unique endpoint, so **no subscription or resource group is needed**.
 
 ## Getting Started
 
