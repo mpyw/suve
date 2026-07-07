@@ -438,8 +438,14 @@ jobs:
           for dir in dist/*/; do
             [[ -d "$dir" ]] || continue
             build_name=$(basename "$dir")
-            goos=$(echo "$build_name" | cut -d'_' -f2)
-            goarch=$(echo "$build_name" | cut -d'_' -f3)
+            # goreleaser dir format is {id}_{goos}_{goarch}. The id itself may
+            # contain underscores (e.g. suve-linux-amd64-webkit2_41), so take the
+            # last two underscore-separated fields rather than fixed positions f2/f3,
+            # otherwise webkit2_41 builds mis-parse to goos=41/goarch=linux and the
+            # archive name loses its arch (amd64/arm64 then collide).
+            goarch="${build_name##*_}"
+            rest="${build_name%_*}"
+            goos="${rest##*_}"
 
             # Determine archive name based on build type
             if [[ "$build_name" == suve-cli-* ]]; then
