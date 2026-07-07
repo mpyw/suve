@@ -38,7 +38,7 @@ func TestResourceHint(t *testing.T) {
 func TestDebugDialOptions_disabled(t *testing.T) {
 	t.Parallel()
 
-	assert.Nil(t, debugDialOptions(context.Background()))
+	assert.Empty(t, debugDialOptions(context.Background()))
 }
 
 func TestDebugDialOptions_enabled(t *testing.T) {
@@ -101,8 +101,8 @@ func TestDebugUnaryInterceptor(t *testing.T) {
 func TestDebugGRPCDialOptions(t *testing.T) {
 	t.Parallel()
 
-	// Disabled: nil, so the emulator path adds nothing.
-	assert.Nil(t, debugGRPCDialOptions(context.Background()))
+	// Disabled: empty, so the emulator path adds nothing.
+	assert.Empty(t, debugGRPCDialOptions(context.Background()))
 
 	// Enabled: one chained-interceptor option, shared by both client paths.
 	ctx := debug.With(context.Background(), debug.Config{Enabled: true, Writer: &bytes.Buffer{}})

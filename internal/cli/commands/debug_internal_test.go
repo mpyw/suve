@@ -97,5 +97,5 @@ func TestEnableDebug_aliasSummary(t *testing.T) {
 	}
 
 	_, stderr := runProbe(t, det, []string{appName, "--debug", "probe"})
-	assert.Contains(t, stderr, "flat aliases: param=aws secret=gcloud stage=(none) (aws via ~/.aws/credentials fallback)")
+	assert.Contains(t, stderr, "flat aliases: param=aws secret=gcloud stage=(none) (AWS via ~/.aws/credentials fallback)")
 }

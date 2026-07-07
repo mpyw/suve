@@ -4,6 +4,7 @@ package commands
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 
@@ -105,12 +106,10 @@ func enableDebug(det detect.Result) cli.BeforeFunc {
 			return ctx, nil
 		}
 
-		w := cmd.Root().ErrWriter
-		if w == nil {
-			w = os.Stderr
+		cfg := debug.Config{
+			Enabled: true,
+			Writer:  lo.CoalesceOrEmpty[io.Writer](cmd.Root().ErrWriter, os.Stderr),
 		}
-
-		cfg := debug.Config{Enabled: true, Writer: w}
 		cfg.Logf("cli: suve version=%s\n", cmd.Root().Version)
 		cfg.Logf("cli: flat aliases: param=%s secret=%s stage=%s%s\n",
 			aliasTarget(det.Param), aliasTarget(det.Secret), aliasTarget(det.Stage), fallbackNote(det))
@@ -122,21 +121,17 @@ func enableDebug(det detect.Result) cli.BeforeFunc {
 // aliasTarget renders a flat-alias provider for the debug summary, making the
 // "no alias" case explicit instead of printing an empty string.
 func aliasTarget(p provider.Provider) string {
-	if p == "" {
-		return "(none)"
-	}
-
-	return groupName(p)
+	return groupName(lo.CoalesceOrEmpty(p, "(none)"))
 }
 
 // fallbackNote annotates the debug alias summary when AWS became active only
 // through the ~/.aws/credentials fallback rather than an env signal.
 func fallbackNote(det detect.Result) string {
-	if det.AWSViaFallback {
-		return " (aws via ~/.aws/credentials fallback)"
-	}
-
-	return ""
+	return lo.Ternary(
+		det.AWSViaFallback,
+		" (AWS via ~/.aws/credentials fallback)",
+		"",
+	)
 }
 
 // flatCommand builds the top-level alias command (named "param" or "secret") for
@@ -207,10 +202,11 @@ func aliasDescription(det detect.Result) string {
 			"'suve aws', 'suve gcloud', or 'suve azure'."
 	}
 
-	via := " (from environment)"
-	if det.AWSViaFallback {
-		via = " (AWS via ~/.aws/credentials)"
-	}
+	via := lo.Ternary(
+		det.AWSViaFallback,
+		" (AWS via ~/.aws/credentials)",
+		" (from environment)",
+	)
 
 	return "Active top-level aliases" + via + ":\n" + strings.Join(lines, "\n") +
 		"\nThe explicit groups ('suve aws', 'suve gcloud', 'suve azure') are always available."

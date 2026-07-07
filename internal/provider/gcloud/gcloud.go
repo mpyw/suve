@@ -13,6 +13,7 @@ import (
 	"time"
 
 	secretmanager "cloud.google.com/go/secretmanager/apiv1"
+	"github.com/samber/lo"
 	"google.golang.org/api/option"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -67,11 +68,8 @@ func debugUnaryInterceptor(cfg debug.Config) grpc.UnaryClientInterceptor {
 		err := invoker(ctx, method, req, reply, cc, opts...)
 
 		hint := resourceHint(req)
-		if hint != "" {
-			hint = " " + hint
-		}
-
-		cfg.Logf("gcloud grpc: %s%s (%s) %s in %s\n", method, hint, cc.Target(), grpcStatus(err), time.Since(start))
+		cfg.Logf("gcloud grpc: %s%s (%s) %s in %s\n",
+			method, lo.Ternary(hint == "", "", " "+hint), cc.Target(), grpcStatus(err), time.Since(start))
 
 		return err
 	}
@@ -92,17 +90,9 @@ func debugGRPCDialOptions(ctx context.Context) []grpc.DialOption {
 
 // debugDialOptions wraps debugGRPCDialOptions for the self-dialing client path.
 func debugDialOptions(ctx context.Context) []option.ClientOption {
-	grpcOpts := debugGRPCDialOptions(ctx)
-	if len(grpcOpts) == 0 {
-		return nil
-	}
-
-	clientOpts := make([]option.ClientOption, 0, len(grpcOpts))
-	for _, opt := range grpcOpts {
-		clientOpts = append(clientOpts, option.WithGRPCDialOption(opt))
-	}
-
-	return clientOpts
+	return lo.Map(debugGRPCDialOptions(ctx), func(opt grpc.DialOption, _ int) option.ClientOption {
+		return option.WithGRPCDialOption(opt)
+	})
 }
 
 // newSecretManagerClient builds the Secret Manager client, honoring the
