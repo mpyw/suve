@@ -137,7 +137,7 @@ cd suve
 **CLI only:**
 
 ```bash
-mise build
+mise build-cli
 # Binary: bin/suve
 ```
 
@@ -872,7 +872,7 @@ mise test
 mise lint
 
 # Build CLI (without GUI)
-mise build
+mise build-cli
 
 # Build with GUI support — builds the frontend first, then embeds it into
 # bin/suve. (A bare `go build -tags production` skips the frontend build, so the
