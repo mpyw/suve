@@ -4,6 +4,7 @@ package commands
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/samber/lo"
@@ -16,6 +17,7 @@ import (
 	"github.com/mpyw/suve/internal/cli/commands/secret"
 	"github.com/mpyw/suve/internal/cli/commands/stage"
 	"github.com/mpyw/suve/internal/cli/output"
+	"github.com/mpyw/suve/internal/debug"
 	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/provider/detect"
 )
@@ -68,6 +70,8 @@ func MakeAppWithDetect(det detect.Result) *cli.Command {
 		Usage:       baseUsage,
 		Description: aliasDescription(det),
 		Version:     Version,
+		Flags:       []cli.Flag{debugFlag()},
+		Before:      enableDebug(det),
 		Commands:    append(flat, commands...),
 		CommandNotFound: func(_ context.Context, cmd *cli.Command, command string) {
 			_ = cli.ShowAppHelp(cmd)
@@ -76,6 +80,63 @@ func MakeAppWithDetect(det detect.Result) *cli.Command {
 			output.Warning(w, "Command not found: %s", command)
 		},
 	}
+}
+
+// debugFlag defines the global --debug switch. It is a persistent flag (v3
+// flags propagate to subcommands unless marked Local), so it works in any
+// position: `suve --debug sm ls` and `suve sm ls --debug` are equivalent. The
+// SUVE_DEBUG environment variable is an alternative source.
+func debugFlag() cli.Flag {
+	return &cli.BoolFlag{
+		Name:    "debug",
+		Usage:   "Log cloud SDK requests/responses to stderr (metadata only, no secret values)",
+		Sources: cli.EnvVars("SUVE_DEBUG"),
+	}
+}
+
+// enableDebug builds the root Before hook: when --debug (or SUVE_DEBUG) is set
+// it stores a debug.Config in the context that provider adapters read to turn on
+// their SDK request logging, and logs a one-shot summary of the decisions suve
+// already made before any API call (version, flat-alias resolution). Debug
+// output goes to the root ErrWriter so it never contaminates piped STDOUT.
+func enableDebug(det detect.Result) cli.BeforeFunc {
+	return func(ctx context.Context, cmd *cli.Command) (context.Context, error) {
+		if !cmd.Bool("debug") {
+			return ctx, nil
+		}
+
+		w := cmd.Root().ErrWriter
+		if w == nil {
+			w = os.Stderr
+		}
+
+		cfg := debug.Config{Enabled: true, Writer: w}
+		cfg.Logf("cli: suve version=%s\n", cmd.Root().Version)
+		cfg.Logf("cli: flat aliases: param=%s secret=%s stage=%s%s\n",
+			aliasTarget(det.Param), aliasTarget(det.Secret), aliasTarget(det.Stage), fallbackNote(det))
+
+		return debug.With(ctx, cfg), nil
+	}
+}
+
+// aliasTarget renders a flat-alias provider for the debug summary, making the
+// "no alias" case explicit instead of printing an empty string.
+func aliasTarget(p provider.Provider) string {
+	if p == "" {
+		return "(none)"
+	}
+
+	return groupName(p)
+}
+
+// fallbackNote annotates the debug alias summary when AWS became active only
+// through the ~/.aws/credentials fallback rather than an env signal.
+func fallbackNote(det detect.Result) string {
+	if det.AWSViaFallback {
+		return " (aws via ~/.aws/credentials fallback)"
+	}
+
+	return ""
 }
 
 // flatCommand builds the top-level alias command (named "param" or "secret") for
