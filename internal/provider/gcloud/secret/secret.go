@@ -30,6 +30,7 @@ import (
 	"google.golang.org/protobuf/types/known/fieldmaskpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
+	"github.com/mpyw/suve/internal/debug"
 	"github.com/mpyw/suve/internal/domain"
 	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/version/gcloudversion"
@@ -249,6 +250,10 @@ func (s *Store) List(ctx context.Context) ([]string, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to list secrets: %w", err)
 	}
+
+	// The total makes a successful-but-empty result (wrong project) visible at
+	// a glance; the parent pins down which project was actually queried.
+	debug.From(ctx).Logf("gcloud secretmanager: ListSecrets (%s) -> %d secrets\n", s.parent(), len(secrets))
 
 	return lo.Map(secrets, func(sec *secretmanagerpb.Secret, _ int) string {
 		return shortName(sec.GetName())
