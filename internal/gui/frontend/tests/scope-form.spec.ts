@@ -167,6 +167,30 @@ test.describe('Azure scope form', () => {
     });
   });
 
+  test('scope info always renders every row ("?" when unset); Change scope stays present but disables while editing', async ({ page }) => {
+    // Only a Key Vault is configured — no App Configuration store.
+    await setupWailsMocks(
+      page,
+      createAzureState({ currentScope: { provider: 'azure', projectId: '', vaultName: 'only-vault', storeName: '' } }),
+    );
+    await page.goto('/');
+    const info = page.locator('.scope-info');
+    await expect(info).toBeVisible();
+
+    // Every row renders; the unset App Configuration store shows "?" (not hidden).
+    await expect(info).toContainText('only-vault');
+    await expect(info).toContainText('?');
+
+    // Change scope is present and enabled while connected...
+    const change = page.getByRole('button', { name: 'Change scope' });
+    await expect(change).toBeEnabled();
+
+    // ...and stays present but disabled once a form is pending.
+    await change.click();
+    await expect(page.locator('#azure-vault')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Change scope' })).toBeDisabled();
+  });
+
   test.describe('a11y', () => {
     test('fields are labeled and the first field is focused on open', async ({ page }) => {
       await setupWailsMocks(page);

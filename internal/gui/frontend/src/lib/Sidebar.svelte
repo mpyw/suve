@@ -224,46 +224,47 @@
   {/if}
 
   <!-- Identity / scope info (hidden while a scope form is pending) -->
-  {#if scopeReady && !pendingProvider && provider === 'aws' && accountId && region}
+  {#if provider === 'aws'}
+    <!-- Gated by provider only, symmetric with Google Cloud / Azure: every row
+         is always rendered, showing "?" when unset (e.g. identity unavailable).
+         AWS has no editable scope form (region/creds come from the ambient AWS
+         config), so there is no Change scope button. -->
     <div class="aws-info">
-      {#if profile}
-        <div class="aws-info-row">
-          <span class="aws-info-label">Profile</span>
-          <span class="aws-info-value aws-info-profile" title={profile}>{profile}</span>
-        </div>
-      {/if}
+      <div class="aws-info-row">
+        <span class="aws-info-label">Profile</span>
+        <span class="aws-info-value aws-info-profile" title={profile || '?'}>{profile || '?'}</span>
+      </div>
       <div class="aws-info-row">
         <span class="aws-info-label">Account</span>
-        <span class="aws-info-value" title={accountId}>{accountId}</span>
+        <span class="aws-info-value" title={accountId || '?'}>{accountId || '?'}</span>
       </div>
       <div class="aws-info-row">
         <span class="aws-info-label">Region</span>
-        <span class="aws-info-value" title={region}>{region}</span>
+        <span class="aws-info-value" title={region || '?'}>{region || '?'}</span>
       </div>
     </div>
-  {:else if scopeReady && !pendingProvider && provider === 'googlecloud' && scope?.projectId}
+  {:else if provider === 'googlecloud'}
+    <!-- Gated by provider only: every row is always rendered ("?" when unset).
+         Change scope is always present and only disabled while a form is pending
+         (so it stays reachable in an errored/partial state). -->
     <div class="aws-info scope-info">
       <div class="aws-info-row">
         <span class="aws-info-label">Project</span>
-        <span class="aws-info-value" title={scope.projectId}>{scope.projectId}</span>
+        <span class="aws-info-value" title={scope?.projectId || '?'}>{scope?.projectId || '?'}</span>
       </div>
-      <button type="button" class="scope-change" onclick={() => onchangescope?.()}>Change scope</button>
+      <button type="button" class="scope-change" disabled={!!pendingProvider} onclick={() => onchangescope?.()}>Change scope</button>
     </div>
-  {:else if scopeReady && !pendingProvider && provider === 'azure'}
+  {:else if provider === 'azure'}
     <div class="aws-info scope-info">
-      {#if scope?.vaultName}
-        <div class="aws-info-row">
-          <span class="aws-info-label">Key Vault</span>
-          <span class="aws-info-value" title={scope.vaultName}>{scope.vaultName}</span>
-        </div>
-      {/if}
-      {#if scope?.storeName}
-        <div class="aws-info-row">
-          <span class="aws-info-label">App Config</span>
-          <span class="aws-info-value" title={scope.storeName}>{scope.storeName}</span>
-        </div>
-      {/if}
-      <button type="button" class="scope-change" onclick={() => onchangescope?.()}>Change scope</button>
+      <div class="aws-info-row">
+        <span class="aws-info-label">Key Vault</span>
+        <span class="aws-info-value" title={scope?.vaultName || '?'}>{scope?.vaultName || '?'}</span>
+      </div>
+      <div class="aws-info-row">
+        <span class="aws-info-label">App Config</span>
+        <span class="aws-info-value" title={scope?.storeName || '?'}>{scope?.storeName || '?'}</span>
+      </div>
+      <button type="button" class="scope-change" disabled={!!pendingProvider} onclick={() => onchangescope?.()}>Change scope</button>
     </div>
   {/if}
 </aside>
@@ -380,9 +381,14 @@
     cursor: pointer;
   }
 
-  .scope-change:hover {
+  .scope-change:hover:not(:disabled) {
     color: #fff;
     border-color: #3d3d5c;
+  }
+
+  .scope-change:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
   }
 
   .nav {

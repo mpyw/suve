@@ -139,61 +139,60 @@ test.describe('AWS Identity Display', () => {
     await expect(awsInfo).toContainText('ap-northeast-1');
   });
 
-  test('should display AWS identity without profile', async ({ page }) => {
+  test('renders "?" for the profile when none is set', async ({ page }) => {
     await setupWailsMocks(page, createAWSIdentityState('987654321098', 'us-east-1', ''));
     await page.goto('/');
 
     const awsInfo = page.locator('.aws-info');
     await expect(awsInfo).toBeVisible();
 
-    // Profile row should not be displayed
-    await expect(awsInfo.locator('.aws-info-profile')).not.toBeVisible();
-
-    // Account and region should still be displayed
+    // Profile is optional; it renders as "?" instead of being hidden.
+    await expect(awsInfo.locator('.aws-info-profile')).toHaveText('?');
+    // Account and region still show their values.
     await expect(awsInfo).toContainText('987654321098');
     await expect(awsInfo).toContainText('us-east-1');
   });
 
-  test('should not display AWS info section when identity is unavailable', async ({ page }) => {
+  test('renders the AWS panel with "?" everywhere when identity is unavailable', async ({ page }) => {
     await setupWailsMocks(page, createNoAWSIdentityState());
     await page.goto('/');
 
-    // Wait for sidebar to be visible
-    await expect(page.locator('.sidebar')).toBeVisible();
-
-    // AWS info section should not be displayed
-    await expect(page.locator('.aws-info')).not.toBeVisible();
+    const awsInfo = page.locator('.aws-info');
+    // Symmetric with Google Cloud / Azure: the panel always renders, with "?"
+    // for every unresolved value rather than being hidden.
+    await expect(awsInfo).toBeVisible();
+    await expect(awsInfo.getByText('?', { exact: true })).toHaveCount(3);
   });
 
-  test('should not display AWS info section when GetAWSIdentity fails', async ({ page }) => {
+  test('renders the AWS panel with "?" when GetAWSIdentity fails', async ({ page }) => {
     await setupWailsMocks(page, {
       simulateError: { operation: 'GetAWSIdentity', message: 'No credentials found' },
     });
     await page.goto('/');
 
-    // Wait for sidebar to be visible
-    await expect(page.locator('.sidebar')).toBeVisible();
-
-    // AWS info section should not be displayed when API fails
-    await expect(page.locator('.aws-info')).not.toBeVisible();
+    const awsInfo = page.locator('.aws-info');
+    await expect(awsInfo).toBeVisible();
+    await expect(awsInfo.getByText('?', { exact: true })).toHaveCount(3);
   });
 
-  test('should not display AWS info section when only accountId is available', async ({ page }) => {
+  test('renders "?" for region when only the account id is available', async ({ page }) => {
     await setupWailsMocks(page, createAWSIdentityState('123456789012', '', ''));
     await page.goto('/');
 
-    await expect(page.locator('.sidebar')).toBeVisible();
-    // Both accountId AND region are required
-    await expect(page.locator('.aws-info')).not.toBeVisible();
+    const awsInfo = page.locator('.aws-info');
+    await expect(awsInfo).toBeVisible();
+    await expect(awsInfo).toContainText('123456789012'); // account shown
+    await expect(awsInfo.getByText('?', { exact: true })).toHaveCount(2); // region + profile
   });
 
-  test('should not display AWS info section when only region is available', async ({ page }) => {
+  test('renders "?" for the account id when only the region is available', async ({ page }) => {
     await setupWailsMocks(page, createAWSIdentityState('', 'ap-northeast-1', ''));
     await page.goto('/');
 
-    await expect(page.locator('.sidebar')).toBeVisible();
-    // Both accountId AND region are required
-    await expect(page.locator('.aws-info')).not.toBeVisible();
+    const awsInfo = page.locator('.aws-info');
+    await expect(awsInfo).toBeVisible();
+    await expect(awsInfo).toContainText('ap-northeast-1'); // region shown
+    await expect(awsInfo.getByText('?', { exact: true })).toHaveCount(2); // account + profile
   });
 });
 
