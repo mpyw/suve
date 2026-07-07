@@ -829,7 +829,7 @@ All timestamps are formatted in RFC3339 format with the local timezone offset ap
 |----------|-------------|
 | `TZ` | Timezone for date/time formatting (see above) |
 | `SUVE_NO_UPDATE_CHECK` | Opt out of the update-check notification |
-| `SUVE_DEBUG` | Enable verbose debug logging (same as the global `--debug` flag) |
+| `SUVE_DEBUG` | Enable verbose debug logging (same as the global `--debug` flag); any non-empty value except `0`/`false` enables it |
 
 ### Debugging
 
@@ -844,7 +844,8 @@ suve secret ls --debug          # flag works in any position
 SUVE_DEBUG=1 suve secret ls      # or via environment
 ```
 
-Every line shares the `[suve debug <time>]` prefix. The output includes:
+Each entry starts with a `[suve debug <time>]` prefix (multi-line HTTP dumps
+are prefixed on their first line). The output includes:
 
 - **CLI decisions** — the suve version and which provider each flat alias
   (`param` / `secret` / `stage`) resolved to.
@@ -859,10 +860,13 @@ Every line shares the `[suve debug <time>]` prefix. The output includes:
   the client-side prefix/regex filters, so "the API returned nothing" and "my
   filter dropped everything" are distinguishable.
 
-Only request/response **metadata** is printed — secret values are never logged
-(AWS uses the bodyless log modes, the gRPC interceptor never prints messages,
-and azcore logs headers/status only). Debug output goes to stderr, so it never
-contaminates piped stdout.
+Only request/response **metadata** is printed — secret values are never logged:
+AWS uses the bodyless log modes and suve redacts the credential-bearing headers
+(`Authorization`, `X-Amz-Security-Token`) from the signed-request dumps; the
+gRPC interceptor never prints request/reply messages; azcore redacts headers
+outside its allowlist and never logs bodies (error events may include the
+service's error document, the same text normal error output already shows).
+Debug output goes to stderr, so it never contaminates piped stdout.
 
 ### Staging
 

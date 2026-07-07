@@ -25,17 +25,26 @@ import (
 // arnAccountIDRegex extracts AWS account ID (12 digits) from ARN strings.
 var arnAccountIDRegex = regexp.MustCompile(`:(\d{12}):`)
 
+// sensitiveHeaderRegex matches HTTP header lines whose values carry live
+// credentials. The SDK's LogRequest dump runs AFTER SigV4 signing, so without
+// redaction it would print the full Authorization header (a replayable signed
+// request) and, for temporary credentials (SSO / assume-role), the session
+// token — exactly what users must never paste into an issue.
+var sensitiveHeaderRegex = regexp.MustCompile(`(?im)^((?:Authorization|Proxy-Authorization|X-Amz-Security-Token):[ \t]*).*$`)
+
 // debugLogger adapts the debug writer to smithy's logging.Logger so SDK
 // request/response dumps share the unified "[suve debug ...]" line prefix with
 // every other provider (multi-line HTTP dumps are prefixed on their first line
-// only).
+// only). Credential-bearing headers are redacted before anything is written,
+// mirroring azcore's log-policy behavior on the Azure side.
 type debugLogger struct {
 	cfg debug.Config
 }
 
 // Logf implements smithy logging.Logger.
 func (l debugLogger) Logf(classification logging.Classification, format string, v ...any) {
-	l.cfg.Logf("aws sdk %s: %s\n", classification, fmt.Sprintf(format, v...))
+	msg := sensitiveHeaderRegex.ReplaceAllString(fmt.Sprintf(format, v...), "${1}REDACTED")
+	l.cfg.Logf("aws sdk %s: %s\n", classification, msg)
 }
 
 // LoadConfig loads the default AWS configuration. When debug is enabled on the

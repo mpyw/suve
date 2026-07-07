@@ -100,6 +100,12 @@ var debugLogOnce sync.Once
 // azidentity.EventAuthentication is included so the DefaultAzureCredential
 // chain reports which credential it tried and which one it selected — the most
 // common Azure debugging question when a command fails or returns nothing.
+//
+// Because the listener is process-global and set once, it stays bound to the
+// FIRST debug-enabled context's writer for the process lifetime. That is
+// exactly right for the one-shot CLI (single writer, single setting); a
+// long-lived embedder (e.g. the GUI, which never enables debug today) would
+// need a re-targetable listener before exposing a debug switch.
 func enableDebugLogging(ctx context.Context) {
 	d := debug.From(ctx)
 	if !d.Enabled {

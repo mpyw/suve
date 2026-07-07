@@ -54,7 +54,9 @@ func runProbe(t *testing.T, det detect.Result, args []string) (bool, string) {
 }
 
 func TestEnableDebug_off(t *testing.T) {
-	t.Parallel()
+	// Not parallel: neutralizes ambient SUVE_DEBUG from the developer's shell
+	// via t.Setenv so the "off" assertion is hermetic.
+	t.Setenv("SUVE_DEBUG", "")
 
 	enabled, stderr := runProbe(t, detect.Result{}, []string{appName, "probe"})
 	assert.False(t, enabled)
@@ -85,6 +87,33 @@ func TestEnableDebug_env(t *testing.T) {
 
 	enabled, _ := runProbe(t, detect.Result{}, []string{appName, "probe"})
 	assert.True(t, enabled)
+}
+
+// TestEnableDebug_envLenient covers the lenient SUVE_DEBUG parsing: bool-ish
+// values are honored, any other non-empty value enables debug, and no value
+// ever makes the command fail (the strict flag-Source parsing it replaces
+// hard-failed every invocation on SUVE_DEBUG=yes). Not parallel: subtests
+// mutate the process environment via t.Setenv.
+func TestEnableDebug_envLenient(t *testing.T) {
+	tests := []struct {
+		value string
+		want  bool
+	}{
+		{value: "yes", want: true},
+		{value: "on", want: true},
+		{value: "true", want: true},
+		{value: "0", want: false},
+		{value: "false", want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.value, func(t *testing.T) {
+			t.Setenv("SUVE_DEBUG", tt.value)
+
+			enabled, _ := runProbe(t, detect.Result{}, []string{appName, "probe"})
+			assert.Equal(t, tt.want, enabled)
+		})
+	}
 }
 
 func TestEnableDebug_aliasSummary(t *testing.T) {

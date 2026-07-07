@@ -72,7 +72,7 @@ func (u *ListUseCase) Execute(ctx context.Context, input ListInput) (*ListOutput
 
 	// Distinguishes "the API returned nothing" from "the client-side filters
 	// dropped everything" — the two look identical in the final output.
-	debug.From(ctx).Logf("list: provider returned %d names, %d after filters (prefix=%q, recursive=%v, filter=%q)\n",
+	debug.From(ctx).Logf("aws ssm list: provider returned %d names, %d after filters (prefix=%q, recursive=%v, filter=%q)\n",
 		len(names), len(filtered), input.Prefix, input.Recursive, input.Filter)
 
 	return u.buildOutput(ctx, input.WithValue, filtered), nil
