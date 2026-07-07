@@ -25,26 +25,76 @@ import (
 // arnAccountIDRegex extracts AWS account ID (12 digits) from ARN strings.
 var arnAccountIDRegex = regexp.MustCompile(`:(\d{12}):`)
 
-// sensitiveHeaderRegex matches HTTP header lines whose values carry live
-// credentials. The SDK's LogRequest dump runs AFTER SigV4 signing, so without
-// redaction it would print the full Authorization header (a replayable signed
-// request) and, for temporary credentials (SSO / assume-role), the session
-// token — exactly what users must never paste into an issue.
-var sensitiveHeaderRegex = regexp.MustCompile(`(?im)^((?:Authorization|Proxy-Authorization|X-Amz-Security-Token):[ \t]*).*$`)
+// safeHeaders is the allowlist of HTTP header names whose values are safe to
+// show in a debug dump. Any header NOT listed here has its value redacted, so
+// the dump fails CLOSED: a new or unexpected credential-bearing header (a future
+// auth scheme, a custom proxy header) is hidden by default rather than leaked.
+// This mirrors azcore's allowlist model on the Azure side, and is the reason a
+// denylist was rejected — the SDK's LogRequest dump runs AFTER SigV4 signing, so
+// it carries the live Authorization header and, for temporary credentials, the
+// session token. Names are lowercased for case-insensitive matching; the set is
+// scoped to headers useful for diagnosing empty/unexpected output (#306): the
+// target region (Host), the operation (X-Amz-Target), timing, and request IDs.
+//
+//nolint:gochecknoglobals // effectively const lookup table
+var safeHeaders = map[string]struct{}{
+	"host":                  {},
+	"user-agent":            {},
+	"content-type":          {},
+	"content-length":        {},
+	"accept-encoding":       {},
+	"date":                  {},
+	"connection":            {},
+	"server":                {},
+	"x-amz-target":          {},
+	"x-amz-date":            {},
+	"amz-sdk-invocation-id": {},
+	"amz-sdk-request":       {},
+	"x-amzn-requestid":      {},
+	"x-amz-request-id":      {},
+	"x-amz-id-2":            {},
+	"x-amzn-trace-id":       {},
+	"x-amz-cf-id":           {},
+}
+
+// headerLineRegex splits one line of an HTTP request/response dump into header
+// name and value. Non-header lines (the request/status line, the blank
+// separator) do not match and pass through untouched.
+var headerLineRegex = regexp.MustCompile(`^([A-Za-z0-9-]+):[ \t]*(.*)$`)
+
+// redactDump rewrites an HTTP dump so only allowlisted header values survive;
+// every other header value becomes REDACTED (the name is kept, so the reader
+// still sees the header exists). Fail-closed by design — see safeHeaders.
+func redactDump(dump string) string {
+	lines := strings.Split(dump, "\n")
+	for i, line := range lines {
+		m := headerLineRegex.FindStringSubmatch(strings.TrimRight(line, "\r"))
+		if m == nil {
+			continue // request/status line, blank separator, etc.
+		}
+
+		if _, ok := safeHeaders[strings.ToLower(m[1])]; ok {
+			continue
+		}
+
+		lines[i] = m[1] + ": REDACTED"
+	}
+
+	return strings.Join(lines, "\n")
+}
 
 // debugLogger adapts the debug writer to smithy's logging.Logger so SDK
 // request/response dumps share the unified "[suve debug ...]" line prefix with
 // every other provider (multi-line HTTP dumps are prefixed on their first line
-// only). Credential-bearing headers are redacted before anything is written,
-// mirroring azcore's log-policy behavior on the Azure side.
+// only). Header values are allowlisted before anything is written, mirroring
+// azcore's log-policy behavior on the Azure side.
 type debugLogger struct {
 	cfg debug.Config
 }
 
 // Logf implements smithy logging.Logger.
 func (l debugLogger) Logf(classification logging.Classification, format string, v ...any) {
-	msg := sensitiveHeaderRegex.ReplaceAllString(fmt.Sprintf(format, v...), "${1}REDACTED")
-	l.cfg.Logf("aws sdk %s: %s\n", classification, msg)
+	l.cfg.Logf("aws sdk %s: %s\n", classification, redactDump(fmt.Sprintf(format, v...)))
 }
 
 // LoadConfig loads the default AWS configuration. When debug is enabled on the

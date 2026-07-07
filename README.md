@@ -889,12 +889,15 @@ are prefixed on their first line). The output includes:
   filter dropped everything" are distinguishable.
 
 Only request/response **metadata** is printed — secret values are never logged:
-AWS uses the bodyless log modes and suve redacts the credential-bearing headers
-(`Authorization`, `X-Amz-Security-Token`) from the signed-request dumps; the
-gRPC interceptor never prints request/reply messages; azcore redacts headers
-outside its allowlist and never logs bodies (error events may include the
-service's error document, the same text normal error output already shows).
-Debug output goes to stderr, so it never contaminates piped stdout.
+AWS uses the bodyless log modes, and because the dump is taken after request
+signing, suve shows only an **allowlist** of non-sensitive headers (`Host`,
+`X-Amz-Target`, request IDs, …) and redacts every other header value — so the
+signing `Authorization` header, the session token, and any future
+credential-bearing header fail closed rather than leaking. The gRPC interceptor
+never prints request/reply messages; azcore redacts headers outside its own
+allowlist and never logs bodies (error events may include the service's error
+document, the same text normal error output already shows). Debug output goes to
+stderr, so it never contaminates piped stdout.
 
 ### Staging
 
