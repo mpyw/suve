@@ -96,6 +96,16 @@ var debugLogOnce sync.Once
 // is process-global and must be set before clients issue requests; the default
 // (IncludeBody off) logs headers and status only, so secret values are never
 // printed.
+//
+// azidentity.EventAuthentication is included so the DefaultAzureCredential
+// chain reports which credential it tried and which one it selected — the most
+// common Azure debugging question when a command fails or returns nothing.
+//
+// Because the listener is process-global and set once, it stays bound to the
+// FIRST debug-enabled context's writer for the process lifetime. That is
+// exactly right for the one-shot CLI (single writer, single setting); a
+// long-lived embedder (e.g. the GUI, which never enables debug today) would
+// need a re-targetable listener before exposing a debug switch.
 func enableDebugLogging(ctx context.Context) {
 	d := debug.From(ctx)
 	if !d.Enabled {
@@ -103,9 +113,12 @@ func enableDebugLogging(ctx context.Context) {
 	}
 
 	debugLogOnce.Do(func() {
-		azlog.SetEvents(azlog.EventRequest, azlog.EventResponse, azlog.EventResponseError, azlog.EventRetryPolicy)
+		azlog.SetEvents(
+			azlog.EventRequest, azlog.EventResponse, azlog.EventResponseError, azlog.EventRetryPolicy,
+			azidentity.EventAuthentication,
+		)
 		azlog.SetListener(func(cls azlog.Event, msg string) {
-			d.Logf("[suve debug] azure %s: %s\n", cls, msg)
+			d.Logf("azure %s: %s\n", cls, msg)
 		})
 	})
 }

@@ -4,7 +4,9 @@ package commands
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/samber/lo"
@@ -71,7 +73,7 @@ func MakeAppWithDetect(det detect.Result) *cli.Command {
 		Description: aliasDescription(det),
 		Version:     Version,
 		Flags:       []cli.Flag{debugFlag()},
-		Before:      enableDebug,
+		Before:      enableDebug(det),
 		Commands:    append(flat, commands...),
 		// EnableShellCompletion adds a hidden `completion` command (bash/zsh/fish/pwsh)
 		// and the `--generate-shell-completion` mechanism the scripts rely on.
@@ -93,30 +95,70 @@ func MakeAppWithDetect(det detect.Result) *cli.Command {
 // debugFlag defines the global --debug switch. It is a persistent flag (v3
 // flags propagate to subcommands unless marked Local), so it works in any
 // position: `suve --debug sm ls` and `suve sm ls --debug` are equivalent. The
-// SUVE_DEBUG environment variable is an alternative source.
+// SUVE_DEBUG environment variable is an alternative source, read leniently by
+// envDebugEnabled rather than wired as a flag Source: urfave/cli's strict bool
+// parsing would otherwise make every command hard-fail on SUVE_DEBUG=yes.
 func debugFlag() cli.Flag {
 	return &cli.BoolFlag{
-		Name:    "debug",
-		Usage:   "Log cloud SDK requests/responses to stderr (metadata only, no secret values)",
-		Sources: cli.EnvVars("SUVE_DEBUG"),
+		Name:  "debug",
+		Usage: "Log cloud SDK requests/responses to stderr (metadata only, no secret values) [$SUVE_DEBUG]",
 	}
 }
 
-// enableDebug is the root Before hook: when --debug (or SUVE_DEBUG) is set it
-// stores a debug.Config in the context that provider adapters read to turn on
-// their SDK request logging. Debug output goes to the root ErrWriter so it never
-// contaminates piped STDOUT.
-func enableDebug(ctx context.Context, cmd *cli.Command) (context.Context, error) {
-	if !cmd.Bool("debug") {
-		return ctx, nil
+// envDebugEnabled reports whether SUVE_DEBUG requests debug logging. Bool-ish
+// values are honored (so SUVE_DEBUG=0/false stay off) and any other non-empty
+// value counts as enabled, consistent with SUVE_NO_UPDATE_CHECK's "any
+// non-empty value" semantics.
+func envDebugEnabled() bool {
+	v := os.Getenv("SUVE_DEBUG")
+	if v == "" {
+		return false
 	}
 
-	w := cmd.Root().ErrWriter
-	if w == nil {
-		w = os.Stderr
+	if b, err := strconv.ParseBool(v); err == nil {
+		return b
 	}
 
-	return debug.With(ctx, debug.Config{Enabled: true, Writer: w}), nil
+	return true
+}
+
+// enableDebug builds the root Before hook: when --debug (or SUVE_DEBUG) is set
+// it stores a debug.Config in the context that provider adapters read to turn on
+// their SDK request logging, and logs a one-shot summary of the decisions suve
+// already made before any API call (version, flat-alias resolution). Debug
+// output goes to the root ErrWriter so it never contaminates piped STDOUT.
+func enableDebug(det detect.Result) cli.BeforeFunc {
+	return func(ctx context.Context, cmd *cli.Command) (context.Context, error) {
+		if !cmd.Bool("debug") && !envDebugEnabled() {
+			return ctx, nil
+		}
+
+		cfg := debug.Config{
+			Enabled: true,
+			Writer:  lo.CoalesceOrEmpty[io.Writer](cmd.Root().ErrWriter, os.Stderr),
+		}
+		cfg.Logf("cli: suve version=%s\n", cmd.Root().Version)
+		cfg.Logf("cli: flat aliases: param=%s secret=%s stage=%s%s\n",
+			aliasTarget(det.Param), aliasTarget(det.Secret), aliasTarget(det.Stage), fallbackNote(det))
+
+		return debug.With(ctx, cfg), nil
+	}
+}
+
+// aliasTarget renders a flat-alias provider for the debug summary, making the
+// "no alias" case explicit instead of printing an empty string.
+func aliasTarget(p provider.Provider) string {
+	return groupName(lo.CoalesceOrEmpty(p, "(none)"))
+}
+
+// fallbackNote annotates the debug alias summary when AWS became active only
+// through the ~/.aws/credentials fallback rather than an env signal.
+func fallbackNote(det detect.Result) string {
+	return lo.Ternary(
+		det.AWSViaFallback,
+		" (AWS via ~/.aws/credentials fallback)",
+		"",
+	)
 }
 
 // flatCommand builds the top-level alias command (named "param" or "secret") for
@@ -187,10 +229,11 @@ func aliasDescription(det detect.Result) string {
 			"'suve aws', 'suve gcloud', or 'suve azure'."
 	}
 
-	via := " (from environment)"
-	if det.AWSViaFallback {
-		via = " (AWS via ~/.aws/credentials)"
-	}
+	via := lo.Ternary(
+		det.AWSViaFallback,
+		" (AWS via ~/.aws/credentials)",
+		" (from environment)",
+	)
 
 	return "Active top-level aliases" + via + ":\n" + strings.Join(lines, "\n") +
 		"\nThe explicit groups ('suve aws', 'suve gcloud', 'suve azure') are always available."

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"testing"
 
+	"cloud.google.com/go/secretmanager/apiv1/secretmanagerpb"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
@@ -21,10 +22,23 @@ func TestGRPCStatus(t *testing.T) {
 	assert.Equal(t, "failed: boom", grpcStatus(errors.New("boom")))
 }
 
+func TestResourceHint(t *testing.T) {
+	t.Parallel()
+
+	// Real request shapes: name-addressed (Access/Get) and parent-addressed
+	// (List/Create). Both carry only resource paths, never payloads.
+	assert.Equal(t, "projects/p/secrets/s/versions/1",
+		resourceHint(&secretmanagerpb.AccessSecretVersionRequest{Name: "projects/p/secrets/s/versions/1"}))
+	assert.Equal(t, "projects/p",
+		resourceHint(&secretmanagerpb.ListSecretsRequest{Parent: "projects/p"}))
+	assert.Empty(t, resourceHint(&secretmanagerpb.ListSecretsRequest{}))
+	assert.Empty(t, resourceHint(struct{}{}))
+}
+
 func TestDebugDialOptions_disabled(t *testing.T) {
 	t.Parallel()
 
-	assert.Nil(t, debugDialOptions(context.Background()))
+	assert.Empty(t, debugDialOptions(context.Background()))
 }
 
 func TestDebugDialOptions_enabled(t *testing.T) {
@@ -45,11 +59,22 @@ func TestDebugUnaryInterceptor(t *testing.T) {
 
 	tests := []struct {
 		name       string
+		req        any
 		invokerErr error
-		wantSubstr string
+		wantSubstr []string
 	}{
-		{name: "ok", invokerErr: nil, wantSubstr: "ok in"},
-		{name: "error", invokerErr: errors.New("boom"), wantSubstr: "failed: boom"},
+		{
+			name:       "ok with resource hint",
+			req:        &secretmanagerpb.ListSecretsRequest{Parent: "projects/p"},
+			invokerErr: nil,
+			wantSubstr: []string{"gcloud grpc: /pkg.Svc/Method projects/p (", "ok in"},
+		},
+		{
+			name:       "error without hint",
+			req:        nil,
+			invokerErr: errors.New("boom"),
+			wantSubstr: []string{"gcloud grpc: /pkg.Svc/Method (", "failed: boom"},
+		},
 	}
 
 	for _, tt := range tests {
@@ -62,11 +87,24 @@ func TestDebugUnaryInterceptor(t *testing.T) {
 			invoker := func(context.Context, string, any, any, *grpc.ClientConn, ...grpc.CallOption) error {
 				return tt.invokerErr
 			}
-			err := interceptor(context.Background(), "/pkg.Svc/Method", nil, nil, cc, invoker)
+			err := interceptor(context.Background(), "/pkg.Svc/Method", tt.req, nil, cc, invoker)
 
 			assert.Equal(t, tt.invokerErr, err)
-			assert.Contains(t, buf.String(), "gRPC /pkg.Svc/Method")
-			assert.Contains(t, buf.String(), tt.wantSubstr)
+
+			for _, want := range tt.wantSubstr {
+				assert.Contains(t, buf.String(), want)
+			}
 		})
 	}
+}
+
+func TestDebugGRPCDialOptions(t *testing.T) {
+	t.Parallel()
+
+	// Disabled: empty, so the emulator path adds nothing.
+	assert.Empty(t, debugGRPCDialOptions(context.Background()))
+
+	// Enabled: one chained-interceptor option, shared by both client paths.
+	ctx := debug.With(context.Background(), debug.Config{Enabled: true, Writer: &bytes.Buffer{}})
+	assert.Len(t, debugGRPCDialOptions(ctx), 1)
 }

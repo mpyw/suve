@@ -38,7 +38,8 @@ func TestConfig_Logf_enabled(t *testing.T) {
 	cfg := debug.Config{Enabled: true, Writer: &buf}
 	cfg.Logf("hello %s\n", "world")
 
-	assert.Equal(t, "hello world\n", buf.String())
+	// Every line carries the unified prefix with a wall-clock timestamp.
+	assert.Regexp(t, `^\[suve debug \d{2}:\d{2}:\d{2}\.\d{3}\] hello world\n$`, buf.String())
 }
 
 func TestConfig_Logf_noop(t *testing.T) {

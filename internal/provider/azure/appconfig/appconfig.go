@@ -33,6 +33,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/data/azappconfig"
 	"github.com/samber/lo"
 
+	"github.com/mpyw/suve/internal/debug"
 	"github.com/mpyw/suve/internal/domain"
 	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/version/azureappconfigversion"
@@ -131,6 +132,10 @@ func (s *Store) List(ctx context.Context) ([]string, error) {
 	}
 
 	sort.Strings(names)
+
+	// The totals make a successful-but-empty result (wrong store) visible at a
+	// glance, which a bodyless HTTP log cannot.
+	debug.From(ctx).Logf("azure appconfig: ListSettings -> %d settings, %d distinct keys\n", len(settings), len(names))
 
 	return names, nil
 }

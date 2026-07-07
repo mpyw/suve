@@ -31,6 +31,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/security/keyvault/azsecrets"
 	"github.com/samber/lo"
 
+	"github.com/mpyw/suve/internal/debug"
 	"github.com/mpyw/suve/internal/domain"
 	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/version/azurekvversion"
@@ -196,6 +197,10 @@ func (s *Store) List(ctx context.Context) ([]string, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to list secrets: %w", err)
 	}
+
+	// The total makes a successful-but-empty result (wrong vault) visible at a
+	// glance, which a bodyless HTTP log cannot.
+	debug.From(ctx).Logf("azure keyvault: ListSecretProperties -> %d secrets\n", len(props))
 
 	return lo.Map(props, func(p *azsecrets.SecretProperties, _ int) string {
 		return secretName(p.ID)

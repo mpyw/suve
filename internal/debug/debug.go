@@ -13,6 +13,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"time"
 )
 
 // ctxKey is the unexported context key under which Config is stored.
@@ -40,14 +41,20 @@ func From(ctx context.Context) Config {
 	return cfg
 }
 
-// Logf writes a single formatted debug line to the configured Writer. It is a
-// no-op when debug is disabled or no Writer is set, so callers can invoke it
-// unconditionally. Centralizing the write here keeps provider adapters free of
-// direct fmt.Fprint* usage (see the output package for the same rationale).
+// Logf writes a single formatted debug line to the configured Writer, prefixed
+// with "[suve debug <wall clock>] " so every provider's output shares one
+// grep-able, time-correlatable format. It is a no-op when debug is disabled or
+// no Writer is set, so callers can invoke it unconditionally. Centralizing the
+// write here keeps provider adapters free of direct fmt.Fprint* usage (see the
+// output package for the same rationale).
+//
+// Callers supply the format WITHOUT a prefix or timestamp; multi-line payloads
+// (e.g. HTTP dumps) are prefixed on their first line only.
 func (c Config) Logf(format string, args ...any) {
 	if !c.Enabled || c.Writer == nil {
 		return
 	}
 
-	_, _ = fmt.Fprintf(c.Writer, format, args...)
+	_, _ = fmt.Fprintf(c.Writer, "[suve debug %s] "+format,
+		append([]any{time.Now().Format("15:04:05.000")}, args...)...)
 }

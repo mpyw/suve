@@ -13,6 +13,7 @@ import (
 	"time"
 
 	secretmanager "cloud.google.com/go/secretmanager/apiv1"
+	"github.com/samber/lo"
 	"google.golang.org/api/option"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -39,9 +40,25 @@ func grpcStatus(err error) string {
 	return "ok"
 }
 
-// debugUnaryInterceptor logs each unary gRPC call's method, target, duration and
-// status via cfg. It deliberately never logs the request or reply messages, so
-// only metadata is printed.
+// resourceHint extracts a safe, non-secret resource identifier from a request
+// message: the resource name (Get/Access/Delete/...) or the parent
+// (List/Create). Both are `projects/...` paths — never payloads — and they are
+// exactly what a user needs to spot a wrong project ID. Unknown shapes yield "".
+func resourceHint(req any) string {
+	if n, ok := req.(interface{ GetName() string }); ok && n.GetName() != "" {
+		return n.GetName()
+	}
+
+	if p, ok := req.(interface{ GetParent() string }); ok && p.GetParent() != "" {
+		return p.GetParent()
+	}
+
+	return ""
+}
+
+// debugUnaryInterceptor logs each unary gRPC call's method, resource, target,
+// duration and status via cfg. It deliberately never logs the request or reply
+// messages themselves — only the resource name/parent (metadata) is printed.
 func debugUnaryInterceptor(cfg debug.Config) grpc.UnaryClientInterceptor {
 	return func(
 		ctx context.Context, method string, req, reply any,
@@ -49,25 +66,33 @@ func debugUnaryInterceptor(cfg debug.Config) grpc.UnaryClientInterceptor {
 	) error {
 		start := time.Now()
 		err := invoker(ctx, method, req, reply, cc, opts...)
-		cfg.Logf("[suve debug] gRPC %s (%s) %s in %s\n", method, cc.Target(), grpcStatus(err), time.Since(start))
+
+		hint := resourceHint(req)
+		cfg.Logf("gcloud grpc: %s%s (%s) %s in %s\n",
+			method, lo.Ternary(hint == "", "", " "+hint), cc.Target(), grpcStatus(err), time.Since(start))
 
 		return err
 	}
 }
 
-// debugDialOptions returns gRPC dial options that enable request logging when
-// debug is active on ctx, or nil otherwise. They apply only to the normal
-// (self-dialed) client; the emulator seam supplies its own pre-dialed
-// connection, for which dial options are ignored.
-func debugDialOptions(ctx context.Context) []option.ClientOption {
+// debugGRPCDialOptions returns the raw gRPC dial options that enable request
+// logging when debug is active on ctx, or nil otherwise. Both the normal
+// (self-dialed) client and the emulator connection use them, so e2e runs
+// against the emulator exercise the same debug path as production.
+func debugGRPCDialOptions(ctx context.Context) []grpc.DialOption {
 	d := debug.From(ctx)
 	if !d.Enabled {
 		return nil
 	}
 
-	return []option.ClientOption{
-		option.WithGRPCDialOption(grpc.WithChainUnaryInterceptor(debugUnaryInterceptor(d))),
-	}
+	return []grpc.DialOption{grpc.WithChainUnaryInterceptor(debugUnaryInterceptor(d))}
+}
+
+// debugDialOptions wraps debugGRPCDialOptions for the self-dialing client path.
+func debugDialOptions(ctx context.Context) []option.ClientOption {
+	return lo.Map(debugGRPCDialOptions(ctx), func(opt grpc.DialOption, _ int) option.ClientOption {
+		return option.WithGRPCDialOption(opt)
+	})
 }
 
 // newSecretManagerClient builds the Secret Manager client, honoring the
@@ -79,7 +104,12 @@ func newSecretManagerClient(ctx context.Context) (*secretmanager.Client, error) 
 	}
 
 	// Emulator: dial plaintext gRPC and skip authentication entirely.
-	conn, err := grpc.NewClient(endpoint, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	dialOpts := append(
+		[]grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())},
+		debugGRPCDialOptions(ctx)...,
+	)
+
+	conn, err := grpc.NewClient(endpoint, dialOpts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to dial Google Cloud Secret Manager emulator at %s: %w", endpoint, err)
 	}
