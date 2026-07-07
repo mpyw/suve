@@ -17,6 +17,9 @@ import (
 	cliinternal "github.com/mpyw/suve/internal/cli/commands/internal"
 )
 
+// nounSecret is the command name / noun used across the Google Cloud secret commands.
+const nounSecret = "secret"
+
 // Command returns the gcloud command with the secret subcommand group.
 func Command() *cli.Command {
 	return &cli.Command{
@@ -83,7 +86,7 @@ func resolveProject(ctx context.Context, cmd *cli.Command) (context.Context, err
 // SecretCommand returns the "gcloud secret" subcommand group.
 func SecretCommand() *cli.Command {
 	return &cli.Command{
-		Name:    "secret",
+		Name:    nounSecret,
 		Aliases: []string{"secrets", "sm"},
 		Usage:   "Interact with Google Cloud Secret Manager secrets",
 		Commands: []*cli.Command{

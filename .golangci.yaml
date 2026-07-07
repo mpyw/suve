@@ -35,6 +35,10 @@ linters:
     - perfsprint       # fmt.Sprintf -> string concat is often less readable
     # Package/variable naming - too strict
     - predeclared      # Package names like 'delete' are intentional
+    # Deprecated since golangci-lint v2.12.0; superseded by gomodguard_v2 (which
+    # `default: all` already enables). We rely on depguard for module gating, so
+    # keep the deprecated linter off to avoid its deprecation warning.
+    - gomodguard
   enable:
     - depguard
   exclusions:
@@ -54,12 +58,15 @@ linters:
         linters:
           - forbidigo
         text: "context\\.Background"
-      # Exclude maintidx, mnd, and dupl from test files
+      # Exclude maintidx, mnd, dupl, and goconst from test files: table-driven
+      # tests intentionally repeat fixture literals (keys, names, specs) across
+      # cases, and hoisting them into constants hurts readability.
       - path: "_test\\.go$"
         linters:
           - maintidx
           - mnd
           - dupl
+          - goconst
       # Exclude tparallel from e2e tests (integration tests need sequential execution)
       - path: "e2e/"
         linters:

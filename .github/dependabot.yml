@@ -5,6 +5,11 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    # Supply-chain hardening: wait until a version has been public for 7 days
+    # before opening a bump PR, so a compromised release (typically yanked
+    # within days) never lands here. Uniform across major/minor/patch.
+    cooldown:
+      default-days: 7
     groups:
       wailsapp:
         patterns:
@@ -20,6 +25,10 @@ updates:
     directory: /internal/gui/frontend
     schedule:
       interval: weekly
+    # Mirrors the install-time min-release-age=7 in
+    # internal/gui/frontend/.npmrc so automated bumps obey the same 7-day age.
+    cooldown:
+      default-days: 7
     groups:
       npm-dependencies:
         patterns:
@@ -30,6 +39,10 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    # 7-day cooldown before bumping pinned action SHAs (see workflows: actions
+    # are pinned to full commit SHAs with a `# vX` tag comment).
+    cooldown:
+      default-days: 7
     groups:
       github-actions:
         patterns:

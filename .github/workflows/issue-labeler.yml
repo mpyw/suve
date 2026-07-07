@@ -12,7 +12,7 @@ jobs:
       issues: write
     steps:
       - name: Label issue based on content
-        uses: github/issue-labeler@v3.4
+        uses: github/issue-labeler@c1b0f9f52a63158c4adc09425e858e87b32e9685 # v3.4
         with:
           configuration-path: .github/issue-labeler.yml
           repo-token: ${{ secrets.GITHUB_TOKEN }}

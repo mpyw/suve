@@ -53,7 +53,7 @@ func (p *logPresenter) RenderPatch(_, _ io.Writer, _ int, _, _ bool) {}
 func LogCommand() *cli.Command {
 	return genericlog.Command(genericlog.Config{
 		Usage:     "Show setting version history (unsupported)",
-		ArgsUsage: "<key>",
+		ArgsUsage: argsUsageKey,
 		Description: `App Configuration has no version history.
 
 This command exists for parity with the other providers but always reports that

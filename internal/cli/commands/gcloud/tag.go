@@ -28,7 +28,7 @@ You can specify multiple labels in a single command.
 EXAMPLES:
    suve gcloud secret tag my-api-key env=prod                 Add single label
    suve gcloud secret tag my-api-key env=prod team=backend    Add multiple labels`,
-		Noun:       "secret",
+		Noun:       nounSecret,
 		UsageError: "usage: suve gcloud secret tag <name> <key=value> [key=value]",
 		NewTagger:  newTagger,
 	})
@@ -46,7 +46,7 @@ Specify the label keys to remove. Non-existent keys are silently ignored.
 EXAMPLES:
    suve gcloud secret untag my-api-key deprecated             Remove single label
    suve gcloud secret untag my-api-key env team               Remove multiple labels`,
-		Noun:       "secret",
+		Noun:       nounSecret,
 		UsageError: "usage: suve gcloud secret untag <name> <key> [key]",
 		NewTagger:  newTagger,
 	})

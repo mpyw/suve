@@ -9,10 +9,13 @@ import (
 	stgcli "github.com/mpyw/suve/internal/staging/cli"
 )
 
+// nounSecret is the command / item name used across the secret stage command.
+const nounSecret = "secret"
+
 //nolint:gochecknoglobals // package-level config for command factory
 var config = stgcli.CommandConfig{
-	CommandName:   "secret",
-	ItemName:      "secret",
+	CommandName:   nounSecret,
+	ItemName:      nounSecret,
 	Factory:       cliinternal.SecretStrategyFactory,
 	ParserFactory: staging.SecretParserFactory,
 }
@@ -26,7 +29,7 @@ func Config() stgcli.CommandConfig {
 // Command returns the secret stage command with all staging subcommands.
 func Command() *cli.Command {
 	return &cli.Command{
-		Name:    "secret",
+		Name:    nounSecret,
 		Aliases: []string{"sm", "secretsmanager"},
 		Usage:   "Staging operations for Secrets Manager",
 		Description: `Stage changes locally before applying to AWS.

@@ -41,7 +41,7 @@ func (u *StashPushUseCase) Execute(ctx context.Context, input StashPushInput) (*
 	// Read state from the working staging area (keep for now, will clear after successful stash write if needed)
 	workingState, err := u.Working.Drain(ctx, "", true)
 	if err != nil {
-		return nil, &StashPushError{Op: "load", Err: err}
+		return nil, &StashPushError{Op: stashOpLoad, Err: err}
 	}
 
 	// Extract service-specific state if filtered
@@ -90,7 +90,7 @@ func (u *StashPushUseCase) Execute(ctx context.Context, input StashPushInput) (*
 
 	// Write to stash file
 	if err := u.Stash.WriteState(ctx, "", finalState); err != nil {
-		return nil, &StashPushError{Op: "write", Err: err}
+		return nil, &StashPushError{Op: stashOpWrite, Err: err}
 	}
 
 	// Prepare output (before cleanup, so we can return it even on non-fatal errors)
@@ -141,9 +141,9 @@ type StashPushError struct {
 
 func (e *StashPushError) Error() string {
 	switch e.Op {
-	case "load":
+	case stashOpLoad:
 		return "failed to read the working staging area: " + e.Err.Error()
-	case "write":
+	case stashOpWrite:
 		return "failed to save state to file: " + e.Err.Error()
 	case "clear":
 		return "failed to clear the working staging area: " + e.Err.Error()
