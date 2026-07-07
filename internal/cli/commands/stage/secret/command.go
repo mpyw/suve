@@ -27,7 +27,7 @@ func Config() stgcli.CommandConfig {
 func Command() *cli.Command {
 	return &cli.Command{
 		Name:    "secret",
-		Aliases: []string{"sm"},
+		Aliases: []string{"sm", "secretsmanager"},
 		Usage:   "Staging operations for Secrets Manager",
 		Description: `Stage changes locally before applying to AWS.
 

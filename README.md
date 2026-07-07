@@ -542,7 +542,7 @@ Explicit command groups (always available) and their bare aliases (exposed per t
 | Backend | Explicit command | Bare alias (conditional) |
 |---------|------------------|--------------------------|
 | [AWS SSM Parameter Store](docs/aws.md) | `aws param` (`ssm`, `ps`) | `param` |
-| [AWS Secrets Manager](docs/aws.md) | `aws secret` (`sm`) | `secret` |
+| [AWS Secrets Manager](docs/aws.md) | `aws secret` (`sm`, `secretsmanager`) | `secret` |
 | AWS Staging | `aws stage` (`stg`) | `stage` |
 | [Google Cloud Secret Manager](docs/gcloud.md) | `gcloud secret` (`secrets`, `sm`) | `secret` |
 | Google Cloud Staging | `gcloud stage` (`stg`) | `stage` |

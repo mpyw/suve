@@ -3,7 +3,7 @@
 [<- Back to README](../README.md) | [Google Cloud Commands](gcloud.md) | [Azure Commands](azure.md)
 
 > [!TIP]
-> AWS is invoked as `suve aws param` (`ssm`, `ps`), `suve aws secret` (`sm`), and `suve aws stage` (`stg`).
+> AWS is invoked as `suve aws param` (`ssm`, `ps`), `suve aws secret` (`sm`, `secretsmanager`), and `suve aws stage` (`stg`).
 > You can drop the `aws` prefix — `suve param`, `suve secret`, `suve stage` — when AWS is the only provider active in your environment. The exact rules are in [Provider selection](../README.md#provider-selection).
 
 ## suve aws param show
