@@ -17,14 +17,17 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
+	azlog "github.com/Azure/azure-sdk-for-go/sdk/azcore/log"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/Azure/azure-sdk-for-go/sdk/data/azappconfig"
 	"github.com/Azure/azure-sdk-for-go/sdk/security/keyvault/azsecrets"
 
+	"github.com/mpyw/suve/internal/debug"
 	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/provider/azure/appconfig"
 	"github.com/mpyw/suve/internal/provider/azure/keyvault"
@@ -70,6 +73,8 @@ var _ provider.Factory = Factory{}
 // store (requires scope.StoreName). A missing required field yields a clear
 // error; an unknown kind yields provider.ErrUnsupportedKind.
 func (Factory) Store(ctx context.Context, scope provider.Scope, kind provider.Kind) (provider.Store, error) {
+	enableDebugLogging(ctx)
+
 	switch kind {
 	case provider.KindSecret:
 		return keyVaultStore(ctx, scope)
@@ -78,6 +83,38 @@ func (Factory) Store(ctx context.Context, scope provider.Scope, kind provider.Ki
 	default:
 		return nil, fmt.Errorf("%w: %s", provider.ErrUnsupportedKind, kind)
 	}
+}
+
+// debugLogOnce guards the process-global azcore logger so it is configured at
+// most once per process.
+//
+//nolint:gochecknoglobals // azcore's logger is inherently process-global state
+var debugLogOnce sync.Once
+
+// enableDebugLogging turns on azcore request/response logging to the debug
+// writer the first time it is called with debug active on ctx. azcore's logger
+// is process-global and must be set before clients issue requests; the default
+// (IncludeBody off) logs headers and status only, so secret values are never
+// printed.
+//
+// azidentity.EventAuthentication is included so the DefaultAzureCredential
+// chain reports which credential it tried and which one it selected — the most
+// common Azure debugging question when a command fails or returns nothing.
+func enableDebugLogging(ctx context.Context) {
+	d := debug.From(ctx)
+	if !d.Enabled {
+		return
+	}
+
+	debugLogOnce.Do(func() {
+		azlog.SetEvents(
+			azlog.EventRequest, azlog.EventResponse, azlog.EventResponseError, azlog.EventRetryPolicy,
+			azidentity.EventAuthentication,
+		)
+		azlog.SetListener(func(cls azlog.Event, msg string) {
+			d.Logf("azure %s: %s\n", cls, msg)
+		})
+	})
 }
 
 // keyVaultStore builds a Key Vault secrets store for the scope's vault.
