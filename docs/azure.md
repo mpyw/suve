@@ -23,8 +23,6 @@ Unlike `aws stage`, there is no cross-service `azure stage status`/`apply` aggre
 
 | Setting | Flag | Environment variable |
 |---------|------|----------------------|
-| Subscription | `--subscription` | `AZURE_SUBSCRIPTION_ID` |
-| Resource group | `--resource-group` | `AZURE_RESOURCE_GROUP` |
 | Key Vault name (secret) | `--vault-name` | `AZURE_KEYVAULT_NAME` |
 | App Config store (param) | `--store-name` | `AZURE_APPCONFIG_NAME` |
 
@@ -34,15 +32,15 @@ Authentication uses the **DefaultAzureCredential** chain (environment, managed i
 az login
 ```
 
-The subscription and resource group can be supplied per-invocation or globally via environment variables:
+The target resource is addressed by its **globally-unique name** — the Key Vault
+or App Configuration store — which is all suve needs; no subscription or resource
+group is required. Supply the name per-invocation or via an environment variable:
 
 ```bash
 # Via flags
-suve azure --subscription <sub-id> --resource-group my-rg secret list --vault-name my-vault
+suve azure secret list --vault-name my-vault
 
 # Via environment variables
-export AZURE_SUBSCRIPTION_ID=<sub-id>
-export AZURE_RESOURCE_GROUP=my-rg
 export AZURE_KEYVAULT_NAME=my-vault
 suve azure secret list
 ```

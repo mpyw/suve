@@ -36,8 +36,7 @@ AZURE_KEYVAULT_NAME environment variable.`,
 				Sources: cli.EnvVars("AZURE_KEYVAULT_NAME"),
 			},
 		},
-		// Before merges the resolved vault name onto the base scope (subscription
-		// / resource group) set by the parent azure command. Resolution is
+		// Before stashes the resolved vault name in the context. Resolution is
 		// deferred to store construction, so `suve azure secret --help` works
 		// without a vault.
 		Before: func(ctx context.Context, cmd *cli.Command) (context.Context, error) {

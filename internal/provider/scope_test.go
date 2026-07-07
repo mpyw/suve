@@ -27,14 +27,15 @@ func TestScope_Key(t *testing.T) {
 			want:  "googlecloud/my-project",
 		},
 		{
+			// Vault names are globally unique, so the name alone keys the scope.
 			name:  "azure keyvault",
-			scope: provider.AzureKeyVaultScope("sub1", "rg1", "vault1"),
-			want:  "azure/sub1/rg1/keyvault/vault1",
+			scope: provider.AzureKeyVaultScope("vault1"),
+			want:  "azure/keyvault/vault1",
 		},
 		{
 			name:  "azure appconfig",
-			scope: provider.AzureAppConfigScope("sub1", "rg1", "store1"),
-			want:  "azure/sub1/rg1/appconfig/store1",
+			scope: provider.AzureAppConfigScope("store1"),
+			want:  "azure/appconfig/store1",
 		},
 		{
 			name:  "unknown provider",
@@ -75,13 +76,13 @@ func TestScope_SupportsService(t *testing.T) {
 		},
 		{
 			name:       "azure keyvault secret only",
-			scope:      provider.AzureKeyVaultScope("sub1", "rg1", "vault1"),
+			scope:      provider.AzureKeyVaultScope("vault1"),
 			wantParam:  false,
 			wantSecret: true,
 		},
 		{
 			name:       "azure appconfig param only",
-			scope:      provider.AzureAppConfigScope("sub1", "rg1", "store1"),
+			scope:      provider.AzureAppConfigScope("store1"),
 			wantParam:  true,
 			wantSecret: false,
 		},
@@ -123,7 +124,7 @@ func TestScope_SupportedKinds(t *testing.T) {
 		},
 		{
 			name:  "azure appconfig param only",
-			scope: provider.AzureAppConfigScope("sub1", "rg1", "store1"),
+			scope: provider.AzureAppConfigScope("store1"),
 			want:  []provider.Kind{provider.KindParam},
 		},
 		{
@@ -154,13 +155,11 @@ func TestScope_Constructors(t *testing.T) {
 	assert.Equal(t, provider.ProviderGoogleCloud, gcloud.Provider)
 	assert.Equal(t, "proj", gcloud.ProjectID)
 
-	kv := provider.AzureKeyVaultScope("sub", "rg", "vault")
+	kv := provider.AzureKeyVaultScope("vault")
 	assert.Equal(t, provider.ProviderAzure, kv.Provider)
-	assert.Equal(t, "sub", kv.SubscriptionID)
-	assert.Equal(t, "rg", kv.ResourceGroup)
 	assert.Equal(t, "vault", kv.VaultName)
 
-	ac := provider.AzureAppConfigScope("sub", "rg", "store")
+	ac := provider.AzureAppConfigScope("store")
 	assert.Equal(t, provider.ProviderAzure, ac.Provider)
 	assert.Equal(t, "store", ac.StoreName)
 }

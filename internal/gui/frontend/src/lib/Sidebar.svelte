@@ -50,8 +50,6 @@
 
   // ---- Scope-form inputs (seeded from the prefill for the pending provider) --
   let projectInput = $state('');
-  let subscriptionInput = $state('');
-  let resourceGroupInput = $state('');
   let vaultInput = $state('');
   let storeInput = $state('');
   let formError = $state('');
@@ -61,8 +59,6 @@
     // Re-seed the inputs whenever the pending provider (or its prefill) changes.
     const s = formScope;
     projectInput = pendingProvider === 'googlecloud' ? (s?.projectId ?? '') : '';
-    subscriptionInput = pendingProvider === 'azure' ? (s?.subscriptionId ?? '') : '';
-    resourceGroupInput = pendingProvider === 'azure' ? (s?.resourceGroup ?? '') : '';
     vaultInput = pendingProvider === 'azure' ? (s?.vaultName ?? '') : '';
     storeInput = pendingProvider === 'azure' ? (s?.storeName ?? '') : '';
     formError = '';
@@ -114,8 +110,6 @@
     onselectscope?.({
       provider: 'googlecloud',
       projectId,
-      subscriptionId: '',
-      resourceGroup: '',
       vaultName: '',
       storeName: '',
     } as gui.ScopeSelection);
@@ -133,8 +127,6 @@
     onselectscope?.({
       provider: 'azure',
       projectId: '',
-      subscriptionId: subscriptionInput.trim(),
-      resourceGroup: resourceGroupInput.trim(),
       vaultName,
       storeName,
     } as gui.ScopeSelection);
@@ -181,19 +173,15 @@
     </form>
   {:else if pendingProvider === 'azure'}
     <form class="scope-form" onsubmit={submitAzure}>
-      <label class="scope-label" for="azure-subscription">Subscription ID</label>
+      <label class="scope-label" for="azure-vault">Key Vault name</label>
       <input
-        id="azure-subscription"
+        id="azure-vault"
         class="scope-input"
         type="text"
-        placeholder="00000000-0000-…"
-        bind:value={subscriptionInput}
+        placeholder="my-vault (secrets)"
+        bind:value={vaultInput}
         bind:this={firstFieldEl}
       />
-      <label class="scope-label" for="azure-resource-group">Resource Group</label>
-      <input id="azure-resource-group" class="scope-input" type="text" placeholder="my-rg" bind:value={resourceGroupInput} />
-      <label class="scope-label" for="azure-vault">Key Vault name</label>
-      <input id="azure-vault" class="scope-input" type="text" placeholder="my-vault (secrets)" bind:value={vaultInput} />
       <label class="scope-label" for="azure-store">App Configuration store</label>
       <input id="azure-store" class="scope-input" type="text" placeholder="my-store (params)" bind:value={storeInput} />
       {#if formError || scopeError}
@@ -260,18 +248,6 @@
     </div>
   {:else if scopeReady && provider === 'azure'}
     <div class="aws-info scope-info">
-      {#if scope?.subscriptionId}
-        <div class="aws-info-row">
-          <span class="aws-info-label">Subscription</span>
-          <span class="aws-info-value" title={scope.subscriptionId}>{scope.subscriptionId}</span>
-        </div>
-      {/if}
-      {#if scope?.resourceGroup}
-        <div class="aws-info-row">
-          <span class="aws-info-label">Resource Group</span>
-          <span class="aws-info-value" title={scope.resourceGroup}>{scope.resourceGroup}</span>
-        </div>
-      {/if}
       {#if scope?.vaultName}
         <div class="aws-info-row">
           <span class="aws-info-label">Key Vault</span>
@@ -355,6 +331,7 @@
     letter-spacing: 0.05em;
     color: #666;
   }
+
 
   .scope-input {
     width: 100%;

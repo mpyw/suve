@@ -76,8 +76,6 @@ if $want_appconfig; then
   env_kv+=(
     "SUVE_AZURE_APPCONFIG_CONNECTION_STRING=Endpoint=http://127.0.0.1:${appconfig_port};Id=abcd;Secret=c2VjcmV0"
     "AZURE_APPCONFIG_NAME=suve-dev"
-    "AZURE_SUBSCRIPTION_ID=00000000-0000-0000-0000-000000000000"
-    "AZURE_RESOURCE_GROUP=suve-dev"
   )
 fi
 
@@ -88,8 +86,6 @@ if $want_keyvault; then
   env_kv+=(
     "SUVE_AZURE_KEYVAULT_ENDPOINT=https://127.0.0.1:${keyvault_port}"
     "AZURE_KEYVAULT_NAME=suve-dev"
-    "AZURE_SUBSCRIPTION_ID=00000000-0000-0000-0000-000000000000"
-    "AZURE_RESOURCE_GROUP=suve-dev"
   )
 fi
 

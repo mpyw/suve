@@ -7,8 +7,9 @@ import "fmt"
 //
 //   - AWS: AccountID + Region (shared for param and secret).
 //   - GoogleCloud: ProjectID (Secret Manager only).
-//   - Azure: SubscriptionID + ResourceGroup, plus VaultName (Key Vault, secret)
-//     or StoreName (App Configuration, param).
+//   - Azure: VaultName (Key Vault, secret) or StoreName (App Configuration,
+//     param) — each a globally-unique name that fully identifies the resource,
+//     so no subscription/resource-group is needed.
 //
 // Scope is used both to select a provider factory (Provider field) and to key
 // on-disk staging storage (see Key).
@@ -24,10 +25,6 @@ type Scope struct {
 	// ProjectID is the Google Cloud project id (GoogleCloud).
 	ProjectID string `json:"projectId,omitempty"`
 
-	// SubscriptionID is the Azure subscription id (Azure).
-	SubscriptionID string `json:"subscriptionId,omitempty"`
-	// ResourceGroup is the Azure resource group (Azure).
-	ResourceGroup string `json:"resourceGroup,omitempty"`
 	// VaultName is the Azure Key Vault name (Azure, secret).
 	VaultName string `json:"vaultName,omitempty"`
 	// StoreName is the Azure App Configuration store name (Azure, param).
@@ -43,11 +40,14 @@ func (s Scope) Key() string {
 	case ProviderGoogleCloud:
 		return fmt.Sprintf("googlecloud/%s", s.ProjectID)
 	case ProviderAzure:
+		// Key Vault and App Configuration names are globally unique DNS labels
+		// (*.vault.azure.net / *.azconfig.io), so the name alone identifies the
+		// resource — no subscription/resource-group needed.
 		if s.VaultName != "" {
-			return fmt.Sprintf("azure/%s/%s/keyvault/%s", s.SubscriptionID, s.ResourceGroup, s.VaultName)
+			return fmt.Sprintf("azure/keyvault/%s", s.VaultName)
 		}
 
-		return fmt.Sprintf("azure/%s/%s/appconfig/%s", s.SubscriptionID, s.ResourceGroup, s.StoreName)
+		return fmt.Sprintf("azure/appconfig/%s", s.StoreName)
 	default:
 		return ""
 	}
@@ -107,22 +107,20 @@ func GoogleCloudScope(projectID string) Scope {
 }
 
 // AzureKeyVaultScope creates a Scope for an Azure Key Vault (secret store).
-func AzureKeyVaultScope(subscriptionID, resourceGroup, vaultName string) Scope {
+// The vault name is globally unique, so it fully identifies the resource.
+func AzureKeyVaultScope(vaultName string) Scope {
 	return Scope{
-		Provider:       ProviderAzure,
-		SubscriptionID: subscriptionID,
-		ResourceGroup:  resourceGroup,
-		VaultName:      vaultName,
+		Provider:  ProviderAzure,
+		VaultName: vaultName,
 	}
 }
 
 // AzureAppConfigScope creates a Scope for an Azure App Configuration store
-// (param store).
-func AzureAppConfigScope(subscriptionID, resourceGroup, storeName string) Scope {
+// (param store). The store name is globally unique, so it fully identifies the
+// resource.
+func AzureAppConfigScope(storeName string) Scope {
 	return Scope{
-		Provider:       ProviderAzure,
-		SubscriptionID: subscriptionID,
-		ResourceGroup:  resourceGroup,
-		StoreName:      storeName,
+		Provider:  ProviderAzure,
+		StoreName: storeName,
 	}
 }

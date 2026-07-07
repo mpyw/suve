@@ -72,8 +72,8 @@ func TestMakeAppWithDetect_flatCommandsAreRunnable(t *testing.T) {
 	err := app.Run(t.Context(), []string{"suve", "secret", "--help"})
 	require.NoError(t, err)
 
-	// A flat Azure param alias should carry the base --subscription flag folded
-	// in on top of --store-name.
+	// A flat Azure param alias should behave like `azure param`: it carries the
+	// --store-name flag from the group. `--help` must succeed.
 	app = commands.MakeAppWithDetect(detect.Result{Param: provider.ProviderAzure})
 	err = app.Run(t.Context(), []string{"suve", "param", "--help"})
 	require.NoError(t, err)

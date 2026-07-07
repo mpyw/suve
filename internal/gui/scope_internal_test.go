@@ -37,28 +37,28 @@ func TestApp_SelectScope(t *testing.T) {
 		},
 		{
 			name: "azure with vault only",
-			sel:  ScopeSelection{Provider: "azure", SubscriptionID: "sub", ResourceGroup: "rg", VaultName: "vault"},
+			sel:  ScopeSelection{Provider: "azure", VaultName: "vault"},
 			wantScope: provider.Scope{
-				Provider: provider.ProviderAzure, SubscriptionID: "sub", ResourceGroup: "rg", VaultName: "vault",
+				Provider: provider.ProviderAzure, VaultName: "vault",
 			},
 		},
 		{
 			name: "azure with store only",
-			sel:  ScopeSelection{Provider: "azure", SubscriptionID: "sub", ResourceGroup: "rg", StoreName: "store"},
+			sel:  ScopeSelection{Provider: "azure", StoreName: "store"},
 			wantScope: provider.Scope{
-				Provider: provider.ProviderAzure, SubscriptionID: "sub", ResourceGroup: "rg", StoreName: "store",
+				Provider: provider.ProviderAzure, StoreName: "store",
 			},
 		},
 		{
 			name: "azure with both vault and store",
-			sel:  ScopeSelection{Provider: "azure", SubscriptionID: "sub", ResourceGroup: "rg", VaultName: "vault", StoreName: "store"},
+			sel:  ScopeSelection{Provider: "azure", VaultName: "vault", StoreName: "store"},
 			wantScope: provider.Scope{
-				Provider: provider.ProviderAzure, SubscriptionID: "sub", ResourceGroup: "rg", VaultName: "vault", StoreName: "store",
+				Provider: provider.ProviderAzure, VaultName: "vault", StoreName: "store",
 			},
 		},
 		{
 			name:    "azure missing both vault and store",
-			sel:     ScopeSelection{Provider: "azure", SubscriptionID: "sub", ResourceGroup: "rg"},
+			sel:     ScopeSelection{Provider: "azure"},
 			wantErr: errAzureScopeRequired,
 		},
 		{
@@ -100,19 +100,19 @@ func TestApp_GetCurrentScope_RoundTrip(t *testing.T) {
 		{name: "googlecloud", sel: ScopeSelection{Provider: "googlecloud", ProjectID: "proj"}},
 		{
 			name: "azure key vault + app config",
-			sel:  ScopeSelection{Provider: "azure", SubscriptionID: "sub", ResourceGroup: "rg", VaultName: "vault", StoreName: "store"},
+			sel:  ScopeSelection{Provider: "azure", VaultName: "vault", StoreName: "store"},
 		},
 		{
 			// Only one Azure service configured: Key Vault (secret) available,
 			// App Configuration (param) absent. The readback must preserve the
 			// empty storeName so #267 can render the half-filled form.
 			name: "azure key vault only",
-			sel:  ScopeSelection{Provider: "azure", SubscriptionID: "sub", ResourceGroup: "rg", VaultName: "vault"},
+			sel:  ScopeSelection{Provider: "azure", VaultName: "vault"},
 		},
 		{
 			// Mirror case: only App Configuration (param) available, no vault.
 			name: "azure app config only",
-			sel:  ScopeSelection{Provider: "azure", SubscriptionID: "sub", ResourceGroup: "rg", StoreName: "store"},
+			sel:  ScopeSelection{Provider: "azure", StoreName: "store"},
 		},
 	}
 
@@ -147,8 +147,6 @@ func TestApp_GetCurrentScope_EnvDerivedInitialScope(t *testing.T) {
 }
 
 func TestApp_GetCurrentScope_EnvDerivedAzure(t *testing.T) {
-	t.Setenv("AZURE_SUBSCRIPTION_ID", "env-sub")
-	t.Setenv("AZURE_RESOURCE_GROUP", "env-rg")
 	t.Setenv("AZURE_KEYVAULT_NAME", "env-vault")
 	t.Setenv("AZURE_APPCONFIG_NAME", "env-store")
 
@@ -157,8 +155,6 @@ func TestApp_GetCurrentScope_EnvDerivedAzure(t *testing.T) {
 	got := app.GetCurrentScope()
 	require.NotNil(t, got)
 	assert.Equal(t, string(provider.ProviderAzure), got.Provider)
-	assert.Equal(t, "env-sub", got.SubscriptionID)
-	assert.Equal(t, "env-rg", got.ResourceGroup)
 	assert.Equal(t, "env-vault", got.VaultName)
 	assert.Equal(t, "env-store", got.StoreName)
 }
@@ -168,8 +164,6 @@ func TestApp_GetCurrentScope_EnvDerivedAzure(t *testing.T) {
 // Configuration (param) stays absent. AZURE_APPCONFIG_NAME is pinned empty so
 // the case is hermetic regardless of the ambient environment.
 func TestApp_GetCurrentScope_EnvDerivedAzure_VaultOnly(t *testing.T) {
-	t.Setenv("AZURE_SUBSCRIPTION_ID", "env-sub")
-	t.Setenv("AZURE_RESOURCE_GROUP", "env-rg")
 	t.Setenv("AZURE_KEYVAULT_NAME", "env-vault")
 	t.Setenv("AZURE_APPCONFIG_NAME", "")
 
@@ -185,8 +179,6 @@ func TestApp_GetCurrentScope_EnvDerivedAzure_VaultOnly(t *testing.T) {
 // TestApp_GetCurrentScope_EnvDerivedAzure_StoreOnly is the mirror: only App
 // Configuration (param) is configured; Key Vault stays absent.
 func TestApp_GetCurrentScope_EnvDerivedAzure_StoreOnly(t *testing.T) {
-	t.Setenv("AZURE_SUBSCRIPTION_ID", "env-sub")
-	t.Setenv("AZURE_RESOURCE_GROUP", "env-rg")
 	t.Setenv("AZURE_KEYVAULT_NAME", "")
 	t.Setenv("AZURE_APPCONFIG_NAME", "env-store")
 

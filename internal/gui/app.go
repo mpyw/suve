@@ -97,8 +97,7 @@ type App struct {
 
 // NewApp creates a new App with the given initial provider. The initial
 // read/write scope is derived from that provider using the ambient environment
-// (project / subscription / resource-group / vault / store); an empty provider
-// defaults to AWS.
+// (project / vault / store); an empty provider defaults to AWS.
 func NewApp(initial provider.Provider) *App {
 	return &App{
 		initialProvider: initial,
@@ -113,11 +112,9 @@ func initialScope(p provider.Provider) provider.Scope {
 		return provider.GoogleCloudScope(os.Getenv("GOOGLE_CLOUD_PROJECT"))
 	case provider.ProviderAzure:
 		return provider.Scope{
-			Provider:       provider.ProviderAzure,
-			SubscriptionID: os.Getenv("AZURE_SUBSCRIPTION_ID"),
-			ResourceGroup:  os.Getenv("AZURE_RESOURCE_GROUP"),
-			VaultName:      os.Getenv("AZURE_KEYVAULT_NAME"),
-			StoreName:      os.Getenv("AZURE_APPCONFIG_NAME"),
+			Provider:  provider.ProviderAzure,
+			VaultName: os.Getenv("AZURE_KEYVAULT_NAME"),
+			StoreName: os.Getenv("AZURE_APPCONFIG_NAME"),
 		}
 	case provider.ProviderAWS:
 		return provider.Scope{Provider: provider.ProviderAWS}
@@ -141,15 +138,13 @@ func (a *App) Startup(ctx context.Context) {
 // operations. Only the fields relevant to the chosen provider are read:
 //   - aws: (none; the ambient AWS config supplies the region)
 //   - googlecloud: ProjectID
-//   - azure: SubscriptionID + ResourceGroup, plus VaultName (Key Vault secret)
-//     and/or StoreName (App Configuration param)
+//   - azure: VaultName (Key Vault secret) and/or StoreName (App Configuration
+//     param)
 type ScopeSelection struct {
-	Provider       string `json:"provider"`
-	ProjectID      string `json:"projectId"`
-	SubscriptionID string `json:"subscriptionId"`
-	ResourceGroup  string `json:"resourceGroup"`
-	VaultName      string `json:"vaultName"`
-	StoreName      string `json:"storeName"`
+	Provider  string `json:"provider"`
+	ProjectID string `json:"projectId"`
+	VaultName string `json:"vaultName"`
+	StoreName string `json:"storeName"`
 }
 
 // SelectScope sets the current read/write provider scope. It performs no
@@ -188,11 +183,9 @@ func scopeFromSelection(sel ScopeSelection) (provider.Scope, error) {
 		}
 
 		return provider.Scope{
-			Provider:       provider.ProviderAzure,
-			SubscriptionID: sel.SubscriptionID,
-			ResourceGroup:  sel.ResourceGroup,
-			VaultName:      sel.VaultName,
-			StoreName:      sel.StoreName,
+			Provider:  provider.ProviderAzure,
+			VaultName: sel.VaultName,
+			StoreName: sel.StoreName,
 		}, nil
 	default:
 		return provider.Scope{}, fmt.Errorf("%w: %q", errInvalidProvider, sel.Provider)
@@ -220,20 +213,18 @@ func (a *App) GetCurrentScope() *ScopeSelection {
 // stay empty.
 func selectionFromScope(s provider.Scope) *ScopeSelection {
 	return &ScopeSelection{
-		Provider:       string(s.Provider),
-		ProjectID:      s.ProjectID,
-		SubscriptionID: s.SubscriptionID,
-		ResourceGroup:  s.ResourceGroup,
-		VaultName:      s.VaultName,
-		StoreName:      s.StoreName,
+		Provider:  string(s.Provider),
+		ProjectID: s.ProjectID,
+		VaultName: s.VaultName,
+		StoreName: s.StoreName,
 	}
 }
 
 // stagingScope resolves the provider.Scope that keys on-disk staging state for
 // the active provider. It mirrors the CLI's ScopeResolvers: AWS is keyed by the
 // STS caller identity (account/region), while Google Cloud and Azure are keyed
-// purely from the already-selected scope (project / subscription+group+vault or
-// store) with no network call. Deriving the staging store AND the apply/diff
+// purely from the already-selected scope (project / vault or store) with no
+// network call. Deriving the staging store AND the apply/diff
 // strategy from this one scope keeps them structurally in sync — the invariant
 // that replaces #276's interim non-AWS guard.
 func (a *App) stagingScope() (provider.Scope, error) {

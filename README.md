@@ -642,7 +642,7 @@ Uses integer version numbers (with the `latest` alias) and has no staging labels
 
 ### Azure Key Vault
 
-Secrets are versioned by opaque IDs and have no staging labels. Select the vault with `--vault-name` or the `AZURE_KEYVAULT_NAME` environment variable. The shared `azure` base flags are `--subscription` / `AZURE_SUBSCRIPTION_ID` and `--resource-group` / `AZURE_RESOURCE_GROUP`. Authentication uses the [DefaultAzureCredential](https://learn.microsoft.com/en-us/azure/developer/go/azure-sdk-authentication) chain (environment, managed identity, Azure CLI, ...). See [docs/azure.md](docs/azure.md) for details.
+Secrets are versioned by opaque IDs and have no staging labels. Select the vault with `--vault-name` or the `AZURE_KEYVAULT_NAME` environment variable — the vault name is a globally-unique endpoint, so no subscription or resource group is needed. Authentication uses the [DefaultAzureCredential](https://learn.microsoft.com/en-us/azure/developer/go/azure-sdk-authentication) chain (environment, managed identity, Azure CLI, ...). See [docs/azure.md](docs/azure.md) for details.
 
 | Command | Options | Description |
 |---------|---------|-------------|
@@ -673,7 +673,7 @@ Secrets are versioned by opaque IDs and have no staging labels. Select the vault
 
 ### Azure App Configuration
 
-Unversioned key-value store. Version specifiers (`#VERSION`, `~SHIFT`, `:LABEL`) are rejected, `log` reports that history is unsupported, and `tag` / `untag` are unsupported (SDK limitation). Select the store with `--store-name` or the `AZURE_APPCONFIG_NAME` environment variable, plus the shared `azure` base flags described above. See [docs/azure.md](docs/azure.md) for details.
+Unversioned key-value store. Version specifiers (`#VERSION`, `~SHIFT`, `:LABEL`) are rejected, `log` reports that history is unsupported, and `tag` / `untag` are unsupported (SDK limitation). Select the store with `--store-name` or the `AZURE_APPCONFIG_NAME` environment variable — the store name is a globally-unique endpoint, so no subscription or resource group is needed. See [docs/azure.md](docs/azure.md) for details.
 
 | Command | Options | Description |
 |---------|---------|-------------|
@@ -765,10 +765,10 @@ All timestamps are formatted in RFC3339 format with the local timezone offset ap
 
 | Variable | Description |
 |----------|-------------|
-| `AZURE_SUBSCRIPTION_ID` | Subscription (or use `--subscription`) |
-| `AZURE_RESOURCE_GROUP` | Resource group (or use `--resource-group`) |
 | `AZURE_KEYVAULT_NAME` | Key Vault name for `azure secret` (or use `--vault-name`) |
 | `AZURE_APPCONFIG_NAME` | App Configuration store for `azure param` (or use `--store-name`) |
+
+Authentication uses the DefaultAzureCredential chain (`az login`, environment, managed identity, ...). The Key Vault / App Configuration name is a globally-unique endpoint, so no subscription or resource group is needed.
 
 ## AWS Configuration
 

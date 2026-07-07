@@ -257,11 +257,11 @@ export namespace gui {
 	    hasStaging: boolean;
 	    hasForceDelete: boolean;
 	    hasRecoveryWindow: boolean;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ServiceCapability(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.service = source["service"];
@@ -314,8 +314,6 @@ export namespace gui {
 	export class ScopeSelection {
 	    provider: string;
 	    projectId: string;
-	    subscriptionId: string;
-	    resourceGroup: string;
 	    vaultName: string;
 	    storeName: string;
 	
@@ -327,8 +325,6 @@ export namespace gui {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.provider = source["provider"];
 	        this.projectId = source["projectId"];
-	        this.subscriptionId = source["subscriptionId"];
-	        this.resourceGroup = source["resourceGroup"];
 	        this.vaultName = source["vaultName"];
 	        this.storeName = source["storeName"];
 	    }
