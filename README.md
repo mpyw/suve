@@ -829,6 +829,23 @@ All timestamps are formatted in RFC3339 format with the local timezone offset ap
 |----------|-------------|
 | `TZ` | Timezone for date/time formatting (see above) |
 | `SUVE_NO_UPDATE_CHECK` | Opt out of the update-check notification |
+| `SUVE_DEBUG` | Enable verbose debug logging (same as the global `--debug` flag) |
+
+### Debugging
+
+Pass the global `--debug` flag (or set `SUVE_DEBUG=1`) to log each cloud SDK
+request/response to stderr. This is useful when a command produces empty or
+unexpected output and you want to see the actual API calls, target region, and
+HTTP status:
+
+```bash
+suve secret ls --debug          # flag works in any position
+SUVE_DEBUG=1 suve secret ls      # or via environment
+```
+
+Only request/response **metadata** (method, endpoint, region, status, retries)
+is printed — secret values are never logged. Debug output goes to stderr, so it
+never contaminates piped stdout.
 
 ### Staging
 
