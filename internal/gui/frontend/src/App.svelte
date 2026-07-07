@@ -192,6 +192,16 @@
     scopeError = '';
   }
 
+  // handleChangeScope re-opens the scope form for the ACTIVE provider, prefilled
+  // with its current values, so the user can point it at a different resource.
+  // It deliberately bypasses handleSelectProvider (which would auto-apply the
+  // cached scope) by parking pendingProvider directly — the form's prefill comes
+  // from formPrefill (cache/current scope), and Connect overwrites the cache.
+  function handleChangeScope() {
+    scopeError = '';
+    pendingProvider = provider;
+  }
+
   // applyScope validates+commits the scope server-side, then (AWS only) loads
   // identity and the staging badge. On success it switches the active provider
   // and clears the pending form; on rejection it leaves the previous provider
@@ -280,6 +290,7 @@
     onselectprovider={handleSelectProvider}
     onselectscope={handleSelectScope}
     oncancelscope={handleCancelScope}
+    onchangescope={handleChangeScope}
   />
 
   <main class="main-content">

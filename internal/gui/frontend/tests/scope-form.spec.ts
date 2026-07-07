@@ -141,6 +141,32 @@ test.describe('Azure scope form', () => {
     await expect(page.locator('.nav').getByRole('button', { name: /Key Vault/i })).toBeVisible();
   });
 
+  test('Change scope re-opens the prefilled form and re-points to a different resource', async ({ page }) => {
+    // Azure launched with vault+store already applied (no form on start).
+    await setupWailsMocks(page, createAzureState());
+    await page.goto('/');
+    await waitForItemList(page);
+    await expect(page.locator('#azure-vault')).toHaveCount(0); // connected: no form
+
+    // "Change scope" re-opens the form, prefilled with the current values —
+    // without auto-reconnecting the cached scope.
+    await page.getByRole('button', { name: 'Change scope' }).click();
+    await expect(page.locator('#azure-vault')).toHaveValue('my-vault');
+    await expect(page.locator('#azure-store')).toHaveValue('my-store');
+
+    // Re-point to a different vault and reconnect.
+    await page.locator('#azure-vault').fill('other-vault');
+    await page.getByRole('button', { name: 'Connect' }).click();
+    await waitForItemList(page);
+
+    const calls = await getSelectScopeCalls(page);
+    expect(calls[calls.length - 1]).toMatchObject({
+      provider: 'azure',
+      vaultName: 'other-vault', // replaced
+      storeName: 'my-store', // preserved from the prefill
+    });
+  });
+
   test.describe('a11y', () => {
     test('fields are labeled and the first field is focused on open', async ({ page }) => {
       await setupWailsMocks(page);
