@@ -95,32 +95,42 @@ type App struct {
 	stagingStoreMu sync.Mutex // protects stagingStore + stagingStores
 }
 
-// NewApp creates a new App with the given initial provider. The initial
-// read/write scope is derived from that provider using the ambient environment
-// (project / vault / store); an empty provider defaults to AWS.
-func NewApp(initial provider.Provider) *App {
+// NewApp creates a new App with the given initial launch scope. Empty resource
+// fields on the scope are hydrated from the ambient environment, so an explicit
+// selection (e.g. from a --project / --vault-name / --store-name flag) wins,
+// while an unset one still falls back to env.
+func NewApp(initial provider.Scope) *App {
 	return &App{
-		initialProvider: initial,
-		scope:           initialScope(initial),
+		initialProvider: initial.Provider,
+		scope:           hydrateScope(initial),
 	}
 }
 
-// initialScope derives the launch scope for a provider from the environment.
-func initialScope(p provider.Provider) provider.Scope {
-	switch p {
+// hydrateScope fills empty resource fields on an initial launch scope from the
+// environment. Flag-supplied values take precedence; unset ones fall back to
+// GOOGLE_CLOUD_PROJECT / AZURE_KEYVAULT_NAME / AZURE_APPCONFIG_NAME. AWS carries
+// no resource field (region comes from the ambient AWS config).
+func hydrateScope(s provider.Scope) provider.Scope {
+	switch s.Provider {
 	case provider.ProviderGoogleCloud:
-		return provider.GoogleCloudScope(os.Getenv("GOOGLE_CLOUD_PROJECT"))
+		if s.ProjectID == "" {
+			s.ProjectID = os.Getenv("GOOGLE_CLOUD_PROJECT")
+		}
 	case provider.ProviderAzure:
-		return provider.Scope{
-			Provider:  provider.ProviderAzure,
-			VaultName: os.Getenv("AZURE_KEYVAULT_NAME"),
-			StoreName: os.Getenv("AZURE_APPCONFIG_NAME"),
+		if s.VaultName == "" {
+			s.VaultName = os.Getenv("AZURE_KEYVAULT_NAME")
+		}
+
+		if s.StoreName == "" {
+			s.StoreName = os.Getenv("AZURE_APPCONFIG_NAME")
 		}
 	case provider.ProviderAWS:
-		return provider.Scope{Provider: provider.ProviderAWS}
+		// region comes from the ambient AWS config; nothing to hydrate.
 	default:
 		return defaultScope
 	}
+
+	return s
 }
 
 // InitialProvider returns the provider the GUI was launched with (empty when no

@@ -72,7 +72,7 @@ func TestApp_SelectScope(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			app := NewApp(provider.ProviderAWS)
+			app := NewApp(provider.Scope{Provider: provider.ProviderAWS})
 
 			err := app.SelectScope(tt.sel)
 			if tt.wantErr != nil {
@@ -120,7 +120,7 @@ func TestApp_GetCurrentScope_RoundTrip(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			app := NewApp(provider.ProviderAWS)
+			app := NewApp(provider.Scope{Provider: provider.ProviderAWS})
 			require.NoError(t, app.SelectScope(tt.sel))
 
 			got := app.GetCurrentScope()
@@ -138,7 +138,7 @@ func TestApp_GetCurrentScope_RoundTrip(t *testing.T) {
 func TestApp_GetCurrentScope_EnvDerivedInitialScope(t *testing.T) {
 	t.Setenv("GOOGLE_CLOUD_PROJECT", "env-project")
 
-	app := NewApp(provider.ProviderGoogleCloud)
+	app := NewApp(provider.Scope{Provider: provider.ProviderGoogleCloud})
 
 	got := app.GetCurrentScope()
 	require.NotNil(t, got)
@@ -150,7 +150,7 @@ func TestApp_GetCurrentScope_EnvDerivedAzure(t *testing.T) {
 	t.Setenv("AZURE_KEYVAULT_NAME", "env-vault")
 	t.Setenv("AZURE_APPCONFIG_NAME", "env-store")
 
-	app := NewApp(provider.ProviderAzure)
+	app := NewApp(provider.Scope{Provider: provider.ProviderAzure})
 
 	got := app.GetCurrentScope()
 	require.NotNil(t, got)
@@ -167,7 +167,7 @@ func TestApp_GetCurrentScope_EnvDerivedAzure_VaultOnly(t *testing.T) {
 	t.Setenv("AZURE_KEYVAULT_NAME", "env-vault")
 	t.Setenv("AZURE_APPCONFIG_NAME", "")
 
-	app := NewApp(provider.ProviderAzure)
+	app := NewApp(provider.Scope{Provider: provider.ProviderAzure})
 
 	got := app.GetCurrentScope()
 	require.NotNil(t, got)
@@ -182,7 +182,7 @@ func TestApp_GetCurrentScope_EnvDerivedAzure_StoreOnly(t *testing.T) {
 	t.Setenv("AZURE_KEYVAULT_NAME", "")
 	t.Setenv("AZURE_APPCONFIG_NAME", "env-store")
 
-	app := NewApp(provider.ProviderAzure)
+	app := NewApp(provider.Scope{Provider: provider.ProviderAzure})
 
 	got := app.GetCurrentScope()
 	require.NotNil(t, got)
