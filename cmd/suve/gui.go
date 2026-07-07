@@ -68,6 +68,10 @@ func registerGUIFlag() {
 		Name:  "gui",
 		Usage: "Launch GUI mode (picks the active provider, or opens the in-app picker if none is unambiguous)",
 	})
+	// Wrap (do not replace) the root Before: the app already installs one
+	// (enableDebug), and clobbering it silently disables --debug / SUVE_DEBUG in
+	// the GUI build. Chain to it on the non-GUI path, mirroring attachGUIFlag.
+	inner := commands.App.Before
 	commands.App.Before = func(ctx context.Context, cmd *cli.Command) (context.Context, error) {
 		if cmd.Bool("gui") {
 			// Launch with the uniquely-active provider when the environment
@@ -76,6 +80,10 @@ func registerGUIFlag() {
 			// than erroring. No scope flags on the bare form, so the GUI hydrates
 			// any resource fields from env.
 			return launchGUI(ctx, provider.Scope{Provider: gui.InitialProviderFromEnv()})
+		}
+
+		if inner != nil {
+			return inner(ctx, cmd)
 		}
 
 		return ctx, nil
