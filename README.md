@@ -35,6 +35,9 @@ A **Git-like CLI/GUI** for AWS Parameter Store / Secrets Manager, Google Cloud S
 
 ## Installation
 
+> [!NOTE]
+> On Linux, `suve` requires GTK3 and WebKit2GTK for GUI support. Use the CLI-only version if you only need CLI functionality.
+
 ### Using [mise](https://mise.jdx.dev/) (macOS/Linux/Windows)
 
 suve is installable directly from GitHub Releases via mise's `github` backend — no extra registry required:
@@ -54,6 +57,16 @@ mise use -g "github:mpyw/suve[matching=cli]"
 > "github:mpyw/suve" = { version = "latest", matching_regex = "(darwin|windows|cli_[0-9.]+_linux)" }
 > ```
 
+### Using [aqua](https://aquaproj.github.io/) (macOS/Linux/Windows)
+
+suve is available in the [standard aqua registry](https://github.com/aquaproj/aqua-registry):
+
+```bash
+aqua g -i mpyw/suve
+```
+
+The registry picks the right asset per platform automatically: the self-contained GUI build on macOS/Windows, and the dependency-free CLI-only static build on Linux (supported from v1.3.0).
+
 ### Using [Homebrew](https://brew.sh/) (macOS/Linux)
 
 ```bash
@@ -63,9 +76,6 @@ brew install mpyw/tap/suve
 # CLI-only version (no GUI dependencies, recommended for Linux)
 brew install mpyw/tap/suve-cli
 ```
-
-> [!NOTE]
-> On Linux, `suve` requires GTK3 and WebKit2GTK for GUI support. Use `suve-cli` if you only need CLI functionality.
 
 ### Using [Scoop](https://scoop.sh/) (Windows)
 
@@ -198,6 +208,24 @@ cd gui && wails build -tags production,webkit2_41 -skipbindings
 </details>
 
 </details>
+
+## Shell Completion
+
+suve can generate completion scripts for **bash**, **zsh**, **fish**, and **PowerShell**. Source the output to enable completion for commands, subcommands, and flags.
+
+```bash
+# bash — add to ~/.bashrc
+source <(suve completion bash)
+
+# zsh — add to ~/.zshrc
+source <(suve completion zsh)
+
+# fish
+suve completion fish > ~/.config/fish/completions/suve.fish
+
+# PowerShell — add to $PROFILE
+suve completion pwsh | Out-String | Invoke-Expression
+```
 
 ## Authentication
 
