@@ -163,7 +163,7 @@ suve/
 ├── .github/workflows/
 │   └── test.yml                  # CI: test + lint on push/PR
 │
-└── mise.toml                     # toolchain + tasks: build, test, lint, e2e, gui-dev/gui-build/gui-bindings, up, down (run via `mise <task>` / `mise run <task>`)
+└── mise.toml                     # toolchain + tasks: build-cli/build-gui, test, lint, e2e(+ -gcloud/-azure-appconfig/-azure-keyvault), generate-gui-bindings, coverage/coverage-all, clean, bash (run via `mise <task>` / `mise run <task>`)
 ```
 
 ### Key Design Patterns
@@ -185,7 +185,7 @@ mise test
 mise lint
 
 # Build CLI
-mise build
+mise build-cli
 
 # E2E tests (each task starts its emulator automatically via docker compose)
 mise e2e                  # AWS (localstack)
@@ -200,10 +200,10 @@ mise run bash --aws --gcloud --azure
 # Coverage
 mise coverage
 
-# GUI development (requires Wails)
-mise gui-dev      # Run GUI in dev mode
-mise gui-build    # Build GUI binary
-mise gui-bindings # Regenerate GUI bindings
+# GUI (requires Wails + Node.js)
+mise build-gui             # Build the CLI+GUI binary (bin/suve) with the frontend embedded
+mise generate-gui-bindings # Regenerate the GUI wailsjs bindings
+(cd gui && wails dev)      # GUI hot-reload dev server
 ```
 
 ## Testing Strategy

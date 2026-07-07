@@ -5,7 +5,8 @@
 #   - `go` matches the directive in go.mod / gui/go.mod (Go 1.25).
 #   - `golangci-lint` matches the version pinned by the lint jobs.
 #   - the wails CLI is pinned to the same release as the wailsapp/wails/v2
-#     library in gui/go.mod so `wails dev` / `wails build` match the bindings.
+#     library in gui/go.mod, so the bindings it regenerates (via `wails dev` in
+#     the generate-gui-bindings task) match the library.
 [tools]
 # Pinned to the exact go.mod directive so CI's carve-out jobs (which read the
 # version from go.mod via setup-go) and the mise jobs compile with the same
@@ -21,13 +22,41 @@ nfpm = "2.41.1"
 # Tasks (run with `mise run <task>`, or `mise <task>` — no name collides with a
 # mise subcommand). List them with `mise tasks`.
 #
-# GUI tasks invoke `wails` directly: mise puts the pinned wails/node/go on PATH
-# for the task, so versions match the bindings regardless of the ambient shell.
+# GUI tasks call wails / npm / go directly: mise puts the pinned versions on
+# PATH for the task, so builds and bindings are reproducible regardless of the
+# ambient shell.
 # =============================================================================
 
-[tasks.build]
+[tasks.build-cli]
 description = "Build the CLI binary"
 run = "go build -o bin/suve ./cmd/suve"
+
+[tasks.build-gui]
+description = "Build the single CLI+GUI binary (bin/suve), embedding a freshly-built frontend"
+# A bare `go build -tags production ./cmd/suve` embeds internal/gui/frontend/dist
+# as-is, so without this frontend build the binary aborts at `suve --gui` with
+# 'no index.html could be found'. Linux/webkit2gtk-4.1 needs webkit2_41 — override
+# with SUVE_GUI_TAGS=production,webkit2_41.
+run = '''
+echo "Building the GUI frontend (embedded into the binary)…"
+(cd internal/gui/frontend && npm install && npm run build)
+tags="${SUVE_GUI_TAGS:-production}"
+echo "Building bin/suve (tags: $tags)…"
+CGO_ENABLED=1 go build -tags "$tags" -o bin/suve ./cmd/suve
+echo "Built bin/suve — run 'suve --gui'."
+'''
+
+[tasks.generate-gui-bindings]
+description = "Regenerate the GUI wailsjs bindings"
+run = '''
+echo "Temporarily removing build constraints..."
+find gui internal/gui -name '*.go' -exec sed -i.bak 's|^//go:build.*||' {} \;
+echo "Generating bindings..."
+(cd gui && timeout 30 wails dev -tags dev 2>&1 | head -30) || true
+echo "Restoring build constraints..."
+find gui internal/gui -name '*.go.bak' -exec sh -c 'mv "$1" "${1%.bak}"' _ {} \;
+echo "Done. Check internal/gui/frontend/wailsjs/go/ for updated bindings."
+'''
 
 [tasks.test]
 description = "Run unit tests (excludes GUI + cmd)"
@@ -35,8 +64,8 @@ run = "go test $(go list ./... | grep -v internal/gui | grep -v /cmd/)"
 
 [tasks.lint]
 description = "Run golangci-lint on the host OS with all build tags"
-# GOHOSTOS is the build host's OS regardless of any ambient GOOS, matching the
-# old Makefile's uname-based host detection.
+# GOHOSTOS is the build host's OS regardless of any ambient GOOS, so lint runs
+# against the host platform's build tags.
 run = "GOOS=$(go env GOHOSTOS) golangci-lint run --build-tags=e2e,production ./..."
 
 [tasks.e2e]
@@ -125,43 +154,6 @@ SUVE_LOCALSTACK_EXTERNAL_PORT="$port" go test -tags=e2e -coverprofile=coverage-e
 echo "Merging coverage profiles..."
 go run github.com/wadey/gocovmerge@latest coverage-unit.out coverage-e2e.out > coverage-all.out
 go tool cover -func=coverage-all.out | grep total
-'''
-
-[tasks.build-gui]
-description = "Build the single CLI+GUI binary (bin/suve), embedding a freshly-built frontend"
-# A bare `go build -tags production ./cmd/suve` embeds internal/gui/frontend/dist
-# as-is, so without this frontend build the binary aborts at `suve --gui` with
-# 'no index.html could be found'. Linux/webkit2gtk-4.1 needs webkit2_41 — override
-# with SUVE_GUI_TAGS=production,webkit2_41.
-run = '''
-echo "Building the GUI frontend (embedded into the binary)…"
-(cd internal/gui/frontend && npm install && npm run build)
-tags="${SUVE_GUI_TAGS:-production}"
-echo "Building bin/suve (tags: $tags)…"
-CGO_ENABLED=1 go build -tags "$tags" -o bin/suve ./cmd/suve
-echo "Built bin/suve — run 'suve --gui'."
-'''
-
-[tasks.gui-dev]
-description = "Start the GUI development server"
-dir = "gui"
-run = "wails dev -skipbindings -tags dev"
-
-[tasks.gui-build]
-description = "Build the GUI for production"
-dir = "gui"
-run = "wails build -tags production -skipbindings"
-
-[tasks.gui-bindings]
-description = "Regenerate the GUI wailsjs bindings"
-run = '''
-echo "Temporarily removing build constraints..."
-find gui internal/gui -name '*.go' -exec sed -i.bak 's|^//go:build.*||' {} \;
-echo "Generating bindings..."
-(cd gui && timeout 30 wails dev -tags dev 2>&1 | head -30) || true
-echo "Restoring build constraints..."
-find gui internal/gui -name '*.go.bak' -exec sh -c 'mv "$1" "${1%.bak}"' _ {} \;
-echo "Done. Check internal/gui/frontend/wailsjs/go/ for updated bindings."
 '''
 
 # Linux GUI test environment (requires XQuartz on macOS).
