@@ -22,6 +22,7 @@
     onselectprovider?: (provider: string) => void;
     onselectscope?: (sel: gui.ScopeSelection) => void;
     oncancelscope?: () => void;
+    onchangescope?: () => void;
   }
 
   let {
@@ -43,6 +44,7 @@
     onselectprovider,
     onselectscope,
     oncancelscope,
+    onchangescope,
   }: Props = $props();
 
   // Service key → stable nav icon/letter (labels come from capability names).
@@ -221,8 +223,8 @@
     </nav>
   {/if}
 
-  <!-- Identity / scope info -->
-  {#if scopeReady && provider === 'aws' && accountId && region}
+  <!-- Identity / scope info (hidden while a scope form is pending) -->
+  {#if scopeReady && !pendingProvider && provider === 'aws' && accountId && region}
     <div class="aws-info">
       {#if profile}
         <div class="aws-info-row">
@@ -239,14 +241,15 @@
         <span class="aws-info-value" title={region}>{region}</span>
       </div>
     </div>
-  {:else if scopeReady && provider === 'googlecloud' && scope?.projectId}
+  {:else if scopeReady && !pendingProvider && provider === 'googlecloud' && scope?.projectId}
     <div class="aws-info scope-info">
       <div class="aws-info-row">
         <span class="aws-info-label">Project</span>
         <span class="aws-info-value" title={scope.projectId}>{scope.projectId}</span>
       </div>
+      <button type="button" class="scope-change" onclick={() => onchangescope?.()}>Change scope</button>
     </div>
-  {:else if scopeReady && provider === 'azure'}
+  {:else if scopeReady && !pendingProvider && provider === 'azure'}
     <div class="aws-info scope-info">
       {#if scope?.vaultName}
         <div class="aws-info-row">
@@ -260,6 +263,7 @@
           <span class="aws-info-value" title={scope.storeName}>{scope.storeName}</span>
         </div>
       {/if}
+      <button type="button" class="scope-change" onclick={() => onchangescope?.()}>Change scope</button>
     </div>
   {/if}
 </aside>
@@ -363,6 +367,22 @@
     font-size: 11px;
     color: #e94560;
     line-height: 1.4;
+  }
+
+  .scope-change {
+    margin-top: 8px;
+    padding: 4px 8px;
+    background: transparent;
+    color: #8a8aa0;
+    border: 1px solid #2d2d44;
+    border-radius: 6px;
+    font-size: 11px;
+    cursor: pointer;
+  }
+
+  .scope-change:hover {
+    color: #fff;
+    border-color: #3d3d5c;
   }
 
   .nav {
