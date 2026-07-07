@@ -199,6 +199,24 @@ cd gui && wails build -tags production,webkit2_41 -skipbindings
 
 </details>
 
+## Shell Completion
+
+suve can generate completion scripts for **bash**, **zsh**, **fish**, and **PowerShell**. Source the output to enable completion for commands, subcommands, and flags.
+
+```bash
+# bash — add to ~/.bashrc
+source <(suve completion bash)
+
+# zsh — add to ~/.zshrc
+source <(suve completion zsh)
+
+# fish
+suve completion fish > ~/.config/fish/completions/suve.fish
+
+# PowerShell — add to $PROFILE
+suve completion pwsh | Out-String | Invoke-Expression
+```
+
 ## Authentication
 
 suve talks to each cloud's **data plane** using that cloud's own SDK credential chain — the same one the native CLI (`aws` / `gcloud` / `az`) uses. There is nothing suve-specific to configure: sign in the normal way, then point suve at the resource with an environment variable (or the equivalent flag).
