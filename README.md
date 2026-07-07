@@ -35,6 +35,25 @@ A **Git-like CLI/GUI** for AWS Parameter Store / Secrets Manager, Google Cloud S
 
 ## Installation
 
+### Using [mise](https://mise.jdx.dev/) (macOS/Linux/Windows)
+
+suve is installable directly from GitHub Releases via mise's `github` backend — no extra registry required:
+
+```bash
+# Full version (CLI + GUI)
+mise use -g "github:mpyw/suve"
+
+# CLI-only version (no GUI dependencies, recommended for Linux. Not available on macOS/Windows)
+mise use -g "github:mpyw/suve[matching=cli]"
+```
+
+> [!TIP]
+> Committing to a shared `mise.toml` used across OSes? Use a single cross-platform rule instead:
+> ```toml
+> [tools]
+> "github:mpyw/suve" = { version = "latest", matching_regex = "(darwin|windows|cli_[0-9.]+_linux)" }
+> ```
+
 ### Using [Homebrew](https://brew.sh/) (macOS/Linux)
 
 ```bash
