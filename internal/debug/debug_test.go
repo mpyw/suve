@@ -29,3 +29,29 @@ func TestWith_roundtrip(t *testing.T) {
 	assert.True(t, cfg.Enabled)
 	assert.Same(t, &buf, cfg.Writer)
 }
+
+func TestConfig_Logf_enabled(t *testing.T) {
+	t.Parallel()
+
+	var buf bytes.Buffer
+
+	cfg := debug.Config{Enabled: true, Writer: &buf}
+	cfg.Logf("hello %s\n", "world")
+
+	assert.Equal(t, "hello world\n", buf.String())
+}
+
+func TestConfig_Logf_noop(t *testing.T) {
+	t.Parallel()
+
+	// Disabled: nothing is written.
+	var buf bytes.Buffer
+
+	(debug.Config{Enabled: false, Writer: &buf}).Logf("nope")
+	assert.Empty(t, buf.String())
+
+	// Enabled but no writer: must not panic.
+	assert.NotPanics(t, func() {
+		(debug.Config{Enabled: true}).Logf("nope")
+	})
+}
