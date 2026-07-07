@@ -69,6 +69,14 @@ func MakeAppWithDetect(det detect.Result) *cli.Command {
 		Description: aliasDescription(det),
 		Version:     Version,
 		Commands:    append(flat, commands...),
+		// EnableShellCompletion adds a hidden `completion` command (bash/zsh/fish/pwsh)
+		// and the `--generate-shell-completion` mechanism the scripts rely on.
+		EnableShellCompletion: true,
+		// Surface the completion command in help so it is discoverable, rather than
+		// leaving it hidden as urfave/cli does by default.
+		ConfigureShellCompletionCommand: func(c *cli.Command) {
+			c.Hidden = false
+		},
 		CommandNotFound: func(_ context.Context, cmd *cli.Command, command string) {
 			_ = cli.ShowAppHelp(cmd)
 			w := lo.CoalesceOrEmpty(cmd.Root().ErrWriter, cmd.Root().Writer)

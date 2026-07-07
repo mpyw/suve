@@ -1,6 +1,7 @@
 package commands_test
 
 import (
+	"bytes"
 	"slices"
 	"testing"
 
@@ -77,6 +78,36 @@ func TestMakeAppWithDetect_flatCommandsAreRunnable(t *testing.T) {
 	app = commands.MakeAppWithDetect(detect.Result{Param: provider.ProviderAzure})
 	err = app.Run(t.Context(), []string{"suve", "param", "--help"})
 	require.NoError(t, err)
+}
+
+func TestMakeApp_shellCompletion(t *testing.T) {
+	t.Parallel()
+
+	// urfave/cli injects the completion command during setup and hides it by
+	// default; we un-hide it, so it must appear in top-level help.
+	var help bytes.Buffer
+
+	app := commands.MakeAppWithDetect(detect.Result{})
+	app.Writer = &help
+
+	require.NoError(t, app.Run(t.Context(), []string{"suve", "--help"}))
+	assert.Contains(t, help.String(), "completion", "completion command should be discoverable in help")
+
+	// Each supported shell must emit a non-empty script.
+	for _, shell := range []string{"bash", "zsh", "fish", "pwsh"} {
+		t.Run(shell, func(t *testing.T) {
+			t.Parallel()
+
+			var out bytes.Buffer
+
+			app := commands.MakeAppWithDetect(detect.Result{})
+			app.Writer = &out
+
+			err := app.Run(t.Context(), []string{"suve", "completion", shell})
+			require.NoError(t, err)
+			assert.NotEmpty(t, out.String())
+		})
+	}
 }
 
 func contains(ss []string, s string) bool {
