@@ -78,19 +78,26 @@ test.describe('Azure scope form', () => {
     });
   });
 
-  test('Connect is disabled until a vault or store name is given', async ({ page }) => {
-    await setupWailsMocks(page);
+  test('submitting an empty scope form disconnects and clears the cached scope', async ({ page }) => {
+    // Connected to Azure (vault + store), so the scope is cached.
+    await setupWailsMocks(page, createAzureState());
     await page.goto('/');
     await waitForItemList(page);
 
+    // Open the form, clear both fields, and Connect empty → disconnect + clear.
+    await page.getByRole('button', { name: 'Change scope' }).click();
+    await page.locator('#azure-vault').fill('');
+    await page.locator('#azure-store').fill('');
+    await page.getByRole('button', { name: 'Connect' }).click();
+
+    // Back to the provider prompt (no active scope).
+    await expect(page.getByText('Select a provider to begin.')).toBeVisible();
+
+    // Re-selecting Azure shows the EMPTY form — the cached scope was cleared,
+    // so it no longer auto-reconnects.
     await pickProvider(page, 'azure');
-    const connect = page.getByRole('button', { name: 'Connect' });
-    await expect(connect).toBeDisabled(); // nothing entered yet
-    await page.locator('#azure-vault').fill('v');
-    await expect(connect).toBeEnabled();
-    // whitespace-only does not count
-    await page.locator('#azure-vault').fill('   ');
-    await expect(connect).toBeDisabled();
+    await expect(page.locator('#azure-vault')).toHaveValue('');
+    await expect(page.locator('#azure-store')).toHaveValue('');
   });
 
   test('a rejected SelectScope shows the error and keeps the previous scope browsable', async ({ page }) => {
