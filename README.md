@@ -829,6 +829,40 @@ All timestamps are formatted in RFC3339 format with the local timezone offset ap
 |----------|-------------|
 | `TZ` | Timezone for date/time formatting (see above) |
 | `SUVE_NO_UPDATE_CHECK` | Opt out of the update-check notification |
+| `SUVE_DEBUG` | Enable verbose debug logging (same as the global `--debug` flag) |
+
+### Debugging
+
+Pass the global `--debug` flag (or set `SUVE_DEBUG=1`) to trace what suve is
+doing on stderr. This is designed for the "command produces empty or unexpected
+output" case: it shows the decisions suve made *before* calling any API, the
+effective cloud configuration, each SDK request/response, and how many results
+each step produced:
+
+```bash
+suve secret ls --debug          # flag works in any position
+SUVE_DEBUG=1 suve secret ls      # or via environment
+```
+
+Every line shares the `[suve debug <time>]` prefix. The output includes:
+
+- **CLI decisions** — the suve version and which provider each flat alias
+  (`param` / `secret` / `stage`) resolved to.
+- **Effective configuration** — for AWS, the resolved region, profile, and
+  credentials source (the usual suspects when a listing is unexpectedly empty);
+  for Google Cloud, the queried `projects/...` parent; for Azure, the
+  credential the `DefaultAzureCredential` chain selected.
+- **SDK requests/responses** — AWS HTTP request/response dumps (bodyless) with
+  retries, gRPC calls with resource paths and durations for Google Cloud, and
+  azcore request/response/retry/authentication events for Azure.
+- **Result counts** — items returned per API page, and how many names survived
+  the client-side prefix/regex filters, so "the API returned nothing" and "my
+  filter dropped everything" are distinguishable.
+
+Only request/response **metadata** is printed — secret values are never logged
+(AWS uses the bodyless log modes, the gRPC interceptor never prints messages,
+and azcore logs headers/status only). Debug output goes to stderr, so it never
+contaminates piped stdout.
 
 ### Staging
 
