@@ -15,7 +15,7 @@ import (
 func Command() *cli.Command {
 	return &cli.Command{
 		Name:    "secret",
-		Aliases: []string{"sm"},
+		Aliases: []string{"sm", "secretsmanager"},
 		Usage:   "Interact with AWS Secrets Manager",
 		Commands: []*cli.Command{
 			ShowCommand(),
