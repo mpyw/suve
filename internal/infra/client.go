@@ -13,17 +13,29 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
+	"github.com/aws/smithy-go/logging"
 	"github.com/samber/lo"
 	"gopkg.in/ini.v1"
 
+	"github.com/mpyw/suve/internal/debug"
 	"github.com/mpyw/suve/internal/maputil"
 )
 
 // arnAccountIDRegex extracts AWS account ID (12 digits) from ARN strings.
 var arnAccountIDRegex = regexp.MustCompile(`:(\d{12}):`)
 
-// LoadConfig loads the default AWS configuration.
+// LoadConfig loads the default AWS configuration. When debug is enabled on the
+// context it turns on SDK request/response/retry logging (metadata only — the
+// bodyless LogRequest/LogResponse modes never print secret values) directed at
+// the debug writer.
 func LoadConfig(ctx context.Context) (aws.Config, error) {
+	if d := debug.From(ctx); d.Enabled {
+		return config.LoadDefaultConfig(ctx,
+			config.WithClientLogMode(aws.LogRequest|aws.LogResponse|aws.LogRetries),
+			config.WithLogger(logging.NewStandardLogger(d.Writer)),
+		)
+	}
+
 	return config.LoadDefaultConfig(ctx)
 }
 

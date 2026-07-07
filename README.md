@@ -35,6 +35,9 @@ A **Git-like CLI/GUI** for AWS Parameter Store / Secrets Manager, Google Cloud S
 
 ## Installation
 
+> [!NOTE]
+> On Linux, `suve` requires GTK3 and WebKit2GTK for GUI support. Use the CLI-only version if you only need CLI functionality.
+
 ### Using [mise](https://mise.jdx.dev/) (macOS/Linux/Windows)
 
 suve is installable directly from GitHub Releases via mise's `github` backend — no extra registry required:
@@ -54,6 +57,16 @@ mise use -g "github:mpyw/suve[matching=cli]"
 > "github:mpyw/suve" = { version = "latest", matching_regex = "(darwin|windows|cli_[0-9.]+_linux)" }
 > ```
 
+### Using [aqua](https://aquaproj.github.io/) (macOS/Linux/Windows)
+
+suve is available in the [standard aqua registry](https://github.com/aquaproj/aqua-registry):
+
+```bash
+aqua g -i mpyw/suve
+```
+
+The registry picks the right asset per platform automatically: the self-contained GUI build on macOS/Windows, and the dependency-free CLI-only static build on Linux (supported from v1.3.0).
+
 ### Using [Homebrew](https://brew.sh/) (macOS/Linux)
 
 ```bash
@@ -63,9 +76,6 @@ brew install mpyw/tap/suve
 # CLI-only version (no GUI dependencies, recommended for Linux)
 brew install mpyw/tap/suve-cli
 ```
-
-> [!NOTE]
-> On Linux, `suve` requires GTK3 and WebKit2GTK for GUI support. Use `suve-cli` if you only need CLI functionality.
 
 ### Using [Scoop](https://scoop.sh/) (Windows)
 
@@ -847,6 +857,23 @@ All timestamps are formatted in RFC3339 format with the local timezone offset ap
 |----------|-------------|
 | `TZ` | Timezone for date/time formatting (see above) |
 | `SUVE_NO_UPDATE_CHECK` | Opt out of the update-check notification |
+| `SUVE_DEBUG` | Enable verbose debug logging (same as the global `--debug` flag) |
+
+### Debugging
+
+Pass the global `--debug` flag (or set `SUVE_DEBUG=1`) to log each cloud SDK
+request/response to stderr. This is useful when a command produces empty or
+unexpected output and you want to see the actual API calls, target region, and
+HTTP status:
+
+```bash
+suve secret ls --debug          # flag works in any position
+SUVE_DEBUG=1 suve secret ls      # or via environment
+```
+
+Only request/response **metadata** (method, endpoint, region, status, retries)
+is printed — secret values are never logged. Debug output goes to stderr, so it
+never contaminates piped stdout.
 
 ### Staging
 

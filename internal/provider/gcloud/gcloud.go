@@ -10,12 +10,14 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"time"
 
 	secretmanager "cloud.google.com/go/secretmanager/apiv1"
 	"google.golang.org/api/option"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
+	"github.com/mpyw/suve/internal/debug"
 	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/provider/gcloud/secret"
 )
@@ -27,12 +29,53 @@ import (
 // Never set this in production.
 const EmulatorEnvVar = "SUVE_GCLOUD_SECRETMANAGER_ENDPOINT"
 
+// grpcStatus renders a unary call's outcome for a debug line without printing
+// the reply message (an AccessSecretVersion reply carries the secret payload).
+func grpcStatus(err error) string {
+	if err != nil {
+		return fmt.Sprintf("failed: %v", err)
+	}
+
+	return "ok"
+}
+
+// debugUnaryInterceptor logs each unary gRPC call's method, target, duration and
+// status via cfg. It deliberately never logs the request or reply messages, so
+// only metadata is printed.
+func debugUnaryInterceptor(cfg debug.Config) grpc.UnaryClientInterceptor {
+	return func(
+		ctx context.Context, method string, req, reply any,
+		cc *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption,
+	) error {
+		start := time.Now()
+		err := invoker(ctx, method, req, reply, cc, opts...)
+		cfg.Logf("[suve debug] gRPC %s (%s) %s in %s\n", method, cc.Target(), grpcStatus(err), time.Since(start))
+
+		return err
+	}
+}
+
+// debugDialOptions returns gRPC dial options that enable request logging when
+// debug is active on ctx, or nil otherwise. They apply only to the normal
+// (self-dialed) client; the emulator seam supplies its own pre-dialed
+// connection, for which dial options are ignored.
+func debugDialOptions(ctx context.Context) []option.ClientOption {
+	d := debug.From(ctx)
+	if !d.Enabled {
+		return nil
+	}
+
+	return []option.ClientOption{
+		option.WithGRPCDialOption(grpc.WithChainUnaryInterceptor(debugUnaryInterceptor(d))),
+	}
+}
+
 // newSecretManagerClient builds the Secret Manager client, honoring the
 // emulator seam (EmulatorEnvVar) when set.
 func newSecretManagerClient(ctx context.Context) (*secretmanager.Client, error) {
 	endpoint := os.Getenv(EmulatorEnvVar)
 	if endpoint == "" {
-		return secretmanager.NewClient(ctx)
+		return secretmanager.NewClient(ctx, debugDialOptions(ctx)...)
 	}
 
 	// Emulator: dial plaintext gRPC and skip authentication entirely.

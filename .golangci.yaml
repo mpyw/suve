@@ -48,6 +48,12 @@ linters:
         linters:
           - forbidigo
         text: "fmt\\.Fprint"
+      # Allow fmt.Fprint* in debug/debug.go (Config.Logf is the wrapper providers
+      # use, so the debug write is centralized here just like the output package)
+      - path: "internal/debug/debug\\.go"
+        linters:
+          - forbidigo
+        text: "fmt\\.Fprint"
       # Allow fmt.Fprint* in e2e tests
       - path: "e2e/"
         linters:
