@@ -11,10 +11,13 @@ import (
 	"github.com/mpyw/suve/internal/cli/commands/secret/update"
 )
 
+// nounSecret is the command name / noun used across the Secrets Manager commands.
+const nounSecret = "secret"
+
 // Command returns the secret command with all subcommands.
 func Command() *cli.Command {
 	return &cli.Command{
-		Name:    "secret",
+		Name:    nounSecret,
 		Aliases: []string{"sm", "secretsmanager"},
 		Usage:   "Interact with AWS Secrets Manager",
 		Commands: []*cli.Command{

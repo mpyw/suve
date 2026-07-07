@@ -17,6 +17,9 @@ import (
 	cliinternal "github.com/mpyw/suve/internal/cli/commands/internal"
 )
 
+// argsUsageKey is the ArgsUsage string shared by the single-key commands.
+const argsUsageKey = "<key>"
+
 // Command returns the "azure param" subcommand group.
 func Command() *cli.Command {
 	return &cli.Command{

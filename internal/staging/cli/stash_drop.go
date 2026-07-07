@@ -135,7 +135,7 @@ func globalStashDropAction(resolver staging.ScopeResolver) func(context.Context,
 		}
 
 		// Confirm unless --yes
-		skipConfirm := cmd.Bool("yes")
+		skipConfirm := cmd.Bool(flagYes)
 		if !skipConfirm && terminal.IsTerminalWriter(cmd.Root().ErrWriter) {
 			// Check if encrypted to decide confirmation message
 			isEncrypted, err := fileStore.IsEncrypted()
@@ -203,7 +203,7 @@ func serviceStashDropAction(service staging.Service, resolver staging.ScopeResol
 		}
 
 		// Confirm unless --yes
-		skipConfirm := cmd.Bool("yes")
+		skipConfirm := cmd.Bool(flagYes)
 		if !skipConfirm && terminal.IsTerminalWriter(cmd.Root().ErrWriter) {
 			// Count items for the message
 			state, err := fileStore.Drain(ctx, "", true)
@@ -248,8 +248,8 @@ func serviceStashDropAction(service staging.Service, resolver staging.ScopeResol
 func stashDropFlags() []cli.Flag {
 	return []cli.Flag{
 		&cli.BoolFlag{
-			Name:  "yes",
-			Usage: "Skip confirmation prompt",
+			Name:  flagYes,
+			Usage: usageSkipConfirm,
 		},
 	}
 }
@@ -258,12 +258,12 @@ func stashDropFlags() []cli.Flag {
 func serviceStashDropFlags() []cli.Flag {
 	return []cli.Flag{
 		&cli.BoolFlag{
-			Name:  "yes",
-			Usage: "Skip confirmation prompt",
+			Name:  flagYes,
+			Usage: usageSkipConfirm,
 		},
 		&cli.BoolFlag{
-			Name:  "passphrase-stdin",
-			Usage: "Read passphrase from stdin (for scripts/automation)",
+			Name:  flagPassphraseStdin,
+			Usage: usagePassphraseStdin,
 		},
 	}
 }

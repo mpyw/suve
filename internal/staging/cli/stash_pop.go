@@ -77,20 +77,20 @@ func stashPopFlags() []cli.Flag {
 			Usage: "Keep the file after restoring into memory",
 		},
 		&cli.BoolFlag{
-			Name:  "yes",
-			Usage: "Skip confirmation prompt",
+			Name:  flagYes,
+			Usage: usageSkipConfirm,
 		},
 		&cli.BoolFlag{
-			Name:  "merge",
+			Name:  flagMerge,
 			Usage: "Merge with the existing working staging area (default)",
 		},
 		&cli.BoolFlag{
-			Name:  "overwrite",
+			Name:  flagOverwrite,
 			Usage: "Overwrite the working staging area",
 		},
 		&cli.BoolFlag{
-			Name:  "passphrase-stdin",
-			Usage: "Read passphrase from stdin (for scripts/automation)",
+			Name:  flagPassphraseStdin,
+			Usage: usagePassphraseStdin,
 		},
 	}
 }
@@ -100,8 +100,8 @@ func stashPopMutuallyExclusiveFlags() []cli.MutuallyExclusiveFlags {
 	return []cli.MutuallyExclusiveFlags{
 		{
 			Flags: [][]cli.Flag{
-				{&cli.BoolFlag{Name: "merge"}},
-				{&cli.BoolFlag{Name: "overwrite"}},
+				{&cli.BoolFlag{Name: flagMerge}},
+				{&cli.BoolFlag{Name: flagOverwrite}},
 			},
 		},
 	}
@@ -207,8 +207,8 @@ func stashPopAction(service staging.Service, resolver staging.ScopeResolver) fun
 		}
 
 		result, err := chooser.ChooseMode(StashPopModeInput{
-			MergeFlag:     cmd.Bool("merge"),
-			OverwriteFlag: cmd.Bool("overwrite"),
+			MergeFlag:     cmd.Bool(flagMerge),
+			OverwriteFlag: cmd.Bool(flagOverwrite),
 			HasChanges:    !existingState.IsEmpty(),
 			ItemCount:     existingState.TotalCount(),
 			IsTTY:         terminal.IsTerminalWriter(cmd.Root().ErrWriter),

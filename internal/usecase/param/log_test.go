@@ -2,6 +2,7 @@ package param_test
 
 import (
 	"context"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -33,8 +34,7 @@ func newLogStore(oldestFirst []logVer) *providermock.Store {
 
 	versionsNewestFirst := make([]domain.Version, 0, len(oldestFirst))
 
-	for i := len(oldestFirst) - 1; i >= 0; i-- {
-		v := oldestFirst[i]
+	for _, v := range slices.Backward(oldestFirst) {
 		id := strconv.FormatInt(v.ver, 10)
 		byID[id] = v
 		versionsNewestFirst = append(versionsNewestFirst, domain.Version{ID: id, Created: v.modified})

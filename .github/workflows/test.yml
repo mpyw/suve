@@ -18,10 +18,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
 
       - name: Set up toolchain (mise)
-        uses: jdx/mise-action@v4
+        uses: jdx/mise-action@e6a8b3978addb5a52f2b4cd9d91eafa7f0ab959d # v4
         with:
           install_args: "go"
           github_token: ${{ secrets.GITHUB_TOKEN }}
@@ -36,7 +36,7 @@ jobs:
           go test -v -race -coverprofile=coverage.txt -covermode=atomic -coverpkg=$COVERPKG $PACKAGES
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac # v5
         with:
           files: ./coverage.txt
           flags: unittests
@@ -50,10 +50,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
 
       - name: Set up toolchain (mise)
-        uses: jdx/mise-action@v4
+        uses: jdx/mise-action@e6a8b3978addb5a52f2b4cd9d91eafa7f0ab959d # v4
         with:
           install_args: "go"
           github_token: ${{ secrets.GITHUB_TOKEN }}
@@ -73,7 +73,7 @@ jobs:
             -coverpkg=./internal/gui/... ./internal/gui/...
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac # v5
         with:
           files: ./coverage-gui.txt
           flags: gui
@@ -100,10 +100,10 @@ jobs:
           --health-retries 5
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
 
       - name: Set up toolchain (mise)
-        uses: jdx/mise-action@v4
+        uses: jdx/mise-action@e6a8b3978addb5a52f2b4cd9d91eafa7f0ab959d # v4
         with:
           install_args: "go"
           github_token: ${{ secrets.GITHUB_TOKEN }}
@@ -120,7 +120,7 @@ jobs:
           SUVE_LOCALSTACK_EXTERNAL_PORT: 4566
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac # v5
         with:
           files: ./coverage-e2e.txt
           flags: e2e
@@ -140,10 +140,10 @@ jobs:
           - 9090:9090
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
 
       - name: Set up toolchain (mise)
-        uses: jdx/mise-action@v4
+        uses: jdx/mise-action@e6a8b3978addb5a52f2b4cd9d91eafa7f0ab959d # v4
         with:
           install_args: "go"
           github_token: ${{ secrets.GITHUB_TOKEN }}
@@ -159,7 +159,7 @@ jobs:
           SUVE_GCLOUD_SECRETMANAGER_ENDPOINT: localhost:9090
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac # v5
         with:
           files: ./coverage-e2e-gcloud.txt
           flags: e2e
@@ -190,10 +190,10 @@ jobs:
           - 8443:8443
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
 
       - name: Set up toolchain (mise)
-        uses: jdx/mise-action@v4
+        uses: jdx/mise-action@e6a8b3978addb5a52f2b4cd9d91eafa7f0ab959d # v4
         with:
           install_args: "go"
           github_token: ${{ secrets.GITHUB_TOKEN }}
@@ -213,7 +213,7 @@ jobs:
           SUVE_AZURE_KEYVAULT_ENDPOINT: "https://localhost:8443"
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac # v5
         with:
           files: ./coverage-e2e-azure.txt
           flags: e2e
@@ -227,10 +227,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
 
       - name: Set up toolchain (mise)
-        uses: jdx/mise-action@v4
+        uses: jdx/mise-action@e6a8b3978addb5a52f2b4cd9d91eafa7f0ab959d # v4
         with:
           install_args: "go golangci-lint"
           github_token: ${{ secrets.GITHUB_TOKEN }}
@@ -257,7 +257,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
 
       - name: Check Google Cloud naming (no bare acronym)
         run: bash .github/scripts/check-naming.sh
@@ -270,10 +270,10 @@ jobs:
         working-directory: internal/gui/frontend
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
 
       - name: Set up toolchain (mise)
-        uses: jdx/mise-action@v4
+        uses: jdx/mise-action@e6a8b3978addb5a52f2b4cd9d91eafa7f0ab959d # v4
         with:
           install_args: "node"
           github_token: ${{ secrets.GITHUB_TOKEN }}
@@ -296,10 +296,10 @@ jobs:
         working-directory: internal/gui/frontend
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
 
       - name: Set up toolchain (mise)
-        uses: jdx/mise-action@v4
+        uses: jdx/mise-action@e6a8b3978addb5a52f2b4cd9d91eafa7f0ab959d # v4
         with:
           install_args: "node"
           github_token: ${{ secrets.GITHUB_TOKEN }}
@@ -314,7 +314,7 @@ jobs:
         run: npm test
 
       - name: Upload Playwright report
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         if: ${{ !cancelled() }}
         with:
           name: playwright-report-${{ matrix.os }}
@@ -326,10 +326,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
 
       - name: Set up toolchain (mise)
-        uses: jdx/mise-action@v4
+        uses: jdx/mise-action@e6a8b3978addb5a52f2b4cd9d91eafa7f0ab959d # v4
         with:
           install_args: "go nfpm"
           github_token: ${{ secrets.GITHUB_TOKEN }}
@@ -411,21 +411,21 @@ jobs:
             pkg_suffix: "_webkit2_41"
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
 
       # This job's webkit-4.0 matrix leg runs on Ubuntu 22.04 (the only runner
       # that still ships libwebkit2gtk-4.0-dev), whose glibc 2.35 is too old for
       # mise's prebuilt binary. Use the standard setup actions here; the tool
       # versions are kept in sync with mise.toml.
       - name: Set up Go
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
           go-version-file: go.mod
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
         with:
-          node-version: '20'
+          node-version: '24'
           cache: 'npm'
           cache-dependency-path: internal/gui/frontend/package-lock.json
 
@@ -518,10 +518,10 @@ jobs:
             runner: windows-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
 
       - name: Set up toolchain (mise)
-        uses: jdx/mise-action@v4
+        uses: jdx/mise-action@e6a8b3978addb5a52f2b4cd9d91eafa7f0ab959d # v4
         with:
           install_args: "go"
           github_token: ${{ secrets.GITHUB_TOKEN }}
@@ -556,7 +556,7 @@ jobs:
           go test -v -race -coverprofile=coverage-platform-${{ matrix.os }}.txt -covermode=atomic -coverpkg="$COVERPKG" ${{ steps.packages.outputs.packages }}
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac # v5
         with:
           files: ./coverage-platform-${{ matrix.os }}.txt
           flags: platform-${{ matrix.os }}
@@ -580,10 +580,10 @@ jobs:
           # Main Lint job (Linux) covers all essential checks.
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
 
       - name: Set up toolchain (mise)
-        uses: jdx/mise-action@v4
+        uses: jdx/mise-action@e6a8b3978addb5a52f2b4cd9d91eafa7f0ab959d # v4
         with:
           install_args: "go golangci-lint"
           github_token: ${{ secrets.GITHUB_TOKEN }}
@@ -608,10 +608,10 @@ jobs:
             goarch: amd64
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
 
       - name: Set up toolchain (mise)
-        uses: jdx/mise-action@v4
+        uses: jdx/mise-action@e6a8b3978addb5a52f2b4cd9d91eafa7f0ab959d # v4
         with:
           install_args: "go"
           github_token: ${{ secrets.GITHUB_TOKEN }}

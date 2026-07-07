@@ -18,10 +18,13 @@ import (
 	"github.com/mpyw/suve/internal/version/azurekvversion"
 )
 
+// nounSecret is the command name / noun used across the Key Vault secret commands.
+const nounSecret = "secret"
+
 // Command returns the "azure secret" subcommand group.
 func Command() *cli.Command {
 	return &cli.Command{
-		Name:    "secret",
+		Name:    nounSecret,
 		Aliases: []string{"kv", "keyvault"},
 		Usage:   "Interact with Azure Key Vault secrets",
 		Description: `Interact with Azure Key Vault secrets.

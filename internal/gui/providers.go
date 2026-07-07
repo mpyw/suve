@@ -7,6 +7,13 @@ import (
 	"github.com/mpyw/suve/internal/provider/detect"
 )
 
+// Service keys and display labels reused across the capability descriptors.
+const (
+	serviceParam      = "param"
+	serviceSecret     = "secret"
+	displayNameSecret = "Secret"
+)
+
 // =============================================================================
 // Provider detection
 // =============================================================================
@@ -148,12 +155,12 @@ func (a *App) Capabilities() []ProviderCapability {
 			ScopeFields: []string{},
 			Services: []ServiceCapability{
 				{
-					Service: "param", DisplayName: "Param",
+					Service: serviceParam, DisplayName: "Param",
 					HasVersionHistory: true, HasVersionSpecifiers: true, HasTags: true, HasRestore: false,
 					HasStaging: true, HasForceDelete: false, HasRecoveryWindow: false,
 				},
 				{
-					Service: "secret", DisplayName: "Secret",
+					Service: serviceSecret, DisplayName: displayNameSecret,
 					HasVersionHistory: true, HasVersionSpecifiers: true, HasTags: true, HasRestore: true,
 					HasStaging: true, HasForceDelete: true, HasRecoveryWindow: true,
 				},
@@ -165,7 +172,7 @@ func (a *App) Capabilities() []ProviderCapability {
 			ScopeFields: []string{"project"},
 			Services: []ServiceCapability{
 				{
-					Service: "secret", DisplayName: "Secret",
+					Service: serviceSecret, DisplayName: displayNameSecret,
 					HasVersionHistory: true, HasVersionSpecifiers: true, HasTags: true, HasRestore: false,
 					HasStaging: true, HasForceDelete: false, HasRecoveryWindow: false,
 				},
@@ -178,12 +185,12 @@ func (a *App) Capabilities() []ProviderCapability {
 			Services: []ServiceCapability{
 				// App Configuration is unversioned and cannot write tags.
 				{
-					Service: "param", DisplayName: "App Configuration",
+					Service: serviceParam, DisplayName: "App Configuration",
 					HasVersionHistory: false, HasVersionSpecifiers: false, HasTags: false, HasRestore: false,
 					HasStaging: true, HasForceDelete: false, HasRecoveryWindow: false,
 				},
 				{
-					Service: "secret", DisplayName: "Key Vault",
+					Service: serviceSecret, DisplayName: "Key Vault",
 					HasVersionHistory: true, HasVersionSpecifiers: true, HasTags: true, HasRestore: false,
 					HasStaging: true, HasForceDelete: false, HasRecoveryWindow: false,
 				},

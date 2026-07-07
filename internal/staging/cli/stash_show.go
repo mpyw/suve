@@ -113,8 +113,8 @@ func stashShowFlags() []cli.Flag {
 			Usage:   "Show detailed information",
 		},
 		&cli.BoolFlag{
-			Name:  "passphrase-stdin",
-			Usage: "Read passphrase from stdin (for scripts/automation)",
+			Name:  flagPassphraseStdin,
+			Usage: usagePassphraseStdin,
 		},
 	}
 }

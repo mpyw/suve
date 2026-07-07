@@ -105,7 +105,7 @@ func (p *showPresenter) RenderJSON(stdout io.Writer, value string) error {
 func ShowCommand() *cli.Command {
 	return genericshow.Command(genericshow.Config[*azureappconfigversion.Spec]{
 		Usage:     "Show setting value with metadata",
-		ArgsUsage: "<key>",
+		ArgsUsage: argsUsageKey,
 		Description: `Display an App Configuration setting's value along with its metadata.
 
 App Configuration is UNVERSIONED: version specifiers (#VERSION, ~SHIFT, :LABEL)

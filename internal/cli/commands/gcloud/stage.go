@@ -14,8 +14,8 @@ import (
 // on-disk staging state by the resolved project.
 func gcloudStageConfig() stgcli.CommandConfig {
 	return stgcli.CommandConfig{
-		CommandName:   "secret",
-		ItemName:      "secret",
+		CommandName:   nounSecret,
+		ItemName:      nounSecret,
 		Factory:       cliinternal.GoogleCloudSecretStrategyFactory,
 		ParserFactory: staging.GoogleCloudSecretParserFactory,
 		ScopeResolver: cliinternal.GoogleCloudStagingScopeResolver,

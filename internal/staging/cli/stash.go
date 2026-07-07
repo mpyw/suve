@@ -123,7 +123,7 @@ func fileStoreForReading(cmd *cli.Command, scope provider.Scope, checkExists boo
 		}
 
 		switch {
-		case cmd.Bool("passphrase-stdin"):
+		case cmd.Bool(flagPassphraseStdin):
 			pass, err = prompter.ReadFromStdin()
 			if err != nil {
 				return nil, fmt.Errorf("failed to read passphrase from stdin: %w", err)

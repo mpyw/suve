@@ -8,6 +8,13 @@ import (
 	"github.com/mpyw/suve/internal/staging/store"
 )
 
+// Stash error Op codes shared by StashPopError and StashPushError.
+const (
+	stashOpLoad   = "load"
+	stashOpWrite  = "write"
+	stashOpDelete = "delete"
+)
+
 // StashPopInput holds input for the drain use case.
 type StashPopInput struct {
 	// Service filters the drain to a specific service. Empty means all services.
@@ -43,7 +50,7 @@ func (u *StashPopUseCase) Execute(ctx context.Context, input StashPopInput) (*St
 	// Read from the stash (keep for now, we'll delete after successful working write)
 	stashState, err := u.Stash.Drain(ctx, "", true)
 	if err != nil {
-		return nil, &StashPopError{Op: "load", Err: err}
+		return nil, &StashPopError{Op: stashOpLoad, Err: err}
 	}
 
 	// Extract service-specific state if filtered
@@ -98,7 +105,7 @@ func (u *StashPopUseCase) Execute(ctx context.Context, input StashPopInput) (*St
 
 	// Set state in the working staging area
 	if err := u.Working.WriteState(ctx, "", finalState); err != nil {
-		return nil, &StashPopError{Op: "write", Err: err}
+		return nil, &StashPopError{Op: stashOpWrite, Err: err}
 	}
 
 	// Prepare output (before cleanup, so we can return it even on non-fatal errors)
@@ -128,18 +135,18 @@ func (u *StashPopUseCase) Execute(ctx context.Context, input StashPopInput) (*St
 				// Delete the stash file entirely
 				if _, err := u.Stash.Drain(ctx, "", false); err != nil {
 					// Non-fatal: state is already in the working area
-					return output, &StashPopError{Op: "delete", Err: err, NonFatal: true}
+					return output, &StashPopError{Op: stashOpDelete, Err: err, NonFatal: true}
 				}
 			} else {
 				// Write back the remaining state
 				if err := u.Stash.WriteState(ctx, "", stashState); err != nil {
-					return output, &StashPopError{Op: "delete", Err: err, NonFatal: true}
+					return output, &StashPopError{Op: stashOpDelete, Err: err, NonFatal: true}
 				}
 			}
 		} else {
 			// Drain again with keep=false to delete the stash file
 			if _, err := u.Stash.Drain(ctx, "", false); err != nil {
-				return output, &StashPopError{Op: "delete", Err: err, NonFatal: true}
+				return output, &StashPopError{Op: stashOpDelete, Err: err, NonFatal: true}
 			}
 		}
 	}
@@ -161,11 +168,11 @@ type StashPopError struct {
 
 func (e *StashPopError) Error() string {
 	switch e.Op {
-	case "load":
+	case stashOpLoad:
 		return "failed to load state from file: " + e.Err.Error()
-	case "write":
+	case stashOpWrite:
 		return "failed to write the working staging area: " + e.Err.Error()
-	case "delete":
+	case stashOpDelete:
 		return "failed to delete file: " + e.Err.Error()
 	default:
 		return e.Err.Error()

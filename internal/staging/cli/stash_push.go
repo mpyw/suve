@@ -84,20 +84,20 @@ func stashPushFlags() []cli.Flag {
 			Usage: "Keep staged changes in the working staging area after stashing",
 		},
 		&cli.BoolFlag{
-			Name:  "yes",
-			Usage: "Skip confirmation prompt",
+			Name:  flagYes,
+			Usage: usageSkipConfirm,
 		},
 		&cli.BoolFlag{
-			Name:  "merge",
+			Name:  flagMerge,
 			Usage: "Merge with existing stash (default)",
 		},
 		&cli.BoolFlag{
-			Name:  "overwrite",
+			Name:  flagOverwrite,
 			Usage: "Overwrite existing stash",
 		},
 		&cli.BoolFlag{
-			Name:  "passphrase-stdin",
-			Usage: "Read passphrase from stdin (for scripts/automation)",
+			Name:  flagPassphraseStdin,
+			Usage: usagePassphraseStdin,
 		},
 	}
 }
@@ -107,8 +107,8 @@ func stashPushMutuallyExclusiveFlags() []cli.MutuallyExclusiveFlags {
 	return []cli.MutuallyExclusiveFlags{
 		{
 			Flags: [][]cli.Flag{
-				{&cli.BoolFlag{Name: "merge"}},
-				{&cli.BoolFlag{Name: "overwrite"}},
+				{&cli.BoolFlag{Name: flagMerge}},
+				{&cli.BoolFlag{Name: flagOverwrite}},
 			},
 		},
 	}
@@ -137,9 +137,9 @@ func stashPushAction(service staging.Service, resolver staging.ScopeResolver) fu
 		}
 
 		// Determine mode based on flags
-		mergeFlag := cmd.Bool("merge")
-		overwriteFlag := cmd.Bool("overwrite")
-		skipConfirm := cmd.Bool("yes")
+		mergeFlag := cmd.Bool(flagMerge)
+		overwriteFlag := cmd.Bool(flagOverwrite)
+		skipConfirm := cmd.Bool(flagYes)
 
 		var mode usestaging.StashMode
 
@@ -210,7 +210,7 @@ func stashPushAction(service staging.Service, resolver staging.ScopeResolver) fu
 		var pass string
 
 		switch {
-		case cmd.Bool("passphrase-stdin"):
+		case cmd.Bool(flagPassphraseStdin):
 			pass, err = prompter.ReadFromStdin()
 			if err != nil {
 				return fmt.Errorf("failed to read passphrase from stdin: %w", err)
@@ -267,7 +267,7 @@ func stashPushAction(service staging.Service, resolver staging.ScopeResolver) fu
 // newGlobalStashPushCommand creates a global stash push command that operates on all services.
 func newGlobalStashPushCommand(resolver staging.ScopeResolver) *cli.Command {
 	return &cli.Command{
-		Name:  "push",
+		Name:  cmdNamePush,
 		Usage: "Save staged changes from the working staging area to the stash file",
 		Description: `Save staged changes from the working staging area to the stash file.
 
@@ -294,7 +294,7 @@ func newStashPushCommand(cfg CommandConfig) *cli.Command {
 	service := parser.Service()
 
 	return &cli.Command{
-		Name:  "push",
+		Name:  cmdNamePush,
 		Usage: fmt.Sprintf("Save staged %s changes from the working staging area to the stash file", cfg.ItemName),
 		Description: fmt.Sprintf(`Save staged %s changes from the working staging area to the stash file.
 

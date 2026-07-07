@@ -32,7 +32,7 @@ func DeleteCommand() *cli.Command {
 		Name:      "delete",
 		Aliases:   []string{"rm"},
 		Usage:     "Delete a setting",
-		ArgsUsage: "<key>",
+		ArgsUsage: argsUsageKey,
 		Description: `Delete a setting (key-value) from Azure App Configuration.
 
 Deletion removes the current value for the key (default label). App

@@ -11,12 +11,12 @@
 # Pinned to the exact go.mod directive so CI's carve-out jobs (which read the
 # version from go.mod via setup-go) and the mise jobs compile with the same
 # Go patch release.
-go = "1.25.0"
-node = "20"
-golangci-lint = "2.11.4"
+go = "1.25.11"
+node = "24"
+golangci-lint = "2.12.2"
 goreleaser = "2"
 nfpm = "2.41.1"
-"go:github.com/wailsapp/wails/v2/cmd/wails" = "2.11.0"
+"go:github.com/wailsapp/wails/v2/cmd/wails" = "2.13.0"
 
 # =============================================================================
 # Tasks (run with `mise run <task>`, or `mise <task>` — no name collides with a

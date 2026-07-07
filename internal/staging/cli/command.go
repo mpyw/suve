@@ -15,6 +15,19 @@ import (
 	stagingusecase "github.com/mpyw/suve/internal/usecase/staging"
 )
 
+// Flag names, flag usages, command names, and arg-usage strings shared across
+// sibling stage command builders.
+const (
+	flagYes              = "yes"
+	usageSkipConfirm     = "Skip confirmation prompt"
+	flagPassphraseStdin  = "passphrase-stdin"
+	usagePassphraseStdin = "Read passphrase from stdin (for scripts/automation)"
+	flagMerge            = "merge"
+	flagOverwrite        = "overwrite"
+	cmdNamePush          = "push"
+	argsUsageName        = "[name]"
+)
+
 // CommandConfig holds service-specific configuration for building stage commands.
 type CommandConfig struct {
 	// CommandName is the subcommand name (e.g., "param", "secret").
@@ -39,7 +52,7 @@ func NewStatusCommand(cfg CommandConfig) *cli.Command {
 	return &cli.Command{
 		Name:        "status",
 		Usage:       fmt.Sprintf("Show staged %s changes", cfg.ItemName),
-		ArgsUsage:   "[name]",
+		ArgsUsage:   argsUsageName,
 		Description: statusDescription(cfg),
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
@@ -80,7 +93,7 @@ func NewDiffCommand(cfg CommandConfig) *cli.Command {
 	return &cli.Command{
 		Name:        "diff",
 		Usage:       "Show diff between staged and AWS values",
-		ArgsUsage:   "[name]",
+		ArgsUsage:   argsUsageName,
 		Description: diffDescription(cfg),
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
@@ -253,14 +266,14 @@ func NewEditCommand(cfg CommandConfig) *cli.Command {
 func NewApplyCommand(cfg CommandConfig) *cli.Command {
 	return &cli.Command{
 		Name:        "apply",
-		Aliases:     []string{"push"},
+		Aliases:     []string{cmdNamePush},
 		Usage:       fmt.Sprintf("Apply staged %s changes to AWS", cfg.ItemName),
-		ArgsUsage:   "[name]",
+		ArgsUsage:   argsUsageName,
 		Description: applyDescription(cfg),
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
-				Name:  "yes",
-				Usage: "Skip confirmation prompt",
+				Name:  flagYes,
+				Usage: usageSkipConfirm,
 			},
 			&cli.BoolFlag{
 				Name:  "ignore-conflicts",
@@ -300,7 +313,7 @@ func NewApplyCommand(cfg CommandConfig) *cli.Command {
 				Store:       store,
 				Parser:      cfg.ParserFactory(),
 				Confirmer:   prompter,
-				SkipConfirm: cmd.Bool("yes"),
+				SkipConfirm: cmd.Bool(flagYes),
 				Stdout:      cmd.Root().Writer,
 				Stderr:      cmd.Root().ErrWriter,
 			}
