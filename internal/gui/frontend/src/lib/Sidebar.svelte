@@ -102,16 +102,14 @@
     }
   }
 
+  // Submitting empty is intentional: the parent treats a no-scope submission as
+  // "disconnect + clear", so Connect stays enabled and there is no required-field
+  // guard here.
   function submitProject(e: SubmitEvent) {
     e.preventDefault();
-    const projectId = projectInput.trim();
-    if (!projectId) {
-      formError = 'Project ID is required.';
-      return;
-    }
     onselectscope?.({
       provider: 'googlecloud',
-      projectId,
+      projectId: projectInput.trim(),
       vaultName: '',
       storeName: '',
     } as gui.ScopeSelection);
@@ -119,18 +117,11 @@
 
   function submitAzure(e: SubmitEvent) {
     e.preventDefault();
-    const vaultName = vaultInput.trim();
-    const storeName = storeInput.trim();
-    // Mirror the backend rule (#276): at least one service target is required.
-    if (!vaultName && !storeName) {
-      formError = 'Enter a Key Vault name (for secrets) and/or an App Configuration store name (for parameters).';
-      return;
-    }
     onselectscope?.({
       provider: 'azure',
       projectId: '',
-      vaultName,
-      storeName,
+      vaultName: vaultInput.trim(),
+      storeName: storeInput.trim(),
     } as gui.ScopeSelection);
   }
 </script>
@@ -171,7 +162,7 @@
       {#if formError || scopeError}
         <div class="scope-error">{formError || scopeError}</div>
       {/if}
-      <button type="submit" class="scope-submit" disabled={!projectInput.trim()}>Connect</button>
+      <button type="submit" class="scope-submit">Connect</button>
     </form>
   {:else if pendingProvider === 'azure'}
     <form class="scope-form" onsubmit={submitAzure}>
@@ -189,7 +180,7 @@
       {#if formError || scopeError}
         <div class="scope-error">{formError || scopeError}</div>
       {/if}
-      <button type="submit" class="scope-submit" disabled={!vaultInput.trim() && !storeInput.trim()}>Connect</button>
+      <button type="submit" class="scope-submit">Connect</button>
     </form>
   {/if}
 

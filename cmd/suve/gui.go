@@ -5,7 +5,6 @@ package main
 
 import (
 	"context"
-	"errors"
 	"os"
 	"strings"
 
@@ -14,14 +13,6 @@ import (
 	"github.com/mpyw/suve/internal/cli/commands"
 	"github.com/mpyw/suve/internal/gui"
 	"github.com/mpyw/suve/internal/provider"
-)
-
-// errInvalidGUIProvider is returned when a bare `suve --gui` cannot resolve a
-// single active provider from the environment (0 or 2+ active). The user must
-// choose explicitly with `suve <provider> --gui`.
-var errInvalidGUIProvider = errors.New(
-	"--gui: cannot determine a unique active provider from the environment; " +
-		"launch a specific one with `suve aws --gui`, `suve gcloud --gui`, or `suve azure --gui`",
 )
 
 // launchGUI runs the GUI with the given initial scope and exits. It is the
@@ -75,17 +66,16 @@ func registerGUIFlag() {
 	// Bare `suve --gui`: initial provider resolved from the environment.
 	commands.App.Flags = append(commands.App.Flags, &cli.BoolFlag{
 		Name:  "gui",
-		Usage: "Launch GUI mode (bare form picks the uniquely-active provider)",
+		Usage: "Launch GUI mode (picks the active provider, or opens the in-app picker if none is unambiguous)",
 	})
 	commands.App.Before = func(ctx context.Context, cmd *cli.Command) (context.Context, error) {
 		if cmd.Bool("gui") {
-			initial := gui.InitialProviderFromEnv()
-			if initial == "" {
-				return ctx, errInvalidGUIProvider
-			}
-
-			// Bare form carries no scope flags; the GUI hydrates from env.
-			return launchGUI(ctx, provider.Scope{Provider: initial})
+			// Launch with the uniquely-active provider when the environment
+			// resolves one; otherwise (0 or 2+ active) InitialProviderFromEnv
+			// returns "", and the GUI opens at its in-app provider picker rather
+			// than erroring. No scope flags on the bare form, so the GUI hydrates
+			// any resource fields from env.
+			return launchGUI(ctx, provider.Scope{Provider: gui.InitialProviderFromEnv()})
 		}
 
 		return ctx, nil

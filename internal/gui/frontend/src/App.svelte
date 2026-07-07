@@ -152,6 +152,15 @@
     }
   }
 
+  function clearCachedScope(p: string): void {
+    if (!p || typeof localStorage === 'undefined') return;
+    try {
+      localStorage.removeItem(scopeStorageKey(p));
+    } catch {
+      // best-effort; ignore private-mode failures.
+    }
+  }
+
   function hasRequiredScope(sel: gui.ScopeSelection): boolean {
     switch (sel.provider) {
       case 'aws':
@@ -180,8 +189,16 @@
     }
   }
 
-  // handleSelectScope is invoked when a scope form is submitted.
+  // handleSelectScope is invoked when a scope form is submitted. Submitting with
+  // the fields empty (no required scope) is treated as "disconnect + clear": it
+  // forgets the provider's cached scope and returns to the provider prompt,
+  // rather than erroring. A non-empty submission applies normally.
   async function handleSelectScope(sel: gui.ScopeSelection) {
+    if (!hasRequiredScope(sel)) {
+      clearScope(sel.provider);
+      return;
+    }
+
     await applyScope(sel);
   }
 
@@ -193,13 +210,27 @@
   }
 
   // handleChangeScope re-opens the scope form for the ACTIVE provider, prefilled
-  // with its current values, so the user can point it at a different resource.
-  // It deliberately bypasses handleSelectProvider (which would auto-apply the
-  // cached scope) by parking pendingProvider directly — the form's prefill comes
-  // from formPrefill (cache/current scope), and Connect overwrites the cache.
+  // with its current values. From there you can re-point it (enter new values →
+  // Connect) or disconnect (clear the fields → Connect). It bypasses
+  // handleSelectProvider (which would auto-apply the cached scope) by parking
+  // pendingProvider directly — the prefill comes from formPrefill.
   function handleChangeScope() {
     scopeError = '';
     pendingProvider = provider;
+  }
+
+  // clearScope forgets a provider's cached scope and returns to the "select a
+  // provider" prompt — the escape hatch from a wrong/unreachable cached scope
+  // that would otherwise auto-reconnect on every launch. Reached by submitting
+  // an empty scope form.
+  function clearScope(p: string) {
+    clearCachedScope(p);
+    provider = '';
+    scope = null;
+    scopeReady = false;
+    pendingProvider = '';
+    scopeError = '';
+    resetIdentity();
   }
 
   // applyScope validates+commits the scope server-side, then (AWS only) loads
