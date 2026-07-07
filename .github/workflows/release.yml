@@ -468,10 +468,17 @@ jobs:
 
             if [[ "$goos" == "windows" ]]; then
               cp "$dir/${src_binary}.exe" "$staging/${dst_binary}.exe"
+              # Restore the executable bit: upload/download-artifact does not
+              # preserve POSIX permissions, so the binary arrives here as 0644.
+              # Without this, tarball/zip consumers that extract-and-run (mise/ubi
+              # github backend) get "Permission denied".
+              chmod +x "$staging/${dst_binary}.exe"
               cp README.md LICENSE "$staging/"
               (cd "$staging" && zip -r "../releases/${archive_name}" .)
             else
               cp "$dir/${src_binary}" "$staging/${dst_binary}"
+              # Restore the executable bit (see note above).
+              chmod +x "$staging/${dst_binary}"
               cp README.md LICENSE "$staging/"
               tar -czvf "releases/${archive_name}" -C "$staging" .
             fi
