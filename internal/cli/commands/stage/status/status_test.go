@@ -238,8 +238,9 @@ func TestCommand_Validation(t *testing.T) {
 
 	app.Writer = &buf
 
-	// Test that the command exists and works
-	err := app.Run(t.Context(), []string{"suve", "status", "--help"})
+	// Test that the command exists and works. `status` is a subcommand of
+	// `stage`, not a top-level command, so it must be invoked as `stage status`.
+	err := app.Run(t.Context(), []string{"suve", "stage", "status", "--help"})
 	require.NoError(t, err)
 	assert.Contains(t, buf.String(), "staged changes")
 }

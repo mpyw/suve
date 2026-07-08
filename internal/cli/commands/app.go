@@ -15,6 +15,7 @@ import (
 	awscmd "github.com/mpyw/suve/internal/cli/commands/aws"
 	"github.com/mpyw/suve/internal/cli/commands/azure"
 	"github.com/mpyw/suve/internal/cli/commands/gcloud"
+	cliinternal "github.com/mpyw/suve/internal/cli/commands/internal"
 	"github.com/mpyw/suve/internal/cli/commands/param"
 	"github.com/mpyw/suve/internal/cli/commands/secret"
 	"github.com/mpyw/suve/internal/cli/commands/stage"
@@ -88,6 +89,11 @@ func MakeAppWithDetect(det detect.Result) *cli.Command {
 			w := lo.CoalesceOrEmpty(cmd.Root().ErrWriter, cmd.Root().Writer)
 			output.Println(w, "")
 			output.Warning(w, "Command not found: %s", command)
+
+			// urfave/cli's CommandNotFound is void, so Run returns nil; exit
+			// non-zero (via the overridable cli.OsExiter) so an unknown command
+			// fails instead of silently succeeding with status 0.
+			cli.OsExiter(cliinternal.CommandNotFoundExitCode)
 		},
 	}
 }
