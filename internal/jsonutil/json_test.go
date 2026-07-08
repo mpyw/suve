@@ -48,6 +48,30 @@ func TestTryFormat(t *testing.T) {
 			wantStr:  "{\n  \"url\": \"https://x.com/?a=1&b=<2>\"\n}",
 			wantBool: true,
 		},
+		{
+			name:     "preserves large integers beyond 2^53",
+			input:    `{"id":9007199254740993}`,
+			wantStr:  "{\n  \"id\": 9007199254740993\n}",
+			wantBool: true,
+		},
+		{
+			name:     "preserves the distinction between 1.0 and 1",
+			input:    `{"a":1.0,"b":1}`,
+			wantStr:  "{\n  \"a\": 1.0,\n  \"b\": 1\n}",
+			wantBool: true,
+		},
+		{
+			name:     "preserves high-precision decimals",
+			input:    `{"n":0.1234567890123456789}`,
+			wantStr:  "{\n  \"n\": 0.1234567890123456789\n}",
+			wantBool: true,
+		},
+		{
+			name:     "trailing data after a JSON value is rejected",
+			input:    `{"a":1} garbage`,
+			wantStr:  `{"a":1} garbage`,
+			wantBool: false,
+		},
 	}
 
 	for _, tt := range tests {
