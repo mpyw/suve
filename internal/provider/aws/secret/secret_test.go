@@ -231,6 +231,67 @@ func TestGet_LatestOmitsVersionID(t *testing.T) {
 	assert.False(t, hadVersionID)
 }
 
+// A version can carry several staging labels in an unspecified order; the
+// representative Label must be chosen deterministically by priority, so
+// AWSCURRENT wins even when it is not the first stage returned (#317).
+func TestGet_LabelPrefersAWSCURRENTRegardlessOfOrder(t *testing.T) {
+	t.Parallel()
+
+	store := secret.New(&mockClient{
+		getValue: func(_ *secretsmanager.GetSecretValueInput) (*secretsmanager.GetSecretValueOutput, error) {
+			return &secretsmanager.GetSecretValueOutput{
+				Name:          aws.String("my-secret"),
+				SecretString:  aws.String("v"),
+				VersionId:     aws.String("id-3"),
+				VersionStages: []string{"my-custom-label", "AWSPREVIOUS", "AWSCURRENT"},
+			}, nil
+		},
+		describe: func(_ *secretsmanager.DescribeSecretInput) (*secretsmanager.DescribeSecretOutput, error) {
+			return &secretsmanager.DescribeSecretOutput{}, nil
+		},
+	})
+
+	entry, err := store.Get(t.Context(), "my-secret", provider.NewVersionRef("id-3"))
+	require.NoError(t, err)
+	assert.Equal(t, "AWSCURRENT", entry.Version.Label)
+}
+
+// Priority ordering among the well-known and custom labels: AWSPENDING beats
+// AWSPREVIOUS, and custom-only labels tie-break lexicographically (#317).
+func TestHistory_LabelPriorityOrdering(t *testing.T) {
+	t.Parallel()
+
+	base := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
+	store := secret.New(&mockClient{
+		listVersion: func(_ *secretsmanager.ListSecretVersionIdsInput) (*secretsmanager.ListSecretVersionIdsOutput, error) {
+			return &secretsmanager.ListSecretVersionIdsOutput{
+				Versions: []types.SecretVersionsListEntry{
+					{
+						VersionId:     aws.String("id-2"),
+						CreatedDate:   aws.Time(base.Add(time.Hour)),
+						VersionStages: []string{"AWSPREVIOUS", "AWSPENDING"},
+					},
+					{
+						VersionId:     aws.String("id-1"),
+						CreatedDate:   aws.Time(base),
+						VersionStages: []string{"zeta", "alpha"},
+					},
+				},
+			}, nil
+		},
+	})
+
+	versions, err := store.History(t.Context(), "my-secret")
+	require.NoError(t, err)
+	require.Len(t, versions, 2)
+	// Newest first: id-2 (AWSPENDING preferred over AWSPREVIOUS).
+	assert.Equal(t, "id-2", versions[0].ID)
+	assert.Equal(t, "AWSPENDING", versions[0].Label)
+	// Custom-only labels tie-break lexicographically: "alpha" < "zeta".
+	assert.Equal(t, "id-1", versions[1].ID)
+	assert.Equal(t, "alpha", versions[1].Label)
+}
+
 func TestHistory_NewestFirst(t *testing.T) {
 	t.Parallel()
 
@@ -547,14 +608,28 @@ func TestRestore(t *testing.T) {
 func TestDescribe(t *testing.T) {
 	t.Parallel()
 
+	// The secret was created long before its current version; Describe must
+	// report the VERSION's own CreatedDate, not the secret's (#317).
+	secretCreated := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
+	currentVersionCreated := time.Date(2024, 1, 3, 0, 0, 0, 0, time.UTC)
+
 	store := secret.New(&mockClient{
 		describe: func(_ *secretsmanager.DescribeSecretInput) (*secretsmanager.DescribeSecretOutput, error) {
 			return &secretsmanager.DescribeSecretOutput{
 				Name:               aws.String("my-secret"),
 				Description:        aws.String("the desc"),
 				Tags:               []types.Tag{{Key: aws.String("team"), Value: aws.String("sec")}},
+				CreatedDate:        aws.Time(secretCreated),
 				LastChangedDate:    aws.Time(time.Date(2024, 2, 1, 0, 0, 0, 0, time.UTC)),
 				VersionIdsToStages: map[string][]string{"id-3": {"AWSCURRENT"}},
+			}, nil
+		},
+		listVersion: func(_ *secretsmanager.ListSecretVersionIdsInput) (*secretsmanager.ListSecretVersionIdsOutput, error) {
+			return &secretsmanager.ListSecretVersionIdsOutput{
+				Versions: []types.SecretVersionsListEntry{
+					{VersionId: aws.String("id-1"), CreatedDate: aws.Time(secretCreated), VersionStages: []string{}},
+					{VersionId: aws.String("id-3"), CreatedDate: aws.Time(currentVersionCreated), VersionStages: []string{"AWSCURRENT"}},
+				},
 			}, nil
 		},
 	})
@@ -566,6 +641,11 @@ func TestDescribe(t *testing.T) {
 	assert.Equal(t, domain.ValueTypeSecret, entry.Type)
 	assert.Equal(t, "the desc", entry.Description)
 	assert.Equal(t, "id-3", entry.Version.ID)
+	assert.Equal(t, "AWSCURRENT", entry.Version.Label)
+	// The version's own creation time, not the secret-level CreatedDate.
+	require.NotNil(t, entry.Version.Created)
+	assert.Equal(t, currentVersionCreated, *entry.Version.Created)
+	assert.NotEqual(t, secretCreated, *entry.Version.Created)
 	require.Len(t, entry.Tags, 1)
 	assert.Equal(t, "team", entry.Tags[0].Key)
 }

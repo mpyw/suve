@@ -108,8 +108,12 @@ func (u *LogUseCase) Execute(ctx context.Context, input LogInput) (*LogOutput, e
 			VersionStage: stages(v.Label),
 			Value:        value,
 			CreatedDate:  v.Created,
-			IsCurrent:    v.Label == "AWSCURRENT",
-			Error:        fetchErr,
+			// The adapter picks the version's Label by priority, so AWSCURRENT
+			// always surfaces whenever the version carries it (even alongside a
+			// custom label). This equality is therefore a correct membership
+			// test, not a fragile "first stage" check (#317).
+			IsCurrent: v.Label == "AWSCURRENT",
+			Error:     fetchErr,
 		})
 	}
 
