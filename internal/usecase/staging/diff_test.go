@@ -3,6 +3,7 @@ package staging_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -10,6 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/staging"
 	"github.com/mpyw/suve/internal/staging/store/testutil"
 	usecasestaging "github.com/mpyw/suve/internal/usecase/staging"
@@ -204,7 +206,7 @@ func TestDiffUseCase_Execute_AutoUnstage_AlreadyDeleted(t *testing.T) {
 	}))
 
 	strategy := newMockDiffStrategy()
-	strategy.fetchErrors["/app/gone"] = errors.New("not found")
+	strategy.fetchErrors["/app/gone"] = fmt.Errorf("%w: not found", provider.ErrNotFound)
 
 	uc := &usecasestaging.DiffUseCase{
 		Strategy: strategy,
@@ -274,7 +276,7 @@ func TestDiffUseCase_Execute_AutoUnstage_UpdateNoLongerExists(t *testing.T) {
 	}))
 
 	strategy := newMockDiffStrategy()
-	strategy.fetchErrors["/app/gone"] = errors.New("not found")
+	strategy.fetchErrors["/app/gone"] = fmt.Errorf("%w: not found", provider.ErrNotFound)
 
 	uc := &usecasestaging.DiffUseCase{
 		Strategy: strategy,
@@ -292,6 +294,41 @@ func TestDiffUseCase_Execute_AutoUnstage_UpdateNoLongerExists(t *testing.T) {
 	// Verify auto-unstaged
 	_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/gone")
 	assert.ErrorIs(t, err, staging.ErrNotStaged)
+}
+
+// TestDiffUseCase_Execute_KeepStagedOnTransientError verifies a non-not-found
+// fetch error does NOT auto-unstage a staged delete/update (#321).
+func TestDiffUseCase_Execute_KeepStagedOnTransientError(t *testing.T) {
+	t.Parallel()
+
+	for _, op := range []staging.Operation{staging.OperationDelete, staging.OperationUpdate} {
+		t.Run(string(op), func(t *testing.T) {
+			t.Parallel()
+
+			store := testutil.NewMockStore()
+
+			entry := staging.Entry{Operation: op, StagedAt: time.Now()}
+			if op == staging.OperationUpdate {
+				entry.Value = lo.ToPtr("v")
+			}
+
+			require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/x", entry))
+
+			strategy := newMockDiffStrategy()
+			strategy.fetchErrors["/app/x"] = errors.New("throttled")
+
+			uc := &usecasestaging.DiffUseCase{Strategy: strategy, Store: store}
+
+			output, err := uc.Execute(t.Context(), usecasestaging.DiffInput{})
+			require.NoError(t, err)
+			require.Len(t, output.Entries, 1)
+			assert.Equal(t, usecasestaging.DiffEntryWarning, output.Entries[0].Type)
+
+			// Must remain staged.
+			_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/x")
+			require.NoError(t, err)
+		})
+	}
 }
 
 func TestDiffUseCase_Execute_ListError(t *testing.T) {

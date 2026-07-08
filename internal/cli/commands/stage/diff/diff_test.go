@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -32,9 +33,20 @@ func storeReturning(value, versionID string) *providermock.Store {
 	}
 }
 
-// storeGetError builds a provider.Store mock whose Get fails, simulating a
-// resource that no longer exists in the provider.
+// storeGetError builds a provider.Store mock whose Get fails with a genuine
+// provider.ErrNotFound, simulating a resource that no longer exists.
 func storeGetError(msg string) *providermock.Store {
+	return &providermock.Store{
+		GetFunc: func(_ context.Context, _ string, _ provider.VersionRef) (*domain.Entry, error) {
+			return nil, fmt.Errorf("%w: %s", provider.ErrNotFound, msg)
+		},
+	}
+}
+
+// storeGetTransientError builds a provider.Store mock whose Get fails with a
+// non-not-found error (e.g. throttling, expired credentials, a network blip),
+// which must NOT trigger auto-unstaging of staged work.
+func storeGetTransientError(msg string) *providermock.Store {
 	return &providermock.Store{
 		GetFunc: func(_ context.Context, _ string, _ provider.VersionRef) (*domain.Entry, error) {
 			return nil, errors.New(msg)
@@ -603,6 +615,47 @@ func TestRun_DeleteAutoUnstageWhenAlreadyDeleted(t *testing.T) {
 	// Verify unstaged
 	_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/config")
 	assert.ErrorIs(t, err, staging.ErrNotStaged)
+}
+
+// TestRun_KeptStagedOnTransientFetchError verifies that a non-not-found fetch
+// error (throttling, expired credentials, a network blip) on a read-only
+// `stage diff` does NOT discard staged deletes/updates (#321).
+func TestRun_KeptStagedOnTransientFetchError(t *testing.T) {
+	t.Parallel()
+
+	for _, op := range []staging.Operation{staging.OperationDelete, staging.OperationUpdate} {
+		t.Run(string(op), func(t *testing.T) {
+			t.Parallel()
+
+			store := testutil.NewMockStore()
+
+			entry := staging.Entry{Operation: op, StagedAt: time.Now()}
+			if op == staging.OperationUpdate {
+				entry.Value = lo.ToPtr("new-value")
+			}
+
+			require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", entry))
+
+			var stdout, stderr bytes.Buffer
+
+			r := &stagediff.Runner{
+				Services:      []stagediff.ServiceStrategy{paramDiff(staging.NewParamStrategy(storeGetTransientError("throttled")))},
+				ProviderLabel: "AWS",
+				Store:         store,
+				Stdout:        &stdout,
+				Stderr:        &stderr,
+			}
+
+			require.NoError(t, r.Run(t.Context(), stagediff.Options{}))
+
+			// Surfaced as a warning, but NOT unstaged.
+			assert.Contains(t, stderr.String(), "throttled")
+			assert.NotContains(t, stderr.String(), "unstaged")
+
+			_, err := store.GetEntry(t.Context(), staging.ServiceParam, "/app/config")
+			require.NoError(t, err, "entry must remain staged after a transient fetch error")
+		})
+	}
 }
 
 func TestRun_SecretDeleteAutoUnstageWhenAlreadyDeleted(t *testing.T) {
