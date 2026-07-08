@@ -950,6 +950,10 @@
 
   .staging-content {
     flex: 1;
+    /* min-height: 0 lets this flex child shrink below its content height so its
+       own overflow-y scrolls, instead of growing past .view-container and being
+       clipped by .main-content's overflow:hidden (no scroll at all). */
+    min-height: 0;
     overflow-y: auto;
     padding: 16px;
     display: flex;

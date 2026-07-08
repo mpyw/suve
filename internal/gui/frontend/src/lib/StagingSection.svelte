@@ -223,6 +223,11 @@
     background: #1a1a2e;
     border-radius: 8px;
     overflow: hidden;
+    /* Keep the section at its natural height inside the flex-column
+       .staging-content; without this it shrinks to the viewport and its
+       overflow:hidden clips the entries (rows past the fold vanish and nothing
+       scrolls). The scroll belongs to .staging-content. */
+    flex-shrink: 0;
   }
 
   .section-header {
