@@ -2,9 +2,13 @@ package output
 
 import (
 	"bytes"
+	"strings"
 	"testing"
 
+	"github.com/fatih/color"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/mpyw/suve/internal/cli/colors"
 )
 
 func TestWriter_Field(t *testing.T) {
@@ -171,6 +175,48 @@ func TestColorDiff_EmptyInput(t *testing.T) {
 
 	result := colorDiff("")
 	assert.Empty(t, result)
+}
+
+// TestDiff_MatchesDiffRawNewlines guards #338: with color disabled, Diff is
+// structure-only, so it must equal DiffRaw with no spurious trailing newline.
+//
+//nolint:paralleltest // toggles the process-global color.NoColor
+func TestDiff_MatchesDiffRawNewlines(t *testing.T) {
+	orig := color.NoColor
+
+	t.Cleanup(func() { color.NoColor = orig })
+
+	color.NoColor = true
+
+	got := Diff("f", "f", "a\nb\n", "a\nc\n")
+	raw := DiffRaw("f", "f", "a\nb\n", "a\nc\n")
+
+	assert.Equal(t, raw, got)
+	assert.False(t, strings.HasSuffix(got, "\n\n"), "must not doubly-terminate the diff")
+}
+
+// TestColorDiff_InHunkDashLinesNotHeaders guards #339: inside a hunk, a
+// removed/added line whose content starts with -- / ++ must be colored as
+// removed/added, not misclassified as a ---/+++ header.
+//
+//nolint:paralleltest // toggles the process-global color.NoColor
+func TestColorDiff_InHunkDashLinesNotHeaders(t *testing.T) {
+	orig := color.NoColor
+
+	t.Cleanup(func() { color.NoColor = orig })
+
+	color.NoColor = false
+
+	diff := "--- old\n+++ new\n@@ -1 +1 @@\n--- removed content\n+++ added content"
+
+	result := colorDiff(diff)
+
+	// The in-hunk lines are wrapped exactly as removed/added would wrap them.
+	assert.Contains(t, result, colors.DiffRemoved("--- removed content"))
+	assert.Contains(t, result, colors.DiffAdded("+++ added content"))
+	// And the real file-label headers are still colored as headers.
+	assert.Contains(t, result, colors.DiffHeader("--- old"))
+	assert.Contains(t, result, colors.DiffHeader("+++ new"))
 }
 
 func TestWarning(t *testing.T) {
