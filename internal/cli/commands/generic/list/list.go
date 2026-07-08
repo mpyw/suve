@@ -121,9 +121,14 @@ func Command(cfg Config) *cli.Command {
 		Description: cfg.Description,
 		Flags:       cfg.Flags,
 		Action: func(ctx context.Context, cmd *cli.Command) error {
+			outputFormat, err := output.ParseFormat(cmd.String("output"))
+			if err != nil {
+				return err
+			}
+
 			opts := Options{
 				Show:   cmd.Bool("show"),
-				Output: output.ParseFormat(cmd.String("output")),
+				Output: outputFormat,
 			}
 
 			list, err := cfg.NewList(ctx, cmd, opts.Show)

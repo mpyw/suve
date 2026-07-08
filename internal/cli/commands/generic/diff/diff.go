@@ -160,10 +160,15 @@ func Command[S any](cfg Config[S]) *cli.Command {
 				return err
 			}
 
+			outputFormat, err := output.ParseFormat(cmd.String("output"))
+			if err != nil {
+				return err
+			}
+
 			opts := Options{
 				ParseJSON: cmd.Bool("parse-json"),
 				NoPager:   cmd.Bool("no-pager"),
-				Output:    output.ParseFormat(cmd.String("output")),
+				Output:    outputFormat,
 			}
 
 			// JSON output disables pager

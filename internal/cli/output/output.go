@@ -30,14 +30,17 @@ const (
 	FormatJSON Format = "json"
 )
 
-// ParseFormat parses a format string and returns the Format.
-// Returns FormatText for empty string or invalid values.
-func ParseFormat(s string) Format {
+// ParseFormat parses an --output value into a Format. An empty value or "text"
+// is FormatText and "json" is FormatJSON; any other value is a usage error so a
+// typo like "jsonn" fails loudly instead of silently printing text.
+func ParseFormat(s string) (Format, error) {
 	switch s {
-	case "json":
-		return FormatJSON
+	case "", string(FormatText):
+		return FormatText, nil
+	case string(FormatJSON):
+		return FormatJSON, nil
 	default:
-		return FormatText
+		return "", fmt.Errorf("invalid --output value %q: must be %q or %q", s, FormatText, FormatJSON)
 	}
 }
 

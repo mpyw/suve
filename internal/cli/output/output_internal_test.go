@@ -7,6 +7,7 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/mpyw/suve/internal/cli/colors"
 )
@@ -279,19 +280,29 @@ func TestParseFormat(t *testing.T) {
 	tests := []struct {
 		input    string
 		expected Format
+		wantErr  bool
 	}{
-		{"json", FormatJSON},
-		{"JSON", FormatText}, // Not case-insensitive
-		{"text", FormatText},
-		{"", FormatText},
-		{"invalid", FormatText},
+		{input: "json", expected: FormatJSON},
+		{input: "text", expected: FormatText},
+		{input: "", expected: FormatText},
+		{input: "JSON", wantErr: true}, // not case-insensitive
+		{input: "invalid", wantErr: true},
+		{input: "jsonn", wantErr: true}, // the #349 typo
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
 			t.Parallel()
 
-			result := ParseFormat(tt.input)
+			result, err := ParseFormat(tt.input)
+			if tt.wantErr {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), "--output")
+
+				return
+			}
+
+			require.NoError(t, err)
 			assert.Equal(t, tt.expected, result)
 		})
 	}
