@@ -78,6 +78,81 @@ test.describe('Azure scope form', () => {
     });
   });
 
+  test('namespace field feeds the SelectScope payload (trimmed) alongside the store', async ({ page }) => {
+    await setupWailsMocks(page);
+    await page.goto('/');
+    await waitForItemList(page);
+
+    await pickProvider(page, 'azure');
+    await page.locator('#azure-store').fill('the-store');
+    await page.locator('#azure-namespace').fill('  dev  '); // whitespace trimmed
+    await page.getByRole('button', { name: 'Connect' }).click();
+    await waitForItemList(page);
+
+    const calls = await getSelectScopeCalls(page);
+    expect(calls[calls.length - 1]).toMatchObject({
+      provider: 'azure',
+      storeName: 'the-store',
+      namespace: 'dev', // trimmed
+    });
+  });
+
+  test('an empty namespace submits as an empty string (App Config default label)', async ({ page }) => {
+    await setupWailsMocks(page);
+    await page.goto('/');
+    await waitForItemList(page);
+
+    await pickProvider(page, 'azure');
+    await page.locator('#azure-store').fill('the-store');
+    await page.locator('#azure-namespace').fill(''); // left empty
+    await page.getByRole('button', { name: 'Connect' }).click();
+    await waitForItemList(page);
+
+    const calls = await getSelectScopeCalls(page);
+    expect(calls[calls.length - 1]).toMatchObject({
+      provider: 'azure',
+      storeName: 'the-store',
+      namespace: '',
+    });
+  });
+
+  test('Change scope prefills the namespace from the current scope', async ({ page }) => {
+    // Azure launched with vault + store + a namespace already applied.
+    await setupWailsMocks(
+      page,
+      createAzureState({
+        currentScope: { provider: 'azure', projectId: '', vaultName: 'my-vault', storeName: 'my-store', namespace: 'dev' },
+      }),
+    );
+    await page.goto('/');
+    await waitForItemList(page);
+    await expect(page.locator('#azure-namespace')).toHaveCount(0); // connected: no form
+
+    // "Change scope" re-opens the form, prefilled with the current namespace.
+    await page.getByRole('button', { name: 'Change scope' }).click();
+    await expect(page.locator('#azure-vault')).toHaveValue('my-vault');
+    await expect(page.locator('#azure-store')).toHaveValue('my-store');
+    await expect(page.locator('#azure-namespace')).toHaveValue('dev');
+  });
+
+  test('namespace field is Azure-only (absent for Google Cloud and AWS)', async ({ page }) => {
+    await setupWailsMocks(page);
+    await page.goto('/');
+    await waitForItemList(page);
+
+    // Azure exposes the namespace field...
+    await pickProvider(page, 'azure');
+    await expect(page.locator('#azure-namespace')).toBeVisible();
+
+    // ...Google Cloud (project-only form) does not.
+    await pickProvider(page, 'googlecloud');
+    await expect(page.locator('#azure-namespace')).toHaveCount(0);
+
+    // ...AWS (no scope form) does not.
+    await pickProvider(page, 'aws');
+    await expect(page.locator('#azure-namespace')).toHaveCount(0);
+  });
+
   test('submitting an empty scope form disconnects and clears the cached scope', async ({ page }) => {
     // Connected to Azure (vault + store), so the scope is cached.
     await setupWailsMocks(page, createAzureState());

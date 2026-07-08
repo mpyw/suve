@@ -14,8 +14,10 @@
 //
 // Two further constraints shape the adapter:
 //
-//   - It addresses the default (no) App Configuration label only; the default
-//     label is never exposed as a version.
+//   - The App Configuration label axis is exposed as suve's "namespace" (see
+//     the aznamespace subpackage): List forwards the raw value as a LabelFilter;
+//     single-key ops decode it to one literal label; empty is the null/default
+//     namespace. A label is never exposed as a version.
 //   - The azappconfig high-level SDK cannot round-trip setting tags: its
 //     SetSetting/AddSetting drop tags (and a write would clear existing ones).
 //     Tag/Untag therefore return ErrTagsUnsupported rather than silently losing
@@ -36,6 +38,7 @@ import (
 	"github.com/mpyw/suve/internal/debug"
 	"github.com/mpyw/suve/internal/domain"
 	"github.com/mpyw/suve/internal/provider"
+	"github.com/mpyw/suve/internal/provider/azure/appconfig/aznamespace"
 	"github.com/mpyw/suve/internal/version/azureappconfigversion"
 )
 
@@ -46,31 +49,38 @@ var ErrTagsUnsupported = errors.New(
 	"tag mutation is not supported by Azure App Configuration (the azappconfig SDK cannot write setting tags)",
 )
 
-// Client is the narrow App Configuration surface this adapter needs. Every
-// method uses the default (no) label. The list method returns a drained slice
-// rather than the SDK's pager so tests can mock the interface trivially; the
-// production adapter (see Wrap) confines the pager draining and the concrete
+// Client is the narrow App Configuration surface this adapter needs. Single-key
+// methods take a resolved literal label ("" = the null/default label); the list
+// method takes a LabelFilter. The list method returns a drained slice rather
+// than the SDK's pager so tests can mock the interface trivially; the production
+// adapter (see Wrap) confines the pager draining and the concrete
 // *azappconfig.Client to this package.
 type Client interface {
-	GetSetting(ctx context.Context, key string) (azappconfig.GetSettingResponse, error)
-	SetSetting(ctx context.Context, key, value string) (azappconfig.SetSettingResponse, error)
-	AddSetting(ctx context.Context, key, value string) (azappconfig.AddSettingResponse, error)
-	DeleteSetting(ctx context.Context, key string) (azappconfig.DeleteSettingResponse, error)
-	ListSettings(ctx context.Context) ([]azappconfig.Setting, error)
+	GetSetting(ctx context.Context, key, label string) (azappconfig.GetSettingResponse, error)
+	SetSetting(ctx context.Context, key, value, label string) (azappconfig.SetSettingResponse, error)
+	AddSetting(ctx context.Context, key, value, label string) (azappconfig.AddSettingResponse, error)
+	DeleteSetting(ctx context.Context, key, label string) (azappconfig.DeleteSettingResponse, error)
+	ListSettings(ctx context.Context, filter string) ([]azappconfig.Setting, error)
 }
 
 // Store is the App Configuration implementation of provider.Store. It implements
 // neither Restorer nor Describer.
 type Store struct {
 	client Client
+	// namespace is the raw --namespace value selected for this store (the axis
+	// Azure calls a "label"). It is interpreted per operation: a LabelFilter for
+	// List, a decoded single literal label for single-key ops. Empty is the
+	// null (default) namespace.
+	namespace string
 }
 
 // Compile-time assertion that Store implements the provider contract.
 var _ provider.Store = (*Store)(nil)
 
-// New builds a Store backed by the given client.
-func New(client Client) *Store {
-	return &Store{client: client}
+// New builds a Store backed by the given client, scoped to the given raw
+// namespace value (empty = the null/default namespace).
+func New(client Client, namespace string) *Store {
+	return &Store{client: client, namespace: namespace}
 }
 
 // Resolve validates that the spec carries no version specifier (App
@@ -84,6 +94,12 @@ func (s *Store) Resolve(_ context.Context, _, spec string) (provider.VersionRef,
 		return provider.VersionRef{}, fmt.Errorf("%w", azureappconfigversion.ErrVersioningUnsupported)
 	}
 
+	// Resolve precedes every single-item read; reject a namespace value that
+	// names all/multiple namespaces here so the usage error surfaces early.
+	if _, err := aznamespace.Literal(s.namespace); err != nil {
+		return provider.VersionRef{}, err
+	}
+
 	return provider.NewVersionRef(""), nil
 }
 
@@ -91,7 +107,12 @@ func (s *Store) Resolve(_ context.Context, _, spec string) (provider.VersionRef,
 // is always plaintext; Version is left empty (App Configuration has no
 // versions); the setting's tags become Tags.
 func (s *Store) Get(ctx context.Context, name string, _ provider.VersionRef) (*domain.Entry, error) {
-	resp, err := s.client.GetSetting(ctx, name)
+	label, err := aznamespace.Literal(s.namespace)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := s.client.GetSetting(ctx, name, label)
 	if err != nil {
 		return nil, mapError(err, name, "get setting")
 	}
@@ -112,9 +133,12 @@ func (s *Store) History(_ context.Context, _ string) ([]domain.Version, error) {
 	return nil, fmt.Errorf("%w (no version history)", azureappconfigversion.ErrVersioningUnsupported)
 }
 
-// List returns the distinct key names in the store (across all labels), sorted.
+// List returns the distinct key names visible under the selected namespace
+// filter, sorted. The raw --namespace value is forwarded as an App
+// Configuration LabelFilter (empty -> the null-label filter); its `*`/`,`/`\`
+// grammar is honored natively by the service.
 func (s *Store) List(ctx context.Context) ([]string, error) {
-	settings, err := s.client.ListSettings(ctx)
+	settings, err := s.client.ListSettings(ctx, aznamespace.Filter(s.namespace))
 	if err != nil {
 		return nil, fmt.Errorf("failed to list settings: %w", err)
 	}
@@ -150,7 +174,12 @@ func (s *Store) List(ctx context.Context) ([]string, error) {
 func (s *Store) Create(
 	ctx context.Context, name, value string, _ domain.ValueType, _ string, _ ...provider.WriteOption,
 ) (domain.Version, error) {
-	_, err := s.client.AddSetting(ctx, name, value)
+	label, err := aznamespace.Literal(s.namespace)
+	if err != nil {
+		return domain.Version{}, err
+	}
+
+	_, err = s.client.AddSetting(ctx, name, value, label)
 	if err != nil {
 		if isAlreadyExists(err) {
 			return domain.Version{}, fmt.Errorf("%w: %s", provider.ErrAlreadyExists, name)
@@ -168,7 +197,12 @@ func (s *Store) Create(
 func (s *Store) Put(
 	ctx context.Context, name, value string, _ domain.ValueType, _ string, _ ...provider.WriteOption,
 ) (domain.Version, error) {
-	if _, err := s.client.SetSetting(ctx, name, value); err != nil {
+	label, err := aznamespace.Literal(s.namespace)
+	if err != nil {
+		return domain.Version{}, err
+	}
+
+	if _, err := s.client.SetSetting(ctx, name, value, label); err != nil {
 		return domain.Version{}, fmt.Errorf("failed to set setting: %w", err)
 	}
 
@@ -177,7 +211,12 @@ func (s *Store) Put(
 
 // Delete removes a setting. Provider.DeleteOptions (AWS-specific) are ignored.
 func (s *Store) Delete(ctx context.Context, name string, _ ...provider.DeleteOption) error {
-	if _, err := s.client.DeleteSetting(ctx, name); err != nil {
+	label, err := aznamespace.Literal(s.namespace)
+	if err != nil {
+		return err
+	}
+
+	if _, err := s.client.DeleteSetting(ctx, name, label); err != nil {
 		return mapError(err, name, "delete setting")
 	}
 

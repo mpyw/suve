@@ -316,17 +316,19 @@ export namespace gui {
 	    projectId: string;
 	    vaultName: string;
 	    storeName: string;
-	
+	    namespace: string;
+
 	    static createFrom(source: any = {}) {
 	        return new ScopeSelection(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.provider = source["provider"];
 	        this.projectId = source["projectId"];
 	        this.vaultName = source["vaultName"];
 	        this.storeName = source["storeName"];
+	        this.namespace = source["namespace"];
 	    }
 	}
 	export class SecretCreateResult {

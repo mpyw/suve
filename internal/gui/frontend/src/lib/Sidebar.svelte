@@ -54,6 +54,7 @@
   let projectInput = $state('');
   let vaultInput = $state('');
   let storeInput = $state('');
+  let namespaceInput = $state('');
   let formError = $state('');
   let firstFieldEl: HTMLInputElement | undefined = $state();
 
@@ -63,6 +64,7 @@
     projectInput = pendingProvider === 'googlecloud' ? (s?.projectId ?? '') : '';
     vaultInput = pendingProvider === 'azure' ? (s?.vaultName ?? '') : '';
     storeInput = pendingProvider === 'azure' ? (s?.storeName ?? '') : '';
+    namespaceInput = pendingProvider === 'azure' ? (s?.namespace ?? '') : '';
     formError = '';
   });
 
@@ -112,6 +114,7 @@
       projectId: projectInput.trim(),
       vaultName: '',
       storeName: '',
+      namespace: '',
     } as gui.ScopeSelection);
   }
 
@@ -122,6 +125,7 @@
       projectId: '',
       vaultName: vaultInput.trim(),
       storeName: storeInput.trim(),
+      namespace: namespaceInput.trim(),
     } as gui.ScopeSelection);
   }
 </script>
@@ -177,6 +181,15 @@
       />
       <label class="scope-label" for="azure-store">App Configuration store</label>
       <input id="azure-store" class="scope-input" type="text" placeholder="my-store (params)" bind:value={storeInput} />
+      <label class="scope-label" for="azure-namespace">Namespace</label>
+      <input
+        id="azure-namespace"
+        class="scope-input"
+        type="text"
+        placeholder="empty = default"
+        bind:value={namespaceInput}
+      />
+      <p class="scope-hint">Azure calls this a label; empty = default. Applies to the App Configuration store only.</p>
       {#if formError || scopeError}
         <div class="scope-error">{formError || scopeError}</div>
       {/if}
@@ -255,6 +268,12 @@
         <span class="aws-info-label">App Config</span>
         <span class="aws-info-value" title={scope?.storeName || '?'}>{scope?.storeName || '?'}</span>
       </div>
+      {#if scope?.storeName}
+        <div class="aws-info-row">
+          <span class="aws-info-label">Namespace</span>
+          <span class="aws-info-value" title={scope?.namespace || 'default'}>{scope?.namespace || 'default'}</span>
+        </div>
+      {/if}
       <button type="button" class="scope-change" disabled={!!pendingProvider} onclick={() => onchangescope?.()}>Change scope</button>
     </div>
   {/if}
@@ -358,6 +377,13 @@
   .scope-error {
     font-size: 11px;
     color: #e94560;
+    line-height: 1.4;
+  }
+
+  .scope-hint {
+    margin: 0;
+    font-size: 10px;
+    color: #666;
     line-height: 1.4;
   }
 

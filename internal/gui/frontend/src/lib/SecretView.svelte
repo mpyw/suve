@@ -15,11 +15,12 @@
 
   interface Props {
     capability?: gui.ServiceCapability;
+    provider?: string;
     onnavigatetostaging?: () => void;
     onstagingchange?: () => void;
   }
 
-  let { capability, onnavigatetostaging, onstagingchange }: Props = $props();
+  let { capability, provider = '', onnavigatetostaging, onstagingchange }: Props = $props();
 
   // Capability-driven visibility. Absent capability defaults to AWS-like (true).
   const stagingEnabled = $derived(capability?.hasStaging ?? true);
@@ -576,7 +577,7 @@
             {/if}
 
             {#if tagsEnabled}
-              <TagList tags={secretDetail.tags} serviceClass="secret" onadd={openTagModal} onremove={openRemoveTagModal} />
+              <TagList tags={secretDetail.tags} serviceClass="secret" {provider} onadd={openTagModal} onremove={openRemoveTagModal} />
             {/if}
 
             {#if historyEnabled && secretLog.length > 0}

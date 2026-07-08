@@ -57,6 +57,13 @@ func TestApp_SelectScope(t *testing.T) {
 			},
 		},
 		{
+			name: "azure with store and app config namespace",
+			sel:  ScopeSelection{Provider: "azure", StoreName: "store", Namespace: "dev"},
+			wantScope: provider.Scope{
+				Provider: provider.ProviderAzure, StoreName: "store", AppConfigNamespace: "dev",
+			},
+		},
+		{
 			name:    "azure missing both vault and store",
 			sel:     ScopeSelection{Provider: "azure"},
 			wantErr: errAzureScopeRequired,
@@ -114,6 +121,11 @@ func TestApp_GetCurrentScope_RoundTrip(t *testing.T) {
 			name: "azure app config only",
 			sel:  ScopeSelection{Provider: "azure", StoreName: "store"},
 		},
+		{
+			// The App Configuration namespace round-trips through the scope.
+			name: "azure app config with namespace",
+			sel:  ScopeSelection{Provider: "azure", StoreName: "store", Namespace: "dev"},
+		},
 	}
 
 	for _, tt := range tests {
@@ -149,6 +161,7 @@ func TestApp_GetCurrentScope_EnvDerivedInitialScope(t *testing.T) {
 func TestApp_GetCurrentScope_EnvDerivedAzure(t *testing.T) {
 	t.Setenv("AZURE_KEYVAULT_NAME", "env-vault")
 	t.Setenv("AZURE_APPCONFIG_NAME", "env-store")
+	t.Setenv("AZURE_APPCONFIG_NAMESPACE", "env-ns")
 
 	app := NewApp(provider.Scope{Provider: provider.ProviderAzure})
 
@@ -157,6 +170,36 @@ func TestApp_GetCurrentScope_EnvDerivedAzure(t *testing.T) {
 	assert.Equal(t, string(provider.ProviderAzure), got.Provider)
 	assert.Equal(t, "env-vault", got.VaultName)
 	assert.Equal(t, "env-store", got.StoreName)
+	assert.Equal(t, "env-ns", got.Namespace)
+}
+
+// TestApp_GetCurrentScope_EnvDerivedAzure_Namespace covers the App
+// Configuration namespace hydrating from AZURE_APPCONFIG_NAMESPACE while the
+// store name comes from its own env, mirroring the CLI's env channel.
+func TestApp_GetCurrentScope_EnvDerivedAzure_Namespace(t *testing.T) {
+	t.Setenv("AZURE_KEYVAULT_NAME", "")
+	t.Setenv("AZURE_APPCONFIG_NAME", "env-store")
+	t.Setenv("AZURE_APPCONFIG_NAMESPACE", "dev")
+
+	app := NewApp(provider.Scope{Provider: provider.ProviderAzure})
+
+	got := app.GetCurrentScope()
+	require.NotNil(t, got)
+	assert.Equal(t, "env-store", got.StoreName)
+	assert.Equal(t, "dev", got.Namespace)
+}
+
+// TestApp_GetCurrentScope_ExplicitNamespaceWinsOverEnv verifies a flag-supplied
+// namespace on the launch scope is not overwritten by the env fallback.
+func TestApp_GetCurrentScope_ExplicitNamespaceWinsOverEnv(t *testing.T) {
+	t.Setenv("AZURE_APPCONFIG_NAME", "env-store")
+	t.Setenv("AZURE_APPCONFIG_NAMESPACE", "env-ns")
+
+	app := NewApp(provider.Scope{Provider: provider.ProviderAzure, AppConfigNamespace: "flag-ns"})
+
+	got := app.GetCurrentScope()
+	require.NotNil(t, got)
+	assert.Equal(t, "flag-ns", got.Namespace)
 }
 
 // TestApp_GetCurrentScope_EnvDerivedAzure_VaultOnly covers a one-sided Azure

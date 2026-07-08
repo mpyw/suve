@@ -125,3 +125,80 @@ func TestAzureAppConfig_FullWorkflow(t *testing.T) {
 		require.Error(t, err)
 	})
 }
+
+// TestAzureAppConfig_Namespace exercises the --namespace / --ns axis (#381
+// Phase 1) end-to-end against the emulator. It doubles as the empirical check
+// that the emulator honors App Configuration labels: (key, label) pairs are
+// stored and filtered independently, so the same key under two namespaces holds
+// two distinct values and a namespace-scoped list hides the others.
+func TestAzureAppConfig_Namespace(t *testing.T) {
+	setupAzureAppConfig(t)
+
+	// A key that exists under BOTH the null (default) namespace and "dev", to
+	// prove label isolation on read; plus a key that exists ONLY under "dev", to
+	// prove list isolation.
+	const (
+		shared  = "suve/e2e/azure/ns/shared"
+		devOnly = "suve/e2e/azure/ns/dev-only"
+	)
+
+	// Best-effort cleanup from a previous run (each (key, namespace) is distinct).
+	_, _ = runAzureParam(t, "delete", "--yes", shared)
+	_, _ = runAzureParam(t, "delete", "--yes", "--namespace", "dev", shared)
+	_, _ = runAzureParam(t, "delete", "--yes", "--namespace", "dev", devOnly)
+
+	t.Cleanup(func() {
+		_, _ = runAzureParam(t, "delete", "--yes", shared)
+		_, _ = runAzureParam(t, "delete", "--yes", "--namespace", "dev", shared)
+		_, _ = runAzureParam(t, "delete", "--yes", "--namespace", "dev", devOnly)
+	})
+
+	t.Run("create-under-namespaces", func(t *testing.T) {
+		_, err := runAzureParam(t, "create", shared, "null-value")
+		require.NoError(t, err)
+
+		_, err = runAzureParam(t, "create", "--namespace", "dev", shared, "dev-value")
+		require.NoError(t, err)
+
+		_, err = runAzureParam(t, "create", "--ns", "dev", devOnly, "dev-only-value")
+		require.NoError(t, err)
+	})
+
+	// The same key resolves to a different value per namespace — proof the
+	// emulator keys on (key, label), not key alone.
+	t.Run("show-is-namespace-scoped", func(t *testing.T) {
+		stdout, err := runAzureParam(t, "show", "--raw", shared)
+		require.NoError(t, err)
+		assert.Equal(t, "null-value", stdout)
+
+		stdout, err = runAzureParam(t, "show", "--raw", "--namespace", "dev", shared)
+		require.NoError(t, err)
+		assert.Equal(t, "dev-value", stdout)
+	})
+
+	// list is scoped: the null list hides dev-only keys; the dev list shows
+	// them; --namespace "*" spans all namespaces.
+	t.Run("list-is-namespace-scoped", func(t *testing.T) {
+		nullList, err := runAzureParam(t, "list")
+		require.NoError(t, err)
+		assert.Contains(t, nullList, shared)
+		assert.NotContains(t, nullList, devOnly)
+
+		devList, err := runAzureParam(t, "list", "--namespace", "dev")
+		require.NoError(t, err)
+		assert.Contains(t, devList, devOnly)
+
+		allList, err := runAzureParam(t, "list", "--namespace", "*")
+		require.NoError(t, err)
+		assert.Contains(t, allList, devOnly)
+	})
+
+	// A filter value (all/multiple) is rejected on a single-item op.
+	t.Run("wildcard-rejected-on-single-item", func(t *testing.T) {
+		_, err := runAzureParam(t, "show", "--raw", "--namespace", "*", shared)
+		require.Error(t, err)
+
+		_, err = runAzureParam(t, "show", "--raw", "--namespace", "dev,prod", shared)
+		require.Error(t, err)
+	})
+}

@@ -41,12 +41,24 @@ variable.`,
 				Usage:   "Azure App Configuration store name (defaults to $AZURE_APPCONFIG_NAME)",
 				Sources: cli.EnvVars("AZURE_APPCONFIG_NAME"),
 			},
+			&cli.StringFlag{
+				Name:    "namespace",
+				Aliases: []string{"ns"},
+				Usage: "App Configuration namespace to target (the label axis; Azure calls it a " +
+					`"label"). List/read accept a filter ("*"=all, "dev,prod"=OR, "dev*"=prefix); ` +
+					"single-item ops need one namespace. Empty = the default namespace " +
+					"(defaults to $AZURE_APPCONFIG_NAMESPACE)",
+				Sources: cli.EnvVars("AZURE_APPCONFIG_NAMESPACE"),
+			},
 		},
-		// Before stashes the resolved store name in the context. Resolution is
-		// deferred to store construction, so `suve azure param --help` works
-		// without a store.
+		// Before stashes the resolved store name and namespace in the context.
+		// Resolution is deferred to store construction, so `suve azure param
+		// --help` works without a store.
 		Before: func(ctx context.Context, cmd *cli.Command) (context.Context, error) {
-			return cliinternal.WithAzureStoreName(ctx, cmd.String("store-name")), nil
+			ctx = cliinternal.WithAzureStoreName(ctx, cmd.String("store-name"))
+			ctx = cliinternal.WithAzureAppConfigNamespace(ctx, cmd.String("namespace"))
+
+			return ctx, nil
 		},
 		Commands: []*cli.Command{
 			ShowCommand(),

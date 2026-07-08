@@ -52,8 +52,9 @@ type azureScopeContextKey struct{}
 // azure command group. Each subgroup (secret/param) sets its vault/store name
 // via its Before hook.
 type azureScopeCtx struct {
-	vaultName string
-	storeName string
+	vaultName          string
+	storeName          string
+	appConfigNamespace string
 }
 
 func azureScopeFromContext(ctx context.Context) azureScopeCtx {
@@ -81,6 +82,24 @@ func WithAzureStoreName(ctx context.Context, storeName string) context.Context {
 	sc.storeName = storeName
 
 	return context.WithValue(ctx, azureScopeContextKey{}, sc)
+}
+
+// WithAzureAppConfigNamespace returns a context carrying the resolved Azure App
+// Configuration namespace (the axis Azure calls a "label"), merged onto any base
+// scope already present. The azure param subgroup's Before hook sets it (from
+// --namespace/--ns or the AZURE_APPCONFIG_NAMESPACE env). Empty is the null
+// (default) namespace and also overrides an env default back to null.
+func WithAzureAppConfigNamespace(ctx context.Context, namespace string) context.Context {
+	sc := azureScopeFromContext(ctx)
+	sc.appConfigNamespace = namespace
+
+	return context.WithValue(ctx, azureScopeContextKey{}, sc)
+}
+
+// AzureAppConfigNamespace returns the Azure App Configuration namespace resolved
+// into ctx by WithAzureAppConfigNamespace (empty = the null/default namespace).
+func AzureAppConfigNamespace(ctx context.Context) string {
+	return azureScopeFromContext(ctx).appConfigNamespace
 }
 
 // storeScope is the provider selector for read/write commands. Only the
@@ -147,6 +166,7 @@ func AzureAppConfigStore(ctx context.Context) (provider.Store, error) {
 	}
 
 	scope := provider.AzureAppConfigScope(sc.storeName)
+	scope.AppConfigNamespace = sc.appConfigNamespace
 
 	return registry.Store(ctx, scope, provider.KindParam)
 }
@@ -265,8 +285,16 @@ func AzureAppConfigStagingScopeResolver(ctx context.Context) (staging.ResolvedSc
 		)
 	}
 
+	scope := provider.AzureAppConfigScope(sc.storeName)
+	scope.AppConfigNamespace = sc.appConfigNamespace
+
+	target := "store " + sc.storeName
+	if sc.appConfigNamespace != "" {
+		target += " (namespace " + sc.appConfigNamespace + ")"
+	}
+
 	return staging.ResolvedScope{
-		Scope:  provider.AzureAppConfigScope(sc.storeName),
-		Target: "store " + sc.storeName,
+		Scope:  scope,
+		Target: target,
 	}, nil
 }
