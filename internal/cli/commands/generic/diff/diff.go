@@ -97,7 +97,7 @@ func (r *Runner) Run(ctx context.Context) error {
 		return nil
 	}
 
-	diff := output.Diff(oldLabel, newLabel, value1, value2)
+	diff := output.Diff(r.Stdout, oldLabel, newLabel, value1, value2)
 
 	// The raw values differ but --parse-json normalized them to the same form:
 	// there is no textual diff to show, so say so explicitly instead of printing

@@ -56,7 +56,7 @@ func New(w io.Writer) *Writer {
 
 // Field prints a labeled field.
 func (o *Writer) Field(label, value string) {
-	_, _ = fmt.Fprintf(o.w, "%s %s\n", colors.FieldLabel(label+":"), value)
+	_, _ = fmt.Fprintf(o.w, "%s %s\n", colors.For(o.w).FieldLabel(label+":"), value)
 }
 
 // Separator prints a separator line.
@@ -88,6 +88,8 @@ func (o *Writer) Value(value string) {
 
 // labeled formats a message and prints it as a single line, coloring the whole
 // "label+message" string with colorize. A label of "" colors the message alone.
+// colorize comes from the destination writer's palette, so color tracks w's own
+// TTY-ness and redirected stderr stays clean (#341).
 //
 //nolint:goprintffuncname // intentionally named without 'f' suffix for cleaner API
 func labeled(w io.Writer, colorize func(...any) string, label, format string, args ...any) {
@@ -110,7 +112,7 @@ func prefixed(w io.Writer, prefix, format string, args ...any) {
 //
 //nolint:goprintffuncname // intentionally named without 'f' suffix for cleaner API
 func Warning(w io.Writer, format string, args ...any) {
-	labeled(w, colors.Warning, "Warning: ", format, args...)
+	labeled(w, colors.For(w).Warning, "Warning: ", format, args...)
 }
 
 // Hint prints a hint message in cyan.
@@ -119,7 +121,7 @@ func Warning(w io.Writer, format string, args ...any) {
 //
 //nolint:goprintffuncname // intentionally named without 'f' suffix for cleaner API
 func Hint(w io.Writer, format string, args ...any) {
-	labeled(w, colors.Info, "Hint: ", format, args...)
+	labeled(w, colors.For(w).Info, "Hint: ", format, args...)
 }
 
 // Error prints an error message in red.
@@ -128,7 +130,7 @@ func Hint(w io.Writer, format string, args ...any) {
 //
 //nolint:goprintffuncname // intentionally named without 'f' suffix for cleaner API
 func Error(w io.Writer, format string, args ...any) {
-	labeled(w, colors.Error, "Error: ", format, args...)
+	labeled(w, colors.For(w).Error, "Error: ", format, args...)
 }
 
 // Info prints an informational message in cyan with no prefix.
@@ -137,7 +139,7 @@ func Error(w io.Writer, format string, args ...any) {
 //
 //nolint:goprintffuncname // intentionally named without 'f' suffix for cleaner API
 func Info(w io.Writer, format string, args ...any) {
-	labeled(w, colors.Info, "", format, args...)
+	labeled(w, colors.For(w).Info, "", format, args...)
 }
 
 // Warn prints a warning message with a yellow "!" prefix.
@@ -146,7 +148,7 @@ func Info(w io.Writer, format string, args ...any) {
 //
 //nolint:goprintffuncname // intentionally named without 'f' suffix for cleaner API
 func Warn(w io.Writer, format string, args ...any) {
-	prefixed(w, colors.Warning("!"), format, args...)
+	prefixed(w, colors.For(w).Warning("!"), format, args...)
 }
 
 // Success prints a success message with a green checkmark prefix.
@@ -155,14 +157,14 @@ func Warn(w io.Writer, format string, args ...any) {
 //
 //nolint:goprintffuncname // intentionally named without 'f' suffix for cleaner API
 func Success(w io.Writer, format string, args ...any) {
-	prefixed(w, colors.Success("✓"), format, args...)
+	prefixed(w, colors.For(w).Success("✓"), format, args...)
 }
 
 // Failed prints a per-item failure message with a red "Failed" prefix,
 // appending the error that caused it.
 // Example: "Failed /app/config: error message".
 func Failed(w io.Writer, name string, err error) {
-	_, _ = fmt.Fprintf(w, "%s %s: %v\n", colors.Failed("Failed"), name, err)
+	_, _ = fmt.Fprintf(w, "%s %s: %v\n", colors.For(w).Failed("Failed"), name, err)
 }
 
 // WriteJSON encodes v as indented JSON (two-space indent) followed by a
@@ -175,12 +177,14 @@ func WriteJSON(w io.Writer, v any) error {
 	return enc.Encode(v)
 }
 
-// Diff generates a unified diff between two strings with ANSI colors.
-func Diff(oldName, newName, oldContent, newContent string) string {
+// Diff generates a unified diff between two strings, colored for the terminal
+// it will be printed to. Pass the same writer the result is written to so the
+// diff's color tracks that destination's TTY-ness (#341).
+func Diff(w io.Writer, oldName, newName, oldContent, newContent string) string {
 	edits := udiff.Strings(oldContent, newContent)
 	unified, _ := udiff.ToUnifiedDiff(oldName, newName, oldContent, edits, udiff.DefaultContextLines)
 
-	return colorDiff(unified.String())
+	return colorDiff(colors.For(w), unified.String())
 }
 
 // DiffRaw generates a unified diff between two strings without colors.
@@ -191,8 +195,8 @@ func DiffRaw(oldName, newName, oldContent, newContent string) string {
 	return unified.String()
 }
 
-// colorDiff adds ANSI colors to diff output.
-func colorDiff(diff string) string {
+// colorDiff adds ANSI colors to diff output using the given palette.
+func colorDiff(p colors.Palette, diff string) string {
 	if diff == "" {
 		return ""
 	}
@@ -208,14 +212,14 @@ func colorDiff(diff string) string {
 	for i, line := range lines {
 		switch {
 		case !inHunk && (strings.HasPrefix(line, "---") || strings.HasPrefix(line, "+++")):
-			colored[i] = colors.DiffHeader(line)
+			colored[i] = p.DiffHeader(line)
 		case strings.HasPrefix(line, "@@"):
 			inHunk = true
-			colored[i] = colors.DiffHunk(line)
+			colored[i] = p.DiffHunk(line)
 		case strings.HasPrefix(line, "-"):
-			colored[i] = colors.DiffRemoved(line)
+			colored[i] = p.DiffRemoved(line)
 		case strings.HasPrefix(line, "+"):
-			colored[i] = colors.DiffAdded(line)
+			colored[i] = p.DiffAdded(line)
 		default:
 			colored[i] = line
 		}

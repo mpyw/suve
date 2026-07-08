@@ -105,7 +105,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 		}
 
 		output.Printf(r.Stdout, "%s (%d):\n",
-			colors.Warning("Staged "+parser.ServiceName()+" changes"), total)
+			colors.For(r.Stdout).Warning("Staged "+parser.ServiceName()+" changes"), total)
 		printEntries(printer, svcEntries, opts.Verbose, parser.HasDeleteOptions())
 		printTagEntries(r.Stdout, svcTags, opts.Verbose)
 
@@ -153,7 +153,7 @@ func printTagEntries(w io.Writer, tagEntries map[string]staging.TagEntry, verbos
 		}
 
 		summary := strings.Join(parts, ", ")
-		output.Printf(w, "  %s %s [%s]\n", colors.Info("T"), name, summary)
+		output.Printf(w, "  %s %s [%s]\n", colors.For(w).Info("T"), name, summary)
 
 		if verbose {
 			for key, value := range entry.Add {

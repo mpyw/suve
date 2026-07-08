@@ -57,7 +57,7 @@ func (r *StatusRunner) Run(ctx context.Context, opts StatusOptions) error {
 	}
 
 	// For all items, show header and entries
-	output.Printf(r.Stdout, "%s (%d):\n", colors.Warning(fmt.Sprintf("Staged %s changes", result.ServiceName)), totalCount)
+	output.Printf(r.Stdout, "%s (%d):\n", colors.For(r.Stdout).Warning(fmt.Sprintf("Staged %s changes", result.ServiceName)), totalCount)
 
 	printer := &staging.EntryPrinter{Writer: r.Stdout}
 
@@ -96,7 +96,7 @@ func (r *StatusRunner) printTagEntry(e stagingusecase.StatusTagEntry, verbose bo
 	}
 
 	summary := strings.Join(parts, ", ")
-	output.Printf(r.Stdout, "  %s %s [%s]\n", colors.Info("T"), e.Name, summary)
+	output.Printf(r.Stdout, "  %s %s [%s]\n", colors.For(r.Stdout).Info("T"), e.Name, summary)
 
 	if verbose {
 		for key, value := range e.Add {

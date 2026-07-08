@@ -71,7 +71,7 @@ func updateAction(ctx context.Context, cmd *cli.Command) error {
 	if !skipConfirm {
 		currentValue, _ := uc.GetCurrentValue(ctx, name)
 		if currentValue != "" {
-			diff := output.Diff(name+" (current)", name+" (new)", currentValue, newValue)
+			diff := output.Diff(cmd.Root().ErrWriter, name+" (current)", name+" (new)", currentValue, newValue)
 			if diff != "" {
 				output.Println(cmd.Root().ErrWriter, diff)
 			}

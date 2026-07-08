@@ -5,12 +5,36 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/fatih/color"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/mpyw/suve/internal/cli/colors"
+	"github.com/mpyw/suve/internal/cli/terminal"
 )
+
+// fakeTTY is a bytes.Buffer that also satisfies terminal.Fder, so
+// terminal.IsTerminalWriter can classify it as a terminal when IsTTY is mocked.
+type fakeTTY struct {
+	bytes.Buffer
+}
+
+func (f *fakeTTY) Fd() uintptr { return 1 }
+
+// enabledPalette returns a palette with color forced on, for asserting exact
+// ANSI wrapping. It mocks terminal.IsTTY and clears NO_COLOR, so callers must
+// not run in parallel (t.Setenv already enforces this).
+func enabledPalette(t *testing.T) colors.Palette {
+	t.Helper()
+
+	orig := terminal.IsTTY
+
+	t.Cleanup(func() { terminal.IsTTY = orig })
+	t.Setenv("NO_COLOR", "")
+
+	terminal.IsTTY = func(uintptr) bool { return true }
+
+	return colors.For(&fakeTTY{})
+}
 
 func TestWriter_Field(t *testing.T) {
 	t.Parallel()
@@ -139,7 +163,7 @@ func TestDiff(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			result := Diff(tt.oldName, tt.newName, tt.oldContent, tt.newContent)
+			result := Diff(&bytes.Buffer{}, tt.oldName, tt.newName, tt.oldContent, tt.newContent)
 
 			for _, expected := range tt.contains {
 				assert.Contains(t, result, expected)
@@ -155,7 +179,7 @@ func TestDiff(t *testing.T) {
 func TestDiff_EmptyInputs(t *testing.T) {
 	t.Parallel()
 
-	result := Diff("old", "new", "", "")
+	result := Diff(&bytes.Buffer{}, "old", "new", "", "")
 	assert.Empty(t, result)
 }
 
@@ -164,7 +188,9 @@ func TestColorDiff(t *testing.T) {
 
 	diff := "--- old\n+++ new\n@@ -1 +1 @@\n-removed\n+added\n context"
 
-	result := colorDiff(diff)
+	// A plain (non-terminal) palette leaves the content unwrapped, so the
+	// substrings appear verbatim regardless of ANSI.
+	result := colorDiff(colors.For(&bytes.Buffer{}), diff)
 
 	assert.NotEmpty(t, result)
 	assert.Contains(t, result, "removed")
@@ -174,22 +200,16 @@ func TestColorDiff(t *testing.T) {
 func TestColorDiff_EmptyInput(t *testing.T) {
 	t.Parallel()
 
-	result := colorDiff("")
+	result := colorDiff(colors.For(&bytes.Buffer{}), "")
 	assert.Empty(t, result)
 }
 
-// TestDiff_MatchesDiffRawNewlines guards #338: with color disabled, Diff is
+// TestDiff_MatchesDiffRawNewlines guards #338: for a non-terminal writer Diff is
 // structure-only, so it must equal DiffRaw with no spurious trailing newline.
-//
-//nolint:paralleltest // toggles the process-global color.NoColor
 func TestDiff_MatchesDiffRawNewlines(t *testing.T) {
-	orig := color.NoColor
+	t.Parallel()
 
-	t.Cleanup(func() { color.NoColor = orig })
-
-	color.NoColor = true
-
-	got := Diff("f", "f", "a\nb\n", "a\nc\n")
+	got := Diff(&bytes.Buffer{}, "f", "f", "a\nb\n", "a\nc\n")
 	raw := DiffRaw("f", "f", "a\nb\n", "a\nc\n")
 
 	assert.Equal(t, raw, got)
@@ -198,26 +218,23 @@ func TestDiff_MatchesDiffRawNewlines(t *testing.T) {
 
 // TestColorDiff_InHunkDashLinesNotHeaders guards #339: inside a hunk, a
 // removed/added line whose content starts with -- / ++ must be colored as
-// removed/added, not misclassified as a ---/+++ header.
+// removed/added, not misclassified as a ---/+++ header. Uses a color-enabled
+// palette so headers (cyan) and removed/added (red/green) are distinguishable.
 //
-//nolint:paralleltest // toggles the process-global color.NoColor
+//nolint:paralleltest // enabledPalette mutates terminal.IsTTY and NO_COLOR
 func TestColorDiff_InHunkDashLinesNotHeaders(t *testing.T) {
-	orig := color.NoColor
-
-	t.Cleanup(func() { color.NoColor = orig })
-
-	color.NoColor = false
+	pal := enabledPalette(t)
 
 	diff := "--- old\n+++ new\n@@ -1 +1 @@\n--- removed content\n+++ added content"
 
-	result := colorDiff(diff)
+	result := colorDiff(pal, diff)
 
 	// The in-hunk lines are wrapped exactly as removed/added would wrap them.
-	assert.Contains(t, result, colors.DiffRemoved("--- removed content"))
-	assert.Contains(t, result, colors.DiffAdded("+++ added content"))
+	assert.Contains(t, result, pal.DiffRemoved("--- removed content"))
+	assert.Contains(t, result, pal.DiffAdded("+++ added content"))
 	// And the real file-label headers are still colored as headers.
-	assert.Contains(t, result, colors.DiffHeader("--- old"))
-	assert.Contains(t, result, colors.DiffHeader("+++ new"))
+	assert.Contains(t, result, pal.DiffHeader("--- old"))
+	assert.Contains(t, result, pal.DiffHeader("+++ new"))
 }
 
 func TestWarning(t *testing.T) {
@@ -272,6 +289,47 @@ func TestInfo(t *testing.T) {
 	var buf bytes.Buffer
 	Info(&buf, "No changes %s", "staged")
 	assert.Contains(t, buf.String(), "No changes staged")
+}
+
+// TestFeedback_ColorTracksWriterTTY guards #341: a feedback message's color is
+// decided by its own destination writer, not by a process-global. A terminal
+// writer receives ANSI while a non-terminal writer (a plain bytes.Buffer with
+// no Fd) written in the same process stays clean.
+func TestFeedback_ColorTracksWriterTTY(t *testing.T) {
+	origIsTTY := terminal.IsTTY
+
+	t.Cleanup(func() { terminal.IsTTY = origIsTTY })
+	t.Setenv("NO_COLOR", "")
+
+	terminal.IsTTY = func(uintptr) bool { return true }
+
+	var tty fakeTTY
+
+	Warning(&tty, "heads up")
+	assert.Contains(t, tty.String(), "\x1b[", "a terminal writer must receive ANSI color")
+	assert.Contains(t, tty.String(), "heads up")
+
+	var buf bytes.Buffer
+
+	Warning(&buf, "heads up")
+	assert.NotContains(t, buf.String(), "\x1b[", "a non-terminal writer must stay plain")
+}
+
+// TestFeedback_NoColorEnvDisables guards #341: NO_COLOR disables coloring even
+// for a terminal writer.
+func TestFeedback_NoColorEnvDisables(t *testing.T) {
+	origIsTTY := terminal.IsTTY
+
+	t.Cleanup(func() { terminal.IsTTY = origIsTTY })
+	t.Setenv("NO_COLOR", "1")
+
+	terminal.IsTTY = func(uintptr) bool { return true }
+
+	var tty fakeTTY
+
+	Error(&tty, "boom")
+	assert.NotContains(t, tty.String(), "\x1b[", "NO_COLOR must suppress ANSI even on a TTY")
+	assert.Contains(t, tty.String(), "Error: boom")
 }
 
 func TestParseFormat(t *testing.T) {

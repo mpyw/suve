@@ -120,7 +120,7 @@ func (r *DiffRunner) OutputDiff(opts DiffOptions, entry stagingusecase.DiffEntry
 		"%s (staged)",
 	), entry.Name)
 
-	diff := output.Diff(label1, label2, awsValue, stagedValue)
+	diff := output.Diff(r.Stdout, label1, label2, awsValue, stagedValue)
 	output.Print(r.Stdout, diff)
 
 	// Show staged metadata
@@ -141,7 +141,7 @@ func (r *DiffRunner) OutputDiffCreate(opts DiffOptions, entry stagingusecase.Dif
 	label1 := fmt.Sprintf("%s (not in AWS)", entry.Name)
 	label2 := fmt.Sprintf("%s (staged for creation)", entry.Name)
 
-	diff := output.Diff(label1, label2, "", stagedValue)
+	diff := output.Diff(r.Stdout, label1, label2, "", stagedValue)
 	output.Print(r.Stdout, diff)
 
 	// Show staged metadata
@@ -151,13 +151,13 @@ func (r *DiffRunner) OutputDiffCreate(opts DiffOptions, entry stagingusecase.Dif
 // OutputMetadata outputs metadata for a diff entry.
 func (r *DiffRunner) OutputMetadata(entry stagingusecase.DiffEntry) {
 	if desc := lo.FromPtr(entry.Description); desc != "" {
-		output.Printf(r.Stdout, "%s %s\n", colors.FieldLabel("Description:"), desc)
+		output.Printf(r.Stdout, "%s %s\n", colors.For(r.Stdout).FieldLabel("Description:"), desc)
 	}
 }
 
 // OutputTagEntry outputs a tag entry.
 func (r *DiffRunner) OutputTagEntry(tagEntry stagingusecase.DiffTagEntry) {
-	output.Printf(r.Stdout, "%s %s (staged tag changes)\n", colors.Info("Tags:"), tagEntry.Name)
+	output.Printf(r.Stdout, "%s %s (staged tag changes)\n", colors.For(r.Stdout).Info("Tags:"), tagEntry.Name)
 
 	if len(tagEntry.Add) > 0 {
 		tagPairs := make([]string, 0, len(tagEntry.Add))
@@ -165,7 +165,7 @@ func (r *DiffRunner) OutputTagEntry(tagEntry stagingusecase.DiffTagEntry) {
 			tagPairs = append(tagPairs, fmt.Sprintf("%s=%s", k, tagEntry.Add[k]))
 		}
 
-		output.Printf(r.Stdout, "  %s %s\n", colors.OpAdd("+"), strings.Join(tagPairs, ", "))
+		output.Printf(r.Stdout, "  %s %s\n", colors.For(r.Stdout).OpAdd("+"), strings.Join(tagPairs, ", "))
 	}
 
 	if len(tagEntry.Remove) > 0 {
@@ -178,6 +178,6 @@ func (r *DiffRunner) OutputTagEntry(tagEntry stagingusecase.DiffTagEntry) {
 			}
 		}
 
-		output.Printf(r.Stdout, "  %s %s\n", colors.OpDelete("-"), strings.Join(tagPairs, ", "))
+		output.Printf(r.Stdout, "  %s %s\n", colors.For(r.Stdout).OpDelete("-"), strings.Join(tagPairs, ", "))
 	}
 }

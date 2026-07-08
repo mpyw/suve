@@ -109,14 +109,14 @@ func (p *logPresenter) RenderOneline(stdout io.Writer, i, maxValueLength int) {
 
 	currentMark := ""
 	if entry.IsCurrent {
-		currentMark = colors.Current(" (current)")
+		currentMark = colors.For(stdout).Current(" (current)")
 	}
 
 	output.Printf(stdout, "%s%d%s  %s  %s\n",
-		colors.Version(""),
+		colors.For(stdout).Version(""),
 		entry.Version,
 		currentMark,
-		colors.FieldLabel(dateStr),
+		colors.For(stdout).FieldLabel(dateStr),
 		value,
 	)
 }
@@ -126,13 +126,13 @@ func (p *logPresenter) RenderHeader(stdout io.Writer, i int) {
 
 	versionLabel := fmt.Sprintf("Version %d", entry.Version)
 	if entry.IsCurrent {
-		versionLabel += " " + colors.Current("(current)")
+		versionLabel += " " + colors.For(stdout).Current("(current)")
 	}
 
-	output.Println(stdout, colors.Version(versionLabel))
+	output.Println(stdout, colors.For(stdout).Version(versionLabel))
 
 	if entry.LastModified != nil {
-		output.Printf(stdout, "%s %s\n", colors.FieldLabel("Date:"), timeutil.FormatRFC3339(*entry.LastModified))
+		output.Printf(stdout, "%s %s\n", colors.For(stdout).FieldLabel("Date:"), timeutil.FormatRFC3339(*entry.LastModified))
 	}
 }
 
@@ -183,7 +183,7 @@ func (p *logPresenter) RenderPatch(stdout, stderr io.Writer, i int, parseJSON, r
 
 	newName := fmt.Sprintf("%s#%d", p.result.Name, newEntry.Version)
 
-	diff := output.Diff(oldName, newName, oldValue, newValue)
+	diff := output.Diff(stdout, oldName, newName, oldValue, newValue)
 	if diff != "" {
 		output.Println(stdout, "")
 		output.Print(stdout, diff)

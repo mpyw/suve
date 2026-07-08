@@ -108,13 +108,13 @@ func (p *logPresenter) RenderOneline(stdout io.Writer, i, _ int) {
 
 	labelsStr := ""
 	if len(entry.VersionStage) > 0 {
-		labelsStr = colors.Current(fmt.Sprintf(" %v", entry.VersionStage))
+		labelsStr = colors.For(stdout).Current(fmt.Sprintf(" %v", entry.VersionStage))
 	}
 
 	output.Printf(stdout, "%s%s  %s%s\n",
-		colors.Version(secretversion.TruncateVersionID(entry.VersionID)),
+		colors.For(stdout).Version(secretversion.TruncateVersionID(entry.VersionID)),
 		labelsStr,
-		colors.FieldLabel(dateStr),
+		colors.For(stdout).FieldLabel(dateStr),
 		"",
 	)
 }
@@ -124,13 +124,13 @@ func (p *logPresenter) RenderHeader(stdout io.Writer, i int) {
 
 	versionLabel := fmt.Sprintf("Version %s", secretversion.TruncateVersionID(entry.VersionID))
 	if len(entry.VersionStage) > 0 {
-		versionLabel += " " + colors.Current(fmt.Sprintf("%v", entry.VersionStage))
+		versionLabel += " " + colors.For(stdout).Current(fmt.Sprintf("%v", entry.VersionStage))
 	}
 
-	output.Println(stdout, colors.Version(versionLabel))
+	output.Println(stdout, colors.For(stdout).Version(versionLabel))
 
 	if entry.CreatedDate != nil {
-		output.Printf(stdout, "%s %s\n", colors.FieldLabel("Date:"), timeutil.FormatRFC3339(*entry.CreatedDate))
+		output.Printf(stdout, "%s %s\n", colors.For(stdout).FieldLabel("Date:"), timeutil.FormatRFC3339(*entry.CreatedDate))
 	}
 }
 
@@ -184,7 +184,7 @@ func (p *logPresenter) RenderPatch(stdout, stderr io.Writer, i int, parseJSON, r
 
 	newName := fmt.Sprintf("%s#%s", p.result.Name, secretversion.TruncateVersionID(newEntry.VersionID))
 
-	diff := output.Diff(oldName, newName, oldValue, newValue)
+	diff := output.Diff(stdout, oldName, newName, oldValue, newValue)
 	if diff != "" {
 		output.Println(stdout, "")
 		output.Print(stdout, diff)
