@@ -44,8 +44,9 @@ func TestLogUseCase_Execute(t *testing.T) {
 
 	now := time.Now()
 	versions := []domain.Version{
-		{ID: "v3", Label: "AWSCURRENT", Created: &now},
-		{ID: "v2", Label: "AWSPREVIOUS", Created: tp(now, -time.Hour)},
+		// Unsorted, multi-valued staging labels: all must surface, sorted (#419).
+		{ID: "v3", StagingLabels: []string{"custom", "AWSCURRENT"}, Created: &now},
+		{ID: "v2", StagingLabels: []string{"AWSPREVIOUS"}, Created: tp(now, -time.Hour)},
 		{ID: "v1", Created: tp(now, -2*time.Hour)},
 	}
 	values := map[string]string{"v1": "value1", "v2": "value2", "v3": "value3"}
@@ -57,10 +58,37 @@ func TestLogUseCase_Execute(t *testing.T) {
 	require.Len(t, output.Entries, 3)
 	// Newest first.
 	assert.Equal(t, "v3", output.Entries[0].VersionID)
+	// IsCurrent is a membership test: AWSCURRENT alongside a custom label.
 	assert.True(t, output.Entries[0].IsCurrent)
-	assert.Contains(t, output.Entries[0].VersionStage, "AWSCURRENT")
+	assert.Equal(t, []string{"AWSCURRENT", "custom"}, output.Entries[0].VersionStage)
+	// AWS Secrets Manager carries staging labels, not a per-version state (#419).
+	assert.Empty(t, output.Entries[0].State)
 	assert.Equal(t, "value3", output.Entries[0].Value)
 	assert.False(t, output.Entries[2].IsCurrent)
+}
+
+// TestLogUseCase_Execute_State asserts that a GCloud/Key Vault-style history
+// (per-version State set, no staging labels) surfaces State on each entry and
+// leaves VersionStage empty — the two concepts must not be conflated (#419).
+func TestLogUseCase_Execute_State(t *testing.T) {
+	t.Parallel()
+
+	now := time.Now()
+	versions := []domain.Version{
+		{ID: "2", State: "enabled", Created: &now},
+		{ID: "1", State: "disabled", Created: tp(now, -time.Hour)},
+	}
+	values := map[string]string{"1": "value1", "2": "value2"}
+
+	uc := &secret.LogUseCase{Reader: logStore(versions, values, nil)}
+
+	output, err := uc.Execute(t.Context(), secret.LogInput{Name: "my-secret", MaxResults: 10})
+	require.NoError(t, err)
+	require.Len(t, output.Entries, 2)
+	assert.Equal(t, "enabled", output.Entries[0].State)
+	assert.Empty(t, output.Entries[0].VersionStage)
+	assert.Equal(t, "disabled", output.Entries[1].State)
+	assert.Empty(t, output.Entries[1].VersionStage)
 }
 
 func TestLogUseCase_Execute_Empty(t *testing.T) {
@@ -94,8 +122,8 @@ func TestLogUseCase_Execute_Reverse(t *testing.T) {
 
 	now := time.Now()
 	versions := []domain.Version{
-		{ID: "v2", Label: "AWSCURRENT", Created: &now},
-		{ID: "v1", Label: "AWSPREVIOUS", Created: tp(now, -time.Hour)},
+		{ID: "v2", StagingLabels: []string{"AWSCURRENT"}, Created: &now},
+		{ID: "v1", StagingLabels: []string{"AWSPREVIOUS"}, Created: tp(now, -time.Hour)},
 	}
 
 	uc := &secret.LogUseCase{Reader: logStore(versions, map[string]string{}, nil)}

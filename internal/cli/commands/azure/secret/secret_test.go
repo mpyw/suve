@@ -132,7 +132,7 @@ func TestShowPresenter(t *testing.T) {
 				Name:    name,
 				Value:   "s3cr3t",
 				Type:    domain.ValueTypeSecret,
-				Version: domain.Version{ID: "abc123", Label: "enabled", Created: &created},
+				Version: domain.Version{ID: "abc123", State: "enabled", Created: &created},
 				Tags:    []domain.Tag{{Key: "env", Value: "prod"}},
 			}, nil
 		},
@@ -164,8 +164,8 @@ func TestLogPresenter(t *testing.T) {
 	store := &providermock.Store{
 		HistoryFunc: func(_ context.Context, _ string) ([]domain.Version, error) {
 			return []domain.Version{
-				{ID: "new", Label: "enabled", Created: &created},
-				{ID: "old", Label: "disabled", Created: &created},
+				{ID: "new", State: "enabled", Created: &created},
+				{ID: "old", State: "disabled", Created: &created},
 			}, nil
 		},
 		ResolveFunc: func(_ context.Context, _, spec string) (provider.VersionRef, error) {
@@ -200,8 +200,8 @@ func TestLogPresenter_Patch(t *testing.T) {
 	store := &providermock.Store{
 		HistoryFunc: func(_ context.Context, _ string) ([]domain.Version, error) {
 			return []domain.Version{
-				{ID: "2", Label: "enabled", Created: &created},
-				{ID: "1", Label: "enabled", Created: &created},
+				{ID: "2", State: "enabled", Created: &created},
+				{ID: "1", State: "enabled", Created: &created},
 			}, nil
 		},
 		ResolveFunc: func(_ context.Context, _, spec string) (provider.VersionRef, error) {

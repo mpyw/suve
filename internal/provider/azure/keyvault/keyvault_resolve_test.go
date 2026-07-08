@@ -245,7 +245,7 @@ func TestGet_NilFieldsTolerated(t *testing.T) {
 	entry, err := store.Get(t.Context(), "my-secret", provider.VersionRef{})
 	require.NoError(t, err)
 	assert.Empty(t, entry.Version.ID)
-	assert.Empty(t, entry.Version.Label)
+	assert.Empty(t, entry.Version.State)
 }
 
 // TestStore_ErrorPaths covers the non-not-found error branches of the write and

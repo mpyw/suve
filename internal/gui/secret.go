@@ -38,15 +38,22 @@ type SecretShowTag struct {
 }
 
 // SecretShowResult represents the result of showing a secret.
+//
+// StagingLabels and State carry two independent concepts that must NOT be
+// conflated (#419): StagingLabels holds AWS Secrets Manager staging labels
+// (empty for other providers), while State holds the per-version lifecycle
+// state (enabled/disabled/destroyed) for Google Cloud + Azure Key Vault (empty
+// for AWS). A version never has both.
 type SecretShowResult struct {
-	Name         string          `json:"name"`
-	ARN          string          `json:"arn"`
-	VersionID    string          `json:"versionId"`
-	VersionStage []string        `json:"versionStage"`
-	Value        string          `json:"value"`
-	Description  string          `json:"description,omitempty"`
-	CreatedDate  string          `json:"createdDate,omitempty"`
-	Tags         []SecretShowTag `json:"tags"`
+	Name          string          `json:"name"`
+	ARN           string          `json:"arn"`
+	VersionID     string          `json:"versionId"`
+	StagingLabels []string        `json:"stagingLabels"`
+	State         string          `json:"state,omitempty"`
+	Value         string          `json:"value"`
+	Description   string          `json:"description,omitempty"`
+	CreatedDate   string          `json:"createdDate,omitempty"`
+	Tags          []SecretShowTag `json:"tags"`
 }
 
 // SecretLogResult represents the result of showing secret history.
@@ -56,12 +63,19 @@ type SecretLogResult struct {
 }
 
 // SecretLogEntry represents a single version in the history.
+//
+// StagingLabels and State carry two independent concepts that must NOT be
+// conflated (#419): StagingLabels holds AWS Secrets Manager staging labels
+// (empty for other providers), while State holds the per-version lifecycle
+// state (enabled/disabled/destroyed) for Google Cloud + Azure Key Vault (empty
+// for AWS). A version never has both.
 type SecretLogEntry struct {
-	VersionID string   `json:"versionId"`
-	Stages    []string `json:"stages"`
-	Value     string   `json:"value"`
-	IsCurrent bool     `json:"isCurrent"`
-	Created   string   `json:"created,omitempty"`
+	VersionID     string   `json:"versionId"`
+	StagingLabels []string `json:"stagingLabels"`
+	State         string   `json:"state,omitempty"`
+	Value         string   `json:"value"`
+	IsCurrent     bool     `json:"isCurrent"`
+	Created       string   `json:"created,omitempty"`
 }
 
 // SecretCreateResult represents the result of creating a secret.
@@ -154,13 +168,14 @@ func (a *App) SecretShow(specStr string) (*SecretShowResult, error) {
 	}
 
 	r := &SecretShowResult{
-		Name:         result.Name,
-		ARN:          result.ARN,
-		VersionID:    result.VersionID,
-		VersionStage: result.VersionStage,
-		Value:        result.Value,
-		Description:  result.Description,
-		Tags:         make([]SecretShowTag, 0, len(result.Tags)),
+		Name:          result.Name,
+		ARN:           result.ARN,
+		VersionID:     result.VersionID,
+		StagingLabels: result.VersionStage,
+		State:         result.State,
+		Value:         result.Value,
+		Description:   result.Description,
+		Tags:          make([]SecretShowTag, 0, len(result.Tags)),
 	}
 	if result.CreatedDate != nil {
 		r.CreatedDate = timeutil.FormatRFC3339(*result.CreatedDate)
@@ -196,10 +211,11 @@ func (a *App) SecretLog(name string, maxResults int32) (*SecretLogResult, error)
 	entries := make([]SecretLogEntry, len(result.Entries))
 	for i, e := range result.Entries {
 		entry := SecretLogEntry{
-			VersionID: e.VersionID,
-			Stages:    e.VersionStage,
-			Value:     e.Value,
-			IsCurrent: e.IsCurrent,
+			VersionID:     e.VersionID,
+			StagingLabels: e.VersionStage,
+			State:         e.State,
+			Value:         e.Value,
+			IsCurrent:     e.IsCurrent,
 		}
 		if e.CreatedDate != nil {
 			entry.Created = timeutil.FormatRFC3339(*e.CreatedDate)

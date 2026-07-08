@@ -39,10 +39,10 @@ test.describe('Secret CRUD Operations', () => {
       await expect(page.locator('.detail-title')).toContainText('my-secret');
     });
 
-    test('should display secret metadata (version ID, labels)', async ({ page }) => {
+    test('should display secret metadata (version ID, staging labels)', async ({ page }) => {
       await clickItemByName(page, 'my-secret');
       await expect(page.locator('.meta-label').filter({ hasText: 'Version ID' })).toBeVisible();
-      await expect(page.locator('.meta-label').filter({ hasText: 'Labels' })).toBeVisible();
+      await expect(page.locator('.meta-label').filter({ hasText: 'Staging labels' })).toBeVisible();
     });
 
     test('should display ARN', async ({ page }) => {
@@ -462,12 +462,13 @@ test.describe('Secret Edge Cases', () => {
 });
 
 test.describe('Secret provider-neutral presence gating (#268)', () => {
-  // A secret from a provider without an ARN or staging labels (as Google Cloud
-  // and Azure return) must not render the AWS-only ARN section or the Labels
-  // row — the fields are presence-gated, no capability flag involved.
+  // A secret from a provider without an ARN, staging labels, or a state (as an
+  // AWS SSM-style value would be) must not render the AWS-only ARN section or a
+  // State/Staging-labels row — the fields are presence-gated, no capability flag
+  // involved.
   test.beforeEach(async ({ page }) => {
     await setupWailsMocks(page, {
-      secrets: [{ name: 'neutral-secret', value: 'v', arn: '', versionStage: [] }],
+      secrets: [{ name: 'neutral-secret', value: 'v', arn: '', stagingLabels: [], state: '' }],
       secretTags: {},
     } as Partial<MockState>);
     await page.goto('/');
@@ -481,8 +482,9 @@ test.describe('Secret provider-neutral presence gating (#268)', () => {
     await expect(page.locator('.arn-display')).toHaveCount(0);
   });
 
-  test('hides the Labels row when there are no staging labels', async ({ page }) => {
-    await expect(page.locator('.meta-label').filter({ hasText: 'Labels' })).toHaveCount(0);
+  test('hides the State / Staging-labels row when neither is set', async ({ page }) => {
+    await expect(page.locator('.meta-label').filter({ hasText: 'State' })).toHaveCount(0);
+    await expect(page.locator('.meta-label').filter({ hasText: 'Staging labels' })).toHaveCount(0);
   });
 
   test('still renders always-present metadata (Version ID)', async ({ page }) => {
@@ -490,19 +492,21 @@ test.describe('Secret provider-neutral presence gating (#268)', () => {
   });
 });
 
-// domain.Version.Label is overloaded: AWS Secrets Manager carries genuine
-// staging labels (AWSCURRENT/...), while Google Cloud and Azure Key Vault carry
-// the per-version STATE (enabled/disabled/destroyed). The version-meta heading
-// must therefore read "Labels" only for AWS and "State" for the others (#418).
-test.describe('Secret version-meta heading is provider-aware (#418)', () => {
+// Staging labels and per-version state are two independent concepts (#419):
+// AWS Secrets Manager carries genuine staging labels (AWSCURRENT/...), while
+// Google Cloud and Azure Key Vault carry the per-version state
+// (enabled/disabled/destroyed). The version-meta heading is now driven by which
+// field is populated, NOT by the provider string (superseding the #418/#420
+// heuristic).
+test.describe('Secret version-meta heading is concept-driven (#419)', () => {
   const metaLabel = (page: import('@playwright/test').Page, text: string) =>
     page.locator('.detail-meta .meta-label').filter({ hasText: text });
 
-  test('Google Cloud: version state is headed "State" (not "Labels"), badge shows the state', async ({ page }) => {
+  test('Google Cloud: per-version state is headed "State", badge shows the state', async ({ page }) => {
     await setupWailsMocks(
       page,
       createGoogleCloudState({
-        secrets: [{ name: 'gcloud-secret-1', value: 'v1', arn: '', versionStage: ['enabled'] }],
+        secrets: [{ name: 'gcloud-secret-1', value: 'v1', arn: '', stagingLabels: [], state: 'enabled' }],
       }),
     );
     await page.goto('/');
@@ -513,15 +517,15 @@ test.describe('Secret version-meta heading is provider-aware (#418)', () => {
     await expect(page.locator('.detail-panel')).toBeVisible();
 
     await expect(metaLabel(page, 'State')).toBeVisible();
-    await expect(metaLabel(page, 'Labels')).toHaveCount(0);
+    await expect(metaLabel(page, 'Staging labels')).toHaveCount(0);
     await expect(page.locator('.detail-meta .badge-stage')).toHaveText('enabled');
   });
 
-  test('Azure Key Vault: version state is headed "State" (not "Labels")', async ({ page }) => {
+  test('Azure Key Vault: per-version state is headed "State"', async ({ page }) => {
     await setupWailsMocks(
       page,
       createAzureState({
-        secrets: [{ name: 'kv-secret', value: 'v', arn: '', versionStage: ['enabled'], versionId: 'a1b2c3d4e5f6' }],
+        secrets: [{ name: 'kv-secret', value: 'v', arn: '', stagingLabels: [], state: 'enabled', versionId: 'a1b2c3d4e5f6' }],
       }),
     );
     await page.goto('/');
@@ -532,13 +536,15 @@ test.describe('Secret version-meta heading is provider-aware (#418)', () => {
     await expect(page.locator('.detail-panel')).toBeVisible();
 
     await expect(metaLabel(page, 'State')).toBeVisible();
-    await expect(metaLabel(page, 'Labels')).toHaveCount(0);
+    await expect(metaLabel(page, 'Staging labels')).toHaveCount(0);
     await expect(page.locator('.detail-meta .badge-stage')).toHaveText('enabled');
   });
 
-  test('AWS Secrets Manager: staging label is headed "Labels" (not "State")', async ({ page }) => {
-    // Default state is AWS; my-secret carries the default ['AWSCURRENT'] staging label.
-    await setupWailsMocks(page);
+  test('AWS Secrets Manager: staging labels are headed "Staging labels", every label badge shows', async ({ page }) => {
+    // AWS default; seed multiple staging labels to prove they all render.
+    await setupWailsMocks(page, {
+      secrets: [{ name: 'my-secret', value: 'v', stagingLabels: ['AWSCURRENT', 'AWSPREVIOUS'] }],
+    } as Partial<MockState>);
     await page.goto('/');
     await navigateTo(page, 'Secret');
     await waitForItemList(page);
@@ -546,8 +552,8 @@ test.describe('Secret version-meta heading is provider-aware (#418)', () => {
     await clickItemByName(page, 'my-secret');
     await expect(page.locator('.detail-panel')).toBeVisible();
 
-    await expect(metaLabel(page, 'Labels')).toBeVisible();
+    await expect(metaLabel(page, 'Staging labels')).toBeVisible();
     await expect(metaLabel(page, 'State')).toHaveCount(0);
-    await expect(page.locator('.detail-meta .badge-stage')).toHaveText('AWSCURRENT');
+    await expect(page.locator('.detail-meta .badge-stage')).toHaveText(['AWSCURRENT', 'AWSPREVIOUS']);
   });
 });

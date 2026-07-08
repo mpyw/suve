@@ -433,19 +433,21 @@ export namespace gui {
 	}
 	export class SecretLogEntry {
 	    versionId: string;
-	    stages: string[];
+	    stagingLabels: string[];
+	    state?: string;
 	    value: string;
 	    isCurrent: boolean;
 	    created?: string;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new SecretLogEntry(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.versionId = source["versionId"];
-	        this.stages = source["stages"];
+	        this.stagingLabels = source["stagingLabels"];
+	        this.state = source["state"];
 	        this.value = source["value"];
 	        this.isCurrent = source["isCurrent"];
 	        this.created = source["created"];
@@ -515,22 +517,24 @@ export namespace gui {
 	    name: string;
 	    arn: string;
 	    versionId: string;
-	    versionStage: string[];
+	    stagingLabels: string[];
+	    state?: string;
 	    value: string;
 	    description?: string;
 	    createdDate?: string;
 	    tags: SecretShowTag[];
-	
+
 	    static createFrom(source: any = {}) {
 	        return new SecretShowResult(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.name = source["name"];
 	        this.arn = source["arn"];
 	        this.versionId = source["versionId"];
-	        this.versionStage = source["versionStage"];
+	        this.stagingLabels = source["stagingLabels"];
+	        this.state = source["state"];
 	        this.value = source["value"];
 	        this.description = source["description"];
 	        this.createdDate = source["createdDate"];

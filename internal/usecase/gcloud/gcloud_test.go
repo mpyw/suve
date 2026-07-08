@@ -69,7 +69,7 @@ func TestShowUseCase(t *testing.T) {
 			return &domain.Entry{
 				Name:    name,
 				Value:   "hello",
-				Version: domain.Version{ID: "3", Label: "enabled"},
+				Version: domain.Version{ID: "3", State: "enabled"},
 				Tags:    []domain.Tag{{Key: "env", Value: "prod"}},
 			}, nil
 		},

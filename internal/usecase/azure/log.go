@@ -103,7 +103,7 @@ func (u *LogUseCase) Execute(ctx context.Context, input LogInput) (*LogOutput, e
 
 		entries = append(entries, LogEntry{
 			Version:     v.ID,
-			State:       v.Label,
+			State:       v.State,
 			Value:       value,
 			CreatedDate: v.Created,
 			Error:       fetchErr,

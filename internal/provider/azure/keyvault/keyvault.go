@@ -167,7 +167,7 @@ func (s *Store) Get(ctx context.Context, name string, ref provider.VersionRef) (
 
 	if attr := resp.Attributes; attr != nil {
 		entry.Version.Created = attr.Created
-		entry.Version.Label = enabledLabel(attr.Enabled)
+		entry.Version.State = enabledLabel(attr.Enabled)
 		entry.Modified = attr.Updated
 	}
 
@@ -175,7 +175,7 @@ func (s *Store) Get(ctx context.Context, name string, ref provider.VersionRef) (
 }
 
 // History returns the secret's version history, newest first. The per-version
-// enabled/disabled state is surfaced in the neutral Version.Label for display.
+// enabled/disabled state is surfaced in the neutral Version.State for display.
 func (s *Store) History(ctx context.Context, name string) ([]domain.Version, error) {
 	versions, err := s.versionsNewestFirst(ctx, name)
 	if err != nil {
@@ -185,7 +185,7 @@ func (s *Store) History(ctx context.Context, name string) ([]domain.Version, err
 	return lo.Map(versions, func(v secretVersion, _ int) domain.Version {
 		return domain.Version{
 			ID:      v.id,
-			Label:   boolLabel(v.enabled),
+			State:   boolLabel(v.enabled),
 			Created: v.created,
 		}
 	}), nil

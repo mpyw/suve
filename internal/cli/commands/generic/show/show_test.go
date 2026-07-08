@@ -385,7 +385,7 @@ func TestRunSecret(t *testing.T) {
 			store: showStore(&domain.Entry{
 				Name:    "my-secret",
 				Value:   "secret-value",
-				Version: domain.Version{ID: "abc123", Label: "AWSCURRENT", Created: &now},
+				Version: domain.Version{ID: "abc123", StagingLabels: []string{"AWSCURRENT"}, Created: &now},
 				Extra:   []domain.Field{{Label: "ARN", Value: testARN}},
 			}),
 			check: func(t *testing.T, output string) {
@@ -414,7 +414,7 @@ func TestRunSecret(t *testing.T) {
 			store: showStore(&domain.Entry{
 				Name:    "my-secret",
 				Value:   `{"zebra":"last","apple":"first"}`,
-				Version: domain.Version{ID: "abc123", Label: "AWSCURRENT", Created: &now},
+				Version: domain.Version{ID: "abc123", StagingLabels: []string{"AWSCURRENT"}, Created: &now},
 				Extra:   []domain.Field{{Label: "ARN", Value: testARN}},
 			}),
 			check: func(t *testing.T, output string) {
@@ -522,7 +522,7 @@ func TestRunSecret(t *testing.T) {
 			store: showStore(&domain.Entry{
 				Name:    "my-secret",
 				Value:   "secret-value",
-				Version: domain.Version{ID: "abc123", Label: "AWSCURRENT", Created: &now},
+				Version: domain.Version{ID: "abc123", StagingLabels: []string{"AWSCURRENT"}, Created: &now},
 				Extra:   []domain.Field{{Label: "ARN", Value: testARN}},
 				Tags: []domain.Tag{
 					{Key: "Environment", Value: "production"},
@@ -546,7 +546,7 @@ func TestRunSecret(t *testing.T) {
 			store: showStore(&domain.Entry{
 				Name:    "my-secret",
 				Value:   "secret-value",
-				Version: domain.Version{ID: "abc123", Label: "AWSCURRENT", Created: &now},
+				Version: domain.Version{ID: "abc123", StagingLabels: []string{"AWSCURRENT"}, Created: &now},
 				Extra:   []domain.Field{{Label: "ARN", Value: testARN}},
 				Tags: []domain.Tag{
 					{Key: "Environment", Value: "production"},

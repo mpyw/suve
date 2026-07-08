@@ -21,9 +21,10 @@ func TestEntry_Fields(t *testing.T) {
 		Value: "hunter2",
 		Type:  domain.ValueTypeSecret,
 		Version: domain.Version{
-			ID:      "v3",
-			Label:   "current",
-			Created: &created,
+			ID:            "v3",
+			State:         "enabled",
+			StagingLabels: []string{"AWSCURRENT", "AWSPREVIOUS"},
+			Created:       &created,
 		},
 		Description: "example",
 		Tags:        []domain.Tag{{Key: "env", Value: "prod"}},
@@ -34,7 +35,8 @@ func TestEntry_Fields(t *testing.T) {
 	assert.Equal(t, "hunter2", entry.Value)
 	assert.Equal(t, domain.ValueTypeSecret, entry.Type)
 	assert.Equal(t, "v3", entry.Version.ID)
-	assert.Equal(t, "current", entry.Version.Label)
+	assert.Equal(t, "enabled", entry.Version.State)
+	assert.Equal(t, []string{"AWSCURRENT", "AWSPREVIOUS"}, entry.Version.StagingLabels)
 	assert.Equal(t, &created, entry.Version.Created)
 	assert.Equal(t, "example", entry.Description)
 	assert.Len(t, entry.Tags, 1)

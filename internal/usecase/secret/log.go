@@ -19,9 +19,16 @@ type LogInput struct {
 }
 
 // LogEntry represents a single version entry.
+//
+// VersionStage and State carry the two independent, provider-specific axes that
+// must NOT be conflated (#419): VersionStage holds AWS Secrets Manager staging
+// labels (empty for other providers), while State holds the per-version
+// lifecycle state (enabled/disabled/destroyed) for Google Cloud + Azure Key
+// Vault (empty for AWS). A version never has both.
 type LogEntry struct {
 	VersionID    string
 	VersionStage []string
+	State        string
 	Value        string
 	CreatedDate  *time.Time
 	IsCurrent    bool
@@ -105,14 +112,14 @@ func (u *LogUseCase) Execute(ctx context.Context, input LogInput) (*LogOutput, e
 
 		entries = append(entries, LogEntry{
 			VersionID:    v.ID,
-			VersionStage: stages(v.Label),
+			VersionStage: stages(v.StagingLabels),
+			State:        v.State,
 			Value:        value,
 			CreatedDate:  v.Created,
-			// The adapter picks the version's Label by priority, so AWSCURRENT
-			// always surfaces whenever the version carries it (even alongside a
-			// custom label). This equality is therefore a correct membership
-			// test, not a fragile "first stage" check (#317).
-			IsCurrent: v.Label == "AWSCURRENT",
+			// A version is current when AWSCURRENT is among its staging labels;
+			// membership (not a "first stage" check) keeps this correct even when
+			// the version carries additional custom labels (#317).
+			IsCurrent: slices.Contains(v.StagingLabels, "AWSCURRENT"),
 			Error:     fetchErr,
 		})
 	}

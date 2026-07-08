@@ -254,9 +254,9 @@ func (s *Store) Get(ctx context.Context, name string, ref provider.VersionRef) (
 		Value: aws.ToString(out.SecretString),
 		Type:  domain.ValueTypeSecret,
 		Version: domain.Version{
-			ID:      aws.ToString(out.VersionId),
-			Label:   representativeStage(out.VersionStages),
-			Created: out.CreatedDate,
+			ID:            aws.ToString(out.VersionId),
+			StagingLabels: out.VersionStages,
+			Created:       out.CreatedDate,
 		},
 		Modified: out.CreatedDate,
 		Extra:    []domain.Field{{Label: "ARN", Value: aws.ToString(out.ARN)}},
@@ -286,9 +286,9 @@ func (s *Store) History(ctx context.Context, name string) ([]domain.Version, err
 
 	return lo.Map(list, func(v types.SecretVersionsListEntry, _ int) domain.Version {
 		return domain.Version{
-			ID:      aws.ToString(v.VersionId),
-			Label:   representativeStage(v.VersionStages),
-			Created: v.CreatedDate,
+			ID:            aws.ToString(v.VersionId),
+			StagingLabels: v.VersionStages,
+			Created:       v.CreatedDate,
 		}
 	}), nil
 }
@@ -505,9 +505,9 @@ func (s *Store) Describe(ctx context.Context, name string) (*domain.Entry, error
 			return slices.Contains(v.VersionStages, "AWSCURRENT")
 		}); found {
 			entry.Version = domain.Version{
-				ID:      aws.ToString(cur.VersionId),
-				Label:   representativeStage(cur.VersionStages),
-				Created: cur.CreatedDate,
+				ID:            aws.ToString(cur.VersionId),
+				StagingLabels: cur.VersionStages,
+				Created:       cur.CreatedDate,
 			}
 		}
 	}
@@ -551,29 +551,6 @@ func (s *Store) Untag(ctx context.Context, name string, keys []string) error {
 	}
 
 	return nil
-}
-
-// representativeStage picks a single, DETERMINISTIC staging label to surface as
-// the version's provider-neutral Label. A version can carry several labels and
-// AWS returns them in an unspecified order, so choosing stages[0] made both the
-// displayed label and any "is this AWSCURRENT?" check non-deterministic (#317).
-//
-// A well-known label wins in fixed priority order (AWSCURRENT > AWSPENDING >
-// AWSPREVIOUS); otherwise the lexicographically smallest custom label is used
-// so the choice is stable. It returns "" when there are no labels.
-func representativeStage(stages []string) string {
-	if len(stages) == 0 {
-		return ""
-	}
-
-	// Well-known AWS staging labels, highest priority first.
-	for _, known := range []string{"AWSCURRENT", "AWSPENDING", "AWSPREVIOUS"} {
-		if slices.Contains(stages, known) {
-			return known
-		}
-	}
-
-	return slices.Min(stages)
 }
 
 // mapTags maps Secrets Manager tags to provider-neutral domain tags.
