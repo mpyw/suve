@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/mpyw/suve/internal/cli/pager"
+	"github.com/mpyw/suve/internal/cli/terminal"
 )
 
 func TestWithPagerWriter_NoPagerTrue(t *testing.T) {
@@ -94,4 +95,39 @@ func TestWithPagerWriter_WithFdNonTTY(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Equal(t, "test output", string(output))
+}
+
+type fakeTTYWriter struct {
+	bytes.Buffer
+}
+
+func (f *fakeTTYWriter) Fd() uintptr { return 1 }
+
+// TestWithPagerWriter_WidthSeesRealTerminalUnderPager guards #346: when output
+// is buffered for paging on a real TTY, terminal width detection must see the
+// real terminal, not the width-less buffer (which fell back to DefaultWidth and
+// truncated log --oneline to ~20 chars). Mocks package-global terminal vars, so
+// it is not parallel.
+//
+//nolint:paralleltest // mutates package-global terminal.IsTTY/GetSize
+func TestWithPagerWriter_WidthSeesRealTerminalUnderPager(t *testing.T) {
+	origTTY, origSize := terminal.IsTTY, terminal.GetSize
+
+	t.Cleanup(func() { terminal.IsTTY, terminal.GetSize = origTTY, origSize })
+
+	terminal.IsTTY = func(uintptr) bool { return true }
+	terminal.GetSize = func(int) (int, int, error) { return 123, 40, nil }
+
+	stdout := &fakeTTYWriter{}
+
+	var gotWidth int
+
+	err := pager.WithPagerWriter(stdout, false, func(w io.Writer) error {
+		gotWidth = terminal.GetWidthFromWriter(w)
+		_, werr := io.WriteString(w, "short line\n")
+
+		return werr
+	})
+	require.NoError(t, err)
+	assert.Equal(t, 123, gotWidth, "render width must reflect the real terminal, not the buffer default")
 }
