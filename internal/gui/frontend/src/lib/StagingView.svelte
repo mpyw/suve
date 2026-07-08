@@ -503,18 +503,18 @@
     <div class="actions-center">
       <button
         class="btn-action btn-apply"
-        onclick={() => openApplyModal(paramEntries.length > 0 ? 'param' : 'secret')}
-        disabled={paramEntries.length === 0 && secretEntries.length === 0}
+        onclick={() => openApplyModal((paramEntries.length > 0 || paramTagEntries.length > 0) ? 'param' : 'secret')}
+        disabled={paramEntries.length === 0 && secretEntries.length === 0 && paramTagEntries.length === 0 && secretTagEntries.length === 0}
       >
         Apply All
       </button>
       <button
         class="btn-action btn-reset"
         onclick={() => {
-          if (paramEntries.length > 0) openResetModal('param');
-          if (secretEntries.length > 0) openResetModal('secret');
+          if (paramEntries.length > 0 || paramTagEntries.length > 0) openResetModal('param');
+          if (secretEntries.length > 0 || secretTagEntries.length > 0) openResetModal('secret');
         }}
-        disabled={paramEntries.length === 0 && secretEntries.length === 0}
+        disabled={paramEntries.length === 0 && secretEntries.length === 0 && paramTagEntries.length === 0 && secretTagEntries.length === 0}
       >
         Reset All
       </button>
@@ -538,7 +538,7 @@
           <button
             class="dropdown-item"
             onclick={() => { showStashDropdown = false; openPersistModal(); }}
-            disabled={loading || (paramEntries.length === 0 && secretEntries.length === 0)}
+            disabled={loading || (paramEntries.length === 0 && secretEntries.length === 0 && paramTagEntries.length === 0 && secretTagEntries.length === 0)}
           >
             <span class="dropdown-icon">⏏️</span>
             Push <span class="dropdown-desc">(Persist)</span>
