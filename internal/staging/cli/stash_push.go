@@ -88,27 +88,24 @@ func stashPushFlags() []cli.Flag {
 			Usage: usageSkipConfirm,
 		},
 		&cli.BoolFlag{
-			Name:  flagMerge,
-			Usage: "Merge with existing stash (default)",
-		},
-		&cli.BoolFlag{
-			Name:  flagOverwrite,
-			Usage: "Overwrite existing stash",
-		},
-		&cli.BoolFlag{
 			Name:  flagPassphraseStdin,
 			Usage: usagePassphraseStdin,
 		},
 	}
 }
 
-// stashPushMutuallyExclusiveFlags returns the mutually exclusive flags constraint.
+// stashPushMutuallyExclusiveFlags returns the mutually exclusive --merge /
+// --overwrite constraint. The flags are declared ONLY here (not also in
+// stashPushFlags): urfave/cli v3 binds parsed values to the first flag instance
+// of a name, so a separate copy in Flags would shadow these, leaving the group's
+// instances never IsSet() and the exclusivity check dead. Declaring them solely
+// in the group lets v3 fold them into the command and enforce the constraint.
 func stashPushMutuallyExclusiveFlags() []cli.MutuallyExclusiveFlags {
 	return []cli.MutuallyExclusiveFlags{
 		{
 			Flags: [][]cli.Flag{
-				{&cli.BoolFlag{Name: flagMerge}},
-				{&cli.BoolFlag{Name: flagOverwrite}},
+				{&cli.BoolFlag{Name: flagMerge, Usage: "Merge with existing stash (default)"}},
+				{&cli.BoolFlag{Name: flagOverwrite, Usage: "Overwrite existing stash"}},
 			},
 		},
 	}
