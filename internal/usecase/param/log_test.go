@@ -201,6 +201,32 @@ func TestLogUseCase_Execute_DateRangeFilter(t *testing.T) {
 	assert.Equal(t, int64(2), output.Entries[0].Version)
 }
 
+// TestLogUseCase_Execute_FilterBeforeCount asserts date filters run BEFORE the
+// count cap: -n must yield up to N versions that match the filter, not N newest
+// then filtered down to fewer (#351). Here only the two oldest versions match
+// --until, and the old count-first order would have truncated them all away.
+func TestLogUseCase_Execute_FilterBeforeCount(t *testing.T) {
+	t.Parallel()
+
+	now := time.Now()
+	store := newLogStore([]logVer{
+		{ver: 1, value: "v1", modified: lo.ToPtr(now.Add(-3 * time.Hour))},
+		{ver: 2, value: "v2", modified: lo.ToPtr(now.Add(-2 * time.Hour))},
+		{ver: 3, value: "v3", modified: lo.ToPtr(now)},
+	})
+
+	uc := &param.LogUseCase{Reader: store}
+
+	until := now.Add(-1 * time.Hour)
+	output, err := uc.Execute(t.Context(), param.LogInput{Name: "/app/config", MaxResults: 1, Until: &until})
+	require.NoError(t, err)
+
+	// Only v1 and v2 predate --until; capping to 1 yields the newest of those (v2),
+	// not an empty result from truncating to v3 first.
+	require.Len(t, output.Entries, 1)
+	assert.Equal(t, int64(2), output.Entries[0].Version)
+}
+
 func TestLogUseCase_Execute_NoLastModifiedDate(t *testing.T) {
 	t.Parallel()
 

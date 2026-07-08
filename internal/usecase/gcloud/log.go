@@ -62,18 +62,12 @@ func (u *LogUseCase) Execute(ctx context.Context, input LogInput) (*LogOutput, e
 	// tell whether the oldest shown version is genuinely the initial one.
 	initialVersion := versions[len(versions)-1].ID
 
-	if input.MaxResults > 0 && len(versions) > int(input.MaxResults) {
-		versions = versions[:input.MaxResults]
-	}
+	// Apply date filters BEFORE the count limit: -n must return up to N versions
+	// that match --since/--until, not N newest-then-filtered to fewer (#351).
+	if input.Since != nil || input.Until != nil {
+		kept := versions[:0]
 
-	if input.Reverse {
-		slices.Reverse(versions)
-	}
-
-	entries := make([]LogEntry, 0, len(versions))
-
-	for _, v := range versions {
-		if input.Since != nil || input.Until != nil {
+		for _, v := range versions {
 			if v.Created == nil {
 				continue
 			}
@@ -85,8 +79,24 @@ func (u *LogUseCase) Execute(ctx context.Context, input LogInput) (*LogOutput, e
 			if input.Until != nil && v.Created.After(*input.Until) {
 				continue
 			}
+
+			kept = append(kept, v)
 		}
 
+		versions = kept
+	}
+
+	if input.MaxResults > 0 && len(versions) > int(input.MaxResults) {
+		versions = versions[:input.MaxResults]
+	}
+
+	if input.Reverse {
+		slices.Reverse(versions)
+	}
+
+	entries := make([]LogEntry, 0, len(versions))
+
+	for _, v := range versions {
 		value, fetchErr := u.getValue(ctx, input.Name, v.ID)
 
 		entries = append(entries, LogEntry{

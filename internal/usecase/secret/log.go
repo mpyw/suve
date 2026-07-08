@@ -64,6 +64,30 @@ func (u *LogUseCase) Execute(ctx context.Context, input LogInput) (*LogOutput, e
 	// tell whether the oldest shown version is genuinely the initial one.
 	initialVersion := versions[len(versions)-1].ID
 
+	// Apply date filters BEFORE the count limit: -n must return up to N versions
+	// that match --since/--until, not N newest-then-filtered to fewer (#351).
+	if input.Since != nil || input.Until != nil {
+		kept := versions[:0]
+
+		for _, v := range versions {
+			if v.Created == nil {
+				continue
+			}
+
+			if input.Since != nil && v.Created.Before(*input.Since) {
+				continue
+			}
+
+			if input.Until != nil && v.Created.After(*input.Until) {
+				continue
+			}
+
+			kept = append(kept, v)
+		}
+
+		versions = kept
+	}
+
 	// History is newest first; MaxResults caps the number of versions shown.
 	if input.MaxResults > 0 && len(versions) > int(input.MaxResults) {
 		versions = versions[:input.MaxResults]
@@ -77,21 +101,6 @@ func (u *LogUseCase) Execute(ctx context.Context, input LogInput) (*LogOutput, e
 	entries := make([]LogEntry, 0, len(versions))
 
 	for _, v := range versions {
-		// Apply date filters (skip entries without CreatedDate when filters are applied).
-		if input.Since != nil || input.Until != nil {
-			if v.Created == nil {
-				continue
-			}
-
-			if input.Since != nil && v.Created.Before(*input.Since) {
-				continue
-			}
-
-			if input.Until != nil && v.Created.After(*input.Until) {
-				continue
-			}
-		}
-
 		value, fetchErr := u.getValue(ctx, input.Name, v.ID)
 
 		entries = append(entries, LogEntry{

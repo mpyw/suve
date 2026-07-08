@@ -150,6 +150,32 @@ func TestLogUseCase_Execute_SinceUntil(t *testing.T) {
 	assert.Equal(t, "middle", output.Entries[0].VersionID)
 }
 
+// TestLogUseCase_Execute_FilterBeforeCount asserts date filters run BEFORE the
+// count cap: -n must yield up to N versions that match the filter, not N newest
+// then filtered down to fewer (#351). Here only the two oldest versions match
+// --until, and the old count-first order would have truncated them all away.
+func TestLogUseCase_Execute_FilterBeforeCount(t *testing.T) {
+	t.Parallel()
+
+	now := time.Now()
+	versions := []domain.Version{
+		{ID: "newest", Created: &now},
+		{ID: "middle", Created: tp(now, -2*time.Hour)},
+		{ID: "oldest", Created: tp(now, -3*time.Hour)},
+	}
+
+	uc := &secret.LogUseCase{Reader: logStore(versions, map[string]string{}, nil)}
+
+	output, err := uc.Execute(t.Context(), secret.LogInput{
+		Name:       "my-secret",
+		MaxResults: 1,
+		Until:      tp(now, -time.Hour),
+	})
+	require.NoError(t, err)
+	require.Len(t, output.Entries, 1)
+	assert.Equal(t, "middle", output.Entries[0].VersionID)
+}
+
 // TestLogUseCase_Execute_PartialFetchError records a per-version fetch failure
 // on the entry rather than aborting the whole listing.
 func TestLogUseCase_Execute_PartialFetchError(t *testing.T) {
