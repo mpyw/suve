@@ -49,10 +49,17 @@ func (a *apiClient) DeleteSetting(ctx context.Context, key string) (azappconfig.
 	return a.c.DeleteSetting(ctx, key, nil)
 }
 
-func (a *apiClient) ListSettings(ctx context.Context) ([]azappconfig.Setting, error) {
-	pager := a.c.NewListSettingsPager(azappconfig.SettingSelector{
+// listSettingSelector is the selector used to enumerate settings: all keys but
+// ONLY the null (default) label, so List matches what the single-key operations
+// address. A nil LabelFilter (SettingSelector{}) would enumerate every label.
+func listSettingSelector() azappconfig.SettingSelector {
+	return azappconfig.SettingSelector{
 		LabelFilter: lo.ToPtr(nullLabelFilter),
-	}, nil)
+	}
+}
+
+func (a *apiClient) ListSettings(ctx context.Context) ([]azappconfig.Setting, error) {
+	pager := a.c.NewListSettingsPager(listSettingSelector(), nil)
 
 	var out []azappconfig.Setting
 
