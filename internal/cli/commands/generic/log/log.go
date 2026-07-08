@@ -157,13 +157,18 @@ func Command(cfg Config) *cli.Command {
 				return fmt.Errorf("%s", cfg.UsageError)
 			}
 
+			outputFormat, err := output.ParseFormat(cmd.String("output"))
+			if err != nil {
+				return err
+			}
+
 			opts := Options{
 				ShowPatch: cmd.Bool("patch"),
 				ParseJSON: cmd.Bool("parse-json"),
 				Reverse:   cmd.Bool("reverse"),
 				NoPager:   cmd.Bool("no-pager"),
 				Oneline:   cmd.Bool("oneline"),
-				Output:    output.ParseFormat(cmd.String("output")),
+				Output:    outputFormat,
 				// --max-value-length is declared as an Int32Flag, so it must be
 				// read with cmd.Int32: urfave/cli's cmd.Int does a strict int
 				// type assertion that fails for int32 and silently returns 0,

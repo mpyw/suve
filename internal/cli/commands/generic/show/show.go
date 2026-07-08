@@ -129,7 +129,11 @@ func Command[S any](cfg Config[S]) *cli.Command {
 				return err
 			}
 
-			outputFormat := output.ParseFormat(cmd.String("output"))
+			outputFormat, err := output.ParseFormat(cmd.String("output"))
+			if err != nil {
+				return err
+			}
+
 			raw := cmd.Bool("raw")
 
 			// Check mutually exclusive options
