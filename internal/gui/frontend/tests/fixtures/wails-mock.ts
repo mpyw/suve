@@ -156,6 +156,9 @@ export interface MockState {
   // Provider selection (multi-cloud). Defaults describe an AWS-only environment
   // so existing AWS specs are unaffected.
   initialProvider: string;
+  // initialService is the launched service ('param'/'secret', or '' for none),
+  // mirroring the Go App.InitialService binding. Drives the initial view.
+  initialService: string;
   currentScope: ScopeSelection;
   detectResult: DetectResult;
   capabilities: ProviderCapability[];
@@ -323,6 +326,7 @@ export const defaultMockState: MockState = {
     tags: [],
   },
   initialProvider: 'aws',
+  initialService: '',
   currentScope: awsScopeSelection,
   detectResult: awsOnlyDetectResult,
   capabilities: defaultCapabilities,
@@ -793,6 +797,7 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
       DetectProviders: async () => state.detectResult,
       Capabilities: async () => state.capabilities,
       InitialProvider: async () => state.initialProvider,
+      InitialService: async () => state.initialService,
       GetCurrentScope: async () => state.currentScope,
       SelectScope: async (sel: any) => {
         calls.push('SelectScope');

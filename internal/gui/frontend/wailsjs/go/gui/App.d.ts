@@ -12,6 +12,8 @@ export function GetCurrentScope():Promise<gui.ScopeSelection>;
 
 export function InitialProvider():Promise<string>;
 
+export function InitialService():Promise<string>;
+
 export function ParamAddTag(arg1:string,arg2:string,arg3:string):Promise<void>;
 
 export function ParamDelete(arg1:string):Promise<gui.ParamDeleteResult>;

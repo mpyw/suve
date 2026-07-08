@@ -27,10 +27,23 @@ func TestErrInvalidService(t *testing.T) {
 func TestNewApp(t *testing.T) {
 	t.Parallel()
 
-	app := NewApp(provider.Scope{Provider: provider.ProviderAWS})
+	app := NewApp(provider.Scope{Provider: provider.ProviderAWS}, "")
 	assert.NotNil(t, app)
 	// Verify the staging store is nil (lazy initialization).
 	assert.Nil(t, app.stagingStore)
+}
+
+func TestNewApp_InitialService(t *testing.T) {
+	t.Parallel()
+
+	// The launched service is surfaced verbatim via InitialService.
+	assert.Equal(t, "param",
+		NewApp(provider.Scope{Provider: provider.ProviderAzure}, "param").InitialService())
+	assert.Equal(t, "secret",
+		NewApp(provider.Scope{Provider: provider.ProviderAzure}, "secret").InitialService())
+	// A group-level / bare launch carries no specific service.
+	assert.Empty(t,
+		NewApp(provider.Scope{Provider: provider.ProviderAzure}, "").InitialService())
 }
 
 func TestHydrateScope_FlagWinsElseEnv(t *testing.T) {
@@ -38,13 +51,16 @@ func TestHydrateScope_FlagWinsElseEnv(t *testing.T) {
 	t.Setenv("GOOGLE_CLOUD_PROJECT", "env-project")
 	t.Setenv("AZURE_KEYVAULT_NAME", "env-vault")
 	t.Setenv("AZURE_APPCONFIG_NAME", "env-store")
+	t.Setenv("AZURE_APPCONFIG_NAMESPACE", "env-ns")
 
 	// Flag-supplied values win over the environment.
 	gc := hydrateScope(provider.Scope{Provider: provider.ProviderGoogleCloud, ProjectID: "flag-project"})
 	assert.Equal(t, "flag-project", gc.ProjectID)
 
-	az := hydrateScope(provider.Scope{Provider: provider.ProviderAzure, VaultName: "flag-vault"})
+	az := hydrateScope(provider.Scope{Provider: provider.ProviderAzure, VaultName: "flag-vault", AppConfigNamespace: "flag-ns"})
 	assert.Equal(t, "flag-vault", az.VaultName)
+	// The namespace flag wins over AZURE_APPCONFIG_NAMESPACE.
+	assert.Equal(t, "flag-ns", az.AppConfigNamespace)
 	// The unset side still falls back to env.
 	assert.Equal(t, "env-store", az.StoreName)
 
@@ -53,6 +69,8 @@ func TestHydrateScope_FlagWinsElseEnv(t *testing.T) {
 	azEnv := hydrateScope(provider.Scope{Provider: provider.ProviderAzure})
 	assert.Equal(t, "env-vault", azEnv.VaultName)
 	assert.Equal(t, "env-store", azEnv.StoreName)
+	// The namespace falls back to AZURE_APPCONFIG_NAMESPACE when the flag is unset.
+	assert.Equal(t, "env-ns", azEnv.AppConfigNamespace)
 
 	// AWS carries no resource field (region from ambient config).
 	assert.Equal(t, provider.Scope{Provider: provider.ProviderAWS}, hydrateScope(provider.Scope{Provider: provider.ProviderAWS}))
@@ -61,7 +79,7 @@ func TestHydrateScope_FlagWinsElseEnv(t *testing.T) {
 func TestApp_Startup(t *testing.T) {
 	t.Parallel()
 
-	app := NewApp(provider.Scope{Provider: provider.ProviderAWS})
+	app := NewApp(provider.Scope{Provider: provider.ProviderAWS}, "")
 	assert.Nil(t, app.ctx)
 
 	app.Startup(t.Context())
