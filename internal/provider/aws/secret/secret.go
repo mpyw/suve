@@ -255,7 +255,6 @@ func (s *Store) Get(ctx context.Context, name string, ref provider.VersionRef) (
 		Type:  domain.ValueTypeSecret,
 		Version: domain.Version{
 			ID:            aws.ToString(out.VersionId),
-			Label:         representativeStage(out.VersionStages),
 			StagingLabels: out.VersionStages,
 			Created:       out.CreatedDate,
 		},
@@ -288,7 +287,6 @@ func (s *Store) History(ctx context.Context, name string) ([]domain.Version, err
 	return lo.Map(list, func(v types.SecretVersionsListEntry, _ int) domain.Version {
 		return domain.Version{
 			ID:            aws.ToString(v.VersionId),
-			Label:         representativeStage(v.VersionStages),
 			StagingLabels: v.VersionStages,
 			Created:       v.CreatedDate,
 		}
@@ -508,7 +506,6 @@ func (s *Store) Describe(ctx context.Context, name string) (*domain.Entry, error
 		}); found {
 			entry.Version = domain.Version{
 				ID:            aws.ToString(cur.VersionId),
-				Label:         representativeStage(cur.VersionStages),
 				StagingLabels: cur.VersionStages,
 				Created:       cur.CreatedDate,
 			}
@@ -554,29 +551,6 @@ func (s *Store) Untag(ctx context.Context, name string, keys []string) error {
 	}
 
 	return nil
-}
-
-// representativeStage picks a single, DETERMINISTIC staging label to surface as
-// the version's provider-neutral Label. A version can carry several labels and
-// AWS returns them in an unspecified order, so choosing stages[0] made both the
-// displayed label and any "is this AWSCURRENT?" check non-deterministic (#317).
-//
-// A well-known label wins in fixed priority order (AWSCURRENT > AWSPENDING >
-// AWSPREVIOUS); otherwise the lexicographically smallest custom label is used
-// so the choice is stable. It returns "" when there are no labels.
-func representativeStage(stages []string) string {
-	if len(stages) == 0 {
-		return ""
-	}
-
-	// Well-known AWS staging labels, highest priority first.
-	for _, known := range []string{"AWSCURRENT", "AWSPENDING", "AWSPREVIOUS"} {
-		if slices.Contains(stages, known) {
-			return known
-		}
-	}
-
-	return slices.Min(stages)
 }
 
 // mapTags maps Secrets Manager tags to provider-neutral domain tags.

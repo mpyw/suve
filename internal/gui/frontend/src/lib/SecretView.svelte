@@ -30,11 +30,11 @@
   const forceDeleteEnabled = $derived(capability?.hasForceDelete ?? true);
   const recoveryWindowEnabled = $derived(capability?.hasRecoveryWindow ?? true);
 
-  // Version.Label is overloaded per provider: AWS Secrets Manager carries genuine
-  // staging labels (AWSCURRENT/AWSPENDING/...), while Google Cloud and Azure Key
-  // Vault carry the per-version state (enabled/disabled/destroyed). Only AWS has
-  // staging labels, so label the heading accordingly.
-  const versionMetaLabel = $derived(provider === 'aws' ? 'Labels' : 'State');
+  // Staging labels and per-version state are two independent concepts (#419), so
+  // render each from the field that actually carries it rather than guessing
+  // from the provider string. AWS Secrets Manager populates stagingLabels
+  // (AWSCURRENT/AWSPENDING/...); Google Cloud + Azure Key Vault populate state
+  // (enabled/disabled/destroyed). A version never has both.
 
   const PAGE_SIZE = 50;
   const debounce = createDebouncer(300);
@@ -552,12 +552,19 @@
                 <span class="meta-label">Version ID</span>
                 <span class="meta-value mono">{secretDetail.versionId}</span>
               </div>
-              {#if (secretDetail.versionStage || []).length > 0}
+              {#if secretDetail.state}
                 <div class="meta-item">
-                  <span class="meta-label">{versionMetaLabel}</span>
+                  <span class="meta-label">State</span>
                   <span class="meta-value">
-                    {#each secretDetail.versionStage || [] as stage}
-                      <span class="badge badge-stage">{stage}</span>
+                    <span class="badge badge-stage">{secretDetail.state}</span>
+                  </span>
+                </div>
+              {:else if (secretDetail.stagingLabels || []).length > 0}
+                <div class="meta-item">
+                  <span class="meta-label">Staging labels</span>
+                  <span class="meta-value">
+                    {#each secretDetail.stagingLabels || [] as label}
+                      <span class="badge badge-stage">{label}</span>
                     {/each}
                   </span>
                 </div>
@@ -625,10 +632,14 @@
                           {/if}
                           <span class="history-date">{formatDate(logEntry.created)}</span>
                         </div>
-                        {#if (logEntry.stages || []).length > 0}
+                        {#if logEntry.state}
                           <div class="history-labels">
-                            {#each logEntry.stages || [] as stage}
-                              <span class="badge badge-stage small">{stage}</span>
+                            <span class="badge badge-stage small">{logEntry.state}</span>
+                          </div>
+                        {:else if (logEntry.stagingLabels || []).length > 0}
+                          <div class="history-labels">
+                            {#each logEntry.stagingLabels || [] as label}
+                              <span class="badge badge-stage small">{label}</span>
                             {/each}
                           </div>
                         {/if}

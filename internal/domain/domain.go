@@ -40,15 +40,6 @@ const (
 type Version struct {
 	// ID is the provider-internal version identifier.
 	ID string
-	// Label is an optional human-facing label (empty when unsupported).
-	//
-	// NOTE: Label is overloaded to mean a representative staging label (AWS
-	// Secrets Manager) OR a per-version state (Google Cloud, Azure Key Vault).
-	// It is retained for back-compat during the #419 migration; prefer
-	// StagingLabels or State in new code. A later cleanup removes it once all
-	// readers migrate (do NOT mark it Deprecated yet: that would trip staticcheck
-	// SA1019 on the existing dual-write readers this phase must preserve).
-	Label string
 	// State is the per-version lifecycle state: "enabled" / "disabled" /
 	// "destroyed", or "" when the provider has no such concept. It is a
 	// per-version switch controlling whether that version's value can be read

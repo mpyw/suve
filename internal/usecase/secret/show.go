@@ -24,12 +24,19 @@ type ShowTag struct {
 }
 
 // ShowOutput holds the result of the show use case.
+//
+// VersionStage and State carry the two independent, provider-specific axes that
+// must NOT be conflated (#419): VersionStage holds AWS Secrets Manager staging
+// labels (empty for other providers), while State holds the per-version
+// lifecycle state (enabled/disabled/destroyed) for Google Cloud + Azure Key
+// Vault (empty for AWS). A version never has both.
 type ShowOutput struct {
 	Name         string
 	ARN          string
 	Value        string
 	VersionID    string
 	VersionStage []string
+	State        string
 	Description  string
 	CreatedDate  *time.Time
 	Tags         []ShowTag
@@ -60,6 +67,7 @@ func (u *ShowUseCase) Execute(ctx context.Context, input ShowInput) (*ShowOutput
 		Value:        entry.Value,
 		VersionID:    entry.Version.ID,
 		VersionStage: stages(entry.Version.StagingLabels),
+		State:        entry.Version.State,
 		Description:  entry.Description,
 		CreatedDate:  entry.Version.Created,
 		Tags: lo.Map(entry.Tags, func(tag domain.Tag, _ int) ShowTag {

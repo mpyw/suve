@@ -15,10 +15,15 @@ export interface Secret {
   value: string;
   // Optional overrides for SecretShow. When omitted, SecretShow synthesizes an
   // AWS-shaped ARN and an ['AWSCURRENT'] staging label (backward compatible).
-  // A provider without these (e.g. an empty arn / empty stages, as Google Cloud
-  // and Azure return) drives the presence-gated rendering in SecretView.
+  // A provider without these (e.g. an empty arn / empty stagingLabels, as Google
+  // Cloud and Azure return) drives the presence-gated rendering in SecretView.
+  //
+  // stagingLabels and state are the two independent concepts (#419): AWS Secrets
+  // Manager populates stagingLabels; Google Cloud + Azure Key Vault populate
+  // state (enabled/disabled/destroyed). A version never has both.
   arn?: string;
-  versionStage?: string[];
+  stagingLabels?: string[];
+  state?: string;
   versionId?: string;
 }
 
@@ -60,7 +65,10 @@ export interface ParamLogEntry {
 
 export interface SecretLogEntry {
   versionId: string;
-  stages: string[];
+  // Two independent concepts (#419): stagingLabels for AWS Secrets Manager,
+  // state (enabled/disabled/destroyed) for Google Cloud + Azure Key Vault.
+  stagingLabels?: string[];
+  state?: string;
   value: string;
   isCurrent: boolean;
   created: string;
@@ -292,9 +300,9 @@ export const defaultMockState: MockState = {
   },
   secretVersions: {
     'my-secret': [
-      { versionId: 'v3-current', stages: ['AWSCURRENT'], value: 'secret-value-1', isCurrent: true, created: new Date().toISOString() },
-      { versionId: 'v2-previous', stages: ['AWSPREVIOUS'], value: 'secret-value-old', isCurrent: false, created: new Date(Date.now() - 86400000).toISOString() },
-      { versionId: 'v1-initial', stages: [], value: 'secret-value-initial', isCurrent: false, created: new Date(Date.now() - 172800000).toISOString() },
+      { versionId: 'v3-current', stagingLabels: ['AWSCURRENT'], value: 'secret-value-1', isCurrent: true, created: new Date().toISOString() },
+      { versionId: 'v2-previous', stagingLabels: ['AWSPREVIOUS'], value: 'secret-value-old', isCurrent: false, created: new Date(Date.now() - 86400000).toISOString() },
+      { versionId: 'v1-initial', stagingLabels: [], value: 'secret-value-initial', isCurrent: false, created: new Date(Date.now() - 172800000).toISOString() },
     ],
   },
   enablePagination: false,
@@ -446,9 +454,9 @@ export function createVersionHistoryState(): Partial<MockState> {
     },
     secretVersions: {
       'my-secret': [
-        { versionId: 'ver-003', stages: ['AWSCURRENT'], value: '{"current": "v3"}', isCurrent: true, created: new Date().toISOString() },
-        { versionId: 'ver-002', stages: ['AWSPREVIOUS'], value: '{"previous": "v2"}', isCurrent: false, created: new Date(Date.now() - 86400000).toISOString() },
-        { versionId: 'ver-001', stages: [], value: '{"initial": "v1"}', isCurrent: false, created: new Date(Date.now() - 172800000).toISOString() },
+        { versionId: 'ver-003', stagingLabels: ['AWSCURRENT'], value: '{"current": "v3"}', isCurrent: true, created: new Date().toISOString() },
+        { versionId: 'ver-002', stagingLabels: ['AWSPREVIOUS'], value: '{"previous": "v2"}', isCurrent: false, created: new Date(Date.now() - 86400000).toISOString() },
+        { versionId: 'ver-001', stagingLabels: [], value: '{"initial": "v1"}', isCurrent: false, created: new Date(Date.now() - 172800000).toISOString() },
       ],
     },
   };
@@ -609,15 +617,16 @@ export function createGoogleCloudState(overrides: Partial<MockState> = {}): Part
       secretActive: ['googlecloud'],
       stageActive: [],
     },
-    // Google Cloud secret versions are integers and carry no ARN/staging labels.
+    // Google Cloud secret versions are integers and carry no ARN/staging labels;
+    // they carry a per-version state (enabled/disabled/destroyed) instead.
     secrets: [
-      { name: 'gcloud-secret-1', value: 'v1', arn: '', versionStage: [] },
-      { name: 'gcloud-secret-2', value: 'v2', arn: '', versionStage: [] },
+      { name: 'gcloud-secret-1', value: 'v1', arn: '', stagingLabels: [], state: 'enabled' },
+      { name: 'gcloud-secret-2', value: 'v2', arn: '', stagingLabels: [], state: 'enabled' },
     ],
     secretVersions: {
       'gcloud-secret-1': [
-        { versionId: '2', stages: [], value: 'v2', isCurrent: true, created: new Date().toISOString() },
-        { versionId: '1', stages: [], value: 'v1', isCurrent: false, created: new Date(Date.now() - 86400000).toISOString() },
+        { versionId: '2', stagingLabels: [], state: 'enabled', value: 'v2', isCurrent: true, created: new Date().toISOString() },
+        { versionId: '1', stagingLabels: [], state: 'disabled', value: 'v1', isCurrent: false, created: new Date(Date.now() - 86400000).toISOString() },
       ],
     },
     ...overrides,
@@ -646,11 +655,12 @@ export function createAzureState(overrides: Partial<MockState> = {}): Partial<Mo
     },
     // App Configuration values are untyped/unversioned; Key Vault has no ARN.
     params: [{ name: 'app/config/key', type: 'String', value: 'v' }],
-    secrets: [{ name: 'kv-secret', value: 'v', arn: '', versionStage: [], versionId: 'a1b2c3d4e5f6' }],
-    // Key Vault versions are opaque hex ids with no AWS staging labels.
+    secrets: [{ name: 'kv-secret', value: 'v', arn: '', stagingLabels: [], state: 'enabled', versionId: 'a1b2c3d4e5f6' }],
+    // Key Vault versions are opaque hex ids with no AWS staging labels; they
+    // carry a per-version enabled/disabled state instead.
     secretVersions: {
       'kv-secret': [
-        { versionId: 'a1b2c3d4e5f6', stages: [], value: 'v', isCurrent: true, created: new Date().toISOString() },
+        { versionId: 'a1b2c3d4e5f6', stagingLabels: [], state: 'enabled', value: 'v', isCurrent: true, created: new Date().toISOString() },
       ],
     },
     ...overrides,
@@ -990,7 +1000,8 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
           name,
           arn: secret?.arn !== undefined ? secret.arn : `arn:aws:secretsmanager:us-east-1:123456789:secret:${name}`,
           versionId: secret?.versionId ?? 'v1',
-          versionStage: secret?.versionStage !== undefined ? secret.versionStage : ['AWSCURRENT'],
+          stagingLabels: secret?.stagingLabels !== undefined ? secret.stagingLabels : ['AWSCURRENT'],
+          state: secret?.state ?? '',
           value: secret?.value || 'mock-secret',
           description: '',
           createdDate: new Date().toISOString(),
@@ -999,7 +1010,7 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
       },
       SecretLog: async (name: string, _limit?: number) => {
         const versions = state.secretVersions[name] || [
-          { versionId: 'v1', stages: ['AWSCURRENT'], value: 'current', isCurrent: true, created: new Date().toISOString() },
+          { versionId: 'v1', stagingLabels: ['AWSCURRENT'], value: 'current', isCurrent: true, created: new Date().toISOString() },
         ];
         return {
           name,
