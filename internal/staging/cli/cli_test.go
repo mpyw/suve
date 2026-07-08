@@ -1830,6 +1830,95 @@ func TestApplyRunner_WithTags(t *testing.T) {
 	})
 }
 
+// stubConfirmer is a Confirmer that returns a fixed reply and records whether
+// it was asked (so tests can assert the apply flow reached confirmation rather
+// than short-circuiting on "no changes staged").
+type stubConfirmer struct {
+	reply   bool
+	called  bool
+	message string
+}
+
+func (c *stubConfirmer) Confirm(message string, _ bool) (bool, error) {
+	c.called = true
+	c.message = message
+
+	return c.reply, nil
+}
+
+// TestApplyRunner_RunInteractive_TagOnly covers the service-specific interactive
+// apply flow for tag-only staged changes (#329): a staged tag with no staged
+// entry must not be reported as "No changes staged", must be counted, and must
+// be a valid name-filtered target.
+func TestApplyRunner_RunInteractive_TagOnly(t *testing.T) {
+	t.Parallel()
+
+	newRunner := func(store *testutil.MockStore, conf *stubConfirmer, out, errOut *bytes.Buffer) *cli.ApplyRunner {
+		return &cli.ApplyRunner{
+			UseCase: &stagingusecase.ApplyUseCase{
+				Strategy: &fullMockStrategy{service: staging.ServiceParam},
+				Store:    store,
+			},
+			Store:     store,
+			Parser:    &fullMockStrategy{service: staging.ServiceParam},
+			Confirmer: conf,
+			Stdout:    out,
+			Stderr:    errOut,
+		}
+	}
+
+	t.Run("tag-only staged is applied, not reported as no changes", func(t *testing.T) {
+		t.Parallel()
+
+		store := testutil.NewMockStore()
+		_ = store.StageTag(t.Context(), staging.ServiceParam, "/app/config", staging.TagEntry{
+			Add:      map[string]string{"env": "prod"},
+			StagedAt: time.Now(),
+		})
+
+		var stdout, stderr bytes.Buffer
+
+		conf := &stubConfirmer{reply: true}
+		require.NoError(t, newRunner(store, conf, &stdout, &stderr).RunInteractive(t.Context(), cli.ApplyOptions{}))
+
+		assert.True(t, conf.called, "expected confirmation to be asked")
+		assert.Contains(t, conf.message, "1 staged")
+		assert.NotContains(t, stdout.String(), "No param changes staged")
+		assert.Contains(t, stdout.String(), "Tagged")
+	})
+
+	t.Run("name-filtered apply accepts a tag-only name", func(t *testing.T) {
+		t.Parallel()
+
+		store := testutil.NewMockStore()
+		_ = store.StageTag(t.Context(), staging.ServiceParam, "/app/config", staging.TagEntry{
+			Add:      map[string]string{"env": "prod"},
+			StagedAt: time.Now(),
+		})
+
+		var stdout, stderr bytes.Buffer
+
+		conf := &stubConfirmer{reply: true}
+		err := newRunner(store, conf, &stdout, &stderr).RunInteractive(t.Context(), cli.ApplyOptions{Name: "/app/config"})
+		require.NoError(t, err)
+		assert.True(t, conf.called)
+	})
+
+	t.Run("empty store still reports no changes", func(t *testing.T) {
+		t.Parallel()
+
+		store := testutil.NewMockStore()
+
+		var stdout, stderr bytes.Buffer
+
+		conf := &stubConfirmer{reply: true}
+		require.NoError(t, newRunner(store, conf, &stdout, &stderr).RunInteractive(t.Context(), cli.ApplyOptions{}))
+
+		assert.False(t, conf.called, "empty store must short-circuit before confirmation")
+		assert.Contains(t, stdout.String(), "No param changes staged")
+	})
+}
+
 // =============================================================================
 // StatusRunner Tag Tests
 // =============================================================================
