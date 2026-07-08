@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -11,6 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/staging"
 	"github.com/mpyw/suve/internal/staging/cli"
 	"github.com/mpyw/suve/internal/staging/store/testutil"
@@ -511,9 +513,12 @@ func TestDiffRunner_Run(t *testing.T) {
 
 		r := &cli.DiffRunner{
 			UseCase: &stagingusecase.DiffUseCase{
-				// FetchCurrent returns error because item was deleted from AWS
-				Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentErr: errors.New("parameter not found")},
-				Store:    store,
+				// FetchCurrent returns a not-found because the item was deleted from AWS
+				Strategy: &fullMockStrategy{
+					service:         staging.ServiceParam,
+					fetchCurrentErr: fmt.Errorf("%w: parameter not found", provider.ErrNotFound),
+				},
+				Store: store,
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,
@@ -670,9 +675,12 @@ func TestDiffRunner_Run(t *testing.T) {
 
 		r := &cli.DiffRunner{
 			UseCase: &stagingusecase.DiffUseCase{
-				// FetchCurrent returns error because item doesn't exist in AWS anymore
-				Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentErr: errors.New("parameter not found")},
-				Store:    store,
+				// FetchCurrent returns a not-found because the item no longer exists in AWS
+				Strategy: &fullMockStrategy{
+					service:         staging.ServiceParam,
+					fetchCurrentErr: fmt.Errorf("%w: parameter not found", provider.ErrNotFound),
+				},
+				Store: store,
 			},
 			Stdout: &stdout,
 			Stderr: &stderr,

@@ -3,6 +3,7 @@ package diff
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -16,6 +17,7 @@ import (
 	"github.com/mpyw/suve/internal/jsonutil"
 	"github.com/mpyw/suve/internal/maputil"
 	"github.com/mpyw/suve/internal/parallel"
+	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/staging"
 	stgcli "github.com/mpyw/suve/internal/staging/cli"
 	"github.com/mpyw/suve/internal/staging/store"
@@ -205,15 +207,26 @@ func (r *Runner) diffEntries(
 		result := results[name]
 
 		if result.Err != nil {
-			// Handle fetch error based on operation type
+			// Only a genuine "not found" justifies auto-unstaging a staged
+			// delete or update. Any other fetch error (expired credentials,
+			// throttling, a network blip) must NOT discard staged work on a
+			// read-only `stage diff`: surface it and leave the entry staged.
+			notFound := errors.Is(result.Err, provider.ErrNotFound)
+
 			switch entry.Operation {
 			case staging.OperationDelete:
-				// Item doesn't exist remotely anymore - deletion already applied
-				if err := r.Store.UnstageEntry(ctx, strategy.Service(), name); err != nil {
-					return fmt.Errorf("failed to unstage %s: %w", name, err)
+				if notFound {
+					// Item doesn't exist remotely anymore - deletion already applied.
+					if err := r.Store.UnstageEntry(ctx, strategy.Service(), name); err != nil {
+						return fmt.Errorf("failed to unstage %s: %w", name, err)
+					}
+
+					output.Warning(r.Stderr, "unstaged %s: already deleted in %s", name, r.ProviderLabel)
+
+					continue
 				}
 
-				output.Warning(r.Stderr, "unstaged %s: already deleted in %s", name, r.ProviderLabel)
+				output.Warning(r.Stderr, "could not diff %s (kept staged): %v", name, result.Err)
 
 				continue
 
@@ -232,12 +245,18 @@ func (r *Runner) diffEntries(
 				continue
 
 			case staging.OperationUpdate:
-				// Item doesn't exist remotely anymore - staged update is invalid
-				if err := r.Store.UnstageEntry(ctx, strategy.Service(), name); err != nil {
-					return fmt.Errorf("failed to unstage %s: %w", name, err)
+				if notFound {
+					// Item doesn't exist remotely anymore - staged update is invalid.
+					if err := r.Store.UnstageEntry(ctx, strategy.Service(), name); err != nil {
+						return fmt.Errorf("failed to unstage %s: %w", name, err)
+					}
+
+					output.Warning(r.Stderr, "unstaged %s: item no longer exists in %s", name, r.ProviderLabel)
+
+					continue
 				}
 
-				output.Warning(r.Stderr, "unstaged %s: item no longer exists in %s", name, r.ProviderLabel)
+				output.Warning(r.Stderr, "could not diff %s (kept staged): %v", name, result.Err)
 
 				continue
 			}

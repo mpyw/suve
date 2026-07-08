@@ -7,6 +7,7 @@ import (
 	"github.com/samber/lo"
 
 	"github.com/mpyw/suve/internal/parallel"
+	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/staging"
 	"github.com/mpyw/suve/internal/staging/store"
 )
@@ -213,14 +214,22 @@ func (u *DiffUseCase) processDiffResult(ctx context.Context, name string, entry 
 func (u *DiffUseCase) handleFetchError(ctx context.Context, name string, entry staging.Entry, err error) DiffEntry {
 	service := u.Strategy.Service()
 
+	// Only a genuine "not found" justifies auto-unstaging a staged delete or
+	// update. Any other fetch error (expired credentials, throttling, a network
+	// blip) must NOT discard staged work on a read-only `stage diff`: surface it
+	// as a warning and leave the staged entry untouched.
+	notFound := errors.Is(err, provider.ErrNotFound)
+
 	switch entry.Operation {
 	case staging.OperationDelete:
-		_ = u.Store.UnstageEntry(ctx, service, name)
+		if notFound {
+			_ = u.Store.UnstageEntry(ctx, service, name)
 
-		return DiffEntry{
-			Name:    name,
-			Type:    DiffEntryAutoUnstaged,
-			Warning: "already deleted in AWS",
+			return DiffEntry{
+				Name:    name,
+				Type:    DiffEntryAutoUnstaged,
+				Warning: "already deleted in AWS",
+			}
 		}
 
 	case staging.OperationCreate:
@@ -233,12 +242,14 @@ func (u *DiffUseCase) handleFetchError(ctx context.Context, name string, entry s
 		}
 
 	case staging.OperationUpdate:
-		_ = u.Store.UnstageEntry(ctx, service, name)
+		if notFound {
+			_ = u.Store.UnstageEntry(ctx, service, name)
 
-		return DiffEntry{
-			Name:    name,
-			Type:    DiffEntryAutoUnstaged,
-			Warning: "item no longer exists in AWS",
+			return DiffEntry{
+				Name:    name,
+				Type:    DiffEntryAutoUnstaged,
+				Warning: "item no longer exists in AWS",
+			}
 		}
 	}
 
