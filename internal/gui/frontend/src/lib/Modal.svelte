@@ -29,7 +29,7 @@
 
 {#if show}
   <div class="modal-backdrop">
-    <button type="button" class="modal-backdrop-dismiss" aria-label="Close" onclick={handleClose}></button>
+    <button type="button" class="modal-backdrop-dismiss" aria-label="Dismiss" onclick={handleClose}></button>
     <div class="modal">
       <div class="modal-header">
         <h3 class="modal-title">{title}</h3>

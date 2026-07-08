@@ -532,7 +532,7 @@
         <span class="dropdown-arrow">▾</span>
       </button>
       {#if showStashDropdown}
-        <button type="button" class="dropdown-backdrop" aria-label="Close menu" onclick={() => showStashDropdown = false}></button>
+        <button type="button" class="dropdown-backdrop" aria-label="Dismiss menu" onclick={() => showStashDropdown = false}></button>
         <div class="dropdown-menu">
           <button
             class="dropdown-item"
