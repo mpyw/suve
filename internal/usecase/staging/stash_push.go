@@ -57,11 +57,14 @@ func (u *StashPushUseCase) Execute(ctx context.Context, input StashPushInput) (*
 
 	switch {
 	case input.Service != "":
-		// Service-specific: always preserve other services from stash
+		// Service-specific: always preserve other services from stash.
+		// A missing stash yields an empty state with a nil error, so any error
+		// here is a real failure (wrong passphrase, corrupt/unreadable file):
+		// propagate it rather than starting fresh, which would silently drop the
+		// existing stash (and the other services it holds) on the WriteState below.
 		stashState, err := u.Stash.Drain(ctx, "", true)
 		if err != nil {
-			// Stash might not exist, which is fine - start fresh
-			stashState = staging.NewEmptyState()
+			return nil, &StashPushError{Op: stashOpReadStash, Err: err}
 		}
 
 		finalState = stashState
@@ -74,11 +77,14 @@ func (u *StashPushUseCase) Execute(ctx context.Context, input StashPushInput) (*
 			finalState.Merge(persistState)
 		}
 	case input.Mode == StashModeMerge:
-		// Global merge: combine stash state with working state
+		// Global merge: combine stash state with working state. A missing stash
+		// yields an empty state with a nil error, so any error here is a real
+		// failure (wrong passphrase, corrupt/unreadable file): propagate it
+		// rather than starting fresh, which would silently overwrite the stash
+		// with only the working data on the WriteState below.
 		stashState, err := u.Stash.Drain(ctx, "", true)
 		if err != nil {
-			// Stash might not exist, which is fine - start fresh
-			stashState = staging.NewEmptyState()
+			return nil, &StashPushError{Op: stashOpReadStash, Err: err}
 		}
 
 		finalState = stashState
@@ -143,6 +149,8 @@ func (e *StashPushError) Error() string {
 	switch e.Op {
 	case stashOpLoad:
 		return "failed to read the working staging area: " + e.Err.Error()
+	case stashOpReadStash:
+		return "failed to read stash file: " + e.Err.Error()
 	case stashOpWrite:
 		return "failed to save state to file: " + e.Err.Error()
 	case "clear":

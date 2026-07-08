@@ -682,68 +682,58 @@ func TestPersistUseCase_ServiceSpecific_ClearError(t *testing.T) {
 	})
 }
 
-func TestPersistUseCase_FileDrainError_TreatedAsFresh(t *testing.T) {
+// TestPersistUseCase_StashDrainError_Propagated: a real stash-read failure
+// (wrong passphrase, corrupt/unreadable file — a missing file returns an empty
+// state with a nil error) must NOT be swallowed and treated as "start fresh",
+// which would overwrite the existing stash with only the working data (#320).
+func TestPersistUseCase_StashDrainError_Propagated(t *testing.T) {
 	t.Parallel()
 
-	t.Run("merge mode with file drain error starts fresh", func(t *testing.T) {
-		t.Parallel()
+	newCase := func(t *testing.T) (*testutil.MockStore, *stagingusecase.StashPushUseCase) {
+		t.Helper()
 
 		agentStore := testutil.NewMockStore()
 		fileStore := testutil.NewMockStore()
 
-		// Agent has entries
 		_ = agentStore.StageEntry(t.Context(), staging.ServiceParam, "/app/param", staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("agent-value"),
 			StagedAt:  time.Now(),
 		})
 
-		// Make file drain fail (simulates file doesn't exist)
-		fileStore.DrainErr = errors.New("file not found")
+		fileStore.DrainErr = errors.New("decryption failed: wrong passphrase or corrupted data")
 
-		usecase := &stagingusecase.StashPushUseCase{
-			Working: agentStore,
-			Stash:   fileStore,
-		}
+		return fileStore, &stagingusecase.StashPushUseCase{Working: agentStore, Stash: fileStore}
+	}
 
-		// Should succeed because file drain error is treated as empty state (start fresh)
-		output, err := usecase.Execute(t.Context(), stagingusecase.StashPushInput{Mode: stagingusecase.StashModeMerge})
-		require.NoError(t, err)
-		assert.Equal(t, 1, output.EntryCount)
+	assertNotOverwritten := func(t *testing.T, fileStore *testutil.MockStore, err error) {
+		t.Helper()
 
-		// Verify entry is in file
-		_, err = fileStore.GetEntry(t.Context(), staging.ServiceParam, "/app/param")
-		require.NoError(t, err)
+		require.Error(t, err)
+
+		var pushErr *stagingusecase.StashPushError
+
+		require.ErrorAs(t, err, &pushErr)
+		assert.Contains(t, err.Error(), "stash file")
+
+		// The stash must not have been overwritten (WriteState never reached).
+		_, getErr := fileStore.GetEntry(t.Context(), staging.ServiceParam, "/app/param")
+		require.ErrorIs(t, getErr, staging.ErrNotStaged)
+	}
+
+	t.Run("merge mode propagates the stash read error", func(t *testing.T) {
+		t.Parallel()
+
+		fileStore, usecase := newCase(t)
+		_, err := usecase.Execute(t.Context(), stagingusecase.StashPushInput{Mode: stagingusecase.StashModeMerge})
+		assertNotOverwritten(t, fileStore, err)
 	})
 
-	t.Run("service-specific push with file drain error starts fresh", func(t *testing.T) {
+	t.Run("service-specific push propagates the stash read error", func(t *testing.T) {
 		t.Parallel()
 
-		agentStore := testutil.NewMockStore()
-		fileStore := testutil.NewMockStore()
-
-		// Agent has entries
-		_ = agentStore.StageEntry(t.Context(), staging.ServiceParam, "/app/param", staging.Entry{
-			Operation: staging.OperationUpdate,
-			Value:     lo.ToPtr("agent-value"),
-			StagedAt:  time.Now(),
-		})
-
-		// Make file drain fail (simulates file doesn't exist)
-		fileStore.DrainErr = errors.New("file not found")
-
-		usecase := &stagingusecase.StashPushUseCase{
-			Working: agentStore,
-			Stash:   fileStore,
-		}
-
-		// Should succeed because file drain error is treated as empty state (start fresh)
-		output, err := usecase.Execute(t.Context(), stagingusecase.StashPushInput{Service: staging.ServiceParam})
-		require.NoError(t, err)
-		assert.Equal(t, 1, output.EntryCount)
-
-		// Verify entry is in file
-		_, err = fileStore.GetEntry(t.Context(), staging.ServiceParam, "/app/param")
-		require.NoError(t, err)
+		fileStore, usecase := newCase(t)
+		_, err := usecase.Execute(t.Context(), stagingusecase.StashPushInput{Service: staging.ServiceParam})
+		assertNotOverwritten(t, fileStore, err)
 	})
 }

@@ -10,9 +10,11 @@ import (
 
 // Stash error Op codes shared by StashPopError and StashPushError.
 const (
-	stashOpLoad   = "load"
-	stashOpWrite  = "write"
-	stashOpDelete = "delete"
+	stashOpLoad        = "load"
+	stashOpWrite       = "write"
+	stashOpDelete      = "delete"
+	stashOpReadStash   = "read-stash"
+	stashOpReadWorking = "read-working"
 )
 
 // StashPopInput holds input for the drain use case.
@@ -61,11 +63,14 @@ func (u *StashPopUseCase) Execute(ctx context.Context, input StashPopInput) (*St
 		return nil, ErrNothingToStashPop
 	}
 
-	// Check if the working staging area already has staged changes
-	workingState, err := u.Working.Drain(ctx, "", true) // keep=true to not clear yet
+	// Read the working staging area (keep=true to not clear yet). A missing file
+	// yields an empty state with a nil error, so any error here is a real
+	// failure (wrong key, corrupt/unreadable file): propagate it BEFORE the
+	// WriteState below would replace working files — and deleting any service
+	// whose slice ended up empty — with a partial view.
+	workingState, err := u.Working.Drain(ctx, "", true)
 	if err != nil {
-		// Working might not exist, which is fine - treat as empty
-		workingState = staging.NewEmptyState()
+		return nil, &StashPopError{Op: stashOpReadWorking, Err: err}
 	}
 
 	// Determine final state based on mode and scope
@@ -174,6 +179,8 @@ func (e *StashPopError) Error() string {
 		return "failed to write the working staging area: " + e.Err.Error()
 	case stashOpDelete:
 		return "failed to delete file: " + e.Err.Error()
+	case stashOpReadWorking:
+		return "failed to read the working staging area: " + e.Err.Error()
 	default:
 		return e.Err.Error()
 	}
