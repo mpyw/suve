@@ -27,9 +27,12 @@ func WithPagerWriter(stdout io.Writer, noPager bool, fn func(w io.Writer) error)
 		return fn(stdout)
 	}
 
-	// Real TTY - collect output first
-	var buf bytes.Buffer
-	if err := fn(&buf); err != nil {
+	// Real TTY - collect output first. The buffer still reports the real
+	// terminal's Fd (see fdBuffer) so width/TTY detection during rendering
+	// (e.g. log --oneline's auto width) sees the actual terminal instead of the
+	// width-less buffer, which would otherwise fall back to DefaultWidth.
+	buf := &fdBuffer{Buffer: &bytes.Buffer{}, fd: f.Fd()}
+	if err := fn(buf); err != nil {
 		return err
 	}
 
@@ -46,6 +49,20 @@ func WithPagerWriter(stdout io.Writer, noPager bool, fn func(w io.Writer) error)
 
 	return moor.PageFromString(buf.String(), moor.Options{})
 }
+
+// fdBuffer buffers output for paging while still reporting the underlying
+// terminal's file descriptor via Fd(). This lets terminal width/TTY detection
+// see the real terminal even though output is buffered before paging. Color
+// output is gated globally (fatih/color), not by this writer's Fd, so exposing
+// it here does not change colorization.
+type fdBuffer struct {
+	*bytes.Buffer
+
+	fd uintptr
+}
+
+// Fd returns the underlying terminal's file descriptor.
+func (b *fdBuffer) Fd() uintptr { return b.fd }
 
 // fitsInTerminal returns true if the content fits within the terminal height.
 // Returns false if terminal size cannot be determined.
