@@ -200,10 +200,10 @@
         id="azure-namespace"
         class="scope-input"
         type="text"
-        placeholder="empty = (NULL)"
+        placeholder="(NULL)"
         bind:value={namespaceInput}
       />
-      <p class="scope-hint">Azure calls this a label; empty = (NULL). Applies to the App Configuration store only.</p>
+      <p class="scope-hint">Azure calls this a label; empty means (NULL). Applies to the App Configuration store only.</p>
       {#if formError || scopeError}
         <div class="scope-error">{formError || scopeError}</div>
       {/if}

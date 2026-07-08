@@ -23,18 +23,13 @@
     }
   }
 
-  function handleBackdropClick(e: MouseEvent) {
-    if (e.target === e.currentTarget) {
-      handleClose();
-    }
-  }
 </script>
 
 <svelte:window onkeydown={handleKeydown} />
 
 {#if show}
-  <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-  <div class="modal-backdrop" onclick={handleBackdropClick}>
+  <div class="modal-backdrop">
+    <button type="button" class="modal-backdrop-dismiss" aria-label="Close" onclick={handleClose}></button>
     <div class="modal">
       <div class="modal-header">
         <h3 class="modal-title">{title}</h3>
@@ -63,7 +58,24 @@
     z-index: 1000;
   }
 
+  /* Full-cover dismiss target behind the modal: clicking outside the modal
+     closes it. A <button> (not a <div onclick>) keeps it keyboard-focusable and
+     satisfies a11y; Escape also closes via the window handler. */
+  .modal-backdrop-dismiss {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    background: transparent;
+    border: none;
+    padding: 0;
+    margin: 0;
+    cursor: default;
+  }
+
   .modal {
+    position: relative;
+    z-index: 1;
     background: #1a1a2e;
     border-radius: 8px;
     /* min(400px, 90vw) so the modal never overflows a 375px viewport. */
