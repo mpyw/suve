@@ -133,13 +133,15 @@ func (s *SecretStrategy) ApplyTags(ctx context.Context, name string, tagEntry Ta
 	return nil
 }
 
-// FetchLastModified returns the last modified time of the secret.
-// Returns zero time if the secret doesn't exist.
+// FetchLastModified returns the last modified time of the secret. It returns a
+// *ResourceNotFoundError when the secret does not exist, so callers can tell
+// "missing" apart from "exists but has no modification time" (the latter returns
+// a zero time with a nil error).
 func (s *SecretStrategy) FetchLastModified(ctx context.Context, name string) (time.Time, error) {
 	entry, err := s.store.Get(ctx, name, provider.VersionRef{})
 	if err != nil {
 		if errors.Is(err, provider.ErrNotFound) {
-			return time.Time{}, nil
+			return time.Time{}, &ResourceNotFoundError{Err: err}
 		}
 
 		return time.Time{}, fmt.Errorf("failed to get secret: %w", err)

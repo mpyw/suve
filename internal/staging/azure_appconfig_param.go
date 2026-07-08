@@ -108,8 +108,11 @@ func (s *AzureAppConfigParamStrategy) ApplyTags(_ context.Context, _ string, _ T
 	return ErrAppConfigTagsUnsupported
 }
 
-// FetchLastModified returns zero time: App Configuration staging uses
-// last-write-wins, so no modified-after conflict is ever reported.
+// FetchLastModified returns a zero time with a nil error: App Configuration
+// staging uses last-write-wins, so no modified-after conflict is ever reported.
+// The nil error means the delete use case treats every setting as existing
+// (never "not found"); apply is idempotent on a missing setting, so this is
+// consistent with the last-write-wins model.
 func (s *AzureAppConfigParamStrategy) FetchLastModified(_ context.Context, _ string) (time.Time, error) {
 	return time.Time{}, nil
 }

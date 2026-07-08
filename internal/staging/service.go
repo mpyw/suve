@@ -72,7 +72,10 @@ type ApplyStrategy interface {
 	ApplyTags(ctx context.Context, name string, tagEntry TagEntry) error
 
 	// FetchLastModified returns the last modified time of the resource in AWS.
-	// Returns zero time if the resource doesn't exist (for create operations).
+	// It returns a *ResourceNotFoundError when the resource does not exist, so
+	// callers can distinguish "missing" from "exists but has no modification
+	// time" (the latter returns a zero time with a nil error). Providers that
+	// disable conflict detection may always return a zero time with a nil error.
 	FetchLastModified(ctx context.Context, name string) (time.Time, error)
 }
 
@@ -132,7 +135,10 @@ type DeleteStrategy interface {
 	ServiceStrategy
 
 	// FetchLastModified returns the last modified time of the resource in AWS.
-	// Used for conflict detection when applying delete operations.
+	// Used for existence and conflict detection when applying delete operations.
+	// It returns a *ResourceNotFoundError when the resource does not exist, so
+	// callers can distinguish "missing" from "exists but has no modification
+	// time" (the latter returns a zero time with a nil error).
 	FetchLastModified(ctx context.Context, name string) (time.Time, error)
 }
 
