@@ -55,6 +55,7 @@
   // Tag edit form
   let tagEditService = $state('');
   let tagEditEntryName = $state('');
+  let tagEditNamespace = $state('');
   let tagEditKey = $state('');
   let tagEditValue = $state('');
   let tagEditIsNew = $state(false);
@@ -217,9 +218,10 @@
   }
 
   // Tag edit modal
-  function openAddTagModal(service: string, entryName: string) {
+  function openAddTagModal(service: string, entryName: string, namespace: string) {
     tagEditService = service;
     tagEditEntryName = entryName;
+    tagEditNamespace = namespace;
     tagEditKey = '';
     tagEditValue = '';
     tagEditIsNew = true;
@@ -227,9 +229,10 @@
     showEditTagModal = true;
   }
 
-  function openEditTagModal(service: string, entryName: string, key: string, value: string) {
+  function openEditTagModal(service: string, entryName: string, namespace: string, key: string, value: string) {
     tagEditService = service;
     tagEditEntryName = entryName;
+    tagEditNamespace = namespace;
     tagEditKey = key;
     tagEditValue = value;
     tagEditIsNew = false;
@@ -246,7 +249,7 @@
     modalLoading = true;
     modalError = '';
     try {
-      await StagingAddTag(tagEditService, tagEditEntryName, tagEditKey, tagEditValue);
+      await StagingAddTag(tagEditService, tagEditEntryName, tagEditKey, tagEditValue, tagEditNamespace);
       showEditTagModal = false;
       await loadStatus();
     } catch (e) {
@@ -256,20 +259,20 @@
     }
   }
 
-  async function handleRemoveTag(service: string, entryName: string, key: string) {
+  async function handleRemoveTag(service: string, entryName: string, namespace: string, key: string) {
     // Cancel a staged tag addition (remove from Tags only, don't add to UntagKeys)
     try {
-      await StagingCancelAddTag(service, entryName, key);
+      await StagingCancelAddTag(service, entryName, key, namespace);
       await loadStatus();
     } catch (e) {
       error = parseError(e);
     }
   }
 
-  async function handleCancelUntag(service: string, entryName: string, key: string) {
+  async function handleCancelUntag(service: string, entryName: string, namespace: string, key: string) {
     // Cancel a staged tag removal (remove from UntagKeys only, don't add to Tags)
     try {
-      await StagingCancelRemoveTag(service, entryName, key);
+      await StagingCancelRemoveTag(service, entryName, key, namespace);
       await loadStatus();
     } catch (e) {
       error = parseError(e);
@@ -475,10 +478,10 @@
         onreset={() => openResetModal('param')}
         onedit={(entry) => openEditModal('param', entry)}
         onunstage={(name, namespace) => handleUnstage('param', name, namespace)}
-        onaddtag={(entryName) => openAddTagModal('param', entryName)}
-        onedittag={(entryName, key, value) => openEditTagModal('param', entryName, key, value)}
-        onremovetag={(entryName, key) => handleRemoveTag('param', entryName, key)}
-        oncanceluntag={(entryName, key) => handleCancelUntag('param', entryName, key)}
+        onaddtag={(entryName, namespace) => openAddTagModal('param', entryName, namespace)}
+        onedittag={(entryName, namespace, key, value) => openEditTagModal('param', entryName, namespace, key, value)}
+        onremovetag={(entryName, namespace, key) => handleRemoveTag('param', entryName, namespace, key)}
+        oncanceluntag={(entryName, namespace, key) => handleCancelUntag('param', entryName, namespace, key)}
       />
     {/if}
 
@@ -495,10 +498,10 @@
         onreset={() => openResetModal('secret')}
         onedit={(entry) => openEditModal('secret', entry)}
         onunstage={(name, namespace) => handleUnstage('secret', name, namespace)}
-        onaddtag={(entryName) => openAddTagModal('secret', entryName)}
-        onedittag={(entryName, key, value) => openEditTagModal('secret', entryName, key, value)}
-        onremovetag={(entryName, key) => handleRemoveTag('secret', entryName, key)}
-        oncanceluntag={(entryName, key) => handleCancelUntag('secret', entryName, key)}
+        onaddtag={(entryName, namespace) => openAddTagModal('secret', entryName, namespace)}
+        onedittag={(entryName, namespace, key, value) => openEditTagModal('secret', entryName, namespace, key, value)}
+        onremovetag={(entryName, namespace, key) => handleRemoveTag('secret', entryName, namespace, key)}
+        oncanceluntag={(entryName, namespace, key) => handleCancelUntag('secret', entryName, namespace, key)}
       />
     {/if}
   </div>

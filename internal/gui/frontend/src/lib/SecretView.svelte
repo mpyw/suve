@@ -389,7 +389,7 @@
       if (immediate) {
         await SecretAddTag(selectedSecret, tagForm.key, tagForm.value);
       } else {
-        await StagingAddTag('secret', selectedSecret, tagForm.key, tagForm.value);
+        await StagingAddTag('secret', selectedSecret, tagForm.key, tagForm.value, '');
         onstagingchange?.();
       }
       showTagModal = false;
@@ -415,7 +415,7 @@
       if (immediate) {
         await SecretRemoveTag(selectedSecret, removeTagTarget);
       } else {
-        await StagingRemoveTag('secret', selectedSecret, removeTagTarget);
+        await StagingRemoveTag('secret', selectedSecret, removeTagTarget, '');
         onstagingchange?.();
       }
       showRemoveTagModal = false;

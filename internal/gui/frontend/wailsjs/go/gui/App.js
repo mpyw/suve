@@ -26,36 +26,36 @@ export function InitialService() {
   return window['go']['gui']['App']['InitialService']();
 }
 
-export function ParamAddTag(arg1, arg2, arg3) {
-  return window['go']['gui']['App']['ParamAddTag'](arg1, arg2, arg3);
+export function ParamAddTag(arg1, arg2, arg3, arg4) {
+  return window['go']['gui']['App']['ParamAddTag'](arg1, arg2, arg3, arg4);
 }
 
-export function ParamDelete(arg1) {
-  return window['go']['gui']['App']['ParamDelete'](arg1);
+export function ParamDelete(arg1, arg2) {
+  return window['go']['gui']['App']['ParamDelete'](arg1, arg2);
 }
 
-export function ParamDiff(arg1, arg2) {
-  return window['go']['gui']['App']['ParamDiff'](arg1, arg2);
+export function ParamDiff(arg1, arg2, arg3) {
+  return window['go']['gui']['App']['ParamDiff'](arg1, arg2, arg3);
 }
 
 export function ParamList(arg1, arg2, arg3, arg4, arg5, arg6) {
   return window['go']['gui']['App']['ParamList'](arg1, arg2, arg3, arg4, arg5, arg6);
 }
 
-export function ParamLog(arg1, arg2) {
-  return window['go']['gui']['App']['ParamLog'](arg1, arg2);
+export function ParamLog(arg1, arg2, arg3) {
+  return window['go']['gui']['App']['ParamLog'](arg1, arg2, arg3);
 }
 
-export function ParamRemoveTag(arg1, arg2) {
-  return window['go']['gui']['App']['ParamRemoveTag'](arg1, arg2);
+export function ParamRemoveTag(arg1, arg2, arg3) {
+  return window['go']['gui']['App']['ParamRemoveTag'](arg1, arg2, arg3);
 }
 
 export function ParamSet(arg1, arg2, arg3, arg4) {
   return window['go']['gui']['App']['ParamSet'](arg1, arg2, arg3, arg4);
 }
 
-export function ParamShow(arg1) {
-  return window['go']['gui']['App']['ParamShow'](arg1);
+export function ParamShow(arg1, arg2) {
+  return window['go']['gui']['App']['ParamShow'](arg1, arg2);
 }
 
 export function ParamTypeOptions() {
@@ -110,20 +110,20 @@ export function StagingAdd(arg1, arg2, arg3, arg4) {
   return window['go']['gui']['App']['StagingAdd'](arg1, arg2, arg3, arg4);
 }
 
-export function StagingAddTag(arg1, arg2, arg3, arg4) {
-  return window['go']['gui']['App']['StagingAddTag'](arg1, arg2, arg3, arg4);
+export function StagingAddTag(arg1, arg2, arg3, arg4, arg5) {
+  return window['go']['gui']['App']['StagingAddTag'](arg1, arg2, arg3, arg4, arg5);
 }
 
 export function StagingApply(arg1, arg2) {
   return window['go']['gui']['App']['StagingApply'](arg1, arg2);
 }
 
-export function StagingCancelAddTag(arg1, arg2, arg3) {
-  return window['go']['gui']['App']['StagingCancelAddTag'](arg1, arg2, arg3);
+export function StagingCancelAddTag(arg1, arg2, arg3, arg4) {
+  return window['go']['gui']['App']['StagingCancelAddTag'](arg1, arg2, arg3, arg4);
 }
 
-export function StagingCancelRemoveTag(arg1, arg2, arg3) {
-  return window['go']['gui']['App']['StagingCancelRemoveTag'](arg1, arg2, arg3);
+export function StagingCancelRemoveTag(arg1, arg2, arg3, arg4) {
+  return window['go']['gui']['App']['StagingCancelRemoveTag'](arg1, arg2, arg3, arg4);
 }
 
 export function StagingCheckStatus(arg1, arg2, arg3) {
@@ -158,8 +158,8 @@ export function StagingPersist(arg1, arg2, arg3, arg4) {
   return window['go']['gui']['App']['StagingPersist'](arg1, arg2, arg3, arg4);
 }
 
-export function StagingRemoveTag(arg1, arg2, arg3) {
-  return window['go']['gui']['App']['StagingRemoveTag'](arg1, arg2, arg3);
+export function StagingRemoveTag(arg1, arg2, arg3, arg4) {
+  return window['go']['gui']['App']['StagingRemoveTag'](arg1, arg2, arg3, arg4);
 }
 
 export function StagingReset(arg1) {

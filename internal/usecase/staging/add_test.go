@@ -54,7 +54,7 @@ func TestAddUseCase_Execute(t *testing.T) {
 	}
 
 	output, err := uc.Execute(t.Context(), usecasestaging.AddInput{
-		Name:        "/app/new-param",
+		Key:         staging.EntryKey{Name: "/app/new-param"},
 		Value:       "new-value",
 		Description: "test description",
 	})
@@ -62,7 +62,7 @@ func TestAddUseCase_Execute(t *testing.T) {
 	assert.Equal(t, "/app/new-param", output.Name)
 
 	// Verify staged
-	entry, err := store.GetEntry(t.Context(), staging.ServiceParam, "/app/new-param", "")
+	entry, err := store.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/new-param", Namespace: ""})
 	require.NoError(t, err)
 	assert.Equal(t, staging.OperationCreate, entry.Operation)
 	assert.Equal(t, "new-value", lo.FromPtr(entry.Value))
@@ -80,7 +80,7 @@ func TestAddUseCase_Execute_RejectsWhenResourceExists(t *testing.T) {
 	}
 
 	_, err := uc.Execute(t.Context(), usecasestaging.AddInput{
-		Name:  "/app/existing",
+		Key:   staging.EntryKey{Name: "/app/existing"},
 		Value: "new-value",
 	})
 	require.Error(t, err)
@@ -97,13 +97,13 @@ func TestAddUseCase_Execute_MinimalInput(t *testing.T) {
 	}
 
 	output, err := uc.Execute(t.Context(), usecasestaging.AddInput{
-		Name:  "/app/simple",
+		Key:   staging.EntryKey{Name: "/app/simple"},
 		Value: "simple-value",
 	})
 	require.NoError(t, err)
 	assert.Equal(t, "/app/simple", output.Name)
 
-	entry, err := store.GetEntry(t.Context(), staging.ServiceParam, "/app/simple", "")
+	entry, err := store.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/simple", Namespace: ""})
 	require.NoError(t, err)
 	assert.Nil(t, entry.Description)
 }
@@ -117,7 +117,7 @@ func TestAddUseCase_Draft_NotStaged(t *testing.T) {
 		Store:    store,
 	}
 
-	output, err := uc.Draft(t.Context(), usecasestaging.DraftInput{Name: "/app/not-exists"})
+	output, err := uc.Draft(t.Context(), usecasestaging.DraftInput{Key: staging.EntryKey{Name: "/app/not-exists"}})
 	require.NoError(t, err)
 	assert.False(t, output.IsStaged)
 	assert.Empty(t, output.Value)
@@ -127,7 +127,7 @@ func TestAddUseCase_Draft_StagedCreate(t *testing.T) {
 	t.Parallel()
 
 	store := testutil.NewMockStore()
-	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/draft", staging.Entry{
+	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/draft"}, staging.Entry{
 		Operation: staging.OperationCreate,
 		Value:     lo.ToPtr("draft-value"),
 		StagedAt:  time.Now(),
@@ -138,7 +138,7 @@ func TestAddUseCase_Draft_StagedCreate(t *testing.T) {
 		Store:    store,
 	}
 
-	output, err := uc.Draft(t.Context(), usecasestaging.DraftInput{Name: "/app/draft"})
+	output, err := uc.Draft(t.Context(), usecasestaging.DraftInput{Key: staging.EntryKey{Name: "/app/draft"}})
 	require.NoError(t, err)
 	assert.True(t, output.IsStaged)
 	assert.Equal(t, "draft-value", output.Value)
@@ -149,7 +149,7 @@ func TestAddUseCase_Draft_StagedUpdate(t *testing.T) {
 
 	store := testutil.NewMockStore()
 	// Update operation should not be returned as draft
-	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/update", staging.Entry{
+	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/update"}, staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("update-value"),
 		StagedAt:  time.Now(),
@@ -160,7 +160,7 @@ func TestAddUseCase_Draft_StagedUpdate(t *testing.T) {
 		Store:    store,
 	}
 
-	output, err := uc.Draft(t.Context(), usecasestaging.DraftInput{Name: "/app/update"})
+	output, err := uc.Draft(t.Context(), usecasestaging.DraftInput{Key: staging.EntryKey{Name: "/app/update"}})
 	require.NoError(t, err)
 	assert.False(t, output.IsStaged) // Update is not a draft
 }
@@ -178,7 +178,7 @@ func TestAddUseCase_Execute_ParseError(t *testing.T) {
 	}
 
 	_, err := uc.Execute(t.Context(), usecasestaging.AddInput{
-		Name:  "invalid",
+		Key:   staging.EntryKey{Name: "invalid"},
 		Value: "value",
 	})
 	require.Error(t, err)
@@ -197,7 +197,7 @@ func TestAddUseCase_Draft_ParseError(t *testing.T) {
 		Store:    store,
 	}
 
-	_, err := uc.Draft(t.Context(), usecasestaging.DraftInput{Name: "invalid"})
+	_, err := uc.Draft(t.Context(), usecasestaging.DraftInput{Key: staging.EntryKey{Name: "invalid"}})
 	assert.Error(t, err)
 }
 
@@ -213,7 +213,7 @@ func TestAddUseCase_Execute_StageError(t *testing.T) {
 	}
 
 	_, err := uc.Execute(t.Context(), usecasestaging.AddInput{
-		Name:  "/app/config",
+		Key:   staging.EntryKey{Name: "/app/config"},
 		Value: "value",
 	})
 	require.Error(t, err)
@@ -231,7 +231,7 @@ func TestAddUseCase_Draft_GetError(t *testing.T) {
 		Store:    store,
 	}
 
-	_, err := uc.Draft(t.Context(), usecasestaging.DraftInput{Name: "/app/config"})
+	_, err := uc.Draft(t.Context(), usecasestaging.DraftInput{Key: staging.EntryKey{Name: "/app/config"}})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "get error")
 }
@@ -248,7 +248,7 @@ func TestAddUseCase_Execute_GetError(t *testing.T) {
 	}
 
 	_, err := uc.Execute(t.Context(), usecasestaging.AddInput{
-		Name:  "/app/config",
+		Key:   staging.EntryKey{Name: "/app/config"},
 		Value: "value",
 	})
 	require.Error(t, err)
@@ -260,7 +260,7 @@ func TestAddUseCase_Execute_RejectsWhenUpdateStaged(t *testing.T) {
 
 	store := testutil.NewMockStore()
 	// Pre-stage an UPDATE operation
-	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/existing", staging.Entry{
+	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/existing"}, staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("update-value"),
 		StagedAt:  time.Now(),
@@ -272,7 +272,7 @@ func TestAddUseCase_Execute_RejectsWhenUpdateStaged(t *testing.T) {
 	}
 
 	_, err := uc.Execute(t.Context(), usecasestaging.AddInput{
-		Name:  "/app/existing",
+		Key:   staging.EntryKey{Name: "/app/existing"},
 		Value: "new-value",
 	})
 	require.Error(t, err)
@@ -284,7 +284,7 @@ func TestAddUseCase_Execute_RejectsWhenDeleteStaged(t *testing.T) {
 
 	store := testutil.NewMockStore()
 	// Pre-stage a DELETE operation
-	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/deleted", staging.Entry{
+	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/deleted"}, staging.Entry{
 		Operation: staging.OperationDelete,
 		StagedAt:  time.Now(),
 	}))
@@ -295,7 +295,7 @@ func TestAddUseCase_Execute_RejectsWhenDeleteStaged(t *testing.T) {
 	}
 
 	_, err := uc.Execute(t.Context(), usecasestaging.AddInput{
-		Name:  "/app/deleted",
+		Key:   staging.EntryKey{Name: "/app/deleted"},
 		Value: "new-value",
 	})
 	require.Error(t, err)
@@ -307,7 +307,7 @@ func TestAddUseCase_Execute_AllowsReEditOfCreate(t *testing.T) {
 
 	store := testutil.NewMockStore()
 	// Pre-stage a CREATE operation
-	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/new", staging.Entry{
+	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/new"}, staging.Entry{
 		Operation: staging.OperationCreate,
 		Value:     lo.ToPtr("initial-value"),
 		StagedAt:  time.Now(),
@@ -320,14 +320,14 @@ func TestAddUseCase_Execute_AllowsReEditOfCreate(t *testing.T) {
 
 	// Should allow updating the value
 	output, err := uc.Execute(t.Context(), usecasestaging.AddInput{
-		Name:  "/app/new",
+		Key:   staging.EntryKey{Name: "/app/new"},
 		Value: "updated-value",
 	})
 	require.NoError(t, err)
 	assert.Equal(t, "/app/new", output.Name)
 
 	// Verify the value was updated but operation remains CREATE
-	entry, err := store.GetEntry(t.Context(), staging.ServiceParam, "/app/new", "")
+	entry, err := store.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/new", Namespace: ""})
 	require.NoError(t, err)
 	assert.Equal(t, staging.OperationCreate, entry.Operation)
 	assert.Equal(t, "updated-value", lo.FromPtr(entry.Value))
@@ -346,7 +346,7 @@ func TestAddUseCase_Execute_FetchError(t *testing.T) {
 	}
 
 	_, err := uc.Execute(t.Context(), usecasestaging.AddInput{
-		Name:  "/app/config",
+		Key:   staging.EntryKey{Name: "/app/config"},
 		Value: "value",
 	})
 	require.Error(t, err)
@@ -359,7 +359,7 @@ func TestAddUseCase_Draft_StagedCreate_Found(t *testing.T) {
 	store := testutil.NewMockStore()
 
 	// Pre-stage a CREATE operation
-	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/draft", staging.Entry{
+	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/draft"}, staging.Entry{
 		Operation: staging.OperationCreate,
 		Value:     lo.ToPtr("draft-value"),
 		StagedAt:  time.Now(),
@@ -370,7 +370,7 @@ func TestAddUseCase_Draft_StagedCreate_Found(t *testing.T) {
 		Store:    store,
 	}
 
-	output, err := uc.Draft(t.Context(), usecasestaging.DraftInput{Name: "/app/draft"})
+	output, err := uc.Draft(t.Context(), usecasestaging.DraftInput{Key: staging.EntryKey{Name: "/app/draft"}})
 	require.NoError(t, err)
 	// Should find the staged draft
 	assert.True(t, output.IsStaged)
@@ -387,7 +387,7 @@ func TestAddUseCase_Draft_NothingStaged(t *testing.T) {
 		Store:    store,
 	}
 
-	output, err := uc.Draft(t.Context(), usecasestaging.DraftInput{Name: "/app/not-exists"})
+	output, err := uc.Draft(t.Context(), usecasestaging.DraftInput{Key: staging.EntryKey{Name: "/app/not-exists"}})
 	require.NoError(t, err)
 	assert.False(t, output.IsStaged)
 	assert.Empty(t, output.Value)
@@ -405,7 +405,7 @@ func TestAddUseCase_Draft_GetEntryError(t *testing.T) {
 		Store:    store,
 	}
 
-	_, err := uc.Draft(t.Context(), usecasestaging.DraftInput{Name: "/app/config"})
+	_, err := uc.Draft(t.Context(), usecasestaging.DraftInput{Key: staging.EntryKey{Name: "/app/config"}})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "storage unavailable")
 }

@@ -13,21 +13,21 @@ import (
 //
 // For Create operations: conflicts if resource now exists (someone else created it).
 // For Update/Delete operations with BaseModifiedAt: conflicts if AWS was modified after base.
-func CheckConflicts(ctx context.Context, strategy ApplyStrategy, entries map[string]Entry) map[string]struct{} {
-	conflicts := make(map[string]struct{})
+func CheckConflicts(ctx context.Context, strategy ApplyStrategy, entries map[EntryKey]Entry) map[EntryKey]struct{} {
+	conflicts := make(map[EntryKey]struct{})
 
 	// Separate entries by check type:
 	// - Create: check if resource now exists (someone else created it)
 	// - Update/Delete with BaseModifiedAt: check if modified after base
-	toCheckCreate := make(map[string]Entry)
-	toCheckModified := make(map[string]Entry)
+	toCheckCreate := make(map[EntryKey]Entry)
+	toCheckModified := make(map[EntryKey]Entry)
 
-	for name, entry := range entries {
+	for key, entry := range entries {
 		switch {
 		case entry.Operation == OperationCreate:
-			toCheckCreate[name] = entry
+			toCheckCreate[key] = entry
 		case (entry.Operation == OperationUpdate || entry.Operation == OperationDelete) && entry.BaseModifiedAt != nil:
-			toCheckModified[name] = entry
+			toCheckModified[key] = entry
 		}
 	}
 
@@ -36,19 +36,19 @@ func CheckConflicts(ctx context.Context, strategy ApplyStrategy, entries map[str
 	}
 
 	// Combine all entries for parallel fetch
-	allToCheck := make(map[string]Entry)
+	allToCheck := make(map[EntryKey]Entry)
 
 	maps.Copy(allToCheck, toCheckCreate)
 	maps.Copy(allToCheck, toCheckModified)
 
 	// Fetch last modified times in parallel
-	results := parallel.ExecuteMap(ctx, allToCheck, func(ctx context.Context, name string, _ Entry) (time.Time, error) {
-		return strategy.FetchLastModified(ctx, name)
+	results := parallel.ExecuteMap(ctx, allToCheck, func(ctx context.Context, key EntryKey, _ Entry) (time.Time, error) {
+		return strategy.FetchLastModified(ctx, key.Name)
 	})
 
 	// Check for conflicts - Create operations
-	for name := range toCheckCreate {
-		result := results[name]
+	for key := range toCheckCreate {
+		result := results[key]
 		if result.Err != nil {
 			// If we can't fetch, assume no conflict (will fail on apply anyway)
 			continue
@@ -56,13 +56,13 @@ func CheckConflicts(ctx context.Context, strategy ApplyStrategy, entries map[str
 
 		// For Create: if resource now exists (non-zero time), someone else created it
 		if !result.Value.IsZero() {
-			conflicts[name] = struct{}{}
+			conflicts[key] = struct{}{}
 		}
 	}
 
 	// Check for conflicts - Update/Delete operations
-	for name, entry := range toCheckModified {
-		result := results[name]
+	for key, entry := range toCheckModified {
+		result := results[key]
 		if result.Err != nil {
 			// If we can't fetch, assume no conflict (will fail on apply anyway)
 			continue
@@ -77,7 +77,7 @@ func CheckConflicts(ctx context.Context, strategy ApplyStrategy, entries map[str
 
 		// If AWS was modified after the base value was fetched, it's a conflict
 		if awsModified.After(*entry.BaseModifiedAt) {
-			conflicts[name] = struct{}{}
+			conflicts[key] = struct{}{}
 		}
 	}
 

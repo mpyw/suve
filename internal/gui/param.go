@@ -197,14 +197,18 @@ func (a *App) paramListWithNamespaces(
 	return &ParamListResult{Entries: entries}, nil
 }
 
-// ParamShow shows a parameter value.
-func (a *App) ParamShow(specStr string) (*ParamShowResult, error) {
+// ParamShow shows a parameter value. namespace selects the Azure App
+// Configuration namespace of the setting (the label axis); empty is the
+// null/default namespace and is ignored by every other provider. It must be the
+// entry's own namespace so a namespaced setting is read under its own label
+// rather than the shared read scope's (which the footer filter never changes).
+func (a *App) ParamShow(specStr, namespace string) (*ParamShowResult, error) {
 	spec, err := a.parseParamSpec(specStr)
 	if err != nil {
 		return nil, err
 	}
 
-	store, err := a.paramStore()
+	store, err := a.paramStoreForNamespace(namespace)
 	if err != nil {
 		return nil, err
 	}
@@ -239,9 +243,11 @@ func (a *App) ParamShow(specStr string) (*ParamShowResult, error) {
 	return r, nil
 }
 
-// ParamLog shows parameter version history.
-func (a *App) ParamLog(name string, maxResults int32) (*ParamLogResult, error) {
-	store, err := a.paramStore()
+// ParamLog shows parameter version history. namespace selects the entry's Azure
+// App Configuration namespace (empty for the null/default namespace and every
+// other provider).
+func (a *App) ParamLog(name string, maxResults int32, namespace string) (*ParamLogResult, error) {
+	store, err := a.paramStoreForNamespace(namespace)
 	if err != nil {
 		return nil, err
 	}
@@ -275,8 +281,10 @@ func (a *App) ParamLog(name string, maxResults int32) (*ParamLogResult, error) {
 	return &ParamLogResult{Name: result.Name, Entries: entries}, nil
 }
 
-// ParamDiff compares two parameter versions.
-func (a *App) ParamDiff(spec1Str, spec2Str string) (*ParamDiffResult, error) {
+// ParamDiff compares two parameter versions. namespace selects the entry's Azure
+// App Configuration namespace (empty for the null/default namespace and every
+// other provider).
+func (a *App) ParamDiff(spec1Str, spec2Str, namespace string) (*ParamDiffResult, error) {
 	spec1, err := a.parseParamSpec(spec1Str)
 	if err != nil {
 		return nil, err
@@ -287,7 +295,7 @@ func (a *App) ParamDiff(spec1Str, spec2Str string) (*ParamDiffResult, error) {
 		return nil, err
 	}
 
-	store, err := a.paramStore()
+	store, err := a.paramStoreForNamespace(namespace)
 	if err != nil {
 		return nil, err
 	}
@@ -369,9 +377,12 @@ func (a *App) ParamSet(name, value, paramType, namespace string) (*ParamSetResul
 	}, nil
 }
 
-// ParamDelete deletes a parameter.
-func (a *App) ParamDelete(name string) (*ParamDeleteResult, error) {
-	store, err := a.paramStore()
+// ParamDelete deletes a parameter. namespace selects the entry's Azure App
+// Configuration namespace (empty for the null/default namespace and every other
+// provider) so a namespaced setting is deleted under its own label, not the
+// shared read scope's.
+func (a *App) ParamDelete(name, namespace string) (*ParamDeleteResult, error) {
+	store, err := a.paramStoreForNamespace(namespace)
 	if err != nil {
 		return nil, err
 	}
@@ -386,9 +397,11 @@ func (a *App) ParamDelete(name string) (*ParamDeleteResult, error) {
 	return &ParamDeleteResult{Name: result.Name}, nil
 }
 
-// ParamAddTag adds or updates a tag on a parameter.
-func (a *App) ParamAddTag(name, key, value string) error {
-	store, err := a.paramStore()
+// ParamAddTag adds or updates a tag on a parameter. namespace selects the entry's
+// Azure App Configuration namespace (empty for the null/default namespace and
+// every other provider).
+func (a *App) ParamAddTag(name, key, value, namespace string) error {
+	store, err := a.paramStoreForNamespace(namespace)
 	if err != nil {
 		return err
 	}
@@ -401,9 +414,11 @@ func (a *App) ParamAddTag(name, key, value string) error {
 	})
 }
 
-// ParamRemoveTag removes a tag from a parameter.
-func (a *App) ParamRemoveTag(name, key string) error {
-	store, err := a.paramStore()
+// ParamRemoveTag removes a tag from a parameter. namespace selects the entry's
+// Azure App Configuration namespace (empty for the null/default namespace and
+// every other provider).
+func (a *App) ParamRemoveTag(name, key, namespace string) error {
+	store, err := a.paramStoreForNamespace(namespace)
 	if err != nil {
 		return err
 	}

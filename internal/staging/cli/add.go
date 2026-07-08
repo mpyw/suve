@@ -7,6 +7,7 @@ import (
 
 	"github.com/mpyw/suve/internal/cli/editor"
 	"github.com/mpyw/suve/internal/cli/output"
+	"github.com/mpyw/suve/internal/staging"
 	stagingusecase "github.com/mpyw/suve/internal/usecase/staging"
 )
 
@@ -31,7 +32,7 @@ type AddOptions struct {
 // Run executes the add command.
 func (r *AddRunner) Run(ctx context.Context, opts AddOptions) error {
 	// Get draft (existing staged create value) for re-editing
-	draft, err := r.UseCase.Draft(ctx, stagingusecase.DraftInput{Name: opts.Name, Namespace: opts.Namespace})
+	draft, err := r.UseCase.Draft(ctx, stagingusecase.DraftInput{Key: staging.EntryKey{Name: opts.Name, Namespace: opts.Namespace}})
 	if err != nil {
 		return err
 	}
@@ -69,10 +70,9 @@ func (r *AddRunner) Run(ctx context.Context, opts AddOptions) error {
 
 	// Execute the add use case
 	result, err := r.UseCase.Execute(ctx, stagingusecase.AddInput{
-		Name:        opts.Name,
+		Key:         staging.EntryKey{Name: opts.Name, Namespace: opts.Namespace},
 		Value:       newValue,
 		Description: opts.Description,
-		Namespace:   opts.Namespace,
 	})
 	if err != nil {
 		return err

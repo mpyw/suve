@@ -58,7 +58,7 @@ func TestEditUseCase_Execute(t *testing.T) {
 	}
 
 	output, err := uc.Execute(t.Context(), usecasestaging.EditInput{
-		Name:        "/app/config",
+		Key:         staging.EntryKey{Name: "/app/config"},
 		Value:       "updated-value",
 		Description: "updated desc",
 	})
@@ -66,7 +66,7 @@ func TestEditUseCase_Execute(t *testing.T) {
 	assert.Equal(t, "/app/config", output.Name)
 
 	// Verify staged
-	entry, err := store.GetEntry(t.Context(), staging.ServiceParam, "/app/config", "")
+	entry, err := store.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config", Namespace: ""})
 	require.NoError(t, err)
 	assert.Equal(t, staging.OperationUpdate, entry.Operation)
 	assert.Equal(t, "updated-value", lo.FromPtr(entry.Value))
@@ -80,7 +80,7 @@ func TestEditUseCase_Execute_PreservesBaseModifiedAt(t *testing.T) {
 	baseTime := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
 
 	// Pre-stage an entry
-	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
+	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 		Operation:      staging.OperationUpdate,
 		Value:          lo.ToPtr("old-value"),
 		StagedAt:       time.Now(),
@@ -94,12 +94,12 @@ func TestEditUseCase_Execute_PreservesBaseModifiedAt(t *testing.T) {
 
 	// Re-edit should preserve original BaseModifiedAt
 	_, err := uc.Execute(t.Context(), usecasestaging.EditInput{
-		Name:  "/app/config",
+		Key:   staging.EntryKey{Name: "/app/config"},
 		Value: "newer-value",
 	})
 	require.NoError(t, err)
 
-	entry, err := store.GetEntry(t.Context(), staging.ServiceParam, "/app/config", "")
+	entry, err := store.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config", Namespace: ""})
 	require.NoError(t, err)
 	assert.Equal(t, baseTime, *entry.BaseModifiedAt)
 }
@@ -119,7 +119,7 @@ func TestEditUseCase_Baseline_FromAWS(t *testing.T) {
 		Store:    store,
 	}
 
-	output, err := uc.Baseline(t.Context(), usecasestaging.BaselineInput{Name: "/app/config"})
+	output, err := uc.Baseline(t.Context(), usecasestaging.BaselineInput{Key: staging.EntryKey{Name: "/app/config"}})
 	require.NoError(t, err)
 	assert.Equal(t, "aws-current-value", output.Value)
 }
@@ -128,7 +128,7 @@ func TestEditUseCase_Baseline_FromStaging(t *testing.T) {
 	t.Parallel()
 
 	store := testutil.NewMockStore()
-	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
+	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("staged-value"),
 		StagedAt:  time.Now(),
@@ -139,7 +139,7 @@ func TestEditUseCase_Baseline_FromStaging(t *testing.T) {
 		Store:    store,
 	}
 
-	output, err := uc.Baseline(t.Context(), usecasestaging.BaselineInput{Name: "/app/config"})
+	output, err := uc.Baseline(t.Context(), usecasestaging.BaselineInput{Key: staging.EntryKey{Name: "/app/config"}})
 	require.NoError(t, err)
 	assert.Equal(t, "staged-value", output.Value)
 }
@@ -148,7 +148,7 @@ func TestEditUseCase_Baseline_FromStagingCreate(t *testing.T) {
 	t.Parallel()
 
 	store := testutil.NewMockStore()
-	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/new", staging.Entry{
+	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/new"}, staging.Entry{
 		Operation: staging.OperationCreate,
 		Value:     lo.ToPtr("create-value"),
 		StagedAt:  time.Now(),
@@ -159,7 +159,7 @@ func TestEditUseCase_Baseline_FromStagingCreate(t *testing.T) {
 		Store:    store,
 	}
 
-	output, err := uc.Baseline(t.Context(), usecasestaging.BaselineInput{Name: "/app/new"})
+	output, err := uc.Baseline(t.Context(), usecasestaging.BaselineInput{Key: staging.EntryKey{Name: "/app/new"}})
 	require.NoError(t, err)
 	assert.Equal(t, "create-value", output.Value)
 }
@@ -177,7 +177,7 @@ func TestEditUseCase_Execute_FetchError(t *testing.T) {
 	}
 
 	_, err := uc.Execute(t.Context(), usecasestaging.EditInput{
-		Name:  "/app/config",
+		Key:   staging.EntryKey{Name: "/app/config"},
 		Value: "new-value",
 	})
 	require.Error(t, err)
@@ -196,7 +196,7 @@ func TestEditUseCase_Baseline_FetchError(t *testing.T) {
 		Store:    store,
 	}
 
-	_, err := uc.Baseline(t.Context(), usecasestaging.BaselineInput{Name: "/app/config"})
+	_, err := uc.Baseline(t.Context(), usecasestaging.BaselineInput{Key: staging.EntryKey{Name: "/app/config"}})
 	assert.Error(t, err)
 }
 
@@ -205,7 +205,7 @@ func TestEditUseCase_Execute_WithStagedCreate(t *testing.T) {
 
 	store := testutil.NewMockStore()
 	// Pre-stage a create operation (no BaseModifiedAt)
-	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/new", staging.Entry{
+	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/new"}, staging.Entry{
 		Operation: staging.OperationCreate,
 		Value:     lo.ToPtr("initial"),
 		StagedAt:  time.Now(),
@@ -217,12 +217,12 @@ func TestEditUseCase_Execute_WithStagedCreate(t *testing.T) {
 	}
 
 	_, err := uc.Execute(t.Context(), usecasestaging.EditInput{
-		Name:  "/app/new",
+		Key:   staging.EntryKey{Name: "/app/new"},
 		Value: "updated",
 	})
 	require.NoError(t, err)
 
-	entry, err := store.GetEntry(t.Context(), staging.ServiceParam, "/app/new", "")
+	entry, err := store.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/new", Namespace: ""})
 	require.NoError(t, err)
 	// Operation should remain Create (not become Update)
 	assert.Equal(t, staging.OperationCreate, entry.Operation)
@@ -248,12 +248,12 @@ func TestEditUseCase_Execute_ZeroLastModified(t *testing.T) {
 	}
 
 	_, err := uc.Execute(t.Context(), usecasestaging.EditInput{
-		Name:  "/app/config",
+		Key:   staging.EntryKey{Name: "/app/config"},
 		Value: "new-value",
 	})
 	require.NoError(t, err)
 
-	entry, err := store.GetEntry(t.Context(), staging.ServiceParam, "/app/config", "")
+	entry, err := store.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config", Namespace: ""})
 	require.NoError(t, err)
 	assert.Nil(t, entry.BaseModifiedAt)
 }
@@ -270,7 +270,7 @@ func TestEditUseCase_Execute_StageError(t *testing.T) {
 	}
 
 	_, err := uc.Execute(t.Context(), usecasestaging.EditInput{
-		Name:  "/app/config",
+		Key:   staging.EntryKey{Name: "/app/config"},
 		Value: "value",
 	})
 	require.Error(t, err)
@@ -289,7 +289,7 @@ func TestEditUseCase_Execute_GetErrorForBaseModified(t *testing.T) {
 	}
 
 	_, err := uc.Execute(t.Context(), usecasestaging.EditInput{
-		Name:  "/app/config",
+		Key:   staging.EntryKey{Name: "/app/config"},
 		Value: "value",
 	})
 	assert.Error(t, err)
@@ -306,7 +306,7 @@ func TestEditUseCase_Baseline_GetError(t *testing.T) {
 		Store:    store,
 	}
 
-	_, err := uc.Baseline(t.Context(), usecasestaging.BaselineInput{Name: "/app/config"})
+	_, err := uc.Baseline(t.Context(), usecasestaging.BaselineInput{Key: staging.EntryKey{Name: "/app/config"}})
 	assert.Error(t, err)
 }
 
@@ -315,7 +315,7 @@ func TestEditUseCase_Execute_BlocksEditOnDelete(t *testing.T) {
 
 	store := testutil.NewMockStore()
 	// Pre-stage a DELETE operation
-	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/deleted", staging.Entry{
+	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/deleted"}, staging.Entry{
 		Operation: staging.OperationDelete,
 		StagedAt:  time.Now(),
 	}))
@@ -327,14 +327,14 @@ func TestEditUseCase_Execute_BlocksEditOnDelete(t *testing.T) {
 
 	// Editing a staged DELETE should be blocked
 	_, err := uc.Execute(t.Context(), usecasestaging.EditInput{
-		Name:  "/app/deleted",
+		Key:   staging.EntryKey{Name: "/app/deleted"},
 		Value: "new-value",
 	})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "staged for deletion")
 
 	// Verify the operation is still DELETE
-	entry, err := store.GetEntry(t.Context(), staging.ServiceParam, "/app/deleted", "")
+	entry, err := store.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/deleted", Namespace: ""})
 	require.NoError(t, err)
 	assert.Equal(t, staging.OperationDelete, entry.Operation)
 }
@@ -344,7 +344,7 @@ func TestEditUseCase_Baseline_BlocksWhenDeleteStaged(t *testing.T) {
 
 	store := testutil.NewMockStore()
 	// Pre-stage a DELETE operation
-	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/deleted", staging.Entry{
+	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/deleted"}, staging.Entry{
 		Operation: staging.OperationDelete,
 		StagedAt:  time.Now(),
 	}))
@@ -361,7 +361,7 @@ func TestEditUseCase_Baseline_BlocksWhenDeleteStaged(t *testing.T) {
 	}
 
 	// When DELETE is staged, Baseline should return an error
-	_, err := uc.Baseline(t.Context(), usecasestaging.BaselineInput{Name: "/app/deleted"})
+	_, err := uc.Baseline(t.Context(), usecasestaging.BaselineInput{Key: staging.EntryKey{Name: "/app/deleted"}})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "staged for deletion")
 }
@@ -373,7 +373,7 @@ func TestEditUseCase_Execute_PreservesUpdateOperation(t *testing.T) {
 	baseTime := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
 
 	// Pre-stage an UPDATE operation
-	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
+	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 		Operation:      staging.OperationUpdate,
 		Value:          lo.ToPtr("old-value"),
 		StagedAt:       time.Now(),
@@ -387,12 +387,12 @@ func TestEditUseCase_Execute_PreservesUpdateOperation(t *testing.T) {
 
 	// Re-edit should preserve UPDATE operation
 	_, err := uc.Execute(t.Context(), usecasestaging.EditInput{
-		Name:  "/app/config",
+		Key:   staging.EntryKey{Name: "/app/config"},
 		Value: "newer-value",
 	})
 	require.NoError(t, err)
 
-	entry, err := store.GetEntry(t.Context(), staging.ServiceParam, "/app/config", "")
+	entry, err := store.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config", Namespace: ""})
 	require.NoError(t, err)
 	assert.Equal(t, staging.OperationUpdate, entry.Operation)
 	assert.Equal(t, "newer-value", lo.FromPtr(entry.Value))
@@ -416,7 +416,7 @@ func TestEditUseCase_Execute_Skipped_SameAsAWS(t *testing.T) {
 
 	// Edit with same value as AWS - should be skipped
 	output, err := uc.Execute(t.Context(), usecasestaging.EditInput{
-		Name:  "/app/config",
+		Key:   staging.EntryKey{Name: "/app/config"},
 		Value: "aws-value", // Same as AWS
 	})
 	require.NoError(t, err)
@@ -424,7 +424,7 @@ func TestEditUseCase_Execute_Skipped_SameAsAWS(t *testing.T) {
 	assert.False(t, output.Unstaged)
 
 	// Verify nothing was staged
-	_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/config", "")
+	_, err = store.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config", Namespace: ""})
 	assert.ErrorIs(t, err, staging.ErrNotStaged)
 }
 
@@ -434,7 +434,7 @@ func TestEditUseCase_Execute_Unstaged_RevertedToAWS(t *testing.T) {
 	store := testutil.NewMockStore()
 
 	// Pre-stage an UPDATE operation
-	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
+	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("staged-value"),
 		StagedAt:  time.Now(),
@@ -453,7 +453,7 @@ func TestEditUseCase_Execute_Unstaged_RevertedToAWS(t *testing.T) {
 
 	// Edit back to AWS value - should auto-unstage
 	output, err := uc.Execute(t.Context(), usecasestaging.EditInput{
-		Name:  "/app/config",
+		Key:   staging.EntryKey{Name: "/app/config"},
 		Value: "aws-value", // Reverted to AWS value
 	})
 	require.NoError(t, err)
@@ -461,7 +461,7 @@ func TestEditUseCase_Execute_Unstaged_RevertedToAWS(t *testing.T) {
 	assert.True(t, output.Unstaged)
 
 	// Verify entry was unstaged
-	_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/config", "")
+	_, err = store.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config", Namespace: ""})
 	assert.ErrorIs(t, err, staging.ErrNotStaged)
 }
 
@@ -472,7 +472,7 @@ func TestEditUseCase_Execute_UnstageError(t *testing.T) {
 	store := testutil.NewMockStore()
 
 	// Pre-stage an UPDATE operation
-	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
+	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("staged-value"),
 		StagedAt:  time.Now(),
@@ -494,7 +494,7 @@ func TestEditUseCase_Execute_UnstageError(t *testing.T) {
 
 	// Edit back to AWS value - should trigger auto-unstage which fails
 	_, err := uc.Execute(t.Context(), usecasestaging.EditInput{
-		Name:  "/app/config",
+		Key:   staging.EntryKey{Name: "/app/config"},
 		Value: "aws-value", // Reverted to AWS value
 	})
 	require.Error(t, err)
@@ -518,7 +518,7 @@ func TestEditUseCase_Execute_NotSkipped_DifferentFromAWS(t *testing.T) {
 
 	// Edit with different value - should be staged
 	output, err := uc.Execute(t.Context(), usecasestaging.EditInput{
-		Name:  "/app/config",
+		Key:   staging.EntryKey{Name: "/app/config"},
 		Value: "new-value", // Different from AWS
 	})
 	require.NoError(t, err)
@@ -526,7 +526,7 @@ func TestEditUseCase_Execute_NotSkipped_DifferentFromAWS(t *testing.T) {
 	assert.False(t, output.Unstaged)
 
 	// Verify entry was staged
-	entry, err := store.GetEntry(t.Context(), staging.ServiceParam, "/app/config", "")
+	entry, err := store.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config", Namespace: ""})
 	require.NoError(t, err)
 	assert.Equal(t, "new-value", lo.FromPtr(entry.Value))
 }
@@ -552,14 +552,14 @@ func TestEditUseCase_Execute_EmptyStringValue_AutoSkip(t *testing.T) {
 
 	// Edit with empty string (same as AWS) - should auto-skip
 	output, err := uc.Execute(t.Context(), usecasestaging.EditInput{
-		Name:  "/app/config",
+		Key:   staging.EntryKey{Name: "/app/config"},
 		Value: "", // Same as AWS empty string
 	})
 	require.NoError(t, err)
 	assert.True(t, output.Skipped, "should auto-skip when editing to same empty string")
 
 	// Verify nothing was staged
-	_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/config", "")
+	_, err = store.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config", Namespace: ""})
 	assert.ErrorIs(t, err, staging.ErrNotStaged)
 }
 
@@ -583,14 +583,14 @@ func TestEditUseCase_Execute_EmptyStringValue_Stage(t *testing.T) {
 
 	// Edit to non-empty value - should stage
 	output, err := uc.Execute(t.Context(), usecasestaging.EditInput{
-		Name:  "/app/config",
+		Key:   staging.EntryKey{Name: "/app/config"},
 		Value: "new-value",
 	})
 	require.NoError(t, err)
 	assert.False(t, output.Skipped)
 
 	// Verify entry was staged
-	entry, err := store.GetEntry(t.Context(), staging.ServiceParam, "/app/config", "")
+	entry, err := store.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config", Namespace: ""})
 	require.NoError(t, err)
 	assert.Equal(t, "new-value", lo.FromPtr(entry.Value))
 }
@@ -614,7 +614,7 @@ func TestEditUseCase_Baseline_NotStaged_FetchesFromAWS(t *testing.T) {
 		Store:    store,
 	}
 
-	output, err := uc.Baseline(t.Context(), usecasestaging.BaselineInput{Name: "/app/config"})
+	output, err := uc.Baseline(t.Context(), usecasestaging.BaselineInput{Key: staging.EntryKey{Name: "/app/config"}})
 	require.NoError(t, err)
 	assert.Equal(t, "aws-value", output.Value)
 	assert.False(t, output.IsStagedEdit)
@@ -627,7 +627,7 @@ func TestEditUseCase_Baseline_Staged(t *testing.T) {
 	store := testutil.NewMockStore()
 
 	// Pre-stage an UPDATE operation
-	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
+	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("staged-value"),
 		StagedAt:  time.Now(),
@@ -644,7 +644,7 @@ func TestEditUseCase_Baseline_Staged(t *testing.T) {
 		Store:    store,
 	}
 
-	output, err := uc.Baseline(t.Context(), usecasestaging.BaselineInput{Name: "/app/config"})
+	output, err := uc.Baseline(t.Context(), usecasestaging.BaselineInput{Key: staging.EntryKey{Name: "/app/config"}})
 	require.NoError(t, err)
 	assert.Equal(t, "staged-value", output.Value)
 	assert.True(t, output.IsStagedEdit)
@@ -668,14 +668,14 @@ func TestEditUseCase_Execute_NotStaged_StagesFromAWS(t *testing.T) {
 	}
 
 	output, err := uc.Execute(t.Context(), usecasestaging.EditInput{
-		Name:  "/app/config",
+		Key:   staging.EntryKey{Name: "/app/config"},
 		Value: "new-value",
 	})
 	require.NoError(t, err)
 	assert.False(t, output.Skipped)
 	assert.False(t, output.Unstaged)
 
-	entry, err := store.GetEntry(t.Context(), staging.ServiceParam, "/app/config", "")
+	entry, err := store.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config", Namespace: ""})
 	require.NoError(t, err)
 	assert.Equal(t, staging.OperationUpdate, entry.Operation)
 	assert.Equal(t, "new-value", lo.FromPtr(entry.Value))
@@ -699,7 +699,7 @@ func TestEditUseCase_Execute_NotStaged_SameAsAWS(t *testing.T) {
 	}
 
 	output, err := uc.Execute(t.Context(), usecasestaging.EditInput{
-		Name:  "/app/config",
+		Key:   staging.EntryKey{Name: "/app/config"},
 		Value: "aws-value", // Same as AWS
 	})
 	require.NoError(t, err)
@@ -707,7 +707,7 @@ func TestEditUseCase_Execute_NotStaged_SameAsAWS(t *testing.T) {
 	assert.False(t, output.Unstaged)
 
 	// Verify nothing was staged
-	_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/config", "")
+	_, err = store.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config", Namespace: ""})
 	assert.ErrorIs(t, err, staging.ErrNotStaged)
 }
 
@@ -718,7 +718,7 @@ func TestEditUseCase_Execute_StagedCreate_SkipsAWSFetch(t *testing.T) {
 	store := testutil.NewMockStore()
 
 	// Pre-stage a CREATE operation
-	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/new", staging.Entry{
+	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/new"}, staging.Entry{
 		Operation: staging.OperationCreate,
 		Value:     lo.ToPtr("initial-value"),
 		StagedAt:  time.Now(),
@@ -735,7 +735,7 @@ func TestEditUseCase_Execute_StagedCreate_SkipsAWSFetch(t *testing.T) {
 
 	// This should succeed without calling FetchCurrentValue
 	output, err := uc.Execute(t.Context(), usecasestaging.EditInput{
-		Name:  "/app/new",
+		Key:   staging.EntryKey{Name: "/app/new"},
 		Value: "updated-value",
 	})
 	require.NoError(t, err)
@@ -743,7 +743,7 @@ func TestEditUseCase_Execute_StagedCreate_SkipsAWSFetch(t *testing.T) {
 	assert.False(t, output.Unstaged)
 
 	// Verify entry was updated
-	entry, err := store.GetEntry(t.Context(), staging.ServiceParam, "/app/new", "")
+	entry, err := store.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/new", Namespace: ""})
 	require.NoError(t, err)
 	assert.Equal(t, staging.OperationCreate, entry.Operation)
 	assert.Equal(t, "updated-value", lo.FromPtr(entry.Value))
@@ -764,7 +764,7 @@ func TestEditUseCase_Execute_GetEntryError(t *testing.T) {
 	}
 
 	_, err := uc.Execute(t.Context(), usecasestaging.EditInput{
-		Name:  "/app/config",
+		Key:   staging.EntryKey{Name: "/app/config"},
 		Value: "new-value",
 	})
 	require.Error(t, err)
@@ -785,7 +785,7 @@ func TestEditUseCase_Baseline_GetEntryError(t *testing.T) {
 		Store:    store,
 	}
 
-	_, err := uc.Baseline(t.Context(), usecasestaging.BaselineInput{Name: "/app/config"})
+	_, err := uc.Baseline(t.Context(), usecasestaging.BaselineInput{Key: staging.EntryKey{Name: "/app/config"}})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "storage unavailable")
 }

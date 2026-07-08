@@ -71,9 +71,26 @@ func (r *ApplyRunner) RunInteractive(ctx context.Context, opts ApplyOptions) err
 	}
 
 	// Validate the target name if specified: staged as an entry OR a tag change.
+	// Items are keyed by EntryKey (name, namespace), so match on the key's name —
+	// a name may be staged under several App Configuration namespaces.
 	if opts.Name != "" {
-		_, entryStaged := serviceEntries[opts.Name]
-		_, tagStaged := serviceTags[opts.Name]
+		entryStaged, tagStaged := false, false
+
+		for key := range serviceEntries {
+			if key.Name == opts.Name {
+				entryStaged = true
+
+				break
+			}
+		}
+
+		for key := range serviceTags {
+			if key.Name == opts.Name {
+				tagStaged = true
+
+				break
+			}
+		}
 
 		if !entryStaged && !tagStaged {
 			return fmt.Errorf("%s is not staged", opts.Name)

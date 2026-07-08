@@ -71,13 +71,13 @@ func TestAzureKeyVaultStage_Workflow(t *testing.T) {
 	require.NoError(t, err)
 
 	now := time.Now()
-	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceSecret, updateName, staging.Entry{
+	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceSecret, staging.EntryKey{Name: updateName}, staging.Entry{
 		Operation: staging.OperationUpdate, Value: lo.ToPtr("staged-value"), StagedAt: now,
 	}))
-	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceSecret, createName, staging.Entry{
+	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceSecret, staging.EntryKey{Name: createName}, staging.Entry{
 		Operation: staging.OperationCreate, Value: lo.ToPtr("created-value"), StagedAt: now,
 	}))
-	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceSecret, deleteName, staging.Entry{
+	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceSecret, staging.EntryKey{Name: deleteName}, staging.Entry{
 		Operation: staging.OperationDelete, StagedAt: now,
 	}))
 
@@ -153,10 +153,10 @@ func TestAzureAppConfigStage_Workflow(t *testing.T) {
 	require.NoError(t, err)
 
 	now := time.Now()
-	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, updateName, staging.Entry{
+	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: updateName}, staging.Entry{
 		Operation: staging.OperationUpdate, Value: lo.ToPtr("staged-value"), StagedAt: now,
 	}))
-	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, createName, staging.Entry{
+	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: createName}, staging.Entry{
 		Operation: staging.OperationCreate, Value: lo.ToPtr("created-value"), StagedAt: now,
 	}))
 

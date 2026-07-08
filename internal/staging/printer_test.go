@@ -150,7 +150,7 @@ func TestEntryPrinter_PrintEntry(t *testing.T) {
 
 			printer := &staging.EntryPrinter{Writer: &buf}
 
-			printer.PrintEntry(tt.entryName, tt.entry, tt.verbose, tt.showDeleteOptions)
+			printer.PrintEntry(staging.EntryKey{Name: tt.entryName}, tt.entry, tt.verbose, tt.showDeleteOptions)
 
 			output := buf.String()
 

@@ -51,10 +51,11 @@ func TestApp_StagingStatus(t *testing.T) {
 		app := setupTestApp(t)
 
 		// Stage a param entry
-		err := app.stagingStore.StageEntry(app.ctx, staging.ServiceParam, "/app/config", staging.Entry{
+		err := app.stagingStore.StageEntry(app.ctx, staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("test-value"),
 		})
+
 		require.NoError(t, err)
 
 		result, err := app.StagingStatus()
@@ -69,9 +70,10 @@ func TestApp_StagingStatus(t *testing.T) {
 		app := setupTestApp(t)
 
 		// Stage tag changes
-		err := app.stagingStore.StageTag(app.ctx, staging.ServiceSecret, "my-secret", staging.TagEntry{
+		err := app.stagingStore.StageTag(app.ctx, staging.ServiceSecret, staging.EntryKey{Name: "my-secret"}, staging.TagEntry{
 			Add: map[string]string{"env": "prod"},
 		})
+
 		require.NoError(t, err)
 
 		result, err := app.StagingStatus()
@@ -90,10 +92,11 @@ func TestApp_StagingUnstage(t *testing.T) {
 		app := setupTestApp(t)
 
 		// Stage an entry
-		err := app.stagingStore.StageEntry(app.ctx, staging.ServiceParam, "/app/config", staging.Entry{
+		err := app.stagingStore.StageEntry(app.ctx, staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("value"),
 		})
+
 		require.NoError(t, err)
 
 		// Unstage it
@@ -126,18 +129,19 @@ func TestApp_StagingCancelAddTag(t *testing.T) {
 		app := setupTestApp(t)
 
 		// Stage multiple tags
-		err := app.stagingStore.StageTag(app.ctx, staging.ServiceParam, "/app/config", staging.TagEntry{
+		err := app.stagingStore.StageTag(app.ctx, staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.TagEntry{
 			Add: map[string]string{"env": "prod", "team": "backend"},
 		})
+
 		require.NoError(t, err)
 
 		// Cancel one tag
-		result, err := app.StagingCancelAddTag("param", "/app/config", "env")
+		result, err := app.StagingCancelAddTag("param", "/app/config", "env", "")
 		require.NoError(t, err)
 		assert.Equal(t, "/app/config", result.Name)
 
 		// Verify only team remains
-		tagEntry, err := app.stagingStore.GetTag(app.ctx, staging.ServiceParam, "/app/config")
+		tagEntry, err := app.stagingStore.GetTag(app.ctx, staging.ServiceParam, staging.EntryKey{Name: "/app/config"})
 		require.NoError(t, err)
 		assert.NotContains(t, tagEntry.Add, "env")
 		assert.Contains(t, tagEntry.Add, "team")
@@ -148,17 +152,18 @@ func TestApp_StagingCancelAddTag(t *testing.T) {
 		app := setupTestApp(t)
 
 		// Stage single tag
-		err := app.stagingStore.StageTag(app.ctx, staging.ServiceParam, "/app/config", staging.TagEntry{
+		err := app.stagingStore.StageTag(app.ctx, staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.TagEntry{
 			Add: map[string]string{"env": "prod"},
 		})
+
 		require.NoError(t, err)
 
 		// Cancel the only tag
-		_, err = app.StagingCancelAddTag("param", "/app/config", "env")
+		_, err = app.StagingCancelAddTag("param", "/app/config", "env", "")
 		require.NoError(t, err)
 
 		// Verify tag entry is removed
-		_, err = app.stagingStore.GetTag(app.ctx, staging.ServiceParam, "/app/config")
+		_, err = app.stagingStore.GetTag(app.ctx, staging.ServiceParam, staging.EntryKey{Name: "/app/config"})
 		assert.ErrorIs(t, err, staging.ErrNotStaged)
 	})
 }
@@ -180,10 +185,11 @@ func TestApp_StagingCheckStatus(t *testing.T) {
 		t.Parallel()
 		app := setupTestApp(t)
 
-		err := app.stagingStore.StageEntry(app.ctx, staging.ServiceParam, "/app/config", staging.Entry{
+		err := app.stagingStore.StageEntry(app.ctx, staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("value"),
 		})
+
 		require.NoError(t, err)
 
 		result, err := app.StagingCheckStatus("param", "/app/config", "")
@@ -196,9 +202,10 @@ func TestApp_StagingCheckStatus(t *testing.T) {
 		t.Parallel()
 		app := setupTestApp(t)
 
-		err := app.stagingStore.StageTag(app.ctx, staging.ServiceParam, "/app/config", staging.TagEntry{
+		err := app.stagingStore.StageTag(app.ctx, staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.TagEntry{
 			Add: map[string]string{"env": "prod"},
 		})
+
 		require.NoError(t, err)
 
 		result, err := app.StagingCheckStatus("param", "/app/config", "")
@@ -211,15 +218,17 @@ func TestApp_StagingCheckStatus(t *testing.T) {
 		t.Parallel()
 		app := setupTestApp(t)
 
-		err := app.stagingStore.StageEntry(app.ctx, staging.ServiceParam, "/app/config", staging.Entry{
+		err := app.stagingStore.StageEntry(app.ctx, staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("value"),
 		})
+
 		require.NoError(t, err)
 
-		err = app.stagingStore.StageTag(app.ctx, staging.ServiceParam, "/app/config", staging.TagEntry{
+		err = app.stagingStore.StageTag(app.ctx, staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.TagEntry{
 			Add: map[string]string{"env": "prod"},
 		})
+
 		require.NoError(t, err)
 
 		result, err := app.StagingCheckStatus("param", "/app/config", "")
@@ -266,18 +275,19 @@ func TestApp_StagingCancelRemoveTag(t *testing.T) {
 		app := setupTestApp(t)
 
 		// Stage multiple remove tags
-		err := app.stagingStore.StageTag(app.ctx, staging.ServiceParam, "/app/config", staging.TagEntry{
+		err := app.stagingStore.StageTag(app.ctx, staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.TagEntry{
 			Remove: maputil.NewSet("env", "team"),
 		})
+
 		require.NoError(t, err)
 
 		// Cancel one tag removal
-		result, err := app.StagingCancelRemoveTag("param", "/app/config", "env")
+		result, err := app.StagingCancelRemoveTag("param", "/app/config", "env", "")
 		require.NoError(t, err)
 		assert.Equal(t, "/app/config", result.Name)
 
 		// Verify only team remains in remove list
-		tagEntry, err := app.stagingStore.GetTag(app.ctx, staging.ServiceParam, "/app/config")
+		tagEntry, err := app.stagingStore.GetTag(app.ctx, staging.ServiceParam, staging.EntryKey{Name: "/app/config"})
 		require.NoError(t, err)
 		assert.False(t, tagEntry.Remove.Contains("env"))
 		assert.True(t, tagEntry.Remove.Contains("team"))
@@ -288,17 +298,18 @@ func TestApp_StagingCancelRemoveTag(t *testing.T) {
 		app := setupTestApp(t)
 
 		// Stage single remove tag
-		err := app.stagingStore.StageTag(app.ctx, staging.ServiceParam, "/app/config", staging.TagEntry{
+		err := app.stagingStore.StageTag(app.ctx, staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.TagEntry{
 			Remove: maputil.NewSet("env"),
 		})
+
 		require.NoError(t, err)
 
 		// Cancel the only tag
-		_, err = app.StagingCancelRemoveTag("param", "/app/config", "env")
+		_, err = app.StagingCancelRemoveTag("param", "/app/config", "env", "")
 		require.NoError(t, err)
 
 		// Verify tag entry is removed
-		_, err = app.stagingStore.GetTag(app.ctx, staging.ServiceParam, "/app/config")
+		_, err = app.stagingStore.GetTag(app.ctx, staging.ServiceParam, staging.EntryKey{Name: "/app/config"})
 		assert.ErrorIs(t, err, staging.ErrNotStaged)
 	})
 
@@ -307,18 +318,19 @@ func TestApp_StagingCancelRemoveTag(t *testing.T) {
 		app := setupTestApp(t)
 
 		// Stage both add and remove
-		err := app.stagingStore.StageTag(app.ctx, staging.ServiceParam, "/app/config", staging.TagEntry{
+		err := app.stagingStore.StageTag(app.ctx, staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.TagEntry{
 			Add:    map[string]string{"env": "prod"},
 			Remove: maputil.NewSet("team"),
 		})
+
 		require.NoError(t, err)
 
 		// Cancel the remove tag
-		_, err = app.StagingCancelRemoveTag("param", "/app/config", "team")
+		_, err = app.StagingCancelRemoveTag("param", "/app/config", "team", "")
 		require.NoError(t, err)
 
 		// Verify add tags are preserved
-		tagEntry, err := app.stagingStore.GetTag(app.ctx, staging.ServiceParam, "/app/config")
+		tagEntry, err := app.stagingStore.GetTag(app.ctx, staging.ServiceParam, staging.EntryKey{Name: "/app/config"})
 		require.NoError(t, err)
 		assert.Empty(t, tagEntry.Remove)
 		assert.Equal(t, "prod", tagEntry.Add["env"])
@@ -333,29 +345,33 @@ func TestApp_StagingStatus_EdgeCases(t *testing.T) {
 		app := setupTestApp(t)
 
 		// Stage param entry
-		err := app.stagingStore.StageEntry(app.ctx, staging.ServiceParam, "/app/config", staging.Entry{
+		err := app.stagingStore.StageEntry(app.ctx, staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("value1"),
 		})
+
 		require.NoError(t, err)
 
 		// Stage secret entry
-		err = app.stagingStore.StageEntry(app.ctx, staging.ServiceSecret, "my-secret", staging.Entry{
+		err = app.stagingStore.StageEntry(app.ctx, staging.ServiceSecret, staging.EntryKey{Name: "my-secret"}, staging.Entry{
 			Operation: staging.OperationCreate,
 			Value:     lo.ToPtr("secret-value"),
 		})
+
 		require.NoError(t, err)
 
 		// Stage param tag
-		err = app.stagingStore.StageTag(app.ctx, staging.ServiceParam, "/app/other", staging.TagEntry{
+		err = app.stagingStore.StageTag(app.ctx, staging.ServiceParam, staging.EntryKey{Name: "/app/other"}, staging.TagEntry{
 			Add: map[string]string{"env": "prod"},
 		})
+
 		require.NoError(t, err)
 
 		// Stage secret tag
-		err = app.stagingStore.StageTag(app.ctx, staging.ServiceSecret, "other-secret", staging.TagEntry{
+		err = app.stagingStore.StageTag(app.ctx, staging.ServiceSecret, staging.EntryKey{Name: "other-secret"}, staging.TagEntry{
 			Remove: maputil.NewSet("deprecated"),
 		})
+
 		require.NoError(t, err)
 
 		result, err := app.StagingStatus()
@@ -370,9 +386,10 @@ func TestApp_StagingStatus_EdgeCases(t *testing.T) {
 		t.Parallel()
 		app := setupTestApp(t)
 
-		err := app.stagingStore.StageEntry(app.ctx, staging.ServiceParam, "/to-delete", staging.Entry{
+		err := app.stagingStore.StageEntry(app.ctx, staging.ServiceParam, staging.EntryKey{Name: "/to-delete"}, staging.Entry{
 			Operation: staging.OperationDelete,
 		})
+
 		require.NoError(t, err)
 
 		result, err := app.StagingStatus()
@@ -386,10 +403,11 @@ func TestApp_StagingStatus_EdgeCases(t *testing.T) {
 		t.Parallel()
 		app := setupTestApp(t)
 
-		err := app.stagingStore.StageTag(app.ctx, staging.ServiceParam, "/app/config", staging.TagEntry{
+		err := app.stagingStore.StageTag(app.ctx, staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.TagEntry{
 			Add:    map[string]string{"env": "prod", "team": "backend"},
 			Remove: maputil.NewSet("deprecated", "old"),
 		})
+
 		require.NoError(t, err)
 
 		result, err := app.StagingStatus()
@@ -410,11 +428,12 @@ func TestApp_StagingReset(t *testing.T) {
 		app := setupTestApp(t)
 
 		// Stage entries in both services
-		_ = app.stagingStore.StageEntry(app.ctx, staging.ServiceParam, "/app/config", staging.Entry{
+		_ = app.stagingStore.StageEntry(app.ctx, staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("value"),
 		})
-		_ = app.stagingStore.StageEntry(app.ctx, staging.ServiceSecret, "my-secret", staging.Entry{
+
+		_ = app.stagingStore.StageEntry(app.ctx, staging.ServiceSecret, staging.EntryKey{Name: "my-secret"}, staging.Entry{
 			Operation: staging.OperationCreate,
 			Value:     lo.ToPtr("secret"),
 		})
@@ -437,11 +456,12 @@ func TestApp_StagingReset(t *testing.T) {
 		app := setupTestApp(t)
 
 		// Stage entries in both services
-		_ = app.stagingStore.StageEntry(app.ctx, staging.ServiceParam, "/app/config", staging.Entry{
+		_ = app.stagingStore.StageEntry(app.ctx, staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("value"),
 		})
-		_ = app.stagingStore.StageEntry(app.ctx, staging.ServiceSecret, "my-secret", staging.Entry{
+
+		_ = app.stagingStore.StageEntry(app.ctx, staging.ServiceSecret, staging.EntryKey{Name: "my-secret"}, staging.Entry{
 			Operation: staging.OperationCreate,
 			Value:     lo.ToPtr("secret"),
 		})
@@ -533,7 +553,7 @@ func TestFileDrainPersist(t *testing.T) {
 
 		// Create state with entries
 		state := staging.NewEmptyState()
-		state.Entries[staging.ServiceParam]["/app/config"] = staging.Entry{
+		state.Entries[staging.ServiceParam][staging.EntryKey{Name: "/app/config"}] = staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("test-value"),
 		}
@@ -555,7 +575,7 @@ func TestFileDrainPersist(t *testing.T) {
 		// Drain (read back)
 		drainedState, err := fileStore.Drain(context.Background(), "", true)
 		require.NoError(t, err)
-		assert.Equal(t, "test-value", lo.FromPtr(drainedState.Entries[staging.ServiceParam]["/app/config"].Value))
+		assert.Equal(t, "test-value", lo.FromPtr(drainedState.Entries[staging.ServiceParam][staging.EntryKey{Name: "/app/config"}].Value))
 	})
 
 	t.Run("persist and drain cycle - encrypted", func(t *testing.T) {
@@ -570,7 +590,7 @@ func TestFileDrainPersist(t *testing.T) {
 
 		// Create state
 		state := staging.NewEmptyState()
-		state.Entries[staging.ServiceSecret]["my-secret"] = staging.Entry{
+		state.Entries[staging.ServiceSecret][staging.EntryKey{Name: "my-secret"}] = staging.Entry{
 			Operation: staging.OperationCreate,
 			Value:     lo.ToPtr("secret-value"),
 		}
@@ -587,7 +607,7 @@ func TestFileDrainPersist(t *testing.T) {
 		// Drain with correct passphrase
 		drainedState, err := fileStore.Drain(context.Background(), "", true)
 		require.NoError(t, err)
-		assert.Equal(t, "secret-value", lo.FromPtr(drainedState.Entries[staging.ServiceSecret]["my-secret"].Value))
+		assert.Equal(t, "secret-value", lo.FromPtr(drainedState.Entries[staging.ServiceSecret][staging.EntryKey{Name: "my-secret"}].Value))
 
 		// Drain with wrong passphrase should fail
 		wrongStore := file.NewStoreWithPath(localFilePath)
@@ -607,7 +627,7 @@ func TestFileDrainPersist(t *testing.T) {
 
 		// Create and write state
 		state := staging.NewEmptyState()
-		state.Entries[staging.ServiceParam]["/test"] = staging.Entry{
+		state.Entries[staging.ServiceParam][staging.EntryKey{Name: "/test"}] = staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("value"),
 		}
@@ -636,7 +656,7 @@ func TestFileDrainPersist(t *testing.T) {
 
 		// Create state with tags only (no entries)
 		state := staging.NewEmptyState()
-		state.Tags[staging.ServiceParam]["/app/config"] = staging.TagEntry{
+		state.Tags[staging.ServiceParam][staging.EntryKey{Name: "/app/config"}] = staging.TagEntry{
 			Add:    map[string]string{"env": "prod"},
 			Remove: maputil.NewSet("deprecated"),
 		}
@@ -647,8 +667,8 @@ func TestFileDrainPersist(t *testing.T) {
 		// Drain and verify
 		drainedState, err := fileStore.Drain(context.Background(), "", true)
 		require.NoError(t, err)
-		assert.Equal(t, "prod", drainedState.Tags[staging.ServiceParam]["/app/config"].Add["env"])
-		assert.True(t, drainedState.Tags[staging.ServiceParam]["/app/config"].Remove.Contains("deprecated"))
+		assert.Equal(t, "prod", drainedState.Tags[staging.ServiceParam][staging.EntryKey{Name: "/app/config"}].Add["env"])
+		assert.True(t, drainedState.Tags[staging.ServiceParam][staging.EntryKey{Name: "/app/config"}].Remove.Contains("deprecated"))
 	})
 
 	t.Run("persist multiple services", func(t *testing.T) {
@@ -661,11 +681,11 @@ func TestFileDrainPersist(t *testing.T) {
 
 		// Create state with both services
 		state := staging.NewEmptyState()
-		state.Entries[staging.ServiceParam]["/app/config"] = staging.Entry{
+		state.Entries[staging.ServiceParam][staging.EntryKey{Name: "/app/config"}] = staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("param-value"),
 		}
-		state.Entries[staging.ServiceSecret]["my-secret"] = staging.Entry{
+		state.Entries[staging.ServiceSecret][staging.EntryKey{Name: "my-secret"}] = staging.Entry{
 			Operation: staging.OperationCreate,
 			Value:     lo.ToPtr("secret-value"),
 		}
@@ -676,8 +696,8 @@ func TestFileDrainPersist(t *testing.T) {
 		// Drain and verify both services
 		drainedState, err := fileStore.Drain(context.Background(), "", true)
 		require.NoError(t, err)
-		assert.Equal(t, "param-value", lo.FromPtr(drainedState.Entries[staging.ServiceParam]["/app/config"].Value))
-		assert.Equal(t, "secret-value", lo.FromPtr(drainedState.Entries[staging.ServiceSecret]["my-secret"].Value))
+		assert.Equal(t, "param-value", lo.FromPtr(drainedState.Entries[staging.ServiceParam][staging.EntryKey{Name: "/app/config"}].Value))
+		assert.Equal(t, "secret-value", lo.FromPtr(drainedState.Entries[staging.ServiceSecret][staging.EntryKey{Name: "my-secret"}].Value))
 	})
 
 	t.Run("drain nonexistent file returns empty state", func(t *testing.T) {
@@ -709,7 +729,7 @@ func TestFileDrainPersist(t *testing.T) {
 
 		// Write first state
 		state1 := staging.NewEmptyState()
-		state1.Entries[staging.ServiceParam]["/first"] = staging.Entry{
+		state1.Entries[staging.ServiceParam][staging.EntryKey{Name: "/first"}] = staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("first-value"),
 		}
@@ -718,7 +738,7 @@ func TestFileDrainPersist(t *testing.T) {
 
 		// Overwrite with second state
 		state2 := staging.NewEmptyState()
-		state2.Entries[staging.ServiceParam]["/second"] = staging.Entry{
+		state2.Entries[staging.ServiceParam][staging.EntryKey{Name: "/second"}] = staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("second-value"),
 		}
@@ -728,8 +748,8 @@ func TestFileDrainPersist(t *testing.T) {
 		// Drain should only have second state
 		drainedState, err := fileStore.Drain(context.Background(), "", true)
 		require.NoError(t, err)
-		assert.NotContains(t, drainedState.Entries[staging.ServiceParam], "/first")
-		assert.Contains(t, drainedState.Entries[staging.ServiceParam], "/second")
+		assert.NotContains(t, drainedState.Entries[staging.ServiceParam], staging.EntryKey{Name: "/first"})
+		assert.Contains(t, drainedState.Entries[staging.ServiceParam], staging.EntryKey{Name: "/second"})
 	})
 }
 
@@ -778,10 +798,11 @@ func TestApp_StagingUnstage_ErrorPaths(t *testing.T) {
 		mockStore := app.stagingStore.(*testutil.MockStore) //nolint:forcetypeassert // test helper
 
 		// Stage an entry first
-		err := app.stagingStore.StageEntry(app.ctx, staging.ServiceParam, "/test", staging.Entry{
+		err := app.stagingStore.StageEntry(app.ctx, staging.ServiceParam, staging.EntryKey{Name: "/test"}, staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("value"),
 		})
+
 		require.NoError(t, err)
 
 		// Inject error
@@ -798,9 +819,10 @@ func TestApp_StagingUnstage_ErrorPaths(t *testing.T) {
 		mockStore := app.stagingStore.(*testutil.MockStore) //nolint:forcetypeassert // test helper
 
 		// Stage a tag first
-		err := app.stagingStore.StageTag(app.ctx, staging.ServiceParam, "/test", staging.TagEntry{
+		err := app.stagingStore.StageTag(app.ctx, staging.ServiceParam, staging.EntryKey{Name: "/test"}, staging.TagEntry{
 			Add: map[string]string{"key": "value"},
 		})
+
 		require.NoError(t, err)
 
 		// Inject error
@@ -819,7 +841,7 @@ func TestApp_StagingCancelAddTag_ErrorPaths(t *testing.T) {
 		t.Parallel()
 		app := setupTestApp(t)
 
-		_, err := app.StagingCancelAddTag("invalid", "/test", "key")
+		_, err := app.StagingCancelAddTag("invalid", "/test", "key", "")
 		assert.ErrorIs(t, err, errInvalidService)
 	})
 
@@ -827,7 +849,7 @@ func TestApp_StagingCancelAddTag_ErrorPaths(t *testing.T) {
 		t.Parallel()
 		app := setupTestApp(t)
 
-		_, err := app.StagingCancelAddTag("param", "/nonexistent", "key")
+		_, err := app.StagingCancelAddTag("param", "/nonexistent", "key", "")
 		assert.ErrorIs(t, err, staging.ErrNotStaged)
 	})
 
@@ -837,16 +859,17 @@ func TestApp_StagingCancelAddTag_ErrorPaths(t *testing.T) {
 		mockStore := app.stagingStore.(*testutil.MockStore) //nolint:forcetypeassert // test helper
 
 		// Stage multiple add tags
-		err := app.stagingStore.StageTag(app.ctx, staging.ServiceParam, "/test", staging.TagEntry{
+		err := app.stagingStore.StageTag(app.ctx, staging.ServiceParam, staging.EntryKey{Name: "/test"}, staging.TagEntry{
 			Add: map[string]string{"key1": "val1", "key2": "val2"},
 		})
+
 		require.NoError(t, err)
 
 		// Inject error for restaging
 		mockStore.StageTagErr = context.DeadlineExceeded
 
 		// Cancel one tag (should fail when restaging)
-		_, err = app.StagingCancelAddTag("param", "/test", "key1")
+		_, err = app.StagingCancelAddTag("param", "/test", "key1", "")
 		require.Error(t, err)
 		assert.ErrorIs(t, err, context.DeadlineExceeded)
 	})
@@ -857,16 +880,17 @@ func TestApp_StagingCancelAddTag_ErrorPaths(t *testing.T) {
 		mockStore := app.stagingStore.(*testutil.MockStore) //nolint:forcetypeassert // test helper
 
 		// Stage single add tag
-		err := app.stagingStore.StageTag(app.ctx, staging.ServiceParam, "/test", staging.TagEntry{
+		err := app.stagingStore.StageTag(app.ctx, staging.ServiceParam, staging.EntryKey{Name: "/test"}, staging.TagEntry{
 			Add: map[string]string{"key": "value"},
 		})
+
 		require.NoError(t, err)
 
 		// Inject error for unstaging
 		mockStore.UnstageTagErr = context.DeadlineExceeded
 
 		// Cancel the only tag (should fail when trying to unstage)
-		_, err = app.StagingCancelAddTag("param", "/test", "key")
+		_, err = app.StagingCancelAddTag("param", "/test", "key", "")
 		require.Error(t, err)
 		assert.ErrorIs(t, err, context.DeadlineExceeded)
 	})
@@ -879,7 +903,7 @@ func TestApp_StagingCancelRemoveTag_ErrorPaths(t *testing.T) {
 		t.Parallel()
 		app := setupTestApp(t)
 
-		_, err := app.StagingCancelRemoveTag("invalid", "/test", "key")
+		_, err := app.StagingCancelRemoveTag("invalid", "/test", "key", "")
 		assert.ErrorIs(t, err, errInvalidService)
 	})
 
@@ -887,7 +911,7 @@ func TestApp_StagingCancelRemoveTag_ErrorPaths(t *testing.T) {
 		t.Parallel()
 		app := setupTestApp(t)
 
-		_, err := app.StagingCancelRemoveTag("param", "/nonexistent", "key")
+		_, err := app.StagingCancelRemoveTag("param", "/nonexistent", "key", "")
 		assert.ErrorIs(t, err, staging.ErrNotStaged)
 	})
 
@@ -897,16 +921,17 @@ func TestApp_StagingCancelRemoveTag_ErrorPaths(t *testing.T) {
 		mockStore := app.stagingStore.(*testutil.MockStore) //nolint:forcetypeassert // test helper
 
 		// Stage multiple remove tags
-		err := app.stagingStore.StageTag(app.ctx, staging.ServiceParam, "/test", staging.TagEntry{
+		err := app.stagingStore.StageTag(app.ctx, staging.ServiceParam, staging.EntryKey{Name: "/test"}, staging.TagEntry{
 			Remove: maputil.NewSet("key1", "key2"),
 		})
+
 		require.NoError(t, err)
 
 		// Inject error for restaging
 		mockStore.StageTagErr = context.DeadlineExceeded
 
 		// Cancel one tag (should fail when restaging)
-		_, err = app.StagingCancelRemoveTag("param", "/test", "key1")
+		_, err = app.StagingCancelRemoveTag("param", "/test", "key1", "")
 		require.Error(t, err)
 		assert.ErrorIs(t, err, context.DeadlineExceeded)
 	})
@@ -917,16 +942,17 @@ func TestApp_StagingCancelRemoveTag_ErrorPaths(t *testing.T) {
 		mockStore := app.stagingStore.(*testutil.MockStore) //nolint:forcetypeassert // test helper
 
 		// Stage single remove tag
-		err := app.stagingStore.StageTag(app.ctx, staging.ServiceParam, "/test", staging.TagEntry{
+		err := app.stagingStore.StageTag(app.ctx, staging.ServiceParam, staging.EntryKey{Name: "/test"}, staging.TagEntry{
 			Remove: maputil.NewSet("key"),
 		})
+
 		require.NoError(t, err)
 
 		// Inject error for unstaging
 		mockStore.UnstageTagErr = context.DeadlineExceeded
 
 		// Cancel the only tag (should fail when trying to unstage)
-		_, err = app.StagingCancelRemoveTag("param", "/test", "key")
+		_, err = app.StagingCancelRemoveTag("param", "/test", "key", "")
 		require.Error(t, err)
 		assert.ErrorIs(t, err, context.DeadlineExceeded)
 	})
@@ -953,10 +979,11 @@ func TestApp_StagingReset_ErrorPaths(t *testing.T) {
 		mockStore := app.stagingStore.(*testutil.MockStore) //nolint:forcetypeassert // test helper
 
 		// Stage an entry
-		err := app.stagingStore.StageEntry(app.ctx, staging.ServiceParam, "/test", staging.Entry{
+		err := app.stagingStore.StageEntry(app.ctx, staging.ServiceParam, staging.EntryKey{Name: "/test"}, staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("value"),
 		})
+
 		require.NoError(t, err)
 
 		// Inject error
@@ -980,23 +1007,26 @@ func TestApp_StagingStatus_AllOperations(t *testing.T) {
 		app := setupTestApp(t)
 
 		// Create operation
-		err := app.stagingStore.StageEntry(app.ctx, staging.ServiceParam, "/create", staging.Entry{
+		err := app.stagingStore.StageEntry(app.ctx, staging.ServiceParam, staging.EntryKey{Name: "/create"}, staging.Entry{
 			Operation: staging.OperationCreate,
 			Value:     lo.ToPtr("new-value"),
 		})
+
 		require.NoError(t, err)
 
 		// Update operation
-		err = app.stagingStore.StageEntry(app.ctx, staging.ServiceParam, "/update", staging.Entry{
+		err = app.stagingStore.StageEntry(app.ctx, staging.ServiceParam, staging.EntryKey{Name: "/update"}, staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("updated-value"),
 		})
+
 		require.NoError(t, err)
 
 		// Delete operation
-		err = app.stagingStore.StageEntry(app.ctx, staging.ServiceParam, "/delete", staging.Entry{
+		err = app.stagingStore.StageEntry(app.ctx, staging.ServiceParam, staging.EntryKey{Name: "/delete"}, staging.Entry{
 			Operation: staging.OperationDelete,
 		})
+
 		require.NoError(t, err)
 
 		result, err := app.StagingStatus()
@@ -1024,9 +1054,10 @@ func TestApp_StagingCheckStatus_BothEntryAndTags(t *testing.T) {
 		mockStore := app.stagingStore.(*testutil.MockStore) //nolint:forcetypeassert // test helper
 
 		// Stage a tag (no entry)
-		err := app.stagingStore.StageTag(app.ctx, staging.ServiceParam, "/test", staging.TagEntry{
+		err := app.stagingStore.StageTag(app.ctx, staging.ServiceParam, staging.EntryKey{Name: "/test"}, staging.TagEntry{
 			Add: map[string]string{"key": "value"},
 		})
+
 		require.NoError(t, err)
 
 		// GetEntryErr is not staging.ErrNotStaged, but GetEntry returns error for non-existent
@@ -1052,15 +1083,17 @@ func TestApp_StagingUnstage_BothEntryAndTag(t *testing.T) {
 		app := setupTestApp(t)
 
 		// Stage both entry and tag for the same item
-		err := app.stagingStore.StageEntry(app.ctx, staging.ServiceParam, "/app/config", staging.Entry{
+		err := app.stagingStore.StageEntry(app.ctx, staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("value"),
 		})
+
 		require.NoError(t, err)
 
-		err = app.stagingStore.StageTag(app.ctx, staging.ServiceParam, "/app/config", staging.TagEntry{
+		err = app.stagingStore.StageTag(app.ctx, staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.TagEntry{
 			Add: map[string]string{"env": "prod"},
 		})
+
 		require.NoError(t, err)
 
 		// Verify both are staged
@@ -1090,16 +1123,18 @@ func TestApp_StagingReset_ResetBothEntriesAndTags(t *testing.T) {
 		app := setupTestApp(t)
 
 		// Stage entries
-		err := app.stagingStore.StageEntry(app.ctx, staging.ServiceParam, "/entry1", staging.Entry{
+		err := app.stagingStore.StageEntry(app.ctx, staging.ServiceParam, staging.EntryKey{Name: "/entry1"}, staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("value1"),
 		})
+
 		require.NoError(t, err)
 
 		// Stage tags
-		err = app.stagingStore.StageTag(app.ctx, staging.ServiceParam, "/tag1", staging.TagEntry{
+		err = app.stagingStore.StageTag(app.ctx, staging.ServiceParam, staging.EntryKey{Name: "/tag1"}, staging.TagEntry{
 			Add: map[string]string{"key": "value"},
 		})
+
 		require.NoError(t, err)
 
 		// Verify staged

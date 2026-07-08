@@ -11,7 +11,6 @@ import (
 
 	"github.com/mpyw/suve/internal/cli/confirm"
 	"github.com/mpyw/suve/internal/cli/output"
-	"github.com/mpyw/suve/internal/maputil"
 	"github.com/mpyw/suve/internal/parallel"
 	"github.com/mpyw/suve/internal/staging"
 	stgcli "github.com/mpyw/suve/internal/staging/cli"
@@ -27,7 +26,7 @@ type ServiceApply struct {
 
 // serviceConflictCheck holds entries and strategy for a single service's conflict checking.
 type serviceConflictCheck struct {
-	entries  map[string]staging.Entry
+	entries  map[staging.EntryKey]staging.Entry
 	strategy staging.ApplyStrategy
 }
 
@@ -182,8 +181,8 @@ func (r *Runner) Run(ctx context.Context) error {
 
 		allConflicts := r.checkAllConflicts(ctx, checks)
 		if len(allConflicts) > 0 {
-			for _, name := range maputil.SortedKeys(allConflicts) {
-				output.Warning(r.Stderr, "conflict detected for %s: %s was modified after staging", name, r.ProviderLabel)
+			for _, key := range staging.SortedEntryKeys(allConflicts) {
+				output.Warning(r.Stderr, "conflict detected for %s: %s was modified after staging", key.Name, r.ProviderLabel)
 			}
 
 			return fmt.Errorf("apply rejected: %d conflict(s) detected (use --ignore-conflicts to force)", len(allConflicts))
@@ -226,34 +225,38 @@ func (r *Runner) Run(ctx context.Context) error {
 	return nil
 }
 
-func (r *Runner) applyService(ctx context.Context, strategy staging.ApplyStrategy, staged map[string]staging.Entry) (succeeded, failed int) {
+func (r *Runner) applyService(
+	ctx context.Context,
+	strategy staging.ApplyStrategy,
+	staged map[staging.EntryKey]staging.Entry,
+) (succeeded, failed int) {
 	service := strategy.Service()
 	serviceName := strategy.ServiceName()
 
-	results := parallel.ExecuteMap(ctx, staged, func(ctx context.Context, name string, entry staging.Entry) (staging.Operation, error) {
-		err := strategy.Apply(ctx, name, entry)
+	results := parallel.ExecuteMap(ctx, staged, func(ctx context.Context, key staging.EntryKey, entry staging.Entry) (staging.Operation, error) {
+		err := strategy.Apply(ctx, key.Name, entry)
 
 		return entry.Operation, err
 	})
 
-	for _, name := range maputil.SortedKeys(staged) {
-		result := results[name]
+	for _, key := range staging.SortedEntryKeys(staged) {
+		result := results[key]
 		if result.Err != nil {
-			output.Failed(r.Stderr, serviceName+": "+name, result.Err)
+			output.Failed(r.Stderr, serviceName+": "+key.Name, result.Err)
 
 			failed++
 		} else {
 			switch result.Value {
 			case staging.OperationCreate:
-				output.Success(r.Stdout, "%s: Created %s", serviceName, name)
+				output.Success(r.Stdout, "%s: Created %s", serviceName, key.Name)
 			case staging.OperationUpdate:
-				output.Success(r.Stdout, "%s: Updated %s", serviceName, name)
+				output.Success(r.Stdout, "%s: Updated %s", serviceName, key.Name)
 			case staging.OperationDelete:
-				output.Success(r.Stdout, "%s: Deleted %s", serviceName, name)
+				output.Success(r.Stdout, "%s: Deleted %s", serviceName, key.Name)
 			}
 
-			if err := r.Store.UnstageEntry(ctx, service, name, ""); err != nil {
-				output.Warning(r.Stderr, "failed to clear staging for %s: %v", name, err)
+			if err := r.Store.UnstageEntry(ctx, service, key); err != nil {
+				output.Warning(r.Stderr, "failed to clear staging for %s: %v", key.Name, err)
 			}
 
 			succeeded++
@@ -263,29 +266,33 @@ func (r *Runner) applyService(ctx context.Context, strategy staging.ApplyStrateg
 	return succeeded, failed
 }
 
-func (r *Runner) applyTagService(ctx context.Context, strategy staging.ApplyStrategy, staged map[string]staging.TagEntry) (succeeded, failed int) {
+func (r *Runner) applyTagService(
+	ctx context.Context,
+	strategy staging.ApplyStrategy,
+	staged map[staging.EntryKey]staging.TagEntry,
+) (succeeded, failed int) {
 	service := strategy.Service()
 	serviceName := strategy.ServiceName()
 
-	results := parallel.ExecuteMap(ctx, staged, func(ctx context.Context, name string, tagEntry staging.TagEntry) (struct{}, error) {
-		err := strategy.ApplyTags(ctx, name, tagEntry)
+	results := parallel.ExecuteMap(ctx, staged, func(ctx context.Context, key staging.EntryKey, tagEntry staging.TagEntry) (struct{}, error) {
+		err := strategy.ApplyTags(ctx, key.Name, tagEntry)
 
 		return struct{}{}, err
 	})
 
-	for _, name := range maputil.SortedKeys(staged) {
-		tagEntry := staged[name]
+	for _, key := range staging.SortedEntryKeys(staged) {
+		tagEntry := staged[key]
 
-		result := results[name]
+		result := results[key]
 		if result.Err != nil {
-			output.Failed(r.Stderr, serviceName+": "+name+" (tags)", result.Err)
+			output.Failed(r.Stderr, serviceName+": "+key.Name+" (tags)", result.Err)
 
 			failed++
 		} else {
-			output.Success(r.Stdout, "%s: Tagged %s%s", serviceName, name, formatTagApplySummary(tagEntry))
+			output.Success(r.Stdout, "%s: Tagged %s%s", serviceName, key.Name, formatTagApplySummary(tagEntry))
 
-			if err := r.Store.UnstageTag(ctx, service, name); err != nil {
-				output.Warning(r.Stderr, "failed to clear staging for %s tags: %v", name, err)
+			if err := r.Store.UnstageTag(ctx, service, key); err != nil {
+				output.Warning(r.Stderr, "failed to clear staging for %s tags: %v", key.Name, err)
 			}
 
 			succeeded++
@@ -313,13 +320,13 @@ func formatTagApplySummary(tagEntry staging.TagEntry) string {
 }
 
 // checkAllConflicts checks all services for conflicts and returns a combined map of conflicting names.
-func (r *Runner) checkAllConflicts(ctx context.Context, checks []serviceConflictCheck) map[string]struct{} {
-	allConflicts := make(map[string]struct{})
+func (r *Runner) checkAllConflicts(ctx context.Context, checks []serviceConflictCheck) map[staging.EntryKey]struct{} {
+	allConflicts := make(map[staging.EntryKey]struct{})
 
 	for _, check := range checks {
 		conflicts := staging.CheckConflicts(ctx, check.strategy, check.entries)
-		for name := range conflicts {
-			allConflicts[name] = struct{}{}
+		for key := range conflicts {
+			allConflicts[key] = struct{}{}
 		}
 	}
 

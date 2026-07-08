@@ -48,7 +48,7 @@ func (r *StatusRunner) Run(ctx context.Context, opts StatusOptions) error {
 	if opts.Name != "" {
 		printer := &staging.EntryPrinter{Writer: r.Stdout}
 		for _, entry := range result.Entries {
-			printer.PrintEntry(entry.Name, toStagingEntry(entry), opts.Verbose, entry.ShowDeleteOptions)
+			printer.PrintEntry(staging.EntryKey{Name: entry.Name, Namespace: entry.Namespace}, toStagingEntry(entry), opts.Verbose, entry.ShowDeleteOptions)
 		}
 
 		for _, tagEntry := range result.TagEntries {
@@ -76,7 +76,7 @@ func (r *StatusRunner) Run(ctx context.Context, opts StatusOptions) error {
 	})
 
 	for _, entry := range entries {
-		printer.PrintEntry(entry.Name, toStagingEntry(entry), opts.Verbose, entry.ShowDeleteOptions)
+		printer.PrintEntry(staging.EntryKey{Name: entry.Name, Namespace: entry.Namespace}, toStagingEntry(entry), opts.Verbose, entry.ShowDeleteOptions)
 	}
 
 	// Print tag entries
@@ -122,7 +122,6 @@ func toStagingEntry(e stagingusecase.StatusEntry) staging.Entry {
 		Operation:     e.Operation,
 		Value:         e.Value,
 		Description:   e.Description,
-		Namespace:     e.Namespace,
 		DeleteOptions: e.DeleteOptions,
 		StagedAt:      e.StagedAt,
 	}

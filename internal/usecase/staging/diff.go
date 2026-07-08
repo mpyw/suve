@@ -45,9 +45,12 @@ type DiffEntry struct {
 
 // DiffTagEntry represents a single diff result for tag changes.
 type DiffTagEntry struct {
-	Name   string
-	Add    map[string]string // Tags to add or update
-	Remove map[string]string // Tags to remove (key=current value from AWS)
+	Name string
+	// Namespace is the App Configuration namespace of the tagged item (empty for
+	// the null/default namespace and every other provider).
+	Namespace string
+	Add       map[string]string // Tags to add or update
+	Remove    map[string]string // Tags to remove (key=current value from AWS)
 }
 
 // DiffOutput holds the result of the diff use case.
@@ -103,21 +106,21 @@ func (u *DiffUseCase) Execute(ctx context.Context, input DiffInput) (*DiffOutput
 
 	tagEntries := allTagEntries[service]
 
-	// Filter by name if specified. Entries/tags are keyed by the (name, namespace)
-	// composite, so match on the decoded bare name — for App Configuration this
-	// diffs the named setting across every namespace it is staged under.
+	// Filter by name if specified. Items are keyed by EntryKey (name, namespace),
+	// so match on the key's name — for App Configuration this diffs the named
+	// setting across every namespace it is staged under.
 	if input.Name != "" {
-		filteredEntries := make(map[string]staging.Entry)
-		filteredTags := make(map[string]staging.TagEntry)
+		filteredEntries := make(map[staging.EntryKey]staging.Entry)
+		filteredTags := make(map[staging.EntryKey]staging.TagEntry)
 
 		for key, entry := range entries {
-			if name, _ := staging.SplitEntryKey(key); name == input.Name {
+			if key.Name == input.Name {
 				filteredEntries[key] = entry
 			}
 		}
 
 		for key, tagEntry := range tagEntries {
-			if name, _ := staging.SplitEntryKey(key); name == input.Name {
+			if key.Name == input.Name {
 				filteredTags[key] = tagEntry
 			}
 		}
@@ -141,36 +144,39 @@ func (u *DiffUseCase) Execute(ctx context.Context, input DiffInput) (*DiffOutput
 	if len(entries) > 0 {
 		// Fetch all current values in parallel, each through the strategy scoped
 		// to its entry's namespace (App Configuration) or the single strategy.
-		results := parallel.ExecuteMap(ctx, entries, func(ctx context.Context, key string, entry staging.Entry) (*staging.FetchResult, error) {
-			name, _ := staging.SplitEntryKey(key)
-
-			strategy, err := u.strategyForNamespace(entry.Namespace)
+		results := parallel.ExecuteMap(ctx, entries, func(ctx context.Context, key staging.EntryKey, _ staging.Entry) (*staging.FetchResult, error) {
+			strategy, err := u.strategyForNamespace(key.Namespace)
 			if err != nil {
 				return nil, err
 			}
 
-			return strategy.FetchCurrent(ctx, name)
+			return strategy.FetchCurrent(ctx, key.Name)
 		})
 
 		// Process results
 		for key, entry := range entries {
-			name, _ := staging.SplitEntryKey(key)
 			result := results[key]
-			diffEntry := u.processDiffResult(ctx, name, entry, result)
+			diffEntry := u.processDiffResult(ctx, key, entry, result)
 			output.Entries = append(output.Entries, diffEntry)
 		}
 	}
 
 	// Process tag entries - fetch current values for removed tags
-	for name, tagEntry := range tagEntries {
+	for key, tagEntry := range tagEntries {
 		diffTagEntry := DiffTagEntry{
-			Name: name,
-			Add:  tagEntry.Add,
+			Name:      key.Name,
+			Namespace: key.Namespace,
+			Add:       tagEntry.Add,
 		}
 
 		// Fetch current tag values for removed tags
 		if tagEntry.Remove.Len() > 0 {
-			currentTags, err := u.Strategy.FetchCurrentTags(ctx, name)
+			strategy, err := u.strategyForNamespace(key.Namespace)
+			if err != nil {
+				return nil, err
+			}
+
+			currentTags, err := strategy.FetchCurrentTags(ctx, key.Name)
 			if err != nil {
 				// If fetch fails, use keys only (fallback to old behavior)
 				diffTagEntry.Remove = make(map[string]string, tagEntry.Remove.Len())
@@ -196,11 +202,11 @@ func (u *DiffUseCase) Execute(ctx context.Context, input DiffInput) (*DiffOutput
 }
 
 //nolint:lll // function parameters are descriptive for clarity
-func (u *DiffUseCase) processDiffResult(ctx context.Context, name string, entry staging.Entry, result *parallel.Result[*staging.FetchResult]) DiffEntry {
+func (u *DiffUseCase) processDiffResult(ctx context.Context, key staging.EntryKey, entry staging.Entry, result *parallel.Result[*staging.FetchResult]) DiffEntry {
 	service := u.Strategy.Service()
 
 	if result.Err != nil {
-		return u.handleFetchError(ctx, name, entry, result.Err)
+		return u.handleFetchError(ctx, key, entry, result.Err)
 	}
 
 	fetchResult := result.Value
@@ -217,19 +223,19 @@ func (u *DiffUseCase) processDiffResult(ctx context.Context, name string, entry 
 	// to be the empty string (legal in Azure App Configuration / Key Vault /
 	// Google Cloud), so an empty-valued delete must not be silently cancelled.
 	if entry.Operation != staging.OperationDelete && awsValue == stagedValue {
-		_ = u.Store.UnstageEntry(ctx, service, name, entry.Namespace)
+		_ = u.Store.UnstageEntry(ctx, service, key)
 
 		return DiffEntry{
-			Name:      name,
-			Namespace: entry.Namespace,
+			Name:      key.Name,
+			Namespace: key.Namespace,
 			Type:      DiffEntryAutoUnstaged,
 			Warning:   "identical to AWS current",
 		}
 	}
 
 	return DiffEntry{
-		Name:          name,
-		Namespace:     entry.Namespace,
+		Name:          key.Name,
+		Namespace:     key.Namespace,
 		Type:          DiffEntryNormal,
 		Operation:     entry.Operation,
 		AWSValue:      awsValue,
@@ -239,7 +245,7 @@ func (u *DiffUseCase) processDiffResult(ctx context.Context, name string, entry 
 	}
 }
 
-func (u *DiffUseCase) handleFetchError(ctx context.Context, name string, entry staging.Entry, err error) DiffEntry {
+func (u *DiffUseCase) handleFetchError(ctx context.Context, key staging.EntryKey, entry staging.Entry, err error) DiffEntry {
 	service := u.Strategy.Service()
 
 	// Only a genuine "not found" justifies auto-unstaging a staged delete or
@@ -251,11 +257,11 @@ func (u *DiffUseCase) handleFetchError(ctx context.Context, name string, entry s
 	switch entry.Operation {
 	case staging.OperationDelete:
 		if notFound {
-			_ = u.Store.UnstageEntry(ctx, service, name, entry.Namespace)
+			_ = u.Store.UnstageEntry(ctx, service, key)
 
 			return DiffEntry{
-				Name:      name,
-				Namespace: entry.Namespace,
+				Name:      key.Name,
+				Namespace: key.Namespace,
 				Type:      DiffEntryAutoUnstaged,
 				Warning:   "already deleted in AWS",
 			}
@@ -263,8 +269,8 @@ func (u *DiffUseCase) handleFetchError(ctx context.Context, name string, entry s
 
 	case staging.OperationCreate:
 		return DiffEntry{
-			Name:        name,
-			Namespace:   entry.Namespace,
+			Name:        key.Name,
+			Namespace:   key.Namespace,
 			Type:        DiffEntryCreate,
 			Operation:   entry.Operation,
 			StagedValue: lo.FromPtr(entry.Value),
@@ -273,11 +279,11 @@ func (u *DiffUseCase) handleFetchError(ctx context.Context, name string, entry s
 
 	case staging.OperationUpdate:
 		if notFound {
-			_ = u.Store.UnstageEntry(ctx, service, name, entry.Namespace)
+			_ = u.Store.UnstageEntry(ctx, service, key)
 
 			return DiffEntry{
-				Name:      name,
-				Namespace: entry.Namespace,
+				Name:      key.Name,
+				Namespace: key.Namespace,
 				Type:      DiffEntryAutoUnstaged,
 				Warning:   "item no longer exists in AWS",
 			}
@@ -285,8 +291,8 @@ func (u *DiffUseCase) handleFetchError(ctx context.Context, name string, entry s
 	}
 
 	return DiffEntry{
-		Name:      name,
-		Namespace: entry.Namespace,
+		Name:      key.Name,
+		Namespace: key.Namespace,
 		Type:      DiffEntryWarning,
 		Warning:   err.Error(),
 	}

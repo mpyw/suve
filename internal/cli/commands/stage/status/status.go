@@ -11,7 +11,6 @@ import (
 
 	"github.com/mpyw/suve/internal/cli/colors"
 	"github.com/mpyw/suve/internal/cli/output"
-	"github.com/mpyw/suve/internal/maputil"
 	"github.com/mpyw/suve/internal/staging"
 	stgcli "github.com/mpyw/suve/internal/staging/cli"
 	"github.com/mpyw/suve/internal/staging/store"
@@ -116,7 +115,10 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 }
 
 // hasAnyChanges reports whether any service has staged entries or tags.
-func hasAnyChanges(entries map[staging.Service]map[string]staging.Entry, tagEntries map[staging.Service]map[string]staging.TagEntry) bool {
+func hasAnyChanges(
+	entries map[staging.Service]map[staging.EntryKey]staging.Entry,
+	tagEntries map[staging.Service]map[staging.EntryKey]staging.TagEntry,
+) bool {
 	for _, serviceEntries := range entries {
 		if len(serviceEntries) > 0 {
 			return true
@@ -132,16 +134,16 @@ func hasAnyChanges(entries map[staging.Service]map[string]staging.Entry, tagEntr
 	return false
 }
 
-func printEntries(printer *staging.EntryPrinter, entries map[string]staging.Entry, verbose, showDeleteOptions bool) {
-	// Sort names for consistent output
-	for _, name := range maputil.SortedKeys(entries) {
-		printer.PrintEntry(name, entries[name], verbose, showDeleteOptions)
+func printEntries(printer *staging.EntryPrinter, entries map[staging.EntryKey]staging.Entry, verbose, showDeleteOptions bool) {
+	// Sort keys for consistent output; the printer badges the namespace itself.
+	for _, key := range staging.SortedEntryKeys(entries) {
+		printer.PrintEntry(key, entries[key], verbose, showDeleteOptions)
 	}
 }
 
-func printTagEntries(w io.Writer, tagEntries map[string]staging.TagEntry, verbose bool) {
-	for _, name := range maputil.SortedKeys(tagEntries) {
-		entry := tagEntries[name]
+func printTagEntries(w io.Writer, tagEntries map[staging.EntryKey]staging.TagEntry, verbose bool) {
+	for _, key := range staging.SortedEntryKeys(tagEntries) {
+		entry := tagEntries[key]
 
 		parts := []string{}
 		if len(entry.Add) > 0 {
@@ -153,7 +155,13 @@ func printTagEntries(w io.Writer, tagEntries map[string]staging.TagEntry, verbos
 		}
 
 		summary := strings.Join(parts, ", ")
-		output.Printf(w, "  %s %s [%s]\n", colors.For(w).Info("T"), name, summary)
+
+		nameLabel := key.Name
+		if key.Namespace != "" {
+			nameLabel += " " + colors.For(w).FieldLabel("["+key.Namespace+"]")
+		}
+
+		output.Printf(w, "  %s %s [%s]\n", colors.For(w).Info("T"), nameLabel, summary)
 
 		if verbose {
 			for key, value := range entry.Add {

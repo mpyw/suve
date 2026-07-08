@@ -115,7 +115,7 @@ func TestStatusRunner_Run(t *testing.T) {
 		t.Parallel()
 
 		store := testutil.NewMockStore()
-		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
+		_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("staged-value"),
 			StagedAt:  time.Now(),
@@ -163,7 +163,7 @@ func TestStatusRunner_Run(t *testing.T) {
 		t.Parallel()
 
 		store := testutil.NewMockStore()
-		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
+		_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("staged-value"),
 			StagedAt:  time.Now(),
@@ -210,17 +210,19 @@ func TestStatusRunner_Run(t *testing.T) {
 		t.Parallel()
 
 		store := testutil.NewMockStore()
-		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config1", staging.Entry{
+		_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config1"}, staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("value1"),
 			StagedAt:  time.Now(),
 		})
-		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config2", staging.Entry{
+
+		_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config2"}, staging.Entry{
 			Operation: staging.OperationCreate,
 			Value:     lo.ToPtr("value2"),
 			StagedAt:  time.Now(),
 		})
-		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config3", staging.Entry{
+
+		_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config3"}, staging.Entry{
 			Operation: staging.OperationDelete,
 			StagedAt:  time.Now(),
 		})
@@ -251,7 +253,7 @@ func TestStatusRunner_Run(t *testing.T) {
 		t.Parallel()
 
 		store := testutil.NewMockStore()
-		_ = store.StageEntry(t.Context(), staging.ServiceSecret, "my-secret", staging.Entry{
+		_ = store.StageEntry(t.Context(), staging.ServiceSecret, staging.EntryKey{Name: "my-secret"}, staging.Entry{
 			Operation:     staging.OperationDelete,
 			StagedAt:      time.Now(),
 			DeleteOptions: &staging.DeleteOptions{Force: true},
@@ -286,7 +288,7 @@ func TestDiffRunner_Run(t *testing.T) {
 		t.Parallel()
 
 		store := testutil.NewMockStore()
-		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
+		_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("new-value"),
 			StagedAt:  time.Now(),
@@ -315,12 +317,13 @@ func TestDiffRunner_Run(t *testing.T) {
 		t.Parallel()
 
 		store := testutil.NewMockStore()
-		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config1", staging.Entry{
+		_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config1"}, staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("new1"),
 			StagedAt:  time.Now(),
 		})
-		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config2", staging.Entry{
+
+		_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config2"}, staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("new2"),
 			StagedAt:  time.Now(),
@@ -391,7 +394,7 @@ func TestDiffRunner_Run(t *testing.T) {
 		t.Parallel()
 
 		store := testutil.NewMockStore()
-		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
+		_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr(`{"b":2,"a":1}`),
 			StagedAt:  time.Now(),
@@ -420,7 +423,7 @@ func TestDiffRunner_Run(t *testing.T) {
 		t.Parallel()
 
 		store := testutil.NewMockStore()
-		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
+		_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("not-json"),
 			StagedAt:  time.Now(),
@@ -446,7 +449,7 @@ func TestDiffRunner_Run(t *testing.T) {
 		t.Parallel()
 
 		store := testutil.NewMockStore()
-		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
+		_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("same-value"),
 			StagedAt:  time.Now(),
@@ -469,7 +472,7 @@ func TestDiffRunner_Run(t *testing.T) {
 		assert.Contains(t, stderr.String(), "identical")
 
 		// Verify unstaged
-		_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/config", "")
+		_, err = store.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config", Namespace: ""})
 		assert.ErrorIs(t, err, staging.ErrNotStaged)
 	})
 
@@ -477,7 +480,7 @@ func TestDiffRunner_Run(t *testing.T) {
 		t.Parallel()
 
 		store := testutil.NewMockStore()
-		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
+		_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 			Operation: staging.OperationDelete,
 			StagedAt:  time.Now(),
 		})
@@ -505,7 +508,7 @@ func TestDiffRunner_Run(t *testing.T) {
 		t.Parallel()
 
 		store := testutil.NewMockStore()
-		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
+		_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("new-value"),
 			StagedAt:  time.Now(),
@@ -532,7 +535,7 @@ func TestDiffRunner_Run(t *testing.T) {
 		assert.Contains(t, stderr.String(), "no longer exists")
 
 		// Verify unstaged
-		_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/config", "")
+		_, err = store.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config", Namespace: ""})
 		assert.ErrorIs(t, err, staging.ErrNotStaged)
 	})
 
@@ -540,7 +543,7 @@ func TestDiffRunner_Run(t *testing.T) {
 		t.Parallel()
 
 		store := testutil.NewMockStore()
-		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/new-param", staging.Entry{
+		_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/new-param"}, staging.Entry{
 			Operation: staging.OperationCreate,
 			Value:     lo.ToPtr("brand-new-value"),
 			StagedAt:  time.Now(),
@@ -569,7 +572,7 @@ func TestDiffRunner_Run(t *testing.T) {
 		assert.Contains(t, output, "staged for creation")
 
 		// Verify still staged (not auto-unstaged)
-		entry, err := store.GetEntry(t.Context(), staging.ServiceParam, "/app/new-param", "")
+		entry, err := store.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/new-param", Namespace: ""})
 		require.NoError(t, err)
 		assert.Equal(t, staging.OperationCreate, entry.Operation)
 	})
@@ -578,7 +581,7 @@ func TestDiffRunner_Run(t *testing.T) {
 		t.Parallel()
 
 		store := testutil.NewMockStore()
-		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/new-json", staging.Entry{
+		_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/new-json"}, staging.Entry{
 			Operation: staging.OperationCreate,
 			Value:     lo.ToPtr(`{"b":2,"a":1}`),
 			StagedAt:  time.Now(),
@@ -608,7 +611,7 @@ func TestDiffRunner_Run(t *testing.T) {
 		t.Parallel()
 
 		store := testutil.NewMockStore()
-		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/param", staging.Entry{
+		_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/param"}, staging.Entry{
 			Operation: staging.OperationCreate,
 			Value:     lo.ToPtr("same-value"),
 			StagedAt:  time.Now(),
@@ -632,7 +635,7 @@ func TestDiffRunner_Run(t *testing.T) {
 		assert.Contains(t, stderr.String(), "identical")
 
 		// Verify unstaged
-		_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/param", "")
+		_, err = store.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/param", Namespace: ""})
 		assert.ErrorIs(t, err, staging.ErrNotStaged)
 	})
 
@@ -640,7 +643,7 @@ func TestDiffRunner_Run(t *testing.T) {
 		t.Parallel()
 
 		store := testutil.NewMockStore()
-		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/param", staging.Entry{
+		_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/param"}, staging.Entry{
 			Operation: staging.OperationCreate,
 			Value:     lo.ToPtr("new-value"),
 			StagedAt:  time.Now(),
@@ -670,7 +673,7 @@ func TestDiffRunner_Run(t *testing.T) {
 		t.Parallel()
 
 		store := testutil.NewMockStore()
-		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
+		_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 			Operation: staging.OperationDelete,
 			StagedAt:  time.Now(),
 		})
@@ -696,7 +699,7 @@ func TestDiffRunner_Run(t *testing.T) {
 		assert.Contains(t, stderr.String(), "already deleted")
 
 		// Verify unstaged
-		_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/config", "")
+		_, err = store.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config", Namespace: ""})
 		assert.ErrorIs(t, err, staging.ErrNotStaged)
 	})
 }
@@ -733,7 +736,7 @@ func TestEditRunner_Run(t *testing.T) {
 		require.NoError(t, err)
 		assert.Contains(t, stdout.String(), "Staged")
 
-		entry, err := store.GetEntry(t.Context(), staging.ServiceParam, "/app/config", "")
+		entry, err := store.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config", Namespace: ""})
 		require.NoError(t, err)
 		assert.Equal(t, staging.OperationUpdate, entry.Operation)
 		assert.Equal(t, "edited-value", lo.FromPtr(entry.Value))
@@ -743,7 +746,7 @@ func TestEditRunner_Run(t *testing.T) {
 		t.Parallel()
 
 		store := testutil.NewMockStore()
-		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
+		_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("staged-value"),
 			StagedAt:  time.Now(),
@@ -768,7 +771,7 @@ func TestEditRunner_Run(t *testing.T) {
 		err := r.Run(t.Context(), cli.EditOptions{Name: "/app/config"})
 		require.NoError(t, err)
 
-		entry, err := store.GetEntry(t.Context(), staging.ServiceParam, "/app/config", "")
+		entry, err := store.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config", Namespace: ""})
 		require.NoError(t, err)
 		assert.Equal(t, "new-value", lo.FromPtr(entry.Value))
 	})
@@ -777,7 +780,7 @@ func TestEditRunner_Run(t *testing.T) {
 		t.Parallel()
 
 		store := testutil.NewMockStore()
-		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
+		_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 			Operation: staging.OperationCreate,
 			Value:     lo.ToPtr("create-value"),
 			StagedAt:  time.Now(),
@@ -888,17 +891,19 @@ func TestApplyRunner_Run(t *testing.T) {
 		t.Parallel()
 
 		store := testutil.NewMockStore()
-		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config1", staging.Entry{
+		_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config1"}, staging.Entry{
 			Operation: staging.OperationCreate,
 			Value:     lo.ToPtr("value1"),
 			StagedAt:  time.Now(),
 		})
-		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config2", staging.Entry{
+
+		_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config2"}, staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("value2"),
 			StagedAt:  time.Now(),
 		})
-		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config3", staging.Entry{
+
+		_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config3"}, staging.Entry{
 			Operation: staging.OperationDelete,
 			StagedAt:  time.Now(),
 		})
@@ -923,11 +928,11 @@ func TestApplyRunner_Run(t *testing.T) {
 		assert.Contains(t, output, "Deleted")
 
 		// Verify all unstaged
-		_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/config1", "")
+		_, err = store.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config1", Namespace: ""})
 		require.ErrorIs(t, err, staging.ErrNotStaged)
-		_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/config2", "")
+		_, err = store.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config2", Namespace: ""})
 		require.ErrorIs(t, err, staging.ErrNotStaged)
-		_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/config3", "")
+		_, err = store.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config3", Namespace: ""})
 		require.ErrorIs(t, err, staging.ErrNotStaged)
 	})
 
@@ -935,12 +940,13 @@ func TestApplyRunner_Run(t *testing.T) {
 		t.Parallel()
 
 		store := testutil.NewMockStore()
-		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config1", staging.Entry{
+		_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config1"}, staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("value1"),
 			StagedAt:  time.Now(),
 		})
-		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config2", staging.Entry{
+
+		_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config2"}, staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("value2"),
 			StagedAt:  time.Now(),
@@ -961,9 +967,9 @@ func TestApplyRunner_Run(t *testing.T) {
 		require.NoError(t, err)
 
 		// Only config1 should be unstaged
-		_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/config1", "")
+		_, err = store.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config1", Namespace: ""})
 		require.ErrorIs(t, err, staging.ErrNotStaged)
-		_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/config2", "")
+		_, err = store.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config2", Namespace: ""})
 		require.NoError(t, err) // Still staged
 	})
 
@@ -972,7 +978,7 @@ func TestApplyRunner_Run(t *testing.T) {
 
 		store := testutil.NewMockStore()
 		// Stage a different item so we can test "specific item not staged"
-		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/other", staging.Entry{
+		_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/other"}, staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("value"),
 			StagedAt:  time.Now(),
@@ -1019,7 +1025,7 @@ func TestApplyRunner_Run(t *testing.T) {
 		t.Parallel()
 
 		store := testutil.NewMockStore()
-		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
+		_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("value"),
 			StagedAt:  time.Now(),
@@ -1046,11 +1052,10 @@ func TestApplyRunner_Run(t *testing.T) {
 		t.Parallel()
 
 		store := testutil.NewMockStore()
-		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/new-config", staging.Entry{
+		_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/new-config"}, staging.Entry{
 			Operation: staging.OperationCreate,
 			Value:     lo.ToPtr("new-value"),
 			StagedAt:  time.Now(),
-			// No BaseModifiedAt for Create (didn't exist at staging time)
 		})
 
 		var stdout, stderr bytes.Buffer
@@ -1076,11 +1081,11 @@ func TestApplyRunner_Run(t *testing.T) {
 
 		store := testutil.NewMockStore()
 		baseTime := time.Now().Add(-time.Hour)
-		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
+		_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 			Operation:      staging.OperationUpdate,
 			Value:          lo.ToPtr("updated-value"),
 			StagedAt:       time.Now(),
-			BaseModifiedAt: &baseTime, // AWS was at this time when we fetched
+			BaseModifiedAt: &baseTime,
 		})
 
 		var stdout, stderr bytes.Buffer
@@ -1106,7 +1111,7 @@ func TestApplyRunner_Run(t *testing.T) {
 
 		store := testutil.NewMockStore()
 		baseTime := time.Now().Add(-time.Hour)
-		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
+		_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 			Operation:      staging.OperationDelete,
 			StagedAt:       time.Now(),
 			BaseModifiedAt: &baseTime,
@@ -1133,7 +1138,7 @@ func TestApplyRunner_Run(t *testing.T) {
 
 		store := testutil.NewMockStore()
 		baseTime := time.Now()
-		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
+		_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 			Operation:      staging.OperationUpdate,
 			Value:          lo.ToPtr("updated-value"),
 			StagedAt:       time.Now(),
@@ -1162,7 +1167,7 @@ func TestApplyRunner_Run(t *testing.T) {
 
 		store := testutil.NewMockStore()
 		baseTime := time.Now().Add(-time.Hour)
-		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
+		_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 			Operation:      staging.OperationUpdate,
 			Value:          lo.ToPtr("updated-value"),
 			StagedAt:       time.Now(),
@@ -1190,7 +1195,7 @@ func TestApplyRunner_Run(t *testing.T) {
 		t.Parallel()
 
 		store := testutil.NewMockStore()
-		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/new-config", staging.Entry{
+		_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/new-config"}, staging.Entry{
 			Operation: staging.OperationCreate,
 			Value:     lo.ToPtr("new-value"),
 			StagedAt:  time.Now(),
@@ -1226,12 +1231,13 @@ func TestResetRunner_Run(t *testing.T) {
 		t.Parallel()
 
 		store := testutil.NewMockStore()
-		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config1", staging.Entry{
+		_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config1"}, staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("value1"),
 			StagedAt:  time.Now(),
 		})
-		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config2", staging.Entry{
+
+		_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config2"}, staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("value2"),
 			StagedAt:  time.Now(),
@@ -1254,7 +1260,7 @@ func TestResetRunner_Run(t *testing.T) {
 		assert.Contains(t, stdout.String(), "(2)")
 
 		// Verify all unstaged
-		_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/config1", "")
+		_, err = store.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config1", Namespace: ""})
 		assert.ErrorIs(t, err, staging.ErrNotStaged)
 	})
 
@@ -1283,7 +1289,7 @@ func TestResetRunner_Run(t *testing.T) {
 		t.Parallel()
 
 		store := testutil.NewMockStore()
-		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
+		_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("value"),
 			StagedAt:  time.Now(),
@@ -1304,7 +1310,7 @@ func TestResetRunner_Run(t *testing.T) {
 		require.NoError(t, err)
 		assert.Contains(t, stdout.String(), "Unstaged")
 
-		_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/config", "")
+		_, err = store.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config", Namespace: ""})
 		assert.ErrorIs(t, err, staging.ErrNotStaged)
 	})
 
@@ -1357,7 +1363,7 @@ func TestResetRunner_Run(t *testing.T) {
 		assert.Contains(t, stdout.String(), "Restored")
 		assert.Contains(t, stdout.String(), "#1")
 
-		entry, err := store.GetEntry(t.Context(), staging.ServiceParam, "/app/config#1", "")
+		entry, err := store.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config#1", Namespace: ""})
 		require.NoError(t, err)
 		assert.Equal(t, "old-value", lo.FromPtr(entry.Value))
 	})
@@ -1447,7 +1453,7 @@ func TestRunners_SecretService(t *testing.T) {
 		t.Parallel()
 
 		store := testutil.NewMockStore()
-		_ = store.StageEntry(t.Context(), staging.ServiceSecret, "my-secret", staging.Entry{
+		_ = store.StageEntry(t.Context(), staging.ServiceSecret, staging.EntryKey{Name: "my-secret"}, staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("secret-value"),
 			StagedAt:  time.Now(),
@@ -1473,7 +1479,7 @@ func TestRunners_SecretService(t *testing.T) {
 		t.Parallel()
 
 		store := testutil.NewMockStore()
-		_ = store.StageEntry(t.Context(), staging.ServiceSecret, "my-secret", staging.Entry{
+		_ = store.StageEntry(t.Context(), staging.ServiceSecret, staging.EntryKey{Name: "my-secret"}, staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("secret-value"),
 			StagedAt:  time.Now(),
@@ -1503,7 +1509,7 @@ func TestRunners_DeleteOptions(t *testing.T) {
 		t.Parallel()
 
 		store := testutil.NewMockStore()
-		_ = store.StageEntry(t.Context(), staging.ServiceSecret, "my-secret", staging.Entry{
+		_ = store.StageEntry(t.Context(), staging.ServiceSecret, staging.EntryKey{Name: "my-secret"}, staging.Entry{
 			Operation:     staging.OperationDelete,
 			StagedAt:      time.Now(),
 			DeleteOptions: &staging.DeleteOptions{RecoveryWindow: 14},
@@ -1536,7 +1542,7 @@ func TestDiffRunner_OutputMetadata(t *testing.T) {
 
 		store := testutil.NewMockStore()
 		desc := "Updated config description"
-		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
+		_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 			Operation:   staging.OperationUpdate,
 			Value:       lo.ToPtr("new-value"),
 			Description: &desc,
@@ -1566,12 +1572,13 @@ func TestDiffRunner_OutputMetadata(t *testing.T) {
 		t.Parallel()
 
 		store := testutil.NewMockStore()
-		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
+		_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("new-value"),
 			StagedAt:  time.Now(),
 		})
-		_ = store.StageTag(t.Context(), staging.ServiceParam, "/app/config", staging.TagEntry{
+
+		_ = store.StageTag(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.TagEntry{
 			Add:      map[string]string{"env": "prod", "team": "platform"},
 			StagedAt: time.Now(),
 		})
@@ -1601,13 +1608,14 @@ func TestDiffRunner_OutputMetadata(t *testing.T) {
 
 		store := testutil.NewMockStore()
 		desc := "New parameter"
-		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/new-param", staging.Entry{
+		_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/new-param"}, staging.Entry{
 			Operation:   staging.OperationCreate,
 			Value:       lo.ToPtr("brand-new"),
 			Description: &desc,
 			StagedAt:    time.Now(),
 		})
-		_ = store.StageTag(t.Context(), staging.ServiceParam, "/app/new-param", staging.TagEntry{
+
+		_ = store.StageTag(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/new-param"}, staging.TagEntry{
 			Add:      map[string]string{"env": "staging"},
 			StagedAt: time.Now(),
 		})
@@ -1666,7 +1674,7 @@ func TestEditRunner_WithMetadata(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		entry, err := store.GetEntry(t.Context(), staging.ServiceParam, "/app/config", "")
+		entry, err := store.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config", Namespace: ""})
 		require.NoError(t, err)
 		assert.Equal(t, "Updated description", lo.FromPtr(entry.Description))
 	})
@@ -1698,7 +1706,7 @@ func TestEditRunner_WithMetadata(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		entry, err := store.GetEntry(t.Context(), staging.ServiceParam, "/app/config", "")
+		entry, err := store.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config", Namespace: ""})
 		require.NoError(t, err)
 		require.NotNil(t, entry.BaseModifiedAt)
 		assert.WithinDuration(t, awsTime, *entry.BaseModifiedAt, time.Second)
@@ -1709,7 +1717,7 @@ func TestEditRunner_WithMetadata(t *testing.T) {
 
 		store := testutil.NewMockStore()
 		// Stage a delete operation
-		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
+		_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 			Operation: staging.OperationDelete,
 			StagedAt:  time.Now(),
 		})
@@ -1735,7 +1743,7 @@ func TestEditRunner_WithMetadata(t *testing.T) {
 		assert.Contains(t, err.Error(), "staged for deletion")
 
 		// Entry should still be DELETE
-		entry, err := store.GetEntry(t.Context(), staging.ServiceParam, "/app/config", "")
+		entry, err := store.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config", Namespace: ""})
 		require.NoError(t, err)
 		assert.Equal(t, staging.OperationDelete, entry.Operation)
 	})
@@ -1751,11 +1759,12 @@ func TestApplyRunner_UnstageFailureWarns(t *testing.T) {
 		t.Parallel()
 
 		store := testutil.NewMockStore()
-		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
+		_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("v"),
 			StagedAt:  time.Now(),
 		})
+
 		store.UnstageEntryErr = errors.New("disk full")
 
 		var stdout, stderr bytes.Buffer
@@ -1779,10 +1788,11 @@ func TestApplyRunner_UnstageFailureWarns(t *testing.T) {
 		t.Parallel()
 
 		store := testutil.NewMockStore()
-		_ = store.StageTag(t.Context(), staging.ServiceParam, "/app/config", staging.TagEntry{
+		_ = store.StageTag(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.TagEntry{
 			Add:      map[string]string{"env": "prod"},
 			StagedAt: time.Now(),
 		})
+
 		store.UnstageTagErr = errors.New("disk full")
 
 		var stdout, stderr bytes.Buffer
@@ -1809,7 +1819,7 @@ func TestApplyRunner_WithTags(t *testing.T) {
 		t.Parallel()
 
 		store := testutil.NewMockStore()
-		_ = store.StageTag(t.Context(), staging.ServiceParam, "/app/config", staging.TagEntry{
+		_ = store.StageTag(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.TagEntry{
 			Add:      map[string]string{"env": "prod", "team": "backend"},
 			StagedAt: time.Now(),
 		})
@@ -1840,7 +1850,7 @@ func TestApplyRunner_WithTags(t *testing.T) {
 		removeKeys := make(map[string]struct{})
 		removeKeys["deprecated"] = struct{}{}
 		removeKeys["old"] = struct{}{}
-		_ = store.StageTag(t.Context(), staging.ServiceParam, "/app/config", staging.TagEntry{
+		_ = store.StageTag(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.TagEntry{
 			Remove:   removeKeys,
 			StagedAt: time.Now(),
 		})
@@ -1870,12 +1880,13 @@ func TestApplyRunner_WithTags(t *testing.T) {
 		store := testutil.NewMockStore()
 		removeKeys := make(map[string]struct{})
 		removeKeys["deprecated"] = struct{}{}
-		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
+		_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("new-value"),
 			StagedAt:  time.Now(),
 		})
-		_ = store.StageTag(t.Context(), staging.ServiceParam, "/app/config", staging.TagEntry{
+
+		_ = store.StageTag(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.TagEntry{
 			Add:      map[string]string{"env": "prod"},
 			Remove:   removeKeys,
 			StagedAt: time.Now(),
@@ -1944,7 +1955,7 @@ func TestApplyRunner_RunInteractive_TagOnly(t *testing.T) {
 		t.Parallel()
 
 		store := testutil.NewMockStore()
-		_ = store.StageTag(t.Context(), staging.ServiceParam, "/app/config", staging.TagEntry{
+		_ = store.StageTag(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.TagEntry{
 			Add:      map[string]string{"env": "prod"},
 			StagedAt: time.Now(),
 		})
@@ -1964,7 +1975,7 @@ func TestApplyRunner_RunInteractive_TagOnly(t *testing.T) {
 		t.Parallel()
 
 		store := testutil.NewMockStore()
-		_ = store.StageTag(t.Context(), staging.ServiceParam, "/app/config", staging.TagEntry{
+		_ = store.StageTag(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.TagEntry{
 			Add:      map[string]string{"env": "prod"},
 			StagedAt: time.Now(),
 		})
@@ -2023,7 +2034,7 @@ func TestApplyRunner_RunInteractive_ReadsPrompterStdin(t *testing.T) {
 		t.Parallel()
 
 		store := testutil.NewMockStore()
-		_ = store.StageTag(t.Context(), staging.ServiceParam, "/app/config", staging.TagEntry{
+		_ = store.StageTag(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.TagEntry{
 			Add:      map[string]string{"env": "prod"},
 			StagedAt: time.Now(),
 		})
@@ -2037,7 +2048,7 @@ func TestApplyRunner_RunInteractive_ReadsPrompterStdin(t *testing.T) {
 		// Declined: no apply happened, so the tag remains staged.
 		assert.NotContains(t, stdout.String(), "Tagged")
 
-		_, err = store.GetTag(t.Context(), staging.ServiceParam, "/app/config")
+		_, err = store.GetTag(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"})
 		require.NoError(t, err)
 	})
 
@@ -2045,7 +2056,7 @@ func TestApplyRunner_RunInteractive_ReadsPrompterStdin(t *testing.T) {
 		t.Parallel()
 
 		store := testutil.NewMockStore()
-		_ = store.StageTag(t.Context(), staging.ServiceParam, "/app/config", staging.TagEntry{
+		_ = store.StageTag(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.TagEntry{
 			Add:      map[string]string{"env": "prod"},
 			StagedAt: time.Now(),
 		})
@@ -2059,7 +2070,7 @@ func TestApplyRunner_RunInteractive_ReadsPrompterStdin(t *testing.T) {
 		// Confirmed: apply happened and the tag was unstaged.
 		assert.Contains(t, stdout.String(), "Tagged")
 
-		_, err = store.GetTag(t.Context(), staging.ServiceParam, "/app/config")
+		_, err = store.GetTag(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"})
 		assert.Equal(t, staging.ErrNotStaged, err)
 	})
 }
@@ -2075,7 +2086,7 @@ func TestStatusRunner_WithTagEntries(t *testing.T) {
 		t.Parallel()
 
 		store := testutil.NewMockStore()
-		_ = store.StageTag(t.Context(), staging.ServiceParam, "/app/config", staging.TagEntry{
+		_ = store.StageTag(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.TagEntry{
 			Add:      map[string]string{"env": "prod", "team": "backend"},
 			StagedAt: time.Now(),
 		})
@@ -2105,7 +2116,7 @@ func TestStatusRunner_WithTagEntries(t *testing.T) {
 
 		store := testutil.NewMockStore()
 		removeKeys := map[string]struct{}{"deprecated": {}, "old": {}}
-		_ = store.StageTag(t.Context(), staging.ServiceParam, "/app/config", staging.TagEntry{
+		_ = store.StageTag(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.TagEntry{
 			Add:      map[string]string{"env": "prod"},
 			Remove:   removeKeys,
 			StagedAt: time.Now(),
@@ -2135,7 +2146,7 @@ func TestStatusRunner_WithTagEntries(t *testing.T) {
 
 		store := testutil.NewMockStore()
 		removeKeys := map[string]struct{}{"deprecated": {}}
-		_ = store.StageTag(t.Context(), staging.ServiceParam, "/app/config", staging.TagEntry{
+		_ = store.StageTag(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.TagEntry{
 			Add:      map[string]string{"env": "prod"},
 			Remove:   removeKeys,
 			StagedAt: time.Now(),
@@ -2164,11 +2175,12 @@ func TestStatusRunner_WithTagEntries(t *testing.T) {
 		t.Parallel()
 
 		store := testutil.NewMockStore()
-		_ = store.StageTag(t.Context(), staging.ServiceParam, "/app/config1", staging.TagEntry{
+		_ = store.StageTag(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config1"}, staging.TagEntry{
 			Add:      map[string]string{"env": "prod"},
 			StagedAt: time.Now(),
 		})
-		_ = store.StageTag(t.Context(), staging.ServiceParam, "/app/config2", staging.TagEntry{
+
+		_ = store.StageTag(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config2"}, staging.TagEntry{
 			Add:      map[string]string{"env": "dev"},
 			StagedAt: time.Now(),
 		})
@@ -2198,12 +2210,13 @@ func TestStatusRunner_WithTagEntries(t *testing.T) {
 		t.Parallel()
 
 		store := testutil.NewMockStore()
-		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/value", staging.Entry{
+		_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/value"}, staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("new-value"),
 			StagedAt:  time.Now(),
 		})
-		_ = store.StageTag(t.Context(), staging.ServiceParam, "/app/tags", staging.TagEntry{
+
+		_ = store.StageTag(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/tags"}, staging.TagEntry{
 			Add:      map[string]string{"env": "prod"},
 			StagedAt: time.Now(),
 		})
@@ -2233,7 +2246,7 @@ func TestStatusRunner_WithTagEntries(t *testing.T) {
 
 		store := testutil.NewMockStore()
 		removeKeys := map[string]struct{}{"old": {}}
-		_ = store.StageTag(t.Context(), staging.ServiceParam, "/app/config", staging.TagEntry{
+		_ = store.StageTag(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.TagEntry{
 			Add:      map[string]string{"env": "prod"},
 			Remove:   removeKeys,
 			StagedAt: time.Now(),
@@ -2282,7 +2295,7 @@ func TestDeleteRunner_Run(t *testing.T) {
 		require.NoError(t, err)
 		assert.Contains(t, stdout.String(), "Staged for deletion: /app/config")
 
-		entry, err := store.GetEntry(t.Context(), staging.ServiceParam, "/app/config", "")
+		entry, err := store.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config", Namespace: ""})
 		require.NoError(t, err)
 		assert.Equal(t, staging.OperationDelete, entry.Operation)
 		assert.Nil(t, entry.DeleteOptions) // SSM has no delete options
@@ -2311,7 +2324,7 @@ func TestDeleteRunner_Run(t *testing.T) {
 		require.NoError(t, err)
 		assert.Contains(t, stdout.String(), "Staged for deletion (14-day recovery): my-secret")
 
-		entry, err := store.GetEntry(t.Context(), staging.ServiceSecret, "my-secret", "")
+		entry, err := store.GetEntry(t.Context(), staging.ServiceSecret, staging.EntryKey{Name: "my-secret", Namespace: ""})
 		require.NoError(t, err)
 		assert.Equal(t, staging.OperationDelete, entry.Operation)
 		require.NotNil(t, entry.DeleteOptions)
@@ -2342,7 +2355,7 @@ func TestDeleteRunner_Run(t *testing.T) {
 		require.NoError(t, err)
 		assert.Contains(t, stdout.String(), "Staged for immediate deletion: my-secret")
 
-		entry, err := store.GetEntry(t.Context(), staging.ServiceSecret, "my-secret", "")
+		entry, err := store.GetEntry(t.Context(), staging.ServiceSecret, staging.EntryKey{Name: "my-secret", Namespace: ""})
 		require.NoError(t, err)
 		assert.Equal(t, staging.OperationDelete, entry.Operation)
 		require.NotNil(t, entry.DeleteOptions)
@@ -2400,7 +2413,7 @@ func TestDeleteRunner_Run(t *testing.T) {
 		store := testutil.NewMockStore()
 
 		// Pre-stage a CREATE operation
-		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/new-config", staging.Entry{
+		_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/new-config"}, staging.Entry{
 			Operation: staging.OperationCreate,
 			Value:     lo.ToPtr("new-value"),
 			StagedAt:  time.Now(),
@@ -2422,7 +2435,7 @@ func TestDeleteRunner_Run(t *testing.T) {
 		assert.Contains(t, stdout.String(), "Unstaged creation: /app/new-config")
 
 		// Verify entry was unstaged (not converted to delete)
-		_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/new-config", "")
+		_, err = store.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/new-config", Namespace: ""})
 		assert.ErrorIs(t, err, staging.ErrNotStaged)
 	})
 }
@@ -2459,7 +2472,7 @@ func TestEditRunner_Skipped_Unstaged(t *testing.T) {
 		assert.Contains(t, stdout.String(), "Skipped /app/config (same as AWS)")
 
 		// Verify nothing was staged
-		_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/config", "")
+		_, err = store.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config", Namespace: ""})
 		assert.ErrorIs(t, err, staging.ErrNotStaged)
 	})
 
@@ -2469,7 +2482,7 @@ func TestEditRunner_Skipped_Unstaged(t *testing.T) {
 		store := testutil.NewMockStore()
 
 		// Pre-stage an UPDATE operation
-		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
+		_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("staged-value"),
 			StagedAt:  time.Now(),
@@ -2495,7 +2508,7 @@ func TestEditRunner_Skipped_Unstaged(t *testing.T) {
 		assert.Contains(t, stdout.String(), "Unstaged /app/config (reverted to AWS)")
 
 		// Verify entry was unstaged
-		_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/config", "")
+		_, err = store.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config", Namespace: ""})
 		assert.ErrorIs(t, err, staging.ErrNotStaged)
 	})
 }
@@ -2536,7 +2549,7 @@ func TestResetRunner_Skipped(t *testing.T) {
 		assert.Contains(t, stdout.String(), "Skipped /app/config#3 (version #3 matches current value)")
 
 		// Verify nothing was staged (auto-skipped)
-		_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/config#3", "")
+		_, err = store.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config#3", Namespace: ""})
 		assert.ErrorIs(t, err, staging.ErrNotStaged)
 	})
 }
@@ -2556,7 +2569,7 @@ func TestStashPopRunner_Run(t *testing.T) {
 		agentStore := testutil.NewMockStore()
 
 		// Stage entries in the file store
-		_ = fileStore.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
+		_ = fileStore.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("file-value"),
 			StagedAt:  time.Now(),
@@ -2578,12 +2591,12 @@ func TestStashPopRunner_Run(t *testing.T) {
 		assert.Contains(t, stdout.String(), "Stashed changes restored and file deleted")
 
 		// Verify entry was moved to agent
-		entry, err := agentStore.GetEntry(t.Context(), staging.ServiceParam, "/app/config", "")
+		entry, err := agentStore.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config", Namespace: ""})
 		require.NoError(t, err)
 		assert.Equal(t, "file-value", lo.FromPtr(entry.Value))
 
 		// Verify file store is empty (not kept)
-		_, err = fileStore.GetEntry(t.Context(), staging.ServiceParam, "/app/config", "")
+		_, err = fileStore.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config", Namespace: ""})
 		assert.ErrorIs(t, err, staging.ErrNotStaged)
 	})
 
@@ -2593,7 +2606,7 @@ func TestStashPopRunner_Run(t *testing.T) {
 		fileStore := testutil.NewMockStore()
 		agentStore := testutil.NewMockStore()
 
-		_ = fileStore.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
+		_ = fileStore.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("file-value"),
 			StagedAt:  time.Now(),
@@ -2615,9 +2628,9 @@ func TestStashPopRunner_Run(t *testing.T) {
 		assert.Contains(t, stdout.String(), "file kept")
 
 		// Verify entry exists in both stores
-		_, err = agentStore.GetEntry(t.Context(), staging.ServiceParam, "/app/config", "")
+		_, err = agentStore.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config", Namespace: ""})
 		require.NoError(t, err)
-		_, err = fileStore.GetEntry(t.Context(), staging.ServiceParam, "/app/config", "")
+		_, err = fileStore.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config", Namespace: ""})
 		require.NoError(t, err) // Still in file (kept)
 	})
 
@@ -2628,14 +2641,14 @@ func TestStashPopRunner_Run(t *testing.T) {
 		agentStore := testutil.NewMockStore()
 
 		// Agent already has an entry
-		_ = agentStore.StageEntry(t.Context(), staging.ServiceParam, "/app/existing", staging.Entry{
+		_ = agentStore.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/existing"}, staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("agent-value"),
 			StagedAt:  time.Now(),
 		})
 
 		// File has another entry
-		_ = fileStore.StageEntry(t.Context(), staging.ServiceParam, "/app/new", staging.Entry{
+		_ = fileStore.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/new"}, staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("file-value"),
 			StagedAt:  time.Now(),
@@ -2657,9 +2670,9 @@ func TestStashPopRunner_Run(t *testing.T) {
 		assert.Contains(t, stdout.String(), "merged")
 
 		// Verify both entries exist in agent
-		_, err = agentStore.GetEntry(t.Context(), staging.ServiceParam, "/app/existing", "")
+		_, err = agentStore.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/existing", Namespace: ""})
 		require.NoError(t, err)
-		_, err = agentStore.GetEntry(t.Context(), staging.ServiceParam, "/app/new", "")
+		_, err = agentStore.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/new", Namespace: ""})
 		require.NoError(t, err)
 	})
 
@@ -2670,14 +2683,14 @@ func TestStashPopRunner_Run(t *testing.T) {
 		agentStore := testutil.NewMockStore()
 
 		// Agent already has an entry
-		_ = agentStore.StageEntry(t.Context(), staging.ServiceParam, "/app/existing", staging.Entry{
+		_ = agentStore.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/existing"}, staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("agent-value"),
 			StagedAt:  time.Now(),
 		})
 
 		// File has another entry
-		_ = fileStore.StageEntry(t.Context(), staging.ServiceParam, "/app/new", staging.Entry{
+		_ = fileStore.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/new"}, staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("file-value"),
 			StagedAt:  time.Now(),
@@ -2700,13 +2713,13 @@ func TestStashPopRunner_Run(t *testing.T) {
 		assert.Contains(t, stdout.String(), "file kept")
 
 		// Verify both entries exist in agent
-		_, err = agentStore.GetEntry(t.Context(), staging.ServiceParam, "/app/existing", "")
+		_, err = agentStore.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/existing", Namespace: ""})
 		require.NoError(t, err)
-		_, err = agentStore.GetEntry(t.Context(), staging.ServiceParam, "/app/new", "")
+		_, err = agentStore.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/new", Namespace: ""})
 		require.NoError(t, err)
 
 		// Verify file store still has the entry (kept)
-		_, err = fileStore.GetEntry(t.Context(), staging.ServiceParam, "/app/new", "")
+		_, err = fileStore.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/new", Namespace: ""})
 		require.NoError(t, err)
 	})
 
@@ -2739,14 +2752,14 @@ func TestStashPopRunner_Run(t *testing.T) {
 		agentStore := testutil.NewMockStore()
 
 		// Agent already has entries
-		_ = agentStore.StageEntry(t.Context(), staging.ServiceParam, "/app/existing", staging.Entry{
+		_ = agentStore.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/existing"}, staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("agent-value"),
 			StagedAt:  time.Now(),
 		})
 
 		// File also has entries
-		_ = fileStore.StageEntry(t.Context(), staging.ServiceParam, "/app/new", staging.Entry{
+		_ = fileStore.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/new"}, staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("file-value"),
 			StagedAt:  time.Now(),
@@ -2769,9 +2782,9 @@ func TestStashPopRunner_Run(t *testing.T) {
 		assert.Contains(t, stdout.String(), "merged")
 
 		// Verify both entries exist in agent
-		_, err = agentStore.GetEntry(t.Context(), staging.ServiceParam, "/app/existing", "")
+		_, err = agentStore.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/existing", Namespace: ""})
 		require.NoError(t, err)
-		_, err = agentStore.GetEntry(t.Context(), staging.ServiceParam, "/app/new", "")
+		_, err = agentStore.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/new", Namespace: ""})
 		require.NoError(t, err)
 	})
 
@@ -2782,14 +2795,14 @@ func TestStashPopRunner_Run(t *testing.T) {
 		agentStore := testutil.NewMockStore()
 
 		// Agent already has entries
-		_ = agentStore.StageEntry(t.Context(), staging.ServiceParam, "/app/existing", staging.Entry{
+		_ = agentStore.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/existing"}, staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("agent-value"),
 			StagedAt:  time.Now(),
 		})
 
 		// File also has entries
-		_ = fileStore.StageEntry(t.Context(), staging.ServiceParam, "/app/new", staging.Entry{
+		_ = fileStore.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/new"}, staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("file-value"),
 			StagedAt:  time.Now(),
@@ -2810,7 +2823,7 @@ func TestStashPopRunner_Run(t *testing.T) {
 		require.NoError(t, err)
 
 		// With overwrite, file content replaces agent content
-		_, err = agentStore.GetEntry(t.Context(), staging.ServiceParam, "/app/new", "")
+		_, err = agentStore.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/new", Namespace: ""})
 		require.NoError(t, err)
 	})
 
@@ -2821,12 +2834,13 @@ func TestStashPopRunner_Run(t *testing.T) {
 		agentStore := testutil.NewMockStore()
 
 		// File has entries for both services
-		_ = fileStore.StageEntry(t.Context(), staging.ServiceParam, "/app/param", staging.Entry{
+		_ = fileStore.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/param"}, staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("param-value"),
 			StagedAt:  time.Now(),
 		})
-		_ = fileStore.StageEntry(t.Context(), staging.ServiceSecret, "my-secret", staging.Entry{
+
+		_ = fileStore.StageEntry(t.Context(), staging.ServiceSecret, staging.EntryKey{Name: "my-secret"}, staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("secret-value"),
 			StagedAt:  time.Now(),
@@ -2848,11 +2862,11 @@ func TestStashPopRunner_Run(t *testing.T) {
 		require.NoError(t, err)
 
 		// Param should be in agent
-		_, err = agentStore.GetEntry(t.Context(), staging.ServiceParam, "/app/param", "")
+		_, err = agentStore.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/param", Namespace: ""})
 		require.NoError(t, err)
 
 		// Secret should still be in file (not drained)
-		_, err = fileStore.GetEntry(t.Context(), staging.ServiceSecret, "my-secret", "")
+		_, err = fileStore.GetEntry(t.Context(), staging.ServiceSecret, staging.EntryKey{Name: "my-secret", Namespace: ""})
 		require.NoError(t, err)
 	})
 
@@ -2862,7 +2876,7 @@ func TestStashPopRunner_Run(t *testing.T) {
 		fileStore := testutil.NewMockStore()
 		agentStore := testutil.NewMockStore()
 
-		_ = fileStore.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
+		_ = fileStore.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("file-value"),
 			StagedAt:  time.Now(),
@@ -2903,7 +2917,7 @@ func TestStashPushRunner_Run(t *testing.T) {
 		fileStore := testutil.NewMockStore()
 
 		// Stage entries in the agent store
-		_ = agentStore.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
+		_ = agentStore.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("agent-value"),
 			StagedAt:  time.Now(),
@@ -2926,12 +2940,12 @@ func TestStashPushRunner_Run(t *testing.T) {
 		assert.Contains(t, stderr.String(), "plain text") // Warning about plain text storage
 
 		// Verify entry was moved to file
-		entry, err := fileStore.GetEntry(t.Context(), staging.ServiceParam, "/app/config", "")
+		entry, err := fileStore.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config", Namespace: ""})
 		require.NoError(t, err)
 		assert.Equal(t, "agent-value", lo.FromPtr(entry.Value))
 
 		// Verify agent store is empty (not kept)
-		_, err = agentStore.GetEntry(t.Context(), staging.ServiceParam, "/app/config", "")
+		_, err = agentStore.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config", Namespace: ""})
 		assert.ErrorIs(t, err, staging.ErrNotStaged)
 	})
 
@@ -2941,7 +2955,7 @@ func TestStashPushRunner_Run(t *testing.T) {
 		agentStore := testutil.NewMockStore()
 		fileStore := testutil.NewMockStore()
 
-		_ = agentStore.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
+		_ = agentStore.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("agent-value"),
 			StagedAt:  time.Now(),
@@ -2963,9 +2977,9 @@ func TestStashPushRunner_Run(t *testing.T) {
 		assert.Contains(t, stdout.String(), "kept in the working staging area")
 
 		// Verify entry exists in both stores
-		_, err = fileStore.GetEntry(t.Context(), staging.ServiceParam, "/app/config", "")
+		_, err = fileStore.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config", Namespace: ""})
 		require.NoError(t, err)
-		_, err = agentStore.GetEntry(t.Context(), staging.ServiceParam, "/app/config", "")
+		_, err = agentStore.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config", Namespace: ""})
 		require.NoError(t, err) // Still in agent (kept)
 	})
 
@@ -2975,7 +2989,7 @@ func TestStashPushRunner_Run(t *testing.T) {
 		agentStore := testutil.NewMockStore()
 		fileStore := testutil.NewMockStore()
 
-		_ = agentStore.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
+		_ = agentStore.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("agent-value"),
 			StagedAt:  time.Now(),
@@ -3028,12 +3042,13 @@ func TestStashPushRunner_Run(t *testing.T) {
 		fileStore := testutil.NewMockStore()
 
 		// Agent has entries for both services
-		_ = agentStore.StageEntry(t.Context(), staging.ServiceParam, "/app/param", staging.Entry{
+		_ = agentStore.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/param"}, staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("param-value"),
 			StagedAt:  time.Now(),
 		})
-		_ = agentStore.StageEntry(t.Context(), staging.ServiceSecret, "my-secret", staging.Entry{
+
+		_ = agentStore.StageEntry(t.Context(), staging.ServiceSecret, staging.EntryKey{Name: "my-secret"}, staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("secret-value"),
 			StagedAt:  time.Now(),
@@ -3055,11 +3070,11 @@ func TestStashPushRunner_Run(t *testing.T) {
 		require.NoError(t, err)
 
 		// Param should be in file
-		_, err = fileStore.GetEntry(t.Context(), staging.ServiceParam, "/app/param", "")
+		_, err = fileStore.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/param", Namespace: ""})
 		require.NoError(t, err)
 
 		// Secret should still be in agent (not persisted)
-		_, err = agentStore.GetEntry(t.Context(), staging.ServiceSecret, "my-secret", "")
+		_, err = agentStore.GetEntry(t.Context(), staging.ServiceSecret, staging.EntryKey{Name: "my-secret", Namespace: ""})
 		require.NoError(t, err)
 	})
 
@@ -3069,7 +3084,7 @@ func TestStashPushRunner_Run(t *testing.T) {
 		agentStore := testutil.NewMockStore()
 		fileStore := testutil.NewMockStore()
 
-		_ = agentStore.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
+		_ = agentStore.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("agent-value"),
 			StagedAt:  time.Now(),
@@ -3105,7 +3120,7 @@ func TestDiffRunner_TagEntries(t *testing.T) {
 
 		store := testutil.NewMockStore()
 		removeKeys := map[string]struct{}{"deprecated": {}, "old": {}}
-		_ = store.StageTag(t.Context(), staging.ServiceParam, "/app/config", staging.TagEntry{
+		_ = store.StageTag(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.TagEntry{
 			Add:      map[string]string{"env": "prod", "team": "platform"},
 			Remove:   removeKeys,
 			StagedAt: time.Now(),
@@ -3135,7 +3150,7 @@ func TestDiffRunner_TagEntries(t *testing.T) {
 		t.Parallel()
 
 		store := testutil.NewMockStore()
-		_ = store.StageTag(t.Context(), staging.ServiceParam, "/app/config", staging.TagEntry{
+		_ = store.StageTag(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.TagEntry{
 			Add:      map[string]string{"env": "prod"},
 			StagedAt: time.Now(),
 		})
@@ -3164,7 +3179,7 @@ func TestDiffRunner_TagEntries(t *testing.T) {
 
 		store := testutil.NewMockStore()
 		removeKeys := map[string]struct{}{"deprecated": {}}
-		_ = store.StageTag(t.Context(), staging.ServiceParam, "/app/config", staging.TagEntry{
+		_ = store.StageTag(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.TagEntry{
 			Remove:   removeKeys,
 			StagedAt: time.Now(),
 		})
@@ -3193,11 +3208,12 @@ func TestDiffRunner_TagEntries(t *testing.T) {
 		t.Parallel()
 
 		store := testutil.NewMockStore()
-		_ = store.StageTag(t.Context(), staging.ServiceParam, "/app/config1", staging.TagEntry{
+		_ = store.StageTag(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config1"}, staging.TagEntry{
 			Add:      map[string]string{"env": "prod"},
 			StagedAt: time.Now(),
 		})
-		_ = store.StageTag(t.Context(), staging.ServiceParam, "/app/config2", staging.TagEntry{
+
+		_ = store.StageTag(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config2"}, staging.TagEntry{
 			Add:      map[string]string{"env": "dev"},
 			StagedAt: time.Now(),
 		})
@@ -3234,7 +3250,7 @@ func TestStatusRunner_RemoveOnlyTag(t *testing.T) {
 
 		store := testutil.NewMockStore()
 		removeKeys := map[string]struct{}{"deprecated": {}, "old": {}}
-		_ = store.StageTag(t.Context(), staging.ServiceParam, "/app/config", staging.TagEntry{
+		_ = store.StageTag(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.TagEntry{
 			Remove:   removeKeys,
 			StagedAt: time.Now(),
 		})
@@ -3263,7 +3279,7 @@ func TestStatusRunner_RemoveOnlyTag(t *testing.T) {
 
 		store := testutil.NewMockStore()
 		removeKeys := map[string]struct{}{"deprecated": {}, "old": {}}
-		_ = store.StageTag(t.Context(), staging.ServiceParam, "/app/config", staging.TagEntry{
+		_ = store.StageTag(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.TagEntry{
 			Remove:   removeKeys,
 			StagedAt: time.Now(),
 		})
@@ -3299,7 +3315,7 @@ func TestApplyRunner_TagSummaryEdgeCases(t *testing.T) {
 		t.Parallel()
 
 		store := testutil.NewMockStore()
-		_ = store.StageTag(t.Context(), staging.ServiceParam, "/app/config", staging.TagEntry{
+		_ = store.StageTag(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.TagEntry{
 			Add:      map[string]string{"env": "prod", "team": "backend"},
 			StagedAt: time.Now(),
 		})
@@ -3328,7 +3344,7 @@ func TestApplyRunner_TagSummaryEdgeCases(t *testing.T) {
 
 		store := testutil.NewMockStore()
 		removeKeys := map[string]struct{}{"deprecated": {}, "old": {}, "obsolete": {}}
-		_ = store.StageTag(t.Context(), staging.ServiceParam, "/app/config", staging.TagEntry{
+		_ = store.StageTag(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.TagEntry{
 			Remove:   removeKeys,
 			StagedAt: time.Now(),
 		})

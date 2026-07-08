@@ -61,17 +61,17 @@ func TestGoogleCloudStage_Workflow(t *testing.T) {
 	store := newGoogleCloudStore(project)
 	now := time.Now()
 
-	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceSecret, updateName, staging.Entry{
+	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceSecret, staging.EntryKey{Name: updateName}, staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("staged-value"),
 		StagedAt:  now,
 	}))
-	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceSecret, createName, staging.Entry{
+	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceSecret, staging.EntryKey{Name: createName}, staging.Entry{
 		Operation: staging.OperationCreate,
 		Value:     lo.ToPtr("created-value"),
 		StagedAt:  now,
 	}))
-	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceSecret, deleteName, staging.Entry{
+	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceSecret, staging.EntryKey{Name: deleteName}, staging.Entry{
 		Operation: staging.OperationDelete,
 		StagedAt:  now,
 	}))
@@ -137,7 +137,7 @@ func TestGoogleCloudStage_FlatAliasReachesEmulator(t *testing.T) {
 	const project = "suve-e2e"
 
 	store := newGoogleCloudStore(project)
-	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceSecret, "suve-e2e-gcloud-flat/secret", staging.Entry{
+	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceSecret, staging.EntryKey{Name: "suve-e2e-gcloud-flat/secret"}, staging.Entry{
 		Operation: staging.OperationCreate,
 		Value:     lo.ToPtr("v"),
 		StagedAt:  time.Now(),

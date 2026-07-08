@@ -11,15 +11,13 @@ import (
 	"github.com/mpyw/suve/internal/staging/transition"
 )
 
-// DeleteInput holds input for the delete use case.
+// DeleteInput holds input for the delete use case. Key identifies the item by
+// name and (Azure App Configuration) namespace; the namespace is empty for the
+// null/default namespace and every other provider.
 type DeleteInput struct {
-	Name           string
+	Key            staging.EntryKey
 	Force          bool // For Secrets Manager: force immediate deletion
 	RecoveryWindow int  // For Secrets Manager: days before permanent deletion (7-30)
-	// Namespace is the Azure App Configuration namespace of the setting being
-	// deleted; empty is the null/default namespace and the only value for every
-	// other provider.
-	Namespace string
 }
 
 // DeleteOutput holds the result of the delete use case.
@@ -60,7 +58,7 @@ func (u *DeleteUseCase) Execute(ctx context.Context, input DeleteInput) (*Delete
 		currentValue *string
 	)
 
-	fetched, err := u.Strategy.FetchLastModified(ctx, input.Name)
+	fetched, err := u.Strategy.FetchLastModified(ctx, input.Key.Name)
 	if err != nil {
 		// ResourceNotFoundError means the resource doesn't exist; leave
 		// currentValue nil so the reducer either errors (nothing to delete) or
@@ -76,8 +74,10 @@ func (u *DeleteUseCase) Execute(ctx context.Context, input DeleteInput) (*Delete
 		currentValue = new(string)
 	}
 
+	key := input.Key
+
 	// Load current state with CurrentValue for existence check
-	entryState, err := transition.LoadEntryState(ctx, u.Store, service, input.Name, input.Namespace, currentValue)
+	entryState, err := transition.LoadEntryState(ctx, u.Store, service, key, currentValue)
 	if err != nil {
 		return nil, err
 	}
@@ -91,29 +91,29 @@ func (u *DeleteUseCase) Execute(ctx context.Context, input DeleteInput) (*Delete
 	// Check if we should unstage a CREATE
 	if result.DiscardTags {
 		// CREATE -> NotStaged: unstage entry and tags
-		if err := u.Store.UnstageEntry(ctx, service, input.Name, input.Namespace); err != nil {
+		if err := u.Store.UnstageEntry(ctx, service, key); err != nil {
 			return nil, err
 		}
 		// Unstage tags too (ignore ErrNotStaged)
-		if err := u.Store.UnstageTag(ctx, service, input.Name); err != nil && !errors.Is(err, staging.ErrNotStaged) {
+		if err := u.Store.UnstageTag(ctx, service, key); err != nil && !errors.Is(err, staging.ErrNotStaged) {
 			return nil, err
 		}
 
 		return &DeleteOutput{
-			Name:     input.Name,
+			Name:     input.Key.Name,
 			Unstaged: true,
 		}, nil
 	}
 
 	// Stage delete with options (single persist)
 	if err := u.stageDeleteWithOptions(
-		ctx, service, input.Name, input.Namespace, lastModified, hasDeleteOptions, input.Force, input.RecoveryWindow,
+		ctx, service, key, lastModified, hasDeleteOptions, input.Force, input.RecoveryWindow,
 	); err != nil {
 		return nil, err
 	}
 
 	output := &DeleteOutput{
-		Name:              input.Name,
+		Name:              input.Key.Name,
 		ShowDeleteOptions: hasDeleteOptions,
 	}
 	if hasDeleteOptions {
@@ -127,10 +127,9 @@ func (u *DeleteUseCase) Execute(ctx context.Context, input DeleteInput) (*Delete
 // stageDeleteWithOptions stages a delete entry with optional delete options.
 //
 //nolint:lll // function parameters are descriptive for clarity
-func (u *DeleteUseCase) stageDeleteWithOptions(ctx context.Context, service staging.Service, name, namespace string, lastModified time.Time, hasDeleteOptions, force bool, recoveryWindow int) error {
+func (u *DeleteUseCase) stageDeleteWithOptions(ctx context.Context, service staging.Service, key staging.EntryKey, lastModified time.Time, hasDeleteOptions, force bool, recoveryWindow int) error {
 	entry := staging.Entry{
 		Operation: staging.OperationDelete,
-		Namespace: namespace,
 		StagedAt:  time.Now(),
 	}
 	if !lastModified.IsZero() {
@@ -144,5 +143,5 @@ func (u *DeleteUseCase) stageDeleteWithOptions(ctx context.Context, service stag
 		}
 	}
 
-	return u.Store.StageEntry(ctx, service, name, entry)
+	return u.Store.StageEntry(ctx, service, key, entry)
 }
