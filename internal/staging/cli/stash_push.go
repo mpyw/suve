@@ -114,6 +114,36 @@ func stashPushMutuallyExclusiveFlags() []cli.MutuallyExclusiveFlags {
 	}
 }
 
+// stashPeeker is the minimal stash-store surface stashExistsMessage needs.
+// *file.Store satisfies it.
+type stashPeeker interface {
+	IsEncrypted() (bool, error)
+	Drain(ctx context.Context, service staging.Service, keep bool) (*staging.State, error)
+}
+
+// stashExistsMessage builds the "stash already exists" line shown before the
+// merge/overwrite prompt. It never attempts to decrypt: an ENCRYPTED stash is
+// reported without an item count because the pre-check store carries no
+// passphrase, and decrypting here would abort the push before the passphrase is
+// ever requested (#328).
+func stashExistsMessage(ctx context.Context, s stashPeeker) (string, error) {
+	encrypted, err := s.IsEncrypted()
+	if err != nil {
+		return "", fmt.Errorf("failed to check stash file: %w", err)
+	}
+
+	if encrypted {
+		return "Stash file already exists (encrypted).", nil
+	}
+
+	state, err := s.Drain(ctx, "", true)
+	if err != nil {
+		return "", fmt.Errorf("failed to read stash file: %w", err)
+	}
+
+	return fmt.Sprintf("Stash file already exists with %d item(s).", state.TotalCount()), nil
+}
+
 // stashPushAction creates the action function for stash push commands.
 func stashPushAction(service staging.Service, resolver staging.ScopeResolver) func(context.Context, *cli.Command) error {
 	return func(ctx context.Context, cmd *cli.Command) error {
@@ -159,13 +189,11 @@ func stashPushAction(service staging.Service, resolver staging.ScopeResolver) fu
 			// Only prompt for global push when file exists and TTY available
 			// Service-specific push defaults to merge (preserves other services)
 			if exists && service == "" && terminal.IsTerminalWriter(cmd.Root().ErrWriter) {
-				// Count existing items for the prompt message
-				existingState, err := basicStashStore.Drain(ctx, "", true)
+				// Announce the existing stash before prompting merge/overwrite.
+				existsMsg, err := stashExistsMessage(ctx, basicStashStore)
 				if err != nil {
-					return fmt.Errorf("failed to read stash file: %w", err)
+					return err
 				}
-
-				itemCount := existingState.TotalCount()
 
 				confirmPrompter := &confirm.Prompter{
 					Stdin:  cmd.Root().Reader,
@@ -173,7 +201,7 @@ func stashPushAction(service staging.Service, resolver staging.ScopeResolver) fu
 					Stderr: cmd.Root().ErrWriter,
 				}
 
-				output.Warning(cmd.Root().ErrWriter, "Stash file already exists with %d item(s).", itemCount)
+				output.Warning(cmd.Root().ErrWriter, "%s", existsMsg)
 
 				choice, err := confirmPrompter.ConfirmChoice("How do you want to proceed?", []confirm.Choice{
 					{Label: "Merge", Description: "combine with existing stash"},
