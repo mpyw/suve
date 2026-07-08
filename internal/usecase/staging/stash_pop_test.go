@@ -432,35 +432,43 @@ func TestDrainUseCase_ServiceSpecific_MergeWithAgentState(t *testing.T) {
 	})
 }
 
-func TestDrainUseCase_AgentDrainError_TreatedAsEmpty(t *testing.T) {
+// TestDrainUseCase_WorkingDrainError_Propagated: a real working-area read
+// failure (wrong key, corrupt/unreadable file — a missing file returns an empty
+// state with a nil error) must NOT be swallowed and treated as empty, which
+// would replace the working files (deleting any service whose slice ended up
+// empty) with a partial view (#320).
+func TestDrainUseCase_WorkingDrainError_Propagated(t *testing.T) {
 	t.Parallel()
 
 	fileStore := testutil.NewMockStore()
-	agentStore := testutil.NewMockStore()
+	workingStore := testutil.NewMockStore()
 
-	// File has param entries
+	// Stash has param entries.
 	_ = fileStore.StageEntry(t.Context(), staging.ServiceParam, "/app/param", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("file-param"),
 		StagedAt:  time.Now(),
 	})
 
-	// Make agent drain fail (simulates agent not running)
-	agentStore.DrainErr = errors.New("agent not available")
+	// Working-area read fails (wrong key / unreadable file).
+	workingStore.DrainErr = errors.New("decryption failed: wrong passphrase or corrupted data")
 
 	usecase := &stagingusecase.StashPopUseCase{
 		Stash:   fileStore,
-		Working: agentStore,
+		Working: workingStore,
 	}
 
-	// Should succeed because agent drain error is treated as empty state
-	output, err := usecase.Execute(t.Context(), stagingusecase.StashPopInput{})
-	require.NoError(t, err)
-	assert.Equal(t, 1, output.EntryCount)
+	_, err := usecase.Execute(t.Context(), stagingusecase.StashPopInput{})
+	require.Error(t, err)
 
-	// Verify entry is in agent (write should succeed even though drain failed)
-	_, err = agentStore.GetEntry(t.Context(), staging.ServiceParam, "/app/param")
-	require.NoError(t, err)
+	var popErr *stagingusecase.StashPopError
+
+	require.ErrorAs(t, err, &popErr)
+	assert.Contains(t, err.Error(), "working staging area")
+
+	// The working area must not have been written (WriteState never reached).
+	_, getErr := workingStore.GetEntry(t.Context(), staging.ServiceParam, "/app/param")
+	require.ErrorIs(t, getErr, staging.ErrNotStaged)
 }
 
 func TestDrainUseCase_ServiceSpecific_FileDeleteDrainError(t *testing.T) {
