@@ -1737,6 +1737,67 @@ func TestEditRunner_WithMetadata(t *testing.T) {
 	})
 }
 
+// TestApplyRunner_UnstageFailureWarns verifies that when the cloud apply
+// succeeds but clearing the staged entry afterwards fails, the service-specific
+// apply surfaces a warning instead of silently ignoring it (#327).
+func TestApplyRunner_UnstageFailureWarns(t *testing.T) {
+	t.Parallel()
+
+	t.Run("entry unstage failure warns", func(t *testing.T) {
+		t.Parallel()
+
+		store := testutil.NewMockStore()
+		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
+			Operation: staging.OperationUpdate,
+			Value:     lo.ToPtr("v"),
+			StagedAt:  time.Now(),
+		})
+		store.UnstageEntryErr = errors.New("disk full")
+
+		var stdout, stderr bytes.Buffer
+
+		r := &cli.ApplyRunner{
+			UseCase: &stagingusecase.ApplyUseCase{
+				Strategy: &fullMockStrategy{service: staging.ServiceParam},
+				Store:    store,
+			},
+			Stdout: &stdout,
+			Stderr: &stderr,
+		}
+
+		require.NoError(t, r.Run(t.Context(), cli.ApplyOptions{}))
+		assert.Contains(t, stdout.String(), "Updated /app/config")
+		assert.Contains(t, stderr.String(), "failed to clear staging for /app/config")
+		assert.Contains(t, stderr.String(), "disk full")
+	})
+
+	t.Run("tag unstage failure warns", func(t *testing.T) {
+		t.Parallel()
+
+		store := testutil.NewMockStore()
+		_ = store.StageTag(t.Context(), staging.ServiceParam, "/app/config", staging.TagEntry{
+			Add:      map[string]string{"env": "prod"},
+			StagedAt: time.Now(),
+		})
+		store.UnstageTagErr = errors.New("disk full")
+
+		var stdout, stderr bytes.Buffer
+
+		r := &cli.ApplyRunner{
+			UseCase: &stagingusecase.ApplyUseCase{
+				Strategy: &fullMockStrategy{service: staging.ServiceParam},
+				Store:    store,
+			},
+			Stdout: &stdout,
+			Stderr: &stderr,
+		}
+
+		require.NoError(t, r.Run(t.Context(), cli.ApplyOptions{}))
+		assert.Contains(t, stdout.String(), "Tagged /app/config")
+		assert.Contains(t, stderr.String(), "failed to clear staging for /app/config tags")
+	})
+}
+
 func TestApplyRunner_WithTags(t *testing.T) {
 	t.Parallel()
 
