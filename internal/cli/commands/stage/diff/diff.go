@@ -292,17 +292,12 @@ func (r *Runner) outputDiff(
 		stagedValue = ""
 	}
 
-	// Format as JSON if enabled
-	if opts.ParseJSON {
-		remoteValue, stagedValue = jsonutil.TryFormatOrWarn2(remoteValue, stagedValue, r.Stderr, name)
-	}
-
-	// The identical-value auto-unstage never applies to a delete: deleting a
-	// resource is not a no-op just because its current value happens to be the
-	// empty string (legal in Azure App Configuration / Key Vault / Google
-	// Cloud), so an empty-valued delete must not be silently cancelled.
+	// The auto-unstage decision is made on the RAW values, never on the
+	// --parse-json-normalized ones: whether staged work survives must not depend
+	// on a display flag, and it must match the service-level DiffUseCase which
+	// compares raw values. It also never applies to a delete (deleting is not a
+	// no-op just because the current value is the empty string).
 	if entry.Operation != staging.OperationDelete && remoteValue == stagedValue {
-		// Auto-unstage since there's no difference
 		if err := r.Store.UnstageEntry(ctx, strategy.Service(), name); err != nil {
 			return fmt.Errorf("failed to unstage %s: %w", name, err)
 		}
@@ -312,6 +307,12 @@ func (r *Runner) outputDiff(
 		return nil
 	}
 
+	// Format for rendering only.
+	displayRemote, displayStaged := remoteValue, stagedValue
+	if opts.ParseJSON {
+		displayRemote, displayStaged = jsonutil.TryFormatOrWarn2(remoteValue, stagedValue, r.Stderr, name)
+	}
+
 	label1 := fmt.Sprintf("%s%s (%s)", name, fr.Identifier, r.ProviderLabel)
 	label2 := fmt.Sprintf(lo.Ternary(
 		entry.Operation == staging.OperationDelete,
@@ -319,7 +320,16 @@ func (r *Runner) outputDiff(
 		"%s (staged)",
 	), name)
 
-	diff := output.Diff(label1, label2, remoteValue, stagedValue)
+	diff := output.Diff(label1, label2, displayRemote, displayStaged)
+
+	// Raw values differ but --parse-json renders no textual diff: the staged
+	// update only reformats JSON. It remains staged (decided on raw above).
+	if diff == "" {
+		output.Warning(r.Stderr, "%s: staged value differs from %s only in JSON formatting", name, r.ProviderLabel)
+
+		return nil
+	}
+
 	output.Print(r.Stdout, diff)
 
 	// Show staged metadata

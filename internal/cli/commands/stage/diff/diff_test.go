@@ -688,6 +688,39 @@ func TestRun_DeleteEmptyRemoteNotUnstaged(t *testing.T) {
 	require.NoError(t, err)
 }
 
+// TestRun_ParseJSONReformatOnlyUpdateKeptStaged verifies that a staged update
+// which only reformats JSON (same content, different key order) is NOT unstaged
+// by `stage diff -j`: the auto-unstage decision is made on raw values, so
+// staged work does not depend on a display flag (#324).
+func TestRun_ParseJSONReformatOnlyUpdateKeptStaged(t *testing.T) {
+	t.Parallel()
+
+	store := testutil.NewMockStore()
+	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
+		Operation: staging.OperationUpdate,
+		Value:     lo.ToPtr(`{"b":2,"a":1}`),
+		StagedAt:  time.Now(),
+	}))
+
+	var stdout, stderr bytes.Buffer
+
+	r := &stagediff.Runner{
+		Services:      []stagediff.ServiceStrategy{paramDiff(staging.NewParamStrategy(storeReturning(`{"a":1,"b":2}`, "1")))},
+		ProviderLabel: "AWS",
+		Store:         store,
+		Stdout:        &stdout,
+		Stderr:        &stderr,
+	}
+
+	require.NoError(t, r.Run(t.Context(), stagediff.Options{ParseJSON: true}))
+	assert.NotContains(t, stderr.String(), "unstaged")
+	assert.Contains(t, stderr.String(), "only in JSON formatting")
+
+	// The staged update must survive `stage diff -j`.
+	_, err := store.GetEntry(t.Context(), staging.ServiceParam, "/app/config")
+	require.NoError(t, err)
+}
+
 func TestRun_SecretDeleteAutoUnstageWhenAlreadyDeleted(t *testing.T) {
 	t.Parallel()
 
