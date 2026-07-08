@@ -148,33 +148,37 @@ func (p *logPresenter) RenderValue(stdout io.Writer, i, maxValueLength int) {
 
 func (p *logPresenter) RenderPatch(stdout, stderr io.Writer, i int, parseJSON, reverse bool) {
 	entries := p.result.Entries
+	parentIdx, oldest := genericlog.PatchParent(i, len(entries), reverse)
 
-	// For patch mode, we need to compare with the next entry in the list.
-	// The list is ordered by the usecase based on reverse.
-	if i >= len(entries)-1 {
-		return
-	}
-
-	var oldEntry, newEntry param.LogEntry
-
-	if reverse {
-		// In reverse mode (oldest first): current is old, next is new
-		oldEntry = entries[i]
-		newEntry = entries[i+1]
-	} else {
-		// In normal mode (newest first): next is old, current is new
-		oldEntry = entries[i+1]
-		newEntry = entries[i]
-	}
-
-	oldValue := oldEntry.Value
-
+	newEntry := entries[i]
 	newValue := newEntry.Value
-	if parseJSON {
-		oldValue, newValue = jsonutil.TryFormatOrWarn2(oldValue, newValue, stderr, "")
+
+	var oldValue, oldName string
+
+	if oldest {
+		// The oldest version in the window has no parent to diff against. Render
+		// its creation (all-added) diff, but only when it is genuinely the
+		// initial version — otherwise a --number/date-filter window cut would
+		// masquerade as a creation.
+		if !p.result.InitialIncluded {
+			return
+		}
+
+		oldName = p.result.Name
+
+		if parseJSON {
+			newValue = jsonutil.TryFormatOrWarn(newValue, stderr, "")
+		}
+	} else {
+		oldEntry := entries[parentIdx]
+		oldValue = oldEntry.Value
+		oldName = fmt.Sprintf("%s#%d", p.result.Name, oldEntry.Version)
+
+		if parseJSON {
+			oldValue, newValue = jsonutil.TryFormatOrWarn2(oldValue, newValue, stderr, "")
+		}
 	}
 
-	oldName := fmt.Sprintf("%s#%d", p.result.Name, oldEntry.Version)
 	newName := fmt.Sprintf("%s#%d", p.result.Name, newEntry.Version)
 
 	diff := output.Diff(oldName, newName, oldValue, newValue)

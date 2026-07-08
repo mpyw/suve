@@ -230,7 +230,7 @@ func TestRunParam(t *testing.T) {
 			},
 		},
 		{
-			name: "patch with single version shows no diff",
+			name: "patch with single version shows creation diff",
 			req:  genericlog.Request{Name: "/app/param", MaxResults: 10},
 			opts: genericlog.Options{ShowPatch: true},
 			store: paramLogStore([]paramLogVer{
@@ -238,8 +238,12 @@ func TestRunParam(t *testing.T) {
 			}),
 			check: func(t *testing.T, output string) {
 				t.Helper()
+				// The sole version is the initial one: git log -p renders it as
+				// an all-added creation diff, not a bare header.
 				assert.Contains(t, output, "Version 1")
-				assert.NotContains(t, output, "---")
+				assert.Contains(t, output, "--- /app/param")
+				assert.Contains(t, output, "+++ /app/param#1")
+				assert.Contains(t, output, "+only-value")
 			},
 		},
 		{
@@ -288,6 +292,57 @@ func TestRunParam(t *testing.T) {
 				assert.Contains(t, output, "+new-value")
 				assert.Contains(t, output, "--- /app/param#1")
 				assert.Contains(t, output, "+++ /app/param#2")
+			},
+		},
+		{
+			name: "reverse patch attaches each patch under its own version header",
+			req:  genericlog.Request{Name: "/app/param", MaxResults: 10, Reverse: true},
+			opts: genericlog.Options{ShowPatch: true, Reverse: true},
+			store: paramLogStore([]paramLogVer{
+				{ver: 1, value: "a", modified: lo.ToPtr(now.Add(-2 * time.Hour))},
+				{ver: 2, value: "b", modified: lo.ToPtr(now.Add(-time.Hour))},
+				{ver: 3, value: "c", modified: &now},
+			}),
+			check: func(t *testing.T, output string) {
+				t.Helper()
+
+				// git log -p --reverse: each version's own patch sits under its
+				// own header. v2's patch (#1->#2) must fall between the Version 2
+				// and Version 3 headers, and v3's patch (#2->#3) after Version 3.
+				v2Hdr := strings.Index(output, "Version 2")
+				v3Hdr := strings.Index(output, "Version 3")
+				patch12 := strings.Index(output, "+++ /app/param#2")
+				patch23 := strings.Index(output, "+++ /app/param#3")
+
+				require.NotEqual(t, -1, patch12)
+				require.NotEqual(t, -1, patch23)
+				assert.Greater(t, patch12, v2Hdr, "v1->v2 patch must be under Version 2 header")
+				assert.Less(t, patch12, v3Hdr, "v1->v2 patch must precede Version 3 header")
+				assert.Greater(t, patch23, v3Hdr, "v2->v3 patch must be under Version 3 header")
+
+				// The initial version (v1) renders its all-added creation diff.
+				assert.Contains(t, output, "+++ /app/param#1")
+			},
+		},
+		{
+			name: "patch does not fabricate a creation diff when the window is cut by --number",
+			req:  genericlog.Request{Name: "/app/param", MaxResults: 2},
+			opts: genericlog.Options{ShowPatch: true},
+			store: paramLogStore([]paramLogVer{
+				{ver: 1, value: "a", modified: lo.ToPtr(now.Add(-2 * time.Hour))},
+				{ver: 2, value: "b", modified: lo.ToPtr(now.Add(-time.Hour))},
+				{ver: 3, value: "c", modified: &now},
+			}),
+			check: func(t *testing.T, output string) {
+				t.Helper()
+				// Only versions 3 and 2 are shown; version 1 exists beyond the
+				// window, so the oldest shown version (2) is NOT a creation and
+				// must not get an all-added hunk.
+				assert.Contains(t, output, "Version 3")
+				assert.Contains(t, output, "Version 2")
+				assert.NotContains(t, output, "Version 1")
+				assert.NotContains(t, output, "@@ -0,0")
+				assert.NotContains(t, output, "+++ /app/param#2")
 			},
 		},
 		{
@@ -472,7 +527,7 @@ func TestRunParam(t *testing.T) {
 			},
 		},
 		{
-			name: "patch with identical values shows no diff",
+			name: "patch with identical consecutive values shows no diff between them",
 			req:  genericlog.Request{Name: "/app/param", MaxResults: 10},
 			opts: genericlog.Options{ShowPatch: true},
 			store: paramLogStore([]paramLogVer{
@@ -482,8 +537,11 @@ func TestRunParam(t *testing.T) {
 			check: func(t *testing.T, output string) {
 				t.Helper()
 				assert.Contains(t, output, "Version")
+				// v1 -> v2 is a no-op, so no line is ever removed.
 				assert.NotContains(t, output, "-same-value")
-				assert.NotContains(t, output, "+same-value")
+				// The initial version (v1) still renders its all-added creation
+				// diff exactly once; the v2 patch adds nothing.
+				assert.Equal(t, 1, strings.Count(output, "+same-value"))
 			},
 		},
 	}
@@ -605,7 +663,7 @@ func TestRunSecret(t *testing.T) {
 			},
 		},
 		{
-			name: "patch with single version shows no diff",
+			name: "patch with single version shows creation diff",
 			req:  genericlog.Request{Name: "my-secret", MaxResults: 10},
 			opts: genericlog.Options{ShowPatch: true},
 			store: secretLogStore([]domain.Version{
@@ -613,8 +671,11 @@ func TestRunSecret(t *testing.T) {
 			}, map[string]string{"only-version": "only-value"}, nil, nil),
 			check: func(t *testing.T, output string) {
 				t.Helper()
+				// The sole version is the initial one: rendered as an all-added
+				// creation diff (git log -p style), not a bare header.
 				assert.Contains(t, output, "Version")
-				assert.NotContains(t, output, "---")
+				assert.Contains(t, output, "--- my-secret")
+				assert.Contains(t, output, "+only-value")
 			},
 		},
 		{

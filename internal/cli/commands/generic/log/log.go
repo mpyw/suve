@@ -108,6 +108,24 @@ func (r *Runner) Run(ctx context.Context) error {
 	return nil
 }
 
+// PatchParent computes, for version i in a fetched window of n versions, the
+// index of its parent (the immediately-older version) and whether i is the
+// oldest version in the window.
+//
+// git log -p attaches each version's own creation patch under its own header —
+// the diff from its parent to itself. In newest-first order the parent is the
+// next entry (i+1); in reverse (oldest-first) order it is the previous entry
+// (i-1). The oldest version in the window has no parent in the list; the caller
+// renders it as an all-added creation diff, but only when it is genuinely the
+// initial version (guarding against a --number / date-filter window cut).
+func PatchParent(i, n int, reverse bool) (parentIdx int, oldest bool) {
+	if reverse {
+		return i - 1, i == 0
+	}
+
+	return i + 1, i == n-1
+}
+
 // Config holds the provider-specific configuration for the log command.
 type Config struct {
 	// Usage is the one-line command usage string.
