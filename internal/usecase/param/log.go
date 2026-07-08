@@ -65,18 +65,14 @@ func (u *LogUseCase) Execute(ctx context.Context, input LogInput) (*LogOutput, e
 	// tell whether the oldest shown version is genuinely the initial one.
 	initialVersion := parseVersion(versions[len(versions)-1].ID)
 
-	// History is newest first; MaxResults caps the number of versions shown.
-	if input.MaxResults > 0 && len(versions) > int(input.MaxResults) {
-		versions = versions[:input.MaxResults]
-	}
-
-	// The current version is the highest version number in the working set.
+	// The current version is the highest version number over the full history.
 	maxVersion := lo.MaxBy(versions, func(a, b domain.Version) bool {
 		return parseVersion(a.ID) > parseVersion(b.ID)
 	})
 	maxVersionNum := parseVersion(maxVersion.ID)
 
-	// Apply date filters against each version's creation time.
+	// Apply date filters BEFORE the count limit: -n must return up to N versions
+	// that match --since/--until, not N newest-then-filtered to fewer (#351).
 	filtered := lo.Filter(versions, func(v domain.Version, _ int) bool {
 		if input.Since == nil && input.Until == nil {
 			return true
@@ -97,6 +93,11 @@ func (u *LogUseCase) Execute(ctx context.Context, input LogInput) (*LogOutput, e
 
 		return true
 	})
+
+	// Then cap the (newest-first) filtered set to MaxResults.
+	if input.MaxResults > 0 && len(filtered) > int(input.MaxResults) {
+		filtered = filtered[:input.MaxResults]
+	}
 
 	entries := make([]LogEntry, 0, len(filtered))
 

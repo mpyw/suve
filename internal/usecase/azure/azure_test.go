@@ -3,8 +3,11 @@ package azure_test
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
+	"time"
 
+	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -63,6 +66,43 @@ func TestLogUseCase_HistoryErrorPropagates(t *testing.T) {
 	_, err := uc.Execute(t.Context(), azure.LogInput{Name: "my-key"})
 	require.Error(t, err)
 	require.ErrorIs(t, err, sentinel)
+}
+
+// TestLogUseCase_FilterBeforeCount asserts date filters run BEFORE the count
+// cap: -n must yield up to N versions that match the filter, not N newest then
+// filtered down to fewer (#351). Only the two oldest versions match --until;
+// the old count-first order would have truncated them all away.
+func TestLogUseCase_FilterBeforeCount(t *testing.T) {
+	t.Parallel()
+
+	now := time.Now()
+	versions := []domain.Version{
+		{ID: "newest", Created: &now},
+		{ID: "middle", Created: lo.ToPtr(now.Add(-2 * time.Hour))},
+		{ID: "oldest", Created: lo.ToPtr(now.Add(-3 * time.Hour))},
+	}
+
+	store := &providermock.Store{
+		HistoryFunc: func(_ context.Context, _ string) ([]domain.Version, error) {
+			return versions, nil
+		},
+		ResolveFunc: func(_ context.Context, _, spec string) (provider.VersionRef, error) {
+			return provider.NewVersionRef(strings.TrimPrefix(spec, "#")), nil
+		},
+		GetFunc: func(_ context.Context, name string, ref provider.VersionRef) (*domain.Entry, error) {
+			return &domain.Entry{Name: name, Value: ref.ID(), Version: domain.Version{ID: ref.ID()}}, nil
+		},
+	}
+
+	uc := &azure.LogUseCase{Reader: store}
+	out, err := uc.Execute(t.Context(), azure.LogInput{
+		Name:       "my-key",
+		MaxResults: 1,
+		Until:      lo.ToPtr(now.Add(-time.Hour)),
+	})
+	require.NoError(t, err)
+	require.Len(t, out.Entries, 1)
+	assert.Equal(t, "middle", out.Entries[0].Version)
 }
 
 func TestDiffUseCase(t *testing.T) {
