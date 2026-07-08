@@ -209,7 +209,6 @@ func (s *Store) Get(ctx context.Context, name string, ref provider.VersionRef) (
 	}); verr == nil && sv != nil {
 		created := toTime(sv.GetCreateTime())
 		entry.Version.Created = created
-		entry.Version.Label = stateLabel(sv.GetState())
 		entry.Version.State = stateLabel(sv.GetState())
 		entry.Modified = created
 	}
@@ -225,7 +224,7 @@ func (s *Store) Get(ctx context.Context, name string, ref provider.VersionRef) (
 }
 
 // History returns the secret's version history, newest first. The per-version
-// state (enabled/disabled/destroyed) is surfaced in the neutral Version.Label
+// state (enabled/disabled/destroyed) is surfaced in the neutral Version.State
 // for display; destroyed/disabled versions have no accessible value.
 func (s *Store) History(ctx context.Context, name string) ([]domain.Version, error) {
 	versions, err := s.client.ListSecretVersions(ctx, &secretmanagerpb.ListSecretVersionsRequest{
@@ -240,7 +239,6 @@ func (s *Store) History(ctx context.Context, name string) ([]domain.Version, err
 	return lo.Map(versions, func(v *secretmanagerpb.SecretVersion, _ int) domain.Version {
 		return domain.Version{
 			ID:      versionNumber(v.GetName()),
-			Label:   stateLabel(v.GetState()),
 			State:   stateLabel(v.GetState()),
 			Created: toTime(v.GetCreateTime()),
 		}

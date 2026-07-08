@@ -204,7 +204,6 @@ func TestGet_MapsEntryWithDescriptionAndTags(t *testing.T) {
 	assert.Equal(t, "s3cr3t", entry.Value)
 	assert.Equal(t, domain.ValueTypeSecret, entry.Type)
 	assert.Equal(t, "id-3", entry.Version.ID)
-	assert.Equal(t, "AWSCURRENT", entry.Version.Label)
 	// StagingLabels carries the full stage set; State is empty (no such concept).
 	assert.Equal(t, []string{"AWSCURRENT"}, entry.Version.StagingLabels)
 	assert.Empty(t, entry.Version.State)
@@ -256,14 +255,13 @@ func TestGet_LabelPrefersAWSCURRENTRegardlessOfOrder(t *testing.T) {
 
 	entry, err := store.Get(t.Context(), "my-secret", provider.NewVersionRef("id-3"))
 	require.NoError(t, err)
-	assert.Equal(t, "AWSCURRENT", entry.Version.Label)
-	// The representative Label collapses to one; StagingLabels keeps them all.
+	// StagingLabels keeps every staging label AWS returned, in order.
 	assert.Equal(t, []string{"my-custom-label", "AWSPREVIOUS", "AWSCURRENT"}, entry.Version.StagingLabels)
 }
 
-// Priority ordering among the well-known and custom labels: AWSPENDING beats
-// AWSPREVIOUS, and custom-only labels tie-break lexicographically (#317).
-func TestHistory_LabelPriorityOrdering(t *testing.T) {
+// History preserves every staging label AWS returns for a version, in the
+// order AWS reported them (no collapsing to a single representative).
+func TestHistory_StagingLabels(t *testing.T) {
 	t.Parallel()
 
 	base := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
@@ -289,13 +287,10 @@ func TestHistory_LabelPriorityOrdering(t *testing.T) {
 	versions, err := store.History(t.Context(), "my-secret")
 	require.NoError(t, err)
 	require.Len(t, versions, 2)
-	// Newest first: id-2 (AWSPENDING preferred over AWSPREVIOUS).
+	// Newest first: id-2.
 	assert.Equal(t, "id-2", versions[0].ID)
-	assert.Equal(t, "AWSPENDING", versions[0].Label)
 	assert.Equal(t, []string{"AWSPREVIOUS", "AWSPENDING"}, versions[0].StagingLabels)
-	// Custom-only labels tie-break lexicographically: "alpha" < "zeta".
 	assert.Equal(t, "id-1", versions[1].ID)
-	assert.Equal(t, "alpha", versions[1].Label)
 	assert.Equal(t, []string{"zeta", "alpha"}, versions[1].StagingLabels)
 }
 
@@ -312,7 +307,7 @@ func TestHistory_NewestFirst(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, versions, 3)
 	assert.Equal(t, "id-3", versions[0].ID)
-	assert.Equal(t, "AWSCURRENT", versions[0].Label)
+	assert.Equal(t, []string{"AWSCURRENT"}, versions[0].StagingLabels)
 	assert.Equal(t, "id-1", versions[2].ID)
 }
 
@@ -648,7 +643,6 @@ func TestDescribe(t *testing.T) {
 	assert.Equal(t, domain.ValueTypeSecret, entry.Type)
 	assert.Equal(t, "the desc", entry.Description)
 	assert.Equal(t, "id-3", entry.Version.ID)
-	assert.Equal(t, "AWSCURRENT", entry.Version.Label)
 	assert.Equal(t, []string{"AWSCURRENT"}, entry.Version.StagingLabels)
 	// The version's own creation time, not the secret-level CreatedDate.
 	require.NotNil(t, entry.Version.Created)

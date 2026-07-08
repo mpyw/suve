@@ -59,9 +59,32 @@ func TestShowUseCase_Execute(t *testing.T) {
 	assert.Equal(t, "secret-value", output.Value)
 	assert.Equal(t, "abc123", output.VersionID)
 	assert.Equal(t, []string{"AWSCURRENT", "custom"}, output.VersionStage)
+	// AWS Secrets Manager carries staging labels, not a per-version state (#419).
+	assert.Empty(t, output.State)
 	assert.NotNil(t, output.CreatedDate)
 	// Regression guard: the ARN must be surfaced from the entry's Extra metadata.
 	assert.Equal(t, "arn:aws:secretsmanager:us-east-1:123:secret:my-secret", output.ARN)
+}
+
+// TestShowUseCase_Execute_State asserts that a GCloud/Key Vault-style version
+// (per-version State set, no staging labels) surfaces State and leaves
+// VersionStage empty — the two concepts must not be conflated (#419).
+func TestShowUseCase_Execute_State(t *testing.T) {
+	t.Parallel()
+
+	store := showStore(&domain.Entry{
+		Name:    "my-secret",
+		Value:   "secret-value",
+		Type:    domain.ValueTypeSecret,
+		Version: domain.Version{ID: "2", State: "enabled"},
+	})
+
+	uc := &secret.ShowUseCase{Reader: store}
+
+	output, err := uc.Execute(t.Context(), secret.ShowInput{Spec: mustParseSpec(t, "my-secret")})
+	require.NoError(t, err)
+	assert.Equal(t, "enabled", output.State)
+	assert.Empty(t, output.VersionStage)
 }
 
 func TestShowUseCase_Execute_WithVersionID(t *testing.T) {

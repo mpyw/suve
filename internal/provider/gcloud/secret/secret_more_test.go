@@ -147,11 +147,11 @@ func TestHistory_StateLabelsAndUnparsable(t *testing.T) {
 	// Numeric versions sort newest-first; the unparsable name (versionInt == -1)
 	// sorts last.
 	assert.Equal(t, "5", versions[0].ID)
-	assert.Equal(t, "enabled", versions[0].Label)
+	assert.Equal(t, "enabled", versions[0].State)
 	assert.Equal(t, "2", versions[1].ID)
-	assert.Equal(t, "disabled", versions[1].Label)
+	assert.Equal(t, "disabled", versions[1].State)
 	assert.Equal(t, "weird", versions[2].ID)
-	assert.Empty(t, versions[2].Label)
+	assert.Empty(t, versions[2].State)
 }
 
 func TestList_Error(t *testing.T) {
