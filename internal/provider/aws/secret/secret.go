@@ -255,7 +255,7 @@ func (s *Store) Get(ctx context.Context, name string, ref provider.VersionRef) (
 		Type:  domain.ValueTypeSecret,
 		Version: domain.Version{
 			ID:      aws.ToString(out.VersionId),
-			Label:   firstStage(out.VersionStages),
+			Label:   representativeStage(out.VersionStages),
 			Created: out.CreatedDate,
 		},
 		Modified: out.CreatedDate,
@@ -287,7 +287,7 @@ func (s *Store) History(ctx context.Context, name string) ([]domain.Version, err
 	return lo.Map(list, func(v types.SecretVersionsListEntry, _ int) domain.Version {
 		return domain.Version{
 			ID:      aws.ToString(v.VersionId),
-			Label:   firstStage(v.VersionStages),
+			Label:   representativeStage(v.VersionStages),
 			Created: v.CreatedDate,
 		}
 	}), nil
@@ -494,16 +494,21 @@ func (s *Store) Describe(ctx context.Context, name string) (*domain.Entry, error
 		Extra:       []domain.Field{{Label: "ARN", Value: aws.ToString(desc.ARN)}},
 	}
 
-	// Best-effort: surface the current (AWSCURRENT) version if present.
-	for versionID, stages := range desc.VersionIdsToStages {
-		if slices.Contains(stages, "AWSCURRENT") {
+	// Best-effort: surface the current (AWSCURRENT) version with its OWN
+	// creation time. DescribeSecret's CreatedDate is when the SECRET was
+	// created, not when the AWSCURRENT version was, so an updated secret would
+	// otherwise report a stale version timestamp; ListSecretVersionIds carries
+	// the per-version CreatedDate (#317). A listing failure is tolerated: the
+	// metadata entry is still returned without version details.
+	if versions, listErr := s.listAllVersions(ctx, name); listErr == nil {
+		if cur, found := lo.Find(versions, func(v types.SecretVersionsListEntry) bool {
+			return slices.Contains(v.VersionStages, "AWSCURRENT")
+		}); found {
 			entry.Version = domain.Version{
-				ID:      versionID,
-				Label:   firstStage(stages),
-				Created: desc.CreatedDate,
+				ID:      aws.ToString(cur.VersionId),
+				Label:   representativeStage(cur.VersionStages),
+				Created: cur.CreatedDate,
 			}
-
-			break
 		}
 	}
 
@@ -548,14 +553,27 @@ func (s *Store) Untag(ctx context.Context, name string, keys []string) error {
 	return nil
 }
 
-// firstStage returns the first staging label, or "" when there are none. It
-// keeps the AWS label confined to a provider-neutral, informational Label.
-func firstStage(stages []string) string {
+// representativeStage picks a single, DETERMINISTIC staging label to surface as
+// the version's provider-neutral Label. A version can carry several labels and
+// AWS returns them in an unspecified order, so choosing stages[0] made both the
+// displayed label and any "is this AWSCURRENT?" check non-deterministic (#317).
+//
+// A well-known label wins in fixed priority order (AWSCURRENT > AWSPENDING >
+// AWSPREVIOUS); otherwise the lexicographically smallest custom label is used
+// so the choice is stable. It returns "" when there are no labels.
+func representativeStage(stages []string) string {
 	if len(stages) == 0 {
 		return ""
 	}
 
-	return stages[0]
+	// Well-known AWS staging labels, highest priority first.
+	for _, known := range []string{"AWSCURRENT", "AWSPENDING", "AWSPREVIOUS"} {
+		if slices.Contains(stages, known) {
+			return known
+		}
+	}
+
+	return slices.Min(stages)
 }
 
 // mapTags maps Secrets Manager tags to provider-neutral domain tags.
