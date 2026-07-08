@@ -3,7 +3,6 @@ package apply_test
 import (
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"testing"
 	"time"
@@ -16,6 +15,7 @@ import (
 	"github.com/mpyw/suve/internal/cli/commands/stage/apply"
 	"github.com/mpyw/suve/internal/maputil"
 	"github.com/mpyw/suve/internal/staging"
+	"github.com/mpyw/suve/internal/staging/store"
 	"github.com/mpyw/suve/internal/staging/store/testutil"
 )
 
@@ -98,9 +98,8 @@ func TestRun_NoChanges(t *testing.T) {
 	var buf bytes.Buffer
 
 	r := &apply.Runner{
-		Services:      []apply.ServiceApply{paramApply(newParamStrategy()), secretApply(newSecretStrategy())},
+		Services:      []apply.ServiceApply{paramApply(newParamStrategy(), store), secretApply(newSecretStrategy(), store)},
 		ProviderLabel: "AWS",
-		Store:         store,
 		Stdout:        &buf,
 		Stderr:        &bytes.Buffer{},
 	}
@@ -155,9 +154,8 @@ func TestRun_ApplyBothServices(t *testing.T) {
 	var buf bytes.Buffer
 
 	r := &apply.Runner{
-		Services:      []apply.ServiceApply{paramApply(paramMock), secretApply(secretMock)},
+		Services:      []apply.ServiceApply{paramApply(paramMock, store), secretApply(secretMock, store)},
 		ProviderLabel: "AWS",
-		Store:         store,
 		Stdout:        &buf,
 		Stderr:        &bytes.Buffer{},
 	}
@@ -201,9 +199,8 @@ func TestRun_ApplyParamOnly(t *testing.T) {
 	var buf bytes.Buffer
 
 	r := &apply.Runner{
-		Services:      []apply.ServiceApply{paramApply(paramMock)},
+		Services:      []apply.ServiceApply{paramApply(paramMock, store)},
 		ProviderLabel: "AWS",
-		Store:         store,
 		Stdout:        &buf,
 		Stderr:        &bytes.Buffer{},
 	}
@@ -238,9 +235,8 @@ func TestRun_ApplySecretOnly(t *testing.T) {
 	var buf bytes.Buffer
 
 	r := &apply.Runner{
-		Services:      []apply.ServiceApply{secretApply(secretMock)},
+		Services:      []apply.ServiceApply{secretApply(secretMock, store)},
 		ProviderLabel: "AWS",
-		Store:         store,
 		Stdout:        &buf,
 		Stderr:        &bytes.Buffer{},
 	}
@@ -287,9 +283,8 @@ func TestRun_ApplyDelete(t *testing.T) {
 	var buf bytes.Buffer
 
 	r := &apply.Runner{
-		Services:      []apply.ServiceApply{paramApply(paramMock), secretApply(secretMock)},
+		Services:      []apply.ServiceApply{paramApply(paramMock, store), secretApply(secretMock, store)},
 		ProviderLabel: "AWS",
-		Store:         store,
 		Stdout:        &buf,
 		Stderr:        &bytes.Buffer{},
 	}
@@ -332,9 +327,8 @@ func TestRun_PartialFailure(t *testing.T) {
 	var buf, errBuf bytes.Buffer
 
 	r := &apply.Runner{
-		Services:      []apply.ServiceApply{paramApply(paramMock), secretApply(secretMock)},
+		Services:      []apply.ServiceApply{paramApply(paramMock, store), secretApply(secretMock, store)},
 		ProviderLabel: "AWS",
-		Store:         store,
 		Stdout:        &buf,
 		Stderr:        &errBuf,
 	}
@@ -351,27 +345,6 @@ func TestRun_PartialFailure(t *testing.T) {
 	// Secrets Manager should be unstaged (succeeded)
 	_, err = store.GetEntry(t.Context(), staging.ServiceSecret, "my-secret", "")
 	assert.Equal(t, staging.ErrNotStaged, err)
-}
-
-func TestRun_StoreError(t *testing.T) {
-	t.Parallel()
-
-	store := testutil.NewMockStore()
-	store.ListEntriesErr = errors.New("mock store error")
-
-	var buf bytes.Buffer
-
-	r := &apply.Runner{
-		Services:      []apply.ServiceApply{paramApply(newParamStrategy()), secretApply(newSecretStrategy())},
-		ProviderLabel: "AWS",
-		Store:         store,
-		Stdout:        &buf,
-		Stderr:        &bytes.Buffer{},
-	}
-
-	err := r.Run(t.Context())
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "mock store error")
 }
 
 func TestRun_SecretDeleteWithForce(t *testing.T) {
@@ -400,9 +373,8 @@ func TestRun_SecretDeleteWithForce(t *testing.T) {
 	var buf bytes.Buffer
 
 	r := &apply.Runner{
-		Services:      []apply.ServiceApply{secretApply(secretMock)},
+		Services:      []apply.ServiceApply{secretApply(secretMock, store)},
 		ProviderLabel: "AWS",
-		Store:         store,
 		Stdout:        &buf,
 		Stderr:        &bytes.Buffer{},
 	}
@@ -439,9 +411,8 @@ func TestRun_SecretDeleteWithRecoveryWindow(t *testing.T) {
 	var buf bytes.Buffer
 
 	r := &apply.Runner{
-		Services:      []apply.ServiceApply{secretApply(secretMock)},
+		Services:      []apply.ServiceApply{secretApply(secretMock, store)},
 		ProviderLabel: "AWS",
-		Store:         store,
 		Stdout:        &buf,
 		Stderr:        &bytes.Buffer{},
 	}
@@ -470,9 +441,8 @@ func TestRun_ParamDeleteError(t *testing.T) {
 	var buf, errBuf bytes.Buffer
 
 	r := &apply.Runner{
-		Services:      []apply.ServiceApply{paramApply(paramMock)},
+		Services:      []apply.ServiceApply{paramApply(paramMock, store)},
 		ProviderLabel: "AWS",
-		Store:         store,
 		Stdout:        &buf,
 		Stderr:        &errBuf,
 	}
@@ -501,9 +471,8 @@ func TestRun_SecretSetError(t *testing.T) {
 	var buf, errBuf bytes.Buffer
 
 	r := &apply.Runner{
-		Services:      []apply.ServiceApply{secretApply(secretMock)},
+		Services:      []apply.ServiceApply{secretApply(secretMock, store)},
 		ProviderLabel: "AWS",
-		Store:         store,
 		Stdout:        &buf,
 		Stderr:        &errBuf,
 	}
@@ -531,9 +500,8 @@ func TestRun_SecretDeleteError(t *testing.T) {
 	var buf, errBuf bytes.Buffer
 
 	r := &apply.Runner{
-		Services:      []apply.ServiceApply{secretApply(secretMock)},
+		Services:      []apply.ServiceApply{secretApply(secretMock, store)},
 		ProviderLabel: "AWS",
-		Store:         store,
 		Stdout:        &buf,
 		Stderr:        &errBuf,
 	}
@@ -562,9 +530,8 @@ func TestRun_ParamSetError(t *testing.T) {
 	var buf, errBuf bytes.Buffer
 
 	r := &apply.Runner{
-		Services:      []apply.ServiceApply{paramApply(paramMock)},
+		Services:      []apply.ServiceApply{paramApply(paramMock, store)},
 		ProviderLabel: "AWS",
-		Store:         store,
 		Stdout:        &buf,
 		Stderr:        &errBuf,
 	}
@@ -593,9 +560,8 @@ func TestRun_ConflictDetection_CreateConflict(t *testing.T) {
 	var buf, errBuf bytes.Buffer
 
 	r := &apply.Runner{
-		Services:        []apply.ServiceApply{paramApply(paramMock)},
+		Services:        []apply.ServiceApply{paramApply(paramMock, store)},
 		ProviderLabel:   "AWS",
-		Store:           store,
 		Stdout:          &buf,
 		Stderr:          &errBuf,
 		IgnoreConflicts: false,
@@ -627,9 +593,8 @@ func TestRun_ConflictDetection_UpdateConflict(t *testing.T) {
 	var buf, errBuf bytes.Buffer
 
 	r := &apply.Runner{
-		Services:        []apply.ServiceApply{paramApply(paramMock)},
+		Services:        []apply.ServiceApply{paramApply(paramMock, store)},
 		ProviderLabel:   "AWS",
-		Store:           store,
 		Stdout:          &buf,
 		Stderr:          &errBuf,
 		IgnoreConflicts: false,
@@ -660,9 +625,8 @@ func TestRun_ConflictDetection_DeleteConflict(t *testing.T) {
 	var buf, errBuf bytes.Buffer
 
 	r := &apply.Runner{
-		Services:        []apply.ServiceApply{secretApply(secretMock)},
+		Services:        []apply.ServiceApply{secretApply(secretMock, store)},
 		ProviderLabel:   "AWS",
-		Store:           store,
 		Stdout:          &buf,
 		Stderr:          &errBuf,
 		IgnoreConflicts: false,
@@ -700,9 +664,8 @@ func TestRun_ConflictDetection_IgnoreConflicts(t *testing.T) {
 	var buf, errBuf bytes.Buffer
 
 	r := &apply.Runner{
-		Services:        []apply.ServiceApply{paramApply(paramMock)},
+		Services:        []apply.ServiceApply{paramApply(paramMock, store)},
 		ProviderLabel:   "AWS",
-		Store:           store,
 		Stdout:          &buf,
 		Stderr:          &errBuf,
 		IgnoreConflicts: true, // Should bypass conflict check
@@ -739,9 +702,8 @@ func TestRun_ConflictDetection_NoConflict(t *testing.T) {
 	var buf bytes.Buffer
 
 	r := &apply.Runner{
-		Services:        []apply.ServiceApply{paramApply(paramMock)},
+		Services:        []apply.ServiceApply{paramApply(paramMock, store)},
 		ProviderLabel:   "AWS",
-		Store:           store,
 		Stdout:          &buf,
 		Stderr:          &bytes.Buffer{},
 		IgnoreConflicts: false,
@@ -784,9 +746,8 @@ func TestRun_ConflictDetection_BothServices(t *testing.T) {
 	var buf, errBuf bytes.Buffer
 
 	r := &apply.Runner{
-		Services:        []apply.ServiceApply{paramApply(paramMock), secretApply(secretMock)},
+		Services:        []apply.ServiceApply{paramApply(paramMock, store), secretApply(secretMock, store)},
 		ProviderLabel:   "AWS",
-		Store:           store,
 		Stdout:          &buf,
 		Stderr:          &errBuf,
 		IgnoreConflicts: false,
@@ -819,9 +780,8 @@ func TestRun_ApplyCreate(t *testing.T) {
 	var buf bytes.Buffer
 
 	r := &apply.Runner{
-		Services:      []apply.ServiceApply{paramApply(paramMock)},
+		Services:      []apply.ServiceApply{paramApply(paramMock, store)},
 		ProviderLabel: "AWS",
-		Store:         store,
 		Stdout:        &buf,
 		Stderr:        &bytes.Buffer{},
 	}
@@ -858,9 +818,8 @@ func TestRun_ApplyTagsSuccess(t *testing.T) {
 	var buf bytes.Buffer
 
 	r := &apply.Runner{
-		Services:      []apply.ServiceApply{paramApply(paramMock)},
+		Services:      []apply.ServiceApply{paramApply(paramMock, store)},
 		ProviderLabel: "AWS",
-		Store:         store,
 		Stdout:        &buf,
 		Stderr:        &bytes.Buffer{},
 	}
@@ -897,9 +856,8 @@ func TestRun_ApplyTagsError(t *testing.T) {
 	var buf, errBuf bytes.Buffer
 
 	r := &apply.Runner{
-		Services:      []apply.ServiceApply{paramApply(paramMock)},
+		Services:      []apply.ServiceApply{paramApply(paramMock, store)},
 		ProviderLabel: "AWS",
-		Store:         store,
 		Stdout:        &buf,
 		Stderr:        &errBuf,
 	}
@@ -939,9 +897,8 @@ func TestRun_ApplyTagsSecretService(t *testing.T) {
 	var buf bytes.Buffer
 
 	r := &apply.Runner{
-		Services:      []apply.ServiceApply{secretApply(secretMock)},
+		Services:      []apply.ServiceApply{secretApply(secretMock, store)},
 		ProviderLabel: "AWS",
-		Store:         store,
 		Stdout:        &buf,
 		Stderr:        &bytes.Buffer{},
 	}
@@ -989,9 +946,8 @@ func TestRun_ApplyBothEntriesAndTags(t *testing.T) {
 	var buf bytes.Buffer
 
 	r := &apply.Runner{
-		Services:      []apply.ServiceApply{paramApply(paramMock)},
+		Services:      []apply.ServiceApply{paramApply(paramMock, store)},
 		ProviderLabel: "AWS",
-		Store:         store,
 		Stdout:        &buf,
 		Stderr:        &bytes.Buffer{},
 	}
@@ -1023,9 +979,8 @@ func TestRun_ApplyTagsOnlyAdditions(t *testing.T) {
 	var buf bytes.Buffer
 
 	r := &apply.Runner{
-		Services:      []apply.ServiceApply{paramApply(paramMock)},
+		Services:      []apply.ServiceApply{paramApply(paramMock, store)},
 		ProviderLabel: "AWS",
-		Store:         store,
 		Stdout:        &buf,
 		Stderr:        &bytes.Buffer{},
 	}
@@ -1055,9 +1010,8 @@ func TestRun_ApplyTagsOnlyRemovals(t *testing.T) {
 	var buf bytes.Buffer
 
 	r := &apply.Runner{
-		Services:      []apply.ServiceApply{paramApply(paramMock)},
+		Services:      []apply.ServiceApply{paramApply(paramMock, store)},
 		ProviderLabel: "AWS",
-		Store:         store,
 		Stdout:        &buf,
 		Stderr:        &bytes.Buffer{},
 	}
@@ -1083,9 +1037,8 @@ func TestRun_FormatTagApplySummaryEmpty(t *testing.T) {
 	var buf bytes.Buffer
 
 	r := &apply.Runner{
-		Services:      []apply.ServiceApply{paramApply(paramMock)},
+		Services:      []apply.ServiceApply{paramApply(paramMock, store)},
 		ProviderLabel: "AWS",
-		Store:         store,
 		Stdout:        &buf,
 		Stderr:        &bytes.Buffer{},
 	}
@@ -1098,38 +1051,26 @@ func TestRun_FormatTagApplySummaryEmpty(t *testing.T) {
 	assert.NotContains(t, buf.String(), "[-")
 }
 
-func TestRun_ListTagsError(t *testing.T) {
-	t.Parallel()
+func paramApply(s staging.ApplyStrategy, st store.ReadWriteOperator) apply.ServiceApply {
+	return serviceApply(staging.ServiceParam, s, st)
+}
 
-	store := testutil.NewMockStore()
-	store.ListTagsErr = errors.New("mock list tags error")
+func secretApply(s staging.ApplyStrategy, st store.ReadWriteOperator) apply.ServiceApply {
+	return serviceApply(staging.ServiceSecret, s, st)
+}
 
-	// Stage some entries so we get past the first ListEntries call
-	_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
-		Operation: staging.OperationUpdate,
-		Value:     lo.ToPtr("param-value"),
-		StagedAt:  time.Now(),
-	})
+// serviceApply builds a ServiceApply with this service's staged changes
+// pre-listed from the store (mirroring what the command layer does; the Runner
+// consumes the pre-listed entries).
+func serviceApply(svc staging.Service, s staging.ApplyStrategy, st store.ReadWriteOperator) apply.ServiceApply {
+	entries, _ := st.ListEntries(context.Background(), svc)
+	tags, _ := st.ListTags(context.Background(), svc)
 
-	var buf bytes.Buffer
-
-	r := &apply.Runner{
-		Services:      []apply.ServiceApply{paramApply(newParamStrategy())},
-		ProviderLabel: "AWS",
-		Store:         store,
-		Stdout:        &buf,
-		Stderr:        &bytes.Buffer{},
+	return apply.ServiceApply{
+		Service:  svc,
+		Store:    st,
+		Strategy: s,
+		Entries:  entries[svc],
+		Tags:     tags[svc],
 	}
-
-	err := r.Run(t.Context())
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "mock list tags error")
-}
-
-func paramApply(s staging.ApplyStrategy) apply.ServiceApply {
-	return apply.ServiceApply{Service: staging.ServiceParam, Strategy: s}
-}
-
-func secretApply(s staging.ApplyStrategy) apply.ServiceApply {
-	return apply.ServiceApply{Service: staging.ServiceSecret, Strategy: s}
 }
