@@ -95,8 +95,12 @@ func ParseDiffArgs(args []string) (*Spec, *Spec, error) {
 	)
 }
 
+// isIDChar reports whether c is valid within a Secrets Manager version id.
+// Version ids are ClientRequestTokens (not just console UUIDs): a token created
+// via the API may contain '_' and '.' as well, so accept them alongside
+// letters, digits and '-'. Excludes the specifier characters '#', ':', '~'.
 func isIDChar(c byte) bool {
-	return internal.IsLetter(c) || internal.IsDigit(c) || c == '-'
+	return internal.IsLetter(c) || internal.IsDigit(c) || c == '-' || c == '_' || c == '.'
 }
 
 func isLabelChar(c byte) bool {
