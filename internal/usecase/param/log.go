@@ -33,6 +33,10 @@ type LogEntry struct {
 type LogOutput struct {
 	Name    string
 	Entries []LogEntry
+	// InitialIncluded reports whether the oldest entry in Entries is the very
+	// first version that ever existed. It is false when the window was cut by
+	// --number or a date filter, so the oldest shown version is not a creation.
+	InitialIncluded bool
 }
 
 // LogUseCase executes log operations.
@@ -55,6 +59,11 @@ func (u *LogUseCase) Execute(ctx context.Context, input LogInput) (*LogOutput, e
 	if len(versions) == 0 {
 		return &LogOutput{Name: input.Name}, nil
 	}
+
+	// The complete history is newest first, so its last element is the very
+	// first version that ever existed. Remember it before truncation so we can
+	// tell whether the oldest shown version is genuinely the initial one.
+	initialVersion := parseVersion(versions[len(versions)-1].ID)
 
 	// History is newest first; MaxResults caps the number of versions shown.
 	if input.MaxResults > 0 && len(versions) > int(input.MaxResults) {
@@ -114,6 +123,9 @@ func (u *LogUseCase) Execute(ctx context.Context, input LogInput) (*LogOutput, e
 	return &LogOutput{
 		Name:    input.Name,
 		Entries: entries,
+		InitialIncluded: slices.ContainsFunc(entries, func(e LogEntry) bool {
+			return e.Version == initialVersion
+		}),
 	}, nil
 }
 

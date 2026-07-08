@@ -140,47 +140,49 @@ func (p *logPresenter) RenderValue(_ io.Writer, _, _ int) {}
 
 func (p *logPresenter) RenderPatch(stdout, stderr io.Writer, i int, parseJSON, reverse bool) {
 	entries := p.result.Entries
+	parentIdx, oldest := genericlog.PatchParent(i, len(entries), reverse)
 
-	// Determine old/new indices based on order
-	var oldIdx, newIdx int
+	newEntry := entries[i]
 
-	if reverse {
-		// In reverse mode: comparing with next version (newer)
-		if i < len(entries)-1 {
-			oldIdx = i
-			newIdx = i + 1
-		} else {
-			oldIdx = -1 // No diff for the last (current) version
+	newValue, newOk := p.secretValues[newEntry.VersionID]
+	if !newOk {
+		return
+	}
+
+	var oldValue, oldName string
+
+	if oldest {
+		// The oldest version in the window has no parent to diff against. Render
+		// its creation (all-added) diff, but only when it is genuinely the
+		// initial version — otherwise a --number/date-filter window cut would
+		// masquerade as a creation.
+		if !p.result.InitialIncluded {
+			return
+		}
+
+		oldName = p.result.Name
+
+		if parseJSON {
+			newValue = jsonutil.TryFormatOrWarn(newValue, stderr, "")
 		}
 	} else {
-		// In normal mode: comparing with previous version (older)
-		if i < len(entries)-1 {
-			oldIdx = i + 1
-			newIdx = i
-		} else {
-			oldIdx = -1 // No diff for the oldest version
+		oldEntry := entries[parentIdx]
+
+		var oldOk bool
+
+		oldValue, oldOk = p.secretValues[oldEntry.VersionID]
+		if !oldOk {
+			return
+		}
+
+		oldName = fmt.Sprintf("%s#%s", p.result.Name, secretversion.TruncateVersionID(oldEntry.VersionID))
+
+		if parseJSON {
+			oldValue, newValue = jsonutil.TryFormatOrWarn2(oldValue, newValue, stderr, "")
 		}
 	}
 
-	if oldIdx < 0 {
-		return
-	}
-
-	oldVersionID := entries[oldIdx].VersionID
-	newVersionID := entries[newIdx].VersionID
-	oldValue, oldOk := p.secretValues[oldVersionID]
-
-	newValue, newOk := p.secretValues[newVersionID]
-	if !oldOk || !newOk {
-		return
-	}
-
-	if parseJSON {
-		oldValue, newValue = jsonutil.TryFormatOrWarn2(oldValue, newValue, stderr, "")
-	}
-
-	oldName := fmt.Sprintf("%s#%s", p.result.Name, secretversion.TruncateVersionID(oldVersionID))
-	newName := fmt.Sprintf("%s#%s", p.result.Name, secretversion.TruncateVersionID(newVersionID))
+	newName := fmt.Sprintf("%s#%s", p.result.Name, secretversion.TruncateVersionID(newEntry.VersionID))
 
 	diff := output.Diff(oldName, newName, oldValue, newValue)
 	if diff != "" {
