@@ -205,6 +205,9 @@ func TestGet_MapsEntryWithDescriptionAndTags(t *testing.T) {
 	assert.Equal(t, domain.ValueTypeSecret, entry.Type)
 	assert.Equal(t, "id-3", entry.Version.ID)
 	assert.Equal(t, "AWSCURRENT", entry.Version.Label)
+	// StagingLabels carries the full stage set; State is empty (no such concept).
+	assert.Equal(t, []string{"AWSCURRENT"}, entry.Version.StagingLabels)
+	assert.Empty(t, entry.Version.State)
 	assert.Equal(t, "my desc", entry.Description)
 	require.Len(t, entry.Tags, 1)
 	assert.Equal(t, "env", entry.Tags[0].Key)
@@ -254,6 +257,8 @@ func TestGet_LabelPrefersAWSCURRENTRegardlessOfOrder(t *testing.T) {
 	entry, err := store.Get(t.Context(), "my-secret", provider.NewVersionRef("id-3"))
 	require.NoError(t, err)
 	assert.Equal(t, "AWSCURRENT", entry.Version.Label)
+	// The representative Label collapses to one; StagingLabels keeps them all.
+	assert.Equal(t, []string{"my-custom-label", "AWSPREVIOUS", "AWSCURRENT"}, entry.Version.StagingLabels)
 }
 
 // Priority ordering among the well-known and custom labels: AWSPENDING beats
@@ -287,9 +292,11 @@ func TestHistory_LabelPriorityOrdering(t *testing.T) {
 	// Newest first: id-2 (AWSPENDING preferred over AWSPREVIOUS).
 	assert.Equal(t, "id-2", versions[0].ID)
 	assert.Equal(t, "AWSPENDING", versions[0].Label)
+	assert.Equal(t, []string{"AWSPREVIOUS", "AWSPENDING"}, versions[0].StagingLabels)
 	// Custom-only labels tie-break lexicographically: "alpha" < "zeta".
 	assert.Equal(t, "id-1", versions[1].ID)
 	assert.Equal(t, "alpha", versions[1].Label)
+	assert.Equal(t, []string{"zeta", "alpha"}, versions[1].StagingLabels)
 }
 
 func TestHistory_NewestFirst(t *testing.T) {
@@ -642,6 +649,7 @@ func TestDescribe(t *testing.T) {
 	assert.Equal(t, "the desc", entry.Description)
 	assert.Equal(t, "id-3", entry.Version.ID)
 	assert.Equal(t, "AWSCURRENT", entry.Version.Label)
+	assert.Equal(t, []string{"AWSCURRENT"}, entry.Version.StagingLabels)
 	// The version's own creation time, not the secret-level CreatedDate.
 	require.NotNil(t, entry.Version.Created)
 	assert.Equal(t, currentVersionCreated, *entry.Version.Created)

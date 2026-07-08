@@ -210,6 +210,7 @@ func (s *Store) Get(ctx context.Context, name string, ref provider.VersionRef) (
 		created := toTime(sv.GetCreateTime())
 		entry.Version.Created = created
 		entry.Version.Label = stateLabel(sv.GetState())
+		entry.Version.State = stateLabel(sv.GetState())
 		entry.Modified = created
 	}
 
@@ -240,6 +241,7 @@ func (s *Store) History(ctx context.Context, name string) ([]domain.Version, err
 		return domain.Version{
 			ID:      versionNumber(v.GetName()),
 			Label:   stateLabel(v.GetState()),
+			State:   stateLabel(v.GetState()),
 			Created: toTime(v.GetCreateTime()),
 		}
 	}), nil
