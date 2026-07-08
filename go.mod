@@ -16,6 +16,7 @@ require (
 	github.com/aws/smithy-go v1.27.3
 	github.com/aymanbagabas/go-udiff v0.4.1
 	github.com/fatih/color v1.19.0
+	github.com/gofrs/flock v0.13.0
 	github.com/mattn/go-isatty v0.0.22
 	github.com/samber/lo v1.53.0
 	github.com/stretchr/testify v1.11.1
