@@ -691,8 +691,8 @@ func TestRunSecret(t *testing.T) {
 			name: "show version history",
 			req:  genericlog.Request{Name: "my-secret", MaxResults: 10},
 			store: secretLogStore([]domain.Version{
-				{ID: "v2", Label: "AWSCURRENT", Created: &now},
-				{ID: "v1", Label: "AWSPREVIOUS", Created: at(now, -time.Hour)},
+				{ID: "v2", StagingLabels: []string{"AWSCURRENT"}, Created: &now},
+				{ID: "v1", StagingLabels: []string{"AWSPREVIOUS"}, Created: at(now, -time.Hour)},
 			}, nil, nil, nil),
 			check: func(t *testing.T, output string) {
 				t.Helper()
@@ -705,8 +705,8 @@ func TestRunSecret(t *testing.T) {
 			req:  genericlog.Request{Name: "my-secret", MaxResults: 10},
 			opts: genericlog.Options{ShowPatch: true},
 			store: secretLogStore([]domain.Version{
-				{ID: testVersionID2, Label: "AWSCURRENT", Created: &now},
-				{ID: testVersionID1, Label: "AWSPREVIOUS", Created: at(now, -time.Hour)},
+				{ID: testVersionID2, StagingLabels: []string{"AWSCURRENT"}, Created: &now},
+				{ID: testVersionID1, StagingLabels: []string{"AWSPREVIOUS"}, Created: at(now, -time.Hour)},
 			}, map[string]string{testVersionID1: "old-value", testVersionID2: "new-value"}, nil, nil),
 			check: func(t *testing.T, output string) {
 				t.Helper()
@@ -720,7 +720,7 @@ func TestRunSecret(t *testing.T) {
 			req:  genericlog.Request{Name: "my-secret", MaxResults: 10},
 			opts: genericlog.Options{ShowPatch: true},
 			store: secretLogStore([]domain.Version{
-				{ID: "only-version", Label: "AWSCURRENT", Created: &now},
+				{ID: "only-version", StagingLabels: []string{"AWSCURRENT"}, Created: &now},
 			}, map[string]string{"only-version": "only-value"}, nil, nil),
 			check: func(t *testing.T, output string) {
 				t.Helper()
@@ -742,8 +742,8 @@ func TestRunSecret(t *testing.T) {
 			req:  genericlog.Request{Name: "my-secret", MaxResults: 10, Reverse: true},
 			opts: genericlog.Options{Reverse: true},
 			store: secretLogStore([]domain.Version{
-				{ID: "version-2", Label: "AWSCURRENT", Created: &now},
-				{ID: "version-1", Label: "AWSPREVIOUS", Created: at(now, -time.Hour)},
+				{ID: "version-2", StagingLabels: []string{"AWSCURRENT"}, Created: &now},
+				{ID: "version-1", StagingLabels: []string{"AWSPREVIOUS"}, Created: at(now, -time.Hour)},
 			}, nil, nil, nil),
 			check: func(t *testing.T, output string) {
 				t.Helper()
@@ -769,8 +769,8 @@ func TestRunSecret(t *testing.T) {
 			name: "version without CreatedDate",
 			req:  genericlog.Request{Name: "my-secret", MaxResults: 10},
 			store: secretLogStore([]domain.Version{
-				{ID: "v2", Label: "AWSCURRENT", Created: &now},
-				{ID: "v1", Label: "AWSPREVIOUS"},
+				{ID: "v2", StagingLabels: []string{"AWSCURRENT"}, Created: &now},
+				{ID: "v1", StagingLabels: []string{"AWSPREVIOUS"}},
 			}, nil, nil, nil),
 			check: func(t *testing.T, output string) {
 				t.Helper()
@@ -849,8 +849,8 @@ func TestRunSecret(t *testing.T) {
 			req:  genericlog.Request{Name: "my-secret", MaxResults: 10},
 			opts: genericlog.Options{Oneline: true},
 			store: secretLogStore([]domain.Version{
-				{ID: testVersionID2, Label: "AWSCURRENT", Created: &now},
-				{ID: testVersionID1, Label: "AWSPREVIOUS", Created: at(now, -time.Hour)},
+				{ID: testVersionID2, StagingLabels: []string{"AWSCURRENT"}, Created: &now},
+				{ID: testVersionID1, StagingLabels: []string{"AWSPREVIOUS"}, Created: at(now, -time.Hour)},
 			}, nil, nil, nil),
 			check: func(t *testing.T, output string) {
 				t.Helper()
@@ -864,7 +864,7 @@ func TestRunSecret(t *testing.T) {
 			req:  genericlog.Request{Name: "my-secret", MaxResults: 10},
 			opts: genericlog.Options{Oneline: true},
 			store: secretLogStore([]domain.Version{
-				{ID: testVersionID2, Label: "AWSCURRENT", Created: &now},
+				{ID: testVersionID2, StagingLabels: []string{"AWSCURRENT"}, Created: &now},
 				{ID: testVersionID1},
 			}, nil, nil, nil),
 			check: func(t *testing.T, output string) {
@@ -876,8 +876,8 @@ func TestRunSecret(t *testing.T) {
 			name: "filter by since date",
 			req:  genericlog.Request{Name: "my-secret", MaxResults: 10, Since: at(now, -30*time.Minute)},
 			store: secretLogStore([]domain.Version{
-				{ID: "new-version", Label: "AWSCURRENT", Created: &now},
-				{ID: "old-version", Label: "AWSPREVIOUS", Created: at(now, -2*time.Hour)},
+				{ID: "new-version", StagingLabels: []string{"AWSCURRENT"}, Created: &now},
+				{ID: "old-version", StagingLabels: []string{"AWSPREVIOUS"}, Created: at(now, -2*time.Hour)},
 			}, nil, nil, nil),
 			check: func(t *testing.T, output string) {
 				t.Helper()
@@ -889,8 +889,8 @@ func TestRunSecret(t *testing.T) {
 			name: "filter by until date",
 			req:  genericlog.Request{Name: "my-secret", MaxResults: 10, Until: at(now, -30*time.Minute)},
 			store: secretLogStore([]domain.Version{
-				{ID: "new-version", Label: "AWSCURRENT", Created: &now},
-				{ID: "old-version", Label: "AWSPREVIOUS", Created: at(now, -2*time.Hour)},
+				{ID: "new-version", StagingLabels: []string{"AWSCURRENT"}, Created: &now},
+				{ID: "old-version", StagingLabels: []string{"AWSPREVIOUS"}, Created: at(now, -2*time.Hour)},
 			}, nil, nil, nil),
 			check: func(t *testing.T, output string) {
 				t.Helper()
@@ -932,7 +932,7 @@ func TestRunSecret(t *testing.T) {
 			name: "filter skips versions without CreatedDate",
 			req:  genericlog.Request{Name: "my-secret", MaxResults: 10, Since: at(now, -30*time.Minute)},
 			store: secretLogStore([]domain.Version{
-				{ID: "new-version", Label: "AWSCURRENT", Created: &now},
+				{ID: "new-version", StagingLabels: []string{"AWSCURRENT"}, Created: &now},
 				{ID: "no-date-ver"},
 			}, nil, nil, nil),
 			check: func(t *testing.T, output string) {
@@ -946,8 +946,8 @@ func TestRunSecret(t *testing.T) {
 			req:  genericlog.Request{Name: "my-secret", MaxResults: 10},
 			opts: genericlog.Options{Output: output.FormatJSON},
 			store: secretLogStore([]domain.Version{
-				{ID: testVersionID2, Label: "AWSCURRENT", Created: &now},
-				{ID: testVersionID1, Label: "AWSPREVIOUS", Created: at(now, -time.Hour)},
+				{ID: testVersionID2, StagingLabels: []string{"AWSCURRENT"}, Created: &now},
+				{ID: testVersionID1, StagingLabels: []string{"AWSPREVIOUS"}, Created: at(now, -time.Hour)},
 			}, map[string]string{testVersionID1: "old-value", testVersionID2: "new-value"}, nil, nil),
 			check: func(t *testing.T, output string) {
 				t.Helper()
@@ -962,7 +962,7 @@ func TestRunSecret(t *testing.T) {
 			req:  genericlog.Request{Name: "my-secret", MaxResults: 10},
 			opts: genericlog.Options{Output: output.FormatJSON},
 			store: secretLogStore([]domain.Version{
-				{ID: testVersionID1, Label: "AWSCURRENT", Created: &now},
+				{ID: testVersionID1, StagingLabels: []string{"AWSCURRENT"}, Created: &now},
 			}, nil, map[string]error{testVersionID1: errors.New("access denied")}, nil),
 			check: func(t *testing.T, output string) {
 				t.Helper()

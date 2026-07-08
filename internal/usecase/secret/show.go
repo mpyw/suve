@@ -59,7 +59,7 @@ func (u *ShowUseCase) Execute(ctx context.Context, input ShowInput) (*ShowOutput
 		ARN:          extraValue(entry, "ARN"),
 		Value:        entry.Value,
 		VersionID:    entry.Version.ID,
-		VersionStage: stages(entry.Version.Label),
+		VersionStage: stages(entry.Version.StagingLabels),
 		Description:  entry.Description,
 		CreatedDate:  entry.Version.Created,
 		Tags: lo.Map(entry.Tags, func(tag domain.Tag, _ int) ShowTag {

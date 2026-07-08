@@ -105,14 +105,13 @@ func (u *LogUseCase) Execute(ctx context.Context, input LogInput) (*LogOutput, e
 
 		entries = append(entries, LogEntry{
 			VersionID:    v.ID,
-			VersionStage: stages(v.Label),
+			VersionStage: stages(v.StagingLabels),
 			Value:        value,
 			CreatedDate:  v.Created,
-			// The adapter picks the version's Label by priority, so AWSCURRENT
-			// always surfaces whenever the version carries it (even alongside a
-			// custom label). This equality is therefore a correct membership
-			// test, not a fragile "first stage" check (#317).
-			IsCurrent: v.Label == "AWSCURRENT",
+			// A version is current when AWSCURRENT is among its staging labels;
+			// membership (not a "first stage" check) keeps this correct even when
+			// the version carries additional custom labels (#317).
+			IsCurrent: slices.Contains(v.StagingLabels, "AWSCURRENT"),
 			Error:     fetchErr,
 		})
 	}

@@ -4,7 +4,7 @@
 // interfaces, exactly like the AWS secret use cases, but expose Google
 // Cloud-shaped outputs: integer versions, no ARN, no staging labels. The
 // per-version state (enabled/disabled/destroyed) is surfaced where the provider
-// supplies it via the neutral Version.Label.
+// supplies it via the neutral Version.State.
 package gcloud
 
 import (
