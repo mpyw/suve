@@ -607,6 +607,20 @@ Read/write operations (`show`, `log`, `diff`, `list`, `create`, `update`, `delet
 
 ² App Configuration is unversioned, so staging uses **last-write-wins** (no modified-after conflict check) and `tag`/`untag` are unavailable (tags aren't writable).
 
+### Metadata terminology
+
+suve normalizes every provider's key=value metadata to a single term — **tags** (`suve … tag` / `untag`). Each provider's native word is a documented mapping; suve does **not** add per-provider command or flag aliases.
+
+| Cloud | metadata term (native) | suve term | identity axis (native) |
+|---|---|---|---|
+| AWS SSM / Secrets Manager | tags | **tags** | version |
+| Azure Key Vault | tags | **tags** | version |
+| Azure App Configuration | tags | **tags** | **label** (`(key, label)` — a *separate* concept, surfaced as suve's [namespace](#namespaces)) |
+| Google Cloud Secret Manager | **labels** | **tags** | version |
+
+> [!WARNING]
+> Naming trap: Google Cloud "labels" are key=value **metadata** — suve surfaces them as **tags** (`suve gcloud secret tag …`). Azure App Configuration's "label" is an **identity** dimension (part of a setting's address), which suve exposes as its own **namespace** axis (`--namespace`/`--ns`; see [Namespaces](#namespaces)). These are different concepts that happen to share the vendor word "label".
+
 ### Provider selection
 
 Every backend has an **explicit command group that is always available**, regardless of environment:
@@ -730,6 +744,9 @@ The command **groups** themselves also take aliases: `gcloud` → `gcp` / `googl
 
 Uses integer version numbers (with the `latest` alias) and has no staging labels. Select the project with `--project` or the `GOOGLE_CLOUD_PROJECT` environment variable. Authentication uses [Application Default Credentials (ADC)](https://cloud.google.com/docs/authentication/application-default-credentials). See [docs/gcloud.md](docs/gcloud.md) for details.
 
+> [!NOTE]
+> Google Cloud Secret Manager calls key=value metadata **"labels"**; suve surfaces them under its cross-provider term **tags** (`tag` / `untag`). See [Metadata terminology](#metadata-terminology).
+
 | Command | Options | Description |
 |---------|---------|-------------|
 | [`suve gcloud secret show`](docs/gcloud.md#suve-gcloud-secret-show) | `--raw`<br>`--parse-json` (`-j`)<br>`--no-pager`<br>`--output=<FORMAT>` | Display secret with metadata |
@@ -739,8 +756,8 @@ Uses integer version numbers (with the `latest` alias) and has no staging labels
 | [`suve gcloud secret create`](docs/gcloud.md#suve-gcloud-secret-create) | | Create new secret |
 | [`suve gcloud secret update`](docs/gcloud.md#suve-gcloud-secret-update) | `--yes` | Update existing secret |
 | [`suve gcloud secret delete`](docs/gcloud.md#suve-gcloud-secret-delete) | `--yes` | Delete secret |
-| [`suve gcloud secret tag`](docs/gcloud.md#suve-gcloud-secret-tag) | `<KEY>=<VALUE>...` | Add or update labels |
-| [`suve gcloud secret untag`](docs/gcloud.md#suve-gcloud-secret-untag) | `<KEY>...` | Remove labels |
+| [`suve gcloud secret tag`](docs/gcloud.md#suve-gcloud-secret-tag) | `<KEY>=<VALUE>...` | Add or update tags (Google Cloud "labels") |
+| [`suve gcloud secret untag`](docs/gcloud.md#suve-gcloud-secret-untag) | `<KEY>...` | Remove tags (Google Cloud "labels") |
 
 **Staging commands** (under `suve gcloud stage`; Google Cloud is secret-only, so staging operates on secrets directly):
 
@@ -753,8 +770,8 @@ Uses integer version numbers (with the `latest` alias) and has no staging labels
 | `suve gcloud stage diff` | `--parse-json` (`-j`)<br>`--no-pager` | Show staged vs Google Cloud |
 | `suve gcloud stage apply` | `--yes`<br>`--ignore-conflicts` | Apply staged changes |
 | `suve gcloud stage reset` | `--all` | Unstage changes |
-| `suve gcloud stage tag` | `<KEY>=<VALUE>...` | Stage label additions |
-| `suve gcloud stage untag` | `<KEY>...` | Stage label removals |
+| `suve gcloud stage tag` | `<KEY>=<VALUE>...` | Stage tag additions (Google Cloud "labels") |
+| `suve gcloud stage untag` | `<KEY>...` | Stage tag removals (Google Cloud "labels") |
 | `suve gcloud stage stash` | `push`/`pop`/`show`/`drop` | Save/restore staged changes |
 
 ### Azure Key Vault
@@ -794,11 +811,32 @@ Unversioned key-value store. Version specifiers (`#VERSION`, `~SHIFT`, `:LABEL`)
 
 | Command | Options | Description |
 |---------|---------|-------------|
-| [`suve azure param show`](docs/azure.md#suve-azure-param-show) | `--raw`<br>`--parse-json` (`-j`)<br>`--no-pager`<br>`--output=<FORMAT>` | Display value with metadata |
-| [`suve azure param list`](docs/azure.md#suve-azure-param-list) | `--filter=<REGEX>`<br>`--show`<br>`--output=<FORMAT>` | List keys |
-| [`suve azure param create`](docs/azure.md#suve-azure-param-create) | | Create a new key |
-| [`suve azure param update`](docs/azure.md#suve-azure-param-update) | `--yes` | Update an existing key |
-| [`suve azure param delete`](docs/azure.md#suve-azure-param-delete) | `--yes` | Delete a key |
+| [`suve azure param show`](docs/azure.md#suve-azure-param-show) | `--namespace`/`--ns`<br>`--raw`<br>`--parse-json` (`-j`)<br>`--no-pager`<br>`--output=<FORMAT>` | Display value with metadata |
+| [`suve azure param list`](docs/azure.md#suve-azure-param-list) | `--namespace`/`--ns`<br>`--filter=<REGEX>`<br>`--show`<br>`--output=<FORMAT>` | List keys |
+| [`suve azure param create`](docs/azure.md#suve-azure-param-create) | `--namespace`/`--ns` | Create a new key |
+| [`suve azure param update`](docs/azure.md#suve-azure-param-update) | `--namespace`/`--ns`<br>`--yes` | Update an existing key |
+| [`suve azure param delete`](docs/azure.md#suve-azure-param-delete) | `--namespace`/`--ns`<br>`--yes` | Delete a key |
+
+#### Namespaces
+
+App Configuration addresses a setting by `(key, label)`. This **label axis is an identity dimension** — a flat partition of the key space, like a Kubernetes namespace — not key=value metadata. Because "label" almost everywhere else means metadata (which suve unifies as [tags](#metadata-terminology)), **suve calls this axis a namespace**; Azure App Configuration calls it a "label".
+
+Select the namespace with `--namespace` (alias `--ns`) or the `AZURE_APPCONFIG_NAMESPACE` environment variable (precedence: flag > env > default). The default is the **null namespace** (App Configuration's unlabeled/default settings); a `dev` namespace never surfaces `prod` settings in `list`/`show`.
+
+The value is interpreted by context:
+
+| Value | Meaning | Where |
+|---|---|---|
+| unset or `""` | the **null namespace** (default; `""` also overrides an env default back to null) | all commands |
+| `"*"` | **all** namespaces (wildcard) | list/read only |
+| `"dev,prod"` | **dev OR prod** (`,` = OR-list) | list/read only |
+| `"dev*"` | prefix wildcard | list/read only |
+| `"dev"` | the literal namespace `dev` | all commands |
+| `"\*"`, `"foo\,bar"` | a **literal** namespace containing a reserved char (`\` escapes `*`, `,`, `\`) | all commands |
+
+- **List/read** (`list`, `show`) forward the value to App Configuration's label filter, so `*` (all), `dev*` (prefix), and `dev,prod` (OR-list) work natively; an empty value maps to the null-namespace filter.
+- **Single-item ops** (`show`, `create`, `update`, `delete`, staging) need exactly one namespace: `\` escapes are decoded, and any **unescaped** `*` or `,` is a usage error (it names all/multiple namespaces). This is also how you address a namespace literally named `*` / `,` / `\` — e.g. `--namespace "\*"`.
+- The namespace is a **separate flag/env channel**; the positional argument stays the whole key, so colon keys like `Logging:LogLevel:Default` are unaffected. The filter grammar (`*` `,` `\`) lives only inside the `--namespace` value.
 
 **Staging commands** (under `suve azure stage param`; unversioned → last-write-wins, no `tag`/`untag`):
 
@@ -945,6 +983,7 @@ message bodies at all.
 |----------|-------------|
 | `AZURE_KEYVAULT_NAME` | Key Vault name for `azure secret` (or use `--vault-name`) |
 | `AZURE_APPCONFIG_NAME` | App Configuration store for `azure param` (or use `--store-name`) |
+| `AZURE_APPCONFIG_NAMESPACE` | Default [namespace](#namespaces) for `azure param` — Azure calls this axis a "label" (or use `--namespace`/`--ns`) |
 
 Authentication uses the DefaultAzureCredential chain (`az login`, environment, managed identity, ...). The Key Vault / App Configuration name is a globally-unique endpoint, so no subscription or resource group is needed.
 
