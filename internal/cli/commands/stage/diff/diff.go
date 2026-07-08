@@ -320,7 +320,7 @@ func (r *Runner) outputDiff(
 		"%s (staged)",
 	), name)
 
-	diff := output.Diff(label1, label2, displayRemote, displayStaged)
+	diff := output.Diff(r.Stdout, label1, label2, displayRemote, displayStaged)
 
 	// Raw values differ but --parse-json renders no textual diff: the staged
 	// update only reformats JSON. It remains staged (decided on raw above).
@@ -351,7 +351,7 @@ func (r *Runner) outputDiffCreate(opts Options, name string, entry staging.Entry
 	label1 := fmt.Sprintf("%s (not in %s)", name, r.ProviderLabel)
 	label2 := fmt.Sprintf("%s (staged for creation)", name)
 
-	diff := output.Diff(label1, label2, "", stagedValue)
+	diff := output.Diff(r.Stdout, label1, label2, "", stagedValue)
 	output.Print(r.Stdout, diff)
 
 	// Show staged metadata
@@ -362,12 +362,12 @@ func (r *Runner) outputDiffCreate(opts Options, name string, entry staging.Entry
 
 func (r *Runner) outputMetadata(entry staging.Entry) {
 	if desc := lo.FromPtr(entry.Description); desc != "" {
-		output.Printf(r.Stdout, "%s %s\n", colors.FieldLabel("Description:"), desc)
+		output.Printf(r.Stdout, "%s %s\n", colors.For(r.Stdout).FieldLabel("Description:"), desc)
 	}
 }
 
 func (r *Runner) outputTagDiff(ctx context.Context, strategy staging.DiffStrategy, name string, tagEntry staging.TagEntry) {
-	output.Printf(r.Stdout, "%s %s (staged tag changes)\n", colors.Info("Tags:"), name)
+	output.Printf(r.Stdout, "%s %s (staged tag changes)\n", colors.For(r.Stdout).Info("Tags:"), name)
 
 	if len(tagEntry.Add) > 0 {
 		tagPairs := make([]string, 0, len(tagEntry.Add))
@@ -375,7 +375,7 @@ func (r *Runner) outputTagDiff(ctx context.Context, strategy staging.DiffStrateg
 			tagPairs = append(tagPairs, fmt.Sprintf("%s=%s", k, tagEntry.Add[k]))
 		}
 
-		output.Printf(r.Stdout, "  %s %s\n", colors.OpAdd("+"), strings.Join(tagPairs, ", "))
+		output.Printf(r.Stdout, "  %s %s\n", colors.For(r.Stdout).OpAdd("+"), strings.Join(tagPairs, ", "))
 	}
 
 	if tagEntry.Remove.Len() > 0 {
@@ -405,5 +405,5 @@ func (r *Runner) outputRemovedTags(remove maputil.Set[string], currentTags map[s
 		}
 	}
 
-	output.Printf(r.Stdout, "  %s %s\n", colors.OpDelete("-"), strings.Join(tagPairs, ", "))
+	output.Printf(r.Stdout, "  %s %s\n", colors.For(r.Stdout).OpDelete("-"), strings.Join(tagPairs, ", "))
 }

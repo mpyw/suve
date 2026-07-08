@@ -107,7 +107,7 @@ func (p *Prompter) ReadFromStdin() (string, error) {
 // confirmPlainText asks user to confirm storing as plain text.
 func (p *Prompter) confirmPlainText() bool {
 	output.Warn(p.Stderr, "Storing secrets as plain text on disk.")
-	output.Printf(p.Stderr, "%s Continue without encryption? [y/N]: ", colors.Warning("?"))
+	output.Printf(p.Stderr, "%s Continue without encryption? [y/N]: ", colors.For(p.Stderr).Warning("?"))
 
 	// Use buffered reader to preserve stream position
 	if p.bufReader == nil {

@@ -33,7 +33,7 @@ type Prompter struct {
 // printTargetInfo prints the target information before a prompt, if available.
 func (p *Prompter) printTargetInfo() {
 	if p.Target != "" {
-		output.Printf(p.Stderr, "%s Target: %s\n", colors.Info("i"), p.Target)
+		output.Printf(p.Stderr, "%s Target: %s\n", colors.For(p.Stderr).Info("i"), p.Target)
 
 		return
 	}
@@ -43,9 +43,9 @@ func (p *Prompter) printTargetInfo() {
 	}
 
 	if p.Profile != "" {
-		output.Printf(p.Stderr, "%s Target: %s (%s / %s)\n", colors.Info("i"), p.Profile, p.AccountID, p.Region)
+		output.Printf(p.Stderr, "%s Target: %s (%s / %s)\n", colors.For(p.Stderr).Info("i"), p.Profile, p.AccountID, p.Region)
 	} else {
-		output.Printf(p.Stderr, "%s Target: %s / %s\n", colors.Info("i"), p.AccountID, p.Region)
+		output.Printf(p.Stderr, "%s Target: %s / %s\n", colors.For(p.Stderr).Info("i"), p.AccountID, p.Region)
 	}
 }
 
@@ -71,7 +71,7 @@ func (p *Prompter) Confirm(message string, skipConfirm bool) (bool, error) {
 	}
 
 	p.printTargetInfo()
-	output.Printf(p.Stderr, "%s %s [y/N]: ", colors.Warning("?"), message)
+	output.Printf(p.Stderr, "%s %s [y/N]: ", colors.For(p.Stderr).Warning("?"), message)
 
 	return p.readYesNo()
 }
@@ -90,8 +90,8 @@ func (p *Prompter) ConfirmDelete(target string, skipConfirm bool) (bool, error) 
 	}
 
 	p.printTargetInfo()
-	output.Printf(p.Stderr, "%s This will permanently delete: %s\n", colors.Error("!"), target)
-	output.Printf(p.Stderr, "%s Continue? [y/N]: ", colors.Warning("?"))
+	output.Printf(p.Stderr, "%s This will permanently delete: %s\n", colors.For(p.Stderr).Error("!"), target)
+	output.Printf(p.Stderr, "%s Continue? [y/N]: ", colors.For(p.Stderr).Warning("?"))
 
 	return p.readYesNo()
 }
@@ -115,7 +115,7 @@ const (
 // The first choice (index 0) is the default when user just presses Enter.
 func (p *Prompter) ConfirmChoice(message string, choices []Choice) (ChoiceResult, error) {
 	p.printTargetInfo()
-	output.Printf(p.Stderr, "%s %s\n", colors.Warning("?"), message)
+	output.Printf(p.Stderr, "%s %s\n", colors.For(p.Stderr).Warning("?"), message)
 
 	for i, choice := range choices {
 		if choice.Description != "" {
