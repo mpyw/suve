@@ -7,6 +7,7 @@ package jsonutil
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"io"
 
 	"github.com/mpyw/suve/internal/cli/output"
@@ -19,9 +20,24 @@ import (
 // HTML escaping is disabled so that characters like &, <, > survive verbatim
 // instead of being mangled into &, <, > — secret/parameter values
 // are not HTML and are never rendered in a browser context.
+//
+// Numbers are decoded with UseNumber so their exact literal is preserved:
+// decoding into float64 (the default) silently loses integer precision beyond
+// 2^53 and collapses 1.0/1, which would make genuinely different values format
+// identically (and diff as "identical").
 func TryFormat(value string) (string, bool) {
+	dec := json.NewDecoder(bytes.NewReader([]byte(value)))
+	dec.UseNumber()
+
 	var data any
-	if err := json.Unmarshal([]byte(value), &data); err != nil {
+	if err := dec.Decode(&data); err != nil {
+		return value, false
+	}
+
+	// Reject trailing data after the JSON value: json.Decoder stops at the end
+	// of the first value, whereas json.Unmarshal treated trailing content as
+	// invalid. A clean single-value input yields io.EOF here.
+	if _, err := dec.Token(); !errors.Is(err, io.EOF) {
 		return value, false
 	}
 
@@ -32,7 +48,7 @@ func TryFormat(value string) (string, bool) {
 	enc.SetIndent("", "  ")
 
 	if err := enc.Encode(data); err != nil {
-		// This should not happen if Unmarshal succeeded, but handle it gracefully
+		// This should not happen if Decode succeeded, but handle it gracefully
 		return value, false
 	}
 
