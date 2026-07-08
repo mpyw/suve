@@ -858,6 +858,7 @@ All timestamps are formatted in RFC3339 format with the local timezone offset ap
 | `TZ` | Timezone for date/time formatting (see above) |
 | `SUVE_NO_UPDATE_CHECK` | Opt out of the update-check notification |
 | `SUVE_DEBUG` | Enable verbose debug logging (same as the global `--debug` flag); any non-empty value except `0`/`false` enables it |
+| `SUVE_NO_REDACTION` | With debug enabled, log full request/response bodies and unmasked headers — **including secret values and credentials** (same as the global `--no-redaction` flag); parsed like `SUVE_DEBUG` |
 
 ### Debugging
 
@@ -898,6 +899,25 @@ never prints request/reply messages; azcore redacts headers outside its own
 allowlist and never logs bodies (error events may include the service's error
 document, the same text normal error output already shows). Debug output goes to
 stderr, so it never contaminates piped stdout.
+
+#### Unredacted output (`--no-redaction`)
+
+When the redacted default hides too much — e.g. you need to see the exact secret
+value a request returned, or the raw payload of a failing call — add
+`--no-redaction` (or set `SUVE_NO_REDACTION=1`) alongside `--debug`:
+
+```bash
+suve secret show my-secret --debug --no-redaction
+```
+
+This switches AWS to the with-body log modes and stops masking headers, and turns
+on azcore body logging for Azure, so **full request/response bodies and
+credentials — including secret values and the signing `Authorization` header —
+are written to stderr**. Use it only for deliberate, local debugging and never
+where the log could be captured or shared; a one-line warning is printed to
+stderr whenever it is active. It has no effect without `--debug` (you'll get a
+hint saying so), and no effect on Google Cloud, whose gRPC interceptor logs no
+message bodies at all.
 
 ### Staging
 

@@ -26,6 +26,12 @@ type Config struct {
 	// Writer is where debug output should go (typically stderr). Callers that
 	// set Enabled must supply a non-nil Writer.
 	Writer io.Writer
+	// NoRedaction, when true, tells provider adapters to log full request and
+	// response bodies and to stop masking sensitive headers, so the debug output
+	// includes secret values and live credentials. It is opt-in via
+	// --no-redaction and only meaningful when Enabled; the zero value keeps the
+	// safe, redacted default.
+	NoRedaction bool
 }
 
 // With returns a child context carrying cfg.

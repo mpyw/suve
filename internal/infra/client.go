@@ -92,25 +92,38 @@ type debugLogger struct {
 	cfg debug.Config
 }
 
-// Logf implements smithy logging.Logger.
+// Logf implements smithy logging.Logger. Header/body redaction is applied
+// unless --no-redaction is active, in which case the dump is passed through
+// verbatim (secret values and credentials included).
 func (l debugLogger) Logf(classification logging.Classification, format string, v ...any) {
-	l.cfg.Logf("aws sdk %s: %s\n", classification, redactDump(fmt.Sprintf(format, v...)))
+	dump := fmt.Sprintf(format, v...)
+	if !l.cfg.NoRedaction {
+		dump = redactDump(dump)
+	}
+
+	l.cfg.Logf("aws sdk %s: %s\n", classification, dump)
 }
 
 // LoadConfig loads the default AWS configuration. When debug is enabled on the
-// context it turns on SDK request/response/retry logging (metadata only — the
-// bodyless LogRequest/LogResponse modes never print secret values) plus config
-// resolution warnings, and logs a one-line summary of the effective region,
-// profile, and credentials source — the facts a user needs first when a command
-// unexpectedly returns nothing (see #306).
+// context it turns on SDK request/response/retry logging plus config resolution
+// warnings, and logs a one-line summary of the effective region, profile, and
+// credentials source — the facts a user needs first when a command unexpectedly
+// returns nothing (see #306). By default the bodyless LogRequest/LogResponse
+// modes are used (metadata only, no secret values); --no-redaction switches to
+// the WithBody modes so full request/response payloads are logged too.
 func LoadConfig(ctx context.Context) (aws.Config, error) {
 	d := debug.From(ctx)
 	if !d.Enabled {
 		return config.LoadDefaultConfig(ctx)
 	}
 
+	logMode := aws.LogRequest | aws.LogResponse | aws.LogRetries
+	if d.NoRedaction {
+		logMode = aws.LogRequestWithBody | aws.LogResponseWithBody | aws.LogRetries
+	}
+
 	cfg, err := config.LoadDefaultConfig(ctx,
-		config.WithClientLogMode(aws.LogRequest|aws.LogResponse|aws.LogRetries),
+		config.WithClientLogMode(logMode),
 		config.WithLogger(debugLogger{cfg: d}),
 		config.WithLogConfigurationWarnings(true),
 	)
