@@ -186,7 +186,7 @@ func (s *GoogleCloudSecretStrategy) ParseName(input string) (string, error) {
 	}
 
 	if spec.Absolute.Version != nil || spec.Shift > 0 {
-		return "", fmt.Errorf("stage diff requires a secret name without version specifier")
+		return "", fmt.Errorf("secret name must not contain a version specifier")
 	}
 
 	return spec.Name, nil
