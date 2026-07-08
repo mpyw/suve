@@ -362,6 +362,72 @@ func TestListWithNamespaces_Error(t *testing.T) {
 	assert.Contains(t, err.Error(), "list settings across namespaces")
 }
 
+func TestListWithNamespacesScoped(t *testing.T) {
+	t.Parallel()
+
+	settings := []azappconfig.Setting{
+		{Key: lo.ToPtr("beta"), Label: lo.ToPtr("prd"), Value: lo.ToPtr("bp")},
+		{Key: lo.ToPtr("alpha"), Value: lo.ToPtr("a-null")},
+		{Key: lo.ToPtr("alpha"), Label: lo.ToPtr("dev"), Value: lo.ToPtr("ad")},
+		{Key: lo.ToPtr("beta"), Value: lo.ToPtr("b-null")},
+	}
+
+	// The store namespace becomes the label filter verbatim, EXCEPT empty, which
+	// maps to the reserved null-label filter — this is what makes the default
+	// `param list` scope to the null namespace rather than "*".
+	for name, tc := range map[string]struct {
+		namespace  string
+		wantFilter string
+	}{
+		"null namespace uses the null-label filter": {namespace: "", wantFilter: "\x00"},
+		"single namespace forwarded":                {namespace: "dev", wantFilter: "dev"},
+		"all-namespaces wildcard forwarded":         {namespace: "*", wantFilter: "*"},
+		"OR-list forwarded":                         {namespace: "dev,prd", wantFilter: "dev,prd"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			var gotFilter string
+
+			m := &mockClient{
+				listFunc: func(_ context.Context, filter string) ([]azappconfig.Setting, error) {
+					gotFilter = filter
+
+					return settings, nil
+				},
+			}
+			store := appconfig.New(m, tc.namespace)
+
+			items, err := store.ListWithNamespacesScoped(t.Context())
+			require.NoError(t, err)
+
+			assert.Equal(t, tc.wantFilter, gotFilter, "the store namespace must drive the label filter")
+			// The service applies the filter; the store only sorts by (key, namespace).
+			assert.Equal(t, []appconfig.KeyNamespace{
+				{Key: "alpha", Namespace: "", Value: "a-null"},
+				{Key: "alpha", Namespace: "dev", Value: "ad"},
+				{Key: "beta", Namespace: "", Value: "b-null"},
+				{Key: "beta", Namespace: "prd", Value: "bp"},
+			}, items)
+		})
+	}
+}
+
+func TestListWithNamespacesScoped_Error(t *testing.T) {
+	t.Parallel()
+
+	m := &mockClient{
+		listFunc: func(_ context.Context, _ string) ([]azappconfig.Setting, error) {
+			return nil, serverError()
+		},
+	}
+	store := appconfig.New(m, "")
+
+	_, err := store.ListWithNamespacesScoped(t.Context())
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "list settings with namespaces")
+}
+
 func TestCreate_AlreadyExists(t *testing.T) {
 	t.Parallel()
 

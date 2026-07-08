@@ -193,9 +193,25 @@ type KeyNamespace struct {
 // provider.Reader.List contract untouched. A key that exists under several
 // namespaces yields one entry per (key, namespace) pair.
 func (s *Store) ListWithNamespaces(ctx context.Context) ([]KeyNamespace, error) {
-	settings, err := s.client.ListSettings(ctx, aznamespace.AllNamespacesFilter)
+	return s.listWithNamespaces(ctx, aznamespace.AllNamespacesFilter, "across namespaces")
+}
+
+// ListWithNamespacesScoped returns per-(key, namespace) rows HONORING the
+// store's configured --namespace filter (empty -> the null namespace only, "*"
+// -> all, "dev,prd" -> OR, "dev*" -> prefix), sorted by key then namespace. It
+// is the filter-respecting sibling of ListWithNamespaces (which forces "*"):
+// the CLI `param list` NAMESPACE column (#430) uses it so `param list` defaults
+// to the null namespace, matching the GUI's default filter, while `--namespace
+// "*"` widens to every namespace. Like ListWithNamespaces it is an
+// App-Config-specific extension, not part of the neutral provider seam.
+func (s *Store) ListWithNamespacesScoped(ctx context.Context) ([]KeyNamespace, error) {
+	return s.listWithNamespaces(ctx, aznamespace.Filter(s.namespace), "with namespaces")
+}
+
+func (s *Store) listWithNamespaces(ctx context.Context, filter, what string) ([]KeyNamespace, error) {
+	settings, err := s.client.ListSettings(ctx, filter)
 	if err != nil {
-		return nil, fmt.Errorf("failed to list settings across namespaces: %w", err)
+		return nil, fmt.Errorf("failed to list settings %s: %w", what, err)
 	}
 
 	out := make([]KeyNamespace, 0, len(settings))
@@ -215,7 +231,7 @@ func (s *Store) ListWithNamespaces(ctx context.Context) ([]KeyNamespace, error) 
 		return out[i].Namespace < out[j].Namespace
 	})
 
-	debug.From(ctx).Logf("azure appconfig: ListWithNamespaces -> %d settings across all namespaces\n", len(out))
+	debug.From(ctx).Logf("azure appconfig: listWithNamespaces(filter=%q) -> %d settings\n", filter, len(out))
 
 	return out, nil
 }

@@ -11,8 +11,10 @@ import (
 	appcli "github.com/mpyw/suve/internal/cli/commands"
 	"github.com/mpyw/suve/internal/cli/commands/azure/param"
 	genericlog "github.com/mpyw/suve/internal/cli/commands/generic/log"
+	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/domain"
 	"github.com/mpyw/suve/internal/provider"
+	"github.com/mpyw/suve/internal/provider/azure/appconfig"
 	"github.com/mpyw/suve/internal/provider/providermock"
 	"github.com/mpyw/suve/internal/usecase/azure"
 	"github.com/mpyw/suve/internal/version/azureappconfigversion"
@@ -186,4 +188,102 @@ func TestDeleteRunner(t *testing.T) {
 	require.NoError(t, r.Run(t.Context(), param.DeleteOptions{Name: "app/timeout"}))
 	assert.Equal(t, "app/timeout", deleted)
 	assert.Contains(t, buf.String(), "Deleted setting app/timeout")
+}
+
+// namespaceListerStub is the App-Config-specific lister the namespaced list
+// path depends on.
+type namespaceListerStub struct {
+	rows []appconfig.KeyNamespace
+}
+
+func (s *namespaceListerStub) ListWithNamespacesScoped(_ context.Context) ([]appconfig.KeyNamespace, error) {
+	return s.rows, nil
+}
+
+func nsListRunner(rows []appconfig.KeyNamespace, keyOnlyReader provider.Reader, out, errOut *bytes.Buffer) *param.ListRunner {
+	return &param.ListRunner{
+		Namespace: &azure.ListNamespacesUseCase{Lister: &namespaceListerStub{rows: rows}},
+		KeyOnly:   &azure.ListUseCase{Reader: keyOnlyReader},
+		Stdout:    out,
+		Stderr:    errOut,
+	}
+}
+
+func TestListRunner_NamespaceColumn(t *testing.T) {
+	t.Parallel()
+
+	rows := []appconfig.KeyNamespace{
+		{Key: "app/a", Namespace: "", Value: "a-null"},
+		{Key: "app/a", Namespace: "dev", Value: "a-dev"},
+	}
+
+	t.Run("default prepends NAMESPACE column and renders null as (NULL)", func(t *testing.T) {
+		t.Parallel()
+
+		var buf, errBuf bytes.Buffer
+
+		r := nsListRunner(rows, nil, &buf, &errBuf)
+		require.NoError(t, r.Run(t.Context(), param.ListOptions{}))
+		assert.Equal(t, "(NULL)\tapp/a\ndev\tapp/a\n", buf.String())
+	})
+
+	t.Run("--show appends the value column", func(t *testing.T) {
+		t.Parallel()
+
+		var buf, errBuf bytes.Buffer
+
+		r := nsListRunner(rows, nil, &buf, &errBuf)
+		require.NoError(t, r.Run(t.Context(), param.ListOptions{Show: true}))
+		assert.Equal(t, "(NULL)\tapp/a\ta-null\ndev\tapp/a\ta-dev\n", buf.String())
+	})
+
+	t.Run("json carries the raw namespace (empty, not (NULL))", func(t *testing.T) {
+		t.Parallel()
+
+		var buf, errBuf bytes.Buffer
+
+		r := nsListRunner(rows, nil, &buf, &errBuf)
+		require.NoError(t, r.Run(t.Context(), param.ListOptions{Output: output.FormatJSON}))
+		assert.JSONEq(t, `[{"namespace":"","name":"app/a"},{"namespace":"dev","name":"app/a"}]`, buf.String())
+	})
+}
+
+func TestListRunner_HideNamespace(t *testing.T) {
+	t.Parallel()
+
+	// --hide-namespace falls back to the neutral key-only listing (Reader.List),
+	// so no NAMESPACE column appears and keys are deduped by the provider.
+	reader := &providermock.Store{
+		ListFunc: func(_ context.Context) ([]string, error) {
+			return []string{"app/a", "app/b"}, nil
+		},
+	}
+
+	var buf, errBuf bytes.Buffer
+
+	r := nsListRunner(nil, reader, &buf, &errBuf)
+	require.NoError(t, r.Run(t.Context(), param.ListOptions{HideNS: true}))
+	assert.Equal(t, "app/a\napp/b\n", buf.String())
+}
+
+func TestListRunner_NonAppConfigNoColumn(t *testing.T) {
+	t.Parallel()
+
+	// A store without the App-Config extension leaves Namespace nil, so the
+	// NAMESPACE column never appears even without --hide-namespace.
+	reader := &providermock.Store{
+		ListFunc: func(_ context.Context) ([]string, error) {
+			return []string{"k1", "k2"}, nil
+		},
+	}
+
+	var buf, errBuf bytes.Buffer
+
+	r := &param.ListRunner{
+		KeyOnly: &azure.ListUseCase{Reader: reader},
+		Stdout:  &buf,
+		Stderr:  &errBuf,
+	}
+	require.NoError(t, r.Run(t.Context(), param.ListOptions{}))
+	assert.Equal(t, "k1\nk2\n", buf.String())
 }
