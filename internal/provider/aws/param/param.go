@@ -74,16 +74,12 @@ func (s *Store) Resolve(ctx context.Context, name, spec string) (provider.Versio
 		return provider.NewVersionRef(""), nil
 	}
 
-	// Shift present: walk the history newest-first from the base version.
-	history, err := s.client.GetParameterHistory(ctx, &ssm.GetParameterHistoryInput{
-		Name:           aws.String(name),
-		WithDecryption: aws.Bool(true),
-	})
+	// Shift present: walk the FULL history newest-first from the base version.
+	params, err := s.getFullHistory(ctx, name)
 	if err != nil {
 		return provider.VersionRef{}, fmt.Errorf("failed to get parameter history: %w", err)
 	}
 
-	params := history.Parameters
 	if len(params) == 0 {
 		return provider.VersionRef{}, fmt.Errorf("parameter not found: %s", name)
 	}
@@ -161,15 +157,12 @@ func (s *Store) Get(ctx context.Context, name string, ref provider.VersionRef) (
 
 // History returns the parameter's version history, newest first.
 func (s *Store) History(ctx context.Context, name string) ([]domain.Version, error) {
-	history, err := s.client.GetParameterHistory(ctx, &ssm.GetParameterHistoryInput{
-		Name:           aws.String(name),
-		WithDecryption: aws.Bool(true),
-	})
+	params, err := s.getFullHistory(ctx, name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get parameter history: %w", err)
 	}
 
-	versions := lo.Map(history.Parameters, func(p types.ParameterHistory, _ int) domain.Version {
+	versions := lo.Map(params, func(p types.ParameterHistory, _ int) domain.Version {
 		return domain.Version{
 			ID:      strconv.FormatInt(p.Version, 10),
 			Created: p.LastModifiedDate,
@@ -179,6 +172,39 @@ func (s *Store) History(ctx context.Context, name string) ([]domain.Version, err
 	slices.Reverse(versions) // newest first
 
 	return versions, nil
+}
+
+// getFullHistory returns the parameter's complete version history (oldest
+// first, as AWS returns it), paging through NextToken. GetParameterHistory caps
+// each page at 50 items while SSM retains up to 100 versions, so a single
+// unpaged call would treat page 1 as the whole history — making index 0 look
+// like the latest version and silently mis-resolving ~N / #N~M / log.
+func (s *Store) getFullHistory(ctx context.Context, name string) ([]types.ParameterHistory, error) {
+	var (
+		all   []types.ParameterHistory
+		token *string
+	)
+
+	for {
+		out, err := s.client.GetParameterHistory(ctx, &ssm.GetParameterHistoryInput{
+			Name:           aws.String(name),
+			WithDecryption: aws.Bool(true),
+			NextToken:      token,
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		all = append(all, out.Parameters...)
+
+		if aws.ToString(out.NextToken) == "" {
+			break
+		}
+
+		token = out.NextToken
+	}
+
+	return all, nil
 }
 
 // List returns the names of all parameters, paging through DescribeParameters.
