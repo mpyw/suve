@@ -336,6 +336,7 @@
           <ParamView
             capability={paramCap}
             {provider}
+            initialNamespace={scope?.namespace ?? ''}
             onnavigatetostaging={() => handleNavigate('staging')}
             onstagingchange={handleStagingChange}
           />

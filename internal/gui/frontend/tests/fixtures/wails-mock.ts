@@ -8,6 +8,10 @@ export interface Parameter {
   name: string;
   type: 'String' | 'SecureString' | 'StringList';
   value: string;
+  // Azure App Configuration namespace (the axis Azure calls a "label"). Empty /
+  // omitted is the null/default namespace. Populated into ParamListEntry.namespace
+  // by ParamList so the GUI can filter by namespace client-side (#425).
+  namespace?: string;
 }
 
 export interface Secret {
@@ -673,6 +677,26 @@ export function createAzureState(overrides: Partial<MockState> = {}): Partial<Mo
 }
 
 /**
+ * Azure App Configuration with settings spanning multiple namespaces (the axis
+ * Azure calls a "label"): some in the null/default namespace, some in `dev`,
+ * some in `prd`. The scope's namespace is left empty (the null/default), so the
+ * Namespace dropdown defaults to (NULL). Drives the #425 namespace filter +
+ * per-entry namespace display specs.
+ */
+export function createAzureNamespaceState(overrides: Partial<MockState> = {}): Partial<MockState> {
+  return createAzureState({
+    params: [
+      { name: 'app/config', type: 'String', value: 'null-val', namespace: '' },
+      { name: 'app/db', type: 'String', value: 'dev-db', namespace: 'dev' },
+      { name: 'app/cache', type: 'String', value: 'dev-cache', namespace: 'dev' },
+      { name: 'app/queue', type: 'String', value: 'prd-queue', namespace: 'prd' },
+    ],
+    paramTags: {},
+    ...overrides,
+  });
+}
+
+/**
  * No explicit initial provider and two providers active → the app must show a
  * selector prompt and preselect nothing.
  */
@@ -848,7 +872,8 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
               name: p.name,
               type: p.type,
               secret: p.type === 'SecureString',
-              value: withValue ? p.value : undefined
+              value: withValue ? p.value : undefined,
+              namespace: p.namespace ?? (state.currentScope?.namespace ?? '')
             })),
             nextToken: hasMore ? String(endIndex) : '',
           };
@@ -859,7 +884,8 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
             name: p.name,
             type: p.type,
             secret: p.type === 'SecureString',
-            value: withValue ? p.value : undefined
+            value: withValue ? p.value : undefined,
+            namespace: p.namespace ?? (state.currentScope?.namespace ?? '')
           })),
           nextToken: '',
         };

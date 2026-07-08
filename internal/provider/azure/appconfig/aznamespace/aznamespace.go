@@ -27,6 +27,12 @@ import (
 // encodes it as label=%00 (#352).
 const NullLabelFilter = "\x00"
 
+// AllNamespacesFilter is the App Configuration label filter that matches every
+// namespace (the degenerate `*` wildcard). Cross-namespace enumeration (see
+// appconfig.Store.ListWithNamespaces, #425) uses it to deliberately ignore the
+// store's configured namespace.
+const AllNamespacesFilter = "*"
+
 // Filter maps a raw --namespace value to an App Configuration LabelFilter for
 // list/read enumeration. An empty value maps to the null-label filter (the
 // default namespace); any other value is forwarded verbatim so the service's

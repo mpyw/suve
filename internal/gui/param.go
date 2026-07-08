@@ -3,14 +3,27 @@
 package gui
 
 import (
+	"context"
 	"errors"
+	"regexp"
+
+	"github.com/samber/lo"
 
 	"github.com/mpyw/suve/internal/cli/commands/param/paramtype"
 	"github.com/mpyw/suve/internal/domain"
 	"github.com/mpyw/suve/internal/provider"
+	"github.com/mpyw/suve/internal/provider/azure/appconfig"
 	"github.com/mpyw/suve/internal/timeutil"
 	"github.com/mpyw/suve/internal/usecase/param"
 )
+
+// appConfigNamespaceLister is the App-Config-specific extension the GUI type-
+// asserts on the resolved param store to load entries across ALL namespaces
+// (#425). Only the Azure App Configuration store implements it; the neutral
+// provider.Reader.List contract is untouched, so other providers never match.
+type appConfigNamespaceLister interface {
+	ListWithNamespaces(ctx context.Context) ([]appconfig.KeyNamespace, error)
+}
 
 // =============================================================================
 // Param Types
@@ -30,6 +43,12 @@ type ParamListEntry struct {
 	// provider-neutrally derived from the domain value type.
 	Secret bool    `json:"secret"`
 	Value  *string `json:"value,omitempty"`
+	// Namespace carries each entry's namespace for Azure App Configuration (the
+	// axis Azure calls a "label"); empty is the null/default namespace. It is
+	// populated only when the current scope is Azure App Configuration (the list
+	// is then loaded across ALL namespaces so the GUI can filter client-side,
+	// #425); for every other provider it stays empty.
+	Namespace string `json:"namespace"`
 }
 
 // ParamShowTag represents a tag key-value pair.
@@ -94,11 +113,20 @@ type ParamDeleteResult struct {
 // Param Methods
 // =============================================================================
 
-// ParamList lists SSM parameters.
+// ParamList lists parameters. For Azure App Configuration it loads entries
+// across ALL namespaces (each carrying its namespace) so the GUI can filter by
+// namespace client-side (#425); every other provider uses the neutral
+// param.ListUseCase path and leaves Namespace empty.
 func (a *App) ParamList(prefix string, recursive bool, withValue bool, filter string, _ int, _ string) (*ParamListResult, error) {
 	store, err := a.paramStore()
 	if err != nil {
 		return nil, err
+	}
+
+	// Azure App Configuration: if the store exposes the cross-namespace lister,
+	// list every namespace so each entry carries its own namespace.
+	if lister, ok := store.(appConfigNamespaceLister); ok {
+		return a.paramListWithNamespaces(lister, prefix, recursive, withValue, filter)
 	}
 
 	uc := &param.ListUseCase{Reader: store}
@@ -119,6 +147,51 @@ func (a *App) ParamList(prefix string, recursive bool, withValue bool, filter st
 			Name:  e.Name,
 			Value: e.Value,
 		}
+	}
+
+	return &ParamListResult{Entries: entries}, nil
+}
+
+// paramListWithNamespaces builds the list for Azure App Configuration from the
+// all-namespaces load, so each entry carries its namespace. The same
+// prefix/recursive/regex client-side filtering as param.ListUseCase is applied
+// (via param.MatchPrefix); namespace filtering itself is done in the frontend.
+func (a *App) paramListWithNamespaces(
+	lister appConfigNamespaceLister, prefix string, recursive, withValue bool, filter string,
+) (*ParamListResult, error) {
+	var filterRegex *regexp.Regexp
+
+	if filter != "" {
+		re, err := regexp.Compile(filter)
+		if err != nil {
+			return nil, err
+		}
+
+		filterRegex = re
+	}
+
+	items, err := lister.ListWithNamespaces(a.ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	entries := make([]ParamListEntry, 0, len(items))
+
+	for _, item := range items {
+		if !param.MatchPrefix(item.Key, prefix, recursive) {
+			continue
+		}
+
+		if filterRegex != nil && !filterRegex.MatchString(item.Key) {
+			continue
+		}
+
+		entry := ParamListEntry{Name: item.Key, Namespace: item.Namespace}
+		if withValue {
+			entry.Value = lo.ToPtr(item.Value)
+		}
+
+		entries = append(entries, entry)
 	}
 
 	return &ParamListResult{Entries: entries}, nil
