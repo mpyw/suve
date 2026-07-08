@@ -275,6 +275,29 @@ func TestAzureAppConfig_Namespace(t *testing.T) {
 		assert.Contains(t, allList, devOnly)
 	})
 
+	// The NAMESPACE column is on by default (#430): every row is prefixed with
+	// its namespace, "(NULL)" for the null namespace; --namespace "*" reveals the
+	// dev rows too; --hide-ns drops the column for the neutral key-only output.
+	t.Run("namespace-column", func(t *testing.T) {
+		// Default (null scope): the shared key is prefixed with "(NULL)".
+		nullList, err := runAzureParam(t, "list")
+		require.NoError(t, err)
+		assert.Contains(t, nullList, "(NULL)\t"+shared)
+
+		// --namespace "*" spans namespaces, so both the null and dev rows show,
+		// each carrying its own namespace label.
+		allList, err := runAzureParam(t, "list", "--namespace", "*")
+		require.NoError(t, err)
+		assert.Contains(t, allList, "(NULL)\t"+shared)
+		assert.Contains(t, allList, "dev\t"+devOnly)
+
+		// --hide-ns drops the column: no "(NULL)" prefix, just the bare key.
+		hidden, err := runAzureParam(t, "list", "--namespace", "*", "--hide-ns")
+		require.NoError(t, err)
+		assert.NotContains(t, hidden, "(NULL)")
+		assert.Contains(t, hidden, devOnly)
+	})
+
 	// A filter value (all/multiple) is rejected on a single-item op.
 	t.Run("wildcard-rejected-on-single-item", func(t *testing.T) {
 		_, err := runAzureParam(t, "show", "--raw", "--namespace", "*", shared)

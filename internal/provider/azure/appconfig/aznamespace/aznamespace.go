@@ -33,6 +33,12 @@ const NullLabelFilter = "\x00"
 // store's configured namespace.
 const AllNamespacesFilter = "*"
 
+// NullDisplay is the human-readable rendering of the null (default) namespace,
+// used wherever a namespace is shown to a user (the CLI `param list` NAMESPACE
+// column, #430) so it is visible rather than a blank. It mirrors the GUI's
+// NS_NULL (frontend viewUtils.ts).
+const NullDisplay = "(NULL)"
+
 // Filter maps a raw --namespace value to an App Configuration LabelFilter for
 // list/read enumeration. An empty value maps to the null-label filter (the
 // default namespace); any other value is forwarded verbatim so the service's
