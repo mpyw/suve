@@ -65,7 +65,7 @@
   // scope can land in the new one.
   const scopeKey = $derived(
     scope
-      ? [provider, scope.projectId, scope.vaultName, scope.storeName].join('|')
+      ? [provider, scope.projectId, scope.vaultName, scope.storeName, scope.namespace].join('|')
       : provider,
   );
 
@@ -125,6 +125,7 @@
       projectId: p === 'googlecloud' ? (src?.projectId ?? '') : '',
       vaultName: p === 'azure' ? (src?.vaultName ?? '') : '',
       storeName: p === 'azure' ? (src?.storeName ?? '') : '',
+      namespace: p === 'azure' ? (src?.namespace ?? '') : '',
     } as gui.ScopeSelection;
   }
 
@@ -334,12 +335,14 @@
         {#if effectiveView === 'param' && paramCap}
           <ParamView
             capability={paramCap}
+            {provider}
             onnavigatetostaging={() => handleNavigate('staging')}
             onstagingchange={handleStagingChange}
           />
         {:else if effectiveView === 'secret' && secretCap}
           <SecretView
             capability={secretCap}
+            {provider}
             onnavigatetostaging={() => handleNavigate('staging')}
             onstagingchange={handleStagingChange}
           />

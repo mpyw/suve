@@ -15,11 +15,12 @@
 
   interface Props {
     capability?: gui.ServiceCapability;
+    provider?: string;
     onnavigatetostaging?: () => void;
     onstagingchange?: () => void;
   }
 
-  let { capability, onnavigatetostaging, onstagingchange }: Props = $props();
+  let { capability, provider = '', onnavigatetostaging, onstagingchange }: Props = $props();
 
   // Capability-driven visibility. Absent capability defaults to AWS-like (true)
   // so the component degrades safely if mounted without one.
@@ -532,7 +533,7 @@
             {/if}
 
             {#if tagsEnabled}
-              <TagList tags={paramDetail.tags} serviceClass="param" onadd={openTagModal} onremove={openRemoveTagModal} />
+              <TagList tags={paramDetail.tags} serviceClass="param" {provider} onadd={openTagModal} onremove={openRemoveTagModal} />
             {/if}
 
             {#if historyEnabled && paramLog.length > 0}

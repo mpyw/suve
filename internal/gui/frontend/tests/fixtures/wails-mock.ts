@@ -79,6 +79,7 @@ export interface ScopeSelection {
   projectId: string;
   vaultName: string;
   storeName: string;
+  namespace: string;
 }
 
 // DetectResult mirrors the Go binding DTO (internal/gui/providers.go).
@@ -209,6 +210,7 @@ export const awsScopeSelection: ScopeSelection = {
   projectId: '',
   vaultName: '',
   storeName: '',
+  namespace: '',
 };
 
 /**
@@ -588,7 +590,7 @@ export function createNoAWSIdentityState(): Partial<MockState> {
 // ---- Provider-selection states (multi-cloud) ------------------------------
 
 function emptyScope(provider: string): ScopeSelection {
-  return { provider, projectId: '', vaultName: '', storeName: '' };
+  return { provider, projectId: '', vaultName: '', storeName: '', namespace: '' };
 }
 
 /**
@@ -784,6 +786,7 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
           projectId: p === 'googlecloud' ? (sel.projectId || '') : '',
           vaultName: p === 'azure' ? (sel.vaultName || '') : '',
           storeName: p === 'azure' ? (sel.storeName || '') : '',
+          namespace: p === 'azure' ? (sel.namespace || '') : '',
         };
       },
 

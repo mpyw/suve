@@ -108,8 +108,9 @@ func NewApp(initial provider.Scope) *App {
 
 // hydrateScope fills empty resource fields on an initial launch scope from the
 // environment. Flag-supplied values take precedence; unset ones fall back to
-// GOOGLE_CLOUD_PROJECT / AZURE_KEYVAULT_NAME / AZURE_APPCONFIG_NAME. AWS carries
-// no resource field (region comes from the ambient AWS config).
+// GOOGLE_CLOUD_PROJECT / AZURE_KEYVAULT_NAME / AZURE_APPCONFIG_NAME /
+// AZURE_APPCONFIG_NAMESPACE. AWS carries no resource field (region comes from
+// the ambient AWS config).
 func hydrateScope(s provider.Scope) provider.Scope {
 	switch s.Provider {
 	case provider.ProviderGoogleCloud:
@@ -123,6 +124,10 @@ func hydrateScope(s provider.Scope) provider.Scope {
 
 		if s.StoreName == "" {
 			s.StoreName = os.Getenv("AZURE_APPCONFIG_NAME")
+		}
+
+		if s.AppConfigNamespace == "" {
+			s.AppConfigNamespace = os.Getenv("AZURE_APPCONFIG_NAMESPACE")
 		}
 	case provider.ProviderAWS:
 		// region comes from the ambient AWS config; nothing to hydrate.
@@ -149,17 +154,22 @@ func (a *App) Startup(ctx context.Context) {
 //   - aws: (none; the ambient AWS config supplies the region)
 //   - googlecloud: ProjectID
 //   - azure: VaultName (Key Vault secret) and/or StoreName (App Configuration
-//     param)
+//     param); Namespace is the optional App Configuration namespace (Azure
+//     calls it a "label"), applied only to the App Configuration store — empty
+//     means the default (null) namespace.
 type ScopeSelection struct {
 	Provider  string `json:"provider"`
 	ProjectID string `json:"projectId"`
 	VaultName string `json:"vaultName"`
 	StoreName string `json:"storeName"`
+	Namespace string `json:"namespace"`
 }
 
 // SelectScope sets the current read/write provider scope. It performs no
 // network calls; store construction (and any credential resolution) is deferred
-// to the next param/secret operation.
+// to the next param/secret operation. For Azure the App Configuration namespace
+// (sel.Namespace) is carried on the scope; it is only meaningful for the App
+// Configuration store and harmless for every other provider/store.
 func (a *App) SelectScope(sel ScopeSelection) error {
 	scope, err := scopeFromSelection(sel)
 	if err != nil {
@@ -193,9 +203,10 @@ func scopeFromSelection(sel ScopeSelection) (provider.Scope, error) {
 		}
 
 		return provider.Scope{
-			Provider:  provider.ProviderAzure,
-			VaultName: sel.VaultName,
-			StoreName: sel.StoreName,
+			Provider:           provider.ProviderAzure,
+			VaultName:          sel.VaultName,
+			StoreName:          sel.StoreName,
+			AppConfigNamespace: sel.Namespace,
 		}, nil
 	default:
 		return provider.Scope{}, fmt.Errorf("%w: %q", errInvalidProvider, sel.Provider)
@@ -227,6 +238,7 @@ func selectionFromScope(s provider.Scope) *ScopeSelection {
 		ProjectID: s.ProjectID,
 		VaultName: s.VaultName,
 		StoreName: s.StoreName,
+		Namespace: s.AppConfigNamespace,
 	}
 }
 
