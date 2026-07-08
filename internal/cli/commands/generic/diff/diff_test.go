@@ -16,6 +16,7 @@ import (
 	cmdparam "github.com/mpyw/suve/internal/cli/commands/param"
 	cmdsecret "github.com/mpyw/suve/internal/cli/commands/secret"
 	"github.com/mpyw/suve/internal/cli/diffargs"
+	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/domain"
 	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/provider/providermock"
@@ -538,6 +539,72 @@ func TestParamIdenticalWarning(t *testing.T) {
 	assert.Contains(t, stderr, "comparing identical versions")
 	assert.Contains(t, stderr, "Hint:")
 	assert.Contains(t, stderr, "/app/param~1")
+}
+
+// TestDiff_DistinctVersionsSameContent verifies that comparing two DISTINCT
+// versions whose values happen to match reports the content as identical (not
+// "comparing identical versions") and omits the self-comparison hint (#335).
+func TestDiff_DistinctVersionsSameContent(t *testing.T) {
+	t.Parallel()
+
+	store := paramDiffStore(map[string]*domain.Entry{
+		"1": {Name: "/app/param", Value: "same-value", Version: domain.Version{ID: "1"}},
+		"3": {Name: "/app/param", Value: "same-value", Version: domain.Version{ID: "3"}},
+	})
+
+	spec1 := &paramversion.Spec{Name: "/app/param", Absolute: paramversion.AbsoluteSpec{Version: lo.ToPtr(int64(1))}}
+	spec3 := &paramversion.Spec{Name: "/app/param", Absolute: paramversion.AbsoluteSpec{Version: lo.ToPtr(int64(3))}}
+
+	stdout, stderr, err := run(t, cmdparam.NewDiffPresenter(store, spec1, spec3), genericdiff.Options{})
+	require.NoError(t, err)
+
+	assert.Empty(t, stdout)
+	assert.Contains(t, stderr, "versions differ but content is identical")
+	assert.NotContains(t, stderr, "comparing identical versions")
+	// The self-comparison hint ("use ~1") does not apply to two distinct specs.
+	assert.NotContains(t, stderr, "Hint:")
+}
+
+// TestDiff_FormattingOnlyDifference verifies that with --parse-json, two values
+// that differ only in JSON formatting (key order / whitespace) are reported as
+// formatting-only rather than being masked as identical (#344).
+func TestDiff_FormattingOnlyDifference(t *testing.T) {
+	t.Parallel()
+
+	store := paramDiffStore(map[string]*domain.Entry{
+		"1": {Name: "/app/param", Value: `{"a":1,"b":2}`, Version: domain.Version{ID: "1"}},
+		"3": {Name: "/app/param", Value: `{"b":2,"a":1}`, Version: domain.Version{ID: "3"}},
+	})
+
+	spec1 := &paramversion.Spec{Name: "/app/param", Absolute: paramversion.AbsoluteSpec{Version: lo.ToPtr(int64(1))}}
+	spec3 := &paramversion.Spec{Name: "/app/param", Absolute: paramversion.AbsoluteSpec{Version: lo.ToPtr(int64(3))}}
+
+	stdout, stderr, err := run(t, cmdparam.NewDiffPresenter(store, spec1, spec3), genericdiff.Options{ParseJSON: true})
+	require.NoError(t, err)
+
+	assert.Empty(t, stdout)
+	assert.Contains(t, stderr, "values differ only in JSON formatting")
+	assert.NotContains(t, stderr, "identical")
+}
+
+// TestDiff_JSONOutputIdenticalOnRawValues verifies --output=json reports
+// identical based on the raw stored values, so a formatting-only difference is
+// not masked as identical:true (#344).
+func TestDiff_JSONOutputIdenticalOnRawValues(t *testing.T) {
+	t.Parallel()
+
+	store := paramDiffStore(map[string]*domain.Entry{
+		"1": {Name: "/app/param", Value: `{"a":1,"b":2}`, Version: domain.Version{ID: "1"}},
+		"3": {Name: "/app/param", Value: `{"b":2,"a":1}`, Version: domain.Version{ID: "3"}},
+	})
+
+	spec1 := &paramversion.Spec{Name: "/app/param", Absolute: paramversion.AbsoluteSpec{Version: lo.ToPtr(int64(1))}}
+	spec3 := &paramversion.Spec{Name: "/app/param", Absolute: paramversion.AbsoluteSpec{Version: lo.ToPtr(int64(3))}}
+
+	stdout, _, err := run(t, cmdparam.NewDiffPresenter(store, spec1, spec3),
+		genericdiff.Options{ParseJSON: true, Output: output.FormatJSON})
+	require.NoError(t, err)
+	assert.Contains(t, stdout, `"identical": false`)
 }
 
 // secretDiffStore builds a mock reader keyed by the resolved spec suffix

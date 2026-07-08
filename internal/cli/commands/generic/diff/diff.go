@@ -57,15 +57,20 @@ func (r *Runner) Run(ctx context.Context) error {
 		return err
 	}
 
-	value1 := r.Presenter.OldValue()
-	value2 := r.Presenter.NewValue()
+	rawValue1 := r.Presenter.OldValue()
+	rawValue2 := r.Presenter.NewValue()
 
-	// Format as JSON if enabled
+	// The identical decision is made on the RAW stored values, so a --parse-json
+	// reformat (whitespace, key order, number spelling) never masks a real
+	// stored difference (previously the compare ran AFTER formatting).
+	identical := rawValue1 == rawValue2
+
+	// Format as JSON if enabled — for rendering only.
+	value1, value2 := rawValue1, rawValue2
 	if r.Options.ParseJSON {
 		value1, value2 = jsonutil.TryFormatOrWarn2(value1, value2, r.Stderr, "")
 	}
 
-	identical := value1 == value2
 	oldLabel, newLabel := r.Presenter.Labels()
 
 	// JSON output mode
@@ -79,13 +84,30 @@ func (r *Runner) Run(ctx context.Context) error {
 	}
 
 	if identical {
-		output.Warning(r.Stderr, "comparing identical versions")
-		r.Presenter.Hints(r.Stderr)
+		// The values are byte-identical. Distinguish self-comparison from two
+		// distinct versions that merely happen to hold the same content, and
+		// only offer the self-comparison hints in the former case.
+		if oldLabel == newLabel {
+			output.Warning(r.Stderr, "comparing identical versions")
+			r.Presenter.Hints(r.Stderr)
+		} else {
+			output.Warning(r.Stderr, "versions differ but content is identical")
+		}
 
 		return nil
 	}
 
 	diff := output.Diff(oldLabel, newLabel, value1, value2)
+
+	// The raw values differ but --parse-json normalized them to the same form:
+	// there is no textual diff to show, so say so explicitly instead of printing
+	// nothing (and never claim the versions are identical).
+	if diff == "" {
+		output.Warning(r.Stderr, "values differ only in JSON formatting")
+
+		return nil
+	}
+
 	output.Print(r.Stdout, diff)
 
 	return nil
