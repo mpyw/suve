@@ -10,11 +10,9 @@ import (
 	"github.com/mpyw/suve/internal/provider"
 )
 
-// newTagger builds the Azure App Configuration provider.Tagger.
-//
-// Note: tag mutation is declined by the App Configuration adapter (the
-// azappconfig SDK cannot write setting tags without clearing them); these
-// commands surface that clear error rather than crash.
+// newTagger builds the Azure App Configuration provider.Tagger. The adapter
+// writes tags via a GET-merge-PUT with an ETag precondition (azappconfig/v2), so
+// the value and any other tags are preserved.
 func newTagger(ctx context.Context) (provider.Tagger, error) {
 	return cliinternal.AzureAppConfigStore(ctx)
 }
@@ -22,17 +20,16 @@ func newTagger(ctx context.Context) (provider.Tagger, error) {
 // TagCommand returns the Azure App Configuration tag command.
 func TagCommand() *cli.Command {
 	return generictag.TagCommand(generictag.Config{
-		Usage:     "Add or update tags on a setting (unsupported)",
+		Usage:     "Add or update tags on a setting",
 		ArgsUsage: "<key> <key=value>...",
 		Description: `Add or update tags on a setting.
 
-Note: the azappconfig SDK cannot write setting tags without clearing them, so
-this command reports that tag mutation is unsupported rather than losing data.
-Tags set out-of-band (e.g. via the Azure portal) are still shown by
-'suve azure param show'.
+Tags are written with a GET-merge-PUT (App Configuration replaces the whole
+key-value, so the current value and any other tags are re-sent unchanged); an
+ETag precondition guards against a concurrent write.
 
 EXAMPLES:
-   suve azure param tag app/timeout env=prod                 Reports "tags unsupported"`,
+   suve azure param tag app/timeout env=prod                 Add or update the env tag`,
 		Noun:       "setting",
 		UsageError: "usage: suve azure param tag <key> <key=value> [key=value]",
 		NewTagger:  newTagger,
@@ -42,15 +39,15 @@ EXAMPLES:
 // UntagCommand returns the Azure App Configuration untag command.
 func UntagCommand() *cli.Command {
 	return generictag.UntagCommand(generictag.Config{
-		Usage:     "Remove tags from a setting (unsupported)",
+		Usage:     "Remove tags from a setting",
 		ArgsUsage: "<key> <key>...",
 		Description: `Remove tags from a setting.
 
-Note: the azappconfig SDK cannot write setting tags without clearing them, so
-this command reports that tag mutation is unsupported rather than losing data.
+Tags are removed with a GET-merge-PUT (the current value and any remaining tags
+are preserved); an ETag precondition guards against a concurrent write.
 
 EXAMPLES:
-   suve azure param untag app/timeout env                    Reports "tags unsupported"`,
+   suve azure param untag app/timeout env                    Remove the env tag`,
 		Noun:       "setting",
 		UsageError: "usage: suve azure param untag <key> <key> [key]",
 		NewTagger:  newTagger,

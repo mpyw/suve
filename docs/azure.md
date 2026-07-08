@@ -15,7 +15,7 @@ Azure splits into two services under `suve azure`:
 Azure also supports the local **staging workflow** via `suve azure stage` (or the bare `suve stage` alias when Azure is the only active staging backend). It is **per-service**, because Key Vault and App Configuration keep separate staging state:
 
 - `suve azure stage secret` — Key Vault secrets. Full workflow (`add`/`edit`/`delete`/`status`/`diff`/`apply`/`reset`/`tag`/`untag`/`stash`). Versions are immutable, so a staged `edit` applies as a new version.
-- `suve azure stage param` — App Configuration settings. Because App Configuration is **unversioned**, staging uses **last-write-wins** (no modified-after conflict check), and `tag`/`untag` are unavailable (tags aren't writable). Workflow: `add`/`edit`/`delete`/`status`/`diff`/`apply`/`reset`/`stash`.
+- `suve azure stage param` — App Configuration settings. Because App Configuration is **unversioned**, staging uses **last-write-wins** (no modified-after conflict check). Tags are writable via a GET-merge-PUT, so `tag`/`untag` are available. Workflow: `add`/`edit`/`delete`/`status`/`diff`/`apply`/`reset`/`tag`/`untag`/`stash`.
 
 Unlike `aws stage`, there is no cross-service `azure stage status`/`apply` aggregate — the two services have distinct staging scopes. See the [staging workflow](../README.md#staging-workflow) overview for the general flow.
 
@@ -437,7 +437,7 @@ Because App Configuration has no versions, several commands behave differently f
 | `show`, `list`/`ls`, `create`, `update`, `delete`/`rm` | Supported |
 | `diff` | Supported, but compares **two distinct keys** (not two versions) |
 | `log`/`history` | **Unsupported** -- always reports that history is unsupported |
-| `tag`, `untag` | **Unsupported** -- report an unsupported error (SDK limitation) |
+| `tag`, `untag` | Supported -- written via a GET-merge-PUT with an ETag precondition (`azappconfig/v2`); the value and other tags are preserved |
 
 ---
 
@@ -686,19 +686,18 @@ suve azure param delete --yes app/timeout --store-name my-store
 
 ---
 
-## suve azure param tag / untag (unsupported)
+## suve azure param tag / untag
 
 ```
 suve azure param tag [options] <key> <key=value>...
 suve azure param untag [options] <key> <key>...
 ```
 
-> [!WARNING]
-> Tag mutation is **unsupported** for App Configuration. The `azappconfig` SDK cannot write setting tags without clearing them, so these commands report an unsupported error rather than losing data. Tags set out-of-band (e.g. via the Azure portal) are still shown by `suve azure param show`.
+Add/update or remove tags on a setting. App Configuration's PUT replaces the whole key-value, so writes are a **GET-merge-PUT**: the current value and any other tags are read and re-sent, so `tag`/`untag` preserve them. An ETag (`OnlyIfUnchanged`) precondition guards against a concurrent write; on a 412 conflict the merge is re-tried a few times before the conflict is surfaced. A value write (`suve azure param update`) likewise re-sends existing tags so it does not clear them.
 
 **Examples:**
 
 ```bash
-suve azure param tag app/timeout env=prod --store-name my-store     # Reports "tags unsupported"
-suve azure param untag app/timeout env --store-name my-store        # Reports "tags unsupported"
+suve azure param tag app/timeout env=prod --store-name my-store     # Add or update the env tag
+suve azure param untag app/timeout env --store-name my-store        # Remove the env tag
 ```

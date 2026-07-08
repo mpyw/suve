@@ -599,13 +599,13 @@ where ~SHIFT = ~ | ~N  (repeatable, cumulative)
 | [AWS Secrets Manager](docs/aws.md) | `aws secret` | ✅ UUID + staging labels | ✅ tags | ✅ | ✅ | shared config/env/role |
 | [Google Cloud Secret Manager](docs/gcloud.md) | `gcloud secret` | ✅ integer (`latest`) | ✅ labels | ✅ | ✅ | Application Default Credentials |
 | [Azure Key Vault](docs/azure.md) | `azure secret` | ✅ opaque id | ✅ tags | ✅ | ✅ | DefaultAzureCredential |
-| [Azure App Configuration](docs/azure.md) | `azure param` | ❌ unversioned | ❌ unsupported¹ | ✅² | ✅ | DefaultAzureCredential |
+| [Azure App Configuration](docs/azure.md) | `azure param` | ❌ unversioned | ✅ tags¹ | ✅² | ✅ | DefaultAzureCredential |
 
-Read/write operations (`show`, `log`, `diff`, `list`, `create`, `update`, `delete`, `tag`, `untag`) are available on every backend, with these caveats: `restore` is AWS Secrets Manager only; on Azure App Configuration `log` reports history unsupported and `tag`/`untag` return an unsupported error; version specifiers (`#VERSION`, `~SHIFT`, `:LABEL`) are rejected on App Configuration. Only AWS Secrets Manager has staging labels (`:AWSCURRENT` etc.).
+Read/write operations (`show`, `log`, `diff`, `list`, `create`, `update`, `delete`, `tag`, `untag`) are available on every backend, with these caveats: `restore` is AWS Secrets Manager only; on Azure App Configuration `log` reports history unsupported; version specifiers (`#VERSION`, `~SHIFT`, `:LABEL`) are rejected on App Configuration. Only AWS Secrets Manager has staging labels (`:AWSCURRENT` etc.).
 
-¹ The `azappconfig` SDK cannot write setting tags without clearing them, so tag writes are refused.
+¹ App Configuration's PUT replaces the whole key-value, so tag writes are a **GET-merge-PUT** with an ETag precondition (`azappconfig/v2`): `tag`/`untag` preserve the value and other tags, and a value write (`update`) preserves existing tags.
 
-² App Configuration is unversioned, so staging uses **last-write-wins** (no modified-after conflict check) and `tag`/`untag` are unavailable (tags aren't writable).
+² App Configuration is unversioned, so staging uses **last-write-wins** (no modified-after conflict check); `tag`/`untag` are available.
 
 ### Metadata terminology
 

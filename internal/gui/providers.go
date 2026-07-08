@@ -183,10 +183,11 @@ func (a *App) Capabilities() []ProviderCapability {
 			DisplayName: "Azure",
 			ScopeFields: []string{},
 			Services: []ServiceCapability{
-				// App Configuration is unversioned and cannot write tags.
+				// App Configuration is unversioned; tags are writable via
+				// GET-merge-PUT (azappconfig/v2).
 				{
 					Service: serviceParam, DisplayName: "App Configuration",
-					HasVersionHistory: false, HasVersionSpecifiers: false, HasTags: false, HasRestore: false,
+					HasVersionHistory: false, HasVersionSpecifiers: false, HasTags: true, HasRestore: false,
 					HasStaging: true, HasForceDelete: false, HasRecoveryWindow: false,
 				},
 				{
