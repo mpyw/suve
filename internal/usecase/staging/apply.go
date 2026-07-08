@@ -32,6 +32,10 @@ type ApplyEntryResult struct {
 	Name   string
 	Status ApplyResultStatus
 	Error  error
+	// UnstageError is set when the cloud apply succeeded but clearing the entry
+	// from the staging store afterwards failed. The entry is still staged, so a
+	// later apply would re-run it; callers must surface this rather than ignore it.
+	UnstageError error
 }
 
 // ApplyTagResult represents the result of applying tag changes.
@@ -40,6 +44,9 @@ type ApplyTagResult struct {
 	AddTags   map[string]string   // Tags that were added/updated
 	RemoveTag maputil.Set[string] // Tag keys that were removed
 	Error     error
+	// UnstageError is set when the cloud tag apply succeeded but clearing the
+	// staged tag afterwards failed (see ApplyEntryResult.UnstageError).
+	UnstageError error
 }
 
 // ApplyOutput holds the result of the apply use case.
@@ -174,8 +181,12 @@ func (u *ApplyUseCase) applyEntries(ctx context.Context, service staging.Service
 			case staging.OperationDelete:
 				resultEntry.Status = ApplyResultDeleted
 			}
-			// Unstage successful operations
-			_ = u.Store.UnstageEntry(ctx, service, name)
+			// Unstage successful operations. A failure here leaves the entry
+			// staged after a successful cloud apply, so record it rather than
+			// discarding it — a silent leftover would be re-applied next time.
+			if err := u.Store.UnstageEntry(ctx, service, name); err != nil {
+				resultEntry.UnstageError = err
+			}
 
 			output.EntrySucceeded++
 		}
@@ -205,8 +216,11 @@ func (u *ApplyUseCase) applyTags(ctx context.Context, service staging.Service, t
 			resultTag.Error = result.Err
 			output.TagFailed++
 		} else {
-			// Unstage successful operations
-			_ = u.Store.UnstageTag(ctx, service, name)
+			// Unstage successful operations (see applyEntries: record rather
+			// than discard a post-apply unstage failure).
+			if err := u.Store.UnstageTag(ctx, service, name); err != nil {
+				resultTag.UnstageError = err
+			}
 
 			output.TagSucceeded++
 		}

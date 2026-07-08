@@ -146,6 +146,12 @@ func (r *ApplyRunner) Run(ctx context.Context, opts ApplyOptions) error {
 					// Unreachable: when Status is Failed, entry.Error is always non-nil,
 					// so the outer if-branch handles this case.
 				}
+
+				// The cloud apply succeeded but clearing the staged entry failed:
+				// warn so the leftover (which a later apply would re-run) is visible.
+				if entry.UnstageError != nil {
+					output.Warning(r.Stderr, "failed to clear staging for %s: %v", name, entry.UnstageError)
+				}
 			}
 
 			break
@@ -163,6 +169,10 @@ func (r *ApplyRunner) Run(ctx context.Context, opts ApplyOptions) error {
 				output.Failed(r.Stderr, name+" (tags)", tag.Error)
 			} else {
 				output.Success(r.Stdout, "Tagged %s%s", name, FormatTagApplySummary(tag))
+
+				if tag.UnstageError != nil {
+					output.Warning(r.Stderr, "failed to clear staging for %s tags: %v", name, tag.UnstageError)
+				}
 			}
 
 			break
