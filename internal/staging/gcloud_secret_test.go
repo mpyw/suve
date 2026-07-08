@@ -135,7 +135,7 @@ func TestGoogleCloudSecretStrategy_FetchLastModified(t *testing.T) {
 		assert.Equal(t, mod, got)
 	})
 
-	t.Run("not found yields zero time, no error", func(t *testing.T) {
+	t.Run("not found yields ResourceNotFoundError", func(t *testing.T) {
 		t.Parallel()
 
 		store := &providermock.Store{
@@ -143,9 +143,10 @@ func TestGoogleCloudSecretStrategy_FetchLastModified(t *testing.T) {
 				return nil, secretNotFound(name)
 			},
 		}
-		got, err := staging.NewGoogleCloudSecretStrategy(store).FetchLastModified(t.Context(), "sec")
-		require.NoError(t, err)
-		assert.True(t, got.IsZero())
+		_, err := staging.NewGoogleCloudSecretStrategy(store).FetchLastModified(t.Context(), "sec")
+		notFoundErr := (*staging.ResourceNotFoundError)(nil)
+		require.ErrorAs(t, err, &notFoundErr)
+		require.ErrorIs(t, err, provider.ErrNotFound)
 	})
 }
 

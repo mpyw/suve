@@ -46,17 +46,29 @@ func (u *DeleteUseCase) Execute(ctx context.Context, input DeleteInput) (*Delete
 		}
 	}
 
-	// Fetch LastModified for conflict detection (needed for non-CREATE cases)
-	lastModified, err := u.Strategy.FetchLastModified(ctx, input.Name)
-	if err != nil {
-		return nil, fmt.Errorf("failed to fetch %s: %w", itemName, err)
-	}
+	// Fetch LastModified to determine existence (and, for existing resources, to
+	// record a conflict-detection base). Existence is inferred from the ERROR,
+	// not from the returned timestamp: a resource that exists but carries no
+	// modification time still yields a zero time and must NOT be misread as
+	// "not found".
+	var (
+		lastModified time.Time
+		currentValue *string
+	)
 
-	// Determine CurrentValue based on AWS existence
-	var currentValue *string
-	if !lastModified.IsZero() {
-		// Resource exists on AWS - set a non-nil value to indicate existence
-		// The actual value doesn't matter for delete, only existence check
+	fetched, err := u.Strategy.FetchLastModified(ctx, input.Name)
+	if err != nil {
+		// ResourceNotFoundError means the resource doesn't exist; leave
+		// currentValue nil so the reducer either errors (nothing to delete) or
+		// unstages a staged CREATE. Any other error is a genuine failure.
+		if notFoundErr := (*staging.ResourceNotFoundError)(nil); !errors.As(err, &notFoundErr) {
+			return nil, fmt.Errorf("failed to fetch %s: %w", itemName, err)
+		}
+	} else {
+		// Resource exists on AWS - a non-nil currentValue signals existence to
+		// the reducer. A zero fetched time here means "exists, modification time
+		// unknown" and is preserved as-is.
+		lastModified = fetched
 		currentValue = new(string)
 	}
 

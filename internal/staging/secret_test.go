@@ -534,7 +534,7 @@ func TestSecretStrategy_FetchLastModified(t *testing.T) {
 		assert.Equal(t, now, result)
 	})
 
-	t.Run("not found - returns zero time", func(t *testing.T) {
+	t.Run("not found - returns ResourceNotFoundError", func(t *testing.T) {
 		t.Parallel()
 
 		mock := &providermock.Store{
@@ -544,9 +544,10 @@ func TestSecretStrategy_FetchLastModified(t *testing.T) {
 		}
 
 		s := staging.NewSecretStrategy(mock)
-		result, err := s.FetchLastModified(t.Context(), "my-secret")
-		require.NoError(t, err)
-		assert.True(t, result.IsZero())
+		_, err := s.FetchLastModified(t.Context(), "my-secret")
+		notFoundErr := (*staging.ResourceNotFoundError)(nil)
+		require.ErrorAs(t, err, &notFoundErr)
+		require.ErrorIs(t, err, provider.ErrNotFound)
 	})
 
 	t.Run("other error - returns error", func(t *testing.T) {

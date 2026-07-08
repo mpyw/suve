@@ -65,6 +65,13 @@ func TestParse(t *testing.T) {
 			wantName: "my-secret",
 			wantID:   lo.ToPtr("12345"),
 		},
+		{
+			// ClientRequestToken-style version id with '_' and '.' (#319).
+			name:     "with token ID containing underscore and dot",
+			input:    "my-secret#my_token_0123456789.012345678901234567890",
+			wantName: "my-secret",
+			wantID:   lo.ToPtr("my_token_0123456789.012345678901234567890"),
+		},
 
 		// Label specifier (:LABEL)
 		{
