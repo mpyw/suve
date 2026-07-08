@@ -119,14 +119,15 @@ func (s *Store) Resolve(ctx context.Context, name, spec string) (provider.Versio
 		return provider.NewVersionRef(""), nil
 	}
 
-	// A shift requires the enabled version list, newest first.
-	versions, err := s.enabledVersionsNewestFirst(ctx, name)
+	// A shift counts back from `latest`, so it walks the full version list
+	// (any state), newest first — the same anchor the bare name resolves to.
+	versions, err := s.versionsNewestFirst(ctx, name)
 	if err != nil {
 		return provider.VersionRef{}, err
 	}
 
 	if len(versions) == 0 {
-		return provider.VersionRef{}, fmt.Errorf("secret has no enabled versions: %s", name)
+		return provider.VersionRef{}, fmt.Errorf("secret has no versions: %s", name)
 	}
 
 	baseIdx := 0
@@ -138,7 +139,7 @@ func (s *Store) Resolve(ctx context.Context, name, spec string) (provider.Versio
 			return versionNumber(v.GetName()) == want
 		})
 		if !found {
-			return provider.VersionRef{}, fmt.Errorf("version not found or not enabled: %s", want)
+			return provider.VersionRef{}, fmt.Errorf("version not found: %s", want)
 		}
 
 		baseIdx = idx
@@ -152,9 +153,15 @@ func (s *Store) Resolve(ctx context.Context, name, spec string) (provider.Versio
 	return provider.NewVersionRef(versionNumber(versions[targetIdx].GetName())), nil
 }
 
-// enabledVersionsNewestFirst lists the secret's ENABLED versions sorted by
+// versionsNewestFirst lists ALL the secret's versions (any state) sorted by
 // version number, newest (highest) first.
-func (s *Store) enabledVersionsNewestFirst(ctx context.Context, name string) ([]*secretmanagerpb.SecretVersion, error) {
+//
+// This is the same set History shows and the same ordering the `latest` alias
+// anchors at, so a ~shift counts back positionally from whatever the bare name
+// resolves to. Filtering to ENABLED here (as an earlier version did) made a
+// bare `~N` skip disabled/destroyed versions that `latest` still counts,
+// yielding a version further back than "N before the current one".
+func (s *Store) versionsNewestFirst(ctx context.Context, name string) ([]*secretmanagerpb.SecretVersion, error) {
 	versions, err := s.client.ListSecretVersions(ctx, &secretmanagerpb.ListSecretVersionsRequest{
 		Parent: s.secretPath(name),
 	})
@@ -162,13 +169,9 @@ func (s *Store) enabledVersionsNewestFirst(ctx context.Context, name string) ([]
 		return nil, mapError(err, name, "list secret versions")
 	}
 
-	enabled := lo.Filter(versions, func(v *secretmanagerpb.SecretVersion, _ int) bool {
-		return v.GetState() == secretmanagerpb.SecretVersion_ENABLED
-	})
+	sortNewestFirst(versions)
 
-	sortNewestFirst(enabled)
-
-	return enabled, nil
+	return versions, nil
 }
 
 // Get retrieves the secret value at the given ref (latest when ref is latest)

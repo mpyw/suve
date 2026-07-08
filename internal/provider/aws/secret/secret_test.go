@@ -323,6 +323,32 @@ func TestResolve_ShiftReachesDeprecatedVersion(t *testing.T) {
 	assert.Equal(t, "id-1", ref.ID())
 }
 
+func TestResolve_BareShiftAnchorsAtAWSCURRENT(t *testing.T) {
+	t.Parallel()
+
+	base := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
+
+	// During an in-progress rotation AWSPENDING is the newest-CREATED version.
+	store := secret.New(&mockClient{
+		listVersion: func(_ *secretsmanager.ListSecretVersionIdsInput) (*secretsmanager.ListSecretVersionIdsOutput, error) {
+			return &secretsmanager.ListSecretVersionIdsOutput{
+				Versions: []types.SecretVersionsListEntry{
+					{VersionId: aws.String("pending"), CreatedDate: aws.Time(base.Add(3 * time.Hour)), VersionStages: []string{"AWSPENDING"}},
+					{VersionId: aws.String("current"), CreatedDate: aws.Time(base.Add(2 * time.Hour)), VersionStages: []string{"AWSCURRENT"}},
+					{VersionId: aws.String("previous"), CreatedDate: aws.Time(base.Add(time.Hour)), VersionStages: []string{"AWSPREVIOUS"}},
+				},
+			}, nil
+		},
+	})
+
+	// Bare ~1 counts back from AWSCURRENT (what the bare name resolves to), not
+	// from the newest-created version (AWSPENDING), so it reaches AWSPREVIOUS.
+	// With the old index-0 anchor it would have returned AWSCURRENT. (#313)
+	ref, err := store.Resolve(t.Context(), "my-secret", "~1")
+	require.NoError(t, err)
+	assert.Equal(t, "previous", ref.ID())
+}
+
 func TestList_Paginated(t *testing.T) {
 	t.Parallel()
 
