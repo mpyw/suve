@@ -287,7 +287,7 @@ func TestSecretStrategy_ParseName(t *testing.T) {
 
 		_, err := s.ParseName("my-secret#abc123")
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "without version specifier")
+		assert.Contains(t, err.Error(), "must not contain a version specifier")
 	})
 
 	t.Run("name with label", func(t *testing.T) {
@@ -295,7 +295,7 @@ func TestSecretStrategy_ParseName(t *testing.T) {
 
 		_, err := s.ParseName("my-secret:AWSCURRENT")
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "without version specifier")
+		assert.Contains(t, err.Error(), "must not contain a version specifier")
 	})
 
 	t.Run("name with shift", func(t *testing.T) {
@@ -303,7 +303,7 @@ func TestSecretStrategy_ParseName(t *testing.T) {
 
 		_, err := s.ParseName("my-secret~1")
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "without version specifier")
+		assert.Contains(t, err.Error(), "must not contain a version specifier")
 	})
 
 	t.Run("parse error - empty version ID", func(t *testing.T) {

@@ -193,7 +193,7 @@ func (s *ParamStrategy) ParseName(input string) (string, error) {
 	}
 
 	if spec.Absolute.Version != nil || spec.Shift > 0 {
-		return "", fmt.Errorf("stage diff requires a parameter name without version specifier")
+		return "", fmt.Errorf("parameter name must not contain a version specifier")
 	}
 
 	return spec.Name, nil

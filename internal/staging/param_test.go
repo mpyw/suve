@@ -278,7 +278,7 @@ func TestParamStrategy_ParseName(t *testing.T) {
 
 		_, err := s.ParseName("/app/param#5")
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "without version specifier")
+		assert.Contains(t, err.Error(), "must not contain a version specifier")
 	})
 
 	t.Run("name with shift", func(t *testing.T) {
@@ -286,7 +286,7 @@ func TestParamStrategy_ParseName(t *testing.T) {
 
 		_, err := s.ParseName("/app/param~1")
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "without version specifier")
+		assert.Contains(t, err.Error(), "must not contain a version specifier")
 	})
 
 	t.Run("name is valid even without slash prefix", func(t *testing.T) {
