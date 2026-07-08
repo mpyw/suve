@@ -142,6 +142,23 @@ func TestResolve_VersionThenShift(t *testing.T) {
 	assert.Equal(t, "1", ref.ID())
 }
 
+// TestResolve_HugeShiftDoesNotPanic guards #315: a shift that overflows int when
+// added to the base index must return an "out of range" error, not panic on a
+// negative slice index (baseIdx + MaxInt wraps negative).
+func TestResolve_HugeShiftDoesNotPanic(t *testing.T) {
+	t.Parallel()
+
+	store := param.New(&mockClient{
+		getHistory: func(_ *ssm.GetParameterHistoryInput) (*ssm.GetParameterHistoryOutput, error) {
+			return &ssm.GetParameterHistoryOutput{Parameters: historyOldestFirst()}, nil
+		},
+	})
+
+	_, err := store.Resolve(t.Context(), "/my/param", "#2~9223372036854775807")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "out of range")
+}
+
 func TestResolve_ShiftOutOfRange(t *testing.T) {
 	t.Parallel()
 

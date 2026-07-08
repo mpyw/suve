@@ -2,6 +2,7 @@ package version_test
 
 import (
 	"errors"
+	"math"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -211,6 +212,26 @@ func TestParse(t *testing.T) {
 		spec, err := version.Parse("/my/param~1~2", parser)
 		require.NoError(t, err)
 		assert.Equal(t, 3, spec.Shift) // ~1~2 = 3
+	})
+
+	t.Run("cumulative shift overflow is rejected", func(t *testing.T) {
+		t.Parallel()
+
+		// Previously total wrapped negative -> HasShift() false -> silently
+		// resolved to latest. It must now error instead (#315).
+		_, err := version.Parse("/my/param~9223372036854775807~9223372036854775807", parser)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "out of range")
+	})
+
+	t.Run("single max shift parses without overflow", func(t *testing.T) {
+		t.Parallel()
+
+		// A single MaxInt shift is representable; it is the resolver's bounds
+		// check (targetIdx < 0 || >= len) that rejects it, not the parser.
+		spec, err := version.Parse("/my/param~9223372036854775807", parser)
+		require.NoError(t, err)
+		assert.Equal(t, math.MaxInt, spec.Shift)
 	})
 
 	t.Run("ambiguous tilde", func(t *testing.T) {

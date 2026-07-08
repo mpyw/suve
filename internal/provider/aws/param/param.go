@@ -104,7 +104,7 @@ func (s *Store) Resolve(ctx context.Context, name, spec string) (provider.Versio
 	}
 
 	targetIdx := baseIdx + parsed.Shift
-	if targetIdx >= len(params) {
+	if targetIdx < 0 || targetIdx >= len(params) {
 		return provider.VersionRef{}, fmt.Errorf("version shift out of range: ~%d", parsed.Shift)
 	}
 
