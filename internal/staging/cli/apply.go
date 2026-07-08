@@ -48,22 +48,34 @@ type ApplyOptions struct {
 func (r *ApplyRunner) RunInteractive(ctx context.Context, opts ApplyOptions) error {
 	service := r.Parser.Service()
 
-	// Get entries to show what will be applied
+	// Get entries and staged tag changes to show what will be applied. Tag-only
+	// changes (a staged tag with no staged entry) are valid applies, so both
+	// must feed the has-changes check, name validation, and confirmation count.
 	entries, err := r.Store.ListEntries(ctx, service)
 	if err != nil {
 		return err
 	}
 
+	tags, err := r.Store.ListTags(ctx, service)
+	if err != nil {
+		return err
+	}
+
 	serviceEntries := entries[service]
-	if len(serviceEntries) == 0 {
+	serviceTags := tags[service]
+
+	if len(serviceEntries) == 0 && len(serviceTags) == 0 {
 		output.Info(r.Stdout, "No %s changes staged.", r.Parser.ServiceName())
 
 		return nil
 	}
 
-	// Validate the target name if specified
+	// Validate the target name if specified: staged as an entry OR a tag change.
 	if opts.Name != "" {
-		if _, ok := serviceEntries[opts.Name]; !ok {
+		_, entryStaged := serviceEntries[opts.Name]
+		_, tagStaged := serviceTags[opts.Name]
+
+		if !entryStaged && !tagStaged {
 			return fmt.Errorf("%s is not staged", opts.Name)
 		}
 	}
@@ -73,7 +85,8 @@ func (r *ApplyRunner) RunInteractive(ctx context.Context, opts ApplyOptions) err
 	if opts.Name != "" {
 		message = fmt.Sprintf("Apply staged changes for %s to AWS?", opts.Name)
 	} else {
-		message = fmt.Sprintf("Apply %d staged %s change(s) to AWS?", len(serviceEntries), r.Parser.ServiceName())
+		total := len(serviceEntries) + len(serviceTags)
+		message = fmt.Sprintf("Apply %d staged %s change(s) to AWS?", total, r.Parser.ServiceName())
 	}
 
 	confirmed, err := r.Confirmer.Confirm(message, r.SkipConfirm)
