@@ -6,6 +6,7 @@
     GetAWSIdentity,
     GetCurrentScope,
     InitialProvider,
+    InitialService,
     SelectScope,
     StagingStatus,
   } from '../wailsjs/go/gui/App';
@@ -114,6 +115,14 @@
         picked = uniqueActiveProvider(detected);
       }
 
+      // The launched service (from e.g. `suve azure param --gui`) selects the
+      // initial view. effectiveView clamps it to a service the provider actually
+      // offers, so an empty/unsupported value falls back to the default.
+      const launchedService = await withRetry(() => InitialService());
+      if (launchedService === 'param' || launchedService === 'secret') {
+        activeView = launchedService;
+      }
+
       if (picked) {
         await handleSelectProvider(picked);
       }
@@ -133,16 +142,26 @@
     return only ?? '';
   }
 
-  // buildSelection assembles the auto-apply candidate from the best prefill
-  // source (localStorage-cached scope, else the backend's env-derived scope).
+  // buildSelection assembles the auto-apply candidate for provider p.
+  //
+  // Launch wins, cache fills gaps: the launch-derived backend scope (from --gui
+  // flags + env, via GetCurrentScope) takes precedence PER FIELD, and the
+  // localStorage cache only supplies fields the launch left empty. This keeps
+  // `AZURE_APPCONFIG_NAMESPACE=dev` / `--namespace dev` (and --vault-name /
+  // --store-name / --project) authoritative over a stale cache, while a bare
+  // `suve --gui` (launch scope has only the provider) still restores the cached
+  // resource fields.
   function buildSelection(p: string): gui.ScopeSelection {
-    const src = readCachedScope(p) ?? (scope?.provider === p ? scope : null);
+    const cached = readCachedScope(p);
+    const launch = scope?.provider === p ? scope : null;
+    const pick = (field: keyof gui.ScopeSelection): string =>
+      (launch?.[field] || cached?.[field] || '') as string;
     return {
       provider: p,
-      projectId: p === 'googlecloud' ? (src?.projectId ?? '') : '',
-      vaultName: p === 'azure' ? (src?.vaultName ?? '') : '',
-      storeName: p === 'azure' ? (src?.storeName ?? '') : '',
-      namespace: p === 'azure' ? (src?.namespace ?? '') : '',
+      projectId: p === 'googlecloud' ? pick('projectId') : '',
+      vaultName: p === 'azure' ? pick('vaultName') : '',
+      storeName: p === 'azure' ? pick('storeName') : '',
+      namespace: p === 'azure' ? pick('namespace') : '',
     } as gui.ScopeSelection;
   }
 

@@ -22,6 +22,10 @@ export function InitialProvider() {
   return window['go']['gui']['App']['InitialProvider']();
 }
 
+export function InitialService() {
+  return window['go']['gui']['App']['InitialService']();
+}
+
 export function ParamAddTag(arg1, arg2, arg3) {
   return window['go']['gui']['App']['ParamAddTag'](arg1, arg2, arg3);
 }

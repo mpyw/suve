@@ -77,6 +77,13 @@ type App struct {
 	// via InitialProvider for the initial selection.
 	initialProvider provider.Provider
 
+	// initialService is the service the GUI was launched with ("param" or
+	// "secret"), captured from the subcommand carrying `--gui` (e.g.
+	// `suve azure param --gui`). Empty means no specific service (launched at the
+	// group level or bare). Surfaced to the frontend via InitialService so it can
+	// open the matching view.
+	initialService string
+
 	// scope is the current read/write provider scope, selected from the
 	// frontend via SelectScope. Guarded by scopeMu.
 	scope   provider.Scope
@@ -95,13 +102,15 @@ type App struct {
 	stagingStoreMu sync.Mutex // protects stagingStore + stagingStores
 }
 
-// NewApp creates a new App with the given initial launch scope. Empty resource
-// fields on the scope are hydrated from the ambient environment, so an explicit
-// selection (e.g. from a --project / --vault-name / --store-name flag) wins,
-// while an unset one still falls back to env.
-func NewApp(initial provider.Scope) *App {
+// NewApp creates a new App with the given initial launch scope and service.
+// Empty resource fields on the scope are hydrated from the ambient environment,
+// so an explicit selection (e.g. from a --project / --vault-name / --store-name
+// flag) wins, while an unset one still falls back to env. service is the launch
+// service ("param"/"secret", or "" for none) surfaced via InitialService.
+func NewApp(initial provider.Scope, service string) *App {
 	return &App{
 		initialProvider: initial.Provider,
+		initialService:  service,
 		scope:           hydrateScope(initial),
 	}
 }
@@ -142,6 +151,13 @@ func hydrateScope(s provider.Scope) provider.Scope {
 // explicit `--gui` provider was chosen), so the frontend can pre-select it.
 func (a *App) InitialProvider() string {
 	return string(a.initialProvider)
+}
+
+// InitialService returns the service the GUI was launched with ("param" or
+// "secret"), or "" when no specific service was chosen (group-level or bare
+// `--gui`), so the frontend can open the matching view.
+func (a *App) InitialService() string {
+	return a.initialService
 }
 
 // Startup is called when the app starts.
