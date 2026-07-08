@@ -195,27 +195,33 @@ func colorDiff(diff string) string {
 	}
 
 	lines := strings.Split(diff, "\n")
+	colored := make([]string, len(lines))
 
-	var result strings.Builder
+	// The ---/+++ file labels appear only before the first @@ hunk; once inside
+	// a hunk, a removed/added line whose content starts with --/++ must be
+	// colored as removed/added, not misclassified as a header (#339).
+	inHunk := false
 
-	for _, line := range lines {
+	for i, line := range lines {
 		switch {
-		case strings.HasPrefix(line, "---") || strings.HasPrefix(line, "+++"):
-			result.WriteString(colors.DiffHeader(line))
-		case strings.HasPrefix(line, "-"):
-			result.WriteString(colors.DiffRemoved(line))
-		case strings.HasPrefix(line, "+"):
-			result.WriteString(colors.DiffAdded(line))
+		case !inHunk && (strings.HasPrefix(line, "---") || strings.HasPrefix(line, "+++")):
+			colored[i] = colors.DiffHeader(line)
 		case strings.HasPrefix(line, "@@"):
-			result.WriteString(colors.DiffHunk(line))
+			inHunk = true
+			colored[i] = colors.DiffHunk(line)
+		case strings.HasPrefix(line, "-"):
+			colored[i] = colors.DiffRemoved(line)
+		case strings.HasPrefix(line, "+"):
+			colored[i] = colors.DiffAdded(line)
 		default:
-			result.WriteString(line)
+			colored[i] = line
 		}
-
-		result.WriteString("\n")
 	}
 
-	return result.String()
+	// Join rather than append "\n" per element: strings.Split yields a trailing
+	// empty element for a "\n"-terminated diff, so appending per element added a
+	// spurious extra newline vs DiffRaw (#338).
+	return strings.Join(colored, "\n")
 }
 
 // Print writes a message to the writer without a newline.
