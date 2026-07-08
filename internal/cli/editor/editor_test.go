@@ -38,6 +38,34 @@ printf '%s-modified' "$content" > "$1"
 	assert.Equal(t, "original-modified", result)
 }
 
+func TestOpen_EditorPathWithSpaces(t *testing.T) {
+	if runtime.GOOS == goosWindows {
+		t.Skip("Skipping on Windows - requires Unix shell")
+	}
+
+	// Place the editor script inside a directory whose name contains a space,
+	// mimicking paths like "/Applications/Visual Studio Code.app/.../code".
+	tmpDir := t.TempDir()
+	spacedDir := filepath.Join(tmpDir, "dir with space")
+	require.NoError(t, os.MkdirAll(spacedDir, 0o750))
+
+	scriptPath := filepath.Join(spacedDir, "test editor.sh")
+	script := `#!/bin/sh
+content=$(cat "$1")
+printf '%s-spaced' "$content" > "$1"
+`
+	//nolint:gosec // G306: executable permission required for test shell script
+	require.NoError(t, os.WriteFile(scriptPath, []byte(script), 0o755))
+
+	// $EDITOR is quoted so the shell treats the space-containing path as one word.
+	t.Setenv("EDITOR", `"`+scriptPath+`"`)
+	t.Setenv("VISUAL", "")
+
+	result, err := editor.Open(t.Context(), "original")
+	require.NoError(t, err)
+	assert.Equal(t, "original-spaced", result)
+}
+
 func TestOpen_ReturnsUnmodifiedContent(t *testing.T) {
 	if runtime.GOOS == goosWindows {
 		t.Skip("Skipping on Windows - requires Unix shell")
