@@ -347,3 +347,53 @@ func TestResourceNotFoundError(t *testing.T) {
 		assert.ErrorIs(t, err, staging.ErrNotStaged)
 	})
 }
+
+func TestCompositeEntryKey(t *testing.T) {
+	t.Parallel()
+
+	// The null/default namespace collapses to the bare name, so every non-App-
+	// Config provider's keys and on-disk format are unchanged.
+	assert.Equal(t, "/app/config", staging.CompositeEntryKey("/app/config", ""))
+
+	// A named namespace is folded in with the NUL separator (which cannot appear
+	// in an App Configuration key or label, so it is collision-proof).
+	assert.Equal(t, "dev\x00/app/config", staging.CompositeEntryKey("/app/config", "dev"))
+}
+
+func TestSplitEntryKey(t *testing.T) {
+	t.Parallel()
+
+	for name, tc := range map[string]struct {
+		key           string
+		wantName      string
+		wantNamespace string
+	}{
+		"bare name is the null namespace":  {key: "/app/config", wantName: "/app/config", wantNamespace: ""},
+		"namespaced key splits into parts": {key: "dev\x00/app/config", wantName: "/app/config", wantNamespace: "dev"},
+		"empty key":                        {key: "", wantName: "", wantNamespace: ""},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			gotName, gotNamespace := staging.SplitEntryKey(tc.key)
+			assert.Equal(t, tc.wantName, gotName)
+			assert.Equal(t, tc.wantNamespace, gotNamespace)
+		})
+	}
+}
+
+func TestCompositeEntryKey_RoundTrip(t *testing.T) {
+	t.Parallel()
+
+	// A key or namespace may contain the reserved filter characters (* , \) and
+	// even '/'; only NUL is excluded, so the round-trip is lossless.
+	for _, tc := range []struct{ name, namespace string }{
+		{name: "/a/b", namespace: ""},
+		{name: "Logging:LogLevel", namespace: "dev"},
+		{name: "a,b*c\\d", namespace: "ns/with/slashes"},
+	} {
+		gotName, gotNamespace := staging.SplitEntryKey(staging.CompositeEntryKey(tc.name, tc.namespace))
+		assert.Equal(t, tc.name, gotName)
+		assert.Equal(t, tc.namespace, gotNamespace)
+	}
+}
