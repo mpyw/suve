@@ -245,3 +245,159 @@ func TestAzureAppConfigStage_Namespaces(t *testing.T) {
 		assert.Equal(t, "dev-value", stdout)
 	})
 }
+
+// TestAzureStageGlobal_KeyVaultOnly exercises the provider-wide `suve azure stage`
+// global commands (status/diff/apply) when ONLY Key Vault is connected: App
+// Configuration is not configured (no AZURE_APPCONFIG_NAME), so the global
+// commands must SKIP it rather than error — an unconfigured service can hold no
+// staged state (#435).
+func TestAzureStageGlobal_KeyVaultOnly(t *testing.T) {
+	setupAzureKeyVault(t)
+	setupTempHome(t)
+
+	// Guarantee App Configuration is unconfigured regardless of ambient env.
+	t.Setenv("AZURE_APPCONFIG_NAME", "")
+
+	const name = "suve-e2e-az-global-kv-only"
+
+	cleanup := func() { _, _ = runAzureSecret(t, "delete", "--yes", name) }
+	cleanup()
+	t.Cleanup(cleanup)
+
+	store, err := file.NewStore(provider.AzureKeyVaultScope("suve-e2e"))
+	require.NoError(t, err)
+	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceSecret, name, staging.Entry{
+		Operation: staging.OperationCreate, Value: lo.ToPtr("kv-only-value"), StagedAt: time.Now(),
+	}))
+
+	t.Run("status", func(t *testing.T) {
+		stdout, err := runAzureStage(t, "status")
+		require.NoError(t, err)
+		assert.Contains(t, stdout, "Key Vault")
+		assert.Contains(t, stdout, name)
+		// App Configuration is skipped, not reported.
+		assert.NotContains(t, stdout, "App Configuration")
+	})
+
+	t.Run("diff", func(t *testing.T) {
+		stdout, err := runAzureStage(t, "diff")
+		require.NoError(t, err)
+		assert.Contains(t, stdout, "+kv-only-value")
+	})
+
+	t.Run("apply", func(t *testing.T) {
+		stdout, err := runAzureStage(t, "apply", "--yes")
+		require.NoError(t, err)
+		assert.Contains(t, stdout, name)
+
+		got, err := runAzureSecret(t, "show", "--raw", name)
+		require.NoError(t, err)
+		assert.Equal(t, "kv-only-value", got)
+	})
+}
+
+// TestAzureStageGlobal_AppConfigOnly is the mirror of the Key Vault-only case:
+// only App Configuration is connected, so the global commands must SKIP Key
+// Vault (no AZURE_KEYVAULT_NAME) rather than error.
+func TestAzureStageGlobal_AppConfigOnly(t *testing.T) {
+	setupAzureAppConfig(t)
+	setupTempHome(t)
+
+	// Guarantee Key Vault is unconfigured regardless of ambient env.
+	t.Setenv("AZURE_KEYVAULT_NAME", "")
+
+	const name = "suve/e2e/az/global/ac-only"
+
+	cleanup := func() { _, _ = runAzureParam(t, "delete", "--yes", name) }
+	cleanup()
+	t.Cleanup(cleanup)
+
+	store, err := file.NewStore(provider.AzureAppConfigScope("suve-e2e"))
+	require.NoError(t, err)
+	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, name, staging.Entry{
+		Operation: staging.OperationCreate, Value: lo.ToPtr("ac-only-value"), StagedAt: time.Now(),
+	}))
+
+	t.Run("status", func(t *testing.T) {
+		stdout, err := runAzureStage(t, "status")
+		require.NoError(t, err)
+		assert.Contains(t, stdout, "App Configuration")
+		assert.Contains(t, stdout, name)
+		// Key Vault is skipped, not reported.
+		assert.NotContains(t, stdout, "Key Vault")
+	})
+
+	t.Run("diff", func(t *testing.T) {
+		stdout, err := runAzureStage(t, "diff")
+		require.NoError(t, err)
+		assert.Contains(t, stdout, "+ac-only-value")
+	})
+
+	t.Run("apply", func(t *testing.T) {
+		stdout, err := runAzureStage(t, "apply", "--yes")
+		require.NoError(t, err)
+		assert.Contains(t, stdout, name)
+
+		got, err := runAzureParam(t, "show", "--raw", name)
+		require.NoError(t, err)
+		assert.Equal(t, "ac-only-value", got)
+	})
+}
+
+// TestAzureStageGlobal_BothConnected exercises the global commands when BOTH Key
+// Vault and App Configuration are connected: a single `suve azure stage status`/
+// `apply` spans both services. It is skipped unless both emulator endpoints are
+// set (the single-service e2e make targets run one emulator at a time).
+func TestAzureStageGlobal_BothConnected(t *testing.T) {
+	setupAzureKeyVault(t)
+	setupAzureAppConfig(t)
+	setupTempHome(t)
+
+	const (
+		kvName = "suve-e2e-az-global-both-secret"
+		acName = "suve/e2e/az/global/both-param"
+	)
+
+	cleanup := func() {
+		_, _ = runAzureSecret(t, "delete", "--yes", kvName)
+		_, _ = runAzureParam(t, "delete", "--yes", acName)
+	}
+	cleanup()
+	t.Cleanup(cleanup)
+
+	kvStore, err := file.NewStore(provider.AzureKeyVaultScope("suve-e2e"))
+	require.NoError(t, err)
+	require.NoError(t, kvStore.StageEntry(t.Context(), staging.ServiceSecret, kvName, staging.Entry{
+		Operation: staging.OperationCreate, Value: lo.ToPtr("both-secret-value"), StagedAt: time.Now(),
+	}))
+
+	acStore, err := file.NewStore(provider.AzureAppConfigScope("suve-e2e"))
+	require.NoError(t, err)
+	require.NoError(t, acStore.StageEntry(t.Context(), staging.ServiceParam, acName, staging.Entry{
+		Operation: staging.OperationCreate, Value: lo.ToPtr("both-param-value"), StagedAt: time.Now(),
+	}))
+
+	t.Run("status-spans-both", func(t *testing.T) {
+		stdout, err := runAzureStage(t, "status")
+		require.NoError(t, err)
+		assert.Contains(t, stdout, "Key Vault")
+		assert.Contains(t, stdout, kvName)
+		assert.Contains(t, stdout, "App Configuration")
+		assert.Contains(t, stdout, acName)
+	})
+
+	t.Run("apply-spans-both", func(t *testing.T) {
+		stdout, err := runAzureStage(t, "apply", "--yes")
+		require.NoError(t, err)
+		assert.Contains(t, stdout, kvName)
+		assert.Contains(t, stdout, acName)
+
+		gotSecret, err := runAzureSecret(t, "show", "--raw", kvName)
+		require.NoError(t, err)
+		assert.Equal(t, "both-secret-value", gotSecret)
+
+		gotParam, err := runAzureParam(t, "show", "--raw", acName)
+		require.NoError(t, err)
+		assert.Equal(t, "both-param-value", gotParam)
+	})
+}

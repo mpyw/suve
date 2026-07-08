@@ -100,7 +100,7 @@ SUVE_AZURE_APPCONFIG_PORT="$port" docker compose --profile azure up -d azure-app
 echo "Waiting for the Azure App Configuration emulator on port $port..."
 until bash -c "echo > /dev/tcp/127.0.0.1/$port" 2>/dev/null; do sleep 1; done
 echo "emulator is ready"
-SUVE_AZURE_APPCONFIG_CONNECTION_STRING="Endpoint=http://127.0.0.1:$port;Id=abcd;Secret=c2VjcmV0" go test -tags=e2e -v -run TestAzureAppConfig ./e2e/...
+SUVE_AZURE_APPCONFIG_CONNECTION_STRING="Endpoint=http://127.0.0.1:$port;Id=abcd;Secret=c2VjcmV0" go test -tags=e2e -v -run 'TestAzureAppConfig|TestAzureStageGlobal' ./e2e/...
 '''
 
 [tasks.e2e-azure-keyvault]
@@ -111,7 +111,7 @@ SUVE_AZURE_KEYVAULT_PORT="$port" docker compose --profile azure up -d azure-keyv
 echo "Waiting for the Key Vault emulator on port $port..."
 until curl -sk -o /dev/null "https://127.0.0.1:$port/ping" 2>/dev/null; do sleep 1; done
 echo "emulator is ready"
-SUVE_AZURE_KEYVAULT_ENDPOINT="https://127.0.0.1:$port" go test -tags=e2e -v -run TestAzureKeyVault ./e2e/...
+SUVE_AZURE_KEYVAULT_ENDPOINT="https://127.0.0.1:$port" go test -tags=e2e -v -run 'TestAzureKeyVault|TestAzureStageGlobal' ./e2e/...
 '''
 
 [tasks.clean]

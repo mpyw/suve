@@ -6,6 +6,10 @@ import (
 	"github.com/urfave/cli/v3"
 
 	cliinternal "github.com/mpyw/suve/internal/cli/commands/internal"
+	"github.com/mpyw/suve/internal/cli/commands/stage/apply"
+	"github.com/mpyw/suve/internal/cli/commands/stage/diff"
+	"github.com/mpyw/suve/internal/cli/commands/stage/reset"
+	"github.com/mpyw/suve/internal/cli/commands/stage/status"
 	"github.com/mpyw/suve/internal/staging"
 	stgcli "github.com/mpyw/suve/internal/staging/cli"
 )
@@ -145,21 +149,72 @@ separate staging state:
   - "suve azure stage param"  stages App Configuration settings (unversioned,
     last-write-wins; tags are writable via GET-merge-PUT).
 
+Global commands span both services. A service is included only when it is
+configured (its resource is named); otherwise it is skipped — an unconfigured
+resource can hold no staged state. Set the resource with --store-name /
+--vault-name (or the AZURE_APPCONFIG_NAME / AZURE_KEYVAULT_NAME environment
+variables):
+   status    Show all staged changes (Key Vault and App Configuration)
+   diff      Show diff of all staged changes vs Azure
+   apply     Apply all staged changes to Azure
+   reset     Unstage all changes
+
 EXAMPLES:
    suve azure stage secret add my-secret     Stage a new Key Vault secret
    suve azure stage secret apply             Apply staged Key Vault changes
    suve azure stage param edit my-setting    Edit and stage an App Config setting
-   suve azure stage param apply              Apply staged App Config changes`
+   suve azure stage param apply              Apply staged App Config changes
+   suve azure stage status                   View all staged changes
+   suve azure stage apply                    Apply all staged changes`
+
+// stageGlobalFlags are the resource-name flags the top-level global commands
+// need so each service's scope resolver can key its staging state. They mirror
+// the per-subgroup flags; the parent Before injects both into the context.
+func stageGlobalFlags() []cli.Flag {
+	return []cli.Flag{
+		&cli.StringFlag{
+			Name:    "store-name",
+			Usage:   "Azure App Configuration store name (defaults to $AZURE_APPCONFIG_NAME)",
+			Sources: cli.EnvVars("AZURE_APPCONFIG_NAME"),
+		},
+		&cli.StringFlag{
+			Name:    "vault-name",
+			Usage:   "Azure Key Vault name (defaults to $AZURE_KEYVAULT_NAME)",
+			Sources: cli.EnvVars("AZURE_KEYVAULT_NAME"),
+		},
+	}
+}
 
 // StageCommand returns the "azure stage" command with the secret (Key Vault) and
-// param (App Configuration) staging subgroups.
+// param (App Configuration) staging subgroups plus the provider-wide global
+// commands (status / diff / apply / reset) spanning both services.
 func StageCommand() *cli.Command {
+	gcfg := stgcli.AzureGlobalConfig(appConfigStageConfig(), keyVaultStageConfig())
+
 	return &cli.Command{
-		Name:            "stage",
-		Aliases:         []string{"stg"},
-		Usage:           "Manage staged changes for Azure Key Vault and App Configuration",
-		Description:     stageDescription,
-		Commands:        []*cli.Command{keyVaultStageGroup(), appConfigStageGroup()},
+		Name:        "stage",
+		Aliases:     []string{"stg"},
+		Usage:       "Manage staged changes for Azure Key Vault and App Configuration",
+		Description: stageDescription,
+		Flags:       stageGlobalFlags(),
+		Before: func(ctx context.Context, cmd *cli.Command) (context.Context, error) {
+			// Inject both resource names so the global commands' per-service scope
+			// resolvers can key state. The per-service subgroups own the same flags
+			// and re-inject in their own Before, so subgroup invocations are
+			// unaffected.
+			ctx = cliinternal.WithAzureStoreName(ctx, cmd.String("store-name"))
+			ctx = cliinternal.WithAzureVaultName(ctx, cmd.String("vault-name"))
+
+			return ctx, nil
+		},
+		Commands: []*cli.Command{
+			keyVaultStageGroup(),
+			appConfigStageGroup(),
+			status.Command(gcfg),
+			diff.Command(gcfg),
+			apply.Command(gcfg),
+			reset.Command(gcfg),
+		},
 		CommandNotFound: cliinternal.CommandNotFound,
 	}
 }
