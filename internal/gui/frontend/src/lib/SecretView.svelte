@@ -30,6 +30,12 @@
   const forceDeleteEnabled = $derived(capability?.hasForceDelete ?? true);
   const recoveryWindowEnabled = $derived(capability?.hasRecoveryWindow ?? true);
 
+  // Version.Label is overloaded per provider: AWS Secrets Manager carries genuine
+  // staging labels (AWSCURRENT/AWSPENDING/...), while Google Cloud and Azure Key
+  // Vault carry the per-version state (enabled/disabled/destroyed). Only AWS has
+  // staging labels, so label the heading accordingly.
+  const versionMetaLabel = $derived(provider === 'aws' ? 'Labels' : 'State');
+
   const PAGE_SIZE = 50;
   const debounce = createDebouncer(300);
   const diffMode = createDiffMode<string>();
@@ -548,7 +554,7 @@
               </div>
               {#if (secretDetail.versionStage || []).length > 0}
                 <div class="meta-item">
-                  <span class="meta-label">Labels</span>
+                  <span class="meta-label">{versionMetaLabel}</span>
                   <span class="meta-value">
                     {#each secretDetail.versionStage || [] as stage}
                       <span class="badge badge-stage">{stage}</span>
