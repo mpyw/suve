@@ -5,6 +5,7 @@
 package jsonutil
 
 import (
+	"bytes"
 	"encoding/json"
 	"io"
 
@@ -14,19 +15,30 @@ import (
 // TryFormat attempts to format a JSON string with indentation.
 // Returns the formatted string and true if successful, or the original string and false if not valid JSON.
 // This is useful for commands that need to know whether formatting was applied.
+//
+// HTML escaping is disabled so that characters like &, <, > survive verbatim
+// instead of being mangled into &, <, > — secret/parameter values
+// are not HTML and are never rendered in a browser context.
 func TryFormat(value string) (string, bool) {
 	var data any
 	if err := json.Unmarshal([]byte(value), &data); err != nil {
 		return value, false
 	}
 
-	formatted, err := json.MarshalIndent(data, "", "  ")
-	if err != nil {
+	var buf bytes.Buffer
+
+	enc := json.NewEncoder(&buf)
+	enc.SetEscapeHTML(false)
+	enc.SetIndent("", "  ")
+
+	if err := enc.Encode(data); err != nil {
 		// This should not happen if Unmarshal succeeded, but handle it gracefully
 		return value, false
 	}
 
-	return string(formatted), true
+	// json.Encoder.Encode appends a trailing newline; strip it to match the
+	// previous json.MarshalIndent behavior.
+	return string(bytes.TrimRight(buf.Bytes(), "\n")), true
 }
 
 // TryFormatOrWarn formats JSON or warns and returns original.

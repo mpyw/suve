@@ -42,6 +42,12 @@ func TestTryFormat(t *testing.T) {
 			wantStr:  "[\n  1,\n  2,\n  3\n]",
 			wantBool: true,
 		},
+		{
+			name:     "does not HTML-escape ampersand, angle brackets",
+			input:    `{"url":"https://x.com/?a=1&b=<2>"}`,
+			wantStr:  "{\n  \"url\": \"https://x.com/?a=1&b=<2>\"\n}",
+			wantBool: true,
+		},
 	}
 
 	for _, tt := range tests {
