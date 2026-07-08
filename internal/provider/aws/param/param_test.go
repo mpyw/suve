@@ -431,3 +431,57 @@ func TestGet_NotFoundMapsSentinel(t *testing.T) {
 	require.Error(t, err)
 	assert.ErrorIs(t, err, provider.ErrNotFound)
 }
+
+// paginatedHistoryClient returns history across two pages: page 1 (versions 1,2)
+// with a NextToken, page 2 (version 3) without. Exercises the NextToken loop.
+func paginatedHistoryClient() *mockClient {
+	base := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
+
+	return &mockClient{
+		getHistory: func(in *ssm.GetParameterHistoryInput) (*ssm.GetParameterHistoryOutput, error) {
+			if aws.ToString(in.NextToken) == "" {
+				return &ssm.GetParameterHistoryOutput{
+					Parameters: []types.ParameterHistory{
+						{Name: aws.String("/my/param"), Version: 1, LastModifiedDate: aws.Time(base)},
+						{Name: aws.String("/my/param"), Version: 2, LastModifiedDate: aws.Time(base.Add(time.Hour))},
+					},
+					NextToken: aws.String("tok"),
+				}, nil
+			}
+
+			return &ssm.GetParameterHistoryOutput{
+				Parameters: []types.ParameterHistory{
+					{Name: aws.String("/my/param"), Version: 3, LastModifiedDate: aws.Time(base.Add(2 * time.Hour))},
+				},
+			}, nil
+		},
+	}
+}
+
+// TestHistory_Paginated guards #311: History must page through NextToken so the
+// newest version (on a later page) is not lost.
+func TestHistory_Paginated(t *testing.T) {
+	t.Parallel()
+
+	versions, err := param.New(paginatedHistoryClient()).History(t.Context(), "/my/param")
+	require.NoError(t, err)
+	require.Len(t, versions, 3)
+	assert.Equal(t, "3", versions[0].ID) // newest first, across pages
+	assert.Equal(t, "1", versions[2].ID)
+}
+
+// TestResolve_ShiftAcrossPages guards #311: ~N must anchor at the true latest
+// (last page), not at page 1's last entry.
+func TestResolve_ShiftAcrossPages(t *testing.T) {
+	t.Parallel()
+
+	// ~1 from the true latest (v3, on page 2) => v2.
+	ref, err := param.New(paginatedHistoryClient()).Resolve(t.Context(), "/my/param", "~1")
+	require.NoError(t, err)
+	assert.Equal(t, "2", ref.ID())
+
+	// #3 exists only on page 2; #3~2 => v1.
+	ref, err = param.New(paginatedHistoryClient()).Resolve(t.Context(), "/my/param", "#3~2")
+	require.NoError(t, err)
+	assert.Equal(t, "1", ref.ID())
+}
