@@ -532,8 +532,7 @@
         <span class="dropdown-arrow">▾</span>
       </button>
       {#if showStashDropdown}
-        <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-        <div class="dropdown-backdrop" onclick={() => showStashDropdown = false}></div>
+        <button type="button" class="dropdown-backdrop" aria-label="Dismiss menu" onclick={() => showStashDropdown = false}></button>
         <div class="dropdown-menu">
           <button
             class="dropdown-item"
@@ -1064,6 +1063,11 @@
     right: 0;
     bottom: 0;
     z-index: 99;
+    background: transparent;
+    border: none;
+    padding: 0;
+    margin: 0;
+    cursor: default;
   }
 
   .dropdown-menu {

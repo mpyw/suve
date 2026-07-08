@@ -29,8 +29,9 @@ func launchGUI(ctx context.Context, initial provider.Scope) (context.Context, er
 
 // guiScope builds the initial GUI launch scope for provider p from the flags
 // present on the launching command: --project (Google Cloud), --vault-name /
-// --store-name (Azure). Absent flags stay empty and are hydrated from the
-// environment inside the GUI. AWS carries no scope flag (region from config).
+// --store-name / --namespace (Azure). Absent flags stay empty and are hydrated
+// from the environment inside the GUI (flag wins over env). AWS carries no scope
+// flag (region from config).
 func guiScope(cmd *cli.Command, p provider.Provider) provider.Scope {
 	s := provider.Scope{Provider: p}
 
@@ -40,6 +41,11 @@ func guiScope(cmd *cli.Command, p provider.Provider) provider.Scope {
 	case provider.ProviderAzure:
 		s.VaultName = cmd.String("vault-name")
 		s.StoreName = cmd.String("store-name")
+		// --namespace (App Configuration; Azure calls it a label) is carried into
+		// the launch scope too, so `suve azure param --namespace dev --gui` opens
+		// on that namespace. Empty falls back to AZURE_APPCONFIG_NAMESPACE in
+		// hydrateScope (#425 follow-up).
+		s.AppConfigNamespace = cmd.String("namespace")
 	case provider.ProviderAWS:
 		// region comes from the ambient AWS config; no scope flag.
 	}
