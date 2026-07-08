@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"os"
 	"strings"
 
 	"github.com/urfave/cli/v3"
@@ -112,7 +111,7 @@ func runAction(ctx context.Context, cmd *cli.Command, cfg stgcli.GlobalConfig) e
 
 	// Confirm apply.
 	prompter := &confirm.Prompter{
-		Stdin:  os.Stdin,
+		Stdin:  cmd.Root().Reader,
 		Stdout: cmd.Root().Writer,
 		Stderr: cmd.Root().ErrWriter,
 		Target: resolved.Target,

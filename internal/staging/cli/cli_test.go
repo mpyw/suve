@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"testing"
 	"time"
 
@@ -12,6 +13,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/mpyw/suve/internal/cli/confirm"
 	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/staging"
 	"github.com/mpyw/suve/internal/staging/cli"
@@ -1985,6 +1987,78 @@ func TestApplyRunner_RunInteractive_TagOnly(t *testing.T) {
 
 		assert.False(t, conf.called, "empty store must short-circuit before confirmation")
 		assert.Contains(t, stdout.String(), "No param changes staged")
+	})
+}
+
+// TestApplyRunner_RunInteractive_ReadsPrompterStdin verifies that the
+// interactive apply flow reads its yes/no confirmation from the Prompter's
+// Stdin reader (which the command wires to cmd.Root().Reader, #332) rather than
+// from the process's os.Stdin. It feeds a bytes reader as Prompter.Stdin and
+// asserts that declining aborts the apply and confirming performs it.
+func TestApplyRunner_RunInteractive_ReadsPrompterStdin(t *testing.T) {
+	t.Parallel()
+
+	newRunner := func(store *testutil.MockStore, stdin io.Reader, out, errOut *bytes.Buffer) *cli.ApplyRunner {
+		return &cli.ApplyRunner{
+			UseCase: &stagingusecase.ApplyUseCase{
+				Strategy: &fullMockStrategy{service: staging.ServiceParam},
+				Store:    store,
+			},
+			Store:  store,
+			Parser: &fullMockStrategy{service: staging.ServiceParam},
+			Confirmer: &confirm.Prompter{
+				Stdin:  stdin,
+				Stdout: out,
+				Stderr: errOut,
+			},
+			SkipConfirm: false,
+			Stdout:      out,
+			Stderr:      errOut,
+		}
+	}
+
+	t.Run("declines when reader says no", func(t *testing.T) {
+		t.Parallel()
+
+		store := testutil.NewMockStore()
+		_ = store.StageTag(t.Context(), staging.ServiceParam, "/app/config", staging.TagEntry{
+			Add:      map[string]string{"env": "prod"},
+			StagedAt: time.Now(),
+		})
+
+		var stdout, stderr bytes.Buffer
+
+		err := newRunner(store, bytes.NewBufferString("n\n"), &stdout, &stderr).
+			RunInteractive(t.Context(), cli.ApplyOptions{})
+		require.NoError(t, err)
+
+		// Declined: no apply happened, so the tag remains staged.
+		assert.NotContains(t, stdout.String(), "Tagged")
+
+		_, err = store.GetTag(t.Context(), staging.ServiceParam, "/app/config")
+		require.NoError(t, err)
+	})
+
+	t.Run("applies when reader says yes", func(t *testing.T) {
+		t.Parallel()
+
+		store := testutil.NewMockStore()
+		_ = store.StageTag(t.Context(), staging.ServiceParam, "/app/config", staging.TagEntry{
+			Add:      map[string]string{"env": "prod"},
+			StagedAt: time.Now(),
+		})
+
+		var stdout, stderr bytes.Buffer
+
+		err := newRunner(store, bytes.NewBufferString("y\n"), &stdout, &stderr).
+			RunInteractive(t.Context(), cli.ApplyOptions{})
+		require.NoError(t, err)
+
+		// Confirmed: apply happened and the tag was unstaged.
+		assert.Contains(t, stdout.String(), "Tagged")
+
+		_, err = store.GetTag(t.Context(), staging.ServiceParam, "/app/config")
+		assert.Equal(t, staging.ErrNotStaged, err)
 	})
 }
 
