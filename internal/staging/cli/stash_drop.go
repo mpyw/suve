@@ -16,6 +16,28 @@ import (
 	"github.com/mpyw/suve/internal/staging/store/file"
 )
 
+// errStashDropNeedsYes is returned when `stash drop` runs without --yes in a
+// non-interactive context. Dropping the stash is destructive, so it requires an
+// explicit opt-in rather than proceeding unconfirmed (as it silently did).
+var errStashDropNeedsYes = errors.New(
+	"refusing to drop the stash without confirmation in a non-interactive context; re-run with --yes",
+)
+
+// requireStashDropConfirmation enforces the --yes opt-in when we cannot prompt.
+// Dropping the stash is destructive; without --yes and without a TTY to prompt
+// on (errW), it returns errStashDropNeedsYes instead of proceeding unconfirmed.
+func requireStashDropConfirmation(skipConfirm bool, errW io.Writer) error {
+	if skipConfirm {
+		return nil
+	}
+
+	if !terminal.IsTerminalWriter(errW) {
+		return errStashDropNeedsYes
+	}
+
+	return nil
+}
+
 // GlobalDropRunner executes global stash drop (delete entire file).
 type GlobalDropRunner struct {
 	FileStore *file.Store
@@ -134,9 +156,15 @@ func globalStashDropAction(resolver staging.ScopeResolver) func(context.Context,
 			return errors.New("no stashed changes to drop")
 		}
 
-		// Confirm unless --yes
+		// Confirm unless --yes. In a non-interactive context (no TTY) we cannot
+		// prompt, so require the explicit --yes opt-in rather than dropping
+		// silently.
 		skipConfirm := cmd.Bool(flagYes)
-		if !skipConfirm && terminal.IsTerminalWriter(cmd.Root().ErrWriter) {
+		if err := requireStashDropConfirmation(skipConfirm, cmd.Root().ErrWriter); err != nil {
+			return err
+		}
+
+		if !skipConfirm {
 			// Check if encrypted to decide confirmation message
 			isEncrypted, err := fileStore.IsEncrypted()
 			if err != nil {
@@ -202,9 +230,15 @@ func serviceStashDropAction(service staging.Service, resolver staging.ScopeResol
 			return err
 		}
 
-		// Confirm unless --yes
+		// Confirm unless --yes. In a non-interactive context (no TTY) we cannot
+		// prompt, so require the explicit --yes opt-in rather than dropping
+		// silently.
 		skipConfirm := cmd.Bool(flagYes)
-		if !skipConfirm && terminal.IsTerminalWriter(cmd.Root().ErrWriter) {
+		if err := requireStashDropConfirmation(skipConfirm, cmd.Root().ErrWriter); err != nil {
+			return err
+		}
+
+		if !skipConfirm {
 			// Count items for the message
 			state, err := fileStore.Drain(ctx, "", true)
 			if err != nil {
