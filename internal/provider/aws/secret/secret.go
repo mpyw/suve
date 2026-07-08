@@ -206,16 +206,26 @@ func baseIndex(list []types.SecretVersionsListEntry, abs secretversion.AbsoluteS
 
 // sortNewestFirst sorts version entries by creation date, newest first.
 func sortNewestFirst(list []types.SecretVersionsListEntry) {
-	sort.Slice(list, func(i, j int) bool {
-		if list[i].CreatedDate == nil {
+	// Newest CreatedDate first, with a deterministic version-id tie-break.
+	// CreatedDate has millisecond resolution and the API returns versions
+	// unordered, so equal timestamps (e.g. a batched apply) would otherwise sort
+	// randomly under the old non-stable sort.Slice — making ~N and log ordering
+	// non-deterministic.
+	sort.SliceStable(list, func(i, j int) bool {
+		ci, cj := list[i].CreatedDate, list[j].CreatedDate
+
+		switch {
+		case ci == nil && cj == nil:
+			return aws.ToString(list[i].VersionId) > aws.ToString(list[j].VersionId)
+		case ci == nil:
 			return false
-		}
-
-		if list[j].CreatedDate == nil {
+		case cj == nil:
 			return true
+		case ci.Equal(*cj):
+			return aws.ToString(list[i].VersionId) > aws.ToString(list[j].VersionId)
+		default:
+			return ci.After(*cj)
 		}
-
-		return list[i].CreatedDate.After(*list[j].CreatedDate)
 	})
 }
 

@@ -139,31 +139,29 @@ func TestResolve_ShiftListError(t *testing.T) {
 	require.ErrorIs(t, err, provider.ErrNotFound)
 }
 
-// TestResolve_OrderingEqualTimestamps documents the emulator-relevant behavior:
-// Key Vault Created timestamps are second-granular, so two versions written in
-// the same second are indistinguishable by time. The sort is STABLE, so it
-// preserves the input (server) order — newest-first sort keeps the first input
-// element at index 0. This is why a fast create+update in e2e needs a delay.
+// TestResolve_OrderingEqualTimestamps documents the #314 fix: Key Vault Created
+// timestamps are second-granular and the list-versions API returns versions
+// unordered, so two versions written in the same second are indistinguishable
+// by time. A deterministic version-id tie-break (descending) is applied, so the
+// ~N result no longer depends on the arbitrary API/input order.
 func TestResolve_OrderingEqualTimestamps(t *testing.T) {
 	t.Parallel()
 
 	same := at(5, 20)
-	m := &mockClient{
-		listVersFunc: versionsFixture(
-			verPair{"first", same},
-			verPair{"second", same},
-		),
+
+	// Both input orders must yield the same result: with the id-desc tie-break
+	// "second" > "first", so "second" is newest (index 0) and ~1 is "first".
+	for _, order := range [][]verPair{
+		{{"first", same}, {"second", same}},
+		{{"second", same}, {"first", same}},
+	} {
+		m := &mockClient{listVersFunc: versionsFixture(order...)}
+		store := keyvault.New(m)
+
+		prev, err := store.Resolve(t.Context(), "my-secret", "~1")
+		require.NoError(t, err)
+		assert.Equal(t, "first", prev.ID(), "input order %v", order)
 	}
-	store := keyvault.New(m)
-
-	// Stable sort preserves input order for equal timestamps: index 0 is "first".
-	cur, err := store.Resolve(t.Context(), "my-secret", "")
-	require.NoError(t, err)
-	assert.True(t, cur.IsLatest())
-
-	prev, err := store.Resolve(t.Context(), "my-secret", "~1")
-	require.NoError(t, err)
-	assert.Equal(t, "second", prev.ID())
 }
 
 // TestHistory_NilCreatedSortsLast verifies versions with no Created timestamp

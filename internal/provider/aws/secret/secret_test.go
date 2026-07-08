@@ -661,3 +661,33 @@ func TestDescribe_NotFoundMapsSentinel(t *testing.T) {
 	require.Error(t, err)
 	assert.ErrorIs(t, err, provider.ErrNotFound)
 }
+
+// TestHistory_DeterministicOnEqualTimestamps guards #314: versions with equal
+// CreatedDate must sort deterministically (version-id descending tie-break),
+// independent of the arbitrary API/list order.
+func TestHistory_DeterministicOnEqualTimestamps(t *testing.T) {
+	t.Parallel()
+
+	created := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
+
+	mk := func(order []string) *secret.Store {
+		return secret.New(&mockClient{
+			listVersion: func(_ *secretsmanager.ListSecretVersionIdsInput) (*secretsmanager.ListSecretVersionIdsOutput, error) {
+				vs := make([]types.SecretVersionsListEntry, len(order))
+				for i, id := range order {
+					vs[i] = types.SecretVersionsListEntry{VersionId: aws.String(id), CreatedDate: aws.Time(created)}
+				}
+
+				return &secretsmanager.ListSecretVersionIdsOutput{Versions: vs}, nil
+			},
+		})
+	}
+
+	for _, order := range [][]string{{"aaa", "bbb"}, {"bbb", "aaa"}} {
+		versions, err := mk(order).History(t.Context(), "my-secret")
+		require.NoError(t, err)
+		require.Len(t, versions, 2)
+		assert.Equal(t, "bbb", versions[0].ID, "input %v", order) // id-desc tie-break
+		assert.Equal(t, "aaa", versions[1].ID, "input %v", order)
+	}
+}

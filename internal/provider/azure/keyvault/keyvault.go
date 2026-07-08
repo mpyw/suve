@@ -340,14 +340,23 @@ func toSecretVersion(p *azsecrets.SecretProperties) secretVersion {
 // sortNewestFirst sorts versions by creation time, newest first. Versions with
 // no creation time sort last.
 func sortNewestFirst(versions []secretVersion) {
+	// Newest created first, with a deterministic version-id tie-break. Key Vault
+	// timestamps have only 1-second resolution and the list-versions API returns
+	// versions unordered, so two SetSecret calls within the same second would
+	// otherwise keep their arbitrary API order — making ~N and log ordering
+	// non-deterministic.
 	sort.SliceStable(versions, func(i, j int) bool {
 		ci, cj := versions[i].created, versions[j].created
 
 		switch {
+		case ci == nil && cj == nil:
+			return versions[i].id > versions[j].id
 		case ci == nil:
 			return false
 		case cj == nil:
 			return true
+		case ci.Equal(*cj):
+			return versions[i].id > versions[j].id
 		default:
 			return ci.After(*cj)
 		}
