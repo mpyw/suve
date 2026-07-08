@@ -191,3 +191,42 @@ func TestLogPresenter(t *testing.T) {
 	assert.Contains(t, out, "Version new")
 	assert.Contains(t, out, "enabled")
 }
+
+func TestLogPresenter_Patch(t *testing.T) {
+	t.Parallel()
+
+	created := time.Date(2024, 5, 6, 7, 8, 9, 0, time.UTC)
+
+	store := &providermock.Store{
+		HistoryFunc: func(_ context.Context, _ string) ([]domain.Version, error) {
+			return []domain.Version{
+				{ID: "2", Label: "enabled", Created: &created},
+				{ID: "1", Label: "enabled", Created: &created},
+			}, nil
+		},
+		ResolveFunc: func(_ context.Context, _, spec string) (provider.VersionRef, error) {
+			return provider.NewVersionRef(spec[1:]), nil
+		},
+		GetFunc: func(_ context.Context, _ string, ref provider.VersionRef) (*domain.Entry, error) {
+			return &domain.Entry{Value: "v" + ref.ID()}, nil
+		},
+	}
+
+	presenter := secret.NewLogPresenter(store, genericlog.Request{Name: "my-secret"})
+	require.NoError(t, presenter.Fetch(t.Context()))
+
+	var buf, errBuf bytes.Buffer
+
+	// i=0 is the newest version (v2): patch against its parent v1.
+	presenter.RenderPatch(&buf, &errBuf, 0, false, false)
+	// i=1 is the oldest/initial version (v1): all-added creation diff.
+	presenter.RenderPatch(&buf, &errBuf, 1, false, false)
+
+	out := buf.String()
+	assert.Contains(t, out, "-v1")
+	assert.Contains(t, out, "+v2")
+	assert.Contains(t, out, "my-secret#1")
+	assert.Contains(t, out, "my-secret#2")
+	// The initial version renders its all-added creation diff (+v1).
+	assert.Contains(t, out, "+v1")
+}
