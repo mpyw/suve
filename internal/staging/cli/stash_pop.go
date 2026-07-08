@@ -81,27 +81,22 @@ func stashPopFlags() []cli.Flag {
 			Usage: usageSkipConfirm,
 		},
 		&cli.BoolFlag{
-			Name:  flagMerge,
-			Usage: "Merge with the existing working staging area (default)",
-		},
-		&cli.BoolFlag{
-			Name:  flagOverwrite,
-			Usage: "Overwrite the working staging area",
-		},
-		&cli.BoolFlag{
 			Name:  flagPassphraseStdin,
 			Usage: usagePassphraseStdin,
 		},
 	}
 }
 
-// stashPopMutuallyExclusiveFlags returns the mutually exclusive flags constraint.
+// stashPopMutuallyExclusiveFlags returns the mutually exclusive --merge /
+// --overwrite constraint. The flags are declared ONLY here (see the push
+// equivalent): a duplicate copy in stashPopFlags would shadow these under
+// urfave/cli v3 and silently disable the exclusivity check.
 func stashPopMutuallyExclusiveFlags() []cli.MutuallyExclusiveFlags {
 	return []cli.MutuallyExclusiveFlags{
 		{
 			Flags: [][]cli.Flag{
-				{&cli.BoolFlag{Name: flagMerge}},
-				{&cli.BoolFlag{Name: flagOverwrite}},
+				{&cli.BoolFlag{Name: flagMerge, Usage: "Merge with the existing working staging area (default)"}},
+				{&cli.BoolFlag{Name: flagOverwrite, Usage: "Overwrite the working staging area"}},
 			},
 		},
 	}
