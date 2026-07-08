@@ -234,3 +234,29 @@ func TestNewWorkingStore_KeychainError_EncryptedStateExists_Fatal(t *testing.T) 
 	assert.Contains(t, err.Error(), "keychain locked")
 	assert.Contains(t, err.Error(), "encrypted state exists")
 }
+
+// TestWriteFileAtomic guards #325: writes go through a temp file + rename, so
+// the target ends up complete, owner-only, and no temp file is left behind.
+func TestWriteFileAtomic(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	path := filepath.Join(dir, "stage.json")
+
+	require.NoError(t, writeFileAtomic(path, []byte("hello")))
+
+	got, err := os.ReadFile(path) //nolint:gosec // test temp path
+	require.NoError(t, err)
+	assert.Equal(t, "hello", string(got))
+
+	// No temp files left behind in the directory.
+	entries, err := os.ReadDir(dir)
+	require.NoError(t, err)
+	require.Len(t, entries, 1)
+	assert.Equal(t, "stage.json", entries[0].Name())
+
+	// Owner-only permissions.
+	info, err := os.Stat(path)
+	require.NoError(t, err)
+	assert.Equal(t, os.FileMode(0o600), info.Mode().Perm())
+}

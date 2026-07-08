@@ -345,8 +345,50 @@ func (s *Store) writeFile(path string, state *staging.State) error {
 		}
 	}
 
-	if err := os.WriteFile(path, data, 0o600); err != nil { //nolint:mnd // owner-only file permissions
+	if err := writeFileAtomic(path, data); err != nil {
 		return fmt.Errorf("failed to write state file: %w", err)
+	}
+
+	return nil
+}
+
+// writeFileAtomic writes data to path atomically: it writes to a temp file in
+// the same directory, fsyncs it, then renames it over the target. A crash, OOM,
+// or power loss mid-write then leaves either the old file or the complete new
+// one — never a truncated/corrupt file, which would fail decryption on the next
+// read and feed the error-swallowing overwrite paths. The file is owner-only
+// (0600), matching os.CreateTemp's default.
+func writeFileAtomic(path string, data []byte) error {
+	dir := filepath.Dir(path)
+
+	tmp, err := os.CreateTemp(dir, "."+filepath.Base(path)+".tmp-*")
+	if err != nil {
+		return fmt.Errorf("failed to create temp state file: %w", err)
+	}
+
+	tmpName := tmp.Name()
+
+	// Best-effort cleanup of the temp file if we bail out before renaming.
+	defer func() { _ = os.Remove(tmpName) }()
+
+	if _, err := tmp.Write(data); err != nil {
+		_ = tmp.Close()
+
+		return fmt.Errorf("failed to write temp state file: %w", err)
+	}
+
+	if err := tmp.Sync(); err != nil {
+		_ = tmp.Close()
+
+		return fmt.Errorf("failed to sync temp state file: %w", err)
+	}
+
+	if err := tmp.Close(); err != nil {
+		return fmt.Errorf("failed to close temp state file: %w", err)
+	}
+
+	if err := os.Rename(tmpName, path); err != nil {
+		return fmt.Errorf("failed to rename temp state file: %w", err)
 	}
 
 	return nil
