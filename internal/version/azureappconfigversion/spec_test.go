@@ -29,7 +29,7 @@ func TestParse(t *testing.T) {
 			wantName: "app/config/timeout",
 		},
 		{
-			name:     "name with dots and colons in the middle are fine only if not a specifier",
+			name:     "name with dots",
 			input:    "app.timeout",
 			wantName: "app.timeout",
 		},
@@ -39,78 +39,80 @@ func TestParse(t *testing.T) {
 			wantName: "my-key",
 		},
 
-		// ANY version specifier is rejected (App Configuration is unversioned).
+		// Characters that look like version specifiers are legal key characters
+		// in App Configuration and are preserved verbatim (the #353 regression).
 		{
-			name:    "version number rejected",
-			input:   "my-key#3",
-			wantErr: true,
+			name:     "colon-separated ASP.NET-style key",
+			input:    "Logging:LogLevel:Default",
+			wantName: "Logging:LogLevel:Default",
 		},
 		{
-			name:    "version id rejected",
-			input:   "my-key#abc123",
-			wantErr: true,
+			name:     "hash in key preserved",
+			input:    "my-key#3",
+			wantName: "my-key#3",
 		},
 		{
-			name:    "single shift rejected",
-			input:   "my-key~",
-			wantErr: true,
+			name:     "hash id in key preserved",
+			input:    "my-key#abc123",
+			wantName: "my-key#abc123",
 		},
 		{
-			name:    "numeric shift rejected",
-			input:   "my-key~2",
-			wantErr: true,
+			name:     "trailing tilde preserved",
+			input:    "my-key~",
+			wantName: "my-key~",
 		},
 		{
-			name:    "double tilde rejected",
-			input:   "my-key~~",
-			wantErr: true,
+			name:     "tilde with number preserved",
+			input:    "my-key~2",
+			wantName: "my-key~2",
 		},
 		{
-			name:    "label rejected",
-			input:   "my-key:prod",
-			wantErr: true,
+			name:     "double tilde preserved",
+			input:    "my-key~~",
+			wantName: "my-key~~",
 		},
 		{
-			name:    "hash at end rejected",
-			input:   "my-key#",
-			wantErr: true,
+			name:     "single label-like colon preserved",
+			input:    "my-key:prod",
+			wantName: "my-key:prod",
 		},
 		{
-			name:    "colon at end rejected",
-			input:   "my-key:",
-			wantErr: true,
+			name:     "trailing hash preserved",
+			input:    "my-key#",
+			wantName: "my-key#",
 		},
-
-		// Additional accepted bare names (no version specifier present).
+		{
+			name:     "trailing colon preserved",
+			input:    "my-key:",
+			wantName: "my-key:",
+		},
 		{
 			name:     "name with @ allowed",
 			input:    "user@example.com",
 			wantName: "user@example.com",
 		},
 		{
-			name:     "shift zero collapses to a bare name",
+			name:     "tilde-zero preserved verbatim",
 			input:    "my-key~0",
-			wantName: "my-key",
+			wantName: "my-key~0",
+		},
+		{
+			name:     "cumulative-shift-like key preserved",
+			input:    "my-key~1~2",
+			wantName: "my-key~1~2",
+		},
+		{
+			name:     "hash-and-tilde key preserved",
+			input:    "my-key#abc~1",
+			wantName: "my-key#abc~1",
+		},
+		{
+			name:     "multiple colons preserved",
+			input:    "a:b:c",
+			wantName: "a:b:c",
 		},
 
-		// Additional rejected version specifiers.
-		{
-			name:    "cumulative shift rejected",
-			input:   "my-key~1~2",
-			wantErr: true,
-		},
-		{
-			name:    "version id with shift rejected",
-			input:   "my-key#abc~1",
-			wantErr: true,
-		},
-		{
-			name:    "multiple colons rejected",
-			input:   "a:b:c",
-			wantErr: true,
-		},
-
-		// Empty-input errors are surfaced (not normalized to unsupported).
+		// Empty-input errors are surfaced.
 		{
 			name:    "empty input",
 			input:   "",
@@ -140,26 +142,15 @@ func TestParse(t *testing.T) {
 	}
 }
 
-func TestParse_VersionSpecErrorIsUnsupported(t *testing.T) {
+// TestParse_SpecifierLikeKeysAccepted verifies that keys containing what would
+// be version specifiers in versioned stores are accepted verbatim (#353).
+func TestParse_SpecifierLikeKeysAccepted(t *testing.T) {
 	t.Parallel()
 
-	for _, input := range []string{"my-key#3", "my-key~1", "my-key:prod", "my-key#abc"} {
-		_, err := azureappconfigversion.Parse(input)
-		require.Error(t, err)
-		require.ErrorIs(t, err, azureappconfigversion.ErrVersioningUnsupported, "input=%q", input)
-	}
-}
-
-// TestParse_EmptyErrorsNotNormalized verifies that empty-input and empty-name
-// errors from the shared grammar are surfaced unchanged rather than being
-// collapsed into ErrVersioningUnsupported.
-func TestParse_EmptyErrorsNotNormalized(t *testing.T) {
-	t.Parallel()
-
-	for _, input := range []string{"", "   "} {
-		_, err := azureappconfigversion.Parse(input)
-		require.Error(t, err)
-		require.NotErrorIs(t, err, azureappconfigversion.ErrVersioningUnsupported, "input=%q", input)
+	for _, input := range []string{"my-key#3", "my-key~1", "my-key:prod", "Logging:LogLevel:Default"} {
+		spec, err := azureappconfigversion.Parse(input)
+		require.NoError(t, err, "input=%q", input)
+		assert.Equal(t, input, spec.Name)
 	}
 }
 
@@ -184,18 +175,22 @@ func TestParseDiffArgs(t *testing.T) {
 		assert.Equal(t, "key-b", spec2.Name)
 	})
 
-	t.Run("version spec rejected", func(t *testing.T) {
+	t.Run("single key containing hash compares against itself", func(t *testing.T) {
 		t.Parallel()
 
-		_, _, err := azureappconfigversion.ParseDiffArgs([]string{"my-key#1"})
-		require.Error(t, err)
+		spec1, spec2, err := azureappconfigversion.ParseDiffArgs([]string{"my-key#1"})
+		require.NoError(t, err)
+		assert.Equal(t, "my-key#1", spec1.Name)
+		assert.Equal(t, "my-key#1", spec2.Name)
 	})
 
-	t.Run("name plus specifier-only arg rejected", func(t *testing.T) {
+	t.Run("two keys where the second contains a hash", func(t *testing.T) {
 		t.Parallel()
 
-		_, _, err := azureappconfigversion.ParseDiffArgs([]string{"my-key", "#1"})
-		require.Error(t, err)
+		spec1, spec2, err := azureappconfigversion.ParseDiffArgs([]string{"my-key", "#1"})
+		require.NoError(t, err)
+		assert.Equal(t, "my-key", spec1.Name)
+		assert.Equal(t, "#1", spec2.Name)
 	})
 
 	t.Run("three args rejected", func(t *testing.T) {

@@ -265,20 +265,22 @@ func TestAzureAppConfigParamStrategy_ParseAndVersion(t *testing.T) {
 
 	s := staging.NewAzureAppConfigParamStrategy(&providermock.Store{})
 
-	t.Run("ParseName: bare name ok, specifiers rejected", func(t *testing.T) {
+	t.Run("ParseName: whole argument is the key, including specifier-like chars", func(t *testing.T) {
 		t.Parallel()
 
 		name, err := s.ParseName("cfg")
 		require.NoError(t, err)
 		assert.Equal(t, "cfg", name)
 
-		for _, spec := range []string{"cfg#1", "cfg~1", "cfg:lbl"} {
-			_, err := s.ParseName(spec)
-			require.Error(t, err, spec)
+		// ':' / '#' / '~' are legal App Configuration key characters (#353).
+		for _, key := range []string{"cfg#1", "cfg~1", "cfg:lbl", "Logging:LogLevel:Default"} {
+			got, err := s.ParseName(key)
+			require.NoError(t, err, key)
+			assert.Equal(t, key, got)
 		}
 	})
 
-	t.Run("ParseSpec: bare name has no version, specifier errors", func(t *testing.T) {
+	t.Run("ParseSpec: whole argument is the key, never has a version", func(t *testing.T) {
 		t.Parallel()
 
 		name, hasVersion, err := s.ParseSpec("cfg")
@@ -286,8 +288,10 @@ func TestAzureAppConfigParamStrategy_ParseAndVersion(t *testing.T) {
 		assert.Equal(t, "cfg", name)
 		assert.False(t, hasVersion)
 
-		_, _, err = s.ParseSpec("cfg#1")
-		require.Error(t, err)
+		name, hasVersion, err = s.ParseSpec("cfg#1")
+		require.NoError(t, err)
+		assert.Equal(t, "cfg#1", name)
+		assert.False(t, hasVersion)
 	})
 
 	t.Run("FetchVersion resolves current for a bare name", func(t *testing.T) {
@@ -306,11 +310,21 @@ func TestAzureAppConfigParamStrategy_ParseAndVersion(t *testing.T) {
 		assert.Equal(t, "current", label)
 	})
 
-	t.Run("FetchVersion rejects a version specifier", func(t *testing.T) {
+	t.Run("FetchVersion resolves a specifier-like key as the whole key", func(t *testing.T) {
 		t.Parallel()
 
-		_, _, err := s.FetchVersion(t.Context(), "cfg#1")
-		require.Error(t, err)
+		store := &providermock.Store{
+			GetFunc: func(_ context.Context, name string, ref provider.VersionRef) (*domain.Entry, error) {
+				assert.Equal(t, "cfg#1", name)
+				assert.True(t, ref.IsLatest())
+
+				return &domain.Entry{Value: "current"}, nil
+			},
+		}
+		value, label, err := staging.NewAzureAppConfigParamStrategy(store).FetchVersion(t.Context(), "cfg#1")
+		require.NoError(t, err)
+		assert.Equal(t, "current", value)
+		assert.Equal(t, "current", label)
 	})
 
 	t.Run("FetchVersion propagates get error", func(t *testing.T) {

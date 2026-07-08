@@ -76,9 +76,12 @@ func New(client Client) *Store {
 // Resolve validates that the spec carries no version specifier (App
 // Configuration has none) and returns the latest ref. The parse guard rejects
 // any #/~/: specifier with a clear error before any API call.
-func (s *Store) Resolve(_ context.Context, name, spec string) (provider.VersionRef, error) {
-	if _, err := azureappconfigversion.Parse(name + spec); err != nil {
-		return provider.VersionRef{}, err
+func (s *Store) Resolve(_ context.Context, _, spec string) (provider.VersionRef, error) {
+	// App Configuration is unversioned: the entire argument is the key name, so
+	// the caller passes no version specifier. A non-empty spec means something
+	// tried to version an unversioned store, which is unsupported.
+	if spec != "" {
+		return provider.VersionRef{}, fmt.Errorf("%w", azureappconfigversion.ErrVersioningUnsupported)
 	}
 
 	return provider.NewVersionRef(""), nil

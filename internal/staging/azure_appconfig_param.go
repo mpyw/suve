@@ -131,8 +131,8 @@ func (s *AzureAppConfigParamStrategy) FetchCurrentTags(_ context.Context, _ stri
 	return nil, nil //nolint:nilnil // intentional: App Configuration tags are not staged
 }
 
-// ParseName parses and validates a name. Any version specifier is rejected by
-// azureappconfigversion.
+// ParseName parses and validates a name. App Configuration is unversioned, so
+// the entire argument is the key (':' / '#' / '~' are legal key characters).
 func (s *AzureAppConfigParamStrategy) ParseName(input string) (string, error) {
 	spec, err := azureappconfigversion.Parse(input)
 	if err != nil {
@@ -158,7 +158,7 @@ func (s *AzureAppConfigParamStrategy) FetchCurrentValue(ctx context.Context, nam
 }
 
 // ParseSpec parses a name for reset. App Configuration is unversioned, so a
-// version is never present (specifiers are rejected at parse time).
+// version is never present; the entire argument is the key.
 func (s *AzureAppConfigParamStrategy) ParseSpec(input string) (name string, hasVersion bool, err error) {
 	spec, err := azureappconfigversion.Parse(input)
 	if err != nil {
@@ -168,8 +168,8 @@ func (s *AzureAppConfigParamStrategy) ParseSpec(input string) (name string, hasV
 	return spec.Name, false, nil
 }
 
-// FetchVersion fetches the current value. Version specifiers are rejected at
-// parse time, so this only ever resolves the current (unversioned) value.
+// FetchVersion fetches the current value. App Configuration is unversioned and
+// the entire argument is the key, so this only ever resolves the current value.
 func (s *AzureAppConfigParamStrategy) FetchVersion(ctx context.Context, input string) (value string, versionLabel string, err error) {
 	spec, err := azureappconfigversion.Parse(input)
 	if err != nil {

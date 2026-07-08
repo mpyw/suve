@@ -9,7 +9,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/mpyw/suve/internal/provider"
-	"github.com/mpyw/suve/internal/version/azureappconfigversion"
 	"github.com/mpyw/suve/internal/version/gcloudversion"
 )
 
@@ -50,15 +49,19 @@ func TestApp_parseParamSpec(t *testing.T) {
 			input: "app/config/timeout", wantName: "app/config/timeout",
 		},
 		{
-			// The key regression: '#' in an App Configuration key must NOT be
-			// split into name+version (as the AWS grammar would); it is rejected
-			// with a clean unsupported-versioning error.
-			name: "azure key containing hash is rejected, not mis-split", provider: provider.ProviderAzure,
-			input: "my-key#3", wantErr: azureappconfigversion.ErrVersioningUnsupported,
+			// The #353 regression: '#' in an App Configuration key must NOT be
+			// split into name+version (as the AWS grammar would); the whole
+			// argument is the key.
+			name: "azure key containing hash is kept whole", provider: provider.ProviderAzure,
+			input: "my-key#3", wantName: "my-key#3",
 		},
 		{
-			name: "azure key with tilde is rejected", provider: provider.ProviderAzure,
-			input: "my-key~1", wantErr: azureappconfigversion.ErrVersioningUnsupported,
+			name: "azure key with tilde is kept whole", provider: provider.ProviderAzure,
+			input: "my-key~1", wantName: "my-key~1",
+		},
+		{
+			name: "azure ASP.NET-style colon key is kept whole", provider: provider.ProviderAzure,
+			input: "Logging:LogLevel:Default", wantName: "Logging:LogLevel:Default",
 		},
 	}
 
