@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"strings"
+	"unicode"
 
 	"github.com/urfave/cli/v3"
 
@@ -101,9 +103,9 @@ func (p *logPresenter) RenderOneline(stdout io.Writer, i, maxValueLength int) {
 		maxLen = max(termWidth-metadataOverhead, minValueLength)
 	}
 
-	if maxLen > 0 && len(value) > maxLen {
-		value = value[:maxLen] + "..."
-	}
+	// Replace control characters so a multi-line value can't break the
+	// one-line-per-version layout, then truncate by runes (#340).
+	value = truncateRunes(sanitizeControl(value), maxLen)
 
 	currentMark := ""
 	if entry.IsCurrent {
@@ -137,11 +139,11 @@ func (p *logPresenter) RenderHeader(stdout io.Writer, i int) {
 func (p *logPresenter) RenderValue(stdout io.Writer, i, maxValueLength int) {
 	entry := p.result.Entries[i]
 
-	// Show value preview (unlimited unless --max-value-length specified)
-	value := entry.Value
-	if maxValueLength > 0 && len(value) > maxValueLength {
-		value = value[:maxValueLength] + "..."
-	}
+	// Show value preview (unlimited unless --max-value-length specified).
+	// Truncate by runes so multi-byte content is never cut mid-rune (#340).
+	// Newlines are preserved here: normal mode intentionally shows the full
+	// multi-line value under each version's header.
+	value := truncateRunes(entry.Value, maxValueLength)
 
 	output.Printf(stdout, "%s\n", value)
 }
@@ -186,6 +188,35 @@ func (p *logPresenter) RenderPatch(stdout, stderr io.Writer, i int, parseJSON, r
 		output.Println(stdout, "")
 		output.Print(stdout, diff)
 	}
+}
+
+// truncateRunes shortens s to at most maxLen runes, appending "..." only when
+// it actually trims. Counting runes rather than bytes keeps multi-byte
+// characters (e.g. Japanese text, emoji) whole (#340). A maxLen <= 0 disables
+// truncation.
+func truncateRunes(s string, maxLen int) string {
+	if maxLen <= 0 {
+		return s
+	}
+
+	runes := []rune(s)
+	if len(runes) <= maxLen {
+		return s
+	}
+
+	return string(runes[:maxLen]) + "..."
+}
+
+// sanitizeControl replaces every control character (newlines, tabs, etc.) with
+// a visible ␤ so a value cannot break the one-line-per-version layout (#340).
+func sanitizeControl(s string) string {
+	return strings.Map(func(r rune) rune {
+		if unicode.IsControl(r) {
+			return '␤'
+		}
+
+		return r
+	}, s)
 }
 
 // LogCommand returns the SSM Parameter Store log command.
