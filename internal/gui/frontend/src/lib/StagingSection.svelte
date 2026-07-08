@@ -66,6 +66,11 @@
   function findTagEntry(name: string): gui.StagingDiffTagEntry | undefined {
     return tagEntries.find(t => t.name === name);
   }
+
+  // Tag entries with no matching value entry represent a tag-only staged change.
+  // The value-entry loop only draws tags nested inside a value entry, so these
+  // get their own rows and are counted toward the section total and gating.
+  const tagOnlyEntries = $derived(tagEntries.filter(t => !entries.some(e => e.name === t.name)));
 </script>
 
 <div class="section">
@@ -74,16 +79,16 @@
       <span class="section-icon">{icon}</span>
       {title}
     </h3>
-    <span class="count-badge">{entries.length}</span>
+    <span class="count-badge">{entries.length + tagOnlyEntries.length}</span>
     <div class="section-actions">
-      {#if entries.length > 0}
+      {#if entries.length + tagOnlyEntries.length > 0}
         <button class="btn-section btn-apply-sm" onclick={onapply}>Apply</button>
         <button class="btn-section btn-reset-sm" onclick={onreset}>Reset</button>
       {/if}
     </div>
   </div>
 
-  {#if entries.length === 0}
+  {#if entries.length === 0 && tagOnlyEntries.length === 0}
     <div class="empty-state">{emptyText}</div>
   {:else}
     <ul class="entry-list">
@@ -160,6 +165,43 @@
               <pre class="entry-value">{entry.stagedValue}</pre>
             {/if}
           {/if}
+        </li>
+      {/each}
+      {#each tagOnlyEntries as tagEntry}
+        <li class="entry-item">
+          <div class="entry-header">
+            <span class="entry-name">{tagEntry.name}</span>
+            <div class="entry-actions">
+              <button class="btn-entry btn-unstage" onclick={() => onunstage(tagEntry.name)}>Unstage</button>
+            </div>
+          </div>
+          <div class="entry-tags">
+            {#if hasTags}
+            {#if tagEntry.addTags && Object.keys(tagEntry.addTags).length > 0}
+              <div class="tag-changes tag-add">
+                <span class="tag-label">+ Tags:</span>
+                {#each Object.entries(tagEntry.addTags) as [key, value]}
+                  <button class="tag-item tag-item-editable" type="button" onclick={() => onedittag(tagEntry.name, key, value)}>
+                    {key}={value}
+                    <span class="tag-delete-btn" role="button" tabindex="0" onclick={(e: MouseEvent) => { e.stopPropagation(); onremovetag(tagEntry.name, key); }} onkeydown={(e: KeyboardEvent) => { e.stopPropagation(); if (e.key === 'Enter') onremovetag(tagEntry.name, key); }}>×</span>
+                  </button>
+                {/each}
+              </div>
+            {/if}
+            {#if tagEntry.removeTags && Object.keys(tagEntry.removeTags).length > 0}
+              <div class="tag-changes tag-remove">
+                <span class="tag-label">- Tags:</span>
+                {#each Object.entries(tagEntry.removeTags) as [key, value]}
+                  <span class="tag-item">
+                    {value ? `${key}=${value}` : key}
+                    <button class="tag-cancel-btn" onclick={() => oncanceluntag(tagEntry.name, key)} title="Cancel untag">↩</button>
+                  </span>
+                {/each}
+              </div>
+            {/if}
+            <button class="btn-add-tag" onclick={() => onaddtag(tagEntry.name)}>+ Add Tag</button>
+            {/if}
+          </div>
         </li>
       {/each}
     </ul>
