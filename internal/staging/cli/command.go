@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"os"
 
 	"github.com/urfave/cli/v3"
 
@@ -299,7 +298,7 @@ func NewApplyCommand(cfg CommandConfig) *cli.Command {
 			}
 
 			prompter := &confirm.Prompter{
-				Stdin:  os.Stdin,
+				Stdin:  cmd.Root().Reader,
 				Stdout: cmd.Root().Writer,
 				Stderr: cmd.Root().ErrWriter,
 				Target: resolved.Target,
