@@ -107,30 +107,65 @@ func TestApp_getStagingStore_ScopeKeyed(t *testing.T) {
 	assert.NotSame(t, s1, s2, "a different scope must get its own store")
 }
 
-// TestApp_stagingScopeForKind_AzurePerService is the regression guard for the
-// GUI/CLI divergence: an Azure scope carries BOTH a vault and a store, and
-// scope.Key() resolves a combined scope to the Key Vault key (VaultName first),
-// which would silently key App Configuration staging under the Key Vault bucket.
-// The staging scope must be resolved per service so the on-disk key matches the
-// CLI's per-service resolvers exactly.
-func TestApp_stagingScopeForKind_AzurePerService(t *testing.T) {
+// TestStagingScope_GUICLIParity is the cross-surface guard: for every
+// (provider, service) the GUI's staging scope key MUST equal the CLI's, so a
+// change staged in one surface is always visible in the other. It is the
+// regression test for the App Configuration divergence — the GUI holds a
+// COMBINED Azure scope (both vault and store) and scope.Key() resolves such a
+// scope to the Key Vault key (VaultName is checked first), which silently keyed
+// App Configuration staging under the Key Vault bucket.
+//
+// The CLI resolvers (internal/cli/commands/internal, not importable here under
+// Go's internal rule) are thin wrappers over the provider.*Scope constructors
+// asserted below, so those keys ARE the CLI's staging keys:
+//   - AzureAppConfigStagingScopeResolver -> provider.AzureAppConfigScope(store)
+//   - AzureKeyVaultStagingScopeResolver  -> provider.AzureKeyVaultScope(vault)
+//   - GoogleCloudStagingScopeResolver    -> provider.GoogleCloudScope(project)
+//   - AWSScopeResolver                   -> provider.AWSScope(account, region)
+func TestStagingScope_GUICLIParity(t *testing.T) {
 	t.Parallel()
 
-	app := &App{scope: provider.Scope{
-		Provider:  provider.ProviderAzure,
-		VaultName: "myvault",
-		StoreName: "mystore",
-	}}
+	// The GUI holds a COMBINED Azure scope (both vault and store), which is the
+	// exact shape that trapped scope.Key() into the Key Vault bucket for param.
+	azure := provider.Scope{
+		Provider: provider.ProviderAzure, VaultName: "myvault", StoreName: "mystore", AppConfigNamespace: "dev",
+	}
 
-	paramScope, err := app.stagingScopeForKind(provider.KindParam)
+	aws := provider.AWSScope("123456789012", "us-east-1")
+	gcloud := provider.GoogleCloudScope("proj")
+
+	tests := []struct {
+		name   string
+		scope  provider.Scope
+		kind   provider.Kind
+		cliKey string
+	}{
+		{"azure param -> App Configuration store", azure, provider.KindParam, provider.AzureAppConfigScope("mystore").Key()},
+		{"azure secret -> Key Vault", azure, provider.KindSecret, provider.AzureKeyVaultScope("myvault").Key()},
+		{"google cloud secret -> project", gcloud, provider.KindSecret, gcloud.Key()},
+		{"aws param -> account", aws, provider.KindParam, aws.Key()},
+		{"aws secret -> account", aws, provider.KindSecret, aws.Key()},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			gui := &App{scope: tt.scope}
+			guiScope, err := gui.stagingScopeForKind(tt.kind)
+			require.NoError(t, err)
+
+			assert.Equal(t, tt.cliKey, guiScope.Key(),
+				"GUI staging key must equal the CLI staging key for %s", tt.name)
+		})
+	}
+
+	// The two Azure services must NOT share a bucket (the specific bug).
+	gui := &App{scope: azure}
+	paramScope, err := gui.stagingScopeForKind(provider.KindParam)
 	require.NoError(t, err)
-	assert.Equal(t, "azure/appconfig/mystore", paramScope.Key(),
-		"param staging must key on the App Configuration store, not the vault")
-
-	secretScope, err := app.stagingScopeForKind(provider.KindSecret)
+	secretScope, err := gui.stagingScopeForKind(provider.KindSecret)
 	require.NoError(t, err)
-	assert.Equal(t, "azure/keyvault/myvault", secretScope.Key())
-
-	// The two services must NOT share a bucket.
-	assert.NotEqual(t, paramScope.Key(), secretScope.Key())
+	assert.NotEqual(t, paramScope.Key(), secretScope.Key(),
+		"Azure App Configuration and Key Vault staging must not collide")
 }
