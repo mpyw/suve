@@ -216,16 +216,20 @@ func TestSet_MarshalJSON(t *testing.T) {
 		assert.Equal(t, `["a"]`, string(data))
 	})
 
-	t.Run("multiple values", func(t *testing.T) {
+	t.Run("multiple values are sorted deterministically", func(t *testing.T) {
 		t.Parallel()
 
-		s := maputil.NewSet("a", "b")
-		data, err := json.Marshal(s)
-		require.NoError(t, err)
-		// Order is not guaranteed, so unmarshal and check
-		var values []string
-		require.NoError(t, json.Unmarshal(data, &values))
-		assert.ElementsMatch(t, []string{"a", "b"}, values)
+		// Regardless of insertion order, the JSON is byte-identical and sorted
+		// (#354) so staged-state files don't churn.
+		assertJSON := func(s maputil.Set[string]) {
+			data, err := json.Marshal(s)
+			require.NoError(t, err)
+			assert.Equal(t, `["a","b","c"]`, string(data))
+		}
+
+		assertJSON(maputil.NewSet("a", "b", "c"))
+		assertJSON(maputil.NewSet("c", "b", "a"))
+		assertJSON(maputil.NewSet("b", "a", "c"))
 	})
 
 	t.Run("int set", func(t *testing.T) {
