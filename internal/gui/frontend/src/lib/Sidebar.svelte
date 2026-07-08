@@ -18,11 +18,18 @@
     accountId?: string;
     region?: string;
     profile?: string;
+    // Azure App Configuration namespace filter (footer dropdown). namespaceOptions
+    // are the choices ((NULL), discovered, *); selectedNamespace is the current
+    // value; onchangenamespace reports a new selection. Client-side only — this
+    // does NOT re-scope.
+    namespaceOptions?: string[];
+    selectedNamespace?: string;
     onnavigate?: (view: ViewKey) => void;
     onselectprovider?: (provider: string) => void;
     onselectscope?: (sel: gui.ScopeSelection) => void;
     oncancelscope?: () => void;
     onchangescope?: () => void;
+    onchangenamespace?: (ns: string) => void;
   }
 
   let {
@@ -40,11 +47,14 @@
     accountId = '',
     region = '',
     profile = '',
+    namespaceOptions = [],
+    selectedNamespace = '',
     onnavigate,
     onselectprovider,
     onselectscope,
     oncancelscope,
     onchangescope,
+    onchangenamespace,
   }: Props = $props();
 
   // Service key → stable nav icon/letter (labels come from capability names).
@@ -94,6 +104,10 @@
   function handleProviderChange(e: Event) {
     const value = (e.currentTarget as HTMLSelectElement).value;
     onselectprovider?.(value);
+  }
+
+  function handleNamespaceChange(e: Event) {
+    onchangenamespace?.((e.currentTarget as HTMLSelectElement).value);
   }
 
   // Escape while a scope form is open cancels the pending selection.
@@ -186,10 +200,10 @@
         id="azure-namespace"
         class="scope-input"
         type="text"
-        placeholder="empty = default"
+        placeholder="empty = (NULL)"
         bind:value={namespaceInput}
       />
-      <p class="scope-hint">Azure calls this a label; empty = default. Applies to the App Configuration store only.</p>
+      <p class="scope-hint">Azure calls this a label; empty = (NULL). Applies to the App Configuration store only.</p>
       {#if formError || scopeError}
         <div class="scope-error">{formError || scopeError}</div>
       {/if}
@@ -269,9 +283,21 @@
         <span class="aws-info-value" title={scope?.storeName || '?'}>{scope?.storeName || '?'}</span>
       </div>
       {#if scope?.storeName}
+        <!-- The scope's Namespace row is a client-side filter dropdown (App
+             Configuration only). Changing it filters ParamView's rows without
+             re-scoping; the "Change scope" button below re-points the scope. -->
         <div class="aws-info-row">
           <span class="aws-info-label">Namespace</span>
-          <span class="aws-info-value" title={scope?.namespace || 'default'}>{scope?.namespace || 'default'}</span>
+          <select
+            class="aws-info-value namespace-select"
+            value={selectedNamespace}
+            onchange={handleNamespaceChange}
+            aria-label="Namespace"
+          >
+            {#each namespaceOptions as ns}
+              <option value={ns}>{ns}</option>
+            {/each}
+          </select>
         </div>
       {/if}
       <button type="button" class="scope-change" disabled={!!pendingProvider} onclick={() => onchangescope?.()}>Change scope</button>
@@ -514,5 +540,21 @@
   .aws-info-profile {
     color: #e94560;
     font-weight: bold;
+  }
+
+  /* Namespace filter dropdown in the scope-info footer (App Configuration only).
+     Styled to sit inline with the info rows like the read-only values it
+     replaced. */
+  .namespace-select {
+    max-width: 60%;
+    box-sizing: border-box;
+    padding: 2px 4px;
+    background: #252542;
+    color: #a0a0a0;
+    border: 1px solid #2d2d44;
+    border-radius: 4px;
+    font-family: monospace;
+    font-size: 10px;
+    cursor: pointer;
   }
 </style>

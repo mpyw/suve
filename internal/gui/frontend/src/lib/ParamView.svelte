@@ -10,21 +10,24 @@
   import StagingBanner from './StagingBanner.svelte';
   import TagList from './TagList.svelte';
   import { createDiffMode } from './useDiffMode.svelte';
-  import { createDebouncer, formatDate, maskValue, parseError } from './viewUtils';
+  import { createDebouncer, formatDate, maskValue, NS_ALL, NS_NULL, parseError } from './viewUtils';
   import './common.css';
 
   interface Props {
     capability?: gui.ServiceCapability;
     provider?: string;
-    // initialNamespace is the scope's current App Configuration namespace (empty
-    // = the null/default namespace); it seeds the Namespace dropdown's initial
-    // selection. Only meaningful for Azure App Configuration.
-    initialNamespace?: string;
+    // selectedNamespace is the App Configuration namespace filter, owned by App
+    // (the dropdown lives in the sidebar footer). (NULL) → null/default rows, a
+    // name → that namespace, * → all. Only meaningful for Azure App Configuration.
+    selectedNamespace?: string;
+    // onnamespaces reports the distinct namespaces present in the loaded rows
+    // (sorted) so App can build the footer dropdown's options.
+    onnamespaces?: (ns: string[]) => void;
     onnavigatetostaging?: () => void;
     onstagingchange?: () => void;
   }
 
-  let { capability, provider = '', initialNamespace = '', onnavigatetostaging, onstagingchange }: Props = $props();
+  let { capability, provider = '', selectedNamespace = NS_NULL, onnamespaces, onnavigatetostaging, onstagingchange }: Props = $props();
 
   // Capability-driven visibility. Absent capability defaults to AWS-like (true)
   // so the component degrades safely if mounted without one.
@@ -37,14 +40,6 @@
   // (Key Vault is a secret store, rendered by SecretView).
   const isAppConfig = $derived(provider === 'azure');
 
-  // Namespace dropdown sentinels. (NULL) is the null/default namespace (empty
-  // string); * means all namespaces (no client-side filter). Both are displayed
-  // literally in the dropdown per #425.
-  const NS_NULL = '(NULL)';
-  const NS_ALL = '*';
-  // Selected namespace filter; defaults to the scope's current namespace
-  // ((NULL) when empty). App Config only.
-  let selectedNamespace = $state(initialNamespace === '' ? NS_NULL : initialNamespace);
   // The namespace of the currently selected row, shown in the detail panel.
   let selectedEntryNamespace = $state('');
 
@@ -72,17 +67,15 @@
   let detailLoading = $state(false);
   let showValue = $state(false);
 
-  // Namespace dropdown options (App Config only): (NULL) first, then the
-  // distinct namespaces present in the loaded rows (sorted), then * (all). The
-  // scope's current namespace is always included so the default is selectable
-  // even before its rows load.
-  const namespaceOptions = $derived.by(() => {
+  // Report the distinct namespaces present in the loaded rows (sorted) up to App
+  // (App Config only), which owns the footer Namespace dropdown and its options.
+  $effect(() => {
+    if (!isAppConfig) return;
     const discovered = new Set<string>();
     for (const e of entries) {
       if (e.namespace) discovered.add(e.namespace);
     }
-    if (initialNamespace && initialNamespace !== NS_ALL) discovered.add(initialNamespace);
-    return [NS_NULL, ...[...discovered].sort(), NS_ALL];
+    onnamespaces?.([...discovered].sort());
   });
 
   // Rows actually displayed. Non-App-Config providers show every row; App Config
@@ -457,16 +450,6 @@
       <input type="checkbox" bind:checked={withValue} />
       Show Values
     </label>
-    {#if isAppConfig}
-      <label class="checkbox-label namespace-filter">
-        Namespace
-        <select class="filter-input namespace-select" bind:value={selectedNamespace} aria-label="Namespace">
-          {#each namespaceOptions as ns}
-            <option value={ns}>{ns}</option>
-          {/each}
-        </select>
-      </label>
-    {/if}
     <button class="btn-primary" onclick={() => loadParams({ prefix, filter, recursive, withValue })} disabled={loading}>
       {loading ? 'Loading...' : 'Refresh'}
     </button>
@@ -828,16 +811,6 @@
 
   .value-display.masked {
     font-style: italic;
-  }
-
-  /* Namespace filter dropdown (App Configuration only). */
-  .namespace-filter {
-    gap: 6px;
-  }
-
-  .namespace-select {
-    width: auto;
-    min-width: 90px;
   }
 
   /* Per-row namespace badge in the list. */
