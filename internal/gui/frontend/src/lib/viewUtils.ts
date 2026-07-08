@@ -2,6 +2,12 @@
  * Shared utility functions for ParamView and SecretView
  */
 
+// Azure App Configuration namespace sentinels, shared by App/Sidebar/ParamView.
+// NS_NULL is the null/default namespace (empty string); NS_ALL means "all
+// namespaces" (no client-side filter). Both are displayed literally (#425).
+export const NS_NULL = '(NULL)';
+export const NS_ALL = '*';
+
 /**
  * Mask sensitive values for display
  */

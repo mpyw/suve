@@ -5,13 +5,18 @@ import {
   waitForItemList,
 } from './fixtures/wails-mock';
 
-// #425 — Azure App Configuration Namespace ▾ dropdown: client-side filtering of
-// the loaded rows by namespace, plus per-entry / detail namespace display. The
-// list is loaded across ALL namespaces (LabelFilter "*") so each row carries its
-// namespace; the dropdown narrows the displayed rows without a backend
-// round-trip. Azure App Configuration only.
+// #425 / #427 follow-up — Azure App Configuration namespace filter. The dropdown
+// now lives in the SIDEBAR FOOTER's connected-scope block (the "Namespace" row is
+// itself the <select>), not ParamView's top-right filter bar. It still filters
+// the loaded rows client-side by namespace, with per-entry / detail namespace
+// display. The list is loaded across ALL namespaces (LabelFilter "*") so each row
+// carries its namespace; the dropdown narrows the displayed rows without a
+// backend round-trip and without re-scoping. Azure App Configuration only.
 
 const NULL = '(NULL)';
+
+// The namespace dropdown is the footer scope-info "Namespace" row's <select>.
+const nsSelect = (page: import('@playwright/test').Page) => page.locator('.sidebar .namespace-select');
 
 /** Names shown in the (visible) list, in DOM order. */
 async function visibleNames(page: import('@playwright/test').Page): Promise<string[]> {
@@ -19,12 +24,12 @@ async function visibleNames(page: import('@playwright/test').Page): Promise<stri
 }
 
 test.describe('App Configuration namespace filter (#425)', () => {
-  test('dropdown lists [(NULL), dev, prd, *] and defaults to the scope namespace', async ({ page }) => {
+  test('footer dropdown lists [(NULL), dev, prd, *] and defaults to the scope namespace', async ({ page }) => {
     await setupWailsMocks(page, createAzureNamespaceState());
     await page.goto('/');
     await waitForItemList(page);
 
-    const select = page.locator('.namespace-select');
+    const select = nsSelect(page);
     await expect(select).toBeVisible();
 
     // Options: (NULL) first, discovered namespaces sorted, * last.
@@ -36,12 +41,12 @@ test.describe('App Configuration namespace filter (#425)', () => {
     expect(await visibleNames(page)).toEqual(['app/config']);
   });
 
-  test('selecting a namespace filters the displayed rows client-side', async ({ page }) => {
+  test('selecting a namespace in the footer filters the displayed rows client-side', async ({ page }) => {
     await setupWailsMocks(page, createAzureNamespaceState());
     await page.goto('/');
     await waitForItemList(page);
 
-    const select = page.locator('.namespace-select');
+    const select = nsSelect(page);
 
     // dev → only the two dev rows.
     await select.selectOption('dev');
@@ -62,7 +67,7 @@ test.describe('App Configuration namespace filter (#425)', () => {
     await waitForItemList(page);
 
     // Show everything so all namespaces are visible at once.
-    await page.locator('.namespace-select').selectOption('*');
+    await nsSelect(page).selectOption('*');
 
     const badgeFor = (name: string) =>
       page.locator('.item-entry').filter({ hasText: name }).locator('.namespace-badge');
@@ -77,7 +82,7 @@ test.describe('App Configuration namespace filter (#425)', () => {
     await page.goto('/');
     await waitForItemList(page);
 
-    await page.locator('.namespace-select').selectOption('*');
+    await nsSelect(page).selectOption('*');
 
     const namespaceMeta = page.locator('.meta-item').filter({ hasText: 'Namespace' });
 

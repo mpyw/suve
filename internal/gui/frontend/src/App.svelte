@@ -15,7 +15,7 @@
   import SecretView from './lib/SecretView.svelte';
   import Sidebar from './lib/Sidebar.svelte';
   import StagingView from './lib/StagingView.svelte';
-  import { parseError } from './lib/viewUtils';
+  import { NS_ALL, NS_NULL, parseError } from './lib/viewUtils';
 
   type ViewKey = 'param' | 'secret' | 'staging';
 
@@ -34,6 +34,23 @@
   let accountId = $state('');
   let region = $state('');
   let profile = $state('');
+
+  // ---- Azure App Configuration namespace filter -----------------------------
+  // App owns the client-side namespace filter so the dropdown can live in the
+  // sidebar footer while ParamView does the filtering. selectedNamespace defaults
+  // to the scope's namespace ((NULL) when empty); discoveredNamespaces is reported
+  // by ParamView from its loaded rows. It never re-scopes — purely a display filter.
+  let selectedNamespace = $state(NS_NULL);
+  let discoveredNamespaces = $state<string[]>([]);
+
+  // Footer dropdown options: (NULL) first, discovered namespaces (sorted), then *
+  // (all). The scope's current namespace is folded in so the default stays
+  // selectable even before its rows load.
+  const namespaceOptions = $derived.by(() => {
+    const set = new Set(discoveredNamespaces);
+    if (scope?.namespace) set.add(scope.namespace);
+    return [NS_NULL, ...[...set].sort(), NS_ALL];
+  });
 
   // pendingProvider is a provider the user selected that still needs scope input:
   // its form shows in the sidebar while the previously-active provider stays
@@ -243,6 +260,7 @@
     try {
       await SelectScope(sel);
       scope = await GetCurrentScope();
+      resetNamespaceFilter();
       provider = sel.provider;
       pendingProvider = '';
       scopeReady = true;
@@ -264,6 +282,21 @@
     accountId = '';
     region = '';
     profile = '';
+  }
+
+  // Re-seed the namespace filter to the (new) scope's namespace and drop the
+  // discovered list; ParamView re-reports it after the {#key} remount reloads.
+  function resetNamespaceFilter() {
+    discoveredNamespaces = [];
+    selectedNamespace = scope?.namespace ? scope.namespace : NS_NULL;
+  }
+
+  function handleNamespaces(ns: string[]) {
+    discoveredNamespaces = ns;
+  }
+
+  function handleChangeNamespace(ns: string) {
+    selectedNamespace = ns;
   }
 
   function handleNavigate(view: ViewKey) {
@@ -318,11 +351,14 @@
     {accountId}
     {region}
     {profile}
+    {namespaceOptions}
+    {selectedNamespace}
     onnavigate={handleNavigate}
     onselectprovider={handleSelectProvider}
     onselectscope={handleSelectScope}
     oncancelscope={handleCancelScope}
     onchangescope={handleChangeScope}
+    onchangenamespace={handleChangeNamespace}
   />
 
   <main class="main-content">
@@ -336,7 +372,8 @@
           <ParamView
             capability={paramCap}
             {provider}
-            initialNamespace={scope?.namespace ?? ''}
+            {selectedNamespace}
+            onnamespaces={handleNamespaces}
             onnavigatetostaging={() => handleNavigate('staging')}
             onstagingchange={handleStagingChange}
           />
