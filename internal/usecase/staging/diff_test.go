@@ -222,6 +222,37 @@ func TestDiffUseCase_Execute_AutoUnstage_AlreadyDeleted(t *testing.T) {
 	assert.Contains(t, entry.Warning, "already deleted")
 }
 
+// TestDiffUseCase_Execute_DeleteEmptyRemoteNotUnstaged verifies a staged delete
+// of a resource whose remote value is the empty string is NOT auto-unstaged by
+// the identical-value shortcut (#323).
+func TestDiffUseCase_Execute_DeleteEmptyRemoteNotUnstaged(t *testing.T) {
+	t.Parallel()
+
+	store := testutil.NewMockStore()
+	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/empty", staging.Entry{
+		Operation: staging.OperationDelete,
+		StagedAt:  time.Now(),
+	}))
+
+	strategy := newMockDiffStrategy()
+	// The remote value is the empty string (legal in App Config / Key Vault /
+	// Google Cloud); the staged-delete value is also "" — but a delete must not
+	// be cancelled just because both are empty.
+	strategy.fetchResults["/app/empty"] = &staging.FetchResult{Value: "", Identifier: "#1"}
+
+	uc := &usecasestaging.DiffUseCase{Strategy: strategy, Store: store}
+
+	output, err := uc.Execute(t.Context(), usecasestaging.DiffInput{})
+	require.NoError(t, err)
+	require.Len(t, output.Entries, 1)
+	assert.NotEqual(t, usecasestaging.DiffEntryAutoUnstaged, output.Entries[0].Type)
+	assert.Equal(t, staging.OperationDelete, output.Entries[0].Operation)
+
+	// The staged deletion must survive `stage diff`.
+	_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/empty")
+	require.NoError(t, err)
+}
+
 func TestDiffUseCase_Execute_FilterByName(t *testing.T) {
 	t.Parallel()
 

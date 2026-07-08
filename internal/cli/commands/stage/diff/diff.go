@@ -297,7 +297,11 @@ func (r *Runner) outputDiff(
 		remoteValue, stagedValue = jsonutil.TryFormatOrWarn2(remoteValue, stagedValue, r.Stderr, name)
 	}
 
-	if remoteValue == stagedValue {
+	// The identical-value auto-unstage never applies to a delete: deleting a
+	// resource is not a no-op just because its current value happens to be the
+	// empty string (legal in Azure App Configuration / Key Vault / Google
+	// Cloud), so an empty-valued delete must not be silently cancelled.
+	if entry.Operation != staging.OperationDelete && remoteValue == stagedValue {
 		// Auto-unstage since there's no difference
 		if err := r.Store.UnstageEntry(ctx, strategy.Service(), name); err != nil {
 			return fmt.Errorf("failed to unstage %s: %w", name, err)

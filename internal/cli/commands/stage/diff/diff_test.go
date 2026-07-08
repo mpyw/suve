@@ -658,6 +658,36 @@ func TestRun_KeptStagedOnTransientFetchError(t *testing.T) {
 	}
 }
 
+// TestRun_DeleteEmptyRemoteNotUnstaged verifies a staged delete of a resource
+// whose remote value is the empty string is not cancelled by the
+// identical-value shortcut (#323).
+func TestRun_DeleteEmptyRemoteNotUnstaged(t *testing.T) {
+	t.Parallel()
+
+	store := testutil.NewMockStore()
+	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/empty", staging.Entry{
+		Operation: staging.OperationDelete,
+		StagedAt:  time.Now(),
+	}))
+
+	var stdout, stderr bytes.Buffer
+
+	r := &stagediff.Runner{
+		Services:      []stagediff.ServiceStrategy{paramDiff(staging.NewParamStrategy(storeReturning("", "1")))},
+		ProviderLabel: "AWS",
+		Store:         store,
+		Stdout:        &stdout,
+		Stderr:        &stderr,
+	}
+
+	require.NoError(t, r.Run(t.Context(), stagediff.Options{}))
+	assert.NotContains(t, stderr.String(), "unstaged")
+
+	// The staged deletion must survive `stage diff`.
+	_, err := store.GetEntry(t.Context(), staging.ServiceParam, "/app/empty")
+	require.NoError(t, err)
+}
+
 func TestRun_SecretDeleteAutoUnstageWhenAlreadyDeleted(t *testing.T) {
 	t.Parallel()
 
