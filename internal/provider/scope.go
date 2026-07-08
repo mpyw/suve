@@ -73,11 +73,17 @@ func (s Scope) SupportsService(kind Kind) bool {
 	case ProviderGoogleCloud:
 		return kind == KindSecret
 	case ProviderAzure:
-		if s.VaultName != "" {
-			return kind == KindSecret
+		// App Configuration (param) and Key Vault (secret) are INDEPENDENT Azure
+		// resources: each is supported iff its own name is set. A scope may carry
+		// one or both, so they must NOT be mutually exclusive.
+		switch kind {
+		case KindParam:
+			return s.StoreName != ""
+		case KindSecret:
+			return s.VaultName != ""
+		default:
+			return false
 		}
-
-		return kind == KindParam
 	default:
 		return false
 	}

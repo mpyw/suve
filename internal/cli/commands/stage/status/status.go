@@ -3,6 +3,7 @@ package status
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -19,11 +20,26 @@ import (
 
 // Runner executes the status command.
 type Runner struct {
+	// Store, when set, is used for every service (a test seam). When nil each
+	// service resolves its own working store via its spec's ScopeResolver — Azure
+	// App Configuration and Key Vault live in separate staging buckets.
 	Store store.ReadWriteOperator
 	// Services lists the provider services in stable display order.
 	Services []stgcli.GlobalServiceSpec
 	Stdout   io.Writer
 	Stderr   io.Writer
+}
+
+// storeForService returns the injected Store (test seam) or resolves this
+// service's own working store.
+func (r *Runner) storeForService(ctx context.Context, spec stgcli.GlobalServiceSpec) (store.ReadWriteOperator, error) {
+	if r.Store != nil {
+		return r.Store, nil
+	}
+
+	st, _, err := stgcli.WorkingStore(ctx, spec.ScopeResolver)
+
+	return st, err
 }
 
 // Options holds the options for the status command.
@@ -51,13 +67,7 @@ EXAMPLES:
 			},
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
-			store, _, err := stgcli.WorkingStore(ctx, cfg.ScopeResolver)
-			if err != nil {
-				return err
-			}
-
 			r := &Runner{
-				Store:    store,
 				Services: cfg.Services,
 				Stdout:   cmd.Root().Writer,
 				Stderr:   cmd.Root().ErrWriter,
@@ -68,29 +78,32 @@ EXAMPLES:
 	}
 }
 
-// Run executes the status command.
+// Run executes the status command. Each service reads its OWN store; a service
+// whose scope is not configured (e.g. no Key Vault while only App Configuration
+// is set) is skipped — an unconfigured service can hold no staged state.
 func (r *Runner) Run(ctx context.Context, opts Options) error {
-	entries, err := r.Store.ListEntries(ctx, "")
-	if err != nil {
-		return err
-	}
-
-	tagEntries, err := r.Store.ListTags(ctx, "")
-	if err != nil {
-		return err
-	}
-
-	if !hasAnyChanges(entries, tagEntries) {
-		output.Info(r.Stdout, "No changes staged.")
-
-		return nil
-	}
-
 	printer := &staging.EntryPrinter{Writer: r.Stdout}
 	printed := false
 
 	for _, spec := range r.Services {
-		parser := spec.ParserFactory()
+		st, err := r.storeForService(ctx, spec)
+		if errors.Is(err, staging.ErrServiceNotConfigured) {
+			continue
+		}
+
+		if err != nil {
+			return err
+		}
+
+		entries, err := st.ListEntries(ctx, spec.Service)
+		if err != nil {
+			return err
+		}
+
+		tagEntries, err := st.ListTags(ctx, spec.Service)
+		if err != nil {
+			return err
+		}
 
 		svcEntries := entries[spec.Service]
 		svcTags := tagEntries[spec.Service]
@@ -99,6 +112,8 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 		if total == 0 {
 			continue
 		}
+
+		parser := spec.ParserFactory()
 
 		if printed {
 			output.Println(r.Stdout, "")
@@ -112,30 +127,19 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 		printed = true
 	}
 
+	if !printed {
+		output.Info(r.Stdout, "No changes staged.")
+	}
+
 	return nil
 }
 
-// hasAnyChanges reports whether any service has staged entries or tags.
-func hasAnyChanges(entries map[staging.Service]map[string]staging.Entry, tagEntries map[staging.Service]map[string]staging.TagEntry) bool {
-	for _, serviceEntries := range entries {
-		if len(serviceEntries) > 0 {
-			return true
-		}
-	}
-
-	for _, serviceTags := range tagEntries {
-		if len(serviceTags) > 0 {
-			return true
-		}
-	}
-
-	return false
-}
-
 func printEntries(printer *staging.EntryPrinter, entries map[string]staging.Entry, verbose, showDeleteOptions bool) {
-	// Sort names for consistent output
-	for _, name := range maputil.SortedKeys(entries) {
-		printer.PrintEntry(name, entries[name], verbose, showDeleteOptions)
+	// Entries are keyed by the (name, namespace) composite; print each under its
+	// decoded bare name (the printer badges the namespace from the entry).
+	for _, key := range maputil.SortedKeys(entries) {
+		name, _ := staging.SplitEntryKey(key)
+		printer.PrintEntry(name, entries[key], verbose, showDeleteOptions)
 	}
 }
 
