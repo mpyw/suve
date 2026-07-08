@@ -449,6 +449,24 @@ func TestGet_NotFoundMapsSentinel(t *testing.T) {
 	assert.ErrorIs(t, err, provider.ErrNotFound)
 }
 
+// TestGet_VersionNotFoundMapsSentinel guards #318: requesting a nonexistent
+// version selector raises *types.ParameterVersionNotFound, a distinct SDK type
+// from ParameterNotFound, which must also map to the provider.ErrNotFound
+// sentinel so errors.Is drives staging decisions correctly.
+func TestGet_VersionNotFoundMapsSentinel(t *testing.T) {
+	t.Parallel()
+
+	store := param.New(&mockClient{
+		getParameter: func(*ssm.GetParameterInput) (*ssm.GetParameterOutput, error) {
+			return nil, &types.ParameterVersionNotFound{Message: aws.String("no such version")}
+		},
+	})
+
+	_, err := store.Get(t.Context(), "/p", provider.NewVersionRef("999"))
+	require.Error(t, err)
+	assert.ErrorIs(t, err, provider.ErrNotFound)
+}
+
 // paginatedHistoryClient returns history across two pages: page 1 (versions 1,2)
 // with a NextToken, page 2 (version 3) without. Exercises the NextToken loop.
 func paginatedHistoryClient() *mockClient {
