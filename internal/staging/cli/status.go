@@ -1,9 +1,11 @@
 package cli
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"io"
+	"slices"
 	"strings"
 
 	"github.com/mpyw/suve/internal/cli/colors"
@@ -61,14 +63,20 @@ func (r *StatusRunner) Run(ctx context.Context, opts StatusOptions) error {
 
 	printer := &staging.EntryPrinter{Writer: r.Stdout}
 
-	for _, name := range maputil.SortedNames(result.Entries, func(e stagingusecase.StatusEntry) string { return e.Name }) {
-		for _, entry := range result.Entries {
-			if entry.Name == name {
-				printer.PrintEntry(entry.Name, toStagingEntry(entry), opts.Verbose, entry.ShowDeleteOptions)
-
-				break
-			}
+	// Sort by (name, namespace): the same App Configuration key staged under
+	// several namespaces is several distinct entries, so we must print each one
+	// (deduping by name would drop all but one, order-dependently).
+	entries := slices.Clone(result.Entries)
+	slices.SortFunc(entries, func(a, b stagingusecase.StatusEntry) int {
+		if c := cmp.Compare(a.Name, b.Name); c != 0 {
+			return c
 		}
+
+		return cmp.Compare(a.Namespace, b.Namespace)
+	})
+
+	for _, entry := range entries {
+		printer.PrintEntry(entry.Name, toStagingEntry(entry), opts.Verbose, entry.ShowDeleteOptions)
 	}
 
 	// Print tag entries
