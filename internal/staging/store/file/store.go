@@ -559,8 +559,10 @@ func (s *Store) WriteState(_ context.Context, service staging.Service, state *st
 	return nil
 }
 
-// GetEntry retrieves a staged entry.
-func (s *Store) GetEntry(_ context.Context, service staging.Service, name string) (*staging.Entry, error) {
+// GetEntry retrieves a staged entry identified by (name, namespace). Namespace
+// is the App Configuration label axis; empty (the null/default namespace) is
+// the only value for every other provider.
+func (s *Store) GetEntry(_ context.Context, service staging.Service, name, namespace string) (*staging.Entry, error) {
 	defer s.lock()()
 
 	state, err := s.readFile(s.pathFor(service))
@@ -568,7 +570,9 @@ func (s *Store) GetEntry(_ context.Context, service staging.Service, name string
 		return nil, err
 	}
 
-	if entry, ok := state.Entries[service][name]; ok {
+	if entry, ok := state.Entries[service][staging.CompositeEntryKey(name, namespace)]; ok {
+		entry.Namespace = namespace
+
 		return &entry, nil
 	}
 
@@ -646,7 +650,9 @@ func (s *Store) writeServiceState(service staging.Service, state *staging.State)
 	return s.writeFile(s.stateFilePath, state)
 }
 
-// StageEntry adds or updates a staged entry.
+// StageEntry adds or updates a staged entry. The entry is keyed by the
+// (name, entry.Namespace) composite, so App Configuration settings with the same
+// key under different namespaces are distinct staged entries.
 func (s *Store) StageEntry(_ context.Context, service staging.Service, name string, entry staging.Entry) error {
 	defer s.lock()()
 
@@ -655,7 +661,7 @@ func (s *Store) StageEntry(_ context.Context, service staging.Service, name stri
 		return err
 	}
 
-	state.Entries[service][name] = entry
+	state.Entries[service][staging.CompositeEntryKey(name, entry.Namespace)] = entry
 
 	return s.writeServiceState(service, state)
 }
@@ -674,8 +680,8 @@ func (s *Store) StageTag(_ context.Context, service staging.Service, name string
 	return s.writeServiceState(service, state)
 }
 
-// UnstageEntry removes a staged entry.
-func (s *Store) UnstageEntry(_ context.Context, service staging.Service, name string) error {
+// UnstageEntry removes a staged entry identified by (name, namespace).
+func (s *Store) UnstageEntry(_ context.Context, service staging.Service, name, namespace string) error {
 	defer s.lock()()
 
 	state, err := s.readFile(s.pathFor(service))
@@ -683,11 +689,13 @@ func (s *Store) UnstageEntry(_ context.Context, service staging.Service, name st
 		return err
 	}
 
-	if _, ok := state.Entries[service][name]; !ok {
+	key := staging.CompositeEntryKey(name, namespace)
+
+	if _, ok := state.Entries[service][key]; !ok {
 		return staging.ErrNotStaged
 	}
 
-	delete(state.Entries[service], name)
+	delete(state.Entries[service], key)
 
 	return s.writeServiceState(service, state)
 }

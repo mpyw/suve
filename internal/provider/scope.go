@@ -52,12 +52,10 @@ func (s Scope) Key() string {
 			return fmt.Sprintf("azure/keyvault/%s", s.VaultName)
 		}
 
-		// The null (default) namespace keeps the original backward-compatible
-		// path; a named namespace makes staging state per-(store, namespace).
-		if s.AppConfigNamespace != "" {
-			return fmt.Sprintf("azure/appconfig/%s/%s", s.StoreName, s.AppConfigNamespace)
-		}
-
+		// App Configuration staging is per-STORE, not per-namespace: all of a
+		// store's staged settings share one param.json, and each entry carries
+		// its own namespace as part of its identity (see staging.CompositeEntryKey).
+		// The namespace is deliberately NOT in the key.
 		return fmt.Sprintf("azure/appconfig/%s", s.StoreName)
 	default:
 		return ""

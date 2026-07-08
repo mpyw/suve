@@ -97,3 +97,61 @@ func TestAppConfigNamespaceLister_Gate(t *testing.T) {
 	_, isLister = neutralStore.(appConfigNamespaceLister)
 	assert.False(t, isLister, "neutral provider stores must not expose ListWithNamespaces")
 }
+
+// TestUseAppConfigParamNamespace verifies the create-target namespace guard that
+// backs the GUI namespaced-create (#431): a single concrete namespace aligns the
+// scope, a filter value (`*` / `,`-list) is rejected, and non-App-Config scopes
+// are left untouched.
+func TestUseAppConfigParamNamespace(t *testing.T) {
+	t.Parallel()
+
+	appConfigScope := func() provider.Scope {
+		return provider.Scope{Provider: provider.ProviderAzure, StoreName: "store"}
+	}
+
+	t.Run("concrete namespace aligns the scope", func(t *testing.T) {
+		t.Parallel()
+
+		app := &App{ctx: t.Context(), scope: appConfigScope()}
+		require.NoError(t, app.useAppConfigParamNamespace("dev"))
+		assert.Equal(t, "dev", app.currentScope().AppConfigNamespace)
+	})
+
+	t.Run("empty namespace is the null/default", func(t *testing.T) {
+		t.Parallel()
+
+		app := &App{ctx: t.Context(), scope: provider.Scope{
+			Provider: provider.ProviderAzure, StoreName: "store", AppConfigNamespace: "dev",
+		}}
+		require.NoError(t, app.useAppConfigParamNamespace(""))
+		assert.Empty(t, app.currentScope().AppConfigNamespace)
+	})
+
+	t.Run("escaped literal is decoded", func(t *testing.T) {
+		t.Parallel()
+
+		app := &App{ctx: t.Context(), scope: appConfigScope()}
+		require.NoError(t, app.useAppConfigParamNamespace(`a\*b`))
+		assert.Equal(t, "a*b", app.currentScope().AppConfigNamespace)
+	})
+
+	t.Run("filter values are rejected", func(t *testing.T) {
+		t.Parallel()
+
+		for _, ns := range []string{"*", "dev,prd", "dev*"} {
+			app := &App{ctx: t.Context(), scope: appConfigScope()}
+			err := app.useAppConfigParamNamespace(ns)
+			require.Error(t, err, "namespace %q names all/multiple and must be rejected", ns)
+			assert.Empty(t, app.currentScope().AppConfigNamespace, "a rejected namespace must not mutate the scope")
+		}
+	})
+
+	t.Run("non-App-Config scope is untouched", func(t *testing.T) {
+		t.Parallel()
+
+		app := &App{ctx: t.Context(), scope: provider.Scope{Provider: provider.ProviderAWS}}
+		// Even a filter-shaped value is a no-op: AWS has no namespace axis.
+		require.NoError(t, app.useAppConfigParamNamespace("*"))
+		assert.Empty(t, app.currentScope().AppConfigNamespace)
+	})
+}

@@ -16,6 +16,10 @@ type DeleteInput struct {
 	Name           string
 	Force          bool // For Secrets Manager: force immediate deletion
 	RecoveryWindow int  // For Secrets Manager: days before permanent deletion (7-30)
+	// Namespace is the Azure App Configuration namespace of the setting being
+	// deleted; empty is the null/default namespace and the only value for every
+	// other provider.
+	Namespace string
 }
 
 // DeleteOutput holds the result of the delete use case.
@@ -73,7 +77,7 @@ func (u *DeleteUseCase) Execute(ctx context.Context, input DeleteInput) (*Delete
 	}
 
 	// Load current state with CurrentValue for existence check
-	entryState, err := transition.LoadEntryState(ctx, u.Store, service, input.Name, currentValue)
+	entryState, err := transition.LoadEntryState(ctx, u.Store, service, input.Name, input.Namespace, currentValue)
 	if err != nil {
 		return nil, err
 	}
@@ -87,7 +91,7 @@ func (u *DeleteUseCase) Execute(ctx context.Context, input DeleteInput) (*Delete
 	// Check if we should unstage a CREATE
 	if result.DiscardTags {
 		// CREATE -> NotStaged: unstage entry and tags
-		if err := u.Store.UnstageEntry(ctx, service, input.Name); err != nil {
+		if err := u.Store.UnstageEntry(ctx, service, input.Name, input.Namespace); err != nil {
 			return nil, err
 		}
 		// Unstage tags too (ignore ErrNotStaged)
@@ -102,7 +106,7 @@ func (u *DeleteUseCase) Execute(ctx context.Context, input DeleteInput) (*Delete
 	}
 
 	// Stage delete with options (single persist)
-	if err := u.stageDeleteWithOptions(ctx, service, input.Name, lastModified, hasDeleteOptions, input.Force, input.RecoveryWindow); err != nil {
+	if err := u.stageDeleteWithOptions(ctx, service, input.Name, input.Namespace, lastModified, hasDeleteOptions, input.Force, input.RecoveryWindow); err != nil {
 		return nil, err
 	}
 
@@ -121,9 +125,10 @@ func (u *DeleteUseCase) Execute(ctx context.Context, input DeleteInput) (*Delete
 // stageDeleteWithOptions stages a delete entry with optional delete options.
 //
 //nolint:lll // function parameters are descriptive for clarity
-func (u *DeleteUseCase) stageDeleteWithOptions(ctx context.Context, service staging.Service, name string, lastModified time.Time, hasDeleteOptions, force bool, recoveryWindow int) error {
+func (u *DeleteUseCase) stageDeleteWithOptions(ctx context.Context, service staging.Service, name, namespace string, lastModified time.Time, hasDeleteOptions, force bool, recoveryWindow int) error {
 	entry := staging.Entry{
 		Operation: staging.OperationDelete,
+		Namespace: namespace,
 		StagedAt:  time.Now(),
 	}
 	if !lastModified.IsZero() {

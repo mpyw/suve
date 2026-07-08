@@ -16,6 +16,10 @@ type AddInput struct {
 	Name        string
 	Value       string
 	Description string
+	// Namespace is the Azure App Configuration namespace to stage under (the
+	// label axis); empty is the null/default namespace and the only value for
+	// every other provider.
+	Namespace string
 }
 
 // AddOutput holds the result of the add use case.
@@ -55,7 +59,7 @@ func (u *AddUseCase) Execute(ctx context.Context, input AddInput) (*AddOutput, e
 	}
 
 	// Load current state with AWS existence check
-	entryState, err := transition.LoadEntryState(ctx, u.Store, service, name, currentValue)
+	entryState, err := transition.LoadEntryState(ctx, u.Store, service, name, input.Namespace, currentValue)
 	if err != nil {
 		return nil, err
 	}
@@ -68,7 +72,7 @@ func (u *AddUseCase) Execute(ctx context.Context, input AddInput) (*AddOutput, e
 		opts.Description = &input.Description
 	}
 
-	_, err = executor.ExecuteEntry(ctx, service, name, entryState, transition.EntryActionAdd{Value: input.Value}, opts)
+	_, err = executor.ExecuteEntry(ctx, service, name, input.Namespace, entryState, transition.EntryActionAdd{Value: input.Value}, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -78,7 +82,8 @@ func (u *AddUseCase) Execute(ctx context.Context, input AddInput) (*AddOutput, e
 
 // DraftInput holds input for getting draft (staged create) value.
 type DraftInput struct {
-	Name string
+	Name      string
+	Namespace string
 }
 
 // DraftOutput holds the draft value if any.
@@ -97,7 +102,7 @@ func (u *AddUseCase) Draft(ctx context.Context, input DraftInput) (*DraftOutput,
 		return nil, err
 	}
 
-	stagedEntry, err := u.Store.GetEntry(ctx, service, name)
+	stagedEntry, err := u.Store.GetEntry(ctx, service, name, input.Namespace)
 	if err != nil {
 		if errors.Is(err, staging.ErrNotStaged) {
 			return &DraftOutput{IsStaged: false}, nil

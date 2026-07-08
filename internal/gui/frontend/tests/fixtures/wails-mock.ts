@@ -931,16 +931,20 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
           entries: versions.map((v: any) => ({ ...v, secret: v.type === 'SecureString' })),
         };
       },
-      ParamSet: async (name: string, value: string, _type: string) => {
+      ParamSet: async (name: string, value: string, _type: string, namespace?: string) => {
         // Simulate error if configured
         if (state.simulateError?.operation === 'ParamSet') {
           throw new Error(state.simulateError.message);
         }
-        const existing = state.params.find((p: any) => p.name === name);
+        // App Configuration keys are per-(name, namespace); match on both so a
+        // create under a new namespace doesn't collide with the same key
+        // elsewhere. Empty namespace is the null/default.
+        const ns = namespace ?? '';
+        const existing = state.params.find((p: any) => p.name === name && (p.namespace ?? '') === ns);
         if (existing) {
           existing.value = value;
         } else {
-          state.params.push({ name, type: 'String', value });
+          state.params.push({ name, type: 'String', value, namespace: ns });
         }
         return { name, version: 2, isCreated: !existing };
       },
@@ -1179,9 +1183,11 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
           return { type: 'all', serviceName: 'secret', count };
         }
       },
-      StagingAdd: async (service: string, name: string, value: string) => {
+      StagingAdd: async (service: string, name: string, value: string, namespace?: string) => {
         const staged = service === 'param' ? currentBucket().param : currentBucket().secret;
-        staged.push({ name, operation: 'create', value });
+        // Record the namespace the create targets (App Config only) so specs can
+        // assert it; empty/omitted is the null/default namespace.
+        staged.push({ name, operation: 'create', value, namespace: namespace ?? '' });
         return { name };
       },
       StagingEdit: async (service: string, name: string, value: string) => {

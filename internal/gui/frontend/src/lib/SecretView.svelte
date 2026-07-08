@@ -245,7 +245,7 @@
         await SecretCreate(createForm.name, createForm.value);
         await loadSecrets({ prefix, filter, withValue });
       } else {
-        await StagingAdd('secret', createForm.name, createForm.value);
+        await StagingAdd('secret', createForm.name, createForm.value, '');
         onstagingchange?.();
       }
       showCreateModal = false;

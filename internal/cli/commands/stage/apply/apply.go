@@ -252,7 +252,7 @@ func (r *Runner) applyService(ctx context.Context, strategy staging.ApplyStrateg
 				output.Success(r.Stdout, "%s: Deleted %s", serviceName, name)
 			}
 
-			if err := r.Store.UnstageEntry(ctx, service, name); err != nil {
+			if err := r.Store.UnstageEntry(ctx, service, name, ""); err != nil {
 				output.Warning(r.Stderr, "failed to clear staging for %s: %v", name, err)
 			}
 

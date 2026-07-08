@@ -359,7 +359,20 @@ func (a *App) StagingReset(service string) (*StagingResetResult, error) {
 }
 
 // StagingAdd stages a create operation for a new item.
-func (a *App) StagingAdd(service, name, value string) (*StagingAddResult, error) {
+//
+// namespace selects the Azure App Configuration namespace to stage the create
+// under (param service only); empty is the null/default namespace. Staging is
+// per-(store, namespace), so aligning the scope here keeps the staged create in
+// the same namespace it is applied to (#431). It must name a single concrete
+// namespace — a filter value (`*` / `,`-list) is rejected. It is ignored for the
+// secret service and for non-App-Configuration providers.
+func (a *App) StagingAdd(service, name, value, namespace string) (*StagingAddResult, error) {
+	if service == string(staging.ServiceParam) {
+		if err := a.useAppConfigParamNamespace(namespace); err != nil {
+			return nil, err
+		}
+	}
+
 	store, err := a.getStagingStore()
 	if err != nil {
 		return nil, err
@@ -443,8 +456,10 @@ func (a *App) StagingDelete(service, name string, force bool, recoveryWindow int
 	return &StagingDeleteResult{Name: result.Name}, nil
 }
 
-// StagingUnstage removes an item from staging (both entry and tags).
-func (a *App) StagingUnstage(service, name string) (*StagingUnstageResult, error) {
+// StagingUnstage removes an item from staging (both entry and tags). namespace
+// selects the Azure App Configuration namespace of the entry (empty for the
+// null/default namespace and every other provider).
+func (a *App) StagingUnstage(service, name, namespace string) (*StagingUnstageResult, error) {
 	store, err := a.getStagingStore()
 	if err != nil {
 		return nil, err
@@ -456,7 +471,7 @@ func (a *App) StagingUnstage(service, name string) (*StagingUnstageResult, error
 	}
 
 	// Unstage entry (ignore ErrNotStaged)
-	if err := store.UnstageEntry(a.ctx, svc, name); err != nil && !errors.Is(err, staging.ErrNotStaged) {
+	if err := store.UnstageEntry(a.ctx, svc, name, namespace); err != nil && !errors.Is(err, staging.ErrNotStaged) {
 		return nil, err
 	}
 
@@ -601,7 +616,7 @@ type StagingCheckStatusResult struct {
 }
 
 // StagingCheckStatus checks if a specific item has staged entry or tag changes.
-func (a *App) StagingCheckStatus(service, name string) (*StagingCheckStatusResult, error) {
+func (a *App) StagingCheckStatus(service, name, namespace string) (*StagingCheckStatusResult, error) {
 	store, err := a.getStagingStore()
 	if err != nil {
 		return nil, err
@@ -615,7 +630,7 @@ func (a *App) StagingCheckStatus(service, name string) (*StagingCheckStatusResul
 	result := &StagingCheckStatusResult{}
 
 	// Check for staged entry
-	if _, err := store.GetEntry(a.ctx, svc, name); err == nil {
+	if _, err := store.GetEntry(a.ctx, svc, name, namespace); err == nil {
 		result.HasEntry = true
 	}
 

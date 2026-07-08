@@ -13,6 +13,7 @@ import (
 	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/provider/aws"
 	"github.com/mpyw/suve/internal/provider/azure"
+	"github.com/mpyw/suve/internal/provider/azure/appconfig/aznamespace"
 	"github.com/mpyw/suve/internal/provider/gcloud"
 	"github.com/mpyw/suve/internal/staging"
 	"github.com/mpyw/suve/internal/staging/store"
@@ -310,6 +311,34 @@ func (a *App) paramStore() (provider.Store, error) {
 // registry (AWS by default).
 func (a *App) secretStore() (provider.Store, error) {
 	return registry.Store(a.ctx, a.currentScope(), provider.KindSecret)
+}
+
+// useAppConfigParamNamespace points the current param scope at a single concrete
+// Azure App Configuration namespace so a subsequent create/stage targets exactly
+// one (key, namespace). Because staging state, the staging view, and writes all
+// key on scope.AppConfigNamespace (scope.Key() = azure/appconfig/{store}/{ns}),
+// aligning the scope here keeps a staged create visible in the same namespace it
+// was created under (#431). It is a no-op unless the active scope is Azure App
+// Configuration, and rejects a filter value (`*` / `,`-list) via aznamespace.Literal
+// — a create must name one namespace, not all/many. Empty ns is the null
+// (default) namespace.
+func (a *App) useAppConfigParamNamespace(ns string) error {
+	a.scopeMu.Lock()
+	defer a.scopeMu.Unlock()
+
+	// Only Azure App Configuration has a namespace axis on the param service.
+	if a.scope.Provider != provider.ProviderAzure || a.scope.StoreName == "" {
+		return nil
+	}
+
+	literal, err := aznamespace.Literal(ns)
+	if err != nil {
+		return err
+	}
+
+	a.scope.AppConfigNamespace = literal
+
+	return nil
 }
 
 func (a *App) getStagingStore() (store.ReadWriteOperator, error) {

@@ -4,10 +4,41 @@ package staging
 import (
 	"errors"
 	"maps"
+	"strings"
 	"time"
 
 	"github.com/mpyw/suve/internal/maputil"
 )
+
+// namespaceSep separates the namespace from the name in a composite entry key.
+// NUL can appear in neither an App Configuration key nor a label, so it is a
+// collision-proof separator.
+const namespaceSep = "\x00"
+
+// CompositeEntryKey is the map/storage key identifying a staged entry. For
+// Azure App Configuration a setting is identified by (name, namespace), so the
+// namespace is folded into the key. It collapses to the bare name when the
+// namespace is empty — the null/default namespace and the only case for every
+// other provider — so those providers' in-memory keys and on-disk JSON are
+// byte-for-byte unchanged.
+func CompositeEntryKey(name, namespace string) string {
+	if namespace == "" {
+		return name
+	}
+
+	return namespace + namespaceSep + name
+}
+
+// SplitEntryKey is the inverse of CompositeEntryKey: it recovers the (name,
+// namespace) a composite key encodes. A key with no separator is a bare name in
+// the null/default namespace.
+func SplitEntryKey(key string) (name, namespace string) {
+	if i := strings.IndexByte(key, 0); i >= 0 {
+		return key[i+1:], key[:i]
+	}
+
+	return key, ""
+}
 
 // stateVersion is the current version of the staging state format.
 const stateVersion = 2
@@ -30,6 +61,12 @@ type Entry struct {
 	Operation   Operation `json:"operation"`
 	Value       *string   `json:"value,omitempty"` // nil for delete, pointer to distinguish from empty string
 	Description *string   `json:"description,omitempty"`
+	// Namespace is part of an entry's identity for Azure App Configuration (the
+	// label axis); empty is the null/default namespace and the only value for
+	// every other provider. Staged entries live in one file per store, keyed by
+	// the (name, namespace) composite, so the same key staged under two
+	// namespaces is two distinct entries. See CompositeEntryKey.
+	Namespace string `json:"namespace,omitempty"`
 	//nolint:tagliatelle // JSON uses snake_case for consistency with file storage format
 	StagedAt time.Time `json:"staged_at"`
 	// BaseModifiedAt records the AWS LastModified time when the value was fetched.

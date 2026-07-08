@@ -49,13 +49,15 @@ func NewMockStore() *MockStore {
 	}
 }
 
-// GetEntry retrieves a staged entry.
-func (m *MockStore) GetEntry(_ context.Context, service staging.Service, name string) (*staging.Entry, error) {
+// GetEntry retrieves a staged entry identified by (name, namespace).
+func (m *MockStore) GetEntry(_ context.Context, service staging.Service, name, namespace string) (*staging.Entry, error) {
 	if m.GetEntryErr != nil {
 		return nil, m.GetEntryErr
 	}
 
-	if entry, ok := m.entries[service][name]; ok {
+	if entry, ok := m.entries[service][staging.CompositeEntryKey(name, namespace)]; ok {
+		entry.Namespace = namespace
+
 		return &entry, nil
 	}
 
@@ -75,13 +77,14 @@ func (m *MockStore) GetTag(_ context.Context, service staging.Service, name stri
 	return nil, staging.ErrNotStaged
 }
 
-// StageEntry adds or updates a staged entry change.
+// StageEntry adds or updates a staged entry change, keyed by the
+// (name, entry.Namespace) composite.
 func (m *MockStore) StageEntry(_ context.Context, service staging.Service, name string, entry staging.Entry) error {
 	if m.StageEntryErr != nil {
 		return m.StageEntryErr
 	}
 
-	m.entries[service][name] = entry
+	m.entries[service][staging.CompositeEntryKey(name, entry.Namespace)] = entry
 
 	return nil
 }
@@ -97,17 +100,19 @@ func (m *MockStore) StageTag(_ context.Context, service staging.Service, name st
 	return nil
 }
 
-// UnstageEntry removes a staged entry change.
-func (m *MockStore) UnstageEntry(_ context.Context, service staging.Service, name string) error {
+// UnstageEntry removes a staged entry change identified by (name, namespace).
+func (m *MockStore) UnstageEntry(_ context.Context, service staging.Service, name, namespace string) error {
 	if m.UnstageEntryErr != nil {
 		return m.UnstageEntryErr
 	}
 
-	if _, ok := m.entries[service][name]; !ok {
+	key := staging.CompositeEntryKey(name, namespace)
+
+	if _, ok := m.entries[service][key]; !ok {
 		return staging.ErrNotStaged
 	}
 
-	delete(m.entries[service], name)
+	delete(m.entries[service], key)
 
 	return nil
 }

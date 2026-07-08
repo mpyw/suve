@@ -29,9 +29,12 @@ const (
 
 // ApplyEntryResult represents the result of applying a single entry.
 type ApplyEntryResult struct {
-	Name   string
-	Status ApplyResultStatus
-	Error  error
+	Name string
+	// Namespace is the App Configuration namespace the entry was applied under
+	// (empty for the null/default namespace and every other provider).
+	Namespace string
+	Status    ApplyResultStatus
+	Error     error
 	// UnstageError is set when the cloud apply succeeded but clearing the entry
 	// from the staging store afterwards failed. The entry is still staged, so a
 	// later apply would re-run it; callers must surface this rather than ignore it.
@@ -69,6 +72,22 @@ type ApplyOutput struct {
 type ApplyUseCase struct {
 	Strategy staging.ApplyStrategy
 	Store    store.ReadWriteOperator
+	// StrategyFor, when set, resolves the ApplyStrategy for a given namespace so
+	// each staged entry is applied through a provider store scoped to its own
+	// namespace (Azure App Configuration, whose settings share one staging store
+	// across namespaces). When nil, Strategy applies every entry — the case for
+	// namespace-agnostic providers (AWS, Google Cloud, Key Vault).
+	StrategyFor func(namespace string) (staging.ApplyStrategy, error)
+}
+
+// strategyForNamespace returns the apply strategy scoped to the given namespace,
+// falling back to the single Strategy when no resolver is configured.
+func (u *ApplyUseCase) strategyForNamespace(namespace string) (staging.ApplyStrategy, error) {
+	if u.StrategyFor == nil {
+		return u.Strategy, nil
+	}
+
+	return u.StrategyFor(namespace)
 }
 
 // Execute runs the apply use case.
@@ -96,17 +115,23 @@ func (u *ApplyUseCase) Execute(ctx context.Context, input ApplyInput) (*ApplyOut
 	entries := stagedEntries[service]
 	tags := stagedTags[service]
 
-	// Filter by name if specified
+	// Filter by name if specified. Entries are keyed by the (name, namespace)
+	// composite, so match on the decoded bare name — for App Configuration this
+	// applies the named setting across every namespace it is staged under.
 	if input.Name != "" {
 		filteredEntries := make(map[string]staging.Entry)
 		filteredTags := make(map[string]staging.TagEntry)
 
-		if entry, exists := entries[input.Name]; exists {
-			filteredEntries[input.Name] = entry
+		for key, entry := range entries {
+			if name, _ := staging.SplitEntryKey(key); name == input.Name {
+				filteredEntries[key] = entry
+			}
 		}
 
-		if tagEntry, exists := tags[input.Name]; exists {
-			filteredTags[input.Name] = tagEntry
+		for key, tagEntry := range tags {
+			if name, _ := staging.SplitEntryKey(key); name == input.Name {
+				filteredTags[key] = tagEntry
+			}
 		}
 
 		if len(filteredEntries) == 0 && len(filteredTags) == 0 {
@@ -154,18 +179,27 @@ func (u *ApplyUseCase) Execute(ctx context.Context, input ApplyInput) (*ApplyOut
 }
 
 func (u *ApplyUseCase) applyEntries(ctx context.Context, service staging.Service, entries map[string]staging.Entry, output *ApplyOutput) {
-	// Execute apply operations in parallel
-	results := parallel.ExecuteMap(ctx, entries, func(ctx context.Context, name string, entry staging.Entry) (staging.Operation, error) {
-		err := u.Strategy.Apply(ctx, name, entry)
+	// Execute apply operations in parallel. Entries are keyed by the composite
+	// (name, namespace); each is applied through the strategy scoped to its own
+	// namespace (App Configuration) or the single strategy (other providers).
+	results := parallel.ExecuteMap(ctx, entries, func(ctx context.Context, key string, entry staging.Entry) (staging.Operation, error) {
+		name, _ := staging.SplitEntryKey(key)
 
-		return entry.Operation, err
+		strat, err := u.strategyForNamespace(entry.Namespace)
+		if err != nil {
+			return entry.Operation, err
+		}
+
+		return entry.Operation, strat.Apply(ctx, name, entry)
 	})
 
 	// Collect results
-	for name := range entries {
-		result := results[name]
+	for key, entry := range entries {
+		name, _ := staging.SplitEntryKey(key)
+		result := results[key]
 		resultEntry := ApplyEntryResult{
-			Name: name,
+			Name:      name,
+			Namespace: entry.Namespace,
 		}
 
 		if result.Err != nil {
@@ -184,7 +218,7 @@ func (u *ApplyUseCase) applyEntries(ctx context.Context, service staging.Service
 			// Unstage successful operations. A failure here leaves the entry
 			// staged after a successful cloud apply, so record it rather than
 			// discarding it — a silent leftover would be re-applied next time.
-			if err := u.Store.UnstageEntry(ctx, service, name); err != nil {
+			if err := u.Store.UnstageEntry(ctx, service, name, entry.Namespace); err != nil {
 				resultEntry.UnstageError = err
 			}
 

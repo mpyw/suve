@@ -67,16 +67,39 @@
   let detailLoading = $state(false);
   let showValue = $state(false);
 
-  // Report the distinct namespaces present in the loaded rows (sorted) up to App
-  // (App Config only), which owns the footer Namespace dropdown and its options.
-  $effect(() => {
-    if (!isAppConfig) return;
+  // Distinct namespaces present in the loaded rows (sorted). Feeds both the App
+  // footer dropdown (via onnamespaces) and the create form's suggestions.
+  const discoveredNamespaces = $derived.by(() => {
+    if (!isAppConfig) return [] as string[];
     const discovered = new Set<string>();
     for (const e of entries) {
       if (e.namespace) discovered.add(e.namespace);
     }
-    onnamespaces?.([...discovered].sort());
+    return [...discovered].sort();
   });
+
+  // Report them up to App (App Config only), which owns the footer Namespace
+  // dropdown and its options.
+  $effect(() => {
+    if (!isAppConfig) return;
+    onnamespaces?.(discoveredNamespaces);
+  });
+
+  // A create must target exactly one (key, namespace). When the namespace filter
+  // shows all (*) or multiple (a ,-list), there is no single target, so creation
+  // is blocked until the user narrows the filter (the backend guard is the
+  // backstop). Only meaningful for App Config.
+  const createNamespaceBlocked = $derived(
+    isAppConfig && (selectedNamespace === NS_ALL || selectedNamespace.includes(',')),
+  );
+
+  // The namespace a new setting is created under, derived from the current
+  // filter: a concrete namespace prefills itself; (NULL)/all/multi prefill the
+  // null namespace ("") — for all/multi the form is blocked anyway.
+  function defaultCreateNamespace(): string {
+    if (!isAppConfig || createNamespaceBlocked || selectedNamespace === NS_NULL) return '';
+    return selectedNamespace;
+  }
 
   // Rows actually displayed. Non-App-Config providers show every row; App Config
   // narrows by the selected namespace client-side (like the prefix/regex filters).
@@ -96,7 +119,7 @@
   // Parameter type options are provider-driven (fetched from the backend), so
   // the UI never hardcodes SSM type strings.
   let paramTypeOptions: string[] = $state([]);
-  let setForm = $state({ name: '', value: '', type: '' });
+  let setForm = $state({ name: '', value: '', type: '', namespace: '' });
   let isEditMode = $state(false);
   let deleteTarget = $state('');
   let modalLoading = $state(false);
@@ -258,10 +281,11 @@
   // Set modal
   function openSetModal(name?: string) {
     if (name && paramDetail) {
-      setForm = { name, value: paramDetail.value, type: paramDetail.type };
+      // Edit targets the selected entry's own namespace (read-only in the form).
+      setForm = { name, value: paramDetail.value, type: paramDetail.type, namespace: selectedEntryNamespace };
       isEditMode = true;
     } else {
-      setForm = { name: prefix || '', value: '', type: paramTypeOptions[0] ?? '' };
+      setForm = { name: prefix || '', value: '', type: paramTypeOptions[0] ?? '', namespace: defaultCreateNamespace() };
       isEditMode = false;
     }
     modalError = '';
@@ -278,8 +302,11 @@
     modalError = '';
     try {
       const isEdit = paramDetail && selectedParam === setForm.name;
+      // App Config: create targets the form's namespace; edit targets the
+      // existing entry's namespace. Other providers ignore this argument.
+      const targetNamespace = isEdit ? selectedEntryNamespace : setForm.namespace;
       if (immediate) {
-        await ParamSet(setForm.name, setForm.value, setForm.type);
+        await ParamSet(setForm.name, setForm.value, setForm.type, targetNamespace);
         await loadParams({ prefix, filter, recursive, withValue });
         if (isEdit) {
           await selectParam(setForm.name, selectedEntryNamespace);
@@ -288,7 +315,7 @@
         if (isEdit) {
           await StagingEdit('param', setForm.name, setForm.value);
         } else {
-          await StagingAdd('param', setForm.name, setForm.value);
+          await StagingAdd('param', setForm.name, setForm.value, targetNamespace);
         }
         onstagingchange?.();
         // Refresh staging status to update the indicator
@@ -650,6 +677,31 @@
         disabled={!!paramDetail && selectedParam === setForm.name}
       />
     </div>
+    {#if isAppConfig}
+      {#if !isEditMode && createNamespaceBlocked}
+        <div class="modal-warning" data-testid="ns-blocked">
+          Pick a single namespace to create under — currently viewing all namespaces.
+        </div>
+      {:else}
+        <div class="form-group">
+          <label for="param-namespace">Namespace</label>
+          <input
+            id="param-namespace"
+            type="text"
+            class="form-input"
+            list="param-namespace-suggestions"
+            bind:value={setForm.namespace}
+            placeholder="(NULL) — default namespace"
+            disabled={isEditMode}
+          />
+          <datalist id="param-namespace-suggestions">
+            {#each discoveredNamespaces as ns}
+              <option value={ns}></option>
+            {/each}
+          </datalist>
+        </div>
+      {/if}
+    {/if}
     {#if typeEnabled}
       <div class="form-group">
         <label for="param-type">Type</label>
@@ -678,7 +730,7 @@
     {/if}
     <div class="form-actions">
       <button type="button" class="btn-secondary" onclick={() => showSetModal = false}>Cancel</button>
-      <button type="submit" class="btn-primary" disabled={modalLoading}>
+      <button type="submit" class="btn-primary" disabled={modalLoading || (!isEditMode && createNamespaceBlocked)}>
         {modalLoading ? (immediate ? 'Saving...' : 'Staging...') : (immediate ? 'Save' : 'Stage')}
       </button>
     </div>

@@ -64,8 +64,10 @@ func (u *TagUseCase) loadTagContext(ctx context.Context, inputName string) (*tag
 		return nil, err
 	}
 
-	// Load current entry state with CurrentValue for existence check in reducer
-	entryState, err := transition.LoadEntryState(ctx, u.Store, service, name, currentValue)
+	// Load current entry state with CurrentValue for existence check in reducer.
+	// Tag staging is keyed by name only (not per-namespace), so the null/default
+	// namespace ("") is used for the entry lookup.
+	entryState, err := transition.LoadEntryState(ctx, u.Store, service, name, "", currentValue)
 	if err != nil {
 		return nil, err
 	}
