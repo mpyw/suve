@@ -40,10 +40,11 @@ func Open(ctx context.Context, content string) (string, error) {
 		return "", err
 	}
 
-	// Split editor command to support multi-argument editors like "code --wait"
-	args := strings.Fields(editor)
-	args = append(args, tmpFile.Name())
-	cmd := exec.CommandContext(ctx, args[0], args[1:]...) //nolint:gosec // Editor command from user environment
+	// Invoke the editor through the shell so that quoting and arguments behave
+	// exactly like Git does. The temp-file path is passed as $1 so that $EDITOR,
+	// which may itself contain flags and a space-containing path, is expanded by
+	// the shell (e.g. "code --wait" or "/Applications/Visual Studio Code.app/.../code").
+	cmd := exec.CommandContext(ctx, "sh", "-c", editor+` "$1"`, "sh", tmpFile.Name()) //nolint:gosec // $EDITOR is user-controlled by design
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
