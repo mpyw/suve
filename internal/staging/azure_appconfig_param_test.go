@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/mpyw/suve/internal/domain"
+	"github.com/mpyw/suve/internal/maputil"
 	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/provider/providermock"
 	"github.com/mpyw/suve/internal/staging"
@@ -177,14 +178,65 @@ func TestAzureAppConfigParamStrategy_LastWriteWins(t *testing.T) {
 	assert.True(t, got.IsZero())
 }
 
-// TestAzureAppConfigParamStrategy_ApplyTagsUnsupported asserts tag mutation is
-// rejected.
-func TestAzureAppConfigParamStrategy_ApplyTagsUnsupported(t *testing.T) {
+// TestAzureAppConfigParamStrategy_ApplyTags asserts staged tag changes forward
+// to the store's Tag (adds) and Untag (removes).
+func TestAzureAppConfigParamStrategy_ApplyTags(t *testing.T) {
 	t.Parallel()
 
-	s := staging.NewAzureAppConfigParamStrategy(&providermock.Store{})
-	err := s.ApplyTags(t.Context(), "cfg", staging.TagEntry{Add: map[string]string{"k": "v"}})
-	require.ErrorIs(t, err, staging.ErrAppConfigTagsUnsupported)
+	t.Run("adds and removes forward to Tag/Untag", func(t *testing.T) {
+		t.Parallel()
+
+		var (
+			gotAdd    map[string]string
+			gotRemove []string
+		)
+
+		store := &providermock.Store{
+			TagFunc: func(_ context.Context, _ string, add map[string]string) error {
+				gotAdd = add
+
+				return nil
+			},
+			UntagFunc: func(_ context.Context, _ string, keys []string) error {
+				gotRemove = keys
+
+				return nil
+			},
+		}
+		s := staging.NewAzureAppConfigParamStrategy(store)
+
+		err := s.ApplyTags(t.Context(), "cfg", staging.TagEntry{
+			Add:    map[string]string{"env": "prod"},
+			Remove: maputil.NewSet("old"),
+		})
+		require.NoError(t, err)
+		assert.Equal(t, map[string]string{"env": "prod"}, gotAdd)
+		assert.Equal(t, []string{"old"}, gotRemove)
+	})
+
+	t.Run("add error is wrapped", func(t *testing.T) {
+		t.Parallel()
+
+		boom := errors.New("boom")
+		store := &providermock.Store{
+			TagFunc: func(_ context.Context, _ string, _ map[string]string) error { return boom },
+		}
+		s := staging.NewAzureAppConfigParamStrategy(store)
+		err := s.ApplyTags(t.Context(), "cfg", staging.TagEntry{Add: map[string]string{"k": "v"}})
+		require.ErrorIs(t, err, boom)
+	})
+
+	t.Run("remove error is wrapped", func(t *testing.T) {
+		t.Parallel()
+
+		boom := errors.New("boom")
+		store := &providermock.Store{
+			UntagFunc: func(_ context.Context, _ string, _ []string) error { return boom },
+		}
+		s := staging.NewAzureAppConfigParamStrategy(store)
+		err := s.ApplyTags(t.Context(), "cfg", staging.TagEntry{Remove: maputil.NewSet("k")})
+		require.ErrorIs(t, err, boom)
+	})
 }
 
 func TestAzureAppConfigParamStrategy_Fetch(t *testing.T) {
@@ -215,10 +267,40 @@ func TestAzureAppConfigParamStrategy_Fetch(t *testing.T) {
 		require.ErrorIs(t, err, boom)
 	})
 
-	t.Run("FetchCurrentTags returns nil", func(t *testing.T) {
+	t.Run("FetchCurrentTags returns the setting's tags", func(t *testing.T) {
 		t.Parallel()
 
-		tags, err := staging.NewAzureAppConfigParamStrategy(&providermock.Store{}).FetchCurrentTags(t.Context(), "cfg")
+		store := &providermock.Store{
+			GetFunc: func(_ context.Context, name string, _ provider.VersionRef) (*domain.Entry, error) {
+				return &domain.Entry{
+					Name: name,
+					Tags: []domain.Tag{{Key: "env", Value: "prod"}, {Key: "team", Value: "core"}},
+				}, nil
+			},
+		}
+		tags, err := staging.NewAzureAppConfigParamStrategy(store).FetchCurrentTags(t.Context(), "cfg")
+		require.NoError(t, err)
+		assert.Equal(t, map[string]string{"env": "prod", "team": "core"}, tags)
+	})
+
+	t.Run("FetchCurrentTags: not-found yields nil, no tags yields nil", func(t *testing.T) {
+		t.Parallel()
+
+		notFound := &providermock.Store{
+			GetFunc: func(_ context.Context, name string, _ provider.VersionRef) (*domain.Entry, error) {
+				return nil, secretNotFound(name)
+			},
+		}
+		tags, err := staging.NewAzureAppConfigParamStrategy(notFound).FetchCurrentTags(t.Context(), "cfg")
+		require.NoError(t, err)
+		assert.Nil(t, tags)
+
+		noTags := &providermock.Store{
+			GetFunc: func(_ context.Context, name string, _ provider.VersionRef) (*domain.Entry, error) {
+				return &domain.Entry{Name: name}, nil
+			},
+		}
+		tags, err = staging.NewAzureAppConfigParamStrategy(noTags).FetchCurrentTags(t.Context(), "cfg")
 		require.NoError(t, err)
 		assert.Nil(t, tags)
 	})

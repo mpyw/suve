@@ -3,7 +3,8 @@ package appconfig
 import (
 	"context"
 
-	"github.com/Azure/azure-sdk-for-go/sdk/data/azappconfig"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
+	"github.com/Azure/azure-sdk-for-go/sdk/data/azappconfig/v2"
 	"github.com/samber/lo"
 )
 
@@ -40,10 +41,19 @@ func (a *apiClient) GetSetting(ctx context.Context, key, label string) (azappcon
 	return a.c.GetSetting(ctx, key, opts)
 }
 
-func (a *apiClient) SetSetting(ctx context.Context, key, value, label string) (azappconfig.SetSettingResponse, error) {
-	var opts *azappconfig.SetSettingOptions
+// SetSetting upserts key=value under label, carrying the given tags and (when
+// etag is non-nil) an OnlyIfUnchanged precondition. App Configuration's PUT
+// replaces the whole key-value, so tags must always be re-sent to be preserved;
+// a nil etag makes the write unconditional.
+func (a *apiClient) SetSetting(
+	ctx context.Context, key, value, label string, tags map[string]*string, etag *azcore.ETag,
+) (azappconfig.SetSettingResponse, error) {
+	opts := &azappconfig.SetSettingOptions{
+		Tags:            tags,
+		OnlyIfUnchanged: etag,
+	}
 	if label != "" {
-		opts = &azappconfig.SetSettingOptions{Label: lo.ToPtr(label)}
+		opts.Label = lo.ToPtr(label)
 	}
 
 	return a.c.SetSetting(ctx, key, lo.ToPtr(value), opts)

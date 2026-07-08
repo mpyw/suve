@@ -55,7 +55,8 @@ func keyVaultStageSubcommands(cfg stgcli.CommandConfig) []*cli.Command {
 }
 
 // appConfigStageSubcommands are the staging subcommands for App Configuration.
-// tag/untag are omitted: App Configuration setting tags are not writable.
+// tag/untag are included: setting tags are writable via GET-merge-PUT
+// (azappconfig/v2).
 func appConfigStageSubcommands(cfg stgcli.CommandConfig) []*cli.Command {
 	return []*cli.Command{
 		stgcli.NewAddCommand(cfg),
@@ -65,6 +66,8 @@ func appConfigStageSubcommands(cfg stgcli.CommandConfig) []*cli.Command {
 		stgcli.NewDiffCommand(cfg),
 		stgcli.NewApplyCommand(cfg),
 		stgcli.NewResetCommand(cfg),
+		stgcli.NewTagCommand(cfg),
+		stgcli.NewUntagCommand(cfg),
 		stgcli.NewStashCommand(cfg),
 	}
 }
@@ -130,7 +133,7 @@ Azure staging is per-service, because Key Vault and App Configuration keep
 separate staging state:
   - "suve azure stage secret" stages Key Vault secrets (opaque-versioned).
   - "suve azure stage param"  stages App Configuration settings (unversioned,
-    last-write-wins; tags are not writable, so tag/untag are unavailable).
+    last-write-wins; tags are writable via GET-merge-PUT).
 
 EXAMPLES:
    suve azure stage secret add my-secret     Stage a new Key Vault secret

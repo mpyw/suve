@@ -13,13 +13,6 @@ import (
 	"github.com/mpyw/suve/internal/version/azureappconfigversion"
 )
 
-// ErrAppConfigTagsUnsupported is returned when staged tag changes are applied to
-// Azure App Configuration, whose SDK cannot write setting tags. The azure param
-// stage group does not expose tag/untag, so this is a defensive guard.
-var ErrAppConfigTagsUnsupported = errors.New(
-	"tag mutation is not supported by Azure App Configuration",
-)
-
 // AzureAppConfigParamStrategy implements the staging strategies for Azure App
 // Configuration. App Configuration is UNVERSIONED, so:
 //
@@ -28,9 +21,8 @@ var ErrAppConfigTagsUnsupported = errors.New(
 //   - Conflict detection is disabled (last-write-wins): FetchLastModified and
 //     the edit base time return zero, so apply never reports a modified-after
 //     conflict. Apply overwrites unconditionally.
-//   - Tag mutation is unsupported (the azappconfig SDK cannot write tags), so
-//     ApplyTags returns ErrAppConfigTagsUnsupported and the azure param stage
-//     group omits tag/untag.
+//   - Tag mutation is supported (azappconfig/v2 GET-merge-PUT + ETag): ApplyTags
+//     forwards TagEntry.Add/Remove to the store's Tag/Untag.
 //
 // A nil store yields a parser-only strategy (ParseName/ParseSpec).
 type AzureAppConfigParamStrategy struct {
@@ -103,9 +95,23 @@ func (s *AzureAppConfigParamStrategy) applyDelete(ctx context.Context, name stri
 	return nil
 }
 
-// ApplyTags is unsupported for App Configuration.
-func (s *AzureAppConfigParamStrategy) ApplyTags(_ context.Context, _ string, _ TagEntry) error {
-	return ErrAppConfigTagsUnsupported
+// ApplyTags applies staged tag changes to App Configuration: TagEntry.Add via
+// the store's Tag and TagEntry.Remove via Untag (each a GET-merge-PUT under the
+// scope's namespace label). Additions are applied before removals.
+func (s *AzureAppConfigParamStrategy) ApplyTags(ctx context.Context, name string, tagEntry TagEntry) error {
+	if len(tagEntry.Add) > 0 {
+		if err := s.store.Tag(ctx, name, tagEntry.Add); err != nil {
+			return fmt.Errorf("failed to add tags: %w", err)
+		}
+	}
+
+	if tagEntry.Remove.Len() > 0 {
+		if err := s.store.Untag(ctx, name, tagEntry.Remove.Values()); err != nil {
+			return fmt.Errorf("failed to remove tags: %w", err)
+		}
+	}
+
+	return nil
 }
 
 // FetchLastModified returns a zero time with a nil error: App Configuration
@@ -128,10 +134,29 @@ func (s *AzureAppConfigParamStrategy) FetchCurrent(ctx context.Context, name str
 	return &FetchResult{Value: entry.Value}, nil
 }
 
-// FetchCurrentTags fetches the current tags. App Configuration tags are not
-// mutable and not surfaced here; returns nil.
-func (s *AzureAppConfigParamStrategy) FetchCurrentTags(_ context.Context, _ string) (map[string]string, error) {
-	return nil, nil //nolint:nilnil // intentional: App Configuration tags are not staged
+// FetchCurrentTags fetches the setting's current tags so stage diff can show the
+// current value of a removed tag. A missing setting or a setting with no tags
+// yields nil.
+func (s *AzureAppConfigParamStrategy) FetchCurrentTags(ctx context.Context, name string) (map[string]string, error) {
+	entry, err := s.store.Get(ctx, name, provider.VersionRef{})
+	if err != nil {
+		if errors.Is(err, provider.ErrNotFound) {
+			return nil, nil //nolint:nilnil // intentional: no tags for a non-existent setting
+		}
+
+		return nil, fmt.Errorf("failed to get setting: %w", err)
+	}
+
+	if len(entry.Tags) == 0 {
+		return nil, nil //nolint:nilnil // intentional: setting exists but has no tags
+	}
+
+	tags := make(map[string]string, len(entry.Tags))
+	for _, tag := range entry.Tags {
+		tags[tag.Key] = tag.Value
+	}
+
+	return tags, nil
 }
 
 // ParseName parses and validates a name. App Configuration is unversioned, so

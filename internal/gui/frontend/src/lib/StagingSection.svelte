@@ -10,8 +10,8 @@
     entries: gui.StagingDiffEntry[];
     tagEntries: gui.StagingDiffTagEntry[];
     viewMode: 'diff' | 'value';
-    // Whether this service supports tags; when false (Azure App Configuration)
-    // the section renders no tag chips or "Add Tag" control.
+    // Whether this service supports tags; when false the section renders no tag
+    // chips or "Add Tag" control. Driven by the service capability (HasTags).
     hasTags?: boolean;
     onapply: () => void;
     onreset: () => void;

@@ -77,7 +77,7 @@ test.describe('Multi-provider staging (#270)', () => {
     await expect(page.locator('.staging-count')).toHaveText('1');
   });
 
-  test('Azure App Configuration staged section shows no tag controls', async ({ page }) => {
+  test('Azure App Configuration staged section shows tag controls', async ({ page }) => {
     await setupWailsMocks(page, createAzureState());
     await page.goto('/');
     await waitForItemList(page);
@@ -93,7 +93,8 @@ test.describe('Multi-provider staging (#270)', () => {
     await navigateTo(page, 'Staging');
     const appConfigSection = page.locator('.section').filter({ hasText: 'App Configuration' });
     await expect(appConfigSection).toBeVisible();
-    // App Configuration cannot carry tags → no "Add Tag" control in its section.
-    await expect(appConfigSection.getByRole('button', { name: /Add Tag/i })).toHaveCount(0);
+    // App Configuration tags are writable (azappconfig/v2), so its staged section
+    // exposes the "+ Add Tag" control just like the tag-capable providers.
+    await expect(appConfigSection.getByRole('button', { name: /Add Tag/i })).toHaveCount(1);
   });
 });

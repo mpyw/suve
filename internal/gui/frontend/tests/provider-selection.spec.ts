@@ -104,7 +104,7 @@ test.describe('Provider selection', () => {
       await expect(page.locator('#provider-select option[value="azure"]')).toBeEnabled();
     });
 
-    test('App Configuration (param): no Type dropdown, no version history, no tags', async ({ page }) => {
+    test('App Configuration (param): no Type dropdown, no version history, but tags supported', async ({ page }) => {
       await setupWailsMocks(page, createAzureState());
       await page.goto('/');
       await waitForItemList(page);
@@ -112,9 +112,12 @@ test.describe('Provider selection', () => {
       // Default view clamps to the first service (param = App Configuration).
       await clickItemByName(page, 'app/config/key');
       await expect(page.locator('.detail-panel')).toBeVisible();
-      // Unversioned + untagged.
+      // Unversioned, but tags ARE writable (azappconfig/v2), so the tags list
+      // renders and shows the item's tag.
       await expect(page.getByRole('heading', { name: 'Version History' })).toHaveCount(0);
-      await expect(page.locator('.tags-list')).toHaveCount(0);
+      await expect(page.locator('.tags-list')).toBeVisible();
+      await expect(page.locator('.tags-list')).toContainText('env');
+      await expect(page.locator('.tags-list')).toContainText('prod');
 
       // New-item modal has no Type dropdown (ParamTypeOptions empty).
       await page.getByRole('button', { name: '+ New' }).click();

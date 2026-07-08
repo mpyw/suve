@@ -263,7 +263,7 @@ export const defaultCapabilities: ProviderCapability[] = [
     displayName: 'Azure',
     scopeFields: [],
     services: [
-      { service: 'param', displayName: 'App Configuration', hasVersionHistory: false, hasVersionSpecifiers: false, hasTags: false, hasRestore: false, hasStaging: true, hasForceDelete: false, hasRecoveryWindow: false },
+      { service: 'param', displayName: 'App Configuration', hasVersionHistory: false, hasVersionSpecifiers: false, hasTags: true, hasRestore: false, hasStaging: true, hasForceDelete: false, hasRecoveryWindow: false },
       { service: 'secret', displayName: 'Key Vault', hasVersionHistory: true, hasVersionSpecifiers: true, hasTags: true, hasRestore: false, hasStaging: true, hasForceDelete: false, hasRecoveryWindow: false },
     ],
   },
@@ -655,6 +655,11 @@ export function createAzureState(overrides: Partial<MockState> = {}): Partial<Mo
     },
     // App Configuration values are untyped/unversioned; Key Vault has no ARN.
     params: [{ name: 'app/config/key', type: 'String', value: 'v' }],
+    // App Configuration tags are writable (azappconfig/v2 GET-merge-PUT), so the
+    // param carries a tag to exercise the tag UI.
+    paramTags: {
+      'app/config/key': [{ key: 'env', value: 'prod' }],
+    },
     secrets: [{ name: 'kv-secret', value: 'v', arn: '', stagingLabels: [], state: 'enabled', versionId: 'a1b2c3d4e5f6' }],
     // Key Vault versions are opaque hex ids with no AWS staging labels; they
     // carry a per-version enabled/disabled state instead.

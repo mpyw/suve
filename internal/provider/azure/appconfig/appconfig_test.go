@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
-	"github.com/Azure/azure-sdk-for-go/sdk/data/azappconfig"
+	"github.com/Azure/azure-sdk-for-go/sdk/data/azappconfig/v2"
 	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -36,8 +36,10 @@ func serverError() error {
 // Single-key methods receive the resolved literal label; ListSettings receives
 // the LabelFilter.
 type mockClient struct {
-	getFunc    func(ctx context.Context, key, label string) (azappconfig.GetSettingResponse, error)
-	setFunc    func(ctx context.Context, key, value, label string) (azappconfig.SetSettingResponse, error)
+	getFunc func(ctx context.Context, key, label string) (azappconfig.GetSettingResponse, error)
+	setFunc func(
+		ctx context.Context, key, value, label string, tags map[string]*string, etag *azcore.ETag,
+	) (azappconfig.SetSettingResponse, error)
 	addFunc    func(ctx context.Context, key, value, label string) (azappconfig.AddSettingResponse, error)
 	deleteFunc func(ctx context.Context, key, label string) (azappconfig.DeleteSettingResponse, error)
 	listFunc   func(ctx context.Context, filter string) ([]azappconfig.Setting, error)
@@ -48,9 +50,9 @@ func (m *mockClient) GetSetting(ctx context.Context, key, label string) (azappco
 }
 
 func (m *mockClient) SetSetting(
-	ctx context.Context, key, value, label string,
+	ctx context.Context, key, value, label string, tags map[string]*string, etag *azcore.ETag,
 ) (azappconfig.SetSettingResponse, error) {
-	return m.setFunc(ctx, key, value, label)
+	return m.setFunc(ctx, key, value, label, tags, etag)
 }
 
 func (m *mockClient) AddSetting(
@@ -106,7 +108,7 @@ func TestGet(t *testing.T) {
 			return azappconfig.GetSettingResponse{Setting: azappconfig.Setting{
 				Key:   lo.ToPtr(key),
 				Value: lo.ToPtr("30"),
-				Tags:  map[string]string{"env": "prod"},
+				Tags:  map[string]*string{"env": lo.ToPtr("prod")},
 			}}, nil
 		},
 	}
@@ -397,7 +399,14 @@ func TestPut(t *testing.T) {
 	var setKey, setVal, setLabel string
 
 	m := &mockClient{
-		setFunc: func(_ context.Context, key, value, label string) (azappconfig.SetSettingResponse, error) {
+		// Put first GETs the current tags to re-send them; here the setting does
+		// not yet exist, so there are none to preserve.
+		getFunc: func(_ context.Context, _, _ string) (azappconfig.GetSettingResponse, error) {
+			return azappconfig.GetSettingResponse{}, notFound()
+		},
+		setFunc: func(
+			_ context.Context, key, value, label string, _ map[string]*string, _ *azcore.ETag,
+		) (azappconfig.SetSettingResponse, error) {
 			setKey, setVal, setLabel = key, value, label
 
 			return azappconfig.SetSettingResponse{}, nil
@@ -413,11 +422,49 @@ func TestPut(t *testing.T) {
 	assert.Empty(t, version.ID)
 }
 
+// TestPut_PreservesExistingTags asserts a value update re-sends the setting's
+// current tags so the PUT (which replaces the whole key-value) does not clear
+// them.
+func TestPut_PreservesExistingTags(t *testing.T) {
+	t.Parallel()
+
+	var sentTags map[string]*string
+
+	m := &mockClient{
+		getFunc: func(_ context.Context, key, _ string) (azappconfig.GetSettingResponse, error) {
+			return azappconfig.GetSettingResponse{Setting: azappconfig.Setting{
+				Key:   lo.ToPtr(key),
+				Value: lo.ToPtr("old"),
+				Tags:  map[string]*string{"env": lo.ToPtr("prod"), "team": lo.ToPtr("core")},
+			}}, nil
+		},
+		setFunc: func(
+			_ context.Context, _, value, _ string, tags map[string]*string, _ *azcore.ETag,
+		) (azappconfig.SetSettingResponse, error) {
+			sentTags = tags
+
+			assert.Equal(t, "new", value)
+
+			return azappconfig.SetSettingResponse{}, nil
+		},
+	}
+	store := appconfig.New(m, "")
+
+	_, err := store.Put(t.Context(), "app/timeout", "new", domain.ValueTypePlaintext, "")
+	require.NoError(t, err)
+	assert.Equal(t, map[string]*string{"env": lo.ToPtr("prod"), "team": lo.ToPtr("core")}, sentTags)
+}
+
 func TestPut_Error(t *testing.T) {
 	t.Parallel()
 
 	m := &mockClient{
-		setFunc: func(_ context.Context, _, _, _ string) (azappconfig.SetSettingResponse, error) {
+		getFunc: func(_ context.Context, _, _ string) (azappconfig.GetSettingResponse, error) {
+			return azappconfig.GetSettingResponse{}, notFound()
+		},
+		setFunc: func(
+			_ context.Context, _, _, _ string, _ map[string]*string, _ *azcore.ETag,
+		) (azappconfig.SetSettingResponse, error) {
 			return azappconfig.SetSettingResponse{}, serverError()
 		},
 	}
@@ -433,7 +480,9 @@ func TestPut_RejectsFilterNamespace(t *testing.T) {
 
 	called := false
 	m := &mockClient{
-		setFunc: func(_ context.Context, _, _, _ string) (azappconfig.SetSettingResponse, error) {
+		setFunc: func(
+			_ context.Context, _, _, _ string, _ map[string]*string, _ *azcore.ETag,
+		) (azappconfig.SetSettingResponse, error) {
 			called = true
 
 			return azappconfig.SetSettingResponse{}, nil
@@ -515,18 +564,200 @@ func TestDelete_RejectsFilterNamespace(t *testing.T) {
 	assert.False(t, called)
 }
 
-func TestTagUntag_Unsupported(t *testing.T) {
+// derefTags flattens a map[string]*string to a map[string]string for easy
+// assertion.
+func derefTags(tags map[string]*string) map[string]string {
+	out := make(map[string]string, len(tags))
+	for k, v := range tags {
+		out[k] = lo.FromPtr(v)
+	}
+
+	return out
+}
+
+func TestTag_EmptyIsNoOp(t *testing.T) {
 	t.Parallel()
 
+	// A store whose funcs would panic if called: an empty mutation must not touch
+	// the client.
 	store := appconfig.New(&mockClient{}, "")
 
-	// Non-empty mutation is declined with a clear error.
-	require.ErrorIs(t, store.Tag(t.Context(), "k", map[string]string{"env": "prod"}), appconfig.ErrTagsUnsupported)
-	require.ErrorIs(t, store.Untag(t.Context(), "k", []string{"env"}), appconfig.ErrTagsUnsupported)
-
-	// Empty mutations are no-ops.
 	require.NoError(t, store.Tag(t.Context(), "k", nil))
 	require.NoError(t, store.Untag(t.Context(), "k", nil))
+}
+
+// TestTag_MergesAndPreservesValue asserts Tag GET-merge-PUTs: it adds/updates
+// the given tags onto the existing ones, re-sends the unchanged value, and
+// carries the current ETag as the OnlyIfUnchanged precondition under the
+// namespace label.
+func TestTag_MergesAndPreservesValue(t *testing.T) {
+	t.Parallel()
+
+	var (
+		gotValue string
+		gotLabel string
+		gotTags  map[string]*string
+		gotETag  *azcore.ETag
+	)
+
+	etag := azcore.ETag("v1")
+	m := &mockClient{
+		getFunc: func(_ context.Context, key, label string) (azappconfig.GetSettingResponse, error) {
+			assert.Equal(t, "dev", label)
+
+			return azappconfig.GetSettingResponse{Setting: azappconfig.Setting{
+				Key:   lo.ToPtr(key),
+				Value: lo.ToPtr("keep-me"),
+				Tags:  map[string]*string{"env": lo.ToPtr("dev"), "keep": lo.ToPtr("yes")},
+				ETag:  lo.ToPtr(etag),
+			}}, nil
+		},
+		setFunc: func(
+			_ context.Context, _, value, label string, tags map[string]*string, e *azcore.ETag,
+		) (azappconfig.SetSettingResponse, error) {
+			gotValue, gotLabel, gotTags, gotETag = value, label, tags, e
+
+			return azappconfig.SetSettingResponse{}, nil
+		},
+	}
+	store := appconfig.New(m, "dev")
+
+	require.NoError(t, store.Tag(t.Context(), "app/timeout", map[string]string{"env": "prod", "team": "core"}))
+	assert.Equal(t, "keep-me", gotValue)
+	assert.Equal(t, "dev", gotLabel)
+	assert.Equal(t, &etag, gotETag)
+	assert.Equal(t, map[string]string{"env": "prod", "keep": "yes", "team": "core"}, derefTags(gotTags))
+}
+
+// TestUntag_RemovesKeys asserts Untag deletes the given keys from the current
+// tags and re-PUTs the rest with the unchanged value.
+func TestUntag_RemovesKeys(t *testing.T) {
+	t.Parallel()
+
+	var gotTags map[string]*string
+
+	m := &mockClient{
+		getFunc: func(_ context.Context, key, _ string) (azappconfig.GetSettingResponse, error) {
+			return azappconfig.GetSettingResponse{Setting: azappconfig.Setting{
+				Key:   lo.ToPtr(key),
+				Value: lo.ToPtr("v"),
+				Tags:  map[string]*string{"env": lo.ToPtr("prod"), "team": lo.ToPtr("core")},
+			}}, nil
+		},
+		setFunc: func(
+			_ context.Context, _, _, _ string, tags map[string]*string, _ *azcore.ETag,
+		) (azappconfig.SetSettingResponse, error) {
+			gotTags = tags
+
+			return azappconfig.SetSettingResponse{}, nil
+		},
+	}
+	store := appconfig.New(m, "")
+
+	// Removing an absent key is a no-op alongside a present one.
+	require.NoError(t, store.Untag(t.Context(), "app/timeout", []string{"env", "absent"}))
+	assert.Equal(t, map[string]string{"team": "core"}, derefTags(gotTags))
+}
+
+// TestTag_RetriesOn412ThenSucceeds asserts a single ETag conflict triggers a
+// re-GET-and-retry that then succeeds.
+func TestTag_RetriesOn412ThenSucceeds(t *testing.T) {
+	t.Parallel()
+
+	var gets, sets int
+
+	m := &mockClient{
+		getFunc: func(_ context.Context, key, _ string) (azappconfig.GetSettingResponse, error) {
+			gets++
+
+			return azappconfig.GetSettingResponse{Setting: azappconfig.Setting{
+				Key:   lo.ToPtr(key),
+				Value: lo.ToPtr("v"),
+			}}, nil
+		},
+		setFunc: func(
+			_ context.Context, _, _, _ string, _ map[string]*string, _ *azcore.ETag,
+		) (azappconfig.SetSettingResponse, error) {
+			sets++
+			if sets == 1 {
+				return azappconfig.SetSettingResponse{}, preconditionFailed()
+			}
+
+			return azappconfig.SetSettingResponse{}, nil
+		},
+	}
+	store := appconfig.New(m, "")
+
+	require.NoError(t, store.Tag(t.Context(), "k", map[string]string{"env": "prod"}))
+	assert.Equal(t, 2, gets)
+	assert.Equal(t, 2, sets)
+}
+
+// TestTag_SurfacesPersistentConflict asserts that a PUT that keeps conflicting
+// (412) is retried a bounded number of times and then surfaced as an error.
+func TestTag_SurfacesPersistentConflict(t *testing.T) {
+	t.Parallel()
+
+	var sets int
+
+	m := &mockClient{
+		getFunc: func(_ context.Context, key, _ string) (azappconfig.GetSettingResponse, error) {
+			return azappconfig.GetSettingResponse{Setting: azappconfig.Setting{
+				Key:   lo.ToPtr(key),
+				Value: lo.ToPtr("v"),
+			}}, nil
+		},
+		setFunc: func(
+			_ context.Context, _, _, _ string, _ map[string]*string, _ *azcore.ETag,
+		) (azappconfig.SetSettingResponse, error) {
+			sets++
+
+			return azappconfig.SetSettingResponse{}, preconditionFailed()
+		},
+	}
+	store := appconfig.New(m, "")
+
+	err := store.Tag(t.Context(), "k", map[string]string{"env": "prod"})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "concurrent modification")
+	// The retry loop is bounded (3 attempts here).
+	assert.Equal(t, 3, sets)
+}
+
+// TestTag_GetError surfaces a non-conflict error from the GET without retrying.
+func TestTag_GetError(t *testing.T) {
+	t.Parallel()
+
+	var gets int
+
+	m := &mockClient{
+		getFunc: func(_ context.Context, _, _ string) (azappconfig.GetSettingResponse, error) {
+			gets++
+
+			return azappconfig.GetSettingResponse{}, notFound()
+		},
+	}
+	store := appconfig.New(m, "")
+
+	err := store.Tag(t.Context(), "k", map[string]string{"env": "prod"})
+	require.ErrorIs(t, err, provider.ErrNotFound)
+	assert.Equal(t, 1, gets)
+}
+
+// TestTag_RejectsFilterNamespace asserts a filter (all/multiple) namespace is
+// rejected before any client call.
+func TestTag_RejectsFilterNamespace(t *testing.T) {
+	t.Parallel()
+
+	store := appconfig.New(&mockClient{}, "dev,prod")
+
+	err := store.Tag(t.Context(), "k", map[string]string{"env": "prod"})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "single-item operation needs one")
+
+	err = store.Untag(t.Context(), "k", []string{"env"})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "single-item operation needs one")
 }
 
 // Compile-time assertion that the mock satisfies the adapter's Client interface.

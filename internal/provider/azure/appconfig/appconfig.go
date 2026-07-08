@@ -18,21 +18,24 @@
 //     the aznamespace subpackage): List forwards the raw value as a LabelFilter;
 //     single-key ops decode it to one literal label; empty is the null/default
 //     namespace. A label is never exposed as a version.
-//   - The azappconfig high-level SDK cannot round-trip setting tags: its
-//     SetSetting/AddSetting drop tags (and a write would clear existing ones).
-//     Tag/Untag therefore return ErrTagsUnsupported rather than silently losing
-//     data. Reading tags (Get) works, since GetSetting returns them.
+//   - App Configuration's PUT replaces the whole key-value, so tags must always
+//     be re-sent or they are cleared. Value writes (Put) therefore GET the
+//     current tags and re-send them; Tag/Untag are GET-merge-PUT with an
+//     OnlyIfUnchanged (ETag) precondition and a small retry on a 412 conflict.
+//     This is unblocked by azappconfig/v2, whose SetSettingOptions carries Tags
+//     (map[string]*string) and OnlyIfUnchanged.
 package appconfig
 
 import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"net/http"
 	"sort"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
-	"github.com/Azure/azure-sdk-for-go/sdk/data/azappconfig"
+	"github.com/Azure/azure-sdk-for-go/sdk/data/azappconfig/v2"
 	"github.com/samber/lo"
 
 	"github.com/mpyw/suve/internal/debug"
@@ -42,22 +45,24 @@ import (
 	"github.com/mpyw/suve/internal/version/azureappconfigversion"
 )
 
-// ErrTagsUnsupported is returned by Tag/Untag: the azappconfig high-level SDK
-// surface cannot write setting tags without clearing them, so tag mutation is
-// declined rather than performed destructively.
-var ErrTagsUnsupported = errors.New(
-	"tag mutation is not supported by Azure App Configuration (the azappconfig SDK cannot write setting tags)",
-)
+// tagWriteMaxAttempts bounds the GET-merge-PUT retry loop used by Tag/Untag when
+// a concurrent writer changes the setting between the GET and the conditional
+// PUT (a 412). After this many conflicting attempts the error is surfaced.
+const tagWriteMaxAttempts = 3
 
 // Client is the narrow App Configuration surface this adapter needs. Single-key
 // methods take a resolved literal label ("" = the null/default label); the list
-// method takes a LabelFilter. The list method returns a drained slice rather
-// than the SDK's pager so tests can mock the interface trivially; the production
-// adapter (see Wrap) confines the pager draining and the concrete
-// *azappconfig.Client to this package.
+// method takes a LabelFilter. SetSetting additionally carries the tags to write
+// (App Config's PUT replaces the whole key-value, so tags are always re-sent)
+// and an optional ETag precondition (nil = unconditional). The list method
+// returns a drained slice rather than the SDK's pager so tests can mock the
+// interface trivially; the production adapter (see Wrap) confines the pager
+// draining and the concrete *azappconfig.Client to this package.
 type Client interface {
 	GetSetting(ctx context.Context, key, label string) (azappconfig.GetSettingResponse, error)
-	SetSetting(ctx context.Context, key, value, label string) (azappconfig.SetSettingResponse, error)
+	SetSetting(
+		ctx context.Context, key, value, label string, tags map[string]*string, etag *azcore.ETag,
+	) (azappconfig.SetSettingResponse, error)
 	AddSetting(ctx context.Context, key, value, label string) (azappconfig.AddSettingResponse, error)
 	DeleteSetting(ctx context.Context, key, label string) (azappconfig.DeleteSettingResponse, error)
 	ListSettings(ctx context.Context, filter string) ([]azappconfig.Setting, error)
@@ -170,7 +175,7 @@ func (s *Store) List(ctx context.Context) ([]string, error) {
 // Create creates a new setting (create-only) via AddSetting and returns an empty
 // version (App Configuration is unversioned). It returns a wrapped
 // provider.ErrAlreadyExists if the setting already exists. The valueType and
-// description are ignored.
+// description are ignored. A newly created setting has no tags to preserve.
 func (s *Store) Create(
 	ctx context.Context, name, value string, _ domain.ValueType, _ string, _ ...provider.WriteOption,
 ) (domain.Version, error) {
@@ -192,8 +197,10 @@ func (s *Store) Create(
 }
 
 // Put creates or updates a setting (upsert) via SetSetting and returns an empty
-// version (App Configuration is unversioned). The valueType and description are
-// ignored.
+// version (App Configuration is unversioned). Because App Configuration's PUT
+// replaces the whole key-value, the current tags are read first and re-sent so
+// the value write does not clear them (a not-yet-existing setting has none).
+// The valueType and description are ignored.
 func (s *Store) Put(
 	ctx context.Context, name, value string, _ domain.ValueType, _ string, _ ...provider.WriteOption,
 ) (domain.Version, error) {
@@ -202,7 +209,12 @@ func (s *Store) Put(
 		return domain.Version{}, err
 	}
 
-	if _, err := s.client.SetSetting(ctx, name, value, label); err != nil {
+	tags, err := s.currentTags(ctx, name, label)
+	if err != nil {
+		return domain.Version{}, err
+	}
+
+	if _, err := s.client.SetSetting(ctx, name, value, label, tags, nil); err != nil {
 		return domain.Version{}, fmt.Errorf("failed to set setting: %w", err)
 	}
 
@@ -223,29 +235,106 @@ func (s *Store) Delete(ctx context.Context, name string, _ ...provider.DeleteOpt
 	return nil
 }
 
-// Tag declines tag mutation: the azappconfig SDK cannot write setting tags
-// without clearing them (see the package doc). An empty add is a no-op.
-func (s *Store) Tag(_ context.Context, _ string, add map[string]string) error {
+// Tag adds or updates the given tags on the setting, preserving the value and
+// any other tags. An empty add is a no-op. See mutateTags for the GET-merge-PUT
+// + ETag retry mechanics.
+func (s *Store) Tag(ctx context.Context, name string, add map[string]string) error {
 	if len(add) == 0 {
 		return nil
 	}
 
-	return ErrTagsUnsupported
+	return s.mutateTags(ctx, name, func(tags map[string]*string) {
+		for k, v := range add {
+			tags[k] = lo.ToPtr(v)
+		}
+	})
 }
 
-// Untag declines tag mutation for the same reason as Tag. An empty key set is a
-// no-op.
-func (s *Store) Untag(_ context.Context, _ string, keys []string) error {
+// Untag removes the given tag keys from the setting, preserving the value and
+// any other tags. An empty key set is a no-op. Removing a key that is not
+// present is a no-op. See mutateTags for the GET-merge-PUT + ETag retry.
+func (s *Store) Untag(ctx context.Context, name string, keys []string) error {
 	if len(keys) == 0 {
 		return nil
 	}
 
-	return ErrTagsUnsupported
+	return s.mutateTags(ctx, name, func(tags map[string]*string) {
+		for _, k := range keys {
+			delete(tags, k)
+		}
+	})
+}
+
+// mutateTags applies merge to the setting's current tags and writes them back
+// with an OnlyIfUnchanged (ETag) precondition. App Configuration has no partial
+// tag update, so the whole key-value is re-PUT with the merged tags and the
+// unchanged value. If a concurrent writer changes the setting between the GET
+// and the PUT the service returns 412; the loop re-GETs and re-merges up to
+// tagWriteMaxAttempts times before surfacing the conflict.
+func (s *Store) mutateTags(ctx context.Context, name string, merge func(map[string]*string)) error {
+	label, err := aznamespace.Literal(s.namespace)
+	if err != nil {
+		return err
+	}
+
+	var lastErr error
+
+	for range tagWriteMaxAttempts {
+		resp, err := s.client.GetSetting(ctx, name, label)
+		if err != nil {
+			return mapError(err, name, "get setting")
+		}
+
+		tags := cloneTags(resp.Tags)
+		merge(tags)
+
+		_, err = s.client.SetSetting(ctx, name, lo.FromPtr(resp.Value), label, tags, resp.ETag)
+		if err == nil {
+			return nil
+		}
+
+		if !isPreconditionFailed(err) {
+			return fmt.Errorf("failed to update tags: %w", err)
+		}
+
+		lastErr = err
+	}
+
+	return fmt.Errorf(
+		"failed to update tags on %q after %d attempts due to concurrent modification: %w",
+		name, tagWriteMaxAttempts, lastErr,
+	)
+}
+
+// currentTags returns the setting's current tags (for re-sending on a value
+// write). A not-found setting has no tags to preserve, so a 404 maps to nil
+// rather than an error (the ensuing Put creates the setting fresh).
+func (s *Store) currentTags(ctx context.Context, name, label string) (map[string]*string, error) {
+	resp, err := s.client.GetSetting(ctx, name, label)
+	if err != nil {
+		if isNotFound(err) {
+			return nil, nil //nolint:nilnil // intentional: a missing setting has no tags to preserve
+		}
+
+		return nil, mapError(err, name, "get setting")
+	}
+
+	return resp.Tags, nil
+}
+
+// cloneTags copies a tags map so a merge does not mutate the value read off the
+// GetSetting response.
+func cloneTags(tags map[string]*string) map[string]*string {
+	out := make(map[string]*string, len(tags))
+	maps.Copy(out, tags)
+
+	return out
 }
 
 // mapTags converts an App Configuration tags map to a sorted slice of neutral
-// domain tags (sorted by key for deterministic display).
-func mapTags(tags map[string]string) []domain.Tag {
+// domain tags (sorted by key for deterministic display). Values are pointers in
+// the SDK; a nil value is treated as an empty string.
+func mapTags(tags map[string]*string) []domain.Tag {
 	if len(tags) == 0 {
 		return nil
 	}
@@ -254,7 +343,7 @@ func mapTags(tags map[string]string) []domain.Tag {
 	sort.Strings(keys)
 
 	return lo.Map(keys, func(k string, _ int) domain.Tag {
-		return domain.Tag{Key: k, Value: tags[k]}
+		return domain.Tag{Key: k, Value: lo.FromPtr(tags[k])}
 	})
 }
 
@@ -263,6 +352,14 @@ func isNotFound(err error) bool {
 	var re *azcore.ResponseError
 
 	return errors.As(err, &re) && re.StatusCode == http.StatusNotFound
+}
+
+// isPreconditionFailed reports whether err is an Azure precondition-failed (412)
+// response error, returned by a conditional PUT whose ETag no longer matches.
+func isPreconditionFailed(err error) bool {
+	var re *azcore.ResponseError
+
+	return errors.As(err, &re) && re.StatusCode == http.StatusPreconditionFailed
 }
 
 // isAlreadyExists reports whether err is an Azure precondition-failed (412) or
