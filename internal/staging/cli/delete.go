@@ -20,6 +20,9 @@ type DeleteOptions struct {
 	Name           string
 	Force          bool // For Secrets Manager: force immediate deletion
 	RecoveryWindow int  // For Secrets Manager: days before permanent deletion (7-30)
+	// Namespace is the App Configuration namespace of the setting (empty for the
+	// null/default namespace and every other provider).
+	Namespace string
 }
 
 // Run executes the delete command.
@@ -28,6 +31,7 @@ func (r *DeleteRunner) Run(ctx context.Context, opts DeleteOptions) error {
 		Name:           opts.Name,
 		Force:          opts.Force,
 		RecoveryWindow: opts.RecoveryWindow,
+		Namespace:      opts.Namespace,
 	})
 	if err != nil {
 		return err

@@ -192,7 +192,7 @@ func TestDiffUseCase_Execute_AutoUnstage_Identical(t *testing.T) {
 	assert.Contains(t, entry.Warning, "identical")
 
 	// Verify auto-unstaged
-	_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/same")
+	_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/same", "")
 	assert.ErrorIs(t, err, staging.ErrNotStaged)
 }
 
@@ -249,7 +249,7 @@ func TestDiffUseCase_Execute_DeleteEmptyRemoteNotUnstaged(t *testing.T) {
 	assert.Equal(t, staging.OperationDelete, output.Entries[0].Operation)
 
 	// The staged deletion must survive `stage diff`.
-	_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/empty")
+	_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/empty", "")
 	require.NoError(t, err)
 }
 
@@ -323,7 +323,7 @@ func TestDiffUseCase_Execute_AutoUnstage_UpdateNoLongerExists(t *testing.T) {
 	assert.Contains(t, entry.Warning, "no longer exists")
 
 	// Verify auto-unstaged
-	_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/gone")
+	_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/gone", "")
 	assert.ErrorIs(t, err, staging.ErrNotStaged)
 }
 
@@ -356,7 +356,7 @@ func TestDiffUseCase_Execute_KeepStagedOnTransientError(t *testing.T) {
 			assert.Equal(t, usecasestaging.DiffEntryWarning, output.Entries[0].Type)
 
 			// Must remain staged.
-			_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/x")
+			_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/x", "")
 			require.NoError(t, err)
 		})
 	}
@@ -382,7 +382,9 @@ func TestDiffUseCase_Execute_GetError(t *testing.T) {
 	t.Parallel()
 
 	store := testutil.NewMockStore()
-	store.GetEntryErr = errors.New("get error")
+	// The name-filtered diff lists entries (keyed by the (name, namespace)
+	// composite) and filters by the decoded bare name, so a list error surfaces.
+	store.ListEntriesErr = errors.New("get error")
 
 	uc := &usecasestaging.DiffUseCase{
 		Strategy: newMockDiffStrategy(),
@@ -398,7 +400,8 @@ func TestDiffUseCase_Execute_GetTagError(t *testing.T) {
 	t.Parallel()
 
 	store := testutil.NewMockStore()
-	store.GetTagErr = errors.New("get tag error")
+	// The name-filtered diff also lists tags, so a list-tags error surfaces.
+	store.ListTagsErr = errors.New("get tag error")
 
 	uc := &usecasestaging.DiffUseCase{
 		Strategy: newMockDiffStrategy(),
@@ -524,4 +527,51 @@ func TestDiffUseCase_Execute_WithTagEntriesProcessing(t *testing.T) {
 	assert.Equal(t, "backend", tagEntry.Add["team"])
 	_, hasOldKey := tagEntry.Remove["old-key"]
 	assert.True(t, hasOldKey)
+}
+
+// TestDiffUseCase_Execute_PerNamespaceResolver covers the App Configuration
+// diff path (#431): each staged entry is diffed against the strategy resolved
+// for its own namespace, and the namespace is carried on the diff result.
+func TestDiffUseCase_Execute_PerNamespaceResolver(t *testing.T) {
+	t.Parallel()
+
+	store := testutil.NewMockStore()
+	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "app/k", staging.Entry{
+		Operation: staging.OperationUpdate, Value: lo.ToPtr("dev-staged"), Namespace: "dev", StagedAt: time.Now(),
+	}))
+	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "app/k", staging.Entry{
+		Operation: staging.OperationUpdate, Value: lo.ToPtr("prd-staged"), Namespace: "prd", StagedAt: time.Now(),
+	}))
+
+	// A distinct strategy per namespace, each returning a namespace-specific
+	// remote value — proving the diff read is scoped to the entry's namespace.
+	stratFor := func(namespace string) staging.DiffStrategy {
+		s := newMockDiffStrategy()
+		s.fetchResults["app/k"] = &staging.FetchResult{Value: namespace + "-remote"}
+
+		return s
+	}
+
+	uc := &usecasestaging.DiffUseCase{
+		Strategy: newMockDiffStrategy(),
+		Store:    store,
+		StrategyFor: func(namespace string) (staging.DiffStrategy, error) {
+			return stratFor(namespace), nil
+		},
+	}
+
+	output, err := uc.Execute(t.Context(), usecasestaging.DiffInput{})
+	require.NoError(t, err)
+	require.Len(t, output.Entries, 2)
+
+	byNamespace := map[string]usecasestaging.DiffEntry{}
+	for _, e := range output.Entries {
+		byNamespace[e.Namespace] = e
+	}
+
+	require.Contains(t, byNamespace, "dev")
+	require.Contains(t, byNamespace, "prd")
+	assert.Equal(t, "dev-remote", byNamespace["dev"].AWSValue)
+	assert.Equal(t, "prd-remote", byNamespace["prd"].AWSValue)
+	assert.Equal(t, "dev-staged", byNamespace["dev"].StagedValue)
 }

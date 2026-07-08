@@ -32,6 +32,7 @@ func (e *Executor) ExecuteEntry(
 	ctx context.Context,
 	service staging.Service,
 	name string,
+	namespace string,
 	state EntryState,
 	action EntryAction,
 	opts *EntryExecuteOptions,
@@ -42,7 +43,7 @@ func (e *Executor) ExecuteEntry(
 	}
 
 	// Persist the new state
-	if err := e.persistEntryState(ctx, service, name, state, result, opts); err != nil {
+	if err := e.persistEntryState(ctx, service, name, namespace, state, result, opts); err != nil {
 		return result, err
 	}
 
@@ -87,6 +88,7 @@ func (e *Executor) persistEntryState(
 	ctx context.Context,
 	service staging.Service,
 	name string,
+	namespace string,
 	oldState EntryState,
 	result EntryTransitionResult,
 	opts *EntryExecuteOptions,
@@ -97,13 +99,14 @@ func (e *Executor) persistEntryState(
 	case EntryStagedStateNotStaged:
 		// Unstage if was previously staged
 		if _, wasStaged := oldState.StagedState.(EntryStagedStateNotStaged); !wasStaged {
-			err = e.Store.UnstageEntry(ctx, service, name)
+			err = e.Store.UnstageEntry(ctx, service, name, namespace)
 		}
 
 	case EntryStagedStateCreate:
 		entry := staging.Entry{
 			Operation: staging.OperationCreate,
 			Value:     lo.ToPtr(s.DraftValue),
+			Namespace: namespace,
 			StagedAt:  time.Now(),
 		}
 		if opts != nil && opts.Description != nil {
@@ -116,6 +119,7 @@ func (e *Executor) persistEntryState(
 		entry := staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr(s.DraftValue),
+			Namespace: namespace,
 			StagedAt:  time.Now(),
 		}
 		if opts != nil {
@@ -130,6 +134,7 @@ func (e *Executor) persistEntryState(
 	case EntryStagedStateDelete:
 		entry := staging.Entry{
 			Operation: staging.OperationDelete,
+			Namespace: namespace,
 			StagedAt:  time.Now(),
 		}
 		if opts != nil {
@@ -175,9 +180,10 @@ func LoadEntryState(
 	store store.ReadOperator,
 	service staging.Service,
 	name string,
+	namespace string,
 	currentAWSValue *string,
 ) (EntryState, error) {
-	state, _, err := LoadEntryStateWithMetadata(ctx, store, service, name, currentAWSValue)
+	state, _, err := LoadEntryStateWithMetadata(ctx, store, service, name, namespace, currentAWSValue)
 
 	return state, err
 }
@@ -189,9 +195,10 @@ func LoadEntryStateWithMetadata(
 	store store.ReadOperator,
 	service staging.Service,
 	name string,
+	namespace string,
 	currentAWSValue *string,
 ) (EntryState, *time.Time, error) {
-	stagedEntry, err := store.GetEntry(ctx, service, name)
+	stagedEntry, err := store.GetEntry(ctx, service, name, namespace)
 	if err != nil && !errors.Is(err, staging.ErrNotStaged) {
 		return EntryState{}, nil, err
 	}

@@ -3,7 +3,6 @@ package staging
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
@@ -19,7 +18,10 @@ type StatusInput struct {
 
 // StatusEntry represents a single staged entry (create/update/delete).
 type StatusEntry struct {
-	Name              string
+	Name string
+	// Namespace is the App Configuration namespace of the entry (empty for the
+	// null/default namespace and every other provider).
+	Namespace         string
 	Operation         staging.Operation
 	Value             *string
 	Description       *string
@@ -64,55 +66,43 @@ func (u *StatusUseCase) Execute(ctx context.Context, input StatusInput) (*Status
 		ItemName:    itemName,
 	}
 
-	if input.Name != "" {
-		// Get specific entry
-		entry, entryErr := u.Store.GetEntry(ctx, service, input.Name)
-		if entryErr != nil && !errors.Is(entryErr, staging.ErrNotStaged) {
-			return nil, entryErr
-		}
-
-		if entry != nil {
-			output.Entries = []StatusEntry{toStatusEntry(input.Name, *entry, showDeleteOptions)}
-		}
-
-		// Get specific tag entry
-		tagEntry, tagErr := u.Store.GetTag(ctx, service, input.Name)
-		if tagErr != nil && !errors.Is(tagErr, staging.ErrNotStaged) {
-			return nil, tagErr
-		}
-
-		if tagEntry != nil {
-			output.TagEntries = []StatusTagEntry{toStatusTagEntry(input.Name, *tagEntry)}
-		}
-
-		// If neither exists, return error
-		if entry == nil && tagEntry == nil {
-			return nil, fmt.Errorf("%s %s is not staged", itemName, input.Name)
-		}
-
-		return output, nil
-	}
-
-	// Get all entries
+	// Get all entries and tags, then (if a name was given) filter by the decoded
+	// bare name. Entries are keyed by the (name, namespace) composite, so a name
+	// with settings under several namespaces yields one row per namespace.
 	entries, err := u.Store.ListEntries(ctx, service)
 	if err != nil {
 		return nil, err
 	}
 
-	serviceEntries := entries[service]
-	for name, entry := range serviceEntries {
-		output.Entries = append(output.Entries, toStatusEntry(name, entry, showDeleteOptions))
-	}
-
-	// Get all tag entries
 	tagEntries, err := u.Store.ListTags(ctx, service)
 	if err != nil {
 		return nil, err
 	}
 
-	serviceTagEntries := tagEntries[service]
-	for name, tagEntry := range serviceTagEntries {
+	matched := false
+
+	for key, entry := range entries[service] {
+		name, _ := staging.SplitEntryKey(key)
+		if input.Name != "" && name != input.Name {
+			continue
+		}
+
+		output.Entries = append(output.Entries, toStatusEntry(name, entry, showDeleteOptions))
+		matched = true
+	}
+
+	for key, tagEntry := range tagEntries[service] {
+		name, _ := staging.SplitEntryKey(key)
+		if input.Name != "" && name != input.Name {
+			continue
+		}
+
 		output.TagEntries = append(output.TagEntries, toStatusTagEntry(name, tagEntry))
+		matched = true
+	}
+
+	if input.Name != "" && !matched {
+		return nil, fmt.Errorf("%s %s is not staged", itemName, input.Name)
 	}
 
 	return output, nil
@@ -121,6 +111,7 @@ func (u *StatusUseCase) Execute(ctx context.Context, input StatusInput) (*Status
 func toStatusEntry(name string, entry staging.Entry, showDeleteOptions bool) StatusEntry {
 	return StatusEntry{
 		Name:              name,
+		Namespace:         entry.Namespace,
 		Operation:         entry.Operation,
 		Value:             entry.Value,
 		Description:       entry.Description,

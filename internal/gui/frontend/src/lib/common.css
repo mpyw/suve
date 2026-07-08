@@ -520,6 +520,15 @@
   font-size: 13px;
 }
 
+.modal-warning {
+  padding: 10px 12px;
+  background: rgba(255, 167, 38, 0.15);
+  border: 1px solid #ffa726;
+  border-radius: 4px;
+  color: #ffa726;
+  font-size: 13px;
+}
+
 /* Modal Confirm */
 .modal-confirm {
   text-align: center;

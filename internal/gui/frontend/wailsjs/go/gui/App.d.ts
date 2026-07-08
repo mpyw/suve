@@ -26,7 +26,7 @@ export function ParamLog(arg1:string,arg2:number):Promise<gui.ParamLogResult>;
 
 export function ParamRemoveTag(arg1:string,arg2:string):Promise<void>;
 
-export function ParamSet(arg1:string,arg2:string,arg3:string):Promise<gui.ParamSetResult>;
+export function ParamSet(arg1:string,arg2:string,arg3:string,arg4:string):Promise<gui.ParamSetResult>;
 
 export function ParamShow(arg1:string):Promise<gui.ParamShowResult>;
 
@@ -54,7 +54,7 @@ export function SecretUpdate(arg1:string,arg2:string):Promise<gui.SecretUpdateRe
 
 export function SelectScope(arg1:gui.ScopeSelection):Promise<void>;
 
-export function StagingAdd(arg1:string,arg2:string,arg3:string):Promise<gui.StagingAddResult>;
+export function StagingAdd(arg1:string,arg2:string,arg3:string,arg4:string):Promise<gui.StagingAddResult>;
 
 export function StagingAddTag(arg1:string,arg2:string,arg3:string,arg4:string):Promise<gui.StagingAddTagResult>;
 
@@ -64,9 +64,9 @@ export function StagingCancelAddTag(arg1:string,arg2:string,arg3:string):Promise
 
 export function StagingCancelRemoveTag(arg1:string,arg2:string,arg3:string):Promise<gui.StagingCancelRemoveTagResult>;
 
-export function StagingCheckStatus(arg1:string,arg2:string):Promise<gui.StagingCheckStatusResult>;
+export function StagingCheckStatus(arg1:string,arg2:string,arg3:string):Promise<gui.StagingCheckStatusResult>;
 
-export function StagingDelete(arg1:string,arg2:string,arg3:boolean,arg4:number):Promise<gui.StagingDeleteResult>;
+export function StagingDelete(arg1:string,arg2:string,arg3:boolean,arg4:number,arg5:string):Promise<gui.StagingDeleteResult>;
 
 export function StagingDiff(arg1:string,arg2:string):Promise<gui.StagingDiffResult>;
 
@@ -74,7 +74,7 @@ export function StagingDrain(arg1:string,arg2:string,arg3:boolean,arg4:string):P
 
 export function StagingDrop():Promise<gui.StagingDropResult>;
 
-export function StagingEdit(arg1:string,arg2:string,arg3:string):Promise<gui.StagingEditResult>;
+export function StagingEdit(arg1:string,arg2:string,arg3:string,arg4:string):Promise<gui.StagingEditResult>;
 
 export function StagingFileStatus():Promise<gui.StagingFileStatusResult>;
 
@@ -86,4 +86,4 @@ export function StagingReset(arg1:string):Promise<gui.StagingResetResult>;
 
 export function StagingStatus():Promise<gui.StagingStatusResult>;
 
-export function StagingUnstage(arg1:string,arg2:string):Promise<gui.StagingUnstageResult>;
+export function StagingUnstage(arg1:string,arg2:string,arg3:string):Promise<gui.StagingUnstageResult>;

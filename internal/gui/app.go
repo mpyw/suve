@@ -13,6 +13,7 @@ import (
 	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/provider/aws"
 	"github.com/mpyw/suve/internal/provider/azure"
+	"github.com/mpyw/suve/internal/provider/azure/appconfig/aznamespace"
 	"github.com/mpyw/suve/internal/provider/gcloud"
 	"github.com/mpyw/suve/internal/staging"
 	"github.com/mpyw/suve/internal/staging/store"
@@ -285,6 +286,34 @@ func (a *App) stagingScope() (provider.Scope, error) {
 	return provider.AWSScope(identity.AccountID, identity.Region), nil
 }
 
+// stagingScopeForKind resolves the staging scope for ONE service kind. It exists
+// because Azure's two services are INDEPENDENT resources with separate staging
+// buckets: App Configuration (param) is keyed by store name, Key Vault (secret)
+// by vault name, and scope.Key() resolves a combined scope to the Key Vault key
+// (VaultName is checked first) — which would silently key App Configuration
+// staging under the Key Vault bucket, diverging from the CLI's per-service
+// ScopeResolvers (a GUI-staged param would be invisible to `suve azure stage
+// param`). Resolving a service-specific scope keeps the GUI and CLI on the exact
+// same on-disk key. AWS keeps one account scope for both services (they share
+// it); Google Cloud has only the secret service.
+func (a *App) stagingScopeForKind(kind provider.Kind) (provider.Scope, error) {
+	sc := a.currentScope()
+
+	if sc.Provider == provider.ProviderAzure {
+		if kind == provider.KindParam {
+			scope := provider.AzureAppConfigScope(sc.StoreName)
+			scope.AppConfigNamespace = sc.AppConfigNamespace
+
+			return scope, nil
+		}
+
+		return provider.AzureKeyVaultScope(sc.VaultName), nil
+	}
+
+	// AWS (both services share the account scope) and Google Cloud (secret only).
+	return a.stagingScope()
+}
+
 // =============================================================================
 // Errors
 // =============================================================================
@@ -312,7 +341,71 @@ func (a *App) secretStore() (provider.Store, error) {
 	return registry.Store(a.ctx, a.currentScope(), provider.KindSecret)
 }
 
-func (a *App) getStagingStore() (store.ReadWriteOperator, error) {
+// effectiveParamScope returns the active param scope with the App Configuration
+// namespace overridden to ns, so a create/stage can target one concrete
+// (key, namespace) without mutating the shared read scope. It is a no-op for
+// non-App-Configuration scopes (which have no namespace axis).
+func (a *App) effectiveParamScope(ns string) provider.Scope {
+	sc := a.currentScope()
+	if sc.Provider == provider.ProviderAzure && sc.StoreName != "" {
+		sc.AppConfigNamespace = ns
+	}
+
+	return sc
+}
+
+// validateParamNamespace rejects a namespace that names all/multiple namespaces
+// (`*` or a `,`-list) for the App Configuration param service — a write targets
+// exactly one (key, namespace). It is a no-op for non-App-Configuration scopes
+// and for the null/default namespace. Returns the decoded literal namespace.
+func (a *App) validateParamNamespace(ns string) (string, error) {
+	sc := a.currentScope()
+	if sc.Provider != provider.ProviderAzure || sc.StoreName == "" {
+		return ns, nil
+	}
+
+	return aznamespace.Literal(ns)
+}
+
+// paramStoreForNamespace resolves a param provider.Store scoped to the given App
+// Configuration namespace (no-op namespace for other providers).
+func (a *App) paramStoreForNamespace(ns string) (provider.Store, error) {
+	return registry.Store(a.ctx, a.effectiveParamScope(ns), provider.KindParam)
+}
+
+// appConfigParamStrategyForNamespace builds the App Configuration staging
+// strategy over a provider store scoped to ns, so a staged entry's create/diff/
+// apply runs against its own namespace (the per-namespace resolver #431 threads
+// into the apply/diff use cases).
+func (a *App) appConfigParamStrategyForNamespace(ns string) (staging.FullStrategy, error) {
+	s, err := a.paramStoreForNamespace(ns)
+	if err != nil {
+		return nil, err
+	}
+
+	return staging.NewAzureAppConfigParamStrategy(s), nil
+}
+
+// isAppConfigParam reports whether the active param scope is Azure App
+// Configuration (the only param service with a namespace axis).
+func (a *App) isAppConfigParam() bool {
+	sc := a.currentScope()
+
+	return sc.Provider == provider.ProviderAzure && sc.StoreName != ""
+}
+
+// kindForService maps the frontend service string to the provider Kind used to
+// resolve the (service-specific) staging scope. An unrecognized service is
+// treated as param; getService validates the string separately.
+func kindForService(service string) provider.Kind {
+	if service == string(staging.ServiceSecret) {
+		return provider.KindSecret
+	}
+
+	return provider.KindParam
+}
+
+func (a *App) getStagingStore(kind provider.Kind) (store.ReadWriteOperator, error) {
 	// Test seam: an injected store bypasses scope resolution (and any STS call).
 	a.stagingStoreMu.Lock()
 	if a.stagingStore != nil {
@@ -322,7 +415,7 @@ func (a *App) getStagingStore() (store.ReadWriteOperator, error) {
 	}
 	a.stagingStoreMu.Unlock()
 
-	scope, err := a.stagingScope()
+	scope, err := a.stagingScopeForKind(kind)
 	if err != nil {
 		return nil, err
 	}

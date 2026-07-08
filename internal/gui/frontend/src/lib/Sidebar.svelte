@@ -287,12 +287,12 @@
              Configuration only). Changing it filters ParamView's rows without
              re-scoping; the "Change scope" button below re-points the scope. -->
         <div class="aws-info-row">
-          <span class="aws-info-label">Namespace</span>
+          <span class="aws-info-label">App Config NS</span>
           <select
             class="aws-info-value namespace-select"
             value={selectedNamespace}
             onchange={handleNamespaceChange}
-            aria-label="Namespace"
+            aria-label="App Config NS"
           >
             {#each namespaceOptions as ns}
               <option value={ns}>{ns}</option>

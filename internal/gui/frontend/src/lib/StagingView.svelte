@@ -49,6 +49,8 @@
   let editService = $state('');
   let editName = $state('');
   let editValue = $state('');
+  // App Configuration namespace of the entry being edited (empty otherwise).
+  let editNamespace = $state('');
 
   // Tag edit form
   let tagEditService = $state('');
@@ -179,6 +181,7 @@
   function openEditModal(service: string, entry: gui.StagingDiffEntry) {
     editService = service;
     editName = entry.name;
+    editNamespace = entry.namespace;
     editValue = entry.stagedValue || '';
     modalError = '';
     showEditModal = true;
@@ -193,7 +196,7 @@
     modalLoading = true;
     modalError = '';
     try {
-      await StagingEdit(editService, editName, editValue);
+      await StagingEdit(editService, editName, editValue, editNamespace);
       showEditModal = false;
       await loadStatus();
     } catch (e) {
@@ -204,9 +207,9 @@
   }
 
   // Unstage
-  async function handleUnstage(service: string, name: string) {
+  async function handleUnstage(service: string, name: string, namespace: string) {
     try {
-      await StagingUnstage(service, name);
+      await StagingUnstage(service, name, namespace);
       await loadStatus();
     } catch (e) {
       error = parseError(e);
@@ -466,11 +469,12 @@
         entries={paramEntries}
         tagEntries={paramTagEntries}
         hasTags={paramSvc?.hasTags ?? true}
+        showNamespace={paramSvc?.hasNamespaces ?? false}
         {viewMode}
         onapply={() => openApplyModal('param')}
         onreset={() => openResetModal('param')}
         onedit={(entry) => openEditModal('param', entry)}
-        onunstage={(name) => handleUnstage('param', name)}
+        onunstage={(name, namespace) => handleUnstage('param', name, namespace)}
         onaddtag={(entryName) => openAddTagModal('param', entryName)}
         onedittag={(entryName, key, value) => openEditTagModal('param', entryName, key, value)}
         onremovetag={(entryName, key) => handleRemoveTag('param', entryName, key)}
@@ -490,7 +494,7 @@
         onapply={() => openApplyModal('secret')}
         onreset={() => openResetModal('secret')}
         onedit={(entry) => openEditModal('secret', entry)}
-        onunstage={(name) => handleUnstage('secret', name)}
+        onunstage={(name, namespace) => handleUnstage('secret', name, namespace)}
         onaddtag={(entryName) => openAddTagModal('secret', entryName)}
         onedittag={(entryName, key, value) => openEditTagModal('secret', entryName, key, value)}
         onremovetag={(entryName, key) => handleRemoveTag('secret', entryName, key)}

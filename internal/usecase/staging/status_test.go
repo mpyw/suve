@@ -149,7 +149,9 @@ func TestStatusUseCase_Execute_GetError(t *testing.T) {
 	t.Parallel()
 
 	store := testutil.NewMockStore()
-	store.GetEntryErr = errors.New("store error")
+	// The name-filtered path lists entries (keyed by the (name, namespace)
+	// composite) and filters by the decoded bare name, so a list error surfaces.
+	store.ListEntriesErr = errors.New("store error")
 
 	uc := &usecasestaging.StatusUseCase{
 		Strategy: newParamStrategy(),
@@ -283,7 +285,8 @@ func TestStatusUseCase_Execute_GetTagError(t *testing.T) {
 	t.Parallel()
 
 	store := testutil.NewMockStore()
-	store.GetTagErr = errors.New("get tag error")
+	// The name-filtered path also lists tags, so a list-tags error surfaces.
+	store.ListTagsErr = errors.New("get tag error")
 
 	uc := &usecasestaging.StatusUseCase{
 		Strategy: newParamStrategy(),

@@ -469,7 +469,7 @@ func TestDiffRunner_Run(t *testing.T) {
 		assert.Contains(t, stderr.String(), "identical")
 
 		// Verify unstaged
-		_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/config")
+		_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/config", "")
 		assert.ErrorIs(t, err, staging.ErrNotStaged)
 	})
 
@@ -532,7 +532,7 @@ func TestDiffRunner_Run(t *testing.T) {
 		assert.Contains(t, stderr.String(), "no longer exists")
 
 		// Verify unstaged
-		_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/config")
+		_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/config", "")
 		assert.ErrorIs(t, err, staging.ErrNotStaged)
 	})
 
@@ -563,11 +563,13 @@ func TestDiffRunner_Run(t *testing.T) {
 
 		output := stdout.String()
 		assert.Contains(t, output, "+brand-new-value")
-		assert.Contains(t, output, "not in AWS")
+		// The remote label is the strategy's ServiceName (here the mock's
+		// "param"), not a hard-coded "AWS" — this runner serves every provider.
+		assert.Contains(t, output, "not in param")
 		assert.Contains(t, output, "staged for creation")
 
 		// Verify still staged (not auto-unstaged)
-		entry, err := store.GetEntry(t.Context(), staging.ServiceParam, "/app/new-param")
+		entry, err := store.GetEntry(t.Context(), staging.ServiceParam, "/app/new-param", "")
 		require.NoError(t, err)
 		assert.Equal(t, staging.OperationCreate, entry.Operation)
 	})
@@ -630,7 +632,7 @@ func TestDiffRunner_Run(t *testing.T) {
 		assert.Contains(t, stderr.String(), "identical")
 
 		// Verify unstaged
-		_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/param")
+		_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/param", "")
 		assert.ErrorIs(t, err, staging.ErrNotStaged)
 	})
 
@@ -694,7 +696,7 @@ func TestDiffRunner_Run(t *testing.T) {
 		assert.Contains(t, stderr.String(), "already deleted")
 
 		// Verify unstaged
-		_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/config")
+		_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/config", "")
 		assert.ErrorIs(t, err, staging.ErrNotStaged)
 	})
 }
@@ -731,7 +733,7 @@ func TestEditRunner_Run(t *testing.T) {
 		require.NoError(t, err)
 		assert.Contains(t, stdout.String(), "Staged")
 
-		entry, err := store.GetEntry(t.Context(), staging.ServiceParam, "/app/config")
+		entry, err := store.GetEntry(t.Context(), staging.ServiceParam, "/app/config", "")
 		require.NoError(t, err)
 		assert.Equal(t, staging.OperationUpdate, entry.Operation)
 		assert.Equal(t, "edited-value", lo.FromPtr(entry.Value))
@@ -766,7 +768,7 @@ func TestEditRunner_Run(t *testing.T) {
 		err := r.Run(t.Context(), cli.EditOptions{Name: "/app/config"})
 		require.NoError(t, err)
 
-		entry, err := store.GetEntry(t.Context(), staging.ServiceParam, "/app/config")
+		entry, err := store.GetEntry(t.Context(), staging.ServiceParam, "/app/config", "")
 		require.NoError(t, err)
 		assert.Equal(t, "new-value", lo.FromPtr(entry.Value))
 	})
@@ -921,11 +923,11 @@ func TestApplyRunner_Run(t *testing.T) {
 		assert.Contains(t, output, "Deleted")
 
 		// Verify all unstaged
-		_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/config1")
+		_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/config1", "")
 		require.ErrorIs(t, err, staging.ErrNotStaged)
-		_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/config2")
+		_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/config2", "")
 		require.ErrorIs(t, err, staging.ErrNotStaged)
-		_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/config3")
+		_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/config3", "")
 		require.ErrorIs(t, err, staging.ErrNotStaged)
 	})
 
@@ -959,9 +961,9 @@ func TestApplyRunner_Run(t *testing.T) {
 		require.NoError(t, err)
 
 		// Only config1 should be unstaged
-		_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/config1")
+		_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/config1", "")
 		require.ErrorIs(t, err, staging.ErrNotStaged)
-		_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/config2")
+		_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/config2", "")
 		require.NoError(t, err) // Still staged
 	})
 
@@ -1252,7 +1254,7 @@ func TestResetRunner_Run(t *testing.T) {
 		assert.Contains(t, stdout.String(), "(2)")
 
 		// Verify all unstaged
-		_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/config1")
+		_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/config1", "")
 		assert.ErrorIs(t, err, staging.ErrNotStaged)
 	})
 
@@ -1302,7 +1304,7 @@ func TestResetRunner_Run(t *testing.T) {
 		require.NoError(t, err)
 		assert.Contains(t, stdout.String(), "Unstaged")
 
-		_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/config")
+		_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/config", "")
 		assert.ErrorIs(t, err, staging.ErrNotStaged)
 	})
 
@@ -1355,7 +1357,7 @@ func TestResetRunner_Run(t *testing.T) {
 		assert.Contains(t, stdout.String(), "Restored")
 		assert.Contains(t, stdout.String(), "#1")
 
-		entry, err := store.GetEntry(t.Context(), staging.ServiceParam, "/app/config#1")
+		entry, err := store.GetEntry(t.Context(), staging.ServiceParam, "/app/config#1", "")
 		require.NoError(t, err)
 		assert.Equal(t, "old-value", lo.FromPtr(entry.Value))
 	})
@@ -1664,7 +1666,7 @@ func TestEditRunner_WithMetadata(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		entry, err := store.GetEntry(t.Context(), staging.ServiceParam, "/app/config")
+		entry, err := store.GetEntry(t.Context(), staging.ServiceParam, "/app/config", "")
 		require.NoError(t, err)
 		assert.Equal(t, "Updated description", lo.FromPtr(entry.Description))
 	})
@@ -1696,7 +1698,7 @@ func TestEditRunner_WithMetadata(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		entry, err := store.GetEntry(t.Context(), staging.ServiceParam, "/app/config")
+		entry, err := store.GetEntry(t.Context(), staging.ServiceParam, "/app/config", "")
 		require.NoError(t, err)
 		require.NotNil(t, entry.BaseModifiedAt)
 		assert.WithinDuration(t, awsTime, *entry.BaseModifiedAt, time.Second)
@@ -1733,7 +1735,7 @@ func TestEditRunner_WithMetadata(t *testing.T) {
 		assert.Contains(t, err.Error(), "staged for deletion")
 
 		// Entry should still be DELETE
-		entry, err := store.GetEntry(t.Context(), staging.ServiceParam, "/app/config")
+		entry, err := store.GetEntry(t.Context(), staging.ServiceParam, "/app/config", "")
 		require.NoError(t, err)
 		assert.Equal(t, staging.OperationDelete, entry.Operation)
 	})
@@ -2280,7 +2282,7 @@ func TestDeleteRunner_Run(t *testing.T) {
 		require.NoError(t, err)
 		assert.Contains(t, stdout.String(), "Staged for deletion: /app/config")
 
-		entry, err := store.GetEntry(t.Context(), staging.ServiceParam, "/app/config")
+		entry, err := store.GetEntry(t.Context(), staging.ServiceParam, "/app/config", "")
 		require.NoError(t, err)
 		assert.Equal(t, staging.OperationDelete, entry.Operation)
 		assert.Nil(t, entry.DeleteOptions) // SSM has no delete options
@@ -2309,7 +2311,7 @@ func TestDeleteRunner_Run(t *testing.T) {
 		require.NoError(t, err)
 		assert.Contains(t, stdout.String(), "Staged for deletion (14-day recovery): my-secret")
 
-		entry, err := store.GetEntry(t.Context(), staging.ServiceSecret, "my-secret")
+		entry, err := store.GetEntry(t.Context(), staging.ServiceSecret, "my-secret", "")
 		require.NoError(t, err)
 		assert.Equal(t, staging.OperationDelete, entry.Operation)
 		require.NotNil(t, entry.DeleteOptions)
@@ -2340,7 +2342,7 @@ func TestDeleteRunner_Run(t *testing.T) {
 		require.NoError(t, err)
 		assert.Contains(t, stdout.String(), "Staged for immediate deletion: my-secret")
 
-		entry, err := store.GetEntry(t.Context(), staging.ServiceSecret, "my-secret")
+		entry, err := store.GetEntry(t.Context(), staging.ServiceSecret, "my-secret", "")
 		require.NoError(t, err)
 		assert.Equal(t, staging.OperationDelete, entry.Operation)
 		require.NotNil(t, entry.DeleteOptions)
@@ -2420,7 +2422,7 @@ func TestDeleteRunner_Run(t *testing.T) {
 		assert.Contains(t, stdout.String(), "Unstaged creation: /app/new-config")
 
 		// Verify entry was unstaged (not converted to delete)
-		_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/new-config")
+		_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/new-config", "")
 		assert.ErrorIs(t, err, staging.ErrNotStaged)
 	})
 }
@@ -2457,7 +2459,7 @@ func TestEditRunner_Skipped_Unstaged(t *testing.T) {
 		assert.Contains(t, stdout.String(), "Skipped /app/config (same as AWS)")
 
 		// Verify nothing was staged
-		_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/config")
+		_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/config", "")
 		assert.ErrorIs(t, err, staging.ErrNotStaged)
 	})
 
@@ -2493,7 +2495,7 @@ func TestEditRunner_Skipped_Unstaged(t *testing.T) {
 		assert.Contains(t, stdout.String(), "Unstaged /app/config (reverted to AWS)")
 
 		// Verify entry was unstaged
-		_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/config")
+		_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/config", "")
 		assert.ErrorIs(t, err, staging.ErrNotStaged)
 	})
 }
@@ -2534,7 +2536,7 @@ func TestResetRunner_Skipped(t *testing.T) {
 		assert.Contains(t, stdout.String(), "Skipped /app/config#3 (version #3 matches current value)")
 
 		// Verify nothing was staged (auto-skipped)
-		_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/config#3")
+		_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/config#3", "")
 		assert.ErrorIs(t, err, staging.ErrNotStaged)
 	})
 }
@@ -2576,12 +2578,12 @@ func TestStashPopRunner_Run(t *testing.T) {
 		assert.Contains(t, stdout.String(), "Stashed changes restored and file deleted")
 
 		// Verify entry was moved to agent
-		entry, err := agentStore.GetEntry(t.Context(), staging.ServiceParam, "/app/config")
+		entry, err := agentStore.GetEntry(t.Context(), staging.ServiceParam, "/app/config", "")
 		require.NoError(t, err)
 		assert.Equal(t, "file-value", lo.FromPtr(entry.Value))
 
 		// Verify file store is empty (not kept)
-		_, err = fileStore.GetEntry(t.Context(), staging.ServiceParam, "/app/config")
+		_, err = fileStore.GetEntry(t.Context(), staging.ServiceParam, "/app/config", "")
 		assert.ErrorIs(t, err, staging.ErrNotStaged)
 	})
 
@@ -2613,9 +2615,9 @@ func TestStashPopRunner_Run(t *testing.T) {
 		assert.Contains(t, stdout.String(), "file kept")
 
 		// Verify entry exists in both stores
-		_, err = agentStore.GetEntry(t.Context(), staging.ServiceParam, "/app/config")
+		_, err = agentStore.GetEntry(t.Context(), staging.ServiceParam, "/app/config", "")
 		require.NoError(t, err)
-		_, err = fileStore.GetEntry(t.Context(), staging.ServiceParam, "/app/config")
+		_, err = fileStore.GetEntry(t.Context(), staging.ServiceParam, "/app/config", "")
 		require.NoError(t, err) // Still in file (kept)
 	})
 
@@ -2655,9 +2657,9 @@ func TestStashPopRunner_Run(t *testing.T) {
 		assert.Contains(t, stdout.String(), "merged")
 
 		// Verify both entries exist in agent
-		_, err = agentStore.GetEntry(t.Context(), staging.ServiceParam, "/app/existing")
+		_, err = agentStore.GetEntry(t.Context(), staging.ServiceParam, "/app/existing", "")
 		require.NoError(t, err)
-		_, err = agentStore.GetEntry(t.Context(), staging.ServiceParam, "/app/new")
+		_, err = agentStore.GetEntry(t.Context(), staging.ServiceParam, "/app/new", "")
 		require.NoError(t, err)
 	})
 
@@ -2698,13 +2700,13 @@ func TestStashPopRunner_Run(t *testing.T) {
 		assert.Contains(t, stdout.String(), "file kept")
 
 		// Verify both entries exist in agent
-		_, err = agentStore.GetEntry(t.Context(), staging.ServiceParam, "/app/existing")
+		_, err = agentStore.GetEntry(t.Context(), staging.ServiceParam, "/app/existing", "")
 		require.NoError(t, err)
-		_, err = agentStore.GetEntry(t.Context(), staging.ServiceParam, "/app/new")
+		_, err = agentStore.GetEntry(t.Context(), staging.ServiceParam, "/app/new", "")
 		require.NoError(t, err)
 
 		// Verify file store still has the entry (kept)
-		_, err = fileStore.GetEntry(t.Context(), staging.ServiceParam, "/app/new")
+		_, err = fileStore.GetEntry(t.Context(), staging.ServiceParam, "/app/new", "")
 		require.NoError(t, err)
 	})
 
@@ -2767,9 +2769,9 @@ func TestStashPopRunner_Run(t *testing.T) {
 		assert.Contains(t, stdout.String(), "merged")
 
 		// Verify both entries exist in agent
-		_, err = agentStore.GetEntry(t.Context(), staging.ServiceParam, "/app/existing")
+		_, err = agentStore.GetEntry(t.Context(), staging.ServiceParam, "/app/existing", "")
 		require.NoError(t, err)
-		_, err = agentStore.GetEntry(t.Context(), staging.ServiceParam, "/app/new")
+		_, err = agentStore.GetEntry(t.Context(), staging.ServiceParam, "/app/new", "")
 		require.NoError(t, err)
 	})
 
@@ -2808,7 +2810,7 @@ func TestStashPopRunner_Run(t *testing.T) {
 		require.NoError(t, err)
 
 		// With overwrite, file content replaces agent content
-		_, err = agentStore.GetEntry(t.Context(), staging.ServiceParam, "/app/new")
+		_, err = agentStore.GetEntry(t.Context(), staging.ServiceParam, "/app/new", "")
 		require.NoError(t, err)
 	})
 
@@ -2846,11 +2848,11 @@ func TestStashPopRunner_Run(t *testing.T) {
 		require.NoError(t, err)
 
 		// Param should be in agent
-		_, err = agentStore.GetEntry(t.Context(), staging.ServiceParam, "/app/param")
+		_, err = agentStore.GetEntry(t.Context(), staging.ServiceParam, "/app/param", "")
 		require.NoError(t, err)
 
 		// Secret should still be in file (not drained)
-		_, err = fileStore.GetEntry(t.Context(), staging.ServiceSecret, "my-secret")
+		_, err = fileStore.GetEntry(t.Context(), staging.ServiceSecret, "my-secret", "")
 		require.NoError(t, err)
 	})
 
@@ -2924,12 +2926,12 @@ func TestStashPushRunner_Run(t *testing.T) {
 		assert.Contains(t, stderr.String(), "plain text") // Warning about plain text storage
 
 		// Verify entry was moved to file
-		entry, err := fileStore.GetEntry(t.Context(), staging.ServiceParam, "/app/config")
+		entry, err := fileStore.GetEntry(t.Context(), staging.ServiceParam, "/app/config", "")
 		require.NoError(t, err)
 		assert.Equal(t, "agent-value", lo.FromPtr(entry.Value))
 
 		// Verify agent store is empty (not kept)
-		_, err = agentStore.GetEntry(t.Context(), staging.ServiceParam, "/app/config")
+		_, err = agentStore.GetEntry(t.Context(), staging.ServiceParam, "/app/config", "")
 		assert.ErrorIs(t, err, staging.ErrNotStaged)
 	})
 
@@ -2961,9 +2963,9 @@ func TestStashPushRunner_Run(t *testing.T) {
 		assert.Contains(t, stdout.String(), "kept in the working staging area")
 
 		// Verify entry exists in both stores
-		_, err = fileStore.GetEntry(t.Context(), staging.ServiceParam, "/app/config")
+		_, err = fileStore.GetEntry(t.Context(), staging.ServiceParam, "/app/config", "")
 		require.NoError(t, err)
-		_, err = agentStore.GetEntry(t.Context(), staging.ServiceParam, "/app/config")
+		_, err = agentStore.GetEntry(t.Context(), staging.ServiceParam, "/app/config", "")
 		require.NoError(t, err) // Still in agent (kept)
 	})
 
@@ -3053,11 +3055,11 @@ func TestStashPushRunner_Run(t *testing.T) {
 		require.NoError(t, err)
 
 		// Param should be in file
-		_, err = fileStore.GetEntry(t.Context(), staging.ServiceParam, "/app/param")
+		_, err = fileStore.GetEntry(t.Context(), staging.ServiceParam, "/app/param", "")
 		require.NoError(t, err)
 
 		// Secret should still be in agent (not persisted)
-		_, err = agentStore.GetEntry(t.Context(), staging.ServiceSecret, "my-secret")
+		_, err = agentStore.GetEntry(t.Context(), staging.ServiceSecret, "my-secret", "")
 		require.NoError(t, err)
 	})
 

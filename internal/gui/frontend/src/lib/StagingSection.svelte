@@ -13,10 +13,13 @@
     // Whether this service supports tags; when false the section renders no tag
     // chips or "Add Tag" control. Driven by the service capability (HasTags).
     hasTags?: boolean;
+    // Whether to show each entry's namespace as a badge (Azure App Configuration
+    // only). "(NULL)" is the null/default namespace.
+    showNamespace?: boolean;
     onapply: () => void;
     onreset: () => void;
     onedit: (entry: gui.StagingDiffEntry) => void;
-    onunstage: (name: string) => void;
+    onunstage: (name: string, namespace: string) => void;
     onaddtag: (entryName: string) => void;
     onedittag: (entryName: string, key: string, value: string) => void;
     onremovetag: (entryName: string, key: string) => void;
@@ -31,6 +34,7 @@
     tagEntries,
     viewMode,
     hasTags = true,
+    showNamespace = false,
     onapply,
     onreset,
     onedit,
@@ -99,12 +103,15 @@
             <span class="operation-badge" style="background: {getOperationColor(entry.operation || '')}">
               {entry.operation}
             </span>
+            {#if showNamespace}
+              <span class="namespace-badge">{entry.namespace || '(NULL)'}</span>
+            {/if}
             <span class="entry-name">{entry.name}</span>
             <div class="entry-actions">
               {#if showEditButton(entry)}
                 <button class="btn-entry" onclick={() => onedit(entry)}>Edit</button>
               {/if}
-              <button class="btn-entry btn-unstage" onclick={() => onunstage(entry.name)}>Unstage</button>
+              <button class="btn-entry btn-unstage" onclick={() => onunstage(entry.name, entry.namespace)}>Unstage</button>
             </div>
           </div>
           <div class="entry-tags">
@@ -172,7 +179,7 @@
           <div class="entry-header">
             <span class="entry-name">{tagEntry.name}</span>
             <div class="entry-actions">
-              <button class="btn-entry btn-unstage" onclick={() => onunstage(tagEntry.name)}>Unstage</button>
+              <button class="btn-entry btn-unstage" onclick={() => onunstage(tagEntry.name, '')}>Unstage</button>
             </div>
           </div>
           <div class="entry-tags">
@@ -464,5 +471,17 @@
   .btn-add-tag:hover {
     background: rgba(76, 175, 80, 0.1);
     border-style: solid;
+  }
+
+  /* Per-entry namespace badge (Azure App Configuration). */
+  .namespace-badge {
+    display: inline-block;
+    margin-right: 8px;
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: 11px;
+    background: rgba(120, 120, 120, 0.18);
+    color: #888;
+    white-space: nowrap;
   }
 </style>

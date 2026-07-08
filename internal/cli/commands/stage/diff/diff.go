@@ -217,7 +217,7 @@ func (r *Runner) diffEntries(
 			case staging.OperationDelete:
 				if notFound {
 					// Item doesn't exist remotely anymore - deletion already applied.
-					if err := r.Store.UnstageEntry(ctx, strategy.Service(), name); err != nil {
+					if err := r.Store.UnstageEntry(ctx, strategy.Service(), name, ""); err != nil {
 						return fmt.Errorf("failed to unstage %s: %w", name, err)
 					}
 
@@ -247,7 +247,7 @@ func (r *Runner) diffEntries(
 			case staging.OperationUpdate:
 				if notFound {
 					// Item doesn't exist remotely anymore - staged update is invalid.
-					if err := r.Store.UnstageEntry(ctx, strategy.Service(), name); err != nil {
+					if err := r.Store.UnstageEntry(ctx, strategy.Service(), name, ""); err != nil {
 						return fmt.Errorf("failed to unstage %s: %w", name, err)
 					}
 
@@ -298,7 +298,7 @@ func (r *Runner) outputDiff(
 	// compares raw values. It also never applies to a delete (deleting is not a
 	// no-op just because the current value is the empty string).
 	if entry.Operation != staging.OperationDelete && remoteValue == stagedValue {
-		if err := r.Store.UnstageEntry(ctx, strategy.Service(), name); err != nil {
+		if err := r.Store.UnstageEntry(ctx, strategy.Service(), name, ""); err != nil {
 			return fmt.Errorf("failed to unstage %s: %w", name, err)
 		}
 

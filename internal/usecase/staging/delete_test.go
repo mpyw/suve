@@ -57,7 +57,7 @@ func TestDeleteUseCase_Execute_Param(t *testing.T) {
 	assert.False(t, output.ShowDeleteOptions)
 
 	// Verify staged
-	entry, err := store.GetEntry(t.Context(), staging.ServiceParam, "/app/to-delete")
+	entry, err := store.GetEntry(t.Context(), staging.ServiceParam, "/app/to-delete", "")
 	require.NoError(t, err)
 	assert.Equal(t, staging.OperationDelete, entry.Operation)
 	assert.NotNil(t, entry.BaseModifiedAt)
@@ -84,7 +84,7 @@ func TestDeleteUseCase_Execute_SecretWithRecoveryWindow(t *testing.T) {
 	assert.Equal(t, 14, output.RecoveryWindow)
 	assert.False(t, output.Force)
 
-	entry, err := store.GetEntry(t.Context(), staging.ServiceSecret, "my-secret")
+	entry, err := store.GetEntry(t.Context(), staging.ServiceSecret, "my-secret", "")
 	require.NoError(t, err)
 	assert.NotNil(t, entry.DeleteOptions)
 	assert.Equal(t, 14, entry.DeleteOptions.RecoveryWindow)
@@ -202,7 +202,7 @@ func TestDeleteUseCase_Execute_ZeroLastModified_ResourceExists(t *testing.T) {
 	assert.False(t, output.Unstaged)
 
 	// Verify it was staged for deletion, with no conflict base (zero Modified).
-	entry, err := store.GetEntry(t.Context(), staging.ServiceParam, "/app/to-delete")
+	entry, err := store.GetEntry(t.Context(), staging.ServiceParam, "/app/to-delete", "")
 	require.NoError(t, err)
 	assert.Equal(t, staging.OperationDelete, entry.Operation)
 	assert.Nil(t, entry.BaseModifiedAt)
@@ -237,7 +237,7 @@ func TestDeleteUseCase_Execute_ZeroLastModified_StagedCreate(t *testing.T) {
 	assert.True(t, output.Unstaged) // Should be unstaged, not deleted
 
 	// Verify entry is removed
-	_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/new-param")
+	_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/new-param", "")
 	assert.ErrorIs(t, err, staging.ErrNotStaged)
 }
 
@@ -324,7 +324,7 @@ func TestDeleteUseCase_Execute_UnstagesCreate(t *testing.T) {
 	assert.Equal(t, "/app/new", output.Name)
 
 	// Verify the entry was unstaged (removed), not staged as DELETE
-	_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/new")
+	_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/new", "")
 	assert.ErrorIs(t, err, staging.ErrNotStaged)
 }
 
@@ -351,7 +351,7 @@ func TestDeleteUseCase_Execute_DeleteOnUpdate(t *testing.T) {
 	assert.False(t, output.Unstaged) // Not unstaged, it was re-staged as DELETE
 
 	// Verify the operation changed to DELETE
-	entry, err := store.GetEntry(t.Context(), staging.ServiceParam, "/app/existing")
+	entry, err := store.GetEntry(t.Context(), staging.ServiceParam, "/app/existing", "")
 	require.NoError(t, err)
 	assert.Equal(t, staging.OperationDelete, entry.Operation)
 }

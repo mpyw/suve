@@ -312,8 +312,19 @@ func (a *App) ParamDiff(spec1Str, spec2Str string) (*ParamDiffResult, error) {
 
 // ParamSet creates or updates a parameter.
 // It first tries to create the parameter; if it already exists, it updates instead.
-func (a *App) ParamSet(name, value, paramType string) (*ParamSetResult, error) {
-	store, err := a.paramStore()
+//
+// namespace selects the Azure App Configuration namespace to write under (the
+// label axis); empty is the null/default namespace and it is ignored by every
+// other provider. It must name a single concrete namespace — a filter value
+// (`*` or a `,`-list) is rejected, since a write targets exactly one
+// (key, namespace).
+func (a *App) ParamSet(name, value, paramType, namespace string) (*ParamSetResult, error) {
+	namespace, err := a.validateParamNamespace(namespace)
+	if err != nil {
+		return nil, err
+	}
+
+	store, err := a.paramStoreForNamespace(namespace)
 	if err != nil {
 		return nil, err
 	}

@@ -97,7 +97,7 @@ func TestApp_StagingUnstage(t *testing.T) {
 		require.NoError(t, err)
 
 		// Unstage it
-		result, err := app.StagingUnstage("param", "/app/config")
+		result, err := app.StagingUnstage("param", "/app/config", "")
 		require.NoError(t, err)
 		assert.Equal(t, "/app/config", result.Name)
 
@@ -112,7 +112,7 @@ func TestApp_StagingUnstage(t *testing.T) {
 		app := setupTestApp(t)
 
 		// Should not error even if not staged
-		result, err := app.StagingUnstage("param", "/nonexistent")
+		result, err := app.StagingUnstage("param", "/nonexistent", "")
 		require.NoError(t, err)
 		assert.Equal(t, "/nonexistent", result.Name)
 	})
@@ -170,7 +170,7 @@ func TestApp_StagingCheckStatus(t *testing.T) {
 		t.Parallel()
 		app := setupTestApp(t)
 
-		result, err := app.StagingCheckStatus("param", "/app/config")
+		result, err := app.StagingCheckStatus("param", "/app/config", "")
 		require.NoError(t, err)
 		assert.False(t, result.HasEntry)
 		assert.False(t, result.HasTags)
@@ -186,7 +186,7 @@ func TestApp_StagingCheckStatus(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		result, err := app.StagingCheckStatus("param", "/app/config")
+		result, err := app.StagingCheckStatus("param", "/app/config", "")
 		require.NoError(t, err)
 		assert.True(t, result.HasEntry)
 		assert.False(t, result.HasTags)
@@ -201,7 +201,7 @@ func TestApp_StagingCheckStatus(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		result, err := app.StagingCheckStatus("param", "/app/config")
+		result, err := app.StagingCheckStatus("param", "/app/config", "")
 		require.NoError(t, err)
 		assert.False(t, result.HasEntry)
 		assert.True(t, result.HasTags)
@@ -222,7 +222,7 @@ func TestApp_StagingCheckStatus(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		result, err := app.StagingCheckStatus("param", "/app/config")
+		result, err := app.StagingCheckStatus("param", "/app/config", "")
 		require.NoError(t, err)
 		assert.True(t, result.HasEntry)
 		assert.True(t, result.HasTags)
@@ -768,7 +768,7 @@ func TestApp_StagingUnstage_ErrorPaths(t *testing.T) {
 		t.Parallel()
 		app := setupTestApp(t)
 
-		_, err := app.StagingUnstage("invalid", "/test")
+		_, err := app.StagingUnstage("invalid", "/test", "")
 		assert.ErrorIs(t, err, errInvalidService)
 	})
 
@@ -787,7 +787,7 @@ func TestApp_StagingUnstage_ErrorPaths(t *testing.T) {
 		// Inject error
 		mockStore.UnstageEntryErr = context.DeadlineExceeded
 
-		_, err = app.StagingUnstage("param", "/test")
+		_, err = app.StagingUnstage("param", "/test", "")
 		require.Error(t, err)
 		assert.ErrorIs(t, err, context.DeadlineExceeded)
 	})
@@ -806,7 +806,7 @@ func TestApp_StagingUnstage_ErrorPaths(t *testing.T) {
 		// Inject error
 		mockStore.UnstageTagErr = context.DeadlineExceeded
 
-		_, err = app.StagingUnstage("param", "/test")
+		_, err = app.StagingUnstage("param", "/test", "")
 		require.Error(t, err)
 		assert.ErrorIs(t, err, context.DeadlineExceeded)
 	})
@@ -939,7 +939,7 @@ func TestApp_StagingCheckStatus_ErrorPaths(t *testing.T) {
 		t.Parallel()
 		app := setupTestApp(t)
 
-		_, err := app.StagingCheckStatus("invalid", "/test")
+		_, err := app.StagingCheckStatus("invalid", "/test", "")
 		assert.ErrorIs(t, err, errInvalidService)
 	})
 }
@@ -1031,14 +1031,14 @@ func TestApp_StagingCheckStatus_BothEntryAndTags(t *testing.T) {
 
 		// GetEntryErr is not staging.ErrNotStaged, but GetEntry returns error for non-existent
 		// The behavior depends on the mock - let's verify the positive case
-		result, err := app.StagingCheckStatus("param", "/test")
+		result, err := app.StagingCheckStatus("param", "/test", "")
 		require.NoError(t, err)
 		assert.False(t, result.HasEntry)
 		assert.True(t, result.HasTags)
 
 		// Now set error and verify handling
 		mockStore.GetEntryErr = context.DeadlineExceeded
-		result, err = app.StagingCheckStatus("param", "/test")
+		result, err = app.StagingCheckStatus("param", "/test", "")
 		require.NoError(t, err) // GetEntry error is swallowed, HasEntry is just false
 		assert.False(t, result.HasEntry)
 	})
@@ -1064,18 +1064,18 @@ func TestApp_StagingUnstage_BothEntryAndTag(t *testing.T) {
 		require.NoError(t, err)
 
 		// Verify both are staged
-		status, err := app.StagingCheckStatus("param", "/app/config")
+		status, err := app.StagingCheckStatus("param", "/app/config", "")
 		require.NoError(t, err)
 		assert.True(t, status.HasEntry)
 		assert.True(t, status.HasTags)
 
 		// Unstage both
-		result, err := app.StagingUnstage("param", "/app/config")
+		result, err := app.StagingUnstage("param", "/app/config", "")
 		require.NoError(t, err)
 		assert.Equal(t, "/app/config", result.Name)
 
 		// Verify both are unstaged
-		status, err = app.StagingCheckStatus("param", "/app/config")
+		status, err = app.StagingCheckStatus("param", "/app/config", "")
 		require.NoError(t, err)
 		assert.False(t, status.HasEntry)
 		assert.False(t, status.HasTags)

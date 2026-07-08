@@ -259,11 +259,12 @@ export namespace gui {
 	    hasStaging: boolean;
 	    hasForceDelete: boolean;
 	    hasRecoveryWindow: boolean;
-	
+	    hasNamespaces: boolean;
+
 	    static createFrom(source: any = {}) {
 	        return new ServiceCapability(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.service = source["service"];
@@ -275,6 +276,7 @@ export namespace gui {
 	        this.hasStaging = source["hasStaging"];
 	        this.hasForceDelete = source["hasForceDelete"];
 	        this.hasRecoveryWindow = source["hasRecoveryWindow"];
+	        this.hasNamespaces = source["hasNamespaces"];
 	    }
 	}
 	export class ProviderCapability {
@@ -734,6 +736,7 @@ export namespace gui {
 	}
 	export class StagingDiffEntry {
 	    name: string;
+	    namespace: string;
 	    type: string;
 	    operation?: string;
 	    remoteValue?: string;
@@ -741,14 +744,15 @@ export namespace gui {
 	    stagedValue?: string;
 	    description?: string;
 	    warning?: string;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new StagingDiffEntry(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.name = source["name"];
+	        this.namespace = source["namespace"];
 	        this.type = source["type"];
 	        this.operation = source["operation"];
 	        this.remoteValue = source["remoteValue"];
@@ -851,17 +855,19 @@ export namespace gui {
 	}
 	export class StagingEntry {
 	    name: string;
+	    namespace: string;
 	    operation: string;
 	    value?: string;
 	    stagedAt: string;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new StagingEntry(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.name = source["name"];
+	        this.namespace = source["namespace"];
 	        this.operation = source["operation"];
 	        this.value = source["value"];
 	        this.stagedAt = source["stagedAt"];

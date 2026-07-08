@@ -306,4 +306,21 @@ func TestAzureAppConfig_Namespace(t *testing.T) {
 		_, err = runAzureParam(t, "show", "--raw", "--namespace", "dev,prod", shared)
 		require.Error(t, err)
 	})
+
+	// create is a single-item op: it must target exactly one namespace, so a
+	// filter value (`*` / `,`-list) is rejected (backs the GUI create guard, #431).
+	t.Run("create-rejects-nonunique-namespace", func(t *testing.T) {
+		const key = "suve/e2e/azure/ns/create-guard"
+
+		_, err := runAzureParam(t, "create", "--namespace", "*", key, "v")
+		require.Error(t, err)
+
+		_, err = runAzureParam(t, "create", "--namespace", "dev,prd", key, "v")
+		require.Error(t, err)
+
+		// Nothing was created under any namespace by the rejected attempts.
+		all, err := runAzureParam(t, "list", "--namespace", "*")
+		require.NoError(t, err)
+		assert.NotContains(t, all, key)
+	})
 }

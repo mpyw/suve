@@ -286,7 +286,7 @@ func TestRun_IdenticalValues(t *testing.T) {
 	assert.Contains(t, stderr.String(), "unstaged /app/config: identical to AWS current")
 
 	// Verify actually unstaged
-	_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/config")
+	_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/config", "")
 	assert.Equal(t, staging.ErrNotStaged, err)
 }
 
@@ -348,7 +348,7 @@ func TestRun_ParamUpdateAutoUnstageWhenDeleted(t *testing.T) {
 	assert.Contains(t, stderr.String(), "no longer exists")
 
 	// Verify unstaged
-	_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/config")
+	_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/config", "")
 	assert.ErrorIs(t, err, staging.ErrNotStaged)
 }
 
@@ -380,7 +380,7 @@ func TestRun_SecretUpdateAutoUnstageWhenDeleted(t *testing.T) {
 	assert.Contains(t, stderr.String(), "no longer exists")
 
 	// Verify unstaged
-	_, err = store.GetEntry(t.Context(), staging.ServiceSecret, "my-secret")
+	_, err = store.GetEntry(t.Context(), staging.ServiceSecret, "my-secret", "")
 	assert.ErrorIs(t, err, staging.ErrNotStaged)
 }
 
@@ -413,7 +413,7 @@ func TestRun_SecretIdenticalValues(t *testing.T) {
 	assert.Contains(t, stderr.String(), "unstaged my-secret: identical to AWS current")
 
 	// Verify actually unstaged
-	_, err = store.GetEntry(t.Context(), staging.ServiceSecret, "my-secret")
+	_, err = store.GetEntry(t.Context(), staging.ServiceSecret, "my-secret", "")
 	assert.Equal(t, staging.ErrNotStaged, err)
 }
 
@@ -613,7 +613,7 @@ func TestRun_DeleteAutoUnstageWhenAlreadyDeleted(t *testing.T) {
 	assert.Contains(t, stderr.String(), "already deleted")
 
 	// Verify unstaged
-	_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/config")
+	_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/config", "")
 	assert.ErrorIs(t, err, staging.ErrNotStaged)
 }
 
@@ -652,7 +652,7 @@ func TestRun_KeptStagedOnTransientFetchError(t *testing.T) {
 			assert.Contains(t, stderr.String(), "throttled")
 			assert.NotContains(t, stderr.String(), "unstaged")
 
-			_, err := store.GetEntry(t.Context(), staging.ServiceParam, "/app/config")
+			_, err := store.GetEntry(t.Context(), staging.ServiceParam, "/app/config", "")
 			require.NoError(t, err, "entry must remain staged after a transient fetch error")
 		})
 	}
@@ -684,7 +684,7 @@ func TestRun_DeleteEmptyRemoteNotUnstaged(t *testing.T) {
 	assert.NotContains(t, stderr.String(), "unstaged")
 
 	// The staged deletion must survive `stage diff`.
-	_, err := store.GetEntry(t.Context(), staging.ServiceParam, "/app/empty")
+	_, err := store.GetEntry(t.Context(), staging.ServiceParam, "/app/empty", "")
 	require.NoError(t, err)
 }
 
@@ -717,7 +717,7 @@ func TestRun_ParseJSONReformatOnlyUpdateKeptStaged(t *testing.T) {
 	assert.Contains(t, stderr.String(), "only in JSON formatting")
 
 	// The staged update must survive `stage diff -j`.
-	_, err := store.GetEntry(t.Context(), staging.ServiceParam, "/app/config")
+	_, err := store.GetEntry(t.Context(), staging.ServiceParam, "/app/config", "")
 	require.NoError(t, err)
 }
 
@@ -748,7 +748,7 @@ func TestRun_SecretDeleteAutoUnstageWhenAlreadyDeleted(t *testing.T) {
 	assert.Contains(t, stderr.String(), "already deleted")
 
 	// Verify unstaged
-	_, err = store.GetEntry(t.Context(), staging.ServiceSecret, "my-secret")
+	_, err = store.GetEntry(t.Context(), staging.ServiceSecret, "my-secret", "")
 	assert.ErrorIs(t, err, staging.ErrNotStaged)
 }
 

@@ -17,6 +17,10 @@ type EditInput struct {
 	Name        string
 	Value       string
 	Description string
+	// Namespace is the Azure App Configuration namespace of the setting being
+	// edited; empty is the null/default namespace and the only value for every
+	// other provider.
+	Namespace string
 }
 
 // EditOutput holds the result of the edit use case.
@@ -39,7 +43,7 @@ func (u *EditUseCase) Execute(ctx context.Context, input EditInput) (*EditOutput
 	// Check staged state first to avoid unnecessary AWS fetch
 	var stagedEntry *staging.Entry
 
-	entry, err := u.Store.GetEntry(ctx, service, input.Name)
+	entry, err := u.Store.GetEntry(ctx, service, input.Name, input.Namespace)
 	if err != nil && !errors.Is(err, staging.ErrNotStaged) {
 		return nil, err
 	}
@@ -86,7 +90,7 @@ func (u *EditUseCase) Execute(ctx context.Context, input EditInput) (*EditOutput
 	executor := transition.NewExecutor(u.Store)
 	_, wasNotStaged := entryState.StagedState.(transition.EntryStagedStateNotStaged)
 
-	result, err := executor.ExecuteEntry(ctx, service, input.Name, entryState, transition.EntryActionEdit{Value: input.Value}, opts)
+	result, err := executor.ExecuteEntry(ctx, service, input.Name, input.Namespace, entryState, transition.EntryActionEdit{Value: input.Value}, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -153,7 +157,8 @@ func (u *EditUseCase) fetchCurrentState(ctx context.Context, name string) (*stri
 
 // BaselineInput holds input for getting baseline value.
 type BaselineInput struct {
-	Name string
+	Name      string
+	Namespace string
 }
 
 // BaselineOutput holds the baseline value for editing.
@@ -167,7 +172,7 @@ func (u *EditUseCase) Baseline(ctx context.Context, input BaselineInput) (*Basel
 	service := u.Strategy.Service()
 
 	// Check if already staged
-	stagedEntry, err := u.Store.GetEntry(ctx, service, input.Name)
+	stagedEntry, err := u.Store.GetEntry(ctx, service, input.Name, input.Namespace)
 	if err != nil && !errors.Is(err, staging.ErrNotStaged) {
 		return nil, err
 	}

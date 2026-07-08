@@ -202,11 +202,11 @@ func TestStashPushRunner_RunBasic(t *testing.T) {
 		require.NoError(t, err)
 
 		// Param should be in file
-		_, err = fileStore.GetEntry(t.Context(), staging.ServiceParam, "/app/config")
+		_, err = fileStore.GetEntry(t.Context(), staging.ServiceParam, "/app/config", "")
 		require.NoError(t, err)
 
 		// Secret should still be in agent
-		_, err = agentStore.GetEntry(t.Context(), staging.ServiceSecret, "my-secret")
+		_, err = agentStore.GetEntry(t.Context(), staging.ServiceSecret, "my-secret", "")
 		require.NoError(t, err)
 	})
 }
@@ -312,11 +312,11 @@ func TestStashPushRunner_Run_WithModes(t *testing.T) {
 		require.NoError(t, err)
 
 		// New data should be in file
-		_, err = fileStore.GetEntry(t.Context(), staging.ServiceParam, "/new")
+		_, err = fileStore.GetEntry(t.Context(), staging.ServiceParam, "/new", "")
 		require.NoError(t, err)
 
 		// Existing data should be removed
-		_, err = fileStore.GetEntry(t.Context(), staging.ServiceParam, "/existing")
+		_, err = fileStore.GetEntry(t.Context(), staging.ServiceParam, "/existing", "")
 		require.ErrorIs(t, err, staging.ErrNotStaged)
 	})
 
@@ -357,11 +357,11 @@ func TestStashPushRunner_Run_WithModes(t *testing.T) {
 		require.NoError(t, err)
 
 		// New data should be in file
-		_, err = fileStore.GetEntry(t.Context(), staging.ServiceParam, "/new")
+		_, err = fileStore.GetEntry(t.Context(), staging.ServiceParam, "/new", "")
 		require.NoError(t, err)
 
 		// Existing data should be preserved
-		_, err = fileStore.GetEntry(t.Context(), staging.ServiceParam, "/existing")
+		_, err = fileStore.GetEntry(t.Context(), staging.ServiceParam, "/existing", "")
 		require.NoError(t, err)
 	})
 }

@@ -50,8 +50,8 @@ export function ParamRemoveTag(arg1, arg2) {
   return window['go']['gui']['App']['ParamRemoveTag'](arg1, arg2);
 }
 
-export function ParamSet(arg1, arg2, arg3) {
-  return window['go']['gui']['App']['ParamSet'](arg1, arg2, arg3);
+export function ParamSet(arg1, arg2, arg3, arg4) {
+  return window['go']['gui']['App']['ParamSet'](arg1, arg2, arg3, arg4);
 }
 
 export function ParamShow(arg1) {
@@ -106,8 +106,8 @@ export function SelectScope(arg1) {
   return window['go']['gui']['App']['SelectScope'](arg1);
 }
 
-export function StagingAdd(arg1, arg2, arg3) {
-  return window['go']['gui']['App']['StagingAdd'](arg1, arg2, arg3);
+export function StagingAdd(arg1, arg2, arg3, arg4) {
+  return window['go']['gui']['App']['StagingAdd'](arg1, arg2, arg3, arg4);
 }
 
 export function StagingAddTag(arg1, arg2, arg3, arg4) {
@@ -126,12 +126,12 @@ export function StagingCancelRemoveTag(arg1, arg2, arg3) {
   return window['go']['gui']['App']['StagingCancelRemoveTag'](arg1, arg2, arg3);
 }
 
-export function StagingCheckStatus(arg1, arg2) {
-  return window['go']['gui']['App']['StagingCheckStatus'](arg1, arg2);
+export function StagingCheckStatus(arg1, arg2, arg3) {
+  return window['go']['gui']['App']['StagingCheckStatus'](arg1, arg2, arg3);
 }
 
-export function StagingDelete(arg1, arg2, arg3, arg4) {
-  return window['go']['gui']['App']['StagingDelete'](arg1, arg2, arg3, arg4);
+export function StagingDelete(arg1, arg2, arg3, arg4, arg5) {
+  return window['go']['gui']['App']['StagingDelete'](arg1, arg2, arg3, arg4, arg5);
 }
 
 export function StagingDiff(arg1, arg2) {
@@ -146,8 +146,8 @@ export function StagingDrop() {
   return window['go']['gui']['App']['StagingDrop']();
 }
 
-export function StagingEdit(arg1, arg2, arg3) {
-  return window['go']['gui']['App']['StagingEdit'](arg1, arg2, arg3);
+export function StagingEdit(arg1, arg2, arg3, arg4) {
+  return window['go']['gui']['App']['StagingEdit'](arg1, arg2, arg3, arg4);
 }
 
 export function StagingFileStatus() {
@@ -170,6 +170,6 @@ export function StagingStatus() {
   return window['go']['gui']['App']['StagingStatus']();
 }
 
-export function StagingUnstage(arg1, arg2) {
-  return window['go']['gui']['App']['StagingUnstage'](arg1, arg2);
+export function StagingUnstage(arg1, arg2, arg3) {
+  return window['go']['gui']['App']['StagingUnstage'](arg1, arg2, arg3);
 }

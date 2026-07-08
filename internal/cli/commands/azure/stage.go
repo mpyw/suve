@@ -34,6 +34,16 @@ func appConfigStageConfig() stgcli.CommandConfig {
 		Factory:       cliinternal.AzureAppConfigParamStrategyFactory,
 		ParserFactory: staging.AzureAppConfigParamParserFactory,
 		ScopeResolver: cliinternal.AzureAppConfigStagingScopeResolver,
+		// App Configuration keys are per-(name, namespace): the --namespace value
+		// (resolved into ctx) is recorded on each staged entry, and status/diff/
+		// apply resolve a store scoped to each entry's own namespace so one
+		// per-store staging file spans every namespace (#431).
+		Namespace: cliinternal.AzureAppConfigNamespace,
+		StrategyForNamespace: func(ctx context.Context, namespace string) (staging.FullStrategy, error) {
+			return cliinternal.AzureAppConfigParamStrategyFactory(
+				cliinternal.WithAzureAppConfigNamespace(ctx, namespace),
+			)
+		},
 	}
 }
 

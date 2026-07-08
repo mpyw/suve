@@ -41,12 +41,12 @@ func TestDrainUseCase_Execute(t *testing.T) {
 		assert.False(t, output.Merged)
 
 		// Verify entry moved to agent
-		entry, err := agentStore.GetEntry(t.Context(), staging.ServiceParam, "/app/config")
+		entry, err := agentStore.GetEntry(t.Context(), staging.ServiceParam, "/app/config", "")
 		require.NoError(t, err)
 		assert.Equal(t, "file-value", lo.FromPtr(entry.Value))
 
 		// Verify file is cleared
-		_, err = fileStore.GetEntry(t.Context(), staging.ServiceParam, "/app/config")
+		_, err = fileStore.GetEntry(t.Context(), staging.ServiceParam, "/app/config", "")
 		assert.ErrorIs(t, err, staging.ErrNotStaged)
 	})
 
@@ -71,9 +71,9 @@ func TestDrainUseCase_Execute(t *testing.T) {
 		require.NoError(t, err)
 
 		// Verify entry exists in both
-		_, err = agentStore.GetEntry(t.Context(), staging.ServiceParam, "/app/config")
+		_, err = agentStore.GetEntry(t.Context(), staging.ServiceParam, "/app/config", "")
 		require.NoError(t, err)
-		_, err = fileStore.GetEntry(t.Context(), staging.ServiceParam, "/app/config")
+		_, err = fileStore.GetEntry(t.Context(), staging.ServiceParam, "/app/config", "")
 		require.NoError(t, err)
 	})
 
@@ -104,9 +104,9 @@ func TestDrainUseCase_Execute(t *testing.T) {
 		assert.True(t, output.Merged)
 
 		// Verify both entries exist in agent
-		_, err = agentStore.GetEntry(t.Context(), staging.ServiceParam, "/app/existing")
+		_, err = agentStore.GetEntry(t.Context(), staging.ServiceParam, "/app/existing", "")
 		require.NoError(t, err)
-		_, err = agentStore.GetEntry(t.Context(), staging.ServiceParam, "/app/new")
+		_, err = agentStore.GetEntry(t.Context(), staging.ServiceParam, "/app/new", "")
 		require.NoError(t, err)
 	})
 
@@ -136,7 +136,7 @@ func TestDrainUseCase_Execute(t *testing.T) {
 		require.NoError(t, err)
 
 		// With overwrite, agent should have file content
-		_, err = agentStore.GetEntry(t.Context(), staging.ServiceParam, "/app/config")
+		_, err = agentStore.GetEntry(t.Context(), staging.ServiceParam, "/app/config", "")
 		require.NoError(t, err)
 	})
 
@@ -183,9 +183,9 @@ func TestDrainUseCase_Execute(t *testing.T) {
 		assert.True(t, output.Merged)
 
 		// Both entries should exist
-		_, err = agentStore.GetEntry(t.Context(), staging.ServiceParam, "/app/existing")
+		_, err = agentStore.GetEntry(t.Context(), staging.ServiceParam, "/app/existing", "")
 		require.NoError(t, err)
-		_, err = agentStore.GetEntry(t.Context(), staging.ServiceParam, "/app/config")
+		_, err = agentStore.GetEntry(t.Context(), staging.ServiceParam, "/app/config", "")
 		require.NoError(t, err)
 	})
 
@@ -215,11 +215,11 @@ func TestDrainUseCase_Execute(t *testing.T) {
 		require.NoError(t, err)
 
 		// Param should be in agent
-		_, err = agentStore.GetEntry(t.Context(), staging.ServiceParam, "/app/param")
+		_, err = agentStore.GetEntry(t.Context(), staging.ServiceParam, "/app/param", "")
 		require.NoError(t, err)
 
 		// Secret should still be in file
-		_, err = fileStore.GetEntry(t.Context(), staging.ServiceSecret, "my-secret")
+		_, err = fileStore.GetEntry(t.Context(), staging.ServiceSecret, "my-secret", "")
 		require.NoError(t, err)
 	})
 
@@ -386,7 +386,7 @@ func TestDrainUseCase_ServiceSpecific_FileDeleteErrors(t *testing.T) {
 		assert.True(t, drainErr.NonFatal)
 
 		// Agent should still have the param entry (operation succeeded before cleanup)
-		_, err = agentStore.GetEntry(t.Context(), staging.ServiceParam, "/app/param")
+		_, err = agentStore.GetEntry(t.Context(), staging.ServiceParam, "/app/param", "")
 		require.NoError(t, err)
 	})
 }
@@ -425,9 +425,9 @@ func TestDrainUseCase_ServiceSpecific_MergeWithAgentState(t *testing.T) {
 		require.NoError(t, err)
 
 		// Both services should be in agent
-		_, err = agentStore.GetEntry(t.Context(), staging.ServiceParam, "/app/param")
+		_, err = agentStore.GetEntry(t.Context(), staging.ServiceParam, "/app/param", "")
 		require.NoError(t, err)
-		_, err = agentStore.GetEntry(t.Context(), staging.ServiceSecret, "existing-secret")
+		_, err = agentStore.GetEntry(t.Context(), staging.ServiceSecret, "existing-secret", "")
 		require.NoError(t, err)
 	})
 }
@@ -467,7 +467,7 @@ func TestDrainUseCase_WorkingDrainError_Propagated(t *testing.T) {
 	assert.Contains(t, err.Error(), "working staging area")
 
 	// The working area must not have been written (WriteState never reached).
-	_, getErr := workingStore.GetEntry(t.Context(), staging.ServiceParam, "/app/param")
+	_, getErr := workingStore.GetEntry(t.Context(), staging.ServiceParam, "/app/param", "")
 	require.ErrorIs(t, getErr, staging.ErrNotStaged)
 }
 

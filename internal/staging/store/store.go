@@ -9,8 +9,10 @@ import (
 
 // ReadOperator provides read-only access to individual staging entries.
 type ReadOperator interface {
-	// GetEntry retrieves a staged entry.
-	GetEntry(ctx context.Context, service staging.Service, name string) (*staging.Entry, error)
+	// GetEntry retrieves a staged entry identified by (name, namespace). Namespace
+	// is the App Configuration label axis; empty (the null/default namespace) is
+	// the only value for every other provider.
+	GetEntry(ctx context.Context, service staging.Service, name, namespace string) (*staging.Entry, error)
 	// GetTag retrieves staged tag changes.
 	GetTag(ctx context.Context, service staging.Service, name string) (*staging.TagEntry, error)
 	// ListEntries returns all staged entries for a service.
@@ -25,8 +27,8 @@ type WriteOperator interface {
 	StageEntry(ctx context.Context, service staging.Service, name string, entry staging.Entry) error
 	// StageTag adds or updates staged tag changes.
 	StageTag(ctx context.Context, service staging.Service, name string, tagEntry staging.TagEntry) error
-	// UnstageEntry removes a staged entry.
-	UnstageEntry(ctx context.Context, service staging.Service, name string) error
+	// UnstageEntry removes a staged entry identified by (name, namespace).
+	UnstageEntry(ctx context.Context, service staging.Service, name, namespace string) error
 	// UnstageTag removes staged tag changes.
 	UnstageTag(ctx context.Context, service staging.Service, name string) error
 	// UnstageAll removes all staged changes for a service.

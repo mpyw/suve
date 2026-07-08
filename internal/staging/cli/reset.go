@@ -19,13 +19,17 @@ type ResetRunner struct {
 type ResetOptions struct {
 	Spec string // Name with optional version spec
 	All  bool   // Reset all staged items for this service
+	// Namespace is the App Configuration namespace of the entry to reset (empty
+	// for the null/default namespace and every other provider; ignored with All).
+	Namespace string
 }
 
 // Run executes the reset command.
 func (r *ResetRunner) Run(ctx context.Context, opts ResetOptions) error {
 	result, err := r.UseCase.Execute(ctx, stagingusecase.ResetInput{
-		Spec: opts.Spec,
-		All:  opts.All,
+		Spec:      opts.Spec,
+		All:       opts.All,
+		Namespace: opts.Namespace,
 	})
 	if err != nil {
 		return err

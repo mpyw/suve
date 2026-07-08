@@ -3,6 +3,7 @@ package staging_test
 import (
 	"context"
 	"errors"
+	"sync"
 	"testing"
 	"time"
 
@@ -98,7 +99,7 @@ func TestApplyUseCase_Execute_SingleCreate(t *testing.T) {
 	assert.Equal(t, usecasestaging.ApplyResultCreated, output.EntryResults[0].Status)
 
 	// Verify unstaged after apply
-	_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/new")
+	_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/new", "")
 	assert.ErrorIs(t, err, staging.ErrNotStaged)
 }
 
@@ -164,7 +165,7 @@ func TestApplyUseCase_Execute_FilterByName(t *testing.T) {
 	assert.Equal(t, "/app/one", output.EntryResults[0].Name)
 
 	// /app/two should still be staged
-	_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/two")
+	_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/two", "")
 	require.NoError(t, err)
 }
 
@@ -216,11 +217,11 @@ func TestApplyUseCase_Execute_PartialFailure(t *testing.T) {
 	assert.Equal(t, 1, output.EntryFailed)
 
 	// Failed entry should still be staged
-	_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/fail")
+	_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/fail", "")
 	require.NoError(t, err)
 
 	// Successful entry should be unstaged
-	_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/success")
+	_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/success", "")
 	assert.ErrorIs(t, err, staging.ErrNotStaged)
 }
 
@@ -510,4 +511,50 @@ func TestApplyUseCase_Execute_ListTagsError(t *testing.T) {
 	_, err := uc.Execute(t.Context(), usecasestaging.ApplyInput{})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "list tags error")
+}
+
+// TestApplyUseCase_Execute_PerNamespaceResolver covers the App Configuration
+// path (#431): the same key staged under two namespaces lives in one store as
+// two entries, each applied through the strategy resolved for its own namespace,
+// and unstaged independently by (name, namespace).
+func TestApplyUseCase_Execute_PerNamespaceResolver(t *testing.T) {
+	t.Parallel()
+
+	store := testutil.NewMockStore()
+	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "app/k", staging.Entry{
+		Operation: staging.OperationCreate, Value: lo.ToPtr("dev-val"), Namespace: "dev", StagedAt: time.Now(),
+	}))
+	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "app/k", staging.Entry{
+		Operation: staging.OperationCreate, Value: lo.ToPtr("prd-val"), Namespace: "prd", StagedAt: time.Now(),
+	}))
+
+	var mu sync.Mutex
+
+	seen := map[string]bool{}
+	uc := &usecasestaging.ApplyUseCase{
+		Strategy: newMockApplyStrategy(),
+		Store:    store,
+		StrategyFor: func(namespace string) (staging.ApplyStrategy, error) {
+			mu.Lock()
+			seen[namespace] = true
+			mu.Unlock()
+
+			return newMockApplyStrategy(), nil
+		},
+	}
+
+	output, err := uc.Execute(t.Context(), usecasestaging.ApplyInput{IgnoreConflicts: true})
+	require.NoError(t, err)
+	assert.Equal(t, 2, output.EntrySucceeded)
+	assert.True(t, seen["dev"] && seen["prd"], "the resolver must be called for each entry's namespace")
+
+	// Each (name, namespace) is a distinct entry and is unstaged independently.
+	_, err = store.GetEntry(t.Context(), staging.ServiceParam, "app/k", "dev")
+	require.ErrorIs(t, err, staging.ErrNotStaged)
+	_, err = store.GetEntry(t.Context(), staging.ServiceParam, "app/k", "prd")
+	require.ErrorIs(t, err, staging.ErrNotStaged)
+
+	// The applied namespace is reported on each result.
+	got := []string{output.EntryResults[0].Namespace, output.EntryResults[1].Namespace}
+	assert.ElementsMatch(t, []string{"dev", "prd"}, got)
 }
