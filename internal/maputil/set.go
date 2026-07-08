@@ -1,6 +1,10 @@
 package maputil
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"fmt"
+	"sort"
+)
 
 // Set is a generic set type that serializes to/from JSON arrays.
 type Set[T comparable] map[T]struct{}
@@ -49,7 +53,16 @@ func (s Set[T]) Values() []T {
 
 // MarshalJSON implements json.Marshaler.
 func (s Set[T]) MarshalJSON() ([]byte, error) {
-	return json.Marshal(s.Values())
+	values := s.Values()
+
+	// Deterministic order so staged-state files (which embed a Set in
+	// TagEntry.Remove) don't churn byte-for-byte across otherwise-identical
+	// writes. T is only comparable, not ordered, so sort by string form.
+	sort.Slice(values, func(i, j int) bool {
+		return fmt.Sprint(values[i]) < fmt.Sprint(values[j])
+	})
+
+	return json.Marshal(values)
 }
 
 // UnmarshalJSON implements json.Unmarshaler.
