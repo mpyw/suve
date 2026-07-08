@@ -2,6 +2,7 @@ package version
 
 import (
 	"fmt"
+	"math"
 	"strconv"
 
 	"github.com/mpyw/suve/internal/version/internal"
@@ -33,12 +34,24 @@ func parseShift(s string) (int, error) {
 		}
 
 		if numStart == i {
-			// Bare ~ means ~1
+			// Bare ~ means ~1.
+			if total == math.MaxInt {
+				return 0, errShiftOutOfRange
+			}
+
 			total++
 		} else {
 			n, err := strconv.Atoi(s[numStart:i])
 			if err != nil {
 				return 0, fmt.Errorf("shift number too large: %s", s[numStart:i])
+			}
+
+			// Overflow-checked cumulative sum: n is non-negative (digits only),
+			// so an unchecked `total += n` could wrap to a negative total, which
+			// HasShift() then reads as "no shift" and silently resolves to latest
+			// (e.g. `~MAX~MAX`). Reject instead.
+			if n > math.MaxInt-total {
+				return 0, errShiftOutOfRange
 			}
 
 			total += n
@@ -47,6 +60,10 @@ func parseShift(s string) (int, error) {
 
 	return total, nil
 }
+
+// errShiftOutOfRange is returned when a ~N shift (or a cumulative ~N~M sum)
+// exceeds what an int can hold.
+var errShiftOutOfRange = fmt.Errorf("shift out of range")
 
 // isShiftStart returns true if position i in string s looks like the start of a shift.
 func isShiftStart(s string, i int) bool {
