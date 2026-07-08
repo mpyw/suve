@@ -55,7 +55,7 @@ func (u *ShowUseCase) Execute(ctx context.Context, input ShowInput) (*ShowOutput
 		Name:        entry.Name,
 		Value:       entry.Value,
 		Version:     entry.Version.ID,
-		State:       entry.Version.Label,
+		State:       entry.Version.State,
 		CreatedDate: entry.Version.Created,
 		Tags: lo.Map(entry.Tags, func(tag domain.Tag, _ int) ShowTag {
 			return ShowTag{Key: tag.Key, Value: tag.Value}

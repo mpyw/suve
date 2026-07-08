@@ -1,6 +1,7 @@
 package secret
 
 import (
+	"slices"
 	"strconv"
 	"strings"
 
@@ -52,13 +53,16 @@ func extraValue(entry *domain.Entry, label string) string {
 	return ""
 }
 
-// stages converts a single provider-neutral version Label into the []string
-// staging-label slice the secret outputs expose. An empty label yields nil so
-// that callers omit the field entirely (matching the pre-migration behavior).
-func stages(label string) []string {
-	if label == "" {
+// stages returns a deterministically sorted copy of a version's AWS Secrets
+// Manager staging labels for stable output. An empty slice yields nil so that
+// callers omit the field entirely (matching the pre-migration behavior).
+func stages(labels []string) []string {
+	if len(labels) == 0 {
 		return nil
 	}
 
-	return []string{label}
+	out := slices.Clone(labels)
+	slices.Sort(out)
+
+	return out
 }
