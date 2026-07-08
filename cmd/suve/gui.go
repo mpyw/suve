@@ -89,9 +89,15 @@ func registerGUIFlag() {
 		return ctx, nil
 	}
 
+	// Azure's --vault-name / --store-name live on its secret / param subgroups.
+	const (
+		subcommandSecret = "secret"
+		subcommandParam  = "param"
+	)
+
 	// Per-provider `suve <group> --gui`: launch with that provider pre-selected.
-	// Azure's --vault-name / --store-name live on its secret / param subgroups,
-	// so --gui is attached there too, letting those flags seed the launch scope.
+	// Azure attaches --gui to its secret / param subgroups too, letting those
+	// flags seed the launch scope.
 	for _, group := range commands.App.Commands {
 		p := groupProvider(group.Name)
 		if p == "" {
@@ -102,7 +108,7 @@ func registerGUIFlag() {
 
 		if p == provider.ProviderAzure {
 			for _, sub := range group.Commands {
-				if sub.Name == "secret" || sub.Name == "param" {
+				if sub.Name == subcommandSecret || sub.Name == subcommandParam {
 					attachGUIFlag(sub, p)
 				}
 			}
