@@ -467,8 +467,7 @@ func (s *Store) IsEncrypted() (bool, error) {
 // If service is empty, returns all services; otherwise filters to the specified service.
 // If keep is false, the file(s) read is deleted after reading.
 func (s *Store) Drain(_ context.Context, service staging.Service, keep bool) (*staging.State, error) {
-	fileMu.Lock()
-	defer fileMu.Unlock()
+	defer s.lock()()
 
 	if !s.isSplit() {
 		return s.drainSingle(service, keep)
@@ -537,8 +536,7 @@ func (s *Store) drainServiceFile(service staging.Service, keep bool) (*staging.S
 // This implements StateWriter for file-based storage.
 // If service is empty, writes all supported services; otherwise writes only the specified service.
 func (s *Store) WriteState(_ context.Context, service staging.Service, state *staging.State) error {
-	fileMu.Lock()
-	defer fileMu.Unlock()
+	defer s.lock()()
 
 	if !s.isSplit() {
 		if service != "" {
@@ -563,8 +561,7 @@ func (s *Store) WriteState(_ context.Context, service staging.Service, state *st
 
 // GetEntry retrieves a staged entry.
 func (s *Store) GetEntry(_ context.Context, service staging.Service, name string) (*staging.Entry, error) {
-	fileMu.Lock()
-	defer fileMu.Unlock()
+	defer s.lock()()
 
 	state, err := s.readFile(s.pathFor(service))
 	if err != nil {
@@ -580,8 +577,7 @@ func (s *Store) GetEntry(_ context.Context, service staging.Service, name string
 
 // GetTag retrieves staged tag changes.
 func (s *Store) GetTag(_ context.Context, service staging.Service, name string) (*staging.TagEntry, error) {
-	fileMu.Lock()
-	defer fileMu.Unlock()
+	defer s.lock()()
 
 	state, err := s.readFile(s.pathFor(service))
 	if err != nil {
@@ -599,8 +595,7 @@ func (s *Store) GetTag(_ context.Context, service staging.Service, name string) 
 // If service is empty, returns entries for all supported services.
 // Empty service maps are omitted from the result.
 func (s *Store) ListEntries(_ context.Context, service staging.Service) (map[staging.Service]map[string]staging.Entry, error) {
-	fileMu.Lock()
-	defer fileMu.Unlock()
+	defer s.lock()()
 
 	result := make(map[staging.Service]map[string]staging.Entry)
 
@@ -622,8 +617,7 @@ func (s *Store) ListEntries(_ context.Context, service staging.Service) (map[sta
 // If service is empty, returns tags for all supported services.
 // Empty service maps are omitted from the result.
 func (s *Store) ListTags(_ context.Context, service staging.Service) (map[staging.Service]map[string]staging.TagEntry, error) {
-	fileMu.Lock()
-	defer fileMu.Unlock()
+	defer s.lock()()
 
 	result := make(map[staging.Service]map[string]staging.TagEntry)
 
@@ -654,8 +648,7 @@ func (s *Store) writeServiceState(service staging.Service, state *staging.State)
 
 // StageEntry adds or updates a staged entry.
 func (s *Store) StageEntry(_ context.Context, service staging.Service, name string, entry staging.Entry) error {
-	fileMu.Lock()
-	defer fileMu.Unlock()
+	defer s.lock()()
 
 	state, err := s.readFile(s.pathFor(service))
 	if err != nil {
@@ -669,8 +662,7 @@ func (s *Store) StageEntry(_ context.Context, service staging.Service, name stri
 
 // StageTag adds or updates staged tag changes.
 func (s *Store) StageTag(_ context.Context, service staging.Service, name string, tagEntry staging.TagEntry) error {
-	fileMu.Lock()
-	defer fileMu.Unlock()
+	defer s.lock()()
 
 	state, err := s.readFile(s.pathFor(service))
 	if err != nil {
@@ -684,8 +676,7 @@ func (s *Store) StageTag(_ context.Context, service staging.Service, name string
 
 // UnstageEntry removes a staged entry.
 func (s *Store) UnstageEntry(_ context.Context, service staging.Service, name string) error {
-	fileMu.Lock()
-	defer fileMu.Unlock()
+	defer s.lock()()
 
 	state, err := s.readFile(s.pathFor(service))
 	if err != nil {
@@ -703,8 +694,7 @@ func (s *Store) UnstageEntry(_ context.Context, service staging.Service, name st
 
 // UnstageTag removes staged tag changes.
 func (s *Store) UnstageTag(_ context.Context, service staging.Service, name string) error {
-	fileMu.Lock()
-	defer fileMu.Unlock()
+	defer s.lock()()
 
 	state, err := s.readFile(s.pathFor(service))
 	if err != nil {
@@ -723,8 +713,7 @@ func (s *Store) UnstageTag(_ context.Context, service staging.Service, name stri
 // UnstageAll removes all staged changes for a service.
 // If service is empty, all supported services are cleared.
 func (s *Store) UnstageAll(_ context.Context, service staging.Service) error {
-	fileMu.Lock()
-	defer fileMu.Unlock()
+	defer s.lock()()
 
 	if !s.isSplit() {
 		state, err := s.readFile(s.stateFilePath)
@@ -783,8 +772,7 @@ func initializeStateMaps(state *staging.State) {
 // Delete removes all backing state files without reading their contents.
 // This is useful for dropping stash when decryption is not needed.
 func (s *Store) Delete() error {
-	fileMu.Lock()
-	defer fileMu.Unlock()
+	defer s.lock()()
 
 	if !s.isSplit() {
 		if err := os.Remove(s.stateFilePath); err != nil && !os.IsNotExist(err) {

@@ -260,3 +260,38 @@ func TestWriteFileAtomic(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, os.FileMode(0o600), info.Mode().Perm())
 }
+
+// TestLockPath verifies the advisory lockfile path in both store modes (#326).
+func TestLockPath(t *testing.T) {
+	t.Parallel()
+
+	split, err := NewStore(provider.AWSScope("123456789012", "ap-northeast-1"))
+	require.NoError(t, err)
+	assert.Equal(t, filepath.Join(split.stateDir, ".lock"), split.lockPath())
+
+	single := NewStoreWithPath(filepath.Join(t.TempDir(), "stash.json"))
+	assert.Equal(t, filepath.Join(filepath.Dir(single.stateFilePath), ".lock"), single.lockPath())
+}
+
+// TestLock_CreatesLockfileAndOperationsWork verifies a mutating operation
+// acquires the file lock (creating the lockfile) and still persists correctly
+// (#326).
+func TestLock_CreatesLockfileAndOperationsWork(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	store := NewStoreWithPath(filepath.Join(dir, "stage.json"))
+
+	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/a", staging.Entry{
+		Operation: staging.OperationCreate,
+		Value:     lo.ToPtr("v"),
+	}))
+
+	// The advisory lockfile was created in the state file's directory.
+	_, statErr := os.Stat(filepath.Join(dir, ".lock"))
+	require.NoError(t, statErr)
+
+	got, err := store.GetEntry(t.Context(), staging.ServiceParam, "/a")
+	require.NoError(t, err)
+	assert.Equal(t, "v", lo.FromPtr(got.Value))
+}
