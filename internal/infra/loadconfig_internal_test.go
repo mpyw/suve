@@ -53,10 +53,27 @@ func TestLoadConfig_debug(t *testing.T) {
 		require.NoError(t, err)
 		assert.NotNil(t, cfg.Logger)
 		assert.NotZero(t, cfg.ClientLogMode)
+		// The default (redacted) mode logs metadata only — bodies are not dumped.
+		assert.False(t, cfg.ClientLogMode.IsRequestWithBody())
+		assert.False(t, cfg.ClientLogMode.IsResponseWithBody())
 
 		// The effective-configuration summary is logged immediately, before any
 		// service call, so the user sees region/profile/credentials up front.
 		assert.Contains(t, buf.String(), `aws: region="us-east-1" profile="default" credentials-source=EnvConfigCredentials`)
+	})
+
+	t.Run("with debug and no redaction", func(t *testing.T) {
+		setAWSTestEnv(t)
+
+		var buf bytes.Buffer
+
+		ctx := debug.With(context.Background(), debug.Config{Enabled: true, Writer: &buf, NoRedaction: true})
+
+		cfg, err := LoadConfig(ctx)
+		require.NoError(t, err)
+		// --no-redaction switches to the WithBody modes so payloads are logged.
+		assert.True(t, cfg.ClientLogMode.IsRequestWithBody())
+		assert.True(t, cfg.ClientLogMode.IsResponseWithBody())
 	})
 }
 
@@ -107,4 +124,23 @@ func TestDebugLogger_redactsCredentials(t *testing.T) {
 	assert.Contains(t, out, "X-Amz-Target: AmazonSSM.DescribeParameters")
 	assert.Contains(t, out, "X-Amz-Date: 20260707T000000Z")
 	assert.Contains(t, out, "POST / HTTP/1.1")
+}
+
+func TestDebugLogger_noRedactionKeepsCredentials(t *testing.T) {
+	t.Parallel()
+
+	var buf bytes.Buffer
+
+	l := debugLogger{cfg: debug.Config{Enabled: true, Writer: &buf, NoRedaction: true}}
+	l.Logf(logging.Debug, "Request\n"+
+		"POST / HTTP/1.1\n"+
+		"Authorization: AWS4-HMAC-SHA256 Credential=AKIDEXAMPLE, Signature=deadbeef\n"+
+		"X-Amz-Security-Token: SESSIONTOKENVALUE123\n")
+
+	out := buf.String()
+	// With --no-redaction the dump is passed through verbatim: nothing is masked.
+	assert.NotContains(t, out, "REDACTED")
+	assert.Contains(t, out, "AKIDEXAMPLE")
+	assert.Contains(t, out, "deadbeef")
+	assert.Contains(t, out, "SESSIONTOKENVALUE123")
 }

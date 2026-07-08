@@ -123,8 +123,23 @@ func enableDebugLogging(ctx context.Context) {
 	})
 }
 
+// debugLogOptions returns azcore logging options for a client. When
+// --no-redaction is active on ctx it enables full body logging, so secret
+// values carried in request/response payloads (e.g. a Key Vault secret value)
+// are dumped. Otherwise it returns the zero value, leaving azcore's safe
+// defaults (bodies omitted, sensitive headers masked). azcore has no "log every
+// header" switch, so even under --no-redaction its header allowlist still
+// applies — the un-redacted payload is the body.
+func debugLogOptions(ctx context.Context) policy.LogOptions {
+	if debug.From(ctx).NoRedaction {
+		return policy.LogOptions{IncludeBody: true}
+	}
+
+	return policy.LogOptions{}
+}
+
 // keyVaultStore builds a Key Vault secrets store for the scope's vault.
-func keyVaultStore(_ context.Context, scope provider.Scope) (provider.Store, error) {
+func keyVaultStore(ctx context.Context, scope provider.Scope) (provider.Store, error) {
 	if scope.VaultName == "" {
 		return nil, fmt.Errorf("no Azure Key Vault specified: set --vault-name")
 	}
@@ -139,7 +154,10 @@ func keyVaultStore(_ context.Context, scope provider.Scope) (provider.Store, err
 			},
 		}
 		opts := &azsecrets.ClientOptions{
-			ClientOptions:                        azcore.ClientOptions{Transport: httpClient},
+			ClientOptions: azcore.ClientOptions{
+				Transport: httpClient,
+				Logging:   debugLogOptions(ctx),
+			},
 			DisableChallengeResourceVerification: true,
 		}
 
@@ -158,7 +176,11 @@ func keyVaultStore(_ context.Context, scope provider.Scope) (provider.Store, err
 
 	vaultURL := fmt.Sprintf("https://%s.vault.azure.net", scope.VaultName)
 
-	client, err := azsecrets.NewClient(vaultURL, cred, nil)
+	opts := &azsecrets.ClientOptions{
+		ClientOptions: azcore.ClientOptions{Logging: debugLogOptions(ctx)},
+	}
+
+	client, err := azsecrets.NewClient(vaultURL, cred, opts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Azure Key Vault client: %w", err)
 	}
@@ -167,7 +189,7 @@ func keyVaultStore(_ context.Context, scope provider.Scope) (provider.Store, err
 }
 
 // appConfigStore builds an App Configuration store for the scope's store.
-func appConfigStore(_ context.Context, scope provider.Scope) (provider.Store, error) {
+func appConfigStore(ctx context.Context, scope provider.Scope) (provider.Store, error) {
 	if scope.StoreName == "" {
 		return nil, fmt.Errorf("no Azure App Configuration store specified: set --store-name")
 	}
@@ -176,7 +198,10 @@ func appConfigStore(_ context.Context, scope provider.Scope) (provider.Store, er
 	// endpoint + DefaultAzureCredential and allows HMAC auth over plain HTTP.
 	if connStr := os.Getenv(AppConfigConnStringEnvVar); connStr != "" {
 		opts := &azappconfig.ClientOptions{
-			ClientOptions: azcore.ClientOptions{InsecureAllowCredentialWithHTTP: true},
+			ClientOptions: azcore.ClientOptions{
+				InsecureAllowCredentialWithHTTP: true,
+				Logging:                         debugLogOptions(ctx),
+			},
 		}
 
 		client, err := azappconfig.NewClientFromConnectionString(connStr, opts)
@@ -194,7 +219,11 @@ func appConfigStore(_ context.Context, scope provider.Scope) (provider.Store, er
 
 	endpoint := fmt.Sprintf("https://%s.azconfig.io", scope.StoreName)
 
-	client, err := azappconfig.NewClient(endpoint, cred, nil)
+	opts := &azappconfig.ClientOptions{
+		ClientOptions: azcore.ClientOptions{Logging: debugLogOptions(ctx)},
+	}
+
+	client, err := azappconfig.NewClient(endpoint, cred, opts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Azure App Configuration client: %w", err)
 	}

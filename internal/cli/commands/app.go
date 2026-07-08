@@ -73,7 +73,7 @@ func MakeAppWithDetect(det detect.Result) *cli.Command {
 		Usage:       baseUsage,
 		Description: aliasDescription(det),
 		Version:     Version,
-		Flags:       []cli.Flag{debugFlag()},
+		Flags:       []cli.Flag{debugFlag(), noRedactionFlag()},
 		Before:      enableDebug(det),
 		Commands:    append(flat, commands...),
 		// EnableShellCompletion adds a hidden `completion` command (bash/zsh/fish/pwsh)
@@ -111,12 +111,38 @@ func debugFlag() cli.Flag {
 	}
 }
 
+// noRedactionFlag defines the global --no-redaction switch. Like --debug it is a
+// persistent flag readable in any position, with an env alternative
+// (SUVE_NO_REDACTION) parsed leniently by envNoRedactionEnabled. It only affects
+// debug output: with it set, provider adapters log full request/response bodies
+// and stop masking sensitive headers, so secret values and live credentials
+// appear in the log — hence it is off by default and never implied by --debug.
+func noRedactionFlag() cli.Flag {
+	return &cli.BoolFlag{
+		Name:  "no-redaction",
+		Usage: "With --debug, log full bodies and unmasked headers, INCLUDING secret values and credentials [$SUVE_NO_REDACTION]",
+	}
+}
+
 // envDebugEnabled reports whether SUVE_DEBUG requests debug logging. Bool-ish
 // values are honored (so SUVE_DEBUG=0/false stay off) and any other non-empty
 // value counts as enabled, consistent with SUVE_NO_UPDATE_CHECK's "any
 // non-empty value" semantics.
 func envDebugEnabled() bool {
-	v := os.Getenv("SUVE_DEBUG")
+	return envBoolLenient("SUVE_DEBUG")
+}
+
+// envNoRedactionEnabled reports whether SUVE_NO_REDACTION requests unredacted
+// debug output, using the same lenient parsing as envDebugEnabled.
+func envNoRedactionEnabled() bool {
+	return envBoolLenient("SUVE_NO_REDACTION")
+}
+
+// envBoolLenient reads a bool-ish environment variable: empty is false, a
+// parseable bool (0/1/true/false) is honored, and any other non-empty value
+// counts as true.
+func envBoolLenient(name string) bool {
+	v := os.Getenv(name)
 	if v == "" {
 		return false
 	}
@@ -135,14 +161,34 @@ func envDebugEnabled() bool {
 // output goes to the root ErrWriter so it never contaminates piped STDOUT.
 func enableDebug(det detect.Result) cli.BeforeFunc {
 	return func(ctx context.Context, cmd *cli.Command) (context.Context, error) {
-		if !cmd.Bool("debug") && !envDebugEnabled() {
+		debugOn := cmd.Bool("debug") || envDebugEnabled()
+		noRedaction := cmd.Bool("no-redaction") || envNoRedactionEnabled()
+
+		w := lo.CoalesceOrEmpty[io.Writer](cmd.Root().ErrWriter, os.Stderr)
+
+		if !debugOn {
+			// --no-redaction only shapes debug output, so on its own it does
+			// nothing. Say so rather than silently ignoring it, since a user who
+			// expected verbose output would otherwise be left guessing.
+			if noRedaction {
+				output.Hint(w, "--no-redaction has no effect without --debug (or SUVE_DEBUG)")
+			}
+
 			return ctx, nil
 		}
 
 		cfg := debug.Config{
-			Enabled: true,
-			Writer:  lo.CoalesceOrEmpty[io.Writer](cmd.Root().ErrWriter, os.Stderr),
+			Enabled:     true,
+			Writer:      w,
+			NoRedaction: noRedaction,
 		}
+
+		// Print the warning before any debug line so the caller sees, up front,
+		// that this run's log may carry secret values and live credentials.
+		if noRedaction {
+			output.Warning(w, "--no-redaction: debug output will include secret values and live credentials")
+		}
+
 		cfg.Logf("cli: suve version=%s\n", cmd.Root().Version)
 		cfg.Logf("cli: flat aliases: param=%s secret=%s stage=%s%s\n",
 			aliasTarget(det.Param), aliasTarget(det.Secret), aliasTarget(det.Stage), fallbackNote(det))
