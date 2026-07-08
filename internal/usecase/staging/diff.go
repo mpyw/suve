@@ -189,8 +189,11 @@ func (u *DiffUseCase) processDiffResult(ctx context.Context, name string, entry 
 		stagedValue = ""
 	}
 
-	// Check if identical and auto-unstage
-	if awsValue == stagedValue {
+	// Check if identical and auto-unstage. This never applies to a delete:
+	// deleting a resource is not a no-op just because its current value happens
+	// to be the empty string (legal in Azure App Configuration / Key Vault /
+	// Google Cloud), so an empty-valued delete must not be silently cancelled.
+	if entry.Operation != staging.OperationDelete && awsValue == stagedValue {
 		_ = u.Store.UnstageEntry(ctx, service, name)
 
 		return DiffEntry{
