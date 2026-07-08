@@ -312,6 +312,56 @@ func TestList_Error(t *testing.T) {
 	assert.Contains(t, err.Error(), "list settings")
 }
 
+func TestListWithNamespaces(t *testing.T) {
+	t.Parallel()
+
+	var gotFilter string
+
+	m := &mockClient{
+		listFunc: func(_ context.Context, filter string) ([]azappconfig.Setting, error) {
+			gotFilter = filter
+
+			// Settings span the null (unlabeled) namespace and "dev"/"prd", in
+			// an unsorted order to exercise the sort.
+			return []azappconfig.Setting{
+				{Key: lo.ToPtr("beta"), Label: lo.ToPtr("prd"), Value: lo.ToPtr("bp")},
+				{Key: lo.ToPtr("alpha"), Value: lo.ToPtr("a-null")},
+				{Key: lo.ToPtr("alpha"), Label: lo.ToPtr("dev"), Value: lo.ToPtr("ad")},
+				{Key: lo.ToPtr("beta"), Value: lo.ToPtr("b-null")},
+			}, nil
+		},
+	}
+	// The store is scoped to "dev", but ListWithNamespaces must ignore that and
+	// enumerate ALL namespaces via the "*" wildcard filter.
+	store := appconfig.New(m, "dev")
+
+	items, err := store.ListWithNamespaces(t.Context())
+	require.NoError(t, err)
+
+	assert.Equal(t, "*", gotFilter, "must list across all namespaces regardless of the store's namespace")
+	assert.Equal(t, []appconfig.KeyNamespace{
+		{Key: "alpha", Namespace: "", Value: "a-null"},
+		{Key: "alpha", Namespace: "dev", Value: "ad"},
+		{Key: "beta", Namespace: "", Value: "b-null"},
+		{Key: "beta", Namespace: "prd", Value: "bp"},
+	}, items)
+}
+
+func TestListWithNamespaces_Error(t *testing.T) {
+	t.Parallel()
+
+	m := &mockClient{
+		listFunc: func(_ context.Context, _ string) ([]azappconfig.Setting, error) {
+			return nil, serverError()
+		},
+	}
+	store := appconfig.New(m, "")
+
+	_, err := store.ListWithNamespaces(t.Context())
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "list settings across namespaces")
+}
+
 func TestCreate_AlreadyExists(t *testing.T) {
 	t.Parallel()
 

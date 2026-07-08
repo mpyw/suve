@@ -59,7 +59,7 @@ func (u *ListUseCase) Execute(ctx context.Context, input ListInput) (*ListOutput
 
 	// Apply prefix/recursive and regex filtering client-side.
 	filtered := lo.Filter(names, func(name string, _ int) bool {
-		if !matchPrefix(name, input.Prefix, input.Recursive) {
+		if !MatchPrefix(name, input.Prefix, input.Recursive) {
 			return false
 		}
 
@@ -78,7 +78,7 @@ func (u *ListUseCase) Execute(ctx context.Context, input ListInput) (*ListOutput
 	return u.buildOutput(ctx, input.WithValue, filtered), nil
 }
 
-// matchPrefix reports whether name is in scope for the given prefix, using AWS
+// MatchPrefix reports whether name is in scope for the given prefix, using AWS
 // Parameter Store PATH-HIERARCHY semantics (the old server-side Path filter):
 //
 //   - An empty prefix matches everything (the old code applied no Path filter,
@@ -91,7 +91,7 @@ func (u *ListUseCase) Execute(ctx context.Context, input ListInput) (*ListOutput
 //     "prefix/" must contain no further "/".
 //
 // A trailing slash on the prefix is normalized so "/app/" behaves like "/app".
-func matchPrefix(name, prefix string, recursive bool) bool {
+func MatchPrefix(name, prefix string, recursive bool) bool {
 	if prefix == "" {
 		return true
 	}

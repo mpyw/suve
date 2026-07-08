@@ -73,17 +73,19 @@ export namespace gui {
 	    type: string;
 	    secret: boolean;
 	    value?: string;
-	
+	    namespace: string;
+
 	    static createFrom(source: any = {}) {
 	        return new ParamListEntry(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.name = source["name"];
 	        this.type = source["type"];
 	        this.secret = source["secret"];
 	        this.value = source["value"];
+	        this.namespace = source["namespace"];
 	    }
 	}
 	export class ParamListResult {

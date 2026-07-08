@@ -172,6 +172,54 @@ func (s *Store) List(ctx context.Context) ([]string, error) {
 	return names, nil
 }
 
+// KeyNamespace pairs an App Configuration setting's key with the namespace it
+// lives in — the axis Azure calls a "label". An empty Namespace is the null
+// (default) namespace. Value carries the setting's current value so a caller can
+// display it without a second round-trip (App Configuration's list response
+// already includes it). This type and ListWithNamespaces are App-Config-specific
+// and are NOT part of the neutral provider seam: only a caller that has
+// type-asserted the concrete App Configuration store can reach them.
+type KeyNamespace struct {
+	Key       string
+	Namespace string
+	Value     string
+}
+
+// ListWithNamespaces returns every setting across ALL namespaces (LabelFilter
+// "*"), each paired with its namespace and value, sorted by key then namespace.
+// Unlike List it deliberately IGNORES the store's configured namespace so a
+// caller (the GUI, #425) can present a cross-namespace list and filter it
+// client-side. It is an App-Config-specific extension and leaves the neutral
+// provider.Reader.List contract untouched. A key that exists under several
+// namespaces yields one entry per (key, namespace) pair.
+func (s *Store) ListWithNamespaces(ctx context.Context) ([]KeyNamespace, error) {
+	settings, err := s.client.ListSettings(ctx, aznamespace.AllNamespacesFilter)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list settings across namespaces: %w", err)
+	}
+
+	out := make([]KeyNamespace, 0, len(settings))
+	for _, setting := range settings {
+		out = append(out, KeyNamespace{
+			Key:       lo.FromPtr(setting.Key),
+			Namespace: lo.FromPtr(setting.Label),
+			Value:     lo.FromPtr(setting.Value),
+		})
+	}
+
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Key != out[j].Key {
+			return out[i].Key < out[j].Key
+		}
+
+		return out[i].Namespace < out[j].Namespace
+	})
+
+	debug.From(ctx).Logf("azure appconfig: ListWithNamespaces -> %d settings across all namespaces\n", len(out))
+
+	return out, nil
+}
+
 // Create creates a new setting (create-only) via AddSetting and returns an empty
 // version (App Configuration is unversioned). It returns a wrapped
 // provider.ErrAlreadyExists if the setting already exists. The valueType and

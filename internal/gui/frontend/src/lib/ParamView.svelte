@@ -16,17 +16,37 @@
   interface Props {
     capability?: gui.ServiceCapability;
     provider?: string;
+    // initialNamespace is the scope's current App Configuration namespace (empty
+    // = the null/default namespace); it seeds the Namespace dropdown's initial
+    // selection. Only meaningful for Azure App Configuration.
+    initialNamespace?: string;
     onnavigatetostaging?: () => void;
     onstagingchange?: () => void;
   }
 
-  let { capability, provider = '', onnavigatetostaging, onstagingchange }: Props = $props();
+  let { capability, provider = '', initialNamespace = '', onnavigatetostaging, onstagingchange }: Props = $props();
 
   // Capability-driven visibility. Absent capability defaults to AWS-like (true)
   // so the component degrades safely if mounted without one.
   const stagingEnabled = $derived(capability?.hasStaging ?? true);
   const tagsEnabled = $derived(capability?.hasTags ?? true);
   const historyEnabled = $derived(capability?.hasVersionHistory ?? true);
+
+  // The namespace axis (Azure calls it a "label") exists only for Azure App
+  // Configuration; ParamView under the Azure provider is always App Config
+  // (Key Vault is a secret store, rendered by SecretView).
+  const isAppConfig = $derived(provider === 'azure');
+
+  // Namespace dropdown sentinels. (NULL) is the null/default namespace (empty
+  // string); * means all namespaces (no client-side filter). Both are displayed
+  // literally in the dropdown per #425.
+  const NS_NULL = '(NULL)';
+  const NS_ALL = '*';
+  // Selected namespace filter; defaults to the scope's current namespace
+  // ((NULL) when empty). App Config only.
+  let selectedNamespace = $state(initialNamespace === '' ? NS_NULL : initialNamespace);
+  // The namespace of the currently selected row, shown in the detail panel.
+  let selectedEntryNamespace = $state('');
 
   const PAGE_SIZE = 50;
   const debounce = createDebouncer(300);
@@ -51,6 +71,27 @@
   let paramLog: gui.ParamLogEntry[] = $state([]);
   let detailLoading = $state(false);
   let showValue = $state(false);
+
+  // Namespace dropdown options (App Config only): (NULL) first, then the
+  // distinct namespaces present in the loaded rows (sorted), then * (all). The
+  // scope's current namespace is always included so the default is selectable
+  // even before its rows load.
+  const namespaceOptions = $derived.by(() => {
+    const discovered = new Set<string>();
+    for (const e of entries) {
+      if (e.namespace) discovered.add(e.namespace);
+    }
+    if (initialNamespace && initialNamespace !== NS_ALL) discovered.add(initialNamespace);
+    return [NS_NULL, ...[...discovered].sort(), NS_ALL];
+  });
+
+  // Rows actually displayed. Non-App-Config providers show every row; App Config
+  // narrows by the selected namespace client-side (like the prefix/regex filters).
+  const visibleEntries = $derived.by(() => {
+    if (!isAppConfig || selectedNamespace === NS_ALL) return entries;
+    if (selectedNamespace === NS_NULL) return entries.filter((e) => !e.namespace);
+    return entries.filter((e) => e.namespace === selectedNamespace);
+  });
 
   // Staging status for the selected item
   let stagingStatus: { hasEntry: boolean; hasTags: boolean } | null = $state(null);
@@ -175,8 +216,9 @@
     }
   }
 
-  async function selectParam(name: string) {
+  async function selectParam(name: string, namespace = '') {
     selectedParam = name;
+    selectedEntryNamespace = namespace;
     detailLoading = true;
     showValue = withValue;
     stagingStatus = null;
@@ -247,7 +289,7 @@
         await ParamSet(setForm.name, setForm.value, setForm.type);
         await loadParams({ prefix, filter, recursive, withValue });
         if (isEdit) {
-          await selectParam(setForm.name);
+          await selectParam(setForm.name, selectedEntryNamespace);
         }
       } else {
         if (isEdit) {
@@ -258,7 +300,7 @@
         onstagingchange?.();
         // Refresh staging status to update the indicator
         if (isEdit) {
-          await selectParam(setForm.name);
+          await selectParam(setForm.name, selectedEntryNamespace);
         }
       }
       showSetModal = false;
@@ -346,7 +388,7 @@
         onstagingchange?.();
       }
       showTagModal = false;
-      await selectParam(selectedParam);
+      await selectParam(selectedParam, selectedEntryNamespace);
     } catch (err) {
       tagError = parseError(err);
     } finally {
@@ -372,7 +414,7 @@
         onstagingchange?.();
       }
       showRemoveTagModal = false;
-      await selectParam(selectedParam);
+      await selectParam(selectedParam, selectedEntryNamespace);
     } catch (err) {
       removeTagError = parseError(err);
     } finally {
@@ -415,6 +457,16 @@
       <input type="checkbox" bind:checked={withValue} />
       Show Values
     </label>
+    {#if isAppConfig}
+      <label class="checkbox-label namespace-filter">
+        Namespace
+        <select class="filter-input namespace-select" bind:value={selectedNamespace} aria-label="Namespace">
+          {#each namespaceOptions as ns}
+            <option value={ns}>{ns}</option>
+          {/each}
+        </select>
+      </label>
+    {/if}
     <button class="btn-primary" onclick={() => loadParams({ prefix, filter, recursive, withValue })} disabled={loading}>
       {loading ? 'Loading...' : 'Refresh'}
     </button>
@@ -429,16 +481,19 @@
 
   <div class="content">
     <div class="list-panel" class:collapsed={selectedParam !== null}>
-      {#if entries.length === 0 && !loading}
+      {#if visibleEntries.length === 0 && !loading}
         <div class="empty-state">
           No parameters found. Try adjusting the prefix filter.
         </div>
       {:else}
         <ul class="item-list">
-          {#each entries as entry}
-            <li class="item-entry" class:selected={selectedParam === entry.name}>
-              <button class="item-button" onclick={() => selectParam(entry.name)}>
+          {#each visibleEntries as entry}
+            <li class="item-entry" class:selected={selectedParam === entry.name && selectedEntryNamespace === entry.namespace}>
+              <button class="item-button" onclick={() => selectParam(entry.name, entry.namespace)}>
                 <span class="item-name param">{entry.name}</span>
+                {#if isAppConfig}
+                  <span class="namespace-badge">{entry.namespace || NS_NULL}</span>
+                {/if}
                 {#if entry.value !== undefined}
                   <span class="item-value">{entry.value}</span>
                 {/if}
@@ -511,6 +566,12 @@
                 <div class="meta-item">
                   <span class="meta-label">Version</span>
                   <span class="meta-value">{paramDetail.version}</span>
+                </div>
+              {/if}
+              {#if isAppConfig}
+                <div class="meta-item">
+                  <span class="meta-label">Namespace</span>
+                  <span class="meta-value namespace-value">{selectedEntryNamespace || NS_NULL}</span>
                 </div>
               {/if}
               {#if typeEnabled}
@@ -767,5 +828,27 @@
 
   .value-display.masked {
     font-style: italic;
+  }
+
+  /* Namespace filter dropdown (App Configuration only). */
+  .namespace-filter {
+    gap: 6px;
+  }
+
+  .namespace-select {
+    width: auto;
+    min-width: 90px;
+  }
+
+  /* Per-row namespace badge in the list. */
+  .namespace-badge {
+    display: inline-block;
+    margin-left: 8px;
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: 11px;
+    background: rgba(120, 120, 120, 0.18);
+    color: #888;
+    white-space: nowrap;
   }
 </style>
