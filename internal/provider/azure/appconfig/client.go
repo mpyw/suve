@@ -7,20 +7,14 @@ import (
 	"github.com/samber/lo"
 )
 
-// nullLabelFilter is the reserved App Configuration label filter that matches
-// ONLY settings with no label. The Get/Set/Add/Delete single-key operations all
-// address the null (default) label, so List must restrict to the same label —
-// otherwise it enumerates every label and surfaces phantom keys that show/stage
-// then cannot fetch. The service encodes this reserved value as label=%00.
-const nullLabelFilter = "\x00"
-
 // apiClient adapts the concrete *azappconfig.Client to the narrow Client
 // interface, draining the SDK's list pager into a slice. It is the only place
 // the concrete SDK client and its pager are referenced.
 //
-// Every operation uses the default (no) App Configuration label: options are
-// left nil so the store addresses the single default-labeled setting per key,
-// which the adapter presents as an unversioned parameter.
+// The label carrying suve's namespace is applied via the high-level SDK options
+// (GetSettingOptions.Label, SetSettingOptions.Label, ...) for single-key ops and
+// SettingSelector.LabelFilter for List. An empty label leaves the options nil so
+// the request is byte-for-byte identical to addressing the null (default) label.
 type apiClient struct {
 	c *azappconfig.Client
 }
@@ -33,33 +27,58 @@ func Wrap(c *azappconfig.Client) Client {
 // Compile-time assertion that apiClient satisfies Client.
 var _ Client = (*apiClient)(nil)
 
-func (a *apiClient) GetSetting(ctx context.Context, key string) (azappconfig.GetSettingResponse, error) {
-	return a.c.GetSetting(ctx, key, nil)
+// An empty label leaves the options pointer nil so the request addresses the
+// null (default) label exactly as it did before the namespace axis existed; a
+// non-empty label is carried via the option's Label field.
+
+func (a *apiClient) GetSetting(ctx context.Context, key, label string) (azappconfig.GetSettingResponse, error) {
+	var opts *azappconfig.GetSettingOptions
+	if label != "" {
+		opts = &azappconfig.GetSettingOptions{Label: lo.ToPtr(label)}
+	}
+
+	return a.c.GetSetting(ctx, key, opts)
 }
 
-func (a *apiClient) SetSetting(ctx context.Context, key, value string) (azappconfig.SetSettingResponse, error) {
-	return a.c.SetSetting(ctx, key, lo.ToPtr(value), nil)
+func (a *apiClient) SetSetting(ctx context.Context, key, value, label string) (azappconfig.SetSettingResponse, error) {
+	var opts *azappconfig.SetSettingOptions
+	if label != "" {
+		opts = &azappconfig.SetSettingOptions{Label: lo.ToPtr(label)}
+	}
+
+	return a.c.SetSetting(ctx, key, lo.ToPtr(value), opts)
 }
 
-func (a *apiClient) AddSetting(ctx context.Context, key, value string) (azappconfig.AddSettingResponse, error) {
-	return a.c.AddSetting(ctx, key, lo.ToPtr(value), nil)
+func (a *apiClient) AddSetting(ctx context.Context, key, value, label string) (azappconfig.AddSettingResponse, error) {
+	var opts *azappconfig.AddSettingOptions
+	if label != "" {
+		opts = &azappconfig.AddSettingOptions{Label: lo.ToPtr(label)}
+	}
+
+	return a.c.AddSetting(ctx, key, lo.ToPtr(value), opts)
 }
 
-func (a *apiClient) DeleteSetting(ctx context.Context, key string) (azappconfig.DeleteSettingResponse, error) {
-	return a.c.DeleteSetting(ctx, key, nil)
+func (a *apiClient) DeleteSetting(ctx context.Context, key, label string) (azappconfig.DeleteSettingResponse, error) {
+	var opts *azappconfig.DeleteSettingOptions
+	if label != "" {
+		opts = &azappconfig.DeleteSettingOptions{Label: lo.ToPtr(label)}
+	}
+
+	return a.c.DeleteSetting(ctx, key, opts)
 }
 
-// listSettingSelector is the selector used to enumerate settings: all keys but
-// ONLY the null (default) label, so List matches what the single-key operations
-// address. A nil LabelFilter (SettingSelector{}) would enumerate every label.
-func listSettingSelector() azappconfig.SettingSelector {
+// listSettingSelector is the selector used to enumerate settings: all keys,
+// restricted by the given LabelFilter. The filter is resolved by the store from
+// the raw --namespace value (empty -> the null-label filter, aznamespace.Filter).
+// A nil LabelFilter (SettingSelector{}) would enumerate every label.
+func listSettingSelector(filter string) azappconfig.SettingSelector {
 	return azappconfig.SettingSelector{
-		LabelFilter: lo.ToPtr(nullLabelFilter),
+		LabelFilter: lo.ToPtr(filter),
 	}
 }
 
-func (a *apiClient) ListSettings(ctx context.Context) ([]azappconfig.Setting, error) {
-	pager := a.c.NewListSettingsPager(listSettingSelector(), nil)
+func (a *apiClient) ListSettings(ctx context.Context, filter string) ([]azappconfig.Setting, error) {
+	pager := a.c.NewListSettingsPager(listSettingSelector(filter), nil)
 
 	var out []azappconfig.Setting
 

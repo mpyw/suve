@@ -29,6 +29,11 @@ type Scope struct {
 	VaultName string `json:"vaultName,omitempty"`
 	// StoreName is the Azure App Configuration store name (Azure, param).
 	StoreName string `json:"storeName,omitempty"`
+	// AppConfigNamespace is the Azure App Configuration namespace — the axis
+	// Azure calls a "label" — selected for the store (Azure, param). Empty is
+	// the null (default) namespace. A single resolved namespace only; the
+	// filter grammar (`*`/`,`) never reaches staging (see #381).
+	AppConfigNamespace string `json:"appConfigNamespace,omitempty"`
 }
 
 // Key returns a stable, filesystem-safe key identifying the scope. It is used
@@ -45,6 +50,12 @@ func (s Scope) Key() string {
 		// resource — no subscription/resource-group needed.
 		if s.VaultName != "" {
 			return fmt.Sprintf("azure/keyvault/%s", s.VaultName)
+		}
+
+		// The null (default) namespace keeps the original backward-compatible
+		// path; a named namespace makes staging state per-(store, namespace).
+		if s.AppConfigNamespace != "" {
+			return fmt.Sprintf("azure/appconfig/%s/%s", s.StoreName, s.AppConfigNamespace)
 		}
 
 		return fmt.Sprintf("azure/appconfig/%s", s.StoreName)

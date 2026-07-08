@@ -209,7 +209,7 @@ func appConfigStore(ctx context.Context, scope provider.Scope) (provider.Store, 
 			return nil, fmt.Errorf("failed to create Azure App Configuration client from connection string: %w", err)
 		}
 
-		return appconfig.New(appconfig.Wrap(client)), nil
+		return appconfig.New(appconfig.Wrap(client), scope.AppConfigNamespace), nil
 	}
 
 	cred, err := azidentity.NewDefaultAzureCredential(nil)
@@ -228,7 +228,7 @@ func appConfigStore(ctx context.Context, scope provider.Scope) (provider.Store, 
 		return nil, fmt.Errorf("failed to create Azure App Configuration client: %w", err)
 	}
 
-	return appconfig.New(appconfig.Wrap(client)), nil
+	return appconfig.New(appconfig.Wrap(client), scope.AppConfigNamespace), nil
 }
 
 // Register associates the Azure Factory with provider.ProviderAzure in reg.
