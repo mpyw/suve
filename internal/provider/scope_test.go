@@ -38,6 +38,16 @@ func TestScope_Key(t *testing.T) {
 			want:  "azure/appconfig/store1",
 		},
 		{
+			// A named namespace makes staging state per-(store, namespace).
+			name: "azure appconfig with namespace",
+			scope: provider.Scope{
+				Provider:           provider.ProviderAzure,
+				StoreName:          "store1",
+				AppConfigNamespace: "dev",
+			},
+			want: "azure/appconfig/store1/dev",
+		},
+		{
 			name:  "unknown provider",
 			scope: provider.Scope{},
 			want:  "",

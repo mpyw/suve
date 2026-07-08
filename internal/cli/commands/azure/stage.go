@@ -104,9 +104,20 @@ func appConfigStageGroup() *cli.Command {
 				Usage:   "Azure App Configuration store name (defaults to $AZURE_APPCONFIG_NAME)",
 				Sources: cli.EnvVars("AZURE_APPCONFIG_NAME"),
 			},
+			&cli.StringFlag{
+				Name:    "namespace",
+				Aliases: []string{"ns"},
+				Usage: "App Configuration namespace to stage under (the label axis; Azure calls " +
+					`it a "label"). Staging is per-(store, namespace); a staged op needs one ` +
+					"namespace. Empty = the default namespace (defaults to $AZURE_APPCONFIG_NAMESPACE)",
+				Sources: cli.EnvVars("AZURE_APPCONFIG_NAMESPACE"),
+			},
 		},
 		Before: func(ctx context.Context, cmd *cli.Command) (context.Context, error) {
-			return cliinternal.WithAzureStoreName(ctx, cmd.String("store-name")), nil
+			ctx = cliinternal.WithAzureStoreName(ctx, cmd.String("store-name"))
+			ctx = cliinternal.WithAzureAppConfigNamespace(ctx, cmd.String("namespace"))
+
+			return ctx, nil
 		},
 		Commands:        appConfigStageSubcommands(appConfigStageConfig()),
 		CommandNotFound: cliinternal.CommandNotFound,
