@@ -154,6 +154,9 @@ func TestGet(t *testing.T) {
 	assert.Equal(t, domain.ValueTypeSecret, entry.Type)
 	assert.Equal(t, "v1", entry.Version.ID)
 	assert.Equal(t, "enabled", entry.Version.Label)
+	// State carries the per-version enable/disable; StagingLabels is not a Key Vault concept.
+	assert.Equal(t, "enabled", entry.Version.State)
+	assert.Empty(t, entry.Version.StagingLabels)
 	assert.Equal(t, []domain.Tag{{Key: "env", Value: "prod"}}, entry.Tags)
 }
 
@@ -193,8 +196,12 @@ func TestHistory(t *testing.T) {
 	// Newest first.
 	assert.Equal(t, "new", versions[0].ID)
 	assert.Equal(t, "enabled", versions[0].Label)
+	assert.Equal(t, "enabled", versions[0].State)
+	assert.Empty(t, versions[0].StagingLabels)
 	assert.Equal(t, "old", versions[1].ID)
 	assert.Equal(t, "disabled", versions[1].Label)
+	assert.Equal(t, "disabled", versions[1].State)
+	assert.Empty(t, versions[1].StagingLabels)
 }
 
 func TestList(t *testing.T) {

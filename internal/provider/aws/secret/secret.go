@@ -254,9 +254,10 @@ func (s *Store) Get(ctx context.Context, name string, ref provider.VersionRef) (
 		Value: aws.ToString(out.SecretString),
 		Type:  domain.ValueTypeSecret,
 		Version: domain.Version{
-			ID:      aws.ToString(out.VersionId),
-			Label:   representativeStage(out.VersionStages),
-			Created: out.CreatedDate,
+			ID:            aws.ToString(out.VersionId),
+			Label:         representativeStage(out.VersionStages),
+			StagingLabels: out.VersionStages,
+			Created:       out.CreatedDate,
 		},
 		Modified: out.CreatedDate,
 		Extra:    []domain.Field{{Label: "ARN", Value: aws.ToString(out.ARN)}},
@@ -286,9 +287,10 @@ func (s *Store) History(ctx context.Context, name string) ([]domain.Version, err
 
 	return lo.Map(list, func(v types.SecretVersionsListEntry, _ int) domain.Version {
 		return domain.Version{
-			ID:      aws.ToString(v.VersionId),
-			Label:   representativeStage(v.VersionStages),
-			Created: v.CreatedDate,
+			ID:            aws.ToString(v.VersionId),
+			Label:         representativeStage(v.VersionStages),
+			StagingLabels: v.VersionStages,
+			Created:       v.CreatedDate,
 		}
 	}), nil
 }
@@ -505,9 +507,10 @@ func (s *Store) Describe(ctx context.Context, name string) (*domain.Entry, error
 			return slices.Contains(v.VersionStages, "AWSCURRENT")
 		}); found {
 			entry.Version = domain.Version{
-				ID:      aws.ToString(cur.VersionId),
-				Label:   representativeStage(cur.VersionStages),
-				Created: cur.CreatedDate,
+				ID:            aws.ToString(cur.VersionId),
+				Label:         representativeStage(cur.VersionStages),
+				StagingLabels: cur.VersionStages,
+				Created:       cur.CreatedDate,
 			}
 		}
 	}

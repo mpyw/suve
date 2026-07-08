@@ -21,13 +21,45 @@ const (
 	ValueTypeList ValueType = "list" // AWS StringList
 )
 
-// Version identifies one version of an entry. Label is optional and may be
-// empty for providers without human-facing version labels.
+// Version identifies one version of an entry.
+//
+// It carries two independent, provider-specific axes that must NOT be
+// conflated (#419):
+//
+//   - StagingLabels are movable pointers naming "which version is current"
+//     (AWS Secrets Manager: AWSCURRENT / AWSPENDING / AWSPREVIOUS). Rotation
+//     moves a label from one version to another; a version may carry several
+//     labels or none (unlabeled versions are passively retained history, still
+//     readable by ID). Multi-valued.
+//   - State is a per-version enable/disable switch for reading that specific
+//     version's value (Google Cloud + Azure Key Vault). It is single-valued and
+//     orthogonal to "which version is latest".
+//
+// Providers that have neither concept (AWS SSM, Azure App Configuration) leave
+// both empty.
 type Version struct {
 	// ID is the provider-internal version identifier.
 	ID string
 	// Label is an optional human-facing label (empty when unsupported).
+	//
+	// NOTE: Label is overloaded to mean a representative staging label (AWS
+	// Secrets Manager) OR a per-version state (Google Cloud, Azure Key Vault).
+	// It is retained for back-compat during the #419 migration; prefer
+	// StagingLabels or State in new code. A later cleanup removes it once all
+	// readers migrate (do NOT mark it Deprecated yet: that would trip staticcheck
+	// SA1019 on the existing dual-write readers this phase must preserve).
 	Label string
+	// State is the per-version lifecycle state: "enabled" / "disabled" /
+	// "destroyed", or "" when the provider has no such concept. It is a
+	// per-version switch controlling whether that version's value can be read
+	// (Google Cloud + Azure Key Vault); it is orthogonal to which version is
+	// latest. Empty for AWS Secrets Manager, AWS SSM and Azure App Config.
+	State string
+	// StagingLabels are the AWS Secrets Manager staging labels for this version
+	// (all of them, e.g. AWSCURRENT / AWSPREVIOUS). A staging label is a movable
+	// pointer naming "which version is current", not a per-version state.
+	// nil/empty for every other provider.
+	StagingLabels []string
 	// Created is the version creation time, if known.
 	Created *time.Time
 }

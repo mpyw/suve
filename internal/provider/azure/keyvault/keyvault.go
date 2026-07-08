@@ -168,6 +168,7 @@ func (s *Store) Get(ctx context.Context, name string, ref provider.VersionRef) (
 	if attr := resp.Attributes; attr != nil {
 		entry.Version.Created = attr.Created
 		entry.Version.Label = enabledLabel(attr.Enabled)
+		entry.Version.State = enabledLabel(attr.Enabled)
 		entry.Modified = attr.Updated
 	}
 
@@ -186,6 +187,7 @@ func (s *Store) History(ctx context.Context, name string) ([]domain.Version, err
 		return domain.Version{
 			ID:      v.id,
 			Label:   boolLabel(v.enabled),
+			State:   boolLabel(v.enabled),
 			Created: v.created,
 		}
 	}), nil
