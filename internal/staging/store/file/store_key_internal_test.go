@@ -291,7 +291,7 @@ func TestLock_CreatesLockfileAndOperationsWork(t *testing.T) {
 	_, statErr := os.Stat(filepath.Join(dir, ".lock"))
 	require.NoError(t, statErr)
 
-	got, err := store.GetEntry(t.Context(), staging.ServiceParam, "/a")
+	got, err := store.GetEntry(t.Context(), staging.ServiceParam, "/a", "")
 	require.NoError(t, err)
 	assert.Equal(t, "v", lo.FromPtr(got.Value))
 }

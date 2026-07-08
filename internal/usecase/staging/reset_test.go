@@ -75,7 +75,7 @@ func TestResetUseCase_Execute_Unstage(t *testing.T) {
 	assert.Equal(t, "/app/config", output.Name)
 
 	// Verify unstaged
-	_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/config")
+	_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/config", "")
 	assert.ErrorIs(t, err, staging.ErrNotStaged)
 }
 
@@ -167,7 +167,7 @@ func TestResetUseCase_Execute_Restore(t *testing.T) {
 	assert.Equal(t, "#3", output.VersionLabel)
 
 	// Verify staged
-	entry, err := store.GetEntry(t.Context(), staging.ServiceParam, "/app/config#3")
+	entry, err := store.GetEntry(t.Context(), staging.ServiceParam, "/app/config#3", "")
 	require.NoError(t, err)
 	assert.Equal(t, staging.OperationUpdate, entry.Operation)
 	assert.Equal(t, "version-value", lo.FromPtr(entry.Value))
@@ -380,7 +380,7 @@ func TestResetUseCase_Execute_RestoreSkipped_SameAsAWS(t *testing.T) {
 	assert.Equal(t, "#3", output.VersionLabel)
 
 	// Verify nothing was staged (auto-skipped)
-	_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/config#3")
+	_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/config#3", "")
 	assert.ErrorIs(t, err, staging.ErrNotStaged)
 }
 
@@ -413,7 +413,7 @@ func TestResetUseCase_Execute_RestoreNotSkipped_DifferentFromAWS(t *testing.T) {
 	assert.Equal(t, "#3", output.VersionLabel)
 
 	// Verify entry was staged
-	entry, err := store.GetEntry(t.Context(), staging.ServiceParam, "/app/config#3")
+	entry, err := store.GetEntry(t.Context(), staging.ServiceParam, "/app/config#3", "")
 	require.NoError(t, err)
 	assert.Equal(t, "old-version-value", lo.FromPtr(entry.Value))
 }

@@ -98,7 +98,7 @@ func TestApplyUseCase_Execute_SingleCreate(t *testing.T) {
 	assert.Equal(t, usecasestaging.ApplyResultCreated, output.EntryResults[0].Status)
 
 	// Verify unstaged after apply
-	_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/new")
+	_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/new", "")
 	assert.ErrorIs(t, err, staging.ErrNotStaged)
 }
 
@@ -164,7 +164,7 @@ func TestApplyUseCase_Execute_FilterByName(t *testing.T) {
 	assert.Equal(t, "/app/one", output.EntryResults[0].Name)
 
 	// /app/two should still be staged
-	_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/two")
+	_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/two", "")
 	require.NoError(t, err)
 }
 
@@ -216,11 +216,11 @@ func TestApplyUseCase_Execute_PartialFailure(t *testing.T) {
 	assert.Equal(t, 1, output.EntryFailed)
 
 	// Failed entry should still be staged
-	_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/fail")
+	_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/fail", "")
 	require.NoError(t, err)
 
 	// Successful entry should be unstaged
-	_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/success")
+	_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/success", "")
 	assert.ErrorIs(t, err, staging.ErrNotStaged)
 }
 

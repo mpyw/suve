@@ -66,7 +66,7 @@ func TestEditUseCase_Execute(t *testing.T) {
 	assert.Equal(t, "/app/config", output.Name)
 
 	// Verify staged
-	entry, err := store.GetEntry(t.Context(), staging.ServiceParam, "/app/config")
+	entry, err := store.GetEntry(t.Context(), staging.ServiceParam, "/app/config", "")
 	require.NoError(t, err)
 	assert.Equal(t, staging.OperationUpdate, entry.Operation)
 	assert.Equal(t, "updated-value", lo.FromPtr(entry.Value))
@@ -99,7 +99,7 @@ func TestEditUseCase_Execute_PreservesBaseModifiedAt(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	entry, err := store.GetEntry(t.Context(), staging.ServiceParam, "/app/config")
+	entry, err := store.GetEntry(t.Context(), staging.ServiceParam, "/app/config", "")
 	require.NoError(t, err)
 	assert.Equal(t, baseTime, *entry.BaseModifiedAt)
 }
@@ -222,7 +222,7 @@ func TestEditUseCase_Execute_WithStagedCreate(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	entry, err := store.GetEntry(t.Context(), staging.ServiceParam, "/app/new")
+	entry, err := store.GetEntry(t.Context(), staging.ServiceParam, "/app/new", "")
 	require.NoError(t, err)
 	// Operation should remain Create (not become Update)
 	assert.Equal(t, staging.OperationCreate, entry.Operation)
@@ -253,7 +253,7 @@ func TestEditUseCase_Execute_ZeroLastModified(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	entry, err := store.GetEntry(t.Context(), staging.ServiceParam, "/app/config")
+	entry, err := store.GetEntry(t.Context(), staging.ServiceParam, "/app/config", "")
 	require.NoError(t, err)
 	assert.Nil(t, entry.BaseModifiedAt)
 }
@@ -334,7 +334,7 @@ func TestEditUseCase_Execute_BlocksEditOnDelete(t *testing.T) {
 	assert.Contains(t, err.Error(), "staged for deletion")
 
 	// Verify the operation is still DELETE
-	entry, err := store.GetEntry(t.Context(), staging.ServiceParam, "/app/deleted")
+	entry, err := store.GetEntry(t.Context(), staging.ServiceParam, "/app/deleted", "")
 	require.NoError(t, err)
 	assert.Equal(t, staging.OperationDelete, entry.Operation)
 }
@@ -392,7 +392,7 @@ func TestEditUseCase_Execute_PreservesUpdateOperation(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	entry, err := store.GetEntry(t.Context(), staging.ServiceParam, "/app/config")
+	entry, err := store.GetEntry(t.Context(), staging.ServiceParam, "/app/config", "")
 	require.NoError(t, err)
 	assert.Equal(t, staging.OperationUpdate, entry.Operation)
 	assert.Equal(t, "newer-value", lo.FromPtr(entry.Value))
@@ -424,7 +424,7 @@ func TestEditUseCase_Execute_Skipped_SameAsAWS(t *testing.T) {
 	assert.False(t, output.Unstaged)
 
 	// Verify nothing was staged
-	_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/config")
+	_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/config", "")
 	assert.ErrorIs(t, err, staging.ErrNotStaged)
 }
 
@@ -461,7 +461,7 @@ func TestEditUseCase_Execute_Unstaged_RevertedToAWS(t *testing.T) {
 	assert.True(t, output.Unstaged)
 
 	// Verify entry was unstaged
-	_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/config")
+	_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/config", "")
 	assert.ErrorIs(t, err, staging.ErrNotStaged)
 }
 
@@ -526,7 +526,7 @@ func TestEditUseCase_Execute_NotSkipped_DifferentFromAWS(t *testing.T) {
 	assert.False(t, output.Unstaged)
 
 	// Verify entry was staged
-	entry, err := store.GetEntry(t.Context(), staging.ServiceParam, "/app/config")
+	entry, err := store.GetEntry(t.Context(), staging.ServiceParam, "/app/config", "")
 	require.NoError(t, err)
 	assert.Equal(t, "new-value", lo.FromPtr(entry.Value))
 }
@@ -559,7 +559,7 @@ func TestEditUseCase_Execute_EmptyStringValue_AutoSkip(t *testing.T) {
 	assert.True(t, output.Skipped, "should auto-skip when editing to same empty string")
 
 	// Verify nothing was staged
-	_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/config")
+	_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/config", "")
 	assert.ErrorIs(t, err, staging.ErrNotStaged)
 }
 
@@ -590,7 +590,7 @@ func TestEditUseCase_Execute_EmptyStringValue_Stage(t *testing.T) {
 	assert.False(t, output.Skipped)
 
 	// Verify entry was staged
-	entry, err := store.GetEntry(t.Context(), staging.ServiceParam, "/app/config")
+	entry, err := store.GetEntry(t.Context(), staging.ServiceParam, "/app/config", "")
 	require.NoError(t, err)
 	assert.Equal(t, "new-value", lo.FromPtr(entry.Value))
 }
@@ -675,7 +675,7 @@ func TestEditUseCase_Execute_NotStaged_StagesFromAWS(t *testing.T) {
 	assert.False(t, output.Skipped)
 	assert.False(t, output.Unstaged)
 
-	entry, err := store.GetEntry(t.Context(), staging.ServiceParam, "/app/config")
+	entry, err := store.GetEntry(t.Context(), staging.ServiceParam, "/app/config", "")
 	require.NoError(t, err)
 	assert.Equal(t, staging.OperationUpdate, entry.Operation)
 	assert.Equal(t, "new-value", lo.FromPtr(entry.Value))
@@ -707,7 +707,7 @@ func TestEditUseCase_Execute_NotStaged_SameAsAWS(t *testing.T) {
 	assert.False(t, output.Unstaged)
 
 	// Verify nothing was staged
-	_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/config")
+	_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/config", "")
 	assert.ErrorIs(t, err, staging.ErrNotStaged)
 }
 
@@ -743,7 +743,7 @@ func TestEditUseCase_Execute_StagedCreate_SkipsAWSFetch(t *testing.T) {
 	assert.False(t, output.Unstaged)
 
 	// Verify entry was updated
-	entry, err := store.GetEntry(t.Context(), staging.ServiceParam, "/app/new")
+	entry, err := store.GetEntry(t.Context(), staging.ServiceParam, "/app/new", "")
 	require.NoError(t, err)
 	assert.Equal(t, staging.OperationCreate, entry.Operation)
 	assert.Equal(t, "updated-value", lo.FromPtr(entry.Value))

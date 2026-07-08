@@ -11,8 +11,11 @@ import (
 )
 
 // namespaceSep separates the namespace from the name in a composite entry key.
-// NUL can appear in neither an App Configuration key nor a label, so it is a
-// collision-proof separator.
+// It is NUL because an Azure App Configuration key or label can contain neither
+// a NUL nor any other control character, making it a collision-proof separator
+// (the reserved filter characters `*`/`,`/`\` CAN appear in a real key/label, so
+// they would not be safe). This keeps the key unambiguous — unlike a JSON-string
+// key, where a name that legitimately begins with `{` could be misread.
 const namespaceSep = "\x00"
 
 // CompositeEntryKey is the map/storage key identifying a staged entry. For

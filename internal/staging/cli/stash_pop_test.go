@@ -170,9 +170,9 @@ func TestStashPopRunner_RunBasic(t *testing.T) {
 		assert.Contains(t, stdout.String(), "merged")
 
 		// Verify both entries exist in agent
-		_, err = agentStore.GetEntry(t.Context(), staging.ServiceParam, "/app/existing")
+		_, err = agentStore.GetEntry(t.Context(), staging.ServiceParam, "/app/existing", "")
 		require.NoError(t, err)
-		_, err = agentStore.GetEntry(t.Context(), staging.ServiceParam, "/app/new")
+		_, err = agentStore.GetEntry(t.Context(), staging.ServiceParam, "/app/new", "")
 		require.NoError(t, err)
 	})
 

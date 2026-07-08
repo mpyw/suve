@@ -62,7 +62,7 @@ func TestAddUseCase_Execute(t *testing.T) {
 	assert.Equal(t, "/app/new-param", output.Name)
 
 	// Verify staged
-	entry, err := store.GetEntry(t.Context(), staging.ServiceParam, "/app/new-param")
+	entry, err := store.GetEntry(t.Context(), staging.ServiceParam, "/app/new-param", "")
 	require.NoError(t, err)
 	assert.Equal(t, staging.OperationCreate, entry.Operation)
 	assert.Equal(t, "new-value", lo.FromPtr(entry.Value))
@@ -103,7 +103,7 @@ func TestAddUseCase_Execute_MinimalInput(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "/app/simple", output.Name)
 
-	entry, err := store.GetEntry(t.Context(), staging.ServiceParam, "/app/simple")
+	entry, err := store.GetEntry(t.Context(), staging.ServiceParam, "/app/simple", "")
 	require.NoError(t, err)
 	assert.Nil(t, entry.Description)
 }
@@ -327,7 +327,7 @@ func TestAddUseCase_Execute_AllowsReEditOfCreate(t *testing.T) {
 	assert.Equal(t, "/app/new", output.Name)
 
 	// Verify the value was updated but operation remains CREATE
-	entry, err := store.GetEntry(t.Context(), staging.ServiceParam, "/app/new")
+	entry, err := store.GetEntry(t.Context(), staging.ServiceParam, "/app/new", "")
 	require.NoError(t, err)
 	assert.Equal(t, staging.OperationCreate, entry.Operation)
 	assert.Equal(t, "updated-value", lo.FromPtr(entry.Value))

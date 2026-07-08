@@ -92,11 +92,11 @@ func TestRun_UnstageAll(t *testing.T) {
 	assert.Contains(t, buf.String(), "Unstaged all changes (2 SSM Parameter Store, 1 Secrets Manager)")
 
 	// Verify all unstaged
-	_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/config1")
+	_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/config1", "")
 	assert.Equal(t, staging.ErrNotStaged, err)
-	_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/config2")
+	_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/config2", "")
 	assert.Equal(t, staging.ErrNotStaged, err)
-	_, err = store.GetEntry(t.Context(), staging.ServiceSecret, "secret1")
+	_, err = store.GetEntry(t.Context(), staging.ServiceSecret, "secret1", "")
 	assert.Equal(t, staging.ErrNotStaged, err)
 }
 
@@ -253,11 +253,11 @@ func TestRun_UnstageEntriesAndTags(t *testing.T) {
 	assert.Contains(t, buf.String(), "Unstaged all changes (2 SSM Parameter Store, 2 Secrets Manager)")
 
 	// Verify all unstaged
-	_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/config")
+	_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/config", "")
 	assert.Equal(t, staging.ErrNotStaged, err)
 	_, err = store.GetTag(t.Context(), staging.ServiceParam, "/app/other")
 	assert.Equal(t, staging.ErrNotStaged, err)
-	_, err = store.GetEntry(t.Context(), staging.ServiceSecret, "my-secret")
+	_, err = store.GetEntry(t.Context(), staging.ServiceSecret, "my-secret", "")
 	assert.Equal(t, staging.ErrNotStaged, err)
 	_, err = store.GetTag(t.Context(), staging.ServiceSecret, "other-secret")
 	assert.Equal(t, staging.ErrNotStaged, err)

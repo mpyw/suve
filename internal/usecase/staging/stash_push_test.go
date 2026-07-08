@@ -39,12 +39,12 @@ func TestPersistUseCase_Execute(t *testing.T) {
 		assert.Equal(t, 1, output.EntryCount)
 
 		// Verify entry moved to file
-		entry, err := fileStore.GetEntry(t.Context(), staging.ServiceParam, "/app/config")
+		entry, err := fileStore.GetEntry(t.Context(), staging.ServiceParam, "/app/config", "")
 		require.NoError(t, err)
 		assert.Equal(t, "agent-value", lo.FromPtr(entry.Value))
 
 		// Verify agent is cleared
-		_, err = agentStore.GetEntry(t.Context(), staging.ServiceParam, "/app/config")
+		_, err = agentStore.GetEntry(t.Context(), staging.ServiceParam, "/app/config", "")
 		assert.ErrorIs(t, err, staging.ErrNotStaged)
 	})
 
@@ -69,9 +69,9 @@ func TestPersistUseCase_Execute(t *testing.T) {
 		require.NoError(t, err)
 
 		// Verify entry exists in both
-		_, err = fileStore.GetEntry(t.Context(), staging.ServiceParam, "/app/config")
+		_, err = fileStore.GetEntry(t.Context(), staging.ServiceParam, "/app/config", "")
 		require.NoError(t, err)
-		_, err = agentStore.GetEntry(t.Context(), staging.ServiceParam, "/app/config")
+		_, err = agentStore.GetEntry(t.Context(), staging.ServiceParam, "/app/config", "")
 		require.NoError(t, err)
 	})
 
@@ -116,15 +116,15 @@ func TestPersistUseCase_Execute(t *testing.T) {
 		require.NoError(t, err)
 
 		// Param should be in file
-		_, err = fileStore.GetEntry(t.Context(), staging.ServiceParam, "/app/param")
+		_, err = fileStore.GetEntry(t.Context(), staging.ServiceParam, "/app/param", "")
 		require.NoError(t, err)
 
 		// Secret should still be in agent
-		_, err = agentStore.GetEntry(t.Context(), staging.ServiceSecret, "my-secret")
+		_, err = agentStore.GetEntry(t.Context(), staging.ServiceSecret, "my-secret", "")
 		require.NoError(t, err)
 
 		// Param should be cleared from the working staging area (not kept)
-		_, err = agentStore.GetEntry(t.Context(), staging.ServiceParam, "/app/param")
+		_, err = agentStore.GetEntry(t.Context(), staging.ServiceParam, "/app/param", "")
 		assert.ErrorIs(t, err, staging.ErrNotStaged)
 	})
 
@@ -183,9 +183,9 @@ func TestPersistUseCase_Execute(t *testing.T) {
 		require.NoError(t, err)
 
 		// Both should exist in file
-		_, err = fileStore.GetEntry(t.Context(), staging.ServiceParam, "/app/config")
+		_, err = fileStore.GetEntry(t.Context(), staging.ServiceParam, "/app/config", "")
 		require.NoError(t, err)
-		_, err = fileStore.GetEntry(t.Context(), staging.ServiceSecret, "existing-secret")
+		_, err = fileStore.GetEntry(t.Context(), staging.ServiceSecret, "existing-secret", "")
 		require.NoError(t, err)
 	})
 }
@@ -229,15 +229,15 @@ func TestPersistUseCase_PersistMode(t *testing.T) {
 		require.NoError(t, err)
 
 		// New param should exist
-		_, err = fileStore.GetEntry(t.Context(), staging.ServiceParam, "/new/param")
+		_, err = fileStore.GetEntry(t.Context(), staging.ServiceParam, "/new/param", "")
 		require.NoError(t, err)
 
 		// Existing param should be gone (overwritten)
-		_, err = fileStore.GetEntry(t.Context(), staging.ServiceParam, "/existing/param")
+		_, err = fileStore.GetEntry(t.Context(), staging.ServiceParam, "/existing/param", "")
 		require.ErrorIs(t, err, staging.ErrNotStaged)
 
 		// Existing secret should also be gone (overwritten)
-		_, err = fileStore.GetEntry(t.Context(), staging.ServiceSecret, "existing-secret")
+		_, err = fileStore.GetEntry(t.Context(), staging.ServiceSecret, "existing-secret", "")
 		require.ErrorIs(t, err, staging.ErrNotStaged)
 	})
 
@@ -277,11 +277,11 @@ func TestPersistUseCase_PersistMode(t *testing.T) {
 		require.NoError(t, err)
 
 		// All entries should exist
-		_, err = fileStore.GetEntry(t.Context(), staging.ServiceParam, "/new/param")
+		_, err = fileStore.GetEntry(t.Context(), staging.ServiceParam, "/new/param", "")
 		require.NoError(t, err)
-		_, err = fileStore.GetEntry(t.Context(), staging.ServiceParam, "/existing/param")
+		_, err = fileStore.GetEntry(t.Context(), staging.ServiceParam, "/existing/param", "")
 		require.NoError(t, err)
-		_, err = fileStore.GetEntry(t.Context(), staging.ServiceSecret, "existing-secret")
+		_, err = fileStore.GetEntry(t.Context(), staging.ServiceSecret, "existing-secret", "")
 		require.NoError(t, err)
 	})
 
@@ -316,7 +316,7 @@ func TestPersistUseCase_PersistMode(t *testing.T) {
 		require.NoError(t, err)
 
 		// Agent value should win
-		entry, err := fileStore.GetEntry(t.Context(), staging.ServiceParam, "/app/config")
+		entry, err := fileStore.GetEntry(t.Context(), staging.ServiceParam, "/app/config", "")
 		require.NoError(t, err)
 		assert.Equal(t, "new-value", lo.FromPtr(entry.Value))
 	})
@@ -357,11 +357,11 @@ func TestPersistUseCase_ServiceSpecific_EdgeCases(t *testing.T) {
 		require.NoError(t, err)
 
 		// Param should exist in file
-		_, err = fileStore.GetEntry(t.Context(), staging.ServiceParam, "/app/config")
+		_, err = fileStore.GetEntry(t.Context(), staging.ServiceParam, "/app/config", "")
 		require.NoError(t, err)
 
 		// Secret should still exist in file (preserved)
-		_, err = fileStore.GetEntry(t.Context(), staging.ServiceSecret, "existing-secret")
+		_, err = fileStore.GetEntry(t.Context(), staging.ServiceSecret, "existing-secret", "")
 		require.NoError(t, err)
 	})
 
@@ -397,11 +397,11 @@ func TestPersistUseCase_ServiceSpecific_EdgeCases(t *testing.T) {
 		require.NoError(t, err)
 
 		// Secret should exist in file
-		_, err = fileStore.GetEntry(t.Context(), staging.ServiceSecret, "my-secret")
+		_, err = fileStore.GetEntry(t.Context(), staging.ServiceSecret, "my-secret", "")
 		require.NoError(t, err)
 
 		// Param should still exist in file (preserved)
-		_, err = fileStore.GetEntry(t.Context(), staging.ServiceParam, "/existing/param")
+		_, err = fileStore.GetEntry(t.Context(), staging.ServiceParam, "/existing/param", "")
 		require.NoError(t, err)
 	})
 
@@ -443,15 +443,15 @@ func TestPersistUseCase_ServiceSpecific_EdgeCases(t *testing.T) {
 		require.NoError(t, err)
 
 		// New param should exist
-		_, err = fileStore.GetEntry(t.Context(), staging.ServiceParam, "/new/param")
+		_, err = fileStore.GetEntry(t.Context(), staging.ServiceParam, "/new/param", "")
 		require.NoError(t, err)
 
 		// Old param should be gone (replaced due to overwrite mode)
-		_, err = fileStore.GetEntry(t.Context(), staging.ServiceParam, "/old/param")
+		_, err = fileStore.GetEntry(t.Context(), staging.ServiceParam, "/old/param", "")
 		require.ErrorIs(t, err, staging.ErrNotStaged)
 
 		// Secret should still exist (preserved)
-		_, err = fileStore.GetEntry(t.Context(), staging.ServiceSecret, "existing-secret")
+		_, err = fileStore.GetEntry(t.Context(), staging.ServiceSecret, "existing-secret", "")
 		require.NoError(t, err)
 	})
 
@@ -488,11 +488,11 @@ func TestPersistUseCase_ServiceSpecific_EdgeCases(t *testing.T) {
 		require.NoError(t, err)
 
 		// Param should exist
-		_, err = fileStore.GetEntry(t.Context(), staging.ServiceParam, "/app/config")
+		_, err = fileStore.GetEntry(t.Context(), staging.ServiceParam, "/app/config", "")
 		require.NoError(t, err)
 
 		// Secret should still exist (service filter forces merge behavior)
-		_, err = fileStore.GetEntry(t.Context(), staging.ServiceSecret, "existing-secret")
+		_, err = fileStore.GetEntry(t.Context(), staging.ServiceSecret, "existing-secret", "")
 		require.NoError(t, err)
 	})
 }
@@ -623,7 +623,7 @@ func TestPersistUseCase_GlobalClearError(t *testing.T) {
 		assert.True(t, persistErr.NonFatal)
 
 		// Stash should still have the entry (write succeeded)
-		_, err = stashStore.GetEntry(t.Context(), staging.ServiceParam, "/app/config")
+		_, err = stashStore.GetEntry(t.Context(), staging.ServiceParam, "/app/config", "")
 		require.NoError(t, err)
 	})
 }
@@ -717,7 +717,7 @@ func TestPersistUseCase_StashDrainError_Propagated(t *testing.T) {
 		assert.Contains(t, err.Error(), "stash file")
 
 		// The stash must not have been overwritten (WriteState never reached).
-		_, getErr := fileStore.GetEntry(t.Context(), staging.ServiceParam, "/app/param")
+		_, getErr := fileStore.GetEntry(t.Context(), staging.ServiceParam, "/app/param", "")
 		require.ErrorIs(t, getErr, staging.ErrNotStaged)
 	}
 

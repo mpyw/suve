@@ -172,9 +172,9 @@ func TestRun_ApplyBothServices(t *testing.T) {
 	assert.Contains(t, buf.String(), "Secrets Manager: Updated my-secret")
 
 	// Verify both unstaged
-	_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/config")
+	_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/config", "")
 	assert.Equal(t, staging.ErrNotStaged, err)
-	_, err = store.GetEntry(t.Context(), staging.ServiceSecret, "my-secret")
+	_, err = store.GetEntry(t.Context(), staging.ServiceSecret, "my-secret", "")
 	assert.Equal(t, staging.ErrNotStaged, err)
 }
 
@@ -344,12 +344,12 @@ func TestRun_PartialFailure(t *testing.T) {
 	assert.Contains(t, err.Error(), "applied 1, failed 1")
 
 	// SSM Parameter Store should still be staged (failed)
-	entry, err := store.GetEntry(t.Context(), staging.ServiceParam, "/app/config")
+	entry, err := store.GetEntry(t.Context(), staging.ServiceParam, "/app/config", "")
 	require.NoError(t, err)
 	assert.Equal(t, "param-value", lo.FromPtr(entry.Value))
 
 	// Secrets Manager should be unstaged (succeeded)
-	_, err = store.GetEntry(t.Context(), staging.ServiceSecret, "my-secret")
+	_, err = store.GetEntry(t.Context(), staging.ServiceSecret, "my-secret", "")
 	assert.Equal(t, staging.ErrNotStaged, err)
 }
 

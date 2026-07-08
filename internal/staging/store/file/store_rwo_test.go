@@ -34,7 +34,7 @@ func TestStore_GetEntry_NotStaged(t *testing.T) {
 
 	store := newTempStore(t)
 
-	_, err := store.GetEntry(t.Context(), staging.ServiceParam, "/missing")
+	_, err := store.GetEntry(t.Context(), staging.ServiceParam, "/missing", "")
 	assert.ErrorIs(t, err, staging.ErrNotStaged)
 }
 
@@ -54,7 +54,7 @@ func TestStore_StageAndGetEntry(t *testing.T) {
 
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/a", sampleEntry("v1")))
 
-	got, err := store.GetEntry(t.Context(), staging.ServiceParam, "/a")
+	got, err := store.GetEntry(t.Context(), staging.ServiceParam, "/a", "")
 	require.NoError(t, err)
 	assert.Equal(t, "v1", lo.FromPtr(got.Value))
 
@@ -62,11 +62,11 @@ func TestStore_StageAndGetEntry(t *testing.T) {
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/b", sampleEntry("v2")))
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/a", sampleEntry("v1-updated")))
 
-	got, err = store.GetEntry(t.Context(), staging.ServiceParam, "/a")
+	got, err = store.GetEntry(t.Context(), staging.ServiceParam, "/a", "")
 	require.NoError(t, err)
 	assert.Equal(t, "v1-updated", lo.FromPtr(got.Value))
 
-	got, err = store.GetEntry(t.Context(), staging.ServiceParam, "/b")
+	got, err = store.GetEntry(t.Context(), staging.ServiceParam, "/b", "")
 	require.NoError(t, err)
 	assert.Equal(t, "v2", lo.FromPtr(got.Value))
 }
@@ -136,12 +136,12 @@ func TestStore_UnstageEntry(t *testing.T) {
 	store := newTempStore(t)
 
 	// Unstage a missing entry returns ErrNotStaged.
-	require.ErrorIs(t, store.UnstageEntry(t.Context(), staging.ServiceParam, "/missing"), staging.ErrNotStaged)
+	require.ErrorIs(t, store.UnstageEntry(t.Context(), staging.ServiceParam, "/missing", ""), staging.ErrNotStaged)
 
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/a", sampleEntry("v")))
-	require.NoError(t, store.UnstageEntry(t.Context(), staging.ServiceParam, "/a"))
+	require.NoError(t, store.UnstageEntry(t.Context(), staging.ServiceParam, "/a", ""))
 
-	_, err := store.GetEntry(t.Context(), staging.ServiceParam, "/a")
+	_, err := store.GetEntry(t.Context(), staging.ServiceParam, "/a", "")
 	assert.ErrorIs(t, err, staging.ErrNotStaged)
 }
 
@@ -178,10 +178,10 @@ func TestStore_UnstageAll_RemovesFile(t *testing.T) {
 	// UnstageAll with a specific service clears only that service.
 	require.NoError(t, store.UnstageAll(t.Context(), staging.ServiceParam))
 
-	_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/p")
+	_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/p", "")
 	require.ErrorIs(t, err, staging.ErrNotStaged)
 
-	got, err := store.GetEntry(t.Context(), staging.ServiceSecret, "s")
+	got, err := store.GetEntry(t.Context(), staging.ServiceSecret, "s", "")
 	require.NoError(t, err)
 	assert.Equal(t, "s", lo.FromPtr(got.Value))
 
