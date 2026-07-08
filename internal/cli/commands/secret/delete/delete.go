@@ -19,10 +19,33 @@ import (
 	"github.com/mpyw/suve/internal/usecase/secret"
 )
 
-// defaultRecoveryWindow is the AWS Secrets Manager default recovery window in
-// days, used to compute the displayed scheduled deletion date when no explicit
-// window is given.
-const defaultRecoveryWindow = 30
+// Recovery-window bounds enforced by AWS Secrets Manager, mirrored here so an
+// invalid value is rejected before the confirmation prompt rather than by AWS
+// after it.
+const (
+	minRecoveryWindow = 7
+	maxRecoveryWindow = 30
+	// defaultRecoveryWindow is the AWS Secrets Manager default recovery window
+	// in days, used to compute the displayed scheduled deletion date when no
+	// explicit window is given.
+	defaultRecoveryWindow = maxRecoveryWindow
+)
+
+// validateDeleteFlags checks the --force / --recovery-window combination before
+// any confirmation prompt or deletion is attempted. recoveryWindow must be the
+// value the user explicitly supplied (0 when the flag was left at its default),
+// so that --force alone is not mistaken for a combined invocation.
+func validateDeleteFlags(force bool, recoveryWindow int) error {
+	if force && recoveryWindow > 0 {
+		return fmt.Errorf("--force and --recovery-window cannot be combined")
+	}
+
+	if recoveryWindow > 0 && (recoveryWindow < minRecoveryWindow || recoveryWindow > maxRecoveryWindow) {
+		return fmt.Errorf("--recovery-window must be between %d and %d days", minRecoveryWindow, maxRecoveryWindow)
+	}
+
+	return nil
+}
 
 // Runner executes the delete command.
 type Runner struct {
@@ -71,7 +94,7 @@ EXAMPLES:
 			&cli.IntFlag{
 				Name:  "recovery-window",
 				Usage: "Number of days before permanent deletion (7-30)",
-				Value: 30, //nolint:mnd // AWS Secrets Manager default recovery window
+				Value: defaultRecoveryWindow,
 			},
 			&cli.BoolFlag{
 				Name:  "yes",
@@ -89,6 +112,19 @@ func action(ctx context.Context, cmd *cli.Command) error {
 
 	name := cmd.Args().First()
 	skipConfirm := cmd.Bool("yes")
+	force := cmd.Bool("force")
+	recoveryWindow := cmd.Int("recovery-window")
+
+	// Only the explicitly-supplied window participates in flag validation; the
+	// flag default must not be mistaken for a user-supplied value.
+	givenWindow := 0
+	if cmd.IsSet("recovery-window") {
+		givenWindow = recoveryWindow
+	}
+
+	if err := validateDeleteFlags(force, givenWindow); err != nil {
+		return err
+	}
 
 	store, err := internal.SecretStore(ctx)
 	if err != nil {
@@ -143,8 +179,8 @@ func action(ctx context.Context, cmd *cli.Command) error {
 
 	return r.Run(ctx, Options{
 		Name:           name,
-		Force:          cmd.Bool("force"),
-		RecoveryWindow: cmd.Int("recovery-window"),
+		Force:          force,
+		RecoveryWindow: recoveryWindow,
 	})
 }
 
