@@ -16,6 +16,7 @@ package file
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -121,18 +122,35 @@ func NewWorkingStore(scope provider.Scope) (*Store, error) {
 
 	key, plaintext, err := resolveKeyFunc()
 	if err != nil {
+		// A hard keychain failure (as opposed to a genuinely absent keyring
+		// backend or a bad SUVE_STAGING_KEY) is fatal ONLY when encrypted state
+		// already exists: reading it needs the key, so the real keychain cause
+		// must be surfaced instead of letting a nil key later fail with a
+		// misleading "wrong passphrase" error. With no encrypted state yet, the
+		// tool stays usable via the documented plaintext fallback (e.g. on
+		// headless CI without a keyring), warning the user once.
+		var kcErr *keyprovider.KeychainUnavailableError
+		if errors.As(err, &kcErr) {
+			encrypted, encErr := s.IsEncrypted()
+			if encErr != nil {
+				return nil, fmt.Errorf("failed to check staging state encryption: %w", encErr)
+			}
+
+			if encrypted {
+				return nil, fmt.Errorf(
+					"cannot access the staging encryption key while encrypted state exists: %w", err)
+			}
+
+			warnPlaintextOnce(err)
+
+			return s, nil
+		}
+
 		return nil, fmt.Errorf("failed to resolve staging encryption key: %w", err)
 	}
 
 	if plaintext {
-		plaintextWarnOnce.Do(func() {
-			// Direct stderr write: this low-level store package intentionally
-			// avoids depending on the cli/output package.
-			//nolint:forbidigo // one-time operator warning to stderr.
-			fmt.Fprintln(os.Stderr,
-				"warning: staging state is stored UNENCRYPTED; "+
-					"set SUVE_STAGING_KEY or enable an OS keychain to encrypt")
-		})
+		warnPlaintextOnce(nil)
 
 		return s, nil
 	}
@@ -140,6 +158,24 @@ func NewWorkingStore(scope provider.Scope) (*Store, error) {
 	s.key = key
 
 	return s, nil
+}
+
+// warnPlaintextOnce emits the unencrypted-storage warning once per process. When
+// cause is non-nil (a hard keychain failure that degraded to plaintext), the
+// underlying keychain error is included so the operator can diagnose it.
+func warnPlaintextOnce(cause error) {
+	plaintextWarnOnce.Do(func() {
+		msg := "warning: staging state is stored UNENCRYPTED; " +
+			"set SUVE_STAGING_KEY or enable an OS keychain to encrypt"
+		if cause != nil {
+			msg += "\nwarning: " + cause.Error()
+		}
+
+		// Direct stderr write: this low-level store package intentionally
+		// avoids depending on the cli/output package.
+		//nolint:forbidigo // one-time operator warning to stderr.
+		fmt.Fprintln(os.Stderr, msg)
+	})
 }
 
 // NewStoreWithPath creates a new single-file Store with a custom state file path.

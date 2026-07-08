@@ -13,6 +13,7 @@ import (
 	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/staging"
 	"github.com/mpyw/suve/internal/staging/store/file/internal/crypt"
+	"github.com/mpyw/suve/internal/staging/store/file/internal/keyprovider"
 )
 
 func newTestKey() []byte {
@@ -164,4 +165,72 @@ func TestNewWorkingStore_ResolveError(t *testing.T) {
 	require.Error(t, err)
 	assert.Nil(t, s)
 	assert.Contains(t, err.Error(), "failed to resolve staging encryption key")
+}
+
+// TestNewWorkingStore_KeychainError_NoEncryptedState_Plaintext verifies that a
+// hard keychain failure degrades to plaintext when no encrypted state exists
+// yet (so the tool stays usable on e.g. headless CI without a keyring).
+//
+//nolint:paralleltest // overrides package-level resolveKeyFunc.
+func TestNewWorkingStore_KeychainError_NoEncryptedState_Plaintext(t *testing.T) {
+	origResolve := resolveKeyFunc
+	origHome := userHomeDirFunc
+
+	defer func() {
+		resolveKeyFunc = origResolve
+		userHomeDirFunc = origHome
+	}()
+
+	userHomeDirFunc = func() (string, error) { return t.TempDir(), nil }
+	resolveKeyFunc = func() ([]byte, bool, error) {
+		return nil, false, &keyprovider.KeychainUnavailableError{Err: errors.New("dbus down")}
+	}
+
+	s, err := NewWorkingStore(provider.AWSScope("123456789012", "ap-northeast-1"))
+	require.NoError(t, err)
+	assert.Nil(t, s.key)
+}
+
+// TestNewWorkingStore_KeychainError_EncryptedStateExists_Fatal verifies that a
+// hard keychain failure is surfaced (not downgraded) when encrypted state
+// already exists — the real cause must reach the user instead of a later
+// misleading "wrong passphrase" decryption error.
+//
+//nolint:paralleltest // overrides package-level resolveKeyFunc.
+func TestNewWorkingStore_KeychainError_EncryptedStateExists_Fatal(t *testing.T) {
+	origResolve := resolveKeyFunc
+	origHome := userHomeDirFunc
+
+	defer func() {
+		resolveKeyFunc = origResolve
+		userHomeDirFunc = origHome
+	}()
+
+	home := t.TempDir()
+	userHomeDirFunc = func() (string, error) { return home, nil }
+
+	scope := provider.AWSScope("123456789012", "ap-northeast-1")
+
+	// Seed an ENCRYPTED param.json under the scope directory.
+	seed, err := NewStore(scope)
+	require.NoError(t, err)
+
+	seed.key = newTestKey()
+
+	state := staging.NewEmptyState()
+	state.Entries[staging.ServiceParam]["/app/secret"] = staging.Entry{
+		Operation: staging.OperationCreate,
+		Value:     lo.ToPtr("v"),
+	}
+	require.NoError(t, seed.WriteState(t.Context(), "", state))
+
+	resolveKeyFunc = func() ([]byte, bool, error) {
+		return nil, false, &keyprovider.KeychainUnavailableError{Err: errors.New("keychain locked")}
+	}
+
+	s, err := NewWorkingStore(scope)
+	require.Error(t, err)
+	assert.Nil(t, s)
+	assert.Contains(t, err.Error(), "keychain locked")
+	assert.Contains(t, err.Error(), "encrypted state exists")
 }

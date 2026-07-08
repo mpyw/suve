@@ -102,15 +102,16 @@ func TestResolve_Keychain_GetOrCreate(t *testing.T) {
 	})
 }
 
+// TestResolve_UnsupportedPlatform_Plaintext: a platform with no keyring backend
+// takes the documented plaintext fallback.
+//
 //nolint:paralleltest // overrides package-level hook vars.
-func TestResolve_PlaintextFallback(t *testing.T) {
+//nolint:paralleltest // overrides package-level hook vars.
+func TestResolve_UnsupportedPlatform_Plaintext(t *testing.T) {
 	withHooks(t, func() {
 		lookupEnvFunc = func(string) (string, bool) { return "", false }
 		keyringGetFunc = func(string, string) (string, error) {
-			return "", errors.New("keychain unavailable")
-		}
-		keyringSetFunc = func(string, string, string) error {
-			return errors.New("keychain unavailable")
+			return "", keyring.ErrUnsupportedPlatform
 		}
 
 		key, plaintext, err := Resolve()
@@ -120,8 +121,33 @@ func TestResolve_PlaintextFallback(t *testing.T) {
 	})
 }
 
+// TestResolve_HardKeychainError_Surfaced: a hard Get failure (locked keychain,
+// unreachable dbus) is surfaced as a *KeychainUnavailableError, NOT silently
+// downgraded to plaintext.
+//
 //nolint:paralleltest // overrides package-level hook vars.
-func TestResolve_Keychain_SetError_FallsBackToPlaintext(t *testing.T) {
+func TestResolve_HardKeychainError_Surfaced(t *testing.T) {
+	withHooks(t, func() {
+		lookupEnvFunc = func(string) (string, bool) { return "", false }
+		keyringGetFunc = func(string, string) (string, error) {
+			return "", errors.New("keychain locked")
+		}
+
+		key, plaintext, err := Resolve()
+		require.Error(t, err)
+		assert.False(t, plaintext)
+		assert.Nil(t, key)
+
+		var kcErr *KeychainUnavailableError
+		require.ErrorAs(t, err, &kcErr)
+	})
+}
+
+// TestResolve_SetError_Surfaced: a failed store (Get says not-found, Set fails)
+// is a hard error, surfaced rather than silently downgraded.
+//
+//nolint:paralleltest // overrides package-level hook vars.
+func TestResolve_SetError_Surfaced(t *testing.T) {
 	withHooks(t, func() {
 		lookupEnvFunc = func(string) (string, bool) { return "", false }
 		keyringGetFunc = func(string, string) (string, error) {
@@ -131,9 +157,29 @@ func TestResolve_Keychain_SetError_FallsBackToPlaintext(t *testing.T) {
 			return errors.New("cannot write to keychain")
 		}
 
-		key, plaintext, err := Resolve()
-		require.NoError(t, err)
-		assert.True(t, plaintext)
-		assert.Nil(t, key)
+		_, plaintext, err := Resolve()
+		require.Error(t, err)
+		assert.False(t, plaintext)
+
+		var kcErr *KeychainUnavailableError
+		require.ErrorAs(t, err, &kcErr)
+	})
+}
+
+// TestResolve_CorruptStoredKey_Surfaced: a corrupted stored key is a hard error.
+//
+//nolint:paralleltest // overrides package-level hook vars.
+func TestResolve_CorruptStoredKey_Surfaced(t *testing.T) {
+	withHooks(t, func() {
+		lookupEnvFunc = func(string) (string, bool) { return "", false }
+		keyringGetFunc = func(string, string) (string, error) {
+			return "!!not-base64!!", nil
+		}
+
+		_, _, err := Resolve()
+		require.Error(t, err)
+
+		var kcErr *KeychainUnavailableError
+		require.ErrorAs(t, err, &kcErr)
 	})
 }
