@@ -164,8 +164,14 @@ func (s *Store) listAllVersions(ctx context.Context, name string) ([]types.Secre
 }
 
 // baseIndex finds the starting index in a newest-first version list for the
-// given absolute spec (version ID or staging label). No absolute spec anchors
-// at the newest version (index 0).
+// given absolute spec (version ID or staging label).
+//
+// With NO absolute spec, a bare `~N` counts back from whatever the bare name
+// resolves to — the AWSCURRENT version (GetSecretValue with no VersionId) — NOT
+// the newest-by-CreatedDate entry. During an in-progress rotation AWSPENDING is
+// the newest-created version, so anchoring at index 0 would make `~1` skip past
+// AWSCURRENT (and leave AWSPREVIOUS unreachable). Anchor at AWSCURRENT instead,
+// falling back to index 0 only if no version carries that label.
 func baseIndex(list []types.SecretVersionsListEntry, abs secretversion.AbsoluteSpec) (int, error) {
 	switch {
 	case abs.ID != nil:
@@ -187,7 +193,14 @@ func baseIndex(list []types.SecretVersionsListEntry, abs secretversion.AbsoluteS
 
 		return idx, nil
 	default:
-		return 0, nil
+		_, idx, found := lo.FindIndexOf(list, func(v types.SecretVersionsListEntry) bool {
+			return slices.Contains(v.VersionStages, "AWSCURRENT")
+		})
+		if !found {
+			return 0, nil
+		}
+
+		return idx, nil
 	}
 }
 
