@@ -10,7 +10,6 @@ import (
 
 	"github.com/mpyw/suve/internal/cli/colors"
 	"github.com/mpyw/suve/internal/cli/output"
-	"github.com/mpyw/suve/internal/maputil"
 	"github.com/mpyw/suve/internal/staging"
 	stagingusecase "github.com/mpyw/suve/internal/usecase/staging"
 )
@@ -79,15 +78,20 @@ func (r *StatusRunner) Run(ctx context.Context, opts StatusOptions) error {
 		printer.PrintEntry(staging.EntryKey{Name: entry.Name, Namespace: entry.Namespace}, toStagingEntry(entry), opts.Verbose, entry.ShowDeleteOptions)
 	}
 
-	// Print tag entries
-	for _, name := range maputil.SortedNames(result.TagEntries, func(e stagingusecase.StatusTagEntry) string { return e.Name }) {
-		for _, tagEntry := range result.TagEntries {
-			if tagEntry.Name == name {
-				r.printTagEntry(tagEntry, opts.Verbose)
-
-				break
-			}
+	// Print tag entries, sorted by (name, namespace). Like entries, the same App
+	// Configuration key tagged under several namespaces is several distinct tag
+	// entries — deduping by name would drop all but one.
+	tagEntries := slices.Clone(result.TagEntries)
+	slices.SortFunc(tagEntries, func(a, b stagingusecase.StatusTagEntry) int {
+		if c := cmp.Compare(a.Name, b.Name); c != 0 {
+			return c
 		}
+
+		return cmp.Compare(a.Namespace, b.Namespace)
+	})
+
+	for _, tagEntry := range tagEntries {
+		r.printTagEntry(tagEntry, opts.Verbose)
 	}
 
 	return nil
@@ -104,7 +108,15 @@ func (r *StatusRunner) printTagEntry(e stagingusecase.StatusTagEntry, verbose bo
 	}
 
 	summary := strings.Join(parts, ", ")
-	output.Printf(r.Stdout, "  %s %s [%s]\n", colors.For(r.Stdout).Info("T"), e.Name, summary)
+
+	// App Configuration tags carry a namespace (the label axis); badge it inline
+	// so the same key tagged under several namespaces is unambiguous.
+	nameLabel := e.Name
+	if e.Namespace != "" {
+		nameLabel += " " + colors.For(r.Stdout).FieldLabel("["+e.Namespace+"]")
+	}
+
+	output.Printf(r.Stdout, "  %s %s [%s]\n", colors.For(r.Stdout).Info("T"), nameLabel, summary)
 
 	if verbose {
 		for key, value := range e.Add {
