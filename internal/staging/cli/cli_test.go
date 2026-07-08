@@ -563,7 +563,9 @@ func TestDiffRunner_Run(t *testing.T) {
 
 		output := stdout.String()
 		assert.Contains(t, output, "+brand-new-value")
-		assert.Contains(t, output, "not in AWS")
+		// The remote label is the strategy's ServiceName (here the mock's
+		// "param"), not a hard-coded "AWS" — this runner serves every provider.
+		assert.Contains(t, output, "not in param")
 		assert.Contains(t, output, "staged for creation")
 
 		// Verify still staged (not auto-unstaged)

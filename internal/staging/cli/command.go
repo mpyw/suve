@@ -44,6 +44,52 @@ type CommandConfig struct {
 	// ScopeResolver resolves the provider staging scope used to key on-disk
 	// state. When nil, it defaults to AWSScopeResolver, preserving AWS behavior.
 	ScopeResolver staging.ScopeResolver
+
+	// Namespace resolves the App Configuration namespace a single-item staging
+	// op targets, from the command context (the --namespace flag). It records
+	// the namespace on the staged entry as part of its identity. Nil for
+	// providers without a namespace axis (the namespace is then always empty).
+	Namespace func(ctx context.Context) string
+
+	// StrategyForNamespace builds a strategy backed by a provider store scoped to
+	// the given namespace, so status/diff/apply act on each staged entry under
+	// its own namespace (App Configuration keeps all namespaces in one staging
+	// store). Nil for providers without a namespace axis.
+	StrategyForNamespace func(ctx context.Context, namespace string) (staging.FullStrategy, error)
+}
+
+// namespaceFor returns the single-item namespace for this command context, or ""
+// for providers without a namespace axis.
+func (c CommandConfig) namespaceFor(ctx context.Context) string {
+	if c.Namespace == nil {
+		return ""
+	}
+
+	return c.Namespace(ctx)
+}
+
+// diffStrategyFor adapts StrategyForNamespace to the DiffUseCase resolver, or nil
+// when the provider has no namespace axis (the single strategy handles all).
+func (c CommandConfig) diffStrategyFor(ctx context.Context) func(string) (staging.DiffStrategy, error) {
+	if c.StrategyForNamespace == nil {
+		return nil
+	}
+
+	return func(ns string) (staging.DiffStrategy, error) {
+		return c.StrategyForNamespace(ctx, ns)
+	}
+}
+
+// applyStrategyFor adapts StrategyForNamespace to the ApplyUseCase resolver, or
+// nil when the provider has no namespace axis.
+func (c CommandConfig) applyStrategyFor(ctx context.Context) func(string) (staging.ApplyStrategy, error) {
+	if c.StrategyForNamespace == nil {
+		return nil
+	}
+
+	return func(ns string) (staging.ApplyStrategy, error) {
+		return c.StrategyForNamespace(ctx, ns)
+	}
 }
 
 // NewStatusCommand creates a status command with the given config.
@@ -142,8 +188,9 @@ func NewDiffCommand(cfg CommandConfig) *cli.Command {
 			return pager.WithPagerWriter(cmd.Root().Writer, opts.NoPager, func(w io.Writer) error {
 				r := &DiffRunner{
 					UseCase: &stagingusecase.DiffUseCase{
-						Strategy: strategy,
-						Store:    store,
+						Strategy:    strategy,
+						Store:       store,
+						StrategyFor: cfg.diffStrategyFor(ctx),
 					},
 					Stdout: w,
 					Stderr: cmd.Root().ErrWriter,
@@ -203,6 +250,7 @@ func NewAddCommand(cfg CommandConfig) *cli.Command {
 				Name:        name,
 				Value:       value,
 				Description: cmd.String("description"),
+				Namespace:   cfg.namespaceFor(ctx),
 			})
 		},
 	}
@@ -256,6 +304,7 @@ func NewEditCommand(cfg CommandConfig) *cli.Command {
 				Name:        name,
 				Value:       value,
 				Description: cmd.String("description"),
+				Namespace:   cfg.namespaceFor(ctx),
 			})
 		},
 	}
@@ -306,8 +355,9 @@ func NewApplyCommand(cfg CommandConfig) *cli.Command {
 
 			r := &ApplyRunner{
 				UseCase: &stagingusecase.ApplyUseCase{
-					Strategy: strategy,
-					Store:    store,
+					Strategy:    strategy,
+					Store:       store,
+					StrategyFor: cfg.applyStrategyFor(ctx),
 				},
 				Store:       store,
 				Parser:      cfg.ParserFactory(),
@@ -343,7 +393,8 @@ func NewResetCommand(cfg CommandConfig) *cli.Command {
 			}
 
 			opts := ResetOptions{
-				All: resetAll,
+				All:       resetAll,
+				Namespace: cfg.namespaceFor(ctx),
 			}
 
 			if !resetAll {
@@ -456,6 +507,7 @@ func NewDeleteCommand(cfg CommandConfig) *cli.Command {
 				Name:           name,
 				Force:          force,
 				RecoveryWindow: recoveryWindow,
+				Namespace:      cfg.namespaceFor(ctx),
 			})
 		},
 	}

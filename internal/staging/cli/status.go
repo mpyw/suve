@@ -114,6 +114,7 @@ func toStagingEntry(e stagingusecase.StatusEntry) staging.Entry {
 		Operation:     e.Operation,
 		Value:         e.Value,
 		Description:   e.Description,
+		Namespace:     e.Namespace,
 		DeleteOptions: e.DeleteOptions,
 		StagedAt:      e.StagedAt,
 	}

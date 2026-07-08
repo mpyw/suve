@@ -23,12 +23,15 @@ type AddOptions struct {
 	Name        string
 	Value       string // Optional: if set, skip editor and use this value
 	Description string
+	// Namespace is the App Configuration namespace to stage under (empty for the
+	// null/default namespace and every other provider).
+	Namespace string
 }
 
 // Run executes the add command.
 func (r *AddRunner) Run(ctx context.Context, opts AddOptions) error {
 	// Get draft (existing staged create value) for re-editing
-	draft, err := r.UseCase.Draft(ctx, stagingusecase.DraftInput{Name: opts.Name})
+	draft, err := r.UseCase.Draft(ctx, stagingusecase.DraftInput{Name: opts.Name, Namespace: opts.Namespace})
 	if err != nil {
 		return err
 	}
@@ -69,6 +72,7 @@ func (r *AddRunner) Run(ctx context.Context, opts AddOptions) error {
 		Name:        opts.Name,
 		Value:       newValue,
 		Description: opts.Description,
+		Namespace:   opts.Namespace,
 	})
 	if err != nil {
 		return err

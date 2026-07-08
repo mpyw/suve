@@ -333,7 +333,7 @@ func TestSecret_StagingDeleteOptions(t *testing.T) {
 
 		// Verify options are stored
 		store := newStore()
-		entry, err := store.GetEntry(t.Context(), staging.ServiceSecret, secretName)
+		entry, err := store.GetEntry(t.Context(), staging.ServiceSecret, secretName, "")
 		require.NoError(t, err)
 		require.NotNil(t, entry.DeleteOptions)
 		assert.Equal(t, 14, entry.DeleteOptions.RecoveryWindow)

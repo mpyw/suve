@@ -185,12 +185,12 @@ func (u *ApplyUseCase) applyEntries(ctx context.Context, service staging.Service
 	results := parallel.ExecuteMap(ctx, entries, func(ctx context.Context, key string, entry staging.Entry) (staging.Operation, error) {
 		name, _ := staging.SplitEntryKey(key)
 
-		strat, err := u.strategyForNamespace(entry.Namespace)
+		strategy, err := u.strategyForNamespace(entry.Namespace)
 		if err != nil {
 			return entry.Operation, err
 		}
 
-		return entry.Operation, strat.Apply(ctx, name, entry)
+		return entry.Operation, strategy.Apply(ctx, name, entry)
 	})
 
 	// Collect results

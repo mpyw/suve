@@ -108,13 +108,14 @@ func (u *DiffUseCase) Execute(ctx context.Context, input DiffInput) (*DiffOutput
 	// diffs the named setting across every namespace it is staged under.
 	if input.Name != "" {
 		filteredEntries := make(map[string]staging.Entry)
+		filteredTags := make(map[string]staging.TagEntry)
+
 		for key, entry := range entries {
 			if name, _ := staging.SplitEntryKey(key); name == input.Name {
 				filteredEntries[key] = entry
 			}
 		}
 
-		filteredTags := make(map[string]staging.TagEntry)
 		for key, tagEntry := range tagEntries {
 			if name, _ := staging.SplitEntryKey(key); name == input.Name {
 				filteredTags[key] = tagEntry
@@ -143,12 +144,12 @@ func (u *DiffUseCase) Execute(ctx context.Context, input DiffInput) (*DiffOutput
 		results := parallel.ExecuteMap(ctx, entries, func(ctx context.Context, key string, entry staging.Entry) (*staging.FetchResult, error) {
 			name, _ := staging.SplitEntryKey(key)
 
-			strat, err := u.strategyForNamespace(entry.Namespace)
+			strategy, err := u.strategyForNamespace(entry.Namespace)
 			if err != nil {
 				return nil, err
 			}
 
-			return strat.FetchCurrent(ctx, name)
+			return strategy.FetchCurrent(ctx, name)
 		})
 
 		// Process results

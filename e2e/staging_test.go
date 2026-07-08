@@ -353,7 +353,7 @@ func TestGlobal_ResetWithTags(t *testing.T) {
 		t.Logf("global reset output: %s", stdout)
 
 		// Verify staging is empty
-		_, err = store.GetEntry(t.Context(), staging.ServiceParam, paramName)
+		_, err = store.GetEntry(t.Context(), staging.ServiceParam, paramName, "")
 		assert.Equal(t, staging.ErrNotStaged, err)
 		_, err = store.GetTag(t.Context(), staging.ServiceParam, paramName)
 		assert.Equal(t, staging.ErrNotStaged, err)
@@ -803,7 +803,7 @@ func TestAgentStore_DirectMethods(t *testing.T) {
 		err := store.StageEntry(t.Context(), staging.ServiceParam, paramName, entry)
 		require.NoError(t, err)
 
-		retrieved, err := store.GetEntry(t.Context(), staging.ServiceParam, paramName)
+		retrieved, err := store.GetEntry(t.Context(), staging.ServiceParam, paramName, "")
 		require.NoError(t, err)
 		assert.Equal(t, staging.OperationCreate, retrieved.Operation)
 		assert.Equal(t, "direct-test-value", lo.FromPtr(retrieved.Value))
@@ -818,16 +818,16 @@ func TestAgentStore_DirectMethods(t *testing.T) {
 
 	// Test UnstageEntry
 	t.Run("unstage-entry", func(t *testing.T) {
-		err := store.UnstageEntry(t.Context(), staging.ServiceParam, paramName)
+		err := store.UnstageEntry(t.Context(), staging.ServiceParam, paramName, "")
 		require.NoError(t, err)
 
-		_, err = store.GetEntry(t.Context(), staging.ServiceParam, paramName)
+		_, err = store.GetEntry(t.Context(), staging.ServiceParam, paramName, "")
 		assert.ErrorIs(t, err, staging.ErrNotStaged)
 	})
 
 	// Test GetEntry for non-existent entry
 	t.Run("get-nonexistent-entry", func(t *testing.T) {
-		_, err := store.GetEntry(t.Context(), staging.ServiceParam, "/nonexistent/param")
+		_, err := store.GetEntry(t.Context(), staging.ServiceParam, "/nonexistent/param", "")
 		assert.ErrorIs(t, err, staging.ErrNotStaged)
 	})
 }
@@ -968,7 +968,7 @@ func TestAgentStore_DrainMethod(t *testing.T) {
 		assert.NotNil(t, state.Entries[staging.ServiceParam][paramName])
 
 		// Data should still be there after drain with keep
-		entry, err := store.GetEntry(t.Context(), staging.ServiceParam, paramName)
+		entry, err := store.GetEntry(t.Context(), staging.ServiceParam, paramName, "")
 		require.NoError(t, err)
 		assert.Equal(t, "drain-value", lo.FromPtr(entry.Value))
 	})
@@ -980,7 +980,7 @@ func TestAgentStore_DrainMethod(t *testing.T) {
 		assert.NotNil(t, state.Entries[staging.ServiceParam][paramName])
 
 		// Data should be gone after drain without keep
-		_, err = store.GetEntry(t.Context(), staging.ServiceParam, paramName)
+		_, err = store.GetEntry(t.Context(), staging.ServiceParam, paramName, "")
 		assert.ErrorIs(t, err, staging.ErrNotStaged)
 	})
 
@@ -1023,11 +1023,11 @@ func TestAgentStore_UnstageAll(t *testing.T) {
 		require.NoError(t, err)
 
 		// Param should be gone
-		_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/suve-e2e/unstage-all/param")
+		_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/suve-e2e/unstage-all/param", "")
 		require.ErrorIs(t, err, staging.ErrNotStaged)
 
 		// Secret should still be there
-		entry, err := store.GetEntry(t.Context(), staging.ServiceSecret, "suve-e2e/unstage-all/secret")
+		entry, err := store.GetEntry(t.Context(), staging.ServiceSecret, "suve-e2e/unstage-all/secret", "")
 		require.NoError(t, err)
 		assert.Equal(t, "secret-value", lo.FromPtr(entry.Value))
 	})
@@ -1046,9 +1046,9 @@ func TestAgentStore_UnstageAll(t *testing.T) {
 		require.NoError(t, err)
 
 		// Both should be gone
-		_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/suve-e2e/unstage-all/param")
+		_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/suve-e2e/unstage-all/param", "")
 		require.ErrorIs(t, err, staging.ErrNotStaged)
-		_, err = store.GetEntry(t.Context(), staging.ServiceSecret, "suve-e2e/unstage-all/secret")
+		_, err = store.GetEntry(t.Context(), staging.ServiceSecret, "suve-e2e/unstage-all/secret", "")
 		require.ErrorIs(t, err, staging.ErrNotStaged)
 	})
 }
@@ -1156,10 +1156,10 @@ func TestStore_SequentialOperations(t *testing.T) {
 			})
 			require.NoError(t, err)
 
-			_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/suve-e2e/ipc-test")
+			_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/suve-e2e/ipc-test", "")
 			require.NoError(t, err)
 
-			err = store.UnstageEntry(t.Context(), staging.ServiceParam, "/suve-e2e/ipc-test")
+			err = store.UnstageEntry(t.Context(), staging.ServiceParam, "/suve-e2e/ipc-test", "")
 			require.NoError(t, err)
 		}
 	})
@@ -1198,7 +1198,7 @@ func TestStore_SeparateAccounts(t *testing.T) {
 
 	// GetEntry on an empty staging area returns ErrNotStaged.
 	t.Run("get-entry-empty", func(t *testing.T) {
-		_, err := store.GetEntry(t.Context(), staging.ServiceParam, "/test")
+		_, err := store.GetEntry(t.Context(), staging.ServiceParam, "/test", "")
 		assert.ErrorIs(t, err, staging.ErrNotStaged)
 	})
 

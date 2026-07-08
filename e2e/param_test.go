@@ -456,7 +456,7 @@ func TestParam_StagingResetWithVersion(t *testing.T) {
 	// 3. Verify staged value is from version 1
 	t.Run("verify-staged", func(t *testing.T) {
 		store := newStore()
-		entry, err := store.GetEntry(t.Context(), staging.ServiceParam, paramName)
+		entry, err := store.GetEntry(t.Context(), staging.ServiceParam, paramName, "")
 		require.NoError(t, err)
 		require.NotNil(t, entry.Value)
 		assert.Equal(t, "v1", *entry.Value)
@@ -802,7 +802,7 @@ func TestParam_StagingAddWithOptions(t *testing.T) {
 		store := newStore()
 
 		// Verify entry
-		entry, err := store.GetEntry(t.Context(), staging.ServiceParam, paramName)
+		entry, err := store.GetEntry(t.Context(), staging.ServiceParam, paramName, "")
 		require.NoError(t, err)
 		require.NotNil(t, entry.Value)
 		assert.Equal(t, "value-with-options", *entry.Value)

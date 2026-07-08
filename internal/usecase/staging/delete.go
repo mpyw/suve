@@ -106,7 +106,9 @@ func (u *DeleteUseCase) Execute(ctx context.Context, input DeleteInput) (*Delete
 	}
 
 	// Stage delete with options (single persist)
-	if err := u.stageDeleteWithOptions(ctx, service, input.Name, input.Namespace, lastModified, hasDeleteOptions, input.Force, input.RecoveryWindow); err != nil {
+	if err := u.stageDeleteWithOptions(
+		ctx, service, input.Name, input.Namespace, lastModified, hasDeleteOptions, input.Force, input.RecoveryWindow,
+	); err != nil {
 		return nil, err
 	}
 

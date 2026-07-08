@@ -36,8 +36,8 @@ func CompositeEntryKey(name, namespace string) string {
 // namespace) a composite key encodes. A key with no separator is a bare name in
 // the null/default namespace.
 func SplitEntryKey(key string) (name, namespace string) {
-	if i := strings.IndexByte(key, 0); i >= 0 {
-		return key[i+1:], key[:i]
+	if ns, n, found := strings.Cut(key, namespaceSep); found {
+		return n, ns
 	}
 
 	return key, ""

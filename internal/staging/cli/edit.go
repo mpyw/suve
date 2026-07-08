@@ -23,12 +23,15 @@ type EditOptions struct {
 	Name        string
 	Value       string // Optional: if set, skip editor and use this value
 	Description string
+	// Namespace is the App Configuration namespace of the setting (empty for the
+	// null/default namespace and every other provider).
+	Namespace string
 }
 
 // Run executes the edit command.
 func (r *EditRunner) Run(ctx context.Context, opts EditOptions) error {
 	// Get baseline value (staged value if exists, otherwise from AWS)
-	baseline, err := r.UseCase.Baseline(ctx, stagingusecase.BaselineInput{Name: opts.Name})
+	baseline, err := r.UseCase.Baseline(ctx, stagingusecase.BaselineInput{Name: opts.Name, Namespace: opts.Namespace})
 	if err != nil {
 		return err
 	}
@@ -62,6 +65,7 @@ func (r *EditRunner) Run(ctx context.Context, opts EditOptions) error {
 		Name:        opts.Name,
 		Value:       newValue,
 		Description: opts.Description,
+		Namespace:   opts.Namespace,
 	})
 	if err != nil {
 		return err

@@ -23,6 +23,17 @@ type DiffRunner struct {
 	Stderr  io.Writer
 }
 
+// remoteLabel names the backing store in diff labels (e.g. "App Configuration",
+// "Key Vault", "Secret Manager") via the strategy's ServiceName. This runner
+// serves every non-AWS provider, so the label must not be hard-coded to "AWS".
+func (r *DiffRunner) remoteLabel() string {
+	if r.UseCase == nil || r.UseCase.Strategy == nil {
+		return "remote"
+	}
+
+	return r.UseCase.Strategy.ServiceName()
+}
+
 // DiffOptions holds options for the diff command.
 type DiffOptions struct {
 	Name      string // Optional: diff only this item, otherwise diff all
@@ -113,12 +124,13 @@ func (r *DiffRunner) OutputDiff(opts DiffOptions, entry stagingusecase.DiffEntry
 		awsValue, stagedValue = jsonutil.TryFormatOrWarn2(awsValue, stagedValue, r.Stderr, entry.Name)
 	}
 
-	label1 := fmt.Sprintf("%s%s (AWS)", entry.Name, entry.AWSIdentifier)
+	name := diffEntryDisplayName(entry)
+	label1 := fmt.Sprintf("%s%s (%s)", name, entry.AWSIdentifier, r.remoteLabel())
 	label2 := fmt.Sprintf(lo.Ternary(
 		entry.Operation == staging.OperationDelete,
 		"%s (staged for deletion)",
 		"%s (staged)",
-	), entry.Name)
+	), name)
 
 	diff := output.Diff(r.Stdout, label1, label2, awsValue, stagedValue)
 	output.Print(r.Stdout, diff)
@@ -138,14 +150,27 @@ func (r *DiffRunner) OutputDiffCreate(opts DiffOptions, entry stagingusecase.Dif
 		}
 	}
 
-	label1 := fmt.Sprintf("%s (not in AWS)", entry.Name)
-	label2 := fmt.Sprintf("%s (staged for creation)", entry.Name)
+	name := diffEntryDisplayName(entry)
+	label1 := fmt.Sprintf("%s (not in %s)", name, r.remoteLabel())
+	label2 := fmt.Sprintf("%s (staged for creation)", name)
 
 	diff := output.Diff(r.Stdout, label1, label2, "", stagedValue)
 	output.Print(r.Stdout, diff)
 
 	// Show staged metadata
 	r.OutputMetadata(entry)
+}
+
+// diffEntryDisplayName qualifies the entry name with its Azure App Configuration
+// namespace (the label axis) when present, so a key staged under several
+// namespaces is unambiguous in the diff. Empty namespace (the null/default, and
+// every other provider) yields the bare name.
+func diffEntryDisplayName(entry stagingusecase.DiffEntry) string {
+	if entry.Namespace == "" {
+		return entry.Name
+	}
+
+	return fmt.Sprintf("%s [%s]", entry.Name, entry.Namespace)
 }
 
 // OutputMetadata outputs metadata for a diff entry.
