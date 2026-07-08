@@ -90,19 +90,47 @@ func TestApp_getStagingStore_ScopeKeyed(t *testing.T) {
 	app.Startup(t.Context())
 	app.scope = provider.GoogleCloudScope("proj-a")
 
-	s1, err := app.getStagingStore()
+	s1, err := app.getStagingStore(provider.KindSecret)
 	require.NoError(t, err) // Google Cloud: no STS; key via SUVE_STAGING_KEY
 	require.NotNil(t, s1)
 
 	// Same scope → cached same instance.
-	s1b, err := app.getStagingStore()
+	s1b, err := app.getStagingStore(provider.KindSecret)
 	require.NoError(t, err)
 	assert.Same(t, s1, s1b, "same scope should return the cached store")
 
 	// Different scope → different, isolated store.
 	app.scope = provider.GoogleCloudScope("proj-b")
 
-	s2, err := app.getStagingStore()
+	s2, err := app.getStagingStore(provider.KindSecret)
 	require.NoError(t, err)
 	assert.NotSame(t, s1, s2, "a different scope must get its own store")
+}
+
+// TestApp_stagingScopeForKind_AzurePerService is the regression guard for the
+// GUI/CLI divergence: an Azure scope carries BOTH a vault and a store, and
+// scope.Key() resolves a combined scope to the Key Vault key (VaultName first),
+// which would silently key App Configuration staging under the Key Vault bucket.
+// The staging scope must be resolved per service so the on-disk key matches the
+// CLI's per-service resolvers exactly.
+func TestApp_stagingScopeForKind_AzurePerService(t *testing.T) {
+	t.Parallel()
+
+	app := &App{scope: provider.Scope{
+		Provider:  provider.ProviderAzure,
+		VaultName: "myvault",
+		StoreName: "mystore",
+	}}
+
+	paramScope, err := app.stagingScopeForKind(provider.KindParam)
+	require.NoError(t, err)
+	assert.Equal(t, "azure/appconfig/mystore", paramScope.Key(),
+		"param staging must key on the App Configuration store, not the vault")
+
+	secretScope, err := app.stagingScopeForKind(provider.KindSecret)
+	require.NoError(t, err)
+	assert.Equal(t, "azure/keyvault/myvault", secretScope.Key())
+
+	// The two services must NOT share a bucket.
+	assert.NotEqual(t, paramScope.Key(), secretScope.Key())
 }

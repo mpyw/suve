@@ -189,16 +189,19 @@ var (
 // scope supports are queried (Google Cloud has no param service); unsupported
 // services yield empty slices so the capability-gated frontend renders nothing.
 func (a *App) StagingStatus() (*StagingStatusResult, error) {
-	store, err := a.getStagingStore()
-	if err != nil {
-		return nil, err
-	}
-
 	scope := a.currentScope()
 
 	var paramResult, secretResult *stagingusecase.StatusOutput
 
+	// Each service reads its OWN staging store: Azure's param (App Configuration)
+	// and secret (Key Vault) live in separate on-disk buckets, so a single shared
+	// store would read only one of them (and the wrong key). See stagingScopeForKind.
 	if scope.SupportsService(provider.KindParam) {
+		store, err := a.getStagingStore(provider.KindParam)
+		if err != nil {
+			return nil, err
+		}
+
 		parser, _ := a.getParser(string(staging.ServiceParam))
 
 		paramResult, err = (&stagingusecase.StatusUseCase{Strategy: parser, Store: store}).Execute(a.ctx, stagingusecase.StatusInput{})
@@ -208,6 +211,11 @@ func (a *App) StagingStatus() (*StagingStatusResult, error) {
 	}
 
 	if scope.SupportsService(provider.KindSecret) {
+		store, err := a.getStagingStore(provider.KindSecret)
+		if err != nil {
+			return nil, err
+		}
+
 		parser, _ := a.getParser(string(staging.ServiceSecret))
 
 		secretResult, err = (&stagingusecase.StatusUseCase{Strategy: parser, Store: store}).Execute(a.ctx, stagingusecase.StatusInput{})
@@ -277,7 +285,7 @@ func toStagingTagEntries(tags []stagingusecase.StatusTagEntry) []StagingTagEntry
 
 // StagingApply applies staged changes for a service.
 func (a *App) StagingApply(service string, ignoreConflicts bool) (*StagingApplyResult, error) {
-	store, err := a.getStagingStore()
+	store, err := a.getStagingStore(kindForService(service))
 	if err != nil {
 		return nil, err
 	}
@@ -346,7 +354,7 @@ func (a *App) StagingApply(service string, ignoreConflicts bool) (*StagingApplyR
 
 // StagingReset resets (unstages) all staged changes for a service.
 func (a *App) StagingReset(service string) (*StagingResetResult, error) {
-	store, err := a.getStagingStore()
+	store, err := a.getStagingStore(kindForService(service))
 	if err != nil {
 		return nil, err
 	}
@@ -383,7 +391,7 @@ func (a *App) StagingReset(service string) (*StagingResetResult, error) {
 // namespace — a filter value (`*` / `,`-list) is rejected. It is ignored for the
 // secret service and for non-App-Configuration providers.
 func (a *App) StagingAdd(service, name, value, namespace string) (*StagingAddResult, error) {
-	store, err := a.getStagingStore()
+	store, err := a.getStagingStore(kindForService(service))
 	if err != nil {
 		return nil, err
 	}
@@ -444,7 +452,7 @@ func (a *App) editStrategyForNamespace(service, namespace string) (staging.EditS
 // the Azure App Configuration namespace of the setting (empty for the
 // null/default namespace and every other provider).
 func (a *App) StagingEdit(service, name, value, namespace string) (*StagingEditResult, error) {
-	store, err := a.getStagingStore()
+	store, err := a.getStagingStore(kindForService(service))
 	if err != nil {
 		return nil, err
 	}
@@ -475,7 +483,7 @@ func (a *App) StagingEdit(service, name, value, namespace string) (*StagingEditR
 // selects the Azure App Configuration namespace of the setting (empty for the
 // null/default namespace and every other provider).
 func (a *App) StagingDelete(service, name string, force bool, recoveryWindow int, namespace string) (*StagingDeleteResult, error) {
-	store, err := a.getStagingStore()
+	store, err := a.getStagingStore(kindForService(service))
 	if err != nil {
 		return nil, err
 	}
@@ -520,7 +528,7 @@ func (a *App) StagingDelete(service, name string, force bool, recoveryWindow int
 // selects the Azure App Configuration namespace of the entry (empty for the
 // null/default namespace and every other provider).
 func (a *App) StagingUnstage(service, name, namespace string) (*StagingUnstageResult, error) {
-	store, err := a.getStagingStore()
+	store, err := a.getStagingStore(kindForService(service))
 	if err != nil {
 		return nil, err
 	}
@@ -545,7 +553,7 @@ func (a *App) StagingUnstage(service, name, namespace string) (*StagingUnstageRe
 
 // StagingAddTag stages adding a tag to an item.
 func (a *App) StagingAddTag(service, name, key, value string) (*StagingAddTagResult, error) {
-	store, err := a.getStagingStore()
+	store, err := a.getStagingStore(kindForService(service))
 	if err != nil {
 		return nil, err
 	}
@@ -573,7 +581,7 @@ func (a *App) StagingAddTag(service, name, key, value string) (*StagingAddTagRes
 
 // StagingRemoveTag stages removing a tag from an item.
 func (a *App) StagingRemoveTag(service, name, key string) (*StagingRemoveTagResult, error) {
-	store, err := a.getStagingStore()
+	store, err := a.getStagingStore(kindForService(service))
 	if err != nil {
 		return nil, err
 	}
@@ -601,7 +609,7 @@ func (a *App) StagingRemoveTag(service, name, key string) (*StagingRemoveTagResu
 
 // StagingCancelAddTag cancels a staged tag addition (removes from Add only).
 func (a *App) StagingCancelAddTag(service, name, key string) (*StagingCancelAddTagResult, error) {
-	store, err := a.getStagingStore()
+	store, err := a.getStagingStore(kindForService(service))
 	if err != nil {
 		return nil, err
 	}
@@ -636,7 +644,7 @@ func (a *App) StagingCancelAddTag(service, name, key string) (*StagingCancelAddT
 
 // StagingCancelRemoveTag cancels a staged tag removal (removes from Remove only).
 func (a *App) StagingCancelRemoveTag(service, name, key string) (*StagingCancelRemoveTagResult, error) {
-	store, err := a.getStagingStore()
+	store, err := a.getStagingStore(kindForService(service))
 	if err != nil {
 		return nil, err
 	}
@@ -677,7 +685,7 @@ type StagingCheckStatusResult struct {
 
 // StagingCheckStatus checks if a specific item has staged entry or tag changes.
 func (a *App) StagingCheckStatus(service, name, namespace string) (*StagingCheckStatusResult, error) {
-	store, err := a.getStagingStore()
+	store, err := a.getStagingStore(kindForService(service))
 	if err != nil {
 		return nil, err
 	}
@@ -704,7 +712,7 @@ func (a *App) StagingCheckStatus(service, name, namespace string) (*StagingCheck
 
 // StagingDiff shows diff between staged changes and AWS.
 func (a *App) StagingDiff(service string, name string) (*StagingDiffResult, error) {
-	store, err := a.getStagingStore()
+	store, err := a.getStagingStore(kindForService(service))
 	if err != nil {
 		return nil, err
 	}

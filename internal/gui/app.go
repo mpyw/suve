@@ -286,6 +286,34 @@ func (a *App) stagingScope() (provider.Scope, error) {
 	return provider.AWSScope(identity.AccountID, identity.Region), nil
 }
 
+// stagingScopeForKind resolves the staging scope for ONE service kind. It exists
+// because Azure's two services are INDEPENDENT resources with separate staging
+// buckets: App Configuration (param) is keyed by store name, Key Vault (secret)
+// by vault name, and scope.Key() resolves a combined scope to the Key Vault key
+// (VaultName is checked first) — which would silently key App Configuration
+// staging under the Key Vault bucket, diverging from the CLI's per-service
+// ScopeResolvers (a GUI-staged param would be invisible to `suve azure stage
+// param`). Resolving a service-specific scope keeps the GUI and CLI on the exact
+// same on-disk key. AWS keeps one account scope for both services (they share
+// it); Google Cloud has only the secret service.
+func (a *App) stagingScopeForKind(kind provider.Kind) (provider.Scope, error) {
+	sc := a.currentScope()
+
+	if sc.Provider == provider.ProviderAzure {
+		if kind == provider.KindParam {
+			scope := provider.AzureAppConfigScope(sc.StoreName)
+			scope.AppConfigNamespace = sc.AppConfigNamespace
+
+			return scope, nil
+		}
+
+		return provider.AzureKeyVaultScope(sc.VaultName), nil
+	}
+
+	// AWS (both services share the account scope) and Google Cloud (secret only).
+	return a.stagingScope()
+}
+
 // =============================================================================
 // Errors
 // =============================================================================
@@ -366,7 +394,18 @@ func (a *App) isAppConfigParam() bool {
 	return sc.Provider == provider.ProviderAzure && sc.StoreName != ""
 }
 
-func (a *App) getStagingStore() (store.ReadWriteOperator, error) {
+// kindForService maps the frontend service string to the provider Kind used to
+// resolve the (service-specific) staging scope. An unrecognized service is
+// treated as param; getService validates the string separately.
+func kindForService(service string) provider.Kind {
+	if service == string(staging.ServiceSecret) {
+		return provider.KindSecret
+	}
+
+	return provider.KindParam
+}
+
+func (a *App) getStagingStore(kind provider.Kind) (store.ReadWriteOperator, error) {
 	// Test seam: an injected store bypasses scope resolution (and any STS call).
 	a.stagingStoreMu.Lock()
 	if a.stagingStore != nil {
@@ -376,7 +415,7 @@ func (a *App) getStagingStore() (store.ReadWriteOperator, error) {
 	}
 	a.stagingStoreMu.Unlock()
 
-	scope, err := a.stagingScope()
+	scope, err := a.stagingScopeForKind(kind)
 	if err != nil {
 		return nil, err
 	}
