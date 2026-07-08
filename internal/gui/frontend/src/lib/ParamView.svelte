@@ -259,7 +259,7 @@
     // never break the detail pane.
     if (stagingEnabled) {
       try {
-        stagingStatus = await StagingCheckStatus('param', name);
+        stagingStatus = await StagingCheckStatus('param', name, namespace);
       } catch {
         stagingStatus = null;
       }
@@ -313,7 +313,7 @@
         }
       } else {
         if (isEdit) {
-          await StagingEdit('param', setForm.name, setForm.value);
+          await StagingEdit('param', setForm.name, setForm.value, targetNamespace);
         } else {
           await StagingAdd('param', setForm.name, setForm.value, targetNamespace);
         }
@@ -349,7 +349,7 @@
         }
         await loadParams({ prefix, filter, recursive, withValue });
       } else {
-        await StagingDelete('param', deleteTarget, false, 0);
+        await StagingDelete('param', deleteTarget, false, 0, selectedEntryNamespace);
         onstagingchange?.();
       }
       showDeleteModal = false;

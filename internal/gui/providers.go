@@ -116,6 +116,10 @@ type ServiceCapability struct {
 	// service (every provider service today); the frontend hides the staging
 	// tab/banner/checkbox when false.
 	HasStaging bool `json:"hasStaging"`
+	// HasNamespaces is true when the service partitions keys by a namespace (the
+	// Azure App Configuration label axis, #431). The frontend shows the namespace
+	// column/badge and the create-form namespace field only when true.
+	HasNamespaces bool `json:"hasNamespaces"`
 	// HasForceDelete is true when an immediate (no-recovery-window) delete is
 	// offered (AWS Secrets Manager only). The frontend hides the force-delete
 	// checkbox otherwise.
@@ -188,7 +192,7 @@ func (a *App) Capabilities() []ProviderCapability {
 				{
 					Service: serviceParam, DisplayName: "App Configuration",
 					HasVersionHistory: false, HasVersionSpecifiers: false, HasTags: true, HasRestore: false,
-					HasStaging: true, HasForceDelete: false, HasRecoveryWindow: false,
+					HasStaging: true, HasForceDelete: false, HasRecoveryWindow: false, HasNamespaces: true,
 				},
 				{
 					Service: serviceSecret, DisplayName: "Key Vault",

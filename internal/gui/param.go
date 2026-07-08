@@ -319,11 +319,12 @@ func (a *App) ParamDiff(spec1Str, spec2Str string) (*ParamDiffResult, error) {
 // (`*` or a `,`-list) is rejected, since a write targets exactly one
 // (key, namespace).
 func (a *App) ParamSet(name, value, paramType, namespace string) (*ParamSetResult, error) {
-	if err := a.useAppConfigParamNamespace(namespace); err != nil {
+	namespace, err := a.validateParamNamespace(namespace)
+	if err != nil {
 		return nil, err
 	}
 
-	store, err := a.paramStore()
+	store, err := a.paramStoreForNamespace(namespace)
 	if err != nil {
 		return nil, err
 	}

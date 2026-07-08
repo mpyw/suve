@@ -98,60 +98,70 @@ func TestAppConfigNamespaceLister_Gate(t *testing.T) {
 	assert.False(t, isLister, "neutral provider stores must not expose ListWithNamespaces")
 }
 
-// TestUseAppConfigParamNamespace verifies the create-target namespace guard that
-// backs the GUI namespaced-create (#431): a single concrete namespace aligns the
-// scope, a filter value (`*` / `,`-list) is rejected, and non-App-Config scopes
-// are left untouched.
-func TestUseAppConfigParamNamespace(t *testing.T) {
+// TestParamNamespaceHelpers verifies the create-target namespace helpers that
+// back the GUI namespaced-create (#431): validateParamNamespace rejects a filter
+// value (`*` / `,`-list) and decodes escapes for App Configuration while leaving
+// other providers untouched, and effectiveParamScope overrides the namespace on
+// a resolved store scope without mutating the shared read scope.
+func TestParamNamespaceHelpers(t *testing.T) {
 	t.Parallel()
 
 	appConfigScope := func() provider.Scope {
 		return provider.Scope{Provider: provider.ProviderAzure, StoreName: "store"}
 	}
 
-	t.Run("concrete namespace aligns the scope", func(t *testing.T) {
+	t.Run("validate accepts a concrete namespace", func(t *testing.T) {
 		t.Parallel()
 
 		app := &App{ctx: t.Context(), scope: appConfigScope()}
-		require.NoError(t, app.useAppConfigParamNamespace("dev"))
-		assert.Equal(t, "dev", app.currentScope().AppConfigNamespace)
+		ns, err := app.validateParamNamespace("dev")
+		require.NoError(t, err)
+		assert.Equal(t, "dev", ns)
 	})
 
-	t.Run("empty namespace is the null/default", func(t *testing.T) {
-		t.Parallel()
-
-		app := &App{ctx: t.Context(), scope: provider.Scope{
-			Provider: provider.ProviderAzure, StoreName: "store", AppConfigNamespace: "dev",
-		}}
-		require.NoError(t, app.useAppConfigParamNamespace(""))
-		assert.Empty(t, app.currentScope().AppConfigNamespace)
-	})
-
-	t.Run("escaped literal is decoded", func(t *testing.T) {
+	t.Run("validate decodes an escaped literal", func(t *testing.T) {
 		t.Parallel()
 
 		app := &App{ctx: t.Context(), scope: appConfigScope()}
-		require.NoError(t, app.useAppConfigParamNamespace(`a\*b`))
-		assert.Equal(t, "a*b", app.currentScope().AppConfigNamespace)
+		ns, err := app.validateParamNamespace(`a\*b`)
+		require.NoError(t, err)
+		assert.Equal(t, "a*b", ns)
 	})
 
-	t.Run("filter values are rejected", func(t *testing.T) {
+	t.Run("validate rejects filter values", func(t *testing.T) {
 		t.Parallel()
 
 		for _, ns := range []string{"*", "dev,prd", "dev*"} {
 			app := &App{ctx: t.Context(), scope: appConfigScope()}
-			err := app.useAppConfigParamNamespace(ns)
+			_, err := app.validateParamNamespace(ns)
 			require.Error(t, err, "namespace %q names all/multiple and must be rejected", ns)
-			assert.Empty(t, app.currentScope().AppConfigNamespace, "a rejected namespace must not mutate the scope")
 		}
 	})
 
-	t.Run("non-App-Config scope is untouched", func(t *testing.T) {
+	t.Run("validate is a no-op for non-App-Config scopes", func(t *testing.T) {
 		t.Parallel()
 
 		app := &App{ctx: t.Context(), scope: provider.Scope{Provider: provider.ProviderAWS}}
-		// Even a filter-shaped value is a no-op: AWS has no namespace axis.
-		require.NoError(t, app.useAppConfigParamNamespace("*"))
-		assert.Empty(t, app.currentScope().AppConfigNamespace)
+		// Even a filter-shaped value passes through untouched: AWS has no namespace axis.
+		ns, err := app.validateParamNamespace("*")
+		require.NoError(t, err)
+		assert.Equal(t, "*", ns)
+	})
+
+	t.Run("effectiveParamScope overrides the namespace without mutating the read scope", func(t *testing.T) {
+		t.Parallel()
+
+		app := &App{ctx: t.Context(), scope: appConfigScope()}
+		eff := app.effectiveParamScope("dev")
+		assert.Equal(t, "dev", eff.AppConfigNamespace)
+		assert.Empty(t, app.currentScope().AppConfigNamespace, "the shared read scope must be untouched")
+	})
+
+	t.Run("effectiveParamScope leaves non-App-Config scopes alone", func(t *testing.T) {
+		t.Parallel()
+
+		app := &App{ctx: t.Context(), scope: provider.Scope{Provider: provider.ProviderAWS}}
+		eff := app.effectiveParamScope("dev")
+		assert.Empty(t, eff.AppConfigNamespace)
 	})
 }

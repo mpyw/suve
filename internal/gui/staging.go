@@ -27,7 +27,11 @@ type StagingStatusResult struct {
 
 // StagingEntry represents a staged entry change.
 type StagingEntry struct {
-	Name      string  `json:"name"`
+	Name string `json:"name"`
+	// Namespace is the App Configuration namespace the entry is staged under
+	// (empty for the null/default namespace and every other provider). The
+	// frontend shows it as a badge and passes it back to unstage/edit/delete.
+	Namespace string  `json:"namespace"`
 	Operation string  `json:"operation"`
 	Value     *string `json:"value,omitempty"`
 	StagedAt  string  `json:"stagedAt"`
@@ -128,7 +132,10 @@ type StagingDiffResult struct {
 // against (AWS today; the field names are provider-neutral so Google Cloud and
 // Azure fit without another rename).
 type StagingDiffEntry struct {
-	Name             string  `json:"name"`
+	Name string `json:"name"`
+	// Namespace is the App Configuration namespace of the entry (empty for the
+	// null/default namespace and every other provider).
+	Namespace        string  `json:"namespace"`
 	Type             string  `json:"type"` // "normal", "create", "autoUnstaged", "warning"
 	Operation        string  `json:"operation,omitempty"`
 	RemoteValue      string  `json:"remoteValue,omitempty"`
@@ -242,6 +249,7 @@ func toStagingEntries(entries []stagingusecase.StatusEntry) []StagingEntry {
 	for i, e := range entries {
 		out[i] = StagingEntry{
 			Name:      e.Name,
+			Namespace: e.Namespace,
 			Operation: string(e.Operation),
 			Value:     e.Value,
 			StagedAt:  timeutil.FormatRFC3339(e.StagedAt),
@@ -282,6 +290,14 @@ func (a *App) StagingApply(service string, ignoreConflicts bool) (*StagingApplyR
 	uc := &stagingusecase.ApplyUseCase{
 		Strategy: strategy,
 		Store:    store,
+	}
+
+	// App Configuration stages entries across namespaces in one store; apply each
+	// under its own namespace via a namespace-scoped strategy.
+	if service == string(staging.ServiceParam) && a.isAppConfigParam() {
+		uc.StrategyFor = func(namespace string) (staging.ApplyStrategy, error) {
+			return a.appConfigParamStrategyForNamespace(namespace)
+		}
 	}
 
 	result, err := uc.Execute(a.ctx, stagingusecase.ApplyInput{
@@ -367,18 +383,15 @@ func (a *App) StagingReset(service string) (*StagingResetResult, error) {
 // namespace — a filter value (`*` / `,`-list) is rejected. It is ignored for the
 // secret service and for non-App-Configuration providers.
 func (a *App) StagingAdd(service, name, value, namespace string) (*StagingAddResult, error) {
-	if service == string(staging.ServiceParam) {
-		if err := a.useAppConfigParamNamespace(namespace); err != nil {
-			return nil, err
-		}
-	}
-
 	store, err := a.getStagingStore()
 	if err != nil {
 		return nil, err
 	}
 
-	strategy, err := a.getEditStrategy(service)
+	// For App Configuration the existence check must run under the target
+	// namespace, and the staged entry records that namespace as part of its
+	// identity; other providers ignore it.
+	strategy, namespace, err := a.editStrategyForNamespace(service, namespace)
 	if err != nil {
 		return nil, err
 	}
@@ -389,8 +402,9 @@ func (a *App) StagingAdd(service, name, value, namespace string) (*StagingAddRes
 	}
 
 	result, err := uc.Execute(a.ctx, stagingusecase.AddInput{
-		Name:  name,
-		Value: value,
+		Name:      name,
+		Value:     value,
+		Namespace: namespace,
 	})
 	if err != nil {
 		return nil, err
@@ -399,14 +413,43 @@ func (a *App) StagingAdd(service, name, value, namespace string) (*StagingAddRes
 	return &StagingAddResult{Name: result.Name}, nil
 }
 
-// StagingEdit stages an update operation for an existing item.
-func (a *App) StagingEdit(service, name, value string) (*StagingEditResult, error) {
+// editStrategyForNamespace returns the edit strategy for a staged entry and the
+// validated namespace. For the App Configuration param service the strategy is
+// scoped to the target namespace (rejecting a `*`/`,` filter value); for every
+// other service the base strategy is returned and the namespace is empty.
+func (a *App) editStrategyForNamespace(service, namespace string) (staging.EditStrategy, string, error) {
+	if service == string(staging.ServiceParam) && a.isAppConfigParam() {
+		literal, err := a.validateParamNamespace(namespace)
+		if err != nil {
+			return nil, "", err
+		}
+
+		strategy, err := a.appConfigParamStrategyForNamespace(literal)
+		if err != nil {
+			return nil, "", err
+		}
+
+		return strategy, literal, nil
+	}
+
+	strategy, err := a.getEditStrategy(service)
+	if err != nil {
+		return nil, "", err
+	}
+
+	return strategy, "", nil
+}
+
+// StagingEdit stages an update operation for an existing item. namespace selects
+// the Azure App Configuration namespace of the setting (empty for the
+// null/default namespace and every other provider).
+func (a *App) StagingEdit(service, name, value, namespace string) (*StagingEditResult, error) {
 	store, err := a.getStagingStore()
 	if err != nil {
 		return nil, err
 	}
 
-	strategy, err := a.getEditStrategy(service)
+	strategy, namespace, err := a.editStrategyForNamespace(service, namespace)
 	if err != nil {
 		return nil, err
 	}
@@ -417,8 +460,9 @@ func (a *App) StagingEdit(service, name, value string) (*StagingEditResult, erro
 	}
 
 	result, err := uc.Execute(a.ctx, stagingusecase.EditInput{
-		Name:  name,
-		Value: value,
+		Name:      name,
+		Value:     value,
+		Namespace: namespace,
 	})
 	if err != nil {
 		return nil, err
@@ -427,14 +471,29 @@ func (a *App) StagingEdit(service, name, value string) (*StagingEditResult, erro
 	return &StagingEditResult{Name: result.Name}, nil
 }
 
-// StagingDelete stages a delete operation for an existing item.
-func (a *App) StagingDelete(service, name string, force bool, recoveryWindow int) (*StagingDeleteResult, error) {
+// StagingDelete stages a delete operation for an existing item. namespace
+// selects the Azure App Configuration namespace of the setting (empty for the
+// null/default namespace and every other provider).
+func (a *App) StagingDelete(service, name string, force bool, recoveryWindow int, namespace string) (*StagingDeleteResult, error) {
 	store, err := a.getStagingStore()
 	if err != nil {
 		return nil, err
 	}
 
-	strategy, err := a.getDeleteStrategy(service)
+	var strategy staging.DeleteStrategy
+
+	if service == string(staging.ServiceParam) && a.isAppConfigParam() {
+		namespace, err = a.validateParamNamespace(namespace)
+		if err != nil {
+			return nil, err
+		}
+
+		strategy, err = a.appConfigParamStrategyForNamespace(namespace)
+	} else {
+		namespace = ""
+		strategy, err = a.getDeleteStrategy(service)
+	}
+
 	if err != nil {
 		return nil, err
 	}
@@ -448,6 +507,7 @@ func (a *App) StagingDelete(service, name string, force bool, recoveryWindow int
 		Name:           name,
 		Force:          force,
 		RecoveryWindow: recoveryWindow,
+		Namespace:      namespace,
 	})
 	if err != nil {
 		return nil, err
@@ -659,6 +719,13 @@ func (a *App) StagingDiff(service string, name string) (*StagingDiffResult, erro
 		Store:    store,
 	}
 
+	// App Configuration diffs each staged entry against its own namespace.
+	if service == string(staging.ServiceParam) && a.isAppConfigParam() {
+		uc.StrategyFor = func(namespace string) (staging.DiffStrategy, error) {
+			return a.appConfigParamStrategyForNamespace(namespace)
+		}
+	}
+
 	result, err := uc.Execute(a.ctx, stagingusecase.DiffInput{Name: name})
 	if err != nil {
 		return nil, err
@@ -668,6 +735,7 @@ func (a *App) StagingDiff(service string, name string) (*StagingDiffResult, erro
 	for i, e := range result.Entries {
 		entries[i] = StagingDiffEntry{
 			Name:             e.Name,
+			Namespace:        e.Namespace,
 			Type:             diffEntryTypeNames[e.Type],
 			Operation:        string(e.Operation),
 			RemoteValue:      e.AWSValue,

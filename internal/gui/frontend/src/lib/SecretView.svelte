@@ -206,7 +206,7 @@
     // just means no banner and never breaks the detail pane.
     if (stagingEnabled) {
       try {
-        stagingStatus = await StagingCheckStatus('secret', name);
+        stagingStatus = await StagingCheckStatus('secret', name, '');
       } catch {
         stagingStatus = null;
       }
@@ -281,7 +281,7 @@
           selectSecret(editForm.name)
         ]);
       } else {
-        await StagingEdit('secret', editForm.name, editForm.value);
+        await StagingEdit('secret', editForm.name, editForm.value, '');
         onstagingchange?.();
         // Refresh staging status to update the indicator
         await selectSecret(editForm.name);
@@ -314,7 +314,7 @@
         await loadSecrets({ prefix, filter, withValue });
       } else {
         // Stage delete with recovery window (default 30 days unless force)
-        await StagingDelete('secret', deleteTarget, forceDelete, forceDelete ? 0 : 30);
+        await StagingDelete('secret', deleteTarget, forceDelete, forceDelete ? 0 : 30, '');
         onstagingchange?.();
       }
       showDeleteModal = false;

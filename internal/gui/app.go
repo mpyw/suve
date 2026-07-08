@@ -313,32 +313,57 @@ func (a *App) secretStore() (provider.Store, error) {
 	return registry.Store(a.ctx, a.currentScope(), provider.KindSecret)
 }
 
-// useAppConfigParamNamespace points the current param scope at a single concrete
-// Azure App Configuration namespace so a subsequent create/stage targets exactly
-// one (key, namespace). Because staging state, the staging view, and writes all
-// key on scope.AppConfigNamespace (scope.Key() = azure/appconfig/{store}/{ns}),
-// aligning the scope here keeps a staged create visible in the same namespace it
-// was created under (#431). It is a no-op unless the active scope is Azure App
-// Configuration, and rejects a filter value (`*` / `,`-list) via aznamespace.Literal
-// — a create must name one namespace, not all/many. Empty ns is the null
-// (default) namespace.
-func (a *App) useAppConfigParamNamespace(ns string) error {
-	a.scopeMu.Lock()
-	defer a.scopeMu.Unlock()
-
-	// Only Azure App Configuration has a namespace axis on the param service.
-	if a.scope.Provider != provider.ProviderAzure || a.scope.StoreName == "" {
-		return nil
+// effectiveParamScope returns the active param scope with the App Configuration
+// namespace overridden to ns, so a create/stage can target one concrete
+// (key, namespace) without mutating the shared read scope. It is a no-op for
+// non-App-Configuration scopes (which have no namespace axis).
+func (a *App) effectiveParamScope(ns string) provider.Scope {
+	sc := a.currentScope()
+	if sc.Provider == provider.ProviderAzure && sc.StoreName != "" {
+		sc.AppConfigNamespace = ns
 	}
 
-	literal, err := aznamespace.Literal(ns)
+	return sc
+}
+
+// validateParamNamespace rejects a namespace that names all/multiple namespaces
+// (`*` or a `,`-list) for the App Configuration param service — a write targets
+// exactly one (key, namespace). It is a no-op for non-App-Configuration scopes
+// and for the null/default namespace. Returns the decoded literal namespace.
+func (a *App) validateParamNamespace(ns string) (string, error) {
+	sc := a.currentScope()
+	if sc.Provider != provider.ProviderAzure || sc.StoreName == "" {
+		return ns, nil
+	}
+
+	return aznamespace.Literal(ns)
+}
+
+// paramStoreForNamespace resolves a param provider.Store scoped to the given App
+// Configuration namespace (no-op namespace for other providers).
+func (a *App) paramStoreForNamespace(ns string) (provider.Store, error) {
+	return registry.Store(a.ctx, a.effectiveParamScope(ns), provider.KindParam)
+}
+
+// appConfigParamStrategyForNamespace builds the App Configuration staging
+// strategy over a provider store scoped to ns, so a staged entry's create/diff/
+// apply runs against its own namespace (the per-namespace resolver #431 threads
+// into the apply/diff use cases).
+func (a *App) appConfigParamStrategyForNamespace(ns string) (staging.FullStrategy, error) {
+	s, err := a.paramStoreForNamespace(ns)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	a.scope.AppConfigNamespace = literal
+	return staging.NewAzureAppConfigParamStrategy(s), nil
+}
 
-	return nil
+// isAppConfigParam reports whether the active param scope is Azure App
+// Configuration (the only param service with a namespace axis).
+func (a *App) isAppConfigParam() bool {
+	sc := a.currentScope()
+
+	return sc.Provider == provider.ProviderAzure && sc.StoreName != ""
 }
 
 func (a *App) getStagingStore() (store.ReadWriteOperator, error) {
