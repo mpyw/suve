@@ -30,7 +30,7 @@ func TestResolve_Errors(t *testing.T) {
 		require.Error(t, err)
 	})
 
-	t.Run("shift on secret with no enabled versions", func(t *testing.T) {
+	t.Run("shift on secret with no versions", func(t *testing.T) {
 		t.Parallel()
 
 		m := &mockClient{
@@ -42,10 +42,10 @@ func TestResolve_Errors(t *testing.T) {
 
 		_, err := store.Resolve(t.Context(), "my-secret", "~1")
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "no enabled versions")
+		assert.Contains(t, err.Error(), "no versions")
 	})
 
-	t.Run("shift from explicit version that is not enabled", func(t *testing.T) {
+	t.Run("shift from a nonexistent explicit version", func(t *testing.T) {
 		t.Parallel()
 
 		m := &mockClient{
@@ -60,7 +60,7 @@ func TestResolve_Errors(t *testing.T) {
 
 		_, err := store.Resolve(t.Context(), "my-secret", "#9~1")
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "not found or not enabled")
+		assert.Contains(t, err.Error(), "version not found")
 	})
 
 	t.Run("shift propagates list error", func(t *testing.T) {

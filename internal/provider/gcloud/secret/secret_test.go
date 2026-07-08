@@ -114,7 +114,7 @@ func TestResolve(t *testing.T) {
 		assert.Equal(t, "3", ref.ID())
 	})
 
-	t.Run("shift walks enabled versions newest first", func(t *testing.T) {
+	t.Run("shift counts back from latest through all version states", func(t *testing.T) {
 		t.Parallel()
 
 		m := &mockClient{
@@ -128,8 +128,15 @@ func TestResolve(t *testing.T) {
 		}
 		store := newStore(m)
 
-		// ~1 from latest ENABLED (3) -> next enabled is 1 (2 is disabled, skipped).
+		// latest is version 3; ~1 is the version immediately before it (2) even
+		// though 2 is disabled — a shift counts back positionally from what the
+		// bare name / `latest` resolves to, not through ENABLED-only. (#313)
 		ref, err := store.Resolve(t.Context(), "my-secret", "~1")
+		require.NoError(t, err)
+		assert.Equal(t, "2", ref.ID())
+
+		// ~2 reaches version 1.
+		ref, err = store.Resolve(t.Context(), "my-secret", "~2")
 		require.NoError(t, err)
 		assert.Equal(t, "1", ref.ID())
 	})
