@@ -3,6 +3,7 @@ package reset
 
 import (
 	"context"
+	"errors"
 	"io"
 	"strconv"
 	"strings"
@@ -10,17 +11,32 @@ import (
 	"github.com/urfave/cli/v3"
 
 	"github.com/mpyw/suve/internal/cli/output"
+	"github.com/mpyw/suve/internal/staging"
 	stgcli "github.com/mpyw/suve/internal/staging/cli"
 	"github.com/mpyw/suve/internal/staging/store"
 )
 
 // Runner executes the reset command.
 type Runner struct {
+	// Store, when set, is used for every service (a test seam). When nil each
+	// service resolves its own working store via its spec's ScopeResolver.
 	Store store.ReadWriteOperator
 	// Services lists the provider services in stable display order.
 	Services []stgcli.GlobalServiceSpec
 	Stdout   io.Writer
 	Stderr   io.Writer
+}
+
+// storeForService returns the injected Store (test seam) or resolves this
+// service's own working store.
+func (r *Runner) storeForService(ctx context.Context, spec stgcli.GlobalServiceSpec) (store.ReadWriteOperator, error) {
+	if r.Store != nil {
+		return r.Store, nil
+	}
+
+	st, _, err := stgcli.WorkingStore(ctx, spec.ScopeResolver)
+
+	return st, err
 }
 
 // Command returns the global reset command for the given provider config.
@@ -51,13 +67,7 @@ EXAMPLES:
 				return nil
 			}
 
-			store, _, err := stgcli.WorkingStore(ctx, cfg.ScopeResolver)
-			if err != nil {
-				return err
-			}
-
 			r := &Runner{
-				Store:    store,
 				Services: cfg.Services,
 				Stdout:   cmd.Root().Writer,
 				Stderr:   cmd.Root().ErrWriter,
@@ -68,33 +78,41 @@ EXAMPLES:
 	}
 }
 
-// Run executes the reset command.
+// Run executes the reset command. Each service is reset in its OWN store; a
+// service whose scope is not configured is skipped (it can hold no staged state).
 func (r *Runner) Run(ctx context.Context) error {
-	// Get counts before reset
-	staged, err := r.Store.ListEntries(ctx, "")
-	if err != nil {
-		return err
-	}
-
-	tagStaged, err := r.Store.ListTags(ctx, "")
-	if err != nil {
-		return err
-	}
-
 	var (
 		totalCount int
 		summaries  []string
 	)
 
 	for _, spec := range r.Services {
+		st, err := r.storeForService(ctx, spec)
+		if errors.Is(err, staging.ErrServiceNotConfigured) {
+			continue
+		}
+
+		if err != nil {
+			return err
+		}
+
+		staged, err := st.ListEntries(ctx, spec.Service)
+		if err != nil {
+			return err
+		}
+
+		tagStaged, err := st.ListTags(ctx, spec.Service)
+		if err != nil {
+			return err
+		}
+
 		count := len(staged[spec.Service]) + len(tagStaged[spec.Service])
 		totalCount += count
 		summaries = append(summaries, formatCount(count, spec.ParserFactory().ServiceName()))
-	}
 
-	// Empty service ("") clears all services.
-	if err := r.Store.UnstageAll(ctx, ""); err != nil {
-		return err
+		if err := st.UnstageAll(ctx, spec.Service); err != nil {
+			return err
+		}
 	}
 
 	if totalCount == 0 {
