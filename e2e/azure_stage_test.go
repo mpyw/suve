@@ -193,3 +193,55 @@ func TestAzureAppConfigStage_Workflow(t *testing.T) {
 		assert.Equal(t, "created-value", stdout)
 	})
 }
+
+// TestAzureAppConfigStage_Namespaces exercises the per-store staging model
+// (#431): a single `param.json` holds creates staged under different namespaces,
+// `status` shows them all (whatever the --namespace filter), and `apply` writes
+// each under its own namespace.
+func TestAzureAppConfigStage_Namespaces(t *testing.T) {
+	setupAzureAppConfig(t)
+	setupTempHome(t)
+
+	const key = "suve/e2e/az/ac/stage/ns-key"
+
+	cleanup := func() {
+		_, _ = runAzureParam(t, "delete", "--yes", key)
+		_, _ = runAzureParam(t, "delete", "--yes", "--namespace", "dev", key)
+	}
+	cleanup()
+	t.Cleanup(cleanup)
+
+	// Stage a create under the null namespace and the same key under "dev". Both
+	// land in the one per-store staging file (namespace is part of each entry's
+	// identity, not of the on-disk path).
+	t.Run("stage-under-two-namespaces", func(t *testing.T) {
+		_, err := runAzureStage(t, "param", "add", key, "null-value")
+		require.NoError(t, err)
+
+		_, err = runAzureStage(t, "param", "add", "--namespace", "dev", key, "dev-value")
+		require.NoError(t, err)
+	})
+
+	// status (no --namespace) lists BOTH staged entries and marks the dev one with
+	// its namespace — the detection that per-namespace buckets used to break.
+	t.Run("status-shows-both-namespaces", func(t *testing.T) {
+		stdout, err := runAzureStage(t, "param", "status")
+		require.NoError(t, err)
+		assert.Contains(t, stdout, key)
+		assert.Contains(t, stdout, "[dev]")
+	})
+
+	t.Run("apply-writes-each-namespace", func(t *testing.T) {
+		_, err := runAzureStage(t, "param", "apply", "--yes")
+		require.NoError(t, err)
+
+		// The null-namespace value and the dev value are independent.
+		stdout, err := runAzureParam(t, "show", "--raw", key)
+		require.NoError(t, err)
+		assert.Equal(t, "null-value", stdout)
+
+		stdout, err = runAzureParam(t, "show", "--raw", "--namespace", "dev", key)
+		require.NoError(t, err)
+		assert.Equal(t, "dev-value", stdout)
+	})
+}

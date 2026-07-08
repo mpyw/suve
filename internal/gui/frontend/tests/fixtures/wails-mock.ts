@@ -117,6 +117,7 @@ export interface ServiceCapability {
   hasStaging: boolean;
   hasForceDelete: boolean;
   hasRecoveryWindow: boolean;
+  hasNamespaces: boolean;
 }
 
 export interface ProviderCapability {
@@ -253,8 +254,8 @@ export const defaultCapabilities: ProviderCapability[] = [
     displayName: 'AWS',
     scopeFields: [],
     services: [
-      { service: 'param', displayName: 'Param', hasVersionHistory: true, hasVersionSpecifiers: true, hasTags: true, hasRestore: false, hasStaging: true, hasForceDelete: false, hasRecoveryWindow: false },
-      { service: 'secret', displayName: 'Secret', hasVersionHistory: true, hasVersionSpecifiers: true, hasTags: true, hasRestore: true, hasStaging: true, hasForceDelete: true, hasRecoveryWindow: true },
+      { service: 'param', displayName: 'Param', hasVersionHistory: true, hasVersionSpecifiers: true, hasTags: true, hasRestore: false, hasStaging: true, hasForceDelete: false, hasRecoveryWindow: false, hasNamespaces: false },
+      { service: 'secret', displayName: 'Secret', hasVersionHistory: true, hasVersionSpecifiers: true, hasTags: true, hasRestore: true, hasStaging: true, hasForceDelete: true, hasRecoveryWindow: true, hasNamespaces: false },
     ],
   },
   {
@@ -262,7 +263,7 @@ export const defaultCapabilities: ProviderCapability[] = [
     displayName: 'Google Cloud',
     scopeFields: ['project'],
     services: [
-      { service: 'secret', displayName: 'Secret', hasVersionHistory: true, hasVersionSpecifiers: true, hasTags: true, hasRestore: false, hasStaging: true, hasForceDelete: false, hasRecoveryWindow: false },
+      { service: 'secret', displayName: 'Secret', hasVersionHistory: true, hasVersionSpecifiers: true, hasTags: true, hasRestore: false, hasStaging: true, hasForceDelete: false, hasRecoveryWindow: false, hasNamespaces: false },
     ],
   },
   {
@@ -270,8 +271,8 @@ export const defaultCapabilities: ProviderCapability[] = [
     displayName: 'Azure',
     scopeFields: [],
     services: [
-      { service: 'param', displayName: 'App Configuration', hasVersionHistory: false, hasVersionSpecifiers: false, hasTags: true, hasRestore: false, hasStaging: true, hasForceDelete: false, hasRecoveryWindow: false },
-      { service: 'secret', displayName: 'Key Vault', hasVersionHistory: true, hasVersionSpecifiers: true, hasTags: true, hasRestore: false, hasStaging: true, hasForceDelete: false, hasRecoveryWindow: false },
+      { service: 'param', displayName: 'App Configuration', hasVersionHistory: false, hasVersionSpecifiers: false, hasTags: true, hasRestore: false, hasStaging: true, hasForceDelete: false, hasRecoveryWindow: false, hasNamespaces: true },
+      { service: 'secret', displayName: 'Key Vault', hasVersionHistory: true, hasVersionSpecifiers: true, hasTags: true, hasRestore: false, hasStaging: true, hasForceDelete: false, hasRecoveryWindow: false, hasNamespaces: false },
     ],
   },
 ];
@@ -1132,6 +1133,7 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
           itemName: service === 'param' ? 'parameter' : 'secret',
           entries: staged.map((s: any) => ({
             name: s.name,
+            namespace: s.namespace ?? '',
             type: s.operation === 'create' ? 'create' : 'normal',
             operation: s.operation,
             remoteValue: s.operation === 'create' ? '' : 'remote-value',
@@ -1190,28 +1192,32 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
         staged.push({ name, operation: 'create', value, namespace: namespace ?? '' });
         return { name };
       },
-      StagingEdit: async (service: string, name: string, value: string) => {
+      StagingEdit: async (service: string, name: string, value: string, namespace?: string) => {
         const staged = service === 'param' ? currentBucket().param : currentBucket().secret;
-        const existing = staged.find((s: any) => s.name === name);
+        const ns = namespace ?? '';
+        const existing = staged.find((s: any) => s.name === name && (s.namespace ?? '') === ns);
         if (existing) {
           existing.value = value;
         } else {
-          staged.push({ name, operation: 'update', value });
+          staged.push({ name, operation: 'update', value, namespace: ns });
         }
         return { name };
       },
-      StagingDelete: async (service: string, name: string, _keepCurrentValue?: boolean, _currentVersion?: number) => {
+      StagingDelete: async (service: string, name: string, _force?: boolean, _recoveryWindow?: number, namespace?: string) => {
         const staged = service === 'param' ? currentBucket().param : currentBucket().secret;
-        staged.push({ name, operation: 'delete' });
+        staged.push({ name, operation: 'delete', namespace: namespace ?? '' });
         return { name };
       },
-      StagingUnstage: async (service: string, name: string) => {
+      StagingUnstage: async (service: string, name: string, namespace?: string) => {
+        const ns = namespace ?? '';
+        const sameEntry = (s: any) => s.name === name && (s.namespace ?? '') === ns;
+        const sameName = (s: any) => s.name === name;
         if (service === 'param') {
-          currentBucket().param = currentBucket().param.filter((s: any) => s.name !== name);
-          currentBucket().paramTags = currentBucket().paramTags.filter((s: any) => s.name !== name);
+          currentBucket().param = currentBucket().param.filter((s: any) => !sameEntry(s));
+          currentBucket().paramTags = currentBucket().paramTags.filter((s: any) => !sameName(s));
         } else {
-          currentBucket().secret = currentBucket().secret.filter((s: any) => s.name !== name);
-          currentBucket().secretTags = currentBucket().secretTags.filter((s: any) => s.name !== name);
+          currentBucket().secret = currentBucket().secret.filter((s: any) => !sameEntry(s));
+          currentBucket().secretTags = currentBucket().secretTags.filter((s: any) => !sameName(s));
         }
         return { name };
       },
@@ -1372,10 +1378,11 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
 
         return { dropped: true };
       },
-      StagingCheckStatus: async (service: string, name: string) => {
+      StagingCheckStatus: async (service: string, name: string, namespace?: string) => {
         const staged = service === 'param' ? currentBucket().param : currentBucket().secret;
         const tagStaged = service === 'param' ? currentBucket().paramTags : currentBucket().secretTags;
-        const hasEntry = staged.some((s: any) => s.name === name);
+        const ns = namespace ?? '';
+        const hasEntry = staged.some((s: any) => s.name === name && (s.namespace ?? '') === ns);
         const hasTags = tagStaged.some((t: any) => t.name === name);
         return { hasEntry, hasTags };
       },
