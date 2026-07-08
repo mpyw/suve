@@ -5,6 +5,8 @@ import {
   createSecret,
   createMultiTagState,
   createNoTagsState,
+  createGoogleCloudState,
+  createAzureState,
   waitForItemList,
   clickItemByName,
   openCreateModal,
@@ -485,5 +487,67 @@ test.describe('Secret provider-neutral presence gating (#268)', () => {
 
   test('still renders always-present metadata (Version ID)', async ({ page }) => {
     await expect(page.locator('.meta-label').filter({ hasText: 'Version ID' })).toBeVisible();
+  });
+});
+
+// domain.Version.Label is overloaded: AWS Secrets Manager carries genuine
+// staging labels (AWSCURRENT/...), while Google Cloud and Azure Key Vault carry
+// the per-version STATE (enabled/disabled/destroyed). The version-meta heading
+// must therefore read "Labels" only for AWS and "State" for the others (#418).
+test.describe('Secret version-meta heading is provider-aware (#418)', () => {
+  const metaLabel = (page: import('@playwright/test').Page, text: string) =>
+    page.locator('.detail-meta .meta-label').filter({ hasText: text });
+
+  test('Google Cloud: version state is headed "State" (not "Labels"), badge shows the state', async ({ page }) => {
+    await setupWailsMocks(
+      page,
+      createGoogleCloudState({
+        secrets: [{ name: 'gcloud-secret-1', value: 'v1', arn: '', versionStage: ['enabled'] }],
+      }),
+    );
+    await page.goto('/');
+    await waitForItemList(page);
+
+    // Google Cloud launches straight into the secret view.
+    await clickItemByName(page, 'gcloud-secret-1');
+    await expect(page.locator('.detail-panel')).toBeVisible();
+
+    await expect(metaLabel(page, 'State')).toBeVisible();
+    await expect(metaLabel(page, 'Labels')).toHaveCount(0);
+    await expect(page.locator('.detail-meta .badge-stage')).toHaveText('enabled');
+  });
+
+  test('Azure Key Vault: version state is headed "State" (not "Labels")', async ({ page }) => {
+    await setupWailsMocks(
+      page,
+      createAzureState({
+        secrets: [{ name: 'kv-secret', value: 'v', arn: '', versionStage: ['enabled'], versionId: 'a1b2c3d4e5f6' }],
+      }),
+    );
+    await page.goto('/');
+    await navigateTo(page, 'Key Vault');
+    await waitForItemList(page);
+
+    await clickItemByName(page, 'kv-secret');
+    await expect(page.locator('.detail-panel')).toBeVisible();
+
+    await expect(metaLabel(page, 'State')).toBeVisible();
+    await expect(metaLabel(page, 'Labels')).toHaveCount(0);
+    await expect(page.locator('.detail-meta .badge-stage')).toHaveText('enabled');
+  });
+
+  test('AWS Secrets Manager: staging label is headed "Labels" (not "State")', async ({ page }) => {
+    // Default state is AWS; my-secret carries the default ['AWSCURRENT'] staging label.
+    await setupWailsMocks(page);
+    await page.goto('/');
+    await navigateTo(page, 'Secret');
+    await waitForItemList(page);
+
+    await clickItemByName(page, 'my-secret');
+    await expect(page.locator('.detail-panel')).toBeVisible();
+
+    await expect(metaLabel(page, 'Labels')).toBeVisible();
+    await expect(metaLabel(page, 'State')).toHaveCount(0);
+    await expect(page.locator('.detail-meta .badge-stage')).toHaveText('AWSCURRENT');
   });
 });
