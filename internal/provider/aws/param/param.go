@@ -120,8 +120,12 @@ func (s *Store) Get(ctx context.Context, name string, ref provider.VersionRef) (
 		WithDecryption: aws.Bool(true),
 	})
 	if err != nil {
-		var notFound *types.ParameterNotFound
-		if errors.As(err, &notFound) {
+		var (
+			notFound        *types.ParameterNotFound
+			versionNotFound *types.ParameterVersionNotFound
+		)
+
+		if errors.As(err, &notFound) || errors.As(err, &versionNotFound) {
 			return nil, fmt.Errorf("%w: %s", provider.ErrNotFound, name)
 		}
 
