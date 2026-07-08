@@ -113,3 +113,52 @@ func TestMakeApp_shellCompletion(t *testing.T) {
 func contains(ss []string, s string) bool {
 	return slices.Contains(ss, s)
 }
+
+// TestApp_UnknownCommand_ExitsNonZero verifies an unknown command produces a
+// non-zero exit (#347): urfave/cli's void CommandNotFound hook makes Run return
+// nil, so the handler must exit explicitly. It mutates the process-wide
+// cli.OsExiter, so it is not parallel.
+//
+//nolint:paralleltest // mutates the process-wide cli.OsExiter
+func TestApp_UnknownCommand_ExitsNonZero(t *testing.T) {
+	origExiter := cli.OsExiter
+
+	t.Cleanup(func() { cli.OsExiter = origExiter })
+
+	cases := []struct {
+		name string
+		args []string
+	}{
+		{"top-level", []string{"suve", "definitely-not-a-command"}},
+		{"subcommand", []string{"suve", "secret", "definitely-not-a-command"}},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var (
+				called  bool
+				gotCode int
+			)
+
+			cli.OsExiter = func(code int) { called, gotCode = true, code }
+
+			app := commands.MakeAppWithDetect(detect.Result{
+				Param:  provider.ProviderAWS,
+				Secret: provider.ProviderAWS,
+				Stage:  provider.ProviderAWS,
+			})
+
+			var out, errb bytes.Buffer
+
+			app.Writer = &out
+			app.ErrWriter = &errb
+
+			// urfave/cli returns nil after the void CommandNotFound hook runs.
+			err := app.Run(t.Context(), tc.args)
+			require.NoError(t, err)
+
+			assert.True(t, called, "an unknown command must exit")
+			assert.NotZero(t, gotCode, "exit code must be non-zero")
+		})
+	}
+}
