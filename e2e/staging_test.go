@@ -818,7 +818,7 @@ func TestAgentStore_DirectMethods(t *testing.T) {
 	t.Run("list-entries", func(t *testing.T) {
 		entries, err := store.ListEntries(t.Context(), staging.ServiceParam)
 		require.NoError(t, err)
-		assert.Contains(t, entries[staging.ServiceParam], paramName)
+		assert.Contains(t, entries[staging.ServiceParam], staging.EntryKey{Name: paramName})
 	})
 
 	// Test UnstageEntry
@@ -872,7 +872,7 @@ func TestAgentStore_TagMethods(t *testing.T) {
 	t.Run("list-tags", func(t *testing.T) {
 		tags, err := store.ListTags(t.Context(), staging.ServiceParam)
 		require.NoError(t, err)
-		assert.Contains(t, tags[staging.ServiceParam], paramName)
+		assert.Contains(t, tags[staging.ServiceParam], staging.EntryKey{Name: paramName})
 	})
 
 	// Test UnstageTag
@@ -1111,15 +1111,15 @@ func TestAgentStore_ListMethods(t *testing.T) {
 		entries, err := store.ListEntries(t.Context(), staging.ServiceParam)
 		require.NoError(t, err)
 		assert.Len(t, entries[staging.ServiceParam], 2)
-		assert.Contains(t, entries[staging.ServiceParam], "/suve-e2e/list/param1")
-		assert.Contains(t, entries[staging.ServiceParam], "/suve-e2e/list/param2")
+		assert.Contains(t, entries[staging.ServiceParam], staging.EntryKey{Name: "/suve-e2e/list/param1"})
+		assert.Contains(t, entries[staging.ServiceParam], staging.EntryKey{Name: "/suve-e2e/list/param2"})
 	})
 
 	// Test ListTags
 	t.Run("list-tags-with-data", func(t *testing.T) {
 		tags, err := store.ListTags(t.Context(), staging.ServiceParam)
 		require.NoError(t, err)
-		assert.Contains(t, tags[staging.ServiceParam], "/suve-e2e/list/param1")
+		assert.Contains(t, tags[staging.ServiceParam], staging.EntryKey{Name: "/suve-e2e/list/param1"})
 	})
 
 	// Test ListEntries for all services (empty string)

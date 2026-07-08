@@ -132,9 +132,9 @@ func TestStore_NamespaceIsolation(t *testing.T) {
 	require.NoError(t, store.UnstageTag(ctx, staging.ServiceParam, dev))
 
 	_, err = store.GetEntry(ctx, staging.ServiceParam, dev)
-	assert.ErrorIs(t, err, staging.ErrNotStaged)
+	require.ErrorIs(t, err, staging.ErrNotStaged)
 	_, err = store.GetTag(ctx, staging.ServiceParam, dev)
-	assert.ErrorIs(t, err, staging.ErrNotStaged)
+	require.ErrorIs(t, err, staging.ErrNotStaged)
 
 	_, err = store.GetEntry(ctx, staging.ServiceParam, prod)
 	require.NoError(t, err, "prod entry must survive unstaging dev")
