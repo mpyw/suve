@@ -248,6 +248,81 @@ func TestHistory_NewestFirst(t *testing.T) {
 	assert.Equal(t, "id-1", versions[2].ID)
 }
 
+func TestHistory_IncludeDeprecatedAndPaginates(t *testing.T) {
+	t.Parallel()
+
+	base := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
+
+	var (
+		gotIncludeDeprecated bool
+		calls                int
+	)
+
+	store := secret.New(&mockClient{
+		listVersion: func(in *secretsmanager.ListSecretVersionIdsInput) (*secretsmanager.ListSecretVersionIdsOutput, error) {
+			gotIncludeDeprecated = aws.ToBool(in.IncludeDeprecated)
+			calls++
+
+			if aws.ToString(in.NextToken) == "" {
+				// Page 1: the labeled versions.
+				return &secretsmanager.ListSecretVersionIdsOutput{
+					Versions: []types.SecretVersionsListEntry{
+						{VersionId: aws.String("id-3"), CreatedDate: aws.Time(base.Add(2 * time.Hour)), VersionStages: []string{"AWSCURRENT"}},
+						{VersionId: aws.String("id-2"), CreatedDate: aws.Time(base.Add(time.Hour)), VersionStages: []string{"AWSPREVIOUS"}},
+					},
+					NextToken: aws.String("tok"),
+				}, nil
+			}
+
+			// Page 2: a deprecated (unlabeled) version, retained but invisible
+			// without IncludeDeprecated.
+			return &secretsmanager.ListSecretVersionIdsOutput{
+				Versions: []types.SecretVersionsListEntry{
+					{VersionId: aws.String("id-1"), CreatedDate: aws.Time(base), VersionStages: []string{}},
+				},
+			}, nil
+		},
+	})
+
+	versions, err := store.History(t.Context(), "my-secret")
+	require.NoError(t, err)
+	assert.True(t, gotIncludeDeprecated, "History must request IncludeDeprecated=true")
+	assert.Equal(t, 2, calls, "History must page through all results")
+	require.Len(t, versions, 3)
+	assert.Equal(t, "id-3", versions[0].ID)
+	assert.Equal(t, "id-1", versions[2].ID, "deprecated version must be included as the oldest")
+}
+
+func TestResolve_ShiftReachesDeprecatedVersion(t *testing.T) {
+	t.Parallel()
+
+	base := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
+
+	var gotIncludeDeprecated bool
+
+	store := secret.New(&mockClient{
+		listVersion: func(in *secretsmanager.ListSecretVersionIdsInput) (*secretsmanager.ListSecretVersionIdsOutput, error) {
+			gotIncludeDeprecated = aws.ToBool(in.IncludeDeprecated)
+
+			return &secretsmanager.ListSecretVersionIdsOutput{
+				Versions: []types.SecretVersionsListEntry{
+					{VersionId: aws.String("id-3"), CreatedDate: aws.Time(base.Add(2 * time.Hour)), VersionStages: []string{"AWSCURRENT"}},
+					{VersionId: aws.String("id-2"), CreatedDate: aws.Time(base.Add(time.Hour)), VersionStages: []string{}},
+					{VersionId: aws.String("id-1"), CreatedDate: aws.Time(base), VersionStages: []string{}},
+				},
+			}, nil
+		},
+	})
+
+	// AWSCURRENT~2 walks two versions back into a deprecated (unlabeled) one;
+	// this would fail with "version shift out of range" if deprecated versions
+	// were excluded from the listing.
+	ref, err := store.Resolve(t.Context(), "my-secret", ":AWSCURRENT~2")
+	require.NoError(t, err)
+	assert.True(t, gotIncludeDeprecated, "Resolve must request IncludeDeprecated=true")
+	assert.Equal(t, "id-1", ref.ID())
+}
+
 func TestList_Paginated(t *testing.T) {
 	t.Parallel()
 

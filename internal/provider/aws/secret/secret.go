@@ -103,14 +103,11 @@ func (s *Store) Resolve(ctx context.Context, name, spec string) (provider.Versio
 	}
 
 	// Label resolution and/or shift require the full version list.
-	versions, err := s.client.ListSecretVersionIds(ctx, &secretsmanager.ListSecretVersionIdsInput{
-		SecretId: aws.String(name),
-	})
+	list, err := s.listAllVersions(ctx, name)
 	if err != nil {
 		return provider.VersionRef{}, fmt.Errorf("failed to list versions: %w", err)
 	}
 
-	list := versions.Versions
 	if len(list) == 0 {
 		return provider.VersionRef{}, fmt.Errorf("secret not found or has no versions: %s", name)
 	}
@@ -128,6 +125,42 @@ func (s *Store) Resolve(ctx context.Context, name, spec string) (provider.Versio
 	}
 
 	return provider.NewVersionRef(aws.ToString(list[targetIdx].VersionId)), nil
+}
+
+// listAllVersions returns every version of the secret, INCLUDING deprecated
+// (unlabeled) versions, paging through ListSecretVersionIds.
+//
+// Without IncludeDeprecated the API returns only versions that still carry a
+// staging label (typically AWSCURRENT/AWSPREVIOUS/AWSPENDING), hiding retained
+// but unlabeled versions from history and from ~shift resolution even though
+// they remain fetchable by version ID. Pagination is mandatory once deprecated
+// versions are included, as the list can span multiple pages.
+func (s *Store) listAllVersions(ctx context.Context, name string) ([]types.SecretVersionsListEntry, error) {
+	var (
+		all   []types.SecretVersionsListEntry
+		token *string
+	)
+
+	for {
+		out, err := s.client.ListSecretVersionIds(ctx, &secretsmanager.ListSecretVersionIdsInput{
+			SecretId:          aws.String(name),
+			IncludeDeprecated: aws.Bool(true),
+			NextToken:         token,
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		all = append(all, out.Versions...)
+
+		if aws.ToString(out.NextToken) == "" {
+			break
+		}
+
+		token = out.NextToken
+	}
+
+	return all, nil
 }
 
 // baseIndex finds the starting index in a newest-first version list for the
@@ -218,16 +251,14 @@ func (s *Store) Get(ctx context.Context, name string, ref provider.VersionRef) (
 	return entry, nil
 }
 
-// History returns the secret's version history, newest first.
+// History returns the secret's version history, newest first, including
+// deprecated (unlabeled) versions.
 func (s *Store) History(ctx context.Context, name string) ([]domain.Version, error) {
-	out, err := s.client.ListSecretVersionIds(ctx, &secretsmanager.ListSecretVersionIdsInput{
-		SecretId: aws.String(name),
-	})
+	list, err := s.listAllVersions(ctx, name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list secret versions: %w", err)
 	}
 
-	list := out.Versions
 	sortNewestFirst(list)
 
 	return lo.Map(list, func(v types.SecretVersionsListEntry, _ int) domain.Version {
