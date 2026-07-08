@@ -14,7 +14,7 @@
   // suve uses one metadata vocabulary ("Tags") across every provider. Google
   // Cloud natively calls this same key=value metadata "labels", so surface a
   // secondary, non-primary hint for GCloud users without renaming the field.
-  const nativeHint = $derived(provider === 'googlecloud' ? 'Google Cloud: labels' : '');
+  const nativeHint = $derived(provider === 'googlecloud' ? '(= Google Cloud: labels)' : '');
 </script>
 
 <div class="detail-section">

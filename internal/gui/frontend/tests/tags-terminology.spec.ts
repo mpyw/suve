@@ -8,10 +8,10 @@ import {
 
 // The Tags field keeps one vocabulary across every provider. Google Cloud
 // natively calls the same key=value metadata "labels", so TagList surfaces a
-// secondary hint ("Google Cloud: labels") for Google Cloud only — the field is
-// still titled "Tags" everywhere.
+// secondary hint ("(= Google Cloud: labels)") for Google Cloud only — the field
+// is still titled "Tags" everywhere.
 test.describe('Tags terminology hint', () => {
-  test('Google Cloud: a tagged secret shows the "Google Cloud: labels" hint', async ({ page }) => {
+  test('Google Cloud: a tagged secret shows the "(= Google Cloud: labels)" hint', async ({ page }) => {
     await setupWailsMocks(
       page,
       createGoogleCloudState({
@@ -29,7 +29,7 @@ test.describe('Tags terminology hint', () => {
     await expect(page.getByRole('heading', { name: 'Tags' })).toBeVisible();
     const hint = page.locator('.tag-native-hint');
     await expect(hint).toBeVisible();
-    await expect(hint).toHaveText('Google Cloud: labels');
+    await expect(hint).toHaveText('(= Google Cloud: labels)');
     await expect(page.locator('.tag-item')).toBeVisible();
   });
 
