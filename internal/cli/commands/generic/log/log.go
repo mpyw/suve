@@ -158,13 +158,17 @@ func Command(cfg Config) *cli.Command {
 			}
 
 			opts := Options{
-				ShowPatch:      cmd.Bool("patch"),
-				ParseJSON:      cmd.Bool("parse-json"),
-				Reverse:        cmd.Bool("reverse"),
-				NoPager:        cmd.Bool("no-pager"),
-				Oneline:        cmd.Bool("oneline"),
-				Output:         output.ParseFormat(cmd.String("output")),
-				MaxValueLength: cmd.Int("max-value-length"),
+				ShowPatch: cmd.Bool("patch"),
+				ParseJSON: cmd.Bool("parse-json"),
+				Reverse:   cmd.Bool("reverse"),
+				NoPager:   cmd.Bool("no-pager"),
+				Oneline:   cmd.Bool("oneline"),
+				Output:    output.ParseFormat(cmd.String("output")),
+				// --max-value-length is declared as an Int32Flag, so it must be
+				// read with cmd.Int32: urfave/cli's cmd.Int does a strict int
+				// type assertion that fails for int32 and silently returns 0,
+				// disabling truncation entirely.
+				MaxValueLength: int(cmd.Int32("max-value-length")),
 			}
 
 			req := Request{
