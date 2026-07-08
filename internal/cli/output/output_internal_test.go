@@ -10,7 +10,16 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/mpyw/suve/internal/cli/colors"
+	"github.com/mpyw/suve/internal/cli/terminal"
 )
+
+// fakeTTY is a bytes.Buffer that also satisfies terminal.Fder, so
+// terminal.IsTerminalWriter can classify it as a terminal when IsTTY is mocked.
+type fakeTTY struct {
+	bytes.Buffer
+}
+
+func (f *fakeTTY) Fd() uintptr { return 1 }
 
 func TestWriter_Field(t *testing.T) {
 	t.Parallel()
@@ -272,6 +281,54 @@ func TestInfo(t *testing.T) {
 	var buf bytes.Buffer
 	Info(&buf, "No changes %s", "staged")
 	assert.Contains(t, buf.String(), "No changes staged")
+}
+
+// TestFeedback_ColorTracksWriterTTY guards #341: a feedback message's color is
+// decided by its own destination writer, not the process-global color.NoColor.
+// A terminal writer receives ANSI even when the global would say otherwise, and
+// a non-terminal writer (a plain bytes.Buffer with no Fd) stays clean.
+func TestFeedback_ColorTracksWriterTTY(t *testing.T) {
+	origIsTTY := terminal.IsTTY
+	origNoColor := color.NoColor
+
+	t.Cleanup(func() {
+		terminal.IsTTY = origIsTTY
+		color.NoColor = origNoColor
+	})
+	t.Setenv("NO_COLOR", "")
+
+	// Force the global off (as `suve … | cat` would) to prove color no longer
+	// depends on it, then treat the mocked fd as a terminal.
+	color.NoColor = true
+	terminal.IsTTY = func(uintptr) bool { return true }
+
+	var tty fakeTTY
+
+	Warning(&tty, "heads up")
+	assert.Contains(t, tty.String(), "\x1b[", "a terminal writer must receive ANSI color")
+	assert.Contains(t, tty.String(), "heads up")
+
+	var buf bytes.Buffer
+
+	Warning(&buf, "heads up")
+	assert.NotContains(t, buf.String(), "\x1b[", "a non-terminal writer must stay plain")
+}
+
+// TestFeedback_NoColorEnvDisables guards #341: NO_COLOR disables coloring even
+// for a terminal writer.
+func TestFeedback_NoColorEnvDisables(t *testing.T) {
+	origIsTTY := terminal.IsTTY
+
+	t.Cleanup(func() { terminal.IsTTY = origIsTTY })
+	t.Setenv("NO_COLOR", "1")
+
+	terminal.IsTTY = func(uintptr) bool { return true }
+
+	var tty fakeTTY
+
+	Error(&tty, "boom")
+	assert.NotContains(t, tty.String(), "\x1b[", "NO_COLOR must suppress ANSI even on a TTY")
+	assert.Contains(t, tty.String(), "Error: boom")
 }
 
 func TestParseFormat(t *testing.T) {
