@@ -598,3 +598,102 @@ test.describe('Staging Edge Cases', () => {
     await expect(page.locator('.entry-item')).toBeVisible();
   });
 });
+
+// ============================================================================
+// Tag-Only Staged Changes (regression: #416)
+//
+// A staged change with ONLY tag edits (no value change) must be rendered,
+// counted, and actionable in its service section. Before the fix the sidebar
+// badge counted it while the section showed count 0 / "No staged changes" and
+// Apply/Reset/Stash were all disabled.
+// ============================================================================
+
+test.describe('Tag-Only Staged Changes (#416)', () => {
+  // Parametrize across both AWS services so the fix is proven for value-less
+  // tag changes on param and secret alike. sectionIndex: param is the first
+  // .section, secret the second (both services exist under the AWS provider).
+  const cases = [
+    {
+      service: 'param',
+      sectionIndex: 0,
+      name: '/app/config',
+      seed: (tags: ReturnType<typeof createStagedTags>[]) => createTagOnlyStagedState(tags, []),
+      valueAndTag: (): Partial<MockState> => ({
+        stagedParam: [createStagedValue('/app/config', 'update', 'new-value')],
+        stagedParamTags: [createStagedTags('/app/config', { env: 'prod' }, {})],
+        stagedSecret: [],
+        stagedSecretTags: [],
+      }),
+    },
+    {
+      service: 'secret',
+      sectionIndex: 1,
+      name: 'my-secret',
+      seed: (tags: ReturnType<typeof createStagedTags>[]) => createTagOnlyStagedState([], tags),
+      valueAndTag: (): Partial<MockState> => ({
+        stagedParam: [],
+        stagedParamTags: [],
+        stagedSecret: [createStagedValue('my-secret', 'update', 'new-value')],
+        stagedSecretTags: [createStagedTags('my-secret', { env: 'prod' }, {})],
+      }),
+    },
+  ] as const;
+
+  for (const c of cases) {
+    test(`${c.service}: tag-only change renders in its section with count 1 and no empty-state`, async ({ page }) => {
+      const state = c.seed([createStagedTags(c.name, { env: 'staging' }, { old: 'gone' })]);
+      await setupWailsMocks(page, state);
+      await page.goto('/');
+      await navigateTo(page, 'Staging');
+      await page.waitForFunction(() => document.querySelector('.entry-item') !== null);
+
+      const section = page.locator('.section').nth(c.sectionIndex);
+      // Section shows exactly one entry (the tag-only row), count badge 1.
+      await expect(section.locator('.entry-item')).toHaveCount(1);
+      await expect(section.locator('.count-badge')).toHaveText('1');
+      // Empty-state must NOT be shown for this section.
+      await expect(section.locator('.empty-state')).toHaveCount(0);
+      // Entry renders the name and both the add / remove tag chips.
+      await expect(section.locator('.entry-name')).toHaveText(c.name);
+      await expect(section.locator('.tag-add')).toContainText('env=staging');
+      await expect(section.locator('.tag-remove')).toContainText('old');
+      // Tag-only rows carry no value operation badge.
+      await expect(section.locator('.operation-badge')).toHaveCount(0);
+      // Per-section Apply / Reset are enabled.
+      await expect(section.locator('.btn-apply-sm')).toBeEnabled();
+      await expect(section.locator('.btn-reset-sm')).toBeEnabled();
+    });
+
+    test(`${c.service}: Apply All / Reset All / Stash enabled with only a tag-only change`, async ({ page }) => {
+      const state = c.seed([createStagedTags(c.name, { env: 'staging' }, {})]);
+      await setupWailsMocks(page, state);
+      await page.goto('/');
+      await navigateTo(page, 'Staging');
+      await page.waitForFunction(() => document.querySelector('.entry-item') !== null);
+
+      await expect(page.getByRole('button', { name: 'Apply All' })).toBeEnabled();
+      await expect(page.getByRole('button', { name: 'Reset All' })).toBeEnabled();
+
+      // Open the Stash dropdown and confirm Push (Persist) is enabled.
+      await page.getByRole('button', { name: /Stash/ }).click();
+      await expect(page.getByRole('button', { name: /Push/ })).toBeEnabled();
+    });
+
+    test(`${c.service}: value + tag change on the same name renders a single row`, async ({ page }) => {
+      await setupWailsMocks(page, c.valueAndTag());
+      await page.goto('/');
+      await navigateTo(page, 'Staging');
+      await page.waitForFunction(() => document.querySelector('.entry-item') !== null);
+
+      const section = page.locator('.section').nth(c.sectionIndex);
+      // Regression guard: the new tag-only loop must NOT duplicate a name that
+      // already has a value entry.
+      await expect(section.locator('.entry-item')).toHaveCount(1);
+      await expect(section.locator('.count-badge')).toHaveText('1');
+      await expect(section.locator('.entry-name')).toHaveText(c.name);
+      // Value operation badge and the tag chip both belong to the one row.
+      await expect(section.locator('.operation-badge')).toHaveText(/update/i);
+      await expect(section.locator('.tag-add')).toContainText('env=prod');
+    });
+  }
+});
