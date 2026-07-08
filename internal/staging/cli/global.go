@@ -15,6 +15,12 @@ type GlobalServiceSpec struct {
 	ParserFactory staging.ParserFactory
 	// Factory builds a provider-backed strategy for this service.
 	Factory staging.StrategyFactory
+	// ScopeResolver resolves THIS service's staging scope. It is per-service
+	// because a provider's services may live in independent resources with
+	// separate staging buckets: Azure App Configuration (param) is keyed by
+	// store name, Key Vault (secret) by vault name. AWS keeps one account scope
+	// for both. Nil defaults to AWS (AWSScopeResolver).
+	ScopeResolver staging.ScopeResolver
 }
 
 // GlobalConfig configures the provider-wide stage commands so a single set of
@@ -38,8 +44,34 @@ func AWSGlobalConfig(paramCfg, secretCfg CommandConfig) GlobalConfig {
 		ProviderLabel: "AWS",
 		ScopeResolver: AWSScopeResolver,
 		Services: []GlobalServiceSpec{
-			{Service: staging.ServiceParam, ParserFactory: paramCfg.ParserFactory, Factory: paramCfg.Factory},
-			{Service: staging.ServiceSecret, ParserFactory: secretCfg.ParserFactory, Factory: secretCfg.Factory},
+			{Service: staging.ServiceParam, ParserFactory: paramCfg.ParserFactory, Factory: paramCfg.Factory, ScopeResolver: AWSScopeResolver},
+			{Service: staging.ServiceSecret, ParserFactory: secretCfg.ParserFactory, Factory: secretCfg.Factory, ScopeResolver: AWSScopeResolver},
+		},
+	}
+}
+
+// AzureGlobalConfig builds the GlobalConfig for Azure. Unlike AWS, App
+// Configuration (param) and Key Vault (secret) are INDEPENDENT resources with
+// separate staging buckets, so each service carries its own ScopeResolver. The
+// top-level ScopeResolver keys the (single-file) global stash under App
+// Configuration; cross-resource stash is tracked separately (#435).
+func AzureGlobalConfig(paramCfg, secretCfg CommandConfig) GlobalConfig {
+	return GlobalConfig{
+		ProviderLabel: "Azure",
+		ScopeResolver: paramCfg.ScopeResolver,
+		Services: []GlobalServiceSpec{
+			{
+				Service:       staging.ServiceParam,
+				ParserFactory: paramCfg.ParserFactory,
+				Factory:       paramCfg.Factory,
+				ScopeResolver: paramCfg.ScopeResolver,
+			},
+			{
+				Service:       staging.ServiceSecret,
+				ParserFactory: secretCfg.ParserFactory,
+				Factory:       secretCfg.Factory,
+				ScopeResolver: secretCfg.ScopeResolver,
+			},
 		},
 	}
 }
