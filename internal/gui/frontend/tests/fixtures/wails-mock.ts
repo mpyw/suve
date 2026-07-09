@@ -76,6 +76,8 @@ export interface SecretLogEntry {
   value: string;
   isCurrent: boolean;
   created: string;
+  // Per-version tags (Azure Key Vault only).
+  tags?: Tag[];
 }
 
 export interface AWSIdentity {
@@ -113,6 +115,7 @@ export interface ServiceCapability {
   hasVersionHistory: boolean;
   hasVersionSpecifiers: boolean;
   hasTags: boolean;
+  tagsPerVersion: boolean;
   hasRestore: boolean;
   hasStaging: boolean;
   hasForceDelete: boolean;
@@ -254,8 +257,8 @@ export const defaultCapabilities: ProviderCapability[] = [
     displayName: 'AWS',
     scopeFields: [],
     services: [
-      { service: 'param', displayName: 'Param', hasVersionHistory: true, hasVersionSpecifiers: true, hasTags: true, hasRestore: false, hasStaging: true, hasForceDelete: false, hasRecoveryWindow: false, hasNamespaces: false },
-      { service: 'secret', displayName: 'Secret', hasVersionHistory: true, hasVersionSpecifiers: true, hasTags: true, hasRestore: true, hasStaging: true, hasForceDelete: true, hasRecoveryWindow: true, hasNamespaces: false },
+      { service: 'param', displayName: 'Param', hasVersionHistory: true, hasVersionSpecifiers: true, hasTags: true, tagsPerVersion: false, hasRestore: false, hasStaging: true, hasForceDelete: false, hasRecoveryWindow: false, hasNamespaces: false },
+      { service: 'secret', displayName: 'Secret', hasVersionHistory: true, hasVersionSpecifiers: true, hasTags: true, tagsPerVersion: false, hasRestore: true, hasStaging: true, hasForceDelete: true, hasRecoveryWindow: true, hasNamespaces: false },
     ],
   },
   {
@@ -263,7 +266,7 @@ export const defaultCapabilities: ProviderCapability[] = [
     displayName: 'Google Cloud',
     scopeFields: ['project'],
     services: [
-      { service: 'secret', displayName: 'Secret', hasVersionHistory: true, hasVersionSpecifiers: true, hasTags: true, hasRestore: false, hasStaging: true, hasForceDelete: false, hasRecoveryWindow: false, hasNamespaces: false },
+      { service: 'secret', displayName: 'Secret', hasVersionHistory: true, hasVersionSpecifiers: true, hasTags: true, tagsPerVersion: false, hasRestore: false, hasStaging: true, hasForceDelete: false, hasRecoveryWindow: false, hasNamespaces: false },
     ],
   },
   {
@@ -271,8 +274,8 @@ export const defaultCapabilities: ProviderCapability[] = [
     displayName: 'Azure',
     scopeFields: [],
     services: [
-      { service: 'param', displayName: 'App Configuration', hasVersionHistory: false, hasVersionSpecifiers: false, hasTags: true, hasRestore: false, hasStaging: true, hasForceDelete: false, hasRecoveryWindow: false, hasNamespaces: true },
-      { service: 'secret', displayName: 'Key Vault', hasVersionHistory: true, hasVersionSpecifiers: true, hasTags: true, hasRestore: false, hasStaging: true, hasForceDelete: false, hasRecoveryWindow: false, hasNamespaces: false },
+      { service: 'param', displayName: 'App Configuration', hasVersionHistory: false, hasVersionSpecifiers: false, hasTags: true, tagsPerVersion: false, hasRestore: false, hasStaging: true, hasForceDelete: false, hasRecoveryWindow: false, hasNamespaces: true },
+      { service: 'secret', displayName: 'Key Vault', hasVersionHistory: true, hasVersionSpecifiers: true, hasTags: true, tagsPerVersion: true, hasRestore: false, hasStaging: true, hasForceDelete: false, hasRecoveryWindow: false, hasNamespaces: false },
     ],
   },
 ];
@@ -1073,7 +1076,9 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
         ];
         return {
           name,
-          entries: versions,
+          // Mirror the backend: every entry carries a tags array (empty, not
+          // undefined) so per-version tag rendering sees the real shape.
+          entries: versions.map((v) => ({ ...v, tags: v.tags ?? [] })),
         };
       },
       SecretCreate: async (name: string, value: string) => {

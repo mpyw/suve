@@ -75,6 +75,7 @@ type secretVersion struct {
 	id      string
 	created *time.Time
 	enabled bool
+	tags    []domain.Tag
 }
 
 // Resolve parses the version spec (generic) and resolves it to an opaque
@@ -187,6 +188,7 @@ func (s *Store) History(ctx context.Context, name string) ([]domain.Version, err
 			ID:      v.id,
 			State:   boolLabel(v.enabled),
 			Created: v.created,
+			Tags:    v.tags,
 		}
 	}), nil
 }
@@ -332,7 +334,7 @@ func (s *Store) updateTags(ctx context.Context, name, version string, tags map[s
 
 // toSecretVersion maps SDK SecretProperties to the neutral secretVersion.
 func toSecretVersion(p *azsecrets.SecretProperties) secretVersion {
-	v := secretVersion{id: versionID(p.ID)}
+	v := secretVersion{id: versionID(p.ID), tags: mapTags(p.Tags)}
 
 	if attr := p.Attributes; attr != nil {
 		v.created = attr.Created
