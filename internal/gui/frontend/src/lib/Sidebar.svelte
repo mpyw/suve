@@ -195,7 +195,7 @@
       />
       <label class="scope-label" for="azure-store">App Configuration store</label>
       <input id="azure-store" class="scope-input" type="text" placeholder="my-store (params)" bind:value={storeInput} />
-      <label class="scope-label" for="azure-namespace">Namespace</label>
+      <label class="scope-label" for="azure-namespace">App Configuration NS</label>
       <input
         id="azure-namespace"
         class="scope-input"
@@ -203,7 +203,7 @@
         placeholder="(NULL)"
         bind:value={namespaceInput}
       />
-      <p class="scope-hint">Azure calls this a label; empty means (NULL). Applies to the App Configuration store only.</p>
+      <p class="scope-hint">Azure calls this a label; empty means (NULL).</p>
       {#if formError || scopeError}
         <div class="scope-error">{formError || scopeError}</div>
       {/if}
