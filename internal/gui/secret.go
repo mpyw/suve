@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/mpyw/suve/internal/provider"
-	awssecret "github.com/mpyw/suve/internal/provider/aws/secret"
 	"github.com/mpyw/suve/internal/timeutil"
 	"github.com/mpyw/suve/internal/usecase/secret"
 )
@@ -291,7 +290,11 @@ func (a *App) SecretDelete(name string, force bool) (*SecretDeleteResult, error)
 
 	var options []provider.DeleteOption
 	if force {
-		options = append(options, awssecret.ForceDelete{})
+		// Force-delete is AWS Secrets Manager only (mapped to
+		// ForceDeleteWithoutRecovery); the frontend hides the checkbox elsewhere
+		// (hasForceDelete=false), so force is never set for Key Vault or Google
+		// Cloud, which soft-delete/retain by policy instead.
+		options = append(options, provider.ForceDelete{})
 	}
 
 	result, err := uc.Execute(a.ctx, secret.DeleteInput{

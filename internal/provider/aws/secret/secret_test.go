@@ -508,7 +508,7 @@ func TestDelete_ForceDelete(t *testing.T) {
 		},
 	})
 
-	require.NoError(t, store.Delete(t.Context(), "my-secret", secret.ForceDelete{}))
+	require.NoError(t, store.Delete(t.Context(), "my-secret", provider.ForceDelete{}))
 	require.NotNil(t, in)
 	assert.True(t, aws.ToBool(in.ForceDeleteWithoutRecovery))
 	assert.Nil(t, in.RecoveryWindowInDays)

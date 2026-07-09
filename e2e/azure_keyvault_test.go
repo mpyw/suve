@@ -177,3 +177,39 @@ func TestAzureKeyVault_FullWorkflow(t *testing.T) {
 		require.Error(t, err)
 	})
 }
+
+// TestAzureKeyVault_SoftDelete exercises soft-delete recovery: delete (soft) →
+// restore → the secret is readable again. Mirrors AWS Secrets Manager's
+// delete/restore semantics. Force-delete/purge is intentionally unsupported for
+// Key Vault, so there is nothing to exercise here.
+func TestAzureKeyVault_SoftDelete(t *testing.T) {
+	setupAzureKeyVault(t)
+	setupTempHome(t)
+
+	const name = "suve-e2e-kv-softdelete"
+
+	// Best-effort cleanup: delete (soft) then restore-and-delete is unnecessary; a
+	// plain delete is enough to reset for the next run.
+	cleanup := func() { _, _ = runAzureSecret(t, "delete", "--yes", name) }
+	cleanup()
+	t.Cleanup(cleanup)
+
+	_, err := runAzureSecret(t, "create", name, "v1")
+	require.NoError(t, err)
+
+	t.Run("soft-delete-then-restore", func(t *testing.T) {
+		_, err := runAzureSecret(t, "delete", "--yes", name)
+		require.NoError(t, err)
+
+		// Soft-deleted: not readable until restored.
+		_, err = runAzureSecret(t, "show", "--raw", name)
+		require.Error(t, err)
+
+		_, err = runAzureSecret(t, "restore", name)
+		require.NoError(t, err)
+
+		stdout, err := runAzureSecret(t, "show", "--raw", name)
+		require.NoError(t, err)
+		assert.Equal(t, "v1", stdout)
+	})
+}

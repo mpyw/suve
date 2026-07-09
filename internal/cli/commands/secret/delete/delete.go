@@ -190,7 +190,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 
 	switch {
 	case opts.Force:
-		options = append(options, awssecret.ForceDelete{})
+		options = append(options, provider.ForceDelete{})
 	case opts.RecoveryWindow > 0:
 		options = append(options, awssecret.RecoveryWindow{Days: int64(opts.RecoveryWindow)})
 	}

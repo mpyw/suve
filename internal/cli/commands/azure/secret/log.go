@@ -203,7 +203,7 @@ func (p *logPresenter) RenderPatch(stdout, stderr io.Writer, i int, parseJSON, r
 func LogCommand() *cli.Command {
 	return genericlog.Command(genericlog.Config{
 		Usage:     "Show secret version history",
-		ArgsUsage: "<name>",
+		ArgsUsage: argsUsageName,
 		Description: `Display the version history of a secret, showing each version's
 opaque id, state (enabled/disabled), and creation date.
 

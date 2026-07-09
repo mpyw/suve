@@ -108,7 +108,7 @@ func deleteOptions(o *DeleteOptions) []provider.DeleteOption {
 
 	switch {
 	case o.Force:
-		return []provider.DeleteOption{awssecret.ForceDelete{}}
+		return []provider.DeleteOption{provider.ForceDelete{}}
 	case o.RecoveryWindow > 0:
 		return []provider.DeleteOption{awssecret.RecoveryWindow{Days: int64(o.RecoveryWindow)}}
 	default:

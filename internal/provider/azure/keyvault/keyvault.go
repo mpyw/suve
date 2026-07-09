@@ -47,6 +47,7 @@ type Client interface {
 		ctx context.Context, name string, params azsecrets.SetSecretParameters,
 	) (azsecrets.SetSecretResponse, error)
 	DeleteSecret(ctx context.Context, name string) (azsecrets.DeleteSecretResponse, error)
+	RecoverDeletedSecret(ctx context.Context, name string) (azsecrets.RecoverDeletedSecretResponse, error)
 	UpdateSecretProperties(
 		ctx context.Context, name, version string, params azsecrets.UpdateSecretPropertiesParameters,
 	) (azsecrets.UpdateSecretPropertiesResponse, error)
@@ -54,14 +55,19 @@ type Client interface {
 	ListSecretPropertiesVersions(ctx context.Context, name string) ([]*azsecrets.SecretProperties, error)
 }
 
-// Store is the Key Vault implementation of provider.Store. Like the Google
-// Cloud secret store it implements neither Restorer nor Describer.
+// Store is the Key Vault implementation of provider.Store. It also implements
+// the optional Restorer capability (soft-delete recovery); it does not
+// implement Describer.
 type Store struct {
 	client Client
 }
 
-// Compile-time assertion that Store implements the provider contract.
-var _ provider.Store = (*Store)(nil)
+// Compile-time assertions that Store implements the provider contract and the
+// optional Restorer capability (soft-delete recovery).
+var (
+	_ provider.Store    = (*Store)(nil)
+	_ provider.Restorer = (*Store)(nil)
+)
 
 // New builds a Store backed by the given client.
 func New(client Client) *Store {
@@ -248,11 +254,22 @@ func (s *Store) setSecret(ctx context.Context, name, value string) (domain.Versi
 	return domain.Version{ID: versionID(resp.ID)}, nil
 }
 
-// Delete deletes a secret. Key Vault delete is a soft-delete when the vault has
-// soft-delete enabled; provider.DeleteOptions (AWS-specific) are ignored.
+// Restore recovers a soft-deleted secret (RecoverDeletedSecret). It makes the
+// store satisfy provider.Restorer, mirroring AWS Secrets Manager's restore.
+func (s *Store) Restore(ctx context.Context, name string) error {
+	if _, err := s.client.RecoverDeletedSecret(ctx, name); err != nil {
+		return mapError(err, name, "restore secret")
+	}
+
+	return nil
+}
+
+// Delete soft-deletes a secret when the vault has soft-delete enabled (the
+// default); use Restore to recover it within the vault's retention window. All
+// delete options are ignored: Key Vault has no per-delete recovery window (that
+// is a vault property), and force-delete/purge is intentionally unsupported.
 func (s *Store) Delete(ctx context.Context, name string, _ ...provider.DeleteOption) error {
-	_, err := s.client.DeleteSecret(ctx, name)
-	if err != nil {
+	if _, err := s.client.DeleteSecret(ctx, name); err != nil {
 		return mapError(err, name, "delete secret")
 	}
 

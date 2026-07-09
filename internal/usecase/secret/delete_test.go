@@ -104,11 +104,11 @@ func TestDeleteUseCase_Execute_ForwardsForceDelete(t *testing.T) {
 
 	_, err := uc.Execute(t.Context(), secret.DeleteInput{
 		Name:    "my-secret",
-		Options: []provider.DeleteOption{awssecret.ForceDelete{}},
+		Options: []provider.DeleteOption{provider.ForceDelete{}},
 	})
 	require.NoError(t, err)
 	require.Len(t, gotOpts, 1)
-	assert.IsType(t, awssecret.ForceDelete{}, gotOpts[0])
+	assert.IsType(t, provider.ForceDelete{}, gotOpts[0])
 }
 
 // TestDeleteUseCase_Execute_ForwardsRecoveryWindow is a genuine anti-regression

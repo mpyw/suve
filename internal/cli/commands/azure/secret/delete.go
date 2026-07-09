@@ -32,16 +32,16 @@ func DeleteCommand() *cli.Command {
 		Name:      "delete",
 		Aliases:   []string{"rm"},
 		Usage:     "Delete a secret",
-		ArgsUsage: "<name>",
+		ArgsUsage: argsUsageName,
 		Description: `Delete a secret and all its versions from Azure Key Vault.
 
 When the vault has soft-delete enabled, the secret is recoverable within the
-vault's retention window via the Azure portal/CLI; otherwise deletion is
-permanent.
+vault's retention window (use 'suve azure secret restore'); otherwise deletion
+is permanent.
 
 EXAMPLES:
-   suve azure secret delete my-secret        Delete (with confirmation)
-   suve azure secret delete --yes my-secret  Delete without confirmation`,
+   suve azure secret delete my-secret          Soft-delete (with confirmation)
+   suve azure secret delete --yes my-secret    Soft-delete without confirmation`,
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
 				Name:  "yes",

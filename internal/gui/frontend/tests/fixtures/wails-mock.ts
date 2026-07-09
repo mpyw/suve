@@ -275,7 +275,7 @@ export const defaultCapabilities: ProviderCapability[] = [
     scopeFields: [],
     services: [
       { service: 'param', displayName: 'App Configuration', hasVersionHistory: false, hasVersionSpecifiers: false, hasTags: true, tagsPerVersion: false, hasRestore: false, hasStaging: true, hasForceDelete: false, hasRecoveryWindow: false, hasNamespaces: true },
-      { service: 'secret', displayName: 'Key Vault', hasVersionHistory: true, hasVersionSpecifiers: true, hasTags: true, tagsPerVersion: true, hasRestore: false, hasStaging: true, hasForceDelete: false, hasRecoveryWindow: false, hasNamespaces: false },
+      { service: 'secret', displayName: 'Key Vault', hasVersionHistory: true, hasVersionSpecifiers: true, hasTags: true, tagsPerVersion: true, hasRestore: true, hasStaging: true, hasForceDelete: false, hasRecoveryWindow: false, hasNamespaces: false },
     ],
   },
 ];
@@ -1094,8 +1094,14 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
         if (existing) existing.value = value;
         return { name, versionId: 'v2', arn: '' };
       },
-      SecretDelete: async (name: string) => {
+      SecretDelete: async (name: string, force?: boolean) => {
+        const removed = state.secrets.filter((s: any) => s.name === name);
         state.secrets = state.secrets.filter((s: any) => s.name !== name);
+        // Soft-delete keeps the secret recoverable; force purges it for good.
+        if (!force) {
+          (window as any).__softDeleted = (window as any).__softDeleted ?? [];
+          (window as any).__softDeleted.push(...removed);
+        }
         return { name, deletionDate: new Date().toISOString(), arn: '' };
       },
       SecretDiff: async (spec1: string, spec2: string) => {
@@ -1120,7 +1126,15 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
         };
       },
       SecretRestore: async (name: string) => {
-        return { name, arn: `arn:aws:secretsmanager:us-east-1:123456789:secret:${name}` };
+        // Recover a soft-deleted secret back into the listing (purged ones stay
+        // gone). Mirrors RecoverDeletedSecret.
+        const soft = ((window as any).__softDeleted ?? []) as any[];
+        const idx = soft.findIndex((s) => s.name === name);
+        if (idx >= 0) {
+          state.secrets.push(soft[idx]);
+          soft.splice(idx, 1);
+        }
+        return { name, arn: '' };
       },
       SecretAddTag: async (name: string, key: string, value: string) => {
         if (!state.secretTags[name]) state.secretTags[name] = [];
