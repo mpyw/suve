@@ -330,7 +330,14 @@
     // Steady-state, AWS-only: no retry wrapping (a real failure must not hammer).
     try {
       const staged = await StagingStatus();
-      stagingCount = (staged?.param?.length ?? 0) + (staged?.secret?.length ?? 0);
+      // Include tag-only staged changes (paramTags/secretTags) so the badge
+      // matches the Staging tab's total; otherwise a tag-only stage shows 0
+      // until the Staging view recomputes.
+      stagingCount =
+        (staged?.param?.length ?? 0) +
+        (staged?.secret?.length ?? 0) +
+        (staged?.paramTags?.length ?? 0) +
+        (staged?.secretTags?.length ?? 0);
     } catch {
       stagingCount = 0;
     }

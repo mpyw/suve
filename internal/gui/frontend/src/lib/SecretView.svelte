@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onDestroy, onMount } from 'svelte';
+  import { onDestroy, onMount, untrack } from 'svelte';
   import { SecretAddTag, SecretCreate, SecretDelete, SecretDiff, SecretList, SecretLog, SecretRemoveTag, SecretRestore, SecretShow, SecretUpdate, StagingAdd, StagingAddTag, StagingCheckStatus, StagingDelete, StagingEdit, StagingRemoveTag } from '../../wailsjs/go/gui/App';
   import type { gui } from '../../wailsjs/go/models';
   import DiffDisplay from './DiffDisplay.svelte';
@@ -63,11 +63,13 @@
     withValue: boolean;
   }
 
-  // Reload when filter options change
+  // Reload when the checkbox changes. prefix/filter are intentionally NOT
+  // dependencies — the debounced oninput handlers own text-input reloads, so
+  // typing doesn't fire a backend list on every keystroke.
   $effect(() => {
-    const opts = { prefix, filter, withValue }; // read values to create dependencies
+    const trackedWithValue = withValue;
     if (initialLoadDone) {
-      loadSecrets(opts);
+      loadSecrets(untrack(() => ({ prefix, filter, withValue: trackedWithValue })));
     }
   });
 
