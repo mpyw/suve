@@ -117,6 +117,10 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		paramType = "SecureString"
 	}
 
+	if err := paramtype.Validate(paramType); err != nil {
+		return err
+	}
+
 	if err := paramopts.ValidateTier(cmd.String("tier")); err != nil {
 		return err
 	}

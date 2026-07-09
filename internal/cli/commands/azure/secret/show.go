@@ -21,6 +21,7 @@ import (
 type showJSONOutput struct {
 	Name    string            `json:"name"`
 	Version string            `json:"version,omitempty"`
+	State   string            `json:"state,omitempty"`
 	Created string            `json:"created,omitempty"`
 	Tags    map[string]string `json:"tags"`
 	Value   string            `json:"value"`
@@ -94,6 +95,7 @@ func (p *showPresenter) RenderJSON(stdout io.Writer, value string) error {
 	jsonOut := showJSONOutput{
 		Name:    result.Name,
 		Version: result.Version,
+		State:   result.State,
 		Value:   value,
 	}
 
