@@ -44,6 +44,8 @@ type mockClient struct {
 	updateFunc   func(ctx context.Context, name, version string, params updParams) (updResp, error)
 	listFunc     func(ctx context.Context) ([]*azsecrets.SecretProperties, error)
 	listVersFunc func(ctx context.Context, name string) ([]*azsecrets.SecretProperties, error)
+	recoverFunc  func(ctx context.Context, name string) (azsecrets.RecoverDeletedSecretResponse, error)
+	purgeFunc    func(ctx context.Context, name string) (azsecrets.PurgeDeletedSecretResponse, error)
 }
 
 func (m *mockClient) GetSecret(ctx context.Context, name, version string) (azsecrets.GetSecretResponse, error) {
@@ -58,6 +60,18 @@ func (m *mockClient) SetSecret(
 
 func (m *mockClient) DeleteSecret(ctx context.Context, name string) (azsecrets.DeleteSecretResponse, error) {
 	return m.deleteFunc(ctx, name)
+}
+
+func (m *mockClient) RecoverDeletedSecret(
+	ctx context.Context, name string,
+) (azsecrets.RecoverDeletedSecretResponse, error) {
+	return m.recoverFunc(ctx, name)
+}
+
+func (m *mockClient) PurgeDeletedSecret(
+	ctx context.Context, name string,
+) (azsecrets.PurgeDeletedSecretResponse, error) {
+	return m.purgeFunc(ctx, name)
 }
 
 func (m *mockClient) UpdateSecretProperties(
@@ -292,6 +306,49 @@ func TestDelete(t *testing.T) {
 
 	require.NoError(t, store.Delete(t.Context(), "my-secret"))
 	assert.Equal(t, "my-secret", deleted)
+}
+
+func TestDelete_Force_Purges(t *testing.T) {
+	t.Parallel()
+
+	var deleted, purged string
+
+	m := &mockClient{
+		deleteFunc: func(_ context.Context, name string) (azsecrets.DeleteSecretResponse, error) {
+			deleted = name
+
+			return azsecrets.DeleteSecretResponse{}, nil
+		},
+		purgeFunc: func(_ context.Context, name string) (azsecrets.PurgeDeletedSecretResponse, error) {
+			purged = name
+
+			return azsecrets.PurgeDeletedSecretResponse{}, nil
+		},
+	}
+	store := keyvault.New(m)
+
+	// provider.ForceDelete: soft-delete THEN purge (no recovery window left).
+	require.NoError(t, store.Delete(t.Context(), "my-secret", provider.ForceDelete{}))
+	assert.Equal(t, "my-secret", deleted)
+	assert.Equal(t, "my-secret", purged, "force delete must purge after the soft-delete")
+}
+
+func TestRestore(t *testing.T) {
+	t.Parallel()
+
+	var recovered string
+
+	m := &mockClient{
+		recoverFunc: func(_ context.Context, name string) (azsecrets.RecoverDeletedSecretResponse, error) {
+			recovered = name
+
+			return azsecrets.RecoverDeletedSecretResponse{}, nil
+		},
+	}
+	store := keyvault.New(m)
+
+	require.NoError(t, store.Restore(t.Context(), "my-secret"))
+	assert.Equal(t, "my-secret", recovered)
 }
 
 func TestTag(t *testing.T) {

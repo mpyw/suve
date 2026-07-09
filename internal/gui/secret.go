@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/mpyw/suve/internal/provider"
-	awssecret "github.com/mpyw/suve/internal/provider/aws/secret"
 	"github.com/mpyw/suve/internal/timeutil"
 	"github.com/mpyw/suve/internal/usecase/secret"
 )
@@ -291,7 +290,9 @@ func (a *App) SecretDelete(name string, force bool) (*SecretDeleteResult, error)
 
 	var options []provider.DeleteOption
 	if force {
-		options = append(options, awssecret.ForceDelete{})
+		// Neutral force-delete: AWS maps it to ForceDeleteWithoutRecovery, Azure
+		// Key Vault soft-deletes then purges. One option works for both.
+		options = append(options, provider.ForceDelete{})
 	}
 
 	result, err := uc.Execute(a.ctx, secret.DeleteInput{

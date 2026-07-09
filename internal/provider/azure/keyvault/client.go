@@ -39,6 +39,18 @@ func (a *apiClient) DeleteSecret(
 	return a.c.DeleteSecret(ctx, name, nil)
 }
 
+func (a *apiClient) RecoverDeletedSecret(
+	ctx context.Context, name string,
+) (azsecrets.RecoverDeletedSecretResponse, error) {
+	return a.c.RecoverDeletedSecret(ctx, name, nil)
+}
+
+func (a *apiClient) PurgeDeletedSecret(
+	ctx context.Context, name string,
+) (azsecrets.PurgeDeletedSecretResponse, error) {
+	return a.c.PurgeDeletedSecret(ctx, name, nil)
+}
+
 func (a *apiClient) UpdateSecretProperties(
 	ctx context.Context, name, version string, params azsecrets.UpdateSecretPropertiesParameters,
 ) (azsecrets.UpdateSecretPropertiesResponse, error) {
