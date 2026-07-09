@@ -25,6 +25,10 @@
   // Capability-driven visibility. Absent capability defaults to AWS-like (true).
   const stagingEnabled = $derived(capability?.hasStaging ?? true);
   const tagsEnabled = $derived(capability?.hasTags ?? true);
+  // Azure Key Vault scopes tags per version: show them inside each Version
+  // History entry (add/remove only on the latest) instead of one resource-level
+  // list. Every other provider keeps the single top-level TagList.
+  const tagsPerVersion = $derived(capability?.tagsPerVersion ?? false);
   const historyEnabled = $derived(capability?.hasVersionHistory ?? true);
   const restoreEnabled = $derived(capability?.hasRestore ?? true);
   const forceDeleteEnabled = $derived(capability?.hasForceDelete ?? true);
@@ -589,7 +593,7 @@
               </div>
             {/if}
 
-            {#if tagsEnabled}
+            {#if tagsEnabled && !tagsPerVersion}
               <TagList tags={secretDetail.tags} serviceClass="secret" {provider} onadd={openTagModal} onremove={openRemoveTagModal} />
             {/if}
 
@@ -644,6 +648,28 @@
                           </div>
                         {/if}
                         <pre class="history-value" class:masked={!showValue}>{showValue ? formatJsonValue(logEntry.value) : maskValue(logEntry.value)}</pre>
+                        {#if tagsPerVersion && tagsEnabled}
+                          <div class="history-tags">
+                            <span class="history-tags-label">Tags</span>
+                            {#if (logEntry.tags || []).length > 0}
+                              {#each logEntry.tags as tag}
+                                <span class="tag-item">
+                                  <span class="tag-key secret">{tag.key}</span>
+                                  <span class="tag-separator">=</span>
+                                  <span class="tag-value">{tag.value}</span>
+                                  {#if logEntry.isCurrent}
+                                    <button class="btn-tag-remove" onclick={() => openRemoveTagModal(tag.key)} title="Remove tag">×</button>
+                                  {/if}
+                                </span>
+                              {/each}
+                            {:else}
+                              <span class="no-tags-inline">no tags</span>
+                            {/if}
+                            {#if logEntry.isCurrent}
+                              <button class="btn-tag-add-sm" onclick={openTagModal}>+ Add</button>
+                            {/if}
+                          </div>
+                        {/if}
                       </div>
                     </li>
                   {/each}

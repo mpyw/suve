@@ -76,6 +76,8 @@ type SecretLogEntry struct {
 	Value         string   `json:"value"`
 	IsCurrent     bool     `json:"isCurrent"`
 	Created       string   `json:"created,omitempty"`
+	// Tags attached to THIS version (Azure Key Vault only; empty otherwise).
+	Tags []SecretShowTag `json:"tags"`
 }
 
 // SecretCreateResult represents the result of creating a secret.
@@ -216,9 +218,14 @@ func (a *App) SecretLog(name string, maxResults int32) (*SecretLogResult, error)
 			State:         e.State,
 			Value:         e.Value,
 			IsCurrent:     e.IsCurrent,
+			Tags:          make([]SecretShowTag, 0, len(e.Tags)),
 		}
 		if e.CreatedDate != nil {
 			entry.Created = timeutil.FormatRFC3339(*e.CreatedDate)
+		}
+
+		for _, tag := range e.Tags {
+			entry.Tags = append(entry.Tags, SecretShowTag{Key: tag.Key, Value: tag.Value})
 		}
 
 		entries[i] = entry

@@ -53,6 +53,10 @@ type Version struct {
 	StagingLabels []string
 	// Created is the version creation time, if known.
 	Created *time.Time
+	// Tags are the labels attached to THIS version. Only Azure Key Vault scopes
+	// tags per version (each version has its own); every other provider keeps
+	// tags at the resource level (see Entry.Tags) and leaves this nil.
+	Tags []Tag
 }
 
 // Tag is a single key/value label attached to an entry.
