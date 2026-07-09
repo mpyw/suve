@@ -118,14 +118,14 @@ func TestRun_ApplyBothServices(t *testing.T) {
 	store := testutil.NewMockStore()
 
 	// Stage SSM Parameter Store parameter
-	_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
+	_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("param-value"),
 		StagedAt:  time.Now(),
 	})
 
 	// Stage Secrets Manager secret
-	_ = store.StageEntry(t.Context(), staging.ServiceSecret, "my-secret", staging.Entry{
+	_ = store.StageEntry(t.Context(), staging.ServiceSecret, staging.EntryKey{Name: "my-secret"}, staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("secret-value"),
 		StagedAt:  time.Now(),
@@ -172,9 +172,9 @@ func TestRun_ApplyBothServices(t *testing.T) {
 	assert.Contains(t, buf.String(), "Secrets Manager: Updated my-secret")
 
 	// Verify both unstaged
-	_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/config", "")
+	_, err = store.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config", Namespace: ""})
 	assert.Equal(t, staging.ErrNotStaged, err)
-	_, err = store.GetEntry(t.Context(), staging.ServiceSecret, "my-secret", "")
+	_, err = store.GetEntry(t.Context(), staging.ServiceSecret, staging.EntryKey{Name: "my-secret", Namespace: ""})
 	assert.Equal(t, staging.ErrNotStaged, err)
 }
 
@@ -184,7 +184,7 @@ func TestRun_ApplyParamOnly(t *testing.T) {
 	store := testutil.NewMockStore()
 
 	// Stage only SSM Parameter Store parameter
-	_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
+	_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("param-value"),
 		StagedAt:  time.Now(),
@@ -221,7 +221,7 @@ func TestRun_ApplySecretOnly(t *testing.T) {
 	store := testutil.NewMockStore()
 
 	// Stage only Secrets Manager secret
-	_ = store.StageEntry(t.Context(), staging.ServiceSecret, "my-secret", staging.Entry{
+	_ = store.StageEntry(t.Context(), staging.ServiceSecret, staging.EntryKey{Name: "my-secret"}, staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("secret-value"),
 		StagedAt:  time.Now(),
@@ -258,11 +258,12 @@ func TestRun_ApplyDelete(t *testing.T) {
 	store := testutil.NewMockStore()
 
 	// Stage deletes
-	_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/old", staging.Entry{
+	_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/old"}, staging.Entry{
 		Operation: staging.OperationDelete,
 		StagedAt:  time.Now(),
 	})
-	_ = store.StageEntry(t.Context(), staging.ServiceSecret, "old-secret", staging.Entry{
+
+	_ = store.StageEntry(t.Context(), staging.ServiceSecret, staging.EntryKey{Name: "old-secret"}, staging.Entry{
 		Operation: staging.OperationDelete,
 		StagedAt:  time.Now(),
 	})
@@ -308,12 +309,13 @@ func TestRun_PartialFailure(t *testing.T) {
 	store := testutil.NewMockStore()
 
 	// Stage both
-	_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
+	_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("param-value"),
 		StagedAt:  time.Now(),
 	})
-	_ = store.StageEntry(t.Context(), staging.ServiceSecret, "my-secret", staging.Entry{
+
+	_ = store.StageEntry(t.Context(), staging.ServiceSecret, staging.EntryKey{Name: "my-secret"}, staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("secret-value"),
 		StagedAt:  time.Now(),
@@ -344,12 +346,12 @@ func TestRun_PartialFailure(t *testing.T) {
 	assert.Contains(t, err.Error(), "applied 1, failed 1")
 
 	// SSM Parameter Store should still be staged (failed)
-	entry, err := store.GetEntry(t.Context(), staging.ServiceParam, "/app/config", "")
+	entry, err := store.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config", Namespace: ""})
 	require.NoError(t, err)
 	assert.Equal(t, "param-value", lo.FromPtr(entry.Value))
 
 	// Secrets Manager should be unstaged (succeeded)
-	_, err = store.GetEntry(t.Context(), staging.ServiceSecret, "my-secret", "")
+	_, err = store.GetEntry(t.Context(), staging.ServiceSecret, staging.EntryKey{Name: "my-secret", Namespace: ""})
 	assert.Equal(t, staging.ErrNotStaged, err)
 }
 
@@ -380,7 +382,7 @@ func TestRun_SecretDeleteWithForce(t *testing.T) {
 	store := testutil.NewMockStore()
 
 	// Stage Secrets Manager delete with force option
-	_ = store.StageEntry(t.Context(), staging.ServiceSecret, "my-secret", staging.Entry{
+	_ = store.StageEntry(t.Context(), staging.ServiceSecret, staging.EntryKey{Name: "my-secret"}, staging.Entry{
 		Operation: staging.OperationDelete,
 		StagedAt:  time.Now(),
 		DeleteOptions: &staging.DeleteOptions{
@@ -419,7 +421,7 @@ func TestRun_SecretDeleteWithRecoveryWindow(t *testing.T) {
 	store := testutil.NewMockStore()
 
 	// Stage Secrets Manager delete with custom recovery window
-	_ = store.StageEntry(t.Context(), staging.ServiceSecret, "my-secret", staging.Entry{
+	_ = store.StageEntry(t.Context(), staging.ServiceSecret, staging.EntryKey{Name: "my-secret"}, staging.Entry{
 		Operation: staging.OperationDelete,
 		StagedAt:  time.Now(),
 		DeleteOptions: &staging.DeleteOptions{
@@ -457,7 +459,7 @@ func TestRun_ParamDeleteError(t *testing.T) {
 
 	store := testutil.NewMockStore()
 
-	_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
+	_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 		Operation: staging.OperationDelete,
 		StagedAt:  time.Now(),
 	})
@@ -487,7 +489,7 @@ func TestRun_SecretSetError(t *testing.T) {
 
 	store := testutil.NewMockStore()
 
-	_ = store.StageEntry(t.Context(), staging.ServiceSecret, "my-secret", staging.Entry{
+	_ = store.StageEntry(t.Context(), staging.ServiceSecret, staging.EntryKey{Name: "my-secret"}, staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("value"),
 		StagedAt:  time.Now(),
@@ -518,7 +520,7 @@ func TestRun_SecretDeleteError(t *testing.T) {
 
 	store := testutil.NewMockStore()
 
-	_ = store.StageEntry(t.Context(), staging.ServiceSecret, "my-secret", staging.Entry{
+	_ = store.StageEntry(t.Context(), staging.ServiceSecret, staging.EntryKey{Name: "my-secret"}, staging.Entry{
 		Operation: staging.OperationDelete,
 		StagedAt:  time.Now(),
 	})
@@ -548,7 +550,7 @@ func TestRun_ParamSetError(t *testing.T) {
 
 	store := testutil.NewMockStore()
 
-	_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
+	_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("value"),
 		StagedAt:  time.Now(),
@@ -580,7 +582,7 @@ func TestRun_ConflictDetection_CreateConflict(t *testing.T) {
 	store := testutil.NewMockStore()
 
 	// Stage a create operation
-	_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/new-param", staging.Entry{
+	_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/new-param"}, staging.Entry{
 		Operation: staging.OperationCreate,
 		Value:     lo.ToPtr("new-value"),
 		StagedAt:  time.Now(),
@@ -613,7 +615,7 @@ func TestRun_ConflictDetection_UpdateConflict(t *testing.T) {
 	store := testutil.NewMockStore()
 
 	baseTime := time.Now().Add(-1 * time.Hour)
-	_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
+	_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 		Operation:      staging.OperationUpdate,
 		Value:          lo.ToPtr("updated-value"),
 		StagedAt:       time.Now(),
@@ -647,7 +649,7 @@ func TestRun_ConflictDetection_DeleteConflict(t *testing.T) {
 	store := testutil.NewMockStore()
 
 	baseTime := time.Now().Add(-1 * time.Hour)
-	_ = store.StageEntry(t.Context(), staging.ServiceSecret, "my-secret", staging.Entry{
+	_ = store.StageEntry(t.Context(), staging.ServiceSecret, staging.EntryKey{Name: "my-secret"}, staging.Entry{
 		Operation:      staging.OperationDelete,
 		StagedAt:       time.Now(),
 		BaseModifiedAt: &baseTime,
@@ -680,7 +682,7 @@ func TestRun_ConflictDetection_IgnoreConflicts(t *testing.T) {
 	store := testutil.NewMockStore()
 
 	baseTime := time.Now().Add(-1 * time.Hour)
-	_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
+	_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 		Operation:      staging.OperationUpdate,
 		Value:          lo.ToPtr("updated-value"),
 		StagedAt:       time.Now(),
@@ -719,7 +721,7 @@ func TestRun_ConflictDetection_NoConflict(t *testing.T) {
 	store := testutil.NewMockStore()
 
 	baseTime := time.Now()
-	_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
+	_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 		Operation:      staging.OperationUpdate,
 		Value:          lo.ToPtr("updated-value"),
 		StagedAt:       time.Now(),
@@ -760,7 +762,7 @@ func TestRun_ConflictDetection_BothServices(t *testing.T) {
 	baseTime := time.Now().Add(-1 * time.Hour)
 
 	// Stage param with conflict
-	_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
+	_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 		Operation:      staging.OperationUpdate,
 		Value:          lo.ToPtr("param-value"),
 		StagedAt:       time.Now(),
@@ -768,7 +770,7 @@ func TestRun_ConflictDetection_BothServices(t *testing.T) {
 	})
 
 	// Stage secret with conflict
-	_ = store.StageEntry(t.Context(), staging.ServiceSecret, "my-secret", staging.Entry{
+	_ = store.StageEntry(t.Context(), staging.ServiceSecret, staging.EntryKey{Name: "my-secret"}, staging.Entry{
 		Operation:      staging.OperationUpdate,
 		Value:          lo.ToPtr("secret-value"),
 		StagedAt:       time.Now(),
@@ -805,7 +807,7 @@ func TestRun_ApplyCreate(t *testing.T) {
 	store := testutil.NewMockStore()
 
 	// Stage create operation
-	_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/new-param", staging.Entry{
+	_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/new-param"}, staging.Entry{
 		Operation: staging.OperationCreate,
 		Value:     lo.ToPtr("new-value"),
 		StagedAt:  time.Now(),
@@ -837,7 +839,7 @@ func TestRun_ApplyTagsSuccess(t *testing.T) {
 	store := testutil.NewMockStore()
 
 	// Stage tag changes
-	_ = store.StageTag(t.Context(), staging.ServiceParam, "/app/config", staging.TagEntry{
+	_ = store.StageTag(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.TagEntry{
 		Add:      map[string]string{"env": "prod", "team": "api"},
 		Remove:   maputil.NewSet("deprecated"),
 		StagedAt: time.Now(),
@@ -874,7 +876,7 @@ func TestRun_ApplyTagsSuccess(t *testing.T) {
 	assert.Contains(t, buf.String(), "-1")
 
 	// Verify tag was unstaged
-	_, err = store.GetTag(t.Context(), staging.ServiceParam, "/app/config")
+	_, err = store.GetTag(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"})
 	assert.Equal(t, staging.ErrNotStaged, err)
 }
 
@@ -884,7 +886,7 @@ func TestRun_ApplyTagsError(t *testing.T) {
 	store := testutil.NewMockStore()
 
 	// Stage tag changes
-	_ = store.StageTag(t.Context(), staging.ServiceParam, "/app/config", staging.TagEntry{
+	_ = store.StageTag(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.TagEntry{
 		Add:      map[string]string{"env": "prod"},
 		StagedAt: time.Now(),
 	})
@@ -911,7 +913,7 @@ func TestRun_ApplyTagsError(t *testing.T) {
 	assert.Contains(t, errBuf.String(), "(tags)")
 
 	// Verify tag was NOT unstaged (failed)
-	_, err = store.GetTag(t.Context(), staging.ServiceParam, "/app/config")
+	_, err = store.GetTag(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"})
 	require.NoError(t, err)
 }
 
@@ -921,7 +923,7 @@ func TestRun_ApplyTagsSecretService(t *testing.T) {
 	store := testutil.NewMockStore()
 
 	// Stage secret tag changes
-	_ = store.StageTag(t.Context(), staging.ServiceSecret, "my-secret", staging.TagEntry{
+	_ = store.StageTag(t.Context(), staging.ServiceSecret, staging.EntryKey{Name: "my-secret"}, staging.TagEntry{
 		Add:      map[string]string{"env": "staging"},
 		StagedAt: time.Now(),
 	})
@@ -959,14 +961,14 @@ func TestRun_ApplyBothEntriesAndTags(t *testing.T) {
 	store := testutil.NewMockStore()
 
 	// Stage entry change
-	_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
+	_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("updated-value"),
 		StagedAt:  time.Now(),
 	})
 
 	// Stage tag change (different resource)
-	_ = store.StageTag(t.Context(), staging.ServiceParam, "/app/other", staging.TagEntry{
+	_ = store.StageTag(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/other"}, staging.TagEntry{
 		Add:      map[string]string{"env": "prod"},
 		StagedAt: time.Now(),
 	})
@@ -1010,7 +1012,7 @@ func TestRun_ApplyTagsOnlyAdditions(t *testing.T) {
 	store := testutil.NewMockStore()
 
 	// Stage tag changes with only additions
-	_ = store.StageTag(t.Context(), staging.ServiceParam, "/app/config", staging.TagEntry{
+	_ = store.StageTag(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.TagEntry{
 		Add:      map[string]string{"env": "prod"},
 		StagedAt: time.Now(),
 	})
@@ -1042,7 +1044,7 @@ func TestRun_ApplyTagsOnlyRemovals(t *testing.T) {
 	store := testutil.NewMockStore()
 
 	// Stage tag changes with only removals
-	_ = store.StageTag(t.Context(), staging.ServiceParam, "/app/config", staging.TagEntry{
+	_ = store.StageTag(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.TagEntry{
 		Remove:   maputil.NewSet("old-tag", "deprecated"),
 		StagedAt: time.Now(),
 	})
@@ -1074,7 +1076,7 @@ func TestRun_FormatTagApplySummaryEmpty(t *testing.T) {
 	store := testutil.NewMockStore()
 
 	// Stage tag changes with both empty add and remove
-	_ = store.StageTag(t.Context(), staging.ServiceParam, "/app/config", staging.TagEntry{
+	_ = store.StageTag(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.TagEntry{
 		StagedAt: time.Now(),
 	})
 
@@ -1105,7 +1107,7 @@ func TestRun_ListTagsError(t *testing.T) {
 	store.ListTagsErr = errors.New("mock list tags error")
 
 	// Stage some entries so we get past the first ListEntries call
-	_ = store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
+	_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("param-value"),
 		StagedAt:  time.Now(),

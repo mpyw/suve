@@ -68,12 +68,12 @@ func TestStatusUseCase_Execute_WithEntries(t *testing.T) {
 	now := time.Now().Truncate(time.Second)
 
 	// Stage some entries
-	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
+	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("new-value"),
 		StagedAt:  now,
 	}))
-	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/secret", staging.Entry{
+	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/secret"}, staging.Entry{
 		Operation: staging.OperationDelete,
 		StagedAt:  now,
 	}))
@@ -94,7 +94,7 @@ func TestStatusUseCase_Execute_FilterByName(t *testing.T) {
 	store := testutil.NewMockStore()
 	now := time.Now()
 
-	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
+	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("value"),
 		StagedAt:  now,
@@ -123,7 +123,7 @@ func TestStatusUseCase_Execute_SecretWithDeleteOptions(t *testing.T) {
 	store := testutil.NewMockStore()
 	now := time.Now()
 
-	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceSecret, "my-secret", staging.Entry{
+	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceSecret, staging.EntryKey{Name: "my-secret"}, staging.Entry{
 		Operation: staging.OperationDelete,
 		StagedAt:  now,
 		DeleteOptions: &staging.DeleteOptions{
@@ -186,11 +186,11 @@ func TestStatusUseCase_Execute_WithTagEntries(t *testing.T) {
 	now := time.Now().Truncate(time.Second)
 
 	// Stage tag entries
-	require.NoError(t, store.StageTag(t.Context(), staging.ServiceParam, "/app/config", staging.TagEntry{
+	require.NoError(t, store.StageTag(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.TagEntry{
 		Add:      map[string]string{"env": "prod", "team": "backend"},
 		StagedAt: now,
 	}))
-	require.NoError(t, store.StageTag(t.Context(), staging.ServiceParam, "/app/secret", staging.TagEntry{
+	require.NoError(t, store.StageTag(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/secret"}, staging.TagEntry{
 		Remove:   map[string]struct{}{"deprecated": {}},
 		StagedAt: now,
 	}))
@@ -232,7 +232,7 @@ func TestStatusUseCase_Execute_FilterByName_TagEntry(t *testing.T) {
 	now := time.Now()
 
 	// Stage only tag entry (no regular entry)
-	require.NoError(t, store.StageTag(t.Context(), staging.ServiceParam, "/app/config", staging.TagEntry{
+	require.NoError(t, store.StageTag(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.TagEntry{
 		Add:      map[string]string{"env": "prod"},
 		StagedAt: now,
 	}))
@@ -258,12 +258,12 @@ func TestStatusUseCase_Execute_FilterByName_BothEntryAndTag(t *testing.T) {
 	now := time.Now()
 
 	// Stage both regular entry and tag entry
-	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
+	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("new-value"),
 		StagedAt:  now,
 	}))
-	require.NoError(t, store.StageTag(t.Context(), staging.ServiceParam, "/app/config", staging.TagEntry{
+	require.NoError(t, store.StageTag(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.TagEntry{
 		Add:      map[string]string{"env": "prod"},
 		StagedAt: now,
 	}))

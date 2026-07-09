@@ -108,9 +108,10 @@ func (u *ResetUseCase) unstageAll(ctx context.Context, serviceName, itemName str
 
 func (u *ResetUseCase) unstage(ctx context.Context, name, namespace, _, _ string) (*ResetOutput, error) {
 	service := u.Parser.Service()
+	key := staging.EntryKey{Name: name, Namespace: namespace}
 
 	// Load current state (nil CurrentValue since we don't care about AWS state for reset)
-	entryState, err := transition.LoadEntryState(ctx, u.Store, service, name, namespace, nil)
+	entryState, err := transition.LoadEntryState(ctx, u.Store, service, key, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -125,7 +126,7 @@ func (u *ResetUseCase) unstage(ctx context.Context, name, namespace, _, _ string
 
 	// Execute the reset transition
 	executor := transition.NewExecutor(u.Store)
-	if _, err := executor.ExecuteEntry(ctx, service, name, namespace, entryState, transition.EntryActionReset{}, nil); err != nil {
+	if _, err := executor.ExecuteEntry(ctx, service, key, entryState, transition.EntryActionReset{}, nil); err != nil {
 		return nil, err
 	}
 
@@ -137,6 +138,7 @@ func (u *ResetUseCase) unstage(ctx context.Context, name, namespace, _, _ string
 
 func (u *ResetUseCase) restore(ctx context.Context, spec, name, namespace string) (*ResetOutput, error) {
 	service := u.Parser.Service()
+	key := staging.EntryKey{Name: name, Namespace: namespace}
 
 	if u.Fetcher == nil {
 		return nil, errors.New("reset strategy required for restore operation")
@@ -156,7 +158,7 @@ func (u *ResetUseCase) restore(ctx context.Context, spec, name, namespace string
 	currentValue := &fetchResult.Value
 
 	// Load current state with AWS value for auto-skip
-	entryState, err := transition.LoadEntryState(ctx, u.Store, service, name, namespace, currentValue)
+	entryState, err := transition.LoadEntryState(ctx, u.Store, service, key, currentValue)
 	if err != nil {
 		return nil, err
 	}
@@ -167,7 +169,7 @@ func (u *ResetUseCase) restore(ctx context.Context, spec, name, namespace string
 	// Execute the edit transition with the restored value
 	executor := transition.NewExecutor(u.Store)
 
-	result, err := executor.ExecuteEntry(ctx, service, name, namespace, entryState, transition.EntryActionEdit{Value: value}, nil)
+	result, err := executor.ExecuteEntry(ctx, service, key, entryState, transition.EntryActionEdit{Value: value}, nil)
 	if err != nil {
 		return nil, err
 	}

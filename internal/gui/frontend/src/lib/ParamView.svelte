@@ -243,8 +243,8 @@
     // Configuration): fetch it only when supported, and use allSettled so a
     // failed ParamLog never blanks out the value shown by ParamShow.
     const [detailResult, logResult] = await Promise.allSettled([
-      ParamShow(name),
-      historyEnabled ? ParamLog(name, 10) : Promise.resolve(null),
+      ParamShow(name, namespace),
+      historyEnabled ? ParamLog(name, 10, namespace) : Promise.resolve(null),
     ]);
     if (detailResult.status === 'fulfilled') {
       paramDetail = detailResult.value;
@@ -343,7 +343,7 @@
     modalError = '';
     try {
       if (immediate) {
-        await ParamDelete(deleteTarget);
+        await ParamDelete(deleteTarget, selectedEntryNamespace);
         if (selectedParam === deleteTarget) {
           closeDetail();
         }
@@ -370,7 +370,7 @@
       const sorted = [...diffMode.selectedVersions].sort((a, b) => a - b);
       const spec1 = `${selectedParam}#${sorted[0]}`;
       const spec2 = `${selectedParam}#${sorted[1]}`;
-      diffResult = await ParamDiff(spec1, spec2);
+      diffResult = await ParamDiff(spec1, spec2, selectedEntryNamespace);
       showDiffModal = true;
     } catch (err) {
       error = parseError(err);
@@ -402,9 +402,9 @@
     tagError = '';
     try {
       if (immediate) {
-        await ParamAddTag(selectedParam, tagForm.key, tagForm.value);
+        await ParamAddTag(selectedParam, tagForm.key, tagForm.value, selectedEntryNamespace);
       } else {
-        await StagingAddTag('param', selectedParam, tagForm.key, tagForm.value);
+        await StagingAddTag('param', selectedParam, tagForm.key, tagForm.value, selectedEntryNamespace);
         onstagingchange?.();
       }
       showTagModal = false;
@@ -428,9 +428,9 @@
     removeTagError = '';
     try {
       if (immediate) {
-        await ParamRemoveTag(selectedParam, removeTagTarget);
+        await ParamRemoveTag(selectedParam, removeTagTarget, selectedEntryNamespace);
       } else {
-        await StagingRemoveTag('param', selectedParam, removeTagTarget);
+        await StagingRemoveTag('param', selectedParam, removeTagTarget, selectedEntryNamespace);
         onstagingchange?.();
       }
       showRemoveTagModal = false;

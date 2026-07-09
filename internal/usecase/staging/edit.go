@@ -12,15 +12,13 @@ import (
 	"github.com/mpyw/suve/internal/staging/transition"
 )
 
-// EditInput holds input for the edit use case.
+// EditInput holds input for the edit use case. Key identifies the item by name
+// and (Azure App Configuration) namespace; the namespace is empty for the
+// null/default namespace and every other provider.
 type EditInput struct {
-	Name        string
+	Key         staging.EntryKey
 	Value       string
 	Description string
-	// Namespace is the Azure App Configuration namespace of the setting being
-	// edited; empty is the null/default namespace and the only value for every
-	// other provider.
-	Namespace string
 }
 
 // EditOutput holds the result of the edit use case.
@@ -43,7 +41,9 @@ func (u *EditUseCase) Execute(ctx context.Context, input EditInput) (*EditOutput
 	// Check staged state first to avoid unnecessary AWS fetch
 	var stagedEntry *staging.Entry
 
-	entry, err := u.Store.GetEntry(ctx, service, input.Name, input.Namespace)
+	key := input.Key
+
+	entry, err := u.Store.GetEntry(ctx, service, key)
 	if err != nil && !errors.Is(err, staging.ErrNotStaged) {
 		return nil, err
 	}
@@ -63,7 +63,7 @@ func (u *EditUseCase) Execute(ctx context.Context, input EditInput) (*EditOutput
 		// Not staged or staged as Update/Delete → fetch from AWS
 		var err error
 
-		currentValue, awsBaseModifiedAt, err = u.fetchCurrentState(ctx, input.Name)
+		currentValue, awsBaseModifiedAt, err = u.fetchCurrentState(ctx, key.Name)
 		if err != nil {
 			return nil, err
 		}
@@ -90,13 +90,13 @@ func (u *EditUseCase) Execute(ctx context.Context, input EditInput) (*EditOutput
 	executor := transition.NewExecutor(u.Store)
 	_, wasNotStaged := entryState.StagedState.(transition.EntryStagedStateNotStaged)
 
-	result, err := executor.ExecuteEntry(ctx, service, input.Name, input.Namespace, entryState, transition.EntryActionEdit{Value: input.Value}, opts)
+	result, err := executor.ExecuteEntry(ctx, service, key, entryState, transition.EntryActionEdit{Value: input.Value}, opts)
 	if err != nil {
 		return nil, err
 	}
 
 	// Check if skipped or unstaged
-	output := &EditOutput{Name: input.Name}
+	output := &EditOutput{Name: key.Name}
 	_, isNotStaged := result.NewState.StagedState.(transition.EntryStagedStateNotStaged)
 
 	if wasNotStaged && isNotStaged {
@@ -157,8 +157,7 @@ func (u *EditUseCase) fetchCurrentState(ctx context.Context, name string) (*stri
 
 // BaselineInput holds input for getting baseline value.
 type BaselineInput struct {
-	Name      string
-	Namespace string
+	Key staging.EntryKey
 }
 
 // BaselineOutput holds the baseline value for editing.
@@ -172,7 +171,7 @@ func (u *EditUseCase) Baseline(ctx context.Context, input BaselineInput) (*Basel
 	service := u.Strategy.Service()
 
 	// Check if already staged
-	stagedEntry, err := u.Store.GetEntry(ctx, service, input.Name, input.Namespace)
+	stagedEntry, err := u.Store.GetEntry(ctx, service, input.Key)
 	if err != nil && !errors.Is(err, staging.ErrNotStaged) {
 		return nil, err
 	}
@@ -191,7 +190,7 @@ func (u *EditUseCase) Baseline(ctx context.Context, input BaselineInput) (*Basel
 	}
 
 	// Not staged → fetch from AWS
-	return u.fetchBaselineFromAWS(ctx, input.Name)
+	return u.fetchBaselineFromAWS(ctx, input.Key.Name)
 }
 
 // fetchBaselineFromAWS fetches the baseline value from AWS.

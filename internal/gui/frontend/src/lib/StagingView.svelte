@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { StagingAddTag, StagingApply, StagingCancelAddTag, StagingCancelRemoveTag, StagingDiff, StagingDrain, StagingDrop, StagingEdit, StagingFileStatus, StagingPersist, StagingReset, StagingUnstage } from '../../wailsjs/go/gui/App';
-  import type { gui } from '../../wailsjs/go/models';
+  import { gui } from '../../wailsjs/go/models';
   import Modal from './Modal.svelte';
   import PassphraseModal from './PassphraseModal.svelte';
   import { withRetry } from './retry';
@@ -55,6 +55,7 @@
   // Tag edit form
   let tagEditService = $state('');
   let tagEditEntryName = $state('');
+  let tagEditNamespace = $state('');
   let tagEditKey = $state('');
   let tagEditValue = $state('');
   let tagEditIsNew = $state(false);
@@ -133,9 +134,38 @@
     modalError = '';
     applyResult = null;
     try {
-      const result = await StagingApply(applyService, ignoreConflicts);
-      applyResult = result;
-      if (result.entryFailed === 0 && result.tagFailed === 0 && result.conflicts?.length === 0) {
+      // "Apply All" (applyService === 'all') applies every service with staged
+      // changes in one click — each service is a separate backend call (Azure
+      // App Configuration and Key Vault have independent scopes), so aggregate
+      // the per-service results into one. Per-section apply passes a concrete
+      // service and applies just that one.
+      const targets = applyService === 'all' ? stagedServices() : [applyService];
+
+      const merged = new gui.StagingApplyResult({
+        serviceName: getServiceName(applyService),
+        entryResults: [],
+        tagResults: [],
+        conflicts: [],
+        entrySucceeded: 0,
+        entryFailed: 0,
+        tagSucceeded: 0,
+        tagFailed: 0,
+      });
+
+      for (const svc of targets) {
+        const r = await StagingApply(svc, ignoreConflicts);
+        merged.entrySucceeded += r.entrySucceeded;
+        merged.entryFailed += r.entryFailed;
+        merged.tagSucceeded += r.tagSucceeded;
+        merged.tagFailed += r.tagFailed;
+        // The backend marshals empty slices as null, so guard every spread.
+        merged.conflicts = [...(merged.conflicts ?? []), ...(r.conflicts ?? [])];
+        merged.entryResults = [...merged.entryResults, ...(r.entryResults ?? [])];
+        merged.tagResults = [...merged.tagResults, ...(r.tagResults ?? [])];
+      }
+
+      applyResult = merged;
+      if (merged.entryFailed === 0 && merged.tagFailed === 0 && merged.conflicts?.length === 0) {
         await loadStatus();
       }
     } catch (e) {
@@ -174,7 +204,18 @@
   }
 
   function getServiceName(service: string): string {
+    if (service === 'all') return 'all services';
     return service === 'param' ? paramLabel : secretLabel;
+  }
+
+  // Services that currently have staged changes (entries or tags), in display
+  // order. Drives "Apply All" so a single click applies every service, not just
+  // the first non-empty one.
+  function stagedServices(): string[] {
+    const targets: string[] = [];
+    if (paramEntries.length > 0 || paramTagEntries.length > 0) targets.push('param');
+    if (secretEntries.length > 0 || secretTagEntries.length > 0) targets.push('secret');
+    return targets;
   }
 
   // Edit modal
@@ -217,9 +258,10 @@
   }
 
   // Tag edit modal
-  function openAddTagModal(service: string, entryName: string) {
+  function openAddTagModal(service: string, entryName: string, namespace: string) {
     tagEditService = service;
     tagEditEntryName = entryName;
+    tagEditNamespace = namespace;
     tagEditKey = '';
     tagEditValue = '';
     tagEditIsNew = true;
@@ -227,9 +269,10 @@
     showEditTagModal = true;
   }
 
-  function openEditTagModal(service: string, entryName: string, key: string, value: string) {
+  function openEditTagModal(service: string, entryName: string, namespace: string, key: string, value: string) {
     tagEditService = service;
     tagEditEntryName = entryName;
+    tagEditNamespace = namespace;
     tagEditKey = key;
     tagEditValue = value;
     tagEditIsNew = false;
@@ -246,7 +289,7 @@
     modalLoading = true;
     modalError = '';
     try {
-      await StagingAddTag(tagEditService, tagEditEntryName, tagEditKey, tagEditValue);
+      await StagingAddTag(tagEditService, tagEditEntryName, tagEditKey, tagEditValue, tagEditNamespace);
       showEditTagModal = false;
       await loadStatus();
     } catch (e) {
@@ -256,20 +299,20 @@
     }
   }
 
-  async function handleRemoveTag(service: string, entryName: string, key: string) {
+  async function handleRemoveTag(service: string, entryName: string, namespace: string, key: string) {
     // Cancel a staged tag addition (remove from Tags only, don't add to UntagKeys)
     try {
-      await StagingCancelAddTag(service, entryName, key);
+      await StagingCancelAddTag(service, entryName, key, namespace);
       await loadStatus();
     } catch (e) {
       error = parseError(e);
     }
   }
 
-  async function handleCancelUntag(service: string, entryName: string, key: string) {
+  async function handleCancelUntag(service: string, entryName: string, namespace: string, key: string) {
     // Cancel a staged tag removal (remove from UntagKeys only, don't add to Tags)
     try {
-      await StagingCancelRemoveTag(service, entryName, key);
+      await StagingCancelRemoveTag(service, entryName, key, namespace);
       await loadStatus();
     } catch (e) {
       error = parseError(e);
@@ -475,10 +518,10 @@
         onreset={() => openResetModal('param')}
         onedit={(entry) => openEditModal('param', entry)}
         onunstage={(name, namespace) => handleUnstage('param', name, namespace)}
-        onaddtag={(entryName) => openAddTagModal('param', entryName)}
-        onedittag={(entryName, key, value) => openEditTagModal('param', entryName, key, value)}
-        onremovetag={(entryName, key) => handleRemoveTag('param', entryName, key)}
-        oncanceluntag={(entryName, key) => handleCancelUntag('param', entryName, key)}
+        onaddtag={(entryName, namespace) => openAddTagModal('param', entryName, namespace)}
+        onedittag={(entryName, namespace, key, value) => openEditTagModal('param', entryName, namespace, key, value)}
+        onremovetag={(entryName, namespace, key) => handleRemoveTag('param', entryName, namespace, key)}
+        oncanceluntag={(entryName, namespace, key) => handleCancelUntag('param', entryName, namespace, key)}
       />
     {/if}
 
@@ -495,10 +538,10 @@
         onreset={() => openResetModal('secret')}
         onedit={(entry) => openEditModal('secret', entry)}
         onunstage={(name, namespace) => handleUnstage('secret', name, namespace)}
-        onaddtag={(entryName) => openAddTagModal('secret', entryName)}
-        onedittag={(entryName, key, value) => openEditTagModal('secret', entryName, key, value)}
-        onremovetag={(entryName, key) => handleRemoveTag('secret', entryName, key)}
-        oncanceluntag={(entryName, key) => handleCancelUntag('secret', entryName, key)}
+        onaddtag={(entryName, namespace) => openAddTagModal('secret', entryName, namespace)}
+        onedittag={(entryName, namespace, key, value) => openEditTagModal('secret', entryName, namespace, key, value)}
+        onremovetag={(entryName, namespace, key) => handleRemoveTag('secret', entryName, namespace, key)}
+        oncanceluntag={(entryName, namespace, key) => handleCancelUntag('secret', entryName, namespace, key)}
       />
     {/if}
   </div>
@@ -507,7 +550,7 @@
     <div class="actions-center">
       <button
         class="btn-action btn-apply"
-        onclick={() => openApplyModal((paramEntries.length > 0 || paramTagEntries.length > 0) ? 'param' : 'secret')}
+        onclick={() => openApplyModal('all')}
         disabled={paramEntries.length === 0 && secretEntries.length === 0 && paramTagEntries.length === 0 && secretTagEntries.length === 0}
       >
         Apply All
@@ -947,6 +990,10 @@
 
   .staging-content {
     flex: 1;
+    /* min-height: 0 lets this flex child shrink below its content height so its
+       own overflow-y scrolls, instead of growing past .view-container and being
+       clipped by .main-content's overflow:hidden (no scroll at all). */
+    min-height: 0;
     overflow-y: auto;
     padding: 16px;
     display: flex;

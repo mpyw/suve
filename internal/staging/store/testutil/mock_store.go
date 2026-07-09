@@ -12,8 +12,8 @@ import (
 // MockStore implements store.ReadWriteOperator for testing.
 // It stores state in memory and can be configured to return errors.
 type MockStore struct {
-	entries map[staging.Service]map[string]staging.Entry
-	tags    map[staging.Service]map[string]staging.TagEntry
+	entries map[staging.Service]map[staging.EntryKey]staging.Entry
+	tags    map[staging.Service]map[staging.EntryKey]staging.TagEntry
 
 	// Error injection for testing error paths
 	GetEntryErr     error
@@ -38,75 +38,70 @@ type MockStore struct {
 // NewMockStore creates a new MockStore with initialized maps.
 func NewMockStore() *MockStore {
 	return &MockStore{
-		entries: map[staging.Service]map[string]staging.Entry{
-			staging.ServiceParam:  make(map[string]staging.Entry),
-			staging.ServiceSecret: make(map[string]staging.Entry),
+		entries: map[staging.Service]map[staging.EntryKey]staging.Entry{
+			staging.ServiceParam:  make(map[staging.EntryKey]staging.Entry),
+			staging.ServiceSecret: make(map[staging.EntryKey]staging.Entry),
 		},
-		tags: map[staging.Service]map[string]staging.TagEntry{
-			staging.ServiceParam:  make(map[string]staging.TagEntry),
-			staging.ServiceSecret: make(map[string]staging.TagEntry),
+		tags: map[staging.Service]map[staging.EntryKey]staging.TagEntry{
+			staging.ServiceParam:  make(map[staging.EntryKey]staging.TagEntry),
+			staging.ServiceSecret: make(map[staging.EntryKey]staging.TagEntry),
 		},
 	}
 }
 
-// GetEntry retrieves a staged entry identified by (name, namespace).
-func (m *MockStore) GetEntry(_ context.Context, service staging.Service, name, namespace string) (*staging.Entry, error) {
+// GetEntry retrieves the staged entry identified by key.
+func (m *MockStore) GetEntry(_ context.Context, service staging.Service, key staging.EntryKey) (*staging.Entry, error) {
 	if m.GetEntryErr != nil {
 		return nil, m.GetEntryErr
 	}
 
-	if entry, ok := m.entries[service][staging.CompositeEntryKey(name, namespace)]; ok {
-		entry.Namespace = namespace
-
+	if entry, ok := m.entries[service][key]; ok {
 		return &entry, nil
 	}
 
 	return nil, staging.ErrNotStaged
 }
 
-// GetTag retrieves staged tag changes.
-func (m *MockStore) GetTag(_ context.Context, service staging.Service, name string) (*staging.TagEntry, error) {
+// GetTag retrieves the staged tag changes identified by key.
+func (m *MockStore) GetTag(_ context.Context, service staging.Service, key staging.EntryKey) (*staging.TagEntry, error) {
 	if m.GetTagErr != nil {
 		return nil, m.GetTagErr
 	}
 
-	if tag, ok := m.tags[service][name]; ok {
+	if tag, ok := m.tags[service][key]; ok {
 		return &tag, nil
 	}
 
 	return nil, staging.ErrNotStaged
 }
 
-// StageEntry adds or updates a staged entry change, keyed by the
-// (name, entry.Namespace) composite.
-func (m *MockStore) StageEntry(_ context.Context, service staging.Service, name string, entry staging.Entry) error {
+// StageEntry adds or updates the staged entry identified by key.
+func (m *MockStore) StageEntry(_ context.Context, service staging.Service, key staging.EntryKey, entry staging.Entry) error {
 	if m.StageEntryErr != nil {
 		return m.StageEntryErr
 	}
 
-	m.entries[service][staging.CompositeEntryKey(name, entry.Namespace)] = entry
+	m.entries[service][key] = entry
 
 	return nil
 }
 
-// StageTag adds or updates staged tag changes.
-func (m *MockStore) StageTag(_ context.Context, service staging.Service, name string, tag staging.TagEntry) error {
+// StageTag adds or updates the staged tag changes identified by key.
+func (m *MockStore) StageTag(_ context.Context, service staging.Service, key staging.EntryKey, tag staging.TagEntry) error {
 	if m.StageTagErr != nil {
 		return m.StageTagErr
 	}
 
-	m.tags[service][name] = tag
+	m.tags[service][key] = tag
 
 	return nil
 }
 
-// UnstageEntry removes a staged entry change identified by (name, namespace).
-func (m *MockStore) UnstageEntry(_ context.Context, service staging.Service, name, namespace string) error {
+// UnstageEntry removes the staged entry identified by key.
+func (m *MockStore) UnstageEntry(_ context.Context, service staging.Service, key staging.EntryKey) error {
 	if m.UnstageEntryErr != nil {
 		return m.UnstageEntryErr
 	}
-
-	key := staging.CompositeEntryKey(name, namespace)
 
 	if _, ok := m.entries[service][key]; !ok {
 		return staging.ErrNotStaged
@@ -117,17 +112,17 @@ func (m *MockStore) UnstageEntry(_ context.Context, service staging.Service, nam
 	return nil
 }
 
-// UnstageTag removes staged tag changes.
-func (m *MockStore) UnstageTag(_ context.Context, service staging.Service, name string) error {
+// UnstageTag removes the staged tag changes identified by key.
+func (m *MockStore) UnstageTag(_ context.Context, service staging.Service, key staging.EntryKey) error {
 	if m.UnstageTagErr != nil {
 		return m.UnstageTagErr
 	}
 
-	if _, ok := m.tags[service][name]; !ok {
+	if _, ok := m.tags[service][key]; !ok {
 		return staging.ErrNotStaged
 	}
 
-	delete(m.tags[service], name)
+	delete(m.tags[service], key)
 
 	return nil
 }
@@ -140,16 +135,16 @@ func (m *MockStore) UnstageAll(_ context.Context, service staging.Service) error
 
 	switch service {
 	case staging.ServiceParam:
-		m.entries[staging.ServiceParam] = make(map[string]staging.Entry)
-		m.tags[staging.ServiceParam] = make(map[string]staging.TagEntry)
+		m.entries[staging.ServiceParam] = make(map[staging.EntryKey]staging.Entry)
+		m.tags[staging.ServiceParam] = make(map[staging.EntryKey]staging.TagEntry)
 	case staging.ServiceSecret:
-		m.entries[staging.ServiceSecret] = make(map[string]staging.Entry)
-		m.tags[staging.ServiceSecret] = make(map[string]staging.TagEntry)
+		m.entries[staging.ServiceSecret] = make(map[staging.EntryKey]staging.Entry)
+		m.tags[staging.ServiceSecret] = make(map[staging.EntryKey]staging.TagEntry)
 	case "":
-		m.entries[staging.ServiceParam] = make(map[string]staging.Entry)
-		m.entries[staging.ServiceSecret] = make(map[string]staging.Entry)
-		m.tags[staging.ServiceParam] = make(map[string]staging.TagEntry)
-		m.tags[staging.ServiceSecret] = make(map[string]staging.TagEntry)
+		m.entries[staging.ServiceParam] = make(map[staging.EntryKey]staging.Entry)
+		m.entries[staging.ServiceSecret] = make(map[staging.EntryKey]staging.Entry)
+		m.tags[staging.ServiceParam] = make(map[staging.EntryKey]staging.TagEntry)
+		m.tags[staging.ServiceSecret] = make(map[staging.EntryKey]staging.TagEntry)
 	}
 
 	return nil
@@ -158,12 +153,12 @@ func (m *MockStore) UnstageAll(_ context.Context, service staging.Service) error
 // ListEntries returns all staged entries for a service.
 //
 //nolint:dupl // similar structure to ListTags but different types
-func (m *MockStore) ListEntries(_ context.Context, service staging.Service) (map[staging.Service]map[string]staging.Entry, error) {
+func (m *MockStore) ListEntries(_ context.Context, service staging.Service) (map[staging.Service]map[staging.EntryKey]staging.Entry, error) {
 	if m.ListEntriesErr != nil {
 		return nil, m.ListEntriesErr
 	}
 
-	result := make(map[staging.Service]map[string]staging.Entry)
+	result := make(map[staging.Service]map[staging.EntryKey]staging.Entry)
 
 	switch service {
 	case staging.ServiceParam:
@@ -190,12 +185,12 @@ func (m *MockStore) ListEntries(_ context.Context, service staging.Service) (map
 // ListTags returns all staged tag changes for a service.
 //
 //nolint:dupl // similar structure to ListEntries but different types
-func (m *MockStore) ListTags(_ context.Context, service staging.Service) (map[staging.Service]map[string]staging.TagEntry, error) {
+func (m *MockStore) ListTags(_ context.Context, service staging.Service) (map[staging.Service]map[staging.EntryKey]staging.TagEntry, error) {
 	if m.ListTagsErr != nil {
 		return nil, m.ListTagsErr
 	}
 
-	result := make(map[staging.Service]map[string]staging.TagEntry)
+	result := make(map[staging.Service]map[staging.EntryKey]staging.TagEntry)
 
 	switch service {
 	case staging.ServiceParam:
@@ -220,13 +215,13 @@ func (m *MockStore) ListTags(_ context.Context, service staging.Service) (map[st
 }
 
 // AddEntry is a helper to add entries directly for testing.
-func (m *MockStore) AddEntry(service staging.Service, name string, entry staging.Entry) {
-	m.entries[service][name] = entry
+func (m *MockStore) AddEntry(service staging.Service, key staging.EntryKey, entry staging.Entry) {
+	m.entries[service][key] = entry
 }
 
 // AddTag is a helper to add tag entries directly for testing.
-func (m *MockStore) AddTag(service staging.Service, name string, tag staging.TagEntry) {
-	m.tags[service][name] = tag
+func (m *MockStore) AddTag(service staging.Service, key staging.EntryKey, tag staging.TagEntry) {
+	m.tags[service][key] = tag
 }
 
 // Drain retrieves the entire state from storage.
@@ -253,13 +248,13 @@ func (m *MockStore) Drain(_ context.Context, service staging.Service, keep bool)
 
 	// Clear storage if not keeping
 	if !keep {
-		m.entries = map[staging.Service]map[string]staging.Entry{
-			staging.ServiceParam:  make(map[string]staging.Entry),
-			staging.ServiceSecret: make(map[string]staging.Entry),
+		m.entries = map[staging.Service]map[staging.EntryKey]staging.Entry{
+			staging.ServiceParam:  make(map[staging.EntryKey]staging.Entry),
+			staging.ServiceSecret: make(map[staging.EntryKey]staging.Entry),
 		}
-		m.tags = map[staging.Service]map[string]staging.TagEntry{
-			staging.ServiceParam:  make(map[string]staging.TagEntry),
-			staging.ServiceSecret: make(map[string]staging.TagEntry),
+		m.tags = map[staging.Service]map[staging.EntryKey]staging.TagEntry{
+			staging.ServiceParam:  make(map[staging.EntryKey]staging.TagEntry),
+			staging.ServiceSecret: make(map[staging.EntryKey]staging.TagEntry),
 		}
 	}
 
@@ -284,13 +279,13 @@ func (m *MockStore) WriteState(_ context.Context, service staging.Service, state
 	}
 
 	// Replace all entries and tags
-	m.entries = map[staging.Service]map[string]staging.Entry{
-		staging.ServiceParam:  make(map[string]staging.Entry),
-		staging.ServiceSecret: make(map[string]staging.Entry),
+	m.entries = map[staging.Service]map[staging.EntryKey]staging.Entry{
+		staging.ServiceParam:  make(map[staging.EntryKey]staging.Entry),
+		staging.ServiceSecret: make(map[staging.EntryKey]staging.Entry),
 	}
-	m.tags = map[staging.Service]map[string]staging.TagEntry{
-		staging.ServiceParam:  make(map[string]staging.TagEntry),
-		staging.ServiceSecret: make(map[string]staging.TagEntry),
+	m.tags = map[staging.Service]map[staging.EntryKey]staging.TagEntry{
+		staging.ServiceParam:  make(map[staging.EntryKey]staging.TagEntry),
+		staging.ServiceSecret: make(map[staging.EntryKey]staging.TagEntry),
 	}
 
 	if state == nil {

@@ -7,30 +7,32 @@ import (
 	"github.com/mpyw/suve/internal/staging"
 )
 
-// ReadOperator provides read-only access to individual staging entries.
+// ReadOperator provides read-only access to individual staging entries. Items
+// are addressed by staging.EntryKey (name + namespace); the namespace is the App
+// Configuration label axis (empty for every other provider), and it is part of
+// the key for both entries and tags so a namespaced setting is never resolved
+// under the wrong namespace.
 type ReadOperator interface {
-	// GetEntry retrieves a staged entry identified by (name, namespace). Namespace
-	// is the App Configuration label axis; empty (the null/default namespace) is
-	// the only value for every other provider.
-	GetEntry(ctx context.Context, service staging.Service, name, namespace string) (*staging.Entry, error)
-	// GetTag retrieves staged tag changes.
-	GetTag(ctx context.Context, service staging.Service, name string) (*staging.TagEntry, error)
-	// ListEntries returns all staged entries for a service.
-	ListEntries(ctx context.Context, service staging.Service) (map[staging.Service]map[string]staging.Entry, error)
-	// ListTags returns all staged tag changes for a service.
-	ListTags(ctx context.Context, service staging.Service) (map[staging.Service]map[string]staging.TagEntry, error)
+	// GetEntry retrieves the staged entry identified by key.
+	GetEntry(ctx context.Context, service staging.Service, key staging.EntryKey) (*staging.Entry, error)
+	// GetTag retrieves the staged tag changes identified by key.
+	GetTag(ctx context.Context, service staging.Service, key staging.EntryKey) (*staging.TagEntry, error)
+	// ListEntries returns all staged entries for a service, keyed by EntryKey.
+	ListEntries(ctx context.Context, service staging.Service) (map[staging.Service]map[staging.EntryKey]staging.Entry, error)
+	// ListTags returns all staged tag changes for a service, keyed by EntryKey.
+	ListTags(ctx context.Context, service staging.Service) (map[staging.Service]map[staging.EntryKey]staging.TagEntry, error)
 }
 
 // WriteOperator provides write access to individual staging entries.
 type WriteOperator interface {
-	// StageEntry adds or updates a staged entry.
-	StageEntry(ctx context.Context, service staging.Service, name string, entry staging.Entry) error
-	// StageTag adds or updates staged tag changes.
-	StageTag(ctx context.Context, service staging.Service, name string, tagEntry staging.TagEntry) error
-	// UnstageEntry removes a staged entry identified by (name, namespace).
-	UnstageEntry(ctx context.Context, service staging.Service, name, namespace string) error
-	// UnstageTag removes staged tag changes.
-	UnstageTag(ctx context.Context, service staging.Service, name string) error
+	// StageEntry adds or updates the staged entry identified by key.
+	StageEntry(ctx context.Context, service staging.Service, key staging.EntryKey, entry staging.Entry) error
+	// StageTag adds or updates the staged tag changes identified by key.
+	StageTag(ctx context.Context, service staging.Service, key staging.EntryKey, tagEntry staging.TagEntry) error
+	// UnstageEntry removes the staged entry identified by key.
+	UnstageEntry(ctx context.Context, service staging.Service, key staging.EntryKey) error
+	// UnstageTag removes the staged tag changes identified by key.
+	UnstageTag(ctx context.Context, service staging.Service, key staging.EntryKey) error
 	// UnstageAll removes all staged changes for a service.
 	UnstageAll(ctx context.Context, service staging.Service) error
 }

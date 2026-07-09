@@ -43,7 +43,10 @@ type ApplyEntryResult struct {
 
 // ApplyTagResult represents the result of applying tag changes.
 type ApplyTagResult struct {
-	Name      string
+	Name string
+	// Namespace is the App Configuration namespace the tags were applied under
+	// (empty for the null/default namespace and every other provider).
+	Namespace string
 	AddTags   map[string]string   // Tags that were added/updated
 	RemoveTag maputil.Set[string] // Tag keys that were removed
 	Error     error
@@ -115,21 +118,21 @@ func (u *ApplyUseCase) Execute(ctx context.Context, input ApplyInput) (*ApplyOut
 	entries := stagedEntries[service]
 	tags := stagedTags[service]
 
-	// Filter by name if specified. Entries are keyed by the (name, namespace)
-	// composite, so match on the decoded bare name — for App Configuration this
-	// applies the named setting across every namespace it is staged under.
+	// Filter by name if specified. Items are keyed by EntryKey (name, namespace),
+	// so match on the key's name — for App Configuration this applies the named
+	// setting across every namespace it is staged under.
 	if input.Name != "" {
-		filteredEntries := make(map[string]staging.Entry)
-		filteredTags := make(map[string]staging.TagEntry)
+		filteredEntries := make(map[staging.EntryKey]staging.Entry)
+		filteredTags := make(map[staging.EntryKey]staging.TagEntry)
 
 		for key, entry := range entries {
-			if name, _ := staging.SplitEntryKey(key); name == input.Name {
+			if key.Name == input.Name {
 				filteredEntries[key] = entry
 			}
 		}
 
 		for key, tagEntry := range tags {
-			if name, _ := staging.SplitEntryKey(key); name == input.Name {
+			if key.Name == input.Name {
 				filteredTags[key] = tagEntry
 			}
 		}
@@ -150,8 +153,8 @@ func (u *ApplyUseCase) Execute(ctx context.Context, input ApplyInput) (*ApplyOut
 	if !input.IgnoreConflicts && len(entries) > 0 {
 		conflicts := staging.CheckConflicts(ctx, u.Strategy, entries)
 		if len(conflicts) > 0 {
-			for name := range conflicts {
-				output.Conflicts = append(output.Conflicts, name)
+			for key := range conflicts {
+				output.Conflicts = append(output.Conflicts, key.Name)
 			}
 
 			return output, fmt.Errorf("apply rejected: %d conflict(s) detected", len(conflicts))
@@ -178,28 +181,25 @@ func (u *ApplyUseCase) Execute(ctx context.Context, input ApplyInput) (*ApplyOut
 	return output, nil
 }
 
-func (u *ApplyUseCase) applyEntries(ctx context.Context, service staging.Service, entries map[string]staging.Entry, output *ApplyOutput) {
-	// Execute apply operations in parallel. Entries are keyed by the composite
-	// (name, namespace); each is applied through the strategy scoped to its own
-	// namespace (App Configuration) or the single strategy (other providers).
-	results := parallel.ExecuteMap(ctx, entries, func(ctx context.Context, key string, entry staging.Entry) (staging.Operation, error) {
-		name, _ := staging.SplitEntryKey(key)
-
-		strategy, err := u.strategyForNamespace(entry.Namespace)
+func (u *ApplyUseCase) applyEntries(ctx context.Context, service staging.Service, entries map[staging.EntryKey]staging.Entry, output *ApplyOutput) {
+	// Execute apply operations in parallel. Entries are keyed by EntryKey; each is
+	// applied through the strategy scoped to its own namespace (App Configuration)
+	// or the single strategy (other providers).
+	results := parallel.ExecuteMap(ctx, entries, func(ctx context.Context, key staging.EntryKey, entry staging.Entry) (staging.Operation, error) {
+		strategy, err := u.strategyForNamespace(key.Namespace)
 		if err != nil {
 			return entry.Operation, err
 		}
 
-		return entry.Operation, strategy.Apply(ctx, name, entry)
+		return entry.Operation, strategy.Apply(ctx, key.Name, entry)
 	})
 
 	// Collect results
-	for key, entry := range entries {
-		name, _ := staging.SplitEntryKey(key)
+	for key := range entries {
 		result := results[key]
 		resultEntry := ApplyEntryResult{
-			Name:      name,
-			Namespace: entry.Namespace,
+			Name:      key.Name,
+			Namespace: key.Namespace,
 		}
 
 		if result.Err != nil {
@@ -218,7 +218,7 @@ func (u *ApplyUseCase) applyEntries(ctx context.Context, service staging.Service
 			// Unstage successful operations. A failure here leaves the entry
 			// staged after a successful cloud apply, so record it rather than
 			// discarding it — a silent leftover would be re-applied next time.
-			if err := u.Store.UnstageEntry(ctx, service, name, entry.Namespace); err != nil {
+			if err := u.Store.UnstageEntry(ctx, service, key); err != nil {
 				resultEntry.UnstageError = err
 			}
 
@@ -229,19 +229,24 @@ func (u *ApplyUseCase) applyEntries(ctx context.Context, service staging.Service
 	}
 }
 
-func (u *ApplyUseCase) applyTags(ctx context.Context, service staging.Service, tags map[string]staging.TagEntry, output *ApplyOutput) {
-	// Execute tag apply operations in parallel
-	results := parallel.ExecuteMap(ctx, tags, func(ctx context.Context, name string, tagEntry staging.TagEntry) (struct{}, error) {
-		err := u.Strategy.ApplyTags(ctx, name, tagEntry)
+func (u *ApplyUseCase) applyTags(ctx context.Context, service staging.Service, tags map[staging.EntryKey]staging.TagEntry, output *ApplyOutput) {
+	// Execute tag apply operations in parallel, each through the strategy scoped
+	// to the tagged item's own namespace.
+	results := parallel.ExecuteMap(ctx, tags, func(ctx context.Context, key staging.EntryKey, tagEntry staging.TagEntry) (struct{}, error) {
+		strategy, err := u.strategyForNamespace(key.Namespace)
+		if err != nil {
+			return struct{}{}, err
+		}
 
-		return struct{}{}, err
+		return struct{}{}, strategy.ApplyTags(ctx, key.Name, tagEntry)
 	})
 
 	// Collect results
-	for name, tagEntry := range tags {
-		result := results[name]
+	for key, tagEntry := range tags {
+		result := results[key]
 		resultTag := ApplyTagResult{
-			Name:      name,
+			Name:      key.Name,
+			Namespace: key.Namespace,
 			AddTags:   tagEntry.Add,
 			RemoveTag: tagEntry.Remove,
 		}
@@ -252,7 +257,7 @@ func (u *ApplyUseCase) applyTags(ctx context.Context, service staging.Service, t
 		} else {
 			// Unstage successful operations (see applyEntries: record rather
 			// than discard a post-apply unstage failure).
-			if err := u.Store.UnstageTag(ctx, service, name); err != nil {
+			if err := u.Store.UnstageTag(ctx, service, key); err != nil {
 				resultTag.UnstageError = err
 			}
 

@@ -39,8 +39,8 @@ func TestInitializeStateMaps(t *testing.T) {
 		t.Parallel()
 
 		state := &staging.State{
-			Entries: make(map[staging.Service]map[string]staging.Entry),
-			Tags:    make(map[staging.Service]map[string]staging.TagEntry),
+			Entries: make(map[staging.Service]map[staging.EntryKey]staging.Entry),
+			Tags:    make(map[staging.Service]map[staging.EntryKey]staging.TagEntry),
 		}
 
 		initializeStateMaps(state)
@@ -55,11 +55,11 @@ func TestInitializeStateMaps(t *testing.T) {
 		t.Parallel()
 
 		state := &staging.State{
-			Entries: map[staging.Service]map[string]staging.Entry{
-				staging.ServiceParam: {"key": staging.Entry{}},
+			Entries: map[staging.Service]map[staging.EntryKey]staging.Entry{
+				staging.ServiceParam: {staging.EntryKey{Name: "key"}: staging.Entry{}},
 			},
-			Tags: map[staging.Service]map[string]staging.TagEntry{
-				staging.ServiceSecret: {"key": staging.TagEntry{}},
+			Tags: map[staging.Service]map[staging.EntryKey]staging.TagEntry{
+				staging.ServiceSecret: {staging.EntryKey{Name: "key"}: staging.TagEntry{}},
 			},
 		}
 
@@ -78,8 +78,8 @@ func TestInitializeStateMaps(t *testing.T) {
 		t.Parallel()
 
 		state := staging.NewEmptyState()
-		state.Entries[staging.ServiceParam]["key"] = staging.Entry{}
-		state.Tags[staging.ServiceSecret]["key"] = staging.TagEntry{}
+		state.Entries[staging.ServiceParam][staging.EntryKey{Name: "key"}] = staging.Entry{}
+		state.Tags[staging.ServiceSecret][staging.EntryKey{Name: "key"}] = staging.TagEntry{}
 
 		initializeStateMaps(state)
 
@@ -201,7 +201,7 @@ func TestWriteState_EncryptionError(t *testing.T) {
 	store.SetPassphrase("secret") // Enable encryption
 
 	state := staging.NewEmptyState()
-	state.Entries[staging.ServiceParam]["/test"] = staging.Entry{
+	state.Entries[staging.ServiceParam][staging.EntryKey{Name: "/test"}] = staging.Entry{
 		Operation: staging.OperationCreate,
 		Value:     strPtr("value"),
 	}

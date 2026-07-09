@@ -325,7 +325,11 @@ func (s *Store) writeFile(path string, state *staging.State) error {
 		return nil
 	}
 
-	data, err := json.MarshalIndent(state, "", "  ")
+	// staging.State implements json.Marshaler (MarshalJSON), emitting its
+	// EntryKey-keyed maps as arrays of (name, namespace) records — the EntryKey is
+	// never marshaled as a raw map key, so errchkjson's static "unsupported map
+	// key" warning is a false positive here.
+	data, err := json.MarshalIndent(state, "", "  ") //nolint:errchkjson // State has a custom MarshalJSON
 	if err != nil {
 		return fmt.Errorf("failed to marshal state: %w", err)
 	}
@@ -559,10 +563,8 @@ func (s *Store) WriteState(_ context.Context, service staging.Service, state *st
 	return nil
 }
 
-// GetEntry retrieves a staged entry identified by (name, namespace). Namespace
-// is the App Configuration label axis; empty (the null/default namespace) is
-// the only value for every other provider.
-func (s *Store) GetEntry(_ context.Context, service staging.Service, name, namespace string) (*staging.Entry, error) {
+// GetEntry retrieves the staged entry identified by key.
+func (s *Store) GetEntry(_ context.Context, service staging.Service, key staging.EntryKey) (*staging.Entry, error) {
 	defer s.lock()()
 
 	state, err := s.readFile(s.pathFor(service))
@@ -570,17 +572,15 @@ func (s *Store) GetEntry(_ context.Context, service staging.Service, name, names
 		return nil, err
 	}
 
-	if entry, ok := state.Entries[service][staging.CompositeEntryKey(name, namespace)]; ok {
-		entry.Namespace = namespace
-
+	if entry, ok := state.Entries[service][key]; ok {
 		return &entry, nil
 	}
 
 	return nil, staging.ErrNotStaged
 }
 
-// GetTag retrieves staged tag changes.
-func (s *Store) GetTag(_ context.Context, service staging.Service, name string) (*staging.TagEntry, error) {
+// GetTag retrieves the staged tag changes identified by key.
+func (s *Store) GetTag(_ context.Context, service staging.Service, key staging.EntryKey) (*staging.TagEntry, error) {
 	defer s.lock()()
 
 	state, err := s.readFile(s.pathFor(service))
@@ -588,7 +588,7 @@ func (s *Store) GetTag(_ context.Context, service staging.Service, name string) 
 		return nil, err
 	}
 
-	if tag, ok := state.Tags[service][name]; ok {
+	if tag, ok := state.Tags[service][key]; ok {
 		return &tag, nil
 	}
 
@@ -598,10 +598,10 @@ func (s *Store) GetTag(_ context.Context, service staging.Service, name string) 
 // ListEntries returns all staged entries for a service.
 // If service is empty, returns entries for all supported services.
 // Empty service maps are omitted from the result.
-func (s *Store) ListEntries(_ context.Context, service staging.Service) (map[staging.Service]map[string]staging.Entry, error) {
+func (s *Store) ListEntries(_ context.Context, service staging.Service) (map[staging.Service]map[staging.EntryKey]staging.Entry, error) {
 	defer s.lock()()
 
-	result := make(map[staging.Service]map[string]staging.Entry)
+	result := make(map[staging.Service]map[staging.EntryKey]staging.Entry)
 
 	for _, svc := range s.servicesFor(service) {
 		state, err := s.readFile(s.pathFor(svc))
@@ -620,10 +620,10 @@ func (s *Store) ListEntries(_ context.Context, service staging.Service) (map[sta
 // ListTags returns all staged tag changes for a service.
 // If service is empty, returns tags for all supported services.
 // Empty service maps are omitted from the result.
-func (s *Store) ListTags(_ context.Context, service staging.Service) (map[staging.Service]map[string]staging.TagEntry, error) {
+func (s *Store) ListTags(_ context.Context, service staging.Service) (map[staging.Service]map[staging.EntryKey]staging.TagEntry, error) {
 	defer s.lock()()
 
-	result := make(map[staging.Service]map[string]staging.TagEntry)
+	result := make(map[staging.Service]map[staging.EntryKey]staging.TagEntry)
 
 	for _, svc := range s.servicesFor(service) {
 		state, err := s.readFile(s.pathFor(svc))
@@ -650,10 +650,10 @@ func (s *Store) writeServiceState(service staging.Service, state *staging.State)
 	return s.writeFile(s.stateFilePath, state)
 }
 
-// StageEntry adds or updates a staged entry. The entry is keyed by the
-// (name, entry.Namespace) composite, so App Configuration settings with the same
-// key under different namespaces are distinct staged entries.
-func (s *Store) StageEntry(_ context.Context, service staging.Service, name string, entry staging.Entry) error {
+// StageEntry adds or updates the staged entry identified by key. The stored
+// Entry's Namespace is aligned to the key so it never drifts. App Configuration
+// settings with the same name under different namespaces are distinct entries.
+func (s *Store) StageEntry(_ context.Context, service staging.Service, key staging.EntryKey, entry staging.Entry) error {
 	defer s.lock()()
 
 	state, err := s.readFile(s.pathFor(service))
@@ -661,13 +661,13 @@ func (s *Store) StageEntry(_ context.Context, service staging.Service, name stri
 		return err
 	}
 
-	state.Entries[service][staging.CompositeEntryKey(name, entry.Namespace)] = entry
+	state.Entries[service][key] = entry
 
 	return s.writeServiceState(service, state)
 }
 
-// StageTag adds or updates staged tag changes.
-func (s *Store) StageTag(_ context.Context, service staging.Service, name string, tagEntry staging.TagEntry) error {
+// StageTag adds or updates the staged tag changes identified by key.
+func (s *Store) StageTag(_ context.Context, service staging.Service, key staging.EntryKey, tagEntry staging.TagEntry) error {
 	defer s.lock()()
 
 	state, err := s.readFile(s.pathFor(service))
@@ -675,21 +675,19 @@ func (s *Store) StageTag(_ context.Context, service staging.Service, name string
 		return err
 	}
 
-	state.Tags[service][name] = tagEntry
+	state.Tags[service][key] = tagEntry
 
 	return s.writeServiceState(service, state)
 }
 
-// UnstageEntry removes a staged entry identified by (name, namespace).
-func (s *Store) UnstageEntry(_ context.Context, service staging.Service, name, namespace string) error {
+// UnstageEntry removes the staged entry identified by key.
+func (s *Store) UnstageEntry(_ context.Context, service staging.Service, key staging.EntryKey) error {
 	defer s.lock()()
 
 	state, err := s.readFile(s.pathFor(service))
 	if err != nil {
 		return err
 	}
-
-	key := staging.CompositeEntryKey(name, namespace)
 
 	if _, ok := state.Entries[service][key]; !ok {
 		return staging.ErrNotStaged
@@ -700,8 +698,8 @@ func (s *Store) UnstageEntry(_ context.Context, service staging.Service, name, n
 	return s.writeServiceState(service, state)
 }
 
-// UnstageTag removes staged tag changes.
-func (s *Store) UnstageTag(_ context.Context, service staging.Service, name string) error {
+// UnstageTag removes the staged tag changes identified by key.
+func (s *Store) UnstageTag(_ context.Context, service staging.Service, key staging.EntryKey) error {
 	defer s.lock()()
 
 	state, err := s.readFile(s.pathFor(service))
@@ -709,11 +707,11 @@ func (s *Store) UnstageTag(_ context.Context, service staging.Service, name stri
 		return err
 	}
 
-	if _, ok := state.Tags[service][name]; !ok {
+	if _, ok := state.Tags[service][key]; !ok {
 		return staging.ErrNotStaged
 	}
 
-	delete(state.Tags[service], name)
+	delete(state.Tags[service], key)
 
 	return s.writeServiceState(service, state)
 }
@@ -753,27 +751,27 @@ func (s *Store) UnstageAll(_ context.Context, service staging.Service) error {
 // initializeStateMaps ensures all nested maps are initialized.
 func initializeStateMaps(state *staging.State) {
 	if state.Entries == nil {
-		state.Entries = make(map[staging.Service]map[string]staging.Entry)
+		state.Entries = make(map[staging.Service]map[staging.EntryKey]staging.Entry)
 	}
 
 	if state.Entries[staging.ServiceParam] == nil {
-		state.Entries[staging.ServiceParam] = make(map[string]staging.Entry)
+		state.Entries[staging.ServiceParam] = make(map[staging.EntryKey]staging.Entry)
 	}
 
 	if state.Entries[staging.ServiceSecret] == nil {
-		state.Entries[staging.ServiceSecret] = make(map[string]staging.Entry)
+		state.Entries[staging.ServiceSecret] = make(map[staging.EntryKey]staging.Entry)
 	}
 
 	if state.Tags == nil {
-		state.Tags = make(map[staging.Service]map[string]staging.TagEntry)
+		state.Tags = make(map[staging.Service]map[staging.EntryKey]staging.TagEntry)
 	}
 
 	if state.Tags[staging.ServiceParam] == nil {
-		state.Tags[staging.ServiceParam] = make(map[string]staging.TagEntry)
+		state.Tags[staging.ServiceParam] = make(map[staging.EntryKey]staging.TagEntry)
 	}
 
 	if state.Tags[staging.ServiceSecret] == nil {
-		state.Tags[staging.ServiceSecret] = make(map[string]staging.TagEntry)
+		state.Tags[staging.ServiceSecret] = make(map[staging.EntryKey]staging.TagEntry)
 	}
 }
 

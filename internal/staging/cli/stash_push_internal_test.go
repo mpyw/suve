@@ -47,8 +47,8 @@ func TestStashExistsMessage(t *testing.T) {
 		t.Parallel()
 
 		state := staging.NewEmptyState()
-		state.Entries[staging.ServiceParam]["/a"] = staging.Entry{Operation: staging.OperationCreate}
-		state.Entries[staging.ServiceParam]["/b"] = staging.Entry{Operation: staging.OperationCreate}
+		state.Entries[staging.ServiceParam][staging.EntryKey{Name: "/a"}] = staging.Entry{Operation: staging.OperationCreate}
+		state.Entries[staging.ServiceParam][staging.EntryKey{Name: "/b"}] = staging.Entry{Operation: staging.OperationCreate}
 
 		p := &peekStub{encrypted: false, state: state}
 

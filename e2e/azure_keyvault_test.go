@@ -142,10 +142,27 @@ func TestAzureKeyVault_FullWorkflow(t *testing.T) {
 		assert.Equal(t, "updated-value", outBuf.String())
 	})
 
-	// Note: tag/untag are not exercised here. The suve adapter tags the current
-	// version via UpdateSecretProperties with an empty version path segment,
-	// which real Azure accepts but lowkey-vault rejects (405). Tag behavior is
-	// covered by the keyvault adapter unit tests instead.
+	// Tag/untag against the running emulator. The adapter tags the secret's
+	// CONCRETE current version (PATCH /secrets/{name}/{version}); an empty version
+	// collapses to /secrets/{name}/ and is rejected 405 — the bug this guards.
+	t.Run("tag", func(t *testing.T) {
+		_, err := runAzureSecret(t, "tag", name, "env=prod")
+		require.NoError(t, err)
+
+		stdout, err := runAzureSecret(t, "show", name)
+		require.NoError(t, err)
+		assert.Contains(t, stdout, "env")
+		assert.Contains(t, stdout, "prod")
+	})
+
+	t.Run("untag", func(t *testing.T) {
+		_, err := runAzureSecret(t, "untag", name, "env")
+		require.NoError(t, err)
+
+		stdout, err := runAzureSecret(t, "show", name)
+		require.NoError(t, err)
+		assert.NotContains(t, stdout, "prod")
+	})
 
 	t.Run("delete", func(t *testing.T) {
 		_, err := runAzureSecret(t, "delete", "--yes", name)

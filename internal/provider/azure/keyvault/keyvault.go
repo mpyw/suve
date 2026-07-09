@@ -264,14 +264,14 @@ func (s *Store) Tag(ctx context.Context, name string, add map[string]string) err
 		return nil
 	}
 
-	tags, err := s.currentTags(ctx, name)
+	tags, version, err := s.currentTags(ctx, name)
 	if err != nil {
 		return err
 	}
 
 	maps.Copy(tags, add)
 
-	return s.updateTags(ctx, name, tags)
+	return s.updateTags(ctx, name, version, tags)
 }
 
 // Untag removes tags (by key) from the secret's current version via a
@@ -281,7 +281,7 @@ func (s *Store) Untag(ctx context.Context, name string, keys []string) error {
 		return nil
 	}
 
-	tags, err := s.currentTags(ctx, name)
+	tags, version, err := s.currentTags(ctx, name)
 	if err != nil {
 		return err
 	}
@@ -290,14 +290,17 @@ func (s *Store) Untag(ctx context.Context, name string, keys []string) error {
 		delete(tags, k)
 	}
 
-	return s.updateTags(ctx, name, tags)
+	return s.updateTags(ctx, name, version, tags)
 }
 
-// currentTags fetches the current version's tags as a mutable map.
-func (s *Store) currentTags(ctx context.Context, name string) (map[string]string, error) {
+// currentTags fetches the current version's tags as a mutable map, along with
+// that version's id. The version is required for the write-back: Key Vault's
+// update is PATCH /secrets/{name}/{version}, and an empty version collapses the
+// URL to /secrets/{name}/ which rejects PATCH with 405.
+func (s *Store) currentTags(ctx context.Context, name string) (map[string]string, string, error) {
 	resp, err := s.client.GetSecret(ctx, name, "")
 	if err != nil {
-		return nil, mapError(err, name, "get secret")
+		return nil, "", mapError(err, name, "get secret")
 	}
 
 	tags := make(map[string]string, len(resp.Tags))
@@ -305,17 +308,19 @@ func (s *Store) currentTags(ctx context.Context, name string) (map[string]string
 		tags[k] = lo.FromPtr(v)
 	}
 
-	return tags, nil
+	return tags, versionID(resp.ID), nil
 }
 
-// updateTags writes the tags map back to the secret's current version.
-func (s *Store) updateTags(ctx context.Context, name string, tags map[string]string) error {
+// updateTags writes the tags map back to the given secret version. version must
+// be a concrete version id (see currentTags): PATCH against an empty version
+// hits /secrets/{name}/ and returns 405 Method Not Allowed.
+func (s *Store) updateTags(ctx context.Context, name, version string, tags map[string]string) error {
 	azTags := make(map[string]*string, len(tags))
 	for k, v := range tags {
 		azTags[k] = lo.ToPtr(v)
 	}
 
-	_, err := s.client.UpdateSecretProperties(ctx, name, "", azsecrets.UpdateSecretPropertiesParameters{
+	_, err := s.client.UpdateSecretProperties(ctx, name, version, azsecrets.UpdateSecretPropertiesParameters{
 		Tags: azTags,
 	})
 	if err != nil {

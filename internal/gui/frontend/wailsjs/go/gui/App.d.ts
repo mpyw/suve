@@ -14,21 +14,21 @@ export function InitialProvider():Promise<string>;
 
 export function InitialService():Promise<string>;
 
-export function ParamAddTag(arg1:string,arg2:string,arg3:string):Promise<void>;
+export function ParamAddTag(arg1:string,arg2:string,arg3:string,arg4:string):Promise<void>;
 
-export function ParamDelete(arg1:string):Promise<gui.ParamDeleteResult>;
+export function ParamDelete(arg1:string,arg2:string):Promise<gui.ParamDeleteResult>;
 
-export function ParamDiff(arg1:string,arg2:string):Promise<gui.ParamDiffResult>;
+export function ParamDiff(arg1:string,arg2:string,arg3:string):Promise<gui.ParamDiffResult>;
 
 export function ParamList(arg1:string,arg2:boolean,arg3:boolean,arg4:string,arg5:number,arg6:string):Promise<gui.ParamListResult>;
 
-export function ParamLog(arg1:string,arg2:number):Promise<gui.ParamLogResult>;
+export function ParamLog(arg1:string,arg2:number,arg3:string):Promise<gui.ParamLogResult>;
 
-export function ParamRemoveTag(arg1:string,arg2:string):Promise<void>;
+export function ParamRemoveTag(arg1:string,arg2:string,arg3:string):Promise<void>;
 
 export function ParamSet(arg1:string,arg2:string,arg3:string,arg4:string):Promise<gui.ParamSetResult>;
 
-export function ParamShow(arg1:string):Promise<gui.ParamShowResult>;
+export function ParamShow(arg1:string,arg2:string):Promise<gui.ParamShowResult>;
 
 export function ParamTypeOptions():Promise<Array<string>>;
 
@@ -56,13 +56,13 @@ export function SelectScope(arg1:gui.ScopeSelection):Promise<void>;
 
 export function StagingAdd(arg1:string,arg2:string,arg3:string,arg4:string):Promise<gui.StagingAddResult>;
 
-export function StagingAddTag(arg1:string,arg2:string,arg3:string,arg4:string):Promise<gui.StagingAddTagResult>;
+export function StagingAddTag(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string):Promise<gui.StagingAddTagResult>;
 
 export function StagingApply(arg1:string,arg2:boolean):Promise<gui.StagingApplyResult>;
 
-export function StagingCancelAddTag(arg1:string,arg2:string,arg3:string):Promise<gui.StagingCancelAddTagResult>;
+export function StagingCancelAddTag(arg1:string,arg2:string,arg3:string,arg4:string):Promise<gui.StagingCancelAddTagResult>;
 
-export function StagingCancelRemoveTag(arg1:string,arg2:string,arg3:string):Promise<gui.StagingCancelRemoveTagResult>;
+export function StagingCancelRemoveTag(arg1:string,arg2:string,arg3:string,arg4:string):Promise<gui.StagingCancelRemoveTagResult>;
 
 export function StagingCheckStatus(arg1:string,arg2:string,arg3:string):Promise<gui.StagingCheckStatusResult>;
 
@@ -80,7 +80,7 @@ export function StagingFileStatus():Promise<gui.StagingFileStatusResult>;
 
 export function StagingPersist(arg1:string,arg2:string,arg3:boolean,arg4:string):Promise<gui.StagingPersistResult>;
 
-export function StagingRemoveTag(arg1:string,arg2:string,arg3:string):Promise<gui.StagingRemoveTagResult>;
+export function StagingRemoveTag(arg1:string,arg2:string,arg3:string,arg4:string):Promise<gui.StagingRemoveTagResult>;
 
 export function StagingReset(arg1:string):Promise<gui.StagingResetResult>;
 

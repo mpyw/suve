@@ -17,10 +17,10 @@ type EntryPrinter struct {
 	Writer io.Writer
 }
 
-// PrintEntry prints a single staged entry.
+// PrintEntry prints a single staged entry identified by key.
 // If verbose is true, shows detailed information including timestamp and value.
 // If showDeleteOptions is true, shows delete options (Force/RecoveryWindow) for delete operations.
-func (p *EntryPrinter) PrintEntry(name string, entry Entry, verbose, showDeleteOptions bool) {
+func (p *EntryPrinter) PrintEntry(key EntryKey, entry Entry, verbose, showDeleteOptions bool) {
 	pal := colors.For(p.Writer)
 
 	var opColor string
@@ -38,17 +38,17 @@ func (p *EntryPrinter) PrintEntry(name string, entry Entry, verbose, showDeleteO
 	// inline so a name staged under several namespaces is unambiguous. Empty is
 	// the null/default namespace (and every other provider), shown bare.
 	nsSuffix := ""
-	if entry.Namespace != "" {
-		nsSuffix = " " + pal.FieldLabel("["+entry.Namespace+"]")
+	if key.Namespace != "" {
+		nsSuffix = " " + pal.FieldLabel("["+key.Namespace+"]")
 	}
 
 	if !verbose {
-		output.Printf(p.Writer, "  %s %s%s\n", opColor, name, nsSuffix)
+		output.Printf(p.Writer, "  %s %s%s\n", opColor, key.Name, nsSuffix)
 
 		return
 	}
 
-	output.Printf(p.Writer, "\n%s %s%s\n", opColor, name, nsSuffix)
+	output.Printf(p.Writer, "\n%s %s%s\n", opColor, key.Name, nsSuffix)
 	output.Printf(p.Writer, "  %s %s\n", pal.FieldLabel("Staged:"), entry.StagedAt.Format("2006-01-02 15:04:05"))
 
 	switch entry.Operation {

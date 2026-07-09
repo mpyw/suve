@@ -20,10 +20,10 @@
     onreset: () => void;
     onedit: (entry: gui.StagingDiffEntry) => void;
     onunstage: (name: string, namespace: string) => void;
-    onaddtag: (entryName: string) => void;
-    onedittag: (entryName: string, key: string, value: string) => void;
-    onremovetag: (entryName: string, key: string) => void;
-    oncanceluntag: (entryName: string, key: string) => void;
+    onaddtag: (entryName: string, namespace: string) => void;
+    onedittag: (entryName: string, namespace: string, key: string, value: string) => void;
+    onremovetag: (entryName: string, namespace: string, key: string) => void;
+    oncanceluntag: (entryName: string, namespace: string, key: string) => void;
   }
 
   let {
@@ -120,9 +120,9 @@
               <div class="tag-changes tag-add">
                 <span class="tag-label">+ Tags:</span>
                 {#each Object.entries(tagEntry.addTags) as [key, value]}
-                  <button class="tag-item tag-item-editable" type="button" onclick={() => onedittag(entry.name, key, value)}>
+                  <button class="tag-item tag-item-editable" type="button" onclick={() => onedittag(entry.name, entry.namespace, key, value)}>
                     {key}={value}
-                    <span class="tag-delete-btn" role="button" tabindex="0" onclick={(e: MouseEvent) => { e.stopPropagation(); onremovetag(entry.name, key); }} onkeydown={(e: KeyboardEvent) => { e.stopPropagation(); if (e.key === 'Enter') onremovetag(entry.name, key); }}>×</span>
+                    <span class="tag-delete-btn" role="button" tabindex="0" onclick={(e: MouseEvent) => { e.stopPropagation(); onremovetag(entry.name, entry.namespace, key); }} onkeydown={(e: KeyboardEvent) => { e.stopPropagation(); if (e.key === 'Enter') onremovetag(entry.name, entry.namespace, key); }}>×</span>
                   </button>
                 {/each}
               </div>
@@ -133,13 +133,13 @@
                 {#each Object.entries(tagEntry.removeTags) as [key, value]}
                   <span class="tag-item">
                     {value ? `${key}=${value}` : key}
-                    <button class="tag-cancel-btn" onclick={() => oncanceluntag(entry.name, key)} title="Cancel untag">↩</button>
+                    <button class="tag-cancel-btn" onclick={() => oncanceluntag(entry.name, entry.namespace, key)} title="Cancel untag">↩</button>
                   </span>
                 {/each}
               </div>
             {/if}
             {#if entry.operation !== 'delete'}
-              <button class="btn-add-tag" onclick={() => onaddtag(entry.name)}>+ Add Tag</button>
+              <button class="btn-add-tag" onclick={() => onaddtag(entry.name, entry.namespace)}>+ Add Tag</button>
             {/if}
             {/if}
           </div>
@@ -178,8 +178,11 @@
         <li class="entry-item">
           <div class="entry-header">
             <span class="entry-name">{tagEntry.name}</span>
+            {#if showNamespace}
+              <span class="namespace-badge">{tagEntry.namespace || '(NULL)'}</span>
+            {/if}
             <div class="entry-actions">
-              <button class="btn-entry btn-unstage" onclick={() => onunstage(tagEntry.name, '')}>Unstage</button>
+              <button class="btn-entry btn-unstage" onclick={() => onunstage(tagEntry.name, tagEntry.namespace)}>Unstage</button>
             </div>
           </div>
           <div class="entry-tags">
@@ -188,9 +191,9 @@
               <div class="tag-changes tag-add">
                 <span class="tag-label">+ Tags:</span>
                 {#each Object.entries(tagEntry.addTags) as [key, value]}
-                  <button class="tag-item tag-item-editable" type="button" onclick={() => onedittag(tagEntry.name, key, value)}>
+                  <button class="tag-item tag-item-editable" type="button" onclick={() => onedittag(tagEntry.name, tagEntry.namespace, key, value)}>
                     {key}={value}
-                    <span class="tag-delete-btn" role="button" tabindex="0" onclick={(e: MouseEvent) => { e.stopPropagation(); onremovetag(tagEntry.name, key); }} onkeydown={(e: KeyboardEvent) => { e.stopPropagation(); if (e.key === 'Enter') onremovetag(tagEntry.name, key); }}>×</span>
+                    <span class="tag-delete-btn" role="button" tabindex="0" onclick={(e: MouseEvent) => { e.stopPropagation(); onremovetag(tagEntry.name, tagEntry.namespace, key); }} onkeydown={(e: KeyboardEvent) => { e.stopPropagation(); if (e.key === 'Enter') onremovetag(tagEntry.name, tagEntry.namespace, key); }}>×</span>
                   </button>
                 {/each}
               </div>
@@ -201,12 +204,12 @@
                 {#each Object.entries(tagEntry.removeTags) as [key, value]}
                   <span class="tag-item">
                     {value ? `${key}=${value}` : key}
-                    <button class="tag-cancel-btn" onclick={() => oncanceluntag(tagEntry.name, key)} title="Cancel untag">↩</button>
+                    <button class="tag-cancel-btn" onclick={() => oncanceluntag(tagEntry.name, tagEntry.namespace, key)} title="Cancel untag">↩</button>
                   </span>
                 {/each}
               </div>
             {/if}
-            <button class="btn-add-tag" onclick={() => onaddtag(tagEntry.name)}>+ Add Tag</button>
+            <button class="btn-add-tag" onclick={() => onaddtag(tagEntry.name, tagEntry.namespace)}>+ Add Tag</button>
             {/if}
           </div>
         </li>
@@ -220,6 +223,11 @@
     background: #1a1a2e;
     border-radius: 8px;
     overflow: hidden;
+    /* Keep the section at its natural height inside the flex-column
+       .staging-content; without this it shrinks to the viewport and its
+       overflow:hidden clips the entries (rows past the fold vanish and nothing
+       scrolls). The scroll belongs to .staging-content. */
+    flex-shrink: 0;
   }
 
   .section-header {

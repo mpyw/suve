@@ -896,8 +896,26 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
           nextToken: '',
         };
       },
-      ParamShow: async (name: string) => {
-        const param = state.params.find((p: any) => p.name === name);
+      ParamShow: async (name: string, namespace?: string) => {
+        // Record the (name, namespace) the frontend asked for so specs can assert
+        // a namespaced App Configuration entry is read under its OWN namespace
+        // (the label axis), not the shared read scope's.
+        const ns = namespace ?? '';
+        (window as any).__paramShowCalls = (window as any).__paramShowCalls ?? [];
+        (window as any).__paramShowCalls.push({ name, namespace: ns });
+        // Match on (name, namespace): a namespaced setting resolves to its OWN
+        // value, never the same-key entry in another namespace. If the name
+        // exists only under a DIFFERENT namespace, reject like the real provider
+        // ("entry not found") — this is exactly the reported bug when the read
+        // was issued under the wrong namespace. A name that exists under no
+        // namespace falls back to mock-value so non-namespaced specs are
+        // unaffected.
+        const exact = state.params.find((p: any) => p.name === name && (p.namespace ?? '') === ns);
+        const anyNs = state.params.find((p: any) => p.name === name);
+        if (!exact && anyNs) {
+          throw new Error(`provider: entry not found: ${name}`);
+        }
+        const param = exact ?? anyNs;
         const tags = state.paramTags[name] || [];
         const versions = state.paramVersions[name];
         const currentVersion = versions ? versions.find((v: any) => v.isCurrent) : null;
@@ -1161,11 +1179,15 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
           currentBucket().secret = [];
           currentBucket().secretTags = [];
         }
+        // Mirror the Go backend faithfully: empty slices marshal to null (not
+        // []), so the frontend must guard spreads/reads. Returning [] here would
+        // hide those bugs (this is exactly how the "Apply All" spread crash
+        // slipped past the mock once).
         return {
           serviceName: service,
-          entryResults: staged.map((s: any) => ({ name: s.name, status: s.operation === 'delete' ? 'deleted' : 'updated' })),
-          tagResults: tagStaged.map((t: any) => ({ name: t.name, status: 'updated' })),
-          conflicts: [],
+          entryResults: entryCount > 0 ? staged.map((s: any) => ({ name: s.name, status: s.operation === 'delete' ? 'deleted' : 'updated' })) : null,
+          tagResults: tagCount > 0 ? tagStaged.map((t: any) => ({ name: t.name, status: 'updated' })) : null,
+          conflicts: null,
           entrySucceeded: entryCount,
           entryFailed: 0,
           tagSucceeded: tagCount,

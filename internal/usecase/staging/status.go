@@ -32,10 +32,13 @@ type StatusEntry struct {
 
 // StatusTagEntry represents staged tag changes for an entity.
 type StatusTagEntry struct {
-	Name     string
-	Add      map[string]string   // Tags to add or update
-	Remove   maputil.Set[string] // Tag keys to remove
-	StagedAt time.Time
+	Name string
+	// Namespace is the App Configuration namespace of the tagged item (empty for
+	// the null/default namespace and every other provider).
+	Namespace string
+	Add       map[string]string   // Tags to add or update
+	Remove    maputil.Set[string] // Tag keys to remove
+	StagedAt  time.Time
 }
 
 // StatusOutput holds the result of the status use case.
@@ -82,22 +85,20 @@ func (u *StatusUseCase) Execute(ctx context.Context, input StatusInput) (*Status
 	matched := false
 
 	for key, entry := range entries[service] {
-		name, _ := staging.SplitEntryKey(key)
-		if input.Name != "" && name != input.Name {
+		if input.Name != "" && key.Name != input.Name {
 			continue
 		}
 
-		output.Entries = append(output.Entries, toStatusEntry(name, entry, showDeleteOptions))
+		output.Entries = append(output.Entries, toStatusEntry(key, entry, showDeleteOptions))
 		matched = true
 	}
 
 	for key, tagEntry := range tagEntries[service] {
-		name, _ := staging.SplitEntryKey(key)
-		if input.Name != "" && name != input.Name {
+		if input.Name != "" && key.Name != input.Name {
 			continue
 		}
 
-		output.TagEntries = append(output.TagEntries, toStatusTagEntry(name, tagEntry))
+		output.TagEntries = append(output.TagEntries, toStatusTagEntry(key, tagEntry))
 		matched = true
 	}
 
@@ -108,10 +109,10 @@ func (u *StatusUseCase) Execute(ctx context.Context, input StatusInput) (*Status
 	return output, nil
 }
 
-func toStatusEntry(name string, entry staging.Entry, showDeleteOptions bool) StatusEntry {
+func toStatusEntry(key staging.EntryKey, entry staging.Entry, showDeleteOptions bool) StatusEntry {
 	return StatusEntry{
-		Name:              name,
-		Namespace:         entry.Namespace,
+		Name:              key.Name,
+		Namespace:         key.Namespace,
 		Operation:         entry.Operation,
 		Value:             entry.Value,
 		Description:       entry.Description,
@@ -121,11 +122,12 @@ func toStatusEntry(name string, entry staging.Entry, showDeleteOptions bool) Sta
 	}
 }
 
-func toStatusTagEntry(name string, tagEntry staging.TagEntry) StatusTagEntry {
+func toStatusTagEntry(key staging.EntryKey, tagEntry staging.TagEntry) StatusTagEntry {
 	return StatusTagEntry{
-		Name:     name,
-		Add:      tagEntry.Add,
-		Remove:   tagEntry.Remove,
-		StagedAt: tagEntry.StagedAt,
+		Name:      key.Name,
+		Namespace: key.Namespace,
+		Add:       tagEntry.Add,
+		Remove:    tagEntry.Remove,
+		StagedAt:  tagEntry.StagedAt,
 	}
 }

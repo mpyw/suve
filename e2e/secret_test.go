@@ -245,11 +245,12 @@ func TestSecret_StagingWorkflow(t *testing.T) {
 	// 2. Stage update
 	t.Run("stage-update", func(t *testing.T) {
 		store := newStore()
-		err := store.StageEntry(t.Context(), staging.ServiceSecret, secretName, staging.Entry{
+		err := store.StageEntry(t.Context(), staging.ServiceSecret, staging.EntryKey{Name: secretName}, staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("staged-secret"),
 			StagedAt:  time.Now(),
 		})
+
 		require.NoError(t, err)
 	})
 
@@ -333,7 +334,7 @@ func TestSecret_StagingDeleteOptions(t *testing.T) {
 
 		// Verify options are stored
 		store := newStore()
-		entry, err := store.GetEntry(t.Context(), staging.ServiceSecret, secretName, "")
+		entry, err := store.GetEntry(t.Context(), staging.ServiceSecret, staging.EntryKey{Name: secretName, Namespace: ""})
 		require.NoError(t, err)
 		require.NotNil(t, entry.DeleteOptions)
 		assert.Equal(t, 14, entry.DeleteOptions.RecoveryWindow)

@@ -169,8 +169,8 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 	// Process tag entries in service order.
 	for _, s := range r.Services {
 		tagEntries := allTagEntries[s.Service]
-		for _, name := range maputil.SortedKeys(tagEntries) {
-			tagEntry := tagEntries[name]
+		for _, key := range staging.SortedEntryKeys(tagEntries) {
+			tagEntry := tagEntries[key]
 
 			if !first {
 				output.Println(r.Stdout, "")
@@ -178,7 +178,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 
 			first = false
 
-			r.outputTagDiff(ctx, s.Strategy, name, tagEntry)
+			r.outputTagDiff(ctx, s.Strategy, key, tagEntry)
 		}
 	}
 
@@ -190,21 +190,21 @@ func (r *Runner) diffEntries(
 	ctx context.Context,
 	opts Options,
 	strategy staging.DiffStrategy,
-	entries map[string]staging.Entry,
+	entries map[staging.EntryKey]staging.Entry,
 	first *bool,
 ) error {
 	// Fetch all current values in parallel.
 	results := parallel.ExecuteMap(
 		ctx,
 		entries,
-		func(ctx context.Context, name string, _ staging.Entry) (*staging.FetchResult, error) {
-			return strategy.FetchCurrent(ctx, name)
+		func(ctx context.Context, key staging.EntryKey, _ staging.Entry) (*staging.FetchResult, error) {
+			return strategy.FetchCurrent(ctx, key.Name)
 		},
 	)
 
-	for _, name := range maputil.SortedKeys(entries) {
-		entry := entries[name]
-		result := results[name]
+	for _, key := range staging.SortedEntryKeys(entries) {
+		entry := entries[key]
+		result := results[key]
 
 		if result.Err != nil {
 			// Only a genuine "not found" justifies auto-unstaging a staged
@@ -217,16 +217,16 @@ func (r *Runner) diffEntries(
 			case staging.OperationDelete:
 				if notFound {
 					// Item doesn't exist remotely anymore - deletion already applied.
-					if err := r.Store.UnstageEntry(ctx, strategy.Service(), name, ""); err != nil {
-						return fmt.Errorf("failed to unstage %s: %w", name, err)
+					if err := r.Store.UnstageEntry(ctx, strategy.Service(), key); err != nil {
+						return fmt.Errorf("failed to unstage %s: %w", key.Name, err)
 					}
 
-					output.Warning(r.Stderr, "unstaged %s: already deleted in %s", name, r.ProviderLabel)
+					output.Warning(r.Stderr, "unstaged %s: already deleted in %s", key.Name, r.ProviderLabel)
 
 					continue
 				}
 
-				output.Warning(r.Stderr, "could not diff %s (kept staged): %v", name, result.Err)
+				output.Warning(r.Stderr, "could not diff %s (kept staged): %v", key.Name, result.Err)
 
 				continue
 
@@ -238,7 +238,7 @@ func (r *Runner) diffEntries(
 
 				*first = false
 
-				if err := r.outputDiffCreate(opts, name, entry); err != nil {
+				if err := r.outputDiffCreate(opts, key, entry); err != nil {
 					return err
 				}
 
@@ -247,16 +247,16 @@ func (r *Runner) diffEntries(
 			case staging.OperationUpdate:
 				if notFound {
 					// Item doesn't exist remotely anymore - staged update is invalid.
-					if err := r.Store.UnstageEntry(ctx, strategy.Service(), name, ""); err != nil {
-						return fmt.Errorf("failed to unstage %s: %w", name, err)
+					if err := r.Store.UnstageEntry(ctx, strategy.Service(), key); err != nil {
+						return fmt.Errorf("failed to unstage %s: %w", key.Name, err)
 					}
 
-					output.Warning(r.Stderr, "unstaged %s: item no longer exists in %s", name, r.ProviderLabel)
+					output.Warning(r.Stderr, "unstaged %s: item no longer exists in %s", key.Name, r.ProviderLabel)
 
 					continue
 				}
 
-				output.Warning(r.Stderr, "could not diff %s (kept staged): %v", name, result.Err)
+				output.Warning(r.Stderr, "could not diff %s (kept staged): %v", key.Name, result.Err)
 
 				continue
 			}
@@ -268,7 +268,7 @@ func (r *Runner) diffEntries(
 
 		*first = false
 
-		if err := r.outputDiff(ctx, opts, strategy, name, entry, result.Value); err != nil {
+		if err := r.outputDiff(ctx, opts, strategy, key, entry, result.Value); err != nil {
 			return err
 		}
 	}
@@ -280,10 +280,11 @@ func (r *Runner) outputDiff(
 	ctx context.Context,
 	opts Options,
 	strategy staging.DiffStrategy,
-	name string,
+	key staging.EntryKey,
 	entry staging.Entry,
 	fr *staging.FetchResult,
 ) error {
+	name := diffDisplayName(key)
 	remoteValue := fr.Value
 	stagedValue := lo.FromPtr(entry.Value)
 
@@ -298,7 +299,7 @@ func (r *Runner) outputDiff(
 	// compares raw values. It also never applies to a delete (deleting is not a
 	// no-op just because the current value is the empty string).
 	if entry.Operation != staging.OperationDelete && remoteValue == stagedValue {
-		if err := r.Store.UnstageEntry(ctx, strategy.Service(), name, ""); err != nil {
+		if err := r.Store.UnstageEntry(ctx, strategy.Service(), key); err != nil {
 			return fmt.Errorf("failed to unstage %s: %w", name, err)
 		}
 
@@ -338,7 +339,8 @@ func (r *Runner) outputDiff(
 	return nil
 }
 
-func (r *Runner) outputDiffCreate(opts Options, name string, entry staging.Entry) error {
+func (r *Runner) outputDiffCreate(opts Options, key staging.EntryKey, entry staging.Entry) error {
+	name := diffDisplayName(key)
 	stagedValue := lo.FromPtr(entry.Value)
 
 	// Format as JSON if enabled
@@ -360,14 +362,25 @@ func (r *Runner) outputDiffCreate(opts Options, name string, entry staging.Entry
 	return nil
 }
 
+// diffDisplayName renders an entry key for display, appending the App
+// Configuration namespace when present (empty is the null/default namespace and
+// every other provider, shown bare).
+func diffDisplayName(key staging.EntryKey) string {
+	if key.Namespace == "" {
+		return key.Name
+	}
+
+	return fmt.Sprintf("%s [%s]", key.Name, key.Namespace)
+}
+
 func (r *Runner) outputMetadata(entry staging.Entry) {
 	if desc := lo.FromPtr(entry.Description); desc != "" {
 		output.Printf(r.Stdout, "%s %s\n", colors.For(r.Stdout).FieldLabel("Description:"), desc)
 	}
 }
 
-func (r *Runner) outputTagDiff(ctx context.Context, strategy staging.DiffStrategy, name string, tagEntry staging.TagEntry) {
-	output.Printf(r.Stdout, "%s %s (staged tag changes)\n", colors.For(r.Stdout).Info("Tags:"), name)
+func (r *Runner) outputTagDiff(ctx context.Context, strategy staging.DiffStrategy, key staging.EntryKey, tagEntry staging.TagEntry) {
+	output.Printf(r.Stdout, "%s %s (staged tag changes)\n", colors.For(r.Stdout).Info("Tags:"), diffDisplayName(key))
 
 	if len(tagEntry.Add) > 0 {
 		tagPairs := make([]string, 0, len(tagEntry.Add))
@@ -384,7 +397,7 @@ func (r *Runner) outputTagDiff(ctx context.Context, strategy staging.DiffStrateg
 		// yield a nil map.
 		var currentTags map[string]string
 		if strategy != nil {
-			currentTags, _ = strategy.FetchCurrentTags(ctx, name)
+			currentTags, _ = strategy.FetchCurrentTags(ctx, key.Name)
 		}
 
 		r.outputRemovedTags(tagEntry.Remove, currentTags)

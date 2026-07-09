@@ -39,7 +39,10 @@ type StagingEntry struct {
 
 // StagingTagEntry represents a staged tag change.
 type StagingTagEntry struct {
-	Name       string            `json:"name"`
+	Name string `json:"name"`
+	// Namespace is the App Configuration namespace of the tagged item (empty for
+	// the null/default namespace and every other provider).
+	Namespace  string            `json:"namespace"`
 	AddTags    map[string]string `json:"addTags,omitempty"`
 	RemoveTags []string          `json:"removeTags,omitempty"`
 	StagedAt   string            `json:"stagedAt"`
@@ -147,7 +150,10 @@ type StagingDiffEntry struct {
 
 // StagingDiffTagEntry represents a single diff tag entry.
 type StagingDiffTagEntry struct {
-	Name       string            `json:"name"`
+	Name string `json:"name"`
+	// Namespace is the App Configuration namespace of the tagged item (empty for
+	// the null/default namespace and every other provider).
+	Namespace  string            `json:"namespace"`
 	AddTags    map[string]string `json:"addTags,omitempty"`
 	RemoveTags map[string]string `json:"removeTags,omitempty"` // key=current value from AWS
 }
@@ -274,6 +280,7 @@ func toStagingTagEntries(tags []stagingusecase.StatusTagEntry) []StagingTagEntry
 	for i, t := range tags {
 		out[i] = StagingTagEntry{
 			Name:       t.Name,
+			Namespace:  t.Namespace,
 			AddTags:    t.Add,
 			RemoveTags: t.Remove.Values(),
 			StagedAt:   timeutil.FormatRFC3339(t.StagedAt),
@@ -410,9 +417,8 @@ func (a *App) StagingAdd(service, name, value, namespace string) (*StagingAddRes
 	}
 
 	result, err := uc.Execute(a.ctx, stagingusecase.AddInput{
-		Name:      name,
-		Value:     value,
-		Namespace: namespace,
+		Key:   staging.EntryKey{Name: name, Namespace: namespace},
+		Value: value,
 	})
 	if err != nil {
 		return nil, err
@@ -468,9 +474,8 @@ func (a *App) StagingEdit(service, name, value, namespace string) (*StagingEditR
 	}
 
 	result, err := uc.Execute(a.ctx, stagingusecase.EditInput{
-		Name:      name,
-		Value:     value,
-		Namespace: namespace,
+		Key:   staging.EntryKey{Name: name, Namespace: namespace},
+		Value: value,
 	})
 	if err != nil {
 		return nil, err
@@ -512,10 +517,9 @@ func (a *App) StagingDelete(service, name string, force bool, recoveryWindow int
 	}
 
 	result, err := uc.Execute(a.ctx, stagingusecase.DeleteInput{
-		Name:           name,
+		Key:            staging.EntryKey{Name: name, Namespace: namespace},
 		Force:          force,
 		RecoveryWindow: recoveryWindow,
-		Namespace:      namespace,
 	})
 	if err != nil {
 		return nil, err
@@ -538,27 +542,32 @@ func (a *App) StagingUnstage(service, name, namespace string) (*StagingUnstageRe
 		return nil, err
 	}
 
+	key := staging.EntryKey{Name: name, Namespace: namespace}
+
 	// Unstage entry (ignore ErrNotStaged)
-	if err := store.UnstageEntry(a.ctx, svc, name, namespace); err != nil && !errors.Is(err, staging.ErrNotStaged) {
+	if err := store.UnstageEntry(a.ctx, svc, key); err != nil && !errors.Is(err, staging.ErrNotStaged) {
 		return nil, err
 	}
 
 	// Unstage tags (ignore ErrNotStaged)
-	if err := store.UnstageTag(a.ctx, svc, name); err != nil && !errors.Is(err, staging.ErrNotStaged) {
+	if err := store.UnstageTag(a.ctx, svc, key); err != nil && !errors.Is(err, staging.ErrNotStaged) {
 		return nil, err
 	}
 
 	return &StagingUnstageResult{Name: name}, nil
 }
 
-// StagingAddTag stages adding a tag to an item.
-func (a *App) StagingAddTag(service, name, key, value string) (*StagingAddTagResult, error) {
+// StagingAddTag stages adding a tag to an item. namespace selects the Azure App
+// Configuration namespace of the tagged setting (empty for the null/default
+// namespace and every other provider); it scopes both the strategy and the
+// staged tag's (name, namespace) key.
+func (a *App) StagingAddTag(service, name, key, value, namespace string) (*StagingAddTagResult, error) {
 	store, err := a.getStagingStore(kindForService(service))
 	if err != nil {
 		return nil, err
 	}
 
-	strategy, err := a.getEditStrategy(service)
+	strategy, ns, err := a.editStrategyForNamespace(service, namespace)
 	if err != nil {
 		return nil, err
 	}
@@ -569,7 +578,7 @@ func (a *App) StagingAddTag(service, name, key, value string) (*StagingAddTagRes
 	}
 
 	result, err := uc.Tag(a.ctx, stagingusecase.TagInput{
-		Name: name,
+		Key:  staging.EntryKey{Name: name, Namespace: ns},
 		Tags: map[string]string{key: value},
 	})
 	if err != nil {
@@ -579,14 +588,16 @@ func (a *App) StagingAddTag(service, name, key, value string) (*StagingAddTagRes
 	return &StagingAddTagResult{Name: result.Name}, nil
 }
 
-// StagingRemoveTag stages removing a tag from an item.
-func (a *App) StagingRemoveTag(service, name, key string) (*StagingRemoveTagResult, error) {
+// StagingRemoveTag stages removing a tag from an item. namespace selects the
+// Azure App Configuration namespace of the tagged setting (empty for the
+// null/default namespace and every other provider).
+func (a *App) StagingRemoveTag(service, name, key, namespace string) (*StagingRemoveTagResult, error) {
 	store, err := a.getStagingStore(kindForService(service))
 	if err != nil {
 		return nil, err
 	}
 
-	strategy, err := a.getEditStrategy(service)
+	strategy, ns, err := a.editStrategyForNamespace(service, namespace)
 	if err != nil {
 		return nil, err
 	}
@@ -597,7 +608,7 @@ func (a *App) StagingRemoveTag(service, name, key string) (*StagingRemoveTagResu
 	}
 
 	result, err := uc.Untag(a.ctx, stagingusecase.UntagInput{
-		Name:    name,
+		Key:     staging.EntryKey{Name: name, Namespace: ns},
 		TagKeys: maputil.NewSet(key),
 	})
 	if err != nil {
@@ -608,7 +619,8 @@ func (a *App) StagingRemoveTag(service, name, key string) (*StagingRemoveTagResu
 }
 
 // StagingCancelAddTag cancels a staged tag addition (removes from Add only).
-func (a *App) StagingCancelAddTag(service, name, key string) (*StagingCancelAddTagResult, error) {
+// namespace selects the Azure App Configuration namespace of the tagged setting.
+func (a *App) StagingCancelAddTag(service, name, key, namespace string) (*StagingCancelAddTagResult, error) {
 	store, err := a.getStagingStore(kindForService(service))
 	if err != nil {
 		return nil, err
@@ -619,8 +631,10 @@ func (a *App) StagingCancelAddTag(service, name, key string) (*StagingCancelAddT
 		return nil, err
 	}
 
+	entryKey := staging.EntryKey{Name: name, Namespace: namespace}
+
 	// Get existing tag entry
-	tagEntry, err := store.GetTag(a.ctx, svc, name)
+	tagEntry, err := store.GetTag(a.ctx, svc, entryKey)
 	if err != nil {
 		return nil, err
 	}
@@ -630,11 +644,11 @@ func (a *App) StagingCancelAddTag(service, name, key string) (*StagingCancelAddT
 
 	// If tag entry has no meaningful content, unstage it
 	if len(tagEntry.Add) == 0 && tagEntry.Remove.Len() == 0 {
-		if err := store.UnstageTag(a.ctx, svc, name); err != nil {
+		if err := store.UnstageTag(a.ctx, svc, entryKey); err != nil {
 			return nil, err
 		}
 	} else {
-		if err := store.StageTag(a.ctx, svc, name, *tagEntry); err != nil {
+		if err := store.StageTag(a.ctx, svc, entryKey, *tagEntry); err != nil {
 			return nil, err
 		}
 	}
@@ -643,7 +657,8 @@ func (a *App) StagingCancelAddTag(service, name, key string) (*StagingCancelAddT
 }
 
 // StagingCancelRemoveTag cancels a staged tag removal (removes from Remove only).
-func (a *App) StagingCancelRemoveTag(service, name, key string) (*StagingCancelRemoveTagResult, error) {
+// namespace selects the Azure App Configuration namespace of the tagged setting.
+func (a *App) StagingCancelRemoveTag(service, name, key, namespace string) (*StagingCancelRemoveTagResult, error) {
 	store, err := a.getStagingStore(kindForService(service))
 	if err != nil {
 		return nil, err
@@ -654,8 +669,10 @@ func (a *App) StagingCancelRemoveTag(service, name, key string) (*StagingCancelR
 		return nil, err
 	}
 
+	entryKey := staging.EntryKey{Name: name, Namespace: namespace}
+
 	// Get existing tag entry
-	tagEntry, err := store.GetTag(a.ctx, svc, name)
+	tagEntry, err := store.GetTag(a.ctx, svc, entryKey)
 	if err != nil {
 		return nil, err
 	}
@@ -665,11 +682,11 @@ func (a *App) StagingCancelRemoveTag(service, name, key string) (*StagingCancelR
 
 	// If tag entry has no meaningful content, unstage it
 	if len(tagEntry.Add) == 0 && tagEntry.Remove.Len() == 0 {
-		if err := store.UnstageTag(a.ctx, svc, name); err != nil {
+		if err := store.UnstageTag(a.ctx, svc, entryKey); err != nil {
 			return nil, err
 		}
 	} else {
-		if err := store.StageTag(a.ctx, svc, name, *tagEntry); err != nil {
+		if err := store.StageTag(a.ctx, svc, entryKey, *tagEntry); err != nil {
 			return nil, err
 		}
 	}
@@ -696,14 +713,15 @@ func (a *App) StagingCheckStatus(service, name, namespace string) (*StagingCheck
 	}
 
 	result := &StagingCheckStatusResult{}
+	key := staging.EntryKey{Name: name, Namespace: namespace}
 
 	// Check for staged entry
-	if _, err := store.GetEntry(a.ctx, svc, name, namespace); err == nil {
+	if _, err := store.GetEntry(a.ctx, svc, key); err == nil {
 		result.HasEntry = true
 	}
 
 	// Check for staged tags
-	if _, err := store.GetTag(a.ctx, svc, name); err == nil {
+	if _, err := store.GetTag(a.ctx, svc, key); err == nil {
 		result.HasTags = true
 	}
 
@@ -758,6 +776,7 @@ func (a *App) StagingDiff(service string, name string) (*StagingDiffResult, erro
 	for i, t := range result.TagEntries {
 		tagEntries[i] = StagingDiffTagEntry{
 			Name:       t.Name,
+			Namespace:  t.Namespace,
 			AddTags:    t.Add,
 			RemoveTags: t.Remove,
 		}

@@ -35,7 +35,7 @@ func TestStore_KeyRoundTrip(t *testing.T) {
 	store.key = newTestKey()
 
 	state := staging.NewEmptyState()
-	state.Entries[staging.ServiceParam]["/app/secret"] = staging.Entry{
+	state.Entries[staging.ServiceParam][staging.EntryKey{Name: "/app/secret"}] = staging.Entry{
 		Operation: staging.OperationCreate,
 		Value:     lo.ToPtr("raw-key-value"),
 	}
@@ -51,7 +51,7 @@ func TestStore_KeyRoundTrip(t *testing.T) {
 	// Read back with the same key.
 	got, err := store.Drain(t.Context(), "", true)
 	require.NoError(t, err)
-	assert.Equal(t, "raw-key-value", lo.FromPtr(got.Entries[staging.ServiceParam]["/app/secret"].Value))
+	assert.Equal(t, "raw-key-value", lo.FromPtr(got.Entries[staging.ServiceParam][staging.EntryKey{Name: "/app/secret"}].Value))
 }
 
 func TestStore_KeyReadsLegacyPlaintext(t *testing.T) {
@@ -62,7 +62,7 @@ func TestStore_KeyReadsLegacyPlaintext(t *testing.T) {
 
 	// A legacy, unencrypted stage.json must still be readable by a
 	// key-configured store (migration path).
-	plain := `{"version":2,"entries":{"param":{"/legacy":{"operation":"create","value":"plain"}},"secret":{}},"tags":{"param":{},"secret":{}}}`
+	plain := `{"version":3,"entries":{"param":[{"name":"/legacy","operation":"create","value":"plain"}]}}`
 	require.NoError(t, os.WriteFile(path, []byte(plain), 0o600))
 
 	store := NewStoreWithPath(path)
@@ -70,7 +70,7 @@ func TestStore_KeyReadsLegacyPlaintext(t *testing.T) {
 
 	got, err := store.Drain(t.Context(), "", true)
 	require.NoError(t, err)
-	assert.Equal(t, "plain", lo.FromPtr(got.Entries[staging.ServiceParam]["/legacy"].Value))
+	assert.Equal(t, "plain", lo.FromPtr(got.Entries[staging.ServiceParam][staging.EntryKey{Name: "/legacy"}].Value))
 }
 
 func TestStore_KeyWrongKeyFails(t *testing.T) {
@@ -83,7 +83,7 @@ func TestStore_KeyWrongKeyFails(t *testing.T) {
 	store.key = newTestKey()
 
 	state := staging.NewEmptyState()
-	state.Entries[staging.ServiceParam]["/app/secret"] = staging.Entry{
+	state.Entries[staging.ServiceParam][staging.EntryKey{Name: "/app/secret"}] = staging.Entry{
 		Operation: staging.OperationCreate,
 		Value:     lo.ToPtr("v"),
 	}
@@ -218,7 +218,7 @@ func TestNewWorkingStore_KeychainError_EncryptedStateExists_Fatal(t *testing.T) 
 	seed.key = newTestKey()
 
 	state := staging.NewEmptyState()
-	state.Entries[staging.ServiceParam]["/app/secret"] = staging.Entry{
+	state.Entries[staging.ServiceParam][staging.EntryKey{Name: "/app/secret"}] = staging.Entry{
 		Operation: staging.OperationCreate,
 		Value:     lo.ToPtr("v"),
 	}
@@ -282,7 +282,7 @@ func TestLock_CreatesLockfileAndOperationsWork(t *testing.T) {
 	dir := t.TempDir()
 	store := NewStoreWithPath(filepath.Join(dir, "stage.json"))
 
-	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/a", staging.Entry{
+	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/a"}, staging.Entry{
 		Operation: staging.OperationCreate,
 		Value:     lo.ToPtr("v"),
 	}))
@@ -291,7 +291,7 @@ func TestLock_CreatesLockfileAndOperationsWork(t *testing.T) {
 	_, statErr := os.Stat(filepath.Join(dir, ".lock"))
 	require.NoError(t, statErr)
 
-	got, err := store.GetEntry(t.Context(), staging.ServiceParam, "/a", "")
+	got, err := store.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/a", Namespace: ""})
 	require.NoError(t, err)
 	assert.Equal(t, "v", lo.FromPtr(got.Value))
 }
