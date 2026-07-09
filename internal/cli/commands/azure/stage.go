@@ -220,10 +220,12 @@ func StageCommand() *cli.Command {
 }
 
 // FlatStageCommand returns the Azure stage command as a standalone top-level
-// command named `name` (e.g. "stage"). The secret/param staging subgroups own
-// their --vault-name / --store-name flags and hooks, so it is self-contained.
-// Used for the flat `suve stage` alias when Azure is the uniquely active staging
-// provider.
+// command named `name` (e.g. "stage"). It carries the whole StageCommand tree:
+// the per-service secret/param subgroups (which own their own --vault-name /
+// --store-name flags and Before hooks) AND the provider-wide global commands
+// (status/diff/apply/reset), which rely on the parent command's global flags and
+// Before hook injecting both resource names into the context. Used for the flat
+// `suve stage` alias when Azure is the uniquely active staging provider.
 func FlatStageCommand(name string) *cli.Command {
 	c := StageCommand()
 	c.Name = name
