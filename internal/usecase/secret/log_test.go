@@ -75,7 +75,7 @@ func TestLogUseCase_Execute_State(t *testing.T) {
 
 	now := time.Now()
 	versions := []domain.Version{
-		{ID: "2", State: "enabled", Created: &now},
+		{ID: "2", State: "enabled", Created: &now, Tags: []domain.Tag{{Key: "env", Value: "prod"}}},
 		{ID: "1", State: "disabled", Created: tp(now, -time.Hour)},
 	}
 	values := map[string]string{"1": "value1", "2": "value2"}
@@ -89,6 +89,17 @@ func TestLogUseCase_Execute_State(t *testing.T) {
 	assert.Empty(t, output.Entries[0].VersionStage)
 	assert.Equal(t, "disabled", output.Entries[1].State)
 	assert.Empty(t, output.Entries[1].VersionStage)
+
+	// No AWSCURRENT staging label (Google Cloud / Azure Key Vault): the newest
+	// version is current. Regression guard — this used to be always-false for
+	// those providers, so nothing offered "current"/add-tag in the GUI history.
+	assert.True(t, output.Entries[0].IsCurrent, "newest version is current when there is no AWSCURRENT")
+	assert.False(t, output.Entries[1].IsCurrent)
+
+	// Per-version tags flow through (Azure Key Vault scopes tags per version).
+	require.Len(t, output.Entries[0].Tags, 1)
+	assert.Equal(t, "env", output.Entries[0].Tags[0].Key)
+	assert.Empty(t, output.Entries[1].Tags)
 }
 
 func TestLogUseCase_Execute_Empty(t *testing.T) {

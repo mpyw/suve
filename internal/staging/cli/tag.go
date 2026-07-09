@@ -8,6 +8,7 @@ import (
 
 	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/maputil"
+	"github.com/mpyw/suve/internal/staging"
 	stagingusecase "github.com/mpyw/suve/internal/usecase/staging"
 )
 
@@ -21,7 +22,10 @@ type TagRunner struct {
 // TagOptions holds options for the tag command.
 type TagOptions struct {
 	Name string
-	Tags []string // key=value pairs to add
+	// Namespace is the App Configuration namespace of the resource (empty for the
+	// null/default namespace and every other provider).
+	Namespace string
+	Tags      []string // key=value pairs to add
 }
 
 // Run executes the tag command.
@@ -32,7 +36,7 @@ func (r *TagRunner) Run(ctx context.Context, opts TagOptions) error {
 	}
 
 	result, err := r.UseCase.Tag(ctx, stagingusecase.TagInput{
-		Name: opts.Name,
+		Key:  staging.EntryKey{Name: opts.Name, Namespace: opts.Namespace},
 		Tags: tags,
 	})
 	if err != nil {
@@ -54,13 +58,16 @@ type UntagRunner struct {
 // UntagOptions holds options for the untag command.
 type UntagOptions struct {
 	Name string
-	Keys []string // tag keys to remove
+	// Namespace is the App Configuration namespace of the resource (empty for the
+	// null/default namespace and every other provider).
+	Namespace string
+	Keys      []string // tag keys to remove
 }
 
 // Run executes the untag command.
 func (r *UntagRunner) Run(ctx context.Context, opts UntagOptions) error {
 	result, err := r.UseCase.Untag(ctx, stagingusecase.UntagInput{
-		Name:    opts.Name,
+		Key:     staging.EntryKey{Name: opts.Name, Namespace: opts.Namespace},
 		TagKeys: maputil.NewSet(opts.Keys...),
 	})
 	if err != nil {

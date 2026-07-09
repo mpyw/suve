@@ -6,6 +6,7 @@ import (
 	"slices"
 	"time"
 
+	"github.com/mpyw/suve/internal/domain"
 	"github.com/mpyw/suve/internal/provider"
 )
 
@@ -32,7 +33,10 @@ type LogEntry struct {
 	Value        string
 	CreatedDate  *time.Time
 	IsCurrent    bool
-	Error        error // Error from fetching value, if any
+	// Tags attached to THIS version. Only Azure Key Vault scopes tags per version;
+	// empty for providers whose tags live at the resource level.
+	Tags  []domain.Tag
+	Error error // Error from fetching value, if any
 }
 
 // LogOutput holds the result of the log use case.
@@ -70,6 +74,12 @@ func (u *LogUseCase) Execute(ctx context.Context, input LogInput) (*LogOutput, e
 	// first version that ever existed. Remember it before truncation so we can
 	// tell whether the oldest shown version is genuinely the initial one.
 	initialVersion := versions[len(versions)-1].ID
+
+	// Determine the current version up front (over the FULL history, before any
+	// truncation/reverse): AWS Secrets Manager names it with the AWSCURRENT
+	// staging label; Google Cloud and Azure Key Vault have no such label, so the
+	// newest version is the current one.
+	currentVersion := currentVersionID(versions)
 
 	// Apply date filters BEFORE the count limit: -n must return up to N versions
 	// that match --since/--until, not N newest-then-filtered to fewer (#351).
@@ -116,11 +126,9 @@ func (u *LogUseCase) Execute(ctx context.Context, input LogInput) (*LogOutput, e
 			State:        v.State,
 			Value:        value,
 			CreatedDate:  v.Created,
-			// A version is current when AWSCURRENT is among its staging labels;
-			// membership (not a "first stage" check) keeps this correct even when
-			// the version carries additional custom labels (#317).
-			IsCurrent: slices.Contains(v.StagingLabels, "AWSCURRENT"),
-			Error:     fetchErr,
+			IsCurrent:    v.ID == currentVersion,
+			Tags:         v.Tags,
+			Error:        fetchErr,
 		})
 	}
 
@@ -131,6 +139,21 @@ func (u *LogUseCase) Execute(ctx context.Context, input LogInput) (*LogOutput, e
 			return e.VersionID == initialVersion
 		}),
 	}, nil
+}
+
+// currentVersionID returns the id of the current version. AWS Secrets Manager
+// marks it with the AWSCURRENT staging label (membership, not position, so it
+// stays correct even when the version carries extra custom labels, #317). Google
+// Cloud and Azure Key Vault have no staging labels, so the newest version (first
+// in the newest-first history) is the current one. versions must be non-empty.
+func currentVersionID(versions []domain.Version) string {
+	for _, v := range versions {
+		if slices.Contains(v.StagingLabels, "AWSCURRENT") {
+			return v.ID
+		}
+	}
+
+	return versions[0].ID
 }
 
 // getValue fetches the value for a specific version id, tolerating fetch

@@ -47,6 +47,7 @@ type Client interface {
 		ctx context.Context, name string, params azsecrets.SetSecretParameters,
 	) (azsecrets.SetSecretResponse, error)
 	DeleteSecret(ctx context.Context, name string) (azsecrets.DeleteSecretResponse, error)
+	RecoverDeletedSecret(ctx context.Context, name string) (azsecrets.RecoverDeletedSecretResponse, error)
 	UpdateSecretProperties(
 		ctx context.Context, name, version string, params azsecrets.UpdateSecretPropertiesParameters,
 	) (azsecrets.UpdateSecretPropertiesResponse, error)
@@ -54,14 +55,19 @@ type Client interface {
 	ListSecretPropertiesVersions(ctx context.Context, name string) ([]*azsecrets.SecretProperties, error)
 }
 
-// Store is the Key Vault implementation of provider.Store. Like the Google
-// Cloud secret store it implements neither Restorer nor Describer.
+// Store is the Key Vault implementation of provider.Store. It also implements
+// the optional Restorer capability (soft-delete recovery); it does not
+// implement Describer.
 type Store struct {
 	client Client
 }
 
-// Compile-time assertion that Store implements the provider contract.
-var _ provider.Store = (*Store)(nil)
+// Compile-time assertions that Store implements the provider contract and the
+// optional Restorer capability (soft-delete recovery).
+var (
+	_ provider.Store    = (*Store)(nil)
+	_ provider.Restorer = (*Store)(nil)
+)
 
 // New builds a Store backed by the given client.
 func New(client Client) *Store {
@@ -75,6 +81,7 @@ type secretVersion struct {
 	id      string
 	created *time.Time
 	enabled bool
+	tags    []domain.Tag
 }
 
 // Resolve parses the version spec (generic) and resolves it to an opaque
@@ -187,6 +194,7 @@ func (s *Store) History(ctx context.Context, name string) ([]domain.Version, err
 			ID:      v.id,
 			State:   boolLabel(v.enabled),
 			Created: v.created,
+			Tags:    v.tags,
 		}
 	}), nil
 }
@@ -246,11 +254,22 @@ func (s *Store) setSecret(ctx context.Context, name, value string) (domain.Versi
 	return domain.Version{ID: versionID(resp.ID)}, nil
 }
 
-// Delete deletes a secret. Key Vault delete is a soft-delete when the vault has
-// soft-delete enabled; provider.DeleteOptions (AWS-specific) are ignored.
+// Restore recovers a soft-deleted secret (RecoverDeletedSecret). It makes the
+// store satisfy provider.Restorer, mirroring AWS Secrets Manager's restore.
+func (s *Store) Restore(ctx context.Context, name string) error {
+	if _, err := s.client.RecoverDeletedSecret(ctx, name); err != nil {
+		return mapError(err, name, "restore secret")
+	}
+
+	return nil
+}
+
+// Delete soft-deletes a secret when the vault has soft-delete enabled (the
+// default); use Restore to recover it within the vault's retention window. All
+// delete options are ignored: Key Vault has no per-delete recovery window (that
+// is a vault property), and force-delete/purge is intentionally unsupported.
 func (s *Store) Delete(ctx context.Context, name string, _ ...provider.DeleteOption) error {
-	_, err := s.client.DeleteSecret(ctx, name)
-	if err != nil {
+	if _, err := s.client.DeleteSecret(ctx, name); err != nil {
 		return mapError(err, name, "delete secret")
 	}
 
@@ -264,14 +283,14 @@ func (s *Store) Tag(ctx context.Context, name string, add map[string]string) err
 		return nil
 	}
 
-	tags, err := s.currentTags(ctx, name)
+	tags, version, err := s.currentTags(ctx, name)
 	if err != nil {
 		return err
 	}
 
 	maps.Copy(tags, add)
 
-	return s.updateTags(ctx, name, tags)
+	return s.updateTags(ctx, name, version, tags)
 }
 
 // Untag removes tags (by key) from the secret's current version via a
@@ -281,7 +300,7 @@ func (s *Store) Untag(ctx context.Context, name string, keys []string) error {
 		return nil
 	}
 
-	tags, err := s.currentTags(ctx, name)
+	tags, version, err := s.currentTags(ctx, name)
 	if err != nil {
 		return err
 	}
@@ -290,14 +309,17 @@ func (s *Store) Untag(ctx context.Context, name string, keys []string) error {
 		delete(tags, k)
 	}
 
-	return s.updateTags(ctx, name, tags)
+	return s.updateTags(ctx, name, version, tags)
 }
 
-// currentTags fetches the current version's tags as a mutable map.
-func (s *Store) currentTags(ctx context.Context, name string) (map[string]string, error) {
+// currentTags fetches the current version's tags as a mutable map, along with
+// that version's id. The version is required for the write-back: Key Vault's
+// update is PATCH /secrets/{name}/{version}, and an empty version collapses the
+// URL to /secrets/{name}/ which rejects PATCH with 405.
+func (s *Store) currentTags(ctx context.Context, name string) (map[string]string, string, error) {
 	resp, err := s.client.GetSecret(ctx, name, "")
 	if err != nil {
-		return nil, mapError(err, name, "get secret")
+		return nil, "", mapError(err, name, "get secret")
 	}
 
 	tags := make(map[string]string, len(resp.Tags))
@@ -305,17 +327,19 @@ func (s *Store) currentTags(ctx context.Context, name string) (map[string]string
 		tags[k] = lo.FromPtr(v)
 	}
 
-	return tags, nil
+	return tags, versionID(resp.ID), nil
 }
 
-// updateTags writes the tags map back to the secret's current version.
-func (s *Store) updateTags(ctx context.Context, name string, tags map[string]string) error {
+// updateTags writes the tags map back to the given secret version. version must
+// be a concrete version id (see currentTags): PATCH against an empty version
+// hits /secrets/{name}/ and returns 405 Method Not Allowed.
+func (s *Store) updateTags(ctx context.Context, name, version string, tags map[string]string) error {
 	azTags := make(map[string]*string, len(tags))
 	for k, v := range tags {
 		azTags[k] = lo.ToPtr(v)
 	}
 
-	_, err := s.client.UpdateSecretProperties(ctx, name, "", azsecrets.UpdateSecretPropertiesParameters{
+	_, err := s.client.UpdateSecretProperties(ctx, name, version, azsecrets.UpdateSecretPropertiesParameters{
 		Tags: azTags,
 	})
 	if err != nil {
@@ -327,7 +351,7 @@ func (s *Store) updateTags(ctx context.Context, name string, tags map[string]str
 
 // toSecretVersion maps SDK SecretProperties to the neutral secretVersion.
 func toSecretVersion(p *azsecrets.SecretProperties) secretVersion {
-	v := secretVersion{id: versionID(p.ID)}
+	v := secretVersion{id: versionID(p.ID), tags: mapTags(p.Tags)}
 
 	if attr := p.Attributes; attr != nil {
 		v.created = attr.Created

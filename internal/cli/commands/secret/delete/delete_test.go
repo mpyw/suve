@@ -81,7 +81,7 @@ func TestRun(t *testing.T) {
 			checkOpts: func(t *testing.T, opts []provider.DeleteOption) {
 				t.Helper()
 				require.Len(t, opts, 1)
-				assert.IsType(t, awssecret.ForceDelete{}, opts[0])
+				assert.IsType(t, provider.ForceDelete{}, opts[0])
 			},
 			check: func(t *testing.T, output string) {
 				t.Helper()

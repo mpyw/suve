@@ -58,7 +58,7 @@ func TestCheckConflicts(t *testing.T) {
 		t.Parallel()
 
 		strategy := &mockApplyStrategy{}
-		conflicts := staging.CheckConflicts(t.Context(), strategy, map[string]staging.Entry{})
+		conflicts := staging.CheckConflicts(t.Context(), strategy, map[staging.EntryKey]staging.Entry{})
 		assert.Empty(t, conflicts)
 	})
 
@@ -66,9 +66,9 @@ func TestCheckConflicts(t *testing.T) {
 		t.Parallel()
 
 		strategy := &mockApplyStrategy{}
-		entries := map[string]staging.Entry{
-			"item1": {Operation: staging.OperationUpdate},
-			"item2": {Operation: staging.OperationDelete},
+		entries := map[staging.EntryKey]staging.Entry{
+			{Name: "item1"}: {Operation: staging.OperationUpdate},
+			{Name: "item2"}: {Operation: staging.OperationDelete},
 		}
 		conflicts := staging.CheckConflicts(t.Context(), strategy, entries)
 		assert.Empty(t, conflicts)
@@ -82,11 +82,11 @@ func TestCheckConflicts(t *testing.T) {
 				return baseTime, nil // Resource exists (non-zero time)
 			},
 		}
-		entries := map[string]staging.Entry{
-			"new-item": {Operation: staging.OperationCreate, Value: lo.ToPtr("value")},
+		entries := map[staging.EntryKey]staging.Entry{
+			{Name: "new-item"}: {Operation: staging.OperationCreate, Value: lo.ToPtr("value")},
 		}
 		conflicts := staging.CheckConflicts(t.Context(), strategy, entries)
-		assert.Contains(t, conflicts, "new-item")
+		assert.Contains(t, conflicts, staging.EntryKey{Name: "new-item"})
 	})
 
 	t.Run("create no conflict - resource does not exist", func(t *testing.T) {
@@ -98,8 +98,8 @@ func TestCheckConflicts(t *testing.T) {
 			},
 		}
 
-		entries := map[string]staging.Entry{
-			"new-item": {Operation: staging.OperationCreate, Value: lo.ToPtr("value")},
+		entries := map[staging.EntryKey]staging.Entry{
+			{Name: "new-item"}: {Operation: staging.OperationCreate, Value: lo.ToPtr("value")},
 		}
 		conflicts := staging.CheckConflicts(t.Context(), strategy, entries)
 		assert.Empty(t, conflicts)
@@ -113,8 +113,8 @@ func TestCheckConflicts(t *testing.T) {
 				return time.Time{}, errors.New("access denied")
 			},
 		}
-		entries := map[string]staging.Entry{
-			"new-item": {Operation: staging.OperationCreate, Value: lo.ToPtr("value")},
+		entries := map[staging.EntryKey]staging.Entry{
+			{Name: "new-item"}: {Operation: staging.OperationCreate, Value: lo.ToPtr("value")},
 		}
 		conflicts := staging.CheckConflicts(t.Context(), strategy, entries)
 		assert.Empty(t, conflicts)
@@ -128,15 +128,15 @@ func TestCheckConflicts(t *testing.T) {
 				return laterTime, nil
 			},
 		}
-		entries := map[string]staging.Entry{
-			"existing-item": {
+		entries := map[staging.EntryKey]staging.Entry{
+			{Name: "existing-item"}: {
 				Operation:      staging.OperationUpdate,
 				Value:          lo.ToPtr("value"),
 				BaseModifiedAt: &baseTime,
 			},
 		}
 		conflicts := staging.CheckConflicts(t.Context(), strategy, entries)
-		assert.Contains(t, conflicts, "existing-item")
+		assert.Contains(t, conflicts, staging.EntryKey{Name: "existing-item"})
 	})
 
 	t.Run("update no conflict - AWS not modified after base", func(t *testing.T) {
@@ -147,8 +147,8 @@ func TestCheckConflicts(t *testing.T) {
 				return baseTime, nil // Same time as base
 			},
 		}
-		entries := map[string]staging.Entry{
-			"existing-item": {
+		entries := map[staging.EntryKey]staging.Entry{
+			{Name: "existing-item"}: {
 				Operation:      staging.OperationUpdate,
 				Value:          lo.ToPtr("value"),
 				BaseModifiedAt: &baseTime,
@@ -166,8 +166,8 @@ func TestCheckConflicts(t *testing.T) {
 				return time.Time{}, errors.New("access denied")
 			},
 		}
-		entries := map[string]staging.Entry{
-			"existing-item": {
+		entries := map[staging.EntryKey]staging.Entry{
+			{Name: "existing-item"}: {
 				Operation:      staging.OperationUpdate,
 				Value:          lo.ToPtr("value"),
 				BaseModifiedAt: &baseTime,
@@ -185,14 +185,14 @@ func TestCheckConflicts(t *testing.T) {
 				return laterTime, nil
 			},
 		}
-		entries := map[string]staging.Entry{
-			"delete-item": {
+		entries := map[staging.EntryKey]staging.Entry{
+			{Name: "delete-item"}: {
 				Operation:      staging.OperationDelete,
 				BaseModifiedAt: &baseTime,
 			},
 		}
 		conflicts := staging.CheckConflicts(t.Context(), strategy, entries)
-		assert.Contains(t, conflicts, "delete-item")
+		assert.Contains(t, conflicts, staging.EntryKey{Name: "delete-item"})
 	})
 
 	t.Run("delete no conflict - resource already deleted", func(t *testing.T) {
@@ -203,8 +203,8 @@ func TestCheckConflicts(t *testing.T) {
 				return time.Time{}, nil // Resource doesn't exist
 			},
 		}
-		entries := map[string]staging.Entry{
-			"delete-item": {
+		entries := map[staging.EntryKey]staging.Entry{
+			{Name: "delete-item"}: {
 				Operation:      staging.OperationDelete,
 				BaseModifiedAt: &baseTime,
 			},
@@ -232,15 +232,15 @@ func TestCheckConflicts(t *testing.T) {
 				}
 			},
 		}
-		entries := map[string]staging.Entry{
-			"create-item":        {Operation: staging.OperationCreate, Value: lo.ToPtr("v")},
-			"update-item":        {Operation: staging.OperationUpdate, Value: lo.ToPtr("v"), BaseModifiedAt: &baseTime},
-			"delete-item":        {Operation: staging.OperationDelete, BaseModifiedAt: &baseTime},
-			"update-no-conflict": {Operation: staging.OperationUpdate, Value: lo.ToPtr("v"), BaseModifiedAt: &baseTime},
+		entries := map[staging.EntryKey]staging.Entry{
+			{Name: "create-item"}:        {Operation: staging.OperationCreate, Value: lo.ToPtr("v")},
+			{Name: "update-item"}:        {Operation: staging.OperationUpdate, Value: lo.ToPtr("v"), BaseModifiedAt: &baseTime},
+			{Name: "delete-item"}:        {Operation: staging.OperationDelete, BaseModifiedAt: &baseTime},
+			{Name: "update-no-conflict"}: {Operation: staging.OperationUpdate, Value: lo.ToPtr("v"), BaseModifiedAt: &baseTime},
 		}
 		conflicts := staging.CheckConflicts(t.Context(), strategy, entries)
 		assert.Len(t, conflicts, 2)
-		assert.Contains(t, conflicts, "create-item")
-		assert.Contains(t, conflicts, "update-item")
+		assert.Contains(t, conflicts, staging.EntryKey{Name: "create-item"})
+		assert.Contains(t, conflicts, staging.EntryKey{Name: "update-item"})
 	})
 }

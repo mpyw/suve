@@ -2,49 +2,54 @@
 package staging
 
 import (
+	"encoding/json"
 	"errors"
 	"maps"
+	"slices"
 	"strings"
 	"time"
 
 	"github.com/mpyw/suve/internal/maputil"
 )
 
-// namespaceSep separates the namespace from the name in a composite entry key.
-// It is NUL because an Azure App Configuration key or label can contain neither
-// a NUL nor any other control character, making it a collision-proof separator
-// (the reserved filter characters `*`/`,`/`\` CAN appear in a real key/label, so
-// they would not be safe). This keeps the key unambiguous — unlike a JSON-string
-// key, where a name that legitimately begins with `{` could be misread.
-const namespaceSep = "\x00"
-
-// CompositeEntryKey is the map/storage key identifying a staged entry. For
-// Azure App Configuration a setting is identified by (name, namespace), so the
-// namespace is folded into the key. It collapses to the bare name when the
-// namespace is empty — the null/default namespace and the only case for every
-// other provider — so those providers' in-memory keys and on-disk JSON are
-// byte-for-byte unchanged.
-func CompositeEntryKey(name, namespace string) string {
-	if namespace == "" {
-		return name
-	}
-
-	return namespace + namespaceSep + name
+// EntryKey identifies a staged item — an entry or a tag change — by name and
+// namespace. Namespace is the Azure App Configuration label axis; empty is the
+// null/default namespace and the only value for every other provider. Carrying
+// both in one value is what makes it impossible to address a staged item
+// without its namespace: the store API and the in-memory state maps are keyed
+// by EntryKey, so a namespaced App Configuration setting can never be silently
+// resolved under the default namespace. The same name under two namespaces is
+// two distinct items.
+type EntryKey struct {
+	Name      string
+	Namespace string
 }
 
-// SplitEntryKey is the inverse of CompositeEntryKey: it recovers the (name,
-// namespace) a composite key encodes. A key with no separator is a bare name in
-// the null/default namespace.
-func SplitEntryKey(key string) (name, namespace string) {
-	if ns, n, found := strings.Cut(key, namespaceSep); found {
-		return n, ns
+// SortedEntryKeys returns the keys of m sorted by (name, namespace) for
+// deterministic iteration and output.
+func SortedEntryKeys[V any](m map[EntryKey]V) []EntryKey {
+	keys := make([]EntryKey, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
 	}
 
-	return key, ""
+	slices.SortFunc(keys, func(a, b EntryKey) int {
+		if c := strings.Compare(a.Name, b.Name); c != 0 {
+			return c
+		}
+
+		return strings.Compare(a.Namespace, b.Namespace)
+	})
+
+	return keys
 }
 
-// stateVersion is the current version of the staging state format.
-const stateVersion = 2
+// stateVersion is the current version of the staging state format. v3 replaced
+// the NUL-composite string map keys of v2 with structured (name, namespace)
+// records. Pre-v3 state is NOT migrated — the NUL encoding is gone entirely, so
+// an older on-disk state is treated as empty (staging is local working state; a
+// one-time reset on the format change is acceptable). See State.UnmarshalJSON.
+const stateVersion = 3
 
 // Operation represents the type of staged change.
 type Operation string
@@ -64,12 +69,6 @@ type Entry struct {
 	Operation   Operation `json:"operation"`
 	Value       *string   `json:"value,omitempty"` // nil for delete, pointer to distinguish from empty string
 	Description *string   `json:"description,omitempty"`
-	// Namespace is part of an entry's identity for Azure App Configuration (the
-	// label axis); empty is the null/default namespace and the only value for
-	// every other provider. Staged entries live in one file per store, keyed by
-	// the (name, namespace) composite, so the same key staged under two
-	// namespaces is two distinct entries. See CompositeEntryKey.
-	Namespace string `json:"namespace,omitempty"`
 	//nolint:tagliatelle // JSON uses snake_case for consistency with file storage format
 	StagedAt time.Time `json:"staged_at"`
 	// BaseModifiedAt records the AWS LastModified time when the value was fetched.
@@ -107,12 +106,132 @@ type DeleteOptions struct {
 	RecoveryWindow int `json:"recovery_window,omitempty"`
 }
 
-// State represents the entire staging state (v2).
-// Entries and Tags are managed separately for cleaner separation of concerns.
+// State represents the entire staging state (v3). Entries and Tags are keyed by
+// EntryKey (name + namespace) and managed separately for cleaner separation of
+// concerns. On disk each item is a structured record carrying its name and
+// namespace explicitly; see MarshalJSON / UnmarshalJSON.
 type State struct {
-	Version int                             `json:"version"`
-	Entries map[Service]map[string]Entry    `json:"entries,omitempty"`
-	Tags    map[Service]map[string]TagEntry `json:"tags,omitempty"`
+	Version int
+	Entries map[Service]map[EntryKey]Entry
+	Tags    map[Service]map[EntryKey]TagEntry
+}
+
+// entryRecord is the on-disk form of a staged entry: the Entry fields plus the
+// explicit (name, namespace) identity that keys it. No NUL-composite string.
+type entryRecord struct {
+	Entry
+
+	Name      string `json:"name"`
+	Namespace string `json:"namespace,omitempty"`
+}
+
+// tagRecord is the on-disk form of staged tag changes, keyed by explicit
+// (name, namespace).
+type tagRecord struct {
+	TagEntry
+
+	Name      string `json:"name"`
+	Namespace string `json:"namespace,omitempty"`
+}
+
+// stateJSON is the on-disk shape of State: per-service arrays of records.
+type stateJSON struct {
+	Version int                       `json:"version"`
+	Entries map[Service][]entryRecord `json:"entries,omitempty"`
+	Tags    map[Service][]tagRecord   `json:"tags,omitempty"`
+}
+
+// MarshalJSON writes the state as structured (name, namespace) records, sorted
+// for deterministic output.
+func (s *State) MarshalJSON() ([]byte, error) {
+	out := stateJSON{Version: stateVersion}
+
+	for svc, m := range s.Entries {
+		if len(m) == 0 {
+			continue
+		}
+
+		if out.Entries == nil {
+			out.Entries = make(map[Service][]entryRecord)
+		}
+
+		recs := make([]entryRecord, 0, len(m))
+		for _, k := range SortedEntryKeys(m) {
+			recs = append(recs, entryRecord{Name: k.Name, Namespace: k.Namespace, Entry: m[k]})
+		}
+
+		out.Entries[svc] = recs
+	}
+
+	for svc, m := range s.Tags {
+		if len(m) == 0 {
+			continue
+		}
+
+		if out.Tags == nil {
+			out.Tags = make(map[Service][]tagRecord)
+		}
+
+		recs := make([]tagRecord, 0, len(m))
+		for _, k := range SortedEntryKeys(m) {
+			recs = append(recs, tagRecord{Name: k.Name, Namespace: k.Namespace, TagEntry: m[k]})
+		}
+
+		out.Tags[svc] = recs
+	}
+
+	return json.Marshal(out)
+}
+
+// UnmarshalJSON reads a v3 (structured-record) state, migrating v1/v2 states
+// (NUL-composite string map keys) transparently on read so existing staged and
+// stashed state is never lost.
+func (s *State) UnmarshalJSON(data []byte) error {
+	var head struct {
+		Version int `json:"version"`
+	}
+
+	if err := json.Unmarshal(data, &head); err != nil {
+		return err
+	}
+
+	if head.Version < stateVersion {
+		// Pre-v3 state used a different on-disk layout (NUL-composite string map
+		// keys) that is intentionally not migrated. Treat it as empty so a format
+		// bump never crashes commands; stale local working state is dropped.
+		*s = *NewEmptyState()
+
+		return nil
+	}
+
+	var in stateJSON
+	if err := json.Unmarshal(data, &in); err != nil {
+		return err
+	}
+
+	s.Version = stateVersion
+	s.Entries = make(map[Service]map[EntryKey]Entry)
+	s.Tags = make(map[Service]map[EntryKey]TagEntry)
+
+	for svc, recs := range in.Entries {
+		m := make(map[EntryKey]Entry, len(recs))
+		for _, rec := range recs {
+			m[EntryKey{Name: rec.Name, Namespace: rec.Namespace}] = rec.Entry
+		}
+
+		s.Entries[svc] = m
+	}
+
+	for svc, recs := range in.Tags {
+		m := make(map[EntryKey]TagEntry, len(recs))
+		for _, rec := range recs {
+			m[EntryKey{Name: rec.Name, Namespace: rec.Namespace}] = rec.TagEntry
+		}
+
+		s.Tags[svc] = m
+	}
+
+	return nil
 }
 
 // IsEmpty checks if a state has no entries and no tags.
@@ -183,16 +302,16 @@ func (s *State) Merge(other *State) {
 	}
 
 	if s.Entries == nil {
-		s.Entries = make(map[Service]map[string]Entry)
+		s.Entries = make(map[Service]map[EntryKey]Entry)
 	}
 
 	if s.Tags == nil {
-		s.Tags = make(map[Service]map[string]TagEntry)
+		s.Tags = make(map[Service]map[EntryKey]TagEntry)
 	}
 
 	for svc, entries := range other.Entries {
 		if s.Entries[svc] == nil {
-			s.Entries[svc] = make(map[string]Entry)
+			s.Entries[svc] = make(map[EntryKey]Entry)
 		}
 
 		maps.Copy(s.Entries[svc], entries)
@@ -200,7 +319,7 @@ func (s *State) Merge(other *State) {
 
 	for svc, tags := range other.Tags {
 		if s.Tags[svc] == nil {
-			s.Tags[svc] = make(map[string]TagEntry)
+			s.Tags[svc] = make(map[EntryKey]TagEntry)
 		}
 
 		maps.Copy(s.Tags[svc], tags)
@@ -211,13 +330,13 @@ func (s *State) Merge(other *State) {
 func NewEmptyState() *State {
 	return &State{
 		Version: stateVersion,
-		Entries: map[Service]map[string]Entry{
-			ServiceParam:  make(map[string]Entry),
-			ServiceSecret: make(map[string]Entry),
+		Entries: map[Service]map[EntryKey]Entry{
+			ServiceParam:  make(map[EntryKey]Entry),
+			ServiceSecret: make(map[EntryKey]Entry),
 		},
-		Tags: map[Service]map[string]TagEntry{
-			ServiceParam:  make(map[string]TagEntry),
-			ServiceSecret: make(map[string]TagEntry),
+		Tags: map[Service]map[EntryKey]TagEntry{
+			ServiceParam:  make(map[EntryKey]TagEntry),
+			ServiceSecret: make(map[EntryKey]TagEntry),
 		},
 	}
 }
@@ -259,20 +378,20 @@ func (s *State) RemoveService(service Service) {
 
 	if service == "" {
 		// Clear all
-		s.Entries = map[Service]map[string]Entry{
-			ServiceParam:  make(map[string]Entry),
-			ServiceSecret: make(map[string]Entry),
+		s.Entries = map[Service]map[EntryKey]Entry{
+			ServiceParam:  make(map[EntryKey]Entry),
+			ServiceSecret: make(map[EntryKey]Entry),
 		}
-		s.Tags = map[Service]map[string]TagEntry{
-			ServiceParam:  make(map[string]TagEntry),
-			ServiceSecret: make(map[string]TagEntry),
+		s.Tags = map[Service]map[EntryKey]TagEntry{
+			ServiceParam:  make(map[EntryKey]TagEntry),
+			ServiceSecret: make(map[EntryKey]TagEntry),
 		}
 
 		return
 	}
 
-	s.Entries[service] = make(map[string]Entry)
-	s.Tags[service] = make(map[string]TagEntry)
+	s.Entries[service] = make(map[EntryKey]Entry)
+	s.Tags[service] = make(map[EntryKey]TagEntry)
 }
 
 // Service represents which AWS service the staged change belongs to.

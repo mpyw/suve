@@ -64,9 +64,9 @@ func (r *StashShowRunner) Run(ctx context.Context, opts StashShowOptions) error 
 	totalCount := 0
 	for service, entries := range state.Entries {
 		totalCount += len(entries)
-		for name, entry := range entries {
+		for key, entry := range entries {
 			printer := &staging.EntryPrinter{Writer: r.Stdout}
-			printer.PrintEntry(name, entry, opts.Verbose, false)
+			printer.PrintEntry(key, entry, opts.Verbose, false)
 			output.Printf(r.Stdout, "  Service: %s\n", service)
 		}
 	}
@@ -74,8 +74,8 @@ func (r *StashShowRunner) Run(ctx context.Context, opts StashShowOptions) error 
 	// Display tags
 	for service, tags := range state.Tags {
 		totalCount += len(tags)
-		for name, tagEntry := range tags {
-			printTagSummary(r.Stdout, name, tagEntry)
+		for key, tagEntry := range tags {
+			printTagSummary(r.Stdout, key.Name, tagEntry)
 			output.Printf(r.Stdout, "  Service: %s\n", service)
 		}
 	}

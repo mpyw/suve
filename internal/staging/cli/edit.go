@@ -7,6 +7,7 @@ import (
 
 	"github.com/mpyw/suve/internal/cli/editor"
 	"github.com/mpyw/suve/internal/cli/output"
+	"github.com/mpyw/suve/internal/staging"
 	stagingusecase "github.com/mpyw/suve/internal/usecase/staging"
 )
 
@@ -31,7 +32,7 @@ type EditOptions struct {
 // Run executes the edit command.
 func (r *EditRunner) Run(ctx context.Context, opts EditOptions) error {
 	// Get baseline value (staged value if exists, otherwise from AWS)
-	baseline, err := r.UseCase.Baseline(ctx, stagingusecase.BaselineInput{Name: opts.Name, Namespace: opts.Namespace})
+	baseline, err := r.UseCase.Baseline(ctx, stagingusecase.BaselineInput{Key: staging.EntryKey{Name: opts.Name, Namespace: opts.Namespace}})
 	if err != nil {
 		return err
 	}
@@ -62,10 +63,9 @@ func (r *EditRunner) Run(ctx context.Context, opts EditOptions) error {
 
 	// Execute the edit use case
 	result, err := r.UseCase.Execute(ctx, stagingusecase.EditInput{
-		Name:        opts.Name,
+		Key:         staging.EntryKey{Name: opts.Name, Namespace: opts.Namespace},
 		Value:       newValue,
 		Description: opts.Description,
-		Namespace:   opts.Namespace,
 	})
 	if err != nil {
 		return err

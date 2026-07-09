@@ -119,11 +119,12 @@ func TestRun_ParamOnly(t *testing.T) {
 
 	store := testutil.NewMockStore()
 
-	err := store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
+	err := store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("new-value"),
 		StagedAt:  time.Now(),
 	})
+
 	require.NoError(t, err)
 
 	var stdout, stderr bytes.Buffer
@@ -150,11 +151,12 @@ func TestRun_SecretOnly(t *testing.T) {
 
 	store := testutil.NewMockStore()
 
-	err := store.StageEntry(t.Context(), staging.ServiceSecret, "my-secret", staging.Entry{
+	err := store.StageEntry(t.Context(), staging.ServiceSecret, staging.EntryKey{Name: "my-secret"}, staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("new-secret"),
 		StagedAt:  time.Now(),
 	})
+
 	require.NoError(t, err)
 
 	var stdout, stderr bytes.Buffer
@@ -179,18 +181,20 @@ func TestRun_BothServices(t *testing.T) {
 
 	store := testutil.NewMockStore()
 
-	err := store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
+	err := store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("param-new"),
 		StagedAt:  time.Now(),
 	})
+
 	require.NoError(t, err)
 
-	err = store.StageEntry(t.Context(), staging.ServiceSecret, "my-secret", staging.Entry{
+	err = store.StageEntry(t.Context(), staging.ServiceSecret, staging.EntryKey{Name: "my-secret"}, staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("secret-new"),
 		StagedAt:  time.Now(),
 	})
+
 	require.NoError(t, err)
 
 	var stdout, stderr bytes.Buffer
@@ -222,16 +226,18 @@ func TestRun_DeleteOperations(t *testing.T) {
 
 	store := testutil.NewMockStore()
 
-	err := store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
+	err := store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 		Operation: staging.OperationDelete,
 		StagedAt:  time.Now(),
 	})
+
 	require.NoError(t, err)
 
-	err = store.StageEntry(t.Context(), staging.ServiceSecret, "my-secret", staging.Entry{
+	err = store.StageEntry(t.Context(), staging.ServiceSecret, staging.EntryKey{Name: "my-secret"}, staging.Entry{
 		Operation: staging.OperationDelete,
 		StagedAt:  time.Now(),
 	})
+
 	require.NoError(t, err)
 
 	var stdout, stderr bytes.Buffer
@@ -260,11 +266,12 @@ func TestRun_IdenticalValues(t *testing.T) {
 
 	store := testutil.NewMockStore()
 
-	err := store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
+	err := store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("same-value"),
 		StagedAt:  time.Now(),
 	})
+
 	require.NoError(t, err)
 
 	var stdout, stderr bytes.Buffer
@@ -283,7 +290,7 @@ func TestRun_IdenticalValues(t *testing.T) {
 	assert.Contains(t, stderr.String(), "unstaged /app/config: identical to AWS current")
 
 	// Verify actually unstaged
-	_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/config", "")
+	_, err = store.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config", Namespace: ""})
 	assert.Equal(t, staging.ErrNotStaged, err)
 }
 
@@ -292,11 +299,12 @@ func TestRun_ParseJSON(t *testing.T) {
 
 	store := testutil.NewMockStore()
 
-	err := store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
+	err := store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr(`{"key":"new"}`),
 		StagedAt:  time.Now(),
 	})
+
 	require.NoError(t, err)
 
 	var stdout, stderr bytes.Buffer
@@ -321,11 +329,12 @@ func TestRun_ParamUpdateAutoUnstageWhenDeleted(t *testing.T) {
 
 	store := testutil.NewMockStore()
 
-	err := store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
+	err := store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("new-value"),
 		StagedAt:  time.Now(),
 	})
+
 	require.NoError(t, err)
 
 	var stdout, stderr bytes.Buffer
@@ -343,7 +352,7 @@ func TestRun_ParamUpdateAutoUnstageWhenDeleted(t *testing.T) {
 	assert.Contains(t, stderr.String(), "no longer exists")
 
 	// Verify unstaged
-	_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/config", "")
+	_, err = store.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config", Namespace: ""})
 	assert.ErrorIs(t, err, staging.ErrNotStaged)
 }
 
@@ -352,11 +361,12 @@ func TestRun_SecretUpdateAutoUnstageWhenDeleted(t *testing.T) {
 
 	store := testutil.NewMockStore()
 
-	err := store.StageEntry(t.Context(), staging.ServiceSecret, "my-secret", staging.Entry{
+	err := store.StageEntry(t.Context(), staging.ServiceSecret, staging.EntryKey{Name: "my-secret"}, staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("new-value"),
 		StagedAt:  time.Now(),
 	})
+
 	require.NoError(t, err)
 
 	var stdout, stderr bytes.Buffer
@@ -374,7 +384,7 @@ func TestRun_SecretUpdateAutoUnstageWhenDeleted(t *testing.T) {
 	assert.Contains(t, stderr.String(), "no longer exists")
 
 	// Verify unstaged
-	_, err = store.GetEntry(t.Context(), staging.ServiceSecret, "my-secret", "")
+	_, err = store.GetEntry(t.Context(), staging.ServiceSecret, staging.EntryKey{Name: "my-secret", Namespace: ""})
 	assert.ErrorIs(t, err, staging.ErrNotStaged)
 }
 
@@ -383,11 +393,12 @@ func TestRun_SecretIdenticalValues(t *testing.T) {
 
 	store := testutil.NewMockStore()
 
-	err := store.StageEntry(t.Context(), staging.ServiceSecret, "my-secret", staging.Entry{
+	err := store.StageEntry(t.Context(), staging.ServiceSecret, staging.EntryKey{Name: "my-secret"}, staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("same-value"),
 		StagedAt:  time.Now(),
 	})
+
 	require.NoError(t, err)
 
 	var stdout, stderr bytes.Buffer
@@ -406,7 +417,7 @@ func TestRun_SecretIdenticalValues(t *testing.T) {
 	assert.Contains(t, stderr.String(), "unstaged my-secret: identical to AWS current")
 
 	// Verify actually unstaged
-	_, err = store.GetEntry(t.Context(), staging.ServiceSecret, "my-secret", "")
+	_, err = store.GetEntry(t.Context(), staging.ServiceSecret, staging.EntryKey{Name: "my-secret", Namespace: ""})
 	assert.Equal(t, staging.ErrNotStaged, err)
 }
 
@@ -415,11 +426,12 @@ func TestRun_SecretParseJSON(t *testing.T) {
 
 	store := testutil.NewMockStore()
 
-	err := store.StageEntry(t.Context(), staging.ServiceSecret, "my-secret", staging.Entry{
+	err := store.StageEntry(t.Context(), staging.ServiceSecret, staging.EntryKey{Name: "my-secret"}, staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr(`{"key":"new"}`),
 		StagedAt:  time.Now(),
 	})
+
 	require.NoError(t, err)
 
 	var stdout, stderr bytes.Buffer
@@ -444,11 +456,12 @@ func TestRun_SecretParseJSONMixed(t *testing.T) {
 
 	store := testutil.NewMockStore()
 
-	err := store.StageEntry(t.Context(), staging.ServiceSecret, "my-secret", staging.Entry{
+	err := store.StageEntry(t.Context(), staging.ServiceSecret, staging.EntryKey{Name: "my-secret"}, staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("not-json"),
 		StagedAt:  time.Now(),
 	})
+
 	require.NoError(t, err)
 
 	var stdout, stderr bytes.Buffer
@@ -471,17 +484,19 @@ func TestRun_ParamCreateOperation(t *testing.T) {
 
 	store := testutil.NewMockStore()
 
-	err := store.StageEntry(t.Context(), staging.ServiceParam, "/app/new-param", staging.Entry{
+	err := store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/new-param"}, staging.Entry{
 		Operation:   staging.OperationCreate,
 		Value:       lo.ToPtr("new-value"),
 		Description: lo.ToPtr("New parameter"),
 		StagedAt:    time.Now(),
 	})
+
 	require.NoError(t, err)
-	err = store.StageTag(t.Context(), staging.ServiceParam, "/app/new-param", staging.TagEntry{
+	err = store.StageTag(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/new-param"}, staging.TagEntry{
 		Add:      map[string]string{"env": "prod", "team": "platform"},
 		StagedAt: time.Now(),
 	})
+
 	require.NoError(t, err)
 
 	var stdout, stderr bytes.Buffer
@@ -510,17 +525,19 @@ func TestRun_SecretCreateOperation(t *testing.T) {
 
 	store := testutil.NewMockStore()
 
-	err := store.StageEntry(t.Context(), staging.ServiceSecret, "new-secret", staging.Entry{
+	err := store.StageEntry(t.Context(), staging.ServiceSecret, staging.EntryKey{Name: "new-secret"}, staging.Entry{
 		Operation:   staging.OperationCreate,
 		Value:       lo.ToPtr("secret-value"),
 		Description: lo.ToPtr("New secret"),
 		StagedAt:    time.Now(),
 	})
+
 	require.NoError(t, err)
-	err = store.StageTag(t.Context(), staging.ServiceSecret, "new-secret", staging.TagEntry{
+	err = store.StageTag(t.Context(), staging.ServiceSecret, staging.EntryKey{Name: "new-secret"}, staging.TagEntry{
 		Add:      map[string]string{"env": "staging"},
 		StagedAt: time.Now(),
 	})
+
 	require.NoError(t, err)
 
 	var stdout, stderr bytes.Buffer
@@ -549,11 +566,12 @@ func TestRun_CreateWithParseJSON(t *testing.T) {
 
 	store := testutil.NewMockStore()
 
-	err := store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
+	err := store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 		Operation: staging.OperationCreate,
 		Value:     lo.ToPtr(`{"key":"value","nested":{"a":1}}`),
 		StagedAt:  time.Now(),
 	})
+
 	require.NoError(t, err)
 
 	var stdout, stderr bytes.Buffer
@@ -579,10 +597,11 @@ func TestRun_DeleteAutoUnstageWhenAlreadyDeleted(t *testing.T) {
 
 	store := testutil.NewMockStore()
 
-	err := store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
+	err := store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 		Operation: staging.OperationDelete,
 		StagedAt:  time.Now(),
 	})
+
 	require.NoError(t, err)
 
 	var stdout, stderr bytes.Buffer
@@ -600,7 +619,7 @@ func TestRun_DeleteAutoUnstageWhenAlreadyDeleted(t *testing.T) {
 	assert.Contains(t, stderr.String(), "already deleted")
 
 	// Verify unstaged
-	_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/config", "")
+	_, err = store.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config", Namespace: ""})
 	assert.ErrorIs(t, err, staging.ErrNotStaged)
 }
 
@@ -621,7 +640,7 @@ func TestRun_KeptStagedOnTransientFetchError(t *testing.T) {
 				entry.Value = lo.ToPtr("new-value")
 			}
 
-			require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", entry))
+			require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, entry))
 
 			var stdout, stderr bytes.Buffer
 
@@ -638,7 +657,7 @@ func TestRun_KeptStagedOnTransientFetchError(t *testing.T) {
 			assert.Contains(t, stderr.String(), "throttled")
 			assert.NotContains(t, stderr.String(), "unstaged")
 
-			_, err := store.GetEntry(t.Context(), staging.ServiceParam, "/app/config", "")
+			_, err := store.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config", Namespace: ""})
 			require.NoError(t, err, "entry must remain staged after a transient fetch error")
 		})
 	}
@@ -651,7 +670,7 @@ func TestRun_DeleteEmptyRemoteNotUnstaged(t *testing.T) {
 	t.Parallel()
 
 	store := testutil.NewMockStore()
-	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/empty", staging.Entry{
+	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/empty"}, staging.Entry{
 		Operation: staging.OperationDelete,
 		StagedAt:  time.Now(),
 	}))
@@ -669,7 +688,7 @@ func TestRun_DeleteEmptyRemoteNotUnstaged(t *testing.T) {
 	assert.NotContains(t, stderr.String(), "unstaged")
 
 	// The staged deletion must survive `stage diff`.
-	_, err := store.GetEntry(t.Context(), staging.ServiceParam, "/app/empty", "")
+	_, err := store.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/empty", Namespace: ""})
 	require.NoError(t, err)
 }
 
@@ -681,7 +700,7 @@ func TestRun_ParseJSONReformatOnlyUpdateKeptStaged(t *testing.T) {
 	t.Parallel()
 
 	store := testutil.NewMockStore()
-	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
+	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr(`{"b":2,"a":1}`),
 		StagedAt:  time.Now(),
@@ -701,7 +720,7 @@ func TestRun_ParseJSONReformatOnlyUpdateKeptStaged(t *testing.T) {
 	assert.Contains(t, stderr.String(), "only in JSON formatting")
 
 	// The staged update must survive `stage diff -j`.
-	_, err := store.GetEntry(t.Context(), staging.ServiceParam, "/app/config", "")
+	_, err := store.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config", Namespace: ""})
 	require.NoError(t, err)
 }
 
@@ -710,10 +729,11 @@ func TestRun_SecretDeleteAutoUnstageWhenAlreadyDeleted(t *testing.T) {
 
 	store := testutil.NewMockStore()
 
-	err := store.StageEntry(t.Context(), staging.ServiceSecret, "my-secret", staging.Entry{
+	err := store.StageEntry(t.Context(), staging.ServiceSecret, staging.EntryKey{Name: "my-secret"}, staging.Entry{
 		Operation: staging.OperationDelete,
 		StagedAt:  time.Now(),
 	})
+
 	require.NoError(t, err)
 
 	var stdout, stderr bytes.Buffer
@@ -731,7 +751,7 @@ func TestRun_SecretDeleteAutoUnstageWhenAlreadyDeleted(t *testing.T) {
 	assert.Contains(t, stderr.String(), "already deleted")
 
 	// Verify unstaged
-	_, err = store.GetEntry(t.Context(), staging.ServiceSecret, "my-secret", "")
+	_, err = store.GetEntry(t.Context(), staging.ServiceSecret, staging.EntryKey{Name: "my-secret", Namespace: ""})
 	assert.ErrorIs(t, err, staging.ErrNotStaged)
 }
 
@@ -740,12 +760,13 @@ func TestRun_MetadataWithDescription(t *testing.T) {
 
 	store := testutil.NewMockStore()
 
-	err := store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
+	err := store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 		Operation:   staging.OperationUpdate,
 		Value:       lo.ToPtr("new-value"),
 		Description: lo.ToPtr("Updated config"),
 		StagedAt:    time.Now(),
 	})
+
 	require.NoError(t, err)
 
 	var stdout, stderr bytes.Buffer
@@ -770,16 +791,18 @@ func TestRun_MetadataWithTags(t *testing.T) {
 
 	store := testutil.NewMockStore()
 
-	err := store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
+	err := store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("new-value"),
 		StagedAt:  time.Now(),
 	})
+
 	require.NoError(t, err)
-	err = store.StageTag(t.Context(), staging.ServiceParam, "/app/config", staging.TagEntry{
+	err = store.StageTag(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.TagEntry{
 		Add:      map[string]string{"env": "prod", "team": "platform"},
 		StagedAt: time.Now(),
 	})
+
 	require.NoError(t, err)
 
 	var stdout, stderr bytes.Buffer
@@ -807,10 +830,11 @@ func TestRun_TagOnlyDiff(t *testing.T) {
 	store := testutil.NewMockStore()
 
 	// Stage only tag changes (no entry change)
-	err := store.StageTag(t.Context(), staging.ServiceParam, "/app/config", staging.TagEntry{
+	err := store.StageTag(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.TagEntry{
 		Add:      map[string]string{"env": "prod", "team": "api"},
 		StagedAt: time.Now(),
 	})
+
 	require.NoError(t, err)
 
 	var stdout, stderr bytes.Buffer
@@ -840,10 +864,11 @@ func TestRun_TagOnlyRemovalsDiff(t *testing.T) {
 	store := testutil.NewMockStore()
 
 	// Stage only tag removals (no additions)
-	err := store.StageTag(t.Context(), staging.ServiceParam, "/app/config", staging.TagEntry{
+	err := store.StageTag(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.TagEntry{
 		Remove:   maputil.NewSet("deprecated", "old-tag"),
 		StagedAt: time.Now(),
 	})
+
 	require.NoError(t, err)
 
 	var stdout, stderr bytes.Buffer
@@ -872,11 +897,12 @@ func TestRun_SecretTagDiff(t *testing.T) {
 	store := testutil.NewMockStore()
 
 	// Stage secret tag changes
-	err := store.StageTag(t.Context(), staging.ServiceSecret, "my-secret", staging.TagEntry{
+	err := store.StageTag(t.Context(), staging.ServiceSecret, staging.EntryKey{Name: "my-secret"}, staging.TagEntry{
 		Add:      map[string]string{"env": "staging"},
 		Remove:   maputil.NewSet("deprecated"),
 		StagedAt: time.Now(),
 	})
+
 	require.NoError(t, err)
 
 	var stdout, stderr bytes.Buffer
@@ -905,11 +931,12 @@ func TestRun_SecretCreateWithParseJSON(t *testing.T) {
 
 	store := testutil.NewMockStore()
 
-	err := store.StageEntry(t.Context(), staging.ServiceSecret, "new-secret", staging.Entry{
+	err := store.StageEntry(t.Context(), staging.ServiceSecret, staging.EntryKey{Name: "new-secret"}, staging.Entry{
 		Operation: staging.OperationCreate,
 		Value:     lo.ToPtr(`{"key":"value","nested":{"a":1}}`),
 		StagedAt:  time.Now(),
 	})
+
 	require.NoError(t, err)
 
 	var stdout, stderr bytes.Buffer
@@ -936,18 +963,20 @@ func TestRun_BothEntriesAndTags(t *testing.T) {
 	store := testutil.NewMockStore()
 
 	// Stage entry change
-	err := store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
+	err := store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("new-value"),
 		StagedAt:  time.Now(),
 	})
+
 	require.NoError(t, err)
 
 	// Stage tag change (different resource)
-	err = store.StageTag(t.Context(), staging.ServiceParam, "/app/other", staging.TagEntry{
+	err = store.StageTag(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/other"}, staging.TagEntry{
 		Add:      map[string]string{"env": "prod"},
 		StagedAt: time.Now(),
 	})
+
 	require.NoError(t, err)
 
 	var stdout, stderr bytes.Buffer
@@ -978,10 +1007,11 @@ func TestRun_ParamTagDiffWithValues(t *testing.T) {
 	store := testutil.NewMockStore()
 
 	// Stage param tag removals
-	err := store.StageTag(t.Context(), staging.ServiceParam, "/app/config", staging.TagEntry{
+	err := store.StageTag(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.TagEntry{
 		Remove:   maputil.NewSet("deprecated", "old-tag"),
 		StagedAt: time.Now(),
 	})
+
 	require.NoError(t, err)
 
 	// Provider returns current tag values for the removal preview.
@@ -1016,10 +1046,11 @@ func TestRun_SecretTagDiffWithValues(t *testing.T) {
 	store := testutil.NewMockStore()
 
 	// Stage secret tag removals
-	err := store.StageTag(t.Context(), staging.ServiceSecret, "my-secret", staging.TagEntry{
+	err := store.StageTag(t.Context(), staging.ServiceSecret, staging.EntryKey{Name: "my-secret"}, staging.TagEntry{
 		Remove:   maputil.NewSet("deprecated"),
 		StagedAt: time.Now(),
 	})
+
 	require.NoError(t, err)
 
 	// Provider returns current tag values for the removal preview.
@@ -1049,10 +1080,11 @@ func TestRun_ParamTagDiffAPIError(t *testing.T) {
 	store := testutil.NewMockStore()
 
 	// Stage param tag removals
-	err := store.StageTag(t.Context(), staging.ServiceParam, "/app/config", staging.TagEntry{
+	err := store.StageTag(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.TagEntry{
 		Remove:   maputil.NewSet("deprecated"),
 		StagedAt: time.Now(),
 	})
+
 	require.NoError(t, err)
 
 	var stdout, stderr bytes.Buffer
@@ -1079,10 +1111,11 @@ func TestRun_SecretTagDiffAPIError(t *testing.T) {
 	store := testutil.NewMockStore()
 
 	// Stage secret tag removals
-	err := store.StageTag(t.Context(), staging.ServiceSecret, "my-secret", staging.TagEntry{
+	err := store.StageTag(t.Context(), staging.ServiceSecret, staging.EntryKey{Name: "my-secret"}, staging.TagEntry{
 		Remove:   maputil.NewSet("old-tag"),
 		StagedAt: time.Now(),
 	})
+
 	require.NoError(t, err)
 
 	var stdout, stderr bytes.Buffer
@@ -1109,10 +1142,11 @@ func TestRun_TagDiffWithMissingValue(t *testing.T) {
 	store := testutil.NewMockStore()
 
 	// Stage param tag removals
-	err := store.StageTag(t.Context(), staging.ServiceParam, "/app/config", staging.TagEntry{
+	err := store.StageTag(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.TagEntry{
 		Remove:   maputil.NewSet("has-value", "no-value"),
 		StagedAt: time.Now(),
 	})
+
 	require.NoError(t, err)
 
 	// Provider returns only some of the staged tags (no-value not present).

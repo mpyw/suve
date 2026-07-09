@@ -345,6 +345,43 @@
   user-select: none;
 }
 
+/* Per-version tags inside a Version History entry (Azure Key Vault). */
+.history-tags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.history-tags-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #777;
+}
+
+.no-tags-inline {
+  font-size: 12px;
+  color: #666;
+  font-style: italic;
+}
+
+.btn-tag-add-sm {
+  padding: 2px 8px;
+  font-size: 11px;
+  background: transparent;
+  color: #aaa;
+  border: 1px solid #3a3a52;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.btn-tag-add-sm:hover {
+  color: #fff;
+  border-color: #e94560;
+}
+
 /* Badges */
 .badge {
   font-size: 10px;

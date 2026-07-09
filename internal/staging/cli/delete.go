@@ -5,6 +5,7 @@ import (
 	"io"
 
 	"github.com/mpyw/suve/internal/cli/output"
+	"github.com/mpyw/suve/internal/staging"
 	stagingusecase "github.com/mpyw/suve/internal/usecase/staging"
 )
 
@@ -28,10 +29,9 @@ type DeleteOptions struct {
 // Run executes the delete command.
 func (r *DeleteRunner) Run(ctx context.Context, opts DeleteOptions) error {
 	result, err := r.UseCase.Execute(ctx, stagingusecase.DeleteInput{
-		Name:           opts.Name,
+		Key:            staging.EntryKey{Name: opts.Name, Namespace: opts.Namespace},
 		Force:          opts.Force,
 		RecoveryWindow: opts.RecoveryWindow,
-		Namespace:      opts.Namespace,
 	})
 	if err != nil {
 		return err

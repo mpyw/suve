@@ -31,8 +31,7 @@ type EntryExecuteOptions struct {
 func (e *Executor) ExecuteEntry(
 	ctx context.Context,
 	service staging.Service,
-	name string,
-	namespace string,
+	key staging.EntryKey,
 	state EntryState,
 	action EntryAction,
 	opts *EntryExecuteOptions,
@@ -43,13 +42,13 @@ func (e *Executor) ExecuteEntry(
 	}
 
 	// Persist the new state
-	if err := e.persistEntryState(ctx, service, name, namespace, state, result, opts); err != nil {
+	if err := e.persistEntryState(ctx, service, key, state, result, opts); err != nil {
 		return result, err
 	}
 
 	// Handle tag unstaging if needed
 	if result.DiscardTags {
-		if err := e.Store.UnstageTag(ctx, service, name); err != nil {
+		if err := e.Store.UnstageTag(ctx, service, key); err != nil {
 			// Ignore ErrNotStaged - it's fine if there were no tags
 			if !errors.Is(err, staging.ErrNotStaged) {
 				return result, err
@@ -64,7 +63,7 @@ func (e *Executor) ExecuteEntry(
 func (e *Executor) ExecuteTag(
 	ctx context.Context,
 	service staging.Service,
-	name string,
+	key staging.EntryKey,
 	entryState EntryState,
 	stagedTags StagedTags,
 	action TagAction,
@@ -76,7 +75,7 @@ func (e *Executor) ExecuteTag(
 	}
 
 	// Persist the new staged tags
-	if err := e.persistTagState(ctx, service, name, result.NewStagedTags, baseModifiedAt); err != nil {
+	if err := e.persistTagState(ctx, service, key, result.NewStagedTags, baseModifiedAt); err != nil {
 		return result, err
 	}
 
@@ -87,8 +86,7 @@ func (e *Executor) ExecuteTag(
 func (e *Executor) persistEntryState(
 	ctx context.Context,
 	service staging.Service,
-	name string,
-	namespace string,
+	key staging.EntryKey,
 	oldState EntryState,
 	result EntryTransitionResult,
 	opts *EntryExecuteOptions,
@@ -99,27 +97,25 @@ func (e *Executor) persistEntryState(
 	case EntryStagedStateNotStaged:
 		// Unstage if was previously staged
 		if _, wasStaged := oldState.StagedState.(EntryStagedStateNotStaged); !wasStaged {
-			err = e.Store.UnstageEntry(ctx, service, name, namespace)
+			err = e.Store.UnstageEntry(ctx, service, key)
 		}
 
 	case EntryStagedStateCreate:
 		entry := staging.Entry{
 			Operation: staging.OperationCreate,
 			Value:     lo.ToPtr(s.DraftValue),
-			Namespace: namespace,
 			StagedAt:  time.Now(),
 		}
 		if opts != nil && opts.Description != nil {
 			entry.Description = opts.Description
 		}
 
-		err = e.Store.StageEntry(ctx, service, name, entry)
+		err = e.Store.StageEntry(ctx, service, key, entry)
 
 	case EntryStagedStateUpdate:
 		entry := staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr(s.DraftValue),
-			Namespace: namespace,
 			StagedAt:  time.Now(),
 		}
 		if opts != nil {
@@ -129,19 +125,18 @@ func (e *Executor) persistEntryState(
 			}
 		}
 
-		err = e.Store.StageEntry(ctx, service, name, entry)
+		err = e.Store.StageEntry(ctx, service, key, entry)
 
 	case EntryStagedStateDelete:
 		entry := staging.Entry{
 			Operation: staging.OperationDelete,
-			Namespace: namespace,
 			StagedAt:  time.Now(),
 		}
 		if opts != nil {
 			entry.BaseModifiedAt = opts.BaseModifiedAt
 		}
 
-		err = e.Store.StageEntry(ctx, service, name, entry)
+		err = e.Store.StageEntry(ctx, service, key, entry)
 	}
 
 	return err
@@ -151,13 +146,13 @@ func (e *Executor) persistEntryState(
 func (e *Executor) persistTagState(
 	ctx context.Context,
 	service staging.Service,
-	name string,
+	key staging.EntryKey,
 	stagedTags StagedTags,
 	baseModifiedAt *time.Time,
 ) error {
 	// If no tags to stage, unstage
 	if stagedTags.IsEmpty() {
-		err := e.Store.UnstageTag(ctx, service, name)
+		err := e.Store.UnstageTag(ctx, service, key)
 		if errors.Is(err, staging.ErrNotStaged) {
 			return nil // Already not staged, that's fine
 		}
@@ -166,7 +161,7 @@ func (e *Executor) persistTagState(
 	}
 
 	// Stage the tags
-	return e.Store.StageTag(ctx, service, name, staging.TagEntry{
+	return e.Store.StageTag(ctx, service, key, staging.TagEntry{
 		Add:            stagedTags.ToSet,
 		Remove:         stagedTags.ToUnset,
 		StagedAt:       time.Now(),
@@ -179,11 +174,10 @@ func LoadEntryState(
 	ctx context.Context,
 	store store.ReadOperator,
 	service staging.Service,
-	name string,
-	namespace string,
+	key staging.EntryKey,
 	currentAWSValue *string,
 ) (EntryState, error) {
-	state, _, err := LoadEntryStateWithMetadata(ctx, store, service, name, namespace, currentAWSValue)
+	state, _, err := LoadEntryStateWithMetadata(ctx, store, service, key, currentAWSValue)
 
 	return state, err
 }
@@ -194,11 +188,10 @@ func LoadEntryStateWithMetadata(
 	ctx context.Context,
 	store store.ReadOperator,
 	service staging.Service,
-	name string,
-	namespace string,
+	key staging.EntryKey,
 	currentAWSValue *string,
 ) (EntryState, *time.Time, error) {
-	stagedEntry, err := store.GetEntry(ctx, service, name, namespace)
+	stagedEntry, err := store.GetEntry(ctx, service, key)
 	if err != nil && !errors.Is(err, staging.ErrNotStaged) {
 		return EntryState{}, nil, err
 	}
@@ -229,8 +222,8 @@ func LoadEntryStateWithMetadata(
 }
 
 // LoadStagedTags loads the current staged tags from the store.
-func LoadStagedTags(ctx context.Context, store store.ReadOperator, service staging.Service, name string) (StagedTags, *time.Time, error) {
-	tagEntry, err := store.GetTag(ctx, service, name)
+func LoadStagedTags(ctx context.Context, store store.ReadOperator, service staging.Service, key staging.EntryKey) (StagedTags, *time.Time, error) {
+	tagEntry, err := store.GetTag(ctx, service, key)
 	if err != nil {
 		if errors.Is(err, staging.ErrNotStaged) {
 			return StagedTags{}, nil, nil

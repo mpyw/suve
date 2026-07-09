@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/mpyw/suve/internal/provider"
-	awssecret "github.com/mpyw/suve/internal/provider/aws/secret"
 	"github.com/mpyw/suve/internal/timeutil"
 	"github.com/mpyw/suve/internal/usecase/secret"
 )
@@ -76,6 +75,8 @@ type SecretLogEntry struct {
 	Value         string   `json:"value"`
 	IsCurrent     bool     `json:"isCurrent"`
 	Created       string   `json:"created,omitempty"`
+	// Tags attached to THIS version (Azure Key Vault only; empty otherwise).
+	Tags []SecretShowTag `json:"tags"`
 }
 
 // SecretCreateResult represents the result of creating a secret.
@@ -216,9 +217,14 @@ func (a *App) SecretLog(name string, maxResults int32) (*SecretLogResult, error)
 			State:         e.State,
 			Value:         e.Value,
 			IsCurrent:     e.IsCurrent,
+			Tags:          make([]SecretShowTag, 0, len(e.Tags)),
 		}
 		if e.CreatedDate != nil {
 			entry.Created = timeutil.FormatRFC3339(*e.CreatedDate)
+		}
+
+		for _, tag := range e.Tags {
+			entry.Tags = append(entry.Tags, SecretShowTag{Key: tag.Key, Value: tag.Value})
 		}
 
 		entries[i] = entry
@@ -284,7 +290,11 @@ func (a *App) SecretDelete(name string, force bool) (*SecretDeleteResult, error)
 
 	var options []provider.DeleteOption
 	if force {
-		options = append(options, awssecret.ForceDelete{})
+		// Force-delete is AWS Secrets Manager only (mapped to
+		// ForceDeleteWithoutRecovery); the frontend hides the checkbox elsewhere
+		// (hasForceDelete=false), so force is never set for Key Vault or Google
+		// Cloud, which soft-delete/retain by policy instead.
+		options = append(options, provider.ForceDelete{})
 	}
 
 	result, err := uc.Execute(a.ctx, secret.DeleteInput{

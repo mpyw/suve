@@ -62,12 +62,13 @@ func TestGlobal_StageWorkflow(t *testing.T) {
 
 	// Stage both
 	store := newStore()
-	_ = store.StageEntry(t.Context(), staging.ServiceParam, paramName, staging.Entry{
+	_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: paramName}, staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("staged-param"),
 		StagedAt:  time.Now(),
 	})
-	_ = store.StageEntry(t.Context(), staging.ServiceSecret, secretName, staging.Entry{
+
+	_ = store.StageEntry(t.Context(), staging.ServiceSecret, staging.EntryKey{Name: secretName}, staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("staged-secret"),
 		StagedAt:  time.Now(),
@@ -145,12 +146,13 @@ func TestGlobal_StageResetAll(t *testing.T) {
 	_, _, _ = runCommand(t, secretcreate.Command(), secretName, "original")
 
 	store := newStore()
-	_ = store.StageEntry(t.Context(), staging.ServiceParam, paramName, staging.Entry{
+	_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: paramName}, staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("staged"),
 		StagedAt:  time.Now(),
 	})
-	_ = store.StageEntry(t.Context(), staging.ServiceSecret, secretName, staging.Entry{
+
+	_ = store.StageEntry(t.Context(), staging.ServiceSecret, staging.EntryKey{Name: secretName}, staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("staged"),
 		StagedAt:  time.Now(),
@@ -272,10 +274,11 @@ func TestGlobal_StagingWithTags(t *testing.T) {
 
 	// Stage tag changes using the staging store directly
 	store := newStore()
-	err = store.StageTag(t.Context(), staging.ServiceParam, paramName, staging.TagEntry{
+	err = store.StageTag(t.Context(), staging.ServiceParam, staging.EntryKey{Name: paramName}, staging.TagEntry{
 		Add:      map[string]string{"env": "test", "team": "e2e"},
 		StagedAt: time.Now(),
 	})
+
 	require.NoError(t, err)
 
 	// Test global diff shows tag changes
@@ -332,16 +335,18 @@ func TestGlobal_ResetWithTags(t *testing.T) {
 
 	// Stage entry and tag changes
 	store := newStore()
-	err = store.StageEntry(t.Context(), staging.ServiceParam, paramName, staging.Entry{
+	err = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: paramName}, staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("updated-value"),
 		StagedAt:  time.Now(),
 	})
+
 	require.NoError(t, err)
-	err = store.StageTag(t.Context(), staging.ServiceParam, paramName, staging.TagEntry{
+	err = store.StageTag(t.Context(), staging.ServiceParam, staging.EntryKey{Name: paramName}, staging.TagEntry{
 		Add:      map[string]string{"env": "test"},
 		StagedAt: time.Now(),
 	})
+
 	require.NoError(t, err)
 
 	// Test global reset clears both entries and tags
@@ -353,9 +358,9 @@ func TestGlobal_ResetWithTags(t *testing.T) {
 		t.Logf("global reset output: %s", stdout)
 
 		// Verify staging is empty
-		_, err = store.GetEntry(t.Context(), staging.ServiceParam, paramName, "")
+		_, err = store.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: paramName, Namespace: ""})
 		assert.Equal(t, staging.ErrNotStaged, err)
-		_, err = store.GetTag(t.Context(), staging.ServiceParam, paramName)
+		_, err = store.GetTag(t.Context(), staging.ServiceParam, staging.EntryKey{Name: paramName})
 		assert.Equal(t, staging.ErrNotStaged, err)
 	})
 }
@@ -800,10 +805,10 @@ func TestAgentStore_DirectMethods(t *testing.T) {
 			Value:     lo.ToPtr("direct-test-value"),
 			StagedAt:  time.Now(),
 		}
-		err := store.StageEntry(t.Context(), staging.ServiceParam, paramName, entry)
+		err := store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: paramName}, entry)
 		require.NoError(t, err)
 
-		retrieved, err := store.GetEntry(t.Context(), staging.ServiceParam, paramName, "")
+		retrieved, err := store.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: paramName, Namespace: ""})
 		require.NoError(t, err)
 		assert.Equal(t, staging.OperationCreate, retrieved.Operation)
 		assert.Equal(t, "direct-test-value", lo.FromPtr(retrieved.Value))
@@ -813,21 +818,21 @@ func TestAgentStore_DirectMethods(t *testing.T) {
 	t.Run("list-entries", func(t *testing.T) {
 		entries, err := store.ListEntries(t.Context(), staging.ServiceParam)
 		require.NoError(t, err)
-		assert.Contains(t, entries[staging.ServiceParam], paramName)
+		assert.Contains(t, entries[staging.ServiceParam], staging.EntryKey{Name: paramName})
 	})
 
 	// Test UnstageEntry
 	t.Run("unstage-entry", func(t *testing.T) {
-		err := store.UnstageEntry(t.Context(), staging.ServiceParam, paramName, "")
+		err := store.UnstageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: paramName, Namespace: ""})
 		require.NoError(t, err)
 
-		_, err = store.GetEntry(t.Context(), staging.ServiceParam, paramName, "")
+		_, err = store.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: paramName, Namespace: ""})
 		assert.ErrorIs(t, err, staging.ErrNotStaged)
 	})
 
 	// Test GetEntry for non-existent entry
 	t.Run("get-nonexistent-entry", func(t *testing.T) {
-		_, err := store.GetEntry(t.Context(), staging.ServiceParam, "/nonexistent/param", "")
+		_, err := store.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/nonexistent/param", Namespace: ""})
 		assert.ErrorIs(t, err, staging.ErrNotStaged)
 	})
 }
@@ -853,10 +858,10 @@ func TestAgentStore_TagMethods(t *testing.T) {
 			Remove:   maputil.NewSet("old-tag"),
 			StagedAt: time.Now(),
 		}
-		err := store.StageTag(t.Context(), staging.ServiceParam, paramName, tagEntry)
+		err := store.StageTag(t.Context(), staging.ServiceParam, staging.EntryKey{Name: paramName}, tagEntry)
 		require.NoError(t, err)
 
-		retrieved, err := store.GetTag(t.Context(), staging.ServiceParam, paramName)
+		retrieved, err := store.GetTag(t.Context(), staging.ServiceParam, staging.EntryKey{Name: paramName})
 		require.NoError(t, err)
 		assert.Equal(t, "test", retrieved.Add["env"])
 		assert.Equal(t, "e2e", retrieved.Add["team"])
@@ -867,21 +872,21 @@ func TestAgentStore_TagMethods(t *testing.T) {
 	t.Run("list-tags", func(t *testing.T) {
 		tags, err := store.ListTags(t.Context(), staging.ServiceParam)
 		require.NoError(t, err)
-		assert.Contains(t, tags[staging.ServiceParam], paramName)
+		assert.Contains(t, tags[staging.ServiceParam], staging.EntryKey{Name: paramName})
 	})
 
 	// Test UnstageTag
 	t.Run("unstage-tag", func(t *testing.T) {
-		err := store.UnstageTag(t.Context(), staging.ServiceParam, paramName)
+		err := store.UnstageTag(t.Context(), staging.ServiceParam, staging.EntryKey{Name: paramName})
 		require.NoError(t, err)
 
-		_, err = store.GetTag(t.Context(), staging.ServiceParam, paramName)
+		_, err = store.GetTag(t.Context(), staging.ServiceParam, staging.EntryKey{Name: paramName})
 		assert.ErrorIs(t, err, staging.ErrNotStaged)
 	})
 
 	// Test GetTag for non-existent tag
 	t.Run("get-nonexistent-tag", func(t *testing.T) {
-		_, err := store.GetTag(t.Context(), staging.ServiceParam, "/nonexistent/param")
+		_, err := store.GetTag(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/nonexistent/param"})
 		assert.ErrorIs(t, err, staging.ErrNotStaged)
 	})
 }
@@ -909,16 +914,16 @@ func TestAgentStore_LoadAndWriteState(t *testing.T) {
 	// Test WriteState
 	t.Run("write-state", func(t *testing.T) {
 		state := &staging.State{
-			Entries: map[staging.Service]map[string]staging.Entry{
+			Entries: map[staging.Service]map[staging.EntryKey]staging.Entry{
 				staging.ServiceParam: {
-					"/suve-e2e-direct/write-state": {
+					staging.EntryKey{Name: "/suve-e2e-direct/write-state"}: {
 						Operation: staging.OperationUpdate,
 						Value:     lo.ToPtr("written-value"),
 						StagedAt:  time.Now(),
 					},
 				},
 			},
-			Tags: map[staging.Service]map[string]staging.TagEntry{},
+			Tags: map[staging.Service]map[staging.EntryKey]staging.TagEntry{},
 		}
 		err := store.WriteState(t.Context(), "", state)
 		require.NoError(t, err)
@@ -926,7 +931,7 @@ func TestAgentStore_LoadAndWriteState(t *testing.T) {
 		// Verify state was written
 		loaded, err := store.Drain(t.Context(), "", true)
 		require.NoError(t, err)
-		assert.NotNil(t, loaded.Entries[staging.ServiceParam]["/suve-e2e-direct/write-state"])
+		assert.NotNil(t, loaded.Entries[staging.ServiceParam][staging.EntryKey{Name: "/suve-e2e-direct/write-state"}])
 	})
 
 	// Test Load with data
@@ -934,7 +939,7 @@ func TestAgentStore_LoadAndWriteState(t *testing.T) {
 		state, err := store.Drain(t.Context(), "", true)
 		require.NoError(t, err)
 		assert.False(t, state.IsEmpty())
-		entry := state.Entries[staging.ServiceParam]["/suve-e2e-direct/write-state"]
+		entry := state.Entries[staging.ServiceParam][staging.EntryKey{Name: "/suve-e2e-direct/write-state"}]
 		assert.Equal(t, "written-value", lo.FromPtr(entry.Value))
 	})
 }
@@ -954,21 +959,22 @@ func TestAgentStore_DrainMethod(t *testing.T) {
 	})
 
 	// Stage some data first
-	err := store.StageEntry(t.Context(), staging.ServiceParam, paramName, staging.Entry{
+	err := store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: paramName}, staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("drain-value"),
 		StagedAt:  time.Now(),
 	})
+
 	require.NoError(t, err)
 
 	// Test Drain with keep=true
 	t.Run("drain-with-keep", func(t *testing.T) {
 		state, err := store.Drain(t.Context(), "", true)
 		require.NoError(t, err)
-		assert.NotNil(t, state.Entries[staging.ServiceParam][paramName])
+		assert.NotNil(t, state.Entries[staging.ServiceParam][staging.EntryKey{Name: paramName}])
 
 		// Data should still be there after drain with keep
-		entry, err := store.GetEntry(t.Context(), staging.ServiceParam, paramName, "")
+		entry, err := store.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: paramName, Namespace: ""})
 		require.NoError(t, err)
 		assert.Equal(t, "drain-value", lo.FromPtr(entry.Value))
 	})
@@ -977,10 +983,10 @@ func TestAgentStore_DrainMethod(t *testing.T) {
 	t.Run("drain-without-keep", func(t *testing.T) {
 		state, err := store.Drain(t.Context(), "", false)
 		require.NoError(t, err)
-		assert.NotNil(t, state.Entries[staging.ServiceParam][paramName])
+		assert.NotNil(t, state.Entries[staging.ServiceParam][staging.EntryKey{Name: paramName}])
 
 		// Data should be gone after drain without keep
-		_, err = store.GetEntry(t.Context(), staging.ServiceParam, paramName, "")
+		_, err = store.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: paramName, Namespace: ""})
 		assert.ErrorIs(t, err, staging.ErrNotStaged)
 	})
 
@@ -1006,12 +1012,13 @@ func TestAgentStore_UnstageAll(t *testing.T) {
 	})
 
 	// Stage entries for both services
-	_ = store.StageEntry(t.Context(), staging.ServiceParam, "/suve-e2e/unstage-all/param", staging.Entry{
+	_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/suve-e2e/unstage-all/param"}, staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("param-value"),
 		StagedAt:  time.Now(),
 	})
-	_ = store.StageEntry(t.Context(), staging.ServiceSecret, "suve-e2e/unstage-all/secret", staging.Entry{
+
+	_ = store.StageEntry(t.Context(), staging.ServiceSecret, staging.EntryKey{Name: "suve-e2e/unstage-all/secret"}, staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("secret-value"),
 		StagedAt:  time.Now(),
@@ -1023,11 +1030,11 @@ func TestAgentStore_UnstageAll(t *testing.T) {
 		require.NoError(t, err)
 
 		// Param should be gone
-		_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/suve-e2e/unstage-all/param", "")
+		_, err = store.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/suve-e2e/unstage-all/param", Namespace: ""})
 		require.ErrorIs(t, err, staging.ErrNotStaged)
 
 		// Secret should still be there
-		entry, err := store.GetEntry(t.Context(), staging.ServiceSecret, "suve-e2e/unstage-all/secret", "")
+		entry, err := store.GetEntry(t.Context(), staging.ServiceSecret, staging.EntryKey{Name: "suve-e2e/unstage-all/secret", Namespace: ""})
 		require.NoError(t, err)
 		assert.Equal(t, "secret-value", lo.FromPtr(entry.Value))
 	})
@@ -1035,7 +1042,7 @@ func TestAgentStore_UnstageAll(t *testing.T) {
 	// Test UnstageAll for all services
 	t.Run("unstage-all-services", func(t *testing.T) {
 		// Re-add param
-		_ = store.StageEntry(t.Context(), staging.ServiceParam, "/suve-e2e/unstage-all/param", staging.Entry{
+		_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/suve-e2e/unstage-all/param"}, staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("param-value"),
 			StagedAt:  time.Now(),
@@ -1046,9 +1053,9 @@ func TestAgentStore_UnstageAll(t *testing.T) {
 		require.NoError(t, err)
 
 		// Both should be gone
-		_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/suve-e2e/unstage-all/param", "")
+		_, err = store.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/suve-e2e/unstage-all/param", Namespace: ""})
 		require.ErrorIs(t, err, staging.ErrNotStaged)
-		_, err = store.GetEntry(t.Context(), staging.ServiceSecret, "suve-e2e/unstage-all/secret", "")
+		_, err = store.GetEntry(t.Context(), staging.ServiceSecret, staging.EntryKey{Name: "suve-e2e/unstage-all/secret", Namespace: ""})
 		require.ErrorIs(t, err, staging.ErrNotStaged)
 	})
 }
@@ -1082,17 +1089,19 @@ func TestAgentStore_ListMethods(t *testing.T) {
 	})
 
 	// Stage multiple entries and tags
-	_ = store.StageEntry(t.Context(), staging.ServiceParam, "/suve-e2e/list/param1", staging.Entry{
+	_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/suve-e2e/list/param1"}, staging.Entry{
 		Operation: staging.OperationCreate,
 		Value:     lo.ToPtr("value1"),
 		StagedAt:  time.Now(),
 	})
-	_ = store.StageEntry(t.Context(), staging.ServiceParam, "/suve-e2e/list/param2", staging.Entry{
+
+	_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/suve-e2e/list/param2"}, staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("value2"),
 		StagedAt:  time.Now(),
 	})
-	_ = store.StageTag(t.Context(), staging.ServiceParam, "/suve-e2e/list/param1", staging.TagEntry{
+
+	_ = store.StageTag(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/suve-e2e/list/param1"}, staging.TagEntry{
 		Add:      map[string]string{"key": "value"},
 		StagedAt: time.Now(),
 	})
@@ -1102,21 +1111,21 @@ func TestAgentStore_ListMethods(t *testing.T) {
 		entries, err := store.ListEntries(t.Context(), staging.ServiceParam)
 		require.NoError(t, err)
 		assert.Len(t, entries[staging.ServiceParam], 2)
-		assert.Contains(t, entries[staging.ServiceParam], "/suve-e2e/list/param1")
-		assert.Contains(t, entries[staging.ServiceParam], "/suve-e2e/list/param2")
+		assert.Contains(t, entries[staging.ServiceParam], staging.EntryKey{Name: "/suve-e2e/list/param1"})
+		assert.Contains(t, entries[staging.ServiceParam], staging.EntryKey{Name: "/suve-e2e/list/param2"})
 	})
 
 	// Test ListTags
 	t.Run("list-tags-with-data", func(t *testing.T) {
 		tags, err := store.ListTags(t.Context(), staging.ServiceParam)
 		require.NoError(t, err)
-		assert.Contains(t, tags[staging.ServiceParam], "/suve-e2e/list/param1")
+		assert.Contains(t, tags[staging.ServiceParam], staging.EntryKey{Name: "/suve-e2e/list/param1"})
 	})
 
 	// Test ListEntries for all services (empty string)
 	t.Run("list-entries-all-services", func(t *testing.T) {
 		// Add a secret entry too
-		_ = store.StageEntry(t.Context(), staging.ServiceSecret, "suve-e2e/list/secret1", staging.Entry{
+		_ = store.StageEntry(t.Context(), staging.ServiceSecret, staging.EntryKey{Name: "suve-e2e/list/secret1"}, staging.Entry{
 			Operation: staging.OperationCreate,
 			Value:     lo.ToPtr("secret-value"),
 			StagedAt:  time.Now(),
@@ -1149,17 +1158,18 @@ func TestStore_SequentialOperations(t *testing.T) {
 	// Multiple sequential operations test IPC reliability
 	t.Run("multiple-sequential-ipc-calls", func(t *testing.T) {
 		for range 5 {
-			err := store.StageEntry(t.Context(), staging.ServiceParam, "/suve-e2e/ipc-test", staging.Entry{
+			err := store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/suve-e2e/ipc-test"}, staging.Entry{
 				Operation: staging.OperationUpdate,
 				Value:     lo.ToPtr("test-value"),
 				StagedAt:  time.Now(),
 			})
+
 			require.NoError(t, err)
 
-			_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/suve-e2e/ipc-test", "")
+			_, err = store.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/suve-e2e/ipc-test", Namespace: ""})
 			require.NoError(t, err)
 
-			err = store.UnstageEntry(t.Context(), staging.ServiceParam, "/suve-e2e/ipc-test", "")
+			err = store.UnstageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/suve-e2e/ipc-test", Namespace: ""})
 			require.NoError(t, err)
 		}
 	})
@@ -1170,9 +1180,9 @@ func TestStore_SequentialOperations(t *testing.T) {
 		require.NoError(t, err)
 		assert.True(t, state.IsEmpty())
 
-		state.Entries = map[staging.Service]map[string]staging.Entry{
+		state.Entries = map[staging.Service]map[staging.EntryKey]staging.Entry{
 			staging.ServiceParam: {
-				"/suve-e2e/ipc-write": {
+				staging.EntryKey{Name: "/suve-e2e/ipc-write"}: {
 					Operation: staging.OperationCreate,
 					Value:     lo.ToPtr("ipc-value"),
 					StagedAt:  time.Now(),
@@ -1184,7 +1194,7 @@ func TestStore_SequentialOperations(t *testing.T) {
 
 		loaded, err := store.Drain(t.Context(), "", true)
 		require.NoError(t, err)
-		assert.NotNil(t, loaded.Entries[staging.ServiceParam]["/suve-e2e/ipc-write"])
+		assert.NotNil(t, loaded.Entries[staging.ServiceParam][staging.EntryKey{Name: "/suve-e2e/ipc-write"}])
 	})
 }
 
@@ -1198,7 +1208,7 @@ func TestStore_SeparateAccounts(t *testing.T) {
 
 	// GetEntry on an empty staging area returns ErrNotStaged.
 	t.Run("get-entry-empty", func(t *testing.T) {
-		_, err := store.GetEntry(t.Context(), staging.ServiceParam, "/test", "")
+		_, err := store.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/test", Namespace: ""})
 		assert.ErrorIs(t, err, staging.ErrNotStaged)
 	})
 

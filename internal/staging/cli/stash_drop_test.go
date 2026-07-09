@@ -29,12 +29,12 @@ func TestGlobalDropRunner_Run(t *testing.T) {
 
 		// Write test data
 		state := staging.NewEmptyState()
-		state.Entries[staging.ServiceParam]["/app/config"] = staging.Entry{
+		state.Entries[staging.ServiceParam][staging.EntryKey{Name: "/app/config"}] = staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("test-value"),
 			StagedAt:  time.Now(),
 		}
-		state.Entries[staging.ServiceSecret]["my-secret"] = staging.Entry{
+		state.Entries[staging.ServiceSecret][staging.EntryKey{Name: "my-secret"}] = staging.Entry{
 			Operation: staging.OperationCreate,
 			Value:     lo.ToPtr("secret-value"),
 			StagedAt:  time.Now(),
@@ -93,12 +93,12 @@ func TestServiceDropRunner_Run(t *testing.T) {
 
 		// Write test data with both services
 		state := staging.NewEmptyState()
-		state.Entries[staging.ServiceParam]["/app/config"] = staging.Entry{
+		state.Entries[staging.ServiceParam][staging.EntryKey{Name: "/app/config"}] = staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("param-value"),
 			StagedAt:  time.Now(),
 		}
-		state.Entries[staging.ServiceSecret]["my-secret"] = staging.Entry{
+		state.Entries[staging.ServiceSecret][staging.EntryKey{Name: "my-secret"}] = staging.Entry{
 			Operation: staging.OperationCreate,
 			Value:     lo.ToPtr("secret-value"),
 			StagedAt:  time.Now(),
@@ -140,7 +140,7 @@ func TestServiceDropRunner_Run(t *testing.T) {
 
 		// Write test data with tags
 		state := staging.NewEmptyState()
-		state.Tags[staging.ServiceParam]["/app/config"] = staging.TagEntry{
+		state.Tags[staging.ServiceParam][staging.EntryKey{Name: "/app/config"}] = staging.TagEntry{
 			Add:    map[string]string{"env": "prod"},
 			Remove: maputil.NewSet("old-tag"),
 		}
@@ -174,7 +174,7 @@ func TestServiceDropRunner_Run(t *testing.T) {
 
 		// Write test data with only param service
 		state := staging.NewEmptyState()
-		state.Entries[staging.ServiceParam]["/app/config"] = staging.Entry{
+		state.Entries[staging.ServiceParam][staging.EntryKey{Name: "/app/config"}] = staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("test-value"),
 			StagedAt:  time.Now(),
@@ -206,7 +206,7 @@ func TestServiceDropRunner_Run(t *testing.T) {
 
 		// Write test data with only one service
 		state := staging.NewEmptyState()
-		state.Entries[staging.ServiceParam]["/app/config"] = staging.Entry{
+		state.Entries[staging.ServiceParam][staging.EntryKey{Name: "/app/config"}] = staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("test-value"),
 			StagedAt:  time.Now(),
@@ -241,12 +241,12 @@ func TestServiceDropRunner_Run(t *testing.T) {
 
 		// Write test data with both services
 		state := staging.NewEmptyState()
-		state.Entries[staging.ServiceParam]["/app/config"] = staging.Entry{
+		state.Entries[staging.ServiceParam][staging.EntryKey{Name: "/app/config"}] = staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("param-value"),
 			StagedAt:  time.Now(),
 		}
-		state.Entries[staging.ServiceSecret]["my-secret"] = staging.Entry{
+		state.Entries[staging.ServiceSecret][staging.EntryKey{Name: "my-secret"}] = staging.Entry{
 			Operation: staging.OperationCreate,
 			Value:     lo.ToPtr("secret-value"),
 			StagedAt:  time.Now(),
@@ -304,9 +304,9 @@ func TestState_TotalCount(t *testing.T) {
 		t.Parallel()
 
 		s := staging.NewEmptyState()
-		s.Entries[staging.ServiceParam]["/app/config1"] = staging.Entry{}
-		s.Entries[staging.ServiceParam]["/app/config2"] = staging.Entry{}
-		s.Entries[staging.ServiceSecret]["secret1"] = staging.Entry{}
+		s.Entries[staging.ServiceParam][staging.EntryKey{Name: "/app/config1"}] = staging.Entry{}
+		s.Entries[staging.ServiceParam][staging.EntryKey{Name: "/app/config2"}] = staging.Entry{}
+		s.Entries[staging.ServiceSecret][staging.EntryKey{Name: "secret1"}] = staging.Entry{}
 		assert.Equal(t, 3, s.TotalCount())
 	})
 
@@ -314,8 +314,8 @@ func TestState_TotalCount(t *testing.T) {
 		t.Parallel()
 
 		s := staging.NewEmptyState()
-		s.Tags[staging.ServiceParam]["/app/config"] = staging.TagEntry{}
-		s.Tags[staging.ServiceSecret]["secret"] = staging.TagEntry{}
+		s.Tags[staging.ServiceParam][staging.EntryKey{Name: "/app/config"}] = staging.TagEntry{}
+		s.Tags[staging.ServiceSecret][staging.EntryKey{Name: "secret"}] = staging.TagEntry{}
 		assert.Equal(t, 2, s.TotalCount())
 	})
 
@@ -323,9 +323,9 @@ func TestState_TotalCount(t *testing.T) {
 		t.Parallel()
 
 		s := staging.NewEmptyState()
-		s.Entries[staging.ServiceParam]["/app/config"] = staging.Entry{}
-		s.Tags[staging.ServiceParam]["/app/config2"] = staging.TagEntry{}
-		s.Entries[staging.ServiceSecret]["secret"] = staging.Entry{}
+		s.Entries[staging.ServiceParam][staging.EntryKey{Name: "/app/config"}] = staging.Entry{}
+		s.Tags[staging.ServiceParam][staging.EntryKey{Name: "/app/config2"}] = staging.TagEntry{}
+		s.Entries[staging.ServiceSecret][staging.EntryKey{Name: "secret"}] = staging.Entry{}
 		assert.Equal(t, 3, s.TotalCount())
 	})
 }

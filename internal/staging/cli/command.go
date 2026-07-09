@@ -566,7 +566,7 @@ func NewTagCommand(cfg CommandConfig) *cli.Command {
 			Stderr:  stderr,
 		}
 
-		return r.Run(ctx, TagOptions{Name: name, Tags: tags})
+		return r.Run(ctx, TagOptions{Name: name, Namespace: cfg.namespaceFor(ctx), Tags: tags})
 	}
 
 	return &cli.Command{
@@ -593,7 +593,7 @@ func NewUntagCommand(cfg CommandConfig) *cli.Command {
 			Stderr:  stderr,
 		}
 
-		return r.Run(ctx, UntagOptions{Name: name, Keys: keys})
+		return r.Run(ctx, UntagOptions{Name: name, Namespace: cfg.namespaceFor(ctx), Keys: keys})
 	}
 
 	return &cli.Command{

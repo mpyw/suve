@@ -50,13 +50,15 @@ func TestApp_Capabilities_StagingAndDeleteFlags(t *testing.T) {
 		hasRecoveryWindow bool
 		hasRestore        bool
 	}{
-		// Staging is now available for every provider service; force-delete
-		// and recovery-window stay AWS Secrets Manager only.
+		// Staging is available for every provider service. Restore belongs to the
+		// soft-delete providers — AWS Secrets Manager AND Azure Key Vault — but
+		// force-delete and the per-delete recovery window are AWS SM only: Key Vault
+		// retention is a vault property and force-delete/purge is unsupported there.
 		{string(provider.ProviderAWS), "param", true, false, false, false},
 		{string(provider.ProviderAWS), "secret", true, true, true, true},
 		{string(provider.ProviderGoogleCloud), "secret", true, false, false, false},
 		{string(provider.ProviderAzure), "param", true, false, false, false},
-		{string(provider.ProviderAzure), "secret", true, false, false, false},
+		{string(provider.ProviderAzure), "secret", true, false, false, true},
 	}
 
 	for _, tt := range tests {
@@ -72,17 +74,19 @@ func TestApp_Capabilities_StagingAndDeleteFlags(t *testing.T) {
 	}
 }
 
-// TestApp_Capabilities_DeleteOptionsAWSOnly pins the remaining AWS-only
-// invariant: force-delete and recovery-window are Secrets Manager features, so
-// no other provider/service may advertise them even though they now stage.
-func TestApp_Capabilities_DeleteOptionsAWSOnly(t *testing.T) {
+// TestApp_Capabilities_ForceDeleteAndRecoveryWindowAWSOnly pins the AWS-only
+// invariant: both force-delete and the per-delete recovery window are Secrets
+// Manager features. Azure Key Vault soft-deletes (Restore recovers) but neither
+// purges on force nor exposes a per-delete recovery window (retention is a vault
+// property), so no other provider/service may report these.
+func TestApp_Capabilities_ForceDeleteAndRecoveryWindowAWSOnly(t *testing.T) {
 	t.Parallel()
 
 	for _, p := range (&App{}).Capabilities() {
 		for _, s := range p.Services {
 			isAWSSecret := p.Provider == string(provider.ProviderAWS) && s.Service == "secret"
 			if !isAWSSecret {
-				assert.False(t, s.HasForceDelete, "%s/%s must not have force-delete", p.Provider, s.Service)
+				assert.False(t, s.HasForceDelete, "%s/%s must not offer force-delete", p.Provider, s.Service)
 				assert.False(t, s.HasRecoveryWindow, "%s/%s must not have a recovery window", p.Provider, s.Service)
 			}
 		}

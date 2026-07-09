@@ -44,6 +44,7 @@ type mockClient struct {
 	updateFunc   func(ctx context.Context, name, version string, params updParams) (updResp, error)
 	listFunc     func(ctx context.Context) ([]*azsecrets.SecretProperties, error)
 	listVersFunc func(ctx context.Context, name string) ([]*azsecrets.SecretProperties, error)
+	recoverFunc  func(ctx context.Context, name string) (azsecrets.RecoverDeletedSecretResponse, error)
 }
 
 func (m *mockClient) GetSecret(ctx context.Context, name, version string) (azsecrets.GetSecretResponse, error) {
@@ -58,6 +59,12 @@ func (m *mockClient) SetSecret(
 
 func (m *mockClient) DeleteSecret(ctx context.Context, name string) (azsecrets.DeleteSecretResponse, error) {
 	return m.deleteFunc(ctx, name)
+}
+
+func (m *mockClient) RecoverDeletedSecret(
+	ctx context.Context, name string,
+) (azsecrets.RecoverDeletedSecretResponse, error) {
+	return m.recoverFunc(ctx, name)
 }
 
 func (m *mockClient) UpdateSecretProperties(
@@ -294,6 +301,24 @@ func TestDelete(t *testing.T) {
 	assert.Equal(t, "my-secret", deleted)
 }
 
+func TestRestore(t *testing.T) {
+	t.Parallel()
+
+	var recovered string
+
+	m := &mockClient{
+		recoverFunc: func(_ context.Context, name string) (azsecrets.RecoverDeletedSecretResponse, error) {
+			recovered = name
+
+			return azsecrets.RecoverDeletedSecretResponse{}, nil
+		},
+	}
+	store := keyvault.New(m)
+
+	require.NoError(t, store.Restore(t.Context(), "my-secret"))
+	assert.Equal(t, "my-secret", recovered)
+}
+
 func TestTag(t *testing.T) {
 	t.Parallel()
 
@@ -307,7 +332,9 @@ func TestTag(t *testing.T) {
 			}}, nil
 		},
 		updateFunc: func(_ context.Context, _, version string, params updParams) (updResp, error) {
-			assert.Empty(t, version) // current version
+			// Must target the concrete current version, NOT an empty version:
+			// PATCH /secrets/{name}/ (empty version) is rejected 405 by Key Vault.
+			assert.Equal(t, "v1", version)
 
 			written = params.Tags
 
@@ -333,7 +360,9 @@ func TestUntag(t *testing.T) {
 				Tags: map[string]*string{"env": lo.ToPtr("prod"), "team": lo.ToPtr("backend")},
 			}}, nil
 		},
-		updateFunc: func(_ context.Context, _, _ string, params updParams) (updResp, error) {
+		updateFunc: func(_ context.Context, _, version string, params updParams) (updResp, error) {
+			assert.Equal(t, "v1", version) // concrete version, never empty (405)
+
 			written = params.Tags
 
 			return updResp{}, nil

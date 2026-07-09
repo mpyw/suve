@@ -71,13 +71,13 @@ func TestAzureKeyVaultStage_Workflow(t *testing.T) {
 	require.NoError(t, err)
 
 	now := time.Now()
-	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceSecret, updateName, staging.Entry{
+	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceSecret, staging.EntryKey{Name: updateName}, staging.Entry{
 		Operation: staging.OperationUpdate, Value: lo.ToPtr("staged-value"), StagedAt: now,
 	}))
-	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceSecret, createName, staging.Entry{
+	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceSecret, staging.EntryKey{Name: createName}, staging.Entry{
 		Operation: staging.OperationCreate, Value: lo.ToPtr("created-value"), StagedAt: now,
 	}))
-	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceSecret, deleteName, staging.Entry{
+	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceSecret, staging.EntryKey{Name: deleteName}, staging.Entry{
 		Operation: staging.OperationDelete, StagedAt: now,
 	}))
 
@@ -153,10 +153,10 @@ func TestAzureAppConfigStage_Workflow(t *testing.T) {
 	require.NoError(t, err)
 
 	now := time.Now()
-	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, updateName, staging.Entry{
+	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: updateName}, staging.Entry{
 		Operation: staging.OperationUpdate, Value: lo.ToPtr("staged-value"), StagedAt: now,
 	}))
-	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, createName, staging.Entry{
+	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: createName}, staging.Entry{
 		Operation: staging.OperationCreate, Value: lo.ToPtr("created-value"), StagedAt: now,
 	}))
 
@@ -266,7 +266,7 @@ func TestAzureStageGlobal_KeyVaultOnly(t *testing.T) {
 
 	store, err := file.NewStore(provider.AzureKeyVaultScope("suve-e2e"))
 	require.NoError(t, err)
-	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceSecret, name, staging.Entry{
+	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceSecret, staging.EntryKey{Name: name}, staging.Entry{
 		Operation: staging.OperationCreate, Value: lo.ToPtr("kv-only-value"), StagedAt: time.Now(),
 	}))
 
@@ -314,7 +314,7 @@ func TestAzureStageGlobal_AppConfigOnly(t *testing.T) {
 
 	store, err := file.NewStore(provider.AzureAppConfigScope("suve-e2e"))
 	require.NoError(t, err)
-	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, name, staging.Entry{
+	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: name}, staging.Entry{
 		Operation: staging.OperationCreate, Value: lo.ToPtr("ac-only-value"), StagedAt: time.Now(),
 	}))
 
@@ -367,13 +367,13 @@ func TestAzureStageGlobal_BothConnected(t *testing.T) {
 
 	kvStore, err := file.NewStore(provider.AzureKeyVaultScope("suve-e2e"))
 	require.NoError(t, err)
-	require.NoError(t, kvStore.StageEntry(t.Context(), staging.ServiceSecret, kvName, staging.Entry{
+	require.NoError(t, kvStore.StageEntry(t.Context(), staging.ServiceSecret, staging.EntryKey{Name: kvName}, staging.Entry{
 		Operation: staging.OperationCreate, Value: lo.ToPtr("both-secret-value"), StagedAt: time.Now(),
 	}))
 
 	acStore, err := file.NewStore(provider.AzureAppConfigScope("suve-e2e"))
 	require.NoError(t, err)
-	require.NoError(t, acStore.StageEntry(t.Context(), staging.ServiceParam, acName, staging.Entry{
+	require.NoError(t, acStore.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: acName}, staging.Entry{
 		Operation: staging.OperationCreate, Value: lo.ToPtr("both-param-value"), StagedAt: time.Now(),
 	}))
 
@@ -399,5 +399,70 @@ func TestAzureStageGlobal_BothConnected(t *testing.T) {
 		gotParam, err := runAzureParam(t, "show", "--raw", acName)
 		require.NoError(t, err)
 		assert.Equal(t, "both-param-value", gotParam)
+	})
+}
+
+// TestAzureAppConfigStage_NamespacedTags proves staged TAGS are keyed per
+// (name, namespace): the SAME key tagged under the null namespace and under
+// "dev" holds independent staged tag changes, `status` attributes each to its
+// namespace, and `apply` writes each tag onto its own namespaced setting. This
+// is the end-to-end guard for the tag-namespace-collision fix (tags used to be
+// keyed by bare name). Gated on the emulator honoring tag writes.
+func TestAzureAppConfigStage_NamespacedTags(t *testing.T) {
+	setupAzureAppConfig(t)
+	setupTempHome(t)
+
+	if !emulatorHonorsTagWrite(t) {
+		t.Skip("App Configuration emulator does not persist setting tags; skipping tag-write assertions")
+	}
+
+	const key = "suve/e2e/az/ac/stage/ns-tag-key"
+
+	cleanup := func() {
+		_, _ = runAzureParam(t, "delete", "--yes", key)
+		_, _ = runAzureParam(t, "delete", "--yes", "--namespace", "dev", key)
+	}
+	cleanup()
+	t.Cleanup(cleanup)
+
+	// The settings must exist (under each namespace) before tagging.
+	_, err := runAzureParam(t, "create", key, "null-value")
+	require.NoError(t, err)
+	_, err = runAzureParam(t, "create", "--namespace", "dev", key, "dev-value")
+	require.NoError(t, err)
+
+	// Stage a DIFFERENT tag on the same key under each namespace.
+	t.Run("stage-tags-under-two-namespaces", func(t *testing.T) {
+		_, err := runAzureStage(t, "param", "tag", key, "tier=null")
+		require.NoError(t, err)
+
+		_, err = runAzureStage(t, "param", "tag", "--namespace", "dev", key, "tier=dev")
+		require.NoError(t, err)
+	})
+
+	// status shows the key twice, each tag attributed to its own namespace (the
+	// dev one badged) — the collision the bare-name key used to cause.
+	t.Run("status-shows-both-namespaced-tags", func(t *testing.T) {
+		stdout, err := runAzureStage(t, "param", "status")
+		require.NoError(t, err)
+		assert.Contains(t, stdout, key)
+		assert.Contains(t, stdout, "[dev]")
+	})
+
+	// apply writes each tag onto its own namespaced setting; neither overwrites
+	// the other.
+	t.Run("apply-writes-each-namespaced-tag", func(t *testing.T) {
+		_, err := runAzureStage(t, "param", "apply", "--yes")
+		require.NoError(t, err)
+
+		nullShow, err := runAzureParam(t, "show", key)
+		require.NoError(t, err)
+		assert.Contains(t, nullShow, "tier")
+		assert.Contains(t, nullShow, "null")
+
+		devShow, err := runAzureParam(t, "show", "--namespace", "dev", key)
+		require.NoError(t, err)
+		assert.Contains(t, devShow, "tier")
+		assert.Contains(t, devShow, "dev")
 	})
 }

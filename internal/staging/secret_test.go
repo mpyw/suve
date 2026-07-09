@@ -163,7 +163,7 @@ func TestSecretStrategy_Apply(t *testing.T) {
 		mock := &providermock.Store{
 			DeleteFunc: func(_ context.Context, _ string, opts ...provider.DeleteOption) error {
 				require.Len(t, opts, 1)
-				assert.IsType(t, awssecret.ForceDelete{}, opts[0])
+				assert.IsType(t, provider.ForceDelete{}, opts[0])
 
 				return nil
 			},

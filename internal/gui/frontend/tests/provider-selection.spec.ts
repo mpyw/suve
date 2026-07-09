@@ -138,14 +138,15 @@ test.describe('Provider selection', () => {
       await expect(page.locator('.error-banner')).toHaveCount(0);
     });
 
-    test('Key Vault (secret): version history yes, Restore no', async ({ page }) => {
+    test('Key Vault (secret): version history yes, Restore yes (soft-delete)', async ({ page }) => {
       await setupWailsMocks(page, createAzureState());
       await page.goto('/');
       await waitForItemList(page);
       await navigateTo(page, 'Key Vault');
       await waitForItemList(page);
 
-      await expect(page.locator('.btn-restore')).toHaveCount(0);
+      // Key Vault soft-deletes secrets, so Restore is offered (hasRestore=true).
+      await expect(page.locator('.btn-restore')).toBeVisible();
       await clickItemByName(page, 'kv-secret');
       await expect(page.locator('.detail-panel')).toBeVisible();
     });

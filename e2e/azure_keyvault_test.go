@@ -142,10 +142,32 @@ func TestAzureKeyVault_FullWorkflow(t *testing.T) {
 		assert.Equal(t, "updated-value", outBuf.String())
 	})
 
-	// Note: tag/untag are not exercised here. The suve adapter tags the current
-	// version via UpdateSecretProperties with an empty version path segment,
-	// which real Azure accepts but lowkey-vault rejects (405). Tag behavior is
-	// covered by the keyvault adapter unit tests instead.
+	// Tag/untag against the running emulator. The adapter tags the secret's
+	// CONCRETE current version (PATCH /secrets/{name}/{version}); an empty version
+	// collapses to /secrets/{name}/ and is rejected 405 — the bug this guards.
+	t.Run("tag", func(t *testing.T) {
+		_, err := runAzureSecret(t, "tag", name, "env=prod")
+		require.NoError(t, err)
+
+		stdout, err := runAzureSecret(t, "show", name)
+		require.NoError(t, err)
+		assert.Contains(t, stdout, "env")
+		assert.Contains(t, stdout, "prod")
+
+		// log shows the tag on the (current) version — tags are per version.
+		logOut, err := runAzureSecret(t, "log", name)
+		require.NoError(t, err)
+		assert.Contains(t, logOut, "env=prod")
+	})
+
+	t.Run("untag", func(t *testing.T) {
+		_, err := runAzureSecret(t, "untag", name, "env")
+		require.NoError(t, err)
+
+		stdout, err := runAzureSecret(t, "show", name)
+		require.NoError(t, err)
+		assert.NotContains(t, stdout, "prod")
+	})
 
 	t.Run("delete", func(t *testing.T) {
 		_, err := runAzureSecret(t, "delete", "--yes", name)
@@ -153,5 +175,41 @@ func TestAzureKeyVault_FullWorkflow(t *testing.T) {
 
 		_, err = runAzureSecret(t, "show", "--raw", name)
 		require.Error(t, err)
+	})
+}
+
+// TestAzureKeyVault_SoftDelete exercises soft-delete recovery: delete (soft) →
+// restore → the secret is readable again. Mirrors AWS Secrets Manager's
+// delete/restore semantics. Force-delete/purge is intentionally unsupported for
+// Key Vault, so there is nothing to exercise here.
+func TestAzureKeyVault_SoftDelete(t *testing.T) {
+	setupAzureKeyVault(t)
+	setupTempHome(t)
+
+	const name = "suve-e2e-kv-softdelete"
+
+	// Best-effort cleanup: delete (soft) then restore-and-delete is unnecessary; a
+	// plain delete is enough to reset for the next run.
+	cleanup := func() { _, _ = runAzureSecret(t, "delete", "--yes", name) }
+	cleanup()
+	t.Cleanup(cleanup)
+
+	_, err := runAzureSecret(t, "create", name, "v1")
+	require.NoError(t, err)
+
+	t.Run("soft-delete-then-restore", func(t *testing.T) {
+		_, err := runAzureSecret(t, "delete", "--yes", name)
+		require.NoError(t, err)
+
+		// Soft-deleted: not readable until restored.
+		_, err = runAzureSecret(t, "show", "--raw", name)
+		require.Error(t, err)
+
+		_, err = runAzureSecret(t, "restore", name)
+		require.NoError(t, err)
+
+		stdout, err := runAzureSecret(t, "show", "--raw", name)
+		require.NoError(t, err)
+		assert.Equal(t, "v1", stdout)
 	})
 }

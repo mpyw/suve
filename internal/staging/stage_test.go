@@ -1,6 +1,7 @@
 package staging_test
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -32,7 +33,7 @@ func TestState_IsEmpty(t *testing.T) {
 		t.Parallel()
 
 		state := staging.NewEmptyState()
-		state.Entries[staging.ServiceParam]["/app/config"] = staging.Entry{
+		state.Entries[staging.ServiceParam][staging.EntryKey{Name: "/app/config"}] = staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("value"),
 			StagedAt:  time.Now(),
@@ -44,7 +45,7 @@ func TestState_IsEmpty(t *testing.T) {
 		t.Parallel()
 
 		state := staging.NewEmptyState()
-		state.Tags[staging.ServiceParam]["/app/config"] = staging.TagEntry{
+		state.Tags[staging.ServiceParam][staging.EntryKey{Name: "/app/config"}] = staging.TagEntry{
 			Add:      map[string]string{"env": "prod"},
 			StagedAt: time.Now(),
 		}
@@ -59,14 +60,14 @@ func TestState_Merge(t *testing.T) {
 		t.Parallel()
 
 		state1 := staging.NewEmptyState()
-		state1.Entries[staging.ServiceParam]["/app/config1"] = staging.Entry{
+		state1.Entries[staging.ServiceParam][staging.EntryKey{Name: "/app/config1"}] = staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("value1"),
 			StagedAt:  time.Now(),
 		}
 
 		state2 := staging.NewEmptyState()
-		state2.Entries[staging.ServiceParam]["/app/config2"] = staging.Entry{
+		state2.Entries[staging.ServiceParam][staging.EntryKey{Name: "/app/config2"}] = staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("value2"),
 			StagedAt:  time.Now(),
@@ -75,22 +76,22 @@ func TestState_Merge(t *testing.T) {
 		state1.Merge(state2)
 
 		assert.Len(t, state1.Entries[staging.ServiceParam], 2)
-		assert.Contains(t, state1.Entries[staging.ServiceParam], "/app/config1")
-		assert.Contains(t, state1.Entries[staging.ServiceParam], "/app/config2")
+		assert.Contains(t, state1.Entries[staging.ServiceParam], staging.EntryKey{Name: "/app/config1"})
+		assert.Contains(t, state1.Entries[staging.ServiceParam], staging.EntryKey{Name: "/app/config2"})
 	})
 
 	t.Run("merge overwrites existing entries", func(t *testing.T) {
 		t.Parallel()
 
 		state1 := staging.NewEmptyState()
-		state1.Entries[staging.ServiceParam]["/app/config"] = staging.Entry{
+		state1.Entries[staging.ServiceParam][staging.EntryKey{Name: "/app/config"}] = staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("old-value"),
 			StagedAt:  time.Now(),
 		}
 
 		state2 := staging.NewEmptyState()
-		state2.Entries[staging.ServiceParam]["/app/config"] = staging.Entry{
+		state2.Entries[staging.ServiceParam][staging.EntryKey{Name: "/app/config"}] = staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("new-value"),
 			StagedAt:  time.Now(),
@@ -98,20 +99,20 @@ func TestState_Merge(t *testing.T) {
 
 		state1.Merge(state2)
 
-		assert.Equal(t, "new-value", lo.FromPtr(state1.Entries[staging.ServiceParam]["/app/config"].Value))
+		assert.Equal(t, "new-value", lo.FromPtr(state1.Entries[staging.ServiceParam][staging.EntryKey{Name: "/app/config"}].Value))
 	})
 
 	t.Run("merge tags", func(t *testing.T) {
 		t.Parallel()
 
 		state1 := staging.NewEmptyState()
-		state1.Tags[staging.ServiceParam]["/app/config1"] = staging.TagEntry{
+		state1.Tags[staging.ServiceParam][staging.EntryKey{Name: "/app/config1"}] = staging.TagEntry{
 			Add:      map[string]string{"env": "prod"},
 			StagedAt: time.Now(),
 		}
 
 		state2 := staging.NewEmptyState()
-		state2.Tags[staging.ServiceParam]["/app/config2"] = staging.TagEntry{
+		state2.Tags[staging.ServiceParam][staging.EntryKey{Name: "/app/config2"}] = staging.TagEntry{
 			Add:      map[string]string{"team": "backend"},
 			StagedAt: time.Now(),
 		}
@@ -125,7 +126,7 @@ func TestState_Merge(t *testing.T) {
 		t.Parallel()
 
 		state := staging.NewEmptyState()
-		state.Entries[staging.ServiceParam]["/app/config"] = staging.Entry{
+		state.Entries[staging.ServiceParam][staging.EntryKey{Name: "/app/config"}] = staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("value"),
 			StagedAt:  time.Now(),
@@ -134,7 +135,7 @@ func TestState_Merge(t *testing.T) {
 		state.Merge(nil)
 
 		assert.Len(t, state.Entries[staging.ServiceParam], 1)
-		assert.Equal(t, "value", lo.FromPtr(state.Entries[staging.ServiceParam]["/app/config"].Value))
+		assert.Equal(t, "value", lo.FromPtr(state.Entries[staging.ServiceParam][staging.EntryKey{Name: "/app/config"}].Value))
 	})
 
 	t.Run("merge into nil maps initializes them", func(t *testing.T) {
@@ -146,12 +147,12 @@ func TestState_Merge(t *testing.T) {
 		}
 
 		state2 := staging.NewEmptyState()
-		state2.Entries[staging.ServiceParam]["/app/config"] = staging.Entry{
+		state2.Entries[staging.ServiceParam][staging.EntryKey{Name: "/app/config"}] = staging.Entry{
 			Operation: staging.OperationCreate,
 			Value:     lo.ToPtr("new-value"),
 			StagedAt:  time.Now(),
 		}
-		state2.Tags[staging.ServiceSecret]["my-secret"] = staging.TagEntry{
+		state2.Tags[staging.ServiceSecret][staging.EntryKey{Name: "my-secret"}] = staging.TagEntry{
 			Add:      map[string]string{"env": "prod"},
 			StagedAt: time.Now(),
 		}
@@ -160,20 +161,20 @@ func TestState_Merge(t *testing.T) {
 
 		assert.NotNil(t, state1.Entries)
 		assert.NotNil(t, state1.Tags)
-		assert.Equal(t, "new-value", lo.FromPtr(state1.Entries[staging.ServiceParam]["/app/config"].Value))
-		assert.Equal(t, "prod", state1.Tags[staging.ServiceSecret]["my-secret"].Add["env"])
+		assert.Equal(t, "new-value", lo.FromPtr(state1.Entries[staging.ServiceParam][staging.EntryKey{Name: "/app/config"}].Value))
+		assert.Equal(t, "prod", state1.Tags[staging.ServiceSecret][staging.EntryKey{Name: "my-secret"}].Add["env"])
 	})
 
 	t.Run("merge into nil service maps", func(t *testing.T) {
 		t.Parallel()
 
 		state1 := &staging.State{
-			Entries: make(map[staging.Service]map[string]staging.Entry),
-			Tags:    make(map[staging.Service]map[string]staging.TagEntry),
+			Entries: make(map[staging.Service]map[staging.EntryKey]staging.Entry),
+			Tags:    make(map[staging.Service]map[staging.EntryKey]staging.TagEntry),
 		}
 
 		state2 := staging.NewEmptyState()
-		state2.Entries[staging.ServiceParam]["/app/config"] = staging.Entry{
+		state2.Entries[staging.ServiceParam][staging.EntryKey{Name: "/app/config"}] = staging.Entry{
 			Operation: staging.OperationCreate,
 			Value:     lo.ToPtr("value"),
 			StagedAt:  time.Now(),
@@ -203,12 +204,12 @@ func TestState_ExtractService(t *testing.T) {
 		t.Parallel()
 
 		state := staging.NewEmptyState()
-		state.Entries[staging.ServiceParam]["/app/param"] = staging.Entry{
+		state.Entries[staging.ServiceParam][staging.EntryKey{Name: "/app/param"}] = staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("param-value"),
 			StagedAt:  time.Now(),
 		}
-		state.Entries[staging.ServiceSecret]["my-secret"] = staging.Entry{
+		state.Entries[staging.ServiceSecret][staging.EntryKey{Name: "my-secret"}] = staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("secret-value"),
 			StagedAt:  time.Now(),
@@ -224,7 +225,7 @@ func TestState_ExtractService(t *testing.T) {
 		t.Parallel()
 
 		state := staging.NewEmptyState()
-		state.Entries[staging.ServiceParam]["/app/param"] = staging.Entry{
+		state.Entries[staging.ServiceParam][staging.EntryKey{Name: "/app/param"}] = staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("param-value"),
 			StagedAt:  time.Now(),
@@ -251,17 +252,17 @@ func TestState_RemoveService(t *testing.T) {
 		t.Parallel()
 
 		state := staging.NewEmptyState()
-		state.Entries[staging.ServiceParam]["/app/param"] = staging.Entry{
+		state.Entries[staging.ServiceParam][staging.EntryKey{Name: "/app/param"}] = staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("param-value"),
 			StagedAt:  time.Now(),
 		}
-		state.Entries[staging.ServiceSecret]["my-secret"] = staging.Entry{
+		state.Entries[staging.ServiceSecret][staging.EntryKey{Name: "my-secret"}] = staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("secret-value"),
 			StagedAt:  time.Now(),
 		}
-		state.Tags[staging.ServiceParam]["/app/param"] = staging.TagEntry{
+		state.Tags[staging.ServiceParam][staging.EntryKey{Name: "/app/param"}] = staging.TagEntry{
 			Add:      map[string]string{"env": "prod"},
 			StagedAt: time.Now(),
 		}
@@ -278,17 +279,17 @@ func TestState_RemoveService(t *testing.T) {
 		t.Parallel()
 
 		state := staging.NewEmptyState()
-		state.Entries[staging.ServiceParam]["/app/param"] = staging.Entry{
+		state.Entries[staging.ServiceParam][staging.EntryKey{Name: "/app/param"}] = staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("param-value"),
 			StagedAt:  time.Now(),
 		}
-		state.Entries[staging.ServiceSecret]["my-secret"] = staging.Entry{
+		state.Entries[staging.ServiceSecret][staging.EntryKey{Name: "my-secret"}] = staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("secret-value"),
 			StagedAt:  time.Now(),
 		}
-		state.Tags[staging.ServiceParam]["/app/param"] = staging.TagEntry{
+		state.Tags[staging.ServiceParam][staging.EntryKey{Name: "/app/param"}] = staging.TagEntry{
 			Add:      map[string]string{"env": "prod"},
 			StagedAt: time.Now(),
 		}
@@ -348,52 +349,80 @@ func TestResourceNotFoundError(t *testing.T) {
 	})
 }
 
-func TestCompositeEntryKey(t *testing.T) {
+// TestEntryKey_NamespaceIdentity replaces the old NUL-composite key tests. It
+// pins the new model's invariants: (1) the same name under two namespaces is
+// two distinct staged entries; (2) the null/default namespace is the bare name;
+// and (3) the v3 on-disk format carries the namespace as a structured field and
+// never encodes it with a NUL separator.
+func TestEntryKey_NamespaceIdentity(t *testing.T) {
 	t.Parallel()
 
-	// The null/default namespace collapses to the bare name, so every non-App-
-	// Config provider's keys and on-disk format are unchanged.
-	assert.Equal(t, "/app/config", staging.CompositeEntryKey("/app/config", ""))
+	t.Run("same name under different namespaces are distinct entries", func(t *testing.T) {
+		t.Parallel()
 
-	// A named namespace is folded in with the NUL separator (which cannot appear
-	// in an App Configuration key or label, so it is collision-proof).
-	assert.Equal(t, "dev\x00/app/config", staging.CompositeEntryKey("/app/config", "dev"))
-}
+		state := staging.NewEmptyState()
+		state.Entries[staging.ServiceParam][staging.EntryKey{Name: "/app/config"}] = staging.Entry{
+			Operation: staging.OperationCreate,
+			Value:     lo.ToPtr("default-ns"),
+		}
+		state.Entries[staging.ServiceParam][staging.EntryKey{Name: "/app/config", Namespace: "dev"}] = staging.Entry{
+			Operation: staging.OperationCreate,
+			Value:     lo.ToPtr("dev-ns"),
+		}
 
-func TestSplitEntryKey(t *testing.T) {
-	t.Parallel()
+		assert.Len(t, state.Entries[staging.ServiceParam], 2)
+		assert.Equal(t, "default-ns",
+			lo.FromPtr(state.Entries[staging.ServiceParam][staging.EntryKey{Name: "/app/config"}].Value))
+		assert.Equal(t, "dev-ns",
+			lo.FromPtr(state.Entries[staging.ServiceParam][staging.EntryKey{Name: "/app/config", Namespace: "dev"}].Value))
+	})
 
-	for name, tc := range map[string]struct {
-		key           string
-		wantName      string
-		wantNamespace string
-	}{
-		"bare name is the null namespace":  {key: "/app/config", wantName: "/app/config", wantNamespace: ""},
-		"namespaced key splits into parts": {key: "dev\x00/app/config", wantName: "/app/config", wantNamespace: "dev"},
-		"empty key":                        {key: "", wantName: "", wantNamespace: ""},
-	} {
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
+	t.Run("v3 on-disk format uses a namespace field and no NUL separator", func(t *testing.T) {
+		t.Parallel()
 
-			gotName, gotNamespace := staging.SplitEntryKey(tc.key)
-			assert.Equal(t, tc.wantName, gotName)
-			assert.Equal(t, tc.wantNamespace, gotNamespace)
-		})
-	}
-}
+		state := staging.NewEmptyState()
+		state.Entries[staging.ServiceParam][staging.EntryKey{Name: "/app/config"}] = staging.Entry{
+			Operation: staging.OperationCreate,
+			Value:     lo.ToPtr("default-ns"),
+		}
+		state.Entries[staging.ServiceParam][staging.EntryKey{Name: "/app/config", Namespace: "dev"}] = staging.Entry{
+			Operation: staging.OperationCreate,
+			Value:     lo.ToPtr("dev-ns"),
+		}
 
-func TestCompositeEntryKey_RoundTrip(t *testing.T) {
-	t.Parallel()
+		data, err := json.Marshal(state)
+		require.NoError(t, err)
 
-	// A key or namespace may contain the reserved filter characters (* , \) and
-	// even '/'; only NUL is excluded, so the round-trip is lossless.
-	for _, tc := range []struct{ name, namespace string }{
-		{name: "/a/b", namespace: ""},
-		{name: "Logging:LogLevel", namespace: "dev"},
-		{name: "a,b*c\\d", namespace: "ns/with/slashes"},
-	} {
-		gotName, gotNamespace := staging.SplitEntryKey(staging.CompositeEntryKey(tc.name, tc.namespace))
-		assert.Equal(t, tc.name, gotName)
-		assert.Equal(t, tc.namespace, gotNamespace)
-	}
+		encoded := string(data)
+
+		// The named namespace is a structured field, not a NUL-composite key.
+		assert.Contains(t, encoded, `"namespace":"dev"`)
+		assert.NotContains(t, encoded, "\x00")
+
+		// Round-trips losslessly back into distinct EntryKey-keyed entries.
+		var got staging.State
+		require.NoError(t, json.Unmarshal(data, &got))
+		assert.Len(t, got.Entries[staging.ServiceParam], 2)
+		assert.Equal(t, "dev-ns",
+			lo.FromPtr(got.Entries[staging.ServiceParam][staging.EntryKey{Name: "/app/config", Namespace: "dev"}].Value))
+	})
+
+	t.Run("SortedEntryKeys orders by name then namespace", func(t *testing.T) {
+		t.Parallel()
+
+		m := map[staging.EntryKey]staging.Entry{
+			{Name: "/b"}:                    {},
+			{Name: "/a", Namespace: "dev"}:  {},
+			{Name: "/a"}:                    {},
+			{Name: "/a", Namespace: "prod"}: {},
+		}
+
+		got := staging.SortedEntryKeys(m)
+		assert.Equal(t, []staging.EntryKey{
+			{Name: "/a"},
+			{Name: "/a", Namespace: "dev"},
+			{Name: "/a", Namespace: "prod"},
+			{Name: "/b"},
+		}, got)
+	})
 }

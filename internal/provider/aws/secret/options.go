@@ -26,12 +26,6 @@ type RotationRules struct {
 	AutomaticallyAfterDays int64
 }
 
-// ForceDelete deletes the secret immediately, without a recovery window
-// (ForceDeleteWithoutRecovery). It implements provider.DeleteOption.
-type ForceDelete struct {
-	provider.DeleteOptionMarker
-}
-
 // RecoveryWindow sets the number of days AWS retains the secret before
 // permanent deletion. It implements provider.DeleteOption.
 type RecoveryWindow struct {
@@ -44,7 +38,6 @@ type RecoveryWindow struct {
 var (
 	_ provider.WriteOption  = KMSKeyID{}
 	_ provider.WriteOption  = RotationRules{}
-	_ provider.DeleteOption = ForceDelete{}
 	_ provider.DeleteOption = RecoveryWindow{}
 )
 
@@ -82,7 +75,7 @@ func rotationOption(opts []provider.WriteOption) (RotationRules, bool) {
 func applyDeleteOptions(input *secretsmanager.DeleteSecretInput, opts []provider.DeleteOption) {
 	for _, opt := range opts {
 		switch o := opt.(type) {
-		case ForceDelete:
+		case provider.ForceDelete:
 			input.ForceDeleteWithoutRecovery = aws.Bool(true)
 		case RecoveryWindow:
 			if o.Days > 0 {

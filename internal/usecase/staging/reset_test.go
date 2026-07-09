@@ -56,7 +56,7 @@ func TestResetUseCase_Execute_Unstage(t *testing.T) {
 	t.Parallel()
 
 	store := testutil.NewMockStore()
-	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
+	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("value"),
 		StagedAt:  time.Now(),
@@ -75,7 +75,7 @@ func TestResetUseCase_Execute_Unstage(t *testing.T) {
 	assert.Equal(t, "/app/config", output.Name)
 
 	// Verify unstaged
-	_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/config", "")
+	_, err = store.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config", Namespace: ""})
 	assert.ErrorIs(t, err, staging.ErrNotStaged)
 }
 
@@ -99,12 +99,12 @@ func TestResetUseCase_Execute_UnstageAll(t *testing.T) {
 	t.Parallel()
 
 	store := testutil.NewMockStore()
-	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/one", staging.Entry{
+	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/one"}, staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("one"),
 		StagedAt:  time.Now(),
 	}))
-	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/two", staging.Entry{
+	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/two"}, staging.Entry{
 		Operation: staging.OperationCreate,
 		Value:     lo.ToPtr("two"),
 		StagedAt:  time.Now(),
@@ -167,7 +167,7 @@ func TestResetUseCase_Execute_Restore(t *testing.T) {
 	assert.Equal(t, "#3", output.VersionLabel)
 
 	// Verify staged
-	entry, err := store.GetEntry(t.Context(), staging.ServiceParam, "/app/config#3", "")
+	entry, err := store.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config#3", Namespace: ""})
 	require.NoError(t, err)
 	assert.Equal(t, staging.OperationUpdate, entry.Operation)
 	assert.Equal(t, "version-value", lo.FromPtr(entry.Value))
@@ -279,9 +279,10 @@ func TestResetUseCase_Execute_UnstageAllError(t *testing.T) {
 	t.Parallel()
 
 	store := testutil.NewMockStore()
-	store.AddEntry(staging.ServiceParam, "/app/config", staging.Entry{
+	store.AddEntry(staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 		Operation: staging.OperationUpdate,
 	})
+
 	store.UnstageAllErr = errors.New("unstage all error")
 
 	uc := &usecasestaging.ResetUseCase{
@@ -314,9 +315,10 @@ func TestResetUseCase_Execute_UnstageError(t *testing.T) {
 	t.Parallel()
 
 	store := testutil.NewMockStore()
-	store.AddEntry(staging.ServiceParam, "/app/config", staging.Entry{
+	store.AddEntry(staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 		Operation: staging.OperationUpdate,
 	})
+
 	store.UnstageEntryErr = errors.New("unstage error")
 
 	uc := &usecasestaging.ResetUseCase{
@@ -380,7 +382,7 @@ func TestResetUseCase_Execute_RestoreSkipped_SameAsAWS(t *testing.T) {
 	assert.Equal(t, "#3", output.VersionLabel)
 
 	// Verify nothing was staged (auto-skipped)
-	_, err = store.GetEntry(t.Context(), staging.ServiceParam, "/app/config#3", "")
+	_, err = store.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config#3", Namespace: ""})
 	assert.ErrorIs(t, err, staging.ErrNotStaged)
 }
 
@@ -413,7 +415,7 @@ func TestResetUseCase_Execute_RestoreNotSkipped_DifferentFromAWS(t *testing.T) {
 	assert.Equal(t, "#3", output.VersionLabel)
 
 	// Verify entry was staged
-	entry, err := store.GetEntry(t.Context(), staging.ServiceParam, "/app/config#3", "")
+	entry, err := store.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config#3", Namespace: ""})
 	require.NoError(t, err)
 	assert.Equal(t, "old-version-value", lo.FromPtr(entry.Value))
 }
@@ -447,12 +449,12 @@ func TestResetUseCase_Execute_UnstageAll_WithTags(t *testing.T) {
 	t.Parallel()
 
 	store := testutil.NewMockStore()
-	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
+	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("value"),
 		StagedAt:  time.Now(),
 	}))
-	require.NoError(t, store.StageTag(t.Context(), staging.ServiceParam, "/app/config", staging.TagEntry{
+	require.NoError(t, store.StageTag(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.TagEntry{
 		Add:      map[string]string{"env": "prod"},
 		StagedAt: time.Now(),
 	}))

@@ -286,11 +286,12 @@ func TestParam_StagingWorkflow(t *testing.T) {
 	// 2. Stage a new value (using store directly since edit requires interactive editor)
 	t.Run("stage-edit", func(t *testing.T) {
 		store := newStore()
-		err := store.StageEntry(t.Context(), staging.ServiceParam, paramName, staging.Entry{
+		err := store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: paramName}, staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("staged-value"),
 			StagedAt:  time.Now(),
 		})
+
 		require.NoError(t, err)
 	})
 
@@ -387,11 +388,12 @@ func TestParam_StagingAdd(t *testing.T) {
 	// 1. Stage add (using store directly since add requires interactive editor)
 	t.Run("stage-add", func(t *testing.T) {
 		store := newStore()
-		err := store.StageEntry(t.Context(), staging.ServiceParam, paramName, staging.Entry{
+		err := store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: paramName}, staging.Entry{
 			Operation: staging.OperationCreate,
 			Value:     lo.ToPtr("new-param-value"),
 			StagedAt:  time.Now(),
 		})
+
 		require.NoError(t, err)
 	})
 
@@ -456,7 +458,7 @@ func TestParam_StagingResetWithVersion(t *testing.T) {
 	// 3. Verify staged value is from version 1
 	t.Run("verify-staged", func(t *testing.T) {
 		store := newStore()
-		entry, err := store.GetEntry(t.Context(), staging.ServiceParam, paramName, "")
+		entry, err := store.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: paramName, Namespace: ""})
 		require.NoError(t, err)
 		require.NotNil(t, entry.Value)
 		assert.Equal(t, "v1", *entry.Value)
@@ -498,12 +500,13 @@ func TestParam_StagingResetAll(t *testing.T) {
 
 	// Stage both
 	store := newStore()
-	_ = store.StageEntry(t.Context(), staging.ServiceParam, param1, staging.Entry{
+	_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: param1}, staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("staged1"),
 		StagedAt:  time.Now(),
 	})
-	_ = store.StageEntry(t.Context(), staging.ServiceParam, param2, staging.Entry{
+
+	_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: param2}, staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("staged2"),
 		StagedAt:  time.Now(),
@@ -556,12 +559,13 @@ func TestParam_StagingApplySingle(t *testing.T) {
 
 	// Stage both
 	store := newStore()
-	_ = store.StageEntry(t.Context(), staging.ServiceParam, param1, staging.Entry{
+	_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: param1}, staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("staged1"),
 		StagedAt:  time.Now(),
 	})
-	_ = store.StageEntry(t.Context(), staging.ServiceParam, param2, staging.Entry{
+
+	_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: param2}, staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("staged2"),
 		StagedAt:  time.Now(),
@@ -802,7 +806,7 @@ func TestParam_StagingAddWithOptions(t *testing.T) {
 		store := newStore()
 
 		// Verify entry
-		entry, err := store.GetEntry(t.Context(), staging.ServiceParam, paramName, "")
+		entry, err := store.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: paramName, Namespace: ""})
 		require.NoError(t, err)
 		require.NotNil(t, entry.Value)
 		assert.Equal(t, "value-with-options", *entry.Value)
@@ -810,7 +814,7 @@ func TestParam_StagingAddWithOptions(t *testing.T) {
 		assert.Equal(t, "Test description", *entry.Description)
 
 		// Verify tags (now stored separately)
-		tagEntry, err := store.GetTag(t.Context(), staging.ServiceParam, paramName)
+		tagEntry, err := store.GetTag(t.Context(), staging.ServiceParam, staging.EntryKey{Name: paramName})
 		require.NoError(t, err)
 		assert.Equal(t, "test", tagEntry.Add["env"])
 		assert.Equal(t, "e2e", tagEntry.Add["owner"])
@@ -926,11 +930,12 @@ func TestParam_GlobalDiffWithJSON(t *testing.T) {
 
 	// Stage update with different JSON
 	store := newStore()
-	err = store.StageEntry(t.Context(), staging.ServiceParam, paramName, staging.Entry{
+	err = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: paramName}, staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr(`{"a":1,"b":2}`),
 		StagedAt:  time.Now(),
 	})
+
 	require.NoError(t, err)
 
 	// Check diff with -j flag (--parse-json)

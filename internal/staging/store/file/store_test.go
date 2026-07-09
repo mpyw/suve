@@ -174,14 +174,12 @@ func TestStore_Drain(t *testing.T) {
 
 		// Write test data
 		testData := `{
-			"version": 2,
+			"version": 3,
 			"entries": {
-				"param": {
-					"/app/config": {"operation": "update", "value": "test"}
-				},
-				"secret": {}
-			},
-			"tags": {"param": {}, "secret": {}}
+				"param": [
+					{"name": "/app/config", "operation": "update", "value": "test"}
+				]
+			}
 		}`
 		err := os.WriteFile(path, []byte(testData), 0o600)
 		require.NoError(t, err)
@@ -190,9 +188,9 @@ func TestStore_Drain(t *testing.T) {
 		state, err := store.Drain(t.Context(), "", true)
 		require.NoError(t, err)
 
-		assert.Equal(t, 2, state.Version)
+		assert.Equal(t, 3, state.Version)
 		assert.Len(t, state.Entries[staging.ServiceParam], 1)
-		assert.Equal(t, "test", lo.FromPtr(state.Entries[staging.ServiceParam]["/app/config"].Value))
+		assert.Equal(t, "test", lo.FromPtr(state.Entries[staging.ServiceParam][staging.EntryKey{Name: "/app/config"}].Value))
 
 		// File should still exist
 		_, err = os.Stat(path)
@@ -226,8 +224,7 @@ func TestStore_Drain(t *testing.T) {
 		path := filepath.Join(tmpDir, "stage.json")
 
 		// Write encrypted data
-		//nolint:lll // mock function signature
-		testData := `{"version": 2, "entries": {"param": {"/test": {"operation": "create", "value": "secret"}}, "secret": {}}, "tags": {"param": {}, "secret": {}}}`
+		testData := `{"version": 3, "entries": {"param": [{"name": "/test", "operation": "create", "value": "secret"}]}}`
 		encrypted, err := crypt.Encrypt([]byte(testData), "mypassword")
 		require.NoError(t, err)
 		err = os.WriteFile(path, encrypted, 0o600)
@@ -239,7 +236,7 @@ func TestStore_Drain(t *testing.T) {
 
 		state, err := store.Drain(t.Context(), "", true)
 		require.NoError(t, err)
-		assert.Equal(t, "secret", lo.FromPtr(state.Entries[staging.ServiceParam]["/test"].Value))
+		assert.Equal(t, "secret", lo.FromPtr(state.Entries[staging.ServiceParam][staging.EntryKey{Name: "/test"}].Value))
 	})
 
 	t.Run("encrypted without passphrase fails", func(t *testing.T) {
@@ -267,16 +264,15 @@ func TestStore_Drain(t *testing.T) {
 
 		// Write test data with both services
 		testData := `{
-			"version": 2,
+			"version": 3,
 			"entries": {
-				"param": {
-					"/app/config": {"operation": "update", "value": "param-val"}
-				},
-				"secret": {
-					"my-secret": {"operation": "create", "value": "secret-val"}
-				}
-			},
-			"tags": {"param": {}, "secret": {}}
+				"param": [
+					{"name": "/app/config", "operation": "update", "value": "param-val"}
+				],
+				"secret": [
+					{"name": "my-secret", "operation": "create", "value": "secret-val"}
+				]
+			}
 		}`
 		err := os.WriteFile(path, []byte(testData), 0o600)
 		require.NoError(t, err)
@@ -290,7 +286,7 @@ func TestStore_Drain(t *testing.T) {
 		// Should only have param entries
 		assert.Len(t, state.Entries[staging.ServiceParam], 1)
 		assert.Empty(t, state.Entries[staging.ServiceSecret])
-		assert.Equal(t, "param-val", lo.FromPtr(state.Entries[staging.ServiceParam]["/app/config"].Value))
+		assert.Equal(t, "param-val", lo.FromPtr(state.Entries[staging.ServiceParam][staging.EntryKey{Name: "/app/config"}].Value))
 	})
 
 	t.Run("read error (not IsNotExist)", func(t *testing.T) {
@@ -356,7 +352,7 @@ func TestStore_Persist(t *testing.T) {
 		store := file.NewStoreWithPath(path)
 
 		state := staging.NewEmptyState()
-		state.Entries[staging.ServiceParam]["/app/config"] = staging.Entry{
+		state.Entries[staging.ServiceParam][staging.EntryKey{Name: "/app/config"}] = staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("test-value"),
 		}
@@ -371,7 +367,7 @@ func TestStore_Persist(t *testing.T) {
 		// Read back and verify
 		readState, err := store.Drain(t.Context(), "", true)
 		require.NoError(t, err)
-		assert.Equal(t, "test-value", lo.FromPtr(readState.Entries[staging.ServiceParam]["/app/config"].Value))
+		assert.Equal(t, "test-value", lo.FromPtr(readState.Entries[staging.ServiceParam][staging.EntryKey{Name: "/app/config"}].Value))
 	})
 
 	t.Run("persist empty state removes file", func(t *testing.T) {
@@ -383,7 +379,7 @@ func TestStore_Persist(t *testing.T) {
 
 		// First persist non-empty state
 		state := staging.NewEmptyState()
-		state.Entries[staging.ServiceParam]["/app/config"] = staging.Entry{
+		state.Entries[staging.ServiceParam][staging.EntryKey{Name: "/app/config"}] = staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("test"),
 		}
@@ -409,7 +405,7 @@ func TestStore_Persist(t *testing.T) {
 		store.SetPassphrase("secret123")
 
 		state := staging.NewEmptyState()
-		state.Entries[staging.ServiceParam]["/app/secret"] = staging.Entry{
+		state.Entries[staging.ServiceParam][staging.EntryKey{Name: "/app/secret"}] = staging.Entry{
 			Operation: staging.OperationCreate,
 			Value:     lo.ToPtr("encrypted-value"),
 		}
@@ -425,7 +421,7 @@ func TestStore_Persist(t *testing.T) {
 		// Should be able to drain with same passphrase
 		readState, err := store.Drain(t.Context(), "", true)
 		require.NoError(t, err)
-		assert.Equal(t, "encrypted-value", lo.FromPtr(readState.Entries[staging.ServiceParam]["/app/secret"].Value))
+		assert.Equal(t, "encrypted-value", lo.FromPtr(readState.Entries[staging.ServiceParam][staging.EntryKey{Name: "/app/secret"}].Value))
 	})
 
 	t.Run("persist with service filter", func(t *testing.T) {
@@ -436,11 +432,11 @@ func TestStore_Persist(t *testing.T) {
 		store := file.NewStoreWithPath(path)
 
 		state := staging.NewEmptyState()
-		state.Entries[staging.ServiceParam]["/app/config"] = staging.Entry{
+		state.Entries[staging.ServiceParam][staging.EntryKey{Name: "/app/config"}] = staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("param-value"),
 		}
-		state.Entries[staging.ServiceSecret]["my-secret"] = staging.Entry{
+		state.Entries[staging.ServiceSecret][staging.EntryKey{Name: "my-secret"}] = staging.Entry{
 			Operation: staging.OperationCreate,
 			Value:     lo.ToPtr("secret-value"),
 		}
@@ -464,7 +460,7 @@ func TestStore_Persist(t *testing.T) {
 		store := file.NewStoreWithPath(nestedPath)
 
 		state := staging.NewEmptyState()
-		state.Entries[staging.ServiceParam]["/app/config"] = staging.Entry{
+		state.Entries[staging.ServiceParam][staging.EntryKey{Name: "/app/config"}] = staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("test"),
 		}
@@ -491,7 +487,7 @@ func TestStore_Persist(t *testing.T) {
 		store := file.NewStoreWithPath(invalidPath)
 
 		state := staging.NewEmptyState()
-		state.Entries[staging.ServiceParam]["/app/config"] = staging.Entry{
+		state.Entries[staging.ServiceParam][staging.EntryKey{Name: "/app/config"}] = staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("test"),
 		}
@@ -528,7 +524,7 @@ func TestStore_Persist(t *testing.T) {
 		store := file.NewStoreWithPath(filePath)
 
 		state := staging.NewEmptyState()
-		state.Entries[staging.ServiceParam]["/app/config"] = staging.Entry{
+		state.Entries[staging.ServiceParam][staging.EntryKey{Name: "/app/config"}] = staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("test"),
 		}
@@ -590,7 +586,7 @@ func TestStore_Delete(t *testing.T) {
 
 		// Write encrypted state
 		state := staging.NewEmptyState()
-		state.Entries[staging.ServiceParam]["/app/config"] = staging.Entry{
+		state.Entries[staging.ServiceParam][staging.EntryKey{Name: "/app/config"}] = staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("secret-value"),
 		}

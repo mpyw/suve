@@ -11,9 +11,13 @@ import (
 	"github.com/mpyw/suve/internal/staging/transition"
 )
 
-// TagInput holds input for the tag staging use case.
+// TagInput holds input for the tag staging use case. Key identifies the resource
+// by name and (Azure App Configuration) namespace; staged tags are keyed by
+// (name, namespace) so the same name under two namespaces holds independent tag
+// changes. The namespace is empty for the null/default namespace and every other
+// provider.
 type TagInput struct {
-	Name string
+	Key  staging.EntryKey
 	Tags map[string]string
 }
 
@@ -22,9 +26,10 @@ type TagOutput struct {
 	Name string
 }
 
-// UntagInput holds input for the untag staging use case.
+// UntagInput holds input for the untag staging use case. Key identifies the
+// resource by name and (Azure App Configuration) namespace.
 type UntagInput struct {
-	Name    string
+	Key     staging.EntryKey
 	TagKeys maputil.Set[string]
 }
 
@@ -42,14 +47,14 @@ type TagUseCase struct {
 // tagContext holds common context for tag operations.
 type tagContext struct {
 	service        staging.Service
-	name           string
+	key            staging.EntryKey
 	entryState     transition.EntryState
 	stagedTags     transition.StagedTags
 	baseModifiedAt *time.Time
 }
 
 // loadTagContext loads common context needed for both Tag and Untag operations.
-func (u *TagUseCase) loadTagContext(ctx context.Context, inputName string) (*tagContext, error) {
+func (u *TagUseCase) loadTagContext(ctx context.Context, inputName, namespace string) (*tagContext, error) {
 	service := u.Strategy.Service()
 
 	// Parse and validate name
@@ -58,6 +63,8 @@ func (u *TagUseCase) loadTagContext(ctx context.Context, inputName string) (*tag
 		return nil, err
 	}
 
+	key := staging.EntryKey{Name: name, Namespace: namespace}
+
 	// Fetch AWS resource to check existence and get base modified time
 	currentValue, awsBaseModifiedAt, err := u.fetchAWSCurrentValue(ctx, name)
 	if err != nil {
@@ -65,15 +72,13 @@ func (u *TagUseCase) loadTagContext(ctx context.Context, inputName string) (*tag
 	}
 
 	// Load current entry state with CurrentValue for existence check in reducer.
-	// Tag staging is keyed by name only (not per-namespace), so the null/default
-	// namespace ("") is used for the entry lookup.
-	entryState, err := transition.LoadEntryState(ctx, u.Store, service, name, "", currentValue)
+	entryState, err := transition.LoadEntryState(ctx, u.Store, service, key, currentValue)
 	if err != nil {
 		return nil, err
 	}
 
 	// Load current staged tags
-	stagedTags, baseModifiedAt, err := transition.LoadStagedTags(ctx, u.Store, service, name)
+	stagedTags, baseModifiedAt, err := transition.LoadStagedTags(ctx, u.Store, service, key)
 	if err != nil {
 		return nil, err
 	}
@@ -85,7 +90,7 @@ func (u *TagUseCase) loadTagContext(ctx context.Context, inputName string) (*tag
 
 	return &tagContext{
 		service:        service,
-		name:           name,
+		key:            key,
 		entryState:     entryState,
 		stagedTags:     stagedTags,
 		baseModifiedAt: baseModifiedAt,
@@ -119,7 +124,7 @@ func (u *TagUseCase) Tag(ctx context.Context, input TagInput) (*TagOutput, error
 		return nil, errors.New("no tags specified")
 	}
 
-	tc, err := u.loadTagContext(ctx, input.Name)
+	tc, err := u.loadTagContext(ctx, input.Key.Name, input.Key.Namespace)
 	if err != nil {
 		return nil, err
 	}
@@ -135,12 +140,12 @@ func (u *TagUseCase) Tag(ctx context.Context, input TagInput) (*TagOutput, error
 	// Execute the transition
 	executor := transition.NewExecutor(u.Store)
 
-	_, err = executor.ExecuteTag(ctx, tc.service, tc.name, tc.entryState, tc.stagedTags, action, tc.baseModifiedAt)
+	_, err = executor.ExecuteTag(ctx, tc.service, tc.key, tc.entryState, tc.stagedTags, action, tc.baseModifiedAt)
 	if err != nil {
 		return nil, err
 	}
 
-	return &TagOutput{Name: tc.name}, nil
+	return &TagOutput{Name: tc.key.Name}, nil
 }
 
 // Untag removes tags from a staged resource.
@@ -149,7 +154,7 @@ func (u *TagUseCase) Untag(ctx context.Context, input UntagInput) (*UntagOutput,
 		return nil, errors.New("no tag keys specified")
 	}
 
-	tc, err := u.loadTagContext(ctx, input.Name)
+	tc, err := u.loadTagContext(ctx, input.Key.Name, input.Key.Namespace)
 	if err != nil {
 		return nil, err
 	}
@@ -170,10 +175,10 @@ func (u *TagUseCase) Untag(ctx context.Context, input UntagInput) (*UntagOutput,
 	// Execute the transition
 	executor := transition.NewExecutor(u.Store)
 
-	_, err = executor.ExecuteTag(ctx, tc.service, tc.name, tc.entryState, tc.stagedTags, action, tc.baseModifiedAt)
+	_, err = executor.ExecuteTag(ctx, tc.service, tc.key, tc.entryState, tc.stagedTags, action, tc.baseModifiedAt)
 	if err != nil {
 		return nil, err
 	}
 
-	return &UntagOutput{Name: tc.name}, nil
+	return &UntagOutput{Name: tc.key.Name}, nil
 }

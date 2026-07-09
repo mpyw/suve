@@ -24,7 +24,7 @@ func TestDrainUseCase_Execute(t *testing.T) {
 		fileStore := testutil.NewMockStore()
 		agentStore := testutil.NewMockStore()
 
-		_ = fileStore.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
+		_ = fileStore.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("file-value"),
 			StagedAt:  time.Now(),
@@ -41,12 +41,12 @@ func TestDrainUseCase_Execute(t *testing.T) {
 		assert.False(t, output.Merged)
 
 		// Verify entry moved to agent
-		entry, err := agentStore.GetEntry(t.Context(), staging.ServiceParam, "/app/config", "")
+		entry, err := agentStore.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config", Namespace: ""})
 		require.NoError(t, err)
 		assert.Equal(t, "file-value", lo.FromPtr(entry.Value))
 
 		// Verify file is cleared
-		_, err = fileStore.GetEntry(t.Context(), staging.ServiceParam, "/app/config", "")
+		_, err = fileStore.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config", Namespace: ""})
 		assert.ErrorIs(t, err, staging.ErrNotStaged)
 	})
 
@@ -56,7 +56,7 @@ func TestDrainUseCase_Execute(t *testing.T) {
 		fileStore := testutil.NewMockStore()
 		agentStore := testutil.NewMockStore()
 
-		_ = fileStore.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
+		_ = fileStore.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("file-value"),
 			StagedAt:  time.Now(),
@@ -71,9 +71,9 @@ func TestDrainUseCase_Execute(t *testing.T) {
 		require.NoError(t, err)
 
 		// Verify entry exists in both
-		_, err = agentStore.GetEntry(t.Context(), staging.ServiceParam, "/app/config", "")
+		_, err = agentStore.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config", Namespace: ""})
 		require.NoError(t, err)
-		_, err = fileStore.GetEntry(t.Context(), staging.ServiceParam, "/app/config", "")
+		_, err = fileStore.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config", Namespace: ""})
 		require.NoError(t, err)
 	})
 
@@ -83,12 +83,13 @@ func TestDrainUseCase_Execute(t *testing.T) {
 		fileStore := testutil.NewMockStore()
 		agentStore := testutil.NewMockStore()
 
-		_ = agentStore.StageEntry(t.Context(), staging.ServiceParam, "/app/existing", staging.Entry{
+		_ = agentStore.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/existing"}, staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("agent-value"),
 			StagedAt:  time.Now(),
 		})
-		_ = fileStore.StageEntry(t.Context(), staging.ServiceParam, "/app/new", staging.Entry{
+
+		_ = fileStore.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/new"}, staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("file-value"),
 			StagedAt:  time.Now(),
@@ -104,9 +105,9 @@ func TestDrainUseCase_Execute(t *testing.T) {
 		assert.True(t, output.Merged)
 
 		// Verify both entries exist in agent
-		_, err = agentStore.GetEntry(t.Context(), staging.ServiceParam, "/app/existing", "")
+		_, err = agentStore.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/existing", Namespace: ""})
 		require.NoError(t, err)
-		_, err = agentStore.GetEntry(t.Context(), staging.ServiceParam, "/app/new", "")
+		_, err = agentStore.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/new", Namespace: ""})
 		require.NoError(t, err)
 	})
 
@@ -116,12 +117,13 @@ func TestDrainUseCase_Execute(t *testing.T) {
 		fileStore := testutil.NewMockStore()
 		agentStore := testutil.NewMockStore()
 
-		_ = agentStore.StageEntry(t.Context(), staging.ServiceParam, "/app/existing", staging.Entry{
+		_ = agentStore.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/existing"}, staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("agent-value"),
 			StagedAt:  time.Now(),
 		})
-		_ = fileStore.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
+
+		_ = fileStore.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("file-value"),
 			StagedAt:  time.Now(),
@@ -136,7 +138,7 @@ func TestDrainUseCase_Execute(t *testing.T) {
 		require.NoError(t, err)
 
 		// With overwrite, agent should have file content
-		_, err = agentStore.GetEntry(t.Context(), staging.ServiceParam, "/app/config", "")
+		_, err = agentStore.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config", Namespace: ""})
 		require.NoError(t, err)
 	})
 
@@ -161,12 +163,13 @@ func TestDrainUseCase_Execute(t *testing.T) {
 		fileStore := testutil.NewMockStore()
 		agentStore := testutil.NewMockStore()
 
-		_ = agentStore.StageEntry(t.Context(), staging.ServiceParam, "/app/existing", staging.Entry{
+		_ = agentStore.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/existing"}, staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("agent-value"),
 			StagedAt:  time.Now(),
 		})
-		_ = fileStore.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
+
+		_ = fileStore.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("file-value"),
 			StagedAt:  time.Now(),
@@ -183,9 +186,9 @@ func TestDrainUseCase_Execute(t *testing.T) {
 		assert.True(t, output.Merged)
 
 		// Both entries should exist
-		_, err = agentStore.GetEntry(t.Context(), staging.ServiceParam, "/app/existing", "")
+		_, err = agentStore.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/existing", Namespace: ""})
 		require.NoError(t, err)
-		_, err = agentStore.GetEntry(t.Context(), staging.ServiceParam, "/app/config", "")
+		_, err = agentStore.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config", Namespace: ""})
 		require.NoError(t, err)
 	})
 
@@ -195,12 +198,13 @@ func TestDrainUseCase_Execute(t *testing.T) {
 		fileStore := testutil.NewMockStore()
 		agentStore := testutil.NewMockStore()
 
-		_ = fileStore.StageEntry(t.Context(), staging.ServiceParam, "/app/param", staging.Entry{
+		_ = fileStore.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/param"}, staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("param-value"),
 			StagedAt:  time.Now(),
 		})
-		_ = fileStore.StageEntry(t.Context(), staging.ServiceSecret, "my-secret", staging.Entry{
+
+		_ = fileStore.StageEntry(t.Context(), staging.ServiceSecret, staging.EntryKey{Name: "my-secret"}, staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("secret-value"),
 			StagedAt:  time.Now(),
@@ -215,11 +219,11 @@ func TestDrainUseCase_Execute(t *testing.T) {
 		require.NoError(t, err)
 
 		// Param should be in agent
-		_, err = agentStore.GetEntry(t.Context(), staging.ServiceParam, "/app/param", "")
+		_, err = agentStore.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/param", Namespace: ""})
 		require.NoError(t, err)
 
 		// Secret should still be in file
-		_, err = fileStore.GetEntry(t.Context(), staging.ServiceSecret, "my-secret", "")
+		_, err = fileStore.GetEntry(t.Context(), staging.ServiceSecret, staging.EntryKey{Name: "my-secret", Namespace: ""})
 		require.NoError(t, err)
 	})
 
@@ -229,7 +233,7 @@ func TestDrainUseCase_Execute(t *testing.T) {
 		fileStore := testutil.NewMockStore()
 		agentStore := testutil.NewMockStore()
 
-		_ = fileStore.StageTag(t.Context(), staging.ServiceParam, "/app/config", staging.TagEntry{
+		_ = fileStore.StageTag(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.TagEntry{
 			Add:      map[string]string{"env": "prod"},
 			StagedAt: time.Now(),
 		})
@@ -244,7 +248,7 @@ func TestDrainUseCase_Execute(t *testing.T) {
 		assert.Equal(t, 1, output.TagCount)
 
 		// Verify tag moved to agent
-		tag, err := agentStore.GetTag(t.Context(), staging.ServiceParam, "/app/config")
+		tag, err := agentStore.GetTag(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"})
 		require.NoError(t, err)
 		assert.Equal(t, "prod", tag.Add["env"])
 	})
@@ -278,11 +282,12 @@ func TestDrainUseCase_Execute_Errors(t *testing.T) {
 		fileStore := testutil.NewMockStore()
 		agentStore := testutil.NewMockStore()
 
-		_ = fileStore.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
+		_ = fileStore.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("value"),
 			StagedAt:  time.Now(),
 		})
+
 		agentStore.WriteStateErr = errors.New("write error")
 
 		usecase := &stagingusecase.StashPopUseCase{
@@ -354,12 +359,13 @@ func TestDrainUseCase_ServiceSpecific_FileDeleteErrors(t *testing.T) {
 		agentStore := testutil.NewMockStore()
 
 		// File has both param and secret entries
-		_ = fileStore.StageEntry(t.Context(), staging.ServiceParam, "/app/param", staging.Entry{
+		_ = fileStore.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/param"}, staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("param-value"),
 			StagedAt:  time.Now(),
 		})
-		_ = fileStore.StageEntry(t.Context(), staging.ServiceSecret, "my-secret", staging.Entry{
+
+		_ = fileStore.StageEntry(t.Context(), staging.ServiceSecret, staging.EntryKey{Name: "my-secret"}, staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("secret-value"),
 			StagedAt:  time.Now(),
@@ -386,7 +392,7 @@ func TestDrainUseCase_ServiceSpecific_FileDeleteErrors(t *testing.T) {
 		assert.True(t, drainErr.NonFatal)
 
 		// Agent should still have the param entry (operation succeeded before cleanup)
-		_, err = agentStore.GetEntry(t.Context(), staging.ServiceParam, "/app/param", "")
+		_, err = agentStore.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/param", Namespace: ""})
 		require.NoError(t, err)
 	})
 }
@@ -401,14 +407,14 @@ func TestDrainUseCase_ServiceSpecific_MergeWithAgentState(t *testing.T) {
 		agentStore := testutil.NewMockStore()
 
 		// Agent already has secret entries
-		_ = agentStore.StageEntry(t.Context(), staging.ServiceSecret, "existing-secret", staging.Entry{
+		_ = agentStore.StageEntry(t.Context(), staging.ServiceSecret, staging.EntryKey{Name: "existing-secret"}, staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("agent-secret"),
 			StagedAt:  time.Now(),
 		})
 
 		// File has param entries
-		_ = fileStore.StageEntry(t.Context(), staging.ServiceParam, "/app/param", staging.Entry{
+		_ = fileStore.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/param"}, staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("file-param"),
 			StagedAt:  time.Now(),
@@ -425,9 +431,9 @@ func TestDrainUseCase_ServiceSpecific_MergeWithAgentState(t *testing.T) {
 		require.NoError(t, err)
 
 		// Both services should be in agent
-		_, err = agentStore.GetEntry(t.Context(), staging.ServiceParam, "/app/param", "")
+		_, err = agentStore.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/param", Namespace: ""})
 		require.NoError(t, err)
-		_, err = agentStore.GetEntry(t.Context(), staging.ServiceSecret, "existing-secret", "")
+		_, err = agentStore.GetEntry(t.Context(), staging.ServiceSecret, staging.EntryKey{Name: "existing-secret", Namespace: ""})
 		require.NoError(t, err)
 	})
 }
@@ -444,7 +450,7 @@ func TestDrainUseCase_WorkingDrainError_Propagated(t *testing.T) {
 	workingStore := testutil.NewMockStore()
 
 	// Stash has param entries.
-	_ = fileStore.StageEntry(t.Context(), staging.ServiceParam, "/app/param", staging.Entry{
+	_ = fileStore.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/param"}, staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("file-param"),
 		StagedAt:  time.Now(),
@@ -467,7 +473,7 @@ func TestDrainUseCase_WorkingDrainError_Propagated(t *testing.T) {
 	assert.Contains(t, err.Error(), "working staging area")
 
 	// The working area must not have been written (WriteState never reached).
-	_, getErr := workingStore.GetEntry(t.Context(), staging.ServiceParam, "/app/param", "")
+	_, getErr := workingStore.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/param", Namespace: ""})
 	require.ErrorIs(t, getErr, staging.ErrNotStaged)
 }
 
@@ -481,7 +487,7 @@ func TestDrainUseCase_ServiceSpecific_FileDeleteDrainError(t *testing.T) {
 		agentStore := testutil.NewMockStore()
 
 		// File has only param entries (will be empty after draining param service)
-		_ = fileStore.StageEntry(t.Context(), staging.ServiceParam, "/app/param", staging.Entry{
+		_ = fileStore.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/param"}, staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("param-value"),
 			StagedAt:  time.Now(),
@@ -516,7 +522,7 @@ func TestDrainUseCase_ServiceSpecific_FileDeleteDrainError(t *testing.T) {
 		agentStore := testutil.NewMockStore()
 
 		// File has entries
-		_ = fileStore.StageEntry(t.Context(), staging.ServiceParam, "/app/param", staging.Entry{
+		_ = fileStore.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/param"}, staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("param-value"),
 			StagedAt:  time.Now(),

@@ -109,6 +109,11 @@ type ServiceCapability struct {
 	// HasTags is true when tag/label read+write is supported (false for Azure
 	// App Configuration).
 	HasTags bool `json:"hasTags"`
+	// TagsPerVersion is true when tags are scoped to a specific version rather
+	// than the resource (Azure Key Vault only): each version has its own tags,
+	// so the GUI shows them per version in the history and writes target the
+	// latest version. Every other provider keeps tags at the resource level.
+	TagsPerVersion bool `json:"tagsPerVersion"`
 	// HasRestore is true when a soft-deleted item can be restored (AWS Secrets
 	// Manager only).
 	HasRestore bool `json:"hasRestore"`
@@ -196,7 +201,11 @@ func (a *App) Capabilities() []ProviderCapability {
 				},
 				{
 					Service: serviceSecret, DisplayName: "Key Vault",
-					HasVersionHistory: true, HasVersionSpecifiers: true, HasTags: true, HasRestore: false,
+					HasVersionHistory: true, HasVersionSpecifiers: true, HasTags: true, TagsPerVersion: true, HasRestore: true,
+					// Force-delete (purge) is unsupported: Key Vault retention is a vault
+					// property (softDeleteRetentionInDays), not a per-delete choice, and
+					// staged deletes can't carry it — so deletes are always soft (Restore
+					// recovers them). HasForceDelete/HasRecoveryWindow both stay false.
 					HasStaging: true, HasForceDelete: false, HasRecoveryWindow: false,
 				},
 			},

@@ -12,7 +12,6 @@ import (
 
 	"github.com/mpyw/suve/internal/cli/confirm"
 	"github.com/mpyw/suve/internal/cli/output"
-	"github.com/mpyw/suve/internal/maputil"
 	"github.com/mpyw/suve/internal/parallel"
 	"github.com/mpyw/suve/internal/staging"
 	stgcli "github.com/mpyw/suve/internal/staging/cli"
@@ -31,9 +30,10 @@ type ServiceApply struct {
 	// StrategyFor, when set, resolves a strategy per namespace so each App
 	// Configuration entry applies under its own namespace. Nil elsewhere.
 	StrategyFor func(namespace string) (staging.ApplyStrategy, error)
-	// Entries/Tags are this service's staged changes, pre-listed from its store.
-	Entries map[string]staging.Entry
-	Tags    map[string]staging.TagEntry
+	// Entries/Tags are this service's staged changes, pre-listed from its store,
+	// keyed by the (name, namespace) EntryKey.
+	Entries map[staging.EntryKey]staging.Entry
+	Tags    map[staging.EntryKey]staging.TagEntry
 }
 
 // strategyForNamespace returns the strategy scoped to the given namespace, or the
@@ -48,7 +48,7 @@ func (s ServiceApply) strategyForNamespace(namespace string) (staging.ApplyStrat
 
 // serviceConflictCheck holds entries and strategy for a single service's conflict checking.
 type serviceConflictCheck struct {
-	entries  map[string]staging.Entry
+	entries  map[staging.EntryKey]staging.Entry
 	strategy staging.ApplyStrategy
 }
 
@@ -217,9 +217,8 @@ func (r *Runner) Run(ctx context.Context) error {
 
 		allConflicts := r.checkAllConflicts(ctx, checks)
 		if len(allConflicts) > 0 {
-			for _, key := range maputil.SortedKeys(allConflicts) {
-				name, _ := staging.SplitEntryKey(key)
-				output.Warning(r.Stderr, "conflict detected for %s: %s was modified after staging", name, r.ProviderLabel)
+			for _, key := range staging.SortedEntryKeys(allConflicts) {
+				output.Warning(r.Stderr, "conflict detected for %s: %s was modified after staging", key.Name, r.ProviderLabel)
 			}
 
 			return fmt.Errorf("apply rejected: %d conflict(s) detected (use --ignore-conflicts to force)", len(allConflicts))
@@ -263,39 +262,35 @@ func (r *Runner) Run(ctx context.Context) error {
 func (r *Runner) applyService(ctx context.Context, svc ServiceApply) (succeeded, failed int) {
 	serviceName := svc.Strategy.ServiceName()
 
-	// Entries are keyed by the (name, namespace) composite; apply each through
-	// the strategy scoped to its own namespace and unstage under that namespace.
-	results := parallel.ExecuteMap(ctx, svc.Entries, func(ctx context.Context, key string, entry staging.Entry) (staging.Operation, error) {
-		name, namespace := staging.SplitEntryKey(key)
-
-		strategy, err := svc.strategyForNamespace(namespace)
+	// Entries are keyed by the (name, namespace) EntryKey; apply each through the
+	// strategy scoped to its own namespace and unstage under that key.
+	results := parallel.ExecuteMap(ctx, svc.Entries, func(ctx context.Context, key staging.EntryKey, entry staging.Entry) (staging.Operation, error) {
+		strategy, err := svc.strategyForNamespace(key.Namespace)
 		if err != nil {
 			return entry.Operation, err
 		}
 
-		return entry.Operation, strategy.Apply(ctx, name, entry)
+		return entry.Operation, strategy.Apply(ctx, key.Name, entry)
 	})
 
-	for _, key := range maputil.SortedKeys(svc.Entries) {
-		name, namespace := staging.SplitEntryKey(key)
+	for _, key := range staging.SortedEntryKeys(svc.Entries) {
 		result := results[key]
-
 		if result.Err != nil {
-			output.Failed(r.Stderr, serviceName+": "+name, result.Err)
+			output.Failed(r.Stderr, serviceName+": "+key.Name, result.Err)
 
 			failed++
 		} else {
 			switch result.Value {
 			case staging.OperationCreate:
-				output.Success(r.Stdout, "%s: Created %s", serviceName, name)
+				output.Success(r.Stdout, "%s: Created %s", serviceName, key.Name)
 			case staging.OperationUpdate:
-				output.Success(r.Stdout, "%s: Updated %s", serviceName, name)
+				output.Success(r.Stdout, "%s: Updated %s", serviceName, key.Name)
 			case staging.OperationDelete:
-				output.Success(r.Stdout, "%s: Deleted %s", serviceName, name)
+				output.Success(r.Stdout, "%s: Deleted %s", serviceName, key.Name)
 			}
 
-			if err := svc.Store.UnstageEntry(ctx, svc.Service, name, namespace); err != nil {
-				output.Warning(r.Stderr, "failed to clear staging for %s: %v", name, err)
+			if err := svc.Store.UnstageEntry(ctx, svc.Service, key); err != nil {
+				output.Warning(r.Stderr, "failed to clear staging for %s: %v", key.Name, err)
 			}
 
 			succeeded++
@@ -306,29 +301,32 @@ func (r *Runner) applyService(ctx context.Context, svc ServiceApply) (succeeded,
 }
 
 func (r *Runner) applyTagService(ctx context.Context, svc ServiceApply) (succeeded, failed int) {
-	service := svc.Service
 	serviceName := svc.Strategy.ServiceName()
-	staged := svc.Tags
 
-	results := parallel.ExecuteMap(ctx, staged, func(ctx context.Context, name string, tagEntry staging.TagEntry) (struct{}, error) {
-		err := svc.Strategy.ApplyTags(ctx, name, tagEntry)
+	// Tags share the (name, namespace) EntryKey; resolve the strategy per
+	// namespace so App Configuration tags target the right store partition.
+	results := parallel.ExecuteMap(ctx, svc.Tags, func(ctx context.Context, key staging.EntryKey, tagEntry staging.TagEntry) (struct{}, error) {
+		strategy, err := svc.strategyForNamespace(key.Namespace)
+		if err != nil {
+			return struct{}{}, err
+		}
 
-		return struct{}{}, err
+		return struct{}{}, strategy.ApplyTags(ctx, key.Name, tagEntry)
 	})
 
-	for _, name := range maputil.SortedKeys(staged) {
-		tagEntry := staged[name]
+	for _, key := range staging.SortedEntryKeys(svc.Tags) {
+		tagEntry := svc.Tags[key]
 
-		result := results[name]
+		result := results[key]
 		if result.Err != nil {
-			output.Failed(r.Stderr, serviceName+": "+name+" (tags)", result.Err)
+			output.Failed(r.Stderr, serviceName+": "+key.Name+" (tags)", result.Err)
 
 			failed++
 		} else {
-			output.Success(r.Stdout, "%s: Tagged %s%s", serviceName, name, formatTagApplySummary(tagEntry))
+			output.Success(r.Stdout, "%s: Tagged %s%s", serviceName, key.Name, formatTagApplySummary(tagEntry))
 
-			if err := svc.Store.UnstageTag(ctx, service, name); err != nil {
-				output.Warning(r.Stderr, "failed to clear staging for %s tags: %v", name, err)
+			if err := svc.Store.UnstageTag(ctx, svc.Service, key); err != nil {
+				output.Warning(r.Stderr, "failed to clear staging for %s tags: %v", key.Name, err)
 			}
 
 			succeeded++
@@ -355,14 +353,14 @@ func formatTagApplySummary(tagEntry staging.TagEntry) string {
 	return " [" + strings.Join(parts, ", ") + "]"
 }
 
-// checkAllConflicts checks all services for conflicts and returns a combined map of conflicting names.
-func (r *Runner) checkAllConflicts(ctx context.Context, checks []serviceConflictCheck) map[string]struct{} {
-	allConflicts := make(map[string]struct{})
+// checkAllConflicts checks all services for conflicts and returns a combined map of conflicting keys.
+func (r *Runner) checkAllConflicts(ctx context.Context, checks []serviceConflictCheck) map[staging.EntryKey]struct{} {
+	allConflicts := make(map[staging.EntryKey]struct{})
 
 	for _, check := range checks {
 		conflicts := staging.CheckConflicts(ctx, check.strategy, check.entries)
-		for name := range conflicts {
-			allConflicts[name] = struct{}{}
+		for key := range conflicts {
+			allConflicts[key] = struct{}{}
 		}
 	}
 

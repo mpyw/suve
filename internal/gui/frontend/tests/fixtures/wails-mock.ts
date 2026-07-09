@@ -76,6 +76,8 @@ export interface SecretLogEntry {
   value: string;
   isCurrent: boolean;
   created: string;
+  // Per-version tags (Azure Key Vault only).
+  tags?: Tag[];
 }
 
 export interface AWSIdentity {
@@ -113,6 +115,7 @@ export interface ServiceCapability {
   hasVersionHistory: boolean;
   hasVersionSpecifiers: boolean;
   hasTags: boolean;
+  tagsPerVersion: boolean;
   hasRestore: boolean;
   hasStaging: boolean;
   hasForceDelete: boolean;
@@ -254,8 +257,8 @@ export const defaultCapabilities: ProviderCapability[] = [
     displayName: 'AWS',
     scopeFields: [],
     services: [
-      { service: 'param', displayName: 'Param', hasVersionHistory: true, hasVersionSpecifiers: true, hasTags: true, hasRestore: false, hasStaging: true, hasForceDelete: false, hasRecoveryWindow: false, hasNamespaces: false },
-      { service: 'secret', displayName: 'Secret', hasVersionHistory: true, hasVersionSpecifiers: true, hasTags: true, hasRestore: true, hasStaging: true, hasForceDelete: true, hasRecoveryWindow: true, hasNamespaces: false },
+      { service: 'param', displayName: 'Param', hasVersionHistory: true, hasVersionSpecifiers: true, hasTags: true, tagsPerVersion: false, hasRestore: false, hasStaging: true, hasForceDelete: false, hasRecoveryWindow: false, hasNamespaces: false },
+      { service: 'secret', displayName: 'Secret', hasVersionHistory: true, hasVersionSpecifiers: true, hasTags: true, tagsPerVersion: false, hasRestore: true, hasStaging: true, hasForceDelete: true, hasRecoveryWindow: true, hasNamespaces: false },
     ],
   },
   {
@@ -263,7 +266,7 @@ export const defaultCapabilities: ProviderCapability[] = [
     displayName: 'Google Cloud',
     scopeFields: ['project'],
     services: [
-      { service: 'secret', displayName: 'Secret', hasVersionHistory: true, hasVersionSpecifiers: true, hasTags: true, hasRestore: false, hasStaging: true, hasForceDelete: false, hasRecoveryWindow: false, hasNamespaces: false },
+      { service: 'secret', displayName: 'Secret', hasVersionHistory: true, hasVersionSpecifiers: true, hasTags: true, tagsPerVersion: false, hasRestore: false, hasStaging: true, hasForceDelete: false, hasRecoveryWindow: false, hasNamespaces: false },
     ],
   },
   {
@@ -271,8 +274,8 @@ export const defaultCapabilities: ProviderCapability[] = [
     displayName: 'Azure',
     scopeFields: [],
     services: [
-      { service: 'param', displayName: 'App Configuration', hasVersionHistory: false, hasVersionSpecifiers: false, hasTags: true, hasRestore: false, hasStaging: true, hasForceDelete: false, hasRecoveryWindow: false, hasNamespaces: true },
-      { service: 'secret', displayName: 'Key Vault', hasVersionHistory: true, hasVersionSpecifiers: true, hasTags: true, hasRestore: false, hasStaging: true, hasForceDelete: false, hasRecoveryWindow: false, hasNamespaces: false },
+      { service: 'param', displayName: 'App Configuration', hasVersionHistory: false, hasVersionSpecifiers: false, hasTags: true, tagsPerVersion: false, hasRestore: false, hasStaging: true, hasForceDelete: false, hasRecoveryWindow: false, hasNamespaces: true },
+      { service: 'secret', displayName: 'Key Vault', hasVersionHistory: true, hasVersionSpecifiers: true, hasTags: true, tagsPerVersion: true, hasRestore: true, hasStaging: true, hasForceDelete: false, hasRecoveryWindow: false, hasNamespaces: false },
     ],
   },
 ];
@@ -896,8 +899,26 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
           nextToken: '',
         };
       },
-      ParamShow: async (name: string) => {
-        const param = state.params.find((p: any) => p.name === name);
+      ParamShow: async (name: string, namespace?: string) => {
+        // Record the (name, namespace) the frontend asked for so specs can assert
+        // a namespaced App Configuration entry is read under its OWN namespace
+        // (the label axis), not the shared read scope's.
+        const ns = namespace ?? '';
+        (window as any).__paramShowCalls = (window as any).__paramShowCalls ?? [];
+        (window as any).__paramShowCalls.push({ name, namespace: ns });
+        // Match on (name, namespace): a namespaced setting resolves to its OWN
+        // value, never the same-key entry in another namespace. If the name
+        // exists only under a DIFFERENT namespace, reject like the real provider
+        // ("entry not found") — this is exactly the reported bug when the read
+        // was issued under the wrong namespace. A name that exists under no
+        // namespace falls back to mock-value so non-namespaced specs are
+        // unaffected.
+        const exact = state.params.find((p: any) => p.name === name && (p.namespace ?? '') === ns);
+        const anyNs = state.params.find((p: any) => p.name === name);
+        if (!exact && anyNs) {
+          throw new Error(`provider: entry not found: ${name}`);
+        }
+        const param = exact ?? anyNs;
         const tags = state.paramTags[name] || [];
         const versions = state.paramVersions[name];
         const currentVersion = versions ? versions.find((v: any) => v.isCurrent) : null;
@@ -1055,7 +1076,9 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
         ];
         return {
           name,
-          entries: versions,
+          // Mirror the backend: every entry carries a tags array (empty, not
+          // undefined) so per-version tag rendering sees the real shape.
+          entries: versions.map((v) => ({ ...v, tags: v.tags ?? [] })),
         };
       },
       SecretCreate: async (name: string, value: string) => {
@@ -1071,8 +1094,14 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
         if (existing) existing.value = value;
         return { name, versionId: 'v2', arn: '' };
       },
-      SecretDelete: async (name: string) => {
+      SecretDelete: async (name: string, force?: boolean) => {
+        const removed = state.secrets.filter((s: any) => s.name === name);
         state.secrets = state.secrets.filter((s: any) => s.name !== name);
+        // Soft-delete keeps the secret recoverable; force purges it for good.
+        if (!force) {
+          (window as any).__softDeleted = (window as any).__softDeleted ?? [];
+          (window as any).__softDeleted.push(...removed);
+        }
         return { name, deletionDate: new Date().toISOString(), arn: '' };
       },
       SecretDiff: async (spec1: string, spec2: string) => {
@@ -1097,7 +1126,15 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
         };
       },
       SecretRestore: async (name: string) => {
-        return { name, arn: `arn:aws:secretsmanager:us-east-1:123456789:secret:${name}` };
+        // Recover a soft-deleted secret back into the listing (purged ones stay
+        // gone). Mirrors RecoverDeletedSecret.
+        const soft = ((window as any).__softDeleted ?? []) as any[];
+        const idx = soft.findIndex((s) => s.name === name);
+        if (idx >= 0) {
+          state.secrets.push(soft[idx]);
+          soft.splice(idx, 1);
+        }
+        return { name, arn: '' };
       },
       SecretAddTag: async (name: string, key: string, value: string) => {
         if (!state.secretTags[name]) state.secretTags[name] = [];
@@ -1161,11 +1198,15 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
           currentBucket().secret = [];
           currentBucket().secretTags = [];
         }
+        // Mirror the Go backend faithfully: empty slices marshal to null (not
+        // []), so the frontend must guard spreads/reads. Returning [] here would
+        // hide those bugs (this is exactly how the "Apply All" spread crash
+        // slipped past the mock once).
         return {
           serviceName: service,
-          entryResults: staged.map((s: any) => ({ name: s.name, status: s.operation === 'delete' ? 'deleted' : 'updated' })),
-          tagResults: tagStaged.map((t: any) => ({ name: t.name, status: 'updated' })),
-          conflicts: [],
+          entryResults: entryCount > 0 ? staged.map((s: any) => ({ name: s.name, status: s.operation === 'delete' ? 'deleted' : 'updated' })) : null,
+          tagResults: tagCount > 0 ? tagStaged.map((t: any) => ({ name: t.name, status: 'updated' })) : null,
+          conflicts: null,
           entrySucceeded: entryCount,
           entryFailed: 0,
           tagSucceeded: tagCount,

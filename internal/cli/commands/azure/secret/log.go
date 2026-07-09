@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/urfave/cli/v3"
 
@@ -19,11 +20,12 @@ import (
 
 // logJSONItem represents a single version entry in JSON output.
 type logJSONItem struct {
-	Version string  `json:"version"`
-	State   string  `json:"state,omitempty"`
-	Created string  `json:"created,omitempty"`
-	Value   *string `json:"value,omitempty"`
-	Error   string  `json:"error,omitempty"`
+	Version string            `json:"version"`
+	State   string            `json:"state,omitempty"`
+	Created string            `json:"created,omitempty"`
+	Value   *string           `json:"value,omitempty"`
+	Tags    map[string]string `json:"tags,omitempty"`
+	Error   string            `json:"error,omitempty"`
 }
 
 // logPresenter renders Azure Key Vault log output.
@@ -82,6 +84,13 @@ func (p *logPresenter) RenderJSON(stdout io.Writer) error {
 			item.Value = &entry.Value
 		}
 
+		if len(entry.Tags) > 0 {
+			item.Tags = make(map[string]string, len(entry.Tags))
+			for _, tag := range entry.Tags {
+				item.Tags[tag.Key] = tag.Value
+			}
+		}
+
 		items = append(items, item)
 	}
 
@@ -120,6 +129,16 @@ func (p *logPresenter) RenderHeader(stdout io.Writer, i int) {
 
 	if entry.CreatedDate != nil {
 		output.Printf(stdout, "%s %s\n", colors.For(stdout).FieldLabel("Date:"), timeutil.FormatRFC3339(*entry.CreatedDate))
+	}
+
+	// Key Vault tags are per version, so show this version's own tags.
+	if len(entry.Tags) > 0 {
+		pairs := make([]string, 0, len(entry.Tags))
+		for _, tag := range entry.Tags {
+			pairs = append(pairs, fmt.Sprintf("%s=%s", tag.Key, tag.Value))
+		}
+
+		output.Printf(stdout, "%s %s\n", colors.For(stdout).FieldLabel("Tags:"), strings.Join(pairs, ", "))
 	}
 }
 
@@ -184,7 +203,7 @@ func (p *logPresenter) RenderPatch(stdout, stderr io.Writer, i int, parseJSON, r
 func LogCommand() *cli.Command {
 	return genericlog.Command(genericlog.Config{
 		Usage:     "Show secret version history",
-		ArgsUsage: "<name>",
+		ArgsUsage: argsUsageName,
 		Description: `Display the version history of a secret, showing each version's
 opaque id, state (enabled/disabled), and creation date.
 

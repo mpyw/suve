@@ -21,6 +21,9 @@ import (
 // nounSecret is the command name / noun used across the Key Vault secret commands.
 const nounSecret = "secret"
 
+// argsUsageName is the shared ArgsUsage for single-secret commands.
+const argsUsageName = "<name>"
+
 // Command returns the "azure secret" subcommand group.
 func Command() *cli.Command {
 	return &cli.Command{
@@ -53,6 +56,7 @@ AZURE_KEYVAULT_NAME environment variable.`,
 			CreateCommand(),
 			UpdateCommand(),
 			DeleteCommand(),
+			RestoreCommand(),
 			TagCommand(),
 			UntagCommand(),
 		},

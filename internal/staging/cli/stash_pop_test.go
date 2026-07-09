@@ -26,7 +26,7 @@ func TestStashPopRunner_RunBasic(t *testing.T) {
 		fileStore := testutil.NewMockStore()
 		agentStore := testutil.NewMockStore()
 
-		_ = fileStore.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
+		_ = fileStore.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("test-value"),
 			StagedAt:  time.Now(),
@@ -56,7 +56,7 @@ func TestStashPopRunner_RunBasic(t *testing.T) {
 		fileStore := testutil.NewMockStore()
 		agentStore := testutil.NewMockStore()
 
-		_ = fileStore.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
+		_ = fileStore.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("test-value"),
 			StagedAt:  time.Now(),
@@ -85,12 +85,13 @@ func TestStashPopRunner_RunBasic(t *testing.T) {
 		fileStore := testutil.NewMockStore()
 		agentStore := testutil.NewMockStore()
 
-		_ = agentStore.StageEntry(t.Context(), staging.ServiceParam, "/app/existing", staging.Entry{
+		_ = agentStore.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/existing"}, staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("existing-value"),
 			StagedAt:  time.Now(),
 		})
-		_ = fileStore.StageEntry(t.Context(), staging.ServiceParam, "/app/new", staging.Entry{
+
+		_ = fileStore.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/new"}, staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("new-value"),
 			StagedAt:  time.Now(),
@@ -141,12 +142,13 @@ func TestStashPopRunner_RunBasic(t *testing.T) {
 		fileStore := testutil.NewMockStore()
 		agentStore := testutil.NewMockStore()
 
-		_ = agentStore.StageEntry(t.Context(), staging.ServiceParam, "/app/existing", staging.Entry{
+		_ = agentStore.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/existing"}, staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("existing-value"),
 			StagedAt:  time.Now(),
 		})
-		_ = fileStore.StageEntry(t.Context(), staging.ServiceParam, "/app/new", staging.Entry{
+
+		_ = fileStore.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/new"}, staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("new-value"),
 			StagedAt:  time.Now(),
@@ -170,9 +172,9 @@ func TestStashPopRunner_RunBasic(t *testing.T) {
 		assert.Contains(t, stdout.String(), "merged")
 
 		// Verify both entries exist in agent
-		_, err = agentStore.GetEntry(t.Context(), staging.ServiceParam, "/app/existing", "")
+		_, err = agentStore.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/existing", Namespace: ""})
 		require.NoError(t, err)
-		_, err = agentStore.GetEntry(t.Context(), staging.ServiceParam, "/app/new", "")
+		_, err = agentStore.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/new", Namespace: ""})
 		require.NoError(t, err)
 	})
 
@@ -182,7 +184,7 @@ func TestStashPopRunner_RunBasic(t *testing.T) {
 		fileStore := testutil.NewMockStore()
 		agentStore := testutil.NewMockStore()
 
-		_ = fileStore.StageEntry(t.Context(), staging.ServiceParam, "/app/config", staging.Entry{
+		_ = fileStore.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("test-value"),
 			StagedAt:  time.Now(),
