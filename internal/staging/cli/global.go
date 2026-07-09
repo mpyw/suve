@@ -1,6 +1,8 @@
 package cli
 
 import (
+	"context"
+
 	"github.com/mpyw/suve/internal/staging"
 )
 
@@ -15,6 +17,17 @@ type GlobalServiceSpec struct {
 	ParserFactory staging.ParserFactory
 	// Factory builds a provider-backed strategy for this service.
 	Factory staging.StrategyFactory
+	// ScopeResolver resolves THIS service's staging scope. It is per-service
+	// because a provider's services may live in independent resources with
+	// separate staging buckets: Azure App Configuration (param) is keyed by
+	// store name, Key Vault (secret) by vault name. AWS keeps one account scope
+	// for both. Nil defaults to AWS (AWSScopeResolver).
+	ScopeResolver staging.ScopeResolver
+	// StrategyForNamespace, when set, builds a strategy scoped to a given
+	// namespace so apply/diff act on each staged entry under its own namespace
+	// (Azure App Configuration keeps all namespaces in one staging store). Nil
+	// for services without a namespace axis — the single Factory strategy is used.
+	StrategyForNamespace func(ctx context.Context, namespace string) (staging.FullStrategy, error)
 }
 
 // GlobalConfig configures the provider-wide stage commands so a single set of
@@ -38,8 +51,36 @@ func AWSGlobalConfig(paramCfg, secretCfg CommandConfig) GlobalConfig {
 		ProviderLabel: "AWS",
 		ScopeResolver: AWSScopeResolver,
 		Services: []GlobalServiceSpec{
-			{Service: staging.ServiceParam, ParserFactory: paramCfg.ParserFactory, Factory: paramCfg.Factory},
-			{Service: staging.ServiceSecret, ParserFactory: secretCfg.ParserFactory, Factory: secretCfg.Factory},
+			{Service: staging.ServiceParam, ParserFactory: paramCfg.ParserFactory, Factory: paramCfg.Factory, ScopeResolver: AWSScopeResolver},
+			{Service: staging.ServiceSecret, ParserFactory: secretCfg.ParserFactory, Factory: secretCfg.Factory, ScopeResolver: AWSScopeResolver},
+		},
+	}
+}
+
+// AzureGlobalConfig builds the GlobalConfig for Azure. Unlike AWS, App
+// Configuration (param) and Key Vault (secret) are INDEPENDENT resources with
+// separate staging buckets, so each service carries its own ScopeResolver. The
+// top-level ScopeResolver keys the (single-file) global stash under App
+// Configuration; cross-resource stash is tracked separately (#435).
+func AzureGlobalConfig(paramCfg, secretCfg CommandConfig) GlobalConfig {
+	return GlobalConfig{
+		ProviderLabel: "Azure",
+		ScopeResolver: paramCfg.ScopeResolver,
+		Services: []GlobalServiceSpec{
+			{
+				Service:              staging.ServiceParam,
+				ParserFactory:        paramCfg.ParserFactory,
+				Factory:              paramCfg.Factory,
+				ScopeResolver:        paramCfg.ScopeResolver,
+				StrategyForNamespace: paramCfg.StrategyForNamespace,
+			},
+			{
+				Service:              staging.ServiceSecret,
+				ParserFactory:        secretCfg.ParserFactory,
+				Factory:              secretCfg.Factory,
+				ScopeResolver:        secretCfg.ScopeResolver,
+				StrategyForNamespace: secretCfg.StrategyForNamespace,
+			},
 		},
 	}
 }

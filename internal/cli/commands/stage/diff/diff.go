@@ -27,17 +27,38 @@ import (
 // strategy is nil when no changes are staged for that service and thus no
 // provider client was initialized.
 type ServiceStrategy struct {
-	Service  staging.Service
+	Service staging.Service
+	// Store is this service's own working store (App Configuration and Key Vault
+	// live in separate buckets).
+	Store store.ReadWriteOperator
+	// Strategy is the default (namespace-agnostic) diff strategy.
 	Strategy staging.DiffStrategy
+	// StrategyFor, when set, resolves a strategy per namespace so each App
+	// Configuration entry is diffed under its own namespace. Nil elsewhere.
+	StrategyFor func(namespace string) (staging.DiffStrategy, error)
+	// Entries/Tags are this service's staged changes, pre-listed from its store,
+	// keyed by the (name, namespace) EntryKey.
+	Entries map[staging.EntryKey]staging.Entry
+	Tags    map[staging.EntryKey]staging.TagEntry
+}
+
+// strategyForNamespace returns the strategy scoped to the given namespace, or the
+// default strategy when no per-namespace resolver is configured.
+func (s ServiceStrategy) strategyForNamespace(namespace string) (staging.DiffStrategy, error) {
+	if s.StrategyFor == nil {
+		return s.Strategy, nil
+	}
+
+	return s.StrategyFor(namespace)
 }
 
 // Runner executes the diff command.
 type Runner struct {
-	// Services lists the provider services in stable display order.
+	// Services lists the configured provider services (with staged changes) in
+	// stable display order, each carrying its own store.
 	Services []ServiceStrategy
 	// ProviderLabel is the human-readable provider name (e.g. "AWS").
 	ProviderLabel string
-	Store         store.ReadWriteOperator
 	Stdout        io.Writer
 	Stderr        io.Writer
 }
@@ -81,51 +102,86 @@ EXAMPLES:
 	}
 }
 
-func runAction(ctx context.Context, cmd *cli.Command, cfg stgcli.GlobalConfig) error {
-	store, _, err := stgcli.WorkingStore(ctx, cfg.ScopeResolver)
-	if err != nil {
-		return err
+// workingStoreResolver resolves a service's staging store and scope. It matches
+// stgcli.WorkingStore; tests substitute a fake to exercise skip-unconfigured and
+// store-error paths without touching disk.
+type workingStoreResolver func(
+	ctx context.Context, resolver staging.ScopeResolver,
+) (store.ReadWriteOperator, staging.ResolvedScope, error)
+
+// gatherServices lists each CONFIGURED service's staged changes from its OWN
+// store, skipping any service whose scope is not configured (it can hold no
+// staged state). It returns only services that actually have staged changes.
+// resolve is injected so tests can drive skip-unconfigured and store-error
+// propagation.
+func gatherServices(
+	ctx context.Context, cfg stgcli.GlobalConfig, resolve workingStoreResolver,
+) ([]ServiceStrategy, error) {
+	services := make([]ServiceStrategy, 0, len(cfg.Services))
+
+	for _, spec := range cfg.Services {
+		st, _, err := resolve(ctx, spec.ScopeResolver)
+		if errors.Is(err, staging.ErrServiceNotConfigured) {
+			continue
+		}
+
+		if err != nil {
+			return nil, err
+		}
+
+		entries, err := st.ListEntries(ctx, spec.Service)
+		if err != nil {
+			return nil, err
+		}
+
+		tags, err := st.ListTags(ctx, spec.Service)
+		if err != nil {
+			return nil, err
+		}
+
+		svcEntries := entries[spec.Service]
+		svcTags := tags[spec.Service]
+
+		if len(svcEntries) == 0 && len(svcTags) == 0 {
+			continue
+		}
+
+		strategy, err := spec.Factory(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to initialize %s client: %w", spec.ParserFactory().ServiceName(), err)
+		}
+
+		services = append(services, ServiceStrategy{
+			Service:     spec.Service,
+			Store:       st,
+			Strategy:    strategy,
+			StrategyFor: diffStrategyFor(ctx, spec),
+			Entries:     svcEntries,
+			Tags:        svcTags,
+		})
 	}
 
+	return services, nil
+}
+
+func runAction(ctx context.Context, cmd *cli.Command, cfg stgcli.GlobalConfig) error {
 	opts := Options{
 		ParseJSON: cmd.Bool("parse-json"),
 		NoPager:   cmd.Bool("no-pager"),
 	}
 
-	allEntries, err := store.ListEntries(ctx, "")
+	resolve := func(
+		ctx context.Context, resolver staging.ScopeResolver,
+	) (store.ReadWriteOperator, staging.ResolvedScope, error) {
+		return stgcli.WorkingStore(ctx, resolver)
+	}
+
+	services, err := gatherServices(ctx, cfg, resolve)
 	if err != nil {
 		return err
 	}
 
-	allTags, err := store.ListTags(ctx, "")
-	if err != nil {
-		return err
-	}
-
-	// Initialize a strategy for each service that has staged changes.
-	services := make([]ServiceStrategy, 0, len(cfg.Services))
-	anyChanges := false
-
-	for _, svc := range cfg.Services {
-		has := len(allEntries[svc.Service]) > 0 || len(allTags[svc.Service]) > 0
-
-		var strategy staging.DiffStrategy
-
-		if has {
-			anyChanges = true
-
-			full, err := svc.Factory(ctx)
-			if err != nil {
-				return fmt.Errorf("failed to initialize %s client: %w", svc.ParserFactory().ServiceName(), err)
-			}
-
-			strategy = full
-		}
-
-		services = append(services, ServiceStrategy{Service: svc.Service, Strategy: strategy})
-	}
-
-	if !anyChanges {
+	if len(services) == 0 {
 		output.Warning(cmd.Root().ErrWriter, "nothing staged")
 
 		return nil
@@ -134,7 +190,6 @@ func runAction(ctx context.Context, cmd *cli.Command, cfg stgcli.GlobalConfig) e
 	r := &Runner{
 		Services:      services,
 		ProviderLabel: cfg.ProviderLabel,
-		Store:         store,
 		Stderr:        cmd.Root().ErrWriter,
 	}
 
@@ -145,32 +200,33 @@ func runAction(ctx context.Context, cmd *cli.Command, cfg stgcli.GlobalConfig) e
 	})
 }
 
-// Run executes the diff command.
+// diffStrategyFor adapts a spec's StrategyForNamespace to the per-entry resolver
+// used during diff, or nil when the service has no namespace axis.
+func diffStrategyFor(ctx context.Context, spec stgcli.GlobalServiceSpec) func(string) (staging.DiffStrategy, error) {
+	if spec.StrategyForNamespace == nil {
+		return nil
+	}
+
+	return func(namespace string) (staging.DiffStrategy, error) {
+		return spec.StrategyForNamespace(ctx, namespace)
+	}
+}
+
+// Run executes the diff command over the pre-gathered per-service stores.
 func (r *Runner) Run(ctx context.Context, opts Options) error {
-	allEntries, err := r.Store.ListEntries(ctx, "")
-	if err != nil {
-		return err
-	}
-
-	allTagEntries, err := r.Store.ListTags(ctx, "")
-	if err != nil {
-		return err
-	}
-
 	first := true
 
 	// Process value entries in service order (all entries before any tags).
-	for _, s := range r.Services {
-		if err := r.diffEntries(ctx, opts, s.Strategy, allEntries[s.Service], &first); err != nil {
+	for _, svc := range r.Services {
+		if err := r.diffEntries(ctx, opts, svc, &first); err != nil {
 			return err
 		}
 	}
 
 	// Process tag entries in service order.
-	for _, s := range r.Services {
-		tagEntries := allTagEntries[s.Service]
-		for _, key := range staging.SortedEntryKeys(tagEntries) {
-			tagEntry := tagEntries[key]
+	for _, svc := range r.Services {
+		for _, key := range staging.SortedEntryKeys(svc.Tags) {
+			tagEntry := svc.Tags[key]
 
 			if !first {
 				output.Println(r.Stdout, "")
@@ -178,32 +234,33 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 
 			first = false
 
-			r.outputTagDiff(ctx, s.Strategy, key, tagEntry)
+			r.outputTagDiff(ctx, svc, key, tagEntry)
 		}
 	}
 
 	return nil
 }
 
-// diffEntries processes staged value entries for a single service in sorted order.
-func (r *Runner) diffEntries(
-	ctx context.Context,
-	opts Options,
-	strategy staging.DiffStrategy,
-	entries map[staging.EntryKey]staging.Entry,
-	first *bool,
-) error {
-	// Fetch all current values in parallel.
+// diffEntries processes one service's staged value entries in sorted order. Each
+// entry is keyed by the (name, namespace) EntryKey; it is fetched/unstaged under
+// its own namespace via the per-namespace strategy and this service's store.
+func (r *Runner) diffEntries(ctx context.Context, opts Options, svc ServiceStrategy, first *bool) error {
+	// Fetch all current values in parallel, each under its entry's namespace.
 	results := parallel.ExecuteMap(
 		ctx,
-		entries,
+		svc.Entries,
 		func(ctx context.Context, key staging.EntryKey, _ staging.Entry) (*staging.FetchResult, error) {
+			strategy, err := svc.strategyForNamespace(key.Namespace)
+			if err != nil {
+				return nil, err
+			}
+
 			return strategy.FetchCurrent(ctx, key.Name)
 		},
 	)
 
-	for _, key := range staging.SortedEntryKeys(entries) {
-		entry := entries[key]
+	for _, key := range staging.SortedEntryKeys(svc.Entries) {
+		entry := svc.Entries[key]
 		result := results[key]
 
 		if result.Err != nil {
@@ -217,7 +274,7 @@ func (r *Runner) diffEntries(
 			case staging.OperationDelete:
 				if notFound {
 					// Item doesn't exist remotely anymore - deletion already applied.
-					if err := r.Store.UnstageEntry(ctx, strategy.Service(), key); err != nil {
+					if err := svc.Store.UnstageEntry(ctx, svc.Service, key); err != nil {
 						return fmt.Errorf("failed to unstage %s: %w", key.Name, err)
 					}
 
@@ -247,7 +304,7 @@ func (r *Runner) diffEntries(
 			case staging.OperationUpdate:
 				if notFound {
 					// Item doesn't exist remotely anymore - staged update is invalid.
-					if err := r.Store.UnstageEntry(ctx, strategy.Service(), key); err != nil {
+					if err := svc.Store.UnstageEntry(ctx, svc.Service, key); err != nil {
 						return fmt.Errorf("failed to unstage %s: %w", key.Name, err)
 					}
 
@@ -268,7 +325,7 @@ func (r *Runner) diffEntries(
 
 		*first = false
 
-		if err := r.outputDiff(ctx, opts, strategy, key, entry, result.Value); err != nil {
+		if err := r.outputDiff(ctx, opts, svc, key, entry, result.Value); err != nil {
 			return err
 		}
 	}
@@ -279,12 +336,12 @@ func (r *Runner) diffEntries(
 func (r *Runner) outputDiff(
 	ctx context.Context,
 	opts Options,
-	strategy staging.DiffStrategy,
+	svc ServiceStrategy,
 	key staging.EntryKey,
 	entry staging.Entry,
 	fr *staging.FetchResult,
 ) error {
-	name := diffDisplayName(key)
+	name := key.Name
 	remoteValue := fr.Value
 	stagedValue := lo.FromPtr(entry.Value)
 
@@ -299,7 +356,7 @@ func (r *Runner) outputDiff(
 	// compares raw values. It also never applies to a delete (deleting is not a
 	// no-op just because the current value is the empty string).
 	if entry.Operation != staging.OperationDelete && remoteValue == stagedValue {
-		if err := r.Store.UnstageEntry(ctx, strategy.Service(), key); err != nil {
+		if err := svc.Store.UnstageEntry(ctx, svc.Service, key); err != nil {
 			return fmt.Errorf("failed to unstage %s: %w", name, err)
 		}
 
@@ -314,12 +371,13 @@ func (r *Runner) outputDiff(
 		displayRemote, displayStaged = jsonutil.TryFormatOrWarn2(remoteValue, stagedValue, r.Stderr, name)
 	}
 
-	label1 := fmt.Sprintf("%s%s (%s)", name, fr.Identifier, r.ProviderLabel)
+	disp := diffDisplayName(key)
+	label1 := fmt.Sprintf("%s%s (%s)", disp, fr.Identifier, r.ProviderLabel)
 	label2 := fmt.Sprintf(lo.Ternary(
 		entry.Operation == staging.OperationDelete,
 		"%s (staged for deletion)",
 		"%s (staged)",
-	), name)
+	), disp)
 
 	diff := output.Diff(r.Stdout, label1, label2, displayRemote, displayStaged)
 
@@ -340,7 +398,6 @@ func (r *Runner) outputDiff(
 }
 
 func (r *Runner) outputDiffCreate(opts Options, key staging.EntryKey, entry staging.Entry) error {
-	name := diffDisplayName(key)
 	stagedValue := lo.FromPtr(entry.Value)
 
 	// Format as JSON if enabled
@@ -350,8 +407,9 @@ func (r *Runner) outputDiffCreate(opts Options, key staging.EntryKey, entry stag
 		}
 	}
 
-	label1 := fmt.Sprintf("%s (not in %s)", name, r.ProviderLabel)
-	label2 := fmt.Sprintf("%s (staged for creation)", name)
+	disp := diffDisplayName(key)
+	label1 := fmt.Sprintf("%s (not in %s)", disp, r.ProviderLabel)
+	label2 := fmt.Sprintf("%s (staged for creation)", disp)
 
 	diff := output.Diff(r.Stdout, label1, label2, "", stagedValue)
 	output.Print(r.Stdout, diff)
@@ -379,7 +437,7 @@ func (r *Runner) outputMetadata(entry staging.Entry) {
 	}
 }
 
-func (r *Runner) outputTagDiff(ctx context.Context, strategy staging.DiffStrategy, key staging.EntryKey, tagEntry staging.TagEntry) {
+func (r *Runner) outputTagDiff(ctx context.Context, svc ServiceStrategy, key staging.EntryKey, tagEntry staging.TagEntry) {
 	output.Printf(r.Stdout, "%s %s (staged tag changes)\n", colors.For(r.Stdout).Info("Tags:"), diffDisplayName(key))
 
 	if len(tagEntry.Add) > 0 {
@@ -392,11 +450,10 @@ func (r *Runner) outputTagDiff(ctx context.Context, strategy staging.DiffStrateg
 	}
 
 	if tagEntry.Remove.Len() > 0 {
-		// Fetch current tag values from the provider. A nil strategy (no staged
-		// value changes for this service, so no client) or a fetch error both
-		// yield a nil map.
+		// Fetch current tag values under this entry's namespace. A resolver error
+		// or a fetch error both yield a nil map (keys are then shown without values).
 		var currentTags map[string]string
-		if strategy != nil {
+		if strategy, err := svc.strategyForNamespace(key.Namespace); err == nil && strategy != nil {
 			currentTags, _ = strategy.FetchCurrentTags(ctx, key.Name)
 		}
 

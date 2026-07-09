@@ -3,6 +3,7 @@ package internal
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/provider/aws"
@@ -263,8 +264,9 @@ func AzureAppConfigParamStrategyFactory(ctx context.Context) (staging.FullStrate
 func AzureKeyVaultStagingScopeResolver(ctx context.Context) (staging.ResolvedScope, error) {
 	sc := azureScopeFromContext(ctx)
 	if sc.vaultName == "" {
-		return staging.ResolvedScope{}, errors.New(
-			"no Azure Key Vault specified: set --vault-name or the AZURE_KEYVAULT_NAME environment variable",
+		return staging.ResolvedScope{}, fmt.Errorf(
+			"%w: no Azure Key Vault specified: set --vault-name or the AZURE_KEYVAULT_NAME environment variable",
+			staging.ErrServiceNotConfigured,
 		)
 	}
 
@@ -280,8 +282,9 @@ func AzureKeyVaultStagingScopeResolver(ctx context.Context) (staging.ResolvedSco
 func AzureAppConfigStagingScopeResolver(ctx context.Context) (staging.ResolvedScope, error) {
 	sc := azureScopeFromContext(ctx)
 	if sc.storeName == "" {
-		return staging.ResolvedScope{}, errors.New(
-			"no Azure App Configuration store specified: set --store-name or the AZURE_APPCONFIG_NAME environment variable",
+		return staging.ResolvedScope{}, fmt.Errorf(
+			"%w: no Azure App Configuration store specified: set --store-name or the AZURE_APPCONFIG_NAME environment variable",
+			staging.ErrServiceNotConfigured,
 		)
 	}
 

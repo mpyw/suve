@@ -2,9 +2,18 @@ package staging
 
 import (
 	"context"
+	"errors"
 
 	"github.com/mpyw/suve/internal/provider"
 )
+
+// ErrServiceNotConfigured is returned by a ScopeResolver when the active scope
+// does not name this service's backing resource (e.g. no Azure Key Vault while
+// only App Configuration is configured). A single-service command treats it as
+// a fatal usage error (with the resolver's descriptive message); a provider-wide
+// command treats it as "skip this service" — an unconfigured service can hold no
+// staged state, since staging is keyed by the resource name.
+var ErrServiceNotConfigured = errors.New("staging service not configured")
 
 // ResolvedScope is the outcome of resolving the active provider's staging scope:
 // the provider.Scope used to key on-disk staging state, plus a human-readable

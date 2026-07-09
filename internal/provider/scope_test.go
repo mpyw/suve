@@ -100,6 +100,15 @@ func TestScope_SupportsService(t *testing.T) {
 			wantSecret: false,
 		},
 		{
+			// A scope carrying BOTH a store and a vault supports BOTH services —
+			// they are independent Azure resources (regression guard: a vault must
+			// not suppress param support).
+			name:       "azure both vault and store",
+			scope:      provider.Scope{Provider: provider.ProviderAzure, StoreName: "store1", VaultName: "vault1"},
+			wantParam:  true,
+			wantSecret: true,
+		},
+		{
 			name:       "unknown supports nothing",
 			scope:      provider.Scope{},
 			wantParam:  false,

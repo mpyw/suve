@@ -2,7 +2,9 @@ package status_test
 
 import (
 	"bytes"
+	"context"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -448,4 +450,56 @@ func awsServices() []stgcli.GlobalServiceSpec {
 		{Service: staging.ServiceParam, ParserFactory: staging.ParamParserFactory},
 		{Service: staging.ServiceSecret, ParserFactory: staging.SecretParserFactory},
 	}
+}
+
+// notConfiguredResolver mimics an Azure scope resolver whose resource is not
+// named (e.g. no --vault-name), signalling the service should be skipped.
+func notConfiguredResolver(_ context.Context) (staging.ResolvedScope, error) {
+	return staging.ResolvedScope{}, fmt.Errorf("%w: no resource", staging.ErrServiceNotConfigured)
+}
+
+// TestRun_SkipUnconfiguredService verifies that a service whose scope is not
+// configured is skipped (an unconfigured service can hold no staged state), so a
+// provider like Azure with only one of Key Vault / App Configuration connected
+// reports no error. Store is nil so each spec resolves via its ScopeResolver.
+func TestRun_SkipUnconfiguredService(t *testing.T) {
+	t.Parallel()
+
+	var buf bytes.Buffer
+
+	r := &status.Runner{
+		Services: []stgcli.GlobalServiceSpec{
+			{Service: staging.ServiceParam, ParserFactory: staging.ParamParserFactory, ScopeResolver: notConfiguredResolver},
+			{Service: staging.ServiceSecret, ParserFactory: staging.SecretParserFactory, ScopeResolver: notConfiguredResolver},
+		},
+		Stdout: &buf,
+		Stderr: &bytes.Buffer{},
+	}
+
+	err := r.Run(t.Context(), status.Options{})
+	require.NoError(t, err)
+	assert.Contains(t, buf.String(), "No changes staged")
+}
+
+// TestRun_ResolverErrorPropagates verifies a non-sentinel resolver error is not
+// swallowed by the skip path.
+func TestRun_ResolverErrorPropagates(t *testing.T) {
+	t.Parallel()
+
+	wantErr := errors.New("boom")
+
+	var buf bytes.Buffer
+
+	r := &status.Runner{
+		Services: []stgcli.GlobalServiceSpec{
+			{Service: staging.ServiceParam, ParserFactory: staging.ParamParserFactory, ScopeResolver: func(_ context.Context) (staging.ResolvedScope, error) {
+				return staging.ResolvedScope{}, wantErr
+			}},
+		},
+		Stdout: &buf,
+		Stderr: &bytes.Buffer{},
+	}
+
+	err := r.Run(t.Context(), status.Options{})
+	require.ErrorIs(t, err, wantErr)
 }

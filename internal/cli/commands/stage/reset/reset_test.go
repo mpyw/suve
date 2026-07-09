@@ -2,7 +2,9 @@ package reset_test
 
 import (
 	"bytes"
+	"context"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -326,4 +328,55 @@ func awsServices() []stgcli.GlobalServiceSpec {
 		{Service: staging.ServiceParam, ParserFactory: staging.ParamParserFactory},
 		{Service: staging.ServiceSecret, ParserFactory: staging.SecretParserFactory},
 	}
+}
+
+// notConfiguredResolver mimics an Azure scope resolver whose resource is not
+// named (e.g. no --store-name), signalling the service should be skipped.
+func notConfiguredResolver(_ context.Context) (staging.ResolvedScope, error) {
+	return staging.ResolvedScope{}, fmt.Errorf("%w: no resource", staging.ErrServiceNotConfigured)
+}
+
+// TestRun_SkipUnconfiguredService verifies reset skips services whose scope is
+// not configured (an unconfigured service can hold no staged state), so a
+// provider with only one service connected reports no error rather than failing.
+func TestRun_SkipUnconfiguredService(t *testing.T) {
+	t.Parallel()
+
+	var buf bytes.Buffer
+
+	r := &reset.Runner{
+		Services: []stgcli.GlobalServiceSpec{
+			{Service: staging.ServiceParam, ParserFactory: staging.ParamParserFactory, ScopeResolver: notConfiguredResolver},
+			{Service: staging.ServiceSecret, ParserFactory: staging.SecretParserFactory, ScopeResolver: notConfiguredResolver},
+		},
+		Stdout: &buf,
+		Stderr: &bytes.Buffer{},
+	}
+
+	err := r.Run(t.Context())
+	require.NoError(t, err)
+	assert.Contains(t, buf.String(), "No changes staged")
+}
+
+// TestRun_ResolverErrorPropagates verifies a non-sentinel resolver error is not
+// swallowed by the skip path.
+func TestRun_ResolverErrorPropagates(t *testing.T) {
+	t.Parallel()
+
+	wantErr := errors.New("boom")
+
+	var buf bytes.Buffer
+
+	r := &reset.Runner{
+		Services: []stgcli.GlobalServiceSpec{
+			{Service: staging.ServiceParam, ParserFactory: staging.ParamParserFactory, ScopeResolver: func(_ context.Context) (staging.ResolvedScope, error) {
+				return staging.ResolvedScope{}, wantErr
+			}},
+		},
+		Stdout: &buf,
+		Stderr: &bytes.Buffer{},
+	}
+
+	err := r.Run(t.Context())
+	require.ErrorIs(t, err, wantErr)
 }
