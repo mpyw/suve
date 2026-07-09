@@ -279,7 +279,9 @@ func (a *App) SecretUpdate(name, value string) (*SecretUpdateResult, error) {
 	}, nil
 }
 
-// SecretDelete deletes a secret (with recovery window).
+// SecretDelete deletes a secret (soft delete; a recovery-window date is
+// surfaced only for AWS Secrets Manager — Google Cloud deletes immediately and
+// Azure Key Vault retention is governed by vault policy).
 func (a *App) SecretDelete(name string, force bool) (*SecretDeleteResult, error) {
 	store, err := a.secretStore()
 	if err != nil {

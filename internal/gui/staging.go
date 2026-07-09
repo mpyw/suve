@@ -728,7 +728,7 @@ func (a *App) StagingCheckStatus(service, name, namespace string) (*StagingCheck
 	return result, nil
 }
 
-// StagingDiff shows diff between staged changes and AWS.
+// StagingDiff shows diff between staged changes and the provider's current values.
 func (a *App) StagingDiff(service string, name string) (*StagingDiffResult, error) {
 	store, err := a.getStagingStore(kindForService(service))
 	if err != nil {

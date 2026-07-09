@@ -88,8 +88,8 @@ func DiffCommand() *cli.Command {
 		Description: `Compare two App Configuration settings in unified diff format.
 
 App Configuration is UNVERSIONED, so diff compares two distinct keys rather than
-two versions of one key. Version specifiers (#VERSION, ~SHIFT, :LABEL) are
-rejected with a clear error.
+two versions of one key. #, ~, and : in a key are literal characters, not
+version specifiers.
 
 EXAMPLES:
   suve azure param diff key-a key-b                    Compare two settings
