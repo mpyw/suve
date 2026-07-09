@@ -307,7 +307,9 @@ func TestTag(t *testing.T) {
 			}}, nil
 		},
 		updateFunc: func(_ context.Context, _, version string, params updParams) (updResp, error) {
-			assert.Empty(t, version) // current version
+			// Must target the concrete current version, NOT an empty version:
+			// PATCH /secrets/{name}/ (empty version) is rejected 405 by Key Vault.
+			assert.Equal(t, "v1", version)
 
 			written = params.Tags
 
@@ -333,7 +335,9 @@ func TestUntag(t *testing.T) {
 				Tags: map[string]*string{"env": lo.ToPtr("prod"), "team": lo.ToPtr("backend")},
 			}}, nil
 		},
-		updateFunc: func(_ context.Context, _, _ string, params updParams) (updResp, error) {
+		updateFunc: func(_ context.Context, _, version string, params updParams) (updResp, error) {
+			assert.Equal(t, "v1", version) // concrete version, never empty (405)
+
 			written = params.Tags
 
 			return updResp{}, nil
