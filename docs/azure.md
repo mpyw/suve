@@ -441,7 +441,7 @@ suve azure secret untag my-api-key env team --vault-name my-vault
 Access to Azure App Configuration key-values.
 
 > [!IMPORTANT]
-> App Configuration is **UNVERSIONED**: each key (with the default label) holds a single current value with **no history**. Version specifiers (`#VERSION`, `~SHIFT`, `:LABEL`) are **rejected with a clear error**. Set the store with `--store-name` or `AZURE_APPCONFIG_NAME`.
+> App Configuration is **UNVERSIONED**: each key (with the default label) holds a single current value with **no history**. `#`, `~`, and `:` are valid key characters — the whole argument is the literal key name, not a version specifier — so nothing is rejected at parse time; only `log` reports that history is unsupported. Set the store with `--store-name` or `AZURE_APPCONFIG_NAME`.
 
 Because App Configuration has no versions, several commands behave differently from their AWS / Key Vault / Google Cloud counterparts:
 
@@ -466,7 +466,7 @@ suve azure param show [options] <key>
 
 | Argument | Description |
 |----------|-------------|
-| `key` | Setting key (no version specifier -- specifiers are rejected) |
+| `key` | Setting key (the literal key name; `#`/`~`/`:` are valid key characters, not version specifiers) |
 
 **Options:**
 
@@ -491,7 +491,7 @@ suve azure param show --output=json my-key --store-name my-store
 ```
 
 > [!NOTE]
-> Version specifiers (`#VERSION`, `~SHIFT`, `:LABEL`) are rejected with a clear error because App Configuration is unversioned.
+> `#`, `~`, and `:` are valid key characters — the whole argument is the literal key name, not a version specifier — because App Configuration is unversioned.
 
 ---
 
@@ -525,7 +525,7 @@ suve azure param diff [options] <key1> [key2]
 ```
 
 > [!NOTE]
-> App Configuration is unversioned, so `diff` compares **two distinct keys** rather than two versions of one key. Version specifiers (`#VERSION`, `~SHIFT`, `:LABEL`) are rejected with a clear error.
+> App Configuration is unversioned, so `diff` compares **two distinct keys** rather than two versions of one key. `#`/`~`/`:` in a key are literal characters, not version specifiers.
 
 **Arguments:**
 
