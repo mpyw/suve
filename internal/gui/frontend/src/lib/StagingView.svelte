@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { StagingAddTag, StagingApply, StagingCancelAddTag, StagingCancelRemoveTag, StagingDiff, StagingDrain, StagingDrop, StagingEdit, StagingFileStatus, StagingPersist, StagingReset, StagingUnstage } from '../../wailsjs/go/gui/App';
-  import type { gui } from '../../wailsjs/go/models';
+  import { gui } from '../../wailsjs/go/models';
   import Modal from './Modal.svelte';
   import PassphraseModal from './PassphraseModal.svelte';
   import { withRetry } from './retry';
@@ -134,9 +134,38 @@
     modalError = '';
     applyResult = null;
     try {
-      const result = await StagingApply(applyService, ignoreConflicts);
-      applyResult = result;
-      if (result.entryFailed === 0 && result.tagFailed === 0 && result.conflicts?.length === 0) {
+      // "Apply All" (applyService === 'all') applies every service with staged
+      // changes in one click — each service is a separate backend call (Azure
+      // App Configuration and Key Vault have independent scopes), so aggregate
+      // the per-service results into one. Per-section apply passes a concrete
+      // service and applies just that one.
+      const targets = applyService === 'all' ? stagedServices() : [applyService];
+
+      const merged = new gui.StagingApplyResult({
+        serviceName: getServiceName(applyService),
+        entryResults: [],
+        tagResults: [],
+        conflicts: [],
+        entrySucceeded: 0,
+        entryFailed: 0,
+        tagSucceeded: 0,
+        tagFailed: 0,
+      });
+
+      for (const svc of targets) {
+        const r = await StagingApply(svc, ignoreConflicts);
+        merged.entrySucceeded += r.entrySucceeded;
+        merged.entryFailed += r.entryFailed;
+        merged.tagSucceeded += r.tagSucceeded;
+        merged.tagFailed += r.tagFailed;
+        // The backend marshals empty slices as null, so guard every spread.
+        merged.conflicts = [...(merged.conflicts ?? []), ...(r.conflicts ?? [])];
+        merged.entryResults = [...merged.entryResults, ...(r.entryResults ?? [])];
+        merged.tagResults = [...merged.tagResults, ...(r.tagResults ?? [])];
+      }
+
+      applyResult = merged;
+      if (merged.entryFailed === 0 && merged.tagFailed === 0 && merged.conflicts?.length === 0) {
         await loadStatus();
       }
     } catch (e) {
@@ -175,7 +204,18 @@
   }
 
   function getServiceName(service: string): string {
+    if (service === 'all') return 'all services';
     return service === 'param' ? paramLabel : secretLabel;
+  }
+
+  // Services that currently have staged changes (entries or tags), in display
+  // order. Drives "Apply All" so a single click applies every service, not just
+  // the first non-empty one.
+  function stagedServices(): string[] {
+    const targets: string[] = [];
+    if (paramEntries.length > 0 || paramTagEntries.length > 0) targets.push('param');
+    if (secretEntries.length > 0 || secretTagEntries.length > 0) targets.push('secret');
+    return targets;
   }
 
   // Edit modal
@@ -510,7 +550,7 @@
     <div class="actions-center">
       <button
         class="btn-action btn-apply"
-        onclick={() => openApplyModal((paramEntries.length > 0 || paramTagEntries.length > 0) ? 'param' : 'secret')}
+        onclick={() => openApplyModal('all')}
         disabled={paramEntries.length === 0 && secretEntries.length === 0 && paramTagEntries.length === 0 && secretTagEntries.length === 0}
       >
         Apply All

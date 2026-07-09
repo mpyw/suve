@@ -1179,11 +1179,15 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
           currentBucket().secret = [];
           currentBucket().secretTags = [];
         }
+        // Mirror the Go backend faithfully: empty slices marshal to null (not
+        // []), so the frontend must guard spreads/reads. Returning [] here would
+        // hide those bugs (this is exactly how the "Apply All" spread crash
+        // slipped past the mock once).
         return {
           serviceName: service,
-          entryResults: staged.map((s: any) => ({ name: s.name, status: s.operation === 'delete' ? 'deleted' : 'updated' })),
-          tagResults: tagStaged.map((t: any) => ({ name: t.name, status: 'updated' })),
-          conflicts: [],
+          entryResults: entryCount > 0 ? staged.map((s: any) => ({ name: s.name, status: s.operation === 'delete' ? 'deleted' : 'updated' })) : null,
+          tagResults: tagCount > 0 ? tagStaged.map((t: any) => ({ name: t.name, status: 'updated' })) : null,
+          conflicts: null,
           entrySucceeded: entryCount,
           entryFailed: 0,
           tagSucceeded: tagCount,
