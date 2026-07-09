@@ -179,15 +179,18 @@ func TestAzureKeyVault_FullWorkflow(t *testing.T) {
 }
 
 // TestAzureKeyVault_SoftDelete exercises soft-delete recovery: delete (soft) →
-// restore → the secret is readable again; then delete --force → purge, and it is
-// gone for good. Mirrors AWS Secrets Manager's delete/restore semantics.
+// restore → the secret is readable again. Mirrors AWS Secrets Manager's
+// delete/restore semantics. Force-delete/purge is intentionally unsupported for
+// Key Vault, so there is nothing to exercise here.
 func TestAzureKeyVault_SoftDelete(t *testing.T) {
 	setupAzureKeyVault(t)
 	setupTempHome(t)
 
 	const name = "suve-e2e-kv-softdelete"
 
-	cleanup := func() { _, _ = runAzureSecret(t, "delete", "--yes", "--force", name) }
+	// Best-effort cleanup: delete (soft) then restore-and-delete is unnecessary; a
+	// plain delete is enough to reset for the next run.
+	cleanup := func() { _, _ = runAzureSecret(t, "delete", "--yes", name) }
 	cleanup()
 	t.Cleanup(cleanup)
 
@@ -208,24 +211,5 @@ func TestAzureKeyVault_SoftDelete(t *testing.T) {
 		stdout, err := runAzureSecret(t, "show", "--raw", name)
 		require.NoError(t, err)
 		assert.Equal(t, "v1", stdout)
-	})
-
-	t.Run("force-delete-purges", func(t *testing.T) {
-		_, err := runAzureSecret(t, "delete", "--yes", "--force", name)
-		if err != nil && strings.Contains(err.Error(), "cannot be purged") {
-			// lowkey-vault rejects immediate purge (purge-protection-like). The
-			// delete+purge sequence is correct for real Azure and is covered by the
-			// keyvault adapter unit test; skip the emulator assertion.
-			t.Skip("emulator does not support purge; force-delete/purge covered by unit tests")
-		}
-
-		require.NoError(t, err)
-
-		// Purged: gone, and NOT restorable.
-		_, err = runAzureSecret(t, "show", "--raw", name)
-		require.Error(t, err)
-
-		_, err = runAzureSecret(t, "restore", name)
-		require.Error(t, err, "a purged secret cannot be restored")
 	})
 }

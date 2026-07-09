@@ -202,10 +202,11 @@ func (a *App) Capabilities() []ProviderCapability {
 				{
 					Service: serviceSecret, DisplayName: "Key Vault",
 					HasVersionHistory: true, HasVersionSpecifiers: true, HasTags: true, TagsPerVersion: true, HasRestore: true,
-					// HasForceDelete: purge (PurgeDeletedSecret) skips the recovery
-					// window. HasRecoveryWindow stays false: Key Vault's retention is a
-					// vault property (softDeleteRetentionInDays), not chosen per delete.
-					HasStaging: true, HasForceDelete: true, HasRecoveryWindow: false,
+					// Force-delete (purge) is unsupported: Key Vault retention is a vault
+					// property (softDeleteRetentionInDays), not a per-delete choice, and
+					// staged deletes can't carry it — so deletes are always soft (Restore
+					// recovers them). HasForceDelete/HasRecoveryWindow both stay false.
+					HasStaging: true, HasForceDelete: false, HasRecoveryWindow: false,
 				},
 			},
 		},

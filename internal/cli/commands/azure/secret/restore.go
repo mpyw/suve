@@ -34,7 +34,7 @@ func RestoreCommand() *cli.Command {
 		Description: `Recover a soft-deleted Key Vault secret (RecoverDeletedSecret).
 
 Works while the secret is within the vault's soft-delete retention window and
-has not been purged. A secret deleted with --force (purged) cannot be restored.
+has not been purged.
 
 EXAMPLES:
    suve azure secret restore my-secret    Recover a soft-deleted secret`,

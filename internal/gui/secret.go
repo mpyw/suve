@@ -290,8 +290,10 @@ func (a *App) SecretDelete(name string, force bool) (*SecretDeleteResult, error)
 
 	var options []provider.DeleteOption
 	if force {
-		// Neutral force-delete: AWS maps it to ForceDeleteWithoutRecovery, Azure
-		// Key Vault soft-deletes then purges. One option works for both.
+		// Force-delete is AWS Secrets Manager only (mapped to
+		// ForceDeleteWithoutRecovery); the frontend hides the checkbox elsewhere
+		// (hasForceDelete=false), so force is never set for Key Vault or Google
+		// Cloud, which soft-delete/retain by policy instead.
 		options = append(options, provider.ForceDelete{})
 	}
 

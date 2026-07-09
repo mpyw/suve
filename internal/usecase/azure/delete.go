@@ -11,9 +11,6 @@ import (
 // DeleteInput holds input for the delete use case.
 type DeleteInput struct {
 	Name string
-	// Options are passed through to the provider (e.g. provider.ForceDelete to
-	// purge a Key Vault secret immediately instead of soft-deleting).
-	Options []provider.DeleteOption
 }
 
 // DeleteOutput holds the result of the delete use case.
@@ -43,7 +40,7 @@ func (u *DeleteUseCase) GetCurrentValue(ctx context.Context, name string) (strin
 
 // Execute runs the delete use case.
 func (u *DeleteUseCase) Execute(ctx context.Context, input DeleteInput) (*DeleteOutput, error) {
-	if err := u.Store.Delete(ctx, input.Name, input.Options...); err != nil {
+	if err := u.Store.Delete(ctx, input.Name); err != nil {
 		return nil, fmt.Errorf("failed to delete entry: %w", err)
 	}
 

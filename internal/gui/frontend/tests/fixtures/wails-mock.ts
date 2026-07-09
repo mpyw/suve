@@ -275,7 +275,7 @@ export const defaultCapabilities: ProviderCapability[] = [
     scopeFields: [],
     services: [
       { service: 'param', displayName: 'App Configuration', hasVersionHistory: false, hasVersionSpecifiers: false, hasTags: true, tagsPerVersion: false, hasRestore: false, hasStaging: true, hasForceDelete: false, hasRecoveryWindow: false, hasNamespaces: true },
-      { service: 'secret', displayName: 'Key Vault', hasVersionHistory: true, hasVersionSpecifiers: true, hasTags: true, tagsPerVersion: true, hasRestore: true, hasStaging: true, hasForceDelete: true, hasRecoveryWindow: false, hasNamespaces: false },
+      { service: 'secret', displayName: 'Key Vault', hasVersionHistory: true, hasVersionSpecifiers: true, hasTags: true, tagsPerVersion: true, hasRestore: true, hasStaging: true, hasForceDelete: false, hasRecoveryWindow: false, hasNamespaces: false },
     ],
   },
 ];

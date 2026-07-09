@@ -48,7 +48,6 @@ type Client interface {
 	) (azsecrets.SetSecretResponse, error)
 	DeleteSecret(ctx context.Context, name string) (azsecrets.DeleteSecretResponse, error)
 	RecoverDeletedSecret(ctx context.Context, name string) (azsecrets.RecoverDeletedSecretResponse, error)
-	PurgeDeletedSecret(ctx context.Context, name string) (azsecrets.PurgeDeletedSecretResponse, error)
 	UpdateSecretProperties(
 		ctx context.Context, name, version string, params azsecrets.UpdateSecretPropertiesParameters,
 	) (azsecrets.UpdateSecretPropertiesResponse, error)
@@ -56,8 +55,9 @@ type Client interface {
 	ListSecretPropertiesVersions(ctx context.Context, name string) ([]*azsecrets.SecretProperties, error)
 }
 
-// Store is the Key Vault implementation of provider.Store. Like the Google
-// Cloud secret store it implements neither Restorer nor Describer.
+// Store is the Key Vault implementation of provider.Store. It also implements
+// the optional Restorer capability (soft-delete recovery); it does not
+// implement Describer.
 type Store struct {
 	client Client
 }
@@ -264,30 +264,13 @@ func (s *Store) Restore(ctx context.Context, name string) error {
 	return nil
 }
 
-// Delete deletes a secret. Key Vault delete is a soft-delete when the vault has
-// soft-delete enabled. provider.ForceDelete makes it permanent immediately, the
-// way AWS Secrets Manager's ForceDeleteWithoutRecovery does: soft-delete, then
-// purge (PurgeDeletedSecret) so no recovery window remains. Other delete options
-// are ignored (Key Vault has no per-delete recovery window — that is a vault
-// property).
-func (s *Store) Delete(ctx context.Context, name string, opts ...provider.DeleteOption) error {
-	force := false
-
-	for _, opt := range opts {
-		if _, ok := opt.(provider.ForceDelete); ok {
-			force = true
-		}
-	}
-
-	_, err := s.client.DeleteSecret(ctx, name)
-	if err != nil {
+// Delete soft-deletes a secret when the vault has soft-delete enabled (the
+// default); use Restore to recover it within the vault's retention window. All
+// delete options are ignored: Key Vault has no per-delete recovery window (that
+// is a vault property), and force-delete/purge is intentionally unsupported.
+func (s *Store) Delete(ctx context.Context, name string, _ ...provider.DeleteOption) error {
+	if _, err := s.client.DeleteSecret(ctx, name); err != nil {
 		return mapError(err, name, "delete secret")
-	}
-
-	if force {
-		if _, err := s.client.PurgeDeletedSecret(ctx, name); err != nil {
-			return mapError(err, name, "purge secret")
-		}
 	}
 
 	return nil

@@ -11,7 +11,6 @@ import (
 	cliinternal "github.com/mpyw/suve/internal/cli/commands/internal"
 	"github.com/mpyw/suve/internal/cli/confirm"
 	"github.com/mpyw/suve/internal/cli/output"
-	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/usecase/azure"
 )
 
@@ -24,8 +23,7 @@ type DeleteRunner struct {
 
 // DeleteOptions holds the options for the delete command.
 type DeleteOptions struct {
-	Name  string
-	Force bool
+	Name string
 }
 
 // DeleteCommand returns the Azure Key Vault delete command.
@@ -39,20 +37,15 @@ func DeleteCommand() *cli.Command {
 
 When the vault has soft-delete enabled, the secret is recoverable within the
 vault's retention window (use 'suve azure secret restore'); otherwise deletion
-is permanent. --force purges immediately, skipping the recovery window.
+is permanent.
 
 EXAMPLES:
    suve azure secret delete my-secret          Soft-delete (with confirmation)
-   suve azure secret delete --yes my-secret    Soft-delete without confirmation
-   suve azure secret delete --force my-secret  Delete and purge (no recovery)`,
+   suve azure secret delete --yes my-secret    Soft-delete without confirmation`,
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
 				Name:  "yes",
 				Usage: "Skip confirmation prompt",
-			},
-			&cli.BoolFlag{
-				Name:  "force",
-				Usage: "Purge immediately, skipping the recovery window (no recovery)",
 			},
 		},
 		Action: deleteAction,
@@ -105,27 +98,17 @@ func deleteAction(ctx context.Context, cmd *cli.Command) error {
 		Stderr:  cmd.Root().ErrWriter,
 	}
 
-	return r.Run(ctx, DeleteOptions{Name: name, Force: cmd.Bool("force")})
+	return r.Run(ctx, DeleteOptions{Name: name})
 }
 
 // Run executes the delete command.
 func (r *DeleteRunner) Run(ctx context.Context, opts DeleteOptions) error {
-	var options []provider.DeleteOption
-	if opts.Force {
-		// Key Vault soft-deletes then purges; the recovery window is skipped.
-		options = append(options, provider.ForceDelete{})
-	}
-
-	result, err := r.UseCase.Execute(ctx, azure.DeleteInput{Name: opts.Name, Options: options})
+	result, err := r.UseCase.Execute(ctx, azure.DeleteInput{Name: opts.Name})
 	if err != nil {
 		return err
 	}
 
-	if opts.Force {
-		output.Success(r.Stdout, "Deleted and purged secret %s", result.Name)
-	} else {
-		output.Success(r.Stdout, "Deleted secret %s", result.Name)
-	}
+	output.Success(r.Stdout, "Deleted secret %s", result.Name)
 
 	return nil
 }
