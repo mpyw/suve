@@ -48,8 +48,19 @@ func (s ServiceApply) strategyForNamespace(namespace string) (staging.ApplyStrat
 
 // serviceConflictCheck holds entries and strategy for a single service's conflict checking.
 type serviceConflictCheck struct {
-	entries  map[staging.EntryKey]staging.Entry
-	strategy staging.ApplyStrategy
+	serviceName string
+	entries     map[staging.EntryKey]staging.Entry
+	strategy    staging.ApplyStrategy
+}
+
+// conflictItem identifies a conflicting staged entry, qualified by its service.
+// Conflicts are tracked per (service, key) rather than per key alone so two
+// services staging the same (name, namespace) — e.g. an SSM param and a Secrets
+// Manager secret both named "foo" — are counted and reported separately instead
+// of collapsing into one.
+type conflictItem struct {
+	serviceName string
+	key         staging.EntryKey
 }
 
 // Runner executes the apply command.
@@ -102,33 +113,39 @@ EXAMPLES:
 	}
 }
 
-func runAction(ctx context.Context, cmd *cli.Command, cfg stgcli.GlobalConfig) error {
-	var (
-		svcs        []ServiceApply
-		targets     []string
-		totalStaged int
-	)
+// workingStoreResolver resolves a service's staging store and scope. It matches
+// stgcli.WorkingStore; tests substitute a fake to exercise skip-unconfigured and
+// store-error paths without touching disk.
+type workingStoreResolver func(
+	ctx context.Context, resolver staging.ScopeResolver,
+) (store.ReadWriteOperator, staging.ResolvedScope, error)
 
-	// Gather each CONFIGURED service's staged changes from its OWN store. A
-	// service whose scope is not configured is skipped (it can hold no state).
+// gatherServices lists each CONFIGURED service's staged changes from its OWN
+// store, skipping any service whose scope is not configured (it can hold no
+// staged state). It returns the services that actually have staged changes,
+// their confirmation targets, and the total staged count. resolve is injected so
+// tests can drive skip-unconfigured and store-error propagation.
+func gatherServices(
+	ctx context.Context, cfg stgcli.GlobalConfig, resolve workingStoreResolver,
+) (svcs []ServiceApply, targets []string, totalStaged int, err error) {
 	for _, spec := range cfg.Services {
-		st, resolved, err := stgcli.WorkingStore(ctx, spec.ScopeResolver)
+		st, resolved, err := resolve(ctx, spec.ScopeResolver)
 		if errors.Is(err, staging.ErrServiceNotConfigured) {
 			continue
 		}
 
 		if err != nil {
-			return err
+			return nil, nil, 0, err
 		}
 
 		entries, err := st.ListEntries(ctx, spec.Service)
 		if err != nil {
-			return err
+			return nil, nil, 0, err
 		}
 
 		tags, err := st.ListTags(ctx, spec.Service)
 		if err != nil {
-			return err
+			return nil, nil, 0, err
 		}
 
 		svcEntries := entries[spec.Service]
@@ -141,7 +158,7 @@ func runAction(ctx context.Context, cmd *cli.Command, cfg stgcli.GlobalConfig) e
 
 		strategy, err := spec.Factory(ctx)
 		if err != nil {
-			return err
+			return nil, nil, 0, err
 		}
 
 		targets = append(targets, resolved.Target)
@@ -153,6 +170,21 @@ func runAction(ctx context.Context, cmd *cli.Command, cfg stgcli.GlobalConfig) e
 			Entries:     svcEntries,
 			Tags:        svcTags,
 		})
+	}
+
+	return svcs, targets, totalStaged, nil
+}
+
+func runAction(ctx context.Context, cmd *cli.Command, cfg stgcli.GlobalConfig) error {
+	resolve := func(
+		ctx context.Context, resolver staging.ScopeResolver,
+	) (store.ReadWriteOperator, staging.ResolvedScope, error) {
+		return stgcli.WorkingStore(ctx, resolver)
+	}
+
+	svcs, targets, totalStaged, err := gatherServices(ctx, cfg, resolve)
+	if err != nil {
+		return err
 	}
 
 	if totalStaged == 0 {
@@ -211,14 +243,19 @@ func (r *Runner) Run(ctx context.Context) error {
 
 		for _, svc := range r.Services {
 			if len(svc.Entries) > 0 {
-				checks = append(checks, serviceConflictCheck{entries: svc.Entries, strategy: svc.Strategy})
+				checks = append(checks, serviceConflictCheck{
+					serviceName: svc.Strategy.ServiceName(),
+					entries:     svc.Entries,
+					strategy:    svc.Strategy,
+				})
 			}
 		}
 
 		allConflicts := r.checkAllConflicts(ctx, checks)
 		if len(allConflicts) > 0 {
-			for _, key := range staging.SortedEntryKeys(allConflicts) {
-				output.Warning(r.Stderr, "conflict detected for %s: %s was modified after staging", key.Name, r.ProviderLabel)
+			for _, c := range allConflicts {
+				output.Warning(r.Stderr, "conflict detected for %s (%s): %s was modified after staging",
+					keyLabel(c.key), c.serviceName, r.ProviderLabel)
 			}
 
 			return fmt.Errorf("apply rejected: %d conflict(s) detected (use --ignore-conflicts to force)", len(allConflicts))
@@ -353,16 +390,28 @@ func formatTagApplySummary(tagEntry staging.TagEntry) string {
 	return " [" + strings.Join(parts, ", ") + "]"
 }
 
-// checkAllConflicts checks all services for conflicts and returns a combined map of conflicting keys.
-func (r *Runner) checkAllConflicts(ctx context.Context, checks []serviceConflictCheck) map[staging.EntryKey]struct{} {
-	allConflicts := make(map[staging.EntryKey]struct{})
+// checkAllConflicts checks all services for conflicts and returns them qualified
+// by service, in a stable (service order, then sorted key) order. Two services
+// with a conflict on the same (name, namespace) yield two distinct items.
+func (r *Runner) checkAllConflicts(ctx context.Context, checks []serviceConflictCheck) []conflictItem {
+	var all []conflictItem
 
 	for _, check := range checks {
 		conflicts := staging.CheckConflicts(ctx, check.strategy, check.entries)
-		for key := range conflicts {
-			allConflicts[key] = struct{}{}
+		for _, key := range staging.SortedEntryKeys(conflicts) {
+			all = append(all, conflictItem{serviceName: check.serviceName, key: key})
 		}
 	}
 
-	return allConflicts
+	return all
+}
+
+// keyLabel renders an entry key for display, appending the namespace when
+// present (empty is the null/default namespace, shown bare).
+func keyLabel(key staging.EntryKey) string {
+	if key.Namespace == "" {
+		return key.Name
+	}
+
+	return fmt.Sprintf("%s [%s]", key.Name, key.Namespace)
 }

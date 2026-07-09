@@ -102,35 +102,41 @@ EXAMPLES:
 	}
 }
 
-func runAction(ctx context.Context, cmd *cli.Command, cfg stgcli.GlobalConfig) error {
-	opts := Options{
-		ParseJSON: cmd.Bool("parse-json"),
-		NoPager:   cmd.Bool("no-pager"),
-	}
+// workingStoreResolver resolves a service's staging store and scope. It matches
+// stgcli.WorkingStore; tests substitute a fake to exercise skip-unconfigured and
+// store-error paths without touching disk.
+type workingStoreResolver func(
+	ctx context.Context, resolver staging.ScopeResolver,
+) (store.ReadWriteOperator, staging.ResolvedScope, error)
 
-	// Gather each CONFIGURED service's staged changes from its OWN store. A
-	// service whose scope is not configured is skipped (it can hold no state).
+// gatherServices lists each CONFIGURED service's staged changes from its OWN
+// store, skipping any service whose scope is not configured (it can hold no
+// staged state). It returns only services that actually have staged changes.
+// resolve is injected so tests can drive skip-unconfigured and store-error
+// propagation.
+func gatherServices(
+	ctx context.Context, cfg stgcli.GlobalConfig, resolve workingStoreResolver,
+) ([]ServiceStrategy, error) {
 	services := make([]ServiceStrategy, 0, len(cfg.Services))
-	anyChanges := false
 
 	for _, spec := range cfg.Services {
-		st, _, err := stgcli.WorkingStore(ctx, spec.ScopeResolver)
+		st, _, err := resolve(ctx, spec.ScopeResolver)
 		if errors.Is(err, staging.ErrServiceNotConfigured) {
 			continue
 		}
 
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		entries, err := st.ListEntries(ctx, spec.Service)
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		tags, err := st.ListTags(ctx, spec.Service)
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		svcEntries := entries[spec.Service]
@@ -140,11 +146,9 @@ func runAction(ctx context.Context, cmd *cli.Command, cfg stgcli.GlobalConfig) e
 			continue
 		}
 
-		anyChanges = true
-
 		strategy, err := spec.Factory(ctx)
 		if err != nil {
-			return fmt.Errorf("failed to initialize %s client: %w", spec.ParserFactory().ServiceName(), err)
+			return nil, fmt.Errorf("failed to initialize %s client: %w", spec.ParserFactory().ServiceName(), err)
 		}
 
 		services = append(services, ServiceStrategy{
@@ -157,7 +161,27 @@ func runAction(ctx context.Context, cmd *cli.Command, cfg stgcli.GlobalConfig) e
 		})
 	}
 
-	if !anyChanges {
+	return services, nil
+}
+
+func runAction(ctx context.Context, cmd *cli.Command, cfg stgcli.GlobalConfig) error {
+	opts := Options{
+		ParseJSON: cmd.Bool("parse-json"),
+		NoPager:   cmd.Bool("no-pager"),
+	}
+
+	resolve := func(
+		ctx context.Context, resolver staging.ScopeResolver,
+	) (store.ReadWriteOperator, staging.ResolvedScope, error) {
+		return stgcli.WorkingStore(ctx, resolver)
+	}
+
+	services, err := gatherServices(ctx, cfg, resolve)
+	if err != nil {
+		return err
+	}
+
+	if len(services) == 0 {
 		output.Warning(cmd.Root().ErrWriter, "nothing staged")
 
 		return nil
