@@ -4,7 +4,12 @@
 // and parsing concerns in the param CLI layer so the usecases carry no AWS type.
 package paramtype
 
-import "github.com/mpyw/suve/internal/domain"
+import (
+	"fmt"
+	"strings"
+
+	"github.com/mpyw/suve/internal/domain"
+)
 
 // SSM parameter type names as displayed by the CLI and accepted by --type.
 const (
@@ -38,8 +43,23 @@ func Display(t domain.ValueType) string {
 	}
 }
 
+// Validate rejects a non-empty --type value that is not one of Options(). The
+// empty string is allowed: it means the flag was not set, so the default
+// ("String") applies. Callers MUST validate before Parse, because Parse maps any
+// unknown value to plaintext — so a typo like "securestring" or "SecureSting"
+// would otherwise silently store a value the user meant to encrypt as plaintext.
+func Validate(s string) error {
+	switch s {
+	case "", String, SecureString, StringList:
+		return nil
+	default:
+		return fmt.Errorf("invalid --type %q: must be one of %s", s, strings.Join(Options(), ", "))
+	}
+}
+
 // Parse maps an SSM --type flag value to a domain.ValueType. Unknown values map
-// to domain.ValueTypePlaintext (matching the historical default of "String").
+// to domain.ValueTypePlaintext (matching the historical default of "String");
+// callers should Validate first to reject typos (see Validate).
 func Parse(s string) domain.ValueType {
 	switch s {
 	case SecureString:
