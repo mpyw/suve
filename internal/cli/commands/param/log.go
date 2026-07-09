@@ -230,7 +230,7 @@ number, modification date, and a preview of the value.
 Output is sorted with the most recent version first (use --reverse to flip).
 Value preview truncation depends on the mode:
   - Normal mode: Full value is shown (no truncation)
-  - Oneline mode: Truncated to fit terminal width (default 50 if width unavailable)
+  - Oneline mode: Truncated to roughly (terminal width - 30); about 20 chars when width is unavailable
 
 Use --max-value-length to override the automatic truncation.
 Use --patch to show the diff between consecutive versions (like git log -p).

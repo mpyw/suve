@@ -64,9 +64,10 @@ type DeleteOptionMarker struct{}
 func (DeleteOptionMarker) deleteOption() {}
 
 // ForceDelete requests immediate, unrecoverable deletion, skipping any recovery
-// window. It is provider-neutral because the concept is shared: AWS Secrets
-// Manager maps it to ForceDeleteWithoutRecovery, and Azure Key Vault soft-deletes
-// then purges. Providers without the concept ignore it.
+// window. Only AWS Secrets Manager honors it (mapped to
+// ForceDeleteWithoutRecovery). Azure Key Vault ignores it — its retention is a
+// vault-level property, not a per-delete option, so deletes stay soft (use
+// Restore to recover). Providers without the concept ignore it.
 type ForceDelete struct{ DeleteOptionMarker }
 
 // Reader provides read access to a provider's entries.

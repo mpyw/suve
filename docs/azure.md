@@ -17,7 +17,7 @@ Azure also supports the local **staging workflow** via `suve azure stage` (or th
 - `suve azure stage secret` — Key Vault secrets. Full workflow (`add`/`edit`/`delete`/`status`/`diff`/`apply`/`reset`/`tag`/`untag`/`stash`). Versions are immutable, so a staged `edit` applies as a new version.
 - `suve azure stage param` — App Configuration settings. Because App Configuration is **unversioned**, staging uses **last-write-wins** (no modified-after conflict check). Tags are writable via a GET-merge-PUT, so `tag`/`untag` are available. Workflow: `add`/`edit`/`delete`/`status`/`diff`/`apply`/`reset`/`tag`/`untag`/`stash`.
 
-Unlike `aws stage`, there is no cross-service `azure stage status`/`apply` aggregate — the two services have distinct staging scopes. See the [staging workflow](../README.md#staging-workflow) overview for the general flow.
+The two services keep distinct staging scopes, but provider-wide `azure stage status`/`diff`/`apply`/`reset` span both — each resolves its own scope and any service that is not configured (no `--store-name`/`--vault-name`) is skipped. See the [staging workflow](../README.md#staging-workflow) overview for the general flow.
 
 ## Authentication and Configuration
 
@@ -359,7 +359,20 @@ suve azure secret delete --yes my-secret --vault-name my-vault
 ```
 
 > [!NOTE]
-> When the vault has soft-delete enabled, the secret is recoverable within the vault's retention window via the Azure portal/CLI; otherwise deletion is permanent.
+> When the vault has soft-delete enabled, the secret is recoverable within the vault's retention window with `suve azure secret restore` (see below); otherwise deletion is permanent.
+
+---
+
+## suve azure secret restore
+
+Recover a soft-deleted Key Vault secret while it is still within the vault's soft-delete retention window (`RecoverDeletedSecret`), mirroring AWS Secrets Manager's `restore`.
+
+```ShellSession
+user@host:~$ suve azure secret restore my-secret --vault-name my-vault
+Restored secret my-secret
+```
+
+Deletes stay soft — suve does not expose force-delete/purge for Key Vault (retention is a vault-level property, not a per-delete option), so a recently deleted secret can always be restored until the retention window elapses.
 
 ---
 
@@ -428,7 +441,7 @@ suve azure secret untag my-api-key env team --vault-name my-vault
 Access to Azure App Configuration key-values.
 
 > [!IMPORTANT]
-> App Configuration is **UNVERSIONED**: each key (with the default label) holds a single current value with **no history**. Version specifiers (`#VERSION`, `~SHIFT`, `:LABEL`) are **rejected with a clear error**. Set the store with `--store-name` or `AZURE_APPCONFIG_NAME`.
+> App Configuration is **UNVERSIONED**: each key (with the default label) holds a single current value with **no history**. `#`, `~`, and `:` are valid key characters — the whole argument is the literal key name, not a version specifier — so nothing is rejected at parse time; only `log` reports that history is unsupported. Set the store with `--store-name` or `AZURE_APPCONFIG_NAME`.
 
 Because App Configuration has no versions, several commands behave differently from their AWS / Key Vault / Google Cloud counterparts:
 
@@ -453,7 +466,7 @@ suve azure param show [options] <key>
 
 | Argument | Description |
 |----------|-------------|
-| `key` | Setting key (no version specifier -- specifiers are rejected) |
+| `key` | Setting key (the literal key name; `#`/`~`/`:` are valid key characters, not version specifiers) |
 
 **Options:**
 
@@ -478,7 +491,7 @@ suve azure param show --output=json my-key --store-name my-store
 ```
 
 > [!NOTE]
-> Version specifiers (`#VERSION`, `~SHIFT`, `:LABEL`) are rejected with a clear error because App Configuration is unversioned.
+> `#`, `~`, and `:` are valid key characters — the whole argument is the literal key name, not a version specifier — because App Configuration is unversioned.
 
 ---
 
@@ -512,7 +525,7 @@ suve azure param diff [options] <key1> [key2]
 ```
 
 > [!NOTE]
-> App Configuration is unversioned, so `diff` compares **two distinct keys** rather than two versions of one key. Version specifiers (`#VERSION`, `~SHIFT`, `:LABEL`) are rejected with a clear error.
+> App Configuration is unversioned, so `diff` compares **two distinct keys** rather than two versions of one key. `#`/`~`/`:` in a key are literal characters, not version specifiers.
 
 **Arguments:**
 

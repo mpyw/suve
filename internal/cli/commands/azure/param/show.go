@@ -108,8 +108,8 @@ func ShowCommand() *cli.Command {
 		ArgsUsage: argsUsageKey,
 		Description: `Display an App Configuration setting's value along with its metadata.
 
-App Configuration is UNVERSIONED: version specifiers (#VERSION, ~SHIFT, :LABEL)
-are rejected with a clear error.
+App Configuration is UNVERSIONED: #, ~, and : are valid key characters (the
+whole argument is the literal key name, not a version specifier).
 
 Use --raw to output only the value without metadata (for piping/scripting).
 Use --output=json for structured JSON output (cannot be used with --raw).

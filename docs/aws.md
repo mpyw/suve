@@ -1461,7 +1461,7 @@ Created secret my-api-key (version: abc12345-1234-1234-1234-123456789012)
 With JSON value and description:
 
 ```ShellSession
-user@host:~$ suve aws secret create -d "Production database credentials" my-database-credentials '{"username":"admin","password":"secret"}'
+user@host:~$ suve aws secret create --description "Production database credentials" my-database-credentials '{"username":"admin","password":"secret"}'
 Created secret my-database-credentials (version: def67890-1234-1234-1234-123456789012)
 ```
 
@@ -1541,7 +1541,7 @@ suve aws secret delete [options] <name>
 | Option | Alias | Default | Description |
 |--------|-------|---------|-------------|
 | `--force` | - | `false` | Delete immediately without recovery window |
-| `--recovery-window` | - | `30` | Days before permanent deletion (7-30). Ignored if `--force` is set. |
+| `--recovery-window` | - | `30` | Days before permanent deletion (7-30). Cannot be combined with `--force`. |
 | `--yes` | - | `false` | Skip confirmation prompt |
 
 **Examples:**
@@ -2128,4 +2128,4 @@ suve aws stage secret untag my-secret deprecated old-tag
 
 ## Staging (`suve aws stage`)
 
-Staging (`stage add`/`edit`/`delete`/`status`/`diff`/`apply`/`reset`/`stash`) is currently AWS-only. See [Staging State Transitions](staging-state-transitions.md) for the underlying state model; the per-command staging docs live in the README staging section. Full multi-provider staging support is tracked in [#247](https://github.com/mpyw/suve/issues/247).
+Staging (`stage add`/`edit`/`delete`/`status`/`diff`/`apply`/`reset`/`stash`) is available on AWS, Google Cloud, and Azure — each provider keys its on-disk staging state by its own scope. See [Staging State Transitions](staging-state-transitions.md) for the underlying state model; the per-command staging docs live in the README staging section.

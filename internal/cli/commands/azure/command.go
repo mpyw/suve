@@ -34,9 +34,9 @@ Azure splits the two services:
   - "suve azure secret" targets Key Vault (opaque-id-versioned, no labels).
   - "suve azure param"   targets App Configuration (UNVERSIONED).
 
-App Configuration has no version history: version specifiers (#VERSION, ~SHIFT,
-:LABEL) are rejected with a clear error, and "log" reports that history is
-unsupported.
+App Configuration has no version history: #, ~, and : are valid key characters
+(the whole argument is the literal key name, not a version specifier), and "log"
+reports that history is unsupported.
 
 Authentication uses the DefaultAzureCredential chain (environment, managed
 identity, Azure CLI via 'az login', ...). The target resource is addressed by

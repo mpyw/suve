@@ -88,7 +88,7 @@ If only one version/spec is specified, compares against the latest version.
 
 VERSION SPECIFIERS:
   #VERSION  Specific version by integer number
-  ~SHIFT    N enabled versions ago; ~ alone means ~1
+  ~SHIFT    N versions ago (any state); ~ alone means ~1
 
 EXAMPLES:
   suve gcloud secret diff my-secret~                   Compare previous with latest

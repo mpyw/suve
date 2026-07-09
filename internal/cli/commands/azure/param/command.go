@@ -1,10 +1,11 @@
 // Package param provides CLI commands for Azure App Configuration, exposed as
 // the "suve azure param <op>" command group.
 //
-// Azure App Configuration is UNVERSIONED — the abstraction's acid test. Version
-// specifiers (#VERSION, ~SHIFT, :LABEL) are rejected at parse time with a clear
-// error, and "log" reports that version history is unsupported instead of
-// crashing. The group otherwise reuses the generic command scaffolding (show,
+// Azure App Configuration is UNVERSIONED — the abstraction's acid test. #, ~,
+// and : are valid key characters (the whole argument is the literal key name,
+// not a version specifier), so nothing is rejected at parse time; "log" reports
+// that version history is unsupported instead of crashing. The group otherwise
+// reuses the generic command scaffolding (show,
 // list, diff, create, update, delete, tag, untag) via App Configuration
 // presenters and the shared internal/usecase/azure use cases.
 package param
@@ -29,9 +30,9 @@ func Command() *cli.Command {
 		Description: `Interact with Azure App Configuration key-values.
 
 App Configuration is UNVERSIONED: each key (with the default label) holds a
-single current value with no history. Version specifiers (#VERSION, ~SHIFT,
-:LABEL) are rejected with a clear error, and "log" reports that history is
-unsupported.
+single current value with no history. #, ~, and : are valid key characters (the
+whole argument is the literal key name, not a version specifier), and "log"
+reports that history is unsupported.
 
 Set the store with --store-name or the AZURE_APPCONFIG_NAME environment
 variable.`,

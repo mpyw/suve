@@ -247,7 +247,7 @@ This command loads the staging state from the stash file
 (~/.suve/staging/aws/{accountID}/{region}/{param,secret}.json).
 
 By default, the stash file is deleted after restoring.
-Use --keep to retain the stash file after popping (same as 'stash apply').
+Use --keep to retain the stash file after popping (like 'git stash apply').
 
 EXAMPLES:
    suve stage stash pop                            Restore from stash and delete the stash file
