@@ -153,6 +153,11 @@ func TestAzureKeyVault_FullWorkflow(t *testing.T) {
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "env")
 		assert.Contains(t, stdout, "prod")
+
+		// log shows the tag on the (current) version — tags are per version.
+		logOut, err := runAzureSecret(t, "log", name)
+		require.NoError(t, err)
+		assert.Contains(t, logOut, "env=prod")
 	})
 
 	t.Run("untag", func(t *testing.T) {

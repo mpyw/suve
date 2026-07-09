@@ -6,6 +6,7 @@ import (
 	"slices"
 	"time"
 
+	"github.com/mpyw/suve/internal/domain"
 	"github.com/mpyw/suve/internal/provider"
 )
 
@@ -24,7 +25,10 @@ type LogEntry struct {
 	State       string // enabled/disabled, may be ""
 	Value       string
 	CreatedDate *time.Time
-	Error       error // Error from fetching value, if any (e.g. disabled versions)
+	// Tags attached to THIS version. Key Vault scopes tags per version, so each
+	// version carries its own set.
+	Tags  []domain.Tag
+	Error error // Error from fetching value, if any (e.g. disabled versions)
 }
 
 // LogOutput holds the result of the log use case.
@@ -106,6 +110,7 @@ func (u *LogUseCase) Execute(ctx context.Context, input LogInput) (*LogOutput, e
 			State:       v.State,
 			Value:       value,
 			CreatedDate: v.Created,
+			Tags:        v.Tags,
 			Error:       fetchErr,
 		})
 	}
