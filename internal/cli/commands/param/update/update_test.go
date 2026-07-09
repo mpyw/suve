@@ -56,6 +56,16 @@ func TestCommand_Validation(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid --tier")
 	})
+
+	// A typo/wrong-case --type must be rejected, not silently stored as plaintext.
+	t.Run("invalid type value", func(t *testing.T) {
+		t.Parallel()
+
+		app := apptest.AWSApp()
+		err := app.Run(t.Context(), []string{"suve", "param", "update", "--yes", "--type", "securestring", "/app/param", "value"})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid --type")
+	})
 }
 
 func TestRun_WriteOptions(t *testing.T) {
